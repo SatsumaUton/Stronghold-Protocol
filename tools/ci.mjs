@@ -19,6 +19,7 @@
 //
 // Not mirrored: actions/checkout and actions/setup-node (GitHub runner setup) and `npm ci` (the install — run it
 // yourself; replacing node_modules is not a check). The OS × Node matrix is whatever this machine has.
+// The independent `golden` job is run locally with `npm run golden`, separately from these six steps.
 // Every child is `process.execPath` with a script path (eslint and tsc from node_modules/<pkg>/package.json `bin`),
 // never npm or a shell, so the run does not depend on PATH or on the shell npm uses for scripts.
 // test/ci.test.js keeps this list and ci.yml in step: a ci.yml step this file does not know fails it.
@@ -37,11 +38,12 @@ export const CI_TEST_ENV = { SP_E2E: '0', SP_REAL_E2E: '0', RENDER_E2E: '0', NO_
 /** The paths the smoke step requests (the curl URLs of ci.yml's smoke step; test/ci.test.js compares them). */
 export const SMOKE_PATHS = ['/healthz', '/', '/vendor/pixi.min.js'];
 
-/** ci.yml steps that only make sense on a GitHub runner, by `uses:` action or by step name. */
+/** Runner setup / install steps, and the full Golden check run separately (scoped to its job and command). */
 export const SKIPPED_CI_STEPS = [
   { uses: 'actions/checkout', why: 'GitHub runner: the checkout is this folder' },
   { uses: 'actions/setup-node', why: 'GitHub runner: the Node.js of this machine is used' },
   { name: 'Install (npm ci → postinstall copies public/vendor)', why: 'run `npm ci` yourself; it is not a check' },
+  { job: 'golden', name: 'Full Golden regression check', run: 'npm run golden', why: 'run `npm run golden` separately for the full corpus' },
 ];
 
 /**
@@ -151,9 +153,10 @@ export function parseWorkflow(text) {
   return { jobs };
 }
 
-/** Is a ci.yml step one of SKIPPED_CI_STEPS? @param {{ name?: string, uses?: string }} s */
+/** Is a ci.yml step one of SKIPPED_CI_STEPS? @param {{ job?: string, name?: string, uses?: string, run?: string }} s */
 export function isSkippedCiStep(s) {
-  return SKIPPED_CI_STEPS.some((k) => (k.uses ? (s.uses || '').split('@')[0] === k.uses : s.name === k.name));
+  return SKIPPED_CI_STEPS.some((k) => (!k.job || s.job === k.job) && (!k.run || s.run === k.run)
+    && (k.uses ? (s.uses || '').split('@')[0] === k.uses : s.name === k.name));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
