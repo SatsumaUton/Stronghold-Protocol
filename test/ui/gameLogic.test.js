@@ -722,7 +722,7 @@ describe('keyboard & settings', () => {
   test('sanitizeSettings', () => {
     assert.deepEqual(sanitizeSettings(null), { ...DEFAULT_SETTINGS });
     assert.deepEqual(sanitizeSettings({ bgm: 3, sfx: -1, voice: 2, muted: 'yes', damageNumbers: false, quality: 'ultra' }),
-      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, bondTimers: false, combatMetrics: false, prepDeployFold: true, quality: 'high', officialFx: 'auto', otherSkins: true, textSize: 'sm', keys: { ...DEFAULT_SETTINGS.keys } },
+      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, screenWakeLock: false, bondTimers: false, combatMetrics: false, prepDeployFold: true, quality: 'high', officialFx: 'auto', otherSkins: true, textSize: 'sm', keys: { ...DEFAULT_SETTINGS.keys } },
       'a saved profile without `keys` (before 0.2.0) gets the default key map (test/ui/feedback5-hotkeys.test.js)');
     // 显示其他玩家的皮肤 (docs/SKINS.md): on by default, and off only when the profile says so
     assert.equal(DEFAULT_SETTINGS.otherSkins, true);
@@ -751,6 +751,13 @@ describe('keyboard & settings', () => {
     for (const bad of ['native', 'JP', 'ja', 1, null]) assert.equal(sanitizeSettings({ voiceLang: bad }).voiceLang, 'cn', String(bad));
     assert.equal(sanitizeSettings({ bgm: 0.333 }).bgm, 0.33);
     assert.equal(sanitizeSettings({ quality: 'low' }).quality, 'low');
+  });
+  test('screen wake lock is opt-in, including old and invalid saved profiles', () => {
+    assert.equal(DEFAULT_SETTINGS.screenWakeLock, false);
+    assert.equal(sanitizeSettings(null).screenWakeLock, false);
+    assert.equal(sanitizeSettings({ bgm: 0.5 }).screenWakeLock, false);
+    for (const value of [true, false]) assert.equal(sanitizeSettings({ screenWakeLock: value }).screenWakeLock, value);
+    for (const value of ['true', 1, null, {}, []]) assert.equal(sanitizeSettings({ screenWakeLock: value }).screenWakeLock, false);
   });
 });
 
