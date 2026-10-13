@@ -282,6 +282,72 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
     assert.deepEqual(p.problems, []);
   });
 
+  test('1000–1280px windows: match information fits and scrolls; closing restores strategy selection', { timeout: 180000 }, async () => {
+    const p = await player('窗口测试');
+    const { page } = p;
+    await page.evaluate(() => globalThis.__SP__.net.request('room.create', { mode: 'solo', difficulty: 'HARD' }));
+    await waitSt(page, s => !!s.room, 'solo room');
+    await page.evaluate(() => globalThis.__SP__.net.request('room.start', {}));
+    await waitSt(page, s => s.phase === 'INFO_CHECK', 'briefing');
+    await page.waitForSelector('.brief__right .brief-banned', { visible: true, timeout: 15000 });
+    await sleep(500);
+    const brief = await readInfo(page, '.brief');
+    assert.equal(brief.factions.length, 3, 'dire announces three special enemy types');
+    await press(p, '.brief__foot .btn--primary', '准备就绪');
+    await waitSt(page, s => s.phase === 'BAND_DRAFT', 'band draft');
+    const selected = await selBand(page);
+    const requests = (await intents(page)).length;
+
+    for (const [width, height] of [[1000, 600], [1001, 600], [1024, 768], [1120, 630], [1280, 720]]) {
+      await page.setViewport({ width, height, deviceScaleFactor: 1 });
+      await sleep(250);
+      await openDialog(p);
+      assert.deepEqual(await readInfo(page, '.minfo-dlg'), brief, width + 'px: all briefing information is retained');
+      await shot(page, 'window-' + width + '-dialog');
+      const layout = await page.$eval('.minfo-dlg', el => {
+        const r = el.getBoundingClientRect();
+        return { box: [r.left, r.top, r.right, r.bottom], fits: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight };
+      });
+      assert.ok(layout.fits, width + 'px: dialog stays inside the window ' + JSON.stringify(layout.box));
+
+      const clipped = await page.evaluate(() => {
+        const box = document.querySelector('.minfo-dlg');
+        const body = box.querySelector('.modal__body');
+        const failures = [];
+        if (body.scrollWidth > body.clientWidth + 1) failures.push('horizontal overflow');
+        const selectors = '.brief-boss__name, .brief-boss__when, .brief-boss__abil li, .brief-stage__name, .brief-faction__text b, .brief-faction__text span, .brief-bonds .brief-h, .brief-bond .bond__name, .brief-banned .brief-h, .brief-banned__grid .uthumb';
+        for (const el of box.querySelectorAll(selectors)) {
+          el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          const r = el.getBoundingClientRect(), b = body.getBoundingClientRect();
+          if (r.left < b.left - 1 || r.right > b.right + 1 || r.top < b.top - 1 || r.bottom > b.bottom + 1) failures.push(el.textContent.trim() || el.getAttribute('title'));
+        }
+        for (const sel of ['[data-testid="match-info-close"]', '[data-testid="match-info-status"]']) {
+          const r = box.querySelector(sel).getBoundingClientRect();
+          if (r.left < 0 || r.right > innerWidth || r.top < 0 || r.bottom > innerHeight) failures.push(sel);
+        }
+        return failures;
+      });
+      assert.deepEqual(clipped, [], width + 'px: scrolling reveals every name, description, ability and banned operator');
+      await shot(page, 'window-' + width + '-scrolled');
+      await press(p, '[data-testid="match-info-close"]', '关闭');
+      await page.waitForFunction(() => !document.querySelector('.minfo-dlg'), { timeout: 3000 });
+      assert.equal(await selBand(page), selected, width + 'px: closing preserves the selected strategy');
+      const interactive = await page.evaluate(() => {
+        const reachable = sel => {
+          const el = document.querySelector(sel), r = el.getBoundingClientRect();
+          return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight
+            && el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+        };
+        return { strategy: reachable('.dband.is-sel'), confirm: reachable('.draft-detail__btns .btn--primary') };
+      });
+      assert.deepEqual(interactive, { strategy: true, confirm: true }, width + 'px: strategy and confirmation controls are reachable after closing');
+    }
+    assert.deepEqual((await intents(page)).slice(requests), [], 'reading match information sends no game intent');
+    await press(p, '.draft-detail__btns .btn--primary', '确认选择');
+    await waitSt(page, s => s.phase !== 'BAND_DRAFT', 'confirmation ends the draft');
+    assert.deepEqual(p.problems, []);
+  });
+
   test('co-op 绝境, desktop + phone: live countdown in the dialog, a turn change closes it, phones fit and scroll, the draft completes', { timeout: 300000 }, async (t) => {
     const a = await player('桌面博士');
     const b = await player('手机博士', { phone: PHONE(844, 390) });
