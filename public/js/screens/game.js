@@ -135,7 +135,7 @@ import { isClientCombat, observeTarget, teammateProgress, cameraLayers, layerCam
 import { screenStrip, playerBonds, playerLayer, detailBondOwner, toggleBond, popupView } from '../ui/watchBonds.js';
 import { data, getMode } from '../data.js';
 import { audio, resultSpeaker, resultVoiceSlot } from '../audio.js';
-import { useDocClass, FullscreenButton, reducedMotion } from '../ui/device.js';
+import { useDocClass, useScreenWakeLock, FullscreenButton, reducedMotion } from '../ui/device.js';
 import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady } from '../ui/turnPopup.js';
 // MatchEnded, PausedOverlay, the highlight styles and keepEarly live in ./game/*.js.
 import { HUD_HZ_MS, MERGE_HL, SEL_RANGE, cx } from './game/marks.js';
@@ -266,6 +266,7 @@ function MatchScreen() {
   const phase = pub?.phase;
   const mode = phaseMode(phase);
   const combat = isCombatPhase(phase);
+  useScreenWakeLock(combat);
   const solo = roomSolo || String(pub?.modeId || '').includes('single');
   const players = sortedPlayers(pub);
   const meP = players.find((p) => p.playerId === myId) || null;
