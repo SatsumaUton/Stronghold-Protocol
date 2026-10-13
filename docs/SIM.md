@@ -1477,9 +1477,11 @@ Unknown subprofessions fall back to the profession default (test `professions.te
   `DOWN_STATE`: 0 counting, 1 timer done / DP short, 2 timer done / its tile taken — a safeguard: no ally deploys on a
   knocked-out operator's tile, §1; `row, col` = the tile it lies on and comes back on, `unit.body`); `elem: [[id, element, fill,
   cooldownEnd, cooldown]]` (only when non-empty) = `elementView` of every unit with a gauge or a running 爆发冷却 (§3);
-  `ammo: [[id, left, magazine]]`, `wolves: [[id, left, max]]` and `neg: [[id, fill]]` (each only when non-empty; display only) = the HP-bar
-  readouts of `snapshot.js` `ammoView` (an ally's running ammo skill: whole rounds, the magazine = `ammoMax`), `wolfView` (伺夜's 狼群:
-  `mem.shadows` of `mem.wolfCapacity`) and `negView` (`unit.negFill()`, set by 斩业星熊's T1 业火: the 我执 pool as a share of its cap);
+  `ammo: [[id, left, magazine]]`, `wolves: [[id, left, max]]`, `neg: [[id, fill]]` and `motes: [[id, count, wide]]` (each only when
+  non-empty; display only) = the readouts of `snapshot.js` `ammoView` (an ally's running ammo skill: whole rounds, the magazine = `ammoMax`),
+  `wolfView` (伺夜's 狼群: `mem.shadows` of `mem.wolfCapacity`), `negView` (`unit.negFill()`, set by 斩业星熊's T1 业火: the 我执 pool as a
+  share of its cap) and `moteView` (`unit.moteRing()`, set by 魔王's T1 过往尘埃: the 「微尘」 still circling her and whether S2's
+  旋转半径扩大 is up — `render/motes.js` draws that many sprites of her model's own `C_Eff_Moire_B` region, §client);
   UnitInfo `ammoSkill` marks an ally whose skill is an ammo magazine (DESIGN §8.2).
   `layers: [[id, n]]` and `charges: [[id, stored, max]]` (each only when non-empty; display only, 0.3.0 round 46) =
   `snapshot.js` `layerView` (the sum of a unit's buffs' `shieldHits`: 泥岩's 护盾 layers) and `chargeView` (an ally skill
