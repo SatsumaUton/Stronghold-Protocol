@@ -10,7 +10,7 @@
 // Steps, in the order of ci.yml (job `test`, then job `tooling`):
 //   setup      node tools/setup.mjs --check --no-local
 //   test       npm test: node --test over TEST_FILES (package.json "test")
-//   smoke     the server on a free port on 127.0.0.1: GET /healthz, / (must contain <html) and /vendor/pixi.min.js,
+//   smoke      the server on a free port on 127.0.0.1: GET /healthz, / (must contain <html) and /vendor/pixi.min.js,
 //              then node tools/doctor.mjs (its exit code is ignored, like `|| true` in ci.yml), then the server stops
 //   lint       eslint .                                   (npm run lint; warnings do not fail it)
 //   imports    node tools/check-imports.mjs               (npm run check:imports)
