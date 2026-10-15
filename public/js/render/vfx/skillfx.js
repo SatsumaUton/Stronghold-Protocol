@@ -366,7 +366,10 @@ export class SkillFx {
       // a passive: its loops follow the deployment (the sim's 1 / 0 frame its 0.5 s clip) — unless the kit runs it as a
       // timed skill (UF.SKILL seen: `timed`), whose 0 ends it
       U.on = !!on;
-      if (on) { U.passiveDone = false; return live ? this._passive(U, v, true) : false; }
+      // a passive with nothing official to draw at that 1 (普罗旺斯 S1, 琳琅诗怀雅 S1: no cast rows) shows no procedural
+      // burst either, as an active skill's cast does (R10, _noBurst) — the sim's 0.5 s window of a passive without a
+      // duration is no cast in the client
+      if (on) { U.passiveDone = false; return live ? (this._passive(U, v, true) || this._noBurst(U)) : false; }
       if (U.timed) {
         U.passiveDone = true;
         U.passiveOn = false;

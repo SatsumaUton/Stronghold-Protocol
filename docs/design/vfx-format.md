@@ -1347,7 +1347,9 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   - A skill whose official plan has no cast rows (no start, loop or range row, no attack cast / range row: 赫默 S2,
     巫恋 S2, 古米 S1, 银灰 S1, 塞雷娅 S1, 瑰盐 S1, 流星 S1 / S2, 华法琳 S2, 塑心 S3, 魔王 S2) shows no procedural
     activation burst or aura (`SkillFx.skill` → true): the client shows nothing at that cast. "Installed" is any
-    prefab of the unit's plan, its skill's `effects`, its modes' rows, its `refs` or its `startEffect`.
+    prefab of the unit's plan, its skill's `effects`, its modes' rows, its `refs` or its `startEffect`. Since 0.3.1
+    (history §34.1.6) the same holds for a passive skill's 0.5 s window at deploy (普罗旺斯 S1, 琳琅诗怀雅 S1):
+    `SkillFx.skill`'s passive branch asks `_noBurst` too.
   - A kit fx that stands for an official effect the client plays there is bound to it (`FX_BINDINGS`, now with `keys`
     — prefabs no projectile record lists as reached —, `hold: 'fx'` — the fx's own `duration` / `dur` / `hold` —,
     `during` — only while the skill lasts — and owner `'skill'` for an fx that names no owner): the areas 锡人 S1 / S2,
