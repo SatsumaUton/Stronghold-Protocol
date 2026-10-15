@@ -442,7 +442,7 @@ never reads it. A standalone replay does not restore those cosmetic files automa
 **Limits** [ASSUMED]: 300 MB of art per set, 20 000 writes per plugin, 16 files per voice slot, 32 override warnings per
 set, 2 MB copied by references per plugin and 4 MB per set, the lock's limits above; the plugin limits of §5 apply too.
 
-**Start from** `plugins/_template/cosmetic/` — references to the installation's own art only, no file. Never put files
+**Start from** `plugins/_template/cosmetic/` — two original CC0 files (a checkerboard PNG and a short synthesized OGG) plus installed-art references. Never put files
 of the official game in a plugin.
 
 ## 10. Data plugins (P1b)
@@ -790,6 +790,8 @@ empty. Only plugin `char_x_…` ids add a shop charId lookup; official dispatch 
 | `sp.kit` / imported `kit` | `num`, `talentBb`, `talentGrid`, `moduleBb`, `traitBb`, `moduleOn`, `up`, `cheb`, `isMainHit`, `byEnemyAttack`, `skillBusy`, `giveSp`, `onHitBy`, `onHitOn`, `onDamagedOn`, `enemiesInGrid`, `alliesInGridOf`, `enemyInRange`, `statBuff`, `toggleBuff`, `instantKind`, `skillRec`, `skillBbOf`, `batMod` — tier1 signatures |
 | `sp.math` / imported `math` | The exports of `server/sim/detmath.js` |
 | `sp.constants` / imported `constants` | Frozen simulation constants |
+| `sp.dir` / imported `dir` | Frozen `dirVec(direction)`, `offsetTile(row, col, dr, dc, direction)`; frozen returned arrays |
+| `sp.targeting` / imported `targeting` | Frozen `absoluteRangeKeys(grid, row, col, direction, extend = 0)`; frozen tile keys; at most 1024 input cells [ASSUMED] |
 | `sp.settings` | A frozen copy of the manifest's normalized settings, included in cs |
 | `sp.log(...values)` | At most 20 lines per setup, each value truncated to 500 characters [ASSUMED] |
 
@@ -800,6 +802,9 @@ process/globalThis, fetch/XHR/WebSocket, Date, Math.random or localeCompare; com
 implementation-approximated Math functions are also refused. This is deliberately not a complete parser or a sandbox;
 obfuscation can evade it, and conservative scans can refuse inert template/regex text. `trusted` page/server entries
 are unrestricted and never labelled sandboxable; their sim/meta entries still use the SDK checks.
+
+Geometry helpers read no battle state and incur no engine-action charge; their caller still uses the callback budget.
+`sortEnemyTargets` remains unavailable: it mutates its candidate array, uses live Unit references and calls Battle.remainingDistance.
 
 **Budget.** Script callbacks and engine actions use the same per-battle/per-plugin counter as DSL (default 8000).
 Setup installs, hooks, timer callbacks and skill callbacks count. Engine actions (damage, buffs, spawning, DP, etc.)
@@ -1001,8 +1006,7 @@ schema, findings in plain words and hot reload. The design is DESIGN §32.9; the
   Japanese dub), 换音乐 / 音效 (`audio`: a music track with its intro, a leader's music, an interface or battle sound, a
   unit's own sounds) —, what it changes found by its **official name** (`server/studio/targets.js`: operators, summons,
   enemies, items, bonds, strategies, interface pictures, music, sounds, each with its picture), a name; the id is made
-  from it (a legal one nobody has, editable). The folder gets `plugin.json` and a README — no file of the game, no
-  picture: an empty entry is a valid plugin that changes nothing yet. More templates and targets join a plugin with
+  from it (a legal one nobody has, editable). The folder gets `plugin.json` and a README. Art/audio targets start with an original CC0 sample in the first slot; other cosmetic templates remain empty until filled. No game file is copied. More templates and targets join a plugin with
   「添加替换内容」 (an operator's avatar, model and voice in one plugin); the page keeps what it shows in the dot file
   `.studio.json` of the folder (never listed, served, checked or packed; a plugin made by hand gets its sections read
   off its overlay).
@@ -1285,6 +1289,10 @@ lacks). The table below is generated from it (`node tools/plugin.mjs errors --wr
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_RECORD_EXISTS` | The record to add exists already ({where}) | Change an existing record with a patch (set / merge); a new record needs a new id. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_RECORD_DELETE` | A plugin cannot delete a record ({where}) | To keep an operator or an enemy out, change the pools, stages or waves that use it — never remove the record. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_RECORD_ID` | A new record's id is outside this plugin's namespace ({where}): {detail} | A new record's id carries the plugin id: plugin my-mod's new operator is char_x_my_mod_<name> (its - becomes _), a skill skx_my_mod_…; with kitRef the official skill ids may stay. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_RECORD_HIDDEN` | Hidden must be a boolean ({where}) | Set chess.hidden to true or false. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_RECORD_PAIR` | Normal and elite ids are invalid ({where}) | Use distinct namespaced chess.ids.normal and elite; omit chess.id. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_RECORD_ART` | Art references are invalid ({where}) | Use asset ids in art.ref or art.assets, never paths or URLs. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_RECORD_ORIGIN` | Source records are missing or inconsistent ({where}) | Use installed official charId or chessId in origin; both must agree. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_RECORD_TYPE` | A compact record is not written the right way ({where}): {detail} | An operator has a charId, a name, a profession, a position and a rarity (1–6); its kit has exactly one source: generic, ref (an official kit), dsl or a JSON SkillSpec. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_RECORD_SKILLS` | An operator's skills are not right ({where}): {detail} | The skills list has exactly one default (default: true), the same as "skill"; when a description's count changes, change both. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_KIT_REF` | The official kit that "kitRef" names does not exist ({where}) | kitRef names an official operator (char_102_texas for example), whose skill logic is reused; spell it as the game does. |
@@ -1335,7 +1343,9 @@ lacks). The table below is generated from it (`node tools/plugin.mjs errors --wr
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_FORGE_JSON` | JSON in the pack cannot be read: {detail} | JSON must parse, stay within 8 MB and 64 levels of nesting, and keep numbers within ±1e9. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_FORGE_ID` | This pack's id cannot become a plugin id: {detail} | Pass --id with a plugin id: 2–32 lower-case letters, digits and -, for example rose-skin. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_FORGE_EXISTS` | The destination folder already exists, so nothing was written: {detail} | Choose another --out or --id, or move the existing plugin folder aside and import again. |
-| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_FORGE_SCRIPT` | A script in the pack was not imported and was not run: {detail} | A kits/<id>.js becomes the sandboxed script plugin when its id is an imported record (or an official id declared in overrides) and its imports map to sp:sdk@1 (@kit/tier1.js, @sim/constants.js, @sim/detmath.js, the pack's ./ files); otherwise rewrite the logic as a JSON SkillSpec, DSL or a script plugin. The importer never runs a .js from the pack. |
+| The plugin works, with a note in the check | `PLUGIN_FORGE_MOUNT` | Panel mount needs manual adaptation: {detail} | Rewrite for the suggested slot; it is not the original mount position. |
+| The plugin works, with a note in the check | `PLUGIN_FORGE_PANEL_SCRIPT` | Panel script was not copied: {detail} | Rewrite the panel script with postMessage API v1; import never executed it. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_FORGE_SCRIPT` | A script in the pack was not imported and was not run: {detail} | A kits/<id>.js becomes the sandboxed script plugin when its id is an imported record (or an official id declared in overrides) and its imports map to sp:sdk@1 (@kit/tier1.js, @sim/constants.js, @sim/detmath.js, the safe subsets of @sim/dir.js and @sim/targeting.js, the pack's ./ files); otherwise rewrite the logic as a JSON SkillSpec, DSL or a script plugin. The importer never runs a .js from the pack. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_INVALID` | The plugin has a problem: {detail} | Read the original line; if it is unclear, ask on GitHub with it. |
 <!-- plugin-errors:end -->
 
@@ -1418,6 +1428,28 @@ not copied [ASSUMED]. A failed commit removes only the destinations that attempt
 content set see plugins already installed, through a temporary symlink view. The source pack is not part of that
 view. Two i18n entries that canonicalise to the same language are `PLUGIN_FORGE_INPUT` and write nothing.
 
+### Compact metadata (0.3.1)
+
+Optional operator fields preserve old plugins unchanged:
+
+- `chess.hidden: true`: retain both records for grants; exclude shop/shared pools, handbook/loadout lists,
+  bond visible members and DIY owned selection. [ASSUMED] For `as: "both"`, hiding also excludes the DIY pick.
+- `chess.ids: { normal, elite }`: distinct `chess_x_<plugin_namespace>_…` IDs; do not also set legacy `chess.id`.
+  Pair references and `upgradeChessId` use these IDs directly; suffixes are not required.
+- `art.ref`: default installed character art and voice bank. `art.assets` overrides exact manifest IDs:
+  `avatar`, `portrait`, `spine`, `voice`, `skillIcon`, `subProfIcon`, each optionally suffixed `Golden`.
+  These are IDs, never file paths or URLs. Golden model/voice/icon defaults to the normal value;
+  avatar/portrait retain the existing `art.ref` default unless their Golden value is supplied.
+  [ASSUMED] A borrowed voice bank shares that bank's browser voice preference.
+- `origin: { charId?, chessId? }`: installed official provenance; at least one is required, both must agree.
+  [ASSUMED] This is metadata only: it never inherits stats, art or a kit. Art and kit selection are explicit.
+
+Strict checks use `PLUGIN_RECORD_HIDDEN`, `PLUGIN_RECORD_PAIR`, `PLUGIN_RECORD_ART`, `PLUGIN_RECORD_ORIGIN`.
+Forge `isHidden` / non-DIY `visible: false` maps to `chess.hidden` [ASSUMED: either hides both forms]; `baseId` is the
+pair's normal ID, while an explicit official `base` or official `charId` supplies provenance. A matched skill kit
+never supplies provenance. `assets` preserves each form's IDs; pack asset keys are rewritten with their records.
+Modules (`statsBase`, `traitBase`, `talentsBase`), new garrisons and bonds remain outside this mapping.
+
 ### Mapping
 
 | Forge piece | Becomes | When it does not |
@@ -1435,7 +1467,7 @@ view. Two i18n entries that canonicalise to the same language are `PLUGIN_FORGE_
 | `art.audio.sfx.units` | attack, hit, skill, die, born, and skills / attacks / hits by an index 0–99 | any other field or bucket (`ui`, `battle`, `units` only) |
 | `overrides` of `"file:id"` plus a partial of an existing record | a content `data` patch. An array whose type already matches is one `set` of the whole array. `talents` and `talentsBase` are not replaced: Forge merges those by index, and this version says so | not listed in `overrides` (a silent replace is refused); a field whose type or path does not match |
 | `units.json`, a new operator | a compact record `char_x_<namespace>_…`, namespace taken from the content plugin id (`--out`'s basename when that product is primary). Skills come from the selected form when that form has a list, otherwise from the record. One default skill (`default` or `isDefault`). Each form's named talents and trait are copied (text, numbers, range) | no name, profession, branch, forms or skill; rarity outside 1–6; no bond that exists here. A 6★ declared in `operators` is `as: "diy"` (no shop piece; `chess.tier` is still the rarity, because the compact schema requires it). Below 6★ in that list, and a unit that is not declared there, is chess, unless a `chess.json` pair of the pack is its shop piece (then that pair is the record) [ASSUMED] |
-| `chess.json`, a new `_a` / `_b` pair (`baseId`, `goldenId`, `isGolden`) | one compact record `char_x_<namespace>_<stem>` (the stem is the base id without `chess_` and `_a`): a shop piece, or `as: "diy"` when `isDiy` and 6★. The normal form is the `_a` record, the elite the `_b` record (stats, range, skills, trait, talents each). `tier`, `bonds`, `price` (normal/golden), `sellPrice` (when both are equal), `garrisonIds` (normal/golden, the `{ normal, golden }` form of §10), `identifier`, `shopSortId`, the identity and attack fields are kept. The unit is the `charId` when it is an official operator (`art.ref`) or a unit of the pack; with `charId` null, an official operator its `assets` name gives the art only [ASSUMED]. A pair with no bond at all gets the fallback bond 协防干员 (`economy.fallbackBondId`), as the studio's operator template does [ASSUMED] | no name, profession, branch, tier, skill or stats; a `chessId` that is not its key; two normal or two elite records; a `charId` that is neither official nor a unit of the pack (and no official art in `assets`); bonds that all do not exist here. `status`, the merge count, the chess type (always `PRESET`, its own stand-in), hidden / invisible flags come from our economy, and a different value is named. Modules, potentials (`potDown`, `potMin` / `potBelow`), `statsBase` / `traitBase` / `talentsBase`, immunities, summons, `rangeId` and module talents are named and dropped. One record alone is copied into both forms [ASSUMED] |
+| `chess.json`, a new `_a` / `_b` pair (`baseId`, `goldenId`, `isGolden`) | one compact record `char_x_<namespace>_<stem>` (the stem is the base id without `chess_` and `_a`): a shop piece, or `as: "diy"` when `isDiy` and 6★. The normal form is the `_a` record, the elite the `_b` record (stats, range, skills, trait, talents each). `tier`, `bonds`, `price` (normal/golden), `sellPrice` (when both are equal), `garrisonIds` (normal/golden, the `{ normal, golden }` form of §10), `identifier`, `shopSortId`, the identity and attack fields are kept. The unit is the `charId` when it is an official operator (`art.ref`) or a unit of the pack; with `charId` null, explicit `assets` IDs supply art without inferring a character. A pair with no bond at all gets the fallback bond 协防干员 (`economy.fallbackBondId`), as the studio's operator template does [ASSUMED] | no name, profession, branch, tier, skill or stats; a `chessId` that is not its key; two normal or two elite records; an unknown non-null `charId`, or no character and no explicit asset IDs; bonds that all do not exist here. `status`, the merge count, the chess type (always `PRESET`, its own stand-in), come from our economy, and a different value is named. Modules, potentials (`potDown`, `potMin` / `potBelow`), `statsBase` / `traitBase` / `talentsBase`, immunities, summons, `rangeId` and module talents are named and dropped. One record alone is copied into both forms [ASSUMED] |
 | skill ids that are official skills of one operator (`data/chess.json` and `data/backups.json` skills → that operator) | the record keeps those ids and names the operator's kit, `kit: { ref }` (§10): its chess kit (`chess_char_…_a`) for a shop piece when the default skill is the same (the same tier first when there are two), its 自选 kit (`char_…`, `ops/op-*.js`, which authors every skill) for a 自选 record or when no chess kit fits. Talents and trait are copied, so the kit reads the record's numbers | a skill id that is not official (a partial match), skills of several operators or of one shared by several (`skcom_*`), a different default for a chess kit, or an operator with no kit of its own: the kit stays `"generic"`, and the report says which skills and why. 补位 stand-in kits are not bound [ASSUMED] |
 | `enemies.json` with an official `base` or `special` that exists here | `enemy_x_<namespace>_…`, stats over that base | no such base: a kit is not invented |
 | `kits/<id>.js` (top level, not `_…`), or the `.js` file a record's `kit` field names | one script plugin `kits-<id>` for the pack (`server/plugins/forgeKits.js`): its sim entry `sim/index.js` carries each kit and every `./` file of the pack it imports, one function scope per Forge file in dependency order, and calls `sp.kits.register(<the record's new charId>, <that kit>)` once per kit. Imports are rewritten by the table below. It requires the content plugin at its exact version. A kit for an official id the pack declares in `overrides` (`chess:<id>`, `units:<charId>`) registers that id, and the manifest lists it in `overrides` (§13). The record itself keeps `"generic"` (or its official kit) in the content plugin: without the script plugin it plays with that kit | the id is not an imported chess or operator record of this pack, nor a declared official override (a summon `tokens` kit has no record here); a second kit for the same record; `--no-scripts`. A file whose imports do not map, that fails `shared/plugins/scriptCheck.js` (the registry's own scan), that uses syntax the sandbox refuses (dynamic `import()`, `import.meta`, `async`, generators, `**`, `export *`, a `let` / `var` / destructuring export), that does not parse, whose default export is not a function, or whose graph is cyclic, over 64 files or over 1 MiB, is named with its reason and not written; so is every kit that imports it. `PLUGIN_FORGE_SCRIPT` |
@@ -1448,12 +1480,47 @@ view. Two i18n entries that canonicalise to the same language are `PLUGIN_FORGE_
 | `dependencies`, `conflicts` | `requires`, `conflicts` when the id is a plugin id. An omitted range is `*` [ASSUMED] | an id that cannot become a plugin id. A product does not require itself |
 | `client.panels` `screen.game.hud` and `screen.game.aside` | a ui plugin, slot `hud.right`, one HTML stub | a second panel for the same slot |
 | `client.panels` `screen.result.footer` | a ui plugin, slot `result.tab` | |
-| any other panel mount | — | not `hud.right`, `result.tab`, `stats.tab` or `room.panel`. Those last two have no Forge mount yet |
+| any other panel mount | manual adaptation report | `PLUGIN_FORGE_MOUNT`; panel name, Forge mount and suggested rewrite slot |
 | a panel with `wraps`, or `readonly` / `readOnly: false` | — | it rewrites a component, so it is not read-only |
-| the panel's script | not copied. The stub answers welcome with ready, then slot and resize, and says the author must rewrite it to postMessage API v1 | `PLUGIN_FORGE_SCRIPT` |
+| the panel's script | not copied. The stub answers welcome with ready, then slot and resize, and says the author must rewrite it to postMessage API v1 | `PLUGIN_FORGE_PANEL_SCRIPT` |
 | `server`, `routes`, `assets` (`.spresources`), `forms`, `fx`, `variants`, `behaviour`, `playtest`, `support`, `combat: true`, `layer` | — | engine replacement, protocol, server logic, or a switch this manifest has no field for. One reason each, in Chinese and in English |
 | any other `.js` `.mjs` `.cjs` `.ts` `.jsx` `.tsx` | not imported and not executed | `PLUGIN_FORGE_SCRIPT` |
 | a file `pack.json` does not reference | — | named in the report, except a loose music file whose basename is a bgm track |
+
+### Built-in language overlays
+
+[ASSUMED] A manifest-2 `lang` plugin may overlay one shipped `public/i18n/<lang>.json`. Exactly one overlay is
+accepted per built-in language, in sorted plugin-folder order; another provider remains `PLUGIN_DUPLICATE`.
+Legacy `packs/` collisions and duplicate plugin IDs keep their old refusal. `zh` remains the source language.
+The index exposes one language choice with the built-in name/fallback metadata and an additional `files.uiOverlay`
+URL. Supplied strings override; missing/empty strings and broken source placeholders retain built-in translations.
+Optional game text uses `files.dataOverlay` and the existing per-record source checks over the built-in data.
+Missing downloads fall back to built-in text [ASSUMED]; reload after installation changes, as before.
+
+Scope is unchanged: `lang` plugins are installed globally, scope `personal`, and each browser chooses a language.
+There is no room selection, gameplay hash input or simulation change. Forge flat UI i18n becomes this same lang plugin.
+A language-only pack for an installed language no longer fails as a duplicate.
+
+### Forge panel mounts and report codes
+
+The three existing mappings remain. Suggested rewrites are [ASSUMED] author guidance, not automatic positional equivalence.
+
+| Forge mount | Automatic slot | Suggested manual rewrite |
+| --- | --- | --- |
+| `root.overlays` | — | `hud.right` (in-game information; global overlay behavior must be redesigned) |
+| `root.guide` | — | `stats.tab` (reference information) |
+| `screen.game.aside` | `hud.right` | — |
+| `screen.game.hud` | `hud.right` | — |
+| `screen.game.overlay` | — | `hud.right` (move overlay information into the HUD) |
+| `screen.game.shopCard` | — | `hud.right` (separate shop summary; no card wrapping) |
+| `screen.game.bondStrip` | — | `hud.right` (separate bond summary) |
+| `screen.result.footer` | `result.tab` | — |
+| `screen.loadout.detail` | — | `room.panel` (separate pre-match information) |
+
+`PLUGIN_FORGE_MOUNT` identifies unsupported mount adaptation. `PLUGIN_FORGE_PANEL_SCRIPT` independently identifies
+an uncopied panel script, including when its mount failed. `PLUGIN_FORGE_SCRIPT` continues to describe other
+unmapped scripts/kits. No panel script runs at import. UI-only unsupported packs report **需要人工适配 / needs manual
+adaptation**, with `needsManualAdaptation` and `manualPanels` in JSON, instead of “nothing importable.”
 
 **Kit imports.** Production script plugins allow only self-contained entries (§13), so a Forge kit's imports are
 rewritten to `sp:sdk@1` where the SDK exports the same helpers, and every other one refuses the file:
@@ -1464,7 +1531,10 @@ rewritten to `sp:sdk@1` where the SDK exports the same helpers, and every other 
 | `@sim/constants.js` `{ name }` | `constants.<name>` |
 | `@sim/detmath.js` `{ name }` | `math.<name>` |
 | `./x.js`, a file of the pack (`.js`, no `..`, `%`, query or `\`, resolved from the importing file) | that file's scope in the same entry; its exports are read once, after it ran (initialization-time bindings, as in the sandbox) |
-| `@kit/tier1.js` names outside that list, `@kit/tier2.js` … `tier6.js`, `@kit/summoner.js`, `@sim/dir.js`, `@sim/targeting.js`, `@ops/…`, a bare name, an absolute path, `..`, a default or namespace import of an SDK module | refused: the file is named, and nothing of it is written |
+| `@sim/dir.js`: `dirVec`, `offsetTile` | `dir` SDK geometry helpers; frozen arrays |
+| `@sim/targeting.js`: `absoluteRangeKeys` | `targeting` SDK geometry helper; bounded grid, frozen keys |
+| `@sim/targeting.js`: `sortEnemyTargets` | refused by name: mutates candidates and reads live battle/units; no pure SDK equivalent |
+| `@kit/tier1.js` names outside that list, `@kit/tier2.js` … `tier6.js`, `@kit/summoner.js`, `@ops/…`, a bare name, an absolute path, `..`, a default or namespace import of an SDK module | refused: the file is named, and nothing of it is written |
 
 **When the script plugin runs.** Only where the server owner set `SP_PLUGIN_SCRIPTS=sandbox` (SES compartments, §13
 P3b), or a trusted mode with the lock pinned in `plugins/config.json` and every player's consent, and a room selects
