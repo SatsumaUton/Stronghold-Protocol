@@ -5,10 +5,10 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { FxWiring } from '../../public/js/render/vfx/wiring.js';
+import { FxWiring, wolfHolds } from '../../public/js/render/vfx/wiring.js';
 import { skillRecordOf, tokenSkillRecord, planFor, resolveSkill } from '../../public/js/render/vfx/skills.js';
 
-const KEYS = ['doll_aura', 'sea_aura_1', 'sea_aura_3', 'g_hit', 'g_heal', 'g_enemy', 'g_birth'];
+const KEYS = ['doll_aura', 'sea_aura_1', 'sea_aura_3', 'g_hit', 'g_heal', 'g_enemy', 'g_birth', 'wolf_sub_1', 'wolf_sub_2', 'wolf_cast'];
 const LOOPING = new Set(['doll_aura', 'sea_aura_1', 'sea_aura_3']);
 const aura = (k) => ({ role: 'loop', keys: [k], from: 'AuraAbility._effects', node: 'Aura' });
 
@@ -20,6 +20,14 @@ function makeIndex() {
       // 诅咒娃娃: an AppearSkill whose aura loops (sktok_vodfox_token)
       token_1_doll: tok({ sktok_doll: { rootClass: 'AppearSkill', rootAbility: 'ActiveAbilityWrapper', projectiles: [], mode: null, uses: [aura('doll_aura')] } }),
       // 斯卡蒂的海嗣: one skill per owner skill (sktok_skadi2_1 / _3)
+      // 狼群: a MeleeAttack whose VigilWolfEffectEmitter rows are bound to the talent's buffs, and a plain cast row
+      token_3_wolf: { kind: 'token', rootClass: 'RallyPoint', skills: {}, startEffect: null, deadEffect: null, modes: [{ name: 'Default', attack: {
+        class: 'MeleeAttack', emitters: [{ class: 'VigilWolfEffectEmitter' }, { class: 'UberEffectEmitter' }], cast: [
+          { directionType: 0, effects: ['wolf_sub_1'], oneshot: 0, startEvent: 2, endEvent: 3, buffKey: 'vigil_wolf_t_1_enhance[damage]', field: '_vigilWolfCastEffects', emitter: 0 },
+          { directionType: 0, effects: ['wolf_sub_2'], oneshot: 0, startEvent: 2, endEvent: 3, buffKey: 'vigil_wolf_t_1_enhance[trigger_override]', field: '_vigilWolfCastEffects', emitter: 0 },
+          { directionType: 0, effects: ['wolf_cast'], oneshot: 1, startEvent: 2, endEvent: 3, buffKey: 'some_other_buff', emitter: 1 },
+        ] } }] },
+      enemy_1: { kind: 'enemy', modes: [{ name: 'Default', attack: { class: 'MeleeAttack', cast: [], hit: [] } }], skills: {} },
       token_2_sea: tok({
         sktok_sea_1: { rootClass: 'CastSkill', rootAbility: 'ActiveAbilityWrapper', projectiles: [], mode: null, uses: [aura('sea_aura_1')] },
         sktok_sea_3: { rootClass: 'CastSkill', rootAbility: 'ActiveAbilityWrapper', projectiles: [], mode: null, uses: [aura('sea_aura_3')] },
@@ -118,5 +126,37 @@ describe('a token\'s skill record from its owners\' variants (R18)', () => {
     view(1, 'token_1_doll', 5, { skillIndex: 1 });
     frame();
     assert.equal(count(spawned, 'doll_aura'), 1);
+  });
+});
+
+describe('the 狼群\'s buff-bound cast rows (R19)', () => {
+  test('wolfHolds: [damage] with 2 wolves or more, [trigger_override] with all of them, nothing else', () => {
+    assert.equal(wolfHolds({ wolves: [1, 3] }, 'vigil_wolf_t_1_enhance[damage]'), false);
+    assert.equal(wolfHolds({ wolves: [2, 3] }, 'vigil_wolf_t_1_enhance[damage]'), true);
+    assert.equal(wolfHolds({ wolves: [2, 3] }, 'vigil_wolf_t_1_enhance[trigger_override]'), false);
+    assert.equal(wolfHolds({ wolves: [3, 3] }, 'vigil_wolf_t_1_enhance[trigger_override]'), true);
+    assert.equal(wolfHolds({ wolves: [1, 1] }, 'vigil_wolf_t_1_enhance[trigger_override]'), false, 'a lone wolf holds no holder');
+    assert.equal(wolfHolds({ wolves: null }, 'vigil_wolf_t_1_enhance[damage]'), false);
+    assert.equal(wolfHolds({ wolves: [3, 3] }, 'vigil_wolf_t_1[block_cnt]'), false);
+  });
+
+  test('a bite casts the shadows\' attack effects by the pack\'s wolves; a row bound to another buff never plays', async () => {
+    const { w, spawned, view, frame } = await setup();
+    const wolf = view(1, 'token_3_wolf', 5);
+    const t = view(2, 'enemy_1', 6);
+    const bite = (n) => { frame(); w.castStart(wolf, t, 'none', { skip: 0, left: 0.5 }); w.attack(wolf, t, 'none', n, true); w.damage(t, 'phys', wolf, n); };
+    wolf.wolves = [1, 3];
+    bite(1);
+    assert.deepEqual(['wolf_sub_1', 'wolf_sub_2', 'wolf_cast'].map((k) => count(spawned, k)), [0, 0, 0]);
+    assert.equal(count(spawned, 'g_hit'), 1, 'the generic hit (the client\'s own hit comes from a buff template the index lacks)');
+    wolf.wolves = [2, 3];
+    bite(2);
+    assert.deepEqual(['wolf_sub_1', 'wolf_sub_2'].map((k) => count(spawned, k)), [1, 0]);
+    wolf.wolves = [3, 3];
+    bite(3);
+    assert.deepEqual(['wolf_sub_1', 'wolf_sub_2'].map((k) => count(spawned, k)), [2, 1]);
+    wolf.wolves = null;
+    bite(4);
+    assert.deepEqual(['wolf_sub_1', 'wolf_sub_2', 'wolf_cast'].map((k) => count(spawned, k)), [2, 1, 0]);
   });
 });
