@@ -217,6 +217,9 @@ export function compileEffect(desc, lib = {}) {
   const md = num(pe._mainDir, 1) | 0;
   def.mainYaw = (def.rotateType === 2 || def.rotateType === 4 || def.proj) && md >= 0 && md <= 3 ? DIR_YAW[md] : 0;
   def.useBodyRotation = on(def.pe?._useBodyRotation);
+  // authored behind its unit: the root's `static_offset` node pushed into the board (z > 0) — see behindUnits
+  const so = nodes.find((nd) => nd && nd.name === 'static_offset' && nd.parent === (Number.isInteger(desc?.root) ? desc.root : 0));
+  def.back = !!so && Array.isArray(so.pos) && num(so.pos[2], 0) > 0;
   def.loops = def.isLoop || def.ps.some((p) => p && p.looping && p.playOnAwake !== false) || def.animators.some((a) => def.clips[a.clip]?.loop);
   def.material = (i, lite) => {
     const list = lite ? def.lite : def.materials;
@@ -693,19 +696,19 @@ export class Effect {
         if (m0 && s.count > 0) {
           const meshData = r.mode === 'mesh' ? (r.mesh && this.lib ? this.lib.mesh(r.mesh) : null) : null;
           if (r.mode !== 'mesh' || meshData) {
-            sink(entry('ps', i, 0, m0, ov, r.order, r.layer, dist + r.fudge, behindUnits(r.layer, r.order) || (isFlatParticles(r, w, meshData) && nearGround), this, r.mode === 'mesh' ? r.mesh : null));
+            sink(entry('ps', i, 0, m0, ov, r.order, r.layer, dist + r.fudge, behindUnits(r.layer, r.order, def.back) || (isFlatParticles(r, w, meshData) && nearGround), this, r.mode === 'mesh' ? r.mesh : null));
           }
         }
         if (s.def.trail && r.mats[1] != null && (s.count > 0 || s.orphans.length)) {
           const m1 = def.material(r.mats[1], lite);
-          if (m1) sink(entry('trailmod', i, 0, m1, ov, r.order, r.layer, dist + r.fudge, behindUnits(r.layer, r.order), this, null));
+          if (m1) sink(entry('trailmod', i, 0, m1, ov, r.order, r.layer, dist + r.fudge, behindUnits(r.layer, r.order, def.back), this, null));
         }
       }
       const mr = def.mesh[i];
       if (mr && mr.enabled && mr.mesh && (this.rendOv.get(i)?.enabled ?? true)) {
         const md = this.lib ? this.lib.mesh(mr.mesh) : null;
         if (md && md.submeshes) {
-          const flat = behindUnits(mr.layer, mr.order) || (isFlatMesh(md, w) && nearGround);
+          const flat = behindUnits(mr.layer, mr.order, def.back) || (isFlatMesh(md, w) && nearGround);
           for (let k = 0; k < mr.mats.length; k++) {
             if (mr.mats[k] == null || !md.submeshes[k]) continue;
             const mat = def.material(mr.mats[k], lite);
@@ -720,7 +723,7 @@ export class Effect {
           for (let k = 0; k < sk.mats.length; k++) {
             if (sk.mats[k] == null || !md.submeshes[k]) continue;
             const mat = def.material(sk.mats[k], lite);
-            if (mat) sink(entry('skinned', i, k, mat, ov, sk.order, sk.layer, dist, behindUnits(sk.layer, sk.order), this, sk.mesh));
+            if (mat) sink(entry('skinned', i, k, mat, ov, sk.order, sk.layer, dist, behindUnits(sk.layer, sk.order, def.back), this, sk.mesh));
           }
         }
       }
@@ -728,7 +731,7 @@ export class Effect {
       if (tr && tr.enabled && tr.mats[0] != null) {
         const st = this.trails.get(i);
         const mat = st && st.n > 0 ? def.material(tr.mats[0], lite) : null;
-        if (mat) sink(entry('trail', i, 0, mat, ov, tr.order, tr.layer, dist, behindUnits(tr.layer, tr.order), this, null));
+        if (mat) sink(entry('trail', i, 0, mat, ov, tr.order, tr.layer, dist, behindUnits(tr.layer, tr.order, def.back), this, null));
       }
       const ln = def.line[i];
       // a world-space line's authored points are the editor's placeholders — fixed spots of the authoring scene (§33.6;
@@ -736,7 +739,7 @@ export class Effect {
       if (ln && ln.enabled && ln.mats[0] != null && (!ln.world || this.linePts.has(i))) {
         const pts = this.linePts.get(i) || ln.points;
         const mat = pts.length >= 2 ? def.material(ln.mats[0], lite) : null;
-        if (mat) sink(entry('line', i, 0, mat, ov, ln.order, ln.layer, dist, behindUnits(ln.layer, ln.order), this, null));
+        if (mat) sink(entry('line', i, 0, mat, ov, ln.order, ln.layer, dist, behindUnits(ln.layer, ln.order, def.back), this, null));
       }
     }
   }
@@ -877,10 +880,15 @@ function entry(part, node, submesh, mat, ov, order, layer, dist, ground, effect,
  * transparent renderers by sorting layer, then order in layer, then distance, so a renderer on a lower layer, or on the
  * Default layer with a negative order, is drawn before every unit: the client's way to put an aura behind its owner
  * (野鬃 S2's ring of lances at −3, a bubble's back half at −2). Order 0 on layer 0 sorts by distance with the units —
- * kept by the flat-on-the-ground rule (isFlatParticles / isFlatMesh); a positive order is drawn after them.
+ * kept by the flat-on-the-ground rule (isFlatParticles / isFlatMesh), and by the prefab's own offset: an effect whose
+ * root `static_offset` node lies deeper in the board than its anchor (z > 0: `def.back`, 50 prefabs of the used set —
+ * auras, the back halves `*_back`, a slash for a unit facing up) stands farther from the camera than the unit it is
+ * placed on, whose tilted body lies at its feet's depth, so Unity draws its order-0 renderers first (0.3.1: 瑕光 S3's
+ * horses, wings and halo at z +0.23 and 0.5–1.1 tiles behind her feet covered her); one pulled forward (z < 0) stays
+ * over them. A positive order is drawn after them. [ASSUMED: the units' order-0 renderers sort at their feet's depth]
  */
-export function behindUnits(layer, order) {
-  return layer < 0 || (layer === 0 && order < 0);
+export function behindUnits(layer, order, back = false) {
+  return layer < 0 || (layer === 0 && (order < 0 || (back && order === 0)));
 }
 
 /** Particles drawn flat on the board: world / vertical billboards, local quads (or flat meshes) lying in XY. */

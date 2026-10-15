@@ -2,13 +2,13 @@
 // §33.16 / §33.6) on a synthetic index and a fake effects layer: a token's skill record from its owners' variants (R18:
 // 诅咒娃娃's aura), the 狼群's buff-bound cast rows (R19), an ability action's target effect on the unit a kit fx names
 // (R20: 归溟幽灵鲨 S1), a skill's own start effect replacing the deploy effect (R21: 缄默德克萨斯, 斯卡蒂 S2), a
-// stretched billboard's Y size along its velocity (风笛's lance).
+// stretched billboard's Y size along its velocity (风笛's lance), an effect authored behind its unit drawn under it (瑕光 S3).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { FxWiring, wolfHolds } from '../../public/js/render/vfx/wiring.js';
 import { skillRecordOf, tokenSkillRecord, planFor, resolveSkill, skillPlan, targetBound, bindingKeys } from '../../public/js/render/vfx/skills.js';
-import { compileEffect, Effect } from '../../public/js/render/vfx/effect.js';
+import { compileEffect, Effect, behindUnits } from '../../public/js/render/vfx/effect.js';
 import { FrameData, cameraBasis } from '../../public/js/render/vfx/geom.js';
 
 const KEYS = ['doll_aura', 'sea_aura_1', 'sea_aura_3', 'g_hit', 'g_heal', 'g_enemy', 'g_birth', 'wolf_sub_1', 'wolf_sub_2', 'wolf_cast', 'ghost2_skill_01_start', 'ghost2_skill_01_hit', 'ghost2_skill_01_buff', 'tx_birth_01', 'common_empty', 'tx_appear', 'sk_start_loop', 'mode_birth'];
@@ -309,5 +309,46 @@ describe('a stretched billboard runs its Y size along the velocity (风笛\'s la
     // a negative length scale extends ahead of the particle with the same size
     const neg = quad(prefab(0.5, 3.5, -1));
     assert.ok(Math.abs(len(neg.ax) - 7) < 1e-4);
+  });
+});
+
+describe('an effect authored behind its unit is drawn under the units at order 0 (瑕光 S3)', () => {
+  const MAT = {
+    name: 'm', shader: 'Torappu/Particles/Additive', passes: [{ blend: ['SrcAlpha', 'One', 'Zero', 'OneMinusSrcAlpha'], blendOp: 'Add', zTest: 'Disabled', zWrite: false, cull: 'Off', colorMask: 15 }],
+    queue: 'Transparent', keywords: [], floats: {}, colors: { _TintColor: [1, 1, 1, 1] }, textures: { _MainTex: { tex: 't', st: [1, 1, 0, 0] } },
+  };
+  // a standing cone (no flat decal) at the given sorting order, under the root's static_offset at depth z
+  const CONE = { positions: [0, 0, 0, 1, 0, 1, -1, 0, 1, 0, 1, 1], uv0: [0, 0, 1, 0, 0, 1, 1, 1], submeshes: [[0, 1, 2, 0, 2, 3]] };
+  const gathered = (z, orders, name = 'static_offset') => {
+    const nodes = [
+      { id: 0, name: 'root', parent: null, children: [1], active: true, pos: [0, 0, 0], rot: [0, 0, 0, 1], scale: [1, 1, 1],
+        behaviours: [{ class: 'ParticleEffect', enabled: true, fields: { _delayToPlay: 0, _delayToFinish: 0, _maxLifetime: -1, _isLoop: 1, _rotateType: 0, _spawnLocation: 1 } }] },
+      { id: 1, name, parent: 0, children: [], active: true, pos: [0, 0, z], rot: [0, 0, 0, 1], scale: [1, 1, 1] },
+    ];
+    orders.forEach((o, i) => {
+      nodes[1].children.push(2 + i);
+      nodes.push({ id: 2 + i, name: `m${i}`, parent: 1, children: [], active: true, pos: [0, 0.6, 0], rot: [0, 0, 0, 1], scale: [1, 1, 1],
+        meshFilter: 'cone', meshRenderer: { m_Enabled: true, materials: [0], m_SortingOrder: o, m_SortingLayer: 0 } });
+    });
+    const d = { format: 'fx-prefab', version: 1, key: 'aura', nodes, materials: [MAT], clips: [], textures: ['t'], meshes: [], refs: [], stats: {} };
+    const fx = new Effect(compileEffect(d), { seed: 1, lib: { mesh: (k) => (k === 'cone' ? CONE : null) } });
+    fx.update(1 / 30);
+    const out = [];
+    fx.gather(cameraBasis(30, [0, -5, -8], 720, 0.7), (e) => out.push(e));
+    return out.map((e) => e.ground);
+  };
+
+  test('behindUnits: order 0 on the Default layer is behind only for an effect authored so', () => {
+    assert.equal(behindUnits(0, 0, true), true);
+    assert.equal(behindUnits(0, 0), false);
+    assert.equal(behindUnits(0, 3, true), false, 'a positive order is drawn after the units');
+    assert.equal(behindUnits(0, -1, false), true);
+  });
+
+  test('static_offset z +0.23 (blemsh_skill_03_buff): order 0 under the units, order 10 over; z −0.2 or 0: over as before', () => {
+    assert.deepEqual(gathered(0.23, [0, 10]), [true, false]);
+    assert.deepEqual(gathered(-0.2, [0, 10]), [false, false]);
+    assert.deepEqual(gathered(0, [0]), [false]);
+    assert.deepEqual(gathered(0.23, [0], 'other_helper'), [false], 'only the root\'s static_offset says so');
   });
 });
