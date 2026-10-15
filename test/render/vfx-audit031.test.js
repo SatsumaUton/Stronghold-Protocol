@@ -6,10 +6,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { FxWiring, wolfHolds } from '../../public/js/render/vfx/wiring.js';
-import { skillRecordOf, tokenSkillRecord, planFor, resolveSkill } from '../../public/js/render/vfx/skills.js';
+import { skillRecordOf, tokenSkillRecord, planFor, resolveSkill, skillPlan, targetBound, bindingKeys } from '../../public/js/render/vfx/skills.js';
 
-const KEYS = ['doll_aura', 'sea_aura_1', 'sea_aura_3', 'g_hit', 'g_heal', 'g_enemy', 'g_birth', 'wolf_sub_1', 'wolf_sub_2', 'wolf_cast'];
-const LOOPING = new Set(['doll_aura', 'sea_aura_1', 'sea_aura_3']);
+const KEYS = ['doll_aura', 'sea_aura_1', 'sea_aura_3', 'g_hit', 'g_heal', 'g_enemy', 'g_birth', 'wolf_sub_1', 'wolf_sub_2', 'wolf_cast', 'ghost2_skill_01_start', 'ghost2_skill_01_hit', 'ghost2_skill_01_buff'];
+const LOOPING = new Set(['doll_aura', 'sea_aura_1', 'sea_aura_3', 'ghost2_skill_01_buff']);
 const aura = (k) => ({ role: 'loop', keys: [k], from: 'AuraAbility._effects', node: 'Aura' });
 
 function makeIndex() {
@@ -27,6 +27,14 @@ function makeIndex() {
           { directionType: 0, effects: ['wolf_sub_2'], oneshot: 0, startEvent: 2, endEvent: 3, buffKey: 'vigil_wolf_t_1_enhance[trigger_override]', field: '_vigilWolfCastEffects', emitter: 0 },
           { directionType: 0, effects: ['wolf_cast'], oneshot: 1, startEvent: 2, endEvent: 3, buffKey: 'some_other_buff', emitter: 1 },
         ] } }] },
+      // 归溟幽灵鲨 S1: the ExchangeHp ability's two CreateEffect actions (SOURCE's start, TARGET's hit) as index v3 writes them
+      char_1023_ghost2: { kind: 'char', modes: [{ name: 'Default', attack: { class: 'MeleeAttack' } }], startEffect: null, deadEffect: null, skills: {
+        skchr_ghost2_1: { rootClass: 'CastSkill', rootAbility: 'ActiveBuffAbility', projectiles: [], mode: null, uses: [
+          { role: 'loop', keys: ['ghost2_skill_01_buff'], from: 'ActiveBuffAbility._buffs', node: 'skchr_ghost2_1', on: 'owner', buff: 'ghost2_s_1' },
+          { role: 'start', keys: ['ghost2_skill_01_start'], from: 'AnimatedActionToTargetAbility._actions CreateEffect', node: 'ExchangeHp', action: 'CreateEffect' },
+          { role: 'start', keys: ['ghost2_skill_01_hit'], from: 'AnimatedActionToTargetAbility._actions CreateEffect', node: 'ExchangeHp', action: 'CreateEffect' },
+        ] } } },
+      char_9_mate: { kind: 'char', modes: [{ name: 'Default', attack: { class: 'MeleeAttack' } }], skills: {}, startEffect: null, deadEffect: null },
       enemy_1: { kind: 'enemy', modes: [{ name: 'Default', attack: { class: 'MeleeAttack', cast: [], hit: [] } }], skills: {} },
       token_2_sea: tok({
         sktok_sea_1: { rootClass: 'CastSkill', rootAbility: 'ActiveAbilityWrapper', projectiles: [], mode: null, uses: [aura('sea_aura_1')] },
@@ -42,6 +50,7 @@ function makeIndex() {
 // data/tokens.json shapes: the top `skill` has only { skillId, bb }; the owners' variants hold the full records
 const tokSkill = (skillId, index, o = {}) => ({ skillId, prefabId: skillId, index, skillType: 'PASSIVE', durationType: 'NONE', duration: -1, spType: 'ON_DEPLOY', bb: {}, ...o });
 const RECS = {
+  char_1023_ghost2: { charId: 'char_1023_ghost2', skill: { skillId: 'skchr_ghost2_1', index: 0, skillType: 'AUTO', durationType: 'NONE', duration: 20, bb: {} } },
   token_1_doll: {
     tokenId: 'token_1_doll', skill: { skillId: 'sktok_doll', bb: { atk: -0.25 } },
     variants: { chess_a: { skill: tokSkill('sktok_doll', 1, { duration: 15 }), bySkill: { 0: { skill: tokSkill('sktok_doll', 1, { duration: 15 }) } } } },
@@ -158,5 +167,32 @@ describe('the 狼群\'s buff-bound cast rows (R19)', () => {
     wolf.wolves = null;
     bite(4);
     assert.deepEqual(['wolf_sub_1', 'wolf_sub_2', 'wolf_cast'].map((k) => count(spawned, k)), [2, 1, 0]);
+  });
+});
+
+describe('an ability action\'s target effect on the unit the kit fx names (R20)', () => {
+  test('归溟幽灵鲨 S1: the hit is no start row on her; the binding names it', () => {
+    const index = makeIndex();
+    const p = skillPlan(index, 'char_1023_ghost2', 'skchr_ghost2_1', { rec: RECS.char_1023_ghost2.skill });
+    assert.deepEqual(p.start.map((e) => e.key), ['ghost2_skill_01_start']);
+    assert.deepEqual([...targetBound('skchr_ghost2_1')], ['ghost2_skill_01_hit']);
+    assert.ok(bindingKeys(index, 'skchr_ghost2_1').includes('ghost2_skill_01_hit'), 'still preloaded');
+  });
+
+  test('her start plays on her, the hit on the ally of the kit\'s hpShare (its procedural flash skipped)', async () => {
+    const { w, handles, view, frame } = await setup();
+    const g = view(1, 'char_1023_ghost2', 5);
+    const ally = view(2, 'char_9_mate', 6);
+    frame();
+    w.skill(g, true);
+    assert.equal(handles.filter((h) => h.key === 'ghost2_skill_01_start' && h.opts.owner === g).length, 1);
+    assert.equal(handles.filter((h) => h.key === 'ghost2_skill_01_hit').length, 0, 'not on her at the start');
+    assert.equal(w.simFx('hpShare', ally.x, ally.y, { id: g.id, to: ally.id }), true);
+    const hits = handles.filter((h) => h.key === 'ghost2_skill_01_hit');
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0].opts.owner, ally, 'on the ally');
+    // another kit's hpShare (魔王's, a ratio on herself, names no `to`) is not this binding's
+    const other = view(3, 'char_9_mate', 4);
+    assert.equal(w.simFx('hpShare', other.x, other.y, { id: other.id, ratio: 0.5 }), false);
   });
 });

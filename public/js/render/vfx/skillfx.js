@@ -61,7 +61,7 @@
 //     in a form naming one of its modes (formMode) plays that mode's copy of the skill.
 //   * Kit 'fx' tuples (simFx; the procedural fx is skipped when this returns true):
 //       (1) FX_BINDINGS (skills.js): a kit fx standing for an official effect no plan row places (克莱门莎 S3's mark,
-//           泡泡 S2's counter on her attacker);
+//           泡泡 S2's counter on her attacker, 归溟幽灵鲨 S1's hit on the ally she swaps HP with);
 //       (2) pulse: a fx tagged with its skill (`extra.skill`) while the skill is on, when the plan has `pulse` entries —
 //           the owner's buff ticks for a fx on the owner, the skill's other hits for a fx away from it — plays them there;
 //       (3) the start flash: a cast-flash fx (FLASH archetypes) on the owner in the frame of its official skill start;
@@ -1000,8 +1000,8 @@ export class SkillFx {
     const keys = bindingEffects(this.w.idx, bind).filter((k) => this.w.ofx.lib.has(k));
     if (!keys.length) return false;
     if (bind.at === 'target') {
-      // once on the unit the fx names (泡泡's attacker), else where it happens; turned by the owner's side
-      const tv = this.w.view(extra.target) || { id: 'fx:point', x, y, z: 0 };
+      // once on the unit the fx names (泡泡's attacker, 归溟幽灵鲨 S1's ally), else where it happens; turned by the owner's side
+      const tv = this.w.view(extra[bind.target || 'target']) || { id: 'fx:point', x, y, z: 0 };
       let drew = false;
       for (const k of keys) if (this.w.playOn(k, tv, { flipFrom: U.v || undefined })) drew = true;
       return drew;
