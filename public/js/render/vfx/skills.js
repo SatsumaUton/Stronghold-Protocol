@@ -333,7 +333,10 @@ export function skillRecordOf(rec, skillIndex) {
  * the full records — skillType, duration, prefabId, the owner skill's blackboard): the one whose `index` is the unit's
  * skillIndex (the sim's token def merges the owner's choice and UnitInfo sends its `index`: 浊心斯卡蒂 S1 / S2 / S3 give
  * her 海嗣 sktok_skadi2_1 / _2 / _3), else — no index — the top record completed with the type fields of the variant
- * record of its id; null when no variant record fits (the top record stays as it is).
+ * record of its id; null when no variant record fits (the top record stays as it is). [ASSUMED] the first owner's
+ * record of that index (data order: the base piece `_a` before its elite `_b` — UnitInfo names no summoner): the
+ * owners' records of one index differ only in level, text, blackboard values and (蜜蜡's 沙之碑) SP cost, and the top
+ * record carries the base piece's too.
  */
 export function tokenSkillRecord(rec, skillIndex) {
   const all = [];

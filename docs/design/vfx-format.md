@@ -1235,7 +1235,10 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   loops from the deploy while it stands (the sim sends no skill event for a passive with a duration, and the plan read
   as instant without a type); the 海嗣's aura loops while it stands too (its PASSIVE token skill). A passive token
   skill's mode holds from the deploy (every 香槟炸弹 in M2: its ability loop and M2's two hit rows); 流形's MANUAL
-  records make its plan lasting, and only S3's (sktok_mlyss_wtrman_3) has effects.
+  records make its plan lasting, and only S3's (sktok_mlyss_wtrman_3) has effects. [ASSUMED] the variant record is
+  the first owner's (the base piece `_a`; UnitInfo names no summoner): an elite `_b` owner's record of the same index
+  differs only in level, text, blackboard values and (蜜蜡's 沙之碑) SP cost — the base piece's values, as the top
+  record had.
 * **An AppearSkill's start effect** (0.3.1, audit R21; plan entries with `birth`, `SkillFx.birthOf`): the
   `_overrideStartEffect` use of an AppearSkill / MultiAppearSkill is the unit's deploy effect while it fights with that
   skill — the client's Character.GetStartEffect returns it before the mode's `overrideStartEffect` and the unit's own
