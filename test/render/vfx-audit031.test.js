@@ -11,8 +11,8 @@ import { skillRecordOf, tokenSkillRecord, planFor, resolveSkill, skillPlan, targ
 import { compileEffect, Effect, behindUnits } from '../../public/js/render/vfx/effect.js';
 import { FrameData, cameraBasis } from '../../public/js/render/vfx/geom.js';
 
-const KEYS = ['doll_aura', 'sea_aura_1', 'sea_aura_3', 'g_hit', 'g_heal', 'g_enemy', 'g_birth', 'wolf_sub_1', 'wolf_sub_2', 'wolf_cast', 'ghost2_skill_01_start', 'ghost2_skill_01_hit', 'ghost2_skill_01_buff', 'tx_birth_01', 'common_empty', 'tx_appear', 'sk_start_loop', 'mode_birth'];
-const LOOPING = new Set(['doll_aura', 'sea_aura_1', 'sea_aura_3', 'ghost2_skill_01_buff', 'sk_start_loop']);
+const KEYS = ['doll_aura', 'sea_aura_1', 'sea_aura_3', 'g_hit', 'g_heal', 'g_enemy', 'g_birth', 'wolf_sub_1', 'wolf_sub_2', 'wolf_cast', 'ghost2_skill_01_start', 'ghost2_skill_01_hit', 'ghost2_skill_01_buff', 'tx_birth_01', 'common_empty', 'tx_appear', 'sk_start_loop', 'mode_birth', 'bomb_loop', 'bomb_hit', 'bomb_hit_02'];
+const LOOPING = new Set(['doll_aura', 'sea_aura_1', 'sea_aura_3', 'ghost2_skill_01_buff', 'sk_start_loop', 'bomb_loop']);
 const aura = (k) => ({ role: 'loop', keys: [k], from: 'AuraAbility._effects', node: 'Aura' });
 
 function makeIndex() {
@@ -55,6 +55,16 @@ function makeIndex() {
       } },
       char_9_mate: { kind: 'char', modes: [{ name: 'Default', attack: { class: 'MeleeAttack' } }], skills: {}, startEffect: null, deadEffect: null },
       enemy_1: { kind: 'enemy', modes: [{ name: 'Default', attack: { class: 'MeleeAttack', cast: [], hit: [] } }], skills: {} },
+      // 香槟炸弹: a PassiveSkill naming mode M2, whose general ability loops its buff effect while the unit is in M2
+      token_4_bomb: { kind: 'token', rootClass: 'Trap', startEffect: null, deadEffect: null,
+        modes: [
+          { name: 'Default', attack: { class: 'MeleeAttack', cast: [{ directionType: 0, effects: ['bomb_hit'], oneshot: 0, startEvent: 2, endEvent: 3 }] } },
+          { name: 'M2', attack: { class: 'MultiMeleeAttack', cast: [{ directionType: 0, effects: ['bomb_hit'], oneshot: 0, startEvent: 2, endEvent: 3 }, { directionType: 0, effects: ['bomb_hit_02'], oneshot: 0, startEvent: 2, endEvent: 3 }] } },
+        ],
+        skills: { sktok_bomb: { rootClass: 'PassiveSkill', rootAbility: 'PassiveBuffAbility', projectiles: [], mode: 1, modeBy: 'data', uses: [] } },
+        abilities: [{ kind: 'general', name: 'Ability0', node: 'Modes/M2/Body/GeneralAbilities/Ability0', class: 'PassiveBuffAbility', modes: ['M2'], when: 'passive',
+          effects: ['bomb_loop'], projectiles: [], roles: { loop: ['bomb_loop'] }, unclassified: [], abilities: [],
+          uses: [{ role: 'loop', keys: ['bomb_loop'], from: 'PassiveBuffAbility._buffs', node: 'Modes/M2/Body/GeneralAbilities/Ability0', on: 'owner', buff: 'token_gdtrap_passive[eff]', template: 'empty', life: { type: 'INFINITY' } }] }] },
       token_2_sea: tok({
         sktok_sea_1: { rootClass: 'CastSkill', rootAbility: 'ActiveAbilityWrapper', projectiles: [], mode: null, uses: [aura('sea_aura_1')] },
         sktok_sea_3: { rootClass: 'CastSkill', rootAbility: 'ActiveAbilityWrapper', projectiles: [], mode: null, uses: [aura('sea_aura_3')] },
@@ -70,6 +80,7 @@ function makeIndex() {
 const tokSkill = (skillId, index, o = {}) => ({ skillId, prefabId: skillId, index, skillType: 'PASSIVE', durationType: 'NONE', duration: -1, spType: 'ON_DEPLOY', bb: {}, ...o });
 const chessRec = (charId, skills) => ({ charId, skills: skills.map(([skillId, index, skillType, duration]) => ({ skillId, index, skillType, durationType: 'NONE', duration, bb: {} })) });
 const RECS = {
+  token_4_bomb: { tokenId: 'token_4_bomb', skill: { skillId: 'sktok_bomb', bb: {} }, variants: { chess_c: { skill: tokSkill('sktok_bomb', 1, { duration: 0 }) } } },
   char_1028_texas2: chessRec('char_1028_texas2', [['skchr_tx_1', 0, 'PASSIVE', 11], ['skchr_tx_2', 1, 'PASSIVE', 8], ['skchr_tx_9', 2, 'AUTO', 10]]),
   char_263_skadi: chessRec('char_263_skadi', [['skchr_skadi_2', 1, 'PASSIVE', -1], ['skchr_skadi_3', 2, 'MANUAL', 38]]),
   char_1023_ghost2: { charId: 'char_1023_ghost2', skill: { skillId: 'skchr_ghost2_1', index: 0, skillType: 'AUTO', durationType: 'NONE', duration: 20, bb: {} } },
@@ -157,6 +168,18 @@ describe('a token\'s skill record from its owners\' variants (R18)', () => {
     view(1, 'token_1_doll', 5, { skillIndex: 1 });
     frame();
     assert.equal(count(spawned, 'doll_aura'), 1);
+  });
+
+  test('a passive token skill\'s mode holds from the deploy: 香槟炸弹 in M2 (its ability loop, M2\'s attack)', async () => {
+    const { w, spawned, view, frame, index } = await setup();
+    const b = view(1, 'token_4_bomb', 5, { skillIndex: 1 });
+    frame();
+    w.deploy(b);
+    frame();
+    assert.equal(w.mode(index.units.token_4_bomb, b)?.name, 'M2', 'no skill event comes: the passive is on while it stands');
+    assert.equal(count(spawned, 'bomb_loop'), 1);
+    for (let i = 0; i < 10; i++) frame();
+    assert.equal(count(spawned, 'bomb_loop'), 1, 'one loop for the deployment');
   });
 });
 

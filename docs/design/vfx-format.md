@@ -1233,7 +1233,9 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   skillIndex (浊心斯卡蒂 S1 / S2 / S3 → her 海嗣's sktok_skadi2_1 / _2 / _3), else the top record with the type fields of
   the variant record of its id. 诅咒娃娃's PASSIVE record makes its plan a passive: its aura `vodfox_skill_02_buff`
   loops from the deploy while it stands (the sim sends no skill event for a passive with a duration, and the plan read
-  as instant without a type); the 海嗣's aura loops while it stands too (its PASSIVE token skill).
+  as instant without a type); the 海嗣's aura loops while it stands too (its PASSIVE token skill). A passive token
+  skill's mode holds from the deploy (every 香槟炸弹 in M2: its ability loop and M2's two hit rows); 流形's MANUAL
+  records make its plan lasting, and only S3's (sktok_mlyss_wtrman_3) has effects.
 * **An AppearSkill's start effect** (0.3.1, audit R21; plan entries with `birth`, `SkillFx.birthOf`): the
   `_overrideStartEffect` use of an AppearSkill / MultiAppearSkill is the unit's deploy effect while it fights with that
   skill — the client's Character.GetStartEffect returns it before the mode's `overrideStartEffect` and the unit's own
