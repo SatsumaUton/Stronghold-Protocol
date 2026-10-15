@@ -4,6 +4,16 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
 
 **Changelog** (for runtimes reading the files; newest first)
 
+* **2026-10-16 — readings corrected from the client's data and code, no format change (0.3.1: the 0.3.0 effects audit's
+  R18–R21 and its low-confidence observations; history 0.3.1)**. (1) A prefab's root node is active when the effect
+  plays, whatever its `active` (§33.4): 35 prefabs of the used set are saved with an inactive root. (2) A stretched
+  billboard runs the particle's Y size along its velocity and its X size across (§33.6). (3) An effect whose root
+  `static_offset` node lies deeper in the board than its anchor (`pos` z > 0) sorts its order-0 renderers behind the
+  units (§33.6). (4) A `VigilWolfEffectEmitter` row's `buffKey` is a buff its owner must hold when the row plays (§33.12
+  Mode attacks). (5) A token's skill record is its owner variant's (data/tokens.json, §33.16). (6) An AppearSkill's
+  `_overrideStartEffect` use is its unit's deploy effect (§33.12 roles, §33.16). (7) A CreateEffect action of an
+  ability (`…_actions CreateEffect` uses) may target the ability's target, which index v3 does not write (§33.16).
+
 * **2026-10-15 — the skin points' rotation (index.json `skins`, §33.12 Skin)**; no version change, fields added only:
   every point has `rot` (its local rotation, quaternion x y z w) and every point with a `bone` has `followRot` (its
   BoneFollower's `followBoneRotation`). 54 of the used set's 1,118 bone-followed points do not take their bone's
@@ -321,7 +331,11 @@ systems, `duration` the time until every non-looping system has finished (startD
 
 World matrix of a node = parent's world matrix × T(pos) · R(rot) · S(scale). A node is active when it and all its
 parents are `active` (Unity's activeInHierarchy); an inactive node renders and simulates nothing until something (an
-FxDelay, a clip curve on `m_IsActive`) activates it. A renderer also has its own `m_Enabled`.
+FxDelay, a clip curve on `m_IsActive`) activates it. A renderer also has its own `m_Enabled`. The root is the
+exception: the client activates an effect's GameObject as it plays it (`Effect._DelayToActiveGameObject` →
+`GameObjectUtil.SetActiveIfNecessary`, GameAssembly.dll of 2026-09-13), so a root saved inactive — 35 prefabs of the
+used set: the 狼群's `vigil_token_sub_attack_1` / `_2`, 伺夜's and 至简's attack starts, 艾雅法拉's hit, 风笛 S3's buff,
+百炼嘉维尔 S2's chainsaw glow … — plays like any other (the runtime drew nothing of them before 0.3.1).
 
 The usual layout: the root carries the controlling behaviour (`ParticleEffect`, `ProjectileEffect`, §33.11) → a node
 `static_offset` → a node `fixed` (or `rotation_y` / `rotation_z`, nodes the behaviour turns by direction) holding a
@@ -433,8 +447,12 @@ plane), `world` (1), `local` (2, the system's transform orientation — 9,422 re
 quads are local), `facing` (3, face the camera position), `velocity` (4); `m_SortMode` (0 none, 1 by distance, 2 oldest
 in front, 3 youngest in front), `m_SortingFudge` (bias of the camera distance used to sort this system against
 others), `m_MinParticleSize` / `m_MaxParticleSize` (on-screen size clamp, as a fraction of the viewport height),
-`m_LengthScale` / `m_VelocityScale` / `m_CameraVelocityScale` (stretched billboards: length = size × lengthScale +
-speed × velocityScale), `m_FreeformStretching`, `m_RotateWithStretchDirection`, `m_NormalDirection`, `m_Pivot` (in
+`m_LengthScale` / `m_VelocityScale` / `m_CameraVelocityScale` (stretched billboards: along the velocity the particle's
+Y size × lengthScale + speed × velocityScale, across it its X size — the particle's Y is the stretched axis: of the
+used set's stretched renderers with a pivot, 2,434 set it in Y and 9 in X, against 405 / 379 for plain billboards,
+and 2,130 of the 2,449 stretched systems with unequal X / Y sizes make Y the long one; 风笛's lance thrust, a Y 3.5 /
+X 0.5 flash flying along the thrust, was a vertical needle with the sizes the other way round, 0.3.1),
+`m_FreeformStretching`, `m_RotateWithStretchDirection`, `m_NormalDirection`, `m_Pivot` (in
 particle-size units), `m_Flip` (0…1: the share of particles mirrored per axis), `m_AllowRoll`; mesh particles:
 `m_Mesh`, `m_Mesh1…3` (`{mesh}` or null), `m_MeshDistribution` (0 uniform, 1 by `m_MeshWeighting*`), `m_MaskInteraction`;
 `materials[0]` draws the particles, `materials[1]` the TrailModule's trails.
@@ -487,7 +505,13 @@ renderers (its chararts' `Front` / `Back` / `Spine` MeshRenderers) sit on the De
 order 0, so an effect renderer on a lower layer, or on the Default layer with a negative order, is drawn before every
 unit — behind it (野鬃 S2's ring of lances at −3, a bubble's back half at −2; 5,637 of the used set's 34,061 enabled
 renderers) —, a positive order after them, and order 0 by distance with them. The web runtime draws the first kind in
-its pass under the units (`render/vfx/effect.js` `behindUnits`) along with the renderers lying flat on the ground.
+its pass under the units (`render/vfx/effect.js` `behindUnits`) along with the renderers lying flat on the ground,
+and — for order 0 — the renderers of an effect authored behind its unit: a root `static_offset` node deeper in the
+board than the anchor (`pos` z > 0; 50 prefabs of the used set — auras, the `*_back` halves, a slash for a unit
+facing up) puts the effect farther from the camera than the unit's tilted body, which lies at its feet's depth, so
+Unity draws it first (0.3.1: 瑕光 S3's horses, wings and halo, z +0.23 and 0.5–1.1 tiles behind her feet, covered her);
+a `static_offset` pulled forward (z < 0) or at 0 keeps the flat rule [ASSUMED: the units' renderers sort at their
+feet's depth; an effect whose depth comes from its children's positions alone is not judged].
 
 ### 33.7 Materials (`descriptor.materials[]`)
 
@@ -903,7 +927,7 @@ and gives every effect a role — when the runtime plays it on the sim's skill t
 
 | role | when | from |
 |---|---|---|
-| `start` | once when the skill starts (for a one-cast skill — `ReplacementSkill` — its cast) | one-shot cast rows (start event 2 / 4 / 0), `_beginEffect`, `_overrideStartEffect` (summons), `_startEffect`, `_chantSuccessEffects`, a buff template's action at ON_BUFF_START / ON_SKILL_START |
+| `start` | once when the skill starts (for a one-cast skill — `ReplacementSkill` — its cast) | one-shot cast rows (start event 2 / 4 / 0), `_beginEffect`, `_overrideStartEffect` (an AppearSkill's: the unit's deploy effect while it fights with that skill — Character.GetStartEffect returns it before the mode's `overrideStartEffect` and the unit's `_startEffect`; 0.3.1), `_startEffect`, `_chantSuccessEffects`, a buff template's action at ON_BUFF_START / ON_SKILL_START |
 | `loop` | while the skill lasts (or the buff carrying it: `on` says on whom) | looping cast rows (start → end event), attach rows, a buff's effect (`overrideEffectKey`, else its template's `effectKey`), aura `_effects`, channel emitters, buffs a template creates |
 | `range` | the skill's area marker (loop or one-shot by `oneshot`) | a cast row or a field named `*_range*`, `RangeEffectEmitter`, `_tileEffectKey` |
 | `cast` | each ability use while a buff lasts | a template's action at ON_ABILITY_START / ON_ABILITY_SPELL_ON / ON_BEFORE_ATTACK |
@@ -1139,7 +1163,13 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   its `emitter` allows: an UberAnimation replace group's row (`anim`) when the attack plays that animation — for
   `loopType` 1 the group animations in turn by the unit's attack count [ASSUMED], else the animation the model plays
   (SpineActor.attackAnim), else `sourceAnimKey`; an InCertainMode emitter's rows only in the mode of index
-  `activeMode`; a VigilWolf row bound to a buff of its owner (`buffKey`) never (no view shows that buff). Version 1's
+  `activeMode`; a VigilWolf row bound to a buff of its owner (`buffKey`) while the owner holds that buff — the client's
+  VigilWolfCastEffectOptions.PlayEffect checks Entity.ContainsBuff — read from the 狼群's 狼影 count (b.snap `wolves`
+  [left, max], `wiring.js WOLF_BUFFS`): the 狼群领袖 talent's `vigil_wolf_t_1_enhance[holder]` buffs (one per 狼影 beyond the
+  pack, `[born]` making one at the deploy) each derive a `…[damage]`, held from 2 wolves on (`vigil_token_sub_attack_1`),
+  and `…[trigger_override]` exists while the holders are at max_stack_cnt (all 3 wolves: `vigil_token_sub_attack_2`)
+  [ASSUMED: the sim's count is the client's holders + 1]; a row bound to another buff never (0.3.1, audit R19; before,
+  every buff-bound row was skipped). Version 1's
   attacks carry none of these fields and play as before. Version 3 (Phase 3d): the UberAnimation `loopType` is 0 LOOP
   (in turn) and 1 RANDOM (a seeded pick — §33.17 resolved it; Phase 3c had taken 1 for in turn); a group's `select`
   decides its sub-ability — `parallel` all (its `main` first: that one's projectile), `random` a seeded pick
@@ -1196,6 +1226,27 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   (`CHARGE_EMITTERS`), which stays for a version 1 index.
 * **Root class**: a skill's `rootClass` is kept on the plan (`plan.rootClass`); a ReplacementSkill* is one cast (the
   plan's kind `instant`: its single attack is the skill), a PassiveSkill without our record a passive.
+* **A token's skill record** (0.3.1, audit R18; `skills.js skillRecordOf` / `tokenSkillRecord`): data/tokens.json
+  writes only `{ skillId, bb }` at a token's top; the full records (skillType, duration, prefabId) sit in its owners'
+  `variants` — `skill` and `bySkill[i].skill`, one per index of the owner's skill choice, the def the sim merges for
+  the token, whose UnitInfo `skillIndex` is that record's `index`. The plan takes the variant record with the unit's
+  skillIndex (浊心斯卡蒂 S1 / S2 / S3 → her 海嗣's sktok_skadi2_1 / _2 / _3), else the top record with the type fields of
+  the variant record of its id. 诅咒娃娃's PASSIVE record makes its plan a passive: its aura `vodfox_skill_02_buff`
+  loops from the deploy while it stands (the sim sends no skill event for a passive with a duration, and the plan read
+  as instant without a type); the 海嗣's aura loops while it stands too (its PASSIVE token skill). A passive token
+  skill's mode holds from the deploy (every 香槟炸弹 in M2: its ability loop and M2's two hit rows); 流形's MANUAL
+  records make its plan lasting, and only S3's (sktok_mlyss_wtrman_3) has effects. [ASSUMED] the variant record is
+  the first owner's (the base piece `_a`; UnitInfo names no summoner): an elite `_b` owner's record of the same index
+  differs only in level, text, blackboard values and (蜜蜡's 沙之碑) SP cost — the base piece's values, as the top
+  record had.
+* **An AppearSkill's start effect** (0.3.1, audit R21; plan entries with `birth`, `SkillFx.birthOf`): the
+  `_overrideStartEffect` use of an AppearSkill / MultiAppearSkill is the unit's deploy effect while it fights with that
+  skill — the client's Character.GetStartEffect returns it before the mode's `overrideStartEffect` and the unit's own
+  `_startEffect` (else the generic deploy) —, so `FxWiring.deploy` plays no other one: 缄默德克萨斯 S1 shows
+  `texas2_birth_01_start` alone, S2 / S3 (`common_empty`) no deploy effect beside the appear strike, 斯卡蒂 S2 her
+  looping `skadi_skill_02_start` without the generic pillar (弑君者 S2 / S3 alike). A passive plays it with its start
+  one-shots (a looping one held while the unit stands); for another kind the deploy plays it and the skill's start
+  leaves it out.
 * **Enemy skills (v2)**: `units[enemy].skills` by the lower-case `prefabKey` of the enemy's data record's `skills[]`
   (the slot order). A skill's window opens on ['cast', id, slot, dur?] — since Phase 3d the sim sends it (SIM.md,
   `content/enemies/helpers.js castSlot`: a cooldown cast, an SP skill's attack before its 'atk', a kit's own moment) —
@@ -1275,7 +1326,14 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   where a kit's fx stands for that projectile (克莱门莎 S3's `projectile_chr_clemnt_s3`). A binding may name its own
   `keys` instead, played once `at: 'target'` on the unit the fx names (round 46: 泡泡 S2's 'counter' →
   `bubble_skill_02_hit` on the attacker, the client's `bubble_s_2` CreateEffect on MODIFIER_SOURCE at ON_TAKE_DAMAGE;
-  the kit's fx carries `target`).
+  the kit's fx carries `target`; another field with the binding's `target`: 0.3.1, audit R20 — 归溟幽灵鲨 S1's
+  'hpShare' names the ally in `to`, and her ExchangeHp ability (AnimatedActionToTargetAbility, [uc]skills.ab) creates
+  `ghost2_skill_01_start` on SOURCE and `ghost2_skill_01_hit` on TARGET). A key bound so is no row on the owner
+  (`skills.js targetBound`, unmapped `bound`): index v3 writes an ability's `_actions` CreateEffect uses without their
+  target, as start rows of the owner. The same cause stays open for 雪猎's talent (`snhunt_talent_01_hit` / `_02` on
+  TARGET, at her skill start; the kit's 'strike' names the target) and 真言 S1 (a 自选 pick: `mantra_skill_01_hit_01`
+  / `mantra_bounce_hit_01` on PROJECTILE_TRACETARGET, the shot's target): the extractor should write each action's
+  `_targetType` (open).
 * **`[eff_cond]` state loops** (round 46, history §32.14.42; `skills.js COND_BUFFS`, `condState`, plan `cond`;
   `skillfx.js _cond`): the buffs a skill's `[eff_cond]` template creates at its ON_BUFF_TRIGGER (every 0.1 s) show a
   condition's state, and index.json lists only their keys. For the templates whose client graph COND_BUFFS transcribes
@@ -1306,7 +1364,8 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
     and 溯光星源 S3's links, 空弦 S1 / S2's, 流星 S2's and 雪猎 S2's volleys, 信仰搅拌机 S3's counters, 歌蕾蒂娅 S3's
     tornado pulls, 伺夜 S1's and 迷迭香 S3's summon pillars, 卡涅利安 S2's chains (once her loops are drawable).
   - A summon's pillar ('summon' archetypes, not the floating units' kinds) in the frame its official birth effect was
-    drawn (`FxWiring.deploy`'s key: the mode's override, its own, the generic one) is skipped: 风丸 S2's 替身, 伺夜's
+    drawn (`FxWiring.deploy`'s key: its skill's own start effect — an AppearSkill's, 0.3.1 —, the mode's override,
+    its own, the generic one) is skipped: 风丸 S2's 替身, 伺夜's
     wolves, 夕's and 维娜·维多利亚 S3's summons, 耀骑士临光 S3's sword; a token's arrival burst ('radiantSword',
     'summonStun', 'summonBurst', 'paperDoll', 'obelisk') only with its own birth effect.
   - Kept procedural (the client shows such a cue that is not placed here, or the fx is not the skill's): 引星棘刺 S2's

@@ -30,7 +30,13 @@
 // record (data/enemies.json): `charId`, `skill` { skillId, prefabId, index } and `skills[]` (each with `index`).
 //   * the index unit: the first of [diy.charId, spine, rec.charId, defId] that index.json has (a `_<n>` suffix dropped),
 //     the order of FxWiring.unitOf;
-//   * the skill record: `rec.skills[]` with `index === skillIndex` (the loadout's pick), else `rec.skill`;
+//   * the skill record: `rec.skills[]` with `index === skillIndex` (the loadout's pick), else `rec.skill`; a token's
+//     record (data/tokens.json) carries only `{ skillId, bb }` at its top — its owners' `variants` hold the full skill
+//     records (`skill`, `bySkill[i].skill`: one per index of the owner's skill choice, the def the sim merges for the
+//     token, whose UnitInfo skillIndex is that record's `index`): the variant record with the unit's skillIndex, else
+//     the top record completed from the variant record of its id (0.3.1, audit R18: 诅咒娃娃's PASSIVE record made its
+//     plan 'passive' — it read as 'instant' without a type, and the sim sends no skill event for a passive with a
+//     duration, so its aura never played);
 //   * the skill id: its `prefabId`, else `skillId` (lower case; a `[n]` variant suffix such as 预备干员's
 //     `skcom_charge_cost[1]` dropped), looked up in the unit's `skills`, then in index.skills; without a record, the
 //     client's naming `skchr_<code>_<skillIndex + 1>` of a `char_<n>_<code>` unit (`via: 'name'`; not when a record names
@@ -60,7 +66,7 @@
 // group; `hitOpts` { indexed, loop, random, once }: index v2's exported groups and the emitter's flags — skillfx.js
 // pickGroup); `aim` plays on the attack's targets at its cast, once. Entry = { key, role, at, loop, hold, from, node?,
 // ability?, list?, startEvent?, endEvent?, directionType?, slots?, firstOnly?, afterFirst?, event?, action?, buff?,
-// on?, byName?, point?, follow?, and index v2's group?, groups?, anim?, mode?, useLoopHitEffect?, useRandomHitEffect?,
+// on?, byName?, point?, follow?, birth?, and index v2's group?, groups?, anim?, mode?, useLoopHitEffect?, useRandomHitEffect?,
 // keepBaseHitEffect?, oncePerTarget? }:
 //   at    'owner' (placed on the owner by the prefab's own _spawnLocation: feet, HitPoint, Muzzle, a Special point, its
 //         ground centre — the wiring's playOn reads it), 'target' (on the target hit; HIT_POINT for most), 'targets'
@@ -110,7 +116,10 @@
 //     ON_CALCULATE_DAMAGE, …) → unmapped 'conditional'. Actions on targets follow `on: 'targets'` (a target's buff start
 //     is its hit → `each.hit`).
 //   * effect fields: ReadySkillEffect → `ready`; `_beginEffect` / `_startEffect` / … → `start` (a looping one is held
-//     for the skill); `_endEffect` → `end`;
+//     for the skill); an AppearSkill's (or MultiAppearSkill's) `_overrideStartEffect` → a `start` entry with `birth`:
+//     the unit's deploy effect while it fights with that skill (0.3.1, audit R21 — the client's Character.GetStartEffect
+//     returns it before the mode's `overrideStartEffect` and the unit's own `_startEffect`; `common_empty` for
+//     缄默德克萨斯 S2 / S3: no deploy effect) — FxWiring.deploy plays no other (SkillFx.birthOf); `_endEffect` → `end`;
 //     aura `_effects` → `loop`; `_hitEffect(Key)` / `_effectOnEliminatePos` → `each.hit`; points of a path or a line
 //     (`_lineEffectKey`, `_startPointEffectKey`, `_waypointEffectKey`, `_endPointEffectKey`, `_edgeLineRendererEffectKey`)
 //     and `_tileEffectKey` need positions the client is not given: unmapped 'path' / 'tiles'.
@@ -261,6 +270,7 @@ export const UNMAPPED = Object.freeze({
   'hit-no-attack': "hits of a non-attack ability: no 'atk' event names its targets",
   'channel-hit': "a channel's damage ticks: the sim sends them without a source",
   path: 'a line / path effect: its points come from the game',
+  bound: 'created on the target of the ability: a kit fx binding places it there (FX_BINDINGS `at: \'target\'`)',
   tiles: 'tile effects on tiles the client is not told',
   other: 'the extractor could not place it in time',
 });
@@ -297,9 +307,17 @@ export function unitKeyOf(idx, cands) {
   return null;
 }
 
-/** Our data's skill record a unit fights with: `rec.skills[]` with that index, else `rec.skill`. */
+/**
+ * Our data's skill record a unit fights with: `rec.skills[]` with that index, else `rec.skill` — for a token's record
+ * (data/tokens.json: a top `skill` without its type, the full records in its owners' `variants`) the variant record
+ * (tokenSkillRecord).
+ */
 export function skillRecordOf(rec, skillIndex) {
   if (!isObj(rec)) return null;
+  if (isObj(rec.variants) && isObj(rec.skill) && typeof rec.skill.skillType !== 'string') {
+    const t = tokenSkillRecord(rec, skillIndex);
+    if (t) return t;
+  }
   const list = Array.isArray(rec.skills) ? rec.skills : [];
   if (Number.isInteger(skillIndex)) {
     const s = list.find((x) => isObj(x) && x.index === skillIndex);
@@ -308,6 +326,37 @@ export function skillRecordOf(rec, skillIndex) {
     return null;
   }
   return isObj(rec.skill) ? rec.skill : list.find((x) => isObj(x) && x.isDefault) || null;
+}
+
+/**
+ * A token's skill record from its owners' variants (data/tokens.json `variants[owner].skill` and `.bySkill[i].skill`,
+ * the full records — skillType, duration, prefabId, the owner skill's blackboard): the one whose `index` is the unit's
+ * skillIndex (the sim's token def merges the owner's choice and UnitInfo sends its `index`: 浊心斯卡蒂 S1 / S2 / S3 give
+ * her 海嗣 sktok_skadi2_1 / _2 / _3), else — no index — the top record completed with the type fields of the variant
+ * record of its id; null when no variant record fits (the top record stays as it is). [ASSUMED] the first owner's
+ * record of that index (data order: the base piece `_a` before its elite `_b` — UnitInfo names no summoner): the
+ * owners' records of one index differ only in level, text, blackboard values and (蜜蜡's 沙之碑) SP cost, and the top
+ * record carries the base piece's too.
+ */
+export function tokenSkillRecord(rec, skillIndex) {
+  const all = [];
+  for (const v of Object.values(rec?.variants || {})) {
+    if (!isObj(v)) continue;
+    if (isObj(v.skill)) all.push(v.skill);
+    for (const b of Object.values(isObj(v.bySkill) ? v.bySkill : {})) if (isObj(b?.skill)) all.push(b.skill);
+  }
+  const typed = all.filter((s) => typeof s.skillType === 'string');
+  if (Number.isInteger(skillIndex)) {
+    const s = typed.find((x) => x.index === skillIndex);
+    if (s) return s;
+  }
+  const top = isObj(rec?.skill) ? rec.skill : null;
+  if (!top) return null;
+  const ids = skillIdsOf(top);
+  const same = typed.find((x) => skillIdsOf(x).some((k) => ids.includes(k)));
+  if (!same) return null;
+  const { skillType, durationType, duration, spType } = same;
+  return { ...top, skillType, durationType, duration, spType };
 }
 
 /** Candidate index skill ids of a skill record (prefabId, skillId; lower case, a `[n]` suffix dropped). */
@@ -588,6 +637,13 @@ export function skillPlan(idx, unitKey, skillId, opts = {}) {
     if (kk && projs[kk] && !plan.projectiles.includes(kk)) plan.projectiles.push(kk);
   }
   planUses(idx, plan, [...(Array.isArray(skill.uses) ? skill.uses : []), ...attach], { ...opts, abilities: skill.abilities });
+  // a key a kit fx binding plays on the unit that fx names is no row on the owner (FX_BINDINGS `at: 'target'`)
+  const bound = targetBound(id);
+  if (bound.size) {
+    for (const role of ['start', 'loop', 'range', 'end']) {
+      plan[role] = plan[role].filter((e) => !bound.has(e.key) || (plan.unmapped.push({ key: e.key, role: e.role, reason: 'bound', from: e.from }), false));
+    }
+  }
   if (isObj(opts.rec)) tagCasts(plan, skill);
   return plan;
 }
@@ -749,6 +805,8 @@ function entryOf(key, role, u, prefabs, describe) {
   // a slot without an extracted prefab plays nothing (null)
   if (Array.isArray(u.slots) && u.slots.length) e.slots = u.slots.map((x) => { const k = lc(x); return k && prefabs[k] ? k : null; });
   if (u.by === 'name') e.byName = true;
+  // the start effect a skill that appears with its unit gives the unit's deploy (Character.GetStartEffect)
+  if (/AppearSkill\._overrideStartEffect$/.test(String(u.from || ''))) e.birth = true;
   if (typeof describe === 'function') {
     const a = anchorOf(describe(key));
     if (a) { e.point = a.point; e.follow = a.follow; }
@@ -1233,8 +1291,10 @@ export function chargeKeys(plan) {
  *   keys        else these prefabs (an official effect our projectile records do not list as reached: a projectile's
  *               main effect, a skill row the kit's moment stands for; a one-shot of the skill's own: its `at` 'target')
  *   at          'point': the fx's (x, y) on the ground (the unit `extra.id` names stands there: its feet); 'target': once
- *               on the unit `extra.target` names (else at the fx's point), turned by the owner's side (FLIP_TWO_SIDE);
- *               else on the view `extra.id` names (the fx's point without one)
+ *               on the unit the fx names in `extra[target]` (`target`, default 'target'; else at the fx's point), turned
+ *               by the owner's side (FLIP_TWO_SIDE) — such a key is no row of the skill on its owner (targetBound: the
+ *               client creates it on the ability's target, the index writes it as a start row); else on the view
+ *               `extra.id` names (the fx's point without one)
  *   hold        how long a looping reached effect stays: a blackboard key of our skill record (seconds), 'fx' — the
  *               fx's own `duration` / `dur` / `hold` (the kit's area or lock time) —, else `holdS`
  *   cover       fx kinds of the same owner at that tile that the reached effect draws (skipped while it plays)
@@ -1299,6 +1359,14 @@ export const FX_BINDINGS = Object.freeze({
   skchr_bubble_2: Object.freeze({
     counter: binding({ owner: 'id', keys: ['bubble_skill_02_hit'], at: 'target' }),
   }),
+  // 归溟幽灵鲨 S1 (chess_char_5_13-ghost2.js: 'hpShare' as she swaps HP ratios with an ally, id = her, to = the ally,
+  // at the ally): the skill's ExchangeHp ability (AnimatedActionToTargetAbility, [uc]skills.ab skchr_ghost2_1) runs
+  // ExchangeHpRatio, CreateEffect ghost2_skill_01_start on SOURCE and CreateEffect ghost2_skill_01_hit on TARGET — the
+  // hit plays on the ally, not on her (0.3.1, audit R20: index v3 writes both action effects as start rows without
+  // their target, so the plan put the hit on her too; a key bound `at: 'target'` is no owner row — targetBound)
+  skchr_ghost2_1: Object.freeze({
+    hpShare: binding({ owner: 'id', keys: ['ghost2_skill_01_hit'], at: 'target', target: 'to' }),
+  }),
   // 锏 S3 (op-blkkgt.js): each slash of the kit ('slash', id = her, every 0.3 s while the skill lasts) is the skill's
   // Damage ability (MultiMeleeAttack: blkkgt_skill_03_start_01 / _02 on her); the finale is its EndAttack (`when: 'end'`)
   skchr_blkkgt_3: Object.freeze({
@@ -1316,6 +1384,19 @@ export function bindingEffects(idx, bind) {
   if (!p) return [];
   const list = Array.isArray(p.onReached) && p.onReached.length ? p.onReached : Array.isArray(p.onHit) ? p.onHit : [];
   return list.map(lc).filter(Boolean);
+}
+
+/**
+ * The keys a skill's bindings play on the unit their fx names (`at: 'target'` with `keys`, lower case): the client
+ * creates them on the ability's target, so they are no rows on the owner (skillPlan drops them from its start, loop,
+ * range and end rows).
+ */
+export function targetBound(skillId) {
+  const out = new Set();
+  for (const bind of Object.values(FX_BINDINGS[lc(skillId)] || {})) {
+    if (bind.at === 'target' && Array.isArray(bind.keys)) for (const k of bind.keys) if (lc(k)) out.add(lc(k));
+  }
+  return out;
 }
 
 /** The fx kinds whose binding names no owner ('skill'), by kind → the skill ids that bind it. */

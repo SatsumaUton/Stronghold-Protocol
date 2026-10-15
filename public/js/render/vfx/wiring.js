@@ -98,6 +98,31 @@ const BLOCKED_NODE = /(?:^|\/)Blocked[A-Z]\w*$/;
  */
 const MODE_VARIANT = /^(.*?)(?:\[(down|d|up|u|lr)\]|\((down|d|up|u|lr)\))$/i;
 
+/**
+ * The 狼群's buffs its VigilWolfEffectEmitter rows are bound to (`buffKey`), by the pack's wolves as the snapshot gives
+ * them (b.snap `wolves` [left, max]: the view's `wolves`). The client plays such a row only while the owner holds that
+ * buff (VigilWolfCastEffectOptions.PlayEffect calls Entity.ContainsBuff — GameAssembly.dll of 2026-09-13). The
+ * 狼群领袖 talent's buffs (config/buff_template_holder.ab): every 狼影 beyond the pack itself is a
+ * `vigil_wolf_t_1_enhance[holder]` whose derived `…[damage]` adds the attack's extra hit (`…[born]` makes one at the
+ * deploy), and `…[trigger_override]` is created when the holders reach max_stack_cnt (2) and finished as soon as one is
+ * lost — the pack at its most. So `…[damage]` while 2 wolves or more stand (vigil_token_sub_attack_1), `…[trigger_override]`
+ * while all of them do (vigil_token_sub_attack_2) [ASSUMED: the sim's count is the pack's wolves, the client's holders
+ * plus one — its initial 2 is `[born]`'s holder, its 至多3只 max_stack_cnt 2 + 1].
+ */
+export const WOLF_BUFFS = Object.freeze({
+  'vigil_wolf_t_1_enhance[damage]': (left) => left >= 2,
+  'vigil_wolf_t_1_enhance[trigger_override]': (left, max) => left >= 2 && left >= max,
+});
+
+/** Whether a 狼群 view holds a buff of WOLF_BUFFS now (its `wolves` [left, max]); false for any other buff or view. */
+export function wolfHolds(v, buffKey) {
+  const f = WOLF_BUFFS[buffKey];
+  const w = v?.wolves;
+  if (!f || !Array.isArray(w) || w.length < 2) return false;
+  const left = Number(w[0]), max = Number(w[1]);
+  return Number.isFinite(left) && Number.isFinite(max) && f(left, max);
+}
+
 /** A deterministic 32-bit seed of a unit and its attack count (random picks of groups and sub-abilities: replayable). */
 export function seedOf(id, n) {
   let h = 2166136261;
@@ -705,11 +730,12 @@ export class FxWiring {
    * attack plays its animation — the group animations replace `sourceAnimKey` in turn by the unit's attack count for
    * `loopType` 0 (LOOP), at random for 1 (RANDOM: index v3's `loopTypeName`; a seeded pick by unit id × attack count, the
    * same in a replay); an InCertainMode emitter's in its mode (`activeMode`: the mode's index); a VigilWolf row bound to
-   * a buff of its owner (`buffKey`) never (no view shows it).
+   * a buff of its owner (`buffKey`) while the 狼群 holds that buff by its 狼影 count (wolfHolds); a row bound to a buff no
+   * view shows never.
    */
   _rowOk(r, em, src, nth, modeIdx) {
     if (!r) return false;
-    if (r.buffKey) return false;
+    if (r.buffKey) return em?.class === 'VigilWolfEffectEmitter' && wolfHolds(src, r.buffKey);
     if (em?.class === 'UberEffectEmitterInCertainMode' && Number.isInteger(em.activeMode) && modeIdx >= 0 && em.activeMode !== modeIdx) return false;
     if (r.anim && em?.class === 'UberAnimationEffectEmitter') {
       const anims = Array.isArray(em.replaceAnims) ? em.replaceAnims : [];
@@ -1326,12 +1352,19 @@ export class FxWiring {
     return !!(key && this.playOn(key, v, {}));
   }
 
-  /** b.ev 'deploy': the unit's own start effect or the generic deploy (operators and summons). */
+  /**
+   * b.ev 'deploy': the unit's start effect (the client's Character.GetStartEffect: its skill's own — an AppearSkill's
+   * `_overrideStartEffect`, SkillFx.birthOf —, else its mode's override, its own, else the generic deploy) — operators
+   * and summons. A passive skill's start one-shots play the skill's own (SkillFx.deployed) and nothing else does
+   * (0.3.1, audit R21: 缄默德克萨斯 S1–S3 and 斯卡蒂 S2 showed the generic pillar too).
+   */
   deploy(v) {
     if (!v || !this.idx) return false;
     this.skills.deployed(v);   // a passive's loops and start one-shots (it is drawn whatever the deploy effect is)
     this.talents.deployed(v);  // the deploy talents' one-shots (耀骑士临光's birth), once per life
     if (!this.ofx.active || v.isEnemy) return false;
+    const b = this.skills.birthOf(v);
+    if (b && b.drawn) return b.own || b.empty ? true : !!this.playOn(b.key, v, {});
     const u = this.unitOf(v);
     const m = u ? this.mode(u, v) : null;
     const key = lc(m?.overrideStartEffect) || lc(u?.startEffect) || this.idx.generic?.birth?.char;
