@@ -1,3 +1,9 @@
+## 0.3.1 — unreleased
+
+### 工具
+
+- Windows 上 `node tools/plugin.mjs test <id>` 现在能运行插件的作者测试（之前预加载脚本以文件路径传给 Node，被当成网址拒绝：ERR_UNSUPPORTED_ESM_URL_SCHEME）；测试报告在 Node 22 / 24 下统一为 spec 格式，输出不是终端时也一样。
+
 ## 0.3.0 — 2026-10-16
 
 ### 规则与插件
