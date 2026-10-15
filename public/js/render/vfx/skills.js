@@ -30,7 +30,13 @@
 // record (data/enemies.json): `charId`, `skill` { skillId, prefabId, index } and `skills[]` (each with `index`).
 //   * the index unit: the first of [diy.charId, spine, rec.charId, defId] that index.json has (a `_<n>` suffix dropped),
 //     the order of FxWiring.unitOf;
-//   * the skill record: `rec.skills[]` with `index === skillIndex` (the loadout's pick), else `rec.skill`;
+//   * the skill record: `rec.skills[]` with `index === skillIndex` (the loadout's pick), else `rec.skill`; a token's
+//     record (data/tokens.json) carries only `{ skillId, bb }` at its top — its owners' `variants` hold the full skill
+//     records (`skill`, `bySkill[i].skill`: one per index of the owner's skill choice, the def the sim merges for the
+//     token, whose UnitInfo skillIndex is that record's `index`): the variant record with the unit's skillIndex, else
+//     the top record completed from the variant record of its id (0.3.1, audit R18: 诅咒娃娃's PASSIVE record made its
+//     plan 'passive' — it read as 'instant' without a type, and the sim sends no skill event for a passive with a
+//     duration, so its aura never played);
 //   * the skill id: its `prefabId`, else `skillId` (lower case; a `[n]` variant suffix such as 预备干员's
 //     `skcom_charge_cost[1]` dropped), looked up in the unit's `skills`, then in index.skills; without a record, the
 //     client's naming `skchr_<code>_<skillIndex + 1>` of a `char_<n>_<code>` unit (`via: 'name'`; not when a record names
@@ -297,9 +303,17 @@ export function unitKeyOf(idx, cands) {
   return null;
 }
 
-/** Our data's skill record a unit fights with: `rec.skills[]` with that index, else `rec.skill`. */
+/**
+ * Our data's skill record a unit fights with: `rec.skills[]` with that index, else `rec.skill` — for a token's record
+ * (data/tokens.json: a top `skill` without its type, the full records in its owners' `variants`) the variant record
+ * (tokenSkillRecord).
+ */
 export function skillRecordOf(rec, skillIndex) {
   if (!isObj(rec)) return null;
+  if (isObj(rec.variants) && isObj(rec.skill) && typeof rec.skill.skillType !== 'string') {
+    const t = tokenSkillRecord(rec, skillIndex);
+    if (t) return t;
+  }
   const list = Array.isArray(rec.skills) ? rec.skills : [];
   if (Number.isInteger(skillIndex)) {
     const s = list.find((x) => isObj(x) && x.index === skillIndex);
@@ -308,6 +322,34 @@ export function skillRecordOf(rec, skillIndex) {
     return null;
   }
   return isObj(rec.skill) ? rec.skill : list.find((x) => isObj(x) && x.isDefault) || null;
+}
+
+/**
+ * A token's skill record from its owners' variants (data/tokens.json `variants[owner].skill` and `.bySkill[i].skill`,
+ * the full records — skillType, duration, prefabId, the owner skill's blackboard): the one whose `index` is the unit's
+ * skillIndex (the sim's token def merges the owner's choice and UnitInfo sends its `index`: 浊心斯卡蒂 S1 / S2 / S3 give
+ * her 海嗣 sktok_skadi2_1 / _2 / _3), else — no index — the top record completed with the type fields of the variant
+ * record of its id; null when no variant record fits (the top record stays as it is).
+ */
+export function tokenSkillRecord(rec, skillIndex) {
+  const all = [];
+  for (const v of Object.values(rec?.variants || {})) {
+    if (!isObj(v)) continue;
+    if (isObj(v.skill)) all.push(v.skill);
+    for (const b of Object.values(isObj(v.bySkill) ? v.bySkill : {})) if (isObj(b?.skill)) all.push(b.skill);
+  }
+  const typed = all.filter((s) => typeof s.skillType === 'string');
+  if (Number.isInteger(skillIndex)) {
+    const s = typed.find((x) => x.index === skillIndex);
+    if (s) return s;
+  }
+  const top = isObj(rec?.skill) ? rec.skill : null;
+  if (!top) return null;
+  const ids = skillIdsOf(top);
+  const same = typed.find((x) => skillIdsOf(x).some((k) => ids.includes(k)));
+  if (!same) return null;
+  const { skillType, durationType, duration, spType } = same;
+  return { ...top, skillType, durationType, duration, spType };
 }
 
 /** Candidate index skill ids of a skill record (prefabId, skillId; lower case, a `[n]` suffix dropped). */
