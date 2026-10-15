@@ -326,7 +326,7 @@ export class SkillFx {
   _loopsOnly(U, v, byFlag) {
     U.loopsOn = true;
     U.byFlag = byFlag;
-    for (const e of uniq([...U.plan.start, ...U.plan.range, ...U.plan.loop])) if (isLoop(e)) this._keep(U, e, this._play(e, v));
+    for (const e of uniq([...U.plan.start, ...U.plan.range, ...U.plan.loop])) if (isLoop(e) && !e.birth) this._keep(U, e, this._play(e, v));
   }
 
   /** A passive's loops (while deployed) and, once per deployment, its start one-shots (a held one-shot prefab too). */
@@ -384,6 +384,7 @@ export class SkillFx {
       this._stopLoops(U);          // a cast while on (onEnd re-cast) starts afresh
       let drew = false;
       for (const e of uniq([...U.plan.start, ...U.plan.range, ...U.plan.loop])) {
+        if (e.birth) continue;     // the deploy's (birthOf: FxWiring.deploy plays it)
         const h = this._play(e, v);
         if (h) { drew = true; this._keep(U, e, h); }
       }
@@ -551,14 +552,34 @@ export class SkillFx {
     return this._on(U) || U.startFrame === this.frame || now - U.offAt <= COVER_AFTER_S || this.marks.some((m) => m.owner === U.id && m.until > now);
   }
 
-  /** The unit's official birth effect (FxWiring.deploy's key: its mode's override, its own, else the generic one). */
+  /**
+   * The unit's official birth effect (FxWiring.deploy's key: its skill's own start effect — birthOf —, its mode's
+   * override, its own, else the generic one).
+   */
   _birth(v) {
     if (!this.active() || !v || v.isEnemy) return;
     const u = this.w.unitOf(v);
     const m = u ? this.w.mode(u, v) : null;
-    const own = lc(m?.overrideStartEffect) || lc(u?.startEffect);
+    const own = this.birthOf(v)?.key || lc(m?.overrideStartEffect) || lc(u?.startEffect);
     const key = own || lc(this.w.idx.generic?.birth?.char);
     if (key && this.w.ofx.lib.has(key)) this.born.set(idOf(v), { frame: this.frame, own: !!own && key === own });
+  }
+
+  /**
+   * The deploy effect the unit's skill gives it (0.3.1, audit R21): an AppearSkill's `_overrideStartEffect` (the plan's
+   * start entry with `birth`, skills.js) comes before the mode's override and the unit's own start effect — the
+   * client's Character.GetStartEffect — and `common_empty` (缄默德克萨斯 S2 / S3) means none. { key, drawn, own } or null
+   * without one: `drawn` — the official layer stands for the deploy (the prefab is installed, or nothing is to be
+   * drawn); `own` — the skill's start plays it at the deploy (a passive's start one-shots, a held one for its while:
+   * 斯卡蒂 S2's loop), else FxWiring.deploy plays it and the skill's start leaves it out.
+   */
+  birthOf(v) {
+    const U = this.of(v);
+    const e = U?.plan ? U.plan.start.find((x) => x.birth) : null;
+    if (!e) return null;
+    const key = this._key(e, v);
+    const empty = key === 'common_empty';
+    return { key, entry: e, drawn: empty || (!!key && this.w.ofx.lib.has(key)), own: U.plan.kind === 'passive', empty };
   }
 
   /** b.ev 'deploy': a passive's loops and start one-shots; a redeployed 秘术师 starts with no energy. */

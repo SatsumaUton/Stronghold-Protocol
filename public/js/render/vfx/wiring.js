@@ -1352,12 +1352,19 @@ export class FxWiring {
     return !!(key && this.playOn(key, v, {}));
   }
 
-  /** b.ev 'deploy': the unit's own start effect or the generic deploy (operators and summons). */
+  /**
+   * b.ev 'deploy': the unit's start effect (the client's Character.GetStartEffect: its skill's own — an AppearSkill's
+   * `_overrideStartEffect`, SkillFx.birthOf —, else its mode's override, its own, else the generic deploy) — operators
+   * and summons. A passive skill's start one-shots play the skill's own (SkillFx.deployed) and nothing else does
+   * (0.3.1, audit R21: 缄默德克萨斯 S1–S3 and 斯卡蒂 S2 showed the generic pillar too).
+   */
   deploy(v) {
     if (!v || !this.idx) return false;
     this.skills.deployed(v);   // a passive's loops and start one-shots (it is drawn whatever the deploy effect is)
     this.talents.deployed(v);  // the deploy talents' one-shots (耀骑士临光's birth), once per life
     if (!this.ofx.active || v.isEnemy) return false;
+    const b = this.skills.birthOf(v);
+    if (b && b.drawn) return b.own || b.empty ? true : !!this.playOn(b.key, v, {});
     const u = this.unitOf(v);
     const m = u ? this.mode(u, v) : null;
     const key = lc(m?.overrideStartEffect) || lc(u?.startEffect) || this.idx.generic?.birth?.char;

@@ -66,7 +66,7 @@
 // group; `hitOpts` { indexed, loop, random, once }: index v2's exported groups and the emitter's flags — skillfx.js
 // pickGroup); `aim` plays on the attack's targets at its cast, once. Entry = { key, role, at, loop, hold, from, node?,
 // ability?, list?, startEvent?, endEvent?, directionType?, slots?, firstOnly?, afterFirst?, event?, action?, buff?,
-// on?, byName?, point?, follow?, and index v2's group?, groups?, anim?, mode?, useLoopHitEffect?, useRandomHitEffect?,
+// on?, byName?, point?, follow?, birth?, and index v2's group?, groups?, anim?, mode?, useLoopHitEffect?, useRandomHitEffect?,
 // keepBaseHitEffect?, oncePerTarget? }:
 //   at    'owner' (placed on the owner by the prefab's own _spawnLocation: feet, HitPoint, Muzzle, a Special point, its
 //         ground centre — the wiring's playOn reads it), 'target' (on the target hit; HIT_POINT for most), 'targets'
@@ -116,7 +116,10 @@
 //     ON_CALCULATE_DAMAGE, …) → unmapped 'conditional'. Actions on targets follow `on: 'targets'` (a target's buff start
 //     is its hit → `each.hit`).
 //   * effect fields: ReadySkillEffect → `ready`; `_beginEffect` / `_startEffect` / … → `start` (a looping one is held
-//     for the skill); `_endEffect` → `end`;
+//     for the skill); an AppearSkill's (or MultiAppearSkill's) `_overrideStartEffect` → a `start` entry with `birth`:
+//     the unit's deploy effect while it fights with that skill (0.3.1, audit R21 — the client's Character.GetStartEffect
+//     returns it before the mode's `overrideStartEffect` and the unit's own `_startEffect`; `common_empty` for
+//     缄默德克萨斯 S2 / S3: no deploy effect) — FxWiring.deploy plays no other (SkillFx.birthOf); `_endEffect` → `end`;
 //     aura `_effects` → `loop`; `_hitEffect(Key)` / `_effectOnEliminatePos` → `each.hit`; points of a path or a line
 //     (`_lineEffectKey`, `_startPointEffectKey`, `_waypointEffectKey`, `_endPointEffectKey`, `_edgeLineRendererEffectKey`)
 //     and `_tileEffectKey` need positions the client is not given: unmapped 'path' / 'tiles'.
@@ -799,6 +802,8 @@ function entryOf(key, role, u, prefabs, describe) {
   // a slot without an extracted prefab plays nothing (null)
   if (Array.isArray(u.slots) && u.slots.length) e.slots = u.slots.map((x) => { const k = lc(x); return k && prefabs[k] ? k : null; });
   if (u.by === 'name') e.byName = true;
+  // the start effect a skill that appears with its unit gives the unit's deploy (Character.GetStartEffect)
+  if (/AppearSkill\._overrideStartEffect$/.test(String(u.from || ''))) e.birth = true;
   if (typeof describe === 'function') {
     const a = anchorOf(describe(key));
     if (a) { e.point = a.point; e.follow = a.follow; }

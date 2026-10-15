@@ -8,8 +8,8 @@ import assert from 'node:assert/strict';
 import { FxWiring, wolfHolds } from '../../public/js/render/vfx/wiring.js';
 import { skillRecordOf, tokenSkillRecord, planFor, resolveSkill, skillPlan, targetBound, bindingKeys } from '../../public/js/render/vfx/skills.js';
 
-const KEYS = ['doll_aura', 'sea_aura_1', 'sea_aura_3', 'g_hit', 'g_heal', 'g_enemy', 'g_birth', 'wolf_sub_1', 'wolf_sub_2', 'wolf_cast', 'ghost2_skill_01_start', 'ghost2_skill_01_hit', 'ghost2_skill_01_buff'];
-const LOOPING = new Set(['doll_aura', 'sea_aura_1', 'sea_aura_3', 'ghost2_skill_01_buff']);
+const KEYS = ['doll_aura', 'sea_aura_1', 'sea_aura_3', 'g_hit', 'g_heal', 'g_enemy', 'g_birth', 'wolf_sub_1', 'wolf_sub_2', 'wolf_cast', 'ghost2_skill_01_start', 'ghost2_skill_01_hit', 'ghost2_skill_01_buff', 'tx_birth_01', 'common_empty', 'tx_appear', 'sk_start_loop', 'mode_birth'];
+const LOOPING = new Set(['doll_aura', 'sea_aura_1', 'sea_aura_3', 'ghost2_skill_01_buff', 'sk_start_loop']);
 const aura = (k) => ({ role: 'loop', keys: [k], from: 'AuraAbility._effects', node: 'Aura' });
 
 function makeIndex() {
@@ -34,6 +34,22 @@ function makeIndex() {
           { role: 'start', keys: ['ghost2_skill_01_start'], from: 'AnimatedActionToTargetAbility._actions CreateEffect', node: 'ExchangeHp', action: 'CreateEffect' },
           { role: 'start', keys: ['ghost2_skill_01_hit'], from: 'AnimatedActionToTargetAbility._actions CreateEffect', node: 'ExchangeHp', action: 'CreateEffect' },
         ] } } },
+      // 缄默德克萨斯 S1 / S2 and 斯卡蒂 S2: skills that appear with the unit and name its start effect
+      char_1028_texas2: { kind: 'char', modes: [{ name: 'Default', attack: { class: 'MeleeAttack' } }], startEffect: null, deadEffect: null, skills: {
+        skchr_tx_1: { rootClass: 'MultiAppearSkill', rootAbility: 'ActiveBuffAbility', projectiles: [], mode: null, uses: [
+          { role: 'start', keys: ['tx_birth_01'], from: 'MultiAppearSkill._overrideStartEffect', node: 'skchr_tx_1' }] },
+        skchr_tx_2: { rootClass: 'MultiAppearSkill', rootAbility: 'AbilitySequenceGroup', projectiles: [], mode: null, uses: [
+          { role: 'start', keys: ['common_empty'], from: 'MultiAppearSkill._overrideStartEffect', node: 'skchr_tx_2' },
+          { role: 'start', keys: ['tx_appear'], from: 'UberEffectEmitter._castEffects', node: 'Damage', ability: 'MeleeAttack', startEvent: 'ON_CAST_START', endEvent: 'ON_CAST_END', oneshot: true, list: 'cast' }] },
+        // a lasting (not passive) appear skill: the deploy plays the override itself, the skill's start leaves it out
+        skchr_tx_9: { rootClass: 'AppearSkill', rootAbility: 'ActiveBuffAbility', projectiles: [], mode: null, uses: [
+          { role: 'start', keys: ['tx_birth_01'], from: 'AppearSkill._overrideStartEffect', node: 'skchr_tx_9' }] },
+      } },
+      char_263_skadi: { kind: 'char', modes: [{ name: 'Default', overrideStartEffect: 'mode_birth', attack: { class: 'MeleeAttack' } }], startEffect: null, deadEffect: null, skills: {
+        skchr_skadi_2: { rootClass: 'AppearSkill', rootAbility: 'ActiveBuffAbility', projectiles: [], mode: null, uses: [
+          { role: 'start', keys: ['sk_start_loop'], from: 'AppearSkill._overrideStartEffect', node: 'skchr_skadi_2' }] },
+        skchr_skadi_3: { rootClass: 'CastSkill', rootAbility: 'ActiveBuffAbility', projectiles: [], mode: null, uses: [] },
+      } },
       char_9_mate: { kind: 'char', modes: [{ name: 'Default', attack: { class: 'MeleeAttack' } }], skills: {}, startEffect: null, deadEffect: null },
       enemy_1: { kind: 'enemy', modes: [{ name: 'Default', attack: { class: 'MeleeAttack', cast: [], hit: [] } }], skills: {} },
       token_2_sea: tok({
@@ -49,7 +65,10 @@ function makeIndex() {
 
 // data/tokens.json shapes: the top `skill` has only { skillId, bb }; the owners' variants hold the full records
 const tokSkill = (skillId, index, o = {}) => ({ skillId, prefabId: skillId, index, skillType: 'PASSIVE', durationType: 'NONE', duration: -1, spType: 'ON_DEPLOY', bb: {}, ...o });
+const chessRec = (charId, skills) => ({ charId, skills: skills.map(([skillId, index, skillType, duration]) => ({ skillId, index, skillType, durationType: 'NONE', duration, bb: {} })) });
 const RECS = {
+  char_1028_texas2: chessRec('char_1028_texas2', [['skchr_tx_1', 0, 'PASSIVE', 11], ['skchr_tx_2', 1, 'PASSIVE', 8], ['skchr_tx_9', 2, 'AUTO', 10]]),
+  char_263_skadi: chessRec('char_263_skadi', [['skchr_skadi_2', 1, 'PASSIVE', -1], ['skchr_skadi_3', 2, 'MANUAL', 38]]),
   char_1023_ghost2: { charId: 'char_1023_ghost2', skill: { skillId: 'skchr_ghost2_1', index: 0, skillType: 'AUTO', durationType: 'NONE', duration: 20, bb: {} } },
   token_1_doll: {
     tokenId: 'token_1_doll', skill: { skillId: 'sktok_doll', bb: { atk: -0.25 } },
@@ -194,5 +213,57 @@ describe('an ability action\'s target effect on the unit the kit fx names (R20)'
     // another kit's hpShare (魔王's, a ratio on herself, names no `to`) is not this binding's
     const other = view(3, 'char_9_mate', 4);
     assert.equal(w.simFx('hpShare', other.x, other.y, { id: other.id, ratio: 0.5 }), false);
+  });
+});
+
+describe('a skill\'s own start effect replaces the deploy effect (R21)', () => {
+  test('缄默德克萨斯 S1: her birth effect once, no generic pillar; S2 (common_empty): nothing but the appear strike', async () => {
+    const { w, spawned, view, frame } = await setup();
+    const s1 = view(1, 'char_1028_texas2', 5, { skillIndex: 0 });
+    frame();
+    assert.equal(w.deploy(s1), true, 'the official layer stands for the deploy');
+    assert.equal(count(spawned, 'tx_birth_01'), 1);
+    assert.equal(count(spawned, 'g_birth'), 0);
+    const s2 = view(2, 'char_1028_texas2', 6, { skillIndex: 1 });
+    frame();
+    assert.equal(w.deploy(s2), true);
+    assert.equal(count(spawned, 'g_birth'), 0, 'common_empty: no deploy effect');
+    assert.equal(count(spawned, 'tx_birth_01'), 1);
+    assert.equal(count(spawned, 'tx_appear'), 1, 'her appear strike (the skill\'s own cast at its start)');
+  });
+
+  test('斯卡蒂 S2: the looping start effect lasts while she stands; the mode\'s override and the generic one never play', async () => {
+    const { w, spawned, handles, view, frame } = await setup();
+    const sk = view(1, 'char_263_skadi', 5, { skillIndex: 1 });
+    frame();
+    w.deploy(sk);
+    w.skill(sk, true);   // the sim's 0.5 s window of a passive without a duration
+    for (let i = 0; i < 20; i++) frame();
+    w.skill(sk, false);
+    frame();
+    assert.equal(count(spawned, 'sk_start_loop'), 1);
+    assert.equal(live(handles, 'sk_start_loop'), 1, 'held while deployed');
+    assert.deepEqual([count(spawned, 'mode_birth'), count(spawned, 'g_birth')], [0, 0]);
+    sk.alive = false;
+    w.death(sk);
+    frame();
+    assert.equal(live(handles, 'sk_start_loop'), 0);
+    // with another skill the mode's own override is her start effect
+    const s3 = view(2, 'char_263_skadi', 6, { skillIndex: 2 });
+    frame();
+    w.deploy(s3);
+    assert.equal(count(spawned, 'mode_birth'), 1);
+  });
+
+  test('an appear skill that is no passive: the deploy plays its start effect, the skill\'s start does not again', async () => {
+    const { w, spawned, view, frame } = await setup();
+    const u = view(1, 'char_1028_texas2', 5, { skillIndex: 2 });
+    frame();
+    assert.equal(w.deploy(u), true);
+    assert.equal(count(spawned, 'tx_birth_01'), 1);
+    w.skill(u, true);
+    frame();
+    assert.equal(count(spawned, 'tx_birth_01'), 1);
+    assert.equal(count(spawned, 'g_birth'), 0);
   });
 });
