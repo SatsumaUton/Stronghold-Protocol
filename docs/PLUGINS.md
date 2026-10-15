@@ -487,7 +487,8 @@ adds shop chess to their bonds' member lists. An existing record must be changed
 
 Behavior is `kit: "generic"`, `{ "ref": "<official kit key or file stem>" }`,
 `{ "spec": <JSON SkillSpec or JSON file path> }`, or `{ "dsl": <DSL spec> }`. Files are JSON, including transitive spec files. `art: { ref: charId }`
-references asset ids already installed; it carries no art file. `talentMods` supplies permanent numeric mods with a
+references an installed character id (`^[A-Za-z0-9_-]+$`, the same pattern as `art.assets`); a path or URL is
+`PLUGIN_RECORD_ART`. It carries no art file. `talentMods` supplies permanent numeric mods with a
 JSON SkillSpec. Per-skill `skillSpec` overrides the operator's spec for that selection.
 
 `kitOf` resolves extensions → `raw.dsl` → `raw.skillSpec` → `raw.kitRef` → official kit → generic. When the record
@@ -1436,11 +1437,16 @@ Optional operator fields preserve old plugins unchanged:
   bond visible members and DIY owned selection. [ASSUMED] For `as: "both"`, hiding also excludes the DIY pick.
 - `chess.ids: { normal, elite }`: distinct `chess_x_<plugin_namespace>_…` IDs; do not also set legacy `chess.id`.
   Pair references and `upgradeChessId` use these IDs directly; suffixes are not required.
-- `art.ref`: default installed character art and voice bank. `art.assets` overrides exact manifest IDs:
+- `art.ref`: default installed character art and voice bank. The id matches `^[A-Za-z0-9_-]+$`, the same
+  pattern as each `art.assets` id; a path or a URL is `PLUGIN_RECORD_ART`. `art.assets` overrides exact manifest IDs:
   `avatar`, `portrait`, `spine`, `voice`, `skillIcon`, `subProfIcon`, each optionally suffixed `Golden`.
-  These are IDs, never file paths or URLs. Golden model/voice/icon defaults to the normal value;
-  avatar/portrait retain the existing `art.ref` default unless their Golden value is supplied.
+  These are IDs, never file paths or URLs. Golden model/voice/icon defaults to the normal value
+  (character entries have no E2 model or voice field). Avatar/portrait keep the `art.ref` id unless a Golden
+  value is supplied; when that id is a character-manifest key, a golden piece uses `avatarE2` / `portraitE2`
+  if the entry has one, and otherwise that entry's own URL.
   [ASSUMED] A borrowed voice bank shares that bank's browser voice preference.
+- A hidden operator is appended to the bond's `members` only. The bond popup uses `visibleMembers` whenever
+  that array is present, including when it is empty, so a bond with no visible members draws no catalogue row.
 - `origin: { charId?, chessId? }`: installed official provenance; at least one is required, both must agree.
   [ASSUMED] This is metadata only: it never inherits stats, art or a kit. Art and kit selection are explicit.
 

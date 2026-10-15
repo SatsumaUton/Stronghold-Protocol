@@ -1969,7 +1969,9 @@
               "properties": {
                 "ref": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9_-]+$"
                 },
                 "assets": {
                   "type": "object",
@@ -4115,7 +4117,9 @@
                 "properties": {
                   "ref": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9_-]+$"
                   },
                   "assets": {
                     "type": "object",
@@ -6275,7 +6279,9 @@
                     "properties": {
                       "ref": {
                         "type": "string",
-                        "minLength": 1
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
                       },
                       "assets": {
                         "type": "object",

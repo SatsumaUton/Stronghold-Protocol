@@ -4,8 +4,8 @@ const str = { type: 'string', minLength: 1 }, obj = { type: 'object' };
 const ids = { type: 'array', items: str };
 const assetId = { ...str, maxLength: 128, pattern: '^[A-Za-z0-9_-]+$' };
 export const OPERATOR_ART_SCHEMA = { type: 'object', minProperties: 1, additionalProperties: false,
-  // Keep the legacy opaque ref string contract; new sidecars use plain IDs, never fetchable paths.
-  properties: { ref: str, assets: { type: 'object', minProperties: 1, additionalProperties: false,
+  // art.ref is an installed character id, the same pattern as art.assets: never a path or a URL.
+  properties: { ref: assetId, assets: { type: 'object', minProperties: 1, additionalProperties: false,
     properties: Object.fromEntries(['avatar', 'portrait', 'spine', 'voice', 'skillIcon', 'subProfIcon'].flatMap(k => [[k, assetId], [`${k}Golden`, assetId]])) } } };
 export const OPERATOR_ORIGIN_SCHEMA = { type: 'object', minProperties: 1, additionalProperties: false, properties: { chessId: assetId, charId: assetId } };
 const form = { type: 'object', required: ['stats', 'rangeGrid'], properties: { stats: obj, rangeGrid: GRID_SCHEMA, skills: { type: 'array' } }, additionalProperties: true };
