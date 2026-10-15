@@ -23,7 +23,7 @@ import { PLUGIN_ERRORS } from './errors.js';
 import { CATALOG_ENTRY_FIELDS, CATALOG_FIELDS } from './catalog.js';
 import { SDK_ID, SDK_MEMBERS } from './sdk.js';
 /** The exports of shared/plugins/sdk.js besides SDK_ID / SDK_MEMBERS (test/plugins/surface.test.js checks the real module has no other). */
-export const SDK_EXPORTS = Object.freeze(['constants', 'createSDK', 'kit', 'math']);
+export const SDK_EXPORTS = Object.freeze(['constants', 'createSDK', 'dir', 'kit', 'math', 'targeting']);
 
 /** The release that froze this surface. Dev builds of that release count as it. */
 export const SURFACE_SINCE = '0.3.0';
@@ -99,7 +99,10 @@ export function recordNames(schema = RECORD_SCHEMA) {
 export function buildSurface(extra = {}) {
   /** @type {{ name: string, group: string, stability: 'stable' | 'experimental' | 'internal', since: string, anchor: string }[]} */
   const rows = [];
-  const add = (name, group, stability, anchor) => rows.push({ name, group, stability, since: SURFACE_SINCE, anchor });
+  const added031 = new Set(['record.operator.origin', 'sdk.sp:sdk@1.dir', 'sdk.sp:sdk@1.targeting', 'sdk.export.dir', 'sdk.export.targeting',
+    'error.PLUGIN_RECORD_HIDDEN', 'error.PLUGIN_RECORD_PAIR', 'error.PLUGIN_RECORD_ART', 'error.PLUGIN_RECORD_ORIGIN',
+    'error.PLUGIN_FORGE_MOUNT', 'error.PLUGIN_FORGE_PANEL_SCRIPT']);
+  const add = (name, group, stability, anchor) => rows.push({ name, group, stability, since: added031.has(name) ? '0.3.1' : SURFACE_SINCE, anchor });
   for (const field of MANIFEST_FIELDS) add(`manifest.field.${field}`, 'manifest', EXPERIMENTAL_FIELDS.has(field) ? 'experimental' : 'stable', 'shared/plugins/manifest.js#MANIFEST_FIELDS');
   for (const name of Object.keys(PERMISSIONS)) add(`permission.${name}`, 'permission', EXPERIMENTAL_PERMISSIONS.has(name) ? 'experimental' : 'stable', 'shared/plugins/manifest.js#PERMISSIONS');
   for (const [name, cls] of Object.entries(PLUGIN_CLASSES)) add(`class.${name}`, 'class', cls.status === 'unsupported' || EXPERIMENTAL_CLASSES.has(name) ? 'experimental' : 'stable', 'shared/plugins/manifest.js#PLUGIN_CLASSES');

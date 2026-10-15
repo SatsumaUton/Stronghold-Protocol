@@ -104,7 +104,9 @@ const doc = parseTable(fs.readFileSync(path.join(ROOT, 'docs/PLUGIN-API.md'), 'u
 test('the document table and buildSurface are the same rows', () => {
   assert.ok(rows.length > 50, `${rows.length} rows`);
   assert.deepEqual(doc, rows.map(({ name, stability, since, anchor }) => ({ name, stability, since, anchor })));
-  assert.ok(rows.every((r) => r.since === SURFACE_SINCE && r.since === '0.3.0'));
+  assert.equal(SURFACE_SINCE, '0.3.0');
+  assert.ok(rows.every((r) => ['0.3.0', '0.3.1'].includes(r.since)));
+  assert.equal(rows.find(r => r.name === 'record.operator.origin').since, '0.3.1');
 });
 
 test('every closed-set member is a row, and the table has no extra name', () => {

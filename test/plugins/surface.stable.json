@@ -300,6 +300,10 @@
     "anchor": "shared/plugins/recordsSchema.js#RECORD_SCHEMA"
   },
   {
+    "name": "record.operator.origin",
+    "anchor": "shared/plugins/recordsSchema.js#RECORD_SCHEMA"
+  },
+  {
     "name": "record.operator.art",
     "anchor": "shared/plugins/recordsSchema.js#RECORD_SCHEMA"
   },
@@ -1484,6 +1488,22 @@
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },
   {
+    "name": "error.PLUGIN_RECORD_HIDDEN",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
+    "name": "error.PLUGIN_RECORD_PAIR",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
+    "name": "error.PLUGIN_RECORD_ART",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
+    "name": "error.PLUGIN_RECORD_ORIGIN",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
     "name": "error.PLUGIN_RECORD_TYPE",
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },
@@ -1681,6 +1701,14 @@
   },
   {
     "name": "error.PLUGIN_FORGE_EXISTS",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
+    "name": "error.PLUGIN_FORGE_MOUNT",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
+    "name": "error.PLUGIN_FORGE_PANEL_SCRIPT",
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },
   {
