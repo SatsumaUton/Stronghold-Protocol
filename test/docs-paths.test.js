@@ -21,8 +21,8 @@ const DOCS = [['docs/ARCHITECTURE.md', 100], ['CONTRIBUTING.md', 15]];
 const TOP = /^(?:server|shared|public|data|tools|test|docs|types|scripts|\.github)\//;
 /** … or is one of these root files (README.md is left out: a bare `README.md` often means a folder's own). */
 const ROOT_FILES = new Set(['package.json', 'eslint.config.js', 'jsconfig.json', 'CHANGELOG.md', 'CONTRIBUTING.md']);
-/** Git-ignored or made at install time. */
-const EXEMPT = ['public/assets/', 'public/vendor/', 'data/local-assets.json'];
+/** Git-ignored or made at install time; fetch-assets.mjs downloads fonts just like the optional art. */
+const EXEMPT = ['public/assets/', 'public/fonts/', 'public/vendor/', 'data/local-assets.json'];
 
 /** Repository paths named in a Markdown text (inline code and fenced blocks), without duplicates. */
 function namedPaths(md) {
@@ -87,6 +87,9 @@ test('the path extraction: placeholders, globs, directories and the exemptions',
   assert.deepEqual(namedPaths(md).sort(), ['data/*.json', 'public/assets/', 'server/sim/content/kits/ops/op-<codename>.js', 'test/golden.test.js', 'tools/golden.mjs'].sort());
   assert.deepEqual(fixedPart('server/sim/content/kits/ops/op-<codename>.js'), { path: 'server/sim/content/kits/ops/', dir: true });
   assert.equal(missing('public/assets/'), null);
+  assert.equal(missing('public/fonts/'), null);
+  assert.equal(missing('public/fonts/fonts.css'), null);
+  assert.equal(missing('public/fontz/'), 'public/fontz/: not found');
   assert.equal(missing('server/no-such-file.js'), 'server/no-such-file.js: not found');
   assert.equal(missing('server/index.js/'), 'server/index.js/: not a directory');
 });

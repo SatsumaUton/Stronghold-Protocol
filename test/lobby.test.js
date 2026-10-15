@@ -80,6 +80,17 @@ async function joinRoom(c, code) {
 }
 
 const seatOf = (state, id) => state.seats.find((s) => s && s.playerId === id) || null;
+
+// Exercise the real socket pipeline with Network's existing clock seam: compression and CI scheduling must not
+// refill a supposedly instantaneous burst or split an abuse window. Restore the clock before other tests run.
+function networkClock(srv, t) {
+  const original = srv.network.now;
+  let now = original();
+  srv.network.now = () => now;
+  t.after(() => { srv.network.now = original; });
+  return (ms) => { now += ms; };
+}
+
 const expectError = async (c, msg, code) => {
   const r = await c.request(msg);
   assert.equal(r.t, 'error', `expected error ${code} for ${msg.t}, got ${JSON.stringify(r)}`);
@@ -557,8 +568,11 @@ describe('websocket lobby', () => {
     assert.equal(pong.t, 'pong');
   });
 
-  test('rate limit: bursts beyond 40 msg/s get RATE, connection survives, bucket refills', async () => {
-    const c = await pool.player('Spammer');
+  test('rate limit: bursts beyond 40 msg/s get RATE, connection survives, bucket refills', async (t) => {
+    const advance = networkClock(srv, t);
+    const c = await pool.connect({ wsOptions: { perMessageDeflate: false } });
+    await c.hello('Spammer');
+    assert.equal(c.ws.extensions, '', 'this burst tests rate limiting, not asynchronous compression');
     const N = 100;
     const rids = [];
     for (let i = 0; i < N; i++) rids.push(c.send({ t: 'ping', c: i }));
@@ -567,24 +581,37 @@ describe('websocket lobby', () => {
     const pongs = replies.filter((m) => m.t === 'pong').length;
     const limited = replies.filter((m) => m.t === 'error' && m.code === ERR.RATE).length;
     assert.equal(pongs + limited, N);
-    assert.ok(pongs >= 39 && pongs <= 45, `pongs ${pongs}`); // hello used one token
-    assert.ok(limited >= 55, `limited ${limited}`);
+    assert.equal(pongs, 39, 'hello used one of the 40 burst tokens');
+    assert.equal(limited, 61);
     assert.ok(c.isOpen);
-    await delay(1100);
+    advance(24);
+    assert.equal((await c.request({ t: 'ping', c: 0 })).code, ERR.RATE, '0.96 tokens cannot admit a message');
+    advance(1);
+    assert.equal((await c.request({ t: 'ping', c: 0 })).t, 'pong', 'one token refills in 25 ms');
+    advance(1100);
     const ok = await c.request({ t: 'ping', c: 0 });
     assert.equal(ok.t, 'pong');
   });
 
-  test('flooding far beyond the limit closes the socket (1008)', async () => {
-    const c = await pool.player('Flood');
-    // bursts until the server closes it: the close needs more than abuseDropsPerSec drops inside one 1 s window, and on
-    // a heavily loaded machine a single burst of 600 can be read over more than a second — the old single burst then
-    // never closed the socket and `await c.closed` (no timeout) hung the whole file
-    const t0 = Date.now();
-    while (c.isOpen && Date.now() - t0 < 20000) {
-      for (let i = 0; i < 600 && c.isOpen; i++) c.send({ t: 'ping', c: i, rid: null });
-      await delay(50);
-    }
+  test('flooding far beyond the limit closes the socket (1008)', async (t) => {
+    const advance = networkClock(srv, t);
+    const c = await pool.connect({ wsOptions: { perMessageDeflate: false } });
+    await c.hello('Flood');
+    const burst = async (count) => {
+      const rids = Array.from({ length: count }, (_, i) => c.send({ t: 'ping', c: i }));
+      return Promise.all(rids.map(rid => c.waitFor(null, m => m.rid === rid, 3000)));
+    };
+    // hello spent one token: 39 pongs + exactly 400 RATE drops must NOT close the socket. The next drop must close it.
+    let replies = await burst(439);
+    assert.equal(replies.filter(m => m.t === 'pong').length, 39);
+    assert.equal(replies.filter(m => m.t === 'error' && m.code === ERR.RATE).length, 400);
+    assert.ok(c.isOpen, 'the abuse threshold is strictly greater than 400 drops');
+    advance(1000);
+    replies = await burst(440);
+    assert.equal(replies.filter(m => m.t === 'pong').length, 40, 'the token bucket refills in the next window');
+    assert.equal(replies.filter(m => m.t === 'error' && m.code === ERR.RATE).length, 400);
+    assert.ok(c.isOpen, 'the previous window must not count towards the current abuse threshold');
+    c.send({ t: 'ping', c: 440, rid: null });
     const info = await Promise.race([c.closed, delay(10000).then(() => null)]);
     assert.ok(info, 'the server closed the flooding socket');
     assert.equal(info.code, 1008);
