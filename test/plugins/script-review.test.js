@@ -53,7 +53,8 @@ function runComposition(dirs, ids, probeMs = 1000) {
     import { buildContentSet } from ${JSON.stringify(new URL('../../server/plugins/contentSet.js',import.meta.url).href)};
     const registry = createPluginRegistry(${JSON.stringify(dirs)}, {scriptMode:'trusted',scriptHost:'127.0.0.1'});
     console.log(JSON.stringify(buildContentSet({registry,ids:${JSON.stringify(ids)}})));`;
-  // (the probe's ceiling at 1 s here, SP_SCRIPT_PROBE_MS: the hang case returns quickly; the default is 5 s)
+  // (the probe's ceiling, SP_SCRIPT_PROBE_MS, at probeMs — 1 s unless a test needs more: the hang case returns quickly;
+  // the default is 5 s)
   const env = {...process.env, SP_SCRIPT_PROBE_MS: String(probeMs)}; delete env.NODE_TEST_CONTEXT;
   const child = spawn(process.execPath,['--input-type=module','-e',source],{env,stdio:['ignore','pipe','pipe'],timeout:probeMs+7000,killSignal:'SIGKILL'});
   let stdout = '', stderr = '';
