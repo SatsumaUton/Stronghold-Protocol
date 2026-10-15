@@ -352,3 +352,23 @@ describe('an effect authored behind its unit is drawn under the units at order 0
     assert.deepEqual(gathered(0.23, [0], 'other_helper'), [false], 'only the root\'s static_offset says so');
   });
 });
+
+describe('an effect saved with an inactive root plays (the 狼群\'s shadow attacks, 艾雅法拉\'s hit …)', () => {
+  test('its systems emit as the root is activated on play; an inactive child stays off', () => {
+    const MAT = { name: 'm', shader: 'Torappu/Particles/Additive', passes: [{ blend: ['SrcAlpha', 'One', 'Zero', 'OneMinusSrcAlpha'], blendOp: 'Add', zTest: 'Disabled', zWrite: false, cull: 'Off', colorMask: 15 }],
+      queue: 'Transparent', keywords: [], floats: {}, colors: { _TintColor: [1, 1, 1, 1] }, textures: { _MainTex: { tex: 't', st: [1, 1, 0, 0] } } };
+    const ps = (id, active) => ({ id, name: `ps${id}`, parent: 0, children: [], active, pos: [0, 0, 0], rot: [0, 0, 0, 1], scale: [1, 1, 1],
+      particleSystem: { lengthInSec: 0.5, looping: false, prewarm: false, startDelay: 0, playOnAwake: true, simulationSpeed: 1, moveWithTransform: 0, scalingMode: 1,
+        InitialModule: { startLifetime: 0.3, startSpeed: 0, startSize: 1, startColor: [1, 1, 1, 1], maxNumParticles: 10 },
+        EmissionModule: { rateOverTime: 0, m_Bursts: [{ time: 0, countCurve: 2, cycleCount: 1, repeatInterval: 0.01, probability: 1 }] } },
+      particleSystemRenderer: { m_Enabled: true, renderMode: 'billboard', renderAlignment: 'view', materials: [0, null] } });
+    const d = { format: 'fx-prefab', version: 1, key: 'saved_off', root: 0, materials: [MAT], clips: [], textures: ['t'], meshes: [], refs: [], stats: {}, nodes: [
+      { id: 0, name: 'root', parent: null, children: [1, 2], active: false, pos: [0, 0, 0], rot: [0, 0, 0, 1], scale: [1, 1, 1],
+        behaviours: [{ class: 'ParticleEffect', enabled: true, fields: { _delayToPlay: 0, _delayToFinish: 0, _maxLifetime: -1, _isLoop: 0, _rotateType: 0, _spawnLocation: 1, _inactiveOnFinish: [] } }] },
+      ps(1, true), ps(2, false)] };
+    const fx = new Effect(compileEffect(d), { seed: 1 });
+    fx.update(1 / 30);
+    assert.equal(fx.sys[1].count, 2, 'the active child plays');
+    assert.equal(fx.sys[2].count, 0, 'an inactive child stays off');
+  });
+});

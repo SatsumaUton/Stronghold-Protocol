@@ -191,6 +191,13 @@ export function compileEffect(desc, lib = {}) {
       }
     }
   }
+  // the root is active when the effect plays, whatever the prefab was saved with: the client activates an effect's
+  // GameObject as it plays it (Effect._DelayToActiveGameObject's GameObjectUtil.SetActiveIfNecessary, GameAssembly of
+  // 2026-09-13) — 35 prefabs of the used set are saved with an inactive root (the 狼群's shadow attacks
+  // vigil_token_sub_attack_1 / _2 and its deaths, 伺夜's and 至简's attack starts, 艾雅法拉's hit, 风笛 S3's buff, …) and
+  // drew nothing (0.3.1)
+  const rootIdx = Number.isInteger(desc?.root) && desc.root >= 0 && desc.root < n ? desc.root : 0;
+  if (n) def.activeBase[rootIdx] = 1;
   // systems under another system play with it at the start (Unity plays child systems with their parent)
   for (let i = 0; i < n; i++) {
     let p = def.parent[i];
