@@ -295,6 +295,10 @@ node tools/plugin.mjs pack my-texas --zip
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_RECORD_EXISTS` | 要新增的记录已经存在（{where}） | 改已有的记录用补丁（patch 文件里的 set / merge）；新增的记录要起一个新的 id。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_RECORD_DELETE` | 插件不能删除记录（{where}） | 想让一个干员或敌人不出现，就改它在卡池、关卡或波次里的数据，不要删记录本身。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_RECORD_ID` | 新记录的 id 不在这个插件的命名空间里（{where}）：{detail} | 新记录的 id 要带上插件 id：插件 my-mod 的新干员写 char_x_my_mod_名字（插件 id 里的 - 换成 _），技能写 skx_my_mod_…；用 kitRef 借官方技能时可以保留官方技能 id。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_RECORD_HIDDEN` | 隐藏标记必须是布尔值（{where}） | chess.hidden 写 true 或 false。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_RECORD_PAIR` | 普通和精锐 id 配对不正确（{where}） | chess.ids 写本插件命名空间内不同的 normal 和 elite，不能同时写 chess.id。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_RECORD_ART` | 美术引用格式不正确（{where}） | art.ref 或 art.assets 写素材 id，不能写路径或网址。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_RECORD_ORIGIN` | 来源记录不存在或不一致（{where}） | origin 写本安装官方 charId 或 chessId，两个都写时必须匹配。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_RECORD_TYPE` | 紧凑记录的写法不对（{where}）：{detail} | 干员要写 charId、名字、职业、位置、稀有度（1–6）；kit 只能选一种来源：generic、ref（借官方 kit）、dsl 或一份 JSON 技能规格。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_RECORD_SKILLS` | 干员的技能列表不对（{where}）：{detail} | 技能列表里正好有一个默认技能（default: true），而且它和 "skill" 写的是同一个；改技能说明里的次数时，两处一起改。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_KIT_REF` | "kitRef" 写的官方 kit 不存在（{where}） | kitRef 写官方干员的 id（例如 char_102_texas），它的技能逻辑会照搬过来；拼写要和官方一致。 |
@@ -345,7 +349,9 @@ node tools/plugin.mjs pack my-texas --zip
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_JSON` | 包里的 JSON 读不了：{detail} | JSON 要能解析，不超过 8 MB，嵌套不超过 64 层，数字在 ±1e9 以内。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_ID` | 这个包的 id 变不成插件 id：{detail} | 用 --id 指定一个插件 id：2–32 位小写字母、数字和 -，例如 rose-skin。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_EXISTS` | 目标文件夹已经存在，没有写入：{detail} | 换一个 --out 或 --id，或者把已有的插件文件夹挪走后再导入。 |
-| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_SCRIPT` | 包里的脚本没有导入，也没有执行：{detail} | kits/<id>.js 的 id 是包里导入的记录（或 overrides 里声明的官方 id），import 又能映射到 sp:sdk@1（@kit/tier1.js、@sim/constants.js、@sim/detmath.js、包里的 ./ 文件）时，会变成沙箱里的脚本插件；不然就把技能逻辑改写成 JSON SkillSpec、DSL 或脚本插件。导入器不会运行包里的 .js。 |
+| 插件能用，但检查时有提示 | `PLUGIN_FORGE_MOUNT` | 面板挂载点需要人工适配：{detail} | 按报告建议的插槽改写面板；建议位置不是原挂载点。 |
+| 插件能用，但检查时有提示 | `PLUGIN_FORGE_PANEL_SCRIPT` | 面板脚本没有复制：{detail} | 用 postMessage API v1 重写面板脚本；导入时没有执行脚本。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_SCRIPT` | 包里的脚本没有导入，也没有执行：{detail} | kits/<id>.js 的 id 是包里导入的记录（或 overrides 里声明的官方 id），import 又能映射到 sp:sdk@1（@kit/tier1.js、@sim/constants.js、@sim/detmath.js、@sim/dir.js 与 @sim/targeting.js 的安全子集、包里的 ./ 文件）时，会变成沙箱里的脚本插件；不然就把技能逻辑改写成 JSON SkillSpec、DSL 或脚本插件。导入器不会运行包里的 .js。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_INVALID` | 插件有问题：{detail} | 看后面的英文原文；看不懂的话，可以到 GitHub 提问并附上这段文字。 |
 <!-- plugin-errors:end -->
 
@@ -373,7 +379,7 @@ node tools/plugin.mjs import-forge <工坊包目录或 zip> [--out plugins/<id>]
   自选干员用她的自选 kit，棋子用对应官方棋子的 kit）。只对上一部分，或者对上好几名干员，就用通用 kit，报告写明原因。
 - 包里的 `kits/<棋子 id>.js` 行为脚本会合成一个**脚本插件** `kits-<id>`：每个文件一个作用域，`@kit/tier1.js`、
   `@sim/constants.js`、`@sim/detmath.js` 改成 `sp:sdk@1`，包里 `./` 开头的文件一起带上。别的 import（`@kit/tier3.js`、
-  `@sim/dir.js` 之类）映射不过来，那份脚本就不写，报告里点名。导入时**不执行**它。
+  `@sim/targeting.js` 的 `sortEnemyTargets` 之类）映射不过来，那份脚本就不写，报告里点名。导入时**不执行**它。
 - 这个脚本插件**只在服主设置 `SP_PLUGIN_SCRIPTS=sandbox`（或受信任模式）并且房间选中它时**才运行（SES 沙箱，见下一节）。
   没开脚本的服务器照样能用数据插件，只是那名干员用通用 kit（或官方 kit）。
 - 不想要脚本插件：命令行加 `--no-scripts`，或在工作台里勾选「不生成脚本插件」。
@@ -449,3 +455,22 @@ SP_E2E=1 node --test test/ui/plugins-settings.e2e.test.js
 
 截图会出现在 `test/e2e/out/` 里：`studio-start.png`（工作台首页）、`studio-templates.png`（选模板）、`studio-picker.png`（按名字搜索）、
 `studio-preview.png`（拖入图片后的并排预览）、`studio-packed.png`（打包完成）。
+
+### Forge 新棋子的附加信息（0.3.1）
+
+紧凑干员可写 `chess.hidden: true`（保留供效果授予，不进商店、图鉴或自选池），
+`chess.ids: { normal, elite }`（两个不同的本插件命名空间 id，不能同时写 `chess.id`），
+`art.assets`（avatar/portrait/spine/voice/skillIcon/subProfIcon；加 Golden 指定精锐），
+以及 `origin: { charId?, chessId? }`（存在且一致的官方来源）。`art.ref` 给默认美术与语音。
+[ASSUMED] 来源只作记录，不继承数值或技能；隐藏也排除 `as: "both"` 的自选身份；借用语音共享语音库的浏览器偏好。
+Forge 的 baseId 是普通棋子 id，不当官方来源猜测。详见 [PLUGINS §16](PLUGINS.md#16-forge-import)。
+
+### Forge 导入后继续适配（0.3.1）
+
+- 安全几何函数可以直接导入：`@sim/dir.js` 的 `dirVec`、`offsetTile`，`@sim/targeting.js` 的 `absoluteRangeKeys`。
+  它们对应 SDK `sp.dir`、`sp.targeting`，返回冻结数组。`sortEnemyTargets` 会修改候选列表并读取战场对象，仍不开放。
+- 内置语言也能装 lang 插件：[ASSUMED] 同语言只收一个覆盖包（文件夹排序决定），只改提供的词条，缺失词条回退内置。
+  仍由每个浏览器选语言，不跟房间走、不影响战斗。原文 zh 不作为语言包。
+- 界面包的 `PLUGIN_FORGE_MOUNT` 表示挂载点需要人工适配；`PLUGIN_FORGE_PANEL_SCRIPT` 表示面板脚本没复制。
+  报告会写面板名、原挂载点和建议插槽；建议不是自动映射。全部九种挂载点见 [PLUGINS §16](PLUGINS.md#16-forge-import)。
+- 外观模板自带原创 CC0 棋盘格 PNG 和短音 OGG。工作台新建美术/音频模板时，目标的第一个插槽会填入示例 [ASSUMED]；可直接替换后校验、打包。

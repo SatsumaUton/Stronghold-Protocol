@@ -644,15 +644,22 @@ export function scanPlugins({ publicDir, dataDir, packsDir, pluginsDir }, { app 
   const plugins = [];
   const ids = new Map();
   const langs = new Map();
+  const overlaid = new Set();
   for (const p of found) {
     const idKey = p.id.toLowerCase();
     if (ids.has(idKey)) { skip(p.where, 'PLUGIN_DUPLICATE', `the id "${p.id}" is taken by ${ids.get(idKey)}`, { id: p.id, where: `${p.id} (${ids.get(idKey)})` }); continue; }
     if (p.class === 'lang' && langs.has(p.manifest.lang)) {
-      skip(p.where, 'PLUGIN_DUPLICATE', `the language ${p.manifest.lang} is already provided by ${langs.get(p.manifest.lang)}`, { where: `${p.manifest.lang} (${langs.get(p.manifest.lang)})` });
-      continue;
+      const base = langs.get(p.manifest.lang);
+      // [ASSUMED] One manifest-2 plugin may overlay a built-in language. The first sorted plugin wins;
+      // further providers and legacy pack collisions remain duplicates. Language choice stays browser-local.
+      if (p.source === 'plugins' && base.source === 'i18n' && !overlaid.has(p.manifest.lang)) overlaid.add(p.manifest.lang);
+      else {
+        skip(p.where, 'PLUGIN_DUPLICATE', `the language ${p.manifest.lang} is already provided by ${base.where}`, { where: `${p.manifest.lang} (${base.where})` });
+        continue;
+      }
     }
     ids.set(idKey, p.where);
-    if (p.class === 'lang') langs.set(p.manifest.lang, p.where);
+    if (p.class === 'lang' && !langs.has(p.manifest.lang)) langs.set(p.manifest.lang, p);
     plugins.push(p);
   }
   // what a plugin requires: installed, in its range (P1c refuses to enable it otherwise; here a warning)
@@ -686,10 +693,18 @@ export function scanPacks(dirs, { app = APP_VERSION } = {}) {
  * @param {{ app?: string }} [opts]
  */
 export function packIndexOf(packs, { app = APP_VERSION } = {}) {
-  const entries = packs.filter((p) => p.supported).map((p) => packIndexEntry(p.manifest, {
+  const builtin = new Map(packs.filter(p => p.source === 'i18n').map(p => [p.manifest.lang, p]));
+  const overlays = new Map(packs.filter(p => p.supported && p.source === 'plugins' && builtin.has(p.manifest.lang)).map(p => [p.manifest.lang, p]));
+  const entries = packs.filter((p) => p.supported && overlays.get(p.manifest.lang) !== p).map((p) => packIndexEntry(p.manifest, {
     files: Object.fromEntries(Object.entries(p.files).map(([role, f]) => [role, f.url])),
     strings: p.strings,
   }));
+  for (const e of entries) {
+    const overlay = overlays.get(e.lang);
+    if (!overlay) continue;
+    e.files.uiOverlay = overlay.files.ui.url;
+    if (overlay.files.data) e.files[e.files.data ? 'dataOverlay' : 'data'] = overlay.files.data.url;
+  }
   return buildPackIndex(entries, { app });
 }
 

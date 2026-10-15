@@ -13,10 +13,11 @@
 //             track: shared/plugins/visual.js), field the name the page labels it by, dir + base where its files go
 //             (art/char_102_texas/avatar.png …); manifest: the installation's art manifest (a voice's slots are its lines)
 //   overlay(target)           the `assets` part of a new plugin for that target: its entry, empty (nothing replaced yet)
-// createPlugin() puts a manifest and a README into a new folder. A cosmetic template adds nothing else (no file of the
-// game, no picture): an empty entry is a valid plugin until the author fills a slot. A template with build() also
+// createPlugin() puts a manifest and a README into a new folder. Art/audio targets also receive one original
+// sample media file; other cosmetic templates stay empty until the author fills a slot. A template with build() also
 // writes its own files (the dsl template: one operator and one prep spec). check and pack pass on either as it is.
 
+import fs from 'node:fs';
 import { APP_VERSION, PLUGIN_API } from '../../../shared/constants.js';
 import { isPluginId } from '../../../shared/plugins/manifest.js';
 import art from './art.js';
@@ -77,7 +78,7 @@ export function entryOverlay(target, value = {}) {
  * @param {StudioTemplate} template
  * @param {{ id: string, name?: string, target?: Target | null, authors?: string[], license?: string, credits?: string,
  *   lang?: string, options?: any, data?: any }} opts
- * @returns {{ manifest: Record<string, any>, files: Record<string, string>, authoring?: any }}
+ * @returns {{ manifest: Record<string, any>, files: Record<string, string | Uint8Array>, authoring?: any }}
  */
 export function createPlugin(template, { id, name = '', target = null, authors = [], license = '', credits = '', lang = 'zh', options = {}, data = null }) {
   if (!isPluginId(id)) throw Object.assign(new Error(`${id} is not a plugin id`), { code: 'PLUGIN_ID' });
@@ -123,7 +124,22 @@ export function createPlugin(template, { id, name = '', target = null, authors =
   }
   manifest.permissions = ['assets.override'];
   manifest.assets = template.overlay(target);
-  return { manifest, files: { 'README.md': readmeOf({ id, name: text, template: template.id, target }) } };
+  const files = { 'README.md': readmeOf({ id, name: text, template: template.id, target }) };
+  // [ASSUMED] Start art/audio targets with one original CC0 sample in the first editable slot.
+  // The exact same bytes ship in the filesystem template and the release's plugin resources.
+  if (target && ['art', 'audio'].includes(template.id)) {
+    const slot = template.slots(target, null)[0];
+    if (slot) {
+      const ext = template.id === 'art' ? 'png' : 'ogg';
+      const rel = `${slot.dir}/${slot.base}.${ext}`;
+      let node = manifest.assets;
+      for (const key of slot.at.slice(0, -1)) node = node[key] ??= {};
+      node[slot.at.at(-1)] = slot.kind === 'track' ? { loop: rel } : rel;
+      files[rel] = fs.readFileSync(new URL(`../../../plugins/_template/cosmetic/media/sample.${ext}`, import.meta.url));
+      files['README.md'] += '\nOriginal CC0 sample included: a 32×32 checkerboard or a 0.15-second synthesized sine tone. Replace it in the studio.\n';
+    }
+  }
+  return { manifest, files };
 }
 
 /**

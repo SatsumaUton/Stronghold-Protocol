@@ -751,3 +751,10 @@ burn hammers 2 each; limited accelerator 1; shield drone and laser emitter 4 eac
 Ashlock 10, Fartooth 3. Rebuild `choices.json` offline; these weights do not exempt draws from shared availability.
 The runtime derives unlimited fixed-gift families from `SERVER_GAIN_EQUIP`; this is a grant-source exemption,
 not a zero-occupancy flag or a manually maintained second list in generated data.
+
+## Plugin compact metadata (0.3.1)
+
+Plugin records may carry optional `origin` (official charId/chessId provenance) and `assets.voice` (voice bank ID).
+`assets.spine` and other art IDs may differ by form. Pair references, not suffixes, identify normal/elite forms.
+Hidden additions retain records with `isHidden: true`, `visible: false` and omit visible pools.
+See [PLUGINS §16](PLUGINS.md#16-forge-import) for the compact inputs and [ASSUMED] defaults.

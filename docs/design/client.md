@@ -514,3 +514,17 @@ restarts (a new match / a rewound round); a new round's prep clears only 当前�
 enters b.progress / b.result, and a tracked battle's result and rendered events are byte-identical to an untracked one
 (test/match/combat-metrics.test.js, test/match/runner.test.js). Ported from [xinhai-ai/Stronghold-Protocol](https://github.com/xinhai-ai/Stronghold-Protocol)
 (其公开部署分支，作者 @临夏俨然) with thanks.
+
+### Forge compact metadata (0.3.1)
+
+Compact operators may declare `chess.hidden`, explicit `chess.ids.normal/elite`, exact `art.assets` and official
+`origin` references ([PLUGINS §16](../PLUGINS.md#16-forge-import)). Hidden records remain addressable for grants,
+but never enter shops, visible handbook/loadout lists or owned DIY selection. Explicit pair IDs drive upgrades.
+[ASSUMED] Provenance is descriptive only, hiding applies to both forms and both identities, and borrowed voice
+preferences belong to the borrowed bank. Evidence and migration: [0.3.1 history](../history/0.3.1.md).
+
+[ASSUMED] One installed lang plugin may overlay each built-in language, in sorted plugin order; supplied UI/game-text
+keys override and missing/invalid entries retain built-in text. Scope remains browser-local choice, independent of
+room content and simulation. Pure geometry SDK helpers return frozen values and accept at most 1024 range cells.
+Forge UI mounts without an equivalent slot require an explicit manual-adaptation report, separate from script copying.
+Art/audio templates ship original CC0 sample media; the studio fills the target's first editable slot [ASSUMED].

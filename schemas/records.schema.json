@@ -904,6 +904,27 @@
                     "minLength": 1
                   },
                   "minItems": 1
+                },
+                "hidden": {
+                  "type": "boolean"
+                },
+                "ids": {
+                  "type": "object",
+                  "required": [
+                    "normal",
+                    "elite"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "normal": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "elite": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
                 }
               },
               "additionalProperties": true
@@ -1922,18 +1943,116 @@
             "trait": {
               "type": "object"
             },
+            "origin": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": false,
+              "properties": {
+                "chessId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "charId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                }
+              }
+            },
             "art": {
               "type": "object",
-              "required": [
-                "ref"
-              ],
+              "minProperties": 1,
+              "additionalProperties": false,
               "properties": {
                 "ref": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "assets": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "properties": {
+                    "avatar": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "avatarGolden": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "portrait": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "portraitGolden": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "spine": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "spineGolden": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "voice": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "voiceGolden": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "skillIcon": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "skillIconGolden": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "subProfIcon": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    },
+                    "subProfIconGolden": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    }
+                  }
                 }
-              },
-              "additionalProperties": false
+              }
             },
             "nationId": {
               "anyOf": [
@@ -2933,6 +3052,27 @@
                       "minLength": 1
                     },
                     "minItems": 1
+                  },
+                  "hidden": {
+                    "type": "boolean"
+                  },
+                  "ids": {
+                    "type": "object",
+                    "required": [
+                      "normal",
+                      "elite"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "normal": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "elite": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
                   }
                 },
                 "additionalProperties": true
@@ -3951,18 +4091,116 @@
               "trait": {
                 "type": "object"
               },
+              "origin": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": false,
+                "properties": {
+                  "chessId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9_-]+$"
+                  },
+                  "charId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9_-]+$"
+                  }
+                }
+              },
               "art": {
                 "type": "object",
-                "required": [
-                  "ref"
-                ],
+                "minProperties": 1,
+                "additionalProperties": false,
                 "properties": {
                   "ref": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9_-]+$"
+                  },
+                  "assets": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                      "avatar": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "avatarGolden": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "portrait": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "portraitGolden": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "spine": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "spineGolden": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "voice": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "voiceGolden": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "skillIcon": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "skillIconGolden": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "subProfIcon": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "subProfIconGolden": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      }
+                    }
                   }
-                },
-                "additionalProperties": false
+                }
               },
               "nationId": {
                 "anyOf": [
@@ -4976,6 +5214,27 @@
                           "minLength": 1
                         },
                         "minItems": 1
+                      },
+                      "hidden": {
+                        "type": "boolean"
+                      },
+                      "ids": {
+                        "type": "object",
+                        "required": [
+                          "normal",
+                          "elite"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "normal": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "elite": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
                       }
                     },
                     "additionalProperties": true
@@ -5994,18 +6253,116 @@
                   "trait": {
                     "type": "object"
                   },
+                  "origin": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                      "chessId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "charId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      }
+                    }
+                  },
                   "art": {
                     "type": "object",
-                    "required": [
-                      "ref"
-                    ],
+                    "minProperties": 1,
+                    "additionalProperties": false,
                     "properties": {
                       "ref": {
                         "type": "string",
-                        "minLength": 1
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      },
+                      "assets": {
+                        "type": "object",
+                        "minProperties": 1,
+                        "additionalProperties": false,
+                        "properties": {
+                          "avatar": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "avatarGolden": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "portrait": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "portraitGolden": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "spine": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "spineGolden": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "voice": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "voiceGolden": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "skillIcon": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "skillIconGolden": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "subProfIcon": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          },
+                          "subProfIconGolden": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9_-]+$"
+                          }
+                        }
                       }
-                    },
-                    "additionalProperties": false
+                    }
                   },
                   "nationId": {
                     "anyOf": [

@@ -104,6 +104,7 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `record.operator.talentMods` | stable | 0.3.0 | `shared/plugins/recordsSchema.js#RECORD_SCHEMA` |
 | `record.operator.talents` | stable | 0.3.0 | `shared/plugins/recordsSchema.js#RECORD_SCHEMA` |
 | `record.operator.trait` | stable | 0.3.0 | `shared/plugins/recordsSchema.js#RECORD_SCHEMA` |
+| `record.operator.origin` | stable | 0.3.1 | `shared/plugins/recordsSchema.js#RECORD_SCHEMA` |
 | `record.operator.art` | stable | 0.3.0 | `shared/plugins/recordsSchema.js#RECORD_SCHEMA` |
 | `record.operator.nationId` | stable | 0.3.0 | `shared/plugins/recordsSchema.js#RECORD_SCHEMA` |
 | `record.operator.powers` | stable | 0.3.0 | `shared/plugins/recordsSchema.js#RECORD_SCHEMA` |
@@ -400,6 +401,10 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `error.PLUGIN_RECORD_EXISTS` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_RECORD_DELETE` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_RECORD_ID` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_RECORD_HIDDEN` | stable | 0.3.1 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_RECORD_PAIR` | stable | 0.3.1 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_RECORD_ART` | stable | 0.3.1 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_RECORD_ORIGIN` | stable | 0.3.1 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_RECORD_TYPE` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_RECORD_SKILLS` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_KIT_REF` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
@@ -450,6 +455,8 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `error.PLUGIN_FORGE_JSON` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_FORGE_ID` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_FORGE_EXISTS` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_FORGE_MOUNT` | stable | 0.3.1 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_FORGE_PANEL_SCRIPT` | stable | 0.3.1 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_FORGE_SCRIPT` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_INVALID` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `catalog.field.$schema` | stable | 0.3.0 | `shared/plugins/catalog.js#CATALOG_FIELDS` |
@@ -472,6 +479,7 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `sdk.SDK_MEMBERS` | internal | 0.3.0 | `shared/plugins/sdk.js#SDK_MEMBERS` |
 | `sdk.sp:sdk@1.constants` | experimental | 0.3.0 | `shared/plugins/sdk.js#SDK_MEMBERS` |
 | `sdk.sp:sdk@1.content.register` | experimental | 0.3.0 | `shared/plugins/sdk.js#SDK_MEMBERS` |
+| `sdk.sp:sdk@1.dir` | experimental | 0.3.1 | `shared/plugins/sdk.js#SDK_MEMBERS` |
 | `sdk.sp:sdk@1.enemies.register` | experimental | 0.3.0 | `shared/plugins/sdk.js#SDK_MEMBERS` |
 | `sdk.sp:sdk@1.kit` | experimental | 0.3.0 | `shared/plugins/sdk.js#SDK_MEMBERS` |
 | `sdk.sp:sdk@1.kits.register` | experimental | 0.3.0 | `shared/plugins/sdk.js#SDK_MEMBERS` |
@@ -479,10 +487,13 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `sdk.sp:sdk@1.math` | experimental | 0.3.0 | `shared/plugins/sdk.js#SDK_MEMBERS` |
 | `sdk.sp:sdk@1.meta.register` | experimental | 0.3.0 | `shared/plugins/sdk.js#SDK_MEMBERS` |
 | `sdk.sp:sdk@1.settings` | experimental | 0.3.0 | `shared/plugins/sdk.js#SDK_MEMBERS` |
+| `sdk.sp:sdk@1.targeting` | experimental | 0.3.1 | `shared/plugins/sdk.js#SDK_MEMBERS` |
 | `sdk.export.constants` | experimental | 0.3.0 | `shared/plugins/sdk.js#constants` |
 | `sdk.export.createSDK` | experimental | 0.3.0 | `shared/plugins/sdk.js#createSDK` |
+| `sdk.export.dir` | experimental | 0.3.1 | `shared/plugins/sdk.js#dir` |
 | `sdk.export.kit` | experimental | 0.3.0 | `shared/plugins/sdk.js#kit` |
 | `sdk.export.math` | experimental | 0.3.0 | `shared/plugins/sdk.js#math` |
+| `sdk.export.targeting` | experimental | 0.3.1 | `shared/plugins/sdk.js#targeting` |
 | `api.PLUGIN_API.min` | stable | 0.3.0 | `shared/constants.js#PLUGIN_API` |
 | `api.PLUGIN_API.current` | stable | 0.3.0 | `shared/constants.js#PLUGIN_API` |
 <!-- plugin-surface:end -->

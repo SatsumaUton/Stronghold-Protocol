@@ -35,6 +35,7 @@ import { gameplayDataFiles } from './identity.js';
 import { applyPatches, normalizeSettings } from '../../shared/plugins/patch.js';
 import { appendOfficialBounds } from '../../shared/plugins/officialBounds.js';
 import { zipFiles } from './zip.js';
+import { operatorMetadataProblems } from '../../shared/plugins/records.js';
 
 /** What packs a lock (its `generator`). */
 export const LOCK_GENERATOR = 'tools/plugin.mjs pack';
@@ -102,6 +103,12 @@ export function checkPluginFolder(dir, where, { vanilla, dataDir = DATA_DIR } = 
   // Check patched official values with the same bounds as C1, without running any script/preflight.
   // Paths supplied only by dependencies still need the complete content-set check in C1.
   const p = r.plugin;
+  const operators = [...(p?.manifest.parts.operators?.files || []), ...(p?.manifest.parts.data?.files || [])]
+    .flatMap(rel => { const doc = p.content?.documents[rel]; return Array.isArray(doc) ? doc : doc?.entries ?? [doc]; });
+  if (!list.problems.length && operators.some(op => op?.origin)) {
+    const official = Object.fromEntries(gameplayDataFiles(dataDir).map(f => [f.name, JSON.parse(fs.readFileSync(f.abs, 'utf8'))]));
+    for (const op of operators) for (const e of operatorMetadataProblems(op, p.id, official)) list.problem(e.code, e.message, { where: e.path, detail: e.message });
+  }
   const patches = (p?.manifest.parts.data?.files || []).map(rel => p.content?.documents[rel]).filter(doc => doc?.patch === 1);
   if (!list.problems.length && patches.length) {
     const official = Object.fromEntries(gameplayDataFiles(dataDir).map(f => [f.name, JSON.parse(fs.readFileSync(f.abs, 'utf8'))]));

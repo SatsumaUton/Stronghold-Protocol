@@ -219,7 +219,7 @@ test('mixed pack: cosmetic, content, ui and lang; refused pieces named with thei
     assert.match(report, /server logic/);
     assert.match(report, /HTTP 路由/);
     assert.match(report, /root\.overlays/);
-    assert.match(report, /对不上我们的界面插槽/);
+    assert.match(report, /需要人工适配/);
     assert.match(report, /extra\/note\.png/);
     assert.match(report, /没有引用它/);
     assert.match(report, /kits\/boom\.js/);
@@ -863,8 +863,13 @@ function pairOf(stem, { both = {}, a = {}, b = {} } = {}) {
 const KIT_SOURCE = `// a Forge-style kit written for this test
 import { num } from '@kit/tier1.js';
 import { bonus } from './lib/bonus.js';
+import { dirVec, offsetTile } from '@sim/dir.js';
+import { absoluteRangeKeys } from '@sim/targeting.js';
 
 export default function kit(bb) {
+  const v = dirVec('UP'), tile = offsetTile(2, 2, 0, 1, 'UP');
+  const keys = absoluteRangeKeys([[0, 0]], 2, 2, 'UP');
+  if (v[0] !== 1 || tile[0] !== 3 || keys.length !== 1 || !Object.isFrozen(v) || !Object.isFrozen(tile) || !Object.isFrozen(keys)) throw new Error('geometry facade');
   return {
     skill: { kind: 'duration', duration: 10, mods: { atkPct: num(bb.atk, 0) } },
     talents: [{ install(battle, unit) { battle.addBuff(unit, { key: 'rose:resolve', mods: { atkPct: bonus() }, persist: true, allowDead: true }); } }],
@@ -899,7 +904,7 @@ test('chess.json pairs become compact records: a shop piece and a 自选 piece; 
         a: { garrisonIds: ['garrison_01_a'], status: { phase: 9, level: 9, skillLevel: 9, equipLevel: 0 } },
         b: { garrisonIds: ['garrison_01_b'] },
       }),
-      ...pairOf('rose_ace', { both: { charId: 'char_102_texas', isDiy: true, rarity: 6, tier: 6, name: '玫瑰王牌' } }),
+      ...pairOf('rose_ace', { both: { charId: 'char_102_texas', isDiy: true, visible: false, rarity: 6, tier: 6, name: '玫瑰王牌' } }),
       ...pairOf('rose_ghost', { both: { charId: 'char_rose_nobody', name: '玫瑰幽灵' } }),
     }),
   });
@@ -911,8 +916,9 @@ test('chess.json pairs become compact records: a shop piece and a 自选 piece; 
     const ace = ops.find((o) => o.charId === 'char_x_rose_chess_rose_ace');
     assert.equal(ops.length, 2, JSON.stringify(ops.map((o) => o.charId)));
     assert.equal(piece.as, 'chess');
-    assert.deepEqual(piece.chess, { tier: 2, bonds: ['deputShip'], price: 3, sellPrice: 1, garrisonIds: { normal: ['garrison_01_a'], golden: ['garrison_01_b'] }, identifier: 7, shopSortId: 3 });
-    assert.deepEqual(piece.art, { ref: 'char_102_texas' });
+    assert.deepEqual(piece.chess, { tier: 2, bonds: ['deputShip'], price: 3, sellPrice: 1, garrisonIds: { normal: ['garrison_01_a'], golden: ['garrison_01_b'] }, identifier: 7, shopSortId: 3, ids: { normal: 'chess_x_rose_chess_rose_pair_a', elite: 'chess_x_rose_chess_rose_pair_b' } });
+    assert.deepEqual(piece.art, { ref: 'char_102_texas', assets: { avatar: 'char_102_texas', avatarGolden: 'char_102_texas' } });
+    assert.deepEqual(piece.origin, { charId: 'char_102_texas' });
     assert.equal(piece.kit, 'generic');
     const s = piece.forms.normal.skills[0];
     assert.match(s.skillId, /^skx_rose_chess_/);
@@ -1051,7 +1057,7 @@ test('kits/<id>.js becomes one script plugin: SDK imports rewritten, the pack\'s
     assert.equal(manifest.overrides, undefined);
     const source = fs.readFileSync(path.join(dir, 'sim', 'index.js'), 'utf8');
     assert.deepEqual(checkScript(source).problems, []);
-    assert.match(source, /^import \{ kit as __forgeKit \} from 'sp:sdk@1';$/m);
+    assert.match(source, /^import \{ kit as __forgeKit, dir as __forgeDir, targeting as __forgeTargeting \} from 'sp:sdk@1';$/m);
     assert.match(source, /const num = __forgeKit\["num"\];/);
     assert.match(source, /\/\/ ---- kits\/lib\/bonus\.js ----/);
     assert.match(source, /sp\.kits\.register\("char_x_rose_kit_rose_hunter", __forgeModule1\["default"\]\);/);
@@ -1059,7 +1065,7 @@ test('kits/<id>.js becomes one script plugin: SDK imports rewritten, the pack\'s
     assert.deepEqual(walk(dir).sort(), ['README.md', 'plugin.json', 'plugin.lock.json', 'sim/index.js']);
     assert.equal(opsOf(path.join(parent, 'rose-kit'))[0].kit, 'generic');
     const product = got.report.products.find((p) => p.id === 'kits-rose-kit');
-    assert.deepEqual(product.rewritten, ['@kit/tier1.js { num } → sp:sdk@1 kit.num']);
+    assert.deepEqual(product.rewritten, ['@kit/tier1.js { num } → sp:sdk@1 kit.num', '@sim/dir.js { dirVec } → sp:sdk@1 dir.dirVec', '@sim/dir.js { offsetTile } → sp:sdk@1 dir.offsetTile', '@sim/targeting.js { absoluteRangeKeys } → sp:sdk@1 targeting.absoluteRangeKeys']);
     assert.match(product.imported[0], /kits\/chess_rose_hunter_a\.js → sim\/index\.js · sp\.kits\.register\("char_x_rose_kit_rose_hunter"\).* \+ kits\/lib\/bonus\.js/);
     const report = fs.readFileSync(path.join(parent, 'rose-kit', 'IMPORT-REPORT.md'), 'utf8');
     assert.match(report, /SP_PLUGIN_SCRIPTS=sandbox/);
@@ -1085,7 +1091,7 @@ test('a kit whose import does not map, that fails the script check, or uses synt
   kitPack(pack, {
     chess: { ...pairOf('rose_dir'), ...pairOf('rose_fs'), ...pairOf('rose_date'), ...pairOf('rose_async'), ...pairOf('rose_tier') },
     kits: {
-      'kits/chess_rose_dir_a.js': "import { dirVec } from '@sim/dir.js';\nexport default function kit() { return { skill: null, x: dirVec }; }\n",
+      'kits/chess_rose_dir_a.js': "import { sortEnemyTargets } from '@sim/targeting.js';\nexport default function kit() { return { skill: null, x: sortEnemyTargets }; }\n",
       'kits/chess_rose_fs_a.js': `import { writeFileSync } from 'node:fs';\nwriteFileSync('${BAIT}', 'executed\\n');\nexport default function kit() { return {}; }\n`,
       'kits/chess_rose_date_a.js': 'export default function kit() { return { skill: { kind: "passive", mods: { atkPct: Date.now() % 2 } } }; }\n',
       'kits/chess_rose_async_a.js': 'export default async function kit() { return {}; }\n',
@@ -1098,7 +1104,7 @@ test('a kit whose import does not map, that fails the script check, or uses synt
     assert.equal(got.ok, true, got.markdown);
     assert.deepEqual(dirsOf(parent).filter((n) => n !== 'pack'), ['rose-kit']);
     const reason = (file) => got.report.skipped.find((s) => s.path === file);
-    assert.match(reason('kits/chess_rose_dir_a.js').en, /"@sim\/dir\.js" on line 1 has no sp:sdk@1 equivalent/);
+    assert.match(reason('kits/chess_rose_dir_a.js').en, /sortEnemyTargets mutates the candidate array/);
     assert.match(reason('kits/chess_rose_fs_a.js').en, /"node:fs"/);
     assert.match(reason('kits/chess_rose_date_a.js').en, /fails the script check \(Date is not available in sp:sdk@1\)/);
     assert.match(reason('kits/chess_rose_async_a.js').en, /an async function/);
@@ -1247,4 +1253,78 @@ test('the bundler mirrors the SDK and the sandbox limits; it refuses cycles, mis
   const none = bundleForgeKits({ files, parse: null, kits: [{ file: 'kits/lib.js', register: 'char_x_rose_lib' }] });
   assert.equal(none.source, null);
   assert.match(none.refused[0].en, /no JavaScript parser/);
+});
+
+test('hidden pieces preserve explicit pair, source and both forms of art without kit inference', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-sidecar-'));
+  try {
+    const pack = path.join(parent, 'pack');
+    const source = Object.values(pairOf('seed'));
+    const normal = 'chess_seed', elite = 'chess_bloom';
+    const chess = Object.fromEntries(source.map((r, i) => [i ? elite : normal, { ...r,
+      chessId: i ? elite : normal, baseId: normal, goldenId: elite, upgradeChessId: i ? null : elite,
+      isHidden: true, visible: false, base: 'chess_char_1_02_a',
+      assets: { portrait: i ? 'char_102_texas_2' : 'char_102_texas_1', spine: i ? 'char_112_siege' : 'char_102_texas', voice: 'char_102_texas' },
+    }]));
+    writePack(pack, { id: 'sidecar', name: 'Sidecar', version: '1.0.0', license: 'CC0-1.0', content: ['chess'] }, { 'chess.json': JSON.stringify(chess) });
+    const got = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'sidecar') });
+    assert.equal(got.ok, true, got.markdown);
+    const [op] = opsOf(path.join(parent, 'sidecar'));
+    assert.equal(op.chess.hidden, true);
+    assert.deepEqual(op.chess.ids, { normal: 'chess_x_sidecar_seed', elite: 'chess_x_sidecar_bloom' });
+    assert.equal(op.origin.chessId, 'chess_char_1_02_a');
+    assert.equal(op.art.assets.spineGolden, 'char_112_siege');
+    assert.equal(op.art.assets.voice, 'char_102_texas');
+    assert.equal(op.art.ref, undefined);
+    const { registry } = setsOf(parent);
+    const set = buildContentSet({ registry, ids: ['sidecar'] });
+    assert.deepEqual(set.problems, []);
+    assert.equal(set.data.chess.chess_x_sidecar_seed.upgradeChessId, 'chess_x_sidecar_bloom');
+    assert.equal(set.data.chess.chess_x_sidecar_bloom.assets.portrait, 'char_102_texas_2');
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('a Forge built-in language imports as a global lang overlay, separate from room content', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-overlay-'));
+  try {
+    const pack = path.join(parent, 'pack');
+    writePack(pack, { id: 'english-overlay', name: 'English overlay', version: '1.0.0', license: 'CC0-1.0', content: [], i18n: { en: 'i18n/en.json' } }, {
+      'i18n/en.json': JSON.stringify({ 开始: 'Begin here' }),
+    });
+    const got = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'english-overlay') });
+    assert.equal(got.ok, true, got.markdown);
+    assert.equal(got.report.products[0].class, 'lang');
+    const manifest = JSON.parse(fs.readFileSync(path.join(parent, 'english-overlay/plugin.json')));
+    assert.equal(manifest.class, 'lang');
+    assert.ok(got.report.assumed.some(a => a.what === 'i18n-ui' && a.en.includes('falls back')));
+    const { registry } = setsOf(parent);
+    assert.ok(registry.plugins().some(p => p.id === 'english-overlay'));
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('all nine Forge UI mounts distinguish adaptation from uncopied scripts, including UI-only packs', async () => {
+  const mounts = { 'root.overlays': null, 'root.guide': null, 'screen.game.aside': 'hud.right', 'screen.game.hud': 'hud.right',
+    'screen.game.overlay': null, 'screen.game.shopCard': null, 'screen.game.bondStrip': null, 'screen.result.footer': 'result.tab', 'screen.loadout.detail': null };
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-panels-'));
+  try {
+    for (const [slot, expected] of Object.entries(mounts)) {
+      const pack = path.join(parent, slot);
+      writePack(pack, { id: 'panel-pack', name: 'Panel pack', version: '1.0.0', license: 'CC0-1.0', content: [],
+        client: { panels: [{ id: 'example-panel', name: 'Example panel', slot, module: 'panel.js' }] } }, { 'panel.js': "throw new Error('must never execute');" });
+      const got = await importForge(pack, { ...forgeOpts(parent), dryRun: true });
+      assert.equal(got.ok, true, got.markdown);
+      const scripts = got.report.skipped.filter(s => s.code === 'PLUGIN_FORGE_PANEL_SCRIPT');
+      const mismatches = got.report.skipped.filter(s => s.code === 'PLUGIN_FORGE_MOUNT');
+      assert.equal(scripts.length, 1);
+      assert.equal(mismatches.length, expected ? 0 : 1);
+      assert.equal(got.report.needsManualAdaptation, !expected);
+      if (expected) assert.ok(got.report.products.some(p => p.class === 'ui'));
+      else {
+        assert.match(got.report.check, /需要人工适配.*needs manual adaptation/);
+        assert.equal(got.report.manualPanels[0].mount, slot);
+        assert.equal(got.report.manualPanels[0].panel, 'Example panel');
+        assert.ok(['hud.right', 'stats.tab', 'room.panel'].includes(got.report.manualPanels[0].suggestedSlot));
+      }
+    }
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
 });

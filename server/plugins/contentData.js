@@ -6,6 +6,7 @@ import { jsonProblems, object, problem } from '../../shared/plugins/dataUtils.js
 import { isPackPath, PLUGIN_LIMITS } from '../../shared/plugins/manifest.js';
 import { deepFreeze } from '../data.js';
 import { validateDsl } from '../sim/content/dsl/validate.js';
+import { operatorMetadataProblems } from '../../shared/plugins/records.js';
 
 export function readContentData(dir, manifest) {
   const documents = {}, files = {}, problems = [];
@@ -44,6 +45,8 @@ export function readContentData(dir, manifest) {
     for (const rel of Object.values(manifest.parts.i18n?.langs ?? {})) read(rel);
     // kit.spec may point at a JSON file; it is declared transitively by its compact operator record.
     const resolveSpec = r => {
+      const errors = operatorMetadataProblems(r, manifest.id);
+      if (errors.length) throw errors[0];
       if (typeof r?.kit?.spec === 'string') r.kit.spec = read(r.kit.spec);
     };
     for (const rel of manifest.parts.operators?.files ?? []) for (const r of Array.isArray(documents[rel]) ? documents[rel] : [documents[rel]]) resolveSpec(r);

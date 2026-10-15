@@ -570,6 +570,26 @@ export const PLUGIN_ERRORS = Object.freeze({
     zh: '新记录的 id 不在这个插件的命名空间里（{where}）：{detail}', en: 'A new record\'s id is outside this plugin\'s namespace ({where}): {detail}',
     fix: { zh: '新记录的 id 要带上插件 id：插件 my-mod 的新干员写 char_x_my_mod_名字（插件 id 里的 - 换成 _），技能写 skx_my_mod_…；用 kitRef 借官方技能时可以保留官方技能 id。', en: 'A new record\'s id carries the plugin id: plugin my-mod\'s new operator is char_x_my_mod_<name> (its - becomes _), a skill skx_my_mod_…; with kitRef the official skill ids may stay.' },
   },
+  PLUGIN_RECORD_HIDDEN: {
+    level: 'problem', doc: D.data,
+    zh: '隐藏标记必须是布尔值（{where}）', en: 'Hidden must be a boolean ({where})',
+    fix: { zh: 'chess.hidden 写 true 或 false。', en: 'Set chess.hidden to true or false.' },
+  },
+  PLUGIN_RECORD_PAIR: {
+    level: 'problem', doc: D.data,
+    zh: '普通和精锐 id 配对不正确（{where}）', en: 'Normal and elite ids are invalid ({where})',
+    fix: { zh: 'chess.ids 写本插件命名空间内不同的 normal 和 elite，不能同时写 chess.id。', en: 'Use distinct namespaced chess.ids.normal and elite; omit chess.id.' },
+  },
+  PLUGIN_RECORD_ART: {
+    level: 'problem', doc: D.data,
+    zh: '美术引用格式不正确（{where}）', en: 'Art references are invalid ({where})',
+    fix: { zh: 'art.ref 或 art.assets 写素材 id，不能写路径或网址。', en: 'Use asset ids in art.ref or art.assets, never paths or URLs.' },
+  },
+  PLUGIN_RECORD_ORIGIN: {
+    level: 'problem', doc: D.data,
+    zh: '来源记录不存在或不一致（{where}）', en: 'Source records are missing or inconsistent ({where})',
+    fix: { zh: 'origin 写本安装官方 charId 或 chessId，两个都写时必须匹配。', en: 'Use installed official charId or chessId in origin; both must agree.' },
+  },
   PLUGIN_RECORD_TYPE: {
     level: 'problem', doc: D.data,
     zh: '紧凑记录的写法不对（{where}）：{detail}', en: 'A compact record is not written the right way ({where}): {detail}',
@@ -829,10 +849,20 @@ export const PLUGIN_ERRORS = Object.freeze({
     zh: '目标文件夹已经存在，没有写入：{detail}', en: 'The destination folder already exists, so nothing was written: {detail}',
     fix: { zh: '换一个 --out 或 --id，或者把已有的插件文件夹挪走后再导入。', en: 'Choose another --out or --id, or move the existing plugin folder aside and import again.' },
   },
+  PLUGIN_FORGE_MOUNT: {
+    level: 'warning', doc: D.forge,
+    zh: '面板挂载点需要人工适配：{detail}', en: 'Panel mount needs manual adaptation: {detail}',
+    fix: { zh: '按报告建议的插槽改写面板；建议位置不是原挂载点。', en: 'Rewrite for the suggested slot; it is not the original mount position.' },
+  },
+  PLUGIN_FORGE_PANEL_SCRIPT: {
+    level: 'warning', doc: D.forge,
+    zh: '面板脚本没有复制：{detail}', en: 'Panel script was not copied: {detail}',
+    fix: { zh: '用 postMessage API v1 重写面板脚本；导入时没有执行脚本。', en: 'Rewrite the panel script with postMessage API v1; import never executed it.' },
+  },
   PLUGIN_FORGE_SCRIPT: {
     level: 'problem', doc: D.forge,
     zh: '包里的脚本没有导入，也没有执行：{detail}', en: 'A script in the pack was not imported and was not run: {detail}',
-    fix: { zh: 'kits/<id>.js 的 id 是包里导入的记录（或 overrides 里声明的官方 id），import 又能映射到 sp:sdk@1（@kit/tier1.js、@sim/constants.js、@sim/detmath.js、包里的 ./ 文件）时，会变成沙箱里的脚本插件；不然就把技能逻辑改写成 JSON SkillSpec、DSL 或脚本插件。导入器不会运行包里的 .js。', en: 'A kits/<id>.js becomes the sandboxed script plugin when its id is an imported record (or an official id declared in overrides) and its imports map to sp:sdk@1 (@kit/tier1.js, @sim/constants.js, @sim/detmath.js, the pack\'s ./ files); otherwise rewrite the logic as a JSON SkillSpec, DSL or a script plugin. The importer never runs a .js from the pack.' },
+    fix: { zh: 'kits/<id>.js 的 id 是包里导入的记录（或 overrides 里声明的官方 id），import 又能映射到 sp:sdk@1（@kit/tier1.js、@sim/constants.js、@sim/detmath.js、@sim/dir.js 与 @sim/targeting.js 的安全子集、包里的 ./ 文件）时，会变成沙箱里的脚本插件；不然就把技能逻辑改写成 JSON SkillSpec、DSL 或脚本插件。导入器不会运行包里的 .js。', en: 'A kits/<id>.js becomes the sandboxed script plugin when its id is an imported record (or an official id declared in overrides) and its imports map to sp:sdk@1 (@kit/tier1.js, @sim/constants.js, @sim/detmath.js, the safe subsets of @sim/dir.js and @sim/targeting.js, the pack\'s ./ files); otherwise rewrite the logic as a JSON SkillSpec, DSL or a script plugin. The importer never runs a .js from the pack.' },
   },
 
   // ---- anything a check reported without a code of its own ----------------------------------------------------------
