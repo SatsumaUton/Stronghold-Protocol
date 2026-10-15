@@ -66,7 +66,7 @@ function exampleRoot() {
   put(dir, 'plugins/broken/plugin.json', '{ "manifest": 2, ');
   put(dir, 'plugins/qab/plugin.json', content());
   put(dir, 'plugins/qab/data/economy.json', { patch: 1, ops: [] });
-  put(dir, 'plugins/dup-lang/plugin.json', { manifest: 2, class: 'lang', lang: 'qaa', version: '1.0.0', files: { ui: 'ui.json' } });
+  put(dir, 'plugins/dup-lang/plugin.json', { manifest: 2, class: 'lang', lang: 'qab', version: '1.0.0', files: { ui: 'ui.json' } });
   put(dir, 'plugins/dup-lang/ui.json', { 开始: 'x' });
   put(dir, 'plugins/stray/plugin.json', content());
   put(dir, 'plugins/stray/data/economy.json', {});
@@ -95,7 +95,7 @@ test('one scan: the language packs, packs/ and plugins/ by class — lang and co
     assert.match(why['plugins/oldstyle/'], /pack\.json is the manifest 1 of a pack folder in packs\//);
     assert.match(why['plugins/broken/'], /plugin\.json: not valid JSON/);
     assert.match(why['plugins/qab/'], /the id "qab" is taken by packs\/qab\//);
-    assert.match(why['plugins/dup-lang/'], /the language qaa is already provided by public\/i18n\/qaa\.json/);
+    assert.match(why['plugins/dup-lang/'], /the language qab is already provided by packs\/qab\//);
     assert.match(why['plugins/stray/'], /tools\/run\.exe: \.exe is not a file a content plugin may carry/);
     assert.match(why['plugins/missing/'], /"data": data\/none\.json is missing/);
     assert.ok(!Object.keys(why).some((w) => w.includes('_template') || w.includes('config') || w.includes('README')), 'templates and top-level files are never read');
@@ -303,4 +303,11 @@ test('plugins/: ignored by git except its readme and templates, which the releas
   }
   assert.ok(fs.existsSync(path.join(ROOT, 'plugins/README.md')));
   assert.deepEqual(selectTracked(['plugins/README.md', 'plugins/_template/content/plugin.json']).keep, ['plugins/README.md', 'plugins/_template/content/plugin.json']);
+});
+
+test('release allowlist includes both original template media files', () => {
+  const samples = ['plugins/_template/cosmetic/media/sample.png', 'plugins/_template/cosmetic/media/sample.ogg'];
+  assert.deepEqual(selectTracked(samples).keep, [...samples].sort());
+  assert.equal(fs.readFileSync(path.join(ROOT, samples[0])).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(fs.readFileSync(path.join(ROOT, samples[1])).subarray(0, 4).toString(), 'OggS');
 });
