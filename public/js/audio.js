@@ -1265,7 +1265,7 @@ export class AudioManager {
     if (!u || typeof u !== 'object' || u.id == null) return;
     // UnitInfo.spine is the model id (charId / tokenId / enemyId) — the key of sfx.units; kind/defId pick the
     // official class sounds (operator vs summon vs device). `skillActive` follows the ['skill', id, 1] / 0 events.
-    this.units.set(u.id, { def: u.spine || u.defId, defId: u.defId ?? null, kind: u.kind ?? null, side: u.side, boss: !!u.boss,
+    this.units.set(u.id, { def: u.spine || u.defId, voice: u.voice || u.spine || u.defId, defId: u.defId ?? null, kind: u.kind ?? null, side: u.side, boss: !!u.boss,
       skillIndex: Number.isInteger(u.skillIndex) ? u.skillIndex : null, skillActive: !!u.skillActive });
     // a cast that arrived before this unit was known (handleBattleEvents): it sounds now, once
     const held = this.pendingSkill.get(u.id);
@@ -1417,7 +1417,7 @@ export class AudioManager {
             // 作战中N: the equipped skill's own slot (0-based; 作战中4 is the fallback of a 4th slot)
             if (unitSoundClass(u) === 'char') {
               const n = Number.isInteger(u.skillIndex) ? Math.min(4, u.skillIndex + 1) : 1;
-              this.voice(u.def, `skill${n}`, { unitKey: e[1] });
+              this.voice(u.voice, `skill${n}`, { unitKey: e[1] });
             }
           } else {
             // The unit is not tracked yet. The sim emits the cast of a deployment that fires inside its own first tick
@@ -1436,7 +1436,7 @@ export class AudioManager {
         } else if (kind === 'engage') {
           // 行动开始: the first attack a unit makes on an enemy (the sim's ENGAGE, official ENCOUNTER_ENEMY, 3 s apart)
           const u = this.units.get(e[1]);
-          if (u && unitSoundClass(u) === 'char') this.voice(u.def, 'faceEnemy', { unitKey: e[1] });
+          if (u && unitSoundClass(u) === 'char') this.voice(u.voice, 'faceEnemy', { unitKey: e[1] });
         } else if (kind === 'die') {
           const u = this.units.get(e[1]);
           if (!u) continue;
@@ -1469,8 +1469,8 @@ export class AudioManager {
           if (unitSoundClass(u) === 'char') {
             if (!this.startVoiceDone) {
               this.startVoiceDone = true;
-              if (!this.voice(u.def, 'start')) this.voice(u.def, 'place', { unitKey: e[1] });
-            } else this.voice(u.def, 'place', { unitKey: e[1] });
+              if (!this.voice(u.voice, 'start')) this.voice(u.voice, 'place', { unitKey: e[1] });
+            } else this.voice(u.voice, 'place', { unitKey: e[1] });
           }
           if (!url) continue;
           const own = url === m?.audio?.sfx?.units?.[u.def]?.born;

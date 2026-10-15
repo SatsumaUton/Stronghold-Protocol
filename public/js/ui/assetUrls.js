@@ -37,6 +37,7 @@ export function chessPortraitUrl(m, chess) {
   const id = str(chess?.assets?.portrait);
   if (!chars) return null;
   if (id) {
+    if (chars[id]) return str(chars[id].portrait);
     if (id.endsWith('_2')) {
       const base = chars[id.slice(0, -2)];
       if (base) return str(base.portraitE2) || str(base.portrait);

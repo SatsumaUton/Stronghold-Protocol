@@ -183,7 +183,7 @@ export function ForgeDialog({ open, onClose, onImported }) {
         onChange=${(e) => toggleScripts(e.currentTarget.checked)} /> ${t('不生成脚本插件（kits/ 里的行为脚本）')}</label>
       ${note ? html`<p class="st-note">${note}</p>` : null}
       ${error ? html`<p class="st-error" role="alert">${error}</p>` : null}
-      ${report && !report.products?.length ? html`<p class="st-note">${t('这个包没有可以写入的插件。')}</p>` : null}
+      ${report && !report.products?.length ? html`<p class="st-note">${report.needsManualAdaptation ? t('需要人工适配') : t('这个包没有可以写入的插件。')}</p>` : null}
       ${hasScript ? html`<p class="st-note" data-testid="forge-script-note">${t('脚本插件只在服主开启 SP_PLUGIN_SCRIPTS=sandbox（或受信任模式）并且房间选中它时运行；导入时没有执行它。')}</p>` : null}
       ${report ? html`<div>
         <h3 class="st-note">${t('导入报告')}</h3>
