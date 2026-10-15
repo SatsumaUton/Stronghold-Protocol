@@ -8,8 +8,11 @@
 // billboards lie in the world XZ plane and vertical ones turn about world Y — Unity's literal geometry in this frame,
 // whose ground is XY. The roll of a billboard turns it clockwise on screen for positive angles (ROLL_SIGN, §33.5:
 // assumed, Unity's behaviour, which no data of the client confirms). Stretched billboards run along the velocity from the particle (the head) back by
-// size × lengthScale + speed × velocityScale, the texture's u along the stretch (u = 1 at the head) [ASSUMED: the
-// streak textures are horizontal]. Mesh particles: the mesh × the 3D size, turned by the particle's Euler rotation
+// the particle's Y size × lengthScale + speed × velocityScale, its X size across, the texture's u along the stretch (u
+// = 1 at the head) [ASSUMED: the streak textures are horizontal]. The particle's Y is the stretched axis in the client's
+// data (0.3.1, 风笛's lance thrust drawn as a vertical needle): of the used set's stretched renderers with a pivot, 2,434
+// set it in Y and 9 in X (plain billboards: 405 / 379), and of the 2,449 stretched systems with unequal X / Y sizes 2,130
+// make Y the long one. Mesh particles: the mesh × the 3D size, turned by the particle's Euler rotation
 // inside the alignment frame. Texture sheets: frame 0 is the top-left tile; frame index =
 // floor(frac(startFrame + frameOverTime(frac(t · cycles))) · frames) (§33.5, resolved: the authored curves end at
 // 0.9999 so that the last frame does not wrap to the first).
@@ -256,7 +259,8 @@ export function buildParticles(ps, r, cam, fd, frameNo) {
         let vx = ps.tvx[i], vy = ps.tvy[i], vz = ps.tvz[i];
         if (def.space !== 1) { mat4Dir(m, vx, vy, vz, _v); vx = _v[0]; vy = _v[1]; vz = _v[2]; }
         const sp = Math.hypot(vx, vy, vz);
-        const len = sx * r.lengthScale + sp * r.velocityScale;
+        // the particle's Y size along the velocity, its X size across (header)
+        const len = sy * r.lengthScale + sp * r.velocityScale;
         const moving = sp > 1e-6;
         const dx = moving ? vx / sp : R[0], dy = moving ? vy / sp : R[1], dz = moving ? vz / sp : R[2];
         // across: perpendicular to the direction and to the view ray
@@ -265,7 +269,7 @@ export function buildParticles(ps, r, cam, fd, frameNo) {
         const wl = Math.hypot(wx, wy, wz) || 1;
         wx /= wl; wy /= wl; wz /= wl;
         ax0 = dx * len; ax1 = dy * len; ax2 = dz * len;
-        ay0 = wx * sy; ay1 = wy * sy; ay2 = wz * sy;
+        ay0 = wx * sx; ay1 = wy * sx; ay2 = wz * sx;
         cx -= dx * len / 2; cy -= dy * len / 2; cz -= dz * len / 2;
       } else {
         // the alignment frame (X, Y)

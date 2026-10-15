@@ -1,12 +1,15 @@
 // test/render/vfx-audit031.test.js — 0.3.1's fixes of the 0.3.0 effects audit's low findings (history 0.3.1, DESIGN
 // §33.16 / §33.6) on a synthetic index and a fake effects layer: a token's skill record from its owners' variants (R18:
 // 诅咒娃娃's aura), the 狼群's buff-bound cast rows (R19), an ability action's target effect on the unit a kit fx names
-// (R20: 归溟幽灵鲨 S1), a skill's own start effect replacing the deploy effect (R21: 缄默德克萨斯, 斯卡蒂 S2).
+// (R20: 归溟幽灵鲨 S1), a skill's own start effect replacing the deploy effect (R21: 缄默德克萨斯, 斯卡蒂 S2), a
+// stretched billboard's Y size along its velocity (风笛's lance).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { FxWiring, wolfHolds } from '../../public/js/render/vfx/wiring.js';
 import { skillRecordOf, tokenSkillRecord, planFor, resolveSkill, skillPlan, targetBound, bindingKeys } from '../../public/js/render/vfx/skills.js';
+import { compileEffect, Effect } from '../../public/js/render/vfx/effect.js';
+import { FrameData, cameraBasis } from '../../public/js/render/vfx/geom.js';
 
 const KEYS = ['doll_aura', 'sea_aura_1', 'sea_aura_3', 'g_hit', 'g_heal', 'g_enemy', 'g_birth', 'wolf_sub_1', 'wolf_sub_2', 'wolf_cast', 'ghost2_skill_01_start', 'ghost2_skill_01_hit', 'ghost2_skill_01_buff', 'tx_birth_01', 'common_empty', 'tx_appear', 'sk_start_loop', 'mode_birth'];
 const LOOPING = new Set(['doll_aura', 'sea_aura_1', 'sea_aura_3', 'ghost2_skill_01_buff', 'sk_start_loop']);
@@ -265,5 +268,46 @@ describe('a skill\'s own start effect replaces the deploy effect (R21)', () => {
     frame();
     assert.equal(count(spawned, 'tx_birth_01'), 1);
     assert.equal(count(spawned, 'g_birth'), 0);
+  });
+});
+
+describe('a stretched billboard runs its Y size along the velocity (风笛\'s lance thrust)', () => {
+  const MAT = {
+    name: 'm', shader: 'Torappu/Particles/Additive', passes: [{ blend: ['SrcAlpha', 'One', 'Zero', 'OneMinusSrcAlpha'], blendOp: 'Add', zTest: 'Disabled', zWrite: false, cull: 'Off', colorMask: 15 }],
+    queue: 'Transparent', keywords: [], floats: {}, colors: { _TintColor: [1, 1, 1, 1] }, textures: { _MainTex: { tex: 't', st: [1, 1, 0, 0] } },
+  };
+  // bpipe_attack_01_start's 'baoshan': a burst moving along +x (startSpeed with the node turned −90° about Y), its
+  // SizeModule's separate axes X 0.5 / Y 3.5 (both flat here), length scale 1
+  const prefab = (sizeX, sizeY, lengthScale = 1) => ({
+    format: 'fx-prefab', version: 1, key: 'lance', materials: [MAT], clips: [], textures: ['t'], meshes: [], refs: [], stats: {},
+    nodes: [
+      { id: 0, name: 'root', parent: null, children: [1], active: true, pos: [0, 0, 0], rot: [0, 0, 0, 1], scale: [1, 1, 1],
+        behaviours: [{ class: 'ParticleEffect', enabled: true, fields: { _delayToPlay: 0, _delayToFinish: 0, _maxLifetime: -1, _isLoop: 0, _rotateType: 0, _spawnLocation: 1, _inactiveOnFinish: [] } }] },
+      { id: 1, name: 'baoshan', parent: 0, children: [], active: true, pos: [0, 0, 0], rot: [0, -0.707107, 0, 0.707107], scale: [1, 1, 1],
+        particleSystem: { lengthInSec: 0.5, looping: false, prewarm: false, startDelay: 0, playOnAwake: true, simulationSpeed: 1, moveWithTransform: 0, scalingMode: 1,
+          InitialModule: { startLifetime: 0.25, startSpeed: -12, startSize: 2, startColor: [1, 1, 1, 1], maxNumParticles: 10 },
+          EmissionModule: { rateOverTime: 0, m_Bursts: [{ time: 0, countCurve: 1, cycleCount: 1, repeatInterval: 0.01, probability: 1 }] },
+          SizeModule: { curve: { scalar: sizeX, curve: [[0, 1, 0, 0], [1, 1, 0, 0]] }, y: { scalar: sizeY, curve: [[0, 1, 0, 0], [1, 1, 0, 0]] }, z: 1, separateAxes: true } },
+        particleSystemRenderer: { m_Enabled: true, m_RenderMode: 1, renderMode: 'stretch', renderAlignment: 'view', m_LengthScale: lengthScale, m_VelocityScale: 0, m_MaxParticleSize: 0, materials: [0, null] } },
+    ],
+  });
+  const quad = (d) => {
+    const fx = new Effect(compileEffect(d), { seed: 1 });
+    fx.update(1 / 30);
+    const fd = new FrameData();
+    fx.collect(cameraBasis(30, [0, -5, -8], 720, 0.7), fd, () => {}, 1);
+    const b = fd.quad;
+    return { ax: [b[3], b[4], b[5]], ay: [b[6], b[7], b[8]] };
+  };
+  const len = (v) => Math.hypot(v[0], v[1], v[2]);
+
+  test('the quad\'s length (along +x, the thrust) is 2 × 3.5 × lengthScale, its width 2 × 0.5', () => {
+    const { ax, ay } = quad(prefab(0.5, 3.5));
+    assert.ok(Math.abs(Math.abs(ax[0]) - 7) < 1e-4 && Math.abs(ax[1]) < 1e-4 && Math.abs(ax[2]) < 1e-4, `along the velocity: ${ax}`);
+    assert.ok(Math.abs(len(ay) - 1) < 1e-4, `across: ${len(ay)}`);
+    assert.ok(Math.abs(ay[0]) < 1e-4, 'across is perpendicular to the thrust');
+    // a negative length scale extends ahead of the particle with the same size
+    const neg = quad(prefab(0.5, 3.5, -1));
+    assert.ok(Math.abs(len(neg.ax) - 7) < 1e-4);
   });
 });
