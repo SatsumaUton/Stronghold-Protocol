@@ -23,6 +23,7 @@
 ### 工具
 
 - Windows 上 `node tools/plugin.mjs test <id>` 现在能运行插件的作者测试（之前预加载脚本以文件路径传给 Node，被当成网址拒绝：ERR_UNSUPPORTED_ESM_URL_SCHEME）；测试报告在 Node 22 / 24 下统一为 spec 格式，输出不是终端时也一样。
+- 本地客户端提取不完整或是旧版清单时，`node tools/setup.mjs` 会对照当前提取器会写出的分组（以及官方特效清单 `data/local-fx.json` 的分组、条目数和版本）提示已有多少、这一版期望多少，并请用 `--local` 重新提取；不再把只带旧前缀的清单报成已完成，战场场景也不再写成 0.2.5 素材（#665，感谢 @RushFTK）。
 
 ## 0.3.0 — 2026-10-16
 
