@@ -190,6 +190,9 @@ describe('match hosts in rooms (P1c): verification, the watchdog, crashes', () =
     c.id = w.playerId;
     return c;
   };
+  // room.start answers once the room's match host (a child process) is up: a Windows CI runner can take more than
+  // the client's 2 s default to spawn one, so the start and its first inMatch state get a longer wait
+  const START_MS = 20_000;
   const ok = async (c, msg, timeout) => { const r = await c.request(msg, timeout); assert.equal(r.t, 'ok', `${msg.t}: ${JSON.stringify(r)}`); return r; };
   /** A solo room with the plugin `id` switched on and checked by the host's page. */
   async function moddedRoom(srv, host, id, mode = 'solo') {
@@ -210,8 +213,8 @@ describe('match hosts in rooms (P1c): verification, the watchdog, crashes', () =
     servers.push(srv);
     const host = await player(srv, 'Kal');
     const st = await moddedRoom(srv, host, 'rules');
-    await ok(host, { t: 'room.start' });
-    await host.waitFor('room.state', (s) => s.inMatch === true);
+    await ok(host, { t: 'room.start' }, START_MS);
+    await host.waitFor('room.state', (s) => s.inMatch === true, START_MS);
     await ok(host, { t: 'g.emote', id: EMOTES[0] }, 5000); // the worker is up and answering
     const t0 = Date.now();
     const hung = await host.request({ t: 'g.emote', id: EMOTES[1] }, 15_000);
@@ -224,8 +227,8 @@ describe('match hosts in rooms (P1c): verification, the watchdog, crashes', () =
     assert.ok(errors.some((l) => /stopped \(plugin-hang/.test(l)), `the log names it: ${errors.join(' | ')}`);
     assert.equal(srv.hosts.stats().workers, 0);
     // the next match of the set gets a new worker
-    await ok(host, { t: 'room.start' });
-    await host.waitFor('room.state', (s) => s.inMatch === true);
+    await ok(host, { t: 'room.start' }, START_MS);
+    await host.waitFor('room.state', (s) => s.inMatch === true, START_MS);
     await ok(host, { t: 'g.emote', id: EMOTES[0] }, 5000);
     const probe = await host.waitFor('m.toast', (m) => /^probe;/.test(m.text || ''), 5000);
     assert.match(probe.text, /;bond=0\.33;/);
@@ -250,8 +253,8 @@ describe('match hosts in rooms (P1c): verification, the watchdog, crashes', () =
     servers.push(srv);
     const host = await player(srv, 'Doctor');
     await moddedRoom(srv, host, 'endless');
-    await ok(host, { t: 'room.start' });
-    await host.waitFor('room.state', (s) => s.inMatch === true);
+    await ok(host, { t: 'room.start' }, START_MS);
+    await host.waitFor('room.state', (s) => s.inMatch === true, START_MS);
     await host.request({ t: 'g.emote', id: EMOTES[3] }).catch(() => null);
     const toast = await host.waitFor('m.toast', (m) => [HANG, CRASH, START].includes(m.msgid), 60_000);
     assert.equal(toast.kind, 'error');
@@ -283,7 +286,7 @@ describe('match hosts in rooms (P1c): verification, the watchdog, crashes', () =
     b.sim = attachWsSimClient(b, { ds, pace: 'instant', speed: 40 });
     for (const c of [a, b]) await ok(c, { t: 'room.contentReady', cs });
     await ok(b, { t: 'room.ready', ready: true });
-    await ok(a, { t: 'room.start' });
+    await ok(a, { t: 'room.start' }, START_MS);
     const latest = (c, type) => { for (let i = c.log.length - 1; i >= 0; i--) if (c.log[i].t === type) return c.log[i]; return null; };
     const reached = (c) => { const p = latest(c, 'm.public'); return !!p && ((p.phase === 'PREP' && p.round >= 3) || p.phase === 'RESULT' || p.round > 3); };
     await Promise.all([drive(a, () => reached(a)), drive(b, () => reached(b))]);
