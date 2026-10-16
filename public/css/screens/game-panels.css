@@ -517,6 +517,41 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   .spcard__desc { font-size: .19rem; }
   .spov__grid--3 .spcard__desc { -webkit-line-clamp: 10; }
 }
+/* 「轮到你选」 (ui/turnPopup.js): the official effectChoose/* sprites around the middle of the screen, in design px of the
+   1920×1080 footage (--px, fitted to the viewport; offsets from the centre). Pops in, holds, fades: 1.2 s. */
+.sptp {
+  --px: min(.01rem, calc(100vw / 1920), calc(100vh / 1080));
+  position: fixed; left: 50%; top: 50%; z-index: var(--z-banner); width: 0; height: 0; pointer-events: none;
+  animation: sptp-out 1200ms linear both;
+}
+.sptp img { position: absolute; display: block; max-width: none; }
+.sptp__disc { position: absolute; left: calc(-265 * var(--px)); top: calc(-295 * var(--px)); width: calc(540 * var(--px)); height: calc(500 * var(--px));
+  animation: sptp-disc 220ms cubic-bezier(.2, .8, .3, 1) both; }
+.sptp__bg { inset: 0; width: 100%; height: 100%; }
+.sptp__ring { position: absolute; left: calc(43 * var(--px)); top: calc(23 * var(--px)); width: calc(454 * var(--px)); height: calc(454 * var(--px)); border-radius: 50%;
+  background: radial-gradient(closest-side, transparent 63%, rgba(31, 230, 190, .3) 64%, rgba(31, 230, 190, .3) 70%, transparent 71%,
+    transparent 83%, rgba(31, 230, 190, .26) 84%, rgba(31, 230, 190, .18) 99%, transparent 100%); }
+.sptp__cube { left: calc(-62 * var(--px)); top: calc(-146 * var(--px)); width: calc(131 * var(--px)); height: calc(134 * var(--px));
+  animation: sptp-pop 260ms ease-out both; }
+.sptp__spark { left: calc(-111 * var(--px)); top: calc(-174 * var(--px)); width: calc(64 * var(--px)); height: calc(64 * var(--px));
+  animation: sptp-pop 260ms 40ms ease-out both; }
+.sptp__text { position: absolute; left: calc(-200 * var(--px)); top: calc(9 * var(--px)); width: calc(408 * var(--px)); text-align: center; white-space: nowrap;
+  color: #2ee6c0; font-size: calc(72 * var(--px)); font-weight: 900; line-height: 1; letter-spacing: .02em;
+  text-shadow: 0 0 calc(16 * var(--px)) rgba(31, 230, 190, .55); animation: sptp-pop 200ms 60ms ease-out both; }
+.sptp__bar { left: calc(-134 * var(--px)); top: calc(99 * var(--px)); width: calc(279 * var(--px)); height: calc(17 * var(--px));
+  animation: sptp-in 200ms 120ms ease-out both; }
+.sptp__x { width: calc(30 * var(--px)); height: calc(31 * var(--px)); opacity: .8; animation: sptp-in 200ms 120ms ease-out both; }
+.sptp__x--tl { left: calc(-195 * var(--px)); top: calc(-144 * var(--px)); }
+.sptp__x--tr { left: calc(176 * var(--px)); top: calc(-144 * var(--px)); }
+.sptp__x--bl { left: calc(-195 * var(--px)); top: calc(84 * var(--px)); }
+.sptp__x--br { left: calc(176 * var(--px)); top: calc(84 * var(--px)); }
+@keyframes sptp-out { 0%, 87.5% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes sptp-disc { from { opacity: 0; transform: scale(.72); } }
+@keyframes sptp-pop { from { opacity: 0; transform: scale(1.25); filter: brightness(1.8); } }
+@keyframes sptp-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .sptp { display: none; }
+}
 /* The narrowest of them (640×360): with Noto Sans SC — the page's web font and Android's CJK font — the longest text
    (海沟实验体) wraps to 8 lines in a 162 px card, one more than the clamp; a slightly tighter line height gives the 8th
    line room (QA, playtest #6). */
