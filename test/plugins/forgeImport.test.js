@@ -14,12 +14,16 @@ import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { main } from '../../tools/plugin.mjs';
 import { importForge, readUntrustedZip } from '../../server/plugins/forgeImport.js';
+import { skeletonClipData } from '../../server/plugins/pack.js';
+import { parseSkel } from '../../tools/assets/skel.mjs';
 import { crc32, zipFiles } from '../../server/plugins/zip.js';
 import { createStudio } from '../../server/studio/index.js';
 import { createPluginRegistry, readVanillaAssets } from '../../server/plugins/registry.js';
 import { createVisualSets } from '../../server/plugins/visualSet.js';
 import { buildContentSet, contentSetFiles } from '../../server/plugins/contentSet.js';
 import { PLUGIN_LIMITS } from '../../shared/plugins/manifest.js';
+import { skel, atlas, png } from '../helpers/pluginFixtures.js';
+import { canonicalJson } from '../../shared/plugins/identity.js';
 import { bundleForgeKits, FORGE_IMPORT_MAP, KIT_BUNDLE_BYTES, KIT_MODULES_MAX, SDK_KIT_NAMES } from '../../server/plugins/forgeKits.js';
 import { checkScript } from '../../shared/plugins/scriptCheck.js';
 import { makeBattle, checkInvariants } from '../helpers/battleHarness.js';
@@ -1326,5 +1330,346 @@ test('all nine Forge UI mounts distinguish adaptation from uncopied scripts, inc
         assert.ok(['hud.right', 'stats.tab', 'room.panel'].includes(got.report.manualPanels[0].suggestedSlot));
       }
     }
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('a Spine import writes clip data the way pack does, and drops only an unreadable skeleton', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-spine-'));
+  const pack = path.join(parent, 'pack');
+  const page = png(4, 4);
+  writePack(pack, {
+    id: 'rose-spine', name: '骨架', version: '1.0.0', license: 'CC0-1.0', content: [],
+    art: { chars: {
+      char_rose_good: { spine: { front: { skel: 'models/good.skel', atlas: 'models/good.atlas', textures: ['models/a.png'] } } },
+      char_rose_bad: { spine: { front: { skel: 'models/bad.skel', atlas: 'models/bad.atlas', textures: ['models/a.png'] } } },
+    } },
+  }, {
+    'models/good.skel': skel(), 'models/good.atlas': atlas(['a.png']),
+    'models/bad.skel': Buffer.from('not a skeleton'), 'models/bad.atlas': atlas(['a.png']),
+    'models/a.png': page,
+  });
+  const out = path.join(parent, 'rose-spine');
+  try {
+    const dry = await importForge(pack, { ...forgeOpts(parent), out, dryRun: true });
+    assert.equal(dry.ok, true, dry.markdown);
+    assert.equal(dry.wrote, false);
+    assert.equal(dry.issues.length, 0);
+    assert.equal(fs.existsSync(out), false);
+    const dropped = dry.report.skipped.filter((s) => /bad\.skel/.test(s.path));
+    assert.equal(dropped.length, 1);
+    assert.match(dropped[0].en, /only this model was dropped/);
+    assert.match(dropped[0].zh, /只丢掉这个模型/);
+    const wrote = await importForge(pack, { ...forgeOpts(parent), out });
+    assert.equal(wrote.ok, true, wrote.markdown);
+    assert.equal(wrote.wrote, true);
+    const assets = JSON.parse(fs.readFileSync(path.join(out, 'assets.json'), 'utf8'));
+    assert.equal(assets.chars.char_rose_good.spine.front.skel, 'files/models/good.skel');
+    assert.equal(assets.chars.char_rose_bad, undefined);
+    const lock = JSON.parse(fs.readFileSync(path.join(out, 'plugin.lock.json'), 'utf8'));
+    assert.ok(lock.spine['files/models/good.skel'], Object.keys(lock.spine).join(','));
+    assert.equal(lock.spine['files/models/bad.skel'], undefined);
+    assert.equal(lock.spine['files/models/good.skel'].sha256.length, 64);
+    const check = await quiet(['check', out, '--strict', '--root', ROOT]);
+    assert.equal(check.code, 0, check.out);
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('a safe integer past ±1e9 does not reject a Forge file; game-data fields stay inside that window', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-num-'));
+  const pack = path.join(parent, 'pack');
+  const bomb = path.join(parent, 'bomb');
+  writePack(pack, {
+    id: 'rose-stamp', name: '时间戳', version: '1.0.0', license: 'CC0-1.0', content: ['stages', 'chess'],
+    overrides: ['chess:chess_char_1_01_a'],
+  }, {
+    'data/stages.json': JSON.stringify({ 来源: 'forge', 内容: { act: { events: [{ start: 1745674200, end: 1746993599 }] } } }),
+    'chess.json': JSON.stringify({ chess_char_1_01_a: { price: 2e9, rangeGrid: [[1, 0]] } }),
+  });
+  writePack(bomb, {
+    id: 'rose-bomb', name: '过大', version: '1.0.0', license: 'CC0-1.0', content: ['stages'],
+  }, {
+    'data/stages.json': JSON.stringify({ 内容: { act: { events: [{ start: 1e20 }] } } }),
+  });
+  try {
+    const got = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'rose-stamp') });
+    assert.equal(got.ok, true, got.markdown);
+    assert.equal(got.issues.length, 0);
+    assert.match(got.markdown, /1745674200/);
+    assert.match(got.markdown, /2000000000/);
+    assert.match(got.markdown, /price/);
+    const patch = JSON.parse(fs.readFileSync(path.join(parent, 'rose-stamp', 'data', 'patch.json'), 'utf8'));
+    const grid = patch.ops.filter((o) => o.id === 'chess_char_1_01_a' && o.path.join('.') === 'rangeGrid');
+    assert.equal(grid.length, 1);
+    assert.deepEqual(grid[0].value, [[1, 0]]);
+    assert.equal(patch.ops.some((o) => o.path.join('.') === 'price'), false);
+    const { registry } = setsOf(parent);
+    const set = buildContentSet({ registry, ids: ['rose-stamp'] });
+    assert.deepEqual(set.problems, [], JSON.stringify(set.problems));
+    const refused = await importForge(bomb, { ...forgeOpts(parent), dryRun: true });
+    assert.equal(refused.ok, false);
+    assert.equal(refused.issues[0].code, 'PLUGIN_FORGE_JSON');
+    assert.match(refused.issues[0].detail, /not a safe integer/);
+    assert.match(refused.issues[0].detail, /stages\.json/);
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('a chess override writes skill and the default skills[] entry as one object', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-skill-'));
+  const pack = path.join(parent, 'pack');
+  const official = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'chess.json'), 'utf8'));
+  const aligned = (rec, mutate) => {
+    const skills = JSON.parse(JSON.stringify(rec.skills));
+    const i = skills.findIndex((s) => s && s.isDefault === true);
+    const body = { ...skills[i] };
+    delete body.isDefault;
+    mutate(body);
+    skills[i] = { ...body, isDefault: true };
+    return { skill: body, skills };
+  };
+  const good = aligned(official.chess_char_1_01_a, (body) => { body.bb = { ...body.bb, extra_key: 3 }; });
+  const bad = aligned(official.chess_char_1_01_b, () => {});
+  bad.skill = { ...bad.skill, name: `${bad.skill.name}-other` };
+  writePack(pack, {
+    id: 'rose-skill', name: '技能', version: '1.0.0', license: 'CC0-1.0', content: ['chess'],
+    overrides: ['chess:chess_char_1_01_a', 'chess:chess_char_1_01_b'],
+  }, {
+    'chess.json': JSON.stringify({
+      chess_char_1_01_a: { skill: good.skill, skills: good.skills },
+      chess_char_1_01_b: { skill: bad.skill, skills: bad.skills },
+    }),
+  });
+  try {
+    const got = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'rose-skill') });
+    assert.equal(got.ok, true, got.markdown);
+    assert.match(got.markdown, /chess:chess_char_1_01_b/);
+    assert.match(got.markdown, /differ: name/);
+    assert.match(got.markdown, /这条记录没有导入/);
+    const patch = JSON.parse(fs.readFileSync(path.join(parent, 'rose-skill', 'data', 'patch.json'), 'utf8'));
+    const of = (id, key) => patch.ops.filter((o) => o.id === id && o.path.join('.') === key);
+    assert.equal(of('chess_char_1_01_b', 'skill').length, 0);
+    const skill = of('chess_char_1_01_a', 'skill');
+    const skills = of('chess_char_1_01_a', 'skills');
+    assert.equal(skill.length, 1);
+    assert.equal(skills.length, 1);
+    assert.equal(canonicalJson(skill[0].value), canonicalJson(good.skill));
+    const marked = skills[0].value.find((s) => s.isDefault === true);
+    const body = { ...marked };
+    delete body.isDefault;
+    assert.equal(canonicalJson(body), canonicalJson(skill[0].value));
+    assert.equal(body.bb.extra_key, 3);
+    const { registry } = setsOf(parent);
+    const set = buildContentSet({ registry, ids: ['rose-skill'] });
+    assert.deepEqual(set.problems, [], JSON.stringify(set.problems));
+    const composed = set.data.chess.chess_char_1_01_a;
+    const def = composed.skills.find((s) => s.isDefault === true);
+    const composedBody = { ...def };
+    delete composedBody.isDefault;
+    assert.equal(canonicalJson(composedBody), canonicalJson(composed.skill));
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('an unknown bond, garrison or bond member is named and left out of the override', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-bond-'));
+  const pack = path.join(parent, 'pack');
+  const bonds = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'bonds.json'), 'utf8'));
+  const members = bonds.deputShip.members;
+  writePack(pack, {
+    id: 'rose-bond', name: '盟约', version: '1.0.0', license: 'CC0-1.0', content: ['chess', 'bonds'],
+    overrides: ['chess:chess_char_1_01_a', 'bonds:deputShip'],
+  }, {
+    'chess.json': JSON.stringify({ chess_char_1_01_a: {
+      bonds: ['lateranoShip', 'victoriaShip', 'noSuchShip'], garrisonIds: ['no_such_garrison'], rangeGrid: [[1, 0]],
+      chessType: 'NORMAL', backup: { charId: 'char_102_texas', tmplId: null, skillIndex: 0, uniEquipId: null, potRank: 0 },
+      status: { phase: 0, level: 1, skillLevel: 1, equipLevel: 0 },
+    } }),
+    'bonds.json': JSON.stringify({ deputShip: { members: [...members, 'chess_nope'] } }),
+  });
+  try {
+    const got = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'rose-bond') });
+    assert.equal(got.ok, true, got.markdown);
+    assert.match(got.markdown, /noSuchShip/);
+    assert.match(got.markdown, /swiftShip/);
+    assert.match(got.markdown, /victoriaShip/);
+    assert.match(got.markdown, /no_such_garrison/);
+    assert.match(got.markdown, /chess_nope/);
+    assert.match(got.markdown, /「backup」沿用本安装的官方记录/);
+    assert.match(got.markdown, /「chessType」沿用本安装的官方记录/);
+    assert.match(got.markdown, /「status」沿用本安装的官方记录/);
+    const patch = JSON.parse(fs.readFileSync(path.join(parent, 'rose-bond', 'data', 'patch.json'), 'utf8'));
+    assert.equal(patch.ops.some((o) => ['backup', 'chessType', 'status'].includes(o.path[0])), false);
+    const bondsOp = patch.ops.find((o) => o.id === 'chess_char_1_01_a' && o.path.join('.') === 'bonds');
+    assert.deepEqual(bondsOp.value, ['lateranoShip', 'victoriaShip']);
+    assert.equal(patch.ops.some((o) => o.path.join('.') === 'garrisonIds'), false);
+    assert.equal(patch.ops.some((o) => o.id === 'deputShip' && o.path.join('.') === 'members'), false);
+    assert.equal(patch.ops.some((o) => o.id === 'lateranoShip'), false);
+    const bondField = (id, field) => patch.ops.find((o) => o.file === 'bonds' && o.id === id && o.path.join('.') === field);
+    const swiftM = bondField('swiftShip', 'members');
+    const swiftV = bondField('swiftShip', 'visibleMembers');
+    assert.deepEqual(swiftM.value, bonds.swiftShip.members.filter((x) => x !== 'chess_char_1_01_a'));
+    assert.deepEqual(swiftV.value, bonds.swiftShip.visibleMembers.filter((x) => x !== 'chess_char_1_01_a'));
+    assert.deepEqual(bondField('victoriaShip', 'members').value, [...bonds.victoriaShip.members, 'chess_char_1_01_a']);
+    assert.deepEqual(bondField('victoriaShip', 'visibleMembers').value, [...bonds.victoriaShip.visibleMembers, 'chess_char_1_01_a']);
+    const grid = patch.ops.find((o) => o.id === 'chess_char_1_01_a' && o.path.join('.') === 'rangeGrid');
+    assert.deepEqual(grid.value, [[1, 0]]);
+    const { registry } = setsOf(parent);
+    const set = buildContentSet({ registry, ids: ['rose-bond'] });
+    assert.deepEqual(set.problems, [], JSON.stringify(set.problems));
+    assert.deepEqual(set.data.chess.chess_char_1_01_a.bonds, ['lateranoShip', 'victoriaShip']);
+    assert.equal(set.data.bonds.swiftShip.members.includes('chess_char_1_01_a'), false);
+    assert.equal(set.data.bonds.swiftShip.visibleMembers.includes('chess_char_1_01_a'), false);
+    assert.equal(set.data.bonds.victoriaShip.members.at(-1), 'chess_char_1_01_a');
+    assert.equal(set.data.bonds.victoriaShip.visibleMembers.at(-1), 'chess_char_1_01_a');
+    assert.equal(set.data.bonds.lateranoShip.members.includes('chess_char_1_01_a'), true);
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('a finite number past ±1e9 inside an array leaf is omitted and the rest of the record imports', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-grid-'));
+  const pack = path.join(parent, 'pack');
+  writePack(pack, {
+    id: 'rose-grid', name: '射程', version: '1.0.0', license: 'CC0-1.0', content: ['chess'],
+    overrides: ['chess:chess_char_1_01_a'],
+  }, {
+    'chess.json': JSON.stringify({ chess_char_1_01_a: { rangeGrid: [[2e9, 0]], price: 3 } }),
+  });
+  try {
+    const got = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'rose-grid') });
+    assert.equal(got.ok, true, got.markdown);
+    assert.equal(got.issues.length, 0);
+    assert.match(got.markdown, /2000000000/);
+    assert.match(got.markdown, /rangeGrid/);
+    const patch = JSON.parse(fs.readFileSync(path.join(parent, 'rose-grid', 'data', 'patch.json'), 'utf8'));
+    assert.equal(JSON.stringify(patch).includes('2000000000'), false);
+    assert.equal(patch.ops.some((o) => o.path.join('.') === 'rangeGrid'), false);
+    const price = patch.ops.find((o) => o.id === 'chess_char_1_01_a' && o.path.join('.') === 'price');
+    assert.equal(price.value, 3);
+    const { registry } = setsOf(parent);
+    const set = buildContentSet({ registry, ids: ['rose-grid'] });
+    assert.deepEqual(set.problems, [], JSON.stringify(set.problems));
+    assert.equal(set.data.chess.chess_char_1_01_a.price, 3);
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('a skill override without skills[] merges onto the official skill', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-partial-'));
+  const pack = path.join(parent, 'pack');
+  const official = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'chess.json'), 'utf8')).chess_char_1_01_a;
+  writePack(pack, {
+    id: 'rose-partial', name: '半技能', version: '1.0.0', license: 'CC0-1.0', content: ['chess'],
+    overrides: ['chess:chess_char_1_01_a'],
+  }, {
+    'chess.json': JSON.stringify({ chess_char_1_01_a: { skill: { spCost: 30 }, rangeGrid: [[1, 0]] } }),
+  });
+  try {
+    const got = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'rose-partial') });
+    assert.equal(got.ok, true, got.markdown);
+    assert.equal(got.issues.some((i) => i.code === 'PLUGIN_DATA_REQUIRED'), false);
+    const patch = JSON.parse(fs.readFileSync(path.join(parent, 'rose-partial', 'data', 'patch.json'), 'utf8'));
+    const skill = patch.ops.find((o) => o.id === 'chess_char_1_01_a' && o.path.join('.') === 'skill');
+    const skills = patch.ops.find((o) => o.id === 'chess_char_1_01_a' && o.path.join('.') === 'skills');
+    assert.equal(skill.value.spCost, 30);
+    assert.equal(skill.value.skillId, official.skill.skillId);
+    assert.equal(skill.value.index, official.skill.index);
+    assert.equal(canonicalJson(skill.value.bb), canonicalJson(official.skill.bb));
+    const marked = skills.value.find((s) => s.isDefault === true);
+    const body = { ...marked };
+    delete body.isDefault;
+    assert.equal(canonicalJson(body), canonicalJson(skill.value));
+    const grid = patch.ops.find((o) => o.id === 'chess_char_1_01_a' && o.path.join('.') === 'rangeGrid');
+    assert.deepEqual(grid.value, [[1, 0]]);
+    const { registry } = setsOf(parent);
+    const set = buildContentSet({ registry, ids: ['rose-partial'] });
+    assert.deepEqual(set.problems, [], JSON.stringify(set.problems));
+    assert.equal(set.data.chess.chess_char_1_01_a.skill.spCost, 30);
+    assert.equal(set.data.chess.chess_char_1_01_a.skill.skillId, official.skill.skillId);
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('a garrison bbStr bond token that is not a bond id is named and that field is not written', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-gar-'));
+  const pack = path.join(parent, 'pack');
+  const official = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'garrisons.json'), 'utf8'));
+  writePack(pack, {
+    id: 'rose-gar', name: '驻守', version: '1.0.0', license: 'CC0-1.0', content: ['garrisons'],
+    overrides: ['garrisons:garrison_10_a', 'garrisons:garrison_10_b', 'garrisons:garrison_35_a'],
+  }, {
+    'garrisons.json': JSON.stringify({
+      garrison_10_a: { bbStr: { bond_id: 'yanShip' }, charLevel: 1 },
+      garrison_10_b: { bbStr: { bond_id: `${official.garrison_10_b.bbStr.bond_id},noSuchBond` } },
+      garrison_35_a: { bbStr: { bond: 'yanShip,victoriaShip,rhodesShip' }, charLevel: 2 },
+    }),
+  });
+  try {
+    const got = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'rose-gar') });
+    assert.equal(got.ok, true, got.markdown);
+    assert.match(got.markdown, /noSuchBond/);
+    assert.match(got.markdown, /rhodesShip/);
+    assert.match(got.markdown, /bbStr\.bond_id/);
+    assert.match(got.markdown, /bbStr\.bond/);
+    const patch = JSON.parse(fs.readFileSync(path.join(parent, 'rose-gar', 'data', 'patch.json'), 'utf8'));
+    const field = (id, key) => patch.ops.find((o) => o.id === id && o.path.join('.') === key);
+    assert.equal(field('garrison_10_a', 'bbStr.bond_id').value, 'yanShip');
+    assert.equal(field('garrison_10_a', 'charLevel').value, 1);
+    assert.equal(patch.ops.some((o) => o.id === 'garrison_10_b' && o.path.join('.') === 'bbStr.bond_id'), false);
+    assert.equal(patch.ops.some((o) => o.id === 'garrison_35_a' && o.path.join('.') === 'bbStr.bond'), false);
+    assert.equal(field('garrison_35_a', 'charLevel').value, 2);
+    assert.equal(JSON.stringify(patch).includes('rhodesShip'), false);
+    assert.equal(JSON.stringify(patch).includes('noSuchBond'), false);
+    const { registry } = setsOf(parent);
+    const set = buildContentSet({ registry, ids: ['rose-gar'] });
+    assert.deepEqual(set.problems, [], JSON.stringify(set.problems));
+    assert.equal(set.data.garrisons.garrison_10_b.bbStr.bond_id, official.garrison_10_b.bbStr.bond_id);
+    assert.equal(set.data.garrisons.garrison_35_a.bbStr.bond, official.garrison_35_a.bbStr.bond);
+    assert.equal(set.data.garrisons.garrison_10_a.bbStr.bond_id, 'yanShip');
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('a skeleton whose bone, slot or skin count exceeds the cap is rejected before allocation', async () => {
+  const hostile = (counts) => {
+    const parts = [];
+    const str = (s) => { const b = Buffer.from(s); parts.push(Buffer.from([b.length + 1]), b); };
+    const vi = (n) => {
+      const bytes = [];
+      let v = n >>> 0;
+      while (v > 127) { bytes.push((v & 127) | 128); v >>>= 7; }
+      bytes.push(v & 127);
+      parts.push(Buffer.from(bytes));
+    };
+    str('hash');
+    str('3.8.99');
+    parts.push(Buffer.alloc(16));
+    parts.push(Buffer.from([0]));
+    vi(0);
+    vi(counts.bones || 0);
+    vi(counts.slots || 0);
+    vi(0); vi(0); vi(0);
+    vi(0);
+    vi(counts.skins || 0);
+    return Buffer.concat(parts);
+  };
+  const info = parseSkel(skel());
+  assert.ok(info.animations.includes('Idle'));
+  assert.throws(() => parseSkel(hostile({ bones: 5000 })), /bone count 5000 exceeds 4096/);
+  assert.throws(() => parseSkel(hostile({ slots: 5000 })), /slot count 5000 exceeds 4096/);
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-skelcap-'));
+  try {
+    const bomb = hostile({ skins: 1 << 24 });
+    fs.writeFileSync(path.join(parent, 'a.skel'), bomb);
+    fs.writeFileSync(path.join(parent, 'a.atlas'), atlas(['a.png']));
+    fs.writeFileSync(path.join(parent, 'a.png'), png(1, 1));
+    const t0 = Date.now();
+    const clip = skeletonClipData(parent, { skel: 'a.skel', atlas: 'a.atlas', textures: ['a.png'] }, new Set(['chars']));
+    const ms = Date.now() - t0;
+    assert.equal(clip.entry, null);
+    assert.match(clip.problems.map(String).join('\n'), /exceeds/);
+    assert.ok(ms < 1000, `skel cap took ${ms}ms`);
+    const good = path.join(parent, 'good');
+    fs.mkdirSync(good);
+    fs.writeFileSync(path.join(good, 'a.skel'), skel());
+    fs.writeFileSync(path.join(good, 'a.atlas'), atlas(['a.png']));
+    fs.writeFileSync(path.join(good, 'a.png'), png(1, 1));
+    const kept = skeletonClipData(good, { skel: 'a.skel', atlas: 'a.atlas', textures: ['a.png'] }, new Set(['chars']));
+    assert.ok(kept.entry, JSON.stringify(kept.problems));
+    assert.equal(kept.problems.length, 0);
   } finally { fs.rmSync(parent, { recursive: true, force: true }); }
 });

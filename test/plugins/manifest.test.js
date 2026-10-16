@@ -281,6 +281,10 @@ test('JSON limits: nesting, numbers finite and within ±1e9', () => {
   assert.equal(checkJsonLimits({ a: [1, 2, { b: -1e9 }], s: 'x' }), null);
   assert.equal(checkJsonLimits(JSON.parse('{ "x": [0, 1e999] }')), '$.x[1]: a number that is not finite');
   assert.equal(checkJsonLimits({ hp: 2e9 }), '$.hp: 2000000000 is beyond ±1000000000');
+  assert.equal(checkJsonLimits({ start: 1745674200 }, { numbers: 'safe' }), null);
+  assert.equal(checkJsonLimits({ hp: 2e9 }, { numbers: 'safe' }), null);
+  assert.match(checkJsonLimits({ hp: 1e20 }, { numbers: 'safe' }), /not a safe integer/);
+  assert.match(checkJsonLimits({ hp: 1.5e16 }, { numbers: 'safe' }), /not a safe integer/);
   let deep = 0;
   for (let i = 0; i < PLUGIN_LIMITS.jsonDepth; i++) deep = [deep];
   assert.equal(checkJsonLimits(deep), null, 'exactly 64 levels');

@@ -377,7 +377,7 @@ node tools/plugin.mjs pack my-texas --zip
 | 工作台里的操作被拒绝，旁边显示原因 | `PLUGIN_INSTALL_EXISTS` | plugins/ 里已经有这个 id：{detail} | 不加 --force 就不会覆盖。--force 会把旧文件夹挪到 plugins/_replaced/，不会删除。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_INPUT` | 这不是一份能读的 Forge 包：{detail} | 选一个含 pack.json 的工坊包目录，或那个目录打出来的 zip。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_ZIP` | 这个包的文件不安全，没有解压：{detail} | 路径不能跳出包目录，不能有符号链接，单个包最多 5000 个文件、一共 200 MB。换一份包再导入。 |
-| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_JSON` | 包里的 JSON 读不了：{detail} | JSON 要能解析，不超过 8 MB，嵌套不超过 64 层，数字在 ±1e9 以内。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_JSON` | 包里的 JSON 读不了：{detail} | JSON 要能解析，不超过 8 MB，嵌套不超过 64 层。读 Forge 包时，±1e9 以内的有限数和安全整数都可以；非有限数和超出安全整数范围的数仍然拒绝。写进插件或游戏数据的数仍须在 ±1e9 以内。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_ID` | 这个包的 id 变不成插件 id：{detail} | 用 --id 指定一个插件 id：2–32 位小写字母、数字和 -，例如 rose-skin。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_FORGE_EXISTS` | 目标文件夹已经存在，没有写入：{detail} | 换一个 --out 或 --id，或者把已有的插件文件夹挪走后再导入。 |
 | 插件能用，但检查时有提示 | `PLUGIN_FORGE_MOUNT` | 面板挂载点需要人工适配：{detail} | 按报告建议的插槽改写面板；建议位置不是原挂载点。 |
@@ -417,6 +417,15 @@ node tools/plugin.mjs import-forge <工坊包目录或 zip> [--out plugins/<id>]
 - 写 kit 的作者注意：天赋的 `install` 里加 buff 要写 `allowDead: true`（常驻的再加 `persist: true`，和 `kit.statBuff` 一样）。
   开战前干员还没部署，没写的 buff 会被引擎拒掉（Forge 的引擎也是这条规则）。报告会点名这样的 kit；Forge 自带的
   `kit-demo` 示例就是一例，导入后它的「攻击力 +25%」不生效。
+
+覆盖一条官方记录时，还有这几条：
+
+- `bonds` 里本安装没有的盟约 id 会点名，并且不写进名单。写进去的名单如果少了官方盟约，这份棋子会从那条盟约的 members 和 visibleMembers 里去掉；多了一条本安装已有的盟约，就加进去。报告点名这些官方 id。过滤之后一个都不剩时，官方 bonds 和成员名单都保持原样。
+- 数组叶子（例如 rangeGrid）里有一个超出 ±1e9 的有限数时，整段数组不写，报告点名这条路径。同一条记录上的其他字段（例如 price）仍会导入。
+- 只写了 `skill` 的一部分、没有 `skills[]` 时，按字段叠到官方技能上（对象合并，数组替换），并写回默认的 `skills[]` 条目。不会拿半份对象换掉整条技能。
+- 官方驻守的 `bbStr.bond` 和 `bbStr.bond_id` 按逗号拆开。有一个记号不是盟约 id 时，点名，并且这个字段整段不写（不写成删掉未知记号之后的短名单）。记号全都是已有盟约时，改变后的字符串仍会写入。
+
+Spine 骨架在导入和 `plugin.mjs pack` 里用同一次读取。骨头、插槽、皮肤、顶点的数量超过上限时，在分配数组之前拒绝：骨头、插槽、皮肤和顶点 4096，浮点数组 8192，三角形索引 16384。这些上限高于本安装实测的最大骨架（581 根骨头、360 个插槽、3 张皮肤、186 个顶点），也远低于 2^24。[ASSUMED]
 
 完整对照表在 [PLUGINS.md](PLUGINS.md) §16。
 

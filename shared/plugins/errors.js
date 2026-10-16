@@ -838,7 +838,7 @@ export const PLUGIN_ERRORS = Object.freeze({
   PLUGIN_FORGE_JSON: {
     level: 'problem', doc: D.forge,
     zh: '包里的 JSON 读不了：{detail}', en: 'JSON in the pack cannot be read: {detail}',
-    fix: { zh: 'JSON 要能解析，不超过 8 MB，嵌套不超过 64 层，数字在 ±1e9 以内。', en: 'JSON must parse, stay within 8 MB and 64 levels of nesting, and keep numbers within ±1e9.' },
+    fix: { zh: 'JSON 要能解析，不超过 8 MB，嵌套不超过 64 层。读 Forge 包时，±1e9 以内的有限数和安全整数都可以；非有限数和超出安全整数范围的数仍然拒绝。写进插件或游戏数据的数仍须在 ±1e9 以内。', en: 'JSON must parse, stay within 8 MB and 64 levels. A Forge pack may contain finite numbers within ±1e9 and safe integers; non-finite numbers and values past the safe-integer range are still refused. A number written into a plugin or into game data must still stay within ±1e9.' },
   },
   PLUGIN_FORGE_ID: {
     level: 'problem', doc: D.forge,
