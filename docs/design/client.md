@@ -230,6 +230,13 @@ history and the open points: DESIGN §32.14.25.
   extraction (`tools/local-extract`), served to every player of that server: a remote player sees the host's effects,
   whatever client they have. The effects draw on the 3D board with WebGL2 only; the 2D board and the simplified board
   keep the procedural effects. A tier switch clears the effects; the skill loops that should run start again quietly.
+- **Plugin effects** (0.3.1, [§34.18](../history/0.3.1.md#3418-plugin-operator-effects)). Explicit `fx.unit` requires
+  an exact index key for both skills and attack/talent wiring; a miss skips `fx.skills` and keeps the old fallback.
+  [ASSUMED] Borrowed talents use the borrower's equipped indices and active module. Author flipbooks draw on both
+  boards; compiled prefabs remain 3D-only. The browser rechecks unit ownership and prefab bodies before merge.
+  [ASSUMED] Only an identified source whose custom hit draws replaces that damage spark: ranged arrivals are
+  estimated and cannot claim source-less damage on the target. Owner/target death cancels pending arrivals.
+  Replacing the visual set or destroying the player releases flipbook base textures after their sprites.
 - **Dev.** `public/dev/fx-viewer.html` plays any effect key (`?key=`, on a unit's mount points with `&unit=`, turned as
   the wiring turns it for its spawn location;
   `?attack=<unit id>` repeats that unit's attack from index.json through the wiring; `?skilldemo=<unit id>&s=<slot>`

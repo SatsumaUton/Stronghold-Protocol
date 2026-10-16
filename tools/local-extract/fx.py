@@ -43,6 +43,7 @@ import math
 import os
 import re
 import struct
+import subprocess
 import sys
 import time
 import zlib
@@ -3060,9 +3061,24 @@ def game_data(root):
             return json.loads((excel / n).read_text(encoding='utf-8'))
         except (OSError, ValueError):
             return {}
+    # Repository-owned JSON reader; installed plugin code is never imported or executed.
+    try:
+        ref_reader = Path(__file__).with_name('plugin-fx.mjs')
+        refs = json.loads(subprocess.check_output(['node', str(ref_reader), str(root)], timeout=30))
+    except (OSError, ValueError, subprocess.SubprocessError):
+        refs = []
+    char_table = load_excel('character_table.json')
+    for cid in refs:
+        if cid not in chars:
+            chars.append(cid)
+        # Shared skills do not always follow skchr_<codename>_<slot>.
+        for skill_rec in (char_table.get(cid) or {}).get('skills') or []:
+            sid = skill_rec.get('skillId') if isinstance(skill_rec, dict) else None
+            if sid:
+                skills.setdefault(cid, set()).add(sid)
     return {'chars': chars, 'skills': {k: sorted(v) for k, v in skills.items()}, 'enemies': sorted(enemies), 'tokens': toks,
             'tokenSkills': token_skills,
-            'talentKeys': talent_keys(chars + toks, load_excel('character_table.json'),
+            'talentKeys': talent_keys(chars + toks, char_table,
                                       load_excel('battle_equip_table.json'), load_excel('uniequip_table.json')),
             'enemyTalentKeys': {k: enemy_talent_prefixes(v) for k, v in enemies.items() if isinstance(v, dict)}}
 

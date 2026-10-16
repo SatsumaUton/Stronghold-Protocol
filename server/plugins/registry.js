@@ -43,13 +43,14 @@ import { nodeSha256 } from './identity.js';
 import { readScripts, applyTrust, isScriptClass } from './trusted.js';
 import { readContentData } from './contentData.js';
 import fs from 'node:fs';
+import { readFxAssets, readFxManifest as readPluginManifest } from './fxAssets.js';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { APP_VERSION, PLUGIN_API } from '../../shared/constants.js';
 import { PACK_TYPES, PACK_MANIFEST, PACKS_URL, normalizeManifest, packIndexEntry, buildPackIndex } from '../../shared/packs.js';
 import { SOURCE_LANG, isLangCode, countStrings } from '../../shared/i18nPacks.js';
 import {
-  PLUGIN_MANIFEST, PLUGIN_LIMITS, appVersionMatches, buildPluginIndex, checkJsonLimits, checkPluginFiles, classStatus, declaredPaths, readPluginManifest,
+  PLUGIN_MANIFEST, PLUGIN_LIMITS, appVersionMatches, buildPluginIndex, checkJsonLimits, checkPluginFiles, classStatus, declaredPaths,
 } from '../../shared/plugins/manifest.js';
 import {
   FILE_URL_DIGITS, LOCK_FILE, attachSpineMeta, modelHashOf, readAssetOverlay, readPluginLock, visualHashOf, writesHashOf,
@@ -301,7 +302,14 @@ function readVisual(dir, manifest, listed, { vanilla, hashCache }) {
     else if (bad) list.problem('PLUGIN_LOCK', `${LOCK_FILE}: ${bad}`, { file: LOCK_FILE });
     else { const l = readPluginLock(r.json); list.take(l); lock = l.lock; }
   }
-  const ov = readAssetOverlay(assets, { vanilla: vanilla.manifest, permissions: manifest.permissions, has: (rel) => fileSet.has(rel) });
+  let effects = null;
+  if (assets.fx !== undefined) {
+    try { effects = readFxAssets(dir, assets.fx, [manifest.id, ...Object.keys(manifest.requires || {})], listed); }
+    catch (e) { list.problem('PLUGIN_PART_SHAPE', `fx: ${e.message}`, { at: ['assets', 'fx'], detail: e.message }); }
+  }
+  const { fx: _fx, ...plainAssets } = assets;
+  const ov = readAssetOverlay(plainAssets, { vanilla: vanilla.manifest, permissions: manifest.permissions, has: (rel) => fileSet.has(rel) });
+  if (effects) ov.files.push(...effects.files);
   list.take(ov);
   if (problems.length) return out(null);
   // the files that shape the overlay (shared/plugins/visual.js: the `files` of its part of a vs)
@@ -317,6 +325,7 @@ function readVisual(dir, manifest, listed, { vanilla, hashCache }) {
   if (problems.length) return out(null);
   const sha = (rel) => hashed[rel]?.sha256 ?? null;
   const meta = attachSpineMeta(ov.ops, lock, sha);
+  if (effects) meta.ops.push({ at: ['fx', manifest.id], effects: effects.value });
   list.take(meta);
   if (problems.length) return out(null);
   /** @type {Map<string, ServedFile>} */

@@ -1822,5 +1822,29 @@
   {
     "name": "record.operator.forms.tokens",
     "anchor": "server/plugins/gameplayRecords.js#expandGameplayRecords"
+  },
+  {
+    "name": "record.operator.fx",
+    "anchor": "public/js/render/vfx/pluginFormat.js#pluginFxProblems"
+  },
+  {
+    "name": "overlay.fx.index",
+    "anchor": "public/js/render/vfx/pluginFormat.js#pluginFxProblems"
+  },
+  {
+    "name": "overlay.fx.flipbooks",
+    "anchor": "public/js/render/vfx/pluginFormat.js#pluginFxProblems"
+  },
+  {
+    "name": "overlay.fx.bind",
+    "anchor": "public/js/render/vfx/pluginFormat.js#pluginFxProblems"
+  },
+  {
+    "name": "overlay.fx.silentPhases",
+    "anchor": "public/js/render/vfx/pluginFormat.js#pluginFxProblems"
+  },
+  {
+    "name": "dsl.fx.plugin",
+    "anchor": "public/js/render/vfx/pluginFormat.js#pluginFxProblems"
   }
 ]

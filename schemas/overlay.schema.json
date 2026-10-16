@@ -239,6 +239,189 @@
         }
       },
       "additionalProperties": false
+    },
+    "fx": {
+      "type": "object",
+      "description": "Optional 0.3.1 presentation effects, checked by server/plugins/fxAssets.js. Ownership, file/hash budgets, compiled prefab shape, PNG dimensions and frame-grid divisibility are checked on disk. See docs/PLUGINS.md §9.",
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "const": "fx/index.json"
+        },
+        "flipbooks": {
+          "type": "object",
+          "maxProperties": 128,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+            "not": {
+              "enum": [
+                "constructor",
+                "prototype",
+                "__proto__"
+              ]
+            }
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "image",
+              "frames",
+              "cols",
+              "fps"
+            ],
+            "properties": {
+              "image": {
+                "type": "string",
+                "pattern": "^fx/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*\\.png$"
+              },
+              "frames": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 256
+              },
+              "cols": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 256
+              },
+              "fps": {
+                "type": "number",
+                "minimum": 0.1,
+                "maximum": 60
+              },
+              "anchor": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "scale": {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 8
+              },
+              "blend": {
+                "enum": [
+                  "normal",
+                  "add"
+                ]
+              },
+              "loop": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "bind": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^char_x_[a-z0-9_]+$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "maxProperties": 10,
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+              "not": {
+                "enum": [
+                  "constructor",
+                  "prototype",
+                  "__proto__"
+                ]
+              }
+            },
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "skillStart": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                  "not": {
+                    "enum": [
+                      "constructor",
+                      "prototype",
+                      "__proto__"
+                    ]
+                  }
+                },
+                "skillLoop": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                  "not": {
+                    "enum": [
+                      "constructor",
+                      "prototype",
+                      "__proto__"
+                    ]
+                  }
+                },
+                "skillEnd": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                  "not": {
+                    "enum": [
+                      "constructor",
+                      "prototype",
+                      "__proto__"
+                    ]
+                  }
+                },
+                "attack": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                  "not": {
+                    "enum": [
+                      "constructor",
+                      "prototype",
+                      "__proto__"
+                    ]
+                  }
+                },
+                "hit": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                  "not": {
+                    "enum": [
+                      "constructor",
+                      "prototype",
+                      "__proto__"
+                    ]
+                  }
+                },
+                "projectile": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                  "not": {
+                    "enum": [
+                      "constructor",
+                      "prototype",
+                      "__proto__"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "silentPhases": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+          }
+        }
+      }
     }
   },
   "additionalProperties": false,

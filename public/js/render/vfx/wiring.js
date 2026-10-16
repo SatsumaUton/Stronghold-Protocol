@@ -262,6 +262,13 @@ export class FxWiring {
       k = null;
       // (a point on the ground — a kit fx's tile, SkillFx — has no info and no unit)
       const cands = this.opts.unitKey && v.info ? [].concat(this.opts.unitKey(v.info) || []) : [];
+      const rec = v.info ? this.opts.record?.(v.info) : null;
+      if (this.idx.pluginUnits?.[rec?.charId]) cands.unshift(this.idx.pluginUnits[rec.charId]);
+      if (rec?.fx?.unit) {
+        this.ofx.lib.notePluginUnit?.(rec.fx.unit);
+        // Explicit fx.unit uses exact keys only; the fallback art candidates below still accept suffixes.
+        if (Object.hasOwn(this.idx.units || {}, rec.fx.unit)) cands.unshift(rec.fx.unit);
+      }
       cands.push(v.info?.spine, v.info?.defId);
       for (const c of cands) {
         if (!c) continue;

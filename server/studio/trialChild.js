@@ -14,6 +14,7 @@ import { manifestText } from './templates/index.js';
 import { writeTrialDraftFile } from './trialDraft.js';
 import { scriptExecution } from '../../shared/plugins/scriptLoad.js';
 import { chooseOperator, baselineOperator, trialScenario } from './trialScenario.js';
+import { addFxReplay } from './fxReplay.js';
 
 const quiet = { info() {}, warn() {}, error() {}, log() {} };
 const issue = p => ({ level: 'problem', code: p.code || 'PLUGIN_INVALID', text: p.message || p.zh || p.text || '', file: p.file,
@@ -96,7 +97,7 @@ process.once('message', async ({ dirs, request, allowedScripts, temporary, heapM
       runner.once('exit', () => reject(new StudioError('PLUGIN_STUDIO_TRIAL_FAILED', 500)));
       runner.send({ base, set, baseScene, modScene, original, op });
     });
-    reply(result);
+    reply(addFxReplay(result, view, request.id, set.data, files));
   } catch (e) { reply({ ok: false, issues: [issue({ code: e.code?.startsWith('PLUGIN_') ? e.code : 'PLUGIN_STUDIO_TRIAL_FAILED', params: e.params })] }); }
   finally { if (temporary) fs.rmSync(temporary, { recursive: true, force: true }); }
 });

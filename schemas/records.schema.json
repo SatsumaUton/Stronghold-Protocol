@@ -2090,6 +2090,52 @@
             "targetPriority": {
               "type": "string",
               "minLength": 1
+            },
+            "fx": {
+              "type": "object",
+              "required": [
+                "unit"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "unit": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                  "not": {
+                    "enum": [
+                      "constructor",
+                      "prototype",
+                      "__proto__"
+                    ]
+                  }
+                },
+                "skills": {
+                  "type": "object",
+                  "maxProperties": 10,
+                  "propertyNames": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                    "not": {
+                      "enum": [
+                        "constructor",
+                        "prototype",
+                        "__proto__"
+                      ]
+                    }
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                    "not": {
+                      "enum": [
+                        "constructor",
+                        "prototype",
+                        "__proto__"
+                      ]
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -4238,6 +4284,52 @@
               "targetPriority": {
                 "type": "string",
                 "minLength": 1
+              },
+              "fx": {
+                "type": "object",
+                "required": [
+                  "unit"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "unit": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                    "not": {
+                      "enum": [
+                        "constructor",
+                        "prototype",
+                        "__proto__"
+                      ]
+                    }
+                  },
+                  "skills": {
+                    "type": "object",
+                    "maxProperties": 10,
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                      "not": {
+                        "enum": [
+                          "constructor",
+                          "prototype",
+                          "__proto__"
+                        ]
+                      }
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                      "not": {
+                        "enum": [
+                          "constructor",
+                          "prototype",
+                          "__proto__"
+                        ]
+                      }
+                    }
+                  }
+                }
               }
             }
           },
@@ -6400,6 +6492,52 @@
                   "targetPriority": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "fx": {
+                    "type": "object",
+                    "required": [
+                      "unit"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "unit": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                        "not": {
+                          "enum": [
+                            "constructor",
+                            "prototype",
+                            "__proto__"
+                          ]
+                        }
+                      },
+                      "skills": {
+                        "type": "object",
+                        "maxProperties": 10,
+                        "propertyNames": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                          "not": {
+                            "enum": [
+                              "constructor",
+                              "prototype",
+                              "__proto__"
+                            ]
+                          }
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9_-]{0,95}$",
+                          "not": {
+                            "enum": [
+                              "constructor",
+                              "prototype",
+                              "__proto__"
+                            ]
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               },

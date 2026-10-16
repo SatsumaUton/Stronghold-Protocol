@@ -24,6 +24,7 @@ import * as sdk from '../../shared/plugins/sdk.js';
 import { SURFACE_MARKERS, SURFACE_SINCE, buildSurface, uncoveredSdkExports } from '../../shared/plugins/surface.js';
 import { STUDIO_ROUTES } from '../../server/studio/index.js';
 import * as vocab from '../../server/sim/content/dsl/vocab.js';
+import { pluginFxSurface } from '../../public/js/render/vfx/pluginFormat.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -85,6 +86,7 @@ function expectedNames() {
   for (const name of Object.keys(sdk).filter((k) => k !== 'SDK_ID' && k !== 'SDK_MEMBERS').sort()) names.push(`sdk.export.${name}`);
   names.push('api.PLUGIN_API.min', 'api.PLUGIN_API.current');
   names.push('record.file.bonds', 'record.file.items', 'record.operator.forms.tags', 'record.operator.forms.tokens');
+  names.push('record.operator.fx', 'overlay.fx.index', 'overlay.fx.flipbooks', 'overlay.fx.bind', 'overlay.fx.silentPhases', 'dsl.fx.plugin');
   return names;
 }
 
@@ -100,7 +102,7 @@ function parseTable(md) {
   return rows;
 }
 
-const rows = [...buildSurface({ dsl: vocab, studioRoutes: STUDIO_ROUTES }), ...GAMEPLAY_RECORD_SURFACE];
+const rows = [...buildSurface({ dsl: vocab, studioRoutes: STUDIO_ROUTES }), ...GAMEPLAY_RECORD_SURFACE, ...pluginFxSurface()];
 const doc = parseTable(fs.readFileSync(path.join(ROOT, 'docs/PLUGIN-API.md'), 'utf8'));
 
 test('the document table and buildSurface are the same rows', () => {

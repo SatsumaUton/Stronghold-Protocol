@@ -8,6 +8,7 @@ import { contentHashOf, canonicalJson, csUrlPart } from '../../shared/plugins/id
 import { resolvePluginOrder } from '../../shared/plugins/order.js';
 import { applyPatches, normalizeSettings } from '../../shared/plugins/patch.js';
 import { expandGameplayRecords, reconcilePluginBonds, reconcilePluginTokens, validateGameplayData } from './gameplayRecords.js';
+import { expandFxRecords } from './fxRecords.js';
 import { object, own, clone, problem, RECORD_MAPS, recordId, namespaceCollisions } from '../../shared/plugins/dataUtils.js';
 import { buildRecordOverlay, walkOverlay, getPath, applyRecordOverlay } from '../../shared/i18nData.js';
 import { computeGroundPaths, computeDeployTiles } from '../sim/groundPaths.js';
@@ -238,7 +239,7 @@ function composeContentSet({ registry, ids = [] }) {
       } else {
         if (!p.manifest.permissions.includes('data.add')) { problems.push(problem('PLUGIN_CONTENT_PERMISSION', rel, 'records require data.add')); continue; }
         const entries = part === 'data' ? doc.entries : (Array.isArray(doc) ? doc : [doc]).map(v => part === 'operators' ? v : { ...v, file: part });
-        r = expandGameplayRecords(data, entries, { pluginId: p.id, validateDsl });
+        r = expandFxRecords(data, entries, { pluginId: p.id, validateDsl }, expandGameplayRecords);
       }
       problems.push(...r.problems.map(e => ({ ...e, plugin: p.id, file: rel })));
       data = r.data;

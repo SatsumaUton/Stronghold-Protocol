@@ -92,6 +92,7 @@ import { STUDIO_ROUTES } from '../server/studio/index.js';
 import { annotateCatalog, readCatalog } from '../shared/plugins/catalog.js';
 import { installFromFile, installFromUrl, installedPluginVersion, isRemoteAddress, loadCatalogText } from '../server/plugins/install.js';
 import { buildSurface, surfaceMarkdown, SURFACE_MARKERS } from '../shared/plugins/surface.js';
+import { pluginFxSurface } from '../public/js/render/vfx/pluginFormat.js';
 import { importForge } from '../server/plugins/forgeImport.js';
 
 export { checkPluginFolder, buildPluginLock };
@@ -463,7 +464,7 @@ export async function main(argv) {
 
   if (cmd === 'surface') {
     const vocab = await import('../server/sim/content/dsl/vocab.js');
-    const rows = [...buildSurface({ dsl: vocab, studioRoutes: STUDIO_ROUTES }), ...GAMEPLAY_RECORD_SURFACE];
+    const rows = [...buildSurface({ dsl: vocab, studioRoutes: STUDIO_ROUTES }), ...GAMEPLAY_RECORD_SURFACE, ...pluginFxSurface()];
     const table = surfaceMarkdown(rows);
     if (!flags.has('write')) { console.log(table); return 0; }
     const abs = path.join(root, 'docs/PLUGIN-API.md');
