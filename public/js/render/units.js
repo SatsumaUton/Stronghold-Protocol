@@ -573,7 +573,7 @@ function bar(P, parent, color, alpha = 1) {
  * Shared context handed to every view by app.js (`audio`: the audio manager of public/js/audio.js — prep landings, land()).
  * @typedef {{ P: any, layers: { shadow: any, units: any, bars: any, groundFx: any },
  *   assets: any, audio?: any, cam: () => any, heightAt: (r:number,c:number)=>number, fx: any, time: () => number,
- *   settings: { damageNumbers: boolean, quality: string, ammoCount?: boolean, mysticEnergy?: boolean } }} ViewCtx
+ *   settings: { damageNumbers: boolean, quality: string, ammoEnergyCount?: boolean } }} ViewCtx
  */
 
 /** Scratch skeletons per skeleton data (bonePose): one pose is computed and read at a time. */
@@ -1786,16 +1786,15 @@ export class UnitView {
       ic.width = ic.height = isz;
       ic.position.set(x - ((icons.length - 1) * (isz + 2)) / 2 + i * (isz + 2), iy);
     }
-    // 狼影 pips under the bars (b.snap `wolves`), then the purses and — 设置「秘术师能量」 on (off by default) — the stored
-    // energies (b.snap `coins` / `energy`), then the element gauge row under them (b.snap `elem`); redeploy ring above a
-    // knocked-down operator (b.snap `down`).
-    // 设置「弹药数量」 (off by default) first puts the magazine's count right under the ammo bar, and the rows below move
-    // down by its height
+    // 狼影 pips under the bars (b.snap `wolves`), then the purses and — 设置「显示弹药与能量数量」 on (off by default) —
+    // the stored energies (b.snap `coins` / `energy`), then the element gauge row under them (b.snap `elem`); redeploy
+    // ring above a knocked-down operator (b.snap `down`). The same switch first puts the magazine's count right under
+    // the ammo bar, and the rows below move down by its height.
     let rowsTop = cy + bh / 2 + (showSp ? spH + 1.5 : 0);
-    rowsTop += this._updateAmmoCount(showSp && !!ammo && this.ctx.settings?.ammoCount === true, x0 + bw / 2, rowsTop, s);
+    rowsTop += this._updateAmmoCount(showSp && !!ammo && this.ctx.settings?.ammoEnergyCount === true, x0 + bw / 2, rowsTop, s);
     const wolfH = this._updateWolfPips(showBars && !this.isEnemy && !!this.wolves, x0, rowsTop, s);
     const coinH = this._updateCoins(showBars && !this.isEnemy && !!this.coins, x0, rowsTop + wolfH, s);
-    const energyH = this._updateEnergy(showBars && !this.isEnemy && !!this.energy && this.ctx.settings?.mysticEnergy === true, x0, rowsTop + wolfH + coinH, s);
+    const energyH = this._updateEnergy(showBars && !this.isEnemy && !!this.energy && this.ctx.settings?.ammoEnergyCount === true, x0, rowsTop + wolfH + coinH, s);
     this._updateElementBar(showBars && !!this.el, x0, bw, rowsTop + wolfH + coinH + energyH + 1, spH, s, t);
     this._updateDownRing(!prep && !!this.down && !this.alive, x, this.screen.y - DOWN_LOOK.height * s, s, t);
     // blocked marker at the feet (enemies held by a blocker)

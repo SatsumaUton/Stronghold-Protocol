@@ -18,7 +18,11 @@ view.setStage(stage)                         // draw tiles (procedural), devices
 view.setCamera(kind /* 'prep'|'normal'|'unite'|'boss' */, { rect, side, shop, ms })  // animates camera; shop: false = the
                                              //   folded shop's prep camera (official shop-collapsed framing, §21.27);
                                              //   ms overrides the flight duration — the shop fold / unfold zoom takes
-                                             //   the short FOLD_CAMERA_MS (render/app/tune.js, GitHub #602);
+                                             //   the short FOLD_CAMERA_MS (render/app/tune.js, GitHub #602).
+                                             //   设置「部署时收起商店」 (prepDeployFold, default on) is that zoom;
+                                             //   off, a pickup changes neither the shop fold nor the camera (§34.3).
+                                             //   Opening 敌方情报 during a held drag leaves that one-shot restore owed
+                                             //   until the pen closes [ASSUMED] (§34.3).
                                              //   'pen' pans to the enemy preview pen in 0.25 s (see below)
 view.setPrep(privateState, { editable })     // render hand/temp/board pieces as chibis (spine or fallback); editable enables drag;
                                              //   a merge's new elite on the board plays fx.promote instead of fx.deploy (render/promote.js, §20.11),
@@ -145,7 +149,7 @@ history and the open points: DESIGN §32.14.25.
   no hit), its own projectile for a ranged one —, else its `each` rows join the mode's; the buffs of its attacks loop
   on their targets for the blackboard's duration (a status loop of the same key takes over); `trigger` plays on the
   owner's damage (once a frame). An instant skill whose kit made no attack between 1 and 0 plays its attack's cast
-  once. 深靛's stored energies (b.snap `energy`, sent whatever 设置「秘术师能量」 says): each store plays its one-shot and
+  once. 深靛's stored energies (b.snap `energy`, sent whatever 设置「显示弹药与能量数量」 says): each store plays its one-shot and
   lights the next slot's loop at its Special point; an attack flies one projectile per stored energy from its slot
   beside the shot (the sim's 1 + n hits) and the slots go dark; a death or redeploy dims them. When the official layer
   shows a skill, its procedural activation burst and aura are not drawn, and neither are the kit 'fx' it stands for
@@ -335,7 +339,10 @@ Explicit false and unmarked raw displacements face the travel direction. Normal 
 ### Local preferences and recovery (§28.14, §28.18–20)
 
 Settings persist `textSize` (sm/md/lg/xl; default sm), `voiceLang` (cn/jp/en/kr; default cn), `voiceNative` (the
-本土语言 switch; default false) and `voiceOverrides` (charId → cn/jp/en/kr/native; default empty). CSS text uses `--t`;
+本土语言 switch; default false), `voiceOverrides` (charId → cn/jp/en/kr/native; default empty), `prepDeployFold`
+(部署时收起商店; default true — only an explicit false turns the 0.3.0 deploy fold off) and `ammoEnergyCount`
+(显示弹药与能量数量; default false). A saved `ammoCount` or `mysticEnergy` of `true` migrates into `ammoEnergyCount`
+on read and is not written back. CSS text uses `--t`;
 the layout rem, camera and board geometry stay unchanged. Larger text and translated controls wrap within the settings
 modal. The normal roster detail and chosen DIY cards expose each operator's voice preference, shared across that
 charId's forms, listing only the dubs this server has and offering a preview. An absent override follows the global
@@ -422,7 +429,7 @@ Title-count display uses the following 20-award boundary, confirmed in the offic
 | Exactly 20 | Full fill and count highlight. |
 | Above 20 | Full fill and count highlight; the number continues to show the actual count. |
 
-Community UI and recovery (§29.6): DIY reuses roster stats and skill previews; Swire's coins and, with 设置「秘术师能量」 on, a 秘术师's stored attack energies (GitHub #633, PR #636) show current/cap. The lobby player chip opens statistics and the responsive header keeps optional controls from overlapping its title. Settlement's summary scrolls separately from Return. Failed board art can retry, and failed three.js imports use two bounded fresh URLs. Failed engine initialization can remount on online/visibility, at most twice consecutively, cleaning up each previous view; explicit fallback/2D stays selected.
+Community UI and recovery (§29.6): DIY reuses roster stats and skill previews; Swire's coins and, with 设置「显示弹药与能量数量」 on, a 秘术师's stored attack energies (GitHub #633, PR #636) show current/cap. The lobby player chip opens statistics and the responsive header keeps optional controls from overlapping its title. Settlement's summary scrolls separately from Return. Failed board art can retry, and failed three.js imports use two bounded fresh URLs. Failed engine initialization can remount on online/visibility, at most twice consecutively, cleaning up each previous view; explicit fallback/2D stays selected.
 
 Replacing a field renderer also resets the game screen's entered-view identity. Frames are buffered while the replacement loads; after subscribing, the local runner re-shows full current metadata/snapshot, or the server resends the watched field. Real local and server-streamed battles preserve the same simulation object and clock through recovery, including enemies spawned before the new renderer existed.
 
@@ -470,23 +477,22 @@ lands in a hidden tab. Battle deploys keep the silent `onDeploy`; audio.handleBa
   elite land; so does a piece that a new state puts on a board tile it was not on (from the bench, another tile, a swap),
   when that state arrives. Turning in place, a retreat and bench moves do not.
 
-### Optional ammo count (§31.9)
+### Optional ammo and stored-energy counts (§31.9, §32.14.28, §34.3)
 
-设置 →「弹药数量」 (`ammoCount`, PR #552 by @IceCodeNew) defaults off — the official HUD has no such number (the
-maintainer's decision of 2026-10-13). On, an operator's ammo bar carries `left/magazine` under it (`UnitView._updateAmmoCount`,
-the exact b.snap `ammo` counts, extra rounds and refills included), centred in the bar's yellow; the rows under the bars
-move down by its height. It hides with the magazine, in the prep view and after death. The simplified board has no ammo
-bar and so no count.
+设置 →「显示弹药与能量数量」 (`ammoEnergyCount`) is one switch, off by default. It replaces 「弹药数量」
+(`ammoCount`, PR #552 by @IceCodeNew) and 「秘术师能量」 (`mysticEnergy`, PR #636 by @zasx77771, GitHub #633).
+The official HUD has neither number (the maintainer's decisions of 2026-10-13 and 2026-10-15). A saved profile is
+read once: the merged switch is on when either old key was the boolean `true`; a stored boolean `ammoEnergyCount`
+wins, and the old keys are not written back. [ASSUMED] that precedence, so turning the merged switch off stays off.
 
-### Optional stored-energy count (§32.14.28)
-
-设置 →「秘术师能量」 (`mysticEnergy`, PR #636 by @zasx77771, GitHub #633) defaults off — the official HUD has no such
-number; the client shows a 秘术师's stored attack energies as an effect on the operator (the maintainer's decision of
-2026-10-15). On, the count `stored/cap` sits in the row stack under the purse (`UnitView._updateEnergy`, b.snap `energy`
-from `snapshot.js mysticView`: `trait.stored` against `profile.storeMax`, zero included), in a violet orb of its own;
-the element gauge moves down by its height. Allies only; kits with a store of their own (维伊, 黑键) have no row. The
-official effect is the default display: with 设置「官方特效」 on, the same readout lights 深靛's stored energies on the
-operator (§9 "Official battle effects", Skills) whatever this setting says.
+On, an operator's ammo bar carries `left/magazine` under it (`UnitView._updateAmmoCount`, the exact b.snap `ammo`
+counts, extra rounds and refills included), centred in the bar's yellow; the rows under the bars move down by its
+height. It hides with the magazine, in the prep view and after death. The simplified board has no ammo bar and so no
+count. The same switch puts a 秘术师's `stored/cap` in the row stack under the purse (`UnitView._updateEnergy`,
+b.snap `energy` from `snapshot.js mysticView`: `trait.stored` against `profile.storeMax`, zero included), in a violet
+orb of its own; the element gauge moves down by its height. Allies only; kits with a store of their own (维伊, 黑键)
+have no row. The official effect is the default display: with 设置「官方特效」 on, the same readout lights 深靛's
+stored energies on the operator (§9 "Official battle effects", Skills) whatever this setting says.
 
 ### Plugin studio gameplay previews (§32.9.1)
 
@@ -501,7 +507,7 @@ Authoring checks (DESIGN §32.9.1): numeric fields display the shared official b
 
 ### Combat metrics (作战统计) — ported from the xinhai-ai fork, opt-in
 
-设置 →「作战统计」 (`combatMetrics`, PR #618 by @robll-v1) defaults off, the same kind of decision as 弹药数量: the
+设置 →「作战统计」 (`combatMetrics`, PR #618 by @robll-v1) defaults off, the same kind of decision as 显示弹药与能量数量: the
 official HUD has no such panel. Off, the corner button is not rendered and `trackCombat` is not called (no `damaged`
 hook, `battle.heal` is not wrapped). On, the corner's 作战统计 button (`gm__metrics`, `ui/combatMetrics.js`) opens a
 modeless panel over the running battle: the fight keeps playing behind it, ✕ / Esc closes it, and the next frame's
