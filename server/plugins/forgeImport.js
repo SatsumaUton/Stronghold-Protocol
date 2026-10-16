@@ -958,13 +958,16 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   // is not one of these: the record itself was still imported. [ASSUMED] garrisons and a traits table both
   // count as traits; chess and units both count as operators.
   const dropped = { operators: 0, bonds: 0, bands: 0, items: 0, tokens: 0, traits: 0, kits: 0, panels: 0 };
-  /** ids named by a dropped record, so a cosmetic aimed only at them can say it has nothing to apply to */
+  // ids of dropped gameplay records, so a cosmetic aimed only at them can say it has nothing to apply to.
+  // A panel title is not one of these: a panel named like a kept portrait must not make that cosmetic bare.
   const droppedIds = new Set();
+  const DROP_ID_KINDS = new Set(['operators', 'bonds', 'bands', 'items', 'tokens', 'traits', 'kits']);
   const noteDrop = (kind, n = 1) => { if (Object.hasOwn(dropped, kind) && n > 0) dropped[kind] += n; };
   const skip = (p, zh, en, code, kind) => {
     skipped.push({ path: p, zh, en, ...(code ? { code } : {}) });
     if (!kind) return;
     noteDrop(kind);
+    if (!DROP_ID_KINDS.has(kind)) return;
     const id = String(p).split(':').slice(1).join(':').split('#')[0];
     if (id) droppedIds.add(id);
   };
@@ -2376,8 +2379,9 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   for (const t of translations.filter((x) => x.kind === 'ui')) roles.push(`lang:${t.lang}`);
 
   // [ASSUMED] A cosmetic has nothing to apply to when every asked portrait / bond / item id belongs to a dropped
-  // record and no kept visual key sits outside that set. Audio alone (no asked ids) is not this case. A plugin
-  // that keeps one real target is not this case either.
+  // gameplay record (operators, bonds, bands, items, tokens, traits, kits) and no kept visual key sits outside
+  // that set. A panel title is never such an id. Audio alone (no asked ids) is not this case. A plugin that
+  // keeps one real target is not this case either.
   const asked = [];
   if (isObj(pack.art)) for (const t of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items']) if (isObj(pack.art[t])) asked.push(...Object.keys(pack.art[t]));
   if (isObj(pack.bondIcons)) asked.push(...Object.keys(pack.bondIcons));

@@ -316,8 +316,30 @@ export async function main(argv) {
       for (const line of findingLines(r, lang)) console.log(line);
       if (!r.problems.length && !r.warnings.length) console.log('  ok');
     }
-    // The same rules the registry applies across folders. A folder checked alone can still lose to another folder
-    // in this run, or to a pack / the built-in language file the registry already recorded.
+    // The same rules the registry applies across folders. Named targets arrive in argument order; the registry
+    // walks plugins/ with readDirSorted (folder name, default UTF-16). Sort that way before the cross-plugin rules.
+    // A folder this run keeps is not also recorded as the loser of another order. A folder checked alone can still
+    // lose to a pack or the built-in language file, which this plugins-only pass cannot see.
+    const folderName = (where) => {
+      const s = String(where || '').replace(/\/+$/, '');
+      const cut = s.lastIndexOf('/');
+      return cut >= 0 ? s.slice(cut + 1) : s;
+    };
+    const byName = new Map();
+    for (const p of loaded) {
+      const name = folderName(p.where);
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name).push(p);
+    }
+    loaded.length = 0;
+    for (const name of [...byName.keys()].sort()) loaded.push(...byName.get(name));
+    const ordered = new Set(loaded.map((p) => p.where));
+    const winnerWhere = (issue) => {
+      const raw = issue && issue.params && issue.params.where;
+      if (typeof raw !== 'string') return '';
+      const m = raw.match(/\(([^()]*)\)\s*$/);
+      return m ? m[1] : '';
+    };
     const cross = crossPluginFindings(loaded);
     const interested = new Set(folders.map((f) => f.where));
     const seenDup = new Set(cross.skipped.map((s) => s.where));
@@ -326,6 +348,7 @@ export async function main(argv) {
       for (const s of scan.skipped) {
         if (!interested.has(s.where) || seenDup.has(s.where)) continue;
         if (!s.issues?.some((i) => i.code === 'PLUGIN_DUPLICATE')) continue;
+        if (s.issues.some((i) => i.code === 'PLUGIN_DUPLICATE' && ordered.has(winnerWhere(i)))) continue;
         cross.skipped.push(s);
         seenDup.add(s.where);
       }

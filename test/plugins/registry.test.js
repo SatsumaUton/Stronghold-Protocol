@@ -346,6 +346,23 @@ test('plugin check reports a second overlay and a shared slot; list follows SP_P
     assert.match(check.stdout, /slot hud\.right is also requested by log, meter/);
     const alone = run(['check', 'alpha']);
     assert.equal(alone.status, 0, alone.stdout);
+    const named = (args) => {
+      const r = run(['check', ...args, '--json']);
+      const body = JSON.parse(r.stdout);
+      const dups = (body.folders || []).flatMap((f) => (f.issues || []).filter((i) => i.code === 'PLUGIN_DUPLICATE'));
+      return { status: r.status, problems: body.problems, dups };
+    };
+    for (const args of [['alpha', 'beta'], ['beta', 'alpha']]) {
+      const got = named(args);
+      assert.equal(got.status, 1, JSON.stringify({ args, problems: got.problems, texts: got.dups.map((d) => d.text) }));
+      assert.equal(got.problems, 1);
+      assert.equal(got.dups.length, 1);
+      assert.equal(got.dups[0].where, 'plugins/beta/');
+      assert.match(got.dups[0].text, /alpha \(plugins\/alpha\/\)/);
+    }
+    const onlyBeta = named(['beta']);
+    assert.equal(onlyBeta.status, 0, JSON.stringify(onlyBeta.dups.map((d) => d.text)));
+    assert.equal(onlyBeta.problems, 0);
     const off = run(['list']);
     assert.match(off.stdout, /kit .+disabled/);
     const sandbox = run(['list'], { SP_PLUGIN_SCRIPTS: 'sandbox' });

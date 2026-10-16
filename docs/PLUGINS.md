@@ -263,7 +263,10 @@ node tools/plugin.mjs surface [--write]            the frozen API table; --write
 `check` of every folder in `plugins/`, or of more than one named folder, also applies the registry's cross-plugin rules:
 a duplicate id, a second overlay of one language (the message names the plugin folder that won; the first in sorted
 order), and two ui plugins that ask for the same slot (`PLUGIN_UI_SLOT_SHARED`, a warning — the match shows tabs).
-Checking one named folder does not scan the others. `list` calls the same trust gate as the server (`SP_PLUGIN_SCRIPTS`).
+Named folders are sorted by folder name before those rules, the same order `readDirSorted` uses when the registry
+reads `plugins/`. A folder that order keeps stays kept: a later scan does not add a second duplicate that names it
+as the loser. Checking one named folder does not scan the others. `list` calls the same trust gate as the server
+(`SP_PLUGIN_SCRIPTS`).
 
 `--root <dir>` points it at another checkout or an unpacked release. Full and lite releases ship this CLI, its
 runtime dependencies, schemas, templates, author documentation and `test/helpers/battleHarness.js`. The harness
@@ -1624,7 +1627,9 @@ operators (chess and units), bonds, bands, items, tokens, traits (a garrison tab
 and only when a count is above zero. A field-level note, a unit already covered by its chess pair, `--no-scripts`, and a
 mounted panel whose script was not copied do not set `partial`. [ASSUMED] Effects are not a counted kind. A cosmetic
 whose asked art, bond or item targets were all dropped says, in Chinese and in English, that it has nothing to apply to
-(`cosmeticBare`); the files are still copied. A product that keeps a target, or that only carries audio, does not say that.
+(`cosmeticBare`); the files are still copied. Those targets are gameplay record ids (operators, bonds, bands, items,
+tokens, traits, kits). A dropped panel title is never one of them, so a panel named like a kept portrait leaves the
+imported art list in place. A product that keeps a target, or that only carries audio, does not say that.
 
 **Kit imports.** Production script plugins allow only self-contained entries (§13), so a Forge kit's imports are
 rewritten to `sp:sdk@1` where the SDK exports the same helpers, and every other one refuses the file:

@@ -1723,6 +1723,12 @@ test('a pack that drops whole gameplay records says so, and a cosmetic aimed onl
     id: 'gap-panel', name: '面板', version: '1.0.0', license: 'CC0-1.0',
     client: { panels: [{ name: '侧栏', slot: 'nowhere.panel' }] },
   }, {});
+  const collide = path.join(parent, 'collide');
+  writePack(collide, {
+    id: 'gap-collide', name: '撞名', version: '1.0.0', license: 'CC0-1.0',
+    art: { chars: { char_102_texas: { avatar: 'icon.png' } } },
+    client: { panels: [{ name: 'char_102_texas', slot: 'nowhere.panel' }] },
+  }, { 'icon.png': PNG });
   const noscript = path.join(parent, 'noscript');
   writePack(noscript, { id: 'gap-noscript', name: '不转脚本', version: '1.0.0', license: 'CC0-1.0', content: ['chess'] }, {
     'chess.json': JSON.stringify(pairOf('rose_hunter')),
@@ -1782,6 +1788,19 @@ test('a pack that drops whole gameplay records says so, and a cosmetic aimed onl
     assert.equal(mounted.report.needsManualAdaptation, true);
     assert.equal(mounted.report.dropped.panels, 1);
     assert.match(mounted.markdown, /1 面板/);
+
+    const hit = await importForge(collide, { ...forgeOpts(parent), out: path.join(parent, 'gap-collide') });
+    assert.equal(hit.ok, true, hit.markdown);
+    assert.equal(hit.report.partial, true);
+    assert.equal(hit.report.dropped.panels, 1);
+    assert.equal(hit.report.dropped.operators, 0);
+    assert.equal(hit.report.cosmeticBare, undefined);
+    const hitLook = hit.report.products.find((p) => p.class === 'cosmetic');
+    assert.ok(hitLook, JSON.stringify(hit.report.products.map((p) => p.class)));
+    assert.equal(/没有可应用的目标|nothing to apply to/.test(hitLook.imported.join('\n')), false);
+    assert.match(hitLook.imported.join('\n'), /chars\.char_102_texas\.avatar/);
+    const hitAssets = JSON.parse(fs.readFileSync(path.join(parent, hitLook.id, 'assets.json'), 'utf8'));
+    assert.deepEqual(Object.keys(hitAssets.chars), ['char_102_texas']);
 
     const skippedKit = await importForge(noscript, { ...forgeOpts(parent), out: path.join(parent, 'gap-noscript'), scripts: false });
     assert.equal(skippedKit.ok, true, skippedKit.markdown);

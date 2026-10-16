@@ -488,6 +488,7 @@ export function createFallbackView(host, opts = {}) {
       schedule();
     },
     highlightTiles(tiles, style) {
+      if (st.destroyed) return false;
       if (!tiles || !style) { st.highlight.clear(); st.hlGroups.clear(); schedule(); return; }
       if (typeof style === 'object' && style.group) {
         // a named group (direction wheel / selected unit range): replaced as a whole, drawn as a range tile
