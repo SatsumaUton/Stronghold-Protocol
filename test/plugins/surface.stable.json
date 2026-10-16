@@ -384,11 +384,19 @@
     "anchor": "shared/plugins/visual.js#ASSET_CONTAINERS"
   },
   {
+    "name": "overlay.chars.illust",
+    "anchor": "shared/plugins/visual.js#ASSET_CONTAINERS"
+  },
+  {
     "name": "overlay.chars.spine.front",
     "anchor": "shared/plugins/visual.js#ASSET_CONTAINERS"
   },
   {
     "name": "overlay.chars.spine.back",
+    "anchor": "shared/plugins/visual.js#ASSET_CONTAINERS"
+  },
+  {
+    "name": "overlay.chars.skins.*",
     "anchor": "shared/plugins/visual.js#ASSET_CONTAINERS"
   },
   {

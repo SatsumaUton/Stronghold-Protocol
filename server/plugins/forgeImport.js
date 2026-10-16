@@ -14,7 +14,11 @@
 //   * voices (Forge's default dub, which Forge documents as Japanese) → audio.voiceJp; voiceLangs.cn → audio.voice (ja / en / ko →
 //     audio.voiceJp / voiceEn / voiceKr, round 40);
 //     en/kr have no table here.
-//   * skins[] collapse onto one overlay of that operator. Our cosmetic plugin has no wardrobe.
+//   * skins[]: an outfit whose id is a skin key becomes that operator's own `skins` variant (docs/PLUGINS.md §9); one
+//     with no usable id is collapsed onto that operator's one overlay, as every outfit used to be. No wardrobe offers
+//     them to a player yet.
+//   * art.chars takes avatar, avatarE2, portrait, portraitE2 and illust (the full illustration, chars[<charId>].illust);
+//     any other field of that record is named and left out.
 //   * DEFENDER / HEAVY / GUARDIAN → TANK, VANGUARD → PIONEER, GUARD → WARRIOR.
 //   * A missing position is MELEE for tank/warrior/pioneer and RANGED otherwise.
 //   * Forge form ranks are phase/level/skillLevel/equipLevel, compared as integers (a plain integer is a rank too).
@@ -101,7 +105,7 @@ import { createPluginRegistry } from './registry.js';
 import { buildContentSet } from './contentSet.js';
 import { createVisualSets } from './visualSet.js';
 import { PLUGIN_LIMITS, PLUGIN_MANIFEST, UI_SLOT_IDS, extOf, isPackPath, isPluginId, checkJsonLimits } from '../../shared/plugins/manifest.js';
-import { ASSET_CONTAINERS, getPath, isAssetKey, readAssetOverlay } from '../../shared/plugins/visual.js';
+import { ASSET_CONTAINERS, getPath, isAssetKey, isSkinKey, readAssetOverlay } from '../../shared/plugins/visual.js';
 import { namespace, namespaceCollides } from '../../shared/plugins/dataUtils.js';
 import { canonicalJson } from '../../shared/plugins/identity.js';
 import { validateSkillSpec } from '../../shared/plugins/skillSpec.js';
@@ -148,7 +152,7 @@ const PATCH_TABLE = {
   bonds: 'bonds', enemies: 'enemies', chess: 'chess', items: 'items', stages: 'stages', waves: 'waves', bands: 'bands',
   effects: 'effects', tokens: 'tokens', garrisons: 'garrisons', bosses: 'bosses', factions: 'factions', choices: 'choices',
 };
-const CHAR_FIELDS = new Set(['avatar', 'avatarE2', 'portrait', 'portraitE2']);
+const CHAR_FIELDS = new Set(['avatar', 'avatarE2', 'portrait', 'portraitE2', 'illust']);
 const SKIP_TOP = {
   server: ['这是服务端逻辑（会改协议或对局），不能导入。', 'This is server logic (it would change the protocol or the match) and cannot be imported.'],
   routes: ['没有只读的 HTTP 路由这类插件，不能导入。', 'There is no read-only HTTP-route plugin class, so this cannot be imported.'],
@@ -1041,15 +1045,17 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     media.set(dest, buf);
   };
 
-  const putImage = (container, key, field, rel) => {
-    if (!isAssetKey(key)) { skip(`${container.join('.')}.${String(key).slice(0, 40)}`, '素材 id 不合规，没有导入。', 'The asset id is not a valid key, so it was not imported.'); return; }
+  const putFileAt = (at, rel) => {
     const got = takeMedia(files, used, rel, 'image');
     if (!got) { skip(String(rel), '声明了图片，但包里没有这个文件，没有导入。', 'An image was declared, but that file is not in the pack, so it was not imported.'); return; }
     if (got.error) { skip(String(rel), `图片扩展名 ${got.error} 不能放进外观插件，没有导入。`, `Image extension ${got.error} cannot go in a cosmetic plugin, so it was not imported.`); return; }
-    const at = field ? [...container, key, ...field] : [...container, key];
     setAt(assets, at, got.dest);
     remember(got.src, got.dest);
     importedAssets.push(`${at.join('.')} ← ${got.src}`);
+  };
+  const putImage = (container, key, field, rel) => {
+    if (!isAssetKey(key)) { skip(`${container.join('.')}.${String(key).slice(0, 40)}`, '素材 id 不合规，没有导入。', 'The asset id is not a valid key, so it was not imported.'); return; }
+    putFileAt(field ? [...container, key, ...field] : [...container, key], rel);
   };
   const putAudio = (container, key, slot, rels) => {
     if (!isAssetKey(key)) { skip(`${container.join('.')}.${String(key).slice(0, 40)}`, '素材 id 不合规，没有导入。', 'The asset id is not a valid key, so it was not imported.'); return; }
@@ -1106,7 +1112,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       if (isObj(rec.spine.front)) putSpine(['chars'], key, ['spine', 'front'], rec.spine.front);
       if (isObj(rec.spine.back)) putSpine(['chars'], key, ['spine', 'back'], rec.spine.back);
     }
-    for (const k of Object.keys(rec)) if (!CHAR_FIELDS.has(k) && k !== 'spine') skip(`art.chars.${key}.${k}`, '这个立绘字段我们的外观叠加没有，没有导入。', 'The cosmetic overlay has no such portrait field, so it was not imported.');
+    for (const k of Object.keys(rec)) if (!CHAR_FIELDS.has(k) && k !== 'spine') skip(`art.chars.${key}.${k}`, '外观叠加没有这个立绘字段（可用的：avatar、avatarE2、portrait、portraitE2、illust、spine），没有导入。', 'The cosmetic overlay takes no such portrait field (it has avatar, avatarE2, portrait, portraitE2, illust and spine), so it was not imported.');
   }
   if (isObj(art.enemies)) for (const [key, rec] of Object.entries(art.enemies)) {
     if (!isObj(rec)) continue;
@@ -1164,12 +1170,27 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     }
   }
   if (Array.isArray(pack.skins)) {
-    assume('skins', 'Forge 的多套时装收成该干员的一份外观叠加（我们没有衣柜）。', 'Forge\'s several outfits were collapsed into one overlay of that operator (there is no wardrobe here).');
     for (const skin of pack.skins) {
       if (!isObj(skin) || typeof skin.charId !== 'string') { skip('skins', '一条时装没有 charId，没有导入。', 'A skin has no charId, so it was not imported.'); continue; }
-      if (isObj(skin.art)) {
-        for (const field of CHAR_FIELDS) if (typeof skin.art[field] === 'string') putImage(['chars'], skin.charId, [field], skin.art[field]);
-        if (isObj(skin.art.spine?.front)) putSpine(['chars'], skin.charId, ['spine', 'front'], skin.art.spine.front);
+      // an outfit whose id is a skin key (docs/PLUGINS.md §9) is kept apart from the operator's own overlay: several
+      // outfits of one operator under their own keys. An outfit with no usable id is folded onto that operator's one
+      // overlay, as before [ASSUMED: the wardrobe that would offer them to a player is not built yet]
+      const key = typeof skin.id === 'string' && isSkinKey(skin.id) ? skin.id : null;
+      if (key) {
+        assume('skins-variants', 'Forge 的多套时装各自写进该干员的 skins 变体（键是时装 id）；还没有衣柜界面去挑它们。', 'Each Forge outfit is written as that operator\'s own skins variant (keyed by the outfit\'s id); no wardrobe picks them yet.');
+        const name = typeof skin.name === 'string' ? skin.name.trim() : '';
+        if (name && [...name].length <= 64) setAt(assets, ['chars', skin.charId, 'skins', key, 'name'], name);
+        else if (name) skip(`skins.${key}.name`, '时装的显示名不在 1–64 字以内，没有写入。', 'The outfit\'s display name is not within 1–64 characters, so it was not written.');
+        if (isObj(skin.art)) {
+          for (const field of CHAR_FIELDS) if (typeof skin.art[field] === 'string') putFileAt(['chars', skin.charId, 'skins', key, field], skin.art[field]);
+          if (isObj(skin.art.spine?.front)) putSpine(['chars', skin.charId, 'skins'], key, ['spine', 'front'], skin.art.spine.front);
+        }
+      } else {
+        assume('skins', 'Forge 的时装没有能当皮肤键的 id，收成该干员的一份外观叠加（我们没有衣柜）。', 'A Forge outfit has no id a skin key can use, so it was collapsed into one overlay of that operator (there is no wardrobe here).');
+        if (isObj(skin.art)) {
+          for (const field of CHAR_FIELDS) if (typeof skin.art[field] === 'string') putImage(['chars'], skin.charId, [field], skin.art[field]);
+          if (isObj(skin.art.spine?.front)) putSpine(['chars'], skin.charId, ['spine', 'front'], skin.art.spine.front);
+        }
       }
       if (isObj(skin.voices)) putVoices(`skins.${skin.id || skin.charId}`, ['audio', 'voiceJp'], { [skin.charId]: skin.voices });
     }

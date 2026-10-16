@@ -125,8 +125,10 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `overlay.chars.avatarE2` | stable | 0.3.0 | `shared/plugins/visual.js#ASSET_CONTAINERS` |
 | `overlay.chars.portrait` | stable | 0.3.0 | `shared/plugins/visual.js#ASSET_CONTAINERS` |
 | `overlay.chars.portraitE2` | stable | 0.3.0 | `shared/plugins/visual.js#ASSET_CONTAINERS` |
+| `overlay.chars.illust` | stable | 0.3.0 | `shared/plugins/visual.js#ASSET_CONTAINERS` |
 | `overlay.chars.spine.front` | stable | 0.3.0 | `shared/plugins/visual.js#ASSET_CONTAINERS` |
 | `overlay.chars.spine.back` | stable | 0.3.0 | `shared/plugins/visual.js#ASSET_CONTAINERS` |
+| `overlay.chars.skins.*` | stable | 0.3.0 | `shared/plugins/visual.js#ASSET_CONTAINERS` |
 | `overlay.enemies.icon` | stable | 0.3.0 | `shared/plugins/visual.js#ASSET_CONTAINERS` |
 | `overlay.enemies.spine` | stable | 0.3.0 | `shared/plugins/visual.js#ASSET_CONTAINERS` |
 | `overlay.tokens.avatar` | stable | 0.3.0 | `shared/plugins/visual.js#ASSET_CONTAINERS` |
