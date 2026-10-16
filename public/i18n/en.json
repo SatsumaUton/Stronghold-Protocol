@@ -1991,5 +1991,16 @@
   "场景版本不受支持": "This scenario version is not supported",
   "至少要有一个阵地": "At least one field is required",
   "单位编号重复": "The unit number is repeated",
-  "这个回合没有可用波次": "This round has no usable wave"
+  "这个回合没有可用波次": "This round has no usable wave",
+  "{h}时{m}分{s}秒": "{h}:{m}:{s}",
+  "更多": "More",
+  "等级：本机记录的官方对局累计获得的卫戍认证": "Level: the Stronghold Certification earned in all in the official matches recorded on this device",
+  "获得卫戍认证 +{n}": "Stronghold Certification +{n}",
+  "每日防卫目标：{today}/{need}": "Daily Defense Goal: {today}/{need}",
+  "每日防卫目标 +{n}": "Daily Defense Goal +{n}",
+  "非官方对局不计入等级": "Unofficial matches do not count toward the level",
+  "模拟中断": "Simulation Interrupted",
+  "累计奖杯": "Total trophies",
+  "同盟通过回合": "Alliance Rounds Cleared",
+  "数据详情": "Full Report"
 }
