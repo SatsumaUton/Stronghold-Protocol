@@ -3,7 +3,8 @@
 // where it plays it: 安洁莉娜 S2's orbs flew 0.94 tile above their path); an effect spawned at FOOT_POINT / HIT_POINT /
 // HEAD_POINT takes the unit's Graphic tilt (荒芜拉普兰德 S3's seal and 能天使 S3's light bars stand facing the camera), the
 // ground and NONE spawns the identity, FLIP_TWO_SIDE still flips the tilted ones, a FollowMountPoint keeps or follows; a
-// renderer's pivot moves the particle off its position by pivot × size (the seal's tips point outward).
+// renderer's pivot moves the particle off its position by pivot × size (the seal's tips point outward); a local-space
+// particle is drawn at its node's scale as it is now (the seal's discs grow with their 0.5 s pop-in).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -247,5 +248,36 @@ describe("a renderer's pivot", () => {
     near(left.c[0], -0.6, 1e-6, 'left tip: its quad from x −1.1 to −0.1');
     const right = quads(tip({ pos: [0.1, 0, 0], rot: [0, 1, 0, 0] }))[0];   // 180° about Y
     near(right.c[0], 0.6, 1e-6, 'right tip (turned 180° about Y): from 0.1 to 1.1');
+  });
+});
+
+// ---- a local-space particle's size follows its node's scale (DESIGN §33.5 scaling modes) -------------------------------
+
+describe("the scaling mode's scale, as it is now", () => {
+  /** A prefab whose clip grows node 1 from 0 to 1 over 0.5 s (荒芜拉普兰德 S3's seal discs: `s3_buffstart`). */
+  const popIn = (space) => {
+    const d = desc([rootNode([pe({ _spawnLocation: 0, _isLoop: 1 })]), psNode(1, 0, { size: 1.24, life: 4.8, space, scale: [0, 0, 0] })], {
+      clips: [{ name: 'pop', length: 0.5, loop: false, curves: ['x', 'y', 'z'].map((c) => ({ node: 1, type: 'Transform', property: `localScale.${c}`, keys: [[0, 0, 2, 2], [0.5, 1, 2, 2]] })) }],
+    });
+    d.nodes[0].animator = { controller: 'c', clips: [0], default: 0, enabled: true };
+    return d;
+  };
+  const sizeOn = (fx) => {
+    const fd = new FrameData();
+    let a = 0;
+    fx.collect(CAM, fd, (it) => { for (let k = 0; k < it.count; k++) { const o = (it.first + k) * 27; a = Math.max(a, Math.hypot(fd.quad[o + 3], fd.quad[o + 4], fd.quad[o + 5])); } }, 1);
+    return a;
+  };
+  test('a local-space particle born at the scale 0 of its node grows as the node does', () => {
+    const fx = new Effect(compileEffect(popIn(0)), { seed: 1 }).place({ pos: [0, 0, 0], rootRot: [0, 0, 0, 1] });
+    fx.update(1 / 60);
+    assert.equal(fx.sys[1].count, 1, 'born in the first frame');
+    for (let i = 0; i < 59; i++) fx.update(1 / 60);
+    near(sizeOn(fx), 1.24, 1e-3, 'full size once the node is (it stayed 0 for its 4.8 s life)');
+  });
+  test('a world-space particle keeps the scale it was born at', () => {
+    const fx = new Effect(compileEffect(popIn(1)), { seed: 1 }).place({ pos: [0, 0, 0], rootRot: [0, 0, 0, 1] });
+    for (let i = 0; i < 60; i++) fx.update(1 / 60);
+    near(sizeOn(fx), 0, 1e-6, 'born at 0');
   });
 });

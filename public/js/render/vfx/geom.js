@@ -233,6 +233,8 @@ export function buildParticles(ps, r, cam, fd, frameNo) {
   nl(lx); nl(ly); nl(lz);
   const mirror = (m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5])) < 0 ? -1 : 1;
   const pv = r.pivot;
+  // a local-space system's sizes are drawn at its scaling mode's scale as it is now (psys.js sizeScale)
+  const k0 = ps.sizeScale(0), k1 = ps.sizeScale(1), k2 = ps.sizeScale(2);
   let w = 0;
   for (let k = 0; k < n; k++) {
     const i = _idx[k];
@@ -243,7 +245,7 @@ export function buildParticles(ps, r, cam, fd, frameNo) {
     if (r.tint) { _c4[0] *= r.tint[0]; _c4[1] *= r.tint[1]; _c4[2] *= r.tint[2]; _c4[3] *= r.tint[3]; }
     _c4[0] = c01(_c4[0]); _c4[1] = c01(_c4[1]); _c4[2] = c01(_c4[2]); _c4[3] = c01(_c4[3]);
     sizeMul(ps, i, t, _sm);
-    let sx = ps.sx[i] * _sm[0], sy = (def.size3D ? ps.sy[i] : ps.sx[i]) * _sm[1], sz = (def.size3D ? ps.sz[i] : ps.sx[i]) * _sm[2];
+    let sx = ps.sx[i] * k0 * _sm[0], sy = (def.size3D ? ps.sy[i] * k1 : ps.sx[i] * k0) * _sm[1], sz = (def.size3D ? ps.sz[i] * k2 : ps.sx[i] * k0) * _sm[2];
     const s = ps.seed[i];
     const fx = r.flip && r.flip[0] > 0 && hashRand(s, RF.FLIP_X) < r.flip[0] ? -1 : 1;
     const fy = r.flip && r.flip[1] > 0 && hashRand(s, RF.FLIP_Y) < r.flip[1] ? -1 : 1;
@@ -461,7 +463,7 @@ export function buildParticleTrails(ps, cam, fd, tint) {
       for (let k = 0; k < n; k++) { ps.worldPos(order[k], _w); rp[k * 3] = _w[0]; rp[k * 3 + 1] = _w[1]; rp[k * 3 + 2] = _w[2]; }
       buildRibbon(rp, n, (k, u) => {
         const i = order[k]; const t = ps.age[i] / ps.life[i];
-        return (tr.sizeWidth ? ps.sx[i] * (ps.sizeX ? ps.sizeX.at(t, hashRand(ps.seed[i], RF.SIZE_OL)) : 1) : 1) * tr.width.at(u, 0.5) / 2;
+        return (tr.sizeWidth ? ps.sx[i] * ps.sizeScale(0) * (ps.sizeX ? ps.sizeX.at(t, hashRand(ps.seed[i], RF.SIZE_OL)) : 1) : 1) * tr.width.at(u, 0.5) / 2;
       }, (k, u, out) => {
         const i = order[k]; const t = ps.age[i] / ps.life[i];
         if (tr.inheritColor) particleColor(ps, i, t, out); else { out[0] = out[1] = out[2] = out[3] = 1; }
@@ -488,7 +490,7 @@ export function buildParticleTrails(ps, cam, fd, tint) {
         n++;
       }
       if (n < 2) continue;
-      const size = tr.sizeWidth ? ps.sx[i] * (ps.sizeX ? ps.sizeX.at(t, hashRand(ps.seed[i], RF.SIZE_OL)) : 1) : 1;
+      const size = tr.sizeWidth ? ps.sx[i] * ps.sizeScale(0) * (ps.sizeX ? ps.sizeX.at(t, hashRand(ps.seed[i], RF.SIZE_OL)) : 1) : 1;
       particleColor(ps, i, t, _e4);
       const pc = tr.inheritColor ? [_e4[0], _e4[1], _e4[2], _e4[3]] : [1, 1, 1, 1];
       tr.colorLife.at(t, hashRand(ps.seed[i], RF.TRAIL_C), _d4);
