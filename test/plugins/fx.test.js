@@ -178,3 +178,54 @@ test('Forge silent phases produce a cosmetic even without media and unknown fiel
   const empty = await importForge(path.join(f.root, 'pack'), { pluginsDir: path.join(f.root, 'plugins'), root: ROOT, dataDir: path.join(ROOT, 'data'), dryRun: true });
   assert.equal(empty.report.products.length, 0);
 });
+
+test('client preparation and merging reject pinned official-unit hijacks and hostile prefab bodies', t => {
+  const f = fxFixture(t); compiled(f);
+  const { value, files: used } = readFxAssets(f.root, { index: 'fx/index.json' }, ['fx-demo'], listPluginFiles(f.root));
+  const files = Object.fromEntries(used.map(rel => [rel, nodeSha256(fs.readFileSync(path.join(f.root, rel)))]));
+  const prepare = effects => {
+    const ops = [{ at: ['fx', 'fx-demo'], effects }];
+    const v = { v: 2, assets: 'a'.repeat(64), overlays: [{ id: 'fx-demo', version: '1.0.0', files, writes: visual.writesHashOf(ops) }] };
+    v.vs = visual.visualHashOf(v);
+    return preparePluginFx({ visual: v, writes: [{ id: 'fx-demo', ops }] }, visual);
+  };
+  assert.equal(prepare(value).length, 1);
+  const official = { units: { char_103_angel: { kind: 'char', marker: 'official' } }, skills: {}, prefabs: {} };
+  for (const mutate of [
+    e => { e.index.units.char_103_angel = e.index.units.char_x_fx_demo_guard; },
+    e => { e.index.units.char_x_foreign_guard = e.index.units.char_x_fx_demo_guard; },
+    e => { e.prefabs.spark.nodes[0].particleSystem = { InitialModule: { maxNumParticles: 1e9 } }; },
+    e => { e.prefabs.spark.nodes[0].parent = 0; },
+    e => { e.prefabs.spark.materials[0].shader = 'custom'; },
+  ]) {
+    const e = structuredClone(value); mutate(e);
+    assert.equal(prepare(e).length, 0, 'a valid writes hash does not replace schema validation');
+    const merged = mergePluginFx(official, { 'fx-demo': e });
+    assert.deepEqual(merged.index.units, official.units);
+    assert.deepEqual(merged.index.pluginUnits, {});
+    assert.equal(merged.descriptors.size, 0);
+  }
+});
+
+test('client ownership allows declared dependency units, including compiled units without bindings', t => {
+  const f = fxFixture(t), idx = compiled(f);
+  idx.units.char_x_dependency_guard = idx.units.char_x_fx_demo_guard;
+  f.put('fx/index.json', idx);
+  const { value } = readFxAssets(f.root, { index: 'fx/index.json' }, ['fx-demo', 'dependency'], listPluginFiles(f.root));
+  assert.equal(mergePluginFx(null, { 'fx-demo': value }).index.pluginUnits.char_x_dependency_guard, 'plugin:fx-demo:char_x_dependency_guard');
+});
+
+for (const path of ['prepare', 'merge']) test(`client ${path} validates hostile prefabs even when all units are owned`, t => {
+  const f = fxFixture(t); compiled(f);
+  const { value, files: used } = readFxAssets(f.root, { index: 'fx/index.json' }, ['fx-demo'], listPluginFiles(f.root));
+  value.prefabs.spark.nodes[0].particleSystem = { InitialModule: { maxNumParticles: 1e9 } };
+  if (path === 'merge') {
+    assert.equal(mergePluginFx(null, { 'fx-demo': value }).descriptors.size, 0);
+  } else {
+    const ops = [{ at: ['fx', 'fx-demo'], effects: value }];
+    const files = Object.fromEntries(used.map(rel => [rel, 'b'.repeat(64)]));
+    const v = { v: 2, assets: 'a'.repeat(64), overlays: [{ id: 'fx-demo', version: '1.0.0', files, writes: visual.writesHashOf(ops) }] };
+    v.vs = visual.visualHashOf(v);
+    assert.equal(preparePluginFx({ visual: v, writes: [{ id: 'fx-demo', ops }] }, visual).length, 0);
+  }
+});

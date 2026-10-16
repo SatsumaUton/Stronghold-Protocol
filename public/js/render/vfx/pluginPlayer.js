@@ -8,12 +8,13 @@ export class PluginFxPlayer {
   constructor({ P, layer, assets, cam, enabled, record, speed, ofx }) {
     Object.assign(this, { P, layer, assets, cam, enabled, record, speed, ofx });
     this.live = new Set(); this.loops = new Map(); this.time = 0; this.textures = new Map();
-    this.pendingHits = []; this.hitClaims = new Map();
+    // Per-shot arrivals, keyed by the shot object; never a target-wide claim on damage events.
+    this.hitClaims = new Map();
     this.source = null; this.catalog = mergePluginFx(null, {});
   }
   refresh() {
     const source = this.assets?.manifest?.fx;
-    if (source !== this.source) { this.clear(); this.textures.clear(); this.source = source; this.catalog = mergePluginFx(null, source); }
+    if (source !== this.source) { this.clear(); this.clearTextures(); this.source = source; this.catalog = mergePluginFx(null, source); }
   }
   binding(v) {
     const rec = this.record(v?.info), idx = v?.info?.diy?.skillIndex ?? v?.info?.skillIndex ?? rec?.skill?.index;
@@ -23,7 +24,7 @@ export class PluginFxPlayer {
   }
   play(key, at, { owner = null, duration = null, target = null, flight = null, loop = false, done = null } = {}) {
     this.refresh();
-    if (!this.enabled() || !at || this.live.size >= 128) return null; // [ASSUMED] 128 plugin instances on either board.
+    if (!this.enabled() || !at || owner?.destroyed || owner?.alive === false || this.live.size >= 128) return null; // [ASSUMED] 128 plugin instances on either board.
     const b = this.catalog.books.get(key), prefab = this.catalog.descriptors.has(key);
     if (!b && !prefab) return null;
     if (prefab && !this.ofx.active) return null;
@@ -37,7 +38,10 @@ export class PluginFxPlayer {
       e.sprite.anchor.set(...(b.anchor || [0.5, 0.5]));
       e.sprite.blendMode = b.blend === 'add' ? this.P.BLEND_MODES.ADD : this.P.BLEND_MODES.NORMAL;
       this.layer.addChild(e.sprite);
-    } else e.handle = this.ofx.spawn(key, { pos: [pos.x - 10, pos.y - 9, -pos.z] }, { owner, loop });
+    } else {
+      e.handle = this.ofx.spawn(key, { pos: [pos.x - 10, pos.y - 9, -pos.z] }, { owner, loop });
+      if (!e.handle) return null;
+    }
     e.stop = () => { if (e.dead) return; e.dead = true; e.handle?.kill(); e.sprite?.destroy(); e.texture?.destroy(false); this.live.delete(e); };
     this.live.add(e);
     return e;
@@ -73,16 +77,15 @@ export class PluginFxPlayer {
     if (!kind || kind === 'none') return !!cast;
     // [ASSUMED] Match the generic projectile speed; the event does not carry an authoritative arrival time.
     const flight = Math.max(0.05, Math.min(3, Math.hypot(tgt.x - src.x, tgt.y - src.y) / Math.max(1, this.speed(kind))));
-    const projectile = this.phase(src, 'projectile', src, { target: tgt, flight, duration: flight, done: () => this.phase(src, 'hit', tgt) });
-    if (this.enabled() && this.binding(src).hit && this.pendingHits.length < 128) {
-      // [ASSUMED] Ranged damage has no source id; reserve its target spark through the visual arrival window.
-      this.hitClaims.set(tgt.info?.id ?? tgt.id, this.time + flight + 0.35);
-      if (!projectile) this.pendingHits.push({ at: this.time + flight, src, tgt });
+    const projectile = this.phase(src, 'projectile', src, { target: tgt, flight, duration: flight });
+    if (this.enabled() && src.alive !== false && !src.destroyed && this.binding(src).hit && this.hitClaims.size < 128) {
+      this.hitClaims.set({ src, tgt }, this.time + flight);
     }
     return !!projectile;
   }
   hit(src, target) {
-    if (this.enabled() && this.hitClaims.has(target?.info?.id ?? target?.id)) return true;
+    // [ASSUMED] The damage tuple has no ranged source id. Only an identified source that draws a hit may
+    // suppress this event's spark; estimated arrivals cannot claim unrelated ranged, husk or paired damage.
     return src ? !!this.phase(src, 'hit', target) : false;
   }
   simFx(kind, x, y, extra) {
@@ -97,10 +100,11 @@ export class PluginFxPlayer {
     this.refresh();
     if (!this.enabled()) { this.clear(); return; }
     this.time += Math.max(0, dt);
-    for (const [id, until] of this.hitClaims) if (until < this.time) this.hitClaims.delete(id);
-    const due = this.pendingHits.filter(h => h.at <= this.time);
-    this.pendingHits = this.pendingHits.filter(h => h.at > this.time);
-    for (const h of due) if (!h.tgt.destroyed && h.tgt.alive !== false) this.phase(h.src, 'hit', h.tgt);
+    for (const [shot, at] of this.hitClaims) {
+      const { src, tgt } = shot;
+      if (src.destroyed || src.alive === false || tgt.destroyed || tgt.alive === false) this.hitClaims.delete(shot);
+      else if (at <= this.time) { this.hitClaims.delete(shot); this.phase(src, 'hit', tgt); }
+    }
     for (const e of [...this.live]) {
       if (e.owner && (e.owner.destroyed || e.owner.alive === false)) { e.stop(); continue; }
       if (this.time >= e.end) { e.stop(); e.done?.(); continue; }
@@ -120,6 +124,7 @@ export class PluginFxPlayer {
       e.sprite.width = p.s * (e.b.scale ?? 1); e.sprite.height = e.sprite.width * h / w;
     }
   }
-  clear() { for (const e of [...this.live]) e.stop(); this.loops.clear(); this.pendingHits.length = 0; this.hitClaims.clear(); }
-  destroy() { this.clear(); this.textures.clear(); }
+  clear() { for (const e of [...this.live]) e.stop(); this.loops.clear(); this.hitClaims.clear(); }
+  clearTextures() { for (const base of this.textures.values()) base.destroy(); this.textures.clear(); }
+  destroy() { this.clear(); this.clearTextures(); }
 }

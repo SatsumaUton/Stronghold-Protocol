@@ -66,8 +66,7 @@ export function activeTalentKeys(idx, unitKey, { rec = null } = {}) {
   const tk = unit?.talentKeys;
   if (!isObj(tk) || unit.kind === 'enemy' || !isObj(rec)) return null;
   const out = new Set((Array.isArray(tk.trait) ? tk.trait : []).filter((k) => typeof k === 'string'));
-  // [ASSUMED] Borrowing an effect unit includes its base talent visuals, without inheriting its gameplay or modules.
-  if (rec.fx?.unit === unitKey) for (const list of Object.values(tk.base || {})) for (const key of list) out.add(key);
+  // [ASSUMED] Borrowed visuals use the borrower's equipped talent indices and active module, just like its own unit.
   const modId = rec.module && rec.module.active !== false ? rec.module.id : null;
   for (const t of Array.isArray(rec.talents) ? rec.talents : []) {
     if (!isObj(t) || !Number.isInteger(t.index)) continue;

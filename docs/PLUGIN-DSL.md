@@ -92,7 +92,9 @@
 `flash` 是本插件 `assets.fx.flipbooks` 或编译索引中的本地特效名。加载器校验名称，把地址写进既有事件的
 `skill: "plugin:<插件 id>:flash"`，单位 `id` 仍由引擎填写；作者不得同时指定 `skill`。
 事件仍是普通 `fx`，不改变无插件的事件流和内容哈希。[ASSUMED] 缺图或关闭“官方特效”时不画；视觉持续时间最多 30 秒，
-不改变战斗计时。绑定、PNG 图集和编译特效的限制见 [PLUGINS.md §9](PLUGINS.md#operator-effects-031)。
+不改变战斗计时。客户端准备及合并时也校验预制体和单位归属；非法素材不参与合并。
+[ASSUMED] `bind.hit` 只有在识别来源并播出效果时才替代该次伤害火花；远程预估抵达不抢占无来源事件，射手死亡取消待播命中。
+绑定、PNG 图集和编译特效的限制见 [PLUGINS.md §9](PLUGINS.md#operator-effects-031)。
 
 [ASSUMED] `damage.lose: true` 改为生命流失（`loseHp`）。`minRemain` 表示流失后生命会低于这个数时，这次不流失。`damage.from` 为 `"lastSpawn"` 时，伤害来源是刚召唤的单位。
 

@@ -381,7 +381,10 @@ export function skillIdsOf(srec) {
  * @returns {{ unitKey: string|null, skillId: string|null, skill: any, via: 'record'|'name'|'plugin'|null, reason: string|null }}
  */
 export function resolveSkill(idx, { info = null, rec = null, unitKey = null, skillIndex } = {}) {
-  const key = unitKeyOf(idx, [rec?.fx?.unit]) || idx?.pluginUnits?.[rec?.charId || info?.diy?.charId] || unitKey || unitKeyOf(idx, [info?.diy?.charId, info?.spine, rec?.charId, info?.defId]);
+  // Explicit mappings require an exact extracted key; art candidates retain their legacy suffix fallback.
+  const requested = rec?.fx?.unit;
+  const mappedUnit = typeof requested === 'string' && Object.hasOwn(idx?.units || {}, requested) ? requested : null;
+  const key = mappedUnit || idx?.pluginUnits?.[rec?.charId || info?.diy?.charId] || unitKey || unitKeyOf(idx, [info?.diy?.charId, info?.spine, rec?.charId, info?.defId]);
   const out = { unitKey: key, skillId: null, skill: null, via: null, reason: null };
   if (!key) { out.reason = 'no-unit'; return out; }
   const unit = idx.units[key];
@@ -390,7 +393,7 @@ export function resolveSkill(idx, { info = null, rec = null, unitKey = null, ski
     : Number.isInteger(info?.diy?.skillIndex) ? info.diy.skillIndex : Number.isInteger(info?.skillIndex) ? info.skillIndex : undefined;
   const find = (id) => (isObj(unit.skills) && unit.skills[id]) || (isObj(idx.skills) && idx.skills[id]) || null;
   const srec = skillRecordOf(rec, index);
-  const mapping = rec?.fx?.skills;
+  const mapping = mappedUnit === key ? rec?.fx?.skills : null;
   // [ASSUMED] An explicit slot wins over an id; a missing mapping falls through to the old resolver.
   const mapped = mapping?.[String(index ?? srec?.index)] ?? mapping?.[srec?.skillId] ?? mapping?.[srec?.prefabId];
   if (typeof mapped === 'string' && find(mapped)) return { ...out, skillId: mapped, skill: find(mapped), via: 'plugin' };

@@ -266,7 +266,8 @@ export class FxWiring {
       if (this.idx.pluginUnits?.[rec?.charId]) cands.unshift(this.idx.pluginUnits[rec.charId]);
       if (rec?.fx?.unit) {
         this.ofx.lib.notePluginUnit?.(rec.fx.unit);
-        cands.unshift(rec.fx.unit);
+        // Explicit fx.unit uses exact keys only; the fallback art candidates below still accept suffixes.
+        if (Object.hasOwn(this.idx.units || {}, rec.fx.unit)) cands.unshift(rec.fx.unit);
       }
       cands.push(v.info?.spine, v.info?.defId);
       for (const c of cands) {

@@ -460,11 +460,13 @@ of the official game in a plugin.
 
 An operator record can borrow official effects independently of its model:
 `"fx": { "unit": "char_112_siege", "skills": { "0": "skchr_siege_3" } }`.
-`unit` is an extracted index unit key; `skills` maps our zero-based slot or exact skill id to an official skill id.
+`unit` must be an exact extracted index unit key (no suffix stripping); `skills` maps our zero-based slot or exact skill id to an official skill id.
 The slot wins [ASSUMED]. Explicit unit/skill mappings precede the existing fallback chain. Attacks, projectiles,
-hits, skill start/loop/end and base-talent visuals use the existing official renderer (3D); no gameplay is inherited.
-Module visuals still require that module. Missing units/skills fall through, with one console note for a missing
-unit. Studio/check warn about locally absent units; malformed declarations refuse the plugin.
+hits and skill start/loop/end use the existing official renderer (3D); no gameplay is inherited.
+[ASSUMED] Borrowed talent visuals select only the borrower’s equipped talent indices, plus the trait; module
+visuals still require that active module. A missing exact unit disables its entire skills map, including skills
+present in the global table, and keeps the old resolution chain. Missing skills also fall through. A missing unit
+produces one console note per view. Studio/check warn about locally absent units; malformed declarations refuse the plugin.
 
 `setup --local` now also extracts used effects. Startup/update setup discovers official character references in
 installed plugins' declared JSON (`fx.unit`, `origin.charId`, `art.ref`, `art.assets`, official-format charIds and asset
@@ -489,6 +491,8 @@ Bindings select unit → zero-based skill slot or exact id → `skillStart`, `sk
 `projectile`. Referenced effect IDs must exist in the bundle. Units must belong to this plugin or a declared
 dependency [ASSUMED]; official units cannot be overwritten. Every runtime unit/skill/prefab/texture key is namespaced as
 `plugin:<plugin-id>:<local-id>`. Files and declarations are pinned by the existing visual `files`/`writes` hashes.
+The browser rechecks unit ownership and prefab bodies before preparation and merge; invalid bundles contribute
+nothing. The loader pins the provider/dependency owner list with the payload; binding keys cannot grant ownership.
 
 Flipbooks use Pixi sprites on **both boards**, obey 官方特效 (off hides them), and advance in battle seconds
 [ASSUMED]. Frames read left-to-right, top-to-bottom, skipping unused cells; image dimensions must divide the grid.
@@ -496,7 +500,9 @@ Defaults [ASSUMED]: anchor `[0.5,0.5]`, scale `1` (one tile wide), blend `normal
 skill end/death. Other looping books stop after one cycle unless a duration is supplied. Projectile bindings use
 generic projectile speed and play hit on arrival [ASSUMED: events carry no authoritative arrival time]. Without a
 custom projectile, ranged hit bindings use the same estimated arrival time. Melee hit bindings use the damage event.
-[ASSUMED] Ranged target sparks are reserved through arrival plus 0.35 s; the damage tuple has no source id.
+[ASSUMED] Ranged damage has no source id, so an estimated arrival never suppresses a damage-event spark.
+Only an identified source whose hit effect draws replaces that event’s spark; other attackers and husk hit-count
+events retain their normal handling. Owner/target death cancels pending arrival hits, with or without a custom projectile.
 
 Compiled effects add `"index":"fx/index.json"`. This version-3 `fx-index` fragment contains `units`, `skills`,
 `prefabs` and `textures: {"sheet":{"file":"fx/sheet.png"}}`. Prefabs are version-1 `fx-prefab` JSON under `fx/`,
@@ -515,7 +521,7 @@ Unsupported components fail validation. Compiled effects remain 3D-only. All aut
 1,024 particles and 32 emitters per prefab; 256 particles/system, 16 bursts/system, rate ≤256/s, lifetime ≤30s,
 speed/size/simulation-speed ≤8, delays ≤30s, burst repeats 1–16 with interval 0.01–30s, numeric values within ±10,000. Textures: 8-bit RGB/RGBA PNG, dimensions ≤2,048 (no SVG/JPEG/WebP).
 Flipbooks: 1–256 frames, 0.1–60 fps, anchor 0–1, scale 0.01–8, normal/add blend; 128 live custom instances,
-600-second held loops. Existing renderer tier/particle caps still apply. Removing a visual set clears its effects.
+600-second held loops. Existing renderer tier/particle caps still apply. Removing/replacing a visual set clears its effects and destroys cached flipbook base textures; destroying the player does the same.
 
 DSL: `{"fx":{"kind":"plugin","id":"flash","at":"self","dur":0.4}}` draws an effect in the same plugin's
 assets. The loader compiles this into the existing plain fx event, kind `plugin`, effect address in `extra.skill`,

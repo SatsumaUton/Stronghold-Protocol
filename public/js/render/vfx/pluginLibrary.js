@@ -1,5 +1,28 @@
 // Validated, hash-pinned visual-set effects. All runtime keys are private to one plugin.
-import { fxNamespace, fxPath, pluginFxProblems } from './pluginFormat.js';
+import { fxNamespace, fxPath, fxId, fxObject, ownsFxUnit, pluginFxProblems, PLUGIN_FX_LIMITS as CAP } from './pluginFormat.js';
+import { boundedFxJson, validateFxPrefab } from './pluginValidate.js';
+
+// The loader pins its checked dependency owners in the effects payload. Legacy payloads own only their provider's
+// namespace; deriving ownership from bind/index keys would let the payload authorize itself.
+function validPluginFx(id, e) {
+  try {
+    if (!fxId(id) || !fxObject(e)) return false;
+    const owners = e.owners ?? [id];
+    if (!Array.isArray(owners) || !owners.includes(id) || !owners.every(fxId) || pluginFxProblems(e.config, owners).length) return false;
+    if (e.index) {
+      boundedFxJson(e.index);
+      if (!fxObject(e.index.units) || Object.keys(e.index.units).length > CAP.units ||
+        Object.keys(e.index.units).some(key => !ownsFxUnit(key, owners))) return false;
+    }
+    const prefabs = e.prefabs ?? {};
+    if (!fxObject(prefabs) || Object.keys(prefabs).length > CAP.effects) return false;
+    for (const [key, d] of Object.entries(prefabs)) {
+      if (!fxId(key) || key !== d?.key) return false;
+      validateFxPrefab(d, e.textures || {});
+    }
+    return true;
+  } catch { return false; }
+}
 
 /** Extend a checked visual document's prepared writes without changing the legacy visual protocol. */
 export function preparePluginFx(doc, visual) {
@@ -10,10 +33,8 @@ export function preparePluginFx(doc, visual) {
     if (op.at?.length !== 2 || op.at[0] !== 'fx' || op.at[1] !== id) continue;
     const files = doc.visual.overlays.find(o => o.id === id)?.files || {};
     const e = op.effects;
-    // The server checked ownership, descriptors, image dimensions and budgets before pinning these writes.
-    if (!e?.config || !e.prefabs || !e.textures || !e.images || Object.keys(e.prefabs).length > 128) continue;
-    const owners = Object.keys(e.config.bind || {}).map(k => k.match(/^char_x_(.+)_[^_]+$/)?.[1]?.replace(/_/g, '-')).filter(Boolean);
-    if (pluginFxProblems(e.config, [id, ...owners]).length) continue;
+    // Hash validation proves which payload arrived; ownership and prefab budgets must still hold in the browser.
+    if (!validPluginFx(id, e) || !e.images) continue;
     const urls = [], images = {};
     let bad = false;
     for (const rel of Object.keys(e.images)) {
@@ -33,6 +54,7 @@ export function mergePluginFx(index, effects) {
     prefabs: { ...index?.prefabs }, skins: { ...index?.skins }, projectiles: { ...index?.projectiles }, pluginUnits: {} };
   const descriptors = new Map(), textures = {}, books = new Map(), bindings = {}, silent = new Set();
   for (const [id, e] of Object.entries(effects || {})) {
+    if (!validPluginFx(id, e)) continue;
     const ns = fxNamespace(id), ix = e.index;
     const names = new Set([...Object.keys(ix?.prefabs || {}), ...Object.keys(ix?.skills || {}), ...Object.keys(e.textures || {})]);
     const rewrite = (v, key = '') => {

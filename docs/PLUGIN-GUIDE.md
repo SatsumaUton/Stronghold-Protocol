@@ -535,6 +535,8 @@ Forge 的 baseId 是普通棋子 id，不当官方来源猜测。详见 [PLUGINS
 
 借用官方特效，在干员 JSON 顶层写 `"fx":{"unit":"char_112_siege","skills":{"0":"skchr_siege_3"}}`。
 这里的 `0` 是本插件技能的第一个槽位，右边是要借用的官方技能。它只决定画面，不继承数值、技能逻辑或模型。
+`unit` 必须精确匹配本地索引；缺失时整个 `skills` 映射失效，回到原来的解析链，不去掉数字后缀猜干员。
+[ASSUMED] 借用天赋画面只选本干员已装备的天赋序号和特性，模组画面仍要求对应模组启用。
 工作台校验发现本机索引没有这个干员会警告；可以运行 `node tools/setup.mjs --local`，从本机游戏提取。
 日常启动 / 更新发现插件新增引用，也会询问是否提取；默认不提取，明确输入 yes 才继续。
 
@@ -548,12 +550,15 @@ Forge 的 baseId 是普通棋子 id，不当官方来源猜测。详见 [PLUGINS
 
 把 `my_pack` 换成自己的插件命名空间。每个技能可绑定 skillStart、skillLoop、skillEnd、attack、hit、projectile。
 [ASSUMED] skillLoop 跟随干员直到技能结束或死亡；弹道按通用弹道速度飞向目标，抵达时播 hit。
+[ASSUMED] 远程伤害事件没有来源 id，因此预估抵达效果不抢占目标的伤害火花；只有已识别来源且实际播出 hit 时才替代本次火花。
+射手或目标死亡会取消待播命中，其他攻击者和躯壳计次伤害继续正常显示。
 序列帧在 2D 和 3D 都显示；「官方特效」关闭时隐藏，暂停时也暂停。
 同一个内容插件自带 assets 时，DSL 可以写 `{"fx":{"kind":"plugin","id":"flash","at":"self","dur":0.4}}`。
 另一个外观插件应使用 bind；DSL 不跨插件找同名效果 [ASSUMED]。
 
 已有编译工具的作者可在 fx 中加 `"index":"fx/index.json"`，提供本项目 fx-index v3 / fx-prefab v1 的受限子集。
 只支持粒子、内置 Quad 和内置粒子材质；不支持脚本、自定义着色器、外部 URL、自定义网格、动画剪辑和效果链。
+浏览器准备和合并素材时会再次校验单位归属及预制体内容；非法包不参与合并。切换素材组或销毁回放会释放序列帧底层贴图。
 编译特效仍仅显示在 3D。[ASSUMED] 每包 256 文件 / 32 MiB，单 JSON 1 MiB，JSON 总共 4 MiB；
 贴图仅接受 8 位 RGB/RGBA PNG，宽高最多 2048；序列帧最多 256 帧、60 fps；粒子上限等完整规则见
 [PLUGINS.md 的 Operator effects](PLUGINS.md#operator-effects-031)。这些限制是本项目的资源预算，不是官方数值。
