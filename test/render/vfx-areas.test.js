@@ -440,7 +440,7 @@ describe("a bound area's place", () => {
     assert.ok(spawned.includes('tinman_skill_01_range_01'), 'out of its skill: the arrival plays them as before');
   });
 
-  test("a ground-placed effect's root sits on its point (the client sets its localPosition); a projectile's and a hit's keep their offset", () => {
+  test("an effect's root sits on its point (the client sets its localPosition): a ground-placed one, a hit's and a projectile's (§34.6.1)", () => {
     const desc = (cls, spawn) => ({ root: 0, nodes: [
       { id: 0, name: 'root', parent: -1, active: true, pos: [0, 0, 10], rot: [0, 0, 0, 1], scale: [1, 1, 1], behaviours: [{ class: cls, fields: cls === 'ParticleEffect' ? { _spawnLocation: spawn } : {} }] },
       { id: 1, name: 'static_offset', parent: 0, active: true, pos: [0, 0, 0], rot: [0, 0, 0, 1], scale: [1, 1, 1] },
@@ -452,8 +452,8 @@ describe("a bound area's place", () => {
       return Array.from(fx.world[0].slice(12, 15)).map((x) => Math.round(x * 100) / 100);
     };
     assert.deepEqual(at('ParticleEffect', 5), [1, 2, 0], 'GROUND_CENTER: at the anchor (萨卡兹枯朽战士\'s pool is saved 10 tiles under the board)');
-    assert.deepEqual(at('ParticleEffect', 2), [1, 2, 10], 'a HitPoint effect: unchanged for now');
-    assert.deepEqual(at('ProjectileEffect', 0), [1, 2, 10], "a projectile's own effect: unchanged");
+    assert.deepEqual(at('ParticleEffect', 2), [1, 2, 0], 'a HitPoint effect: at the anchor too (§34.6.1: every root)');
+    assert.deepEqual(at('ProjectileEffect', 0), [1, 2, 0], "a projectile's own effect: on the projectile's body (§34.6.1)");
   });
 });
 

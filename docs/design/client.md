@@ -72,7 +72,8 @@ history and the open points: DESIGN §32.14.25.
 - **Simulation.** `psys.js` interprets Unity's ParticleSystem: the main module, emission (rate over time and distance,
   bursts with cycles and probability), the shapes, velocity / limit velocity / force / inherit velocity / noise /
   rotation / size / colour over lifetime and by speed, texture sheets, trails, sub-emitters, prewarm, start delay,
-  simulation spaces and scaling modes, in fixed sub-steps of at most 1/30 s with a seeded generator. `clips.js` samples
+  simulation spaces and scaling modes (a particle's size × the scaling mode's scale per axis, a local-space one's as it
+  is now: DESIGN §33.5), in fixed sub-steps of at most 1/30 s with a seeded generator. `clips.js` samples
   the prefabs' clips (transforms, active flags, material, renderer and system properties). `effect.js Effect` runs the
   hierarchy and the behaviours: ParticleEffect (delays, loop and stop fade, max lifetime, direction helpers, spawn
   location), ProjectileEffect, FxDelay, FxUVTweener(Advance), FxUVRotation, FxLODSetting, FollowMountPoint /
@@ -131,9 +132,13 @@ history and the open points: DESIGN §32.14.25.
   HeadPoint, Special points; front / back skeleton, mirrored for a unit facing left) at the unit's feet — a point a
   BoneFollower keeps on a Spine bone where the model draws that bone (`UnitView.boneOffset`) —; an effect with a
   FollowMountPoint follows its point, a weapon effect (and a MUZZLE_POINT / Special-point spawn) with the point's
-  rotation; a mode's facing variant plays for the unit's facing (DESIGN §32.14.36). An effect played before its prefab
-  loaded is placed by index.json's summary (`prefabs[key].spawn`, its FollowMountPoint's `follow` point from the first
-  frame) and takes up its rotation, direction and pause behaviours once loaded (round 46).
+  rotation; a mode's facing variant plays for the unit's facing (DESIGN §32.14.36). A prefab root's authored position is
+  dropped and its rotation is the spawn location's — the unit's Graphic tilt at FOOT / HIT / HEAD (`mounts.js
+  spawnRotation`, `graphicRotation`), none at MUZZLE_POINT_WITHOUT_ROTATION, NONE, the ground spawns and a point of the
+  ground — so an effect authored standing stands facing the camera (荒芜拉普兰德 S3's seal, 能天使 S3's light bars); a shot
+  whose movement comes back (跃跃's boomerang) flies back to the thrower's HitPoint after its hit (DESIGN §34.6). An
+  effect played before its prefab loaded is placed by index.json's summary (`prefabs[key].spawn`, its FollowMountPoint's
+  `follow` point from the first frame) and takes up its rotation, direction and pause behaviours once loaded (round 46).
 - **Skills** (0.3.0 Phase 3b – 3d, `skillfx.js SkillFx`, owned by the wiring; the plans of `skills.js`, DESIGN §33.12
   and §33.16). A battle unit resolves once to its official skill and plan (its data record: `ctx.lookupDef`) and its
   秘术师 charge plan. ['skill', id, 1] plays the plan's `start` and `range` and starts its `loop` (held for the skill:
@@ -205,7 +210,8 @@ history and the open points: DESIGN §32.14.25.
   extraction (`tools/local-extract`), served to every player of that server: a remote player sees the host's effects,
   whatever client they have. The effects draw on the 3D board with WebGL2 only; the 2D board and the simplified board
   keep the procedural effects. A tier switch clears the effects; the skill loops that should run start again quietly.
-- **Dev.** `public/dev/fx-viewer.html` plays any effect key (`?key=`, on a unit's mount points with `&unit=`;
+- **Dev.** `public/dev/fx-viewer.html` plays any effect key (`?key=`, on a unit's mount points with `&unit=`, turned as
+  the wiring turns it for its spawn location;
   `?attack=<unit id>` repeats that unit's attack from index.json through the wiring; `?skilldemo=<unit id>&s=<slot>`
   cycles its skill through the wiring — on, an attack a second, off — with `&instant=1`, `&passive=1`, `&charge=<n>`,
   `&ready=1`, `&hits=<n>` (damage events per blow: a MultiHit attack's groups); an enemy's opens its window with the

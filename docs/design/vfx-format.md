@@ -7,13 +7,27 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
 * **2026-10-16 — lingering areas: readings from the client's data and code, no format change (0.3.1, the maintainer's
   report of 2026-10-16; history 0.3.1 §34.5)**. (1) A ground-placed effect's root (`ParticleEffect._spawnLocation` 5,
   7, 17, 26, 35) sits on its point: the client's Effect._InitLocationFromEntity sets the root's localPosition to the
-  spawn location, so its authored `pos` is no offset (§33.4) — 萨卡兹枯朽战士's `enemy_nhpbr_attack_range` is saved with
+  spawn location, so its authored `pos` is no offset (§33.4; the next entry extends this to every root) — 萨卡兹枯朽战士's `enemy_nhpbr_attack_range` is saved with
   its root 10 tiles under the board. (2) An enemy's kit areas are its talents' and skills' projectiles and rows the
   index writes without the moment they play (a death talent's projectile, a skill's second projectile, a castTarget row
   of a skill its kit fires itself): §33.16 reads them for the sim's zone fx (ENEMY_FX_BINDINGS). (3) An enemy skill
   whose root ability is an attack is that one attack: its kit fx drawn, its window's later attacks are the enemy's own
   (§33.16 Enemy skills). (4) A talent loop created by a buff at its
   tick in a mode (水遁忍者's RotateEffect) plays while that mode lasts (§33.16).
+* **2026-10-16 (2) — where an effect stands and how big its particles are, from the client's code and data, no format
+  change (0.3.1: the maintainer's report of 2026-10-16, history §34.6)**. (1) A prefab root's own transform is no part
+  of the effect: the client sets the root's position where it plays it, and a projectile's flying effect sits on the
+  projectile's body (§33.4); 203 prefabs have an authored root position — 安洁莉娜 S2's orbs were drawn 0.94 tile above
+  their path. (2) An effect at FOOT_POINT, HIT_POINT or HEAD_POINT takes the unit's Graphic tilt (−30° about X, its
+  skin animator's rotation), MUZZLE_POINT_WITHOUT_ROTATION, NONE, the ground spawns and an effect played at a map
+  position none (§33.2, §33.11): the effects authored standing (荒芜拉普兰德 S3's seal, 能天使 S3's light bars) stand facing
+  the camera. (3) A renderer's `m_Pivot` moves the particle by + pivot × size along its own axes, a stretched billboard
+  included: pivot.y × the particle's Y size along the velocity and pivot.x × its X size across, not along the stretched
+  length (§33.6). (4) A local-space particle is drawn at its scaling mode's scale as it is now, and a particle's size is × that scale per axis
+  whether or not its system has `size3D` (§33.5). (5) A projectile whose movement has `comeBack` flies back to its
+  source after its hit at the come-back speed toward the HitPoint as it is now (§33.12 Projectile). `delayAfterReached`
+  of 1 on the Paracurve / NarantS3 come-back projectiles is a flag; the wait is `delayTime` 0.01 s, under one sim tick,
+  and the visual turns back on the hit with the sim.
 
 * **2026-10-16 — readings corrected from the client's data and code, no format change (0.3.1: the 0.3.0 effects audit's
   R18–R21 and its low-confidence observations; history 0.3.1)**. (1) A prefab's root node is active when the effect
@@ -245,10 +259,13 @@ two). Direction vectors map with C as well
 frame. Euler angles (transforms, clips, shape rotation) are degrees applied as Unity's `Quaternion.Euler(x, y, z)`:
 rotate about Z, then X, then Y (q = q_y · q_x · q_z).
 
-Why it works out: the effects' own geometry is pre-tilted for the battle camera — e.g. every child system of
-`common_hit_01` is rotated +30° about X, and every unit's `Graphic` node is rotated −30° about X (quaternion
-`(-0.258819, 0, 0, 0.965926)`), so a character's skeleton plane is perpendicular to the camera's view direction. With
-our camera being the official one, the authored transforms produce the official picture.
+Why it works out: every unit's `Graphic` node is rotated −30° about X (quaternion `(-0.258819, 0, 0, 0.965926)`), so a
+character's skeleton plane is perpendicular to the camera's view direction, and the client gives an effect it spawns
+at the unit's FOOT, HIT or HEAD point that same rotation (§33.11 `_spawnLocation`, resolved 0.3.1): a plane authored in
+the effect's own XY plane stands facing the camera like the skeleton (荒芜拉普兰德 S3's seal, 能天使 S3's light bars), one
+turned +30° about X under it lies in the board (`common_hit_01`'s `andi`; the deploy ring of `common_char_birth_01`,
+turned −150°, alike), and an effect placed on the ground or at a map position takes no rotation. With our camera being the official one, the
+authored transforms produce the official picture.
 
 **Gravity.** A ParticleSystem's gravity is `Physics.gravity × gravityModifier` in battle-world space; the client's
 `Physics.gravity` (globalgamemanagers, PhysicsManager) is the default `(0, −9.81, 0)`: towards row 0, in the board's
@@ -346,19 +363,18 @@ FxDelay, a clip curve on `m_IsActive`) activates it. A renderer also has its own
 exception: the client activates an effect's GameObject as it plays it (`Effect._DelayToActiveGameObject` →
 `GameObjectUtil.SetActiveIfNecessary`, GameAssembly.dll of 2026-09-13), so a root saved inactive — 35 prefabs of the
 used set: the 狼群's `vigil_token_sub_attack_1` / `_2`, 伺夜's and 至简's attack starts, 艾雅法拉's hit, 风笛 S3's buff,
-百炼嘉维尔 S2's chainsaw glow … — plays like any other (the runtime drew nothing of them before 0.3.1). Nor is the root's
-`pos` where the effect plays: Effect._InitLocationFromEntity sets the effect root's localPosition to its spawn location
-(Transform.set_localPosition in every SpawnLocation branch — round 46's disassembly of GameAssembly.dll), so the authored
-position is overwritten. 199 prefabs of the used set are saved with a root offset (> 0.05): 155 are projectiles' own
-effects (a projectile places them), 15 are ground-placed — `enemy_nhpbr_attack_range` (z 10), `headb2_*` (1 ahead),
-`texas2_skill_03_hit_02`, `shu_talent_buff_01`, `sbell2_tile_defrost` … The runtime drops the offset of the
-ground-placed roots since 0.3.1 (`effect.js` `placedRoot`); the other 29 (statuses such as `buff_poison_1`–`_4`, hits
-such as `common_magic_hit_01_m`, lines such as `pasngr_attack_line`) keep it until each is checked [open].
+百炼嘉维尔 S2's chainsaw glow … — plays like any other (the runtime drew nothing of them before 0.3.1). The root's own
+transform is the game's too: the client sets the root's position where it plays the effect (`Effect._InitLocation…`,
+its rotation by the spawn location, §33.11), and a projectile's flying effect is a child of the projectile's body,
+which flies the path, with its transform reset (`Misc.Reset`) — so the root's authored `pos` (203 prefabs, 155 of them
+projectile bodies: `aglina_skill_02_trail` at (0.18, 0.74, −0.60), 0.94 tile up the screen) is not added, and a
+projectile body's authored `rot` gives way to its flight (0.3.1, history §34.6).
 
 The usual layout: the root carries the controlling behaviour (`ParticleEffect`, `ProjectileEffect`, §33.11) → a node
 `static_offset` → a node `fixed` (or `rotation_y` / `rotation_z`, nodes the behaviour turns by direction) holding a
 ParticleSystem whose renderer is disabled (`Default-Particle` material) — it only times its children (in Unity, playing
-a system plays its child systems) → the visible systems, quads, trails. Note the children's +30° X tilt (§33.2).
+a system plays its child systems) → the visible systems, quads, trails. Note the children's tilts against the root's
+spawn rotation (§33.2).
 
 ### 33.5 ParticleSystem (`node.particleSystem`)
 
@@ -371,7 +387,12 @@ Local — particles move with the system's transform, 1 World — they stay wher
 `moveWithCustomTransform` `{node, component}`), `scalingMode` (0 Hierarchy — the full world scale applies, 1 Local —
 only the system's own `scale` applies to its particles: the player's frame is the world rotation with unit axes times
 that scale, and an axis a parent scaled to zero is rebuilt from the other two, mirrored with the effect (history
-§32.14.38), 2 Shape — scale applies to the emission shape only), `stopAction`, `cullingMode`, `ringBufferMode`,
+§32.14.38), 2 Shape — scale applies to the emission shape only; a particle's size is × the Hierarchy / Local scale per
+axis — x across, y up the particle, z through a mesh — whether or not the system has `size3D` (1,318 systems of 462
+prefabs sit on unevenly scaled nodes: 荒芜拉普兰德 S3's seal tips 1 × 0.7, 娜仁图亚 S3's hit glow a 2.4 × 0.29 streak), and
+a local-space particle is drawn at that scale as it is now, a world-space one at the scale it was born at (a clip that
+grows a node from 0 grows its particles: the seal's discs; 531 systems of 142 prefabs are born at 0 or animated) —
+0.3.1, history §34.6; the remake drew a uniform size × the x scale, as born), `stopAction`, `cullingMode`, `ringBufferMode`,
 `ringBufferLoopRange`, `emitterVelocityMode` (0 Transform, 1 Rigidbody: the emitter's velocity for inherit-velocity and
 rate-over-distance), `useUnscaledTime`, `autoRandomSeed`, `randomSeed`.
 
@@ -471,7 +492,15 @@ used set's stretched renderers with a pivot, 2,434 set it in Y and 9 in X, again
 and 2,130 of the 2,449 stretched systems with unequal X / Y sizes make Y the long one; 风笛's lance thrust, a Y 3.5 /
 X 0.5 flash flying along the thrust, was a vertical needle with the sizes the other way round, 0.3.1),
 `m_FreeformStretching`, `m_RotateWithStretchDirection`, `m_NormalDirection`, `m_Pivot` (in
-particle-size units), `m_Flip` (0…1: the share of particles mirrored per axis), `m_AllowRoll`; mesh particles:
+particle-size units: the quad or mesh is drawn at position + pivot × size along the particle's own axes, turning with
+its roll — 荒芜拉普兰德 S3's seal tips, Quads with a pivot of −0.5 / −0.81 left of the centre and their twins turned 180°
+about Y right of it, point outward only so, and of the used set's view billboards with a Y pivot 210 lift the quad
+against 22: 艾雅法拉 S2's range flames stand on the ground; a stretched billboard adds the same pivot after its head
+shift, pivot.y × the particle's Y size along the velocity and pivot.x × its X size across — that Y size, not the
+stretched length; 1,754 stretched renderers have |pivot| > 0.2, and the largest shifts are 锏 S3
+`blkkgt_skill_03_start_01` `light` (up to 4.62 tiles), `enemy_mdrock_buff_03_start_02` `shandian` (4.57) and 陈 S2
+`chen_skill_02_start` `renwu_01` (2.77) — 1,291 renderers of 661
+prefabs set one — the remake moved the particle the other way before 0.3.1, and skipped it on a stretch, history §34.6), `m_Flip` (0…1: the share of particles mirrored per axis), `m_AllowRoll`; mesh particles:
 `m_Mesh`, `m_Mesh1…3` (`{mesh}` or null), `m_MeshDistribution` (0 uniform, 1 by `m_MeshWeighting*`), `m_MaskInteraction`;
 `materials[0]` draws the particles, `materials[1]` the TrailModule's trails.
 
@@ -642,9 +671,14 @@ Semantics below are read from the field names, the data and the client's type, f
   18–25 MP_SPECIAL_8–15, 26 GROUND_CENTER_WITH_TILE_HEIGHT, 27–34 MP_SPECIAL_16–23, 35 GROUND_CENTER_WITH_HIGHLAND_HEIGHT.
   The points are the unit's mount points (§33.12 `skins`): FOOT = the unit's root, HIT = `HitPoint`, MUZZLE = `Muzzle` /
   `MuzzlePoint`, HEAD = `HeadPoint`, MP_SPECIAL_n = `Special<n>` / `SpecialPoint<n>`. In the sample: hits use 2, cast
-  flashes 3 / 6 / 8, status loops 1 / 4, ranges 5 / 7. **Resolved** (the client's `Effect._InitLocationFromEntity`):
-  FOOT_POINT, HIT_POINT, HEAD_POINT and MUZZLE_POINT_WITHOUT_ROTATION take the point's position and the unit's own
-  (unturned) rotation — these prefabs are pre-tilted for the camera (§33.2) —; MUZZLE_POINT and the MP_SPECIAL points
+  flashes 3 / 6 / 8, status loops 1 / 4, ranges 5 / 7. **Resolved** (the client's `Effect._InitLocationFromEntity`;
+  the rotations corrected in 0.3.1, history §34.6): FOOT_POINT, HIT_POINT and HEAD_POINT take the point's position and
+  the rotation of the unit's skin animator — the `Graphic` node's −30° about X, without the FaceSwitcher's turn: an
+  effect authored in its own XY plane stands facing the camera (§33.2; 2,590 prefabs play there, their planar
+  renderers authored standing 7,255 times against 514 lying flat), FLIP_TWO_SIDE mirrors it for a unit facing left —;
+  MUZZLE_POINT_WITHOUT_ROTATION and NONE take no rotation, the ground spawns (GROUND_CENTER…, TILE_CENTER) the unit
+  root's (none), and an effect the game plays at a map position (`Effect._InitLocation`: a kit fx's tile, a
+  projectile's target tile) none; MUZZLE_POINT and the MP_SPECIAL points
   (`_SetPosAndRotToMountPoint`) take the point's position and its world rotation: the unit's Graphic tilt (−30° about
   X), the FaceSwitcher's turn for a unit facing left (180° about the skeleton plane's up axis: the client tweens that
   node's rotation to turn a unit) and, for a point a BoneFollower keeps on a bone, the bone's angle — such prefabs are
@@ -696,8 +730,10 @@ SPECIAL_5–SPECIAL_23 — sample: `buff_frozen` 0, `common_root_01` 1, `enemy_t
 **Resolved** (`FollowMountPoint._FollowMountPoint`): every LateUpdate the effect takes the point's position and,
 unless `_keepOriginRotation`, its world rotation (as MUZZLE_POINT above); `_followScaleSign` copies the sign of the
 point's local scale, `_followScale` the scale itself (× `_scaleMultiplier`). The status loops keep their rotation
-(`buff_stun`, `buff_frozen`, `common_root_01`: `_keepOriginRotation` 1); the weapon effects take it (安洁莉娜's
-`aglina_skill_02_start` on SPECIAL_0, its parts 0.35–0.4 along local +x: up her staff).
+(`buff_stun`, `buff_frozen`, `common_root_01`: `_keepOriginRotation` 1) — the rotation their spawn location gave them
+(`_spawnLocation` above: the Graphic tilt on FOOT / HIT / HEAD, 0.3.1); the weapon effects take it (安洁莉娜's
+`aglina_skill_02_start` on SPECIAL_0, its parts 0.35–0.4 along local +x: up her staff); FOOT's point is the skeleton's
+root, so an effect following it takes the tilt and the facing turn.
 **`FollowDirection`**: turns with the owner's facing (`_useFourDir`, `_useOwnerDirection`, `_useOwnerMoveDirection`,
 `_leftIsDefault`, `_reverseWhenFaceToBack`, `_flipWhenFaceToVertical`, `_onlyFollowOnPlay`, `_useDirectionLerp`,
 `_lerpDuration`, …). **`FollowOwner`**, **`FollowOwnerRootTileHeight`**, **`FollowTileHeight`** (`_followTileHeightSpeed`):
@@ -1014,7 +1050,18 @@ in `randomHeightRange`), 0 when the ground distance is not above `noRaiseHeightT
 + h − end height) and T = distance / speed it climbs at √(2gh) under g = 2(√h + √H)²/T² — it tops out h above its
 start — and after the top g is re-solved each tick to land on the target's current height; `inverseParacurve`
 (`randomInverseParacurve`: a coin) flies the mirror image. As a function of the flight fraction k the height is
-start + 2√h·s·k − s²·k² (s = √h + √H) whatever T is. `AmiyaS2Movement` (安洁莉娜 S2): straight and homing in `time` s
+start + 2√h·s·k − s²·k² (s = √h + √H) whatever T is. **Resolved** (0.3.1, history §34.6: their Comeback state): a
+movement with `comeBack` turns, after the hit, into a leg back to the source's HitPoint at `speed` ×
+`comeBackSpeedScale` (跃跃's `projectile_chr_caper` 15 × 0.25 = 3.75 tiles/s, the sim's BOOMERANG_RETURN_SPEED), stepping
+at that speed toward the HitPoint as it is now — a duration locked at the turn would cover a thrower who moves in the
+original time, faster than 3.75 —, a ParacurveMovement along an arc rebuilt only when its start height, end height or
+ground distance changes; the projectile keeps its main effect until it is back and then
+clears it, and a source gone takes nothing back — 10 projectiles (跃跃's, 娜仁图亚's). The pause before that leg is not
+1 s: on a ParacurveMovement / NarantS3Movement `delayAfterReached` is 0 or 1 (a flag) and `delayTime` is the seconds
+(0.01 on `projectile_chr_caper_s2` / `_s2_1` and `projectile_chr_narant_s3` / `_s3_1` / `_s3_2`); on an AdvancedMovement
+`delayAfterReached` itself is the seconds (0.01, or 0 on `narant_s2`). 0.01 s is under one sim tick, the return
+projectile already waits for the next tick, and the visual turns back on the hit so it stays on the sim's catch
+[ASSUMED: the raw float pmUpdateAfterReach waits at +0xec is `delayTime`]. `AmiyaS2Movement` (安洁莉娜 S2): straight and homing in `time` s
 after a start phase of `startDuration` towards `startDistance` in a random direction, its body at
 (0, sin φ · `yAnimateOffset`, 0) across the flight, φ advancing 2π · `yAnimateSpeed` per second from a random start. The
 sim keeps its own projectile speeds; the visual flies its flying effect along the sim's flight and plays `onHit` at the
@@ -1370,7 +1417,14 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   FollowMountPoint moves with the unit, its offset from the feet as it started (a ground spawn on the ground); a hit or
   a ground range not held stays where it started, a FollowOwner one keeps to the feet only when held, as before
   [ASSUMED: §33.11 `_holdByOwner`; a status loop whose prefab says 0 — `common_stealth`, `buff_ fragile_01`,
-  `common_invincible_01` — follows its unit all the same].
+  `common_invincible_01` — follows its unit all the same]. Since 0.3.1 (history §34.6): the prefab root's authored
+  position is no part of an effect (`compileEffect`; kept as `rootPos`), and its rotation is the spawn location's
+  (`mounts.js spawnRotation`, the effect's `rootRot`): the Graphic tilt for FOOT / HIT / HEAD (`graphicRotation`), none
+  for MUZZLE_POINT_WITHOUT_ROTATION, NONE, the ground spawns and an effect on a point of the ground (a kit fx's tile, a
+  projectile's target tile), the point's rotation (`mountRotation`, above) for MUZZLE_POINT and the Special points; a
+  FollowMountPoint without `_keepOriginRotation` takes its point's, on FOOT the skeleton root's (the tilt and the facing
+  turn), and with it keeps the spawn location's; a chained effect (OnPlayEmitter) takes its own spawn location's; an
+  effect played before its descriptor arrived takes up its rotation once loaded, as above.
 * **Projectile reached effects**: a skill projectile's `onReached` (else `onHit`) is what `skills.js FX_BINDINGS` plays
   where a kit's fx stands for that projectile (克莱门莎 S3's `projectile_chr_clemnt_s3`). A binding may name its own
   `keys` instead, played once `at: 'target'` on the unit the fx names (round 46: 泡泡 S2's 'counter' →
@@ -1443,7 +1497,15 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
 * **A projectile's parts** (2026-10-15, history §32.14.36 and §32.14.38; `flight.js projectileParts`, `wiring.js
   _fly`): the flying effect is the projectile class's own `_mainEffect` and its life that class's LIMITED `_lifeTime`,
   read from `behaviours` (an index written before the correction named a chain's or a rope's line `main` for 30
-  projectiles); it flies from the shot's mount point (Placement above). A harpoon's rope (a HarpoonRenderer's
+  projectiles); it flies from the shot's mount point (Placement above), its root's transform the flight's (0.3.1). A
+  projectile whose movement has `comeBack` (§33.12 Projectile) plays its hit at the target and flies back to the
+  thrower's HitPoint at the sim's return speed for the 回环射手's 'boomerang' (else `speed` ×
+  `comeBackSpeedScale`), stepping that speed toward the HitPoint as it is now, a Paracurve one along an arc rebuilt
+  when its inputs change, its effect removed at the catch; a thrower gone ends it at the
+  hit. The client's `delayAfterReached` of 1 on the Paracurve / NarantS3 come-backs is a flag (`delayTime` 0.01 s, under
+  one tick); the visual does not hang, so the drawn boomerang stays on the sim's catch
+  (`wiring.js _comeBack` / `_turnBack` / `_stepBack`, 0.3.1, history §34.6: it stopped at the target, then a locked
+  return duration rubber-banded a moving thrower). A harpoon's rope (a HarpoonRenderer's
   `_mainEffect`) runs from the shooter's point as it is drawn to the head while it flies — its LineRenderers' end
   points set by the runtime (`effect.js linkLines`; a world-space line without them draws nothing) — and fades once the
   head arrives; a chain's lightning (a ChainLightningEffectBehaviour's) is not flown — the client plays it between the
