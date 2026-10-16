@@ -86,8 +86,10 @@
 //     `welcome` carries `diyKitted` (welcomeInfo): the operators a DIY slot may field, so the client's picker offers
 //     exactly what the server accepts.
 //   * 干员皮肤 (docs/SKINS.md): room.skins { skins } — `{ [charId]: skinId }`, the appearance each operator wears — is
-//     checked structurally only (shared/protocol.js isSkinSelection; an unknown skinId can do nothing worse than fail
-//     to resolve in the client's spineEntry and draw the default model) and stored on the session and the seat. Unlike
+//     a plain map of charIds to skinIds, at most SKIN_LIMITS.entries (256 [ASSUMED]); a bad shape is BAD_MSG and does
+//     not clear the stored choice. A charId the room's content does not have is dropped (shared/protocol.js
+//     checkSkinSelection). An unknown skinId can do nothing worse than fail to resolve in the client's spineEntry.
+//     Stored on the session and the seat. Unlike
 //     the settings above there is NO phase gate: a match receives seats[].skins when it starts AND takes a later change
 //     at once (match.setSkins, any phase), because the choice is public — a teammate sees your model — and cosmetic.
 //   * Content identity (DESIGN §32, the plugin system's first step): the lobby is given the server's vanilla content
@@ -161,7 +163,7 @@
 
 import { randomBytes, randomInt } from 'node:crypto';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
-import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, isSkinSelection } from '../shared/protocol.js';
+import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
 import { Match as DefaultMatch } from './match/Match.js';
@@ -246,15 +248,17 @@ function freezeDiy(picks) {
 /**
  * Frozen copy of a skin selection (docs/SKINS.md), keyed by operator charId.
  *
- * Deliberately not a `checkLoadout`-style validator, and nothing here can be abused: a skinId the client made up, or
- * one of another operator, simply fails to resolve in `spineEntry()` and the unit draws its default model. What the
- * gate keeps out is a malformed entry (the wire check, shared/protocol.js isSkinSelection: a charId key — `char_498_inside`
- * — and a bounded skinId), so the stored copy is only ever what the picker could have written.
+ * A non-plain object, a key that is not a charId, a value that is not a skinId, or a map over the wire cap is refused
+ * (`null` — the caller answers BAD_MSG and does not clear what is already stored). A charId `hasOperator` rejects is
+ * dropped. The stored copy is then at most the operator count of the room's content, and ≤ 256 [ASSUMED].
  * @param {Record<string, string>} skins `{ [charId]: skinId }`
+ * @param {(charId: string) => boolean} hasOperator
+ * @returns {Readonly<Record<string, string>>|null}
  */
-function freezeSkins(skins) {
-  if (!isSkinSelection(skins)) return Object.freeze({});
-  return Object.freeze({ ...skins });
+function freezeSkins(skins, hasOperator) {
+  const res = checkSkinSelection(skins, hasOperator);
+  if (!res.ok) return null;
+  return Object.freeze({ ...res.skins });
 }
 
 /** One room: 4 seat slots, host, difficulty, optional running match. */
@@ -1227,9 +1231,11 @@ export class Lobby {
    * harmless, and the next `m.public` broadcast carries it to everyone.
    */
   skins(session, { skins }) {
-    const kept = freezeSkins(skins);
-    session.skins = kept;
     const room = this.roomOf(session);
+    const ids = operatorCharIds(this.dataFor(room));
+    const kept = freezeSkins(skins, (id) => ids.has(id));
+    if (!kept) return fail(ERR.BAD_MSG, 'bad skin selection');
+    session.skins = kept;
     if (!room) return OK;
     const seat = room.seatOf(session.playerId);
     if (seat) seat.skins = kept;
@@ -1304,9 +1310,15 @@ export class Lobby {
       const r = checkDiyPicks({ ...diy }, { data, kitted: this.kittedFor(room) });
       diy = r && 'ok' in r ? freezeDiy(r.picks) : null;
     }
-    // 干员皮肤 (docs/SKINS.md): a skinId is not checked against the content — the appearance it names lives in a
-    // cosmetic plugin's overlay, which is not part of the room's content set — so the selection travels as stored
-    const skins = s.skins || null;
+    // 干员皮肤 (docs/SKINS.md): the skinId lives in a cosmetic overlay, not the content set, but the KEY is an operator
+    // of this room. A charId the content does not have is dropped; a map that is no longer a plain charId→skinId
+    // selection is left off the seat rather than handed to the match.
+    let skins = null;
+    if (s.skins && typeof s.skins === 'object') {
+      const ids = operatorCharIds(data);
+      const res = checkSkinSelection(s.skins, (id) => ids.has(id));
+      if (res.ok) skins = Object.freeze({ ...res.skins });
+    }
     return { loadout, ops, notOwned, diy, skins };
   }
 

@@ -17,13 +17,13 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isSkinId, isSkinSelection, validateC2S, SKIN_LIMITS } from '../shared/protocol.js';
-import { Lobby } from '../server/lobby.js';
+import { isSkinId, isCharId, isSkinSelection, checkSkinSelection, operatorCharIds, validateC2S, SKIN_LIMITS } from '../shared/protocol.js';
 import { makeMatch, DATA } from './match/harness.js';
 import { Battle } from '../server/sim/Battle.js';
+import { makeBattle } from './helpers/battleHarness.js';
 import { avatarUrl, portraitUrl, illustUrl, spineEntry, hasBackSpine, unitPictureUrl, skinsOf, skinHasModel } from '../public/js/assets.js';
 import { createStore } from '../public/js/store.js';
 import { parseStoredSkins, SKINS_KEY, SKINS_SYNC_KEY } from '../public/js/ui/skins.js';
@@ -72,24 +72,40 @@ describe('皮肤: the wire shape of room.skins', () => {
     }
   });
 
-  test('isSkinSelection: a map of ≤ 160 operator ids → skinIds, and nothing else', () => {
+  test('isCharId is an operator, never a chess id', () => {
+    for (const id of [OPERATOR, OTHER, 'char_002_amiya', 'char_1012_skadi2', 'char_4145_ulpia', 'char_616_pithst', 'char_x_mod_rose']) {
+      assert.ok(isCharId(id), id);
+    }
+    for (const bad of ['chess_char_1_01_a', 'char_498_inside@kitchen#2', 'token_10006_vodfox_doll', '', 'char_', 'char_x_', '__proto__']) {
+      assert.ok(!isCharId(bad), JSON.stringify(bad));
+    }
+    const ids = operatorCharIds(DATA);
+    assert.ok(ids.has(OPERATOR) && ids.has(OTHER));
+    assert.ok(!ids.has('chess_char_1_01_a'));
+    assert.ok(ids.size <= SKIN_LIMITS.entries, `vanilla roster ${ids.size} fits the wire cap`);
+  });
+
+  test('isSkinSelection: a plain map of ≤ SKIN_LIMITS.entries charIds → skinIds, and nothing else', () => {
+    assert.equal(SKIN_LIMITS.entries, 256);
     assert.ok(isSkinSelection({ [OPERATOR]: SKIN }));
+    assert.ok(isSkinSelection({ char_x_mod_rose: SKIN }), 'a plugin operator is a charId');
     assert.ok(isSkinSelection({}), 'an empty selection clears every skin');
     assert.ok(!isSkinSelection(null));
     assert.ok(!isSkinSelection([]));
     assert.ok(!isSkinSelection([SKIN]), 'not a list');
+    assert.ok(!isSkinSelection(Object.create(null)), 'a null-prototype object is not a plain map');
     assert.ok(!isSkinSelection({ [OPERATOR]: '' }));
     assert.ok(!isSkinSelection({ [OPERATOR]: 'bad id' }));
     assert.ok(!isSkinSelection({ [OPERATOR]: 42 }));
     assert.ok(!isSkinSelection({ 'char 1': SKIN }));
+    assert.ok(!isSkinSelection({ chess_char_1_01_a: SKIN }), 'a chess id is not a charId');
+    assert.ok(!isSkinSelection({ [OPERATOR]: SKIN, chess_char_1_01_a: SKIN }), 'one bad key refuses the whole map');
     const big = {};
     for (let i = 0; i <= SKIN_LIMITS.entries; i++) big[`char_${i}_x`] = SKIN;
     assert.ok(!isSkinSelection(big), `more than ${SKIN_LIMITS.entries} entries`);
-    // A key of the wrong KIND is not refused here: `isId` is a shape check, and `chess_char_1_01_a` has the shape of an
-    // operator id. It is harmless — `chars['chess_char_1_01_a']` of the manifest has no `skins` map, so the entry
-    // resolves to nothing and the piece draws the default model. That is what makes the shallow wire check safe, and it
-    // is why the error a wrong key produces is not an error at all.
-    assert.ok(isSkinSelection({ [OPERATOR]: SKIN, chess_char_1_01_a: SKIN }));
+    const capped = {};
+    for (let i = 0; i < SKIN_LIMITS.entries; i++) capped[`char_${i}_x`] = SKIN;
+    assert.ok(isSkinSelection(capped), 'the cap itself is still a selection');
   });
 
   test('validateC2S: room.skins needs a selection, and room.skin.install does not exist', () => {
@@ -98,6 +114,8 @@ describe('皮肤: the wire shape of room.skins', () => {
     assert.ok(validateC2S({ t: 'room.skins' }), 'missing field');
     assert.ok(validateC2S({ t: 'room.skins', skins: SKIN }), 'not a map');
     assert.ok(validateC2S({ t: 'room.skins', skins: { [OPERATOR]: 'has space' } }), 'bad skin id');
+    assert.ok(validateC2S({ t: 'room.skins', skins: { chess_char_1_01_a: SKIN } }), 'a chess id is not a charId');
+    assert.ok(validateC2S({ t: 'room.skins', skins: [] }), 'not a plain object');
     // the install channel is NOT ported: an unauthenticated "make the server download and rewrite shared data" message
     // is exactly what upstream closed (#652)
     assert.ok(validateC2S({ t: 'room.skin.install', skinId: SKIN }), 'the installer message must not be routable');
@@ -118,16 +136,28 @@ describe('皮肤: the lobby seat and the match', () => {
 
   test('Match.setSkins: only the caller\'s own seat, any phase, and the public view carries it', () => {
     const h = makeMatch({ mode: 'coop', seats });
-    // a chess-shaped key is kept by the wire check (it looks like an operator id) but resolves to nothing, so it is
-    // inert rather than destructive — the entries beside it still work
-    assert.equal(h.m.setSkins('p_0', { [OPERATOR]: SKIN, 'chess_char_1_01_a': SKIN }).ok, true);
-    assert.deepEqual(h.ps('p_0').skins, { [OPERATOR]: SKIN, 'chess_char_1_01_a': SKIN });
+    const before = { [OPERATOR]: SKIN };
+    assert.deepEqual(h.ps('p_0').skins, before);
+    // a chess id, a bad skin id, a non-plain object and a map over the cap each refuse the WHOLE selection
+    assert.equal(h.m.setSkins('p_0', { [OPERATOR]: SKIN, chess_char_1_01_a: SKIN }).error, 'BAD_MSG');
+    assert.equal(h.m.setSkins('p_0', { [OPERATOR]: 'has space' }).error, 'BAD_MSG');
+    assert.equal(h.m.setSkins('p_0', { [OPERATOR]: '' }).error, 'BAD_MSG');
+    assert.equal(h.m.setSkins('p_0', []).error, 'BAD_MSG');
+    assert.equal(h.m.setSkins('p_0', Object.create(null)).error, 'BAD_MSG');
+    const big = {};
+    for (let i = 0; i <= SKIN_LIMITS.entries; i++) big[`char_${i}_x`] = SKIN;
+    assert.equal(h.m.setSkins('p_0', big).error, 'BAD_MSG');
+    assert.deepEqual(h.ps('p_0').skins, before, 'a refusal leaves the stored choice');
+    // an operator the room does not have is dropped; the rest is kept
+    assert.equal(h.m.setSkins('p_0', { [OPERATOR]: SKIN, char_999_nope: SKIN }).ok, true);
+    assert.deepEqual(h.ps('p_0').skins, { [OPERATOR]: SKIN });
+    assert.equal(checkSkinSelection({ [OPERATOR]: SKIN, char_999_nope: SKIN }, (id) => operatorCharIds(DATA).has(id)).dropped, 1);
     assert.equal(spineEntry(MANIFEST, OPERATOR, { skin: 'chess_char_1_01_a' }).skel, '/s/inside/front.skel',
       'a key the manifest does not hold resolves to nothing: the operator\'s own model');
     assert.equal(h.m.setSkins('ai_0', { [OPERATOR]: SKIN }).error, 'NOT_IN_ROOM', 'a bot has no seat to change');
     assert.equal(h.m.setSkins('nobody', { [OPERATOR]: SKIN }).error, 'NOT_IN_ROOM');
     const me = h.m.publicView().players.find((p) => p.playerId === 'p_0');
-    assert.deepEqual(me.skins, { [OPERATOR]: SKIN, 'chess_char_1_01_a': SKIN });
+    assert.deepEqual(me.skins, { [OPERATOR]: SKIN });
     const bot = h.m.publicView().players.find((p) => p.playerId === 'ai_0');
     assert.equal(bot.skins, undefined, 'omitted when empty, so a vanilla payload is byte-identical');
     assert.equal(h.m.setSkins('p_0', {}).ok, true, 'clearing is a valid selection');
@@ -195,6 +225,33 @@ describe('皮肤: the lobby seat and the match', () => {
     const other = plain.fieldMeta().units.find((u) => u.defId === 'chess_char_1_01_a');
     assert.equal(other.skin, undefined);
     assert.ok(!JSON.stringify(other).includes('"skin"'), 'no key on the wire at all');
+  });
+
+  test('the same seeded battle ends the same with and without a skin', () => {
+    const spec = { seed: 498, timeLimit: 1, autoFinish: true, units: [{ chessId: 'chess_char_1_01_a', row: 10, col: 4 }] };
+    const plain = makeBattle(spec);
+    const worn = makeBattle({ ...spec, units: [{ chessId: 'chess_char_1_01_a', row: 10, col: 4, skin: SKIN }] });
+    assert.equal(plain.unit('chess_char_1_01_a').skin, null);
+    assert.equal(worn.unit('chess_char_1_01_a').skin, SKIN, 'the skin is on the unit');
+    const a = plain.runToEnd();
+    const b = worn.runToEnd();
+    assert.deepEqual(b, a);
+    assert.ok(!JSON.stringify(a).includes(SKIN), 'Battle.result does not carry the skin');
+  });
+
+  test('no file under server/sim reads Unit.skin except the three that carry it', () => {
+    const root = path.join(ROOT, 'server', 'sim');
+    const hits = [];
+    const walk = (dir) => {
+      for (const ent of readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, ent.name);
+        if (ent.isDirectory()) walk(p);
+        else if (ent.name.endsWith('.js') && readFileSync(p, 'utf8').includes('.skin')) hits.push(path.relative(ROOT, p));
+      }
+    };
+    walk(root);
+    hits.sort();
+    assert.deepEqual(hits, ['server/sim/battle/players.js', 'server/sim/snapshot.js', 'server/sim/units.js']);
   });
 });
 

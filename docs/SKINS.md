@@ -120,12 +120,12 @@ exists) gets no section rather than an empty grid.
 
 | File | Where | What |
 |---|---|---|
-| `shared/protocol.js` | before `isNotOwnedList` | `SKIN_LIMITS`, `isSkinId` (**not** `isId`), `isSkinSelection` |
+| `shared/protocol.js` | before `isNotOwnedList` | `SKIN_LIMITS` (256 [ASSUMED]), `isSkinId` (**not** `isId`; the same character class as `isSkinKey`), `isCharId`, `isSkinSelection`, `operatorCharIds`, `checkSkinSelection` |
 | `shared/protocol.js` | `C2S` | `'room.skins'` — and **no** `'room.skin.install'` |
 | `server/net.js` | `HEAVY_TYPES`, `Session` ctor | `'room.skins'`; `session.skins` |
-| `server/lobby.js` | after `freezeDiy`, `onMessage`, after `diy()`, `humanSeat`, `seatSettings`, `startMatch` | `freezeSkins` (the wire check again, frozen), `case 'room.skins'`, `skins()` — **no phase gate**, unlike the loadout — and the selection riding into the match |
+| `server/lobby.js` | after `freezeDiy`, `onMessage`, after `diy()`, `humanSeat`, `seatSettings`, `startMatch` | `freezeSkins` (charId + skinId, drop operators the room lacks; a bad map is BAD_MSG and does not clear), `case 'room.skins'`, `skins()` — **no phase gate**, unlike the loadout — and the selection riding into the match |
 | `server/match/PlayerState.js` | ctor | `this.skins = Object.freeze({})` + `setSkins(seat.skins)` |
-| `server/match/player/basics.js` | after `setLoadout` | `skinCharIdOf` / `skinFor` / `setSkins` (bots refused; a malformed entry dropped, never the whole selection) |
+| `server/match/player/basics.js` | after `setLoadout` | `skinCharIdOf` / `skinFor` / `setSkins` (bots refused; a bad map refused whole, unknown operators dropped) |
 | `server/match/match/platform.js` | after `setLoadout` | `setSkins(playerId, skins)` — any phase, `markPublic()` |
 | `server/match/match/views.js` | `publicView().players[]`, `_prepBoardUnits`, the scouted bench | `skins` (omitted when empty), and `skin` on every unit the player owns |
 | `server/match/player/round.js` | `battleInput` | the unit's `skin`, from the player's own selection and the piece's operator (a 自选 slot follows its pick) |
@@ -147,16 +147,23 @@ exists) gets no section rather than an empty grid.
 
 - **No `cs`.** An appearance is never part of a room's content set: it changes nothing a battle does, so no battle
   identity moves for it (docs/PLUGINS.md §6).
-- **No `server/sim/` rule.** The sim carries `skin` as opaque data (`Unit.skin` → `unitInfo().skin`); no rule reads it,
-  and `test/golden/*.json` is unchanged.
+- **No `server/sim/` rule.** The sim carries `skin` as opaque data (`Unit.skin` → `unitInfo().skin`); no rule reads it
+  (`server/sim/units.js` stores it, `battle/players.js` copies it onto the ally, `snapshot.js` publishes it). The same
+  seeded battle run with and without a skin returns the same `Battle.result()` (`test/skins.test.js`), and
+  `test/golden/*.json` is unchanged. `skin` is listed with the sim fields in `docs/design/engine.md` §5.2 and
+  `docs/SIM.md` §2 as display-only.
 - **No `data/` write.** Nothing in this feature writes a data file; a plugin's own files are served from
   `plugins/<id>/` under `/p/<id>/<hash>/…` (docs/PLUGINS.md §9).
 - **No game art in git.** As ever: skin art belongs to a plugin (or to a locally extracted client), never to this
   repository.
-- **A malformed selection is dropped entry by entry.** An unknown skin, a skin of another operator or a chess-shaped key
-  resolves to nothing and the piece draws the default model — which is why the wire check may stay shallow
-  (`PlayerState.setSkins`, `Match.setSkins`).
-- **The client never sends more than the wire accepts.** `SKIN_LIMITS.entries` (160) is applied in
+- **A bad map is refused whole.** `isSkinSelection` / `validateC2S` (`room.skins`), the lobby (`freezeSkins` / `skins()`)
+  and `PlayerState.setSkins` all require a plain object, a charId key (`isCharId`: official `char_<digits>_<token>` or
+  a plugin `char_x_…`, never a chess id) and a skinId value (`isSkinId`). An array, a null-prototype object, one bad
+  key or value, or more than 256 entries [ASSUMED] is BAD_MSG and does **not** clear a choice already stored. A charId
+  the room's content does not have (`operatorCharIds`: chess records, `backups.units`, `diy.ownedPool`,
+  `diy.operators`) is dropped and the rest kept, so the stored map is at most that operator count. An unknown skinId
+  of an operator the room does have still draws the default model (`spineEntry`).
+- **The client never sends more than the wire accepts.** `SKIN_LIMITS.entries` (256 [ASSUMED]) is applied in
   `public/js/ui/skins.js parseStoredSkins`, the one place a stored selection is read — the store's initial state, every
   edit and the `room.skins` payload the sync prepares. The limit has to be honoured there because an over-long map is not
   trimmed entry by entry on the server: `isSkinSelection` refuses the WHOLE message (BAD_MSG), so nothing would be stored

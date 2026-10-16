@@ -92,7 +92,8 @@ export class MatchPlatform {
    * room.skins during the match (docs/SKINS.md): accepted in ANY phase, unlike the loadout just above. The loadout is
    * locked at INFO_CHECK because it changes what a unit does; a skin changes only what it looks like, and it is public —
    * a teammate picking a different model mid-match is harmless, so `markPublic` carries it to everyone on the next
-   * broadcast. The lobby already filtered the shape (freezeSkins); PlayerState.setSkins re-checks it.
+   * broadcast. The lobby already filtered the shape (freezeSkins); PlayerState.setSkins re-checks it and refuses a
+   * bad map without clearing the choice already stored.
    * @param {string} playerId
    * @param {Record<string, string> | null} skins
    * @returns {{ ok: true } | { error: string, detail?: string }}
@@ -100,12 +101,13 @@ export class MatchPlatform {
   setSkins(playerId, skins) {
     const ps = this.players.get(playerId);
     if (!ps || ps.isBot || ps.left) return fail(ERR.NOT_IN_ROOM);
+    let res = OK;
     this.guard(() => {
-      // an empty selection is a valid one: it clears every skin (PlayerState.setSkins keeps what it can parse)
-      ps.setSkins(skins);
+      // an empty selection is a valid one: it clears every skin. A bad map leaves the stored choice alone.
+      if (!ps.setSkins(skins)) { res = fail(ERR.BAD_MSG, 'bad skin selection'); return; }
       this.markPublic();
     });
-    return OK;
+    return res;
   }
 
   onDisconnect(playerId) {

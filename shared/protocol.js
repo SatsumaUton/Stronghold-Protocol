@@ -272,19 +272,76 @@ export function checkLoadoutOps(ops, isOperator, changesWithPotential = null) {
  * in 设置 → 外观插件 — `scope: ["personal"]`, so a room is never part of it). Unlike `room.loadout` these are PUBLIC:
  * they ride in `Match.publicView().players[]`, which is how a teammate sees your skin.
  *
- * Validation here is deliberately shallow, and that is safe: an unknown skinId, or one belonging to another operator,
- * can do nothing worse than fail to resolve in `spineEntry()` and the unit draws its default model. So only the shape
- * is checked on the wire; the ids are carried as sent.
+ * The wire refuses the shape of the whole map (a non-plain object, a key that is not an operator charId, a value that
+ * is not a skinId, or more than `SKIN_LIMITS.entries` pairs). Whether the operator is one this room's content has is
+ * `checkSkinSelection`: that entry is dropped and the rest kept. A skinId the manifest does not hold still draws the
+ * operator's default model (`spineEntry`).
  */
-export const SKIN_LIMITS = Object.freeze({ entries: 160, idLen: 64, charIdLen: 64 });
-/** A skinId. NOT `isId`: that allows only `[A-Za-z0-9_\-.:]`, while a skin key carries `@` and `#` (`char_002_amiya@winter#1`). */
+export const SKIN_LIMITS = Object.freeze({
+  // [ASSUMED] absolute ceiling of one message. The practical cap is the operator count of the room's content
+  // (checkSkinSelection drops the rest); 256 is above the vanilla roster (210) and the same order as the loadout's
+  // operator map. A larger map is refused whole, the way an over-long loadout is.
+  entries: 256, idLen: 64, charIdLen: 64,
+});
+/** A skinId. NOT `isId`: that allows only `[A-Za-z0-9_\-.:]`, while a skin key carries `@` and `#` (`char_002_amiya@winter#1`). The same character class as shared/plugins/visual.js `isSkinKey`. */
 export const isSkinId = (v) => typeof v === 'string' && v.length > 0 && v.length <= SKIN_LIMITS.idLen && /^[A-Za-z0-9_][A-Za-z0-9_@#+.\-]*$/.test(v);
 /**
- * Structural check of `room.skins.skins`: ≤ 160 entries, keyed by an operator charId (`isId` — `char_498_inside`), each
- * value a skinId. A charId is narrower than a skin key on purpose: the key is what the renderer and the picker look the
- * appearance up by (`chars[charId].skins[skinId]`), and a key of another shape can only ever fall back.
+ * An operator charId. Official ids are `char_<digits>_<token>` (character_table / data/chess.json: `char_498_inside`,
+ * `char_1012_skadi2`, `char_4145_ulpia`, `char_616_pithst`). A plugin operator is `char_x_<id>`
+ * (shared/plugins/recordsSchema.js). A chess id (`chess_char_1_01_a`) is not one: `isId` would accept it.
  */
-export const isSkinSelection = (v) => isMap(v, SKIN_LIMITS.entries, (k) => isId(k) && k.length <= SKIN_LIMITS.charIdLen, isSkinId);
+export const CHAR_ID = /^char_(?:x_[A-Za-z0-9_-]+|[0-9]+_[A-Za-z0-9_]+)$/;
+export const isCharId = (v) => typeof v === 'string' && v.length <= SKIN_LIMITS.charIdLen && CHAR_ID.test(v);
+/**
+ * Structural check of `room.skins.skins`: a plain object of ≤ 256 entries, keyed by an operator charId, each value a
+ * skinId. Anything else — an array, a null-prototype object, a chess id, a bad skin id, one more entry — is refused
+ * as a whole (BAD_MSG). The room's own operator list is not known here.
+ */
+export const isSkinSelection = (v) => isMap(v, SKIN_LIMITS.entries, isCharId, isSkinId);
+
+const SKIN_OPS = new WeakMap();
+/**
+ * The operators a room's content has, as charIds: every chess record (hidden and golden share the base charId), the
+ * stand-in bodies (`backups.units`), and the 自选 picks (`diy.ownedPool`, `diy.operators`). Not chess ids.
+ * @param {{ chess?: Record<string, any>, backups?: any }|null|undefined} data
+ * @returns {Set<string>}
+ */
+export function operatorCharIds(data) {
+  if (!data || typeof data !== 'object') return new Set();
+  let ids = SKIN_OPS.get(data);
+  if (ids) return ids;
+  ids = new Set();
+  const chess = data.chess && typeof data.chess === 'object' ? data.chess : null;
+  if (chess) for (const c of Object.values(chess)) if (c && isCharId(c.charId)) ids.add(c.charId);
+  const backups = data.backups && typeof data.backups === 'object' ? data.backups : null;
+  const units = backups?.units && typeof backups.units === 'object' ? backups.units : null;
+  if (units) for (const id of Object.keys(units)) if (isCharId(id)) ids.add(id);
+  const diy = backups?.diy && typeof backups.diy === 'object' ? backups.diy : null;
+  if (Array.isArray(diy?.ownedPool)) for (const id of diy.ownedPool) if (isCharId(id)) ids.add(id);
+  const ops = diy?.operators && typeof diy.operators === 'object' ? diy.operators : null;
+  if (ops) for (const id of Object.keys(ops)) if (isCharId(id)) ids.add(id);
+  SKIN_OPS.set(data, ids);
+  return ids;
+}
+
+/**
+ * A skin selection the room may store. The shape is `isSkinSelection` (a failure refuses the whole map). A charId the
+ * room's content does not have is dropped; the rest is kept, so the stored map is at most the operator count, and at
+ * most `SKIN_LIMITS.entries` [ASSUMED].
+ * @param {any} skins
+ * @param {(charId: string) => boolean} [hasOperator]
+ * @returns {{ ok: true, skins: Record<string, string>, dropped: number } | { error: 'BAD_MSG', detail: string }}
+ */
+export function checkSkinSelection(skins, hasOperator) {
+  if (!isSkinSelection(skins)) return { error: 'BAD_MSG', detail: 'bad skin selection' };
+  const out = {};
+  let dropped = 0;
+  for (const id of Object.keys(skins)) {
+    if (typeof hasOperator === 'function' && !hasOperator(id)) { dropped++; continue; }
+    out[id] = skins[id];
+  }
+  return { ok: true, skins: out, dropped };
+}
 
 // ---- operator ownership (干员持有, 0.2.0 补位): room.ownership { notOwned } -------------------------------------------
 

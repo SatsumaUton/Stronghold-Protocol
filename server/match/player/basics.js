@@ -9,13 +9,9 @@
 
 import { PHASE } from '../../../shared/constants.js';
 import { msg, dn } from '../../../shared/i18n.js';
-import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, resolveLoadout, charPotentialChanges, SKIN_LIMITS } from '../../../shared/protocol.js';
+import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, resolveLoadout, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../../../shared/protocol.js';
 import { cultivationOf } from '../../../shared/potential.js';
 import { tileKey, boardOrder } from '../board.js';
-
-/** An operator's charId as an asset key: the shape `chars[<charId>]` of the manifest uses (a skin's container). */
-const OPERATOR_KEY = /^[A-Za-z0-9_\-.:]+$/;
-const isOperatorKey = (v) => typeof v === 'string' && v.length > 0 && v.length <= SKIN_LIMITS.charIdLen && OPERATOR_KEY.test(v);
 
 /** The charIds a player may set a potential / 练度 for, per game-data object (shared/protocol.js cultivationCharIds). */
 const OPS_IDS = new WeakMap();
@@ -144,29 +140,28 @@ export class PlayerBasics {
   }
 
   /**
-   * 干员皮肤 (docs/SKINS.md): replace this player's skin choices — `{ [charId]: skinId }`, the ids of the appearance the
-   * composed asset manifest offers under `chars[charId].skins`.
+   * 干员皮肤 (docs/SKINS.md): replace this player's skin choices — `{ [charId]: skinId }`.
    *
-   * Validation is deliberately light, unlike setLoadout: an unknown skinId, or one of another operator, can do nothing
-   * but fail to resolve in `spineEntry()` and leave the operator on its default model, so only the shape is checked and
-   * a malformed entry is dropped rather than rejecting the whole selection.
+   * A non-plain object, a key that is not a charId, a value that is not a skinId, or a map larger than
+   * `SKIN_LIMITS.entries` (256 [ASSUMED]) refuses the whole selection and leaves `this.skins` as it was. A charId this
+   * match's content does not have is dropped. An empty map is a valid clear. Bots wear the default model.
+   * An unknown skinId still cannot change a battle: `spineEntry` draws the operator's own model, and no sim rule
+   * reads `Unit.skin`.
    * @param {Record<string, string>|null} skins
-   * @returns {boolean} whether anything was accepted
+   * @returns {boolean} false when refused (nothing changes); true when stored, including a clear
    */
   setSkins(skins) {
     if (this.isBot) return false;
+    const ids = operatorCharIds(this.gd?.raw);
+    const res = checkSkinSelection(skins, (id) => ids.has(id));
+    if (!res.ok) return false;
     const out = {};
-    if (skins && typeof skins === 'object' && !Array.isArray(skins)) {
-      for (const [charId, skinId] of Object.entries(skins)) {
-        if (!isOperatorKey(charId) || typeof skinId !== 'string' || !skinId || skinId.length > SKIN_LIMITS.idLen) continue;
-        out[charId] = skinId;
-      }
-    }
+    for (const [charId, skinId] of Object.entries(res.skins)) out[charId] = skinId;
     this.skins = Object.freeze(out);
     // No dirty() here: this runs from the constructor too (a seat's choice applied at match start), where `this.m` has
     // no view to mark yet. Callers that change it mid-match mark the public view themselves — Match.setSkins calls
     // markPublic, because skins are public (that is how a teammate sees your skin).
-    return Object.keys(out).length > 0;
+    return true;
   }
 
   /**

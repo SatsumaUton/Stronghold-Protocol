@@ -14,9 +14,10 @@
 //   * voices (Forge's default dub, which Forge documents as Japanese) → audio.voiceJp; voiceLangs.cn → audio.voice (ja / en / ko →
 //     audio.voiceJp / voiceEn / voiceKr, round 40);
 //     en/kr have no table here.
-//   * skins[]: an outfit whose id is a skin key becomes that operator's own `skins` variant (docs/PLUGINS.md §9); one
-//     with no usable id is collapsed onto that operator's one overlay, as every outfit used to be. No wardrobe offers
-//     them to a player yet.
+//   * skins[]: an outfit whose id is a skin key becomes that operator's own `skins` variant (docs/PLUGINS.md §9). Once
+//     the cosmetic plugin is composed onto the manifest, `public/js/ui/skins.js availableSkins` lists that id and the
+//     player wears it with `room.skins` (干员调配 / the 自选 detail, docs/SKINS.md). One with no usable id is collapsed
+//     onto that operator's one overlay and is not a picker row.
 //   * art.chars takes avatar, avatarE2, portrait, portraitE2 and illust (the full illustration, chars[<charId>].illust);
 //     any other field of that record is named and left out.
 //   * DEFENDER / HEAVY / GUARDIAN → TANK, VANGUARD → PIONEER, GUARD → WARRIOR.
@@ -1173,11 +1174,11 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     for (const skin of pack.skins) {
       if (!isObj(skin) || typeof skin.charId !== 'string') { skip('skins', '一条时装没有 charId，没有导入。', 'A skin has no charId, so it was not imported.'); continue; }
       // an outfit whose id is a skin key (docs/PLUGINS.md §9) is kept apart from the operator's own overlay: several
-      // outfits of one operator under their own keys. An outfit with no usable id is folded onto that operator's one
-      // overlay, as before [ASSUMED: the wardrobe that would offer them to a player is not built yet]
+      // outfits of one operator under their own keys. The 皮肤 picker lists that key (availableSkins) once the plugin
+      // is composed. An outfit with no usable id is folded onto that operator's one overlay and is not a picker row.
       const key = typeof skin.id === 'string' && isSkinKey(skin.id) ? skin.id : null;
       if (key) {
-        assume('skins-variants', 'Forge 的多套时装各自写进该干员的 skins 变体（键是时装 id）；还没有衣柜界面去挑它们。', 'Each Forge outfit is written as that operator\'s own skins variant (keyed by the outfit\'s id); no wardrobe picks them yet.');
+        assume('skins-variants', 'Forge 的多套时装各自写进该干员的 skins 变体（键是时装 id）。外观插件叠到清单上之后，干员调配和自选详情的皮肤一栏会列出这个 id，玩家用 room.skins 穿上。', 'Each Forge outfit is written as that operator\'s own skins variant (keyed by the outfit\'s id). Once the cosmetic plugin is composed onto the manifest, the skin section in operator setup and the DIY detail lists that id, and the player wears it with room.skins.');
         const name = typeof skin.name === 'string' ? skin.name.trim() : '';
         if (name && [...name].length <= 64) setAt(assets, ['chars', skin.charId, 'skins', key, 'name'], name);
         else if (name) skip(`skins.${key}.name`, '时装的显示名不在 1–64 字以内，没有写入。', 'The outfit\'s display name is not within 1–64 characters, so it was not written.');
@@ -1186,7 +1187,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
           if (isObj(skin.art.spine?.front)) putSpine(['chars', skin.charId, 'skins'], key, ['spine', 'front'], skin.art.spine.front);
         }
       } else {
-        assume('skins', 'Forge 的时装没有能当皮肤键的 id，收成该干员的一份外观叠加（我们没有衣柜）。', 'A Forge outfit has no id a skin key can use, so it was collapsed into one overlay of that operator (there is no wardrobe here).');
+        assume('skins', 'Forge 的时装没有能当皮肤键的 id，收成该干员的一份外观叠加，不会成为皮肤栏里的一行。', 'A Forge outfit has no id a skin key can use, so it was collapsed into one overlay of that operator and is not a row in the skin picker.');
         if (isObj(skin.art)) {
           for (const field of CHAR_FIELDS) if (typeof skin.art[field] === 'string') putImage(['chars'], skin.charId, [field], skin.art[field]);
           if (isObj(skin.art.spine?.front)) putSpine(['chars'], skin.charId, ['spine', 'front'], skin.art.spine.front);

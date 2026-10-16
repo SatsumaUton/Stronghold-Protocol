@@ -708,7 +708,7 @@ test('player feedback after 0.1.0 (DESIGN §21, v0.1.1): every report mapped, th
   assert.match(sec(8), /`m\.ticker \{text, id, type, priority, playerId\}`/);
   assert.match(META, /The strip queues by `priority`, highest first/);
   // UnitInfo / unitStats / rewardOffer shapes (§8)
-  assert.match(sec(8), /skillIndex\?, moduleId\?, items\?, form\? \}/);
+  assert.match(sec(8), /skillIndex\?, moduleId\?, items\?, form\?, skin\? \}/);
   assert.match(sec(8), /moveSpeed, range\?, base: \{…same\}\}/);
   assert.match(sec(8), /rewardOffer: null \| \{ tier, source: 'merge'\|'special', label, queued, slots/);
   // §6.6 describes the new bot; the old one-liner is gone

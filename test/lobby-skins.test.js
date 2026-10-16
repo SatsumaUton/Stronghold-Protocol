@@ -1,5 +1,5 @@
 // test/lobby-skins.test.js — room.skins end to end over WebSocket (docs/SKINS.md): the structural check (a skinId
-// that is NOT an isId, ≤ 160 entries, an operator-shaped key), storage on the session and the seat, the seat handed to
+// that is NOT an isId, ≤ SKIN_LIMITS.entries charId keys), storage on the session and the seat, the seat handed to
 // the Match when it starts, bots refused, and — unlike room.loadout / room.diy / room.ownership — a change while a
 // match runs going straight to it rather than being stored for the next one.
 //
@@ -13,6 +13,7 @@ import { startServer } from '../server/index.js';
 import { StubMatch } from '../server/match/StubMatch.js';
 import { TestClient } from './helpers/wsClient.js';
 import { ERR } from '../shared/constants.js';
+import { SKIN_LIMITS } from '../shared/protocol.js';
 
 const OPERATOR = 'char_498_inside';
 const SKIN = 'char_498_inside@kitchen#2';
@@ -74,6 +75,11 @@ describe('room.skins (lobby, stub match)', () => {
     await err(c, { t: 'room.skins', skins: { [OPERATOR]: 'x'.repeat(65) } }, ERR.BAD_MSG);
     await err(c, { t: 'room.skins', skins: { ['k'.repeat(65)]: SKIN } }, ERR.BAD_MSG);
     await err(c, { t: 'room.skins', skins: [SKIN] }, ERR.BAD_MSG);
+    await err(c, { t: 'room.skins', skins: { chess_char_1_01_a: SKIN } }, ERR.BAD_MSG);
+    await err(c, { t: 'room.skins', skins: { [OPERATOR]: SKIN, chess_char_1_01_a: SKIN } }, ERR.BAD_MSG);
+    const big = {};
+    for (let i = 0; i <= SKIN_LIMITS.entries; i++) big[`char_${i}_x`] = SKIN;
+    await err(c, { t: 'room.skins', skins: big }, ERR.BAD_MSG);
     await err(c, { t: 'room.skins' }, ERR.BAD_MSG);
     // …and the install channel is not routable at all (upstream #652: it let any client make the server download files
     // and rewrite the shared data/assets.json)
@@ -82,6 +88,18 @@ describe('room.skins (lobby, stub match)', () => {
     const st = await createRoom(c);
     assert.ok(st.seats.some((s) => s && s.playerId === c.id));
     await ok(c, { t: 'room.skins', skins: {} });
+  });
+
+  test('a charId the room does not have is dropped; a refusal does not clear the rest', async () => {
+    const host = await pool.player('Host');
+    await ok(host, { t: 'room.skins', skins: { [OPERATOR]: SKIN, char_999_nope: SKIN } });
+    await createRoom(host);
+    await err(host, { t: 'room.skins', skins: { [OPERATOR]: '@@@' } }, ERR.BAD_MSG);
+    await err(host, { t: 'room.skins', skins: { chess_char_1_01_a: SKIN } }, ERR.BAD_MSG);
+    await ok(host, { t: 'room.start' });
+    await host.waitFor('m.public', (p) => p.phase === 'INFO_CHECK');
+    const seat = RecordingStub.instances.at(-1).opts.seats.find((s) => s.playerId === host.id);
+    assert.deepEqual(seat.skins, { [OPERATOR]: SKIN }, 'the unknown operator is gone and the refusal did not clear the choice');
   });
 
   test('stored per session and per seat, and handed to the Match when it starts', async () => {

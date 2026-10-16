@@ -356,10 +356,11 @@ reported as the same fault of the operator's own record would be; a skin's model
 other. What a skin *is* —
 its name, its series, the picture a picker would show, the wearing of one — is this section's business; the key's shape is
 the overlay's own rule: the reader resolves every key into a path of the installation's manifest, so a key of the wrong
-shape is `PLUGIN_ASSET_KEY` (§15), as an entry key of the wrong shape is. No picker lists skins yet (the studio finds an
-operator, an enemy, an interface picture … by its official name, `server/studio/targets.js`, not a skin) and nothing
-offers a skin to a player yet (§16), so a skin key is copied from the installation's own catalogue or written in the stem
-form.
+shape is `PLUGIN_ASSET_KEY` (§15), as an entry key of the wrong shape is. The player picker
+(`public/js/ui/skins.js availableSkins`, docs/SKINS.md) lists a skin once this overlay is composed onto the manifest,
+and the player wears that id with `room.skins`. The studio still does not list skins (it finds an operator, an enemy,
+an interface picture … by its official name, `server/studio/targets.js`, not a skin), so a skin key is copied from the
+installation's own catalogue or written in the stem form.
 
 ```json
 "chars": { "char_102_texas": {
@@ -1618,7 +1619,7 @@ Modules (`statsBase`, `traitBase`, `talentsBase`), new garrisons and bonds remai
 | `bondIcons`, `itemIcons` | `assets.bonds`, `assets.items` | a bond already named by `art.bonds` is not imported again from `bondIcons` |
 | `voices` | `audio.voiceJp` [ASSUMED: Forge documents that table as the Japanese dub] | a slot outside `^[A-Za-z][A-Za-z0-9]{0,31}$`, or a file that is not `.mp3` / `.ogg` |
 | `voiceLangs.cn` (and `zh`), `voiceLangs.ja` / `jp`, `voiceLangs.en`, `voiceLangs.ko` / `kr` | `audio.voice`, `audio.voiceJp`, `audio.voiceEn`, `audio.voiceKr` | any other dub: no table of that language (an own-language dub is per operator, `audio.voiceNative`, which Forge has no table for) |
-| `skins[]` | that operator's own `skins` variants (§9): `assets.chars[charId].skins[<the outfit's id>]`, its pictures, its model and `name` [ASSUMED: the wardrobe that would let a player wear one is not built yet, so the variants are carried but nothing offers them]. An outfit added to an operator this installation already has is a change to that entry, so the cosmetic plugin's `permissions` carries `assets.override` (§9) | a skin without `charId`; an outfit whose `id` is not a skin key (or no `id`) — its art is folded onto that operator's one overlay, as every outfit used to be |
+| `skins[]` | that operator's own `skins` variants (§9): `assets.chars[charId].skins[<the outfit's id>]`, its pictures, its model and `name`. Once the cosmetic plugin is composed onto the manifest, `public/js/ui/skins.js availableSkins(charId)` lists that id (docs/SKINS.md); the player wears it with `room.skins` `{ [charId]: skinId }` from 干员调配 or the 自选 detail. An outfit added to an operator this installation already has is a change to that entry, so the cosmetic plugin's `permissions` carries `assets.override` (§9) | a skin without `charId`; an outfit whose `id` is not a skin key (or no `id`) — its art is folded onto that operator's one overlay and is not a picker row |
 | `art.audio.bgm` of lobby, prep, combat, unite, boss; an unreferenced file whose basename is one of those | `audio.bgm` `{ loop }` | any other music key. `art.audio` is not a documented Forge table [ASSUMED] |
 | `art.audio.bossBgm` | `audio.bossBgm` `{ loop, intro? }` | an id that is not an asset key, or a file that is not audio |
 | `art.audio.sfx.ui`, `sfx.battle` | one audio file each | |

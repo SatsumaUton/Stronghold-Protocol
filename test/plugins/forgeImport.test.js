@@ -29,6 +29,8 @@ import { checkScript } from '../../shared/plugins/scriptCheck.js';
 import { makeBattle, checkInvariants } from '../helpers/battleHarness.js';
 import { DataSource } from '../../server/sim/simdata.js';
 import { setGameData } from '../../server/sim/content/support/index.js';
+import { availableSkins } from '../../public/js/ui/skins.js';
+import { data } from '../../public/js/data.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURES = path.join(ROOT, 'test', 'fixtures', 'forge');
@@ -177,6 +179,13 @@ test('one outfit per skin: an id that is a skin key becomes that operator\'s own
     const set = visual.resolve(['rose-wardrobe']);
     assert.equal(set.ok, true, JSON.stringify(set));
     assert.deepEqual(set.set.warnings, []);
+    // the imported outfit is what the picker lists: availableSkins reads chars[charId].skins off the composed manifest
+    data.setContent({ id: 'f'.repeat(64), values: { assets: overlay } });
+    try {
+      const rows = availableSkins('char_102_texas');
+      assert.ok(rows.some((r) => r.id === 'char_102_texas@sightseer#2'), 'an imported Forge outfit is a picker row');
+      assert.deepEqual(availableSkins('char_112_siege').map((r) => r.id), [''], 'a collapsed outfit is the operator\'s own row, not a skin');
+    } finally { data.setContent(null); }
   } finally { fs.rmSync(parent, { recursive: true, force: true }); }
 });
 
