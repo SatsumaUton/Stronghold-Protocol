@@ -2,9 +2,9 @@
 //
 //   const THREE = await loadThree()            // '/vendor/three.module.js' (tools/vendor.mjs), null when missing
 //   const pack = await loadBoardPack(assets)   // null when the board art is not installed (→ 2D board)
-//   → { key, images: { D, N?, R?, E?, common?, commonE?, BG?, wind?, gate?, waterN?, caustics?, noise? },
-//       meshes: { crate?, blower?, bgPlane?, gate: { startDown?, startUp?, startBack?, endDown?, endUp? } },
-//       tiles, uv, materials: { theme?, fx? } }
+//   → { key, images: { D, N?, R?, E?, common?, commonE?, BG?, wind?, gate?, waterN?, caustics?, noise?, platform?, crate? },
+//       meshes: { crate?, box?, platform?, blower?, bgPlane?, gate: { startDown?, startUp?, startBack?, endDown?, endUp? } },
+//       tiles, uv, materials: { theme?, fx?, trap? } }
 //   const scene = await loadScenePack(assets, stageId)   // the stage's official scene (tools/local-extract/scenes.py),
 //   → { key, stage, doc, chunks: [{ material, lightmap, group, bounds, position, uv, uv1, normal, color, index }],
 //       groups: { name: [x0, y0, x1, y1] }, images: { tex: { name: img }, lm: [img|null] } }     null when not extracted
@@ -70,10 +70,12 @@ export const PACK_IMAGES = Object.freeze({
   caustics: ['map/water', 'TX_Caustics256'],
   noise: ['map/water', 'T_noise_clouds_01'],
   platform: ['mesh/trap_110', 'TX_trap_1106_achplat'],
+  crate: ['mesh/trap_110', 'TX_trap_1105_accrate'],
 });
 
 export const PACK_MESHES = Object.freeze({
-  crate: ['mesh/s_common_box_01', 'pCube2'],
+  crate: ['mesh/trap_110', 'trap_1105_accrate'],
+  box: ['mesh/s_common_box_01', 'pCube2'],
   blower: ['mesh/s_wind_device', 'S_wild_wind_device'],
   bgPlane: ['mesh/s_background_common', 'pPlane1'],
   platform: ['mesh/trap_110', 'trap_1106_achplat'],

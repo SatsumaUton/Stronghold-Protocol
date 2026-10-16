@@ -519,7 +519,7 @@ export function sceneMaterial(THREE, o, focus) {
 }
 
 /**
- * The official device shader (Torappu/Scene/Trap/Shadow — MT_trap_1106_achplat, the 射击台 model both boards draw):
+ * The official device shader (Torappu/Scene/Trap/Shadow — 射击台 and 阻隔工事, trap_1106_achplat / trap_1105_accrate):
  * albedo × (_Ambient + _Diffuse · N·L) in display values, so the model reads nearly flat-lit like in the client.
  * `info` is the material record (mesh/trap_110/materials.json), `lightDir` the key light direction in board space
  * (an official scene's own light when it is drawn). [ASSUMED] the formula, inferred from the material's two lighting
@@ -528,6 +528,7 @@ export function sceneMaterial(THREE, o, focus) {
 export function trapMaterial(THREE, map, focus, info = null, lightDir = [0.36, 0.45, 0.82]) {
   const uniforms = {
     uMap: { value: map || null },
+    uOpacity: { value: 1 },
     uAmbient: { value: floatOf(info, '_Ambient', 0.9) }, uDiffuse: { value: floatOf(info, '_Diffuse', 0.2) },
     uLightDir: { value: new THREE.Vector3(...lightDir).normalize() },
     ...focus,
@@ -545,7 +546,7 @@ export function trapMaterial(THREE, map, focus, info = null, lightDir = [0.36, 0
       '}',
     ].join('\n'),
     fragmentShader: [
-      'uniform sampler2D uMap; uniform float uAmbient; uniform float uDiffuse; uniform vec3 uLightDir;',
+      'uniform sampler2D uMap; uniform float uOpacity; uniform float uAmbient; uniform float uDiffuse; uniform vec3 uLightDir;',
       FOCUS_GLSL,
       'varying vec2 vUv; varying vec3 vN; varying vec3 vWorld;',
       'vec3 toDisplay(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }',
@@ -554,7 +555,7 @@ export function trapMaterial(THREE, map, focus, info = null, lightDir = [0.36, 0
       '  vec3 a = toDisplay(texture2D(uMap, vUv).rgb);',
       '  vec3 n = normalize(gl_FrontFacing ? vN : -vN);',
       '  vec3 lit = a * (uAmbient + uDiffuse * max(dot(n, uLightDir), 0.0));',
-      '  gl_FragColor = vec4(toLinear(clamp(lit, 0.0, 1.0)) * focusMask(vWorld.xy), 1.0);',
+      '  gl_FragColor = vec4(toLinear(clamp(lit, 0.0, 1.0)) * focusMask(vWorld.xy), uOpacity);',
       '  #include <colorspace_fragment>',
       '}',
     ].join('\n'),
