@@ -39,8 +39,9 @@
 // piece on the own prep board, and a legal drop's direction wheel, fold the shop bar for as long as they last and zoom
 // to that framing at once (gameLogic deployFoldsShop) while 设置「部署时收起商店」 is on (the default). Off, the pickup
 // changes neither the shop's fold nor the camera. Turning it off mid-drag gives both back on that frame
-// (gameLogic deployZoomStep / prepDeployCamera). The player's own fold state comes back after. The fold flights
-// take FOLD_CAMERA_MS (render/app/tune.js), not the generic camera flight.
+// (gameLogic deployZoomStep / prepDeployCamera). Opening 敌方情报 while the piece is still held does not spend
+// that frame: the zoom stays owed until the pen closes (deployZoomRemember). [ASSUMED] The player's own fold
+// state comes back after. The fold flights take FOLD_CAMERA_MS (render/app/tune.js), not the generic camera flight.
 // Equipment dropped on an operator whose two slots are used opens the equip-replace dialog (ui/equipReplace.js): the
 // player picks the equipped item to destroy → g.equip {itemUid, targetUid, replaceUid}; 取消 sends nothing. 销毁 is only
 // offered for loose items (equipped ones are locked, ui/facing.js itemDestroyable).
@@ -111,7 +112,7 @@ import {
   snapHud, activeBubbles, shortcutFor, shortcutBlocked, prepShortcutsSuspended, closesOnFieldPress, phaseTotalSeconds, homeFieldId, ownFieldId, normalizeSp, normalizePersonalChoice, sortedPlayers,
   terrainInfo, deviceInfo, deviceTipAt, noteDeviceUnits, deviceUnitsForEntry,
   countdownState, shopBlockReason, stageOverrides, effectiveStage, watchTarget, dropFailureReason,
-  previewEnemyKey, prepCamera, prepCameraFor, deployFoldsShop, deployZoomStep, prepDeployCamera, deployFieldOf, fieldTile, panelSide, panelSlots, bondPopupPlace, unitLoadout, deployedRecord,
+  previewEnemyKey, prepCamera, prepCameraFor, deployFoldsShop, deployZoomStep, deployZoomRemember, prepDeployCamera, deployFieldOf, fieldTile, panelSide, panelSlots, bondPopupPlace, unitLoadout, deployedRecord,
   mergeTarget, modeOffBonds, readyFundsPrompt, readyShopFold, ownerBandId, ownDiyRecord, ownStandIn, roundStartReplay,
 } from '../ui/gameLogic.js';
 import { toast } from '../ui/toasts.js';
@@ -336,7 +337,8 @@ function MatchScreen() {
   const prepCamKey = `${prepCam.kind}:${prepCam.opts.side}`;
   const prepCamSeen = useRef(prepCamKey);                // the prep camera last requested
   const camRef = useRef({ kind: 'prep', opts: { rect: { ...GEO.NORMAL_RECT }, side: 'L' } });
-  // the previous frame applied the deploy zoom, so turning 设置「部署时收起商店」 off mid-drag can give it back
+  // the previous frame applied the deploy zoom, so turning 设置「部署时收起商店」 off mid-drag can give it back.
+  // It stays set when that release returns null only because the enemy pen is open (deployZoomRemember). [ASSUMED]
   const deployZoomedRef = useRef(false);
   const penRef = useRef({ on: false, collapsed: false });
   // shopFolded (the own prep board's folded-shop camera state) is derived with the prep-view flags below (showPrep).
@@ -693,15 +695,19 @@ function MatchScreen() {
   // deployFoldsShop) while 设置「部署时收起商店」 is on: it zooms to the shop-collapsed camera as soon as the piece is
   // picked up, for the drag and the wheel's whole duration, and restores the player's own shop state when it ends.
   // Turning the setting off mid-drag releases that zoom on this one frame even while the piece is still held
-  // (deployZoomedRef); later frames of the same drag do not, so a hand-made 收起 still waits.
+  // (deployZoomedRef); later frames of the same drag do not, so a hand-made 收起 still waits. Opening 敌方情报
+  // during the held drag makes that release frame return null; the zoom stays owed until the pen closes
+  // (deployZoomRemember). [ASSUMED] no official source settles that order.
   useEffect(() => {
     const step = deployZoomStep(deployZoomedRef.current, deployFold);
-    deployZoomedRef.current = step.zoomed;
     const next = prepDeployCamera({
       pub, myId, deployFold, releaseDeploy: step.release, folded: shopFolded,
       ownPrep: !!view && viewModeRef.current === 'prep' && showPrep,
       pen, busy: !!drag || !!facing, current: camRef.current,
     });
+    // a null release because the pen is open stays owed; a null only because the camera already
+    // matches the player's fold spends it. [ASSUMED]
+    deployZoomedRef.current = deployZoomRemember(step, { next, pen });
     // the fold zoom and the restore fly with the short FOLD_CAMERA_MS, not a generic camera flight
     if (next) setCam(next.kind, { ...next.opts, ms: FOLD_CAMERA_MS });
   }, [view, deployFold, shopFolded, showPrep, pen, !!drag, !!facing, prepCamKey]);

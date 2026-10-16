@@ -127,6 +127,24 @@ export function deployZoomStep(zoomed, deployFold) {
 }
 
 /**
+ * Whether the deploy zoom is still owed after this frame (`deployZoomedRef`). `step` is `deployZoomStep`;
+ * `frame.next` is what `prepDeployCamera` returned for that same step and `frame.pen` is the enemy pen.
+ * Turning 设置「部署时收起商店」 off asks for the player's camera on one frame. Opening 敌方情报 during the
+ * held drag makes that frame return null (`foldCamera` while `pen`), and forgetting the zoom there left an
+ * open shop on the still-zoomed board until the drag ended. A null because the pen is open keeps the zoom
+ * owed, so closing the pen still passes `releaseDeploy` while the piece is held. A null only because the
+ * camera already matches the player's own fold spends it, so a later hand-made 收起 in that drag still waits.
+ * [ASSUMED] no official source settles opening the pen during a held deploy drag.
+ * @param {{ release?: boolean, zoomed?: boolean }|null|undefined} step
+ * @param {{ next?: object|null, pen?: boolean }|null|undefined} [frame]
+ * @returns {boolean}
+ */
+export function deployZoomRemember(step, frame) {
+  if (step?.zoomed) return true;
+  return !!step?.release && !frame?.next && !!frame?.pen;
+}
+
+/**
  * The prep camera this frame: the deploy zoom when `deployFold` (GitHub #602), else the shop fold's camera
  * (`foldCamera`). `releaseDeploy` skips the busy deferral for the one frame a deploy zoom is given back, so turning
  * the setting off mid-drag cannot leave the camera zoomed. A hand-made fold while the setting is off and no deploy

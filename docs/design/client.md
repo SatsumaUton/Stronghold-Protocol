@@ -20,7 +20,9 @@ view.setCamera(kind /* 'prep'|'normal'|'unite'|'boss' */, { rect, side, shop, ms
                                              //   ms overrides the flight duration — the shop fold / unfold zoom takes
                                              //   the short FOLD_CAMERA_MS (render/app/tune.js, GitHub #602).
                                              //   设置「部署时收起商店」 (prepDeployFold, default on) is that zoom;
-                                             //   off, a pickup changes neither the shop fold nor the camera (§34.3);
+                                             //   off, a pickup changes neither the shop fold nor the camera (§34.3).
+                                             //   Opening 敌方情报 during a held drag leaves that one-shot restore owed
+                                             //   until the pen closes [ASSUMED] (§34.3).
                                              //   'pen' pans to the enemy preview pen in 0.25 s (see below)
 view.setPrep(privateState, { editable })     // render hand/temp/board pieces as chibis (spine or fallback); editable enables drag;
                                              //   a merge's new elite on the board plays fx.promote instead of fx.deploy (render/promote.js, §20.11),
