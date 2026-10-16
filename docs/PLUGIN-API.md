@@ -247,6 +247,8 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `ui.message.host.limit` | stable | 0.3.0 | `shared/plugins/ui.js#UI_HOST_MESSAGES` |
 | `ui.message.host.slot` | stable | 0.3.0 | `shared/plugins/ui.js#UI_HOST_MESSAGES` |
 | `ui.message.host.rejected` | stable | 0.3.0 | `shared/plugins/ui.js#UI_HOST_MESSAGES` |
+| `ui.message.host.result` | stable | 0.3.1 | `shared/plugins/ui.js#UI_HOST_MESSAGES` |
+| `ui.message.host.net` | stable | 0.3.1 | `shared/plugins/ui.js#UI_HOST_MESSAGES` |
 | `ui.slot.hud.right` | stable | 0.3.0 | `shared/plugins/manifest.js#UI_SLOT_IDS` |
 | `ui.slot.result.tab` | stable | 0.3.0 | `shared/plugins/manifest.js#UI_SLOT_IDS` |
 | `ui.slot.stats.tab` | stable | 0.3.0 | `shared/plugins/manifest.js#UI_SLOT_IDS` |
@@ -501,3 +503,15 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `api.PLUGIN_API.min` | stable | 0.3.0 | `shared/constants.js#PLUGIN_API` |
 | `api.PLUGIN_API.current` | stable | 0.3.0 | `shared/constants.js#PLUGIN_API` |
 <!-- plugin-surface:end -->
+
+## Host feeds for a read-only panel (0.3.1)
+
+`ui.message.host.result` and `ui.message.host.net` are host-to-frame snapshots. `welcome` may also carry `version`, `lang`, `plugins` and `prefs`. `state` may also carry `room`. A frame still posts only the plugin message names. `validateHostMessage` refuses a payload whose tree contains a match intent (`g.*`, `b.*`, `room.*`, `hello`, `ping`). These feeds do not become a client-to-server intent.
+
+**`result`.** `{ v: 1, t: 'result', result }`. `result` is the settle object the result screen already shows, or `null`. Kept player stats: `dmgDealt`, `bossDamage`, `kills`, `leaks`, `lpLost`, `merges`, `itemsEquipped`, `activatedLayers`, `refreshes`, `perfectRounds`, `gold` (exact finite numbers). Kept player fields: `playerId`, `seat`, `name`, `isBot`, `left`, `alive`, `victory`, `roundsPassed`, `creditedKills`, `eliminatedRound`, `lp`, `bandId`, `stats`, and `title`, `trophies`, `reward` when present. Kept match fields: `victory`, `roundsPassed`, `hiddenReached`, `hiddenCleared`, `reason`, `teamLp`, `modeId`, `difficulty`, `stageId`, `bossId`, `durationMs`. At most 8 players. Lineup, diy, seed and the hidden-boss id stay off this message. The host posts it when a live frame is ready and again when the result changes. The studio preview does not receive it.
+
+**`net`.** `{ v: 1, t: 'net', status, attempt, retryAt, rtt, lastError }`. `status` is the connection state. `attempt` is the reconnect count. `retryAt` is a timestamp or `null`. `rtt` is the latency in milliseconds, or `null`. [ASSUMED] The wire field is `rtt` because the key `ping` is a client intent. `lastError` is `{ code, text }` or `null`. The player id is not included. The host posts one snapshot when the frame loads, then a later change at most once a second (`UI_LIMITS.netHz` is 1) [ASSUMED]. The studio preview does not receive it.
+
+**`state.room`.** Present when the room has a `seats` array or a plugin list. `seats` keeps empty holes, so a room of `MAX_SEATS` (4) reports length 4, and each occupied seat is `{ seat, playerId, name, isBot, ready, connected }` (at most 8). `plugins` is up to 32 plugin ids from `content.plugins`. The join code, host id, spectators, consent and loadouts are omitted. `hostState(pub, priv)` with no third argument keeps the previous `{ v, t, public, private }` shape.
+
+**`welcome`.** With info: `version` is the integer `PROTOCOL_VERSION`, `lang` is the player's language (at most 16 characters), `plugins` is the room's plugin ids, and `prefs` is the scalar values already stored for this plugin (string, finite number or boolean; at most 32 keys matching `^[A-Za-z0-9._-]{1,64}$`). Without info the message stays `{ v, t, id, slots }`. The studio preview sends that shorter welcome.

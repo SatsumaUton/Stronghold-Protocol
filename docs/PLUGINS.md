@@ -966,17 +966,23 @@ is not the fix. The rest of the site uses the separate P3b policy (§13).
 
 **The feed** is postMessage API v1 (`shared/plugins/ui.js`, `schemas/ui.schema.json`). The host sends the player's
 visible `m.public` (a subset), the player's own `m.private` (a subset), throttled events and snapshots of the battle
-on screen, and unit stats when the plugin asks. The plugin may ask for a slot, a height, a short notice, and a few
-namespaced storage keys (`sp.plugin.<id>.`, proxied by the host page). It cannot send a match intent: a message whose
-type is `hello`, `ping`, `room.*`, `g.*` or `b.*`, or that carries one, is rejected. The host never turns a plugin
-message into a client→server message.
+on screen, and unit stats when the plugin asks. It also sends, still read-only: `result` (settle stats already on the
+result screen; no lineup, diy or seed), `net` (connection status; latency is the field `rtt`, because the key `ping`
+is a client intent) on change and then at most once a second, and `state.room` (seats, including empty holes, and the
+room's plugin ids, never the join code). `welcome` may add `version` (`PROTOCOL_VERSION`), `lang`, `plugins` and the
+scalar prefs already stored for that plugin. A plugin that only reads `t === 'welcome'` keeps working. The plugin may
+ask for a slot, a height, a short notice, and a few namespaced storage keys (`sp.plugin.<id>.`, proxied by the host
+page). It cannot send a match intent: a message whose type is `hello`, `ping`, `room.*`, `g.*` or `b.*`, or that
+carries one, is rejected. The host never turns a plugin message into a client→server message. Nothing in these feeds
+lets the frame reach the parent page.
 
 **Limits [ASSUMED]:** 20 messages a second per plugin, burst 40; battle pushes at 4 Hz, ≤ 40 events a batch; a
 snapshot whose JSON is over 48 KB is dropped with `truncated`, and `truncated` is also set when a string, array, object
 or nesting depth was cut (the partial snapshot is kept when it still fits); a plugin message over 8 KB refused;
 storage keys of 1–64 characters from `A–Z a–z 0–9 . _ -`, not `__proto__`, `prototype`, `constructor` or `..`, a JSON
 value ≤ 4096 UTF-8 bytes, ≤ 32 keys and ≤ 32 KB UTF-8 per plugin; height 48–480 px; a notice ≤ 80 characters, and a
-distinct notice at most once per 2 seconds (the same text is still delivered so toasts can merge); one slot per
+distinct notice at most once per 2 seconds (the same text is still delivered so toasts can merge); connection pushes
+after the first at most once a second (`netHz`) [ASSUMED]; one slot per
 plugin. The protocol table grants one plugin per slot at a time. When several ui plugins ask for the same slot, the
 match shows the first by name and the player switches with tabs in the slot (`PLUGIN_UI_SLOT_SHARED` is a warning, not
 a refusal). [ASSUMED] That name order is the initial tab, and a later sync does not override a tab the player already
@@ -1576,11 +1582,13 @@ Modules (`statsBase`, `traitBase`, `talentsBase`), new garrisons and bonds remai
 | notices, credits, description | `description` (at most 500 characters) and `credits` on every product that is not a language pack | unreadable |
 | `license`, `authors` | copied when they are short strings | |
 | `dependencies`, `conflicts` | `requires`, `conflicts` when the id is a plugin id. An omitted range is `*` [ASSUMED] | an id that cannot become a plugin id. A product does not require itself |
-| `client.panels` `screen.game.hud` and `screen.game.aside` | a ui plugin, slot `hud.right`, one HTML stub | a second panel for the same slot |
+| `client.panels` `screen.game.hud` and `screen.game.aside` | a ui plugin, slot `hud.right`. A supported panel is the shim page; anything else is one HTML stub | a second stub for the same slot. A second supported panel is another ui plugin on that slot (the match already tabs them) |
 | `client.panels` `screen.result.footer` | a ui plugin, slot `result.tab` | |
+| a supported panel on `root.guide` that listens for `room.state` | a ui plugin, slot `room.panel` [ASSUMED: our room screen, not Forge's guide] | |
+| any other supported panel whose suggested slot is one of the four | a ui plugin on that suggested slot [ASSUMED: not Forge's position] | |
 | any other panel mount | manual adaptation report | `PLUGIN_FORGE_MOUNT`; panel name, Forge mount and suggested rewrite slot |
 | a panel with `wraps`, or `readonly` / `readOnly: false` | — | it rewrites a component, so it is not read-only |
-| the panel's script | not copied. The stub answers welcome with ready, then slot and resize, and says the author must rewrite it to postMessage API v1 | `PLUGIN_FORGE_PANEL_SCRIPT` |
+| the panel's script, when the static scan finds a mount and only the read-only surfaces the shim feeds, and the pack-relative `.js` / `.css` / `.json` closure stays within 256 KB a file, 1 MB and 64 files [ASSUMED] | copied. The entry page inlines the shim and a classic bundle. The original files sit in `ui/mod/` and are not loaded a second time. Import does not run the script | a bare or remote specifier, `fetch`, `net.send`, `pack.messages`, a host stylesheet with no panel surface, `documentElement` on the parent, an appearance provider. The stub stays, and the skip lists those surfaces (`PLUGIN_FORGE_PANEL_SCRIPT`) |
 | `server`, `routes`, `assets` (`.spresources`), `forms`, `fx`, `variants`, `behaviour`, `playtest`, `support`, `combat: true`, `layer` | — | engine replacement, protocol, server logic, or a switch this manifest has no field for. One reason each, in Chinese and in English |
 | any other `.js` `.mjs` `.cjs` `.ts` `.jsx` `.tsx` | not imported and not executed | `PLUGIN_FORGE_SCRIPT` |
 | a file `pack.json` does not reference | — | named in the report, except a loose music file whose basename is a bgm track |
@@ -1617,9 +1625,18 @@ The three existing mappings remain. Suggested rewrites are [ASSUMED] author guid
 | `screen.loadout.detail` | — | `room.panel` (separate pre-match information) |
 
 `PLUGIN_FORGE_MOUNT` identifies unsupported mount adaptation. `PLUGIN_FORGE_PANEL_SCRIPT` independently identifies
-an uncopied panel script, including when its mount failed. `PLUGIN_FORGE_SCRIPT` continues to describe other
-unmapped scripts/kits. No panel script runs at import. UI-only unsupported packs report **需要人工适配 / needs manual
+an uncopied panel script, including when its mount failed, and may add `surfaces` (the names the scan found). A copied
+panel does not raise that code. `PLUGIN_FORGE_SCRIPT` continues to describe other unmapped scripts/kits. No panel
+script runs at import: a copied panel runs later, in the player's sandboxed iframe, where `connect-src` is `'none'`.
+The shim (`shared/plugins/forgePanel.js`) answers `net.send`, `session.send`, `setPreload` and resource messages with
+`{ available: false, reason: 'not available in this game' }`. It does not invent a content digest, a chess table or
+an econ payload. `data.get` returns a clone only for `chess` or `assets` when the panel declared that table and the
+page passed the data in; otherwise null. UI-only unsupported packs report **需要人工适配 / needs manual
 adaptation**, with `needsManualAdaptation` and `manualPanels` in JSON, instead of “nothing importable.”
+
+The iframe's own document gets `screen` and `result` on the document element and on `body` only for a `result.tab`
+panel while a result payload is present, and `room-screen` only for a `room.panel` panel while seats are known.
+It never gets `st`. [ASSUMED] Those classes are how a Forge panel decides it is on screen; they are not the game page.
 
 When whole gameplay records are not written, the report is still `ok` if nothing else failed, and it says so up front.
 The markdown heading `## 没有导入的玩法` comes before `## 导入了什么`. JSON adds `partial: true` and `dropped` counts for

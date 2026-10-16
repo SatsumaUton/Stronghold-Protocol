@@ -84,8 +84,12 @@
 //     unite|boss, bossBgm as { loop }, sfx.ui / sfx.battle as one file, sfx.units attack|hit|skill|die|born and
 //     skills|attacks|hits by index. Any other audio key is named and left out.
 //   * client.panels: screen.game.hud and screen.game.aside → hud.right, screen.result.footer → result.tab, and only
-//     when the panel does not wrap a component. The page is a stub; the author rewrites it to postMessage API v1.
-//     The panel's script is not copied.
+//     when the panel does not wrap a component. A panel whose module and its pack-relative .js / .css / .json imports
+//     stay inside the caps, and whose static scan uses only the read-only surfaces the shim feeds, is copied. The
+//     entry page inlines the shim and a classic bundle. The script is not executed here. Anything else stays a stub,
+//     and the report names the unsupported surfaces (PLUGIN_FORGE_PANEL_SCRIPT). [ASSUMED] 256 KB a file, 1 MB a
+//     panel, 64 files. A supported panel on root.guide that listens for room.state is shown in room.panel; other
+//     supported panels on an unmapped mount use the suggestion slot. Those are not Forge's positions.
 //   * Several products share the pack id. content keeps it; a cosmetic beside it is <id>-look; a ui plugin is
 //     <id>-<slot>; a lang plugin is <id>-<lang>. --out names the primary folder and its id.
 //   * dependencies / conflicts become requires / conflicts when the id becomes a plugin id. An omitted range is "*".
@@ -100,7 +104,7 @@ import { packPlugin, skeletonClipData } from './pack.js';
 import { createPluginRegistry } from './registry.js';
 import { buildContentSet } from './contentSet.js';
 import { createVisualSets } from './visualSet.js';
-import { PLUGIN_LIMITS, PLUGIN_MANIFEST, UI_SLOT_IDS, extOf, isPackPath, isPluginId, checkJsonLimits } from '../../shared/plugins/manifest.js';
+import { PLUGIN_LIMITS, PLUGIN_MANIFEST, extOf, isPackPath, isPluginId, checkJsonLimits } from '../../shared/plugins/manifest.js';
 import { ASSET_CONTAINERS, getPath, isAssetKey, readAssetOverlay } from '../../shared/plugins/visual.js';
 import { namespace, namespaceCollides } from '../../shared/plugins/dataUtils.js';
 import { canonicalJson } from '../../shared/plugins/identity.js';
@@ -108,6 +112,7 @@ import { validateSkillSpec } from '../../shared/plugins/skillSpec.js';
 import { canonicalLang, languageName, SOURCE_LANG } from '../../shared/i18nPacks.js';
 import { KITS, OPERATOR_KITS, TIER_KITS } from '../sim/content/kits/index.js';
 import { bundleForgeKits } from './forgeKits.js';
+import { FORGE_SHIM_TEXT, forgeDisplaySlot, forgePanelPage, planForgePanel } from './forgePanels.js';
 
 const APP_RANGE = '>=0.3.0 <0.4.0';
 const DANGER_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -139,7 +144,6 @@ const PROFESSIONS = new Set(['PIONEER', 'WARRIOR', 'TANK', 'SNIPER', 'CASTER', '
 const PROFESSION_ALIAS = { DEFENDER: 'TANK', HEAVY: 'TANK', GUARDIAN: 'TANK', VANGUARD: 'PIONEER', GUARD: 'WARRIOR' };
 const MELEE = new Set(['TANK', 'WARRIOR', 'PIONEER']);
 const VOICE_SLOT = /^[A-Za-z][A-Za-z0-9]{0,31}$/;
-const PANEL_SLOT = { 'screen.game.hud': 'hud.right', 'screen.game.aside': 'hud.right', 'screen.result.footer': 'result.tab' };
 // [ASSUMED] Suggestions describe a possible rewrite, not equivalent mount positions.
 const PANEL_REWRITE = { 'root.overlays': 'hud.right', 'root.guide': 'stats.tab', 'screen.game.overlay': 'hud.right',
   'screen.game.shopCard': 'hud.right', 'screen.game.bondStrip': 'hud.right', 'screen.loadout.detail': 'room.panel' };
@@ -963,8 +967,8 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   const droppedIds = new Set();
   const DROP_ID_KINDS = new Set(['operators', 'bonds', 'bands', 'items', 'tokens', 'traits', 'kits']);
   const noteDrop = (kind, n = 1) => { if (Object.hasOwn(dropped, kind) && n > 0) dropped[kind] += n; };
-  const skip = (p, zh, en, code, kind) => {
-    skipped.push({ path: p, zh, en, ...(code ? { code } : {}) });
+  const skip = (p, zh, en, code, kind, extra) => {
+    skipped.push({ path: p, zh, en, ...(code ? { code } : {}), ...(extra && typeof extra === 'object' ? extra : {}) });
     if (!kind) return;
     noteDrop(kind);
     if (!DROP_ID_KINDS.has(kind)) return;
@@ -2239,45 +2243,89 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     }
   }
 
-  /** @type {{ slot: string, module: string, title: string }[]} */
+  /** @type {{ slot: string, module: string, title: string, role?: string, copied?: boolean, bundle?: string, css?: string, marker?: string | null, copies?: { src: string, dest: string, text: string }[], strings?: Record<string, Record<string, string>>, declared?: string[], packId?: string }[]} */
   const panels = [];
   const manualPanels = [];
   const panelList = Array.isArray(pack.client?.panels) ? pack.client.panels : isObj(pack.client?.panels) ? Object.values(pack.client.panels) : pack.client?.panels != null ? [pack.client.panels] : [];
-  const takenSlots = new Set();
+  /** slot → how many panels already took it. A second skeleton stays manual; a second copied panel gets its own ui plugin. */
+  const slotUses = new Map();
   if (pack.client != null && !isObj(pack.client)) skip('client', 'client 不是对象，没有导入。', 'client is not an object, so it was not imported.');
   else if (isObj(pack.client)) {
     for (const k of Object.keys(pack.client)) if (k !== 'panels') skip(`client.${k}`, '除了只读面板，client 里的其他声明不能导入。', 'Apart from a read-only panel, other client declarations cannot be imported.');
   }
+  const uiStrings = () => {
+    /** @type {Record<string, Record<string, string>>} */
+    const strings = {};
+    for (const row of translations) if (row.kind === 'ui' && row.strings) strings[row.lang] = row.strings;
+    return strings;
+  };
   for (const panel of panelList) {
     if (!isObj(panel)) { skip('client.panels', '面板不是对象，没有导入。', 'A panel is not an object, so it was not imported.', undefined, 'panels'); continue; }
     const forgeSlot = typeof panel.slot === 'string' ? panel.slot : '';
     const module = typeof panel.module === 'string' ? panel.module : typeof panel.entry === 'string' ? panel.entry : '';
-    const ours = PANEL_SLOT[forgeSlot];
     const title = String(panel.name || panel.id || forgeSlot || '?').slice(0, 80);
+    const shortTitle = typeof panel.name === 'string' ? panel.name.slice(0, 40) : typeof panel.id === 'string' ? panel.id.slice(0, 40) : title.slice(0, 40);
+    const blocked = panel.wraps != null || panel.readonly === false || panel.readOnly === false;
+    let found = '';
+    /** @type {{ ok?: boolean, surfaces?: string[], listensRoom?: boolean, bundle?: string, css?: string, copies?: { src: string, dest: string, text: string }[], declared?: string[] } | null} */
+    let planned = null;
     if (module) {
-      const found = lookup(files, module);
-      if (found) used.add(found);
-      skip(`client.panels:${title}#module`, `面板「${title}」的脚本 ${module} 没有复制；需要改写成 postMessage API v1。`, `Panel "${title}" script ${module} was not copied; rewrite it to postMessage API v1.`, 'PLUGIN_FORGE_PANEL_SCRIPT');
+      const hit = lookup(files, module);
+      if (hit) { found = hit; used.add(hit); }
     }
-    if (!ours || !UI_SLOT_IDS.includes(ours)) {
-      const suggestedSlot = PANEL_REWRITE[forgeSlot] || 'room.panel';
+    if (found && !blocked) {
+      planned = typeof parse === 'function'
+        ? planForgePanel({ files, entry: found, panel, parse, requires: isObj(pack.client) ? pack.client.requires : null })
+        : { ok: false, surfaces: ['parse'], listensRoom: false };
+    } else if (blocked) {
+      const surfaces = [];
+      if (panel.wraps != null) surfaces.push('wraps');
+      if (panel.readonly === false || panel.readOnly === false) surfaces.push('readonly');
+      planned = { ok: false, surfaces, listensRoom: false };
+    }
+    const compatible = !!(planned && planned.ok);
+    const display = forgeDisplaySlot(forgeSlot, { compatible, listensRoom: !!(planned && planned.listensRoom) });
+    const surfaces = planned && Array.isArray(planned.surfaces) ? planned.surfaces : [];
+    if (module && !compatible) {
+      const listed = surfaces.length ? ` 用到了这里没有的接口：${surfaces.join('、')}。` : '';
+      const listedEn = surfaces.length ? ` Unsupported surfaces: ${surfaces.join(', ')}.` : '';
+      skip(`client.panels:${title}#module`, `面板「${title}」的脚本 ${module} 没有复制；需要改写成 postMessage API v1。${listed}`, `Panel "${title}" script ${module} was not copied; rewrite it to postMessage API v1.${listedEn}`, 'PLUGIN_FORGE_PANEL_SCRIPT', undefined, surfaces.length ? { surfaces } : undefined);
+    }
+    if (blocked) {
+      const where = display.slot || display.suggested || 'room.panel';
+      manualPanels.push({ panel: title, mount: forgeSlot, suggestedSlot: where });
+      skip(`client.panels:${title}#mount`, `面板「${title}」在 ${forgeSlot} 改写页面组件，需要人工适配为 ${where} 的只读面板。`, `Panel "${title}" at ${forgeSlot} rewrites a component; it needs manual adaptation as a read-only ${where} panel.`, 'PLUGIN_FORGE_MOUNT', 'panels');
+      continue;
+    }
+    if (!display.slot) {
+      const suggestedSlot = display.suggested || PANEL_REWRITE[forgeSlot] || 'room.panel';
       manualPanels.push({ panel: title, mount: forgeSlot, suggestedSlot });
       skip(`client.panels:${title}#mount`, `面板「${title}」挂载点 ${forgeSlot || '(none)'} 需要人工适配，可改写到 ${suggestedSlot}（位置与原版不同）。`, `Panel "${title}" at Forge mount ${forgeSlot || '(none)'} needs manual adaptation; consider rewriting for ${suggestedSlot} (a different location).`, 'PLUGIN_FORGE_MOUNT', 'panels');
       continue;
     }
-    if (panel.wraps != null || panel.readonly === false || panel.readOnly === false) {
-      manualPanels.push({ panel: title, mount: forgeSlot, suggestedSlot: ours });
-      skip(`client.panels:${title}#mount`, `面板「${title}」在 ${forgeSlot} 改写页面组件，需要人工适配为 ${ours} 的只读面板。`, `Panel "${title}" at ${forgeSlot} rewrites a component; it needs manual adaptation as a read-only ${ours} panel.`, 'PLUGIN_FORGE_MOUNT', 'panels');
+    if (!compatible) {
+      if ((slotUses.get(display.slot) || 0) > 0) {
+        manualPanels.push({ panel: title, mount: forgeSlot, suggestedSlot: display.slot });
+        skip(`client.panels:${title}#mount`, `面板「${title}」在 ${forgeSlot} 对应的 ${display.slot} 插槽已有面板，需要人工合并。`, `Panel "${title}" at ${forgeSlot} maps to occupied slot ${display.slot}; it needs manual adaptation into the existing panel.`, 'PLUGIN_FORGE_MOUNT', 'panels');
+        continue;
+      }
+      slotUses.set(display.slot, 1);
+      panels.push({ slot: display.slot, module, title: shortTitle, role: `ui:${display.slot}`, copied: false });
+      rewrittenAssets.push(`${forgeSlot} → ${display.slot}`);
       continue;
     }
-    if (takenSlots.has(ours)) {
-      manualPanels.push({ panel: title, mount: forgeSlot, suggestedSlot: ours });
-      skip(`client.panels:${title}#mount`, `面板「${title}」在 ${forgeSlot} 对应的 ${ours} 插槽已有面板，需要人工合并。`, `Panel "${title}" at ${forgeSlot} maps to occupied slot ${ours}; it needs manual adaptation into the existing panel.`, 'PLUGIN_FORGE_MOUNT', 'panels');
-      continue;
-    }
-    takenSlots.add(ours);
-    panels.push({ slot: ours, module, title: typeof panel.name === 'string' ? panel.name.slice(0, 40) : typeof panel.id === 'string' ? panel.id.slice(0, 40) : ours });
-    rewrittenAssets.push(`${forgeSlot} → ${ours}`);
+    const n = (slotUses.get(display.slot) || 0) + 1;
+    slotUses.set(display.slot, n);
+    const role = n === 1 ? `ui:${display.slot}` : `ui:${display.slot}-${n}`;
+    assume('forge-panel', '只读面板在浏览器的沙箱 iframe 里运行；导入时没有执行它的脚本。', 'A read-only panel runs in the browser sandbox iframe; its script was not executed at import.');
+    if (display.assumed) assume('panel-slot', `面板「${title}」的挂载点 ${forgeSlot} 按建议显示在 ${display.slot}（不是原位置）。`, `Panel "${title}" at ${forgeSlot} is shown in ${display.slot} (not Forge's position).`);
+    for (const copy of planned.copies || []) used.add(copy.src);
+    panels.push({
+      slot: display.slot, module, title: shortTitle, role, copied: true,
+      bundle: planned.bundle || '', css: planned.css || '', marker: display.marker, copies: planned.copies || [],
+      strings: uiStrings(), declared: planned.declared || [], packId: typeof pack.id === 'string' ? pack.id : base,
+    });
+    rewrittenAssets.push(`${forgeSlot} → ${display.slot}`);
   }
 
   for (const [rel] of files) {
@@ -2375,7 +2423,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   if (hasContent) roles.push('content');
   if (Object.keys(assets).length && media.size) roles.push('cosmetic');
   if (scriptPlan) roles.push('script');
-  for (const panel of panels) roles.push(`ui:${panel.slot}`);
+  for (const panel of panels) roles.push(panel.role || `ui:${panel.slot}`);
   for (const t of translations.filter((x) => x.kind === 'ui')) roles.push(`lang:${t.lang}`);
 
   // [ASSUMED] A cosmetic has nothing to apply to when every asked portrait / bond / item id belongs to a dropped
@@ -2468,8 +2516,11 @@ parent.postMessage({ v: 1, t: 'resize', height: 72 }, '*');
 `;
 }
 
-function readme(id, cls, lines) {
-  return `# ${id}\n\n从 Forge 工坊包导入的 ${cls} 插件。导入器不执行包里的脚本，也不检查官方素材。\n\n${lines.join('\n')}\n\n详细对照见同一次导入的 IMPORT-REPORT.md。界面骨架要手改成 postMessage API v1。\n`;
+function readme(id, cls, lines, tail) {
+  const foot = tail === 'sandbox'
+    ? '详细对照见同一次导入的 IMPORT-REPORT.md。这份界面在玩家浏览器的沙箱 iframe 里运行，导入时没有执行包里的脚本。'
+    : '详细对照见同一次导入的 IMPORT-REPORT.md。界面骨架要手改成 postMessage API v1。';
+  return `# ${id}\n\n从 Forge 工坊包导入的 ${cls} 插件。导入器不执行包里的脚本，也不检查官方素材。\n\n${lines.join('\n')}\n\n${foot}\n`;
 }
 
 /**
@@ -2542,13 +2593,35 @@ function buildProducts(meta, ids, primaryRole) {
     products.push({ id: ids.script, class: 'script', role: 'script', files, imported, rewritten: [...meta.script.mapped], manifest: man });
   }
   for (const panel of meta.panels) {
-    const role = `ui:${panel.slot}`;
+    const role = panel.role || `ui:${panel.slot}`;
     const id = ids[role];
     if (!id) continue;
     const man = manifestCommon(id, meta, {
       class: 'ui', scope: ['personal'], permissions: ['ui.frame'], entry: { client: 'ui/index.html' }, slots: [panel.slot],
     });
+    if (panel.title) man.name = { zh: panel.title, en: panel.title };
     const files = new Map();
+    if (panel.copied) {
+      files.set('ui/index.html', forgePanelPage({
+        slot: panel.slot, title: panel.title, bundle: panel.bundle || '', css: panel.css || '',
+        strings: panel.strings || {}, marker: panel.marker || null, declared: panel.declared || [],
+        packId: panel.packId || meta.packId, panelId: id, order: 0,
+      }));
+      files.set('ui/forge-shim.js', FORGE_SHIM_TEXT);
+      for (const copy of panel.copies || []) files.set(copy.dest, copy.text);
+      files.set('README.md', readme(id, 'ui', [
+        `- 插槽 ${panel.slot}。`,
+        '- 面板在玩家浏览器的沙箱 iframe 里运行，导入时没有执行它的脚本。',
+        '- 原文件在 ui/mod/。入口页内联了兼容层，不从 script src 再加载一次。',
+      ], 'sandbox'));
+      products.push({
+        id, class: 'ui', role, files,
+        imported: [`client.panels → ${panel.slot}（沙箱，导入时未执行）`],
+        rewritten: panel.module ? [`${panel.module} → ui/index.html（兼容层）`] : [],
+        manifest: man,
+      });
+      continue;
+    }
     files.set('ui/index.html', uiHtml(panel.slot, panel.title, panel.module));
     files.set('README.md', readme(id, 'ui', [`- 插槽 ${panel.slot}。`, `- 原面板脚本没有复制${panel.module ? `（${panel.module}）` : ''}。`, '- 请把页面改成 postMessage API v1，不要贴回 Forge 的模块。']));
     products.push({ id, class: 'ui', role, files, imported: [`client.panels → ${panel.slot}`], rewritten: panel.module ? [`${panel.module} → ui/index.html（骨架，未复制脚本）`] : [], manifest: man });
@@ -2770,9 +2843,9 @@ export async function importForge(source, opts = {}) {
     const primaryName = opts.out ? path.basename(path.resolve(opts.out)) : null;
     if (primaryName && !isPluginId(primaryName)) fail('PLUGIN_FORGE_ID', `"${primaryName}" is not a plugin id`);
     const scripts = opts.scripts !== false;
-    // acorn parses kits/ (forgeKits.js); it never evaluates them. Loaded only for a pack that has a script to read.
+    // acorn parses kits/ and panel modules. It never evaluates them. Panel scans still need it when --no-scripts.
     let parse = null;
-    if (scripts && [...files.keys()].some((rel) => SCRIPT_EXT.has(extOf(rel)))) {
+    if ([...files.keys()].some((rel) => SCRIPT_EXT.has(extOf(rel)))) {
       try { ({ parse } = await import('acorn')); } catch { parse = null; }
     }
     const planned = planForgeImport(files, { id: opts.id, contentId: primaryName || undefined, dataDir, vanilla, scripts, parse });
