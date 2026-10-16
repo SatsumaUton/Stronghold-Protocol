@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getData } from '../../server/data.js';
-import { expandGameplayRecords } from '../../server/plugins/gameplayRecords.js';
+import { expandGameplayRecords, reconcilePluginTokens, validateGameplayData } from '../../server/plugins/gameplayRecords.js';
 import { expandRecords } from '../../shared/plugins/records.js';
 import { validateData } from '../../shared/plugins/validate.js';
 import { buildContentSet } from '../../server/plugins/contentSet.js';
@@ -116,4 +116,70 @@ test('DIY token references receive independent, complete variants without alteri
     assert.notEqual(form.tokens[0], tokenId);
     assert.ok(set.data.backups.tokens[form.tokens[0]].variants[`${op.charId}@${status}`]);
   }
+});
+
+test('DIY token aliases select the matching normal/elite chess variant', t => {
+  const f = fixture(t), op = guard(); op.kit = 'generic';
+  const tokenId = 'token_x_data_demo_helper', source = structuredClone(Object.values(base.tokens)[0]);
+  source.tokenId = tokenId;
+  source.stats.atk = 85;
+  const variant = structuredClone(source); delete variant.variants;
+  source.variants = Object.fromEntries([false, true].map(golden => [
+    `chess_x_data_demo_guard_${golden ? 'b' : 'a'}`,
+    { ...structuredClone(variant), sources: ['skill'], stats: { ...source.stats, atk: golden ? 114 : 95 } },
+  ]));
+  for (const form of Object.values(op.forms)) form.tokens = [tokenId];
+  f.put('data-demo', { data: ['r.json'], operators: ['o.json'] }, {
+    'r.json': { records: 1, entries: [{ file: 'tokens', id: tokenId, value: source }] }, 'o.json': op,
+  });
+  const set = buildContentSet({ registry: f.registry, ids: ['data-demo'] });
+  assert.deepEqual(set.problems, []);
+  assert.deepEqual(set.data.tokens[tokenId], source);
+  for (const [status, form] of Object.entries(set.data.backups.units[op.charId].forms)) {
+    const alias = form.tokens[0], variant = set.data.backups.tokens[alias].variants[`${op.charId}@${status}`];
+    assert.equal(variant.stats.atk, form.status.equipLevel > 0 ? 114 : 95);
+    assert.deepEqual(variant.sources, ['skill']);
+  }
+});
+
+test('custom skill admission retains general limits, step bounds and known zero-valued official keys', () => {
+  const vanilla = structuredClone(base), first = Object.values(vanilla.chess)[0];
+  first.skill.bb.known_zero = 0; first.skills.find(s => s.isDefault).bb.known_zero = 0;
+  const op = guard(); op.kit = 'generic';
+  const expanded = bb => expandGameplayRecords(vanilla, [{ ...op, skills: [{ ...op.skills[0], bb }] }], opts).data;
+  assert.deepEqual(validateGameplayData(expanded({ heal: 65, 'custom.heal@value': -80 }), { vanilla }), []);
+  for (const bb of [{ heal: 1e9 + 1 }, { known_zero: 65 }, { 'custom.interval': 65 }, { 'custom.cost': 0.00001 }]) {
+    const data = expanded({ heal: 65 }), chess = data.chess.chess_x_data_demo_guard_a;
+    chess.skill.bb = bb; chess.skills[0].bb = bb;
+    assert.ok(validateGameplayData(data, { vanilla }).some(p => p.code === 'PLUGIN_DATA_BOUND'), JSON.stringify(bb));
+  }
+  const talent = expanded({ heal: 65 });
+  talent.chess.chess_x_data_demo_guard_a.talents = [{ name: 'Test', bb: { heal: 80 } }];
+  assert.ok(validateGameplayData(talent, { vanilla }).some(p => p.code === 'PLUGIN_DATA_BOUND' && p.path.includes('.talents')));
+  const missing = expanded({ heal: 65 });
+  missing.chess.chess_x_data_demo_guard_a.tokens = ['token_missing'];
+  assert.ok(validateGameplayData(missing, { vanilla }).some(p => p.code === 'PLUGIN_DATA_REFERENCE'));
+  const mismatch = expanded({ heal: 65 });
+  mismatch.chess.chess_x_data_demo_guard_a.skill.bb = { heal: 80 };
+  assert.ok(validateGameplayData(mismatch, { vanilla }).length);
+});
+
+test('DIY token status variants keep precedence and ambiguous or missing variants retain the base', () => {
+  const charId = 'char_x_data_demo_guard', tokenId = 'token_x_data_demo_helper', status = '1/1/1/1', chessId = 'chess_x_data_demo_guard_b';
+  const run = variants => {
+    const token = { tokenId, stats: { atk: 85 }, sources: ['skill'], variants };
+    const data = { tokens: { [tokenId]: token }, chess: {}, backups: { tokens: {}, units: { [charId]: { charId,
+      forms: { [status]: { chessId, tokens: [tokenId], displayTokens: [tokenId], skills: [{ overrideTokenKey: tokenId }], talents: [{ tokenKey: tokenId }] } },
+    } } } };
+    const out = reconcilePluginTokens(data), form = out.backups.units[charId].forms[status], alias = form.tokens[0];
+    assert.notEqual(alias, tokenId);
+    assert.deepEqual(form.displayTokens, [alias]); assert.equal(form.skills[0].overrideTokenKey, alias); assert.equal(form.talents[0].tokenKey, alias);
+    assert.deepEqual(data.tokens[tokenId], token); assert.deepEqual(data.backups.tokens, {});
+    return out.backups.tokens[alias].variants[`${charId}@${status}`].stats.atk;
+  };
+  const chess = { stats: { atk: 114 }, sources: ['skill'] }, trained = { stats: { atk: 130 }, sources: ['skill'] };
+  assert.equal(run({ [chessId]: chess }), 114);
+  assert.equal(run({ [chessId]: chess, [`owner@${status}`]: trained }), 130);
+  assert.equal(run({ [chessId]: chess, [`owner@${status}`]: trained, [`other@${status}`]: trained }), 85);
+  assert.equal(run({ chess_someone_else_b: chess }), 85);
 });

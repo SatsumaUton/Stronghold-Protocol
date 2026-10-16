@@ -110,7 +110,8 @@ import { KITS, OPERATOR_KITS, TIER_KITS } from '../sim/content/kits/index.js';
 import { bundleForgeKits } from './forgeKits.js';
 import { planForgeRecords, rewriteForgeIds, rewriteForgeKit } from './forgeRecords.js';
 import { localOfficialUnits } from './officialUnits.js';
-import { BOUND_TABLES, rememberOfficialBounds, officialBbRange } from '../../shared/plugins/officialBounds.js';
+import { BOUND_TABLES, rememberOfficialBounds, officialBbRange, officialBbMax } from '../../shared/plugins/officialBounds.js';
+import { isStepKey } from '../../shared/plugins/limits.js';
 
 const APP_RANGE = '>=0.3.0 <0.4.0';
 const DANGER_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -1573,14 +1574,16 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     return { ref: null, zh: `官方干员 ${charId} 在本模拟器里没有自己的 kit，保留通用 kit。`, en: `The official operator ${charId} has no kit of its own in this simulator, so the kit stays generic.` };
   };
 
-  const numericBb = (bb, dropped, label) => {
+  const numericBb = (bb, dropped, label, skill = false) => {
     if (!isObj(bb)) return null;
     const out = {};
     for (const [k, v] of Object.entries(bb)) {
       if (DANGER_KEYS.has(k)) continue;
       if (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= PLUGIN_LIMITS.number) {
         const bound = officialBbRange(k);
-        if (Math.abs(v) <= bound.max && !(v > 0 && v < bound.positiveMin)) out[k] = v;
+        // [ASSUMED] Custom non-step skill parameters have no official maximum to scale; retain the general game bound.
+        const max = skill && officialBbMax(k) === null && !isStepKey(k) ? PLUGIN_LIMITS.number : bound.max;
+        if (Math.abs(v) <= max && !(v > 0 && v < bound.positiveMin)) out[k] = v;
         else { dropped.add(`${label}bb.${k}=${v} (admission bound ${bound.max}, minimum ${bound.positiveMin})`); }
       }
       else dropped.add(`${label}bb.${k}`);
@@ -1619,7 +1622,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
         if (allowed.has(v)) skill[k] = v;
         else if (v != null) dropped.add(k);
       } else if (k === 'bb') {
-        const bb = numericBb(v, dropped, '');
+        const bb = numericBb(v, dropped, '', true);
         if (bb) skill.bb = bb;
       } else if (k === 'bbStr') {
         const m = stringMap(v);

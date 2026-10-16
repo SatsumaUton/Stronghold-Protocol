@@ -11,6 +11,10 @@ import { planForgeImport, importForge } from '../../server/plugins/forgeImport.j
 import { getData, ROOT } from '../../server/data.js';
 import { expandGameplayRecords } from '../../server/plugins/gameplayRecords.js';
 import { validateData } from '../../shared/plugins/validate.js';
+import { buildContentSet } from '../../server/plugins/contentSet.js';
+import { createPluginRegistry } from '../../server/plugins/registry.js';
+import { officialBbRange } from '../../shared/plugins/officialBounds.js';
+import { PLUGIN_LIMITS } from '../../shared/plugins/manifest.js';
 
 const id = 'char_999_test', status = { phase: 1, level: 5, skillLevel: 4, equipLevel: 0 };
 function tables() {
@@ -106,4 +110,38 @@ test('synthetic new hook imports as a validated content product', async t => {
   const files = new Map(Object.entries({ 'pack.json': { id: 'test-hook', name: 'Hook', version: '1.0.0', content: ['items'] }, 'items.json': { hook: item } }).map(([k, v]) => [k, Buffer.from(JSON.stringify(v))]));
   const result = await importForge({ files }, { root, dataDir: path.join(ROOT, 'data'), dryRun: true });
   assert.equal(result.ok, true, JSON.stringify(result.issues)); assert.equal(result.report.products[0].class, 'content');
+});
+
+test('Forge keeps custom skill heal 65/80 through import and composition, retaining official and step bounds', async t => {
+  const root = temp(t), dataDir = path.join(ROOT, 'data');
+  getData();
+  const atkCap = officialBbRange('atk').max;
+  const chess = Object.fromEntries([false, true].map(golden => {
+    const chessId = `chess_healer_${golden ? 'b' : 'a'}`;
+    return [chessId, { chessId, baseId: 'chess_healer_a', goldenId: 'chess_healer_b', isGolden: golden,
+      name: 'Healer', charId: null, assets: { avatar: 'synthetic-avatar' }, tier: 1, rarity: 4,
+      profession: 'TANK', subProfessionId: 'protector', position: 'MELEE', bonds: ['deputShip'],
+      stats: { maxHp: 1000, atk: 100, def: 100, res: 0, cost: 10, blockCnt: 1, bat: 1, aspd: 100, respawnTime: 70 }, rangeGrid: [[0, 0]],
+      skills: [{ skillId: 'heal-skill', name: 'Heal', isDefault: true, desc: 'Heal {heal}', bb: {
+        heal: golden ? 80 : 65, custom_value: PLUGIN_LIMITS.number, custom_negative: -PLUGIN_LIMITS.number,
+        over_number: PLUGIN_LIMITS.number + 1, atk: atkCap + 1, 'custom.interval': 65, 'custom.cost': 0.00001,
+      } }],
+    }];
+  }));
+  const files = new Map(Object.entries({
+    'pack.json': { id: 'test-healer', name: 'Healer', version: '1.0.0', content: ['chess'] }, 'chess.json': chess,
+  }).map(([k, v]) => [k, Buffer.from(JSON.stringify(v))]));
+  const result = await importForge({ files }, { root, dataDir, out: path.join(root, 'plugins/test-healer') });
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  const registry = createPluginRegistry({ publicDir: path.join(root, 'public'), packsDir: path.join(root, 'packs'), pluginsDir: path.join(root, 'plugins'), dataDir });
+  registry.rescan();
+  const set = buildContentSet({ registry, ids: ['test-healer'] });
+  assert.deepEqual(set.problems, []);
+  for (const [golden, heal] of [[false, 65], [true, 80]]) {
+    const form = Object.values(set.data.chess).find(c => c.chessId.startsWith('chess_x_test_healer_') && c.isGolden === golden);
+    assert.deepEqual(form.skills[0].bb, { heal, custom_value: PLUGIN_LIMITS.number, custom_negative: -PLUGIN_LIMITS.number });
+    assert.equal(form.skill.bb.heal, heal);
+    assert.equal(form.skills[0].desc, `Heal ${heal}`);
+  }
+  assert.ok(result.report.skipped.some(s => s.en.includes('bb.atk=') && s.en.includes('custom.interval')));
 });

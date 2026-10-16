@@ -553,7 +553,9 @@ Supported files: enemies, waves, stages, modes, items, bands, garrisons, effects
   `server/plugins/gameplayRecords.js` before ordinary content validation; the legacy shared schema is unchanged.
 - Compact operator forms can also carry `tags` and `tokens` (at most 64 strings [ASSUMED], token ids must exist).
   DIY references receive a separate token id and per-status backups variants; a unique authored status variant wins,
-  otherwise the complete token base is used with a skill source [ASSUMED]. Token records alone do not summon anything: the operator kit or placement mechanics must use them.
+  then, only when no status variant matches, the variant keyed by the form's chess id (normal/elite). An ambiguous
+  status match or missing chess variant uses the complete token base with a skill source [ASSUMED]. Token records
+  alone do not summon anything: the operator kit or placement mechanics must use them.
 - A mode requires an official `base`; nested objects inherit field by field and arrays replace whole arrays.
   The base's choice schedule is copied. Changes to that schedule can then be patched explicitly. `GameData` overlays
   mode-level economy, DP, timers and other global configuration keys; omitted values retain the official defaults.
@@ -1824,8 +1826,12 @@ need an official `base`/`effectRef`. Missing item effect records are built from 
 Exact data references, comma-separated blackboard ids, and exact string literals in carried kits follow the new ids.
 The importer parses scripts only. The pure `@kit/tier2.js` `onDefaultSkill` predicate is inlined using our existing
 loadout contract [ASSUMED]; other unsupported imports remain explicit refusals. Custom bond blackboards are metadata,
-not executable behavior; the report names every unmapped key. Supported operator blackboard numbers outside the
-existing admission bounds are omitted and named with their value and bound [ASSUMED], never silently clamped.
+not executable behavior; the report names every unmapped key. For new operators' skill blackboards, a key absent
+from the official tables that is not an interval, period or cost step retains any finite value within
+`±PLUGIN_LIMITS.number` (±1e9) [ASSUMED], including `heal: 65` / `80`. Official keys, including keys whose official
+maximum is zero, retain the 10×/64 cap; steps retain their caps and positive minimum. Trait/talent blackboards keep
+the existing bounds. Out-of-bound values are omitted and named [ASSUMED], never silently clamped. Server composition
+applies the same skill exception; shared validators and vanilla code bytes remain unchanged.
 
 An official `char_<number>_<name>` absent from this installation's chess/backups requires local
 `.cache/gamedata/excel/{character,skill,range}_table.json`. The importer calls `server/plugins/officialUnitBuilder.js`

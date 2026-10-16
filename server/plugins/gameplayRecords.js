@@ -2,6 +2,10 @@
 import { createHash } from 'node:crypto';
 import { expandRecords } from '../../shared/plugins/records.js';
 import { clone, object, recordId, problem, jsonProblems, mergeData } from '../../shared/plugins/dataUtils.js';
+import { validateData } from '../../shared/plugins/validate.js';
+import { officialBbMax, rememberOfficialBounds } from '../../shared/plugins/officialBounds.js';
+import { isStepKey } from '../../shared/plugins/limits.js';
+import { PLUGIN_LIMITS } from '../../shared/plugins/manifest.js';
 
 export const GAMEPLAY_RECORDS = Object.freeze({ bonds: 'bond_x', items: 'item_x' });
 export const GAMEPLAY_RECORD_SURFACE = Object.freeze([
@@ -80,6 +84,38 @@ export function reconcilePluginBonds(data) {
   return out;
 }
 
+/** Server-only admission extension; shared validators and vanilla content bytes retain their original contract. */
+export function validateGameplayData(data, options = {}) {
+  const problems = validateData(data, options);
+  if (!options.vanilla || !problems.some(p => p.code === 'PLUGIN_DATA_BOUND')) return problems;
+  rememberOfficialBounds(options.vanilla);
+  const checked = clone(data), boundedPaths = new Set(problems.filter(p => p.code === 'PLUGIN_DATA_BOUND').map(p => p.path));
+  const admitted = new Set();
+  const skill = (s, path) => {
+    for (const [key, value] of Object.entries(s?.bb ?? {})) {
+      // [ASSUMED] Only new operators' finite, non-step skill values without an official key use the general ±1e9 bound.
+      // Match exact diagnostic paths: official keys (including zero maxima), steps, talents and other limits still fail.
+      if (officialBbMax(key) === null && !isStepKey(key) && typeof value === 'number' && Number.isFinite(value)
+        && Math.abs(value) <= PLUGIN_LIMITS.number && boundedPaths.has(`${path}.bb.${key}`)) {
+        s.bb[key] = 0; admitted.add(`${path}.bb.${key}`);
+      }
+    }
+  };
+  const form = (f, path) => {
+    skill(f.skill, `${path}.skill`);
+    if (Array.isArray(f.skills)) f.skills.forEach((s, i) => skill(s, `${path}.skills[${i}]`));
+  };
+  for (const [id, c] of Object.entries(checked.chess ?? {})) if (typeof c?.charId === 'string' && c.charId.startsWith('char_x_')) form(c, `chess.${id}`);
+  for (const [id, u] of Object.entries(checked.backups?.units ?? {})) if (id.startsWith('char_x_')) {
+    for (const [status, f] of Object.entries(u.forms ?? {})) form(f, `backups.units.${id}.forms.${status}`);
+  }
+  // Validate a copy with only admitted scalars neutralized. Rerun every check: filtering early bounds diagnostics
+  // alone would skip validateData's later reference checks. The composed data keeps the original skill values.
+  if (!admitted.size) return problems;
+  const remaining = problems.filter(p => p.code !== 'PLUGIN_DATA_BOUND' || !admitted.has(p.path));
+  return remaining.length ? remaining : validateData(checked, options);
+}
+
 /** DIY summons live in backups.tokens with variants per training status (DATA §18), not the shop token table. */
 export function reconcilePluginTokens(data) {
   const units = Object.values(data.backups?.units ?? {}).filter(u => u.charId.startsWith('char_x_') && Object.values(u.forms ?? {}).some(f => f.tokens?.length));
@@ -93,8 +129,11 @@ export function reconcilePluginTokens(data) {
     const alias = `${prefix}_diy_${createHash('sha256').update(`${u.charId}\0${id}`).digest('hex').slice(0, 24)}`;
     if (!out.backups.tokens[alias]) out.backups.tokens[alias] = { ...clone(token), tokenId: alias, variants: {} };
     const candidates = Object.entries(token.variants ?? {}).filter(([key]) => key.endsWith(`@${status}`));
-    // [ASSUMED] A single authored variant at this training status wins; otherwise the complete token's base is the fallback.
-    const variant = candidates.length === 1 ? candidates[0][1] : token;
+    const chessId = original.chessId ?? Object.values(out.chess).find(c => c.charId === u.charId
+      && c.isGolden === (original.status?.equipLevel > 0))?.chessId;
+    // [ASSUMED] A unique status variant wins. With no status match, use this form's chess variant, then the complete base.
+    // Ambiguous status variants still fall back to the base rather than choosing another owner's stats.
+    const variant = candidates.length === 1 ? candidates[0][1] : candidates.length === 0 ? token.variants?.[chessId] ?? token : token;
     out.backups.tokens[alias].variants[`${u.charId}@${status}`] = { ...clone(variant), tokenId: alias, sources: variant.sources ?? ['skill'] };
     const form = out.backups.units[u.charId].forms[status];
     form.tokens = form.tokens.map(t => t === id ? alias : t);

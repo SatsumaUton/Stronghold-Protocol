@@ -7,8 +7,7 @@ import { computeVanillaContent, gameplayDataFiles, nodeSha256 } from './identity
 import { contentHashOf, canonicalJson, csUrlPart } from '../../shared/plugins/identity.js';
 import { resolvePluginOrder } from '../../shared/plugins/order.js';
 import { applyPatches, normalizeSettings } from '../../shared/plugins/patch.js';
-import { expandGameplayRecords, reconcilePluginBonds, reconcilePluginTokens } from './gameplayRecords.js';
-import { validateData } from '../../shared/plugins/validate.js';
+import { expandGameplayRecords, reconcilePluginBonds, reconcilePluginTokens, validateGameplayData } from './gameplayRecords.js';
 import { object, own, clone, problem, RECORD_MAPS, recordId, namespaceCollisions } from '../../shared/plugins/dataUtils.js';
 import { buildRecordOverlay, walkOverlay, getPath, applyRecordOverlay } from '../../shared/i18nData.js';
 import { computeGroundPaths, computeDeployTiles } from '../sim/groundPaths.js';
@@ -269,7 +268,7 @@ function composeContentSet({ registry, ids = [] }) {
   }
   if (plugins.length) {
     data = reconcilePluginTokens(reconcilePluginBonds(data));
-    problems.push(...validateData(data, { kitExists: ref => !!officialKit(ref), vanilla: base.data, owners, validateDsl }));
+    problems.push(...validateGameplayData(data, { kitExists: ref => !!officialKit(ref), vanilla: base.data, owners, validateDsl }));
     if (problems.length) return { problems };
     data = { ...data, stages: { ...data.stages } };
     const routes = Object.values(data.waves).flatMap(w => [...(w.routes ?? []), ...(w.extraRoutes ?? [])]);
