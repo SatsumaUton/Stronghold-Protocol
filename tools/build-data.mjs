@@ -2965,6 +2965,38 @@ function buildStages(ctx, modesById) {
  * weighted entry per round, per-ACTION replacement counts computed at runtime by server/match/waves.js from
  * enemies.json `attrPower` / `beFactor`.
  */
+/** enemy_handbook_table `levelInfoList` stat → the enemies.json vocabulary (attackSpeed is the attack interval in s). */
+const HANDBOOK_STATS = Object.freeze({
+  maxHP: 'maxHp', attack: 'atk', def: 'def', magicRes: 'res', moveSpeed: 'moveSpeed', attackSpeed: 'interval',
+  enemyRes: 'elementRes', enemyDamageRes: 'elementDmgRes',
+});
+
+/**
+ * The enemy handbook's letter grades (enemy_handbook_table `levelInfoList`: ten grades E … SS) → factions.json
+ * `handbookLevels`, weakest first: per grade the official [min, max) of each stat (max null: open-ended). `interval`
+ * runs the other way (a shorter attack interval is the higher grade). The 敌方图鉴 (screens/sweep.js enemyGrade) grades
+ * a stat by the band its value falls in.
+ * @returns {{ level: string, [stat: string]: any }[]}
+ */
+function buildHandbookLevels(ctx) {
+  const list = ctx.handbook?.levelInfoList;
+  if (!Array.isArray(list) || !list.length) {
+    warn('enemy_handbook_table has no levelInfoList: factions.json handbookLevels is empty');
+    return [];
+  }
+  const out = list.map((l) => {
+    const rec = { level: l.classLevel };
+    for (const [src, key] of Object.entries(HANDBOOK_STATS)) {
+      const r = l[src];
+      if (!r || !Number.isFinite(r.min) || !Number.isFinite(r.max)) { warn(`enemy_handbook_table level ${l.classLevel}: no ${src} range`); continue; }
+      rec[key] = [r.min, r.max < 0 ? null : r.max];
+    }
+    return rec;
+  });
+  // the table lists SS first; ascending by the HP band's lower bound
+  return out.sort((a, b) => (a.maxHp?.[0] ?? 0) - (b.maxHp?.[0] ?? 0));
+}
+
 function buildFactions(ctx, enemies) {
   const { ac, act } = ctx;
   const c = ac.constData;
@@ -3016,6 +3048,7 @@ function buildFactions(ctx, enemies) {
   return {
     templateSlots: slotKey,
     types, entries,
+    handbookLevels: buildHandbookLevels(ctx),
     generation: {
       source: 'official client RandomEnemyGenerater (research 08 §2, decoded from the client; normative)',
       specialEnemyNum: c.specialEnemyNum ?? 3,
