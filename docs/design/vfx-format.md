@@ -1281,23 +1281,27 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   whose attack is a later 'atk' — 暴鸰's bomb, 0.27 s after its 'cast' — keeps the window's rows for it) [ASSUMED: the
   window's `dur` is then the skill's effect's, not a time the attacks change].
 * **Enemies' areas** (0.3.1, the maintainer's report of 2026-10-16, history §34.5; `skills.js ENEMY_FX_BINDINGS`,
-  `skillfx.js _enemyFx`): the sim's zones name no source (`content/enemies/helpers.js zone`: ['fx', 'zone', x, y,
-  { r, dur, kind }]), so a binding by the enemy's unit key says how its fx finds the enemy — `id`; `died`: one of that
-  key that died in the fx's frame within OWNER_NEAR (1) tile of its point (a death zone: the sim makes it in the death
-  hook, after the 'die'); `cast`: one whose skill (its prefabKey) was cast in that frame (castSlot comes in the same
-  tick); `near`: a standing one within OWNER_NEAR of it; `any`: the kind is that enemy's alone —, the surest first. A
-  zone plays its prefabs at the fx's point on the ground, the looping ones for its `dur`: 萨卡兹枯朽战士 / 组长's death
-  pool (PollutedDie's `projectile_enemy_nhpbr_polluted`, whose `toTargetOnStart` `enemy_nhpbr_attack_range` loops until
-  the projectile stops — its life the blackboard's `projectile_life_time`), 萨卡兹枯朽战车 / 尖端's 秽蚀轰击 pool
-  (AttackPolluted's `projectile_enemy_nhtank_polluted` reached `enemy_nhtank_attack_range`), 假想敌：蚀裂's cloud on its
-  killer (`projectile_enemy_actoxi` reached `enemy_actoxi_idle`), 咸鳞汁推荐者's barrel zone (BlockedBoom's
-  `projectile_enemy_wintun_range` reached `enemy_wintun_range`), 鼠王's 【沙狱】 (the castTarget row
-  `mousek_skill_02_range` — the sandstorm, a one-shot of 21 s — once on the target). An aura's tick its talent loops
-  stand for (talentfx.js draws them: 深溟巢涌者's 'pulse' — AOE —, 鼎沸's 'boil' — aoe —) skips the procedural pulse,
-  and the HP damage the tick deals in that frame to a unit within its radius (+ 0.6) that no attack owns plays the
-  aura's buff effects on it (the talent's uses `on: 'targets'`: a trigger once — `enemy_dsubrl_attack_hit` —, a loop
-  held AURA_HOLD_S (1.25 s) past the last tick — `enemy_cjhot_debuff` [ASSUMED]) instead of the procedural spark. A
-  mode's loops: 水遁忍者's spin ('telegraph' of kind 'spin') plays its mode M1's RotateEffect loop
+  `skillfx.js _enemyFx`): a zone names no source (`content/enemies/helpers.js zone`: ['fx', 'zone', x, y,
+  { r, dur, kind }]) except 【污染秽蚀】, whose fx carries `pollution`'s src (display only). A binding by the enemy's unit
+  key says how its fx finds the enemy — `id`; `died`: one of that key that died in the fx's frame within OWNER_NEAR (1)
+  tile of its point (a death zone: the sim makes it in the death hook, after the 'die'); `cast`: one whose skill (its
+  prefabKey) was cast in that frame (castSlot comes in the same tick); `near`: a standing one within OWNER_NEAR of it;
+  `any`: the kind is that enemy's alone. Tried as: the unit the zone's id names, then a death within OWNER_NEAR, then a
+  cast the zone does not name, then a unit at the point, then the kind alone [ASSUMED: a zone with no id belongs to the
+  death at the point, else to the cast]. A binding that draws nothing does not claim the fx. A zone plays its prefabs at
+  the fx's point on the ground, the looping ones for its `dur`: 萨卡兹枯朽战士 / 组长's death pool (PollutedDie's
+  `projectile_enemy_nhpbr_polluted`, whose `toTargetOnStart` `enemy_nhpbr_attack_range` loops until the projectile stops
+  — its life the blackboard's `projectile_life_time`), 萨卡兹枯朽战车 / 尖端's 秽蚀轰击 pool (AttackPolluted's
+  `projectile_enemy_nhtank_polluted` reached `enemy_nhtank_attack_range`; the zone's id keeps it when a warrior also died
+  on that tile), 假想敌：蚀裂's cloud on its killer (`projectile_enemy_actoxi` reached `enemy_actoxi_idle`), 咸鳞汁推荐者's
+  barrel zone (BlockedBoom's `projectile_enemy_wintun_range` reached `enemy_wintun_range`), 鼠王's 【沙狱】 (the
+  castTarget row `mousek_skill_02_range` — the sandstorm, a one-shot of 21 s — once on the target). An aura's tick its
+  talent loops stand for (talentfx.js draws them: 深溟巢涌者's 'pulse' — AOE —, 鼎沸's 'boil' — aoe —) skips the
+  procedural pulse, and one unclaimed HP hit in that frame on a unit inside the sim radius that no attack owns plays the
+  aura's buff effects on it (each aura takes at most one per unit, and that hit is offered to every aura in the frame
+  [ASSUMED]: the talent's uses `on: 'targets'` — a trigger once, `enemy_dsubrl_attack_hit`; a loop held AURA_HOLD_S
+  (1.25 s) past the last tick, `enemy_cjhot_debuff`) instead of the procedural spark. A unit past the radius keeps its
+  spark. A mode's loops: 水遁忍者's spin ('telegraph' of kind 'spin') plays its mode M1's RotateEffect loop
   (`enemy_ymgtop_skill_01_buff_01`, a buff its template creates at its tick, which talents.js leaves unmapped) for its
   record's `EndRotate.rotate_duration`, until 失衡's 'phase' spinStop or its death [ASSUMED: the loop lasts the sim's
   spin]. The bound prefabs preload with the battle's units (SkillFx.keys). Layer off, or the prefabs not installed: the

@@ -1501,21 +1501,24 @@ export const OWNER_NEAR = 1;
  * Kit 'fx' tuples of an enemy (server/sim/content/enemies) that stand for an official effect of its own the client plays
  * there — its areas that keep acting (0.3.1, the maintainer's report of 2026-10-16: 萨卡兹枯朽战士's 污染秽蚀) —, by the
  * enemy's index unit key → fx kind → binding. render/vfx/skillfx.js plays them (SkillFx.simFx → _enemyFx) and the field
- * view skips the procedural fx; with 官方特效 off, or none of a binding's prefabs installed, the procedural fx stays. The
- * sim's zones name no source (content/enemies/helpers.js zone), so a binding says how its fx finds the enemy:
+ * view skips the procedural fx; with 官方特效 off, or none of a binding's prefabs installed, the procedural fx stays. A
+ * zone names no source (content/enemies/helpers.js zone) except 【污染秽蚀】, whose fx carries `pollution`'s src. A binding
+ * says how its fx finds the enemy:
  *   xkind      the fx's `extra.kind` (the sim's zone kind: 'pollution', 'poison', 'barrel', 'sandStorm', 'boil')
  *   owner      'id' — `extra.id` names it; 'died' — an enemy of this key that died in the fx's frame within OWNER_NEAR
  *              tiles of its point (a death zone: the sim makes it in the death hook, right after the 'die' event); 'cast'
  *              — an enemy of this key whose skill `skill` (its data record's prefabKey) was cast in the fx's frame (the
  *              sim's castSlot comes in the same tick); 'near' — a standing enemy of this key within OWNER_NEAR tiles of the
  *              point (an fx at its feet that names no one); 'any' — the kind is this enemy's alone (假想敌：蚀裂's cloud lands
- *              on its killer after its death: no id, no frame of its own)
+ *              on its killer after its death: no id, no frame of its own). A zone whose `extra.id` is that unit (【污染秽蚀】
+ *              carries `pollution`'s src) matches as 'id' even when the field says 'cast'. SkillFx tries a 'died' owner
+ *              within OWNER_NEAR before a cast the zone does not name, and a binding that draws nothing does not claim it.
  *   projectile / part / keys    the prefabs (bindingEffects; `part`: the projectile field to read)
  *   hold / holdS               how long the looping ones stay at the fx's point: 'fx' — the fx's `dur` (the zone's time) —,
  *              else `holdS`; `once`: the prefabs play once there, for their own life (a one-shot)
  *   talent     instead of prefabs: the talent (prefab key) whose aura the fx is a tick of — while the unit's talent loops
- *              (render/vfx/talentfx.js) are drawn they stand for it, and the HP damage the tick deals in its frame to units
- *              within its radius plays the aura's buff effects on them (auraTargets)
+ *              (render/vfx/talentfx.js) are drawn they stand for it, and one unclaimed HP hit in that frame on a unit
+ *              inside the sim radius plays the aura's buff effects on it, offered to each aura (auraTargets)
  *   modeLoops  or: the fx starts a mode of the unit whose talent (this prefab key) loops on it meanwhile — its loop uses
  *              (a buff it creates at its tick: a condition talents.js cannot read, here the mode's own) — for its record's
  *              blackboard value `bbKey` (talents.bb), else `holdS` s; `endMode`: the fx ends it early
@@ -1577,8 +1580,9 @@ export const ENEMY_FX_BINDINGS = Object.freeze({
 });
 
 /**
- * The enemy unit keys with a binding of each fx kind (SkillFx._enemyFx's candidates), the surest owner first: an `id`, a
- * skill cast in the frame, a death in the frame at the point, a unit at the point, the kind alone.
+ * The enemy unit keys with a binding of each fx kind (SkillFx._enemyFx's candidates). The list order is an id, a cast,
+ * a death, a unit at the point, the kind alone; the fx itself is ranked again — the unit `extra.id` names, then a death
+ * within OWNER_NEAR, then a cast the zone does not name (skillfx.js _fxRank).
  */
 const OWNER_ORDER = Object.freeze({ id: 0, cast: 1, died: 2, near: 3, any: 4 });
 export const ENEMY_FX_KINDS = Object.freeze((() => {

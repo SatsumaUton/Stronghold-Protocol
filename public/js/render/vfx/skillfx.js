@@ -63,9 +63,10 @@
 //     in a form naming one of its modes (formMode) plays that mode's copy of the skill.
 //   * Kit 'fx' tuples (simFx; the procedural fx is skipped when this returns true):
 //       (0) ENEMY_FX_BINDINGS (skills.js, 0.3.1): an enemy's area — its zone's prefabs at the fx's point for its time
-//           (萨卡兹枯朽战士's death pool by the frame's 'die', 萨卡兹枯朽战车's by its 'cast', 鼠王's 沙狱 by its id,
-//           假想敌：蚀裂's cloud by its kind), an aura's tick its talent loops stand for (深溟巢涌者, 鼎沸: the tick's damage
-//           then plays the aura's buff effect on the unit — auraHit), a mode's loops (水遁忍者's spin);
+//           (萨卡兹枯朽战士's death pool by the frame's 'die', 萨卡兹枯朽战车's by its 'cast' — or by the zone's source id,
+//           ahead of a death at the point), 鼠王's 沙狱 by its id, 假想敌：蚀裂's cloud by its kind), an aura's tick its
+//           talent loops stand for (深溟巢涌者, 鼎沸: one HP hit inside the sim radius plays the aura's effect — auraHit),
+//           a mode's loops (水遁忍者's spin);
 //       (1) FX_BINDINGS (skills.js): a kit fx standing for an official effect no plan row places (克莱门莎 S3's mark,
 //           泡泡 S2's counter on her attacker, 归溟幽灵鲨 S1's hit on the ally she swaps HP with);
 //       (2) pulse: a fx tagged with its skill (`extra.skill`) while the skill is on, when the plan has `pulse` entries —
@@ -118,8 +119,6 @@ const DIRS = ['UP', 'RIGHT', 'DOWN', 'LEFT'];
 const CAST_START = new Set([0, 2]);
 /** Battle seconds an enemy's skill window outlasts its start before the snapshot's anim may end it (the sim's 0.5 s). */
 const ENEMY_GRACE = 0.3;
-/** Tiles past an aura tick's radius within which a unit it hurt stands (its collider, the drawn positions' lag). */
-const AURA_REACH = 0.6;
 /**
  * Battle seconds an aura's looping buff effect stays on a unit after the last tick that hurt it (鼎沸's
  * enemy_cjhot_debuff: the client keeps it while the unit is in the aura — its ticks come every second) [ASSUMED].
@@ -1121,29 +1120,53 @@ export class SkillFx {
 
   /**
    * An enemy's kit fx its official effects stand for (ENEMY_FX_BINDINGS: its zone's prefabs at the fx's point, an aura
-   * tick its talent loops stand for): true when drawn (the procedural fx is skipped).
+   * tick its talent loops stand for): true when drawn (the procedural fx is skipped). A binding that draws nothing does
+   * not claim the fx — the next candidate is tried (a missing 秽蚀轰击 prefab used to swallow the death pool).
    */
   _enemyFx(kind, x, y, extra) {
     const cands = ENEMY_FX_KINDS[kind];
     if (!cands) return false;
+    const rows = [];
     for (const key of cands) {
       const bind = ENEMY_FX_BINDINGS[key][kind];
       if (bind.xkind && extra.kind !== bind.xkind) continue;
       const owner = this._enemyOwner(key, bind, x, y, extra);
       if (!owner) continue;
+      rows.push({ key, bind, owner, rank: this._fxRank(bind, owner, extra) });
+    }
+    rows.sort((a, b) => a.rank - b.rank);
+    for (const { key, bind, owner } of rows) {
       if (bind.endMode) { this._modeEnd(owner); return false; }   // (its procedural cue stays)
-      if (bind.modeLoops) return this._modeWin(owner, key, bind);
-      if (bind.talent) return this._aura(owner, key, bind, x, y, extra);
-      const drew = this._zone(bind, x, y, extra);
+      const drew = bind.modeLoops ? this._modeWin(owner, key, bind)
+        : bind.talent ? this._aura(owner, key, bind, x, y, extra)
+        : this._zone(bind, x, y, extra);
+      if (!drew) continue;
       // the kit's own moment stood for an attack-rooted skill of a window: that was its one attack — the enemy's next
       // attacks in the window are its own (0.3.1: the 'cast' of 鼠王's 【沙狱】 holds the window for the debuff's 15 s, and
       // every attack of the boss in it replayed the sandstorm on its target; 暴鸰's bomb, an 'atk' 0.27 s after its
       // 'cast', keeps its window's rows)
-      const W = drew && owner.id != null ? this.units.get(owner.id)?.ewin : null;
+      const oid = owner !== true ? idOf(owner) : null;
+      const W = oid != null ? this.units.get(oid)?.ewin : null;
       if (W && W.attackRoot) W.fired = true;
-      return drew;
+      return true;
     }
     return false;
+  }
+
+  /**
+   * Who a matching binding is tried as. A zone that names its source (`extra.id` — 【污染秽蚀】 carries `pollution`'s
+   * src) matches as owner 'id', ahead of a death at the point, so a 秽蚀轰击 pool on a tile where a 枯朽战士 also died
+   * keeps the tank's prefab. A death within OWNER_NEAR is ahead of a cast the zone does not name: the cast has no
+   * distance check (the pool is on the target, not the caster) and one render frame holds both.
+   * [ASSUMED] a zone with no id belongs to the death at the point, else to the cast.
+   */
+  _fxRank(bind, owner, extra) {
+    const oid = owner && owner !== true ? idOf(owner) : null;
+    if (bind.owner === 'id' || (extra.id != null && oid != null && oid === extra.id)) return 0;
+    if (bind.owner === 'died') return 1;
+    if (bind.owner === 'cast') return 2;
+    if (bind.owner === 'near') return 3;
+    return 4;
   }
 
   /**
@@ -1197,8 +1220,8 @@ export class SkillFx {
 
   /**
    * An aura's tick (a 'pulse' / 'boil' of an enemy whose talent is the aura): the unit's talent loops (TalentFx) stand
-   * for it while they are drawn — and then the HP damage the tick deals in this frame to the units within its radius plays
-   * the aura's buff effects on them (auraHit).
+   * for it while they are drawn — and then one HP hit this frame on a unit inside the sim radius plays the aura's buff
+   * effects on it (auraHit).
    */
   _aura(v, key, bind, x, y, extra) {
     const T = this.w.talents?.units?.get(idOf(v));
@@ -1238,27 +1261,36 @@ export class SkillFx {
   }
 
   /**
-   * b.ev 'dmg' (HP) on view v that no attack owns (`claimed` false): a hit of an aura tick of this frame whose radius holds
-   * v (_aura) — the aura's buff effects on it: its one-shot each tick, its loop held AURA_HOLD_S past the last tick. True
-   * when drawn (the procedural spark is skipped).
+   * b.ev 'dmg' (HP) on view v that no attack owns (`claimed` false): a hit of an aura tick of this frame whose sim
+   * radius holds v (_aura) — the aura's buff effects on it: its one-shot each tick, its loop held AURA_HOLD_S past the
+   * last tick. Each aura takes at most one such hit per unit in the frame; the hit it takes is still offered to the
+   * next aura (two nests both play, and so does 鼎沸). True when one of them drew (the procedural spark is skipped).
+   * A unit past the sim radius, or a second hit on the same unit, keeps its spark.
+   * [ASSUMED] that one unclaimed HP hit inside the radius is the aura's tick — the client's buff trigger is not an event.
    */
   auraHit(v, claimed) {
     if (claimed || !this.auraWins.length || !v || v.isEnemy) return false;
     const now = this.w.ofx.time;
+    const id = idOf(v);
+    let any = false;
     for (const a of this.auraWins) {
-      if (a.frame !== this.frame || a.src === v || !(Math.hypot(v.x - a.x, v.y - a.y) <= a.r + AURA_REACH)) continue;
+      if (a.frame !== this.frame || a.src === v || !(Math.hypot(v.x - a.x, v.y - a.y) <= a.r)) continue;
+      const took = a.took || (a.took = new Set());
+      if (id != null && took.has(id)) continue;
       let drew = false;
       for (const k of a.tg.shots) if (this.w.playOn(k, v, { flipFrom: a.src })) drew = true;
       for (const k of a.tg.loops) {
-        const slot = `${idOf(v)}|${k}`;
+        const slot = `${id}|${k}`;
         const t = this.aloops.get(slot);
         if (t && t.h.alive) { t.until = now + AURA_HOLD_S; drew = true; continue; }
         const h = this.w.playOn(k, v, { follow: true, loop: true, important: true });
         if (h) { this.aloops.set(slot, { h, until: now + AURA_HOLD_S, v }); drew = true; }
       }
-      if (drew) return true;
+      if (!drew) continue;
+      if (id != null) took.add(id);
+      any = true;
     }
-    return false;
+    return any;
   }
 
   // ---- preload ----------------------------------------------------------------------------------------------------

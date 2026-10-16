@@ -215,6 +215,31 @@ describe('an enemy\'s zone under the official layer', () => {
     assert.equal(w.simFx('zone', 6, 9, zone({ r: 1.5, dur: 30, kind: 'pollution' })), false, 'another kind than its own');
   });
 
+  test("a 秽蚀轰击 cast in the frame does not take a 枯朽战士's death pool; the zone's source id keeps the tank pool on that tile", async () => {
+    const { w, view, frame, spawned } = await setup();
+    const tank = view(1, 'enemy_1272_nhtank', 0), war = view(2, 'enemy_1267_nhpbr', 20);
+    frame();
+    w.enemyCast(tank, 0);
+    w.death(war);
+    assert.equal(w.simFx('zone', 20, 9, zone({ kind: 'pollution' })), true);
+    assert.equal(w.simFx('zone', 0.2, 9, zone({ r: 1.7, dur: 10, kind: 'pollution' })), true);
+    assert.deepEqual(spawned.filter((k) => k.startsWith('enemy_nh')), ['enemy_nhpbr_attack_range', 'enemy_nhtank_attack_range']);
+    const onTile = await setup();
+    const tank2 = onTile.view(1, 'enemy_1272_nhtank', 0), war2 = onTile.view(2, 'enemy_1267_nhpbr', 5);
+    onTile.frame();
+    onTile.w.enemyCast(tank2, 0);
+    onTile.w.death(war2);
+    assert.equal(onTile.w.simFx('zone', 5, 9, zone({ kind: 'pollution', id: 1 })), true, 'the source id is the tank');
+    assert.deepEqual(onTile.spawned.filter((k) => k.startsWith('enemy_nh')), ['enemy_nhtank_attack_range']);
+    const miss = await setup({ installed: KEYS.filter((k) => k !== 'enemy_nhtank_attack_range') });
+    const tank3 = miss.view(1, 'enemy_1272_nhtank', 0), war3 = miss.view(2, 'enemy_1267_nhpbr', 20);
+    miss.frame();
+    miss.w.enemyCast(tank3, 0);
+    miss.w.death(war3);
+    assert.equal(miss.w.simFx('zone', 20, 9, zone({ kind: 'pollution' })), true, 'the tank prefab is missing: the death pool still plays');
+    assert.deepEqual(miss.spawned.filter((k) => k.startsWith('enemy_nh')), ['enemy_nhpbr_attack_range']);
+  });
+
   test("假想敌：蚀裂's cloud lands on its killer after its death (no id, no frame): its kind is its own", async () => {
     const { w, frame, spawned } = await setup();
     frame();
@@ -271,8 +296,32 @@ describe("an enemy aura's tick", () => {
     assert.equal(w.damage(a, 'arts', null, 1), true, 'its hit stands for the spark');
     assert.equal(spawned.at(-1), 'enemy_dsubrl_attack_hit');
     assert.equal(w.damage(far, 'arts', null, 1), false, 'out of its radius');
+    assert.equal(w.damage(a, 'true', null, 1), false, 'a second hit on the same ally keeps its spark');
     frame();
     assert.equal(w.damage(a, 'arts', null, 1.1), false, "a later frame's damage is not the tick's");
+    const slop = view(4, 'char_4039_horn', 9.7);   // 1.7 past r 1.6: the old +0.6 would have taken it
+    assert.equal(w.simFx('pulse', 8, 9, { r: 1.6, id: 1 }), true);
+    assert.equal(w.damage(slop, 'arts', null, 1.2), false, 'past the sim radius');
+  });
+
+  test('two auras in the frame each play their hit on the unit inside both; a hit one took is offered to the other', async () => {
+    const { w, view, frame, spawned } = await setup();
+    const a = view(1, 'enemy_1234_dsubrl', 8), b = view(4, 'enemy_1234_dsubrl', 8.2), ally = view(2, 'char_4039_horn', 9.2);
+    w.spawned(a); w.spawned(b); frame();
+    assert.equal(w.simFx('pulse', 8, 9, { r: 1.6, id: 1 }), true);
+    assert.equal(w.simFx('pulse', 8.2, 9, { r: 1.6, id: 4 }), true);
+    assert.equal(w.damage(ally, 'arts', null, 1), true);
+    assert.equal(w.damage(ally, 'true', null, 1), false, 'the second hit is not another tick');
+    assert.equal(spawned.filter((k) => k === 'enemy_dsubrl_attack_hit').length, 2);
+    const boil = await setup();
+    const near = boil.view(1, 'enemy_10054_cjhot', 8), far = boil.view(2, 'enemy_10054_cjhot', 12);
+    const op = boil.view(3, 'char_4039_horn', 8.2), op2 = boil.view(4, 'char_4039_horn', 12.2);
+    boil.w.spawned(near); boil.w.spawned(far); boil.frame();
+    assert.equal(boil.w.simFx('explode', 8.1, 9, { r: 1.6, kind: 'boil' }), true);
+    assert.equal(boil.w.simFx('explode', 12, 9, { r: 1.6, kind: 'boil' }), true);
+    assert.equal(boil.w.damage(op, 'arts', null, 1), true);
+    assert.equal(boil.w.damage(op2, 'arts', null, 1), true, 'the other aura still has its own hit');
+    assert.equal(boil.spawned.filter((k) => k === 'enemy_cjhot_debuff').length, 2);
   });
 
   test('鼎沸 (no id): its boil at its feet is its tick; the units it hurts carry its buff loop until AURA_HOLD_S after the last tick', async () => {
