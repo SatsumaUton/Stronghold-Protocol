@@ -169,15 +169,18 @@ export class BoardScene {
     this.scene.fog = new T.Fog(LIGHTING.fog.color, LIGHTING.fog.near, LIGHTING.fog.far);
     this.camera = new T.PerspectiveCamera(40, 16 / 9, 0.5, 120);
     this.focus = focusUniforms(T);
+    this.envMap = null;
+    this.envRT = null;
     if (opts.environment !== false) {
       try {
         this.envMap = environmentMap(T, R);
+        this.envRT = this.envMap?.userData?.pmremTarget || null;
         if (this.envMap) {
           this.scene.environment = this.envMap;
           this.scene.environmentIntensity = LIGHTING.env;
           this.scene.environmentRotation?.set?.(-Math.PI / 2, 0, 0);
         }
-      } catch { this.envMap = null; }
+      } catch { this.envMap = null; this.envRT = null; }
     }
     this.focusTarget = null;
     const aniso = Math.min(8, R.capabilities?.getMaxAnisotropy?.() || 1);
@@ -452,6 +455,8 @@ export class BoardScene {
             map: res.tex[info?.map] || null, lightMap: c.lightmap >= 0 ? (res.lm[c.lightmap] || null) : null, info,
             light: pack.doc?.light || null, lightRange: pack.doc?.lightRange, lightEncoding: pack.doc?.lightEncoding,
             normalMap: res.data[info?.normalMap] || null, glossMap: res.data[info?.glossMap] || null,
+            // sRGB. sceneMaterial samples it only when _EMISSION is on, so a map without the keyword stays unlit.
+            emissionMap: res.tex[info?.emissionMap] || null,
             env: res.env, envRange: pack.doc?.env?.range,
           }, this.focus);
         res.mats.set(mk, mat);
@@ -626,8 +631,13 @@ export class BoardScene {
 
   _fitShadow(board) {
     const k = this.key;
-    const b = board.bounds;
-    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+    const b = (board && board.bounds) || {};
+    // [ASSUMED] an empty or non-finite board box (no tiles yet) centres the shadow camera at the origin
+    // with a 30-tile span. A finite box keeps the previous centre and span.
+    const finite = [b.x0, b.x1, b.y0, b.y1].every((v) => Number.isFinite(v));
+    const cx = finite ? (b.x0 + b.x1) / 2 : 0;
+    const cy = finite ? (b.y0 + b.y1) / 2 : 0;
+    const span = finite ? Math.max(b.x1 - b.x0, b.y1 - b.y0) : 30;
     const d = LIGHTING.key.dir;
     const len = Math.hypot(d[0], d[1], d[2]);
     const dist = 30;
@@ -636,7 +646,7 @@ export class BoardScene {
     k.target.updateMatrixWorld();
     const cam = k.shadow.camera;
     // light-space box covering the island and its shadow on the background plane
-    const half = Math.max(b.x1 - b.x0, b.y1 - b.y0) / 2 + 9;
+    const half = span / 2 + 9;
     cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half;
     cam.near = 1; cam.far = dist + 30;
     cam.updateProjectionMatrix();
@@ -772,7 +782,15 @@ export class BoardScene {
     this.mat.edge?.map?.dispose?.(); // canvas dash texture (not in this.tex)
     for (const m of Object.values(this.mat)) m?.dispose?.();
     for (const t of Object.values(this.tex)) t?.dispose?.();
-    this.envMap?.dispose?.();
+    // PMREM's render target owns the environment texture. Disposing the texture alone leaks the framebuffer.
+    // app.js rebuilds 3D by destroy() then a new BoardScene. [ASSUMED] the target's dispose frees the texture too.
+    if (this.envRT) {
+      try { this.envRT.dispose(); } catch { /* ignore */ }
+    } else {
+      this.envMap?.dispose?.();
+    }
+    this.envRT = null;
+    this.envMap = null;
     this.canvas.removeEventListener?.('webglcontextlost', this._onLost);
     try { this.renderer.dispose(); } catch { /* ignore */ }
     try { this.renderer.forceContextLoss?.(); } catch { /* ignore */ }
