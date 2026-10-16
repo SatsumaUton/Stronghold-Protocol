@@ -342,6 +342,8 @@ span.settle__nexticon .icon { width: .3rem; height: .3rem; }
 .steam__barbg .sprite { height: 1.65rem; }
 .steam__outcome { position: absolute; left: .42rem; top: 9.24rem; display: flex; flex-direction: column; align-items: flex-start; gap: .04rem; }
 .steam__tags { display: flex; align-items: center; gap: .1rem; }
+/* the 测试 mark of a 「测试」 match (0.3.1), beside the mode pill on both pages */
+.settle__test { display: inline-flex; align-items: center; gap: .06rem; color: #e8b84a; font-size: calc(.15 * var(--t)); white-space: nowrap; }
 .steam__title { font-size: calc(.66 * var(--t)); font-weight: 900; letter-spacing: .03em; line-height: 1.15; color: #f4f7f6; white-space: nowrap; }
 .steam__rounds { position: absolute; left: 3.45rem; top: 9.24rem; width: 2.7rem; height: 1.36rem; display: flex; flex-direction: column; align-items: center; justify-content: center;
   border-left: 2px solid rgba(200, 214, 210, .14); border-right: 2px solid rgba(200, 214, 210, .14); }

@@ -92,6 +92,21 @@ test('levelProgress: a match with gameplay plugins earns nothing and leaves the 
   assert.equal(p.trophies, 0);
 });
 
+test('levelProgress: a record marked test (0.3.1 测试 mode) counts toward neither the level nor the daily goal', () => {
+  const now = at(16, 20);
+  const p = S.levelProgress([rec('a', at(16, 9), { reward: 100, rounds: 10 }), { ...rec('b', at(16, 10), { reward: 900, rounds: 14 }), test: true }],
+    { id: 'own', gain: 0, rounds: 0, at: now, rewards: REWARDS });
+  assert.equal(p.before, 100, 'the test record adds no 卫戍认证 (and does not complete the daily goal)');
+  assert.equal(p.daily.today, 100, 'nor daily points');
+});
+
+test('the result flow marks a 测试 match on both pages and counts it toward nothing', () => {
+  const src = readFileSync(new URL('../../public/js/screens/settle.js', import.meta.url), 'utf8');
+  assert.match(src, /<\$\{SettleTestMark\} res=\$\{res\} \/><\/div>/, 'the personal report');
+  assert.match(src, /steam__tags[^\n]*<\$\{SettleTestMark\} res=\$\{res\} \/>/, 'the alliance page');
+  assert.match(src, /counted: !isTest && !isModdedRoom/);
+});
+
 test('levelProgress without the data\'s rewards: the rewards only, no daily goal', () => {
   const p = S.levelProgress([rec('a', 1, { reward: 30 })], { id: 'own', gain: 10, at: 2 });
   assert.deepEqual([p.before, p.after, p.bonus, p.daily], [30, 40, 0, null]);

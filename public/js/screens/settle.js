@@ -27,6 +27,7 @@ import { sentText } from '../ui/lang.js';
 import { reducedMotion } from '../ui/device.js';
 import { recordId, selfRowOf, loadStats, isModdedRecord } from '../ui/stats.js';
 import { UnofficialMark, isModdedRoom } from '../ui/pluginTag.js';
+import { TestMark } from '../ui/testConsole.js';
 import { ResultView, resultBonds } from './result.js';
 import { DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
 import { t } from '../../../shared/i18n.js';
@@ -96,7 +97,8 @@ export function levelProgress(records, { id = null, gain = 0, rounds = 0, trophi
   let cups = 0;
   for (const rec of Array.isArray(records) ? records : []) {
     // a quit record had no settlement: nothing earned
-    if (!rec || rec.id === id || !Number.isFinite(rec.t) || rec.t > now || rec.end === 'quit' || isModdedRecord(rec)) continue;
+    // (a 测试 match never counts: its record is not kept, and an old or imported one marked test is skipped too)
+    if (!rec || rec.id === id || !Number.isFinite(rec.t) || rec.t > now || rec.end === 'quit' || rec.test === true || isModdedRecord(rec)) continue;
     const row = selfRowOf(rec);
     total += int(row?.reward);
     cups += int(row?.trophies);
@@ -388,7 +390,7 @@ function LevelStrip({ prog, milestones }) {
         <span class="slv__gain"><${Sprite} k="settle/reward_normal_icon" class="slv__icon" />${t('获得卫戍认证 +{n}', { n: gain })}</span>
         ${d ? html`<span class=${cx('slv__gain', 'slv__gain--daily', prog.bonus && 'is-done')} title=${t('每日防卫目标：{today}/{need}', { today: d.today, need: d.need })}>
           <${Sprite} k="settle/reward_plus" class="slv__icon" />${t('每日防卫目标 +{n}', { n: prog.bonus })}<small class="num">${d.today}/${d.need}</small></span>` : null}`
-        : html`<span class="slv__gain slv__gain--off">${t('非官方对局不计入等级')}</span>`}
+        : html`<span class="slv__gain slv__gain--off">${prog.test ? t('测试对局不计入等级') : t('非官方对局不计入等级')}</span>`}
     </div>
   </div>`;
 }
@@ -406,7 +408,13 @@ function Medal({ m, i }) {
   </span>`;
 }
 
-function SelfPage({ r, raw, self, gd, prog, content, onNext }) {
+/** The 测试 mark of a match of the 「测试」 mode (0.3.1, DESIGN §34.8) with its command count, as on the detail view. */
+function SettleTestMark({ res }) {
+  if (res?.test !== true) return null;
+  return html`<span class="settle__test" data-testid="settle-test"><${TestMark} /> ${t('测试对局')}${Number.isInteger(res.testActions) ? html` · ${t('测试指令 {n} 次', { n: res.testActions })}` : null}</span>`;
+}
+
+function SelfPage({ r, res, raw, self, gd, prog, content, onNext }) {
   const cleared = rowCleared(raw, self, r.victory);
   const [leaving, setLeaving] = useState(false);
   const nextRef = useRef(null);
@@ -436,7 +444,7 @@ function SelfPage({ r, raw, self, gd, prog, content, onNext }) {
       <div class="sself__fx" aria-hidden="true"></div>
       <${Logo} />
       <div class="sself__band">${self.bandId ? html`<${BandIcon} bandId=${self.bandId} size="lg" />` : html`<${PlayerAvatar} player=${self} self=${true} />`}<i aria-hidden="true"></i></div>
-      <div class="sself__mode"><${ModePill} r=${r} /><${UnofficialMark} room=${content ? { content } : null} class="sself__modmark" /></div>
+      <div class="sself__mode"><${ModePill} r=${r} /><${UnofficialMark} room=${content ? { content } : null} class="sself__modmark" /><${SettleTestMark} res=${res} /></div>
       <h1 class="sself__title">${cleared ? t('模拟完成') : t('模拟中断')}</h1>
       <div class="sself__rounds"><span>${t('通过回合')}</span><b class="num">${rounds}</b></div>
       ${medals.length ? html`<div class="sself__medals">${medals.map((m, i) => html`<${Medal} key=${m.kind} m=${m} i=${i} />`)}</div>` : null}
@@ -533,7 +541,7 @@ function TeamPage({ r, res, gd, myId, at: when, content, backLabel, onBack, onDe
       </div>
       <div class="settle__barbg steam__barbg" aria-hidden="true"><${Sprite} k="settle/bottom_bg" /></div>
       <div class="steam__outcome">
-        <span class="steam__tags"><${ModePill} r=${r} /><${UnofficialMark} room=${content ? { content } : null} /></span>
+        <span class="steam__tags"><${ModePill} r=${r} /><${UnofficialMark} room=${content ? { content } : null} /><${SettleTestMark} res=${res} /></span>
         <b class="steam__title">${r.victory ? t('模拟完成') : t('模拟中断')}</b>
       </div>
       <div class="steam__rounds"><span>${t('同盟通过回合')}</span><b class="num">${rounds}</b></div>
@@ -572,16 +580,18 @@ export function SettleFlow({ res, pub = null, myId = null, content = null, backL
     const own = records.find((x) => x.id === id);
     return { records, id, at: own?.t || Date.now() };
   }, []);
-  const prog = useMemo(() => (self ? levelProgress(ctx.records, {
+  // a 测试 match earns nothing toward the level or the daily goal (its server reward is 0 and its record is not kept)
+  const isTest = res?.test === true;
+  const prog = useMemo(() => (self ? { ...levelProgress(ctx.records, {
     id: ctx.id, gain: self.reward, rounds: self.roundsPassed, trophies: self.trophies, at: ctx.at,
-    counted: !isModdedRoom(content ? { content } : null), rewards: gd.config?.rewards,
-  }) : null), [gd.config]);
+    counted: !isTest && !isModdedRoom(content ? { content } : null), rewards: gd.config?.rewards,
+  }), test: isTest } : null), [gd.config]);
   const rootRef = useRef(null);
   useStageFit(rootRef);
   const lose = self ? !rowCleared(rawSelf, self, r.victory) : !r.victory;
   return html`<div ref=${rootRef} class=${cx('screen', 'result', 'settle', `settle--${page}`)} data-testid="settle">
     ${page === 'intro' ? html`<${SettleIntro} players=${r.players} myId=${myId} lose=${lose} onDone=${() => setPage('self')} />` : null}
-    ${page === 'self' ? html`<${SelfPage} r=${r} raw=${rawSelf} self=${self} gd=${gd} prog=${prog} content=${content} onNext=${() => setPage('team')} />` : null}
+    ${page === 'self' ? html`<${SelfPage} r=${r} res=${res} raw=${rawSelf} self=${self} gd=${gd} prog=${prog} content=${content} onNext=${() => setPage('team')} />` : null}
     ${page === 'team' ? html`<${TeamPage} r=${r} res=${res} gd=${gd} myId=${myId} at=${ctx.at} content=${content} backLabel=${backLabel} onBack=${onBack} onDetail=${() => setDetail(true)} />` : null}
     ${detail ? html`<div class="settle__detail" data-testid="settle-detail">
       <${ResultView} res=${res} pub=${pub} myId=${myId} quiet=${true} slot=${false} content=${content} backLabel=${t('返回')} onBack=${() => setDetail(false)} /></div>` : null}
