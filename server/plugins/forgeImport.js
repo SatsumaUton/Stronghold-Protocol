@@ -42,6 +42,17 @@
 //     tier first), its 自选 kit for a 自选 record. A partial or ambiguous match keeps "generic" and is named. [ASSUMED]
 //   * An override array replaces the official array in one set. talents and talentsBase are merged by index in Forge;
 //     this version names them and does not replace them.
+//   * A chess override's `skill` and the `isDefault` entry of `skills[]` are one object (Forge DATA.md). The importer
+//     writes both from that entry. A record whose two sides differ is not imported; the rest of the pack is. [ASSUMED]
+//   * A bond, garrison or bond-member id this installation does not have is named and left out of that list. A list
+//     that is then empty is not written, so the official list stays. New bonds and new chess ids are not invented.
+//     A chess override does not write backup, chessType or status: those stay on the official record. [ASSUMED]
+//   * Spine clip data is computed during the import by skeletonClipData, the same read `plugin.mjs pack` uses, on a
+//     dry run and on a write. A skeleton that cannot be parsed is named and only that model is dropped. [ASSUMED]
+//   * Forge JSON may hold a safe integer outside ±1e9 (a Unix timestamp). That does not reject the file. A number
+//     written into game data stays within ±1e9: skill duration, spCost, initSp, maxChargeTime, increment, blackboard
+//     numbers, stats, price, sellPrice, and patch leaves. A larger one is named and not written. Written plugin JSON
+//     stays within ±1e9. [ASSUMED]
 //   * Record ids use the content plugin id (--out's basename when that product is primary, otherwise the pack id).
 //   * Two i18n entries that canonicalise to one language are refused (PLUGIN_FORGE_INPUT). They are not merged.
 //   * JSON keys __proto__, constructor and prototype are refused before any mapping. Asset trees use Object.create(null).
@@ -77,13 +88,14 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { crc32 } from './zip.js';
-import { checkPluginFolder, packPlugin } from './pack.js';
+import { packPlugin, skeletonClipData } from './pack.js';
 import { createPluginRegistry } from './registry.js';
 import { buildContentSet } from './contentSet.js';
 import { createVisualSets } from './visualSet.js';
 import { PLUGIN_LIMITS, PLUGIN_MANIFEST, UI_SLOT_IDS, extOf, isPackPath, isPluginId, checkJsonLimits } from '../../shared/plugins/manifest.js';
 import { ASSET_CONTAINERS, getPath, isAssetKey, readAssetOverlay } from '../../shared/plugins/visual.js';
 import { namespace, namespaceCollides } from '../../shared/plugins/dataUtils.js';
+import { canonicalJson } from '../../shared/plugins/identity.js';
 import { validateSkillSpec } from '../../shared/plugins/skillSpec.js';
 import { canonicalLang, languageName, SOURCE_LANG } from '../../shared/i18nPacks.js';
 import { KITS, OPERATOR_KITS, TIER_KITS } from '../sim/content/kits/index.js';
@@ -578,7 +590,9 @@ function readJsonBuf(buf, label) {
   if (buf.length > PLUGIN_LIMITS.jsonBytes) fail('PLUGIN_FORGE_JSON', `${label}: larger than ${PLUGIN_LIMITS.jsonBytes} bytes`);
   let value;
   try { value = JSON.parse(buf.toString('utf8')); } catch (e) { fail('PLUGIN_FORGE_JSON', `${label}: ${e instanceof SyntaxError ? e.message : e.code || 'unreadable'}`); }
-  const bad = checkJsonLimits(value);
+  // Safe integers past ±1e9 stay readable (a Unix timestamp on a field that is not imported). Written plugin JSON
+  // and every number copied into game data still use the ±1e9 window.
+  const bad = checkJsonLimits(value, { numbers: 'safe' });
   if (bad) fail('PLUGIN_FORGE_JSON', `${label}: ${bad}`);
   assertSafeKeys(value, label);
   return value;
@@ -723,11 +737,120 @@ function finiteStats(src, baseStats) {
   /** @type {Record<string, number>} */
   const out = {};
   for (const k of STAT_KEYS) {
-    if (!has(src, k) || typeof src[k] !== 'number' || !Number.isFinite(src[k])) continue;
+    if (!has(src, k)) continue;
+    const v = src[k];
+    // A stat past ±1e9 must not enter the compact record (the written plugin JSON would be refused, and the
+    // content set would fail the whole pack). Drop the form instead of copying a partial block.
+    if (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) > PLUGIN_LIMITS.number) return null;
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
     if (baseStats && has(baseStats, k) && typeof baseStats[k] !== 'number') continue;
-    out[k] = src[k];
+    out[k] = v;
   }
   return Object.keys(out).length ? out : null;
+}
+
+/** Paths of finite numbers outside ±1e9. The file was allowed to parse; these values are not copied. */
+function numbersPastBound(value, at = '$') {
+  /** @type {string[]} */
+  const out = [];
+  const stack = [{ v: value, at }];
+  while (stack.length && out.length < 32) {
+    const cur = stack.pop();
+    const v = cur.v;
+    if (typeof v === 'number') {
+      if (Number.isFinite(v) && Math.abs(v) > PLUGIN_LIMITS.number) out.push(`${cur.at}: ${v}`);
+      continue;
+    }
+    if (!v || typeof v !== 'object') continue;
+    if (Array.isArray(v)) {
+      for (let i = v.length - 1; i >= 0; i--) stack.push({ v: v[i], at: `${cur.at}[${i}]` });
+    } else {
+      for (const k of Object.keys(v).reverse()) {
+        if (DANGER_KEYS.has(k)) continue;
+        stack.push({ v: v[k], at: `${cur.at}.${k}` });
+      }
+    }
+  }
+  return out;
+}
+
+/** `skill` without `isDefault`. Forge: the isDefault skills[] entry equals `skill`. */
+function skillBody(entry) {
+  if (!isObj(entry)) return null;
+  const rest = { ...entry };
+  delete rest.isDefault;
+  return rest;
+}
+
+function oneDefaultSkill(skills) {
+  if (!Array.isArray(skills)) return null;
+  const marked = skills.filter((s) => isObj(s) && s.isDefault === true);
+  return marked.length === 1 ? marked[0] : null;
+}
+
+function skillDiffText(skill, body) {
+  const ak = isObj(skill) ? Object.keys(skill) : [];
+  const bk = isObj(body) ? Object.keys(body) : [];
+  const onlySkill = ak.filter((k) => !bk.includes(k));
+  const onlyEntry = bk.filter((k) => !ak.includes(k));
+  const differ = ak.filter((k) => bk.includes(k) && canonicalJson(skill[k]) !== canonicalJson(body[k]));
+  const parts = [];
+  if (onlySkill.length) parts.push(`only on skill: ${onlySkill.slice(0, 6).join(', ')}`);
+  if (onlyEntry.length) parts.push(`only on the default skills[] entry: ${onlyEntry.slice(0, 6).join(', ')}`);
+  if (differ.length) parts.push(`differ: ${differ.slice(0, 6).join(', ')}`);
+  return parts.join('; ') || 'values differ';
+}
+
+/**
+ * Chess `skill` and the isDefault `skills[]` entry are one object. Derive both from that entry when the pack
+ * supplies them and they agree. A record whose two sides differ is not imported.
+ * @returns {{ rest: any, ops: { path: string[], value: any }[] } | { drop: true, zh: string, en: string }}
+ */
+function alignChessSkills(vanillaRec, partial) {
+  const hasSkill = isObj(partial.skill);
+  const hasSkills = Array.isArray(partial.skills);
+  const rest = { ...partial };
+  delete rest.skill;
+  delete rest.skills;
+  if (hasSkills) {
+    const def = oneDefaultSkill(partial.skills);
+    if (!def) {
+      return {
+        drop: true,
+        zh: 'skills[] 没有恰好一条 isDefault，写不出和 skill 相同的默认技能，这条记录没有导入。',
+        en: 'skills[] does not mark exactly one isDefault, so skill cannot equal the default entry and this record was not imported.',
+      };
+    }
+    const body = skillBody(def);
+    if (hasSkill && canonicalJson(body) !== canonicalJson(partial.skill)) {
+      const diff = skillDiffText(partial.skill, body);
+      return {
+        drop: true,
+        zh: `skill 和默认 skills[] 条目不一致（${diff}），这条记录没有导入。`,
+        en: `skill differs from the default skills[] entry (${diff}), so this record was not imported.`,
+      };
+    }
+    /** @type {{ path: string[], value: any }[]} */
+    const ops = [];
+    if (!sameJson(partial.skills, vanillaRec?.skills)) ops.push({ path: ['skills'], value: partial.skills });
+    if (!sameJson(body, vanillaRec?.skill)) ops.push({ path: ['skill'], value: body });
+    return { rest, ops };
+  }
+  const def = oneDefaultSkill(vanillaRec?.skills);
+  if (!def || !isObj(vanillaRec?.skill)) {
+    return {
+      drop: true,
+      zh: '官方记录没有恰好一条默认技能，包里的 skill 对不齐，这条记录没有导入。',
+      en: 'The official record has no single default skill, so the pack skill cannot be aligned and this record was not imported.',
+    };
+  }
+  const body = skillBody(partial.skill);
+  const next = vanillaRec.skills.map((s) => (s && s.isDefault === true ? { ...body, isDefault: true } : s));
+  /** @type {{ path: string[], value: any }[]} */
+  const ops = [];
+  if (!sameJson(next, vanillaRec.skills)) ops.push({ path: ['skills'], value: next });
+  if (!sameJson(body, vanillaRec.skill)) ops.push({ path: ['skill'], value: body });
+  return { rest, ops };
 }
 
 function gridOf(v) {
@@ -1123,17 +1246,67 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     const prefix = file === 'units' ? ['units', id] : [];
     const vanillaRec = file === 'units' ? table('units')?.[id] : table(file)?.[id];
     if (!vanillaRec) { skip(`${file}:${id}`, '覆盖声明指向的官方记录不存在，没有改。', 'The override names an official record that does not exist, so nothing was changed.'); return; }
+    let source = partial;
+    /** @type {{ path: string[], value: any }[]} */
+    const forced = [];
+    let skillHeld = false;
+    if (file === 'chess' && (isObj(partial.skill) || Array.isArray(partial.skills))) {
+      const aligned = alignChessSkills(vanillaRec, partial);
+      if ('drop' in aligned) { skip(`${file}:${id}`, aligned.zh, aligned.en); return; }
+      source = aligned.rest;
+      const past = aligned.ops.flatMap((op) => numbersPastBound(op.value, op.path.join('.')));
+      if (past.length) {
+        skillHeld = true;
+        skip(`${file}:${id}#skill`, `skill / skills 里的数超出 ±${PLUGIN_LIMITS.number}（${past.slice(0, 6).join('；')}），没有写进游戏数据。`, `A number in skill / skills is outside ±${PLUGIN_LIMITS.number} (${past.slice(0, 6).join('; ')}), so it was not written into game data.`);
+      } else forced.push(...aligned.ops);
+    }
+    // [ASSUMED] An id this installation does not have is named and left out of the written list. A list that is then
+    // empty is not written, so the official list stays. New bonds and new chess ids are not invented here.
+    let listedHeld = false;
+    const keepKnown = (field, tableName, labelZh, labelEn) => {
+      if (!Array.isArray(source[field])) return;
+      const knownTable = table(tableName) || {};
+      const unknown = [];
+      const known = [];
+      for (const item of source[field]) {
+        const key = typeof item === 'string' ? item : '';
+        if (!key || !has(knownTable, key)) unknown.push(String(item ?? '').slice(0, 40));
+        else if (!known.includes(key)) known.push(key);
+      }
+      if (!unknown.length) return;
+      listedHeld = true;
+      skip(`${file}:${id}#${field}`, `「${unknown.slice(0, 6).join('、')}」在本安装里没有这条${labelZh}，没有写进 ${field}。`, `"${unknown.slice(0, 6).join(', ')}" is not a ${labelEn} in this installation, so it was not written into ${field}.`);
+      if (known.length) source[field] = known;
+      else delete source[field];
+    };
+    if (file === 'chess') {
+      keepKnown('bonds', 'bonds', '盟约', 'bond');
+      keepKnown('garrisonIds', 'garrisons', '驻守', 'garrison');
+      // The stand-in, the PRESET/NORMAL type and the promotion status belong to this installation. A pack value
+      // that differs is named. Writing it breaks the official stand-in (a partial backup, or a status with no module).
+      for (const field of ['backup', 'chessType', 'status']) {
+        if (source[field] == null || sameJson(source[field], vanillaRec[field])) continue;
+        listedHeld = true;
+        skip(`${file}:${id}#${field}`, `「${field}」沿用本安装的官方记录（替身、棋子类型和晋升由这里的数据决定），包里的值没有写入。`, `"${field}" stays on the official record (the stand-in, the chess type and the promotion belong to this installation), so the pack's value was not written.`);
+        delete source[field];
+      }
+    }
+    if (file === 'bonds') {
+      keepKnown('members', 'chess', '棋子', 'chess piece');
+      keepKnown('visibleMembers', 'chess', '棋子', 'chess piece');
+    }
     const notes = [];
     const unsupported = [];
     const leaves = [];
-    leafOps(vanillaRec, partial, prefix, leaves, notes, unsupported);
+    leafOps(vanillaRec, source, prefix, leaves, notes, unsupported);
+    for (const op of forced) leaves.push({ path: [...prefix, ...op.path], value: op.value });
     const dataFile = file === 'units' ? 'backups' : file;
     for (const leaf of leaves) {
       if (file === 'units') patches.push({ op: 'set', file: 'backups', path: leaf.path, value: leaf.value });
       else patches.push({ op: 'set', file: dataFile, id, path: leaf.path, value: leaf.value });
     }
     if (leaves.length) importedData.push(`${file}:${id} → ${leaves.length} set`);
-    else if (!unsupported.length) skip(`${file}:${id}`, '没有类型对得上的字段，没有改这条官方记录。', 'No field kept its type, so this official record was not changed.');
+    else if (!unsupported.length && !skillHeld && !listedHeld) skip(`${file}:${id}`, '没有类型对得上的字段，没有改这条官方记录。', 'No field kept its type, so this official record was not changed.');
     if (unsupported.length) skip(`${file}:${id}#${unsupported[0]}`, `数组「${unsupported[0]}」要按 index 合并（talents / talentsBase）。这一版不整块替换，也没有逐项改。`, `The array "${unsupported[0]}" is merged by index (talents / talentsBase). This version neither replaces it wholesale nor edits its items.`);
     if (notes.length) skip(`${file}:${id}#${notes.slice(0, 3).join(',')}`, '有些字段对不上官方记录的类型或路径，那些字段没有改。', 'Some fields did not match the official type or path, so those fields were not changed.');
   };
@@ -1246,7 +1419,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     const out = {};
     for (const [k, v] of Object.entries(bb)) {
       if (DANGER_KEYS.has(k)) continue;
-      if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
+      if (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= PLUGIN_LIMITS.number) out[k] = v;
       else dropped.add(`${label}bb.${k}`);
     }
     return Object.keys(out).length ? out : null;
@@ -1274,7 +1447,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
         continue;
       }
       if (['duration', 'spCost', 'initSp', 'maxChargeTime', 'increment'].includes(k)) {
-        if (typeof v === 'number' && Number.isFinite(v)) skill[k] = v;
+        if (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= PLUGIN_LIMITS.number) skill[k] = v;
         else if (v != null) dropped.add(k);
       } else if (k === 'desc' && typeof v === 'string') skill.desc = v.slice(0, 200);
       else if (k === 'descRaw' && typeof v === 'string') skill.descRaw = v.slice(0, 400);
@@ -1609,11 +1782,15 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       return out;
     };
     const chess = { tier, bonds };
-    const priceN = typeof normal.price === 'number' && Number.isFinite(normal.price) ? normal.price : null;
-    const priceE = typeof elite.price === 'number' && Number.isFinite(elite.price) ? elite.price : priceN;
+    const money = (n) => (typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= PLUGIN_LIMITS.number ? n : null);
+    if (typeof normal.price === 'number' && Number.isFinite(normal.price) && Math.abs(normal.price) > PLUGIN_LIMITS.number) skip(`${label}#price`, `price ${normal.price} 超出 ±${PLUGIN_LIMITS.number}，没有写进游戏数据。`, `price ${normal.price} is outside ±${PLUGIN_LIMITS.number}, so it was not written into game data.`);
+    if (typeof elite.price === 'number' && Number.isFinite(elite.price) && Math.abs(elite.price) > PLUGIN_LIMITS.number) skip(`${label}#price`, `精锐 price ${elite.price} 超出 ±${PLUGIN_LIMITS.number}，没有写进游戏数据。`, `The elite price ${elite.price} is outside ±${PLUGIN_LIMITS.number}, so it was not written into game data.`);
+    const priceN = money(normal.price);
+    const priceE = money(elite.price) ?? priceN;
     if (priceN != null) chess.price = priceN === priceE ? priceN : { normal: priceN, golden: priceE };
-    const sellN = typeof normal.sellPrice === 'number' && Number.isFinite(normal.sellPrice) ? normal.sellPrice : null;
-    const sellE = typeof elite.sellPrice === 'number' && Number.isFinite(elite.sellPrice) ? elite.sellPrice : sellN;
+    if (typeof normal.sellPrice === 'number' && Number.isFinite(normal.sellPrice) && Math.abs(normal.sellPrice) > PLUGIN_LIMITS.number) skip(`${label}#sellPrice`, `sellPrice ${normal.sellPrice} 超出 ±${PLUGIN_LIMITS.number}，没有写进游戏数据。`, `sellPrice ${normal.sellPrice} is outside ±${PLUGIN_LIMITS.number}, so it was not written into game data.`);
+    const sellN = money(normal.sellPrice);
+    const sellE = money(elite.sellPrice) ?? sellN;
     if (sellN != null && sellN === sellE) chess.sellPrice = sellN;
     else if (sellN != null) skip(`${label}#sellPrice`, '普通和精锐的卖价不同，紧凑记录只有一个卖价，用本安装的经济表。', 'The normal and elite sell prices differ, and the compact record has one sell price, so the economy table applies.');
     const garrisons = table('garrisons') || {};
@@ -1719,6 +1896,12 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     if (!doc) {
       if (declaredContent.includes(name)) skip(`content:${name}`, 'content 声明了这个文件，但包里没有对应的 JSON，没有导入。', 'content names this file, but the pack has no such JSON, so it was not imported.');
       continue;
+    }
+    const past = numbersPastBound(doc);
+    if (past.length) {
+      const shown = past.slice(0, 8);
+      const tail = past.length > shown.length ? ` (+${past.length - shown.length})` : '';
+      skip(`${name}.json#number`, `这些数超出 ±${PLUGIN_LIMITS.number}，没有写进游戏数据。写进游戏数据的仍限 ±${PLUGIN_LIMITS.number}：技能 duration、spCost、initSp、maxChargeTime、increment，黑板，属性，price、sellPrice，补丁叶子。${shown.join('；')}${tail}`, `These numbers are outside ±${PLUGIN_LIMITS.number} and were not written into game data. Values that are written stay within ±${PLUGIN_LIMITS.number}: skill duration, spCost, initSp, maxChargeTime, increment, blackboards, stats, price, sellPrice, and patch leaves. ${shown.join('; ')}${tail}`);
     }
     const idField = name === 'units' ? 'charId' : name === 'enemies' ? 'key' : name === 'chess' ? 'chessId' : 'id';
     const map = asMap(doc, idField);
@@ -2258,6 +2441,64 @@ function publicReport({ meta, products, primaryId, wrote, dryRun, check, issues 
   return report;
 }
 
+function removeSpineValue(node, skel) {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) { for (const item of node) removeSpineValue(item, skel); return; }
+  for (const k of Object.keys(node)) {
+    const v = node[k];
+    if (isObj(v) && v.skel === skel) delete node[k];
+    else removeSpineValue(v, skel);
+  }
+}
+
+function pruneEmptyObjects(node) {
+  if (!isObj(node)) return;
+  for (const k of Object.keys(node)) {
+    pruneEmptyObjects(node[k]);
+    if (isObj(node[k]) && !Object.keys(node[k]).length) delete node[k];
+  }
+}
+
+/**
+ * Parse each Spine model the way `plugin.mjs pack` does. A skeleton that yields no clip entry is removed from the
+ * overlay and named; the other models stay. The lock is written afterwards by packPlugin.
+ * @param {string} dir the staged plugin folder
+ * @returns {{ path: string, zh: string, en: string }[]}
+ */
+function dropUnreadableModels(dir) {
+  const assetsPath = path.join(dir, 'assets.json');
+  if (!fs.existsSync(assetsPath)) return [];
+  let assets;
+  try { assets = JSON.parse(fs.readFileSync(assetsPath, 'utf8')); } catch { return []; }
+  const has = (rel) => { try { return fs.statSync(path.join(dir, ...String(rel).split('/'))).isFile(); } catch { return false; } };
+  const ov = readAssetOverlay(assets, { has, permissions: ['assets.add', 'assets.override'] });
+  /** @type {Map<string, { spine: { skel: string, atlas: string, textures: string[] }, containers: Set<string> }>} */
+  const models = new Map();
+  for (const op of ov.ops || []) {
+    if (!op.spine) continue;
+    if (!models.has(op.spine.skel)) models.set(op.spine.skel, { spine: op.spine, containers: new Set() });
+    models.get(op.spine.skel).containers.add(op.at[0]);
+  }
+  /** @type {{ path: string, zh: string, en: string }[]} */
+  const dropped = [];
+  for (const { spine, containers } of models.values()) {
+    const clip = skeletonClipData(dir, spine, containers);
+    if (clip.entry) continue;
+    const why = clip.problems[0] || `${spine.skel}: unreadable`;
+    removeSpineValue(assets, spine.skel);
+    dropped.push({
+      path: spine.skel,
+      zh: `读不了骨架 ${spine.skel}（${why}），只丢掉这个模型，其余照常导入。`,
+      en: `Could not read skeleton ${spine.skel} (${why}); only this model was dropped.`,
+    });
+  }
+  if (dropped.length) {
+    pruneEmptyObjects(assets);
+    fs.writeFileSync(assetsPath, `${JSON.stringify(assets, null, 2)}\n`);
+  }
+  return dropped;
+}
+
 function writeTree(dir, files, manifest) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, PLUGIN_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -2338,10 +2579,9 @@ export async function importForge(source, opts = {}) {
       for (const p of built.products) {
         const dir = path.join(stage, p.id);
         writeTree(dir, p.files, p.manifest);
-        const checked = checkPluginFolder(dir, `plugins/${p.id}/`, { vanilla: vanilla || undefined });
-        if (checked.problems.length || checked.warnings.length) {
-          for (const text of [...checked.problems, ...checked.warnings]) issues.push({ code: 'PLUGIN_INVALID', detail: `${p.id}: ${text}` });
-        }
+        // Clip data has to exist before the strict check. packPlugin reads each skeleton the same way
+        // `node tools/plugin.mjs pack` does and writes plugin.lock.json. An unreadable skeleton is removed first.
+        if (p.class === 'cosmetic') for (const row of dropUnreadableModels(dir)) planned.meta.skipped.push(row);
         const packed = packPlugin(dir, { vanilla: vanilla || undefined, where: `plugins/${p.id}/` });
         if (!packed.wrote || packed.build.problems.length) {
           for (const text of packed.build.problems) issues.push({ code: 'PLUGIN_INVALID', detail: `${p.id}: ${text}` });
