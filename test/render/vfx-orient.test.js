@@ -4,7 +4,8 @@
 // HEAD_POINT takes the unit's Graphic tilt (荒芜拉普兰德 S3's seal and 能天使 S3's light bars stand facing the camera), the
 // ground and NONE spawns the identity, FLIP_TWO_SIDE still flips the tilted ones, a FollowMountPoint keeps or follows; a
 // renderer's pivot moves the particle off its position by pivot × size (the seal's tips point outward); a local-space
-// particle is drawn at its node's scale as it is now (the seal's discs grow with their 0.5 s pop-in); a 回环射手's
+// particle is drawn at its node's scale as it is now (the seal's discs grow with their 0.5 s pop-in), and per axis (the
+// seal's tips are flat spikes, 娜仁图亚 S3's hit a streak); a 回环射手's
 // boomerang flies back to its thrower after its hit (index.json movement `comeBack`).
 
 import { test, describe } from 'node:test';
@@ -288,6 +289,19 @@ describe("the scaling mode's scale, as it is now", () => {
     const fx = new Effect(compileEffect(popIn(1)), { seed: 1 }).place({ pos: [0, 0, 0], rootRot: [0, 0, 0, 1] });
     for (let i = 0; i < 60; i++) fx.update(1 / 60);
     near(sizeOn(fx), 0, 1e-6, 'born at 0');
+  });
+  test('per axis, sizes uniform or not: a quad on a node scaled (0.27, 4.2, 1) is a streak (娜仁图亚 S3\'s hit), the seal\'s tips (1, 0.7) are flat', () => {
+    const mesh = (scale, space) => quads(psNode(1, 0, { size: 1.2, scale, space, r: { renderMode: 'mesh', renderAlignment: 'local', m_Mesh: { builtin: 'Quad' } } }))[0];
+    for (const space of [0, 1]) {
+      const q = mesh([0.269, 4.205, 1], space);
+      near(Math.hypot(...q.ax), 1.2 * 0.269, 1e-6, `${space ? 'world' : 'local'} space: the quad's width`);
+      near(Math.hypot(...q.ay), 1.2 * 4.205, 1e-6, `${space ? 'world' : 'local'} space: its height (it was drawn as wide)`);
+    }
+    const tip = mesh([1, 0.7, 1], 0);
+    near(Math.hypot(...tip.ay) / Math.hypot(...tip.ax), 0.7, 1e-6, 'the seal tip\'s height / width');
+    const b = quads(psNode(1, 0, { size: 1, scale: [2, 0.5, 1] }))[0];
+    near(Math.hypot(...b.ax), 2, 1e-6, 'a view billboard: the x scale across the screen');
+    near(Math.hypot(...b.ay), 0.5, 1e-6, 'the y scale up it');
   });
 });
 

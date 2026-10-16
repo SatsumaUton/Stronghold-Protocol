@@ -13,7 +13,10 @@
 // data (0.3.1, 风笛's lance thrust drawn as a vertical needle): of the used set's stretched renderers with a pivot, 2,434
 // set it in Y and 9 in X (plain billboards: 405 / 379), and of the 2,449 stretched systems with unequal X / Y sizes 2,130
 // make Y the long one. Mesh particles: the mesh × the 3D size, turned by the particle's Euler rotation
-// inside the alignment frame. A renderer's pivot (m_Pivot, in particle sizes) moves a billboard or mesh particle off its
+// inside the alignment frame. A particle's size is × the scaling mode's scale per axis — x across, y up the particle, z
+// through a mesh — whether or not its system sets size3D (0.3.1, history §34.6: the remake drew a uniform size at the x
+// scale; 1,318 systems of 462 prefabs sit on unevenly scaled nodes: 荒芜拉普兰德 S3's seal tips (1, 0.7) are flat spikes,
+// 娜仁图亚 S3's hit glow (2.4, 0.29) a streak along the cut, not a round glow). A renderer's pivot (m_Pivot, in particle sizes) moves a billboard or mesh particle off its
 // position by pivot × size along the particle's own axes — it turns with the particle's roll about the position (0.3.1,
 // history §34.6: the remake moved it the other way; the client's data settle it — 荒芜拉普兰德 S3's seal tips, quads with a
 // pivot of −0.5 / −0.81 placed left of the centre and their mirrored twins right of it, point outward only so, and of
@@ -245,7 +248,8 @@ export function buildParticles(ps, r, cam, fd, frameNo) {
     if (r.tint) { _c4[0] *= r.tint[0]; _c4[1] *= r.tint[1]; _c4[2] *= r.tint[2]; _c4[3] *= r.tint[3]; }
     _c4[0] = c01(_c4[0]); _c4[1] = c01(_c4[1]); _c4[2] = c01(_c4[2]); _c4[3] = c01(_c4[3]);
     sizeMul(ps, i, t, _sm);
-    let sx = ps.sx[i] * k0 * _sm[0], sy = (def.size3D ? ps.sy[i] * k1 : ps.sx[i] * k0) * _sm[1], sz = (def.size3D ? ps.sz[i] * k2 : ps.sx[i] * k0) * _sm[2];
+    // per axis even when the sizes are uniform (no size3D): a node scaled (0.27, 4.2, 1) draws a streak (header)
+    let sx = ps.sx[i] * k0 * _sm[0], sy = ps.sy[i] * k1 * _sm[1], sz = ps.sz[i] * k2 * _sm[2];
     const s = ps.seed[i];
     const fx = r.flip && r.flip[0] > 0 && hashRand(s, RF.FLIP_X) < r.flip[0] ? -1 : 1;
     const fy = r.flip && r.flip[1] > 0 && hashRand(s, RF.FLIP_Y) < r.flip[1] ? -1 : 1;
