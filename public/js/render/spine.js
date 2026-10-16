@@ -13,10 +13,14 @@
 //                                         GitHub #58): every attack plays the clip once — at its own speed, faster
 //                                         only when the attacks come quicker than the clip —, then base (Move while
 //                                         the sim walks it: it stands for that clip, server/sim/ai.js attackStand)
-//   setSkill(on)                          skill begin, then — when the skill has an idle clip of its own (skill.idle,
-//                                         not its loop) — that idle between attacks, its loop (the skill's attack clip)
-//                                         only on attacks (community report #23: 折桠's S2 jump attack looped with no
-//                                         enemy engaged); end on stop. A skill clip with NEITHER a Begin nor an own Idle
+//   setSkill(on)                          skill begin once, then the loop for the whole skill when the clip is a
+//                                         begin/loop/end set with no idle of its own (DESIGN §34.4: 白面鸮 S2 holds
+//                                         Skill_Loop through every heal). An attack during that skill plays the skill's
+//                                         own attack clip when the skeleton has one (焰影苇草 Skill_3_Attack) and then
+//                                         the loop again; otherwise the attack does not touch the clip. A skill with an
+//                                         idle clip of its own (skill.idle, not its loop) stands in that idle between
+//                                         attacks and plays its loop only on attacks (community report #23: 折桠's S2
+//                                         jump). End on stop. A skill clip with NEITHER a Begin nor an own Idle
 //                                         (德克萨斯 剑雨 and the other 58 instant skills: anims.skill {begin:null,
 //                                         loop:'Skill', end:null}) plays that clip once for its own length: an instant
 //                                         skill's flag is off again within the same 0.5 s window (sim skills.js), so
@@ -38,9 +42,10 @@
 //                                         redraws the model, only advances `clock`)
 //   clipBounds(names)                     skeleton-space bounds of those clips (sampled once per skeleton data, see
 //                                         "clip bounds" below; render/units.js sizes the impostor box from them)
-// Each attack plays its clip once, then the end clip (if any) and base — except the attacks of a skill
-// with its own idle clip, which go straight back to that idle: the skill's end clip closes the skill, not each spell of
-// attacks while it runs.
+// Each attack plays its clip once, then the end clip (if any) and base — except a skill that holds its loop
+// (begin/loop/end and no idle of its own: the loop stays up, and a dedicated attack clip returns to that loop) and a
+// skill with its own idle clip (those attacks go straight back to that idle). The skill's end clip closes the skill,
+// not each attack while it runs.
 
 const clampN = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -701,9 +706,67 @@ export class SpineActor {
     }
   }
 
+  /**
+   * Begin / loop / end, and no idle of its own: the loop is the stance for the whole skill (DESIGN §34.4).
+   * A distinct skill.idle (折桠 Skill_2_Idle) is the stance between attacks, so the loop stays the attack clip.
+   * via:'attack' (远牙: the role is the normal attack triple) is not a skill stance.
+   */
+  _skillLoopHeld() {
+    const sk = this.roles.skill;
+    if (!this.skillOn || !sk || sk.via === 'attack') return false;
+    if (!this.has(sk.begin) || !this.has(sk.loop) || !this.has(sk.end)) return false;
+    if (sk.idle && sk.idle !== sk.loop && this.has(sk.idle)) return false;
+    return true;
+  }
+
+  /** Skill_3_Begin → Skill_3, Skill_Start → Skill, Skill1_Loop → Skill1. */
+  _skillPrefix() {
+    const sk = this.roles.skill;
+    const name = (sk && (sk.begin || sk.loop)) || '';
+    return String(name).replace(/_(?:Begin|Start|Loop|End|Idle)$/i, '').replace(/(?:Begin|Start|Loop|End|Idle)$/i, '');
+  }
+
+  /**
+   * This skill's own strike clip, which the resolver drops when a Loop exists (anim-roles skillFamily: loop =
+   * P_Loop before P_Attack). 焰影苇草 S3 is Skill_3_Attack beside Skill_3_Begin/Loop/End.
+   * [ASSUMED] (DESIGN §34.4): no table says which clip an atk plays during a held loop. Only a same-prefix
+   * `<prefix>_Attack` (or `<prefix>_Attack_*`, not Down / Begin / End / Idle) counts — not the normal Attack and
+   * not another skill's Attack_2 (塞雷娅). A loop that already contains OnAttack (初雪, 安洁莉娜, 锏 S3) stays the
+   * held loop at the clip's own speed; it is not restarted or retimed to the attack interval.
+   */
+  _skillOwnAttack() {
+    const sk = this.roles.skill;
+    if (!sk || /attack/i.test(sk.loop || '')) return null;
+    const prefix = this._skillPrefix();
+    if (!prefix) return null;
+    const used = new Set([sk.begin, sk.loop, sk.end, sk.idle]);
+    const head = `${prefix}_Attack`;
+    const re = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_Attack(?:_|$)`, 'i');
+    const hits = (this.entry && this.entry.hits) || {};
+    const cands = [];
+    for (const n of this.names) {
+      if (used.has(n) || /down/i.test(n) || /_(?:begin|start|end|idle)(?:_|$)/i.test(n)) continue;
+      if (!re.test(n)) continue;
+      cands.push(n);
+    }
+    if (!cands.length) return null;
+    if (cands.includes(head)) return head;
+    cands.sort();
+    const withHit = cands.find((n) => Array.isArray(hits[n]) && hits[n].length);
+    return withHit || cands[0];
+  }
+
   _attackClip() {
     const sk = this.roles.skill;
-    if (this.skillOn && sk && this.has(sk.loop) && sk.via !== 'attack' && !this._skillIsBuffOnly()) return sk;
+    if (this.skillOn && sk && this.has(sk.loop) && sk.via !== 'attack' && !this._skillIsBuffOnly()) {
+      if (this._skillLoopHeld()) {
+        // No dedicated strike clip: leave the begin / looping loop alone. Returning the normal attack here
+        // would stand the operator up; returning the skill role would replay the loop as a one-shot and then End.
+        const atk = this._skillOwnAttack();
+        return atk ? { begin: null, loop: atk, end: null } : null;
+      }
+      return sk;
+    }
     const a = this.roles.attack;
     if (a && this.has(a.loop)) return a;
     return null;
@@ -882,6 +945,12 @@ export class SpineActor {
         if (this.clock > this.attackUntil) {
           this.mode = 'base';
           this.wound = false;
+          // a held begin/loop/end skill: the dedicated attack clip (if the skeleton has one) returns to the
+          // looping loop. Skill_End and Idle would stand her up between heals (DESIGN §34.4).
+          if (this._skillLoopHeld() && this.has(this.roles.skill.loop)) {
+            this._play(this.roles.skill.loop, true, { mix: 0.15 });
+            break;
+          }
           const clip = this._attackClip() || this.roles.attack;
           // a skill with its own idle: back to that idle (its end clip is for the end of the skill, setSkill(false))
           const toSkillIdle = clip === this.roles.skill && !!this._skillIdle();
