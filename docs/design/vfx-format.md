@@ -11,7 +11,8 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
   its root 10 tiles under the board. (2) An enemy's kit areas are its talents' and skills' projectiles and rows the
   index writes without the moment they play (a death talent's projectile, a skill's second projectile, a castTarget row
   of a skill its kit fires itself): §33.16 reads them for the sim's zone fx (ENEMY_FX_BINDINGS). (3) An enemy skill
-  whose root ability is an attack is that one attack (§33.16 Enemy skills). (4) A talent loop created by a buff at its
+  whose root ability is an attack is that one attack: its kit fx drawn, its window's later attacks are the enemy's own
+  (§33.16 Enemy skills). (4) A talent loop created by a buff at its
   tick in a mode (水遁忍者's RotateEffect) plays while that mode lasts (§33.16).
 
 * **2026-10-16 — readings corrected from the client's data and code, no format change (0.3.1: the 0.3.0 effects audit's
@@ -1274,10 +1275,11 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   its time is over (the event's `dur`, else 0.3 s [ASSUMED]), or on the enemy's death or leak. A use's `mode` picks the
   copy of the enemy's current mode; `inModes` is not needed. Not drawn: the skill's effects on others (`on: 'targets'`:
   no event names them). A skill whose root ability is an attack (`rootAbility` …Attack: RangedAttack, MeleeAttack) is
-  that one attack: fired by its kit (no 'atk' in its first frame), the enemy's attacks in the rest of its window are its
-  normal ones (0.3.1, history §34.5: the 'cast' of 鼠王's 【沙狱】 carries the debuff's 15 s, and every attack of the boss
-  in it played the sandstorm `mousek_skill_02_range` on its target) [ASSUMED: the window's `dur` is then the skill's
-  effect's, not a time the attacks change].
+  that one attack: once the kit's own fx stood for it (an Enemies' areas binding below drew in its window), the enemy's
+  attacks in the rest of the window are its normal ones (0.3.1, history §34.5: the 'cast' of 鼠王's 【沙狱】 carries the
+  debuff's 15 s, and every attack of the boss in it played the sandstorm `mousek_skill_02_range` on its target; a skill
+  whose attack is a later 'atk' — 暴鸰's bomb, 0.27 s after its 'cast' — keeps the window's rows for it) [ASSUMED: the
+  window's `dur` is then the skill's effect's, not a time the attacks change].
 * **Enemies' areas** (0.3.1, the maintainer's report of 2026-10-16, history §34.5; `skills.js ENEMY_FX_BINDINGS`,
   `skillfx.js _enemyFx`): the sim's zones name no source (`content/enemies/helpers.js zone`: ['fx', 'zone', x, y,
   { r, dur, kind }]), so a binding by the enemy's unit key says how its fx finds the enemy — `id`; `died`: one of that
