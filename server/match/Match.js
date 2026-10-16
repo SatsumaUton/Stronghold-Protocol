@@ -327,6 +327,12 @@ export class Match {
       this._testHeld = null;
       /** the last callback setDeadline armed, so timers can be turned off mid-phase */
       this._testArmed = null;
+      /** false once the input journal stops logging (the replay decoder's line cap) */
+      this.testReplayable = true;
+      /** replay: stop a sliced callback after this many steps; null while recording */
+      this._testSliceBudget = null;
+      /** steps taken by the timer callback now running (the journal's `steps`) */
+      this._testSliceCount = 0;
     }
     /** @type {Map<string, { id: string, job: any, executor: string, timer: any }>} delegated rehearsals in flight */
     this._rehearsalTasks = new Map();
@@ -472,12 +478,10 @@ export class Match {
     this.hiddenReached = false;
     this.outcome = null;
     this._turnToken = 0;
-    if (this.test) {
-      // [ASSUMED] Test journals must not depend on CPU slice duration.
-      this.botSliceMs = Infinity;
-      this.headlessSliceMs = Infinity;
-      installTestTrace(this, opts);
-    }
+    // [ASSUMED] A real scheduler keeps the 8 ms bot and headless slices, including a test match,
+    // so one callback cannot run to HARD_CAP_SECONDS. Virtual time stays unbounded (the defaults
+    // above). The input journal records the steps that callback took; replay stops there.
+    if (this.test && opts.journal !== false) installTestTrace(this, opts);
   }
 }
 

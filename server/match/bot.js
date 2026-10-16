@@ -1161,12 +1161,15 @@ export function createRehearsalJob(m, ps, chosen, plans, inputs, prebuilt = null
     : inputs.map((o) => () => m.newBattle(o, { preview: true }));
   const job = {
     chosen, plans, inputs, cap, best: plans[0], done: false, pending: false,
-    run(budgetMs = Infinity) {
+    run(budgetMs = Infinity, control = null) {
       if (job.done) return true;
       if (!run) run = new RehearsalRun(factories, ps.playerId, cap);
-      const timed = Number.isFinite(budgetMs);
+      // A test replay (`control.replaying`) stops on the journalled step count, not the wall clock.
+      const replaying = !!(control && control.replaying);
+      const timed = !replaying && Number.isFinite(budgetMs);
       const t0 = timed ? performance.now() : 0;
-      job.done = run.run(timed ? () => performance.now() - t0 >= budgetMs : null);
+      const over = () => (replaying ? control.stop() : performance.now() - t0 >= budgetMs);
+      job.done = run.run(timed || replaying ? over : null, control);
       job.best = job.plans[run.score.index] || job.best;
       return job.done;
     },
@@ -1189,7 +1192,7 @@ export function createDelegatedRehearsalJob(m, ps, chosen, plans, inputs) {
   job.accept = (index) => { if (!job.pending) return; job.pending = false; job.done = true; job.best = job.plans[index]; };
   /** The server runs the same candidates (timeout, host gone, a failed or refused task). */
   job.takeOver = () => { job.pending = false; };
-  job.run = (budgetMs) => { if (job.pending) job.takeOver(); return step(budgetMs); };
+  job.run = (budgetMs, control) => { if (job.pending) job.takeOver(); return step(budgetMs, control); };
   return job;
 }
 

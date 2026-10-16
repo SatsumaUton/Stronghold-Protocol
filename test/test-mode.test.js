@@ -247,8 +247,11 @@ import { makeMatch, DATA } from './match/harness.js';
 import { buildResult } from '../server/match/results.js';
 import { replayTestMatch } from '../server/match/testReplay.js';
 import { Match } from '../server/match/Match.js';
-import { VirtualScheduler } from '../server/match/scheduler.js';
-import { TEST_COMMANDS, TEST_RATE_COUNT } from '../shared/testMode.js';
+import { RealScheduler, VirtualScheduler } from '../server/match/scheduler.js';
+import { collectViolations } from '../server/match/invariants.js';
+import { TEST_JOURNAL_CAP } from '../server/match/testTrace.js';
+import { FakeBattle } from './match/fakeBattle.js';
+import { TEST_COMMANDS, TEST_RATE_COUNT, guardTestMessage } from '../shared/testMode.js';
 
 function fixture(t, opts = {}) {
   const h = makeMatch({ mode: 'solo', test: true, ...opts });
@@ -368,7 +371,8 @@ test('host migration, spectators, rate bounds and audit results cannot mutate an
   assert.equal(h.m.testLog.at(-1).cmd, 'funds');
   assert.equal(h.m.testLog.at(-1).code, 'SPECTATOR');
   assert.equal(h.m.testLog.at(-2).cmd, 'funds');
-  for (let i = 0; i < TEST_RATE_COUNT; i++) error(h.cmd('funds', { amount: -1 }), 'BAD_TARGET');
+  // The guest and the spectator already took two slots of the shared funds bucket.
+  for (let i = 0; i < TEST_RATE_COUNT - 2; i++) error(h.cmd('funds', { amount: -1 }), 'BAD_TARGET');
   error(h.cmd('funds', { amount: 90 }), 'RATE');
   assert.equal(other.funds, before);
   h.sched.advance(10000);
@@ -563,4 +567,275 @@ test('any known equipment can be granted after stock is exhausted using existing
   assert.ok([...h.p.hand, ...h.p.temp].some(p => p?.kind === 'item'));
   assert.equal(h.m.itemPool.canGain(id), false);
   assert.equal(h.m.itemPool.debtOf(id), debt + 1);
+});
+
+test('LP 0 stays a raw write through combat, and an accepted jump eliminates it', (t) => {
+  const live = makeMatch({ test: true, mode: 'solo', fake: true });
+  t.after(() => live.m.dispose());
+  live.start(); live.toPrep();
+  const p = live.ps('p_0');
+  ok(live.m.handle('p_0', { t: 'g.test', cmd: 'lp', args: { value: 0 } }));
+  assert.ok(collectViolations(live.m).some((v) => v.includes('alive with lp')));
+  error(live.m.handle('p_0', { t: 'g.test', cmd: 'round', args: { round: 99 } }), 'BAD_TARGET');
+  assert.equal(p.alive, true);
+  assert.equal(p.lp, 0);
+  ok(live.m.handle('p_0', { t: 'g.test', cmd: 'phase', args: { name: 'combat' } }));
+  assert.ok(live.run(() => live.m.phase === 'SETTLE' || live.m.ended));
+  assert.equal(p.alive, false);
+  assert.deepEqual(collectViolations(live.m), []);
+
+  const jumped = makeMatch({ test: true, mode: 'solo', fake: true });
+  t.after(() => jumped.m.dispose());
+  jumped.start(); jumped.toPrep();
+  const jp = jumped.ps('p_0');
+  ok(jumped.m.handle('p_0', { t: 'g.test', cmd: 'lp', args: { value: 0 } }));
+  ok(jumped.m.handle('p_0', { t: 'g.test', cmd: 'round', args: { round: 3 } }));
+  assert.equal(jumped.m.ended, true);
+  assert.equal(jumped.m.outcome.victory, false);
+  assert.equal(jumped.m.outcome.reason, 'eliminated');
+  assert.equal(jumped.m.round, 1);
+  assert.equal(jp.alive, false);
+  assert.equal(jp.funds, 0);
+  assert.equal(jp.eliminatedRound, 1);
+  assert.equal(jp.hand.some(Boolean), false);
+  assert.deepEqual(collectViolations(jumped.m), []);
+  error(jumped.m.handle('p_0', { t: 'g.test', cmd: 'lp', args: { value: 30 } }), 'WRONG_PHASE');
+  assert.equal(jp.alive, false);
+});
+
+test('co-op jump eliminates only doctors already at LP 0; boss prep waits, hidden jump opens team LP', (t) => {
+  const h = makeMatch({ test: true, mode: 'coop', humans: 2, fake: true });
+  t.after(() => h.m.dispose());
+  h.start(); h.toPrep();
+  const host = h.ps('p_0');
+  const guest = h.ps('p_1');
+  ok(h.m.handle('p_0', { t: 'g.test', cmd: 'lp', args: { value: 0 } }));
+  const left = h.m.round;
+  const guestFunds = guest.funds;
+  ok(h.m.handle('p_0', { t: 'g.test', cmd: 'round', args: { round: 3 } }));
+  assert.equal(host.alive, false);
+  assert.equal(host.eliminatedRound, left);
+  assert.equal(host.funds, 0);
+  assert.equal(host.board.size, 0);
+  assert.equal(host.hand.some(Boolean), false);
+  assert.equal(guest.alive, true);
+  assert.ok(guest.funds > guestFunds);
+  assert.equal(h.m.ended, false);
+  h.sched.runUntil(() => h.m.phase !== 'ROUND_START');
+  assert.deepEqual(collectViolations(h.m), []);
+  ok(h.m.handle('p_0', { t: 'g.test', cmd: 'lp', args: { value: 30 } }));
+  assert.equal(host.alive, false);
+  assert.equal(host.lp, 30);
+  assert.deepEqual(collectViolations(h.m), []);
+
+  const both = makeMatch({ test: true, mode: 'coop', humans: 2, fake: true });
+  t.after(() => both.m.dispose());
+  both.start(); both.toPrep();
+  both.ps('p_1').lp = 0;
+  ok(both.m.handle('p_0', { t: 'g.test', cmd: 'lp', args: { value: 0 } }));
+  ok(both.m.handle('p_0', { t: 'g.test', cmd: 'round', args: { round: 3 } }));
+  assert.equal(both.m.ended, true);
+  assert.equal(both.m.round, 1);
+  assert.equal(both.m.outcome.reason, 'eliminated');
+  assert.equal(both.ps('p_0').funds, 0);
+  assert.equal(both.ps('p_1').funds, 0);
+  assert.deepEqual(collectViolations(both.m), []);
+
+  const boss = makeMatch({ test: true, mode: 'solo', fake: true, instant: false });
+  t.after(() => boss.m.dispose());
+  boss.start(); boss.toPrep();
+  const bp = boss.ps('p_0');
+  ok(boss.m.handle('p_0', { t: 'g.test', cmd: 'round', args: { round: boss.m.gd.bossRound } }));
+  boss.sched.runUntil(() => boss.m.phase !== 'ROUND_START');
+  assert.equal(boss.m.phase, 'PREP');
+  assert.equal(boss.m.teamLp, null);
+  assert.ok(boss.m.bossWaves.length >= 1);
+  assert.deepEqual(collectViolations(boss.m), []);
+  ok(boss.m.handle('p_0', { t: 'g.test', cmd: 'phase', args: { name: 'combat' } }));
+  assert.equal(boss.m.phase, 'FINAL_ASSAULT');
+  assert.equal(boss.m.teamLp, bp.lp);
+  assert.ok(boss.m.teamLp > 0);
+
+  const hid = makeMatch({ test: true, mode: 'solo', fake: true, instant: false });
+  t.after(() => hid.m.dispose());
+  hid.start(); hid.toPrep();
+  const hp = hid.ps('p_0');
+  const hidden = hid.m.gd.hiddenRound;
+  ok(hid.m.handle('p_0', { t: 'g.test', cmd: 'round', args: { round: hidden } }));
+  assert.equal(hid.m.teamLp, hp.lp);
+  assert.equal(hp.lpAtFinal, hp.lp);
+  const pool = hid.m.teamLp;
+  ok(hid.m.handle('p_0', { t: 'g.test', cmd: 'lp', args: { value: hp.lp - 1 } }));
+  ok(hid.m.handle('p_0', { t: 'g.test', cmd: 'round', args: { round: hidden } }));
+  assert.equal(hid.m.teamLp, pool);
+  assert.notEqual(hid.m.teamLp, hp.lp);
+  hid.sched.runUntil(() => hid.m.phase === 'PREP');
+  assert.deepEqual(collectViolations(hid.m), []);
+  ok(hid.m.handle('p_0', { t: 'g.test', cmd: 'phase', args: { name: 'combat' } }));
+  assert.equal(hid.m.phase, 'HIDDEN_CORE');
+  assert.ok(hid.m.teamLp > 0);
+  hid.sched.runNext();
+  assert.equal(hid.m.phase, 'HIDDEN_CORE');
+  assert.deepEqual(collectViolations(hid.m), []);
+});
+
+test('real-scheduler test matches keep 8 ms slices; virtual time stays unbounded', (t) => {
+  const seats = [{ playerId: 'p', seat: 0, name: 'P', connected: true }];
+  const quiet = { send() {}, broadcast() {}, onEnd() {}, log: { info() {}, warn() {}, error() {} } };
+  const real = new Match({ mode: 'solo', difficulty: 'NORMAL', test: true, hostId: 'p', seats, data: DATA, scheduler: new RealScheduler(), ...quiet });
+  t.after(() => real.dispose());
+  assert.equal(real.botSliceMs, 8);
+  assert.equal(real.headlessSliceMs, 8);
+  const virt = new Match({ mode: 'solo', difficulty: 'NORMAL', test: true, hostId: 'p', seats, data: DATA, scheduler: new VirtualScheduler(), ...quiet });
+  t.after(() => virt.dispose());
+  assert.equal(virt.botSliceMs, Infinity);
+  assert.equal(virt.headlessSliceMs, Infinity);
+  const plain = new Match({ mode: 'solo', difficulty: 'NORMAL', seats, data: DATA, scheduler: new RealScheduler(), ...quiet });
+  t.after(() => plain.dispose());
+  assert.equal(plain.botSliceMs, 8);
+  assert.equal(plain.headlessSliceMs, 8);
+});
+
+test('spectators share the rate bucket; oversized args never reach the journal', (t) => {
+  const entries = [];
+  const audits = [];
+  const m = new Match({
+    mode: 'coop', difficulty: 'NORMAL', test: true, hostId: 'p_0',
+    seats: [
+      { playerId: 'p_0', seat: 0, name: 'P0', connected: true },
+      { playerId: 'p_1', seat: 1, name: 'P1', connected: true },
+    ],
+    spectators: ['watch'], data: DATA, scheduler: new VirtualScheduler(),
+    send() {}, broadcast() {}, onEnd() {},
+    log: { info(line) {
+      if (typeof line !== 'string') return;
+      if (line.startsWith('[test-input ')) entries.push(JSON.parse(line.slice(line.indexOf(']') + 2)));
+      if (line.startsWith('[test-audit ')) audits.push(JSON.parse(line.slice(line.indexOf(']') + 2)));
+    } },
+  });
+  t.after(() => m.dispose());
+  const before = entries.length;
+  for (let i = 0; i < 250; i++) {
+    const res = m.handle('watch', { t: 'g.test', cmd: 'funds', args: { amount: 1 } });
+    assert.equal(res.error, i < TEST_RATE_COUNT ? 'SPECTATOR' : 'RATE');
+  }
+  assert.equal(entries.length - before, 250);
+  assert.equal(audits.length, 250);
+  assert.equal(audits[TEST_RATE_COUNT - 1].code, 'SPECTATOR');
+  assert.equal(audits[TEST_RATE_COUNT].code, 'RATE');
+  assert.equal(m._testRate.get('funds').length, TEST_RATE_COUNT);
+  const huge = 'c'.repeat(60000);
+  const grew = entries.length;
+  const res = m.handle('p_0', { t: 'g.test', cmd: 'chess', args: { id: huge } });
+  assert.equal(res.error, 'BAD_TARGET');
+  assert.equal(entries.length, grew + 1);
+  assert.equal(audits.at(-1).code, 'BAD_TARGET');
+  assert.equal(audits.at(-1).args.rejected, true);
+  assert.equal(JSON.stringify(entries.at(-1)).includes(huge), false);
+  const wide = m.handle('p_0', { t: 'g.test', cmd: 'z'.repeat(60000) });
+  assert.equal(wide.error, 'BAD_MSG');
+  assert.equal(JSON.stringify(entries.at(-1)).includes('z'.repeat(80)), false);
+  assert.equal(guardTestMessage({ t: 'g.test', cmd: 'chess', args: { id: huge } }).oversize, 'BAD_TARGET');
+  assert.equal(m.testReplayable, true);
+  assert.equal(m.publicView().testReplayable, undefined);
+});
+
+test('a full input journal is marked not replayable instead of truncated', (t) => {
+  const entries = [];
+  const scheduler = new VirtualScheduler();
+  const m = new Match({
+    mode: 'solo', difficulty: 'NORMAL', test: true, hostId: 'p', seed: 3,
+    seats: [{ playerId: 'p', seat: 0, name: 'P', connected: true }],
+    data: DATA, scheduler, send() {}, broadcast() {}, onEnd() {},
+    log: { info(line) {
+      if (typeof line === 'string' && line.startsWith('[test-input ')) entries.push(JSON.parse(line.slice(line.indexOf(']') + 2)));
+    } },
+  });
+  t.after(() => m.dispose());
+  for (let i = 0; i < TEST_JOURNAL_CAP + 16; i++) {
+    if (i > 0 && i % TEST_RATE_COUNT === 0) scheduler.advance(TEST_RATE_COUNT * 2000);
+    m.handle('p', { t: 'g.test', cmd: 'nope' });
+    if (m.testReplayable === false) break;
+  }
+  assert.equal(m.testReplayable, false);
+  assert.equal(entries.length <= TEST_JOURNAL_CAP, true);
+  assert.equal(entries.at(-1).kind, 'capped');
+  assert.equal(buildResult(m, { victory: false }).testReplayable, false);
+  assert.equal(m.publicView().testReplayable, undefined);
+  assert.throws(() => replayTestMatch(DATA, entries), /not replayable/);
+});
+
+test('sliced bot prep and a server-run battle replay a host command between slices', (t) => {
+  const origNow = performance.now.bind(performance);
+  let clock = 0;
+  performance.now = () => (clock += 100);
+  FakeBattle.reset();
+  FakeBattle.script = () => ({ duration: 1 });
+  const scheduler = new VirtualScheduler({ instantCombat: false });
+  const entries = [];
+  const m = new Match({
+    mode: 'coop', difficulty: 'NORMAL', test: true, hostId: 'p_0', seed: 832,
+    seats: [
+      { playerId: 'p_0', seat: 0, name: 'P', connected: true },
+      { playerId: 'ai_0', seat: 1, name: 'AI', isBot: true, connected: true },
+    ],
+    data: DATA, scheduler, clientCombat: true, botRehearsal: 0, botSliceMs: 8, headlessSliceMs: 8,
+    BattleClass: FakeBattle, send() {}, broadcast() {}, onEnd() {},
+    log: { info(line) {
+      if (typeof line === 'string' && line.startsWith('[test-input ')) entries.push(JSON.parse(line.slice(line.indexOf(']') + 2)));
+    }, warn() {}, error() {} },
+  });
+  t.after(() => { performance.now = origNow; FakeBattle.reset(); m.dispose(); });
+  assert.equal(m.botSliceMs, 8);
+  assert.equal(m.headlessSliceMs, 8);
+  const pump = (pred, max = 250000) => {
+    for (let i = 0; i < max; i++) {
+      if (pred()) return true;
+      const ps = m.players.get('p_0');
+      if (ps && !ps.left) {
+        if (m.phase === 'INFO_CHECK' && !ps.infoReady) m.handle('p_0', { t: 'g.infoReady' });
+        else if (m.phase === 'BAND_DRAFT' && m.draftTurn() === 'p_0') m.handle('p_0', { t: 'g.band', bandId: 'band_bldsk' });
+      }
+      if (pred()) return true;
+      if (!scheduler.runNext()) return !!pred();
+    }
+    return !!pred();
+  };
+  m.start();
+  assert.ok(pump(() => m.phase === 'PREP'), `prep ${m.phase}`);
+  const ai = m.players.get('ai_0');
+  assert.ok(pump(() => entries.some((e) => e.kind === 'timer' && e.steps > 0) && !ai.ready), 'bot prep did not slice');
+  const fundsBefore = m.players.get('p_0').funds;
+  ok(m.handle('p_0', { t: 'g.test', cmd: 'funds', args: { amount: fundsBefore + 25 } }));
+  assert.equal(ai.ready, false);
+  assert.equal(m.players.get('p_0').funds, fundsBefore + 25);
+  assert.deepEqual(collectViolations(m), []);
+  const prepCut = entries.findIndex((e) => e.kind === 'call' && e.args?.[1]?.cmd === 'funds');
+  assert.ok(prepCut > 0 && entries.slice(0, prepCut).some((e) => e.kind === 'timer' && e.steps > 0));
+  // Journal the drop (onDisconnect). A raw connected write is invisible to replay, so the human
+  // field would stay on the client and the sliced server battle would not re-sim.
+  m.onDisconnect('p_0');
+  const host = m.players.get('p_0');
+  if (host.personalChoice) m.handle('p_0', { t: 'g.choice', idx: 0, choiceId: host.personalChoice.id });
+  if (!host.tempEmpty) host.resolveTemp();
+  ok(m.handle('p_0', { t: 'g.ready', ready: true }));
+  assert.ok(pump(() => m.phase === 'COMBAT' && m.fields.some((f) => f.job && !f.job.done) && entries.slice(prepCut + 1).some((e) => e.kind === 'timer' && e.steps > 0)), `combat ${m.phase}`);
+  const marked = entries.length;
+  error(m.handle('p_0', { t: 'g.test', cmd: 'lp', args: { value: 17 } }), 'WRONG_PHASE');
+  assert.ok(m.fields.some((f) => f.job && !f.job.done));
+  const battleCut = entries.findIndex((e, i) => i >= marked && e.kind === 'call' && e.args?.[1]?.cmd === 'lp');
+  assert.ok(battleCut > prepCut);
+  assert.ok(entries.slice(prepCut + 1, battleCut).some((e) => e.kind === 'timer' && e.steps > 0));
+  assert.ok(pump(() => m.phase === 'SETTLE' || m.ended), `settle ${m.phase}`);
+  assert.ok(entries.slice(battleCut + 1).some((e) => e.kind === 'timer' && e.steps > 0));
+  assert.deepEqual(collectViolations(m), []);
+  performance.now = origNow;
+  const copy = replayTestMatch(DATA, entries, { BattleClass: FakeBattle });
+  t.after(() => copy.dispose());
+  assert.deepEqual(copy.publicView(), m.publicView());
+  assert.deepEqual(copy.players.get('p_0').privateView(), m.players.get('p_0').privateView());
+  assert.deepEqual(copy.players.get('ai_0').privateView(), m.players.get('ai_0').privateView());
+  assert.deepEqual(copy.testLog, m.testLog);
+  assert.equal(copy.phase, m.phase);
+  assert.equal(copy.errorCount, 0);
 });

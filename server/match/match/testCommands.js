@@ -23,17 +23,22 @@
 //     After the draft, bandId changes and LP is kept unless resetLp is true.
 //   * level calls levelUp: it spends the real upgrade price and obeys that method's gate
 //     (PREP, not ready, not max level).
-//   * round calls startRound. Intermediate rounds are not settled. Refused before a strategy
-//     is chosen, and while a battle is live.
+//   * round calls startRound. Intermediate rounds are not settled. An accepted jump first
+//     eliminates every alive player with LP <= 0, the same helper settlement uses. If nobody
+//     remains, the match ends eliminated and the round does not start. A jump into the hidden
+//     round opens team LP with the Final Assault's helper when that pool was never opened.
+//     Refused before a strategy is chosen, and while a battle is live. A refusal does not eliminate.
 //   * phase prep from ROUND_START calls enterPrep and therefore skips a 机变 draft that has
 //     not started. From SP_DRAFT it is refused until every pick is in, so an open draft is
 //     not aborted. phase combat calls prepDeadline (the real timeout path), not a new jump.
 //   * The shop queue replaces the whole next roll once, frozen slots included. A queued shop blocks level upgrades until consumed.
 //   * Timers off holds the phase callback instead of scaling time to zero (a zero delay would
 //     fire at once). Turning them on re-arms the original duration, not the leftover.
-//   * Rate: 8 attempted commands of one type per 10s of scheduler time. A refusal that passed
-//     the host check counts. NOT_HOST and TEST_FORBIDDEN do not. The audit keeps the parsed
-//     args, or { rejected: true } when the shape itself was refused.
+//   * Rate: 8 attempted commands of one type per 10s of scheduler time, counted before the
+//     audit. Guests (NOT_HOST) and spectators (SPECTATOR) share that bucket. TEST_FORBIDDEN
+//     does not. An oversized id or string is refused before it is traced (BAD_TARGET or
+//     BAD_MSG, never clamped). The audit keeps the parsed args, or { rejected: true } when
+//     the shape itself was refused.
 //   * bond count sets the ordinary extra-member bonus (0..99), allowing activation without
 //     pieces. computeBonds still decides the tier; a mode-disabled bond is refused.
 
@@ -45,23 +50,34 @@ const BLOCKED = new Set([PHASE.LOBBY, PHASE.COMBAT, PHASE.UNITE, PHASE.FINAL_ASS
 
 export class MatchTestCommands {
   /**
-   * g.test { cmd, args? }. Refused unless this match was created as a test match and the sender
-   * is the current host. Parse and rate happen before the primitive runs.
+   * g.test { cmd, args? }. Refused unless this match was created as a test match. Every attempt
+   * is rated first. Spectators and other seats are then refused. Only the current host runs a command.
    * @param {import('../PlayerState.js').PlayerState} ps
    * @param {{ cmd?: string, args?: object }} msg
    */
   applyTestCommand(ps, msg) {
     if (this.test !== true) return fail(ERR.TEST_FORBIDDEN);
-    if (!ps || ps.spectator || ps.playerId !== this.hostId) {
-      if (ps) this._testAudit(ps, msg?.cmd, { rejected: true }, ERR.NOT_HOST);
-      return fail(ERR.NOT_HOST);
-    }
+    if (!ps) return fail(ERR.NOT_HOST);
+    // [ASSUMED] Every seat shares one bucket per command, including a guest or a spectator.
+    // The stamp happens before the refusal audit so those attempts consume a slot.
     const cmd = isTestCommand(msg?.cmd) ? msg.cmd : 'invalid';
     if (!this._testRateAllows(cmd)) {
       this._testAudit(ps, cmd, { rejected: true }, ERR.RATE);
       return fail(ERR.RATE);
     }
     this._testStamp(cmd);
+    if (ps.spectator) {
+      this._testAudit(ps, cmd, { rejected: true }, ERR.SPECTATOR);
+      return fail(ERR.SPECTATOR);
+    }
+    if (ps.playerId !== this.hostId) {
+      this._testAudit(ps, cmd, { rejected: true }, ERR.NOT_HOST);
+      return fail(ERR.NOT_HOST);
+    }
+    if (msg && (msg.oversize === 'BAD_TARGET' || msg.oversize === 'BAD_MSG')) {
+      this._testAudit(ps, cmd, { rejected: true }, msg.oversize);
+      return fail(msg.oversize === 'BAD_TARGET' ? ERR.BAD_TARGET : ERR.BAD_MSG);
+    }
     const parsed = parseTestArgs(cmd, msg && msg.args);
     if ('error' in parsed) {
       this._testAudit(ps, cmd, { rejected: true }, parsed.error);
@@ -224,10 +240,18 @@ export class MatchTestCommands {
     const hidden = this.gd.hiddenRound;
     const hi = Math.max(this.gd.lastRound || 0, hidden > 0 ? hidden : 0);
     if (round > hi) return fail(ERR.BAD_TARGET);
+    this.eliminateBroken();
+    if (!this.alivePlayers().length) {
+      this.finish({ victory: false, reason: 'eliminated' });
+      return OK;
+    }
     this.setDeadline(0);
     this.cancel(this._turnTimer);
     this._turnToken++;
     this.startRound(round);
+    // Ordinary progression opens team LP when the Final Assault starts, and the hidden round
+    // keeps that pool. A jump never fought that assault. Boss prep itself still has no team LP.
+    if (hidden > 0 && hidden !== this.gd.bossRound && this.round === hidden && this.teamLp == null) this._openTeamLp();
     return OK;
   }
 

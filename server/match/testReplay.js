@@ -5,6 +5,7 @@ import { TEST_INPUT_METHODS } from './testTrace.js';
 
 export function replayTestMatch(data, entries, { send = () => {}, broadcast = () => {}, onEnd = () => {}, registry, BattleClass } = {}) {
   entries = decodeTestTrace(entries);
+  if (entries.some((e) => e && e.kind === 'capped')) throw new TypeError('journal is not replayable');
   const init = entries[0];
   if (!init || init.version !== 1 || init.kind !== 'init' || init.options?.test !== true) throw new TypeError('invalid test journal');
   let now = init.at;
@@ -16,15 +17,20 @@ export function replayTestMatch(data, entries, { send = () => {}, broadcast = ()
     setTimeout: (fn) => add(fn, false), setInterval: (fn) => add(fn, true),
     clearTimeout: (id) => timers.delete(id), clearInterval: (id) => timers.delete(id), dispose: () => timers.clear(),
   };
-  const m = new Match({ ...init.options, data, scheduler, send, broadcast, onEnd, registry, BattleClass });
+  // journal:false — replaying must not log again, and must not wrap timers a second time.
+  const m = new Match({ ...init.options, journal: false, data, scheduler, send, broadcast, onEnd, registry, BattleClass });
   for (const e of entries.slice(1)) {
     if (!Number.isFinite(e.at) || e.at < now) throw new TypeError('invalid journal time');
     now = e.at;
+    if (e.kind === 'capped') throw new TypeError('journal is not replayable');
     if (e.kind === 'timer') {
       const timer = timers.get(e.id);
       if (!timer) throw new TypeError(`missing journal timer ${e.id}`);
       if (!timer.repeat) timers.delete(e.id);
-      timer.fn();
+      m._testSliceBudget = Number.isInteger(e.steps) && e.steps > 0 ? e.steps : null;
+      m._testSliceCount = 0;
+      try { timer.fn(); }
+      finally { m._testSliceBudget = null; }
     } else if (e.kind === 'call' && TEST_INPUT_METHODS.includes(e.method) && Array.isArray(e.args)) {
       m[e.method](...e.args);
     } else throw new TypeError('invalid journal entry');

@@ -38,9 +38,13 @@ export class MatchPlatform {
     if (!ps || ps.isBot || ps.left) return fail(ERR.NOT_IN_ROOM);
     // a spectator seat only watches (the platform routes nothing else of it)
     if (ps.spectator && (!msg || msg.t !== 'g.watch')) {
+      // g.test shares the host's rate bucket (applyTestCommand audits SPECTATOR after the stamp).
       if (this.test && msg?.t === 'g.test') {
-        this._testAudit(ps, msg.cmd, { rejected: true }, ERR.SPECTATOR);
+        let res;
+        try { res = this.applyTestCommand(ps, msg); }
+        catch (e) { this.reportError('handle g.test', e); res = fail(ERR.INTERNAL); }
         try { this.flush(); } catch (e) { this.reportError('flush', e); }
+        return res && res.error ? res : OK;
       }
       return fail(ERR.SPECTATOR);
     }

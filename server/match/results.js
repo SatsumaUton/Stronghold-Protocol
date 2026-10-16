@@ -157,6 +157,7 @@ export function buildResult(m, outcome) {
   if (m.test === true) {
     out.test = true;
     out.testActions = m.testActions | 0;
+    if (m.testReplayable === false) out.testReplayable = false;
   }
   return out;
 }

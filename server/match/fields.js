@@ -300,9 +300,11 @@ export class HeadlessJob {
     this._out = null;
   }
 
-  run(budgetMs = Infinity, now = perfNow) {
+  run(budgetMs = Infinity, now = perfNow, control = null) {
     if (this.done) return true;
-    const timed = Number.isFinite(budgetMs);
+    // `control` is a test-match slice (server/match/testTrace.js testSlice). Replay ignores the wall clock.
+    const replaying = !!(control && control.replaying);
+    const timed = !replaying && Number.isFinite(budgetMs);
     const t0 = timed ? now() : 0;
     let b = this.battle;
     try {
@@ -311,8 +313,9 @@ export class HeadlessJob {
         b.step();
         this.n++;
         k++;
+        if (control) control.note(1);
         if (this.n % this.every === 0) this.timeline.push(timelineSample(b));
-        if (timed && (k & 15) === 0 && !b.finished && now() - t0 >= budgetMs) return false;
+        if ((k & 15) === 0 && !b.finished && (replaying ? control.stop() : timed && now() - t0 >= budgetMs)) return false;
       }
       if (!b.finished) b.forceEnd('timeout');
     } catch (e) {

@@ -35,6 +35,67 @@ const PHASES = new Set(TEST_PHASES);
 
 export const isTestCommand = (v) => typeof v === 'string' && CMD.has(v);
 
+const TEST_ARG_STR = 64;
+const TEST_CMD_STR = 16;
+const TEST_ARG_DEPTH = 4;
+const TEST_ARG_KEYS = 8;
+const TEST_ARG_ARRAY = 16;
+
+/**
+ * Refuse a g.test body that is too large to trace, before any journal clone.
+ * A short unknown command is left alone (the match audits it as invalid).
+ * An oversized command string is BAD_MSG. An oversized id or other string is BAD_TARGET.
+ * A too-wide object or array, or a value nested too deep, is BAD_MSG.
+ * The returned message never keeps the oversized text. A message that is already small is returned as-is.
+ * [ASSUMED] These bounds match the catalogue's id length and the audit's command slice.
+ * @param {object} msg
+ */
+export function guardTestMessage(msg) {
+  if (!msg || typeof msg !== 'object' || msg.t !== 'g.test') return msg;
+  if (msg.oversize === 'BAD_TARGET' || msg.oversize === 'BAD_MSG') {
+    return { t: 'g.test', cmd: isTestCommand(msg.cmd) ? msg.cmd : 'invalid', oversize: msg.oversize };
+  }
+  const cmdOk = isTestCommand(msg.cmd);
+  let problem = null;
+  if (msg.cmd != null && typeof msg.cmd !== 'string') problem = 'BAD_MSG';
+  else if (typeof msg.cmd === 'string' && msg.cmd.length > TEST_CMD_STR) problem = 'BAD_MSG';
+  if (!problem && msg.args !== undefined) problem = scanTestValue(msg.args, 0);
+  if (!problem) {
+    const keys = Object.keys(msg);
+    if (keys.length > TEST_ARG_KEYS) problem = 'BAD_MSG';
+    for (const k of keys) {
+      if (problem) break;
+      if (k === 't' || k === 'cmd' || k === 'args' || k === 'oversize') continue;
+      if (k.length > TEST_ARG_STR) { problem = 'BAD_TARGET'; break; }
+      problem = scanTestValue(msg[k], 0);
+    }
+  }
+  if (!problem) return msg;
+  return { t: 'g.test', cmd: cmdOk ? msg.cmd : 'invalid', oversize: problem };
+}
+
+function scanTestValue(v, depth) {
+  if (typeof v === 'string') return v.length > TEST_ARG_STR ? 'BAD_TARGET' : null;
+  if (v == null || typeof v !== 'object') return null;
+  if (depth > TEST_ARG_DEPTH) return 'BAD_MSG';
+  if (Array.isArray(v)) {
+    if (v.length > TEST_ARG_ARRAY) return 'BAD_MSG';
+    for (const x of v) {
+      const p = scanTestValue(x, depth + 1);
+      if (p) return p;
+    }
+    return null;
+  }
+  const keys = Object.keys(v);
+  if (keys.length > TEST_ARG_KEYS) return 'BAD_MSG';
+  for (const k of keys) {
+    if (k.length > TEST_ARG_STR) return 'BAD_TARGET';
+    const p = scanTestValue(v[k], depth + 1);
+    if (p) return p;
+  }
+  return null;
+}
+
 const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
 const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 const isId = (v) => typeof v === 'string' && v.length > 0 && v.length <= 64 && !['__proto__', 'prototype', 'constructor'].includes(v) && /^[A-Za-z0-9_\-.:]+$/.test(v);
