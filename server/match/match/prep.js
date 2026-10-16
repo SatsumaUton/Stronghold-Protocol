@@ -60,10 +60,10 @@ export class MatchPrep {
       const t0 = now();
       let r = null;
       try {
-        do { // loop-cap: generator and the bot time slice
+        do {
           r = gen.next();
           if (sliceCtl) sliceCtl.note(1);
-        } while (!r.done && !(sliceCtl ? sliceCtl.wall(now() - t0, this.botSliceMs) : (bounded && now() - t0 >= this.botSliceMs)));
+        } while (!r.done && !(sliceCtl ? sliceCtl.wall(now() - t0, this.botSliceMs) : (bounded && now() - t0 >= this.botSliceMs))); // loop-cap: generator and the bot time slice
       } catch (e) {
         this.reportError(`bot ${ps.playerId}${label}`, e);
         then(null);

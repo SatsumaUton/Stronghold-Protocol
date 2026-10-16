@@ -27,15 +27,15 @@ const SILENT_OFF = new Set(['', '0', 'off', 'false', 'no']);
 
 /** Printed when `1` is refused. The launcher and the server log share this text. */
 export const TEST_MODE_PUBLIC_HINT =
-  '测试模式 1 未开启：监听地址是公网，或这台机器有公网地址。仅本机请用 --host 127.0.0.1；局域网请用 --host <局域网IP>；要在公网监听上开启请用 --test-mode force（或 SP_TEST_MODE=force）。';
+  '测试模式 1 未开启：监听地址是公网，或这台机器有公网地址。仅本机请用 --host 127.0.0.1；局域网请用 --host <局域网IP>；要在公网监听上开启请用 --test-mode force（或 SP_TEST_MODE=force）。'; // i18n-ignore: operator console text (launcher and server log), not UI
 
 /** Printed when SP_TEST_MODE is a word this process does not know. Test rooms stay off. */
 export const TEST_MODE_UNKNOWN_HINT =
-  '未识别的 SP_TEST_MODE，测试房间保持关闭。可用的值：off、1、force。';
+  '未识别的 SP_TEST_MODE，测试房间保持关闭。可用的值：off、1、force。'; // i18n-ignore: operator console text (launcher and server log), not UI
 
 /** Printed when force opens test rooms on a public or wildcard listener. Same hint style as TEST_MODE_PUBLIC_HINT. */
 export const TEST_MODE_FORCE_HINT =
-  '测试模式 force 已在公网或通配监听上开启测试房间（--test-mode force 或 SP_TEST_MODE=force）。环回地址前面的反向代理仍然是公网部署。';
+  '测试模式 force 已在公网或通配监听上开启测试房间（--test-mode force 或 SP_TEST_MODE=force）。环回地址前面的反向代理仍然是公网部署。'; // i18n-ignore: operator console text (launcher and server log), not UI
 
 /** @param {unknown} raw @returns {'off'|'local'|'force'} */
 export function parseTestModeEnv(raw) {
