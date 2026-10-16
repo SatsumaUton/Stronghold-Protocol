@@ -190,17 +190,18 @@ describe('match hosts in rooms (P1c): verification, the watchdog, crashes', () =
     c.id = w.playerId;
     return c;
   };
-  // room.start answers once the room's match host (a child process) is up: a Windows CI runner can take more than
-  // the client's 2 s default to spawn one, so the start and its first inMatch state get a longer wait
+  // room.setPlugins composes the room's content set and room.start answers once the room's match host (a child
+  // process) is up: a Windows CI runner can take more than the client's 2 s default for either, so those steps and
+  // the states they publish get a longer wait
   const START_MS = 20_000;
   const ok = async (c, msg, timeout) => { const r = await c.request(msg, timeout); assert.equal(r.t, 'ok', `${msg.t}: ${JSON.stringify(r)}`); return r; };
   /** A solo room with the plugin `id` switched on and checked by the host's page. */
   async function moddedRoom(srv, host, id, mode = 'solo') {
     await ok(host, { t: 'room.create', mode, difficulty: 'NORMAL' });
     await host.waitFor('room.state');
-    await ok(host, { t: 'room.setPlugins', plugins: [{ id }] });
-    const st = await host.waitFor('room.state', (s) => s.content?.vanilla === false);
-    await ok(host, { t: 'room.contentReady', cs: st.content.cs });
+    await ok(host, { t: 'room.setPlugins', plugins: [{ id }] }, START_MS);
+    const st = await host.waitFor('room.state', (s) => s.content?.vanilla === false, START_MS);
+    await ok(host, { t: 'room.contentReady', cs: st.content.cs }, START_MS);
     return st;
   }
 
@@ -276,15 +277,15 @@ describe('match hosts in rooms (P1c): verification, the watchdog, crashes', () =
     const s0 = await a.waitFor('room.state');
     await ok(b, { t: 'room.join', code: s0.code });
     await ok(a, { t: 'room.addBot' });
-    await ok(a, { t: 'room.setPlugins', plugins: [{ id: 'rules' }] });
-    const st = await a.waitFor('room.state', (s) => s.content?.vanilla === false);
+    await ok(a, { t: 'room.setPlugins', plugins: [{ id: 'rules' }] }, START_MS);
+    const st = await a.waitFor('room.state', (s) => s.content?.vanilla === false, START_MS);
     const cs = st.content.cs;
     // both pages simulate on the content set's data (what /cs/<cs16>/ serves): Alpha names it in b.result, Bravo not
     const ds = new DataSource(srv.contents.dataOf(cs), null);
     assert.equal(srv.contents.dataOf(cs).bonds.deputShip.bb.base_def, 0.36);
     a.sim = attachWsSimClient(a, { ds, pace: 'instant', speed: 40, withCs: true });
     b.sim = attachWsSimClient(b, { ds, pace: 'instant', speed: 40 });
-    for (const c of [a, b]) await ok(c, { t: 'room.contentReady', cs });
+    for (const c of [a, b]) await ok(c, { t: 'room.contentReady', cs }, START_MS);
     await ok(b, { t: 'room.ready', ready: true });
     await ok(a, { t: 'room.start' }, START_MS);
     const latest = (c, type) => { for (let i = c.log.length - 1; i >= 0; i--) if (c.log[i].t === type) return c.log[i]; return null; };
