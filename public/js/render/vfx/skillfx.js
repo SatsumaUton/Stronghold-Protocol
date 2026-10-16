@@ -20,6 +20,7 @@
 //                                the stored-energy display (b.snap energy), target loops and marks past their time
 //   s.simFx(kind, x, y, extra)   a kit 'fx' tuple the official layer stands for (true: the procedural one is skipped)
 //   s.auraHit(v, claimed)        b.ev 'dmg' (HP) no attack owns: a hit of an enemy aura's tick of this frame (true: drawn)
+//   s.bindsReached(src, proj)    a skill binding of the shooter's places the projectile's reached effects (FxWiring._arrive)
 //   s.keys(views)                every key to preload; s.clear()
 //
 // What plays when (skills.js header for the roles and signals):
@@ -1079,7 +1080,7 @@ export class SkillFx {
       return drew;
     }
     const tv = this.w.view(extra.id);
-    const at = bind.at === 'point' || !tv ? { id: 'fx:point', x, y, z: tv ? tv.z || 0 : 0 } : tv;
+    const at = bind.at === 'point' || !tv ? this._ground(x, y, tv) : tv;
     const bb = U.srec?.bb || {};
     const fxS = Number(extra.duration ?? extra.dur ?? extra.hold);
     const holdS = bind.hold === 'fx' ? (fxS > 0 ? fxS : bind.holdS || SKILL_CAST_S)
@@ -1093,6 +1094,22 @@ export class SkillFx {
       this.marks.push({ owner: U.id, r: Math.round(y), c: Math.round(x), until: this.w.ofx.time + holdS, h, cover: bind.cover || [] });
     }
     return drew;
+  }
+
+  /**
+   * Whether a skill binding of the shooter's places projectile `proj`'s reached effects (FX_BINDINGS `projectile` at
+   * 'point', in force — `during`: while the skill lasts —): its kit's area fx plays them at the zone's point for the zone's
+   * time, so the flight's arrival does not play them again (0.3.1: 锡人's flask drew twice — on the ground and, for 8 s,
+   * at the target's HitPoint where the drawn flight ended).
+   */
+  bindsReached(src, proj) {
+    const U = proj ? this.units.get(idOf(src)) : null;
+    const binds = U ? FX_BINDINGS[U.skillId] : null;
+    if (!binds) return false;
+    for (const b of Object.values(binds)) {
+      if (b.at === 'point' && b.projectile && this.w.idx?.projectiles?.[lc(b.projectile)] === proj && (!b.during || this._lasts(U))) return true;
+    }
+    return false;
   }
 
   /**

@@ -1375,6 +1375,24 @@ export const FX_BINDINGS = Object.freeze({
   skchr_blkkgt_3: Object.freeze({
     slash: binding({ owner: 'id', attack: 'Damage' }),
   }),
+  // 号角 S1 (chess_char_5_08-horn.js: the flare's 'zone' where her S1 shot lands, id = her, r = projectile_range, duration =
+  // projectile_delay_time): the skill's RangedAttackGroup (AbilityParallelGroup) fires the shell projectile_chr_horn_s1 —
+  // the shot the wiring flies — and RangedAttack_Light's projectile_chr_horn_s1_light, whose reached effects are the flare
+  // (horn_skill_01_hit_02_buff, looping, and horn_skill_01_hit_02) at the landing point (0.3.1, lingering areas)
+  skchr_horn_1: Object.freeze({ zone: binding({ owner: 'id', projectile: 'projectile_chr_horn_s1_light', at: 'point', hold: 'fx', holdS: 6, cover: ['zone'] }) }),
+  // 琴柳 S2 (a 自选 pick; op-sleach.js: the flag's 'zone' on the ally's tile it is planted on, id = her, dur = the skill's
+  // duration): the skill's FlagBuff (RangedAttack) puts projectile_chr_sleach_s2 there — AttachToTarget, AuraHitBehaviour —:
+  // its flying effect is the flag (sleach_skill_02_flag_01) and its reached effect the ground (sleach_skill_02_ground_01),
+  // both looping for its life (0.3.1)
+  skchr_sleach_2: Object.freeze({ zone: binding({ owner: 'id', keys: ['sleach_skill_02_flag_01', 'sleach_skill_02_ground_01'], at: 'point', hold: 'fx', holdS: 15, during: true, cover: ['zone'] }) }),
+  // 琴柳 S3 (the thrown flag's 'zone' on its tile, id = her, dur; its strike 'aoe' there FLAG_FLIGHT s later): the skill's
+  // DamageFlag group (AbilityParallelGroup of ProjectileToTileAbility) puts Debuff's projectile_chr_sleach_s3 on the tile —
+  // the flag sleach_skill_03_flag_01 and, on the tile as it starts, sleach_skill_03_range_loop_01 / _02 (looping) — and
+  // Damage's projectile_chr_sleach_s3_2, whose sleach_skill_03_range_start_01 / _02 (one-shots) are the strike
+  skchr_sleach_3: Object.freeze({
+    zone: binding({ owner: 'id', keys: ['sleach_skill_03_flag_01', 'sleach_skill_03_range_loop_01', 'sleach_skill_03_range_loop_02'], at: 'point', hold: 'fx', holdS: 10, during: true, cover: ['zone'] }),
+    aoe: binding({ owner: 'id', keys: ['sleach_skill_03_range_start_01', 'sleach_skill_03_range_start_02'], at: 'point', holdS: 7.5, during: true }),
+  }),
 });
 
 /**
@@ -1446,6 +1464,19 @@ export const FX_COVER = Object.freeze({
   skchr_rosmon_3: Object.freeze(['summon']),
   // 卡涅利安 S2: the chains — her skill's loops, once they are drawable (audit R6: her conditional buffs)
   skchr_billro_2: Object.freeze(['sandChains', 'sandChainsCharged']),
+  // 浊心斯卡蒂 S3: the tide at the cast — the skill's Aura `_effects` loop on her while it lasts (skadi2_skill_03_buff on the
+  // ground, _02 / _03 on her) and its start (skadi2_skill_03_begin_start) (0.3.1, lingering areas)
+  skchr_skadi2_3: Object.freeze(['tide']),
+  // 银灰 S2: the snow at the switch — the skill's own loop (svrash_skill_02_buff) on him, no area (0.3.1)
+  skchr_svrash_2: Object.freeze(['snow']),
+  // 珊比 S3 (a 自选 pick): the conveyor's zone — the skill's range loop on her (thumpy_skill_03_range_01, its template
+  // thumpy[skill_3_buff] at ON_BUFF_START; _end at its finish) shows the belt (0.3.1)
+  skchr_thumpy_3: Object.freeze(['zone']),
+  // 假日威龙陈 S2 / S3 (a 自选 pick): the slime zone — every attack of the skill's mode puts its projectile on the target
+  // (projectile_chr_chen2_s2 / _s3: AttachToTarget, AutoLoadBoxRange), whose reached chen2_skill_02 / 03_range_01 is the
+  // slime there; the client shows no area at her (0.3.1)
+  skchr_chen2_2: Object.freeze(['zone']),
+  skchr_chen2_3: Object.freeze(['zone']),
 });
 
 /** Whether a skill's official effects stand for a kit fx kind (FX_COVER). */
