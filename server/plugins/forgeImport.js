@@ -40,19 +40,27 @@
 //   * Official kits: when every skill id of a record is an official skill of one operator, the record keeps those
 //     ids and names that operator's kit (kit.ref): its chess kit for a shop piece (the same default skill, the same
 //     tier first), its 自选 kit for a 自选 record. A partial or ambiguous match keeps "generic" and is named. [ASSUMED]
-//   * An override array replaces the official array in one set. talents and talentsBase are merged by index in Forge;
-//     this version names them and does not replace them.
-//   * A chess override's `skill` and the `isDefault` entry of `skills[]` are one object (Forge DATA.md). The importer
-//     writes both from that entry. A record whose two sides differ is not imported; the rest of the pack is. [ASSUMED]
+//   * An override array replaces the official array in one set. A finite number inside that array (nested arrays and
+//     objects included) that sits outside ±1e9 omits the whole array, and the path is named, the same as a scalar leaf.
+//     talents and talentsBase are merged by index in Forge; this version names them and does not replace them.
+//   * A chess override's `skill` and the `isDefault` entry of `skills[]` are one object (Forge DATA.md). When the pack
+//     supplies skills[], both are written from that entry. A record whose two sides differ is not imported; the rest
+//     of the pack is. When skills[] is absent, the skill object is merged onto the official skill (plain objects
+//     merge, arrays and scalars replace) and that result is written as skill and as the default skills[] entry. [ASSUMED]
 //   * A bond, garrison or bond-member id this installation does not have is named and left out of that list. A list
-//     that is then empty is not written, so the official list stays. New bonds and new chess ids are not invented.
-//     A chess override does not write backup, chessType or status: those stay on the official record. [ASSUMED]
+//     that is then empty is not written, so the official list stays. When a chess override's written bonds list drops
+//     an official bond, that chess id is removed from the bond's members and visibleMembers, and the report names
+//     those official ids. A bond that joins is added the same way. An empty filtered list does not strip membership.
+//     New bonds and new chess ids are not invented. A chess override does not write backup, chessType or status.
+//     A garrison override's bbStr.bond and bbStr.bond_id are split on commas. A token that is not a bond id is named
+//     and that field is not written; the list is not shortened. A list of known bond ids is still written. [ASSUMED]
 //   * Spine clip data is computed during the import by skeletonClipData, the same read `plugin.mjs pack` uses, on a
-//     dry run and on a write. A skeleton that cannot be parsed is named and only that model is dropped. [ASSUMED]
+//     dry run and on a write. Bone, slot, skin and vertex counts above the cap in tools/assets/skel.mjs are refused
+//     before the parser allocates. A skeleton that cannot be parsed is named and only that model is dropped. [ASSUMED]
 //   * Forge JSON may hold a safe integer outside ±1e9 (a Unix timestamp). That does not reject the file. A number
 //     written into game data stays within ±1e9: skill duration, spCost, initSp, maxChargeTime, increment, blackboard
-//     numbers, stats, price, sellPrice, and patch leaves. A larger one is named and not written. Written plugin JSON
-//     stays within ±1e9. [ASSUMED]
+//     numbers, stats, price, sellPrice, and patch leaves, including a number nested in an array leaf. A larger one is
+//     named and not written. Written plugin JSON stays within ±1e9. [ASSUMED]
 //   * Record ids use the content plugin id (--out's basename when that product is primary, otherwise the pack id).
 //   * Two i18n entries that canonicalise to one language are refused (PLUGIN_FORGE_INPUT). They are not merged.
 //   * JSON keys __proto__, constructor and prototype are refused before any mapping. Asset trees use Object.create(null).
@@ -708,12 +716,37 @@ function sameJson(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** A finite number outside ±1e9 anywhere under an array leaf. Non-finite values stay on the scalar path. */
+function containsOversizedNumber(value) {
+  const stack = [value];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (typeof cur === 'number') {
+      if (Number.isFinite(cur) && Math.abs(cur) > PLUGIN_LIMITS.number) return true;
+      continue;
+    }
+    if (!cur || typeof cur !== 'object') continue;
+    if (Array.isArray(cur)) {
+      for (let i = 0; i < cur.length; i++) stack.push(cur[i]);
+    } else {
+      for (const k of Object.keys(cur)) {
+        if (DANGER_KEYS.has(k)) continue;
+        stack.push(cur[k]);
+      }
+    }
+  }
+  return false;
+}
+
 function leafOps(vanilla, partial, path, out, notes, unsupported) {
   if (out.length > 2000) return;
   if (Array.isArray(partial)) {
     if (!Array.isArray(vanilla)) { notes.push(path.join('.') || '(root)'); return; }
     const key = path.length ? String(path[path.length - 1]) : '';
     if (INDEX_MERGE_ARRAYS.has(key)) { unsupported.push(path.join('.') || key); return; }
+    // A matching array is one set. A finite number past ±1e9 inside it would be stored and then reject the pack
+    // (checkJsonLimits). Omit the op and name the path, the same as a scalar leaf, so the rest of the record imports.
+    if (containsOversizedNumber(partial)) { notes.push(path.join('.') || '(root)'); return; }
     if (path.length && !sameJson(partial, vanilla)) out.push({ path, value: partial });
     return;
   }
@@ -782,6 +815,19 @@ function skillBody(entry) {
   return rest;
 }
 
+/** Overlay `over` onto `base`. Plain objects merge; arrays and scalars replace. Official keys stay first. */
+function mergeOnto(base, over) {
+  const out = isObj(base) ? { ...base } : {};
+  if (!isObj(over)) return out;
+  for (const k of Object.keys(over)) {
+    if (k === 'isDefault' || DANGER_KEYS.has(k)) continue;
+    const v = over[k];
+    if (isObj(v) && isObj(out[k])) out[k] = mergeOnto(out[k], v);
+    else out[k] = v;
+  }
+  return out;
+}
+
 function oneDefaultSkill(skills) {
   if (!Array.isArray(skills)) return null;
   const marked = skills.filter((s) => isObj(s) && s.isDefault === true);
@@ -803,7 +849,8 @@ function skillDiffText(skill, body) {
 
 /**
  * Chess `skill` and the isDefault `skills[]` entry are one object. Derive both from that entry when the pack
- * supplies them and they agree. A record whose two sides differ is not imported.
+ * supplies skills[] and the two sides agree. A record whose two sides differ is not imported. With no skills[],
+ * merge the partial skill onto the official skill so a lone spCost does not replace the skill object.
  * @returns {{ rest: any, ops: { path: string[], value: any }[] } | { drop: true, zh: string, en: string }}
  */
 function alignChessSkills(vanillaRec, partial) {
@@ -844,7 +891,7 @@ function alignChessSkills(vanillaRec, partial) {
       en: 'The official record has no single default skill, so the pack skill cannot be aligned and this record was not imported.',
     };
   }
-  const body = skillBody(partial.skill);
+  const body = mergeOnto(skillBody(vanillaRec.skill), skillBody(partial.skill));
   const next = vanillaRec.skills.map((s) => (s && s.isDefault === true ? { ...body, isDefault: true } : s));
   /** @type {{ path: string[], value: any }[]} */
   const ops = [];
@@ -1222,6 +1269,17 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
 
   /** @type {any[]} */
   const patches = [];
+  /** Chess ids to add or remove on a bond's members and visibleMembers after every bonds override is in `patches`. */
+  /** @type {Map<string, { remove: Set<string>, add: Set<string> }>} */
+  const bondEdits = new Map();
+  const noteBond = (bondId, kind, chessId) => {
+    let edit = bondEdits.get(bondId);
+    if (!edit) {
+      edit = { remove: new Set(), add: new Set() };
+      bondEdits.set(bondId, edit);
+    }
+    edit[kind].add(chessId);
+  };
   /** @type {any[]} */
   const operators = [];
   /** @type {any[]} */
@@ -1280,7 +1338,40 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       else delete source[field];
     };
     if (file === 'chess') {
-      keepKnown('bonds', 'bonds', '盟约', 'bond');
+      if (Array.isArray(source.bonds)) {
+        const bondTable = table('bonds') || {};
+        const unknown = [];
+        const known = [];
+        for (const item of source.bonds) {
+          const key = typeof item === 'string' ? item : '';
+          if (!key || !has(bondTable, key)) unknown.push(String(item ?? '').slice(0, 40));
+          else if (!known.includes(key)) known.push(key);
+        }
+        if (unknown.length) {
+          listedHeld = true;
+          skip(`${file}:${id}#bonds`, `「${unknown.slice(0, 6).join('、')}」在本安装里没有这条盟约，没有写进 bonds。`, `"${unknown.slice(0, 6).join(', ')}" is not a bond in this installation, so it was not written into bonds.`);
+          if (known.length) source.bonds = known;
+          else delete source.bonds;
+        }
+        // pieceBonds counts chess.bonds. A list that drops or joins an official bond has to move this chess id on
+        // that bond's members and visibleMembers, or the catalogue still lists a piece the count no longer includes.
+        // An empty filtered list leaves the official bonds in place, so membership stays too.
+        if (known.length) {
+          const official = Array.isArray(vanillaRec.bonds) ? vanillaRec.bonds.filter((x) => typeof x === 'string') : [];
+          const dropped = official.filter((x) => !known.includes(x));
+          const joined = known.filter((x) => !official.includes(x));
+          if (dropped.length) {
+            listedHeld = true;
+            skip(`${file}:${id}#bonds-off`, `写入的 bonds 去掉了官方盟约「${dropped.slice(0, 6).join('、')}」，已把 ${id} 从这些盟约的 members 和 visibleMembers 里去掉。`, `The written bonds list drops the official bond "${dropped.slice(0, 6).join(', ')}", so ${id} was removed from those bonds' members and visibleMembers.`);
+            for (const b of dropped) noteBond(b, 'remove', id);
+          }
+          if (joined.length) {
+            listedHeld = true;
+            skip(`${file}:${id}#bonds-on`, `写入的 bonds 加上了官方盟约「${joined.slice(0, 6).join('、')}」，已把 ${id} 加进这些盟约的 members 和 visibleMembers。`, `The written bonds list adds the official bond "${joined.slice(0, 6).join(', ')}", so ${id} was added to those bonds' members and visibleMembers.`);
+            for (const b of joined) noteBond(b, 'add', id);
+          }
+        }
+      }
       keepKnown('garrisonIds', 'garrisons', '驻守', 'garrison');
       // The stand-in, the PRESET/NORMAL type and the promotion status belong to this installation. A pack value
       // that differs is named. Writing it breaks the official stand-in (a partial backup, or a status with no module).
@@ -1294,6 +1385,31 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     if (file === 'bonds') {
       keepKnown('members', 'chess', '棋子', 'chess piece');
       keepKnown('visibleMembers', 'chess', '棋子', 'chess piece');
+    }
+    // [ASSUMED] bbStr.bond and bond_id are comma-separated bond ids (the garrison effect splits them the same way).
+    // A token this installation does not have is named, and that field is not written: a shortened list would still
+    // be a different effect. A string of known bond ids is left for leafOps.
+    if (file === 'garrisons' && isObj(source.bbStr)) {
+      const bondTable = table('bonds') || {};
+      let bb = null;
+      for (const key of ['bond', 'bond_id']) {
+        const raw = (bb || source.bbStr)[key];
+        if (typeof raw !== 'string') continue;
+        const unknown = [];
+        const seenTok = new Set();
+        for (const token of raw.split(',')) {
+          const t = token.trim();
+          if (!t || seenTok.has(t)) continue;
+          seenTok.add(t);
+          if (!has(bondTable, t)) unknown.push(t.slice(0, 40));
+        }
+        if (!unknown.length) continue;
+        listedHeld = true;
+        skip(`${file}:${id}#bbStr.${key}`, `「${unknown.slice(0, 6).join('、')}」不是盟约 id，bbStr.${key} 的记号列表会因此改变，这个字段没有写入。`, `"${unknown.slice(0, 6).join(', ')}" is not a bond id, so the bbStr.${key} token list would change and that field was not written.`);
+        if (!bb) bb = { ...source.bbStr };
+        delete bb[key];
+      }
+      if (bb) source = { ...source, bbStr: bb };
     }
     const notes = [];
     const unsupported = [];
@@ -1941,6 +2057,33 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       skip(`${name}:${id}`, '新记录没有安全的紧凑映射（模式不是 Forge 的表；其他表只自动导入带官方 base 的敌人、干员和成对的棋子，以及已有记录上类型不变的补丁）。', 'A new record has no safe compact mapping (Forge has no mode table; other tables only auto-import enemies with an official base, operators, chess pairs, and type-preserving patches of existing records).');
     }
     if (newChess.size) mapChessRecords(newChess);
+  }
+
+  // Chess overrides are planned before bond overrides. Compose membership onto the bond op when one exists, otherwise
+  // onto the official array. A result that equals the official list drops a redundant op. visibleMembers is edited
+  // only when that array already exists: an empty invented list would hide every other member in the catalogue.
+  if (bondEdits.size) {
+    const bondTable = table('bonds') || {};
+    const sameList = (a, b) => Array.isArray(b) && a.length === b.length && a.every((v, i) => v === b[i]);
+    for (const [bondId, edit] of bondEdits) {
+      const official = bondTable[bondId];
+      if (!isObj(official)) continue;
+      for (const field of ['members', 'visibleMembers']) {
+        const idx = patches.findIndex((op) => op && op.op === 'set' && op.file === 'bonds' && op.id === bondId && Array.isArray(op.path) && op.path.length === 1 && op.path[0] === field);
+        const existing = idx >= 0 ? patches[idx] : null;
+        const base = existing && Array.isArray(existing.value) ? existing.value.slice()
+          : Array.isArray(official[field]) ? official[field].slice() : null;
+        if (!base) continue;
+        const next = base.filter((m) => typeof m !== 'string' || !edit.remove.has(m));
+        for (const chessId of edit.add) {
+          if (!edit.remove.has(chessId) && !next.includes(chessId)) next.push(chessId);
+        }
+        if (sameList(next, official[field])) {
+          if (idx >= 0) patches.splice(idx, 1);
+        } else if (existing) existing.value = next;
+        else patches.push({ op: 'set', file: 'bonds', id: bondId, path: [field], value: next });
+      }
+    }
   }
 
   // ---- kits/<id>.js → one sandboxed script plugin (Addition 3, round 43; forgeKits.js) --------------------------------
