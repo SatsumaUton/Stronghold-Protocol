@@ -1463,9 +1463,10 @@ A Forge workshop pack — a folder or a zip with `pack.json` at its root, one wr
 into one or more of our plugins. The importer (`server/plugins/forgeImport.js`) is original code. It does not copy
 Forge's source, and it does not screen for official art, the same rule as the packer: what a plugin carries is its
 author's responsibility. A pack is untrusted. The importer reads bytes only. It never `import()`s, `eval()`s or
-`require()`s a file from the pack. The one place a pack's code is written is the sandboxed script plugin of its
-`kits/<id>.js` files (below, `server/plugins/forgeKits.js`): parsed with acorn and rewritten there, never run during
-the import, and run afterwards only where the server owner set `SP_PLUGIN_SCRIPTS` and a room selects that plugin.
+`require()`s a file from the pack. Compatible read-only panels become sandboxed ui plugins (below);
+`kits/<id>.js` files become sandboxed script plugins (`server/plugins/forgeKits.js`): parsed with acorn and rewritten,
+never run during the import. Kits run afterwards only where the server owner set `SP_PLUGIN_SCRIPTS` and a room
+selects that plugin; panels run only in the player's iframe.
 
 ```
 node tools/plugin.mjs import-forge <dir or zip> [--out plugins/<id>] [--id <id>] [--dry-run] [--json] [--no-scripts]
@@ -1634,6 +1635,25 @@ an econ payload. `data.get` returns a clone only for `chess` or `assets` when th
 page passed the data in; otherwise null. UI-only unsupported packs report **需要人工适配 / needs manual
 adaptation**, with `needsManualAdaptation` and `manualPanels` in JSON, instead of “nothing importable.”
 
+The receiver accepts a feed only when `event.source === parent`, before queuing or applying it. Opaque origins
+still permit cross-window messaging ([HTML CrossOriginProperties](https://html.spec.whatwg.org/multipage/nav-history-apis.html#crossoriginproperties-(-o-)));
+the static scan is a compatibility check, not the sender boundary. Repeated `ready` messages do nothing. Each entry
+document gets one initial `net`; subsequent changed snapshots are deduplicated and throttled per frame at 1 Hz
+[ASSUMED]. Initializing another frame cannot consume a pending update. Moving a frame starts a new document.
+
+`welcome.cs` and `state.room.cs` carry only the real room `content.cs` (64 lower-case hex digits). The shim exposes
+its first eight digits as `net.welcome().mods.digest` [ASSUMED], replacing or clearing it when the room changes;
+unknown identity stays absent. Static `/shared/i18n.js` imports bind `t` (aliases and namespaces supported), as do
+literal dynamic imports. Other static exports are rejected by name. Every unique JS, CSS and JSON file counts
+toward the 64-file closure limit before traversal, including assets reached only through `styles`; `styles` must
+name `.css` files. Duplicate paths count once [ASSUMED].
+
+Missing activation inputs stay manual [ASSUMED conservative scan]: host URL access (`host-location`), desktop /
+Android bridges (`desktop`), and controllers assigned on a frame global for the host to call (`host-controller`).
+Thus demo `guest-strip`, `lan-panel` and `match-overlay` are not compatible copies. Expanded-room fields
+`playerCapacity` / `seatCap` are `room.capacity`: this server has four fixed seats and no capacity setting.
+`capacity-panel` therefore stays manual; its 8/12/16/20 choices and room-setting claim are not presented to players.
+
 The iframe's own document gets `screen` and `result` on the document element and on `body` only for a `result.tab`
 panel while a result payload is present, and `room-screen` only for a `room.panel` panel while seats are known.
 It never gets `st`. [ASSUMED] Those classes are how a Forge panel decides it is on screen; they are not the game page.
@@ -1641,8 +1661,13 @@ It never gets `st`. [ASSUMED] Those classes are how a Forge panel decides it is 
 When whole gameplay records are not written, the report is still `ok` if nothing else failed, and it says so up front.
 The markdown heading `## 没有导入的玩法` comes before `## 导入了什么`. JSON adds `partial: true` and `dropped` counts for
 operators (chess and units), bonds, bands, items, tokens, traits (a garrison table and a traits table), kits and panels,
-and only when a count is above zero. A field-level note, a unit already covered by its chess pair, `--no-scripts`, and a
-mounted panel whose script was not copied do not set `partial`. [ASSUMED] Effects are not a counted kind. A cosmetic
+and only when a count is above zero. A skeleton counts once as a dropped panel; a copied panel never counts.
+Dropped server modules, host stylesheets, messages and other client declarations also set `partial: true` and
+`needsManualAdaptation: true`, with bilingual `manualReasons` (`path`, `zh`, `en`, optional `surfaces`) in JSON.
+Markdown starts with **部分导入 / Partial import** and **需要人工适配 / Needs manual adaptation**, with those reasons
+before products. `ok` still means validation succeeded, including when a skeleton validates [ASSUMED].
+A field-level note, a unit already covered by its chess pair and `--no-scripts` do not set `partial` on their own.
+[ASSUMED] Effects are not a counted kind. A cosmetic
 whose asked art, bond or item targets were all dropped says, in Chinese and in English, that it has nothing to apply to
 (`cosmeticBare`); the files are still copied. Those targets are gameplay record ids (operators, bonds, bands, items,
 tokens, traits, kits). A dropped panel title is never one of them, so a panel named like a kept portrait leaves the

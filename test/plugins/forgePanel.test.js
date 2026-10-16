@@ -5,12 +5,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'acorn';
 import { installForgeShim } from '../../shared/plugins/forgePanel.js';
-import { isMatchIntent } from '../../shared/plugins/ui.js';
+import { hostState, hostWelcome, isMatchIntent } from '../../shared/plugins/ui.js';
 import { PANEL_FILE_MAX, PANEL_FILES_MAX, PANEL_TOTAL_MAX, planForgePanel } from '../../server/plugins/forgePanels.js';
-import { importForge } from '../../server/plugins/forgeImport.js';
+import { importForge, planForgeImport } from '../../server/plugins/forgeImport.js';
 import { readVanillaAssets } from '../../server/plugins/registry.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -107,6 +108,117 @@ function filesOf(map) {
   return files;
 }
 
+test('only the parent can queue feeds, start a panel or update a running panel', () => {
+  let receive;
+  let mounts = 0;
+  const parent = { postMessage() {} };
+  const sibling = {};
+  const root = { parent, addEventListener: (_type, fn) => { receive = fn; }, __spForgeMount: () => { mounts += 1; } };
+  const api = installForgeShim(root);
+  api.boot({ slot: 'hud.right' });
+  const deliver = (source, data) => receive({ source, origin: 'null', data });
+  deliver(sibling, { v: 1, t: 'result', result: { forged: true } });
+  deliver(sibling, { v: 1, t: 'welcome', version: 999, plugins: ['spoof'] });
+  assert.equal(mounts, 0);
+  assert.equal(api.__feed, undefined);
+  deliver(parent, { v: 1, t: 'net', rtt: 12 });
+  deliver(parent, { v: 1, t: 'welcome', version: 1, plugins: [] });
+  assert.equal(mounts, 1);
+  assert.equal(api.__feed.result, null);
+  assert.equal(api.__feed.ctx.net.status().ping, 12);
+  for (const source of [sibling, null, root]) {
+    deliver(source, { v: 1, t: 'welcome', version: 999, plugins: ['spoof'] });
+    deliver(source, { v: 1, t: 'result', result: { forged: true } });
+    deliver(source, { v: 1, t: 'state', room: { seats: ['forged'] } });
+    deliver(source, { v: 1, t: 'net', rtt: 999 });
+  }
+  assert.equal(api.__feed.ctx.net.welcome().version, '1');
+  assert.equal(api.__feed.result, null);
+  assert.equal(api.__feed.room, null);
+  assert.equal(api.__feed.ctx.net.status().ping, 12);
+  deliver(parent, { v: 1, t: 'result', result: { victory: true } });
+  assert.equal(api.__feed.result.victory, true);
+});
+
+test('static i18n named and namespace bindings execute, unsupported exports refuse the copy', () => {
+  for (const [binding, call] of [['{ t as tr }', 'tr'], ['* as lang', 'lang.t']]) {
+    const plan = planForgePanel({ parse, entry: 'p.js', panel: {}, files: filesOf({
+      'p.js': `import ${binding} from '/shared/i18n.js'; export function mount(ctx){ctx.host.textContent=${call}('Room');}`,
+    }) });
+    assert.equal(plan.ok, true, plan.surfaces.join(','));
+    const realm = vm.createContext({ __spForge: { __t: (s) => `translated:${s}` } });
+    vm.runInContext(plan.bundle, realm);
+    const host = {};
+    realm.__spForgeMount({ host });
+    assert.equal(host.textContent, 'translated:Room');
+  }
+  for (const binding of ['{ getLang }', 't', '{ t, setLang }']) {
+    const plan = planForgePanel({ parse, entry: 'p.js', panel: {}, files: filesOf({
+      'p.js': `import ${binding} from '/shared/i18n.js'; export function mount(ctx){ctx.host;}`,
+    }) });
+    assert.equal(plan.ok, false, binding);
+    assert.ok(plan.surfaces.some((s) => s.startsWith('i18n:export:')));
+  }
+});
+
+test('styles must be CSS and every unique asset counts toward the file cap', () => {
+  const files = { 'p.js': 'export function mount(ctx){ctx.host;}', 'x.json': '{}', 'x.js': 'export const x=1;' };
+  for (let i = 0; i < PANEL_FILES_MAX; i += 1) files[`s${i}.css`] = 'b{color:red}';
+  for (const style of ['p.js', 'x.json', 'x.js']) {
+    const bad = planForgePanel({ parse, entry: 'p.js', panel: { styles: [style] }, files: filesOf(files) });
+    assert.equal(bad.ok, false, style);
+    assert.ok(bad.surfaces.includes('style-type'));
+  }
+  const styles = Array.from({ length: PANEL_FILES_MAX - 1 }, (_, i) => `s${i}.css`);
+  const atCap = planForgePanel({ parse, entry: 'p.js', panel: { styles: [...styles, styles[0]] }, files: filesOf(files) });
+  assert.equal(atCap.ok, true);
+  assert.equal(atCap.copies.length, PANEL_FILES_MAX);
+  const over = planForgePanel({ parse, entry: 'p.js', panel: { styles: [...styles, `s${PANEL_FILES_MAX - 1}.css`] }, files: filesOf(files) });
+  assert.equal(over.ok, false);
+  assert.ok(over.surfaces.includes('cap:count'));
+  const assets = Object.fromEntries(styles.map((s) => [s.replace('.css', '.json'), '{}']));
+  assets['p.js'] = Object.keys(assets).map((s) => `import './${s}';`).join('') + "import './extra.json';export function mount(ctx){ctx.host;}";
+  assets['extra.json'] = '{}';
+  const jsonOver = planForgePanel({ parse, entry: 'p.js', files: filesOf(assets) });
+  assert.equal(jsonOver.ok, false);
+  assert.ok(jsonOver.surfaces.includes('cap:count'));
+});
+
+for (const [name, source, surface] of [
+  ['guest URL', 'new URLSearchParams(globalThis.location.search);', 'host-location'],
+  ['desktop bridge', 'if (!globalThis.desktop) return {};', 'desktop'],
+  ['host controller', 'globalThis.__controller = {start(){}};', 'host-controller'],
+  ['expanded capacity', 'const caps=[4,8,12,16,20]; const n=ctx.net.status()?.experimental?.playerCapacity;', 'room.capacity'],
+]) test(`a panel needing ${name} stays manual`, () => {
+  const plan = planForgeImport(filesOf({
+    'pack.json': JSON.stringify({ id: 'missing-input', name: name, version: '1.0.0', client: { panels: [{ id: 'p', slot: 'root.guide', module: 'p.js' }] } }),
+    'p.js': `export function mount(ctx){ctx.host;${source}}`,
+  }), { parse, dataDir: path.join(ROOT, 'data'), vanilla });
+  assert.equal(plan.meta.panels.filter((p) => p.copied).length, 0);
+  assert.equal(plan.meta.manualPanels.length, 1);
+  assert.ok(plan.meta.skipped.some((s) => s.surfaces?.includes(surface)));
+});
+
+test('room identity is sanitized, shortened and replaced or cleared with the room', () => {
+  const { api, feed } = feedOf();
+  const cs = '12345678'.repeat(8);
+  const welcome = hostWelcome('p', [], { version: 1, plugins: ['rules'], cs });
+  api.apply(feed, welcome);
+  assert.equal(welcome.cs, cs);
+  assert.equal(feed.ctx.net.welcome().mods.digest, '12345678');
+  const next = hostState({}, {}, { seats: [null, null, null, null], content: { cs: 'abcdef00'.repeat(8), plugins: [] } });
+  api.apply(feed, next);
+  assert.equal(next.room.cs, 'abcdef00'.repeat(8));
+  assert.equal(feed.ctx.net.welcome().mods.digest, 'abcdef00');
+  api.apply(feed, hostState({}, {}, { seats: [], content: { cs: '<bad>', plugins: [] } }));
+  assert.equal(feed.ctx.net.welcome().mods.digest, undefined);
+  api.apply(feed, next);
+  api.apply(feed, hostState({}, {}, null));
+  assert.equal(feed.ctx.net.welcome().mods.digest, undefined);
+  assert.deepEqual(feed.ctx.net.welcome().mods.packs, []);
+  assert.equal(hostWelcome('p', [], { cs: 'secret' }).cs, undefined);
+});
+
 test('a relative closure is copied and a rejected specifier stays a skeleton', () => {
   const ok = planForgePanel({
     parse, entry: 'ui/panel.js', panel: { slot: 'screen.game.hud' },
@@ -201,6 +313,34 @@ function writePack(dir, pack, files) {
     fs.writeFileSync(abs, data);
   }
 }
+
+test('skeletons and dropped server, host styles or messages report partial/manual up front', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-panel-'));
+  try {
+    for (const [name, extra, source] of [
+      ['skeleton', {}, 'export function mount(ctx){ctx.net.send("say",{});}'],
+      ['server', { server: { modules: [{ entry: 'server.mjs' }] } }, 'export function mount(ctx){ctx.host;}'],
+      ['host-style', { client: { theme: { vars: { '--x': 'red' } } } }, 'export function mount(ctx){ctx.host;}'],
+      ['messages', { client: { messages: ['say'] } }, 'export function mount(ctx){ctx.host;}'],
+    ]) {
+      const dir = path.join(parent, name);
+      const pack = { id: `probe-${name}`, name, version: '1.0.0', license: 'CC0-1.0', ...extra,
+        client: { ...extra.client, panels: [{ slot: 'screen.game.hud', module: 'p.js' }] } };
+      writePack(dir, pack, { 'p.js': source, 'server.mjs': 'throw new Error("must never run");' });
+      for (const dryRun of [true, false]) {
+        const out = path.join(parent, `out-${name}-${dryRun}`);
+        const got = await importForge(dir, { pluginsDir: out, root: ROOT, dataDir: path.join(ROOT, 'data'), vanilla, dryRun });
+        assert.equal(got.ok, true, got.markdown);
+        assert.equal(got.report.partial, true, name);
+        assert.equal(got.report.needsManualAdaptation, true, name);
+        assert.ok(got.report.manualReasons.length, name);
+        assert.ok(got.markdown.indexOf('部分导入 / Partial import') < got.markdown.indexOf('## 导入了什么'));
+        assert.match(got.markdown, /需要人工适配 \/ Needs manual adaptation/);
+        assert.equal(got.report.dropped?.panels || 0, name === 'skeleton' ? 1 : 0);
+      }
+    }
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
 
 test('import copies a supported panel, keeps a skeleton for send, and tabs a second copy', async () => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-panel-'));

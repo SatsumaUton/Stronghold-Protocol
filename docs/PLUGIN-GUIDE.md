@@ -406,7 +406,9 @@ node tools/plugin.mjs pack my-texas --zip
 整条玩法记录没有写入时（干员 / 棋子、盟约、乐队、道具、召唤物、特性、技能脚本、面板），报告开头有「没有导入的玩法」，
 JSON 里写 `partial: true` 和各类的 `dropped` 数量。`ok` 仍表示没有硬错误。外观要套的干员、棋子或道具全都没导入时，
 这份产品写明没有可应用的对象；文件仍会复制。只替换一部分、或只有语音时，不写这句话。[ASSUMED] 效果不单列；棋子对已经
-覆盖的干员、`--no-scripts`、以及已经挂上但脚本没复制的面板，都不算进 `partial`。
+覆盖的干员、`--no-scripts` 不单独算进 `partial`。只生成骨架的面板算丢失一块面板，已复制的面板不计入丢失数量。
+服务端模块、宿主样式或消息声明没有导入时，也会在开头写「部分导入 / Partial import」和「需要人工适配 / Needs manual adaptation」，
+JSON 写 `partial: true`、`needsManualAdaptation: true` 和双语原因 `manualReasons`；`ok` 只表示校验通过。[ASSUMED]
 
 命令行做同一件事：
 
@@ -423,6 +425,15 @@ node tools/plugin.mjs import-forge <工坊包目录或 zip> [--out plugins/<id>]
 加载兼容层再挂上面板。导入时仍然不执行脚本。`fetch`、`net.send`、包消息、改宿主页面的样式、外观提供者，报告会点名，
 页面保持原来的骨架。[ASSUMED] 单个文件 256 KB，一个面板一共 1 MB、最多 64 个文件。`root.guide` 上监听 `room.state`
 的面板显示在房间屏；其他对得上的未映射挂载点用建议插槽，那不是 Forge 原来的位置。同一个插槽有多块时，对局里用标签切换。
+
+面板只接收父窗口的 feed，兄弟 iframe 发来的消息在排队前就会丢弃。每次入口文档只初始化一次，重复 `ready` 不会重发；
+连接更新按每块面板独立去重、每秒最多一次，装另一块面板不会吞掉待发更新。[ASSUMED] 本房真实 `content.cs` 的前 8 位
+作为 `net.welcome().mods.digest`；换房会替换，离房会清空，不编造摘要。静态或字面量动态导入 `/shared/i18n.js` 可使用 `t`，
+静态导入支持别名和命名空间，其他静态导出会拒绝。`styles` 只能指向 `.css`，CSS / JSON 与入口都计入 64 个唯一文件上限。
+
+依赖宿主 URL、桌面桥或宿主调用全局控制器的面板暂需人工适配：演示包的 guest-strip、lan-panel、match-overlay 都缺少
+启动输入，不会作为兼容面板复制。[ASSUMED] 本服固定四席，没有容量设置；capacity-panel 的扩容字段 `playerCapacity` /
+`seatCap` 会被点名为 `room.capacity`，暂不展示其 8/12/16/20 档位与房间设置提示。
 
 技能怎么办：
 

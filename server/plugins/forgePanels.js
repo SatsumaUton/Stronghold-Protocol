@@ -134,6 +134,8 @@ function readModule(path, bytes, parse, files) {
       const dep = depOf(n.source.value);
       if (dep.error) continue;
       for (const s of n.specifiers) {
+        const binding = s.type === 'ImportDefaultSpecifier' ? 'default' : s.type === 'ImportSpecifier' ? propName(s.imported) : null;
+        if (deps[dep.index].i18n && binding != null && binding !== 't') surfaces.add(`i18n:export:${binding}`);
         if (s.type === 'ImportNamespaceSpecifier') imports.push({ local: s.local.name, from: dep.index, name: null });
         else if (s.type === 'ImportDefaultSpecifier') imports.push({ local: s.local.name, from: dep.index, name: 'default' });
         else imports.push({ local: s.local.name, from: dep.index, name: propName(s.imported) });
@@ -179,6 +181,10 @@ function readModule(path, bytes, parse, files) {
     }
   }
   walk(ast, (node, fnDepth) => {
+    // [ASSUMED] A frame has neither the host URL/desktop bridge nor callers of controllers published on its
+    // global, and our fixed-seat server has no expanded capacity. Reject these dependencies conservatively.
+    if (node.type === 'AssignmentExpression' && node.left?.type === 'MemberExpression'
+      && ['globalThis', 'window', 'self'].includes(node.left.object?.name)) surfaces.add('host-controller');
     if (node.type === 'MetaProperty') surfaces.add('import.meta');
     if (node.type === 'AwaitExpression' && fnDepth === 0) surfaces.add('top-level-await');
     if (node.type === 'ImportExpression') {
@@ -200,6 +206,14 @@ function readModule(path, bytes, parse, files) {
       if (member && (member.type === 'MemberExpression')) {
         const name = propName(member.property);
         const obj = member.object;
+        const global = obj?.type === 'Identifier' && ['globalThis', 'window', 'self'].includes(obj.name);
+        if (global && name === 'location') surfaces.add('host-location');
+        if (global && (name === 'desktop' || name === 'Android')) surfaces.add('desktop');
+        if (name === 'playerCapacity' || name === 'seatCap') surfaces.add('room.capacity');
+        if (obj?.type === 'Identifier') {
+          const imported = imports.find((i) => i.local === obj.name && i.name == null && deps[i.from]?.i18n);
+          if (imported && name !== 't') surfaces.add(`i18n:export:${name || '?'}`);
+        }
         if (obj && obj.type === 'Identifier' && obj.name === 'ctx' && name && CTX_SURFACES.has(name)) supported = true;
         if (name === 'documentElement') surfaces.add('documentElement');
         if (name === 'serviceWorker') surfaces.add('serviceWorker');
@@ -264,8 +278,8 @@ function renderModule(mod) {
   for (const [start, end, value] of edits) body = body.slice(0, start) + value + body.slice(end);
   const head = mod.imports.map((i) => {
     const dep = mod.deps[i.from];
-    if (!dep || !dep.path) return '';
-    const base = `__spMod[${JSON.stringify(dep.path)}]`;
+    if (!dep) return '';
+    const base = dep.i18n ? '{ t: globalThis.__spForgeT }' : `__spMod[${JSON.stringify(dep.path)}]`;
     return i.name == null ? `const ${i.local} = ${base};` : `const ${i.local} = ${base}[${JSON.stringify(i.name)}];`;
   }).filter(Boolean).join('\n');
   const out = mod.exports.map(([name, local]) => `${JSON.stringify(name)}: ${local}`).join(', ');
@@ -337,10 +351,12 @@ export function planForgePanel({ files, entry, panel, parse, requires }) {
   const visit = (rel) => {
     if (state.get(rel) === 'done') return null;
     if (state.get(rel) === 'open') return { surface: 'cycle', zh: `${rel} 的 import 成环。`, en: `${rel} has a cyclic import.` };
+    // Count every unique file before descending, including CSS/JSON assets and the entry itself.
+    if (state.size >= PANEL_FILES_MAX) return { surface: 'cap:count', zh: `面板要带的文件超过 ${PANEL_FILES_MAX} 个。`, en: `The panel needs more than ${PANEL_FILES_MAX} files.` };
     const mod = load(rel);
     if (mod.error) return mod.error;
-    if (mod.asset) { state.set(rel, 'done'); order.push(rel); return null; }
     state.set(rel, 'open');
+    if (mod.asset) { state.set(rel, 'done'); order.push(rel); return null; }
     for (const dep of mod.deps) {
       if (!dep.path) continue;
       const why = visit(dep.path);
@@ -348,13 +364,14 @@ export function planForgePanel({ files, entry, panel, parse, requires }) {
     }
     state.set(rel, 'done');
     order.push(rel);
-    if (order.length > PANEL_FILES_MAX) return { surface: 'cap:count', zh: `面板要带的文件超过 ${PANEL_FILES_MAX} 个。`, en: `The panel needs more than ${PANEL_FILES_MAX} files.` };
     return null;
   };
   const styleList = typeof panel?.styles === 'string' ? [panel.styles] : Array.isArray(panel?.styles) ? panel.styles : [];
+  if (panel?.styles != null && typeof panel.styles !== 'string' && !Array.isArray(panel.styles)) surfaces.add('style-type');
   for (const rel of styleList) {
-    if (typeof rel !== 'string') continue;
+    if (typeof rel !== 'string') { surfaces.add('style-type'); continue; }
     const norm = rel.replace(/\\/g, '/').replace(/^\.\//, '');
+    if (!norm.endsWith('.css')) { surfaces.add('style-type'); continue; }
     if (!files.has(norm)) { surfaces.add('style-missing'); continue; }
     const why = visit(norm);
     if (why) surfaces.add(why.surface || 'style');
@@ -400,6 +417,10 @@ export function planForgePanel({ files, entry, panel, parse, requires }) {
   }
   /** @type {string[]} */
   const parts = ['var __spMod = Object.create(null);\n'];
+  // Install the translation wrapper before module initialization, so static imports bind a callable function.
+  parts.push('globalThis.__spForgeT = function (msgid, vars) {\n');
+  parts.push('  var api = globalThis.__spForge;\n');
+  parts.push('  return api && api.__t ? api.__t(msgid, vars) : String(msgid);\n};\n');
   for (const rel of order) {
     const mod = mods.get(rel);
     if (!mod || mod.error) continue;
@@ -417,9 +438,6 @@ export function planForgePanel({ files, entry, panel, parse, requires }) {
     parts.push(renderModule(mod));
   }
   parts.push(`globalThis.__spForgeMount = (__spMod[${JSON.stringify(entry)}] || {}).mount || (__spMod[${JSON.stringify(entry)}] || {})["default"];\n`);
-  parts.push('globalThis.__spForgeT = function (msgid, vars) {\n');
-  parts.push('  var api = globalThis.__spForge;\n');
-  parts.push('  return api && api.__t ? api.__t(msgid, vars) : String(msgid);\n};\n');
   const bundle = parts.join('');
   try { parse(bundle, { ecmaVersion: 2022, sourceType: 'script' }); }
   catch (e) {

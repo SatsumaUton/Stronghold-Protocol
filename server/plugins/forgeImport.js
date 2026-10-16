@@ -956,6 +956,9 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   const used = new Set(['pack.json']);
   /** @type {{ path: string, zh: string, en: string, code?: string }[]} */
   const skipped = [];
+  // [ASSUMED] Dropping panel behavior or declared host capabilities is a partial import even when a stub or
+  // another product validates. Keep the reasons separate from whole-record counts and field-level notes.
+  const manualReasons = [];
   /** @type {{ what: string, zh: string, en: string }[]} */
   const assumed = [];
   // Whole gameplay records that never became a plugin record. A field note (#bonds, #kit, #skill-fields)
@@ -969,6 +972,11 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   const noteDrop = (kind, n = 1) => { if (Object.hasOwn(dropped, kind) && n > 0) dropped[kind] += n; };
   const skip = (p, zh, en, code, kind, extra) => {
     skipped.push({ path: p, zh, en, ...(code ? { code } : {}), ...(extra && typeof extra === 'object' ? extra : {}) });
+    if (code === 'PLUGIN_FORGE_PANEL_SCRIPT' || code === 'PLUGIN_FORGE_MOUNT'
+      || ['pack.json:server', 'pack.json:serverModules', 'pack.json:routes', 'pack.json:messages', 'pack.json:theme'].includes(p)
+      || (p.startsWith('client.') && !p.startsWith('client.panels'))) {
+      manualReasons.push({ path: p, zh, en, ...(extra && typeof extra === 'object' ? extra : {}) });
+    }
     if (!kind) return;
     noteDrop(kind);
     if (!DROP_ID_KINDS.has(kind)) return;
@@ -2285,11 +2293,12 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     }
     const compatible = !!(planned && planned.ok);
     const display = forgeDisplaySlot(forgeSlot, { compatible, listensRoom: !!(planned && planned.listensRoom) });
-    const surfaces = planned && Array.isArray(planned.surfaces) ? planned.surfaces : [];
-    if (module && !compatible) {
+    const surfaces = planned && Array.isArray(planned.surfaces) ? planned.surfaces : ['missing'];
+    if (!compatible) {
       const listed = surfaces.length ? ` 用到了这里没有的接口：${surfaces.join('、')}。` : '';
       const listedEn = surfaces.length ? ` Unsupported surfaces: ${surfaces.join(', ')}.` : '';
-      skip(`client.panels:${title}#module`, `面板「${title}」的脚本 ${module} 没有复制；需要改写成 postMessage API v1。${listed}`, `Panel "${title}" script ${module} was not copied; rewrite it to postMessage API v1.${listedEn}`, 'PLUGIN_FORGE_PANEL_SCRIPT', undefined, surfaces.length ? { surfaces } : undefined);
+      const capacity = surfaces.includes('room.capacity');
+      skip(`client.panels:${title}#module`, `面板「${title}」的脚本 ${module || '(none)'} 没有复制；需要改写成 postMessage API v1。${listed}${capacity ? ' 本服固定 4 个席位，没有扩容或房间容量设置。' : ''}`, `Panel "${title}" script ${module || '(none)'} was not copied; rewrite it to postMessage API v1.${listedEn}${capacity ? ' This server has four fixed seats and no room-capacity setting.' : ''}`, 'PLUGIN_FORGE_PANEL_SCRIPT', undefined, surfaces.length ? { surfaces } : undefined);
     }
     if (blocked) {
       const where = display.slot || display.suggested || 'room.panel';
@@ -2310,6 +2319,8 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
         continue;
       }
       slotUses.set(display.slot, 1);
+      manualPanels.push({ panel: title, mount: forgeSlot, suggestedSlot: display.slot });
+      noteDrop('panels');
       panels.push({ slot: display.slot, module, title: shortTitle, role: `ui:${display.slot}`, copied: false });
       rewrittenAssets.push(`${forgeSlot} → ${display.slot}`);
       continue;
@@ -2438,7 +2449,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   for (const bucket of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items', 'skills', 'modules']) if (isObj(assets[bucket])) kept.push(...Object.keys(assets[bucket]));
   const cosmeticBare = asked.length > 0 && asked.every((k) => droppedIds.has(k)) && kept.every((k) => droppedIds.has(k));
 
-  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, contentI18n, panels, manualPanels, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare };
+  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, contentI18n, panels, manualPanels, manualReasons, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare };
   return { meta, roles };
 }
 
@@ -2686,6 +2697,7 @@ function reportMarkdown(report) {
 
 来源：${report.pack.id} ${report.pack.name} ${report.pack.version}
 写入：${report.wrote ? '是' : '否'}${report.dryRun ? '（dry-run，没有写文件）' : ''}
+${report.partial ? '\n状态：部分导入 / Partial import\n' : ''}${report.needsManualAdaptation ? `\n需要人工适配 / Needs manual adaptation\n\n${bullets(report.manualReasons || [], (s) => `- \`${s.path}\`：${s.zh} (${s.en})`)}\n` : ''}
 
 导入器只读文件，不执行包里的任何脚本，也不拦截官方素材（和打包工具一样，作者自己对素材负责）。
 ${scriptNote(report.products)}
@@ -2717,7 +2729,7 @@ function publicReport({ meta, products, primaryId, wrote, dryRun, check, issues 
     assumed: [...meta.assumed].sort((a, b) => (a.what < b.what ? -1 : a.what > b.what ? 1 : 0)),
     check, dryRun, issues, ok: issues.length === 0, pack: { id: meta.packId, name: meta.packName, version: meta.version },
     primary: primaryId,
-    needsManualAdaptation: !!meta.manualPanels?.length,
+    needsManualAdaptation: !!meta.manualPanels?.length || !!meta.manualReasons?.length,
     manualPanels: meta.manualPanels || [],
     products: products.map((p) => ({
       class: p.class, dir: `plugins/${p.id}`, id: p.id, imported: [...p.imported], permissions: p.manifest.permissions || [], rewritten: [...p.rewritten],
@@ -2725,7 +2737,11 @@ function publicReport({ meta, products, primaryId, wrote, dryRun, check, issues 
     skipped: [...meta.skipped].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)),
     wrote,
   };
-  // Absent unless a whole gameplay record was dropped, so a complete import keeps the previous fields.
+  if (meta.manualReasons?.length) {
+    report.partial = true;
+    report.manualReasons = [...meta.manualReasons].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  }
+  // A copied panel is never counted as dropped. A skeleton counts once, just like an entirely manual panel.
   if (meta.dropped && Object.values(meta.dropped).some((n) => n > 0)) {
     report.partial = true;
     report.dropped = { ...meta.dropped };
@@ -2850,7 +2866,7 @@ export async function importForge(source, opts = {}) {
     }
     const planned = planForgeImport(files, { id: opts.id, contentId: primaryName || undefined, dataDir, vanilla, scripts, parse });
     if (!planned.roles.length) {
-      const report = publicReport({ meta: planned.meta, products: [], primaryId: null, wrote: false, dryRun, check: planned.meta.manualPanels.length ? '需要人工适配 · needs manual adaptation（见面板及建议插槽）。' : '没有可导入的内容。', issues: [] });
+      const report = publicReport({ meta: planned.meta, products: [], primaryId: null, wrote: false, dryRun, check: planned.meta.manualPanels.length || planned.meta.manualReasons.length ? '需要人工适配 · needs manual adaptation（见原因、面板及建议插槽）。' : '没有可导入的内容。', issues: [] });
       return { ok: true, wrote: false, dryRun, issues: [], report: stableJson(report), markdown: report.markdown };
     }
     const alloc = allocateIds(planned.meta.base, planned.roles, primaryName);

@@ -1324,7 +1324,10 @@ test('all nine Forge UI mounts distinguish adaptation from uncopied scripts, inc
       const mismatches = got.report.skipped.filter(s => s.code === 'PLUGIN_FORGE_MOUNT');
       assert.equal(scripts.length, 1);
       assert.equal(mismatches.length, expected ? 0 : 1);
-      assert.equal(got.report.needsManualAdaptation, !expected);
+      assert.equal(got.report.needsManualAdaptation, true);
+      assert.equal(got.report.partial, true);
+      assert.equal(got.report.dropped.panels, 1);
+      assert.ok(got.report.manualReasons.some((s) => s.path.endsWith('#module')));
       if (expected) assert.ok(got.report.products.some(p => p.class === 'ui'));
       else {
         assert.match(got.report.check, /需要人工适配.*needs manual adaptation/);

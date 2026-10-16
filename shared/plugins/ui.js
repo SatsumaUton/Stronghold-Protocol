@@ -541,7 +541,7 @@ export function frameEntryAllowed(id, entry) {
 const RESULT_STATS = ['dmgDealt', 'bossDamage', 'kills', 'leaks', 'lpLost', 'merges', 'itemsEquipped', 'activatedLayers', 'refreshes', 'perfectRounds', 'gold'];
 
 /**
- * Room seats and the room's plugin ids. Null holes stay, so a 4-seat room reports length 4.
+ * Room seats, content identity and plugin ids. Null holes stay, so a 4-seat room reports length 4.
  * The join code, consent and loadouts are dropped. No plugin list and no seats → null.
  * @param {unknown} room
  */
@@ -563,6 +563,7 @@ export function subsetRoom(room) {
   if (!hasSeats && !plugins) return null;
   /** @type {Record<string, unknown>} */
   const out = {};
+  if (isObj(room.content) && typeof room.content.cs === 'string' && /^[0-9a-f]{64}$/.test(room.content.cs)) out.cs = room.content.cs;
   if (hasSeats) {
     out.seats = room.seats.slice(0, 8).map((s) => {
       if (!isObj(s)) return null;
@@ -657,7 +658,7 @@ const scalarPref = (v) => {
 /**
  * @param {string} id
  * @param {string[]} slots
- * @param {{ version?: unknown, lang?: unknown, plugins?: unknown, prefs?: unknown }} [info]
+ * @param {{ version?: unknown, lang?: unknown, plugins?: unknown, prefs?: unknown, cs?: unknown }} [info]
  *   Omitted: the message stays `{ v, t, id, slots }`.
  */
 export function hostWelcome(id, slots, info) {
@@ -665,6 +666,7 @@ export function hostWelcome(id, slots, info) {
   if (!isObj(info)) return msg;
   if (typeof info.version === 'number' && Number.isFinite(info.version)) msg.version = info.version;
   if (typeof info.lang === 'string' && info.lang) msg.lang = info.lang.slice(0, 16);
+  if (typeof info.cs === 'string' && /^[0-9a-f]{64}$/.test(info.cs)) msg.cs = info.cs;
   if (Array.isArray(info.plugins)) {
     msg.plugins = info.plugins.filter((x) => typeof x === 'string' && !isIntentType(x)).slice(0, 32).map((x) => x.slice(0, 64));
   }
@@ -695,6 +697,7 @@ export function hostState(pub, priv, room) {
   if (arguments.length >= 3) {
     const sub = subsetRoom(room);
     if (sub) msg.room = sub;
+    else if (room === null) msg.room = null;
   }
   return msg;
 }

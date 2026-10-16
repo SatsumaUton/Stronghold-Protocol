@@ -4,7 +4,8 @@
 //
 // [ASSUMED] Forge's net.status().ping is the number we receive as host message field `rtt`. The wire key is not
 // `ping`: that string is a client→server intent (isMatchIntent). Forge's net.welcome().version is a string; ours is
-// the decimal text of PROTOCOL_VERSION. A digest is omitted when we do not have one. data.get returns a clone only
+// the decimal text of PROTOCOL_VERSION. mods.digest is the first 8 hex digits of the real room cs, omitted when
+// unavailable. data.get returns a clone only
 // for a table the panel declared and the caller supplied (chess / assets); anything else is null. Calls we cannot
 // feed return { available: false, reason: 'not available in this game' } and no invented payload.
 
@@ -115,6 +116,7 @@ export function installForgeShim(root) {
       post: typeof o.post === 'function' ? o.post : null,
       version: null,
       plugins: null,
+      cs: null,
       room: null,
       result: null,
       hasResult: false,
@@ -165,7 +167,9 @@ export function installForgeShim(root) {
         welcome() {
           if (feed.version == null && !feed.plugins) return null;
           const packs = Array.isArray(feed.plugins) ? feed.plugins.slice() : [];
-          return { version: feed.version == null ? '' : String(feed.version), mods: { packs } };
+          const mods = { packs };
+          if (feed.cs) mods.digest = feed.cs.slice(0, 8);
+          return { version: feed.version == null ? '' : String(feed.version), mods };
         },
         send() { return unavailable(); },
         sendResourceMessage() { return unavailable(); },
@@ -214,6 +218,7 @@ export function installForgeShim(root) {
       if (typeof msg.version === 'number' && Number.isFinite(msg.version)) feed.version = msg.version;
       else if (typeof msg.version === 'string' && msg.version) feed.version = msg.version;
       if (Array.isArray(msg.plugins)) feed.plugins = msg.plugins.filter((id) => typeof id === 'string').slice(0, 32);
+      feed.cs = typeof msg.cs === 'string' && /^[0-9a-f]{64}$/.test(msg.cs) ? msg.cs : null;
       if (msg.prefs && typeof msg.prefs === 'object') {
         for (const k of Object.keys(msg.prefs)) if (keyOk(k) && scalar(msg.prefs[k])) feed.prefs[k] = msg.prefs[k];
       }
@@ -229,11 +234,13 @@ export function installForgeShim(root) {
           if (row && row.playerId === feed.meId && typeof row.name === 'string') feed.meName = row.name;
         }
       }
-      if (msg.room && typeof msg.room === 'object' && Array.isArray(msg.room.seats)) {
-        feed.room = { seats: msg.room.seats };
-        if (Array.isArray(msg.room.plugins)) feed.plugins = msg.room.plugins.filter((id) => typeof id === 'string').slice(0, 32);
+      if (Object.prototype.hasOwnProperty.call(msg, 'room')) {
+        const room = msg.room && typeof msg.room === 'object' ? msg.room : null;
+        feed.room = room && Array.isArray(room.seats) ? { seats: room.seats } : null;
+        feed.cs = room && typeof room.cs === 'string' && /^[0-9a-f]{64}$/.test(room.cs) ? room.cs : null;
+        feed.plugins = room && Array.isArray(room.plugins) ? room.plugins.filter((id) => typeof id === 'string').slice(0, 32) : [];
         paint(feed);
-        dispatch(feed, 'room.state', feed.room);
+        if (feed.room) dispatch(feed, 'room.state', feed.room);
       }
       return;
     }
@@ -303,6 +310,8 @@ export function installForgeShim(root) {
       }
     };
     const onMsg = (ev) => {
+      // Opaque origins still permit cross-window postMessage. Check the sender before even queuing a feed.
+      if (!ev || ev.source !== g.parent) return;
       const m = ev && ev.data;
       if (!m || m.v !== 1 || typeof m.t !== 'string') return;
       if (!started) {

@@ -61,7 +61,8 @@ const api = {
 
 /**
  * @typedef {{ id: string, iframe: HTMLIFrameElement, declared: string[], entry: any, ready: boolean,
- *   preview?: any, entries: Record<string, string>, limitAt: number, loads: number, closed: boolean }} FrameRec
+ *   preview?: any, entries: Record<string, string>, limitAt: number, loads: number, closed: boolean,
+ *   netAt?: number | null, netText?: string }} FrameRec
  */
 
 let park = null;
@@ -69,9 +70,6 @@ let booted = false;
 let stateTimer = 0;
 let lastState = '';
 let netTimer = 0;
-/** @type {number | null} */
-let lastNetAt = null;
-let lastNetText = '';
 let lastResultText = '';
 let battleTimer = 0;
 /** @type {unknown[]} */
@@ -161,6 +159,8 @@ function rescue(node) {
 function moveFrame(rec, home) {
   rec.loads = 0;
   rec.ready = false;
+  rec.netAt = null;
+  rec.netText = '';
   home.appendChild(rec.iframe);
 }
 
@@ -350,15 +350,17 @@ function welcomeInfo(rec) {
     version: PROTOCOL_VERSION,
     lang: getLang(),
     plugins: room && Array.isArray(room.plugins) ? room.plugins : [],
+    cs: room && room.cs,
     prefs,
   };
 }
 
 /** @param {FrameRec} rec */
 function postNetNow(rec) {
+  if (rec.netAt != null) return;
   const msg = hostNet(store.get().connection);
-  try { lastNetText = JSON.stringify(msg); } catch { return; }
-  lastNetAt = Date.now();
+  try { rec.netText = JSON.stringify(msg); } catch { return; }
+  rec.netAt = Date.now();
   post(rec, msg);
 }
 
@@ -382,20 +384,18 @@ function scheduleNet() {
   const msg = hostNet(store.get().connection);
   let text = '';
   try { text = JSON.stringify(msg); } catch { return; }
-  if (text === lastNetText) return;
-  const slot = netSlot(lastNetAt, Date.now(), Math.round(1000 / UI_LIMITS.netHz));
-  const flush = () => {
-    netTimer = 0;
-    const next = hostNet(store.get().connection);
-    let nextText = '';
-    try { nextText = JSON.stringify(next); } catch { return; }
-    if (nextText === lastNetText) return;
-    lastNetText = nextText;
-    lastNetAt = Date.now();
-    for (const rec of frames.values()) if (feeding(rec) && !rec.preview) post(rec, next);
-  };
-  if (slot.send) { flush(); return; }
-  netTimer = window.setTimeout(flush, slot.wait);
+  const now = Date.now();
+  let wait = Infinity;
+  // Delivery is tracked per document: initializing a sibling must not consume a pending broadcast.
+  for (const rec of frames.values()) {
+    if (!feeding(rec) || rec.preview || text === rec.netText) continue;
+    const slot = netSlot(rec.netAt, now, Math.round(1000 / UI_LIMITS.netHz));
+    if (!slot.send) { wait = Math.min(wait, slot.wait); continue; }
+    rec.netAt = now;
+    rec.netText = text;
+    post(rec, msg);
+  }
+  if (Number.isFinite(wait)) netTimer = window.setTimeout(() => { netTimer = 0; scheduleNet(); }, wait);
 }
 
 function scheduleResult() {
@@ -479,17 +479,17 @@ function onStorage(rec, msg) {
 /** @param {FrameRec} rec @param {Record<string, unknown>} msg */
 function handle(rec, msg) {
   if (msg.t === 'ready') {
-    // Load 1 is the redirect. Load 2 is the entry. A later document must not receive the private view.
+    // Only the entry document may initialize, once. Duplicate ready must not bypass feed throttling.
     // welcome is posted from the load handler, not from here, so a plugin that answers welcome cannot loop.
-    if (frameLoadDecision(rec.loads) !== 'entry') return;
+    if (rec.ready || frameLoadDecision(rec.loads) !== 'entry') return;
     rec.ready = true;
     const live = store.get();
     const m = rec.preview?.state || live.match;
     post(rec, hostState(m && m.public, m && m.private, rec.preview ? undefined : live.room));
     if (!rec.preview) {
       postNetNow(rec);
+      scheduleNet();
       const result = hostResult(m && m.result);
-      try { lastResultText = JSON.stringify(result); } catch { /* the post below still carries it */ }
       post(rec, result);
     }
     return;
