@@ -14,6 +14,14 @@ import { timelineAt } from '../fields.js';
 import { bossFieldPlacement } from '../finalAssault.js';
 import { battleProgress } from '../../sim/spec.js';
 
+/** Milliseconds since the match started. A stamp before the start, or a bad stamp, is 0. The stored log keeps the epoch. */
+function auditClock(at, startedAt) {
+  const stamp = Number(at);
+  const start = Number(startedAt);
+  if (!Number.isFinite(stamp) || !Number.isFinite(start)) return 0;
+  return Math.max(0, stamp - start);
+}
+
 /** A reported capsule numerator clamped to its denominator, else null (unknown — never a fabricated 0). */
 const finiteOrNull = (v, cap = Infinity) => {
   if (v == null) return null;   // Number(null) === 0: an unreported value must not read as "0 resolved"
@@ -160,7 +168,10 @@ export class MatchViews {
       v.testTimers = this.testTimers !== false;
       const log = Array.isArray(this.testLog) ? this.testLog : [];
       v.testLog = log.slice(-TEST_PUBLIC_LOG).map((e) => ({
-        seq: e.seq, playerId: e.playerId, cmd: e.cmd, args: e.args, at: e.at, ok: e.ok === true,
+        seq: e.seq, playerId: e.playerId, cmd: e.cmd, args: e.args,
+        // The stored row keeps the scheduler epoch. The dock clock is time since this match started.
+        at: auditClock(e.at, this.startedAt),
+        ok: e.ok === true,
         ...(e.code ? { code: e.code } : {}),
         ...(e.detail ? { detail: e.detail } : {}),
       }));

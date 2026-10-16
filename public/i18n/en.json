@@ -1922,7 +1922,7 @@
   "成功": "Success",
   "这一级商店要 {chess} 个干员和 {item} 个装备": "This shop level needs {chess} operators and {item} pieces of equipment",
   "回合只能是 1 到 {hi}": "The round must be from 1 to {hi}",
-  "层数不能减少": "Layers cannot decrease",
+  "层数不能减少": "Stacks cannot decrease",
   "作战进行中不能开关计时": "Timers cannot be switched during a battle",
   "这个盟约不能在本模式使用": "This Alliance cannot be used in this mode",
   "按反引号键（Backquote）开关测试面板": "Press Backquote to toggle the test panel",

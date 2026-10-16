@@ -7,6 +7,35 @@
 
 /* ---- screen shell ---------------------------------------------------------------------------- */
 .gm { background: transparent; }
+/* Host test dock (public/js/ui/testDock.js DOCK_REM). Unitless rem, shared by the HUD and the dock.
+   team-right = .team left .22 + avatar .8 + gap .1 + name 1.5 + info padding .18.
+   bond-bottom = fieldHost.js HUD_REM.bondStripBottom. shop-top = HUD_REM.shopBarTop.
+   hand-clear = prep hudPadding bottom 3.2 + the bench piece 1.56. top = bottom of .gtop.
+   ready-h = .gtop padding .2 + clock --cd-h .7 + gap .1 + .readybtn .56. */
+.gm, .testconsole {
+  --dock-w: 3.6;
+  --dock-margin: 0.08;
+  --dock-team-left: 0.22;
+  --dock-team-right: 2.8;
+  --dock-team-top: 2.36;
+  --dock-team-avatar: 0.8;
+  --dock-team-gap: 0.14;
+  --dock-team-rows: 4;
+  --dock-bond-left: 1.56;
+  --dock-bond-top: 1.36;
+  --dock-bond-bottom: 2.16;
+  --dock-bond-slot: 0.74;
+  --dock-bond-gap: 0.1;
+  --dock-top: 1.02;
+  --dock-hand-clear: 4.76;
+  --dock-hand-left: 2.85;
+  --dock-ready-right: 0.3;
+  --dock-ready-w: 2.6;
+  --dock-ready-h: 1.56;
+  --dock-shop-top: 2.64;
+  --dock-funds-w: 1.18;
+  --dock-shop-right: 0.26;
+}
 .gm__field { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
 .gm__field canvas { display: block; }
 .gm__vignette {
@@ -21,24 +50,35 @@
 .gm__hud > * { pointer-events: auto; }
 .gload { align-items: center; justify-content: center; gap: .2rem; }
 
-/* Host test console (DESIGN §34.8). Left drawer under the top bar and above the hand, so an open
-   panel does not cover funds, the shop, the ready button or the hand at 1280×720 / 1920×1080.
-   Collapsed it is only the 测试 tab. */
+/* Host test console (DESIGN §34.8). A floating field panel. Its default left/top is the dock home
+   (right of .team, below the bond strip, above the hand) from the --dock-* rem above. The host drags
+   it by the header; JS then sets left/top in px. At ≤720px the top sheet wins, including over a stored position. */
 .testconsole {
-  position: fixed; left: .08rem; top: 1.02rem; z-index: 20; display: flex; flex-direction: column; align-items: flex-start;
-  gap: .06rem; width: auto; max-width: min(3.6rem, 28vw); max-height: calc(100vh - 2.4rem);
+  position: fixed;
+  left: calc((var(--dock-team-right) + var(--dock-margin)) * 1rem);
+  top: calc((var(--dock-bond-bottom) + var(--dock-margin)) * 1rem);
+  z-index: 20; display: flex; flex-direction: column; align-items: flex-start;
+  gap: .06rem; width: auto; max-width: min(calc(var(--dock-w) * 1rem), 28vw);
+  max-height: calc(100vh - (var(--dock-hand-clear) + var(--dock-bond-bottom) + var(--dock-margin) * 2) * 1rem);
   pointer-events: auto; box-sizing: border-box;
 }
-.testconsole.is-open { width: min(3.6rem, 28vw); }
+.testconsole.is-open {
+  width: min(calc(var(--dock-w) * 1rem), 28vw);
+  overflow: hidden;
+}
 .testconsole__tab, .testconsole__run, .testconsole__row button {
   color: #1a1408; background: #e8b84a; border: 0; font-weight: 700; padding: .04rem .1rem; cursor: pointer;
 }
 .testconsole__body {
   width: 100%; display: grid; gap: .06rem; padding: .1rem; background: rgba(12, 14, 12, .94);
   border: 1px solid rgba(232, 184, 74, .7); color: var(--text-hi); font-size: calc(.15 * var(--t));
-  max-height: calc(100vh - 2.6rem); overflow: auto; box-sizing: border-box;
+  max-height: calc(100vh - (var(--dock-hand-clear) + var(--dock-bond-bottom) + var(--dock-margin) * 2) * 1rem - .4rem);
+  overflow: auto; box-sizing: border-box;
 }
+.testconsole.is-open .testconsole__body { flex: 1 1 auto; min-height: 0; max-height: none; }
 .testconsole__head, .testconsole__row, .testconsole__field, .testconsole__check { display: flex; flex-wrap: wrap; align-items: center; gap: .06rem; }
+.testconsole__head { cursor: grab; touch-action: none; user-select: none; }
+.testconsole__head:active { cursor: grabbing; }
 .testconsole__field { display: grid; gap: .02rem; min-width: 0; }
 .testconsole__field input, .testconsole__field select {
   color: var(--text-hi); background: var(--bg-2); border: 1px solid var(--line-2); padding: .03rem .06rem;
@@ -47,9 +87,12 @@
 .testconsole__log { margin: 0; padding: 0; list-style: none; max-height: 2.4rem; overflow: auto; overflow-wrap: anywhere; }
 .testconsole__log .is-bad { color: #ff8a5c; }
 @media (max-width: 720px) {
-  .testconsole { top: 8px; left: 8px; max-width: calc(100vw - 16px); font-size: 14px; }
-  .testconsole.is-open { width: calc(100vw - 16px); max-width: calc(100vw - 16px); max-height: 55vh; }
-  .testconsole__body { font-size: 14px; max-height: 48vh; }
+  .testconsole {
+    top: 8px !important; left: 8px !important; width: auto !important;
+    max-width: calc(100vw - 16px) !important; max-height: none !important; font-size: 14px;
+  }
+  .testconsole.is-open { width: calc(100vw - 16px) !important; max-width: calc(100vw - 16px) !important; max-height: 55vh !important; }
+  .testconsole__body, .testconsole.is-open .testconsole__body { font-size: 14px; max-height: 48vh !important; flex: none; }
   .testconsole__tab, .testconsole__run, .testconsole__row button,
   .testconsole__field input, .testconsole__field select {
     min-height: 32px; min-width: 32px; font-size: 14px; padding: 6px 10px;

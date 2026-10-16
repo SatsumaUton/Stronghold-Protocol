@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTestModeEnv, testModeGate, interfacesArePrivate, TEST_MODE_PUBLIC_HINT } from '../server/testMode.js';
+import { parseTestModeEnv, testModeGate, interfacesArePrivate, TEST_MODE_PUBLIC_HINT, TEST_MODE_FORCE_HINT } from '../server/testMode.js';
 import { parseTestArgs } from '../shared/testMode.js';
 import { validateC2S } from '../shared/protocol.js';
 import { Lobby } from '../server/lobby.js';
@@ -51,9 +51,9 @@ test('testModeGate: local accepts 1, public needs force, unknown host fails clos
   assert.equal(testModeGate('local', '::', PUBLIC_NICS).enabled, false);
   const forced = testModeGate('force', '8.8.8.8');
   assert.equal(forced.enabled, true);
-  assert.match(forced.warn, /public or wildcard/);
+  assert.equal(forced.warn, TEST_MODE_FORCE_HINT);
   assert.equal(testModeGate('force', '::', PUBLIC_NICS).enabled, true);
-  assert.match(testModeGate('force', '::', PUBLIC_NICS).warn, /public or wildcard/);
+  assert.equal(testModeGate('force', '::', PUBLIC_NICS).warn, TEST_MODE_FORCE_HINT);
   assert.deepEqual(testModeGate('force', '127.0.0.1'), { enabled: true, warn: null });
   assert.deepEqual(testModeGate('force', ''), { enabled: false, warn: null });
   assert.deepEqual(testModeGate('local', ''), { enabled: false, warn: null });
@@ -70,7 +70,7 @@ test('a wildcard bind follows the machine interfaces', () => {
   assert.equal(testModeGate('local', '0.0.0.0', v4).warn, TEST_MODE_PUBLIC_HINT);
   const v6 = { eth0: [{ address: '2001:4860:4860::8888', family: 'IPv6', internal: false }] };
   assert.equal(testModeGate('local', '::', v6).enabled, false);
-  assert.match(testModeGate('force', '::', v6).warn, /public or wildcard/);
+  assert.equal(testModeGate('force', '::', v6).warn, TEST_MODE_FORCE_HINT);
   assert.equal(testModeGate('local', '::', {}).enabled, true);
   assert.equal(testModeGate('local', '::', { lo: [{ address: '127.0.0.1', family: 'IPv4', internal: true }] }).enabled, true);
   assert.equal(interfacesArePrivate(null), false);
@@ -290,7 +290,9 @@ import { collectViolations } from '../server/match/invariants.js';
 import { TEST_JOURNAL_CAP } from '../server/match/testTrace.js';
 import { FakeBattle } from './match/fakeBattle.js';
 import { TEST_COMMANDS, TEST_RATE_COUNT, guardTestMessage } from '../shared/testMode.js';
-import { matchClock, newestFirst, explainTestDetail, formatAuditLine } from '../public/js/ui/testAudit.js';
+import { readFileSync } from 'node:fs';
+import { matchClock, newestFirst, explainTestDetail, formatAuditLine, testRefusalText } from '../public/js/ui/testAudit.js';
+import { DOCK_REM, clampDock, dockHome, dockMetricsFromStyle, dockObstacles, readDockPos, rectAreaOverlap, writeDockPos } from '../public/js/ui/testDock.js';
 
 function fixture(t, opts = {}) {
   const h = makeMatch({ mode: 'solo', test: true, ...opts });
@@ -450,6 +452,80 @@ test('audit rows use one number, the actor name, a clock and the translated reas
   const bad = formatAuditLine(log[0], '凯尔希');
   assert.match(bad, /^1 凯尔希 00:00:05 bond 层数不能减少$/);
   assert.equal(bad.split('1').length, 2);
+  assert.equal(testRefusalText({ code: 'WRONG_PHASE', detail: 'timers', message: 'ignored' }), '作战进行中不能开关计时');
+  assert.equal(testRefusalText({ code: 'WRONG_PHASE' }), '当前阶段无法进行该操作');
+  assert.equal(testRefusalText({ code: 'BAD_TARGET' }), '无效的目标');
+  assert.equal(testRefusalText({ message: 'plain' }).includes('无效的目标'), false);
+  const packs = ['en', 'ja', 'ko', 'zh-TW'].map((code) => [code, JSON.parse(readFileSync(new URL(`../public/i18n/${code}.json`, import.meta.url), 'utf8'))]);
+  for (const [code, pack] of packs) {
+    const term = pack['层数'];
+    assert.equal(typeof term, 'string');
+    assert.equal(pack['层数不能减少'].includes(term), true, code);
+  }
+});
+
+test('the public audit clock is match-relative when the scheduler stamp is an epoch', (t) => {
+  const h = fixture(t);
+  const epoch = 1_791_234_567_890;
+  h.m.startedAt = epoch;
+  ok(h.cmd('funds', { amount: 4 }));
+  const stored = h.m.testLog.at(-1);
+  stored.at = epoch + 12_500;
+  const row = h.m.publicView().testLog.at(-1);
+  assert.equal(stored.at, epoch + 12_500);
+  assert.equal(row.at, 12_500);
+  assert.equal(matchClock(row.at), '00:00:12');
+  assert.match(matchClock(stored.at), /^497/);
+  stored.at = epoch - 1000;
+  assert.equal(h.m.publicView().testLog.at(-1).at, 0);
+  assert.equal(matchClock(0), '00:00:00');
+});
+
+test('the open test dock defaults to the field and stays inside the viewport', () => {
+  const css = readFileSync(new URL('../public/css/screens/game.css', import.meta.url), 'utf8');
+  const declared = {
+    '--dock-w': DOCK_REM.width, '--dock-margin': DOCK_REM.margin, '--dock-team-left': DOCK_REM.teamLeft,
+    '--dock-team-right': DOCK_REM.teamRight, '--dock-team-top': DOCK_REM.teamTop, '--dock-team-avatar': DOCK_REM.teamAvatar,
+    '--dock-team-gap': DOCK_REM.teamGap, '--dock-team-rows': DOCK_REM.teamRows, '--dock-bond-left': DOCK_REM.bondLeft,
+    '--dock-bond-top': DOCK_REM.bondTop, '--dock-bond-bottom': DOCK_REM.bondBottom, '--dock-bond-slot': DOCK_REM.bondSlot,
+    '--dock-bond-gap': DOCK_REM.bondGap, '--dock-top': DOCK_REM.topBar, '--dock-hand-clear': DOCK_REM.handClear,
+    '--dock-hand-left': DOCK_REM.handLeft, '--dock-ready-right': DOCK_REM.readyRight, '--dock-ready-w': DOCK_REM.readyWidth,
+    '--dock-ready-h': DOCK_REM.readyHeight, '--dock-shop-top': DOCK_REM.shopTop, '--dock-funds-w': DOCK_REM.fundsWidth,
+    '--dock-shop-right': DOCK_REM.shopRight,
+  };
+  for (const [name, value] of Object.entries(declared)) assert.match(css, new RegExp(`${name}: ${value};`));
+  const style = { getPropertyValue: (name) => declared[name] == null ? '' : String(declared[name]) };
+  const metrics = dockMetricsFromStyle(style);
+  assert.equal(metrics.bondBottom, DOCK_REM.bondBottom);
+  assert.equal(metrics.handClear, DOCK_REM.handClear);
+  assert.equal(dockMetricsFromStyle({ getPropertyValue: () => '' }).width, DOCK_REM.width);
+  const piece1280 = { x: 190, y: 405, w: 57, h: 104 };
+  const piece1920 = { x: 285, y: 607.5, w: 85.5, h: 156 };
+  for (const [size, piece] of [[[1280, 720], piece1280], [[1920, 1080], piece1920]]) {
+    const view = { width: size[0], height: size[1] };
+    const home = dockHome(view, metrics);
+    assert.equal(home.sheet, false);
+    const panel = { x: home.x, y: home.y, w: home.width, h: home.height };
+    assert.equal(rectAreaOverlap(panel, piece), 0, `${size} hand`);
+    const boxes = dockObstacles(view, metrics);
+    for (const [name, box] of Object.entries(boxes)) assert.equal(rectAreaOverlap(panel, box), 0, `${size} ${name}`);
+    assert.ok(panel.x >= boxes.team.x + boxes.team.w - 1);
+    assert.ok(panel.y >= boxes.bonds.y + boxes.bonds.h - 1);
+    assert.ok(panel.y + panel.h <= boxes.hand.y + 1);
+  }
+  assert.equal(dockHome({ width: 720, height: 1280 }).sheet, true);
+  assert.equal(dockHome({ width: 360, height: 640 }).sheet, true);
+  const clamped = clampDock({ x: -40, y: 9000 }, { width: 1280, height: 720 }, { width: 240, height: 248 });
+  assert.equal(clamped.x, 0);
+  assert.equal(clamped.y, 720 - 248);
+  const mem = { m: new Map(), getItem(k) { return this.m.has(k) ? this.m.get(k) : null; }, setItem(k, v) { this.m.set(k, v); } };
+  assert.equal(readDockPos(mem), null);
+  assert.equal(writeDockPos({ x: 12, y: 34 }, mem), true);
+  assert.deepEqual(readDockPos(mem), { x: 12, y: 34 });
+  const boom = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); } };
+  assert.equal(readDockPos(boom), null);
+  assert.equal(writeDockPos({ x: 1, y: 2 }, boom), false);
+  assert.equal(writeDockPos({ x: NaN, y: 1 }, mem), false);
 });
 
 test('an unrecognised SP_TEST_MODE stays off and warns; a silent off does not', (t) => {
@@ -568,13 +644,13 @@ test('public/wildcard/numeric listener variants require force and an actual IP',
     assert.equal(testModeGate('local', host).enabled, false);
     assert.equal(testModeGate('local', host).warn, TEST_MODE_PUBLIC_HINT);
     assert.equal(testModeGate('force', host).enabled, true);
-    assert.match(testModeGate('force', host).warn, /public or wildcard/);
+    assert.equal(testModeGate('force', host).warn, TEST_MODE_FORCE_HINT);
   }
   for (const host of ['0.0.0.0', '0.1.2.3', '::', '0:0:0:0:0:0:0:0', '::ffff:0.0.0.0']) {
     assert.equal(testModeGate('local', host, PUBLIC_NICS).enabled, false);
     assert.equal(testModeGate('local', host, PUBLIC_NICS).warn, TEST_MODE_PUBLIC_HINT);
     assert.equal(testModeGate('force', host, PUBLIC_NICS).enabled, true);
-    assert.match(testModeGate('force', host, PUBLIC_NICS).warn, /public or wildcard/);
+    assert.equal(testModeGate('force', host, PUBLIC_NICS).warn, TEST_MODE_FORCE_HINT);
   }
   for (const host of ['', 'localhost', 'not-an-address']) assert.equal(testModeGate('force', host).enabled, false);
 });
