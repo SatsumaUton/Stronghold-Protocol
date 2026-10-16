@@ -84,7 +84,9 @@
   color: var(--text-hi); background: var(--bg-2); border: 1px solid var(--line-2); padding: .03rem .06rem;
   min-width: 0; width: 100%; box-sizing: border-box;
 }
-.testconsole__log { margin: 0; padding: 0; list-style: none; max-height: 2.4rem; overflow: auto; overflow-wrap: anywhere; }
+/* the audit log keeps about five rows: a scroll container's automatic minimum is 0, so in the open panel's grid the
+   other controls squeezed it to a few px at the default height (the panel body scrolls instead) */
+.testconsole__log { margin: 0; padding: 0; list-style: none; min-height: 1.1rem; max-height: 2.4rem; overflow: auto; overflow-wrap: anywhere; }
 .testconsole__log .is-bad { color: #ff8a5c; }
 @media (max-width: 720px) {
   .testconsole {
