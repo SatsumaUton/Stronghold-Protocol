@@ -92,6 +92,9 @@ export function makeMatch(o = {}) {
     cs: o.cs,
     vs: o.vs,
     requireCs: o.requireCs,
+    // a modded room's 自选 list (Match.diyKitted). Omitted unless the test passes one, so a vanilla harness match
+    // still has no kitted key.
+    ...(o.kitted !== undefined ? { kitted: o.kitted } : {}),
   });
   const m = h.m;
   if (m.clientCombat && o.clients !== false) {

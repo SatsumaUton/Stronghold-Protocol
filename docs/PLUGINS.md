@@ -77,8 +77,11 @@ zip, can be imported as the plugins it can become (§16). Install local zips or 
 ## 2. For server owners
 
 Put the folder into `plugins/` (the id is the folder name). `node tools/plugin.mjs list` shows what the registry found,
-by class, with what this version does with each, what was skipped and why; `node tools/plugin.mjs check` checks the
-folders in depth. The server prints the same at start (`[plugins] …`) and notices a new or changed plugin on the next
+by class, with what this version does with each, what was skipped and why. It reads `SP_PLUGIN_SCRIPTS` the way the
+server does: `sandbox` with a valid lock lists a script plugin as loaded; unset, or `trusted` with no pin, leaves it
+disabled. `node tools/plugin.mjs check` checks the
+folders in depth and, across those folders, duplicate ids, a second language overlay and two ui plugins that ask for
+the same slot (§8, §14). The server prints the same at start (`[plugins] …`) and notices a new or changed plugin on the next
 page load — no restart. A server's own plugins are git-ignored (the folder's readme and templates are tracked and ship in the
 release zips), never packed into a release and never touched by an update. One unreadable
 folder is skipped with its reason; it never stops the server.
@@ -256,6 +259,14 @@ node tools/plugin.mjs install <zip|https URL>       install a zip; HTTPS require
 node tools/plugin.mjs catalog <file|https URL>     inspect a community catalogue (--json available)
 node tools/plugin.mjs surface [--write]            the frozen API table; --write regenerates docs/PLUGIN-API.md
 ```
+
+`check` of every folder in `plugins/`, or of more than one named folder, also applies the registry's cross-plugin rules:
+a duplicate id, a second overlay of one language (the message names the plugin folder that won; the first in sorted
+order), and two ui plugins that ask for the same slot (`PLUGIN_UI_SLOT_SHARED`, a warning — the match shows tabs).
+Named folders are sorted by folder name before those rules, the same order `readDirSorted` uses when the registry
+reads `plugins/`. A folder that order keeps stays kept: a later scan does not add a second duplicate that names it
+as the loser. Checking one named folder does not scan the others. `list` calls the same trust gate as the server
+(`SP_PLUGIN_SCRIPTS`).
 
 `--root <dir>` points it at another checkout or an unpacked release. Full and lite releases ship this CLI, its
 runtime dependencies, schemas, templates, author documentation and `test/helpers/battleHarness.js`. The harness
@@ -661,7 +672,11 @@ everything off brings back the vanilla shape of `room.state.content` exactly.
 class, hash, auto? }], warnings, bytes, dataBytes, vs?, modes?, modeId?, kittedExtra? }`: `dataBytes` is what a member
 downloads beyond the vanilla files, `modes` the modes its plugins add (`{ id, name, roomMode, difficulty }`), `modeId`
 the one the host chose, `kittedExtra` the operators the set adds to a 自选 slot's list (`welcome.diyKitted` has the
-server's own). Each human seat and spectator carries `content: 'loading' | 'ready' | 'failed'`, only in such a room. The
+server's own). A modded room passes that full list into the match as `kitted` (the local match, the match host, reconnect
+and the test journal / replay). `setDiy` checks a human's 自选 picks against it, so an operator the lobby already
+accepted is still there when the match starts. A vanilla match omits the key and stays on `KITTED_CHARS`, so its journal
+stays byte-identical. [ASSUMED] Bots still send no 自选 picks; they read a human's composed piece once the pick is kept.
+Each human seat and spectator carries `content: 'loading' | 'ready' | 'failed'`, only in such a room. The
 protocol increments are listed in `docs/design/network.md` §8.
 
 **Download and check** (`public/js/content.js`). `/cs/<cs16>/index.json` is the set's manifest (§10): enough to
@@ -934,7 +949,10 @@ Start from `plugins/_template/ui/` (a damage tally). A folder whose name starts 
 never loads it.
 
 **The frame.** The page runs in `<iframe sandbox="allow-scripts">` — no `allow-same-origin`, so its origin is the
-opaque string `"null"` and it cannot read this site's storage or credentials. The iframe points straight at that plugin's own
+opaque string `"null"` and it cannot read this site's storage or credentials. The host iframe uses `color-scheme: dark`
+and a transparent background. [ASSUMED] That clears the opaque white canvas; a background the plugin's own page paints
+still shows. The generated Forge skeleton and `plugins/_template/ui/` set `color-scheme: dark` on `html` for the same
+reason. The iframe points straight at that plugin's own
 `/p/<id>/<hash8>/<entry>`. Its first load is the entry, and any later load destroys the frame: the host then clears
 `ready` and posts nothing more. `postMessage` to `"null"` cannot tell those documents
 apart. Files at `/p/` for a ui plugin, and not cosmetic art, are sent with
@@ -959,7 +977,13 @@ or nesting depth was cut (the partial snapshot is kept when it still fits); a pl
 storage keys of 1–64 characters from `A–Z a–z 0–9 . _ -`, not `__proto__`, `prototype`, `constructor` or `..`, a JSON
 value ≤ 4096 UTF-8 bytes, ≤ 32 keys and ≤ 32 KB UTF-8 per plugin; height 48–480 px; a notice ≤ 80 characters, and a
 distinct notice at most once per 2 seconds (the same text is still delivered so toasts can merge); one slot per
-plugin, one plugin per slot, at most 8 mounted. Engine `dmg` / `heal` tuples expose the HP at `amount` (the unit id
+plugin. The protocol table grants one plugin per slot at a time. When several ui plugins ask for the same slot, the
+match shows the first by name and the player switches with tabs in the slot (`PLUGIN_UI_SLOT_SHARED` is a warning, not
+a refusal). [ASSUMED] That name order is the initial tab, and a later sync does not override a tab the player already
+chose. At most 8 mounted. `hud.right` (`.gm__ui-slot`) sits above the hand, inset from the effects column, and its
+height stops under the ready button, so it does not cover the shop, the hand, the ready button or funds at 1280×720
+or 1920×1080. [ASSUMED] Both viewports are 19.2×10.8rem; the hand's top is the dock clearance 4.76rem; the slot's
+bottom is 4.88rem and its right inset is 0.92rem. Engine `dmg` / `heal` tuples expose the HP at `amount` (the unit id
 is `unitId`). The private subset drops loadout, ops, diy, effects, nextEnemies, personalChoice, rewardOffer and
 tokens. The exact allowlists are `subsetPublic` and `subsetPrivate`. Storing a snapshot does not trip
 `PLUGIN_INTENT` just because the host had labelled it `b.snap`.
@@ -1364,7 +1388,8 @@ lacks). The table below is generated from it (`node tools/plugin.mjs errors --wr
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_I18N` | A translation file of the plugin is not right ({where}): {detail} | A translation file is { "version": 1, "lang": "en", "files": { … } } with lang matching its name; it replaces existing text only, never adds a field. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_UI_SLOTS` | The "slots" of a ui plugin are not right: {detail} | "slots" is a list of hud.right, result.tab, stats.tab and room.panel, each at most once. |
 | The plugin works, with a note in the check | `PLUGIN_UI_NO_SLOT` | The ui plugin asks for no slot, so its page is never shown | List where it goes in "slots", for example ["hud.right"]. |
-| The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_SLOT` | The slot a ui plugin asked for was not granted: its manifest's "slots" does not list it, or another plugin holds it | List the slot in "slots" of plugin.json (hud.right, result.tab, stats.tab, room.panel). One plugin per slot: the first switched on gets it. |
+| The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_SLOT` | The slot a ui plugin asked for was not granted: its manifest's "slots" does not list it, or another plugin holds it | List the slot in "slots" of plugin.json (hud.right, result.tab, stats.tab, room.panel). The protocol table grants one plugin at a time; when several ask for one slot, the match shows tabs to switch. |
+| The plugin works, with a note in the check | `PLUGIN_UI_SLOT_SHARED` | Several ui plugins ask for the same slot ({detail}). The match shows tabs and displays one at a time | This is not a failure: the player can switch within the slot. Give them different slots if each should be visible at once. |
 | The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_RATE` | The ui plugin sends messages too fast and was throttled | A plugin sends at most 20 messages a second (bursts of 40). Batch them, or send only when something changed. |
 | The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_STORAGE` | The ui plugin's storage request was refused: the key is not allowed or the space is used up | A key is 1–64 characters of letters, digits and . _ -; a value's JSON is at most 4096 bytes; a plugin keeps at most 32 keys and 32 KB. |
 | The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_INTENT` | The ui plugin tried to send a match action, which is refused | A ui plugin watches and never plays (it cannot become a bot or a cheat): do not send hello, ping, room.*, g.* or b.* messages, nor carry one inside another message. |
@@ -1563,8 +1588,9 @@ Modules (`statsBase`, `traitBase`, `talentsBase`), new garrisons and bonds remai
 ### Built-in language overlays
 
 [ASSUMED] A manifest-2 `lang` plugin may overlay one shipped `public/i18n/<lang>.json`. Exactly one overlay is
-accepted per built-in language, in sorted plugin-folder order; another provider remains `PLUGIN_DUPLICATE`.
-Legacy `packs/` collisions and duplicate plugin IDs keep their old refusal. `zh` remains the source language.
+accepted per built-in language, in sorted plugin-folder order. A later plugin overlay is `PLUGIN_DUPLICATE` and the
+message names the plugin that won, not the built-in file. A collision with a pack folder, or with the built-in file
+when no plugin overlay has won, still names that provider. Duplicate plugin ids keep their old refusal. `zh` remains the source language.
 The index exposes one language choice with the built-in name/fallback metadata and an additional `files.uiOverlay`
 URL. Supplied strings override; missing/empty strings and broken source placeholders retain built-in translations.
 Optional game text uses `files.dataOverlay` and the existing per-record source checks over the built-in data.
@@ -1594,6 +1620,16 @@ The three existing mappings remain. Suggested rewrites are [ASSUMED] author guid
 an uncopied panel script, including when its mount failed. `PLUGIN_FORGE_SCRIPT` continues to describe other
 unmapped scripts/kits. No panel script runs at import. UI-only unsupported packs report **需要人工适配 / needs manual
 adaptation**, with `needsManualAdaptation` and `manualPanels` in JSON, instead of “nothing importable.”
+
+When whole gameplay records are not written, the report is still `ok` if nothing else failed, and it says so up front.
+The markdown heading `## 没有导入的玩法` comes before `## 导入了什么`. JSON adds `partial: true` and `dropped` counts for
+operators (chess and units), bonds, bands, items, tokens, traits (a garrison table and a traits table), kits and panels,
+and only when a count is above zero. A field-level note, a unit already covered by its chess pair, `--no-scripts`, and a
+mounted panel whose script was not copied do not set `partial`. [ASSUMED] Effects are not a counted kind. A cosmetic
+whose asked art, bond or item targets were all dropped says, in Chinese and in English, that it has nothing to apply to
+(`cosmeticBare`); the files are still copied. Those targets are gameplay record ids (operators, bonds, bands, items,
+tokens, traits, kits). A dropped panel title is never one of them, so a panel named like a kept portrait leaves the
+imported art list in place. A product that keeps a target, or that only carries audio, does not say that.
 
 **Kit imports.** Production script plugins allow only self-contained entries (§13), so a Forge kit's imports are
 rewritten to `sp:sdk@1` where the SDK exports the same helpers, and every other one refuses the file:

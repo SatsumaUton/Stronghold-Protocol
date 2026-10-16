@@ -1338,6 +1338,9 @@ export class Lobby {
         ...(room.content ? { cs: room.content.cs } : {}),
         ...(room.content?.vs ? { vs: room.content.vs } : {}),
         ...(modded ? { requireCs: true } : {}),
+        // The list the lobby just checked the picks with (kittedFor). Vanilla rooms omit it: setDiy stays on
+        // KITTED_CHARS, and the worker payload / test journal of a normal match do not grow a key.
+        ...(modded ? { kitted: this.kittedFor(room) } : {}),
         data,
         log: this.log,
         now: this.now,

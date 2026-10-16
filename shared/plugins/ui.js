@@ -15,7 +15,8 @@
 //     sp.plugin.<id>.<key> in the host page's localStorage
 //   * iframe height clamped to 48–480 px; a notice ≤ 80 characters; a distinct notice at most once per 2 seconds
 //     (the same text is still delivered, so the toast host can merge it)
-//   * one slot per plugin, one plugin per slot, at most 8 plugins mounted; slots are the four UI_SLOT_IDS
+//   * one slot per plugin; the protocol table grants one plugin per slot at a time (at most 8 mounted). When several
+//     ask for the same slot, the match shows tabs and displays one (public/js/ui/pluginFrame.js). Slots are the four UI_SLOT_IDS
 //   * the private subset is the allowlist in subsetPrivate (never loadout, ops, diy, effects, tokens, other hands)
 //   * the public subset is the allowlist in subsetPublic
 //   * CSP UI_FRAME_CSP is on every ui /p/ response that carries the file headers (200, 206, 304), not on cosmetic
@@ -254,7 +255,7 @@ export function checkStorageWrite(entries, key, value) {
 }
 
 /**
- * One slot per plugin, one plugin per slot. `allowed` is the plugin's declared slots.
+ * One slot per plugin, and one holder per slot in this table. The match shows tabs when several plugins ask for one slot. `allowed` is the plugin's declared slots.
  * @returns {{ request: (pluginId: string, slot: string, allowed: string[]) => { ok: true, slot: string } | { ok: false, error: string },
  *   release: (pluginId: string) => void, slotOf: (pluginId: string) => string | null, holder: (slot: string) => string | null }}
  */

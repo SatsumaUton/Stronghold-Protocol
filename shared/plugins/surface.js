@@ -101,7 +101,7 @@ export function buildSurface(extra = {}) {
   const rows = [];
   const added031 = new Set(['record.operator.origin', 'sdk.sp:sdk@1.dir', 'sdk.sp:sdk@1.targeting', 'sdk.export.dir', 'sdk.export.targeting',
     'error.PLUGIN_RECORD_HIDDEN', 'error.PLUGIN_RECORD_PAIR', 'error.PLUGIN_RECORD_ART', 'error.PLUGIN_RECORD_ORIGIN',
-    'error.PLUGIN_FORGE_MOUNT', 'error.PLUGIN_FORGE_PANEL_SCRIPT', 'error.PLUGIN_STUDIO_CONSOLE_SCENARIO',
+    'error.PLUGIN_FORGE_MOUNT', 'error.PLUGIN_FORGE_PANEL_SCRIPT', 'error.PLUGIN_UI_SLOT_SHARED', 'error.PLUGIN_STUDIO_CONSOLE_SCENARIO',
     'studio.route.POST /studio/api/console/options', 'studio.route.POST /studio/api/console/build']);
   const add = (name, group, stability, anchor) => rows.push({ name, group, stability, since: added031.has(name) ? '0.3.1' : SURFACE_SINCE, anchor });
   for (const field of MANIFEST_FIELDS) add(`manifest.field.${field}`, 'manifest', EXPERIMENTAL_FIELDS.has(field) ? 'experimental' : 'stable', 'shared/plugins/manifest.js#MANIFEST_FIELDS');

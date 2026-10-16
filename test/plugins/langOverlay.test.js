@@ -24,7 +24,11 @@ test('one installed lang plugin overlays built-in UI and data, missing/invalid k
   put('second-overlay', manifest, { 'ui.json': { 开始: 'Second' }, 'game.json': builtin });
   const scan = scanPlugins({ publicDir: path.join(dir, 'public'), dataDir, packsDir: path.join(dir, 'packs'), pluginsDir: path.join(dir, 'plugins') });
   assert.ok(scan.plugins.some(p => p.id === 'first-overlay'), JSON.stringify(scan.skipped));
-  assert.ok(scan.skipped.some(s => s.where === 'plugins/second-overlay/' && s.issues.some(i => i.code === 'PLUGIN_DUPLICATE')));
+  const second = scan.skipped.find(s => s.where === 'plugins/second-overlay/');
+  assert.ok(second && second.issues.some(i => i.code === 'PLUGIN_DUPLICATE'));
+  assert.match(second.problems.join('\n'), /first-overlay/);
+  assert.match(second.problems.join('\n'), /one overlay per language/);
+  assert.doesNotMatch(second.problems.join('\n'), /public\/i18n\/qzz\.json/);
   const entries = readPackIndex(packIndexOf(scan.plugins), 'lang');
   assert.equal(entries.length, 1);
   assert.equal(entries[0].files.ui, '/i18n/qzz.json');

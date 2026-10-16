@@ -76,7 +76,8 @@ import { buildContentSet } from '../server/plugins/contentSet.js';
 import { createPluginRegistry } from '../server/plugins/registry.js';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { scanPlugins, pluginIndexOf, readVanillaAssets } from '../server/plugins/registry.js';
+import { scanPlugins, pluginIndexOf, readVanillaAssets, crossPluginFindings } from '../server/plugins/registry.js';
+import { applyTrust } from '../server/plugins/trusted.js';
 import { computeVanillaContent } from '../server/plugins/identity.js';
 import { checkPluginFolder, buildPluginLock, packPlugin, zipPlugin } from '../server/plugins/pack.js';
 import { DATA_SHIM_JS } from '../server/http/static.js';
@@ -214,6 +215,9 @@ export async function main(argv) {
   if (cmd === 'list') {
     if (targets.length) { console.error(`plugin: list takes no folder\n${USAGE}`); return 2; }
     const scan = scanPlugins(dirs);
+    // The same gate the server uses (registry create → applyTrust). Sandbox with a valid lock is loaded; trusted
+    // with no pin stays disabled.
+    applyTrust(scan.plugins, { pluginsDir: dirs.pluginsDir, mode: process.env.SP_PLUGIN_SCRIPTS });
     const content = vanillaOf(root);
     if (flags.has('json')) {
       console.log(JSON.stringify({ index: pluginIndexOf(scan.plugins, { vanilla: content.cs }), skipped: scan.skipped, warnings: scan.warnings }, null, 2));
@@ -294,9 +298,12 @@ export async function main(argv) {
     let warnings = 0;
     const vanilla = readVanillaAssets(dirs.dataDir);
     const report = [];
+    /** @type {import('../server/plugins/registry.js').Plugin[]} */
+    const loaded = [];
     for (const { dir, where } of folders) {
       const r = checkPluginFolder(dir, where, { vanilla, dataDir: dirs.dataDir });
       const p = r.plugin;
+      if (p) loaded.push(p);
       problems += r.problems.length;
       warnings += r.warnings.length;
       if (json) {
@@ -309,7 +316,64 @@ export async function main(argv) {
       for (const line of findingLines(r, lang)) console.log(line);
       if (!r.problems.length && !r.warnings.length) console.log('  ok');
     }
-    if (json) console.log(JSON.stringify({ folders: report, problems, warnings }, null, 2));
+    // The same rules the registry applies across folders. Named targets arrive in argument order; the registry
+    // walks plugins/ with readDirSorted (folder name, default UTF-16). Sort that way before the cross-plugin rules.
+    // A folder this run keeps is not also recorded as the loser of another order. A folder checked alone can still
+    // lose to a pack or the built-in language file, which this plugins-only pass cannot see.
+    const folderName = (where) => {
+      const s = String(where || '').replace(/\/+$/, '');
+      const cut = s.lastIndexOf('/');
+      return cut >= 0 ? s.slice(cut + 1) : s;
+    };
+    const byName = new Map();
+    for (const p of loaded) {
+      const name = folderName(p.where);
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name).push(p);
+    }
+    loaded.length = 0;
+    for (const name of [...byName.keys()].sort()) loaded.push(...byName.get(name));
+    const ordered = new Set(loaded.map((p) => p.where));
+    const winnerWhere = (issue) => {
+      const raw = issue && issue.params && issue.params.where;
+      if (typeof raw !== 'string') return '';
+      const m = raw.match(/\(([^()]*)\)\s*$/);
+      return m ? m[1] : '';
+    };
+    const cross = crossPluginFindings(loaded);
+    const interested = new Set(folders.map((f) => f.where));
+    const seenDup = new Set(cross.skipped.map((s) => s.where));
+    if (folders.length > 1 || !targets.length) {
+      const scan = scanPlugins(dirs);
+      for (const s of scan.skipped) {
+        if (!interested.has(s.where) || seenDup.has(s.where)) continue;
+        if (!s.issues?.some((i) => i.code === 'PLUGIN_DUPLICATE')) continue;
+        if (s.issues.some((i) => i.code === 'PLUGIN_DUPLICATE' && ordered.has(winnerWhere(i)))) continue;
+        cross.skipped.push(s);
+        seenDup.add(s.where);
+      }
+    }
+    const crossIssues = [
+      ...cross.skipped.flatMap((s) => s.issues.map((i) => ({ ...i, where: s.where }))),
+      ...cross.warnings.map((w) => ({ ...w.issue, text: w.warning, where: w.where })),
+    ];
+    problems += cross.skipped.reduce((n, s) => n + s.problems.length, 0);
+    warnings += cross.warnings.length;
+    if (!json && crossIssues.length) {
+      console.log('cross-plugin');
+      for (const s of cross.skipped) {
+        console.log(`${s.where}`);
+        for (const line of findingLines({ problems: s.problems, warnings: [], issues: s.issues }, lang)) console.log(line);
+      }
+      for (const w of cross.warnings) {
+        console.log(`${w.where}`);
+        for (const line of findingLines({ problems: [], warnings: [w.warning], issues: [w.issue] }, lang)) console.log(line);
+      }
+    }
+    if (json) {
+      if (crossIssues.length) report.push({ where: '(cross-plugin)', id: null, loadable: false, class: null, status: null, version: null, issues: crossIssues.map((i) => ({ ...i, ...describeIssue(i, lang) })) });
+      console.log(JSON.stringify({ folders: report, problems, warnings }, null, 2));
+    }
     else console.log(`${folders.length} folder(s): ${problems} problem(s), ${warnings} warning(s)`);
     return problems || (flags.has('strict') && warnings) ? 1 : 0;
   }

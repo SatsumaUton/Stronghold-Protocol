@@ -954,7 +954,23 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   const skipped = [];
   /** @type {{ what: string, zh: string, en: string }[]} */
   const assumed = [];
-  const skip = (p, zh, en, code) => skipped.push({ path: p, zh, en, ...(code ? { code } : {}) });
+  // Whole gameplay records that never became a plugin record. A field note (#bonds, #kit, #skill-fields)
+  // is not one of these: the record itself was still imported. [ASSUMED] garrisons and a traits table both
+  // count as traits; chess and units both count as operators.
+  const dropped = { operators: 0, bonds: 0, bands: 0, items: 0, tokens: 0, traits: 0, kits: 0, panels: 0 };
+  // ids of dropped gameplay records, so a cosmetic aimed only at them can say it has nothing to apply to.
+  // A panel title is not one of these: a panel named like a kept portrait must not make that cosmetic bare.
+  const droppedIds = new Set();
+  const DROP_ID_KINDS = new Set(['operators', 'bonds', 'bands', 'items', 'tokens', 'traits', 'kits']);
+  const noteDrop = (kind, n = 1) => { if (Object.hasOwn(dropped, kind) && n > 0) dropped[kind] += n; };
+  const skip = (p, zh, en, code, kind) => {
+    skipped.push({ path: p, zh, en, ...(code ? { code } : {}) });
+    if (!kind) return;
+    noteDrop(kind);
+    if (!DROP_ID_KINDS.has(kind)) return;
+    const id = String(p).split(':').slice(1).join(':').split('#')[0];
+    if (id) droppedIds.add(id);
+  };
   const assume = (what, zh, en) => { if (!assumed.some((a) => a.what === what)) assumed.push({ what, zh, en }); };
 
   const version = semverOf(pack.version) || '0.1.0';
@@ -1297,7 +1313,16 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
 
   const declaredContent = Array.isArray(pack.content) ? pack.content.filter((n) => typeof n === 'string') : [];
   for (const name of declaredContent) {
-    if (!CONTENT_NAMES.includes(name)) skip(`content:${name}`, '这不是 Forge 的数据文件名，也不能当成模式导入。', 'This is not a Forge data-file name, and it was not imported as a mode.');
+    if (CONTENT_NAMES.includes(name)) continue;
+    skip(`content:${name}`, '这不是 Forge 的数据文件名，也不能当成模式导入。', 'This is not a Forge data-file name, and it was not imported as a mode.');
+    // traits.json is not one of our tables. Count its records; the file is not imported.
+    if (name !== 'traits') continue;
+    let n = 0;
+    try {
+      const doc = loadTableFile(files, used, 'traits');
+      n = doc ? Object.keys(asMap(doc, 'id')).length : 0;
+    } catch { n = 0; }
+    noteDrop('traits', n || 1);
   }
 
   const patchRecord = (file, id, partial) => {
@@ -1691,19 +1716,19 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   };
 
   const mapOperator = (rawId, rec) => {
-    if (!isObj(rec)) { skip(`units:${rawId}`, '干员记录不是对象，没有导入。', 'The operator record is not an object, so it was not imported.'); return; }
+    if (!isObj(rec)) { skip(`units:${rawId}`, '干员记录不是对象，没有导入。', 'The operator record is not an object, so it was not imported.', undefined, 'operators'); return; }
     const name = typeof rec.name === 'string' ? rec.name.trim().slice(0, 60) : '';
     const profession = professionOf(rec.profession);
     if (!name || !PROFESSIONS.has(profession) || typeof rec.subProfessionId !== 'string' || !rec.subProfessionId.trim()) {
-      skip(`units:${rawId}`, '干员缺名字、职业或分支，没有导入。', 'The operator lacks a name, profession or branch, so it was not imported.');
+      skip(`units:${rawId}`, '干员缺名字、职业或分支，没有导入。', 'The operator lacks a name, profession or branch, so it was not imported.', undefined, 'operators');
       return;
     }
-    if (!Number.isInteger(rec.rarity) || rec.rarity < 1 || rec.rarity > 6) { skip(`units:${rawId}`, '星级不在 1–6，没有导入。', 'Rarity is not from 1 to 6, so it was not imported.'); return; }
+    if (!Number.isInteger(rec.rarity) || rec.rarity < 1 || rec.rarity > 6) { skip(`units:${rawId}`, '星级不在 1–6，没有导入。', 'Rarity is not from 1 to 6, so it was not imported.', undefined, 'operators'); return; }
     const formsIn = isObj(rec.forms) ? rec.forms : null;
-    if (!formsIn) { skip(`units:${rawId}`, '没有形态（forms），没有导入。', 'There are no forms, so it was not imported.'); return; }
+    if (!formsIn) { skip(`units:${rawId}`, '没有形态（forms），没有导入。', 'There are no forms, so it was not imported.', undefined, 'operators'); return; }
     const keys = formOrder(Object.keys(formsIn));
     const picked = keys.map((k) => formsIn[k]).filter((f) => isObj(f) && finiteStats(f.stats || f));
-    if (!picked.length) { skip(`units:${rawId}`, '形态里没有能用的数值，没有导入。', 'No form has usable stats, so it was not imported.'); return; }
+    if (!picked.length) { skip(`units:${rawId}`, '形态里没有能用的数值，没有导入。', 'No form has usable stats, so it was not imported.', undefined, 'operators'); return; }
     assume('forms', 'Forge 的形态阶（phase/level/skillLevel/equipLevel，或一个整数）按数字比较：最低一阶是 normal，最高一阶是 elite。', 'Forge form ranks (phase/level/skillLevel/equipLevel, or one integer) are compared as numbers: the lowest is normal, the highest is elite.');
     const position = positionOf(rec.position, profession);
     const pool = isObj(pack.operators) ? pack.operators : {};
@@ -1726,7 +1751,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     const knownBonds = bonds.filter((b) => bondTable && has(bondTable, b));
     if (bonds.length && knownBonds.length !== bonds.length) skip(`units:${rawId}#bonds`, '有的盟约在本安装里不存在，那些盟约没有写上。', 'Some bonds do not exist in this installation, so those bonds were not written.');
     if (!knownBonds.length) {
-      skip(`units:${rawId}`, as === 'diy' ? '自选干员也要至少一个本安装里存在的盟约，没有导入这个干员。' : '棋子需要至少一个本安装里存在的盟约，没有导入这个干员。', as === 'diy' ? 'A recruit-pool operator still needs a bond that exists in this installation, so this operator was not imported.' : 'A chess operator needs a bond that exists in this installation, so this operator was not imported.');
+      skip(`units:${rawId}`, as === 'diy' ? '自选干员也要至少一个本安装里存在的盟约，没有导入这个干员。' : '棋子需要至少一个本安装里存在的盟约，没有导入这个干员。', as === 'diy' ? 'A recruit-pool operator still needs a bond that exists in this installation, so this operator was not imported.' : 'A chess operator needs a bond that exists in this installation, so this operator was not imported.', undefined, 'operators');
       return;
     }
     const charId = namespaced('char_x', recordNs, rawId, seenIds);
@@ -1747,7 +1772,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     const compiledForms = formSkills.map((list, idx) => compileSkillList(list, { owner: rawId, tag: `f${idx}`, label: name, keepIds, defaultId: null, dropped }));
     const compiledTop = compileSkillList(topSkills, { owner: rawId, tag: '', label: name, keepIds, defaultId: null, dropped });
     const fallback = compiledForms.find(Boolean) || compiledTop;
-    if (!fallback) { skip(`units:${rawId}`, '没有技能，不能做成干员，没有导入。', 'There is no skill, so this cannot become an operator and was not imported.'); return; }
+    if (!fallback) { skip(`units:${rawId}`, '没有技能，不能做成干员，没有导入。', 'There is no skill, so this cannot become an operator and was not imported.', undefined, 'operators'); return; }
     /** @type {Set<string>} */
     const fieldsDropped = new Set();
     const oneForm = (f, idx) => {
@@ -1829,9 +1854,9 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     const name = typeof normal.name === 'string' ? normal.name.trim().slice(0, 60) : '';
     const profession = professionOf(normal.profession);
     const sub = typeof normal.subProfessionId === 'string' ? normal.subProfessionId.trim().slice(0, 40) : '';
-    if (!name || !PROFESSIONS.has(profession) || !sub) { skip(label, '棋子缺名字、职业或分支，没有导入。', 'The chess record lacks a name, profession or branch, so it was not imported.'); return; }
+    if (!name || !PROFESSIONS.has(profession) || !sub) { skip(label, '棋子缺名字、职业或分支，没有导入。', 'The chess record lacks a name, profession or branch, so it was not imported.', undefined, 'operators'); return; }
     const tier = Number.isInteger(normal.tier) && normal.tier >= 1 && normal.tier <= 6 ? normal.tier : 0;
-    if (!tier) { skip(label, '阶级（tier）不在 1–6，没有导入。', 'The tier is not from 1 to 6, so it was not imported.'); return; }
+    if (!tier) { skip(label, '阶级（tier）不在 1–6，没有导入。', 'The tier is not from 1 to 6, so it was not imported.', undefined, 'operators'); return; }
     let rarity = Number.isInteger(normal.rarity) && normal.rarity >= 1 && normal.rarity <= 6 ? normal.rarity : 0;
     if (!rarity) {
       rarity = tier;
@@ -1839,7 +1864,9 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     }
     const unit = chessUnit(normal);
     if (!unit) {
-      skip(label, `棋子的 charId（${String(normal.charId ?? 'null').slice(0, 40)}）既不是官方干员，也不是本包 units.json 里的干员，assets 里也没有官方干员的美术，没有导入。`, `The chess record's charId (${String(normal.charId ?? 'null').slice(0, 40)}) is neither an official operator nor a unit of this pack's units.json, and its assets name no official art, so it was not imported.`);
+      // Art is keyed by charId, which the skip path (the chess id) does not record.
+      if (typeof normal.charId === 'string' && normal.charId) droppedIds.add(normal.charId);
+      skip(label, `棋子的 charId（${String(normal.charId ?? 'null').slice(0, 40)}）既不是官方干员，也不是本包 units.json 里的干员，assets 里也没有官方干员的美术，没有导入。`, `The chess record's charId (${String(normal.charId ?? 'null').slice(0, 40)}) is neither an official operator nor a unit of this pack's units.json, and its assets name no official art, so it was not imported.`, undefined, 'operators');
       return;
     }
     const position = positionOf(normal.position, profession);
@@ -1859,13 +1886,13 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
         assume('chess-fallback-bond', `没有盟约的棋子写上兜底盟约 ${fallbackBond}（协防干员），和工作台的干员模板一样。`, `A chess record with no bond gets the fallback bond ${fallbackBond} (协防干员), as the studio's operator template does.`);
       }
     }
-    if (!bonds.length) { skip(label, '棋子需要至少一个本安装里存在的盟约，没有导入这个棋子。', 'A chess piece needs a bond that exists in this installation, so this piece was not imported.'); return; }
+    if (!bonds.length) { skip(label, '棋子需要至少一个本安装里存在的盟约，没有导入这个棋子。', 'A chess piece needs a bond that exists in this installation, so this piece was not imported.', undefined, 'operators'); return; }
     const nList = Array.isArray(normal.skills) && normal.skills.some(isObj) ? normal.skills.filter(isObj) : isObj(normal.skill) ? [normal.skill] : [];
     const eList = Array.isArray(elite.skills) && elite.skills.some(isObj) ? elite.skills.filter(isObj) : isObj(elite.skill) ? [elite.skill] : [];
     const defN = typeof normal.skill?.skillId === 'string' ? normal.skill.skillId : null;
     const defE = typeof elite.skill?.skillId === 'string' ? elite.skill.skillId : defN;
-    if (!nList.length && !eList.length) { skip(label, '没有技能，不能做成棋子，没有导入。', 'There is no skill, so this cannot become a piece and was not imported.'); return; }
-    if (!finiteStats(normal.stats) || !finiteStats(elite.stats)) { skip(label, '没有能用的数值（stats），没有导入。', 'There are no usable stats, so it was not imported.'); return; }
+    if (!nList.length && !eList.length) { skip(label, '没有技能，不能做成棋子，没有导入。', 'There is no skill, so this cannot become a piece and was not imported.', undefined, 'operators'); return; }
+    if (!finiteStats(normal.stats) || !finiteStats(elite.stats)) { skip(label, '没有能用的数值（stats），没有导入。', 'There are no usable stats, so it was not imported.', undefined, 'operators'); return; }
     const declared6 = unit.kind === 'pack' && rarity === 6 && isObj(pack.operators) && (has(pack.operators, unit.key) || has(pack.operators, unit.charId));
     if (unit.kind === 'pack' && declared6) assume('chess-and-diy', `「${name}」既有 chess.json 的棋子，又在 operators 里声明为自选：写成两条记录，棋子一条，自选一条。`, `"${name}" has a chess.json piece and a recruit-pool declaration: two records were written, the piece and the 自选 operator.`);
     const stem = baseId.replace(/^chess_/, '').replace(/_a$/, '');
@@ -1985,8 +2012,8 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     const parents = new Map();
     for (const [id, rec] of records) for (const target of [rec?.upgradeChessId, rec?.goldenId]) if (target && target !== id) parents.set(target, id);
     for (const [id, rec] of records) {
-      if (!isObj(rec)) { skip(`chess:${id}`, '棋子记录不是对象，没有导入。', 'The chess record is not an object, so it was not imported.'); continue; }
-      if (rec.chessId != null && rec.chessId !== id) { skip(`chess:${id}`, 'chessId 和键不一致（Forge 也拒这一条），没有导入。', 'chessId differs from its key (Forge refuses it too), so it was not imported.'); continue; }
+      if (!isObj(rec)) { skip(`chess:${id}`, '棋子记录不是对象，没有导入。', 'The chess record is not an object, so it was not imported.', undefined, 'operators'); continue; }
+      if (rec.chessId != null && rec.chessId !== id) { skip(`chess:${id}`, 'chessId 和键不一致（Forge 也拒这一条），没有导入。', 'chessId differs from its key (Forge refuses it too), so it was not imported.', undefined, 'operators'); continue; }
       const parent = parents.get(id);
       const base = typeof rec.baseId === 'string' && rec.baseId ? rec.baseId : parent ?? id.replace(/_b$/, '_a');
       const golden = rec.isGolden === true || (rec.isGolden == null && (parent != null || id.endsWith('_b')));
@@ -1994,7 +2021,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       groups.get(base)[golden ? 'elite' : 'normal'].push({ ...rec, chessId: id });
     }
     for (const [base, g] of groups) {
-      if (g.normal.length > 1 || g.elite.length > 1) { skip(`chess:${base}`, '同一对棋子里有两条普通或两条精锐记录，没有导入。', 'The pair has two normal or two elite records, so it was not imported.'); continue; }
+      if (g.normal.length > 1 || g.elite.length > 1) { skip(`chess:${base}`, '同一对棋子里有两条普通或两条精锐记录，没有导入。', 'The pair has two normal or two elite records, so it was not imported.', undefined, 'operators'); continue; }
       const normal = g.normal[0] || g.elite[0];
       const elite = g.elite[0] || g.normal[0];
       if (!g.normal.length || !g.elite.length) assume('chess-one', '一对棋子只有一条记录时，这一条写进普通和精锐两档。', 'A pair with one record uses it for both the normal and the elite form.');
@@ -2002,15 +2029,18 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     }
   };
 
+  // [ASSUMED] Only a whole new record that was not written counts. An official record left alone, a field note,
+  // and a unit already imported as its chess pair do not. Effects are not one of these kinds.
+  const DROP_TABLE = { chess: 'operators', units: 'operators', bonds: 'bonds', bands: 'bands', items: 'items', tokens: 'tokens', garrisons: 'traits' };
   for (const name of CONTENT_NAMES) {
     let doc;
     try { doc = loadTableFile(files, used, name); } catch (e) {
       if (e instanceof ForgeImportError) throw e;
-      skip(`${name}.json`, '这个数据文件读不了，没有导入。', 'This data file could not be read, so it was not imported.');
+      skip(`${name}.json`, '这个数据文件读不了，没有导入。', 'This data file could not be read, so it was not imported.', undefined, DROP_TABLE[name]);
       continue;
     }
     if (!doc) {
-      if (declaredContent.includes(name)) skip(`content:${name}`, 'content 声明了这个文件，但包里没有对应的 JSON，没有导入。', 'content names this file, but the pack has no such JSON, so it was not imported.');
+      if (declaredContent.includes(name)) skip(`content:${name}`, 'content 声明了这个文件，但包里没有对应的 JSON，没有导入。', 'content names this file, but the pack has no such JSON, so it was not imported.', undefined, DROP_TABLE[name]);
       continue;
     }
     const past = numbersPastBound(doc);
@@ -2054,7 +2084,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
         rewrittenData.push(`${id} → ${eid}`);
         continue;
       }
-      skip(`${name}:${id}`, '新记录没有安全的紧凑映射（模式不是 Forge 的表；其他表只自动导入带官方 base 的敌人、干员和成对的棋子，以及已有记录上类型不变的补丁）。', 'A new record has no safe compact mapping (Forge has no mode table; other tables only auto-import enemies with an official base, operators, chess pairs, and type-preserving patches of existing records).');
+      skip(`${name}:${id}`, '新记录没有安全的紧凑映射（模式不是 Forge 的表；其他表只自动导入带官方 base 的敌人、干员和成对的棋子，以及已有记录上类型不变的补丁）。', 'A new record has no safe compact mapping (Forge has no mode table; other tables only auto-import enemies with an official base, operators, chess pairs, and type-preserving patches of existing records).', undefined, DROP_TABLE[name]);
     }
     if (newChess.size) mapChessRecords(newChess);
   }
@@ -2108,7 +2138,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       used.add(file);
       const stem = file.split('/').pop().replace(/\.js$/, '');
       if (!SAFE_KIT.test(file)) {
-        skip(file, '文件名里有字母、数字和 . _ - 以外的字符，转不成脚本插件；导入时不执行它。', 'The file name has characters other than letters, digits and . _ -, so it was not converted; the importer does not run it.', 'PLUGIN_FORGE_SCRIPT');
+        skip(file, '文件名里有字母、数字和 . _ - 以外的字符，转不成脚本插件；导入时不执行它。', 'The file name has characters other than letters, digits and . _ -, so it was not converted; the importer does not run it.', 'PLUGIN_FORGE_SCRIPT', 'kits');
         continue;
       }
       const owner = explicitKits.get(file);
@@ -2117,11 +2147,11 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
         const why = packTokenIds.has(stem)
           ? ['这是召唤物（tokens）的 kit，召唤物记录没有导入，所以没有转成脚本插件；导入时不执行它。', 'This is a summon (tokens) kit. Summon records are not imported, so it was not converted; the importer does not run it.']
           : [`文件名「${stem}」不是本包导入的棋子或干员，也不是 overrides 里声明的官方 id，转不成脚本插件；导入时不执行它。`, `The file name "${stem}" is not an imported chess or operator record of this pack, nor an official id the pack declares in overrides, so it was not converted; the importer does not run it.`];
-        skip(file, why[0], why[1], 'PLUGIN_FORGE_SCRIPT');
+        skip(file, why[0], why[1], 'PLUGIN_FORGE_SCRIPT', 'kits');
         continue;
       }
       if (taken.has(target.charId)) {
-        skip(file, `「${target.label}」已经有 ${taken.get(target.charId)} 这份 kit，这一份没有转换；导入时不执行它。`, `"${target.label}" already has the kit ${taken.get(target.charId)}, so this one was not converted; the importer does not run it.`, 'PLUGIN_FORGE_SCRIPT');
+        skip(file, `「${target.label}」已经有 ${taken.get(target.charId)} 这份 kit，这一份没有转换；导入时不执行它。`, `"${target.label}" already has the kit ${taken.get(target.charId)}, so this one was not converted; the importer does not run it.`, 'PLUGIN_FORGE_SCRIPT', 'kits');
         continue;
       }
       if (!scripts) {
@@ -2141,7 +2171,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
           'It runs only where the server owner set SP_PLUGIN_SCRIPTS=sandbox (or a trusted mode) and a room selects this plugin.',
         ],
       });
-      for (const r of got.refused) skip(r.path, `${r.zh} 没有写进脚本插件；导入时不执行它。`, `${r.en} It was not written into the script plugin; the importer does not run it.`, 'PLUGIN_FORGE_SCRIPT');
+      for (const r of got.refused) skip(r.path, `${r.zh} 没有写进脚本插件；导入时不执行它。`, `${r.en} It was not written into the script plugin; the importer does not run it.`, 'PLUGIN_FORGE_SCRIPT', 'kits');
       if (got.source) {
         const registered = got.registered.map((r) => {
           const job = jobs.find((j) => j.file === r.file);
@@ -2219,7 +2249,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     for (const k of Object.keys(pack.client)) if (k !== 'panels') skip(`client.${k}`, '除了只读面板，client 里的其他声明不能导入。', 'Apart from a read-only panel, other client declarations cannot be imported.');
   }
   for (const panel of panelList) {
-    if (!isObj(panel)) { skip('client.panels', '面板不是对象，没有导入。', 'A panel is not an object, so it was not imported.'); continue; }
+    if (!isObj(panel)) { skip('client.panels', '面板不是对象，没有导入。', 'A panel is not an object, so it was not imported.', undefined, 'panels'); continue; }
     const forgeSlot = typeof panel.slot === 'string' ? panel.slot : '';
     const module = typeof panel.module === 'string' ? panel.module : typeof panel.entry === 'string' ? panel.entry : '';
     const ours = PANEL_SLOT[forgeSlot];
@@ -2232,17 +2262,17 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     if (!ours || !UI_SLOT_IDS.includes(ours)) {
       const suggestedSlot = PANEL_REWRITE[forgeSlot] || 'room.panel';
       manualPanels.push({ panel: title, mount: forgeSlot, suggestedSlot });
-      skip(`client.panels:${title}#mount`, `面板「${title}」挂载点 ${forgeSlot || '(none)'} 需要人工适配，可改写到 ${suggestedSlot}（位置与原版不同）。`, `Panel "${title}" at Forge mount ${forgeSlot || '(none)'} needs manual adaptation; consider rewriting for ${suggestedSlot} (a different location).`, 'PLUGIN_FORGE_MOUNT');
+      skip(`client.panels:${title}#mount`, `面板「${title}」挂载点 ${forgeSlot || '(none)'} 需要人工适配，可改写到 ${suggestedSlot}（位置与原版不同）。`, `Panel "${title}" at Forge mount ${forgeSlot || '(none)'} needs manual adaptation; consider rewriting for ${suggestedSlot} (a different location).`, 'PLUGIN_FORGE_MOUNT', 'panels');
       continue;
     }
     if (panel.wraps != null || panel.readonly === false || panel.readOnly === false) {
       manualPanels.push({ panel: title, mount: forgeSlot, suggestedSlot: ours });
-      skip(`client.panels:${title}#mount`, `面板「${title}」在 ${forgeSlot} 改写页面组件，需要人工适配为 ${ours} 的只读面板。`, `Panel "${title}" at ${forgeSlot} rewrites a component; it needs manual adaptation as a read-only ${ours} panel.`, 'PLUGIN_FORGE_MOUNT');
+      skip(`client.panels:${title}#mount`, `面板「${title}」在 ${forgeSlot} 改写页面组件，需要人工适配为 ${ours} 的只读面板。`, `Panel "${title}" at ${forgeSlot} rewrites a component; it needs manual adaptation as a read-only ${ours} panel.`, 'PLUGIN_FORGE_MOUNT', 'panels');
       continue;
     }
     if (takenSlots.has(ours)) {
       manualPanels.push({ panel: title, mount: forgeSlot, suggestedSlot: ours });
-      skip(`client.panels:${title}#mount`, `面板「${title}」在 ${forgeSlot} 对应的 ${ours} 插槽已有面板，需要人工合并。`, `Panel "${title}" at ${forgeSlot} maps to occupied slot ${ours}; it needs manual adaptation into the existing panel.`, 'PLUGIN_FORGE_MOUNT');
+      skip(`client.panels:${title}#mount`, `面板「${title}」在 ${forgeSlot} 对应的 ${ours} 插槽已有面板，需要人工合并。`, `Panel "${title}" at ${forgeSlot} maps to occupied slot ${ours}; it needs manual adaptation into the existing panel.`, 'PLUGIN_FORGE_MOUNT', 'panels');
       continue;
     }
     takenSlots.add(ours);
@@ -2348,7 +2378,19 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   for (const panel of panels) roles.push(`ui:${panel.slot}`);
   for (const t of translations.filter((x) => x.kind === 'ui')) roles.push(`lang:${t.lang}`);
 
-  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, contentI18n, panels, manualPanels, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base };
+  // [ASSUMED] A cosmetic has nothing to apply to when every asked portrait / bond / item id belongs to a dropped
+  // gameplay record (operators, bonds, bands, items, tokens, traits, kits) and no kept visual key sits outside
+  // that set. A panel title is never such an id. Audio alone (no asked ids) is not this case. A plugin that
+  // keeps one real target is not this case either.
+  const asked = [];
+  if (isObj(pack.art)) for (const t of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items']) if (isObj(pack.art[t])) asked.push(...Object.keys(pack.art[t]));
+  if (isObj(pack.bondIcons)) asked.push(...Object.keys(pack.bondIcons));
+  if (isObj(pack.itemIcons)) asked.push(...Object.keys(pack.itemIcons));
+  const kept = [];
+  for (const bucket of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items', 'skills', 'modules']) if (isObj(assets[bucket])) kept.push(...Object.keys(assets[bucket]));
+  const cosmeticBare = asked.length > 0 && asked.every((k) => droppedIds.has(k)) && kept.every((k) => droppedIds.has(k));
+
+  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, contentI18n, panels, manualPanels, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare };
   return { meta, roles };
 }
 
@@ -2406,7 +2448,7 @@ function uiHtml(slot, title, modulePath) {
 <head>
 <meta charset="utf-8">
 <title>${safeTitle}</title>
-<style>html,body{margin:0;background:transparent;color:#e8e0d0;font:12px/1.4 sans-serif}body{padding:6px}</style>
+<style>html{color-scheme:dark}html,body{margin:0;background:transparent;color:#e8e0d0;font:12px/1.4 sans-serif}body{padding:6px}</style>
 </head>
 <body>
 <p>${safeTitle}</p>
@@ -2479,7 +2521,10 @@ function buildProducts(meta, ids, primaryRole) {
     files.set('assets.json', `${JSON.stringify(meta.assets, null, 2)}\n`);
     for (const [rel, buf] of meta.media) files.set(rel, buf);
     files.set('README.md', readme(ids.cosmetic, 'cosmetic', ['- 素材在 assets.json 指向的文件里。', '- Spine 的剪辑由 pack 写入 plugin.lock.json，不要手写 anims。']));
-    products.push({ id: ids.cosmetic, class: 'cosmetic', role: 'cosmetic', files, imported: meta.importedAssets, rewritten: meta.rewrittenAssets, manifest: man });
+    const imported = meta.cosmeticBare
+      ? ['没有可应用的目标：要套的干员、棋子或道具都没有导入。 (This cosmetic has nothing to apply to.)']
+      : meta.importedAssets;
+    products.push({ id: ids.cosmetic, class: 'cosmetic', role: 'cosmetic', files, imported, rewritten: meta.rewrittenAssets, manifest: man });
   }
   if (ids.script && meta.script) {
     const man = manifestCommon(ids.script, meta, { class: 'script', scope: ['room'], permissions: ['sim.code'], entry: { sim: 'sim/index.js' } });
@@ -2535,6 +2580,32 @@ function scriptNote(products) {
   return `\n脚本插件 ${ids.join('、')} 只在服主设置 SP_PLUGIN_SCRIPTS=sandbox（或 trusted / trusted-force，见 PLUGINS.md §13）并且房间选中它时运行；导入时没有执行它。沙箱模式下它的锁文件有效，写入后房间就能选它。 (The script plugin ${ids.join(', ')} runs only where the server owner set SP_PLUGIN_SCRIPTS=sandbox (or trusted / trusted-force, PLUGINS.md §13) and a room selects it; it was not run during the import. In sandbox mode its lock is valid, so rooms can select it once it is written.)\n`;
 }
 
+/** Counts of whole gameplay records that were not written. Empty when nothing was dropped. */
+function droppedBlock(report) {
+  const d = report.dropped;
+  if (!report.partial || !d) return '';
+  const rows = [
+    ['operators', '干员 / 棋子', 'operators / chess'],
+    ['bonds', '盟约', 'bonds'],
+    ['bands', '乐队', 'bands'],
+    ['items', '道具', 'items'],
+    ['tokens', '召唤物', 'tokens'],
+    ['traits', '特性', 'traits'],
+    ['kits', '技能脚本', 'kits'],
+    ['panels', '面板', 'panels'],
+  ].filter(([k]) => d[k] > 0).map(([k, zh, en]) => `- ${d[k]} ${zh} (${en})`);
+  const bare = report.cosmeticBare
+    ? '\n外观要套的目标都没有导入，这份外观没有可应用的对象。 (This cosmetic has nothing to apply to.)\n'
+    : '';
+  return `
+## 没有导入的玩法
+
+这些玩法记录整条没有写进插件。检查通过只说明没有硬错误，不说明玩法都在。 (These gameplay records were not written into a plugin. A passing check means there is no hard error; it does not mean the gameplay is all here.)
+
+${rows.join('\n')}
+${bare}`;
+}
+
 function reportMarkdown(report) {
   const line = (s) => s || '（无）';
   const bullets = (rows, fmt) => (rows.length ? rows.map(fmt).join('\n') : '- （无）');
@@ -2545,6 +2616,7 @@ function reportMarkdown(report) {
 
 导入器只读文件，不执行包里的任何脚本，也不拦截官方素材（和打包工具一样，作者自己对素材负责）。
 ${scriptNote(report.products)}
+${droppedBlock(report)}
 ## 导入了什么
 
 ${bullets(report.products, (p) => `### ${p.class} \`${p.id}\`\n\n${p.imported.length ? p.imported.map((x) => `- ${x}`).join('\n') : '- （这一类没有条目）'}`)}
@@ -2580,6 +2652,12 @@ function publicReport({ meta, products, primaryId, wrote, dryRun, check, issues 
     skipped: [...meta.skipped].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)),
     wrote,
   };
+  // Absent unless a whole gameplay record was dropped, so a complete import keeps the previous fields.
+  if (meta.dropped && Object.values(meta.dropped).some((n) => n > 0)) {
+    report.partial = true;
+    report.dropped = { ...meta.dropped };
+  }
+  if (meta.cosmeticBare) report.cosmeticBare = true;
   report.markdown = reportMarkdown(report);
   return report;
 }

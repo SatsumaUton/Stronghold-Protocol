@@ -74,7 +74,7 @@ export function installTestTrace(m, opts) {
     }
   };
   const options = {};
-  for (const key of ['roomCode', 'mode', 'difficulty', 'modeId', 'seats', 'spectators', 'seed', 'matchNo', 'hostId', 'aiPicksLast', 'cs', 'vs', 'requireCs']) {
+  for (const key of ['roomCode', 'mode', 'difficulty', 'modeId', 'seats', 'spectators', 'seed', 'matchNo', 'hostId', 'aiPicksLast', 'cs', 'vs', 'requireCs', 'kitted']) {
     if (opts[key] !== undefined) options[key] = clone(opts[key]);
   }
   Object.assign(options, {

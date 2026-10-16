@@ -309,6 +309,7 @@ export function TestConsole() {
           <option value="choice">${t('机变')}</option>
         </select>
       </label>
+      <div class="testconsole__row">
       ${cmd === 'funds' || cmd === 'lp' || cmd === 'hp' || cmd === 'teamLp' ? html`<label class="testconsole__field">${cmd === 'funds' ? t('资金') : cmd === 'lp' ? t('目标生命') : cmd === 'hp' ? t('领袖生命') : t('队伍生命')}
         <input value=${amount} onInput=${(e) => setAmount(e.target.value)} inputmode="numeric" />
       </label>` : null}
@@ -333,9 +334,10 @@ export function TestConsole() {
       </label><label class="testconsole__field">${t('机变选项')}
         <input value=${choiceId} onInput=${(e) => setChoiceId(e.target.value)} aria-label=${t('机变选项')} />
       </label>` : null}
+      <button type="button" class="testconsole__run" onClick=${() => runRef.current()}>${t('执行')}</button>
+      </div>
       <datalist id="test-content-ids">${choices.map(([key, rec]) => html`<option key=${key} value=${key}>${data.localeName(rec.name || key)}</option>`)}</datalist>
       <datalist id="test-owner-uids">${owned.map((p) => html`<option key=${p.uid} value=${p.uid}>${pieceName(p.id)} ${p.uid}</option>`)}</datalist>
-      <button type="button" class="testconsole__run" onClick=${() => runRef.current()}>${t('执行')}</button>
       <ul class="testconsole__log">
         ${log.length ? log.map((e) => html`<li key=${e.seq} class=${e.ok ? 'is-ok' : 'is-bad'}>${formatAuditLine(e, names.get(e.playerId))}</li>`) : html`<li class="t-dim">${t('尚无测试指令')}</li>`}
       </ul>

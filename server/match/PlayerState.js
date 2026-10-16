@@ -182,7 +182,10 @@ export class PlayerState {
     this.diyStock = new DiyStock();
     /** slotted slots without stock: every bond of the operator is switched off this match */
     this.diyBanned = Object.freeze([]);
-    if (!this.isBot && seat.diy) this.setDiy(seat.diy);
+    // A modded room's content list (Match.diyKitted) is what the lobby already accepted. Without it setDiy
+    // keeps the vanilla kit list and drops a plugin operator with no error (checkDiyPicks is lenient).
+    // Bots never slot 自选; they read the human's composed records once this succeeds (bot.js chessRec).
+    if (!this.isBot && seat.diy) this.setDiy(seat.diy, this.m.diyKitted ? { kitted: this.m.diyKitted } : undefined);
     this.shop = { level: 1, upgradePrice: this.gd.upgradeBase(1) ?? 0, slots: [], frozen: false, freeRefreshes: 0 };
     /** reward offers queue (merge rewards, special refreshes): { tier, source, label, slots: [{ kind, id, price, sold }] } */
     this.offers = [];

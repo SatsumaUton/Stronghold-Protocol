@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { scanPlugins, scanPacks, packIndexOf, createPluginRegistry, readPluginFolder } from '../../server/plugins/registry.js';
+import { scanPlugins, scanPacks, packIndexOf, createPluginRegistry, readPluginFolder, crossPluginFindings } from '../../server/plugins/registry.js';
 import * as compat from '../../server/packs.js';
 import { readPackIndex } from '../../shared/packs.js';
 import { selectTracked } from '../../tools/package.mjs';
@@ -290,6 +290,87 @@ test('tools/plugin.mjs: list names every class and the vanilla hash; check exits
     const outside = run('check', path.join(root, 'plugins/skin'));
     assert.equal(outside.status, 0, outside.stdout);
     assert.equal(run('check', 'nope').status, 2);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('cross-plugin: a second overlay names the plugin that won, and a shared slot is a warning', () => {
+  const lang = (id, code, source = 'plugins') => ({
+    id, class: 'lang', source, where: source === 'i18n' ? `public/i18n/${code}.json` : `plugins/${id}/`, manifest: { lang: code },
+  });
+  const ui = (id) => ({
+    id, class: 'ui', source: 'plugins', where: `plugins/${id}/`, manifest: { slots: ['hud.right'] }, ui: { slots: ['hud.right'] },
+  });
+  const cross = crossPluginFindings([lang('en', 'en', 'i18n'), lang('alpha', 'en'), lang('beta', 'en'), ui('meter'), ui('log')]);
+  assert.equal(cross.plugins.some((p) => p.id === 'alpha'), true);
+  assert.equal(cross.plugins.some((p) => p.id === 'beta'), false);
+  const lost = cross.skipped.find((s) => s.where === 'plugins/beta/');
+  assert.match(lost.problems[0], /alpha \(plugins\/alpha\/\)/);
+  assert.match(lost.problems[0], /one overlay per language/);
+  assert.doesNotMatch(lost.problems[0], /public\/i18n\/en\.json/);
+  assert.equal(cross.warnings.length, 2);
+  assert.match(cross.warnings[0].warning, /hud\.right/);
+  assert.match(cross.warnings[0].warning, /meter, log/);
+  assert.equal(cross.warnings[0].issue.code, 'PLUGIN_UI_SLOT_SHARED');
+});
+
+test('plugin check reports a second overlay and a shared slot; list follows SP_PLUGIN_SCRIPTS', () => {
+  const root = tmpdir('cross');
+  const run = (args, env = {}) => spawnSync(process.execPath, [path.join(ROOT, 'tools/plugin.mjs'), ...args, '--root', root], {
+    encoding: 'utf8', env: { ...process.env, ...env },
+  });
+  try {
+    put(root, 'public/i18n/en.json', { _meta: { name: 'English', complete: true }, 开始: 'Start' });
+    put(root, 'packs/.keep', '');
+    put(root, 'data/assets.json', '{}\n');
+    const lang = (id) => ({ manifest: 2, class: 'lang', lang: 'en', name: id, version: '1.0.0', files: { ui: 'ui.json' } });
+    put(root, 'plugins/alpha/plugin.json', lang('alpha'));
+    put(root, 'plugins/alpha/ui.json', { 开始: 'Alpha' });
+    put(root, 'plugins/beta/plugin.json', lang('beta'));
+    put(root, 'plugins/beta/ui.json', { 开始: 'Beta' });
+    const ui = (id) => ({
+      manifest: 2, name: id, version: '1.0.0', app: '*', api: 1, class: 'ui', scope: ['personal'], permissions: ['ui.frame'],
+      entry: { client: 'ui/index.html' }, slots: ['hud.right'],
+    });
+    put(root, 'plugins/meter/plugin.json', ui('meter'));
+    put(root, 'plugins/meter/ui/index.html', '<!doctype html><title>meter</title><style>html{color-scheme:dark}</style>');
+    put(root, 'plugins/log/plugin.json', ui('log'));
+    put(root, 'plugins/log/ui/index.html', '<!doctype html><title>log</title>');
+    put(root, 'plugins/kit/plugin.json', { manifest: 2, name: 'kit', version: '1.0.0', app: '*', api: 1, class: 'script', permissions: ['sim.code'], entry: { sim: 'sim/index.js' } });
+    put(root, 'plugins/kit/sim/index.js', 'export default function setup() {}\n');
+    const packed = run(['pack', 'kit']);
+    assert.equal(packed.status, 0, packed.stdout + packed.stderr);
+    const check = run(['check']);
+    assert.equal(check.status, 1, check.stdout);
+    assert.match(check.stdout, /already has an overlay from alpha/);
+    assert.match(check.stdout, /one overlay per language/);
+    assert.match(check.stdout, /slot hud\.right is also requested by log, meter/);
+    const alone = run(['check', 'alpha']);
+    assert.equal(alone.status, 0, alone.stdout);
+    const named = (args) => {
+      const r = run(['check', ...args, '--json']);
+      const body = JSON.parse(r.stdout);
+      const dups = (body.folders || []).flatMap((f) => (f.issues || []).filter((i) => i.code === 'PLUGIN_DUPLICATE'));
+      return { status: r.status, problems: body.problems, dups };
+    };
+    for (const args of [['alpha', 'beta'], ['beta', 'alpha']]) {
+      const got = named(args);
+      assert.equal(got.status, 1, JSON.stringify({ args, problems: got.problems, texts: got.dups.map((d) => d.text) }));
+      assert.equal(got.problems, 1);
+      assert.equal(got.dups.length, 1);
+      assert.equal(got.dups[0].where, 'plugins/beta/');
+      assert.match(got.dups[0].text, /alpha \(plugins\/alpha\/\)/);
+    }
+    const onlyBeta = named(['beta']);
+    assert.equal(onlyBeta.status, 0, JSON.stringify(onlyBeta.dups.map((d) => d.text)));
+    assert.equal(onlyBeta.problems, 0);
+    const off = run(['list']);
+    assert.match(off.stdout, /kit .+disabled/);
+    const sandbox = run(['list'], { SP_PLUGIN_SCRIPTS: 'sandbox' });
+    assert.equal(sandbox.status, 0, sandbox.stderr);
+    assert.match(sandbox.stdout, /kit /);
+    assert.doesNotMatch(sandbox.stdout, /kit .+disabled/);
+    const trusted = run(['list'], { SP_PLUGIN_SCRIPTS: 'trusted' });
+    assert.match(trusted.stdout, /kit .+disabled/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 

@@ -69,6 +69,7 @@
 .testconsole__tab, .testconsole__run, .testconsole__row button {
   color: #1a1408; background: #e8b84a; border: 0; font-weight: 700; padding: .04rem .1rem; cursor: pointer;
 }
+.testconsole__run { flex: 0 0 auto; }
 .testconsole__body {
   width: 100%; display: grid; gap: .06rem; padding: .1rem; background: rgba(12, 14, 12, .94);
   border: 1px solid rgba(232, 184, 74, .7); color: var(--text-hi); font-size: calc(.15 * var(--t));
@@ -80,6 +81,7 @@
 .testconsole__head { cursor: grab; touch-action: none; user-select: none; }
 .testconsole__head:active { cursor: grabbing; }
 .testconsole__field { display: grid; gap: .02rem; min-width: 0; }
+.testconsole__row .testconsole__field { flex: 1 1 8em; }
 .testconsole__field input, .testconsole__field select {
   color: var(--text-hi); background: var(--bg-2); border: 1px solid var(--line-2); padding: .03rem .06rem;
   min-width: 0; width: 100%; box-sizing: border-box;

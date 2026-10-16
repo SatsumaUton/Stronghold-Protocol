@@ -103,7 +103,15 @@ node tools/plugin.mjs pack my-texas --zip
 ```
 
 `node tools/plugin.mjs new` 不带参数会列出所有模板。`plugin.json` 开头的 `"$schema": "../../schemas/plugin.schema.json"`
-让 VS Code 这类编辑器自动补全字段、标出写错的地方。
+让 VS Code 这类编辑器自动补全字段、标出写错的地方。一次检查 `plugins/` 里的全部文件夹，或一次点名多个文件夹时，还会按
+注册表的规则看跨插件的问题：重复的 id、同一种语言的第二个覆盖（提示里写明已经生效的是哪个插件，按文件夹名排序，第一个
+胜出）、两个界面插件要同一个位置（警告 `PLUGIN_UI_SLOT_SHARED`：对局里用标签切换，一次只显示一个，不是失败）。只检查
+一个文件夹时不扫其他文件夹。`plugin list` 和服务器读同一个 `SP_PLUGIN_SCRIPTS`：`sandbox` 且锁有效时脚本插件是已加载，
+没设置或 `trusted` 但没钉住锁时仍是禁用。
+
+界面插件的页面要在 `html` 上写 `color-scheme: dark`（模板已经写了），否则 iframe 会铺一块不透明的白底，浅色字读不清。
+插件自己设置的背景仍会显示。对局右侧的位置在商店、手牌、准备按钮和资金旁边，不盖住它们。同一个位置有多个插件时，按
+名字先显示一个，玩家用位置里的标签切换。
 
 ## 其他模板的要点
 
@@ -338,7 +346,8 @@ node tools/plugin.mjs pack my-texas --zip
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_I18N` | 插件的翻译文件不对（{where}）：{detail} | 翻译文件写 { "version": 1, "lang": "en", "files": { … } }，lang 和文件名一致；只能替换已有的文字，不能新增字段。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_UI_SLOTS` | 界面插件的 "slots" 写得不对：{detail} | "slots" 是列表，从 hud.right、result.tab、stats.tab、room.panel 里选，每个最多写一次。 |
 | 插件能用，但检查时有提示 | `PLUGIN_UI_NO_SLOT` | 界面插件没有要任何位置，页面不会显示出来 | 在 "slots" 里写上它要放的位置，例如 ["hud.right"]。 |
-| 界面插件的页面收到拒绝（ok: false、rejected 或 limit 消息） | `PLUGIN_SLOT` | 界面插件要的位置没有给它：清单的 "slots" 里没有这个位置，或者别的插件已经占了 | 在 plugin.json 的 "slots" 里写上这个位置（hud.right、result.tab、stats.tab、room.panel）。一个位置只放一个插件，先开的先得。 |
+| 界面插件的页面收到拒绝（ok: false、rejected 或 limit 消息） | `PLUGIN_SLOT` | 界面插件要的位置没有给它：清单的 "slots" 里没有这个位置，或者别的插件已经占了 | 在 plugin.json 的 "slots" 里写上这个位置（hud.right、result.tab、stats.tab、room.panel）。协议表同一时间只挂一个插件；同一个位置有多个时，对局里用标签切换。 |
+| 插件能用，但检查时有提示 | `PLUGIN_UI_SLOT_SHARED` | 同一个位置有多个界面插件（{detail}）。对局里用标签切换，一次只显示一个 | 这不是错误：玩家可以在这个位置里切换。若要各自独立显示，把它们写成不同的 slots。 |
 | 界面插件的页面收到拒绝（ok: false、rejected 或 limit 消息） | `PLUGIN_RATE` | 界面插件发消息太快，被限流了 | 每个插件每秒最多 20 条（连发最多 40 条）。把要发的东西攒一攒再发，或者只在数据变了的时候发。 |
 | 界面插件的页面收到拒绝（ok: false、rejected 或 limit 消息） | `PLUGIN_STORAGE` | 界面插件的存储请求被拒绝：键名不合规，或者超出了容量 | 键名 1–64 个字符，只用字母、数字和 . _ -；一个值的 JSON 不超过 4096 字节；每个插件最多 32 个键、一共 32 KB。 |
 | 界面插件的页面收到拒绝（ok: false、rejected 或 limit 消息） | `PLUGIN_INTENT` | 界面插件想发对局操作，被拒绝了 | 界面插件只能看，不能操作对局（它不能成为自动操作或作弊工具）：不要发 hello、ping、room.*、g.*、b.* 这类消息，也不要把它们夹在别的消息里。 |
@@ -393,6 +402,11 @@ node tools/plugin.mjs pack my-texas --zip
 在工作台里点 **「从 Forge 包导入」**。选一个 zip，或选整个文件夹。先看导入报告，确认之后才会写入 `plugins/`。
 报告里写着导入了什么、改成了什么、没导入的和原因。常见的没导入原因：这是服务端逻辑、会改协议、是一段对不上的脚本
 （导入器**不运行**包里的任何代码），或者挂载点对不上我们的界面插槽。
+
+整条玩法记录没有写入时（干员 / 棋子、盟约、乐队、道具、召唤物、特性、技能脚本、面板），报告开头有「没有导入的玩法」，
+JSON 里写 `partial: true` 和各类的 `dropped` 数量。`ok` 仍表示没有硬错误。外观要套的干员、棋子或道具全都没导入时，
+这份产品写明没有可应用的对象；文件仍会复制。只替换一部分、或只有语音时，不写这句话。[ASSUMED] 效果不单列；棋子对已经
+覆盖的干员、`--no-scripts`、以及已经挂上但脚本没复制的面板，都不算进 `partial`。
 
 命令行做同一件事：
 
