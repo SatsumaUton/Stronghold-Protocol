@@ -24,7 +24,8 @@ aklz4.py registers a decoder for it. This script pulls the art the web sources l
     names resolved through the shaders/*.ab bundles), the background / device meshes as Wavefront OBJ
     (mesh/<bundle>/<mesh>.obj; UnityPy's exporter, X mirrored into a right-handed frame) and their GameObject
     placement (mesh/<bundle>/prefab.json); of the 卫戍协议 device bundle (arts/maps/common/trap/trap_110.ab) only the
-    射击台 (trap_1106_achplat: mesh, texture, material → mesh/trap_110), which the board draws in place of its slab
+    射击台 (trap_1106_achplat) and 阻隔工事 (trap_1105_accrate): mesh, texture, material → mesh/trap_110, which the
+    board draws in place of the 射击台's slab and of the crate's box (GitHub #663)
   - the standard gate / objective effects of every battle map (arts/effects/[pack]map.ab → map/fx: the [opt]start_box /
     [opt]end_box / [opt]start_fly meshes, their merged additive textures, materials and prefab), the blower's texture
     (arts/maps/common/res.ab → map/common: TX_wind_device of the s_wind_device mesh) and the shared water / noise
