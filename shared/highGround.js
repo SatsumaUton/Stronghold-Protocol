@@ -29,7 +29,8 @@ export function baseTraitText(rec) {
  * The build-time flag `placeOnRanged` is the Chinese trait without a module (tools/build-data.mjs). It is what a
  * localized record still carries after the overlay replaces the trait text (GitHub #676). A record without the flag —
  * the Chinese data before the flag, or a plugin record — still matches the Simplified line.
- * [ASSUMED] A plugin may set `placeOnRanged: true` without that line. A record with neither the flag nor the line
+ * [ASSUMED] A plugin may set `placeOnRanged: true` without that line. The compact expander copies a MELEE form's
+ * `true` onto the built form (`shared/plugins/records.js`). A record with neither the flag nor the line
  * stays ground-only, including a plugin whose trait text is only a translation.
  * @param {object|null} rec a chess record (normal or golden)
  * @returns {boolean}

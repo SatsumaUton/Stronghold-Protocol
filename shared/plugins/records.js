@@ -112,11 +112,16 @@ function operator(data, r, pluginId, validateDsl) {
     });
     const dmgType = f.dmgType ?? r.dmgType ?? (r.profession === 'MEDIC' ? 'heal' : r.profession === 'CASTER' ? 'arts' : 'phys');
     const attackKind = f.attackKind ?? r.attackKind ?? (dmgType === 'heal' ? 'heal' : r.position === 'RANGED' ? 'ranged' : 'melee');
+    // [ASSUMED] A compact MELEE form may set placeOnRanged: true without 「可以放置于远程位」.
+    // composeUnitRecord copies that boolean onto the shop chess and a 自选 piece (GitHub #676).
+    // Any other value, and the flag on a RANGED operator, is not stored.
+    const placeOnRanged = r.position === 'MELEE' && f.placeOnRanged === true;
     return { status, stats: { ...stats, ...f.stats }, immunities: {}, rangeId: null, rangeGrid: f.rangeGrid,
       dmgType, attackKind, projectile: r.projectile ?? (attackKind === 'melee' ? 'none' : dmgType === 'heal' ? 'orb' : dmgType === 'arts' ? 'bolt' : 'arrow'),
       canHitFly: r.canHitFly ?? (attackKind === 'ranged' && r.subProfessionId !== 'fortress'), targetPriority: r.targetPriority ?? null,
       trait: text(f.trait ?? r.trait), talents: (f.talents ?? r.talents ?? []).map((t, index) => ({ index, name: '', tokenKey: null, hidden: false, fromModule: false, ...text(t) })),
-      skills: expanded, modules: [], tokens: [], displayTokens: [], ...b };
+      skills: expanded, modules: [], tokens: [], displayTokens: [], ...b,
+      ...(placeOnRanged ? { placeOnRanged: true } : {}) };
   };
   if (r.as !== 'diy') {
     const c = r.chess, tier = c?.tier, econ = data.config?.economy;
