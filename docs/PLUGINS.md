@@ -1101,6 +1101,63 @@ results, event counts and per-unit damage/healing/taken stats. The studio feeds 
 replay and speed controls. It does not simulate in the page. The bench is a single battle; prep/mode economy still needs
 an actual room or author harness test. See the three step-by-step sections in PLUGIN-GUIDE.md.
 
+<a id="test-console"></a>
+
+**Test console (0.3.1).** `/studio/console.html`, linked from the studio header, is an independent vanilla battle
+sandbox. Both `POST /studio/api/console/options` and `POST /studio/api/console/build` require the existing studio key,
+LAN/Host/origin gate; an unkeyed request is 404. Options supplies the initial scene and battle-supported tactic cards.
+Build takes the scene below, validates shape, references, loadouts, placement and bounded work against official data,
+and returns `{scenario, spec, cap, maps, tokens, scale}`. It never runs the battle on the server, changes a room,
+installs a plugin, changes the sim singleton or records statistics. The page loads the real browser sim and field view.
+
+The versioned JSON is `shared/studio/scenario.js`; unknown fields and unsafe object keys are rejected. Required fields:
+
+| Field | Value |
+|---|---|
+| `v`, `name` | `1`, a title of at most 120 characters |
+| `stageId`, `modeId`, `kind` | official IDs; `normal`, `boss`, `hidden` or `unite` |
+| `round`, `seed`, `seconds` | 1–15; integer 1–4294967295; cap 1–1200 game seconds |
+| `waveId`, `bossId` | official ID or `null` for automatic selection; incompatible field/template combinations are errors |
+| `enemyMode`, `enemies` | `official` and an empty list, or `custom` with `{enemyKey,count,routeIndex,time,interval}` groups |
+| `bounties` | effect IDs from the options' bounty cards, at most 16 |
+| `players` | one owner (normal) or one/two owners (other fields), each as below |
+| `flags` | optional `dpInit`, `dpPerSec`, `dpMax`, `layerGainsEnabled`, `startOpCooldown` inside an object |
+
+Each player has `units`, `bonds`, `bandId` (or `null`), `choices` (battle-capable tactic effect IDs),
+`deviceOverrides` (official aliases → booleans), `handUnits` (0–15). A chess unit is
+`{uid,kind:'chess',chessId,row,col,dir,items}`; a token is `{uid,kind:'token',tokenId,ownerUid,row,col,dir}`.
+UIDs are unique across both owners; coordinates are the owner's board rows 9–12, columns 2–10; directions are
+`UP|RIGHT|DOWN|LEFT`. Boss R is mirrored by the spec; unite's second board is offset eight columns. Summons require a
+deployed owner, its selected skill and the match's summon stock / owner-range rules. Equipment slots are at most two;
+consumed-on-equip and acquisition/prep effects are not replayed. Population limits are deliberately absent in the sandbox.
+Chess may add `skillIndex`, `moduleId` (`none` removes it), `potential` (1–6), `cultivate` (0–3), `diy`
+(`{charId,skillIndex,uniEquipId}`), or `standIn:true` (without own skill/module/potential/cultivate).
+Prototype DIY selections retain their locked skill/module and reject potential/cultivation; other-mode modules are refused.
+`carryState:{hpPct,sp,down}` is optional (tokens only accept `sp`). Bonds are explicit `{tier,layers}` by bond ID;
+they are not inferred from the roster. `facts` optionally carries `shopLevel`, `funds`, `handChess`, `roundStats`
+(`refreshes,buys,sells,spent,gainedChess,arts`) and `extraBands` for conditions read by combat content; it does not run
+prep events. Normal round wave selection/scaling, leader templates and pool HP, bounty scaling, terrain and devices
+reuse the match builders. No arbitrary effect references or executable content can be imported.
+
+[ASSUMED] Authoring limits: 512 KiB JSON; 36 units per owner; 100 custom groups / 500 enemies (before bounties);
+1–100 enemies per group, spawn 0–1200 s and interval 0–120 s; 32 choices per owner. Any official template can be
+exercised at another round's scaling. The default unite exercise treats the entire selected normal wave as leaked
+enemies of owner one; use custom groups for the actual leaks. Bounties also belong to owner one. Leader pool HP uses
+the number of boards in this isolated field. Other fields, team LP, real-time overtime, acquisition effects, economy,
+cross-round state, arbitrary stat edits, movable devices, Arts items and plugin content sets are outside this console.
+The UI names its unsupported parts and prep-only tactics. Phase 2 (full match test mode) is deferred: there is no
+server flag, launcher option or room debug intent.
+
+The run starts paused. Editing recompiles and resets; one tick / one second means 1 / 30 fixed sim ticks, up to the
+cap or the normal battle end. Empty custom waves stay open until the cap. Speed 0.25×–8× affects tick scheduling only;
+an optional renderer `playbackTime` also holds animations while paused. A background tab pauses. Inspector and
+damage/heal logs read the live battle; `official:<key>` records an actually loaded official instance, while
+`procedural:*` records this view's procedural calls (particle entries require an accepted pool object). Totals survive
+the 300-entry log cap. Effects depend on assets, renderer tier and load timing; they are diagnostics, not a sim digest.
+3D / 2D and official FX off / lite / full use the normal renderer and report its actual state.
+Download/import never include the studio key. The last validated scene is kept in browser localStorage
+`sp.studio.console.v1`; malformed imports keep the current scene. JSON is a reproducible setup, not a mid-battle save.
+
 **Room panel completion.** Declared settings now show boolean, integer, number and typed-enum controls with min/max/step.
 The host applies the form via the existing `room.setPlugins`; values are normalized before composition and the resolved
 `plugins[].settings` is broadcast only when nonempty. Other players and running matches are read-only. Switches and
@@ -1141,6 +1198,7 @@ GET without the body):
 | `POST …/pack` · `GET …/zip` · `GET …/preview` | the lock and the check; the zip (a download, packs nothing); the temporary composition |
 | `GET …/f/<hash8>/<path>`, `…/files/<path>` · `PUT` / `DELETE …/files/<path>` | a file of the folder (a draft's too) — of the types the studio writes only, sandboxed (`Content-Security-Policy: default-src 'none'; sandbox`); write or remove one |
 | `GET /studio/api/trial-options` · `POST /studio/api/trial` | scenarios; a checked child-process battle comparison (key required) |
+| `POST /studio/api/console/options` · `POST /studio/api/console/build` | test console defaults / combat choice support; validate a scene and build its browser BattleSpec (both keyed; 512 KiB body limit) |
 | `POST …/authoring` · `POST /studio/api/validate-dsl` | wizard save with revision; structural DSL validation |
 | `POST /studio/api/authors` · `GET /studio/api/events` | name the page's game sessions; the change events |
 | `POST /studio/api/forge/preview` · `POST /studio/api/forge/import` | a Forge pack as `{ zip?: base64, files?: [{ name, data: base64 }], id?, noScripts? }` — never a path on the server. Preview is a dry run; `noScripts` leaves the script plugin of `kits/` out. §16 |
@@ -1181,6 +1239,7 @@ lacks). The table below is generated from it (`node tools/plugin.mjs errors --wr
 | The studio refuses the action and says why | `PLUGIN_STUDIO_TRIAL_TIMEOUT` | The trial exceeded its time limit | Shorten the scenario, reduce units or check the plugin effects. |
 | The studio refuses the action and says why | `PLUGIN_STUDIO_TRIAL_FAILED` | The trial process could not finish | Check the plugin again; consult the server log if it still fails. |
 | The studio refuses the action and says why | `PLUGIN_STUDIO_TRIAL_LIMIT` | The trial replay exceeded its size limit | Shorten the trial or reduce units and effects. |
+| The studio refuses the action and says why | `PLUGIN_STUDIO_CONSOLE_SCENARIO` | Invalid test scenario: {path} ({reason}) | Check scenario fields, legal tiles, summon owners and waves; unsupported fields cannot run. |
 | The studio refuses the action and says why | `PLUGIN_STUDIO_TRIAL_SCENARIO` | This trial scenario cannot run | Select valid operators, a wave and 1–120 seconds; use the sandbox preview for UI plugins. |
 | The room will not switch it on; the panel says why | `PLUGIN_CONSENT` | A player has not consented to trusted plugins | Every seated player must personally accept the risk for this content set. |
 | The room will not switch it on; the panel says why | `PLUGIN_TRUST_PUBLIC` | Trusted plugins are refused on a public listening address | Bind to a local address, or explicitly opt into trusted-force after reviewing the risk. |

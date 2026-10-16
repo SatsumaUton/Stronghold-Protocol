@@ -4,6 +4,21 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
 
 ## 9. Client rendering contract (public/js/render)
 
+**Studio test console (0.3.1).**
+
+The maintainer's standalone battle sandbox is `/studio/console.html` (history §34.8; format and limits in
+[PLUGINS.md](../PLUGINS.md#test-console)). Its options/build API uses the existing local-network studio gate and key.
+The server validates and builds a vanilla BattleSpec using match wave/placement helpers; the browser's real sim and
+field view run it without rooms or result submissions. Editing resets to tick zero, runs start paused, stepping is
+one or thirty fixed ticks, speed is 0.25×–8×, and a hidden tab pauses. JSON saves the setup and seed; the last valid
+setup persists in this browser. Official/prep effects outside that single battle are named as unsupported.
+
+`createFieldView(host, { …, playbackTime: () => gameSeconds })` optionally drives visual animation time from the
+caller's simulation clock, allowing exact pauses/steps in the console. Ordinary views omit it and retain their
+wall-clock/interpolation timing. Official effects still follow the snapshot clock; the console observes only its
+own renderer's loaded instances/procedural calls. These diagnostic counts depend on assets and rendering, never
+participate in simulation results, and are distinct from damage/heal totals. Full match test mode is deferred.
+
 Bond-layer audio (#482): live own preparation gains arrive as `m.layer`; the displayed battle's `layer` tuples
 play the same `bondUp` cue. A gain of several layers plays once, including gains to inactive bonds. The official
 `ON_ACT1AUTOCHESS_ADD_BOND` bank allows one sound and replaces the oldest; there is no added cooldown. Existing

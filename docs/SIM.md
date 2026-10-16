@@ -1544,6 +1544,13 @@ objects), and call `checkInvariants` at the end. Run: `node --test test/sim/*.te
 
 ## 11. Tools
 
+For interactive vanilla reproduction, open the studio's `/studio/console.html` with its key. The server validates
+`shared/studio/scenario.js` scenes through `server/studio/console.js`; the page runs `createBattleFromSpec` with the
+real browser sim and renderer. Start paused, step one/thirty ticks, inspect units and damage/heal/effect logs, or save
+the seeded setup as JSON. Empty custom waves remain open until the console cap. This single-field tool does not
+run prep economy, settle a match or submit results; [the console reference](PLUGINS.md#test-console) lists input
+fields and unsupported cases. Tests: `test/studio/console.test.js` (no listener/browser needed).
+
 Equipment/fortress corrections (§30.3): Kjerag Ice and Tear Gas use actual enemy damage events, including DoT,
 not attack declarations or element-gauge/HP-loss events. Fortress fallback targeting and skill automation include
 the operator's own tile after blocked/ranged candidates; only explicitly enabled skills retain melee splash.

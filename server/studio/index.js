@@ -73,6 +73,8 @@ import { STUDIO_URL, STUDIO_API, isStudioPath } from './paths.js';
 import { loadStudioKey, sameKey } from './key.js';
 import { createTrialBench, TRIAL_LIMITS } from './trial.js';
 import { trialOptions } from './trialOptions.js';
+import { consoleOptions, buildConsoleScenario } from './console.js';
+import { SCENARIO_BYTES } from '../../shared/studio/scenario.js';
 import { readStudioData } from './gameData.js';
 import { createAuthoring } from './authoring.js';
 import { createPluginWatcher } from './watch.js';
@@ -136,6 +138,8 @@ export const STUDIO_ROUTES = Object.freeze([
   'GET /studio/api/info',
   'GET /studio/api/trial-options',
   'POST /studio/api/trial',
+  'POST /studio/api/console/options',
+  'POST /studio/api/console/build',
   'GET /studio/api/authoring',
   'GET /studio/api/dsl-example',
   'POST /studio/api/validate-dsl',
@@ -792,6 +796,12 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
         app: APP_VERSION, api: PLUGIN_API, mode, watching: watcher.active, limits: { ...STUDIO_LIMITS, pluginBytes: PLUGIN_LIMITS.pluginBytes, trial: TRIAL_LIMITS, removeMax: REMOVE_MAX },
         templates: TEMPLATES.map((t) => ({ id: t.id, class: t.class, kinds: t.kinds })), kinds: Object.keys(TARGET_KINDS),
       });
+    }
+    if ((route === 'console/options' || route === 'console/build') && method === 'POST') {
+      if (!mayChange(req)) return false;
+      const body = await readJson(req, SCENARIO_BYTES);
+      const data = readStudioData(dataDir);
+      return json(200, route === 'console/options' ? consoleOptions(data) : buildConsoleScenario(body, data));
     }
     if (route === 'trial-options' && read) return json(200, trialOptions(dataDir));
     if (route === 'trial' && method === 'POST') {

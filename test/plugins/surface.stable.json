@@ -900,6 +900,14 @@
     "anchor": "server/studio/index.js#STUDIO_ROUTES"
   },
   {
+    "name": "studio.route.POST /studio/api/console/options",
+    "anchor": "server/studio/index.js#STUDIO_ROUTES"
+  },
+  {
+    "name": "studio.route.POST /studio/api/console/build",
+    "anchor": "server/studio/index.js#STUDIO_ROUTES"
+  },
+  {
     "name": "studio.route.GET /studio/api/authoring",
     "anchor": "server/studio/index.js#STUDIO_ROUTES"
   },
@@ -1041,6 +1049,10 @@
   },
   {
     "name": "error.PLUGIN_STUDIO_TRIAL_LIMIT",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
+    "name": "error.PLUGIN_STUDIO_CONSOLE_SCENARIO",
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },
   {
