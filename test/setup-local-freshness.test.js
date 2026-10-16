@@ -11,7 +11,8 @@ import path from 'node:path';
 import { EXPECTED_FX, EXPECTED_LOCAL_GROUPS, EXPECTED_SCENE } from '../tools/local-extract/expected.mjs';
 import {
   assessLocal, artRowAfterScenes, doctorLocalDetail, fxCatalogReport, fxReextractCommand,
-  localArtDetail, localArtState, localGaps, sceneAskDefault, sceneClientExtractAllowed, sceneInstallPlan,
+  localArtDetail, localArtState, localGaps, sceneAskDefault, sceneClientExtractAllowed, sceneFilesPartial,
+  sceneInstallPlan, sceneVersionOnlyGap,
   IS_WIN, ROOT, venvPython,
 } from '../tools/setup.mjs';
 
@@ -257,6 +258,8 @@ test('a partial battlefield set does not start a client extract unless --scenes 
   const ask = sceneInstallPlan(sceneOpts(assessed, { client: true, python: true }));
   assert.equal(ask.state, 'ask');
   assert.equal(ask.run, false);
+  assert.equal(sceneFilesPartial(assessed), true);
+  assert.equal(sceneVersionOnlyGap(assessed), false);
   assert.equal(sceneAskDefault(true), false);
   assert.equal(sceneAskDefault(false), true);
   assert.equal(sceneClientExtractAllowed({ partial: true, answer: true }), false);
@@ -265,7 +268,8 @@ test('a partial battlefield set does not start a client extract unless --scenes 
   assert.equal(sceneClientExtractAllowed({ partial: true, yes: true, answer: false }), true);
   assert.equal(sceneClientExtractAllowed({ partial: false, answer: true }), true);
   const src = fs.readFileSync(path.join(ROOT, 'tools/setup.mjs'), 'utf8');
-  assert.match(src, /ask\('现在下载并提取吗？', sceneAskDefault\(partial\)\)/);
+  assert.match(src, /ask\('现在下载并提取吗？', sceneAskDefault\(filesPartial \|\| versionOnly\)\)/);
+  assert.equal((src.match(/ask\('现在下载并提取吗？'/g) || []).length, 1);
   assert.equal(sceneInstallPlan(sceneOpts(assessed, { client: true, python: true, yes: true })).run, true);
   assert.equal(sceneInstallPlan(sceneOpts(assessed, { client: true, python: true, force: true })).run, true);
   const checking = sceneInstallPlan(sceneOpts(assessed, { check: true, client: true, python: true }));
@@ -313,9 +317,9 @@ function manifestCurrentScenes(version) {
   return doc;
 }
 
-test('an old scene-record version is stale and asks for --scenes once; version 2 is fresh', () => {
-  assert.equal(EXPECTED_SCENE.version, 2);
-  const current = assessLocal(manifestCurrentScenes(2), null);
+test('an old scene-record version is stale and asks for --scenes once; version 3 is fresh', () => {
+  assert.equal(EXPECTED_SCENE.version, 3);
+  const current = assessLocal(manifestCurrentScenes(3), null);
   assert.equal(current.sceneVersionStale, false);
   assert.equal(current.scenes, true);
   assert.equal(current.stale, false);
@@ -331,38 +335,69 @@ test('an old scene-record version is stale and asks for --scenes once; version 2
   assert.equal(old.scenes, false);
   assert.equal(old.stale, true);
   assert.equal(old.missingGroups.length, 0);
-  assert.equal(localGaps(old, { client: true }), '，场景版本 无，期望 2，请重新运行 node tools/setup.mjs --scenes');
+  assert.equal(localGaps(old, { client: true }), '，场景版本 无，期望 3，请重新运行 node tools/setup.mjs --scenes');
   assert.doesNotMatch(localGaps(old, { client: true }), /--local|金属地块|已有 11 个战场/);
   const copy = '没有客户端的服务器可以从同一版本的整合包（完整包）复制 public/assets/local 和 data/local-assets.json';
-  assert.equal(localGaps(old), `，场景版本 无，期望 2。${copy}`);
+  assert.equal(localGaps(old), `，场景版本 无，期望 3。${copy}`);
   assert.doesNotMatch(localGaps(old), /--scenes|--local/);
   const withClient = doctorLocalDetail(old, true);
-  assert.match(withClient, /场景版本 无，期望 2，请重新运行 node tools\/setup\.mjs --scenes/);
+  assert.match(withClient, /场景版本 无，期望 3，请重新运行 node tools\/setup\.mjs --scenes/);
   assert.equal((withClient.match(/--scenes/g) || []).length, 1);
   assert.doesNotMatch(withClient, /--local|金属地块|已有 11 个战场/);
   const noClient = doctorLocalDetail(old, false);
-  assert.match(noClient, /场景版本 无，期望 2/);
+  assert.match(noClient, /场景版本 无，期望 3/);
   assert.match(noClient, /同一版本的整合包/);
   assert.doesNotMatch(noClient, /--scenes|--local/);
 
   const ask = sceneInstallPlan(sceneOpts(old, { client: true, python: true }));
   assert.equal(ask.state, 'ask');
   assert.equal(ask.run, false);
-  assert.match(ask.detail, /场景版本 无，期望 2/);
+  assert.match(ask.detail, /场景版本 无，期望 3/);
   assert.doesNotMatch(ask.detail, /--local|金属地块/);
-  assert.equal(sceneClientExtractAllowed({ partial: true, answer: true }), false);
+  assert.equal(sceneVersionOnlyGap(old), true);
+  assert.equal(sceneFilesPartial(old), false);
+  assert.equal(sceneClientExtractAllowed({ partial: sceneFilesPartial(old), answer: true }), true);
   assert.equal(sceneInstallPlan(sceneOpts(old, { client: true, python: true, yes: true })).run, true);
+
+  const v2 = assessLocal(manifestCurrentScenes(2), null);
+  assert.equal(v2.sceneVersionHave, '2');
+  assert.equal(v2.sceneVersionStale, true);
+  assert.equal(v2.scenes, false);
+  assert.equal(sceneVersionOnlyGap(v2), true, 'a version-2 extract (normal and gloss only) is stale');
+  assert.match(localGaps(v2, { client: true }), /场景版本 2，期望 3，请重新运行 node tools\/setup\.mjs --scenes/);
 
   const v1 = assessLocal(manifestCurrentScenes(1), null);
   assert.equal(v1.sceneVersionHave, '1');
   assert.equal(v1.stale, true);
-  assert.match(localGaps(v1, { client: true }), /场景版本 1，期望 2，请重新运行 node tools\/setup\.mjs --scenes/);
+  assert.match(localGaps(v1, { client: true }), /场景版本 1，期望 3，请重新运行 node tools\/setup\.mjs --scenes/);
 
-  const mixed = manifestCurrentScenes(2);
+  const mixed = manifestCurrentScenes(3);
   const stage = EXPECTED_LOCAL_GROUPS.find((g) => g.startsWith('scene/act'));
   mixed.groups[stage].scene.version = 1;
   const mix = assessLocal(mixed, null);
   assert.equal(mix.sceneVersionHave, '不一致');
   assert.equal(mix.stale, true);
-  assert.match(localGaps(mix, { client: true }), /场景版本 不一致，期望 2/);
+  assert.match(localGaps(mix, { client: true }), /场景版本 不一致，期望 3/);
+});
+
+test('a typed yes on a version-only gap extracts; a missing-scene set still does not', () => {
+  const v2 = assessLocal(manifestCurrentScenes(2), null);
+  assert.equal(sceneAskDefault(sceneFilesPartial(v2) || sceneVersionOnlyGap(v2)), false);
+  assert.equal(sceneClientExtractAllowed({ partial: sceneFilesPartial(v2), answer: true }), true);
+  assert.equal(sceneClientExtractAllowed({ partial: sceneFilesPartial(v2), answer: false }), false);
+
+  const bothDoc = manifestCurrentScenes(2);
+  delete bothDoc.groups['scene/tex'];
+  const both = assessLocal(bothDoc, null);
+  assert.ok(both.missingSceneGroups.includes('scene/tex'));
+  assert.equal(both.sceneVersionStale, true);
+  assert.equal(sceneFilesPartial(both), true, 'missing scenes keep the §34.11 rule even when the version is old');
+  assert.equal(sceneVersionOnlyGap(both), false);
+  assert.equal(sceneClientExtractAllowed({ partial: sceneFilesPartial(both), answer: true }), false);
+
+  const src = fs.readFileSync(path.join(ROOT, 'tools/setup.mjs'), 'utf8');
+  assert.equal((src.match(/ask\('现在下载并提取吗？'/g) || []).length, 1);
+  assert.match(src, /sceneClientExtractAllowed\(\{ partial: filesPartial,/);
+  assert.match(src, /saveState\(\{ sceneDeclined: true \}\)/);
+  assert.equal((src.match(/'--only', 'scene'/g) || []).length, 1);
 });

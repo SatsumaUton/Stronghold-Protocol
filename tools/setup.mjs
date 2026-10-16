@@ -25,8 +25,9 @@
 //      --scenes when a client is present and the full-package copy sentence when it is not (--local never fetches
 //      scene bundles). The effects row names the .venv-extract interpreter. A partial battlefield set does not start
 //      extract.py unless --scenes or --yes; that prompt defaults to no. A scene group whose `scene` record (kind
-//      Scene) is not this version's scene extract version is the same kind of gap: --scenes once, even when every
-//      group key is present. The art row is checked again after step 7.
+//      Scene) is not this version's scene extract version, with every scene group present, asks that same question
+//      once (default no). A typed yes runs extract.py --only scene, the same path as a first-time yes; a 否 is
+//      remembered. It is not a second prompt. The art row is checked again after step 7.
 //
 // Options:
 //   --check          report only, change nothing (exit 1 when something essential is missing)
@@ -514,8 +515,11 @@ export function doctorLocalDetail(local, clientUsable) {
  * Missing Python or UnityPy / lz4 / Pillow is not fatal: the 3D board keeps the metal tiles.
  * `client` is true (autochess bundles present), 'incomplete' (a client dir without them) or false.
  * `hasScenes` means every expected scene group is present, including scene/tex — not merely a scene/act prefix.
- * A partial set (`sceneGroupHave` > 0, not force/yes) warns when the fetch is blocked and asks otherwise.
- * That ask defaults to no, and a yes on it does not start extract.py — only `--scenes` (force) or `--yes` does.
+ * A partial set (some scene groups present and some missing, not force/yes) warns when the fetch is blocked
+ * and asks otherwise. That ask defaults to no, and a yes on it does not start extract.py — only `--scenes`
+ * (force) or `--yes` does (§34.11). A version-only gap (every scene group present, record version stale) uses
+ * the same ask and also defaults to no. A typed yes there is not partial: the caller runs extract.py --only scene
+ * the same way as a first-time yes. A 否 is remembered.
  * With no usable client the partial detail is the copy sentence, not `--scenes` (the old branch returned
  * before the no-client sentence). Callers that omit `sceneGroupHave` keep the older branches.
  * @param {{ hasScenes?: boolean, sceneStagesHave?: number, sceneStagesExpected?: number, sceneGroupHave?: number, missingSceneGroups?: string[], client?: boolean|string, python?: boolean, deps?: boolean, check?: boolean, declined?: boolean, force?: boolean, yes?: boolean }} o
@@ -556,18 +560,38 @@ export function sceneInstallPlan(o = {}) {
 }
 
 /**
- * Default for 「现在下载并提取吗？」. A partial battlefield set defaults to no: Enter and the 60s
- * timeout must not start extract.py. The first-time prompt (no scene group yet) keeps yes.
+ * Some battlefield groups are on disk and some expected scene groups are not.
+ * A version-stale extract that still has every scene group is not this (§34.12).
+ * §34.11 / #665: this prompt defaults to no, and a typed yes does not start extract.py.
  */
-export function sceneAskDefault(partial) {
-  return !partial;
+export function sceneFilesPartial(local) {
+  const missing = local?.missingSceneGroups;
+  return (local?.sceneGroupHave || 0) > 0 && Array.isArray(missing) && missing.length > 0;
+}
+
+/**
+ * Every scene group is present and a battlefield `scene` record is not this version.
+ * Not a missing-file partial set, and not a first extract (no records → not stale).
+ */
+export function sceneVersionOnlyGap(local) {
+  return !!(local?.sceneVersionStale && !(local?.missingSceneGroups?.length) && (local?.sceneGroupHave || 0) > 0);
+}
+
+/**
+ * Default for 「现在下载并提取吗？」. An existing extract — missing scene files, or a version-only
+ * gap — defaults to no: Enter and the 60s timeout must not start extract.py. The first-time prompt
+ * (no scene group yet) keeps yes.
+ */
+export function sceneAskDefault(existing) {
+  return !existing;
 }
 
 /**
  * May this run start extract.py --only scene against the client?
- * `--scenes` (force) and `--yes` may. A partial set's prompt never does, including a typed yes.
- * [ASSUMED] A typed yes is not `--scenes` or `--yes`. The first-time prompt (not partial) still
- * runs when the answer is yes, including that prompt's default of yes.
+ * `--scenes` (force) and `--yes` may. `partial` means some scene groups are missing (§34.11 / #665):
+ * that prompt never starts extract.py, including a typed yes. A version-only gap is not partial: the
+ * caller passes partial false, so a typed yes runs, the same as a first-time yes. A 否 (answer false)
+ * does not run; the caller remembers it as sceneDeclined.
  */
 export function sceneClientExtractAllowed({ partial = false, force = false, yes = false, answer = false } = {}) {
   if (force || yes) return true;
@@ -883,18 +907,20 @@ async function main() {
       client: clientFlag, python: !!scenePy, check: opts.check,
       declined: !!loadState().sceneDeclined, force: opts.scenes === 'force', yes: opts.yes,
     });
-    const partial = (sceneLocal.sceneGroupHave || 0) > 0 && !sceneLocal.scenes;
+    const filesPartial = sceneFilesPartial(sceneLocal);
+    const versionOnly = sceneVersionOnlyGap(sceneLocal);
     if (decision.state === 'ask') {
-      if (partial) log(`\n${c.cyan('▶')} ${decision.detail}`);
+      if (filesPartial || versionOnly) log(`\n${c.cyan('▶')} ${decision.detail}`);
       else {
         log(`\n${c.cyan('▶')} 各战场的官方场景还没提取（${sceneLocal.sceneStagesExpected} 个战场；赛季场景包约 23 MB，贴图仍取自本机客户端）。`);
         log('  下载并提取后，3D 棋盘按战场显示官方场景。没有提取依赖、下载失败或跳过时，仍用现在的金属地块。');
       }
-      const answer = await ask('现在下载并提取吗？', sceneAskDefault(partial));
-      const allow = sceneClientExtractAllowed({ partial, force: opts.scenes === 'force', yes: opts.yes, answer });
+      const answer = await ask('现在下载并提取吗？', sceneAskDefault(filesPartial || versionOnly));
+      const allow = sceneClientExtractAllowed({ partial: filesPartial, force: opts.scenes === 'force', yes: opts.yes, answer });
       if (answer === null) decision = { run: false, state: 'skip', detail: '无终端，未询问、未提取战场场景。3D 棋盘用金属地块（需要时 node tools/setup.mjs --scenes）' };
       else if (!allow) {
-        // A partial set never starts extract.py from this prompt. Enter, the timeout, and a typed yes do not.
+        // A partial set (some scenes missing) never starts extract.py from this prompt.
+        // Enter, the timeout, and a typed yes do not. A version-only 否 is remembered here too.
         if (answer) log(c.dim('  这一步不会从客户端提取。需要时运行 node tools/setup.mjs --scenes，或加上 --yes'));
         else saveState({ sceneDeclined: true });
         decision = answer
@@ -903,8 +929,9 @@ async function main() {
       } else decision = { run: true, state: 'ok', detail: decision.detail };
     }
     // Second gate: extract.py --only scene runs only when the plan's run is allowed for this manifest.
+    // filesPartial, not a version-only gap: a typed yes on the version prompt already set run.
     const mayExtract = decision.run && sceneClientExtractAllowed({
-      partial, force: opts.scenes === 'force', yes: opts.yes, answer: true,
+      partial: filesPartial, force: opts.scenes === 'force', yes: opts.yes, answer: true,
     });
     if (!mayExtract) add(decision.state === 'ok' ? 'ok' : decision.state, '各战场官方场景（可选）', decision.detail);
     else {
