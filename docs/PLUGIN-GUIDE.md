@@ -408,7 +408,9 @@ node tools/plugin.mjs pack my-texas --zip
 整条玩法记录没有写入时（干员 / 棋子、盟约、乐队、道具、召唤物、特性、技能脚本、面板），报告开头有「没有导入的玩法」，
 JSON 里写 `partial: true` 和各类的 `dropped` 数量。`ok` 仍表示没有硬错误。外观要套的干员、棋子或道具全都没导入时，
 这份产品写明没有可应用的对象；文件仍会复制。只替换一部分、或只有语音时，不写这句话。[ASSUMED] 效果不单列；棋子对已经
-覆盖的干员、`--no-scripts`、以及已经挂上但脚本没复制的面板，都不算进 `partial`。
+覆盖的干员、`--no-scripts` 不单独算进 `partial`。只生成骨架的面板算丢失一块面板，已复制的面板不计入丢失数量。
+服务端模块、宿主样式或消息声明没有导入时，也会在开头写「部分导入 / Partial import」和「需要人工适配 / Needs manual adaptation」，
+JSON 写 `partial: true`、`needsManualAdaptation: true` 和双语原因 `manualReasons`；`ok` 只表示校验通过。[ASSUMED]
 
 命令行做同一件事：
 
@@ -419,6 +421,21 @@ node tools/plugin.mjs import-forge <工坊包目录或 zip> [--out plugins/<id>]
 `--dry-run` 只打印报告，不写文件。皮肤、立绘、头像、图标、Spine、语音、对得上的音乐和音效会变成外观插件；数值改动、
 新干员、`chess.json` 里成对的新棋子（`_a` 普通、`_b` 精锐；`isDiy` 的六星写成自选）和新敌人会变成数据插件；界面词条
 会变成语言包；公告和鸣谢写进清单的说明。对不上的部分留在 `IMPORT-REPORT.md` 里，中文和英文各一行。
+
+只读的 Forge 面板，如果脚本和包内的 `./` 引用都是 `.js` / `.css` / `.json`，并且静态扫描只碰到兼容层能提供的接口
+（房间座位、结算统计、连接状态、协议版本和本房插件名单、面板自己的词条），会复制进界面插件：入口页在沙箱 iframe 里
+加载兼容层再挂上面板。导入时仍然不执行脚本。`fetch`、`net.send`、包消息、改宿主页面的样式、外观提供者，报告会点名，
+页面保持原来的骨架。[ASSUMED] 单个文件 256 KB，一个面板一共 1 MB、最多 64 个文件。`root.guide` 上监听 `room.state`
+的面板显示在房间屏；其他对得上的未映射挂载点用建议插槽，那不是 Forge 原来的位置。同一个插槽有多块时，对局里用标签切换。
+
+面板只接收父窗口的 feed，兄弟 iframe 发来的消息在排队前就会丢弃。每次入口文档只初始化一次，重复 `ready` 不会重发；
+连接更新按每块面板独立去重、每秒最多一次，装另一块面板不会吞掉待发更新。[ASSUMED] 本房真实 `content.cs` 的前 8 位
+作为 `net.welcome().mods.digest`；换房会替换，离房会清空，不编造摘要。静态或字面量动态导入 `/shared/i18n.js` 可使用 `t`，
+静态导入支持别名和命名空间，其他静态导出会拒绝。`styles` 只能指向 `.css`，CSS / JSON 与入口都计入 64 个唯一文件上限。
+
+依赖宿主 URL、桌面桥或宿主调用全局控制器的面板暂需人工适配：演示包的 guest-strip、lan-panel、match-overlay 都缺少
+启动输入，不会作为兼容面板复制。[ASSUMED] 本服固定四席，没有容量设置；capacity-panel 的扩容字段 `playerCapacity` /
+`seatCap` 会被点名为 `room.capacity`，暂不展示其 8/12/16/20 档位与房间设置提示。
 
 技能怎么办：
 
@@ -528,7 +545,7 @@ Forge 的 baseId 是普通棋子 id，不当官方来源猜测。详见 [PLUGINS
 - 内置语言也能装 lang 插件：[ASSUMED] 同语言只收一个覆盖包（文件夹排序决定），只改提供的词条，缺失词条回退内置。
   仍由每个浏览器选语言，不跟房间走、不影响战斗。原文 zh 不作为语言包。
 - 界面包的 `PLUGIN_FORGE_MOUNT` 表示挂载点需要人工适配；`PLUGIN_FORGE_PANEL_SCRIPT` 表示面板脚本没复制。
-  报告会写面板名、原挂载点和建议插槽；建议不是自动映射。全部九种挂载点见 [PLUGINS §16](PLUGINS.md#16-forge-import)。
+  报告会写面板名、原挂载点和建议插槽；建议不是自动映射。只读且依赖都在包内的面板会复制进沙箱 iframe，不再报「没有复制」，导入时仍然不执行脚本。全部九种挂载点见 [PLUGINS §16](PLUGINS.md#16-forge-import)。
 - 外观模板自带原创 CC0 棋盘格 PNG 和短音 OGG。工作台新建美术/音频模板时，目标的第一个插槽会填入示例 [ASSUMED]；可直接替换后校验、打包。
 
 

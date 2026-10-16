@@ -251,6 +251,8 @@ fallbacks. They do not change the sim event protocol or the identity of content 
 | `ui.message.host.limit` | stable | 0.3.0 | `shared/plugins/ui.js#UI_HOST_MESSAGES` |
 | `ui.message.host.slot` | stable | 0.3.0 | `shared/plugins/ui.js#UI_HOST_MESSAGES` |
 | `ui.message.host.rejected` | stable | 0.3.0 | `shared/plugins/ui.js#UI_HOST_MESSAGES` |
+| `ui.message.host.result` | stable | 0.3.1 | `shared/plugins/ui.js#UI_HOST_MESSAGES` |
+| `ui.message.host.net` | stable | 0.3.1 | `shared/plugins/ui.js#UI_HOST_MESSAGES` |
 | `ui.slot.hud.right` | stable | 0.3.0 | `shared/plugins/manifest.js#UI_SLOT_IDS` |
 | `ui.slot.result.tab` | stable | 0.3.0 | `shared/plugins/manifest.js#UI_SLOT_IDS` |
 | `ui.slot.stats.tab` | stable | 0.3.0 | `shared/plugins/manifest.js#UI_SLOT_IDS` |
@@ -515,3 +517,17 @@ fallbacks. They do not change the sim event protocol or the identity of content 
 | `overlay.fx.silentPhases` | stable | 0.3.1 | `public/js/render/vfx/pluginFormat.js#pluginFxProblems` |
 | `dsl.fx.plugin` | stable | 0.3.1 | `public/js/render/vfx/pluginFormat.js#pluginFxProblems` |
 <!-- plugin-surface:end -->
+
+## Host feeds for a read-only panel (0.3.1)
+
+`ui.message.host.result` and `ui.message.host.net` are host-to-frame snapshots. `welcome` may also carry `version`, `lang`, `plugins`, `cs` and `prefs`. `state` may also carry `room`. A frame still posts only the plugin message names. `validateHostMessage` refuses a payload whose tree contains a match intent (`g.*`, `b.*`, `room.*`, `hello`, `ping`). These feeds do not become a client-to-server intent. The Forge receiver checks `event.source === parent` before queuing or applying any message. These are optional fields of existing stable welcome/state messages; no message name is added.
+
+**`result`.** `{ v: 1, t: 'result', result }`. `result` is the settle object the result screen already shows, or `null`. Kept player stats: `dmgDealt`, `bossDamage`, `kills`, `leaks`, `lpLost`, `merges`, `itemsEquipped`, `activatedLayers`, `refreshes`, `perfectRounds`, `gold` (exact finite numbers). Kept player fields: `playerId`, `seat`, `name`, `isBot`, `left`, `alive`, `victory`, `roundsPassed`, `creditedKills`, `eliminatedRound`, `lp`, `bandId`, `stats`, and `title`, `trophies`, `reward` when present. Kept match fields: `victory`, `roundsPassed`, `hiddenReached`, `hiddenCleared`, `reason`, `teamLp`, `modeId`, `difficulty`, `stageId`, `bossId`, `durationMs`. At most 8 players. Lineup, diy, seed and the hidden-boss id stay off this message. The host posts it when a live frame is ready and again when the result changes. The studio preview does not receive it.
+
+**`net`.** `{ v: 1, t: 'net', status, attempt, retryAt, rtt, lastError }`. `status` is the connection state. `attempt` is the reconnect count. `retryAt` is a timestamp or `null`. `rtt` is the latency in milliseconds, or `null`. [ASSUMED] The wire field is `rtt` because the key `ping` is a client intent. `lastError` is `{ code, text }` or `null`. The player id is not included. The host posts one snapshot per entry document before welcome, then a later change at most once a second per frame (`UI_LIMITS.netHz` is 1) [ASSUMED]. Duplicate `ready` is ignored; initialization of a sibling cannot alter another frame's pending delivery or deduplication. A host move resets that document's delivery state. The studio preview does not receive it.
+
+**`state.room`.** Present when the room has a `seats` array or a plugin list. `seats` keeps empty holes, so a room of `MAX_SEATS` (4) reports length 4, and each occupied seat is `{ seat, playerId, name, isBot, ready, connected }` (at most 8). `plugins` is up to 32 plugin ids from `content.plugins`. Optional `cs` is the real `content.cs`, accepted only as 64 lower-case hex digits. An explicit null room sends `room: null` to clear the previous room; omitting the third argument keeps the old shape. The join code, host id, spectators, consent and loadouts are omitted. `hostState(pub, priv)` with no third argument keeps the previous `{ v, t, public, private }` shape.
+
+**`welcome`.** With info: `version` is the integer `PROTOCOL_VERSION`, `lang` is the player's language (at most 16 characters), `plugins` is the room's plugin ids, optional `cs` is the same sanitized room identity as in `state.room.cs`, and `prefs` is the scalar values already stored for this plugin (string, finite number or boolean; at most 32 keys matching `^[A-Za-z0-9._-]{1,64}$`). Without info the message stays `{ v, t, id, slots }`. The studio preview sends that shorter welcome.
+
+The Forge shim exposes the first eight digits of the actual room `cs` as `net.welcome().mods.digest` [ASSUMED]. Room changes replace it; leaving a room or an unavailable identity clears it. It is never invented. Its `/shared/i18n.js` compatibility module supplies only `t`: static named aliases and namespaces bind it, unsupported static exports are refused; literal dynamic imports also supply `t`.

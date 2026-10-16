@@ -23,12 +23,13 @@ import { store } from '../store.js';
 import { battleRunner } from '../battle/runner.js';
 import { catalog, loadCatalog, installedCount, pluginName } from '../content.js';
 import { toast } from './toasts.js';
-import { t } from '../../../shared/i18n.js';
+import { getLang, t } from '../../../shared/i18n.js';
+import { PROTOCOL_VERSION } from '../../../shared/constants.js';
 import { uiPlugins, uiPluginEntries } from './uiPlugins.js';
 import {
   UI_ERRORS, UI_LIMITS, UI_SLOTS, battlePayload, checkStorageWrite, clampHeight, clampNotice, createNoticeLimiter,
-  createRateLimiter, createSlotTable, frameLoadDecision, framePageUrl, hostLimit, hostRejected, hostState, hostWelcome,
-  namespacedStorageKey, validatePluginMessage,
+  createRateLimiter, createSlotTable, frameLoadDecision, framePageUrl, hostLimit, hostNet, hostRejected, hostResult,
+  hostState, hostWelcome, isIntentType, namespacedStorageKey, netSlot, subsetRoom, validatePluginMessage,
 } from '../../../shared/plugins/ui.js';
 
 const SLOT_MS = Math.round(1000 / UI_LIMITS.battleHz);
@@ -60,13 +61,16 @@ const api = {
 
 /**
  * @typedef {{ id: string, iframe: HTMLIFrameElement, declared: string[], entry: any, ready: boolean,
- *   preview?: any, entries: Record<string, string>, limitAt: number, loads: number, closed: boolean }} FrameRec
+ *   preview?: any, entries: Record<string, string>, limitAt: number, loads: number, closed: boolean,
+ *   netAt?: number | null, netText?: string }} FrameRec
  */
 
 let park = null;
 let booted = false;
 let stateTimer = 0;
 let lastState = '';
+let netTimer = 0;
+let lastResultText = '';
 let battleTimer = 0;
 /** @type {unknown[]} */
 let battleQueue = [];
@@ -155,6 +159,8 @@ function rescue(node) {
 function moveFrame(rec, home) {
   rec.loads = 0;
   rec.ready = false;
+  rec.netAt = null;
+  rec.netText = '';
   home.appendChild(rec.iframe);
 }
 
@@ -290,7 +296,11 @@ function mount(entry, preview = null) {
     const decision = frameLoadDecision(rec.loads);
     if (decision === 'destroy') { stopForLeaving(id); return; }
     // The entry document. welcome does not include the private view; ready (accepted only at this count) does.
-    if (decision === 'entry') post(rec, hostWelcome(id, declared));
+    // `net` is not the private view: the panel reads it during mount, before ready.
+    if (decision === 'entry') {
+      if (!rec.preview) postNetNow(rec);
+      post(rec, hostWelcome(id, declared, rec.preview ? undefined : welcomeInfo(rec)));
+    }
   });
   iframe.src = src;
   place(rec);
@@ -317,18 +327,85 @@ function loadEntries(id) {
   return entries;
 }
 
+/** Scalar prefs already in the host page's storage. Objects are not sent. Intent-typed keys are not sent. */
+function welcomeInfo(rec) {
+  const room = subsetRoom(store.get().room);
+  /** @type {Record<string, string | number | boolean>} */
+  const prefs = {};
+  let n = 0;
+  for (const key of Object.keys(rec.entries || {})) {
+    if (n >= 32) break;
+    if (isIntentType(key)) continue;
+    let value;
+    try { value = JSON.parse(rec.entries[key]); } catch { continue; }
+    if (typeof value === 'string') {
+      if (value.length > 4096) continue;
+      prefs[key] = value;
+    } else if (typeof value === 'number' && Number.isFinite(value)) prefs[key] = value;
+    else if (typeof value === 'boolean') prefs[key] = value;
+    else continue;
+    n += 1;
+  }
+  return {
+    version: PROTOCOL_VERSION,
+    lang: getLang(),
+    plugins: room && Array.isArray(room.plugins) ? room.plugins : [],
+    cs: room && room.cs,
+    prefs,
+  };
+}
+
+/** @param {FrameRec} rec */
+function postNetNow(rec) {
+  if (rec.netAt != null) return;
+  const msg = hostNet(store.get().connection);
+  try { rec.netText = JSON.stringify(msg); } catch { return; }
+  rec.netAt = Date.now();
+  post(rec, msg);
+}
+
 function scheduleState() {
   if (stateTimer) return;
   stateTimer = window.setTimeout(() => {
     stateTimer = 0;
-    const m = store.get().match;
-    const msg = hostState(m && m.public, m && m.private);
+    const s = store.get();
+    const m = s.match;
+    const msg = hostState(m && m.public, m && m.private, s.room);
     let text = '';
     try { text = JSON.stringify(msg); } catch { return; }
     if (text === lastState) return;
     lastState = text;
     for (const rec of frames.values()) if (feeding(rec)) post(rec, msg);
   }, STATE_MS);
+}
+
+function scheduleNet() {
+  if (netTimer) return;
+  const msg = hostNet(store.get().connection);
+  let text = '';
+  try { text = JSON.stringify(msg); } catch { return; }
+  const now = Date.now();
+  let wait = Infinity;
+  // Delivery is tracked per document: initializing a sibling must not consume a pending broadcast.
+  for (const rec of frames.values()) {
+    if (!feeding(rec) || rec.preview || text === rec.netText) continue;
+    const slot = netSlot(rec.netAt, now, Math.round(1000 / UI_LIMITS.netHz));
+    if (!slot.send) { wait = Math.min(wait, slot.wait); continue; }
+    rec.netAt = now;
+    rec.netText = text;
+    post(rec, msg);
+  }
+  if (Number.isFinite(wait)) netTimer = window.setTimeout(() => { netTimer = 0; scheduleNet(); }, wait);
+}
+
+function scheduleResult() {
+  const m = store.get().match;
+  const msg = hostResult(m && m.result);
+  let text = '';
+  try { text = JSON.stringify(msg); } catch { return; }
+  if (text === lastResultText) return;
+  lastResultText = text;
+  for (const rec of frames.values()) if (feeding(rec) && !rec.preview) post(rec, msg);
 }
 
 function flushBattle() {
@@ -402,12 +479,19 @@ function onStorage(rec, msg) {
 /** @param {FrameRec} rec @param {Record<string, unknown>} msg */
 function handle(rec, msg) {
   if (msg.t === 'ready') {
-    // Load 1 is the redirect. Load 2 is the entry. A later document must not receive the private view.
+    // Only the entry document may initialize, once. Duplicate ready must not bypass feed throttling.
     // welcome is posted from the load handler, not from here, so a plugin that answers welcome cannot loop.
-    if (frameLoadDecision(rec.loads) !== 'entry') return;
+    if (rec.ready || frameLoadDecision(rec.loads) !== 'entry') return;
     rec.ready = true;
-    const m = rec.preview?.state || store.get().match;
-    post(rec, hostState(m && m.public, m && m.private));
+    const live = store.get();
+    const m = rec.preview?.state || live.match;
+    post(rec, hostState(m && m.public, m && m.private, rec.preview ? undefined : live.room));
+    if (!rec.preview) {
+      postNetNow(rec);
+      scheduleNet();
+      const result = hostResult(m && m.result);
+      post(rec, result);
+    }
     return;
   }
   if (msg.t === 'slot') {
@@ -527,7 +611,9 @@ function boot() {
   catalog.subscribe(() => sync());
   store.subscribe((s, prev) => {
     if (!prev || s.installedPlugins !== prev.installedPlugins) sync();
-    if (!prev || s.match !== prev.match) scheduleState();
+    if (!prev || s.match !== prev.match || s.room !== prev.room) scheduleState();
+    if (!prev || s.connection !== prev.connection) scheduleNet();
+    if (!prev || s.match !== prev.match || (s.match && prev.match && s.match.result !== prev.match.result)) scheduleResult();
   });
   if (battleRunner && typeof battleRunner.on === 'function') {
     battleRunner.on('ev', (payload) => {
