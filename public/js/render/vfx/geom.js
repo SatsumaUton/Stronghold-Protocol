@@ -13,7 +13,12 @@
 // data (0.3.1, 风笛's lance thrust drawn as a vertical needle): of the used set's stretched renderers with a pivot, 2,434
 // set it in Y and 9 in X (plain billboards: 405 / 379), and of the 2,449 stretched systems with unequal X / Y sizes 2,130
 // make Y the long one. Mesh particles: the mesh × the 3D size, turned by the particle's Euler rotation
-// inside the alignment frame. Texture sheets: frame 0 is the top-left tile; frame index =
+// inside the alignment frame. A renderer's pivot (m_Pivot, in particle sizes) moves a billboard or mesh particle off its
+// position by pivot × size along the particle's own axes — it turns with the particle's roll about the position (0.3.1,
+// history §34.6: the remake moved it the other way; the client's data settle it — 荒芜拉普兰德 S3's seal tips, quads with a
+// pivot of −0.5 / −0.81 placed left of the centre and their mirrored twins right of it, point outward only so, and of
+// the used set's view billboards with a Y pivot 210 lift the quad (+) against 22, 34 against 1 of those spawned on the
+// ground: 艾雅法拉 S2's range flames rise from the ground); a stretched billboard's pivot is not applied. Texture sheets: frame 0 is the top-left tile; frame index =
 // floor(frac(startFrame + frameOverTime(frac(t · cycles))) · frames) (§33.5, resolved: the authored curves end at
 // 0.9999 so that the last frame does not wrap to the first).
 
@@ -296,7 +301,8 @@ export function buildParticles(ps, r, cam, fd, frameNo) {
         const kx = sx * fx * mirror, ky = sy * fy;
         ax0 = rx0 * kx; ax1 = rx1 * kx; ax2 = rx2 * kx;
         ay0 = ry0 * ky; ay1 = ry1 * ky; ay2 = ry2 * ky;
-        if (pv && (pv[0] || pv[1])) { cx -= ax0 * pv[0] + ay0 * pv[1]; cy -= ax1 * pv[0] + ay1 * pv[1]; cz -= ax2 * pv[0] + ay2 * pv[1]; }
+        // the pivot moves the quad off the particle by pivot × size along its (rolled) axes (header)
+        if (pv && (pv[0] || pv[1])) { cx += ax0 * pv[0] + ay0 * pv[1]; cy += ax1 * pv[0] + ay1 * pv[1]; cz += ax2 * pv[0] + ay2 * pv[1]; }
       }
       buf[o] = cx; buf[o + 1] = cy; buf[o + 2] = cz;
       buf[o + 3] = ax0; buf[o + 4] = ax1; buf[o + 5] = ax2;
@@ -345,9 +351,9 @@ export function buildParticles(ps, r, cam, fd, frameNo) {
       }
       let cx = _p[0], cy = _p[1], cz = _p[2];
       if (pv && (pv[0] || pv[1] || pv[2])) {
-        cx -= _ax[0] * pv[0] + _ay[0] * pv[1] + _az[0] * pv[2];
-        cy -= _ax[1] * pv[0] + _ay[1] * pv[1] + _az[1] * pv[2];
-        cz -= _ax[2] * pv[0] + _ay[2] * pv[1] + _az[2] * pv[2];
+        cx += _ax[0] * pv[0] + _ay[0] * pv[1] + _az[0] * pv[2];
+        cy += _ax[1] * pv[0] + _ay[1] * pv[1] + _az[1] * pv[2];
+        cz += _ax[2] * pv[0] + _ay[2] * pv[1] + _az[2] * pv[2];
       }
       buf[o] = cx; buf[o + 1] = cy; buf[o + 2] = cz;
       buf[o + 3] = _ax[0]; buf[o + 4] = _ax[1]; buf[o + 5] = _ax[2];

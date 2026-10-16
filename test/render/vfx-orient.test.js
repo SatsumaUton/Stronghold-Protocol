@@ -2,7 +2,8 @@
 // of 2026-10-16, DESIGN §34.6): the prefab root's authored transform is no part of the effect (the client sets the root
 // where it plays it: 安洁莉娜 S2's orbs flew 0.94 tile above their path); an effect spawned at FOOT_POINT / HIT_POINT /
 // HEAD_POINT takes the unit's Graphic tilt (荒芜拉普兰德 S3's seal and 能天使 S3's light bars stand facing the camera), the
-// ground and NONE spawns the identity, FLIP_TWO_SIDE still flips the tilted ones, a FollowMountPoint keeps or follows.
+// ground and NONE spawns the identity, FLIP_TWO_SIDE still flips the tilted ones, a FollowMountPoint keeps or follows; a
+// renderer's pivot moves the particle off its position by pivot × size (the seal's tips point outward).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,6 +14,8 @@ import { compileEffect, Effect } from '../../public/js/render/vfx/effect.js';
 import { FxWiring } from '../../public/js/render/vfx/wiring.js';
 import { spawnRotation, graphicRotation } from '../../public/js/render/vfx/mounts.js';
 import { quatRotate } from '../../public/js/render/vfx/math.js';
+import { FrameData, cameraBasis } from '../../public/js/render/vfx/geom.js';
+import { builtinMesh } from '../../public/js/render/vfx/library.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PREFABS = path.join(ROOT, 'public/assets/local/fx/prefabs');
@@ -209,5 +212,40 @@ describe('the rotation an effect takes from its spawn location', () => {
     h.opts.track(fx);
     nearV(fx.rootRot, [0, 0, 0, 1], 1e-9, 'the chained GROUND_CENTER effect lies on the board');
     assert.equal(fx.mountRot, null);
+  });
+});
+
+// ---- the renderer's pivot (DESIGN §33.6 m_Pivot) ---------------------------------------------------------------------
+
+const CAM = cameraBasis(30, [0, -5, -8], 720, 0.7);
+const QUAD = builtinMesh('Quad');
+
+/** The quads (or mesh instances) one system draws one frame after its burst: [{ c: centre, ax, ay }]. */
+function quads(node) {
+  const lib = { mesh: (k) => (k === 'builtin:Quad' ? QUAD : null) };
+  const fx = new Effect(compileEffect(desc([rootNode([pe({ _spawnLocation: 0 })]), node])), { seed: 1, lib }).place({ pos: [0, 0, 0], rootRot: [0, 0, 0, 1] });
+  fx.update(1 / 30);
+  const fd = new FrameData();
+  const out = [];
+  fx.collect(CAM, fd, (it) => {
+    const mesh = it.kind === 'mesh', b = mesh ? fd.mesh : fd.quad, st = mesh ? 30 : 27;
+    for (let k = 0; k < it.count; k++) { const o = (it.first + k) * st; out.push({ c: [b[o], b[o + 1], b[o + 2]], ax: [b[o + 3], b[o + 4], b[o + 5]], ay: [b[o + 6], b[o + 7], b[o + 8]] }); }
+  }, 1);
+  return out;
+}
+
+describe("a renderer's pivot", () => {
+  test('moves a billboard by pivot × size along its own axes: a Y pivot of 0.5 stands it on its position (艾雅法拉 S2\'s flames rise)', () => {
+    const [q] = quads(psNode(1, 0, { size: 1, r: { m_Pivot: [0, 0.5, 0] } }));
+    nearV(q.c, [q.ay[0] * 0.5, q.ay[1] * 0.5, q.ay[2] * 0.5], 1e-6, 'the quad\'s centre half its height up the camera');
+    assert.ok(q.ay[1] > 0 && q.ay[2] < 0, 'up the screen (+row, up from the board)');
+  });
+
+  test('a mesh particle\'s pivot alike: 荒芜拉普兰德 S3\'s seal tips (a pivot of −0.5) reach out to the left of their node, their mirrored twins to the right', () => {
+    const tip = (o) => psNode(1, 0, { size: 1, pos: o.pos, rot: o.rot, r: { renderMode: 'mesh', renderAlignment: 'local', m_Mesh: { builtin: 'Quad' }, m_Pivot: [-0.5, 0, 0] } });
+    const left = quads(tip({ pos: [-0.1, 0, 0] }))[0];
+    near(left.c[0], -0.6, 1e-6, 'left tip: its quad from x −1.1 to −0.1');
+    const right = quads(tip({ pos: [0.1, 0, 0], rot: [0, 1, 0, 0] }))[0];   // 180° about Y
+    near(right.c[0], 0.6, 1e-6, 'right tip (turned 180° about Y): from 0.1 to 1.1');
   });
 });
