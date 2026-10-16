@@ -374,6 +374,13 @@ modal. The normal roster detail and chosen DIY cards expose each operator's voic
 charId's forms, listing only the dubs this server has and offering a preview. An absent override follows the global
 preference, then the own-language dub when the switch is on and the operator has one, then Chinese. A missing line
 falls back to the Chinese file of the same name. Changing the global language does not clear per-operator choices.
+
+异形屏适配 (`ui/screenFit.js`) persists `sp.pref.screenFit` — four whole pixel offsets `{ l, r, t, b }` in ±100 (inward
+positive; the settings show each as a 0–100 slider, 50 = 0, 2 px a step) — on this device only. While any offset is
+non-zero, `<html data-fit>` with `--fit-l/r/t/b` makes `.app-root` and the full-page panels (统计数据, 干员调配, 玩法说明)
+the inset box and computes the layout rem from it (css/devices.css §5); dialogs and toasts keep the whole screen. The
+board is sized from its host, and `fieldHost.js hudBands` measures the HUD from the host's top. All zero leaves no
+attribute: the page is exactly the unmoved one.
 Overrides are local listening preferences, absent from room loadouts and their exports.
 
 The title and lobby offer explicit recovery of a previously saved local match seat. `sp.matches` stores bounded name /
