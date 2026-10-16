@@ -760,3 +760,12 @@ Plugin records may carry optional `origin` (official charId/chessId provenance) 
 `assets.spine` and other art IDs may differ by form. Pair references, not suffixes, identify normal/elite forms.
 Hidden additions retain records with `isHidden: true`, `visible: false` and omit visible pools.
 See [PLUGINS §16](PLUGINS.md#16-forge-import) for the compact inputs and [ASSUMED] defaults.
+
+
+### Plugin-only records (0.3.1)
+
+`server/plugins/gameplayRecords.js` adds namespaced bonds and complete supported item pairs to a content set,
+without changing these generated files. Membership is rebuilt from chess records. Operator forms may retain tags
+and existing token ids. `server/plugins/officialUnitBuilder.js` exports the import-only `deriveOfficialUnit` helper; `tools/build-data.mjs` shares its
+normal builder's stat, potential, skill, talent, range and classification paths; loading it performs no CLI I/O.
+See PLUGINS.md for namespaces, limits and the local-table version recorded by Forge imports.

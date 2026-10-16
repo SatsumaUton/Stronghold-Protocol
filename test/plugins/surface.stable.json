@@ -1806,5 +1806,21 @@
   {
     "name": "api.PLUGIN_API.current",
     "anchor": "shared/constants.js#PLUGIN_API"
+  },
+  {
+    "name": "record.file.bonds",
+    "anchor": "server/plugins/gameplayRecords.js#GAMEPLAY_RECORDS"
+  },
+  {
+    "name": "record.file.items",
+    "anchor": "server/plugins/gameplayRecords.js#GAMEPLAY_RECORDS"
+  },
+  {
+    "name": "record.operator.forms.tags",
+    "anchor": "server/plugins/gameplayRecords.js#expandGameplayRecords"
+  },
+  {
+    "name": "record.operator.forms.tokens",
+    "anchor": "server/plugins/gameplayRecords.js#expandGameplayRecords"
   }
 ]

@@ -7,8 +7,7 @@ import { computeVanillaContent, gameplayDataFiles, nodeSha256 } from './identity
 import { contentHashOf, canonicalJson, csUrlPart } from '../../shared/plugins/identity.js';
 import { resolvePluginOrder } from '../../shared/plugins/order.js';
 import { applyPatches, normalizeSettings } from '../../shared/plugins/patch.js';
-import { expandRecords } from '../../shared/plugins/records.js';
-import { validateData } from '../../shared/plugins/validate.js';
+import { expandGameplayRecords, reconcilePluginBonds, reconcilePluginTokens, validateGameplayData } from './gameplayRecords.js';
 import { object, own, clone, problem, RECORD_MAPS, recordId, namespaceCollisions } from '../../shared/plugins/dataUtils.js';
 import { buildRecordOverlay, walkOverlay, getPath, applyRecordOverlay } from '../../shared/i18nData.js';
 import { computeGroundPaths, computeDeployTiles } from '../sim/groundPaths.js';
@@ -44,7 +43,7 @@ function baseFor(registry) {
 }
 const maps = data => ({ ...Object.fromEntries(Object.keys(RECORD_MAPS).map(k => [k, data[k]])),
   bonds: data.bonds, modes: data.config?.modes, units: data.backups?.units, operators: data.backups?.diy?.operators });
-const prefixes = { ...Object.fromEntries(Object.entries(RECORD_MAPS).map(([k, v]) => [k, v[0]])), modes: 'mode_x', units: 'char_x', operators: 'char_x' };
+const prefixes = { ...Object.fromEntries(Object.entries(RECORD_MAPS).map(([k, v]) => [k, v[0]])), bonds: 'bond_x', modes: 'mode_x', units: 'char_x', operators: 'char_x' };
 /** All map replacements are checked too, so a root merge cannot bypass addition/dependency/deletion rules. */
 function writesAllowed(before, after, plugin, owners) {
   const problems = [], prev = maps(before), next = maps(after), id = plugin.id;
@@ -239,7 +238,7 @@ function composeContentSet({ registry, ids = [] }) {
       } else {
         if (!p.manifest.permissions.includes('data.add')) { problems.push(problem('PLUGIN_CONTENT_PERMISSION', rel, 'records require data.add')); continue; }
         const entries = part === 'data' ? doc.entries : (Array.isArray(doc) ? doc : [doc]).map(v => part === 'operators' ? v : { ...v, file: part });
-        r = expandRecords(data, entries, { pluginId: p.id, validateDsl });
+        r = expandGameplayRecords(data, entries, { pluginId: p.id, validateDsl });
       }
       problems.push(...r.problems.map(e => ({ ...e, plugin: p.id, file: rel })));
       data = r.data;
@@ -268,7 +267,8 @@ function composeContentSet({ registry, ids = [] }) {
     data.dsl = table;
   }
   if (plugins.length) {
-    problems.push(...validateData(data, { kitExists: ref => !!officialKit(ref), vanilla: base.data, owners, validateDsl }));
+    data = reconcilePluginTokens(reconcilePluginBonds(data));
+    problems.push(...validateGameplayData(data, { kitExists: ref => !!officialKit(ref), vanilla: base.data, owners, validateDsl }));
     if (problems.length) return { problems };
     data = { ...data, stages: { ...data.stages } };
     const routes = Object.values(data.waves).flatMap(w => [...(w.routes ?? []), ...(w.extraRoutes ?? [])]);

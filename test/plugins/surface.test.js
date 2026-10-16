@@ -1,3 +1,4 @@
+import { GAMEPLAY_RECORD_SURFACE } from '../../server/plugins/gameplayRecords.js';
 // test/plugins/surface.test.js — the frozen plugin API v1 (DESIGN §32.13, docs/PLUGIN-API.md).
 // Three things must agree: the markdown table, buildSurface(), and the closed sets themselves (enumerated in this
 // file, not by calling buildSurface's helpers). A new export means a new member of one of those sets — a manifest
@@ -83,6 +84,7 @@ function expectedNames() {
   // from the real module, not from surface.js: every export but the id and the member list
   for (const name of Object.keys(sdk).filter((k) => k !== 'SDK_ID' && k !== 'SDK_MEMBERS').sort()) names.push(`sdk.export.${name}`);
   names.push('api.PLUGIN_API.min', 'api.PLUGIN_API.current');
+  names.push('record.file.bonds', 'record.file.items', 'record.operator.forms.tags', 'record.operator.forms.tokens');
   return names;
 }
 
@@ -98,7 +100,7 @@ function parseTable(md) {
   return rows;
 }
 
-const rows = buildSurface({ dsl: vocab, studioRoutes: STUDIO_ROUTES });
+const rows = [...buildSurface({ dsl: vocab, studioRoutes: STUDIO_ROUTES }), ...GAMEPLAY_RECORD_SURFACE];
 const doc = parseTable(fs.readFileSync(path.join(ROOT, 'docs/PLUGIN-API.md'), 'utf8'));
 
 test('the document table and buildSurface are the same rows', () => {
