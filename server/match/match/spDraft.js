@@ -18,7 +18,7 @@ export class MatchSpDraft {
   enterSpDraft() {
     const draft = generateDraft(this.gd, this.rngDraft, this.round, { stageId: this.stageId, bondAvailable: (bondId) => this.bondLive(bondId), itemAvailable: id => this.itemPool.canGain(id) });
     const alive = this.alivePlayers();
-    if (!draft || !alive.length) { this.enterPrep(); return; }
+    if (!draft || !alive.length) { this.beforePrepOffers(); return; }
     this.phase = PHASE.SP_DRAFT;
     let order = alive.map((p) => p.playerId);
     if (!this.isSolo) this.rngDraft.shuffle(order);
@@ -113,7 +113,7 @@ export class MatchSpDraft {
     if (this.phase !== PHASE.SP_DRAFT) return;
     this.cancel(this._turnTimer);
     this._turnTimer = null;
-    this.enterPrep();
+    this.beforePrepOffers();
   }
 
   /**

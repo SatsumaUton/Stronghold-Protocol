@@ -14,6 +14,11 @@ import path from 'node:path';
 import { createPluginRegistry } from '../../server/plugins/registry.js';
 import { buildContentSet } from '../../server/plugins/contentSet.js';
 import { offersAt } from '../../shared/plugins/offers.js';
+import { createRoomSets } from '../../server/plugins/roomSets.js';
+import { createContentSets } from '../../server/plugins/contentSets.js';
+import { createMatchHosts } from '../../server/match/host/index.js';
+import { getData } from '../../server/data.js';
+import { fileURLToPath } from 'node:url';
 import { PHASE } from '../../shared/constants.js';
 import { makeMatch } from '../match/harness.js';
 
@@ -25,10 +30,10 @@ const PILOT = {
     offers: ['offers/before-r3.json', 'offers/before-r9.json', 'offers/every-2.json'],
   },
   files: {
-    'offers/before-r3.json': { offer: 1, id: 'before-r3', when: { at: ['prep'], rounds: [3] }, windowSec: 20, quorum: 'all', onTimeout: 'auto', slots: 3, refresh: { perSlot: 1 }, shared: { enemy: { slots: 3 } }, options: { source: 'lib/options.json' }, apply: { funds: 5 } },
+    'offers/before-r3.json': { offer: 1, id: 'before-r3', when: { at: ['prep'], rounds: [3] }, windowSec: 20, quorum: 'all', onTimeout: 'auto', slots: 3, refresh: { perSlot: 1 }, options: { source: 'lib/options.json' }, apply: { funds: 5 } },
     'offers/before-r9.json': { offer: 1, id: 'before-r9', when: { at: ['prep'], rounds: [9] }, windowSec: 20, quorum: 'all', onTimeout: 'auto', slots: 3, options: { source: 'lib/options.json' }, apply: { layers: { bond: 'deputShip', count: 1 } } },
     'offers/every-2.json': { offer: 1, id: 'every-2', when: { at: ['prep'], rounds: { every: 2 } }, windowSec: 0, quorum: 'none', slots: 3, options: { source: 'lib/options.json' }, apply: { funds: 1 } },
-    'lib/options.json': [{ id: 'option-a' }, { id: 'option-b' }, { id: 'option-c' }],
+    'lib/options.json': ['a', 'b', 'c', 'd'].map(id => ({ id, name: `Card ${id}`, desc: 'Window grant', icon: 'funds' })),
   },
 };
 
@@ -53,7 +58,7 @@ function pilotSet(t) {
   assert.equal(found[0].offers.length, 3, 'its three windows were read');
   const set = buildContentSet({ registry, ids: ['pilot'] });
   assert.deepEqual(set.problems, [], JSON.stringify(set.problems));
-  return { set, registry };
+  return { set, registry, root };
 }
 
 test('a manifest with nothing but offers is loaded, and the set carries its windows tagged by plugin', (t) => {
@@ -102,4 +107,52 @@ test('a vanilla match of the same code opens no window at all (the part absent â
   }
   assert.equal(h.m.offerSeq, 0, 'no window was ever built');
   h.m.dispose();
+});
+
+test('offers-only content changes room identity; option edits replace cs and old snapshots survive', t => {
+  const { set, registry, root } = pilotSet(t);
+  const vanilla = buildContentSet({ registry, ids: [] });
+  assert.notEqual(set.cs, vanilla.cs);
+  assert.equal(set.plugins[0].id, 'pilot');
+  const contents = createContentSets({ registry, vanillaData: getData() });
+  const room = createRoomSets({ registry, visual: null, contents, policy: null }).resolve(['pilot']);
+  assert.equal(room.ok, true);
+  assert.equal(room.set.cs, set.cs);
+  assert.equal(room.set.plugins[0].id, 'pilot');
+  assert.equal(room.set.plugins[0].hash, set.plugins[0].hash.slice(0, 16));
+  const file = path.join(root, 'lib/options.json');
+  const cards = JSON.parse(fs.readFileSync(file)); cards[0].name = 'Changed';
+  fs.writeFileSync(file, JSON.stringify(cards)); registry.rescan();
+  const changed = buildContentSet({ registry, ids: ['pilot'] });
+  assert.deepEqual(changed.problems, []);
+  assert.notEqual(changed.cs, set.cs);
+  assert.notEqual(changed.plugins[0].hash, set.plugins[0].hash);
+  assert.notEqual(set.offers[0].cards[0].name, 'Changed');
+  assert.equal(buildContentSet({ registry, ids: [] }).cs, vanilla.cs, 'installing/editing offers never changes vanilla composition');
+});
+
+for (const transport of ['process', 'worker']) test(`offers reach real Match options, snapshots and g.offer in ${transport} host`, { timeout: 30000 }, async t => {
+  const { registry } = pilotSet(t);
+  const contents = createContentSets({ registry, vanillaData: getData() });
+  const resolved = contents.resolve(['pilot']); assert.ok(resolved.ok, JSON.stringify(resolved));
+  const hosts = createMatchHosts({ contents, options: { transport, matchOptions: { botRehearsal: 0 },
+    matchModule: fileURLToPath(new URL('./fixtures/offerMatch.js', import.meta.url)) } });
+  t.after(() => hosts.close());
+  let deliver;
+  const first = new Promise(resolve => { deliver = resolve; });
+  const frames = [];
+  const match = hosts.create(resolved.set.cs, { roomCode: 'PILT', mode: 'coop', difficulty: 'NORMAL',
+    seats: [0, 1].map(seat => ({ seat, playerId: `p_${seat}`, name: 'Pilot', connected: true, isBot: false })),
+    seed: 7, cs: resolved.set.cs, requireCs: true, send() { return true; }, onEnd() {},
+    broadcast(msg) { frames.push(msg); if (msg.offers?.length) deliver(msg); } });
+  match.start();
+  const timer = setTimeout(() => deliver(null), 20000); t.after(() => clearTimeout(timer));
+  const frame = await first; assert.ok(frame, 'host published a playable window');
+  const w = frame.offers[0];
+  assert.equal(w.pluginId, 'pilot'); assert.equal(w.seats[0].slots.length, 3);
+  assert.ok(w.seats[0].slots.every(c => c.name && c.desc && c.icon));
+  assert.deepEqual(await match.handle('p_0', { t: 'g.offer', offerId: w.id, pluginId: w.pluginId, seq: w.seq, idx: 0 }), { ok: true });
+  assert.deepEqual(await match.handle('p_1', { t: 'g.offer', offerId: w.id, pluginId: w.pluginId, seq: w.seq, idx: 0 }), { ok: true });
+  const diag = await match.diag(); assert.equal(diag.errorCount, 0);
+  match.dispose();
 });

@@ -2033,5 +2033,10 @@
   "累计奖杯": "Total trophies",
   "同盟通过回合": "Alliance Rounds Cleared",
   "数据详情": "Full Report",
-  "测试对局不计入等级": "Test matches do not count toward the level"
+  "测试对局不计入等级": "Test matches do not count toward the level",
+  "插件选择": "Plugin choices",
+  "点击卡牌选中，再次点击确认": "Select a card, then tap again to confirm",
+  "还有 {n} 人未选择": "{n} players still choosing",
+  "刷新（剩余 {n} 次）": "Refresh ({n} left)",
+  "等待队友": "Waiting for teammates"
 }

@@ -45,7 +45,7 @@ export function makeMatch(o = {}) {
   }
   const sched = new VirtualScheduler({ instantCombat: o.instant !== false });
   const logs = { error: [], warn: [] };
-  const log = { info() {}, debug() {}, warn: (...a) => logs.warn.push(a.map(String).join(' ')), error: (...a) => logs.error.push(a.map(String).join(' ')) };
+  const log = { info: (...a) => o.log?.info?.(...a), debug() {}, warn: (...a) => logs.warn.push(a.map(String).join(' ')), error: (...a) => logs.error.push(a.map(String).join(' ')) };
   const h = { sent: [], bc: [], ended: null, endedCount: 0, logs, sched, frames: 0, badFrames: [], onSend: [], onBroadcast: [], clients: null };
   const captureFrames = o.captureFrames !== false;
   const checkFrame = (msg) => {
@@ -71,6 +71,7 @@ export function makeMatch(o = {}) {
     onEnd: (s) => { h.ended = s; h.endedCount++; },
     scheduler: sched,
     registry: o.registry,
+    offers: o.offers,
     BattleClass: o.fake ? FakeBattle : undefined,
     battleContent: o.battleContent,
     timerScale: o.timerScale,

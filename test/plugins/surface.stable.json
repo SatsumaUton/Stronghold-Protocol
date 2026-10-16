@@ -1580,6 +1580,10 @@
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },
   {
+    "name": "error.PLUGIN_OFFER_REFERENCE",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
     "name": "error.PLUGIN_OFFER_SHAPE",
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },

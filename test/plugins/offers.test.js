@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  OFFER_EFFECTS, OFFER_NAMES, OFFER_QUORUM, OFFER_TIMEOUT, OFFER_WHEN, OFFER_FILE_VERSION, OFFER_ROUND_MAX,
+  OFFER_EFFECTS, OFFER_QUORUM, OFFER_TIMEOUT, OFFER_WHEN, OFFER_FILE_VERSION, OFFER_ROUND_MAX,
   offerAt, offersAt, readOfferFile, readRounds, roundsMatch, roundsText,
 } from '../../shared/plugins/offers.js';
 import { PLUGIN_OFFERS_MAX_WINDOW_SEC, PLUGIN_OFFER_SLOTS } from '../../shared/plugins/limits.js';
@@ -144,19 +144,8 @@ test('the limits: slots and refresh share the host\'s own caps, windowSec is bou
   for (const t of OFFER_TIMEOUT) assert.deepEqual(read(window({ onTimeout: t })).problems, [], t);
 });
 
-test('a shared (room-wide) set of options and the value a pick applies', () => {
-  const shared = read(window({ shared: { enemy: { slots: 3, refresh: { perSlot: 0 } }, player: { slots: 1 } } }));
-  assert.deepEqual(shared.problems, []);
-  assert.deepEqual(Object.keys(shared.offer.shared), OFFER_NAMES);
-  assert.deepEqual(shared.offer.shared.enemy, { slots: 3, refresh: { perSlot: 0 } });
-  assert.equal(shared.offer.shared.player.refresh, null);
-  assert.deepEqual(codes(read(window({ shared: { enemy: { slots: 7 } } }))), ['PLUGIN_OFFER_SHAPE']);
-  assert.deepEqual(codes(read(window({ shared: { enemy: { slots: 3, refresh: { perSlot: 9 } } } }))), ['PLUGIN_OFFER_SHAPE']);
-  assert.deepEqual(codes(read(window({ shared: {} }))), ['PLUGIN_OFFER_SHAPE']);
-  // an unknown shared name is a warning: the window still opens
-  const odd = read(window({ shared: { monsters: { slots: 2 } } }));
-  assert.deepEqual(odd.problems, []);
-  assert.equal(odd.warnings.length, 1);
+test('unsupported shared pools are refused and effects stay declarative', () => {
+  assert.deepEqual(codes(read(window({ shared: { enemy: { slots: 3 } } }))), ['PLUGIN_OFFER_SHAPE']);
   for (const apply of OFFER_EFFECTS.map((k) => ({ [k]: k === 'layers' ? { bond: 'b', count: 1 } : k === 'item' || k === 'chess' ? 'x' : k === 'effect' ? { id: 'x' } : 1 }))) {
     assert.deepEqual(read(window({ apply })).problems, [], JSON.stringify(apply));
   }
@@ -188,7 +177,7 @@ test('the part is read off a plugin folder like every other part, and a bad wind
   });
   put(dir, 'plugin.json', manifest());
   put(dir, 'offers/early-pick.json', window());
-  put(dir, 'lib/cards.json', { cards: [] });
+  put(dir, 'lib/cards.json', { cards: Array.from({length: 4}, (_, i) => ({ id: `c-${i}`, name: `Card ${i}`, desc: 'Three funds', icon: 'funds', apply: { funds: 3 } })) });
   const good = readPluginFolder(dir, { app: '0.3.0' });
   assert.deepEqual(good.problems, [], JSON.stringify(good.problems));
   assert.equal(good.plugin.offers.length, 1);
@@ -234,4 +223,85 @@ test('the schema names the part and the level, and the frozen API table carries 
   // and the document that explains it exists where the catalogue points
   const doc = fs.readFileSync(path.join(ROOT, 'docs/PLUGINS.md'), 'utf8');
   assert.match(doc, /^## 10b\. Offers/m);
+});
+
+function offerFolder(t, { apply = { funds: 3 }, cards, data } = {}) {
+  const parent = tmpdir('checked'), dir = path.join(parent, 'demo');
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  put(dir, 'plugin.json', { manifest: 2, id: 'demo', version: '1.0.0', api: 2, app: '*',
+    class: 'content', scope: ['room'], permissions: ['offers', ...(data ? ['data.add'] : [])],
+    offers: ['offers/early-pick.json'], ...(data ? { data: ['data.json'] } : {}) });
+  put(dir, 'offers/early-pick.json', window({ apply }));
+  put(dir, 'lib/cards.json', cards || ['a', 'b', 'c', 'd'].map(id => ({ id, name: id, desc: 'Grant', icon: 'funds' })));
+  if (data) put(dir, 'data.json', data);
+  return dir;
+}
+
+test('registry reads and hashes both the declaration and transitive option source', t => {
+  const dir = offerFolder(t);
+  const a = readPluginFolder(dir).plugin;
+  assert.equal(a.offers[0].cards.length, 4);
+  assert.ok(a.content.files['offers/early-pick.json']);
+  assert.ok(a.content.files['lib/cards.json']);
+  const cards = JSON.parse(fs.readFileSync(path.join(dir, 'lib/cards.json')));
+  cards[0].apply = { freeRefresh: 2 };
+  put(dir, 'lib/cards.json', cards);
+  const b = readPluginFolder(dir).plugin;
+  assert.notEqual(a.content.hash, b.content.hash);
+  assert.deepEqual(b.offers[0].cards[0].effect, { freeRefresh: 2 });
+  assert.deepEqual(a.offers[0].cards[0].effect, { funds: 3 }, 'old snapshot stays immutable');
+});
+
+test('registry rejects invalid option payloads, scripts, missing sources and escaping links', t => {
+  for (const cards of [[], [{ id: 'a' }], Array(129).fill({ id: 'a' }),
+    ['a', 'b', 'c'].map(id => ({ id, name: id, desc: 'Grant', icon: 'https://invalid.test/image', apply: { funds: 1 } }))]) {
+    const r = readPluginFolder(offerFolder(t, { cards }));
+    assert.equal(r.plugin, null);
+    assert.ok(r.issues.some(i => i.code === 'PLUGIN_OFFER_SHAPE'));
+  }
+  const dir = offerFolder(t), source = path.join(dir, 'lib/cards.json');
+  fs.unlinkSync(source);
+  assert.equal(readPluginFolder(dir).plugin, null);
+  put(path.dirname(dir), 'outside.json', []);
+  fs.symlinkSync(path.join(path.dirname(dir), 'outside.json'), source);
+  assert.equal(readPluginFolder(dir).plugin, null);
+});
+
+test('all numeric primitives reject nonfinite, negative, fractional and oversized grants at discovery', t => {
+  for (const apply of [{ funds: 1001 }, { funds: -1 }, { funds: 0.5 }, { funds: null }, { pendingFunds: 1001 },
+    { freeRefresh: 7 }, { layers: { bond: 'deputShip', count: 1000 } }, { effect: { id: 'unknown' } }]) {
+    const r = readPluginFolder(offerFolder(t, { apply }));
+    assert.equal(r.plugin, null, JSON.stringify(apply));
+    assert.ok(r.issues.some(i => i.code === 'PLUGIN_OFFER_SHAPE'));
+  }
+});
+
+test('unknown, foreign, prototype and undeclared own references fail with PLUGIN_OFFER_REFERENCE', t => {
+  for (const apply of [{ item: 'constructor' }, { chess: '__proto__' }, { layers: { bond: 'missing', count: 1 } },
+    { item: 'item_x_foreign_token' }, { item: 'item_x_demo_missing' }, { chess: 'chess_x_demo_missing_a' }]) {
+    const r = readPluginFolder(offerFolder(t, { apply }));
+    assert.equal(r.plugin, null, JSON.stringify(apply));
+    assert.ok(r.issues.some(i => i.code === 'PLUGIN_OFFER_REFERENCE'));
+  }
+});
+
+test('official references and actual own records are accepted; foreign effects on individual cards are checked', t => {
+  for (const apply of [{ item: 'chess_item_4_01_e_a' }, { layers: { bond: 'deputShip', count: 1 } }, { chess: 'chess_char_1_01_a' }]) {
+    const r = readPluginFolder(offerFolder(t, { apply }));
+    assert.deepEqual(r.problems, [], JSON.stringify(apply));
+  }
+  const data = { records: 1, entries: [{ file: 'items', id: 'item_x_demo_token', base: 'chess_item_4_01_e_a', set: { name: 'Token' } }] };
+  assert.deepEqual(readPluginFolder(offerFolder(t, { apply: { item: 'item_x_demo_token' }, data })).problems, []);
+  const cards = ['a', 'b', 'c'].map(id => ({ id, name: id, desc: 'Grant', icon: 'item', apply: { item: 'item_x_other_token' } }));
+  assert.ok(readPluginFolder(offerFolder(t, { cards })).issues.some(i => i.code === 'PLUGIN_OFFER_REFERENCE'));
+});
+
+test('offers require API 2; existing API 1 manifests still load without offers', t => {
+  const dir = offerFolder(t), file = path.join(dir, 'plugin.json'), m = JSON.parse(fs.readFileSync(file));
+  m.api = 1; put(dir, 'plugin.json', m);
+  assert.ok(readPluginFolder(dir).issues.some(i => i.code === 'PLUGIN_API'));
+  delete m.offers; m.permissions = []; put(dir, 'plugin.json', m);
+  const read = readPluginFolder(dir);
+  assert.deepEqual(read.problems, []);
+  assert.deepEqual(Object.keys(read.plugin.content.files), ['plugin.json'], 'unused offer files never enter old plugin identity');
 });

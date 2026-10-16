@@ -734,67 +734,82 @@ are served from memory with `Cache-Control: immutable` while a room holds the se
 
 ## 10b. Offers — interaction windows
 
-**Plugin API v2.** A plugin asks the host to open an **interaction window**: a declared set of options a player picks
-from inside the match flow, with a deadline, a quorum and a fallback. The window's *lifecycle* — open, collect the
-picks, close at the deadline, apply one pick — is the host's own code, and a pick's effect is one of a closed set of
-effect primitives. **No plugin code runs to open a window, to draw its options or to apply a pick**, so this part is a
-data plugin's (`class: content`) as much as a script one's, and the match host loads no module for it.
+Plugin API 2 (`current: 2`, `min: 1`): PR #682 by **@DuolaCCCCat**, issue #681, completed for 0.3.1.
+The `offers` manifest part names JSON files and requires permission `offers` (`content`, `script`, `trusted`).
+No plugin scripts run to open, draw, refresh or apply a window. Old API 1 manifests without this part still load.
 
-**Manifest.** The part is `offers`, a `.json` path or a list of them, permission `offers` (classes `content`,
-`script`, `trusted`). A manifest that uses it states `"api": 2`: a build that knows only level 1 refuses that plugin
-([PLUGIN-API.md](PLUGIN-API.md)) instead of loading it without its windows.
+A complete, art-free example is [offers-demo](examples/offers-demo/plugin.json), with
+[its window](examples/offers-demo/offers.json) and [cards](examples/offers-demo/cards.json).
+Copy that directory to `plugins/offers-demo`, check it, then enable it in the room's plugin panel.
 
 ```json
-{ "manifest": 2, "api": 2, "class": "content", "scope": ["room"],
-  "permissions": ["data.patch", "offers"],
-  "offers": ["offers/early-pick.json"] }
-```
-
-**`offers/<id>.json`** — one file is one window:
-
-```json
-{ "offer": 1,
-  "id": "early-pick",
-  "when": { "at": ["prep"], "rounds": [3, 9] },
-  "windowSec": 30, "quorum": "all", "onTimeout": "auto", "defer": [],
+{ "offer": 1, "id": "supplies",
+  "when": { "at": "prep", "rounds": [1, 3, 9] },
+  "windowSec": 30, "quorum": "all", "onTimeout": "auto",
   "slots": 3, "refresh": { "perSlot": 1 },
-  "shared": { "enemy": { "slots": 3 } },
-  "options": { "source": "lib/cards.json" },
-  "apply": { "funds": 3 } }
+  "options": { "source": "cards.json" } }
 ```
 
-| Field | Meaning |
+| Field | Rule |
 |---|---|
-| `offer` | `1`, required |
-| `id` | the window's name, `^[a-z0-9][a-z0-9-]{0,31}$`, required |
-| `when.at` | the moment the window precedes: `battleCheck` or `prep` (one or both), required |
-| `when.rounds` | **which rounds it opens on**: a list of rounds `[1, 3, 6, 11]`, `"any"` (every round), `{ "every": N }` or `{ "from": R, "to": R }`; absent is every round. The window opens **before that round begins** |
-| `windowSec` | the window's deadline in whole seconds, 0–300; **0 (the default) opens no window and holds nothing back** |
-| `quorum` | who the host waits for: `all`, `majority`, or `none` (the default — nobody waits, the first pick settles its player) |
-| `onTimeout` | what a deadline does with an open window: `auto` (the default — the host takes the first option), `bot` (the fallback the host's own drafts use for a seat that did not pick) or `skip` (nothing is applied) |
-| `defer` | the batches the host holds back while the window is open: `prepSettle`. Empty (the default) holds nothing. A window that gates a round's start or that round's prep already holds that batch back, so this field is accepted and reserved for a window that has to hold back something else |
-| `slots` | options per player, 1–`PLUGIN_OFFER_SLOTS` (6, `shared/plugins/limits.js` — the cap the host's own pick-one offers use) |
-| `refresh.perSlot` | how many times a player may redraw one slot, 0–2 |
-| `shared.<name>` | a **room-wide** set of options (one for the whole room, redrawn by nobody): `{ slots, refresh }` |
-| `options.source` | the `.json` file inside the plugin folder the host draws the options from. This level shows a window's slots without their option payloads (a page draws the slot count and the deadline); the payload a slot carries is what `options.source` names and is read by the host |
-| `apply` | what one pick applies, one effect primitive: `funds`, `pendingFunds`, `freeRefresh`, `layers`, `item`, `chess` or `effect`. Never code |
+| `offer`, `id` | Version `1`; unique local id, 1–32 lowercase letters/digits/hyphens |
+| `when.at` | `battleCheck`, `prep`, or an array containing both |
+| `when.rounds` | `[1,3,9]`, `"any"`, `{ "every": 2 }`, `{ "from": 3, "to": 9 }`; omitted means any; rounds 1–99, list at most 64, every 1–32 |
+| `windowSec` | Integer 0–300, default 0. **Zero creates no window, sequence, timer or grant, and never blocks** |
+| `slots` | 1–6 per seat, default 1; at most 32 window files per plugin |
+| `refresh.perSlot` | 0–2 per seat **per slot**; default 0; no refresh after a pick |
+| `quorum` | `all`, `majority` (strictly more than half), `none` (default; never holds a phase) |
+| `onTimeout` | `auto`/`bot`: first current slot; `skip`: no grant. Default `auto` |
+| `defer` | Optional `[]` or `["prepSettle"]`; records intent, with no separate scheduler beyond the hook's gate |
+| `options.source` | Required relative `.json` path inside this plugin; checked and hashed transitively |
+| `apply` | Optional fallback primitive for cards without their own `apply` |
 
-**Round decoupling.** `when.rounds` is an expression over the round number and nothing else: the host asks
-`offersAt(plugins, { at, round })` once per round and opens what answers yes. No round is special — a window declared
-for R3 or R9 behaves exactly like one declared for R1 — and a window declared for a round a mode never reaches simply
-never opens. A window belongs to the plugin that declares it; a plugin may declare several, and the windows of
-several plugins are ordered like every other plugin list (`shared/plugins/order.js`).
+**Sources.** Only a JSON array or `{ "cards": [...] }` exists in this version; no dynamic tables, weights,
+remote URLs or scripts. It contains `slots`–128 cards. Each card has a unique `id` (same syntax as window ids),
+nonempty `name` (≤80 characters), `desc` (≤240), `icon` (`funds`, `layers`, `item`, `chess`, `refresh`), and one
+`apply` primitive (or inherits the window's). Icons are native symbols; text is rendered as text, never HTML.
 
-**Coexistence with the host's own windows.** A round may hold the host's own draft or bounty window and a plugin's
-window at once. The host's window runs first and a plugin's window may not delay it; `defer` names only the batches a
-plugin's own window holds back; two windows do not block one another. `m.offers` carries the open window to every
-member — its id, its slots, its deadline and how many players are still to pick; a pick is a match intent (`g.offer`,
-`g.offerRefresh`), and a ui plugin's read-only feed sees the same message and can never answer it (§14), because
-choosing is an intent a ui plugin never sends. A player who leaves while a window waits is not waited for.
+```json
+[{ "id": "supplies", "name": "Supplies", "desc": "Gain 3 funds.",
+   "icon": "funds", "apply": { "funds": 3 } }]
+```
 
-**Compatibility.** Without an `offers` part no window is ever built: no plugin window opens, nothing is held back and
-the host's own moments run in their own order. `windowSec` defaults to 0, so declaring the part alone changes nothing.
-The registry checks the part's files like every other part (`shared/plugins/offers.js`; `PLUGIN_OFFER_*`).
+**Effects.** One key per primitive: `funds`/`pendingFunds` integer 0–1000; `freeRefresh` integer 1–6;
+`layers: { "bond": "<id>", "count": 1 }` with count 1–999; `item: "<id>"` or `chess: "<id>"` grants one
+through normal acquisition/stock rules. Ids must exist in official data or this plugin's own declared records in
+the room content set. Discovery refuses unknown, foreign and undeclared ids with **`PLUGIN_OFFER_REFERENCE`**;
+composition checks existence again. Invalid amounts/cards use `PLUGIN_OFFER_SHAPE`. Arbitrary persistent `effect`
+and `shared` enemy/player pools are refused: their runtime semantics are not supported. `options.tiers` remains
+an explicit ignored-field warning. There is no script callback or cross-plugin grant permission.
+
+**Timing and choices.** `battleCheck` runs after the initial official check before R1 and before the start of
+*every* later named round, including boss rounds. `prep` runs after round-start income/shop draw and the official
+机变 draft, before entering prep. Vanilla takes its original path and draws at its original time. The engine builds
+uniform, distinct initial slots with an independent seed derived from match seed, plugin/window, hook, round,
+window sequence and seat. A refresh adds slot and refresh count to that seed: it really replaces the card and
+leaves other seats untouched. It prefers unseen cards; if necessary it can duplicate another slot, but never the
+slot's current card. A one-card pool cannot refresh and consumes no allowance.
+
+Bots and autoplay seats resolve immediately with the timeout rule. A strict majority resolves unpicked seats with
+the same rule; departed/eliminated seats leave the quorum. `none` stays selectable until all seats answer, its
+deadline, or the next round (then the fallback runs). Multiple windows coexist with independent timers; only
+blocking windows delay their continuation. Unrenderable/empty payloads never hold a phase. These draw, fallback,
+quorum, numeric/text limits and unsupported-source choices are **[ASSUMED]** remake API policy, not official rules.
+The maintainer's #681 decisions bind declaration-only, API 2/min 1, `g.offer`, caps, zero-length behavior and native UI.
+
+**Native UI and protocol.** The match screen supplies the popup; a UI plugin is not required. It shows each slot's
+name/icon/description, two-tap or Enter confirmation, per-slot refresh count, countdown, and co-op waiting state.
+Tab stays in the popup; Escape clears selection. Cards scroll at enlarged text sizes and on touch screens.
+Spectators see a read-only view (the first live seat's cards). Window tabs allow all concurrent windows to be answered.
+The built-in interface strings use all five supported languages; plugin card text is literal author text.
+`m.public.offers` is a full snapshot, including every seat's cards, picked status and remaining refreshes;
+reconnect restores it. `g.offer` and `g.offerRefresh` send `{ offerId, pluginId, seq, idx, cardId? }` (the native UI sends cardId to reject a stale slot after refresh), rejecting stale
+sequences and other plugins' same-named windows. `g.choice` remains the official draft/personal-choice intent.
+Test input journals capture both intents and the declaration snapshot for replay; content process/worker hosts
+receive the same options at construction. Offers-only plugins appear in room content summaries and change `cs`;
+both declaration and source bytes are hashed. Plugins without offers gain no new file-hash input. Installing an
+offer plugin never changes the vanilla composition. Shared engine/protocol code edits still change the build-wide
+vanilla code identity, as required by §9's hash contract.
 
 ## 12. DSL
 
@@ -1459,6 +1474,7 @@ lacks). The table below is generated from it (`node tools/plugin.mjs errors --wr
 | The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_STORAGE` | The ui plugin's storage request was refused: the key is not allowed or the space is used up | A key is 1–64 characters of letters, digits and . _ -; a value's JSON is at most 4096 bytes; a plugin keeps at most 32 keys and 32 KB. |
 | The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_INTENT` | The ui plugin tried to send a match action, which is refused | A ui plugin watches and never plays (it cannot become a bot or a cheat): do not send hello, ping, room.*, g.* or b.* messages, nor carry one inside another message. |
 | The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_SHAPE` | A message from the ui plugin is not shaped right and was dropped | Every message is { "v": 1, "t": <type>, … } with a type of ready, slot, resize, storage, notice or stats, at most 8 KB; schemas/ui.schema.json has the shapes. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_OFFER_REFERENCE` | An offer references an unavailable record: {detail} | Use official records or this plugin’s own items, chess and bonds declared in the room content set. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_OFFER_SHAPE` | This interaction window is not shaped right: {detail} | One offers/*.json is { "offer": 1, "id": "<name>", "when": { "at": ["battleCheck" or "prep"], "rounds": <rounds> }, "windowSec": <seconds>, "slots": 1–6, "options": { "source": "<a .json in the plugin>" } }; windowSec defaults to 0 (no window, nothing held back). |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_OFFER_ROUNDS` | The round expression of this interaction window is not readable: {detail} | Write rounds as a list of 1–99 ([1, 3, 6, 11]), "any" (every round), { "every": N } or { "from": R, "to": R }; the window opens before that round begins, on any round — not only the ones the official schedule uses. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_DSL_SHAPE` | The DSL spec is not shaped right: {detail} | The whole spec is one object: { "dsl": 1, "pluginId": "<plugin id>", then "skill", "skills", "talents" or "meta" }. |

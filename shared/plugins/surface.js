@@ -110,6 +110,7 @@ export function buildSurface(extra = {}) {
   /** @type {{ name: string, group: string, stability: 'stable' | 'experimental' | 'internal', since: string, anchor: string }[]} */
   const rows = [];
   const added031 = new Set(['record.operator.origin', 'sdk.sp:sdk@1.dir', 'sdk.sp:sdk@1.targeting', 'sdk.export.dir', 'sdk.export.targeting',
+    'manifest.field.offers', 'permission.offers', 'error.PLUGIN_OFFER_SHAPE', 'error.PLUGIN_OFFER_ROUNDS', 'error.PLUGIN_OFFER_REFERENCE',
     'error.PLUGIN_RECORD_HIDDEN', 'error.PLUGIN_RECORD_PAIR', 'error.PLUGIN_RECORD_ART', 'error.PLUGIN_RECORD_ORIGIN',
     'error.PLUGIN_FORGE_MOUNT', 'error.PLUGIN_FORGE_PANEL_SCRIPT', 'error.PLUGIN_UI_SLOT_SHARED', 'error.PLUGIN_STUDIO_CONSOLE_SCENARIO',
     'studio.route.POST /studio/api/console/options', 'studio.route.POST /studio/api/console/build']);

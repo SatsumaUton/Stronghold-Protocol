@@ -1,6 +1,6 @@
-// shared/plugins/offers.js — the declarative `offers` part of manifest 2 (PLUGIN API v2, docs/PLUGINS.md §10x):
+// shared/plugins/offers.js — the declarative `offers` part of manifest 2 (PLUGIN API v2, docs/PLUGINS.md §10b):
 // an interaction window a plugin asks the host to open. Pure data: this module only reads and checks the files, it
-// never runs plugin code and never touches the match. A window's *lifecycle* (open → collect g.choice → deadline →
+// never runs plugin code and never touches the match. A window's *lifecycle* (open → collect g.offer → deadline →
 // settle) is engine code, and a pick's effect is one of the closed effect primitives below.
 //
 // Round decoupling (the point of the part): `when.rounds` is an expression over the round number, not a fixed
@@ -33,7 +33,10 @@ export const OFFER_DEFER = Object.freeze(['prepSettle']);
  * The closed set of effect primitives a pick applies (no plugin code runs at settle time). Each one is a plain
  * object with one key; the host executes it with the picker's player scope.
  */
-export const OFFER_EFFECTS = Object.freeze(['funds', 'pendingFunds', 'freeRefresh', 'layers', 'item', 'chess', 'effect']);
+export const OFFER_EFFECTS = Object.freeze(['funds', 'pendingFunds', 'freeRefresh', 'layers', 'item', 'chess']);
+// [ASSUMED] Small, uniform JSON pools and symbolic icons; no scripts, URLs, weights or dynamic sources.
+export const OFFER_ICONS = Object.freeze(['funds', 'layers', 'item', 'chess', 'refresh']);
+export const OFFER_CARDS_MAX = 128;
 /** Best-effort marker names inside a deferred batch, for messages: never a path and never code. */
 export const OFFER_NAMES = Object.freeze(['enemy', 'player']);
 
@@ -98,19 +101,46 @@ export function roundsText(rounds) {
 }
 
 /** A problem with one effect primitive, or null. Pure: the caller decides whether it is fatal. */
-function effectProblem(effect, at) {
+export function effectProblem(effect, at) {
   if (!isObj(effect)) return `${at}: not an object`;
   const keys = Object.keys(effect);
   if (keys.length !== 1 || !OFFER_EFFECTS.includes(keys[0])) return `${at}: one of ${OFFER_EFFECTS.join(', ')}`;
   const [kind] = keys;
   const v = effect[kind];
   const bad = `${at}.${kind}: wrong value`;
-  if (kind === 'funds' || kind === 'pendingFunds') return int(v, -1e6, 1e6) ? null : bad;
+  // [ASSUMED] Grants only: at most 1000 funds, 999 layers, six refreshes or one record per pick.
+  if (kind === 'funds' || kind === 'pendingFunds') return int(v, 0, 1000) ? null : bad;
   if (kind === 'freeRefresh') return int(v, 1, PLUGIN_OFFER_SLOTS) ? null : bad;
-  if (kind === 'layers') return isObj(v) && typeof v.bond === 'string' && v.bond.length <= 64 && int(v.count, -1000, 1000) ? null : bad;
+  if (kind === 'layers') return isObj(v) && Object.keys(v).length === 2 && typeof v.bond === 'string' && v.bond.length <= 64 && int(v.count, 1, 999) ? null : bad;
   if (kind === 'item' || kind === 'chess') return typeof v === 'string' && v.length <= 64 && v.trim() ? null : bad;
-  // effect: a persistent EffectRef the plugin owns; the host names it `effect:<plugin id>:<local>`
-  return isObj(v) && typeof v.id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v.id) ? null : bad;
+  return bad;
+}
+
+/** Read a JSON array (or {cards: [...]}); every rendered slot has a checked payload and effect. */
+export function readOfferCards(raw, offer) {
+  const cards = Array.isArray(raw) ? raw : raw?.cards;
+  const problems = [];
+  const bad = (path, message) => problems.push(problem('PLUGIN_OFFER_SHAPE', path, message));
+  if (!Array.isArray(cards) || cards.length < offer.slots || cards.length > OFFER_CARDS_MAX) {
+    bad('options.source', `expected ${offer.slots}–${OFFER_CARDS_MAX} cards`);
+    return { cards: [], problems };
+  }
+  const ids = new Set();
+  const out = cards.map((c, i) => {
+    const at = `cards[${i}]`;
+    if (!isObj(c)) { bad(at, 'card must be an object'); return null; }
+    if (typeof c.id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,31}$/.test(c.id) || ids.has(c.id)) bad(`${at}.id`, 'unique card id required');
+    ids.add(c.id);
+    for (const [key, max] of Object.entries({ name: 80, desc: 240 })) {
+      if (typeof c[key] !== 'string' || !c[key].trim() || c[key].length > max) bad(`${at}.${key}`, `nonempty text, at most ${max} characters`);
+    }
+    if (!OFFER_ICONS.includes(c.icon)) bad(`${at}.icon`, `one of ${OFFER_ICONS.join(', ')}`);
+    const effect = c.apply ?? offer.apply;
+    const err = effectProblem(effect, `${at}.apply`);
+    if (err) bad(`${at}.apply`, err);
+    return { id: c.id, name: c.name, desc: c.desc, icon: c.icon, effect };
+  });
+  return { cards: problems.length ? [] : out, problems };
 }
 
 /**
@@ -164,28 +194,10 @@ export function readOfferFile(raw, { pluginId = '', rel = '' } = {}) {
     if (!isObj(o.refresh) || !int(o.refresh.perSlot, 0, 2) || Object.keys(o.refresh).some((k) => k !== 'perSlot')) p('PLUGIN_OFFER_SHAPE', 'refresh', '"refresh" is { "perSlot": 0–2 } (how many times a player may redraw one slot)');
     else refresh = { perSlot: o.refresh.perSlot };
   }
-  // the room-wide half: one set of options for the whole room, redrawn by nobody
-  let shared = null;
-  if (o.shared !== undefined) {
-    if (!isObj(o.shared) || !Object.keys(o.shared).length) p('PLUGIN_OFFER_SHAPE', 'shared', '"shared" is { "<name>": { "slots": 1–6, "refresh"?: { "perSlot": 0–2 } } }');
-    else {
-      shared = {};
-      for (const [name, spec] of Object.entries(/** @type {Record<string, any>} */ (o.shared))) {
-        if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(name)) { p('PLUGIN_OFFER_SHAPE', `shared.${name}`, 'a shared window name is 1–32 lower-case letters, digits and -'); continue; }
-        if (!OFFER_NAMES.includes(name)) w('PLUGIN_OFFER_SHAPE', `shared.${name}`, `"shared.${name}" is not one of ${OFFER_NAMES.join(', ')} (the host still opens it; messages may name it plainly)`);
-        if (!isObj(spec) || !int(spec.slots, 1, PLUGIN_OFFER_SLOTS)) { p('PLUGIN_OFFER_SHAPE', `shared.${name}.slots`, `"shared.${name}.slots" is 1–${PLUGIN_OFFER_SLOTS}`); continue; }
-        let r = null;
-        if (spec.refresh !== undefined) {
-          if (!isObj(spec.refresh) || !int(spec.refresh.perSlot, 0, 2) || Object.keys(spec.refresh).some((k) => k !== 'perSlot')) { p('PLUGIN_OFFER_SHAPE', `shared.${name}.refresh`, '"refresh" is { "perSlot": 0–2 }'); continue; }
-          r = { perSlot: spec.refresh.perSlot };
-        }
-        shared[name] = { slots: spec.slots, refresh: r };
-      }
-      if (!Object.keys(shared).length) shared = null;
-    }
-  }
-  // the options: a file inside the plugin folder this build reads as plain JSON. A later API level reads the
-  // plugin's private data part here instead; the shape of the field does not change.
+  // [ASSUMED] Shared enemy/player pools have no declarative effect semantics yet; refuse instead of ignoring.
+  const shared = null;
+  if (o.shared !== undefined) p('PLUGIN_OFFER_SHAPE', 'shared', 'shared option pools are not supported');
+  // Only local JSON card pools are supported; the registry reads and hashes this transitive source.
   let options = null;
   if (!isObj(o.options) || typeof o.options.source !== 'string' || !o.options.source.trim()) {
     p('PLUGIN_OFFER_SHAPE', 'options', '"options" is { "source": "<file inside the plugin folder>" }');
@@ -197,8 +209,7 @@ export function readOfferFile(raw, { pluginId = '', rel = '' } = {}) {
     for (const k of Object.keys(o.options)) if (!['source', 'tiers'].includes(k)) w('PLUGIN_OFFER_SHAPE', `options.${k}`, `"options.${k}" is not a field of "options" (ignored)`);
     if (o.options.tiers !== undefined) w('PLUGIN_OFFER_SHAPE', 'options.tiers', '"options.tiers" is not read by this build (rounds pick the window: "when.rounds")');
   }
-  // one pick's effect: the closed primitives (no plugin code runs at settle time). Optional here — the host applies
-  // the same primitives when the plugin declares them through the SDK at a later API level.
+  // Optional fallback for cards without their own apply primitive. Never a script or SDK callback.
   if (o.apply !== undefined) {
     const message = effectProblem(o.apply, 'apply');
     if (message) p('PLUGIN_OFFER_SHAPE', 'apply', `"apply": ${message} (a pick applies one effect primitive, never code)`);

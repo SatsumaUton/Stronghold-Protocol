@@ -667,6 +667,11 @@ export const PLUGIN_ERRORS = Object.freeze({
   },
 
   // ---- the declarative interaction windows of PLUGIN API v2 (shared/plugins/offers.js) ------------------------------
+  PLUGIN_OFFER_REFERENCE: {
+    level: 'problem', doc: D.offers,
+    zh: '交互窗口引用了不可用的记录：{detail}', en: 'An offer references an unavailable record: {detail}',
+    fix: { zh: '只使用官方数据或本插件在房间内容集内声明的物品、棋子和羁绊。', en: 'Use official records or this plugin’s own items, chess and bonds declared in the room content set.' },
+  },
   PLUGIN_OFFER_SHAPE: {
     level: 'problem', doc: D.offers,
     zh: '这个交互窗口的写法不对：{detail}', en: 'This interaction window is not shaped right: {detail}',

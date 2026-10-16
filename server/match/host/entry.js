@@ -168,11 +168,9 @@ async function boot() {
   // [ASSUMED] Grant the prep EffectRefs after super(), once players exist (DESIGN §32.7).
   MatchClass = class ContentMatch extends Inner {
     constructor(opts) {
-      super(opts);
+      super({ ...opts, offers });
       grantPrepDsl(this, dslGrants);
-      // PLUGIN API v2 (docs/PLUGINS.md §10b): the set's interaction windows, after super() like the DSL grants.
-      // No code runs for them — the engine opens, settles and applies them (server/match/match/offers.js).
-      if (Array.isArray(offers) && offers.length) this.offers = offers;
+
     }
   };
   if (options.virtualTime) ({ VirtualScheduler } = await import('../scheduler.js'));

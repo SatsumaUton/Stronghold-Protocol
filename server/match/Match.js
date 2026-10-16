@@ -291,8 +291,8 @@ export class Match {
     if (Array.isArray(opts.kitted)) this.diyKitted = Object.freeze(opts.kitted.filter((id) => typeof id === 'string'));
     /**
      * The interaction windows this match's content set declares (PLUGIN API v2, docs/PLUGINS.md §10b): the normalized
-     * `offers` of the plugins the host installed, injected by the match host after `super()` — like its prep DSL grants
-     * — or handed in as `opts.offers` (a server-process match). `[]` for every match whose set declares none, and then
+     * `offers` of the plugins the host installed, handed in as `opts.offers` before construction so test journals
+     * and both host transports capture the same declaration snapshot. `[]` for every match whose set declares none, and then
      * no window code ever runs (MatchOffers.openOfferWindow returns before it touches the phase).
      * @type {object[]}
      */

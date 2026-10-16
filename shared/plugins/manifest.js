@@ -626,6 +626,7 @@ export function readPluginManifest(raw, ctx) {
   else if (!Number.isInteger(m.api)) list.problem('PLUGIN_API', `"api": ${short(m.api)} is not an integer`, apiAt);
   else if (m.api < supported.min || m.api > supported.current) list.problem('PLUGIN_API', `"api": ${m.api} is not supported (this game: ${supported.min}–${supported.current})`, apiAt);
   else api = m.api;
+  if (m.offers !== undefined && api !== null && api < 2) list.problem('PLUGIN_API', 'offers requires plugin API 2', apiAt);
 
   let scope = [...kind.defaultScope];
   if (m.scope !== undefined) {

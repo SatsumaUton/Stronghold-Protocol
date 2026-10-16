@@ -132,6 +132,7 @@ export class MatchSettle {
     // A command that ends a test match must be audited/counted before publishing its result.
     if (this.test && this._testApplying) { this._testOutcome = { victory, hiddenCleared, reason }; return; }
     if (this.ended || this.disposed) return;
+    this.offersDispose();
     this.ended = true;
     if (this.runner) { try { this.runner.stop(); } catch { /* ignore */ } this.runner = null; }
     this._stopClientCombat();

@@ -18,6 +18,7 @@ import { exportOfficialBounds, rememberOfficialBounds } from '../../shared/plugi
 import { browserScriptSources } from '../../shared/plugins/scriptLoad.js';
 import { preflightScripts } from './scriptPreflight.js';
 import { validateDsl, validatePrepSpec } from '../sim/content/dsl/validate.js';
+import { offerReferenceProblems } from './offerData.js';
 
 const bases = new WeakMap(), buffers = new WeakMap(), caches = new WeakMap();
 function baseFor(registry) {
@@ -268,6 +269,7 @@ function composeContentSet({ registry, ids = [] }) {
     data.dsl = table;
   }
   if (plugins.length) {
+    for (const p of plugins) if (p.offers?.length) problems.push(...offerReferenceProblems(p.offers, p.manifest, p.content.documents, base.data, data));
     problems.push(...validateData(data, { kitExists: ref => !!officialKit(ref), vanilla: base.data, owners, validateDsl }));
     if (problems.length) return { problems };
     data = { ...data, stages: { ...data.stages } };
@@ -327,8 +329,7 @@ function composeContentSet({ registry, ids = [] }) {
   for (const [rel, body] of bodies) files[rel] = { sha256: nodeSha256(body), bytes: body.length };
   const vanilla = plugins.length === 0;
   // The interaction windows of the set (PLUGIN API v2, docs/PLUGINS.md §10b): the registry already checked each
-  // file, so this only tags every window with the plugin that declares it. Not part of `cs`: a window never changes a
-  // battle (its effect primitives reach the match, not the sim).
+  // file, including transitive option sources in content.files: every offer byte participates in cs.
   const offers = plugins.flatMap(p => (p.offers || []).map(o => ({ pluginId: p.id, ...o })));
   const index = vanilla ? base.identity.index : { ...base.identity.index, cs, vanilla: false, plugins: parts, settings, data: {}, i18n: {}, bounds: {}, ...(scripts.length ? {scripts:{}, execution} : {}) };
   if (!vanilla) for (const [rel, f] of Object.entries(files)) {
