@@ -7,6 +7,10 @@ the profession defaults and the test harness. Everything here is deterministic: 
 and the only floating-point functions are correctly rounded ones (`detmath.js` below), so a battle gives the same bits in
 every browser and on the server.
 
+A match test room (DESIGN §34.8) does not change this engine. `g.test` is a match input applied before a battle
+starts or between battles; shared boss HP/team LP and phase timers can also change during boss battles. Operator HP, SP and positions inside a running battle are sim state and are not test
+commands. `server/match/testReplay.js` replays test-only `[test-input ROOM]` JSON entries (init options, platform calls, actual timer order) with the same data/build and optional registry. No journal is loaded through the network. Test results have no awards or local records. The studio battle sandbox builds one BattleSpec and runs it here; it does not write server match state.
+
 ```
 server/sim/
   Battle.js        one field (normal / unite / boss / hidden) — the class: constructor, method install, public API

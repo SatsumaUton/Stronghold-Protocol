@@ -21,6 +21,26 @@
 .gm__hud > * { pointer-events: auto; }
 .gload { align-items: center; justify-content: center; gap: .2rem; }
 
+/* Host test console (DESIGN §34.8). Fixed so it covers the briefing, the draft and the match. */
+.testconsole {
+  position: fixed; right: .16rem; bottom: .16rem; z-index: 40; display: flex; flex-direction: column; align-items: flex-end;
+  gap: .06rem; max-width: min(7.2rem, calc(100vw - .32rem)); pointer-events: auto;
+}
+.testconsole__tab, .testconsole__run, .testconsole__row button {
+  color: #1a1408; background: #e8b84a; border: 0; font-weight: 700; padding: .04rem .1rem; cursor: pointer;
+}
+.testconsole__body {
+  width: 100%; display: grid; gap: .06rem; padding: .1rem; background: rgba(12, 14, 12, .94);
+  border: 1px solid rgba(232, 184, 74, .7); color: var(--text-hi); font-size: calc(.14 * var(--t));
+}
+.testconsole__head, .testconsole__row, .testconsole__field, .testconsole__check { display: flex; flex-wrap: wrap; align-items: center; gap: .06rem; }
+.testconsole__field { display: grid; gap: .02rem; }
+.testconsole__field input, .testconsole__field select {
+  color: var(--text-hi); background: var(--bg-2); border: 1px solid var(--line-2); padding: .03rem .06rem; min-width: 0;
+}
+.testconsole__log { margin: 0; padding-left: .2rem; max-height: 1.6rem; overflow: auto; }
+.testconsole__log .is-bad { color: #ff8a5c; }
+
 /* ---- top bar -------------------------------------------------------------------------------------- */
 .gtop {
   position: absolute; left: 0; right: 0; top: 0;

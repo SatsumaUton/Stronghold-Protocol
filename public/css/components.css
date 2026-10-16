@@ -1138,6 +1138,11 @@
   white-space: nowrap;
 }
 .modmark--compact { height: .2rem; padding: 0 .06rem; font-size: calc(.11 * var(--t)); }
+.testmark {
+  display: inline-flex; align-items: center; height: .26rem; padding: 0 .1rem; border: 1px solid rgba(232, 184, 74, .8);
+  background: rgba(232, 184, 74, .16); color: #e8b84a; font-size: calc(.13 * var(--t)); font-weight: 800; letter-spacing: .08em;
+  white-space: nowrap;
+}
 
 .plugin-settings { display: grid; gap: .06rem; margin-top: .08rem; }
 .plugin-settings__row { display: flex; gap: .1rem; align-items: center; justify-content: space-between; }

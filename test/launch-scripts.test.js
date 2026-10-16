@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseArgs, serverEnv, SCRIPT_MODES } from '../scripts/launch.mjs';
+import { parseArgs, serverEnv, SCRIPT_MODES, TEST_MODE_FLAGS } from '../scripts/launch.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -24,9 +24,31 @@ test('--scripts sets SP_PLUGIN_SCRIPTS for the server; off removes an inherited 
   assert.deepEqual([env.PORT, env.SP_PLUGIN_SCRIPTS], ['3001', 'trusted-force']);
 });
 
+test('--test-mode sets SP_TEST_MODE; off removes an inherited one; no flag keeps it', () => {
+  assert.deepEqual([...TEST_MODE_FLAGS], ['off', '1', 'force']);
+  for (const argv of [['--test-mode', '1'], ['--test-mode=force']]) {
+    const o = parseArgs(argv);
+    assert.equal(o.testMode, argv[0].includes('=') ? 'force' : '1');
+    assert.equal(serverEnv(o, {}).SP_TEST_MODE, o.testMode);
+  }
+  assert.equal(serverEnv(parseArgs(['--test-mode', 'off']), { SP_TEST_MODE: '1' }).SP_TEST_MODE, undefined);
+  assert.equal(serverEnv(parseArgs([]), { SP_TEST_MODE: 'force' }).SP_TEST_MODE, 'force');
+  const src = readFileSync(path.join(ROOT, 'scripts/launch.mjs'), 'utf8');
+  assert.match(src, /--test-mode \$\{o\.testMode\} 不会改变正在运行的服务器/);
+});
+
 test('start-windows-sandbox.bat is start-windows.bat --scripts sandbox (CRLF, other arguments passed on)', () => {
   const bat = readFileSync(path.join(ROOT, 'scripts/start-windows-sandbox.bat'), 'utf8');
   assert.match(bat, /^@echo off\r\n/);
   assert.ok(!/[^\r]\n/.test(bat), 'CRLF line endings (cmd.exe)');
   assert.match(bat, /call "%~dp0start-windows\.bat" --scripts sandbox %\*\r\n$/);
+});
+
+test('bare --test-mode enables local mode without swallowing another launcher option', () => {
+  const o = parseArgs(['--test-mode', '--host', '127.0.0.1', '--no-open', '--no-setup']);
+  assert.equal(o.testMode, '1'); assert.equal(o.host, '127.0.0.1');
+  assert.equal(o.open, false); assert.equal(o.setup, false); assert.deepEqual(o.setupArgs, []);
+  assert.equal(serverEnv(o, {}).SP_TEST_MODE, '1');
+  assert.equal(parseArgs(['--test-mode=']).testMode, '');
+  assert.equal(TEST_MODE_FLAGS.includes(parseArgs(['--test-mode', 'invalid']).testMode), false);
 });
