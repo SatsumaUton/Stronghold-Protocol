@@ -35,6 +35,7 @@ import { overtimeState, overtimeDrainPerSec, remainAt } from './matchStatus.js';
 import { hotkeyLabelOf } from './settings.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 import { UnofficialMark } from './pluginTag.js';
+import { TestMark } from './testConsole.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -392,6 +393,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
           <${SpectatorPill} spectators=${spectators} myId=${myId} isHost=${isHost} onRemove=${onRemoveSpectator} />
         </div>
         ${pub?.difficulty ? html`<${DifficultyTag} difficulty=${pub.difficulty} size="sm" />` : null}
+        ${pub?.test ? html`<${TestMark} class="gtop__test" />` : null}
         <${UnofficialMark} room=${room} compact=${true} class="gtop__mod" />
       </div>
     </div>

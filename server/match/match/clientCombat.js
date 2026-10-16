@@ -7,6 +7,7 @@
 import { PHASE } from '../../../shared/constants.js';
 import { DeadBattle, syntheticResult, RESULT_GRACE_MS, HARD_CAP_SECONDS, HeadlessJob } from '../fields.js';
 import { buildBattleSpec, createBattleFromSpec } from '../../sim/spec.js';
+import { testSlice } from '../testTrace.js';
 
 export class MatchClientCombat {
   /** Stop every client-combat timer and the headless pacer (phase end, finish, dispose). */
@@ -184,8 +185,9 @@ export class MatchClientCombat {
       f.endGt = Number(run.battle.time) || 0;
       this._armRelease(f);
     };
+    const sliceCtl = testSlice(this);
     if (!Number.isFinite(this.headlessSliceMs)) {
-      job.run(Infinity);
+      job.run(Infinity, undefined, sliceCtl);
       complete();
     } else {
       // a real host: wall-clock-bounded slices in callbacks of their own (3 bot fields at combat start would otherwise
@@ -193,7 +195,7 @@ export class MatchClientCombat {
       const slice = () => {
         f.sliceTimer = null;
         if (f.job !== job || f.done) return;
-        if (job.run(this.headlessSliceMs)) complete();
+        if (job.run(this.headlessSliceMs, undefined, sliceCtl)) complete();
         else f.sliceTimer = this.later(0, slice);
       };
       f.sliceTimer = this.later(0, slice);

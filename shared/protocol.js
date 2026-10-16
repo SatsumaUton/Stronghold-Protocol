@@ -7,6 +7,7 @@ import { diySlotIds, validateDiyPicks } from './diy.js';
 import { cultivatedStats, isPotential, isCultivate, POTENTIAL_DEFAULT, CULTIVATE_DEFAULT, hasPotentialData } from './potential.js';
 import { isContentHash } from './plugins/identity.js';
 import { isPluginId } from './plugins/manifest.js';
+import { isTestCommand } from './testMode.js';
 
 // ---- tiny validators -------------------------------------------------------
 const isInt = (v, lo = -Infinity, hi = Infinity) => Number.isInteger(v) && v >= lo && v <= hi;
@@ -412,8 +413,10 @@ export const C2S = {
   hello: { name: (v) => isStr(v, NAME_MAX_LEN) && v.trim().length > 0, token: (v) => v == null || isStr(v, 64), version: (v) => v == null || isInt(v, 0, 1e6),
     noReplace: isBool, claimAt: (v) => isNum(v, 0, Number.MAX_SAFE_INTEGER), $optional: ['token', 'version', 'noReplace', 'claimAt'] },
   ping: { c: (v) => typeof v === 'number' && Number.isFinite(v) },
-  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v) },
-  'room.join': { code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
+  // test: only the literal true (DESIGN §34.8). Omit it for a normal room — `false` is a bad field, so a
+  // string cannot sneak in as "not a test". The server still refuses it unless SP_TEST_MODE is on.
+  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, $optional: ['test'] },
+  'room.join': { $optional: ['testAck'], testAck: (v) => v === true, code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'room.leave': {},
   'room.ready': { ready: isBool },
   'room.setDifficulty': { difficulty: (v) => DIFFICULTIES.includes(v) },
@@ -440,7 +443,7 @@ export const C2S = {
   // spectator seats (remake feature, community report #26; MAX_SPECTATORS): take one of a co-op room's spectator seats —
   // in its lobby or while its match runs — never a player seat; the host frees one by playerId (the spectator gets
   // room.closed { reason: 'kicked' }). room.leave / g.leave leave a spectator seat like a player seat.
-  'room.spectate': { code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
+  'room.spectate': { $optional: ['testAck'], testAck: (v) => v === true, code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'room.removeSpectator': { playerId: isId },
   // the room's plugins (DESIGN §32, P1a; host, before the match — like a difficulty change it un-readies the others):
   // the plugins of this server the room switches on, in any order (the server closes the set over their requirements
@@ -494,6 +497,9 @@ export const C2S = {
   // the push m.unitStats { seq, round, units: [unitStatsEntry] }; `seq` is echoed so the client keeps the newest answer
   'g.unitStats': { seq: (v) => isInt(v, 0, 2 ** 31), $optional: ['seq'] },
   'g.leave': {},
+  // host test commands (DESIGN §34.8 phase 2). The server applies them only in a test match. `args` is checked
+  // again by shared/testMode.js parseTestArgs (ids, bounds). Unknown keys inside args fail there, not here.
+  'g.test': { cmd: isTestCommand, args: (v) => v === undefined || (isPlain(v) && Object.keys(v).length <= 8), $optional: ['args'] },
 
   // client-side combat (DESIGN §14): the authoritative client of a field reports its battle; a 联防 field adds
   // `left` = { [leakerId]: its enemies still standing (unspawned, alive, or through again) } (server/sim/spec.js

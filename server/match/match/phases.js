@@ -88,6 +88,7 @@ export class MatchPhases {
     const d = this.draft;
     this.cancel(this._turnTimer);
     this._turnTimer = null;
+    if (this.test) this.setDeadline(0);
     while (d.idx < d.order.length && d.picks[d.order[d.idx]]) d.idx++; // loop-cap: draft order
     if (d.idx >= d.order.length) {
       d.turnDeadline = 0;
@@ -101,11 +102,13 @@ export class MatchPhases {
       d.turnDeadline = this.sched.now() + ms;
       // the step's countdown IS the turn's (one number everywhere)
       this.deadline = d.turnDeadline;
-      this._turnTimer = this.later(ms, () => {
+      const expire = () => {
         if (this.phase !== PHASE.BAND_DRAFT || token !== this._turnToken) return;
         const pid = this.draftTurn();
         if (pid) this._applyBand(this.players.get(pid), this.timeoutBand(pid));
-      });
+      };
+      if (this.test) { this.setDeadline(ms / 1000 / (this.timerScale || 1), expire); d.turnDeadline = this.deadline; }
+      else this._turnTimer = this.later(ms, expire);
     } else {
       d.turnDeadline = 0;
       this.deadline = 0;

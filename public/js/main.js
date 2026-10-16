@@ -44,7 +44,7 @@ import { store, useStore, emptyMatch, selectRoute, sessionResetNotice, isSpectat
 import { data } from './data.js';
 import { GAME_FILES } from './ui/gameComponents.js';
 import { TitleScreen, sanitizeName } from './screens/title.js';
-import { LobbyScreen, rememberRoom, parseRoomParam } from './screens/lobby.js';
+import { LobbyScreen, rememberRoom, parseRoomParam, joinKnown } from './screens/lobby.js';
 import { RoomScreen, TrustedNotice } from './screens/room.js';
 import { GameScreen } from './screens/game.js';
 import { audio, installAudio } from './audio.js';
@@ -117,7 +117,7 @@ function schedulePendingJoin() {
     }
     joinInFlight = true;
     try {
-      await net.request('room.join', { code });
+      await joinKnown('room.join', code);
     } catch (err) {
       toastError(err);
     } finally {
@@ -169,6 +169,7 @@ function onWelcome(msg) {
     content: msg.content && typeof msg.content.vanilla === 'string' ? { vanilla: msg.content.vanilla } : null,
     // how many unofficial plugins it has (P1a — absent: none; content.js fetches the catalogue only when there are some)
     installedPlugins: pluginCount(msg.content),
+    testMode: msg.testMode === true,
   });
   welcomeAt = Date.now();
 
@@ -211,7 +212,7 @@ function onRoomState(msg) {
   store.set({ room });
   identity.rememberMatch(room.inMatch && seats.some((seat) => seat?.playerId === myId)
     ? { name: store.get().me.name, code: room.code || '' } : null);
-  if (room.mode === 'coop' && typeof room.code === 'string') rememberRoom(room.code);
+  if (room.mode === 'coop' && typeof room.code === 'string') rememberRoom(room.code, room.test === true);
   maybeFinishRestore();
 }
 
@@ -259,7 +260,7 @@ function wireNet() {
     // replays dedupe by content id inside recordResult (spectator seats' copies build no record at all)
     // (`vs`: the room's cosmetic plugins, recorded — such a match still counts as the original game: ui/stats.js)
     // (`content`: the room's content set when it played gameplay plugins — such a match is unofficial: ui/stats.js)
-    recordResult(res, { myId: store.get().me.playerId, roomMode: store.get().room?.mode ?? null, vs: store.get().room?.content?.vs ?? null, content: store.get().room?.content ?? null, now: Date.now() });
+    if (store.get().room?.test !== true && store.get().match.public?.test !== true) recordResult(res, { myId: store.get().me.playerId, roomMode: store.get().room?.mode ?? null, vs: store.get().room?.content?.vs ?? null, content: store.get().room?.content ?? null, now: Date.now() });
   });
   net.on('m.toast', (msg) => {
     const kind = ['info', 'success', 'warn', 'error'].includes(msg.kind) ? msg.kind : 'info';

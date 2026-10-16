@@ -229,6 +229,8 @@ import { MatchReports } from './match/reports.js';
 import { MatchUnite } from './match/unitePhase.js';
 import { MatchBoss } from './match/bossRounds.js';
 import { MatchSettle } from './match/settle.js';
+import { installTestTrace } from './testTrace.js';
+import { MatchTestCommands } from './match/testCommands.js';
 
 export { FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS } from './match/common.js';
 
@@ -305,6 +307,33 @@ export class Match {
     this.botRehearsalDelegateMs = Number.isFinite(opts.botRehearsalDelegateMs) && opts.botRehearsalDelegateMs > 0 ? opts.botRehearsalDelegateMs : REHEARSAL_ANSWER_MS;
     /** the room's current host (opts.hostId; server/lobby.js room.hostId — setHost follows a migration) */
     this.hostId = typeof opts.hostId === 'string' ? opts.hostId : null;
+    /**
+     * Match test mode (DESIGN §34.8 phase 2). opts.test is only forwarded for a room created with the flag.
+     * The extra state exists only then, and public / result views omit the keys while this is false, so a
+     * normal match stays byte-identical.
+     */
+    this.test = opts.test === true;
+    if (this.test) {
+      /** phase deadlines are armed. false holds the callback (g.test timers) instead of scaling time to 0. */
+      this.testTimers = true;
+      /** successful g.test commands this match (m.result.testActions) */
+      this.testActions = 0;
+      /** @type {{ seq: number, playerId: string, cmd: string, args: object, at: number, ok: boolean, code?: string }[]} */
+      this.testLog = [];
+      /** @type {Map<string, number[]>} command → scheduler timestamps inside the rate window */
+      this._testRate = new Map();
+      this._testSeq = 0;
+      /** the phase callback held while testTimers is false */
+      this._testHeld = null;
+      /** the last callback setDeadline armed, so timers can be turned off mid-phase */
+      this._testArmed = null;
+      /** false once the input journal stops logging (the replay decoder's line cap) */
+      this.testReplayable = true;
+      /** replay: stop a sliced callback after this many steps; null while recording */
+      this._testSliceBudget = null;
+      /** steps taken by the timer callback now running (the journal's `steps`) */
+      this._testSliceCount = 0;
+    }
     /** @type {Map<string, { id: string, job: any, executor: string, timer: any }>} delegated rehearsals in flight */
     this._rehearsalTasks = new Map();
     this._rehearsalSeq = 0;
@@ -449,11 +478,15 @@ export class Match {
     this.hiddenReached = false;
     this.outcome = null;
     this._turnToken = 0;
+    // [ASSUMED] A real scheduler keeps the 8 ms bot and headless slices, including a test match,
+    // so one callback cannot run to HARD_CAP_SECONDS. Virtual time stays unbounded (the defaults
+    // above). The input journal records the steps that callback took; replay stops there.
+    if (this.test && opts.journal !== false) installTestTrace(this, opts);
   }
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

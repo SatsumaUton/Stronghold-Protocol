@@ -7,6 +7,10 @@ the profession defaults and the test harness. Everything here is deterministic: 
 and the only floating-point functions are correctly rounded ones (`detmath.js` below), so a battle gives the same bits in
 every browser and on the server.
 
+A match test room (DESIGN §34.8) does not change this engine. `g.test` is a match input applied before a battle
+starts or between battles; shared boss HP/team LP and phase timers can also change during boss battles. Operator HP, SP and positions inside a running battle are sim state and are not test
+commands. `server/match/testReplay.js` replays test-only `[test-input ROOM]` JSON entries (init options, platform calls, actual timer order, and the step count of a sliced callback) with the same data/build and optional registry. Replay stops a sliced callback at that count and does not read the wall clock again. A journal that hit the 4096-line cap is not replayable. No journal is loaded through the network. Test results have no awards or local records. The studio battle sandbox builds one BattleSpec and runs it here; it does not write server match state.
+
 ```
 server/sim/
   Battle.js        one field (normal / unite / boss / hidden) — the class: constructor, method install, public API
@@ -1543,6 +1547,13 @@ Rules for content tests: seed everything, prefer synthetic `enemyRec` targets fo
 objects), and call `checkInvariants` at the end. Run: `node --test test/sim/*.test.js test/content/*.test.js`.
 
 ## 11. Tools
+
+For interactive vanilla reproduction, open the studio's `/studio/console.html` with its key. The server validates
+`shared/studio/scenario.js` scenes through `server/studio/console.js`; the page runs `createBattleFromSpec` with the
+real browser sim and renderer. Start paused, step one/thirty ticks, inspect units and damage/heal/effect logs, or save
+the seeded setup as JSON. Empty custom waves remain open until the console cap. This single-field tool does not
+run prep economy, settle a match or submit results; [the console reference](PLUGINS.md#test-console) lists input
+fields and unsupported cases. Tests: `test/studio/console.test.js` (no listener/browser needed).
 
 Equipment/fortress corrections (§30.3): Kjerag Ice and Tear Gas use actual enemy damage events, including DoT,
 not attack declarations or element-gauge/HP-loss events. Fortress fallback targeting and skill automation include

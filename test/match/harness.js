@@ -8,7 +8,8 @@
 // fake (true → test/match/fakeBattle.js as BattleClass), script (FakeBattle.script), registry, instant (virtual
 // scheduler runs battles synchronously; default true), timerScale, battleContent, botRehearsal (default 0),
 // botSliceMs (bot rehearsal slice budget; default: unbounded in virtual time), aiPicksLast (the room option
-// AI 队友最后选择: the drafts order every human seat before every AI seat), hostId / botRehearsalDelegate /
+// AI 队友最后选择: the drafts order every human seat before every AI seat), test (DESIGN §34.8; hostId then
+// defaults to the first human), hostId / botRehearsalDelegate /
 // botRehearsalDelegateMs (the delegated bot rehearsal, DESIGN §14: test/match/rehearsal-delegate.test.js),
 // cs / vs / requireCs (a gameplay-plugin room: host rehearsal stays off).
 // Combat mode: clientCombat (default false here: the legacy server-run mode most suites were written for; production
@@ -83,7 +84,8 @@ export function makeMatch(o = {}) {
     aiPicksLast: o.aiPicksLast,
     // a bot prep's layout rehearsal delegated to the room's host (DESIGN §14; test/match/rehearsal-delegate.test.js):
     // `hostId` is the executor a task is sent to, `botRehearsalDelegateMs` its answer window
-    hostId: o.hostId,
+    hostId: o.hostId !== undefined ? o.hostId : (o.test === true ? (seats.find((s) => s && !s.isBot)?.playerId ?? null) : undefined),
+    test: o.test === true,
     botRehearsalDelegate: o.botRehearsalDelegate,
     botRehearsalDelegateMs: o.botRehearsalDelegateMs,
     // a gameplay-plugin room (DESIGN §32.6): host rehearsal stays off there (match/rehearsal.js requireCs)

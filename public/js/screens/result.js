@@ -25,6 +25,7 @@ import { store, useStore, emptyMatch } from '../store.js';
 import { audio } from '../audio.js';
 import { sentText } from '../ui/lang.js';
 import { UnofficialMark } from '../ui/pluginTag.js';
+import { TestMark } from '../ui/testConsole.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -149,6 +150,8 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         ${r.difficulty ? html`<${DifficultyTag} difficulty=${r.difficulty} size="lg" />` : null}
         <h1 class="result__headline">${r.victory ? t('模拟完成') : t('模拟失败')}</h1>
         <${UnofficialMark} room=${content ? { content } : null} class="result__modmark" />
+        ${res?.test === true ? html`<p class="result__test" data-testid="result-test"><${TestMark} /> ${t('测试对局')}${Number.isInteger(res.testActions) ? html` · ${t('测试指令 {n} 次', { n: res.testActions })}` : null}</p>
+          <p class="t-dim">${t('本局为测试对局，不计入统计、成就、称号、徽章与卫戍认证。')}</p>` : null}
         <p class="result__sub">${r.victory ? t('成功卫戍 · 敌方领袖已被击败') : t('防线已被突破')}</p>
         <div class="result__rounds">
           <span class="result__rlabel">${t('通过回合')}</span>
