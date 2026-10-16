@@ -124,7 +124,9 @@ export function createContentSets({ registry, vanillaData, log = noopLog, maxSet
     for (const id of ids) {
       const p = registry.plugin(id);
       if (!p || !p.content || typeof p.content.hash !== 'string') return null;
-      parts.push([id, p.content.hash, p.script?.execution ?? null, p.status, p.manifest ?? null, norm[id] ?? null]);
+      const manifest = p.manifest ? { ...p.manifest } : null;
+      if (manifest) delete manifest.notices; // Catalogue data cannot invalidate a room's gameplay memo.
+      parts.push([id, p.content.hash, p.script?.execution ?? null, p.status, manifest, norm[id] ?? null]);
     }
     try { return JSON.stringify(parts); } catch { return null; }
   };

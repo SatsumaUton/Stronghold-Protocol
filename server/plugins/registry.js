@@ -55,6 +55,7 @@ import {
   FILE_URL_DIGITS, LOCK_FILE, attachSpineMeta, modelHashOf, readAssetOverlay, readPluginLock, visualHashOf, writesHashOf,
 } from '../../shared/plugins/visual.js';
 import { canonicalJson } from '../../shared/plugins/identity.js';
+import { readThemeDeclaration } from '../../shared/plugins/theme.js';
 import { issueList, issueLine, makeIssue } from '../../shared/plugins/errors.js';
 
 /** The language folders' subdirectory (public/i18n/, data/i18n/). */
@@ -280,7 +281,6 @@ function readVisual(dir, manifest, listed, { vanilla, hashCache }) {
   const list = issueList();
   const { problems, warnings, issues } = list;
   const out = (visual) => ({ visual, problems, warnings, issues });
-  if (manifest.parts.theme) list.warning('PLUGIN_THEME_UNUSED', '"theme" is not applied by this version (it applies the art of "assets")', { at: ['theme'] });
   const part = manifest.parts.assets;
   let assets = {};
   let assetsFile = null;
@@ -458,6 +458,25 @@ export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, whe
     if (isFile(abs) && !inside(dir, abs)) list.problem('PLUGIN_FILE_OUTSIDE', `"${d.at}": ${d.rel} leads out of the plugin folder`, { at: d.at.split('.'), file: d.rel });
   }
   if (!manifest || problems.length) return out(null);
+  const themeFile = manifest.parts.theme;
+  if (themeFile && !themeFile.inline) {
+    if (themeFile.files.length !== 1) list.problem('PLUGIN_PART_SHAPE', '"theme" names more than one file (one theme per plugin)', { at: ['theme'] });
+    else {
+      const rel = themeFile.files[0];
+      const loaded = readJson(path.join(dir, ...rel.split('/')));
+      if (loaded.error) list.problem(loaded.code, `${rel}: ${loaded.error}`, { file: rel, detail: loaded.error });
+      else {
+        const bad = checkJsonLimits(loaded.json);
+        if (bad) list.problem('PLUGIN_JSON_LIMIT', `${rel}: ${bad}`, { file: rel });
+        else {
+          const decl = readThemeDeclaration(loaded.json);
+          for (const p of decl.problems) list.problem(p.code, p.text, { at: p.at });
+          if (decl.vars && Object.keys(decl.vars).length) manifest.themeVars = decl.vars;
+        }
+      }
+    }
+    if (problems.length) return out(null);
+  }
   const status = classStatus(manifest.class);
   /** @type {Record<string, PackFile>} */
   const served = {};
@@ -494,7 +513,9 @@ export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, whe
       plugin.script = readScripts(dir,manifest,files);
       for (const p of plugin.script.problems) list.problem(p.code,p.message,{where:p.path,detail:p.message});
       if (problems.length) return out(null);
-      plugin.content = { ...c.content, files: {...c.content.files,...plugin.script.files}, hash: nodeSha256(Buffer.from(JSON.stringify({...c.content.files,...plugin.script.files}))) };
+      const gameplayFiles = { ...(c.content.gameplayFiles || c.content.files), ...plugin.script.files };
+      plugin.content = { ...c.content, files: {...c.content.files,...plugin.script.files},
+        ...(c.content.gameplayFiles ? { gameplayFiles } : {}), hash: nodeSha256(Buffer.from(JSON.stringify(gameplayFiles))) };
       plugin.script.manifestSource = fs.readFileSync(man,'utf8');
       // Every snapshot byte must be from the pinned lock too, even if an author saves midway through the scan.
       plugin.script.lockValid &&= Object.entries(plugin.content.files).every(([rel,hash]) => plugin.script.lockedFiles[rel]?.sha256 === hash)

@@ -17,6 +17,12 @@
 
 ## 做法一：用插件工作台（不写代码）
 
+### 主题与公告（手写清单）
+
+外观插件可以在 `plugin.json` 添加 `"permissions": ["theme"]` 和 `"theme": { "vars": { "--text-hi": "#f4faf7", "--t-fast": "0s" } }`。若还有素材权限，把 `theme` 加到原来的权限列表。只能写本安装的颜色、时间和缓动变量；完整名单在 `shared/plugins/theme.js`。颜色用十六进制或 `rgb()/rgba()/hsl()/hsla()` 的数字、百分比，时间为 0–2000ms 或 0–2s，缓动用 CSS 关键字或 x 在 0–1 的 `cubic-bezier()`。不收网址、`var()`、引号或 CSS 语句。
+
+任何类别的插件都可以添加 `"notices": [{ "id": "welcome", "title": "欢迎", "body": "第一行\n第二行", "date": "2026-10-17", "i18n": { "en": { "title": "Welcome", "body": "First line\nSecond line" } } }]`，不需要新增权限。日期与译文可以省略。服务器所有已加载插件的公告都会显示，与房间选择无关；标题页和大厅有公告时才出现入口，打开后清除未读点。[ASSUMED] 只显示纯文本，链接也是文字，每个插件最多 20 条，标题 80 字、正文 2000 字；全目录最多 100 条、48 KiB 的公告 JSON，按新到旧保留，遇到放不下的就停止。公告不影响内容哈希和对局。工作台的清单保存与命令行检查使用同一套校验；这一版没有专门的主题/公告表单。
+
 ### 1. 打开工作台
 
 服务器启动后，窗口里会多一行 **`Studio:`**，后面是工作台的地址，形如 `http://localhost:3000/studio/#key=…`。
@@ -273,8 +279,16 @@ node tools/plugin.mjs pack my-texas --zip
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_PART_CLASS` | 「{where}」不是 {class} 插件能带的东西 | 外观插件只带 "assets"（素材）和 "theme"（主题）；界面插件带 "entry.client" 和 "slots"；改数值、加干员之类的要做成 content 插件。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_PART_SHAPE` | 「{where}」的写法不对 | 写成插件文件夹里的一个 .json 文件路径（或这些路径的列表）；"assets" 和 "theme" 也可以直接写成 { … } 对象。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_ASSET_FILE` | 素材「{where}」写的文件不对：不是插件文件夹里的路径，或者不是这个位置要的文件类型 | 写插件文件夹里的相对路径，例如 art/avatar.png。图片位置用 .png .jpg .webp，声音位置用 .mp3 .ogg，模型用 .skel 和 .atlas（贴图 .png）。 |
-| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_THEME_URL` | 主题 "theme" 里写了网址 | 主题只能写颜色、长度和插件自带的字体名，不能引用网址（这是为了防止泄露数据）。 |
-| 插件能用，但检查时有提示 | `PLUGIN_THEME_UNUSED` | 这个版本还不应用 "theme"（只应用 "assets" 里的素材） | 可以先留着，以后的版本会用上；或者删掉它，提示就没了。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_THEME_URL` | 主题「{where}」里写了网址 | 主题变量只能写颜色、时间或缓动，不能写网址、var() 或其他表达式。 |
+| 插件能用，但检查时有提示 | `PLUGIN_THEME_UNUSED` | 这条提示来自旧版本：这一版会在玩家自己的画面上应用主题变量 | 这一版不再发出这条提示。主题变量写在 theme.vars 里，只能用本安装的设计变量。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_THEME_NAME` | 主题变量「{where}」不是本安装的设计变量 | 只能设置 public/css/theme.css 里 :root 的颜色、时间和缓动变量，例如 --text-hi、--t-fast、--ease-out。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_THEME_VALUE` | 主题变量「{where}」的值不是这种变量允许的颜色、时间或缓动 | 颜色用 #rgb、#rgba、#rrggbb、#rrggbbaa 或 rgb()/rgba()/hsl()/hsla()；时间用 0–2000ms 或 0–2s；缓动用关键字或 cubic-bezier()。不能写网址、引号或表达式。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_THEME_LIMIT` | 主题变量超过了 64 个 | 一个插件最多写 64 个主题变量。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_THEME_SHAPE` | 主题「{where}」不是变量表 | 写成 "theme": { "vars": { "--text-hi": "#f4faf7" } }。键都是 -- 开头的扁平对象也可以。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_NOTICE_SHAPE` | 公告「{where}」的写法不对 | notices 是列表，每条有 id（小写字母、数字和 -）、title、body，可以有 date（YYYY-MM-DD）和 i18n。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_NOTICE_LIMIT` | 公告超过了条数或字数上限 | 一个插件最多 20 条公告，标题最多 80 字，正文最多 2000 字。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_NOTICE_TEXT` | 公告「{where}」的标题或正文不是纯文本，或是空的 | 标题和正文都要有字。正文可以换行。不要写控制字符。链接就当普通文字写。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_NOTICE_LANG` | 公告「{where}」的语言代码不认识 | i18n 的键用本游戏认识的语言代码，例如 en、ja、ko、zh-TW。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_ENTRY` | 入口 "entry" 写得不对，或者这个类别不能有入口：{where} | 外观插件不需要 "entry"，删掉它。界面插件写 "entry": { "client": "ui/index.html" }（插件文件夹里的一个 .html 文件）。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_LANG_ONLY` | 「{where}」只属于语言包（lang 类），{class} 插件不能写 | 删掉它；要做语言包的话，把 class 改成 "lang"。（工作台可一键修复） |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_PERMISSION` | 权限写得不对：「{where}」不认识，或者 {class} 插件不能有 | 外观插件能用的权限：assets.override（替换本安装已有的素材）、assets.add（新增一个本安装没有的条目）、theme；界面插件用 ui.frame。"permissions" 要写成列表。 |
@@ -416,7 +430,14 @@ node tools/plugin.mjs import-forge <工坊包目录或 zip> [--out plugins/<id>]
 
 `--dry-run` 只打印报告，不写文件。皮肤、立绘、头像、图标、Spine、语音、对得上的音乐和音效会变成外观插件；数值改动、
 新干员、`chess.json` 里成对的新棋子（`_a` 普通、`_b` 精锐；`isDiy` 的六星写成自选）和新敌人会变成数据插件；界面词条
-会变成语言包；公告和鸣谢写进清单的说明。对不上的部分留在 `IMPORT-REPORT.md` 里，中文和英文各一行。
+会变成语言包；公告和鸣谢仍写进清单的说明，并且各成一条公告（见下）。对不上的部分留在 `IMPORT-REPORT.md` 里，中文和英文各一行。
+
+主题变量和公告：
+
+- 工坊包的 `client.theme.vars` 会变成外观插件的 `theme.vars`。只能用本安装 `:root` 上的颜色、时间和缓动变量（例如 `--text-hi`、`--t-fast`、`--ease-out`）。对不上的名字会在报告里点名并且不写入。一个插件最多 64 个。[ASSUMED] 玩家在「外观插件」里打开它之后，只改自己这个浏览器的界面，不注入样式表，也不影响别人。两个都打开时，插件 id 靠后的那个生效，面板上写着是谁的值。关掉立刻恢复。
+- 只有主题、没有素材的包会变成一份只给个人用的外观插件（例如夜间主题）。带素材的外观仍是房间和个人都能选；主题仍只跟这名玩家自己的开关走。
+- `notices.announcement`（或 `announcements`）和 `notices.credits` 会变成清单里的 `notices`。公告标题是版本、日期和摘要，正文是各节的名字和条目，一行一条；鸣谢单独一条，链接当普通文字。[ASSUMED] 纯文本，不解析 HTML。一个插件最多 20 条，标题 80 字，正文 2000 字。只有公告的包也会变成一份个人外观插件。公告不进内容哈希，不进房间，也不进对局。
+- 关掉动画的面板和样式表（例如一份「轻量」包里的 `root.overlays` 面板）不会导入，报告写需要人工适配。它的主题变量仍会导入。
 
 技能怎么办：
 

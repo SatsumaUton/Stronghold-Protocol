@@ -212,12 +212,12 @@ with cosmetic plugins; a room with gameplay plugins will read `MODDED cs=… plu
 file's URL (`/data/<file>?v=<8 hex>`), hash and size — cached for good; any other `cs` is 404. `GET /plugins/index.json`
 (never cached) is the catalogue: `{ version, app, api, content: { vanilla }, plugins: [entry …] }`, every plugin and
 pack found by class and id, with its `status` (`loaded` / `disabled` / `planned` / `unsupported`), `unofficial`, its manifest's
-public fields, size and file count — never a path on the server; a loaded cosmetic plugin adds `vs` (the visual set of
-it alone, §9) and `artBytes` (the art it serves). A loaded interface plugin adds `slots`, `entry` (a path inside the
-plugin), `vs`, `frameBytes` and `frameFiles` (`{ path: sha256 }`, §14) — not `artBytes`.
+public fields, size and file count — never a path on the server; a loaded cosmetic plugin that writes art adds `vs` (the visual set of
+it alone, §9) and `artBytes` (the art it serves). [ASSUMED] A theme- or notices-bearing cosmetic with an empty overlay omits both, so the page does not fetch an empty document; pre-existing entries keep their shape. A loaded interface plugin adds `slots`, `entry` (a path inside the
+plugin), `vs`, `frameBytes` and `frameFiles` (`{ path: sha256 }`, §14) — not `artBytes`. A plugin that declares theme variables adds `theme.vars`; a plugin that declares announcements adds `notices`. Both are omitted when absent, so a catalogue entry without them keeps its old shape. Notices are not a content-hash input (§9.2).
 
 Cosmetic plugins and interface plugins never change `cs`: neither changes a battle, so a room whose plugins are only
-of those classes plays the vanilla `cs`. Installing a ui plugin, or editing its page, does not change `cs`. Editing a
+of those classes plays the vanilla `cs`. Installing a ui plugin, or editing its page, does not change `cs`. Editing notice text does not change `cs` either: when `plugin.json` declares `notices`, the content set hashes the canonical manifest with that key removed. For script plugins, the descriptor uses that stripped source and identifies the gameplay file hashes instead of the notice-sensitive raw lock; owner admission still verifies the complete original lock [ASSUMED]. A plugin that never declares `notices` keeps the hash of its original `plugin.json` bytes. Editing a
 served `/shared/**.js` does, because `cs` hashes every one of them — including `shared/plugins/ui.js`. The art a
 cosmetic plugin draws, and the frame an interface plugin draws, are named by the visual hash `vs` (§9, §14).
 
@@ -328,8 +328,7 @@ that model: a model write the browser leaves out, or whose file fails to load, l
 battle music `audio.bgm.combatAlts` (the mode's own 开战 tracks, 骑士之日 / 无畏者, fixed per round) is not something a
 plugin changes: the client plays it instead of `combat` in the rounds it covers, so a plugin's `combat` is heard only
 where no such track plays. Writing an
-entry the installation has needs the permission `assets.override`, a new entry `assets.add`. `theme` is not applied yet
-(a warning).
+entry the installation has needs the permission `assets.override`, a new entry `assets.add`. `theme` is the allowlisted variables of §9.1, applied on this player's page only.
 
 **Spine models and `plugin.lock.json`.** A model's clip roles, durations, events, hit times and bounds come from the
 skeleton itself: `node tools/plugin.mjs pack <dir>` parses it the way `tools/fetch-assets.mjs` parses the game's
@@ -455,6 +454,18 @@ set, 2 MB copied by references per plugin and 4 MB per set, the lock's limits ab
 
 **Start from** `plugins/_template/cosmetic/` — two original CC0 files (a checkerboard PNG and a short synthesized OGG) plus installed-art references. Never put files
 of the official game in a plugin.
+
+### 9.1 Theme variables
+
+A cosmetic plugin (and a trusted one) may set `theme.vars`, a map of custom properties to values. A flat map whose every key starts with `--` is the same declaration [ASSUMED]. A single relative JSON file may hold either shape, checked by the same validator when scanned. The permission is `theme`. The names are only the colour, time and easing tokens this installation defines on `:root` (`shared/plugins/theme.js`, from `public/css/theme.css`). A colour is `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, or `rgb()` / `rgba()` / `hsl()` / `hsla()` with numbers and percentages. A time is `0–2000ms` or `0–2s`. An easing is `linear`, `ease`, `ease-in`, `ease-out`, `ease-in-out`, `step-start`, `step-end`, or `cubic-bezier()` with x in 0–1. `url(`, `var(`, `calc(`, quotes, backslashes and `; { } < >` are refused. [ASSUMED] At most 64 variables. One bad name or value refuses the whole theme on our manifests (`PLUGIN_THEME_NAME`, `PLUGIN_THEME_VALUE`, `PLUGIN_THEME_LIMIT`, `PLUGIN_THEME_SHAPE`, `PLUGIN_THEME_URL`). `check --strict`, the registry and the studio call the same function.
+
+The page writes the variables of the player's switched-on personal cosmetic plugins with `documentElement.style.setProperty`, in plugin-id order. [ASSUMED] The later id wins a shared token, and the 外观插件 panel names that plugin. Switching one off removes the properties at once. A room's visual set does not apply them, and they are never sent. No stylesheet is injected. [ASSUMED] Fonts, z-index, `--t`, `--bk-l`, `--bk-w`, `--sa-*`, `--tap-min` and properties that are not on `:root` are not tokens. Functions/keywords are lowercase; numbers are decimal without exponents or an explicit plus, with CSS ASCII whitespace. Cubic-bezier y values may be any finite number.
+
+### 9.2 Announcements (公告)
+
+Any plugin may declare `notices`: a list of `{ id, title, body, date?, i18n? }`. `id` is `/^[a-z0-9][a-z0-9-]{0,31}$/` and unique in that plugin. `date`, when present, is a valid calendar date in `YYYY-MM-DD` [ASSUMED]. `i18n` maps a valid BCP 47 language code to `{ title, body }`. This is data, not a part and not a permission. [ASSUMED] Plain text: the page renders the strings as text, so `<` and `>` stay characters and a link is not an anchor. Newlines in the body are kept. A title has no newline. Empty text is refused. [ASSUMED] Caps: 20 notices, a title of 80 characters, a body of 2000 (`PLUGIN_NOTICE_SHAPE`, `PLUGIN_NOTICE_TEXT`, `PLUGIN_NOTICE_LIMIT`, `PLUGIN_NOTICE_LANG`). One problem refuses the whole list.
+
+[ASSUMED] Every loaded plugin's notices are shown, whether or not a room selects that plugin. They ride on `GET /plugins/index.json` (no separate route). `content.notices: true` in `/healthz` and `welcome` tells the page to fetch the catalogue even for a language-only installation; the hint is absent when there are none and never enters room content. The catalogue keeps at most 100 notices and 48 KiB of serialized notice arrays (UTF-8, including escaping, ids, dates and translations), newest first, and stops at the first that would not fit. The title screen and the lobby show 公告 only when there is at least one. The popup lists them newest first (a dated notice before an undated one, then plugin id, then notice id) with the plugin's name, in the player's language when that notice has a translation. A dot marks unseen ids. Seen ids are `sp.pref.notices-seen` in this browser; every access is in try/catch. [ASSUMED] Opening the popup marks every notice then on screen as seen, and the list keeps at most 400 ids. Notices never enter a content hash, a room's composition or a match.
 
 ## 10. Data plugins (P1b)
 
@@ -1315,8 +1326,16 @@ lacks). The table below is generated from it (`node tools/plugin.mjs errors --wr
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_PART_CLASS` | “{where}” is not something a {class} plugin carries | A cosmetic plugin carries "assets" and "theme" only, a ui plugin "entry.client" and "slots"; numbers and new operators belong to a content plugin. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_PART_SHAPE` | “{where}” is not written the right way | Write the path of a .json file of the plugin folder (or a list of them); "assets" and "theme" may also be the { … } object itself. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_ASSET_FILE` | The file of “{where}” is not right: not a path inside the plugin folder, or not the kind of file this place takes | Write a path inside the plugin folder such as art/avatar.png. Pictures are .png .jpg .webp, sounds .mp3 .ogg, models .skel with .atlas (pages .png). |
-| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_THEME_URL` | "theme" names a URL | A theme sets colours, lengths and the plugin's own font names only — never a URL (it could leak data). |
-| The plugin works, with a note in the check | `PLUGIN_THEME_UNUSED` | This version does not apply "theme" yet (only the art of "assets") | Keep it for a later version, or remove it to silence the note. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_THEME_URL` | “{where}” names a URL | A theme variable is a colour, a time or an easing — never a URL, var() or another expression. |
+| The plugin works, with a note in the check | `PLUGIN_THEME_UNUSED` | This note is from an older version: this version applies theme variables on the player's own screen | This version no longer raises this note. Write theme.vars, and only this installation's design tokens. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_THEME_NAME` | “{where}” is not a design token of this installation | Set only a colour, time or easing custom property of :root in public/css/theme.css, such as --text-hi, --t-fast or --ease-out. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_THEME_VALUE` | “{where}” is not a colour, a time or an easing this token allows | A colour is #rgb, #rgba, #rrggbb, #rrggbbaa or rgb()/rgba()/hsl()/hsla(). A time is 0–2000ms or 0–2s. An easing is a keyword or cubic-bezier(). No URL, quotes or expression. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_THEME_LIMIT` | There are more than 64 theme variables | One plugin sets at most 64 theme variables. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_THEME_SHAPE` | “{where}” is not a theme variable map | Write "theme": { "vars": { "--text-hi": "#f4faf7" } }. A flat object whose every key starts with -- is also accepted. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_NOTICE_SHAPE` | “{where}” is not a notice | notices is a list. Each item has id (lower-case letters, digits and -), title and body, and may have date (YYYY-MM-DD) and i18n. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_NOTICE_LIMIT` | A notice exceeds the count or the length limit | One plugin has at most 20 notices, a title of at most 80 characters and a body of at most 2000. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_NOTICE_TEXT` | “{where}” has a title or a body that is empty or not plain text | Title and body must both contain text. The body may contain newlines. No control characters. Write a link as text. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_NOTICE_LANG` | “{where}” names a language this game does not know | An i18n key is a language code this game knows, such as en, ja, ko or zh-TW. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_ENTRY` | An entry point is not right, or this class has none: {where} | A cosmetic plugin needs no "entry": remove it. A ui plugin has "entry": { "client": "ui/index.html" } (an .html file of the plugin folder). |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_LANG_ONLY` | “{where}” belongs to a language pack (class lang), not a {class} plugin | Remove it; for a language pack, make "class": "lang". (the studio fixes it in one click) |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_PERMISSION` | A permission is not right: “{where}” is unknown or not one a {class} plugin may have | A cosmetic plugin's permissions: assets.override (replace art the installation has), assets.add (a new entry), theme; a ui plugin's: ui.frame. "permissions" is a list. |
@@ -1573,9 +1592,10 @@ Modules (`statsBase`, `traitBase`, `talentsBase`), new garrisons and bonds remai
 | new items, stages, waves, tokens, bosses, modes | — | no safe compact mapping. `variants` and `behaviour` are engine switches, not modes |
 | a flat `{ msgid: string }` translation | a `lang` plugin, `files.ui` | `zh` is the source language and is not a language pack |
 | `{ version: 1, lang, files }` | content i18n, only when every leaf replaces an existing string | a missing leaf would refuse the whole content set, so the file is skipped |
-| notices, credits, description | `description` (at most 500 characters) and `credits` on every product that is not a language pack | unreadable |
+| notices (`announcement` or `announcements`, and `credits`) | `notices` on the primary product: the announcement's title is version, date and summary (80 characters) and its body is each section's name and items as lines (2000 characters); credits are their own notice, a url written as text [ASSUMED]. Text is kept out of hashed description/credits metadata. A pack whose only usable part is notices is one personal-scope cosmetic | unreadable or missing files. Both keys at once: only `announcement` is used. Extra notice keys are named and skipped |
 | `license`, `authors` | copied when they are short strings | |
 | `dependencies`, `conflicts` | `requires`, `conflicts` when the id is a plugin id. An omitted range is `*` [ASSUMED] | an id that cannot become a plugin id. A product does not require itself |
+| `client.theme.vars` | a cosmetic plugin's `theme.vars`. Allowlisted names are kept; every other name is listed as dropped (`PLUGIN_THEME_NAME`, `PLUGIN_THEME_VALUE`, `PLUGIN_THEME_URL`, past 64 `PLUGIN_THEME_LIMIT`). A pack whose only usable part is its theme is one personal-scope cosmetic. No stylesheet is injected | a name or a value the grammar refuses |
 | `client.panels` `screen.game.hud` and `screen.game.aside` | a ui plugin, slot `hud.right`, one HTML stub | a second panel for the same slot |
 | `client.panels` `screen.result.footer` | a ui plugin, slot `result.tab` | |
 | any other panel mount | manual adaptation report | `PLUGIN_FORGE_MOUNT`; panel name, Forge mount and suggested rewrite slot |
@@ -1724,7 +1744,7 @@ it is not executed. `uniqueItemProperties` is a keyword of this repository's val
 Implemented features are documented in §9–§17: cosmetics, data, room content sets, DSL, scripts, interface widgets,
 the studio and trial bench, Forge import, and catalogue/address installs. The following remain unavailable:
 
-- Cosmetic theme colours and plugin fonts are not applied; `theme` produces a warning (§9).
+- Plugin fonts are not applied. Theme variables of the allowlist are applied on this player's page only (§9.1).
 - `allowIncompatible` does not bypass the content builder (§11).
 - Additional mode-code hooks and plugin-specific `golden` / `simcheck` / balance-tool switches have not been added.
 - Personal plugins refresh on the next catalogue fetch; file changes are not pushed to every player's preferences.
