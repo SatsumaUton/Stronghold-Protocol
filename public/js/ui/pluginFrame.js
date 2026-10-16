@@ -222,7 +222,7 @@ function renderSlotTabs() {
     const bar = old || document.createElement('div');
     bar.className = 'ui-slot__tabs';
     bar.setAttribute('role', 'tablist');
-    try { bar.setAttribute('aria-label', t('界面插件')); } catch { bar.setAttribute('aria-label', '界面插件'); }
+    bar.setAttribute('aria-label', t('界面插件'));
     const holder = slots.holder(slot);
     bar.replaceChildren(...list.map((rec) => {
       const b = document.createElement('button');
