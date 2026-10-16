@@ -114,7 +114,7 @@ describe('scenes.py (no UnityPy needed)', { skip: !PY && 'no python3' }, () => {
     const { scenes } = JSON.parse(r.stdout);
     assert.equal(scenes.sub, 'scene');
     assert.equal(scenes.tex, SCENE_TEX_GROUP);
-    assert.equal(scenes.version, 2, 'manifest scene-record version; scene.json stays SCENE_VERSION');
+    assert.equal(scenes.version, 3, 'manifest scene-record version; scene.json stays SCENE_VERSION');
     const ids = scenes.stages.map((x) => x.id);
     const battlefields = Object.keys(stages).filter((id) => /^act\dautochess_m\d+$/.test(id)).sort();
     assert.deepEqual([...ids].sort(), battlefields, 'every battlefield has a scene');
@@ -199,7 +199,7 @@ print(json.dumps({'mode': d.mode, 'px': list(d.getdata()), 'range': s.LIGHT_RANG
     assert.equal(out.wanted.length, 2, 'the scene and its lighting data, nothing else');
   });
 
-  test('data maps are lossless WebP; emission is exported only with _EMISSION and stays lossy', { skip: !HAS_PIL && 'no Pillow' }, () => {
+  test('data maps are lossless WebP; emission is exported only with _EMISSION', { skip: !HAS_PIL && 'no Pillow' }, () => {
     const out = py(`import tempfile, os
 from PIL import Image
 try:
@@ -226,7 +226,7 @@ print(json.dumps({
   'lossless': lossless.get('webp'), 'lossy': lossy.get('webp'), 'match': match,
 }))`);
     assert.equal(out.mesh, SCENE_VERSION);
-    assert.equal(out.ver, 2);
+    assert.equal(out.ver, 3);
     assert.deepEqual(out.metro, ['map', 'normalMap', 'glossMap', 'emissionMap']);
     assert.deepEqual(out.floor, ['map', 'normalMap', 'glossMap']);
     assert.deepEqual(out.cut, ['map', 'normalMap', 'glossMap', 'emissionMap']);
@@ -238,6 +238,49 @@ print(json.dumps({
     } else {
       assert.equal(out.lossless, null);
       assert.equal(out.lossy, null);
+    }
+  });
+
+  test('an emission map round-trips a saturated texel exactly', { skip: !HAS_PIL && 'no Pillow' }, () => {
+    const out = py(`import tempfile, os
+from PIL import Image
+try:
+    from PIL import features
+    webp = bool(features.check('webp'))
+except Exception:
+    webp = False
+# The three measured lights, plus a neighbour so 4:2:0 has something to average.
+px = [(173, 165, 12, 255), (231, 49, 49, 255), (255, 135, 2, 255), (12, 40, 220, 255)]
+img = Image.new('RGBA', (2, 2))
+img.putdata(px)
+lossless = 'emissionMap' in s.LOSSLESS_MAPS
+with tempfile.TemporaryDirectory() as d:
+    entry = s.save_image(img, d, 'E', 'scene/tex', lossless)
+    got = None
+    lossy = None
+    if webp and entry.get('webp'):
+        got = list(Image.open(os.path.join(d, 'E.webp')).convert('RGBA').getdata())
+        bad = s.save_image(img, d, 'L', 'scene/tex', False)
+        if bad.get('webp') == 'lossy':
+            lossy = list(Image.open(os.path.join(d, 'L.webp')).convert('RGBA').getdata())
+print(json.dumps({
+  'webp': webp,
+  'inSet': 'emissionMap' in s.LOSSLESS_MAPS and 'normalMap' in s.LOSSLESS_MAPS and 'glossMap' in s.LOSSLESS_MAPS,
+  'mapLossy': 'map' not in s.LOSSLESS_MAPS,
+  'mode': entry.get('webp'),
+  'match': got == px if got is not None else None,
+  'got0': got[0] if got else None,
+  'lossyDiffers': (lossy != px) if lossy is not None else None,
+}))`);
+    assert.equal(out.inSet, true);
+    assert.equal(out.mapLossy, true);
+    if (out.webp) {
+      assert.equal(out.mode, 'lossless');
+      assert.equal(out.match, true, 'lossless emission keeps each saturated texel');
+      assert.deepEqual(out.got0, [173, 165, 12, 255]);
+      assert.equal(out.lossyDiffers, true, 'quality 95 would have moved the same texels');
+    } else {
+      assert.equal(out.mode, null);
     }
   });
 });

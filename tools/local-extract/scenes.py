@@ -20,8 +20,8 @@ Output per stage, under <out>/scene/<stageId>/ (manifest group scene/<stageId>):
   lm<i>.png    lightmap page i (+ a WebP copy, the one the manifest lists): RGB = the baked indirect light (Lightmap-<i>_comp_light, stored RGBM: decode_rgbm),
                A = the key light's baked shadow (Lightmap-<i>_comp_shadowmask, R)
 and the materials' albedo, normal (normal_rgb), metallic-gloss and (only with the _EMISSION keyword) emission textures under
-<out>/scene/tex/ (manifest group scene/tex, shared by the scenes). Normal and metallic-gloss are lossless WebP;
-albedo, lightmaps and emission stay lossy. The manifest scene record's version (SCENE_EXTRACT_VERSION) is what
+<out>/scene/tex/ (manifest group scene/tex, shared by the scenes). Normal, metallic-gloss and emission are lossless WebP;
+albedo and lightmaps stay lossy. The manifest scene record's version (SCENE_EXTRACT_VERSION) is what
 setup treats as fresh; scene.json version stays the mesh layout (SCENE_VERSION).
 A chunk's `group` is '' for what the scene shows at rest and the sub-graphic name (HIDDEN@1 …, MapSubGraphicHolder)
 for the meshes the game switches on later.
@@ -57,9 +57,10 @@ SCENE_SUB = 'scene'
 TEX_SUB = 'scene/tex'
 SCENE_VERSION = 1
 # Manifest `scene` record (kind Scene) of each scene/<stageId> group. scene.json `version` stays SCENE_VERSION so a
-# scene extracted before this still loads. setup / doctor compare this with expected.mjs and ask for --scenes once
-# when an existing record is older (DESIGN §34.12).
-SCENE_EXTRACT_VERSION = 2
+# scene extracted before this still loads. setup / doctor compare this with expected.mjs and ask once when an
+# existing record is older (DESIGN §34.12). 3: emission maps are lossless too, so a version-2 extract (normal and
+# gloss only) is stale and that same prompt asks again.
+SCENE_EXTRACT_VERSION = 3
 # display-space light value that a lightmap page's 1.0 stands for (decode_rgbm; scene.json lightRange, with
 # lightEncoding 'gamma'). The pages of the eleven scenes stay below 2.8.
 LIGHT_RANGE = 3.0
@@ -68,10 +69,11 @@ LIGHT_ENCODING = 'gamma'
 # emissionMap is exported only when the _EMISSION keyword is on (map_exports): the Syracuse floor assigns
 # _EmissionMap without the keyword, and the program does not sample it.
 TEX_SLOTS = (('_MainTex', 'map'), ('_BumpMap', 'normalMap'), ('_MetallicGlossMap', 'glossMap'), ('_EmissionMap', 'emissionMap'))
-# Data maps: channels are independent values. Lossy WebP's 4:2:0 chroma would mix them (extract.py WEBP 'lossless').
-# Albedo and emission are colour and stay lossy. [ASSUMED] the scene emission map is colour, unlike the board's
-# TX_autochessi_E, which extract.py lists as lossless.
-LOSSLESS_MAPS = frozenset({'normalMap', 'glossMap'})
+# Data maps: channels are independent values. Lossy WebP's 4:2:0 chroma mixes them (extract.py WEBP 'lossless').
+# Emission is a colour map, and the same 4:2:0 pass turns a saturated light grey
+# (TX_KXMR_E (173,165,12) → (149,152,133) at quality 95), so it is lossless too, like the board's TX_autochessi_E.
+# Albedo and lightmaps stay lossy.
+LOSSLESS_MAPS = frozenset({'normalMap', 'glossMap', 'emissionMap'})
 # RGBM range of a reflection cubemap in gamma colour space (the same 5 as the lightmap pages)
 ENV_RGBM = 5.0
 # bytes of one 4 × 4 block of the cubemap formats the scenes use
@@ -228,8 +230,9 @@ def map_exports(kind, keywords):
 
 def save_image(img, out_dir, stem, sub, lossless=False):
     """Write `img` as <stem>.png and a WebP copy beside it. `lossless` uses extract.py WEBP_OPTIONS['lossless']
-    (normal and metallic-gloss). Colour maps stay lossy at quality 95 with the alpha lossless and the RGB under
-    transparent texels kept. Returns the manifest entry, which lists the copy (the PNG when Pillow has no WebP)."""
+    (normal, metallic-gloss and emission). Albedo and lightmaps stay lossy at quality 95 with the alpha lossless
+    and the RGB under transparent texels kept. Returns the manifest entry, which lists the copy (the PNG when
+    Pillow has no WebP)."""
     img.save(Path(out_dir) / f'{stem}.png')
     entry = {'path': f'/assets/local/{sub}/{stem}.png', 'w': img.width, 'h': img.height}
     try:
