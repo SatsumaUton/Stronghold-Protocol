@@ -16,8 +16,11 @@
 //   setSkill(on)                          skill begin once, then the loop for the whole skill when the clip is a
 //                                         begin/loop/end set with no idle of its own (DESIGN §34.4: 白面鸮 S2 holds
 //                                         Skill_Loop through every heal). An attack during that skill plays the skill's
-//                                         own attack clip when the skeleton has one (焰影苇草 Skill_3_Attack) and then
-//                                         the loop again; otherwise the attack does not touch the clip. A skill with an
+//                                         own attack clip when the skeleton has one (焰影苇草 Skill_3_Attack), or that
+//                                         loop when it has OnAttack (送葬人 S2: scaled to the interval, strikePose on
+//                                         that frame), then the loop again. A loop with no OnAttack is not restarted.
+//                                         A stun returns to the held loop; Begin waits until the stun ends if the skill
+//                                         turned on during it. A skill with an
 //                                         idle clip of its own (skill.idle, not its loop) stands in that idle between
 //                                         attacks and plays its loop only on attacks (community report #23: 折桠's S2
 //                                         jump). End on stop. A skill clip with NEITHER a Begin nor an own Idle
@@ -418,6 +421,7 @@ export class SpineActor {
     this.skillOn = false;
     this.skillClipOnce = false;    // skillBegin: the skill's own clip plays once (a clip with no Begin / own Idle)
     this.skillEndPending = false;  // … and the skill turned off inside it: play its End clip / base when it ends
+    this.skillBeginPending = false; // setSkill(true) during a stun: Begin plays when the stun ends (§34.4.1)
     this.attackUntil = 0;
     this.clock = 0;
     this.current = '';
@@ -563,6 +567,9 @@ export class SpineActor {
 
   _idleName() {
     const sk = this.roles.skill;
+    // [ASSUMED] DESIGN §34.4.1: the resting clip of a held skill is its loop. Idle here is the stand-up a stun
+    // used to leave behind for the rest of the skill (白面鸮 S2).
+    if (this._skillLoopHeld()) return sk.loop;
     if (this.skillOn && sk && this.has(sk.idle)) return sk.idle;
     return this.has(this.roles.idle) ? this.roles.idle : (this.has('Idle') ? 'Idle' : [...this.names][0]);
   }
@@ -625,6 +632,18 @@ export class SpineActor {
   _leaveStun() {
     this.frozen = false;
     this.mode = 'base';
+    // [ASSUMED] DESIGN §34.4.1: Begin cannot play under a stun. A skill that turned on during it plays Begin
+    // now and queues the loop. A skill that was already on resumes the loop through _idleName (no second Begin).
+    if (this.skillBeginPending && this._skillLoopHeld()) {
+      this.skillBeginPending = false;
+      const sk = this.roles.skill;
+      this.mode = 'skillBegin';
+      this._play(sk.begin, false, { mix: 0.08 });
+      this.skillBeginUntil = this.clock + this.dur(sk.begin);
+      if (this.has(sk.loop)) this._queue(sk.loop, true);
+      return;
+    }
+    this.skillBeginPending = false;
     this._play(this._baseName(), true);
   }
 
@@ -729,10 +748,10 @@ export class SpineActor {
   /**
    * This skill's own strike clip, which the resolver drops when a Loop exists (anim-roles skillFamily: loop =
    * P_Loop before P_Attack). 焰影苇草 S3 is Skill_3_Attack beside Skill_3_Begin/Loop/End.
-   * [ASSUMED] (DESIGN §34.4): no table says which clip an atk plays during a held loop. Only a same-prefix
+   * [ASSUMED] (DESIGN §34.4.1): no table says which clip an atk plays during a held loop. Only a same-prefix
    * `<prefix>_Attack` (or `<prefix>_Attack_*`, not Down / Begin / End / Idle) counts — not the normal Attack and
-   * not another skill's Attack_2 (塞雷娅). A loop that already contains OnAttack (初雪, 安洁莉娜, 锏 S3) stays the
-   * held loop at the clip's own speed; it is not restarted or retimed to the attack interval.
+   * not another skill's Attack_2 (塞雷娅). A loop that itself contains OnAttack is not a separate clip: `_attackClip`
+   * returns the skill role so the existing per-attack scale and strikePose path plays that loop.
    */
   _skillOwnAttack() {
     const sk = this.roles.skill;
@@ -760,10 +779,15 @@ export class SpineActor {
     const sk = this.roles.skill;
     if (this.skillOn && sk && this.has(sk.loop) && sk.via !== 'attack' && !this._skillIsBuffOnly()) {
       if (this._skillLoopHeld()) {
-        // No dedicated strike clip: leave the begin / looping loop alone. Returning the normal attack here
-        // would stand the operator up; returning the skill role would replay the loop as a one-shot and then End.
+        // A dedicated strike clip (焰影苇草 Skill_3_Attack) wins. Otherwise a loop that itself has OnAttack is
+        // the strike: return the skill role so windUp / attack scale it and strikePose is that frame. The attack
+        // end already returns to the looping loop and skips End. A loop with no OnAttack stays put — returning
+        // the normal attack would stand her up (白面鸮 S2). [ASSUMED] DESIGN §34.4.1.
         const atk = this._skillOwnAttack();
-        return atk ? { begin: null, loop: atk, end: null } : null;
+        if (atk) return { begin: null, loop: atk, end: null };
+        const hits = this.entry && this.entry.hits && this.entry.hits[sk.loop];
+        if (Array.isArray(hits) && hits.length) return sk;
+        return null;
       }
       return sk;
     }
@@ -814,7 +838,13 @@ export class SpineActor {
     if (on === this.skillOn || this.dead) return;
     this.skillOn = on;
     const sk = this.roles.skill;
-    if (this.mode === 'stun' || this.mode === 'die') return;
+    if (this.mode === 'stun' || this.mode === 'die') {
+      // [ASSUMED] DESIGN §34.4.1: Begin waits out a stun. A skill that is already on keeps its loop via _idleName.
+      if (on && this.mode === 'stun' && this._skillLoopHeld()) this.skillBeginPending = true;
+      if (!on) this.skillBeginPending = false;
+      return;
+    }
+    this.skillBeginPending = false;
     // a skill that ends as the unit (re)deploys — 乌尔比安's 【返回】 is a 【移动】 (sim Battle.moveRedeploy) right before
     // his S3's 'skill' off event — lets the deploy clip play out (then the plain idle) instead of cutting it with the End
     if (!on && this.mode === 'deploy') return;
@@ -890,6 +920,7 @@ export class SpineActor {
     if (this.dead) return 0;
     this.dead = true;
     this.frozen = false;
+    this.skillBeginPending = false;
     this.mode = 'die';
     const d = this.dieClip();
     if (d) { this._play(d, false, { mix: 0.05 }); return this.dur(d); }
@@ -923,6 +954,7 @@ export class SpineActor {
     this.frozen = false;
     this.mode = 'base';
     this.skillOn = false;
+    this.skillBeginPending = false;
     this._play(this._baseName(), true);
   }
 
