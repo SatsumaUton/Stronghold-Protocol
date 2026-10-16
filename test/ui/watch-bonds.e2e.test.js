@@ -570,6 +570,13 @@ describe('DESIGN §20.15 — the bond strip shows the watched teammate\'s bonds 
     }
   });
 
+  /** The official 协议已失效 dialog (ui/downedPlate.js) a player sees when their own LP runs out while the team plays on:
+   * 继续观战 closes it (a no-op when it is not open). */
+  async function continueWatching(c) {
+    const btn = await c.page.waitForSelector('[data-testid="downed-plate"] ~ .downm__btns .downm__btn--watch, .downm__btn--watch', { timeout: 4000 }).catch(() => null);
+    if (btn) { await btn.click(); await c.page.waitForFunction(() => !document.querySelector('[data-testid="downed-plate"]'), { timeout: 5000 }).catch(() => {}); }
+  }
+
   test('Final Assault spectator (eliminated): the pair\'s first player, each picked player\'s half + bonds, the lone field', { timeout: 8 * 60 * 1000 }, async () => {
     const srv = await startRealServer({ fast: { timerScale: 1, combatSpeed: 2, startRound: 'boss', idleBots: true, autoPlace: true,
       kits: [UNITE_HOST_KIT, []], botChess: BOT_KIT, eliminate: [1] } });
@@ -583,6 +590,8 @@ describe('DESIGN §20.15 — the bond strip shows the watched teammate\'s bonds 
       await sleep(1500);
       await host.click('.readybtn');
       for (const c of [host, guest]) await c.waitFor((s) => s.phase === 'FINAL_ASSAULT', 'Final Assault', 90000);
+      // the eliminated guest answers the official 协议已失效 dialog (PR #705) with 继续观战 before watching
+      await continueWatching(guest);
       await guest.page.waitForSelector('.chud__layers', { timeout: 20000 });
       await sleep(1000);
       const mv = await matchView(guest);
