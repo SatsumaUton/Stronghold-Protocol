@@ -74,6 +74,8 @@ const CHAIN_WINDOW = 0.5;
 const BLOCK_REACH = 0.75, BLOCK_REACH_AIR = 0.95;
 /** 'dmg' types of HP damage (shared/protocol.js; an element gauge fill names its element instead). */
 const HP_TYPES = new Set(['phys', 'arts', 'true']);
+/** The identity rotation: the root of a projectile's flying effect (the client parents it to the projectile's body). */
+const ID_ROT = Object.freeze([0, 0, 0, 1]);
 
 const lc = (k) => (typeof k === 'string' && k ? k.toLowerCase() : null);
 /** Torappu.SharedConsts.Direction order (a directional emitter row's `slots`). */
@@ -1007,7 +1009,7 @@ export class FxWiring {
     };
     const def = mainKey ? this.ofx.lib.def(mainKey) : null;
     const flipIfLeft = def ? def.flipIfLeft : false;
-    const handle = mainKey ? this.ofx.spawn(mainKey, { pos: from.slice(), groundZ: -(src.z || 0) }, {
+    const handle = mainKey ? this.ofx.spawn(mainKey, { pos: from.slice(), groundZ: -(src.z || 0), rootRot: ID_ROT }, {
       important: true,
       track: (fx) => {
         if (flight.done) return;
@@ -1027,7 +1029,7 @@ export class FxWiring {
       // the rope: its LineRenderers from the shooter's mount point now to the head (effect.js linkLines; a world-space
       // line draws nothing before); without a head it flies the shot itself
       const drive = !handle;
-      flight.rope = this.ofx.spawn(ropeKey, { pos: from.slice(), groundZ: -(src.z || 0) }, {
+      flight.rope = this.ofx.spawn(ropeKey, { pos: from.slice(), groundZ: -(src.z || 0), rootRot: ID_ROT }, {
         important: true,
         track: (fx) => {
           if (flight.done) return;

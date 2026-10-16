@@ -198,6 +198,14 @@ export function compileEffect(desc, lib = {}) {
   // drew nothing (0.3.1)
   const rootIdx = Number.isInteger(desc?.root) && desc.root >= 0 && desc.root < n ? desc.root : 0;
   if (n) def.activeBase[rootIdx] = 1;
+  // the root's authored position is no part of the effect: the client always sets it where it plays the effect
+  // (Effect._InitLocationFromEntity: the spawn point; _InitLocation: the map position; a projectile's main effect is
+  // parented to the projectile's body and reset to it — Projectile._CreateMainEffect → BattleController.CreateEffect(…,
+  // attach) → Misc.Reset, GameAssembly of 2026-09-13). 203 prefabs of the used set keep where the artist left the root:
+  // 155 projectile bodies (安洁莉娜 S2's orbs 0.74 north and 0.6 up, 灰毫's shell 0.78 to the right …), 嵯峨's buff 10
+  // tiles away … — they were drawn that far from their place (0.3.1, history §34.6)
+  def.rootPos = n ? [def.base[rootIdx * 10], def.base[rootIdx * 10 + 1], def.base[rootIdx * 10 + 2]] : [0, 0, 0];
+  if (n) def.base[rootIdx * 10] = def.base[rootIdx * 10 + 1] = def.base[rootIdx * 10 + 2] = 0;
   // systems under another system play with it at the start (Unity plays child systems with their parent)
   for (let i = 0; i < n; i++) {
     let p = def.parent[i];
@@ -269,6 +277,7 @@ export class Effect {
     this.mirror = false;
     this.flipY = false;                                // FLIP_TWO_SIDE with a `_rotationY` helper
     this.mountRot = null;                              // the mount point's world rotation on the root ([x,y,z,w]) or null
+    this.rootRot = null;                               // the rotation the game sets on the root as it plays it, or null
     this.groundZ = 0;
     this.time = 0;                                     // s since spawn (battle clock)
     this.delay = def.delayToPlay + (def.randomDelay > 0 ? Math.random() * def.randomDelay : 0);
@@ -314,7 +323,7 @@ export class Effect {
     this.hier.fill(0); this.prevHier.fill(0); this.actAt.fill(-1); this.forcedOff.fill(0);
     this.matOv.clear(); this.rendOv.clear(); this.trails.clear(); this.linePts.clear();
     this.anchor[0] = this.anchor[1] = this.anchor[2] = 0;
-    this.yaw = 0; this.pitch = 0; this.roll = 0; this.mirror = false; this.flipY = false; this.groundZ = 0; this.mountRot = null;
+    this.yaw = 0; this.pitch = 0; this.roll = 0; this.mirror = false; this.flipY = false; this.groundZ = 0; this.mountRot = null; this.rootRot = null;
     this.time = 0;
     this.delay = def.delayToPlay + (def.randomDelay > 0 ? Math.random() * def.randomDelay : 0);
     this.state = 'play'; this.linger = 0; this.started = false; this.track = null; this.hidden = false; this.pausedBy = false; this.owner = null;
@@ -346,6 +355,10 @@ export class Effect {
       const q = this.mountRot || (this.mountRot = [0, 0, 0, 1]);
       q[0] = o.mountRot[0]; q[1] = o.mountRot[1]; q[2] = o.mountRot[2]; q[3] = o.mountRot[3];
     } else if (o.mountRot === null) this.mountRot = null;
+    if (Array.isArray(o.rootRot) && o.rootRot.length === 4) {
+      const q = this.rootRot || (this.rootRot = [0, 0, 0, 1]);
+      q[0] = o.rootRot[0]; q[1] = o.rootRot[1]; q[2] = o.rootRot[2]; q[3] = o.rootRot[3];
+    } else if (o.rootRot === null) this.rootRot = null;
     return this;
   }
 
@@ -576,6 +589,14 @@ export class Effect {
       _p3[0] = L[o]; _p3[1] = L[o + 1]; _p3[2] = L[o + 2];
       _q[0] = L[o + 3]; _q[1] = L[o + 4]; _q[2] = L[o + 5]; _q[3] = L[o + 6];
       _s3[0] = L[o + 7]; _s3[1] = L[o + 8]; _s3[2] = L[o + 9];
+      // the root's rotation is the one the game gives it as it plays the effect (`rootRot`: the spawn location's —
+      // Effect._InitLocationFromEntity sets transform.rotation —, the identity for a projectile's body, which the client
+      // parents to the projectile and resets), not the prefab's own; an effect placed at a map position keeps it
+      // (Effect._InitLocation sets only the position)
+      if (i === 0) {
+        const r = this.rootRot;
+        if (r) { _q[0] = r[0]; _q[1] = r[1]; _q[2] = r[2]; _q[3] = r[3]; } else if (def.proj) { _q[0] = 0; _q[1] = 0; _q[2] = 0; _q[3] = 1; }
+      }
       // the direction: a `_rotationZ` helper's rotation is set to it (the client's script replaces the helper's
       // authored rotation — ifrit_attack_01_start's is a leftover 90°), else the root turns; yaw about Z relative to
       // the art's `_mainDir`, pitch about the turned Y. A `_rotationY` helper turns 180° about Y for a flipped owner.
