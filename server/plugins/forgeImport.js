@@ -108,6 +108,7 @@ import { validateSkillSpec } from '../../shared/plugins/skillSpec.js';
 import { canonicalLang, languageName, SOURCE_LANG } from '../../shared/i18nPacks.js';
 import { KITS, OPERATOR_KITS, TIER_KITS } from '../sim/content/kits/index.js';
 import { bundleForgeKits } from './forgeKits.js';
+import { readForgeBehaviour } from '../../shared/plugins/rules.js';
 
 const APP_RANGE = '>=0.3.0 <0.4.0';
 const DANGER_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -1011,9 +1012,16 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     }
   }
 
+  const behaviourRead = readForgeBehaviour(pack.behaviour);
+  for (const row of behaviourRead.skipped) skip(row.path, row.zh, row.en);
+  const importedRules = behaviourRead.rules;
   for (const key of Object.keys(SKIP_TOP)) {
     if (pack[key] == null) continue;
+    // behaviour is reported entry by entry above, including an empty list (no second generic skip).
+    if (key === 'behaviour') continue;
     if (key === 'combat' && pack.combat !== true) continue;
+    // A behaviour import implies combat: true. combat alone, or a behaviour that imported nothing, still skips.
+    if (key === 'combat' && importedRules) continue;
     const [zh, en] = SKIP_TOP[key];
     skip(`pack.json:${key}`, zh, en);
   }
@@ -1302,6 +1310,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   const enemyRecords = [];
   /** @type {string[]} */
   const importedData = [];
+  if (importedRules) for (const [name, option] of Object.entries(importedRules)) importedData.push(`behaviour:${name} → rules.${name} = ${option}`);
   /** @type {string[]} */
   const rewrittenData = [];
   const seenIds = new Set();
@@ -2371,7 +2380,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   /** @type {string[]} */
   const roles = [];
   const contentI18n = translations.filter((t) => t.kind === 'content');
-  const hasContent = patches.length || operators.length || enemyRecords.length || contentI18n.length;
+  const hasContent = patches.length || operators.length || enemyRecords.length || contentI18n.length || !!importedRules;
   if (hasContent) roles.push('content');
   if (Object.keys(assets).length && media.size) roles.push('cosmetic');
   if (scriptPlan) roles.push('script');
@@ -2390,7 +2399,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   for (const bucket of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items', 'skills', 'modules']) if (isObj(assets[bucket])) kept.push(...Object.keys(assets[bucket]));
   const cosmeticBare = asked.length > 0 && asked.every((k) => droppedIds.has(k)) && kept.every((k) => droppedIds.has(k));
 
-  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, contentI18n, panels, manualPanels, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare };
+  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, contentI18n, panels, manualPanels, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare, rules: importedRules };
   return { meta, roles };
 }
 
@@ -2508,9 +2517,11 @@ function buildProducts(meta, ids, primaryRole) {
         files.set(rel, `${JSON.stringify(t.doc, null, 2)}\n`);
       }
     }
-    if (!perms.length && !meta.contentI18n.length) perms.push('data.patch');
-    man.permissions = [...new Set(perms)];
-    files.set('README.md', readme(ids.content, 'content', ['- 数值补丁、干员和敌人见 data/、operators/、enemies/。', '- 技能脚本没有执行，映射不上的用通用 kit。']));
+    if (meta.rules) man.rules = meta.rules;
+    // A rules-only plugin declares no permission and no dummy data.patch (an unused permission fails strict check).
+    if (!perms.length && !meta.contentI18n.length && !meta.rules) perms.push('data.patch');
+    if (perms.length) man.permissions = [...new Set(perms)];
+    files.set('README.md', readme(ids.content, 'content', ['- 数值补丁、干员和敌人见 data/、operators/、enemies/。', '- 技能脚本没有执行，映射不上的用通用 kit。', ...(meta.rules ? ['- 规则开关写在 plugin.json 的 rules 里。公告没有导入。'] : [])]));
     products.push({ id: ids.content, class: 'content', role: 'content', files, imported: meta.importedData, rewritten: meta.rewrittenData, manifest: man });
   }
   if (ids.cosmetic) {
@@ -2648,6 +2659,7 @@ function publicReport({ meta, products, primaryId, wrote, dryRun, check, issues 
     manualPanels: meta.manualPanels || [],
     products: products.map((p) => ({
       class: p.class, dir: `plugins/${p.id}`, id: p.id, imported: [...p.imported], permissions: p.manifest.permissions || [], rewritten: [...p.rewritten],
+      ...(p.manifest.rules ? { rules: p.manifest.rules } : {}),
     })).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
     skipped: [...meta.skipped].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)),
     wrote,

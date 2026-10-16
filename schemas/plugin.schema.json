@@ -732,6 +732,37 @@
         "type": "string",
         "pattern": "^[A-Za-z0-9_:-]{1,128}$"
       }
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Gameplay rule switches (DESIGN §34.15). Absent means today's rules. Only a content, script or trusted plugin may set any of these.",
+      "properties": {
+        "shopBias": {
+          "enum": [
+            "official",
+            "bondBias"
+          ]
+        },
+        "prepLoadout": {
+          "enum": [
+            "locked",
+            "prep"
+          ]
+        },
+        "morphPairing": {
+          "enum": [
+            "official",
+            "plus"
+          ]
+        },
+        "unequip": {
+          "enum": [
+            "official",
+            "allow"
+          ]
+        }
+      }
     }
   },
   "additionalProperties": false,
@@ -2092,6 +2123,24 @@
             }
           }
         ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "rules"
+        ]
+      },
+      "then": {
+        "properties": {
+          "class": {
+            "enum": [
+              "content",
+              "script",
+              "trusted"
+            ]
+          }
+        }
       }
     }
   ]

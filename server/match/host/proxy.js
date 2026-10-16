@@ -52,6 +52,8 @@ export function wireOptions(opts) {
     out.test = true;
     if (typeof opts.hostId === 'string') out.hostId = opts.hostId;
   }
+  // Rule switches ride with the content set. A room that declares none keeps today's worker payload.
+  if (opts.rules && typeof opts.rules === 'object' && !Array.isArray(opts.rules)) out.rules = opts.rules;
   return out;
 }
 

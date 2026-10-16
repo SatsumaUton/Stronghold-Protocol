@@ -188,7 +188,7 @@ also parses every JSON file against the limits.
 Every server names the content its rooms play with a hash, **`cs`** (`shared/plugins/identity.js`):
 
 ```
-cs = sha256(canonical({ v: 1, app, sim, data, plugins, settings, i18n? }))
+cs = sha256(canonical({ v: 1, app, sim, data, plugins, settings, i18n?, rules? }))
   sim       sha256(canonical([[path, sha256], …])) of every served /sim/**.js (not nodeData.js), /shared/**.js and /data.js
   data      { <name>: sha256 } of every data/<name>.json the match or the sim reads (not assets, local-assets, emotes, i18n/)
   plugins   [{ id, version, files }] in load order — [] for the vanilla content
@@ -462,6 +462,44 @@ A `content` plugin is now `loaded`: the registry snapshots its declared JSON; `b
 plugins in dependency order and validates the **whole merged data**. No third-party code is imported or evaluated.
 Room selection, worker isolation and HTTP/client switching are §11 (P1c). Start with `plugins/_template/content/`, copied
 to `plugins/data-demo/`. Rename its record namespaces too when renaming that folder.
+
+### Rule switches
+
+Since 0.3.1, a content plugin can carry only `rules`, with no data files or permissions:
+
+```json
+{ "manifest": 2, "id": "prep-rules", "name": "Prep rules", "version": "1.0.0",
+  "app": ">=0.3.1 <0.4.0", "api": 1, "class": "content", "scope": ["room"],
+  "rules": { "prepLoadout": "prep", "unequip": "allow" } }
+```
+
+`shared/plugins/rules.js` owns the closed table (`RULE_SWITCHES`); the manifest validator, composition, match,
+sim and client share its helpers. The editor schema mirrors that table and a test checks it. Only declared
+switches enter `index.rules`, the room summary and the content hash, including an explicitly selected default.
+An absent key adds nothing; [ASSUMED] an empty object is treated as absent. Unknown switches/options or a
+non-gameplay class declaring rules fail with `PLUGIN_RULES`. [ASSUMED] script and trusted plugins may declare the
+same rules as content plugins; their existing execution gates still apply. Conflicting declared options fail
+composition with `PLUGIN_RULE_CONFLICT`, naming the switch and both plugins; repeating the same option is fine.
+Rooms display active non-default rules in words in their plugin tag, panel and match HUD. A client cannot enable one.
+The match host takes rules from the verified content set, overriding any per-match options.
+
+| Switch | Default | Other option and effect |
+| --- | --- | --- |
+| `shopBias` | `official` | `bondBias`: shop item candidates prefer `giveBondId` in this player's active bonds, after the stock gate. The tier still follows chess-tier shares. No matching available item in that tier falls back to the official candidates of that tier. Rolling grants nothing. No core-bond priority, Knight discipline bias, or `giveBondBiasOnly` interpretation. |
+| `prepLoadout` | `locked` | `prep`: existing `room.loadout { entries, ops? }` also works during PREP before this seat is ready. Each submission overlays only named operators. Named defaults reset them; omitted operators retain their choices. INFO_CHECK remains a full replacement independent of ready. The prep HUD opens 干员调配 and closes it on ready or phase exit. [ASSUMED] `ops` uses the same merge semantics. |
+| `morphPairing` | `official` | `plus`: a morph (`canGiveBond`) is required; only the leftmost other item with a valid `giveBondId` grants a bond. The morph takes no equipment slot, at most one morph per operator; two ordinary slots remain. Replacing an item never destroys the morph. The same helper drives prep/effects, combat and client bond displays. |
+| `unequip` | `official` | `allow`: `g.unequip { itemUid }` moves an equipped item into the rightmost free hand slot, else a free temporary slot. Both full: atomic `HAND_FULL`, retaining the original equipment order. Same uid and stock, no content hook; bots never unequip. |
+
+The workshop defines both halves of morphPairing precisely, so the slot policy is implemented too. [ASSUMED]
+requesting the morph as a replacement falls back to the leftmost occupying item; a second morph returns BAD_TARGET.
+[ASSUMED] unequip follows the other prep intents' ready lock and considers only the five visible temporary slots;
+hidden overflow is not free space. Ordinary recycling returns every equipped item and needs no slot-cap check here.
+Official policy is a frozen singleton with the original slot arithmetic. BattleSpec includes `morphPairing: "plus"`
+only for this option, for normal, shared, boss and rehearsal battles.
+
+Rule-less hash inputs, plugin file hashes and vanilla data bytes are unchanged, and no golden scenario moves.
+The build's `cs` still hashes all served shared/sim source bytes (§6), so this engine update changes that code hash;
+it does not freeze or exempt changed code from identity verification.
 
 **Patches** (`shared/plugins/patch.js`): a manifest `data` file is `{ "patch": 1, "ops": [...] }`.
 Each operation names `file` (without `.json`), optional record `id`, and `path` (array of keys/indexes):
@@ -1288,6 +1326,8 @@ lacks). The table below is generated from it (`node tools/plugin.mjs errors --wr
 | The room will not switch it on; the panel says why | `PLUGIN_BLOCKED` | That plugin cannot be switched on here: this version does not apply its class, or its scope does not include this place | A cosmetic plugin has "class": "cosmetic"; its scope is ["room"] (the host switches it on for the room), ["personal"] (a player for themself) or both. |
 | The room will not switch it on; the panel says why | `PLUGIN_DEPENDENCY` | A plugin it requires is missing or out of its version range, or the load-order hints of some plugins form a cycle | Install the plugins its "requires" names (within their ranges), or remove the loadAfter / loadBefore entries that point at each other. |
 | The room will not switch it on; the panel says why | `PLUGIN_CONFLICT` | The chosen plugins conflict with each other | Switch one of them off; a plugin's "conflicts" says which ones it cannot be used with. |
+| The room will not switch it on; the panel says why | `PLUGIN_RULE_CONFLICT` | Two plugins set the same rule switch to different options ({path}) | Keep only one of the plugins, or make them choose the same option. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_RULES` | The manifest rules are wrong: an unknown switch or option, or this plugin class cannot declare rules | rules may name only shopBias, prepLoadout, morphPairing and unequip, each with its two options; only content, script and trusted plugins may declare them. |
 | The room will not switch it on; the panel says why | `PLUGIN_LIMIT` | Over this server's limit: {detail} | Switch on fewer plugins, or make them smaller (compress pictures and sounds, remove unused files, fewer whole-record references). |
 | The room will not switch it on; the panel says why | `PLUGIN_INCOMPATIBLE` | That gameplay plugin is not made for this server's game version (or its plugin API) | Use a version of the plugin made for this game version (its "app" says which), or ask its author for an update. |
 | The room will not switch it on; the panel says why | `PLUGIN_BUSY` | This server already runs as many plugin sets at once as it allows | Try again later, or pick the same plugins as a room already using some; the server owner can raise maxSets in plugins/config.json. |
@@ -1550,6 +1590,11 @@ Modules (`statsBase`, `traitBase`, `talentsBase`), new garrisons and bonds remai
 
 ### Mapping
 
+Forge `behaviour: [{ switch, option }]` maps to the four [rule switches](#rule-switches). A valid declaration
+implies gameplay (`combat: true` is not required on input) and produces a content plugin even with no other data.
+Unknown switches/options are skipped individually with a bilingual reason. [ASSUMED] repeated different options
+keep the first and report the later one. This conversion does not import notices.
+
 | Forge piece | Becomes | When it does not |
 |---|---|---|
 | `art.chars` avatar, avatarE2, portrait, portraitE2 | cosmetic `assets.chars` | any other portrait field has no overlay key |
@@ -1581,7 +1626,7 @@ Modules (`statsBase`, `traitBase`, `talentsBase`), new garrisons and bonds remai
 | any other panel mount | manual adaptation report | `PLUGIN_FORGE_MOUNT`; panel name, Forge mount and suggested rewrite slot |
 | a panel with `wraps`, or `readonly` / `readOnly: false` | — | it rewrites a component, so it is not read-only |
 | the panel's script | not copied. The stub answers welcome with ready, then slot and resize, and says the author must rewrite it to postMessage API v1 | `PLUGIN_FORGE_PANEL_SCRIPT` |
-| `server`, `routes`, `assets` (`.spresources`), `forms`, `fx`, `variants`, `behaviour`, `playtest`, `support`, `combat: true`, `layer` | — | engine replacement, protocol, server logic, or a switch this manifest has no field for. One reason each, in Chinese and in English |
+| `server`, `routes`, `assets` (`.spresources`), `forms`, `fx`, `variants`, `playtest`, `support`, standalone `combat: true`, `layer` | — | engine replacement, protocol, server logic, or a switch this manifest has no field for. One reason each, in Chinese and in English |
 | any other `.js` `.mjs` `.cjs` `.ts` `.jsx` `.tsx` | not imported and not executed | `PLUGIN_FORGE_SCRIPT` |
 | a file `pack.json` does not reference | — | named in the report, except a loose music file whose basename is a bgm track |
 

@@ -246,6 +246,8 @@ node tools/plugin.mjs pack my-texas --zip
 | 房间里开不了这个插件，面板弹出提示 | `PLUGIN_BLOCKED` | 这个插件不能在这里启用：这个版本不应用它的类别，或者它的作用范围不包括这里 | 外观插件的 class 写 "cosmetic"；scope 写 ["room"]（房主给整个房间开）或 ["personal"]（玩家只给自己开），两样都要就都写上。 |
 | 房间里开不了这个插件，面板弹出提示 | `PLUGIN_DEPENDENCY` | 缺少这个插件需要的其他插件（或者版本不对），或者几个插件的加载顺序互相指向、成了一个圈 | 安装 requires 里写的插件（版本要在写的范围内）；或者删掉 loadAfter / loadBefore 里互相指向的那几条。 |
 | 房间里开不了这个插件，面板弹出提示 | `PLUGIN_CONFLICT` | 选中的插件互相冲突，不能一起用 | 关掉其中一个；插件的 conflicts 写着它和谁不能一起用。 |
+| 房间里开不了这个插件，面板弹出提示 | `PLUGIN_RULE_CONFLICT` | 两个插件把同一个规则开关设成了不同的选项（{path}） | 只保留其中一个插件，或让它们选择同一个选项。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_RULES` | 清单里的 rules 写错了：开关或选项不在规定的四种里，或者这个类别的插件不能声明规则 | rules 只能写 shopBias、prepLoadout、morphPairing、unequip，每个用规定的两个选项；只有 content、script、trusted 可以写。 |
 | 房间里开不了这个插件，面板弹出提示 | `PLUGIN_LIMIT` | 超出了本服务器的上限：{detail} | 少开几个插件，或者让插件小一点（压缩图片和声音、删掉没用到的文件、少用整条引用）。 |
 | 房间里开不了这个插件，面板弹出提示 | `PLUGIN_INCOMPATIBLE` | 这个玩法插件不适配本服务器的游戏版本（或插件接口版本） | 换一个适配本版本的插件版本（清单的 "app" 写着它适配的游戏版本），或者请作者更新。 |
 | 房间里开不了这个插件，面板弹出提示 | `PLUGIN_BUSY` | 本服务器同时运行的插件组合已达上限 | 稍后再试，或者和正在用插件的房间选同样的插件；服主可以在 plugins/config.json 里调高 maxSets。 |
@@ -528,3 +530,25 @@ Forge 的 baseId 是普通棋子 id，不当官方来源猜测。详见 [PLUGINS
 - 界面包的 `PLUGIN_FORGE_MOUNT` 表示挂载点需要人工适配；`PLUGIN_FORGE_PANEL_SCRIPT` 表示面板脚本没复制。
   报告会写面板名、原挂载点和建议插槽；建议不是自动映射。全部九种挂载点见 [PLUGINS §16](PLUGINS.md#16-forge-import)。
 - 外观模板自带原创 CC0 棋盘格 PNG 和短音 OGG。工作台新建美术/音频模板时，目标的第一个插槽会填入示例 [ASSUMED]；可直接替换后校验、打包。
+
+### 房间规则开关（0.3.1）
+
+只改规则也能做成 content 插件，不需要虚假的数据补丁或权限。在 plugin.json 写例如
+`"rules": { "prepLoadout": "prep", "unequip": "allow" }`，由房主选择插件后生效。
+房间的插件标签、列表和对局角落会用文字显示当前规则；浏览器自己不能开启。
+
+| 开关 | 默认 | 可选 |
+| --- | --- | --- |
+| shopBias | official：官方抽取 | bondBias：商店装备偏向本玩家已激活盟约的 giveBondId，阶级与库存限制照旧；同阶级没有候选就回落，不直接授予盟约，也不额外偏向核心盟约或骑士戒律 |
+| prepLoadout | locked：简报后锁定 | prep：休整期、未准备时可打开干员调配；复用 room.loadout，只覆盖提交点名的干员，明确的默认值表示恢复默认，其他人保留；简报仍整份替换 |
+| morphPairing | official：同构体占格，配对所有其他盟约装备 | plus：同构体不占格，每人一件，只配对装备行最左边的盟约装备；两格普通装备仍在，替换不会销毁同构体 |
+| unequip | official：无法卸下 | allow：休整期未准备时，干员的装备详情有「卸下」；先退回手牌最右空位，再进临时区；都满则 HAND_FULL，装备不动；机器人不会卸下 |
+
+未知开关、选项或外观/界面/语言插件声明 rules 会报 PLUGIN_RULES。两插件把同一个开关设成不同选项，
+报 PLUGIN_RULE_CONFLICT 并点名双方；同选项可以重复。显式写默认值也参与冲突检查和内容哈希。
+不写 rules 不增加哈希字段；[ASSUMED] 空对象等同没写。脚本类也可声明，但仍须通过原有脚本许可闸门 [ASSUMED]。
+[ASSUMED] prep 提交里的潜能/练度也按干员合并；选同构体作为替换对象时改换最左普通装备；第二件同构体报 BAD_TARGET；
+卸下沿用准备后的操作锁，只认临时区可见的五格，不把隐藏溢出当空位。回收会归还全部装备，不需要检查装备格。
+
+Forge 导入会把 behaviour 的四个开关转成 rules，自动成为玩法插件，支持只有开关的包；未知项逐条跳过并说明。
+重复且选项不同则保留第一条 [ASSUMED]。本项不导入公告。完整定义见 [PLUGINS.md](PLUGINS.md#rule-switches)。

@@ -55,6 +55,7 @@
 import { APP_VERSION, PLUGIN_API } from '../constants.js';
 import { SOURCE_LANG, canonicalLang, isLangCode, languageName, langFields } from '../i18nPacks.js';
 import { issueList } from './errors.js';
+import { readDeclaredRules } from './rules.js';
 
 /** A plugin folder's manifest file (manifest 2). */
 export const PLUGIN_MANIFEST = 'plugin.json';
@@ -171,7 +172,7 @@ const SETTING_TYPES = ['boolean', 'integer', 'number', 'enum'];
 /** Top-level fields of manifest 2 (anything else is warned about and ignored). */
 const V2_FIELDS = new Set(['$schema', 'manifest', 'id', 'name', 'englishName', 'description', 'version', 'app', 'api', 'class', 'scope',
   'authors', 'credits', 'license', 'homepage', 'sourceLang', 'requires', 'optional', 'conflicts', 'loadAfter', 'loadBefore', 'priority',
-  'settings', 'permissions', 'overrides', 'entry', 'slots', 'files', 'lang', 'base', 'fallback', 'complete', 'machineTranslated', 'numberUnits', ...Object.keys(PARTS)]);
+  'settings', 'permissions', 'overrides', 'rules', 'entry', 'slots', 'files', 'lang', 'base', 'fallback', 'complete', 'machineTranslated', 'numberUnits', ...Object.keys(PARTS)]);
 /** Those fields, sorted, for the frozen API table (docs/PLUGIN-API.md). */
 export const MANIFEST_FIELDS = Object.freeze([...V2_FIELDS].sort());
 /** Fields only a lang plugin has. */
@@ -283,7 +284,7 @@ export function appVersionMatches(range, version = APP_VERSION) {
  *   settings: Record<string, PluginSetting>, permissions: string[], parts: Record<string, PluginPart>,
  *   entry: Record<string, string>, slots: string[], files: Record<string, string>, overrides?: string[],
  *   lang?: string, base?: string | null, fallback?: string[], complete?: boolean, machineTranslated?: boolean,
- *   numberUnits?: string[] | null }} PluginManifest
+ *   numberUnits?: string[] | null, rules?: Record<string, string> }} PluginManifest
  *   One shape for both versions. type: the manifest 1 type (lang, assets, data; the class name for the classes that
  *   have none). files: the lang class's role → path. parts / entry: manifest 2 (empty for manifest 1).
  * @typedef {PluginManifest} PackManifest
@@ -728,7 +729,9 @@ export function readPluginManifest(raw, ctx) {
     if (k === 'sim' || k === 'meta') used.add('mode.code');
   }
   for (const p of permissions) if (!used.has(p)) list.warning('PLUGIN_PERMISSION_UNUSED', `the permission "${p}" is declared but nothing in the manifest uses it`, { at: ['permissions'], permission: p });
-  if (!isLang && !Object.keys(parts).length && !Object.keys(entry).length) list.warning('PLUGIN_EMPTY', `carries nothing a ${cls} plugin is made of`, { class: cls });
+  // A declared switch is gameplay. An absent or empty rules object is not, so a plugin that names none stays empty.
+  const rules = readDeclaredRules(m.rules, list, cls);
+  if (!isLang && !Object.keys(parts).length && !Object.keys(entry).length && !rules) list.warning('PLUGIN_EMPTY', `carries nothing a ${cls} plugin is made of`, { class: cls });
 
   const overrides = m.overrides ?? [];
   if (m.overrides !== undefined && (!['script','trusted'].includes(cls) || !Array.isArray(overrides) || overrides.length > 200 || new Set(overrides).size !== overrides.length || overrides.some(x => typeof x !== 'string' || !/^[A-Za-z0-9_:-]{1,128}$/.test(x)))) list.problem('PLUGIN_SCRIPT_OVERRIDE', 'overrides must list official kit ids', {at:['overrides']});
@@ -739,6 +742,7 @@ export function readPluginManifest(raw, ctx) {
     authors: authorsOf(m.authors), credits: str(m.credits, 500), license: str(m.license, 100), homepage, sourceLang: sourceLang || SOURCE_LANG,
     requires, optional, conflicts, loadAfter, loadBefore, priority, settings, permissions, parts, entry, slots, files: {},
     ...(m.overrides !== undefined ? { overrides } : {}),
+    ...(rules ? { rules } : {}),
   };
   if (isLang) {
     readLangFields(m, undefined, out, list);

@@ -11,7 +11,7 @@
 // AI 队友最后选择: the drafts order every human seat before every AI seat), test (DESIGN §34.8; hostId then
 // defaults to the first human), hostId / botRehearsalDelegate /
 // botRehearsalDelegateMs (the delegated bot rehearsal, DESIGN §14: test/match/rehearsal-delegate.test.js),
-// cs / vs / requireCs (a gameplay-plugin room: host rehearsal stays off).
+// cs / vs / requireCs (a gameplay-plugin room: host rehearsal stays off), rules (DESIGN §34.15; omitted unless set).
 // Combat mode: clientCombat (default false here: the legacy server-run mode most suites were written for; production
 // defaults to client-side combat, DESIGN §14). With clientCombat: true every human gets a scripted browser
 // (test/match/simClient.js SimClient: h.clients) unless clients: false; pace 'instant' | 'paced', perPlayer
@@ -95,6 +95,7 @@ export function makeMatch(o = {}) {
     // a modded room's 自选 list (Match.diyKitted). Omitted unless the test passes one, so a vanilla harness match
     // still has no kitted key.
     ...(o.kitted !== undefined ? { kitted: o.kitted } : {}),
+    ...(o.rules !== undefined ? { rules: o.rules } : {}),
   });
   const m = h.m;
   if (m.clientCombat && o.clients !== false) {

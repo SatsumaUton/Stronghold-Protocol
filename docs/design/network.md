@@ -48,6 +48,11 @@ S→C:
 
 `UnitInfo = { id, kind, side, ownerId, defId, name, tier, golden, spine, avatar, x, y, facing, dir, maxHp, skillIndex?, moduleId?, items?, form? }` (`dir` = the ally's deploy direction; the renderer picks the model (Back for UP, mirrored for LEFT) and the ground wedge from it; `skillIndex` = the ally's equipped skill (§16): the renderer plays that skill's Spine clip (`anims.skills[i]`) and the audio its own ON_SKILL_START sound; `moduleId` = an elite ally's equipped module (uniEquipId | 'none'); `items` = an ally operator's equipped item ids (absent without any; never on enemies or summons): the bond popup lists a 变形同构体 wearer from them and the detail card shows its 同构 chip and 装备 (§21.11); all three also on the prep-scouting `m.field` units (`Match.prepFieldMeta`, the held pieces included), so a teammate's unit shows its owner's loadout in the detail card and its equipped items as item pips on the unit (prep surfaces; user playtest #2 item 3); `form` = the unit's current model form (an enemy's mode §21.4, a 傀儡师's 替身 §22.11; a view built mid-battle starts in it)).
 
+Content-plugin rule addition (0.3.1, §34.15): `g.unequip { itemUid }` is validated like other uid intents;
+only unequip=allow permits it in PREP before ready. `room.loadout` keeps its existing shape and can merge named
+operators in PREP under prepLoadout=prep. Room content summaries add `rules` only when declared. No protocol version
+bump; clients without these controls keep their existing messages.
+
 ### 8.3 Exact view shapes (normative for match ⇄ UI)
 
 `m.private`:
