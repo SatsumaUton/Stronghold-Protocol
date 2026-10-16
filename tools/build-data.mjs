@@ -42,6 +42,7 @@ import { bandBondIds } from '../shared/bandBonds.js';
 import { statusKey, composeUnitRecord } from '../shared/standIn.js';
 import { extendedGrid } from '../shared/loadoutRecord.js';
 import { FULL_RANK, atRank, stripPotential } from '../shared/potential.js';
+import { PLACE_ON_RANGED } from '../shared/highGround.js';
 
 // ===== CLI & IO ==================================================================================
 
@@ -971,9 +972,7 @@ function buildChess(ctx) {
     rec.subProfessionName = uniequip.subProfDict?.[char.subProfessionId]?.subProfessionName || null;
     rec.position = char.position;
     rec.nationId = char.nationId || null;
-    // 高台 is not a data flag: a MELEE chess whose trait (no module: `traitBase` / `trait`) reads 「可以放置于远程位」
-    // — the 钩索师 / 推击手 branch trait — may stand there, read at place time (shared/highGround.js; the owner's
-    // decision of 2026-10-05, following PRTS).
+    // 高台 is `placeOnRanged`, set below from the Chinese trait without a module (not from a character id).
 
     // Module (only active on golden chess: equipLevel > 0).
     const modId = shop.defaultUniEquipId || null;
@@ -1075,6 +1074,13 @@ function buildChess(ctx) {
       }
       if (modId) moduleAlts.push({ id: 'none', modulePhase: null, moduleTokenParts: [] });
     }
+
+    // GitHub #676: the client places from the localized record, whose trait text is no longer this Simplified line
+    // (en / ja / ko, and zh-TW writes 於). The boolean is that line on the trait without a module (`traitBase`, else
+    // `trait`) — the 钩索师 / 推击手 branch trait, any module or none (the owner's decision of 2026-10-05). Absent
+    // when it does not apply. A record without the flag still matches the line at place time (shared/highGround.js),
+    // which is how a plugin's Chinese trait keeps the 高台. No character id is named.
+    if (placeOnRangedOf(rec.position, rec.traitBase || rec.trait)) rec.placeOnRanged = true;
 
     // Tokens / summons: displayTokenDict + default-skill overrideTokenKey + talent tokenKey.
     // A talent tokenKey missing from character_table is a container id (凛御银灰's
@@ -1284,7 +1290,21 @@ function buildUnitForm(ctx, charId, status, { chessId = null, skillIndex = null 
     tokens: [...new Set(tokenIds.filter((id) => id && charTable[id]))].sort(naturalCmp),
   };
   if (equipLevel > 0) form.modules = modules;
+  // Same boolean as a chess record (GitHub #676): a 自选 / 补位 body is composed from this form, then localized.
+  if (placeOnRangedOf(char.position, form.trait)) form.placeOnRanged = true;
   return form;
+}
+
+/**
+ * Whether a MELEE record's Chinese trait without a module lets it stand on a 高台. The line is the official branch
+ * trait; the boolean is only so a translated copy of that record still places (shared/highGround.js).
+ * @param {string|null} position
+ * @param {{ desc?: string }|null} trait
+ * @returns {boolean}
+ */
+function placeOnRangedOf(position, trait) {
+  const desc = trait && typeof trait.desc === 'string' ? trait.desc : '';
+  return position === 'MELEE' && desc.includes(PLACE_ON_RANGED);
 }
 
 /**

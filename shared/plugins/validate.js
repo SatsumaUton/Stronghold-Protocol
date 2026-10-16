@@ -31,8 +31,11 @@ export function validateReferences(f, { officialOwnedSkills = true } = {}) {
     // DESIGN §16 loadout choices
     if (!Array.isArray(c.skills) || c.skills.filter((s) => s.isDefault).length !== 1 || c.skills.find((s) => s.isDefault)?.skillId !== c.skill?.skillId) err(`chess ${c.chessId}: skills[] without exactly one default = skill`);
     if (c.modules && (c.modules.filter((m) => m.isDefault).length !== (c.module?.active ? 1 : 0) || !c.statsBase || !c.traitBase || !c.talentsBase)) err(`chess ${c.chessId}: inconsistent module choices`);
-    // 高台 legality is read from the trait text at place time (shared/highGround.js), never a field on the record
+    // The old `placement` string is not a field. 高台 is the boolean `placeOnRanged` (build-data, from the Chinese
+    // trait), read by shared/highGround.js, which still matches the Simplified line when the flag is absent.
     if (c.placement !== undefined) err(`chess ${c.chessId}: placement is not a data field`);
+    if (c.placeOnRanged !== undefined && c.placeOnRanged !== true) err(`chess ${c.chessId}: placeOnRanged must be true when present`);
+    if (c.placeOnRanged === true && c.position !== 'MELEE') err(`chess ${c.chessId}: placeOnRanged on a non-MELEE record`);
   }
   // 补位 / 自选 (data/backups.json, DATA.md §18): a PRESET chess is its own backup; every NORMAL chess (both forms)
   // composes into its stand-in (shared/standIn.js standInRecord) with the chess's skill and module; every DIY slot is a

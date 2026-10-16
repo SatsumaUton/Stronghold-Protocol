@@ -82,6 +82,9 @@ export function composeUnitRecord(identity, unit, form, { skillIndex, moduleId =
     immunities: form.immunities, rangeId: form.rangeId, rangeGrid: form.rangeGrid,
     dmgType: form.dmgType, attackKind: form.attackKind, projectile: form.projectile, canHitFly: form.canHitFly,
     targetPriority: form.targetPriority,
+    // The Chinese branch trait as a boolean (build-data). A localized form keeps it after the trait text is
+    // translated, so a 自选 推击手 still stands on a 高台 (GitHub #676). Absent when the form has no flag.
+    ...(form.placeOnRanged === true ? { placeOnRanged: true } : {}),
     trait: (mod && mod.traitOverride) || form.trait,
     skill: skill ? { ...skill } : null,
     talents,

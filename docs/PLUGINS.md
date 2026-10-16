@@ -477,6 +477,7 @@ changing a default skill requires keeping `skill` equal to its `skills[]` entry.
 **Compact operators** (`operators` manifest files; `schemas/records.schema.json`): one object or an array, with `op: 1`,
 `charId`, `name`, `profession`, `subProfessionId`, `position`, `rarity`, `as`, `forms.normal`, `forms.elite` and `skills`.
 Each form supplies `stats` and `rangeGrid`; optional form `skills`, `trait` and `talents` override the shared ones.
+A MELEE form may set `placeOnRanged: true` [ASSUMED] (no official plugin source; the Simplified trait line still places when the flag is absent). The expander copies only that boolean onto the shop chess and the 自选 form. A RANGED form's flag, and any value other than `true`, is ignored.
 `skills` has exactly one `default: true`, and each skill supplies `skillId`; the expander fills index, SP, trigger,
 blackboards and display fields. `as: "chess"` needs `chess: { tier, bonds, price?, garrisonIds?, sellPrice?, identifier?,
 shopSortId? }`: normal/elite ids, prices, sell values and merge counts come from that tier's economy, and statuses
