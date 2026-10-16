@@ -37,7 +37,9 @@
 // gameLogic prepCameraFor / foldCamera — never over the pen, a teammate's board or a battle; deferred while a piece is
 // dragged or its direction is chosen). A deploy is the other way round (GitHub #602, PR #646 by @Euqorab): picking up a
 // piece on the own prep board, and a legal drop's direction wheel, fold the shop bar for as long as they last and zoom
-// to that framing at once (gameLogic deployFoldsShop); the player's own fold state comes back after. The fold flights
+// to that framing at once (gameLogic deployFoldsShop) while 设置「部署时收起商店」 is on (the default). Off, the pickup
+// changes neither the shop's fold nor the camera. Turning it off mid-drag gives both back on that frame
+// (gameLogic deployZoomStep / prepDeployCamera). The player's own fold state comes back after. The fold flights
 // take FOLD_CAMERA_MS (render/app/tune.js), not the generic camera flight.
 // Equipment dropped on an operator whose two slots are used opens the equip-replace dialog (ui/equipReplace.js): the
 // player picks the equipped item to destroy → g.equip {itemUid, targetUid, replaceUid}; 取消 sends nothing. 销毁 is only
@@ -109,7 +111,7 @@ import {
   snapHud, activeBubbles, shortcutFor, shortcutBlocked, prepShortcutsSuspended, closesOnFieldPress, phaseTotalSeconds, homeFieldId, ownFieldId, normalizeSp, normalizePersonalChoice, sortedPlayers,
   terrainInfo, deviceInfo, deviceTipAt, noteDeviceUnits, deviceUnitsForEntry,
   countdownState, shopBlockReason, stageOverrides, effectiveStage, watchTarget, dropFailureReason,
-  previewEnemyKey, prepCamera, prepCameraFor, foldCamera, deployFoldsShop, deployFieldOf, fieldTile, panelSide, panelSlots, bondPopupPlace, unitLoadout, deployedRecord,
+  previewEnemyKey, prepCamera, prepCameraFor, deployFoldsShop, deployZoomStep, prepDeployCamera, deployFieldOf, fieldTile, panelSide, panelSlots, bondPopupPlace, unitLoadout, deployedRecord,
   mergeTarget, modeOffBonds, readyFundsPrompt, readyShopFold, ownerBandId, ownDiyRecord, ownStandIn, roundStartReplay,
 } from '../ui/gameLogic.js';
 import { toast } from '../ui/toasts.js';
@@ -180,7 +182,8 @@ function MatchScreen() {
   const emotes = useStore((s) => s.emotes);
   const roomSolo = useStore((s) => s.room?.mode === 'solo');
   const spectator = useStore((s) => isSpectating(s.room, s.me.playerId));
-  const metricsSetting = useSettings().combatMetrics === true;
+  const playerSettings = useSettings();
+  const metricsSetting = playerSettings.combatMetrics === true;
   // gameplay plugins (DESIGN §32.6): the HUD corner's MOD mark — re-rendered only when the room's content changes
   const modRoom = useStore((s) => (s.room?.content?.vanilla === false ? s.room : null), (a, b) => (a?.content ?? null) === (b?.content ?? null));
   // the room's spectator seats for the top bar's 观战席 capsule (ui/hud.js SpectatorPill; GitHub #120): room.state keeps coming
@@ -333,6 +336,8 @@ function MatchScreen() {
   const prepCamKey = `${prepCam.kind}:${prepCam.opts.side}`;
   const prepCamSeen = useRef(prepCamKey);                // the prep camera last requested
   const camRef = useRef({ kind: 'prep', opts: { rect: { ...GEO.NORMAL_RECT }, side: 'L' } });
+  // the previous frame applied the deploy zoom, so turning 设置「部署时收起商店」 off mid-drag can give it back
+  const deployZoomedRef = useRef(false);
   const penRef = useRef({ on: false, collapsed: false });
   // shopFolded (the own prep board's folded-shop camera state) is derived with the prep-view flags below (showPrep).
   // 准备就绪 folds the shop bar, cancelling it unfolds the bar again (GitHub #138; gameLogic readyShopFold): the board is set,
@@ -421,8 +426,11 @@ function MatchScreen() {
   // direction wheel a legal drop opens — the official client folds the shop and zooms to the shop-collapsed prep
   // camera (the same framing as 收起, left_prepare_camera_param), then gives the player's own shop state back. It is
   // derived from the interaction state only: `collapsed` (the 收起/展开 state) is never set by it.
+  // 设置「部署时收起商店」 (default on). Off: a pickup changes neither the shop fold nor the camera.
+  // Only an explicit false disables it. [ASSUMED] the label 「部署时收起商店」.
   const deployFold = deployFoldsShop({
     ownPrep: !!view && viewModeRef.current === 'prep' && showPrep, editable, pen, drag: !!drag, facing: !!facing,
+    enabled: playerSettings.prepDeployFold !== false,
   });
   // the shop bar is shown folded (收起; the pen folds it for itself: the player's own state is the one it returns to) —
   // the own prep board then takes the official shop-collapsed camera (public issue #5, gameLogic prepCameraFor);
@@ -682,20 +690,19 @@ function MatchScreen() {
   // deferred while a piece is dragged or its direction is chosen (the drop target and the wheel sit on tiles of the
   // camera in use) and this effect runs again when that ends (gameLogic foldCamera). Picking reads the camera of
   // every frame (render/pick.js). A deploy interaction is the opposite (public issue #602, gameLogic
-  // deployFoldsShop): it zooms to the shop-collapsed camera as soon as the piece is picked up, for the drag and the
-  // wheel's whole duration, and the fold / unfold choice below restores the player's own shop state when it ends.
+  // deployFoldsShop) while 设置「部署时收起商店」 is on: it zooms to the shop-collapsed camera as soon as the piece is
+  // picked up, for the drag and the wheel's whole duration, and restores the player's own shop state when it ends.
+  // Turning the setting off mid-drag releases that zoom on this one frame even while the piece is still held
+  // (deployZoomedRef); later frames of the same drag do not, so a hand-made 收起 still waits.
   useEffect(() => {
-    if (deployFold) {
-      const want = prepCameraFor(pub, myId, true);
-      const cur = camRef.current;
-      // the fold zoom flies with the short FOLD_CAMERA_MS, not a generic camera flight (render/app/tune.js)
-      if (cur.kind !== want.kind || cur.opts?.shop !== false) setCam(want.kind, { ...want.opts, ms: FOLD_CAMERA_MS });
-      return;
-    }
-    const next = foldCamera({
-      pub, myId, folded: shopFolded, ownPrep: !!view && viewModeRef.current === 'prep' && showPrep,
+    const step = deployZoomStep(deployZoomedRef.current, deployFold);
+    deployZoomedRef.current = step.zoomed;
+    const next = prepDeployCamera({
+      pub, myId, deployFold, releaseDeploy: step.release, folded: shopFolded,
+      ownPrep: !!view && viewModeRef.current === 'prep' && showPrep,
       pen, busy: !!drag || !!facing, current: camRef.current,
     });
+    // the fold zoom and the restore fly with the short FOLD_CAMERA_MS, not a generic camera flight
     if (next) setCam(next.kind, { ...next.opts, ms: FOLD_CAMERA_MS });
   }, [view, deployFold, shopFolded, showPrep, pen, !!drag, !!facing, prepCamKey]);
 

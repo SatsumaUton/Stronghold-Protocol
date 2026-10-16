@@ -40,4 +40,4 @@ normative lines it rewrote).
 | §31 | [history/0.2.6.md](history/0.2.6.md) | 0.2.6 — after the 0.2.5 release (2026-10-13) |
 | §32 | [history/0.3.0.md](history/0.3.0.md) | 0.3.0 — the plugin system (插件) and the fixes after 0.2.6 (2026-10-14) |
 | §33 | [design/vfx-format.md](design/vfx-format.md) | Official battle effects (特效): the extracted format the runtime reads |
-| §34 | [history/0.3.1.md](history/0.3.1.md) | 0.3.1 — after the 0.3.0 release (2026-10-16): the effects audit's R18–R21, Forge import U1–U6 |
+| §34 | [history/0.3.1.md](history/0.3.1.md) | 0.3.1 — after the 0.3.0 release (2026-10-16): the effects audit's R18–R21, Forge import U1–U6, settings (prep deploy fold, quality order, voice row, merged ammo and energy count) |

@@ -152,6 +152,24 @@ describe('文字大小: the setting', () => {
     assert.match(read('public/css/screens/game.css'), /\.set-seg\.set-textsize button \{ min-width: \.62rem; \}/,
       'four steps fit the row on a phone (1rem = 40 px)');
   });
+
+  test('画面质量 is listed 低 / 中 / 高, the same direction as 官方特效 关 / 精简 / 完整', () => {
+    const src = read('public/js/ui/settings.js');
+    assert.match(src, /const QUALITY = \[\['low', N_\('低'\)\], \['medium', N_\('中'\)\], \['high', N_\('高'\)\]\];/);
+    const fx = src.indexOf('const OFFICIAL_FX');
+    assert.ok(fx > src.indexOf('const QUALITY'));
+    assert.match(src.slice(fx, fx + 120), /const OFFICIAL_FX = \[\['off', N_\('关'\)\], \['lite', N_\('精简'\)\], \['full', N_\('完整'\)\]\];/);
+  });
+
+  test('语音语言 is one grid (four across, or two by two) and 本土语言 stays beside it', () => {
+    const css = read('public/css/screens/game.css');
+    assert.match(css, /\.set-voice \{[^}]*container-type: inline-size; container-name: setvoice; \}/);
+    assert.match(css, /\.set-voice \.set-seg \{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+    assert.match(css, /\.set-voice \.set-seg button \{[^}]*min-width: 0/);
+    assert.match(css, /\.set-native \{[^}]*display: inline-flex/);
+    assert.match(css, /@container setvoice \(max-width: 3\.4rem\) \{\s*\.set-voice \.set-seg \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+    assert.match(css, /\.set-seg\.set-textsize button \{ min-width: \.62rem; \}/, '文字大小 keeps its own button width');
+  });
 });
 
 describe('文字大小: the CSS text root', () => {
