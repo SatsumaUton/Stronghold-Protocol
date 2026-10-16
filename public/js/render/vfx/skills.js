@@ -19,6 +19,9 @@
 //   chargeStep(plan, prev, next)            → what changes when the stored count goes prev → next
 //   FX_BINDINGS / bindingKeys(idx, skillId) → kit 'fx' tuples bound to a skill's official effect (Phase 3b, below)
 //   FX_COVER / coverOf(owner, kind)         → kit 'fx' kinds a skill's official effects stand for (no procedural fx; below)
+//   ENEMY_FX_BINDINGS / ENEMY_FX_KINDS      → an enemy's kit 'fx' tuples bound to its official effect — its zones, its
+//                                             aura's ticks, a mode's loops (0.3.1: lingering areas; below);
+//                                             enemyBindingKeys / auraTargets / modeLoopKeys their prefabs
 //   eventNum(e)                             → an ability event (name or number) → Torappu.Battle.AbilityStandard/Event
 //
 // ---- Resolving a battle unit (resolveSkill) --------------------------------------------------------------------------
@@ -1372,17 +1375,37 @@ export const FX_BINDINGS = Object.freeze({
   skchr_blkkgt_3: Object.freeze({
     slash: binding({ owner: 'id', attack: 'Damage' }),
   }),
+  // 号角 S1 (chess_char_5_08-horn.js: the flare's 'zone' where her S1 shot lands, id = her, r = projectile_range, duration =
+  // projectile_delay_time): the skill's RangedAttackGroup (AbilityParallelGroup) fires the shell projectile_chr_horn_s1 —
+  // the shot the wiring flies — and RangedAttack_Light's projectile_chr_horn_s1_light, whose reached effects are the flare
+  // (horn_skill_01_hit_02_buff, looping, and horn_skill_01_hit_02) at the landing point (0.3.1, lingering areas)
+  skchr_horn_1: Object.freeze({ zone: binding({ owner: 'id', projectile: 'projectile_chr_horn_s1_light', at: 'point', hold: 'fx', holdS: 6, cover: ['zone'] }) }),
+  // 琴柳 S2 (a 自选 pick; op-sleach.js: the flag's 'zone' on the ally's tile it is planted on, id = her, dur = the skill's
+  // duration): the skill's FlagBuff (RangedAttack) puts projectile_chr_sleach_s2 there — AttachToTarget, AuraHitBehaviour —:
+  // its flying effect is the flag (sleach_skill_02_flag_01) and its reached effect the ground (sleach_skill_02_ground_01),
+  // both looping for its life (0.3.1)
+  skchr_sleach_2: Object.freeze({ zone: binding({ owner: 'id', keys: ['sleach_skill_02_flag_01', 'sleach_skill_02_ground_01'], at: 'point', hold: 'fx', holdS: 15, during: true, cover: ['zone'] }) }),
+  // 琴柳 S3 (the thrown flag's 'zone' on its tile, id = her, dur; its strike 'aoe' there FLAG_FLIGHT s later): the skill's
+  // DamageFlag group (AbilityParallelGroup of ProjectileToTileAbility) puts Debuff's projectile_chr_sleach_s3 on the tile —
+  // the flag sleach_skill_03_flag_01 and, on the tile as it starts, sleach_skill_03_range_loop_01 / _02 (looping) — and
+  // Damage's projectile_chr_sleach_s3_2, whose sleach_skill_03_range_start_01 / _02 (one-shots) are the strike
+  skchr_sleach_3: Object.freeze({
+    zone: binding({ owner: 'id', keys: ['sleach_skill_03_flag_01', 'sleach_skill_03_range_loop_01', 'sleach_skill_03_range_loop_02'], at: 'point', hold: 'fx', holdS: 10, during: true, cover: ['zone'] }),
+    aoe: binding({ owner: 'id', keys: ['sleach_skill_03_range_start_01', 'sleach_skill_03_range_start_02'], at: 'point', holdS: 7.5, during: true }),
+  }),
 });
 
 /**
- * The prefabs a binding plays: its `keys`, else its projectile's reached effects (onReached, else onHit), lower case; []
- * without them.
+ * The prefabs a binding plays: its `keys`, else its projectile's reached effects (onReached, else onHit) — or the
+ * projectile field its `part` names (`toTargetOnStart`: a projectile that plays its area on its target as it starts,
+ * 萨卡兹枯朽战士's) —, lower case; [] without them.
  */
 export function bindingEffects(idx, bind) {
   if (Array.isArray(bind?.keys)) return bind.keys.map(lc).filter(Boolean);
   const p = bind?.projectile ? idx?.projectiles?.[lc(bind.projectile)] : null;
   if (!p) return [];
-  const list = Array.isArray(p.onReached) && p.onReached.length ? p.onReached : Array.isArray(p.onHit) ? p.onHit : [];
+  const list = bind.part ? (Array.isArray(p[bind.part]) ? p[bind.part] : [])
+    : Array.isArray(p.onReached) && p.onReached.length ? p.onReached : Array.isArray(p.onHit) ? p.onHit : [];
   return list.map(lc).filter(Boolean);
 }
 
@@ -1441,6 +1464,19 @@ export const FX_COVER = Object.freeze({
   skchr_rosmon_3: Object.freeze(['summon']),
   // 卡涅利安 S2: the chains — her skill's loops, once they are drawable (audit R6: her conditional buffs)
   skchr_billro_2: Object.freeze(['sandChains', 'sandChainsCharged']),
+  // 浊心斯卡蒂 S3: the tide at the cast — the skill's Aura `_effects` loop on her while it lasts (skadi2_skill_03_buff on the
+  // ground, _02 / _03 on her) and its start (skadi2_skill_03_begin_start) (0.3.1, lingering areas)
+  skchr_skadi2_3: Object.freeze(['tide']),
+  // 银灰 S2: the snow at the switch — the skill's own loop (svrash_skill_02_buff) on him, no area (0.3.1)
+  skchr_svrash_2: Object.freeze(['snow']),
+  // 珊比 S3 (a 自选 pick): the conveyor's zone — the skill's range loop on her (thumpy_skill_03_range_01, its template
+  // thumpy[skill_3_buff] at ON_BUFF_START; _end at its finish) shows the belt (0.3.1)
+  skchr_thumpy_3: Object.freeze(['zone']),
+  // 假日威龙陈 S2 / S3 (a 自选 pick): the slime zone — every attack of the skill's mode puts its projectile on the target
+  // (projectile_chr_chen2_s2 / _s3: AttachToTarget, AutoLoadBoxRange), whose reached chen2_skill_02 / 03_range_01 is the
+  // slime there; the client shows no area at her (0.3.1)
+  skchr_chen2_2: Object.freeze(['zone']),
+  skchr_chen2_3: Object.freeze(['zone']),
 });
 
 /** Whether a skill's official effects stand for a kit fx kind (FX_COVER). */
@@ -1453,5 +1489,143 @@ export function coverOf(skillId, kind) {
 export function bindingKeys(idx, skillId) {
   const out = new Set();
   for (const bind of Object.values(FX_BINDINGS[lc(skillId)] || {})) for (const k of bindingEffects(idx, bind)) out.add(k);
+  return [...out];
+}
+
+// ---- enemies' kit 'fx' tuples bound to official effects (0.3.1: lingering areas) -------------------------------------
+
+/** Tiles from a kit fx's point within which its owner stands (an enemy's death zone, an aura's tick at its feet). */
+export const OWNER_NEAR = 1;
+
+/**
+ * Kit 'fx' tuples of an enemy (server/sim/content/enemies) that stand for an official effect of its own the client plays
+ * there — its areas that keep acting (0.3.1, the maintainer's report of 2026-10-16: 萨卡兹枯朽战士's 污染秽蚀) —, by the
+ * enemy's index unit key → fx kind → binding. render/vfx/skillfx.js plays them (SkillFx.simFx → _enemyFx) and the field
+ * view skips the procedural fx; with 官方特效 off, or none of a binding's prefabs installed, the procedural fx stays. A
+ * zone names no source (content/enemies/helpers.js zone) except 【污染秽蚀】, whose fx carries `pollution`'s src. A binding
+ * says how its fx finds the enemy:
+ *   xkind      the fx's `extra.kind` (the sim's zone kind: 'pollution', 'poison', 'barrel', 'sandStorm', 'boil')
+ *   owner      'id' — `extra.id` names it; 'died' — an enemy of this key that died in the fx's frame within OWNER_NEAR
+ *              tiles of its point (a death zone: the sim makes it in the death hook, right after the 'die' event); 'cast'
+ *              — an enemy of this key whose skill `skill` (its data record's prefabKey) was cast in the fx's frame (the
+ *              sim's castSlot comes in the same tick); 'near' — a standing enemy of this key within OWNER_NEAR tiles of the
+ *              point (an fx at its feet that names no one); 'any' — the kind is this enemy's alone (假想敌：蚀裂's cloud lands
+ *              on its killer after its death: no id, no frame of its own). A zone whose `extra.id` is that unit (【污染秽蚀】
+ *              carries `pollution`'s src) matches as 'id' even when the field says 'cast'. SkillFx tries a 'died' owner
+ *              within OWNER_NEAR before a cast the zone does not name, and a binding that draws nothing does not claim it.
+ *   projectile / part / keys    the prefabs (bindingEffects; `part`: the projectile field to read)
+ *   hold / holdS               how long the looping ones stay at the fx's point: 'fx' — the fx's `dur` (the zone's time) —,
+ *              else `holdS`; `once`: the prefabs play once there, for their own life (a one-shot)
+ *   talent     instead of prefabs: the talent (prefab key) whose aura the fx is a tick of — while the unit's talent loops
+ *              (render/vfx/talentfx.js) are drawn they stand for it, and one unclaimed HP hit in that frame on a unit
+ *              inside the sim radius plays the aura's buff effects on it, offered to each aura (auraTargets)
+ *   modeLoops  or: the fx starts a mode of the unit whose talent (this prefab key) loops on it meanwhile — its loop uses
+ *              (a buff it creates at its tick: a condition talents.js cannot read, here the mode's own) — for its record's
+ *              blackboard value `bbKey` (talents.bb), else `holdS` s; `endMode`: the fx ends it early
+ */
+const ebind = (o) => Object.freeze({ ...o, ...(o.keys ? { keys: Object.freeze(o.keys) } : {}) });
+const POLLUTED_DIE = Object.freeze({
+  // the client's PollutedDie talent (Talent/BslimeTalent_1) fires projectile_enemy_nhpbr_polluted where the unit falls: an
+  // EffectBehaviour that plays enemy_nhpbr_attack_range on its target as it starts (_effectsToTargetWhenStart, looping)
+  // and clears it as it stops (_clearPlayEffectOnStop), its life from the blackboard (projectile_life_time)
+  zone: ebind({ xkind: 'pollution', owner: 'died', projectile: 'projectile_enemy_nhpbr_polluted', part: 'toTargetOnStart', hold: 'fx', holdS: 8 }),
+});
+const POLLUTED_ATK = Object.freeze({
+  // the skill PollutedRangedAtk (AbilityParallelGroup) fires the shell projectile_enemy_nhtank and AttackPolluted's
+  // projectile_enemy_nhtank_polluted, whose reached effect enemy_nhtank_attack_range (looping) is the pool, cleared when
+  // it stops (its life from the blackboard: projectile_life_time)
+  zone: ebind({ xkind: 'pollution', owner: 'cast', skill: 'pollutedrangedatk', projectile: 'projectile_enemy_nhtank_polluted', hold: 'fx', holdS: 10 }),
+});
+const NEST_AURA = Object.freeze({
+  // the AOE talent (AppearSyncedTalent / AuraAbility): its `_effects` loop while the unit stands (talentfx.js), and the
+  // aura's buff enemy_dsubrl_aoe[aura] plays enemy_dsubrl_attack_hit on every unit in it at each tick (ON_BUFF_TRIGGER)
+  pulse: ebind({ owner: 'id', talent: 'AOE' }),
+});
+export const ENEMY_FX_BINDINGS = Object.freeze({
+  // 萨卡兹枯朽战士 / 组长 (content/enemies/archetypes.js kitPolluted: the 'zone' of kind 'pollution' where it fell — r =
+  // PollutedDie.projectile_range, dur = PollutedDie.projectile_life_time —, after its 'die')
+  enemy_1267_nhpbr: POLLUTED_DIE,
+  enemy_1267_nhpbr_2: POLLUTED_DIE,
+  // 萨卡兹枯朽战车 / 尖端 (content/enemies/dot.js kitTank: 秽蚀轰击's 'zone' of kind 'pollution' at its target, r 1.7, dur =
+  // projectile_life_time, in the tick of its 'cast')
+  enemy_1272_nhtank: POLLUTED_ATK,
+  enemy_1272_nhtank_2: POLLUTED_ATK,
+  // 假想敌：蚀裂 (dot.js: the 'zone' of kind 'poison' where its lob lands — on its killer — or where it fell, r =
+  // 1.projectile_range, dur = 1.projectile_life_time): its talent 1 (BslimeTalent_1) fires projectile_enemy_actoxi at its
+  // killer, whose reached effect enemy_actoxi_idle (looping) is the cloud
+  enemy_9006_actoxi: Object.freeze({ zone: ebind({ xkind: 'poison', owner: 'any', projectile: 'projectile_enemy_actoxi', hold: 'fx', holdS: 8 }) }),
+  // 咸鳞汁推荐者 (special.js: its barrel blow's 'zone' of kind 'barrel' where it stands, dur = fixed_duration, in the tick of
+  // its 'cast'): the skill BlockedBoom (ProjectileToTileAbility) puts projectile_enemy_wintun_range on its tile —
+  // AuraHitBehaviour, its reached effect enemy_wintun_range (looping) the zone
+  enemy_10044_wintun: Object.freeze({ zone: ebind({ xkind: 'barrel', owner: 'cast', skill: 'blockedboom', projectile: 'projectile_enemy_wintun_range', hold: 'fx', holdS: 30 }) }),
+  // 鼠王 (leaders.js: 【沙狱】's 'zone' of kind 'sandStorm' on its target, id = it, dur): its skill SandStorm's emitter plays
+  // mousek_skill_02_range on that target as it casts (_castTargetEffects) — the sandstorm itself, a one-shot of 21 s
+  // (its root's FxDelay 0.7 s); the 沙狱's hits are projectile_mousek_s2 attached to the target (no flying effect)
+  enemy_1509_mousek: Object.freeze({ zone: ebind({ xkind: 'sandStorm', owner: 'id', keys: ['mousek_skill_02_range'], once: true }) }),
+  // 深溟巢涌者 / 富营养的巢涌者 (dot.js kitDsubrl: a 'pulse' each second it hurts, id = it, r = its range)
+  enemy_1234_dsubrl: NEST_AURA,
+  enemy_1234_dsubrl_2: NEST_AURA,
+  // 鼎沸 (dot.js: an 'explode' of kind 'boil' every attack interval at its feet, r = its range, no id): its aoe talent
+  // (AppearSyncedTalent / AuraAbility) — its `_effects` loop while it stands, and the units in it carry enemy_cjhot_debuff
+  // (its buff enemy_cjhot_t[aoe], INFINITY, tick 1)
+  enemy_10054_cjhot: Object.freeze({ explode: ebind({ xkind: 'boil', owner: 'near', talent: 'aoe' }) }),
+  // 水遁忍者 (special.js: its 漩涡形态 — a 'telegraph' of kind 'spin' as it starts, id = it; then damage every
+  // RotateDamage.interval s around it for EndRotate.rotate_duration s, ended early by 失衡's 'phase' of kind 'spinStop'):
+  // the client's SwitchModeTrigger puts it in its mode M1 (RotateAttack), whose RotateEffect talent's buff
+  // (ymgtop_m1_t[rotate_effect], created every 0.1 s) is enemy_ymgtop_skill_01_buff_01 at its feet while it spins
+  enemy_10116_ymgtop: Object.freeze({
+    telegraph: ebind({ xkind: 'spin', owner: 'id', modeLoops: 'RotateEffect', bbKey: 'EndRotate.rotate_duration', holdS: 60 }),
+    phase: ebind({ xkind: 'spinStop', owner: 'id', endMode: true }),
+  }),
+});
+
+/**
+ * The enemy unit keys with a binding of each fx kind (SkillFx._enemyFx's candidates). The list order is an id, a cast,
+ * a death, a unit at the point, the kind alone; the fx itself is ranked again — the unit `extra.id` names, then a death
+ * within OWNER_NEAR, then a cast the zone does not name (skillfx.js _fxRank).
+ */
+const OWNER_ORDER = Object.freeze({ id: 0, cast: 1, died: 2, near: 3, any: 4 });
+export const ENEMY_FX_KINDS = Object.freeze((() => {
+  const out = {};
+  for (const [key, kinds] of Object.entries(ENEMY_FX_BINDINGS)) for (const kind of Object.keys(kinds)) (out[kind] ||= []).push(key);
+  for (const [kind, keys] of Object.entries(out)) out[kind] = Object.freeze(keys.sort((a, b) => (OWNER_ORDER[ENEMY_FX_BINDINGS[a][kind].owner] ?? 9) - (OWNER_ORDER[ENEMY_FX_BINDINGS[b][kind].owner] ?? 9)));
+  return out;
+})());
+
+/**
+ * The effects an aura talent's buff plays on the units in it (its uses `on: 'targets'`, lower case): `shots` once per tick
+ * (a 'trigger' / 'hit' use — an action at ON_BUFF_TRIGGER), `loops` while the unit stays in it (a looping buff effect).
+ */
+export function auraTargets(idx, unitKey, talent) {
+  const t = idx?.units?.[unitKey]?.talents?.[talent];
+  const shots = new Set(), loops = new Set();
+  for (const u of Array.isArray(t?.uses) ? t.uses : []) {
+    if (!isObj(u) || u.on !== 'targets') continue;
+    for (const k of Array.isArray(u.keys) ? u.keys : []) {
+      const key = lc(k);
+      if (!key) continue;
+      if (u.role === 'loop' && idx.prefabs?.[key]?.looping !== false) loops.add(key);
+      else shots.add(key);
+    }
+  }
+  return { shots: [...shots], loops: [...loops] };
+}
+
+/** Every key an enemy's kit-fx bindings can play (preloading). */
+export function enemyBindingKeys(idx, unitKey) {
+  const out = new Set();
+  for (const bind of Object.values(ENEMY_FX_BINDINGS[unitKey] || {})) {
+    if (bind.talent) { const a = auraTargets(idx, unitKey, bind.talent); for (const k of [...a.shots, ...a.loops]) out.add(k); }
+    else if (bind.modeLoops) for (const k of modeLoopKeys(idx, unitKey, bind.modeLoops)) out.add(k);
+    else for (const k of bindingEffects(idx, bind)) out.add(k);
+  }
+  return [...out];
+}
+
+/** The loop effects of a unit's talent (its uses with role 'loop', lower case): a binding's `modeLoops`. */
+export function modeLoopKeys(idx, unitKey, talent) {
+  const t = idx?.units?.[unitKey]?.talents?.[talent];
+  const out = new Set();
+  for (const u of Array.isArray(t?.uses) ? t.uses : []) if (isObj(u) && u.role === 'loop') for (const k of Array.isArray(u.keys) ? u.keys : []) if (lc(k)) out.add(lc(k));
   return [...out];
 }

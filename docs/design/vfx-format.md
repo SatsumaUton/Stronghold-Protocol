@@ -4,6 +4,17 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
 
 **Changelog** (for runtimes reading the files; newest first)
 
+* **2026-10-16 — lingering areas: readings from the client's data and code, no format change (0.3.1, the maintainer's
+  report of 2026-10-16; history 0.3.1 §34.5)**. (1) A ground-placed effect's root (`ParticleEffect._spawnLocation` 5,
+  7, 17, 26, 35) sits on its point: the client's Effect._InitLocationFromEntity sets the root's localPosition to the
+  spawn location, so its authored `pos` is no offset (§33.4) — 萨卡兹枯朽战士's `enemy_nhpbr_attack_range` is saved with
+  its root 10 tiles under the board. (2) An enemy's kit areas are its talents' and skills' projectiles and rows the
+  index writes without the moment they play (a death talent's projectile, a skill's second projectile, a castTarget row
+  of a skill its kit fires itself): §33.16 reads them for the sim's zone fx (ENEMY_FX_BINDINGS). (3) An enemy skill
+  whose root ability is an attack is that one attack: its kit fx drawn, its window's later attacks are the enemy's own
+  (§33.16 Enemy skills). (4) A talent loop created by a buff at its
+  tick in a mode (水遁忍者's RotateEffect) plays while that mode lasts (§33.16).
+
 * **2026-10-16 — readings corrected from the client's data and code, no format change (0.3.1: the 0.3.0 effects audit's
   R18–R21 and its low-confidence observations; history 0.3.1)**. (1) A prefab's root node is active when the effect
   plays, whatever its `active` (§33.4): 35 prefabs of the used set are saved with an inactive root. (2) A stretched
@@ -335,7 +346,14 @@ FxDelay, a clip curve on `m_IsActive`) activates it. A renderer also has its own
 exception: the client activates an effect's GameObject as it plays it (`Effect._DelayToActiveGameObject` →
 `GameObjectUtil.SetActiveIfNecessary`, GameAssembly.dll of 2026-09-13), so a root saved inactive — 35 prefabs of the
 used set: the 狼群's `vigil_token_sub_attack_1` / `_2`, 伺夜's and 至简's attack starts, 艾雅法拉's hit, 风笛 S3's buff,
-百炼嘉维尔 S2's chainsaw glow … — plays like any other (the runtime drew nothing of them before 0.3.1).
+百炼嘉维尔 S2's chainsaw glow … — plays like any other (the runtime drew nothing of them before 0.3.1). Nor is the root's
+`pos` where the effect plays: Effect._InitLocationFromEntity sets the effect root's localPosition to its spawn location
+(Transform.set_localPosition in every SpawnLocation branch — round 46's disassembly of GameAssembly.dll), so the authored
+position is overwritten. 199 prefabs of the used set are saved with a root offset (> 0.05): 155 are projectiles' own
+effects (a projectile places them), 15 are ground-placed — `enemy_nhpbr_attack_range` (z 10), `headb2_*` (1 ahead),
+`texas2_skill_03_hit_02`, `shu_talent_buff_01`, `sbell2_tile_defrost` … The runtime drops the offset of the
+ground-placed roots since 0.3.1 (`effect.js` `placedRoot`); the other 29 (statuses such as `buff_poison_1`–`_4`, hits
+such as `common_magic_hit_01_m`, lines such as `pasngr_attack_line`) keep it until each is checked [open].
 
 The usual layout: the root carries the controlling behaviour (`ParticleEffect`, `ProjectileEffect`, §33.11) → a node
 `static_offset` → a node `fixed` (or `rotation_y` / `rotation_z`, nodes the behaviour turns by direction) holding a
@@ -1256,7 +1274,38 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   attack's cast and range rows [ASSUMED]), and it ends — its loops stop, its end plays — once the anim leaves SKILL and
   its time is over (the event's `dur`, else 0.3 s [ASSUMED]), or on the enemy's death or leak. A use's `mode` picks the
   copy of the enemy's current mode; `inModes` is not needed. Not drawn: the skill's effects on others (`on: 'targets'`:
-  no event names them).
+  no event names them). A skill whose root ability is an attack (`rootAbility` …Attack: RangedAttack, MeleeAttack) is
+  that one attack: once the kit's own fx stood for it (an Enemies' areas binding below drew in its window), the enemy's
+  attacks in the rest of the window are its normal ones (0.3.1, history §34.5: the 'cast' of 鼠王's 【沙狱】 carries the
+  debuff's 15 s, and every attack of the boss in it played the sandstorm `mousek_skill_02_range` on its target; a skill
+  whose attack is a later 'atk' — 暴鸰's bomb, 0.27 s after its 'cast' — keeps the window's rows for it) [ASSUMED: the
+  window's `dur` is then the skill's effect's, not a time the attacks change].
+* **Enemies' areas** (0.3.1, the maintainer's report of 2026-10-16, history §34.5; `skills.js ENEMY_FX_BINDINGS`,
+  `skillfx.js _enemyFx`): a zone names no source (`content/enemies/helpers.js zone`: ['fx', 'zone', x, y,
+  { r, dur, kind }]) except 【污染秽蚀】, whose fx carries `pollution`'s src (display only). A binding by the enemy's unit
+  key says how its fx finds the enemy — `id`; `died`: one of that key that died in the fx's frame within OWNER_NEAR (1)
+  tile of its point (a death zone: the sim makes it in the death hook, after the 'die'); `cast`: one whose skill (its
+  prefabKey) was cast in that frame (castSlot comes in the same tick); `near`: a standing one within OWNER_NEAR of it;
+  `any`: the kind is that enemy's alone. Tried as: the unit the zone's id names, then a death within OWNER_NEAR, then a
+  cast the zone does not name, then a unit at the point, then the kind alone [ASSUMED: a zone with no id belongs to the
+  death at the point, else to the cast]. A binding that draws nothing does not claim the fx. A zone plays its prefabs at
+  the fx's point on the ground, the looping ones for its `dur`: 萨卡兹枯朽战士 / 组长's death pool (PollutedDie's
+  `projectile_enemy_nhpbr_polluted`, whose `toTargetOnStart` `enemy_nhpbr_attack_range` loops until the projectile stops
+  — its life the blackboard's `projectile_life_time`), 萨卡兹枯朽战车 / 尖端's 秽蚀轰击 pool (AttackPolluted's
+  `projectile_enemy_nhtank_polluted` reached `enemy_nhtank_attack_range`; the zone's id keeps it when a warrior also died
+  on that tile), 假想敌：蚀裂's cloud on its killer (`projectile_enemy_actoxi` reached `enemy_actoxi_idle`), 咸鳞汁推荐者's
+  barrel zone (BlockedBoom's `projectile_enemy_wintun_range` reached `enemy_wintun_range`), 鼠王's 【沙狱】 (the
+  castTarget row `mousek_skill_02_range` — the sandstorm, a one-shot of 21 s — once on the target). An aura's tick its
+  talent loops stand for (talentfx.js draws them: 深溟巢涌者's 'pulse' — AOE —, 鼎沸's 'boil' — aoe —) skips the
+  procedural pulse, and one unclaimed HP hit in that frame on a unit inside the sim radius that no attack owns plays the
+  aura's buff effects on it (each aura takes at most one per unit, and that hit is offered to every aura in the frame
+  [ASSUMED]: the talent's uses `on: 'targets'` — a trigger once, `enemy_dsubrl_attack_hit`; a loop held AURA_HOLD_S
+  (1.25 s) past the last tick, `enemy_cjhot_debuff`) instead of the procedural spark. A unit past the radius keeps its
+  spark. A mode's loops: 水遁忍者's spin ('telegraph' of kind 'spin') plays its mode M1's RotateEffect loop
+  (`enemy_ymgtop_skill_01_buff_01`, a buff its template creates at its tick, which talents.js leaves unmapped) for its
+  record's `EndRotate.rotate_duration`, until 失衡's 'phase' spinStop or its death [ASSUMED: the loop lasts the sim's
+  spin]. The bound prefabs preload with the battle's units (SkillFx.keys). Layer off, or the prefabs not installed: the
+  procedural fx.
 * **Summons' skills** (v2) play like an operator's.
 * **Talents and abilities (v3, Phase 3d)**: `render/vfx/talents.js` plans every talent node and ability of a unit with
   the skills' planner and binds it by `when`; `render/vfx/talentfx.js` plays it. In force: an operator's or a summon's
@@ -1358,13 +1407,23 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
     strikes `pasngr_skill_03_hit`; 溯光星源 S2's links the link projectile's hit on each pulled enemy; 焰影苇草 S2's
     fire strikes `reed2_skill_02_hit`; 蕾缪安 S3's lock the aim projectile's crosshair (`lemuen_skill_03_crosshair_range`
     / `_02`, 1.5 s without a hold [ASSUMED])
-    and her bombard the attack projectile's reached hit.
+    and her bombard the attack projectile's reached hit. Since 0.3.1 (history §34.5): 号角 S1's flare (the light
+    projectile `projectile_chr_horn_s1_light`'s reached `horn_skill_01_hit_02_buff` / `_02`), and the 自选 pick 琴柳's
+    flags — S2 `sleach_skill_02_flag_01` with its ground, S3 `sleach_skill_03_flag_01` with its range loops and its strike
+    `sleach_skill_03_range_start_01` / `_02` (the flag model itself — a pole and a skinned cloth of the unported SimSpine
+    shader, drawn through the basic fallback — does not show yet [open]).
+    A binding at 'point' lies on the field's tile there (OfficialFx ctx.heightAt; before, its owner's height — 锡人's
+    flask on the road at his high ground's 0.42), and a flight whose projectile a binding of the shooter's places
+    leaves its reached effects to it (SkillFx.bindsReached; before, 锡人's flask also played at the target's HitPoint
+    where the drawn flight ended, for up to LOOP_TTL).
   - A kit fx kind the skill's own official effects stand for is skipped while the skill lasts (`FX_COVER`: on, its
     activation frame, `COVER_AFTER_S` = 1 s after its end [ASSUMED], or a binding of the owner still held) when the
     skill's plan has an installed prefab: 莫斯提马 S2's zone, 白面鸮 S2's and 流明 S1's heal fields (his: the skill's
     buff on the patient, `lumen_skill_01_range`, plays with the heal), 凛御银灰 S2's blast, 远牙 S2's
     and 溯光星源 S3's links, 空弦 S1 / S2's, 流星 S2's and 雪猎 S2's volleys, 信仰搅拌机 S3's counters, 歌蕾蒂娅 S3's
-    tornado pulls, 伺夜 S1's and 迷迭香 S3's summon pillars, 卡涅利安 S2's chains (once her loops are drawable).
+    tornado pulls, 伺夜 S1's and 迷迭香 S3's summon pillars, 卡涅利安 S2's chains (once her loops are drawable); since 0.3.1
+    浊心斯卡蒂 S3's tide (her Aura `_effects` loops), 银灰 S2's snow (his skill loop), the 自选 picks' 珊比 S3 belt
+    (`thumpy_skill_03_range_01`) and 假日威龙陈 S2 / S3 slime (her attacks' `chen2_skill_0N_range_01` on their targets).
   - A summon's pillar ('summon' archetypes, not the floating units' kinds) in the frame its official birth effect was
     drawn (`FxWiring.deploy`'s key: its skill's own start effect — an AppearSkill's, 0.3.1 —, the mode's override,
     its own, the generic one) is skipped: 风丸 S2's 替身, 伺夜's
@@ -1375,7 +1434,12 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
     strikes (`angel2_skill_N_loop_*` on projectiles not flown), 蕾缪安 S3's falling shells, 扎罗's fear-cage beams (the
     client's `enemy_wlfmster_a_skill_end_buff` on the caged operators is not placed), 缇缇 S3's wake (the fx names no
     owner) and the talents' cues (刺玫's and 雪猎's strikes / counters, 风丸's 替身 burst); 泡泡 S2's counter is its
-    binding above (audit R17).
+    binding above (audit R17). Areas kept so in 0.3.1 (history §34.5): 圣聆初雪's snow layers (`sbell2_ground_0N` per
+    tile — no event carries the tiles' layers), the 自选 picks' 珊比 S2 glue (`thumpy_skill_02_trap_01` per glued tile —
+    the fx gives their centre), 黍's farm tiles (`shu_talent_buff_01` per sown tile), 克莱门莎 S2's vortex (no prefab
+    of its own found), 霍尔海雅 S3's and 斩业星熊 S2's moving areas (projectiles that fly or orbit), 集团军重型火炮's
+    burning zone (its prefab is not in the extracted set — and it is no enemy of the four modes), 炎佑's flame (a lasso
+    line to its target).
 * **A projectile's parts** (2026-10-15, history §32.14.36 and §32.14.38; `flight.js projectileParts`, `wiring.js
   _fly`): the flying effect is the projectile class's own `_mainEffect` and its life that class's LIMITED `_lifeTime`,
   read from `behaviours` (an index written before the correction named a chain's or a rope's line `main` for 30

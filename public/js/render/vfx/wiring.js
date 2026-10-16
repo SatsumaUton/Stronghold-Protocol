@@ -1101,6 +1101,9 @@ export class FxWiring {
         this.arrived.set(id, now);
         if ((proj.onHit || []).some((k) => /heal/.test(k))) this.healed.set(id, now);
       }
+      // a skill binding places these where the kit's area fx says, for the area's time (SkillFx.bindsReached: 锡人's
+      // flask, 波登可's spores …) — not a second copy at the flight's end (0.3.1)
+      if (src && this.skills.bindsReached(src, proj)) return;
       for (const k of proj.onReached || []) {
         const kk = lc(k);
         if (kk && this.ofx.lib.has(kk)) this.ofx.spawn(kk, { pos: at.slice(), groundZ: at[2] }, {});
@@ -1180,6 +1183,8 @@ export class FxWiring {
     const flying = this._inAir(id, time, hpHit);
     // a skill's kit hit (SkillFx.seen: no attack owns it — the frame's order names the skill): its hit stands for the spark
     if (hpHit && this.skills.seen(v, false, !!(m || src || fun || flying))) return true;
+    // an enemy aura's tick on it (SkillFx.auraHit: 深溟巢涌者's pulse, 鼎沸's boil — the aura's buff effect on the unit)
+    if (hpHit && this.skills.auraHit(v, !!(m || src || fun || flying))) return true;
     if (flying) return true;
     const arr = this.arrived.get(id);
     if (arr != null && this.ofx.time - arr < ARRIVAL_WINDOW) return true;
