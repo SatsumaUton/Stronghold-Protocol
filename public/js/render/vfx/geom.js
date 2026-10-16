@@ -21,7 +21,9 @@
 // history §34.6: the remake moved it the other way; the client's data settle it — 荒芜拉普兰德 S3's seal tips, quads with a
 // pivot of −0.5 / −0.81 placed left of the centre and their mirrored twins right of it, point outward only so, and of
 // the used set's view billboards with a Y pivot 210 lift the quad (+) against 22, 34 against 1 of those spawned on the
-// ground: 艾雅法拉 S2's range flames rise from the ground); a stretched billboard's pivot is not applied. Texture sheets: frame 0 is the top-left tile; frame index =
+// ground: 艾雅法拉 S2's range flames rise from the ground). A stretched billboard adds the same pivot after the head
+// shift: pivot.y × the particle's Y size along the velocity and pivot.x × its X size across — the Y size, not the
+// stretched length (lengthScale / velocityScale). Texture sheets: frame 0 is the top-left tile; frame index =
 // floor(frac(startFrame + frameOverTime(frac(t · cycles))) · frames) (§33.5, resolved: the authored curves end at
 // 0.9999 so that the last frame does not wrap to the first).
 
@@ -282,6 +284,11 @@ export function buildParticles(ps, r, cam, fd, frameNo) {
         ax0 = dx * len; ax1 = dy * len; ax2 = dz * len;
         ay0 = wx * sx; ay1 = wy * sx; ay2 = wz * sx;
         cx -= dx * len / 2; cy -= dy * len / 2; cz -= dz * len / 2;
+        // pivot × size, added like a billboard: Y along the velocity, X across. size.y, not `len` (header).
+        if (pv && (pv[0] || pv[1])) {
+          const px = pv[0] * sx, py = pv[1] * sy;
+          cx += wx * px + dx * py; cy += wy * px + dy * py; cz += wz * px + dz * py;
+        }
       } else {
         // the alignment frame (X, Y)
         let X0, X1, X2, Y0, Y1, Y2;

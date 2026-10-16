@@ -11,10 +11,13 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
   their path. (2) An effect at FOOT_POINT, HIT_POINT or HEAD_POINT takes the unit's Graphic tilt (−30° about X, its
   skin animator's rotation), MUZZLE_POINT_WITHOUT_ROTATION, NONE, the ground spawns and an effect played at a map
   position none (§33.2, §33.11): the effects authored standing (荒芜拉普兰德 S3's seal, 能天使 S3's light bars) stand facing
-  the camera. (3) A renderer's `m_Pivot` moves the particle by + pivot × size along its own axes (§33.6). (4) A
-  local-space particle is drawn at its scaling mode's scale as it is now, and a particle's size is × that scale per axis
+  the camera. (3) A renderer's `m_Pivot` moves the particle by + pivot × size along its own axes, a stretched billboard
+  included: pivot.y × the particle's Y size along the velocity and pivot.x × its X size across, not along the stretched
+  length (§33.6). (4) A local-space particle is drawn at its scaling mode's scale as it is now, and a particle's size is × that scale per axis
   whether or not its system has `size3D` (§33.5). (5) A projectile whose movement has `comeBack` flies back to its
-  source after its hit (§33.12 Projectile).
+  source after its hit at the come-back speed toward the HitPoint as it is now (§33.12 Projectile). `delayAfterReached`
+  of 1 on the Paracurve / NarantS3 come-back projectiles is a flag; the wait is `delayTime` 0.01 s, under one sim tick,
+  and the visual turns back on the hit with the sim.
 
 * **2026-10-16 — readings corrected from the client's data and code, no format change (0.3.1: the 0.3.0 effects audit's
   R18–R21 and its low-confidence observations; history 0.3.1)**. (1) A prefab's root node is active when the effect
@@ -482,8 +485,12 @@ X 0.5 flash flying along the thrust, was a vertical needle with the sizes the ot
 particle-size units: the quad or mesh is drawn at position + pivot × size along the particle's own axes, turning with
 its roll — 荒芜拉普兰德 S3's seal tips, Quads with a pivot of −0.5 / −0.81 left of the centre and their twins turned 180°
 about Y right of it, point outward only so, and of the used set's view billboards with a Y pivot 210 lift the quad
-against 22: 艾雅法拉 S2's range flames stand on the ground; not applied to a stretched billboard; 1,291 renderers of 661
-prefabs set one — the remake moved the particle the other way before 0.3.1, history §34.6), `m_Flip` (0…1: the share of particles mirrored per axis), `m_AllowRoll`; mesh particles:
+against 22: 艾雅法拉 S2's range flames stand on the ground; a stretched billboard adds the same pivot after its head
+shift, pivot.y × the particle's Y size along the velocity and pivot.x × its X size across — that Y size, not the
+stretched length; 1,754 stretched renderers have |pivot| > 0.2, and the largest shifts are 锏 S3
+`blkkgt_skill_03_start_01` `light` (up to 4.62 tiles), `enemy_mdrock_buff_03_start_02` `shandian` (4.57) and 陈 S2
+`chen_skill_02_start` `renwu_01` (2.77) — 1,291 renderers of 661
+prefabs set one — the remake moved the particle the other way before 0.3.1, and skipped it on a stretch, history §34.6), `m_Flip` (0…1: the share of particles mirrored per axis), `m_AllowRoll`; mesh particles:
 `m_Mesh`, `m_Mesh1…3` (`{mesh}` or null), `m_MeshDistribution` (0 uniform, 1 by `m_MeshWeighting*`), `m_MaskInteraction`;
 `materials[0]` draws the particles, `materials[1]` the TrailModule's trails.
 
@@ -1035,9 +1042,16 @@ start — and after the top g is re-solved each tick to land on the target's cur
 (`randomInverseParacurve`: a coin) flies the mirror image. As a function of the flight fraction k the height is
 start + 2√h·s·k − s²·k² (s = √h + √H) whatever T is. **Resolved** (0.3.1, history §34.6: their Comeback state): a
 movement with `comeBack` turns, after the hit, into a leg back to the source's HitPoint at `speed` ×
-`comeBackSpeedScale` (跃跃's `projectile_chr_caper` 15 × 0.25 = 3.75 tiles/s, the sim's BOOMERANG_RETURN_SPEED), homing
-on the source, a ParacurveMovement along a new arc; the projectile keeps its main effect until it is back and then
-clears it, and a source gone takes nothing back — 10 projectiles (跃跃's, 娜仁图亚's). `AmiyaS2Movement` (安洁莉娜 S2): straight and homing in `time` s
+`comeBackSpeedScale` (跃跃's `projectile_chr_caper` 15 × 0.25 = 3.75 tiles/s, the sim's BOOMERANG_RETURN_SPEED), stepping
+at that speed toward the HitPoint as it is now — a duration locked at the turn would cover a thrower who moves in the
+original time, faster than 3.75 —, a ParacurveMovement along an arc rebuilt only when its start height, end height or
+ground distance changes; the projectile keeps its main effect until it is back and then
+clears it, and a source gone takes nothing back — 10 projectiles (跃跃's, 娜仁图亚's). The pause before that leg is not
+1 s: on a ParacurveMovement / NarantS3Movement `delayAfterReached` is 0 or 1 (a flag) and `delayTime` is the seconds
+(0.01 on `projectile_chr_caper_s2` / `_s2_1` and `projectile_chr_narant_s3` / `_s3_1` / `_s3_2`); on an AdvancedMovement
+`delayAfterReached` itself is the seconds (0.01, or 0 on `narant_s2`). 0.01 s is under one sim tick, the return
+projectile already waits for the next tick, and the visual turns back on the hit so it stays on the sim's catch
+[ASSUMED: the raw float pmUpdateAfterReach waits at +0xec is `delayTime`]. `AmiyaS2Movement` (安洁莉娜 S2): straight and homing in `time` s
 after a start phase of `startDuration` towards `startDistance` in a random direction, its body at
 (0, sin φ · `yAnimateOffset`, 0) across the flight, φ advancing 2π · `yAnimateSpeed` per second from a random start. The
 sim keeps its own projectile speeds; the visual flies its flying effect along the sim's flight and plays `onHit` at the
@@ -1429,9 +1443,13 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   read from `behaviours` (an index written before the correction named a chain's or a rope's line `main` for 30
   projectiles); it flies from the shot's mount point (Placement above), its root's transform the flight's (0.3.1). A
   projectile whose movement has `comeBack` (§33.12 Projectile) plays its hit at the target and flies back to the
-  thrower's HitPoint, homing, at the sim's return speed for the 回环射手's 'boomerang' (else `speed` ×
-  `comeBackSpeedScale`), a Paracurve one along a new arc, its effect removed at the catch; a thrower gone ends it at the
-  hit (`wiring.js _comeBack` / `_turnBack` / `_stepBack`, 0.3.1, history §34.6: it stopped at the target). A harpoon's rope (a HarpoonRenderer's
+  thrower's HitPoint at the sim's return speed for the 回环射手's 'boomerang' (else `speed` ×
+  `comeBackSpeedScale`), stepping that speed toward the HitPoint as it is now, a Paracurve one along an arc rebuilt
+  when its inputs change, its effect removed at the catch; a thrower gone ends it at the
+  hit. The client's `delayAfterReached` of 1 on the Paracurve / NarantS3 come-backs is a flag (`delayTime` 0.01 s, under
+  one tick); the visual does not hang, so the drawn boomerang stays on the sim's catch
+  (`wiring.js _comeBack` / `_turnBack` / `_stepBack`, 0.3.1, history §34.6: it stopped at the target, then a locked
+  return duration rubber-banded a moving thrower). A harpoon's rope (a HarpoonRenderer's
   `_mainEffect`) runs from the shooter's point as it is drawn to the head while it flies — its LineRenderers' end
   points set by the runtime (`effect.js linkLines`; a world-space line without them draws nothing) — and fades once the
   head arrives; a chain's lightning (a ChainLightningEffectBehaviour's) is not flown — the client plays it between the

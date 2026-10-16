@@ -252,6 +252,24 @@ describe("a renderer's pivot", () => {
     assert.ok(q.ay[1] > 0 && q.ay[2] < 0, 'up the screen (+row, up from the board)');
   });
 
+  test('a stretched billboard adds pivot × size: Y along the velocity, X across — the particle\'s Y size, not the stretched length', () => {
+    const burst = { InitialModule: { startLifetime: 1, startSpeed: 6, startSize: 2, startColor: [1, 1, 1, 1], maxNumParticles: 10 } };
+    const stretch = (pivot) => quads(psNode(1, 0, {
+      r: { renderMode: 'stretch', m_LengthScale: 4, m_VelocityScale: 0, m_MaxParticleSize: 0, m_Pivot: pivot },
+      ps: burst,
+    }))[0];
+    const z = stretch([0, 0, 0]);
+    const y = stretch([0, 0.5, 0]);
+    const x = stretch([0.5, 0, 0]);
+    const len = Math.hypot(...z.ax);
+    near(len, 8, 1e-3, 'length is size.y 2 × lengthScale 4');
+    near(Math.hypot(...y.ax), len, 1e-4, 'a pivot does not change the stretched length');
+    const along = z.ax.map((v) => v / len);
+    nearV([y.c[0] - z.c[0], y.c[1] - z.c[1], y.c[2] - z.c[2]], along.map((v) => v * 1), 1e-4, 'Y pivot 0.5 × size.y 2 = 1 along the velocity, not half of the length 8');
+    const across = z.ay.map((v) => v / (Math.hypot(...z.ay) || 1));
+    nearV([x.c[0] - z.c[0], x.c[1] - z.c[1], x.c[2] - z.c[2]], across.map((v) => v * 1), 1e-4, 'X pivot 0.5 × size.x 2 across');
+  });
+
   test('a mesh particle\'s pivot alike: 荒芜拉普兰德 S3\'s seal tips (a pivot of −0.5) reach out to the left of their node, their mirrored twins to the right', () => {
     const tip = (o) => psNode(1, 0, { size: 1, pos: o.pos, rot: o.rot, r: { renderMode: 'mesh', renderAlignment: 'local', m_Mesh: { builtin: 'Quad' }, m_Pivot: [-0.5, 0, 0] } });
     const left = quads(tip({ pos: [-0.1, 0, 0] }))[0];
@@ -354,6 +372,42 @@ describe('a projectile whose movement comes back', () => {
     near(h.fx.anchor[0], -6, 1e-6, 'caught at her HitPoint');
     near(h.fx.anchor[1], 1 + 0.232, 1e-6, '… (its height on the board)');
     assert.ok(h.fx.killed && !h.fx.stopped, 'and it ends there, at once (its prefab has no `_delayToFinish` to linger)');
+    assert.equal(spawned.filter((x) => x.key === 'boom_hit').length, 1, 'one hit, on the way out only');
+  });
+
+  test('a thrower who moves is followed at 3.75 tiles/s, not rubber-banded onto the duration locked at the turn', async () => {
+    const mv = { class: 'AdvancedMovement', moveType: 1, speed: 15, comeBack: 1, comeBackSpeedScale: 0.25 };
+    const { w, ofx, spawned, src, tgt } = await thrower(mv);
+    tgt.x = 8;                                            // 4 tiles out (the locked ETA is 4 / 3.75 = 1.067 s)
+    w.attack(src, tgt, 'boomerang', 0);
+    const h = spawned.find((x) => x.key === 'boom_trail');
+    const out = 4 / 15, eta = 4 / 3.75;
+    run(h, out + 1e-6, ofx);
+    const turn = h.fx.anchor.slice();
+    let maxSp = 0, prev = turn.slice(), prevT = out + 1e-6;
+    const N = 32;
+    for (let i = 1; i <= N; i++) {
+      src.x = 4 - 2 * (i / N);                            // +2 tiles away over that ETA, then she stops
+      const t = out + eta * (i / N);
+      run(h, t, ofx);
+      const sp = Math.hypot(h.fx.anchor[0] - prev[0], h.fx.anchor[1] - prev[1]) / (t - prevT);
+      if (sp > maxSp) maxSp = sp;
+      prev = h.fx.anchor.slice(); prevT = t;
+    }
+    const travelled = Math.hypot(h.fx.anchor[0] - turn[0], h.fx.anchor[1] - turn[1]);
+    assert.equal(h.fx.killed, false, 'not caught when the locked duration runs out');
+    near(travelled, 4, 0.08, '4 tiles covered, not the 6 to where she went');
+    assert.ok(maxSp < 4.05, `the come-back speed stays 3.75 (peak ${maxSp.toFixed(2)}; a locked duration peaks near 7)`);
+    near(h.fx.anchor[0], -6, 0.15, 'about 2 tiles short of her (unity x −8)');
+    let caughtAt = null;
+    for (let i = 1; i <= 40; i++) {
+      const t = out + eta + (2 / 3.75) * (i / 20);
+      run(h, t, ofx);
+      if (h.fx.killed) { caughtAt = t - out; break; }
+    }
+    assert.ok(caughtAt > 1.45 && caughtAt < 1.75, `caught near 1.60 s (at ${caughtAt})`);
+    near(h.fx.anchor[0], -8, 1e-4, 'at her HitPoint, where she stopped');
+    near(h.fx.anchor[1], 1 + 0.232, 1e-4, '… (its height on the board)');
     assert.equal(spawned.filter((x) => x.key === 'boom_hit').length, 1, 'one hit, on the way out only');
   });
 

@@ -1069,7 +1069,7 @@ export class FxWiring {
         if (flipIfLeft && dx < 0) { fx.mirror = true; fx.yaw = Math.atan2(dy, -dx); } // mirrored art: +x after the mirror
         else { fx.mirror = false; fx.yaw = Math.atan2(dy, dx); }
         fx.pitch = horiz > 1e-5 || Math.abs(dz) > 1e-5 ? Math.atan2(-dz, horiz) : 0;
-        if (flight.back ? fx.time - flight.back.t0 >= flight.back.dur : fx.time >= flight.dur) finish(fx);
+        if (flight.back ? flight.back.done : fx.time >= flight.dur) finish(fx);
       },
     }) : null;
     if (ropeKey) {
@@ -1121,9 +1121,18 @@ export class FxWiring {
    * movement a new leg from where it is to the thrower's HitPoint (the source's hitMountPoint, followed) at its speed ×
    * `comeBackSpeedScale` (0.25: 15 → 3.75 tiles/s — PRTS 跃跃 "返回时飞行速度3.75", the sim's BOOMERANG_RETURN_SPEED), a
    * ParacurveMovement's again along its arc, and the flying effect plays on until the thrower catches it (before 0.3.1 it
-   * stopped at the hit). Returns { speed } (tiles per battle s: the sim's return speed for its boomerang kind) or null.
-   * [ASSUMED] no pause at the hit (the movement's `delayAfterReached`, 1 s for the Paracurve ones; the sim returns at
-   * once); a 娜仁图亚 S1 bounce / S2 dash comes straight back from its first target.
+   * stopped at the hit). The leg steps at that speed toward her HitPoint as it is now — a duration locked at the turn
+   * reaches a thrower who has moved on the original ETA, faster than the come-back speed. Returns { speed } (tiles per
+   * battle s: the sim's return speed for its boomerang kind) or null.
+   * The client's pause at the hit is not 1 s. On a ParacurveMovement / NarantS3Movement `delayAfterReached` is only 0
+   * or 1 (a flag, the same pair as AttachToTarget's `_delayAfterReached`) and `delayTime` is the seconds — 0.01 for
+   * projectile_chr_caper_s2 / _s2_1 and projectile_chr_narant_s3 / _s3_1 / _s3_2. An AdvancedMovement has no
+   * `delayTime`; its `delayAfterReached` is the seconds (0.01 for the come-back ones; 0 for narant_s2, whose onward
+   * dash is `moveAheadTime`). amUpdateAfterReach waits the fixed-point at +0x110; pmUpdateAfterReach waits the raw
+   * float at +0xec [ASSUMED: that float is `delayTime`]. 0.01 s is under one sim tick (1/30): the return projectile is
+   * added in the hit's onHit and first moves on the next tick. 跃跃 S2 fires an extra projectile and 娜仁图亚 S3's blast
+   * is the catch — neither skill hovers — so a drawn pause would put the effect behind the sim's catch. The visual
+   * turns back on the hit, on the sim's timing. A 娜仁图亚 S1 bounce / S2 dash comes straight back from its first target.
    */
   _comeBack(proj, kind) {
     const mv = proj?.movement;
@@ -1135,28 +1144,67 @@ export class FxWiring {
   }
 
   /**
-   * Turn a come-back flight around at its hit (comeBack): its new leg from the hit point to the thrower's HitPoint; false
-   * when the thrower is gone (the client stops a boomerang with no source: it is not drawn back).
+   * Turn a come-back flight around at its hit (comeBack): its new leg from the hit point toward the thrower's HitPoint
+   * at `back.speed` every frame (not a duration locked here); false when the thrower is gone (the client stops a
+   * boomerang with no source: it is not drawn back).
    */
   _turnBack(flight, fx, back, src, sSkin, mv, seed) {
     if (!src || src.destroyed || src.alive === false) return false;
-    const from = flight.pos.slice();
-    const to = unitPoint(sSkin, 'hit', this.pose(src));
-    const dist = Math.hypot(to[0] - from[0], to[1] - from[1]);
-    const arc = paracurve(mv, -from[2], -to[2], dist, seed ^ 0x3c6ef372);
-    flight.back = { t0: fx.time, dur: Math.max(0.04, dist / back.speed), from, to, arc };
+    flight.back = {
+      last: fx.time, speed: back.speed, from: flight.pos.slice(), to: unitPoint(sSkin, 'hit', this.pose(src)),
+      mv, seed: seed ^ 0x3c6ef372, arc: null, travelled: 0, done: false,
+    };
     this._stepBack(flight, fx.time, src, sSkin);
     return true;
   }
 
-  /** A come-back flight's way back at t (its effect's clock): homing on the thrower's HitPoint; false once it is gone. */
+  /** Rebuild a Paracurve come-back's arc when its start height, end height or ground distance has changed. */
+  _syncArc(b) {
+    if (!b.mv || b.mv.class !== 'ParacurveMovement') { b.arc = null; return; }
+    const dist = Math.hypot(b.to[0] - b.from[0], b.to[1] - b.from[1]);
+    const hs = -b.from[2], ht = -b.to[2];
+    if (b.arc && b.hs === hs && b.ht === ht && b.dist === dist) return;
+    b.hs = hs; b.ht = ht; b.dist = dist;
+    b.arc = paracurve(b.mv, hs, ht, dist, b.seed);
+  }
+
+  /**
+   * A come-back flight's way back at t (its effect's clock): step `speed · dt` toward the thrower's HitPoint now, and
+   * stop on reaching it (`done`). A Paracurve one keeps its arc over the ground still left; false once she is gone.
+   */
   _stepBack(flight, t, src, sSkin) {
     const b = flight.back;
     if (!src || src.destroyed || src.alive === false) return false;
     unitPoint(sSkin, 'hit', this.pose(src), b.to);
-    const k = Math.min(1, Math.max(0, (t - b.t0) / b.dur));
-    this._flightPoint(b, b.arc, null, k, t, flight.pos);
-    this._flightPoint(b, b.arc, null, Math.min(1, k + 0.02), t, flight.next);
+    const dt = Math.max(0, t - b.last);
+    b.last = t;
+    const dx = b.to[0] - flight.pos[0], dy = b.to[1] - flight.pos[1];
+    const dist = Math.hypot(dx, dy);
+    const step = b.speed * dt;
+    if (!(dist > 1e-4) || (dt > 0 && step >= dist)) {
+      flight.pos[0] = b.to[0]; flight.pos[1] = b.to[1]; flight.pos[2] = b.to[2];
+      flight.next[0] = b.to[0]; flight.next[1] = b.to[1]; flight.next[2] = b.to[2];
+      b.done = true;
+      return true;
+    }
+    const ux = dx / dist, uy = dy / dist;
+    const moved = dt > 0 ? step : 0;
+    flight.pos[0] += ux * moved; flight.pos[1] += uy * moved;
+    b.travelled += moved;
+    const left = dist - moved;
+    const ahead = Math.min(0.02 * b.speed, Math.max(left, 1e-4));
+    flight.next[0] = flight.pos[0] + ux * ahead; flight.next[1] = flight.pos[1] + uy * ahead;
+    if (b.mv && b.mv.class === 'ParacurveMovement') {
+      this._syncArc(b);
+      const total = b.travelled + left;
+      const k = total > 1e-6 ? b.travelled / total : 1;
+      flight.pos[2] = b.arc ? -arcHeight(b.arc, k, -b.to[2]) : flight.pos[2];
+      const kn = Math.min(1, k + (total > 1e-6 ? ahead / total : 0));
+      flight.next[2] = b.arc ? -arcHeight(b.arc, kn, -b.to[2]) : flight.pos[2];
+    } else {
+      if (moved > 0) flight.pos[2] += (b.to[2] - flight.pos[2]) * (moved / dist);
+      flight.next[2] = flight.pos[2] + (b.to[2] - flight.pos[2]) * (ahead / left);
+    }
     return true;
   }
 
