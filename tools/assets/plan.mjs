@@ -23,7 +23,7 @@
 
 import { RAW, joinUrl, safeName, urlBase, urlDir } from './sources.mjs';
 import { kindOf } from './formats.mjs';
-import { pickUnitSfx, pickModeAttacks, pickModeHits, skillModeLetter, SLOT_MODE_LETTER, UI_SFX, BATTLE_SFX, resolveSpec, indexVoice, nativeVoiceDirs, VOICE_DIRS, VOICE_CUSTOM_DIR, VOICE_BATTLE_SLOTS } from './audio.mjs';
+import { pickUnitSfx, assignSkillModeSfx, UI_SFX, BATTLE_SFX, resolveSpec, indexVoice, nativeVoiceDirs, VOICE_DIRS, VOICE_CUSTOM_DIR, VOICE_BATTLE_SLOTS } from './audio.mjs';
 import { literal } from './manifest.mjs';
 import { EMOTE_CATALOG } from '../../shared/constants.js';
 
@@ -250,6 +250,41 @@ export function patternOperator(id, x = {}) {
  * @param {any} ops03 docs/research/03-operators.json
  * @returns {Map<string, number[]>}
  */
+/**
+ * Compact mode list for {@link assignSkillModeSfx}, from a local fx index (`public/assets/local/fx/index.json`,
+ * not committed). `skills[id].mode` is the mode index the skill switches to. An `aliasOf` unit uses the target's modes.
+ * Operators the index does not list are absent, and the plan keeps the filename-letter fallback for them.
+ * @param {any} index parsed fx index
+ * @returns {Map<string, {modes:{name:string}[], skillMode:Map<string, number|null>}>}
+ */
+export function charModesFromIndex(index) {
+  const units = index?.units;
+  const map = new Map();
+  if (!units || typeof units !== 'object') return map;
+  const resolve = (id, seen = new Set()) => {
+    let u = units[id];
+    while (u?.aliasOf && typeof u.aliasOf === 'string' && !seen.has(u.aliasOf)) {
+      seen.add(u.aliasOf);
+      u = units[u.aliasOf];
+    }
+    return u || null;
+  };
+  for (const id of Object.keys(units)) {
+    if (!/^char_/.test(id)) continue;
+    const u = resolve(id);
+    if (!Array.isArray(u?.modes)) continue;
+    const skillMode = new Map();
+    for (const [sid, sk] of Object.entries(u.skills || {})) {
+      skillMode.set(sid, Number.isInteger(sk?.mode) ? sk.mode : null);
+    }
+    map.set(id, {
+      modes: u.modes.map((m) => ({ name: typeof m?.name === 'string' ? m.name : '' })),
+      skillMode,
+    });
+  }
+  return map;
+}
+
 export function skillIndicesByChar(ops03) {
   const primary = new Map();
   const all = new Map();
@@ -345,12 +380,14 @@ export function collectEnemyIds({ assets07, enemies05, maps05, ops03 }) {
  * @param {string[]} [p.moduleTypes] module type icon ids (`typeIcon`, e.g. 'sol-x') → manifest `modules[typeIcon]`, the
  *   official type icon (arts/ui/uniequiptype) the 干员调配 / 自选 module tiles draw when the local-client art lacks it
  * @param {Array<{name:string,rel:string,urls:string[],kind:string}>} [p.statsTemplate] official statistics UI assets
+ * @param {Map<string, {modes:{name:string}[], skillMode:Map<string, number|null>}>|null} [p.charModes]
+ *   from {@link charModesFromIndex} (the local fx index). Absent: skill attack slots stay on the filename letter.
  * @returns {{ template: any, models: Map<string, any>, notes: string[] }}
  */
 export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsData, charword = null, voiceLang = 'cn',
   voiceJp = true, voiceSlots = VOICE_BATTLE_SLOTS, optionalVoice = false,
   extraEnemyIds = [], extraTokenIds = [], extraHandbook = {}, localEnemySpines = {}, localTokenSpines = {}, extraOperators = {},
-  moduleTypes = [], statsTemplate = [] }) {
+  moduleTypes = [], statsTemplate = [], charModes = null }) {
   const notes = [];
   /** @type {Map<string, any>} */
   const models = new Map();
@@ -408,16 +445,27 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
       born: audio.bank(`battle.ON_PROJECTILE_BORN.projectile_chr_${short}`), hit: audio.bank(`battle.ON_PROJECTILE_HIT.projectile_chr_${short}`) } });
     const { roles: u, mix } = unitSounds(audio, sfx);
     const skillSfx = {};
-    // Per-skill ATTACK / IMPACT sound (audio.mjs pickModeAttacks / pickModeHits): a skill mode has its own swing and its
-    // own hit sound, and neither may play as the unit's normal attack / impact (银灰, 纯烬艾雅法拉). An operator whose
-    // every attack belongs to a skill mode has no normal bank at all (司霆惊蛰 — 解放者, she only attacks while a skill
-    // runs — the report 「三技能攻击没有音效」); 赤刃明霄陈's S3 slashes swing `p_atk_hljdswd_s` and land `p_imp_hljdswd_s`
-    // where her normal attack uses the `_n` files (the report 「斩击音效应该和普通攻击不一样」). The mode letter of a skill
-    // index is read from that skill's own activation sound (`p_skill_lzxqlkl_s` → s = 技能3); without one (most operators
-    // carry no activation sound) we infer 技能1 / 2 / 3 = d / h / s ([ASSUMED], below). The client plays
-    // them while that skill is active (public/js/audio.js unit()).
-    const modeAttacks = pickModeAttacks(audio.unitBanks.get(id));
-    const modeHits = pickModeHits(audio.unitBanks.get(id));
+    // Per-skill ATTACK / IMPACT sound (audio.mjs assignSkillModeSfx): a skill mode has its own swing and its own hit
+    // sound, and neither may play as the unit's normal attack / impact (银灰, 纯烬艾雅法拉). An operator whose every
+    // attack belongs to a skill mode has no normal bank at all (司霆惊蛰 — 解放者, she only attacks while a skill runs).
+    // With the local fx index, the bank's mode index is the operator's own mode and the skill's `mode` says which one
+    // runs (#679: 玛恩纳's S3 swing is `attack.3`, not the `_s` letter). Without the index the activation sound's
+    // letter, or else d/h/s for slots 1/2/3, stays ([ASSUMED], DESIGN §28.17). The client plays the slot while that
+    // skill is active (public/js/audio.js unit()).
+    const cm = charModes?.get(id) ?? null;
+    const skillRows = [];
+    for (const i of idx) {
+      const s = (o.skills || []).find((k) => k.index === i);
+      if (!s) continue;
+      const start = s.skillId ? audio.skillBanks.get(s.skillId)?.get('ON_SKILL_START') : null;
+      const linked = cm && s.skillId ? cm.skillMode.get(s.skillId) : undefined;
+      skillRows.push({
+        index: i, skillId: s.skillId ?? null,
+        mode: Number.isInteger(linked) ? linked : null,
+        start: start?.[0] ?? null,
+      });
+    }
+    const assigned = assignSkillModeSfx(audio.unitBanks.get(id), skillRows, cm?.modes ?? null, cm?.skillMode ?? null);
     const attacks = {};
     const hits = {};
     const attackMix = {}, hitMix = {};
@@ -429,16 +477,16 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
       if (s.skillId) skillsById[s.skillId] = iconId;
       const ss = audio.skillBanks.get(s.skillId)?.get('ON_SKILL_START');
       if (ss?.length) skillSfx[String(i)] = soundLeaf(ss);
-      // [ASSUMED] Without a named activation mode, infer d/h/s from slot 1/2/3; see DESIGN §28.17.
-      const letter = skillModeLetter(ss?.[0]) ?? SLOT_MODE_LETTER[i];
-      if (letter && modeAttacks[letter]) {
-        attacks[String(i)] = soundLeaf(modeAttacks[letter]);
-        const m = audio.mixOf?.(modeAttacks[letter]);
+      const ak = assigned.attacks[String(i)];
+      if (ak) {
+        attacks[String(i)] = soundLeaf(ak);
+        const m = audio.mixOf?.(ak);
         if (m) attackMix[String(i)] = m;
       }
-      if (letter && modeHits[letter]) {
-        hits[String(i)] = soundLeaf(modeHits[letter]);
-        const m = audio.mixOf?.(modeHits[letter]);
+      const hk = assigned.hits[String(i)];
+      if (hk) {
+        hits[String(i)] = soundLeaf(hk);
+        const m = audio.mixOf?.(hk);
         if (m) hitMix[String(i)] = m;
       }
     }

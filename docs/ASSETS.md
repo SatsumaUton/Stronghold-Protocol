@@ -662,11 +662,15 @@ The project's code is GPL-3.0-or-later (`LICENSE`); none of the items below is c
 
 ### Skill attack banks (0.2.3, PR #410)
 
-`pickModeAttacks` / `pickModeHits` select a uniform d/h/s bank from the official audio table (attack/combat abilities
-only). A skill's activation sound supplies its mode letter; without one, d/h/s = slots 1/2/3 is [ASSUMED]. Competing
-banks prefer START over ON, then plain/numeric order; this is a deterministic approximation, not proof of every
-operator's runtime ability graph. Mixed-letter banks are skipped. Preserve `mixOf` for each selected bank separately;
-`attacks`/`hits` and `attackMix`/`hitMix` use matching skill keys. Regenerate the current manifest instead of importing
-an older PR's full JSON, preserving JP voices and current operators. See DESIGN §28.17.
+`pickModeAttacks` / `pickModeHits` still group a uniform d/h/s bank by filename letter. `assignSkillModeSfx` (#679) places
+that bank on a skill from the operator's own mode list when `public/assets/local/fx/index.json` is present (a local
+extract, not committed): the first number of the attack/combat key is the mode index, and `skills[id].mode` is the mode
+that skill switches to. A mode named exactly `S<n>` that no skill switches to is skill n's bank instead of a differently
+named link [ASSUMED]; a mode another skill already links is not taken (§34.3). It is not skill N−1 (银灰's `attack.2` is his S3 mode; 司霆惊蛰's keys are dotted). Without the
+index, a skill's activation sound supplies the letter, and otherwise d/h/s = slots 1/2/3 is [ASSUMED]. Competing banks
+prefer START over ON, then plain/numeric order; this is a deterministic approximation, not proof of every operator's
+runtime ability graph. Mixed-letter banks, and files that are not `_d` / `_h` / `_s`, are skipped. Preserve `mixOf` for
+each selected bank separately; `attacks`/`hits` and `attackMix`/`hitMix` use matching skill keys. Regenerate the current
+manifest instead of importing an older PR's full JSON, preserving JP voices and current operators. See DESIGN §34.3.
 
 The 40th local token model is the original champagne bomb (`token_10031_swire2_gdtrap`, §29.5), extracted from the official `btl_pfb_tokens_0.ab` through `TOKEN_SPINES`. Its web fallback is retained. Failed board-pack/image requests can retry after connectivity/visibility recovers; a failed three.js module gets at most two fresh-URL retries per page because browser module failures are cached. Successful resources remain cached.
