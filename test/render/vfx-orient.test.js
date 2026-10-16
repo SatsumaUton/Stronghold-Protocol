@@ -1,6 +1,8 @@
 // test/render/vfx-orient.test.js — official effects that stand, start at the weapon or come back (the maintainer's report
 // of 2026-10-16, DESIGN §34.6): the prefab root's authored transform is no part of the effect (the client sets the root
-// where it plays it: 安洁莉娜 S2's orbs flew 0.94 tile above their path).
+// where it plays it: 安洁莉娜 S2's orbs flew 0.94 tile above their path); an effect spawned at FOOT_POINT / HIT_POINT /
+// HEAD_POINT takes the unit's Graphic tilt (荒芜拉普兰德 S3's seal and 能天使 S3's light bars stand facing the camera), the
+// ground and NONE spawns the identity, FLIP_TWO_SIDE still flips the tilted ones, a FollowMountPoint keeps or follows.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,6 +10,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileEffect, Effect } from '../../public/js/render/vfx/effect.js';
+import { FxWiring } from '../../public/js/render/vfx/wiring.js';
+import { spawnRotation, graphicRotation } from '../../public/js/render/vfx/mounts.js';
+import { quatRotate } from '../../public/js/render/vfx/math.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PREFABS = path.join(ROOT, 'public/assets/local/fx/prefabs');
@@ -82,4 +87,127 @@ test("the local client: 安洁莉娜 S2's flying orb is drawn at its projectile,
   const trail = d.nodes.findIndex((n) => n.trailRenderer);
   nearV(worldPos(fx, trail), [-5.654, 2.147, -1.082], 1e-4, 'the trail rides the projectile');
   nearV(worldX(fx, trail), [-1, 0, 0], 1e-4, 'turned along the flight');
+});
+
+// ---- the spawn location's rotation (DESIGN §33.11, the client's Effect._InitLocationFromEntity) ------------------------
+
+const GRAPHIC = [-0.258819, 0, 0, 0.965926];
+/** The battle camera's view direction in the Unity frame (30° from straight down, towards +row). */
+const CAM_FWD = [0, Math.sin(Math.PI / 6), Math.cos(Math.PI / 6)];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+/** The world direction of a node's local +z axis (a local billboard's / a quad's normal). */
+const worldZ = (fx, i) => { const w = fx.world[i], l = Math.hypot(w[8], w[9], w[10]) || 1; return [w[8] / l, w[9] / l, w[10] / l]; };
+
+/** A prefab: a root with its ParticleEffect (`f`), a `rotation_y` helper and a local billboard in its XY plane. */
+function standing(f = {}, beh = []) {
+  return desc([rootNode([pe({ _rotationY: { node: 1 }, ...f }), ...beh]), { ...psNode(1, 0, { name: 'rotation_y' }), particleSystemRenderer: { m_Enabled: false, materials: [0] } },
+    psNode(2, 1, { pos: [0.3, 0.6, 0], r: { renderAlignment: 'local' } })]);
+}
+
+/** A wiring over a fake layer whose library holds compiled `defs`; it records every spawn's placement. */
+async function wired(defs) {
+  const index = { version: 3, units: { char_t: { kind: 'char', modes: [], skills: {}, skin: 'char_t', refs: [] } },
+    skins: { char_t: { graphic: { rot: GRAPHIC }, points: { HitPoint: { all: { pos: [0, 0.232, -0.25], rot: [0, 0, 0, 1] } }, HeadPoint: { all: { pos: [0, 0.75, -0.55], rot: [0, 0, 0, 1] } },
+      Muzzle: { front: { pos: [0.4, 0.2, -0.1], rot: [0, 0, 0, 1] } } } } },
+    projectiles: {}, skills: {}, generic: {}, prefabs: {} };
+  const spawned = [];
+  const ofx = {
+    active: true, time: 0, timers: [], ctx: { cam: () => ({ tilt: 30 }) },
+    lib: { has: (k) => k in defs, def: (k) => defs[k] || null, index: async () => index, preload: async (keys) => keys.length, defs: new Map() },
+    spawn(key, place, opts) { const h = { key, place, opts, alive: true, stop() {} }; spawned.push(h); return h; },
+  };
+  const w = new FxWiring(ofx, { speed: () => 10, record: () => null });
+  await w.ready();
+  const view = (o = {}) => ({ id: 1, x: 5, y: 10, z: 0, visFacing: 1, isEnemy: false, alive: true, flags: 0, dir: 'RIGHT', info: { id: 1, spine: 'char_t', defId: 'char_t', side: 'ally', kind: 'op' }, ...o });
+  return { w, spawned, view };
+}
+
+/** The effect a recorded spawn draws: the prefab under the placement the wiring gave it, one frame on. */
+function drawn(def, h) {
+  const fx = new Effect(def, { seed: 1 }).place(h.place);
+  fx.update(1 / 30);
+  return fx;
+}
+
+describe('the rotation an effect takes from its spawn location', () => {
+  test('FOOT / HIT / HEAD: the Graphic tilt; MUZZLE / a Special point: the point; the ground, NONE and MUZZLE_POINT_WITHOUT_ROTATION: none', () => {
+    for (const s of [1, 2, 4]) assert.equal(spawnRotation(s), 'graphic', `spawn ${s}`);
+    assert.equal(spawnRotation(3), 'muzzle');
+    assert.equal(spawnRotation(8), 's0');
+    assert.equal(spawnRotation(13), 's4');
+    for (const s of [0, 5, 6, 7, 12, 17, 26, 35]) assert.equal(spawnRotation(s), null, `spawn ${s}`);
+    nearV(graphicRotation(null), GRAPHIC, 1e-9, 'the client\'s −30° about X without a skin');
+    nearV(graphicRotation({ graphic: { rot: [0.258819, 0, 0, -0.965926] } }), [0.258819, 0, 0, -0.965926], 1e-9, 'the skin\'s own');
+  });
+
+  test('an effect authored standing (荒芜拉普兰德 S3\'s seal: a local plane at FOOT_POINT) faces the camera; HIT and HEAD alike', async () => {
+    for (const spawn of [1, 2, 4]) {
+      const def = compileEffect(standing({ _spawnLocation: spawn, _rotateType: 1 }));
+      const { w, spawned, view } = await wired({ seal: def });
+      w.playOn('seal', view(), { follow: true, loop: true });
+      const h = spawned[0];
+      nearV(h.place.rootRot, GRAPHIC, 1e-6, `spawn ${spawn}: the Graphic tilt`);
+      assert.equal(h.place.mountRot, null, 'no facing turn of its own');
+      const n = worldZ(drawn(def, h), 2);
+      assert.ok(dot(n, CAM_FWD) > 0.9999, `spawn ${spawn}: the plane faces the camera (normal ${n.map((x) => x.toFixed(3))})`);
+    }
+  });
+
+  test('a ground spawn, NONE and MUZZLE_POINT_WITHOUT_ROTATION take the identity: a local plane lies on the board', async () => {
+    for (const spawn of [0, 5, 6, 7]) {
+      const def = compileEffect(standing({ _spawnLocation: spawn }));
+      const { w, spawned, view } = await wired({ fx: def });
+      w.playOn('fx', view(), {});
+      nearV(spawned[0].place.rootRot, [0, 0, 0, 1], 1e-9, `spawn ${spawn}`);
+      nearV(worldZ(drawn(def, spawned[0]), 2), [0, 0, 1], 1e-6, `spawn ${spawn}: flat`);
+    }
+  });
+
+  test('FLIP_TWO_SIDE still flips a tilted effect for a unit facing left (the tilt has no facing turn); a MUZZLE_POINT one faces with the unit', async () => {
+    const foot = compileEffect(standing({ _spawnLocation: 1, _rotateType: 1 }));
+    const muzzle = compileEffect(standing({ _spawnLocation: 3, _rotateType: 1 }));
+    const { w, spawned, view } = await wired({ foot, muzzle });
+    const left = view({ visFacing: -1, dir: 'LEFT' });
+    w.playOn('foot', left, {});
+    w.playOn('muzzle', left, {});
+    const [hf, hm] = spawned;
+    assert.equal(hf.place.flipY, true, 'the tilted effect turns its rotation_y helper');
+    nearV(hf.place.rootRot, GRAPHIC, 1e-6, '… under the tilt');
+    const fx = drawn(foot, hf);
+    near(fx.world[2][12] - fx.world[0][12], -0.3, 1e-6, 'its content mirrored to the left in the camera plane');
+    assert.ok(dot(worldZ(fx, 2), CAM_FWD) < -0.9999, '… the plane still facing the camera (seen from behind)');
+    assert.ok(hm.place.mountRot && !hm.place.flipY, 'MUZZLE_POINT takes the point\'s rotation, the facing turn included: no flip of its own');
+  });
+
+  test('a FollowMountPoint with `_keepOriginRotation` keeps its spawn location\'s tilt (the status loops); without it a FOOT point turns with the unit', async () => {
+    const fmp = (mount, keep) => ({ class: 'FollowMountPoint', enabled: true, fields: { _mountPointType: mount, _keepOriginRotation: keep ? 1 : 0 } });
+    const stun = compileEffect(standing({ _spawnLocation: 4 }, [fmp(3, true)]));
+    const feet = compileEffect(standing({ _spawnLocation: 1 }, [fmp(0, false)]));
+    const { w, spawned, view } = await wired({ stun, feet });
+    const v = view({ visFacing: -1, dir: 'LEFT' });
+    w.playOn('stun', v, { follow: true, loop: true });
+    w.playOn('feet', v, { follow: true, loop: true });
+    const [hs, hf] = spawned;
+    nearV(hs.place.rootRot, GRAPHIC, 1e-6, 'kept: the HEAD_POINT spawn\'s tilt');
+    assert.equal(hs.place.mountRot, null);
+    // FOOT followed with its rotation: the face's skeleton root — the tilt and the facing turn (180° about the skeleton's up)
+    const r = hf.place.mountRot;
+    assert.ok(r, 'a FOOT FollowMountPoint without _keepOriginRotation takes the point\'s rotation');
+    nearV(quatRotate(r, [1, 0, 0]), [-1, 0, 0], 1e-6, 'turned to face left');
+    nearV(quatRotate(r, [0, 0, 1]), [0, -CAM_FWD[1], -CAM_FWD[2]], 1e-6, '… about the tilted up axis');
+  });
+
+  test('a chained effect (OnPlayEmitter) takes its own spawn location\'s rotation, not its parent\'s', async () => {
+    const child = compileEffect(standing({ _spawnLocation: 5 }));
+    const parent = compileEffect(standing({ _spawnLocation: 1 }, [{ class: 'OnPlayEmitter', enabled: true, fields: { _effects: ['child'] } }]));
+    const { w, spawned, view } = await wired({ parent, child });
+    w.playOn('parent', view(), { follow: true, loop: true });
+    const h = spawned[0];
+    nearV(h.place.rootRot, GRAPHIC, 1e-6, 'the parent tilted');
+    // system.js FxHandle._start hands the chained effect the parent's placement and track
+    const fx = { def: child, anchor: h.place.pos.slice(), yaw: 0, mirror: false, flipY: false, mountRot: null, rootRot: h.place.rootRot.slice(), time: 0 };
+    h.opts.track(fx);
+    nearV(fx.rootRot, [0, 0, 0, 1], 1e-9, 'the chained GROUND_CENTER effect lies on the board');
+    assert.equal(fx.mountRot, null);
+  });
 });

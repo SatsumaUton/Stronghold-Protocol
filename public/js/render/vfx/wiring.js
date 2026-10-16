@@ -39,7 +39,7 @@
 // 领主's ranged-kind 'atk' on the enemy it blocks is its Combat blow (`_combatKind`); a sim-melee attack whose official
 // ability shoots flies its projectile for show (蒂比: `attack`); a chain's line stays CHAIN_LINE_S (`chain`).
 
-import { spawnPoint, mountPoint, unitPoint, spawnKind, mountKind, spawnRotationKind, mountRotation } from './mounts.js';
+import { spawnPoint, mountPoint, unitPoint, spawnKind, mountKind, spawnRotation, mountRotation, graphicRotation } from './mounts.js';
 import { projectileParts, paracurve, arcHeight, wobble } from './flight.js';
 import { GROUND_SPAWNS } from './effect.js';
 import { SkillFx, fitsAttack, pickGroup, formMode } from './skillfx.js';
@@ -511,7 +511,8 @@ export class FxWiring {
     const pos = P.fmp ? mountPoint(skin, P.fmp.mount, pose) : spawnPoint(skin, P.spawn, pose);
     const ground = (v.z || 0);
     if (P.onGround) pos[2] = -ground;
-    const place = { pos, groundZ: -ground, yaw: 0, mirror: false, flipY: false, mountRot: P.rotKind ? mountRotation(skin, P.rotKind, pose) : null };
+    const place = { pos, groundZ: -ground, yaw: 0, mirror: false, flipY: false, mountRot: null, rootRot: null };
+    this._rotate(P, place, skin, pose);
     this._orient(def, place, pose, o, v);
     const opts = { track: o.track || null, data: o.data ?? null, loop: !!o.loop, important: !!o.important, skip: o.skip > 0 ? o.skip : 0, owner: v };
     // the owner each frame: FollowMountPoint keeps the effect on the unit's point (and its rotation), a held effect
@@ -530,9 +531,10 @@ export class FxWiring {
             // loaded now: its own placement (a FollowOwner, `_keepOriginRotation`), and once the rotation and the
             // direction it takes at its spawn (a mount point's, FLIP_TWO_SIDE, towards the target)
             P = this._placing(d, null, o);
-            const pl = { yaw: fx.yaw, mirror: fx.mirror, flipY: fx.flipY, mountRot: P.rotKind ? mountRotation(skin, P.rotKind, pose) : null };
+            const pl = { yaw: fx.yaw, mirror: fx.mirror, flipY: fx.flipY, mountRot: null, rootRot: null };
+            this._rotate(P, pl, skin, pose);
             this._orient(d, pl, pose, o, v);
-            fx.yaw = pl.yaw; fx.mirror = pl.mirror; fx.flipY = pl.flipY; fx.mountRot = pl.mountRot;
+            fx.yaw = pl.yaw; fx.mirror = pl.mirror; fx.flipY = pl.flipY; fx.mountRot = pl.mountRot; fx.rootRot = pl.rootRot;
           }
         }
         const p = this.pose(v);
@@ -540,14 +542,21 @@ export class FxWiring {
         let Q = P;
         if (d && fx.def && fx.def !== d) {
           Q = chained.get(fx.def);
-          if (!Q) chained.set(fx.def, Q = this._placing(fx.def, null, {}));
+          if (!Q) {
+            chained.set(fx.def, Q = this._placing(fx.def, null, {}));
+            // its rotation is its own spawn location's (the client plays it on the unit as any other effect), not its
+            // parent's
+            const pl = { mountRot: null, rootRot: null };
+            this._rotate(Q, pl, skin, p);
+            fx.mountRot = pl.mountRot; fx.rootRot = pl.rootRot;
+          }
         }
         const G = Q.fmp ? Q : P;
         if (G.follow) {
           mountPoint(skin, G.follow.mount, p, fx.anchor);
           if (G.onGround) fx.anchor[2] = -(v.z || 0);
           fx.groundZ = -(v.z || 0);
-          if (G.fmp && G.rotKind) fx.mountRot = mountRotation(skin, G.rotKind, p, fx.mountRot || [0, 0, 0, 1]);
+          if (Q.rotFollow) fx.mountRot = mountRotation(skin, Q.rotKind, p, fx.mountRot || [0, 0, 0, 1]);
         } else if (stick && v.alive !== false) {
           const sp = spawnPoint(skin, P.spawn, p);
           fx.anchor[0] = sp[0]; fx.anchor[1] = sp[1]; fx.anchor[2] = P.onGround ? -(v.z || 0) : sp[2];
@@ -577,18 +586,41 @@ export class FxWiring {
    * Where an effect sits on its unit, from its descriptor or — not loaded yet — index.json's summary `sum` (`spawn`,
    * `follow`: a FollowMountPoint's MountPointType): `spawn` its spawn location (HIT without either); `fmp` its
    * FollowMountPoint, followed from the first frame; `follow` the point it keeps to — the FollowMountPoint's, else for a
-   * held loop (o.follow) a FollowOwner's / FollowTileHeight's (the feet); `rotKind` the point whose rotation it takes (a
-   * FollowMountPoint without `_keepOriginRotation`, a MUZZLE_POINT or Special-point spawn; a summary's: none until the
-   * descriptor says); `onGround` a ground spawn; `keep` no point to keep to, but the unit holds it — a held effect
-   * (o.follow), a `_holdByOwner` prefab —: it moves with the unit.
+   * held loop (o.follow) a FollowOwner's / FollowTileHeight's (the feet); `rotKind` the rotation it takes (_rotate): a
+   * FollowMountPoint without `_keepOriginRotation` its point's every frame (`rotFollow`; FOOT: 'foot', the face's
+   * skeleton root), else its spawn location's once (mounts.js spawnRotation: 'graphic' — FOOT / HIT / HEAD, the
+   * unit's Graphic tilt —, MUZZLE_POINT's or a Special point's, else none: the identity), which a FollowMountPoint with
+   * `_keepOriginRotation` keeps; `loaded` false for a summary (no rotation until the descriptor says); `onGround` a
+   * ground spawn; `keep` no point to keep to, but the unit holds it — a held effect (o.follow), a `_holdByOwner`
+   * prefab —: it moves with the unit.
    */
   _placing(def, sum, o) {
     const spawn = def ? def.spawn : Number.isInteger(sum?.spawn) ? sum.spawn : 2;
     const fmp = def ? (def.follow && !def.follow.owner ? def.follow : null) : Number.isInteger(sum?.follow) ? { mount: sum.follow } : null;
     const follow = fmp || (o.follow && def?.follow) || null;
-    const rotKind = !def ? null : fmp ? (fmp.keepRot ? null : mountKind(fmp.mount)) : spawnRotationKind(spawn);
+    let rotKind = null, rotFollow = false;
+    if (def) {
+      if (fmp && !fmp.keepRot) { rotKind = fmp.mount === 0 ? 'foot' : mountKind(fmp.mount); rotFollow = !!rotKind; }
+      else rotKind = spawnRotation(spawn);
+    }
     const keep = !follow && (!!o.follow || !!def?.holdByOwner);
-    return { spawn, fmp, follow, rotKind, onGround: GROUND_SPAWNS.has(spawn) && !fmp, keep };
+    return { spawn, fmp, follow, rotKind, rotFollow, loaded: !!def, onGround: GROUND_SPAWNS.has(spawn) && !fmp, keep };
+  }
+
+  /**
+   * The rotation of an effect on a unit (_placing): a point's world rotation — the Graphic tilt, the facing turn, the
+   * bone's angle — as `mountRot` (it faces with the unit: FLIP_TWO_SIDE adds no flip, _orient), else the spawn
+   * location's as `rootRot`: the unit's Graphic tilt for FOOT / HIT / HEAD — no facing turn: FLIP_TWO_SIDE still flips
+   * it — and the identity for the others (both replace the prefab root's own rotation, as the client's
+   * Effect._InitLocationFromEntity does). Before 0.3.1 (history §34.6) FOOT / HIT / HEAD effects took no tilt: an effect
+   * authored standing lay on the board (荒芜拉普兰德 S3's seal, 能天使 S3's light bars, 灰毫 S2's smoke over her legs).
+   */
+  _rotate(P, place, skin, pose) {
+    place.mountRot = null; place.rootRot = null;
+    if (!P.loaded) return;
+    if (P.rotKind === 'graphic') place.rootRot = graphicRotation(skin);
+    else if (P.rotKind) place.mountRot = mountRotation(skin, P.rotKind, pose);
+    else place.rootRot = ID_ROT;
   }
 
   /**
