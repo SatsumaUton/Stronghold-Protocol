@@ -278,7 +278,8 @@ export class SkillFx {
    */
   state(v, skillOn) {
     const U = this.of(v);
-    if (U?.ewin) return { U, on: true, plan: U.ewin.plan };   // an enemy's skill window
+    // an enemy's skill window (not one whose single attack its kit already fired: its later attacks are normal ones)
+    if (U?.ewin && !U.ewin.fired) return { U, on: true, plan: U.ewin.plan };
     let on = typeof skillOn === 'boolean' ? skillOn : U && U.on !== null ? U.on : !!((v?.flags | 0) & UF.SKILL);
     if (U && this._passive0(U)) on = v.alive !== false;
     return { U, on, plan: U ? U.plan : null };
@@ -657,7 +658,9 @@ export class SkillFx {
     if (U.ewin) this._enemyEnd(U, v);
     const plan = this._enemyPlan(U, entry, v);
     const at = this.w.ofx.time;
-    const win = { plan, slot: entry.slot, at, until: at + hold, loops: [], draws: false, startFrame: this.frame, shown: false };
+    // a skill whose root ability is an attack (RangedAttack, MeleeAttack …) is that one attack
+    const attackRoot = /Attack$/.test(this.w.idx.units[U.key]?.skills?.[entry.prefabKey]?.rootAbility || '');
+    const win = { plan, slot: entry.slot, at, until: at + hold, loops: [], draws: false, startFrame: this.frame, shown: false, attackRoot, fired: false };
     U.ewin = win;
     U.startFrame = this.frame;
     U.atkN = 0;
@@ -913,12 +916,18 @@ export class SkillFx {
         }
         else if (U.ewin && anim !== ANIM.SKILL && now > U.ewin.until) this._enemyEnd(U, v);
         // a skill whose effects are its attack's rows with no 'atk' of the enemy in its first frame (the kit flies its
-        // own projectile or blast): that attack's cast and range rows play now [ASSUMED: the skill is that attack]
+        // own projectile or blast): that attack's cast and range rows play now [ASSUMED: the skill is that attack]. An
+        // attack-rooted skill fired so was that one attack: the enemy's attacks in the rest of its window are its normal
+        // ones (0.3.1: the 'cast' of 鼠王's 【沙狱】 holds the window for the debuff's 15 s, and every attack of the boss
+        // in it replayed the sandstorm mousek_skill_02_range on its target)
         const win = U.ewin;
         if (win && !win.shown && this.frame > win.startFrame) {
           win.shown = true;
           const a = win.plan.attacks[0];
-          if (a && U.atkN === 0 && !win.draws) for (const e of uniq([...a.cast, ...a.range])) { const h = this._play(e, v); if (h) this._keep(U, e, h); }
+          if (a && U.atkN === 0) {
+            if (!win.draws) for (const e of uniq([...a.cast, ...a.range])) { const h = this._play(e, v); if (h) this._keep(U, e, h); }
+            if (win.attackRoot) win.fired = true;
+          }
         }
         U.prevAnim = anim;
       }
