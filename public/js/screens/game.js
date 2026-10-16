@@ -1,12 +1,12 @@
 // Game screen — every in-match screen, dispatched by m.public.phase (DESIGN §10):
 //   INFO_CHECK → Briefing (screens/briefing.js), BAND_DRAFT → Band draft (screens/bandDraft.js),
-//   RESULT / m.result → Result (screens/result.js), everything else → MatchScreen below.
+//   RESULT / m.result → the settlement flow (screens/settle.js), everything else → MatchScreen below.
 //
 // MatchScreen = full-screen field view (render engine per DESIGN §9, DOM fallback when it can't load)
 // with the DOM HUD layered on top: top bar, bond strip + popup, team panel (click = g.watch), effects,
 // shop bar (prep), merge-reward and 机变 overlays, detail panel, enemy / match-info drawer, combat HUD
 // (DP, "作战结束，等待队友完成作战" + teammates' progress, observing pill, 联防 / 最终攻势 ‹ › camera halves),
-// phase banners, the round's result box at SETTLE (官方「作战结束」 + 「全员无伤！」 / 「生命值减少 −N」 and the BATTLEOVER sound;
+// phase banners — the round plate at 回合开始 and the 联防 plate (ui/matchPopups.js) —, the round's result box at SETTLE (官方「作战结束」 + 「全员无伤！」 / 「生命值减少 −N」 and the BATTLEOVER sound;
 // GitHub #235, PR #112), ticker, emote wheel + bubbles,
 // settings, exit flow. Drag & drop from the view: pieceDrop on a board tile (also the piece's own tile) opens the
 // direction wheel (ui/facingWheel.js, research 09 §1.2) and its release sends g.move {uid, to, dir} (g.art {…, dir}
@@ -87,7 +87,9 @@ import { TeamPanel } from '../ui/teamPanel.js';
 import { ShopBar } from '../ui/shopBar.js';
 import { DetailPanel, resolveDetail } from '../ui/detailPanel.js';
 import { RewardOverlay } from '../ui/rewardOverlay.js';
-import { ChoiceOverlay } from '../ui/choiceOverlay.js';
+import { FinalAssaultPlate, HiddenCorePlate, EndPlate, preloadBossPlateArt, bossPlateArtReady, finalPlateRows, endPlateOf } from '../ui/bossPlates.js';
+import { DownedPlate, downedDue, preloadDownedArt, downedArtReady } from '../ui/downedPlate.js';
+import { ChoiceOverlay, spMarks } from '../ui/choiceOverlay.js';
 import { EnemyDrawer } from '../ui/enemyDrawer.js';
 import { Ticker } from '../ui/ticker.js';
 import { EmoteWheel } from '../ui/emotes.js';
@@ -96,6 +98,7 @@ import { CombatHud } from '../ui/combatHud.js';
 import { CombatMetricsPanel } from '../ui/combatMetrics.js';
 import { SettingsModal, settingsStore, useSettings } from '../ui/settings.js';
 import { ExitModal, AwayOverlay, awayStore } from '../ui/matchChrome.js';
+import { RoundPopup, PhasePopup, phasePopupOf, roundsToBoss, preloadPopupArt } from '../ui/matchPopups.js';
 import { openGuide } from '../ui/guide.js';
 import { actions, onRefreshBusy } from '../ui/gameActions.js';
 import { FacingWheel, holdPiece, setPieceDir, syncPieceDirs, showRange, useTileScreen } from '../ui/facingWheel.js';
@@ -118,7 +121,8 @@ import {
 import { toast } from '../ui/toasts.js';
 import { BriefingScreen } from './briefing.js';
 import { BandDraftScreen } from './bandDraft.js';
-import { ResultScreen } from './result.js';
+import { ResultScreen } from './settle.js';
+import { ProtocolBoot, preloadBootArt, bootArtReady, BOOT_LEAVE_MS } from '../ui/protocolBoot.js';
 import { net } from '../net.js';
 import { store, useStore, shallowEqual, serverNow, isSpectating } from '../store.js';
 import { battleRunner } from '../battle/runner.js';
@@ -127,7 +131,8 @@ import { isClientCombat, observeTarget, teammateProgress, cameraLayers, layerCam
 import { screenStrip, playerBonds, playerLayer, detailBondOwner, toggleBond, popupView } from '../ui/watchBonds.js';
 import { data, getMode } from '../data.js';
 import { audio, resultSpeaker, resultVoiceSlot } from '../audio.js';
-import { useDocClass, FullscreenButton } from '../ui/device.js';
+import { useDocClass, FullscreenButton, reducedMotion } from '../ui/device.js';
+import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady } from '../ui/turnPopup.js';
 // MatchEnded, PausedOverlay, the highlight styles and keepEarly live in ./game/*.js.
 import { HUD_HZ_MS, MERGE_HL, SEL_RANGE, cx } from './game/marks.js';
 import { keepEarly, audioEarly } from './game/early.js';
@@ -152,6 +157,8 @@ export function GameScreen() {
   const away = useStore((s) => s.away, Object.is, awayStore);
   const autoplay = useStore((s) => !!(Array.isArray(s.match.public?.players) && s.match.public.players.find((p) => p && p.playerId === s.me.playerId)?.autoplay));
   const gd = useGameData();
+  // 协议启动！'s official sprites (ui/protocolBoot.js), fetched while the briefing and the band draft run
+  useEffect(() => { if (gd.ready) preloadBootArt(); }, [gd.ready]);
   if (!pub || !gd.ready) {
     return html`<div class="screen gload">
       <${Spinner} size="lg" label=${pub ? 'LOADING DATA' : 'ENTERING SIMULATION'} />
@@ -177,6 +184,7 @@ const inBattleCard = (d) => d?.kind === 'unit' || (d?.kind === 'device' && d.dev
 
 function MatchScreen() {
   useDocClass('sp-in-match');
+  useEffect(() => { preloadPopupArt(); }, []);
   const pub = useStore((s) => s.match.public);
   const priv = useStore((s) => s.match.private);
   const field = useStore((s) => s.match.field);
@@ -234,8 +242,11 @@ function MatchScreen() {
   const buyPending = useRef(new Set());
   const [holdSeq, setHoldSeq] = useState(0);             // bumped when a held piece is released (re-apply the prep state)
   const [hud, setHud] = useState(null);
-  const [banner, setBanner] = useState(null);
+  const [banner, setBanner] = useState(null);            // a phase's banner (PhaseBanner) or plate (ui/matchPopups.js PhasePopup: `plate`)
+  const [roundPop, setRoundPop] = useState(null);        // the round-start plate (RoundPopup)
+  const [boot, setBoot] = useState(null);                // 协议启动！ (ui/protocolBoot.js): { key } while it shows
   const [resultBox, setResultBox] = useState(null);      // the round's result box (ResultDialog), shown at SETTLE
+  const [bossPlate, setBossPlate] = useState(null);      // ui/bossPlates.js: { kind: 'final'|'core'|'end', … , key }
   const [readyBusy, setReadyBusy] = useState(false);
   const [spBusy, setSpBusy] = useState(null);
   const [personalBusy, setPersonalBusy] = useState(null); // { choiceId, idx }: an older request cannot clear a newer pick
@@ -256,6 +267,17 @@ function MatchScreen() {
   const meP = players.find((p) => p.playerId === myId) || null;
   // a spectator seat watches like an eliminated player (it has no m.private and no row in m.public)
   const alive = spectator ? false : priv ? priv.alive !== false : meP?.alive !== false;
+  // 协议已失效 (ui/downedPlate.js): once, when the player's own `alive` — as read from real data, never a reload's empty
+  // first view — turns false while a teammate is still in; 继续观战 closes it, 离开模拟 opens the exit dialog
+  const [downed, setDowned] = useState(false);
+  const wasAlive = useRef(undefined);
+  useEffect(() => { preloadDownedArt(); }, []);
+  useEffect(() => {
+    if (!spectator && !priv && !meP) return;
+    const was = wasAlive.current;
+    wasAlive.current = alive;
+    if (downedArtReady() && downedDue({ was, alive, spectator, pub, myId })) setDowned(true);
+  }, [alive, !!(priv || meP)]);
   const home = homeFieldId(pub, myId);
   const watchingOther = !!watching && watching !== home && watching !== ownFieldId(myId);
   // watching a teammate's prep board: the 本局信息 drawer shows THEIR 策略 in place of one's own (user playtest #2 item 2)
@@ -759,7 +781,19 @@ function MatchScreen() {
     prevPhase.current = phase;
     if (prev === phase) return;
     const b = phaseBanner(phase, pub, { alive, spectator });
-    if (b) setBanner({ ...b, key: phaseKey });
+    // BATTLE_CHECK: the official 协议启动！ screen once its sprites are in (ui/protocolBoot.js); 最终攻势 / 隐秘核心已解锁
+    // open with the official plates once their art is in (ui/bossPlates.js); else 回合开始 has the round plate
+    // (回合 NN · 获得 +N; 观战中 under it for a watcher, from the banner), 联防 a plate with the banner's words
+    // (ui/matchPopups.js); the other phases keep the banner
+    const plate = phasePopupOf(phase, b);
+    if (phase === PHASE.BATTLE_CHECK && bootArtReady()) setBoot({ key: phaseKey });
+    else if (phase === PHASE.FINAL_ASSAULT && bossPlateArtReady()) { setBanner(null); setBossPlate({ kind: 'final', ...finalPlateRows(pub), key: phaseKey }); }
+    else if (phase === PHASE.HIDDEN_CORE && bossPlateArtReady()) { setBanner(null); setBossPlate({ kind: 'core', key: phaseKey }); }
+    else if (phase === PHASE.ROUND_START && b && pub?.round > 0) {
+      setBanner(null);
+      setRoundPop({ round: pub.round, left: roundsToBoss(pub), sub: b.sub, watching: spectator || !alive, key: phaseKey });
+    } else if (plate) setBanner({ ...plate, plate: true, key: phaseKey });
+    else if (b) setBanner({ ...b, key: phaseKey });
     if (phase === PHASE.ROUND_START) audio.sfx('roundStart');
     else if (phase === PHASE.PREP) audio.sfx('rest', { volume: 0.7 });
     else if (phase === PHASE.COMBAT) audio.sfx('battleStart');
@@ -798,6 +832,42 @@ function MatchScreen() {
     if (phase !== PHASE.PREP) setRewardMin(false);
     setSpBusy(null);
   }, [phaseKey]);
+  // 协议启动！ fades once BATTLE_CHECK is over (ProtocolBoot `leaving`), then goes
+  const bootDone = !!boot && phase !== PHASE.BATTLE_CHECK;
+  useEffect(() => {
+    if (!bootDone) return undefined;
+    const id = setTimeout(() => setBoot(null), BOOT_LEAVE_MS);
+    return () => clearTimeout(id);
+  }, [bootDone]);
+
+  // what the round start paid (the round plate's 获得 +N): the funds this round's ROUND_START shows against the funds the
+  // phase before it opened with — nothing is bought in SETTLE / BATTLE_CHECK, so that is the balance before the income,
+  // whichever of m.public (the phase) and m.private (the funds) arrives first. null until both are known (a reload).
+  const fundsRef = useRef({ key: null, open: null, base: null, round: null, now: null });
+  {
+    const f = fundsRef.current;
+    const v = Number.isFinite(priv?.funds) ? priv.funds : null;
+    if (f.key !== phaseKey) {
+      if (phase === PHASE.ROUND_START) { f.round = pub?.round ?? null; f.base = f.open; f.now = null; }
+      f.key = phaseKey;
+      f.open = v;
+    }
+    if (phase === PHASE.ROUND_START && v != null) f.now = v;
+  }
+  const roundGain = (() => {
+    const f = fundsRef.current;
+    return roundPop && f.round === roundPop.round && f.base != null && f.now != null ? Math.max(0, f.now - f.base) : null;
+  })();
+
+  // the run's end in the server's last pause before RESULT (ui/bossPlates.js endPlateOf: the hidden round over, the team
+  // fallen in the 最终攻势 or eliminated at a settlement — 模拟中断 then takes the result box's place); never delays RESULT
+  useEffect(() => { preloadBossPlateArt(); }, []);
+  const endKind = bossPlateArtReady() ? endPlateOf(phase, pub) : null;
+  useEffect(() => {
+    if (!endKind) return;
+    setResultBox(null);
+    setBossPlate({ kind: 'end', end: endKind, key: `end:${phaseKey}` });
+  }, [endKind, phaseKey]);
 
   useEffect(() => {
     setPersonalBusy((b) => b?.choiceId === personalChoice?.id ? b : null);
@@ -832,9 +902,15 @@ function MatchScreen() {
     if ((busyPrep || myPick) && cd.remain > 0) audio.sfx('timer', { volume: 0.6 });
   });
 
-  // your turn cue in the 机变 draft
+  // your turn cue in the 机变 draft, and the official 轮到你选 disc over the cards (ui/turnPopup.js) once its art is in
   const spMine = !!sp && !solo && sp.turnPid === myId && !sp.pickOf.has(myId);
-  useEffect(() => { if (spMine) audio.sfx('yourTurn'); }, [spMine]);
+  const [turnPop, setTurnPop] = useState(0);
+  useEffect(() => { preloadTurnPopupArt(); }, []);
+  useEffect(() => {
+    if (!spMine) return;
+    audio.sfx('yourTurn');
+    if (turnPopupArtReady() && !reducedMotion()) setTurnPop((n) => n + 1);
+  }, [spMine]);
 
   // promotion (merge reward offered) and bond activation cues; a special refresh's offer (凯瑟琳 定向投放 …) plays the
   // shop's refresh sound instead of the promotion cue
@@ -1573,7 +1649,7 @@ function MatchScreen() {
   // bonds this mode never activates (标准: 10 of 23, 奥术 among them) — shown 本局禁用 on cards, chips and the popup
   const offBonds = modeOffBonds(getMode(pub?.modeId));
 
-  return html`<div class=${cx('screen', 'gm', `gm--${mode}`, drag && 'is-dragging', barCollapsed && 'is-collapsed', (sp || hasPersonalChoice) && 'has-sp', pen && 'is-pen', readyWhy && 'has-readywhy')}
+  return html`<div class=${cx('screen', 'gm', `gm--${mode}`, drag && 'is-dragging', barCollapsed && 'is-collapsed', (sp || hasPersonalChoice) && 'has-sp', sp && 'has-spdraft', pen && 'is-pen', readyWhy && 'has-readywhy')}
       data-camera=${pen ? 'pen' : camKind}>
     <div class="gm__field" ref=${hostRef} onContextMenu=${(e) => e.preventDefault()}></div>
     ${viewKind === 'loading' ? html`<div class="gm__loading"><${Spinner} label="LOADING FIELD" /></div>` : null}
@@ -1609,6 +1685,7 @@ function MatchScreen() {
       </div>
 
       <${TeamPanel} pub=${pub} myId=${myId} watching=${watchingNow} bubbles=${bubbles} onWatch=${watchPlayer} cap=${gd.config?.lpCapPerRound ?? 10} uniteLocal=${uniteLocal}
+        spMarks=${sp ? spMarks(sp, { solo }) : null}
         self=${Number.isFinite(priv?.lp) ? { lp: priv.lp, pending: liveLpNow.pending, unite: liveLpNow.unite, left: liveLpNow.left } : null}
         observe=${cc ? { canObserve: (p) => observeTarget(p, pub, myId, { observing: watchingOther, ownDone: localDone }), observing: watchingOther, onBack: backHome } : null} />
 
@@ -1688,12 +1765,24 @@ function MatchScreen() {
         await actions.choice(i, choiceId);
         setPersonalBusy((b) => b?.choiceId === choiceId ? null : b);
       }} />` : null}
+    ${turnPop ? html`<${TurnPopup} key=${turnPop} onDone=${() => setTurnPop(0)} />` : null}
 
-    ${banner ? html`<${PhaseBanner} key=${banner.key} mode="overlay" title=${banner.title} sub=${banner.sub} micro=${banner.micro}
+    ${boot ? html`<${ProtocolBoot} key=${boot.key} players=${players} myId=${myId} leaving=${phase !== PHASE.BATTLE_CHECK} />` : null}
+    ${roundPop ? html`<${RoundPopup} key=${roundPop.key} round=${roundPop.round} gain=${roundGain} left=${roundPop.left} sub=${roundPop.sub}
+      watching=${roundPop.watching} onDone=${() => setRoundPop(null)} />` : null}
+    ${banner?.plate && !roundPop ? html`<${PhasePopup} key=${banner.key} tone=${banner.tone} faces=${banner.faces} title=${banner.title} sub=${banner.sub}
+      chev=${banner.chev} duration=${banner.duration} onDone=${() => setBanner(null)} />` : null}
+    ${banner && !banner.plate && !roundPop ? html`<${PhaseBanner} key=${banner.key} mode="overlay" title=${banner.title} sub=${banner.sub} micro=${banner.micro}
       tone=${banner.tone} duration=${banner.duration || 1500} onDone=${() => setBanner(null)} />` : null}
 
     ${resultBox ? html`<${ResultDialog} key=${resultBox.key} title=${resultBox.title} sub=${resultBox.sub} micro=${resultBox.micro}
       tone=${resultBox.tone} duration=${resultBox.duration} onDone=${() => setResultBox(null)} />` : null}
+
+    ${bossPlate?.kind === 'final' ? html`<${FinalAssaultPlate} key=${bossPlate.key} rows=${bossPlate.rows} total=${bossPlate.total} bossId=${pub?.bossId}
+      myId=${myId} onDone=${() => setBossPlate(null)} />`
+      : bossPlate?.kind === 'core' ? html`<${HiddenCorePlate} key=${bossPlate.key} bossId=${pub?.hiddenBossId} onDone=${() => setBossPlate(null)} />`
+      : bossPlate?.kind === 'end' ? html`<${EndPlate} key=${bossPlate.key} kind=${bossPlate.end} bossId=${pub?.bossId} hiddenBossId=${pub?.hiddenBossId}
+        onDone=${() => setBossPlate(null)} />` : null}
 
     ${facing && view ? html`<${FacingWheel} key=${`${facing.uid}:${facing.row},${facing.col}`} view=${view} row=${facing.row} col=${facing.col}
       grid=${facing.grid} name=${facing.name} onPreview=${previewFacing} onCommit=${commitFacing} onCancel=${cancelFacing} />` : null}
@@ -1704,6 +1793,7 @@ function MatchScreen() {
       onConfirm=${(uid) => closeReplace(uid)} onCancel=${() => closeReplace(null)} />` : null}
 
     <${SettingsModal} open=${settingsOpen} onClose=${() => setSettingsOpen(false)} />
+    <${DownedPlate} open=${downed} onWatch=${() => setDowned(false)} onLeave=${() => { setDowned(false); setExitOpen(true); }} />
     <${ExitModal} open=${exitOpen} onClose=${() => setExitOpen(false)} solo=${solo} />
   </div>`;
 }

@@ -2977,6 +2977,38 @@ function buildStages(ctx, modesById) {
  * weighted entry per round, per-ACTION replacement counts computed at runtime by server/match/waves.js from
  * enemies.json `attrPower` / `beFactor`.
  */
+/** enemy_handbook_table `levelInfoList` stat → the enemies.json vocabulary (attackSpeed is the attack interval in s). */
+const HANDBOOK_STATS = Object.freeze({
+  maxHP: 'maxHp', attack: 'atk', def: 'def', magicRes: 'res', moveSpeed: 'moveSpeed', attackSpeed: 'interval',
+  enemyRes: 'elementRes', enemyDamageRes: 'elementDmgRes',
+});
+
+/**
+ * The enemy handbook's letter grades (enemy_handbook_table `levelInfoList`: ten grades E … SS) → factions.json
+ * `handbookLevels`, weakest first: per grade the official [min, max) of each stat (max null: open-ended). `interval`
+ * runs the other way (a shorter attack interval is the higher grade). The 敌方图鉴 (screens/sweep.js enemyGrade) grades
+ * a stat by the band its value falls in.
+ * @returns {{ level: string, [stat: string]: any }[]}
+ */
+function buildHandbookLevels(ctx) {
+  const list = ctx.handbook?.levelInfoList;
+  if (!Array.isArray(list) || !list.length) {
+    warn('enemy_handbook_table has no levelInfoList: factions.json handbookLevels is empty');
+    return [];
+  }
+  const out = list.map((l) => {
+    const rec = { level: l.classLevel };
+    for (const [src, key] of Object.entries(HANDBOOK_STATS)) {
+      const r = l[src];
+      if (!r || !Number.isFinite(r.min) || !Number.isFinite(r.max)) { warn(`enemy_handbook_table level ${l.classLevel}: no ${src} range`); continue; }
+      rec[key] = [r.min, r.max < 0 ? null : r.max];
+    }
+    return rec;
+  });
+  // the table lists SS first; ascending by the HP band's lower bound
+  return out.sort((a, b) => (a.maxHp?.[0] ?? 0) - (b.maxHp?.[0] ?? 0));
+}
+
 function buildFactions(ctx, enemies) {
   const { ac, act } = ctx;
   const c = ac.constData;
@@ -3028,6 +3060,7 @@ function buildFactions(ctx, enemies) {
   return {
     templateSlots: slotKey,
     types, entries,
+    handbookLevels: buildHandbookLevels(ctx),
     generation: {
       source: 'official client RandomEnemyGenerater (research 08 §2, decoded from the client; normative)',
       specialEnemyNum: c.specialEnemyNum ?? 3,
@@ -3566,6 +3599,21 @@ function enemyScaleFor(table, type, difficulty, round, isHidden) {
 }
 
 /**
+ * 每日防卫目标 (act2autochess constData dailyMission*): earn `need` 卫戍认证 in a day and the settlement adds `bonus`
+ * more, once a day; the day turns over at `resetHour`. The bonus and the hour are only in the rule text
+ * (「…即可在结算时领取【卫戍认证】x300的额外奖励。*奖励每日一次，每天04:00重置」), so they are read from it.
+ * @param {any} c constData @returns {{name:string, need:number, bonus:number, resetHour:number, rule:string}|null}
+ */
+function dailyMission(c) {
+  if (!c?.dailyMissionParam) return null;
+  const rule = stripRich(c.dailyMissionRule || '');
+  const awards = [...String(c.dailyMissionRule || '').matchAll(/<@acdm\.award>(\d+)<\/>/g)].map((m) => Number(m[1]));
+  const reset = /(\d{1,2}):\d{2}\s*重置/.exec(rule);
+  if (awards.length < 2 || !reset) warn('config: dailyMissionRule no longer names the bonus / the reset hour');
+  return { name: c.dailyMissionName || null, need: c.dailyMissionParam, bonus: awards[1] ?? 0, resetHour: reset ? Number(reset[1]) : 4, rule };
+}
+
+/**
  * Build data/config.json: modes (rounds, timers, shop, enemy scaling), economy, bans, timers,
  * titles, tips, broadcasts, trophies and other global tunables.
  */
@@ -3755,6 +3803,10 @@ function buildConfig(ctx, waves, stages, bands, chess, items) {
       baseByRoundsPassed: (Array.isArray(act.baseRewardDataList) ? act.baseRewardDataList : Object.values(act.baseRewardDataList || {})).map((r) => ({ round: r.round, count: r.item?.count ?? 0, dailyPoint: r.dailyMissionPoint ?? 0 })),
       formula: 'baseByRoundsPassed[roundsPassed].count * difficultyFactor[difficulty] * modeFactor[type]',
       difficultyFactor: act.difficultyFactorInfo, modeFactor: act.modeFactorInfo,
+      // the 功勋 levels: the 卫戍认证 earned in all, level by level (milestoneList tokenNum, cumulative)
+      milestones: (Array.isArray(act.milestoneList) ? act.milestoneList : Object.values(act.milestoneList || {}))
+        .map((m) => ({ level: m.milestoneLvl, tokens: m.tokenNum })).sort((a, b) => a.level - b.level),
+      daily: dailyMission(act.constData),
     },
     constants: {
       maxLevelCnt: ac.constData?.maxLevelCnt ?? 15, bossTrailerStartRound: ac.constData?.bossTrailerStartRound ?? 3,
