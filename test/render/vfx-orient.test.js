@@ -4,7 +4,8 @@
 // HEAD_POINT takes the unit's Graphic tilt (荒芜拉普兰德 S3's seal and 能天使 S3's light bars stand facing the camera), the
 // ground and NONE spawns the identity, FLIP_TWO_SIDE still flips the tilted ones, a FollowMountPoint keeps or follows; a
 // renderer's pivot moves the particle off its position by pivot × size (the seal's tips point outward); a local-space
-// particle is drawn at its node's scale as it is now (the seal's discs grow with their 0.5 s pop-in).
+// particle is drawn at its node's scale as it is now (the seal's discs grow with their 0.5 s pop-in); a 回环射手's
+// boomerang flies back to its thrower after its hit (index.json movement `comeBack`).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -279,5 +280,85 @@ describe("the scaling mode's scale, as it is now", () => {
     const fx = new Effect(compileEffect(popIn(1)), { seed: 1 }).place({ pos: [0, 0, 0], rootRot: [0, 0, 0, 1] });
     for (let i = 0; i < 60; i++) fx.update(1 / 60);
     near(sizeOn(fx), 0, 1e-6, 'born at 0');
+  });
+});
+
+// ---- a boomerang comes back (index.json movement `comeBack`, the client's AdvancedMovement / ParacurveMovement.Comeback) ----
+
+describe('a projectile whose movement comes back', () => {
+  /** A wiring over a fake layer: a thrower (char_b) whose normal attack throws `proj`; fake effects record their track. */
+  async function thrower(movement) {
+    const index = { version: 3,
+      units: { char_b: { kind: 'char', skin: 'char_b', refs: [], skills: {}, modes: [{ name: 'Default', attack: { class: 'RangedAttack', projectileKey: 'p_boom', mount: 'MUZZLE' } }] }, enemy_t: { kind: 'enemy', skin: 'enemy_t', refs: [], skills: {}, modes: [] } },
+      skins: { char_b: { graphic: { rot: GRAPHIC }, points: { HitPoint: { all: { pos: [0, 0.232, -0.25] } }, Muzzle: { front: { pos: [0.3, 0.3, -0.2] } } } }, enemy_t: { points: { HitPoint: { all: { pos: [0, 0.3, -0.3] } } } } },
+      projectiles: { p_boom: { main: 'boom_trail', lifeTime: 10, movement, onHit: ['boom_hit'], effects: ['boom_trail', 'boom_hit'], behaviours: [{ class: 'SimpleProjectile', fields: { _mainEffect: 'boom_trail', _lifeTimeType: 1, _lifeTime: 10 } }] } },
+      skills: {}, generic: { hit: {} }, prefabs: {} };
+    const DEFS = { boom_trail: { isLoop: true, flipIfLeft: false, proj: {} }, boom_hit: { spawn: 2 } };
+    const spawned = [];
+    const ofx = {
+      active: true, time: 0, timers: [], ctx: { cam: () => ({ tilt: 30 }) },
+      lib: { has: (k) => k in DEFS, def: (k) => DEFS[k] || null, index: async () => index, preload: async (keys) => keys.length, defs: new Map() },
+      spawn(key, place, opts) {
+        const fx = { key, def: DEFS[key], anchor: place.pos.slice(), yaw: 0, pitch: 0, mirror: false, time: 0, stopped: null, killed: false, stop(o = {}) { this.stopped = o; }, kill() { this.killed = true; } };
+        const h = { key, place, opts, fx, alive: true, stop(o) { fx.stop(o); } };
+        spawned.push(h);
+        return h;
+      },
+    };
+    const w = new FxWiring(ofx, { speed: (k) => (k === 'boomerangReturn' ? 3.75 : k === 'boomerang' ? 15 : 10), record: () => null });
+    await w.ready();
+    const view = (id, key, x, y) => ({ id, x, y, z: 0, visFacing: 1, isEnemy: /^enemy_/.test(key), alive: true, flags: 0, dir: 'RIGHT', info: { id, spine: key, defId: key, side: /^enemy_/.test(key) ? 'enemy' : 'ally', kind: 'op' } });
+    return { w, ofx, spawned, src: view(1, 'char_b', 4, 10), tgt: view(2, 'enemy_t', 7, 10) };
+  }
+  const run = (h, t, ofx) => { ofx.time = t; h.fx.time = t; h.opts.track(h.fx); };
+
+  test('跃跃\'s boomerang hits on its way out and flies back to her HitPoint at 3.75 tiles/s, its effect on until she catches it', async () => {
+    const mv = { class: 'AdvancedMovement', moveType: 1, speed: 15, comeBack: 1, comeBackSpeedScale: 0.25, delayAfterReached: 0.01 };
+    const { w, ofx, spawned, src, tgt } = await thrower(mv);
+    assert.equal(w.attack(src, tgt, 'boomerang', 0), true, 'the official layer draws it (no procedural boomerang over it)');
+    const h = spawned.find((x) => x.key === 'boom_trail');
+    const out = 3 / 15;                                 // the sim's flight: 3 tiles at 15 tiles/s
+    run(h, out * 0.5, ofx);
+    assert.ok(h.fx.anchor[0] > -6 + 0.3 && h.fx.anchor[0] < -3, 'on its way out');
+    run(h, out + 1e-6, ofx);
+    assert.ok(spawned.some((x) => x.key === 'boom_hit'), 'its hit on the target');
+    assert.equal(h.fx.stopped, null, 'it does not stop at the hit');
+    const back = 3 / 3.75;                              // and back: 3 tiles at 3.75 tiles/s
+    run(h, out + back * 0.5, ofx);
+    near(h.fx.anchor[0], -3 + (-6 - -3) * 0.5, 0.02, 'half way back');
+    assert.ok(Math.cos(h.fx.yaw) < -0.99, `turned towards her (yaw ${h.fx.yaw.toFixed(3)})`);
+    assert.equal(h.fx.stopped, null, 'still flying');
+    run(h, out + back + 1e-3, ofx);
+    near(h.fx.anchor[0], -6, 1e-6, 'caught at her HitPoint');
+    near(h.fx.anchor[1], 1 + 0.232, 1e-6, '… (its height on the board)');
+    assert.ok(h.fx.killed && !h.fx.stopped, 'and it ends there, at once (its prefab has no `_delayToFinish` to linger)');
+    assert.equal(spawned.filter((x) => x.key === 'boom_hit').length, 1, 'one hit, on the way out only');
+  });
+
+  test('a thrower gone at the hit gets nothing back; a projectile that does not come back stops at its hit as before', async () => {
+    const mv = { class: 'AdvancedMovement', moveType: 1, speed: 15, comeBack: 1, comeBackSpeedScale: 0.25 };
+    const a = await thrower(mv);
+    a.w.attack(a.src, a.tgt, 'boomerang', 0);
+    const h = a.spawned.find((x) => x.key === 'boom_trail');
+    a.src.alive = false;
+    run(h, 0.2 + 1e-6, a.ofx);
+    assert.deepEqual(h.fx.stopped, {}, 'stopped at the hit');
+    const b = await thrower({ class: 'AdvancedMovement', moveType: 1, speed: 15 });
+    b.w.attack(b.src, b.tgt, 'arrow', 0);
+    const g = b.spawned.find((x) => x.key === 'boom_trail');
+    run(g, 0.3 + 1e-6, b.ofx);
+    assert.deepEqual(g.fx.stopped, { hit: true });
+  });
+
+  test('a Paracurve boomerang (跃跃 S2) comes back along its arc', async () => {
+    const mv = { class: 'ParacurveMovement', speed: 15, raiseHeight: 0.3, noRaiseHeightThreshold: 1.3, comeBack: 1, comeBackSpeedScale: 0.25 };
+    const { w, ofx, spawned, src, tgt } = await thrower(mv);
+    w.attack(src, tgt, 'boomerang', 0);
+    const h = spawned.find((x) => x.key === 'boom_trail');
+    run(h, 0.2 + 1e-6, ofx);
+    let top = -Infinity;
+    for (let i = 1; i < 40; i++) { run(h, 0.2 + (0.8 * i) / 40, ofx); top = Math.max(top, -h.fx.anchor[2]); }
+    const start = 0.3 * Math.sin(Math.PI / 6);   // the target's HitPoint height
+    assert.ok(top > start + 0.25, `rises on its way back too (top ${top.toFixed(3)})`);
   });
 });

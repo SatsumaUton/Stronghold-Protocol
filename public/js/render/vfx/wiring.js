@@ -1032,12 +1032,22 @@ export class FxWiring {
       this._flightPoint(flight, arc, wob, k, t, flight.pos);
       this._flightPoint(flight, arc, wob, Math.min(1, k + 0.02), t + 0.02 * flight.dur, flight.next);
     };
+    // a 回环射手's boomerang (the movement's `comeBack`): the hit, then the way back to the thrower (comeBack())
+    const back = this._comeBack(proj, kind);
     const finish = (fx) => {
+      if (back && !flight.back) {
+        // the end of its way out: its hit, then (a flying effect, the thrower still there) the way back
+        this._arrive(proj, tgt, flight.to, hitAt > dur ? t0 + hitAt : null, rows, src);
+        if (flight.rope !== fx && this._turnBack(flight, fx, back, src, sSkin, mv, seed)) return;
+      }
       flight.done = true;
-      fx.stop({ hit: true });
+      // caught: the client clears a projectile's main effect as it stops (Projectile.ClearMainEffectIfNot → Effect.FinishMe),
+      // and one without a `_delayToFinish` is recycled there and then — the boomerang does not fade on in the thrower's hands
+      if (flight.back && !(fx.def?.delayToFinish > 0) && typeof fx.kill === 'function') fx.kill();
+      else fx.stop(back ? {} : { hit: true });
       if (flight.rope && flight.rope !== fx) flight.rope.stop();
       this.flights.delete(flight);
-      this._arrive(proj, tgt, flight.to, hitAt > dur ? t0 + hitAt : null, rows, src);
+      if (!back) this._arrive(proj, tgt, flight.to, hitAt > dur ? t0 + hitAt : null, rows, src);
     };
     const def = mainKey ? this.ofx.lib.def(mainKey) : null;
     const flipIfLeft = def ? def.flipIfLeft : false;
@@ -1045,7 +1055,7 @@ export class FxWiring {
       important: true,
       track: (fx) => {
         if (flight.done) return;
-        step(Math.min(flight.dur, fx.time));
+        if (flight.back) { if (!this._stepBack(flight, fx.time, src, sSkin)) { finish(fx); return; } } else step(Math.min(flight.dur, fx.time));
         // direction of travel (Unity frame): yaw in the board plane, pitch with the climb
         const p = flight.pos, q = flight.next;
         const dx = q[0] - p[0], dy = q[1] - p[1], dz = q[2] - p[2];
@@ -1054,7 +1064,7 @@ export class FxWiring {
         if (flipIfLeft && dx < 0) { fx.mirror = true; fx.yaw = Math.atan2(dy, -dx); } // mirrored art: +x after the mirror
         else { fx.mirror = false; fx.yaw = Math.atan2(dy, dx); }
         fx.pitch = horiz > 1e-5 || Math.abs(dz) > 1e-5 ? Math.atan2(-dz, horiz) : 0;
-        if (fx.time >= flight.dur) finish(fx);
+        if (flight.back ? fx.time - flight.back.t0 >= flight.back.dur : fx.time >= flight.dur) finish(fx);
       },
     }) : null;
     if (ropeKey) {
@@ -1098,6 +1108,51 @@ export class FxWiring {
       }
     }
     return out;
+  }
+
+  /**
+   * The way back of a projectile whose movement comes back (index.json movement `comeBack` — the 回环射手 跃跃 and
+   * 娜仁图亚: AdvancedMovement / ParacurveMovement.Comeback, GameAssembly of 2026-09-13): after its hit the client gives the
+   * movement a new leg from where it is to the thrower's HitPoint (the source's hitMountPoint, followed) at its speed ×
+   * `comeBackSpeedScale` (0.25: 15 → 3.75 tiles/s — PRTS 跃跃 "返回时飞行速度3.75", the sim's BOOMERANG_RETURN_SPEED), a
+   * ParacurveMovement's again along its arc, and the flying effect plays on until the thrower catches it (before 0.3.1 it
+   * stopped at the hit). Returns { speed } (tiles per battle s: the sim's return speed for its boomerang kind) or null.
+   * [ASSUMED] no pause at the hit (the movement's `delayAfterReached`, 1 s for the Paracurve ones; the sim returns at
+   * once); a 娜仁图亚 S1 bounce / S2 dash comes straight back from its first target.
+   */
+  _comeBack(proj, kind) {
+    const mv = proj?.movement;
+    if (!mv || !(Number(mv.comeBack) > 0)) return null;
+    const sim = kind === 'boomerang' && this.opts.speed ? Number(this.opts.speed('boomerangReturn')) : NaN;
+    const own = Number(mv.speed) * (Number.isFinite(Number(mv.comeBackSpeedScale)) ? Number(mv.comeBackSpeedScale) : 1);
+    const speed = sim > 0 ? sim : own > 0 ? own : 3.75;
+    return { speed };
+  }
+
+  /**
+   * Turn a come-back flight around at its hit (comeBack): its new leg from the hit point to the thrower's HitPoint; false
+   * when the thrower is gone (the client stops a boomerang with no source: it is not drawn back).
+   */
+  _turnBack(flight, fx, back, src, sSkin, mv, seed) {
+    if (!src || src.destroyed || src.alive === false) return false;
+    const from = flight.pos.slice();
+    const to = unitPoint(sSkin, 'hit', this.pose(src));
+    const dist = Math.hypot(to[0] - from[0], to[1] - from[1]);
+    const arc = paracurve(mv, -from[2], -to[2], dist, seed ^ 0x3c6ef372);
+    flight.back = { t0: fx.time, dur: Math.max(0.04, dist / back.speed), from, to, arc };
+    this._stepBack(flight, fx.time, src, sSkin);
+    return true;
+  }
+
+  /** A come-back flight's way back at t (its effect's clock): homing on the thrower's HitPoint; false once it is gone. */
+  _stepBack(flight, t, src, sSkin) {
+    const b = flight.back;
+    if (!src || src.destroyed || src.alive === false) return false;
+    unitPoint(sSkin, 'hit', this.pose(src), b.to);
+    const k = Math.min(1, Math.max(0, (t - b.t0) / b.dur));
+    this._flightPoint(b, b.arc, null, k, t, flight.pos);
+    this._flightPoint(b, b.arc, null, Math.min(1, k + 0.02), t, flight.next);
+    return true;
   }
 
   /**
