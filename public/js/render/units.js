@@ -771,10 +771,13 @@ export class UnitView {
   // an image-less placeholder that the avatar replaces a moment later (the placeholder only shows when the avatar
   // is missing or still loading after PIC_WAIT_MS).
   /** The picture the manifest names for this unit now (an ICE_TOKENS unit takes none: the token fallback would be its
-   *  owner's face — assets.js tokenAvatarUrl). */
+   *  owner's face — assets.js tokenAvatarUrl). `info.skin` (docs/SKINS.md): an appearance of the operator that ships its
+   *  own avatar; the retry path compares the URL, so a switch to another skin re-resolves the diamond (a view stays up
+   *  only while its info does not change — render/app.js applyInfo). */
   _pictureUrl() {
     const a = this.ctx.assets;
-    return ICE_TOKENS.has(this.info.defId) ? null : a && (a.picture ? a.picture(this.info.avatar) || a.picture(this.info.defId) || a.picture(this.info.spine) : null) || null;
+    const o = this.info.skin ? { skin: this.info.skin } : undefined;
+    return ICE_TOKENS.has(this.info.defId) ? null : a && (a.picture ? a.picture(this.info.avatar, o) || a.picture(this.info.defId, o) || a.picture(this.info.spine, o) : null) || null;
   }
 
   /** @param {boolean} [replace] another picture replaces a shown one: the old one stays on the diamond until it is there */
@@ -782,7 +785,8 @@ export class UnitView {
     const a = this.ctx.assets;
     const url = this._pictureUrl();
     const old = replace && this._pic && this._pic.state === 'img' ? this._pic : null;
-    this._pic = { key: String(this.info.avatar || this.info.defId || 'unknown'), color: this._frameColor(), img: null, state: 'none', shown: null, t0: nowMs(), url, prev: !!old };
+    // the key carries the skinId too (docs/SKINS.md): a switch otherwise keeps the previous appearance's portrait
+    this._pic = { key: String(this.info.avatar || this.info.defId || 'unknown') + (this.info.skin ? `|${this.info.skin}` : ''), color: this._frameColor(), img: null, state: 'none', shown: null, t0: nowMs(), url, prev: !!old };
     if (!url || !a.image) return;
     const cached = typeof a.imageNow === 'function' ? a.imageNow(url) : null;
     if (cached) { this._pic.img = cached; this._pic.state = 'img'; return; }
@@ -845,7 +849,9 @@ export class UnitView {
   _modelEntry(back = this._wantsBack()) {
     const a = this.ctx.assets;
     const id = this.info.spine || this.info.defId;
-    return a && a.spineEntry && id ? a.spineEntry(id, { back }) || null : null;
+    // 皮肤 (docs/SKINS.md): `info.skin` is the owner's chosen appearance; sparkineEntry falls back to the operator's own
+    // model when the manifest holds no such skin (or no model for it), so a view always resolves something to draw
+    return a && a.spineEntry && id ? a.spineEntry(id, this.info.skin ? { back, skin: this.info.skin } : { back }) || null : null;
   }
 
   /** @param {boolean} [retry] load again even after a remembered failure (assets.js acquire `{ retry }`) */
@@ -1205,8 +1211,10 @@ export class UnitView {
   _wantsBack() {
     const a = this.ctx.assets;
     const id = this.info.spine || this.info.defId;
-    if (this.isEnemy || this.dir !== 'UP' || !id || !a || typeof a.hasBack !== 'function' || !a.hasBack(id)) return false;
-    return this.alive || dieClipDur(typeof a.spineEntry === 'function' ? a.spineEntry(id, { back: true }) : null) > 0;
+    // an appearance may ship its own Front/Back pair, so both questions are asked of the skin, not the operator
+    // (docs/SKINS.md): hasBackSpine falls back to the operator's own Back when the skin has none
+    if (this.isEnemy || this.dir !== 'UP' || !id || !a || typeof a.hasBack !== 'function' || !a.hasBack(id, this.info.skin)) return false;
+    return this.alive || dieClipDur(typeof a.spineEntry === 'function' ? a.spineEntry(id, this.info.skin ? { back: true, skin: this.info.skin } : { back: true }) : null) > 0;
   }
 
   /**

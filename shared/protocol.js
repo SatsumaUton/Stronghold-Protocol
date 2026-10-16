@@ -261,6 +261,31 @@ export function checkLoadoutOps(ops, isOperator, changesWithPotential = null) {
   return { ok: true, ops: out };
 }
 
+// ---- 干员皮肤 (docs/SKINS.md): room.skins { skins } ------------------------------------------------------------
+
+/**
+ * `room.skins { skins }`: `skins` = `{ [charId]: skinId }` — which appearance each operator wears, one entry per
+ * OPERATOR, so it covers the normal chess, its elite and a 自选 slot fielding the same operator (the skin catalogue of
+ * the composed asset manifest is grouped per operator too: `chars[charId].skins`, docs/PLUGINS.md §9).
+ *
+ * A skin comes from an enabled cosmetic plugin's overlay (one the server's owner installed, switched on by each player
+ * in 设置 → 外观插件 — `scope: ["personal"]`, so a room is never part of it). Unlike `room.loadout` these are PUBLIC:
+ * they ride in `Match.publicView().players[]`, which is how a teammate sees your skin.
+ *
+ * Validation here is deliberately shallow, and that is safe: an unknown skinId, or one belonging to another operator,
+ * can do nothing worse than fail to resolve in `spineEntry()` and the unit draws its default model. So only the shape
+ * is checked on the wire; the ids are carried as sent.
+ */
+export const SKIN_LIMITS = Object.freeze({ entries: 160, idLen: 64, charIdLen: 64 });
+/** A skinId. NOT `isId`: that allows only `[A-Za-z0-9_\-.:]`, while a skin key carries `@` and `#` (`char_002_amiya@winter#1`). */
+export const isSkinId = (v) => typeof v === 'string' && v.length > 0 && v.length <= SKIN_LIMITS.idLen && /^[A-Za-z0-9_][A-Za-z0-9_@#+.\-]*$/.test(v);
+/**
+ * Structural check of `room.skins.skins`: ≤ 160 entries, keyed by an operator charId (`isId` — `char_498_inside`), each
+ * value a skinId. A charId is narrower than a skin key on purpose: the key is what the renderer and the picker look the
+ * appearance up by (`chars[charId].skins[skinId]`), and a key of another shape can only ever fall back.
+ */
+export const isSkinSelection = (v) => isMap(v, SKIN_LIMITS.entries, (k) => isId(k) && k.length <= SKIN_LIMITS.charIdLen, isSkinId);
+
 // ---- operator ownership (干员持有, 0.2.0 补位): room.ownership { notOwned } -------------------------------------------
 
 /**
@@ -434,6 +459,9 @@ export const C2S = {
   // operator loadout (DESIGN §16): stored per session/seat; accepted until the match leaves INFO_CHECK — `ops` (0.2.2):
   // the per-operator 潜能 / 练度 (absent = none set: every operator at 潜能 6, 精英2 Lv.60)
   'room.loadout': { entries: isLoadoutEntries, ops: isLoadoutOps, $optional: ['ops'] },
+  // 干员皮肤 (docs/SKINS.md): the appearances the player wears, keyed by operator charId; PUBLIC, so it is accepted in
+  // any room phase (the loadout locks at INFO_CHECK because it changes what a unit does; a skin changes only the model)
+  'room.skins': { skins: isSkinSelection },
   // operator ownership (干员持有, 0.2.0 补位): stored per session / seat; a match takes the list its seat had when it
   // started (an out-of-match setting — during a match it is stored for the next one: ROOM_STARTED)
   'room.ownership': { notOwned: isNotOwnedList },

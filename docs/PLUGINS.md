@@ -377,6 +377,18 @@ As the opening of this section says, the committed `data/assets.json` has no `sk
 path the installation's manifest does not carry yet and is `PLUGIN_REF` — it means something only once the installation's
 manifest has `skins` of its own; in this version only the fields of an operator's own record can be referenced.
 
+**Wearing a skin — docs/SKINS.md.** The overlay above is what a *server's owner* installs and what a player switches on
+for themself (`scope: ["personal"]`, 设置 → 外观插件); **no room and no host is involved**, and this version has no
+server-side install route at all (upstream #652 closed the one that let any client make the server download files and
+rewrite the shared `data/assets.json`). What a player then picks is a `{ [charId]: skinKey }` map, keyed by the
+**operator** — the container the key is written under — sent as `room.skins` (accepted in any phase: an appearance
+changes nothing a battle does, so it never enters `cs`) and published to teammates in `Match.publicView().players[]`,
+which is how a co-op partner's piece draws your skin. `public/js/assets.js` resolves it (`spineEntry`, `avatarUrl`,
+`portraitUrl`, `illustUrl` take `opts.skin`) and falls back to the operator's own model and pictures for a skin (or a
+skin's layer) that is not there, so a plugin that replaces only a model still draws a face. 设置「显示其他玩家的皮肤」
+(default on) is a pure client preference: off, this browser draws every OTHER seat's piece on the operator's own model
+while keeping its own player's — their screen keeps showing their skin.
+
 **Spine models and `plugin.lock.json`.** A model's clip roles, durations, events, hit times and bounds come from the
 skeleton itself: `node tools/plugin.mjs pack <dir>` parses it the way `tools/fetch-assets.mjs` parses the game's
 (`tools/assets/skel.mjs`, `anim-roles.mjs`: an operator's three skill slots, an enemy's numbered skills), checks the atlas

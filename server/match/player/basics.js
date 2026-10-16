@@ -9,9 +9,13 @@
 
 import { PHASE } from '../../../shared/constants.js';
 import { msg, dn } from '../../../shared/i18n.js';
-import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, resolveLoadout, charPotentialChanges } from '../../../shared/protocol.js';
+import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, resolveLoadout, charPotentialChanges, SKIN_LIMITS } from '../../../shared/protocol.js';
 import { cultivationOf } from '../../../shared/potential.js';
 import { tileKey, boardOrder } from '../board.js';
+
+/** An operator's charId as an asset key: the shape `chars[<charId>]` of the manifest uses (a skin's container). */
+const OPERATOR_KEY = /^[A-Za-z0-9_\-.:]+$/;
+const isOperatorKey = (v) => typeof v === 'string' && v.length > 0 && v.length <= SKIN_LIMITS.charIdLen && OPERATOR_KEY.test(v);
 
 /** The charIds a player may set a potential / 练度 for, per game-data object (shared/protocol.js cultivationCharIds). */
 const OPS_IDS = new WeakMap();
@@ -109,6 +113,60 @@ export class PlayerBasics {
       this.ops = Object.freeze(o);
     }
     return true;
+  }
+
+  /**
+   * The asset key of a chess piece's appearance: the operator's charId, else null (docs/SKINS.md).
+   *
+   * A skin is keyed by OPERATOR, not by chess: `chars[charId].skins` is where a cosmetic plugin's overlay writes one and
+   * where `assets.js spineEntry` looks it up. That key is also what carries the choice across the normal / elite pair and
+   * a 自选 slot (both of a 自选 slot's records have `charId: null` — 甄选干员 — and the piece draws its PICK's operator, so
+   * `battleInput` resolves that pick's charId itself).
+   * @param {any} rec a chess record, or its chess id @returns {string|null}
+   */
+  skinCharIdOf(rec) {
+    const r = typeof rec === 'string' ? this.gd.chess(rec) : rec;
+    return r && typeof r.charId === 'string' && r.charId ? r.charId : null;
+  }
+
+  /**
+   * The appearance this player wears for a chess piece, or null (docs/SKINS.md) — the one rule every view and the battle
+   * input ask, so a piece's skin can never disagree between the prep board, a teammate's scouting view and the field.
+   * `charId`, when given, wins: a 自选 slot's own record has none, and it fights as the operator of its pick.
+   * @param {any} rec a chess record @param {string|null} [charId]
+   * @returns {string|null}
+   */
+  skinFor(rec, charId = null) {
+    const skins = this.skins;
+    if (!skins) return null;
+    const key = (typeof charId === 'string' && charId) || this.skinCharIdOf(rec);
+    return key ? skins[key] || null : null;
+  }
+
+  /**
+   * 干员皮肤 (docs/SKINS.md): replace this player's skin choices — `{ [charId]: skinId }`, the ids of the appearance the
+   * composed asset manifest offers under `chars[charId].skins`.
+   *
+   * Validation is deliberately light, unlike setLoadout: an unknown skinId, or one of another operator, can do nothing
+   * but fail to resolve in `spineEntry()` and leave the operator on its default model, so only the shape is checked and
+   * a malformed entry is dropped rather than rejecting the whole selection.
+   * @param {Record<string, string>|null} skins
+   * @returns {boolean} whether anything was accepted
+   */
+  setSkins(skins) {
+    if (this.isBot) return false;
+    const out = {};
+    if (skins && typeof skins === 'object' && !Array.isArray(skins)) {
+      for (const [charId, skinId] of Object.entries(skins)) {
+        if (!isOperatorKey(charId) || typeof skinId !== 'string' || !skinId || skinId.length > SKIN_LIMITS.idLen) continue;
+        out[charId] = skinId;
+      }
+    }
+    this.skins = Object.freeze(out);
+    // No dirty() here: this runs from the constructor too (a seat's choice applied at match start), where `this.m` has
+    // no view to mark yet. Callers that change it mid-match mark the public view themselves — Match.setSkins calls
+    // markPublic, because skins are public (that is how a teammate sees your skin).
+    return Object.keys(out).length > 0;
   }
 
   /**

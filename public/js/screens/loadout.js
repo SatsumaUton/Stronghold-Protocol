@@ -37,6 +37,9 @@ import {
 } from '../ui/loadoutModel.js';
 import { loadoutStore, openLoadout, closeLoadout, setEntries, setOpsMap, applyLoadoutEntries, setNotOwned, applyOwnershipImport, setDiyPicks, applyDiyImport } from '../ui/loadoutSync.js';
 import { OperatorVoice } from '../ui/operatorVoice.js';
+// 皮肤 (docs/SKINS.md): a self-contained section — everything it does lives in ui/skinPicker.js, so this screen keeps
+// one import and one line in its detail body
+import { SkinSection } from '../ui/skinPicker.js';
 import { CultivationSelects, CultivationSection, cultivationView, potentialEditable } from './cultivation.js';
 import { cultivationCharIds } from '../../../shared/protocol.js';
 import { atPotential } from '../../../shared/potential.js';
@@ -339,6 +342,14 @@ function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset,
     </div>
     <div class="lo-detail__body" ref=${bodyRef}>
       <${OperatorVoice} charId=${chess.assets?.voice || chess.charId} />
+      ${/* 外观 (docs/SKINS.md) sits directly under the operator's name, before 潜能与练度 and above the 技能 /
+           局内数值 / 模组 sections: a skill and a module usually keep their default and the two selects are a one-off,
+           while the appearance is what a player opens the panel to change. The section itself lives in ui/skinPicker.js
+           (one line here, so upstream rewriting this panel costs one line rather than a conflict). Whether it exists
+           is a GLOBAL question — any operator of the manifest wearing something — so an install without a cosmetic
+           layer keeps the panel's shape, while a loaded plugin gives every operator the section (one 默认 tile when
+           it has no skin). */ null}
+      <${SkinSection} charId=${chess.charId} />
       <${CultivationSection} charId=${chess.charId} ops=${ops} onSet=${onOps} standIn=${notOwned} />
       <${LoadoutGarrisons} chess=${level === 'elite' && golden ? golden : chess} m=${m} />
       <section class="lo-sec">
