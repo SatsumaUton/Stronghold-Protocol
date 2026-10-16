@@ -252,8 +252,19 @@ export class MatchPhases {
 
   enterBattleCheck() {
     this.phase = PHASE.BATTLE_CHECK;
-    this.setDeadline(this.gd.timer('battleCheck'), () => this.startRound(1), { silent: this.soloUntimed });
+    this.setDeadline(this.gd.timer('battleCheck'), () => this.afterBattleCheck(), { silent: this.soloUntimed });
     this.markPublic();
+  }
+
+  /**
+   * BATTLE_CHECK is over: R1 is about to begin. A plugin window declared at `battleCheck` for this round opens here —
+   * "before the round begins", the host's own step first (docs/PLUGINS.md §10b) — and holds R1 back until it closes; a
+   * content set without a window continues exactly as before (`openOfferWindow` returns before it touches anything).
+   */
+  afterBattleCheck() {
+    const step = () => this.startRound(1);
+    if (this.openOfferWindow('battleCheck', 1) !== 'open') { step(); return; }
+    this._offerResume = step;
   }
 
   startRound(r) {
@@ -306,7 +317,11 @@ export class MatchPhases {
   }
 
   afterRoundStart() {
-    if (this.gd.spRounds().includes(this.round)) this.enterSpDraft();
-    else this.enterPrep();
+    const step = () => (this.gd.spRounds().includes(this.round) ? this.enterSpDraft() : this.enterPrep());
+    // A plugin window declared at `prep` opens "before this round's prep begins" (docs/PLUGINS.md §10b): the round
+    // start (this step's caller) and the 机变 draft, when the round has one, have already run — the host's own window
+    // first — and only the prep itself waits for the window.
+    if (this.openOfferWindow('prep', this.round) !== 'open') { step(); return; }
+    this._offerResume = step;
   }
 }

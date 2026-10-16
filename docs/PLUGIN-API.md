@@ -51,6 +51,7 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `manifest.field.modes` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.name` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.numberUnits` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
+| `manifest.field.offers` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.operators` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.optional` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.overrides` | experimental | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
@@ -70,6 +71,7 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `permission.data.patch` | stable | 0.3.0 | `shared/plugins/manifest.js#PERMISSIONS` |
 | `permission.data.add` | stable | 0.3.0 | `shared/plugins/manifest.js#PERMISSIONS` |
 | `permission.dsl` | stable | 0.3.0 | `shared/plugins/manifest.js#PERMISSIONS` |
+| `permission.offers` | stable | 0.3.0 | `shared/plugins/manifest.js#PERMISSIONS` |
 | `permission.sim.code` | experimental | 0.3.0 | `shared/plugins/manifest.js#PERMISSIONS` |
 | `permission.meta.code` | experimental | 0.3.0 | `shared/plugins/manifest.js#PERMISSIONS` |
 | `permission.mode.code` | experimental | 0.3.0 | `shared/plugins/manifest.js#PERMISSIONS` |
@@ -422,6 +424,8 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `error.PLUGIN_STORAGE` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_INTENT` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_SHAPE` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_OFFER_SHAPE` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_OFFER_ROUNDS` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_DSL_SHAPE` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_DSL_VERSION` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_DSL_PLUGIN_ID` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |

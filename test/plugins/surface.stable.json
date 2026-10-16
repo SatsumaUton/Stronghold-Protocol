@@ -120,6 +120,10 @@
     "anchor": "shared/plugins/manifest.js#MANIFEST_FIELDS"
   },
   {
+    "name": "manifest.field.offers",
+    "anchor": "shared/plugins/manifest.js#MANIFEST_FIELDS"
+  },
+  {
     "name": "manifest.field.operators",
     "anchor": "shared/plugins/manifest.js#MANIFEST_FIELDS"
   },
@@ -189,6 +193,10 @@
   },
   {
     "name": "permission.dsl",
+    "anchor": "shared/plugins/manifest.js#PERMISSIONS"
+  },
+  {
+    "name": "permission.offers",
     "anchor": "shared/plugins/manifest.js#PERMISSIONS"
   },
   {
@@ -1569,6 +1577,14 @@
   },
   {
     "name": "error.PLUGIN_SHAPE",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
+    "name": "error.PLUGIN_OFFER_SHAPE",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
+    "name": "error.PLUGIN_OFFER_ROUNDS",
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },
   {

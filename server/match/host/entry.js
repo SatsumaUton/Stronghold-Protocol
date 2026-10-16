@@ -47,8 +47,10 @@ let files = null;
 let bounds = null;
 let scripts = [];
 let sandbox = false;
+/** PLUGIN API v2: the content set's interaction windows (docs/PLUGINS.md §10b) — data, injected into every match. */
+let offers = [];
 let options = {};
-const adopt = (init) => { ({ cs, hashInput, files, bounds = null, scripts = [], sandbox = false } = init || {}); options = (init && init.options) || {}; };
+const adopt = (init) => { ({ cs, hashInput, files, bounds = null, scripts = [], sandbox = false, offers = [] } = init || {}); options = (init && init.options) || {}; };
 if (viaWorker) adopt(workerData);
 // a child process whose parent is gone has nothing left to do
 if (!viaWorker) process.on('disconnect', () => process.exit(0));
@@ -165,7 +167,13 @@ async function boot() {
   if (typeof Inner !== 'function') throw new Error('the match module exports no Match');
   // [ASSUMED] Grant the prep EffectRefs after super(), once players exist (DESIGN §32.7).
   MatchClass = class ContentMatch extends Inner {
-    constructor(opts) { super(opts); grantPrepDsl(this, dslGrants); }
+    constructor(opts) {
+      super(opts);
+      grantPrepDsl(this, dslGrants);
+      // PLUGIN API v2 (docs/PLUGINS.md §10b): the set's interaction windows, after super() like the DSL grants.
+      // No code runs for them — the engine opens, settles and applies them (server/match/match/offers.js).
+      if (Array.isArray(offers) && offers.length) this.offers = offers;
+    }
   };
   if (options.virtualTime) ({ VirtualScheduler } = await import('../scheduler.js'));
 }

@@ -326,6 +326,10 @@ function composeContentSet({ registry, ids = [] }) {
   }
   for (const [rel, body] of bodies) files[rel] = { sha256: nodeSha256(body), bytes: body.length };
   const vanilla = plugins.length === 0;
+  // The interaction windows of the set (PLUGIN API v2, docs/PLUGINS.md §10b): the registry already checked each
+  // file, so this only tags every window with the plugin that declares it. Not part of `cs`: a window never changes a
+  // battle (its effect primitives reach the match, not the sim).
+  const offers = plugins.flatMap(p => (p.offers || []).map(o => ({ pluginId: p.id, ...o })));
   const index = vanilla ? base.identity.index : { ...base.identity.index, cs, vanilla: false, plugins: parts, settings, data: {}, i18n: {}, bounds: {}, ...(scripts.length ? {scripts:{}, execution} : {}) };
   if (!vanilla) for (const [rel, f] of Object.entries(files)) {
     const url = base.files.get(rel)?.equals(bodies.get(rel)) ? `/data/${rel.replace(/^(data\/)/, '')}?v=${f.sha256.slice(0, 8)}` : `/cs/${csUrlPart(cs)}/${rel}`;
@@ -334,7 +338,10 @@ function composeContentSet({ registry, ids = [] }) {
   }
   const set = deepFreeze({ cs, vanilla, plugins: plugins.map(p => ({ id: p.id, version: p.manifest.version, hash: p.content.hash })),
     data, files, ...(scripts.length ? {scripts, execution} : {}), modes: Object.values(data.config.modes), problems: [], warnings, index, settings, bounds: boundsSnap,
-    kitted: [...KITTED_CHARS, ...Object.keys(data.backups.units).filter(id => !own(base.data.backups.units, id))] });
+    kitted: [...KITTED_CHARS, ...Object.keys(data.backups.units).filter(id => !own(base.data.backups.units, id))],
+    // PLUGIN API v2 (docs/PLUGINS.md §10b): the interaction windows the set declares, tagged with their plugin. Data
+    // only and already checked by the registry; a set without one omits the field, so nothing downstream changes.
+    ...(offers.length ? { offers } : {}) });
   // Executable routes use the descriptor's already hashed browser bytes; keep the JSON index table unchanged.
   if (execution === 'trusted') for (const p of scripts) {
     const m = JSON.parse(p.manifestSource);

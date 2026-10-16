@@ -183,6 +183,9 @@ export function createContentSets({ registry, vanillaData, log = noopLog, maxSet
       ...(built.scripts?.length ? {execution:built.execution, scripts:built.scripts} : {}),
       // the official-bounds snapshot (DESIGN §32.5) its match host installs — the one its pages install too
       bounds: built.bounds && built.bounds.v === 1 ? built.bounds : null,
+      // PLUGIN API v2: the set's interaction windows (docs/PLUGINS.md §10b), handed to its match host and to the
+      // rooms' views; [] when the set declares none
+      offers: Array.isArray(built.offers) ? built.offers : [],
     };
   }
 

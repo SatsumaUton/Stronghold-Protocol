@@ -79,8 +79,8 @@
     "api": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 1,
-      "description": "The plugin API level (this game: 1–1)."
+      "maximum": 2,
+      "description": "The plugin API level (this game: 1–2)."
     },
     "class": {
       "enum": [

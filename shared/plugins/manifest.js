@@ -134,6 +134,8 @@ export const PERMISSIONS = Object.freeze({
   'data.patch': ['content', 'script', 'trusted'],
   'data.add': ['content', 'script', 'trusted'],
   dsl: ['content', 'script', 'trusted'],
+  // PLUGIN API v2: declares interaction windows (the `offers` part). Data only, so a content plugin holds it too.
+  offers: ['content', 'script', 'trusted'],
   'sim.code': ['script', 'trusted'],
   'meta.code': ['script', 'trusted'],
   'mode.code': ['script', 'trusted'],
@@ -156,6 +158,9 @@ const PARTS = Object.freeze({
   modes: { classes: ['content', 'script', 'trusted'], shape: 'list', needs: ['data.add'] },
   stages: { classes: ['content', 'script', 'trusted'], shape: 'list', needs: ['data.add'] },
   dsl: { classes: ['content', 'script', 'trusted'], shape: 'list', needs: ['dsl'] },
+  // PLUGIN API v2: a declarative interaction window (shared/plugins/offers.js). Data only — the host owns the window's
+  // lifecycle and applies one of its effect primitives, so the part needs no code permission.
+  offers: { classes: ['content', 'script', 'trusted'], shape: 'list', needs: ['offers'] },
   i18n: { classes: ['content', 'script', 'trusted'], shape: 'langs', needs: [] },
 });
 
