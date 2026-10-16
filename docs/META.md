@@ -1017,3 +1017,11 @@ to shared availability (§30.2). 凯瑟琳's `pool_equip_kathe` is every shop-el
 ## Host test matches (DESIGN §34.8)
 
 `server/testMode.js` gates immutable test rooms. `shared/testMode.js` validates the bounded command catalogue; `server/match/match/testCommands.js` invokes normal match/player primitives for the current host. Normal matches reject every `g.test` and omit all test metadata. Test rooms require join/watch acknowledgement, suppress awards and local records, and expose their audit tail. `server/match/testTrace.js` writes init/call/timer inputs to the server logger; `server/match/testReplay.js` re-simulates a complete journal with identical build/content. See [deployment](DEPLOY.md) and [playing](PLAYING.md) for controls and assumptions.
+
+
+### Plugin bond records (0.3.1)
+
+Namespaced plugin bonds use `GameData` and `computeBonds` unchanged: BOARD / BOARD_AND_DECK / BOARD_ALL_CHESS,
+core/extra classification and persistent capped layers. `data.dsl` prep specs can guard funds/layers/gainItem on
+`bondActive`; the match host installs these through the existing MetaRegistry grants. A descriptive bond record
+alone registers no handler [ASSUMED]. See PLUGINS.md and DESIGN §34.16.

@@ -528,3 +528,31 @@ Forge 的 baseId 是普通棋子 id，不当官方来源猜测。详见 [PLUGINS
 - 界面包的 `PLUGIN_FORGE_MOUNT` 表示挂载点需要人工适配；`PLUGIN_FORGE_PANEL_SCRIPT` 表示面板脚本没复制。
   报告会写面板名、原挂载点和建议插槽；建议不是自动映射。全部九种挂载点见 [PLUGINS §16](PLUGINS.md#16-forge-import)。
 - 外观模板自带原创 CC0 棋盘格 PNG 和短音 OGG。工作台新建美术/音频模板时，目标的第一个插槽会填入示例 [ASSUMED]；可直接替换后校验、打包。
+
+
+### 0.3.1：新盟约、完整装备与名单外官方干员
+
+内容插件的 `data` 文件可以写新盟约：
+
+```json
+{"records":1,"entries":[{"file":"bonds","id":"bond_x_my_pack_team","value":{"name":"演示盟约","desc":"由插件 DSL 定义效果","thresholds":[2,4],"countMode":"BOARD","isCore":true,"identifier":30}}]}
+```
+
+插件 id 为 `my-pack` 时命名空间是 `my_pack`；不能占用官方或别的插件的盟约 id。阈值为递增正整数，
+最多 16 档且每档不超过 100 [ASSUMED]。`BOARD` 数场上不同干员，`BOARD_AND_DECK` 加上手牌，
+`BOARD_ALL_CHESS` 数场上所有精锐（包括重复）。成员由棋子的 `bonds` 生成，层数沿用原有持久状态和上限；
+盟约条、详情、商店和机器人直接读取它。徽记用外观插件的 `art.bonds`。
+
+名字、说明和黑板本身不产生新效果 [ASSUMED]。备战可用 `dsl` 文件的 `meta.on`，以
+`if: { "bondActive": "bond_x_my_pack_team" }` 限制资金、层数和道具奖励；战斗效果写成员的 DSL 天赋或沙箱 kit。
+完整装备记录可以保留普通/进阶两档、合成关系和商店参数，但只能使用引擎已有的 buff 处理器。
+策略仍需官方 `base` / `effectRef`。召唤物记录不等于召唤行为；需要技能使用它。
+干员形态可携带 `tags` / `tokens`（最多 64 个字符串 [ASSUMED]，召唤物 id 必须存在）。
+
+Forge 导入会转换新盟约、支持的装备/驻守效果/效果/召唤物；`traits` 只接受能对应已有驻守 `effectKey` 的记录。
+自定义行为逐项写进报告，不把说明文字当成已实现效果。灵巧钩索保留 2 阶、价格 2、攻速 +25 / +50。
+名单外的官方 `charId` 从本机官方 character/skill/range 表调用数据构建器同一套函数，按经济表练度和满潜能生成，
+再应用包的显式覆盖 [ASSUMED]；报告记录所读表的 SHA-256 版本。没有本机表就跳过，不猜数字、不联网下载。
+输出插件带齐推导数值，使用者不需要这些表。缺 kit 时用通用技能，并明确标注 [ASSUMED]。
+Ave Mujica 的五份 kit 可跟随棋子导入，但其自定义 Fever/盟约引擎和未知特质仍需要适配；
+Kazdel/Rhodes 同样不能仅靠数据恢复自定义行为。结城理原包未带战斗 kit；Duel 的只读资料不能转换为可玩模式。

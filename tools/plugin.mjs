@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { GAMEPLAY_RECORD_SURFACE } from '../server/plugins/gameplayRecords.js';
 // tools/plugin.mjs — the plugins of a checkout (DESIGN §32, docs/PLUGINS.md §8 and §15; the registry the server runs is
 // server/plugins/registry.js, the format shared/plugins/manifest.js, the checks and the packer server/plugins/pack.js,
 // the explanations shared/plugins/errors.js):
@@ -462,7 +463,7 @@ export async function main(argv) {
 
   if (cmd === 'surface') {
     const vocab = await import('../server/sim/content/dsl/vocab.js');
-    const rows = buildSurface({ dsl: vocab, studioRoutes: STUDIO_ROUTES });
+    const rows = [...buildSurface({ dsl: vocab, studioRoutes: STUDIO_ROUTES }), ...GAMEPLAY_RECORD_SURFACE];
     const table = surfaceMarkdown(rows);
     if (!flags.has('write')) { console.log(table); return 0; }
     const abs = path.join(root, 'docs/PLUGIN-API.md');

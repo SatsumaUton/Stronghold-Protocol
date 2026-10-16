@@ -500,4 +500,8 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `sdk.export.targeting` | experimental | 0.3.1 | `shared/plugins/sdk.js#targeting` |
 | `api.PLUGIN_API.min` | stable | 0.3.0 | `shared/constants.js#PLUGIN_API` |
 | `api.PLUGIN_API.current` | stable | 0.3.0 | `shared/constants.js#PLUGIN_API` |
+| `record.file.bonds` | stable | 0.3.1 | `server/plugins/gameplayRecords.js#GAMEPLAY_RECORDS` |
+| `record.file.items` | stable | 0.3.1 | `server/plugins/gameplayRecords.js#GAMEPLAY_RECORDS` |
+| `record.operator.forms.tags` | stable | 0.3.1 | `server/plugins/gameplayRecords.js#expandGameplayRecords` |
+| `record.operator.forms.tokens` | stable | 0.3.1 | `server/plugins/gameplayRecords.js#expandGameplayRecords` |
 <!-- plugin-surface:end -->

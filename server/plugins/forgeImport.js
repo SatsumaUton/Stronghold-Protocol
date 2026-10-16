@@ -108,6 +108,9 @@ import { validateSkillSpec } from '../../shared/plugins/skillSpec.js';
 import { canonicalLang, languageName, SOURCE_LANG } from '../../shared/i18nPacks.js';
 import { KITS, OPERATOR_KITS, TIER_KITS } from '../sim/content/kits/index.js';
 import { bundleForgeKits } from './forgeKits.js';
+import { planForgeRecords, rewriteForgeIds, rewriteForgeKit } from './forgeRecords.js';
+import { localOfficialUnits } from './officialUnits.js';
+import { BOUND_TABLES, rememberOfficialBounds, officialBbRange } from '../../shared/plugins/officialBounds.js';
 
 const APP_RANGE = '>=0.3.0 <0.4.0';
 const DANGER_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -127,7 +130,7 @@ const RECORD_ENUMS = { dmgType: new Set(['phys', 'arts', 'heal']), attackKind: n
 /** The chess.json fields a pair maps (the rest are named in the report). */
 const CHESS_KEEP = new Set(['chessId', 'baseId', 'goldenId', 'isGolden', 'tier', 'identifier', 'isHidden', 'isDiy', 'visible', 'chessType',
   'shopSortId', 'charId', 'name', 'appellation', 'rarity', 'profession', 'subProfessionId', 'subProfessionName', 'position', 'nationId',
-  'bonds', 'garrisonIds', 'price', 'sellPrice', 'upgradeNum', 'upgradeChessId', 'status', 'stats', 'rangeGrid', 'trait', 'skill', 'skills',
+  'bonds', 'garrisonIds', 'price', 'sellPrice', 'upgradeNum', 'upgradeChessId', 'status', 'stats', 'rangeGrid', 'trait', 'skill', 'skills', 'tags', 'tokens',
   'talents', 'dmgType', 'attackKind', 'projectile', 'canHitFly', 'targetPriority', 'assets', 'base', 'backup', 'workshop']);
 /** The chess kits (the tier groups, keyed by the chess `_a` id). The 自选 kits an import may name are OPERATOR_KITS (charId). */
 const CHESS_KIT_KEYS = new Set(TIER_KITS.flatMap((group) => Object.keys(group)));
@@ -143,7 +146,7 @@ const PANEL_SLOT = { 'screen.game.hud': 'hud.right', 'screen.game.aside': 'hud.r
 // [ASSUMED] Suggestions describe a possible rewrite, not equivalent mount positions.
 const PANEL_REWRITE = { 'root.overlays': 'hud.right', 'root.guide': 'stats.tab', 'screen.game.overlay': 'hud.right',
   'screen.game.shopCard': 'hud.right', 'screen.game.bondStrip': 'hud.right', 'screen.loadout.detail': 'room.panel' };
-const CONTENT_NAMES = ['chess', 'units', 'items', 'enemies', 'stages', 'waves', 'tokens', 'bosses', 'factions', 'garrisons', 'bands', 'bonds', 'effects', 'choices'];
+const CONTENT_NAMES = ['chess', 'units', 'items', 'enemies', 'stages', 'waves', 'tokens', 'bosses', 'factions', 'garrisons', 'bands', 'bonds', 'effects', 'choices', 'traits'];
 const PATCH_TABLE = {
   bonds: 'bonds', enemies: 'enemies', chess: 'chess', items: 'items', stages: 'stages', waves: 'waves', bands: 'bands',
   effects: 'effects', tokens: 'tokens', garrisons: 'garrisons', bosses: 'bosses', factions: 'factions', choices: 'choices',
@@ -1315,15 +1318,30 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   for (const name of declaredContent) {
     if (CONTENT_NAMES.includes(name)) continue;
     skip(`content:${name}`, '这不是 Forge 的数据文件名，也不能当成模式导入。', 'This is not a Forge data-file name, and it was not imported as a mode.');
-    // traits.json is not one of our tables. Count its records; the file is not imported.
-    if (name !== 'traits') continue;
-    let n = 0;
-    try {
-      const doc = loadTableFile(files, used, 'traits');
-      n = doc ? Object.keys(asMap(doc, 'id')).length : 0;
-    } catch { n = 0; }
-    noteDrop('traits', n || 1);
+
   }
+
+  rememberOfficialBounds(Object.fromEntries(BOUND_TABLES.map(name => [name, table(name)])));
+  const gameplay = planForgeRecords({
+    read: name => asMap(loadTableFile(files, used, name), name === 'tokens' ? 'tokenId' : 'id'),
+    table, allocate: (prefix, id) => namespaced(prefix, recordNs, id, seenIds), skip, assume,
+  });
+  const gameplayRecords = gameplay.records;
+  const recordIds = gameplay.ids;
+  for (const [name, entries] of gameplay.additions) dataCache.set(name, { ...table(name), ...entries });
+  for (const [old, id] of recordIds) { importedData.push(`${old} → ${id}`); rewrittenData.push(`${old} → ${id}`); }
+  const deriveLocal = dataDir ? localOfficialUnits(dataDir) : null;
+  const derivedChars = new Set();
+  const installedChar = id => typeof id === 'string' && (!!table('units')?.[id] || Object.values(table('chess') ?? {}).some(c => c.charId === id));
+  const deriveChar = (id, tier) => {
+    if (!deriveLocal) throw new Error('Local official character/skill/range tables unavailable (no dataDir).');
+    const econ = table('config')?.economy?.chessStatus?.[tier];
+    if (!econ) throw new Error(`Missing economy training defaults for tier ${tier}.`);
+    const got = deriveLocal(id, [econ.normal, econ.golden]);
+    derivedChars.add(id);
+    importedData.push(`${id}: derived from local official tables (${got.version}); full potential, tier ${tier} economy training; pack overrides retained.`);
+    return got.unit;
+  };
 
   const patchRecord = (file, id, partial) => {
     const prefix = file === 'units' ? ['units', id] : [];
@@ -1516,7 +1534,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     officialSkills = { skills, chars };
     return officialSkills;
   };
-  const officialChar = (id) => typeof id === 'string' && !!id && (officialIndex().chars.has(id) || !!(manifestArt?.chars && has(manifestArt.chars, id)));
+  const officialChar = (id) => derivedChars.has(id) || typeof id === 'string' && !!id && (officialIndex().chars.has(id) || !!(manifestArt?.chars && has(manifestArt.chars, id)));
 
   /**
    * The official kit a record's skill ids name, or why not; null when none of them is official (a new operator).
@@ -1560,7 +1578,11 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     const out = {};
     for (const [k, v] of Object.entries(bb)) {
       if (DANGER_KEYS.has(k)) continue;
-      if (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= PLUGIN_LIMITS.number) out[k] = v;
+      if (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= PLUGIN_LIMITS.number) {
+        const bound = officialBbRange(k);
+        if (Math.abs(v) <= bound.max && !(v > 0 && v < bound.positiveMin)) out[k] = v;
+        else { dropped.add(`${label}bb.${k}=${v} (admission bound ${bound.max}, minimum ${bound.positiveMin})`); }
+      }
       else dropped.add(`${label}bb.${k}`);
     }
     return Object.keys(out).length ? out : null;
@@ -1711,12 +1733,19 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   const kitLine = (label, name, kitPath, reason) => {
     const zh = kitPath || '没有 kit 文件';
     const en = kitPath || 'no kit file';
+    assume(`generic-${label}`, `[ASSUMED] ${label}: 未导入 kit 时使用通用技能。`, `[ASSUMED] ${label}: skills without an imported kit use generic behavior; complex talents are not inferred.`);
     if (reason) skip(`${label}#kit`, `${reason.zh}「${name}」在数据插件里用通用 kit（${zh}）。`, `${reason.en} "${name}" uses the generic kit in the content plugin (${en}).`);
     else skip(`${label}#kit`, `技能逻辑映射不成 kitRef、JSON SkillSpec 或 DSL，「${name}」在数据插件里用通用 kit（${zh}）。脚本不在导入时运行。`, `The skill logic does not map to a kitRef, a JSON SkillSpec or DSL, so "${name}" uses the generic kit in the content plugin (${en}). No script runs during the import.`, 'PLUGIN_FORGE_SCRIPT');
   };
 
   const mapOperator = (rawId, rec) => {
     if (!isObj(rec)) { skip(`units:${rawId}`, '干员记录不是对象，没有导入。', 'The operator record is not an object, so it was not imported.', undefined, 'operators'); return; }
+    if (/^char_\d+_/.test(rec.charId ?? rawId) && !installedChar(rec.charId ?? rawId)) {
+      try {
+        const u = deriveChar(rec.charId ?? rawId, rec.tier ?? rec.rarity ?? 6);
+        rec = { ...u, ...rec, forms: { ...u.forms, ...rec.forms } };
+      } catch (e) { skip(`units:${rawId}#official`, e.message, e.message, undefined, 'operators'); return; }
+    }
     const name = typeof rec.name === 'string' ? rec.name.trim().slice(0, 60) : '';
     const profession = professionOf(rec.profession);
     if (!name || !PROFESSIONS.has(profession) || typeof rec.subProfessionId !== 'string' || !rec.subProfessionId.trim()) {
@@ -1780,6 +1809,8 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       const grid = gridOf(f.rangeGrid || rec.rangeGrid);
       if (!grid) assume('range', '缺攻击范围，写成 [[0, 0]]。请作者改成真实范围。', 'No attack range was found, so it was written as [[0, 0]]. The author should replace it.');
       const out = { stats, rangeGrid: grid || [[0, 0]], skills: compiledForms[idx] || compiledTop || fallback };
+      if (Array.isArray(rec.tags)) out.tags = rec.tags;
+      if (Array.isArray(f.tokens)) { out.tokens = f.tokens.filter(id => table('tokens')?.[id]); for (const id of f.tokens) if (!out.tokens.includes(id)) fieldsDropped.add(`tokens.${id}`); }
       const trait = isObj(f.trait) ? cleanTrait(f.trait, fieldsDropped) : null;
       if (trait) out.trait = trait;
       const talents = cleanTalents(f.talents, fieldsDropped);
@@ -1820,8 +1851,8 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     // [ASSUMED] Only an explicit installed base/character establishes provenance, never the skill binding.
     const source = typeof rec.base === 'string' ? table('chess')?.[rec.base] : null;
     if (source) op.origin = { chessId: rec.base, ...(source.charId ? { charId: source.charId } : {}) };
-    else if (officialChar(rec.base)) op.origin = { charId: rec.base };
-    else if (officialChar(rec.charId)) op.origin = { charId: rec.charId };
+    else if (installedChar(rec.base)) op.origin = { charId: rec.base };
+    else if (installedChar(rec.charId)) op.origin = { charId: rec.charId };
     else if (rec.base != null) skip(`units:${rawId}#base`, '官方来源不存在，没有保留来源引用。', 'The official source does not exist; its provenance reference was omitted.');
     if (dropped.size) skip(`units:${rawId}#skill-fields`, `技能字段 ${[...dropped].slice(0, 8).join('、')} 写不进紧凑记录，没有照抄。`, `Skill fields ${[...dropped].slice(0, 8).join(', ')} do not fit the compact record, so they were not copied.`);
     if (fieldsDropped.size) skip(`units:${rawId}#fields`, `字段 ${[...fieldsDropped].slice(0, 8).join('、')} 写不进紧凑记录，没有照抄。`, `Fields ${[...fieldsDropped].slice(0, 8).join(', ')} do not fit the compact record, so they were not copied.`);
@@ -1850,6 +1881,16 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
 
   /** One chess.json _a/_b pair → one compact record (Addition 1, round 43). */
   const mapChessPair = (baseId, normal, elite) => {
+    if (typeof normal.charId === 'string' && /^char_\d+_/.test(normal.charId) && !installedChar(normal.charId)) {
+      try {
+        const u = deriveChar(normal.charId, normal.tier);
+        const fs = Object.values(u.forms);
+        const fill = (r, f) => { const { forms, moduleNames, ...head } = u; return { ...head, ...f, ...r }; };
+        normal = fill(normal, fs[0]); elite = fill(elite, fs.at(-1));
+      } catch (e) {
+        skip(`chess:${baseId}#official`, e.message, e.message, undefined, 'operators'); return;
+      }
+    }
     const label = `chess:${baseId}`;
     const name = typeof normal.name === 'string' ? normal.name.trim().slice(0, 60) : '';
     const profession = professionOf(normal.profession);
@@ -1898,6 +1939,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     const stem = baseId.replace(/^chess_/, '').replace(/_a$/, '');
     const charId = namespaced('char_x', recordNs, stem, seenIds);
     const target = { charId, label: name };
+    if (unit.kind === 'official') charIds.set(unit.charId, charId);
     for (const k of new Set([baseId, baseId.replace(/_a$/, '_b'), normal.chessId, elite.chessId, baseId.replace(/_a$/, '')])) {
       if (typeof k === 'string' && k) recordTargets.set(k, target);
     }
@@ -1918,6 +1960,11 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       const grid = gridOf(r.rangeGrid);
       if (!grid) assume('range', '缺攻击范围，写成 [[0, 0]]。请作者改成真实范围。', 'No attack range was found, so it was written as [[0, 0]]. The author should replace it.');
       const out = { stats: finiteStats(r.stats), rangeGrid: grid || [[0, 0]], skills };
+      if (Array.isArray(r.tags)) out.tags = r.tags;
+      if (Array.isArray(r.tokens)) {
+        out.tokens = r.tokens.filter(id => table('tokens')?.[id]);
+        for (const id of r.tokens) if (!out.tokens.includes(id)) fieldsDropped.add(`tokens.${id}`);
+      }
       const trait = cleanTrait(r.trait, fieldsDropped);
       if (trait) out.trait = trait;
       const talents = cleanTalents(r.talents, fieldsDropped);
@@ -1958,6 +2005,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     const rawEliteId = elite !== normal ? elite.chessId : normal.upgradeChessId ?? rawNormalId.replace(/_a$/, '_b');
     if (typeof rawNormalId === 'string' && typeof rawEliteId === 'string' && rawNormalId !== rawEliteId) {
       chess.ids = { normal: namespaced('chess_x', recordNs, rawNormalId.replace(/^chess_/, ''), seenIds), elite: namespaced('chess_x', recordNs, rawEliteId.replace(/^chess_/, ''), seenIds) };
+      recordIds.set(rawNormalId, chess.ids.normal); recordIds.set(rawEliteId, chess.ids.elite);
       if (normal.upgradeChessId && normal.upgradeChessId !== rawEliteId) skip(`${label}#upgradeChessId`, '升级目标和精锐棋子 id 不同，升级目标没有照抄。', 'The upgrade target differs from the elite chess id, so that target was not copied.');
     }
     const forms = { normal: form(normal, nSkills), elite: form(elite, eSkills) };
@@ -1984,12 +2032,12 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       forms, skills: nSkills, kit, chess,
     };
     recordExtras(normal, null, op);
-    if (unit.kind === 'official') { op.origin = { charId: unit.charId }; op.art = { ref: unit.charId }; }
+    if (unit.kind === 'official') { if (installedChar(unit.charId)) op.origin = { charId: unit.charId }; op.art = { ref: unit.charId }; }
     // [ASSUMED] Forge base is provenance only. baseId describes the pair, never an official source or a kit.
     if (typeof normal.base === 'string') {
       const source = table('chess')?.[normal.base];
       if (source) op.origin = { chessId: normal.base, ...(source.charId ? { charId: source.charId } : {}) };
-      else if (officialChar(normal.base)) op.origin = { charId: normal.base };
+      else if (installedChar(normal.base)) op.origin = { charId: normal.base };
       else skip(`${label}#base`, '官方来源不存在，没有保留来源引用。', 'The official source does not exist; its provenance reference was omitted.');
     }
     // Forge's sidecars are asset ids. Keep each form's explicit ids so the E2 portrait does not depend on suffix guesses.
@@ -2055,6 +2103,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     const newChess = new Map();
     for (const [id, rec] of Object.entries(map)) {
       if (id === '__proto__' || id === 'constructor' || id === 'prototype') continue;
+      if (gameplay.handled.has(`${name}:${id}`)) continue;
       const exists = name === 'units' ? !!(table('units') && has(table('units'), id)) : !!(table(name) && has(table(name), id));
       const declared = overrideKeys.has(`${name}:${id}`);
       if (exists) {
@@ -2116,6 +2165,11 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     }
   }
 
+  for (const [a, b] of skillIds) recordIds.set(a, b);
+  for (let i = 0; i < gameplayRecords.length; i++) gameplayRecords[i] = rewriteForgeIds(gameplayRecords[i], recordIds);
+  for (let i = 0; i < operators.length; i++) operators[i] = rewriteForgeIds(operators[i], recordIds);
+  for (let i = 0; i < patches.length; i++) patches[i] = rewriteForgeIds(patches[i], recordIds);
+
   // ---- kits/<id>.js → one sandboxed script plugin (Addition 3, round 43; forgeKits.js) --------------------------------
   /** @type {{ source: string, registered: { file: string, register: string, carried: string[], kind: string, label: string }[], mapped: string[], overrides: string[] } | null} */
   let scriptPlan = null;
@@ -2145,7 +2199,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       const target = owner ? { ...owner, kind: 'record', override: null } : recordTargets.has(stem) ? { ...recordTargets.get(stem), kind: 'record', override: null } : officialTarget(stem);
       if (!target) {
         const why = packTokenIds.has(stem)
-          ? ['这是召唤物（tokens）的 kit，召唤物记录没有导入，所以没有转成脚本插件；导入时不执行它。', 'This is a summon (tokens) kit. Summon records are not imported, so it was not converted; the importer does not run it.']
+          ? ['这是召唤物（tokens）的 kit，当前脚本注册接口只支持干员；召唤物数据可导入，但这份 kit 没有转换，导入时不执行它。', 'This is a summon (tokens) kit. Token data can import, but the script registration surface supports operators only, so this kit was not converted; the importer does not run it.']
           : [`文件名「${stem}」不是本包导入的棋子或干员，也不是 overrides 里声明的官方 id，转不成脚本插件；导入时不执行它。`, `The file name "${stem}" is not an imported chess or operator record of this pack, nor an official id the pack declares in overrides, so it was not converted; the importer does not run it.`];
         skip(file, why[0], why[1], 'PLUGIN_FORGE_SCRIPT', 'kits');
         continue;
@@ -2163,7 +2217,11 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     }
     if (jobs.length) {
       const got = bundleForgeKits({
-        files, parse, kits: jobs.map(({ file, register }) => ({ file, register })),
+        files: parse ? new Map([...files].map(([rel, bytes]) => {
+          if (!rel.startsWith('kits/') || !rel.endsWith('.js')) return [rel, bytes];
+          try { return [rel, Buffer.from(rewriteForgeKit(bytes.toString('utf8'), new Map([...recordIds, ...charIds]), parse))]; }
+          catch { return [rel, bytes]; }
+        })) : files, parse, kits: jobs.map(({ file, register }) => ({ file, register })),
         header: [
           `sim/index.js — written by \`node tools/plugin.mjs import-forge\` from the Forge pack ${base} ${version}.`,
           'Nothing in this file ran during the import. Each Forge file below keeps a scope of its own; only its import and',
@@ -2326,6 +2384,8 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   rewriteKey(assets.chars, charIds, 'art.chars', artRenames);
   rewriteKey(assets.enemies, enemyIds, 'art.enemies');
   rewriteKey(assets.skills, skillIds, 'art.skills', iconRenames);
+  rewriteKey(assets.bonds, gameplay.ids, 'art.bonds');
+  rewriteKey(assets.bands, gameplay.ids, 'art.bands');
   if (assets.audio && typeof assets.audio === 'object') {
     for (const tree of ['voiceJp', 'voiceEn', 'voiceKr']) rewriteKey(assets.audio[tree], charIds, `audio.${tree}`, voiceRenames);
     rewriteKey(assets.audio.voice, charIds, 'audio.voice', voiceRenames);
@@ -2371,7 +2431,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   /** @type {string[]} */
   const roles = [];
   const contentI18n = translations.filter((t) => t.kind === 'content');
-  const hasContent = patches.length || operators.length || enemyRecords.length || contentI18n.length;
+  const hasContent = gameplayRecords.length || patches.length || operators.length || enemyRecords.length || contentI18n.length;
   if (hasContent) roles.push('content');
   if (Object.keys(assets).length && media.size) roles.push('cosmetic');
   if (scriptPlan) roles.push('script');
@@ -2390,7 +2450,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   for (const bucket of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items', 'skills', 'modules']) if (isObj(assets[bucket])) kept.push(...Object.keys(assets[bucket]));
   const cosmeticBare = asked.length > 0 && asked.every((k) => droppedIds.has(k)) && kept.every((k) => droppedIds.has(k));
 
-  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, contentI18n, panels, manualPanels, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare };
+  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, gameplayRecords, contentI18n, panels, manualPanels, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare };
   return { meta, roles };
 }
 
@@ -2489,6 +2549,11 @@ function buildProducts(meta, ids, primaryRole) {
       perms.push('data.patch');
       man.data = ['data/patch.json'];
       files.set('data/patch.json', `${JSON.stringify({ patch: 1, ops: meta.patches }, null, 2)}\n`);
+    }
+    if (meta.gameplayRecords.length) {
+      perms.push('data.add');
+      man.data = ['data/records.json', ...(man.data ?? [])];
+      files.set('data/records.json', `${JSON.stringify({ records: 1, entries: meta.gameplayRecords }, null, 2)}\n`);
     }
     if (meta.operators.length) {
       perms.push('data.add');
