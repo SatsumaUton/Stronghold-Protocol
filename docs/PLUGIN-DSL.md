@@ -88,6 +88,12 @@
 | `shield` | `addBuff` 的护盾 | [ASSUMED] 默认可见，`visible: false` 才隐藏 |
 | `fx` | `fx` | `kind`，可选 `at`（`self` / `target` / `source` / `lastSpawn`）、`radius`、`skill`、`token`、`n`、`dur`。`id: false` 时不写单位 id |
 
+0.3.1 的插件特效可以写 `{ "fx": { "kind": "plugin", "id": "flash", "at": "self", "dur": 0.4 } }`。
+`flash` 是本插件 `assets.fx.flipbooks` 或编译索引中的本地特效名。加载器校验名称，把地址写进既有事件的
+`skill: "plugin:<插件 id>:flash"`，单位 `id` 仍由引擎填写；作者不得同时指定 `skill`。
+事件仍是普通 `fx`，不改变无插件的事件流和内容哈希。[ASSUMED] 缺图或关闭“官方特效”时不画；视觉持续时间最多 30 秒，
+不改变战斗计时。绑定、PNG 图集和编译特效的限制见 [PLUGINS.md §9](PLUGINS.md#operator-effects-031)。
+
 [ASSUMED] `damage.lose: true` 改为生命流失（`loseHp`）。`minRemain` 表示流失后生命会低于这个数时，这次不流失。`damage.from` 为 `"lastSpawn"` 时，伤害来源是刚召唤的单位。
 
 [ASSUMED] `then` 可以写在动作旁边，也可以写在该动作的参数里（德克萨斯「打两下再晕眩」用的是参数里的写法）。两处都写，校验报 `PLUGIN_DSL_ACTION`。对伤害、状态、buff、治疗、技力、推、拉、护盾，它在每个目标结算完之后、下一个目标之前跑。其他动作整个做完再跑一次。`then` 最多套 4 层。`times` 是这一个伤害节点重复 1 到 8 次，目标倒下就停；它不是循环语法。

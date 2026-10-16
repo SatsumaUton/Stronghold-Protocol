@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RECORDS_SCHEMA } from '../shared/plugins/recordsSchema.js';
+import { FX_RECORDS_SCHEMA as RECORDS_SCHEMA } from '../server/plugins/fxRecords.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.resolve(process.argv[2] ?? path.join(root, 'schemas/records.schema.json'));

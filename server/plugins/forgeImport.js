@@ -1013,6 +1013,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
 
   for (const key of Object.keys(SKIP_TOP)) {
     if (pack[key] == null) continue;
+    if (key === 'fx' && isObj(pack.fx) && Array.isArray(pack.fx.silentPhases)) continue;
     if (key === 'combat' && pack.combat !== true) continue;
     const [zh, en] = SKIP_TOP[key];
     skip(`pack.json:${key}`, zh, en);
@@ -2368,12 +2369,21 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     } else assetNeed = ['assets.add'];
   }
 
+  // Forge WORKSHOP §1.19: union with the renderer's built-in silent phases; no script is read or run.
+  if (isObj(pack.fx) && Array.isArray(pack.fx.silentPhases)) {
+    const names = pack.fx.silentPhases;
+    if (names.length <= 128 && names.every(v => typeof v === 'string' && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(v))) {
+      if (names.length) { assets.fx = { silentPhases: [...new Set(names)] }; importedAssets.push('fx.silentPhases'); }
+    } else skip('fx.silentPhases', '静态相位名称无效或超过 128 项，没有导入。', 'Invalid phase names or more than 128 entries; not imported.');
+    for (const key of Object.keys(pack.fx)) if (key !== 'silentPhases') skip(`fx.${key}`, '这个特效字段没有 Forge 对应项，没有导入。', 'This effect field has no Forge equivalent; not imported.');
+  }
+
   /** @type {string[]} */
   const roles = [];
   const contentI18n = translations.filter((t) => t.kind === 'content');
   const hasContent = patches.length || operators.length || enemyRecords.length || contentI18n.length;
   if (hasContent) roles.push('content');
-  if (Object.keys(assets).length && media.size) roles.push('cosmetic');
+  if (Object.keys(assets).length && (media.size || assets.fx)) roles.push('cosmetic');
   if (scriptPlan) roles.push('script');
   for (const panel of panels) roles.push(`ui:${panel.slot}`);
   for (const t of translations.filter((x) => x.kind === 'ui')) roles.push(`lang:${t.lang}`);

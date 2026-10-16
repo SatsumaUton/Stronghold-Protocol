@@ -378,10 +378,10 @@ export function skillIdsOf(srec) {
  * @param {any} idx index.json
  * @param {{ info?: any, rec?: any, unitKey?: string|null, skillIndex?: number }} unit  the view's info, its data record
  *   (ctx.lookupDef(info)); `unitKey` / `skillIndex` override what the info says
- * @returns {{ unitKey: string|null, skillId: string|null, skill: any, via: 'record'|'name'|null, reason: string|null }}
+ * @returns {{ unitKey: string|null, skillId: string|null, skill: any, via: 'record'|'name'|'plugin'|null, reason: string|null }}
  */
 export function resolveSkill(idx, { info = null, rec = null, unitKey = null, skillIndex } = {}) {
-  const key = unitKey || unitKeyOf(idx, [info?.diy?.charId, info?.spine, rec?.charId, info?.defId]);
+  const key = unitKeyOf(idx, [rec?.fx?.unit]) || idx?.pluginUnits?.[rec?.charId || info?.diy?.charId] || unitKey || unitKeyOf(idx, [info?.diy?.charId, info?.spine, rec?.charId, info?.defId]);
   const out = { unitKey: key, skillId: null, skill: null, via: null, reason: null };
   if (!key) { out.reason = 'no-unit'; return out; }
   const unit = idx.units[key];
@@ -390,7 +390,12 @@ export function resolveSkill(idx, { info = null, rec = null, unitKey = null, ski
     : Number.isInteger(info?.diy?.skillIndex) ? info.diy.skillIndex : Number.isInteger(info?.skillIndex) ? info.skillIndex : undefined;
   const find = (id) => (isObj(unit.skills) && unit.skills[id]) || (isObj(idx.skills) && idx.skills[id]) || null;
   const srec = skillRecordOf(rec, index);
-  for (const id of skillIdsOf(srec)) {
+  const mapping = rec?.fx?.skills;
+  // [ASSUMED] An explicit slot wins over an id; a missing mapping falls through to the old resolver.
+  const mapped = mapping?.[String(index ?? srec?.index)] ?? mapping?.[srec?.skillId] ?? mapping?.[srec?.prefabId];
+  if (typeof mapped === 'string' && find(mapped)) return { ...out, skillId: mapped, skill: find(mapped), via: 'plugin' };
+  const ns = key.startsWith('plugin:') ? key.slice(0, key.lastIndexOf(':') + 1) : '';
+  for (const id of skillIdsOf(srec).flatMap(id => ns ? [ns + id, id] : [id])) {
     const s = find(id);
     if (s) return { ...out, skillId: id, skill: s, via: 'record' };
   }

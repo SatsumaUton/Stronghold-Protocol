@@ -1,3 +1,4 @@
+import { readFxManifest as readPluginManifest } from '../plugins/fxAssets.js';
 // server/studio/index.js — the plugin studio 插件工作台 (DESIGN §32.9, docs/PLUGINS.md §15; the 0.3.0 plan's interface C5):
 // a page in the browser where someone who does not write code makes, previews and packs a cosmetic plugin, and an API
 // that experienced authors and AI agents can use the same way. Only for this machine and the local network
@@ -53,7 +54,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { APP_VERSION, PLUGIN_API } from '../../shared/constants.js';
-import { PLUGIN_MANIFEST, PLUGIN_LIMITS, PLUGIN_IMAGE_EXTS, PLUGIN_AUDIO_EXTS, extOf, isPackPath, isPluginId, readPluginManifest } from '../../shared/plugins/manifest.js';
+import { PLUGIN_MANIFEST, PLUGIN_LIMITS, PLUGIN_IMAGE_EXTS, PLUGIN_AUDIO_EXTS, extOf, isPackPath, isPluginId } from '../../shared/plugins/manifest.js';
 import { LOCK_FILE, locateAssetPath, readPluginLock } from '../../shared/plugins/visual.js';
 import { PLUGIN_ERRORS, isPluginErrorCode, issueList } from '../../shared/plugins/errors.js';
 import { CATALOG_FETCH_MAX_BYTES, annotateCatalog, readCatalog } from '../../shared/plugins/catalog.js';

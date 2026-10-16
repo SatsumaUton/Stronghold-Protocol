@@ -21,6 +21,7 @@ export function TrialBench({ state, draft }) {
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [reset, setReset] = useState(0);
+  const [board, setBoard] = useState('3d'), [effects, setEffects] = useState('lite');
   useEffect(() => { let alive = true; get('trial-options').then(r => { if (alive) setOptions(r); }); return () => { alive = false; }; }, []);
   const run = async () => {
     setBusy(true); setResult(null); setError('');
@@ -53,9 +54,11 @@ export function TrialBench({ state, draft }) {
         <tr><th>${t('结果')}</th><td>${outcome(result.vanilla.outcome)}</td><td>${outcome(result.plugin.outcome)}</td><td></td></tr></tbody></table>
       <div class="st-inline"><${Button} size="sm" onClick=${() => setPlaying(!playing)}>${playing ? t('暂停') : t('播放')}<//>
         <${Button} size="sm" data-testid="replay-trial" onClick=${() => { setReset(n => n + 1); setPlaying(true); }}>${t('重新播放')}<//>
-        <${Select} label=${t('播放速度')} value=${String(speed)} options=${['0.5','1','2','4']} onChange=${v => setSpeed(Number(v))} /></div>
+        <${Select} label=${t('播放速度')} value=${String(speed)} options=${['0.5','1','2','4']} onChange=${v => setSpeed(Number(v))} />
+        <${Select} label=${t('画面')} value=${board} options=${['3d','2d']} onChange=${setBoard} />
+        <${Select} label=${t('官方特效')} value=${effects} options=${[{ id:'off', name:t('关闭') }, { id:'lite', name:t('精简') }, { id:'full', name:t('完整') }]} onChange=${setEffects} /></div>
       <div class="st-trial-pair">${['vanilla','plugin'].map(side => html`<div><h4>${side === 'vanilla' ? t('原版') : t('插件')}</h4>
-        <${TrialReplay} replay=${result[side]} playing=${playing} speed=${speed} reset=${reset} />
+        <${TrialReplay} replay=${result[side]} playing=${playing} speed=${speed} reset=${reset} board=${board} effects=${effects} />
         <details><summary>${t('事件摘要与伤害统计')}</summary><pre class="st-code">${JSON.stringify({ events: result[side].events, units: result[side].units, errors: result[side].errors }, null, 2)}</pre></details>
       </div>`)}</div>
     </div>` : null}

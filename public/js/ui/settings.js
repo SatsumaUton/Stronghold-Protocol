@@ -42,6 +42,7 @@ import { pluginMicro } from './pluginTag.js';
 import { fxAvailable } from '../render/vfx/available.js';
 import { resolveOfficialFx } from '../render/vfx/tier.js';
 import { ScreenFitSection } from './screenFit.js';
+import { cosmetics } from '../cosmetics.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -347,8 +348,10 @@ export function SettingsModal({ open, onClose }) {
   useEffect(() => {
     if (!open) return undefined;
     let live = true;
-    fxAvailable(null).then((ok) => { if (live) setFxOk(!!ok); }, () => {});
-    return () => { live = false; };
+    const update = () => fxAvailable(null).then((ok) => { if (live) setFxOk(!!ok || Object.values(cosmetics.apply({}).fx || {}).some(e => Object.keys(e.config?.flipbooks || {}).length || e.index)); }, () => {});
+    update();
+    const off = cosmetics.subscribe(update);
+    return () => { live = false; off(); };
   }, [open]);
   const fxTier = resolveOfficialFx(s.officialFx, true);
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('设置')} micro="SETTINGS" width="7.4rem"

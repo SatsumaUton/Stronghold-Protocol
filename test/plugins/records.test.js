@@ -12,7 +12,7 @@ import { applyPatches } from '../../shared/plugins/patch.js';
 import { dataBound } from '../../shared/plugins/limits.js';
 import { officialBbMax, officialFieldMax } from '../../shared/plugins/officialBounds.js';
 import { validateSkillSpec, matchesSchema } from '../../shared/plugins/skillSpec.js';
-import { RECORDS_SCHEMA } from '../../shared/plugins/recordsSchema.js';
+import { FX_RECORDS_SCHEMA as RECORDS_SCHEMA } from '../../server/plugins/fxRecords.js';
 import { guard } from '../helpers/contentFixtures.js';
 import { diyRecord } from '../../shared/diy.js';
 import { meleeOnHighGround } from '../../shared/highGround.js';

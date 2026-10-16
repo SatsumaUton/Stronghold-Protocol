@@ -7,7 +7,7 @@ import { computeVanillaContent, gameplayDataFiles, nodeSha256 } from './identity
 import { contentHashOf, canonicalJson, csUrlPart } from '../../shared/plugins/identity.js';
 import { resolvePluginOrder } from '../../shared/plugins/order.js';
 import { applyPatches, normalizeSettings } from '../../shared/plugins/patch.js';
-import { expandRecords } from '../../shared/plugins/records.js';
+import { expandFxRecords as expandRecords } from './fxRecords.js';
 import { validateData } from '../../shared/plugins/validate.js';
 import { object, own, clone, problem, RECORD_MAPS, recordId, namespaceCollisions } from '../../shared/plugins/dataUtils.js';
 import { buildRecordOverlay, walkOverlay, getPath, applyRecordOverlay } from '../../shared/i18nData.js';

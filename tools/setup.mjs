@@ -36,7 +36,7 @@
 //                    SP_ASSET_SOURCE sets the default; SP_GITHUB_PROXY sets the HTTPS prefix (https://gh-proxy.com/)
 //                    An empty SP_GITHUB_PROXY disables the proxy, including in mirror mode.
 //   --no-local       skip the local-client detection and extraction (the scene step still runs unless --no-scenes)
-//   --local          extract from the local client without asking (re-extracts when already done)
+//   --local          extract local art and used official effects, including installed plugin references
 //   --scenes         download and extract the official battlefield scenes without asking
 //   --no-scenes      do not download or extract battlefield scenes (the metal board stays)
 //   --game <dir>     AssetBundle root of the local client (…/StreamingAssets/AB/Windows or PlayCover …/Documents/Bundles)
@@ -55,6 +55,18 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validateSource } from './assets/network.mjs';
 import { EXPECTED_FX, EXPECTED_LOCAL_GROUPS, EXPECTED_SCENE } from './local-extract/expected.mjs';
+import { installedFxReferences, pluginFxGap } from '../server/plugins/fxReferences.js';
+
+export function checkPluginFx(root = ROOT) {
+  let index = null;
+  try { index = JSON.parse(fs.readFileSync(path.join(root, 'public/assets/local/fx/index.json'), 'utf8')); } catch { /* optional */ }
+  return pluginFxGap(installedFxReferences(root), index);
+}
+
+/** [ASSUMED] A changed reference set may ask again; Enter/timeout never authorizes extraction. */
+export function pluginFxExtractionAllowed(opts, missing, answer = false) {
+  return !opts.check && opts.local !== 'no' && (opts.local === 'force' || missing.length > 0 && (opts.yes || answer === true));
+}
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const MIN_NODE = 22;
@@ -302,7 +314,7 @@ export function assessLocal(manifest, fxDoc) {
  * [ASSUMED] Present-but-wrong groups, entry count, wrapper version, format or index version is a warning. The group
  * set must be exactly FX_GROUPS (an extra fx group is stale: a full fx run rewrites the catalog to those four keys).
  * The catalog's index version is the version check; mesh and prefab files are not opened for MESH_VERSION /
- * FORMAT_VERSION. `--local` does not extract fx, so the hint names the fx command. The interpreter is the
+ * FORMAT_VERSION. The hint names the effects-only command (a full `--local` also extracts effects). The interpreter is the
  * project venv (`.venv-extract`), not `python` on PATH: setup installs UnityPy there.
  */
 export function fxCatalogReport(doc) {
@@ -885,9 +897,27 @@ async function main() {
       }
     }
   }
-  // fx is opt-in (extract.py --only fx). A plain --local does not write data/local-fx.json, so this row stays
-  // on the catalog read at the start of step 6. Absent is skip and does not change the art row above.
-  add(local.fx.state, '官方特效清单（可选）', local.fx.detail);
+  // [ASSUMED] --local includes used effects. A new plugin reference is a separate opt-in gap on update/startup.
+  const missingFx = checkPluginFx();
+  const fxClient = opts.local === 'no' ? null : findClient(opts.game);
+  const gapKey = missingFx.join(',');
+  let fxAnswer = false;
+  if (missingFx.length && fxClient && !opts.check && opts.local !== 'no' && opts.local !== 'force' && !opts.yes && state.pluginFxDeclined !== gapKey) {
+    log(`Plugin effects missing locally: ${missingFx.join(', ')}`);
+    fxAnswer = await ask('Extract referenced official effects from the local game now?', false);
+    if (fxAnswer === false) saveState({ pluginFxDeclined: gapKey });
+  }
+  if (fxClient && pluginFxExtractionAllowed(opts, missingFx, fxAnswer)) {
+    const py = findPython(), venv = py && ensureVenv(py, log);
+    if (venv?.ok) {
+      const r = run(venv.python, [EXTRACT_PY, '--game', fxClient.path, '--only', 'fx', '--fx-set', 'used'], { env: PY_ENV });
+      if (r.ok) saveState({ pluginFxDeclined: '' });
+    }
+  }
+  const fxAfter = checkLocal().fx;
+  add(fxAfter.state, '官方特效清单（可选）', fxAfter.detail);
+  const fxGap = checkPluginFx();
+  if (fxGap.length) add('warn', 'Plugin official effects', `Missing ${fxGap.join(', ')}; run node tools/setup.mjs --local with a local game install.`);
 
   // 7. official battlefield scenes (optional; the full zip ships them, a lite / source install may fetch them)
   if (opts.scenes !== 'no') {

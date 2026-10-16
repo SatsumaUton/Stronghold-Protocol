@@ -456,6 +456,83 @@ set, 2 MB copied by references per plugin and 4 MB per set, the lock's limits ab
 **Start from** `plugins/_template/cosmetic/` — two original CC0 files (a checkerboard PNG and a short synthesized OGG) plus installed-art references. Never put files
 of the official game in a plugin.
 
+### Operator effects (0.3.1)
+
+An operator record can borrow official effects independently of its model:
+`"fx": { "unit": "char_112_siege", "skills": { "0": "skchr_siege_3" } }`.
+`unit` is an extracted index unit key; `skills` maps our zero-based slot or exact skill id to an official skill id.
+The slot wins [ASSUMED]. Explicit unit/skill mappings precede the existing fallback chain. Attacks, projectiles,
+hits, skill start/loop/end and base-talent visuals use the existing official renderer (3D); no gameplay is inherited.
+Module visuals still require that module. Missing units/skills fall through, with one console note for a missing
+unit. Studio/check warn about locally absent units; malformed declarations refuse the plugin.
+
+`setup --local` now also extracts used effects. Startup/update setup discovers official character references in
+installed plugins' declared JSON (`fx.unit`, `origin.charId`, `art.ref`, `art.assets`, official-format charIds and asset
+references), including characters absent from our roster. The Python extractor calls the same repository-owned JSON
+reader: no plugin module is loaded. A new reference missing from `public/assets/local/fx/index.json` asks for a
+re-extract, default **no**; typed yes, `--local` or `--yes` authorizes it. `--check`/`--no-local` never extract.
+A declined reference set is remembered; a different set can ask again [ASSUMED]. Missing client bundles remain
+unavailable; extracted files stay ignored. Discovery caps [ASSUMED]: 256 folders, 64 declared JSON files per plugin,
+8 MiB per file, 24 levels and 100,000 values per document.
+
+A cosmetic plugin, or a content plugin's own assets, can put this inside its `assets` object/file:
+
+```json
+{"fx": {
+  "flipbooks": {"flash": {"image":"fx/sheet.png", "frames":8, "cols":4, "fps":16,
+    "anchor":[0.5,0.5], "scale":1, "blend":"add", "loop":false}},
+  "bind": {"char_x_my_pack_guard": {"0": {"skillStart":"flash", "hit":"flash"}}}
+}}
+```
+
+Bindings select unit → zero-based skill slot or exact id → `skillStart`, `skillLoop`, `skillEnd`, `attack`, `hit`,
+`projectile`. Referenced effect IDs must exist in the bundle. Units must belong to this plugin or a declared
+dependency [ASSUMED]; official units cannot be overwritten. Every runtime unit/skill/prefab/texture key is namespaced as
+`plugin:<plugin-id>:<local-id>`. Files and declarations are pinned by the existing visual `files`/`writes` hashes.
+
+Flipbooks use Pixi sprites on **both boards**, obey 官方特效 (off hides them), and advance in battle seconds
+[ASSUMED]. Frames read left-to-right, top-to-bottom, skipping unused cells; image dimensions must divide the grid.
+Defaults [ASSUMED]: anchor `[0.5,0.5]`, scale `1` (one tile wide), blend `normal`, loop `false`. Skill loops stop on
+skill end/death. Other looping books stop after one cycle unless a duration is supplied. Projectile bindings use
+generic projectile speed and play hit on arrival [ASSUMED: events carry no authoritative arrival time]. Without a
+custom projectile, ranged hit bindings use the same estimated arrival time. Melee hit bindings use the damage event.
+[ASSUMED] Ranged target sparks are reserved through arrival plus 0.35 s; the damage tuple has no source id.
+
+Compiled effects add `"index":"fx/index.json"`. This version-3 `fx-index` fragment contains `units`, `skills`,
+`prefabs` and `textures: {"sheet":{"file":"fx/sheet.png"}}`. Prefabs are version-1 `fx-prefab` JSON under `fx/`,
+following [the extracted format](design/vfx-format.md), with this validated subset:
+
+- Units: `kind:"char"`, skills, modes, optional startEffect/deadEffect. Skill copies match index.skills.
+- Skills: uses (`keys`, role, from, optional ability/oneshot), optional mode/rootClass. Roles: start/loop/end/hit/cast.
+  Mode attacks have cast/hit rows (`effects`, optional oneshot/startEvent/endEvent).
+- Parent-first nodes, transforms, built-in Quad meshes or particle systems, renderer material indices, and optional
+  ParticleEffect behaviour (`_isLoop`, `_maxLifetime`, `_spawnLocation`, `_delayToPlay`, `_delayToFinish`, `_rotateType`).
+- Scalar InitialModule lifetime/speed/size/color/capacity and EmissionModule rate/bursts. Built-in additive/alpha
+  particle materials only. No prewarm, scripts, shader source, URLs, custom meshes, clips, subemitters or effect chains.
+
+Unsupported components fail validation. Compiled effects remain 3D-only. All author limits are **[ASSUMED]**:
+256 files/32 MiB per bundle; 1 MiB per JSON/4 MiB JSON total; 64 units; 128 effects/textures; 64 nodes, 16 systems,
+1,024 particles and 32 emitters per prefab; 256 particles/system, 16 bursts/system, rate ≤256/s, lifetime ≤30s,
+speed/size/simulation-speed ≤8, delays ≤30s, burst repeats 1–16 with interval 0.01–30s, numeric values within ±10,000. Textures: 8-bit RGB/RGBA PNG, dimensions ≤2,048 (no SVG/JPEG/WebP).
+Flipbooks: 1–256 frames, 0.1–60 fps, anchor 0–1, scale 0.01–8, normal/add blend; 128 live custom instances,
+600-second held loops. Existing renderer tier/particle caps still apply. Removing a visual set clears its effects.
+
+DSL: `{"fx":{"kind":"plugin","id":"flash","at":"self","dur":0.4}}` draws an effect in the same plugin's
+assets. The loader compiles this into the existing plain fx event, kind `plugin`, effect address in `extra.skill`,
+anchor unit id in `extra.id`. Absent effects are visual no-ops. Cross-plugin addresses are not accepted [ASSUMED];
+use cosmetic bindings. Loader/client extensions live outside the hashed shared/sim source, preserving vanilla and
+old plugin content hashes. Only sets using new fields gain new data/visual hashes.
+
+Forge `fx.silentPhases` imports to `assets.fx.silentPhases`: union with built-in silent kinds, suppressing only the
+procedural phase flash; model form changes remain. Empty lists produce nothing; unknown fields remain named skips.
+At most 128 identifier-like names [ASSUMED].
+
+Review saved files in `/studio/`: **试一场 → 单干员对木桩 → 优先使用插件的新干员 → 开始对照**. Effect replays carry
+actual plugin render records and hashed preview assets. **画面** switches 3d/2d; **官方特效** switches off/lite/full
+(switching restarts playback). Check skill start/loop/end, attacks, moving projectiles/hits, pause/replay and removal.
+Official mappings need local extraction. `/studio/console.html` stays vanilla-only: use the borrowed official
+operator there as a reference. API names are in [PLUGIN-API.md](PLUGIN-API.md).
+
 ## 10. Data plugins (P1b)
 
 A `content` plugin is now `loaded`: the registry snapshots its declared JSON; `buildContentSet` applies the selected
@@ -1581,7 +1658,8 @@ Modules (`statsBase`, `traitBase`, `talentsBase`), new garrisons and bonds remai
 | any other panel mount | manual adaptation report | `PLUGIN_FORGE_MOUNT`; panel name, Forge mount and suggested rewrite slot |
 | a panel with `wraps`, or `readonly` / `readOnly: false` | — | it rewrites a component, so it is not read-only |
 | the panel's script | not copied. The stub answers welcome with ready, then slot and resize, and says the author must rewrite it to postMessage API v1 | `PLUGIN_FORGE_PANEL_SCRIPT` |
-| `server`, `routes`, `assets` (`.spresources`), `forms`, `fx`, `variants`, `behaviour`, `playtest`, `support`, `combat: true`, `layer` | — | engine replacement, protocol, server logic, or a switch this manifest has no field for. One reason each, in Chinese and in English |
+| `fx.silentPhases` | `assets.fx.silentPhases`: union with built-in phase names; only the generic phase flash is suppressed | invalid names or more than 128 entries; other `fx` fields are reported as skipped |
+| `server`, `routes`, `assets` (`.spresources`), `forms`, other `fx`, `variants`, `behaviour`, `playtest`, `support`, `combat: true`, `layer` | — | engine replacement, protocol, server logic, or a switch this manifest has no field for. One reason each, in Chinese and in English |
 | any other `.js` `.mjs` `.cjs` `.ts` `.jsx` `.tsx` | not imported and not executed | `PLUGIN_FORGE_SCRIPT` |
 | a file `pack.json` does not reference | — | named in the report, except a loose music file whose basename is a bgm track |
 
