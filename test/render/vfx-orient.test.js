@@ -202,6 +202,14 @@ describe('the rotation an effect takes from its spawn location', () => {
     nearV(quatRotate(r, [0, 0, 1]), [0, -CAM_FWD[1], -CAM_FWD[2]], 1e-6, '… about the tilted up axis');
   });
 
+  test('a point on the ground (a kit fx\'s tile, a projectile\'s target tile) is a map position: the prefab root keeps its own rotation', async () => {
+    const def = compileEffect(standing({ _spawnLocation: 1 }));
+    const { w, spawned } = await wired({ fx: def });
+    w.playOn('fx', { id: 'fx:point', x: 5, y: 10, z: 0 }, {});
+    assert.equal(spawned[0].place.rootRot, null, 'no rotation given (Effect._InitLocation)');
+    assert.equal(spawned[0].place.mountRot, null);
+  });
+
   test('a chained effect (OnPlayEmitter) takes its own spawn location\'s rotation, not its parent\'s', async () => {
     const child = compileEffect(standing({ _spawnLocation: 5 }));
     const parent = compileEffect(standing({ _spawnLocation: 1 }, [{ class: 'OnPlayEmitter', enabled: true, fields: { _effects: ['child'] } }]));

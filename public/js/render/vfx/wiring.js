@@ -508,6 +508,9 @@ export class FxWiring {
     const pose = this.pose(v);
     pose.strike = !!o.strike;
     let P = this._placing(def, def ? null : this.idx?.prefabs?.[k] || null, o);
+    // (a point on the ground — a kit fx's tile, a projectile's target tile — is a map position, no unit: the client's
+    // Effect._InitLocation sets no rotation, the prefab root keeps its own)
+    if (!v.info) P.loaded = false;
     const pos = P.fmp ? mountPoint(skin, P.fmp.mount, pose) : spawnPoint(skin, P.spawn, pose);
     const ground = (v.z || 0);
     if (P.onGround) pos[2] = -ground;
@@ -531,6 +534,7 @@ export class FxWiring {
             // loaded now: its own placement (a FollowOwner, `_keepOriginRotation`), and once the rotation and the
             // direction it takes at its spawn (a mount point's, FLIP_TWO_SIDE, towards the target)
             P = this._placing(d, null, o);
+            if (!v.info) P.loaded = false;
             const pl = { yaw: fx.yaw, mirror: fx.mirror, flipY: fx.flipY, mountRot: null, rootRot: null };
             this._rotate(P, pl, skin, pose);
             this._orient(d, pl, pose, o, v);
@@ -544,6 +548,7 @@ export class FxWiring {
           Q = chained.get(fx.def);
           if (!Q) {
             chained.set(fx.def, Q = this._placing(fx.def, null, {}));
+            if (!v.info) Q.loaded = false;
             // its rotation is its own spawn location's (the client plays it on the unit as any other effect), not its
             // parent's
             const pl = { mountRot: null, rootRot: null };
@@ -556,7 +561,7 @@ export class FxWiring {
           mountPoint(skin, G.follow.mount, p, fx.anchor);
           if (G.onGround) fx.anchor[2] = -(v.z || 0);
           fx.groundZ = -(v.z || 0);
-          if (Q.rotFollow) fx.mountRot = mountRotation(skin, Q.rotKind, p, fx.mountRot || [0, 0, 0, 1]);
+          if (Q.rotFollow && Q.loaded) fx.mountRot = mountRotation(skin, Q.rotKind, p, fx.mountRot || [0, 0, 0, 1]);
         } else if (stick && v.alive !== false) {
           const sp = spawnPoint(skin, P.spawn, p);
           fx.anchor[0] = sp[0]; fx.anchor[1] = sp[1]; fx.anchor[2] = P.onGround ? -(v.z || 0) : sp[2];
