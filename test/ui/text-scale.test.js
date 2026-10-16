@@ -161,13 +161,13 @@ describe('文字大小: the setting', () => {
     assert.match(src.slice(fx, fx + 120), /const OFFICIAL_FX = \[\['off', N_\('关'\)\], \['lite', N_\('精简'\)\], \['full', N_\('完整'\)\]\];/);
   });
 
-  test('语音语言 is one grid (four across, or two by two) and 本土语言 stays beside it', () => {
+  test('语音语言 wraps four across or two by two (never 3 + 1) and 本土语言 stays beside it, without a container query', () => {
     const css = read('public/css/screens/game.css');
-    assert.match(css, /\.set-voice \{[^}]*container-type: inline-size; container-name: setvoice; \}/);
-    assert.match(css, /\.set-voice \.set-seg \{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
-    assert.match(css, /\.set-voice \.set-seg button \{[^}]*min-width: 0/);
+    assert.match(css, /\.set-voice \{[^}]*display: flex; flex-wrap: nowrap;/);
+    assert.match(css, /\.set-voice \.set-seg \{[^}]*display: flex; flex-wrap: wrap; gap: 1px;/);
+    assert.match(css, /\.set-voice \.set-seg button \{[^}]*min-width: 0;[^}]*flex: 1 1 clamp\(calc\(25% - 1px\), \(2\.4rem - 100%\) \* 999, calc\(50% - 1px\)\)/);
     assert.match(css, /\.set-native \{[^}]*display: inline-flex/);
-    assert.match(css, /@container setvoice \(max-width: 3\.4rem\) \{\s*\.set-voice \.set-seg \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+    assert.doesNotMatch(css, /@container|container-type/);
     assert.match(css, /\.set-seg\.set-textsize button \{ min-width: \.62rem; \}/, '文字大小 keeps its own button width');
   });
 });

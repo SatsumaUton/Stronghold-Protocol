@@ -620,14 +620,16 @@
 .set-toggle.is-on i::after { transform: translateX(.22rem); background: var(--mint-400); }
 .set-seg { grid-column: 2 / 4; justify-self: start; display: flex; flex-wrap: wrap; max-width: 100%; border: 1px solid var(--line-2); }
 /* 语音语言: the four endonyms plus the 本土语言 switch. A flex wrap left 한국어 on a row of its own (four .8rem
-   minima squeezed by the switch). The group is a 4-column grid (min-width 0, so a button cannot leave the row).
-   Under 3.4rem of this row it becomes 2×2 — still one segmented control, never a single orphan.
-   [ASSUMED] 3.4rem: the usual control column (desktop, and a phone around 844 px where 1rem is 40 px) is wider,
-   so the four names stay on one row beside 本土语言. Container queries need Safari 16+; without them the
-   4-column grid still cannot orphan one button. */
-.set-voice { grid-column: 2 / 4; justify-self: stretch; display: flex; flex-wrap: nowrap; align-items: stretch; gap: .08rem; max-width: 100%; min-width: 0; container-type: inline-size; container-name: setvoice; }
-.set-voice .set-seg { grid-column: auto; flex: 1 1 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 0; }
-.set-voice .set-seg button { min-width: 0; padding: 0 .04rem; overflow-wrap: anywhere; }
+   minima squeezed by the switch). The group wraps its four buttons four across or two by two, never 3 + 1: each
+   button's basis is clamp(25 %, (2.4rem − 100 %) × 999, 50 %) of the group — hugely negative (→ 25 %, four across)
+   while the group is wider than 2.4rem, hugely positive (→ 50 %, two by two) below it. The group's 1 px gaps over
+   its line-coloured background draw the dividers in both layouts. No container query (the CSS stays within the
+   supported browsers, test/client-static.test.js).
+   [ASSUMED] 2.4rem of the group (about 0.6rem a button): the usual control column (desktop, and a phone around
+   844 px where 1rem is 40 px) is wider, so the four names stay on one row beside 本土语言. */
+.set-voice { grid-column: 2 / 4; justify-self: stretch; display: flex; flex-wrap: nowrap; align-items: stretch; gap: .08rem; max-width: 100%; min-width: 0; }
+.set-voice .set-seg { grid-column: auto; flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 1px; min-width: 0; background: var(--line-2); }
+.set-voice .set-seg button { min-width: 0; padding: 0 .04rem; overflow-wrap: anywhere; border-right: 0; flex: 1 1 clamp(calc(25% - 1px), (2.4rem - 100%) * 999, calc(50% - 1px)); }
 .set-native { flex: none; display: inline-flex; align-items: center; justify-content: center; min-height: .38rem; padding: 0 .12rem; background: #0a0d0c; border: 1px solid var(--line-2); color: var(--text-lo); font-size: calc(.16 * var(--t)); cursor: pointer; }
 .set-native.is-on { background: var(--mint-500); color: var(--text-on-mint); font-weight: 700; }
 .set-seg button { flex: 1 1 auto; min-width: .8rem; min-height: .38rem; height: auto; white-space: normal; background: #0a0d0c; border: 0; border-right: 1px solid var(--line-2); color: var(--text-lo); font-size: calc(.16 * var(--t)); }
@@ -635,13 +637,6 @@
    the group would be wider than the row's 1fr column on a phone (1rem = 40 px) */
 .set-seg.set-textsize button { min-width: .62rem; }
 .set-seg button:last-child { border-right: 0; }
-/* the narrow 语音语言 group: two and two, with the 本土语言 switch still stretched beside it */
-@container setvoice (max-width: 3.4rem) {
-  .set-voice .set-seg { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .set-voice .set-seg button { border-bottom: 1px solid var(--line-2); }
-  .set-voice .set-seg button:nth-child(2n) { border-right: 0; }
-  .set-voice .set-seg button:nth-child(n + 3) { border-bottom: 0; }
-}
 .set-seg button.is-on { background: var(--mint-500); color: var(--text-on-mint); font-weight: 700; }
 .set-hint { margin-top: .06rem; font-size: calc(.14 * var(--t)); color: var(--text-dim); line-height: 1.8; }
 .set-hint kbd, .lvcard__key, .toolbtn kbd { font-family: var(--font-num); font-size: .11rem; border: 1px solid var(--line-2); padding: 0 .04rem; color: var(--text-lo); background: rgba(0, 0, 0, .3); }
