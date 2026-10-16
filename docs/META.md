@@ -807,8 +807,13 @@ Every enemy still alive at the end (leaked again, or never spawned before the li
 `uniteRuntime` (sim/battle/spawns.js) and it is neither billed nor shown in the live counter. That tag is about billing
 only: `counted` reads as on any field, so a helper's knock-out of such an enemy still counts in the match's `stats.kills`
 and in its `killed`. A client-run 联防 result may still bill a survivor only to a leaker who sent that enemy in, and only
-for what the wave itself sent; the parents' data offspring count (磨砻 2, 烹泉 4 …; fields.js offspringPerParent) stays the
-plausibility ceiling of a reported split (the client reports `uniteRuntime` per leak and the server keeps it).
+for what the wave itself sent. A leak marked `uniteRuntime` is accepted only by spending the offspring budget the
+parents' data allows (official `levels/enemydata/enemy_database.json` talent blackboards `DeadSpawn.enemy_key` /
+`DeadSpawn.cnt`: 磨砻 2, 烹泉 4 …; fields.js offspringPerParent / `takeDerived`); otherwise the result is refused
+(`unite runtime`) and the server re-simulates. The flag is copied only after that take, and only when the spec is a
+联防 — a forged flag on a normal field is dropped, not stored. [ASSUMED] This budget cannot prove origin: a key that
+is both a scheduled body and another enemy's child (27 such keys in the current tables) can still be flagged within
+that offspring cap; only `SP_VERIFY=all` closes that.
 **Live counter** (user playtest #6 item 7; PRTS 卫戍协议/帮助 "防卫失败的玩家可通过上方信息栏确认自身所属敌人的剩余数量"):
 while the 联防 runs, each leaker's `m.public players[].uniteLeft` = its enemies still standing on the field (not spawned
 yet, alive, or through again) + its leaks that could not re-enter — what settlement would charge before the cap —
@@ -816,10 +821,10 @@ and `pendingLp` = min(`lpCapPerRound`, uniteLeft) (`Match._uniteLeft`). Sources:
 (`{ [leakerId]: n }`, server/sim/spec.js `uniteLeft` / `battleProgress`), the server-run field's timeline samples
 (`fields.js timelineSample`: `[gt, killed, total, left]`) read on the field clock, or the streamed battle itself
 (legacy mode; `_uniteTick` republishes about once a game second); exact from the field's result once it is done
-(`uniteSurvivors`). Live values are clamped to what settlement can bill that leaker (`fields.js uniteBillBounds`: sent
-in + the offspring bound). It only ever falls, as the helpers strike the sent-in enemies down — a split or a summon adds
-nothing (spawns.js tags a runtime spawn `uniteRuntime`); every client that has the 联防 field on screen shows its
-local replica's counts while it runs — the
+(`uniteSurvivors`). Live values are clamped to what the escaped wave sent that leaker (`fields.js uniteBillBounds`:
+`keySourceCounts` only — the same set settlement bills). It only ever falls, as the helpers strike the sent-in enemies
+down — a split or a summon adds nothing (spawns.js tags a runtime spawn `uniteRuntime`); every client that has the
+联防 field on screen shows its local replica's counts while it runs — the
 leaker's own capsule / row (`ui/hud.js uniteRemaining`) and the leakers' team rows (`ui/teamPanel.js rowLp`
 `uniteLocal`, the battle runner's `state().uniteLeft`) — else this value. The settled loss stays min(10, survivors).
 

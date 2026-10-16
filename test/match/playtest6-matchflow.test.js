@@ -13,6 +13,7 @@ import { createRng } from '../../server/sim/rng.js';
 import { Battle } from '../../server/sim/Battle.js';
 import { uniteLeft, battleProgress } from '../../server/sim/spec.js';
 import { uniteSurvivors } from '../../server/match/unite.js';
+import { uniteBillBounds } from '../../server/match/fields.js';
 import { attachSimClients } from './simClient.js';
 
 // =====================================================================================================================
@@ -451,6 +452,22 @@ test('#7 a leaked enemy that splits (磨砻: DeadSpawn ×2) does NOT raise the c
   assert.equal(lp - leaker.lp, Math.min(10, last), `settled LP loss = min(10, ${last} left)`);
   assert.equal(lp - leaker.lp, 0, 'nothing of what the wave sent in survived ⇒ the leaker pays no LP at all');
   h.m.dispose();
+});
+
+test('#7 the live ×N is clamped to what the escaped wave sent, not sent + offspring', () => {
+  const MOLONG = 'enemy_1195_sfyin'; // DeadSpawn 2: the old clamp was sent + 2
+  const SENT = 1;
+  const h = makeMatch({ mode: 'coop', difficulty: 'NORMAL', humans: 2, seed: 711, instant: false, clientCombat: true, clients: false });
+  h.start();
+  enterUnite(h, 'p_1', MOLONG, SENT);
+  const m = h.m;
+  const f = m.fields.find((x) => x.kind === 'unite');
+  assert.equal(f.mode, 'client');
+  assert.equal(uniteBillBounds(m.unitePlan.leaked, m.gd).get('p_1'), SENT);
+  assert.deepEqual(m.handle(f.authority, { t: 'b.progress', battleId: f.battleId, gt: 1, killed: 0, total: SENT, leaks: 0, left: { p_1: 99 } }), { ok: true });
+  assert.equal(f.progress.left.p_1, 99, 'the raw report is stored');
+  assert.equal(pubOf(m, 'p_1').uniteLeft, SENT, 'a reported 99 is clamped to the 1 the wave sent, not 1 + the 磨砻\'s 2 children');
+  m.dispose();
 });
 
 // =====================================================================================================================
