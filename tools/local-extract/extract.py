@@ -48,7 +48,7 @@ aklz4.py registers a decoder for it. This script pulls the art the web sources l
 Usage:
   python3 -m venv .venv && .venv/bin/pip install -r tools/local-extract/requirements.txt
   .venv/bin/python tools/local-extract/extract.py [--game <AB root>] [--out public/assets/local] [--only <subdir prefix>]
-  python3 tools/local-extract/extract.py --print-jobs     (the job table as JSON; needs no dependencies)
+  python3 tools/local-extract/extract.py --print-jobs     (the job table as JSON, including expectedGroups; needs no dependencies)
   python3 tools/local-extract/extract.py --webp           (only the WebP copies of the board textures and the guide
                                                           pages, from the PNGs already extracted — e.g. the local art
                                                           copied from a release bundle; needs Pillow)
@@ -786,6 +786,24 @@ def scene_ids(only):
     return spine_ids(only, scenes.SCENE_SUB, [sid for sid, _deps in scenes.SCENES])
 
 
+def expected_local_groups():
+    """Group keys a full extract writes into data/local-assets.json (no --only; fx stays out — fx.py FX_GROUPS).
+
+    One key per JOBS output subdir, plus spine/enemy/<id>, spine/token/<id>, scene/<stageId> and scene/tex.
+    Derived maps and WebP copies are files inside those groups, not new keys. Sorted. setup's
+    tools/local-extract/expected.mjs is this list; test/setup-local-freshness.test.js keeps the copy honest.
+    `extract.py --print-jobs` prints it and needs no game client.
+    """
+    keys = [job[1] for job in JOBS]
+    keys += [f'{ENEMY_SPINE_SUB}/{i}' for i in ENEMY_SPINES]
+    keys += [f'{TOKEN_SPINE_SUB}/{i}' for i in TOKEN_SPINES]
+    keys += [f'{scenes.SCENE_SUB}/{sid}' for sid, _deps in scenes.SCENES]
+    keys.append(scenes.TEX_SUB)
+    if len(keys) != len(set(keys)):
+        raise RuntimeError('expected local groups are not unique')
+    return sorted(keys)
+
+
 def scene_roots(ab_root, extra):
     """AB roots searched for the scene bundles, in order: the client, --scenes dirs, then every version kept under
     .cache/official-scenes (newest name first)."""
@@ -919,8 +937,10 @@ def main():
                                         'options': GUIDE_WEBP_OPTIONS[GUIDE_WEBP_MODE]},
                           'enemySpines': {'bundles': ENEMY_ART, 'sub': ENEMY_SPINE_SUB, 'ids': ENEMY_SPINES},
                           'tokenSpines': {'bundles': TOKEN_PACKS, 'sub': TOKEN_SPINE_SUB, 'ids': TOKEN_SPINES},
-                          'fx': {'sub': fx.FX_SUB, 'version': fx.FORMAT_VERSION, 'indexVersion': fx.INDEX_VERSION,
-                                 'meshVersion': fx.MESH_VERSION, 'optIn': True,
+                          'expectedGroups': expected_local_groups(),
+                          'fx': {'sub': fx.FX_SUB, 'groups': list(fx.FX_GROUPS), 'version': fx.FORMAT_VERSION,
+                                 'indexVersion': fx.INDEX_VERSION, 'meshVersion': fx.MESH_VERSION,
+                                 'manifestVersion': fx.MANIFEST_VERSION, 'optIn': True,
                                  'sample': {'keys': fx.FX_SAMPLE_KEYS, 'units': fx.FX_SAMPLE_UNITS,
                                             'coverage': fx.FX_COVERAGE_KEYS}},
                           'scenes': {'sub': scenes.SCENE_SUB, 'tex': scenes.TEX_SUB,

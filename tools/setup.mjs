@@ -15,11 +15,13 @@
 //      bottle or PlayCover on macOS, or --game <dir>) with tools/local-extract/extract.py in a project-local Python
 //      venv (.venv-extract), then the board tile crops (tools/crop-board-atlas.mjs → tiles.json). Asked once on a
 //      terminal (the answer is remembered in .cache/setup-state.json; without a terminal it is skipped); never fatal.
-//   7. Optional: the eleven official battlefield scenes (0.2.5 asset pack). The full release zip already contains
+//   7. Optional: the eleven official battlefield scenes. The full release zip already contains
 //      them when the maintainer extracted them. A lite package or a source install may download the in-season bundles
 //      (tools/local-extract/fetch_scenes.py) and extract them (extract.py --only scene). Missing Python or
 //      UnityPy / lz4 / Pillow is a warning: the 3D board keeps the metal tiles. --scenes does it without asking;
-//      --no-scenes skips it. The answer is remembered like step 6.
+//      --no-scenes skips it. The answer is remembered like step 6. A manifest that is missing a group this version's
+//      extractor writes, or an official-effects catalog (data/local-fx.json) whose groups, entry count or version
+//      disagree, is reported (re-run with --local, or --scenes for the battlefields, or extract.py --only fx).
 //
 // Options:
 //   --check          report only, change nothing (exit 1 when something essential is missing)
@@ -46,6 +48,7 @@ import readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validateSource } from './assets/network.mjs';
+import { EXPECTED_FX, EXPECTED_LOCAL_GROUPS } from './local-extract/expected.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const MIN_NODE = 22;
@@ -216,23 +219,148 @@ export const LOCAL_ART_FALLBACK = '3D 棋盘改用 2D，部分官方界面图标
  * printed on every start by scripts/launch.mjs, only points to that section). */
 export const LOCAL_ART_COPY_HINT = '没有客户端的服务器可以从同一版本的整合包（完整包）复制 public/assets/local 和 data/local-assets.json';
 
+const LOCAL_FX = path.join(ROOT, 'data', 'local-fx.json');
+/** Scene groups a full extract writes: one `scene/<stageId>` per battlefield, plus the shared `scene/tex`. */
+const EXPECTED_SCENE_GROUPS = EXPECTED_LOCAL_GROUPS.filter((g) => g.startsWith('scene/'));
+const EXPECTED_SCENE_STAGES = EXPECTED_SCENE_GROUPS.filter((g) => g !== 'scene/tex');
+const LOCAL_REEXTRACT = 'node tools/setup.mjs --local';
+const SCENE_REEXTRACT = 'node tools/setup.mjs --scenes';
+const FX_REEXTRACT = 'python tools/local-extract/extract.py --only fx --fx-set used';
+
+function groupEntryCount(groups) {
+  if (!groups || typeof groups !== 'object') return 0;
+  let n = 0;
+  for (const g of Object.values(groups)) if (g && typeof g === 'object') n += Object.keys(g).length;
+  return n;
+}
+
+/** Up to three group keys, then 「等 N 个」 when more are missing. */
+function formatMissing(keys) {
+  const shown = keys.slice(0, 3);
+  return shown.join('、') + (keys.length > shown.length ? ` 等 ${keys.length} 个` : '');
+}
+
 /**
- * Local-client art (optional): manifest entry count, whether the 3D board atlas is on disk and whether the extraction
- * has the enemy and token models only the client has (`spine/enemy/*` groups, extract.py ENEMY_SPINES — added after
- * 0.1.0; `spine/token/*` groups, TOKEN_SPINES — added in 0.2.0).
+ * Compare a local-assets manifest and an optional fx catalog with the groups this version's extractor writes
+ * (tools/local-extract/expected.mjs, from extract.py --print-jobs; no game client). Does not touch the disk.
+ *
+ * [ASSUMED] A job-table group key is expected after a full extract. A client missing one bundle still gets
+ * "re-run --local". Extra local-assets groups are leftovers from an earlier --only merge and are not stale.
+ * There is no canonical file count (it depends on the client): compare group keys, and report the entry count
+ * the user has. A numeric `count` that disagrees with the listed entries is stale; a missing `count` is not.
+ * fx or fx/* keys left inside local-assets do not satisfy the fx catalog. See fxCatalogReport for the catalog.
  */
-export function checkLocal() {
-  const m = readJson(LOCAL_MANIFEST);
-  const count = m && m.groups ? Object.values(m.groups).reduce((n, g) => n + Object.keys(g || {}).length, 0) : 0;
-  const has = (prefix) => !!(m && m.groups && Object.keys(m.groups).some((g) => g.startsWith(prefix)));
+export function assessLocal(manifest, fxDoc) {
+  const groups = manifest && manifest.groups && typeof manifest.groups === 'object' ? Object.keys(manifest.groups) : [];
+  const have = new Set(groups);
+  const missingGroups = EXPECTED_LOCAL_GROUPS.filter((g) => !have.has(g));
+  const count = groupEntryCount(manifest && manifest.groups);
+  const countField = manifest && Number.isFinite(manifest.count) ? manifest.count : null;
+  const countMismatch = !!(manifest && countField !== null && countField !== count);
+  const missingSceneGroups = missingGroups.filter((g) => g.startsWith('scene/'));
+  const enemyIds = EXPECTED_LOCAL_GROUPS.filter((g) => g.startsWith('spine/enemy/'));
+  const tokenIds = EXPECTED_LOCAL_GROUPS.filter((g) => g.startsWith('spine/token/'));
   return {
-    manifest: !!m, count, board3d: exists(LOCAL_BOARD_ATLAS), tiles: exists(LOCAL_BOARD_TILES), enemySpines: has('spine/enemy/'),
-    tokenSpines: has('spine/token/'), scenes: has('scene/act'), dirPresent: exists(path.join(ROOT, 'public', 'assets', 'local')),
+    manifest: !!manifest,
+    count,
+    groupCount: groups.length,
+    expectedGroupCount: EXPECTED_LOCAL_GROUPS.length,
+    missingGroups,
+    countMismatch,
+    countField,
+    scenes: !!manifest && missingSceneGroups.length === 0,
+    sceneStagesHave: EXPECTED_SCENE_STAGES.filter((g) => have.has(g)).length,
+    sceneStagesExpected: EXPECTED_SCENE_STAGES.length,
+    sceneGroupHave: EXPECTED_SCENE_GROUPS.filter((g) => have.has(g)).length,
+    sceneGroupExpected: EXPECTED_SCENE_GROUPS.length,
+    missingSceneGroups,
+    enemySpines: enemyIds.length > 0 && enemyIds.every((g) => have.has(g)),
+    tokenSpines: tokenIds.length > 0 && tokenIds.every((g) => have.has(g)),
+    // No manifest is "not extracted" (skip), not a stale extract. Callers warn only when manifest is set.
+    stale: !manifest || missingGroups.length > 0 || countMismatch,
+    fx: fxCatalogReport(fxDoc),
   };
 }
 
-/** What an extraction made by an older extract.py lacks (setup's 本地客户端美术 row; re-extract with --local). */
+/**
+ * Official-effects catalog (data/local-fx.json). Absent is opt-in: state skip, and it does not make the art row stale.
+ * [ASSUMED] Present-but-wrong groups, entry count, wrapper version, format or index version is a warning. The group
+ * set must be exactly FX_GROUPS (an extra fx group is stale: a full fx run rewrites the catalog to those four keys).
+ * The catalog's index version is the version check; mesh and prefab files are not opened for MESH_VERSION /
+ * FORMAT_VERSION. `--local` does not extract fx, so the hint names the fx command.
+ */
+export function fxCatalogReport(doc) {
+  const expectGroups = EXPECTED_FX.groups;
+  const expectN = expectGroups.length;
+  const indexExpect = EXPECTED_FX.indexVersion;
+  if (!doc || typeof doc !== 'object') {
+    return {
+      present: false, stale: false, state: 'skip', groupCount: 0, listed: 0,
+      detail: `未提取：已有 0 个分组、0 项，这一版期望 ${expectN} 个分组（${expectGroups.join('、')}）、索引版本 ${indexExpect}。需要时 ${FX_REEXTRACT}`,
+    };
+  }
+  const raw = doc.groups && typeof doc.groups === 'object' ? doc.groups : {};
+  const groups = Object.keys(raw);
+  const listed = groupEntryCount(raw);
+  const missing = expectGroups.filter((g) => !Object.hasOwn(raw, g));
+  const extra = groups.filter((g) => !expectGroups.includes(g));
+  const indexVersion = raw.fx && raw.fx.index ? raw.fx.index.version : undefined;
+  const problems = [];
+  if (missing.length || extra.length || groups.length !== expectN) {
+    const bits = [`分组 ${groups.length} 个，期望 ${expectN} 个（${expectGroups.join('、')}）`];
+    if (missing.length) bits.push(`缺少 ${formatMissing(missing)}`);
+    if (extra.length) bits.push(`多出 ${formatMissing(extra)}`);
+    problems.push(bits.join('，'));
+  }
+  if (indexVersion !== indexExpect) problems.push(`索引版本 ${indexVersion ?? '无'}，期望 ${indexExpect}`);
+  if (doc.version !== EXPECTED_FX.manifestVersion) problems.push(`清单版本 ${doc.version ?? '无'}，期望 ${EXPECTED_FX.manifestVersion}`);
+  if (doc.format !== 'fx-manifest') problems.push(`格式 ${doc.format ?? '无'}，期望 fx-manifest`);
+  // [ASSUMED] The extractor always writes `count`. A missing or disagreeing count is stale; the number itself is not fixed.
+  const countField = Number.isFinite(doc.count) ? doc.count : null;
+  if (countField !== listed) problems.push(`清单写 ${countField ?? '无'} 项，分组里是 ${listed} 项`);
+  if (!problems.length) {
+    return {
+      present: true, stale: false, state: 'ok', listed, groupCount: groups.length, indexVersion,
+      detail: `已提取 ${listed} 项，${groups.length} 个分组，索引版本 ${indexVersion}`,
+    };
+  }
+  return {
+    present: true, stale: true, state: 'warn', listed, groupCount: groups.length, indexVersion,
+    detail: `已有 ${groups.length} 个分组、${listed} 项，这一版期望 ${expectN} 个分组、索引版本 ${indexExpect}（${problems.join('；')}），请重新运行 ${FX_REEXTRACT}`,
+  };
+}
+
+/**
+ * Local-client art (optional): manifest entry count, whether the 3D board atlas is on disk, and whether the
+ * manifest's group keys are the set this version's extractor writes (enemy and token models included). Also reads
+ * data/local-fx.json. Disk flags (board3d, tiles, dirPresent) are added here; assessLocal is the pure comparison.
+ */
+export function checkLocal() {
+  const assessed = assessLocal(readJson(LOCAL_MANIFEST), readJson(LOCAL_FX));
+  return {
+    ...assessed,
+    board3d: exists(LOCAL_BOARD_ATLAS),
+    tiles: exists(LOCAL_BOARD_TILES),
+    dirPresent: exists(path.join(ROOT, 'public', 'assets', 'local')),
+  };
+}
+
+/**
+ * What an extraction is missing, for setup's 本地客户端美术 row.
+ * An object with `missingGroups` (what checkLocal / assessLocal return) names group counts and up to three keys.
+ * An older caller that only sets the prefix flags still gets the flag sentence.
+ */
 export function localGaps(local) {
+  if (local && Array.isArray(local.missingGroups)) {
+    if (!local.missingGroups.length && !local.countMismatch) return '';
+    const groupCount = local.groupCount ?? 0;
+    const count = local.count ?? 0;
+    const expected = local.expectedGroupCount ?? EXPECTED_LOCAL_GROUPS.length;
+    let s = `，已有 ${groupCount} 个分组、${count} 项，这一版期望 ${expected} 个分组`;
+    if (local.missingGroups.length) s += `（缺少 ${formatMissing(local.missingGroups)}）`;
+    if (local.countMismatch) s += `，清单写 ${local.countField} 项，分组里是 ${count} 项`;
+    return `${s}，请重新运行 ${LOCAL_REEXTRACT}`;
+  }
   const gaps = [];
   if (local && !local.enemySpines) gaps.push('灼热/炽焰源石虫模型');
   if (local && !local.tokenSpines) gaps.push('自选召唤物模型');
@@ -240,18 +368,62 @@ export function localGaps(local) {
   return gaps.length ? `，缺少新版的${gaps.join('和')}` : '';
 }
 
+/** skip when nothing was extracted; warn when the manifest is present but stale; otherwise ok. */
+export function localArtState(local) {
+  if (!local?.manifest) return 'skip';
+  return local.stale ? 'warn' : 'ok';
+}
+
 /**
- * Whether setup should download and extract the official battlefield scenes (0.2.5 asset pack).
+ * The 已提取 row. A non-empty localGaps already names `--local`, so the fresh-extract hint is not repeated.
+ * `verb` is 「提取」 on the row printed immediately after a run, 「已提取」 when the files were already there.
+ */
+export function localArtDetail(local, tail = '', verb = '已提取') {
+  const gap = localGaps(local);
+  const again = verb === '已提取' ? '（重新提取：--local）' : '';
+  return `${verb} ${local.count} 项${tail}${gap}${gap ? '' : again}`;
+}
+
+/** Partial battlefield extract: have/expect battlefields, and scene/tex when that shared group is missing. */
+export function scenePartialDetail(o = {}) {
+  const have = o.sceneStagesHave ?? 0;
+  const expect = o.sceneStagesExpected ?? EXPECTED_SCENE_STAGES.length;
+  const missing = Array.isArray(o.missingSceneGroups) ? o.missingSceneGroups : [];
+  const stages = missing.filter((g) => g !== 'scene/tex');
+  let s = `已有 ${have} 个战场，这一版期望 ${expect} 个`;
+  if (stages.length) s += `（缺少 ${formatMissing(stages)}）`;
+  if (missing.includes('scene/tex')) s += '，缺少共用贴图 scene/tex';
+  return `${s}，请重新运行 ${SCENE_REEXTRACT}。没有的战场仍用金属地块`;
+}
+
+/** Doctor's scene clause: complete, partial (have/expect), or none. */
+export function scenePresencePhrase(local) {
+  if (local?.scenes) return '，已提取各战场官方场景';
+  if ((local?.sceneGroupHave || 0) > 0) return `，${scenePartialDetail(local)}`;
+  return '，无各战场官方场景（3D 棋盘用金属地块；node tools/setup.mjs --scenes）';
+}
+
+/**
+ * Whether setup should download and extract the official battlefield scenes.
  * The full release zip already contains them when the maintainer extracted them before packaging.
  * A lite package or a source install may fetch the in-season bundles on this machine and extract them.
  * Missing Python or UnityPy / lz4 / Pillow is not fatal: the 3D board keeps the metal tiles.
  * `client` is true (autochess bundles present), 'incomplete' (a client dir without them) or false.
- * @param {{ hasScenes?: boolean, client?: boolean|string, python?: boolean, deps?: boolean, check?: boolean, declined?: boolean, force?: boolean, yes?: boolean }} o
+ * `hasScenes` means every expected scene group is present, including scene/tex — not merely a scene/act prefix.
+ * A partial set (`sceneGroupHave` > 0, not force/yes) warns when the fetch is blocked and asks otherwise.
+ * Callers that omit `sceneGroupHave` keep the older branches (nothing extracted yet).
+ * @param {{ hasScenes?: boolean, sceneStagesHave?: number, sceneStagesExpected?: number, sceneGroupHave?: number, missingSceneGroups?: string[], client?: boolean|string, python?: boolean, deps?: boolean, check?: boolean, declined?: boolean, force?: boolean, yes?: boolean }} o
  * @returns {{ run: boolean, state: 'ok'|'skip'|'warn'|'ask', detail: string }}
  */
 export function sceneInstallPlan(o = {}) {
   if (o.hasScenes && !o.force) {
-    return { run: false, state: 'ok', detail: '已提取各战场官方场景（0.2.5 素材；某个战场没有文件时仍用金属地块）' };
+    const n = o.sceneStagesExpected ?? EXPECTED_SCENE_STAGES.length;
+    return { run: false, state: 'ok', detail: `已提取各战场官方场景（${n} 个战场；某个战场没有文件时仍用金属地块）` };
+  }
+  if (!o.hasScenes && (o.sceneGroupHave || 0) > 0 && !o.force && !o.yes) {
+    const detail = scenePartialDetail(o);
+    const blocked = o.check || o.client === 'incomplete' || !o.client || !o.python || o.deps === false || o.declined;
+    return { run: false, state: blocked ? 'warn' : 'ask', detail };
   }
   if (o.check) {
     return { run: false, state: 'skip', detail: '未提取各战场官方场景：3D 棋盘用金属地块（node tools/setup.mjs --scenes 可在本机下载并提取）' };
@@ -498,19 +670,19 @@ async function main() {
   // 6. local client (optional)
   const local = checkLocal();
   const state = loadState();
-  if (opts.local === 'no') add(local.manifest ? 'ok' : 'skip', '本地客户端美术（可选）', local.manifest ? `已提取 ${local.count} 项` : '已跳过（--no-local）');
+  if (opts.local === 'no') add(local.manifest ? localArtState(local) : 'skip', '本地客户端美术（可选）', local.manifest ? localArtDetail(local) : '已跳过（--no-local）');
   else {
     const client = findClient(opts.game);
     const already = local.manifest && local.dirPresent;
     if (!client) {
       if (already && local.board3d && !local.tiles && !opts.check) cropBoardTiles(log);
-      add(already ? 'ok' : 'skip', '本地客户端美术（可选）', already ? `已提取 ${local.count} 项`
+      add(already ? localArtState(local) : 'skip', '本地客户端美术（可选）', already ? localArtDetail(local, local.board3d ? '，3D 棋盘可用' : '')
         : `${opts.game ? `找不到 ${opts.game}` : '未检测到本机明日方舟客户端'}：${LOCAL_ART_FALLBACK}（见 docs/DEPLOY.md 第 6 节）`);
     } else if (!client.autochess) {
-      add(already ? 'ok' : 'warn', '本地客户端美术（可选）', `${client.kind} 客户端缺少卫戍协议资源（请在游戏内下载全部资源）：${client.path}`);
+      add(already ? localArtState(local) : 'warn', '本地客户端美术（可选）', `${client.kind} 客户端缺少卫戍协议资源（请在游戏内下载全部资源）：${client.path}${already ? localGaps(local) : ''}`);
     } else if (already && opts.local !== 'force') {
       if (local.board3d && !local.tiles && !opts.check) cropBoardTiles(log);
-      add('ok', '本地客户端美术（可选）', `已提取 ${local.count} 项${local.board3d ? '，3D 棋盘可用' : ''}${localGaps(local)}（重新提取：--local）`);
+      add(localArtState(local), '本地客户端美术（可选）', localArtDetail(local, local.board3d ? '，3D 棋盘可用' : ''));
     } else if (opts.check) {
       add('skip', '本地客户端美术（可选）', `检测到 ${client.kind} 客户端，可运行 node tools/setup.mjs --local 提取`);
     } else {
@@ -539,13 +711,16 @@ async function main() {
             const r = run(venv.python, [EXTRACT_PY, '--game', client.path], { env: PY_ENV });
             if (r.ok) cropBoardTiles(log);
             const after = checkLocal();
-            if (r.ok && after.manifest) { add('ok', '本地客户端美术（可选）', `提取 ${after.count} 项${after.board3d ? '，3D 棋盘可用' : ''}`); saveState({ localDeclined: false, localExtractedFrom: client.path }); }
+            if (r.ok && after.manifest) { add(localArtState(after), '本地客户端美术（可选）', localArtDetail(after, after.board3d ? '，3D 棋盘可用' : '', '提取')); saveState({ localDeclined: false, localExtractedFrom: client.path }); }
             else add('warn', '本地客户端美术（可选）', `提取未成功（退出码 ${r.code}）：游戏照常运行，${LOCAL_ART_FALLBACK}；可稍后重试 node tools/setup.mjs --local`);
           }
         }
       }
     }
   }
+  // fx is opt-in (extract.py --only fx). A plain --local does not write data/local-fx.json, so this row stays
+  // on the catalog read at the start of step 6. Absent is skip and does not change the art row above.
+  add(local.fx.state, '官方特效清单（可选）', local.fx.detail);
 
   // 7. official battlefield scenes (optional; the full zip ships them, a lite / source install may fetch them)
   if (opts.scenes !== 'no') {
@@ -554,12 +729,20 @@ async function main() {
     const scenePy = findPython();
     const clientFlag = sceneClient?.autochess ? true : (sceneClient ? 'incomplete' : false);
     let decision = sceneInstallPlan({
-      hasScenes: sceneLocal.scenes, client: clientFlag, python: !!scenePy, check: opts.check,
+      hasScenes: sceneLocal.scenes,
+      sceneStagesHave: sceneLocal.sceneStagesHave,
+      sceneStagesExpected: sceneLocal.sceneStagesExpected,
+      sceneGroupHave: sceneLocal.sceneGroupHave,
+      missingSceneGroups: sceneLocal.missingSceneGroups,
+      client: clientFlag, python: !!scenePy, check: opts.check,
       declined: !!loadState().sceneDeclined, force: opts.scenes === 'force', yes: opts.yes,
     });
     if (decision.state === 'ask') {
-      log(`\n${c.cyan('▶')} 各战场的官方场景还没提取（11 个战场；赛季场景包约 23 MB，贴图仍取自本机客户端）。`);
-      log('  下载并提取后，3D 棋盘按战场显示官方场景。没有提取依赖、下载失败或跳过时，仍用现在的金属地块。');
+      if ((sceneLocal.sceneGroupHave || 0) > 0) log(`\n${c.cyan('▶')} ${decision.detail}`);
+      else {
+        log(`\n${c.cyan('▶')} 各战场的官方场景还没提取（${sceneLocal.sceneStagesExpected} 个战场；赛季场景包约 23 MB，贴图仍取自本机客户端）。`);
+        log('  下载并提取后，3D 棋盘按战场显示官方场景。没有提取依赖、下载失败或跳过时，仍用现在的金属地块。');
+      }
       const answer = await ask('现在下载并提取吗？', true);
       if (answer === null) decision = { run: false, state: 'skip', detail: '无终端，未询问、未提取战场场景。3D 棋盘用金属地块（需要时 node tools/setup.mjs --scenes）' };
       else if (!answer) {
