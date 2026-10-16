@@ -669,7 +669,7 @@ function buildSkill(ctx, skillId, level, trigger, label) {
   const { desc, descRaw } = textPair(lv.description, phBB, bbStr, `skill ${skillId}`);
   const sp = lv.spData || {};
   if (typeof sp.spType === 'number' && !SP_TYPE_NAMES[sp.spType]) warn(`skill ${skillId}: unknown numeric spType ${sp.spType}`);
-  return {
+  const skill = {
     skillId,
     iconId: s.iconId || skillId,
     name: lv.name,
@@ -689,6 +689,12 @@ function buildSkill(ctx, skillId, level, trigger, label) {
     prefabId: lv.prefabId || skillId,
     trigger: trigger || { rule: 'DEFAULT', rawRule: 'DEFAULT', customRangeGrid: null },
   };
+  // GitHub #700: the client preview reads the localized skill text, which no longer has this Simplified line
+  // (引星棘刺 S3 「被动效果：攻击范围扩大」). The boolean is that line plus a non-empty grid. Absent otherwise.
+  // A record without it still matches the line (shared/loadoutRecord.js), which is how a plugin's Chinese skill
+  // keeps the preview. The battle kits are not this flag; resolveTrigger still reads the Chinese description.
+  if (/被动效果：攻击范围扩大/.test(desc) && Array.isArray(skill.rangeGrid) && skill.rangeGrid.length) skill.passiveRange = true;
+  return skill;
 }
 
 /**
@@ -750,6 +756,12 @@ function traitRecord(ctx, char, phase, level, opParts, chessId, potRank = 0) {
     const mp = textPair(traitMod.moduleText, traitBB.bb, traitBB.bbStr, `${chessId} module trait`);
     trait.moduleDesc = mp.desc;
     trait.moduleDescRaw = mp.descRaw;
+    // GitHub #700: the client preview reads the localized module line. These booleans are the Chinese reading.
+    // `rangeExpand` — 「攻击范围扩大」 (莱恩哈特 SPC-X): the preview uses the module's talentIndex −1 grid.
+    // `modeOnly` — 「集成战略」 (空弦 ISW-A): traitRangeExtend stays 0. Absent otherwise. A record without the
+    // flag still matches the line (shared/loadoutRecord.js). The battle kits still read the Chinese moduleDesc.
+    if (/攻击范围扩大/.test(mp.desc)) trait.rangeExpand = true;
+    if (/集成战略/.test(mp.desc)) trait.modeOnly = true;
   }
   return { trait, classify: classifyAttack(char, tp.desc) };
 }
