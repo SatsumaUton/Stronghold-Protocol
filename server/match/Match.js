@@ -31,6 +31,10 @@
 //                    for the match; those chess fight as their stand-ins (PlayerState setNotOwned; bots own everything).
 //                    `diy` (0.2.0 自选编队, optional): the human's 自选 picks (shared/protocol.js checkDiyPicks) — fixed for
 //                    the match; the slotted operators join the human's own shop (PlayerState setDiy / initDiyStock).
+//   opts.kitted      string[] (optional)        the operators a 自选 slot may field in this room (the content set's
+//                                              list, lobby.kittedFor). Absent on a vanilla match, so setDiy keeps
+//                                              KITTED_CHARS and a normal match stays byte-identical. A modded room
+//                                              always passes it (local match, match host, test journal / replay).
 //   opts.spectators  string[] (optional)        the room's spectator seats (remake feature, community report #26;
 //                                              server/lobby.js): never players — see addSpectator below
 //   opts.hostId      string (optional)          the room's current host (server/lobby.js room.hostId): the executor a
@@ -281,6 +285,9 @@ export class Match {
     this.vs = isContentHash(opts.vs) ? opts.vs : null;
     /** a room with gameplay plugins (opts.requireCs): a client result must name this match's cs (reports.js) */
     this.requireCs = opts.requireCs === true && !!this.cs;
+    // [ASSUMED] Only an array is a content list. Omitting the key (every vanilla match) leaves setDiy on KITTED_CHARS.
+    // A copy so a caller's freeze or later mutation cannot change the check, and so the key stays off public views.
+    if (Array.isArray(opts.kitted)) this.diyKitted = Object.freeze(opts.kitted.filter((id) => typeof id === 'string'));
     this.gd = new GameData(this.data, this.modeId);
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;

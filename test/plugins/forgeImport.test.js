@@ -938,6 +938,8 @@ test('chess.json pairs become compact records: a shop piece and a 自选 piece; 
       assert.ok(got.markdown.includes(word), word);
     }
     assert.equal(got.markdown.includes('skills.index'), false);
+    assert.equal(got.report.partial, true);
+    assert.equal(got.report.dropped.operators, 1);
     assert.ok(got.report.assumed.some((a) => a.what === 'chess-preset'));
     const check = await quiet(['check', path.join(parent, 'rose-chess'), '--strict', '--root', ROOT]);
     assert.equal(check.code, 0, check.out);
@@ -967,6 +969,7 @@ test('a pack unit whose shop piece is a chess pair is written once, as that pair
     assert.deepEqual(ops.map((o) => o.charId), ['char_x_rose_body_rose_body']);
     assert.deepEqual(ops[0].chess.bonds, ['emptyShip']);
     assert.match(got.markdown, /Its shop piece is the chess\.json pair chess_rose_body_a/);
+    assert.equal(got.report.partial, undefined);
     assert.ok(got.report.assumed.some((a) => a.what === 'chess-fallback-bond'));
   } finally { fs.rmSync(parent, { recursive: true, force: true }); }
 });
@@ -1671,5 +1674,118 @@ test('a skeleton whose bone, slot or skin count exceeds the cap is rejected befo
     const kept = skeletonClipData(good, { skel: 'a.skel', atlas: 'a.atlas', textures: ['a.png'] }, new Set(['chars']));
     assert.ok(kept.entry, JSON.stringify(kept.problems));
     assert.equal(kept.problems.length, 0);
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('a pack that drops whole gameplay records says so, and a cosmetic aimed only at those records has nothing to apply to', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-gap-'));
+  const pack = path.join(parent, 'pack');
+  const droppedTables = {
+    'bonds.json': { forge_gap_bond: { id: 'forge_gap_bond', name: '空盟' } },
+    'bands.json': { forge_gap_band: { id: 'forge_gap_band', name: '空队' } },
+    'items.json': { forge_gap_item: { id: 'forge_gap_item', name: '空道具' } },
+    'tokens.json': { forge_gap_token: { id: 'forge_gap_token', name: '空召唤' } },
+    'garrisons.json': { forge_gap_garrison: { id: 'forge_gap_garrison', name: '空驻守' } },
+    'traits.json': { forge_gap_trait_a: { id: 'forge_gap_trait_a' }, forge_gap_trait_b: { id: 'forge_gap_trait_b' } },
+  };
+  writePack(pack, {
+    id: 'gap-pack', name: '缺口', version: '1.0.0', license: 'CC0-1.0',
+    content: ['chess', 'bonds', 'bands', 'items', 'tokens', 'garrisons', 'traits'],
+    art: { items: { forge_gap_item: 'icon.png' } },
+  }, {
+    'chess.json': JSON.stringify(pairOf('lost', { both: { charId: 'char_forge_nobody', name: '失落', assets: {} } })),
+    'kits/chess_lost_a.js': 'export default function kit(){ return {}; }\n',
+    'icon.png': PNG,
+    ...Object.fromEntries(Object.entries(droppedTables).map(([name, doc]) => [name, JSON.stringify(doc)])),
+  });
+  const clean = path.join(parent, 'clean');
+  writePack(clean, { id: 'gap-clean', name: '完整', version: '1.0.0', license: 'CC0-1.0', content: ['chess'] }, {
+    'chess.json': JSON.stringify(pairOf('rose_clean')),
+  });
+  const keep = path.join(parent, 'keep');
+  writePack(keep, {
+    id: 'gap-keep', name: '留一', version: '1.0.0', license: 'CC0-1.0', content: ['bonds'],
+    art: { chars: { char_102_texas: { avatar: 'icon.png' } } },
+  }, {
+    'bonds.json': JSON.stringify({ forge_gap_bond: { id: 'forge_gap_bond', name: '空盟' } }),
+    'icon.png': PNG,
+  });
+  const audio = path.join(parent, 'audio');
+  writePack(audio, {
+    id: 'gap-audio', name: '只有声音', version: '1.0.0', license: 'CC0-1.0', content: ['items'],
+    voices: { char_102_texas: { select: 'select.mp3' } },
+  }, {
+    'items.json': JSON.stringify({ forge_gap_item: { id: 'forge_gap_item', name: '空道具' } }),
+    'select.mp3': MP3,
+  });
+  const panel = path.join(parent, 'panel');
+  writePack(panel, {
+    id: 'gap-panel', name: '面板', version: '1.0.0', license: 'CC0-1.0',
+    client: { panels: [{ name: '侧栏', slot: 'nowhere.panel' }] },
+  }, {});
+  const noscript = path.join(parent, 'noscript');
+  writePack(noscript, { id: 'gap-noscript', name: '不转脚本', version: '1.0.0', license: 'CC0-1.0', content: ['chess'] }, {
+    'chess.json': JSON.stringify(pairOf('rose_hunter')),
+    'kits/chess_rose_hunter_a.js': 'export default function kit(){ return {}; }\n',
+  });
+  try {
+    const got = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'gap-pack') });
+    assert.equal(got.ok, true, got.markdown);
+    assert.equal(got.report.needsManualAdaptation, false);
+    assert.equal(got.report.partial, true);
+    assert.deepEqual(got.report.dropped, {
+      operators: 1, bonds: 1, bands: 1, items: 1, tokens: 1, traits: 3, kits: 1, panels: 0,
+    });
+    const play = got.markdown.indexOf('## 没有导入的玩法');
+    const importedAt = got.markdown.indexOf('## 导入了什么');
+    assert.ok(play >= 0 && play < importedAt, got.markdown.slice(0, 800));
+    assert.match(got.markdown, /1 干员 \/ 棋子/);
+    assert.match(got.markdown, /3 特性/);
+    assert.equal(got.report.cosmeticBare, true);
+    assert.match(got.markdown, /nothing to apply to/);
+    const look = got.report.products.find((p) => p.class === 'cosmetic');
+    assert.ok(look, JSON.stringify(got.report.products.map((p) => p.class)));
+    assert.match(look.imported.join('\n'), /没有可应用的目标/);
+    assert.match(look.imported.join('\n'), /nothing to apply to/);
+    const assets = JSON.parse(fs.readFileSync(path.join(parent, look.id, 'assets.json'), 'utf8'));
+    assert.equal(assets.items.forge_gap_item, 'files/icon.png');
+    assert.equal(fs.existsSync(path.join(parent, look.id, 'files', 'icon.png')), true);
+
+    const whole = await importForge(clean, { ...forgeOpts(parent), out: path.join(parent, 'gap-clean') });
+    assert.equal(whole.ok, true, whole.markdown);
+    assert.equal(whole.report.partial, undefined);
+    assert.equal(whole.report.dropped, undefined);
+    assert.equal(whole.markdown.includes('## 没有导入的玩法'), false);
+
+    const kept = await importForge(keep, { ...forgeOpts(parent), out: path.join(parent, 'gap-keep') });
+    assert.equal(kept.ok, true, kept.markdown);
+    assert.equal(kept.report.partial, true);
+    assert.equal(kept.report.dropped.bonds, 1);
+    assert.equal(kept.report.dropped.operators, 0);
+    assert.equal(kept.report.cosmeticBare, undefined);
+    const keptLook = kept.report.products.find((p) => p.class === 'cosmetic');
+    assert.equal(/没有可应用的目标|nothing to apply to/.test(keptLook.imported.join('\n')), false);
+    assert.match(kept.markdown, /chars\.char_102_texas/);
+
+    const voice = await importForge(audio, { ...forgeOpts(parent), out: path.join(parent, 'gap-audio') });
+    assert.equal(voice.ok, true, voice.markdown);
+    assert.equal(voice.report.partial, true);
+    assert.equal(voice.report.dropped.items, 1);
+    assert.equal(voice.report.cosmeticBare, undefined);
+    const voiceLook = voice.report.products.find((p) => p.class === 'cosmetic');
+    assert.equal(/没有可应用的目标|nothing to apply to/.test(voiceLook.imported.join('\n')), false);
+    assert.match(voiceLook.imported.join('\n'), /voiceJp/);
+
+    const mounted = await importForge(panel, { ...forgeOpts(parent), out: path.join(parent, 'gap-panel') });
+    assert.equal(mounted.ok, true, mounted.markdown);
+    assert.equal(mounted.report.partial, true);
+    assert.equal(mounted.report.needsManualAdaptation, true);
+    assert.equal(mounted.report.dropped.panels, 1);
+    assert.match(mounted.markdown, /1 面板/);
+
+    const skippedKit = await importForge(noscript, { ...forgeOpts(parent), out: path.join(parent, 'gap-noscript'), scripts: false });
+    assert.equal(skippedKit.ok, true, skippedKit.markdown);
+    assert.equal(skippedKit.report.partial, undefined);
+    assert.match(skippedKit.markdown, /--no-scripts/);
   } finally { fs.rmSync(parent, { recursive: true, force: true }); }
 });

@@ -637,7 +637,12 @@ export const PLUGIN_ERRORS = Object.freeze({
   PLUGIN_SLOT: {
     level: 'frame', doc: D.ui,
     zh: '界面插件要的位置没有给它：清单的 "slots" 里没有这个位置，或者别的插件已经占了', en: 'The slot a ui plugin asked for was not granted: its manifest\'s "slots" does not list it, or another plugin holds it',
-    fix: { zh: '在 plugin.json 的 "slots" 里写上这个位置（hud.right、result.tab、stats.tab、room.panel）。一个位置只放一个插件，先开的先得。', en: 'List the slot in "slots" of plugin.json (hud.right, result.tab, stats.tab, room.panel). One plugin per slot: the first switched on gets it.' },
+    fix: { zh: '在 plugin.json 的 "slots" 里写上这个位置（hud.right、result.tab、stats.tab、room.panel）。协议表同一时间只挂一个插件；同一个位置有多个时，对局里用标签切换。', en: 'List the slot in "slots" of plugin.json (hud.right, result.tab, stats.tab, room.panel). The protocol table grants one plugin at a time; when several ask for one slot, the match shows tabs to switch.' },
+  },
+  PLUGIN_UI_SLOT_SHARED: {
+    level: 'warning', doc: D.ui,
+    zh: '同一个位置有多个界面插件（{detail}）。对局里用标签切换，一次只显示一个', en: 'Several ui plugins ask for the same slot ({detail}). The match shows tabs and displays one at a time',
+    fix: { zh: '这不是错误：玩家可以在这个位置里切换。若要各自独立显示，把它们写成不同的 slots。', en: 'This is not a failure: the player can switch within the slot. Give them different slots if each should be visible at once.' },
   },
   PLUGIN_RATE: {
     level: 'frame', doc: D.ui,

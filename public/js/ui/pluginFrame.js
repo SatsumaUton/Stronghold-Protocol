@@ -15,8 +15,9 @@
 // unmounts the slot, the frame is moved back to the park in the same mutation.
 //
 // [ASSUMED] the first declared slot that has an element is granted when the frame is created, otherwise the first
-// free declared slot, so the frame has a home before its own `slot` message. One slot per plugin, one plugin per slot.
-// Nothing here calls net.send. A match intent is rejected locally.
+// free declared slot, so the frame has a home before its own `slot` message. The protocol table stays one plugin
+// per slot. When several plugins prefer the same slot, the first by name is shown and the player switches the
+// others with tabs in the slot. Nothing here calls net.send. A match intent is rejected locally.
 
 import { store } from '../store.js';
 import { battleRunner } from '../battle/runner.js';
@@ -39,6 +40,8 @@ const frames = new Map();
 /** Plugins stopped for leaving their entry page: not mounted again until this page reloads (no re-mount loop). */
 const blocked = new Set();
 const slots = createSlotTable();
+/** slot → plugin the player chose to see. Absent: the first by name. */
+const chosenSlot = new Map();
 const limiter = createRateLimiter();
 const noticeLimiter = createNoticeLimiter();
 const rejected = [];
@@ -104,6 +107,7 @@ function destroy(id) {
   rec.closed = true;
   rec.ready = false;
   frames.delete(id);
+  for (const [slot, held] of chosenSlot) if (held === id) chosenSlot.delete(slot);
   slots.release(id);
   limiter.reset(id);
   noticeLimiter.reset(id);
@@ -162,8 +166,89 @@ function place(rec) {
   if (rec.iframe.parentElement !== home) moveFrame(rec, home);
 }
 
+function byPluginName(a, b) {
+  const an = pluginName(a.entry) || a.id;
+  const bn = pluginName(b.entry) || b.id;
+  return an.localeCompare(bn) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
+/** The first declared slot that currently has an element. */
+function preferredSlot(rec) {
+  const allowed = rec.declared.filter((s) => UI_SLOTS.includes(s));
+  return allowed.find((s) => document.querySelector(`[data-ui-slot="${s}"]`)) || null;
+}
+
+/**
+ * One holder per slot. Several plugins may prefer it: the player's tab wins, otherwise the first by name.
+ * The others stay mounted and parked until a tab shows them. [ASSUMED] that initial order is the name order.
+ */
+function assignSlots() {
+  /** @type {Map<string, FrameRec[]>} */
+  const groups = new Map();
+  for (const rec of frames.values()) {
+    if (rec.preview || rec.closed) continue;
+    const slot = preferredSlot(rec);
+    if (!slot) continue;
+    if (!groups.has(slot)) groups.set(slot, []);
+    groups.get(slot).push(rec);
+  }
+  for (const [slot, list] of groups) {
+    list.sort(byPluginName);
+    const want = chosenSlot.get(slot);
+    const pick = (want && list.find((r) => r.id === want)) || list[0];
+    if (slots.holder(slot) !== pick.id) {
+      const holder = slots.holder(slot);
+      if (holder) slots.release(holder);
+      if (slots.slotOf(pick.id)) slots.release(pick.id);
+      slots.request(pick.id, slot, pick.declared);
+    }
+    for (const rec of list) if (rec.id !== pick.id && slots.slotOf(rec.id) === slot) slots.release(rec.id);
+  }
+}
+
+/** Tabs for a slot that more than one switched-on plugin prefers. One is visible; the rest are listed here. */
+function renderSlotTabs() {
+  for (const slot of UI_SLOTS) {
+    const el = document.querySelector(`[data-ui-slot="${slot}"]`);
+    if (!el) continue;
+    const list = [];
+    for (const rec of frames.values()) {
+      if (rec.preview || rec.closed) continue;
+      if (preferredSlot(rec) === slot) list.push(rec);
+    }
+    list.sort(byPluginName);
+    const old = el.querySelector(':scope > .ui-slot__tabs');
+    if (list.length < 2) { if (old) old.remove(); continue; }
+    const bar = old || document.createElement('div');
+    bar.className = 'ui-slot__tabs';
+    bar.setAttribute('role', 'tablist');
+    try { bar.setAttribute('aria-label', t('界面插件')); } catch { bar.setAttribute('aria-label', '界面插件'); }
+    const holder = slots.holder(slot);
+    bar.replaceChildren(...list.map((rec) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ui-slot__tab';
+      b.setAttribute('role', 'tab');
+      const label = pluginName(rec.entry) || rec.id;
+      b.textContent = label;
+      b.title = label;
+      b.setAttribute('aria-selected', holder === rec.id ? 'true' : 'false');
+      b.addEventListener('click', () => {
+        chosenSlot.set(slot, rec.id);
+        assignSlots();
+        for (const frame of frames.values()) place(frame);
+        renderSlotTabs();
+      });
+      return b;
+    }));
+    if (!old) el.prepend(bar);
+  }
+}
+
 function placeAll() {
+  assignSlots();
   for (const rec of frames.values()) place(rec);
+  renderSlotTabs();
 }
 
 /**

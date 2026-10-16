@@ -1552,6 +1552,10 @@
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },
   {
+    "name": "error.PLUGIN_UI_SLOT_SHARED",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
     "name": "error.PLUGIN_RATE",
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },

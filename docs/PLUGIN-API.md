@@ -417,6 +417,7 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 | `error.PLUGIN_UI_SLOTS` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_UI_NO_SLOT` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_SLOT` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_UI_SLOT_SHARED` | stable | 0.3.1 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_RATE` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_STORAGE` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_INTENT` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |

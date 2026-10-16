@@ -524,6 +524,67 @@ export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, whe
  *   vanilla: the art manifest read for this scan (null when no cosmetic or ui plugin needed it); a warning's `issue`: it with
  *   its code (shared/plugins/errors.js)
  */
+/**
+ * Rules that apply across plugins, not inside one folder. `found` is in scan order: i18n files, then packs/, then
+ * plugin folders sorted by name.
+ * Duplicate ids and a second language overlay are problems. Two ui plugins that ask for the same slot are a warning:
+ * the match keeps both and shows one at a time. [ASSUMED] One manifest-2 plugin may overlay a built-in language;
+ * the first plugin folder in sorted order wins. A pack or a second overlay does not.
+ * @param {Plugin[]} found
+ */
+export function crossPluginFindings(found) {
+  /** @type {Plugin[]} */
+  const plugins = [];
+  /** @type {Skipped[]} */
+  const skipped = [];
+  /** @type {{ where: string, warning: string, issue: import('../../shared/plugins/errors.js').PluginIssue }[]} */
+  const warnings = [];
+  const skip = (where, code, text, extra) => skipped.push({ where, problems: [text], issues: [makeIssue('problem', code, text, extra)] });
+  const ids = new Map();
+  const langs = new Map();
+  /** @type {Map<string, Plugin>} lang → the overlay that won */
+  const overlaid = new Map();
+  for (const p of found) {
+    const idKey = String(p.id).toLowerCase();
+    if (ids.has(idKey)) { skip(p.where, 'PLUGIN_DUPLICATE', `the id "${p.id}" is taken by ${ids.get(idKey)}`, { id: p.id, where: `${p.id} (${ids.get(idKey)})` }); continue; }
+    if (p.class === 'lang' && langs.has(p.manifest.lang)) {
+      const base = langs.get(p.manifest.lang);
+      const won = overlaid.get(p.manifest.lang);
+      // The first plugin folder overlays the built-in file. A later plugin folder loses to that plugin, not to the file.
+      if (p.source === 'plugins' && base.source === 'i18n' && !won) overlaid.set(p.manifest.lang, p);
+      else {
+        const other = won || (base.source === 'plugins' ? base : null);
+        if (p.source === 'plugins' && other) {
+          skip(p.where, 'PLUGIN_DUPLICATE', `the language ${p.manifest.lang} already has an overlay from ${other.id} (${other.where}); one overlay per language, and the first plugin folder in sorted order wins`, { where: `${p.manifest.lang} (${other.where})`, overlay: other.id });
+        } else {
+          skip(p.where, 'PLUGIN_DUPLICATE', `the language ${p.manifest.lang} is already provided by ${base.where}`, { where: `${p.manifest.lang} (${base.where})` });
+        }
+        continue;
+      }
+    }
+    ids.set(idKey, p.where);
+    if (p.class === 'lang' && !langs.has(p.manifest.lang)) langs.set(p.manifest.lang, p);
+    plugins.push(p);
+  }
+  /** @type {Map<string, Plugin[]>} */
+  const bySlot = new Map();
+  for (const p of plugins) {
+    const list = p.ui?.slots || (p.class === 'ui' && Array.isArray(p.manifest?.slots) ? p.manifest.slots : []);
+    for (const slot of list) {
+      if (typeof slot !== 'string') continue;
+      if (!bySlot.has(slot)) bySlot.set(slot, []);
+      bySlot.get(slot).push(p);
+    }
+  }
+  for (const [slot, list] of bySlot) {
+    if (list.length < 2) continue;
+    const names = list.map((p) => p.id).join(', ');
+    const text = `slot ${slot} is also requested by ${names}; the match shows one at a time and the player switches`;
+    for (const p of list) warnings.push({ where: p.where, warning: text, issue: makeIssue('warning', 'PLUGIN_UI_SLOT_SHARED', text, { at: ['slots'], slot, detail: names }) });
+  }
+  return { plugins, skipped, warnings };
+}
+
 export function scanPlugins({ publicDir, dataDir, packsDir, pluginsDir }, { app = APP_VERSION, api = PLUGIN_API, hashCache = new Map(), vanilla = null, artCache = new Map() } = {}) {
   let art = vanilla;
   const getArt = () => (art ||= readVanillaAssets(dataDir, artCache));
@@ -640,28 +701,11 @@ export function scanPlugins({ publicDir, dataDir, packsDir, pluginsDir }, { app 
   }
 
   // one entry per id (any case: one folder on Windows / macOS) and per language; the language folders' files first,
-  // then packs/, then plugins/
-  const plugins = [];
-  const ids = new Map();
-  const langs = new Map();
-  const overlaid = new Set();
-  for (const p of found) {
-    const idKey = p.id.toLowerCase();
-    if (ids.has(idKey)) { skip(p.where, 'PLUGIN_DUPLICATE', `the id "${p.id}" is taken by ${ids.get(idKey)}`, { id: p.id, where: `${p.id} (${ids.get(idKey)})` }); continue; }
-    if (p.class === 'lang' && langs.has(p.manifest.lang)) {
-      const base = langs.get(p.manifest.lang);
-      // [ASSUMED] One manifest-2 plugin may overlay a built-in language. The first sorted plugin wins;
-      // further providers and legacy pack collisions remain duplicates. Language choice stays browser-local.
-      if (p.source === 'plugins' && base.source === 'i18n' && !overlaid.has(p.manifest.lang)) overlaid.add(p.manifest.lang);
-      else {
-        skip(p.where, 'PLUGIN_DUPLICATE', `the language ${p.manifest.lang} is already provided by ${base.where}`, { where: `${p.manifest.lang} (${base.where})` });
-        continue;
-      }
-    }
-    ids.set(idKey, p.where);
-    if (p.class === 'lang' && !langs.has(p.manifest.lang)) langs.set(p.manifest.lang, p);
-    plugins.push(p);
-  }
+  // then packs/, then plugins/. Slot sharing is a warning: the match shows one frame at a time.
+  const cross = crossPluginFindings(found);
+  const plugins = cross.plugins;
+  skipped.push(...cross.skipped);
+  warnings.push(...cross.warnings);
   // what a plugin requires: installed, in its range (P1c refuses to enable it otherwise; here a warning)
   const byId = new Map(plugins.map((p) => [p.id, p]));
   for (const p of plugins) {
