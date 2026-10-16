@@ -139,12 +139,14 @@ async function assertNoGrandson(pid, leaders) {
   for (const leader of leaders) assert.throws(() => process.kill(leader.pid, 0), { code: 'ESRCH' });
 }
 
-for (const ending of ['close', 'timeout']) test(`a real pinned SIGTERM-ignoring probe leaves no grandson after trial ${ending}`, { timeout: 20000 }, async t => {
+// The trial's own timeout must leave the probe time to reach its setup first: forking the trial child and composing
+// the content set took more than 6 s on a Windows runner, and the trial then ended before the marker was written.
+for (const ending of ['close', 'timeout']) test(`a real pinned SIGTERM-ignoring probe leaves no grandson after trial ${ending}`, { timeout: 40000 }, async t => {
   const f = scriptFixture(t), marker = path.join(f.root, 'probe.pid'), leaders = [];
   f.put('loop', loopSetup(marker));
-  const bench = loopBench(t, f, 60000, ending === 'timeout' ? 6000 : 15000, leaders);
+  const bench = loopBench(t, f, 60000, ending === 'timeout' ? 12000 : 15000, leaders);
   const checked = assert.rejects(bench.run({ id: 'loop', seconds: 1 }), { code: ending === 'timeout' ? 'PLUGIN_STUDIO_TRIAL_TIMEOUT' : 'PLUGIN_STUDIO_TRIAL_FAILED' });
-  for (let n = 0; n < 400 && !fs.existsSync(marker); n++) await delay(20);
+  for (let n = 0; n < 700 && !fs.existsSync(marker); n++) await delay(20);
   assert.ok(fs.existsSync(marker), 'the actual contentSet preflight ran');
   const pid = Number(fs.readFileSync(marker, 'utf8'));
   t.after(() => { try { process.kill(pid, 'SIGKILL'); } catch { /* absent */ } });
