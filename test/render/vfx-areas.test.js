@@ -26,7 +26,7 @@ const HAS_INDEX = existsSync(INDEX);
 const LOOPING = new Set(['ymgtop_spin', 'enemy_nhpbr_attack_range', 'enemy_nhtank_attack_range', 'enemy_actoxi_idle', 'enemy_wintun_range', 'dsubrl_aura', 'cjhot_aura',
   'enemy_cjhot_debuff', 'horn_skill_01_hit_02_buff', 'skadi2_skill_03_buff', 'svrash_skill_02_buff', 'tinman_skill_01_range_01', 'sleach_skill_02_flag_01',
   'sleach_skill_02_ground_01', 'sleach_skill_03_flag_01', 'sleach_skill_03_range_loop_01', 'thumpy_skill_03_range_01']);
-const KEYS = [...LOOPING, 'mousek_skill_02_range', 'mousek_skill_02_start', 'enemy_dsubrl_attack_hit', 'horn_skill_01_hit_02', 'g_hit', 'g_enemy', 'g_heal',
+const KEYS = [...LOOPING, 'mousek_skill_02_range', 'mousek_skill_02_start', 'bombd_cast', 'enemy_dsubrl_attack_hit', 'horn_skill_01_hit_02', 'g_hit', 'g_enemy', 'g_heal',
   'tank_shell_hit', 'sleach_skill_03_range_start_01', 'chen2_skill_02_range_01'];
 const GROUND = new Set(['enemy_nhpbr_attack_range', 'enemy_nhtank_attack_range', 'enemy_actoxi_idle', 'enemy_wintun_range', 'mousek_skill_02_range']);
 
@@ -49,6 +49,10 @@ function makeIndex({ installed = KEYS } = {}) {
           { role: 'start', keys: ['mousek_skill_02_start'], from: 'UberEffectEmitter._castEffects', node: 'SandStorm', ability: 'RangedAttack', startEvent: 'ON_CAST_START', endEvent: 'ON_CAST_END', oneshot: true, list: 'cast' },
           { role: 'hit', keys: ['mousek_skill_02_range'], from: 'UberEffectEmitter._castTargetEffects', node: 'SandStorm', ability: 'RangedAttack', startEvent: 'ON_CAST_START', list: 'castTarget' },
         ] } } }),
+      // 暴鸰: a RangedAttack-rooted skill whose attack (the bomb) comes 0.27 s after its cast — no kit fx stands for it
+      enemy_1040_bombd: enemy({ modes: [{ name: 'Default', attack: null, combat: null }], skills: { boomb: { rootClass: 'EnemySkill', rootAbility: 'RangedAttack', projectiles: [], mode: null, uses: [
+        { role: 'start', keys: ['bombd_cast'], from: 'UberEffectEmitter._castEffects', node: 'Boomb', ability: 'RangedAttack', startEvent: 'ON_SPELL_ON', endEvent: 'ON_CAST_END', oneshot: true, list: 'cast' },
+      ] } } }),
       // 深溟巢涌者: the AOE aura's loop while it stands, its tick's hit on every unit in it
       enemy_1234_dsubrl: enemy({ talents: { AOE: { nodes: [{ node: 'Talents/AOE', class: 'AppearSyncedTalent', ability: 'AuraAbility', when: 'deploy' }], uses: [
         aura('dsubrl_aura'),
@@ -95,6 +99,7 @@ const RECS = {
   enemy_1272_nhtank: { skills: [{ prefabKey: 'PollutedRangedAtk', bb: {} }] },
   enemy_10044_wintun: { skills: [{ prefabKey: 'BlockedBoom', bb: {} }] },
   enemy_1509_mousek: { skills: [{ prefabKey: 'SandStorm', bb: { duration: 15 } }] },
+  enemy_1040_bombd: { skills: [{ prefabKey: 'boomb', bb: {} }] },
   enemy_10116_ymgtop: { talents: { bb: { 'EndRotate.rotate_duration': 5 } }, skills: [{ prefabKey: 'SwitchModeTrigger', bb: {} }] },
   char_4039_horn: opRec('skchr_horn_1'),
   char_1012_skadi2: opRec('skchr_skadi2_3', { duration: 20 }),
@@ -230,6 +235,17 @@ describe('an enemy\'s zone under the official layer', () => {
     w.attack(boss, ally, 'enemy', 3);
     assert.ok(!spawned.slice(before).includes('mousek_skill_02_range') && !spawned.slice(before).includes('mousek_skill_02_start'), 'a normal attack, not the sandstorm again');
     assert.equal(w.skills.state(boss).plan, null);
+  });
+
+  test("an attack-rooted skill no kit fx stands for keeps its window's rows for its attack (暴鸰's bomb, 0.27 s after the cast)", async () => {
+    const { w, view, frame, spawned } = await setup();
+    const d = view(1, 'enemy_1040_bombd', 8), ally = view(2, 'char_4039_horn', 7);
+    frame();
+    w.enemyCast(d, 0);
+    for (let i = 0; i < 8; i++) frame(1 / 30);
+    const n = spawned.length;
+    w.attack(d, ally, 'droneBomb', 1);
+    assert.ok(spawned.slice(n).includes('bombd_cast'), "the bomb is the skill's attack: the window's rows play with it");
   });
 
   test('with the layer off, or the prefabs not installed, every procedural zone stays', async () => {
