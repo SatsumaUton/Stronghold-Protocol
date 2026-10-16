@@ -98,14 +98,76 @@ test('a mode named S2 that skill 3 switches to stays on skill 3 (莫斯提马 st
   assert.deepEqual(got.attacks, { 1: [P('p_atk_whitetimewand_s')], 2: [P('p_atk_whitetimewand_s')] });
 });
 
-test('two skills that switch to the same mode both receive it; a different mode is not copied onto them', () => {
+test('an unclaimed mode named S1 replaces the shared differently named link on skill 1 only', () => {
   const banks = new Map([
     ['ON_ABILITY_ON.attack.1', [P('p_atk_ice_d')]],
     ['ON_ABILITY_ON.attack.2', [P('p_atk_ice_h')]],
   ]);
   const skills = [row(0, 1), row(1, 1), row(2, 1)];
   const got = assignSkillModeSfx(banks, skills, modes('Default', 'S1_Default', 'S1', 'S2', 'S3'), new Map(skills.map((s) => [s.skillId, 1])));
-  assert.deepEqual(got.attacks, { 0: [P('p_atk_ice_d')], 1: [P('p_atk_ice_d')], 2: [P('p_atk_ice_d')] });
+  // Mode index 2 is named S1 and nobody links it, so skill 1 takes it. S2/S3 have no bank, so skills 2 and 3 keep the link.
+  assert.deepEqual(got.attacks, { 0: [P('p_atk_ice_h')], 1: [P('p_atk_ice_d')], 2: [P('p_atk_ice_d')] });
+});
+
+test('unclaimed S<n> fills that skill; a mode another skill links is not stolen', () => {
+  // 麦哲伦: every skill links to S1_Default (no bank). Unclaimed S1/S2/S3 each carry the same _h swing and hit.
+  const mag = assignSkillModeSfx(new Map([
+    ['ON_ABILITY_ON.attack.2', [P('p_atk_icecamera_h')]],
+    ['ON_ABILITY_HIT.attack.2', [P('p_imp_icecamera_h')]],
+    ['ON_ABILITY_ON.attack.3', [P('p_atk_icecamera_h')]],
+    ['ON_ABILITY_HIT.attack.3', [P('p_imp_icecamera_h')]],
+    ['ON_ABILITY_ON.attack.4', [P('p_atk_icecamera_h')]],
+    ['ON_ABILITY_HIT.attack.4', [P('p_imp_icecamera_h')]],
+  ]), [row(0, 1, 'skchr_mgllan_1'), row(1, 1, 'skchr_mgllan_2'), row(2, 1, 'skchr_mgllan_3')],
+  modes('Default', 'S1_Default', 'S1', 'S2', 'S3'),
+  new Map([['skchr_mgllan_1', 1], ['skchr_mgllan_2', 1], ['skchr_mgllan_3', 1]]));
+  assert.deepEqual(mag.attacks, { 0: [P('p_atk_icecamera_h')], 1: [P('p_atk_icecamera_h')], 2: [P('p_atk_icecamera_h')] });
+  assert.deepEqual(mag.hits, { 0: [P('p_imp_icecamera_h')], 1: [P('p_imp_icecamera_h')], 2: [P('p_imp_icecamera_h')] });
+
+  // 白铁: S2 links to mode S1. Unclaimed S2 replaces that swing. S1 and S3 keep the modes they link.
+  const iron = assignSkillModeSfx(new Map([
+    ['ON_ABILITY_START.attack.1', [P('p_imp_elecdrill_d')]],
+    ['ON_ABILITY_START.attack.2', [P('p_atk_elecdrill_h')]],
+    ['ON_ABILITY_START.attack.3', [P('p_atk_elecdrill_s')]],
+    ['ON_ABILITY_HIT.attack.3', [P('p_imp_elecdrill_s')]],
+  ]), [row(0, 1, 'skchr_ironmn_1'), row(1, 1, 'skchr_ironmn_2'), row(2, 3, 'skchr_ironmn_3')],
+  modes('Default', 'S1', 'S2', 'S3'),
+  new Map([['skchr_ironmn_1', 1], ['skchr_ironmn_2', 1], ['skchr_ironmn_3', 3]]));
+  assert.deepEqual(iron.attacks, {
+    0: [P('p_imp_elecdrill_d')],
+    1: [P('p_atk_elecdrill_h')],
+    2: [P('p_atk_elecdrill_s')],
+  });
+  assert.deepEqual(iron.hits, { 2: [P('p_imp_elecdrill_s')] });
+
+  // 归溟幽灵鲨: S1 links to Empty. Unclaimed S1 restores the sharpsaw _d swing and hit.
+  const ghost = assignSkillModeSfx(new Map([
+    ['ON_ABILITY_START.attack.3', [P('p_atk_sharpsaw_d')]],
+    ['ON_ABILITY_HIT.attack.3', [P('p_imp_sharpsaw_d')]],
+    ['ON_ABILITY_ON.attack.4', [P('p_imp_sharpsaw_h')]],
+    ['ON_ABILITY_START.attack.5', [P('p_atk_sharpsaw_s')]],
+  ]), [row(0, 2, 'skchr_ghost2_1'), row(1, 4, 'skchr_ghost2_2'), row(2, 5, 'skchr_ghost2_3')],
+  modes('Default', 'Stand', 'Empty', 'S1', 'S2', 'S3'),
+  new Map([['skchr_ghost2_1', 2], ['skchr_ghost2_2', 4], ['skchr_ghost2_3', 5]]));
+  assert.deepEqual(ghost.attacks, {
+    0: [P('p_atk_sharpsaw_d')],
+    1: [P('p_imp_sharpsaw_h')],
+    2: [P('p_atk_sharpsaw_s')],
+  });
+  assert.deepEqual(ghost.hits, { 0: [P('p_imp_sharpsaw_d')] });
+
+  // 水月: S3 owns the mode named S2, so skill 2 keeps the S1 bank.
+  const mizuki = assignSkillModeSfx(new Map([
+    ['ON_ABILITY_ON.attack.2', [P('p_imp_tentacle_h')]],
+    ['ON_ABILITY_ON.attack.3', [P('p_imp_tentacle_s')]],
+  ]), [row(0, 2, 'skchr_mizuki_1'), row(1, 2, 'skchr_mizuki_2'), row(2, 3, 'skchr_mizuki_3')],
+  modes('Default', 'T1', 'S1', 'S2'),
+  new Map([['skchr_mizuki_1', 2], ['skchr_mizuki_2', 2], ['skchr_mizuki_3', 3]]));
+  assert.deepEqual(mizuki.attacks, {
+    0: [P('p_imp_tentacle_h')],
+    1: [P('p_imp_tentacle_h')],
+    2: [P('p_imp_tentacle_s')],
+  });
 });
 
 test('a phase mode fills a skill whose own mode has no skill-mode bank; an End clip does not', () => {

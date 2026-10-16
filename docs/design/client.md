@@ -366,7 +366,7 @@ localhost and browser support still govern installation.
 
 The audio manifest can carry `attacks` / `hits` plus independent `attackMix` / `hitMix` by skill index. Only an active
 skill uses a mode bank. The slot is the skill that switches to that attack mode (§34.3), not the `_d` / `_h` / `_s`
-letter on the file. Impacts remember the mode at the time of the attack; an end event cancels a queued start for
+letter on the file. An unclaimed mode named exactly `S<n>` is skill n [ASSUMED]; a mode another skill links is not taken. Impacts remember the mode at the time of the attack; an end event cancels a queued start for
 an unknown unit, and a late-join snapshot restores the current mode. A mode without a bank falls back to its normal
 sound. A selected mode with no mix uses its own default volume/probability, not the ordinary bank's mix.
 

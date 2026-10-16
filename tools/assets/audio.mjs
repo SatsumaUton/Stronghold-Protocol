@@ -267,12 +267,18 @@ function phaseOfModeName(name) {
  *
  * [ASSUMED] One bank per skill: the same rank as {@link pickModeBanks} (START before ON, plain before numbered,
  * then abilityOrder). A mode with several variants plays the first of that rank. `skills[].mode` (the mode
- * the skill switches to) wins over the mode's name. The name is used only for a mode no skill switches to, and only
- * onto a skill that itself switches to nothing and whose id is that skill number. A phase name fills a skill whose
- * own mode has no d/h/s bank; a name ending in End does not (that clip is not the attack). A skill that does switch
- * stays quiet rather than borrow a numbered mode's letter — except an unsuffixed bank, which is not numbered to a
- * skill mode. Files that are not a uniform `_d` / `_h` / `_s` bank stay out, so a `_n` file on a skill mode (银灰 S3)
- * is not copied onto the skill table.
+ * the skill switches to) wins over the mode's name, except a mode named exactly `S<n>` or `Sk<n>` that no skill
+ * switches to: that uniform bank is skill n's, in place of a differently named link. The fx extract records the
+ * link; nothing in the tables says the unlinked name is the swing that plays. 麦哲伦's three skills link to
+ * `S1_Default` (no `_d/_h/_s` bank) while unclaimed `S1`/`S2`/`S3` each carry `p_atk_icecamera_h` and
+ * `p_imp_icecamera_h`. 白铁 S2 links to `S1` while unclaimed `S2` carries `p_atk_elecdrill_h`. 归溟幽灵鲨 S1 links
+ * to `Empty` while unclaimed `S1` carries `p_atk_sharpsaw_d` and `p_imp_sharpsaw_d`. A mode another skill already
+ * links is not taken (水月 S3 owns the mode named S2). Any other name is used only when no skill switches to that
+ * mode, and only onto a skill that itself switches to nothing and whose id is that skill number. A phase name fills
+ * a skill whose own mode has no d/h/s bank; a name ending in End does not (that clip is not the attack). A skill
+ * that does switch stays quiet rather than borrow a numbered mode's letter — except an unsuffixed bank, which is
+ * not numbered to a skill mode, and except the exact `S<n>` case above. Files that are not a uniform `_d` / `_h` /
+ * `_s` bank stay out, so a `_n` file on a skill mode (银灰 S3) is not copied onto the skill table.
  *
  * @param {Map<string,string[]>|undefined} banks unit bank table (indexAudio().unitBanks)
  * @param {{index:number, skillId?:string|null, mode?:number|null, start?:string|null}[]} skills planned skills
@@ -350,6 +356,26 @@ export function assignSkillModeSfx(banks, skills, modes = null, allLinks = null)
     const chosen = new Map();
     const take = (i, cands) => { if (!chosen.has(i)) chosen.set(i, best(cands).paths); };
     for (const [i, cands] of bySkill) take(i, cands);
+    // [ASSUMED] Exact `S<n>` / `Sk<n>` that nobody links: skill n plays it instead of a differently named link.
+    // Reserved modes stay with the skill that links to them (水月 S3 owns the mode named S2).
+    const namedSkill = new Map();
+    const namedUsed = new Set();
+    if (Array.isArray(modes)) {
+      for (const c of unclaimed) {
+        if (!Number.isInteger(c.modeIndex) || c.modeIndex < 0 || c.modeIndex >= modes.length) continue;
+        if (reserved.has(c.modeIndex)) continue;
+        const raw = String(modes[c.modeIndex]?.name || '').trim();
+        const named = /^(?:sk|s)(\d+)$/i.exec(raw);
+        if (!named) continue;
+        const i = Number(named[1]) - 1;
+        const row = list.find((s) => s.index === i);
+        if (!row || !ownsSkillNumber(row.skillId, i)) continue;
+        if (!namedSkill.has(i)) namedSkill.set(i, []);
+        namedSkill.get(i).push(c);
+        namedUsed.add(c);
+      }
+    }
+    for (const [i, cands] of namedSkill) chosen.set(i, best(cands).paths);
     for (const [i, cands] of phase) {
       const row = list.find((s) => s.index === i);
       if (!row || chosen.has(i) || !explicit.has(i) || !ownsSkillNumber(row.skillId, i)) continue;
@@ -357,6 +383,7 @@ export function assignSkillModeSfx(banks, skills, modes = null, allLinks = null)
     }
     const byLetter = new Map();
     for (const c of unclaimed) {
+      if (namedUsed.has(c)) continue;
       if (!byLetter.has(c.letter)) byLetter.set(c.letter, []);
       byLetter.get(c.letter).push(c);
     }
