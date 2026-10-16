@@ -6,14 +6,16 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { EXPECTED_FX, EXPECTED_LOCAL_GROUPS } from '../tools/local-extract/expected.mjs';
 import {
-  assessLocal, fxCatalogReport, localArtDetail, localArtState, localGaps, sceneInstallPlan,
+  assessLocal, artRowAfterScenes, doctorLocalDetail, fxCatalogReport, fxReextractCommand,
+  localArtDetail, localArtState, localGaps, sceneAskDefault, sceneClientExtractAllowed, sceneInstallPlan,
+  IS_WIN, ROOT, venvPython,
 } from '../tools/setup.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
 const PY = ['python3', 'python'].find((bin) => spawnSync(bin, ['--version']).status === 0);
 const ENV = { ...process.env, PYTHONDONTWRITEBYTECODE: '1' };
 
@@ -84,8 +86,9 @@ test('a 75-group / 1658-entry manifest that only lacks scene/tex is stale', () =
   assert.equal(assessed.sceneStagesHave, 11);
   assert.equal(assessed.sceneGroupHave, 11);
   assert.equal(localArtState(assessed), 'warn');
-  assert.equal(localGaps(assessed), '，已有 75 个分组、1658 项，这一版期望 76 个分组（缺少 scene/tex），请重新运行 node tools/setup.mjs --local');
-  assert.equal(localArtDetail(assessed), '已提取 1658 项，已有 75 个分组、1658 项，这一版期望 76 个分组（缺少 scene/tex），请重新运行 node tools/setup.mjs --local');
+  const sceneGap = '，已有 75 个分组、1658 项，这一版期望 76 个分组（缺少 scene/tex）';
+  assert.equal(localGaps(assessed, { client: true }), `${sceneGap}，请重新运行 node tools/setup.mjs --scenes`);
+  assert.equal(localArtDetail(assessed, '', '已提取', { client: true }), `已提取 1658 项${sceneGap}，请重新运行 node tools/setup.mjs --scenes`);
   assert.equal(assessed.fx.state, 'skip');
   assert.equal(assessed.fx.stale, false);
 
@@ -98,9 +101,14 @@ test('a 75-group / 1658-entry manifest that only lacks scene/tex is stale', () =
 
   const blocked = sceneInstallPlan(sceneOpts(assessed, { client: false, python: true }));
   assert.equal(blocked.state, 'warn');
+  assert.equal(blocked.run, false);
   assert.match(blocked.detail, /scene\/tex/);
+  assert.match(blocked.detail, /同一版本的整合包/);
+  assert.doesNotMatch(blocked.detail, /--scenes/);
+  assert.doesNotMatch(blocked.detail, /--local/);
   const checking = sceneInstallPlan(sceneOpts(assessed, { check: true, client: true, python: true }));
   assert.equal(checking.state, 'warn');
+  assert.equal(checking.run, false);
 });
 
 test('the full group set is not stale, and a superset of local-assets groups is not either', () => {
@@ -163,7 +171,8 @@ test('fx catalog: absent is skip; a wrong catalog warns; a matching one is ok', 
   assert.equal(absent.stale, false);
   assert.match(absent.detail, /已有 0 个分组、0 项/);
   assert.match(absent.detail, /这一版期望 4 个分组（fx、fx\/prefabs、fx\/tex、fx\/mesh）、索引版本 3/);
-  assert.match(absent.detail, /python tools\/local-extract\/extract\.py --only fx --fx-set used/);
+  assert.match(absent.detail, /--only fx --fx-set used/);
+  assert.doesNotMatch(absent.detail, /需要时 python tools/);
 
   const groups = {
     fx: {
@@ -200,6 +209,83 @@ test('fx catalog: absent is skip; a wrong catalog warns; a matching one is ok', 
   });
   assert.equal(extra.state, 'warn');
   assert.match(extra.detail, /多出 fx\/old/);
+});
+
+test('a scene-only gap names --scenes with a client and the full-package copy without one', () => {
+  const assessed = assessLocal(manifestMissingTex(), null);
+  const copy = '没有客户端的服务器可以从同一版本的整合包（完整包）复制 public/assets/local 和 data/local-assets.json';
+  assert.equal(localGaps(assessed), `，已有 75 个分组、1658 项，这一版期望 76 个分组（缺少 scene/tex）。${copy}`);
+  assert.doesNotMatch(localGaps(assessed, { client: false }), /--local|--scenes/);
+  assert.match(localGaps(assessed, { client: true }), /node tools\/setup\.mjs --scenes/);
+  assert.doesNotMatch(localGaps(assessed, { client: true }), /--local/);
+  const noClient = doctorLocalDetail(assessed, false);
+  assert.match(noClient, /同一版本的整合包/);
+  assert.doesNotMatch(noClient, /--local/);
+  assert.doesNotMatch(noClient, /--scenes/);
+  assert.equal((noClient.match(/同一版本的整合包/g) || []).length, 1);
+  const withClient = doctorLocalDetail(assessed, true);
+  assert.match(withClient, /--scenes/);
+  assert.doesNotMatch(withClient, /--local/);
+  assert.equal((withClient.match(/--scenes/g) || []).length, 1);
+
+  const before = {
+    state: 'warn', label: '本地客户端美术（可选）',
+    detail: localArtDetail(assessed, '，3D 棋盘可用', '已提取', { client: true }),
+  };
+  assert.match(before.detail, /--scenes/);
+  const after = artRowAfterScenes(before, assessLocal(manifestOf(EXPECTED_LOCAL_GROUPS), null), {
+    client: true, tail: '，3D 棋盘可用', verb: '已提取',
+  });
+  assert.equal(after.state, 'ok');
+  assert.equal(after.detail, '已提取 76 项，3D 棋盘可用（重新提取：--local）');
+  const src = fs.readFileSync(path.join(ROOT, 'tools/setup.mjs'), 'utf8');
+  const step7 = src.indexOf('// 7. official battlefield scenes');
+  assert.ok(step7 > 0 && src.indexOf('artRowAfterScenes(', step7) > step7);
+
+  const mixedKeys = EXPECTED_LOCAL_GROUPS.filter((g) => g !== 'scene/tex' && !g.startsWith('spine/token/'));
+  const mixed = assessLocal(manifestOf(mixedKeys), null);
+  assert.ok(mixed.missingGroups.some((g) => g.startsWith('scene/')) && mixed.missingGroups.some((g) => !g.startsWith('scene/')));
+  assert.match(localGaps(mixed, { client: true }), /node tools\/setup\.mjs --local/);
+});
+
+test('a partial battlefield set does not start a client extract unless --scenes or --yes', () => {
+  const assessed = assessLocal(manifestMissingTex(), null);
+  const ask = sceneInstallPlan(sceneOpts(assessed, { client: true, python: true }));
+  assert.equal(ask.state, 'ask');
+  assert.equal(ask.run, false);
+  assert.equal(sceneAskDefault(true), false);
+  assert.equal(sceneAskDefault(false), true);
+  assert.equal(sceneClientExtractAllowed({ partial: true, answer: true }), false);
+  assert.equal(sceneClientExtractAllowed({ partial: true, answer: false }), false);
+  assert.equal(sceneClientExtractAllowed({ partial: true, force: true, answer: false }), true);
+  assert.equal(sceneClientExtractAllowed({ partial: true, yes: true, answer: false }), true);
+  assert.equal(sceneClientExtractAllowed({ partial: false, answer: true }), true);
+  const src = fs.readFileSync(path.join(ROOT, 'tools/setup.mjs'), 'utf8');
+  assert.match(src, /ask\('现在下载并提取吗？', sceneAskDefault\(partial\)\)/);
+  assert.equal(sceneInstallPlan(sceneOpts(assessed, { client: true, python: true, yes: true })).run, true);
+  assert.equal(sceneInstallPlan(sceneOpts(assessed, { client: true, python: true, force: true })).run, true);
+  const checking = sceneInstallPlan(sceneOpts(assessed, { check: true, client: true, python: true }));
+  assert.equal(checking.state, 'warn');
+  assert.equal(checking.run, false);
+});
+
+test('the fx repair command is the venv interpreter, not python on PATH', () => {
+  assert.equal(fxReextractCommand(false), '.venv-extract/bin/python tools/local-extract/extract.py --only fx --fx-set used');
+  assert.equal(fxReextractCommand(true), '.venv-extract\\Scripts\\python.exe tools/local-extract/extract.py --only fx --fx-set used');
+  assert.equal(fxReextractCommand().split(' tools/')[0], path.relative(ROOT, venvPython()));
+  assert.equal(IS_WIN, process.platform === 'win32');
+  const groups = {
+    fx: { index: { version: 3, path: '/i' }, textures: { path: '/t' } },
+    'fx/prefabs': { a: { path: '/x' } },
+    'fx/tex': { a: { path: '/x' } },
+    'fx/mesh': { a: { path: '/x' } },
+    'fx/plugin': { a: { path: '/x' } },
+  };
+  const extra = fxCatalogReport({ version: 1, format: 'fx-manifest', count: 6, groups });
+  assert.equal(extra.state, 'warn');
+  assert.match(extra.detail, /多出 fx\/plugin/);
+  assert.match(extra.detail, /请重新运行 \.venv-extract(?:\/bin\/python|\\Scripts\\python\.exe) tools\/local-extract\/extract\.py --only fx --fx-set used/);
+  assert.doesNotMatch(extra.detail, /请重新运行 python /);
 });
 
 test('callers that omit sceneGroupHave still use the old scene branches', () => {

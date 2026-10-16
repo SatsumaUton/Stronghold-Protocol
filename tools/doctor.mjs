@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import {
   ROOT, MIN_NODE, IS_WIN, IS_MAC, c, mark, capture, padDisplay, displayWidth,
   checkNode, checkDeps, checkVendor, checkData, checkAssets, checkLocal, findClient, findPython,
-  localGaps, localArtState, scenePresencePhrase,
+  localArtState, doctorLocalDetail,
   LOCAL_ART_FALLBACK, LOCAL_ART_COPY_HINT,
 } from './setup.mjs';
 import { checkInstall, MANIFEST_FILE, UPDATE_FILE } from '../server/update.js';
@@ -251,8 +251,9 @@ async function main() {
   row(fonts ? 'ok' : 'warn', '字体 public/fonts', fonts ? '' : '未生成（随素材下载一起生成；缺失时用系统字体）');
   const local = checkLocal();
   const client = findClient(null);
+  const usableClient = client?.autochess === true;
   row(local.manifest ? localArtState(local) : 'skip', '本地客户端美术（可选）', local.manifest
-    ? `${local.count} 项${local.board3d ? '，3D 棋盘可用' : '，无棋盘贴图（2D 棋盘）'}${scenePresencePhrase(local)}${localGaps(local)}${local.board3d && !local.tiles ? '；缺 tiles.json → node tools/setup.mjs' : ''}`
+    ? `${local.count} 项${local.board3d ? '，3D 棋盘可用' : '，无棋盘贴图（2D 棋盘）'}${doctorLocalDetail(local, usableClient)}${local.board3d && !local.tiles ? '；缺 tiles.json → node tools/setup.mjs' : ''}`
     : client ? `检测到 ${client.kind} 客户端 → node tools/setup.mjs --local` : `未提取：${LOCAL_ART_FALLBACK}（${LOCAL_ART_COPY_HINT}）`);
   row(local.fx.state, '官方特效清单（可选）', local.fx.detail);
   if (client || local.manifest) {

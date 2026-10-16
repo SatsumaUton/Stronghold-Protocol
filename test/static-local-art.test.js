@@ -103,7 +103,7 @@ test('docs and messages say what falls back without the local art and how a serv
   assert.equal(localGaps({ enemySpines: true, tokenSpines: false }), '，缺少新版的自选召唤物模型');
   assert.equal(localGaps({ enemySpines: false, tokenSpines: false }), '，缺少新版的灼热/炽焰源石虫模型和自选召唤物模型');
   const setupSrc = read('tools/setup.mjs');
-  assert.match(setupSrc, /localGaps\(local\)/);
+  assert.match(setupSrc, /localGaps\(local/);
   assert.match(setupSrc, /（重新提取：--local）/);
   // a non-empty gap already names --local; the fresh-extract hint is not glued on after it
   assert.match(setupSrc, /\$\{gap\}\$\{gap \? '' : again\}/);

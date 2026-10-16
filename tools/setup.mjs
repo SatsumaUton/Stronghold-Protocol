@@ -21,7 +21,10 @@
 //      UnityPy / lz4 / Pillow is a warning: the 3D board keeps the metal tiles. --scenes does it without asking;
 //      --no-scenes skips it. The answer is remembered like step 6. A manifest that is missing a group this version's
 //      extractor writes, or an official-effects catalog (data/local-fx.json) whose groups, entry count or version
-//      disagree, is reported (re-run with --local, or --scenes for the battlefields, or extract.py --only fx).
+//      disagree, is reported. A non-scene gap names --local. A gap whose missing keys are all under scene/ names
+//      --scenes when a client is present and the full-package copy sentence when it is not (--local never fetches
+//      scene bundles). The effects row names the .venv-extract interpreter. A partial battlefield set does not start
+//      extract.py unless --scenes or --yes; that prompt defaults to no. The art row is checked again after step 7.
 //
 // Options:
 //   --check          report only, change nothing (exit 1 when something essential is missing)
@@ -225,7 +228,6 @@ const EXPECTED_SCENE_GROUPS = EXPECTED_LOCAL_GROUPS.filter((g) => g.startsWith('
 const EXPECTED_SCENE_STAGES = EXPECTED_SCENE_GROUPS.filter((g) => g !== 'scene/tex');
 const LOCAL_REEXTRACT = 'node tools/setup.mjs --local';
 const SCENE_REEXTRACT = 'node tools/setup.mjs --scenes';
-const FX_REEXTRACT = 'python tools/local-extract/extract.py --only fx --fx-set used';
 
 function groupEntryCount(groups) {
   if (!groups || typeof groups !== 'object') return 0;
@@ -244,8 +246,10 @@ function formatMissing(keys) {
  * Compare a local-assets manifest and an optional fx catalog with the groups this version's extractor writes
  * (tools/local-extract/expected.mjs, from extract.py --print-jobs; no game client). Does not touch the disk.
  *
- * [ASSUMED] A job-table group key is expected after a full extract. A client missing one bundle still gets
- * "re-run --local". Extra local-assets groups are leftovers from an earlier --only merge and are not stale.
+ * [ASSUMED] A job-table group key is expected after a full extract. A missing non-scene group is still
+ * "re-run --local". Missing keys that are all under scene/ name --scenes when the caller passes a client,
+ * and the full-package copy sentence otherwise (extract.py skips a missing scene bundle; --local does not
+ * run fetch_scenes.py). Extra local-assets groups are leftovers from an earlier --only merge and are not stale.
  * There is no canonical file count (it depends on the client): compare group keys, and report the entry count
  * the user has. A numeric `count` that disagrees with the listed entries is stale; a missing `count` is not.
  * fx or fx/* keys left inside local-assets do not satisfy the fx catalog. See fxCatalogReport for the catalog.
@@ -287,7 +291,8 @@ export function assessLocal(manifest, fxDoc) {
  * [ASSUMED] Present-but-wrong groups, entry count, wrapper version, format or index version is a warning. The group
  * set must be exactly FX_GROUPS (an extra fx group is stale: a full fx run rewrites the catalog to those four keys).
  * The catalog's index version is the version check; mesh and prefab files are not opened for MESH_VERSION /
- * FORMAT_VERSION. `--local` does not extract fx, so the hint names the fx command.
+ * FORMAT_VERSION. `--local` does not extract fx, so the hint names the fx command. The interpreter is the
+ * project venv (`.venv-extract`), not `python` on PATH: setup installs UnityPy there.
  */
 export function fxCatalogReport(doc) {
   const expectGroups = EXPECTED_FX.groups;
@@ -296,7 +301,7 @@ export function fxCatalogReport(doc) {
   if (!doc || typeof doc !== 'object') {
     return {
       present: false, stale: false, state: 'skip', groupCount: 0, listed: 0,
-      detail: `未提取：已有 0 个分组、0 项，这一版期望 ${expectN} 个分组（${expectGroups.join('、')}）、索引版本 ${indexExpect}。需要时 ${FX_REEXTRACT}`,
+      detail: `未提取：已有 0 个分组、0 项，这一版期望 ${expectN} 个分组（${expectGroups.join('、')}）、索引版本 ${indexExpect}。需要时 ${fxReextractCommand()}`,
     };
   }
   const raw = doc.groups && typeof doc.groups === 'object' ? doc.groups : {};
@@ -326,7 +331,7 @@ export function fxCatalogReport(doc) {
   }
   return {
     present: true, stale: true, state: 'warn', listed, groupCount: groups.length, indexVersion,
-    detail: `已有 ${groups.length} 个分组、${listed} 项，这一版期望 ${expectN} 个分组、索引版本 ${indexExpect}（${problems.join('；')}），请重新运行 ${FX_REEXTRACT}`,
+    detail: `已有 ${groups.length} 个分组、${listed} 项，这一版期望 ${expectN} 个分组、索引版本 ${indexExpect}（${problems.join('；')}），请重新运行 ${fxReextractCommand()}`,
   };
 }
 
@@ -346,11 +351,28 @@ export function checkLocal() {
 }
 
 /**
+ * Repair for a gap whose missing keys are all under `scene/`.
+ * `--scenes` only when the caller says a usable client is present. Otherwise the full-package copy
+ * sentence: there is no client to read scene textures from, and `--local` does not fetch scene bundles.
+ * [ASSUMED] `client !== true` (omitted, false, or 'incomplete') is not a usable client. An incomplete
+ * directory has no mode bundles, and those bundles are where the scene materials come from.
+ */
+function sceneRepairClause(client) {
+  return client === true ? `请重新运行 ${SCENE_REEXTRACT}` : LOCAL_ART_COPY_HINT;
+}
+
+function sceneOnlyGap(local) {
+  const keys = local && local.missingGroups;
+  return Array.isArray(keys) && keys.length > 0 && keys.every((g) => String(g).startsWith('scene/'));
+}
+
+/**
  * What an extraction is missing, for setup's 本地客户端美术 row.
  * An object with `missingGroups` (what checkLocal / assessLocal return) names group counts and up to three keys.
  * An older caller that only sets the prefix flags still gets the flag sentence.
+ * `opt.client === true` means a client with the mode's bundles. See sceneRepairClause.
  */
-export function localGaps(local) {
+export function localGaps(local, opt = {}) {
   if (local && Array.isArray(local.missingGroups)) {
     if (!local.missingGroups.length && !local.countMismatch) return '';
     const groupCount = local.groupCount ?? 0;
@@ -359,7 +381,9 @@ export function localGaps(local) {
     let s = `，已有 ${groupCount} 个分组、${count} 项，这一版期望 ${expected} 个分组`;
     if (local.missingGroups.length) s += `（缺少 ${formatMissing(local.missingGroups)}）`;
     if (local.countMismatch) s += `，清单写 ${local.countField} 项，分组里是 ${count} 项`;
-    return `${s}，请重新运行 ${LOCAL_REEXTRACT}`;
+    if (!sceneOnlyGap(local)) return `${s}，请重新运行 ${LOCAL_REEXTRACT}`;
+    // A scene-only key list is not fixed by --local. A count mismatch is still named above.
+    return opt.client === true ? `${s}，${sceneRepairClause(true)}` : `${s}。${sceneRepairClause(false)}`;
   }
   const gaps = [];
   if (local && !local.enemySpines) gaps.push('灼热/炽焰源石虫模型');
@@ -375,16 +399,31 @@ export function localArtState(local) {
 }
 
 /**
- * The 已提取 row. A non-empty localGaps already names `--local`, so the fresh-extract hint is not repeated.
+ * The 已提取 row. A non-empty localGaps already names the repair, so the fresh-extract hint is not repeated.
  * `verb` is 「提取」 on the row printed immediately after a run, 「已提取」 when the files were already there.
+ * `opt.client` is forwarded to localGaps (scene-only gaps).
  */
-export function localArtDetail(local, tail = '', verb = '已提取') {
-  const gap = localGaps(local);
+export function localArtDetail(local, tail = '', verb = '已提取', opt = {}) {
+  const gap = localGaps(local, opt);
   const again = verb === '已提取' ? '（重新提取：--local）' : '';
   return `${verb} ${local.count} 项${tail}${gap}${gap ? '' : again}`;
 }
 
-/** Partial battlefield extract: have/expect battlefields, and scene/tex when that shared group is missing. */
+/**
+ * Replace a manifest-based art row with a fresh checkLocal() result.
+ * Step 6 records the row before step 7 can fill a scene-only gap; without this the row stays warn.
+ */
+export function artRowAfterScenes(row, local, { client = false, tail = '', verb = '已提取' } = {}) {
+  if (!row || !local?.manifest) return row;
+  return {
+    state: localArtState(local),
+    label: row.label,
+    detail: localArtDetail(local, tail, verb, { client }),
+  };
+}
+
+/** Partial battlefield extract: have/expect battlefields, and scene/tex when that shared group is missing.
+ * `o.client === true` names `--scenes`. Any other value names the full-package copy sentence. */
 export function scenePartialDetail(o = {}) {
   const have = o.sceneStagesHave ?? 0;
   const expect = o.sceneStagesExpected ?? EXPECTED_SCENE_STAGES.length;
@@ -393,14 +432,32 @@ export function scenePartialDetail(o = {}) {
   let s = `已有 ${have} 个战场，这一版期望 ${expect} 个`;
   if (stages.length) s += `（缺少 ${formatMissing(stages)}）`;
   if (missing.includes('scene/tex')) s += '，缺少共用贴图 scene/tex';
-  return `${s}，请重新运行 ${SCENE_REEXTRACT}。没有的战场仍用金属地块`;
+  const repair = sceneRepairClause(o.client);
+  const join = o.client === true ? '，' : '。';
+  return `${s}${join}${repair}。没有的战场仍用金属地块`;
 }
 
-/** Doctor's scene clause: complete, partial (have/expect), or none. */
-export function scenePresencePhrase(local) {
+/**
+ * Doctor's scene clause: complete, partial (have/expect), or none.
+ * `opt.client === true` is a usable client. Omitted keeps the older `--scenes` sentence for the
+ * none branch (callers that have not looked). false uses the copy sentence.
+ */
+export function scenePresencePhrase(local, opt = {}) {
   if (local?.scenes) return '，已提取各战场官方场景';
-  if ((local?.sceneGroupHave || 0) > 0) return `，${scenePartialDetail(local)}`;
+  if ((local?.sceneGroupHave || 0) > 0) return `，${scenePartialDetail({ ...local, client: opt.client })}`;
+  if (opt.client === false) return `，无各战场官方场景（3D 棋盘用金属地块；${LOCAL_ART_COPY_HINT}）`;
   return '，无各战场官方场景（3D 棋盘用金属地块；node tools/setup.mjs --scenes）';
+}
+
+/**
+ * Doctor glues the scene clause and the art gap into one cell. A scene-only partial gap is already
+ * the scene clause, so the art gap (which used to add a second, wrong `--local`) is left off.
+ * A count mismatch is not scene-only and is still appended.
+ */
+export function doctorLocalDetail(local, clientUsable) {
+  const sceneOnlyPartial = sceneOnlyGap(local) && !local.countMismatch && (local.sceneGroupHave || 0) > 0;
+  const gaps = sceneOnlyPartial ? '' : localGaps(local, { client: clientUsable });
+  return `${scenePresencePhrase(local, { client: clientUsable })}${gaps}`;
 }
 
 /**
@@ -411,7 +468,9 @@ export function scenePresencePhrase(local) {
  * `client` is true (autochess bundles present), 'incomplete' (a client dir without them) or false.
  * `hasScenes` means every expected scene group is present, including scene/tex — not merely a scene/act prefix.
  * A partial set (`sceneGroupHave` > 0, not force/yes) warns when the fetch is blocked and asks otherwise.
- * Callers that omit `sceneGroupHave` keep the older branches (nothing extracted yet).
+ * That ask defaults to no, and a yes on it does not start extract.py — only `--scenes` (force) or `--yes` does.
+ * With no usable client the partial detail is the copy sentence, not `--scenes` (the old branch returned
+ * before the no-client sentence). Callers that omit `sceneGroupHave` keep the older branches.
  * @param {{ hasScenes?: boolean, sceneStagesHave?: number, sceneStagesExpected?: number, sceneGroupHave?: number, missingSceneGroups?: string[], client?: boolean|string, python?: boolean, deps?: boolean, check?: boolean, declined?: boolean, force?: boolean, yes?: boolean }} o
  * @returns {{ run: boolean, state: 'ok'|'skip'|'warn'|'ask', detail: string }}
  */
@@ -447,6 +506,26 @@ export function sceneInstallPlan(o = {}) {
     return { run: false, state: 'ask', detail: '可以下载赛季场景包并提取（约 23 MB）。失败或跳过时 3D 棋盘仍用金属地块' };
   }
   return { run: true, state: 'ok', detail: '将下载赛季场景包并提取；失败时 3D 棋盘仍用金属地块' };
+}
+
+/**
+ * Default for 「现在下载并提取吗？」. A partial battlefield set defaults to no: Enter and the 60s
+ * timeout must not start extract.py. The first-time prompt (no scene group yet) keeps yes.
+ */
+export function sceneAskDefault(partial) {
+  return !partial;
+}
+
+/**
+ * May this run start extract.py --only scene against the client?
+ * `--scenes` (force) and `--yes` may. A partial set's prompt never does, including a typed yes.
+ * [ASSUMED] A typed yes is not `--scenes` or `--yes`. The first-time prompt (not partial) still
+ * runs when the answer is yes, including that prompt's default of yes.
+ */
+export function sceneClientExtractAllowed({ partial = false, force = false, yes = false, answer = false } = {}) {
+  if (force || yes) return true;
+  if (partial) return false;
+  return answer === true;
 }
 
 /**
@@ -541,6 +620,13 @@ export function findPython() {
 
 export function venvPython() {
   return IS_WIN ? path.join(VENV_DIR, 'Scripts', 'python.exe') : path.join(VENV_DIR, 'bin', 'python');
+}
+
+/** User-facing fx re-extract. The venv interpreter, relative to the repo, not `python` on PATH.
+ * Windows prints `Scripts\\python.exe`. `win` is for tests; the default follows this process. */
+export function fxReextractCommand(win = IS_WIN) {
+  const py = win ? '.venv-extract\\Scripts\\python.exe' : '.venv-extract/bin/python';
+  return `${py} tools/local-extract/extract.py --only fx --fx-set used`;
 }
 
 const PY_ENV = { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', PYTHONDONTWRITEBYTECODE: '1', PIP_DISABLE_PIP_VERSION_CHECK: '1' };
@@ -670,19 +756,29 @@ async function main() {
   // 6. local client (optional)
   const local = checkLocal();
   const state = loadState();
-  if (opts.local === 'no') add(local.manifest ? localArtState(local) : 'skip', '本地客户端美术（可选）', local.manifest ? localArtDetail(local) : '已跳过（--no-local）');
-  else {
+  // Manifest assessments are replaced after step 7 (a scene extract in this run must not leave the art row on warn).
+  let artRefresh = null;
+  const pushArt = (snap, tail, verb, hasClient) => {
+    add(localArtState(snap), '本地客户端美术（可选）', localArtDetail(snap, tail, verb, { client: hasClient }));
+    artRefresh = { index: summary.length - 1, tail, verb, client: hasClient };
+  };
+  if (opts.local === 'no') {
+    // [ASSUMED] --no-local still looks up a client so a scene-only gap names --scenes or the copy sentence. It does not extract.
+    const hinted = findClient(opts.game)?.autochess === true;
+    if (local.manifest) pushArt(local, '', '已提取', hinted);
+    else add('skip', '本地客户端美术（可选）', '已跳过（--no-local）');
+  } else {
     const client = findClient(opts.game);
     const already = local.manifest && local.dirPresent;
     if (!client) {
       if (already && local.board3d && !local.tiles && !opts.check) cropBoardTiles(log);
-      add(already ? localArtState(local) : 'skip', '本地客户端美术（可选）', already ? localArtDetail(local, local.board3d ? '，3D 棋盘可用' : '')
-        : `${opts.game ? `找不到 ${opts.game}` : '未检测到本机明日方舟客户端'}：${LOCAL_ART_FALLBACK}（见 docs/DEPLOY.md 第 6 节）`);
+      if (already) pushArt(local, local.board3d ? '，3D 棋盘可用' : '', '已提取', false);
+      else add('skip', '本地客户端美术（可选）', `${opts.game ? `找不到 ${opts.game}` : '未检测到本机明日方舟客户端'}：${LOCAL_ART_FALLBACK}（见 docs/DEPLOY.md 第 6 节）`);
     } else if (!client.autochess) {
-      add(already ? localArtState(local) : 'warn', '本地客户端美术（可选）', `${client.kind} 客户端缺少卫戍协议资源（请在游戏内下载全部资源）：${client.path}${already ? localGaps(local) : ''}`);
+      add(already ? localArtState(local) : 'warn', '本地客户端美术（可选）', `${client.kind} 客户端缺少卫戍协议资源（请在游戏内下载全部资源）：${client.path}${already ? localGaps(local, { client: false }) : ''}`);
     } else if (already && opts.local !== 'force') {
       if (local.board3d && !local.tiles && !opts.check) cropBoardTiles(log);
-      add(localArtState(local), '本地客户端美术（可选）', localArtDetail(local, local.board3d ? '，3D 棋盘可用' : ''));
+      pushArt(local, local.board3d ? '，3D 棋盘可用' : '', '已提取', true);
     } else if (opts.check) {
       add('skip', '本地客户端美术（可选）', `检测到 ${client.kind} 客户端，可运行 node tools/setup.mjs --local 提取`);
     } else {
@@ -711,7 +807,7 @@ async function main() {
             const r = run(venv.python, [EXTRACT_PY, '--game', client.path], { env: PY_ENV });
             if (r.ok) cropBoardTiles(log);
             const after = checkLocal();
-            if (r.ok && after.manifest) { add(localArtState(after), '本地客户端美术（可选）', localArtDetail(after, after.board3d ? '，3D 棋盘可用' : '', '提取')); saveState({ localDeclined: false, localExtractedFrom: client.path }); }
+            if (r.ok && after.manifest) { pushArt(after, after.board3d ? '，3D 棋盘可用' : '', '提取', true); saveState({ localDeclined: false, localExtractedFrom: client.path }); }
             else add('warn', '本地客户端美术（可选）', `提取未成功（退出码 ${r.code}）：游戏照常运行，${LOCAL_ART_FALLBACK}；可稍后重试 node tools/setup.mjs --local`);
           }
         }
@@ -737,20 +833,30 @@ async function main() {
       client: clientFlag, python: !!scenePy, check: opts.check,
       declined: !!loadState().sceneDeclined, force: opts.scenes === 'force', yes: opts.yes,
     });
+    const partial = (sceneLocal.sceneGroupHave || 0) > 0 && !sceneLocal.scenes;
     if (decision.state === 'ask') {
-      if ((sceneLocal.sceneGroupHave || 0) > 0) log(`\n${c.cyan('▶')} ${decision.detail}`);
+      if (partial) log(`\n${c.cyan('▶')} ${decision.detail}`);
       else {
         log(`\n${c.cyan('▶')} 各战场的官方场景还没提取（${sceneLocal.sceneStagesExpected} 个战场；赛季场景包约 23 MB，贴图仍取自本机客户端）。`);
         log('  下载并提取后，3D 棋盘按战场显示官方场景。没有提取依赖、下载失败或跳过时，仍用现在的金属地块。');
       }
-      const answer = await ask('现在下载并提取吗？', true);
+      const answer = await ask('现在下载并提取吗？', sceneAskDefault(partial));
+      const allow = sceneClientExtractAllowed({ partial, force: opts.scenes === 'force', yes: opts.yes, answer });
       if (answer === null) decision = { run: false, state: 'skip', detail: '无终端，未询问、未提取战场场景。3D 棋盘用金属地块（需要时 node tools/setup.mjs --scenes）' };
-      else if (!answer) {
-        saveState({ sceneDeclined: true });
-        decision = { run: false, state: 'skip', detail: '已跳过战场场景（node tools/setup.mjs --scenes）。3D 棋盘用金属地块' };
+      else if (!allow) {
+        // A partial set never starts extract.py from this prompt. Enter, the timeout, and a typed yes do not.
+        if (answer) log(c.dim('  这一步不会从客户端提取。需要时运行 node tools/setup.mjs --scenes，或加上 --yes'));
+        else saveState({ sceneDeclined: true });
+        decision = answer
+          ? { run: false, state: 'warn', detail: decision.detail }
+          : { run: false, state: 'skip', detail: '已跳过战场场景（node tools/setup.mjs --scenes）。3D 棋盘用金属地块' };
       } else decision = { run: true, state: 'ok', detail: decision.detail };
     }
-    if (!decision.run) add(decision.state === 'ok' ? 'ok' : decision.state, '各战场官方场景（可选）', decision.detail);
+    // Second gate: extract.py --only scene runs only when the plan's run is allowed for this manifest.
+    const mayExtract = decision.run && sceneClientExtractAllowed({
+      partial, force: opts.scenes === 'force', yes: opts.yes, answer: true,
+    });
+    if (!mayExtract) add(decision.state === 'ok' ? 'ok' : decision.state, '各战场官方场景（可选）', decision.detail);
     else {
       const venv = ensureVenv(scenePy, log);
       if (!venv.ok) add('warn', '各战场官方场景（可选）', `${venv.why}。3D 棋盘继续用金属地块`);
@@ -770,6 +876,7 @@ async function main() {
       }
     }
   }
+  if (artRefresh) summary[artRefresh.index] = artRowAfterScenes(summary[artRefresh.index], checkLocal(), artRefresh);
 
   // summary
   log(c.bold('\n── 准备情况 ──────────────────────────────'));
