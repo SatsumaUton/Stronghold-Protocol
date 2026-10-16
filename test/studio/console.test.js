@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
 import { fixture } from '../helpers/contentFixtures.js';
@@ -17,7 +18,9 @@ import { DataSource, setSimData } from '../../server/sim/simdata.js';
 import { setGameData } from '../../server/sim/content/support/index.js';
 import { createBattleFromSpec, resultDigest } from '../../server/sim/spec.js';
 import { makeRunner, makeLog, observeCombat, observeEffects, inspectUnit, pauseIfHidden } from '../../public/studio/js/console/runtime.js';
-import { devicePos, moduleOptions, tokenRemaining, routeLabel } from '../../public/studio/js/console/labels.js';
+import { deviceOptionName, devicePos, lockedModuleLabel, modeOptionLabel, moduleOptionName, moduleOptions, skillOptionName, tokenRemaining, routeLabel } from '../../public/studio/js/console/labels.js';
+import { applyFileOverlay } from '../../shared/i18nData.js';
+import { renderInfo } from '../../public/js/render/app/info.js';
 import { scenarioText } from '../../public/studio/js/console/problems.js';
 import { checkInvariants } from '../helpers/battleHarness.js';
 import { OfficialFx } from '../../public/js/render/vfx/system.js';
@@ -243,12 +246,58 @@ test('preview shows the idle pose, drops the deploy beam and stays paused until 
   assert.equal(r.touched, true);
 });
 
+test('preview keeps a view entry for every starting operator, summon and device', () => {
+  const s = newScenario();
+  s.players[0].units = [
+    op('chess_char_3_19_a', 1, 10, 4),
+    { uid: 2, kind: 'token', tokenId: 'token_10028_vigil_wolf', ownerUid: 1, row: 10, col: 7, dir: 'RIGHT' },
+  ];
+  const b = createBattleFromSpec(build(s).spec, ds, { quiet: true });
+  const frames = [];
+  const r = makeRunner(b, { cap: 30, preview: true, onFrame: (snap, ev) => frames.push({ snap, ev }) });
+  assert.equal(frames.length, 1);
+  assert.equal(r.playing, false);
+  assert.equal(r.touched, false);
+  assert.equal(frames[0].ev.some((e) => e[0] === 'deploy'), false);
+  const infos = new Map();
+  for (const e of frames[0].ev) {
+    if (e[0] !== 'spawn') continue;
+    const info = renderInfo(e[1]);
+    assert.ok(info);
+    infos.set(info.id, info);
+  }
+  const views = new Map();
+  for (const tuple of frames[0].snap.units) {
+    const id = tuple[0];
+    const info = infos.get(id);
+    views.set(id, info
+      ? { id, kind: info.kind, defId: info.defId, spine: info.spine, unknown: false }
+      : { id, kind: 'enemy', defId: null, spine: null, unknown: true });
+  }
+  const present = b.units.filter((u) => u.deployed && (u.kind === 'op' || u.kind === 'token' || u.kind === 'device'));
+  assert.equal(present.filter((u) => u.kind === 'op').length > 0, true);
+  assert.equal(present.filter((u) => u.kind === 'token').length > 0, true);
+  assert.equal(present.filter((u) => u.kind === 'device').length > 0, true);
+  for (const u of present) {
+    const v = views.get(u.id);
+    assert.ok(v, `${u.kind} ${u.defId}`);
+    assert.equal(v.unknown, false, u.defId);
+    assert.equal(v.defId, u.defId);
+    assert.ok(v.spine, u.defId);
+  }
+});
+
 test('device, module, token and route labels, and a named scenario error', () => {
   assert.equal(devicePos([11, 5]), '(11,5)');
   const mods = [{ uniEquipId: 'isw', typeName: 'ISW-A', name: '证章' }, { uniEquipId: 'mod', typeName: 'X', name: '模组' }];
   assert.deepEqual(moduleOptions(mods, true, 'isw').map((m) => m.uniEquipId), ['isw', 'mod']);
   assert.deepEqual(moduleOptions(mods, true, null).map((m) => m.uniEquipId), ['mod']);
   assert.equal(moduleOptions([], true, 'fixed')[0].uniEquipId, 'fixed');
+  assert.equal(moduleOptions([], true, 'fixed')[0].name, 'fixed');
+  const named = moduleOptions([], true, 'uniequip_002_acpion', '郁金香证章')[0];
+  assert.equal(named.uniEquipId, 'uniequip_002_acpion');
+  assert.equal(moduleOptionName(named), '郁金香证章');
+  assert.equal(moduleOptionName({ uniEquipId: 'uniequip_002_acpion', name: 'uniequip_002_acpion' }), 'uniequip_002_acpion');
   assert.equal(tokenRemaining({ ownerUid: 1, tokenId: 't', count: 3 }, [
     { kind: 'token', ownerUid: 1, tokenId: 't' },
     { kind: 'token', ownerUid: 1, tokenId: 't' },
@@ -262,6 +311,47 @@ test('device, module, token and route labels, and a named scenario error', () =>
   const text = scenarioText({ params: { path: 'players.0.units.1.row', reason: 'tile' } });
   assert.match(text, /players\.0\.units\.1\.row/);
   assert.match(text, /这个格子不能部署该单位/);
+});
+
+test('mode, skill and device labels and a locked module name follow the data overlay', () => {
+  const editor = readFileSync(new URL('../../public/studio/js/console/editor.js', import.meta.url), 'utf8');
+  for (const needle of ["data.get('config')", "data.get('backups')", "data.lookup('stages'", 'lockedModuleLabel', 'modeOptionLabel', 'skillOptionName', 'deviceOptionName']) {
+    assert.equal(editor.includes(needle), true, needle);
+  }
+  const config = JSON.parse(readFileSync(new URL('../../data/config.json', import.meta.url), 'utf8'));
+  const chess = JSON.parse(readFileSync(new URL('../../data/chess.json', import.meta.url), 'utf8'));
+  const stages = JSON.parse(readFileSync(new URL('../../data/stages.json', import.meta.url), 'utf8'));
+  const backups = JSON.parse(readFileSync(new URL('../../data/backups.json', import.meta.url), 'utf8'));
+  const zhMode = config.modes.mode_single_normal.name;
+  const zhSkill = chess.chess_char_1_01_a.skills.find((s) => s.index === 0).name;
+  const zhEye = stages.act1autochess_m01.devices.find((d) => d.key === 'trap_1104_aclasert').name;
+  const zhCrate = stages.act1autochess_m01.devices.find((d) => d.role === 'crate').name;
+  assert.equal(zhMode, '险境模拟');
+  assert.equal(zhSkill.includes('不惹麻烦'), true);
+  assert.equal(zhEye.includes('双眼皮'), true);
+  assert.equal(zhCrate, '阻隔工事');
+  const expect = {
+    en: ['Perilous Simulation', "'Don't Invite Trouble'", "'Double Lids'", 'Barricade', "Tulip's Badge"],
+    ja: ['逆境', '「トラブル回避」', '「ダブルリッズ」', 'バリケード', 'チューリップの記章'],
+    ko: ['험지 시뮬레이션', "'트러블 차단'", "'쌍꺼풀'", '차단 공사', '튤립의 배지'],
+  };
+  for (const [lang, want] of Object.entries(expect)) {
+    const ov = JSON.parse(readFileSync(new URL(`../../data/i18n/${lang}.json`, import.meta.url), 'utf8'));
+    const mode = applyFileOverlay(config, ov.files.config).value.modes.mode_single_normal;
+    const skill = applyFileOverlay(chess, ov.files.chess).value.chess_char_1_01_a.skills.find((s) => s.index === 0);
+    const devs = applyFileOverlay(stages, ov.files.stages).value.act1autochess_m01.devices;
+    const eye = devs.find((d) => d.key === 'trap_1104_aclasert');
+    const crate = devs.find((d) => d.role === 'crate');
+    const locBackups = applyFileOverlay(backups, ov.files.backups).value;
+    const mod = lockedModuleLabel(locBackups, 'char_608_acpion', 'uniequip_002_acpion');
+    assert.equal(modeOptionLabel(mode, 'mode_single_normal'), `${want[0]} · mode_single_normal`);
+    assert.equal(skillOptionName(skill), `S1 · ${want[1]}`);
+    assert.equal(deviceOptionName(eye).startsWith(`${want[2]} · `), true);
+    assert.equal(deviceOptionName(crate).startsWith(`${want[3]} · `), true);
+    assert.equal(mod, want[4]);
+    assert.equal(mod.includes('uniequip_'), false);
+    assert.equal(moduleOptionName(moduleOptions([], true, 'uniequip_002_acpion', mod)[0]), want[4]);
+  }
 });
 
 test('one-second stepping and fast playback advance the real official effect clock without frame-cap loss', () => {

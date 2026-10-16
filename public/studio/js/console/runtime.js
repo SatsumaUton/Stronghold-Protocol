@@ -14,15 +14,16 @@ export function makeRunner(battle, { cap = 240, onFrame = () => {}, preview = fa
   };
   battle.start();
   // [ASSUMED] A paused preview steps past DEPLOY_ANIM_TIME (0.5s = 15 ticks at 30 Hz,
-  // server/sim/constants.js) so placed operators are shown idle, then discards the opening
-  // deploy events before the only capture. Enemies may move during that half second.
-  // The default (preview false) stays at t = 0 until the user steps or plays.
+  // server/sim/constants.js) so placed operators are shown idle. The opening deploy beam is
+  // dropped; spawn infos stay, or the view builds a red placeholder (render/app.js createUnknown)
+  // for every operator, summon and crate that was already on the field. Enemies may move during
+  // that half second. The default (preview false) stays at t = 0 until the user steps or plays.
   if (preview) {
     quiet = true;
     stepTicks(15);
     quiet = false;
-    battle.drainEvents();
-    capture();
+    const ev = battle.drainEvents().filter((e) => e[0] !== 'deploy');
+    onFrame(battle.snapshot(), ev);
   } else capture();
   return {
     battle,

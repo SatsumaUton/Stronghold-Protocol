@@ -6,7 +6,7 @@ import { t } from '../../../../shared/i18n.js';
 import { emptyPlayer, cloneScenario, scenarioDevices } from '../../../../shared/studio/scenario.js';
 import { diyPool, lockedSelection } from '../../../../shared/diy.js';
 import { unitForm } from '../../../../shared/standIn.js';
-import { devicePos, moduleOptions, routeLabel, tokenRemaining } from './labels.js';
+import { deviceOptionName, lockedModuleLabel, modeOptionLabel, moduleOptionName, moduleOptions, routeLabel, skillOptionName, tokenRemaining } from './labels.js';
 
 export const labelOf = r => `${data.localeName(r.name || r.id || r.chessId || r.tokenId || r.effectId || '')}${r.isGolden ? ` (${t('精锐')})` : ''} · ${r.id || r.chessId || r.tokenId || r.effectId || r.bondId || r.bandId || r.modeId || r.key || ''}`;
 export function Select({ label, value, options, onChange, disabled = false }) {
@@ -48,6 +48,13 @@ export function Editor({ scenario: s, compiled, options, update, palette, setPal
   const pool = chess?.isDiy ? diyPool(chess.tier, { data: raw }) : [];
   const form = palette.diy ? unitForm(raw.backups, palette.diy.charId, chess?.status) : chess;
   const locked = palette.diy ? lockedSelection(raw, chess?.tier, palette.diy.charId) : null;
+  // Display copies: data.get / lookup apply the same file overlay as the match UI. localeName only
+  // covers the flat names map, so mode, skill and device names stay Chinese if read from getRaw.
+  const locBackups = data.get('backups') || raw.backups;
+  const locChess = (palette.chessId && data.lookup('chess', palette.chessId)) || chess;
+  const shownForm = palette.diy ? (unitForm(locBackups, palette.diy.charId, chess?.status) || form) : (locChess || form);
+  const lockedModName = lockedModuleLabel(locBackups, palette.diy?.charId, locked?.uniEquipId);
+  const modes = (data.get('config') || data.getRaw('config'))?.modes || {};
   const fixedLoadout = palette.kind !== 'chess' || !!palette.standIn || !!locked;
   const unit = p.units.find(u => u.uid === selected);
   const pickChess = id => {
@@ -70,7 +77,7 @@ export function Editor({ scenario: s, compiled, options, update, palette, setPal
       <${Select} label=${t('地图')} value=${s.stageId} options=${entries('stages').map(r => [r.id, labelOf(r)])}
         onChange=${id => write({ stageId: id, players: s.players.map(v => ({ ...v, units: [], deviceOverrides: {} })) })} />
       <${Select} label=${t('战场区域')} value=${s.kind} options=${[['normal', t('各自行动')], ['boss', t('最终攻势')], ['hidden', t('隐秘核心')], ['unite', t('联防')]]} onChange=${kind => { setSide(0); update(changeField(s, kind)); }} />
-      <${Select} label=${t('难度')} value=${s.modeId} options=${Object.entries(data.getRaw('config').modes).map(([id, r]) => [id, labelOf(r)])} onChange=${modeId => write({ modeId, waveId: null })} />
+      <${Select} label=${t('难度')} value=${s.modeId} options=${Object.entries(modes).map(([id, r]) => [id, modeOptionLabel(r, id)])} onChange=${modeId => write({ modeId, waveId: null })} />
       <${Numeric} label=${t('回合')} value=${s.round} min=${1} max=${15} onChange=${round => write({ round })} />
       <${Numeric} label=${t('随机种子')} value=${s.seed} min=${1} max=${4294967295} onChange=${seed => write({ seed })} />
       <${Numeric} label=${t('运行上限（游戏秒）')} value=${s.seconds} min=${1} max=${1200} onChange=${seconds => write({ seconds })} />
@@ -86,11 +93,11 @@ export function Editor({ scenario: s, compiled, options, update, palette, setPal
       <${Search} label=${t('干员（普通 / 精锐）')} records=${entries('chess')} value=${palette.chessId} onChange=${pickChess} />
       ${chess?.isDiy ? html`<${Select} label=${t('自选干员')} value=${palette.diy?.charId} options=${pool.map(v => { const id = typeof v === 'string' ? v : v.charId; return [id, data.localeName(raw.backups.units[id]?.name || id)]; })}
         onChange=${charId => modify({ diy: { charId, ...(lockedSelection(raw, chess.tier, charId) || { skillIndex: 0, uniEquipId: null }) }, potential: undefined, cultivate: undefined })} />` : null}
-      <${Select} label=${t('技能')} disabled=${fixedLoadout} value=${palette.diy?.skillIndex ?? palette.skillIndex ?? form?.skill?.index ?? form?.skills?.[0]?.index}
-        options=${(form?.skills || []).map(sk => [sk.index, `S${sk.index + 1} · ${data.localeName(sk.name)}`])}
+      <${Select} label=${t('技能')} disabled=${fixedLoadout} value=${palette.diy?.skillIndex ?? palette.skillIndex ?? form?.skill?.index ?? shownForm?.skills?.[0]?.index}
+        options=${(shownForm?.skills || []).map(sk => [sk.index, skillOptionName(sk)])}
         onChange=${v => modify(palette.diy ? { diy: { ...palette.diy, skillIndex: +v } } : { skillIndex: +v })} />
       <${Select} label=${t('模组')} disabled=${fixedLoadout} value=${palette.diy ? (palette.diy.uniEquipId || 'none') : palette.moduleId ?? form?.modules?.find(m => m.isDefault)?.uniEquipId ?? 'none'}
-        options=${[['none', t('不装备')], ...moduleOptions(form?.modules, !!palette.diy, locked?.uniEquipId).map(m => [m.uniEquipId, data.localeName(m.name || m.uniEquipId)])]}
+        options=${[['none', t('不装备')], ...moduleOptions(shownForm?.modules, !!palette.diy, locked?.uniEquipId, lockedModName).map(m => [m.uniEquipId, moduleOptionName(m)])]}
         onChange=${v => modify(palette.diy ? { diy: { ...palette.diy, uniEquipId: v === 'none' ? null : v } } : { moduleId: v })} />
       <${Select} label=${t('朝向')} value=${palette.dir} options=${[['RIGHT', t('右')], ['UP', t('上')], ['LEFT', t('左')], ['DOWN', t('下')]]} onChange=${dir => modify({ dir })} />
       ${[0, 1].map(i => html`<${Select} key=${i} disabled=${palette.kind !== 'chess'} label=${t('装备槽 {n}', { n: i + 1 })} value=${palette.items?.[i] || ''} options=${itemOptions} onChange=${v => { const items = [...(palette.items || [])]; items[i] = v; modify({ items: items.filter(Boolean) }); }} />`)}
@@ -149,7 +156,7 @@ function Globals({ s, p, side, compiled, player, options, write }) {
   </div></details>
   <details><summary>${t('场地装置')}</summary><div class="sc-fields">
     <p>${t('装置只能在官方地图预设的位置启用或关闭。')}</p>
-    ${scenarioDevices(data.lookupRaw('stages', s.stageId), s, side).map(d => html`<label key=${d.alias}><input type="checkbox" checked=${p.deviceOverrides[d.alias] ?? compiled?.spec.players[side]?.deviceOverrides[d.alias] ?? d.active ?? !d.hidden}
-      onChange=${e => player({ deviceOverrides: { ...p.deviceOverrides, [d.alias]: e.currentTarget.checked } })} />${data.localeName(d.name || d.key)} · ${devicePos(d.pos)} · ${d.alias}</label>`)}
+    ${scenarioDevices(data.lookup('stages', s.stageId) || data.lookupRaw('stages', s.stageId), s, side).map(d => html`<label key=${d.alias}><input type="checkbox" checked=${p.deviceOverrides[d.alias] ?? compiled?.spec.players[side]?.deviceOverrides[d.alias] ?? d.active ?? !d.hidden}
+      onChange=${e => player({ deviceOverrides: { ...p.deviceOverrides, [d.alias]: e.currentTarget.checked } })} />${deviceOptionName(d)}</label>`)}
   </div></details>`;
 }

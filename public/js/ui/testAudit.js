@@ -42,6 +42,21 @@ export function explainTestDetail(detail) {
   }
 }
 
+/**
+ * Toast text for a refused test command. A known detail is the reason itself. Otherwise the message of the
+ * error code (ERR_TEXT), then the error's own message. 无效的目标 is only the fallback for a real bad target
+ * or a refusal that carries neither.
+ * @param {any} err
+ * @returns {string}
+ */
+export function testRefusalText(err) {
+  const why = explainTestDetail(err?.detail);
+  if (why) return why;
+  if (err && typeof err === 'object' && err.code && Object.hasOwn(ERR_TEXT, err.code)) return t(ERR_TEXT[err.code]);
+  if (typeof err?.message === 'string' && err.message) return t(err.message);
+  return t('无效的目标');
+}
+
 /** One audit line: one number, the actor's name, a clock, the command, the translated result. */
 export function formatAuditLine(entry, name) {
   const e = entry || {};

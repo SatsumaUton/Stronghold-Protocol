@@ -2,11 +2,11 @@
 // room host. Commands go out as g.test; the server applies them. The studio battle sandbox is a different
 // page and does not touch this match.
 //
-// [ASSUMED] The panel is a left-hand drawer, collapsed to a 测试 button until the host opens it. The open
-// state is remembered in this browser (localStorage). Backquote toggles it and is ignored while typing and
-// when that key is bound to a game shortcut. Escape closes the drawer. Enter in a field runs the command.
-// The drawer sits under the top bar and above the hand so it does not cover funds, the shop, the ready
-// button or the hand at 1280×720 and 1920×1080.
+// [ASSUMED] The panel is a floating field panel, collapsed to a 测试 button until the host opens it. The open
+// state and the dragged position are remembered in this browser (localStorage, try/catch). Backquote toggles
+// it and is ignored while typing and when that key is bound to a game shortcut. Escape closes it. Enter in a
+// field runs the command. The host drags it by the header. The default sits on the field only (right of the
+// team roster, below the bond strip, above the hand) at 1280×720 and 1920×1080. At ≤720px it stays the top sheet.
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html } from './components.js';
@@ -17,7 +17,8 @@ import { toast } from './toasts.js';
 import { t } from '../../../shared/i18n.js';
 import { actionForKey } from './gameLogic/shortcuts.js';
 import { settingsStore } from './settings.js';
-import { explainTestDetail, formatAuditLine, newestFirst } from './testAudit.js';
+import { formatAuditLine, newestFirst, testRefusalText } from './testAudit.js';
+import { clampDock, dockHome, dockMetricsFromStyle, DOCK_REM, readDockPos, writeDockPos } from './testDock.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 const DOCK_KEY = 'sp.testConsoleOpen';
@@ -105,6 +106,32 @@ export function TestConsole() {
   const [choiceIdx, setChoiceIdx] = useState('0');
   const [choiceId, setChoiceId] = useState('');
   const dock = useRef(null);
+  const [sheet, setSheet] = useState(false);
+  const [box, setBox] = useState(null);
+  const boxRef = useRef(null);
+  boxRef.current = box;
+  const dragRef = useRef(null);
+  useEffect(() => {
+    const place = () => {
+      const vw = window.innerWidth || 0;
+      const vh = window.innerHeight || 0;
+      if (vw <= 720) { setSheet(true); setBox(null); return; }
+      let metrics = DOCK_REM;
+      try {
+        const host = document.querySelector('.gm') || dock.current;
+        if (host) metrics = dockMetricsFromStyle(getComputedStyle(host));
+      } catch { metrics = DOCK_REM; }
+      const home = dockHome({ width: vw, height: vh }, metrics);
+      if (home.sheet) { setSheet(true); setBox(null); return; }
+      setSheet(false);
+      const stored = readDockPos(globalThis.localStorage);
+      const pos = clampDock(stored || { x: home.x, y: home.y }, { width: vw, height: vh }, home);
+      setBox({ x: pos.x, y: pos.y, width: home.width, height: home.height });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, []);
   const setOpen = (next) => {
     setOpenState((cur) => {
       const value = typeof next === 'function' ? next(cur) : next;
@@ -157,8 +184,7 @@ export function TestConsole() {
     const fields = { cmd: command };
     if (args && Object.keys(args).length) fields.args = args;
     return net.request('g.test', fields).catch((err) => {
-      const why = explainTestDetail(err?.detail);
-      toast(why ? `${t('无效的目标')}：${why}` : (err?.message || t('无效的目标')), 'error');
+      toast(testRefusalText(err), 'error');
     });
   };
   // send is used by run(), which closed over the previous send. Rebind by calling the latest via ref.
@@ -210,12 +236,45 @@ export function TestConsole() {
     if (cmd === 'level') return go('level', {});
     return null;
   };
-  return html`<aside class=${cx('testconsole', open && 'is-open')} data-testid="test-console" ref=${dock}>
+  const style = !sheet && box ? {
+    left: `${box.x}px`, top: `${box.y}px`,
+    ...(open ? { width: `${box.width}px`, maxHeight: `${box.height}px` } : {}),
+  } : undefined;
+  const onHeadDown = (e) => {
+    if (sheet || !boxRef.current || (e.button != null && e.button !== 0)) return;
+    const target = e.target;
+    if (target && typeof target.closest === 'function' && target.closest('button, a, input, select, textarea')) return;
+    const rect = dock.current?.getBoundingClientRect();
+    if (!rect) return;
+    dragRef.current = { id: e.pointerId, dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    e.preventDefault();
+  };
+  const onHeadMove = (e) => {
+    const d = dragRef.current;
+    const cur = boxRef.current;
+    if (!d || e.pointerId !== d.id || !cur) return;
+    const height = dock.current?.offsetHeight || cur.height;
+    const pos = clampDock(
+      { x: e.clientX - d.dx, y: e.clientY - d.dy },
+      { width: window.innerWidth, height: window.innerHeight },
+      { width: cur.width, height },
+    );
+    setBox({ ...cur, x: pos.x, y: pos.y });
+  };
+  const onHeadUp = (e) => {
+    const d = dragRef.current;
+    if (!d || e.pointerId !== d.id) return;
+    dragRef.current = null;
+    const cur = boxRef.current;
+    if (cur) writeDockPos(cur, globalThis.localStorage);
+  };
+  return html`<aside class=${cx('testconsole', open && 'is-open', sheet && 'is-sheet')} data-testid="test-console" ref=${dock} style=${style}>
     <button type="button" class="testconsole__tab" aria-expanded=${open ? 'true' : 'false'} title=${t('按反引号键（Backquote）开关测试面板')} onClick=${() => setOpen(!open)}>
       ${open ? t('收起') : t('测试')}
     </button>
     ${open ? html`<div class="testconsole__body">
-      <header class="testconsole__head">
+      <header class="testconsole__head" onPointerDown=${onHeadDown} onPointerMove=${onHeadMove} onPointerUp=${onHeadUp} onPointerCancel=${onHeadUp}>
         <${TestMark} />
         <b>${t('测试指令')}</b>
         <span class="t-dim">${t('已执行 {n} 次', { n: pub.testActions | 0 })}</span>

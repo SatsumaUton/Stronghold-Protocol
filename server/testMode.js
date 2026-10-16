@@ -33,6 +33,10 @@ export const TEST_MODE_PUBLIC_HINT =
 export const TEST_MODE_UNKNOWN_HINT =
   '未识别的 SP_TEST_MODE，测试房间保持关闭。可用的值：off、1、force。';
 
+/** Printed when force opens test rooms on a public or wildcard listener. Same hint style as TEST_MODE_PUBLIC_HINT. */
+export const TEST_MODE_FORCE_HINT =
+  '测试模式 force 已在公网或通配监听上开启测试房间（--test-mode force 或 SP_TEST_MODE=force）。环回地址前面的反向代理仍然是公网部署。';
+
 /** @param {unknown} raw @returns {'off'|'local'|'force'} */
 export function parseTestModeEnv(raw) {
   const s = String(raw ?? '').trim().toLowerCase();
@@ -97,7 +101,7 @@ export function testModeGate(mode, host, interfaces) {
   if (m === 'force' && !local) {
     return {
       enabled: true,
-      warn: 'SP_TEST_MODE=force enables test rooms on a public or wildcard listener. A reverse proxy in front of loopback is still a public deployment.',
+      warn: TEST_MODE_FORCE_HINT,
     };
   }
   return { enabled: true, warn: null };
