@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from '../../../vendor/hooks.module.js';
 import { html } from '../../../js/ui/components.js';
-import { data } from '../../../js/data.js';
+import { data, useData } from '../../../js/data.js';
+import { useLang } from '../../../js/ui/lang.js';
 import { createAssets } from '../../../js/assets.js';
 import { createFieldView } from '../../../js/render/app.js';
 import { loadBrowserSim } from '../../../js/battle/runner.js';
 import { t } from '../../../../shared/i18n.js';
 import { SPEEDS } from '../../../../shared/studio/scenario.js';
-import { makeRunner, makeLog, observeCombat, observeEffects, inspectUnit } from './runtime.js';
+import { makeRunner, makeLog, observeCombat, observeEffects, inspectUnit, pauseIfHidden } from './runtime.js';
 import { Select } from './editor.js';
 
 const hooks = { ready: false, runner: null, view: null, compiled: null, errors: [] };
 globalThis.__console = hooks;
 let simPromise;
 export function ConsoleView({ compiled, valid, onTile, onSelect, onReroll }) {
+  useLang();
+  useData('chess', 'tokens', 'enemies', 'assets', 'stages');
   const host = useRef(null), state = useRef(null), callback = useRef({ onTile, onSelect });
   callback.current = { onTile, onSelect };
   const [ready, setReady] = useState(false), [failed, setFailed] = useState('');
@@ -22,7 +25,7 @@ export function ConsoleView({ compiled, valid, onTile, onSelect, onReroll }) {
   const viewSettings = useRef({ board, fx, ranges }); viewSettings.current = { board, fx, ranges };
   useEffect(() => {
     if (!compiled) return;
-    let alive = true, view, raf = 0, unobserve = () => {}, uncombat = () => {};
+    let alive = true, view, raf = 0, onHide = null, unobserve = () => {}, uncombat = () => {};
     const controller = new AbortController();
     setReady(false); setFailed(''); hooks.ready = false;
     (async () => {
@@ -45,12 +48,17 @@ export function ConsoleView({ compiled, valid, onTile, onSelect, onReroll }) {
       // The sandbox displays the exact tick selected (no network interpolation/extrapolation).
       view.debug.interp.update = () => view.debug.interp.snapToNewest();
       unobserve = observeEffects(view, effects, () => b.time);
-      const runner = makeRunner(b, { cap: compiled.cap, onFrame: (snap, ev) => {
+      const runner = makeRunner(b, { cap: compiled.cap, preview: true, onFrame: (snap, ev) => {
         view.pushEvents({ t: 'b.ev', fieldId: snap.fieldId, gt: snap.t, ev });
         view.pushSnapshot({ ...snap, t: 'b.snap', gt: snap.t });
       } });
       runner.speedTo(speed);
-      view.on('tileClick', tile => { if (b.time === 0) callback.current.onTile(tile); });
+      // Placement stays open until the user plays or steps. The preview clock is already past 0.
+      view.on('tileClick', tile => { if (!runner.touched) callback.current.onTile(tile); });
+      if (!alive) return;
+      // requestAnimationFrame does not run while the tab is hidden, so pause here.
+      onHide = () => { pauseIfHidden(runner, document.hidden); if (document.hidden) refresh(v => v + 1); };
+      document.addEventListener('visibilitychange', onHide);
       view.on('pieceClick', hit => { setSelected(hit.unitId); callback.current.onSelect(hit.uid); });
       state.current = { runner, view, combat, effects };
       Object.assign(hooks, { ready: true, runner, view, compiled, combat, effects }); setReady(true);
@@ -66,7 +74,9 @@ export function ConsoleView({ compiled, valid, onTile, onSelect, onReroll }) {
       raf = requestAnimationFrame(frame);
     })().catch(e => { if (alive) { setFailed(String(e?.message || e)); hooks.errors.push(String(e)); } });
     return () => {
-      alive = false; controller.abort(); cancelAnimationFrame(raf); state.current?.runner.pause(); unobserve(); uncombat(); view?.destroy(); state.current = null;
+      alive = false; controller.abort(); cancelAnimationFrame(raf);
+      if (onHide) document.removeEventListener('visibilitychange', onHide);
+      state.current?.runner.pause(); unobserve(); uncombat(); view?.destroy(); state.current = null;
       Object.assign(hooks, { ready: false, runner: null, view: null, combat: null, effects: null });
     };
   }, [compiled, reset]);

@@ -21,25 +21,40 @@
 .gm__hud > * { pointer-events: auto; }
 .gload { align-items: center; justify-content: center; gap: .2rem; }
 
-/* Host test console (DESIGN §34.8). Fixed so it covers the briefing, the draft and the match. */
+/* Host test console (DESIGN §34.8). Left drawer under the top bar and above the hand, so an open
+   panel does not cover funds, the shop, the ready button or the hand at 1280×720 / 1920×1080.
+   Collapsed it is only the 测试 tab. */
 .testconsole {
-  position: fixed; right: .16rem; bottom: .16rem; z-index: 40; display: flex; flex-direction: column; align-items: flex-end;
-  gap: .06rem; max-width: min(7.2rem, calc(100vw - .32rem)); pointer-events: auto;
+  position: fixed; left: .08rem; top: 1.02rem; z-index: 20; display: flex; flex-direction: column; align-items: flex-start;
+  gap: .06rem; width: auto; max-width: min(3.6rem, 28vw); max-height: calc(100vh - 2.4rem);
+  pointer-events: auto; box-sizing: border-box;
 }
+.testconsole.is-open { width: min(3.6rem, 28vw); }
 .testconsole__tab, .testconsole__run, .testconsole__row button {
   color: #1a1408; background: #e8b84a; border: 0; font-weight: 700; padding: .04rem .1rem; cursor: pointer;
 }
 .testconsole__body {
   width: 100%; display: grid; gap: .06rem; padding: .1rem; background: rgba(12, 14, 12, .94);
-  border: 1px solid rgba(232, 184, 74, .7); color: var(--text-hi); font-size: calc(.14 * var(--t));
+  border: 1px solid rgba(232, 184, 74, .7); color: var(--text-hi); font-size: calc(.15 * var(--t));
+  max-height: calc(100vh - 2.6rem); overflow: auto; box-sizing: border-box;
 }
 .testconsole__head, .testconsole__row, .testconsole__field, .testconsole__check { display: flex; flex-wrap: wrap; align-items: center; gap: .06rem; }
-.testconsole__field { display: grid; gap: .02rem; }
+.testconsole__field { display: grid; gap: .02rem; min-width: 0; }
 .testconsole__field input, .testconsole__field select {
-  color: var(--text-hi); background: var(--bg-2); border: 1px solid var(--line-2); padding: .03rem .06rem; min-width: 0;
+  color: var(--text-hi); background: var(--bg-2); border: 1px solid var(--line-2); padding: .03rem .06rem;
+  min-width: 0; width: 100%; box-sizing: border-box;
 }
-.testconsole__log { margin: 0; padding-left: .2rem; max-height: 1.6rem; overflow: auto; }
+.testconsole__log { margin: 0; padding: 0; list-style: none; max-height: 2.4rem; overflow: auto; overflow-wrap: anywhere; }
 .testconsole__log .is-bad { color: #ff8a5c; }
+@media (max-width: 720px) {
+  .testconsole { top: 8px; left: 8px; max-width: calc(100vw - 16px); font-size: 14px; }
+  .testconsole.is-open { width: calc(100vw - 16px); max-width: calc(100vw - 16px); max-height: 55vh; }
+  .testconsole__body { font-size: 14px; max-height: 48vh; }
+  .testconsole__tab, .testconsole__run, .testconsole__row button,
+  .testconsole__field input, .testconsole__field select {
+    min-height: 32px; min-width: 32px; font-size: 14px; padding: 6px 10px;
+  }
+}
 
 /* ---- top bar -------------------------------------------------------------------------------------- */
 .gtop {

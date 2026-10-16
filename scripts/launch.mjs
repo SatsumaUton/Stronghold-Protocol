@@ -13,7 +13,10 @@
 //      DEBUG are inherited; --scripts off | sandbox | trusted | trusted-force sets SP_PLUGIN_SCRIPTS for it, the plugin
 //      script mode of docs/PLUGINS.md §13 — scripts/start-windows-sandbox.bat is `--scripts sandbox` on a double click).
 //      --test-mode off | 1 | force sets SP_TEST_MODE for it (docs/DEPLOY.md 测试控制台): off removes an inherited value,
-//      a bare --test-mode means 1. 1 enables test rooms on a local or LAN listener, force also enables them on a public listener and warns.
+//      a bare --test-mode means 1. 1 enables test rooms on a local or LAN listener, including a wildcard
+//      bind when every interface address is private. A public address or a wildcard bind on a machine
+//      with a public address is refused with a Chinese hint unless the value is force. An unrecognised
+//      SP_TEST_MODE word stays off and warns.
 //      then — once /healthz answers — prints the addresses to share and opens http://localhost:<port> (not with
 //      --no-open, SP_NO_BROWSER=1, or on a Linux box without a display).
 // Ctrl+C stops the server (it gets the signal from the terminal itself); the exit code is the server's.
@@ -36,6 +39,7 @@ if (Number(process.versions.node.split('.')[0]) < 22) {
 const { c, mark } = await import('../tools/setup.mjs');
 const { probePort, classifyAddresses, hostUrl, KIND_LABEL } = await import('../tools/doctor.mjs');
 const { applyPendingUpdate, UPDATE_FILE } = await import('../server/update.js');
+const { parseTestModeEnv, testModeGate, unrecognizedTestMode } = await import('../server/testMode.js');
 
 /** The values --scripts takes: off, or a mode server/plugins/policy.js reads from SP_PLUGIN_SCRIPTS. */
 export const SCRIPT_MODES = Object.freeze(['off', 'sandbox', 'trusted', 'trusted-force']);
@@ -73,6 +77,21 @@ export function serverEnv(o, base = process.env) {
 
 function openBrowser(url) {
   return openInBrowser(url) !== null;
+}
+
+/**
+ * Chinese startup hint for a refused `1` or an unrecognised SP_TEST_MODE. `interfaces` is a test snapshot.
+ * @param {{ host?: string }} o @param {NodeJS.ProcessEnv} env @param {{ warn?: (s: string) => void }} [log]
+ * @param {object} [interfaces]
+ */
+export function warnTestMode(o, env, log = console, interfaces) {
+  const raw = env && env.SP_TEST_MODE;
+  const unknown = unrecognizedTestMode(raw);
+  if (unknown) { log.warn?.(unknown); return; }
+  const mode = parseTestModeEnv(raw);
+  if (mode === 'off') return;
+  const gate = testModeGate(mode, o && o.host, interfaces);
+  if (gate.warn && mode === 'local') log.warn?.(gate.warn);
 }
 
 function printShare(port) {
@@ -146,6 +165,7 @@ async function main() {
   }
 
   const env = serverEnv(o);
+  warnTestMode(o, env);
   const child = spawn(process.execPath, [path.join(ROOT, 'server', 'index.js')], { cwd: ROOT, env, stdio: 'inherit' });
   const forward = (sig) => { if (child.exitCode === null) { try { child.kill(sig); } catch { /* gone */ } } };
   // SIGINT reaches the server straight from the terminal (same process group / console); forwarding it too would make

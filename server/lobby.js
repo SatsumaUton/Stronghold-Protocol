@@ -165,7 +165,7 @@ import { KITTED_CHARS } from './sim/content/kits/index.js';
 const VANILLA_KITTED = new Set(KITTED_CHARS);
 import { isContentHash } from '../shared/plugins/identity.js';
 import { msg, wireMessage } from '../shared/i18n.js';
-import { parseTestModeEnv, testModeGate } from './testMode.js';
+import { parseTestModeEnv, testModeGate, unrecognizedTestMode } from './testMode.js';
 
 /** Room code alphabet: uppercase letters without I and O (and no digits, so no 0/1). */
 export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -380,10 +380,12 @@ export class Lobby {
     // Test rooms stay off until the bound address is known (setTestHost). An empty host fails closed, so a
     // server that is about to bind 0.0.0.0 does not briefly accept test rooms on the default. [ASSUMED] the
     // env words are parsed in server/testMode.js.
-    this.testMode = parseTestModeEnv(testModeOpt != null ? testModeOpt : (typeof process !== 'undefined' && process.env ? process.env.SP_TEST_MODE : undefined));
+    const rawMode = testModeOpt != null ? testModeOpt : (typeof process !== 'undefined' && process.env ? process.env.SP_TEST_MODE : undefined);
+    this.testMode = parseTestModeEnv(rawMode);
+    this.testUnrecognized = unrecognizedTestMode(rawMode);
     this.testHost = '';
     this.testEnabled = false;
-    this.testWarn = null;
+    this.testWarn = this.testUnrecognized;
     if (testHostOpt != null) this.setTestHost(testHostOpt);
     /** @type {Map<string, Room>} */
     this.rooms = new Map();
@@ -415,8 +417,8 @@ export class Lobby {
     this.testHost = typeof host === 'string' ? host : '';
     const gate = testModeGate(this.testMode, this.testHost);
     this.testEnabled = gate.enabled === true;
-    this.testWarn = gate.warn;
-    return gate;
+    this.testWarn = this.testUnrecognized || gate.warn;
+    return { enabled: this.testEnabled, warn: this.testWarn };
   }
 
   /**

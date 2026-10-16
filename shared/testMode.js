@@ -47,7 +47,9 @@ const TEST_ARG_ARRAY = 16;
  * An oversized command string is BAD_MSG. An oversized id or other string is BAD_TARGET.
  * A too-wide object or array, or a value nested too deep, is BAD_MSG.
  * The returned message never keeps the oversized text. A message that is already small is returned as-is.
+ * A top-level field other than t, cmd, args, rid and oversize is BAD_MSG (it is not ignored).
  * [ASSUMED] These bounds match the catalogue's id length and the audit's command slice.
+ * rid is the protocol request id on every C2S message; other extra keys are not.
  * @param {object} msg
  */
 export function guardTestMessage(msg) {
@@ -65,9 +67,8 @@ export function guardTestMessage(msg) {
     if (keys.length > TEST_ARG_KEYS) problem = 'BAD_MSG';
     for (const k of keys) {
       if (problem) break;
-      if (k === 't' || k === 'cmd' || k === 'args' || k === 'oversize') continue;
-      if (k.length > TEST_ARG_STR) { problem = 'BAD_TARGET'; break; }
-      problem = scanTestValue(msg[k], 0);
+      if (k === 't' || k === 'cmd' || k === 'args' || k === 'oversize' || k === 'rid') continue;
+      problem = 'BAD_MSG';
     }
   }
   if (!problem) return msg;

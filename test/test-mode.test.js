@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTestModeEnv, testModeGate } from '../server/testMode.js';
+import { parseTestModeEnv, testModeGate, interfacesArePrivate, TEST_MODE_PUBLIC_HINT } from '../server/testMode.js';
 import { parseTestArgs } from '../shared/testMode.js';
 import { validateC2S } from '../shared/protocol.js';
 import { Lobby } from '../server/lobby.js';
@@ -21,23 +21,61 @@ test('parseTestModeEnv: local words, force, everything else off', () => {
   for (const w of [undefined, '', '0', 'off', 'false', 'no', 'nope', 'trusted-force']) assert.equal(parseTestModeEnv(w), 'off');
 });
 
+const PUBLIC_NICS = { eth0: [{ address: '8.8.8.8', family: 'IPv4', internal: false }] };
+const PRIVATE_NICS = {
+  eth0: [
+    { address: '10.1.2.3', family: 'IPv4', internal: false },
+    { address: '192.168.1.5', family: 'IPv4', internal: false },
+    { address: '172.16.4.4', family: 'IPv4', internal: false },
+    { address: '100.64.1.1', family: 'IPv4', internal: false },
+    { address: '169.254.1.1', family: 'IPv4', internal: false },
+    { address: 'fd12::1', family: 'IPv6', internal: false },
+    { address: 'fe80::1', family: 'IPv6', internal: false },
+  ],
+  lo: [{ address: '127.0.0.1', family: 'IPv4', internal: true }],
+};
+
 test('testModeGate: local accepts 1, public needs force, unknown host fails closed', () => {
   assert.deepEqual(testModeGate('off', '127.0.0.1'), { enabled: false, warn: null });
   assert.deepEqual(testModeGate('local', '127.0.0.1'), { enabled: true, warn: null });
   assert.deepEqual(testModeGate('local', '192.168.1.5').enabled, true);
-  const pub = testModeGate('local', '0.0.0.0');
+  const pub = testModeGate('local', '0.0.0.0', PUBLIC_NICS);
   assert.equal(pub.enabled, false);
+  assert.equal(pub.warn, TEST_MODE_PUBLIC_HINT);
+  assert.match(pub.warn, /127\.0\.0\.1/);
+  assert.match(pub.warn, /局域网/);
+  assert.match(pub.warn, /--test-mode force/);
   assert.match(pub.warn, /SP_TEST_MODE=force/);
   assert.equal(testModeGate('local', '8.8.8.8').enabled, false);
-  assert.equal(testModeGate('local', '::').enabled, false);
+  assert.equal(testModeGate('local', '8.8.8.8').warn, TEST_MODE_PUBLIC_HINT);
+  assert.equal(testModeGate('local', '::', PUBLIC_NICS).enabled, false);
   const forced = testModeGate('force', '8.8.8.8');
   assert.equal(forced.enabled, true);
   assert.match(forced.warn, /public or wildcard/);
-  assert.equal(testModeGate('force', '::').enabled, true);
+  assert.equal(testModeGate('force', '::', PUBLIC_NICS).enabled, true);
+  assert.match(testModeGate('force', '::', PUBLIC_NICS).warn, /public or wildcard/);
   assert.deepEqual(testModeGate('force', '127.0.0.1'), { enabled: true, warn: null });
   assert.deepEqual(testModeGate('force', ''), { enabled: false, warn: null });
   assert.deepEqual(testModeGate('local', ''), { enabled: false, warn: null });
   assert.deepEqual(testModeGate('nope', '127.0.0.1'), { enabled: false, warn: null });
+});
+
+test('a wildcard bind follows the machine interfaces', () => {
+  assert.equal(interfacesArePrivate(PRIVATE_NICS), true);
+  assert.deepEqual(testModeGate('local', '::', PRIVATE_NICS), { enabled: true, warn: null });
+  assert.equal(testModeGate('local', '0.0.0.0', PRIVATE_NICS).enabled, true);
+  assert.deepEqual(testModeGate('force', '::', PRIVATE_NICS), { enabled: true, warn: null });
+  const v4 = { eth0: [{ address: '8.8.8.8', family: 'IPv4', internal: false }] };
+  assert.equal(testModeGate('local', '::', v4).enabled, false);
+  assert.equal(testModeGate('local', '0.0.0.0', v4).warn, TEST_MODE_PUBLIC_HINT);
+  const v6 = { eth0: [{ address: '2001:4860:4860::8888', family: 'IPv6', internal: false }] };
+  assert.equal(testModeGate('local', '::', v6).enabled, false);
+  assert.match(testModeGate('force', '::', v6).warn, /public or wildcard/);
+  assert.equal(testModeGate('local', '::', {}).enabled, true);
+  assert.equal(testModeGate('local', '::', { lo: [{ address: '127.0.0.1', family: 'IPv4', internal: true }] }).enabled, true);
+  assert.equal(interfacesArePrivate(null), false);
+  assert.equal(testModeGate('local', '::', null).enabled, false);
+  assert.equal(testModeGate('local', '1.1.1.1', PRIVATE_NICS).enabled, false);
 });
 
 test('parseTestArgs refuses the wrong type, unknown keys and out-of-range values', () => {
@@ -252,6 +290,7 @@ import { collectViolations } from '../server/match/invariants.js';
 import { TEST_JOURNAL_CAP } from '../server/match/testTrace.js';
 import { FakeBattle } from './match/fakeBattle.js';
 import { TEST_COMMANDS, TEST_RATE_COUNT, guardTestMessage } from '../shared/testMode.js';
+import { matchClock, newestFirst, explainTestDetail, formatAuditLine } from '../public/js/ui/testAudit.js';
 
 function fixture(t, opts = {}) {
   const h = makeMatch({ mode: 'solo', test: true, ...opts });
@@ -306,11 +345,22 @@ test('LP, boss HP and team LP accept exact bounded values only in their valid st
 
 test('bond activation, layers and strategy changes use the real calculator and update draft ownership', (t) => {
   const h = fixture(t);
-  const id = h.m.gd.bondIds.find(id => !h.m.gd.modeInactiveBonds.has(id) && h.m.gd.bond(id).thresholds?.length);
+  const id = h.m.gd.bondIds.find((bondId) => {
+    const bond = h.m.gd.bond(bondId);
+    return bond && !h.m.gd.modeInactiveBonds.has(bondId) && bond.thresholdTemplate !== 'count_threshold_downward' && bond.thresholds?.[0] >= 2;
+  });
   const count = h.m.gd.bond(id).thresholds[0];
-  ok(h.cmd('bond', { id, count, layers: 3 })); h.p.recompute();
-  assert.equal(h.p.bonds[id].active, true); assert.equal(h.p.layers[id], 3);
-  error(h.cmd('bond', { id, count: 0, layers: 2 }), 'BAD_TARGET');
+  ok(h.cmd('bond', { id, count: count - 1, layers: 0 }));
+  assert.equal(h.p.bonds[id].active, false);
+  assert.equal(h.p.privateView().bonds.find((b) => b.bondId === id).active, false);
+  ok(h.cmd('bond', { id, count, layers: 0 }));
+  assert.equal(h.p.bonds[id].active, true);
+  assert.equal(h.p.privateView().bonds.find((b) => b.bondId === id).active, true);
+  ok(h.cmd('bond', { id, count, layers: 3 }));
+  assert.equal(h.p.layers[id], 3);
+  const down = h.cmd('bond', { id, count: 0, layers: 2 });
+  assert.equal(down.error, 'BAD_TARGET');
+  assert.equal(down.detail, 'layers');
   assert.equal(h.p.bondCountBonus[id], count);
   const strategy = h.m.gd.bandIds().find(id => id !== h.p.bandId && h.m.gd.bandAllowed(id));
   ok(h.cmd('strategy', { id: strategy, resetLp: true }));
@@ -323,7 +373,9 @@ test('next shop is consumed once by a paid refresh; queued layout blocks upgrade
   const h = fixture(t);
   ok(h.cmd('funds', { amount: 1000 }));
   const slots = h.p.shop.slots.map(s => ({ kind: s.kind, id: s.id }));
-  error(h.cmd('shop', { slots: slots.slice(1) }), 'BAD_TARGET');
+  const short = h.cmd('shop', { slots: slots.slice(1) });
+  assert.equal(short.error, 'BAD_TARGET');
+  assert.match(short.detail, /^shop\|\{"chess":\d+,"item":\d+\}$/);
   ok(h.cmd('shop', { slots }));
   error(h.cmd('level'), 'WRONG_PHASE');
   ok(h.m.handle('p_0', { t: 'g.refresh' }));
@@ -335,7 +387,9 @@ test('next shop is consumed once by a paid refresh; queued layout blocks upgrade
 
 test('round and phase commands cancel stale callbacks; timers hold, advance once and resume', (t) => {
   const h = fixture(t);
-  error(h.cmd('round', { round: 99 }), 'BAD_TARGET');
+  const far = h.cmd('round', { round: 99 });
+  assert.equal(far.error, 'BAD_TARGET');
+  assert.match(far.detail, /^round\|\{"hi":\d+\}$/);
   ok(h.cmd('timers', { on: false }));
   ok(h.cmd('round', { round: 2 })); assert.equal(h.m.round, 2); assert.equal(h.m.phase, 'ROUND_START');
   h.sched.advance(10000); assert.equal(h.m.phase, 'ROUND_START');
@@ -348,6 +402,63 @@ test('round and phase commands cancel stale callbacks; timers hold, advance once
   h.sched.runUntil(() => h.m.phase !== 'ROUND_START');
   ok(h.cmd('timers', { on: false }));
   error(h.cmd('phase', { name: 'advance' }), 'WRONG_PHASE');
+});
+
+test('a live battle refuses timer commands and keeps its deadline', (t) => {
+  const h = fixture(t);
+  h.m.phase = 'COMBAT';
+  h.m.deadline = 4200;
+  for (const on of [false, true]) {
+    const r = h.cmd('timers', { on });
+    assert.equal(r.error, 'WRONG_PHASE');
+    assert.equal(r.detail, 'timers');
+  }
+  assert.equal(h.m.deadline, 4200);
+  assert.equal(h.m.testTimers, true);
+});
+
+test('an extra g.test field is BAD_MSG; rid is still allowed', (t) => {
+  const h = fixture(t);
+  assert.equal(guardTestMessage({ t: 'g.test', cmd: 'funds', args: { amount: 1 }, playerId: 'x', rid: 4 }).oversize, 'BAD_MSG');
+  const kept = guardTestMessage({ t: 'g.test', cmd: 'funds', args: { amount: 1 }, rid: 4 });
+  assert.equal(kept.oversize, undefined);
+  assert.equal(kept.rid, 4);
+  error(h.m.handle('p_0', { t: 'g.test', cmd: 'funds', args: { amount: 1 }, playerId: 'x', rid: 4 }), 'BAD_MSG');
+  error(h.m.applyTestCommand(h.p, { t: 'g.test', cmd: 'funds', args: { amount: 1 }, playerId: 'x' }), 'BAD_MSG');
+  ok(h.m.applyTestCommand(h.p, { t: 'g.test', cmd: 'funds', args: { amount: 2 }, rid: 9 }));
+  assert.equal(h.p.funds, 2);
+});
+
+test('audit rows use one number, the actor name, a clock and the translated reason', () => {
+  assert.equal(matchClock(3661000), '01:01:01');
+  assert.equal(matchClock(0), '00:00:00');
+  assert.equal(matchClock('nope'), '00:00:00');
+  const log = [
+    { seq: 1, playerId: 'p', cmd: 'bond', at: 5000, ok: false, code: 'BAD_TARGET', detail: 'layers' },
+    { seq: 2, playerId: 'p', cmd: 'funds', at: 7000, ok: true },
+  ];
+  assert.deepEqual(newestFirst(log).map((e) => e.seq), [2, 1]);
+  assert.equal(log[0].seq, 1);
+  assert.match(explainTestDetail('shop|{"chess":5,"item":2}'), /5/);
+  assert.match(explainTestDetail('shop|{"chess":5,"item":2}'), /2/);
+  assert.match(explainTestDetail('round|{"hi":15}'), /15/);
+  assert.match(explainTestDetail('layers'), /层数不能减少/);
+  assert.match(explainTestDetail('timers'), /作战进行中不能开关计时/);
+  assert.match(explainTestDetail('bond'), /盟约/);
+  assert.equal(explainTestDetail(''), '');
+  assert.equal(formatAuditLine(log[1], '凯尔希'), '2 凯尔希 00:00:07 funds 成功');
+  const bad = formatAuditLine(log[0], '凯尔希');
+  assert.match(bad, /^1 凯尔希 00:00:05 bond 层数不能减少$/);
+  assert.equal(bad.split('1').length, 2);
+});
+
+test('an unrecognised SP_TEST_MODE stays off and warns; a silent off does not', (t) => {
+  const forced = openLobby(t, { testMode: 'forced', testHost: '127.0.0.1' });
+  assert.equal(forced.lobby.testEnabled, false);
+  assert.match(forced.lobby.testWarn, /未识别/);
+  const quiet = openLobby(t, { testMode: 'off', testHost: '127.0.0.1' });
+  assert.equal(quiet.lobby.testWarn, null);
+  assert.equal(quiet.lobby.testEnabled, false);
 });
 
 test('bounty and choice use the existing offers and reject forged selections', (t) => {
@@ -446,18 +557,24 @@ test('lobby rechecks process and immutable room gates on start and every command
   assert.equal(calls, 0);
   const tester = player('tester'); ok(lobby.create(tester, { mode: 'solo', difficulty: 'NORMAL', test: true }));
   const testRoom = lobby.roomOf(tester);
-  lobby.setTestHost('0.0.0.0');
+  lobby.setTestHost('8.8.8.8');
   error(lobby.startMatch(testRoom), 'TEST_DISABLED');
   error(lobby.routeGameNow(host, { t: 'g.test' }), 'TEST_DISABLED');
   assert.equal(calls, 0); assert.equal(testRoom.match, null);
 });
 
 test('public/wildcard/numeric listener variants require force and an actual IP', () => {
-  for (const host of ['0.0.0.0', '0.1.2.3', '::', '0:0:0:0:0:0:0:0', '::ffff:0.0.0.0', '8.8.8.8', '2001:4860:4860::8888']) {
+  for (const host of ['8.8.8.8', '2001:4860:4860::8888']) {
     assert.equal(testModeGate('local', host).enabled, false);
-    assert.ok(testModeGate('local', host).warn);
+    assert.equal(testModeGate('local', host).warn, TEST_MODE_PUBLIC_HINT);
     assert.equal(testModeGate('force', host).enabled, true);
-    assert.ok(testModeGate('force', host).warn);
+    assert.match(testModeGate('force', host).warn, /public or wildcard/);
+  }
+  for (const host of ['0.0.0.0', '0.1.2.3', '::', '0:0:0:0:0:0:0:0', '::ffff:0.0.0.0']) {
+    assert.equal(testModeGate('local', host, PUBLIC_NICS).enabled, false);
+    assert.equal(testModeGate('local', host, PUBLIC_NICS).warn, TEST_MODE_PUBLIC_HINT);
+    assert.equal(testModeGate('force', host, PUBLIC_NICS).enabled, true);
+    assert.match(testModeGate('force', host, PUBLIC_NICS).warn, /public or wildcard/);
   }
   for (const host of ['', 'localhost', 'not-an-address']) assert.equal(testModeGate('force', host).enabled, false);
 });

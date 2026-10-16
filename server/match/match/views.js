@@ -162,6 +162,7 @@ export class MatchViews {
       v.testLog = log.slice(-TEST_PUBLIC_LOG).map((e) => ({
         seq: e.seq, playerId: e.playerId, cmd: e.cmd, args: e.args, at: e.at, ok: e.ok === true,
         ...(e.code ? { code: e.code } : {}),
+        ...(e.detail ? { detail: e.detail } : {}),
       }));
     }
     return v;

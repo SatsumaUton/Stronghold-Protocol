@@ -78,6 +78,13 @@ export class MatchTestCommands {
       this._testAudit(ps, cmd, { rejected: true }, msg.oversize);
       return fail(msg.oversize === 'BAD_TARGET' ? ERR.BAD_TARGET : ERR.BAD_MSG);
     }
+    if (msg && typeof msg === 'object') {
+      for (const k of Object.keys(msg)) {
+        if (k === 't' || k === 'cmd' || k === 'args' || k === 'rid') continue;
+        this._testAudit(ps, cmd, { rejected: true }, ERR.BAD_MSG);
+        return fail(ERR.BAD_MSG);
+      }
+    }
     const parsed = parseTestArgs(cmd, msg && msg.args);
     if ('error' in parsed) {
       this._testAudit(ps, cmd, { rejected: true }, parsed.error);
@@ -92,7 +99,7 @@ export class MatchTestCommands {
       res = fail(ERR.INTERNAL);
     } finally { this._testApplying = false; }
     const code = res && res.error ? res.error : null;
-    this._testAudit(ps, cmd, parsed.args, code);
+    this._testAudit(ps, cmd, parsed.args, code, res && res.detail);
     if (this._testOutcome) {
       const outcome = this._testOutcome; this._testOutcome = null; this.finish(outcome);
     }
@@ -112,7 +119,7 @@ export class MatchTestCommands {
     this._testRate.set(cmd, list);
   }
 
-  _testAudit(ps, cmd, args, code) {
+  _testAudit(ps, cmd, args, code, detail) {
     const ok = !code;
     const entry = {
       seq: ++this._testSeq,
@@ -123,6 +130,7 @@ export class MatchTestCommands {
       ok,
     };
     if (code) entry.code = String(code).slice(0, 32);
+    if (typeof detail === 'string' && detail) entry.detail = detail.slice(0, 120);
     this.log.info?.(`[test-audit ${this.roomCode}] ${JSON.stringify(entry)}`);
     this.testLog.push(entry);
     if (this.testLog.length > TEST_LOG_CAP) this.testLog.splice(0, this.testLog.length - TEST_LOG_CAP);
@@ -239,7 +247,7 @@ export class MatchTestCommands {
     if (this.phase === PHASE.INFO_CHECK || this.phase === PHASE.BAND_DRAFT || !ps.bandId) return fail(ERR.WRONG_PHASE);
     const hidden = this.gd.hiddenRound;
     const hi = Math.max(this.gd.lastRound || 0, hidden > 0 ? hidden : 0);
-    if (round > hi) return fail(ERR.BAD_TARGET);
+    if (round > hi) return fail(ERR.BAD_TARGET, `round|${JSON.stringify({ hi })}`);
     this.eliminateBroken();
     if (!this.alivePlayers().length) {
       this.finish({ victory: false, reason: 'eliminated' });
@@ -300,11 +308,12 @@ export class MatchTestCommands {
     if (blocked) return blocked;
     const spec = this.gd.shopSlots(ps.shop.level);
     const n = spec.chess + spec.item;
-    if (slots.length !== n) return fail(ERR.BAD_TARGET);
+    const shopDetail = `shop|${JSON.stringify({ chess: spec.chess, item: spec.item })}`;
+    if (slots.length !== n) return fail(ERR.BAD_TARGET, shopDetail);
     for (let i = 0; i < n; i++) {
       const want = i < spec.chess ? 'chess' : 'item';
       const s = slots[i];
-      if (!s || s.kind !== want) return fail(ERR.BAD_TARGET);
+      if (!s || s.kind !== want) return fail(ERR.BAD_TARGET, shopDetail);
       if (want === 'chess' ? !ps.gd.chess(s.id) || (ps.gd.chess(s.id).isDiy && !ps.gd.chess(s.id).diyFor) : !ps.gd.item(s.id)) return fail(ERR.BAD_TARGET);
     }
     ps._testShopNext = slots.map((s) => ({ kind: s.kind, id: s.id }));
@@ -313,6 +322,11 @@ export class MatchTestCommands {
   }
 
   _testTimers(on) {
+    // COMBAT / UNITE / FINAL_ASSAULT / HIDDEN_CORE write this.deadline themselves. Zeroing it
+    // hides every countdown and turning timers back on cannot restore that clock.
+    if (this.phase === PHASE.COMBAT || this.phase === PHASE.UNITE || this.phase === PHASE.FINAL_ASSAULT || this.phase === PHASE.HIDDEN_CORE || this.fields.some((f) => f && f.live)) {
+      return fail(ERR.WRONG_PHASE, 'timers');
+    }
     if (this.phase === PHASE.LOBBY || this.phase === PHASE.RESULT) return fail(ERR.WRONG_PHASE);
     if (on === this.testTimers) return OK;
     if (on) {
@@ -336,12 +350,16 @@ export class MatchTestCommands {
   _testBond(ps, id, layers, count) {
     const blocked = this._testQuiet();
     if (blocked) return blocked;
-    if (!this.gd.bond(id) || this.gd.modeInactiveBonds.has(id)) return fail(ERR.BAD_TARGET);
+    if (!this.gd.bond(id) || this.gd.modeInactiveBonds.has(id)) return fail(ERR.BAD_TARGET, 'bond');
     const cur = ps.layers[id] || 0;
-    if (layers < cur) return fail(ERR.BAD_TARGET);
+    if (layers < cur) return fail(ERR.BAD_TARGET, 'layers');
     // [ASSUMED] count is an absolute extra member count, applied by the ordinary bond calculator.
-    if (count !== undefined) { ps.bondCountBonus[id] = count; ps.dirty(); }
-    if (layers === cur) return OK;
+    // A count-only change still recomputes, so the player's own bond strip updates.
+    if (count !== undefined) ps.bondCountBonus[id] = count;
+    if (layers === cur) {
+      if (count !== undefined) ps.recompute();
+      return OK;
+    }
     const delta = layers - cur;
     if (layerGainRoom(cur, delta) !== delta) return fail(ERR.BAD_TARGET);
     const add = ps.addLayers(id, delta, { reason: 'test' });

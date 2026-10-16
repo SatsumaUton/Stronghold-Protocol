@@ -177,7 +177,10 @@ export function rememberRoom(code, test = false) {
 export async function joinKnown(type, key) {
   try { return await net.request(type, { code: key }); } catch (err) {
     if (err?.code !== ERR.TEST_CONFIRM) throw err;
-    if (await confirmDialog({ title: t('测试'), text: t('这是测试房间，不计入任何记录。确认加入？') })) {
+    const text = type === 'room.spectate'
+      ? t('这是测试房间，不计入任何记录。确认观战？')
+      : t('这是测试房间，不计入任何记录。确认加入？');
+    if (await confirmDialog({ title: t('测试'), text })) {
       return net.request(type, { code: key, testAck: true });
     }
   }

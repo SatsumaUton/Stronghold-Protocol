@@ -9,9 +9,12 @@ import { post, takeKeyFromAddress, keepStudioKey } from '../api.js';
 import { errorText } from '../issues.js';
 import { Editor } from './editor.js';
 import { ConsoleView } from './view.js';
+import { scenarioText } from './problems.js';
 
 function describe(e) {
-  if (e?.code === 'PLUGIN_STUDIO_CONSOLE_SCENARIO' || e?.path) return t('场景无效：{path}（{reason}）', { path: e.params?.path || e.path, reason: e.params?.reason || e.reason });
+  // The console has its own key box. Do not reuse the plugin studio's "change a plugin" wording.
+  if (e?.code === 'PLUGIN_STUDIO_KEY') return t('请输入服务器启动时显示的工作台地址或密钥。');
+  if (e?.code === 'PLUGIN_STUDIO_CONSOLE_SCENARIO' || e?.params?.path || e?.path) return scenarioText(e);
   return errorText(e);
 }
 function download(s) {
@@ -20,7 +23,8 @@ function download(s) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function App() {
-  useLang();
+  const lang = useLang();
+  useEffect(() => { document.title = t('测试控制台'); }, [lang]);
   const [options, setOptions] = useState(null), [s, setScenario] = useState(null), [compiled, setCompiled] = useState(null);
   const [error, setError] = useState(''), [valid, setValid] = useState(false), [key, setKey] = useState('');
   const [side, setSide] = useState(0), [selected, setSelected] = useState(null);
@@ -93,7 +97,7 @@ function App() {
         <button type="button" onClick=${() => file.current.click()}>${t('导入场景 JSON')}</button><input ref=${file} type="file" accept="application/json,.json" hidden onChange=${load} />
         <button type="button" onClick=${restore}>${t('打开上次场景')}</button>
         <span role="status">${valid ? t('场景已验证') : t('等待场景验证')}</span>
-        ${!storage ? html`<span>${t('浏览器存储不可用，请下载 JSON 保存。')}</span>` : null}
+        ${!storage ? html`<span>${t('控制台无法记住场景，请下载场景 JSON 保存。')}</span>` : null}
       </div>
       <div class="sc-layout"><${Editor} scenario=${s} compiled=${compiled} options=${options} update=${update} palette=${palette} setPalette=${setPalette} side=${side} setSide=${setSide} selected=${selected} setSelected=${setSelected} />
         <${ConsoleView} compiled=${compiled} valid=${valid} onTile=${placeTile} onSelect=${uid => { if (uid) { const i = s.players.findIndex(p => p.units.some(u => u.uid === uid)); if (i >= 0) { setSide(i); setSelected(uid); setPalette(cloneScenario(s.players[i].units.find(u => u.uid === uid))); } } }}
@@ -113,5 +117,6 @@ function App() {
   </div>`;
 }
 await initLang().catch(() => {});
+document.title = t('测试控制台');
 takeKeyFromAddress();
 render(html`<${App} />`, document.getElementById('app'));

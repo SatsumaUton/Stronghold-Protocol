@@ -18,7 +18,8 @@
 .sc-toolbar label { font-size: 12px; }
 .sc-toolbar select { width: auto; }
 .sc-canvas { height: min(52vh, 620px); min-height: 320px; position: relative; overflow: hidden; background: #0a0e0d; }
-.sc-live { min-width: 0; position: sticky; top: 80px; }
+.sc-app .st-top { position: static; }
+.sc-live { min-width: 0; position: sticky; top: 0; }
 .sc-app pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; font: 12px/1.5 monospace; }
 .sc-app code { overflow-wrap: anywhere; }
 .sc-grid { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 2px; }

@@ -1,10 +1,12 @@
-import { useMemo, useState } from '../../../vendor/hooks.module.js';
+import { useState } from '../../../vendor/hooks.module.js';
 import { html } from '../../../js/ui/components.js';
-import { data } from '../../../js/data.js';
+import { data, useData } from '../../../js/data.js';
+import { useLang } from '../../../js/ui/lang.js';
 import { t } from '../../../../shared/i18n.js';
 import { emptyPlayer, cloneScenario, scenarioDevices } from '../../../../shared/studio/scenario.js';
-import { diyPool, lockedSelection, isDiyModule } from '../../../../shared/diy.js';
+import { diyPool, lockedSelection } from '../../../../shared/diy.js';
 import { unitForm } from '../../../../shared/standIn.js';
+import { devicePos, moduleOptions, routeLabel, tokenRemaining } from './labels.js';
 
 export const labelOf = r => `${data.localeName(r.name || r.id || r.chessId || r.tokenId || r.effectId || '')}${r.isGolden ? ` (${t('精锐')})` : ''} · ${r.id || r.chessId || r.tokenId || r.effectId || r.bondId || r.bandId || r.modeId || r.key || ''}`;
 export function Select({ label, value, options, onChange, disabled = false }) {
@@ -24,13 +26,25 @@ const entries = name => Object.entries(data.getRaw(name) || {}).map(([id, r]) =>
 const changeField = (s, kind) => ({ ...s, kind, waveId: null, bossId: kind === 'hidden' ? 'boss_8' : kind === 'boss' ? 'boss_1' : null,
   round: kind === 'hidden' ? 15 : kind === 'boss' ? 14 : 1, enemies: [], players: (kind === 'normal' ? s.players.slice(0, 1) : s.players).map(p => ({ ...p, units: [], deviceOverrides: {} })) });
 
+function placedName(u, rawChess) {
+  if (!u) return '';
+  if (u.diy?.charId) {
+    const rec = data.getRaw('backups')?.units?.[u.diy.charId];
+    return data.localeName(rec?.name || u.diy.charId);
+  }
+  if (u.kind === 'token' || (!u.chessId && u.tokenId)) return data.localeName(data.lookupRaw('tokens', u.tokenId)?.name || u.tokenId || '');
+  return data.localeName(rawChess[u.chessId]?.name || u.chessId || '');
+}
+
 export function Editor({ scenario: s, compiled, options, update, palette, setPalette, side, setSide, selected, setSelected }) {
+  useLang();
+  useData('stages', 'chess', 'tokens', 'enemies', 'items', 'bonds', 'bands', 'backups', 'config', 'waves', 'bosses');
   const p = s.players[side] || s.players[0];
   const write = patch => update({ ...s, ...patch });
   const player = patch => write({ players: s.players.map((v, i) => i === side ? { ...v, ...patch } : v) });
   const rawChess = data.getRaw('chess') || {};
   const chess = rawChess[palette.chessId];
-  const raw = useMemo(() => ({ chess: rawChess, backups: data.getRaw('backups') }), []);
+  const raw = { chess: rawChess, backups: data.getRaw('backups') };
   const pool = chess?.isDiy ? diyPool(chess.tier, { data: raw }) : [];
   const form = palette.diy ? unitForm(raw.backups, palette.diy.charId, chess?.status) : chess;
   const locked = palette.diy ? lockedSelection(raw, chess?.tier, palette.diy.charId) : null;
@@ -76,14 +90,14 @@ export function Editor({ scenario: s, compiled, options, update, palette, setPal
         options=${(form?.skills || []).map(sk => [sk.index, `S${sk.index + 1} · ${data.localeName(sk.name)}`])}
         onChange=${v => modify(palette.diy ? { diy: { ...palette.diy, skillIndex: +v } } : { skillIndex: +v })} />
       <${Select} label=${t('模组')} disabled=${fixedLoadout} value=${palette.diy ? (palette.diy.uniEquipId || 'none') : palette.moduleId ?? form?.modules?.find(m => m.isDefault)?.uniEquipId ?? 'none'}
-        options=${[['none', t('不装备')], ...(form?.modules || []).filter(m => !palette.diy || isDiyModule(m)).map(m => [m.uniEquipId, data.localeName(m.name || m.uniEquipId)])]}
+        options=${[['none', t('不装备')], ...moduleOptions(form?.modules, !!palette.diy, locked?.uniEquipId).map(m => [m.uniEquipId, data.localeName(m.name || m.uniEquipId)])]}
         onChange=${v => modify(palette.diy ? { diy: { ...palette.diy, uniEquipId: v === 'none' ? null : v } } : { moduleId: v })} />
       <${Select} label=${t('朝向')} value=${palette.dir} options=${[['RIGHT', t('右')], ['UP', t('上')], ['LEFT', t('左')], ['DOWN', t('下')]]} onChange=${dir => modify({ dir })} />
       ${[0, 1].map(i => html`<${Select} key=${i} disabled=${palette.kind !== 'chess'} label=${t('装备槽 {n}', { n: i + 1 })} value=${palette.items?.[i] || ''} options=${itemOptions} onChange=${v => { const items = [...(palette.items || [])]; items[i] = v; modify({ items: items.filter(Boolean) }); }} />`)}
       <${Numeric} label=${t('潜能')} disabled=${fixedLoadout} value=${palette.potential ?? 6} min=${1} max=${6} onChange=${potential => modify({ potential })} />
       <${Numeric} label=${t('练度')} disabled=${fixedLoadout} value=${palette.cultivate ?? 0} max=${3} onChange=${cultivate => modify({ cultivate })} />
       <${Select} label=${t('通过所属干员部署召唤物')} value=${palette.kind === 'token' ? `${palette.ownerUid}:${palette.tokenId}` : ''}
-        options=${[['', t('部署所选干员')], ...(compiled?.tokens[side] || []).map(v => [`${v.ownerUid}:${v.tokenId}`, `${v.ownerUid} · ${data.localeName(v.name)} (${v.count})`])]}
+        options=${[['', t('部署所选干员')], ...(compiled?.tokens[side] || []).map(v => [`${v.ownerUid}:${v.tokenId}`, `${v.ownerUid} · ${data.localeName(v.name)} (${tokenRemaining(v, p.units)})`])]}
         onChange=${v => { if (!v) pickChess(palette.chessId); else { const [ownerUid, tokenId] = v.split(':'); setPalette({ kind: 'token', tokenId, ownerUid: +ownerUid, dir: palette.dir }); } }} />
       <p>${t('选择单位后点击棋盘格部署。点击已部署单位可检查或移除。')}</p>
       <div class="sc-grid" role="group" aria-label=${t('部署棋盘')}>${[12, 11, 10, 9].flatMap(row => Array.from({ length: 9 }, (_, n) => {
@@ -95,9 +109,9 @@ export function Editor({ scenario: s, compiled, options, update, palette, setPal
             const uid = Math.max(0, ...s.players.flatMap(v => v.units.map(u => u.uid))) + 1;
             const { uid: _uid, row: _row, col: _col, carryState: _carry, ...choice } = palette;
             player({ units: [...p.units, { ...choice, uid, row, col }] }); setSelected(uid);
-          }}>${at ? data.localeName((rawChess[at.chessId] || data.lookupRaw('tokens', at.tokenId))?.name || at.tokenId) : `${row},${col}`}</button>`;
+          }}>${at ? placedName(at, rawChess) : `${row},${col}`}</button>`;
       }))}</div>
-      <ul class="sc-unit-list">${p.units.map(u => html`<li key=${u.uid}><button type="button" onClick=${() => { setSelected(u.uid); setPalette(cloneScenario(u)); }}>${u.uid} · ${labelOf(rawChess[u.chessId] || data.lookupRaw('tokens', u.tokenId) || {})} (${u.row},${u.col})</button><button type="button" onClick=${() => remove(u.uid)}>${t('移除')}</button></li>`)}</ul>
+      <ul class="sc-unit-list">${p.units.map(u => html`<li key=${u.uid}><button type="button" onClick=${() => { setSelected(u.uid); setPalette(cloneScenario(u)); }}>${u.uid} · ${placedName(u, rawChess)} (${u.row},${u.col})</button><button type="button" onClick=${() => remove(u.uid)}>${t('移除')}</button></li>`)}</ul>
     </div></details>
     ${s.enemyMode === 'custom' ? html`<${Enemies} s=${s} compiled=${compiled} write=${write} />` : null}
     <details><summary>${t('悬赏精英')}</summary><div class="sc-fields"><${Search} label=${t('添加悬赏')} records=${options.bounties.map(r => ({ ...r, id: r.effectId }))} value="" empty=${true} onChange=${id => { if (id) write({ bounties: [...s.bounties, id] }); }} />
@@ -114,7 +128,7 @@ function Enemies({ s, compiled, write }) {
     <${Numeric} label=${t('数量')} value=${count} min=${1} max=${100} onChange=${setCount} />
     <${Numeric} label=${t('出现时间（秒）')} value=${time} max=${1200} step=${0.1} onChange=${setTime} />
     <${Numeric} label=${t('间隔（秒）')} value=${interval} max=${120} step=${0.1} onChange=${setInterval} />
-    <${Select} label=${t('出生门 / 路线')} value=${routeIndex} options=${(compiled?.spec.routes || []).map((r, i) => [i, `${i} · ${r.motion} (${r.start}) → (${r.end})`])} onChange=${v => setRoute(+v)} />
+    <${Select} label=${t('出生门 / 路线')} value=${routeIndex} options=${(compiled?.spec.routes || []).map((r, i) => [i, routeLabel(r, i)])} onChange=${v => setRoute(+v)} />
     <button type="button" onClick=${() => write({ enemies: [...s.enemies, { enemyKey, count, time, interval, routeIndex }] })}>${t('添加敌人')}</button>
     ${s.enemies.map((e, i) => html`<button type="button" key=${i} onClick=${() => write({ enemies: s.enemies.filter((_, n) => n !== i) })}>${data.localeName(data.lookupRaw('enemies', e.enemyKey)?.name || e.enemyKey)} ×${e.count} · ${e.time}s · ${e.routeIndex} · ${t('移除')}</button>`)}
   </div></details>`;
@@ -136,6 +150,6 @@ function Globals({ s, p, side, compiled, player, options, write }) {
   <details><summary>${t('场地装置')}</summary><div class="sc-fields">
     <p>${t('装置只能在官方地图预设的位置启用或关闭。')}</p>
     ${scenarioDevices(data.lookupRaw('stages', s.stageId), s, side).map(d => html`<label key=${d.alias}><input type="checkbox" checked=${p.deviceOverrides[d.alias] ?? compiled?.spec.players[side]?.deviceOverrides[d.alias] ?? d.active ?? !d.hidden}
-      onChange=${e => player({ deviceOverrides: { ...p.deviceOverrides, [d.alias]: e.currentTarget.checked } })} />${data.localeName(d.name || d.key)} · (${d.pos}) · ${d.alias}</label>`)}
+      onChange=${e => player({ deviceOverrides: { ...p.deviceOverrides, [d.alias]: e.currentTarget.checked } })} />${data.localeName(d.name || d.key)} · ${devicePos(d.pos)} · ${d.alias}</label>`)}
   </div></details>`;
 }

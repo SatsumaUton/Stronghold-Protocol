@@ -16,7 +16,9 @@ import { buildNormalWave, setupMatchWaves } from '../../server/match/waves.js';
 import { DataSource, setSimData } from '../../server/sim/simdata.js';
 import { setGameData } from '../../server/sim/content/support/index.js';
 import { createBattleFromSpec, resultDigest } from '../../server/sim/spec.js';
-import { makeRunner, makeLog, observeCombat, observeEffects, inspectUnit } from '../../public/studio/js/console/runtime.js';
+import { makeRunner, makeLog, observeCombat, observeEffects, inspectUnit, pauseIfHidden } from '../../public/studio/js/console/runtime.js';
+import { devicePos, moduleOptions, tokenRemaining, routeLabel } from '../../public/studio/js/console/labels.js';
+import { scenarioText } from '../../public/studio/js/console/problems.js';
 import { checkInvariants } from '../helpers/battleHarness.js';
 import { OfficialFx } from '../../public/js/render/vfx/system.js';
 import { advanceEffectClock } from '../../public/js/render/app/playback.js';
@@ -217,6 +219,49 @@ test('runner pauses, steps exactly 1/30 ticks, speeds and stops at a hard cap', 
   assert.throws(() => r.speedTo(100)); assert.throws(() => r.step(300000));
   r.speedTo(8); r.play(); for (let i = 0; i < 10; i++) r.advance(0.2);
   assert.equal(b.finished, true); assert.equal(r.playing, false); assert.ok(Math.abs(b.time - 3) < 1e-9);
+});
+
+test('preview shows the idle pose, drops the deploy beam and stays paused until the user plays', () => {
+  const b = createBattleFromSpec(build(scenario()).spec, ds, { quiet: true });
+  const frames = [];
+  const r = makeRunner(b, { cap: 30, preview: true, onFrame: (snap, ev) => frames.push({ t: snap.t, ev }) });
+  assert.ok(b.time + 1e-9 >= 0.5);
+  assert.equal(r.playing, false);
+  assert.equal(r.touched, false);
+  const ally = b.allyUnits.find((u) => u.uid === 1);
+  assert.ok(b.time - ally.deployedAt + 1e-9 >= 0.5);
+  assert.equal(frames.length, 1);
+  assert.equal(frames[0].ev.some((e) => e[0] === 'deploy'), false);
+  const held = b.time;
+  r.advance(1);
+  assert.equal(b.time, held);
+  pauseIfHidden(r, false);
+  assert.equal(r.playing, false);
+  r.play();
+  pauseIfHidden(r, true);
+  assert.equal(r.playing, false);
+  assert.equal(r.touched, true);
+});
+
+test('device, module, token and route labels, and a named scenario error', () => {
+  assert.equal(devicePos([11, 5]), '(11,5)');
+  const mods = [{ uniEquipId: 'isw', typeName: 'ISW-A', name: '证章' }, { uniEquipId: 'mod', typeName: 'X', name: '模组' }];
+  assert.deepEqual(moduleOptions(mods, true, 'isw').map((m) => m.uniEquipId), ['isw', 'mod']);
+  assert.deepEqual(moduleOptions(mods, true, null).map((m) => m.uniEquipId), ['mod']);
+  assert.equal(moduleOptions([], true, 'fixed')[0].uniEquipId, 'fixed');
+  assert.equal(tokenRemaining({ ownerUid: 1, tokenId: 't', count: 3 }, [
+    { kind: 'token', ownerUid: 1, tokenId: 't' },
+    { kind: 'token', ownerUid: 1, tokenId: 't' },
+    { kind: 'token', ownerUid: 2, tokenId: 't' },
+  ]), 1);
+  assert.equal(tokenRemaining({ ownerUid: 1, tokenId: 't', count: 1 }, [{ kind: 'token', ownerUid: 1, tokenId: 't' }]), 0);
+  const direct = routeLabel({ motion: 'WALK', start: [9, 10], end: [9, 2], checkpoints: [] }, 0);
+  const via = routeLabel({ motion: 'WALK', start: [9, 10], end: [9, 2], checkpoints: [[8, 3]] }, 1);
+  assert.equal(direct, '#1 WALK (9,10) → (9,2) · 直达');
+  assert.equal(via, '#2 WALK (9,10) → (9,2) · 经由 (8,3)');
+  const text = scenarioText({ params: { path: 'players.0.units.1.row', reason: 'tile' } });
+  assert.match(text, /players\.0\.units\.1\.row/);
+  assert.match(text, /这个格子不能部署该单位/);
 });
 
 test('one-second stepping and fast playback advance the real official effect clock without frame-cap loss', () => {

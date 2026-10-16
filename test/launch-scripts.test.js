@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseArgs, serverEnv, SCRIPT_MODES, TEST_MODE_FLAGS } from '../scripts/launch.mjs';
+import { parseArgs, serverEnv, SCRIPT_MODES, TEST_MODE_FLAGS, warnTestMode } from '../scripts/launch.mjs';
+import { TEST_MODE_PUBLIC_HINT, TEST_MODE_UNKNOWN_HINT } from '../server/testMode.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -51,4 +52,23 @@ test('bare --test-mode enables local mode without swallowing another launcher op
   assert.equal(serverEnv(o, {}).SP_TEST_MODE, '1');
   assert.equal(parseArgs(['--test-mode=']).testMode, '');
   assert.equal(TEST_MODE_FLAGS.includes(parseArgs(['--test-mode', 'invalid']).testMode), false);
+});
+
+test('warnTestMode prints the Chinese public hint and an unrecognised word, and stays quiet otherwise', () => {
+  const lines = [];
+  const log = { warn: (s) => lines.push(s) };
+  const pub = { en0: [{ address: '8.8.8.8', family: 'IPv4', internal: false }] };
+  const priv = { en0: [{ address: '192.168.1.9', family: 'IPv4', internal: false }] };
+  warnTestMode({ host: '::' }, { SP_TEST_MODE: '1' }, log, pub);
+  assert.equal(lines[0], TEST_MODE_PUBLIC_HINT);
+  lines.length = 0;
+  warnTestMode({ host: '127.0.0.1' }, { SP_TEST_MODE: 'forced' }, log, priv);
+  assert.equal(lines[0], TEST_MODE_UNKNOWN_HINT);
+  lines.length = 0;
+  warnTestMode({ host: '::' }, { SP_TEST_MODE: 'off' }, log, pub);
+  warnTestMode({ host: '::' }, {}, log, pub);
+  warnTestMode({ host: '127.0.0.1' }, { SP_TEST_MODE: '1' }, log, pub);
+  warnTestMode({ host: '0.0.0.0' }, { SP_TEST_MODE: '1' }, log, priv);
+  warnTestMode({ host: '0.0.0.0' }, { SP_TEST_MODE: '1' }, log, {});
+  assert.deepEqual(lines, []);
 });
