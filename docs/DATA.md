@@ -159,7 +159,7 @@ Top level: `{ season, seasonName, modes, economy, lpCapPerRound, bossOvertimeAft
 | `name`, `appellation` | `"隐现"`, `"Insider"` | |
 | `rarity` | `5` | stars 1–6 |
 | `profession`, `subProfessionId`, `subProfessionName`, `position` | `"SNIPER"`, `"fastshot"`, `"速射手"`, `"RANGED"` | |
-| `placement` | | not stored. A MELEE chess may also stand on a 高台 when its trait without a module (`traitBase`, else `trait`) reads 「可以放置于远程位」 — the 钩索师 / 推击手 branch trait: 歌蕾蒂娅, 崖心, 见行者, normal and elite; the module does not matter (every module of the three keeps the line). Read at place time (`shared/highGround.js meleeOnHighGround`, `board.js positionClass`); the owner's decision of 2026-10-05, following PRTS (it reverses the 2026-10-04 one: elite 歌蕾蒂娅 with HOK-Y only). `position` stays MELEE for the battle |
+| `placeOnRanged` | `true` (present only then) | a MELEE chess whose Chinese trait without a module (`traitBase`, else `trait`) contains 「可以放置于远程位」 — the 钩索师 / 推击手 branch trait: 歌蕾蒂娅, 崖心, 见行者, normal and elite; the module does not matter (every module of the three keeps the line). Stored at build time so a localized record still places: the overlay replaces the trait text, and en / ja / ko / zh-TW (於) no longer contain the Simplified line (GitHub #676). Read at place time (`shared/highGround.js meleeOnHighGround`, which also matches that line when the flag is absent — a Chinese or plugin record — `board.js positionClass`); the owner's decision of 2026-10-05, following PRTS (it reverses the 2026-10-04 one: elite 歌蕾蒂娅 with HOK-Y only). `position` stays MELEE for the battle. The old `placement` string is not stored |
 | `nationId` | `"laterano"` | |
 | `bonds[]` | `["lateranoShip","swiftShip"]` | bondIds (→ `bonds.json`) |
 | `garrisonIds[]` | `["garrison_16_b"]` | 特质 (→ `garrisons.json`); first = displayed trait |
@@ -673,7 +673,7 @@ chess:
 
 A **form** holds the operator fields of a chess record with **nothing selected**: `status`; `stats`, `trait`, `talents`
 **without** a module, at full potential as on a chess (`potDown` / chained talents for the lower ones, §2.3); `immunities`, `rangeId`, `rangeGrid`, `dmgType`, `attackKind`, `projectile`, `canHitFly`,
-`targetPriority`; `skills[]` — every skill unlocked at the status, at its skill level, `trigger` resolved per skill, no
+`targetPriority`; `placeOnRanged` (present only when that Chinese trait contains 「可以放置于远程位」 — 温蒂's forms; the composed 自选 record copies it, GitHub #676); `skills[]` — every skill unlocked at the status, at its skill level, `trigger` resolved per skill, no
 `isDefault`; `displayTokens` / `tokens` (summons — none of the 17 stand-ins has one; 27 of the owned picks do, their
 records in `tokens` below); at `equipLevel > 0` `modules[]` (§2.2 shape without `isDefault`). `buildUnitForm` uses buildChess's helpers and rules, and the build fails when `buildUnitForm` +
 `composeUnitRecord` do not give back every PRESET chess field for field (each is its own backup), so a later change to

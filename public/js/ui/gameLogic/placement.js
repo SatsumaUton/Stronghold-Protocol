@@ -215,10 +215,11 @@ export function placementContext({ priv, stage, editable, field = 'normal', getC
 }
 
 /**
- * Deploy position ('MELEE'|'RANGED'|'ALL') of a chess/token piece, or null for items. A MELEE chess whose trait reads
- * 「可以放置于远程位」 (shared/highGround.js: 歌蕾蒂娅, 崖心, 见行者, normal and elite, any module) is 'ALL': any deployable
- * tile, the 高台 included (server/match/board.js positionClass; the owner's decision of 2026-10-05). Every other MELEE
- * chess is ground-only.
+ * Deploy position ('MELEE'|'RANGED'|'ALL') of a chess/token piece, or null for items. A MELEE chess whose Chinese
+ * trait reads 「可以放置于远程位」 (shared/highGround.js `placeOnRanged`, else the Simplified line: 歌蕾蒂娅, 崖心, 见行者,
+ * normal and elite, any module) is 'ALL': any deployable tile, the 高台 included (server/match/board.js positionClass;
+ * the owner's decision of 2026-10-05). The record here is the localized one (GitHub #676). Every other MELEE chess is
+ * ground-only.
  */
 export function piecePosition(ctx, piece) {
   if (!isObj(piece)) return null;
