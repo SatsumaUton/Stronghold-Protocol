@@ -946,6 +946,7 @@ def main():
                                  'sample': {'keys': fx.FX_SAMPLE_KEYS, 'units': fx.FX_SAMPLE_UNITS,
                                             'coverage': fx.FX_COVERAGE_KEYS}},
                           'scenes': {'sub': scenes.SCENE_SUB, 'tex': scenes.TEX_SUB,
+                                     'version': scenes.SCENE_EXTRACT_VERSION,
                                      'stages': [{'id': sid, 'bundle': scenes.scene_bundle(sid), 'deps': deps}
                                                 for sid, deps in scenes.SCENES]}},
                          ensure_ascii=False))

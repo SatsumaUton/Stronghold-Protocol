@@ -87,6 +87,13 @@ export const EXPECTED_LOCAL_GROUPS = Object.freeze([
   "ui/outer",
 ]);
 
+// Manifest `scene` record version (kind Scene on each scene/<stageId> group). scene.json's mesh version stays 1.
+// An extracted record whose version is not this one is stale: setup asks for --scenes (DESIGN §34.12).
+// [ASSUMED] A group with no kind:Scene record is not a version problem (the group-key check still applies).
+export const EXPECTED_SCENE = Object.freeze({
+  version: 2,
+});
+
 export const EXPECTED_FX = Object.freeze({
   groups: Object.freeze(["fx", "fx/prefabs", "fx/tex", "fx/mesh"]),
   manifestVersion: 1,

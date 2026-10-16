@@ -314,9 +314,10 @@ export async function sceneListed(assets, stageId) {
 }
 
 /**
- * Load a stage's official scene (scene.json + scene.bin + lightmap pages + the materials' albedo (`images.tex`) and
- * normal / metallic-gloss (`images.data`) textures + the reflection atlas `images.env`). A missing texture, lightmap
- * page or atlas only drops that map; a missing or malformed scene gives null (→ the procedural board).
+ * Load a stage's official scene (scene.json + scene.bin + lightmap pages + the materials' albedo and emission
+ * (`images.tex`, sRGB) and normal / metallic-gloss (`images.data`, linear) textures + the reflection atlas
+ * `images.env`). A missing texture, lightmap page or atlas only drops that map; a missing or malformed scene
+ * gives null (→ the procedural board). scene.json `version` stays the mesh layout (SCENE_VERSION).
  * @returns {Promise<object|null>}
  */
 export function loadScenePack(assets, stageId) {
@@ -337,7 +338,7 @@ export function loadScenePack(assets, stageId) {
     };
     const mats = isObj(doc.materials) ? doc.materials : {};
     const namesOf = (...keys) => [...new Set(Object.values(mats).flatMap((m) => keys.map((k) => (isObj(m) && typeof m[k] === 'string' ? m[k] : null))).filter(Boolean))];
-    const names = namesOf('map'), dataNames = namesOf('normalMap', 'glossMap');
+    const names = namesOf('map', 'emissionMap'), dataNames = namesOf('normalMap', 'glossMap');
     const pages = Math.max(0, Math.min(16, doc.lightmaps | 0));
     const [texList, dataList, lm, env] = await Promise.all([
       Promise.all(names.map((n) => img(url(SCENE_TEX_GROUP, n)))),

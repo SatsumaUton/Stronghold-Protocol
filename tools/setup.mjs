@@ -24,7 +24,9 @@
 //      disagree, is reported. A non-scene gap names --local. A gap whose missing keys are all under scene/ names
 //      --scenes when a client is present and the full-package copy sentence when it is not (--local never fetches
 //      scene bundles). The effects row names the .venv-extract interpreter. A partial battlefield set does not start
-//      extract.py unless --scenes or --yes; that prompt defaults to no. The art row is checked again after step 7.
+//      extract.py unless --scenes or --yes; that prompt defaults to no. A scene group whose `scene` record (kind
+//      Scene) is not this version's scene extract version is the same kind of gap: --scenes once, even when every
+//      group key is present. The art row is checked again after step 7.
 //
 // Options:
 //   --check          report only, change nothing (exit 1 when something essential is missing)
@@ -51,7 +53,7 @@ import readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validateSource } from './assets/network.mjs';
-import { EXPECTED_FX, EXPECTED_LOCAL_GROUPS } from './local-extract/expected.mjs';
+import { EXPECTED_FX, EXPECTED_LOCAL_GROUPS, EXPECTED_SCENE } from './local-extract/expected.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const MIN_NODE = 22;
@@ -253,6 +255,9 @@ function formatMissing(keys) {
  * There is no canonical file count (it depends on the client): compare group keys, and report the entry count
  * the user has. A numeric `count` that disagrees with the listed entries is stale; a missing `count` is not.
  * fx or fx/* keys left inside local-assets do not satisfy the fx catalog. See fxCatalogReport for the catalog.
+ * A present `scene` record (kind Scene) on a battlefield group whose `version` is not EXPECTED_SCENE.version is
+ * stale even when every group key is there (an extract from before lossless data maps and emission). A group
+ * with no such record is not a version problem. scene.json's mesh version is not read.
  */
 export function assessLocal(manifest, fxDoc) {
   const groups = manifest && manifest.groups && typeof manifest.groups === 'object' ? Object.keys(manifest.groups) : [];
@@ -262,6 +267,8 @@ export function assessLocal(manifest, fxDoc) {
   const countField = manifest && Number.isFinite(manifest.count) ? manifest.count : null;
   const countMismatch = !!(manifest && countField !== null && countField !== count);
   const missingSceneGroups = missingGroups.filter((g) => g.startsWith('scene/'));
+  const sceneVersions = sceneRecordVersions(manifest);
+  const sceneVersionStale = sceneVersions.length > 0 && sceneVersions.some((v) => v !== EXPECTED_SCENE.version);
   const enemyIds = EXPECTED_LOCAL_GROUPS.filter((g) => g.startsWith('spine/enemy/'));
   const tokenIds = EXPECTED_LOCAL_GROUPS.filter((g) => g.startsWith('spine/token/'));
   return {
@@ -272,7 +279,10 @@ export function assessLocal(manifest, fxDoc) {
     missingGroups,
     countMismatch,
     countField,
-    scenes: !!manifest && missingSceneGroups.length === 0,
+    sceneVersionStale,
+    sceneVersionHave: sceneVersionLabel(sceneVersions),
+    sceneVersionExpected: EXPECTED_SCENE.version,
+    scenes: !!manifest && missingSceneGroups.length === 0 && !sceneVersionStale,
     sceneStagesHave: EXPECTED_SCENE_STAGES.filter((g) => have.has(g)).length,
     sceneStagesExpected: EXPECTED_SCENE_STAGES.length,
     sceneGroupHave: EXPECTED_SCENE_GROUPS.filter((g) => have.has(g)).length,
@@ -281,7 +291,7 @@ export function assessLocal(manifest, fxDoc) {
     enemySpines: enemyIds.length > 0 && enemyIds.every((g) => have.has(g)),
     tokenSpines: tokenIds.length > 0 && tokenIds.every((g) => have.has(g)),
     // No manifest is "not extracted" (skip), not a stale extract. Callers warn only when manifest is set.
-    stale: !manifest || missingGroups.length > 0 || countMismatch,
+    stale: !manifest || missingGroups.length > 0 || countMismatch || sceneVersionStale,
     fx: fxCatalogReport(fxDoc),
   };
 }
@@ -361,6 +371,37 @@ function sceneRepairClause(client) {
   return client === true ? `请重新运行 ${SCENE_REEXTRACT}` : LOCAL_ART_COPY_HINT;
 }
 
+/** Versions of battlefield `scene` records (kind Scene). A missing version is `undefined`. No record → omitted. */
+function sceneRecordVersions(manifest) {
+  const groups = manifest && manifest.groups;
+  if (!groups || typeof groups !== 'object') return [];
+  const out = [];
+  for (const g of EXPECTED_SCENE_STAGES) {
+    const rec = groups[g] && groups[g].scene;
+    if (!rec || rec.kind !== 'Scene') continue;
+    out.push(Object.hasOwn(rec, 'version') ? rec.version : undefined);
+  }
+  return out;
+}
+
+/** One label for the records above: the shared version, 无 when none of them wrote one, 不一致 when they differ. */
+function sceneVersionLabel(versions) {
+  if (!versions.length) return null;
+  const shown = versions.map((v) => (v === undefined || v === null ? null : v));
+  const first = shown[0];
+  if (!shown.every((v) => v === first)) return '不一致';
+  return first == null ? '无' : String(first);
+}
+
+/** Version-only scene gap (every group key is present). One repair clause, no "metal tiles" tail. */
+function sceneVersionDetail(o = {}) {
+  const have = o.sceneVersionHave ?? '无';
+  const exp = o.sceneVersionExpected ?? EXPECTED_SCENE.version;
+  const repair = sceneRepairClause(o.client);
+  const join = o.client === true ? '，' : '。';
+  return `场景版本 ${have}，期望 ${exp}${join}${repair}`;
+}
+
 function sceneOnlyGap(local) {
   const keys = local && local.missingGroups;
   return Array.isArray(keys) && keys.length > 0 && keys.every((g) => String(g).startsWith('scene/'));
@@ -374,7 +415,9 @@ function sceneOnlyGap(local) {
  */
 export function localGaps(local, opt = {}) {
   if (local && Array.isArray(local.missingGroups)) {
-    if (!local.missingGroups.length && !local.countMismatch) return '';
+    if (!local.missingGroups.length && !local.countMismatch) {
+      return local.sceneVersionStale ? `，${sceneVersionDetail({ ...local, client: opt.client })}` : '';
+    }
     const groupCount = local.groupCount ?? 0;
     const count = local.count ?? 0;
     const expected = local.expectedGroupCount ?? EXPECTED_LOCAL_GROUPS.length;
@@ -425,6 +468,9 @@ export function artRowAfterScenes(row, local, { client = false, tail = '', verb 
 /** Partial battlefield extract: have/expect battlefields, and scene/tex when that shared group is missing.
  * `o.client === true` names `--scenes`. Any other value names the full-package copy sentence. */
 export function scenePartialDetail(o = {}) {
+  if (o.sceneVersionStale && !(Array.isArray(o.missingSceneGroups) && o.missingSceneGroups.length)) {
+    return sceneVersionDetail(o);
+  }
   const have = o.sceneStagesHave ?? 0;
   const expect = o.sceneStagesExpected ?? EXPECTED_SCENE_STAGES.length;
   const missing = Array.isArray(o.missingSceneGroups) ? o.missingSceneGroups : [];
@@ -455,7 +501,8 @@ export function scenePresencePhrase(local, opt = {}) {
  * A count mismatch is not scene-only and is still appended.
  */
 export function doctorLocalDetail(local, clientUsable) {
-  const sceneOnlyPartial = sceneOnlyGap(local) && !local.countMismatch && (local.sceneGroupHave || 0) > 0;
+  const versionOnly = !!(local && local.sceneVersionStale && !local.missingGroups?.length && !local.countMismatch);
+  const sceneOnlyPartial = (sceneOnlyGap(local) || versionOnly) && !local.countMismatch && (local.sceneGroupHave || 0) > 0;
   const gaps = sceneOnlyPartial ? '' : localGaps(local, { client: clientUsable });
   return `${scenePresencePhrase(local, { client: clientUsable })}${gaps}`;
 }
@@ -830,6 +877,9 @@ async function main() {
       sceneStagesExpected: sceneLocal.sceneStagesExpected,
       sceneGroupHave: sceneLocal.sceneGroupHave,
       missingSceneGroups: sceneLocal.missingSceneGroups,
+      sceneVersionStale: sceneLocal.sceneVersionStale,
+      sceneVersionHave: sceneLocal.sceneVersionHave,
+      sceneVersionExpected: sceneLocal.sceneVersionExpected,
       client: clientFlag, python: !!scenePy, check: opts.check,
       declined: !!loadState().sceneDeclined, force: opts.scenes === 'force', yes: opts.yes,
     });

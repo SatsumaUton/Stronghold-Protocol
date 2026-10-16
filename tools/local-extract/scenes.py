@@ -10,15 +10,19 @@ index records them: the scene bundle's dependencies).
 
 Output per stage, under <out>/scene/<stageId>/ (manifest group scene/<stageId>):
   scene.json   { version, stage, light, lightmaps, lightRange, lightEncoding, env: { size, mips, range }, materials
-                 (each with the names of its textures: map, normalMap, glossMap), groups, chunks: [{ material,
-                 lightmap, group, verts, tris, offset, index32, bounds }] }
+                 (each with the names of its textures: map, normalMap, glossMap, and emissionMap when the
+                 material's _EMISSION keyword is on), groups, chunks: [{ material, lightmap, group, verts, tris,
+                 offset, index32, bounds }] }
   env.png      the scene's default reflection cubemap, decoded (env_atlas: 6 faces × the mip chain in one atlas)
   scene.bin    the chunks' vertex data in board space (x = column, y = row, z = height: Unity's anchor-local
                (x, y, −z)); per chunk: position f32×3, uv f32×2, lightmap uv f32×2 (scale / offset applied),
                normal i8×4, colour u8×4, indices u16|u32 (padded to 4 bytes)
   lm<i>.png    lightmap page i (+ a WebP copy, the one the manifest lists): RGB = the baked indirect light (Lightmap-<i>_comp_light, stored RGBM: decode_rgbm),
                A = the key light's baked shadow (Lightmap-<i>_comp_shadowmask, R)
-and the materials' albedo, normal (normal_rgb) and metallic-gloss textures under <out>/scene/tex/ (manifest group scene/tex, shared by the scenes).
+and the materials' albedo, normal (normal_rgb), metallic-gloss and (only with the _EMISSION keyword) emission textures under
+<out>/scene/tex/ (manifest group scene/tex, shared by the scenes). Normal and metallic-gloss are lossless WebP;
+albedo, lightmaps and emission stay lossy. The manifest scene record's version (SCENE_EXTRACT_VERSION) is what
+setup treats as fresh; scene.json version stays the mesh layout (SCENE_VERSION).
 A chunk's `group` is '' for what the scene shows at rest and the sub-graphic name (HIDDEN@1 …, MapSubGraphicHolder)
 for the meshes the game switches on later.
 """
@@ -52,12 +56,22 @@ COMMON_DEPS = ['arts/maps/effect.ab']
 SCENE_SUB = 'scene'
 TEX_SUB = 'scene/tex'
 SCENE_VERSION = 1
+# Manifest `scene` record (kind Scene) of each scene/<stageId> group. scene.json `version` stays SCENE_VERSION so a
+# scene extracted before this still loads. setup / doctor compare this with expected.mjs and ask for --scenes once
+# when an existing record is older (DESIGN §34.12).
+SCENE_EXTRACT_VERSION = 2
 # display-space light value that a lightmap page's 1.0 stands for (decode_rgbm; scene.json lightRange, with
 # lightEncoding 'gamma'). The pages of the eleven scenes stay below 2.8.
 LIGHT_RANGE = 3.0
 LIGHT_ENCODING = 'gamma'
-# material texture slots written to scene/tex: slot → key of the texture's name in scene.json materials[name]
-TEX_SLOTS = (('_MainTex', 'map'), ('_BumpMap', 'normalMap'), ('_MetallicGlossMap', 'glossMap'))
+# material texture slots written to scene/tex: slot → key of the texture's name in scene.json materials[name].
+# emissionMap is exported only when the _EMISSION keyword is on (map_exports): the Syracuse floor assigns
+# _EmissionMap without the keyword, and the program does not sample it.
+TEX_SLOTS = (('_MainTex', 'map'), ('_BumpMap', 'normalMap'), ('_MetallicGlossMap', 'glossMap'), ('_EmissionMap', 'emissionMap'))
+# Data maps: channels are independent values. Lossy WebP's 4:2:0 chroma would mix them (extract.py WEBP 'lossless').
+# Albedo and emission are colour and stay lossy. [ASSUMED] the scene emission map is colour, unlike the board's
+# TX_autochessi_E, which extract.py lists as lossless.
+LOSSLESS_MAPS = frozenset({'normalMap', 'glossMap'})
 # RGBM range of a reflection cubemap in gamma colour space (the same 5 as the lightmap pages)
 ENV_RGBM = 5.0
 # bytes of one 4 × 4 block of the cubemap formats the scenes use
@@ -195,15 +209,37 @@ def env_atlas(data, size, mips, fmt, version, platform, intensity):
     return atlas, rng
 
 
-def save_image(img, out_dir, stem, sub):
-    """Write `img` as <stem>.png and a WebP copy beside it (lossy at quality 95 with the alpha lossless and the RGB
-    under transparent texels kept, like extract.py WEBP: every player downloads these with the scene); returns the
-    manifest entry, which lists the copy (the PNG with a Pillow that has no WebP)."""
+def map_exports(kind, keywords):
+    """(unity slot, scene.json key) written when that texture is assigned. Gloss needs `_METALLICGLOSSMAP`.
+    Emission needs `_EMISSION`. Anything but albedo is only for a lit material."""
+    kw = keywords or ()
+    lit = kind == 'lit'
+    out = []
+    for slot, key in TEX_SLOTS:
+        if key != 'map' and not lit:
+            continue
+        if key == 'glossMap' and '_METALLICGLOSSMAP' not in kw:
+            continue
+        if key == 'emissionMap' and '_EMISSION' not in kw:
+            continue
+        out.append((slot, key))
+    return out
+
+
+def save_image(img, out_dir, stem, sub, lossless=False):
+    """Write `img` as <stem>.png and a WebP copy beside it. `lossless` uses extract.py WEBP_OPTIONS['lossless']
+    (normal and metallic-gloss). Colour maps stay lossy at quality 95 with the alpha lossless and the RGB under
+    transparent texels kept. Returns the manifest entry, which lists the copy (the PNG when Pillow has no WebP)."""
     img.save(Path(out_dir) / f'{stem}.png')
     entry = {'path': f'/assets/local/{sub}/{stem}.png', 'w': img.width, 'h': img.height}
     try:
-        img.save(Path(out_dir) / f'{stem}.webp', 'WEBP', quality=95, method=6, alpha_quality=100, exact=True)
-        entry.update(path=f'/assets/local/{sub}/{stem}.webp', webp='lossy')
+        if lossless:
+            img.save(Path(out_dir) / f'{stem}.webp', 'WEBP', lossless=True, quality=100, method=6, exact=True)
+            mode = 'lossless'
+        else:
+            img.save(Path(out_dir) / f'{stem}.webp', 'WEBP', quality=95, method=6, alpha_quality=100, exact=True)
+            mode = 'lossy'
+        entry.update(path=f'/assets/local/{sub}/{stem}.webp', webp=mode)
     except Exception:
         pass
     return entry
@@ -533,16 +569,15 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
     except Exception as e:
         log(f'  warn {stage_id}: reflection cubemap: {e}')
 
-    # textures of the materials (shared by the scenes): albedo, and the normal / metallic-gloss maps of the lit ones
+    # textures of the materials (shared by the scenes): albedo, and the normal / metallic-gloss / emission maps
     tex_dir = Path(out_root) / TEX_SUB
     tex_dir.mkdir(parents=True, exist_ok=True)
     for name, slots in sorted(mat_tex.items()):
-        for slot, key in TEX_SLOTS:
+        info = materials[name]
+        for slot, key in map_exports(info.get('kind'), info.get('keywords')):
             pptr = slots.get(slot)
-            if pptr is None or (key != 'map' and materials[name].get('kind') != 'lit'):
+            if pptr is None:
                 continue
-            if key == 'glossMap' and '_METALLICGLOSSMAP' not in (materials[name].get('keywords') or ()):
-                continue   # the shader variant without the keyword reads _Metallic / _Glossiness
             try:
                 tex = pptr.read()
                 tname = re.sub(r'[^A-Za-z0-9_.\-\[\]]+', '_', tex.m_Name or f'tex_{pptr.m_PathID}')
@@ -550,7 +585,7 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
                 if tname in manifest.get(TEX_SUB, {}):
                     continue
                 img = normal_rgb(tex.image) if key == 'normalMap' else tex.image
-                manifest.setdefault(TEX_SUB, {})[tname] = {**save_image(img, tex_dir, tname, TEX_SUB), 'kind': 'Texture2D'}
+                manifest.setdefault(TEX_SUB, {})[tname] = {**save_image(img, tex_dir, tname, TEX_SUB, key in LOSSLESS_MAPS), 'kind': 'Texture2D'}
                 n += 1
             except Exception as e:
                 log(f'  warn {stage_id}: texture {slot} of {name}: {e}')
@@ -560,7 +595,8 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
            'materials': dict(sorted(materials.items())), 'groups': sorted({rec['group'] for rec in records}),
            'chunks': records, 'binBytes': len(blob)}
     (out_dir / 'scene.json').write_text(json.dumps(doc, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
-    manifest[sub]['scene'] = {'path': f'/assets/local/{sub}/scene.json', 'kind': 'Scene', 'chunks': len(records)}
+    manifest[sub]['scene'] = {'path': f'/assets/local/{sub}/scene.json', 'kind': 'Scene', 'chunks': len(records),
+                              'version': SCENE_EXTRACT_VERSION}
     n += 1
     verts = sum(rec['verts'] for rec in records)
     log(f'{scene_path.name}: {len(records)} chunks, {verts} vertices, {lightmaps} lightmaps -> {sub}'
