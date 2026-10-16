@@ -1800,5 +1800,16 @@
   "其余 {n} 个已移到 plugins/_removed/。": "The other {n} {n|was|were} moved to plugins/_removed/.",
   "已移到 plugins/_removed/：{n} 个插件": "Moved to plugins/_removed/: {n} {n|plugin|plugins}",
   "选中「{name}」": "Select \"{name}\"",
-  "符号链接的插件文件夹不能在这里删除。": "A plugin folder that is a symbolic link cannot be deleted here."
+  "符号链接的插件文件夹不能在这里删除。": "A plugin folder that is a symbolic link cannot be deleted here.",
+  "{h}时{m}分{s}秒": "{h}:{m}:{s}",
+  "更多": "More",
+  "等级：本机记录的官方对局累计获得的卫戍认证": "Level: the Stronghold Certification earned in all in the official matches recorded on this device",
+  "获得卫戍认证 +{n}": "Stronghold Certification +{n}",
+  "每日防卫目标：{today}/{need}": "Daily Defense Goal: {today}/{need}",
+  "每日防卫目标 +{n}": "Daily Defense Goal +{n}",
+  "非官方对局不计入等级": "Unofficial matches do not count toward the level",
+  "模拟中断": "Simulation Interrupted",
+  "累计奖杯": "Total trophies",
+  "同盟通过回合": "Alliance Rounds Cleared",
+  "数据详情": "Full Report"
 }

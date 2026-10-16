@@ -340,6 +340,7 @@ export function compactRecord(rec) {
     playerId: self.playerId, seat: self.seat, alive: self.alive, victory: self.victory, roundsPassed: self.roundsPassed,
     eliminatedRound: self.eliminatedRound, bandId: self.bandId, title: self.title, left: self.left, stats: self.stats,
     trophies: self.trophies,
+    reward: self.reward,
     ...(usedBondIds.length ? { usedBondIds } : {}),
     ...(self.creditedKills != null ? { creditedKills: self.creditedKills } : {}),
   }] : [];

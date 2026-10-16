@@ -3534,6 +3534,21 @@ function enemyScaleFor(table, type, difficulty, round, isHidden) {
 }
 
 /**
+ * 每日防卫目标 (act2autochess constData dailyMission*): earn `need` 卫戍认证 in a day and the settlement adds `bonus`
+ * more, once a day; the day turns over at `resetHour`. The bonus and the hour are only in the rule text
+ * (「…即可在结算时领取【卫戍认证】x300的额外奖励。*奖励每日一次，每天04:00重置」), so they are read from it.
+ * @param {any} c constData @returns {{name:string, need:number, bonus:number, resetHour:number, rule:string}|null}
+ */
+function dailyMission(c) {
+  if (!c?.dailyMissionParam) return null;
+  const rule = stripRich(c.dailyMissionRule || '');
+  const awards = [...String(c.dailyMissionRule || '').matchAll(/<@acdm\.award>(\d+)<\/>/g)].map((m) => Number(m[1]));
+  const reset = /(\d{1,2}):\d{2}\s*重置/.exec(rule);
+  if (awards.length < 2 || !reset) warn('config: dailyMissionRule no longer names the bonus / the reset hour');
+  return { name: c.dailyMissionName || null, need: c.dailyMissionParam, bonus: awards[1] ?? 0, resetHour: reset ? Number(reset[1]) : 4, rule };
+}
+
+/**
  * Build data/config.json: modes (rounds, timers, shop, enemy scaling), economy, bans, timers,
  * titles, tips, broadcasts, trophies and other global tunables.
  */
@@ -3723,6 +3738,10 @@ function buildConfig(ctx, waves, stages, bands, chess, items) {
       baseByRoundsPassed: (Array.isArray(act.baseRewardDataList) ? act.baseRewardDataList : Object.values(act.baseRewardDataList || {})).map((r) => ({ round: r.round, count: r.item?.count ?? 0, dailyPoint: r.dailyMissionPoint ?? 0 })),
       formula: 'baseByRoundsPassed[roundsPassed].count * difficultyFactor[difficulty] * modeFactor[type]',
       difficultyFactor: act.difficultyFactorInfo, modeFactor: act.modeFactorInfo,
+      // the 功勋 levels: the 卫戍认证 earned in all, level by level (milestoneList tokenNum, cumulative)
+      milestones: (Array.isArray(act.milestoneList) ? act.milestoneList : Object.values(act.milestoneList || {}))
+        .map((m) => ({ level: m.milestoneLvl, tokens: m.tokenNum })).sort((a, b) => a.level - b.level),
+      daily: dailyMission(act.constData),
     },
     constants: {
       maxLevelCnt: ac.constData?.maxLevelCnt ?? 15, bossTrailerStartRound: ac.constData?.bossTrailerStartRound ?? 3,
