@@ -9,15 +9,15 @@
 //   board.setArea(rects)             the built areas (layout.js AREAS / areaFor: normal field + pen, 联防, boss)
 //   board.setFocus(rect)             the lit field (others fade, animated)
 //   board.setBattleRect(rect|null)   crates / turrets inside a running battle are sim units: static ones hide
-//   board.createDevice()             → handle { update(cam, { x, y, z, size, height, top, side, alpha, rot }), mesh: null, destroy() }
+//   board.createDevice(spec)         → handle { update(cam, { x, y, z, size, height, top, side, alpha, rot }), mesh: null, destroy() }
 //                                      (render/units.js DeviceView boxes, drawn as the official crate mesh)
 //   board.flashObjective(r, c)       leak flash of a blue objective box
 //   board.render(cam, timeSec)       sync the camera, animate, draw
 //   board.resize(w, h, dpr) · board.stats() · board.destroy()
 //
 // Draw calls: board (tiles + blocks + platforms, merged, MT_autochess), the pen's glass hatches (glassMaterial),
-// static crates (merged, same material), the 射击台 as the official model (trap_1106_achplat, merged, trapMaterial —
-// the slab of layout.js stays the fallback without the local art),
+// static crates and 射击台 as official models (trap_1105_accrate / trap_1106_achplat, merged, trapMaterial —
+// the atlas box / layout.js slab stay the fallbacks without the local art),
 // decals (MT_autochess_common), fence pipes, blowers (merged, unlit), gate boxes (additive + alpha, merged per
 // material), cyan field edges, terrain overlays (≤ 4), background plane + its shadow catcher — ~12–16 in total.
 // An official scene replaces the tiles, glass, decals, pipes and background (all but the device slabs, layout.js
@@ -189,6 +189,7 @@ export class BoardScene {
       waterN: makeTexture(T, img.waterN, { srgb: false, repeat: true }), caustics: makeTexture(T, img.caustics, { srgb: false, repeat: true }),
       noise: makeTexture(T, img.noise, { srgb: false, repeat: true }),
       platform: makeTexture(T, img.platform, { aniso }),
+      crate: makeTexture(T, img.crate, { aniso }),
     };
     if (this.tex.BG) { this.tex.BG.wrapS = T.MirroredRepeatWrapping; this.tex.BG.wrapT = T.MirroredRepeatWrapping; }
     this.mat = {
@@ -208,8 +209,9 @@ export class BoardScene {
       smog: smogMaterial(T, this.tex, this.focus),
       shadowCatcher: new T.ShadowMaterial({ opacity: 0.32, color: 0x000000 }),
       platform: this.tex.platform ? trapMaterial(T, this.tex.platform, this.focus, pack?.materials?.trap?.MT_trap_1106_achplat || null, LIGHTING.key.dir) : null,
+      crate: this.tex.crate ? trapMaterial(T, this.tex.crate, this.focus, pack?.materials?.trap?.MT_trap_1105_accrate
+        || { floats: { _Ambient: 0.809, _Diffuse: 0.271 } }, LIGHTING.key.dir) : null,
     };
-    this.mat.crateFade = null;
     // lights
     const hemi = new T.HemisphereLight(LIGHTING.hemi.sky, LIGHTING.hemi.ground, LIGHTING.hemi.intensity);
     hemi.position.set(0, 0, 1);
@@ -245,7 +247,8 @@ export class BoardScene {
     this.camRef = null;
     this.frames = 0;
     this.lastMs = 0;
-    this._crateGeom = null;
+    this._crateGeom = undefined;
+    this._boxGeom = null;
     this._platformGeom = undefined;
   }
 
@@ -281,17 +284,41 @@ export class BoardScene {
     this.meshes = {};
   }
 
-  /** The crate mesh in board space (s_common_box_01 when loaded, else a unit chamfer-free box), UVs on D. */
-  crateGeometry() {
-    if (this._crateGeom) return this._crateGeom;
+  /** The old atlas box: kept for mounds and missing-art installs (including the procedural-box fallback). */
+  boxGeometry() {
+    if (this._boxGeom) return this._boxGeom;
     const uv = this.pack?.uv || {};
-    const obj = this.pack?.meshes?.crate;
+    const obj = this.pack?.meshes?.box;
     let base;
     if (obj && obj.normal) base = objToBoard(obj, 0.01);
     else base = boxData(0.9, 0.675);
-    this._crateGeom = boxProjectUV(base, uv.crateTop || { src: 'D', rect: [1222, 1938, 134, 108] }, uv.crateSide || { src: 'D', rect: [1087, 1938, 134, 108] });
-    this._crateGeom.color = null;
+    this._boxGeom = boxProjectUV(base, uv.crateTop || { src: 'D', rect: [1222, 1938, 134, 108] }, uv.crateSide || { src: 'D', rect: [1087, 1938, 134, 108] });
+    this._boxGeom.color = null;
+    return this._boxGeom;
+  }
+
+  /**
+   * 阻隔工事: battle prefab Graphic/Mesh/trap_1105_accrate has identity parents, X rotation −90°, scale 0.01.
+   * Undo OBJ's mirrored X, apply that rotation, then battle −z → board height: (−x, z, y) × 0.01 = objToBoard.
+   * Keep the authored UVs and pivot (base ~0.002, top ~0.838, footprint ~1.013 × 1.019 tiles), no recentering.
+   */
+  clientCrateGeometry() {
+    if (this._crateGeom !== undefined) return this._crateGeom;
+    const obj = this.pack?.meshes?.crate;
+    this._crateGeom = obj?.normal && obj?.uv && this.mat.crate ? objToBoard(obj, 0.01) : null;
     return this._crateGeom;
+  }
+
+  crateGeometry() { return this.clientCrateGeometry() || this.boxGeometry(); }
+
+  /** DeviceView's dimensions follow the active model; 2D and missing-art boxes keep their old spec. */
+  deviceSpec(spec) {
+    if (spec?.top !== 'crateTop' || !this.clientCrateGeometry()) return spec;
+    if (!this._crateSpec) {
+      const { min, max } = this.pack.meshes.crate.bounds;
+      this._crateSpec = { ...spec, size: (max[0] - min[0]) * 0.01, height: max[1] * 0.01 };
+    }
+    return this._crateSpec;
   }
 
   /**
@@ -453,17 +480,17 @@ export class BoardScene {
     this.staticCrates = [];
     const wind = this.pack?.meshes?.blower ? objToBoard(this.pack.meshes.blower, 1) : null;
     const plat = this.platformGeometry();
-    if (plat) {
+    for (const mat of [this.mat.platform, this.mat.crate]) if (mat) {
       // lit by the official scene's own key light when one is drawn, else by the procedural board's
       const dir = this.official?.doc?.light?.dir;
-      this.mat.platform.uniforms.uLightDir.value.set(...(Array.isArray(dir) && dir.length === 3 ? dir : LIGHTING.key.dir)).normalize();
+      mat.uniforms.uLightDir.value.set(...(Array.isArray(dir) && dir.length === 3 ? dir : LIGHTING.key.dir)).normalize();
     }
     for (const d of board.devices) {
       if (d.kind === 'crate') this.staticCrates.push(d);
       else if (d.kind === 'platform' && plat) platforms.push(placeMesh(plat, { x: d.c, y: d.r, z: d.z0 }));
       else if (d.kind === 'blower' && wind && this.mat.wind) blowers.push(placeMesh(wind, { x: d.c, y: d.r, z: d.z0 + 0.078, rot: DIR_TURNS[d.dir] ?? 0 }));
       else if (d.kind === 'blower' || d.kind === 'turret') crates.push(placeMesh(boxWithTop(this.pack?.uv, d.kind), { x: d.c, y: d.r, z: d.z0 }));
-      else if (d.kind === 'mound') crates.push(placeMesh(this.crateGeometry(), { x: d.c, y: d.r, z: d.z0, s: 0.95, sz: 0.55 }));
+      else if (d.kind === 'mound') crates.push(placeMesh(this.boxGeometry(), { x: d.c, y: d.r, z: d.z0, s: 0.95, sz: 0.55 }));
       else if (d.kind === 'bush') crates.push(placeMesh(bushData(), { x: d.c, y: d.r, z: d.z0 }));
     }
     if (blowers.length) this.meshes.blowers = this._mesh(mergeInto(blowers), this.mat.wind, { receive: false });
@@ -477,7 +504,7 @@ export class BoardScene {
     const R = this.battleRect;
     const inside = (d) => !!R && d.r >= R.r0 && d.r <= R.r1 && d.c >= R.c0 && d.c <= R.c1;
     const list = (this.staticCrates || []).filter((d) => !inside(d)).map((d) => placeMesh(this.crateGeometry(), { x: d.c, y: d.r, z: d.z0 }));
-    if (list.length) this.meshes.crates = this._mesh(mergeInto(list), this.mat.board);
+    if (list.length) this.meshes.crates = this._mesh(mergeInto(list), this.clientCrateGeometry() ? this.mat.crate : this.mat.board);
     this.renderer.shadowMap.needsUpdate = true;
   }
 
@@ -619,20 +646,24 @@ export class BoardScene {
   // ---- dynamic devices (battle) ------------------------------------------------------------------------------
 
   /** A crate / device box driven by render/units.js DeviceView (see header). */
-  createDevice() {
+  createDevice(spec = { top: 'crateTop' }) {
     const T = this.THREE;
     const self = this;
-    const geom = this._geometry({ ...this.crateGeometry(), color: null });
-    const mat = this.mat.board.clone();
+    const clientCrate = spec.top === 'crateTop' && this.clientCrateGeometry();
+    const geom = this._geometry({ ...(clientCrate || this.boxGeometry()), color: null });
+    const source = clientCrate ? this.mat.crate : this.mat.board;
+    const mat = source.clone();
     mat.transparent = true;
     mat.vertexColors = false;
-    // keep the focus falloff on the clone
-    mat.onBeforeCompile = this.mat.board.onBeforeCompile;
+    // Keep focus and scene light live across stage / camera rebuilds; opacity belongs to this device alone.
+    if (clientCrate) Object.assign(mat.uniforms, this.focus, { uMap: source.uniforms.uMap, uLightDir: source.uniforms.uLightDir });
+    else mat.onBeforeCompile = source.onBeforeCompile;
     const mesh = new T.Mesh(geom, mat);
     mesh.castShadow = true; mesh.receiveShadow = true;
     this.dynamic.add(mesh);
-    const bx = this.crateGeometry().bounds || { x0: -0.45, x1: 0.45, z0: 0, z1: 0.675 };
-    const baseSize = Math.max(0.01, bx.x1 - bx.x0), baseH = Math.max(0.01, bx.z1 - bx.z0);
+    geom.computeBoundingBox();
+    const { min, max } = geom.boundingBox;
+    const baseSize = Math.max(0.01, max.x - min.x), baseH = Math.max(0.01, clientCrate ? max.z : max.z - min.z);
     let dead = false;
     const h = {
       mesh: null,
@@ -645,6 +676,7 @@ export class BoardScene {
         const s = (b.size || baseSize) / baseSize;
         mesh.scale.set(s, s, Math.max(0.001, (b.height ?? baseH) / baseH));
         mat.opacity = Math.max(0, Math.min(1, b.alpha ?? 1));
+        if (clientCrate) mat.uniforms.uOpacity.value = mat.opacity;
         mat.depthWrite = mat.opacity > 0.98;
       },
       destroy() {

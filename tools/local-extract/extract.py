@@ -117,9 +117,9 @@ JOBS = [
     ('spritepack/ui_equip_type_hub_h2_0.ab', 'module', {'Sprite'}),
     *[(rel, f'mesh/{sub}', {'Mesh', 'GameObject', 'Material', 'Texture2D'}) for rel, sub in MESH_BUNDLES],
     # the official 射击台 model (GitHub round 40: 战场#03's raised tiles by the blue gate were our flat grey slab): the
-    # bundle holds every 卫戍协议 device model (red door, plane, laser, crate, 射击台); only the 射击台 is kept
+    # bundle holds every 卫戍协议 device model; keep 射击台 and 阻隔工事 (trap_1105_accrate, #663)
     ('arts/maps/common/trap/trap_110.ab', 'mesh/trap_110', {'Mesh', 'GameObject', 'Material', 'Texture2D'},
-     r'^((MT|TX)_)?trap_1106_achplat$'),
+     r'^((MT|TX)_)?(trap_1106_achplat|trap_1105_accrate)$'),
     ('arts/effects/[pack]map.ab', 'map/fx', {'Mesh', 'GameObject', 'Material', 'Texture2D'}),
     ('arts/maps/common/res.ab', 'map/common', {'Material', 'Texture2D'}, r'^(TX|MT)_wind_device$'),
     ('arts/maps/effect.ab', 'map/water', {'Texture2D'}, r'water_normal|Caustics|WaterNoise|noise_clouds|Water_Foam|SmoothWaves'),
@@ -196,6 +196,7 @@ WEBP = [
     ('map/water', 'TX_Caustics256', 'lossy'),
     ('map/water', 'T_noise_clouds_01', 'lossless'),
     ('mesh/trap_110', 'TX_trap_1106_achplat', 'lossy'),
+    ('mesh/trap_110', 'TX_trap_1105_accrate', 'lossy'),
 ]
 WEBP_OPTIONS = {
     'lossy': {'quality': 95, 'method': 6, 'alpha_quality': 100, 'exact': True},
