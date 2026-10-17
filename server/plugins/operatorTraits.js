@@ -17,14 +17,17 @@ export const TRAIT_SURFACE = Object.freeze([
 
 export const hasOperatorTrait = r => r?.trait?.dsl !== undefined || r?.kit?.dsl?.trait?.on !== undefined
   || Object.values(r?.forms ?? {}).some(f => f?.trait?.dsl !== undefined);
-/** Permissions consumed by operator declarations, beyond what the manifest alone can see. */
+/** Permissions consumed by record JSON, beyond what the manifest alone can see (check, registry and studio). */
 export function operatorTraitPermissions(content, manifest) {
   const used = new Set();
   for (const part of ['operators', 'data']) for (const rel of manifest.parts[part]?.files ?? []) {
     const doc = content?.documents[rel];
-    for (const r of Array.isArray(doc) ? doc : doc?.entries ?? [doc]) if (hasOperatorTrait(r)) {
-      used.add('dsl');
-      if (!r.charId?.startsWith('char_x_')) used.add('data.patch');
+    for (const r of Array.isArray(doc) ? doc : doc?.entries ?? [doc]) {
+      if (r?.kit?.dsl != null) used.add('dsl');
+      if (hasOperatorTrait(r)) {
+        used.add('dsl');
+        if (!r.charId?.startsWith('char_x_')) used.add('data.patch');
+      }
     }
   }
   return used;

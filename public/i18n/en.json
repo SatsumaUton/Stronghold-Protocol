@@ -2059,5 +2059,11 @@
   "还有 {n} 人未选择": "{n} players still choosing",
   "刷新（剩余 {n} 次）": "Refresh ({n} left)",
   "等待队友": "Waiting for teammates",
-  "暂不可用": "Unavailable"
+  "暂不可用": "Unavailable",
+  "外观在『{name}』（设置 → 外观插件）": "Appearance is in “{name}” (Settings → Cosmetic plugins)",
+  "「{a}」和「{b}」的规则开关「{rule}」选项冲突": "“{a}” and “{b}” choose different options for “{rule}”",
+  "商店装备偏向": "Shop equipment bias",
+  "休整期调配": "Preparation loadout",
+  "变形同构体配对": "Morph pairing",
+  "卸下装备": "Unequip items"
 }

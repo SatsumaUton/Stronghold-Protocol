@@ -464,6 +464,25 @@ test('review: trait permissions pass strict checking and cannot be removed by a 
   }
 });
 
+test('P9: embedded kit DSL passes check/registry and survives a stale studio permission autofix', async t => {
+  const { checkPluginFolder } = await import('../../server/plugins/pack.js');
+  const { FIXES } = await import('../../server/studio/edit.js');
+  for (const part of ['operators', 'data']) {
+    const f = fixture(t), record = guard();
+    record.kit = { dsl: { dsl: 1, skill: { kind: 'passive', mods: { atkPct: 0.2 } } } };
+    f.put('data-demo', { permissions: ['data.add', 'dsl'], [part]: ['op.json'] },
+      { 'op.json': part === 'operators' ? [record] : { records: 1, entries: [record] } });
+    const dir = f.dir + '/plugins/data-demo';
+    const checked = checkPluginFolder(dir, dir);
+    assert.deepEqual(checked.problems, []);
+    assert.deepEqual(checked.issues.filter(i => i.code === 'PLUGIN_PERMISSION_UNUSED'), []);
+    assert.deepEqual(buildContentSet({ registry: f.registry, ids: ['data-demo'] }).problems, []);
+    const p = { manifest: JSON.parse(fs.readFileSync(dir + '/plugin.json')) };
+    assert.throws(() => FIXES.dropPermission(p, { params: { permission: 'dsl' } }, { files: { root: () => dir }, id: 'data-demo' }));
+    assert.ok(p.manifest.permissions.includes('dsl'));
+  }
+});
+
 for (const [label, dsl] of Object.entries({
   item: { dsl: 1, meta: { on: [{ when: 'gain', do: [{ gainItem: { item: 'missing_item' } }] }] } },
   bond: { dsl: 1, talents: [{ when: 'elementBurst', do: [{ layers: { bond: 'missing_bond', amount: 1 } }] }] },

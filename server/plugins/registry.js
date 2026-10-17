@@ -567,7 +567,7 @@ export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, whe
       return out(null);
     }
     plugin.content = c.content;
-    // Manifest-only diagnostics cannot see permissions consumed by operator trait JSON.
+    // Manifest-only diagnostics cannot see permissions consumed by record kits / traits.
     const traitPermissions = operatorTraitPermissions(c.content, manifest);
     for (let i = issues.length - 1; i >= 0; i--) {
       const issue = issues[i];
