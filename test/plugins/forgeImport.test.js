@@ -1758,6 +1758,73 @@ test('a skeleton whose bone, slot or skin count exceeds the cap is rejected befo
   } finally { fs.rmSync(parent, { recursive: true, force: true }); }
 });
 
+test('P9: dropped records map distinct chess/item ids to art keys, while retained targets stay usable', async t => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-targets-'));
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  for (const kind of ['chess', 'items', 'bonds']) {
+    const pack = path.join(parent, kind);
+    const key = kind === 'chess' ? 'char_forge_target' : kind === 'items' ? 'trap_forge_target' : 'bond_forge_target';
+    const records = kind === 'chess' ? pairOf('target', { both: { charId: key, name: '' } })
+      : { record_forge_target: { id: 'record_forge_target', trapId: key, iconId: `${key}_icon` } };
+    if (kind === 'bonds') { delete records.record_forge_target; records[key] = { id: key }; }
+    writePack(pack, { id: `target-${kind}`, name: 'Targets', version: '1.0.0', license: 'CC0-1.0', content: [kind],
+      art: { [kind === 'chess' ? 'chars' : kind]: { [key]: kind === 'chess' ? { avatar: 'icon.png' } : 'icon.png' } } },
+    { [`${kind}.json`]: JSON.stringify(records), 'icon.png': PNG });
+    const got = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, `target-${kind}`) });
+    assert.equal(got.ok, true, got.markdown);
+    assert.equal(got.report.cosmeticBare, true, `${kind}: ${got.markdown}`);
+    assert.match(got.markdown, /nothing to apply to/);
+    if (kind === 'chess') {
+      // An invalid extra copy cannot make the retained operator's shared portrait look unusable.
+      writePack(pack, { id: `target-${kind}`, name: 'Targets', version: '1.0.0', license: 'CC0-1.0', content: [kind],
+        art: { chars: { char_112_siege: { avatar: 'icon.png' } } } },
+      { 'chess.json': JSON.stringify({ ...pairOf('target', { both: { charId: 'char_112_siege', name: '' } }),
+        ...pairOf('valid_target', { both: { charId: 'char_112_siege' } }) }), 'icon.png': PNG });
+      const mixed = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'target-chess-mixed'), dryRun: true });
+      assert.equal(mixed.ok, true, mixed.markdown);
+      assert.equal(mixed.report.cosmeticBare, undefined, mixed.markdown);
+      fs.writeFileSync(path.join(pack, 'chess.json'), JSON.stringify(pairOf('target', { both: { charId: 'char_112_siege', name: '' } })));
+      const existing = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'target-chess-existing'), dryRun: true });
+      assert.equal(existing.ok, true, existing.markdown);
+      assert.equal(existing.report.cosmeticBare, undefined, 'the official operator still uses the portrait');
+    }
+    if (kind === 'items') {
+      const manifest = JSON.parse(fs.readFileSync(path.join(pack, 'pack.json')));
+      manifest.art.items = { [`${key}_icon`]: 'icon.png' };
+      fs.writeFileSync(path.join(pack, 'pack.json'), JSON.stringify(manifest));
+      const icon = await importForge(pack, { ...forgeOpts(parent), out: path.join(parent, 'target-items-icon'), dryRun: true });
+      assert.equal(icon.report.cosmeticBare, true, icon.markdown);
+    }
+  }
+  const kept = path.join(parent, 'kept');
+  writePack(kept, { id: 'target-kept', name: 'Kept', version: '1.0.0', license: 'CC0-1.0', content: ['chess'],
+    art: { chars: { char_112_siege: { avatar: 'icon.png' } } } },
+  { 'chess.json': JSON.stringify(pairOf('target_kept', { both: { charId: 'char_112_siege' } })), 'icon.png': PNG });
+  const got = await importForge(kept, { ...forgeOpts(parent), out: path.join(parent, 'target-kept') });
+  assert.equal(got.ok, true, got.markdown);
+  assert.equal(got.report.cosmeticBare, undefined);
+  const content = got.report.products.find(p => p.class === 'content');
+  const look = got.report.products.find(p => p.class === 'cosmetic');
+  const manifest = JSON.parse(fs.readFileSync(path.join(parent, content.id, 'plugin.json')));
+  assert.deepEqual(manifest.optional, { [look.id]: '1.0.0' });
+  assert.equal(manifest.requires?.[look.id], undefined, 'companion art is never auto-enabled');
+});
+
+test('P9: an engine resource container reports partial/manual even with no product', async t => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-container-'));
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  const pack = path.join(parent, 'pack');
+  writePack(pack, { id: 'resource-only', name: 'Resources', version: '1.0.0', license: 'CC0-1.0',
+    assets: { container: 'bundle.spresources', manifest: 'resource-manifest.json' } },
+  { 'bundle.spresources': 'synthetic container', 'resource-manifest.json': '{}' });
+  const got = await importForge(pack, { ...forgeOpts(parent), dryRun: true });
+  assert.equal(got.ok, true, got.markdown);
+  assert.deepEqual(got.report.products, []);
+  assert.equal(got.report.partial, true);
+  assert.equal(got.report.needsManualAdaptation, true);
+  assert.ok(got.report.manualReasons.some(r => r.path === 'pack.json:assets' && /spresources/.test(r.en)));
+});
+
 test('a pack that drops whole gameplay records says so, and a cosmetic aimed only at those records has nothing to apply to', async () => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-gap-'));
   const pack = path.join(parent, 'pack');

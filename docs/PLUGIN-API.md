@@ -25,6 +25,10 @@ content identity; conflicting options return `PLUGIN_RULE_CONFLICT`. The full se
 are in [PLUGINS.md](PLUGINS.md#rule-switches). `g.unequip { itemUid }` is a server-checked game intent, available only
 under unequip=allow; interface plugins still cannot send game intents.
 
+The 0.3.1 import polish (§34.27) reuses stable `manifest.field.optional` for companion cosmetics (id → exact
+version); it adds no manifest field, slot or wire message. Optional personal cosmetics remain the player's choice.
+See [PLUGINS.md](PLUGINS.md#import-and-display-polish-031-3427) for hint visibility and record-permission checks.
+
 ## The table
 
 Theme values and announcements are specified in [PLUGINS §9.1–§9.2](PLUGINS.md#91-theme-variables). `shared/plugins/theme.js` exports the single `THEME_TOKENS` allowlist used by validation and application. Announcements use `notices: [{ id, title, body, date?, i18n? }]` on any class; they are catalogue data and excluded from gameplay descriptors. Adding/editing/removing notices and changing personal theme values preserve `cs`, `vs` and room-facing plugin hashes: manifests always use the same canonical representation without `notices`/`theme`, while raw lock verification remains intact. Theme values have a 400-character raw limit (before trimming/parsing); notice catalogues skip entries that do not fit the 100-entry/48 KiB caps. Server and client both enforce these bounds. Notice-only personal cosmetics remain available as dependencies. [ASSUMED] Cosmetic lock identity includes checked Spine metadata, with actual shaping files hashed separately. Canonicalization migrates pre-fix raw-manifest identities even for plugins without the new fields.

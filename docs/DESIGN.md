@@ -8,6 +8,9 @@ Versions: the first public release was **0.1.0** (2026-10-02, the state of §0�
 
 ---
 
+The 0.3.1 Forge integration/browser polish is [§34.27](history/0.3.1.md#3427-forge-import-and-browser-polish-p9):
+companion cosmetic hints, accurate import reports, record DSL permission checks and usable result panels (§32.8/§32.12).
+
 ## Where each section lives
 
 Section numbers are global and never change: code, tests and the other documents cite them as "DESIGN §N". The

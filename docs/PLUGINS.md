@@ -2004,9 +2004,29 @@ before products. `ok` still means validation succeeded, including when a skeleto
 A field-level note, a unit already covered by its chess pair and `--no-scripts` do not set `partial` on their own.
 [ASSUMED] Effects are not a counted kind. A cosmetic
 whose asked art, bond or item targets were all dropped says, in Chinese and in English, that it has nothing to apply to
-(`cosmeticBare`); the files are still copied. Those targets are gameplay record ids (operators, bonds, bands, items,
-tokens, traits, kits). A dropped panel title is never one of them, so a panel named like a kept portrait leaves the
+(`cosmeticBare`); the files are still copied. Targets use the art namespace: dropped chess records map to `charId`,
+items to their trap/icon keys, bonds to their own ids. A retained record sharing the art key keeps that target usable
+[ASSUMED]. Dropped kits and panel titles are never art targets, so a panel named like a kept portrait leaves the
 imported art list in place. A product that keeps a target, or that only carries audio, does not say that.
+
+### Import and display polish (0.3.1, §34.27)
+
+An unsupported `pack.json.assets` engine resource container (`.spresources`) sets both `partial` and
+`needsManualAdaptation`, with a bilingual `manualReasons` entry, including when no plugin is produced. `ok` still
+means the import/check completed successfully; it does not mean the engine container was converted.
+
+[ASSUMED] When one import produces content and a cosmetic companion, the content manifest records the cosmetic id
+and exact version in the existing `optional` map. This is a hint and load-order metadata; it never enables a personal
+cosmetic. The room's plugin panel names installed, version-matching personal cosmetic companions of active gameplay
+plugins while they are off in both the room and this player's personal selection (including automatic dependencies):
+「外观在『…』（设置 → 外观插件）」. Missing or incompatible companion versions produce no hint.
+
+Folder/CLI checks and the registry count embedded record `kit.dsl` as a `dsl` permission use, alongside operator
+trait DSL and its official-record `data.patch` use (§34.26). Studio refuses a stale autofix that would remove one
+of these consumed permissions. Manifest-only diagnostics are reconciled after the declared record JSON is read.
+Rule-conflict toasts name both plugins and the rule switch in the player's language, falling back to plugin ids.
+[ASSUMED] Imported `result.tab` pages scroll horizontally inside their frame when content is wider than the slot;
+narrow panels retain their existing width. No slot or message API is added.
 
 **Kit imports.** Production script plugins allow only self-contained entries (§13), so a Forge kit's imports are
 rewritten to `sp:sdk@1` where the SDK exports the same helpers, and every other one refuses the file:

@@ -475,15 +475,17 @@ export function forgePanelPage(opts) {
   };
   const bootJson = JSON.stringify(boot).replace(/</g, '\\u003c');
   const css = scriptSafe(String(opts.css || '')).replace(/<\/(style)/gi, '<\\/$1');
+  // [ASSUMED] Scroll the shim's panel host at its current width, keeping narrow panels and other slots unchanged.
+  const scroll = opts.slot === 'result.tab' ? '\n<style>body.sp-forge-result > div{max-width:100%;overflow-x:auto}</style>' : '';
   return `<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="utf-8">
 <title>${title}</title>
 <style>html{color-scheme:dark}html,body{margin:0;background:transparent;color:#e8e0d0;font:12px/1.4 sans-serif}body{padding:6px}</style>
-<style>${css}</style>
+<style>${css}</style>${scroll}
 </head>
-<body>
+<body${opts.slot === 'result.tab' ? ' class="sp-forge-result"' : ''}>
 <script>
 ${scriptSafe(FORGE_SHIM_TEXT)}
 ${scriptSafe(opts.bundle)}

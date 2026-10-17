@@ -10,12 +10,21 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'acorn';
 import { installForgeShim } from '../../shared/plugins/forgePanel.js';
 import { hostState, hostWelcome, isMatchIntent } from '../../shared/plugins/ui.js';
-import { PANEL_FILE_MAX, PANEL_FILES_MAX, PANEL_TOTAL_MAX, planForgePanel } from '../../server/plugins/forgePanels.js';
+import { PANEL_FILE_MAX, PANEL_FILES_MAX, PANEL_TOTAL_MAX, planForgePanel, forgePanelPage } from '../../server/plugins/forgePanels.js';
 import { importForge, planForgeImport } from '../../server/plugins/forgeImport.js';
 import { readVanillaAssets } from '../../server/plugins/registry.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const vanilla = readVanillaAssets(path.join(ROOT, 'data'));
+
+test('P9: result panels contain a horizontal scroll host for wide tables without widening narrow panels', () => {
+  const result = forgePanelPage({ slot: 'result.tab', title: 'Wide table', css: 'table{white-space:nowrap}', bundle: '' });
+  assert.match(result, /body class="sp-forge-result"/);
+  assert.match(result, /body\.sp-forge-result > div\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/);
+  assert.doesNotMatch(result, /min-width:\s*\d+(?:px|rem)/);
+  const narrow = forgePanelPage({ slot: 'hud.right', title: 'Narrow', bundle: '' });
+  assert.doesNotMatch(narrow, /body class="sp-forge-result"/);
+});
 
 function feedOf(opts) {
   const posts = [];

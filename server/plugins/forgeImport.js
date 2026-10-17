@@ -1097,7 +1097,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   // is not one of these: the record itself was still imported. [ASSUMED] garrisons and a traits table both
   // count as traits; chess and units both count as operators.
   const dropped = { operators: 0, bonds: 0, bands: 0, items: 0, tokens: 0, traits: 0, kits: 0, panels: 0 };
-  // ids of dropped gameplay records, so a cosmetic aimed only at them can say it has nothing to apply to.
+  // Table-qualified ids of dropped gameplay records. Resolve their art keys after all records have been mapped.
   // A panel title is not one of these: a panel named like a kept portrait must not make that cosmetic bare.
   const droppedIds = new Set();
   const DROP_ID_KINDS = new Set(['operators', 'bonds', 'bands', 'items', 'tokens', 'traits', 'kits']);
@@ -1105,7 +1105,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   const skip = (p, zh, en, code, kind, extra) => {
     skipped.push({ path: p, zh, en, ...(code ? { code } : {}), ...(extra && typeof extra === 'object' ? extra : {}) });
     if (code === 'PLUGIN_FORGE_PANEL_SCRIPT' || code === 'PLUGIN_FORGE_MOUNT'
-      || ['pack.json:server', 'pack.json:serverModules', 'pack.json:routes', 'pack.json:messages', 'pack.json:theme'].includes(p)
+      || ['pack.json:server', 'pack.json:serverModules', 'pack.json:routes', 'pack.json:messages', 'pack.json:theme', 'pack.json:assets'].includes(p)
       || (p.startsWith('client.') && !p.startsWith('client.panels'))) {
       manualReasons.push({ path: p, zh, en, ...(extra && typeof extra === 'object' ? extra : {}) });
     }
@@ -1113,7 +1113,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     noteDrop(kind);
     if (!DROP_ID_KINDS.has(kind)) return;
     const id = String(p).split(':').slice(1).join(':').split('#')[0];
-    if (id) droppedIds.add(id);
+    if (id) droppedIds.add(`${String(p).split(':')[0]}:${id}`);
   };
   const assume = (what, zh, en) => { if (!assumed.some((a) => a.what === what)) assumed.push({ what, zh, en }); };
 
@@ -2098,8 +2098,6 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
     }
     const unit = chessUnit(normal);
     if (!unit) {
-      // Art is keyed by charId, which the skip path (the chess id) does not record.
-      if (typeof normal.charId === 'string' && normal.charId) droppedIds.add(normal.charId);
       skip(label, `棋子的 charId（${String(normal.charId ?? 'null').slice(0, 40)}）既不是官方干员，也不是本包 units.json 里的干员，assets 里也没有官方干员的美术，没有导入。`, `The chess record's charId (${String(normal.charId ?? 'null').slice(0, 40)}) is neither an official operator nor a unit of this pack's units.json, and its assets name no official art, so it was not imported.`, undefined, 'operators');
       return;
     }
@@ -2719,17 +2717,39 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   for (const t of translations.filter((x) => x.kind === 'ui')) roles.push(`lang:${t.lang}`);
   if (!roles.length && notices.length) roles.push('cosmetic');
 
-  // [ASSUMED] A cosmetic has nothing to apply to when every asked portrait / bond / item id belongs to a dropped
-  // gameplay record (operators, bonds, bands, items, tokens, traits, kits) and no kept visual key sits outside
-  // that set. A panel title is never such an id. Audio alone (no asked ids) is not this case. A plugin that
-  // keeps one real target is not this case either.
+  // Art keys differ from record ids: chess → charId, items → trap/icon, bonds → bond id (WORKSHOP §1.4).
+  // [ASSUMED] Shared art still has a target if another retained record uses it. Whole-record drops only;
+  // a kit or panel being skipped cannot make an imported operator's art bare. Audio alone is never bare.
+  const droppedArt = new Set(), liveArt = new Set();
+  const visualKeys = (name, id, rec) => {
+    const bucket = name === 'chess' || name === 'units' ? 'chars' : name;
+    const keys = bucket === 'chars' ? [rec?.charId || (name === 'units' ? id : null)]
+      : name === 'items' ? [id, rec?.trapId, rec?.iconId, rec?.icon] : [id];
+    return keys.filter(k => typeof k === 'string' && k).map(k => `${bucket}:${k}`);
+  };
+  for (const name of ['chess', 'units', 'items', 'bonds', 'bands', 'tokens']) {
+    // A dropped duplicate may still point at art used by the installation's existing records.
+    for (const [id, rec] of Object.entries(table(name) || {})) for (const key of visualKeys(name, id, rec)) liveArt.add(key);
+    let records = {};
+    try { records = asMap(loadTableFile(files, used, name), name === 'chess' ? 'chessId' : name === 'units' ? 'charId' : 'id'); } catch { /* already reported */ }
+    const parents = new Map();
+    if (name === 'chess') for (const [id, rec] of Object.entries(records)) {
+      for (const target of [rec?.upgradeChessId, rec?.goldenId]) if (target && target !== id) parents.set(target, id);
+    }
+    for (const [id, rec] of Object.entries(records)) {
+      const base = typeof rec?.baseId === 'string' ? rec.baseId : parents.get(id) ?? id.replace(/_b$/, '_a');
+      const target = droppedIds.has(`${name}:${id}`) || droppedIds.has(`${name}:${base}`) ? droppedArt : liveArt;
+      for (const key of visualKeys(name, id, rec)) target.add(key);
+    }
+  }
+  const bareKey = key => droppedArt.has(key) && !liveArt.has(key);
   const asked = [];
-  if (isObj(pack.art)) for (const t of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items']) if (isObj(pack.art[t])) asked.push(...Object.keys(pack.art[t]));
-  if (isObj(pack.bondIcons)) asked.push(...Object.keys(pack.bondIcons));
-  if (isObj(pack.itemIcons)) asked.push(...Object.keys(pack.itemIcons));
+  if (isObj(pack.art)) for (const t of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items']) if (isObj(pack.art[t])) asked.push(...Object.keys(pack.art[t]).map(k => `${t}:${k}`));
+  if (isObj(pack.bondIcons)) asked.push(...Object.keys(pack.bondIcons).map(k => `bonds:${k}`));
+  if (isObj(pack.itemIcons)) asked.push(...Object.keys(pack.itemIcons).map(k => `items:${k}`));
   const kept = [];
-  for (const bucket of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items', 'skills', 'modules']) if (isObj(assets[bucket])) kept.push(...Object.keys(assets[bucket]));
-  const cosmeticBare = asked.length > 0 && asked.every((k) => droppedIds.has(k)) && kept.every((k) => droppedIds.has(k));
+  for (const bucket of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items', 'skills', 'modules']) if (isObj(assets[bucket])) kept.push(...Object.keys(assets[bucket]).map(k => `${bucket}:${k}`));
+  const cosmeticBare = asked.length > 0 && asked.every(bareKey) && kept.every(bareKey);
 
   const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, gameplayRecords, contentI18n, panels, manualPanels, manualReasons, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare, themeVars, notices, rules: importedRules };
   return { meta, roles };
@@ -2828,6 +2848,8 @@ function buildProducts(meta, ids, primaryRole) {
     const perms = [];
     /** @type {Record<string, unknown>} */
     const man = manifestCommon(ids.content, meta, { class: 'content', scope: ['room'] });
+    // [ASSUMED] A same-import cosmetic is an optional companion, never a required/auto-enabled personal choice.
+    if (ids.cosmetic) man.optional = { [ids.cosmetic]: meta.version };
     const files = new Map();
     if (meta.patches.length) {
       perms.push('data.patch');

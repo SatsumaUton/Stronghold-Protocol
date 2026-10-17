@@ -207,7 +207,7 @@ export const FIXES = {
     const perm = String(issue.params?.permission || '');
     const plugin = readPluginFolder(files.root(id)).plugin;
     if (plugin && operatorTraitPermissions(plugin.content, plugin.manifest).has(perm)) {
-      throw new StudioError('PLUGIN_STUDIO_REQUEST', 400, { detail: 'permission is used by operator traits' });
+      throw new StudioError('PLUGIN_STUDIO_REQUEST', 400, { detail: 'permission is used by record kits or traits' });
     }
     if (Array.isArray(p.manifest.permissions)) p.manifest.permissions = p.manifest.permissions.filter((x) => x !== perm);
     if (Array.isArray(p.manifest.permissions) && !p.manifest.permissions.length) delete p.manifest.permissions;

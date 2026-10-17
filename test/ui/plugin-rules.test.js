@@ -4,6 +4,33 @@ import { ruleLine, roomPluginFacts, pluginTagText } from '../../public/js/ui/plu
 import { pieceBondIds, grantedBonds } from '../../public/js/ui/gameLogic/bonds.js';
 import { equipReplaces } from '../../public/js/ui/gameLogic/placement.js';
 import { replaceRequest } from '../../public/js/ui/equipReplace.js';
+import { describeError } from '../../public/js/ui/toasts.js';
+import { catalog } from '../../public/js/content.js';
+import { addMessages, setLang } from '../../shared/i18n.js';
+import fs from 'node:fs';
+import { errorMsg } from '../../server/net.js';
+
+test('P9: rule-conflict toasts name both plugins and the switch in the player language', () => {
+  const before = catalog.get();
+  catalog.set({ ...before, plugins: [
+    { id: 'aa', names: { zh: '甲', en: 'Alpha' } }, { id: 'bb', names: { zh: '乙', en: 'Beta' } },
+  ] });
+  const err = { code: 'PLUGIN_RULE_CONFLICT', detail: 'PLUGIN_RULE_CONFLICT unequip: aa and bb set unequip to different options' };
+  try {
+    assert.equal(describeError(err), '「甲」和「乙」的规则开关「卸下装备」选项冲突');
+    addMessages('en', JSON.parse(fs.readFileSync(new URL('../../public/i18n/en.json', import.meta.url))));
+    setLang('en');
+    assert.equal(describeError(err), '“Alpha” and “Beta” choose different options for “Unequip items”');
+    catalog.set({ ...before, plugins: [] });
+    assert.match(describeError(err), /aa.*bb/);
+    const a = 'a'.repeat(32), b = 'b'.repeat(32);
+    for (const rule of ['shopBias', 'prepLoadout', 'morphPairing', 'unequip']) {
+      const wire = errorMsg('PLUGIN_RULE_CONFLICT', 'test', `PLUGIN_RULE_CONFLICT ${rule}: ${a} and ${b} set ${rule} to different options`);
+      assert.match(describeError(wire), new RegExp(`${a}.*${b}`), `${rule}: bounded wire detail still names both ids`);
+    }
+    assert.doesNotThrow(() => describeError({ code: 'PLUGIN_RULE_CONFLICT', detail: 'malformed' }));
+  } finally { setLang('zh'); catalog.set(before); }
+});
 
 test('room and match summaries expose the active rules in words; vanilla adds no text', () => {
   assert.equal(ruleLine(null), '');
