@@ -55,7 +55,7 @@ function sceneOpts(assessed, extra = {}) {
 
 describe('expected.mjs matches the extractor (no game client)', { skip: !PY && 'no python3' }, () => {
   test('--print-jobs expectedGroups and fx fields', () => {
-    const r = spawnSync(PY, [path.join(ROOT, 'tools/local-extract/extract.py'), '--print-jobs'], { encoding: 'utf8', env: ENV });
+    const r = spawnSync(PY, ['-I', '-B', path.join(ROOT, 'tools/local-extract/extract.py'), '--print-jobs'], { encoding: 'utf8', env: ENV });
     assert.equal(r.status, 0, r.stderr);
     const j = JSON.parse(r.stdout);
     assert.deepEqual(j.expectedGroups, [...EXPECTED_LOCAL_GROUPS]);
@@ -317,9 +317,9 @@ function manifestCurrentScenes(version) {
   return doc;
 }
 
-test('an old scene-record version is stale and asks for --scenes once; version 3 is fresh', () => {
-  assert.equal(EXPECTED_SCENE.version, 3);
-  const current = assessLocal(manifestCurrentScenes(3), null);
+test('an old scene-record version is stale and asks for --scenes once; version 4 is fresh', () => {
+  assert.equal(EXPECTED_SCENE.version, 4);
+  const current = assessLocal(manifestCurrentScenes(4), null);
   assert.equal(current.sceneVersionStale, false);
   assert.equal(current.scenes, true);
   assert.equal(current.stale, false);
@@ -335,49 +335,56 @@ test('an old scene-record version is stale and asks for --scenes once; version 3
   assert.equal(old.scenes, false);
   assert.equal(old.stale, true);
   assert.equal(old.missingGroups.length, 0);
-  assert.equal(localGaps(old, { client: true }), '，场景版本 无，期望 3，请重新运行 node tools/setup.mjs --scenes');
+  assert.equal(localGaps(old, { client: true }), '，场景版本 无，期望 4，请重新运行 node tools/setup.mjs --scenes');
   assert.doesNotMatch(localGaps(old, { client: true }), /--local|金属地块|已有 11 个战场/);
   const copy = '没有客户端的服务器可以从同一版本的整合包（完整包）复制 public/assets/local 和 data/local-assets.json';
-  assert.equal(localGaps(old), `，场景版本 无，期望 3。${copy}`);
+  assert.equal(localGaps(old), `，场景版本 无，期望 4。${copy}`);
   assert.doesNotMatch(localGaps(old), /--scenes|--local/);
   const withClient = doctorLocalDetail(old, true);
-  assert.match(withClient, /场景版本 无，期望 3，请重新运行 node tools\/setup\.mjs --scenes/);
+  assert.match(withClient, /场景版本 无，期望 4，请重新运行 node tools\/setup\.mjs --scenes/);
   assert.equal((withClient.match(/--scenes/g) || []).length, 1);
   assert.doesNotMatch(withClient, /--local|金属地块|已有 11 个战场/);
   const noClient = doctorLocalDetail(old, false);
-  assert.match(noClient, /场景版本 无，期望 3/);
+  assert.match(noClient, /场景版本 无，期望 4/);
   assert.match(noClient, /同一版本的整合包/);
   assert.doesNotMatch(noClient, /--scenes|--local/);
 
   const ask = sceneInstallPlan(sceneOpts(old, { client: true, python: true }));
   assert.equal(ask.state, 'ask');
   assert.equal(ask.run, false);
-  assert.match(ask.detail, /场景版本 无，期望 3/);
+  assert.match(ask.detail, /场景版本 无，期望 4/);
   assert.doesNotMatch(ask.detail, /--local|金属地块/);
   assert.equal(sceneVersionOnlyGap(old), true);
   assert.equal(sceneFilesPartial(old), false);
   assert.equal(sceneClientExtractAllowed({ partial: sceneFilesPartial(old), answer: true }), true);
   assert.equal(sceneInstallPlan(sceneOpts(old, { client: true, python: true, yes: true })).run, true);
 
+  const v3 = assessLocal(manifestCurrentScenes(3), null);
+  assert.equal(v3.sceneVersionStale, true, 'version 3 still contains redundant scene renderers');
+  assert.equal(sceneVersionOnlyGap(v3), true);
+  assert.equal(sceneAskDefault(sceneFilesPartial(v3) || sceneVersionOnlyGap(v3)), false);
+  assert.equal(sceneInstallPlan(sceneOpts(v3, { client: true, python: true })).state, 'ask');
+  assert.equal(sceneClientExtractAllowed({ partial: sceneFilesPartial(v3), answer: true }), true);
+
   const v2 = assessLocal(manifestCurrentScenes(2), null);
   assert.equal(v2.sceneVersionHave, '2');
   assert.equal(v2.sceneVersionStale, true);
   assert.equal(v2.scenes, false);
   assert.equal(sceneVersionOnlyGap(v2), true, 'a version-2 extract (normal and gloss only) is stale');
-  assert.match(localGaps(v2, { client: true }), /场景版本 2，期望 3，请重新运行 node tools\/setup\.mjs --scenes/);
+  assert.match(localGaps(v2, { client: true }), /场景版本 2，期望 4，请重新运行 node tools\/setup\.mjs --scenes/);
 
   const v1 = assessLocal(manifestCurrentScenes(1), null);
   assert.equal(v1.sceneVersionHave, '1');
   assert.equal(v1.stale, true);
-  assert.match(localGaps(v1, { client: true }), /场景版本 1，期望 3，请重新运行 node tools\/setup\.mjs --scenes/);
+  assert.match(localGaps(v1, { client: true }), /场景版本 1，期望 4，请重新运行 node tools\/setup\.mjs --scenes/);
 
-  const mixed = manifestCurrentScenes(3);
+  const mixed = manifestCurrentScenes(4);
   const stage = EXPECTED_LOCAL_GROUPS.find((g) => g.startsWith('scene/act'));
   mixed.groups[stage].scene.version = 1;
   const mix = assessLocal(mixed, null);
   assert.equal(mix.sceneVersionHave, '不一致');
   assert.equal(mix.stale, true);
-  assert.match(localGaps(mix, { client: true }), /场景版本 不一致，期望 3/);
+  assert.match(localGaps(mix, { client: true }), /场景版本 不一致，期望 4/);
 });
 
 test('a typed yes on a version-only gap extracts; a missing-scene set still does not', () => {

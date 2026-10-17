@@ -59,8 +59,8 @@ SCENE_VERSION = 1
 # Manifest `scene` record (kind Scene) of each scene/<stageId> group. scene.json `version` stays SCENE_VERSION so a
 # scene extracted before this still loads. setup / doctor compare this with expected.mjs and ask once when an
 # existing record is older (DESIGN §34.12). 3: emission maps are lossless too, so a version-2 extract (normal and
-# gloss only) is stale and that same prompt asks again.
-SCENE_EXTRACT_VERSION = 3
+# gloss only) is stale and that same prompt asks again. 4: remove exact redundant renderers (#684, §34.24).
+SCENE_EXTRACT_VERSION = 4
 # display-space light value that a lightmap page's 1.0 stands for (decode_rgbm; scene.json lightRange, with
 # lightEncoding 'gamma'). The pages of the eleven scenes stay below 2.8.
 LIGHT_RANGE = 3.0
@@ -80,6 +80,98 @@ ENV_RGBM = 5.0
 ENV_BLOCK_BYTES = {'ETC2_RGBA8': 16}
 HIDDEN_NAME = re.compile(r'^[A-Z_]+@\d+$')
 WATER_SHADERS = ('StylizedWater', 'StandardWater', 'DynamicWaterTile')
+# [ASSUMED] Maintainer decision, 2026-10-17 (#684, DESIGN §34.24): correct exact source-scene duplicates,
+# keeping the normal bake. This is an art correction, not an official visibility rule. In the official Android
+# 26-04-13-12-31-42_e9b560 m03 scene, renderers 2048 / 2193 are the same rock, one statically batched and one loose;
+# their world matrices are equal and baked/loose positions differ by at most 5.61e-7 tile. 1e-6 absolute (no relative
+# tolerance) admits that float32 bake error, not the investigation's much looser 0.001 triangle-overlap tolerance.
+DUPLICATE_EPSILON = 1e-6
+RENDERER_BAKE_FIELDS = frozenset({
+    'm_GameObject', 'm_StaticBatchInfo', 'm_StaticBatchRoot',
+    'm_LightmapIndex', 'm_LightmapIndexDynamic', 'm_LightmapTilingOffset', 'm_LightmapTilingOffsetDynamic',
+})
+
+
+def renderer_state(tree, layer):
+    """All serialized draw state, including material/texture identities, except object identity and bake metadata.
+    PPtrs are file/path pairs in the same scene, so equal material references mean the same material and textures.
+    Keep unknown fields: an unhandled renderer feature must prevent a deletion rather than broaden the rule.
+    """
+    return {'layer': layer, 'renderer': {k: v for k, v in tree.items() if k not in RENDERER_BAKE_FIELDS}}
+
+
+def near_rows(a, b):
+    """Equal shaped numeric rows within the absolute static-bake epsilon (NaN also fails)."""
+    return len(a) == len(b) and all(len(x) == len(y) and all(abs(u - v) <= DUPLICATE_EPSILON for u, v in zip(x, y))
+                                    for x, y in zip(a, b))
+
+
+def same_renderer(a, b):
+    """Full mesh equality after static batching: submeshes, oriented triangles and all surface vertex attributes.
+    Compare world matrices too: differently transformed objects that happen to overlap are not duplicates.
+    UV1 and lightmap assignments are deliberately excluded; those are what the surviving bake supplies.
+    Triangle order is kept; ambiguity (including a different tessellation) conservatively keeps both renderers.
+    """
+    if a['state'] is None or a['state'] != b['state'] or not near_rows(a['world'], b['world']):
+        return False
+    if len(a['parts']) != len(b['parts']) or not a['parts']:
+        return False
+    for x, y in zip(a['parts'], b['parts']):
+        if x['material'] != y['material'] or len(x['idx']) != len(y['idx']):
+            return False
+        xt, yt = x.get('tangent', []), y.get('tangent', [])
+        xu, yu = x.get('extraUV', {}), y.get('extraUV', {})
+        if bool(xt) != bool(yt) or xu.keys() != yu.keys():
+            return False
+        for i, j in zip(x['idx'], y['idx']):
+            if x['uv'][i] != y['uv'][j] or x['col'][i] != y['col'][j]:
+                return False
+            if not near_rows([x['pos'][i], x['nrm'][i]], [y['pos'][j], y['nrm'][j]]):
+                return False
+            if xt and not near_rows([xt[i]], [yt[j]]):
+                return False
+            if any(xu[channel][i] != yu[channel][j] for channel in xu):
+                return False
+    return True
+
+
+def renderer_bake_rank(r):
+    """[ASSUMED] Prefer a non-collapsed lightmapped bake, then base visibility, then static baking; id breaks ties.
+    The m03 loose copy has constant UV1. On m04 both UV1s have area, so the always-visible static bake wins.
+    """
+    baked = False
+    for part in r['parts']:
+        if part['lightmap'] < 0:
+            continue
+        uv, idx = part['uv1'], part['idx']
+        for at in range(0, len(idx), 3):
+            a, b, c = (uv[i] for i in idx[at:at + 3])
+            if abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) > 1e-12:
+                baked = True
+                break
+    return (not baked, bool(r['group']), not r['static'], r['id'])
+
+
+def drop_duplicate_renderers(renderers, log):
+    """Filter complete normalized renderers, returning survivors in source order; log every dropped owner.
+    [ASSUMED] A keeper must cover the removed copy's visibility: the same group, or an always-visible base.
+    Separate hidden groups are not interchangeable, and an inactive base is not an always-visible keeper.
+    """
+    buckets, dropped = {}, set()
+    for r in sorted(renderers, key=renderer_bake_rank):
+        if r['state'] is None or not r['parts']:
+            continue
+        key = (json.dumps(r['state'], sort_keys=True), tuple((p['material'], len(p['idx'])) for p in r['parts']))
+        bucket = buckets.setdefault(key, [])
+        keeper = next((k for k in bucket if (k['group'] == r['group'] or k['group'] == '') and same_renderer(k, r)), None)
+        if keeper is None:
+            bucket.append(r)
+            continue
+        dropped.add(r['id'])
+        triangles = sum(len(p['idx']) // 3 for p in r['parts'])
+        log(f"  drop renderer #{r['id']} {r['path']} [{r['group'] or 'base'}]: exact duplicate of "
+            f"#{keeper['id']} {keeper['path']} [{keeper['group'] or 'base'}], {triangles} triangles; keep normal bake")
+    return [r for r in renderers if r['id'] not in dropped]
 
 
 def scene_bundle(stage_id):
@@ -140,7 +232,7 @@ def pack_chunk(ch):
     out += struct.pack(f'<{n * 4}B', *flat([tuple(max(0, min(255, int(round(c * 255)))) for c in col) for col in ch['col']]))
     idx32 = n > 65535
     out += struct.pack(f'<{len(ch["idx"])}{"I" if idx32 else "H"}', *ch['idx'])
-    while len(out) % 4:
+    while len(out) % 4:  # // loop-cap: at most 3 padding bytes
         out.append(0)
     return bytes(out), idx32
 
@@ -254,7 +346,7 @@ def hidden_groups(raw, objects):
     so the fields are walked as 4-byte words: a length-prefixed name, or a (file 0, path id) pointer to an object."""
     out, group, i = {}, None, 0
     body = raw
-    while i + 4 <= len(body):
+    while i + 4 <= len(body):  # // loop-cap: len(body) / 4; each branch advances at least 4 bytes
         v = struct.unpack_from('<i', body, i)[0]
         if 0 < v < 64 and i + 4 + v <= len(body):
             text = body[i + 4:i + 4 + v]
@@ -323,10 +415,12 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
     go_of_tf = {tid: rec[2].m_PathID for tid, rec in tf.items()}
     tf_of_go = {gid: tid for tid, gid in go_of_tf.items()}
     go_info = {}  # game object path id → (name, active)
+    go_layers = {}
     for o in scene_objs:
         if o.type.name == 'GameObject':
             g = o.read()
             go_info[o.path_id] = (g.m_Name, bool(g.m_IsActive))
+            go_layers[o.path_id] = g.m_Layer
     hidden = {}
     for o in scene_objs:
         if o.type.name != 'MonoBehaviour':
@@ -347,13 +441,22 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
     def state(gid):
         """(active in the hierarchy, hidden group of the object or its nearest grouped ancestor)."""
         active, group, tid = True, None, tf_of_go.get(gid)
-        while tid in tf:
+        while tid in tf:  # // loop-cap: scene hierarchy depth (one parent per transform)
             g = go_of_tf[tid]
             active = active and go_info.get(g, ('', True))[1]
             if group is None and g in hidden:
                 group = hidden[g]
             tid = tf[tid][1]
         return active, group
+
+    def object_path(gid):
+        names, tid = [], tf_of_go.get(gid)
+        for _ in range(len(tf)):
+            if tid not in tf:
+                break
+            names.append(go_info.get(go_of_tf[tid], ('?', True))[0])
+            tid = tf[tid][1]
+        return '/'.join(reversed(names))
 
     anchor = (0.0, 0.0, 0.0)
     for gid, (name, _) in go_info.items():
@@ -380,7 +483,7 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
 
     # ---- renderers → chunks -----------------------------------------------------------------------------------------
     mesh_cache, materials, mat_tex = {}, {}, {}
-    chunks = {}  # (material, lightmap, group) → {'pos': [], …}
+    renderers = []  # complete, per-renderer geometry before merging material/lightmap/group chunks
 
     def mesh_data(pptr):
         key = (getattr(pptr, 'm_FileID', 0), pptr.m_PathID)
@@ -388,7 +491,9 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
             try:
                 h = MeshHandler(pptr.read())
                 h.process()
-                mesh_cache[key] = (h.m_Vertices, h.m_Normals, h.m_UV0, h.m_UV1, h.m_Colors, h.get_triangles())
+                mesh_cache[key] = (h.m_Vertices, h.m_Normals, h.m_UV0, h.m_UV1, h.m_Colors, h.get_triangles(),
+                                   getattr(h, 'm_Tangents', None),
+                                   {i: getattr(h, f'm_UV{i}') for i in range(2, 8) if getattr(h, f'm_UV{i}', None)})
             except Exception as e:
                 log(f'  warn {stage_id}: mesh #{pptr.m_PathID}: {e}')
                 mesh_cache[key] = None
@@ -430,7 +535,7 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
         data = mesh_data(mf.m_Mesh)
         if not data:
             continue
-        verts, normals, uv0, uv1, colors, tris = data
+        verts, normals, uv0, uv1, colors, tris, tangents, extra_uv = data
         active, group = state(gid)
         if not active and group is None:
             group = 'inactive'
@@ -445,15 +550,27 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
         st = (1.0, 1.0, 0.0, 0.0) if static else (so.x, so.y, so.z, so.w)
         lm = r.m_LightmapIndex if r.m_LightmapIndex < 65534 else -1
         luv = uv1 if uv1 else uv0
+        try:
+            draw_state = renderer_state(o.read_typetree(), go_layers[gid])
+        except Exception as e:
+            log(f'  warn {stage_id}: renderer #{o.path_id} state unavailable; kept without deduplication: {e}')
+            draw_state = None
+        renderer = {'id': o.path_id, 'path': object_path(gid), 'group': group or '',
+                    'world': world(tf_of_go.get(gid)), 'state': draw_state, 'static': static, 'parts': []}
+        renderers.append(renderer)
         for k, mref in enumerate(r.m_Materials):
             sub = first + k
             if sub >= len(tris):
+                renderer['state'] = None  # incomplete geometry cannot prove a full renderer duplicate
                 break
             name = material_name(mref)
             if not name:
                 skipped += 1
+                renderer['state'] = None
                 continue
-            ch = chunks.setdefault((name, lm, group or ''), {'pos': [], 'uv': [], 'uv1': [], 'nrm': [], 'col': [], 'idx': [], 'map': None})
+            ch = {'material': name, 'lightmap': lm, 'pos': [], 'uv': [], 'uv1': [], 'nrm': [], 'col': [], 'idx': [],
+                  'tangent': [], 'extraUV': {channel: [] for channel in extra_uv}}
+            renderer['parts'].append(ch)
             remap = {}
             for tri in tris[sub]:
                 tri = (tri[0], tri[2], tri[1]) if flip else tri
@@ -472,6 +589,15 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
                               m[2][0] * nv[0] + m[2][1] * nv[1] + m[2][2] * nv[2])
                         ln = (nw[0] ** 2 + nw[1] ** 2 + nw[2] ** 2) ** 0.5 or 1.0
                         ch['nrm'].append((nw[0] / ln, nw[1] / ln, -nw[2] / ln))
+                        # These attributes are not written to scene.bin, but differing source values still forbid
+                        # deletion. Tangent handedness follows the world transform and the board's z reflection.
+                        if tangents:
+                            tv = tangents[vi]
+                            tw = [sum(m[axis][j] * tv[j] for j in range(3)) for axis in range(3)]
+                            tl = sum(c * c for c in tw) ** 0.5 or 1.0
+                            ch['tangent'].append((tw[0] / tl, tw[1] / tl, -tw[2] / tl, -tv[3] if flip else tv[3]))
+                        for channel, values in extra_uv.items():
+                            ch['extraUV'][channel].append(tuple(values[vi]))
                         t0 = uv0[vi] if uv0 else (0.0, 0.0)
                         ch['uv'].append((t0[0], t0[1]))
                         t1 = luv[vi] if luv else (0.0, 0.0)
@@ -479,6 +605,17 @@ def export_scene(stage_id, deps, scene_path, ab_root, out_root, manifest, log, m
                         col = colors[vi] if colors else (1.0, 1.0, 1.0, 1.0)
                         ch['col'].append(tuple(col[:4]) if len(col) >= 4 else (*col[:3], 1.0))
                     ch['idx'].append(j)
+    kept = drop_duplicate_renderers(renderers, lambda message: log(f'{stage_id}: {message}'))
+    log(f'{stage_id}: dropped {len(renderers) - len(kept)} exact duplicate renderer(s); kept {len(kept)}')
+    chunks = {}  # (material, lightmap, group) → {'pos': [], …}
+    for renderer in kept:
+        for part in renderer['parts']:
+            key = (part['material'], part['lightmap'], renderer['group'])
+            ch = chunks.setdefault(key, {'pos': [], 'uv': [], 'uv1': [], 'nrm': [], 'col': [], 'idx': []})
+            offset = len(ch['pos'])
+            for attr in ('pos', 'uv', 'uv1', 'nrm', 'col'):
+                ch[attr].extend(part[attr])
+            ch['idx'].extend(i + offset for i in part['idx'])
     if not chunks:
         log(f'  warn {stage_id}: no drawable mesh in {scene_path.name}')
         return 0
