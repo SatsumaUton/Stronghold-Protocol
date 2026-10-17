@@ -194,6 +194,20 @@ export async function storageEstimate(nav = globalThis.navigator) {
 }
 
 /**
+ * Whether the browser already keeps the origin's storage (`navigator.storage.persisted()`), or null where it cannot say:
+ * StorageManager exists only in a secure context, so plain http to a LAN IP reads null too. 设置 → 素材存储 shows it.
+ * @returns {Promise<boolean | null>}
+ */
+export async function storagePersisted(nav = globalThis.navigator) {
+  try {
+    if (!nav?.storage?.persisted) return null;
+    return await nav.storage.persisted();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Ask the browser to keep the origin's storage. The return value is not a promise that the bytes will survive
  * eviction (iOS may still drop them after about seven days).
  * @returns {Promise<boolean | null>}
