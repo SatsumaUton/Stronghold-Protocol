@@ -8,6 +8,7 @@ import { contentHashOf, canonicalJson, csUrlPart } from '../../shared/plugins/id
 import { resolvePluginOrder } from '../../shared/plugins/order.js';
 import { applyPatches, normalizeSettings } from '../../shared/plugins/patch.js';
 import { expandGameplayRecords, reconcilePluginBonds, reconcilePluginTokens, validateGameplayData } from './gameplayRecords.js';
+import { expandTraitRecords, operatorTraitPatchProblems } from './operatorTraits.js';
 import { expandFxRecords } from './fxRecords.js';
 import { object, own, clone, problem, RECORD_MAPS, recordId, namespaceCollisions } from '../../shared/plugins/dataUtils.js';
 import { buildRecordOverlay, walkOverlay, getPath, applyRecordOverlay } from '../../shared/i18nData.js';
@@ -86,6 +87,11 @@ function translations(data, initial, plugins) {
       dest.files[file] ??= {};
       dest.files[file][id] = buildRecordOverlay([...leaves.values()]);
     }
+  }
+  for (const g of Object.values(data.garrisons ?? {})) for (const [lang, text] of Object.entries(g.operatorTrait?.translations ?? {})) {
+    const dest = out[lang] ??= { version: 1, lang, names: {}, files: {} };
+    dest.files.garrisons ??= {};
+    dest.files.garrisons[g.garrisonId] = buildRecordOverlay(['desc', 'descRaw'].map(key => ({ path: [key], zh: g[key], en: text })));
   }
   return { out, problems };
 }
@@ -236,10 +242,12 @@ function composeContentSet({ registry, ids = [] }) {
           writes.set(at, p.id);
         }
         r = applyPatches(data, doc.ops, { pluginId: p.id, settings: settings[p.id] });
+        r.problems.push(...operatorTraitPatchProblems(data, r.data));
       } else {
         if (!p.manifest.permissions.includes('data.add')) { problems.push(problem('PLUGIN_CONTENT_PERMISSION', rel, 'records require data.add')); continue; }
         const entries = part === 'data' ? doc.entries : (Array.isArray(doc) ? doc : [doc]).map(v => part === 'operators' ? v : { ...v, file: part });
-        r = expandFxRecords(data, entries, { pluginId: p.id, validateDsl }, expandGameplayRecords);
+        r = expandTraitRecords(data, entries, { pluginId: p.id, validateDsl, permissions: p.manifest.permissions },
+          (d, rs, opts) => expandFxRecords(d, rs, opts, expandGameplayRecords));
       }
       problems.push(...r.problems.map(e => ({ ...e, plugin: p.id, file: rel })));
       data = r.data;

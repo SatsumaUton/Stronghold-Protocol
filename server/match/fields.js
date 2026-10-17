@@ -35,6 +35,7 @@ import { TICK, SNAPSHOT_EVERY } from '../sim/constants.js';
 import { layerGainRoom } from '../../shared/constants.js';
 import { uniteLeft } from '../sim/spec.js';
 import { diyTokenOwner, diyRecordOf } from '../../shared/diy.js';
+import { operatorTraitLayerAllowance } from './operatorTraits.js';
 
 export const MAX_TICKS_PER_INTERVAL = 8;
 export const INTERVAL_MS = 1000 / 30;
@@ -708,7 +709,12 @@ export function specBounds(spec, gd = null) {
       const v = Number(b && b.layers);
       if (Number.isFinite(v) && v > 0) startLayers.set(id, v);
     }
-    players.set(p.playerId, { chess, all, names, defIds, bonds: gd ? layerBondsOf(p, gd) : null, startLayers, layerAllow: gd ? layerAllowanceOf(p, gd) : new Map() });
+    const bonds = gd ? layerBondsOf(p, gd) : null, layerAllow = gd ? layerAllowanceOf(p, gd) : new Map();
+    if (gd) for (const [id, cap] of operatorTraitLayerAllowance(p, gd)) {
+      bonds.add(id);
+      layerAllow.set(id, (layerAllow.get(id) ?? 0) + cap);
+    }
+    players.set(p.playerId, { chess, all, names, defIds, bonds, startLayers, layerAllow });
   }
   const round = Number(spec && spec.round) || 0;
   return {

@@ -145,6 +145,10 @@ async function boot() {
   for (const name of Object.keys(hashInput.data)) data[name] = JSON.parse(decoder.decode(files[name]));
   setData(data);
   installOfficialBounds(bounds && bounds.v === 1 ? bounds : null);
+  if (Object.values(data.garrisons ?? {}).some(g => g.operatorTrait)) {
+    const { installServerOperatorTraits } = await import('../../plugins/operatorTraits.js');
+    await installServerOperatorTraits(data);
+  }
   if (scripts.length) {
     const { verifyScripts, scriptExecution, loadScripts } = await import('../../../shared/plugins/scriptLoad.js');
     verifyScripts(scripts, hashInput);

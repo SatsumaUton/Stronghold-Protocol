@@ -39,6 +39,7 @@
 // An eliminated player gets no dispatch, except the persistent effects whose handler sets `afterElimination: true`
 // (onRoundStart, EffectDispatcher.dispatchEliminated: 信标's gift — GitHub #86).
 
+import { dispatchOperatorTraits } from './operatorTraits.js';
 import { itemKey } from './gamedata.js';
 import { boardOrder, parseKey, tileKey } from './board.js';
 import { pieceBonds as bondsOfPiece } from './bondsMeta.js';
@@ -258,6 +259,7 @@ export class EffectDispatcher {
         const h = reg.get(key);
         if (h) this._call(ps, key, h, hook, { kind: 'bond', key, bondId, bond: ps.bonds[bondId] ?? null }, ev);
       }
+      dispatchOperatorTraits(this, ps, hook, ev);
       // 4. garrisons (onPrice: already run as step 0)
       if (hook !== 'onPrice') this._garrisons(ps, hook, ev, refreshed);
       // 5. equipped items (not for the item-specific hooks): every [holder, item] pair of the owned chess, taken before

@@ -601,3 +601,21 @@ Kazdel/Rhodes 同样不能仅靠数据恢复自定义行为。结城理原包未
 切换会从头回放；暂停和重新播放不应留下旧效果。官方映射需先提取素材；特效引用缺失会回退，格式错误会拒绝加载。
 独立的 `/studio/console.html` 仍只测试原版干员，可用来观察被借用的官方干员作对照。
 Forge 的 `fx.silentPhases` 会变成外观插件的同名声明，只取消该 phase 的通用光效，不取消模型形态变化。
+
+
+### 给干员加特质（0.3.1，#671）
+
+不用写 JavaScript，也不用知道 garrisonIds 或 effectKey。在干员记录中写
+`"trait": { "desc": "<获得时>获得1件阿戈尔重刃", "dsl": "data/trait.json" }`，并声明 `dsl` 权限。
+JSON 文件里写 `{ "dsl": 1, "meta": { "on": [{ "when": "gain", "do": [{ "gainItem": { "item": "chess_item_3_07_e_a", "count": 1 } }] }] } }`。
+精锐在 `forms.elite.trait` 单独声明 count=2；`translations` 可给 en、ja、ko、zh-TW 的特质说明。
+现有干员可只写 op=1、charId、trait；需要 data.add/data.patch/dsl 权限。乌尔比安 id 是 `char_4145_ulpia`。
+[ASSUMED] 默认追加；记录中显式加 `"overrides": ["trait:char_4145_ulpia"]` 才关闭官方模式特质，移除插件恢复。
+职业特性、模组、技能和天赋不受影响。
+
+侵蚀爆发叠层用 `elementBurst`、`if.element: "erosion"`、`targetOnField/selfOnField: true`，
+动作是 `layers: { bond: "selfActive", amount: 1, maxPerBattle: 12 }`（精锐改为 2/24）。
+[ASSUMED] 封顶按每个持有者／动作／盟约单独计数，再部署不重置；cap 和带 cap 的 amount 是正整数，上限 1000000。
+元素只接受引擎已有的 neural、erosion、burn、apoptosis、necrosis。获得时每张实得副本一次，合并不多送；
+[ASSUMED] 其他备战事件每名仍持有的角色一次，精锐优先，出售最后一张后停止，手牌和临时区有效。
+完整事件、库存规则、schema 与可复制的两份规格见 [PLUGIN-DSL 第10节](PLUGIN-DSL.md#10-干员特质031671)。

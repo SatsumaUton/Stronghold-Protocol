@@ -168,3 +168,61 @@
 [ASSUMED] 构建已经拒绝坏规格。编译仍抛错时，战斗在 `setupUnitKit` 记 `contentFault`（`content:dsl`）并以 `forced` 结束，不部署、不换成空 kit 或通用 kit。玩家看到原来的战斗结束框。绕过构建器、但哈希仍对得上的备战规格，在宿主 `boot` 失败（`boot-error` / 房间 `plugin-start`，`PLUGIN_DSL_META`）。`plugin check` 只查形状，不查键里的插件 id，也不查数值上限；这两项由 `buildContentSet` 拒绝。直接字面量超过官方上限是 `PLUGIN_DATA_BOUND`（`max(10 × 原版最大, 64)`）。`{mul}` 里的因子不逐个拒绝，结果钳到同一上限。`duration`、动作数值、`rangeExtend` 不在这张表里。`potDown` 不能写 `dsl` / `pluginId`。别的插件不能改这条记录的 DSL。`data.dsl` 是保留表，数据包补丁不能写它。
 
 `plugins/_template/content/` 里有一个 DSL 干员（被动攻击力 +50%）和一份把第 1 回合收入写成 15 的备战文件。`node tools/plugin.mjs new dsl <id>` 生成同样的例子，并且 `check --strict` 能过。把模板目录复制到 `plugins/data-demo/` 时，文件夹名要和清单里的 id 一致。
+
+
+## 10. 干员特质（0.3.1，#671）
+
+数据插件可声明 `trait: { "desc": "中文特质说明", "dsl": "data/trait.json", "translations": { "en": "Trait text" } }`。
+`dsl` 也可直接写对象。它描述盟约模式的**特质**，不会替换职业／模组的**特性**、技能或天赋。
+规格仍为 `dsl: 1`，战斗条目放 `talents`，备战条目放 `meta.on`（不写 `meta.key`）。
+也可在 `kit.dsl.trait` 写 `{ "desc": "中文说明", "on": [战斗条目], "meta": { "on": [备战条目] } }`，
+与技能 `talents` 和全局 `meta` 分开；两种写法不可同时使用。普通／精锐分别用 `forms.normal.trait`、`forms.elite.trait`，
+缺省继承记录上的 `trait`。翻译支持 en、ja、ko、zh-TW；缺省显示中文。Schema：`schemas/operator-trait.schema.json`。
+
+在 `operators` 中修改现有干员只需 `{ "op": 1, "charId": "char_4145_ulpia", "trait": { … } }`；
+权限为 `data.add`、`data.patch`、`dsl`。新干员仍用完整紧凑记录（`data.add`、`dsl`）。
+[ASSUMED] 默认叠加官方特质；同一记录显式写 `"overrides": ["trait:char_4145_ulpia"]` 才关闭该干员原有的模式驻守特质，
+保留其他插件追加的特质、职业特性、模组和天赋。不是清单的脚本 kit override。移除插件后重新组合，原版完全恢复。
+
+乌尔比安（本项目 id 是 `char_4145_ulpia`）普通获得一件阿戈尔重刃；精锐把 count 改成 2：
+
+```json
+{ "dsl": 1, "meta": { "on": [
+  { "when": "gain", "do": [{ "gainItem": { "item": "chess_item_3_07_e_a", "count": 1 } }] }
+] } }
+```
+
+[ASSUMED] `gain` 每次实际获得一个副本触发一次：购买、奖励、自选棋子的获得、测试指令赠送均走同一路径。
+凑齐合并的最后一张按获得的普通副本触发，合并产出的精锐、直接晋升不额外触发 gain。自选名单的选择本身没有获得棋子。
+`deploy` 仅从手牌／临时区成功进入棋盘触发；换位、转向及战斗内再部署不是备战 deploy。
+其余 `roundStart`、`buy`、`sell`、`merge`、`levelUp`、`battleResult` 是该玩家的现有备战事件；
+`levelUp` 指调度中心升级。[ASSUMED] 这些事件对每名仍持有的角色每次执行一次，精锐优先，副本不倍增；
+手牌／临时区也算持有，卖掉最后一张后不再触发（包括该次 sell）。不影响其他玩家，不受投资人的官方 gain 倍率影响。
+`gainItem.count` 默认 1，[ASSUMED] 必须是 1–64 的整数，逐件走既有库存、整备区和自动合并规则。
+
+克莱门莎式侵蚀叠层（精锐 amount=2、maxPerBattle=24）：
+
+```json
+{ "dsl": 1, "talents": [
+  { "when": "elementBurst", "if": { "element": "erosion", "targetOnField": true, "selfOnField": true },
+    "do": [{ "layers": { "bond": "selfActive", "amount": 1, "maxPerBattle": 12 } }] }
+] }
+```
+
+`elementBurst` 使用 damage.js 已有爆发事件，携带 `target` 和 `source`；不再造伤害或爆发事件。
+[ASSUMED] `element` 是封闭词表：neural（神经，SANITY/1）、erosion（侵蚀，WATER/2）、burn（灼燃，FIRE/3）、
+apoptosis（凋亡，DARK/4）、necrosis（引擎旧有坏死，无新增官方数字 id）。不得用 WATER 等别名或猜测的新元素。
+`targetOnField`、`selfOnField` 必须为布尔值：在场表示存活、未隐藏／移除，友方还必须已部署。
+这三个条件只用于 elementBurst；省略时不筛选，`selfOnField: false` 可在持有者倒下时观察爆发。
+其余既有条件仍全部成立才触发，chance 最后抽签。
+
+`layers.bond` 必填，可写现有盟约 id；[ASSUMED] `selfActive` 遍历持有者自身当前已激活的盟约（含装备配对赋予的盟约，沿用官方 self-bond 助手）。
+`maxPerBattle` 可用于特质里任意既有战斗触发器的 layers 动作，按每个持有者／动作节点／盟约分别累计，
+再部署不清零，新战斗清零。剩余额度不足时只给剩余量。[ASSUMED] cap 及带 cap／selfActive 的 amount 都是 1–1000000 的整数，
+不用黑板表达式；不扩展其他动作的 cap。备战 layers 不接受 maxPerBattle 或 selfActive。
+客户端战果校验按实际上场的角色／精锐形态累计声明额度及引用盟约，自选棋子亦同；未设 cap 的节点仍受房间总层数限制。
+[ASSUMED] 补位单位的战斗特质按实际战斗者的 charId 匹配。
+
+实现位于服务端组合器及客户端加载适配器，沿用现有 DSL 动作预算、引擎助手和确定性随机数。
+不加载插件 JavaScript；不会为原版增加事件或改写 sim/shared 文件。仅使用新字段的组合包含运行时指纹；页面校验后交给禁止联网的 Worker。
+机器人、服务端 match host、浏览器及工作台试打使用相同运行时；独立测试台只模拟战斗，获得物品请用房间测试指令。

@@ -1846,5 +1846,77 @@
   {
     "name": "dsl.fx.plugin",
     "anchor": "public/js/render/vfx/pluginFormat.js#pluginFxProblems"
+  },
+  {
+    "name": "record.operator.trait.dsl",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "record.operator.overrides.trait",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.trait.on",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.trigger.elementBurst",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.condition.element",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.condition.targetOnField",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.condition.selfOnField",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.layers.maxPerBattle",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.layers.selfActive",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.gainItem.count",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.trait.meta.gain",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.trait.meta.deploy",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.trait.meta.roundStart",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.trait.meta.buy",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.trait.meta.sell",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.trait.meta.merge",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.trait.meta.levelUp",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
+  },
+  {
+    "name": "dsl.trait.meta.battleResult",
+    "anchor": "server/plugins/operatorTraits.js#TRAIT_SURFACE"
   }
 ]

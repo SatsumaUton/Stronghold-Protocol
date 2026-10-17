@@ -109,6 +109,91 @@
                     },
                     "skills": {
                       "type": "array"
+                    },
+                    "trait": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "not": {
+                            "required": [
+                              "dsl"
+                            ]
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "dsl"
+                          ],
+                          "properties": {
+                            "dsl": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                {
+                                  "$ref": "operator-trait.schema.json"
+                                }
+                              ]
+                            },
+                            "desc": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8192
+                            },
+                            "text": {
+                              "type": "object",
+                              "required": [
+                                "zh"
+                              ],
+                              "additionalProperties": false,
+                              "properties": {
+                                "zh": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 8192
+                                }
+                              }
+                            },
+                            "translations": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "en": {
+                                  "type": "string",
+                                  "maxLength": 8192
+                                },
+                                "ja": {
+                                  "type": "string",
+                                  "maxLength": 8192
+                                },
+                                "ko": {
+                                  "type": "string",
+                                  "maxLength": 8192
+                                },
+                                "zh-TW": {
+                                  "type": "string",
+                                  "maxLength": 8192
+                                }
+                              }
+                            }
+                          },
+                          "anyOf": [
+                            {
+                              "required": [
+                                "desc"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "text"
+                              ]
+                            }
+                          ]
+                        }
+                      ]
                     }
                   },
                   "additionalProperties": true
@@ -139,6 +224,91 @@
                     },
                     "skills": {
                       "type": "array"
+                    },
+                    "trait": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "not": {
+                            "required": [
+                              "dsl"
+                            ]
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "dsl"
+                          ],
+                          "properties": {
+                            "dsl": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                {
+                                  "$ref": "operator-trait.schema.json"
+                                }
+                              ]
+                            },
+                            "desc": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8192
+                            },
+                            "text": {
+                              "type": "object",
+                              "required": [
+                                "zh"
+                              ],
+                              "additionalProperties": false,
+                              "properties": {
+                                "zh": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 8192
+                                }
+                              }
+                            },
+                            "translations": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "en": {
+                                  "type": "string",
+                                  "maxLength": 8192
+                                },
+                                "ja": {
+                                  "type": "string",
+                                  "maxLength": 8192
+                                },
+                                "ko": {
+                                  "type": "string",
+                                  "maxLength": 8192
+                                },
+                                "zh-TW": {
+                                  "type": "string",
+                                  "maxLength": 8192
+                                }
+                              }
+                            }
+                          },
+                          "anyOf": [
+                            {
+                              "required": [
+                                "desc"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "text"
+                              ]
+                            }
+                          ]
+                        }
+                      ]
                     }
                   },
                   "additionalProperties": true
@@ -1690,7 +1860,65 @@
                   ],
                   "properties": {
                     "dsl": {
-                      "$ref": "dsl.schema.json"
+                      "anyOf": [
+                        {
+                          "$ref": "dsl.schema.json"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "dsl",
+                            "trait"
+                          ],
+                          "properties": {
+                            "dsl": {
+                              "$ref": "dsl.schema.json#/properties/dsl"
+                            },
+                            "pluginId": {
+                              "$ref": "dsl.schema.json#/properties/pluginId"
+                            },
+                            "budget": {
+                              "$ref": "dsl.schema.json#/properties/budget"
+                            },
+                            "skill": {
+                              "$ref": "dsl.schema.json#/properties/skill"
+                            },
+                            "skills": {
+                              "$ref": "dsl.schema.json#/properties/skills"
+                            },
+                            "talents": {
+                              "$ref": "dsl.schema.json#/properties/talents"
+                            },
+                            "meta": {
+                              "$ref": "dsl.schema.json#/properties/meta"
+                            },
+                            "trait": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "on",
+                                "desc"
+                              ],
+                              "properties": {
+                                "desc": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "on": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "operator-trait.schema.json#/definitions/talent"
+                                  }
+                                },
+                                "meta": {
+                                  "$ref": "operator-trait.schema.json#/definitions/meta"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
                     }
                   },
                   "additionalProperties": false
@@ -1941,7 +2169,89 @@
               }
             },
             "trait": {
-              "type": "object"
+              "anyOf": [
+                {
+                  "type": "object",
+                  "not": {
+                    "required": [
+                      "dsl"
+                    ]
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "dsl"
+                  ],
+                  "properties": {
+                    "dsl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "$ref": "operator-trait.schema.json"
+                        }
+                      ]
+                    },
+                    "desc": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 8192
+                    },
+                    "text": {
+                      "type": "object",
+                      "required": [
+                        "zh"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "zh": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8192
+                        }
+                      }
+                    },
+                    "translations": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "en": {
+                          "type": "string",
+                          "maxLength": 8192
+                        },
+                        "ja": {
+                          "type": "string",
+                          "maxLength": 8192
+                        },
+                        "ko": {
+                          "type": "string",
+                          "maxLength": 8192
+                        },
+                        "zh-TW": {
+                          "type": "string",
+                          "maxLength": 8192
+                        }
+                      }
+                    }
+                  },
+                  "anyOf": [
+                    {
+                      "required": [
+                        "desc"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "text"
+                      ]
+                    }
+                  ]
+                }
+              ]
             },
             "origin": {
               "type": "object",
@@ -2191,6 +2501,286 @@
               "type": "object"
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "charId"
+          ],
+          "properties": {
+            "op": {
+              "const": 1
+            },
+            "charId": {
+              "type": "string",
+              "pattern": "^char_(?!x_)[A-Za-z0-9_]+$"
+            },
+            "trait": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "dsl"
+              ],
+              "properties": {
+                "dsl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "$ref": "operator-trait.schema.json"
+                    }
+                  ]
+                },
+                "desc": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 8192
+                },
+                "text": {
+                  "type": "object",
+                  "required": [
+                    "zh"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "zh": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 8192
+                    }
+                  }
+                },
+                "translations": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "en": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "ja": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "ko": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "zh-TW": {
+                      "type": "string",
+                      "maxLength": 8192
+                    }
+                  }
+                }
+              },
+              "anyOf": [
+                {
+                  "required": [
+                    "desc"
+                  ]
+                },
+                {
+                  "required": [
+                    "text"
+                  ]
+                }
+              ]
+            },
+            "forms": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "normal": {
+                  "type": "object",
+                  "required": [
+                    "trait"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "trait": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "dsl"
+                      ],
+                      "properties": {
+                        "dsl": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "$ref": "operator-trait.schema.json"
+                            }
+                          ]
+                        },
+                        "desc": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8192
+                        },
+                        "text": {
+                          "type": "object",
+                          "required": [
+                            "zh"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "zh": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8192
+                            }
+                          }
+                        },
+                        "translations": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "en": {
+                              "type": "string",
+                              "maxLength": 8192
+                            },
+                            "ja": {
+                              "type": "string",
+                              "maxLength": 8192
+                            },
+                            "ko": {
+                              "type": "string",
+                              "maxLength": 8192
+                            },
+                            "zh-TW": {
+                              "type": "string",
+                              "maxLength": 8192
+                            }
+                          }
+                        }
+                      },
+                      "anyOf": [
+                        {
+                          "required": [
+                            "desc"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "text"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "elite": {
+                  "type": "object",
+                  "required": [
+                    "trait"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "trait": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "dsl"
+                      ],
+                      "properties": {
+                        "dsl": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "$ref": "operator-trait.schema.json"
+                            }
+                          ]
+                        },
+                        "desc": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8192
+                        },
+                        "text": {
+                          "type": "object",
+                          "required": [
+                            "zh"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "zh": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8192
+                            }
+                          }
+                        },
+                        "translations": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "en": {
+                              "type": "string",
+                              "maxLength": 8192
+                            },
+                            "ja": {
+                              "type": "string",
+                              "maxLength": 8192
+                            },
+                            "ko": {
+                              "type": "string",
+                              "maxLength": 8192
+                            },
+                            "zh-TW": {
+                              "type": "string",
+                              "maxLength": 8192
+                            }
+                          }
+                        }
+                      },
+                      "anyOf": [
+                        {
+                          "required": [
+                            "desc"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "text"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "overrides": {
+              "type": "array",
+              "maxItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^trait:char_(?!x_)[A-Za-z0-9_]+$"
+              }
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "trait"
+              ]
+            },
+            {
+              "required": [
+                "forms"
+              ]
+            }
+          ]
         }
       ]
     },
@@ -2303,6 +2893,91 @@
                       },
                       "skills": {
                         "type": "array"
+                      },
+                      "trait": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "not": {
+                              "required": [
+                                "dsl"
+                              ]
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "dsl"
+                            ],
+                            "properties": {
+                              "dsl": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "$ref": "operator-trait.schema.json"
+                                  }
+                                ]
+                              },
+                              "desc": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8192
+                              },
+                              "text": {
+                                "type": "object",
+                                "required": [
+                                  "zh"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "zh": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 8192
+                                  }
+                                }
+                              },
+                              "translations": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "en": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "ja": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "ko": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "zh-TW": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  }
+                                }
+                              }
+                            },
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "desc"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "text"
+                                ]
+                              }
+                            ]
+                          }
+                        ]
                       }
                     },
                     "additionalProperties": true
@@ -2333,6 +3008,91 @@
                       },
                       "skills": {
                         "type": "array"
+                      },
+                      "trait": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "not": {
+                              "required": [
+                                "dsl"
+                              ]
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "dsl"
+                            ],
+                            "properties": {
+                              "dsl": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "$ref": "operator-trait.schema.json"
+                                  }
+                                ]
+                              },
+                              "desc": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8192
+                              },
+                              "text": {
+                                "type": "object",
+                                "required": [
+                                  "zh"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "zh": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 8192
+                                  }
+                                }
+                              },
+                              "translations": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "en": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "ja": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "ko": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "zh-TW": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  }
+                                }
+                              }
+                            },
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "desc"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "text"
+                                ]
+                              }
+                            ]
+                          }
+                        ]
                       }
                     },
                     "additionalProperties": true
@@ -3884,7 +4644,65 @@
                     ],
                     "properties": {
                       "dsl": {
-                        "$ref": "dsl.schema.json"
+                        "anyOf": [
+                          {
+                            "$ref": "dsl.schema.json"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "dsl",
+                              "trait"
+                            ],
+                            "properties": {
+                              "dsl": {
+                                "$ref": "dsl.schema.json#/properties/dsl"
+                              },
+                              "pluginId": {
+                                "$ref": "dsl.schema.json#/properties/pluginId"
+                              },
+                              "budget": {
+                                "$ref": "dsl.schema.json#/properties/budget"
+                              },
+                              "skill": {
+                                "$ref": "dsl.schema.json#/properties/skill"
+                              },
+                              "skills": {
+                                "$ref": "dsl.schema.json#/properties/skills"
+                              },
+                              "talents": {
+                                "$ref": "dsl.schema.json#/properties/talents"
+                              },
+                              "meta": {
+                                "$ref": "dsl.schema.json#/properties/meta"
+                              },
+                              "trait": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "on",
+                                  "desc"
+                                ],
+                                "properties": {
+                                  "desc": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "on": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "operator-trait.schema.json#/definitions/talent"
+                                    }
+                                  },
+                                  "meta": {
+                                    "$ref": "operator-trait.schema.json#/definitions/meta"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ]
                       }
                     },
                     "additionalProperties": false
@@ -4135,7 +4953,89 @@
                 }
               },
               "trait": {
-                "type": "object"
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "not": {
+                      "required": [
+                        "dsl"
+                      ]
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dsl"
+                    ],
+                    "properties": {
+                      "dsl": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "$ref": "operator-trait.schema.json"
+                          }
+                        ]
+                      },
+                      "desc": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 8192
+                      },
+                      "text": {
+                        "type": "object",
+                        "required": [
+                          "zh"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "zh": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8192
+                          }
+                        }
+                      },
+                      "translations": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "en": {
+                            "type": "string",
+                            "maxLength": 8192
+                          },
+                          "ja": {
+                            "type": "string",
+                            "maxLength": 8192
+                          },
+                          "ko": {
+                            "type": "string",
+                            "maxLength": 8192
+                          },
+                          "zh-TW": {
+                            "type": "string",
+                            "maxLength": 8192
+                          }
+                        }
+                      }
+                    },
+                    "anyOf": [
+                      {
+                        "required": [
+                          "desc"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "text"
+                        ]
+                      }
+                    ]
+                  }
+                ]
               },
               "origin": {
                 "type": "object",
@@ -4385,6 +5285,286 @@
                 "type": "object"
               }
             }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "charId"
+            ],
+            "properties": {
+              "op": {
+                "const": 1
+              },
+              "charId": {
+                "type": "string",
+                "pattern": "^char_(?!x_)[A-Za-z0-9_]+$"
+              },
+              "trait": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "dsl"
+                ],
+                "properties": {
+                  "dsl": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "$ref": "operator-trait.schema.json"
+                      }
+                    ]
+                  },
+                  "desc": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  },
+                  "text": {
+                    "type": "object",
+                    "required": [
+                      "zh"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "zh": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 8192
+                      }
+                    }
+                  },
+                  "translations": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "en": {
+                        "type": "string",
+                        "maxLength": 8192
+                      },
+                      "ja": {
+                        "type": "string",
+                        "maxLength": 8192
+                      },
+                      "ko": {
+                        "type": "string",
+                        "maxLength": 8192
+                      },
+                      "zh-TW": {
+                        "type": "string",
+                        "maxLength": 8192
+                      }
+                    }
+                  }
+                },
+                "anyOf": [
+                  {
+                    "required": [
+                      "desc"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "text"
+                    ]
+                  }
+                ]
+              },
+              "forms": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "normal": {
+                    "type": "object",
+                    "required": [
+                      "trait"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "trait": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "dsl"
+                        ],
+                        "properties": {
+                          "dsl": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "$ref": "operator-trait.schema.json"
+                              }
+                            ]
+                          },
+                          "desc": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8192
+                          },
+                          "text": {
+                            "type": "object",
+                            "required": [
+                              "zh"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "zh": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8192
+                              }
+                            }
+                          },
+                          "translations": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "en": {
+                                "type": "string",
+                                "maxLength": 8192
+                              },
+                              "ja": {
+                                "type": "string",
+                                "maxLength": 8192
+                              },
+                              "ko": {
+                                "type": "string",
+                                "maxLength": 8192
+                              },
+                              "zh-TW": {
+                                "type": "string",
+                                "maxLength": 8192
+                              }
+                            }
+                          }
+                        },
+                        "anyOf": [
+                          {
+                            "required": [
+                              "desc"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "text"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "elite": {
+                    "type": "object",
+                    "required": [
+                      "trait"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "trait": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "dsl"
+                        ],
+                        "properties": {
+                          "dsl": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "$ref": "operator-trait.schema.json"
+                              }
+                            ]
+                          },
+                          "desc": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8192
+                          },
+                          "text": {
+                            "type": "object",
+                            "required": [
+                              "zh"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "zh": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8192
+                              }
+                            }
+                          },
+                          "translations": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "en": {
+                                "type": "string",
+                                "maxLength": 8192
+                              },
+                              "ja": {
+                                "type": "string",
+                                "maxLength": 8192
+                              },
+                              "ko": {
+                                "type": "string",
+                                "maxLength": 8192
+                              },
+                              "zh-TW": {
+                                "type": "string",
+                                "maxLength": 8192
+                              }
+                            }
+                          }
+                        },
+                        "anyOf": [
+                          {
+                            "required": [
+                              "desc"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "text"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "overrides": {
+                "type": "array",
+                "maxItems": 1,
+                "items": {
+                  "type": "string",
+                  "pattern": "^trait:char_(?!x_)[A-Za-z0-9_]+$"
+                }
+              }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "trait"
+                ]
+              },
+              {
+                "required": [
+                  "forms"
+                ]
+              }
+            ]
           }
         ]
       }
@@ -4511,6 +5691,91 @@
                           },
                           "skills": {
                             "type": "array"
+                          },
+                          "trait": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "not": {
+                                  "required": [
+                                    "dsl"
+                                  ]
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "dsl"
+                                ],
+                                "properties": {
+                                  "dsl": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      {
+                                        "$ref": "operator-trait.schema.json"
+                                      }
+                                    ]
+                                  },
+                                  "desc": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 8192
+                                  },
+                                  "text": {
+                                    "type": "object",
+                                    "required": [
+                                      "zh"
+                                    ],
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "zh": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 8192
+                                      }
+                                    }
+                                  },
+                                  "translations": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "en": {
+                                        "type": "string",
+                                        "maxLength": 8192
+                                      },
+                                      "ja": {
+                                        "type": "string",
+                                        "maxLength": 8192
+                                      },
+                                      "ko": {
+                                        "type": "string",
+                                        "maxLength": 8192
+                                      },
+                                      "zh-TW": {
+                                        "type": "string",
+                                        "maxLength": 8192
+                                      }
+                                    }
+                                  }
+                                },
+                                "anyOf": [
+                                  {
+                                    "required": [
+                                      "desc"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "text"
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
                           }
                         },
                         "additionalProperties": true
@@ -4541,6 +5806,91 @@
                           },
                           "skills": {
                             "type": "array"
+                          },
+                          "trait": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "not": {
+                                  "required": [
+                                    "dsl"
+                                  ]
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "dsl"
+                                ],
+                                "properties": {
+                                  "dsl": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      {
+                                        "$ref": "operator-trait.schema.json"
+                                      }
+                                    ]
+                                  },
+                                  "desc": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 8192
+                                  },
+                                  "text": {
+                                    "type": "object",
+                                    "required": [
+                                      "zh"
+                                    ],
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "zh": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 8192
+                                      }
+                                    }
+                                  },
+                                  "translations": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "en": {
+                                        "type": "string",
+                                        "maxLength": 8192
+                                      },
+                                      "ja": {
+                                        "type": "string",
+                                        "maxLength": 8192
+                                      },
+                                      "ko": {
+                                        "type": "string",
+                                        "maxLength": 8192
+                                      },
+                                      "zh-TW": {
+                                        "type": "string",
+                                        "maxLength": 8192
+                                      }
+                                    }
+                                  }
+                                },
+                                "anyOf": [
+                                  {
+                                    "required": [
+                                      "desc"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "text"
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
                           }
                         },
                         "additionalProperties": true
@@ -6092,7 +7442,65 @@
                         ],
                         "properties": {
                           "dsl": {
-                            "$ref": "dsl.schema.json"
+                            "anyOf": [
+                              {
+                                "$ref": "dsl.schema.json"
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "dsl",
+                                  "trait"
+                                ],
+                                "properties": {
+                                  "dsl": {
+                                    "$ref": "dsl.schema.json#/properties/dsl"
+                                  },
+                                  "pluginId": {
+                                    "$ref": "dsl.schema.json#/properties/pluginId"
+                                  },
+                                  "budget": {
+                                    "$ref": "dsl.schema.json#/properties/budget"
+                                  },
+                                  "skill": {
+                                    "$ref": "dsl.schema.json#/properties/skill"
+                                  },
+                                  "skills": {
+                                    "$ref": "dsl.schema.json#/properties/skills"
+                                  },
+                                  "talents": {
+                                    "$ref": "dsl.schema.json#/properties/talents"
+                                  },
+                                  "meta": {
+                                    "$ref": "dsl.schema.json#/properties/meta"
+                                  },
+                                  "trait": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "on",
+                                      "desc"
+                                    ],
+                                    "properties": {
+                                      "desc": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "on": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "operator-trait.schema.json#/definitions/talent"
+                                        }
+                                      },
+                                      "meta": {
+                                        "$ref": "operator-trait.schema.json#/definitions/meta"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
                           }
                         },
                         "additionalProperties": false
@@ -6343,7 +7751,89 @@
                     }
                   },
                   "trait": {
-                    "type": "object"
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "not": {
+                          "required": [
+                            "dsl"
+                          ]
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "dsl"
+                        ],
+                        "properties": {
+                          "dsl": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "$ref": "operator-trait.schema.json"
+                              }
+                            ]
+                          },
+                          "desc": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8192
+                          },
+                          "text": {
+                            "type": "object",
+                            "required": [
+                              "zh"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "zh": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8192
+                              }
+                            }
+                          },
+                          "translations": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "en": {
+                                "type": "string",
+                                "maxLength": 8192
+                              },
+                              "ja": {
+                                "type": "string",
+                                "maxLength": 8192
+                              },
+                              "ko": {
+                                "type": "string",
+                                "maxLength": 8192
+                              },
+                              "zh-TW": {
+                                "type": "string",
+                                "maxLength": 8192
+                              }
+                            }
+                          }
+                        },
+                        "anyOf": [
+                          {
+                            "required": [
+                              "desc"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "text"
+                            ]
+                          }
+                        ]
+                      }
+                    ]
                   },
                   "origin": {
                     "type": "object",
@@ -6593,6 +8083,286 @@
                     "type": "object"
                   }
                 }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "charId"
+                ],
+                "properties": {
+                  "op": {
+                    "const": 1
+                  },
+                  "charId": {
+                    "type": "string",
+                    "pattern": "^char_(?!x_)[A-Za-z0-9_]+$"
+                  },
+                  "trait": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dsl"
+                    ],
+                    "properties": {
+                      "dsl": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "$ref": "operator-trait.schema.json"
+                          }
+                        ]
+                      },
+                      "desc": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 8192
+                      },
+                      "text": {
+                        "type": "object",
+                        "required": [
+                          "zh"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "zh": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8192
+                          }
+                        }
+                      },
+                      "translations": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "en": {
+                            "type": "string",
+                            "maxLength": 8192
+                          },
+                          "ja": {
+                            "type": "string",
+                            "maxLength": 8192
+                          },
+                          "ko": {
+                            "type": "string",
+                            "maxLength": 8192
+                          },
+                          "zh-TW": {
+                            "type": "string",
+                            "maxLength": 8192
+                          }
+                        }
+                      }
+                    },
+                    "anyOf": [
+                      {
+                        "required": [
+                          "desc"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "text"
+                        ]
+                      }
+                    ]
+                  },
+                  "forms": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "normal": {
+                        "type": "object",
+                        "required": [
+                          "trait"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "trait": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "dsl"
+                            ],
+                            "properties": {
+                              "dsl": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "$ref": "operator-trait.schema.json"
+                                  }
+                                ]
+                              },
+                              "desc": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8192
+                              },
+                              "text": {
+                                "type": "object",
+                                "required": [
+                                  "zh"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "zh": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 8192
+                                  }
+                                }
+                              },
+                              "translations": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "en": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "ja": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "ko": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "zh-TW": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  }
+                                }
+                              }
+                            },
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "desc"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "text"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "elite": {
+                        "type": "object",
+                        "required": [
+                          "trait"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "trait": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "dsl"
+                            ],
+                            "properties": {
+                              "dsl": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "$ref": "operator-trait.schema.json"
+                                  }
+                                ]
+                              },
+                              "desc": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8192
+                              },
+                              "text": {
+                                "type": "object",
+                                "required": [
+                                  "zh"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "zh": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 8192
+                                  }
+                                }
+                              },
+                              "translations": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "en": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "ja": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "ko": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "zh-TW": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  }
+                                }
+                              }
+                            },
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "desc"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "text"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "overrides": {
+                    "type": "array",
+                    "maxItems": 1,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^trait:char_(?!x_)[A-Za-z0-9_]+$"
+                    }
+                  }
+                },
+                "anyOf": [
+                  {
+                    "required": [
+                      "trait"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "forms"
+                    ]
+                  }
+                ]
               }
             ]
           }

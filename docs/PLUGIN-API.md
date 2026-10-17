@@ -514,4 +514,27 @@ fallbacks. They do not change the sim event protocol or the identity of content 
 | `overlay.fx.bind` | stable | 0.3.1 | `public/js/render/vfx/pluginFormat.js#pluginFxProblems` |
 | `overlay.fx.silentPhases` | stable | 0.3.1 | `public/js/render/vfx/pluginFormat.js#pluginFxProblems` |
 | `dsl.fx.plugin` | stable | 0.3.1 | `public/js/render/vfx/pluginFormat.js#pluginFxProblems` |
+| `record.operator.trait.dsl` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `record.operator.overrides.trait` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.on` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trigger.elementBurst` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.condition.element` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.condition.targetOnField` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.condition.selfOnField` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.layers.maxPerBattle` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.layers.selfActive` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.gainItem.count` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.gain` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.deploy` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.roundStart` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.buy` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.sell` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.merge` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.levelUp` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.battleResult` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
 <!-- plugin-surface:end -->
+
+
+Operator trait declarations are content-only additions in 0.3.1 (#671): see PLUGIN-DSL §10 and
+`schemas/operator-trait.schema.json`. The loader validates this extension before delegating the legacy grammar;
+legacy `validateDsl`/`compileDsl` remain unchanged. The app-owned setup adapter is internal, not an author scripting API.

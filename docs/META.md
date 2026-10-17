@@ -1036,3 +1036,7 @@ Namespaced plugin bonds use `GameData` and `computeBonds` unchanged: BOARD / BOA
 core/extra classification and persistent capped layers. `data.dsl` prep specs can guard funds/layers/gainItem on
 `bondActive`; the match host installs these through the existing MetaRegistry grants. A descriptive bond record
 alone registers no handler [ASSUMED]. See PLUGINS.md and DESIGN §34.16.
+
+### Declarative operator traits (0.3.1, #671)
+
+`server/match/operatorTraits.js` compiles operator-owned `meta.on` through the existing prep DSL and dispatches through the existing context helpers. It requires no registry key. [ASSUMED] Gain is per acquired copy, deploy is hand/temp-to-board, and other hooks run once per still-owned character for that player (elite preferred, bench/temp included). The acquisition primitive covers bots, rewards, DIY and test grants; merge output does not acquire another copy. See [PLUGIN-DSL §10](PLUGIN-DSL.md#10-干员特质031671) for events, item bounds and explicit official-trait replacement.
