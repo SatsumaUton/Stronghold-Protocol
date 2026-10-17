@@ -24,8 +24,9 @@ export function TrialBench({ state, draft }) {
   const [speed, setSpeed] = useState(1);
   const [reset, setReset] = useState(0);
   const [board, setBoard] = useState('3d'), [effects, setEffects] = useState('lite');
-  const [exercise, setExercise] = useState({ round: 1, at: 'prep', hook: 'roundStart', actions: [], elite: false });
+  const [exercise, setExercise] = useState({ round: 1, at: 'prep', hook: '', actions: [], elite: false });
   const gameplay = GAMEPLAY_TEMPLATES.includes(draft?.template || state.authoring?.template);
+  useEffect(() => { setExercise(v => ({ ...v, hook: '', elite: false, actions: [] })); }, [draft?.template || state.authoring?.template]);
   useEffect(() => { setResult(null); setExercise(v => ({ ...v, actions: [] })); }, [JSON.stringify(draft)]);
   useEffect(() => { let alive = true; get('trial-options').then(r => { if (alive) setOptions(r); }); return () => { alive = false; }; }, []);
   const run = async (actions = []) => {

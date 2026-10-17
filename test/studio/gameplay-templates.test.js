@@ -53,7 +53,7 @@ for (const template of GAMEPLAY_TEMPLATES) {
     const draft = editGameplay(initial, edits[template]);
     assert.deepEqual(gameplayOptions(JSON.parse(JSON.stringify(draft))), draft.options);
     f.author.save(f.id, draft);
-    assert.deepEqual(f.author.read(f.id).options, draft.options);
+    assert.deepEqual(JSON.parse(f.files.readSidecar(f.id, '.studio.json')).authoring.options, draft.options);
     const checked = checkPluginFolder(f.dir);
     assert.deepEqual(checked.problems, []); assert.deepEqual(checked.warnings, []);
     f.registry.rescan();

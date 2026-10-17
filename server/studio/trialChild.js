@@ -3,14 +3,13 @@ import fs from 'node:fs';
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sandboxProcessOptions } from '../match/host/childHost.js';
-import { isPackPath } from '../../shared/plugins/manifest.js';
 import path from 'node:path';
 import { createPluginRegistry, readPluginFolder } from '../plugins/registry.js';
 import { buildContentSet } from '../plugins/contentSet.js';
 import { checkPluginFolder } from '../plugins/pack.js';
 import { createPluginFiles, StudioError } from './files.js';
-import { createAuthoring, mergeAuthorManifest } from './authoring.js';
-import { manifestText } from './templates/index.js';
+import { createAuthoring } from './authoring.js';
+import { stageAuthorDependencies } from './gameplayCheck.js';
 import { writeTrialDraftFile } from './trialDraft.js';
 import { scriptExecution } from '../../shared/plugins/scriptLoad.js';
 import { chooseOperator, baselineOperator, trialScenario } from './trialScenario.js';
@@ -37,18 +36,13 @@ process.once('message', async ({ dirs, request, allowedScripts, temporary, heapM
       const originalManifest = JSON.parse(fs.readFileSync(files.stat(request.id, 'plugin.json').abs, 'utf8'));
       if (originalManifest.class !== 'content' || !['numbers','operator','dsl','meta','mode', ...GAMEPLAY_TEMPLATES].includes(request.draft.template)) throw new StudioError('PLUGIN_STUDIO_REQUEST', 400);
       // The copied folder is checked and the full dependency set composed below, before any simulation.
-      const made = authored.generate(request.id, request.draft, originalManifest, { validate: false });
+      const made = authored.prepare(request.id, request.draft, { validate: false, allowUntracked: true });
       if (!temporary) throw new StudioError('PLUGIN_STUDIO_TRIAL_FAILED', 500);
       const dir = path.join(temporary, request.id); fs.mkdirSync(dir);
-      for (const f of files.list(request.id)) {
-        if (f.link || !isPackPath(f.rel) || path.isAbsolute(f.rel)) throw new StudioError('PLUGIN_STUDIO_PATH', 403, { detail: f.rel });
-        if (f.rel === 'plugin.lock.json') continue;
-        const target = path.join(dir, f.rel);
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.copyFileSync(files.stat(request.id, f.rel).abs, target);
+      for (const [rel, text] of Object.entries(made.files)) {
+        if (rel !== 'plugin.lock.json') writeTrialDraftFile(dir, rel, text);
       }
-      fs.writeFileSync(path.join(dir, 'plugin.json'), manifestText(mergeAuthorManifest(originalManifest, made.manifest, request.draft.template)));
-      for (const [rel, text] of Object.entries(made.files)) writeTrialDraftFile(dir, rel, text);
+      stageAuthorDependencies(temporary, request.id, made.manifest, { dataDir: dirs.dataDir, pluginsDir: dirs.pluginsDir });
       draft = readPluginFolder(dir, { vanilla: registry.vanillaAssets() });
       const check = checkPluginFolder(dir, undefined, { vanilla: registry.vanillaAssets(), dataDir: dirs.dataDir });
       if (check.problems.length) { reply({ ok: false, issues: check.issues }); return; }

@@ -3,10 +3,12 @@ import { Match } from '../match/Match.js';
 import { VirtualScheduler } from '../match/scheduler.js';
 import { getDefaultRegistry } from '../match/effectsMeta.js';
 import { registerDslMeta } from '../match/dslMeta.js';
-import { GAMEPLAY_TEMPLATES, gameplayOptions, bondId } from '../../public/studio/js/gameplayModel.js';
+import { GAMEPLAY_TEMPLATES, gameplayOptions, bondId, gameplayHooks } from '../../public/studio/js/gameplayModel.js';
+import { PHASE } from '../../shared/constants.js';
+import { rulesTrial } from './rulesTrial.js';
 import { StudioError } from './files.js';
 
-const hooks = { gain: 'onTraitGain', deploy: 'onTraitDeploy', roundStart: 'onRoundStart', buy: 'onBuy', sell: 'onSold', merge: 'onMerge', levelUp: 'onLevelUp', battleResult: 'onBattleResult' };
+const hooks = { income: 'onIncome', refresh: 'onRefresh', gain: 'onTraitGain', deploy: 'onTraitDeploy', roundStart: 'onRoundStart', buy: 'onBuy', sell: 'onSold', merge: 'onMerge', levelUp: 'onLevelUp', battleResult: 'onBattleResult' };
 const fail = detail => { throw new StudioError('PLUGIN_STUDIO_TRIAL_SCENARIO', 400, { detail }); };
 
 export function gameplayTrial(set, scene, draft, request = {}) {
@@ -14,7 +16,7 @@ export function gameplayTrial(set, scene, draft, request = {}) {
   const o = gameplayOptions(draft), input = request.exercise || {};
   const round = input.round ?? 1, at = input.at ?? 'prep', actions = input.actions ?? [];
   if (!Number.isInteger(round) || round < 1 || round > 99 || !['prep', 'battleCheck'].includes(at)
-    || !Array.isArray(actions) || actions.length > 32 || input.hook !== undefined && !Object.hasOwn(hooks, input.hook)) fail('exercise');
+    || !Array.isArray(actions) || actions.length > 32 || input.hook && !gameplayHooks(draft.template).includes(input.hook)) fail('exercise');
   const scheduler = new VirtualScheduler();
   const registry = getDefaultRegistry(), grants = [];
   for (const [pluginId, specs] of Object.entries(set.data.dsl || {})) for (const spec of specs) {
@@ -24,7 +26,7 @@ export function gameplayTrial(set, scene, draft, request = {}) {
     seats: [{ playerId: 'studio', seat: 0, name: 'Studio', isBot: false }], scheduler, registry,
     offers: set.offers || [], ...(set.rules ? { rules: set.rules } : {}), send: () => true, broadcast() {}, onEnd() {} });
   try {
-    m.round = round;
+    m.round = round; m.phase = PHASE.PREP;
     const ps = m.players.get('studio');
     ps.effects.push(...grants);
     const player = scene.spec.players[0];
@@ -51,9 +53,13 @@ export function gameplayTrial(set, scene, draft, request = {}) {
       layers: Object.fromEntries(Object.entries(ps.bonds).map(([id, b]) => [id, b.layers])),
       inventory: [...ps.hand, ...ps.temp].filter(Boolean).map(p => ({ id: p.id, kind: p.kind })), rules: m.rules || {} });
     const before = snapshot();
-    const hook = input.hook || 'roundStart';
+    const hook = input.hook || (draft.template === 'bond' ? o.prep[0]?.when : draft.template === 'trait' ? o.spec.meta?.on?.[0]?.when : null) || 'roundStart';
     // [ASSUMED] One isolated event with the first holder. Cross-round economics still require a full room.
-    m.dispatch(ps, hooks[hook], { piece: pieces[0], kind: 'chess', source: 'studio', win: true, income: 0 });
+    const event = { piece: pieces[0], kind: 'chess', source: 'studio', win: true, income: 0 };
+    m.dispatch(ps, hooks[hook], event);
+    // As in startRound, setIncome modifies the event before its nonnegative integer amount is credited.
+    if (hook === 'income') ps.addFunds(Number.isFinite(event.income) ? Math.max(0, Math.trunc(event.income)) : 0, { reason: 'income' });
+    const ruleChecks = draft.template === 'rules' ? rulesTrial(m, ps, scene, o.rules) : undefined;
     if (draft.template === 'bond') player.bonds[bondId(draft.id)].layers = ps.bonds[bondId(draft.id)].layers;
     m.openOfferWindow(at, round);
     const outcomes = [];
@@ -70,6 +76,6 @@ export function gameplayTrial(set, scene, draft, request = {}) {
       }
     }
     // Item grants are visible in the inventory; equip/trap targeting stays a full match operation.
-    return { before, after: snapshot(), windows: m.offerViews(), blocking: m.offerBlocking(), outcomes, round, at, hook };
+    return { before, after: snapshot(), windows: m.offerViews(), blocking: m.offerBlocking(), outcomes, round, at, hook, ...(ruleChecks ? { ruleChecks } : {}) };
   } finally { m.dispose(); scheduler.dispose(); }
 }

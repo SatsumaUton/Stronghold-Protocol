@@ -43,7 +43,10 @@ Studio authoring follow-up (0.3.1, §34.29): `bond`, `item`, `trait`, `offers` a
 existing new/authoring/trial routes. `POST validate-dsl` additionally accepts `{draft:{id,template,target,options}}`
 and returns the same `{ok,problems}` result shape after folder/data-only composition checks. Trial requests may add
 `exercise:{round,at,hook,elite,actions}` and receive `exercise:{before,after,windows,blocking,outcomes,round,at,hook}`.
-Actions are pick/refresh with window/plugin/slot/card identity, or timeout, capped at 32 [ASSUMED]. These are local
+Rules exercises also return `ruleChecks` and vanilla `reference` action results. Bond hooks are roundStart/income/
+buy/sell/refresh/merge/levelUp/battleResult; trait hooks substitute gain/deploy for income/refresh. Omitted or empty
+hook selects the first authored prep rule, else roundStart [ASSUMED]. Merged validation includes retained content
+and required dependencies before writing. Actions are pick/refresh with window/plugin/slot/card identity, or timeout, capped at 32 [ASSUMED]. These are local
 Studio helpers using existing stable record, trait, offer and rule vocabularies; no new frozen plugin surface row or
 route is introduced. The stable baseline remains unchanged. See PLUGINS §15 for form and exercise limits.
 

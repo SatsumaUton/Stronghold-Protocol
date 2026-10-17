@@ -68,6 +68,8 @@ function recordBattle(set, scene) {
 }
 
 
+    setGameData(base.data); installOfficialBounds(base.bounds);
+    const reference = wizard?.template === 'rules' ? gameplayTrial(base, baseScene, wizard, request) : null;
     const vanilla = recordBattle(base, baseScene);
     if (set.scripts?.length) {
       const hashInput = { plugins: set.index.plugins, settings: set.settings };
@@ -81,6 +83,8 @@ function recordBattle(set, scene) {
     installOfficialBounds(set.bounds);
     setGameData(set.data);
     const exercise = gameplayTrial(set, modScene, wizard, request);
+    if (set.rules?.morphPairing === 'plus') modScene.spec.morphPairing = 'plus';
+    if (exercise && reference) exercise.reference = reference.ruleChecks;
     const plugin = recordBattle(set, modScene);
     process.send({ ok: true, vanilla, plugin, ...(exercise ? { exercise } : {}), comparison: { damage: plugin.damage - vanilla.damage,
       duration: plugin.result.time - vanilla.result.time, baseline: original.name, operator: op.name, duel: modScene.duel } });

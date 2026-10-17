@@ -1,7 +1,6 @@
-import { jsonText } from '../gameData.js';
+import { jsonText, templateFile } from '../gameData.js';
 import { bondId, gameplayDefaults } from '../../../public/studio/js/gameplayModel.js';
 import { StudioError } from '../files.js';
-import fs from 'node:fs';
 
 export default {
   id: 'bond', class: 'content', kinds: [], overlay: () => ({}),
@@ -22,7 +21,7 @@ export default {
     // [ASSUMED] One selected threshold guards all authored effects. Member traits preserve official kits/garrisons.
     const guard = rules => rules.map(r => ({ ...r, if: { ...r.if, bondActive: { id: bid, tier: o.effectTier } } }));
     const files = {
-      'assets/studio-bond.png': fs.readFileSync(new URL('../../../plugins/_template/cosmetic/media/sample.png', import.meta.url)),
+      'assets/studio-bond.png': templateFile('cosmetic', 'media/sample.png', null),
       'data/bond.json': jsonText({ records: 1, entries: [{ file: 'bonds', id: bid, value: {
         name: o.name, desc: o.desc, thresholds: o.thresholds, countMode: o.countMode, isCore: o.isCore } }] }),
       'data/members.json': jsonText({ patch: 1, ops }),

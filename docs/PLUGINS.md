@@ -1450,8 +1450,14 @@ bounded numeric inputs, selects and editable lists. No hand-written JSON or new 
 | `offers` | Hook list, any/list/every/range rounds, 1–6 slots, 0–2 refreshes, window seconds, quorum, timeout, prep deferral, and 1–128 local cards with labels/icons and closed grants. The template owns `offers/cards.json`; cards supply their individual grants. |
 | `rules` | Four selects from `RULE_SWITCHES`, with descriptions. Inherit omits a declaration; other choices explicitly declare it, including official defaults. |
 
-`POST validate-dsl {draft:{id,template,target,options}}` checks a generated temporary plugin with the folder checker
-and data-only composer. The same check gates creation/saving; errors keep the installed files unchanged.
+`POST validate-dsl {draft:{id,template,target,options}}` checks a temporary plugin with the folder checker
+and data-only composer. Existing drafts reopen current document fields and merge only form changes; extra fields,
+records, declarations, needed permissions and assets survive. Unchanged JSON text retains its original bytes.
+Validation, save and unsaved trial share the complete merged folder, including retained files and required
+dependencies; errors occur before any installed file is written. Bond samples read binary SP_PLUGIN_RESOURCES
+resources when configured. Item params are rebuilt from final buffs with the data builder’s first-key-wins semantics
+(strings override numbers within one buff); inherited MAGIC and buff-less morph items are supported, with pairing
+disabled when the base has no elite form.
 `POST trial` accepts an optional `exercise:{round,at,hook,elite,actions}` for these templates. The existing child
 bench returns `exercise` alongside the replay: before/after funds, pending funds, refreshes, layers, inventory,
 rules, open windows and action outcomes. It executes actual Match offer grants, seeded refreshes, quorum and
@@ -1464,7 +1470,12 @@ four explicitly declared default rules. One effect tier guards every bond rule; 
 the new bond directly. Empty prep/talent lists omit their part. Membership authoring is capped at 64; a rules-only
 template needs at least one declaration [ASSUMED]. Trials inject the selected bond tier, equip the
 selected item form on the first holder when it is equipment, and dispatch one selected prep hook with that
-holder. They do not prove population counting, full economic flow, every rule switch or consumable targeting.
+holder. Bond hooks include income/refresh; trait hooks include gain/deploy instead. Auto selects the first authored
+prep hook, falling back to roundStart; income starts at zero and credits setIncome after dispatch [ASSUMED].
+Rules trials compare real Match actions against vanilla: twelve free level-one refreshes with enough Victoria
+members, disabling the first holder’s skill during prep, two bond items followed by a morph, and unequipping a
+elite hammer on a separate holder [ASSUMED]. Replay uses actual equipment/loadout and the applicable morphPairing option.
+They do not prove population counting for authored bonds, full economic flow or consumable targeting.
 Item/chess grants remain visible in inventory. These exercises apply to dummy/wave/duel presets, not golden
 scenarios; the independent vanilla console remains unchanged. Full match checks use the existing test room.
 Item templates add `effectRef` to their own complete records in a second generated patch, after pair expansion;

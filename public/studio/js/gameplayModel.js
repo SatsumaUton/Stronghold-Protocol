@@ -26,3 +26,10 @@ export function gameplayOptions(draft) {
   return { ...gameplayDefaults(draft.template, draft.id), ...draft.options };
 }
 export const editGameplay = (draft, patch) => ({ ...draft, options: { ...gameplayOptions(draft), ...patch } });
+
+// The two DSL vocabularies differ: operator gain/deploy versus bond income/refresh.
+export function gameplayHooks(template) {
+  if (template === 'bond') return ['roundStart', 'income', 'buy', 'sell', 'refresh', 'merge', 'levelUp', 'battleResult'];
+  if (template === 'trait') return ['gain', 'deploy', 'roundStart', 'buy', 'sell', 'merge', 'levelUp', 'battleResult'];
+  return [];
+}

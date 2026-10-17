@@ -584,9 +584,14 @@ Authoring checks (DESIGN §32.9.1): numeric fields display the shared official b
 
 0.3.1 (§34.29) adds bond/item/trait/offers/rules templates with actual fields and official-name pickers. Full-draft
 validation uses the existing keyed validate-dsl endpoint, ordinary folder checks and data-only composition; no new
-plugin grammar or route. Save refuses bad drafts before writing. Their dummy/wave/duel trials add an explicit
+plugin grammar or route. Reopen reads current document fields; save merges only form-owned changes, retaining
+other fields/declarations/required permissions and their unchanged raw JSON bytes. Validation, unsaved trials and
+save check the complete merged folder before writing. Their dummy/wave/duel trials add an explicit
 single-holder prep event and active-bond/equipped-item fixture [ASSUMED], plus real Match offer choice, refresh and
-virtual-clock timeout with before/after feedback. This is a bounded isolated exercise, not a full economy/room;
+virtual-clock timeout with before/after feedback. Bond income/refresh and trait gain/deploy use their own hook
+vocabularies; Auto selects the first prep rule or roundStart [ASSUMED]. Rules trials compare real refresh, prep
+loadout, morph equipment and unequip actions with vanilla; replay carries actual equipment/loadout and morphPairing.
+These fixed bounded fixtures are [ASSUMED], not a full economy/room;
 golden scenes and the independent vanilla console keep their previous behavior. New UI uses the four language packs.
 
 ### Combat metrics (作战统计) — ported from the xinhai-ai fork, opt-in

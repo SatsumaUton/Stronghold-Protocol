@@ -16,14 +16,16 @@ export function ItemForm({ draft, onChange, details }) {
   const baseId = draft.options.base || details?.defaults.base || o.base;
   const change = patch => onChange(editGameplay(draft, { base: baseId, ...patch }));
   const base = details?.items[baseId];
+  const canPair = !!(base?.goldenId && details?.items[base.goldenId]);
+  const paired = o.paired && (details ? canPair : true);
   return html`<div class="st-form" data-testid="item-editor">
     <${TextField} label=${t('名字')} value=${o.name} onChange=${name => change({ name })} />
-    <${RecordPicker} kind="item" table=${details?.items} label=${t('官方基础道具')} value=${baseId} onChange=${base => change({ base, normal: {}, elite: {} })} />
-    <${Toggle} label=${t('生成普通与精锐配对')} value=${o.paired} onChange=${paired => change({ paired })} />
+    <${RecordPicker} kind="item" table=${details?.items} label=${t('官方基础道具')} value=${baseId} onChange=${base => change({ base, paired: !!details?.items[base]?.goldenId, normal: {}, elite: {} })} />
+    <${Toggle} label=${t('生成普通与精锐配对')} value=${paired} disabled=${!canPair} onChange=${paired => change({ paired })} />
     <${Toggle} label=${t('商店隐藏')} value=${o.hideInShop} onChange=${hideInShop => change({ hideInShop })} />
     <${Toggle} label=${t('排除商店')} value=${o.shopExcluded} onChange=${shopExcluded => change({ shopExcluded })} />
     <${NumberField} label=${t('商店排序')} value=${o.shopSortId} min=${-1e9} max=${1e9} onChange=${shopSortId => change({ shopSortId })} />
-    ${(o.paired ? ['normal', 'elite'] : ['normal']).map(which => {
+    ${(paired ? ['normal', 'elite'] : ['normal']).map(which => {
       const src = which === 'elite' ? details?.items[base?.goldenId] : base;
       const f = o[which], set = patch => change({ [which]: { ...f, ...patch } });
       return html`<fieldset><legend>${which === 'normal' ? t('普通') : t('精锐')}</legend>

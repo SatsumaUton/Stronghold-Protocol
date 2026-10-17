@@ -8,7 +8,7 @@ import { validateDraft } from '../validateDraft.js';
 import { IssueList } from '../issues.js';
 import { Field, Select } from './controls.js';
 
-export const Toggle = ({ label, value, onChange }) => html`<label class="st-check"><input type="checkbox" checked=${!!value} onChange=${e => onChange(e.currentTarget.checked)} />${label}</label>`;
+export const Toggle = ({ label, value, onChange, disabled = false }) => html`<label class="st-check"><input type="checkbox" disabled=${disabled} checked=${!!value} onChange=${e => onChange(e.currentTarget.checked)} />${label}</label>`;
 export const LongText = ({ label, value, onChange, max = 8192 }) => html`<${Field} label=${label}><textarea class="st-input" value=${value || ''} maxLength=${max} onInput=${e => onChange(e.currentTarget.value)} /><//>`;
 export const removeAt = (xs, i) => xs.filter((_, n) => n !== i);
 export const replaceAt = (xs, i, value) => xs.map((x, n) => i === n ? value : x);
