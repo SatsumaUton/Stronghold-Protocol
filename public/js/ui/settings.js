@@ -507,7 +507,7 @@ export function SettingsModal({ open, onClose }) {
       <${Toggle} label=${t('部署时收起商店')} micro="DEPLOY FOLD" value=${s.prepDeployFold} onChange=${(v) => updateSettings({ prepDeployFold: v })} />
       <p class="set-hint">${t('拖起干员、装备或召唤物，以及放下后选择朝向时，临时收起商店并放大棋盘。关闭后，拿起时既不改变商店的收起状态，也不缩放镜头。')}</p>
       <${Toggle} label=${t('战斗期间保持屏幕常亮')} micro="SCREEN WAKE LOCK" value=${s.screenWakeLock} onChange=${(v) => updateSettings({ screenWakeLock: v })} />
-      <p class="set-hint">${t('战斗期间尝试阻止屏幕自动熄灭。需要 HTTPS 和浏览器支持；iOS 低电量模式下可能被系统忽略。')}</p>
+      <p class="set-hint">${t('战斗期间尝试阻止屏幕自动熄灭。需要HTTPS和浏览器支持；iOS 低电量模式下可能被系统忽略。')}</p>
       <div class="set-row">
         <span class="set-row__label">${t('画面质量')}<${MicroLabel}>QUALITY<//></span>
         <div class="set-seg" role="radiogroup">

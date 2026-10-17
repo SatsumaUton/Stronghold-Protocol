@@ -171,7 +171,7 @@
   "部署时收起商店": "Fold Shop While Deploying",
   "拖起干员、装备或召唤物，以及放下后选择朝向时，临时收起商店并放大棋盘。关闭后，拿起时既不改变商店的收起状态，也不缩放镜头。": "Picking up an operator, a piece of equipment or a summon, and choosing a direction after the drop, temporarily folds the shop and zooms the board. Off, picking up changes neither the shop's fold nor the camera.",
   "战斗期间保持屏幕常亮": "Keep screen awake during combat",
-  "战斗期间尝试阻止屏幕自动熄灭。需要 HTTPS 和浏览器支持；iOS 低电量模式下可能被系统忽略。": "Try to prevent the screen from turning off during combat. Requires HTTPS and browser support; iOS Low Power Mode may ignore this feature.",
+  "战斗期间尝试阻止屏幕自动熄灭。需要HTTPS和浏览器支持；iOS 低电量模式下可能被系统忽略。": "Try to prevent the screen from turning off during combat. Requires HTTPS and browser support; iOS Low Power Mode may ignore this feature.",
   "画面质量": "Graphics Quality",
   "触屏操作：点击单位选中（撤退 / 出售）· 长按单位或卡牌查看详情 · 拖动部署后滑动选择朝向": "Touch controls: tap a unit to select it (Retreat / Sell) · long-press a unit or card for details · after dragging to deploy, swipe to choose a direction",
   "快捷键": "Hotkeys",
