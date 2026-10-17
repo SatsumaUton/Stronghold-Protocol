@@ -1028,3 +1028,8 @@ same object to the rightmost free hand slot or visible temp, refuses HAND_FULL a
 The shared morph pairing/slot policies drive item attachment, bots, invariants and prep effects as well as combat.
 Rules-only plugins are gameplay; absent rules adds no match/spec field. [PLUGINS.md](PLUGINS.md#rule-switches) lists
 all assumptions and the workshop-defined limits.
+
+Validated PREP loadout changes reconcile affected owners' summons in board/hand/temp against the new skill/module
+stock, then recompute owner ranges and refill the hand. [ASSUMED] Valid board cards survive in reading order before
+hand/temp index order; obsolete/excess copies are removed (including temp deadlines), missing copies use the ordinary
+overflow queue. Unchanged loadouts and other owners never replenish spent cards. Failed validation is atomic.

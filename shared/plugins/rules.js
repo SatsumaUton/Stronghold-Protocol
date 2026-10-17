@@ -113,7 +113,8 @@ export function readDeclaredRules(raw, list, cls) {
 }
 
 /**
- * Forge `behaviour: [{ switch, option }]` → our `rules`. Unknown switches and options are skipped with a reason.
+ * Forge `behaviour: [{ switch, option? }]` → our `rules`. An omitted option declares that switch's default
+ * (WORKSHOP §1.22–§1.23); explicit invalid values are still skipped. Unknown switches/options get a reason.
  * Does not throw and does not reject the pack. null / undefined → no rules.
  * @param {unknown} raw
  * @returns {{ rules: Record<string, string>|null, skipped: { path: string, zh: string, en: string }[] }}
@@ -139,7 +140,6 @@ export function readForgeBehaviour(raw) {
       return;
     }
     const name = entry.switch;
-    const option = entry.option;
     if (typeof name !== 'string' || !own(RULE_SWITCHES, name)) {
       const shown = String(name ?? '').slice(0, 40);
       skipped.push({
@@ -149,6 +149,7 @@ export function readForgeBehaviour(raw) {
       });
       return;
     }
+    const option = own(entry, 'option') ? entry.option : RULE_SWITCHES[name].options[0];
     if (!isOption(name, option)) {
       const shown = String(option ?? '').slice(0, 40);
       skipped.push({

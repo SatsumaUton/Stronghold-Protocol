@@ -32,6 +32,7 @@ function randomIntent(rng, m, ps) {
     case 'g.sell': case 'g.destroy': return { t, uid: uid() };
     case 'g.move': return { t, uid: uid(), to: to() };
     case 'g.equip': return { t, itemUid: uid(), targetUid: uid() };
+    case 'g.unequip': return { t, itemUid: uid() };
     case 'g.art': return { t, itemUid: uid(), row: rng.int(19), col: rng.int(21) };
     case 'g.reward': case 'g.choice': return { t, idx: rng.int(6) };
     case 'g.ready': return { t, ready: rng() < 0.4 };
@@ -43,13 +44,13 @@ function randomIntent(rng, m, ps) {
   }
 }
 
-function fuzzOne(seed, { fake }) {
+function fuzzOne(seed, { fake, rules }) {
   const rng = createRng(seed * 7919);
   const mode = rng() < 0.3 ? 'solo' : 'coop';
   const difficulty = rng.pick(['FUNNY', 'NORMAL', 'HARD', 'ABYSS']);
   const humans = mode === 'solo' ? 1 : 1 + rng.int(3);
   const bots = mode === 'solo' ? 0 : rng.int(3);
-  const h = makeMatch({ mode, difficulty, humans, bots, seed, fake, captureFrames: false, checkFrames: true, script: () => ({ duration: 2 + rng.int(6), leaks: {} }) });
+  const h = makeMatch({ mode, difficulty, humans, bots, seed, fake, rules, captureFrames: false, checkFrames: true, script: () => ({ duration: 2 + rng.int(6), leaks: {} }) });
   const m = h.m;
   m.start();
   const humanIds = [...m.players.values()].filter((p) => !p.isBot).map((p) => p.playerId);
@@ -100,4 +101,23 @@ test('fuzz with FakeBattle: 60 matches of random intents / connection churn / ti
 
 test('fuzz with the real simulation: 8 matches', () => {
   for (let seed = 101; seed <= 108; seed++) fuzzOne(seed, { fake: false });
+});
+
+test('every generated game intent has a valid protocol shape, including unequip', () => {
+  const rng = createRng(48);
+  for (const type of GAME) {
+    const forced = Object.assign(() => rng(), {
+      pick: (list) => list === GAME ? type : rng.pick(list),
+      int: (n) => rng.int(n),
+    });
+    const msg = randomIntent(forced, {}, null);
+    assert.equal(msg.t, type);
+    assert.equal(validateC2S(msg), null, JSON.stringify(msg));
+  }
+});
+
+test('fuzz with all four rules enabled: 12 fake and 4 real matches', () => {
+  const rules = { shopBias: 'bondBias', prepLoadout: 'prep', morphPairing: 'plus', unequip: 'allow' };
+  for (let seed = 201; seed <= 212; seed++) fuzzOne(seed, { fake: true, rules });
+  for (let seed = 301; seed <= 304; seed++) fuzzOne(seed, { fake: false, rules });
 });

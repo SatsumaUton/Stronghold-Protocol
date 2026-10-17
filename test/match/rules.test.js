@@ -170,6 +170,94 @@ test('prepLoadout merges one submission in 休整期 and locks it after 准备',
   info.m.dispose();
 });
 
+const SILENCE = 'chess_char_2_02_a';
+const DRONE = 'token_10000_silent_healrb';
+const tokensOf = (ps, owner) => [...ps.board.values(), ...ps.hand, ...ps.temp]
+  .filter((p) => p?.kind === 'token' && p.ownerUid === owner.uid);
+
+function placeToken(h, ps, token) {
+  for (let row = 9; row <= 12; row++) for (let col = 2; col <= 10; col++) {
+    if (ps.board.has(`${row},${col}`) || !ps._legal(token, row, col)) continue;
+    ok(h.m.handle('p_0', { t: 'g.move', uid: token.uid, to: { area: 'board', row, col } }));
+    return ps.board.get(`${row},${col}`).uid;
+  }
+  assert.fail('no legal summon tile');
+}
+
+test('prep loadout reconciles summons in both skill directions and the next real battle', (t) => {
+  const h = prep({ prepLoadout: 'prep' }, t);
+  t.after(() => h.m.dispose());
+  const ps = h.ps('p_0');
+  ok(h.m.setLoadout('p_0', { [SILENCE]: { skill: 0 } }));
+  const owner = give(h.m, ps, SILENCE, 'board', legalTileFor(h.m, ps, SILENCE));
+  assert.deepEqual(tokensOf(ps, owner), []);
+  ok(h.m.setLoadout('p_0', { [SILENCE]: { skill: 1 } }));
+  const drone = tokensOf(ps, owner)[0];
+  assert.equal(drone?.id, DRONE, 'S1 to S2 immediately grants the drone card');
+  placeToken(h, ps, drone);
+  const opts = h.m._normalOpts(ps);
+  opts.spawns = opts.spawns.map((s) => ({ ...s, time: 100 }));
+  opts.timeLimit = 45;
+  opts.flags = { ...opts.flags, dpInit: 99, dpMax: 99 };
+  const field = () => h.m._ccField({ fieldId: 'loadout', kind: 'normal', players: ['p_0'], opts: { ...opts, players: [ps.battleInput()] } }).spec;
+  const b = createBattleFromSpec(field(), h.m.ds);
+  let deployed = false;
+  for (let tick = 0; tick < 1200 && !b.finished; tick++) {
+    b.step();
+    if (b.units.some((u) => u.defId === DRONE && u.deployed)) deployed = true;
+  }
+  assert.ok(b.units.find((u) => u.uid === owner.uid).skill.activations > 0);
+  assert.ok(deployed, 'the newly selected skill uses its deployed card');
+  h.invariants();
+  ok(h.m.setLoadout('p_0', { [SILENCE]: { skill: 0 } }));
+  assert.deepEqual(tokensOf(ps, owner), [], 'S2 to S1 removes the deployed drone');
+  assert.equal(ps.battleInput().units.some((u) => u.kind === 'token'), false);
+  const next = createBattleFromSpec(field(), h.m.ds);
+  next.step();
+  assert.equal(next.units.some((u) => u.defId === DRONE), false);
+  // Exercise inventory stacks and their temp deadlines as well as the deployed card above.
+  ok(h.m.setLoadout('p_0', { [SILENCE]: { skill: 1 } }));
+  const stack = tokensOf(ps, owner)[0];
+  ps._detach(ps.find(stack.uid));
+  ps.stow(stack, { toTemp: true });
+  const spare = ps.newPiece('token', DRONE, { ownerUid: owner.uid });
+  ps.stow(spare);
+  assert.equal(ps._tempDue.has(stack.uid), true);
+  ok(h.m.setLoadout('p_0', { [SILENCE]: { skill: 0 } }));
+  assert.deepEqual(tokensOf(ps, owner), [], 'obsolete hand and temp cards are removed');
+  assert.equal(ps._tempDue.has(stack.uid), false);
+  h.invariants();
+});
+
+test('prep module changes trim excess summons, preserve valid placements, and leave other owners alone', (t) => {
+  const h = prep({ prepLoadout: 'prep' }, t);
+  t.after(() => h.m.dispose());
+  const ps = h.ps('p_0');
+  const id = chess(SILENCE).goldenId;
+  // Synthetic stock fixture: this module supplies three cards; removing it leaves one.
+  const original = ps.gd.placeableTokens.bind(ps.gd);
+  ps.gd.placeableTokens = (chessId, lo) => original(chessId, lo)
+    .map((s) => ({ ...s, count: chessId === id && lo.moduleId !== 'none' ? 3 : s.count }));
+  const owner = give(h.m, ps, id, 'board', legalTileFor(h.m, ps, id));
+  const other = give(h.m, ps, SILENCE, 'board', legalTileFor(h.m, ps, SILENCE));
+  ps.removeTokensOf(other.uid); // A removed stack must not be replenished by editing another owner.
+  const stack = tokensOf(ps, owner)[0];
+  const placed = placeToken(h, ps, stack);
+  assert.equal(tokensOf(ps, owner).reduce((n, p) => n + p.count, 0), 3);
+  const before = JSON.stringify([ps.loadout, ...tokensOf(ps, owner)]);
+  assert.equal(h.m.setLoadout('p_0', { [SILENCE]: { skill: 99 } }).error, ERR.BAD_TARGET);
+  assert.equal(JSON.stringify([ps.loadout, ...tokensOf(ps, owner)]), before, 'validation fails atomically');
+  ok(h.m.setLoadout('p_0', { [SILENCE]: { module: 'none' } }));
+  assert.deepEqual(tokensOf(ps, owner).map((p) => p.uid), [placed], 'keep the valid placed card before inventory excess');
+  assert.deepEqual(tokensOf(ps, other), [], 'an unaffected owner is not topped up');
+  ok(h.m.setLoadout('p_0', { [SILENCE]: { module: loadoutOptions(chess(SILENCE), chess(id)).defaultModule } }));
+  assert.equal(tokensOf(ps, owner).reduce((n, p) => n + p.count, 0), 3, 'restoring the module grants only the missing two');
+  ps.removeTokensOf(owner.uid);
+  ok(h.m.setLoadout('p_0', {}));
+  assert.deepEqual(tokensOf(ps, owner), [], 'an unchanged submission does not refresh spent stock');
+  h.invariants();
+});
+
 test('morphPairing plus grants only the leftmost bond and does not spend a slot on the morph', (t) => {
   const knife = Object.values(DATA.items).find((it) => it.itemType === 'EQUIP' && !it.canGiveBond && !it.isGolden && it.giveBondId && it.giveBondId !== 'victoriaShip' && it.id !== HAMMER);
   assert.ok(knife, 'a second bond item');
@@ -180,6 +268,7 @@ test('morphPairing plus grants only the leftmost bond and does not spend a slot 
   assert.deepEqual(granted, ['victoriaShip']);
   assert.equal(both.items.some((it) => it.id === ISO), true);
   assert.equal(both.items.filter((it) => !plus.m.gd.item(it.id)?.canGiveBond).length, 2);
+  plus.invariants();
   const ctx = makeCtx(plus.m, plus.ps('p_0'), { piece: both }, 'onEquip');
   assert.deepEqual(metaBonds(ctx, plus.ps('p_0').pieceView(both)), pieceBonds(plus.m.gd, both, plus.m.rules), 'prep effect helpers use the same policy');
   const snapshot = { ...plus.ps('p_0').pieceView(both), uid: 999999 };
@@ -203,6 +292,7 @@ test('morphPairing plus grants only the leftmost bond and does not spend a slot 
   const again = plus.m.handle('p_0', { t: 'g.equip', itemUid: giveItem(plus.m, plus.ps('p_0'), ISO).uid, targetUid: both.uid });
   assert.equal(again.error, ERR.BAD_TARGET);
   assert.equal(again.detail, 'morph already equipped');
+  plus.invariants();
   const official = prep();
   const worn = wearer(official, [HAMMER, knife.id, ISO]);
   assert.equal(worn.items.length, 2, 'official morph occupies a slot and the third item replaced the hammer');

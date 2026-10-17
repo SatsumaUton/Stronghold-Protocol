@@ -497,6 +497,12 @@ hidden overflow is not free space. Ordinary recycling returns every equipped ite
 Official policy is a frozen singleton with the original slot arithmetic. BattleSpec includes `morphPairing: "plus"`
 only for this option, for normal, shared, boss and rehearsal battles.
 
+After a validated prep loadout change, affected owners' summon cards are reconciled against their selected
+skill/module stock across board, hand and temp, then the player is recomputed (including owner-range checks).
+[ASSUMED] Keep valid deployed cards in board reading order before hand/temp index order, remove obsolete/excess
+copies, and grant missing stock through the ordinary hand/overflow queue. Removed temp cards lose their deadlines.
+No-op submissions and unaffected owners do not replenish spent stock; invalid submissions change nothing.
+
 Rule-less hash inputs, plugin file hashes and vanilla data bytes are unchanged, and no golden scenario moves.
 The build's `cs` still hashes all served shared/sim source bytes (§6), so this engine update changes that code hash;
 it does not freeze or exempt changed code from identity verification.
@@ -1590,7 +1596,9 @@ Modules (`statsBase`, `traitBase`, `talentsBase`), new garrisons and bonds remai
 
 ### Mapping
 
-Forge `behaviour: [{ switch, option }]` maps to the four [rule switches](#rule-switches). A valid declaration
+Forge `behaviour: [{ switch, option? }]` maps to the four [rule switches](#rule-switches). Omitting `option`
+declares that switch's default (WORKSHOP §1.22–§1.23); the declaration is retained in the content hash and conflicts
+with a different option. Explicit null, non-string or unknown options remain invalid. A valid declaration
 implies gameplay (`combat: true` is not required on input) and produces a content plugin even with no other data.
 Unknown switches/options are skipped individually with a bilingual reason. [ASSUMED] repeated different options
 keep the first and report the later one. This conversion does not import notices.

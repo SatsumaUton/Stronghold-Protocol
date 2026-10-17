@@ -196,5 +196,9 @@ subsets described in DATA and §30.2.
 Content-plugin exceptions to the official match rules are opt-in (§34.15): `shopBias=bondBias` filters shop item candidates within their drawn tier by active bond/giveBondId after stock checks, falling
 back within that tier; morphPairing=plus uses shared pairing and slot policies (zero-slot morph, one per operator,
 only the leftmost bond item grants); unequip=allow moves one equipped item back to the hand then visible temp,
-atomically refusing HAND_FULL if both are full. These do not alter the default rules above. See
+atomically refusing HAND_FULL if both are full. A validated prepLoadout=prep change reconciles affected owners'
+summons across board/hand/temp to the selected skill/module stock, then recomputes ranges; unchanged loadouts and
+other owners do not replenish spent stock. [ASSUMED] Keep valid board cards in reading order before hand/temp
+index order, remove obsolete/excess cards and temp deadlines, and grant missing copies via normal overflow.
+These do not alter the default rules above. See
 [PLUGINS.md](../PLUGINS.md#rule-switches) for limits and assumptions.

@@ -79,6 +79,32 @@ test('composeRules refuses two options and keeps one option named twice', () => 
   assert.equal(composeRules([{ id: 'plain' }]).rules, null);
 });
 
+test('Forge omitted options preserve a declared default and its conflict', async (t) => {
+  const got = readForgeBehaviour(RULE_NAMES.map((name) => ({ switch: name })));
+  const defaults = Object.fromEntries(RULE_NAMES.map((name) => [name, RULE_SWITCHES[name].options[0]]));
+  assert.deepEqual(got, { rules: defaults, skipped: [] });
+  for (const option of [null, false, 0, '', 'bad']) {
+    const invalid = readForgeBehaviour([{ switch: 'unequip', option }]);
+    assert.equal(invalid.rules, null, `explicit ${JSON.stringify(option)} is not an omitted option`);
+    assert.equal(invalid.skipped.length, 1);
+  }
+  const f = fixture(t);
+  const pack = path.join(f.dir, 'forge-default');
+  fs.mkdirSync(pack);
+  fs.writeFileSync(path.join(pack, 'pack.json'), JSON.stringify({
+    id: 'forge-default', name: 'Default', version: '1.0.0', behaviour: [{ switch: 'unequip' }],
+  }));
+  const result = await importForge(pack, { root: ROOT, pluginsDir: path.join(f.dir, 'plugins'), dryRun: true });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.report.products[0].rules, { unequip: 'official' });
+  f.put('declared-default', { permissions: [], rules: result.report.products[0].rules });
+  f.put('allow', { permissions: [], rules: { unequip: 'allow' } });
+  const conflict = buildContentSet({ registry: f.registry, ids: ['declared-default', 'allow'] });
+  assert.ok(conflict.problems.some((p) => p.code === 'PLUGIN_RULE_CONFLICT'));
+  const declared = buildContentSet({ registry: f.registry, ids: ['declared-default'] });
+  assert.deepEqual(declared.index.rules, { unequip: 'official' });
+});
+
 test('the content hash grows a rules key only when one is passed', () => {
   const parts = { app: '0.3.1', sim: 'aa', data: { chess: 'bb' } };
   const plain = hashInput(parts);
