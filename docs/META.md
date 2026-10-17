@@ -457,7 +457,7 @@ Writes (validated, never throw on bad input; funds and available stock stay non-
 | `addLayers(bondId, n, { requireActive })` | layer gain (`requireActive` = "使已激活的…"); returns layers added — at most the room left under `BOND_LAYER_CAP` (999, shared/constants.js `layerGainRoom`; the battle gains merged at SETTLE too); fires onLayers unless it added 0. During ROUND_START / SP_DRAFT / PREP, a positive gain also sends the owner an ephemeral `m.layer {playerId, bondId, add}` audio notification; no replay on resync or SETTLE backfill |
 | `grantChess(id, { toTemp, golden, requirePool=true, fromPool=true })` | acquire a chess (takes pool copies; with `requirePool` a pool chess with no copy left fails → `null`); merges; fires onGain. `toTemp` puts it into temp, but a free hand slot pulls it in at the next recompute (temp holds overflow only, `PlayerState._fillHandFromTemp`) |
 | `grantItem(id, { toTemp, requirePool=true })` | acquire an item (merges with an identical normal item); `toTemp` as for grantChess. `requirePool:false` bypasses stock only for fixed `SERVER_GAIN_EQUIP` gift families; every copy still counts in occupancy (§30.1). |
-| `rollChess({ maxTier, tier, bond, filter })` / `rollItem({ pool, tier, maxTier })` | copy-weighted chess id from the shared pool / item id (choices.json pools) |
+| `rollChess({ maxTier, tier, bond, filter })` / `rollItem({ pool, tier, maxTier, exclude })` | copy-weighted chess id from the shared pool / item id (choices.json pools); item exclusions are applied before sampling, including `also` and explicit weighted pools |
 | `grantFreeRefresh(n)` | free refreshes (stack) |
 | `modifyPrice(delta)` / `setPrice(v)` | onPrice only: edit `ev.price` |
 | `promote(uid)` / `transform(uid, chessId)` / `upgradeItem(uid)` | elite in place / 突变细胞's transformation: destroy the chess wherever it stands (a board tile is freed; its equipment returns to the hand first, overflow temp), then gain `chessId` like `grantChess` (hand, overflow into the expandable temp queue; a merge it completes as usual — the carrier's tile is no copy's) and return the gained piece (the elite after a merge) / item → golden |
@@ -1024,6 +1024,18 @@ at zero after a removal, without a `debt` entry. Ordinary grants, 整备 and 机
 `requirePool:false` is not a universal equipment bypass. Rockrock/Flametail's measured weighted subsets remain subject
 to shared availability (§30.2). 凯瑟琳's `pool_equip_kathe` is every shop-eligible item plus 突变细胞 (`also`), uniform
 [ASSUMED], at any 调度中心 level (#631); the shop item slot does not read `also`.
+After a successful cell pick from a `band:band_cathy` offer, `ps.counters['band:cathy:cellTaken']` remains 1 for the
+match and later Cathy offers skip it (#677, DESIGN §34.22; maintainer decision 2026-10-17 (official play memory)).
+[ASSUMED] Showing or declining a cell does not count; 昆图斯's R3 grant is independent. [ASSUMED] Queued Cathy offers
+lose their cell too, retaining other choices without rerolling and dropping an offer if it becomes empty. Bots,
+reconnect and test-console/replay paths all retain the same player counter.
+Inherited `effectRef` strategies use `bandEffectId` to identify Cathy (§32.5), retaining their concrete parameters but
+tagging offers with the same `band:band_cathy` source and sharing her allowance. [ASSUMED] After that allowance is used,
+fresh offers sample eligible items without replacement until the requested count or candidate exhaustion, applying
+the cell exclusion before any random draw. `rollPool(poolId, { exclude })` forwards item exclusions to `rollItemId`;
+shared stock, explicit weights and `also` membership still apply. The official `aceffect_band_26` specifies three
+choices and one pick; it exposes neither cell limits nor the sampling algorithm. Unfiltered offers retain their
+existing draw sequence.
 
 ## Host test matches (DESIGN §34.8)
 
