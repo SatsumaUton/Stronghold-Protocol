@@ -103,6 +103,8 @@ export function buildSurface(extra = {}) {
     'error.PLUGIN_RECORD_HIDDEN', 'error.PLUGIN_RECORD_PAIR', 'error.PLUGIN_RECORD_ART', 'error.PLUGIN_RECORD_ORIGIN',
     'error.PLUGIN_FORGE_MOUNT', 'error.PLUGIN_FORGE_PANEL_SCRIPT', 'error.PLUGIN_UI_SLOT_SHARED', 'error.PLUGIN_STUDIO_CONSOLE_SCENARIO',
     'ui.message.host.result', 'ui.message.host.net',
+    'manifest.field.notices', 'error.PLUGIN_THEME_NAME', 'error.PLUGIN_THEME_VALUE', 'error.PLUGIN_THEME_LIMIT', 'error.PLUGIN_THEME_SHAPE',
+    'error.PLUGIN_NOTICE_SHAPE', 'error.PLUGIN_NOTICE_LIMIT', 'error.PLUGIN_NOTICE_TEXT', 'error.PLUGIN_NOTICE_LANG',
     'studio.route.POST /studio/api/console/options', 'studio.route.POST /studio/api/console/build']);
   const add = (name, group, stability, anchor) => rows.push({ name, group, stability, since: added031.has(name) ? '0.3.1' : SURFACE_SINCE, anchor });
   for (const field of MANIFEST_FIELDS) add(`manifest.field.${field}`, 'manifest', EXPERIMENTAL_FIELDS.has(field) ? 'experimental' : 'stable', 'shared/plugins/manifest.js#MANIFEST_FIELDS');

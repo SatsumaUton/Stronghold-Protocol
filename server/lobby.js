@@ -346,7 +346,7 @@ export class Lobby {
    *   plugins?: { resolve: (ids: string[], opts?: { scope?: 'room' | 'personal', settings?: object, replacing?: object | null }) => any,
    *     hold?: (vs: string) => void, release?: (vs: string) => void, holdContent?: (cs: string) => void,
    *     releaseContent?: (cs: string) => void, onContentStale?: (fn: (cs: string, ids: string[]) => void) => () => void, onStale?: (fn: (vs: string, ids: string[]) => void) => () => void,
-   *     unofficial?: () => number, defaults?: () => string[], dataOf?: (cs: string) => any, kittedOf?: (cs: string) => any,
+   *     unofficial?: () => number, hasNotices?: () => boolean, defaults?: () => string[], dataOf?: (cs: string) => any, kittedOf?: (cs: string) => any,
    *     contentInUse?: () => number } | null,
    *   hosts?: { create: (cs: string, opts: object) => any, stats?: () => object } | null,
    *   options?: Partial<typeof LOBBY_DEFAULTS>,
@@ -1277,6 +1277,8 @@ export class Lobby {
       let n;
       try { n = Number(this.plugins?.unofficial?.()) || 0; } catch { n = 0; }
       info = { diyKitted: KITTED_CHARS, content: n > 0 ? { vanilla: this.vanilla.cs, plugins: n } : { vanilla: this.vanilla.cs } };
+      // Catalogue metadata, never part of a room or match; omitted when no loaded plugin publishes a notice.
+      if (this.plugins?.hasNotices?.()) info.content.notices = true;
     }
     // Omitted when the switch is off, so a welcome from a normal server stays identical.
     if (this.testEnabled === true) info.testMode = true;

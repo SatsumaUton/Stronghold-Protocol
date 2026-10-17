@@ -5,6 +5,7 @@ import { ROOT, DATA_DIR, deepFreeze } from '../data.js';
 import { DATA_SHIM_JS } from '../http/static.js';
 import { computeVanillaContent, gameplayDataFiles, nodeSha256 } from './identity.js';
 import { contentHashOf, canonicalJson, csUrlPart } from '../../shared/plugins/identity.js';
+import { manifestTextWithoutNotices } from '../../shared/plugins/notices.js';
 import { resolvePluginOrder } from '../../shared/plugins/order.js';
 import { applyPatches, normalizeSettings } from '../../shared/plugins/patch.js';
 import { expandGameplayRecords, reconcilePluginBonds, reconcilePluginTokens, validateGameplayData } from './gameplayRecords.js';
@@ -298,9 +299,19 @@ function composeContentSet({ registry, ids = [] }) {
   for (const [lang, doc] of Object.entries(tr.out)) if (canonicalJson(doc) !== canonicalJson(base.i18n[lang] ?? null)) bodies.set(`i18n/${lang}.json`, Buffer.from(JSON.stringify(doc)));
   const boundsSnap = exportOfficialBounds(rememberOfficialBounds(base.data));
   if (plugins.length) bodies.set('bounds/official.json', Buffer.from(canonicalJson(boundsSnap)));
+  // Notices and personal theme values are not gameplay. Use the same canonical snapshot whether those fields
+  // are absent or present. The registry retains the raw manifest and lock for owner admission.
+  const noticeFree = new Map(plugins.flatMap(p => {
+    const source = manifestTextWithoutNotices(p.content?.documents?.['plugin.json']);
+    return source ? [[p.id, { source, hash: nodeSha256(Buffer.from(source)) }]] : [];
+  }));
   const scripts = plugins.filter(p => p.script).map(p => ({ id:p.id, version:p.manifest.version, class:p.class,
-    execution:p.script.execution || 'trusted', hash:p.script.lockHash, permissions:p.manifest.permissions, authors:p.manifest.authors,
-    manifestSource:p.script.manifestSource, sources:p.script.sources }));
+    // [ASSUMED] For every script, identify the checked gameplay snapshot rather than its raw lock
+    // (the latter includes the notice bytes). Owner admission still checks the complete, original lock hash.
+    execution:p.script.execution || 'trusted', hash: noticeFree.has(p.id)
+      ? nodeSha256(Buffer.from(canonicalJson({ ...p.content.files, 'plugin.json': noticeFree.get(p.id).hash })))
+      : p.script.lockHash, permissions:p.manifest.permissions, authors:p.manifest.authors,
+    manifestSource: noticeFree.get(p.id)?.source ?? p.script.manifestSource, sources:p.script.sources }));
   // [ASSUMED] Any trusted member makes the whole composition native; sandbox mode cannot enable trusted classes.
   if (scripts.some(p => p.class === 'trusted')) for (const p of scripts) p.execution = 'trusted';
   for (const p of scripts) if (p.execution === 'trusted') p.browserSources = browserScriptSources(p);
@@ -312,7 +323,7 @@ function composeContentSet({ registry, ids = [] }) {
   }
   if ([...bodies.values()].reduce((n, b) => n + b.length, 0) > 300 * 1024 * 1024) return { problems: [problem('PLUGIN_DATA_LIMIT', 'content', 'set exceeds 300 MB')] };
   const parts = plugins.map(p => ({ id: p.id, version: p.manifest.version,
-    files: {...p.content.files, ...(scriptHashes[p.id] ? {'@script':scriptHashes[p.id]} : {})} }));
+    files: {...p.content.files, ...(noticeFree.has(p.id) ? {'plugin.json': noticeFree.get(p.id).hash} : {}), ...(scriptHashes[p.id] ? {'@script':scriptHashes[p.id]} : {})} }));
   const i18n = {};
   if (plugins.length) for (const [rel, body] of bodies) {
     const m = /^i18n\/([A-Za-z0-9-]+)\.json$/.exec(rel);

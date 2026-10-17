@@ -56,6 +56,8 @@ import {
   FILE_URL_DIGITS, LOCK_FILE, attachSpineMeta, modelHashOf, readAssetOverlay, readPluginLock, visualHashOf, writesHashOf,
 } from '../../shared/plugins/visual.js';
 import { canonicalJson } from '../../shared/plugins/identity.js';
+import { readThemeDeclaration } from '../../shared/plugins/theme.js';
+import { manifestTextWithoutNotices } from '../../shared/plugins/notices.js';
 import { issueList, issueLine, makeIssue } from '../../shared/plugins/errors.js';
 
 /** The language folders' subdirectory (public/i18n/, data/i18n/). */
@@ -281,7 +283,6 @@ function readVisual(dir, manifest, listed, { vanilla, hashCache }) {
   const list = issueList();
   const { problems, warnings, issues } = list;
   const out = (visual) => ({ visual, problems, warnings, issues });
-  if (manifest.parts.theme) list.warning('PLUGIN_THEME_UNUSED', '"theme" is not applied by this version (it applies the art of "assets")', { at: ['theme'] });
   const part = manifest.parts.assets;
   let assets = {};
   let assetsFile = null;
@@ -347,7 +348,15 @@ function readVisual(dir, manifest, listed, { vanilla, hashCache }) {
   // its part of a vs (shared/plugins/visual.js): the files that shape the overlay and the hash of its ops — the ops a
   // set's document serves (server/plugins/visualSet.js), which a browser hashes again before it lays them
   const composition = {
-    id: manifest.id, version: manifest.version, files: Object.fromEntries(shaping.sort().map((rel) => [rel, hashed[rel].sha256])),
+    id: manifest.id, version: manifest.version, files: Object.fromEntries(shaping.sort().map((rel) => {
+      // Manifest notices and personal theme values never shape the room's art. Always canonicalize the
+      // manifest, even without either field. Keep raw hashes above for files and lock/Spine verification.
+      if (rel === PLUGIN_MANIFEST) return [rel, nodeSha256(Buffer.from(manifestTextWithoutNotices(readJson(path.join(dir, rel)).json)))];
+      // [ASSUMED] Only checked Spine metadata from a lock shapes art. Its files table duplicates the actual
+      // shaping hashes and includes notice/theme-sensitive manifest bytes, sizes and unrelated theme files.
+      if (rel === LOCK_FILE) return [rel, nodeSha256(Buffer.from(canonicalJson({ spine: lock.spine })))];
+      return [rel, hashed[rel].sha256];
+    })),
     writes: writesHashOf(meta.ops),
   };
   const bytes = [...served.values()].reduce((n, f) => n + f.bytes, 0);
@@ -363,7 +372,7 @@ const FRAME_EXT = new Set(['.html', '.js', '.css', '.png']);
 /**
  * The frame of a ui plugin (see the header): the files under `entry.client` hashed like a cosmetic overlay's, and a
  * `vs` of that plugin alone (visualHashOf — the same family; `writes` is the canonical { entry, slots }, not art ops).
- * plugin.json is part of the composition so editing it changes `vs`, and is not served.
+ * plugin.json is part of the composition with catalogue-only notices removed, and is not served.
  * @param {string} dir
  * @param {PluginManifest} manifest
  * @param {{ rel: string, bytes: number, link?: boolean }[]} listed
@@ -408,7 +417,8 @@ function readUiFrame(dir, manifest, listed, { vanilla, hashCache }) {
   const writes = createHash('sha256').update(canonicalJson({ entry, slots })).digest('hex');
   const composition = {
     id: manifest.id, version: manifest.version,
-    files: Object.fromEntries(shaping.map((rel) => [rel, hashed[rel].sha256])),
+    files: Object.fromEntries(shaping.map((rel) => [rel, rel === PLUGIN_MANIFEST
+      ? nodeSha256(Buffer.from(manifestTextWithoutNotices(readJson(path.join(dir, rel)).json))) : hashed[rel].sha256])),
     writes,
   };
   const bytes = [...served.values()].reduce((n, f) => n + f.bytes, 0);
@@ -467,6 +477,25 @@ export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, whe
     if (isFile(abs) && !inside(dir, abs)) list.problem('PLUGIN_FILE_OUTSIDE', `"${d.at}": ${d.rel} leads out of the plugin folder`, { at: d.at.split('.'), file: d.rel });
   }
   if (!manifest || problems.length) return out(null);
+  const themeFile = manifest.parts.theme;
+  if (themeFile && !themeFile.inline) {
+    if (themeFile.files.length !== 1) list.problem('PLUGIN_PART_SHAPE', '"theme" names more than one file (one theme per plugin)', { at: ['theme'] });
+    else {
+      const rel = themeFile.files[0];
+      const loaded = readJson(path.join(dir, ...rel.split('/')));
+      if (loaded.error) list.problem(loaded.code, `${rel}: ${loaded.error}`, { file: rel, detail: loaded.error });
+      else {
+        const bad = checkJsonLimits(loaded.json);
+        if (bad) list.problem('PLUGIN_JSON_LIMIT', `${rel}: ${bad}`, { file: rel });
+        else {
+          const decl = readThemeDeclaration(loaded.json);
+          for (const p of decl.problems) list.problem(p.code, p.text, { at: p.at });
+          if (decl.vars && Object.keys(decl.vars).length) manifest.themeVars = decl.vars;
+        }
+      }
+    }
+    if (problems.length) return out(null);
+  }
   const status = classStatus(manifest.class);
   /** @type {Record<string, PackFile>} */
   const served = {};
@@ -503,7 +532,9 @@ export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, whe
       plugin.script = readScripts(dir,manifest,files);
       for (const p of plugin.script.problems) list.problem(p.code,p.message,{where:p.path,detail:p.message});
       if (problems.length) return out(null);
-      plugin.content = { ...c.content, files: {...c.content.files,...plugin.script.files}, hash: nodeSha256(Buffer.from(JSON.stringify({...c.content.files,...plugin.script.files}))) };
+      const gameplayFiles = { ...(c.content.gameplayFiles || c.content.files), ...plugin.script.files };
+      plugin.content = { ...c.content, files: {...c.content.files,...plugin.script.files},
+        ...(c.content.gameplayFiles ? { gameplayFiles } : {}), hash: nodeSha256(Buffer.from(JSON.stringify(gameplayFiles))) };
       plugin.script.manifestSource = fs.readFileSync(man,'utf8');
       // Every snapshot byte must be from the pinned lock too, even if an author saves midway through the scan.
       plugin.script.lockValid &&= Object.entries(plugin.content.files).every(([rel,hash]) => plugin.script.lockedFiles[rel]?.sha256 === hash)

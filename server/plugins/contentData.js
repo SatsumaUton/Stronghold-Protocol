@@ -9,6 +9,7 @@ import { validateDsl } from '../sim/content/dsl/validate.js';
 import { operatorMetadataProblems } from '../../shared/plugins/records.js';
 import { compilePluginFxDsl } from './fxRecords.js';
 import { operatorFxProblems } from '../../public/js/render/vfx/pluginFormat.js';
+import { manifestTextWithoutNotices } from '../../shared/plugins/notices.js';
 
 export function readContentData(dir, manifest) {
   const documents = {}, files = {}, problems = [];
@@ -58,5 +59,9 @@ export function readContentData(dir, manifest) {
     // Keep the raw file hashes; only new fx actions change the compiled data the content set serves.
     for (const [rel, doc] of Object.entries(documents)) if (rel !== 'plugin.json' && /"kind"\s*:\s*"plugin"/.test(JSON.stringify(doc))) documents[rel] = compilePluginFxDsl(doc, manifest.id);
   } catch (e) { problems.push(e?.code?.startsWith('PLUGIN_') ? e : problem('PLUGIN_CONTENT_FILE', dir, e.message)); }
-  return { content: problems.length ? null : deepFreeze({ documents, files, hash: nodeSha256(Buffer.from(JSON.stringify(files))) }), problems };
+  // Keep raw files for lock verification. Room identity and stale detection always use the canonical snapshot without notices or personal themes.
+  const source = manifestTextWithoutNotices(documents['plugin.json']);
+  const gameplayFiles = source ? { ...files, 'plugin.json': nodeSha256(Buffer.from(source)) } : files;
+  return { content: problems.length ? null : deepFreeze({ documents, files,
+    ...(source ? { gameplayFiles } : {}), hash: nodeSha256(Buffer.from(JSON.stringify(gameplayFiles))) }), problems };
 }

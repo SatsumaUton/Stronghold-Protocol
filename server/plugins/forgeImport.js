@@ -90,6 +90,13 @@
 //     and the report names the unsupported surfaces (PLUGIN_FORGE_PANEL_SCRIPT). [ASSUMED] 256 KB a file, 1 MB a
 //     panel, 64 files. A supported panel on root.guide that listens for room.state is shown in room.panel; other
 //     supported panels on an unmapped mount use the suggestion slot. Those are not Forge's positions.
+//   * client.theme.vars becomes a cosmetic plugin's theme.vars. Only design tokens this installation defines are kept.
+//     Every other name is listed as dropped. [ASSUMED] At most 64 variables; later keys are dropped. A pack whose only
+//     usable part is its theme is one personal-scope cosmetic. It does not inject a stylesheet.
+//   * pack.json notices (announcement or announcements, and credits) become manifest notices: plain text, not HTML.
+//     [ASSUMED] The announcement title is version, date and summary (80 characters); the body is each section's name
+//     and its items as lines (2000 characters). Credits are their own notice. They are not gameplay. A pack whose only
+//     usable part is notices is one personal-scope cosmetic. Notices also ride on a pack that has other products.
 //   * Several products share the pack id. content keeps it; a cosmetic beside it is <id>-look; a ui plugin is
 //     <id>-<slot>; a lang plugin is <id>-<lang>. --out names the primary folder and its id.
 //   * dependencies / conflicts become requires / conflicts when the id becomes a plugin id. An omitted range is "*".
@@ -110,6 +117,8 @@ import { namespace, namespaceCollides } from '../../shared/plugins/dataUtils.js'
 import { canonicalJson } from '../../shared/plugins/identity.js';
 import { validateSkillSpec } from '../../shared/plugins/skillSpec.js';
 import { canonicalLang, languageName, SOURCE_LANG } from '../../shared/i18nPacks.js';
+import { THEME_VAR_LIMIT, readThemeDeclaration } from '../../shared/plugins/theme.js';
+import { NOTICE_LIMITS, readNotices, isNoticeDate } from '../../shared/plugins/notices.js';
 import { KITS, OPERATOR_KITS, TIER_KITS } from '../sim/content/kits/index.js';
 import { bundleForgeKits } from './forgeKits.js';
 import { planForgeRecords, rewriteForgeIds, rewriteForgeKit } from './forgeRecords.js';
@@ -667,16 +676,129 @@ function textOf(v, depth = 0) {
   return parts.join('\n');
 }
 
-function noticeText(files, used, value) {
+/** Code points, so a sliced title still matches the notice grammar. */
+function sliceChars(s, n) {
+  const chars = [...String(s ?? '')];
+  return chars.length <= n ? chars.join('') : chars.slice(0, n).join('');
+}
+
+/** Drop controls other than newline and tab. A title also loses newlines. */
+function scrubNotice(s, title) {
+  let t = String(s ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+  if (title) t = t.replace(/[\r\n]+/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  return t;
+}
+
+/**
+ * The file a notice field names, or the inline value itself. Marks the file used. Missing paths are dropped.
+ * @returns {{ json: any, text: string, missing?: boolean }}
+ */
+function noticeDoc(files, used, value) {
   if (typeof value === 'string') {
     const found = lookup(files, value);
-    if (!found) return value.trim().slice(0, 800);
+    if (!found) return { json: null, text: value.trim(), missing: true };
     used.add(found);
     const buf = files.get(found);
-    if (extOf(found) === '.json') return textOf(readJsonBuf(buf, found)).slice(0, 800);
-    return buf.toString('utf8').trim().slice(0, 800);
+    if (extOf(found) !== '.json') return { json: null, text: buf.toString('utf8') };
+    const json = readJsonBuf(buf, found);
+    return { json, text: textOf(json) };
   }
-  return textOf(value).slice(0, 800);
+  return { json: value, text: textOf(value) };
+}
+
+function touchNotice(files, used, value) {
+  if (typeof value !== 'string') return;
+  const found = lookup(files, value);
+  if (found) used.add(found);
+}
+
+/** One notice the grammar accepts, or null. */
+function acceptNotice(item) {
+  const read = readNotices([item]);
+  return read.notices && read.notices.length === 1 ? read.notices[0] : null;
+}
+
+/**
+ * Forge announcement.json → one notice. [ASSUMED] title is version · date · summary; body is section names and items.
+ * @param {unknown} doc
+ */
+function announcementFrom(doc) {
+  const src = Array.isArray(doc) ? doc.find((x) => isObj(x)) : doc;
+  if (typeof doc === 'string' || typeof src === 'string') {
+    const body = sliceChars(scrubNotice(typeof doc === 'string' ? doc : src).trim(), NOTICE_LIMITS.body);
+    if (!body.trim()) return null;
+    return acceptNotice({ id: 'announcement', title: '公告', body });
+  }
+  if (!isObj(src)) return null;
+  const version = typeof src.version === 'string' ? scrubNotice(src.version, true) : '';
+  const date = typeof src.date === 'string' && isNoticeDate(src.date.trim()) ? src.date.trim() : '';
+  const summary = typeof src.summary === 'string' ? scrubNotice(src.summary, true) : '';
+  const title = sliceChars([version, date, summary].filter(Boolean).join(' · '), NOTICE_LIMITS.title) || '公告';
+  const lines = [];
+  const sections = Array.isArray(src.sections) ? src.sections : [];
+  for (const sec of sections) {
+    if (!isObj(sec)) continue;
+    const name = typeof sec.name === 'string' ? scrubNotice(sec.name, true) : '';
+    if (name) lines.push(name);
+    const items = Array.isArray(sec.items) ? sec.items : [];
+    for (const item of items) {
+      const line = scrubNotice(typeof item === 'string' ? item : textOf(item)).trim();
+      if (line) lines.push(line);
+    }
+  }
+  let body = lines.join('\n').trim();
+  if (!body) body = summary;
+  body = sliceChars(body, NOTICE_LIMITS.body).trim();
+  if (!body) return null;
+  /** @type {Record<string, unknown>} */
+  const item = { id: 'announcement', title, body };
+  if (date) item.date = date;
+  return acceptNotice(item);
+}
+
+/**
+ * Forge credits.json → one notice. [ASSUMED] Each line is `name — note`, and a url is text on the next line.
+ * The title is translated; the body is the same in every language.
+ * @param {unknown} doc
+ */
+function creditsFrom(doc) {
+  const rows = Array.isArray(doc) ? doc : typeof doc === 'string' ? [doc] : isObj(doc) ? [doc] : [];
+  const lines = [];
+  for (const row of rows) {
+    if (typeof row === 'string') {
+      const t = scrubNotice(row).trim();
+      if (t) lines.push(t);
+      continue;
+    }
+    if (!isObj(row)) continue;
+    const name = typeof row.name === 'string' ? scrubNotice(row.name, true) : '';
+    const note = typeof row.note === 'string' ? scrubNotice(row.note, true) : '';
+    const url = typeof row.url === 'string' ? scrubNotice(row.url, true) : '';
+    let line = name;
+    if (note) line = line ? `${line} — ${note}` : note;
+    if (url) line = line ? `${line}\n${url}` : url;
+    if (line.trim()) lines.push(line.trim());
+  }
+  const body = sliceChars(lines.join('\n').trim(), NOTICE_LIMITS.body);
+  if (!body.trim()) return null;
+  return acceptNotice({
+    id: 'credits', title: '鸣谢', body,
+    i18n: {
+      en: { title: 'Credits', body },
+      ja: { title: 'クレジット', body },
+      ko: { title: '크레딧', body },
+      'zh-TW': { title: '鳴謝', body },
+    },
+  });
+}
+
+/** Why one Forge theme variable was not kept. @param {string} code @param {string} name */
+function themeDrop(code, name) {
+  if (code === 'PLUGIN_THEME_URL') return ['主题变量写了网址，没有导入。', 'A theme variable names a URL, so it was not imported.'];
+  if (code === 'PLUGIN_THEME_NAME') return [`主题变量「${name}」不是本安装的设计变量，没有导入。`, `Theme variable "${name}" is not a design token of this installation, so it was not imported.`];
+  if (code === 'PLUGIN_THEME_VALUE') return [`主题变量「${name}」的值不符合这种变量，没有导入。`, `Theme variable "${name}" has a value this token does not allow, so it was not imported.`];
+  if (code === 'PLUGIN_THEME_LIMIT') return [`主题变量「${name}」超过 64 个的上限，没有导入。`, `Theme variable "${name}" is past the limit of 64, so it was not imported.`];
+  return ['主题变量写不进清单，没有导入。', 'A theme variable does not fit the manifest, so it was not imported.'];
 }
 
 function semverOf(v) {
@@ -992,20 +1114,44 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   const version = semverOf(pack.version) || '0.1.0';
   if (!semverOf(pack.version)) assume('version', `版本「${String(pack.version ?? '').slice(0, 40)}」不是语义化版本，写成 ${version}。`, `Version "${String(pack.version ?? '').slice(0, 40)}" is not semver, so it was written as ${version}.`);
   const packName = typeof pack.name === 'string' && pack.name.trim() ? pack.name.trim().slice(0, 60) : base;
-  let description = typeof pack.description === 'string' ? pack.description.trim().slice(0, 500) : '';
-  let credits = '';
+  const description = typeof pack.description === 'string' ? pack.description.trim().slice(0, 500) : '';
+  // Keep announcement text out of description / credits, which are hashed gameplay manifest metadata.
+  const credits = '';
+  /** @type {Record<string, string> | null} */
+  let themeVars = null;
+  /** @type {NonNullable<ReturnType<typeof readNotices>['notices']>} */
+  const notices = [];
   if (isObj(pack.notices)) {
     try {
-      if (pack.notices.announcements != null) {
-        const t = noticeText(files, used, pack.notices.announcements);
-        if (t) description = `${description}${description ? '\n' : ''}${t}`.slice(0, 500);
+      const notes = pack.notices;
+      const annKey = notes.announcement != null ? 'announcement' : notes.announcements != null ? 'announcements' : null;
+      if (annKey === 'announcement' && notes.announcements != null) {
+        touchNotice(files, used, notes.announcements);
+        skip('notices.announcements', '同时有 announcement 和 announcements，只使用 announcement。', 'Both announcement and announcements are set; only announcement is used.');
       }
-      if (pack.notices.credits != null) credits = noticeText(files, used, pack.notices.credits).slice(0, 500);
+      if (annKey) {
+        const loaded = noticeDoc(files, used, notes[annKey]);
+        const built = loaded.missing ? null : announcementFrom(loaded.json != null ? loaded.json : (loaded.text || null));
+        if (built) notices.push(built);
+        else skip(`notices.${annKey}`, '公告写不成一条纯文本公告，没有写入。', 'The announcement does not become one plain-text notice, so it was not written.');
+      }
+      if (notes.credits != null) {
+        const loaded = noticeDoc(files, used, notes.credits);
+        const built = loaded.missing ? null : creditsFrom(loaded.json != null ? loaded.json : (loaded.text || null));
+        if (built) notices.push(built);
+        else skip('notices.credits', '鸣谢写不成一条纯文本公告，没有写入。', 'The credits do not become one plain-text notice, so they were not written.');
+      }
+      for (const k of Object.keys(notes)) {
+        if (k === 'announcement' || k === 'announcements' || k === 'credits') continue;
+        touchNotice(files, used, notes[k]);
+        skip(`notices.${k}`, '我们的导入器不认识这种公告，没有导入。', 'The importer does not know this notice, so it was not imported.');
+      }
     } catch (e) {
       if (e instanceof ForgeImportError) throw e;
       skip('notices', '公告或鸣谢读不了，没有写入清单。', 'Announcements or credits could not be read, so they were not written into the manifest.');
     }
   }
+  if (notices.length) assume('notices-text', '公告按纯文本导入：标题合并版本、日期与摘要，正文按节换行，鸣谢单独一条；超过 80/2000 字的文字截短。', 'Notices import as plain text: title combines version, date and summary, sections become lines, and credits are separate; titles/bodies are truncated at 80/2000 characters.');
   const authors = typeof pack.author === 'string' && pack.author.trim() ? [pack.author.trim().slice(0, 80)] : [];
   const license = typeof pack.license === 'string' ? pack.license.trim().slice(0, 80) : '';
 
@@ -2321,7 +2467,27 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   const slotUses = new Map();
   if (pack.client != null && !isObj(pack.client)) skip('client', 'client 不是对象，没有导入。', 'client is not an object, so it was not imported.');
   else if (isObj(pack.client)) {
-    for (const k of Object.keys(pack.client)) if (k !== 'panels') skip(`client.${k}`, '除了只读面板，client 里的其他声明不能导入。', 'Apart from a read-only panel, other client declarations cannot be imported.');
+    for (const k of Object.keys(pack.client)) {
+      if (k === 'panels' || k === 'theme') continue;
+      skip(`client.${k}`, '除了只读面板和主题变量，client 里的其他声明不能导入。', 'Apart from a read-only panel and theme variables, other client declarations cannot be imported.');
+    }
+    const theme = pack.client.theme;
+    if (theme != null && !isObj(theme)) skip('client.theme', '主题不是对象，没有导入。', 'The theme is not an object, so it was not imported.');
+    else if (isObj(theme)) {
+      for (const k of Object.keys(theme)) if (k !== 'vars') skip(`client.theme.${k}`, '主题里除了变量，其他声明不能导入。', 'Apart from variables, other theme declarations cannot be imported.');
+      const rawVars = theme.vars;
+      if (rawVars != null && !isObj(rawVars)) skip('client.theme.vars', '主题变量不是对象，没有导入。', 'Theme variables are not an object, so they were not imported.');
+      else if (isObj(rawVars)) {
+        const read = readThemeDeclaration({ vars: rawVars }, { drop: true });
+        themeVars = read.vars && Object.keys(read.vars).length ? read.vars : null;
+        Object.keys(rawVars).forEach((name, i) => {
+          if (themeVars && Object.prototype.hasOwnProperty.call(themeVars, name)) return;
+          const code = i >= THEME_VAR_LIMIT ? 'PLUGIN_THEME_LIMIT' : (readThemeDeclaration({ vars: { [name]: rawVars[name] } }).problems[0]?.code || 'PLUGIN_THEME_VALUE');
+          const [zh, en] = themeDrop(code, name);
+          skip(`client.theme.vars.${name}`, zh, en, code);
+        });
+      }
+    }
   }
   const uiStrings = () => {
     /** @type {Record<string, Record<string, string>>} */
@@ -2367,6 +2533,16 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
       manualPanels.push({ panel: title, mount: forgeSlot, suggestedSlot: where });
       skip(`client.panels:${title}#mount`, `面板「${title}」在 ${forgeSlot} 改写页面组件，需要人工适配为 ${where} 的只读面板。`, `Panel "${title}" at ${forgeSlot} rewrites a component; it needs manual adaptation as a read-only ${where} panel.`, 'PLUGIN_FORGE_MOUNT', 'panels');
       continue;
+    }
+    // a stub panel's stylesheet is not copied (a copied panel carries its styles in its own bundle)
+    if (!compatible) {
+      const styles = Array.isArray(panel.styles) ? panel.styles : typeof panel.styles === 'string' ? [panel.styles] : [];
+      for (const rel of styles) {
+        if (typeof rel !== 'string' || !rel) continue;
+        const found = lookup(files, rel);
+        if (found) used.add(found);
+        skip(`client.panels:${title}#styles`, `面板「${title}」的样式表 ${rel} 没有复制；关掉动画之类的效果需要人工适配。`, `Panel "${title}" stylesheet ${rel} was not copied; effects such as turning animations off need manual adaptation.`, 'PLUGIN_FORGE_PANEL_SCRIPT');
+      }
     }
     if (!display.slot) {
       const suggestedSlot = display.suggested || PANEL_REWRITE[forgeSlot] || 'room.panel';
@@ -2506,9 +2682,11 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   const hasContent = gameplayRecords.length || patches.length || operators.length || enemyRecords.length || contentI18n.length;
   if (hasContent) roles.push('content');
   if (Object.keys(assets).length && (media.size || assets.fx)) roles.push('cosmetic');
+  if (!roles.includes('cosmetic') && themeVars && Object.keys(themeVars).length) roles.push('cosmetic');
   if (scriptPlan) roles.push('script');
   for (const panel of panels) roles.push(panel.role || `ui:${panel.slot}`);
   for (const t of translations.filter((x) => x.kind === 'ui')) roles.push(`lang:${t.lang}`);
+  if (!roles.length && notices.length) roles.push('cosmetic');
 
   // [ASSUMED] A cosmetic has nothing to apply to when every asked portrait / bond / item id belongs to a dropped
   // gameplay record (operators, bonds, bands, items, tokens, traits, kits) and no kept visual key sits outside
@@ -2522,7 +2700,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   for (const bucket of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items', 'skills', 'modules']) if (isObj(assets[bucket])) kept.push(...Object.keys(assets[bucket]));
   const cosmeticBare = asked.length > 0 && asked.every((k) => droppedIds.has(k)) && kept.every((k) => droppedIds.has(k));
 
-  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, gameplayRecords, contentI18n, panels, manualPanels, manualReasons, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare };
+  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, gameplayRecords, contentI18n, panels, manualPanels, manualReasons, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare, themeVars, notices };
   return { meta, roles };
 }
 
@@ -2654,17 +2832,37 @@ function buildProducts(meta, ids, primaryRole) {
     products.push({ id: ids.content, class: 'content', role: 'content', files, imported: meta.importedData, rewritten: meta.rewrittenData, manifest: man });
   }
   if (ids.cosmetic) {
-    const man = manifestCommon(ids.cosmetic, meta, {
-      class: 'cosmetic', scope: ['room', 'personal'], permissions: meta.assetNeed.length ? meta.assetNeed : ['assets.add'], assets: 'assets.json',
-    });
+    // an assets.json part: media, or a media-free assets.fx (Forge silentPhases) — the same test as the cosmetic role
+    const art = (meta.media.size || meta.assets.fx) && Object.keys(meta.assets).length;
+    const theme = meta.themeVars && Object.keys(meta.themeVars).length;
+    /** @type {Record<string, unknown>} */
+    const manExtra = { class: 'cosmetic', scope: art ? ['room', 'personal'] : ['personal'] };
+    if (art) {
+      manExtra.permissions = meta.assetNeed.length ? [...meta.assetNeed] : ['assets.add'];
+      manExtra.assets = 'assets.json';
+    }
+    if (theme) {
+      manExtra.theme = { vars: meta.themeVars };
+      manExtra.permissions = [...(manExtra.permissions || []), 'theme'];
+    }
+    const man = manifestCommon(ids.cosmetic, meta, manExtra);
     const files = new Map();
-    files.set('assets.json', `${JSON.stringify(meta.assets, null, 2)}\n`);
-    for (const [rel, buf] of meta.media) files.set(rel, buf);
-    files.set('README.md', readme(ids.cosmetic, 'cosmetic', ['- 素材在 assets.json 指向的文件里。', '- Spine 的剪辑由 pack 写入 plugin.lock.json，不要手写 anims。']));
-    const imported = meta.cosmeticBare
-      ? ['没有可应用的目标：要套的干员、棋子或道具都没有导入。 (This cosmetic has nothing to apply to.)']
-      : meta.importedAssets;
-    products.push({ id: ids.cosmetic, class: 'cosmetic', role: 'cosmetic', files, imported, rewritten: meta.rewrittenAssets, manifest: man });
+    if (art) {
+      files.set('assets.json', `${JSON.stringify(meta.assets, null, 2)}\n`);
+      for (const [rel, buf] of meta.media) files.set(rel, buf);
+    }
+    const lines = [];
+    if (art) lines.push('- 素材在 assets.json 指向的文件里。', '- Spine 的剪辑由 pack 写入 plugin.lock.json，不要手写 anims。');
+    if (theme) lines.push('- 主题变量在 plugin.json 的 theme.vars。只改这名玩家自己的界面，不注入样式表。');
+    if (!art && !theme) lines.push('- 这份外观只有公告，不改画面。');
+    files.set('README.md', readme(ids.cosmetic, 'cosmetic', lines));
+    const imported = art
+      ? (meta.cosmeticBare
+        ? ['没有可应用的目标：要套的干员、棋子或道具都没有导入。 (This cosmetic has nothing to apply to.)']
+        : [...meta.importedAssets])
+      : [];
+    if (theme) imported.push(`client.theme.vars → theme.vars（${Object.keys(meta.themeVars).join(', ')}）`);
+    products.push({ id: ids.cosmetic, class: 'cosmetic', role: 'cosmetic', files, imported, rewritten: art ? meta.rewrittenAssets : [], manifest: man });
   }
   if (ids.script && meta.script) {
     const man = manifestCommon(ids.script, meta, { class: 'script', scope: ['room'], permissions: ['sim.code'], entry: { sim: 'sim/index.js' } });
@@ -2731,6 +2929,11 @@ function buildProducts(meta, ids, primaryRole) {
   for (const p of products) {
     if (seen.has(p.id)) fail('PLUGIN_FORGE_ID', `two products share the id ${p.id}`);
     seen.add(p.id);
+  }
+  if (meta.notices?.length && products.length) {
+    const host = products.find((p) => p.role === primaryRole) || products[0];
+    host.manifest.notices = meta.notices;
+    for (const n of meta.notices) host.imported.push(`notices → ${n.id}`);
   }
   return { products, primaryRole };
 }
@@ -2989,7 +3192,8 @@ export async function importForge(source, opts = {}) {
         const visual = createVisualSets({ registry });
         for (const p of built.products) {
           if (p.class === 'cosmetic') {
-            const got = visual.resolve([p.id]);
+            const scope = Array.isArray(p.manifest.scope) && p.manifest.scope.includes('room') ? 'room' : 'personal';
+            const got = visual.resolve([p.id], { scope });
             if (!got.ok) issues.push({ code: 'PLUGIN_INVALID', detail: `${p.id}: visual set ${got.error || ''} ${got.detail || ''}`.trim() });
             else if (got.set?.problems?.length || got.set?.warnings?.length) issues.push({ code: 'PLUGIN_INVALID', detail: `${p.id}: visual set ${got.set.problems?.length || 0} problems, ${got.set.warnings?.length || 0} warnings` });
           }

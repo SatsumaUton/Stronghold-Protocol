@@ -33,6 +33,18 @@ const MANIFESTS = [
   ['settings of every type', C({ settings: { on: { type: 'boolean', default: true, label: '开' }, n: { type: 'integer', min: 0, max: 3, step: 1, default: 1 }, x: { type: 'number', min: 0, max: 1 }, e: { type: 'enum', options: ['a', 'b'], default: 'b' } } })],
   ['both asset permissions', C({ permissions: ['assets.override', 'assets.add'] })],
   ['a theme with its permission', C({ permissions: ['assets.override', 'theme'], theme: { '--mint-500': '#f00' } })],
+  ['theme value at the raw length limit', C({ permissions: ['assets.override', 'theme'], theme: { vars: { '--t-fast': '0'.repeat(399) + 's' } } })],
+  ['theme value over the raw length limit', C({ permissions: ['assets.override', 'theme'], theme: { vars: { '--t-fast': '0'.repeat(400) + 's' } } })],
+  ['flat theme over the raw length limit', C({ permissions: ['assets.override', 'theme'], theme: { '--t-fast': '0'.repeat(400) + 's' } })],
+  ['canonical theme variables', C({ permissions: ['assets.override', 'theme'], theme: { vars: { '--text-hi': '#f4faf7', '--t-fast': '0s' } } })],
+  ['unknown theme variable', C({ permissions: ['assets.override', 'theme'], theme: { vars: { '--unknown': '#fff' } } })],
+  ['theme has a mixed wrapper', C({ permissions: ['assets.override', 'theme'], theme: { vars: { '--text-hi': '#fff' }, extra: true } })],
+  ['plain-text notices with translations', C({ notices: [{ id: 'hello', title: 'Hello', body: 'First\nSecond', date: '2026-10-17', i18n: { en: { title: 'Hi', body: 'Text' } } }] })],
+  ['notice title too long', C({ notices: [{ id: 'hello', title: 'x'.repeat(81), body: 'B' }] })],
+  ['notice missing body', C({ notices: [{ id: 'hello', title: 'Hi' }] })],
+  ['notice duplicate ids', C({ notices: [{ id: 'hello', title: 'Hi', body: 'B' }, { id: 'hello', title: 'Hi', body: 'B' }] })],
+  ['notice unknown keys', C({ notices: [{ id: 'hello', title: 'Hi', body: 'B', html: true }] })],
+  ['notice translation unknown keys', C({ notices: [{ id: 'hello', title: 'Hi', body: 'B', i18n: { en: { title: 'Hi', body: 'B', html: true } } }] })],
   ['a content plugin', { manifest: 2, version: '0.1.0', app: '*', api: 1, class: 'content', permissions: ['data.patch', 'data.add'], data: ['data/a.json'], operators: 'ops.json', i18n: { en: 'i18n/en.json' } }],
   ['a content plugin with a DSL operator and a prep file', { manifest: 2, version: '0.1.0', app: '*', api: 1, class: 'content', permissions: ['data.add', 'dsl'], operators: ['operators/a.json'], dsl: ['dsl/income.json'] }],
   ['a prep-only DSL plugin', { manifest: 2, version: '0.1.0', app: '*', api: 1, class: 'content', permissions: ['dsl'], dsl: ['dsl/income.json'] }],
@@ -148,6 +160,14 @@ test('the manifest schema accepts exactly what the checks find clean (no problem
   assert.deepEqual(disagree, []);
   const clean = MANIFESTS.filter(([, m]) => !v.validate('plugin.schema.json', m).length).length;
   assert.ok(clean >= 10 && MANIFESTS.length - clean >= 30, `${clean} valid, ${MANIFESTS.length - clean} broken fixtures`);
+});
+
+test('the manifest schema bounds raw theme strings in both accepted map shapes', () => {
+  for (const wrapped of [false, true]) for (const length of [400, 401]) {
+    const vars = { '--t-fast': '0'.repeat(length - 1) + 's' };
+    const m = C({ permissions: ['assets.override', 'theme'], theme: wrapped ? { vars } : vars });
+    assert.equal(v.validate('plugin.schema.json', m).length === 0, length === 400);
+  }
 });
 
 test('the overlay schema accepts exactly what the checks find clean (no problem, no warning)', () => {

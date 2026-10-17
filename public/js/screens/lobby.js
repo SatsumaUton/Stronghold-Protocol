@@ -28,6 +28,7 @@ import { net, identity } from '../net.js';
 import { store, useStore, shallowEqual, loadPref, savePref } from '../store.js';
 import { getConfig, getMode, getStage, useData } from '../data.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
+import { NoticesButton } from '../ui/notices.js';
 
 /** Official mode texts (activity_table act2autochess.modeDataDict), fallback when config.json is absent. */
 export const MODE_TEXT = {
@@ -335,6 +336,7 @@ export function LobbyScreen() {
         <${PingPill} ms=${conn.ping} online=${online} />
         <span class="topbar__sep" aria-hidden="true"></span>
         <div class="topbar__tools">
+          <${NoticesButton} />
           <${SettingsButton} class="lobby-settings" variant="secondary" square=${true} />
           <${GuideButton} class="lobby-guide" variant="secondary" square=${true} />
           <${PwaInstallButton} class="lobby-pwa" square=${true} />

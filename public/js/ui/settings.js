@@ -34,7 +34,8 @@ import { LangToggle, machineTranslationNote } from './lang.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
 import { errorCount, currentBattle, diagnosticsText } from '../diag.js';
 import { copyText } from './clipboard.js';
-import { catalog, loadCatalog, cosmeticPlugins, installedCount, personal, personalApplied, personalSet, pluginName, setPersonalPlugin } from '../content.js';
+import { catalog, loadCatalog, cosmeticPlugins, installedCount, isPersonalCosmetic, personal, personalApplied, personalSet, pluginName, setPersonalPlugin } from '../content.js';
+import { resolveThemeVars, themeVarsOf } from '../../../shared/plugins/theme.js';
 import { setUiPlugin, uiPluginEntries, uiPlugins } from './uiPlugins.js';
 import { UI_LIMITS } from '../../../shared/plugins/ui.js';
 import { toast, describeError } from './toasts.js';
@@ -272,17 +273,23 @@ function CosmeticSection() {
   const ids = useStore((s) => s.ids, Object.is, personal);
   const installed = useStore(installedCount);
   useEffect(() => { if (installed) loadCatalog({ force: true }); }, [installed]);
-  const list = installed ? cosmeticPlugins(cat.plugins, 'personal') : [];
+  const entries = installed ? cosmeticPlugins(cat.plugins, 'personal') : [];
+  const list = entries.filter(isPersonalCosmetic);
   if (!list.length) return null;
-  const set = personalSet(ids, list.filter((p) => typeof p.vs === 'string'));
+  const set = personalSet(ids, entries);
   const applied = new Set(set.order);
   const auto = new Set(set.auto);
+  const winners = resolveThemeVars(set.order.map((id) => {
+    const p = entries.find((x) => x.id === id);
+    return { id, vars: themeVarsOf(p) };
+  }));
   const flip = (id, on) => { const r = setPersonalPlugin(id, on); if ('error' in r) toast(describeError(r.error), 'warn'); };
   return html`<section class="set-plugins" aria-labelledby="set-plugins-title" data-testid="personal-plugins">
     <div class="set-keys__head">
       <span class="set-row__label" id="set-plugins-title">${t('外观插件')}<${MicroLabel}>COSMETIC PLUGINS<//></span>
     </div>
     <p class="set-hint">${t('只改变你自己看到的画面和声音，不影响其他博士，也不影响战斗；插件为非官方制作。')}</p>
+    ${winners.map((w) => html`<p key=${w.name} class="set-hint set-theme-win">${t('{token} 由「{name}」生效', { token: w.name, name: pluginName(list.find((p) => p.id === w.pluginId) || { id: w.pluginId }) })}</p>`)}
     ${list.map((p) => {
       // on: applied (chosen, or 「自动」: another one needs it) — or chosen but left out now (a conflict): switch it off
       const skipped = set.skipped.includes(p.id);
