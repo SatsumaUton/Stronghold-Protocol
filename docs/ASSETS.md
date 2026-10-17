@@ -232,6 +232,38 @@ The research JSONs in `docs/research/` (03, 05, 07) define **which** ids are nee
 
 The `stem` of a Spine model is the upstream file name. Two examples: `char_107_liskam` has the stem `char_107_liskarm`, and `enemy_9032_aclionk` uses `enemy_1559_vtlionk`. The skel and atlas of a model always share one stem. pixi-spine locates the atlas by swapping the extension, so this matters.
 
+### Re-extracting scenes after an update
+
+Scene extraction version **4** removes complete, exact redundant renderers (GitHub #684, DESIGN §34.24).
+The official Android `26-04-13-12-31-42_e9b560` m03 scene contains both a base rock (renderer 2048) and its
+`HIDDEN@1` copy (2193); static batching gives the base a different mesh buffer and lightmap UVs. **[ASSUMED]**
+The maintainer's 2026-10-17 correction keeps the normal bake: all submeshes, oriented triangles, UV0, colours,
+materials/textures, extra UV channels and other renderer state must agree; world matrices, positions, normals
+and tangents use an absolute
+`1e-6` tolerance for float32 baking. Partial overlaps and different objects stay. A surviving renderer must also
+cover the removed copy's visibility (the same group or the always-visible base). Bake preference and stable-id
+ties are described in §34.24; deletion is a remake art correction, not an official activation rule.
+
+After updating, run `node tools/setup.mjs --scenes`, or answer a typed **yes** to setup's existing version-only
+re-extraction prompt. Version-3 scenes still load but contain the redundant geometry; replacing code alone does
+not repair already extracted files. A missing-scene/partial set retains the existing explicit `--scenes` / `--yes`
+gate. `scene.json` mesh version remains 1; the manifest's `scene` record is version 4.
+
+For inspection without replacing installed assets, the local extractor already supports **both** output options:
+
+```sh
+.venv-extract/bin/python -I -B tools/local-extract/extract.py --only scene \
+  --out /tmp/grok-r48-p2/scene-extract/local \
+  --manifest /tmp/grok-r48-p2/scene-extract/local-assets.json
+```
+
+Use the project's existing extractor venv (on Windows, `.venv-extract/Scripts/python.exe`). `--game <AB root>`
+overrides the local-install discovery (including the configured CrossOver Arknights bottle); `--scenes <AB root>`
+overrides the archived scene-bundle search before `.cache/official-scenes/*`. **Both** `--out` and `--manifest`
+must point into scratch: `--out` alone still writes the default `data/local-assets.json`. Each scene logs its
+drop count, and every deletion names both renderer ids, object paths, groups and triangle count. These files
+remain local; no official scene bytes belong in git or fixtures.
+
 ### Id scope
 
 - **Operators:** all 138 pool charIds from `activity_table` (`charShopChessDatas[*].charId ∪ backupCharId`), including hidden chess and backup operators; plus every unit of `data/backups.json` research 07 does not list — the 72 自选 owned-6★ picks (`diy.ownedPool`, DATA.md §18; the collab operators are not in the data, and 焰狐龙梓兰's entries left the manifest when she left the pool in 0.2.0) — planned from 07's URL patterns (`tools/assets/plan.mjs patternOperator`, `tools/fetch-assets.mjs dataExtras`): avatar and portrait (E0–E1 and E2), the default-skin battle Spine Front / Back, the icon and skill sound of each skill, the sub-profession icon. 209 operators in all (206 with a Back model).

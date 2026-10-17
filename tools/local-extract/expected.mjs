@@ -89,10 +89,10 @@ export const EXPECTED_LOCAL_GROUPS = Object.freeze([
 
 // Manifest `scene` record version (kind Scene on each scene/<stageId> group). scene.json's mesh version stays 1.
 // An extracted record whose version is not this one is stale: setup asks once (DESIGN §34.12).
-// 3 writes emission maps lossless; a version-2 extract (normal and gloss only) is stale.
+// 4 removes exact redundant scene renderers (#684); older extracts still contain the source duplicates.
 // [ASSUMED] A group with no kind:Scene record is not a version problem (the group-key check still applies).
 export const EXPECTED_SCENE = Object.freeze({
-  version: 3,
+  version: 4,
 });
 
 export const EXPECTED_FX = Object.freeze({
