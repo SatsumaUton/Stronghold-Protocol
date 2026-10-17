@@ -5,8 +5,9 @@ import { get, post } from './api.js';
 import { errorText } from './issues.js';
 import { validateDraft } from './validateDraft.js';
 import { editorOf } from './editors/index.js';
+import { SlotCard } from './slots.js';
 
-export function Authoring({ state, busy, onSave, onDraft, initialDraft }) {
+export function Authoring({ state, busy, onSave, onDraft, initialDraft, slotActions }) {
   const [draft, setDraft] = useState(initialDraft || { ...state.authoring, id: state.id });
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState('');
@@ -26,7 +27,7 @@ export function Authoring({ state, busy, onSave, onDraft, initialDraft }) {
     finally { setSaving(false); }
   };
   return html`<section class="st-authoring" data-testid="authoring">
-    ${Component ? html`<${Component} draft=${draft} state=${state} onChange=${change} />` : null}
+    ${Component ? html`<${Component} draft=${draft} state=${state} onChange=${change} slotActions=${slotActions} SlotComponent=${SlotCard} busy=${busy || saving || dirty} />` : null}
     ${failure ? html`<p class="st-error" data-testid="authoring-error">${failure}</p>` : null}
     ${draft.template !== 'script' ? html`<${Button} variant="primary" data-testid="save-wizard" disabled=${busy || saving || !dirty} loading=${busy || saving} onClick=${save}>${t('保存修改')}<//>` : null}
   </section>`;

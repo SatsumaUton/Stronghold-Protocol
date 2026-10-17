@@ -3,18 +3,18 @@ import fs from 'node:fs';
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sandboxProcessOptions } from '../match/host/childHost.js';
-import { isPackPath } from '../../shared/plugins/manifest.js';
 import path from 'node:path';
 import { createPluginRegistry, readPluginFolder } from '../plugins/registry.js';
 import { buildContentSet } from '../plugins/contentSet.js';
 import { checkPluginFolder } from '../plugins/pack.js';
 import { createPluginFiles, StudioError } from './files.js';
-import { createAuthoring, mergeAuthorManifest } from './authoring.js';
-import { manifestText } from './templates/index.js';
+import { createAuthoring } from './authoring.js';
+import { stageAuthorDependencies } from './gameplayCheck.js';
 import { writeTrialDraftFile } from './trialDraft.js';
 import { scriptExecution } from '../../shared/plugins/scriptLoad.js';
 import { chooseOperator, baselineOperator, trialScenario } from './trialScenario.js';
 import { addFxReplay } from './fxReplay.js';
+import { GAMEPLAY_TEMPLATES } from '../../public/studio/js/gameplayModel.js';
 
 const quiet = { info() {}, warn() {}, error() {}, log() {} };
 const issue = p => ({ level: 'problem', code: p.code || 'PLUGIN_INVALID', text: p.message || p.zh || p.text || '', file: p.file,
@@ -34,19 +34,15 @@ process.once('message', async ({ dirs, request, allowedScripts, temporary, heapM
     let draft = null;
     if (request.draft) {
       const originalManifest = JSON.parse(fs.readFileSync(files.stat(request.id, 'plugin.json').abs, 'utf8'));
-      if (originalManifest.class !== 'content' || !['numbers','operator','dsl','meta','mode'].includes(request.draft.template)) throw new StudioError('PLUGIN_STUDIO_REQUEST', 400);
-      const made = authored.generate(request.id, request.draft, originalManifest);
+      if (originalManifest.class !== 'content' || !['numbers','operator','dsl','meta','mode', ...GAMEPLAY_TEMPLATES].includes(request.draft.template)) throw new StudioError('PLUGIN_STUDIO_REQUEST', 400);
+      // The copied folder is checked and the full dependency set composed below, before any simulation.
+      const made = authored.prepare(request.id, request.draft, { validate: false, allowUntracked: true });
       if (!temporary) throw new StudioError('PLUGIN_STUDIO_TRIAL_FAILED', 500);
       const dir = path.join(temporary, request.id); fs.mkdirSync(dir);
-      for (const f of files.list(request.id)) {
-        if (f.link || !isPackPath(f.rel) || path.isAbsolute(f.rel)) throw new StudioError('PLUGIN_STUDIO_PATH', 403, { detail: f.rel });
-        if (f.rel === 'plugin.lock.json') continue;
-        const target = path.join(dir, f.rel);
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.copyFileSync(files.stat(request.id, f.rel).abs, target);
+      for (const [rel, text] of Object.entries(made.files)) {
+        if (rel !== 'plugin.lock.json') writeTrialDraftFile(dir, rel, text);
       }
-      fs.writeFileSync(path.join(dir, 'plugin.json'), manifestText(mergeAuthorManifest(originalManifest, made.manifest, request.draft.template)));
-      for (const [rel, text] of Object.entries(made.files)) writeTrialDraftFile(dir, rel, text);
+      stageAuthorDependencies(temporary, request.id, made.manifest, { dataDir: dirs.dataDir, pluginsDir: dirs.pluginsDir });
       draft = readPluginFolder(dir, { vanilla: registry.vanillaAssets() });
       const check = checkPluginFolder(dir, undefined, { vanilla: registry.vanillaAssets(), dataDir: dirs.dataDir });
       if (check.problems.length) { reply({ ok: false, issues: check.issues }); return; }
@@ -79,7 +75,9 @@ process.once('message', async ({ dirs, request, allowedScripts, temporary, heapM
     const set = buildContentSet({ registry: view, ids: [{ id: request.id, settings: request.settings }] });
     if (!set.cs) { reply({ ok: false, issues: set.problems.map(issue) }); return; }
     const newOp = Object.values(set.data.chess).find(r => !r.isGolden && !base.data.chess[r.chessId]);
-    const op = request.operator ? chooseOperator(set.data, request.operator) : newOp || chooseOperator(set.data);
+    const wizard = request.draft || authored.read(request.id);
+    const member = wizard?.template === 'bond' ? wizard.options.members?.[0] : wizard?.template === 'trait' ? wizard.options.charId || wizard.target?.replace(/^operator:/, '') : null;
+    const op = request.operator ? chooseOperator(set.data, request.operator) : member ? chooseOperator(set.data, member) : newOp || chooseOperator(set.data);
     const opponent = chooseOperator(set.data, request.opponent);
     const original = baselineOperator(base.data, op);
     const originalOpponent = baselineOperator(base.data, opponent);
@@ -95,7 +93,7 @@ process.once('message', async ({ dirs, request, allowedScripts, temporary, heapM
       runner.once('message', resolve);
       runner.once('error', reject);
       runner.once('exit', () => reject(new StudioError('PLUGIN_STUDIO_TRIAL_FAILED', 500)));
-      runner.send({ base, set, baseScene, modScene, original, op });
+      runner.send({ base, set, baseScene, modScene, original, op, request, wizard: wizard ? { ...wizard, id: request.id } : null });
     });
     reply(addFxReplay(result, view, request.id, set.data, files));
   } catch (e) { reply({ ok: false, issues: [issue({ code: e.code?.startsWith('PLUGIN_') ? e.code : 'PLUGIN_STUDIO_TRIAL_FAILED', params: e.params })] }); }

@@ -12,6 +12,11 @@ export const KIND_LABELS = Object.freeze({
 
 /** Templates (server/studio/templates/): title, one line on what it does. */
 export const TEMPLATE_LABELS = Object.freeze({
+  bond: { title: N_('新盟约'), line: N_('选择成员、门槛、图标与准备及战斗效果。') },
+  item: { title: N_('新道具'), line: N_('借用官方效果，填写价格与普通精锐配对。') },
+  trait: { title: N_('干员特质'), line: N_('编辑战斗与准备钩子，明确选择是否替换官方特质。') },
+  offers: { title: N_('交互窗口'), line: N_('填写选项池、时机、刷新次数与奖励。') },
+  rules: { title: N_('规则开关'), line: N_('选择商店、备战调配、变形同构体和卸装规则。') },
   numbers: { title: N_('改数值'), line: N_('按官方名字选目标，修改属性与黑板数值。') },
   operator: { title: N_('新干员'), line: N_('填写属性，选择技能来源，自动生成普通与精锐卡。') },
   dsl: { title: N_('DSL 技能 / 天赋'), line: N_('用下拉选项组合触发器、条件与动作。') },
