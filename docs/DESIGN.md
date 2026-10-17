@@ -43,3 +43,6 @@ normative lines it rewrote).
 | §34 | [history/0.3.1.md](history/0.3.1.md) | 0.3.1 — after the 0.3.0 release (2026-10-16): the effects audit's R18–R21, Forge import U1–U6, settings, Spine skill loops, lingering areas and standing effects under the official effects, 阻隔工事's client model (#663), the test console, 高台 placement in every language (#676), skill attack sounds by mode (#679), local-extract checks (#665), lossless scene maps and emission (#658) |
 
 凯瑟琳's once-per-player/match 突变细胞 offer limit (#677): [§34.22](history/0.3.1.md#3422-cathys-cell-is-once-per-player-per-match-github-677), current rule in [§6.4](design/match.md#64-prep-phase-effect-dispatcher-effectsmetajs). Source: maintainer decision 2026-10-17 (official play memory). [ASSUMED] Only a successful pick counts; 昆图斯's separate cell grant is independent.
+Inherited `effectRef` strategies share Cathy's source and allowance (§32.5). After a cell is taken, fresh offers filter
+it before sampling distinct eligible items without replacement, stopping only at the requested count or pool exhaustion
+[ASSUMED]; the official `aceffect_band_26` requests three choices and one pick.

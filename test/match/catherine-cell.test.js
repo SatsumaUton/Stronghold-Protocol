@@ -8,15 +8,19 @@ import { Match } from '../../server/match/Match.js';
 import { VirtualScheduler } from '../../server/match/scheduler.js';
 import { replayTestMatch } from '../../server/match/testReplay.js';
 import { botPrepBeginSteps } from '../../server/match/bot.js';
+import { createRegistry } from '../../server/match/effectsMeta.js';
+import { setGameData } from '../../server/sim/content/support/index.js';
+import { createRng } from '../../server/sim/rng.js';
 
 const CELL = 'chess_item_5_08_e_a';
+const CELL_TAKEN = 'band:cathy:cellTaken';
 const OK = { ok: true };
 const idsOf = (offer) => offer.slots.map((s) => s.id);
 const cellIndex = (offer) => offer.slots.findIndex((s) => s.id === CELL);
 const cellsOwned = (ps) => [...ps.hand, ...ps.temp].filter((p) => p?.id === CELL).length;
 
-function fixture(t, seed = 236) {
-  const h = makeMatch({ mode: 'solo', seed, fake: true }).start().toPrep(1, { band: 'band_cathy' });
+function fixture(t, seed = 236, opts = {}) {
+  const h = makeMatch({ mode: 'solo', seed, fake: true, ...opts }).start().toPrep(1, { band: 'band_cathy' });
   t.after(() => h.m.dispose());
   const ps = h.ps('p_0');
   ps.funds = 999;
@@ -110,7 +114,92 @@ test('the bot reward routine uses the same Cathy allowance', (t) => {
   const steps = botPrepBeginSteps(h.m, h.ps);
   steps.next(); steps.return(); // First step resolves offers through the real bot routine.
   assert.equal(cellsOwned(h.ps), 1);
-  for (let level = 3; level <= 6; level++) assert.ok(!idsOf(h.upgrade()).includes(CELL));
+  assert.equal(h.ps.counters[CELL_TAKEN], 1, 'the bot records the successful Cathy pick');
+  // Force the next draw to contain a cell unless the allowance excludes it; no lucky later seeds.
+  h.m.itemPool.canGain = (id) => id === CELL;
+  assert.deepEqual(h.ps.levelUp(), OK);
+  assert.equal(h.ps.offers.length, 0, 'the bot cannot receive a second cell even from a cell-only pool');
+});
+
+test('inherited Cathy effects share the canonical source, queued offers and match-long allowance', (t) => {
+  const alias = 'band_x_test_cathy';
+  const data = { ...DATA, bands: { ...DATA.bands,
+    [alias]: { ...structuredClone(DATA.bands.band_cathy), bandId: alias, effectRef: 'band_cathy' },
+  } };
+  setGameData(data);
+  t.after(() => setGameData(null));
+  const h = fixture(t, 236, { data, registry: createRegistry() });
+  h.ps.bandId = alias;
+  assert.equal(h.upgrade().source, 'band:band_cathy');
+  assert.ok(idsOf(h.upgrade()).includes(CELL), 'another inherited offer is queued before the pick');
+  h.pickCell();
+  assert.equal(h.ps.counters[CELL_TAKEN], 1);
+  assert.ok(h.ps.offers.every((o) => !idsOf(o).includes(CELL)), 'queued inherited offers lose the cell');
+  h.ps.bandId = 'band_cathy';
+  assert.ok(!idsOf(h.upgrade()).includes(CELL), 'the original strategy shares the inherited allowance');
+  h.ps.bandId = alias;
+  assert.ok(!idsOf(h.upgrade()).includes(CELL), 'the inherited strategy still excludes the cell');
+  assert.equal(cellsOwned(h.ps), 1);
+});
+
+test('Cathy fills all three eligible choices after excluding the cell, across 300 seeds', (t) => {
+  const h = fixture(t);
+  h.upgrade(); h.pickCell();
+  const shopIds = Object.values(h.m.gd.shopItemsByTier).flat();
+  const eligible = shopIds.slice(0, 3);
+  for (const id of shopIds.filter((id) => !eligible.includes(id))) {
+    for (let copies = 0; copies < 30 && h.m.itemPool.canGain(id); copies++) {
+      assert.ok(h.ps.acquireItem(id, { toTemp: true, silent: true }));
+    }
+    assert.equal(h.m.itemPool.canGain(id), false, `stock exhausted: ${id}`);
+  }
+  assert.deepEqual(shopIds.filter((id) => h.m.itemPool.canGain(id)), eligible);
+  assert.ok(h.m.itemPool.canGain(CELL), 'the uncapped cell stays available in the underlying pool');
+  for (let seed = 1; seed <= 300; seed++) {
+    h.ps.offers = [];
+    h.m.rngMeta = createRng(seed);
+    h.m.dispatch(h.ps, 'onLevelUp', {});
+    assert.deepEqual(idsOf(h.ps.offers[0]).sort(), [...eligible].sort(), `seed ${seed}: all eligible items`);
+  }
+});
+
+test('Cathy samples eligible choices without replacement and stops only at exhaustion [ASSUMED]', (t) => {
+  const h = fixture(t);
+  h.upgrade(); h.pickCell();
+  const shopIds = Object.values(h.m.gd.shopItemsByTier).flat();
+  for (const count of [3, 2, 1, 0]) {
+    const eligible = shopIds.slice(0, count);
+    h.m.itemPool.canGain = (id) => id === CELL || eligible.includes(id);
+    h.ps.offers = [];
+    let draws = 0;
+    h.m.rngMeta = () => { draws++; return 0; }; // Repeated identical rolls must still draw distinct candidates.
+    h.m.dispatch(h.ps, 'onLevelUp', {});
+    assert.deepEqual(h.ps.offers.flatMap(idsOf), eligible, `${count} eligible choices`);
+    assert.equal(draws, count, 'excluded/previously selected items consume no random draws');
+  }
+});
+
+test('item-pool exclusions filter explicit items, weights, tiers and also before sampling', (t) => {
+  const keep = 'chess_item_1_02_e_a', blocked = 'chess_item_1_01_e_a';
+  const pools = {
+    test_items: { kind: 'equip', items: [blocked, keep], also: [CELL] },
+    test_weights: { kind: 'equip', weighted: [[blocked, 100], [keep, 1]], also: [CELL] },
+    test_tiers: { kind: 'equip', tiers: [1], also: [CELL] },
+    test_shop_level: { kind: 'equip', maxTier: 'shopLevel', also: [CELL] },
+    test_also_only: { kind: 'equip', items: [blocked], also: [keep, CELL] },
+  };
+  const data = { ...DATA, choices: { ...DATA.choices, pools: { ...DATA.choices.pools, ...pools } } };
+  const h = fixture(t, 236, { data });
+  h.m.itemPool.canGain = (id) => [keep, blocked, CELL].includes(id);
+  let draws = 0;
+  h.m.rngMeta = () => { draws++; return 0; };
+  for (const pool of Object.keys(pools)) {
+    assert.deepEqual(h.m.rollPool(pool, { shopLevel: 1, exclude: [blocked, CELL] }), { kind: 'item', id: keep }, pool);
+    assert.equal(h.m.rollItemId({ pool, exclude: [blocked, keep, CELL] }), null, `${pool}: exhausted`);
+  }
+  assert.equal(h.m.rollItemId({ tier: 1, exclude: [blocked] }), keep, 'plain tier draws filter too');
+  assert.equal(h.m.rollItemId({ maxTier: 1, exclude: [blocked, keep] }), null, 'plain max-tier draw exhausted');
+  assert.equal(draws, Object.keys(pools).length + 1, 'empty candidates draw no RNG');
 });
 
 test('the Cathy allowance belongs to the player, even when the cell is the only available item', (t) => {

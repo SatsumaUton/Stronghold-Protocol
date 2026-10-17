@@ -36,7 +36,7 @@
 import { GEO } from '../../../../shared/constants.js';
 import { bbCap } from '../../../../shared/plugins/officialBounds.js';
 import { burstLimit } from '../../../../shared/plugins/steps.js';
-import { buffsOf, num, bandRecord, gameData } from '../support/index.js';
+import { buffsOf, num, bandRecord, bandEffectId, gameData } from '../support/index.js';
 import { metaBonds } from '../support/meta.js';
 import * as garrisons from '../garrisons.js';
 
@@ -67,10 +67,20 @@ const chessSlots = (ctx) => ctx.shopSlots().map((s, i) => (s && s.kind === 'ches
 /** Up to `n` distinct item ids of an equip pool. */
 function rollItems(ctx, poolId, n, exclude = []) {
   const out = [];
+  if (exclude.length) {
+    // [ASSUMED] After Cathy's allowance is used, sample eligible items without replacement, up to count (official
+    // aceffect_band_26). Filter before drawing so forbidden/repeated ids cannot underfill a fresh offer.
+    for (let k = 0; k < n; k++) {
+      const r = ctx.rollPool(poolId, { exclude: [...exclude, ...out] });
+      if (!r || r.kind !== 'item') break;
+      out.push(r.id);
+    }
+    return out;
+  }
   for (let k = 0; k < n * 6 && out.length < n; k++) {
     const r = ctx.rollPool(poolId);
     if (!r || r.kind !== 'item') break;
-    if (!out.includes(r.id) && !exclude.includes(r.id)) out.push(r.id);
+    if (!out.includes(r.id)) out.push(r.id);
   }
   return out;
 }
@@ -277,7 +287,8 @@ K.round_start_bond_check_gain_layer = (ps) => ({
 K.up_shop_add_special_goods = (ps, bandId) => ({
   onLevelUp(ctx) {
     const p = ps[0];
-    const cathy = bandId === 'band_cathy';
+    // effectRef inherits the behaviour (DESIGN §32.5); concrete parameters still come from this band's buffs.
+    const cathy = bandEffectId(bandId) === 'band_cathy';
     const exclude = cathy && ctx.counter('band:cathy:cellTaken') ? ['chess_item_5_08_e_a'] : [];
     const ids = rollItems(ctx, p.pool, timesOf(p.count, 3), exclude);
     if (ids.length) ctx.offerItems(ids, { source: cathy ? 'band:band_cathy' : 'band' });

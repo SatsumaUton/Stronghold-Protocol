@@ -98,6 +98,12 @@ shown but declined or a refused pick leaves the allowance available. 昆图斯's
 also removes it from already queued Cathy offers without rerolling their other choices; empty offers are dropped.
 The state survives round changes, item destruction, reconnects and test-console strategy switches; bots and test
 replays use the same player methods.
+Strategies inheriting Cathy through `effectRef` resolve their behaviour with `bandEffectId` (the content inheritance
+contract, §32.5), tag offers with the same `band:band_cathy` source, and share this player counter with Cathy.
+[ASSUMED] Once the allowance is used, filter the cell out before drawing and sample eligible items without replacement
+until the requested count is reached or candidates are exhausted; no retry budget may shorten a fresh filtered offer.
+This filtering includes pool `also` items and respects shared stock and explicit pool weights. Queued offers still
+only lose their cell, as described above.
 
 ### 6.5 Waves (waves.js)
 
