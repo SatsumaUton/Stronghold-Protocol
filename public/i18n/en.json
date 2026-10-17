@@ -2128,5 +2128,11 @@
   "未持久保存：存储空间不足时，浏览器可能清掉导入的素材。": "Not kept: the browser may delete imported assets when storage is low.",
   "浏览器没有同意。Chrome 和 Edge 会根据本站的使用情况自行决定，常用或安装为应用后更容易同意，可以之后再试。": "The browser said no. Chrome and Edge decide from how you use this site, and agree more readily once you use it often or install it as an app. You can try again later.",
   "需要通过 https 或 localhost 打开本站，才能申请持久保存。": "Open this site over https or localhost to ask for persistent storage.",
-  "这个浏览器不支持持久保存。": "This browser does not support persistent storage."
+  "这个浏览器不支持持久保存。": "This browser does not support persistent storage.",
+  "清理旧版本素材": "Clear old assets",
+  "清理": "Clear",
+  "删除这台浏览器里、当前服务器版本已经用不到的导入素材；仍在使用的会保留。": "Delete the imported assets in this browser that this server's current version no longer uses; the ones still in use stay.",
+  "已清理 {n} 个旧版本文件。": "Cleared {n} old-version files.",
+  "没有需要清理的旧版本文件。": "No old-version files to clear.",
+  "读不到服务器的素材清单，没有删除任何文件。": "Could not read the server's asset lists; nothing was deleted."
 }
