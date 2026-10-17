@@ -402,8 +402,8 @@ export const PLUGIN_ERRORS = Object.freeze({
   },
   PLUGIN_ASSET_KEY: {
     level: 'problem', doc: D.cosmetic,
-    zh: '「{where}」不是素材条目的名字', en: '“{where}” is not the name of an asset entry',
-    fix: { zh: '条目名是干员、敌人等的内部 id（例如 char_102_texas，只有字母、数字、_ . / -）。在工作台按官方名字搜索，就不用自己找 id。', en: 'An entry is named by an internal id such as char_102_texas (letters, digits, _ . / -). The studio finds it by its official name.' },
+    zh: '「{where}」不是这个位置能用的键名', en: '“{where}” is not a key this place takes',
+    fix: { zh: '键名怎么写由它所在的位置决定：容器的键是条目的内部 id（字母、数字、_ . / -，例如 char_102_texas）；`skins` 这一层的键额外允许 @ # +，最多 64 个字符（条目的键最多 128 个）。照抄本安装清单里的名字，或按这个字符集取一个新名字。', en: 'The place decides the shape of a key: a container key is an entry\'s internal id (letters, digits, _ . / -, e.g. char_102_texas); a key of the `skins` map also allows @ # + and is at most 64 characters (an entry key takes up to 128). Copy a name from this installation\'s manifest, or make a new one within that character set.' },
   },
   PLUGIN_ASSET_IGNORED: {
     level: 'warning', doc: D.cosmetic, autofix: 'dropAsset',

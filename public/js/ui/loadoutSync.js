@@ -1,20 +1,24 @@
-// Operator loadout + ownership + 自选编队 state and server sync (DESIGN §16; 干员持有 — 0.2.0 补位; 自选编队 — 0.2.0 DIY).
+// Operator loadout + ownership + 自选编队 + 干员皮肤 state and server sync (DESIGN §16; 干员持有 — 0.2.0 补位; 自选编队 —
+// 0.2.0 DIY; 干员皮肤 — docs/SKINS.md).
 //
 // `loadoutStore` holds the per-browser loadout (`entries`, persisted in localStorage through store.js savePref), the
 // per-browser not-owned list of the 干员持有 tab (`notOwned`, likewise), the 自选编队 picks (`diy`, likewise; with
 // `diyKitted` = the operators the server lets a DIY slot field, from every `welcome`) and the overlay's screen state
-// (open / origin / tab / selection / filters). `installLoadoutSync()` / `installOwnershipSync()` / `installDiySync()`
-// (called once by main.js) keep the server's copies current — one sync engine (installPrefSync), three settings: after
-// every `welcome` (new or resumed
+// (open / origin / tab / selection / filters). `installLoadoutSync()` / `installOwnershipSync()` / `installDiySync()` /
+// `installSkinsSync()` (called once by main.js) keep the server's copies current — one sync engine (installPrefSync),
+// four settings: after every `welcome` (new or resumed
 // session — the server keeps them on the session and on the seat, so joining a room needs no resend) and after every
 // edit (debounced; a pending edit goes out at once when the overlay closes), they send `room.loadout { entries, ops }`
 // (sanitised against the loaded data/chess.json: ui/loadoutModel.js sanitizeEntries — a stale entry is dropped, never
 // the whole loadout; `ops` = the per-operator 潜能 / 练度 of 0.2.2, sanitizeOps against chess.json + backups.json), `room.ownership { notOwned }` (sent as stored: the server keeps the droppable chess and drops
-// the rest, so no data is needed) and `room.diy { picks }` (sent as stored, structurally clean: the server keeps the
-// legal picks). Replies: RATE → retried later; WRONG_PHASE / ROOM_STARTED → the running match keeps what it took (the
-// loadout locks when INFO_CHECK ends; the ownership and the 自选 picks never change during a match) — stored for the
-// next match, not an error for the player; anything else is logged. `sync` / `ownSync` / `diySync` ∈ 'idle' |
-// 'pending' | 'sending' | 'synced' | 'locked' | 'error' are mirrored into the store for the screen's status line.
+// the rest, so no data is needed), `room.diy { picks }` (sent as stored, structurally clean: the server keeps the
+// legal picks) and `room.skins { skins }` (ui/skins.js' own store; sent as stored, since an appearance lives in a
+// cosmetic plugin's overlay and can only fail to resolve — and unlike the three above it is accepted in ANY phase, so a
+// match takes it at once). Replies: RATE → retried later; WRONG_PHASE / ROOM_STARTED → the running match keeps what it
+// took (the loadout locks when INFO_CHECK ends; the ownership and the 自选 picks never change during a match) — stored
+// for the next match, not an error for the player; anything else is logged. `sync` / `ownSync` / `diySync` /
+// `skinsSync` ∈ 'idle' | 'pending' | 'sending' | 'synced' | 'locked' | 'error' are mirrored into the store for the
+// screen's status line.
 // A room with gameplay plugins (DESIGN §32.6): data.js then shows the room's content set, so what goes out is checked
 // against the room's data (its operators too); the stored settings keep every entry — one the room does not know is
 // only left out of what is sent, never deleted. Whenever the room's content set arrives or goes (content.js contentSet)
@@ -30,6 +34,7 @@ import { POTENTIAL_DEFAULT, CULTIVATE_DEFAULT } from '../../../shared/potential.
 import { ruleOption } from '../../../shared/plugins/rules.js';
 import { OWNERSHIP_PREF, parseStoredOwnership, toStoredOwnership, cleanIds, sanitizeNotOwned } from './ownershipModel.js';
 import { DIY_PREF, parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks } from './diyModel.js';
+import { skinsStore, SKINS_KEY, SKINS_SYNC_KEY, parseStoredSkins } from './skins.js';
 import { toast } from './toasts.js';
 import { t, N_ } from '../../../shared/i18n.js';
 
@@ -330,6 +335,26 @@ export function installOwnershipSync({ net, timers, target = loadoutStore, notif
     net, timers, target, notify, key: 'notOwned', stateKey: 'ownSync', msgType: 'room.ownership', field: 'notOwned', tag: 'ownership',
     lockedText: N_('干员持有是局外设置，修改将在下一局生效'),
     prepare: async () => cleanIds(target.get().notOwned),
+  });
+}
+
+/**
+ * Wire the 干员皮肤 sync once (docs/SKINS.md): `room.skins { skins }` after every welcome and edit, from `skinsStore`
+ * (ui/skins.js — its own store, like the loadout's: a skin choice belongs to no screen).
+ *
+ * The selection goes as stored, structurally clean (ui/skins.js parseStoredSkins): the appearance it names lives in a
+ * cosmetic plugin's overlay, which is no part of the room's content set, so there is nothing to check it against — an
+ * unknown id can only fail to resolve in `spineEntry()` and draw the default model. During a match the server takes it
+ * at once (`Match.setSkins`, any phase: a skin is cosmetic and public) instead of storing it for the next one, so the
+ * one refusal that can still arrive is 'locked' — a build whose server predates the message.
+ * @param {{ net: any, timers?: { setTimeout: Function, clearTimeout: Function }, target?: ReturnType<typeof createStore>,
+ *   notify?: (text: string) => void }} deps
+ */
+export function installSkinsSync({ net, timers, target = skinsStore, notify } = {}) {
+  return installPrefSync({
+    net, timers, target, notify, key: SKINS_KEY, stateKey: SKINS_SYNC_KEY, msgType: 'room.skins', field: 'skins', tag: 'skins',
+    lockedText: N_('这台服务器不接受皮肤选择，只有本机保存'),
+    prepare: async () => parseStoredSkins(target.get()[SKINS_KEY]),
   });
 }
 

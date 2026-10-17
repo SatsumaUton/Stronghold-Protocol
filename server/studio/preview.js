@@ -9,7 +9,8 @@ import { readFxManifest as readPluginManifest } from '../plugins/fxAssets.js';
 //   at     the path in data/assets.json (['chars', 'char_102_texas', 'avatar'])
 //   value  what the manifest holds there: a URL of the plugin's file (GET /studio/api/plugins/<id>/f/<hash8>/<path>, the
 //          8 hex digits of its SHA-256 — of its model's files' SHA-256s for every file of a Spine model, so the skeleton,
-//          its atlas and pages share one folder as pixi-spine needs, like /p/), a list of them, a track { loop, intro? }, a
+//          its atlas and pages share one folder as pixi-spine needs, like /p/), a list of them, a track { loop, intro? },
+//          a line of the manifest as it is (a skin's `name` or `group`, shared/plugins/visual.js 'text'), a
 //          Spine entry { skel, atlas, textures, pma, anims, animations, events, hits, bounds }
 //   from   a reference: the path of the installation's entry the page copies out of its own manifest
 //   clear  an enemy's or a token's local-client model taken away with its new model (shared/plugins/visual.js)
@@ -78,6 +79,7 @@ export function createPreviews({ vanilla }) {
       if (op.clear) { ops.push({ at: op.at, clear: true }); continue; }
       if (op.file !== undefined) { const u = url(op.file); if (u) ops.push({ at: op.at, value: u }); continue; }
       if (op.files !== undefined) { const us = op.files.map((f) => url(f)); if (us.every(Boolean)) ops.push({ at: op.at, value: us }); continue; }
+      if (op.text !== undefined) { ops.push({ at: op.at, value: op.text }); continue; }
       if (op.track !== undefined) {
         const loop = url(op.track.loop);
         const intro = op.track.intro !== undefined ? url(op.track.intro) : null;

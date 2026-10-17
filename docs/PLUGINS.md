@@ -299,7 +299,7 @@ is a number of `data/enemies.json`), so a room's `cs` is the vanilla one whateve
 
 | Container | A record |
 |---|---|
-| `chars[charId]` | `avatar`, `avatarE2`, `portrait`, `portraitE2` (image), `spine.front`, `spine.back` (Spine) |
+| `chars[charId]` | `avatar`, `avatarE2`, `portrait`, `portraitE2`, `illust` (image), `spine.front`, `spine.back` (Spine), `skins` (one key per skin, below) |
 | `enemies[key]` | `icon` (image), `spine` (Spine) |
 | `tokens[id]` | `avatar` (image), `spine` (Spine) |
 | `bonds`, `items`, `bands`, `skills`, `modules`, `ui`, `prof.icon` / `large` / `battlecard` / `sub` `[key]` | an image |
@@ -329,6 +329,67 @@ battle music `audio.bgm.combatAlts` (the mode's own 开战 tracks, 骑士之日 
 plugin changes: the client plays it instead of `combat` in the rounds it covers, so a plugin's `combat` is heard only
 where no such track plays. Writing an
 entry the installation has needs the permission `assets.override`, a new entry `assets.add`. `theme` is the allowlisted variables of §9.1, applied on this player's page only.
+entry the installation has needs the permission `assets.override`, a new entry `assets.add` — the decision the permission
+is: a write to a path whose entry the installation's manifest already has is an override, whatever it writes there, so an
+operator the manifest has counts as one even when the write only adds a skin under `chars[<charId>].skins` or a field the
+record did not have (`illust`); a new operator is an `assets.add`. `theme` is not applied yet
+(a warning).
+
+**立绘 and the skins of one operator.** `illust` is the full illustration (立绘), the picture a detail view shows. The
+committed `data/assets.json` of this version carries no `illust` and no `skins` yet, so a plugin that writes one adds that field to the
+entry (as any other field of an entry the installation has, it takes `assets.override`). An operator's record may also
+carry several appearances under `skins`, one per key — the key `chars[<charId>].skins` is written under, and it is this
+installation's own skin id where its manifest has one (e.g. `char_003_kalts@boc#6`), else a name the plugin introduces;
+whatever wears a skin and the plugin have to agree on that key. A skin is a record of the same kinds the
+operator's own record has — `avatar`, `avatarE2`, `portrait`, `portraitE2`, `illust` and `spine.front` / `spine.back` —,
+plus `name` (1–64 characters: the skin's own name) and `group` (0–64 characters: its series), as that file writes them.
+An empty `group` is allowed because an entry a plugin adds may have no series — each of the 1388 operator skins of the
+official `.cache/gamedata/excel/skin_table.json` carries a non-empty `displaySkin.skinGroupName` —, so this is
+room for a plugin's own new entry, not the state of the manifest.
+A skin key is wider than an entry key by `@` `#` `+`, narrower by `/`, and is at most 64 characters where an entry key
+takes up to 128; a key shaped like an entry key (the stem form `char_102_texas_epoque_7`) is accepted too, for an
+installation that has no skin id for it [ASSUMED]. A
+key is data, never a path or a URL by itself: a plugin's files are named by paths inside its folder (letters, digits, `.`
+`_` `-` and spaces), and every segment of a served plugin URL is percent-encoded (`pluginFileUrl`), so a `#` in one is
+`%23` and never the start of a fragment. One record takes at most 64 skins. A key outside that character set, a field a
+skin has not, a text that is not 1–64 characters (0–64 for `group`), and a file a skin names that the folder lacks are
+reported as the same fault of the operator's own record would be; a skin's model goes into `plugin.lock.json` like any
+other. What a skin *is* —
+its name, its series, the picture a picker would show, the wearing of one — is this section's business; the key's shape is
+the overlay's own rule: the reader resolves every key into a path of the installation's manifest, so a key of the wrong
+shape is `PLUGIN_ASSET_KEY` (§15), as an entry key of the wrong shape is. The player picker
+(`public/js/ui/skins.js availableSkins`, docs/SKINS.md) lists a skin once this overlay is composed onto the manifest,
+and the player wears that id with `room.skins`. The studio still does not list skins (it finds an operator, an enemy,
+an interface picture … by its official name, `server/studio/targets.js`, not a skin), so a skin key is copied from the
+installation's own catalogue or written in the stem form.
+
+```json
+"chars": { "char_102_texas": {
+  "illust": "art/texas_illust.png",
+  "skins": {
+    "char_102_texas@epoque#7": { "name": "意志", "group": "时代/VII", "illust": "art/texas_epoque.png" },
+    "char_102_texas_epoque_7": { "name": "意志", "avatar": "art/texas_epoque_thumb.png" }
+  }
+} }
+```
+
+One level down, a reference keeps the rule above: `{ "ref": "<entry key>" }` inside a skin reads the same field of that
+entry's own skin of the same key (`chars[<entry key>].skins[<that key>]`), and a whole-skin reference the skin itself.
+As the opening of this section says, the committed `data/assets.json` has no `skins`, so a skin's reference addresses a
+path the installation's manifest does not carry yet and is `PLUGIN_REF` — it means something only once the installation's
+manifest has `skins` of its own; in this version only the fields of an operator's own record can be referenced.
+
+**Wearing a skin — docs/SKINS.md.** The overlay above is what a *server's owner* installs and what a player switches on
+for themself (`scope: ["personal"]`, 设置 → 外观插件); **no room and no host is involved**, and this version has no
+server-side install route at all (upstream #652 closed the one that let any client make the server download files and
+rewrite the shared `data/assets.json`). What a player then picks is a `{ [charId]: skinKey }` map, keyed by the
+**operator** — the container the key is written under — sent as `room.skins` (accepted in any phase: an appearance
+changes nothing a battle does, so it never enters `cs`) and published to teammates in `Match.publicView().players[]`,
+which is how a co-op partner's piece draws your skin. `public/js/assets.js` resolves it (`spineEntry`, `avatarUrl`,
+`portraitUrl`, `illustUrl` take `opts.skin`) and falls back to the operator's own model and pictures for a skin (or a
+skin's layer) that is not there, so a plugin that replaces only a model still draws a face. 设置「显示其他玩家的皮肤」
+(default on) is a pure client preference: off, this browser draws every OTHER seat's piece on the operator's own model
+while keeping its own player's — their screen keeps showing their skin.
 
 **Spine models and `plugin.lock.json`.** A model's clip roles, durations, events, hit times and bounds come from the
 skeleton itself: `node tools/plugin.mjs pack <dir>` parses it the way `tools/fetch-assets.mjs` parses the game's
@@ -448,8 +509,10 @@ record names the room's visual set (`vs`, null without cosmetic plugins — a pl
 plugins=id@version(hash),… personal=id,…`. BattleSpecs may carry the room's `vs` for diagnostics (§11); the sim
 never reads it. A standalone replay does not restore those cosmetic files automatically.
 
-**Limits** [ASSUMED]: 300 MB of art per set, 20 000 writes per plugin, 16 files per voice slot, 32 override warnings per
-set, 2 MB copied by references per plugin and 4 MB per set, the lock's limits above; the plugin limits of §5 apply too.
+**Limits** [ASSUMED]: 300 MB of art per set, 20 000 writes per plugin, 16 files per voice slot, 64 skins per operator's
+record, 64 characters for a skin key (an entry key takes 128, §9), 1–64 characters for a skin's `name` (0–64 for its
+`group`), 32 override warnings per set, 2 MB copied by references per plugin and 4 MB per set, the lock's limits above; the
+plugin limits of §5 apply too.
 
 **Start from** `plugins/_template/cosmetic/` — two original CC0 files (a checkerboard PNG and a short synthesized OGG) plus installed-art references. Never put files
 of the official game in a plugin.
@@ -1504,7 +1567,7 @@ lacks). The table below is generated from it (`node tools/plugin.mjs errors --wr
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_LANG_FILES` | A language pack's "files" are not right: {where} | "files" is { "ui": "ui.json" } (required) and optionally "data", both .json files of the pack. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_PACK` | An older content pack (pack.json) is not right, or this version does not load its type: {where} | packs/ loads language packs ("type": "lang") only. Art and data are plugins of plugins/ (plugin.json, "manifest": 2). |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_ASSETS_SHAPE` | The asset overlay is not written the right way: {where} | Follow data/assets.json: chars → operator id → avatar / portrait / spine …, sounds under audio. The studio's templates write it for you. |
-| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_ASSET_KEY` | “{where}” is not the name of an asset entry | An entry is named by an internal id such as char_102_texas (letters, digits, _ . / -). The studio finds it by its official name. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_ASSET_KEY` | “{where}” is not a key this place takes | The place decides the shape of a key: a container key is an entry's internal id (letters, digits, _ . / -, e.g. char_102_texas); a key of the `skins` map also allows @ # + and is at most 64 characters (an entry key takes up to 128). Copy a name from this installation's manifest, or make a new one within that character set. |
 | The plugin works, with a note in the check | `PLUGIN_ASSET_IGNORED` | “{where}” is not something a cosmetic plugin changes; it is ignored | Check the spelling; PLUGINS.md §9 lists what a cosmetic plugin changes (avatars, portraits, models, icons, interface pictures, voices, sounds, music). (the studio fixes it in one click) |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_REF` | The reference at “{where}” is not right: not written as one, or the installation has no such art | { "ref": "char_112_siege" } borrows an entry of the same kind the installation has. Pick it from the list with the studio's 用已有的素材, or remove the write. (the studio fixes it in one click) |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_SPINE` | The Spine model at “{where}” is not right | The .skel and the .atlas sit side by side with one name (t.skel + t.atlas), the .png pages beside the atlas and in "textures"; clip data is never written by hand — 打包 makes it. |
@@ -1730,13 +1793,13 @@ keep the first and report the later one. This conversion does not import notices
 
 | Forge piece | Becomes | When it does not |
 |---|---|---|
-| `art.chars` avatar, avatarE2, portrait, portraitE2 | cosmetic `assets.chars` | any other portrait field has no overlay key |
+| `art.chars` avatar, avatarE2, portrait, portraitE2, illust | cosmetic `assets.chars` | any other portrait field has no overlay key |
 | Spine on a character (`front` / `back`), an enemy or a token | the overlay's spine. The atlas sits next to the skel, same name; pages in that folder. `anims` is not copied. The import calls `skeletonClipData` — the same read as `node tools/plugin.mjs pack` — on the staged folder, for a dry run and for a write, and pack writes that clip data into `plugin.lock.json` before the strict check [ASSUMED] | skel or atlas missing, or a page outside that folder. Bone, slot, skin and vertex counts above the cap (4096; float arrays 8192; triangle indexes 16384) are rejected before the parser allocates [ASSUMED: above the measured maxima of 581 bones, 360 slots, 3 skins and 186 vertices, and below 2^24]. A skeleton that cannot be parsed is named and only that model is dropped |
 | `art` of bonds, items, bands, skills, modules, ui, prof.sub; enemy `icon`; token `avatar` | the matching overlay container | `art.tokens.*.owner` is not an asset |
 | `bondIcons`, `itemIcons` | `assets.bonds`, `assets.items` | a bond already named by `art.bonds` is not imported again from `bondIcons` |
 | `voices` | `audio.voiceJp` [ASSUMED: Forge documents that table as the Japanese dub] | a slot outside `^[A-Za-z][A-Za-z0-9]{0,31}$`, or a file that is not `.mp3` / `.ogg` |
 | `voiceLangs.cn` (and `zh`), `voiceLangs.ja` / `jp`, `voiceLangs.en`, `voiceLangs.ko` / `kr` | `audio.voice`, `audio.voiceJp`, `audio.voiceEn`, `audio.voiceKr` | any other dub: no table of that language (an own-language dub is per operator, `audio.voiceNative`, which Forge has no table for) |
-| `skins[]` | collapsed onto that operator's one overlay [ASSUMED: no wardrobe] | a skin without `charId` |
+| `skins[]` | that operator's own `skins` variants (§9): `assets.chars[charId].skins[<the outfit's id>]`, its pictures, its model and `name`. Once the cosmetic plugin is composed onto the manifest, `public/js/ui/skins.js availableSkins(charId)` lists that id (docs/SKINS.md); the player wears it with `room.skins` `{ [charId]: skinId }` from 干员调配 or the 自选 detail. An outfit added to an operator this installation already has is a change to that entry, so the cosmetic plugin's `permissions` carries `assets.override` (§9) | a skin without `charId`; an outfit whose `id` is not a skin key (or no `id`) — its art is folded onto that operator's one overlay and is not a picker row |
 | `art.audio.bgm` of lobby, prep, combat, unite, boss; an unreferenced file whose basename is one of those | `audio.bgm` `{ loop }` | any other music key. `art.audio` is not a documented Forge table [ASSUMED] |
 | `art.audio.bossBgm` | `audio.bossBgm` `{ loop, intro? }` | an id that is not an asset key, or a file that is not audio |
 | `art.audio.sfx.ui`, `sfx.battle` | one audio file each | |

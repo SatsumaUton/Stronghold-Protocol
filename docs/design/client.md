@@ -4,6 +4,13 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
 
 ## 9. Client rendering contract (public/js/render)
 
+**Operator skins (§34.23, [SKINS.md](../SKINS.md)).** [ASSUMED] Retain received skin IDs separately from displayed
+skins so the other-player switch restores loaded units when re-enabled, including boss prep partners. Any-phase
+`room.skins` refreshes owner/private and existing scout views; public seat choices update current battle rendering
+without restarting playback or changing the sim / BattleSpec. Resolve every surface's skin from the effective
+operator body (official `activity_table` `charShopChessDatas.backupCharId` for stand-ins, the pick for DIY slots).
+Outfits following that body and live refresh timing are cosmetic UI assumptions; gameplay and golden results stay unchanged.
+
 **Studio test console (0.3.1).**
 
 The maintainer's standalone battle sandbox is `/studio/console.html` (history §34.8; format and limits in

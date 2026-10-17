@@ -29,6 +29,8 @@ import { checkScript } from '../../shared/plugins/scriptCheck.js';
 import { makeBattle, checkInvariants } from '../helpers/battleHarness.js';
 import { DataSource } from '../../server/sim/simdata.js';
 import { setGameData } from '../../server/sim/content/support/index.js';
+import { availableSkins } from '../../public/js/ui/skins.js';
+import { data } from '../../public/js/data.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURES = path.join(ROOT, 'test', 'fixtures', 'forge');
@@ -140,6 +142,82 @@ test('skin pack: cosmetic overlay, check --strict, pack, visual set with no prob
     assert.deepEqual(set.set.warnings, []);
     assert.equal(fs.existsSync(BAIT), false);
   } finally { fs.rmSync(got.parent, { recursive: true, force: true }); }
+});
+
+test('one outfit per skin: an id that is a skin key becomes that operator\'s own skins variant; no usable id collapses onto the operator', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-'));
+  const pack = path.join(parent, 'pack');
+  fs.mkdirSync(path.join(pack, 'chars'), { recursive: true });
+  fs.copyFileSync(path.join(FIXTURES, 'skin-pack', 'chars', 'texas', 'avatar.png'), path.join(pack, 'chars', 'sightseer.png'));
+  fs.writeFileSync(path.join(pack, 'pack.json'), JSON.stringify({
+    id: 'rose-wardrobe', name: '玫瑰衣柜', version: '1.0.0', license: 'CC0-1.0', content: [],
+    skins: [
+      { id: 'char_102_texas@sightseer#2', charId: 'char_102_texas', name: '悠然假日', art: { portrait: 'chars/sightseer.png' } },
+      { charId: 'char_112_siege', art: { avatar: 'chars/sightseer.png' } },
+    ],
+  }));
+  const out = path.join(parent, 'out');
+  const r = await quiet(['import-forge', pack, '--out', path.join(out, 'rose-wardrobe'), '--root', ROOT]);
+  try {
+    assert.equal(r.code, 0, r.out);
+    const dir = path.join(out, 'rose-wardrobe');
+    const overlay = JSON.parse(fs.readFileSync(path.join(dir, 'assets.json'), 'utf8'));
+    assert.equal(overlay.chars.char_102_texas.skins['char_102_texas@sightseer#2'].name, '悠然假日');
+    assert.equal(overlay.chars.char_102_texas.skins['char_102_texas@sightseer#2'].portrait, 'files/chars/sightseer.png');
+    assert.equal(overlay.chars.char_112_siege.avatar, 'files/chars/sightseer.png', 'no skin key: the operator\'s own overlay, as before');
+    assert.equal(overlay.chars.char_112_siege.skins, undefined);
+    assert.match(fs.readFileSync(path.join(dir, 'IMPORT-REPORT.md'), 'utf8'), /skins 变体/);
+    // the overlay writes into chars[char_102_texas], an operator this installation has: the entry counts as changed, so
+    // the permission readAssetOverlay asks for is assets.override — no assets.add anywhere in this pack (§9, §16)
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'plugin.json'), 'utf8'));
+    assert.deepEqual(manifest.permissions, ['assets.override'], `permissions ${manifest.permissions.join(', ')}`);
+    const check = await quiet(['check', dir, '--strict', '--root', ROOT]);
+    assert.equal(check.code, 0, check.out);
+    const packed = await quiet(['pack', dir, '--root', ROOT]);
+    assert.equal(packed.code, 0, packed.out);
+    const { visual } = setsOf(out);
+    const set = visual.resolve(['rose-wardrobe']);
+    assert.equal(set.ok, true, JSON.stringify(set));
+    assert.deepEqual(set.set.warnings, []);
+    // the imported outfit is what the picker lists: availableSkins reads chars[charId].skins off the composed manifest
+    data.setContent({ id: 'f'.repeat(64), values: { assets: overlay } });
+    try {
+      const rows = availableSkins('char_102_texas');
+      assert.ok(rows.some((r) => r.id === 'char_102_texas@sightseer#2'), 'an imported Forge outfit is a picker row');
+      assert.deepEqual(availableSkins('char_112_siege').map((r) => r.id), [''], 'a collapsed outfit is the operator\'s own row, not a skin');
+    } finally { data.setContent(null); }
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('an operator-level illustration lands on chars[<charId>].illust (and needs assets.override when the operator exists here)', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-forge-'));
+  const pack = path.join(parent, 'pack');
+  fs.mkdirSync(pack, { recursive: true });
+  fs.writeFileSync(path.join(pack, 'illust.png'), PNG);
+  fs.writeFileSync(path.join(pack, 'pack.json'), JSON.stringify({
+    id: 'rose-illust', name: '玫瑰立绘', version: '1.0.0', license: 'CC0-1.0', content: [],
+    art: { chars: { char_102_texas: { illust: 'illust.png' }, char_rose_new: { illust: 'illust.png' } } },
+  }));
+  const out = path.join(parent, 'out');
+  const r = await quiet(['import-forge', pack, '--out', path.join(out, 'rose-illust'), '--root', ROOT]);
+  try {
+    assert.equal(r.code, 0, r.out);
+    const dir = path.join(out, 'rose-illust');
+    const overlay = JSON.parse(fs.readFileSync(path.join(dir, 'assets.json'), 'utf8'));
+    assert.equal(overlay.chars.char_102_texas.illust, 'files/illust.png', 'the illustration of an operator this installation has');
+    assert.equal(overlay.chars.char_rose_new.illust, 'files/illust.png', 'and of one the plugin introduces');
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'plugin.json'), 'utf8'));
+    // the same rule readAssetOverlay applies: an entry the manifest already has is an override, a new one an add. This
+    // overlay names one operator the installation has and one it does not, so both are declared
+    if (vanilla?.manifest?.chars?.char_102_texas) {
+      assert.ok(manifest.permissions.includes('assets.override'), `permissions ${manifest.permissions.join(', ')}`);
+      assert.ok(manifest.permissions.includes('assets.add'), `permissions ${manifest.permissions.join(', ')}`);
+    } else {
+      assert.ok(manifest.permissions.includes('assets.add'), `permissions ${manifest.permissions.join(', ')}`);
+    }
+    const check = await quiet(['check', dir, '--strict', '--root', ROOT]);
+    assert.equal(check.code, 0, check.out);
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
 });
 
 test('boss music and ui sounds become a cosmetic overlay; an unknown sound bucket is named and left out', async () => {

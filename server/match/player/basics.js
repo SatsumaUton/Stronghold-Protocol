@@ -9,7 +9,7 @@
 
 import { PHASE } from '../../../shared/constants.js';
 import { msg, dn } from '../../../shared/i18n.js';
-import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, resolveLoadout, charPotentialChanges } from '../../../shared/protocol.js';
+import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, resolveLoadout, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../../../shared/protocol.js';
 import { cultivationOf } from '../../../shared/potential.js';
 import { tileKey, boardOrder } from '../board.js';
 
@@ -114,6 +114,60 @@ export class PlayerBasics {
       for (const [id, e] of Object.entries(opsRes.ops)) o[id] = Object.freeze({ potential: e.potential, cultivate: e.cultivate });
       this.ops = Object.freeze(o);
     }
+    return true;
+  }
+
+  /**
+   * The asset key of a chess piece's appearance: the operator's charId, else null (docs/SKINS.md).
+   *
+   * A skin is keyed by OPERATOR, not by chess: `chars[charId].skins` is where a cosmetic plugin's overlay writes one and
+   * where `assets.js spineEntry` looks it up. That key is also what carries the choice across the normal / elite pair and
+   * a 自选 slot. Resolve the effective body first, like the model: official activity_table's backupCharId (also
+   * data/chess.json backup.charId), or the 自选 pick. [ASSUMED] A stand-in wears its body's chosen outfit; the official
+   * skin_table.charSkins groups outfits by charId but does not specify this remake's live cosmetic selection.
+   * @param {any} rec a chess record, or its chess id @returns {string|null}
+   */
+  skinCharIdOf(rec) {
+    const r = this.fieldRecord(typeof rec === 'string' ? this.gd.chess(rec) : rec);
+    return r && typeof r.charId === 'string' && r.charId ? r.charId : null;
+  }
+
+  /**
+   * The appearance this player wears for a chess piece, or null (docs/SKINS.md) — the one rule every view and the battle
+   * input ask, so a piece's skin can never disagree between the prep board, a teammate's scouting view and the field.
+   * `charId`, when given, wins: a 自选 slot's own record has none, and it fights as the operator of its pick.
+   * @param {any} rec a chess record @param {string|null} [charId]
+   * @returns {string|null}
+   */
+  skinFor(rec, charId = null) {
+    const skins = this.skins;
+    if (!skins) return null;
+    const key = (typeof charId === 'string' && charId) || this.skinCharIdOf(rec);
+    return key ? skins[key] || null : null;
+  }
+
+  /**
+   * 干员皮肤 (docs/SKINS.md): replace this player's skin choices — `{ [charId]: skinId }`.
+   *
+   * A non-plain object, a key that is not a charId, a value that is not a skinId, or a map larger than
+   * `SKIN_LIMITS.entries` (256 [ASSUMED]) refuses the whole selection and leaves `this.skins` as it was. A charId this
+   * match's content does not have is dropped. An empty map is a valid clear. Bots wear the default model.
+   * An unknown skinId still cannot change a battle: `spineEntry` draws the operator's own model, and no sim rule
+   * reads `Unit.skin`.
+   * @param {Record<string, string>|null} skins
+   * @returns {boolean} false when refused (nothing changes); true when stored, including a clear
+   */
+  setSkins(skins) {
+    if (this.isBot) return false;
+    const ids = operatorCharIds(this.gd?.raw);
+    const res = checkSkinSelection(skins, (id) => ids.has(id));
+    if (!res.ok) return false;
+    const out = {};
+    for (const [charId, skinId] of Object.entries(res.skins)) out[charId] = skinId;
+    this.skins = Object.freeze(out);
+    // No dirty() here: this runs from the constructor too (a seat's choice applied at match start), where `this.m` has
+    // no view to mark yet. Match.setSkins marks the private view (including prep scouts and the boss partner) and
+    // the public selection that updates current battle rendering.
     return true;
   }
 

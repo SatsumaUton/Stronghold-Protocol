@@ -310,7 +310,7 @@ node tools/plugin.mjs pack my-texas --zip
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_LANG_FILES` | 语言包的文件表 "files" 写得不对：{where} | "files" 写 { "ui": "ui.json" }（必填）和可选的 { "data": "data.json" }，都是包里的 .json 文件。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_PACK` | 旧式内容包（pack.json）写得不对，或者这个版本不加载它的类型：{where} | packs/ 里只加载语言包（"type": "lang"）。外观和数据请做成 plugins/ 里的插件（plugin.json，"manifest": 2）。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_ASSETS_SHAPE` | 素材表 "assets" 的写法不对：{where} | 按 data/assets.json 的样子写：chars → 干员 id → avatar / portrait / spine …，声音在 audio 里。用工作台的模板就不用手写。 |
-| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_ASSET_KEY` | 「{where}」不是素材条目的名字 | 条目名是干员、敌人等的内部 id（例如 char_102_texas，只有字母、数字、_ . / -）。在工作台按官方名字搜索，就不用自己找 id。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_ASSET_KEY` | 「{where}」不是这个位置能用的键名 | 键名怎么写由它所在的位置决定：容器的键是条目的内部 id（字母、数字、_ . / -，例如 char_102_texas）；`skins` 这一层的键额外允许 @ # +，最多 64 个字符（条目的键最多 128 个）。照抄本安装清单里的名字，或按这个字符集取一个新名字。 |
 | 插件能用，但检查时有提示 | `PLUGIN_ASSET_IGNORED` | 「{where}」不是外观插件能改的位置，被忽略了 | 检查拼写；外观插件能改的位置见 PLUGINS.md §9 的表（头像、立绘、模型、图标、界面图、语音、音效、音乐）。（工作台可一键修复） |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_REF` | 引用「{where}」不对：写法不对，或者本安装没有它指向的素材 | { "ref": "char_112_siege" } 借用本安装已有的同类条目。在工作台点「用已有的素材」从列表里选，就不会写错；或者删掉这条。（工作台可一键修复） |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_SPINE` | Spine 模型「{where}」写得不对 | .skel 和 .atlas 放在同一个文件夹、用同一个名字（t.skel + t.atlas），贴图 .png 放在 atlas 旁边并写进 textures；动画数据不要手写，点「打包」自动生成。 |
