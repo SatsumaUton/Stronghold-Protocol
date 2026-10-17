@@ -543,6 +543,12 @@ Guarantees content can rely on (pinned by `test/sim/robustness.test.js`):
 
 ---
 
+Content-plugin morph pairing (0.3.1, DESIGN §34.15): Battle / BattleSpec accepts optional `morphPairing: "plus"`,
+written by the match from its content set. It is copied onto battle players, so support.unitBonds uses the shared
+`grantedBondsByMorph` helper and grants only the leftmost valid partner bond. Official specs omit the field.
+The same option is used for normal, unite, boss/hidden and rehearsal construction. Equip-slot arithmetic remains
+on the match/client side; `morphSlotPolicy` permits a third carried item only when the morph occupies zero slots.
+
 ## 2. Units
 
 `Unit` fields: `id, side ('ally'|'enemy'), kind ('op'|'token'|'enemy'|'device'), defId, def (normalised), name, ownerId

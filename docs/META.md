@@ -1036,3 +1036,17 @@ Namespaced plugin bonds use `GameData` and `computeBonds` unchanged: BOARD / BOA
 core/extra classification and persistent capped layers. `data.dsl` prep specs can guard funds/layers/gainItem on
 `bondActive`; the match host installs these through the existing MetaRegistry grants. A descriptive bond record
 alone registers no handler [ASSUMED]. See PLUGINS.md and DESIGN §34.16.
+Content-plugin rule switches (0.3.1, DESIGN §34.15) are held in Match.rules from the room's verified content set.
+PlayerEconomy computes active bonds at the item roll for shopBias=bondBias; SharedPool filters within the sampled
+tier after stock checks, with an official same-tier fallback. Match.setLoadout additionally accepts PREP before
+ready with prepLoadout=prep, merging named entries (named defaults reset) and ops [ASSUMED]. The existing INFO_CHECK
+replacement gate ignores ready. PlayerItems.unequip under unequip=allow uses the ordinary prep gate, returns the
+same object to the rightmost free hand slot or visible temp, refuses HAND_FULL atomically, and emits no content hook.
+The shared morph pairing/slot policies drive item attachment, bots, invariants and prep effects as well as combat.
+Rules-only plugins are gameplay; absent rules adds no match/spec field. [PLUGINS.md](PLUGINS.md#rule-switches) lists
+all assumptions and the workshop-defined limits.
+
+Validated PREP loadout changes reconcile affected owners' summons in board/hand/temp against the new skill/module
+stock, then recompute owner ranges and refill the hand. [ASSUMED] Valid board cards survive in reading order before
+hand/temp index order; obsolete/excess copies are removed (including temp deadlines), missing copies use the ordinary
+overflow queue. Unchanged loadouts and other owners never replenish spent cards. Failed validation is atomic.

@@ -29,6 +29,7 @@
 /** The documents the entries point to. */
 const D = Object.freeze({
   manifest: 'docs/PLUGINS.md#3-the-manifest-manifest-2',
+  rules: 'docs/PLUGINS.md#rule-switches',
   permissions: 'docs/PLUGINS.md#4-permissions',
   files: 'docs/PLUGINS.md#5-files-and-limits',
   lang: 'docs/PLUGINS.md#7-language-packs',
@@ -109,6 +110,16 @@ export const PLUGIN_ERRORS = Object.freeze({
     level: 'refusal', doc: D.manifest,
     zh: '选中的插件互相冲突，不能一起用', en: 'The chosen plugins conflict with each other',
     fix: { zh: '关掉其中一个；插件的 conflicts 写着它和谁不能一起用。', en: 'Switch one of them off; a plugin\'s "conflicts" says which ones it cannot be used with.' },
+  },
+  PLUGIN_RULE_CONFLICT: {
+    level: 'refusal', doc: D.rules,
+    zh: '两个插件把同一个规则开关设成了不同的选项（{path}）', en: 'Two plugins set the same rule switch to different options ({path})',
+    fix: { zh: '只保留其中一个插件，或让它们选择同一个选项。', en: 'Keep only one of the plugins, or make them choose the same option.' },
+  },
+  PLUGIN_RULES: {
+    level: 'problem', doc: D.rules,
+    zh: '清单里的 rules 写错了：开关或选项不在规定的四种里，或者这个类别的插件不能声明规则', en: 'The manifest rules are wrong: an unknown switch or option, or this plugin class cannot declare rules',
+    fix: { zh: 'rules 只能写 shopBias、prepLoadout、morphPairing、unequip，每个用规定的两个选项；只有 content、script、trusted 可以写。', en: 'rules may name only shopBias, prepLoadout, morphPairing and unequip, each with its two options; only content, script and trusted plugins may declare them.' },
   },
   PLUGIN_LIMIT: {
     level: 'refusal', doc: D.cosmetic,

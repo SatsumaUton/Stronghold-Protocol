@@ -108,6 +108,7 @@ export function createRoomSets({ registry, visual, contents, policy }) {
         warnings: [...(vset?.warnings || []), ...warnings],
         bytes: vset ? vset.bytes : 0,
         ...(cset ? { dataBytes: cset.dataBytes, modes: cset.modes, kitted: cset.kitted } : {}),
+        ...(cset?.rules ? { rules: cset.rules } : {}),
       },
     };
   }

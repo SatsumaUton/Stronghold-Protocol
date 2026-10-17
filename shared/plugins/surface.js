@@ -15,6 +15,7 @@
 
 import { PLUGIN_API } from '../constants.js';
 import { MANIFEST_FIELDS, PERMISSIONS, PLUGIN_CLASSES, UI_SLOT_IDS } from './manifest.js';
+import { RULE_NAMES } from './rules.js';
 import { PATCH_OPS } from './patch.js';
 import { RECORD_SCHEMA } from './recordsSchema.js';
 import { ASSET_CONTAINERS } from './visual.js';
@@ -105,9 +106,11 @@ export function buildSurface(extra = {}) {
     'ui.message.host.result', 'ui.message.host.net',
     'manifest.field.notices', 'error.PLUGIN_THEME_NAME', 'error.PLUGIN_THEME_VALUE', 'error.PLUGIN_THEME_LIMIT', 'error.PLUGIN_THEME_SHAPE',
     'error.PLUGIN_NOTICE_SHAPE', 'error.PLUGIN_NOTICE_LIMIT', 'error.PLUGIN_NOTICE_TEXT', 'error.PLUGIN_NOTICE_LANG',
-    'studio.route.POST /studio/api/console/options', 'studio.route.POST /studio/api/console/build']);
+    'studio.route.POST /studio/api/console/options', 'studio.route.POST /studio/api/console/build',
+    'manifest.field.rules', 'error.PLUGIN_RULE_CONFLICT', 'error.PLUGIN_RULES', ...RULE_NAMES.map((name) => `rule.${name}`)]);
   const add = (name, group, stability, anchor) => rows.push({ name, group, stability, since: added031.has(name) ? '0.3.1' : SURFACE_SINCE, anchor });
   for (const field of MANIFEST_FIELDS) add(`manifest.field.${field}`, 'manifest', EXPERIMENTAL_FIELDS.has(field) ? 'experimental' : 'stable', 'shared/plugins/manifest.js#MANIFEST_FIELDS');
+  for (const name of RULE_NAMES) add(`rule.${name}`, 'rule', 'stable', 'shared/plugins/rules.js#RULE_SWITCHES');
   for (const name of Object.keys(PERMISSIONS)) add(`permission.${name}`, 'permission', EXPERIMENTAL_PERMISSIONS.has(name) ? 'experimental' : 'stable', 'shared/plugins/manifest.js#PERMISSIONS');
   for (const [name, cls] of Object.entries(PLUGIN_CLASSES)) add(`class.${name}`, 'class', cls.status === 'unsupported' || EXPERIMENTAL_CLASSES.has(name) ? 'experimental' : 'stable', 'shared/plugins/manifest.js#PLUGIN_CLASSES');
   for (const op of PATCH_OPS) add(`patch.op.${op}`, 'patch', 'stable', 'shared/plugins/patch.js#PATCH_OPS');

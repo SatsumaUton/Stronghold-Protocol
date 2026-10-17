@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PLUGIN_API } from '../../shared/constants.js';
 import { MANIFEST_FIELDS, PERMISSIONS, PLUGIN_CLASSES, UI_SLOT_IDS } from '../../shared/plugins/manifest.js';
+import { RULE_NAMES } from '../../shared/plugins/rules.js';
 import { PATCH_OPS } from '../../shared/plugins/patch.js';
 import { RECORD_SCHEMA } from '../../shared/plugins/recordsSchema.js';
 import { ASSET_CONTAINERS } from '../../shared/plugins/visual.js';
@@ -64,6 +65,7 @@ const DSL_GROUPS = [
 function expectedNames() {
   const names = [];
   for (const field of MANIFEST_FIELDS) names.push(`manifest.field.${field}`);
+  for (const name of RULE_NAMES) names.push(`rule.${name}`);
   for (const name of Object.keys(PERMISSIONS)) names.push(`permission.${name}`);
   for (const name of Object.keys(PLUGIN_CLASSES)) names.push(`class.${name}`);
   for (const op of PATCH_OPS) names.push(`patch.op.${op}`);

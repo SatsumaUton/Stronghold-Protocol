@@ -144,6 +144,10 @@
     "anchor": "shared/plugins/manifest.js#MANIFEST_FIELDS"
   },
   {
+    "name": "manifest.field.rules",
+    "anchor": "shared/plugins/manifest.js#MANIFEST_FIELDS"
+  },
+  {
     "name": "manifest.field.scope",
     "anchor": "shared/plugins/manifest.js#MANIFEST_FIELDS"
   },
@@ -170,6 +174,22 @@
   {
     "name": "manifest.field.version",
     "anchor": "shared/plugins/manifest.js#MANIFEST_FIELDS"
+  },
+  {
+    "name": "rule.shopBias",
+    "anchor": "shared/plugins/rules.js#RULE_SWITCHES"
+  },
+  {
+    "name": "rule.prepLoadout",
+    "anchor": "shared/plugins/rules.js#RULE_SWITCHES"
+  },
+  {
+    "name": "rule.morphPairing",
+    "anchor": "shared/plugins/rules.js#RULE_SWITCHES"
+  },
+  {
+    "name": "rule.unequip",
+    "anchor": "shared/plugins/rules.js#RULE_SWITCHES"
   },
   {
     "name": "permission.assets.override",
@@ -1157,6 +1177,14 @@
   },
   {
     "name": "error.PLUGIN_CONFLICT",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
+    "name": "error.PLUGIN_RULE_CONFLICT",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
+    "name": "error.PLUGIN_RULES",
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },
   {

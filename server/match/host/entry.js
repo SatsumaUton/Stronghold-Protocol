@@ -165,7 +165,14 @@ async function boot() {
   if (typeof Inner !== 'function') throw new Error('the match module exports no Match');
   // [ASSUMED] Grant the prep EffectRefs after super(), once players exist (DESIGN §32.7).
   MatchClass = class ContentMatch extends Inner {
-    constructor(opts) { super(opts); grantPrepDsl(this, dslGrants); }
+    constructor(opts) {
+      // Rules come from the verified content identity, never the per-room create payload.
+      const bound = { ...opts };
+      delete bound.rules;
+      if (hashInput.rules) bound.rules = hashInput.rules;
+      super(bound);
+      grantPrepDsl(this, dslGrants);
+    }
   };
   if (options.virtualTime) ({ VirtualScheduler } = await import('../scheduler.js'));
 }

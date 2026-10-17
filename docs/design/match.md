@@ -134,7 +134,7 @@ Official rule (bwiki 盟约, 更新公告 5114): before a match the player canno
 
 **Data (`data/chess.json`, built by tools/build-data.mjs):** every chess keeps `skill` (the default, unchanged shape) and gains `skills: [SkillRecord…]` (index, skillId, iconId, name, desc/descRaw, skillType, durationType, duration, spType, spCost, initSp, maxChargeTime, bb (at the chess's skill level), bbStr, rangeGrid, trigger {rule, customRangeGrid} resolved for THAT skill index, isDefault). Golden chess gain `modules: [ModuleRecord…]` = `{ uniEquipId, name, typeName, icon, isDefault, attr: {maxHp, atk, def, res, aspd, cost, blockCnt, respawnTime…} (flat adds at the chess's equipLevel), traitOverride: {desc, descRaw, bb} | null, talentChanges: [{talentIndex, name, desc, bb}] }` plus `statsBase` (stats WITHOUT any module); `stats` stays = stats with the default module (back-compat).
 
-**Loadout wire & state:** the client keeps a per-browser loadout `{ [baseChessId]: { skill: index, module: uniEquipId | 'none' } }` (localStorage) and sends it with C2S `room.loadout { entries }` (validated: known visible chess, legal skill index for that chess's normal AND elite status, legal module id). The lobby stores it on the seat; at match start `Match` receives `seats[].loadout`; `PlayerState` keeps it immutable for the match; board pieces are resolved to `{chessId, skillIndex, moduleId}` when building `PlayerBattleInput.units[]` (fields `skillIndex`, `moduleId`; BattleSpec carries them). Bots use defaults. m.private exposes the effective loadout so the UI (shop cards, detail panel) shows the chosen skill/module.
+**Loadout wire & state:** the client keeps a per-browser loadout `{ [baseChessId]: { skill: index, module: uniEquipId | 'none' } }` (localStorage) and sends it with C2S `room.loadout { entries }` (validated: known visible chess, legal skill index for that chess's normal AND elite status, legal module id). The lobby stores it on the seat; at match start `Match` receives `seats[].loadout`; `PlayerState` keeps it immutable for the match by default; a room with prepLoadout=prep accepts named overrides during PREP before ready (§34.15); board pieces are resolved to `{chessId, skillIndex, moduleId}` when building `PlayerBattleInput.units[]` (fields `skillIndex`, `moduleId`; BattleSpec carries them). Bots use defaults. m.private exposes the effective loadout so the UI (shop cards, detail panel) shows the chosen skill/module.
 
 Client sync preparation may await chess/backups data. A later edit (including restoring defaults) or `welcome` invalidates the earlier preparation: its payload, missing-data result or failure cannot send or change sync status. The current edit keeps the existing debounce, close flush, ordered requests and retry/lock handling (`public/js/ui/loadoutSync.js`).
 
@@ -191,3 +191,14 @@ destroyed, consumed, wiped from temp, or removed on elimination — repays that 
 returns its equipment to the hand, so the equipment debt stays. 整备, random grants, 机变 item cards and strategy
 grants that are not an already-shown card stay stock-limited. Rockrock and Flametail use the measured weighted
 subsets described in DATA and §30.2.
+
+
+Content-plugin exceptions to the official match rules are opt-in (§34.15): `shopBias=bondBias` filters shop item candidates within their drawn tier by active bond/giveBondId after stock checks, falling
+back within that tier; morphPairing=plus uses shared pairing and slot policies (zero-slot morph, one per operator,
+only the leftmost bond item grants); unequip=allow moves one equipped item back to the hand then visible temp,
+atomically refusing HAND_FULL if both are full. A validated prepLoadout=prep change reconciles affected owners'
+summons across board/hand/temp to the selected skill/module stock, then recomputes ranges; unchanged loadouts and
+other owners do not replenish spent stock. [ASSUMED] Keep valid board cards in reading order before hand/temp
+index order, remove obsolete/excess cards and temp deadlines, and grant missing copies via normal overflow.
+These do not alter the default rules above. See
+[PLUGINS.md](../PLUGINS.md#rule-switches) for limits and assumptions.

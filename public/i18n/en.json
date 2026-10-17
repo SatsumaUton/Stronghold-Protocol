@@ -2036,5 +2036,14 @@
   "累计奖杯": "Total trophies",
   "同盟通过回合": "Alliance Rounds Cleared",
   "数据详情": "Full Report",
-  "测试对局不计入等级": "Test matches do not count toward the level"
+  "测试对局不计入等级": "Test matches do not count toward the level",
+  "规则：{text}": "Rules: {text}",
+  "商店装备偏向已激活盟约": "Shop equipment is biased toward active bonds",
+  "休整期可调整技能与模组": "Skills and modules can be changed during prep",
+  "变形同构体不占格，仅配对最左盟约装备": "Morphs use no slot and pair only with the leftmost bond item",
+  "可以卸下装备": "Equipment can be unequipped",
+  "卸下": "Unequip",
+  "不占装备格": "Does not use an equipment slot",
+  "拖拽至干员身上进行配发（每名干员最多 2 件）": "Drag onto an Operator to equip (up to 2 per Operator)",
+  "两个插件把同一个规则开关设成了不同的选项": "Two plugins set the same rule switch to different options"
 }

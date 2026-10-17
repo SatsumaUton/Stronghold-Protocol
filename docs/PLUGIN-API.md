@@ -19,6 +19,11 @@ This project does not host plugins and does not run a market. A catalogue (`sche
 The 0.3.1 effects surfaces (`record.operator.fx`, `overlay.fx.*`, `dsl.fx.plugin`) are presentation extensions
 compiled by the plugin loader. See [PLUGINS.md §9](PLUGINS.md#operator-effects-031) for their schemas, limits and
 fallbacks. They do not change the sim event protocol or the identity of content which does not use them.
+Since 0.3.1, stable `manifest.field.rules` and `rule.*` rows expose the four closed rule switches in
+`RULE_SWITCHES` (shared/plugins/rules.js). Only gameplay classes may declare them. Declared options enter the
+content identity; conflicting options return `PLUGIN_RULE_CONFLICT`. The full semantics, defaults, and assumptions
+are in [PLUGINS.md](PLUGINS.md#rule-switches). `g.unequip { itemUid }` is a server-checked game intent, available only
+under unequip=allow; interface plugins still cannot send game intents.
 
 ## The table
 
@@ -64,6 +69,7 @@ Theme values and announcements are specified in [PLUGINS §9.1–§9.2](PLUGINS.
 | `manifest.field.permissions` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.priority` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.requires` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
+| `manifest.field.rules` | stable | 0.3.1 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.scope` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.settings` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.slots` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
@@ -71,6 +77,10 @@ Theme values and announcements are specified in [PLUGINS §9.1–§9.2](PLUGINS.
 | `manifest.field.stages` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.theme` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
 | `manifest.field.version` | stable | 0.3.0 | `shared/plugins/manifest.js#MANIFEST_FIELDS` |
+| `rule.shopBias` | stable | 0.3.1 | `shared/plugins/rules.js#RULE_SWITCHES` |
+| `rule.prepLoadout` | stable | 0.3.1 | `shared/plugins/rules.js#RULE_SWITCHES` |
+| `rule.morphPairing` | stable | 0.3.1 | `shared/plugins/rules.js#RULE_SWITCHES` |
+| `rule.unequip` | stable | 0.3.1 | `shared/plugins/rules.js#RULE_SWITCHES` |
 | `permission.assets.override` | stable | 0.3.0 | `shared/plugins/manifest.js#PERMISSIONS` |
 | `permission.assets.add` | stable | 0.3.0 | `shared/plugins/manifest.js#PERMISSIONS` |
 | `permission.theme` | stable | 0.3.0 | `shared/plugins/manifest.js#PERMISSIONS` |
@@ -325,6 +335,8 @@ Theme values and announcements are specified in [PLUGINS §9.1–§9.2](PLUGINS.
 | `error.PLUGIN_BLOCKED` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_DEPENDENCY` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_CONFLICT` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_RULE_CONFLICT` | stable | 0.3.1 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_RULES` | stable | 0.3.1 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_LIMIT` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_INCOMPATIBLE` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_BUSY` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |

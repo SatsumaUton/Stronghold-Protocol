@@ -457,7 +457,7 @@ export async function loadContentSet(cs, { fetch: doFetch = defaultFetch, retryD
   const i18n = Object.fromEntries(langs.map(([lang, f]) => [lang, f.sha256]));
   let again;
   try {
-    again = contentHashOf({ app: index.app, sim: index.sim, data: hashes, plugins: index.plugins, settings: index.settings, ...(langs.length ? { i18n } : {}) });
+    again = contentHashOf({ app: index.app, sim: index.sim, data: hashes, plugins: index.plugins, settings: index.settings, ...(langs.length ? { i18n } : {}), ...(isObj(index.rules) ? { rules: index.rules } : {}) });
   } catch { again = null; }
   if (again !== cs) throw new Error('the manifest does not hash to the room\'s cs');
   // the URLs a manifest may name: this server's data files and this set's own files

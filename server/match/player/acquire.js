@@ -161,7 +161,8 @@ export class PlayerAcquire {
     const items = piece.items || [];
     piece.items = [];
     this.returnCopies(piece);
-    // its equipment comes off first (the returned pair auto-merges, which may free a slot for the gain)
+    // Returned equipment is stowed. morphSlotPolicy is not applied: this path does not check equip slots
+    // (the workshop names a recycle read point this codebase does not have).
     for (const it of items) this.stow(it, { allowTemp: true });
     this.checkItemMerges();
     // The replacement follows the ordinary acquisition path.
