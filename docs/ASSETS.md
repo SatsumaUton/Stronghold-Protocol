@@ -232,6 +232,49 @@ The research JSONs in `docs/research/` (03, 05, 07) define **which** ids are nee
 
 The `stem` of a Spine model is the upstream file name. Two examples: `char_107_liskam` has the stem `char_107_liskarm`, and `enemy_9032_aclionk` uses `enemy_1559_vtlionk`. The skel and atlas of a model always share one stem. pixi-spine locates the atlas by swapping the extension, so this matters.
 
+### Official operator art referenced by plugins (0.3.1)
+
+`node tools/setup.mjs --local` also extracts official operators referenced by installed plugins but absent from
+`data/chess.json` and `data/backups.json.units`. It reuses the bounded, JSON-only W5 discovery (`fx.unit`,
+`origin.charId`, `art.ref`, `art.assets`, official-format ids/keys, including Forge-derived records), including
+disabled plugins. It never executes plugin code or downloads operator art. Discovery limits are documented in
+[PLUGINS.md](PLUGINS.md). Art-only `_1`/`_2` references resolve to the base character, as in the renderer; effect unit
+ids retain exact matching. A normal startup/update setup offers a re-extraction when references or files are missing;
+the answer defaults to **no**. Typed yes, `--local` or `--yes` authorizes it; `--check` and `--no-local` never extract.
+A declined gap set is remembered; a changed set may ask again [ASSUMED].
+
+The local client's `spritepack/ui_char_avatar_*.ab` supplies base/`_2` avatars; `spritepack/char_portrait_*.ab`
+supplies `_1`/`_2` portraits. `chararts/<charId>.ab` supplies the `defaultskin.prefab` Front and Back renderers,
+their skeletons, atlases and every page (the existing alpha merge and atlas normalization). The existing Spine
+parser supplies animation roles, durations, hits and bounds. No building models, alternate skins, illustrations,
+voices or gameplay records are extracted by this path.
+
+Files go to ignored `public/assets/local/char/{avatar,portrait}/<charId>/` and
+`public/assets/local/spine/char/<charId>/{front,back}/`. `data/local-assets.json` lists them in `groups` and adds
+`chars[charId]` using the existing asset-record shape (`avatar`, `avatarE2`, `portrait`, `portraitE2`, `spine`).
+The server merges these records into the **served** `/data/assets.json` before cosmetic layers apply. Shop cards,
+details, 自选 and board models use the ordinary asset helpers; references can borrow the newly available art too.
+Existing base slots win [ASSUMED]; room/personal plugin art keeps its usual priority. `data/assets.json` on disk,
+gameplay data and all content hashes stay untouched. With no local operator art, the served content stays unchanged.
+
+[ASSUMED] The gap check requires base pictures and both battle directions, plus E2 pictures when the cached official
+table declares three phases; it checks the actual files too. Partial re-extraction retains earlier successful slots
+and unrelated groups. Unavailable bundles leave gaps and existing fallbacks: a missing card picture or a generic
+board marker if neither the plugin nor the installation supplies art. E2 helpers already fall back to base pictures.
+Restart/reload after extraction to refresh the page's cached manifest. A static host without the Node manifest view
+does not merge these extra operator records.
+
+For an isolated extraction (no writes to the installation), supply **both** output paths and an installation root
+containing the plugin JSON and roster; `--only plugin-art/<charId>` narrows the discovered references:
+
+```bash
+.venv-extract/bin/python -B tools/local-extract/extract.py --only plugin-art \
+  --plugin-root /tmp/operator-check/install --out /tmp/operator-check/art \
+  --manifest /tmp/operator-check/local-assets.json
+```
+
+`--game <AB root>` selects a local game explicitly; otherwise the existing local-install detection applies.
+
 ### Re-extracting scenes after an update
 
 Scene extraction version **4** removes complete, exact redundant renderers (GitHub #684, DESIGN §34.24).
@@ -625,8 +668,9 @@ bandwidth, layer 1) the server hands out a view of each (`server/http/assetIndex
 - An install without `data/local-assets.json` or `data/local-fx.json` gets an empty manifest (`groups: {}`) for it, not a
   404. The server itself never loads `data/local-fx.json` (`server/data.js UNLOADED_DATA`) and no presentation file
   enters the content hash (`server/plugins/identity.js PRESENTATION_DATA`).
-- Until the index is ready, with `SP_ASSET_INDEX=0`, or on a static host without this server, the manifests go out as
-  committed. The views are rebuilt in memory when a manifest or the hashes change; neither file is ever written by the
+- Until the index is ready or with `SP_ASSET_INDEX=0`, URLs remain plain; the optional operator records above still
+  merge into the served asset manifest. Without those records, or on a static host, manifests go out as committed.
+  The views are rebuilt in memory when either manifest or the hashes change; neither file is ever written by the
   server, and the `hash` field is the committed one. The index lives in `.cache/` only and is never packaged.
 - **Cosmetic plugins** (0.3.0, docs/PLUGINS.md §9, DESIGN §32): a room whose host switched cosmetic plugins on draws with
   the served `data/assets.json` above and the room's visual set over it, composed by the page itself

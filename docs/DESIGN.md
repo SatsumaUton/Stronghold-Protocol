@@ -15,6 +15,8 @@ current rules by area are in `docs/design/`, the per-release revisions (the evid
 `docs/history/`. When a revision changes a rule, the rule in `docs/design/` is rewritten too (the revision lists the
 normative lines it rewrote).
 
+Optional official art for plugin operators outside the roster is specified in [§34.28](history/0.3.1.md#3428-official-art-for-plugin-operators-outside-the-roster), updating §32.3's installation-manifest composition.
+
 | sections | file | content |
 |---|---|---|
 | §0, §1, §2, §11, §12 | [design/overview.md](design/overview.md) | Scope, stack, repository layout, quality bar |

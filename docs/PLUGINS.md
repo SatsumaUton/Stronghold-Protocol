@@ -542,6 +542,17 @@ A declined reference set is remembered; a different set can ask again [ASSUMED].
 unavailable; extracted files stay ignored. Discovery caps [ASSUMED]: 256 folders, 64 declared JSON files per plugin,
 8 MiB per file, 24 levels and 100,000 values per document.
 
+Since §34.28, that same discovery also drives optional **operator art** for official ids outside the shipped roster.
+`setup --local` extracts base/E2 avatars and portraits and default Front/Back battle Spine models from the local game,
+with no network. Startup/update asks again for missing operator art with the same opt-in rules above. Extracted art
+is indexed in `data/local-assets.json` and merged into the served asset manifest before cosmetic layers: shop cards,
+details, 自选 and the board can draw the imported official operator. A plugin's own art still wins. Without extraction
+or matching local bundles, the plugin's own art works; otherwise missing pictures/generic board markers remain.
+[ASSUMED] Existing installation slots win over extracted slots, partial extraction keeps earlier successes, and the
+gap check requires base pictures/both directions plus E2 pictures when the cached official table declares E2.
+This adds no plugin fields and changes no gameplay/content hashes. See [ASSETS.md](ASSETS.md#official-operator-art-referenced-by-plugins-031)
+for paths, scratch-only extraction and limits (no extra skins, illustrations or voices).
+
 A cosmetic plugin, or a content plugin's own assets, can put this inside its `assets` object/file:
 
 ```json

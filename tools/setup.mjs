@@ -56,6 +56,9 @@ import { fileURLToPath } from 'node:url';
 import { validateSource } from './assets/network.mjs';
 import { EXPECTED_FX, EXPECTED_LOCAL_GROUPS, EXPECTED_SCENE } from './local-extract/expected.mjs';
 import { installedFxReferences, pluginFxGap } from '../server/plugins/fxReferences.js';
+import { pluginArtGap } from '../server/plugins/artReferences.js';
+
+export function checkPluginArt(root = ROOT) { return pluginArtGap(root); }
 
 export function checkPluginFx(root = ROOT) {
   let index = null;
@@ -918,6 +921,26 @@ async function main() {
   add(fxAfter.state, '官方特效清单（可选）', fxAfter.detail);
   const fxGap = checkPluginFx();
   if (fxGap.length) add('warn', 'Plugin official effects', `Missing ${fxGap.join(', ')}; run node tools/setup.mjs --local with a local game install.`);
+
+  // §34.28: update/startup uses the same opt-in gate as W5. --check/--no-local never extract.
+  const missingArt = checkPluginArt();
+  const artKey = missingArt.join(',');
+  let artAnswer = false;
+  if (missingArt.length && fxClient && !opts.check && opts.local !== 'no' && opts.local !== 'force' && !opts.yes && state.pluginArtDeclined !== artKey) {
+    log(`Plugin operator art missing locally: ${missingArt.join(', ')}`);
+    artAnswer = await ask('Extract referenced official operator art from the local game now?', false);
+    if (artAnswer === false) saveState({ pluginArtDeclined: artKey });
+  }
+  // --local's full extraction above already includes operator art; retry only remaining gaps here.
+  if (missingArt.length && fxClient && pluginFxExtractionAllowed(opts, missingArt, artAnswer)) {
+    const py = findPython(), venv = py && ensureVenv(py, log);
+    if (venv?.ok) {
+      const r = run(venv.python, [EXTRACT_PY, '--game', fxClient.path, '--only', 'plugin-art'], { env: PY_ENV });
+      if (r.ok) saveState({ pluginArtDeclined: '' });
+    }
+  }
+  const artGap = checkPluginArt();
+  if (artGap.length) add('warn', 'Plugin official operator art', `Missing ${artGap.join(', ')}; run node tools/setup.mjs --local with a local game install. Plugin artwork still takes priority.`);
 
   // 7. official battlefield scenes (optional; the full zip ships them, a lite / source install may fetch them)
   if (opts.scenes !== 'no') {

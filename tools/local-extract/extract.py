@@ -55,6 +55,7 @@ Usage:
                                                           copied from a release bundle; needs Pillow)
   .venv/bin/python tools/local-extract/extract.py --only scene [--scenes <dir of in-season bundles>]
   .venv/bin/python tools/local-extract/extract.py --only fx [--fx-set sample|used] [--fx-keys k1,k2] [--fx-jobs N]
+  .venv/bin/python tools/local-extract/extract.py --only plugin-art [--plugin-root <installation>]
 
 Writes <out>/**.png|.webp|.skel|.atlas and data/local-assets.json (manifest of what was extracted). With --only, just
 the jobs whose output subdir starts with one of the prefixes run, and their groups replace those of the existing
@@ -71,6 +72,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import scenes  # noqa: E402  (the battlefield scene table and exporter; imports UnityPy only when it runs)
 import fx  # noqa: E402  (the official battle effects, DESIGN §33; imports UnityPy only when it runs)
+import operators  # noqa: E402 (installed plugin operators' optional official art, §34.28)
 
 ROOT = Path(__file__).resolve().parents[2]
 HOME = Path.home()
@@ -912,6 +914,7 @@ def main():
     ap.add_argument('--game', help='AssetBundle root (…/StreamingAssets/AB/Windows or …/Documents/Bundles)')
     ap.add_argument('--out', default=str(ROOT / 'public/assets/local'))
     ap.add_argument('--manifest', default=str(ROOT / 'data/local-assets.json'))
+    ap.add_argument('--plugin-root', default=str(ROOT), help='installation whose plugin JSON and roster are scanned')
     ap.add_argument('--only', action='append', default=[], metavar='SUBDIR',
                     help='only run the jobs whose output subdir starts with this prefix (repeatable), e.g. emoticon')
     ap.add_argument('--scenes', action='append', default=[], metavar='DIR',
@@ -963,12 +966,18 @@ def main():
     token_ids = spine_ids(args.only, TOKEN_SPINE_SUB, TOKEN_SPINES)
     stage_ids = scene_ids(args.only)
     fx_on = fx_selected(args.only)
-    if not jobs and not enemy_ids and not token_ids and not stage_ids and not fx_on:
+    art_on = wants_sub(args.only, operators.SUB)
+    art_ids = spine_ids(args.only, operators.SUB, operators.references(Path(args.plugin_root))) if art_on else []
+    if not jobs and not enemy_ids and not token_ids and not stage_ids and not fx_on and not art_on:
         print(f'--only {args.only}: no job matches', file=sys.stderr)
         return 2
     out_root = Path(args.out)
     out_root.mkdir(parents=True, exist_ok=True)
     manifest, total = {}, 0
+    chars = {}
+    if art_ids:
+        chars, n = operators.export(ab_root, out_root, manifest, print, art_ids)
+        total += n
     print(f'AB root: {ab_root}')
     for job in jobs:
         total += export_bundle(ab_root, job, out_root, manifest, print)
@@ -983,15 +992,25 @@ def main():
                               fx_manifest=Path(args.manifest).with_name(fx.FX_MANIFEST))
     if stage_ids:
         total += export_scenes(ab_root, out_root, manifest, print, stage_ids, scene_roots(ab_root, args.scenes))
-    old = {}
-    if args.only and Path(args.manifest).exists():
+    old, old_chars = {}, {}
+    if Path(args.manifest).exists():
         try:
-            old = json.loads(Path(args.manifest).read_text(encoding='utf-8')).get('groups') or {}
+            previous = json.loads(Path(args.manifest).read_text(encoding='utf-8'))
+            old_chars = previous.get('chars') or {}
+            old = previous.get('groups') or {}
+            if not args.only:
+                old = {g: v for g, v in old.items() if g.startswith(('char/', 'spine/char/'))}
         except (OSError, ValueError) as e:
             print(f'warn: previous manifest unreadable ({e}); writing only the re-extracted groups', file=sys.stderr)
+    # Partial sprite packs keep previously extracted pictures, just as merge_chars keeps their URLs.
+    for group in manifest:
+        if group.startswith('char/'):
+            manifest[group] = {**old.get(group, {}), **manifest[group]}
     groups = merge_manifest(old, manifest, ran_groups(old, manifest, fx_on))  # a missing bundle keeps its previous group
     count = sum(len(v) for v in groups.values())
     doc = {'version': 1, 'source': 'local-client', 'count': count, 'groups': groups}
+    if old_chars or chars:
+        doc['chars'] = operators.merge_chars(old_chars, chars)
     Path(args.manifest).write_text(json.dumps(doc, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     print(f'done: {total} files extracted, manifest {args.manifest} ({count} entries)')
     return 0 if total else 1

@@ -40,6 +40,7 @@
 // server/packs.js re-exports the pack API of this file for its old callers.
 
 import { nodeSha256 } from './identity.js';
+import { mergeLocalChars } from './artReferences.js';
 import { readScripts, applyTrust, isScriptClass } from './trusted.js';
 import { operatorTraitPermissions } from './operatorTraits.js';
 import { readContentData } from './contentData.js';
@@ -197,16 +198,21 @@ export function hashFile(abs, cache) {
 /** The art manifest data/assets.json of `dataDir` (VanillaAssets), from `cache` while its stat identity stays. */
 export function readVanillaAssets(dataDir, cache = new Map()) {
   const abs = path.join(dataDir, 'assets.json');
+  const local = path.join(dataDir, 'local-assets.json');
+  let localStamp = '';
+  try { localStamp = JSON.stringify(statIdentity(fs.statSync(local))); } catch { /* optional */ }
   let st;
   try { st = fs.statSync(abs); } catch { return { manifest: null, sha256: null }; }
   const hit = cache.get(abs);
-  if (hit && sameIdentity(hit, statIdentity(st))) return hit.value;
+  if (hit && hit.localStamp === localStamp && sameIdentity(hit, statIdentity(st))) return hit.value;
   let value = { manifest: null, sha256: null };
   try {
     const buf = fs.readFileSync(abs);
     value = { manifest: JSON.parse(buf.toString('utf8')), sha256: createHash('sha256').update(buf).digest('hex') };
+    // Validate references against the same installation art the browser sees. Preserve the existing identity hash.
+    try { value.manifest = mergeLocalChars(value.manifest, JSON.parse(fs.readFileSync(local, 'utf8'))); } catch { /* optional */ }
   } catch { /* unreadable: no references can be checked, no vs */ }
-  cache.set(abs, { ...statIdentity(st), value });
+  cache.set(abs, { ...statIdentity(st), localStamp, value });
   return value;
 }
 
@@ -894,6 +900,7 @@ function signature({ publicDir, dataDir, packsDir, pluginsDir }) {
       add(abs, 5, `x:${n}/`, false, true, { left: WALK_LIMITS.entries });
     }
     try { const st = fs.statSync(path.join(dataDir, 'assets.json')); parts.push(`a:${st.size}:${Math.floor(st.mtimeMs)}`); } catch { /* none */ }
+    try { const st = fs.statSync(path.join(dataDir, 'local-assets.json')); parts.push(`la:${JSON.stringify(statIdentity(st))}`); } catch { /* none */ }
   }
   return parts.join('\n');
 }
