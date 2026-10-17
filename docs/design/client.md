@@ -521,6 +521,14 @@ Operator attack clips play once per actual attack (§30.7), retaining their inte
 is consumed without replay; a later queued attack may start during the previous recovery. Without another attack
 the actor returns to base/skill idle. Late operator events still start at the strike frame; no sim timing changes.
 
+§34.31: Blemishine's S2 strikes use her official S2 mode's `Attack` (`Attack_Down` when facing down and available),
+while `Skill_2` remains the cast; S3 retains `Skill_3`. Read only the effects index the field already loaded.
+The same verified S2 mapping applies without it: the manifest's cast has OnAttack, so absence of that event alone
+cannot identify this cast. The legacy index omits per-mode animation remaps and skin key-to-clip tables; until
+those are exported, every other skill retains its existing roles with or without the index [ASSUMED], rather than
+treating every raw `Attack` key as the normal skeleton clip. Held loops (§34.4/§34.4.1) and distinct skill idles
+(§23.13) keep their rules. History §34.31 lists the further cross-checked candidates, unchanged in 0.3.1.
+
 Connection recovery sits above the AI-away overlay and below global modals (§30.8), so a replaced session can
 be reclaimed by pointer while away. This does not change the stacking behavior of modals nested inside a screen.
 

@@ -777,6 +777,17 @@ export class SpineActor {
 
   _attackClip() {
     const sk = this.roles.skill;
+    const mode = this.skillOn ? this.skillAttackMode?.() : null;
+    if (this.skillOn && !this._skillLoopHeld()) {
+      if (mode?.animKey === 'Attack') {
+        const a = mode.down && this.has(this.roles.attackDown?.loop) ? this.roles.attackDown : this.roles.attack;
+        if (this.has(a?.loop)) return a;
+      } else if (this.has(mode?.animKey)) {
+        if (mode.animKey === sk?.loop) return sk; // keep a skill's own idle / End ownership
+        return { begin: null, loop: mode.animKey, end: null };
+      }
+      // [ASSUMED] A cosmetic skeleton missing the official clip retains its own roles (§34.31).
+    }
     if (this.skillOn && sk && this.has(sk.loop) && sk.via !== 'attack' && !this._skillIsBuffOnly()) {
       if (this._skillLoopHeld()) {
         // A dedicated strike clip (焰影苇草 Skill_3_Attack) wins. Otherwise a loop that itself has OnAttack is
@@ -789,6 +800,8 @@ export class SpineActor {
         if (Array.isArray(hits) && hits.length) return sk;
         return null;
       }
+      // Without a verified mode mapping the skill clip stays the attack clip, as before §34.31: a lone clip without
+      // OnAttack is not proof of a cast (the integrator kept unverified operators unchanged, with or without the index).
       return sk;
     }
     const a = this.roles.attack;
@@ -797,7 +810,7 @@ export class SpineActor {
   }
 
   // Skill loops that are pure stances (no OnAttack in the loop) are still valid attack visuals during a skill;
-  // only an idle-typed skill loop is treated as buff-only.
+  // only an idle-typed skill loop is treated as buff-only (a verified mode mapping wins first, §34.31).
   _skillIsBuffOnly() {
     const sk = this.roles.skill;
     return !!sk && sk.loop === this.roles.idle;

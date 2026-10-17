@@ -83,6 +83,8 @@
 
 import { UF, ANIM } from '../../../shared/constants.js';
 import { SpineActor } from './spine.js';
+import { skillAttackMode } from './skillAttack.js';
+import { MANIFOLD, isManifold, manifoldCopyForm, manifoldAttackForm } from './manifold.js';
 import { diamondTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, hudRings, ringArc, downLabel, HUD_DISC, ELEMENT_RING } from './textures.js';
 import { COLORS, TIER_COLORS, ENEMY_FRAME, UNIT, PROJ, statusIconKey, statusIconSuppressed } from './style.js';
 import { drawCrate, rowDepthKey, ROW_KEY, deviceBoxOf, DEVICE_BOX } from './tiles.js';
@@ -374,6 +376,11 @@ const dollRoles = (idle, die, attack = null) => Object.freeze({
   idle, deploy: idle, die, attack: attack ? Object.freeze({ begin: null, loop: attack, end: null }) : null, attackDown: null, skill: null,
 });
 export const FORMS = Object.freeze({
+  [MANIFOLD]: Object.freeze({
+    Default: Object.freeze({ roles: { ...clipSet('Idle_1', null, 'Stun', 'Attack'), deploy: 'Start', stun: loop('Stun') } }),
+    Melee: Object.freeze({ change: 'Change_A', combat: 'A_Combat', roles: { ...clipSet('A_Idle', null, 'Die', 'A_Attack'), deploy: 'A_Start', stun: loop('A_Stun'), attackDown: null } }),
+    Range: Object.freeze({ change: 'Change_B', combat: 'B_Combat', roles: { ...clipSet('B_Idle', null, 'B_Die', 'B_Attack'), deploy: 'B_Start', stun: loop('B_Stun'), attackDown: null } }),
+  }),
   enemy_9011_acrefr: Object.freeze({
     stopped: Object.freeze({ change: null, roles: clipSet('B_Idle', 'B_Move', 'B_Die', 'B_Attack') }),
   }),
@@ -926,6 +933,15 @@ export class UnitView {
       try {
         actor = new SpineActor(data, entry);
         actor.setSkillIndex(this.skillIndex ?? undefined);
+        // Query at attack time: late index loads, skill slots and facing changes need no new model or request.
+        actor.skillAttackMode = () => {
+          // [ASSUMED] §34.31's cast heuristic is for operators; enemy abilities and token controllers keep their roles.
+          if (this.info.kind !== 'op') return { preserve: true };
+          const mode = skillAttackMode(this.ctx.skillAttackIndex?.(), {
+            info: this.info, rec: this.ctx.lookupDef?.(this.info), skillIndex: this.skillIndex,
+          });
+          return mode ? { ...mode, down: this.dir === 'DOWN' } : null;
+        };
         actor.setRunMode(this.moveFast);
         // enemies play their attack clip once per attack, then walk on (GitHub #58: the sim stands them for that clip)
         actor.clipPerAttack = this.isEnemy;
@@ -982,7 +998,27 @@ export class UnitView {
   }
 
   _formSpec() {
-    return this.form ? FORMS[this.info.spine || this.info.defId]?.[this.form] || null : null;
+    const form = this.form || (isManifold(this.info) ? 'Default' : null);
+    const f = form ? FORMS[this.info.spine || this.info.defId]?.[form] || null : null;
+    if (f?.combat && this._manifoldCombat) return { ...f, roles: { ...f.roles, attack: loop(f.combat), skill: { ...f.roles.skill, loop: f.combat } } };
+    return f;
+  }
+
+  /** Existing 'copy' fx: select one official form, before its next attack (both board renderers). */
+  copyFrom(rec) {
+    if (!isManifold(this.info)) return;
+    const form = manifoldCopyForm(rec);
+    if (form) this.setForm(form);
+  }
+
+  _attackForm(kind) {
+    if (!isManifold(this.info)) return;
+    const form = manifoldAttackForm(kind);
+    const combat = kind === 'none' && !!(this.flags & UF.BLOCKED), changed = combat !== this._manifoldCombat;
+    this._manifoldCombat = combat;
+    // A late join / split clone has no copy event. Do not replay a transformation over its attack.
+    if (form && form !== this.form) this.setForm(form, { late: Infinity });
+    else if (changed && this.actor) this.actor.setForm(this._formSpec()?.roles || null);
   }
 
   /**
@@ -1311,6 +1347,7 @@ export class UnitView {
   /** An attack was made (b.ev 'atk'). `target` = view or null. */
   onAttack(target, now, kind) {
     if (!this.alive) return;
+    this._attackForm(kind);
     this._pendingDeployElapsed = null;
     // a one-off cast (PROJ[kind].once: 暴鸰's bomb drop) is no attack rhythm: its clip plays once at its own speed
     const once = !!PROJ[kind]?.once;
@@ -1343,6 +1380,7 @@ export class UnitView {
    */
   windUp(lead, kind) {
     if (!this.alive || !this.actor || !this.spineReady) return false;
+    this._attackForm(kind);
     const ok = this.actor.windUp(this.atkInterval, lead, !!PROJ[kind]?.once);
     if (ok && this.imp) this.imp.dirty = true;
     return ok;

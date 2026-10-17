@@ -1074,6 +1074,11 @@ export class SkillFx {
     }
     const tv = this.w.view(extra.id);
     const at = bind.at === 'point' || !tv ? this._ground(x, y, tv) : tv;
+    if (bind.oneshot) {
+      let drew = false;
+      for (const k of keys) if (this.w.playOn(k, at, { important: true })) drew = true;
+      return drew;
+    }
     const bb = U.srec?.bb || {};
     const fxS = Number(extra.duration ?? extra.dur ?? extra.hold);
     const holdS = bind.hold === 'fx' ? (fxS > 0 ? fxS : bind.holdS || SKILL_CAST_S)
