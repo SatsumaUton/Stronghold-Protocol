@@ -667,3 +667,27 @@ Forge 的 `fx.silentPhases` 会变成外观插件的同名声明，只取消该 
 Forge 导入会把 behaviour 的四个开关转成 rules，自动成为玩法插件，支持只有开关的包；未知项逐条跳过并说明。
 option 可以省略：省略表示明确选择该开关的默认项，仍进入哈希和冲突检查；显式 null、非字符串或未知选项仍跳过。
 重复且选项不同则保留第一条 [ASSUMED]。本项不导入公告。完整定义见 [PLUGINS.md](PLUGINS.md#rule-switches)。
+
+
+### 给干员加特质（0.3.1，#671）
+
+不用写 JavaScript，也不用知道 garrisonIds 或 effectKey。在干员记录中写
+`"trait": { "desc": "<获得时>获得1件阿戈尔重刃", "dsl": "data/trait.json" }`，并声明 `dsl` 权限。
+JSON 文件里写 `{ "dsl": 1, "meta": { "on": [{ "when": "gain", "do": [{ "gainItem": { "item": "chess_item_3_07_e_a", "count": 1 } }] }] } }`。
+精锐在 `forms.elite.trait` 单独声明 count=2；`translations` 可给 en、ja、ko、zh-TW 的特质说明。
+现有干员可只写 op=1、charId、trait；需要 data.add/data.patch/dsl 权限。乌尔比安 id 是 `char_4145_ulpia`。
+[ASSUMED] 默认追加；记录中显式加 `"overrides": ["trait:char_4145_ulpia"]` 才关闭官方模式特质，移除插件恢复。
+职业特性、模组、技能和天赋不受影响。
+
+侵蚀爆发叠层用 `elementBurst`、`if.element: "erosion"`、`targetOnField/selfOnField: true`，
+动作是 `layers: { bond: "selfActive", amount: 1, maxPerBattle: 12 }`（精锐改为 2/24）。
+[ASSUMED] 封顶按每个持有者／动作／盟约单独计数，再部署不重置；cap 和带 cap 的 amount 是正整数，上限 1000000。
+元素只接受引擎已有的 neural、erosion、burn、apoptosis、necrosis。获得时每张实得副本一次，合并不多送；
+[ASSUMED] 其他备战事件每名仍持有的角色一次，精锐优先，手牌和临时区有效；自身售出按卖出的形态执行一次，
+最后一张也有效，留下的同角色副本不重复执行。铃兰／御守之力可经 `SERVER_GAIN` 强制触发自定义获得特质，
+沿用强制触发的投资人倍率，不算再次获得棋子。特质增层可被魔王加成；[ASSUMED] 加成在节点 cap 外计算，总层数仍封顶 999。
+[ASSUMED] 含增层特质的参战单位且允许增层时，该战场由服务器模拟结算，即使关闭 SP_VERIFY 也不信客户端声明；
+代价是每个受影响战场一次完整服务器推演。普通房间、未参战或禁用增层时不增加此开销。
+严格检查识别必需权限，旧一键修复不能误删；不存在的物品／盟约引用立即报错。
+[ASSUMED] 引用依赖插件时，把依赖放在同级目录并写入 requires；检查只读取和组合数据，不执行脚本。
+完整事件、库存规则、schema 与可复制的两份规格见 [PLUGIN-DSL 第10节](PLUGIN-DSL.md#10-干员特质031671)。

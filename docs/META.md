@@ -1050,3 +1050,7 @@ Validated PREP loadout changes reconcile affected owners' summons in board/hand/
 stock, then recompute owner ranges and refill the hand. [ASSUMED] Valid board cards survive in reading order before
 hand/temp index order; obsolete/excess copies are removed (including temp deadlines), missing copies use the ordinary
 overflow queue. Unchanged loadouts and other owners never replenish spent cards. Failed validation is atomic.
+
+### Declarative operator traits (0.3.1, #671)
+
+`server/match/operatorTraits.js` compiles operator-owned `meta.on` through the existing prep DSL and dispatches through the existing context helpers. It requires no registry key. [ASSUMED] Gain is per acquired copy, deploy is hand/temp-to-board, and other hooks run once per still-owned character for that player (elite preferred, bench/temp included). Self-sale uses the removed piece and sold form once even for its final copy. SERVER_GAIN discovery/forced dispatch exposes custom gain separately, preserving the forced investor multiplier without another acquisition. The acquisition primitive covers bots, rewards, DIY and test grants; merge output does not acquire another copy. See [PLUGIN-DSL §10](PLUGIN-DSL.md#10-干员特质031671) for events, item bounds and explicit official-trait replacement.

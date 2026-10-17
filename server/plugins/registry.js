@@ -41,6 +41,7 @@
 
 import { nodeSha256 } from './identity.js';
 import { readScripts, applyTrust, isScriptClass } from './trusted.js';
+import { operatorTraitPermissions } from './operatorTraits.js';
 import { readContentData } from './contentData.js';
 import fs from 'node:fs';
 import { readFxAssets, readFxManifest as readPluginManifest } from './fxAssets.js';
@@ -528,6 +529,15 @@ export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, whe
       return out(null);
     }
     plugin.content = c.content;
+    // Manifest-only diagnostics cannot see permissions consumed by operator trait JSON.
+    const traitPermissions = operatorTraitPermissions(c.content, manifest);
+    for (let i = issues.length - 1; i >= 0; i--) {
+      const issue = issues[i];
+      if (issue.code !== 'PLUGIN_PERMISSION_UNUSED' || !traitPermissions.has(issue.params?.permission)) continue;
+      const wi = warnings.indexOf(issue.text);
+      if (wi >= 0) warnings.splice(wi, 1);
+      issues.splice(i, 1);
+    }
     if (isScriptClass(manifest.class)) {
       plugin.script = readScripts(dir,manifest,files);
       for (const p of plugin.script.problems) list.problem(p.code,p.message,{where:p.path,detail:p.message});

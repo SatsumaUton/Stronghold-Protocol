@@ -9,6 +9,7 @@ import { manifestTextWithoutNotices } from '../../shared/plugins/notices.js';
 import { resolvePluginOrder } from '../../shared/plugins/order.js';
 import { applyPatches, normalizeSettings } from '../../shared/plugins/patch.js';
 import { expandGameplayRecords, reconcilePluginBonds, reconcilePluginTokens, validateGameplayData } from './gameplayRecords.js';
+import { expandTraitRecords, operatorTraitPatchProblems } from './operatorTraits.js';
 import { expandFxRecords } from './fxRecords.js';
 import { object, own, clone, problem, RECORD_MAPS, recordId, namespaceCollisions } from '../../shared/plugins/dataUtils.js';
 import { buildRecordOverlay, walkOverlay, getPath, applyRecordOverlay } from '../../shared/i18nData.js';
@@ -88,6 +89,11 @@ function translations(data, initial, plugins) {
       dest.files[file] ??= {};
       dest.files[file][id] = buildRecordOverlay([...leaves.values()]);
     }
+  }
+  for (const g of Object.values(data.garrisons ?? {})) for (const [lang, text] of Object.entries(g.operatorTrait?.translations ?? {})) {
+    const dest = out[lang] ??= { version: 1, lang, names: {}, files: {} };
+    dest.files.garrisons ??= {};
+    dest.files.garrisons[g.garrisonId] = buildRecordOverlay(['desc', 'descRaw'].map(key => ({ path: [key], zh: g[key], en: text })));
   }
   return { out, problems };
 }
@@ -200,14 +206,16 @@ function wavesUsedByMode(mode) {
 }
 
 /** C1. ids accepts ids or {id, settings}; failures return only {problems}, never a usable cs/data. */
-function composeContentSet({ registry, ids = [] }) {
+function composeContentSet({ registry, ids = [], checkDataOnly = false }) {
   if (!registry || !Array.isArray(ids)) return { problems: [problem('PLUGIN_CONTENT_FORMAT', 'ids', 'registry and plugin ids required')] };
   let base;
   try { base = baseFor(registry); } catch (e) { return { problems: [problem('PLUGIN_CONTENT_FILE', 'data', e.message)] }; }
   const selected = ids.map(v => typeof v === 'string' ? { id: v } : v);
   const usable = id => {
     const p = registry.plugin(id);
-    return p?.status === 'loaded' && p.manifest.scope.includes('room')
+    // Data-only checks may read a script dependency's JSON without granting it execution permission.
+    const readable = p?.status === 'loaded' || checkDataOnly && p?.status === 'disabled' && p.script && p.content;
+    return readable && p.manifest.scope.includes('room')
       && (['content','script','trusted'].includes(p.class) && p.manifest.compatible !== false && p.content || p.class === 'cosmetic' && p.visual) ? p : null;
   };
   const resolved = resolvePluginOrder(selected.map(v => v?.id), id => usable(id)?.manifest ?? null);
@@ -238,10 +246,12 @@ function composeContentSet({ registry, ids = [] }) {
           writes.set(at, p.id);
         }
         r = applyPatches(data, doc.ops, { pluginId: p.id, settings: settings[p.id] });
+        r.problems.push(...operatorTraitPatchProblems(data, r.data));
       } else {
         if (!p.manifest.permissions.includes('data.add')) { problems.push(problem('PLUGIN_CONTENT_PERMISSION', rel, 'records require data.add')); continue; }
         const entries = part === 'data' ? doc.entries : (Array.isArray(doc) ? doc : [doc]).map(v => part === 'operators' ? v : { ...v, file: part });
-        r = expandFxRecords(data, entries, { pluginId: p.id, validateDsl }, expandGameplayRecords);
+        r = expandTraitRecords(data, entries, { pluginId: p.id, validateDsl, permissions: p.manifest.permissions },
+          (d, rs, opts) => expandFxRecords(d, rs, opts, expandGameplayRecords));
       }
       problems.push(...r.problems.map(e => ({ ...e, plugin: p.id, file: rel })));
       data = r.data;
@@ -290,6 +300,8 @@ function composeContentSet({ registry, ids = [] }) {
   }
   const tr = translations(data, base.i18n, plugins);
   if (tr.problems.length) return { problems: tr.problems };
+  // Checking declarative references must never execute a dependency's script setup/preflight.
+  if (checkDataOnly) return { data, problems: [] };
   const bodies = new Map(base.files), files = {}, hashes = {};
   for (const [name, rec] of Object.entries(data)) {
     const rel = `data/${name}.json`;

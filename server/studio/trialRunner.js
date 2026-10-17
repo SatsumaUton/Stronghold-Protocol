@@ -75,6 +75,8 @@ function recordBattle(set, scene) {
         await sandbox.installSandboxScripts(set.scripts, { hashInput, parse });
       } else await loadScripts(set.scripts, { hashInput });
     }
+    const { installServerOperatorTraits } = await import('../plugins/operatorTraits.js');
+    await installServerOperatorTraits(set.data);
     const plugin = recordBattle(set, modScene);
     process.send({ ok: true, vanilla, plugin, comparison: { damage: plugin.damage - vanilla.damage,
       duration: plugin.result.time - vanilla.result.time, baseline: original.name, operator: op.name, duel: modScene.duel } });

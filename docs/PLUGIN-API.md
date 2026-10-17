@@ -541,6 +541,24 @@ Theme values and announcements are specified in [PLUGINS §9.1–§9.2](PLUGINS.
 | `overlay.fx.bind` | stable | 0.3.1 | `public/js/render/vfx/pluginFormat.js#pluginFxProblems` |
 | `overlay.fx.silentPhases` | stable | 0.3.1 | `public/js/render/vfx/pluginFormat.js#pluginFxProblems` |
 | `dsl.fx.plugin` | stable | 0.3.1 | `public/js/render/vfx/pluginFormat.js#pluginFxProblems` |
+| `record.operator.trait.dsl` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `record.operator.overrides.trait` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.on` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trigger.elementBurst` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.condition.element` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.condition.targetOnField` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.condition.selfOnField` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.layers.maxPerBattle` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.layers.selfActive` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.gainItem.count` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.gain` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.deploy` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.roundStart` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.buy` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.sell` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.merge` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.levelUp` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
+| `dsl.trait.meta.battleResult` | stable | 0.3.1 | `server/plugins/operatorTraits.js#TRAIT_SURFACE` |
 <!-- plugin-surface:end -->
 
 ## Host feeds for a read-only panel (0.3.1)
@@ -556,3 +574,11 @@ Theme values and announcements are specified in [PLUGINS §9.1–§9.2](PLUGINS.
 **`welcome`.** With info: `version` is the integer `PROTOCOL_VERSION`, `lang` is the player's language (at most 16 characters), `plugins` is the room's plugin ids, optional `cs` is the same sanitized room identity as in `state.room.cs`, and `prefs` is the scalar values already stored for this plugin (string, finite number or boolean; at most 32 keys matching `^[A-Za-z0-9._-]{1,64}$`). Without info the message stays `{ v, t, id, slots }`. The studio preview sends that shorter welcome.
 
 The Forge shim exposes the first eight digits of the actual room `cs` as `net.welcome().mods.digest` [ASSUMED]. Room changes replace it; leaving a room or an unavailable identity clears it. It is never invented. Its `/shared/i18n.js` compatibility module supplies only `t`: static named aliases and namespaces bind it, unsupported static exports are refused; literal dynamic imports also supply `t`.
+
+Operator trait declarations are content-only additions in 0.3.1 (#671): see PLUGIN-DSL §10 and
+`schemas/operator-trait.schema.json`. The loader validates this extension before delegating the legacy grammar;
+legacy `validateDsl`/`compileDsl` remain unchanged. The app-owned setup adapter is internal, not an author scripting API.
+
+Trait gain is discoverable through SERVER_GAIN and supports forced dispatch separately from acquisition. Self-sale
+uses the sold form, including the last copy [ASSUMED]. Layer actions preserve garrison attribution and the existing
+cooldown tolerance; affected fields require server authority [ASSUMED]. No new author API names are introduced.

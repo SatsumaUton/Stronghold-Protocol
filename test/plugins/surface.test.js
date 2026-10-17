@@ -1,3 +1,4 @@
+import { TRAIT_SURFACE } from '../../server/plugins/operatorTraits.js';
 import { GAMEPLAY_RECORD_SURFACE } from '../../server/plugins/gameplayRecords.js';
 // test/plugins/surface.test.js — the frozen plugin API v1 (DESIGN §32.13, docs/PLUGIN-API.md).
 // Three things must agree: the markdown table, buildSurface(), and the closed sets themselves (enumerated in this
@@ -89,6 +90,7 @@ function expectedNames() {
   names.push('api.PLUGIN_API.min', 'api.PLUGIN_API.current');
   names.push('record.file.bonds', 'record.file.items', 'record.operator.forms.tags', 'record.operator.forms.tokens');
   names.push('record.operator.fx', 'overlay.fx.index', 'overlay.fx.flipbooks', 'overlay.fx.bind', 'overlay.fx.silentPhases', 'dsl.fx.plugin');
+  names.push(...TRAIT_SURFACE.map(r => r.name));
   return names;
 }
 
@@ -104,7 +106,7 @@ function parseTable(md) {
   return rows;
 }
 
-const rows = [...buildSurface({ dsl: vocab, studioRoutes: STUDIO_ROUTES }), ...GAMEPLAY_RECORD_SURFACE, ...pluginFxSurface()];
+const rows = [...buildSurface({ dsl: vocab, studioRoutes: STUDIO_ROUTES }), ...GAMEPLAY_RECORD_SURFACE, ...pluginFxSurface(), ...TRAIT_SURFACE];
 const doc = parseTable(fs.readFileSync(path.join(ROOT, 'docs/PLUGIN-API.md'), 'utf8'));
 
 test('the document table and buildSurface are the same rows', () => {

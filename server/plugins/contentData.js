@@ -7,6 +7,7 @@ import { isPackPath, PLUGIN_LIMITS } from '../../shared/plugins/manifest.js';
 import { deepFreeze } from '../data.js';
 import { validateDsl } from '../sim/content/dsl/validate.js';
 import { operatorMetadataProblems } from '../../shared/plugins/records.js';
+import { hasOperatorTrait, validateTraitSpec } from './operatorTraits.js';
 import { compilePluginFxDsl } from './fxRecords.js';
 import { operatorFxProblems } from '../../public/js/render/vfx/pluginFormat.js';
 import { manifestTextWithoutNotices } from '../../shared/plugins/notices.js';
@@ -22,6 +23,8 @@ export function readContentData(dir, manifest) {
     const bytes = fs.readFileSync(abs);
     if (bytes.length > PLUGIN_LIMITS.jsonBytes) throw problem('PLUGIN_DATA_LIMIT', rel, 'JSON exceeds 8 MB');
     const doc = JSON.parse(bytes.toString('utf8'));
+    // Compiled marker is host-only; data patches cannot forge ownership, runtime pins or trait code.
+    if (/"operatorTrait"\s*:/.test(JSON.stringify(doc))) throw problem('PLUGIN_DSL_SHAPE', rel, 'operatorTrait is reserved for the content builder');
     const errors = jsonProblems(doc, rel);
     if (errors.length) throw errors[0];
     files[rel] = nodeSha256(bytes);
@@ -53,6 +56,12 @@ export function readContentData(dir, manifest) {
       const errors = operatorMetadataProblems(r, manifest.id);
       if (errors.length) throw errors[0];
       if (typeof r?.kit?.spec === 'string') r.kit.spec = read(r.kit.spec);
+      if (hasOperatorTrait(r)) {
+        for (const tr of [r.trait, ...Object.values(r.forms ?? {}).map(f => f.trait)]) if (tr?.dsl !== undefined) {
+          if (typeof tr.dsl === 'string') tr.dsl = read(tr.dsl);
+          validateTraitSpec(tr.dsl, manifest.id);
+        }
+      }
     };
     for (const rel of manifest.parts.operators?.files ?? []) for (const r of Array.isArray(documents[rel]) ? documents[rel] : [documents[rel]]) resolveSpec(r);
     for (const rel of manifest.parts.data?.files ?? []) for (const r of documents[rel].entries ?? []) resolveSpec(r);

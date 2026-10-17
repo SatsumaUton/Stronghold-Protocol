@@ -12,7 +12,8 @@ import { applyPatches } from '../../shared/plugins/patch.js';
 import { dataBound } from '../../shared/plugins/limits.js';
 import { officialBbMax, officialFieldMax } from '../../shared/plugins/officialBounds.js';
 import { validateSkillSpec, matchesSchema } from '../../shared/plugins/skillSpec.js';
-import { FX_RECORDS_SCHEMA as RECORDS_SCHEMA } from '../../server/plugins/fxRecords.js';
+import { FX_RECORDS_SCHEMA } from '../../server/plugins/fxRecords.js';
+import { TRAIT_RECORDS_SCHEMA as RECORDS_SCHEMA } from '../../server/plugins/traitSchema.js';
 import { guard } from '../helpers/contentFixtures.js';
 import { diyRecord } from '../../shared/diy.js';
 import { meleeOnHighGround } from '../../shared/highGround.js';
@@ -81,7 +82,7 @@ test('checked-in schema equals the runtime schema and accepts/rejects the same s
   fs.unlinkSync(dest);
   assert.deepEqual(JSON.parse(fs.readFileSync('schemas/records.schema.json')), RECORDS_SCHEMA);
   for (const r of [guard(), { ...guard(), as: 'bad' }, { ...guard(), forms: {} }, { file: 'modes', id: 'mode_x_data_demo_one', base: 'mode_single_normal' }]) {
-    const valid = matchesSchema(r, RECORDS_SCHEMA);
+    const valid = matchesSchema(r, FX_RECORDS_SCHEMA);
     const problems = expandRecords(base, [r], context).problems;
     assert.equal(!problems.some(p => p.code === 'PLUGIN_RECORD_TYPE'), valid);
   }
