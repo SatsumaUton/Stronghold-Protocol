@@ -1,5 +1,7 @@
+import { PRESENTATION_TEMPLATES, validatePresentation } from './presentation.js';
 // The save gate is independent of the editor's debounced explanation.
 export async function validateDraft(draft, { get, post }) {
+  if (PRESENTATION_TEMPLATES.includes(draft.template)) return validatePresentation(draft);
   const o = draft.options || {};
   let spec;
   if (draft.template === 'dsl' || draft.template === 'meta') {

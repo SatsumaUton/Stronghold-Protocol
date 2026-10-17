@@ -598,3 +598,9 @@ legacy `validateDsl`/`compileDsl` remain unchanged. The app-owned setup adapter 
 Trait gain is discoverable through SERVER_GAIN and supports forced dispatch separately from acquisition. Self-sale
 uses the sold form, including the last copy [ASSUMED]. Layer actions preserve garrison attribution and the existing
 cooldown tolerance; affected fields require server authority [ASSUMED]. No new author API names are introduced.
+
+
+Studio authoring note (0.3.1, §34.30): `theme`, `notices`, `fx` and `skins` are templates using existing studio
+routes and the stable theme/notices/operator.fx/overlay.fx/overlay.chars.skins contracts above. Form draft options
+are studio metadata, excluded from packed plugins. This adds no stable API member or route; surface.stable.json
+therefore remains unchanged. See PLUGIN-GUIDE.md for the fields, bounds, previews and trial workflow.

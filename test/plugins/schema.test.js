@@ -183,6 +183,15 @@ test('the manifest schema bounds raw theme strings in both accepted map shapes',
   }
 });
 
+test('a notices-only cosmetic agrees with the runtime; an empty notices-only payload is not clean', () => {
+  const manifest = { manifest: 2, version: '1.0.0', class: 'cosmetic', app: '*', api: PLUGIN_API.current, scope: ['personal'],
+    notices: [{ id: 'hello', title: 'Hello', body: 'Plain text' }] };
+  assert.deepEqual(v.validate('plugin.schema.json', manifest), []);
+  const read = readPluginManifest(manifest, { id: 'notice-demo' });
+  assert.deepEqual(read.problems, []); assert.deepEqual(read.warnings, []);
+  assert.ok(v.validate('plugin.schema.json', { ...manifest, notices: [] }).length);
+});
+
 test('the overlay schema accepts exactly what the checks find clean (no problem, no warning)', () => {
   const disagree = [];
   for (const [name, o] of OVERLAYS) {

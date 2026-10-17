@@ -582,6 +582,13 @@ normalized values from the room, read-only for non-hosts and during a match. Van
 
 Authoring checks (DESIGN §32.9.1): numeric fields display the shared official bounds and positive step floor; invalid saves are refused. DSL validation network failures are explicit, and saving revalidates the current spec before writing. Unkeyed studio state reads omit script source. Trial replay remains a data-only renderer feed; sandbox simulation runs in the same SES executor as a formal match. Forge and catalogue entry points remain available beside the authoring templates.
 
+Presentation authoring (§34.30): theme, notices, fx and skins each have a template and form. Theme applies only
+validated tokens to the studio root and restores the previous inline declarations on unmount [ASSUMED]. Notices
+preview uses the announcement popup's localization and plain text. Skins previews use the actual picker rows and
+fallbacks; file-slot changes hydrate the form before subsequent saves. FX drafts use the existing trial replay in
+both board modes; locally indexed borrowed official effects remain 3D-only. Save form metadata before media uploads
+[ASSUMED]. No new route or gameplay rule is introduced.
+
 ### Combat metrics (作战统计) — ported from the xinhai-ai fork, opt-in
 
 设置 →「作战统计」 (`combatMetrics`, PR #618 by @robll-v1) defaults off, the same kind of decision as 显示弹药与能量数量: the

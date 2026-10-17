@@ -27,7 +27,7 @@ export function TrialBench({ state, draft }) {
     setBusy(true); setResult(null); setError('');
     try {
       const r = await post('trial', { id: state.id, scenario, operator: operator || undefined, opponent: opponent || undefined, wave, seconds, seed: 1, settings,
-        ...(draft && draft.template !== 'script' ? { draft } : {}) });
+        ...(draft && ['numbers','operator','dsl','meta','mode','fx'].includes(draft.template) ? { draft } : {}) });
       setResult(r); setPlaying(true); setReset(n => n + 1);
       if (globalThis.__studio) globalThis.__studio.trial = r;
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }

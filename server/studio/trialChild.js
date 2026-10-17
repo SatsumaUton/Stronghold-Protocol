@@ -31,13 +31,13 @@ process.once('message', async ({ dirs, request, allowedScripts, temporary, heapM
     const files = createPluginFiles(dirs.pluginsDir);
     const selected = files.root(request.id);
     const authored = createAuthoring({ files, dataDir: dirs.dataDir });
-    let draft = null;
+    let draft = null, draftDir = null;
     if (request.draft) {
       const originalManifest = JSON.parse(fs.readFileSync(files.stat(request.id, 'plugin.json').abs, 'utf8'));
-      if (originalManifest.class !== 'content' || !['numbers','operator','dsl','meta','mode'].includes(request.draft.template)) throw new StudioError('PLUGIN_STUDIO_REQUEST', 400);
+      if (originalManifest.class !== 'content' || !['numbers','operator','dsl','meta','mode','fx'].includes(request.draft.template)) throw new StudioError('PLUGIN_STUDIO_REQUEST', 400);
       const made = authored.generate(request.id, request.draft, originalManifest);
       if (!temporary) throw new StudioError('PLUGIN_STUDIO_TRIAL_FAILED', 500);
-      const dir = path.join(temporary, request.id); fs.mkdirSync(dir);
+      const dir = path.join(temporary, request.id); draftDir = dir; fs.mkdirSync(dir);
       for (const f of files.list(request.id)) {
         if (f.link || !isPackPath(f.rel) || path.isAbsolute(f.rel)) throw new StudioError('PLUGIN_STUDIO_PATH', 403, { detail: f.rel });
         if (f.rel === 'plugin.lock.json') continue;
@@ -97,7 +97,7 @@ process.once('message', async ({ dirs, request, allowedScripts, temporary, heapM
       runner.once('exit', () => reject(new StudioError('PLUGIN_STUDIO_TRIAL_FAILED', 500)));
       runner.send({ base, set, baseScene, modScene, original, op });
     });
-    reply(addFxReplay(result, view, request.id, set.data, files));
+    reply(addFxReplay(result, view, request.id, set.data, draftDir ? { ...files, root: id => id === request.id ? draftDir : files.root(id) } : files));
   } catch (e) { reply({ ok: false, issues: [issue({ code: e.code?.startsWith('PLUGIN_') ? e.code : 'PLUGIN_STUDIO_TRIAL_FAILED', params: e.params })] }); }
   finally { if (temporary) fs.rmSync(temporary, { recursive: true, force: true }); }
 });

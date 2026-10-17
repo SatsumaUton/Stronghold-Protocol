@@ -1,5 +1,7 @@
 // The wizard owns only its generated files. A revision rejects saves over external edits.
 import fs from 'node:fs';
+import path from 'node:path';
+import { officialEffects } from './presentationData.js';
 import { createHash } from 'node:crypto';
 import { createPlugin, templateById, manifestText } from './templates/index.js';
 import { createTargetIndex, targetOf } from './targets.js';
@@ -19,18 +21,33 @@ export function authorRevision(files, id) {
   return h.digest('hex');
 }
 
-export function createAuthoring({ files, dataDir }) {
+export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir, '../public') }) {
   let data;
   const official = () => (data ||= readStudioData(dataDir));
   const targets = createTargetIndex(dataDir);
   const read = id => {
     let side;
     try { side = JSON.parse(files.readSidecar(id, '.studio.json') || '{}'); } catch { side = {}; }
+    if (side.authoring?.template === 'skins') {
+      const manifest = JSON.parse(fs.readFileSync(files.stat(id, 'plugin.json').abs, 'utf8'));
+      const charId = (side.authoring.target || 'operator:char_102_texas').replace(/^operator:/, '');
+      const skins = manifest.assets?.chars?.[charId]?.skins || {};
+      // Slot uploads/clears are authoritative, so later form saves cannot restore a removed file.
+      side.authoring.options = { ...side.authoring.options, outfits: Object.entries(skins).map(([key, rec]) => ({ key, ...rec })) };
+    }
     return side.authoring ? { ...side.authoring, revision: authorRevision(files, id) } : null;
   };
   const details = (template, target) => {
     const t = targetOf(targets().targets, target);
     const d = official();
+    if (template === 'fx') {
+      const indexed = officialEffects(publicDir);
+      const { normal, elite } = officialOperator(d, t?.key || 'char_102_texas');
+      const normalSkills = normal.skills?.length ? normal.skills : [normal.skill];
+      const eliteSkills = elite.skills?.length ? elite.skills : [elite.skill];
+      return { units: indexed.map(u => ({ ...u, kind: 'operator', name: targets().targets.find(t => t.kind === 'operator' && t.key === u.key)?.name || u.key })),
+        slots: Array.from({ length: Math.max(normalSkills.length, eliteSkills.length) }, (_, i) => ({ id: String(i), name: `S${i + 1}: ${(normalSkills[i] || eliteSkills[i])?.name || (normalSkills[i] || eliteSkills[i])?.skillId || ''}` })) };
+    }
     if (template === 'numbers') return { fields: numericFields(d, t || { kind: 'operator', key: 'char_102_texas' }) };
     if (['operator', 'dsl'].includes(template)) {
       const source = officialOperator(d, t?.key || 'char_102_texas');
@@ -46,7 +63,7 @@ export function createAuthoring({ files, dataDir }) {
     const target = input.target ? targetOf(targets().targets, input.target) : null;
     if (input.target && (!target || !tpl.kinds.includes(target.kind))) throw new StudioError('PLUGIN_STUDIO_TARGET', 400, { target: input.target });
     const name = typeof manifest?.name === 'string' ? manifest.name : manifest?.name?.zh || manifest?.name?.en || id;
-    return createPlugin(tpl, { id, name, target, options: input.options, data: official() });
+    return createPlugin(tpl, { id, name, target, options: input.options, data: official(), publicDir });
   };
   const save = (id, input) => {
     const old = read(id);
@@ -75,7 +92,29 @@ export function createAuthoring({ files, dataDir }) {
 
 /** Preserve metadata, settings, dependencies and other unowned parts in both save and unsaved trials. */
 export function mergeAuthorManifest(manifest, generated, template) {
-  const ownedPermissions = ['numbers'].includes(template) ? ['data.patch'] : ['operator','dsl','meta'].includes(template) ? ['data.add','dsl'] : template === 'mode' ? ['data.add'] : ['ui.frame'];
+  // Presentation wizards own only their own payload; art slot uploads and all other metadata survive saves.
+  if (template === 'theme' || template === 'notices') {
+    manifest[template] = generated[template];
+    if (generated.permissions) manifest.permissions = [...new Set([...(manifest.permissions || []), ...generated.permissions])];
+    return manifest;
+  }
+  if (template === 'skins') {
+    const [charId, rec] = Object.entries(generated.assets.chars)[0];
+    if (typeof manifest.assets === 'string') throw new StudioError('PLUGIN_STUDIO_REQUEST', 409, { detail: 'wizard assets must be inline' });
+    manifest.assets ||= {}; manifest.assets.chars ||= {}; manifest.assets.chars[charId] ||= {};
+    manifest.assets.chars[charId].skins = rec.skins;
+    manifest.permissions = [...new Set([...(manifest.permissions || []), ...generated.permissions])];
+    return manifest;
+  }
+  if (template === 'fx') {
+    if (typeof manifest.assets === 'string') throw new StudioError('PLUGIN_STUDIO_REQUEST', 409, { detail: 'wizard assets must be inline' });
+    if (generated.assets?.fx) { manifest.assets ||= {}; manifest.assets.fx = generated.assets.fx; }
+    else if (manifest.assets) {
+      delete manifest.assets.fx;
+      if (!Object.keys(manifest.assets).length) { delete manifest.assets; manifest.permissions = (manifest.permissions || []).filter(p => p !== 'assets.add'); }
+    }
+  }
+  const ownedPermissions = ['numbers'].includes(template) ? ['data.patch'] : ['operator','dsl','meta'].includes(template) ? ['data.add','dsl'] : ['mode', 'fx'].includes(template) ? ['data.add'] : ['ui.frame'];
   manifest.permissions = [...new Set([...(manifest.permissions || []).filter(p => !ownedPermissions.includes(p)), ...(generated.permissions || [])])];
   for (const key of ['operators', 'data', 'dsl', 'modes', 'slots', 'entry']) {
     if (Object.hasOwn(generated, key)) manifest[key] = generated[key];

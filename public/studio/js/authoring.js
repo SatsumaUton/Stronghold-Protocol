@@ -6,7 +6,7 @@ import { errorText } from './issues.js';
 import { validateDraft } from './validateDraft.js';
 import { editorOf } from './editors/index.js';
 
-export function Authoring({ state, busy, onSave, onDraft, initialDraft }) {
+export function Authoring({ state, busy, onSave, onDraft, initialDraft, onFiles, onClear, onUpload }) {
   const [draft, setDraft] = useState(initialDraft || { ...state.authoring, id: state.id });
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState('');
@@ -19,14 +19,14 @@ export function Authoring({ state, busy, onSave, onDraft, initialDraft }) {
     setSaving(true); setFailure('');
     try {
       const result = await validateDraft(draft, { get, post });
-      if (!result.ok) { setFailure(t('DSL 规格被拒绝，请修正校验结果后再保存。')); return; }
+      if (!result.ok) { setFailure(t('校验未通过，请修正表单中的问题。'));  return; }
       const saved = await onSave(draft);
       if (!saved?.check?.ok) setFailure(t('校验或保存未完成，请重试。'));
     } catch (e) { setFailure(t('校验或保存未完成，请重试。') + ' ' + errorText(e)); }
     finally { setSaving(false); }
   };
   return html`<section class="st-authoring" data-testid="authoring">
-    ${Component ? html`<${Component} draft=${draft} state=${state} onChange=${change} />` : null}
+    ${Component ? html`<${Component} draft=${draft} state=${state} onChange=${change} onFiles=${onFiles} onClear=${onClear} onUpload=${onUpload} dirty=${dirty} busy=${busy || saving} />` : null}
     ${failure ? html`<p class="st-error" data-testid="authoring-error">${failure}</p>` : null}
     ${draft.template !== 'script' ? html`<${Button} variant="primary" data-testid="save-wizard" disabled=${busy || saving || !dirty} loading=${busy || saving} onClick=${save}>${t('保存修改')}<//>` : null}
   </section>`;

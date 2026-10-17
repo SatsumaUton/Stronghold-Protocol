@@ -292,7 +292,7 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
   };
   const files = createPluginFiles(pluginsDir);
   const targets = createTargetIndex(dataDir);
-  const authoring = createAuthoring({ files, dataDir });
+  const authoring = createAuthoring({ files, dataDir, publicDir });
   const trials = createTrialBench({ registry, files, spawn: trialSpawn });
   const previews = createPreviews({ vanilla: () => registry.vanillaAssets() });
   const compress = new CompressCache();
@@ -406,7 +406,9 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
   function saveSections(id, sections) {
     const clean = (Array.isArray(sections) ? sections : []).filter((s) => isObj(s) && templateById(s.template) && targetOf(targets().targets, s.target))
       .slice(0, 64).map((s) => ({ template: s.template, target: s.target }));
-    files.writeSidecar(id, SIDECAR, Buffer.from(`${JSON.stringify({ v: 1, sections: clean }, null, 2)}\n`));
+    let side = {};
+    try { side = JSON.parse(files.readSidecar(id, SIDECAR) || '{}'); } catch { /* first sections */ }
+    files.writeSidecar(id, SIDECAR, Buffer.from(`${JSON.stringify({ ...side, v: 1, sections: clean }, null, 2)}\n`));
     return clean;
   }
 
@@ -575,6 +577,11 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
       const tpl = templateById(s.template);
       const hit = t && tpl ? tpl.slots(t, manifest).find((x) => x.at.join('\u0001') === at.join('\u0001')) : null;
       if (hit) return hit;
+    }
+    if (at[0] === 'chars' && at[2] === 'skins' && ['image', 'spine'].includes(loc.kind)) {
+      // Full UTF-8 hex preserves distinct keys containing @ # + .; sanitizing them would collide.
+      const field = at.at(-1);
+      return { at, kind: loc.kind, field, dir: `skins/${keyDir(at[1])}/${Buffer.from(at[3]).toString('hex')}${loc.kind === 'spine' ? `/${field}` : ''}`, base: field };
     }
     const kind = typeof loc.kind === 'string' ? loc.kind : null;
     if (!kind) throw new StudioError('PLUGIN_STUDIO_REQUEST', 400, { detail: `${at.join('.')} is a whole record, not one place` });
@@ -891,7 +898,7 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
       const t = body.target ? targetOf(targets().targets, text(body.target, 200)) : null;
       if (body.target && !t) throw new StudioError('PLUGIN_STUDIO_TARGET', 404, { target: text(body.target, 80) });
       if (t && !tpl.kinds.includes(t.kind)) throw new StudioError('PLUGIN_STUDIO_TARGET', 400, { target: targetSpec(t) });
-      const made = createPlugin(tpl, { id, name: body.name, target: t, authors: body.authors, license: body.license, credits: body.credits, options: body.options || {}, data: tpl.build ? readStudioData(dataDir) : null, lang: body.lang === 'en' ? 'en' : 'zh' });
+      const made = createPlugin(tpl, { id, name: body.name, target: t, authors: body.authors, license: body.license, credits: body.credits, options: body.options || {}, data: tpl.build ? readStudioData(dataDir) : null, publicDir, lang: body.lang === 'en' ? 'en' : 'zh' });
       files.root(id, { create: true });
       files.write(id, PLUGIN_MANIFEST, Buffer.from(manifestText(made.manifest)));
       for (const [rel, text] of Object.entries(made.files)) files.write(id, rel, Buffer.from(text), { generated: true });

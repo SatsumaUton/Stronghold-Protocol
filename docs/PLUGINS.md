@@ -244,7 +244,7 @@ node tools/plugin.mjs check [<dir|id> …] [--strict] the folders of plugins/ (o
 node tools/plugin.mjs pack <dir|id> … [--zip]      write plugin.lock.json (every file's SHA-256 and size, each Spine model's
           [--out <file|dir>]                       clip data), then check the folder; --zip writes the folder as a zip
                                                    (default plugins/_dist/<id>-<version>.zip)
-node tools/plugin.mjs new <template> <id>          a new plugin folder from a template (art, spine, voice, audio, numbers, operator, dsl, meta, mode, ui, script)
+node tools/plugin.mjs new <template> <id>          a new plugin folder from a template (art, spine, voice, audio, numbers, operator, dsl, meta, mode, ui, script, theme, notices, fx, skins)
           [--target <名字|id>] [--name …] [--dir …] optional target found by its official name; --options <json-file> for wizard options
 node tools/plugin.mjs errors [--markdown] [--write] the error catalogue; --write keeps the symptom tables of the documents
 node tools/plugin.mjs import-forge <dir|zip>       a Forge workshop pack → the plugins it can become (§16);
@@ -1370,6 +1370,26 @@ schema, findings in plain words and hot reload. The design is DESIGN §32.9; the
   「添加替换内容」 (an operator's avatar, model and voice in one plugin); the page keeps what it shows in the dot file
   `.studio.json` of the folder (never listed, served, checked or packed; a plugin made by hand gets its sections read
   off its overlay).
+- **0.3.1 presentation templates**: `theme` (personal cosmetic, `theme` permission) edits every allowlisted
+  colour/time/easing token with its default, a per-token reset, and reversible live styling of the studio root.
+  `notices` (personal cosmetic) edits up to 20 announcements, title ≤80 and body ≤2000 Unicode characters, optional
+  calendar date and complete translations; preview uses the popup's plain-text localization/fallback reader.
+  `skins` (cosmetic, assets.add + assets.override) edits an operator's outfit list and existing image/Spine slots;
+  `isSkinKey`, 64 outfits, 64-character name/group limits and picker fallbacks remain §9 / SKINS.md's rules.
+  [ASSUMED] Metadata is saved before media changes; the full UTF-8 hex skin key separates upload directories.
+  Slot uploads/clears hydrate the next form draft, so a subsequent save/rename retains present media and never
+  resurrects a cleared asset. Other manifest metadata and unrelated art remain untouched.
+  `fx` (content) creates an immediately playable carrier borrowing an official kit and an original CC0 sheet
+  [ASSUMED], then edits official unit/skill mappings or flipbooks and phase bindings (§9 Operator effects).
+  The existing target picker searches only units in the local effects index for the former; a missing index
+  is explained. [ASSUMED] The local index reader caps its JSON at 16 MiB. Borrowed effects remain 3D-only;
+  flipbooks play in both board modes through the existing trial replay, including unsaved form parameters.
+  The controls use the runtime bounds (frames 1–256, cols 1–frames, fps 0.1–60, anchor 0–1, scale .01–8,
+  normal/add, boolean loop); the loader also checks PNG dimensions and cell divisibility. [ASSUMED] At most
+  128 books and 60 unique slot/phase rows (10 × 6); dangling effects are refused. Compiled particle files
+  remain supported by the existing file interface. No new runtime plugin field, permission or studio route.
+  All four templates use one editor module and the same theme/notices/overlay/effect validators as the checker;
+  invalid values are not silently clamped. See the Chinese guide's four subsections for the complete workflow.
 - **Slots**: every place a template fills, the installation's art beside the plugin's. Files dropped on a slot (or
   picked) go into the plugin folder under the slot's name — `art/<key>/avatar.png`, `spine/<key>/front/<key>.skel` and
   `.atlas` under one name with the atlas's pages by their own names and `textures` read from the atlas,

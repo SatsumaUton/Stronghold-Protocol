@@ -1200,6 +1200,16 @@
             "required": [
               "theme"
             ]
+          },
+          {
+            "required": [
+              "notices"
+            ],
+            "properties": {
+              "notices": {
+                "minItems": 1
+              }
+            }
           }
         ]
       }
