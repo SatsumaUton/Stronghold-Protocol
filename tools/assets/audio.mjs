@@ -61,15 +61,32 @@ export function bankMix(sounds, path) {
 }
 
 /**
+ * Official pool limits and per-file playback parameters (excel/audio_data.json soundFXBanks).
+ * Keep the bank id: unrelated banks may use the same file, and aliases share their target's pool.
+ * [ASSUMED] Sparse/custom banks default to the legacy cap 2, no takeover, pitch 1 and no delay.
+ */
+export function bankPool(bank) {
+  const sounds = {};
+  for (const s of bank.sounds || []) {
+    const path = assetToPath(s?.asset);
+    if (!path || sounds[path]) continue;
+    sounds[path] = { minPitch: s.minPitch ?? 1, maxPitch: s.maxPitch ?? 1, delay: s.delay ?? 0 };
+  }
+  return { id: bank.name, maxSoundAllowed: bank.maxSoundAllowed ?? 2, popOldest: bank.popOldest ?? false, sounds };
+}
+
+/**
  * Index an audio_data.json object.
  * @param {any} audioData parsed excel/audio_data.json
  * @returns {{ bank: (name:string)=>string[], bgm: (name:string)=>({intro:string|null, loop:string}|null),
  *   unitBanks: Map<string, Map<string, string[]>>, skillBanks: Map<string, Map<string,string[]>>,
- *   mixOf: (paths: string[]|null|undefined) => ({ p?: number, vol?: number }|null) }}
+ *   mixOf: (paths: string[]|null|undefined) => ({ p?: number, vol?: number }|null),
+ *   poolOf: (paths: string[]|null|undefined) => (ReturnType<typeof bankPool>|null) }}
  */
 export function indexAudio(audioData) {
   const banks = new Map();
   const mixes = new WeakMap(); // a bank's path list (the very array every lookup hands out) → bankMix
+  const pools = new WeakMap();
   for (const b of Array.isArray(audioData?.soundFXBanks) ? audioData.soundFXBanks : []) {
     if (!b || typeof b.name !== 'string') continue;
     const paths = (Array.isArray(b.sounds) ? b.sounds : []).map((s) => assetToPath(s?.asset)).filter(Boolean);
@@ -77,6 +94,7 @@ export function indexAudio(audioData) {
     const list = banks.get(b.name);
     for (const p of paths) if (!list.includes(p)) list.push(p);
     if (list.length && !mixes.has(list)) { const m = bankMix(b.sounds, list[0]); if (m) mixes.set(list, m); }
+    if (list.length && !pools.has(list)) pools.set(list, bankPool(b));
   }
   const alias = audioData?.bankAlias && typeof audioData.bankAlias === 'object' ? audioData.bankAlias : {};
   const bank = (name, depth = 0) => {
@@ -116,7 +134,8 @@ export function indexAudio(audioData) {
   for (const [name, paths] of banks) if (paths.length) addUnit(name, paths);
   for (const name of Object.keys(alias)) if (!banks.has(name)) { const p = bank(name); if (p.length) addUnit(name, p); }
   const mixOf = (paths) => (paths && typeof paths === 'object' && mixes.get(paths)) || null;
-  return { bank, bgm, unitBanks, skillBanks, mixOf };
+  const poolOf = (paths) => (paths && typeof paths === 'object' && pools.get(paths)) || null;
+  return { bank, bgm, unitBanks, skillBanks, mixOf, poolOf };
 }
 
 /** Sort key for ability sub-keys: plain first, then numeric suffixes ascending. */
