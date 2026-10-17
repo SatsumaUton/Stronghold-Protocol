@@ -2181,5 +2181,11 @@
   "借用官方特效或上传序列帧，在 2D / 3D 试播。": "Borrow official effects or upload flipbooks and try them in 2D / 3D.",
   "干员时装": "Operator outfits",
   "添加时装名称、系列、图片及正背面模型。": "Add outfit names, collections, images and front/back models.",
-  "选择图片后，与表单一起保存并校验。": "Choose an image, then save and validate it together with the form."
+  "选择图片后，与表单一起保存并校验。": "Choose an image, then save and validate it together with the form.",
+  "清理旧版本素材": "Clear old assets",
+  "清理": "Clear",
+  "删除这台浏览器里、当前服务器版本已经用不到的导入素材；仍在使用的会保留。": "Delete the imported assets in this browser that this server's current version no longer uses; the ones still in use stay.",
+  "已清理 {n} 个旧版本文件。": "Cleared {n} old-version files.",
+  "没有需要清理的旧版本文件。": "No old-version files to clear.",
+  "读不到服务器的素材清单，没有删除任何文件。": "Could not read the server's asset lists; nothing was deleted."
 }
