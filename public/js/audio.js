@@ -33,9 +33,11 @@
 //   한국어 `audio.voiceKr` and the operator's own-language dub `audio.voiceNative` (settings 语音语言, the 本土语言
 //   switch and the per-operator override; not tied to the interface language). A line the chosen tree or the host
 //   lacks falls back to the Chinese file of the same name (voiceLine).
-// - Battle SFX from `b.ev` tuples (`handleBattleEvents`): at most MAX_VOICES concurrent unit sounds, at most
-//   MAX_PER_URL overlapping copies of one sound (the official banks' maxSoundAllowed 2), a per-unit cooldown and a
-//   per-URL minimum gap (SfxLimiter), so a 60-unit fight stays listenable. A `['skill', id, 1]` that arrives before its
+// - Battle SFX from `b.ev` tuples (`handleBattleEvents`): attack / hit use their official bank's maxSoundAllowed,
+//   popOldest, and the played file's minPitch / maxPitch / delay (audio_data.json, #680). Aliases share a pool; distinct
+//   banks sharing a file do not. [ASSUMED] The remake's MAX_VOICES ceiling, 160 ms per-unit cooldown and 45 ms per-URL
+//   gap remain on top to guard high game speeds; sounds without pool metadata keep the legacy two-copy cap.
+//   A `['skill', id, 1]` that arrives before its
 //   unit is known is held and played once the unit is tracked (`pendingSkill`): a unit that casts inside its own deploy
 //   tick emits that first cue before its `['spawn', unitInfo]`, and dropping it left the one cast silent while every
 //   later one played (GitHub PR #292 by @LimitlessHPPK).
@@ -85,6 +87,7 @@ import { mediaUrl } from './media.js';
 import { unhashedUrl } from '../../shared/assetPaths.js';
 
 const MAX_VOICES = 8;
+// [ASSUMED] Remake anti-spam intervals, retained at high game speeds; not official audio pool parameters (#680).
 const UNIT_COOLDOWN_MS = 160;
 const URL_GAP_MS = 45;
 const MAX_PER_URL = 2;
@@ -417,8 +420,7 @@ export class SfxLimiter {
     this.maxVoices = o.maxVoices ?? MAX_VOICES;
     this.unitCooldownMs = o.unitCooldownMs ?? UNIT_COOLDOWN_MS;
     this.urlGapMs = o.urlGapMs ?? URL_GAP_MS;
-    // the official battle banks (attack, impact, heal, born, dead…) allow at most 2 overlapping copies of a sound
-    // (audio_data maxSoundAllowed 2): a heal / impact heard on every tick of a crowd never piles up
+    // [ASSUMED] Legacy fallback for sounds without official pool metadata (and prep landing voices).
     this.maxPerUrl = o.maxPerUrl ?? MAX_PER_URL;
     this.active = 0;
     this.lastByUnit = new Map();
@@ -432,21 +434,27 @@ export class SfxLimiter {
    * @param {string|number|null} unitKey e.g. `${unitId}:atk`
    * @param {string} url
    */
-  tryAcquire(now, unitKey, url) {
+  tryAcquire(now, unitKey, url, maxPerUrl = this.maxPerUrl) {
     if (this.active >= this.maxVoices) return false;
-    if ((this.activeByUrl.get(url) || 0) >= this.maxPerUrl) return false;
-    if (unitKey != null) {
-      const t = this.lastByUnit.get(unitKey);
-      if (t != null && now - t < this.unitCooldownMs) return false;
-    }
-    const u = this.lastByUrl.get(url);
-    if (u != null && now - u < this.urlGapMs) return false;
+    if ((this.activeByUrl.get(url) || 0) >= maxPerUrl) return false;
+    if (!this.gapsAllow(now, unitKey, url)) return false;
     if (unitKey != null) this.lastByUnit.set(unitKey, now);
     this.lastByUrl.set(url, now);
     if (this.lastByUnit.size > 600) this.lastByUnit.clear();
     if (this.lastByUrl.size > 400) this.lastByUrl.clear();
     this.active += 1;
     this.activeByUrl.set(url, (this.activeByUrl.get(url) || 0) + 1);
+    return true;
+  }
+
+  /** Read-only gap check before a pool takes over its oldest instance. */
+  gapsAllow(now, unitKey, url) {
+    if (unitKey != null) {
+      const t = this.lastByUnit.get(unitKey);
+      if (t != null && now - t < this.unitCooldownMs) return false;
+    }
+    const u = this.lastByUrl.get(url);
+    if (u != null && now - u < this.urlGapMs) return false;
     return true;
   }
 
@@ -570,6 +578,7 @@ export class AudioManager {
     this.bufBytes = new Map(); // url → decoded PCM bytes (the byte budget of the LRU, see _buffer)
     this.warned = new Set();
     this.limiter = new SfxLimiter();
+    this.poolVoices = new Map(); // official bank id → instances in start order (including scheduled delay)
     // prep landings (deployCue): their own voices — a full pool hands the oldest one's voice to the newest (_playLanding);
     // no per-file gap (one landing per piece, the cap bounds the overlap), the per-piece cooldown of the battle sounds
     this.landLimiter = new SfxLimiter({ maxVoices: LAND_VOICES, maxPerUrl: LAND_VOICES, urlGapMs: 0 });
@@ -1018,12 +1027,13 @@ export class AudioManager {
 
   /**
    * @param {string} url
-   * @param {{ volume?: number, rate?: number, limited?: boolean, unitKey?: string | null, again?: (() => unknown) | null }} [o]
+   * @param {{ volume?: number, rate?: number, limited?: boolean, unitKey?: string | null, again?: (() => unknown) | null, pool?: any }} [o]
    *   again: the sound's URL picked from the manifest again — played instead once when this one was a cosmetic plugin's
    *   file that would not load (its entry fell back: see the header)
    */
-  _play(url, { volume = 1, rate = 1, limited = false, unitKey = null, again = null } = {}) {
+  _play(url, { volume = 1, rate = 1, limited = false, unitKey = null, again = null, pool = null } = {}) {
     if (!this.ctx || !url || this.volumes.muted || this.volumes.sfx <= 0) return;
+    if (limited && pool) { this._playPool(url, { volume, unitKey, again, pool }); return; }
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     if (limited) { if (!this.limiter.tryAcquire(now, unitKey, url)) return; }
     else if (this.uiVoices >= 12) return;
@@ -1051,6 +1061,64 @@ export class AudioManager {
         s.start();
       } catch { release(); }
     }, release);
+  }
+
+  /**
+   * Official attack/hit pool (#680, audio_data.json soundFXBanks). Admit after decoding, so a slow/failed download
+   * never steals a playing voice. [ASSUMED] Pitch draws are uniform. Scheduled delayed sources occupy a slot until ended or replaced; 0 means
+   * no bank cap (still bounded by MAX_VOICES). A cosmetic file absent from the bank uses pitch 1 / delay 0.
+   */
+  _playPool(url, { volume, unitKey, again, pool }) {
+    const ctx = this.ctx;
+    this._buffer(url).then((buf) => {
+      if (ctx !== this.ctx) return;
+      if (!buf && again && this.fellBack.has(url)) {
+        const next = again();
+        if (typeof next === 'string' && next !== url) this._play(next, { volume, limited: true, unitKey, pool });
+        return;
+      }
+      if (!buf || this.volumes.muted || this.volumes.sfx <= 0) return;
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (!this.limiter.gapsAllow(now, unitKey, url)) return;
+      const voices = this.poolVoices.get(pool.id) || [];
+      const limit = pool.maxSoundAllowed > 0 ? pool.maxSoundAllowed : Infinity;
+      const oldest = voices.length >= limit ? voices[0] : null;
+      if (oldest && !pool.popOldest) return;
+      if (!oldest && this.limiter.active >= this.limiter.maxVoices) return;
+      const path = unhashedUrl(url).replace(/^\/assets\/audio\/sfx\//, '');
+      const sound = pool.sounds?.[path];
+      const lo = sound?.minPitch > 0 ? sound.minPitch : 1;
+      const hi = sound?.maxPitch >= lo ? sound.maxPitch : lo;
+      const rate = lo + (hi - lo) * Math.max(0, Math.min(1, this.random()));
+      const delay = Math.max(0, sound?.delay || 0);
+      let src, gain, timer, acquired = false, done = false;
+      const end = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (acquired) {
+          this.limiter.release(url);
+          const index = voices.indexOf(voice);
+          if (index >= 0) voices.splice(index, 1);
+          if (!voices.length) this.poolVoices.delete(pool.id);
+        }
+        try { src?.disconnect(); gain?.disconnect(); } catch { /* ignore */ }
+      };
+      const voice = { stop: () => { try { src?.stop(); } catch { /* already ended */ } end(); } };
+      try {
+        src = ctx.createBufferSource(); gain = ctx.createGain();
+        src.buffer = buf; src.playbackRate.value = rate;
+        gain.gain.value = Math.max(0, Math.min(1.5, volume));
+        src.connect(gain); gain.connect(this.sfxGain);
+        if (oldest) oldest.stop();
+        acquired = this.limiter.tryAcquire(now, unitKey, url, Infinity);
+        if (!acquired) { end(); return; }
+        voices.push(voice); this.poolVoices.set(pool.id, voices);
+        src.onended = end;
+        src.start(ctx.currentTime + delay);
+        timer = setTimeout(end, (delay + buf.duration / rate) * 1000 + 250);
+      } catch { end(); }
+    }, () => {});
   }
 
   /**
@@ -1108,7 +1176,11 @@ export class AudioManager {
       const mix = kind === 'skill' ? null : typeof mode === 'string'
         ? (kind === 'attack' ? u?.attackMix : u?.hitMix)?.[skillIndex] : u?.mix?.[kind];
       if (!unitSoundPlays(mix, this.random())) return true;
-      this._play(url, { volume: unitGain(kind === 'attack' || kind === 'hit' ? 0.55 : 0.8, mix), limited: true, unitKey: `${unitId}:${kind}`, again: () => pick().url });
+      const poolId = typeof mode === 'string'
+        ? (kind === 'attack' ? u?.attackPools : u?.hitPools)?.[skillIndex] : u?.pools?.[kind];
+      const params = this.getManifest()?.audio?.sfx?.pools?.[poolId];
+      const pool = params ? { ...params, id: poolId } : null;
+      this._play(url, { volume: unitGain(kind === 'attack' || kind === 'hit' ? 0.55 : 0.8, mix), limited: true, unitKey: `${unitId}:${kind}`, again: () => pick().url, pool });
       return true;
     } catch { return false; }
   }

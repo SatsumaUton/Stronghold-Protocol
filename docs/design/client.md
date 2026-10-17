@@ -264,7 +264,7 @@ its board-space position and facing, including on a mirrored boss half. They can
 from this preview. The inspection affordance does not make the preview a combat unit; the battle sim still creates
 the selected variant at battle start (§30.22).
 
-Audio: autochess BGM per phase, UI SFX (buy/sell/refresh/level/merge/ready/timer), a prep piece's landing sound (its battle deploy sound, once per landing, in landing voices of its own that take over the oldest, §31.8), per-unit attack/hit SFX (throttled; an impact plays for a hostile attack's phys / arts / true damage only, never an operator's skill-mode file for a normal attack, ≤ 2 copies of one battle sound — §18.4; a skill cue that reaches the client before its unit — the sim emits a deploy-tick cast ahead of the unit's `['spawn']` — is held and sounds once when the unit is tracked, `AudioManager.pendingSkill`, GitHub PR #292 by @LimitlessHPPK; entering a field late hands the sound the buffered `spawn` tuples only, `screens/game/early.js audioEarly`, so no old death, deploy or cast replays), boss music in R14/15. While the music is silent — muted, or the BGM volume at 0 — no BGM is downloaded: the track the screen wants is remembered, a different one still playing stops, and the wanted track is fetched once the music is audible again (`AudioManager.bgmSilent`; about 14 MB a match for a player who turned the music off).
+Audio: autochess BGM per phase, UI SFX (buy/sell/refresh/level/merge/ready/timer), a prep piece's landing sound (its battle deploy sound, once per landing, in landing voices of its own that take over the oldest, §31.8), per-unit attack/hit SFX (throttled; an impact plays for a hostile attack's phys / arts / true damage only, never an operator's skill-mode file for a normal attack; each bank's own instance limit, pitch and delay — §34.25; a skill cue that reaches the client before its unit — the sim emits a deploy-tick cast ahead of the unit's `['spawn']` — is held and sounds once when the unit is tracked, `AudioManager.pendingSkill`, GitHub PR #292 by @LimitlessHPPK; entering a field late hands the sound the buffered `spawn` tuples only, `screens/game/early.js audioEarly`, so no old death, deploy or cast replays), boss music in R14/15. While the music is silent — muted, or the BGM volume at 0 — no BGM is downloaded: the track the screen wants is remembered, a different one still playing stops, and the wanted track is fetched once the music is audible again (`AudioManager.bgmSilent`; about 14 MB a match for a player who turned the music off).
 
 ---
 
@@ -422,6 +422,19 @@ skill uses a mode bank. The slot is the skill that switches to that attack mode 
 letter on the file. An unclaimed mode named exactly `S<n>` is skill n [ASSUMED]; a mode another skill links is not taken. Impacts remember the mode at the time of the attack; an end event cancels a queued start for
 an unknown unit, and a late-join snapshot restores the current mode. A mode without a bank falls back to its normal
 sound. A selected mode with no mix uses its own default volume/probability, not the ordinary bank's mix.
+
+Attack / hit playback follows `excel/audio_data.json soundFXBanks` (§34.25, GitHub #680):
+`audio.sfx.pools` retains each selected bank's `maxSoundAllowed` / `popOldest` and each candidate file's
+`minPitch` / `maxPitch` / `delay` (seconds). Unit `pools` and per-skill `attackPools` / `hitPools` identify the bank.
+A full pool with `popOldest: true` stops its oldest instance for the new one; otherwise the new sound is dropped.
+Aliases share their target bank's pool; distinct banks using one file keep separate limits. Pitch is drawn uniformly
+within the played file's own range with client-only randomness ([ASSUMED] uniform distribution); playback starts after its own delay on the audio clock.
+The maintainer chose 0.3.1 for this change (reply draft A). [ASSUMED] The remake retains its global 8-voice budget,
+160 ms per-unit/role cooldown and 45 ms per-URL gap to guard high game speeds. A scheduled delayed source occupies a
+pool slot; admission after decoding prevents a failed download from stealing a voice. A zero bank limit means no
+bank cap, still subject to the global budget. Missing pool metadata keeps the legacy two-copy behavior; sparse/custom
+banks default to cap 2, no takeover, pitch 1 and delay 0. A cosmetic replacement absent from the bank's file list uses
+pitch 1 and delay 0 with the bank's cap. These are client presentation choices; no sim or golden change.
 
 A model that arrives after an actual deployment continues Start at the elapsed game time; after the clip's duration it
 shows the current base pose. A subsequent attack/death supersedes that pending entrance. That change (0.2.3) added no
