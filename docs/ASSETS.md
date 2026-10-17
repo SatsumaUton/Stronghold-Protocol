@@ -595,6 +595,11 @@ Other renderer rules from research 07 §5.4–5.5:
     - `tools/local-extract/extract.py` writes the model to `public/assets/local/spine/enemy/{enemyId}/` (page textures
       with their `[alpha]` texture merged in: straight RGBA, the main texture's RGB untouched; the atlas gets `size:` and
       no `pma` field) and lists its files in `data/local-assets.json`.
+    - An extraction from before this change wrote premultiplied pages (`pma: true`, RGB clamped to A); those bytes cannot
+      be converted back. `data/assets.json` now says `pma: false`, so the old pages would be premultiplied a second time
+      when uploaded and the local enemies and tokens would render darker (black fringes on the tokens). Re-run
+      `node tools/setup.mjs --local` once after upgrading — `--local` re-extracts even when the art is already there —
+      and the pages are rewritten straight.
     - The metadata comes from the committed `tools/assets/local-enemy-spines.json` (`fetch-assets --local-spines`
       parses the extracted models into it), never from the disk: `data/assets.json` is byte-identical with or without
       the extraction, it has no `/assets/local/` URL, and setup / doctor / the manifest tests never miss these files.
