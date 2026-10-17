@@ -13,6 +13,10 @@ companion cosmetic hints, accurate import reports, record DSL permission checks 
 
 Studio presentation authoring extends §32.9 in [§34.30](history/0.3.1.md#3430-studio-templates-for-the-031-presentation-features): theme, notices, fx and skins forms reuse the existing validators, slots and trial routes.
 
+The 0.3.1 sim investigation and rule correction are [§34.32](history/0.3.1.md#3432-瑕光-attacks-the-enemies-she-put-to-sleep-琳琅诗怀雅s-s3-keeps-its-coins):
+瑕光 S2 retains sleeper targeting and attack replay events; 琳琅诗怀雅 S3 keeps double attacks and coins at the cap,
+following the official mode's no-auto-close rule. Current contracts: [design/engine.md](design/engine.md).
+
 ## Where each section lives
 
 Studio §32.9 gains five graphical gameplay templates and isolated Match exercises in
