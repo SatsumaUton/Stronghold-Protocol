@@ -796,9 +796,10 @@ function MatchScreen() {
     // BATTLE_CHECK: the official 协议启动！ screen once its sprites are in (ui/protocolBoot.js); 最终攻势 / 隐秘核心已解锁
     // open with the official plates once their art is in (ui/bossPlates.js); else 回合开始 has the round plate
     // (回合 NN · 获得 +N; 观战中 under it for a watcher, from the banner), 联防 a plate with the banner's words
-    // (ui/matchPopups.js); the other phases keep the banner
+    // (ui/matchPopups.js); the other phases keep the banner. The screen and the plates replace a banner still on screen
+    // from a phase shorter than it (everyone ready at once; the dev mock opening at PREP)
     const plate = phasePopupOf(phase, b);
-    if (phase === PHASE.BATTLE_CHECK && bootArtReady()) setBoot({ key: phaseKey });
+    if (phase === PHASE.BATTLE_CHECK && bootArtReady()) { setBanner(null); setBoot({ key: phaseKey }); }
     else if (phase === PHASE.FINAL_ASSAULT && bossPlateArtReady()) { setBanner(null); setBossPlate({ kind: 'final', ...finalPlateRows(pub), key: phaseKey }); }
     else if (phase === PHASE.HIDDEN_CORE && bossPlateArtReady()) { setBanner(null); setBossPlate({ kind: 'core', key: phaseKey }); }
     else if (phase === PHASE.ROUND_START && b && pub?.round > 0) {
