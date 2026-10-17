@@ -48,6 +48,8 @@ const MANIFESTS = [
   ['a content plugin', { manifest: 2, version: '0.1.0', app: '*', api: 1, class: 'content', permissions: ['data.patch', 'data.add'], data: ['data/a.json'], operators: 'ops.json', i18n: { en: 'i18n/en.json' } }],
   ['a content plugin with a DSL operator and a prep file', { manifest: 2, version: '0.1.0', app: '*', api: 1, class: 'content', permissions: ['data.add', 'dsl'], operators: ['operators/a.json'], dsl: ['dsl/income.json'] }],
   ['a prep-only DSL plugin', { manifest: 2, version: '0.1.0', app: '*', api: 1, class: 'content', permissions: ['dsl'], dsl: ['dsl/income.json'] }],
+  ...['content', 'script', 'trusted'].map(cls => ['rules-only ' + cls, { manifest: 2, version: '1.0.0', app: '*', api: 2, class: cls, rules: { unequip: 'allow' } }]),
+  ['empty rules-only content', { manifest: 2, version: '1.0.0', app: '*', api: 2, class: 'content', rules: {} }],
   ['a dsl part without the dsl permission', { manifest: 2, version: '0.1.0', app: '*', api: 1, class: 'content', permissions: ['data.add'], operators: ['ops.json'], dsl: ['dsl/a.json'] }],
   ['a dsl permission with no dsl part', { manifest: 2, version: '0.1.0', app: '*', api: 1, class: 'content', permissions: ['data.add', 'dsl'], operators: ['ops.json'] }],
   ['a lang plugin', { manifest: 2, version: '1.0.0', class: 'lang', lang: 'en', files: { ui: 'ui.json' } }],
@@ -222,6 +224,15 @@ test('the studio\'s templates and plugins/_template/cosmetic/ and ui/ are accept
     assert.equal(s.$schema, 'https://json-schema.org/draft/2020-12/schema');
     assert.ok(s.title && s.description.length > 100, `${f}: title and description`);
   }
+});
+
+test('API 2 operator files can consume trait permissions; complete file checks still validate their use', () => {
+  const manifest = { manifest: 2, version: '1.0.0', class: 'content', app: '*', api: 2,
+    permissions: ['data.add', 'data.patch', 'dsl'], operators: ['trait.json'] };
+  assert.deepEqual(v.validate('plugin.schema.json', manifest), []);
+  assert.ok(v.validate('plugin.schema.json', without(manifest, 'operators')).length);
+  assert.ok(v.validate('plugin.schema.json', { ...manifest, api: 1 }).length);
+  assert.ok(v.validate('plugin.schema.json', { ...manifest, class: 'cosmetic' }).length);
 });
 
 

@@ -582,6 +582,18 @@ normalized values from the room, read-only for non-hosts and during a match. Van
 
 Authoring checks (DESIGN §32.9.1): numeric fields display the shared official bounds and positive step floor; invalid saves are refused. DSL validation network failures are explicit, and saving revalidates the current spec before writing. Unkeyed studio state reads omit script source. Trial replay remains a data-only renderer feed; sandbox simulation runs in the same SES executor as a formal match. Forge and catalogue entry points remain available beside the authoring templates.
 
+0.3.1 (§34.29) adds bond/item/trait/offers/rules templates with actual fields and official-name pickers. Full-draft
+validation uses the existing keyed validate-dsl endpoint, ordinary folder checks and data-only composition; no new
+plugin grammar or route. Reopen reads current document fields; save merges only form-owned changes, retaining
+other fields/declarations/required permissions and their unchanged raw JSON bytes. Validation, unsaved trials and
+save check the complete merged folder before writing. Their dummy/wave/duel trials add an explicit
+single-holder prep event and active-bond/equipped-item fixture [ASSUMED], plus real Match offer choice, refresh and
+virtual-clock timeout with before/after feedback. Bond income/refresh and trait gain/deploy use their own hook
+vocabularies; Auto selects the first prep rule or roundStart [ASSUMED]. Rules trials compare real refresh, prep
+loadout, morph equipment and unequip actions with vanilla; replay carries actual equipment/loadout and morphPairing.
+These fixed bounded fixtures are [ASSUMED], not a full economy/room;
+golden scenes and the independent vanilla console keep their previous behavior. New UI uses the four language packs.
+
 Presentation authoring (§34.30): theme, notices, fx and skins each have a template and form. Theme applies only
 validated tokens to the studio root and restores the previous inline declarations on unmount [ASSUMED]. Notices
 preview uses the announcement popup's localization and plain text. Skins previews use the actual picker rows and

@@ -1324,6 +1324,16 @@
             "required": [
               "offers"
             ]
+          },
+          {
+            "required": [
+              "rules"
+            ],
+            "properties": {
+              "rules": {
+                "minProperties": 1
+              }
+            }
           }
         ]
       }
@@ -1450,6 +1460,16 @@
             "required": [
               "offers"
             ]
+          },
+          {
+            "required": [
+              "rules"
+            ],
+            "properties": {
+              "rules": {
+                "minProperties": 1
+              }
+            }
           }
         ]
       }
@@ -1676,6 +1696,16 @@
             "required": [
               "offers"
             ]
+          },
+          {
+            "required": [
+              "rules"
+            ],
+            "properties": {
+              "rules": {
+                "minProperties": 1
+              }
+            }
           }
         ]
       }
@@ -2148,6 +2178,18 @@
             "required": [
               "data"
             ]
+          },
+          {
+            "description": "API 2 operator files may consume this permission in their trait or kit DSL; plugin check validates the referenced records.",
+            "required": [
+              "api",
+              "operators"
+            ],
+            "properties": {
+              "api": {
+                "const": 2
+              }
+            }
           }
         ]
       }
@@ -2214,6 +2256,18 @@
             "required": [
               "dsl"
             ]
+          },
+          {
+            "description": "API 2 operator files may consume this permission in their trait or kit DSL; plugin check validates the referenced records.",
+            "required": [
+              "api",
+              "operators"
+            ],
+            "properties": {
+              "api": {
+                "const": 2
+              }
+            }
           }
         ]
       }
