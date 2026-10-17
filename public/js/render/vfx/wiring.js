@@ -45,6 +45,7 @@ import { GROUND_SPAWNS } from './effect.js';
 import { SkillFx, fitsAttack, pickGroup, formMode } from './skillfx.js';
 import { TalentFx } from './talentfx.js';
 import { FunnelFx } from './funnelfx.js';
+import { YuWall, YU_WALL_SOURCE } from './yuwall.js';
 import { formModes } from './talents.js';
 import { shotOf } from './skills.js';
 import { UF } from '../../../../shared/constants.js';
@@ -226,6 +227,7 @@ export class FxWiring {
     this.opts = opts;
     this.idx = null;
     this.flights = new Set();     // projectile flights in the air
+    this.walls = new Set();       // skill-held Yu S3 controller handles
     this.loops = new Map();       // `${unitId}|${status}` → handle
     this.melee = new Map();       // target id → the waiting blow { hits, modeGroups?, groups?, buffs?, src, t, n, hitT, window, seed }
     this.forms = new Map();       // unit id → its sim form (the form fx: render/app.js → form())
@@ -504,6 +506,11 @@ export class FxWiring {
   playOn(key, v, o = {}) {
     let k = lc(key);
     if (!k || !this.ofx.lib.has(k)) return null;
+    if (k === YU_WALL_SOURCE) {
+      const wall = new YuWall(this, v);
+      this.walls.add(wall);
+      return wall;
+    }
     let def = this.ofx.lib.def(k);
     if (def && def.switchable) {
       const alt = lc(this._variant(def.switchable, v, this.pose(v)));
@@ -654,7 +661,9 @@ export class FxWiring {
       if (def.rotY >= 0) place.flipY = flip; else place.mirror = flip;
     } else if (rt === 2 || rt === 4) {
       let a;
-      if (def.useBodyRotation || !o.toward) a = bodyYaw(v, pose);
+      // CastEffectOptions.CreateEffect (official client): useFourDirectionalFace selects the owner's
+      // four-direction vector, not owner→target. Wild Mane S2 sets it; her hit row does not.
+      if (o.fourFace || def.useBodyRotation || !o.toward) a = bodyYaw(v, pose);
       else {
         const dx = o.toward.x - pose.x, dy = o.toward.y - pose.y;
         a = Math.abs(dx) + Math.abs(dy) > 1e-4 ? Math.atan2(dy, dx) : bodyYaw(v, pose);
@@ -713,7 +722,7 @@ export class FxWiring {
           // the rows of the strike sit where its attack clip poses the unit's points at the strike frame
           const h = onTarget
             ? this.playOn(k, tgt, { toward: beyond(src, tgt), flipFrom: src, skip })
-            : this.playOn(k, src, { toward: tgt, skip, strike: phase !== 'start' });
+            : this.playOn(k, src, { toward: tgt, fourFace: !!e.useFourDirectionalFace, skip, strike: phase !== 'start' });
           // a looping row stops at its end event (the cast's end); so does a looping prefab on a one-shot row, which
           // would otherwise never end (known once loaded: decided when the time comes)
           if (h) {
@@ -1536,6 +1545,8 @@ export class FxWiring {
 
   /** Battle reset. */
   clear() {
+    for (const wall of this.walls) wall.kill();
+    this.walls.clear();
     this.flights.clear();
     this.loops.clear();
     this.melee.clear();
@@ -1559,6 +1570,7 @@ export class FxWiring {
   /** Called once per frame: delayed actions on the battle clock (and the frame count the skills' same-frame rules use). */
   tick() {
     this.skills.frame++;
+    for (const wall of this.walls) { wall.update(); if (!wall.alive) this.walls.delete(wall); }
     const T = this.ofx.timers;
     if (!T || !T.length) return;
     const now = this.ofx.time;

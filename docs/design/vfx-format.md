@@ -1484,7 +1484,7 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
     wolves, 夕's and 维娜·维多利亚 S3's summons, 耀骑士临光 S3's sword; a token's arrival burst ('radiantSword',
     'summonStun', 'summonBurst', 'paperDoll', 'obelisk') only with its own birth effect.
   - Kept procedural (the client shows such a cue that is not placed here, or the fx is not the skill's): 引星棘刺 S2's
-    drifting area, 余 S3's fire wall (the client builds it from `yu_skill3_range_01_*` segments), 新约能天使's air
+    drifting area, 新约能天使's air
     strikes (`angel2_skill_N_loop_*` on projectiles not flown), 蕾缪安 S3's falling shells, 扎罗's fear-cage beams (the
     client's `enemy_wlfmster_a_skill_end_buff` on the caged operators is not placed), 缇缇 S3's wake (the fx names no
     owner) and the talents' cues (刺玫's and 雪猎's strikes / counters, 风丸's 替身 burst); 泡泡 S2's counter is its
@@ -1818,3 +1818,40 @@ Placement: 荒芜拉普兰德's wolves face forward on the bones' 87°; 洛洛's
 BoneFollower does not follow F_UVA_01's rotation — and lies flat). Not drawn: 澄闪's self-destruct (`projectile_chr_gdglow_funnel_s12_3` … — the kit's 'explode' keeps the
 procedural blast), a unit hidden while its owner is stunned (`setActiveFalseWhenPause`: no signal ties a unit's pause
 to a status).
+
+
+### Reported effects after 0.3.0 (§34.31, 2026-10-17)
+
+- **Wild Mane S2:** `CastEffectOptions.useFourDirectionalFace` selects the owner's deploy-direction vector for
+  FOUR_DIRECTION / ANY_DIR casts, independently of `directionType` (which selects a key slot). The unit's S2 cast
+  uses `wildmn_skill_02_start`, `directionType=0`, `useFourDirectionalFace=1`; its hit has both directional flags off.
+  The cast's ParticleEffect is FOUR_DIRECTION, GROUND_CENTER, mainDir RIGHT, with a rotation-Z helper authored at
+  90°. `ParticleEffect.FaceTo` replaces that helper rotation; it does not add another quarter-turn or left mirror.
+  The yellow/white `congci_add` / `congci_cl` quads have positive X pivots: §33.6's positive pivot displacement is
+  required (0.3.0 subtracted it, putting the streak behind the owner; the shared fix is already in §34.6).
+- **Yu S3:** `yuwall.js` interprets the installed source/root controllers. `YuS3EffectBehaviour.OnPlay` creates
+  `yu_skill3_range_01_root` per tile across the owner's row for UP/DOWN, column for LEFT/RIGHT.
+  `YuS3EffectWithEdgeBehaviour` offsets visible pieces by `_offset` (officially 0.4) along the facing direction;
+  horizontal pieces use `_effectWhenHorizontal`, vertical pieces use the left/right variant according to world X
+  relative to the battle camera. Adjacent invalid tiles receive the matching horizontal or vertical end caps
+  (first check 0.05 s, subsequent checks 2 s). No stretching one prefab over the whole board.
+  The source is EmptyEffect; `FinishEffectViaOwnerBuff` holds it for `yu_s_3[effect]`, so it is a skill-held composite,
+  including pending loads. Official `skill_table.skchr_yu_3.levels[*].duration` is 45 s. Skill off, owner death/removal
+  and battle reset stop all children. [ASSUMED] The remake's active field rectangle is the official controller's
+  valid map, and fragments are clipped to its outer tile edges (per-effect `boardClip`, including separate draw
+  batches) to keep benches/HUD clear. The procedural 2D/off fallback holds the same offset footprint until skill end;
+  its 0.16-tile ground-strip width and colour are [ASSUMED] presentation. `firewallBlock` places `yu_skill3_annex_01`
+  once at the eliminated bullet. `yu_skill3_annex_02` requires the ally buff's ON_TAKE_DAMAGE trigger: our sim
+  emits no matching event, so it remains unmapped and is never guessed from unrelated damage.
+- **Manifold:** official `token_10030_mlyss_wtrman` mode animation replacement pairs select A_Idle/A_Attack/A_Combat
+  for Melee and Melee_S3, B_Idle/B_Attack/B_Combat for Range. `UnitView` applies those roles in 2D and 3D and keeps
+  them through skill toggles/model loads; its form also selects the index's mode attack/combat effects. The existing
+  `copy {id,src}` event supplies the copied operator's position. [ASSUMED] If that cosmetic event was missed, or a split
+  clone has none, `atk` reconstructs Melee from `none`, Range from its projectile kind (the current sim's copyInto
+  contract); no change animation is replayed over an attack. This does not invent a recovery/c0 transition or a
+  summoner link. The sim exposes no token-owner skill window for `c2_skill_03_buff_01`; it remains conditional.
+
+Sources: local official v3 index/prefabs; `pkgrps/btl_pfb_tokens_0.ab` mode `_replaceAnimPairs` and
+`SwitchToMelee/Range`; `skill_table.json` (`skchr_wildmn_2`, `skchr_yu_3`, `skchr_mlyss_3`); official client
+`CastEffectOptions.CreateEffect`, `ParticleEffect.FaceTo`, `YuS3EffectBehaviour.OnPlay` and
+`YuS3EffectWithEdgeBehaviour` (addresses and replay evidence in history §34.31). No sim rules change.

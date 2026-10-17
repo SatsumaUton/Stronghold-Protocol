@@ -647,7 +647,19 @@ export function skillPlan(idx, unitKey, skillId, opts = {}) {
     const kk = lc(k);
     if (kk && projs[kk] && !plan.projectiles.includes(kk)) plan.projectiles.push(kk);
   }
-  planUses(idx, plan, [...(Array.isArray(skill.uses) ? skill.uses : []), ...attach], { ...opts, abilities: skill.abilities });
+  let uses = Array.isArray(skill.uses) ? skill.uses : [];
+  if (id === 'skchr_yu_3') {
+    // Official ProjectileProbElimateBehaviour places annex_01 at the removed bullet, never on Yu's attacks.
+    // GlobalAuraAbility's annex_02 requires the ally buff's ON_TAKE_DAMAGE trigger; no matching sim event exists.
+    uses = uses.filter((u) => !(u.keys || []).some((k) => /^yu_skill3_annex_0[12]$/i.test(k)));
+    plan.unmapped.push({ key: 'yu_skill3_annex_01', role: 'hit', reason: 'bound', from: 'ProjectileProbElimateBehaviour._effectOnEliminatePos' });
+    plan.unmapped.push({ key: 'yu_skill3_annex_02', role: 'trigger', reason: 'conditional', from: 'GlobalAuraAbility._buffs' });
+  }
+  planUses(idx, plan, [...uses, ...attach], { ...opts, abilities: skill.abilities });
+  // EmptyEffect has no particles/loop flag, but FinishEffectViaOwnerBuff holds this controller for yu_s_3[effect].
+  if (id === 'skchr_yu_3') for (const role of ['start', 'loop', 'range']) for (const e of plan[role]) {
+    if (e.key === 'yu_skill3_range_01_source') { e.hold = 'skill'; e.loop = true; }
+  }
   // a key a kit fx binding plays on the unit that fx names is no row on the owner (FX_BINDINGS `at: 'target'`)
   const bound = targetBound(id);
   if (bound.size) {
@@ -1320,6 +1332,8 @@ export function chargeKeys(plan) {
  */
 const binding = (o) => Object.freeze({ ...o, ...(o.cover ? { cover: Object.freeze(o.cover) } : {}), ...(o.keys ? { keys: Object.freeze(o.keys) } : {}) });
 export const FX_BINDINGS = Object.freeze({
+  // Existing kit event supplies the elimination position (no invented projectile collision or ally trigger).
+  skchr_yu_3: Object.freeze({ firewallBlock: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['yu_skill3_annex_01'] }) }),
   // 克莱门莎 S3 (op-clemnt.js bombard): the kit marks an enemy's tile ('lock': id = the enemy, src = her) and strikes it
   // three times ('blast', id = her, 0.5 / 1.5 / 2.5 s later). The client fires projectile_chr_clemnt_s3 at the marked
   // enemy (AttachToTarget, _immediatelyReach), whose reached effect clemnt_skill_03_mark_all_01 is the mark and its three
@@ -1442,10 +1456,11 @@ export const BOUND_BY_SKILL = Object.freeze((() => {
  * skillfx.js rule 5: with 官方特效 on and the skill's plan drawable, the procedural fx is skipped while the skill lasts —
  * the client shows the skill's own effects then, and no such cue). By skill id; decided per case from the client data
  * (0.3.0 official-effects audit R11, history §32.14.44). Areas, locks and links stay procedural where the client shows
- * such a cue that is not placed here (引星棘刺 S2's drifting unit, 余 S3's wall segments, 新约能天使's strikes, 扎罗's
+ * such a cue that is not placed here (引星棘刺 S2's drifting unit, 新约能天使's strikes, 扎罗's
  * fear cage on its targets — open), and so do the cues of a talent (刺玫's and 雪猎's) or 泡泡 S2's counter (R17).
  */
 export const FX_COVER = Object.freeze({
+  skchr_yu_3: Object.freeze(['firewall']), // YuS3EffectBehaviour's per-grid wall, held for the skill
   // 莫斯提马 S2: the zone at her feet — the skill's range rows (mostma_skill_02_range / _range_02) and loop show it
   skchr_mostma_2: Object.freeze(['zone']),
   // 白面鸮 S2: the heal field at her — the client shows the skill's loop on her (plosis_attack_01_start), no area

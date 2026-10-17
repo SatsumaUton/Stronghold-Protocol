@@ -406,7 +406,7 @@ export async function createFieldView(host, options = {}) {
   ctx.fx = fx;
   // the official battle effects (设置「官方特效」, render/vfx): drawn on the 3D board only (the 2D board fallback keeps the
   // procedural fx), on the battle clock; their files load on demand (data/local-fx.json)
-  const ofx = new OfficialFx({ P, renderer: app.renderer, assets, cam: () => cam, heightAt });
+  const ofx = new OfficialFx({ P, renderer: app.renderer, assets, cam: () => cam, heightAt, fieldRect: fx.ctx.fieldRect });
   setupCleanup.push(() => ofx.destroy());
   layers.vfxGround.addChild(ofx.ground);
   layers.vfxOver.addChild(ofx.over);
@@ -1779,6 +1779,10 @@ export async function createFieldView(host, options = {}) {
       }
       case 'status': { const v = views.get(e[1]); if (v) { v.onStatus?.(e[2], !!e[3]); wiring.status(v, e[2], !!e[3]); } break; }
       case 'fx': {
+        if (e[1] === 'copy' && e[4]?.id != null && e[4]?.src != null) {
+          const src = infos.get(e[4].src);
+          if (src) (views.get(e[4].id) || battleView(e[4].id))?.copyFrom?.(ctx.lookupDef(src));
+        }
         if (e[4] && typeof e[4] === 'object' && e[4].consumed && e[4].id != null) {
           consumedIds.add(e[4].id);
           if (consumedIds.size > 200) consumedIds.delete(consumedIds.values().next().value);
