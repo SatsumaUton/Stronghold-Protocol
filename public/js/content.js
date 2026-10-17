@@ -177,7 +177,7 @@ const orderEntry = (p) => ({
  * header): ordered like a room's set — their requirements switched on too (`auto`) — or, when the choice as a whole is
  * refused (a conflict, a requirement gone: the server's plugins changed since), what still fits, taken by id
  * [ASSUMED]; `skipped`: the chosen ones left out that way. Ids the catalogue does not offer are ignored (kept switched on).
- * @param {string[]} ids @param {any[]} entries cosmeticPlugins(…, 'personal') with a `vs`
+ * @param {string[]} ids @param {any[]} entries all loaded personal cosmetics, including hidden notice-only dependencies
  * @returns {{ order: string[], auto: string[], skipped: string[] }}
  */
 export function personalSet(ids, entries) {
@@ -212,7 +212,7 @@ export function setPersonalPlugin(id, on) {
   if (on) {
     const cat = catalog.get();
     if (cat.status === 'ready' && orderModule) {
-      const entries = cosmeticPlugins(cat.plugins, 'personal').filter(isPersonalCosmetic);
+      const entries = cosmeticPlugins(cat.plugins, 'personal');
       if (entries.some((p) => p.id === id)) {
         const byId = new Map(entries.map((p) => [p.id, orderEntry(p)]));
         const r = orderModule.resolvePluginOrder([...new Set([...ids, id])].filter((x) => byId.has(x)).sort(), (x) => byId.get(x) || null);
@@ -327,7 +327,8 @@ export function installContent({ store = appStore, data = dataStore, layers = co
     const ids = personal.get().ids;
     // none switched on, or a server without plugins (never even asked for its catalogue)
     if (!ids.length || !installedCount(store.get())) { layers.setPersonal([]); syncTheme([], []); return; }
-    const offered = cosmeticPlugins(await loadCatalog({ fetch: doFetch }), 'personal').filter(isPersonalCosmetic);
+    // Keep hidden notice-only cosmetics in dependency lookup; filter switches and overlay fetches separately.
+    const offered = cosmeticPlugins(await loadCatalog({ fetch: doFetch }), 'personal');
     if (req !== personalReq) return;
     // the set as a room's would be (requirements switched on, a conflict refused — what still fits), in its load order.
     // Theme variables are then taken in plugin-id order (the later id wins), on this page only.

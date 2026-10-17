@@ -9,6 +9,8 @@
 
 /** [ASSUMED] At most this many variables on one plugin. */
 export const THEME_VAR_LIMIT = 64;
+/** [ASSUMED] Bound raw strings before trimming or parsing; the Forge workshop also caps values at 400. */
+const THEME_VALUE_LIMIT = 400;
 
 /** @typedef {'colour' | 'time' | 'easing'} ThemeKind */
 
@@ -71,7 +73,7 @@ function colourArgs(inner) {
 
 /** A colour literal, or null. [ASSUMED] no named colours; function names are lowercase. */
 export function acceptColour(raw) {
-  if (typeof raw !== 'string') return null;
+  if (typeof raw !== 'string' || raw.length > THEME_VALUE_LIMIT) return null;
   const v = raw.trim();
   if (/[^\x20-\x7e\t\r\n\f]/.test(v)) return null;
   if (HEX_RE.test(v)) return v;
@@ -91,7 +93,7 @@ export function acceptColour(raw) {
 
 /** A time in 0–2000ms or 0–2s, or null. */
 export function acceptTime(raw) {
-  if (typeof raw !== 'string') return null;
+  if (typeof raw !== 'string' || raw.length > THEME_VALUE_LIMIT) return null;
   const v = raw.trim();
   const m = TIME_RE.exec(v);
   if (!m) return null;
@@ -107,7 +109,7 @@ export function acceptTime(raw) {
  * [ASSUMED] keywords are lowercase; cubic-bezier x is 0–1 and y is any finite number.
  */
 export function acceptEasing(raw) {
-  if (typeof raw !== 'string') return null;
+  if (typeof raw !== 'string' || raw.length > THEME_VALUE_LIMIT) return null;
   const v = raw.trim();
   if (EASING.has(v)) return v;
   const m = /^cubic-bezier\(([^)]+)\)$/.exec(v);
@@ -128,7 +130,7 @@ export function acceptEasing(raw) {
  */
 export function acceptThemeValue(name, value) {
   const kind = typeof name === 'string' ? THEME_TOKENS[name] : null;
-  if (!kind || typeof value !== 'string' || hasUrl(value) || hasForbidden(value)) return null;
+  if (!kind || typeof value !== 'string' || value.length > THEME_VALUE_LIMIT || hasUrl(value) || hasForbidden(value)) return null;
   if (kind === 'colour') return acceptColour(value);
   if (kind === 'time') return acceptTime(value);
   if (kind === 'easing') return acceptEasing(value);
@@ -183,6 +185,10 @@ export function readThemeDeclaration(raw, { drop = false } = {}) {
   for (const name of considered) {
     const value = map[name];
     const at = ['theme', 'vars', name];
+    if (typeof value === 'string' && value.length > THEME_VALUE_LIMIT) {
+      push('PLUGIN_THEME_VALUE', '"theme" has a value this token does not allow', at, name);
+      continue;
+    }
     if (typeof value === 'string' && hasUrl(value)) {
       push('PLUGIN_THEME_URL', '"theme" names a URL (a theme sets colours, times and easings)', at, name);
       continue;

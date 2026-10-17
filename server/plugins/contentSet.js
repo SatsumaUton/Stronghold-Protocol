@@ -298,15 +298,14 @@ function composeContentSet({ registry, ids = [] }) {
   for (const [lang, doc] of Object.entries(tr.out)) if (canonicalJson(doc) !== canonicalJson(base.i18n[lang] ?? null)) bodies.set(`i18n/${lang}.json`, Buffer.from(JSON.stringify(doc)));
   const boundsSnap = exportOfficialBounds(rememberOfficialBounds(base.data));
   if (plugins.length) bodies.set('bounds/official.json', Buffer.from(canonicalJson(boundsSnap)));
-  // Notices are not gameplay. When plugin.json has the key, the published descriptor and the cs input use the
-  // canonical text with that key removed. A plugin without the key keeps the hash of its original bytes, and the
-  // registry's raw manifestSource stays the file (the script lock still matches those bytes).
+  // Notices and personal theme values are not gameplay. Use the same canonical snapshot whether those fields
+  // are absent or present. The registry retains the raw manifest and lock for owner admission.
   const noticeFree = new Map(plugins.flatMap(p => {
     const source = manifestTextWithoutNotices(p.content?.documents?.['plugin.json']);
     return source ? [[p.id, { source, hash: nodeSha256(Buffer.from(source)) }]] : [];
   }));
   const scripts = plugins.filter(p => p.script).map(p => ({ id:p.id, version:p.manifest.version, class:p.class,
-    // [ASSUMED] For a notices-bearing script, identify the checked gameplay snapshot rather than its raw lock
+    // [ASSUMED] For every script, identify the checked gameplay snapshot rather than its raw lock
     // (the latter includes the notice bytes). Owner admission still checks the complete, original lock hash.
     execution:p.script.execution || 'trusted', hash: noticeFree.has(p.id)
       ? nodeSha256(Buffer.from(canonicalJson({ ...p.content.files, 'plugin.json': noticeFree.get(p.id).hash })))

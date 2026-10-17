@@ -56,6 +56,7 @@ import {
 } from '../../shared/plugins/visual.js';
 import { canonicalJson } from '../../shared/plugins/identity.js';
 import { readThemeDeclaration } from '../../shared/plugins/theme.js';
+import { manifestTextWithoutNotices } from '../../shared/plugins/notices.js';
 import { issueList, issueLine, makeIssue } from '../../shared/plugins/errors.js';
 
 /** The language folders' subdirectory (public/i18n/, data/i18n/). */
@@ -338,7 +339,15 @@ function readVisual(dir, manifest, listed, { vanilla, hashCache }) {
   // its part of a vs (shared/plugins/visual.js): the files that shape the overlay and the hash of its ops — the ops a
   // set's document serves (server/plugins/visualSet.js), which a browser hashes again before it lays them
   const composition = {
-    id: manifest.id, version: manifest.version, files: Object.fromEntries(shaping.sort().map((rel) => [rel, hashed[rel].sha256])),
+    id: manifest.id, version: manifest.version, files: Object.fromEntries(shaping.sort().map((rel) => {
+      // Manifest notices and personal theme values never shape the room's art. Always canonicalize the
+      // manifest, even without either field. Keep raw hashes above for files and lock/Spine verification.
+      if (rel === PLUGIN_MANIFEST) return [rel, nodeSha256(Buffer.from(manifestTextWithoutNotices(readJson(path.join(dir, rel)).json)))];
+      // [ASSUMED] Only checked Spine metadata from a lock shapes art. Its files table duplicates the actual
+      // shaping hashes and includes notice/theme-sensitive manifest bytes, sizes and unrelated theme files.
+      if (rel === LOCK_FILE) return [rel, nodeSha256(Buffer.from(canonicalJson({ spine: lock.spine })))];
+      return [rel, hashed[rel].sha256];
+    })),
     writes: writesHashOf(meta.ops),
   };
   const bytes = [...served.values()].reduce((n, f) => n + f.bytes, 0);
@@ -354,7 +363,7 @@ const FRAME_EXT = new Set(['.html', '.js', '.css', '.png']);
 /**
  * The frame of a ui plugin (see the header): the files under `entry.client` hashed like a cosmetic overlay's, and a
  * `vs` of that plugin alone (visualHashOf — the same family; `writes` is the canonical { entry, slots }, not art ops).
- * plugin.json is part of the composition so editing it changes `vs`, and is not served.
+ * plugin.json is part of the composition with catalogue-only notices removed, and is not served.
  * @param {string} dir
  * @param {PluginManifest} manifest
  * @param {{ rel: string, bytes: number, link?: boolean }[]} listed
@@ -399,7 +408,8 @@ function readUiFrame(dir, manifest, listed, { vanilla, hashCache }) {
   const writes = createHash('sha256').update(canonicalJson({ entry, slots })).digest('hex');
   const composition = {
     id: manifest.id, version: manifest.version,
-    files: Object.fromEntries(shaping.map((rel) => [rel, hashed[rel].sha256])),
+    files: Object.fromEntries(shaping.map((rel) => [rel, rel === PLUGIN_MANIFEST
+      ? nodeSha256(Buffer.from(manifestTextWithoutNotices(readJson(path.join(dir, rel)).json))) : hashed[rel].sha256])),
     writes,
   };
   const bytes = [...served.values()].reduce((n, f) => n + f.bytes, 0);

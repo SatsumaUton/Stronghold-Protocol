@@ -53,7 +53,7 @@ export function readContentData(dir, manifest) {
     for (const rel of manifest.parts.operators?.files ?? []) for (const r of Array.isArray(documents[rel]) ? documents[rel] : [documents[rel]]) resolveSpec(r);
     for (const rel of manifest.parts.data?.files ?? []) for (const r of documents[rel].entries ?? []) resolveSpec(r);
   } catch (e) { problems.push(e?.code?.startsWith('PLUGIN_') ? e : problem('PLUGIN_CONTENT_FILE', dir, e.message)); }
-  // Keep raw files for lock verification. Room identity and stale detection use the notice-free snapshot.
+  // Keep raw files for lock verification. Room identity and stale detection always use the canonical snapshot without notices or personal themes.
   const source = manifestTextWithoutNotices(documents['plugin.json']);
   const gameplayFiles = source ? { ...files, 'plugin.json': nodeSha256(Buffer.from(source)) } : files;
   return { content: problems.length ? null : deepFreeze({ documents, files,

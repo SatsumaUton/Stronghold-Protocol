@@ -511,10 +511,10 @@
           }
         }
       },
-      "description": "Plain text announcements, including optional translations; see docs/PLUGINS.md §9.2. The runtime also rejects whitespace-only text, duplicate normalized languages and impossible calendar dates."
+      "description": "Plain text announcements, including optional translations; see docs/PLUGINS.md §9.2. The runtime also rejects whitespace-only text, duplicate normalized languages and impossible calendar dates. Server catalogue and client view keep at most 100 notices and 48 KiB of serialized notice arrays, newest first, skipping entries that do not fit and continuing."
     },
     "theme": {
-      "description": "Theme variables: allowlisted colour, time and easing tokens (theme.vars), applied on the player's own page.",
+      "description": "Theme variables: allowlisted colour, time and easing tokens (theme.vars), applied on the player's own page. Each raw value is at most 400 characters before trimming or parsing.",
       "anyOf": [
         {
           "allOf": [
@@ -597,7 +597,8 @@
                 ]
               },
               "additionalProperties": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 400
               }
             },
             {
@@ -676,7 +677,8 @@
                     ]
                   },
                   "additionalProperties": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 400
                   }
                 }
               }

@@ -19,6 +19,10 @@ import { createContentSets } from '../../server/plugins/contentSets.js';
 import { healthReport } from '../../server/http/routes.js';
 import { Lobby } from '../../server/lobby.js';
 import { ROOT } from '../../server/data.js';
+import { createVisualSets } from '../../server/plugins/visualSet.js';
+import { packPlugin } from '../../server/plugins/pack.js';
+import { nodeSha256 } from '../../server/plugins/identity.js';
+import { png } from '../helpers/pluginFixtures.js';
 
 const vanilla = readVanillaAssets(path.join(ROOT, 'data'));
 const ctx = (id) => ({ id });
@@ -203,7 +207,7 @@ test('notices: good and bad shapes; the catalogue caps and the popup view', () =
   assert.ok(kept.length < 30);
   assert.ok(kept.length <= NOTICE_LIMITS.catalogue);
   assert.equal(capped[29].notices[0].id, 'n', 'the newest dated notice is kept');
-  assert.equal(capped[0].notices, undefined, 'the oldest is dropped, and the walk stops');
+  assert.equal(capped[0].notices, undefined, 'the oldest notice does not fit and is dropped');
   const small = Array.from({ length: 110 }, (_, i) => ({ id: `p${i}`, notices: [{ id: 'n', title: 'T', body: 'B' }] }));
   assert.equal(collectNotices(capCatalogueNotices(small)).length, NOTICE_LIMITS.catalogue);
   const escaped = rows.map((r) => ({ ...r, notices: [{ ...r.notices[0], body: '\n'.repeat(2000) + 'x', i18n: { en: { title: 'T', body: '\t'.repeat(2000) } } }] }));
@@ -338,8 +342,7 @@ test('notice catalogue hint reaches health and welcome, and is omitted when abse
 test('notices are not part of a content set hash', (t) => {
   const fx = fixture(t);
   const id = 'notehash';
-  // Introducing the key can change cs (the contribution switches to canonical JSON). Notice text itself must not.
-  fx.put(id, { permissions: ['data.patch'], data: ['data/patch.json'], notices: [{ id: 'hello', title: 'Hi', body: 'There' }] }, { 'data/patch.json': { patch: 1, ops: [] } });
+  fx.put(id, { permissions: ['data.patch'], data: ['data/patch.json'] }, { 'data/patch.json': { patch: 1, ops: [] } });
   const a = buildContentSet({ registry: fx.registry, ids: [id] });
   assert.equal(a.problems.length, 0, JSON.stringify(a.problems));
   const sets = createContentSets({ registry: fx.registry, vanillaData: {} });
@@ -350,16 +353,21 @@ test('notices are not part of a content set hash', (t) => {
   sets.onStale((...args) => stale.push(args));
   const file = path.join(fx.dir, 'plugins', id, 'plugin.json');
   const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
-  doc.notices = [{ id: 'hello', title: 'Hi', body: 'Changed body only' }];
-  fs.writeFileSync(file, JSON.stringify(doc));
-  fx.registry.rescan();
-  const b = buildContentSet({ registry: fx.registry, ids: [id] });
-  assert.equal(b.problems.length, 0, JSON.stringify(b.problems));
-  assert.equal(b.cs, a.cs);
-  assert.deepEqual(b.plugins, a.plugins, 'notice edits cannot change room composition hashes');
-  assert.deepEqual(stale, [], 'no gameplay-stale notification for catalogue-only changes');
-  assert.equal(sets.resolve([id]).set.cs, selected.set.cs);
+  const snapshot = fx.registry.plugin(id).content.hash;
+  for (const notices of [datedNotice(), [{ id: 'hello', title: 'Hi', body: 'Changed body only' }], [], undefined]) {
+    if (notices === undefined) delete doc.notices; else doc.notices = notices;
+    fs.writeFileSync(file, JSON.stringify(doc, null, 2));
+    fx.registry.rescan();
+    const b = buildContentSet({ registry: fx.registry, ids: [id] });
+    assert.equal(b.problems.length, 0, JSON.stringify(b.problems));
+    assert.equal(b.cs, a.cs, 'notice add/edit/empty/remove keeps cs');
+    assert.equal(fx.registry.plugin(id).content.hash, snapshot, 'same gameplay snapshot');
+    assert.deepEqual(b.plugins, a.plugins, 'same room-facing hashes');
+    assert.deepEqual(stale, [], 'no gameplay-stale notification for catalogue-only changes');
+    assert.equal(sets.resolve([id]).set.cs, selected.set.cs);
+  }
   sets.release(selected.set.cs);
+  sets.close();
 });
 
 test('registry checks theme files and delivers capped notices independently of room selection', (t) => {
@@ -382,19 +390,142 @@ test('registry checks theme files and delivers capped notices independently of r
   assert.equal(sets.hasNotices(), true, 'language plugins also advertise notices');
 });
 
-for (const mode of ['sandbox', 'trusted']) test(`${mode} script notice edits do not change content identity or leak into descriptors`, (t) => {
+for (const mode of ['sandbox', 'trusted']) test(`${mode} script notice add/edit/remove keeps content identity and raw lock verification`, (t) => {
   const fx = scriptFixture(t, { mode });
   const source = 'export default sp => {};';
-  fx.put('note-script', source, { notices: datedNotice() });
+  fx.put('note-script', source);
   const a = buildContentSet({ registry: fx.registry, ids: ['note-script'] });
   assert.deepEqual(a.problems, []);
   verifyScripts(a.scripts, a.index);
   assert.equal(JSON.parse(a.scripts[0].manifestSource).notices, undefined);
-  fx.put('note-script', source, { notices: [{ id: 'updated', title: 'Updated', body: 'Different text', i18n: { en: { title: 'News', body: 'Translated' } } }] });
-  const b = buildContentSet({ registry: fx.registry, ids: ['note-script'] });
-  assert.deepEqual(b.problems, []);
-  verifyScripts(b.scripts, b.index);
-  assert.equal(b.cs, a.cs);
+  const sets = createContentSets({ registry: fx.registry, vanillaData: {} });
+  t.after(() => sets.close());
+  const selected = sets.resolve(['note-script']);
+  sets.hold(selected.set.cs);
+  const stale = [];
+  sets.onStale((...args) => stale.push(args));
+  const rawHashes = new Set([fx.registry.plugin('note-script').script.lockHash]);
+  for (const extra of [{ notices: datedNotice() }, { notices: [{ id: 'updated', title: 'Updated', body: 'Different text' }] }, {}]) {
+    fx.put('note-script', source, extra);
+    const p = fx.registry.plugin('note-script');
+    assert.equal(p.script.lockValid, true);
+    assert.equal(nodeSha256(Buffer.from(p.script.manifestSource)), p.content.files['plugin.json'], 'raw bytes still verify');
+    rawHashes.add(p.script.lockHash);
+    const b = buildContentSet({ registry: fx.registry, ids: ['note-script'] });
+    assert.deepEqual(b.problems, []);
+    verifyScripts(b.scripts, b.index);
+    assert.equal(b.cs, a.cs);
+    assert.deepEqual(b.scripts, a.scripts, 'canonical descriptor for absent and present notices');
+    assert.deepEqual(b.plugins, a.plugins);
+    assert.deepEqual(stale, []);
+  }
+  assert.equal(rawHashes.size, 3, 'lock pins retain the complete notice-sensitive bytes');
+});
+
+for (const packed of [false, true]) test(`art notice and theme edits keep vs and room hashes (${packed ? 'locked' : 'unlocked'})`, (t) => {
+  const fx = fixture(t);
+  const dir = fx.put('art-news', { class: 'cosmetic', scope: ['personal', 'room'], permissions: ['assets.override', 'theme'],
+    assets: { chars: { char_102_texas: { avatar: 'avatar.png' } } }, theme: 'theme.json',
+  }, { 'theme.json': { vars: { '--t-fast': '0s' } } });
+  fs.writeFileSync(path.join(dir, 'avatar.png'), png());
+  const rescan = () => { if (packed) assert.equal(packPlugin(dir).wrote, true); fx.registry.rescan(); };
+  rescan();
+  const visual = createVisualSets({ registry: fx.registry });
+  t.after(() => visual.close());
+  const a = visual.resolve(['art-news']);
+  assert.equal(a.ok, true);
+  visual.hold(a.set.vs);
+  const stale = [];
+  visual.onStale((...args) => stale.push(args));
+  const file = path.join(dir, 'plugin.json');
+  const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  for (const notices of [datedNotice(), [{ id: 'n', title: 'News', body: 'Edited' }], undefined]) {
+    if (notices === undefined) delete doc.notices; else doc.notices = notices;
+    fs.writeFileSync(file, JSON.stringify(doc, null, 2));
+    rescan();
+    const b = visual.resolve(['art-news']);
+    assert.equal(b.set.vs, a.set.vs);
+    assert.deepEqual(b.set.plugins, a.set.plugins);
+    assert.deepEqual(stale, []);
+  }
+  for (const theme of [{ vars: { '--t-fast': '1s' } }, { vars: { '--t-fast': '2s' } }]) {
+    doc.theme = theme;
+    fs.writeFileSync(file, JSON.stringify(doc));
+    fs.writeFileSync(path.join(dir, 'theme.json'), JSON.stringify(theme));
+    rescan();
+    const b = visual.resolve(['art-news']);
+    assert.equal(b.set.vs, a.set.vs, 'inline and file theme values stay personal');
+    assert.deepEqual(b.set.plugins, a.set.plugins);
+    assert.deepEqual(stale, []);
+  }
+  fs.writeFileSync(path.join(dir, 'avatar.png'), png(5));
+  rescan();
+  assert.notEqual(visual.resolve(['art-news']).set.vs, a.set.vs, 'real art changes still invalidate');
+  assert.equal(stale.length, 1);
+});
+
+test('an oversized valid notice cannot suppress another plugin, even near the remaining byte cap', (t) => {
+  const fat = { id: 'fat', title: 'T', body: '汉'.repeat(2000), date: '9999-12-31',
+    i18n: Object.fromEntries(['en', 'ja', 'ko', 'zh-TW', 'fr', 'de', 'es', 'it'].map((code) => [code, { title: 'T', body: '汉'.repeat(2000) }])) };
+  assert.deepEqual(readNotices([fat]).problems, []);
+  const normal = { id: 'normal', title: 'T', body: 'B' };
+  const fx = fixture(t);
+  fx.put('hostile', { class: 'cosmetic', scope: ['personal'], permissions: [], notices: [fat] });
+  fx.put('normal', { class: 'cosmetic', scope: ['personal'], permissions: [], notices: [normal] });
+  assert.equal(fx.registry.plugin('hostile').status, 'loaded');
+  assert.deepEqual(collectNotices(fx.registry.pluginIndex().plugins).map((n) => n.id), ['normal']);
+  const rows = Array.from({ length: 24 }, (_, i) => ({ id: `p${i}`, notices: [{ id: 'n', title: 'T', body: 'x'.repeat(2000), date: '2026-10-17' }] }));
+  const capped = capCatalogueNotices([...rows, { id: 'normal', notices: [normal] }]);
+  assert.equal(capped.find((p) => p.id === 'normal').notices.length, 1, 'skip a non-fitting entry and continue');
+});
+
+test('theme raw values are bounded before trimming or parsing, inline and in files', (t) => {
+  const fx = fixture(t);
+  const boundary = '0'.repeat(399) + 's';
+  const over = '0'.repeat(400) + 's';
+  assert.equal(acceptThemeValue('--t-fast', boundary), boundary);
+  for (const value of [over, ' '.repeat(400) + '0s', '0'.repeat(1024 * 1024) + 's']) {
+    assert.equal(acceptThemeValue('--t-fast', value), null);
+    assert.equal(readThemeDeclaration({ vars: { '--t-fast': value } }).vars, null);
+  }
+  for (const fromFile of [false, true]) {
+    fx.put('oversized', { class: 'cosmetic', scope: ['personal'], permissions: ['theme'],
+      theme: fromFile ? 'theme.json' : { vars: { '--t-fast': over } },
+    }, fromFile ? { 'theme.json': { vars: { '--t-fast': over } } } : {});
+    assert.equal(fx.registry.plugin('oversized'), null, 'registry refuses oversized values');
+  }
+});
+
+test('ui notice add/edit/remove keeps the frame visual identity and file hashes', (t) => {
+  const fx = fixture(t);
+  const manifest = { class: 'ui', scope: ['personal'], permissions: ['ui.frame'], entry: { client: 'ui/index.html' }, slots: ['hud.right'] };
+  fx.put('frame-news', manifest, { 'ui/index.html': '<p>Frame</p>' });
+  const before = fx.registry.plugin('frame-news').ui;
+  for (const extra of [{ notices: datedNotice() }, { notices: [{ id: 'n', title: 'Edited', body: 'Body' }] }, {}]) {
+    fx.put('frame-news', { ...manifest, ...extra });
+    const after = fx.registry.plugin('frame-news').ui;
+    assert.equal(after.vs, before.vs);
+    assert.equal(after.hash, before.hash);
+    assert.deepEqual(after.frameFiles, before.frameFiles);
+  }
+});
+
+test('trusted personal theme values never enter gameplay descriptors or room-facing hashes', (t) => {
+  const fx = scriptFixture(t);
+  const manifest = { class: 'trusted', permissions: ['sim.code', 'theme'], theme: 'theme.json' };
+  fx.put('theme-script', 'export default sp => {};', manifest, { 'theme.json': { vars: { '--t-fast': '0s' } } });
+  const a = buildContentSet({ registry: fx.registry, ids: ['theme-script'] });
+  assert.deepEqual(a.problems, []);
+  for (const theme of ['theme.json', { vars: { '--t-fast': '2s' } }]) {
+    fx.put('theme-script', 'export default sp => {};', { ...manifest, theme }, { 'theme.json': { vars: { '--t-fast': '1s' } } });
+    const b = buildContentSet({ registry: fx.registry, ids: ['theme-script'] });
+    assert.deepEqual(b.problems, []);
+    verifyScripts(b.scripts, b.index);
+    assert.equal(b.cs, a.cs);
+    assert.deepEqual(b.plugins, a.plugins);
+    assert.deepEqual(b.scripts, a.scripts);
+    assert.equal(JSON.parse(b.scripts[0].manifestSource).theme, undefined);
+  }
 });
 
 function memStorage() {

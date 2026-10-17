@@ -140,18 +140,18 @@ export function readNotices(raw) {
 }
 
 /**
- * Canonical plugin.json with `notices` removed, or null when the key is absent.
- * The content hash uses this only when the key is present, so a plugin that does not declare notices keeps
- * the hash of its original bytes.
+ * Canonical plugin.json without notices or personal theme values. Always canonicalize, including when both
+ * keys are absent: introducing or removing the first notice must use exactly the same identity input.
+ * Raw manifest bytes remain available separately for lock verification.
  * @param {unknown} doc parsed plugin.json
  * @returns {string | null}
  */
 export function manifestTextWithoutNotices(doc) {
   if (!isObj(doc)) return null;
   const rec = /** @type {Record<string, unknown>} */ (doc);
-  if (!Object.hasOwn(rec, 'notices')) return null;
   const copy = { ...rec };
   delete copy.notices;
+  delete copy.theme;
   return canonicalJson(copy);
 }
 
@@ -183,8 +183,9 @@ function noticeBytes(n) {
 }
 
 /**
- * Drop notices until the catalogue is within both caps. Walks newest-first and stops at the first notice
- * that would not fit [ASSUMED]: not a knapsack. Entries with no notices are returned unchanged, and a
+ * Drop notices until the catalogue is within both caps. [ASSUMED] Walk newest-first, skipping any notice
+ * that would not fit so a large entry cannot suppress smaller entries from other plugins.
+ * Entries with no notices are returned unchanged, and a
  * catalogue that already fits is the same array.
  * @param {Record<string, any>[]} entries catalogue entries
  */
@@ -204,7 +205,7 @@ export function capCatalogueNotices(entries) {
     if (keep.size >= NOTICE_LIMITS.catalogue) break;
     // Each plugin contributes an array's brackets, and each subsequent notice a comma.
     const b = noticeBytes(row.notice) + (withNotices.has(row.entryId) ? 1 : 2);
-    if (bytes + b > NOTICE_LIMITS.catalogueBytes) break;
+    if (bytes + b > NOTICE_LIMITS.catalogueBytes) continue;
     keep.add(`${row.entryId}/${row.notice.id}`);
     withNotices.add(row.entryId);
     bytes += b;
@@ -230,7 +231,9 @@ export function capCatalogueNotices(entries) {
 export function collectNotices(plugins) {
   /** @type {any[]} */
   const out = [];
-  for (const p of Array.isArray(plugins) ? plugins : []) {
+  // The page enforces its own byte/count caps even if a server sends an uncapped catalogue.
+  const loaded = (Array.isArray(plugins) ? plugins : []).filter((p) => p && (!p.status || p.status === 'loaded'));
+  for (const p of capCatalogueNotices(loaded)) {
     if (!p || typeof p !== 'object') continue;
     if (p.status && p.status !== 'loaded') continue;
     if (!Array.isArray(p.notices)) continue;

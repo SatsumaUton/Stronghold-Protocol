@@ -272,13 +272,14 @@ function CosmeticSection() {
   const ids = useStore((s) => s.ids, Object.is, personal);
   const installed = useStore(installedCount);
   useEffect(() => { if (installed) loadCatalog({ force: true }); }, [installed]);
-  const list = installed ? cosmeticPlugins(cat.plugins, 'personal').filter(isPersonalCosmetic) : [];
+  const entries = installed ? cosmeticPlugins(cat.plugins, 'personal') : [];
+  const list = entries.filter(isPersonalCosmetic);
   if (!list.length) return null;
-  const set = personalSet(ids, list);
+  const set = personalSet(ids, entries);
   const applied = new Set(set.order);
   const auto = new Set(set.auto);
   const winners = resolveThemeVars(set.order.map((id) => {
-    const p = list.find((x) => x.id === id);
+    const p = entries.find((x) => x.id === id);
     return { id, vars: themeVarsOf(p) };
   }));
   const flip = (id, on) => { const r = setPersonalPlugin(id, on); if ('error' in r) toast(describeError(r.error), 'warn'); };
