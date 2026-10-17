@@ -39,7 +39,7 @@
 // An eliminated player gets no dispatch, except the persistent effects whose handler sets `afterElimination: true`
 // (onRoundStart, EffectDispatcher.dispatchEliminated: 信标's gift — GitHub #86).
 
-import { dispatchOperatorTraits } from './operatorTraits.js';
+import { dispatchOperatorTraits, operatorTraitHandler } from './operatorTraits.js';
 import { itemKey } from './gamedata.js';
 import { boardOrder, parseKey, tileKey } from './board.js';
 import { pieceBonds as bondsOfPiece } from './bondsMeta.js';
@@ -381,7 +381,8 @@ export class EffectDispatcher {
         const g = gd.garrison(gid);
         if (!g || g.eventType !== eventType) continue;
         const key = `garrison:${g.effectKey}`;
-        const h = this.registry.get(key);
+        const h = g.operatorTrait && eventType === 'SERVER_GAIN'
+          ? operatorTraitHandler(g.operatorTrait, hook) : this.registry.get(key);
         if (!h) continue;
         const ev = hook === 'onGain' ? { piece: self, kind: 'chess', source: 'trigger' }
           : hook === 'onSold' ? { piece: self, gain: 0 }

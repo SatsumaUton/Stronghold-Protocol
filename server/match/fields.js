@@ -35,7 +35,7 @@ import { TICK, SNAPSHOT_EVERY } from '../sim/constants.js';
 import { layerGainRoom } from '../../shared/constants.js';
 import { uniteLeft } from '../sim/spec.js';
 import { diyTokenOwner, diyRecordOf } from '../../shared/diy.js';
-import { operatorTraitLayerAllowance } from './operatorTraits.js';
+import { requiresTraitLayerAuthority } from './operatorTraits.js';
 
 export const MAX_TICKS_PER_INTERVAL = 8;
 export const INTERVAL_MS = 1000 / 30;
@@ -710,10 +710,6 @@ export function specBounds(spec, gd = null) {
       if (Number.isFinite(v) && v > 0) startLayers.set(id, v);
     }
     const bonds = gd ? layerBondsOf(p, gd) : null, layerAllow = gd ? layerAllowanceOf(p, gd) : new Map();
-    if (gd) for (const [id, cap] of operatorTraitLayerAllowance(p, gd)) {
-      bonds.add(id);
-      layerAllow.set(id, (layerAllow.get(id) ?? 0) + cap);
-    }
     players.set(p.playerId, { chess, all, names, defIds, bonds, startLayers, layerAllow });
   }
   const round = Number(spec && spec.round) || 0;
@@ -779,6 +775,7 @@ export function validateClientResult(spec, raw, { gd = null } = {}) {
   const bad = (reason) => ({ ok: false, reason });
   try {
     if (!spec || !raw || typeof raw !== 'object' || !raw.perPlayer || typeof raw.perPlayer !== 'object') return bad('shape');
+    if (requiresTraitLayerAuthority(spec, gd)) return bad('trait layers require server authority');
     const B = specBounds(spec, gd);
     const bossLike = spec.kind === 'boss' || spec.kind === 'hidden';
     if (!['cleared', 'timeout', 'forced'].includes(raw.reason)) return bad('reason');

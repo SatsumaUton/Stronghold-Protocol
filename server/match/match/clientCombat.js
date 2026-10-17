@@ -4,6 +4,7 @@
 // takeovers), field completion → the phase end, and the timers of it all.
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
+import { requiresTraitLayerAuthority } from '../operatorTraits.js';
 import { PHASE } from '../../../shared/constants.js';
 import { DeadBattle, syntheticResult, RESULT_GRACE_MS, HARD_CAP_SECONDS, HeadlessJob } from '../fields.js';
 import { buildBattleSpec, createBattleFromSpec } from '../../sim/spec.js';
@@ -80,6 +81,9 @@ export class MatchClientCombat {
 
   /** The connected human who simulates a field: lowest seat among its players (normal: the owner). */
   _authorityFor(f, exclude = null) {
+    // [ASSUMED] Layer traits require an authoritative run, even with SP_VERIFY=off.
+    // Use the existing sliced server path (also for shared boss pools) before assigning any client.
+    if (requiresTraitLayerAuthority(f.spec, this.gd)) return null;
     let best = null;
     for (const pid of f.players) {
       if (pid === exclude || (f.demoted && f.demoted.has(pid))) continue;

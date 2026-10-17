@@ -204,14 +204,16 @@ function wavesUsedByMode(mode) {
 }
 
 /** C1. ids accepts ids or {id, settings}; failures return only {problems}, never a usable cs/data. */
-function composeContentSet({ registry, ids = [] }) {
+function composeContentSet({ registry, ids = [], checkDataOnly = false }) {
   if (!registry || !Array.isArray(ids)) return { problems: [problem('PLUGIN_CONTENT_FORMAT', 'ids', 'registry and plugin ids required')] };
   let base;
   try { base = baseFor(registry); } catch (e) { return { problems: [problem('PLUGIN_CONTENT_FILE', 'data', e.message)] }; }
   const selected = ids.map(v => typeof v === 'string' ? { id: v } : v);
   const usable = id => {
     const p = registry.plugin(id);
-    return p?.status === 'loaded' && p.manifest.scope.includes('room')
+    // Data-only checks may read a script dependency's JSON without granting it execution permission.
+    const readable = p?.status === 'loaded' || checkDataOnly && p?.status === 'disabled' && p.script && p.content;
+    return readable && p.manifest.scope.includes('room')
       && (['content','script','trusted'].includes(p.class) && p.manifest.compatible !== false && p.content || p.class === 'cosmetic' && p.visual) ? p : null;
   };
   const resolved = resolvePluginOrder(selected.map(v => v?.id), id => usable(id)?.manifest ?? null);
@@ -296,6 +298,8 @@ function composeContentSet({ registry, ids = [] }) {
   }
   const tr = translations(data, base.i18n, plugins);
   if (tr.problems.length) return { problems: tr.problems };
+  // Checking declarative references must never execute a dependency's script setup/preflight.
+  if (checkDataOnly) return { data, problems: [] };
   const bodies = new Map(base.files), files = {}, hashes = {};
   for (const [name, rec] of Object.entries(data)) {
     const rel = `data/${name}.json`;

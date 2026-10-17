@@ -1950,15 +1950,26 @@ conditions require alive, visible, unremoved targets and deployed allies; these 
 Omitting them imposes no field filter. `layers.bond` is required; `selfActive` means the holder's active own bonds, including equipment-granted bonds.
 [ASSUMED] `maxPerBattle` and capped/selfActive amounts are literal integers 1–1000000; caps are per holder/action/bond,
 survive redeploy and reset each battle. They are battle-only and do not extend other actions.
-Client-result validation includes declared layer caps and referenced bonds for the actual holder/form, including DIY;
-uncapped nodes retain the existing room layer ceiling. Stand-in battle traits follow the fighting body's charId [ASSUMED].
+[ASSUMED] Fields with participating layer-granting traits and enabled gains run authoritatively on the server, even
+with `SP_VERIFY=off`; client results cannot settle them. Normal/unite fields use sliced headless simulation; bosses
+use the existing shared-pool server path. Cost: one full server simulation per affected field, alongside browser
+playback. Fields without these traits or with gains disabled retain their existing path. Caps never prove earned layers
+and no longer increase client allowances. Trait layers carry garrison provenance and their holder as source, enabling
+the official front-tile amplification. [ASSUMED] Node caps bound base grants; amplification is extra, with the final
+999-layer clamp unchanged. Burst cooldowns use the existing `1e-9` trigger tolerance. Stand-in battle traits follow the fighting body's charId [ASSUMED].
 
 Operator prep events: gain, deploy, roundStart, buy, sell, merge, levelUp, battleResult. [ASSUMED] Gain runs once
 for the acquired copy (including the normal copy completing a merge), never for the merge output or promotion;
 DIY selection alone acquires nothing. Deploy is a successful hand/temp-to-board placement. Other hooks run once
-per owned character, elite preferred; bench/temp count, the final sold copy no longer qualifies, and levelUp is shop
-level. Only that player's state is affected. `gainItem.count` defaults to 1, integer 1–64, with ordinary pool/storage/merge rules.
-These hooks do not inherit the official investor gain multiplier. There is no author registry key or JavaScript.
+per owned character, elite preferred; bench/temp count, and levelUp is shop level. [ASSUMED] Self-sale runs once
+from the removed piece in its sold form, including its final copy; remaining copies of that character do not run again. Only that player's state is affected. `gainItem.count` defaults to 1, integer 1–64, with ordinary pool/storage/merge rules.
+Acquisition still runs custom gain once [ASSUMED]. Separately, SERVER_GAIN discovery and forced dispatch expose
+custom gain to Suzuran, her band and copied traits, with the existing forced-dispatch investor multiplier and no new
+acquisition accounting. There is no author registry key or JavaScript.
+Strict checking recognizes trait-consumed dsl/data.patch permissions; a stale unused-permission autofix cannot remove
+them. Checking validates item and bond references (including conditions) against composed data. [ASSUMED] Required
+dependencies resolve from sibling folders; missing dependencies fail checking. This data-only check never runs scripts
+or their preflight.
 Compiled trait metadata is host-owned: ordinary data patches cannot rewrite or erase it, even with a dependency.
 
 Admission and runtime are app-owned extensions outside the vanilla hashed sim/shared tree; only participating data

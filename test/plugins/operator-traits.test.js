@@ -131,7 +131,7 @@ test('existing element burst path, same-seed browser loader and next battle rese
 
 test('selfActive includes equipment-granted bonds like official self-bond traits', async t => {
   const { set } = put(t, custom());
-  const { specBounds } = await import('../../server/match/fields.js');
+  const { operatorTraitLayerAllowance } = await import('../../server/match/operatorTraits.js');
   const { fixtureSpec } = await import('../helpers/simHostFixture.js');
   await installOperatorTraits(set.data); setGameData(set.data);
   t.after(async () => { await installOperatorTraits(DATA); setGameData(null); });
@@ -143,7 +143,7 @@ test('selfActive includes equipment-granted bonds like official self-bond traits
   h.b.emit('elementBurst', { target: u, element: 'erosion' });
   assert.equal(ps.bonds.victoriaShip.layers, 1);
   const spec = fixtureSpec(); Object.assign(spec.players[0].units[0], { chessId: id, items });
-  assert.equal(specBounds(spec, makeMatch({ data: set.data, fake: true }).m.gd).players.get('p1').layerAllow.get('victoriaShip'), 12);
+  assert.equal(operatorTraitLayerAllowance(spec.players[0], makeMatch({ data: set.data, fake: true }).m.gd).get('victoriaShip'), 12);
 });
 
 test('trait DSL file references are pinned and inline kit trait leaves skill/talents intact', t => {
@@ -270,7 +270,7 @@ test('test console grant fires gain exactly once', t => {
   assert.deepEqual(calls, [ITEM]);
 });
 
-test('custom layer allowances reach client-result validation without allowing unrelated bonds', async t => {
+test('custom layer declarations never enlarge client-result allowances', async t => {
   const { specBounds, validateClientResult } = await import('../../server/match/fields.js');
   const { fixtureSpec } = await import('../helpers/simHostFixture.js');
   const { createBattleFromSpec } = await import('../../server/sim/spec.js');
@@ -282,14 +282,14 @@ test('custom layer allowances reach client-result validation without allowing un
   const spec = fixtureSpec(); spec.players[0].units[0].chessId = Object.values(set.data.chess).find(c => c.charId === r.charId && !c.isGolden).chessId;
   const h = makeMatch({ data: set.data, fake: true }), gd = h.m.gd;
   const bounds = specBounds(spec, gd).players.get('p1');
-  assert.equal(bounds.layerAllow.get('arcaneShip'), 100); assert.ok(bounds.bonds.has('arcaneShip'));
+  assert.equal(bounds.layerAllow.get('arcaneShip'), undefined);
   const b = createBattleFromSpec(spec, new DataSource(set.data)); b.start(); b.forceEnd();
   const result = b.result(); assert.equal(result.perPlayer.p1.layerGains.arcaneShip, 100);
-  assert.equal(validateClientResult(spec, result, { gd }).ok, true);
+  assert.equal(validateClientResult(spec, result, { gd }).ok, false);
   result.perPlayer.p1.layerGains.arcaneShip = 161;
-  assert.equal(validateClientResult(spec, result, { gd }).reason, 'layer bound');
+  assert.equal(validateClientResult(spec, result, { gd }).reason, 'trait layers require server authority');
   result.perPlayer.p1.layerGains = { yanShip: 1 };
-  assert.equal(validateClientResult(spec, result, { gd }).reason, 'layer bond');
+  assert.equal(validateClientResult(spec, result, { gd }).reason, 'trait layers require server authority');
 });
 
 test('detail card displays translated custom traits and returns to the official trait on removal', async t => {
@@ -355,4 +355,170 @@ test('production match host and an isolated browser module tree agree', { timeou
   const result = await done;
   assert.deepEqual(result.errors, []); assert.deepEqual(result.snapshot, battle.snapshot());
   assert.deepEqual(result.digest, resultDigest(battle.result())); match.dispose();
+});
+
+// Review regressions (#671): all fixtures are synthetic JSON, never third-party code.
+test('review: forced gain discovery and dispatch survive an official trait override', t => {
+  const { set } = put(t, official(true));
+  const h = makeMatch({ data: set.data, fake: true }).start(); t.after(() => h.m.dispose()); h.toPrep(1);
+  const ps = h.ps('p_0'); let rewards = 0;
+  const acquire = ps.acquireItem.bind(ps);
+  ps.acquireItem = (...args) => { rewards++; return acquire(...args); };
+  const piece = ps.acquireChess(ID);
+  assert.equal(rewards, 1);
+  const gs = ps.gd.chess(ID).garrisonIds.map(id => ps.gd.garrison(id));
+  assert.ok(gs.some(g => g.eventType === 'SERVER_GAIN'));
+  assert.equal(h.m.dispatcher.triggerGarrisons(ps, piece, 'SERVER_GAIN'), 1);
+  assert.equal(rewards, 2);
+  ps.bonds.investShip = { active: true, layers: 0 };
+  h.m.dispatcher.triggerGarrisons(ps, piece, 'SERVER_GAIN', { asPiece: piece });
+  assert.equal(rewards, 4, 'forced gain keeps the existing investor multiplier');
+});
+
+test('review: self-sale uses the sold form even for the last copy or with an elite remaining', t => {
+  const r = official(true);
+  r.trait.dsl = { dsl: 1, meta: { on: [{ when: 'sell', do: [{ funds: { amount: 7 } }] }] } };
+  r.forms.elite.trait.dsl = { dsl: 1, meta: { on: [{ when: 'sell', do: [{ funds: { amount: 17 } }] }] } };
+  const { set } = put(t, r);
+  for (const keepElite of [false, true]) {
+    const h = makeMatch({ data: set.data, fake: true }).start(); t.after(() => h.m.dispose()); h.toPrep(1);
+    const ps = h.ps('p_0'), sold = ps.acquireChess(ID);
+    if (keepElite) ps.acquireChess(ID.replace('_a', '_b'));
+    ps.funds = 100;
+    assert.deepEqual(ps.sell(sold.uid), { ok: true });
+    assert.equal(ps.funds, 108, 'one normal sale reward, independent of remaining copies');
+  }
+});
+
+test('review: trait layers receive garrison amplification, preserving source, cap and budget', async t => {
+  const r = custom(); r.trait.dsl.talents[0].do = [{ layers: { bond: 'egirShip', amount: 1, maxPerBattle: 2 } }];
+  const { set } = put(t, r);
+  await installOperatorTraits(set.data); setGameData(set.data);
+  t.after(async () => { await installOperatorTraits(DATA); setGameData(null); });
+  const id = Object.values(set.data.chess).find(c => c.charId === r.charId && !c.isGolden).chessId;
+  const h = makeBattle({ data: new DataSource(set.data), units: [
+    { uid: 1, chessId: 'chess_char_4_25_a', row: 10, col: 3 }, { uid: 2, chessId: id, row: 10, col: 4 }], autoFinish: false });
+  h.step(); const b = h.b, u = h.unit(2), seen = [];
+  b.getPlayer('p1').bonds.egirShip = { active: true, layers: 0 };
+  b.on('layerGain', e => seen.push({ reason: e.reason, source: e.source }));
+  for (let i = 0; i < 3; i++) b.emit('elementBurst', { target: u, element: 'erosion' });
+  assert.equal(b.result().perPlayer.p1.layerGains.egirShip, 4, 'cap limits base grants; official bonus remains extra');
+  assert.deepEqual(seen, [{ reason: 'garrison', source: u }, { reason: 'garrison', source: u }]);
+  const { budgetUsed } = await import('../../server/sim/content/dsl/budget.js');
+  assert.equal(budgetUsed(b, 'data-demo'), 3);
+  const v = await import('../../server/sim/content/dsl/vocab.js');
+  v.runActions([{ layers: { bond: 'egirShip', amount: 1 } }], v.makeRuntime(b, u, { pluginId: 'data-demo' }));
+  assert.equal(b.result().perPlayer.p1.layerGains.egirShip, 5, 'ordinary DSL from the same plugin keeps its original provenance');
+  assert.equal(seen.at(-1).reason, 'plugin:data-demo');
+  assert.equal(budgetUsed(b, 'data-demo'), 4, 'traits and ordinary DSL share one plugin budget');
+});
+
+test('review: burst cooldown uses the established one-nanosecond tolerance', async t => {
+  const r = custom(); r.trait.dsl.talents[0].cooldown = 0.1;
+  const { set } = put(t, r);
+  await installOperatorTraits(set.data); setGameData(set.data);
+  t.after(async () => { await installOperatorTraits(DATA); setGameData(null); });
+  const id = Object.values(set.data.chess).find(c => c.charId === r.charId && !c.isGolden).chessId;
+  const h = makeBattle({ data: new DataSource(set.data), units: [{ chessId: id, row: 10, col: 4 }], autoFinish: false }); h.step();
+  h.b.getPlayer('p1').bonds.egirShip = { active: true, layers: 0 };
+  for (let i = 0; i < 30; i++) { h.b.emit('elementBurst', { target: h.b.allyUnits[0], element: 'erosion' }); h.step(); }
+  assert.equal(h.b.result().perPlayer.p1.layerGains.egirShip, 10);
+});
+
+test('review: zero-burst client gains require server authority even below the old allowance', async t => {
+  const { fixtureSpec } = await import('../helpers/simHostFixture.js');
+  const { validateClientResult, runHeadless } = await import('../../server/match/fields.js');
+  const { createBattleFromSpec } = await import('../../server/sim/spec.js');
+  const { set } = put(t, custom());
+  await installOperatorTraits(set.data); setGameData(set.data);
+  t.after(async () => { await installOperatorTraits(DATA); setGameData(null); });
+  const spec = fixtureSpec(); spec.round = 1;
+  spec.players[0].units[0].chessId = Object.values(set.data.chess).find(c => c.charId === custom().charId && !c.isGolden).chessId;
+  const h = makeMatch({ data: set.data, fake: true, verify: 'off' }); t.after(() => h.m.dispose());
+  const result = runHeadless(createBattleFromSpec(spec, new DataSource(set.data)), { players: ['p1'] }).result;
+  assert.deepEqual(result.perPlayer.p1.layerGains, {});
+  for (const n of [0, 1, 12, 76]) {
+    result.perPlayer.p1.layerGains = { egirShip: n };
+    assert.equal(validateClientResult(spec, result, { gd: h.m.gd }).ok, false);
+  }
+  for (const kind of ['normal', 'unite', 'boss', 'hidden']) {
+    const field = { kind, spec: { ...spec, kind }, players: ['p_0'], demoted: new Set() };
+    assert.equal(h.m._authorityFor(field), null, 'layer-granting fields are server-owned');
+    assert.equal(h.m._authorityFor({ ...field, spec: { ...field.spec, flags: { layerGainsEnabled: false } } }), 'p_0');
+    const plain = fixtureSpec();
+    assert.equal(h.m._authorityFor({ ...field, spec: plain }), 'p_0', 'unrelated fields retain client authority');
+  }
+});
+
+test('review: trait permissions pass strict checking and cannot be removed by a stale autofix', async t => {
+  const { checkPluginFolder } = await import('../../server/plugins/pack.js');
+  const { FIXES } = await import('../../server/studio/edit.js');
+  const { f } = put(t, official(true)), dir = f.dir + '/plugins/data-demo';
+  const checked = checkPluginFolder(dir, dir);
+  assert.deepEqual(checked.problems, []);
+  assert.deepEqual(checked.issues.filter(i => i.code === 'PLUGIN_PERMISSION_UNUSED'), []);
+  for (const permission of ['data.patch', 'dsl']) {
+    const p = { manifest: JSON.parse(fs.readFileSync(dir + '/plugin.json')) };
+    assert.throws(() => FIXES.dropPermission(p, { params: { permission } }, { files: { root: () => dir }, id: 'data-demo' }));
+    assert.ok(p.manifest.permissions.includes(permission));
+  }
+});
+
+for (const [label, dsl] of Object.entries({
+  item: { dsl: 1, meta: { on: [{ when: 'gain', do: [{ gainItem: { item: 'missing_item' } }] }] } },
+  bond: { dsl: 1, talents: [{ when: 'elementBurst', do: [{ layers: { bond: 'missing_bond', amount: 1 } }] }] },
+  condition: { dsl: 1, talents: [{ when: 'elementBurst', if: { bondActive: 'missing_bond' }, do: [] }] },
+})) test(`review: checking rejects nonexistent trait ${label} references`, async t => {
+  const { checkPluginFolder } = await import('../../server/plugins/pack.js');
+  const f = fixture(t), r = official(); r.trait.dsl = dsl; delete r.forms;
+  const dir = f.put('data-demo', { permissions: ['data.add', 'data.patch', 'dsl'], operators: ['op.json'] }, { 'op.json': r });
+  const checked = checkPluginFolder(dir, dir);
+  assert.ok(checked.issues.some(i => i.level === 'problem' && i.code === 'PLUGIN_DATA_REFERENCE'));
+  assert.equal(checked.plugin, null);
+});
+
+test('checking resolves trait references in declared dependency data and refuses missing dependencies', async t => {
+  const { checkPluginFolder } = await import('../../server/plugins/pack.js');
+  const f = fixture(t), bond = 'bond_x_trait_dep_team', item = 'item_x_trait_dep_gift';
+  f.put('trait-dep', { permissions: ['data.add'], data: ['records.json'] }, { 'records.json': { records: 1, entries: [
+    { file: 'bonds', id: bond, value: { name: 'Team', desc: 'Synthetic', thresholds: [1], countMode: 'BOARD', isCore: false, identifier: 40 } },
+    { file: 'items', id: item, base: ITEM, set: {} },
+  ] } });
+  const r = official(true); delete r.forms;
+  r.trait.dsl = { dsl: 1, talents: [{ when: 'elementBurst', if: { bondActive: { id: bond, tier: 1 } }, do: [{ layers: { bond, amount: 1 } }] }],
+    meta: { on: [{ when: 'gain', do: [{ gainItem: { item } }] }] } };
+  const dir = f.put('data-demo', { permissions: ['data.add', 'data.patch', 'dsl'], operators: ['op.json'], requires: { 'trait-dep': '1.0.0' } }, { 'op.json': r });
+  assert.deepEqual(checkPluginFolder(dir, dir).problems, []);
+  const depDir = f.dir + '/plugins/trait-dep';
+  const dep = JSON.parse(fs.readFileSync(depDir + '/plugin.json'));
+  Object.assign(dep, { class: 'script', entry: { sim: 'index.js' }, permissions: ['data.add', 'sim.code'] });
+  fs.writeFileSync(depDir + '/plugin.json', JSON.stringify(dep));
+  fs.writeFileSync(depDir + '/index.js', 'export function setup() { throw new Error("must not execute during checking"); }');
+  assert.deepEqual(checkPluginFolder(dir, dir).problems, [], 'dependency JSON is checked without executing or authorizing its script');
+  fs.rmSync(depDir, { recursive: true });
+  assert.ok(checkPluginFolder(dir, dir).issues.some(i => i.code === 'PLUGIN_DEPENDENCY'));
+});
+
+test('layer-trait fields settle from a real server run with verification disabled', async t => {
+  const r = custom(); delete r.forms.elite.trait;
+  r.trait.dsl = { dsl: 1, talents: [{ when: 'battleStart', do: [{ layers: { bond: 'egirShip', amount: 3, maxPerBattle: 3 } }] }] };
+  const { set } = put(t, r);
+  await installOperatorTraits(set.data); setGameData(set.data);
+  t.after(async () => { await installOperatorTraits(DATA); setGameData(null); });
+  const h = makeMatch({ data: set.data, mode: 'solo', clientCombat: true, clients: false, verify: 'off' }).start();
+  t.after(() => h.m.dispose()); h.toPrep(1);
+  const ps = h.ps('p_0'), id = Object.values(set.data.chess).find(c => c.charId === r.charId && !c.isGolden).chessId;
+  const piece = ps.acquireChess(id), [row, col] = legalTileFor(h.m, ps, id);
+  assert.deepEqual(ps.move(piece.uid, { area: 'board', row, col }), { ok: true });
+  assert.ok(h.drive(() => h.m.phase === 'COMBAT'));
+  const f = h.m.fields[0];
+  assert.equal(f.mode, 'server'); assert.equal(f.authority, null);
+  assert.equal(f.result.perPlayer.p_0.layerGains.egirShip, 3);
+  const forged = structuredClone(f.result); forged.perPlayer.p_0.layerGains.egirShip = 76;
+  h.m._onResult(ps, { battleId: f.battleId, result: forged });
+  assert.equal(f.result.perPlayer.p_0.layerGains.egirShip, 3);
+  assert.ok(h.runToPhase('SETTLE'));
+  assert.equal(h.m.lastResults.get('p_0').layerGains.egirShip, 3);
+  assert.equal(ps.bonds.egirShip.layers, 5, 'three earned layers plus the standard round award');
+  assert.deepEqual(h.logs.error, []);
 });

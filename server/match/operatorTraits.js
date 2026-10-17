@@ -11,7 +11,7 @@ function traitsOf(gd) {
 }
 export const hasTraitFor = (gd, charId) => traitsOf(gd).some(g => g.operatorTrait.charId === charId);
 
-/** Conservative client-result allowance, using the same holder/form and per-action caps as the runtime. */
+/** Participating layer nodes. Declaration caps describe possibilities, never proof of an earned gain. */
 export function operatorTraitLayerAllowance(player, gd) {
   const out = new Map(), table = traitsOf(gd);
   if (!table.length) return out;
@@ -34,14 +34,18 @@ export function operatorTraitLayerAllowance(player, gd) {
   }
   return out;
 }
+// [ASSUMED] Derive these fields on the server, including bosses; no client cap proves a burst happened.
+export const requiresTraitLayerAuthority = (spec, gd) => spec?.flags?.layerGainsEnabled !== false
+  && (spec?.players ?? []).some(p => operatorTraitLayerAllowance(p, gd).size > 0);
+
 const EVENTS = { onTraitGain: 'gain', onTraitDeploy: 'deploy', onRoundStart: 'roundStart', onBuy: 'buy', onSold: 'sell',
   onMerge: 'merge', onLevelUp: 'levelUp', onBattleResult: 'battleResult' };
 
-function handler(tr, hook) {
+export function operatorTraitHandler(tr, hook) {
   let map = compiled.get(tr);
   if (!map) { map = new Map(); compiled.set(tr, map); }
   if (map.has(hook)) return map.get(hook);
-  const on = (tr.spec.meta?.on ?? []).filter(e => e.when === EVENTS[hook]).map(e => ({ ...e, when: 'roundStart',
+  const on = (tr.spec.meta?.on ?? []).filter(e => e.when === (hook === 'onGain' ? 'gain' : EVENTS[hook])).map(e => ({ ...e, when: 'roundStart',
     do: (e.do ?? []).flatMap(action => action.gainItem
       ? Array.from({ length: action.gainItem.count ?? 1 }, () => ({ gainItem: { item: action.gainItem.item } })) : [action]) }));
   const result = on.length ? { [hook]: compileDslMeta({ dsl: 1, meta: { on } }, { pluginId: tr.pluginId }).onRoundStart } : {};
@@ -53,7 +57,7 @@ export function dispatchOperatorTraits(dispatcher, ps, hook, ev) {
   const table = traitsOf(ps.gd);
   if (!table.length) return;
   // [ASSUMED] Gain/deploy concern only that copy. Other hooks run once per owned character;
-  // an elite copy takes precedence. Sold last copies no longer qualify. Bench/temp count as owned.
+  // an elite copy takes precedence. A self-sale uses the removed copy's form once. Bench/temp count as owned.
   const pieces = hook === 'onTraitGain' || hook === 'onTraitDeploy' ? [ev.piece] : ps.allChess();
   const holders = new Map();
   for (const piece of pieces) {
@@ -62,10 +66,14 @@ export function dispatchOperatorTraits(dispatcher, ps, hook, ev) {
     if (!rec) continue;
     if (!holders.has(rec.charId) || rec.isGolden) holders.set(rec.charId, { piece, rec });
   }
+  if (hook === 'onSold' && ev.piece?.kind === 'chess') {
+    const rec = ps.gd.chess(ev.piece.id);
+    if (rec) holders.set(rec.charId, { piece: ev.piece, rec });
+  }
   for (const g of table) {
     const tr = g.operatorTrait, holder = holders.get(tr.charId);
     if (!holder || tr.elite !== !!holder.rec.isGolden) continue;
     const key = `trait:${g.garrisonId}`;
-    dispatcher._call(ps, key, handler(tr, hook), hook, { kind: 'garrison', key, piece: holder.piece, garrison: g }, ev);
+    dispatcher._call(ps, key, operatorTraitHandler(tr, hook), hook, { kind: 'garrison', key, piece: holder.piece, garrison: g }, ev);
   }
 }

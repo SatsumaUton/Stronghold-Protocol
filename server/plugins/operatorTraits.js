@@ -17,6 +17,18 @@ export const TRAIT_SURFACE = Object.freeze([
 
 export const hasOperatorTrait = r => r?.trait?.dsl !== undefined || r?.kit?.dsl?.trait?.on !== undefined
   || Object.values(r?.forms ?? {}).some(f => f?.trait?.dsl !== undefined);
+/** Permissions consumed by operator declarations, beyond what the manifest alone can see. */
+export function operatorTraitPermissions(content, manifest) {
+  const used = new Set();
+  for (const part of ['operators', 'data']) for (const rel of manifest.parts[part]?.files ?? []) {
+    const doc = content?.documents[rel];
+    for (const r of Array.isArray(doc) ? doc : doc?.entries ?? [doc]) if (hasOperatorTrait(r)) {
+      used.add('dsl');
+      if (!r.charId?.startsWith('char_x_')) used.add('data.patch');
+    }
+  }
+  return used;
+}
 const fail = (path, message, code = 'PLUGIN_DSL_SHAPE') => { throw problem(code, path, message); };
 
 /** Patches cannot rewrite compiled metadata, including through a declared dependency or a parent replacement. */
@@ -36,10 +48,11 @@ export function validateTraitSpec(spec, pluginId, data = null) {
   const walk = (v, depth = 0) => {
     if (depth > 64) fail('trait.dsl', 'nesting exceeds 64', 'PLUGIN_DSL_LOOP');
     if (!v || typeof v !== 'object') return;
+    if (data && v.bondActive !== undefined && !Object.hasOwn(data.bonds ?? {}, typeof v.bondActive === 'string' ? v.bondActive : v.bondActive?.id)) fail('if.bondActive', 'unknown bond', 'PLUGIN_DATA_REFERENCE');
     if (v.layers) {
       const b = v.layers;
       if (!object(b) || typeof b.bond !== 'string' || !b.bond || b.amount === undefined) fail('layers', 'bond and amount required', 'PLUGIN_DSL_ACTION');
-      if (data && b.bond !== 'selfActive' && !data.bonds[b.bond]) fail('layers.bond', 'unknown bond', 'PLUGIN_DATA_REFERENCE');
+      if (data && b.bond !== 'selfActive' && !Object.hasOwn(data.bonds ?? {}, b.bond)) fail('layers.bond', 'unknown bond', 'PLUGIN_DATA_REFERENCE');
       if ((b.maxPerBattle !== undefined || b.bond === 'selfActive') && (!Number.isInteger(b.amount) || b.amount < 1 || b.amount > 1000000)) fail('layers.amount', 'capped/selfActive amount must be an integer 1..1000000', 'PLUGIN_DSL_NUMBER');
       if (b.maxPerBattle !== undefined) {
         // [ASSUMED] A cap is a literal integer 1..1000000, per holder/action/bond, not reset by redeploy.
@@ -68,12 +81,13 @@ export function validateTraitSpec(spec, pluginId, data = null) {
     if (!object(clean.meta) || Object.keys(clean.meta).some(k => k !== 'on') || !Array.isArray(clean.meta.on)) fail('trait.meta', 'operator meta needs on, without a registry key', 'PLUGIN_DSL_META');
     for (const entry of clean.meta.on) {
       if (!object(entry) || !TRAIT_EVENTS.includes(entry.when)) fail('trait.meta.when', 'unknown operator event', 'PLUGIN_DSL_TRIGGER');
+      walk(entry.if);
       entry.when = 'roundStart';
       for (const action of entry.do ?? []) {
         if (action?.layers?.maxPerBattle !== undefined || action?.layers?.bond === 'selfActive') fail('meta.layers', 'battle-only layers fields', 'PLUGIN_DSL_ACTION');
         if (action?.gainItem) {
           const b = action.gainItem;
-          if (typeof b.item !== 'string' || !b.item || data && !data.items[b.item]) fail('gainItem.item', 'existing item required', 'PLUGIN_DATA_REFERENCE');
+          if (typeof b.item !== 'string' || !b.item || data && !Object.hasOwn(data.items ?? {}, b.item)) fail('gainItem.item', 'existing item required', 'PLUGIN_DATA_REFERENCE');
           // [ASSUMED] Bounded grants, same inventory/pool/merge rules as official item acquisition.
           if (b.count !== undefined && (!Number.isInteger(b.count) || b.count < 1 || b.count > 64)) fail('gainItem.count', 'integer 1..64 required', 'PLUGIN_DSL_NUMBER');
           delete b.count;
@@ -139,7 +153,7 @@ export function expandTraitRecords(data, records, options, expand) {
         const elite = which === 'elite';
         const id = `garrison_x_${pluginId.replace(/-/g, '_')}_${createHash('sha256').update(r.charId + which).digest('hex').slice(0, 16)}`;
         if (out.garrisons[id]) fail('trait', 'duplicate operator trait', 'PLUGIN_RECORD_EXISTS');
-        out.garrisons[id] = { garrisonId: id, effectKey: 'NONE', eventType: 'NONE', bb: {}, bbStr: {}, desc: tr.desc, descRaw: tr.desc,
+        out.garrisons[id] = { garrisonId: id, effectKey: 'NONE', eventType: tr.spec.meta?.on?.some(e => e.when === 'gain') ? 'SERVER_GAIN' : 'NONE', bb: {}, bbStr: {}, desc: tr.desc, descRaw: tr.desc,
           operatorTrait: { pluginId, charId: r.charId, elite, spec: tr.spec, translations: tr.translations, runtime: operatorTraitRuntimeDigest() } };
         for (const c of Object.values(out.chess)) if (c.charId === r.charId && c.isGolden === elite) {
           // [ASSUMED] Replaces mode garrisons only, never the class/module trait or combat talents.
