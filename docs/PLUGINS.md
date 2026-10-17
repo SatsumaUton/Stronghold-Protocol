@@ -737,6 +737,8 @@ are served from memory with `Cache-Control: immutable` while a room holds the se
 Plugin API 2 (`current: 2`, `min: 1`): PR #682 by **@DuolaCCCCat**, issue #681, completed for 0.3.1.
 The `offers` manifest part names JSON files and requires permission `offers` (`content`, `script`, `trusted`).
 No plugin scripts run to open, draw, refresh or apply a window. Old API 1 manifests without this part still load.
+The manifest schema checks JSON paths, allowed classes, API 2, the required permission and its corresponding part;
+the shipped example is validated against both the schema and the manifest reader.
 
 A complete, art-free example is [offers-demo](examples/offers-demo/plugin.json), with
 [its window](examples/offers-demo/offers.json) and [cards](examples/offers-demo/cards.json).
@@ -759,7 +761,7 @@ Copy that directory to `plugins/offers-demo`, check it, then enable it in the ro
 | `slots` | 1–6 per seat, default 1; at most 32 window files per plugin |
 | `refresh.perSlot` | 0–2 per seat **per slot**; default 0; no refresh after a pick |
 | `quorum` | `all`, `majority` (strictly more than half), `none` (default; never holds a phase) |
-| `onTimeout` | `auto`/`bot`: first current slot; `skip`: no grant. Default `auto` |
+| `onTimeout` | `auto`/`bot`: first grantable current slot; `skip`: no grant. Default `auto` |
 | `defer` | Optional `[]` or `["prepSettle"]`; records intent, with no separate scheduler beyond the hook's gate |
 | `options.source` | Required relative `.json` path inside this plugin; checked and hashed transitively |
 | `apply` | Optional fallback primitive for cards without their own `apply` |
@@ -778,7 +780,10 @@ nonempty `name` (≤80 characters), `desc` (≤240), `icon` (`funds`, `layers`, 
 `layers: { "bond": "<id>", "count": 1 }` with count 1–999; `item: "<id>"` or `chess: "<id>"` grants one
 through normal acquisition/stock rules. Ids must exist in official data or this plugin's own declared records in
 the room content set. Discovery refuses unknown, foreign and undeclared ids with **`PLUGIN_OFFER_REFERENCE`**;
-composition checks existence again. Invalid amounts/cards use `PLUGIN_OFFER_SHAPE`. Arbitrary persistent `effect`
+composition checks existence again. Unresolved DIY placeholders are refused too: a static id does not identify a
+configured operator. Each seat's slot exposes `available`; current stock and that seat's resolved chess record are
+checked again at acquisition. A failed grant returns `BAD_TARGET` without recording a pick, so the player can select
+another card or refresh the unavailable slot. Invalid amounts/cards use `PLUGIN_OFFER_SHAPE`. Arbitrary persistent `effect`
 and `shared` enemy/player pools are refused: their runtime semantics are not supported. `options.tiers` remains
 an explicit ignored-field warning. There is no script callback or cross-plugin grant permission.
 
@@ -791,18 +796,25 @@ leaves other seats untouched. It prefers unseen cards; if necessary it can dupli
 slot's current card. A one-card pool cannot refresh and consumes no allowance.
 
 Bots and autoplay seats resolve immediately with the timeout rule. A strict majority resolves unpicked seats with
-the same rule; departed/eliminated seats leave the quorum. `none` stays selectable until all seats answer, its
+the same rule; departed/eliminated seats leave the quorum. **[ASSUMED]** Auto/bot fallback tries slots in order,
+skipping unavailable or failed grants; if none succeeds, it records a skipped pick and closes without a grant. `none` stays selectable until all seats answer, its
 deadline, or the next round (then the fallback runs). Multiple windows coexist with independent timers; only
-blocking windows delay their continuation. Unrenderable/empty payloads never hold a phase. These draw, fallback,
+blocking windows delay their continuation. Test-console hidden-round jumps initialize team LP after that delayed
+round-start continuation, so subsequent hidden-boss losses use the same pool as an immediate jump.
+Unrenderable/empty payloads never hold a phase. These draw, fallback,
 quorum, numeric/text limits and unsupported-source choices are **[ASSUMED]** remake API policy, not official rules.
 The maintainer's #681 decisions bind declaration-only, API 2/min 1, `g.offer`, caps, zero-length behavior and native UI.
 
 **Native UI and protocol.** The match screen supplies the popup; a UI plugin is not required. It shows each slot's
 name/icon/description, two-tap or Enter confirmation, per-slot refresh count, countdown, and co-op waiting state.
-Tab stays in the popup; Escape clears selection. Cards scroll at enlarged text sizes and on touch screens.
+Tab stays in the visible popup; Escape clears selection, or collapses a nonblocking popup when nothing is selected.
+**[ASSUMED]** Nonblocking windows also have a Collapse button and reopen controls; a completed seat collapses
+automatically. They never lock prep editing, and collapsed windows do not capture match shortcuts. Blocking windows
+keep their phase gate. Unavailable cards are labelled and disabled for picking, while their remaining refreshes stay
+usable. Cards scroll at enlarged text sizes and on touch screens.
 Spectators see a read-only view (the first live seat's cards). Window tabs allow all concurrent windows to be answered.
 The built-in interface strings use all five supported languages; plugin card text is literal author text.
-`m.public.offers` is a full snapshot, including every seat's cards, picked status and remaining refreshes;
+`m.public.offers` is a full snapshot, including every seat's cards, current slot availability, picked status and remaining refreshes;
 reconnect restores it. `g.offer` and `g.offerRefresh` send `{ offerId, pluginId, seq, idx, cardId? }` (the native UI sends cardId to reject a stale slot after refresh), rejecting stale
 sequences and other plugins' same-named windows. `g.choice` remains the official draft/personal-choice intent.
 Test input journals capture both intents and the declaration snapshot for replay; content process/worker hosts

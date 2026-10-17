@@ -305,3 +305,11 @@ test('offers require API 2; existing API 1 manifests still load without offers',
   assert.deepEqual(read.problems, []);
   assert.deepEqual(Object.keys(read.plugin.content.files), ['plugin.json'], 'unused offer files never enter old plugin identity');
 });
+
+
+test('unresolved official DIY placeholders are not grantable offer references', t => {
+  for (const chess of ['chess_char_5_diy1_a', 'chess_char_5_diy1_b']) {
+    const r = readPluginFolder(offerFolder(t, { apply: { chess } }));
+    assert.ok(r.issues.some(i => i.code === 'PLUGIN_OFFER_REFERENCE'), chess);
+  }
+});

@@ -424,7 +424,8 @@
           "mode.code",
           "ui.frame",
           "trusted.page",
-          "trusted.server"
+          "trusted.server",
+          "offers"
         ]
       }
     },
@@ -732,6 +733,36 @@
         "type": "string",
         "pattern": "^[A-Za-z0-9_:-]{1,128}$"
       }
+    },
+    "offers": {
+      "anyOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "overlay.schema.json#/$defs/path"
+            },
+            {
+              "pattern": "\\.[jJ][sS][oO][nN]$"
+            }
+          ]
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "overlay.schema.json#/$defs/path"
+              },
+              {
+                "pattern": "\\.[jJ][sS][oO][nN]$"
+              }
+            ]
+          }
+        }
+      ],
+      "description": "Interaction-window JSON paths (API 2); permission offers. Declarations and card sources are checked by plugin check (PLUGINS §10b)."
     }
   },
   "additionalProperties": false,
@@ -825,7 +856,8 @@
             }
           },
           "slots": false,
-          "overrides": false
+          "overrides": false,
+          "offers": false
         },
         "required": [
           "lang",
@@ -897,7 +929,8 @@
           "machineTranslated": false,
           "numberUnits": false,
           "slots": false,
-          "overrides": false
+          "overrides": false,
+          "offers": false
         },
         "required": [
           "app",
@@ -954,7 +987,8 @@
                 "assets.add",
                 "data.patch",
                 "data.add",
-                "dsl"
+                "dsl",
+                "offers"
               ]
             }
           },
@@ -1021,6 +1055,11 @@
             "required": [
               "i18n"
             ]
+          },
+          {
+            "required": [
+              "offers"
+            ]
           }
         ]
       }
@@ -1065,7 +1104,8 @@
                 "dsl",
                 "sim.code",
                 "meta.code",
-                "mode.code"
+                "mode.code",
+                "offers"
               ]
             }
           },
@@ -1141,6 +1181,11 @@
                 "minProperties": 1
               }
             }
+          },
+          {
+            "required": [
+              "offers"
+            ]
           }
         ]
       }
@@ -1211,7 +1256,8 @@
           "complete": false,
           "machineTranslated": false,
           "numberUnits": false,
-          "overrides": false
+          "overrides": false,
+          "offers": false
         },
         "required": [
           "app",
@@ -1278,7 +1324,8 @@
                 "meta.code",
                 "mode.code",
                 "trusted.page",
-                "trusted.server"
+                "trusted.server",
+                "offers"
               ]
             }
           },
@@ -1360,6 +1407,11 @@
                 "minProperties": 1
               }
             }
+          },
+          {
+            "required": [
+              "offers"
+            ]
           }
         ]
       }
@@ -2091,6 +2143,48 @@
               }
             }
           }
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "offers"
+        ]
+      },
+      "then": {
+        "required": [
+          "api",
+          "permissions"
+        ],
+        "properties": {
+          "api": {
+            "minimum": 2
+          },
+          "permissions": {
+            "contains": {
+              "const": "offers"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "permissions"
+        ],
+        "properties": {
+          "permissions": {
+            "contains": {
+              "const": "offers"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "offers"
         ]
       }
     }

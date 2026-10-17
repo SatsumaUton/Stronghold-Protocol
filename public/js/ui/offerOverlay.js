@@ -7,37 +7,55 @@ import { t } from '../../../shared/i18n.js';
 
 export const offerSeat = (offer, myId) => offer?.seats?.find(s => s.playerId === myId) || null;
 export const offerPickable = (offer, myId, readOnly, busy) => !readOnly && busy == null && offerSeat(offer, myId)?.picked === false;
+export const offerBlocksPrep = offers => !!offers?.some(o => o.quorum !== 'none');
+// [ASSUMED] Nonblocking picks auto-collapse; a deliberate reopen can inspect the completed seat.
+export function offerVisible(offers, myId, dismissed = [], selected = null) {
+  return offers.find(o => o.seq === selected?.seq && offerSeat(o, myId)?.picked === selected.picked)
+    || offers.find(o => o.quorum !== 'none')
+    || offers.find(o => !dismissed.includes(o.seq) && !offerSeat(o, myId)?.picked)
+    || null;
+}
 const ICONS = { funds: 'sell', layers: 'bolt', item: 'shield', chess: 'rook', refresh: 'refresh' };
 
 export function OfferOverlay({ pub, myId, readOnly = false, onAction }) {
   const [selected, setSelected] = useState(null);
+  const [dismissed, setDismissed] = useState([]);
   const [armed, setArmed] = useState(null);
   const [busy, setBusy] = useState(null);
   const root = useRef(null);
   const offers = pub?.offers || [];
-  const offer = offers.find(o => o.seq === selected) || offers.find(o => offerSeat(o, myId)?.picked === false) || offers[0];
+  const offer = offerVisible(offers, myId, dismissed, selected);
+  const open = o => { setSelected({ seq: o.seq, picked: offerSeat(o, myId)?.picked }); setArmed(null); };
+  const dismissible = offer?.quorum === 'none';
+  const dismiss = () => {
+    if (!dismissible) return;
+    setDismissed(ids => [...ids.filter(id => id !== offer.seq && offers.some(o => o.seq === id)), offer.seq]);
+    setSelected(null); setArmed(null);
+  };
   useEffect(() => { setArmed(null); setBusy(null); }, [offer?.seq]);
   useEffect(() => {
+    if (!offer) return;
     const previous = document.activeElement;
     root.current?.focus();
     return () => previous?.focus?.();
-  }, []);
-  if (!offer) return null;
+  }, [offer?.seq]);
+  if (!offer) return html`<${OfferDock} offers=${offers} myId=${myId} onOpen=${open} />`;
   const can = offerPickable(offer, myId, readOnly, busy);
   const act = async (idx, refresh = false) => {
-    if (!can) return;
+    if (!can || !refresh && offerSeat(offer, myId)?.slots[idx]?.available === false) return;
     const token = `${offer.seq}:${idx}`;
     setArmed(null); setBusy(token);
     try { await onAction(offer, idx, refresh, offerSeat(offer, myId)?.slots[idx]?.id); }
     finally { setBusy(b => b === token ? null : b); }
   };
   const tap = idx => {
+    if (offerSeat(offer, myId)?.slots[idx]?.available === false) return;
     const next = spTap(armed, idx, can);
     setArmed(next.armed);
     if (next.pick != null) void act(next.pick);
   };
   const onKeyDown = e => {
-    if (e.key === 'Escape') { setArmed(null); e.stopPropagation(); }
+    if (e.key === 'Escape') { if (armed == null) dismiss(); setArmed(null); e.stopPropagation(); }
     if (e.key !== 'Tab') return;
     const buttons = [...root.current.querySelectorAll('button:not(:disabled)')];
     const first = buttons[0], last = buttons.at(-1);
@@ -49,11 +67,19 @@ export function OfferOverlay({ pub, myId, readOnly = false, onAction }) {
     <div class="spov__veil" aria-hidden="true"></div>
     <div class="spov__inner">
       <nav class="offerov__tabs" aria-label=${t('插件选择')}>
-        ${offers.map(o => html`<${Button} key=${o.seq} size="sm" onClick=${() => { setSelected(o.seq); setArmed(null); }} aria-pressed=${o.seq === offer.seq}>${o.pluginId} / ${o.id}<//>`)}
+        ${offers.map(o => html`<${Button} key=${o.seq} size="sm" onClick=${() => open(o)} aria-pressed=${o.seq === offer.seq}>${o.pluginId} / ${o.id}<//>`)}
+        ${dismissible ? html`<${Button} size="sm" onClick=${dismiss}>${t('收起')}<//>` : null}
       </nav>
       <${OfferView} offer=${offer} myId=${myId} readOnly=${readOnly} busy=${busy} armed=${armed} onTap=${tap} onRefresh=${idx => act(idx, true)} />
     </div>
   </div>`;
+}
+
+export function OfferDock({ offers, myId, onOpen }) {
+  return html`<nav class="offerov__dock" aria-label=${t('插件选择')}>
+    ${offers.map(o => html`<${Button} key=${o.seq} size="sm" onClick=${() => onOpen(o)}>
+      ${t('插件选择')} · ${o.id} · ${offerSeat(o, myId)?.picked ? t('等待队友') : t('选择一项')}<//>`)}
+  </nav>`;
 }
 
 /** Pure view for the native match popup and node rendering tests; all plugin text stays text. */
@@ -69,13 +95,14 @@ export function OfferView({ offer, myId, readOnly = false, busy = null, armed = 
   </header>
   <div class="spov__grid spov__grid--3">
     ${(seat?.slots || []).map(card => html`<div class="offerov__slot" key=${card.idx}>
-      <button type="button" class=${`spcard ${can ? 'is-pickable' : ''} ${can && armed === card.idx ? 'is-armed' : ''}`}
-        disabled=${!can} aria-pressed=${can && armed === card.idx} aria-busy=${busy != null} onClick=${() => onTap(card.idx)}
-        aria-label=${armed === card.idx ? t('{name}，已选中，再次点击确认', { name: card.name }) : card.name}>
+      <button type="button" class=${`spcard ${can && card.available !== false ? 'is-pickable' : ''} ${can && card.available !== false && armed === card.idx ? 'is-armed' : ''}`}
+        disabled=${!can || card.available === false} aria-pressed=${can && card.available !== false && armed === card.idx} aria-busy=${busy != null} onClick=${() => onTap(card.idx)}
+        aria-label=${card.available !== false && armed === card.idx ? t('{name}，已选中，再次点击确认', { name: card.name }) : card.name}>
         <span class="spcard__head"><span class="spcard__icon" aria-hidden="true"><${GIcon} name=${ICONS[card.icon]} /></span>
           <b class="spcard__name">${card.name}</b></span>
         <span class="spcard__desc">${card.desc}</span>
-        ${can && armed === card.idx ? html`<span class="spcard__confirm"><${Icon} name="check" />${t('确认选择')}</span>` : null}
+        ${card.available === false ? html`<span class="spcard__unavailable">${t('暂不可用')}</span>` : null}
+        ${can && card.available !== false && armed === card.idx ? html`<span class="spcard__confirm"><${Icon} name="check" />${t('确认选择')}</span>` : null}
       </button>
       <${Button} size="sm" icon="refresh" disabled=${!can || card.remaining <= 0} onClick=${() => onRefresh(card.idx)}>
         ${t('刷新（剩余 {n} 次）', { n: card.remaining })}<//>

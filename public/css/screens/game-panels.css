@@ -748,6 +748,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 
 /* Plugin offers share choice cards; text and controls remain reachable at large text scale. */
 .offerov { inset: 0; z-index: 24; }
+.offerov__dock { position: absolute; top: .8rem; right: .16rem; z-index: 24; display: flex; flex-wrap: wrap; gap: .08rem; max-width: 80%; max-height: 25%; overflow: auto; }
+.offerov__dock button { min-height: .44rem; }
 .offerov .spov__inner { top: .3rem; overflow: auto; padding: .2rem; }
 .offerov .spov__head { flex-wrap: wrap; font-size: calc(.18 * var(--t)); }
 .offerov .spov__grid { flex: none; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: auto; overflow: visible; }

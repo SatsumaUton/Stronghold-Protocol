@@ -256,10 +256,11 @@ export class MatchTestCommands {
     this.setDeadline(0);
     this.cancel(this._turnTimer);
     this._turnToken++;
-    this.startRound(round);
-    // Ordinary progression opens team LP when the Final Assault starts, and the hidden round
-    // keeps that pool. A jump never fought that assault. Boss prep itself still has no team LP.
-    if (hidden > 0 && hidden !== this.gd.bossRound && this.round === hidden && this.teamLp == null) this._openTeamLp();
+    this.startRound(round, () => {
+      // Run after any blocking battleCheck window and the actual round start. Ordinary progression
+      // keeps the Final Assault's LP; a jump never fought it. Boss prep itself still has no team LP.
+      if (hidden > 0 && hidden !== this.gd.bossRound && this.round === hidden && this.teamLp == null) this._openTeamLp();
+    });
     return OK;
   }
 

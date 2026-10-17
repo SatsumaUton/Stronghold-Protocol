@@ -1,5 +1,5 @@
 // Declarative plugin windows, PLUGINS §10b. No plugin code, no shared RNG consumption.
-// [ASSUMED] Uniform draws per seat; bots/auto/bot fallbacks take slot zero, skip grants nothing.
+// [ASSUMED] Uniform draws per seat; bots/auto/bot take the first grantable slot, skip grants nothing.
 // Strict majority resolves the rest with that fallback. quorum:none never gates the phase.
 import { ERR } from '../../../shared/constants.js';
 import { offerAt, offersAt } from '../../../shared/plugins/offers.js';
@@ -65,6 +65,7 @@ export class MatchOffers {
         playerId: ps.playerId, picked: w.picks.has(ps.playerId),
         slots: w.options.get(ps.playerId).map((c, idx) => ({
           idx, id: c.id, name: c.name, desc: c.desc, icon: c.icon,
+          available: this._offerAvailable(ps, c),
           remaining: Math.max(0, (w.refresh?.perSlot || 0) - w.refreshUsed.get(ps.playerId)[idx]),
         })),
       })),
@@ -75,8 +76,8 @@ export class MatchOffers {
     const w = this._openOffer(offerId, identity);
     const refusal = this._offerCanPick(ps, w, idx, identity?.cardId);
     if (refusal) return refusal;
+    if (!this._offerApply(ps, w, idx)) return fail(ERR.BAD_TARGET);
     w.picks.set(ps.playerId, { idx });
-    this._offerApply(ps, w, idx);
     this._offerSettleIfDone(w);
     this._offerProgress();
     return OK;
@@ -108,23 +109,39 @@ export class MatchOffers {
     return OK;
   }
 
+  _offerAvailable(ps, card) {
+    const effect = card.effect;
+    if (effect.item) return !!ps.gd.item(effect.item) && this.itemPool.canGain(effect.item);
+    if (effect.chess) {
+      const rec = ps.gd.chess(effect.chess);
+      return !!rec && (!rec.isDiy || !!rec.diyFor);
+    }
+    return true;
+  }
+
   _offerApply(ps, w, idx) {
-    const effect = w.options.get(ps.playerId)[idx].effect;
+    const card = w.options.get(ps.playerId)[idx];
+    if (!this._offerAvailable(ps, card)) return false;
+    const effect = card.effect;
     const reason = `offer:${w.pluginId}:${w.id}`;
     if (effect.funds !== undefined) ps.addFunds(effect.funds, { reason });
     else if (effect.pendingFunds !== undefined) ps.pendingFunds += effect.pendingFunds;
     else if (effect.freeRefresh !== undefined) ps.shop.freeRefreshes += effect.freeRefresh;
     else if (effect.layers) ps.addLayers(effect.layers.bond, effect.layers.count, { reason });
-    else if (effect.item) ps.acquireItem(effect.item, { source: reason });
-    else if (effect.chess) ps.acquireChess(effect.chess, { source: reason });
+    else if (effect.item && !ps.acquireItem(effect.item, { source: reason })) return false;
+    else if (effect.chess && !ps.acquireChess(effect.chess, { source: reason })) return false;
     ps.dirty();
+    return true;
   }
 
   _offerDefault(ps, w) {
     if (w.picks.has(ps.playerId)) return;
-    const idx = w.onTimeout === 'skip' ? null : 0;
+    // [ASSUMED] Try current slots in order; if none can grant, close with an explicit skipped pick.
+    let idx = null;
+    if (w.onTimeout !== 'skip') for (let i = 0; i < w.slots; i++) {
+      if (this._offerApply(ps, w, i)) { idx = i; break; }
+    }
     w.picks.set(ps.playerId, { idx, timeout: true });
-    if (idx !== null) this._offerApply(ps, w, idx);
   }
 
   _offerSettleIfDone(w) {

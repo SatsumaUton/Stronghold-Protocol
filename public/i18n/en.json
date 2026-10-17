@@ -2038,5 +2038,6 @@
   "点击卡牌选中，再次点击确认": "Select a card, then tap again to confirm",
   "还有 {n} 人未选择": "{n} players still choosing",
   "刷新（剩余 {n} 次）": "Refresh ({n} left)",
-  "等待队友": "Waiting for teammates"
+  "等待队友": "Waiting for teammates",
+  "暂不可用": "Unavailable"
 }

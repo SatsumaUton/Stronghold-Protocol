@@ -398,3 +398,97 @@ test('finishing and a test-console round jump discard old windows and queued con
   assert.equal(h.m._offerTimers.size, 0);
   h.m.dispose();
 });
+
+
+test('g.test hidden-round jumps initialize team LP after blocking battleCheck picks or timeout', () => {
+  for (const timeout of [false, true]) {
+    const h = matchWith([], { fake: true, test: true, bots: 0 });
+    h.start(); h.toPrep(1);
+    const hidden = h.m.gd.hiddenRound;
+    h.m.offers = [window_({}, { at: 'battleCheck', rounds: [hidden] })];
+    assert.deepEqual(h.m.handle('p_0', { t: 'g.test', cmd: 'round', args: { round: hidden } }), { ok: true });
+    assert.equal(h.m.round, 1);
+    assert.equal(h.m.teamLp, null);
+    if (!timeout) for (const ps of humans(h)) h.m.handle(ps.playerId, intent(h.m.offerWin[0]));
+    assert.ok(h.run(() => h.m.phase === PHASE.PREP && h.m.round === hidden));
+    const sum = h.m.alivePlayers().reduce((n, p) => n + p.lp, 0);
+    assert.equal(h.m.teamLp, sum);
+    h.m.prepDeadline();
+    assert.equal(h.m.phase, PHASE.HIDDEN_CORE);
+    h.m._teamLpLoss(5);
+    assert.equal(h.m.teamLp, sum - 5);
+    h.m.dispose();
+  }
+});
+
+const stockOffer = (effect, extra = {}) => ({ ...window_({ slots: 2, ...extra }), cards: [
+  { id: 'grant', name: 'Grant', desc: 'Grant', icon: 'item', effect },
+  { id: 'funds', name: 'Funds', desc: 'Funds', icon: 'funds', effect: { funds: 3 } },
+] });
+const exhaustItem = (h, id) => {
+  for (let n = 0; n < 20 && h.m.itemPool.canGain(id); n++) assert.ok(h.ps('p_1').acquireItem(id));
+  assert.equal(h.m.itemPool.canGain(id), false);
+};
+
+for (const [kind, id] of [['chess', 'chess_char_5_diy1_a'], ['item', 'chess_item_1_01_e_a']]) {
+  test(`unavailable ${kind} stays unpicked and another option remains selectable`, () => {
+    const offer = stockOffer({ [kind]: id });
+    const h = matchWith([offer], { fake: true, bots: 0 });
+    h.start(); h.toPrep(1);
+    h.m.openOfferWindow('prep', 3);
+    const w = h.m.offerWin[0], ps = h.ps('p_0');
+    if (kind === 'item') exhaustItem(h, id); // stock can change after the slots are drawn
+    const idx = w.options.get(ps.playerId).findIndex(c => c.id === 'grant');
+    assert.equal(h.m.handle(ps.playerId, intent(w, idx)).error, 'BAD_TARGET');
+    assert.equal(w.picks.has(ps.playerId), false);
+    const slot = h.m.offerViews()[0].seats.find(s => s.playerId === ps.playerId).slots[idx];
+    assert.equal(slot.available, false);
+    const before = ps.funds;
+    assert.deepEqual(h.m.handle(ps.playerId, intent(w, 1 - idx)), { ok: true });
+    assert.equal(ps.funds, before + 3);
+    h.m.dispose();
+  });
+}
+
+test('failed acquisition does not consume a validated choice', () => {
+  const h = matchWith([stockOffer({ item: 'chess_item_1_01_e_a' })], { fake: true, bots: 0 });
+  h.m.openOfferWindow('prep', 3);
+  const w = h.m.offerWin[0], ps = h.ps('p_0');
+  const idx = w.options.get(ps.playerId).findIndex(c => c.id === 'grant');
+  ps.acquireItem = () => null;
+  assert.equal(h.m.handle(ps.playerId, intent(w, idx)).error, 'BAD_TARGET');
+  assert.equal(w.picks.has(ps.playerId), false);
+  h.m.dispose();
+});
+
+test('timeout, bots and majority skip unavailable slots in order, or close with no grant', () => {
+  for (const onTimeout of ['auto', 'bot', 'skip']) for (const allUnavailable of [false, true]) {
+    const offer = stockOffer({ item: 'chess_item_1_01_e_a' }, { onTimeout });
+    if (allUnavailable) offer.cards[1].effect = { chess: 'chess_char_5_diy1_a' };
+    const h = matchWith([offer], { fake: true, bots: 0 });
+    exhaustItem(h, 'chess_item_1_01_e_a');
+    h.m.openOfferWindow('prep', 3);
+    const w = h.m.offerWin[0];
+    for (const ps of h.m.order) w.options.set(ps.playerId, offer.cards.slice());
+    const before = h.m.order.map(p => p.funds);
+    h.sched.advance(30000);
+    assert.equal(h.m.offerWin.length, 0);
+    h.m.order.forEach((ps, i) => {
+      const skipped = onTimeout === 'skip' || allUnavailable;
+      assert.equal(w.picks.get(ps.playerId).idx, skipped ? null : 1);
+      assert.equal(ps.funds, before[i] + (skipped ? 0 : 3));
+    });
+    h.m.dispose();
+  }
+  for (const bots of [0, 2]) {
+    const h = matchWith([stockOffer({ chess: 'chess_char_5_diy1_a' }, { quorum: 'majority' })], { fake: true, humans: 3, bots });
+    h.m.openOfferWindow('prep', 3);
+    const w = h.m.offerWin[0];
+    const idx = w.options.get('p_0').findIndex(c => c.id === 'funds');
+    h.m.handle('p_0', intent(w, idx));
+    if (!bots) h.m.handle('p_1', intent(w, w.options.get('p_1').findIndex(c => c.id === 'funds')));
+    assert.equal(h.m.offerWin.length, 0);
+    for (const ps of h.m.order) assert.equal(w.options.get(ps.playerId)[w.picks.get(ps.playerId).idx].id, 'funds');
+    h.m.dispose();
+  }
+});

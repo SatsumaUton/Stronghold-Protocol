@@ -31,8 +31,11 @@ export function offerReferenceProblems(offers, manifest, documents, official = g
     const id = kind === 'layers' ? effect.layers.bond : effect[kind];
     const allowed = Object.hasOwn(official[table] || {}, id)
       || recordId(id, manifest.id, prefix) && declared.get(table).has(id) && manifest.permissions.includes('data.add');
-    if (!allowed || composed && !Object.hasOwn(composed[table] || {}, id)) {
-      problems.push(problem('PLUGIN_OFFER_REFERENCE', `${o.rel}.apply`, `${table}.${id} must exist in official data or this plugin's own room records`));
+    const record = (composed || official)[table]?.[id];
+    // A static grant cannot bind an official DIY placeholder to a player's loadout.
+    const unresolved = kind === 'chess' && record?.isDiy && !record.diyFor;
+    if (!allowed || unresolved || composed && !Object.hasOwn(composed[table] || {}, id)) {
+      problems.push(problem('PLUGIN_OFFER_REFERENCE', `${o.rel}.apply`, `${table}.${id} must exist in official data or this plugin's own room records and cannot be an unresolved DIY slot`));
     }
   }
   return problems;

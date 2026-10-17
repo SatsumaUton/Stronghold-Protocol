@@ -265,11 +265,11 @@ export class MatchPhases {
     this.startRound(1);
   }
 
-  startRound(r) {
+  startRound(r, afterStart = null) {
     // Every round, including boss rounds. [ASSUMED] Expire nonblocking windows at the next round.
     for (const w of this.offerWin) this._closeOffer(w);
     this.offersDispose(); // A test-console round jump must discard the older continuation too.
-    const step = () => this._startRoundAfterOffers(r);
+    const step = () => { this._startRoundAfterOffers(r); afterStart?.(); };
     if (this.openOfferWindow('battleCheck', r) !== 'open') { step(); return; }
     this._offerResume = step;
   }

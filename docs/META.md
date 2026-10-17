@@ -1023,6 +1023,8 @@ to shared availability (§30.2). 凯瑟琳's `pool_equip_kathe` is every shop-el
 
 Optional `Match({offers})` is a checked content snapshot. `battleCheck` gates each named round's start; `prep` gates
 prep after the official income/shop draw and 机变 draft. No offers means the original timing. `windowSec:0` creates
-no state. Native `g.offer`/`g.offerRefresh` use plugin id, local window id, sequence and slot; `m.public.offers` is a
+no state. Hidden-round `g.test round` LP initialization follows the actual round-start continuation, including a
+blocking `battleCheck` window. Failed grants leave the seat unpicked; auto/bot fallback tries available slots in order
+and skips when none grants [ASSUMED]. Native `g.offer`/`g.offerRefresh` use plugin id, local window id, sequence and slot; `m.public.offers` is a
 reconnectable, spectator-readable snapshot. Bots resolve immediately. Sources, bounds and [ASSUMED] defaults are
 [PLUGINS §10b](PLUGINS.md#10b-offers--interaction-windows); test journals carry declarations and intents.
