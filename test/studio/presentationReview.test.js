@@ -127,7 +127,7 @@ test('review P1: new flipbook and PNG save in one validated request; invalid upl
 
 test('review P1: FX upload input stays enabled for an unsaved new book and stages bytes in the draft', async t => {
   const m = setup(t, 'fx'); let draft = m.author.read(m.id); draft.options.flipbooks.push(emptyBook('new'));
-  const props = { draft, state: { id: m.id, files: [], authoring: draft }, dirty: true, busy: false, onChange: next => { draft = next; } };
+  const props = { draft, state: { id: m.id, files: [], authoring: draft }, dirty: true, busy: false, onChange: next => { draft = typeof next === 'function' ? next(draft) : next; } };
   const node = { __c: { __h: [], props, context: {}, setState() {} } }; preact.__r(node);
   let tree; try { tree = FxEditor(props); } finally { preact.__b(node); }
   const walk = v => Array.isArray(v) ? v.flatMap(walk) : v && typeof v === 'object' ? [v, ...walk(v.props?.children)] : [];

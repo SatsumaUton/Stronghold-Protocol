@@ -1,9 +1,10 @@
 // The wizard owns only visible fields. Validate the complete merged folder before saving.
 import fs from 'node:fs';
 import path from 'node:path';
-import { stageUploads, commitDocuments } from './mediaDraft.js';
+import { stageUploads, commitDocuments, snapshotDocuments, writeDocuments, captureLockChange } from './mediaDraft.js';
 import { officialEffects } from './presentationData.js';
-import { createHash } from 'node:crypto';
+import { inventory, folderRevision, createCandidateAsync, commitCandidate } from './candidate.js';
+import { checkCandidate } from './check.js';
 import { createPlugin, templateById, manifestText } from './templates/index.js';
 import { createTargetIndex, targetOf } from './targets.js';
 import { numericFields, officialOperator, readStudioData, itemParams } from './gameData.js';
@@ -21,12 +22,7 @@ import { mergeAuthorText, mergeAuthorValue, reviseJson, mergeWidgetText, removeA
 import { readPresentationOptions, readAuthorOptions } from './authorOptions.js';
 
 export function authorRevision(files, id) {
-  const h = createHash('sha256');
-  for (const f of files.list(id).sort((a, b) => a.rel < b.rel ? -1 : 1)) {
-    if (f.link) throw new StudioError('PLUGIN_STUDIO_PATH', 403, { detail: f.rel });
-    h.update(f.rel).update('\0').update(fs.readFileSync(files.stat(id, f.rel).abs));
-  }
-  return h.digest('hex');
+  return folderRevision(inventory(files.root(id)));
 }
 
 export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir, '../public') }) {
@@ -91,16 +87,13 @@ export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir,
     }
     return made;
   };
-  const snapshot = id => Object.fromEntries(files.list(id).map(f => {
-    if (f.link) throw new StudioError('PLUGIN_STUDIO_PATH', 403, { detail: f.rel });
-    return [f.rel, fs.readFileSync(files.stat(id, f.rel).abs)];
-  }));
-  const prepare = (id, input, { validate = true, allowUntracked = false } = {}) => {
+  const snapshot = id => snapshotDocuments(files, id);
+  const prepare = (id, input, { validate = true, allowUntracked = false, validateMedia = true } = {}) => {
     // Existing trial API also previews templates in folders without a studio sidecar; only trials allow that.
     const old = read(id) || (allowUntracked ? { template: input.template, target: input.target, options: {} } : null);
     if (!old || old.template === 'script' || input.template !== old.template) throw new StudioError('PLUGIN_STUDIO_REQUEST', 409, { detail: 'this plugin is not editable with this wizard' });
     if (input.revision !== undefined && input.revision !== old.revision) throw new StudioError('PLUGIN_STUDIO_CHANGED', 409);
-    const documents = snapshot(id), source = documents['plugin.json'].toString(), manifest = JSON.parse(source);
+    const documents = snapshot(id), present = new Set(files.list(id).map(f => f.rel)), source = documents['plugin.json'].toString(), manifest = JSON.parse(source);
     const before = generate(id, old, manifest, { validate: false, previous: true });
     const made = generate(id, input, manifest, { validate: false });
     for (const [rel, text] of Object.entries(made.files)) {
@@ -114,7 +107,7 @@ export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir,
         documents[rel] = Buffer.from(mergeAuthorText(documents[rel].toString(), previous, next));
       } else if (documents[rel] && input.template === 'ui' && rel === 'ui/index.html') {
         documents[rel] = Buffer.from(mergeWidgetText(documents[rel].toString(), String(before.files[rel]), String(text)));
-      } else if (!documents[rel]) documents[rel] = Buffer.from(text);
+      } else if (!present.has(rel)) documents[rel] = Buffer.from(text);
       // Existing binary assets and hand-authored non-JSON files are not form fields.
     }
     for (const [rel, text] of Object.entries(before.files)) {
@@ -136,8 +129,8 @@ export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir,
     }
     mergeAuthorManifest(manifest, made.manifest, before.manifest, documents);
     documents['plugin.json'] = Buffer.from(reviseJson(source, manifest));
-    stageUploads(input, documents, manifest);
-    const result = { ...made, manifest, files: documents };
+    stageUploads(input, documents, manifest, { validate: validateMedia });
+    const result = { ...made, manifest, files: documents, sourceDir: files.root(id) };
     if (validate) {
       const checked = checkGameplayDraft(id, result, { dataDir, pluginsDir: files.base, strict: PRESENTATION_TEMPLATES.includes(input.template) });
       if (!checked.ok) {
@@ -155,7 +148,34 @@ export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir,
     const side = JSON.parse(files.readSidecar(id, '.studio.json') || '{}');
     commitDocuments(files, id, made.files, Buffer.from(manifestText({ ...side, authoring: made.authoring })));
   };
+  // HTTP saves/checks use a disposable checker so large media never blocks the game loop.
+  const checkedCandidate = async (id, input, save) => {
+    const made = prepare(id, input, { validate: false, validateMedia: false }), candidate = await createCandidateAsync(files, id);
+    try {
+      if (input.revision !== undefined && input.revision !== candidate.revision) throw new StudioError('PLUGIN_STUDIO_CHANGED', 409);
+      writeDocuments(candidate, id, made.files);
+      const checked = await checkCandidate({ dir: candidate.dir, dataDir, pluginsDir: files.base,
+        strict: PRESENTATION_TEMPLATES.includes(input.template), uploads: (input.uploads || []).map(u => u.path) });
+      if (!checked.ok) { const p = checked.problems[0]; throw new StudioError(p.code, 400, { where: p.path, detail: p.message }); }
+      captureLockChange(candidate);
+      if (save) {
+        const side = JSON.parse(files.readSidecar(id, '.studio.json') || '{}');
+        commitCandidate(files, id, candidate, Buffer.from(manifestText({ ...side, authoring: made.authoring })));
+      }
+      return { ok: true, problems: [] };
+    } finally { await candidate.cleanupAsync(); }
+  };
   return { read, save, generate, prepare, details,
+    saveAsync: (id, input) => {
+      if (input.revision !== authorRevision(files, id)) throw new StudioError('PLUGIN_STUDIO_CHANGED', 409);
+      return checkedCandidate(id, input, true);
+    },
+    async validateDraftAsync(input) {
+      try {
+        if (files.ids().includes(input.id)) return await checkedCandidate(input.id, input, false);
+        generate(input.id, input); return { ok: true, problems: [] };
+      } catch (e) { return { ok: false, problems: [{ code: e.code || 'PLUGIN_STUDIO_REQUEST', path: e.params?.where || '', message: e.params?.detail || e.message }] }; }
+    },
     validateDraft(input) {
       try {
         if (files.ids().includes(input.id)) prepare(input.id, input);

@@ -599,11 +599,21 @@ validated tokens to the studio root and restores the previous inline declaration
 preview uses the announcement popup's localization and plain text. Skins previews use the actual picker rows and
 fallbacks; file-slot changes hydrate the form before subsequent saves. FX drafts use the existing trial replay in
 both board modes; locally indexed borrowed official effects remain 3D-only. All four forms hydrate current declarations
-and reuse the gameplay authoring delta merge. Complete folders and staged media pass strict checks before writes;
+and reuse the gameplay authoring delta merge. Form saves require complete folders and staged media to pass strict checks;
 invalid retained content is refused with contextual errors, without requiring gameplay data for cosmetics. FX images
 are saved with their form; default bindings use the equipped skill. Unsupported summon carriers are refused [ASSUMED].
 Skin uploads isolate shared paths, including Spine, and validate bytes before replacement; numeric directory suffixes
-are [ASSUMED]; only effect sheets keep the FX loader's 2048px non-interlaced RGB/RGBA PNG subset. No new route or gameplay rule is introduced.
+are [ASSUMED]. Skin slot uploads and the files PUT route use a no-new-problems strict gate (code + where/file),
+allowing incremental missing-image repair; each uploaded file must validate. The 0.3.0 slots keep writing directly. Every PNG encoding is inflated to its exact scanline size, including Adam7,
+with a 256 MiB raw cap [ASSUMED]; only declared FX sheets (inline/file overlays; upload checks ignore extension case) use the
+2048px non-interlaced 8-bit RGB/RGBA subset. Candidates hardlink unchanged files (clone-copy fallback) after refusing
+all links; only changed files face upload limits, with aggregate limits checked on the candidate. [ASSUMED] Hidden
+`.sp-studio-*` candidates inside the real plugins directory share its volume and are excluded by registry scanning.
+HTTP link staging and complete checks use bounded children (two concurrent, 20 seconds, 512 MiB heap [ASSUMED]);
+cleanup runs on every outcome. Changed media commits before plugin.json with rollback. FX reads merge into the
+latest draft and disable save while pending. Trial bodies match the 160 MiB authoring limit; staged replay PNGs
+are embedded for the replay lifetime (8 MiB compressed image total inside the 16 MiB result cap [ASSUMED]).
+No new route or gameplay rule is introduced.
 
 ### Combat metrics (作战统计) — ported from the xinhai-ai fork, opt-in
 

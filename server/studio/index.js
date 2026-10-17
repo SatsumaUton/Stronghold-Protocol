@@ -78,7 +78,6 @@ import { consoleOptions, buildConsoleScenario } from './console.js';
 import { SCENARIO_BYTES } from '../../shared/studio/scenario.js';
 import { readStudioData } from './gameData.js';
 import { editMediaDraft } from './mediaDraft.js';
-import { validatePng } from './mediaValidation.js';
 import { createAuthoring } from './authoring.js';
 import { createPluginWatcher } from './watch.js';
 import { importForge } from '../plugins/forgeImport.js';
@@ -608,8 +607,10 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
    * atlas under one name, its pages by theirs), the slot set to them, the files it named before removed when nothing
    * else names them.
    */
-  function putSlot(id, body) {
-    if (body.at?.[0] === 'chars' && body.at?.[2] === 'skins') editMediaDraft(files, id, staged => writeSlot(id, body, staged), { dataDir });
+  async function putSlot(id, body) {
+    // The skins template's slots stage, check and commit the whole change (uploads add no new problem, §34.30); the
+    // 0.3.0 slots (art, models, voice, audio, a bond's icon) write directly as before, their check shown afterwards.
+    if (body.at?.[0] === 'chars' && body.at?.[2] === 'skins') await editMediaDraft(files, id, staged => writeSlot(id, body, staged), { dataDir });
     else writeSlot(id, body, files);
     return changed(id);
   }
@@ -643,7 +644,6 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
         }
       }
     }
-    for (const f of got) if (f.ext === '.png') validatePng(f.data, f.name);
     const written = [];
     const put = (rel, data) => { files.write(id, rel, data); written.push(rel); return rel; };
     let value;
@@ -850,7 +850,7 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
       req.on('close', requestClosed);
       res.on?.('close', responseClosed);
       try {
-        const body = await readJson(req, 256 * 1024);
+        const body = await readJson(req, STUDIO_LIMITS.bodyBytes);
         if (req.aborted || res.destroyed) abort.abort();
         return json(200, await trials.run(body, { signal: abort.signal }));
       } finally {
@@ -863,7 +863,7 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
     if (route === 'validate-dsl' && method === 'POST') {
       if (!mayChange(req)) return false;
       const body = await readJson(req, STUDIO_LIMITS.bodyBytes);
-      return json(200, body.draft ? authoring.validateDraft(body.draft) : authoring.validate(body.spec));
+      return json(200, body.draft ? await authoring.validateDraftAsync(body.draft) : authoring.validate(body.spec));
     }
     if (route === 'targets' && read) {
       const kinds = (q.get('kinds') || '').split(',').filter((k) => Object.hasOwn(TARGET_KINDS, k));
@@ -995,25 +995,16 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
       if (method === 'DELETE') files.remove(id, rel);
       else {
         const bytes = await readBody(req, STUDIO_LIMITS.fileBytes);
-        if (/\.(png|skel|atlas)$/.test(rel)) {
-          // the path and link refusals of every write come before the bytes are looked at
-          files.resolve(id, rel, { forWrite: true });
-          if (rel.endsWith('.png')) {
-            let manifest = null;
-            try { manifest = JSON.parse(fs.readFileSync(files.stat(id, PLUGIN_MANIFEST).abs, 'utf8')); } catch { /* the folder check refuses it */ }
-            // a declared effect sheet is held to the FX loader's subset; any other picture only has to be a PNG
-            const fxImage = typeof manifest?.assets === 'object' && Object.values(manifest.assets?.fx?.flipbooks || {}).some(b => b?.image === rel);
-            validatePng(bytes, rel, { fx: fxImage });
-          }
-          editMediaDraft(files, id, staged => staged.write(id, rel, bytes), { dataDir });
-        } else files.write(id, rel, bytes);
+        // Resolve paths/links before looking at bytes; the candidate refuses links elsewhere too.
+        files.resolve(id, rel, { forWrite: true });
+        await editMediaDraft(files, id, staged => staged.write(id, rel, bytes), { dataDir });
       }
       return json(200, changed(id));
     }
     if (method !== 'POST') return false;
-    if (sub === 'slot') return json(200, putSlot(id, await readJson(req, STUDIO_LIMITS.bodyBytes)));
+    if (sub === 'slot') return json(200, await putSlot(id, await readJson(req, STUDIO_LIMITS.bodyBytes)));
     const body = await readJson(req, sub === 'authoring' ? STUDIO_LIMITS.bodyBytes : 256 * 1024);
-    if (sub === 'authoring') { authoring.save(id, body); return json(200, changed(id)); }
+    if (sub === 'authoring') { await authoring.saveAsync(id, body); return json(200, changed(id)); }
     if (sub === 'meta') { const p = openPlugin(files, id); editMeta(p, body.fields, typeof body.lang === 'string' ? body.lang : 'zh'); p.save(); return json(200, changed(id)); }
     if (sub === 'sections') { files.root(id); saveSections(id, body.sections); return json(200, stateOf(id)); }
     if (sub === 'ref') {

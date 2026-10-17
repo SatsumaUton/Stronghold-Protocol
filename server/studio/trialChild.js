@@ -10,6 +10,7 @@ import { checkPluginFolder } from '../plugins/pack.js';
 import { createPluginFiles, StudioError } from './files.js';
 import { createAuthoring } from './authoring.js';
 import { stageAuthorDependencies } from './gameplayCheck.js';
+import { inventory, linkFile } from './candidate.js';
 import { writeTrialDraftFile } from './trialDraft.js';
 import { scriptExecution } from '../../shared/plugins/scriptLoad.js';
 import { chooseOperator, baselineOperator, trialScenario } from './trialScenario.js';
@@ -39,6 +40,7 @@ process.once('message', async ({ dirs, request, allowedScripts, temporary, heapM
       const made = authored.prepare(request.id, request.draft, { validate: false, allowUntracked: true });
       if (!temporary) throw new StudioError('PLUGIN_STUDIO_TRIAL_FAILED', 500);
       const dir = path.join(temporary, request.id); draftDir = dir; fs.mkdirSync(dir);
+      for (const f of inventory(selected)) linkFile(f.abs, path.join(dir, f.rel));
       for (const [rel, text] of Object.entries(made.files)) {
         if (rel !== 'plugin.lock.json') writeTrialDraftFile(dir, rel, text);
       }
@@ -95,7 +97,7 @@ process.once('message', async ({ dirs, request, allowedScripts, temporary, heapM
       runner.once('exit', () => reject(new StudioError('PLUGIN_STUDIO_TRIAL_FAILED', 500)));
       runner.send({ base, set, baseScene, modScene, original, op, request, wizard: wizard ? { ...wizard, id: request.id } : null });
     });
-    reply(addFxReplay(result, view, request.id, set.data, draftDir ? { ...files, root: id => id === request.id ? draftDir : files.root(id) } : files));
+    reply(addFxReplay(result, view, request.id, set.data, draftDir ? { ...files, root: id => id === request.id ? draftDir : files.root(id) } : files, { staged: request.draft?.uploads?.map(u => u.path) || [] }));
   } catch (e) { reply({ ok: false, issues: [issue({ code: e.code?.startsWith('PLUGIN_') ? e.code : 'PLUGIN_STUDIO_TRIAL_FAILED', params: e.params })] }); }
   finally { if (temporary) fs.rmSync(temporary, { recursive: true, force: true }); }
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useState, useRef } from '../../../vendor/hooks.module.js';
 import { html, Button } from '../../../js/ui/components.js';
 import { t } from '../../../../shared/i18n.js';
 import { FX_PHASES } from '../../../js/render/vfx/pluginFormat.js';
@@ -8,7 +8,8 @@ import { presentationOptions, emptyBook } from '../presentation.js';
 import { NumberField, Select, without } from './controls.js';
 import { Line, Upload, PresentationIssues } from './presentationControls.js';
 
-export function FxEditor({ draft, state, onChange, busy }) {
+export function FxEditor({ draft, state, onChange, busy, onPendingRead = () => {} }) {
+  const reads = useRef(new Map());
   const o = presentationOptions('fx', draft.options);
   const [details, setDetails] = useState({ units: [], slots: [] });
   const [failed, setFailed] = useState(false);
@@ -42,8 +43,15 @@ export function FxEditor({ draft, state, onChange, busy }) {
       ${o.flipbooks.map((b, i) => html`<fieldset class="st-presentation-row" key=${i}><legend>${b.id}</legend>
         <${Line} label=${t('特效 id')} value=${b.id} maxLength=${96} onChange=${id => editBook(i, { id })} />
         <${Upload} label=${t('PNG 序列帧')} accept=".png,image/png" disabled=${busy} onFiles=${async files => {
-          const data = await fileBase64(files[0]);
-          onChange({ ...draft, options: o, uploads: [...(draft.uploads || []).filter(u => u.path !== b.image), { path: b.image, data }] });
+          const token = {}; reads.current.set(b.image, token); onPendingRead(1);
+          try {
+            const data = await fileBase64(files[0]);
+            if (reads.current.get(b.image) !== token) return;
+            onChange(latest => {
+              if (latest.id !== draft.id || latest.revision !== draft.revision || !presentationOptions('fx', latest.options).flipbooks.some(book => book.image === b.image)) return latest;
+              return { ...latest, uploads: [...(latest.uploads || []).filter(u => u.path !== b.image), { path: b.image, data }] };
+            });
+          } finally { if (reads.current.get(b.image) === token) reads.current.delete(b.image); onPendingRead(-1); }
         }} />
         ${draft.uploads?.some(u => u.path === b.image) ? html`<img class="st-sheet-preview" alt=${b.id} src=${`data:image/png;base64,${draft.uploads.find(u => u.path === b.image).data}`} />` : state.files?.some(f => f.rel === b.image) ? html`<img class="st-sheet-preview" alt=${b.id} src=${`${API}${pluginPath(state.id, `files/${b.image}`)}?v=${state.authoring.revision}`} />` : null}
         <${NumberField} label=${t('帧数')} min=${1} max=${256} step=${1} value=${b.frames} onChange=${frames => editBook(i, { frames })} />
