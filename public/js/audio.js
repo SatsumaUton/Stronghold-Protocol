@@ -91,6 +91,10 @@ const MAX_VOICES = 8;
 const UNIT_COOLDOWN_MS = 160;
 const URL_GAP_MS = 45;
 const MAX_PER_URL = 2;
+// [ASSUMED] Bound decoding/delayed attack requests independently of playing voices (#680 review). Stalled URLs
+// keep one decode subscriber across field changes; only the latest request per bank/unit waits for that decode.
+const POOL_PENDING_MAX = 64;
+const POOL_DECODE_MAX_MS = 2500; // [ASSUMED] Older undecoded attacks are obsolete, like the impact attribution window.
 /**
  * 漏怪: the original Arknights exit alarm (`sfx.battle.leak`, `battle/b_ui/b_ui_alarmenter`) runs **1.44 s**, and the
  * official bank is a one-shot: `battle.ON_ENEMY_REACHED_EXIT` carries `maxSoundAllowed: 1` with `popOldest: true` on the
@@ -578,7 +582,10 @@ export class AudioManager {
     this.bufBytes = new Map(); // url → decoded PCM bytes (the byte budget of the LRU, see _buffer)
     this.warned = new Set();
     this.limiter = new SfxLimiter();
-    this.poolVoices = new Map(); // official bank id → instances in start order (including scheduled delay)
+    this.poolVoices = new Map(); // official bank id → playing instances in start order
+    this.poolRequests = new Set(); // decoding / delayed requests; no playing slots reserved
+    this.poolLoads = new Map(); // url → coalesced decode requests (one subscriber per URL, even across fields)
+    this.poolFieldToken = 0;
     // prep landings (deployCue): their own voices — a full pool hands the oldest one's voice to the newest (_playLanding);
     // no per-file gap (one landing per piece, the cap bounds the overlap), the per-piece cooldown of the battle sounds
     this.landLimiter = new SfxLimiter({ maxVoices: LAND_VOICES, maxPerUrl: LAND_VOICES, urlGapMs: 0 });
@@ -1064,61 +1071,118 @@ export class AudioManager {
   }
 
   /**
-   * Official attack/hit pool (#680, audio_data.json soundFXBanks). Admit after decoding, so a slow/failed download
-   * never steals a playing voice. [ASSUMED] Pitch draws are uniform. Scheduled delayed sources occupy a slot until ended or replaced; 0 means
-   * no bank cap (still bounded by MAX_VOICES). A cosmetic file absent from the bank uses pitch 1 / delay 0.
+   * Official attack/hit pool (#680, audio_data.json soundFXBanks). Decode and delay are bounded separately from
+   * playing voices: admission/takeover happens only when playback is due, so a sustained stream cannot keep
+   * replacing sources before any start. [ASSUMED] Pending caps/coalescing/expiry, audio-clock due admission and
+   * field-owned cancellation are web-client scheduling guards (review #680).
    */
   _playPool(url, { volume, unitKey, again, pool }) {
-    const ctx = this.ctx;
-    this._buffer(url).then((buf) => {
-      if (ctx !== this.ctx) return;
-      if (!buf && again && this.fellBack.has(url)) {
-        const next = again();
-        if (typeof next === 'string' && next !== url) this._play(next, { volume, limited: true, unitKey, pool });
-        return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    let load = this.poolLoads.get(url);
+    const key = `${pool.id}:${unitKey ?? ''}`;
+    const previous = load?.get(key);
+    if (previous) { this._dropPoolRequest(previous); load.delete(key); }
+    if (this.poolRequests.size >= POOL_PENDING_MAX || (!load && this.poolLoads.size >= POOL_PENDING_MAX)) return;
+    const req = { url, volume, unitKey, again, pool, ctx: this.ctx, token: this.poolFieldToken, at: now, timer: null };
+    this.poolRequests.add(req);
+    if (load) { load.set(key, req); return; }
+    load = new Map([[key, req]]);
+    this.poolLoads.set(url, load);
+    try {
+      this._buffer(url).then(buf => this._poolDecoded(url, load, buf), () => this._poolDecoded(url, load, null));
+    } catch { this._poolDecoded(url, load, null); }
+  }
+
+  _poolRequestCurrent(req) {
+    return this.poolRequests.has(req) && req.token === this.poolFieldToken && req.ctx === this.ctx
+      && !this.volumes.muted && this.volumes.sfx > 0;
+  }
+
+  _dropPoolRequest(req) {
+    clearTimeout(req.timer);
+    this.poolRequests.delete(req);
+  }
+
+  _poolDecoded(url, load, buf) {
+    this.poolLoads.delete(url);
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    for (const req of load.values()) {
+      if (!this._poolRequestCurrent(req) || now - req.at > POOL_DECODE_MAX_MS) { this._dropPoolRequest(req); continue; }
+      if (!buf) {
+        this._dropPoolRequest(req);
+        const next = req.again && this.fellBack.has(url) ? req.again() : null;
+        if (typeof next === 'string' && next !== url) this._play(next, { volume: req.volume, limited: true, unitKey: req.unitKey, pool: req.pool });
+        continue;
       }
-      if (!buf || this.volumes.muted || this.volumes.sfx <= 0) return;
-      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      if (!this.limiter.gapsAllow(now, unitKey, url)) return;
-      const voices = this.poolVoices.get(pool.id) || [];
-      const limit = pool.maxSoundAllowed > 0 ? pool.maxSoundAllowed : Infinity;
-      const oldest = voices.length >= limit ? voices[0] : null;
-      if (oldest && !pool.popOldest) return;
-      if (!oldest && this.limiter.active >= this.limiter.maxVoices) return;
       const path = unhashedUrl(url).replace(/^\/assets\/audio\/sfx\//, '');
-      const sound = pool.sounds?.[path];
-      const lo = sound?.minPitch > 0 ? sound.minPitch : 1;
-      const hi = sound?.maxPitch >= lo ? sound.maxPitch : lo;
-      const rate = lo + (hi - lo) * Math.max(0, Math.min(1, this.random()));
+      const sound = req.pool.sounds?.[path];
       const delay = Math.max(0, sound?.delay || 0);
-      let src, gain, timer, acquired = false, done = false;
-      const end = () => {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        if (acquired) {
-          this.limiter.release(url);
-          const index = voices.indexOf(voice);
-          if (index >= 0) voices.splice(index, 1);
-          if (!voices.length) this.poolVoices.delete(pool.id);
+      const due = req.ctx.currentTime + delay;
+      const ready = () => {
+        if (!this._poolRequestCurrent(req)) { this._dropPoolRequest(req); return; }
+        // Wall timers also run while AudioContext is suspended. Keep the file's delay on the audio clock.
+        const remaining = due - req.ctx.currentTime;
+        if (remaining > 1e-6) {
+          req.timer = setTimeout(ready, Math.max(10, remaining * 1000));
+          return;
         }
-        try { src?.disconnect(); gain?.disconnect(); } catch { /* ignore */ }
+        this._dropPoolRequest(req);
+        this._startPool(req, buf, sound);
       };
-      const voice = { stop: () => { try { src?.stop(); } catch { /* already ended */ } end(); } };
-      try {
-        src = ctx.createBufferSource(); gain = ctx.createGain();
-        src.buffer = buf; src.playbackRate.value = rate;
-        gain.gain.value = Math.max(0, Math.min(1.5, volume));
-        src.connect(gain); gain.connect(this.sfxGain);
-        if (oldest) oldest.stop();
-        acquired = this.limiter.tryAcquire(now, unitKey, url, Infinity);
-        if (!acquired) { end(); return; }
-        voices.push(voice); this.poolVoices.set(pool.id, voices);
-        src.onended = end;
-        src.start(ctx.currentTime + delay);
-        timer = setTimeout(end, (delay + buf.duration / rate) * 1000 + 250);
-      } catch { end(); }
-    }, () => {});
+      ready();
+    }
+    load.clear();
+  }
+
+  /** Admit only playing instances. A zero official cap is unlimited within the remake's global budget. */
+  _startPool({ ctx, url, volume, unitKey, pool }, buf, sound) {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (!this.limiter.gapsAllow(now, unitKey, url)) return;
+    const voices = this.poolVoices.get(pool.id) || [];
+    const limit = pool.maxSoundAllowed > 0 ? pool.maxSoundAllowed : Infinity;
+    const oldest = voices.length >= limit ? voices[0] : null;
+    if (oldest && !pool.popOldest) return;
+    if (!oldest && this.limiter.active >= this.limiter.maxVoices) return;
+    const lo = sound?.minPitch > 0 ? sound.minPitch : 1;
+    const hi = sound?.maxPitch >= lo ? sound.maxPitch : lo;
+    // [ASSUMED] Uniform draw within the played file's official range; absent cosmetic files use pitch 1 / delay 0.
+    const rate = lo + (hi - lo) * Math.max(0, Math.min(1, this.random()));
+    let src, gain, timer, acquired = false, done = false;
+    const end = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (acquired) {
+        this.limiter.release(url);
+        const index = voices.indexOf(voice);
+        if (index >= 0) voices.splice(index, 1);
+        if (!voices.length) this.poolVoices.delete(pool.id);
+      }
+      try { src?.disconnect(); gain?.disconnect(); } catch { /* ignore */ }
+    };
+    const voice = { stop: () => { try { src?.stop(); } catch { /* already ended */ } end(); } };
+    try {
+      src = ctx.createBufferSource(); gain = ctx.createGain();
+      src.buffer = buf; src.playbackRate.value = rate;
+      gain.gain.value = Math.max(0, Math.min(1.5, volume));
+      src.connect(gain); gain.connect(this.sfxGain);
+      if (oldest) oldest.stop();
+      acquired = this.limiter.tryAcquire(now, unitKey, url, Infinity);
+      if (!acquired) { end(); return; }
+      voices.push(voice); this.poolVoices.set(pool.id, voices);
+      src.onended = end;
+      src.start(ctx.currentTime);
+      timer = setTimeout(end, buf.duration / rate * 1000 + 250);
+    } catch { end(); }
+  }
+
+  /** Field replacement, battle exit and screen cleanup invalidate downloads/delays and stop every playing pool source. */
+  stopPoolSounds() {
+    this.poolFieldToken++;
+    for (const req of this.poolRequests) this._dropPoolRequest(req);
+    // Keep empty loads subscribed: clearing this map would attach more handlers to the same stalled promise next field.
+    for (const load of this.poolLoads.values()) load.clear();
+    for (const voices of this.poolVoices.values()) for (const voice of [...voices]) voice.stop();
   }
 
   /**
@@ -1320,6 +1384,7 @@ export class AudioManager {
 
   /** Reset the unit map for a new field (m.field.units = UnitInfo[]). */
   setFieldUnits(units) {
+    this.stopPoolSounds();
     this.stopBondCue();
     this.units.clear();
     // unit ids belong to one battle: a cast still held for a unit of the field left must not sound for a unit of the new

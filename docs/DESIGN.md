@@ -45,3 +45,5 @@ normative lines it rewrote).
 Attack / hit audio follows each official bank's instance limit, takeover, pitch range and delay in 0.3.1
 (#680, §34.25); the current rule and the retained [ASSUMED] remake anti-spam gates are in
 [design/client.md](design/client.md#skill-mode-sound-and-delayed-models-2817-2822).
+The #680 review fixes bound decoding/delayed requests separately, admit pool voices when playback is due and
+cancel field-owned audio on field replacement, battle exit and game-screen cleanup ([ASSUMED] client scheduling).

@@ -430,8 +430,16 @@ A full pool with `popOldest: true` stops its oldest instance for the new one; ot
 Aliases share their target bank's pool; distinct banks using one file keep separate limits. Pitch is drawn uniformly
 within the played file's own range with client-only randomness ([ASSUMED] uniform distribution); playback starts after its own delay on the audio clock.
 The maintainer chose 0.3.1 for this change (reply draft A). [ASSUMED] The remake retains its global 8-voice budget,
-160 ms per-unit/role cooldown and 45 ms per-URL gap to guard high game speeds. A scheduled delayed source occupies a
-pool slot; admission after decoding prevents a failed download from stealing a voice. A zero bank limit means no
+160 ms per-unit/role cooldown and 45 ms per-URL gap at playback admission to guard high game speeds. Decoding and
+delayed requests reserve no playing slots: admission and takeover happen only when the file's delay has elapsed
+after decoding, on the audio clock (a suspended context does not consume that delay). This keeps a sustained stream
+audible even when attacks arrive faster than the delay; Chen's official attack bank has cap 2, takeover and delay 0.6 s.
+[ASSUMED] At most 64 decoding/delayed requests wait independently of playing slots. A stalled URL has one decode
+subscriber and retains only the latest request per bank/unit-role; at most 64 unresolved URL subscriptions survive
+across fields, so repeated field changes cannot grow a stalled promise's handler list. Undecoded requests older than
+2500 real ms are discarded when decoding finishes. Field replacement, returning to prep and game-screen cleanup
+invalidate pending callbacks with a field generation token, cancel delay timers and stop playing pool sources.
+These queue bounds, expiry and lifecycle/scheduling choices are web-client guards [ASSUMED]. A zero bank limit means no
 bank cap, still subject to the global budget. Missing pool metadata keeps the legacy two-copy behavior; sparse/custom
 banks default to cap 2, no takeover, pitch 1 and delay 0. A cosmetic replacement absent from the bank's file list uses
 pitch 1 and delay 0 with the bank's cap. These are client presentation choices; no sim or golden change.
