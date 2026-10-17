@@ -433,6 +433,7 @@ seat unpicked; refresh remains possible. This is native match state, not a scrip
 | `error.PLUGIN_DATA_PATH` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_DATA_BOUND` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_DATA_REQUIRED` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
+| `error.PLUGIN_BOSS_CENTRE_DEPLOYABLE` | stable | 0.3.1 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_DATA_REFERENCE` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_DATA_PAIR` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |
 | `error.PLUGIN_PATCH_OP` | stable | 0.3.0 | `shared/plugins/errors.js#PLUGIN_ERRORS` |

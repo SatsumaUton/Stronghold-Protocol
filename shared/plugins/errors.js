@@ -573,6 +573,12 @@ export const PLUGIN_ERRORS = Object.freeze({
     zh: '合并后的数据缺东西或者写坏了（{where}）：{detail}', en: 'The merged data lacks something or is broken ({where}): {detail}',
     fix: { zh: '补丁不要删掉游戏必需的字段或者整张表；按后面的英文原文找到是哪一处。', en: 'A patch must not remove a field or a table the game needs; the original line says which one.' },
   },
+  PLUGIN_BOSS_CENTRE_DEPLOYABLE: {
+    level: 'warning', doc: D.data,
+    zh: '地图「{stage}」的首领战中央列 10 可部署（战场行 {rows}）；双方会重叠部署，开战时只部署第一名干员',
+    en: 'Stage {stage} allows deployment on boss centre column 10 (field rows {rows}); both players can overlap there and battle deploys only the first unit',
+    fix: { zh: '将这些格子的有效 buildable 设为 NONE，移走中央列的部署平台；这是提示，不会改变插件规则。', en: 'Set these tiles\' effective buildable to NONE and move deployment platforms off the centre column; this warning does not change plugin rules.' },
+  },
   PLUGIN_DATA_REFERENCE: {
     level: 'problem', doc: D.data,
     zh: '「{where}」引用了不存在的东西：{detail}', en: '“{where}” refers to something that does not exist: {detail}',

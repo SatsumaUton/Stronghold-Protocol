@@ -1548,6 +1548,10 @@
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },
   {
+    "name": "error.PLUGIN_BOSS_CENTRE_DEPLOYABLE",
+    "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
+  },
+  {
     "name": "error.PLUGIN_DATA_REFERENCE",
     "anchor": "shared/plugins/errors.js#PLUGIN_ERRORS"
   },

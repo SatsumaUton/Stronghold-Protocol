@@ -188,6 +188,25 @@ node tools/plugin.mjs pack my-texas --zip
 房间的插件面板现在会按清单显示布尔/整数/小数/枚举设置。房主点「应用设置」后，所有玩家会重新加载同一个内容组合。
 其他玩家只读；正在对局时不能改。修改自动依赖插件的设置会把该插件变为显式选择。内容文件变动时只提示房主重新应用，运行中的对局保持旧内容。
 
+## 新地图的首领战中央列
+
+同盟模式会在这张地图上打最终攻势 / 隐秘核心。两名玩家整备棋盘的第 10 列都映射到首领战场的第 10 列
+（左侧 10 → 10，右侧 20 − 10 → 10）；如果中央格能部署，双方就能放在同一格，开战时只会部署第一名干员。
+官方 11 张地图的中央列（战场行索引 1–5）全是 `buildableType: NONE`，用于领袖 / 传送通道；可部署半场是第 3–9 列与 11–17 列。
+来源：官方 `levels/activities/act1autochess/level_act1autochess_m01…m07.json`、
+`act2autochess/level_act2autochess_m01…m04.json` 的 `mapData.tiles[].buildableType`。
+
+工作台校验、服务器扫描与 `node tools/plugin.mjs check <id>` 会用 `PLUGIN_BOSS_CENTRE_DEPLOYABLE` 提示地图名和受影响的
+战场行索引（不是整备棋盘的行）。将对应地格的有效 `buildable` 改成 `NONE`，把中央列的部署平台移开即可。
+文件夹检查使用默认设置；依赖别的插件提供的地图，要在完整内容组合中再检查。
+[ASSUMED] 即使部署格暂时被可移除的障碍挡着也提示，中央列的活动部署平台也提示。
+维护者 2026-10-17 对 #659 / #660 决定只提示：不会自动改地图、禁止部署或改变开战规则；
+普通 `check` 仍成功，`check --strict` 会和其他提示一样返回失败。官方地图不会出现这条提示。
+
+`check` 和 `list`、服务器一样读取 `SP_PLUGIN_SCRIPTS`：`sandbox` 且锁有效时，脚本插件显示 `(loaded)`；
+关闭或锁失效时显示 `(disabled)`。同种语言的第二个覆盖，在它自己的文件夹那一行显示 `(skipped)` 并点名胜出的插件；
+`--json` 中该文件夹的 `status`、`loadable`、`skipped` 也说明同一结果，跨插件问题仍只计一次。
+
 ## 测试控制台
 
 从工作台顶栏打开「测试控制台」（`/studio/console.html`），使用同一把钥匙，不用先选插件。服务器校验场景，
@@ -342,6 +361,7 @@ node tools/plugin.mjs pack my-texas --zip
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_DATA_PATH` | 「{where}」用了不允许的键名 | __proto__、prototype、constructor 这类键名不能用（它们能改坏程序里的对象），换一个名字。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_DATA_BOUND` | 数值超出了插件允许的范围（{where}）：{detail} | 每个数值最多是原版同一个键最大值的 10 倍（至少允许到 64）；间隔、周期、费用这类步长不能小于原版最小值的十分之一。把数字改小一点——原版 3 倍以内的创意数值都能用。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_DATA_REQUIRED` | 合并后的数据缺东西或者写坏了（{where}）：{detail} | 补丁不要删掉游戏必需的字段或者整张表；按后面的英文原文找到是哪一处。 |
+| 插件能用，但检查时有提示 | `PLUGIN_BOSS_CENTRE_DEPLOYABLE` | 地图「{stage}」的首领战中央列 10 可部署（战场行 {rows}）；双方会重叠部署，开战时只部署第一名干员 | 将这些格子的有效 buildable 设为 NONE，移走中央列的部署平台；这是提示，不会改变插件规则。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_DATA_REFERENCE` | 「{where}」引用了不存在的东西：{detail} | 检查拼写：引用的盟约、敌人、干员、效果等 id 要在原版或这个插件里存在（大小写一致）。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_DATA_PAIR` | 干员棋子的普通卡和精英卡对不上（{where}） | 新干员要成对：…_a 是普通卡、…_b 是精英卡（isGolden: true），两张的 charId 和 tier 一样；用紧凑记录（records 文件）写，工具会替你生成这一对。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_PATCH_OP` | 不认识的补丁操作（{where}） | "op" 只能是 set、merge、add、append、remove 之一。 |

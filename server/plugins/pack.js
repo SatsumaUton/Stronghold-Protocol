@@ -88,7 +88,7 @@ export const errorWords = (e) => (e instanceof SyntaxError ? e.message : e?.code
  * @returns {Findings & { where: string, plugin: import('./registry.js').Plugin | null }}
  */
 export function checkPluginFolder(dir, where, { vanilla, dataDir = DATA_DIR } = {}) {
-  const r = readPluginFolder(dir, { where, vanilla });
+  const r = readPluginFolder(dir, { where, vanilla, dataDir });
   const list = issueList();
   list.take(r);
   if (fs.existsSync(path.join(dir, PLUGIN_MANIFEST))) {

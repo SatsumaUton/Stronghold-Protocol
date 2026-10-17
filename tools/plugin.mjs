@@ -301,6 +301,7 @@ export async function main(argv) {
     let warnings = 0;
     const vanilla = readVanillaAssets(dirs.dataDir);
     const report = [];
+    const checks = [];
     /** @type {import('../server/plugins/registry.js').Plugin[]} */
     const loaded = [];
     for (const { dir, where } of folders) {
@@ -309,16 +310,10 @@ export async function main(argv) {
       if (p) loaded.push(p);
       problems += r.problems.length;
       warnings += r.warnings.length;
-      if (json) {
-        report.push({ where, id: path.basename(dir), loadable: !!p, class: p?.class ?? null, status: p?.status ?? null, version: p?.manifest.version ?? null,
-          issues: r.issues.map((i) => ({ ...i, ...describeIssue(i, lang) })) });
-        continue;
-      }
-      const head = p ? `${p.id} ${p.manifest.version} · ${p.class} (${p.status}) · ${files(p.count)}, ${kb(p.bytes)}` : 'not loadable';
-      console.log(`${where}  ${head}`);
-      for (const line of findingLines(r, lang)) console.log(line);
-      if (!r.problems.length && !r.warnings.length) console.log('  ok');
+      checks.push({ dir, where, r });
     }
+    // Same owner gate as list and the server; inspect status without executing plugin code.
+    applyTrust(loaded, { pluginsDir: dirs.pluginsDir, mode: process.env.SP_PLUGIN_SCRIPTS });
     // The same rules the registry applies across folders. Named targets arrive in argument order; the registry
     // walks plugins/ with readDirSorted (folder name, default UTF-16). Sort that way before the cross-plugin rules.
     // A folder this run keeps is not also recorded as the loser of another order. A folder checked alone can still
@@ -362,6 +357,21 @@ export async function main(argv) {
     ];
     problems += cross.skipped.reduce((n, s) => n + s.problems.length, 0);
     warnings += cross.warnings.length;
+    // Resolve cross-folder winners before showing each folder's status (DESIGN §34.21).
+    const skippedByWhere = new Map(cross.skipped.map(s => [s.where, s]));
+    for (const { dir, where, r } of checks) {
+      const p = r.plugin, skipped = skippedByWhere.get(where);
+      const status = skipped ? 'skipped' : p?.status ?? null;
+      if (json) {
+        report.push({ where, id: path.basename(dir), loadable: !!p && !skipped, class: p?.class ?? null, status, version: p?.manifest.version ?? null,
+          ...(skipped ? { skipped: skipped.problems } : {}), issues: r.issues.map(i => ({ ...i, ...describeIssue(i, lang) })) });
+        continue;
+      }
+      const head = p ? `${p.id} ${p.manifest.version} · ${p.class} (${status}) · ${files(p.count)}, ${kb(p.bytes)}` : 'not loadable';
+      console.log(`${where}  ${head}${skipped ? ` · ${skipped.problems.join('; ')}` : ''}`);
+      for (const line of findingLines(r, lang)) console.log(line);
+      if (!skipped && !r.problems.length && !r.warnings.length) console.log('  ok');
+    }
     if (!json && crossIssues.length) {
       console.log('cross-plugin');
       for (const s of cross.skipped) {
