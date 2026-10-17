@@ -828,7 +828,7 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
     if (route === 'validate-dsl' && method === 'POST') {
       if (!mayChange(req)) return false;
       const body = await readJson(req, 256 * 1024);
-      return json(200, authoring.validate(body.spec));
+      return json(200, body.draft ? authoring.validateDraft(body.draft) : authoring.validate(body.spec));
     }
     if (route === 'targets' && read) {
       const kinds = (q.get('kinds') || '').split(',').filter((k) => Object.hasOwn(TARGET_KINDS, k));
@@ -892,6 +892,7 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
       if (body.target && !t) throw new StudioError('PLUGIN_STUDIO_TARGET', 404, { target: text(body.target, 80) });
       if (t && !tpl.kinds.includes(t.kind)) throw new StudioError('PLUGIN_STUDIO_TARGET', 400, { target: targetSpec(t) });
       const made = createPlugin(tpl, { id, name: body.name, target: t, authors: body.authors, license: body.license, credits: body.credits, options: body.options || {}, data: tpl.build ? readStudioData(dataDir) : null, lang: body.lang === 'en' ? 'en' : 'zh' });
+      if (['bond', 'item', 'trait', 'offers', 'rules'].includes(tpl.id)) authoring.generate(id, { template: tpl.id, target: body.target, options: body.options || {} }, made.manifest);
       files.root(id, { create: true });
       files.write(id, PLUGIN_MANIFEST, Buffer.from(manifestText(made.manifest)));
       for (const [rel, text] of Object.entries(made.files)) files.write(id, rel, Buffer.from(text), { generated: true });

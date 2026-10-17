@@ -25,6 +25,7 @@ import { API, get, post, put, call, pluginPath, nameAuthor, keepStudioKey, takeK
 import { kindLabel, templateTitle, targetName, sizeText } from './labels.js';
 import { IssueList, errorText } from './issues.js';
 import { Authoring } from './authoring.js';
+import { bondId } from './gameplayModel.js';
 import { TrialBench } from './trial.js';
 import { CreateDialog } from './create.js';
 import { CatalogPage } from './catalog.js';
@@ -122,7 +123,8 @@ function PluginView({ id, info, onListChanged, eventsAt, onGone }) {
     if (n !== req.current) return;
     hooks.preview = pv;
     setPreviewIssues(pv.issues || []);
-    layers.set(pv.ops || [], secs.map((s) => s.targetInfo));
+    layers.set(pv.ops || [], [...secs.map((s) => s.targetInfo), ...(st.authoring?.template === 'bond'
+      ? [{ kind: 'bond', key: bondId(st.id), container: ['bonds'] }] : [])]);
     setVersion((v) => v + 1);
   };
   /** Read the plugin again. `fromDisk`: a change on disk asked for it — a folder gone from plugins/ is let go, not an error. */
@@ -198,7 +200,7 @@ function PluginView({ id, info, onListChanged, eventsAt, onGone }) {
     ${tab === 'content' ? html`<div class="st-content">
       ${generalIssues.length ? html`<div class="st-banner is-bad"><strong>${t('整体检查')}</strong><${IssueList} issues=${generalIssues} onFix=${onFix} busy=${busy} /></div>` : null}
       ${previewIssues.length ? html`<div class="st-banner is-warn"><strong>${t('预览')}</strong><${IssueList} issues=${previewIssues} onFix=${onFix} busy=${busy} compact=${true} /></div>` : null}
-      ${state.authoring ? html`<${Authoring} key=${id} state=${state} busy=${busy} initialDraft=${draft} onDraft=${setDraft} onSave=${draft => run(() => post(pluginPath(id, 'authoring'), draft), { list: true })} />` : null}
+      ${state.authoring ? html`<${Authoring} slotActions=${{ onFiles, onRef, onClear, onFix }} key=${id} state=${state} busy=${busy} initialDraft=${draft} onDraft=${setDraft} onSave=${draft => run(() => post(pluginPath(id, 'authoring'), draft), { list: true })} />` : null}
       ${sections.map((s, n) => html`<${Section} key=${`${s.template}|${s.target}`} section=${s} state=${state} busy=${busy} version=${version}
         onFiles=${onFiles} onRef=${onRef} onClear=${onClear} onFix=${onFix} onRemove=${() => saveSections(sections.filter((_, k) => k !== n))} />`)}
       ${state.class === 'cosmetic' && !(state.sections || []).length ? html`<p class="st-note">${t('这个插件还没有要替换的内容。')}</p>` : null}

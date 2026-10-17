@@ -6,9 +6,13 @@ import { createTargetIndex, targetOf } from './targets.js';
 import { numericFields, officialOperator, readStudioData } from './gameData.js';
 import { dslExample } from './dslExamples.js';
 import { validateDsl } from '../sim/content/dsl/validate.js';
-import { rememberOfficialBounds } from '../../shared/plugins/officialBounds.js';
+import { bbCap, officialBbRange, rememberOfficialBounds } from '../../shared/plugins/officialBounds.js';
+import { MOD_KEYS } from '../../shared/plugins/skillSpec.js';
+import { dslBoundForPath } from '../sim/content/dsl/bounds.js';
 import { jsonProblems } from '../../shared/plugins/dataUtils.js';
 import { StudioError } from './files.js';
+import { GAMEPLAY_TEMPLATES, gameplayDefaults } from '../../public/studio/js/gameplayModel.js';
+import { checkGameplayDraft } from './gameplayCheck.js';
 
 export function authorRevision(files, id) {
   const h = createHash('sha256');
@@ -31,6 +35,15 @@ export function createAuthoring({ files, dataDir }) {
   const details = (template, target) => {
     const t = targetOf(targets().targets, target);
     const d = official();
+    if (GAMEPLAY_TEMPLATES.includes(template)) {
+      const defaults = gameplayDefaults(template, 'draft-plugin');
+      if (template === 'trait' && t) defaults.charId = t.key;
+      if (template === 'item' && t) defaults.base = Object.values(d.items).find(r => !r.isGolden && (r.id === t.key || r.iconId === t.key))?.id || defaults.base;
+      rememberOfficialBounds(d);
+      const keys = [...new Set(Object.values(d.items).flatMap(r => (r.buffs || []).flatMap(b => Object.keys(b.bb || {}))))];
+      return { defaults, items: d.items, bounds: Object.fromEntries(keys.map(k => [k, officialBbRange(k)])),
+        dslBounds: Object.fromEntries(MOD_KEYS.map(k => [k, bbCap(dslBoundForPath(`mods.${k}`).key)])) };
+    }
     if (template === 'numbers') return { fields: numericFields(d, t || { kind: 'operator', key: 'char_102_texas' }) };
     if (['operator', 'dsl'].includes(template)) {
       const source = officialOperator(d, t?.key || 'char_102_texas');
@@ -38,7 +51,7 @@ export function createAuthoring({ files, dataDir }) {
     }
     return { modes: Object.values(d.config.modes).filter(m => m.inScope).map(m => ({ id: m.modeId, name: m.name })) };
   };
-  const generate = (id, input, manifest = null) => {
+  const generate = (id, input, manifest = null, { validate = true } = {}) => {
     const tpl = templateById(input.template);
     if (!tpl?.build || !input.options || typeof input.options !== 'object' || Array.isArray(input.options)) throw new StudioError('PLUGIN_STUDIO_REQUEST', 400, { detail: 'wizard template and options required' });
     const problems = jsonProblems(input.options, 'options');
@@ -46,7 +59,15 @@ export function createAuthoring({ files, dataDir }) {
     const target = input.target ? targetOf(targets().targets, input.target) : null;
     if (input.target && (!target || !tpl.kinds.includes(target.kind))) throw new StudioError('PLUGIN_STUDIO_TARGET', 400, { target: input.target });
     const name = typeof manifest?.name === 'string' ? manifest.name : manifest?.name?.zh || manifest?.name?.en || id;
-    return createPlugin(tpl, { id, name, target, options: input.options, data: official() });
+    const made = createPlugin(tpl, { id, name, target, options: input.options, data: official() });
+    if (validate && GAMEPLAY_TEMPLATES.includes(tpl.id)) {
+      const result = checkGameplayDraft(id, made, { dataDir });
+      if (!result.ok) {
+        const p = result.problems[0];
+        throw new StudioError(p.code, 400, { where: p.path || p.params?.where || '', detail: p.message || p.text || p.zh });
+      }
+    }
+    return made;
   };
   const save = (id, input) => {
     const old = read(id);
@@ -62,6 +83,11 @@ export function createAuthoring({ files, dataDir }) {
     files.writeSidecar(id, '.studio.json', Buffer.from(manifestText(side)));
   };
   return { read, save, generate, details,
+    validateDraft(input) {
+      try { generate(input.id, input); return { ok: true, problems: [] }; }
+      catch (e) { return { ok: false, problems: [{ code: e.code || 'PLUGIN_STUDIO_REQUEST', path: e.params?.where || '',
+        message: e.params?.detail || e.message, params: e.params }] }; }
+    },
     example: dslExample,
     // the official caps the build applies (contentSet.js), or a literal over them would pass here and fail on save
     validate: spec => { rememberOfficialBounds(official()); return validateDsl(spec, { bounds: true }); },
@@ -75,11 +101,11 @@ export function createAuthoring({ files, dataDir }) {
 
 /** Preserve metadata, settings, dependencies and other unowned parts in both save and unsaved trials. */
 export function mergeAuthorManifest(manifest, generated, template) {
-  const ownedPermissions = ['numbers'].includes(template) ? ['data.patch'] : ['operator','dsl','meta'].includes(template) ? ['data.add','dsl'] : template === 'mode' ? ['data.add'] : ['ui.frame'];
+  const ownedPermissions = GAMEPLAY_TEMPLATES.includes(template) ? ['data.add', 'data.patch', 'dsl', 'offers'] : ['numbers'].includes(template) ? ['data.patch'] : ['operator','dsl','meta'].includes(template) ? ['data.add','dsl'] : template === 'mode' ? ['data.add'] : ['ui.frame'];
   manifest.permissions = [...new Set([...(manifest.permissions || []).filter(p => !ownedPermissions.includes(p)), ...(generated.permissions || [])])];
-  for (const key of ['operators', 'data', 'dsl', 'modes', 'slots', 'entry']) {
+  for (const key of ['operators', 'data', 'dsl', 'modes', 'slots', 'entry', 'offers', 'rules']) {
     if (Object.hasOwn(generated, key)) manifest[key] = generated[key];
-    else if (['dsl', 'operators'].includes(key) && ['dsl', 'meta', 'operator'].includes(template)) delete manifest[key];
+    else if (['dsl', 'operators'].includes(key) && ['dsl', 'meta', 'operator', 'bond'].includes(template)) delete manifest[key];
   }
   return manifest;
 }

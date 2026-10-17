@@ -582,6 +582,13 @@ normalized values from the room, read-only for non-hosts and during a match. Van
 
 Authoring checks (DESIGN §32.9.1): numeric fields display the shared official bounds and positive step floor; invalid saves are refused. DSL validation network failures are explicit, and saving revalidates the current spec before writing. Unkeyed studio state reads omit script source. Trial replay remains a data-only renderer feed; sandbox simulation runs in the same SES executor as a formal match. Forge and catalogue entry points remain available beside the authoring templates.
 
+0.3.1 (§34.29) adds bond/item/trait/offers/rules templates with actual fields and official-name pickers. Full-draft
+validation uses the existing keyed validate-dsl endpoint, ordinary folder checks and data-only composition; no new
+plugin grammar or route. Save refuses bad drafts before writing. Their dummy/wave/duel trials add an explicit
+single-holder prep event and active-bond/equipped-item fixture [ASSUMED], plus real Match offer choice, refresh and
+virtual-clock timeout with before/after feedback. This is a bounded isolated exercise, not a full economy/room;
+golden scenes and the independent vanilla console keep their previous behavior. New UI uses the four language packs.
+
 ### Combat metrics (作战统计) — ported from the xinhai-ai fork, opt-in
 
 设置 →「作战统计」 (`combatMetrics`, PR #618 by @robll-v1) defaults off, the same kind of decision as 显示弹药与能量数量: the

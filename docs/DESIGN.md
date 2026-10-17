@@ -13,6 +13,10 @@ companion cosmetic hints, accurate import reports, record DSL permission checks 
 
 ## Where each section lives
 
+Studio §32.9 gains five graphical gameplay templates and isolated Match exercises in
+[§34.29](history/0.3.1.md#3429-studio-templates-for-the-031-gameplay-features); the current UI contract is in
+[design/client.md](design/client.md#plugin-studio-gameplay-previews-3291).
+
 Section numbers are global and never change: code, tests and the other documents cite them as "DESIGN §N". The
 current rules by area are in `docs/design/`, the per-release revisions (the evidence behind each rule) in
 `docs/history/`. When a revision changes a rule, the rule in `docs/design/` is rewritten too (the revision lists the

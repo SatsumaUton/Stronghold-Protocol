@@ -1437,7 +1437,40 @@ Wizard state lives in `.studio.json` under `authoring`, independent of cosmetic 
 still refuse executable sources. A UI preview loads the registry's sandboxed `/p/` route.
 `GET /studio/api/authoring?template=&target=` returns official numeric fields/reference records/modes;
 `GET …/dsl-example?name=&id=` returns a starting point; `POST …/validate-dsl {spec}` returns the real validator's result.
-Generated DSL is checked again before new/save writes (including `kit.dsl` and prep host keys); rejected specs leave the saved files unchanged. The form reports failed validation requests, and save revalidates its current spec and checks `ok` before writing. All templates pass strict check/pack and data templates compose through C1; the DSL caster is tested in battle, and generated prep effects in a real match-host round. A single-battle trial does not dispatch prep events.
+Generated DSL is checked again before new/save writes (including `kit.dsl` and prep host keys); rejected specs leave the saved files unchanged. The form reports failed validation requests, and save revalidates its current spec and checks `ok` before writing. All templates pass strict check/pack and data templates compose through C1; the DSL caster is tested in battle, and generated prep effects in a real match-host round. The original single-battle presets do not dispatch prep events; the five templates below add an explicit isolated exercise.
+
+**0.3.1 gameplay forms (§34.29).** Each has a server template and a page editor, with official-name search,
+bounded numeric inputs, selects and editable lists. No hand-written JSON or new HTTP route is required:
+
+| Template | Fields and generated content |
+|---|---|
+| `bond` | Name, description, 1–16 ascending thresholds (1–100), count mode, core/extra, 1–64 distinct operator members, effect tier, prep DSL and member talents. Generates a bond record, membership patches, prep spec and additive operator traits, preserving official kits. Original CC0 icon in the existing art slot; save the form before uploading/borrowing an icon. |
+| `item` | Official normal item, optional elite pair, name, description, prices (0–1e9), tiers (1–6), shop visibility/exclusion/order, and existing buffs' numeric blackboards with official caps. Generates complete records preserving supported handler/effect identity and normal/elite links. No new buff handler can be introduced. |
+| `trait` | Official operator, explicit replacement checkbox, Chinese text and optional en/ja/ko/zh-TW texts, battle talents and all eight operator prep hooks. `elementBurst` exposes element/targetOnField/selfOnField; layer caps 1–1000000 and gainItem count 1–64 follow the trait validator. The common spec applies to both forms. |
+| `offers` | Hook list, any/list/every/range rounds, 1–6 slots, 0–2 refreshes, window seconds, quorum, timeout, prep deferral, and 1–128 local cards with labels/icons and closed grants. The template owns `offers/cards.json`; cards supply their individual grants. |
+| `rules` | Four selects from `RULE_SWITCHES`, with descriptions. Inherit omits a declaration; other choices explicitly declare it, including official defaults. |
+
+`POST validate-dsl {draft:{id,template,target,options}}` checks a generated temporary plugin with the folder checker
+and data-only composer. The same check gates creation/saving; errors keep the installed files unchanged.
+`POST trial` accepts an optional `exercise:{round,at,hook,elite,actions}` for these templates. The existing child
+bench returns `exercise` alongside the replay: before/after funds, pending funds, refreshes, layers, inventory,
+rules, open windows and action outcomes. It executes actual Match offer grants, seeded refreshes, quorum and
+virtual-clock timeout; the page's choose/refresh/timeout buttons replay at most 32 actions from the same seed.
+No room or listening socket is created. Saved and unsaved forms both work.
+
+[ASSUMED] Defaults are editable examples, not official balance: one active bond member, +25% ATK, one fund at
+roundStart; the first official hammer pair; a +25% ATK trait; three small fund cards and a 30-second window;
+four explicitly declared default rules. One effect tier guards every bond rule; a bond's layer action can select
+the new bond directly. Empty prep/talent lists omit their part. Membership authoring is capped at 64; a rules-only
+template needs at least one declaration [ASSUMED]. Trials inject the selected bond tier, equip the
+selected item form on the first holder when it is equipment, and dispatch one selected prep hook with that
+holder. They do not prove population counting, full economic flow, every rule switch or consumable targeting.
+Item/chess grants remain visible in inventory. These exercises apply to dummy/wave/duel presets, not golden
+scenarios; the independent vanilla console remains unchanged. Full match checks use the existing test room.
+Item templates add `effectRef` to their own complete records in a second generated patch, after pair expansion;
+this preserves official prep handlers and combination identity without compact inheritance flattening the pair.
+[ASSUMED] Standalone bond/trait forms require members with playable official chess records in this installation;
+backup-only operators need an operator plugin first, because a trait declaration does not create a chess pair.
 
 **Try a battle.** `GET /studio/api/trial-options` lists official operators/waves and, in source checkouts, golden battle
 scenarios (not whole-match cases). `POST /studio/api/trial` takes `{id, scenario, operator?, opponent?, wave?, seconds?,

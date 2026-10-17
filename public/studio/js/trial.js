@@ -6,6 +6,8 @@ import { Select, NumberField } from './editors/controls.js';
 import { IssueList, errorText } from './issues.js';
 import { TrialReplay } from './preview/replay.js';
 import { PluginSettings } from '../../js/ui/pluginSettings.js';
+import { GAMEPLAY_TEMPLATES } from './gameplayModel.js';
+import { GameplayExercise } from './gameplayTrial.js';
 const outcome = value => ({ win: t('胜利'), loss: t('失败'), timeout: t('达到时限'), draw: t('平局'), left: t('左侧胜利'), right: t('右侧胜利') }[value] || value);
 export function TrialBench({ state, draft }) {
   const [options, setOptions] = useState({ operators: [], waves: [], golden: [] });
@@ -22,11 +24,17 @@ export function TrialBench({ state, draft }) {
   const [speed, setSpeed] = useState(1);
   const [reset, setReset] = useState(0);
   const [board, setBoard] = useState('3d'), [effects, setEffects] = useState('lite');
+  const [exercise, setExercise] = useState({ round: 1, at: 'prep', hook: 'roundStart', actions: [], elite: false });
+  const gameplay = GAMEPLAY_TEMPLATES.includes(draft?.template || state.authoring?.template);
+  useEffect(() => { setResult(null); setExercise(v => ({ ...v, actions: [] })); }, [JSON.stringify(draft)]);
   useEffect(() => { let alive = true; get('trial-options').then(r => { if (alive) setOptions(r); }); return () => { alive = false; }; }, []);
-  const run = async () => {
+  const run = async (actions = []) => {
     setBusy(true); setResult(null); setError('');
     try {
+      const nextExercise = { ...exercise, actions };
+      setExercise(nextExercise);
       const r = await post('trial', { id: state.id, scenario, operator: operator || undefined, opponent: opponent || undefined, wave, seconds, seed: 1, settings,
+        ...(gameplay ? { exercise: nextExercise } : {}),
         ...(draft && draft.template !== 'script' ? { draft } : {}) });
       setResult(r); setPlaying(true); setReset(n => n + 1);
       if (globalThis.__studio) globalThis.__studio.trial = r;
@@ -44,7 +52,9 @@ export function TrialBench({ state, draft }) {
     </div>
     ${scenario === 'duel' ? html`<p class="st-note">${t('定点对打使用普攻与技能攻击属性；只选敌人的技能效果不会把对手当敌人。这不是正式 PvP 模式。')}</p>` : null}
     <${PluginSettings} definitions=${state.manifest.settings || {}} values=${settings} onSave=${setSettings} disabled=${busy} />
-    <${Button} variant="primary" loading=${busy} disabled=${busy || state.class === 'ui'} data-testid="run-trial" onClick=${run}>${t('开始对照')}<//>
+    ${gameplay ? html`<${GameplayExercise} template=${draft?.template || state.authoring?.template} value=${exercise} result=${result?.exercise} busy=${busy || exercise.actions.length >= 32}
+      onChange=${v => { setExercise({ ...v, actions: [] }); setResult(null); }} onAction=${action => run([...exercise.actions, action])} />` : null}
+    <${Button} variant="primary" loading=${busy} disabled=${busy || state.class === 'ui'} data-testid="run-trial" onClick=${() => run()}>${t('开始对照')}<//>
     ${error ? html`<p class="st-error">${error}</p>` : null}
     ${result?.ok === false ? html`<${IssueList} issues=${result.issues} />` : null}
     ${result?.ok ? html`<div data-testid="trial-comparison"><table class="st-table"><thead><tr><th></th><th>${t('原版')}</th><th>${t('插件')}</th><th>${t('差值')}</th></tr></thead>
