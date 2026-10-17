@@ -21,6 +21,7 @@ import { browserScriptSources } from '../../shared/plugins/scriptLoad.js';
 import { preflightScripts } from './scriptPreflight.js';
 import { validateDsl, validatePrepSpec } from '../sim/content/dsl/validate.js';
 import { composeRules } from '../../shared/plugins/rules.js';
+import { offerReferenceProblems } from './offerData.js';
 
 const bases = new WeakMap(), buffers = new WeakMap(), caches = new WeakMap();
 function baseFor(registry) {
@@ -281,6 +282,7 @@ function composeContentSet({ registry, ids = [], checkDataOnly = false }) {
   }
   if (plugins.length) {
     data = reconcilePluginTokens(reconcilePluginBonds(data));
+    for (const p of plugins) if (p.offers?.length) problems.push(...offerReferenceProblems(p.offers, p.manifest, p.content.documents, base.data, data));
     problems.push(...validateGameplayData(data, { kitExists: ref => !!officialKit(ref), vanilla: base.data, owners, validateDsl }));
     if (problems.length) return { problems };
     data = { ...data, stages: { ...data.stages } };
@@ -354,6 +356,9 @@ function composeContentSet({ registry, ids = [], checkDataOnly = false }) {
   }
   for (const [rel, body] of bodies) files[rel] = { sha256: nodeSha256(body), bytes: body.length };
   const vanilla = plugins.length === 0;
+  // The interaction windows of the set (PLUGIN API v2, docs/PLUGINS.md §10b): the registry already checked each
+  // file, including transitive option sources in content.files: every offer byte participates in cs.
+  const offers = plugins.flatMap(p => (p.offers || []).map(o => ({ pluginId: p.id, ...o })));
   const index = vanilla ? base.identity.index : { ...base.identity.index, cs, vanilla: false, plugins: parts, settings, data: {}, i18n: {}, bounds: {}, ...(scripts.length ? {scripts:{}, execution} : {}), ...(rules ? { rules } : {}) };
   if (!vanilla) for (const [rel, f] of Object.entries(files)) {
     const url = base.files.get(rel)?.equals(bodies.get(rel)) ? `/data/${rel.replace(/^(data\/)/, '')}?v=${f.sha256.slice(0, 8)}` : `/cs/${csUrlPart(cs)}/${rel}`;
@@ -362,7 +367,10 @@ function composeContentSet({ registry, ids = [], checkDataOnly = false }) {
   }
   const set = deepFreeze({ cs, vanilla, plugins: plugins.map(p => ({ id: p.id, version: p.manifest.version, hash: p.content.hash })),
     data, files, ...(scripts.length ? {scripts, execution} : {}), ...(rules ? { rules } : {}), modes: Object.values(data.config.modes), problems: [], warnings, index, settings, bounds: boundsSnap,
-    kitted: [...KITTED_CHARS, ...Object.keys(data.backups.units).filter(id => !own(base.data.backups.units, id))] });
+    kitted: [...KITTED_CHARS, ...Object.keys(data.backups.units).filter(id => !own(base.data.backups.units, id))],
+    // PLUGIN API v2 (docs/PLUGINS.md §10b): the interaction windows the set declares, tagged with their plugin. Data
+    // only and already checked by the registry; a set without one omits the field, so nothing downstream changes.
+    ...(offers.length ? { offers } : {}) });
   // Executable routes use the descriptor's already hashed browser bytes; keep the JSON index table unchanged.
   if (execution === 'trusted') for (const p of scripts) {
     const m = JSON.parse(p.manifestSource);

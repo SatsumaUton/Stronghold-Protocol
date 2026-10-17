@@ -47,8 +47,10 @@ let files = null;
 let bounds = null;
 let scripts = [];
 let sandbox = false;
+/** PLUGIN API v2: the content set's interaction windows (docs/PLUGINS.md §10b) — data, injected into every match. */
+let offers = [];
 let options = {};
-const adopt = (init) => { ({ cs, hashInput, files, bounds = null, scripts = [], sandbox = false } = init || {}); options = (init && init.options) || {}; };
+const adopt = (init) => { ({ cs, hashInput, files, bounds = null, scripts = [], sandbox = false, offers = [] } = init || {}); options = (init && init.options) || {}; };
 if (viaWorker) adopt(workerData);
 // a child process whose parent is gone has nothing left to do
 if (!viaWorker) process.on('disconnect', () => process.exit(0));
@@ -171,7 +173,7 @@ async function boot() {
   MatchClass = class ContentMatch extends Inner {
     constructor(opts) {
       // Rules come from the verified content identity, never the per-room create payload.
-      const bound = { ...opts };
+      const bound = { ...opts, offers };
       delete bound.rules;
       if (hashInput.rules) bound.rules = hashInput.rules;
       super(bound);

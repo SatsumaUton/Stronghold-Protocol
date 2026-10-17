@@ -141,6 +141,8 @@ export const PERMISSIONS = Object.freeze({
   'data.patch': ['content', 'script', 'trusted'],
   'data.add': ['content', 'script', 'trusted'],
   dsl: ['content', 'script', 'trusted'],
+  // PLUGIN API v2: declares interaction windows (the `offers` part). Data only, so a content plugin holds it too.
+  offers: ['content', 'script', 'trusted'],
   'sim.code': ['script', 'trusted'],
   'meta.code': ['script', 'trusted'],
   'mode.code': ['script', 'trusted'],
@@ -163,6 +165,9 @@ const PARTS = Object.freeze({
   modes: { classes: ['content', 'script', 'trusted'], shape: 'list', needs: ['data.add'] },
   stages: { classes: ['content', 'script', 'trusted'], shape: 'list', needs: ['data.add'] },
   dsl: { classes: ['content', 'script', 'trusted'], shape: 'list', needs: ['dsl'] },
+  // PLUGIN API v2: a declarative interaction window (shared/plugins/offers.js). Data only — the host owns the window's
+  // lifecycle and applies one of its effect primitives, so the part needs no code permission.
+  offers: { classes: ['content', 'script', 'trusted'], shape: 'list', needs: ['offers'] },
   i18n: { classes: ['content', 'script', 'trusted'], shape: 'langs', needs: [] },
 });
 
@@ -624,6 +629,7 @@ export function readPluginManifest(raw, ctx) {
   else if (!Number.isInteger(m.api)) list.problem('PLUGIN_API', `"api": ${short(m.api)} is not an integer`, apiAt);
   else if (m.api < supported.min || m.api > supported.current) list.problem('PLUGIN_API', `"api": ${m.api} is not supported (this game: ${supported.min}–${supported.current})`, apiAt);
   else api = m.api;
+  if (m.offers !== undefined && api !== null && api < 2) list.problem('PLUGIN_API', 'offers requires plugin API 2', apiAt);
 
   let scope = [...kind.defaultScope];
   if (m.scope !== undefined) {

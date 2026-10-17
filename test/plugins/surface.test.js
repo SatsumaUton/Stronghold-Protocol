@@ -23,7 +23,7 @@ import { PLUGIN_ERRORS } from '../../shared/plugins/errors.js';
 import { CATALOG_ENTRY_FIELDS, CATALOG_FIELDS } from '../../shared/plugins/catalog.js';
 import { SDK_ID, SDK_MEMBERS } from '../../shared/plugins/sdk.js';
 import * as sdk from '../../shared/plugins/sdk.js';
-import { SURFACE_MARKERS, SURFACE_SINCE, buildSurface, uncoveredSdkExports } from '../../shared/plugins/surface.js';
+import { SURFACE_MARKERS, SURFACE_SINCE, SURFACE_SINCE_NEXT, buildSurface, uncoveredSdkExports } from '../../shared/plugins/surface.js';
 import { STUDIO_ROUTES } from '../../server/studio/index.js';
 import * as vocab from '../../server/sim/content/dsl/vocab.js';
 import { pluginFxSurface } from '../../public/js/render/vfx/pluginFormat.js';
@@ -115,6 +115,12 @@ test('the document table and buildSurface are the same rows', () => {
   assert.equal(SURFACE_SINCE, '0.3.0');
   assert.ok(rows.every((r) => ['0.3.0', '0.3.1'].includes(r.since)));
   assert.equal(rows.find(r => r.name === 'record.operator.origin').since, '0.3.1');
+  for (const name of ['manifest.field.offers', 'permission.offers', 'error.PLUGIN_OFFER_SHAPE', 'error.PLUGIN_OFFER_ROUNDS', 'error.PLUGIN_OFFER_REFERENCE']) {
+    assert.equal(rows.find(r => r.name === name).since, '0.3.1', name);
+  }
+  assert.deepEqual(PLUGIN_API, { current: 2, min: 1 });
+  for (const r of rows) assert.doesNotMatch(r.since, /-dev$/, `${r.name}: since names a release`);
+  assert.ok(rows.some((r) => r.since === SURFACE_SINCE), 'the frozen rows still name 0.3.0');
 });
 
 test('every closed-set member is a row, and the table has no extra name', () => {
@@ -248,7 +254,7 @@ test('STUDIO_ROUTES and the routes api() dispatches are the same set', () => {
   assert.deepEqual(discovered, [...STUDIO_ROUTES].sort());
   assert.ok(discovered.includes('POST /studio/api/catalog'));
   assert.ok(discovered.includes('POST /studio/api/catalog/install'));
-  assert.equal(PLUGIN_API.current, 1);
+  assert.equal(PLUGIN_API.current, 2);
   const disabled = src.replace("route === 'targets'", 'false');
   assert.equal(studioRoutesFromApi(disabled).includes('GET /studio/api/targets'), false);
   const method = src.replace("route === 'authors' && method === 'POST'", "route === 'authors' && method === 'GET'");

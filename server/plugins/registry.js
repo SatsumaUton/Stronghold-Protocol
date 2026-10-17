@@ -59,6 +59,9 @@ import {
 import { canonicalJson } from '../../shared/plugins/identity.js';
 import { readThemeDeclaration } from '../../shared/plugins/theme.js';
 import { manifestTextWithoutNotices } from '../../shared/plugins/notices.js';
+import { PLUGIN_OFFERS_PER_PLUGIN } from '../../shared/plugins/limits.js';
+import { readOfferFile, readOfferCards } from '../../shared/plugins/offers.js';
+import { offerReferenceProblems } from './offerData.js';
 import { issueList, issueLine, makeIssue } from '../../shared/plugins/errors.js';
 
 /** The language folders' subdirectory (public/i18n/, data/i18n/). */
@@ -436,6 +439,39 @@ function readUiFrame(dir, manifest, listed, { vanilla, hashCache }) {
 }
 
 /**
+ * Read a plugin's interaction windows (PLUGIN API v2, shared/plugins/offers.js): every `offers` file the manifest
+ * names, in the manifest's order. Data only — nothing is run, nothing is served, and the files are hashed with the
+ * rest of the plugin's parts (they are declared paths, so their bytes enter `cs` like a data or DSL part's).
+ * @param {import('../../shared/plugins/manifest.js').PluginManifest} manifest
+ * @param {object} content immutable JSON snapshot
+ * @returns {{ offers: object[] | null, problems: string[], warnings: string[], issues: PluginIssue[] }}
+ */
+function readOffers(manifest, content) {
+  const list = issueList();
+  const rels = manifest.parts?.offers?.files || [];
+  if (!rels.length) return { offers: null, problems: [], warnings: [], issues: [] };
+  if (rels.length > PLUGIN_OFFERS_PER_PLUGIN) list.problem('PLUGIN_OFFER_SHAPE', `more than ${PLUGIN_OFFERS_PER_PLUGIN} offers files`, { at: ['offers'] });
+  /** @type {object[]} */
+  const offers = [];
+  for (const rel of rels.slice(0, PLUGIN_OFFERS_PER_PLUGIN)) {
+    const read = readOfferFile(content.documents[rel], { pluginId: manifest.id, rel });
+    for (const p of read.problems) list.problem(p.code, `${rel} ${p.path}: ${p.message}`, { file: rel, where: p.path, detail: p.message });
+    for (const w of read.warnings) list.warning(w.code, `${rel} ${w.path}: ${w.message}`, { file: rel, where: w.path, detail: w.message });
+    if (read.offer) {
+      const pool = readOfferCards(content.documents[read.offer.options.source], read.offer);
+      for (const p of pool.problems) list.problem(p.code, `${rel}: ${p.message}`, { file: rel, where: p.path, detail: p.message });
+      offers.push({ ...read.offer, cards: pool.cards });
+    }
+  }
+  const ids = offers.map((o) => o.id);
+  if (new Set(ids).size !== ids.length) list.problem('PLUGIN_OFFER_SHAPE', '"id" is the same in two offers files of this plugin (a window is named once)', { at: ['offers'] });
+  if (!list.problems.length) for (const p of offerReferenceProblems(offers, manifest, content.documents)) {
+    list.problem(p.code, p.message, { where: p.path, detail: p.message });
+  }
+  return { offers: list.problems.length ? null : offers, problems: list.problems, warnings: list.warnings, issues: list.issues };
+}
+
+/**
  * Read one plugin folder: its manifest, its files, the paths the manifest names — and, for a cosmetic plugin, its asset
  * overlay (readVisual), for a ui plugin its frame (readUiFrame). With `problems` it stays out (`plugin` null);
  * otherwise `plugin` is its entry.
@@ -551,6 +587,11 @@ export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, whe
         && nodeSha256(Buffer.from(plugin.script.manifestSource)) === plugin.content.files['plugin.json'];
       plugin.status = 'disabled';
     }
+    // PLUGIN API v2: the plugin's declared interaction windows (data only; a bad one keeps the plugin out)
+    const win = readOffers(manifest, plugin.content);
+    list.take(win);
+    if (win.problems.length) return out(null);
+    if (win.offers) plugin.offers = win.offers;
   }
   if (manifest.class === 'lang') {
     const ui = readJson(served.ui.abs);

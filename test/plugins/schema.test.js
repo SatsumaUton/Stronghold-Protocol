@@ -214,3 +214,25 @@ test('the studio\'s templates and plugins/_template/cosmetic/ and ui/ are accept
     assert.ok(s.title && s.description.length > 100, `${f}: title and description`);
   }
 });
+
+
+test('the shipped offers example validates, and offers manifest constraints match the reader', () => {
+  const example = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/examples/offers-demo/plugin.json'), 'utf8'));
+  assert.deepEqual(v.validate('plugin.schema.json', example), []);
+  const O = extra => ({ manifest: 2, version: '1.0.0', class: 'content', app: '*', api: 2, permissions: ['offers'], offers: ['offers.json'], ...extra });
+  const cases = [
+    ...['content', 'script', 'trusted'].map(cls => [true, O({ class: cls })]),
+    [true, O({ offers: 'offers.json' })],
+    ...['cosmetic', 'lang', 'ui'].map(cls => [false, O({ class: cls })]),
+    [false, O({ api: 1 })], [false, without(O(), 'api')],
+    [false, O({ permissions: [] })], [false, without(O(), 'permissions')],
+    [false, without(O(), 'offers')], [false, O({ offers: [] })],
+    [false, O({ offers: ['../out.json'] })], [false, O({ offers: 'bad.js' })],
+    [false, O({ offers: {} })], [false, O({ offers: Array(257).fill('offers.json') })],
+  ];
+  for (const [valid, manifest] of cases) {
+    const read = readPluginManifest(manifest, { id: 'demo', app: '0.3.1', api: PLUGIN_API });
+    assert.equal(!read.problems.length && !read.warnings.length, valid, JSON.stringify(manifest));
+    assert.equal(v.validate('plugin.schema.json', manifest).length === 0, valid, JSON.stringify(manifest));
+  }
+});

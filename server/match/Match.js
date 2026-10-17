@@ -236,6 +236,7 @@ import { MatchBoss } from './match/bossRounds.js';
 import { MatchSettle } from './match/settle.js';
 import { installTestTrace } from './testTrace.js';
 import { MatchTestCommands } from './match/testCommands.js';
+import { MatchOffers } from './match/offers.js';
 
 export { FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS } from './match/common.js';
 
@@ -291,6 +292,22 @@ export class Match {
     if (Array.isArray(opts.kitted)) this.diyKitted = Object.freeze(opts.kitted.filter((id) => typeof id === 'string'));
     // The room's rule switches (DESIGN §34.15). Omitted on a vanilla match, so its own keys stay the same.
     if (opts.rules && typeof opts.rules === 'object' && !Array.isArray(opts.rules)) this.rules = Object.freeze({ ...opts.rules });
+    /**
+     * The interaction windows this match's content set declares (PLUGIN API v2, docs/PLUGINS.md §10b): the normalized
+     * `offers` of the plugins the host installed, handed in as `opts.offers` before construction so test journals
+     * and both host transports capture the same declaration snapshot. `[]` for every match whose set declares none, and then
+     * no window code ever runs (MatchOffers.openOfferWindow returns before it touches the phase).
+     * @type {object[]}
+     */
+    this.offers = Array.isArray(opts.offers) ? opts.offers : [];
+    /** @type {any[]} the windows open right now (MatchOffers) */
+    this.offerWin = [];
+    /** @type {Map<object, any>} window → its deadline timer (tracked so dispose cancels it) */
+    this._offerTimers = new Map();
+    /** what runs once the last open window closes (a held-back round start / prep) */
+    this._offerResume = null;
+    /** window sequence (diagnostics and messages) */
+    this.offerSeq = 0;
     this.gd = new GameData(this.data, this.modeId);
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
@@ -496,7 +513,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

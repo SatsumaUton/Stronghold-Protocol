@@ -49,6 +49,11 @@ export function readContentData(dir, manifest) {
       if (part === 'data' && !(object(doc) && (doc.patch === 1 && Array.isArray(doc.ops) || doc.records === 1 && Array.isArray(doc.entries)))) throw problem('PLUGIN_CONTENT_FORMAT', rel, 'expected patch:1/ops or records:1/entries');
     }
     for (const rel of Object.values(manifest.parts.i18n?.langs ?? {})) read(rel);
+    // Offers and their transitive sources are immutable, hashed JSON, just like kit.spec.
+    for (const rel of manifest.parts.offers?.files ?? []) {
+      const doc = read(rel);
+      if (typeof doc?.options?.source === 'string') read(doc.options.source);
+    }
     // kit.spec may point at a JSON file; it is declared transitively by its compact operator record.
     const resolveSpec = r => {
       const fxErrors = operatorFxProblems(r?.fx);

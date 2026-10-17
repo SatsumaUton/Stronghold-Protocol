@@ -67,7 +67,7 @@ test('screens/game.js: the round plate at 回合开始, 获得 only for the play
   const g = read('public/js/screens/game.js');
   assert.match(g, /if \(phase === PHASE\.ROUND_START && b && pub\?\.round > 0\) \{\n\s+setBanner\(null\);\n\s+setRoundPop\(\{ round: pub\.round, left: roundsToBoss\(pub\), sub: b\.sub, watching: spectator \|\| !alive, key: phaseKey \}\);/);
   assert.match(g, /<\$\{RoundPopup\} key=\$\{roundPop\.key\} round=\$\{roundPop\.round\} gain=\$\{roundGain\} left=\$\{roundPop\.left\} sub=\$\{roundPop\.sub\}\n\s+watching=\$\{roundPop\.watching\}/);
-  assert.match(g, /\$\{banner && !banner\.plate && !roundPop \? html`<\$\{PhaseBanner\}/, 'the other phases keep the banner');
+  assert.match(g, /\$\{!hasOffers && banner && !banner\.plate && !roundPop \? html`<\$\{PhaseBanner\}/, 'the other phases keep the banner, while an offer dialog stays unobscured');
   assert.match(g, /useEffect\(\(\) => \{ preloadPopupArt\(\); \}, \[\]\);/);
   const pop = read('public/js/ui/matchPopups.js');
   assert.match(pop, /\$\{watching \? null : html`<div class="mpop__cell mpop__cell--gold"/, 'no 获得 for a watcher');

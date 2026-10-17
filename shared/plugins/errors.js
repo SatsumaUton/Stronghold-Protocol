@@ -43,6 +43,7 @@ const D = Object.freeze({
   dslActions: 'docs/PLUGIN-DSL.md#4-动作',
   dslBudget: 'docs/PLUGIN-DSL.md#5-预算和重入',
   dslMeta: 'docs/PLUGIN-DSL.md#6-备战',
+  offers: 'docs/PLUGINS.md#10b-offers--interaction-windows',
   studio: 'docs/PLUGINS.md#15-the-studio-and-the-tools',
   catalog: 'docs/PLUGINS.md#17-the-catalogue-and-installing-by-address-目录与安装',
   forge: 'docs/PLUGINS.md#16-forge-import',
@@ -714,6 +715,23 @@ export const PLUGIN_ERRORS = Object.freeze({
     level: 'frame', doc: D.ui,
     zh: '界面插件发来的消息格式不对，被丢弃了', en: 'A message from the ui plugin is not shaped right and was dropped',
     fix: { zh: '每条消息都是 { "v": 1, "t": 类型, … }，类型只能是 ready、slot、resize、storage、notice、stats，一条不超过 8 KB；格式见 schemas/ui.schema.json。', en: 'Every message is { "v": 1, "t": <type>, … } with a type of ready, slot, resize, storage, notice or stats, at most 8 KB; schemas/ui.schema.json has the shapes.' },
+  },
+
+  // ---- the declarative interaction windows of PLUGIN API v2 (shared/plugins/offers.js) ------------------------------
+  PLUGIN_OFFER_REFERENCE: {
+    level: 'problem', doc: D.offers,
+    zh: '交互窗口引用了不可用的记录：{detail}', en: 'An offer references an unavailable record: {detail}',
+    fix: { zh: '只使用官方数据或本插件在房间内容集内声明的物品、棋子和羁绊。', en: 'Use official records or this plugin’s own items, chess and bonds declared in the room content set.' },
+  },
+  PLUGIN_OFFER_SHAPE: {
+    level: 'problem', doc: D.offers,
+    zh: '这个交互窗口的写法不对：{detail}', en: 'This interaction window is not shaped right: {detail}',
+    fix: { zh: '一份 offers/*.json 是 { "offer": 1, "id": "窗口名", "when": { "at": ["battleCheck" 或 "prep"], "rounds": 轮次 }, "windowSec": 秒数, "slots": 1–6, "options": { "source": "插件里的 .json" } }；windowSec 缺省 0（不开窗、不阻塞）。', en: 'One offers/*.json is { "offer": 1, "id": "<name>", "when": { "at": ["battleCheck" or "prep"], "rounds": <rounds> }, "windowSec": <seconds>, "slots": 1–6, "options": { "source": "<a .json in the plugin>" } }; windowSec defaults to 0 (no window, nothing held back).' },
+  },
+  PLUGIN_OFFER_ROUNDS: {
+    level: 'problem', doc: D.offers,
+    zh: '这个交互窗口的轮次表达式看不懂：{detail}', en: 'The round expression of this interaction window is not readable: {detail}',
+    fix: { zh: '轮次写成 1–99 的列表（如 [1, 3, 6, 11]）、"any"（每一轮）、{ "every": N }（每 N 轮）或 { "from": R, "to": R }；窗口在该轮开始之前打开，任何一轮都可以，不必是官方固定节奏里的轮次。', en: 'Write rounds as a list of 1–99 ([1, 3, 6, 11]), "any" (every round), { "every": N } or { "from": R, "to": R }; the window opens before that round begins, on any round — not only the ones the official schedule uses.' },
   },
 
   // ---- a DSL spec (P2, DESIGN §32.7; the explanations of server/sim/content/dsl/validate.js are Chinese) -------------

@@ -138,7 +138,7 @@ classes and the content sets running at once — §11 and `docs/DEPLOY.md`.
 | `name`, `description` | a text in `sourceLang` or `{ "<lang>": "…" }`; `englishName` a text |
 | `version` | semver, required |
 | `app` | the game versions it is made for — `>=0.3.0 <0.4.0`, `0.3.x`, `^0.3.0` … (a pre-release counts as its release); required but for `lang`. Outside it: `compatible: false` and a warning (P1 refuses a gameplay plugin by default) |
-| `api` | the plugin API level, within `shared/constants.js` `PLUGIN_API` (`{ current: 1, min: 1 }`); required but for `lang` |
+| `api` | the plugin API level, within `shared/constants.js` `PLUGIN_API` (`{ current: 2, min: 1 }`); required but for `lang`. A manifest that uses a part of level 2 (today `offers`, §10b) states `"api": 2` |
 | `class` | §2; every part the manifest names must belong to it |
 | `scope` | `room` (the host's choice for the whole room), `personal` (the player's own setting), `server` (trusted code only), as the class allows — `cosmetic`: room and/or personal; `content`, `script`: room; `ui`, `lang`: personal; `trusted`: server or room |
 | `authors`, `credits`, `license`, `homepage` (http/https), `sourceLang` (default `zh`) | free text |
@@ -146,7 +146,7 @@ classes and the content sets running at once — §11 and `docs/DEPLOY.md`.
 | `loadAfter`, `loadBefore`, `priority` | ordering hints (lists of ids; an integer within ±1000, default 0) |
 | `settings` | ≤ 32 settings: `boolean`, `integer` / `number` (`min` and `max` required, `step`), `enum` (`options`) — no free text; `default` (else `false`, `min`, the first option), `label` |
 | `permissions` | what the plugin does (§4); every part needs one, every permission must fit the class |
-| parts | `assets`, `theme` (cosmetic+) · `data`, `operators`, `enemies`, `modes`, `stages`, `dsl` (content+) — a path, a list of paths or (`assets`, `theme`) the object inline · `i18n` `{ "<lang>": path }` (content+) |
+| parts | `assets`, `theme` (cosmetic+) · `data`, `operators`, `enemies`, `modes`, `stages`, `dsl`, `offers` (content+) — a path, a list of paths or (`assets`, `theme`) the object inline · `i18n` `{ "<lang>": path }` (content+) |
 | `entry` | `{ "sim", "meta" }` (script, `.js`) · `{ "client" }` (ui, `.html`) · `{ "server" }` (trusted, `.js`) |
 | `lang`, `files` … | the `lang` class only: manifest 1's language fields and `files: { ui, data }` (§7) |
 
@@ -162,6 +162,7 @@ patches, compact operator records, modes — are specified in §10.
 | `theme` | cosmetic, trusted | `theme` |
 | `data.patch`, `data.add` | content, script, trusted | `data` (either); `operators`, `enemies`, `modes`, `stages` (`data.add`) |
 | `dsl` | content, script, trusted | `dsl` |
+| `offers` | content, script, trusted | `offers` (§10b; the part is data, so no code permission is needed) |
 | `sim.code`, `meta.code`, `mode.code` | script, trusted | `entry.sim`, `entry.meta` |
 | `ui.frame` | ui | `entry.client` of a ui plugin |
 | `trusted.page`, `trusted.server` | trusted | `entry.client`, `entry.server` of a trusted plugin |
@@ -948,6 +949,97 @@ are served from memory with `Cache-Control: immutable` while a room holds the se
 
 **Remaining limitation**: `allowIncompatible` cannot override the builder's incompatible-plugin refusal (DESIGN §32.6). Settings controls and changed-file notices are implemented (§15); DSL in data plugins is §12.
 
+## 10b. Offers — interaction windows
+
+Plugin API 2 (`current: 2`, `min: 1`): PR #682 by **@DuolaCCCCat**, issue #681, completed for 0.3.1.
+The `offers` manifest part names JSON files and requires permission `offers` (`content`, `script`, `trusted`).
+No plugin scripts run to open, draw, refresh or apply a window. Old API 1 manifests without this part still load.
+The manifest schema checks JSON paths, allowed classes, API 2, the required permission and its corresponding part;
+the shipped example is validated against both the schema and the manifest reader.
+
+A complete, art-free example is [offers-demo](examples/offers-demo/plugin.json), with
+[its window](examples/offers-demo/offers.json) and [cards](examples/offers-demo/cards.json).
+Copy that directory to `plugins/offers-demo`, check it, then enable it in the room's plugin panel.
+
+```json
+{ "offer": 1, "id": "supplies",
+  "when": { "at": "prep", "rounds": [1, 3, 9] },
+  "windowSec": 30, "quorum": "all", "onTimeout": "auto",
+  "slots": 3, "refresh": { "perSlot": 1 },
+  "options": { "source": "cards.json" } }
+```
+
+| Field | Rule |
+|---|---|
+| `offer`, `id` | Version `1`; unique local id, 1–32 lowercase letters/digits/hyphens |
+| `when.at` | `battleCheck`, `prep`, or an array containing both |
+| `when.rounds` | `[1,3,9]`, `"any"`, `{ "every": 2 }`, `{ "from": 3, "to": 9 }`; omitted means any; rounds 1–99, list at most 64, every 1–32 |
+| `windowSec` | Integer 0–300, default 0. **Zero creates no window, sequence, timer or grant, and never blocks** |
+| `slots` | 1–6 per seat, default 1; at most 32 window files per plugin |
+| `refresh.perSlot` | 0–2 per seat **per slot**; default 0; no refresh after a pick |
+| `quorum` | `all`, `majority` (strictly more than half), `none` (default; never holds a phase) |
+| `onTimeout` | `auto`/`bot`: first grantable current slot; `skip`: no grant. Default `auto` |
+| `defer` | Optional `[]` or `["prepSettle"]`; records intent, with no separate scheduler beyond the hook's gate |
+| `options.source` | Required relative `.json` path inside this plugin; checked and hashed transitively |
+| `apply` | Optional fallback primitive for cards without their own `apply` |
+
+**Sources.** Only a JSON array or `{ "cards": [...] }` exists in this version; no dynamic tables, weights,
+remote URLs or scripts. It contains `slots`–128 cards. Each card has a unique `id` (same syntax as window ids),
+nonempty `name` (≤80 characters), `desc` (≤240), `icon` (`funds`, `layers`, `item`, `chess`, `refresh`), and one
+`apply` primitive (or inherits the window's). Icons are native symbols; text is rendered as text, never HTML.
+
+```json
+[{ "id": "supplies", "name": "Supplies", "desc": "Gain 3 funds.",
+   "icon": "funds", "apply": { "funds": 3 } }]
+```
+
+**Effects.** One key per primitive: `funds`/`pendingFunds` integer 0–1000; `freeRefresh` integer 1–6;
+`layers: { "bond": "<id>", "count": 1 }` with count 1–999; `item: "<id>"` or `chess: "<id>"` grants one
+through normal acquisition/stock rules. Ids must exist in official data or this plugin's own declared records in
+the room content set. Discovery refuses unknown, foreign and undeclared ids with **`PLUGIN_OFFER_REFERENCE`**;
+composition checks existence again. Unresolved DIY placeholders are refused too: a static id does not identify a
+configured operator. Each seat's slot exposes `available`; current stock and that seat's resolved chess record are
+checked again at acquisition. A failed grant returns `BAD_TARGET` without recording a pick, so the player can select
+another card or refresh the unavailable slot. Invalid amounts/cards use `PLUGIN_OFFER_SHAPE`. Arbitrary persistent `effect`
+and `shared` enemy/player pools are refused: their runtime semantics are not supported. `options.tiers` remains
+an explicit ignored-field warning. There is no script callback or cross-plugin grant permission.
+
+**Timing and choices.** `battleCheck` runs after the initial official check before R1 and before the start of
+*every* later named round, including boss rounds. `prep` runs after round-start income/shop draw and the official
+机变 draft, before entering prep. Vanilla takes its original path and draws at its original time. The engine builds
+uniform, distinct initial slots with an independent seed derived from match seed, plugin/window, hook, round,
+window sequence and seat. A refresh adds slot and refresh count to that seed: it really replaces the card and
+leaves other seats untouched. It prefers unseen cards; if necessary it can duplicate another slot, but never the
+slot's current card. A one-card pool cannot refresh and consumes no allowance.
+
+Bots and autoplay seats resolve immediately with the timeout rule. A strict majority resolves unpicked seats with
+the same rule; departed/eliminated seats leave the quorum. **[ASSUMED]** Auto/bot fallback tries slots in order,
+skipping unavailable or failed grants; if none succeeds, it records a skipped pick and closes without a grant. `none` stays selectable until all seats answer, its
+deadline, or the next round (then the fallback runs). Multiple windows coexist with independent timers; only
+blocking windows delay their continuation. Test-console hidden-round jumps initialize team LP after that delayed
+round-start continuation, so subsequent hidden-boss losses use the same pool as an immediate jump.
+Unrenderable/empty payloads never hold a phase. These draw, fallback,
+quorum, numeric/text limits and unsupported-source choices are **[ASSUMED]** remake API policy, not official rules.
+The maintainer's #681 decisions bind declaration-only, API 2/min 1, `g.offer`, caps, zero-length behavior and native UI.
+
+**Native UI and protocol.** The match screen supplies the popup; a UI plugin is not required. It shows each slot's
+name/icon/description, two-tap or Enter confirmation, per-slot refresh count, countdown, and co-op waiting state.
+Tab stays in the visible popup; Escape clears selection, or collapses a nonblocking popup when nothing is selected.
+**[ASSUMED]** Nonblocking windows also have a Collapse button and reopen controls; a completed seat collapses
+automatically. They never lock prep editing, and collapsed windows do not capture match shortcuts. Blocking windows
+keep their phase gate. Unavailable cards are labelled and disabled for picking, while their remaining refreshes stay
+usable. Cards scroll at enlarged text sizes and on touch screens.
+Spectators see a read-only view (the first live seat's cards). Window tabs allow all concurrent windows to be answered.
+The built-in interface strings use all five supported languages; plugin card text is literal author text.
+`m.public.offers` is a full snapshot, including every seat's cards, current slot availability, picked status and remaining refreshes;
+reconnect restores it. `g.offer` and `g.offerRefresh` send `{ offerId, pluginId, seq, idx, cardId? }` (the native UI sends cardId to reject a stale slot after refresh), rejecting stale
+sequences and other plugins' same-named windows. `g.choice` remains the official draft/personal-choice intent.
+Test input journals capture both intents and the declaration snapshot for replay; content process/worker hosts
+receive the same options at construction. Offers-only plugins appear in room content summaries and change `cs`;
+both declaration and source bytes are hashed. Plugins without offers gain no new file-hash input. Installing an
+offer plugin never changes the vanilla composition. Shared engine/protocol code edits still change the build-wide
+vanilla code identity, as required by §9's hash contract.
+
 ## 12. DSL
 
 A plugin describes a skill, a talent or a small prep effect in JSON (P2). No plugin code runs. The vocabulary, the
@@ -1627,6 +1719,9 @@ lacks). The table below is generated from it (`node tools/plugin.mjs errors --wr
 | The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_STORAGE` | The ui plugin's storage request was refused: the key is not allowed or the space is used up | A key is 1–64 characters of letters, digits and . _ -; a value's JSON is at most 4096 bytes; a plugin keeps at most 32 keys and 32 KB. |
 | The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_INTENT` | The ui plugin tried to send a match action, which is refused | A ui plugin watches and never plays (it cannot become a bot or a cheat): do not send hello, ping, room.*, g.* or b.* messages, nor carry one inside another message. |
 | The ui plugin's page gets a refusal (ok: false, a rejected or a limit message) | `PLUGIN_SHAPE` | A message from the ui plugin is not shaped right and was dropped | Every message is { "v": 1, "t": <type>, … } with a type of ready, slot, resize, storage, notice or stats, at most 8 KB; schemas/ui.schema.json has the shapes. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_OFFER_REFERENCE` | An offer references an unavailable record: {detail} | Use official records or this plugin’s own items, chess and bonds declared in the room content set. |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_OFFER_SHAPE` | This interaction window is not shaped right: {detail} | One offers/*.json is { "offer": 1, "id": "<name>", "when": { "at": ["battleCheck" or "prep"], "rounds": <rounds> }, "windowSec": <seconds>, "slots": 1–6, "options": { "source": "<a .json in the plugin>" } }; windowSec defaults to 0 (no window, nothing held back). |
+| The plugin is not listed (skipped); the start log and check say why | `PLUGIN_OFFER_ROUNDS` | The round expression of this interaction window is not readable: {detail} | Write rounds as a list of 1–99 ([1, 3, 6, 11]), "any" (every round), { "every": N } or { "from": R, "to": R }; the window opens before that round begins, on any round — not only the ones the official schedule uses. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_DSL_SHAPE` | The DSL spec is not shaped right: {detail} | The whole spec is one object: { "dsl": 1, "pluginId": "<plugin id>", then "skill", "skills", "talents" or "meta" }. |
 | The plugin is not listed (skipped); check names the DSL version | `PLUGIN_DSL_VERSION` | This version reads "dsl": 1 only | Put "dsl": 1 at the top of the spec. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_DSL_PLUGIN_ID` | The plugin id the DSL spec names is not the plugin that carries it: {detail} | Write the id of the plugin that carries the spec (its folder name) as "pluginId", or leave it out and the server fills it in. A plugin cannot spend another plugin's action budget. |
@@ -2009,6 +2104,8 @@ the studio and trial bench, Forge import, and catalogue/address installs. The fo
 - Plugin fonts are not applied. Theme variables of the allowlist are applied on this player's page only (§9.1).
 - `allowIncompatible` does not bypass the content builder (§11).
 - Additional mode-code hooks and plugin-specific `golden` / `simcheck` / balance-tool switches have not been added.
+  A plugin declares interaction windows at the host's existing moments instead (`offers`, §10b); a window with a phase
+  of its own, and a window whose pick carries plugin code, are not part of that part.
 - Personal plugins refresh on the next catalogue fetch; file changes are not pushed to every player's preferences.
   UI recommendations are local to the host's browser until a shared room recommendation protocol exists (§14).
 - The trial bench simulates a single battle, not prep economy or a complete PvP mode (§15). Forge import carries

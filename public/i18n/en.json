@@ -2053,5 +2053,11 @@
   "点击放大预览": "Click to enlarge",
   "外观预览": "Skin preview",
   "显示其他玩家的皮肤": "Show other players' skins",
-  "这台服务器不接受皮肤选择，只有本机保存": "This server does not accept skin choices; they are kept in this browser only"
+  "这台服务器不接受皮肤选择，只有本机保存": "This server does not accept skin choices; they are kept in this browser only",
+  "插件选择": "Plugin choices",
+  "点击卡牌选中，再次点击确认": "Select a card, then tap again to confirm",
+  "还有 {n} 人未选择": "{n} players still choosing",
+  "刷新（剩余 {n} 次）": "Refresh ({n} left)",
+  "等待队友": "Waiting for teammates",
+  "暂不可用": "Unavailable"
 }

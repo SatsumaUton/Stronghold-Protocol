@@ -370,6 +370,9 @@ node tools/plugin.mjs pack my-texas --zip
 | 界面插件的页面收到拒绝（ok: false、rejected 或 limit 消息） | `PLUGIN_STORAGE` | 界面插件的存储请求被拒绝：键名不合规，或者超出了容量 | 键名 1–64 个字符，只用字母、数字和 . _ -；一个值的 JSON 不超过 4096 字节；每个插件最多 32 个键、一共 32 KB。 |
 | 界面插件的页面收到拒绝（ok: false、rejected 或 limit 消息） | `PLUGIN_INTENT` | 界面插件想发对局操作，被拒绝了 | 界面插件只能看，不能操作对局（它不能成为自动操作或作弊工具）：不要发 hello、ping、room.*、g.*、b.* 这类消息，也不要把它们夹在别的消息里。 |
 | 界面插件的页面收到拒绝（ok: false、rejected 或 limit 消息） | `PLUGIN_SHAPE` | 界面插件发来的消息格式不对，被丢弃了 | 每条消息都是 { "v": 1, "t": 类型, … }，类型只能是 ready、slot、resize、storage、notice、stats，一条不超过 8 KB；格式见 schemas/ui.schema.json。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_OFFER_REFERENCE` | 交互窗口引用了不可用的记录：{detail} | 只使用官方数据或本插件在房间内容集内声明的物品、棋子和羁绊。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_OFFER_SHAPE` | 这个交互窗口的写法不对：{detail} | 一份 offers/*.json 是 { "offer": 1, "id": "窗口名", "when": { "at": ["battleCheck" 或 "prep"], "rounds": 轮次 }, "windowSec": 秒数, "slots": 1–6, "options": { "source": "插件里的 .json" } }；windowSec 缺省 0（不开窗、不阻塞）。 |
+| 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_OFFER_ROUNDS` | 这个交互窗口的轮次表达式看不懂：{detail} | 轮次写成 1–99 的列表（如 [1, 3, 6, 11]）、"any"（每一轮）、{ "every": N }（每 N 轮）或 { "from": R, "to": R }；窗口在该轮开始之前打开，任何一轮都可以，不必是官方固定节奏里的轮次。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_DSL_SHAPE` | DSL 规格的整体写法不对：{detail} | 整份规格是一个对象：{ "dsl": 1, "pluginId": "插件 id", 然后是 "skill"、"skills"、"talents" 或 "meta" }。 |
 | 插件没出现在列表里（被跳过）；check 指出 DSL 版本 | `PLUGIN_DSL_VERSION` | 这个版本只认 "dsl": 1 | 在规格最外层写 "dsl": 1。 |
 | 插件没出现在列表里（被跳过）；启动日志和 check 写着原因 | `PLUGIN_DSL_PLUGIN_ID` | DSL 规格写的插件 id 和装着它的插件对不上：{detail} | "pluginId" 写装着这份规格的插件自己的 id（插件文件夹名），或者不写，由服务器填上。一个插件不能用别的插件的动作预算。 |
@@ -691,3 +694,37 @@ JSON 文件里写 `{ "dsl": 1, "meta": { "on": [{ "when": "gain", "do": [{ "gain
 严格检查识别必需权限，旧一键修复不能误删；不存在的物品／盟约引用立即报错。
 [ASSUMED] 引用依赖插件时，把依赖放在同级目录并写入 requires；检查只读取和组合数据，不执行脚本。
 完整事件、库存规则、schema 与可复制的两份规格见 [PLUGIN-DSL 第10节](PLUGIN-DSL.md#10-干员特质031671)。
+## 声明式交互窗口（0.3.1，PR #682）
+
+感谢 **@DuolaCCCCat** 的 PR #682（#681）。把 [示例插件](examples/offers-demo/plugin.json) 所在目录复制到
+`plugins/offers-demo/`，执行 `node tools/plugin.mjs check plugins/offers-demo`，然后在房间中启用。
+示例没有脚本和官方美术；[窗口声明](examples/offers-demo/offers.json) 在第 1、3、9 轮的官方机变结束后打开，
+[候选卡片](examples/offers-demo/cards.json) 各自声明名称、说明、符号图标和收益。
+
+清单用 `api: 2`、`permissions: ["offers"]` 和 `offers: ["offers.json"]`，只允许 content/script/trusted 类；
+JSON Schema 与清单读取器共同校验示例，检查路径、API、类别、权限及对应内容。只有本插件内的 JSON 数组或
+`{ "cards": [...] }` 可以作 `options.source`；不读取脚本或远程地址。卡片数从栏位数到 128，栏位 1–6，
+每栏每位玩家刷新 0–2 次，窗口 0–300 秒，一个插件最多 32 个窗口。**0 秒完全不开窗、不发奖励、不阻塞。**
+`battleCheck` 在每个指定回合开始前执行；`prep` 在收入、商店抽取和官方机变之后执行。轮次可以写列表、`"any"`、
+`{ "every": 2 }` 或 `{ "from": 3, "to": 9 }`，不局限于官方机变轮次。
+
+每张卡写 `id`、`name`（最多 80 字符）、`desc`（最多 240 字符）、`icon`（funds/layers/item/chess/refresh），
+以及只有一个键的 `apply`：funds/pendingFunds 为 0–1000，freeRefresh 为 1–6，layers 的 count 为 1–999，
+item/chess 为一个记录 id。省略卡片 apply 时继承窗口 apply。引用只能来自官方数据或本插件在房间中声明的记录；
+未知、其他插件、只有前缀没有实际记录的 id，以及尚未绑定干员的 DIY 占位棋子报 `PLUGIN_OFFER_REFERENCE`。
+取得物品和棋子仍遵守正常库存规则；发放失败返回 `BAD_TARGET`，不消耗选择，可换选其他卡或刷新。
+每栏的 `available` 随当前库存和玩家记录更新；不可用卡显示提示并禁用选择，仍可使用剩余刷新次数。
+`effect` 和 `shared` 尚不支持，检查时拒绝；`options.tiers` 会警告不读取。
+
+[ASSUMED] 每位玩家独立、均匀抽取，刷新用对局种子和窗口序号确定，优先避开当前所有卡片；候选池太小时可与其他栏
+重复，但不能刷回原卡。`all` 等全部在场玩家，`majority` 要严格过半，`none` 不阻塞阶段。超时 `auto`/`bot` 选当前
+第一个可成功发放的栏位；都不可用时跳过且不发奖励。`skip` 始终不发奖励；AI 和托管立即执行这条规则。多数通过时，未选者也执行同一规则。无阻塞窗口最迟下轮开始时结算。
+这些细则和数值上限是本项目 API 约定，不是官方模式规则。
+
+客户端自带窗口，不必另写 UI 插件：点卡片选中、再点确认，支持 Tab/Enter，Escape 取消本地选中；刷新显示本栏剩余次数。
+[ASSUMED] 非阻塞窗口可点「收起」，无本地选中时也可用 Escape 收起，并从浮动按钮重新打开；选择完成自动收起。
+它不锁定整备部署，收起后恢复游戏快捷键；阻塞窗口仍等待人数门槛。测试控制台跳隐藏关时，团队 LP 在阻塞窗口
+完成并真正开始回合之后初始化，保证隐藏关扣血有效。
+联机显示「等待队友」、未选人数和倒计时，观战只读，大字与触屏可以滚动。断线重连恢复完整窗口；测试日志记录
+`g.offer`/`g.offerRefresh` 并可回放。声明及候选文件都会改变插件内容哈希，未使用 offers 的插件不会增加哈希输入。
+协议及完整规则见 [PLUGINS §10b](PLUGINS.md#10b-offers--interaction-windows)。
