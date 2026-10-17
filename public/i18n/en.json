@@ -1,4 +1,5 @@
 {
+  "离线导入（不下载官方数据表）": "Import offline (do not download official data tables)",
   "_meta": {
     "type": "lang",
     "lang": "en",

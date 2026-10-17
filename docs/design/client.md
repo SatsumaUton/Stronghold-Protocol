@@ -646,6 +646,12 @@ enters b.progress / b.result, and a tracked battle's result and rendered events 
 
 ### Forge compact metadata (0.3.1)
 
+Forge import (CLI and the studio's explicit preview/import) and setup's startup/update gap preparation fetch missing
+official tables only when out-of-roster operators need them (maintainer decision 2026-10-17, §34.33). The cache uses
+the voice indexes' source/mirror policy; offline flags refuse downloads and failures retain the reported local fallback.
+The studio's offline box clears the previous report and applies to preview and confirm. Gameplay never fetches tables.
+The table set, validation limits and installation options are specified in [PLUGINS §16](../PLUGINS.md#16-forge-import).
+
 Compact operators may declare `chess.hidden`, explicit `chess.ids.normal/elite`, exact `art.assets` and official
 `origin` references ([PLUGINS §16](../PLUGINS.md#16-forge-import)). Hidden records remain addressable for grants,
 but never enter shops, visible handbook/loadout lists or owned DIY selection. Explicit pair IDs drive upgrades.

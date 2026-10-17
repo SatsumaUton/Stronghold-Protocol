@@ -4,6 +4,16 @@ Owner: `tools/fetch-assets.mjs` and `tools/assets/*`. Research background: `docs
 
 All official game art, Spine models and audio are **downloaded at install time**. They are never committed; `public/assets/` is git-ignored.
 
+Setup and explicit Forge imports also fetch official JSON tables on demand for plugin operators outside the shipped
+roster (maintainer decision 2026-10-17, DESIGN §34.33): `character_table`, `skill_table`, `range_table`, `uniequip_table`,
+`battle_equip_table`, `activity_table` (`.json`, about 50 MB uncompressed together). They share `cachedJson`,
+`RAW.gamedata`, jsDelivr fallback, `MirrorPolicy` and source/proxy options with `audio_data` / `charword_table`.
+Existing tables are reused unless `--refresh-index` is set. JSON, per-table shape and decoded-size checks precede
+an atomic cache write under `.cache/gamedata/excel/`. Offline/no-network or setup's `--check` / `--no-assets` refuse
+fetches; failures preserve the current local fallback. These tables are never requested by gameplay or served as
+plugin assets. Setup's bounded plugin reference discovery runs before the W5/P10 gap checks; art extraction still
+requires its existing consent. See [DEPLOY](DEPLOY.md#11-安装与首次启动) and [Forge import](PLUGINS.md#16-forge-import).
+
 The UI sound `audio.sfx.ui.bondUp` is the official `ON_ACT1AUTOCHESS_ADD_BOND` bank's
 `act1autochess_b_ui_buffup`. Live prep/battle layer gains use it as well as bond activation. Its bank settings are
 `maxSoundAllowed: 1` and `popOldest: true`: one dedicated SFX channel, replacing the previous sound without an extra

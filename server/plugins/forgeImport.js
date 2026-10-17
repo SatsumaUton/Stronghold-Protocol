@@ -128,6 +128,7 @@ import { KITS, OPERATOR_KITS, TIER_KITS } from '../sim/content/kits/index.js';
 import { bundleForgeKits } from './forgeKits.js';
 import { planForgeRecords, rewriteForgeIds, rewriteForgeKit } from './forgeRecords.js';
 import { localOfficialUnits } from './officialUnits.js';
+import { ensureOfficialTables } from '../../tools/assets/official-tables.mjs';
 import { BOUND_TABLES, rememberOfficialBounds, officialBbRange, officialBbMax } from '../../shared/plugins/officialBounds.js';
 import { isStepKey } from '../../shared/plugins/limits.js';
 import { FORGE_SHIM_TEXT, forgeDisplaySlot, forgePanelPage, planForgePanel } from './forgePanels.js';
@@ -1523,11 +1524,13 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   for (const [old, id] of recordIds) { importedData.push(`${old} → ${id}`); rewrittenData.push(`${old} → ${id}`); }
   const deriveLocal = dataDir ? localOfficialUnits(dataDir) : null;
   const derivedChars = new Set();
+  const officialNeeded = new Set();
   const installedChar = id => typeof id === 'string' && (!!table('units')?.[id] || Object.values(table('chess') ?? {}).some(c => c.charId === id));
   const deriveChar = (id, tier) => {
     if (!deriveLocal) throw new Error('Local official character/skill/range tables unavailable (no dataDir).');
     const econ = table('config')?.economy?.chessStatus?.[tier];
     if (!econ) throw new Error(`Missing economy training defaults for tier ${tier}.`);
+    officialNeeded.add(id);
     const got = deriveLocal(id, [econ.normal, econ.golden]);
     derivedChars.add(id);
     importedData.push(`${id}: derived from local official tables (${got.version}); full potential, tier ${tier} economy training; pack overrides retained.`);
@@ -2751,7 +2754,7 @@ export function planForgeImport(files, { id: idOverride, contentId, dataDir, van
   for (const bucket of ['chars', 'enemies', 'tokens', 'bonds', 'bands', 'items', 'skills', 'modules']) if (isObj(assets[bucket])) kept.push(...Object.keys(assets[bucket]).map(k => `${bucket}:${k}`));
   const cosmeticBare = asked.length > 0 && asked.every(bareKey) && kept.every(bareKey);
 
-  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, gameplayRecords, contentI18n, panels, manualPanels, manualReasons, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare, themeVars, notices, rules: importedRules };
+  const meta = { base, packName, version, description, credits, authors, license, requires, conflicts, assets, media, assetNeed, patches, operators, enemyRecords, gameplayRecords, contentI18n, panels, manualPanels, manualReasons, translations: translations.filter((t) => t.kind === 'ui'), importedAssets, rewrittenAssets, importedData, rewrittenData, skipped, assumed, script: scriptPlan, packId: typeof pack.id === 'string' ? pack.id : base, dropped, cosmeticBare, themeVars, notices, rules: importedRules, officialNeeded: [...officialNeeded], officialTables: [] };
   return { meta, roles };
 }
 
@@ -3037,6 +3040,7 @@ ${report.partial ? '\n状态：部分导入 / Partial import\n' : ''}${report.ne
 
 导入器只读文件，不执行包里的任何脚本，也不拦截官方素材（和打包工具一样，作者自己对素材负责）。
 ${scriptNote(report.products)}
+${report.officialTables?.length ? report.officialTables.join('\n\n') + '\n' : ''}
 ${droppedBlock(report)}
 ## 导入了什么
 
@@ -3084,6 +3088,7 @@ function publicReport({ meta, products, primaryId, wrote, dryRun, check, issues 
     report.dropped = { ...meta.dropped };
   }
   if (meta.cosmeticBare) report.cosmeticBare = true;
+  if (meta.officialTables?.length) report.officialTables = meta.officialTables;
   report.markdown = reportMarkdown(report);
   return report;
 }
@@ -3160,7 +3165,7 @@ function writeTree(dir, files, manifest) {
 /**
  * Import a Forge pack.
  * @param {string | { zip?: Buffer, files?: Map<string, Buffer> }} source a directory, a .zip path, or bytes already read
- * @param {{ out?: string, id?: string, dryRun?: boolean, pluginsDir?: string, dataDir?: string, root?: string, vanilla?: { manifest?: any } | null, scripts?: boolean }} [opts]
+ * @param {{ out?: string, id?: string, dryRun?: boolean, pluginsDir?: string, dataDir?: string, root?: string, vanilla?: { manifest?: any } | null, scripts?: boolean, officialTables?: import('../../tools/assets/official-tables.mjs').TableOptions }} [opts]
  *   out: the primary plugin folder. Other products are siblings. dryRun writes nothing there.
  *   scripts: false writes no script plugin for the pack's kits/ (--no-scripts, the studio's box).
  */
@@ -3201,7 +3206,19 @@ export async function importForge(source, opts = {}) {
     if ([...files.keys()].some((rel) => SCRIPT_EXT.has(extOf(rel)))) {
       try { ({ parse } = await import('acorn')); } catch { parse = null; }
     }
-    const planned = planForgeImport(files, { id: opts.id, contentId: primaryName || undefined, dataDir, vanilla, scripts, parse });
+    const planOpts = { id: opts.id, contentId: primaryName || undefined, dataDir, vanilla, scripts, parse };
+    let planned = planForgeImport(files, planOpts);
+    // Maintainer decision 2026-10-17 (§34.33): only explicit imports may download. The synchronous
+    // planner/loader remains local-only; use its actual derivation requests, not a scan of arbitrary pack strings.
+    if (planned.meta.officialNeeded.length) {
+      const prepared = await ensureOfficialTables(path.resolve(dataDir, '..'),
+        `Forge import needs official operators outside the roster (${planned.meta.officialNeeded.join(', ')})`, opts.officialTables, planned.meta.officialNeeded);
+      planned = planForgeImport(files, planOpts);
+      planned.meta.officialTables = prepared.lines;
+      if (prepared.failures.length) for (const row of planned.meta.skipped) {
+        if (row.en.includes('tables unavailable')) row.en += ` Download unavailable: ${prepared.failures.join('; ')}`;
+      }
+    }
     if (!planned.roles.length) {
       const report = publicReport({ meta: planned.meta, products: [], primaryId: null, wrote: false, dryRun, check: planned.meta.manualPanels.length || planned.meta.manualReasons.length ? '需要人工适配 · needs manual adaptation（见原因、面板及建议插槽）。' : '没有可导入的内容。', issues: [] });
       return { ok: true, wrote: false, dryRun, issues: [], report: stableJson(report), markdown: report.markdown };

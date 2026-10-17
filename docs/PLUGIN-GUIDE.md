@@ -587,10 +587,10 @@ JSON 写 `partial: true`、`needsManualAdaptation: true` 和双语原因 `manual
 命令行做同一件事：
 
 ```bash
-node tools/plugin.mjs import-forge <工坊包目录或 zip> [--out plugins/<id>] [--id <id>] [--dry-run] [--json] [--no-scripts]
+node tools/plugin.mjs import-forge <工坊包目录或 zip> [--out plugins/<id>] [--id <id>] [--dry-run] [--json] [--no-scripts] [--offline] [--asset-source=direct|mirror] [--refresh-index]
 ```
 
-`--dry-run` 只打印报告，不写文件。皮肤、立绘、头像、图标、Spine、语音、对得上的音乐和音效会变成外观插件；数值改动、
+`--dry-run` 不写插件和报告文件，但可能缓存需要的官方表；加 `--offline` 可禁止下载。皮肤、立绘、头像、图标、Spine、语音、对得上的音乐和音效会变成外观插件；数值改动、
 新干员、`chess.json` 里成对的新棋子（`_a` 普通、`_b` 精锐；`isDiy` 的六星写成自选）和新敌人会变成数据插件；界面词条
 会变成语言包；公告和鸣谢仍写进清单的说明，并且各成一条公告（见下）。对不上的部分留在 `IMPORT-REPORT.md` 里，中文和英文各一行。
 
@@ -752,7 +752,18 @@ Forge 的 baseId 是普通棋子 id，不当官方来源猜测。详见 [PLUGINS
 Forge 导入会转换新盟约、支持的装备/驻守效果/效果/召唤物；`traits` 只接受能对应已有驻守 `effectKey` 的记录。
 自定义行为逐项写进报告，不把说明文字当成已实现效果。灵巧钩索保留 2 阶、价格 2、攻速 +25 / +50。
 名单外的官方 `charId` 从本机官方 character/skill/range 表调用数据构建器同一套函数，按经济表练度和满潜能生成，
-再应用包的显式覆盖 [ASSUMED]；报告记录所读表的 SHA-256 版本。没有本机表就跳过，不猜数字、不联网下载。
+再应用包的显式覆盖 [ASSUMED]；报告记录所读表的 SHA-256 版本。维护者 2026-10-17 决定改为按需补表（§34.33）：
+只有导入确实需要这类干员，或 setup / 启动更新缺项检查发现已安装插件引用它们时，才下载缺失的
+`character_table.json`、`skill_table.json`、`range_table.json`、`uniequip_table.json`、`battle_equip_table.json`、
+`activity_table.json` 到 `.cache/gamedata/excel/`，共约 50 MB（未压缩估算），日志和报告会写具体表名、大小与原因。
+源、jsDelivr 回退和代理沿用语音表的 `cachedJson` / `RAW.gamedata` / `MirrorPolicy`，支持
+`--asset-source=direct|mirror`、`SP_ASSET_SOURCE`、`SP_GITHUB_PROXY` 与 HTTP(S)_PROXY；详情见 [部署指南](DEPLOY.md)。
+已有表不重复下载，`--refresh-index` 才重新获取；解析 JSON、校验表结构及大小后原子保存。
+`--offline` / `--no-network` 禁止下载，setup 的 `--check` / `--no-assets` 也不补表。
+工作台勾选「离线导入（不下载官方数据表）」同样禁止预览和确认时联网；切换会清除旧报告。
+下载失败或拒绝时仍跳过并说明原因，不猜数字、不阻断其余导入。大厅、对局和游戏客户端不下载官方表。
+[ASSUMED] 缺表时先按官方 id 的语法与名单差集触发补表，美术提取仍须表内确有该干员且按原流程明确同意；
+现有坏表只在 refresh 时替换，大小上限依次为 32/32/2/16/16/32 MiB，详细结构与并发限制见 [PLUGINS §16](PLUGINS.md#16-forge-import)。
 输出插件带齐推导数值，使用者不需要这些表。缺 kit 时用通用技能，并明确标注 [ASSUMED]。
 新干员技能黑板里，官方表从未使用且不属于间隔、周期或消耗步长的键，可保留 ±10 亿内的有限数值
 （例如治疗量 `heal: 65` / `80`）[ASSUMED]；官方已有键仍受原版最大值 10 倍、至少 64 的上限约束，
