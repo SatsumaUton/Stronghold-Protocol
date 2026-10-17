@@ -2,13 +2,13 @@ import { useEffect, useState } from '../../../vendor/hooks.module.js';
 import { html, Button } from '../../../js/ui/components.js';
 import { t } from '../../../../shared/i18n.js';
 import { FX_PHASES } from '../../../js/render/vfx/pluginFormat.js';
-import { get, API, pluginPath } from '../api.js';
+import { fileBase64, get, API, pluginPath } from '../api.js';
 import { TargetPicker } from '../picker.js';
 import { presentationOptions, emptyBook } from '../presentation.js';
 import { NumberField, Select, without } from './controls.js';
-import { Line, Upload, SaveMediaNote, PresentationIssues } from './presentationControls.js';
+import { Line, Upload, PresentationIssues } from './presentationControls.js';
 
-export function FxEditor({ draft, state, onChange, onUpload, dirty, busy }) {
+export function FxEditor({ draft, state, onChange, busy }) {
   const o = presentationOptions('fx', draft.options);
   const [details, setDetails] = useState({ units: [], slots: [] });
   const [failed, setFailed] = useState(false);
@@ -17,7 +17,7 @@ export function FxEditor({ draft, state, onChange, onUpload, dirty, busy }) {
     get(`authoring?template=fx&target=${encodeURIComponent(`operator:${o.kitRef}`)}`).then(r => { if (alive) { setDetails(r); setFailed(false); } }).catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
   }, [o.kitRef]);
-  const change = patch => onChange({ ...draft, options: { ...o, ...patch } });
+  const change = patch => onChange({ ...draft, options: { ...o, ...patch }, ...(draft.uploads ? { uploads: draft.uploads.filter(u => (patch.flipbooks || o.flipbooks).some(b => b.image === u.path)) } : {}) });
   const editBook = (i, patch) => change({ flipbooks: o.flipbooks.map((b, j) => j === i ? { ...b, ...patch } : b) });
   const editBinding = (i, patch) => change({ bindings: o.bindings.map((b, j) => j === i ? { ...b, ...patch } : b) });
   const unit = details.units.find(u => u.key === o.unit);
@@ -38,11 +38,14 @@ export function FxEditor({ draft, state, onChange, onUpload, dirty, busy }) {
         options=${[{ id: '', name: t('默认') }, ...(unit?.skills || []).map(id => ({ id, name: id }))]} onChange=${value => change({ skills: value ? { ...o.skills, [slot.id]: value } : without(o.skills, slot.id) })} />`)}
     ` : html`
       <p class="st-note">${t('PNG 必须为 8 位 RGB/RGBA，宽高不超过 2048，且能整除格子。')}</p>
-      <${SaveMediaNote} dirty=${dirty} />
+      <p class="st-note">${t('选择图片后，与表单一起保存并校验。')}</p>
       ${o.flipbooks.map((b, i) => html`<fieldset class="st-presentation-row" key=${i}><legend>${b.id}</legend>
         <${Line} label=${t('特效 id')} value=${b.id} maxLength=${96} onChange=${id => editBook(i, { id })} />
-        <${Upload} label=${t('PNG 序列帧')} accept=".png,image/png" disabled=${busy || dirty} onFiles=${files => onUpload(b.image, files[0])} />
-        ${state.files?.some(f => f.rel === b.image) ? html`<img class="st-sheet-preview" alt=${b.id} src=${`${API}${pluginPath(state.id, `files/${b.image}`)}?v=${state.authoring.revision}`} />` : null}
+        <${Upload} label=${t('PNG 序列帧')} accept=".png,image/png" disabled=${busy} onFiles=${async files => {
+          const data = await fileBase64(files[0]);
+          onChange({ ...draft, options: o, uploads: [...(draft.uploads || []).filter(u => u.path !== b.image), { path: b.image, data }] });
+        }} />
+        ${draft.uploads?.some(u => u.path === b.image) ? html`<img class="st-sheet-preview" alt=${b.id} src=${`data:image/png;base64,${draft.uploads.find(u => u.path === b.image).data}`} />` : state.files?.some(f => f.rel === b.image) ? html`<img class="st-sheet-preview" alt=${b.id} src=${`${API}${pluginPath(state.id, `files/${b.image}`)}?v=${state.authoring.revision}`} />` : null}
         <${NumberField} label=${t('帧数')} min=${1} max=${256} step=${1} value=${b.frames} onChange=${frames => editBook(i, { frames })} />
         <${NumberField} label=${t('列数')} min=${1} max=${b.frames} step=${1} value=${b.cols} onChange=${cols => editBook(i, { cols })} />
         <${NumberField} label="fps" min=${0.1} max=${60} value=${b.fps} onChange=${fps => editBook(i, { fps })} />

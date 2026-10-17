@@ -2171,5 +2171,6 @@
   "之前": "Before",
   "之后": "After",
   "操作被拒绝": "Action refused",
-  "本插件盟约": "This plugin’s bond"
+  "本插件盟约": "This plugin’s bond",
+  "选择图片后，与表单一起保存并校验。": "Choose an image, then save and validate it together with the form."
 }

@@ -1,6 +1,7 @@
 // The wizard owns only visible fields. Validate the complete merged folder before saving.
 import fs from 'node:fs';
 import path from 'node:path';
+import { stageUploads, commitDocuments } from './mediaDraft.js';
 import { officialEffects } from './presentationData.js';
 import { createHash } from 'node:crypto';
 import { createPlugin, templateById, manifestText } from './templates/index.js';
@@ -13,10 +14,11 @@ import { MOD_KEYS } from '../../shared/plugins/skillSpec.js';
 import { dslBoundForPath } from '../sim/content/dsl/bounds.js';
 import { jsonProblems } from '../../shared/plugins/dataUtils.js';
 import { StudioError } from './files.js';
+import { PRESENTATION_TEMPLATES } from '../../public/studio/js/presentation.js';
 import { GAMEPLAY_TEMPLATES, gameplayDefaults } from '../../public/studio/js/gameplayModel.js';
 import { checkGameplayDraft } from './gameplayCheck.js';
 import { mergeAuthorText, mergeAuthorValue, reviseJson, mergeWidgetText, removeAuthorOwned } from './authorMerge.js';
-import { readAuthorOptions } from './authorOptions.js';
+import { readPresentationOptions, readAuthorOptions } from './authorOptions.js';
 
 export function authorRevision(files, id) {
   const h = createHash('sha256');
@@ -39,12 +41,7 @@ export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir,
     const manifest = JSON.parse(documents['plugin.json'].toString());
     let options = side.authoring.options;
     if (GAMEPLAY_TEMPLATES.includes(side.authoring.template)) options = readAuthorOptions(id, side.authoring, documents, manifest, official());
-    else if (side.authoring.template === 'skins') {
-      const charId = (side.authoring.target || 'operator:char_102_texas').replace(/^operator:/, '');
-      const skins = manifest.assets?.chars?.[charId]?.skins || {};
-      // Slot uploads/clears are authoritative, so later form saves cannot restore a removed file.
-      options = { ...options, outfits: Object.entries(skins).map(([key, rec]) => ({ key, ...rec })) };
-    }
+    else options = readPresentationOptions(id, side.authoring, documents, manifest, side.authoring.template === 'fx' ? official() : null);
     return { ...side.authoring, options, revision };
   };
   const details = (template, target) => {
@@ -74,17 +71,19 @@ export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir,
     }
     return { modes: Object.values(d.config.modes).filter(m => m.inScope).map(m => ({ id: m.modeId, name: m.name })) };
   };
-  const generate = (id, input, manifest = null, { validate = true } = {}) => {
+  const generate = (id, input, manifest = null, { validate = true, previous = false } = {}) => {
     const tpl = templateById(input.template);
     if (!tpl?.build || !input.options || typeof input.options !== 'object' || Array.isArray(input.options)) throw new StudioError('PLUGIN_STUDIO_REQUEST', 400, { detail: 'wizard template and options required' });
     const problems = jsonProblems(input.options, 'options');
     if (problems.length) throw new StudioError(problems[0].code, 400, { where: problems[0].path, detail: problems[0].message });
-    const target = input.target ? targetOf(targets().targets, input.target) : null;
+    const target = tpl.id === 'skins' && typeof input.target === 'string' && input.target.startsWith('operator:')
+      ? { kind: 'operator', key: input.target.slice(9) } : input.target ? targetOf(targets().targets, input.target) : null;
     if (input.target && (!target || !tpl.kinds.includes(target.kind))) throw new StudioError('PLUGIN_STUDIO_TARGET', 400, { target: input.target });
     const name = typeof manifest?.name === 'string' ? manifest.name : manifest?.name?.zh || manifest?.name?.en || id;
-    const made = createPlugin(tpl, { id, name, target, options: input.options, data: official(), publicDir });
-    if (validate && GAMEPLAY_TEMPLATES.includes(tpl.id)) {
-      const result = checkGameplayDraft(id, made, { dataDir });
+    const made = createPlugin(tpl, { id, name, target, options: input.options, data: tpl.class === 'cosmetic' ? null : official(), publicDir, previous });
+    if (validate && [...GAMEPLAY_TEMPLATES, ...PRESENTATION_TEMPLATES].includes(tpl.id)) {
+      stageUploads(input, made.files, made.manifest);
+      const result = checkGameplayDraft(id, made, { dataDir, strict: PRESENTATION_TEMPLATES.includes(tpl.id) });
       if (!result.ok) {
         const p = result.problems[0];
         throw new StudioError(p.code, 400, { where: p.path || p.params?.where || '', detail: p.message || p.text || p.zh });
@@ -102,13 +101,17 @@ export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir,
     if (!old || old.template === 'script' || input.template !== old.template) throw new StudioError('PLUGIN_STUDIO_REQUEST', 409, { detail: 'this plugin is not editable with this wizard' });
     if (input.revision !== undefined && input.revision !== old.revision) throw new StudioError('PLUGIN_STUDIO_CHANGED', 409);
     const documents = snapshot(id), source = documents['plugin.json'].toString(), manifest = JSON.parse(source);
-    const before = generate(id, old, manifest, { validate: false });
+    const before = generate(id, old, manifest, { validate: false, previous: true });
     const made = generate(id, input, manifest, { validate: false });
     for (const [rel, text] of Object.entries(made.files)) {
       if (rel === 'README.md') continue;
       if (rel === 'assets/studio-bond.png' && manifest.assets?.bonds?.[`bond_x_${id.replaceAll('-', '_')}_one`] !== rel) continue;
       if (documents[rel] && rel.endsWith('.json') && before.files[rel]) {
-        documents[rel] = Buffer.from(mergeAuthorText(documents[rel].toString(), JSON.parse(before.files[rel]), JSON.parse(text)));
+        let previous = JSON.parse(before.files[rel]), next = JSON.parse(text);
+        if (input.template === 'fx' && rel === 'data/operator.json' && Array.isArray(JSON.parse(documents[rel].toString()))) {
+          previous = [previous]; next = [next];
+        }
+        documents[rel] = Buffer.from(mergeAuthorText(documents[rel].toString(), previous, next));
       } else if (documents[rel] && input.template === 'ui' && rel === 'ui/index.html') {
         documents[rel] = Buffer.from(mergeWidgetText(documents[rel].toString(), String(before.files[rel]), String(text)));
       } else if (!documents[rel]) documents[rel] = Buffer.from(text);
@@ -133,9 +136,10 @@ export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir,
     }
     mergeAuthorManifest(manifest, made.manifest, before.manifest, documents);
     documents['plugin.json'] = Buffer.from(reviseJson(source, manifest));
+    stageUploads(input, documents, manifest);
     const result = { ...made, manifest, files: documents };
     if (validate) {
-      const checked = checkGameplayDraft(id, result, { dataDir, pluginsDir: files.base });
+      const checked = checkGameplayDraft(id, result, { dataDir, pluginsDir: files.base, strict: PRESENTATION_TEMPLATES.includes(input.template) });
       if (!checked.ok) {
         const p = checked.problems[0];
         throw new StudioError(p.code, 400, { where: p.path || '', detail: p.message || p.text || p.zh });
@@ -148,15 +152,8 @@ export function createAuthoring({ files, dataDir, publicDir = path.join(dataDir,
     if (input.revision !== old?.revision) throw new StudioError('PLUGIN_STUDIO_CHANGED', 409);
     const made = prepare(id, input);
     if (authorRevision(files, id) !== old.revision) throw new StudioError('PLUGIN_STUDIO_CHANGED', 409);
-    for (const [rel, text] of Object.entries(made.files)) {
-      if (rel === 'plugin.lock.json') continue;
-      const bytes = Buffer.from(text);
-      let current;
-      try { current = fs.readFileSync(files.stat(id, rel).abs); } catch { /* new generated file */ }
-      if (!current?.equals(bytes)) files.write(id, rel, bytes, { generated: true });
-    }
     const side = JSON.parse(files.readSidecar(id, '.studio.json') || '{}');
-    files.writeSidecar(id, '.studio.json', Buffer.from(manifestText({ ...side, authoring: made.authoring })));
+    commitDocuments(files, id, made.files, Buffer.from(manifestText({ ...side, authoring: made.authoring })));
   };
   return { read, save, generate, prepare, details,
     validateDraft(input) {

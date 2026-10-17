@@ -1393,7 +1393,9 @@ schema, findings in plain words and hot reload. The design is DESIGN §32.9; the
   calendar date and complete translations; preview uses the popup's plain-text localization/fallback reader.
   `skins` (cosmetic, assets.add + assets.override) edits an operator's outfit list and existing image/Spine slots;
   `isSkinKey`, 64 outfits, 64-character name/group limits and picker fallbacks remain §9 / SKINS.md's rules.
-  [ASSUMED] Metadata is saved before media changes; the full UTF-8 hex skin key separates upload directories.
+  [ASSUMED] Skin metadata is saved before slot changes; the full UTF-8 hex skin key separates upload directories.
+  Reused keys allocate a fresh numeric-suffix directory when another skin references the destination, including
+  partial Spine uploads. Retired files are retained. FX images are staged with the form, then saved together.
   Slot uploads/clears hydrate the next form draft, so a subsequent save/rename retains present media and never
   resurrects a cleared asset. Other manifest metadata and unrelated art remain untouched.
   `fx` (content) creates an immediately playable carrier borrowing an official kit and an original CC0 sheet
@@ -1407,6 +1409,17 @@ schema, findings in plain words and hot reload. The design is DESIGN §32.9; the
   remain supported by the existing file interface. No new runtime plugin field, permission or studio route.
   All four templates use one editor module and the same theme/notices/overlay/effect validators as the checker;
   invalid values are not silently clamped. See the Chinese guide's four subsections for the complete workflow.
+  Review save contract: all presentation forms hydrate current manifest/record declarations. Saves use the shared
+  three-way delta merge, retaining extra declarations, hidden FX settings and unchanged JSON token bytes. FX/skin forms refuse
+  string `assets` declarations with 409 (edit the referenced document directly). The complete merged folder, dependencies
+  and staged media pass the strict checker before any live write; invalid retained content and empty notice-only
+  plugins are refused with contextual errors. Cosmetic validation does not load gameplay tables. Changed files are
+  preflighted, committed synchronously and rolled back on write failure. Spine uploads use the existing skeleton/atlas
+  readers and commit rebuilt clip metadata. PNG uploads check the signature, chunk checksums and end chunk before
+  replacement. Effect sheets are also decoded within the FX loader's subset (non-interlaced 8-bit RGB/RGBA, at most 2048
+  per side); other pictures (skins, portraits, Spine pages) only have to be well-formed PNGs. FX carriers retain supported damage/attack fields and bind their equipped default
+  skill; sources requiring owner-specific summons or differing per-form top-level attack metadata are explicitly refused [ASSUMED: compact-format limitation].
+
 - **Slots**: every place a template fills, the installation's art beside the plugin's. Files dropped on a slot (or
   picked) go into the plugin folder under the slot's name — `art/<key>/avatar.png`, `spine/<key>/front/<key>.skel` and
   `.atlas` under one name with the atlas's pages by their own names and `textures` read from the atlas,

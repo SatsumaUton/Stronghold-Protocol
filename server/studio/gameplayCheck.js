@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { checkPluginFolder } from '../plugins/pack.js';
+import { buildPluginLock, checkPluginFolder } from '../plugins/pack.js';
 import { buildContentSet } from '../plugins/contentSet.js';
 import { DATA_DIR } from '../data.js';
 import { writeTrialDraftFile } from './trialDraft.js';
@@ -10,7 +10,7 @@ import { hasOperatorTrait } from '../plugins/operatorTraits.js';
 import { createPluginFiles, StudioError } from './files.js';
 import { readPluginFolder } from '../plugins/registry.js';
 
-export function checkGameplayDraft(id, made, { dataDir = DATA_DIR, pluginsDir = null } = {}) {
+export function checkGameplayDraft(id, made, { dataDir = DATA_DIR, pluginsDir = null, strict = false } = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-studio-check-'));
   try {
     const dir = path.join(tmp, id);
@@ -18,8 +18,18 @@ export function checkGameplayDraft(id, made, { dataDir = DATA_DIR, pluginsDir = 
     writeTrialDraftFile(dir, 'plugin.json', JSON.stringify(made.manifest));
     for (const [rel, text] of Object.entries(made.files)) writeTrialDraftFile(dir, rel, text);
     const available = stageAuthorDependencies(tmp, id, made.manifest, { dataDir, pluginsDir });
+    if (strict) {
+      // The packer's skeleton/atlas readers validate new media and rebuild clip metadata before strict checking.
+      const model = buildPluginLock(dir);
+      if (model.issues.length) return { ok: false, problems: model.issues.map(p => ({ code: p.code,
+        path: p.file || p.at?.join('.') || '', message: p.text, params: p.params })), warnings: model.warnings };
+      if (Object.keys(model.lock?.spine || {}).length) {
+        made.files['plugin.lock.json'] = Buffer.from(JSON.stringify(model.lock, null, 2) + '\n');
+        writeTrialDraftFile(dir, 'plugin.lock.json', made.files['plugin.lock.json']);
+      }
+    }
     const check = checkPluginFolder(dir, undefined, { dataDir });
-    const problems = check.issues.filter(p => p.level === 'problem').map(p => ({ code: p.code, path: p.params?.where || p.file || '', message: p.text, params: p.params }));
+    const problems = check.issues.filter(p => strict || p.level === 'problem').map(p => ({ code: p.code, path: p.params?.where || p.file || p.at?.join('.') || '', message: p.text, params: p.params }));
     const alreadyComposed = Object.values(check.plugin?.content?.documents || {}).some(doc =>
       (Array.isArray(doc) ? doc : doc?.entries ?? [doc]).some(hasOperatorTrait));
     if (!problems.length && !alreadyComposed && check.plugin?.class === 'content') {

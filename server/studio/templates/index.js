@@ -86,10 +86,10 @@ export function entryOverlay(target, value = {}) {
  * / `credits` as the author gave them.
  * @param {StudioTemplate} template
  * @param {{ id: string, name?: string, target?: Target | null, authors?: string[], license?: string, credits?: string,
- *   lang?: string, options?: any, data?: any, publicDir?: string }} opts
+ *   lang?: string, options?: any, data?: any, publicDir?: string, previous?: boolean }} opts
  * @returns {{ manifest: Record<string, any>, files: Record<string, string | Uint8Array>, authoring?: any }}
  */
-export function createPlugin(template, { id, name = '', target = null, authors = [], license = '', credits = '', lang = 'zh', options = {}, data = null, publicDir = undefined }) {
+export function createPlugin(template, { id, name = '', target = null, authors = [], license = '', credits = '', lang = 'zh', options = {}, data = null, publicDir = undefined, previous = false }) {
   if (!isPluginId(id)) throw Object.assign(new Error(`${id} is not a plugin id`), { code: 'PLUGIN_ID' });
   /** A text the author gave (a string; anything else is none). @param {unknown} v @param {number} max */
   const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -110,9 +110,9 @@ export function createPlugin(template, { id, name = '', target = null, authors =
   if (str(license, 100)) manifest.license = str(license, 100);
   if (str(credits, 500)) manifest.credits = str(credits, 500);
   if (template.build) {
-    data ||= readStudioData(DATA_DIR);
-    const made = template.build({ id, name: text, target, options, data, publicDir });
-    rememberOfficialBounds(data);
+    if (template.class !== 'cosmetic') data ||= readStudioData(DATA_DIR);
+    const made = template.build({ id, name: text, target, options, data, publicDir, previous });
+    if (data) rememberOfficialBounds(data);
     const check = result => {
       if (result.ok) return;
       const p = result.problems[0];

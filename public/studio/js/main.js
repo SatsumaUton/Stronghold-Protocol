@@ -202,7 +202,7 @@ function PluginView({ id, info, onListChanged, eventsAt, onGone }) {
       ${generalIssues.length ? html`<div class="st-banner is-bad"><strong>${t('整体检查')}</strong><${IssueList} issues=${generalIssues} onFix=${onFix} busy=${busy} /></div>` : null}
       ${previewIssues.length ? html`<div class="st-banner is-warn"><strong>${t('预览')}</strong><${IssueList} issues=${previewIssues} onFix=${onFix} busy=${busy} compact=${true} /></div>` : null}
       ${state.authoring ? html`<${Authoring} slotActions=${{ onFiles, onRef, onClear, onFix }} key=${id} state=${state} busy=${busy} initialDraft=${draft} onDraft=${setDraft}
-        onUpload=${(rel, file) => run(async () => { await put(pluginPath(id, `files/${rel.split('/').map(encodeURIComponent).join('/')}`), file); return get(pluginPath(id)); }, { list: true })} onSave=${draft => run(() => post(pluginPath(id, 'authoring'), draft), { list: true })} />` : null}
+        onSave=${draft => run(() => post(pluginPath(id, 'authoring'), draft), { list: true })} />` : null}
       ${sections.map((s, n) => html`<${Section} key=${`${s.template}|${s.target}`} section=${s} state=${state} busy=${busy} version=${version}
         onFiles=${onFiles} onRef=${onRef} onClear=${onClear} onFix=${onFix} onRemove=${() => saveSections(sections.filter((_, k) => k !== n))} />`)}
       ${state.class === 'cosmetic' && !state.authoring && !(state.sections || []).length ? html`<p class="st-note">${t('这个插件还没有要替换的内容。')}</p>` : null}

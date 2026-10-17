@@ -598,8 +598,12 @@ Presentation authoring (§34.30): theme, notices, fx and skins each have a templ
 validated tokens to the studio root and restores the previous inline declarations on unmount [ASSUMED]. Notices
 preview uses the announcement popup's localization and plain text. Skins previews use the actual picker rows and
 fallbacks; file-slot changes hydrate the form before subsequent saves. FX drafts use the existing trial replay in
-both board modes; locally indexed borrowed official effects remain 3D-only. Save form metadata before media uploads
-[ASSUMED]. No new route or gameplay rule is introduced.
+both board modes; locally indexed borrowed official effects remain 3D-only. All four forms hydrate current declarations
+and reuse the gameplay authoring delta merge. Complete folders and staged media pass strict checks before writes;
+invalid retained content is refused with contextual errors, without requiring gameplay data for cosmetics. FX images
+are saved with their form; default bindings use the equipped skill. Unsupported summon carriers are refused [ASSUMED].
+Skin uploads isolate shared paths, including Spine, and validate bytes before replacement; numeric directory suffixes
+are [ASSUMED]; only effect sheets keep the FX loader's 2048px non-interlaced RGB/RGBA PNG subset. No new route or gameplay rule is introduced.
 
 ### Combat metrics (作战统计) — ported from the xinhai-ai fork, opt-in
 

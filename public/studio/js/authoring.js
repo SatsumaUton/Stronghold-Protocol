@@ -7,7 +7,7 @@ import { validateDraft } from './validateDraft.js';
 import { editorOf } from './editors/index.js';
 import { SlotCard } from './slots.js';
 
-export function Authoring({ state, busy, onSave, onDraft, initialDraft, slotActions, onUpload }) {
+export function Authoring({ state, busy, onSave, onDraft, initialDraft, slotActions }) {
   const [draft, setDraft] = useState(initialDraft || { ...state.authoring, id: state.id });
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState('');
@@ -20,14 +20,14 @@ export function Authoring({ state, busy, onSave, onDraft, initialDraft, slotActi
     setSaving(true); setFailure('');
     try {
       const result = await validateDraft(draft, { get, post });
-      if (!result.ok) { setFailure(t('校验未通过，请修正表单中的问题。'));  return; }
+      if (!result.ok) { setFailure(result.problems?.map(p => `${p.path || ''}: ${p.message || p.code}`).join('\n') || t('校验未通过，请修正表单中的问题。'));  return; }
       const saved = await onSave(draft);
       if (!saved?.check?.ok) setFailure(t('校验或保存未完成，请重试。'));
     } catch (e) { setFailure(t('校验或保存未完成，请重试。') + ' ' + errorText(e)); }
     finally { setSaving(false); }
   };
   return html`<section class="st-authoring" data-testid="authoring">
-    ${Component ? html`<${Component} draft=${draft} state=${state} onChange=${change} slotActions=${slotActions} SlotComponent=${SlotCard} onFiles=${slotActions?.onFiles} onClear=${slotActions?.onClear} onUpload=${onUpload} dirty=${dirty} busy=${busy || saving || dirty} />` : null}
+    ${Component ? html`<${Component} draft=${draft} state=${state} onChange=${change} slotActions=${slotActions} SlotComponent=${SlotCard} onFiles=${slotActions?.onFiles} onClear=${slotActions?.onClear} dirty=${dirty} busy=${busy || saving || (dirty && draft.template !== 'fx')} />` : null}
     ${failure ? html`<p class="st-error" data-testid="authoring-error">${failure}</p>` : null}
     ${draft.template !== 'script' ? html`<${Button} variant="primary" data-testid="save-wizard" disabled=${busy || saving || !dirty} loading=${busy || saving} onClick=${save}>${t('保存修改')}<//>` : null}
   </section>`;

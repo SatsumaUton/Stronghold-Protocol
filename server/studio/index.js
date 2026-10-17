@@ -67,7 +67,7 @@ import { createPluginFiles, StudioError, STUDIO_LIMITS, WRITABLE } from './files
 import { createTargetIndex, searchTargets, targetOf, targetSpec, TARGET_KINDS } from './targets.js';
 import { TEMPLATES, templateById, createPlugin, manifestText } from './templates/index.js';
 import { keyDir } from './templates/art.js';
-import { openPlugin, editMeta, setSlot, clearSlot, filesOfOverlay, filesOfValue, atlasPages, FIXES, getIn } from './edit.js';
+import { openPlugin, editMeta, setSlot, clearSlot, filesOfOverlay, filesOfValue, atlasPages, FIXES, getIn, deleteIn } from './edit.js';
 import { createPreviews } from './preview.js';
 import { atlasInfo } from '../../tools/assets/atlas.mjs';
 import { STUDIO_URL, STUDIO_API, isStudioPath } from './paths.js';
@@ -77,6 +77,8 @@ import { trialOptions } from './trialOptions.js';
 import { consoleOptions, buildConsoleScenario } from './console.js';
 import { SCENARIO_BYTES } from '../../shared/studio/scenario.js';
 import { readStudioData } from './gameData.js';
+import { editMediaDraft } from './mediaDraft.js';
+import { validatePng } from './mediaValidation.js';
 import { createAuthoring } from './authoring.js';
 import { createPluginWatcher } from './watch.js';
 import { importForge } from '../plugins/forgeImport.js';
@@ -607,14 +609,41 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
    * else names them.
    */
   function putSlot(id, body) {
+    if (body.at?.[0] === 'chars' && body.at?.[2] === 'skins') editMediaDraft(files, id, staged => writeSlot(id, body, staged), { dataDir });
+    else writeSlot(id, body, files);
+    return changed(id);
+  }
+
+  function writeSlot(id, body, files) {
     const at = body.at;
     if (!Array.isArray(at) || !at.every((k) => typeof k === 'string')) throw new StudioError('PLUGIN_STUDIO_REQUEST', 400, { detail: 'no slot' });
     const p = openPlugin(files, id);
-    const slot = slotAt(id, p.overlay, at);
+    const slot = { ...slotAt(id, p.overlay, at) };
     const got = decodeFiles(body.files);
     const kindName = { image: '.png / .jpg / .webp', audio: '.mp3 / .ogg', audioList: '.mp3 / .ogg', track: '.mp3 / .ogg', spine: '.skel + .atlas + .png' }[slot.kind];
     const expect = (ok, f) => { if (!ok) throw new StudioError('PLUGIN_STUDIO_FILE_KIND', 400, { kind: kindName, ext: f.ext || f.name }, `${f.name}: not ${kindName}`); };
     const before = filesOfValue(getIn(p.overlay, at));
+    // A rename may leave the old key's media referenced by another skin. Copy on write, also for partial Spine uploads.
+    if (at[0] === 'chars' && at[2] === 'skins') {
+      const others = structuredClone(p.overlay); deleteIn(others, at);
+      const used = filesOfOverlay(others), current = getIn(p.overlay, at);
+      if ([...used].some(rel => rel.startsWith(`${slot.dir}/`)) || [...before].some(rel => used.has(rel))) {
+        const base = slot.dir, existing = files.list(id).map(f => f.rel);
+        // [ASSUMED] A numeric suffix isolates the complete model directory, including its atlas page names.
+        for (let n = 1; n <= existing.length + used.size + 1; n++) {
+          const dir = `${base}-${n}`;
+          if (![...existing, ...used].some(rel => rel.startsWith(`${dir}/`))) { slot.dir = dir; break; }
+        }
+        if (slot.kind === 'spine' && current?.skel) {
+          const relocated = { skel: `${slot.dir}/${slot.base}.skel`, atlas: `${slot.dir}/${slot.base}.atlas`,
+            textures: current.textures.map(rel => `${slot.dir}/${path.basename(rel)}`) };
+          for (const [old, rel] of [[current.skel, relocated.skel], [current.atlas, relocated.atlas], ...current.textures.map((rel, i) => [rel, relocated.textures[i]])])
+            files.write(id, rel, fs.readFileSync(files.stat(id, old).abs));
+          setSlot(p, at, relocated);
+        }
+      }
+    }
+    for (const f of got) if (f.ext === '.png') validatePng(f.data, f.name);
     const written = [];
     const put = (rel, data) => { files.write(id, rel, data); written.push(rel); return rel; };
     let value;
@@ -682,7 +711,6 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
     // files the slot named before and nothing names now (another file type replaced them)
     const still = filesOfOverlay(p.overlay);
     for (const rel of before) if (!still.has(rel) && !written.includes(rel)) { try { files.remove(id, rel); } catch { /* gone or not a file */ } }
-    return changed(id);
   }
 
   /** Run a one-click fix (POST …/fix). */
@@ -834,7 +862,7 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
     if (route === 'dsl-example' && read) return json(200, authoring.example(q.get('name'), q.get('id') || 'draft-plugin'));
     if (route === 'validate-dsl' && method === 'POST') {
       if (!mayChange(req)) return false;
-      const body = await readJson(req, 256 * 1024);
+      const body = await readJson(req, STUDIO_LIMITS.bodyBytes);
       return json(200, body.draft ? authoring.validateDraft(body.draft) : authoring.validate(body.spec));
     }
     if (route === 'targets' && read) {
@@ -898,8 +926,8 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
       const t = body.target ? targetOf(targets().targets, text(body.target, 200)) : null;
       if (body.target && !t) throw new StudioError('PLUGIN_STUDIO_TARGET', 404, { target: text(body.target, 80) });
       if (t && !tpl.kinds.includes(t.kind)) throw new StudioError('PLUGIN_STUDIO_TARGET', 400, { target: targetSpec(t) });
-      const made = createPlugin(tpl, { id, name: body.name, target: t, authors: body.authors, license: body.license, credits: body.credits, options: body.options || {}, data: tpl.build ? readStudioData(dataDir) : null, publicDir, lang: body.lang === 'en' ? 'en' : 'zh' });
-      if (['bond', 'item', 'trait', 'offers', 'rules'].includes(tpl.id)) authoring.generate(id, { template: tpl.id, target: body.target, options: body.options || {} }, made.manifest);
+      const made = createPlugin(tpl, { id, name: body.name, target: t, authors: body.authors, license: body.license, credits: body.credits, options: body.options || {}, data: tpl.build && tpl.class !== 'cosmetic' ? readStudioData(dataDir) : null, publicDir, lang: body.lang === 'en' ? 'en' : 'zh' });
+      if (['bond', 'item', 'trait', 'offers', 'rules', 'theme', 'notices', 'fx', 'skins'].includes(tpl.id)) authoring.generate(id, { template: tpl.id, target: body.target, options: body.options || {} }, made.manifest);
       files.root(id, { create: true });
       files.write(id, PLUGIN_MANIFEST, Buffer.from(manifestText(made.manifest)));
       for (const [rel, text] of Object.entries(made.files)) files.write(id, rel, Buffer.from(text), { generated: true });
@@ -965,12 +993,26 @@ export function createStudio({ publicDir, pluginsDir, dataDir, registry, lobby =
     if (fileRoute && (method === 'PUT' || method === 'DELETE')) {
       const rel = fileRoute[1].split('/').map(decodeURIComponent).join('/');
       if (method === 'DELETE') files.remove(id, rel);
-      else files.write(id, rel, await readBody(req, STUDIO_LIMITS.fileBytes));
+      else {
+        const bytes = await readBody(req, STUDIO_LIMITS.fileBytes);
+        if (/\.(png|skel|atlas)$/.test(rel)) {
+          // the path and link refusals of every write come before the bytes are looked at
+          files.resolve(id, rel, { forWrite: true });
+          if (rel.endsWith('.png')) {
+            let manifest = null;
+            try { manifest = JSON.parse(fs.readFileSync(files.stat(id, PLUGIN_MANIFEST).abs, 'utf8')); } catch { /* the folder check refuses it */ }
+            // a declared effect sheet is held to the FX loader's subset; any other picture only has to be a PNG
+            const fxImage = typeof manifest?.assets === 'object' && Object.values(manifest.assets?.fx?.flipbooks || {}).some(b => b?.image === rel);
+            validatePng(bytes, rel, { fx: fxImage });
+          }
+          editMediaDraft(files, id, staged => staged.write(id, rel, bytes), { dataDir });
+        } else files.write(id, rel, bytes);
+      }
       return json(200, changed(id));
     }
     if (method !== 'POST') return false;
     if (sub === 'slot') return json(200, putSlot(id, await readJson(req, STUDIO_LIMITS.bodyBytes)));
-    const body = await readJson(req, 256 * 1024);
+    const body = await readJson(req, sub === 'authoring' ? STUDIO_LIMITS.bodyBytes : 256 * 1024);
     if (sub === 'authoring') { authoring.save(id, body); return json(200, changed(id)); }
     if (sub === 'meta') { const p = openPlugin(files, id); editMeta(p, body.fields, typeof body.lang === 'string' ? body.lang : 'zh'); p.save(); return json(200, changed(id)); }
     if (sub === 'sections') { files.root(id); saveSections(id, body.sections); return json(200, stateOf(id)); }

@@ -31,6 +31,8 @@ export function removeAuthorOwned(current, before) {
 
 export function mergeAuthorValue(current, before, after) {
   if (equal(before, after)) return current;
+  // An untouched value can take the new value directly, including ordered tuples such as rangeGrid.
+  if (equal(current, before)) return after;
   if (object(before) && object(after) && object(current)) {
     const out = { ...current };
     for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
