@@ -915,6 +915,7 @@ def main():
     ap.add_argument('--out', default=str(ROOT / 'public/assets/local'))
     ap.add_argument('--manifest', default=str(ROOT / 'data/local-assets.json'))
     ap.add_argument('--plugin-root', default=str(ROOT), help='installation whose plugin JSON and roster are scanned')
+    ap.add_argument('--plugin-art', action='store_true', help='explicitly include referenced official operator art in a full run')
     ap.add_argument('--only', action='append', default=[], metavar='SUBDIR',
                     help='only run the jobs whose output subdir starts with this prefix (repeatable), e.g. emoticon')
     ap.add_argument('--scenes', action='append', default=[], metavar='DIR',
@@ -966,7 +967,8 @@ def main():
     token_ids = spine_ids(args.only, TOKEN_SPINE_SUB, TOKEN_SPINES)
     stage_ids = scene_ids(args.only)
     fx_on = fx_selected(args.only)
-    art_on = wants_sub(args.only, operators.SUB)
+    # §34.28: a normal full run is not consent for optional plugin art. --only plugin-art is explicit too.
+    art_on = wants_sub(args.only, operators.SUB) and (bool(args.only) or args.plugin_art)
     art_ids = spine_ids(args.only, operators.SUB, operators.references(Path(args.plugin_root))) if art_on else []
     if not jobs and not enemy_ids and not token_ids and not stage_ids and not fx_on and not art_on:
         print(f'--only {args.only}: no job matches', file=sys.stderr)

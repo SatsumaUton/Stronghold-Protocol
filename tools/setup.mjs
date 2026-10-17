@@ -842,6 +842,17 @@ async function main() {
   // 6. local client (optional)
   const local = checkLocal();
   const state = loadState();
+  // §34.28: resolve art consent before a full run; its ordinary default-yes prompt is only for vanilla art.
+  const missingArt = checkPluginArt();
+  const artClient = opts.local === 'no' ? null : findClient(opts.game);
+  const artKey = missingArt.join(',');
+  let artAnswer = false;
+  if (missingArt.length && artClient && !opts.check && opts.local !== 'no' && opts.local !== 'force' && !opts.yes && state.pluginArtDeclined !== artKey) {
+    log(`Plugin operator art missing locally: ${missingArt.join(', ')}`);
+    artAnswer = await ask('Extract referenced official operator art from the local game now?', false);
+    if (artAnswer === false) saveState({ pluginArtDeclined: artKey });
+  }
+  const artAllowed = artClient && pluginFxExtractionAllowed(opts, missingArt, artAnswer);
   // Manifest assessments are replaced after step 7 (a scene extract in this run must not leave the art row on warn).
   let artRefresh = null;
   const pushArt = (snap, tail, verb, hasClient) => {
@@ -890,7 +901,7 @@ async function main() {
           if (!venv.ok) add('warn', '本地客户端美术（可选）', venv.why);
           else {
             log(`  ${c.cyan('▶')} 提取中（python tools/local-extract/extract.py --game …）`);
-            const r = run(venv.python, [EXTRACT_PY, '--game', client.path], { env: PY_ENV });
+            const r = run(venv.python, [EXTRACT_PY, '--game', client.path, ...(artAllowed ? ['--plugin-art'] : [])], { env: PY_ENV });
             if (r.ok) cropBoardTiles(log);
             const after = checkLocal();
             if (r.ok && after.manifest) { pushArt(after, after.board3d ? '，3D 棋盘可用' : '', '提取', true); saveState({ localDeclined: false, localExtractedFrom: client.path }); }
@@ -922,20 +933,11 @@ async function main() {
   const fxGap = checkPluginFx();
   if (fxGap.length) add('warn', 'Plugin official effects', `Missing ${fxGap.join(', ')}; run node tools/setup.mjs --local with a local game install.`);
 
-  // §34.28: update/startup uses the same opt-in gate as W5. --check/--no-local never extract.
-  const missingArt = checkPluginArt();
-  const artKey = missingArt.join(',');
-  let artAnswer = false;
-  if (missingArt.length && fxClient && !opts.check && opts.local !== 'no' && opts.local !== 'force' && !opts.yes && state.pluginArtDeclined !== artKey) {
-    log(`Plugin operator art missing locally: ${missingArt.join(', ')}`);
-    artAnswer = await ask('Extract referenced official operator art from the local game now?', false);
-    if (artAnswer === false) saveState({ pluginArtDeclined: artKey });
-  }
-  // --local's full extraction above already includes operator art; retry only remaining gaps here.
-  if (missingArt.length && fxClient && pluginFxExtractionAllowed(opts, missingArt, artAnswer)) {
+  // Reuse the consent resolved before full extraction; retry only remaining operator gaps.
+  if (artAllowed && checkPluginArt().length) {
     const py = findPython(), venv = py && ensureVenv(py, log);
     if (venv?.ok) {
-      const r = run(venv.python, [EXTRACT_PY, '--game', fxClient.path, '--only', 'plugin-art'], { env: PY_ENV });
+      const r = run(venv.python, [EXTRACT_PY, '--game', artClient.path, '--only', 'plugin-art'], { env: PY_ENV });
       if (r.ok) saveState({ pluginArtDeclined: '' });
     }
   }

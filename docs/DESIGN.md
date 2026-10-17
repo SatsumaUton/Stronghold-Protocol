@@ -16,6 +16,8 @@ current rules by area are in `docs/design/`, the per-release revisions (the evid
 normative lines it rewrote).
 
 Optional official art for plugin operators outside the roster is specified in [§34.28](history/0.3.1.md#3428-official-art-for-plugin-operators-outside-the-roster), updating §32.3's installation-manifest composition.
+Its review fixes keep §32.3 permission classification on the original manifest while references use merged art;
+discovery requires official-table membership, caps distinct operators, and full extraction uses explicit art consent.
 
 | sections | file | content |
 |---|---|---|

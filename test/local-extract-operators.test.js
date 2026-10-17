@@ -24,6 +24,76 @@ test('operator plan names only exact base/E2 sprites and default battle Front/Ba
   assert.deepEqual(selected, [true, false, ['char_9001_test']]);
 });
 
+test('operator planner independently caps distinct operators, rather than duplicate requests', () => {
+  const got = py(`ids=[f'char_{10000+i}_test' for i in range(600)]
+print(json.dumps([j['id'] for j in op.plan(list(reversed(ids))+ids)]))`);
+  assert.deepEqual(got, Array.from({ length: 256 }, (_, i) => `char_${10000 + i}_test`));
+});
+
+test('full extraction needs --plugin-art; explicit --only plugin-art also authorizes the local art job', t => {
+  const f = fxFixture(t);
+  const got = py(`from pathlib import Path
+import contextlib,io
+root=Path(${JSON.stringify(f.root)})
+ex.export_bundle=lambda *a: 0
+ex.export_enemy_spines=lambda *a: 0
+ex.export_token_spines=lambda *a: 0
+ex.export_scenes=lambda *a: 0
+ex.fx.export_fx=lambda *a,**k: 0
+calls=[]
+op.references=lambda *a: ['char_9001_test']
+def export(*a):
+ calls.append(a[-1]); return {},1
+op.export=export
+results=[]
+for i,flags in enumerate([[],['--plugin-art'],['--only','plugin-art'],['--only','fx']]):
+ calls.clear()
+ sys.argv=['extract.py','--game',str(root),'--out',str(root/f'out{i}'),'--manifest',str(root/f'manifest{i}.json'),*flags]
+ with contextlib.redirect_stdout(io.StringIO()): ex.main()
+ results.append(list(calls))
+print(json.dumps(results))`);
+  assert.deepEqual(got, [[], [['char_9001_test']], [['char_9001_test']], []]);
+});
+
+test('sprite read, decode and save failures do not skip later requested operators in a bundle', t => {
+  const f = fxFixture(t);
+  const got = py(`from pathlib import Path
+from types import SimpleNamespace as NS
+root=Path(${JSON.stringify(f.root)})
+p=root/'spritepack/ui_char_avatar_0.ab'; p.parent.mkdir(parents=True); p.touch()
+bad='char_9001_bad'; good='char_9002_good'
+stage='read'
+class Image:
+ width=2; height=2
+ def __init__(self,name): self.name=name
+ def save(self,p):
+  if self.name==bad and stage=='save': raise OSError('synthetic save failure')
+  Path(p).write_bytes(b'synthetic')
+class Sprite:
+ def __init__(self,name): self.m_Name=name
+ @property
+ def image(self):
+  if self.m_Name==bad and stage=='decode': raise ValueError('synthetic decode failure')
+  return Image(self.m_Name)
+class Obj:
+ type=NS(name='Sprite')
+ def __init__(self,name): self.name=name
+ def read(self):
+  if self.name==bad and stage=='read': raise ValueError('synthetic read failure')
+  return Sprite(self.name)
+order=[bad,good]
+sys.modules['UnityPy']=NS(load=lambda *a:NS(objects=[Obj(n) for n in order]))
+sys.modules['aklz4']=NS()
+results=[]
+for stage in ['read','decode','save']:
+ for order in [[bad,good],[good,bad]]:
+  logs=[]; groups={}
+  chars,n=op.export(root,root/f'out-{stage}-{order[0]}',groups,logs.append,[bad,good])
+  results.append({'files':n,'good':bool(chars.get(good,{}).get('avatar')),'bad':bad in chars,'warnings':sum('warn' in s for s in logs)})
+print(json.dumps(results))`);
+  assert.deepEqual(got, Array.from({ length: 6 }, () => ({ files: 1, good: true, bad: false, warnings: 1 })));
+});
+
 test('partial manifest merge preserves other operators, old pictures, and unextracted battle directions', () => {
   const got = py(`old={'char_9001_test': {'avatar':'old', 'portrait':'keep', 'spine': {'front': {'skel':'old'}, 'back': {'skel':'keep'}}}, 'char_9002_test': {'avatar':'keep'}}
 new={'char_9001_test': {'avatar':'new', 'spine': {'front': {'skel':'new'}}}}

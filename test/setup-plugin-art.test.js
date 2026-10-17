@@ -13,6 +13,8 @@ function fixture(t) {
   const f = fxFixture(t);
   f.put('data/chess.json', { a: { charId: 'char_1_pool' } });
   f.put('data/backups.json', { units: { char_2_backup: {} } });
+  f.put('.cache/gamedata/excel/character_table.json', Object.fromEntries(['char_1_pool', 'char_2_backup', ID,
+    ...Array.from({ length: 5 }, (_, i) => `char_${9002 + i}_test`)].map(id => [id, { phases: [{}, {}] }])));
   f.put('plugins/demo/plugin.json', { operators: ['ops.json'], data: ['records.json'], assets: 'assets.json', entry: { sim: 'evil.js' } });
   f.put('plugins/demo/ops.json', [{ charId: 'char_1_pool' }, { origin: { charId: 'char_2_backup' } },
     { charId: 'char_x_demo_one', fx: { unit: ID }, art: { assets: { portrait: 'char_9002_test' } } },
@@ -54,6 +56,7 @@ test('new references, missing files, directions and E2 art offer extraction; com
   art.avatarE2 = art.avatar; art.portraitE2 = art.portrait;
   f.put('data/local-assets.json', { chars: { [ID]: art } });
   assert.ok(!checkPluginArt(f.root).includes(ID));
+  f.put('.cache/gamedata/excel/character_table.json', { [ID]: { phases: [{}, {}, {}] }, char_9998_new: {} });
   f.put('plugins/new/plugin.json', { origin: { charId: 'char_9998_new' } });
   assert.ok(checkPluginArt(f.root).includes('char_9998_new'));
 });
@@ -64,4 +67,82 @@ test('operator gap uses the existing opt-in gate; check/no-local and no reply ne
   assert.equal(pluginFxExtractionAllowed({ yes: true }, [ID]), true);
   assert.equal(pluginFxExtractionAllowed({ local: 'force' }, [ID]), true);
   for (const opts of [{ check: true, local: 'force' }, { local: 'no', yes: true }]) assert.equal(pluginFxExtractionAllowed(opts, [ID], true), false);
+});
+
+test('art discovery requires an own official table entry; missing and broken tables discover nothing', t => {
+  const f = fxFixture(t);
+  f.put('plugins/demo/plugin.json', { operators: ['ops.json'] });
+  f.put('plugins/demo/ops.json', [ID, 'char_9999_fabricated', '../char_9002_bad'].map(charId => ({ charId })));
+  f.put('.cache/gamedata/excel/character_table.json', { [ID]: {} });
+  assert.deepEqual(installedArtReferences(f.root), [ID]);
+  assert.deepEqual(checkPluginArt(f.root), [ID]);
+  fs.unlinkSync(path.join(f.root, '.cache/gamedata/excel/character_table.json'));
+  assert.deepEqual(installedArtReferences(f.root), []);
+  f.put('.cache/gamedata/excel/character_table.json', Buffer.from('{broken'));
+  assert.deepEqual(installedArtReferences(f.root), []);
+  f.put('.cache/gamedata/excel/character_table.json', null);
+  assert.deepEqual(installedArtReferences(f.root), []);
+});
+
+test('art discovery caps distinct table-backed operators across plugins, after deduplication and roster exclusion', t => {
+  const f = fxFixture(t), ids = Array.from({ length: 600 }, (_, i) => `char_${10000 + i}_test`);
+  f.put('.cache/gamedata/excel/character_table.json', Object.fromEntries(ids.map(id => [id, {}])));
+  f.put('data/chess.json', { pool: { charId: ids[0] } });
+  f.put('plugins/a/plugin.json', { operators: ['ops.json'] });
+  f.put('plugins/a/ops.json', ids.slice().reverse().map(charId => ({ charId })));
+  f.put('plugins/b/plugin.json', { assets: { chars: Object.fromEntries(ids.map(id => [id, { ref: id }])) } });
+  const found = installedArtReferences(f.root);
+  assert.deepEqual(found, ids.slice(1, 257));
+  const cli = spawnSync(process.execPath, ['tools/local-extract/plugin-art.mjs', f.root], { encoding: 'utf8' });
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.deepEqual(JSON.parse(cli.stdout), found);
+});
+
+test('full setup and dedicated operator extraction both obey explicit art consent', async t => {
+  const source = fs.readFileSync(new URL('../tools/setup.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('  const local = checkLocal();', source.indexOf('async function main()'));
+  const end = source.indexOf('  // 7. official battlefield scenes', start);
+  assert.ok(start > 0 && end > start);
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const cases = [
+    { name: 'Enter', answer: false }, { name: 'timeout', answer: null },
+    { name: 'remembered decline', declined: true }, { name: 'typed yes', answer: true, allowed: true },
+    { name: '--local', opts: { local: 'force' }, allowed: true }, { name: '--yes', opts: { yes: true }, allowed: true },
+    { name: '--local refreshes complete art', opts: { local: 'force' }, complete: true, allowed: true },
+    { name: '--check', opts: { check: true, yes: true, local: 'force' } },
+    { name: '--no-local', opts: { local: 'no', yes: true } },
+    { name: 'already extracted vanilla, Enter', already: true, answer: false },
+    { name: 'already extracted vanilla, typed yes', already: true, answer: true, allowed: true },
+  ];
+  for (const c of cases) await t.test(c.name, async () => {
+    let extracted = false;
+    const runs = [], prompts = [];
+    const deps = {
+      opts: { local: 'ask', check: false, yes: false, game: null, ...c.opts }, summary: [],
+      log() {}, add() {}, loadState: () => c.declined ? { pluginArtDeclined: ID } : {}, saveState() {},
+      checkLocal: () => ({ manifest: !!c.already, dirPresent: !!c.already, board3d: false, fx: { state: 'ok', detail: '' } }),
+      findClient: () => ({ autochess: true, kind: 'synthetic', path: '/synthetic-client' }),
+      findPython: () => ({ cmd: 'python3' }), ensureVenv: () => ({ ok: true, python: 'fake-python' }),
+      ask: async (question, def) => { prompts.push({ question, def }); return question.includes('operator art') ? c.answer ?? null : def; },
+      run: (_cmd, args) => {
+        if (!args.includes('--only') && !c.declined && !c.opts) {
+          assert.ok(prompts.some(p => p.question.includes('operator art')), 'resolve art consent before starting full extraction');
+        }
+        runs.push(args);
+        if (args.includes('--plugin-art') || args.includes('--only') && args.includes('plugin-art')) extracted = true;
+        return { ok: true };
+      },
+      c: { cyan: s => s, dim: s => s, warn: s => s }, IS_WIN: false, LOCAL_ART_FALLBACK: 'fallback', EXTRACT_PY: 'extract.py', PY_ENV: {},
+      cropBoardTiles() {}, localArtState: () => 'ok', localArtDetail: () => '',
+      checkPluginFx: () => [], checkPluginArt: () => extracted || c.complete ? [] : [ID], pluginFxExtractionAllowed,
+    };
+    await new AsyncFunction(...Object.keys(deps), source.slice(start, end))(...Object.values(deps));
+    assert.equal(extracted, !!c.allowed, JSON.stringify(runs));
+    const artPrompts = prompts.filter(p => p.question.includes('operator art'));
+    assert.ok(artPrompts.every(p => p.def === false));
+    if (c.declined || c.opts) assert.equal(artPrompts.length, 0);
+    else assert.equal(artPrompts.length, 1);
+    if (c.opts?.check || c.opts?.local === 'no') assert.equal(runs.length, 0);
+    else if (!c.already) assert.ok(runs.some(args => !args.includes('--only')), 'ordinary vanilla full extraction remains available');
+  });
 });

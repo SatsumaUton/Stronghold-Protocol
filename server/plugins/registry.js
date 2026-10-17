@@ -40,7 +40,7 @@
 // server/packs.js re-exports the pack API of this file for its old callers.
 
 import { nodeSha256 } from './identity.js';
-import { mergeLocalChars } from './artReferences.js';
+import { mergeLocalChars, readInstalledAssetOverlay } from './artReferences.js';
 import { readScripts, applyTrust, isScriptClass } from './trusted.js';
 import { operatorTraitPermissions } from './operatorTraits.js';
 import { readContentData } from './contentData.js';
@@ -57,7 +57,7 @@ import {
   PLUGIN_MANIFEST, PLUGIN_LIMITS, appVersionMatches, buildPluginIndex, checkJsonLimits, checkPluginFiles, classStatus, declaredPaths,
 } from '../../shared/plugins/manifest.js';
 import {
-  FILE_URL_DIGITS, LOCK_FILE, attachSpineMeta, modelHashOf, readAssetOverlay, readPluginLock, visualHashOf, writesHashOf,
+  FILE_URL_DIGITS, LOCK_FILE, attachSpineMeta, modelHashOf, readPluginLock, visualHashOf, writesHashOf,
 } from '../../shared/plugins/visual.js';
 import { canonicalJson } from '../../shared/plugins/identity.js';
 import { readThemeDeclaration } from '../../shared/plugins/theme.js';
@@ -112,9 +112,9 @@ const noop = () => {};
  *   pluginsDir: the plugin folders (none: plugins/ is not read — the pack view of 0.2.0's callers)
  * @typedef {Map<string, StatIdentity & { sha256: string }>} HashCache
  *   SHA-256 of files by absolute path, while they keep the stat identity they were hashed with
- * @typedef {{ manifest: any, sha256: string | null }} VanillaAssets
- *   the installation's art manifest (data/assets.json, parsed: what a reference names) and the SHA-256 of its bytes
- *   (the `assets` of a `vs`); both null without the file
+ * @typedef {{ manifest: any, baseManifest?: any, sha256: string | null }} VanillaAssets
+ *   the merged art manifest (what a reference names), the original data/assets.json (permission classification),
+ *   and the SHA-256 of the original bytes (the `assets` of a `vs`); null without the file
  */
 
 const isFile = (abs) => { try { return fs.statSync(abs).isFile(); } catch { return false; } };
@@ -205,10 +205,11 @@ export function readVanillaAssets(dataDir, cache = new Map()) {
   try { st = fs.statSync(abs); } catch { return { manifest: null, sha256: null }; }
   const hit = cache.get(abs);
   if (hit && hit.localStamp === localStamp && sameIdentity(hit, statIdentity(st))) return hit.value;
-  let value = { manifest: null, sha256: null };
+  let value = { manifest: null, baseManifest: null, sha256: null };
   try {
     const buf = fs.readFileSync(abs);
-    value = { manifest: JSON.parse(buf.toString('utf8')), sha256: createHash('sha256').update(buf).digest('hex') };
+    const baseManifest = JSON.parse(buf.toString('utf8'));
+    value = { manifest: baseManifest, baseManifest, sha256: createHash('sha256').update(buf).digest('hex') };
     // Validate references against the same installation art the browser sees. Preserve the existing identity hash.
     try { value.manifest = mergeLocalChars(value.manifest, JSON.parse(fs.readFileSync(local, 'utf8'))); } catch { /* optional */ }
   } catch { /* unreadable: no references can be checked, no vs */ }
@@ -321,7 +322,8 @@ function readVisual(dir, manifest, listed, { vanilla, hashCache }) {
     catch (e) { list.problem('PLUGIN_PART_SHAPE', `fx: ${e.message}`, { at: ['assets', 'fx'], detail: e.message }); }
   }
   const { fx: _fx, ...plainAssets } = assets;
-  const ov = readAssetOverlay(plainAssets, { vanilla: vanilla.manifest, permissions: manifest.permissions, has: (rel) => fileSet.has(rel) });
+  const ov = readInstalledAssetOverlay(plainAssets, { vanilla,
+    permissions: manifest.permissions, has: (rel) => fileSet.has(rel) });
   if (effects) ov.files.push(...effects.files);
   list.take(ov);
   if (problems.length) return out(null);

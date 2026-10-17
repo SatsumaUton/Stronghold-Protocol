@@ -3,12 +3,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { installedFxReferences } from './fxReferences.js';
+import { ASSET_CONTAINERS, getPath, readAssetOverlay } from '../../shared/plugins/visual.js';
+import { issueList } from '../../shared/plugins/errors.js';
 
 const read = (root, rel) => {
   try { return JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8')); } catch { return {}; }
 };
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+/** [ASSUMED] At most 256 distinct official operators per installation/run, shared with operators.py. */
+export const ART_REFERENCE_LIMIT = 256;
 
 /** Optional extracted art belongs to the installation's base, before cosmetic layers.
  * [ASSUMED] Existing base slots win; absent slots use local art. No author-facing fields are added. */
@@ -25,10 +29,44 @@ export function mergeLocalChars(base, local) {
   return { ...base, chars };
 }
 
+/** Validate references against merged art, permissions against the original data/assets.json.
+ * Keep this installation policy server-side: changing shared visual code would change vanilla's content hash.
+ * @param {unknown} assets
+ * @param {{ vanilla?: import('./registry.js').VanillaAssets, permissions?: string[] | null,
+ *   has?: ((rel: string) => boolean) | null }} [ctx]
+ */
+export function readInstalledAssetOverlay(assets, { vanilla, permissions = null, has = null } = {}) {
+  const base = vanilla?.baseManifest ?? vanilla?.manifest;
+  const merged = vanilla?.manifest;
+  if (base === merged) return readAssetOverlay(assets, { vanilla: merged, permissions, has });
+  const ov = readAssetOverlay(assets, { vanilla: merged, has });
+  const list = issueList();
+  list.take(ov);
+  if (base && Array.isArray(permissions)) {
+    const told = new Set();
+    // Same entry-level classification as shared/plugins/visual.js; local-only entries remain additions.
+    for (const op of ov.ops) {
+      if (op.implied) continue;
+      const depth = ASSET_CONTAINERS.find(c => c.path.every((k, i) => op.at[i] === k))?.path.length ?? 1;
+      const exists = getPath(base, op.at.slice(0, depth + 1)) !== undefined;
+      const need = exists ? 'assets.override' : 'assets.add';
+      if (!permissions.includes(need) && !told.has(need)) {
+        told.add(need);
+        list.problem('PLUGIN_PERMISSION_MISSING', `assets.${op.at.join('.')}: ${exists ? 'changes an entry of this installation\'s manifest' : 'adds an entry'} — needs the permission "${need}"`,
+          { at: ['assets', ...op.at], need, needs: [need] });
+      }
+    }
+  }
+  return { ...ov, problems: list.problems, warnings: list.warnings, issues: list.issues };
+}
+
 export function installedArtReferences(root) {
   const chess = read(root, 'data/chess.json'), backups = read(root, 'data/backups.json');
+  const table = read(root, '.cache/gamedata/excel/character_table.json');
+  if (!isObj(table)) return [];
   const roster = new Set([...Object.values(chess).map(r => r?.charId), ...Object.keys(backups.units || {})]);
-  return installedFxReferences(root, { artPhases: true }).filter(id => !roster.has(id));
+  // Syntax alone does not identify an official operator. Missing tables authorize no art discovery.
+  return installedFxReferences(root, { artPhases: true }).filter(id => Object.hasOwn(table, id) && !roster.has(id)).slice(0, ART_REFERENCE_LIMIT);
 }
 
 /** [ASSUMED] Base pictures and both battle directions are required; E2 pictures only for a three-phase operator.

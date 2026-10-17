@@ -550,6 +550,12 @@ details, 自选 and the board can draw the imported official operator. A plugin'
 or matching local bundles, the plugin's own art works; otherwise missing pictures/generic board markers remain.
 [ASSUMED] Existing installation slots win over extracted slots, partial extraction keeps earlier successes, and the
 gap check requires base pictures/both directions plus E2 pictures when the cached official table declares E2.
+Discovery requires membership in the cached official character table; a missing/unreadable table yields no ids.
+[ASSUMED] Discovery and the Python planner cap each run at 256 distinct operators, sorted after deduplication and
+roster exclusion. The default-yes vanilla extraction prompt does not grant art consent: setup resolves the art gate
+before full extraction, and direct full `extract.py` runs require `--plugin-art` (or explicit `--only plugin-art`).
+Registry checks and packing keep `assets.add`/`assets.override` classification against the original `data/assets.json`;
+references use the merged manifest. One broken sprite is logged without skipping later sprites in its bundle.
 This adds no plugin fields and changes no gameplay/content hashes. See [ASSETS.md](ASSETS.md#official-operator-art-referenced-by-plugins-031)
 for paths, scratch-only extraction and limits (no extra skins, illustrations or voices).
 

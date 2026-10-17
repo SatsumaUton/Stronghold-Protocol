@@ -237,11 +237,16 @@ The `stem` of a Spine model is the upstream file name. Two examples: `char_107_l
 `node tools/setup.mjs --local` also extracts official operators referenced by installed plugins but absent from
 `data/chess.json` and `data/backups.json.units`. It reuses the bounded, JSON-only W5 discovery (`fx.unit`,
 `origin.charId`, `art.ref`, `art.assets`, official-format ids/keys, including Forge-derived records), including
-disabled plugins. It never executes plugin code or downloads operator art. Discovery limits are documented in
-[PLUGINS.md](PLUGINS.md). Art-only `_1`/`_2` references resolve to the base character, as in the renderer; effect unit
+disabled plugins. Each id must also exist in `.cache/gamedata/excel/character_table.json`; a missing/unreadable
+table discovers nothing. [ASSUMED] At most 256 distinct operators per installation/run, sorted by id after
+deduplication and roster exclusion; the Python planner independently enforces the same cap. Other discovery limits
+are documented in [PLUGINS.md](PLUGINS.md). Art-only `_1`/`_2` references resolve to the base character, as in the renderer; effect unit
 ids retain exact matching. A normal startup/update setup offers a re-extraction when references or files are missing;
 the answer defaults to **no**. Typed yes, `--local` or `--yes` authorizes it; `--check` and `--no-local` never extract.
 A declined gap set is remembered; a changed set may ask again [ASSUMED].
+The art gate runs before full extraction too: the ordinary default-yes local-client prompt does not authorize
+plugin art. A direct `extract.py` full run excludes plugin art unless `--plugin-art` is passed; `--only plugin-art`
+explicitly selects it. Setup adds `--plugin-art` only with the art authorization above.
 
 The local client's `spritepack/ui_char_avatar_*.ab` supplies base/`_2` avatars; `spritepack/char_portrait_*.ab`
 supplies `_1`/`_2` portraits. `chararts/<charId>.ab` supplies the `defaultskin.prefab` Front and Back renderers,
@@ -256,11 +261,14 @@ The server merges these records into the **served** `/data/assets.json` before c
 details, 自选 and board models use the ordinary asset helpers; references can borrow the newly available art too.
 Existing base slots win [ASSUMED]; room/personal plugin art keeps its usual priority. `data/assets.json` on disk,
 gameplay data and all content hashes stay untouched. With no local operator art, the served content stays unchanged.
+Registry checks and packing classify `assets.add`/`assets.override` against the original `data/assets.json`, while
+resolving references against the merged manifest. Extracting an optional operator never adds an override requirement.
 
 [ASSUMED] The gap check requires base pictures and both battle directions, plus E2 pictures when the cached official
 table declares three phases; it checks the actual files too. Partial re-extraction retains earlier successful slots
 and unrelated groups. Unavailable bundles leave gaps and existing fallbacks: a missing card picture or a generic
 board marker if neither the plugin nor the installation supplies art. E2 helpers already fall back to base pictures.
+Sprite read/decode/write failures are logged per object; later valid sprites in the same bundle are still extracted.
 Restart/reload after extraction to refresh the page's cached manifest. A static host without the Node manifest view
 does not merge these extra operator records.
 

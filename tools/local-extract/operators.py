@@ -9,6 +9,8 @@ from pathlib import Path
 
 SUB = 'plugin-art'
 CHAR = re.compile(r'^char_[0-9]+_[a-z0-9]+$')
+# [ASSUMED] Defence in depth for the bounded table-backed JS discovery (artReferences.js).
+MAX_OPERATORS = 256
 PICTURES = {'avatar': ('spritepack/ui_char_avatar_*.ab', ''),
             'portrait': ('spritepack/char_portrait_*.ab', '_1')}
 
@@ -20,12 +22,13 @@ def references(root):
 
 
 def plan(ids):
-    """Only exact official ids, base/E2 sprites, and the default battle prefab (not building models/skins)."""
+    """Bound table-backed discovery ids before planning base/E2 sprites and default battle models."""
+    selected = sorted({cid for cid in ids if isinstance(cid, str) and CHAR.fullmatch(cid)})[:MAX_OPERATORS]
     return [{'id': cid, 'bundle': f'chararts/{cid}.ab', 'prefab': f'/{cid}/defaultskin.prefab',
              'pictures': {kind: {'bundles': glob, 'names': {kind: cid + suffix, kind + 'E2': cid + '_2'}}
                           for kind, (glob, suffix) in PICTURES.items()},
              'spines': {face: f'spine/char/{cid}/{face}' for face in ('front', 'back')}}
-            for cid in sorted(set(ids)) if isinstance(cid, str) and CHAR.fullmatch(cid)]
+            for cid in selected]
 
 
 def merge_chars(old, new):
@@ -54,7 +57,11 @@ def export(ab_root, out_root, groups, log, ids):
                 break
             try:
                 env = UnityPy.load(str(bundle))
-                for obj in env.objects:
+            except Exception as err:
+                log(f'warn {bundle.name}: {err}')
+                continue
+            for obj in env.objects:
+                try:
                     if obj.type.name != 'Sprite':
                         continue
                     sprite = obj.read()
@@ -72,8 +79,9 @@ def export(ab_root, out_root, groups, log, ids):
                     del wanted[name]
                     count += 1
                     log(f'{bundle.name}: {name} -> {sub}/{name}.png')
-            except Exception as err:
-                log(f'warn {bundle.name}: {err}')
+                except Exception as err:
+                    # One unreadable sprite must not hide later valid sprites in this bundle.
+                    log(f'warn {bundle.name} sprite: {err}')
         for name in sorted(wanted):
             log(f'skip (not found) {kind} {name}')
     for job in jobs:
