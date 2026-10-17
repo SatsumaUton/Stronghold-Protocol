@@ -33,7 +33,8 @@ describe('phase capsule scenes (headless Chrome)', { skip: !ENABLED && 'set SP_E
 
   /**
    * The mock at SETTLE in a fresh context, past the service worker (its own fetches would skip the interception);
-   * `noart` answers /assets/ui/ with 404 (the CI view), `reduce` asks for reduced motion.
+   * `noart` answers /assets/ui/ with 404 (the CI view) — also as /assets/~<hash>/ui/, the form the served manifest
+   * uses once the server's asset index is ready (shared/assetPaths.js) —, `reduce` asks for reduced motion.
    */
   async function open({ noart = false, reduce = false } = {}) {
     const context = await browser.createBrowserContext();
@@ -43,10 +44,12 @@ describe('phase capsule scenes (headless Chrome)', { skip: !ENABLED && 'set SP_E
     const problems = [];
     page.on('console', (m) => { if (m.type() === 'error' && !(noart && /Failed to load resource/.test(m.text()))) problems.push(`console: ${m.text()}`); });
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
+    // the mock loads more than the default 250 resource entries: room for the sprites' entries the wait below reads
+    await page.evaluateOnNewDocument(() => performance.setResourceTimingBufferSize(5000));
     if (reduce) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
     if (noart) {
       await page.setRequestInterception(true);
-      page.on('request', (r) => (/\/assets\/ui\//.test(r.url()) ? r.respond({ status: 404, body: '' }) : r.continue()));
+      page.on('request', (r) => (/\/assets\/(?:~[0-9a-f]{16}\/)?ui\//.test(r.url()) ? r.respond({ status: 404, body: '' }) : r.continue()));
     }
     await page.goto(`${base}/dev/game-mock.html?shot=1&render=fallback&phase=SETTLE`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('.gtop__cap', { timeout: 30000 });

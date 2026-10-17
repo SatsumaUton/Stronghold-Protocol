@@ -13,10 +13,10 @@
 //   the guest leaks, the host and the AI help → the guest (phone) on 全景 sees helper 1's bonds (never its own), taps
 //   each helper's avatar (前往查看) → the camera goes to that helper's half, the ‹ › pill and the strip name the same
 //   helper, 返回战场 sits in the pill and leaves no error; the host (helper, desktop) keeps its own bonds on 全景.
-// Final Assault spectator (2 humans + 2 AI at the boss round, the guest eliminated at the jump): the guest auto-observes
-//   the pair field → its first player's bonds (never its own), taps the second player's operator and its card's bond
-//   chip → the SECOND player's popup (the strip stays on the first), taps each pair player → their half + bonds, taps
-//   the lone field's player → that field and its player's bonds.
+// Final Assault spectator (2 humans + 2 AI at the boss round, the guest eliminated at the jump, boss pairs by seat): the
+//   guest auto-observes the pair field → its first player's bonds (never its own), taps the second player's operator
+//   and its card's bond chip → the SECOND player's popup (the strip stays on the first), taps each pair player → their
+//   half + bonds, taps the lone field's player → that field and its player's bonds.
 // After the own battle (2 humans + 1 idle AI from round 3, 1× combat, the guest's enemies spawning at twice their times):
 //   the host's battle ends first, the host watches a teammate still fighting → the strip shows that teammate's bonds with the observing pill "👁 name" + 返回战场; a
 //   reload keeps all three (the resent field is adopted — battle/observe.js resumedWatch); 返回战场 → the own bonds.
@@ -578,8 +578,11 @@ describe('DESIGN §20.15 — the bond strip shows the watched teammate\'s bonds 
   }
 
   test('Final Assault spectator (eliminated): the pair\'s first player, each picked player\'s half + bonds, the lone field', { timeout: 8 * 60 * 1000 }, async () => {
+    // boss pairs by seat (fastServer SP_SEAT_PAIRS): the eliminated guest follows the host (the first player still in,
+    // MatchWatch._watchTargetOf), and under the random pairs of 0.2.5 the host fought alone in one match of three — the
+    // guest then watched the lone field, which has no ‹ › pill
     const srv = await startRealServer({ fast: { timerScale: 1, combatSpeed: 2, startRound: 'boss', idleBots: true, autoPlace: true,
-      kits: [UNITE_HOST_KIT, []], botChess: BOT_KIT, eliminate: [1] } });
+      kits: [UNITE_HOST_KIT, []], botChess: BOT_KIT, eliminate: [1], seatPairs: true } });
     const P = (await import('puppeteer-core')).default;
     let host = null;
     let guest = null;

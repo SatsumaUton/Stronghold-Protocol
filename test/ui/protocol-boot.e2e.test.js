@@ -33,7 +33,8 @@ describe('协议启动！ screen (headless Chrome)', { skip: !ENABLED && 'set SP
 
   /**
    * The mock (at `phase`) in a fresh context, past the service worker (its own fetches would skip the interception);
-   * `noart` fails /assets/ui/ (the CI view), `reduce` asks for reduced motion.
+   * `noart` fails /assets/ui/ (the CI view) — also as /assets/~<hash>/ui/, the form the served manifest uses once the
+   * server's asset index is ready (shared/assetPaths.js) —, `reduce` asks for reduced motion.
    */
   async function open({ variant = '', noart = false, reduce = false, phase = 'PREP' } = {}) {
     const context = await browser.createBrowserContext();
@@ -48,7 +49,7 @@ describe('协议启动！ screen (headless Chrome)', { skip: !ENABLED && 'set SP
     if (reduce) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
     if (noart) {
       await page.setRequestInterception(true);
-      page.on('request', (r) => (/\/assets\/ui\//.test(r.url()) ? r.abort() : r.continue()));
+      page.on('request', (r) => (/\/assets\/(?:~[0-9a-f]{16}\/)?ui\//.test(r.url()) ? r.abort() : r.continue()));
     }
     await page.goto(`${base}/dev/game-mock.html?shot=1&render=fallback&phase=${phase}${variant ? `&variant=${variant}` : ''}`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector(phase === 'BAND_DRAFT' ? '.screen.draft' : '.gm__hud', { timeout: 30000 });
