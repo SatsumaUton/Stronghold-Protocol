@@ -185,7 +185,7 @@ test('Yu wall survives delayed controller loads and stops on death, retreat, cle
     w.skill(yu, true); assert.equal(handles.length, 0);
     defs.set(SOURCE, source); defs.set(ROOT, root); ofx.time = 1; w.tick();
     assert.equal(handles.length, 10);
-    assert.ok(handles.every((h) => h.opts.loop && h.opts.data.boardClip.join(',') === '-10.5,-0.5,0.5,3.5'));
+    assert.ok(handles.every((h) => h.opts.loop && !h.opts.data?.boardClip), 'the whole curtain draws, unclipped');
     if (end === 'death') yu.alive = false;
     else if (end === 'retreat') w.release(yu);
     else if (end === 'clear') w.clear();
@@ -214,13 +214,8 @@ test('Yu binds annex_01 only to firewallBlock; annex_02 has no matching event', 
   assert.equal(handles.filter((h) => h.key === 'yu_skill3_annex_01').length, 1);
 });
 
-test('all effect shader families clip the wall in world space', () => {
-  for (const family of Object.keys(FAMILIES)) {
-    const src = fragmentSource(family);
-    assert.ok(src.includes('uniform vec4 u_BoardClip;'));
-    assert.ok(src.includes('v_wpos.x > u_BoardClip.z'));
-    assert.ok(src.includes('v_wpos.y > u_BoardClip.w'));
-  }
+test('no effect shader family discards by a board rectangle (the wall draws whole, as in the official video)', () => {
+  for (const family of Object.keys(FAMILIES)) assert.ok(!fragmentSource(family).includes('u_BoardClip'));
 });
 
 test('Manifold copy chooses official cast/hit rows, never a base ball projectile', async () => {

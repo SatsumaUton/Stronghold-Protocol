@@ -413,7 +413,5 @@ void main() {
 /** The fragment shader of a family. */
 export function fragmentSource(family, defs = {}) {
   const f = FAMILIES[family] || FAMILIES.basic;
-  // World-plane clipping for battlefield-sized effects. A zero rectangle disables it for every other effect.
-  const clip = 'if (u_BoardClip.z > u_BoardClip.x && (v_wpos.x < u_BoardClip.x || v_wpos.y < u_BoardClip.y || v_wpos.x > u_BoardClip.z || v_wpos.y > u_BoardClip.w)) discard;';
-  return `${HEAD}${VARY_IN}${COMMON}uniform vec4 u_BoardClip;\n${f.src(defs).replace('void main() {', `void main() {\n  ${clip}`)}`;
+  return `${HEAD}${VARY_IN}${COMMON}${f.src(defs)}`;
 }

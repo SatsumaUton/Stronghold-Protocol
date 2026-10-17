@@ -1838,8 +1838,9 @@ to a status).
   The source is EmptyEffect; `FinishEffectViaOwnerBuff` holds it for `yu_s_3[effect]`, so it is a skill-held composite,
   including pending loads. Official `skill_table.skchr_yu_3.levels[*].duration` is 45 s. Skill off, owner death/removal
   and battle reset stop all children. [ASSUMED] The remake's active field rectangle is the official controller's
-  valid map, and fragments are clipped to its outer tile edges (per-effect `boardClip`, including separate draw
-  batches) to keep benches/HUD clear. The procedural 2D/off fallback holds the same offset footprint until skill end;
+  valid map; the segments are drawn unclipped, the caps on the invalid tiles just past each end, as the maintainer's
+  official recording shows the whole crimson curtain (a world-space clip tried first left flat slivers, because some
+  vertex paths pass local positions as `v_wpos`). The procedural 2D/off fallback holds the same offset footprint until skill end;
   its 0.16-tile ground-strip width and colour are [ASSUMED] presentation. `firewallBlock` places `yu_skill3_annex_01`
   once at the eliminated bullet. `yu_skill3_annex_02` requires the ally buff's ON_TAKE_DAMAGE trigger: our sim
   emits no matching event, so it remains unmapped and is never guessed from unrelated damage.

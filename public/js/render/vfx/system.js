@@ -355,7 +355,6 @@ export class OfficialFx {
         if (!r || !r.count) continue;
         e.kind = r.kind; e.first = r.first; e.count = r.count;
         if (prev && prev.mat === e.mat && prev.kind === e.kind && !prev.ov && !e.ov && prev.meshKey === e.meshKey && prev.submesh === e.submesh
-          && prev.effect.data?.boardClip === e.effect.data?.boardClip
           && prev.first + prev.count === e.first) { prev.count += e.count; continue; }
         list[w++] = e;
         prev = e;
