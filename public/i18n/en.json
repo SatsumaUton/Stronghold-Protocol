@@ -2119,5 +2119,14 @@
   "之前": "Before",
   "之后": "After",
   "操作被拒绝": "Action refused",
-  "本插件盟约": "This plugin’s bond"
+  "本插件盟约": "This plugin’s bond",
+  "素材存储": "Asset storage",
+  "已持久保存": "Kept",
+  "申请持久保存": "Ask to keep",
+  "导入的素材包保存在这个浏览器里。手动清除网站数据会删除它们；Safari 约 7 天没打开本站也可能清除。": "Imported asset packs are stored in this browser. Clearing the site's data deletes them; Safari may also clear them when this site has not been opened for about 7 days.",
+  "已持久保存：存储空间不足时，浏览器不会自动清掉导入的素材。": "Kept: the browser will not delete imported assets on its own when storage is low.",
+  "未持久保存：存储空间不足时，浏览器可能清掉导入的素材。": "Not kept: the browser may delete imported assets when storage is low.",
+  "浏览器没有同意。Chrome 和 Edge 会根据本站的使用情况自行决定，常用或安装为应用后更容易同意，可以之后再试。": "The browser said no. Chrome and Edge decide from how you use this site, and agree more readily once you use it often or install it as an app. You can try again later.",
+  "需要通过 https 或 localhost 打开本站，才能申请持久保存。": "Open this site over https or localhost to ask for persistent storage.",
+  "这个浏览器不支持持久保存。": "This browser does not support persistent storage."
 }

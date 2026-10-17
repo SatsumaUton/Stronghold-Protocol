@@ -720,7 +720,7 @@ Accepted bytes go into Cache Storage under the name `sp-imported-assets-v1`, at 
 
 `worker-src 'self' blob:` was already the site policy (`server/http/csp.js`). `'self'` is what `/sw.js` needs. `blob:` stays for the simulation worker the page already starts. No remote worker origin is added, and `SIM_WORKER_CSP` does not gain this worker.
 
-On `http://` to a LAN IP, `isSecureContext` is false. The import controls explain why and do not throw. Download still works over plain HTTP. The download queue does not request a URL already present in the import cache. Closing the import dialog cancels an in-progress import; closing the download dialog pauses the download. Clear deletes only this cache. `navigator.storage.estimate()` is the whole origin, and `navigator.storage.persist()` is a request the browser may refuse.
+On `http://` to a LAN IP, `isSecureContext` is false. The import controls explain why and do not throw. Download still works over plain HTTP. The download queue does not request a URL already present in the import cache. Closing the import dialog cancels an in-progress import; closing the download dialog pauses the download. Clear deletes only this cache. `navigator.storage.estimate()` is the whole origin, and `navigator.storage.persist()` is a request the browser may refuse. The dialog asks once, as an import ends; 设置 → 素材存储 (`public/js/ui/settings.js` StorageSection, 0.3.1) shows the current answer (`navigator.storage.persisted()`) and asks again on demand. A changed file gets a new hash, so its imported copy is never served again, but it stays in the cache until 清除已导入的素材: nothing prunes entries the current manifests no longer list.
 
 ## Verification
 

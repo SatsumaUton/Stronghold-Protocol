@@ -9,7 +9,7 @@ import { siteCsp, SIM_WORKER_CSP } from '../../server/http/csp.js';
 import { createAssetDownload } from '../../public/js/assetDownload.js';
 import {
   IMPORTED_ASSET_CACHE, IMPORTED_ASSET_CACHE_PREFIX, IMPORTED_ASSET_PATH, IMPORTED_INDEX_URL,
-  addImportedPaths, countImportedFiles, importSupport, listImportedPaths, shouldServeImportedAsset,
+  addImportedPaths, askPersistStorage, countImportedFiles, importSupport, listImportedPaths, shouldServeImportedAsset, storagePersisted,
 } from '../../public/js/assetCache.js';
 import {
   cacheUrlsFor, crc32, createAssetImport, detectAssetPrefix, modelHashOf, normalizePackPath,
@@ -732,4 +732,14 @@ test('a zip File is read in slices, never whole: the same entries and bytes as f
   assert.deepEqual({ accepted: imp.get().accepted, failed: imp.get().failed, skipped: imp.get().skipped }, { accepted: 2, failed: 1, skipped: 1 },
     'big.bin and t.json stored, bad.png unreadable (its CRC), the README skipped');
   assert.equal(mc.assets().length, 2);
+});
+
+test('设置 → 素材存储 reads and asks through StorageManager, and answers null where the browser cannot say', async () => {
+  assert.equal(await storagePersisted({}), null, 'no StorageManager: plain http to a LAN IP, or an old browser');
+  assert.equal(await storagePersisted({ storage: { persisted: async () => true } }), true);
+  assert.equal(await storagePersisted({ storage: { persisted: async () => false } }), false);
+  assert.equal(await storagePersisted({ storage: { persisted: async () => { throw new Error('blocked'); } } }), null);
+  assert.equal(await askPersistStorage({}), null);
+  assert.equal(await askPersistStorage({ storage: { persist: async () => false } }), false, 'a refusal is false, not null');
+  assert.equal(await askPersistStorage({ storage: { persist: async () => true } }), true);
 });

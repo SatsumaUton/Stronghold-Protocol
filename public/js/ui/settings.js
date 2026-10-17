@@ -7,7 +7,8 @@
 // `_meta.machineTranslated`) and the 快捷键 section that rebinds the in-match shortcuts (the key map:
 // ui/gameLogic/shortcuts.js; the community request 「快捷键可不可以自己设置」, the owner's decision of 2026-10-07) and
 // 问题反馈, which copies the diagnostics of this page for a bug report (diag.js: the error log, this browser, optionally
-// the battle on screen; nothing is uploaded). The lobby and the room open it from a 设置 button next to 玩法说明
+// the battle on screen; nothing is uploaded). 素材存储 asks the browser to keep this site's storage, where an imported asset
+// pack lives (assetCache.js; the maintainer's request of 2026-10-17). The lobby and the room open it from a 设置 button next to 玩法说明
 // (SettingsButton, GitHub #238); the title screen and the match have their own gear.
 // 外观插件 (DESIGN §32 P1a, the design study's §7.5): a switch for each cosmetic plugin of scope `personal` the server's
 // catalogue lists (content.js) — kept in this browser (`sp.pref.cosmetics`), never sent, seen by this player alone and
@@ -48,6 +49,7 @@ import { hasAnySkinChoices } from './skins.js';
 import { fxAvailable } from '../render/vfx/available.js';
 import { resolveOfficialFx } from '../render/vfx/tier.js';
 import { ScreenFitSection } from './screenFit.js';
+import { askPersistStorage, storagePersisted } from '../assetCache.js';
 import { cosmetics } from '../cosmetics.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -378,6 +380,49 @@ function UiPluginSection() {
  * Settings modal.
  * @param {{ open: boolean, onClose: Function }} props
  */
+/**
+ * 素材存储: the 导入素材包 dialog asks for persistent storage once, as an import ends (ui/assetImport.js); this button asks
+ * again whenever the player wants, and the line under it says what the browser answers now (navigator.storage.persisted).
+ * Chrome and Edge decide silently from their own signals, Firefox asks the player; neither answer outlives a manual clear
+ * of the site's data. StorageManager exists only in a secure context: on plain http to a LAN IP the line says so and
+ * there is no button. Laid out like 问题反馈 below it.
+ */
+const PERSIST_NOTES = {
+  on: N_('已持久保存：存储空间不足时，浏览器不会自动清掉导入的素材。'),
+  off: N_('未持久保存：存储空间不足时，浏览器可能清掉导入的素材。'),
+  refused: N_('浏览器没有同意。Chrome 和 Edge 会根据本站的使用情况自行决定，常用或安装为应用后更容易同意，可以之后再试。'),
+  insecure: N_('需要通过 https 或 localhost 打开本站，才能申请持久保存。'),
+  unsupported: N_('这个浏览器不支持持久保存。'),
+};
+
+function StorageSection() {
+  const [state, setState] = useState(null);  // a PERSIST_NOTES key, null while the browser is asked
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const unknown = () => (globalThis.isSecureContext ? 'unsupported' : 'insecure');
+    storagePersisted().then((kept) => { if (live) setState(kept === null ? unknown() : kept ? 'on' : 'off'); });
+    return () => { live = false; };
+  }, []);
+  const ask = async () => {
+    setBusy(true);
+    const kept = await askPersistStorage();
+    setBusy(false);
+    setState(kept === null ? 'unsupported' : kept ? 'on' : 'refused');
+  };
+  const askable = state === 'on' || state === 'off' || state === 'refused';
+  return html`<section class="set-storage" aria-labelledby="set-storage-title" data-testid="storage-section">
+    <div class="set-keys__head">
+      <span class="set-row__label" id="set-storage-title">${t('素材存储')}<${MicroLabel}>STORAGE<//></span>
+      ${askable ? html`<${Button} variant="ghost" size="sm" icon="shield" data-testid="storage-persist" disabled=${state === 'on' || busy}
+        loading=${busy} onClick=${ask}>${state === 'on' ? t('已持久保存') : t('申请持久保存')}<//>` : null}
+    </div>
+    <p class="set-hint">${t('导入的素材包保存在这个浏览器里。手动清除网站数据会删除它们；Safari 约 7 天没打开本站也可能清除。')}</p>
+    ${state ? html`<p class=${cx('set-keys__note', state !== 'on' && state !== 'off' && 'is-warn')} role="status" aria-live="polite"
+      data-testid="storage-note">${t(PERSIST_NOTES[state])}</p>` : null}
+  </section>`;
+}
+
 export function SettingsModal({ open, onClose }) {
   const s = useSettings();
   const [tested, setTested] = useState(false);
@@ -457,6 +502,7 @@ export function SettingsModal({ open, onClose }) {
       <${HotkeySection} keys=${s.keys} touchUi=${touchUi} />
       <${CosmeticSection} />
       <${UiPluginSection} />
+      <${StorageSection} />
       <${DiagSection} />
       <p class="set-hint">${touchUi ? t('触屏操作：点击单位选中（撤退 / 出售）· 长按单位或卡牌查看详情 · 拖动部署后滑动选择朝向') : t('右键查看详情')}</p>
     </div>
