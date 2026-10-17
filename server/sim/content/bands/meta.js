@@ -65,12 +65,12 @@ function grant(ctx, id, opts = {}) {
 const chessSlots = (ctx) => ctx.shopSlots().map((s, i) => (s && s.kind === 'chess' && !s.sold ? i : -1)).filter((i) => i >= 0);
 
 /** Up to `n` distinct item ids of an equip pool. */
-function rollItems(ctx, poolId, n) {
+function rollItems(ctx, poolId, n, exclude = []) {
   const out = [];
   for (let k = 0; k < n * 6 && out.length < n; k++) {
     const r = ctx.rollPool(poolId);
     if (!r || r.kind !== 'item') break;
-    if (!out.includes(r.id)) out.push(r.id);
+    if (!out.includes(r.id) && !exclude.includes(r.id)) out.push(r.id);
   }
   return out;
 }
@@ -271,11 +271,16 @@ K.round_start_bond_check_gain_layer = (ps) => ({
   },
 });
 
-K.up_shop_add_special_goods = (ps) => ({
+// Official activity_table aceffect_band_26: count 3, choice 1, pool_equip_kathe; no cell limit is exposed.
+// #677: maintainer decision 2026-10-17 (official play memory): Cathy gives the cell at most once per player/match.
+// [ASSUMED] "given" means successfully taken, not shown; Quintus's independent grant does not use this allowance.
+K.up_shop_add_special_goods = (ps, bandId) => ({
   onLevelUp(ctx) {
     const p = ps[0];
-    const ids = rollItems(ctx, p.pool, timesOf(p.count, 3));
-    if (ids.length) ctx.offerItems(ids, { source: 'band' });
+    const cathy = bandId === 'band_cathy';
+    const exclude = cathy && ctx.counter('band:cathy:cellTaken') ? ['chess_item_5_08_e_a'] : [];
+    const ids = rollItems(ctx, p.pool, timesOf(p.count, 3), exclude);
+    if (ids.length) ctx.offerItems(ids, { source: cathy ? 'band:band_cathy' : 'band' });
   },
 });
 

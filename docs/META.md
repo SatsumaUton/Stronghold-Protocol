@@ -1013,6 +1013,11 @@ at zero after a removal, without a `debt` entry. Ordinary grants, 整备 and 机
 `requirePool:false` is not a universal equipment bypass. Rockrock/Flametail's measured weighted subsets remain subject
 to shared availability (§30.2). 凯瑟琳's `pool_equip_kathe` is every shop-eligible item plus 突变细胞 (`also`), uniform
 [ASSUMED], at any 调度中心 level (#631); the shop item slot does not read `also`.
+After a successful cell pick from a `band:band_cathy` offer, `ps.counters['band:cathy:cellTaken']` remains 1 for the
+match and later Cathy offers skip it (#677, DESIGN §34.22; maintainer decision 2026-10-17 (official play memory)).
+[ASSUMED] Showing or declining a cell does not count; 昆图斯's R3 grant is independent. [ASSUMED] Queued Cathy offers
+lose their cell too, retaining other choices without rerolling and dropping an offer if it becomes empty. Bots,
+reconnect and test-console/replay paths all retain the same player counter.
 
 ## Host test matches (DESIGN §34.8)
 
