@@ -23,11 +23,12 @@
 import fs from 'node:fs';
 import { readFxAssets, readFxManifest as readPluginManifest } from './fxAssets.js';
 import { pluginFxGap } from './fxReferences.js';
+import { readInstalledAssetOverlay } from './artReferences.js';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { readPluginFolder, listPluginFiles, walkProblem } from './registry.js';
 import { PLUGIN_LIMITS, PLUGIN_MANIFEST, isPluginId, checkJsonLimits, extOf } from '../../shared/plugins/manifest.js';
-import { LOCK_FILE, LOCK_VERSION, readAssetOverlay } from '../../shared/plugins/visual.js';
+import { LOCK_FILE, LOCK_VERSION } from '../../shared/plugins/visual.js';
 import { issueList } from '../../shared/plugins/errors.js';
 import { parseSkel } from '../../tools/assets/skel.mjs';
 import { resolveRoles } from '../../tools/assets/anim-roles.mjs';
@@ -199,7 +200,7 @@ export function skeletonClipData(dir, spine, containers) {
  * folder's files — for the lock and the studio's preview.
  * @param {string} dir @param {import('../../shared/plugins/manifest.js').PluginManifest} manifest
  * @param {{ vanilla?: VanillaAssets, has?: (rel: string) => boolean }} [opts]
- * @returns {ReturnType<typeof readAssetOverlay> | null} null for a plugin without an `assets` part
+ * @returns {import('../../shared/plugins/visual.js').AssetOverlay | null} null for a plugin without an `assets` part
  */
 export function readOverlayOf(dir, manifest, { vanilla, has } = {}) {
   const part = manifest.parts.assets;
@@ -218,7 +219,7 @@ export function readOverlayOf(dir, manifest, { vanilla, has } = {}) {
     catch (e) { pre.problem('PLUGIN_PART_SHAPE', `fx: ${e.message}`, { at: ['assets', 'fx'], detail: e.message }); }
   }
   const plain = assets && { ...assets }; if (plain) delete plain.fx;
-  const ov = readAssetOverlay(plain, { has: has || ((rel) => { try { return fs.statSync(abs(dir, rel)).isFile(); } catch { return false; } }), vanilla: vanilla?.manifest ?? null, permissions: manifest.permissions });
+  const ov = readInstalledAssetOverlay(plain, { has: has || ((rel) => { try { return fs.statSync(abs(dir, rel)).isFile(); } catch { return false; } }), vanilla, permissions: manifest.permissions });
   if (effects) { ov.files.push(...effects.files); ov.ops.push({ at: ['fx', manifest.id], effects: effects.value }); }
   if (!pre.issues.length) return ov;
   const list = issueList();
