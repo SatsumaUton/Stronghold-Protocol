@@ -28,6 +28,17 @@ const ART_ONLY = 'char_498_inside@art#9';
 const PICKER_SRC = readFileSync(new URL('../../public/js/ui/skinPicker.js', import.meta.url), 'utf8');
 const FIXTURE_ID = 'x'.repeat(64);
 
+test('the normative picker order keeps the 0.3.1 cultivation section immediately after skins', () => {
+  const docs = readFileSync(new URL('../../docs/SKINS.md', import.meta.url), 'utf8');
+  assert.match(docs, /潜能与练度 immediately follows 皮肤/);
+  assert.doesNotMatch(docs, /with 潜能与练度 last/);
+  for (const [file, next] of [['loadout', '<${CultivationSection}'], ['diy', "${!ch.proto && onOps"]]) {
+    const src = readFileSync(new URL(`../../public/js/screens/${file}.js`, import.meta.url), 'utf8');
+    const skin = src.indexOf('<${SkinSection}');
+    assert.ok(skin >= 0 && src.indexOf(next, skin) > skin);
+  }
+});
+
 /**
  * The composed manifest (see the header): two wear-able skins, one art-only, one operator whose record has a picture and
  * no `skins` at all, one the plugin gave only a 立绘.

@@ -186,6 +186,66 @@ describe('皮肤: the lobby seat and the match', () => {
     assert.deepEqual(pub.players.find((p) => p.playerId === 'p_0').skins, { [OPERATOR]: SKIN });
   });
 
+  test('changing and clearing skins refreshes the owner and an already-open prep scout', () => {
+    const h = makeMatch({ humans: 2, spectators: ['s_0'] }).start();
+    h.toPrep();
+    const ps = h.ps('p_0');
+    const board = ps.newPiece('chess', 'chess_char_1_01_a');
+    ps.board.set('10,4', board);
+    ps.hand[0] = ps.newPiece('chess', board.id);
+    ps.temp[0] = ps.newPiece('chess', board.id);
+    ps.dirty();
+    h.flushAll();
+    for (const id of ['p_1', 's_0']) assert.equal(h.m.handle(id, { t: 'g.watch', fieldId: 'n:p_0' }).ok, true);
+    for (const selected of [SKIN, null]) {
+      h.sent.length = 0;
+      assert.equal(h.m.setSkins('p_0', selected ? { [OPERATOR]: selected } : {}).ok, true);
+      h.flushAll();
+      const priv = h.lastTo('p_0', 'm.private');
+      assert.ok(priv, 'the owner receives the changed board and benches without another action');
+      for (const piece of [priv.board.find((p) => p.uid === board.uid), priv.hand[0], priv.temp[0]]) {
+        assert.equal(piece.skin, selected || undefined);
+      }
+      for (const id of ['p_1', 's_0']) {
+        const scout = h.lastTo(id, 'm.field');
+        assert.ok(scout?.prep, 'an existing scouting view is refreshed');
+        for (const uid of [board.uid, ps.hand[0].uid, ps.temp[0].uid]) {
+          assert.equal(scout.units.find((u) => u.uid === uid).skin, selected || undefined);
+        }
+      }
+    }
+  });
+
+  test('stand-in board, hand, temp, scouting and battle use the effective operator skin', () => {
+    const rec = Object.values(DATA.chess).find((c) => !c.isGolden && c.backup?.charId && c.backup.charId !== c.charId && c.chessType === 'NORMAL');
+    const body = rec.backup.charId;
+    const selected = `${body}@body#1`;
+    const h = makeMatch({ mode: 'solo', seats: [{ seat: 0, playerId: 'p_0', name: 'P0', connected: true,
+      notOwned: [rec.chessId], skins: { [rec.charId]: `${rec.charId}@original#1`, [body]: selected } }] });
+    const ps = h.ps('p_0');
+    const p = ps.newPiece('chess', rec.chessId);
+    ps.board.set('10,4', p);
+    ps.hand[0] = ps.newPiece('chess', rec.chessId);
+    ps.temp[0] = ps.newPiece('chess', rec.chessId);
+    const priv = ps.privateView();
+    const own = [priv.board[0], priv.hand[0], priv.temp[0]];
+    const scout = h.m.prepFieldMeta(ps).units.filter((u) => own.some((v) => v.uid === u.uid));
+    const battle = ps.battleInput().units.find((u) => u.uid === p.uid);
+    const model = { skel: '/test/body.skel', atlas: '/test/body.atlas', anims: { idle: 'Idle' } };
+    const art = { chars: { [body]: { skins: { [selected]: { spine: { front: model } } } } } };
+    for (const u of [...own, ...scout, battle]) {
+      assert.equal(u.skin, selected);
+      assert.equal(spineEntry(art, body, { skin: u.skin }).skel, model.skel);
+    }
+    const sim = new Battle({ fieldId: 'test', data: DATA, players: [ps.battleInput()], spawns: [] });
+    sim.start();
+    const info = sim.fieldMeta().units.find((u) => u.uid === p.uid);
+    assert.equal(info.spine, body);
+    assert.equal(info.skin, selected);
+    h.m.setSkins('p_0', { [rec.charId]: `${rec.charId}@original#1` });
+    assert.equal(ps.pieceView(p).skin, undefined, 'an original operator choice never dresses its stand-in');
+  });
+
   test('every view of a piece carries the skin, keyed by the operator of the piece', () => {
     const h = makeMatch({ mode: 'coop', seats: [{ seat: 0, playerId: 'p_0', name: 'P0', isBot: false, connected: true, skins: { [OPERATOR]: SKIN } }] });
     const ps = h.ps('p_0');

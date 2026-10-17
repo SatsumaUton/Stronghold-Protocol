@@ -39,6 +39,11 @@ Three properties are load-bearing:
 - **The choice is keyed by OPERATOR (charId), not by chess.** `chars[<charId>].skins` is the manifest's own grouping, so
   one entry covers an operator's normal piece, its elite (the merge) and a 自选 slot fielding it. The renderer agrees:
   a unit's skin resolves through `d.spine ?? d.charId ?? u.defId` (server/sim/snapshot.js), i.e. the charId.
+  Every owner/scout board, hand, temp and battle input resolves the **effective body** with `PlayerState.fieldRecord`:
+  a stand-in uses `backup.charId`, a 自选 slot its pick. Official source:
+  `activity_table.activity.AUTOCHESS_SEASON.act2autochess.charShopChessDatas` `backupCharId` (for example
+  `chess_char_3_01_a`: `char_103_angel` → `char_603_csnipe`). [ASSUMED] Skin choices follow that body too, so an original
+  operator's selected outfit never dresses its stand-in; the official table specifies bodies, not this cosmetic UI.
 - **A missing piece falls back; nothing is ever a placeholder.** `spineEntry(m, id, { skin })` draws the operator's own
   model when the skin (or its model) is not in the manifest; `avatarUrl` / `portraitUrl` / `illustUrl` fall back to the
   operator's own pictures. The picker shows the operator's portrait on a skin that ships none.
@@ -67,12 +72,22 @@ Turning it off hides *their* look from *you* and changes nothing on their screen
 renderer decides who is "other" from `UnitInfo.ownerId` and the local `me.playerId`
 (public/js/ui/fieldHost.js `setMe`) — never from the seat whose camera happens to be on screen.
 
+[ASSUMED] Switching off retains the received skin ID separately (`sourceSkin`) and derives only the displayed `skin`.
+Switching back on restores already loaded units immediately, including a boss partner's read-only prep pieces and
+units received while hidden. `room.skins` remains valid in every phase: `Match.setSkins` marks the owner's private
+view, which also refreshes existing prep scouts and the boss partner. `fieldHost` forwards public seat choices to
+`view.setSkins(players)` on mount and when they change. The current battle's operators use that latest selection
+(an omitted `skins` map clears it), even if later spawn metadata carries an older choice. This rebuilds appearance
+only: it neither changes the running sim / BattleSpec nor restarts playback. Live refresh timing is a remake UI
+choice, not a rule established by the official tables.
+
 ## The picker: two display rules
 
 In 干员调配 (`screens/loadout.js Detail`) and in the 自选编队 picker's detail (`screens/diy.js DiyPickerView`), the 皮肤
-section sits directly under the operator's name and above 技能 / 局内数值 / 模组, with 潜能与练度 last: a skill and a
-module usually keep their default and the two selects are a one-off, while the appearance is what a player opens the
-panel to change.
+section sits under the operator's name. 潜能与练度 immediately follows 皮肤 wherever cultivation is offered.
+The preserved 0.3.1 order is 皮肤 → 潜能与练度 → 特质 → 技能 → 局内数值 → 模组 in 干员调配, and
+皮肤 → 潜能与练度 → 局内数值 → 技能 → 模组 in 自选编队 (prototype picks omit cultivation).
+[ASSUMED] This is the existing remake panel order; official tables do not prescribe a skin picker layout.
 
 1. **The section is GLOBAL: every operator shows it, or none does.** The one question `SkinSection` asks is
    `public/js/ui/skins.js hasAnySkinChoices()` — **at least one** operator of the composed manifest has one **wear-able**
@@ -126,20 +141,20 @@ exists) gets no section rather than an empty grid.
 | `server/lobby.js` | after `freezeDiy`, `onMessage`, after `diy()`, `humanSeat`, `seatSettings`, `startMatch` | `freezeSkins` (charId + skinId, drop operators the room lacks; a bad map is BAD_MSG and does not clear), `case 'room.skins'`, `skins()` — **no phase gate**, unlike the loadout — and the selection riding into the match |
 | `server/match/PlayerState.js` | ctor | `this.skins = Object.freeze({})` + `setSkins(seat.skins)` |
 | `server/match/player/basics.js` | after `setLoadout` | `skinCharIdOf` / `skinFor` / `setSkins` (bots refused; a bad map refused whole, unknown operators dropped) |
-| `server/match/match/platform.js` | after `setLoadout` | `setSkins(playerId, skins)` — any phase, `markPublic()` |
+| `server/match/match/platform.js` | after `setLoadout` | `setSkins(playerId, skins)` — any phase, `markPrivate()` (owner, prep scouts, boss partner) and `markPublic()` |
 | `server/match/match/views.js` | `publicView().players[]`, `_prepBoardUnits`, the scouted bench | `skins` (omitted when empty), and `skin` on every unit the player owns |
 | `server/match/player/round.js` | `battleInput` | the unit's `skin`, from the player's own selection and the piece's operator (a 自选 slot follows its pick) |
 | `server/match/player/views.js` | `pieceView` | `skin` on the prep board / hand / temp views |
 | `server/sim/units.js`, `server/sim/battle/players.js`, `server/sim/snapshot.js` | `Unit`, `_createAllyFromInput` / `_makeAlly`, `unitInfo` | carried to the client; `skin: u.skin ?? undefined`, so a piece without one adds no key to the wire |
 | `public/js/assets.js` | `portraitUrl` / `illustUrl` (new) / `spineEntry` / `hasBackSpine` / `unitPictureUrl` / `skinsOf` / `skinHasModel` | every helper takes `opts.skin` (the skinId) and falls back to the operator's own art |
 | `public/js/render/units.js` | `_pictureUrl`, `_modelEntry`, `_wantsBack`, `_loadPicture` | `info.skin` reaches the Spine entry, the diamond and the Front/Back question; the picture's cache key carries the skinId |
-| `public/js/render/app.js` | `otherSkins` setting, `ctx.myPlayerId`, `applyInfo`, `setSettings`, `setMe`, `pieceInfo` | `UnitInfo.skin` is cleared for another player's unit while the switch is off; a changed appearance drops the view; the own prep piece carries the local choice |
+| `public/js/render/app.js` | `otherSkins` setting, `ctx.myPlayerId`, `applyInfo`, `refreshSkins`, `setSettings`, `setMe`, `setSkins`, `pieceInfo` | received `sourceSkin` is retained while displayed `skin` follows the switch and latest public selection; a changed appearance drops the view; read-only prep pieces refresh too |
 | `public/js/render/app/info.js` | `renderInfo` | `skin` |
 | `public/js/ui/loadoutSync.js` | header, `installSkinsSync` | the fourth `installPrefSync` setting (`room.skins { skins }`) |
 | `public/js/main.js` | boot | `installSkinsSync({ net })` |
 | `public/js/ui/settings.js` | `CosmeticSection` | the 显示其他玩家的皮肤 switch — with or without a cosmetic plugin |
 | `public/js/ui/gameLogic/settings.js` | `DEFAULT_SETTINGS`, `sanitizeSettings` | `otherSkins: true` |
-| `public/js/ui/fieldHost.js` | mount, `OPTIONAL` | `view.setMe(store.get().me.playerId)` |
+| `public/js/ui/fieldHost.js` | mount, store subscription, `OPTIONAL` | `view.setMe` and `view.setSkins` adopt and follow local identity / public seat choices; unmount removes the subscription |
 | `public/css/screens/loadout.css` | end | `.lo-skins` / `.lo-skin*` tiles, `.lo-skin-preview` |
 | `public/i18n/*.json` | — | the strings above, in every pack (`node tools/i18n.mjs check --all --strict`) |
 

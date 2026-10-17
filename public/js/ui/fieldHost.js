@@ -21,7 +21,7 @@ const METHODS = ['setStage', 'setCamera', 'setPrep', 'enterBattle', 'pushSnapsho
 // setPen (enemy preview pen list), prepField ({ kind, side, mirror } of the Final Assault prep), stripesUnder (the view
 // stripes range previews under the units itself), replayDeploys (the round start's Start-clip replay, PR #416) —
 // render/app.js; the DOM fallback lacks them (→ null)
-const OPTIONAL = ['pieceScreenRect', 'pieceAtClientPoint', 'setSettings', 'setMe', 'off', 'tileScreen', 'holdPiece', 'setPieceDir', 'setPen', 'prepField', 'stripesUnder', 'replayDeploys'];
+const OPTIONAL = ['pieceScreenRect', 'pieceAtClientPoint', 'setSettings', 'setMe', 'setSkins', 'off', 'tileScreen', 'holdPiece', 'setPieceDir', 'setPen', 'prepField', 'stripesUnder', 'replayDeploys'];
 
 /**
  * Camera padding (px) that keeps the field clear of the DOM HUD (top bar + bond strip, team panel, shop bar /
@@ -292,10 +292,16 @@ export function useFieldView(hostRef) {
         // app store (`me.playerId`, set by welcome), so the view is told it rather than resolving it per frame. Told
         // before the first board arrives — the mount waits for `enterBattle`/`setPrep`, which the game screen calls after.
         view.setMe?.(store.get().me?.playerId || null);
+        view.setSkins?.(store.get().match?.public?.players);
         globalThis.__SP_VIEW__ = view; // dev / E2E introspection (view.raw.stats?.())
         setState({ view, kind: view.kind });
       }, (err) => { if (!dead && !controller.signal.aborted) console.error('[field] mount failed', err); });
     const unsub = settingsStore.subscribe((s) => viewRef.current?.setSettings?.(s));
+    // room.skins is accepted in every phase: update the current field without restarting its battle runner.
+    const unsubSkins = store.subscribe((s, prev) => {
+      if (s.me?.playerId !== prev.me?.playerId) viewRef.current?.setMe?.(s.me?.playerId || null);
+      if (s.match?.public?.players !== prev.match?.public?.players) viewRef.current?.setSkins?.(s.match?.public?.players);
+    });
     const onResize = () => viewRef.current?.resize();
     // A temporary network/vendor failure must not pin this mounted match to fallback forever. Retry on a useful
     // user event, at most twice in succession; the effect cleanup disposes the old view before creating its successor.
@@ -311,6 +317,7 @@ export function useFieldView(hostRef) {
       dead = true;
       controller.abort();
       unsub();
+      unsubSkins();
       window.removeEventListener('resize', onResize);
       window.removeEventListener('online', onRetry);
       document.removeEventListener('visibilitychange', onRetry);

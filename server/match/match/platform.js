@@ -105,6 +105,9 @@ export class MatchPlatform {
     this.guard(() => {
       // an empty selection is a valid one: it clears every skin. A bad map leaves the stored choice alone.
       if (!ps.setSkins(skins)) { res = fail(ERR.BAD_MSG, 'bad skin selection'); return; }
+      // [ASSUMED] Live cosmetic changes refresh every existing prep view, using the same dirty path as a move.
+      // The public choice also reaches current battle renderers; no running sim or BattleSpec is changed.
+      this.markPrivate(ps);
       this.markPublic();
     });
     return res;

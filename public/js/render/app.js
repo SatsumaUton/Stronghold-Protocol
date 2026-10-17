@@ -1541,10 +1541,18 @@ export async function createFieldView(host, options = {}) {
    * turning it off hides THEIR appearance from YOU and never changes what they see.
    */
   const skinOf = (info, myId, otherSkins) => {
-    if (!info.skin) return null;
-    if (info.ownerId == null || !myId || info.ownerId === myId) return info.skin;
-    return otherSkins ? info.skin : null;
+    // Keep the received choice intact across settings changes. A running battle's metadata may predate room.skins;
+    // [ASSUMED] the latest public choice wins for operator bodies (including stand-ins / DIY), purely in this view.
+    let skin = info.sourceSkin === undefined ? info.skin : info.sourceSkin;
+    if (info.kind === 'op' && playerSkins.has(info.ownerId)) {
+      skin = playerSkins.get(info.ownerId)[info.diy?.charId || info.spine] || null;
+    }
+    if (!skin) return null;
+    if (info.ownerId == null || !myId || info.ownerId === myId) return skin;
+    return otherSkins ? skin : null;
   };
+  const playerSkins = new Map();
+  let skinSelectionKey = null;
   const shownSkin = (info) => skinOf(info, ctx.myPlayerId, settings.otherSkins);
 
   /**
@@ -1557,6 +1565,7 @@ export async function createFieldView(host, options = {}) {
   function applyInfo(u) {
     const info = renderInfo(u);
     if (!info) return null;
+    info.sourceSkin = u.sourceSkin === undefined ? info.skin : u.sourceSkin;
     const skin = shownSkin(info);
     const prev = infos.get(info.id);
     if (prev && prev.skin !== skin) dropView(info.id);
@@ -1566,7 +1575,31 @@ export async function createFieldView(host, options = {}) {
   }
 
   /** The player whose pieces are this page's own (docs/SKINS.md): late (the view may be built before `welcome`). */
-  function setMe(playerId) { ctx.myPlayerId = typeof playerId === 'string' && playerId ? playerId : null; }
+  function setMe(playerId) {
+    const id = typeof playerId === 'string' && playerId ? playerId : null;
+    if (ctx.myPlayerId === id) return;
+    ctx.myPlayerId = id;
+    refreshSkins();
+  }
+
+  /** Apply public choices to existing and future units without changing the battle or restarting its playback. */
+  function setSkins(players) {
+    const key = JSON.stringify((players || []).map((p) => [p.playerId, p.skins || {}]));
+    if (key === skinSelectionKey) return;
+    skinSelectionKey = key;
+    playerSkins.clear();
+    for (const p of players || []) if (p?.playerId) playerSkins.set(p.playerId, p.skins || {});
+    refreshSkins();
+  }
+
+  function refreshSkins() {
+    for (const [id, info] of infos) {
+      const next = shownSkin(info);
+      if (next !== info.skin) { dropView(id); info.skin = next; }
+    }
+    // Boss partners use read-only prep views rather than infos. Reapply their signatures immediately too.
+    if (mode === 'prep' && lastPrep) setPrep(lastPrep.ps, lastPrep.o);
+  }
 
   // a hand item on a scouted prep board (UnitInfo kind 'item'): the plate's icon and colour resolve client-side,
   // exactly like the own prep bench (pieceInfo)
@@ -2085,6 +2118,7 @@ export async function createFieldView(host, options = {}) {
     /** 设置「显示其他玩家的皮肤」 (docs/SKINS.md): whose pieces are this page's own — the rest lose their skin when
      * that switch is off. ui/fieldHost.js calls it with `store.get().me.playerId` on mount. */
     setMe,
+    setSkins,
     setCamera,
     setPrep,
     replayDeploys,
@@ -2202,10 +2236,7 @@ export async function createFieldView(host, options = {}) {
       // ones the new choice changes are dropped and rebuilt from their own info on the next frame
       if (typeof s.otherSkins === 'boolean' && s.otherSkins !== settings.otherSkins) {
         settings.otherSkins = s.otherSkins;
-        for (const [id, info] of [...infos]) {
-          const next = shownSkin(info);
-          if (next !== info.skin) { dropView(id); info.skin = next; }
-        }
+        refreshSkins();
       }
       if (s.quality === 'high' || s.quality === 'medium' || s.quality === 'low') settings.quality = s.quality;
       if (typeof s.officialFx === 'string' && s.officialFx !== settings.officialFx) { settings.officialFx = s.officialFx; syncOfficialFx(); }

@@ -11,8 +11,7 @@ import { bountyText, bountyCard } from '../choices.js';
 export class PlayerViews {
   pieceView(p, rc = null) {
     const rec = p.kind === 'item' ? this.gd.item(p.id) : p.kind === 'token' ? this.gd.token(p.id) : this.gd.chess(p.id);
-    // 皮肤 (docs/SKINS.md): the CHESS's own record is the operator's body (a 自选 slot's record has `charId: null`, so a
-    // slotted piece gets no skin here — its operator is only known from the pick, and the battle carries that one).
+    // 皮肤 (docs/SKINS.md): skinFor resolves the effective body, including stand-ins and 自选 picks, on every surface.
     const skinId = p.kind === 'chess' ? this.skinFor(rec) : null;
     const v = {
       uid: p.uid,

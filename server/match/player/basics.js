@@ -116,12 +116,13 @@ export class PlayerBasics {
    *
    * A skin is keyed by OPERATOR, not by chess: `chars[charId].skins` is where a cosmetic plugin's overlay writes one and
    * where `assets.js spineEntry` looks it up. That key is also what carries the choice across the normal / elite pair and
-   * a 自选 slot (both of a 自选 slot's records have `charId: null` — 甄选干员 — and the piece draws its PICK's operator, so
-   * `battleInput` resolves that pick's charId itself).
+   * a 自选 slot. Resolve the effective body first, like the model: official activity_table's backupCharId (also
+   * data/chess.json backup.charId), or the 自选 pick. [ASSUMED] A stand-in wears its body's chosen outfit; the official
+   * skin_table.charSkins groups outfits by charId but does not specify this remake's live cosmetic selection.
    * @param {any} rec a chess record, or its chess id @returns {string|null}
    */
   skinCharIdOf(rec) {
-    const r = typeof rec === 'string' ? this.gd.chess(rec) : rec;
+    const r = this.fieldRecord(typeof rec === 'string' ? this.gd.chess(rec) : rec);
     return r && typeof r.charId === 'string' && r.charId ? r.charId : null;
   }
 
@@ -159,8 +160,8 @@ export class PlayerBasics {
     for (const [charId, skinId] of Object.entries(res.skins)) out[charId] = skinId;
     this.skins = Object.freeze(out);
     // No dirty() here: this runs from the constructor too (a seat's choice applied at match start), where `this.m` has
-    // no view to mark yet. Callers that change it mid-match mark the public view themselves — Match.setSkins calls
-    // markPublic, because skins are public (that is how a teammate sees your skin).
+    // no view to mark yet. Match.setSkins marks the private view (including prep scouts and the boss partner) and
+    // the public selection that updates current battle rendering.
     return true;
   }
 
