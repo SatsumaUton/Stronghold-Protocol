@@ -13,6 +13,9 @@ companion cosmetic hints, accurate import reports, record DSL permission checks 
 
 Studio presentation authoring extends §32.9 in [§34.30](history/0.3.1.md#3430-studio-templates-for-the-031-presentation-features): theme, notices, fx and skins forms reuse the existing validators, slots and trial routes.
 
+Blemishine S2 attack clips extend §9 in [§34.31](history/0.3.1.md#3431-official-effects-and-a-skill-clip-the-maintainer-reported-after-030):
+verified mode mapping and a cast-only fallback, preserving held skill loops; incomplete legacy index mappings remain guarded.
+
 ## Where each section lives
 
 Studio §32.9 gains five graphical gameplay templates and isolated Match exercises in

@@ -424,6 +424,8 @@ export async function createFieldView(host, options = {}) {
     view: (id) => views.get(id) || null,
   });
   ctx.ofx = ofx;
+  // Read the index only after the existing effects path loads it; role selection never calls ready()/index().
+  ctx.skillAttackIndex = () => wiring.index;
   const pluginFx = new PluginFxPlayer({ P, layer: layers.vfxOver, assets, cam: () => cam, enabled: () => settings.officialFx !== 'off',
     record: info => info ? ctx.lookupDef(info) : null, speed: projSpeed, ofx });
   setupCleanup.push(() => pluginFx.destroy());

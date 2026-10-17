@@ -83,6 +83,7 @@
 
 import { UF, ANIM } from '../../../shared/constants.js';
 import { SpineActor } from './spine.js';
+import { skillAttackMode } from './skillAttack.js';
 import { MANIFOLD, isManifold, manifoldCopyForm, manifoldAttackForm } from './manifold.js';
 import { diamondTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, hudRings, ringArc, downLabel, HUD_DISC, ELEMENT_RING } from './textures.js';
 import { COLORS, TIER_COLORS, ENEMY_FRAME, UNIT, PROJ, statusIconKey, statusIconSuppressed } from './style.js';
@@ -932,6 +933,15 @@ export class UnitView {
       try {
         actor = new SpineActor(data, entry);
         actor.setSkillIndex(this.skillIndex ?? undefined);
+        // Query at attack time: late index loads, skill slots and facing changes need no new model or request.
+        actor.skillAttackMode = () => {
+          // [ASSUMED] §34.31's cast heuristic is for operators; enemy abilities and token controllers keep their roles.
+          if (this.info.kind !== 'op') return { preserve: true };
+          const mode = skillAttackMode(this.ctx.skillAttackIndex?.(), {
+            info: this.info, rec: this.ctx.lookupDef?.(this.info), skillIndex: this.skillIndex,
+          });
+          return mode ? { ...mode, down: this.dir === 'DOWN' } : null;
+        };
         actor.setRunMode(this.moveFast);
         // enemies play their attack clip once per attack, then walk on (GitHub #58: the sim stands them for that clip)
         actor.clipPerAttack = this.isEnemy;

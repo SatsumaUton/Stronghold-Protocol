@@ -346,6 +346,13 @@ remain local; no official scene bytes belong in git or fixtures.
   - The parse extracts animation names and durations, event names, `OnAttack` times per animation, and bounds.
   - Attachment paths are checked against the atlas regions.
   - Then the animation-role resolver runs. See `tools/assets/anim-roles.mjs` and research 07 §5.4.
+  - Runtime skill attacks (§34.31) distinguish a cast from a strike. Blemishine S2 uses the verified official
+    mode's Attack / Attack_Down, S3 Skill_3; this does not request the optional effects index. Her Skill_2 has
+    OnAttack and therefore needs that verified mapping even without the index. Every other skill keeps its
+    existing role logic (held loops, own strikes, skill idles), with or without the index.
+    Raw effects-index animKey values are not generally skeleton clip names: mode `_replaceAnimPairs` and skin
+    `_animations` are not exported by the current index. Other indexed skills retain their existing roles until
+    those mappings are available [ASSUMED]. No manifest or skeleton metadata is rewritten.
   - A web enemy model whose clip names mislead the resolver gets the roles of its official battle prefab
     (`tools/assets/spine.mjs PREFAB_SPINE_ROLES`, read from the local client's `battle/enm_pfb_*.ab`: the prefab's anim
     key → clip table and the clip its Spine starts on): 普通囚犯 / 老练囚犯 start on their grey `*3` set (【禁锢】), not
