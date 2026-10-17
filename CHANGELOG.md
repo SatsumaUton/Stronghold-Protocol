@@ -99,6 +99,8 @@
 
 - 新增 `SP_VERSIONS`（`all` 或逗号分隔的版本 id）、`SP_VERSION_DEFAULT`、`SP_MAX_VERSION_HOSTS`：启用第二期上半、第一期下半、第一期上半并指定默认版本，默认只开第二期下半，房间、消息和数据与以前逐字节相同；启用后 `/data/versions/` 只提供已启用的版本，`/healthz` 增加 `versions`，启动日志列出启用的版本（DEPLOY.md §11，DESIGN §35.23）。
 
+- WebSocket 压缩保留 deflate 上下文并把窗口提到 8 KB：4 人局单客户端线缆从 809 KiB 降到 284 KiB，每条连接多约 33 KiB zlib 状态；1 KiB 以下的小帧仍不压缩，改由发送处按 UTF-8 字节数判定（ws 只在协商 `*_no_context_takeover` 时才应用 threshold）。要求 `server_no_context_takeover` 的客户端仍逐条压缩，行为与 0.3.1 一致。
+
 ## 0.3.1 — 2026-10-18
 
 ### 规则
