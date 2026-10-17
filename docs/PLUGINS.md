@@ -265,8 +265,11 @@ a duplicate id, a second overlay of one language (the message names the plugin f
 order), and two ui plugins that ask for the same slot (`PLUGIN_UI_SLOT_SHARED`, a warning — the match shows tabs).
 Named folders are sorted by folder name before those rules, the same order `readDirSorted` uses when the registry
 reads `plugins/`. A folder that order keeps stays kept: a later scan does not add a second duplicate that names it
-as the loser. Checking one named folder does not scan the others. `list` calls the same trust gate as the server
-(`SP_PLUGIN_SCRIPTS`).
+as the loser. Checking one named folder does not scan the others. A losing overlay's own folder line says
+`(skipped)` and names the winner; JSON marks it `status: skipped`, `loadable: false` and supplies the reason in
+`skipped`, without counting the cross-plugin problem twice. `list` and `check` call the same trust gate as the
+server (`SP_PLUGIN_SCRIPTS`): sandbox with a valid lock says `(loaded)`; disabled execution or an invalid lock
+says `(disabled)`.
 
 `--root <dir>` points it at another checkout or an unpacked release. Full and lite releases ship this CLI, its
 runtime dependencies, schemas, templates, author documentation and `test/helpers/battleHarness.js`. The harness
@@ -547,6 +550,20 @@ Supported files: enemies, waves, stages, modes, items, bands, garrisons, effects
   A plugin that changes only a wave's `routes` or `extraRoutes` recomputes `groundPaths` for stages listed on modes
   whose round `template` or `bossTemplates` name those waves, from every current route, and keeps that stage's
   `deployTiles`. [ASSUMED] bots then read the new paths; deployment lists stay the stage's own.
+
+**Boss centre column warning (#659 / #660).** Official stage levels
+(`levels/activities/act1autochess/level_act1autochess_m01…m07.json` and
+`act2autochess/level_act2autochess_m01…m04.json`, `mapData.tiles[].buildableType`) have `NONE` at boss-field
+column 10, rows 1–5. Deployable halves occupy columns 3–9 and 11–17; the centre is the leader / teleport lane.
+Both prep boards' column 10 maps to field column 10 (left: 10; right: 20 − 10). Making it deployable lets two
+players place a unit on the same field tile; battle deploys only the first. Registry scans, `plugin.mjs check`, and
+Studio validation report `PLUGIN_BOSS_CENTRE_DEPLOYABLE`, naming the stage and affected **field row indices**,
+when a non-solo mode with Final Assault or Hidden Core uses such a stage. The complete content-set check also
+catches stages supplied by dependencies. Folder checks use default settings; dependency-only paths need that
+complete check. [ASSUMED] Warn for effective `buildable` ALL / MELEE / RANGED even under removable blockers,
+and for active deployment platforms on the centre column. Set those tiles to `NONE` and move the platforms.
+Per the maintainer's decision of 2026-10-17 this is only a warning: no placement, mirroring, or battle rule changes.
+Ordinary `check` succeeds; `check --strict` fails on this warning as on any other warning. Official maps produce none.
 
 New record ids are ≤64 ASCII letters/digits/`_`/`-`. The plugin id replaces `-` with `_` inside records. Prefixes:
 `chess_x_<plugin>_<name>_a/_b`, `char_x_…`, `skx_…`, `enemy_x_…`, `mode_x_…`, `stage_x_…`, `wave_x_…`,
@@ -1366,6 +1383,7 @@ lacks). The table below is generated from it (`node tools/plugin.mjs errors --wr
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_DATA_PATH` | “{where}” uses a key that is not allowed | Keys such as __proto__, prototype and constructor cannot be used (they could corrupt the program's objects): rename it. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_DATA_BOUND` | A value is outside what a plugin may set ({where}): {detail} | A value may be up to 10 × the official maximum of the same key (at least 64); a step — an interval, a period, a cost — no smaller than a tenth of the official minimum. Make it smaller: creative values within 3 × the official ones always pass. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_DATA_REQUIRED` | The merged data lacks something or is broken ({where}): {detail} | A patch must not remove a field or a table the game needs; the original line says which one. |
+| The plugin works, with a note in the check | `PLUGIN_BOSS_CENTRE_DEPLOYABLE` | Stage {stage} allows deployment on boss centre column 10 (field rows {rows}); both players can overlap there and battle deploys only the first unit | Set these tiles' effective buildable to NONE and move deployment platforms off the centre column; this warning does not change plugin rules. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_DATA_REFERENCE` | “{where}” refers to something that does not exist: {detail} | Check the spelling: the bond, enemy, operator or effect ids it names must exist in the game or in this plugin (same case). |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_DATA_PAIR` | The normal and elite pieces of an operator do not match ({where}) | A new operator comes in pairs: …_a the normal piece, …_b the elite one (isGolden: true), with the same charId and tier; a compact record (a records file) makes the pair for you. |
 | The plugin is not listed (skipped); the start log and check say why | `PLUGIN_PATCH_OP` | An unknown patch operation ({where}) | "op" is one of set, merge, add, append, remove. |

@@ -41,3 +41,6 @@ normative lines it rewrote).
 | §32 | [history/0.3.0.md](history/0.3.0.md) | 0.3.0 — the plugin system (插件) and the fixes after 0.2.6 (2026-10-14) |
 | §33 | [design/vfx-format.md](design/vfx-format.md) | Official battle effects (特效): the extracted format the runtime reads |
 | §34 | [history/0.3.1.md](history/0.3.1.md) | 0.3.1 — after the 0.3.0 release (2026-10-16): the effects audit's R18–R21, Forge import U1–U6, settings, Spine skill loops, lingering areas and standing effects under the official effects, 阻隔工事's client model (#663), the test console, 高台 placement in every language (#676), skill attack sounds by mode (#679), local-extract checks (#665), lossless scene maps and emission (#658) |
+
+Plugin author diagnostics: §34.21 adds a warning for deployable boss centre columns (#659 / #660; no gameplay rule
+change) and aligns `plugin check` folder statuses with the script setting and language-overlay winners.

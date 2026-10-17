@@ -17,6 +17,7 @@ import { KITTED_CHARS } from '../sim/content/kits/index.js';
 import { exportOfficialBounds, rememberOfficialBounds } from '../../shared/plugins/officialBounds.js';
 import { browserScriptSources } from '../../shared/plugins/scriptLoad.js';
 import { preflightScripts } from './scriptPreflight.js';
+import { bossCentreWarnings } from './stageWarnings.js';
 import { validateDsl, validatePrepSpec } from '../sim/content/dsl/validate.js';
 
 const bases = new WeakMap(), buffers = new WeakMap(), caches = new WeakMap();
@@ -270,6 +271,7 @@ function composeContentSet({ registry, ids = [] }) {
   if (plugins.length) {
     problems.push(...validateData(data, { kitExists: ref => !!officialKit(ref), vanilla: base.data, owners, validateDsl }));
     if (problems.length) return { problems };
+    warnings.push(...bossCentreWarnings(data));
     data = { ...data, stages: { ...data.stages } };
     const routes = Object.values(data.waves).flatMap(w => [...(w.routes ?? []), ...(w.extraRoutes ?? [])]);
     const changedWaves = new Set();

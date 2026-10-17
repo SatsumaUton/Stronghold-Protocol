@@ -42,6 +42,8 @@
 import { nodeSha256 } from './identity.js';
 import { readScripts, applyTrust, isScriptClass } from './trusted.js';
 import { readContentData } from './contentData.js';
+import { pluginStageWarnings } from './stageWarnings.js';
+import { DATA_DIR } from '../data.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -421,14 +423,14 @@ function readUiFrame(dir, manifest, listed, { vanilla, hashCache }) {
  * otherwise `plugin` is its entry.
  * @param {string} dir the folder (its name is the id)
  * @param {{ app?: string, api?: { current: number, min: number }, where?: string, vanilla?: VanillaAssets | (() => VanillaAssets),
- *   hashCache?: HashCache }} [opts]
+ *   hashCache?: HashCache, dataDir?: string }} [opts]
  *   vanilla: the installation's art manifest, or a function that reads it (called for a cosmetic or ui plugin only;
  *   default: none — a cosmetic plugin's references are not checked and neither has a `vs`); hashCache: kept file hashes
  *   (default: a new one)
  * @returns {{ plugin: Plugin | null, problems: string[], warnings: string[], issues: PluginIssue[] }}
  *   issues: the problems and warnings with their codes (shared/plugins/errors.js)
  */
-export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, where, vanilla = { manifest: null, sha256: null }, hashCache = new Map() } = {}) {
+export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, where, vanilla = { manifest: null, sha256: null }, hashCache = new Map(), dataDir = DATA_DIR } = {}) {
   const id = path.basename(dir);
   const at = where ?? `plugins/${id}/`;
   const list = issueList();
@@ -490,6 +492,8 @@ export function readPluginFolder(dir, { app = APP_VERSION, api = PLUGIN_API, whe
       return out(null);
     }
     plugin.content = c.content;
+    const stageIssues = pluginStageWarnings(plugin, dataDir);
+    list.take({ problems: [], warnings: stageIssues.map(i => i.text), issues: stageIssues });
     if (isScriptClass(manifest.class)) {
       plugin.script = readScripts(dir,manifest,files);
       for (const p of plugin.script.problems) list.problem(p.code,p.message,{where:p.path,detail:p.message});
@@ -692,7 +696,7 @@ export function scanPlugins({ publicDir, dataDir, packsDir, pluginsDir }, { app 
       if (!st.isDirectory()) continue;
       const where = `plugins/${id}/`;
       guard(where, () => {
-        const r = readPluginFolder(dir, { app, api, where, vanilla: getArt, hashCache });
+        const r = readPluginFolder(dir, { app, api, where, vanilla: getArt, hashCache, dataDir });
         warnIssues(where, r.issues);
         if (!r.plugin) skipped.push({ where, problems: r.problems, issues: r.issues.filter((i) => i.level === 'problem') });
         else found.push(r.plugin);
