@@ -95,11 +95,12 @@ import { installFromFile, installFromUrl, installedPluginVersion, isRemoteAddres
 import { buildSurface, surfaceMarkdown, SURFACE_MARKERS } from '../shared/plugins/surface.js';
 import { pluginFxSurface } from '../public/js/render/vfx/pluginFormat.js';
 import { importForge } from '../server/plugins/forgeImport.js';
+import { restartForEnvProxy } from './assets/env-proxy.mjs';
 
 export { checkPluginFolder, buildPluginLock };
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const USAGE = 'usage: node tools/plugin.mjs list [--json] | check [<dir|id> …] [--strict] [--json] [--lang zh|en] | pack <dir|id> … [--zip] [--out <path>] | new [<template> <id>] [--name … --target … --author … --license … --dir … --options <json-file>] | import-forge <dir|zip> [--out plugins/<id>] [--id <id>] [--dry-run] [--json] [--no-scripts] | test <id> | errors [--markdown] [--lang zh|en] [--write] | install <zip|https> [--sha256 <hex>] [--force] | catalog <file|https> [--json] | surface [--write]   [--root <dir>]';
+const USAGE = 'usage: node tools/plugin.mjs list [--json] | check [<dir|id> …] [--strict] [--json] [--lang zh|en] | pack <dir|id> … [--zip] [--out <path>] | new [<template> <id>] [--name … --target … --author … --license … --dir … --options <json-file>] | import-forge <dir|zip> [--out plugins/<id>] [--id <id>] [--dry-run] [--json] [--no-scripts] [--offline|--no-network] [--asset-source=direct|mirror] [--refresh-index] | test <id> | errors [--markdown] [--lang zh|en] [--write] | install <zip|https> [--sha256 <hex>] [--force] | catalog <file|https> [--json] | surface [--write]   [--root <dir>]';
 /** The documents whose symptom table `errors --write` keeps: path, language. */
 export const TABLE_DOCS = Object.freeze([['docs/PLUGINS.md', 'en'], ['docs/PLUGIN-GUIDE.md', 'zh']]);
 
@@ -161,9 +162,10 @@ function takeValue(rest, i, name) {
 /**
  * The CLI.
  * @param {string[]} argv
+ * @param {{fetchImpl?:typeof fetch}} [io]
  * @returns {Promise<number>} the exit code
  */
-export async function main(argv) {
+export async function main(argv, io = {}) {
   const [cmd, ...rest] = argv;
   let root = REPO;
   const flags = new Set();
@@ -173,7 +175,8 @@ export async function main(argv) {
   try {
     for (let i = 0; i < rest.length; i++) {
       const a = rest[i];
-      if (['--root', '--lang', '--out', '--name', '--target', '--author', '--license', '--credits', '--dir', '--options', '--sha256', '--id'].includes(a)) {
+      if (a.startsWith('--asset-source=')) values['asset-source'] = a.slice('--asset-source='.length);
+      else if (['--asset-source', '--root', '--lang', '--out', '--name', '--target', '--author', '--license', '--credits', '--dir', '--options', '--sha256', '--id'].includes(a)) {
         values[a.slice(2)] = takeValue(rest, i, a.slice(2));
         i++;
       } else if (a.startsWith('--')) flags.add(a.slice(2));
@@ -496,6 +499,8 @@ export async function main(argv) {
       out: values.out ? path.resolve(values.out) : undefined,
       id: values.id, dryRun: flags.has('dry-run'), root, pluginsDir: dirs.pluginsDir, dataDir: dirs.dataDir,
       vanilla: readVanillaAssets(dirs.dataDir), scripts: !flags.has('no-scripts'),
+      officialTables: { offline: flags.has('offline') || flags.has('no-network'), refresh: flags.has('refresh-index'),
+        source: values['asset-source'] || process.env.SP_ASSET_SOURCE || 'direct', fetchImpl: io.fetchImpl, log: line => console.error(line) },
     });
     if (flags.has('json')) console.log(JSON.stringify(result.report));
     else console.log(result.markdown);
@@ -518,4 +523,8 @@ export async function main(argv) {
 }
 
 const invoked = (() => { try { return pathToFileURL(fs.realpathSync(process.argv[1] || '')).href; } catch { return null; } })();
-if (invoked === import.meta.url) main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (e) => { console.error(`plugin: ${e.message}`); process.exitCode = 2; });
+if (invoked === import.meta.url) {
+  const argv = process.argv.slice(2);
+  const restart = argv[0] === 'import-forge' && !argv.includes('--offline') && !argv.includes('--no-network') && restartForEnvProxy();
+  if (!restart) main(argv).then((code) => { process.exitCode = code; }, (e) => { console.error(`plugin: ${e.message}`); process.exitCode = 2; });
+}

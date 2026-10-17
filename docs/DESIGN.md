@@ -32,6 +32,11 @@ Optional official art for plugin operators outside the roster is specified in [�
 Its review fixes keep §32.3 permission classification on the original manifest while references use merged art;
 discovery requires official-table membership, caps distinct operators, and full extraction uses explicit art consent.
 
+Official tables for out-of-roster plugin operators are downloaded on demand during Forge import and setup's
+startup/update gap preparation, per the maintainer's 2026-10-17 decision in
+[§34.33](history/0.3.1.md#3433-official-tables-for-plugin-operators-outside-the-roster-downloaded-when-needed).
+Offline checks and game runtime never fetch them; derived records and the plugin format are unchanged.
+
 | sections | file | content |
 |---|---|---|
 | §0, §1, §2, §11, §12 | [design/overview.md](design/overview.md) | Scope, stack, repository layout, quality bar |

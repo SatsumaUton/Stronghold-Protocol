@@ -31,7 +31,9 @@
 //
 // Options:
 //   --check          report only, change nothing (exit 1 when something essential is missing)
-//   --no-assets      skip the art/audio download
+//   --offline        same read-only checks as --check; --no-network is an alias
+//   --no-assets      skip art/audio and optional plugin official-table downloads
+//   --refresh-index  re-download needed official tables (otherwise existing tables are reused)
 //   --asset-source=M direct (default) or mirror (opt-in; no public-IP lookup)
 //                    SP_ASSET_SOURCE sets the default; SP_GITHUB_PROXY sets the HTTPS prefix (https://gh-proxy.com/)
 //                    An empty SP_GITHUB_PROXY disables the proxy, including in mirror mode.
@@ -57,6 +59,8 @@ import { validateSource } from './assets/network.mjs';
 import { EXPECTED_FX, EXPECTED_LOCAL_GROUPS, EXPECTED_SCENE } from './local-extract/expected.mjs';
 import { installedFxReferences, pluginFxGap } from '../server/plugins/fxReferences.js';
 import { pluginArtGap } from '../server/plugins/artReferences.js';
+import { preparePluginOfficialTables } from './assets/official-tables.mjs';
+import { restartForEnvProxy } from './assets/env-proxy.mjs';
 
 export function checkPluginArt(root = ROOT) { return pluginArtGap(root); }
 
@@ -739,10 +743,12 @@ function ensureVenv(py, log) {
 // ---------------------------------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const o = { check: false, assets: true, local: 'ask', scenes: 'ask', game: null, yes: false, quiet: false, help: false, source: process.env.SP_ASSET_SOURCE || 'direct' };
+  const o = { check: false, offline: false, refresh: false, assets: true, local: 'ask', scenes: 'ask', game: null, yes: false, quiet: false, help: false, source: process.env.SP_ASSET_SOURCE || 'direct' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--check') o.check = true;
+    else if (a === '--offline' || a === '--no-network') { o.offline = true; o.check = true; }
+    else if (a === '--refresh-index') o.refresh = true;
     else if (a === '--no-assets') o.assets = false;
     else if (a === '--asset-source') o.source = argv[++i];
     else if (a.startsWith('--asset-source=')) o.source = a.slice('--asset-source='.length);
@@ -772,6 +778,7 @@ async function main() {
   let opts;
   try { opts = parseArgs(process.argv.slice(2)); } catch (e) { console.error(e.message); return 2; }
   if (opts.help) { console.log(helpText()); return 0; }
+  if (!opts.check && opts.assets && restartForEnvProxy()) return 0;
   const log = (s = '') => console.log(s);
   const say = (s) => { if (!opts.quiet) log(s); };
   const summary = [];
@@ -838,6 +845,9 @@ async function main() {
     else if (!assets.present) add('warn', '美术/音频 public/assets', '未下载（游戏会用占位图）→ node tools/fetch-assets.mjs');
     else add('warn', '美术/音频 public/assets', `缺 ${assets.missing}/${assets.total} 个文件 → 重新运行 setup 续传`);
   }
+
+  // Startup/update launchers run this same setup before starting the game. No runtime downloader.
+  await preparePluginOfficialTables(ROOT, { ...opts, log });
 
   // 6. local client (optional)
   const local = checkLocal();

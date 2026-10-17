@@ -1676,7 +1676,7 @@ GET without the body):
 | `POST /studio/api/console/options` · `POST /studio/api/console/build` | test console defaults / combat choice support; validate a scene and build its browser BattleSpec (both keyed; 512 KiB body limit) |
 | `POST …/authoring` · `POST /studio/api/validate-dsl` | wizard save with revision; structural DSL validation |
 | `POST /studio/api/authors` · `GET /studio/api/events` | name the page's game sessions; the change events |
-| `POST /studio/api/forge/preview` · `POST /studio/api/forge/import` | a Forge pack as `{ zip?: base64, files?: [{ name, data: base64 }], id?, noScripts? }` — never a path on the server. Preview is a dry run; `noScripts` leaves the script plugin of `kits/` out. §16 |
+| `POST /studio/api/forge/preview` · `POST /studio/api/forge/import` | a Forge pack as `{ zip?: base64, files?: [{ name, data: base64 }], id?, noScripts?, offline? }` — never a path on the server. Preview is a dry run; `noScripts` leaves the script plugin of `kits/` out. §16 |
 
 **The files** (`server/studio/files.js`): everything the studio touches is inside `plugins/<id>/` — the id a plugin id
 (never a `_` template or a dot folder), a path a plain relative path (no `..`, no `.` part, no hidden part, ≤ 200
@@ -1927,27 +1927,53 @@ never run during the import. Kits run afterwards only where the server owner set
 selects that plugin; panels run only in the player's iframe.
 
 ```
-node tools/plugin.mjs import-forge <dir or zip> [--out plugins/<id>] [--id <id>] [--dry-run] [--json] [--no-scripts]
+node tools/plugin.mjs import-forge <dir or zip> [--out plugins/<id>] [--id <id>] [--dry-run] [--json] [--no-scripts] [--offline] [--asset-source=direct|mirror] [--refresh-index]
 ```
 
 `--out` names the primary product's folder; its basename becomes that product's id. `--id` overrides the pack id
-before the suffixes below. `--dry-run` writes nothing, including `IMPORT-REPORT.md`. `--json` prints the report
+before the suffixes below. `--dry-run` writes no plugin or `IMPORT-REPORT.md`; needed official tables may be cached
+(use `--offline` to forbid downloads). `--json` prints the report
 object only, keys sorted. Exit 0 when the pack was read, including when nothing could be imported; exit 1 when the
 pack could not be read or a product failed `check`, `pack`, the visual set or the content set; exit 2 on a bad
 command. A product that fails is not left in `plugins/`. `--no-scripts` writes no script plugin: each kit file is
 named in the report with that reason, and its record keeps its own kit in the content plugin.
 
+**On-demand official tables (0.3.1, §34.33).** The maintainer decided on 2026-10-17 that an explicit import needing
+official operators outside the shipped chess/backups roster fetches the missing `character_table.json`,
+`skill_table.json`, `range_table.json`, `uniequip_table.json`, `battle_equip_table.json` and `activity_table.json`.
+Setup/startup/update gap preparation does the same when W5/P10's bounded installed-plugin JSON scan finds such
+references (including disabled plugins). Without the character table, syntax outside the roster is the discovery
+trigger [ASSUMED]; once that table rules out every candidate, no further tables are fetched. Art extraction still
+requires an own official-table entry and its existing consent.
+The source is the same official-data mirror as the voice tables: `RAW.gamedata` (Kengxxiao/ArknightsGameData,
+zh_CN), via `cachedJson`, raw GitHub → jsDelivr and the shared `MirrorPolicy`. `--asset-source=direct|mirror`,
+`SP_ASSET_SOURCE`, `SP_GITHUB_PROXY` and HTTP(S)_PROXY follow the asset downloader. CLI/setup restart once to enable
+Node's env proxy when needed; start a studio server with `NODE_USE_ENV_PROXY=1` when using an HTTP(S) proxy on
+supported Node versions. The guard refuses to bypass a configured proxy.
+
+Console/report lines name the missing tables, approximate MB and reason (about 50 MB uncompressed for all six).
+Cached tables are reused; only `--refresh-index` replaces existing files. `--offline` (alias `--no-network`) always
+forbids downloads, including refresh; setup also honors `--check` / `--no-assets` and offers offline/no-network as
+read-only checks. Invalid existing files stay untouched until refresh [ASSUMED]. Failed/refused downloads retain
+the existing skip/fallback and name the reason. JSON parsing and table-specific shapes are checked before atomic
+rename: record maps with phases/levels/grids, module equipDict/charEquip maps, and activity autoChessData.
+[ASSUMED] Decoded caps are respectively 32/32/2/16/16/32 MiB; estimates are rounded from the local tables inspected
+on 2026-10-17. Concurrent imports share a per-install queue. No table download happens in matches, lobbies or game
+client paths, and no plugin field, API surface or derived-record semantics change.
+
 The studio does the same thing. On `/studio/` the button 「从 Forge 包导入」 takes a zip or a folder. The browser
 sends the bytes. While that read is in progress the preview and confirm buttons stay disabled, and the previous
 report is cleared so a late read cannot confirm the pack that was on screen before. The server is never given a
 path on its disk. `POST /studio/api/forge/preview` and
-`POST /studio/api/forge/import` take `{ zip?: base64, files?: [{ name, data: base64 }], id?, noScripts? }` and use the
+`POST /studio/api/forge/import` take `{ zip?: base64, files?: [{ name, data: base64 }], id?, noScripts?, offline? }` and use the
 same gate as every other change (`X-SP-Studio`, this machine or the local network). A pack that is unsafe to unpack
 is 400 with a `PLUGIN_FORGE_*` code. A pack that was read answers 200 `{ report, plugins: [{ id, class }] }`.
 `report.ok` is false when a product failed the checks, and nothing was written. Preview is a dry run. Confirming
 writes `plugins/<id>/` and rescans. The dialog's box 「不生成脚本插件」 sends `noScripts: true` (the CLI's
 `--no-scripts`); toggling it clears the report, so confirm always writes what the last preview showed. When the
-report has a script plugin the dialog says when it runs (below).
+report has a script plugin the dialog says when it runs (below). The 「离线导入（不下载官方数据表）」 box sends
+`offline: true` for both preview and confirm, and clears the old report when toggled. Online preview may populate
+the official cache; confirming reuses it.
 
 Each product is checked with `checkPluginFolder` and `packPlugin`. A cosmetic product is then resolved with
 `createVisualSets({ registry }).resolve` (there is no `buildVisualSet`). A content product is built with
@@ -2355,7 +2381,8 @@ An official `char_<number>_<name>` absent from this installation's chess/backups
 classification functions. It uses the economy's normal/elite training statuses; a pack's explicit overrides win
 [ASSUMED]. No selected module is invented. Optional local activity/module tables provide trigger/subprofession data;
 without them the builder's ordinary fallback applies [ASSUMED]. The report identifies the local source by a SHA-256
-fingerprint of every table read. No download occurs. Missing tables or missing character/stats/range/skills skip that
+fingerprint of every table read. The explicit import first fetches missing tables as described in §16 above;
+the synchronous planner/loader stays local-only. Still-missing tables or missing character/stats/range/skills skip that
 operator with a reason. Derived fields are saved in the plugin; the receiving installation needs no official cache.
 Scripts can then bind to the newly imported chess. Without an accepted kit, generic behavior is reported [ASSUMED].
 
