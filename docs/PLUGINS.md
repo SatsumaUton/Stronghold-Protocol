@@ -244,7 +244,7 @@ node tools/plugin.mjs check [<dir|id> …] [--strict] the folders of plugins/ (o
 node tools/plugin.mjs pack <dir|id> … [--zip]      write plugin.lock.json (every file's SHA-256 and size, each Spine model's
           [--out <file|dir>]                       clip data), then check the folder; --zip writes the folder as a zip
                                                    (default plugins/_dist/<id>-<version>.zip)
-node tools/plugin.mjs new <template> <id>          a new plugin folder from a template (art, spine, voice, audio, numbers, operator, dsl, meta, mode, ui, script)
+node tools/plugin.mjs new <template> <id>          a new plugin folder from a template (art, spine, voice, audio, numbers, operator, dsl, meta, mode, ui, script, theme, notices, fx, skins)
           [--target <名字|id>] [--name …] [--dir …] optional target found by its official name; --options <json-file> for wizard options
 node tools/plugin.mjs errors [--markdown] [--write] the error catalogue; --write keeps the symptom tables of the documents
 node tools/plugin.mjs import-forge <dir|zip>       a Forge workshop pack → the plugins it can become (§16);
@@ -1387,6 +1387,63 @@ schema, findings in plain words and hot reload. The design is DESIGN §32.9; the
   「添加替换内容」 (an operator's avatar, model and voice in one plugin); the page keeps what it shows in the dot file
   `.studio.json` of the folder (never listed, served, checked or packed; a plugin made by hand gets its sections read
   off its overlay).
+- **0.3.1 presentation templates**: `theme` (personal cosmetic, `theme` permission) edits every allowlisted
+  colour/time/easing token with its default, a per-token reset, and reversible live styling of the studio root.
+  `notices` (personal cosmetic) edits up to 20 announcements, title ≤80 and body ≤2000 Unicode characters, optional
+  calendar date and complete translations; preview uses the popup's plain-text localization/fallback reader.
+  `skins` (cosmetic, assets.add + assets.override) edits an operator's outfit list and existing image/Spine slots;
+  `isSkinKey`, 64 outfits, 64-character name/group limits and picker fallbacks remain §9 / SKINS.md's rules.
+  [ASSUMED] Skin metadata is saved before slot changes; the full UTF-8 hex skin key separates upload directories.
+  Reused keys allocate a fresh numeric-suffix directory when another skin references the destination, including
+  partial Spine uploads. Retired files are retained. FX images are staged with the form, then saved together.
+  Slot uploads/clears hydrate the next form draft, so a subsequent save/rename retains present media and never
+  resurrects a cleared asset. Other manifest metadata and unrelated art remain untouched.
+  `fx` (content) creates an immediately playable carrier borrowing an official kit and an original CC0 sheet
+  [ASSUMED], then edits official unit/skill mappings or flipbooks and phase bindings (§9 Operator effects).
+  The existing target picker searches only units in the local effects index for the former; a missing index
+  is explained. [ASSUMED] The local index reader caps its JSON at 16 MiB. Borrowed effects remain 3D-only;
+  flipbooks play in both board modes through the existing trial replay, including unsaved form parameters.
+  The controls use the runtime bounds (frames 1–256, cols 1–frames, fps 0.1–60, anchor 0–1, scale .01–8,
+  normal/add, boolean loop); the loader also checks PNG dimensions and cell divisibility. [ASSUMED] At most
+  128 books and 60 unique slot/phase rows (10 × 6); dangling effects are refused. Compiled particle files
+  remain supported by the existing file interface. No new runtime plugin field, permission or studio route.
+  All four templates use one editor module and the same theme/notices/overlay/effect validators as the checker;
+  invalid values are not silently clamped. See the Chinese guide's four subsections for the complete workflow.
+  Review save contract: all presentation forms hydrate current manifest/record declarations. Saves use the shared
+  three-way delta merge, retaining extra declarations, hidden FX settings and unchanged JSON token bytes. FX/skin forms refuse
+  string `assets` declarations with 409 (edit the referenced document directly). The complete merged folder, dependencies
+  and staged media must pass the strict checker before a form save; invalid retained content and empty notice-only
+  plugins are refused with contextual errors. Skin slot uploads and the files PUT route instead require **no new problems** (the 0.3.0 art, model, voice
+  and audio slots, and a bond's icon, still write directly and show the check afterwards):
+  candidate strict findings must already exist in the live folder, compared as a multiset of exact code,
+  location (where/file) and finding text/reason. Each existing finding excuses at most one identical candidate finding.
+  [ASSUMED] Changed numbers within a reason (for example a measured folder total) count as a new finding and refuse
+  the upload. Content JSON is composed with `checkDataOnly` independently of asset problems; malformed documents
+  produce findings without executing author code. This permits repairing several missing images one at a time;
+  PNG/Spine bytes on these validated upload paths must independently validate each time.
+  Cosmetic validation does not load gameplay tables. [ASSUMED] Candidates use dot-prefixed `.sp-studio-*` directories
+  inside the real plugins directory (same volume); the registry excludes dot names. A complete initial walk refuses
+  all links, including hidden ones, before staging any files. Unchanged regular files are hardlinked, with
+  `COPYFILE_FICLONE` copy fallback; the three-way merge reads only JSON/HTML documents. [ASSUMED] Revision
+  checks hash document bytes and use size/mtime/inode for other files, avoiding main-process media reads. Only requested writes face
+  studio per-file limits, so an installed file over 64 MiB remains editable when untouched. Candidate totals retain
+  the 200 MiB / 5000 file limits. Changed media precedes plugin.json in the rollback-protected atomic commit;
+  all success/error/timeout paths remove the candidate. HTTP staging and complete checks run in disposable children
+  [ASSUMED: at most two jobs, 20 seconds each, 512 MiB V8 heap]; cleanup is asynchronous.
+  Skin-slot and files-PUT Spine uploads use the packer's skeleton/atlas readers and rebuild clip metadata.
+  PNGs uploaded through skin slots, files PUT or staged FX forms check signature, raw ASCII-letter chunk types,
+  legal IHDR colour/depth/interlace fields, chunk CRCs, palette and end ordering, and inflate zlib with an exact
+  scanline-size bound (including Adam7 passes), then checks scanline filters. [ASSUMED] Decoded scanlines are capped
+  at 256 MiB. Only declared effect sheets use non-interlaced 8-bit RGB/RGBA ≤2048 per side; inline and file-backed
+  overlays both identify them. Upload decoding recognizes `.PNG` too; FX paths retain lowercase `.png` / `.json`.
+  The 0.3.0 art/model/voice/audio slots and a bond's icon keep their direct writes, without this media validation gate.
+  Other validated PNG art accepts all legal depth/colour combinations and Adam7. Pending FX FileReader completions merge into the latest draft; save stays disabled until
+  all reads finish. Trials accept the same 160 MiB request body as authoring. [ASSUMED] Newly staged replay images
+  are embedded as PNG data URLs, at most 8 MiB compressed image bytes total within the existing 16 MiB result cap;
+  they remain available for the replay's lifetime after temporary files are removed. Saved images retain ordinary
+  preview URLs. FX carriers retain supported damage/attack fields and bind their equipped default
+  skill; sources requiring owner-specific summons or differing per-form top-level attack metadata are explicitly refused [ASSUMED: compact-format limitation].
+
 - **Slots**: every place a template fills, the installation's art beside the plugin's. Files dropped on a slot (or
   picked) go into the plugin folder under the slot's name — `art/<key>/avatar.png`, `spine/<key>/front/<key>.skel` and
   `.atlas` under one name with the atlas's pages by their own names and `textures` read from the atlas,

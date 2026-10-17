@@ -47,3 +47,26 @@ export function readAuthorOptions(id, author, documents, manifest, data) {
   }
   return o;
 }
+
+// Presentation forms expose the current declarations, including externally edited values.
+export function readPresentationOptions(id, author, documents, manifest, data) {
+  const o = { ...author.options };
+  if (author.template === 'theme') o.vars = manifest.theme?.vars || {};
+  if (author.template === 'notices') o.notices = manifest.notices || [];
+  if (author.template === 'skins') {
+    const charId = (author.target || 'operator:char_102_texas').replace(/^operator:/, '');
+    o.outfits = Object.entries(manifest.assets?.chars?.[charId]?.skins || {}).map(([key, rec]) => ({ key, ...rec }));
+  }
+  if (author.template === 'fx') {
+    const doc = JSON.parse(documents['data/operator.json']?.toString() || '{}');
+    const record = Array.isArray(doc) ? doc.find(r => r.charId === `char_x_${id.replaceAll('-', '_')}_one`) : doc;
+    o.kitRef = data?.chess?.[record?.kit?.ref]?.charId || record?.kit?.ref || o.kitRef;
+    o.source = record?.fx ? 'official' : 'flipbook';
+    o.unit = record?.fx?.unit || '';
+    o.skills = record?.fx?.skills || {};
+    o.flipbooks = Object.entries(manifest.assets?.fx?.flipbooks || {}).map(([id, book]) => ({ id, ...book }));
+    o.bindings = Object.entries(manifest.assets?.fx?.bind?.[record?.charId] || {}).flatMap(([slot, phases]) =>
+      Object.entries(phases).map(([phase, effect]) => ({ slot, phase, effect })));
+  }
+  return o;
+}
