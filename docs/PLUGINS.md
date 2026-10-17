@@ -1415,8 +1415,12 @@ schema, findings in plain words and hot reload. The design is DESIGN §32.9; the
   and staged media must pass the strict checker before a form save; invalid retained content and empty notice-only
   plugins are refused with contextual errors. Skin slot uploads and the files PUT route instead require **no new problems** (the 0.3.0 art, model, voice
   and audio slots, and a bond's icon, still write directly and show the check afterwards):
-  candidate strict findings must already exist in the live folder, compared by code and where/file. This permits
-  repairing several missing images one at a time; uploaded PNG/Spine bytes must independently validate each time.
+  candidate strict findings must already exist in the live folder, compared as a multiset of exact code,
+  location (where/file) and finding text/reason. Each existing finding excuses at most one identical candidate finding.
+  [ASSUMED] Changed numbers within a reason (for example a measured folder total) count as a new finding and refuse
+  the upload. Content JSON is composed with `checkDataOnly` independently of asset problems; malformed documents
+  produce findings without executing author code. This permits repairing several missing images one at a time;
+  PNG/Spine bytes on these validated upload paths must independently validate each time.
   Cosmetic validation does not load gameplay tables. [ASSUMED] Candidates use dot-prefixed `.sp-studio-*` directories
   inside the real plugins directory (same volume); the registry excludes dot names. A complete initial walk refuses
   all links, including hidden ones, before staging any files. Unchanged regular files are hardlinked, with
@@ -1426,12 +1430,14 @@ schema, findings in plain words and hot reload. The design is DESIGN §32.9; the
   the 200 MiB / 5000 file limits. Changed media precedes plugin.json in the rollback-protected atomic commit;
   all success/error/timeout paths remove the candidate. HTTP staging and complete checks run in disposable children
   [ASSUMED: at most two jobs, 20 seconds each, 512 MiB V8 heap]; cleanup is asynchronous.
-  Spine uploads use the packer's skeleton/atlas readers and rebuild clip metadata. Every PNG upload checks signature,
-  legal IHDR colour/depth/interlace fields, chunk CRCs, palette and end ordering, and inflates zlib with an exact
+  Skin-slot and files-PUT Spine uploads use the packer's skeleton/atlas readers and rebuild clip metadata.
+  PNGs uploaded through skin slots, files PUT or staged FX forms check signature, raw ASCII-letter chunk types,
+  legal IHDR colour/depth/interlace fields, chunk CRCs, palette and end ordering, and inflate zlib with an exact
   scanline-size bound (including Adam7 passes), then checks scanline filters. [ASSUMED] Decoded scanlines are capped
   at 256 MiB. Only declared effect sheets use non-interlaced 8-bit RGB/RGBA ≤2048 per side; inline and file-backed
-  overlays both identify them, and extensions are case-insensitive. Other PNG art accepts all legal depth/colour
-  combinations and Adam7. Pending FX FileReader completions merge into the latest draft; save stays disabled until
+  overlays both identify them. Upload decoding recognizes `.PNG` too; FX paths retain lowercase `.png` / `.json`.
+  The 0.3.0 art/model/voice/audio slots and a bond's icon keep their direct writes, without this media validation gate.
+  Other validated PNG art accepts all legal depth/colour combinations and Adam7. Pending FX FileReader completions merge into the latest draft; save stays disabled until
   all reads finish. Trials accept the same 160 MiB request body as authoring. [ASSUMED] Newly staged replay images
   are embedded as PNG data URLs, at most 8 MiB compressed image bytes total within the existing 16 MiB result cap;
   they remain available for the replay's lifetime after temporary files are removed. Saved images retain ordinary

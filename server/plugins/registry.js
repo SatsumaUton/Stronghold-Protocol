@@ -452,11 +452,12 @@ function readUiFrame(dir, manifest, listed, { vanilla, hashCache }) {
  * Read a plugin's interaction windows (PLUGIN API v2, shared/plugins/offers.js): every `offers` file the manifest
  * names, in the manifest's order. Data only — nothing is run, nothing is served, and the files are hashed with the
  * rest of the plugin's parts (they are declared paths, so their bytes enter `cs` like a data or DSL part's).
+ * Also reused internally by the studio's content-only check when an asset error blocks ordinary registry loading.
  * @param {import('../../shared/plugins/manifest.js').PluginManifest} manifest
  * @param {object} content immutable JSON snapshot
  * @returns {{ offers: object[] | null, problems: string[], warnings: string[], issues: PluginIssue[] }}
  */
-function readOffers(manifest, content) {
+export function readOffers(manifest, content) {
   const list = issueList();
   const rels = manifest.parts?.offers?.files || [];
   if (!rels.length) return { offers: null, problems: [], warnings: [], issues: [] };

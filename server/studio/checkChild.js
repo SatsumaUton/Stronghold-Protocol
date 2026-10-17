@@ -29,9 +29,15 @@ process.once('message', ({ dir, live, dataDir, pluginsDir, strict, uploads, stag
     const checked = checkGameplayFolder(dir, { dataDir, pluginsDir, strict, enforceLimits: true });
     if (live && !checked.ok) {
       const before = checkGameplayFolder(live, { dataDir, pluginsDir, strict, updateLock: false });
-      const key = p => JSON.stringify([p.code, p.path || p.params?.where || p.file || '']);
-      const existing = new Set(before.problems.map(key));
-      checked.problems = checked.problems.filter(p => !existing.has(key(p)));
+      // [ASSUMED] Compare exact reasons, including measured numbers; one finding excuses one identical copy.
+      const key = p => JSON.stringify([p.code, p.path || p.params?.where || p.file || p.at?.join('.') || '', p.message ?? p.text ?? p.params?.detail ?? '']);
+      const existing = new Map();
+      for (const p of before.problems) { const k = key(p); existing.set(k, (existing.get(k) || 0) + 1); }
+      checked.problems = checked.problems.filter(p => {
+        const k = key(p), count = existing.get(k) || 0;
+        if (!count) return true;
+        existing.set(k, count - 1); return false;
+      });
       checked.ok = !checked.problems.length;
     }
     process.send({ checked });
