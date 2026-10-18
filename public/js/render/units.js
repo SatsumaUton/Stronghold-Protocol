@@ -88,6 +88,7 @@ import { MANIFOLD, isManifold, manifoldCopyForm, manifoldAttackForm } from './ma
 import { diamondTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, hudRings, ringArc, downLabel, HUD_DISC, ELEMENT_RING } from './textures.js';
 import { COLORS, TIER_COLORS, ENEMY_FRAME, UNIT, PROJ, statusIconKey, statusIconSuppressed } from './style.js';
 import { drawCrate, rowDepthKey, ROW_KEY, deviceBoxOf, DEVICE_BOX } from './tiles.js';
+import { startAtkInterval, nextAtkInterval, clampAtkInterval } from './attackRate.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const DIRS = ['UP', 'RIGHT', 'DOWN', 'LEFT'];
@@ -711,7 +712,7 @@ export class UnitView {
     this.flash = 0;
     this.bob = Math.random() * Math.PI * 2;
     this.hovered = false; this.dimmed = false; this.lift = 0;
-    this.lastAtk = -1; this.atkInterval = defaultInterval(ctx, info);
+    this.lastAtk = -1; this.atkSeen = false; this.atkInterval = startAtkInterval(info.atkInterval, defaultInterval(ctx, info));
     this.shake = 0;
     this.screen = { x: 0, y: 0, s: 1, top: 0 };
     this.placed = false;          // set by the first update's projection: until then `screen` is not on screen (bounds)
@@ -1353,8 +1354,11 @@ export class UnitView {
     const once = !!PROJ[kind]?.once;
     if (!once) {
       if (this.lastAtk >= 0) {
-        const d = now - this.lastAtk;
-        if (d > 0.05 && d < 6) this.atkInterval = this.atkInterval * 0.6 + d * 0.4;
+        // the real gap between two attacks: the first one replaces the estimate (no slow-motion ramp-in), later ones
+        // follow a real change at once and only smooth tick-sized wobble (render/attackRate.js)
+        const r = nextAtkInterval(this.atkInterval, now - this.lastAtk, this.atkSeen);
+        this.atkInterval = r.interval;
+        if (r.measured) this.atkSeen = true;
       }
       this.lastAtk = now;
     }
@@ -1370,6 +1374,21 @@ export class UnitView {
     }
     this.lunge = 1;
     if (this.actor) this.actor.attack(this.atkInterval, once); // game seconds: the actor's clock runs in game time
+    if (this.imp) this.imp.dirty = true;
+  }
+
+  /**
+   * The sim says this unit's attack interval CHANGED (`b.ev` ['rate', id, seconds], EV.RATE): a skill or an attack-speed
+   * buff/debuff landed (`s.interval`). It is authoritative, so the attack clip is paced right on the NEXT wind-up instead
+   * of waiting for this view to measure two attacks by itself. Later measured gaps still smooth into it.
+   * @param {number} seconds the sim's attack interval
+   */
+  setAtkInterval(seconds) {
+    const v = Number(seconds);
+    if (!Number.isFinite(v) || v <= 0) return;
+    this.atkInterval = clampAtkInterval(v);
+    this.atkSeen = true;
+    if (this.actor) this.actor.interval = this.atkInterval;
     if (this.imp) this.imp.dirty = true;
   }
 
