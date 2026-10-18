@@ -304,16 +304,20 @@ export const isDroppable = (msg) => !!msg && msg.t === 'b.snap';
  * Encode and send one message to a socket. Never throws.
  * @param {import('ws').WebSocket | null | undefined} ws
  * @param {object} msg
+ * @param {string | null} [encoded] bytes a caller already produced; must be this message when it is a state kind
  * @returns {boolean}
  */
-export function send(ws, msg) {
-  const encoded = encode(msg);
-  if (encoded == null) return false;
+export function send(ws, msg, encoded = null) {
+  const bytes = encoded == null ? encode(msg) : encoded;
+  if (bytes == null) return false;
   // state kinds go through the delta transport: it owns the per-connection baseline, so commit() only runs after the
   // frame was really queued (a dropped or terminated socket must not advance it).
-  const frame = prepareStateFrame(ws, msg, encoded);
-  const ok = sendRaw(ws, frame.data, { droppable: isDroppable(msg) });
-  if (ok) frame.commit();
+  const frame = prepareStateFrame(ws, msg, bytes);
+  // Pre-encoded bytes that are not a JSON object cannot be a baseline: fall back to the full frame encoded here.
+  const data = frame.usable ? frame.data : encode(msg);
+  if (data == null) return false;
+  const ok = sendRaw(ws, data, { droppable: isDroppable(msg) });
+  if (ok && frame.usable) frame.commit();
   return ok;
 }
 
@@ -323,9 +327,9 @@ export function send(ws, msg) {
  * @param {object} msg
  * @returns {boolean}
  */
-export function sendSession(session, msg) {
+export function sendSession(session, msg, encoded = null) {
   if (!session || !session.connected) return false;
-  return send(session.ws, msg);
+  return send(session.ws, msg, encoded);
 }
 
 /** @param {unknown} rid */

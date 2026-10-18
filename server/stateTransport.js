@@ -31,14 +31,22 @@ export function negotiateStateDelta(ws, version) {
 /** Forget the baselines (a new negotiation, or a client that asked for a full resync). The counter never rewinds. */
 export function resetStateDelta(ws) { connections.get(ws)?.kinds.clear(); }
 
-/** Return an encoded state and commit its baseline ONLY after the caller successfully queues the reliable frame. */
+/** Return an encoded state and commit its baseline ONLY after the caller successfully queues the reliable frame.
+ * `usable: false` means the given bytes cannot be a baseline (they are not a JSON object) and the caller should send a
+ * full frame it encoded itself; this connection keeps the baseline it already had. */
 export function prepareStateFrame(ws, msg, encoded) {
   const connection = connections.get(ws);
-  if (!connection || !isStateKind(msg?.t) || !DELTA_KINDS.has(msg.t)) return { data: encoded, commit() {} };
+  if (!connection || !isStateKind(msg?.t) || !DELTA_KINDS.has(msg.t)) return { data: encoded, commit() {}, usable: true };
   let snapshot = snapshots.get(msg);
   // The encoding, not mutable game objects, owns this immutable baseline.
   if (!snapshot || snapshot.encoded !== encoded) {
-    snapshot = { encoded, view: JSON.parse(encoded), patches: new WeakMap() };
+    let view;
+    // Bytes a caller pre-encoded (a lane worker) can be anything: never throw out of the send path because of them.
+    try { view = JSON.parse(encoded); } catch { view = null; }
+    if (view === null || typeof view !== 'object' || Array.isArray(view)) {
+      return { data: encoded, commit() {}, usable: false };
+    }
+    snapshot = { encoded, view, patches: new WeakMap() };
     snapshots.set(msg, snapshot);
   }
   const previous = connection.kinds.get(msg.t);
@@ -58,5 +66,5 @@ export function prepareStateFrame(ws, msg, encoded) {
       if (Buffer.byteLength(delta) < Buffer.byteLength(data)) data = delta;
     }
   }
-  return { data, commit() { connection.kinds.set(msg.t, { snapshot, seq }); } };
+  return { data, commit() { connection.kinds.set(msg.t, { snapshot, seq }); }, usable: true };
 }
