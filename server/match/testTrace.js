@@ -80,6 +80,7 @@ export function installTestTrace(m, opts) {
   Object.assign(options, {
     test: true, seed: m.seed, timerScale: m.timerScale, combatSpeed: m.gameSpeed,
     clientCombat: m.clientCombat, verify: m.verifyMode, battleContent: m.battleContent,
+    botStrategy: m.bot.id,
     botRehearsal: m.botRehearsal, botRehearsalDelegate: m.botRehearsalDelegate,
     botRehearsalDelegateMs: m.botRehearsalDelegateMs,
   });

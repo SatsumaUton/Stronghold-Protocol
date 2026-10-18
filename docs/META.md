@@ -339,6 +339,28 @@ details: DESIGN §14 ([design/network.md](design/network.md)).
 
 ---
 
+### 1.6 Selectable AI implementations
+
+`Match({ botStrategy })` resolves a registered ID or a trusted server-side definition object using
+`server/match/botStrategies.js`. The explicit option overrides `SP_BOT_STRATEGY`; the default and sole initial
+built-in is `legacy`, an adapter referencing the original `bot.js` functions. Its decisions and RNG consumption
+are unchanged. `botStrategyContract.js` provides validated immutable definitions, hook inheritance and pure
+registries; it rejects duplicate IDs and malformed hooks instead of altering other matches' registrations.
+An unset or empty `SP_BOT_STRATEGY` uses the original bot when no explicit option is supplied. `startServer()` validates the environment
+selection before data loading or listening; an invalid ID prevents startup with a diagnostic naming the variable,
+rejected value, available IDs and how to unset it to restore the default.
+The test input journal stores the resolved `botStrategy` ID. Replay uses the recorded ID (older records: `legacy`),
+never the replay host's environment, and preserves `testSlice` counts for prep generators and rehearsal jobs.
+Band draft order is unchanged; selecting an AI implementation grants no seat priority.
+
+Band/common-card/private-bounty picks and both sliced prep stages use the selected object. Prep retains its existing
+iterator, rehearsal/delegation and deadline protocol. A custom hook failing before it creates an iterator still
+enters cleanup. `tools/matchrun.mjs --bot ID` and `tools/botbench.mjs --bot ID` select registered implementations
+explicitly; botbench records the ID and calls its bounty estimator. Its solo band override leaves the real band
+metadata intact. No alternative economy, formation, bond or sub-route policy is introduced.
+
+See [Adding an AI strategy](BOT_STRATEGIES.md) for signatures, examples, state ownership and the validation workflow.
+
 ## 2. Effect registry (content API)
 
 ```js

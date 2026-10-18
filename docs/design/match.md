@@ -112,6 +112,24 @@ Per match: pick stage (weighted among the mode's `config.modes[m].stages`, weigh
 
 ### 6.6 AI players (bot.js)
 
+Match selects a trusted server-side implementation through `botStrategies.js`: `opts.botStrategy` (registered ID
+or definition object), then `SP_BOT_STRATEGY`, then `legacy`. The initial registry contains only the unchanged
+`bot.js` adapter. `botStrategyContract.js` defines immutable strategy objects and pure registries; omitted hooks
+inherit an existing strategy (legacy by default). Invalid hooks, unknown IDs and duplicate registrations fail early.
+Registry additions do not reweight opening choices or consume RNG.
+An unset or empty `SP_BOT_STRATEGY` uses the original bot without a programmatic override. `startServer()` validates
+the environment selection before loading data or accepting connections; an unknown ID prevents startup with a
+diagnostic naming the variable, rejected value, available IDs and how to restore the default.
+Test input journals record the resolved strategy ID; replays use it explicitly, defaulting older records to `legacy`
+independently of the replay host's environment. Prep generators and rehearsal jobs retain journalled slice counts.
+The selected implementation does not change draft order or give any AI seat priority.
+
+The selected implementation handles band/card drafts, personal bounty choices, sliced prep begin/end and benchmark
+bounty estimates. Prep hooks return synchronous iterators and preserve the existing rehearsal job protocol,
+including host delegation, cancellation and error cleanup. Definitions do not hold mutable per-room/player state.
+This is a development interface, not a new gameplay policy or a client code/plugin loading mechanism.
+See [the strategy guide](../BOT_STRATEGIES.md) for the contract, registration and testing steps.
+
 After the greedy layout is complete, `planLayoutSteps` rechecks self-range guards on enemy-road tiles. An isolated
 guard may move to a free legal road tile with allied damage covering both it and the preceding tile of every incoming
 ground route. Different routes may have different supporting allies. The exposure score must not decrease [ASSUMED],
