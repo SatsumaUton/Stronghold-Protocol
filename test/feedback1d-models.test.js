@@ -149,6 +149,27 @@ describe('D3: the official slug models are an optional overlay of the web alias'
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
+  test('legacy pma: true assets stay pma: true (an extraction from before this change still loads)', async () => {
+    // The old extractor wrote premultiplied pages and `pma: true` atlases. Neither the atlas reader nor the client may
+    // drop that field: an old extraction must keep working after the straight-page extractor lands (the new extraction
+    // is covered by the pma === false assertion above).
+    const { normalizeAtlas, atlasInfo } = await import('../tools/assets/atlas.mjs');
+    const legacyAtlas = '\nlegacy.png\nsize: 256,256\nformat: RGBA8888\nfilter: Linear,Linear\nrepeat: none\npma: true\nB_1\n  rotate: false\n  xy: 0, 0\n  size: 4, 5\n  orig: 4, 5\n  offset: 0, 0\n';
+    const pageSize = () => ({ width: 256, height: 256 });
+    assert.equal(atlasInfo(legacyAtlas).hasPma, true, 'a legacy atlas still declares PMA');
+    const normalized = normalizeAtlas(legacyAtlas, { pageSize });
+    assert.equal(normalized.changed, false, 'the old atlas needs no rewrite');
+    assert.equal(atlasInfo(normalized.text).hasPma, true, 'the in-memory normalizer keeps an old pma: true');
+
+    const id = SLUGS[0];
+    const legacy = { enemies: { [id]: { spineLocal: { group: `spine/enemy/${id}`, ...COMMITTED[id], pma: true } } } };
+    const entry = spineEntry(legacy, id, { local: localManifest([id]) });
+    assert.equal(entry.pma, true, 'a legacy spineLocal pma is accepted as it is');
+    assert.equal(entry.skel, `/assets/local/spine/enemy/${id}/${COMMITTED[id].skel}`);
+    assert.equal(entry.atlas, `/assets/local/spine/enemy/${id}/${COMMITTED[id].atlas}`);
+    assert.deepEqual(entry.textures, COMMITTED[id].textures.map((f) => `/assets/local/spine/enemy/${id}/${f}`));
+  });
+
   test('loadLocalEnemySpines: the models of the committed file, {} when it is missing or bad', async () => {
     assert.deepEqual(await loadLocalEnemySpines(path.join(ROOT, LOCAL_ENEMY_SPINES_FILE)), COMMITTED);
     assert.deepEqual(await loadLocalEnemySpines(path.join(ROOT, 'no-such-file.json')), {});
