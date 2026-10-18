@@ -6,7 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { installCompat } from '../../public/js/ui/compat.js';
-import { detectFeatures, featureClasses, fullscreen, installDeviceSupport, installScreenWakeLock, LONG_PRESS_MS, screenLandscape } from '../../public/js/ui/device.js';
+import { detectFeatures, featureClasses, fullscreen, installDeviceSupport, installScreenWakeLock, isIOS, LONG_PRESS_MS, screenLandscape } from '../../public/js/ui/device.js';
 import { checkButtons } from '../../public/js/ui/hud.js';
 import { penPlacement, penZoneTiles, previewEnemyKey, PEN } from '../../public/js/ui/gameLogic.js';
 import { bannerVisible } from '../../public/js/ui/connBanner.js';
@@ -89,6 +89,45 @@ describe('ui/compat.js polyfills (Safari 15.0–15.3 / Firefox ESR)', () => {
 // ---- device.js ---------------------------------------------------------------------------------------------------------
 
 describe('ui/device.js feature detection', () => {
+  test('iOS hint detection includes iPhone, iPad and iPod touch across browsers', () => {
+    for (const userAgent of [
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Version/18.0 Mobile/15E148 Safari/604.1',
+      'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) Version/18.0 Mobile/15E148 Safari/604.1',
+      'Mozilla/5.0 (iPod touch; CPU iPhone OS 15_0 like Mac OS X) Version/15.0 Mobile/15E148 Safari/604.1',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1',
+      'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) FxiOS/131.0 Mobile/15E148 Safari/605.1.15',
+    ]) {
+      const { win } = fakeWindow();
+      win.navigator.userAgent = userAgent;
+      assert.equal(isIOS(win), true, userAgent);
+    }
+  });
+  test('iPadOS desktop mode uses the Mac identity together with multitouch', () => {
+    const { win } = fakeWindow({ touchPoints: 5 });
+    win.navigator.platform = 'MacIntel';
+    assert.equal(isIOS(win), true, 'iPadOS platform with multitouch');
+    win.navigator.platform = '';
+    win.navigator.userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Version/18.0 Safari/605.1.15';
+    assert.equal(isIOS(win), true, 'iPadOS desktop user agent with multitouch');
+    win.navigator.maxTouchPoints = 0;
+    assert.equal(isIOS(win), false, 'the same user agent on a desktop Mac');
+    win.navigator.platform = 'MacIntel';
+    win.navigator.maxTouchPoints = 1;
+    assert.equal(isIOS(win), false, 'a Mac identity alone does not identify iPadOS');
+  });
+  test('touch, coarse pointers and narrow windows do not identify iOS', () => {
+    for (const [platform, userAgent] of [
+      ['Linux armv8l', 'Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/129.0.0.0 Mobile Safari/537.36'],
+      ['Win32', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0.0.0 Safari/537.36'],
+      ['', ''],
+    ]) {
+      const { win } = fakeWindow({ touchPoints: 10, media: { '(any-pointer: coarse)': true } });
+      Object.assign(win.navigator, { platform, userAgent });
+      win.innerWidth = 390;
+      assert.equal(isIOS(win), false, platform || 'unknown touchscreen');
+    }
+    assert.equal(isIOS({}), false, 'missing navigator');
+  });
   test('touch / coarse / hover / fullscreen / reduced motion from media queries and APIs (no UA sniffing)', () => {
     const phone = detectFeatures(fakeWindow({ media: { '(any-pointer: coarse)': true, '(prefers-reduced-motion: reduce)': true }, touchPoints: 5 }).win);
     assert.equal(phone.touch, true);

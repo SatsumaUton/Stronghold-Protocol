@@ -821,6 +821,9 @@
 .set-seg button:last-child { border-right: 0; }
 .set-seg button.is-on { background: var(--mint-500); color: var(--text-on-mint); font-weight: 700; }
 .set-hint { margin-top: .06rem; font-size: calc(.14 * var(--t)); color: var(--text-dim); line-height: 1.8; }
+.set-hint__help { display: inline-flex; align-items: center; gap: .03rem; padding: 0; border: 0; background: none; color: var(--text-lo); font: inherit; cursor: help; text-decoration: underline dotted; text-underline-offset: .03rem; }
+.set-hint__help .icon { width: .14rem; height: .14rem; }
+.set-hint__help:hover, .set-hint__help:focus-visible { color: var(--mint-400); }
 .set-hint kbd, .lvcard__key, .toolbtn kbd { font-family: var(--font-num); font-size: .11rem; border: 1px solid var(--line-2); padding: 0 .04rem; color: var(--text-lo); background: rgba(0, 0, 0, .3); }
 /* 快捷键 (ui/settings.js HotkeySection): each shortcut with its key — click the key, press the new one; two columns,
    one under 768 px (phones in landscape) */

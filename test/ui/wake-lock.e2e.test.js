@@ -11,7 +11,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME);
 const LABEL = '全屏时保持屏幕常亮';
-const HINT = '开启后，全屏期间始终尝试保持屏幕常亮；战斗期间无需开启本设置，也会自动尝试保持亮屏。需要HTTPS和浏览器支持；iOS 低电量模式下可能不生效。';
+const HINT = '全屏期间始终保持屏幕常亮（{support}）。';
+const IOS_HINT = '全屏期间始终保持屏幕常亮（{support}）；iOS低电量模式下可能不生效。';
+const SUPPORT = '需要环境支持';
+const REQUIREMENTS = '需要 HTTPS 或可信的本地地址（如 localhost），浏览器支持 Screen Wake Lock API，且页面保持在前台。系统设置仍可能限制生效。';
+const HELP = '[data-testid="wake-lock-hint"] .set-hint__help';
 const ROW = '.modal .set-row';
 const clone = (value) => structuredClone(value);
 
@@ -40,11 +44,16 @@ describe('App screen wake lock', { skip: !ENABLED && 'set SP_E2E=1 (and have Chr
   });
   after(async () => { await browser?.close(); await srv?.close(); });
 
-  async function open(t, preference = {}) {
+  async function open(t, preference = {}, device = {}) {
     const context = await browser.createBrowserContext();
     t.after(() => context.close());
     const page = await context.newPage();
-    await page.setViewport({ width: 1600, height: 1000 });
+    await page.setViewport({ width: 1600, height: 1000, hasTouch: !!device.hasTouch });
+    if (device.userAgent) await page.setUserAgent(device.userAgent);
+    await page.evaluateOnNewDocument(({ platform, maxTouchPoints }) => {
+      if (platform !== undefined) Object.defineProperty(navigator, 'platform', { configurable: true, value: platform });
+      if (maxTouchPoints !== undefined) Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: maxTouchPoints });
+    }, device);
     const errors = [];
     page.on('pageerror', (err) => errors.push(err.message));
     await page.evaluateOnNewDocument((pref) => {
@@ -111,6 +120,23 @@ describe('App screen wake lock', { skip: !ENABLED && 'set SP_E2E=1 (and have Chr
     await page.click('button.fsbtn[aria-pressed]');
     await page.waitForFunction((value) => !!document.fullscreenElement === value, {}, on);
     await page.waitForSelector(`.fsbtn[aria-pressed="${on}"]`);
+  }
+  async function explanation(page, lang, ios = false) {
+    await page.select('.modal [data-testid="lang-toggle"] select', lang);
+    const pack = lang === 'zh' ? null : JSON.parse(readFileSync(path.join(ROOT, `public/i18n/${lang}.json`), 'utf8'));
+    const tr = (key) => pack?.[key] || key;
+    const hint = tr(ios ? IOS_HINT : HINT).replace('{support}', tr(SUPPORT));
+    await page.waitForFunction((text) => document.querySelector('[data-testid="wake-lock-hint"]')?.textContent === text, {}, hint);
+    assert.equal(await page.$eval(HELP, (el) => el.textContent), tr(SUPPORT), `${lang}: environment requirements are the interactive part of the complete translated sentence`);
+    assert.equal(await page.$eval(HELP, (el) => el.getAttribute('title')), null, 'the hint uses the shared Tooltip, not a native title');
+    await page.hover(HELP);
+    await page.waitForSelector('.tooltip.is-shown');
+    assert.equal(await page.$eval('.tooltip', (el) => el.textContent), tr(REQUIREMENTS), `${lang} shows the complete translated requirements`);
+    assert.equal(await page.$eval(HELP, (el) => el.getAttribute('aria-describedby')), await page.$eval('.tooltip', (el) => el.id));
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.tooltip', { hidden: true });
+    assert.ok(await page.$('.modal'), 'closing the help keeps the settings open');
+    return tr(LABEL);
   }
 
   test('all eight states share one lock across combat/fullscreen handoffs and every App route', async (t) => {
@@ -192,11 +218,8 @@ describe('App screen wake lock', { skip: !ENABLED && 'set SP_E2E=1 (and have Chr
     const out = path.join(ROOT, 'test/e2e/out');
     mkdirSync(out, { recursive: true });
     for (const lang of ['zh', 'en', 'ja', 'ko', 'zh-TW']) {
-      await page.select('.modal [data-testid="lang-toggle"] select', lang);
-      const pack = lang === 'zh' ? null : JSON.parse(readFileSync(path.join(ROOT, `public/i18n/${lang}.json`), 'utf8'));
-      const label = pack?.[LABEL] || LABEL, hint = pack?.[HINT] || HINT;
+      const label = await explanation(page, lang);
       await page.waitForFunction((text) => [...document.querySelectorAll('.modal .set-row__label')].some((el) => el.firstChild?.textContent === text), {}, label);
-      assert.ok(await page.evaluate((text) => [...document.querySelectorAll('.modal .set-hint')].some((el) => el.textContent === text), hint), `${lang} shows the translated explanation`);
       assert.equal(await switchValue(), 'false', `${lang} keeps the switch off`);
       const row = await page.evaluateHandle(() => [...document.querySelectorAll('.modal .set-row')].find((el) => el.textContent.includes('SCREEN WAKE LOCK')));
       await row.asElement().scrollIntoView();
@@ -224,6 +247,101 @@ describe('App screen wake lock', { skip: !ENABLED && 'set SP_E2E=1 (and have Chr
         return (await import('/js/ui/settings.js')).settingsStore.get().fullscreenWakeLock;
       }), false, `legacy screenWakeLock=${legacy} is not migrated`);
     }
+  });
+
+  test('only iOS and iPadOS show the Low Power Mode note in the real settings modal', async (t) => {
+    const devices = [
+      ['iPhone Safari', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1', 'iPhone', 5, true],
+      ['iPad Safari', 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1', 'iPad', 5, true],
+      ['iPod touch', 'Mozilla/5.0 (iPod touch; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 Version/15.0 Mobile/15E148 Safari/604.1', 'iPod', 5, true],
+      ['iPadOS desktop mode', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15', 'MacIntel', 5, true],
+      ['Chrome on iOS', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 CriOS/129.0.0.0 Mobile/15E148 Safari/604.1', 'iPhone', 5, true],
+      ['Android touch', 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/129.0.0.0 Mobile Safari/537.36', 'Linux armv8l', 5, false],
+      ['Windows touch', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/129.0.0.0 Safari/537.36', 'Win32', 10, false],
+    ];
+    for (const [name, userAgent, platform, maxTouchPoints, ios] of devices) {
+      const page = await open(t, {}, { userAgent, platform, maxTouchPoints, hasTouch: true });
+      await settings(page);
+      assert.equal(await page.$eval('[data-testid="wake-lock-hint"]', (el) => el.textContent),
+        (ios ? IOS_HINT : HINT).replace('{support}', SUPPORT), name);
+      await page.close();
+    }
+  });
+
+  test('iOS settings use a complete translated sentence and shared help in all five languages', async (t) => {
+    const page = await open(t, {}, {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1',
+      platform: 'iPhone', maxTouchPoints: 5,
+    });
+    await settings(page);
+    for (const lang of ['zh', 'en', 'ja', 'ko', 'zh-TW']) await explanation(page, lang, true);
+    await expectCounts(page, [0, 0], 'reading help never enables fullscreen wake lock');
+  });
+
+  test('requirements help supports hover, keyboard and click without changing the switch', async (t) => {
+    const page = await open(t);
+    await settings(page);
+    await page.hover(HELP);
+    await page.waitForSelector('.tooltip.is-shown');
+    assert.equal(await page.$eval('.tooltip', (el) => el.textContent), REQUIREMENTS);
+    const hit = await page.$eval(HELP, (el) => {
+      const r = el.getBoundingClientRect(), tip = document.querySelector('.tooltip').getBoundingClientRect();
+      const toggle = [...document.querySelectorAll('.modal .set-row')].find((row) => row.textContent.includes('SCREEN WAKE LOCK')).querySelector('[role="switch"]');
+      const s = toggle.getBoundingClientRect();
+      return { hit: el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)),
+        overlaps: tip.left < s.right && s.left < tip.right && tip.top < s.bottom && s.top < tip.bottom };
+    });
+    assert.deepEqual(hit, { hit: true, overlaps: false }, 'help remains hittable and does not cover its setting switch');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.tooltip', { hidden: true });
+    assert.ok(await page.$('.modal'));
+    await page.mouse.move(1, 1);
+    // Focus the previous real control, then use a physical Tab press to reach the help.
+    await page.evaluate((sel) => {
+      const controls = [...document.querySelectorAll('.modal button, .modal input, .modal select')];
+      controls[controls.indexOf(document.querySelector(sel)) - 1].focus();
+    }, HELP);
+    await page.keyboard.press('Tab');
+    assert.equal(await page.$eval(HELP, (el) => document.activeElement === el), true);
+    await page.waitForSelector('.tooltip.is-shown');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.tooltip', { hidden: true });
+    await page.click(HELP);
+    await page.waitForSelector('.tooltip.is-shown');
+    await page.click('.modal__title');
+    await page.waitForSelector('.tooltip', { hidden: true });
+    assert.ok(await page.$('.modal'), 'an outside click closes the help only');
+    assert.equal(await page.evaluate(async () => (await import('/js/ui/settings.js')).settingsStore.get().fullscreenWakeLock), false);
+    await expectCounts(page, [0, 0], 'help interactions do not request a lock');
+    await toggle(page, true);
+    assert.equal(await page.evaluate(async () => (await import('/js/ui/settings.js')).settingsStore.get().fullscreenWakeLock), true, 'the switch still works independently');
+  });
+
+  test('a short touch tap opens requirements; another tap, outside and Escape close it', async (t) => {
+    const page = await open(t, {}, { hasTouch: true });
+    await settings(page);
+    const tap = async (selector) => {
+      await page.$eval(selector, (el) => el.scrollIntoView({ block: 'center' }));
+      const r = await page.$eval(selector, (el) => { const b = el.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; });
+      await page.touchscreen.tap(r.x, r.y);
+    };
+    await tap(HELP);
+    await page.waitForSelector('.tooltip.is-shown');
+    await new Promise((resolve) => setTimeout(resolve, 1700));
+    assert.ok(await page.$('.tooltip.is-shown'), 'tap-open help does not use the old long-press expiration');
+    await tap(HELP);
+    await page.waitForSelector('.tooltip', { hidden: true });
+    await tap(HELP);
+    await page.waitForSelector('.tooltip.is-shown');
+    await tap('.modal__title');
+    await page.waitForSelector('.tooltip', { hidden: true });
+    await tap(HELP);
+    await page.waitForSelector('.tooltip.is-shown');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.tooltip', { hidden: true });
+    assert.ok(await page.$('.modal'));
+    assert.equal(await page.evaluate(async () => (await import('/js/ui/settings.js')).settingsStore.get().fullscreenWakeLock), false);
+    await expectCounts(page, [0, 0], 'touching the help does not enable the setting or request a lock');
   });
 
   test('real tab visibility releases and restores combat; inactive foreground does not acquire', async (t) => {

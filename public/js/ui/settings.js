@@ -25,7 +25,7 @@
 // 异形屏适配 (ui/screenFit.js): imported here, ahead of main.js's first render, so the stored offsets are on at boot.
 
 import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { html, Modal, Button, Icon, MicroLabel, confirmDialog } from './components.js';
+import { html, Modal, Button, Icon, MicroLabel, Tooltip, confirmDialog } from './components.js';
 import { GIcon } from './gameComponents.js';
 import { useStore, savePref, store } from '../store.js';
 import { settingsStore } from './settingsStore.js';
@@ -33,9 +33,9 @@ export { settingsStore } from './settingsStore.js';
 import { sanitizeSettings, HOTKEY_ACTIONS, DEFAULT_HOTKEYS, hotkeyLabel, rebindHotkey, isDefaultHotkeys, captureHotkey, VOICE_LANGS, TEXT_SIZES } from './gameLogic.js';
 import { audio } from '../audio.js';
 import { openGuide } from './guide.js';
-import { detectFeatures } from './device.js';
+import { detectFeatures, isIOS } from './device.js';
 import { LangToggle, machineTranslationNote } from './lang.js';
-import { t, tc, N_ } from '../../../shared/i18n.js';
+import { t, tc, tParts, N_ } from '../../../shared/i18n.js';
 import { errorCount, currentBattle, diagnosticsText } from '../diag.js';
 import { copyText } from './clipboard.js';
 import { catalog, loadCatalog, cosmeticPlugins, installedCount, isPersonalCosmetic, personal, personalApplied, personalSet, pluginName, setPersonalPlugin } from '../content.js';
@@ -507,7 +507,14 @@ export function SettingsModal({ open, onClose }) {
       <${Toggle} label=${t('部署时收起商店')} micro="DEPLOY FOLD" value=${s.prepDeployFold} onChange=${(v) => updateSettings({ prepDeployFold: v })} />
       <p class="set-hint">${t('拖起干员、装备或召唤物，以及放下后选择朝向时，临时收起商店并放大棋盘。关闭后，拿起时既不改变商店的收起状态，也不缩放镜头。')}</p>
       <${Toggle} label=${t('全屏时保持屏幕常亮')} micro="SCREEN WAKE LOCK" value=${s.fullscreenWakeLock} onChange=${(v) => updateSettings({ fullscreenWakeLock: v })} />
-      <p class="set-hint">${t('开启后，全屏期间始终尝试保持屏幕常亮；战斗期间无需开启本设置，也会自动尝试保持亮屏。需要HTTPS和浏览器支持；iOS 低电量模式下可能不生效。')}</p>
+      <p class="set-hint" data-testid="wake-lock-hint">${tParts(isIOS()
+        ? N_('全屏期间始终保持屏幕常亮（{support}）；iOS低电量模式下可能不生效。')
+        : N_('全屏期间始终保持屏幕常亮（{support}）。'), {
+        support: html`<${Tooltip} tap=${true} id="wake-lock-requirements" placement="bottom"
+          text=${t('需要 HTTPS 或可信的本地地址（如 localhost），浏览器支持 Screen Wake Lock API，且页面保持在前台。系统设置仍可能限制生效。')}>
+          <button type="button" class="set-hint__help" aria-describedby="wake-lock-requirements">${t('需要环境支持')}<${Icon} name="info" /></button>
+        <//>`,
+      })}</p>
       <div class="set-row">
         <span class="set-row__label">${t('画面质量')}<${MicroLabel}>QUALITY<//></span>
         <div class="set-seg" role="radiogroup">

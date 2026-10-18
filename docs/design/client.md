@@ -431,7 +431,9 @@ for a valid ongoing match; an ended/absent room or an existing result does not q
 overlapping combat and fullscreen keep the same lock. When neither reason holds, on hiding the page or unmounting,
 release the lock and cancel a pending gesture retry; returning visible while active requests again. A failed normal
 request retries once on the next pointer/touch gesture, and a failed retry stays silent. Late results are released.
-The hint states that HTTPS and browser support are required and iOS Low Power Mode may prevent it from working.
+The short fullscreen hint links to a tooltip describing HTTPS or a trustworthy local address, Screen Wake Lock API
+support, foreground visibility, and possible system restrictions. Hover, keyboard focus, or a tap opens it; outside
+input or Escape closes it. Only iOS/iPadOS shows the Low Power Mode caveat; device detection affects this text only.
 
 The title and lobby offer explicit recovery of a previously saved local match seat. `sp.matches` stores bounded name /
 room-code metadata indexed by token hash; the existing four-entry `sp.tokens` ring remains the authority. Recovery

@@ -1,5 +1,5 @@
 // Multi-device support (desktop Chrome / Edge / Firefox / Safari, iPad and Android tablets in landscape, phones in
-// landscape ≥ 640×360 CSS px). Everything is feature-detected — never UA-sniffed:
+// landscape ≥ 640×360 CSS px). Capabilities are feature-detected; isIOS only selects explanatory copy:
 //
 //   detectFeatures()        { touch, coarse, hover, fullscreen, standalone, reducedMotion, importMaps, … } of this browser
 //   installDeviceSupport()  once at boot (main.js): <html> classes (sp-touch / sp-coarse / sp-hover / sp-fs /
@@ -30,6 +30,14 @@ export const LONG_PRESS_MS = 520;
 const LONG_PRESS_SLOP = 10;
 
 const mq = (win, q) => { try { return !!win.matchMedia?.(q)?.matches; } catch { return false; } };
+
+/** iOS/iPadOS hint copy only; never a browser-capability gate. */
+export function isIOS(win = globalThis) {
+  const nav = win.navigator || {};
+  const ua = nav.userAgent || '';
+  return /iPad|iPhone|iPod/.test(ua)
+    || ((nav.platform === 'MacIntel' || /Macintosh/.test(ua)) && nav.maxTouchPoints > 1);
+}
 
 /**
  * Whether the SCREEN (not the viewport) is in landscape: a split-view iPad or a narrow desktop window has a portrait
