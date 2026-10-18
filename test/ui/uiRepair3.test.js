@@ -71,6 +71,17 @@ describe('detail card vs a press on the field', () => {
     assert.match(h, /setDetail\(\(d\) => \(closesOnFieldPress\(d\) \? null : d\)\)/);
     assert.doesNotMatch(h, /if \(L\.sel\) \{[^}]*setDetail/, 'not only while a piece is selected');
   });
+
+  test('a press elsewhere in the game HUD closes detail cards opened outside the field', () => {
+    const src = readFileSync(new URL('../../public/js/screens/game.js', import.meta.url), 'utf8');
+    const start = src.indexOf('// Detail cards can also be opened');
+    const end = src.indexOf("screen.addEventListener('pointerdown', onDown, true)", start);
+    const h = src.slice(start, end);
+    assert.ok(h.length > 0);
+    assert.match(h, /if \(!live\.current\.detail \|\| e\.target\?\.closest\?\.\('\.dpanel'\)\) return;\s+setDetail\(null\)/);
+    assert.ok(end > start, 'the handler listens on the whole game screen, including the HUD');
+    assert.match(src.slice(end, end + 100), /screen\.addEventListener\('pointerdown', onDown, true\)/);
+  });
 });
 
 describe('交流 pager touch hit areas (css/devices.css)', () => {
