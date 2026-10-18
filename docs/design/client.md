@@ -423,13 +423,15 @@ board is sized from its host, and `fieldHost.js hudBands` measures the HUD from 
 attribute: the page is exactly the unmoved one.
 Overrides are local listening preferences, absent from room loadouts and their exports.
 
-设置 →「战斗期间保持屏幕常亮」 (`screenWakeLock`, PR #574) defaults off, like the optional ammo count: the official
-game has no such feature (the maintainer's decision of 2026-10-13). It shares `sp.pref.settings`. When enabled, players
-and spectators request a screen wake lock only during `isCombatPhase(phase)`. A failed normal request retries once on
-the next pointer/touch gesture; a failed retry stays silent. Turning the setting off, leaving combat, hiding the page
-or unmounting releases the lock and cancels a pending gesture retry; returning visible while active starts a new
-request. Late results are released. The hint states that HTTPS and browser support are required and iOS Low Power
-Mode may ignore it.
+Screen wake lock (PR #574) is a client convenience; parity with the official game is unverified and remains for the
+maintainer to confirm. App requests it automatically for players and spectators when `isCombatPhase(phase)` holds
+for a valid ongoing match; an ended/absent room or an existing result does not qualify. 设置 →「全屏时保持屏幕常亮」
+(`fullscreenWakeLock`, default false) also requests it while fullscreen on any app screen and persists in
+`sp.pref.settings`. The old `screenWakeLock` preference is not migrated. One App-level hook owns both reasons, so
+overlapping combat and fullscreen keep the same lock. When neither reason holds, on hiding the page or unmounting,
+release the lock and cancel a pending gesture retry; returning visible while active requests again. A failed normal
+request retries once on the next pointer/touch gesture, and a failed retry stays silent. Late results are released.
+The hint states that HTTPS and browser support are required and iOS Low Power Mode may prevent it from working.
 
 The title and lobby offer explicit recovery of a previously saved local match seat. `sp.matches` stores bounded name /
 room-code metadata indexed by token hash; the existing four-entry `sp.tokens` ring remains the authority. Recovery

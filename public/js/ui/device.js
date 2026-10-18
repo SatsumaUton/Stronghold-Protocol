@@ -195,18 +195,24 @@ export const fullscreen = {
   toggle(win = globalThis) { return this.active(win) ? this.exit(win) : this.enter(win); },
 };
 
-/** Fullscreen toggle (hidden where the browser has no element fullscreen, e.g. iPhone Safari). */
-export function FullscreenButton({ class: cls = '' }) {
+export function useFullscreen() {
   const [on, setOn] = useState(() => fullscreen.active());
-  const [ok] = useState(() => fullscreen.supported());
   useEffect(() => {
     const d = globalThis.document;
     if (!d) return undefined;
     const upd = () => setOn(fullscreen.active());
     d.addEventListener('fullscreenchange', upd);
     d.addEventListener('webkitfullscreenchange', upd);
+    upd();
     return () => { d.removeEventListener('fullscreenchange', upd); d.removeEventListener('webkitfullscreenchange', upd); };
   }, []);
+  return on;
+}
+
+/** Fullscreen toggle (hidden where the browser has no element fullscreen, e.g. iPhone Safari). */
+export function FullscreenButton({ class: cls = '' }) {
+  const on = useFullscreen();
+  const [ok] = useState(() => fullscreen.supported());
   if (!ok) return null;
   const label = on ? t('退出全屏') : t('全屏');
   return html`<button type="button" class=${`fsbtn tapx ${cls}`} aria-label=${label} title=${label} aria-pressed=${on ? 'true' : 'false'}
