@@ -661,8 +661,9 @@ def merge_alpha(rgb, alpha):
     are straight: the local-client skin pages (char_249_mlyss_ambienceSynesthesia_6: 16.3% of the semi-transparent
     pixels have max(RGB) > A, which premultiplied data cannot) and the two enemy pages (119/116 of ~10.7k); the
     downloaded pages are straight too. The extractor writes them as they are and the atlas carries no `pma`: PIXI
-    premultiplies once on upload. A page that really were premultiplied would need RGB × A here, or `pma: true` in the
-    atlas — the old extractor's `min(RGB, A)` clamp did neither, which darkened the semi-transparent art."""
+    premultiplies once on upload. A page that really were premultiplied would need RGB / (A / 255) here when A > 0
+    (unpremultiply; RGB × A is the straight-to-premultiplied direction), or `pma: true` in the atlas — the old
+    extractor's `min(RGB, A)` clamp did neither, which darkened the semi-transparent art."""
     from PIL import Image
     r, g, b = rgb.convert('RGB').split()
     if alpha is not None:

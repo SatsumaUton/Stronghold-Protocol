@@ -595,11 +595,14 @@ Other renderer rules from research 07 §5.4–5.5:
     - `tools/local-extract/extract.py` writes the model to `public/assets/local/spine/enemy/{enemyId}/` (page textures
       with their `[alpha]` texture merged in: straight RGBA, the main texture's RGB untouched; the atlas gets `size:` and
       no `pma` field) and lists its files in `data/local-assets.json`.
-    - An extraction from before this change wrote premultiplied pages (`pma: true`, RGB clamped to A); those bytes cannot
-      be converted back. `data/assets.json` now says `pma: false`, so the old pages would be premultiplied a second time
-      when uploaded and the local enemies and tokens would render darker (black fringes on the tokens). Re-run
-      `node tools/setup.mjs --local` once after upgrading — `--local` re-extracts even when the art is already there —
-      and the pages are rewritten straight.
+    - An extraction from before this change wrote premultiplied pages (`pma: true`, RGB clamped to A); the `min(RGB, A)`
+      clamp lost colour and cannot be converted back. Re-extraction is still required for that reason, not because of the
+      manifest: the loader reads the atlas's `pma`, not `spineLocal.pma` in `data/assets.json`, and an old page with its
+      old atlas stays a matched pair — changing the manifest alone does not premultiply it again. Re-run
+      `node tools/setup.mjs --local` once after upgrading (`--local` re-extracts even when the art is already there) and
+      update the page and atlas as a set: a straight page with an atlas that carries no `pma`; never mix an old page or
+      an old atlas. Refresh the metadata with `fetch-assets --local-spines` (and `data/assets.json`) and repackage the
+      affected skin plugins. Legacy `pma: true` assets remain readable; the new extraction writes straight pages.
     - The metadata comes from the committed `tools/assets/local-enemy-spines.json` (`fetch-assets --local-spines`
       parses the extracted models into it), never from the disk: `data/assets.json` is byte-identical with or without
       the extraction, it has no `/assets/local/` URL, and setup / doctor / the manifest tests never miss these files.
