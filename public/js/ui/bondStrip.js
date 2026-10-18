@@ -1,4 +1,5 @@
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { cloneElement } from '../../vendor/preact.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 // Bond strip (active-bond discs under the top bar) and the bond detail popup: the key facts first (user playtest #2
 // item 9: name, members in play / next threshold, layers, reached tier and its threshold row, the current effect with
 // layer-resolved numbers), then the full description and the member list with owned / on-board state — operators that
@@ -47,7 +48,8 @@ function OwnerTag({ owner }) {
   </span>`;
 }
 
-function BondScroller({ viewport, count, children }) {
+function BondScroller({ count, children }) {
+  const viewport = useRef(null);
   const [edges, setEdges] = useState({ left: false, right: false });
   useEffect(() => {
     const el = viewport.current;
@@ -63,7 +65,7 @@ function BondScroller({ viewport, count, children }) {
   const scroll = direction => viewport.current?.scrollBy({ left: direction * Math.max(80, viewport.current.clientWidth * .75), behavior: 'smooth' });
   return html`<div class="bstrip-scroll">
     <button type="button" class="bstrip-scroll__arrow" disabled=${!edges.left} aria-label=${t('向左滚动盟约')} onClick=${() => scroll(-1)}>‹</button>
-    ${children}
+    ${cloneElement(children, { ref: viewport })}
     <button type="button" class="bstrip-scroll__arrow" disabled=${!edges.right} aria-label=${t('向右滚动盟约')} onClick=${() => scroll(1)}>›</button>
   </div>`;
 }
@@ -73,7 +75,6 @@ function BondScroller({ viewport, count, children }) {
  *   owner?: string|null }} props — owner: the watched teammate's name (null = your own bonds)
  */
 export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null, owner = null }) {
-  const viewport = { current: null };
   const sorted = sortBonds(bonds, (id) => data.lookup('bonds', id));
   if (!sorted.length) {
     return html`<div class=${cx('bstrip', 'bstrip--empty', owner && 'is-other')} data-owner=${owner || null}>
@@ -81,7 +82,7 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
   }
   const m = data.get('assets');
   const shown = sorted;
-  const strip = html`<div ref=${viewport} tabindex="0" class=${cx('bstrip', layersDisabled && 'is-frozen', owner && 'is-other')} role="list"
+  const strip = html`<div tabindex="0" class=${cx('bstrip', layersDisabled && 'is-frozen', owner && 'is-other')} role="list"
       aria-label=${owner ? t('{owner} 的盟约', { owner }) : t('我的盟约')} data-owner=${owner || null}>
     ${owner ? html`<${OwnerTag} owner=${owner} />` : null}
     ${shown.map((b) => {
@@ -109,7 +110,7 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
       </div>`;
     })}
   </div>`;
-  const content = html`<${BondScroller} viewport=${viewport} count=${sorted.length}>${strip}<//>`;
+  const content = html`<${BondScroller} count=${sorted.length}>${strip}<//>`;
   return layersDisabled ? html`<${Tooltip} text=${t('层数叠加已禁用')} placement="bottom">${content}<//>` : content;
 }
 

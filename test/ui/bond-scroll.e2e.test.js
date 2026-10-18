@@ -31,9 +31,10 @@ test('all bonds remain reachable by arrows, keyboard and native scrolling', { sk
       const last = '.bslot:last-child .bond';
       await page.click(last); await page.waitForSelector('.bpop');
       await page.click('.bpop__close');
-      await page.focus('.bstrip'); await page.keyboard.press('Home');
+      // Reset native scroll separately; only ArrowRight below is a keyboard assertion.
       await page.$eval('.bstrip', el => { el.scrollLeft = 0; });
       await page.waitForFunction(() => document.querySelector('.bstrip-scroll__arrow:first-child').disabled);
+      await page.focus('.bstrip');
       await page.keyboard.press('ArrowRight');
       await page.waitForFunction(() => document.querySelector('.bstrip').scrollLeft > 0);
       await page.click('.bonds-toggle');
@@ -46,13 +47,35 @@ test('all bonds remain reachable by arrows, keyboard and native scrolling', { sk
         const host = document.createElement('div'); host.id = 'frozen-bonds';
         host.className = 'gm__bonds'; host.style.width = '300px'; document.body.appendChild(host);
         const bonds = data.list('bonds').map(b => ({ bondId: b.bondId, count: 1, tier: 0, layers: 0 }));
-        render(html`<div class="gm__bond-list"><${BondStrip} bonds=${bonds} layersDisabled=${true} onOpen=${() => {}} /></div>`, host);
-        await new Promise(r => setTimeout(r, 100));
-        const strip = host.querySelector('.bstrip');
-        const result = { all: strip.querySelectorAll('.bslot').length, width: strip.clientWidth, scroll: strip.scrollWidth };
-        render(null, host); host.remove(); return result;
+        const NativeObserver = globalThis.ResizeObserver;
+        let created = 0, disconnected = 0;
+        globalThis.ResizeObserver = class extends NativeObserver {
+          constructor(callback) { super(callback); created++; }
+          disconnect() { disconnected++; super.disconnect(); }
+        };
+        try {
+          const draw = async entries => {
+            render(html`<div class="gm__bond-list"><${BondStrip} bonds=${entries} layersDisabled=${true} onOpen=${() => {}} /></div>`, host);
+            await new Promise(r => setTimeout(r, 100));
+          };
+          await draw(bonds);
+          const initial = created;
+          await draw(bonds.map(b => ({ ...b, layers: b.layers + 1 })));
+          const afterUpdate = { created, disconnected };
+          const strip = host.querySelector('.bstrip');
+          const result = { all: strip.querySelectorAll('.bslot').length, width: strip.clientWidth, scroll: strip.scrollWidth,
+            initial, afterUpdate };
+          render(null, host);
+          return { ...result, afterUnmount: disconnected };
+        } finally {
+          globalThis.ResizeObserver = NativeObserver;
+          render(null, host); host.remove();
+        }
       });
       assert.equal(frozen.all, count); assert.ok(frozen.width <= 300 && frozen.scroll > frozen.width);
+      assert.equal(frozen.initial, 1);
+      assert.deepEqual(frozen.afterUpdate, { created: 1, disconnected: 0 }, 'layer updates reuse the observer');
+      assert.equal(frozen.afterUnmount, 1, 'unmount disconnects the observer');
       assert.deepEqual(errors, []);
       await page.close();
     }
