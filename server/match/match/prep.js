@@ -103,7 +103,7 @@ export class MatchPrep {
       if (bounded) this.later(0, slice);
       else slice();
     };
-    this.later(this.scaled(DELAYS.BOT_ACTION + i * DELAYS.BOT_STAGGER), () => {
+    const begin = () => {
       if (!valid()) return;
       let gen;
       try { gen = this.bot.prepBegin(this, ps, { delegate: this.botRehearsalDelegate }); }
@@ -130,6 +130,12 @@ export class MatchPrep {
         }
         runJob(job);
       });
+    };
+    this.later(this.scaled(DELAYS.BOT_ACTION + i * DELAYS.BOT_STAGGER), () => {
+      if (!valid()) return;
+      if (this.bot.decide?.(this, ps, { kind: 'prep', valid, complete: () => ps.ready,
+        fallback: () => this.later(0, begin) })) return;
+      begin();
     });
   }
 

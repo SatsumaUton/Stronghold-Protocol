@@ -12,7 +12,7 @@ const soloBot = (opts = {}) => makeMatch({ mode: 'solo', difficulty: 'NORMAL', f
   seats: [{ seat: 0, playerId: 'ai_0', name: 'AI', isBot: true, connected: true }], ...opts });
 
 test('the default strategy is the original bot functions with no wrapping or policy changes', () => {
-  assert.deepEqual(Object.keys(BOT_STRATEGIES), ['legacy']);
+  assert.deepEqual(Object.keys(BOT_STRATEGIES), ['legacy', 'external']);
   assert.equal(getBotStrategy(), LEGACY_BOT);
   assert.equal(getBotStrategy(''), LEGACY_BOT);
   assert.equal(LEGACY_BOT.pickBand, legacy.botPickBand);
@@ -72,7 +72,7 @@ test('strategies override individual hooks and inherit their base without mutati
   assert.ok(Object.isFrozen(registry));
   assert.equal(getBotStrategy('last-card', registry).pickCard, pickCard);
   assert.equal(getBotStrategy('legacy', registry), LEGACY_BOT);
-  assert.deepEqual(Object.keys(BOT_STRATEGIES), ['legacy'], 'a local registry cannot leak into other rooms');
+  assert.deepEqual(Object.keys(BOT_STRATEGIES), ['legacy', 'external'], 'a local registry cannot leak into other rooms');
 });
 
 test('unknown names, duplicate registrations, malformed hooks and misspellings fail early', () => {

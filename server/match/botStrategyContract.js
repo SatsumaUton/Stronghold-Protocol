@@ -12,7 +12,7 @@ export const LEGACY_BOT = Object.freeze({
 
 /** @typedef {{ id: string, pickBand: typeof legacy.botPickBand, pickCard: typeof legacy.botPickCard,
  * prepBegin: typeof legacy.botPrepBeginSteps, prepEnd: typeof legacy.botPrepEndSteps,
- * bountyKillChance: typeof legacy.bountyKillChance }} BotStrategy */
+ * bountyKillChance: typeof legacy.bountyKillChance, decide?: (match: any, player: any, decision: any) => boolean }} BotStrategy */
 /** @typedef {Partial<Omit<BotStrategy, 'id'>> & { id: string, base?: BotStrategy }} BotStrategyDefinition */
 
 const HOOKS = Object.freeze(['pickBand', 'pickCard', 'prepBegin', 'prepEnd', 'bountyKillChance']);
@@ -26,13 +26,18 @@ export function defineBotStrategy(definition) {
   if (!validId(id)) throw new TypeError('Bot strategy: id must be a lowercase identifier (letters, digits, hyphens)');
   if (!base || !validId(base.id) || HOOKS.some((hook) => typeof base[hook] !== 'function')) throw new TypeError(`Bot strategy ${id}: invalid base`);
   for (const key of Object.keys(definition)) {
-    if (key !== 'id' && key !== 'base' && !HOOKS.includes(key)) throw new TypeError(`Bot strategy ${id}: unknown hook ${key}`);
+    if (key !== 'id' && key !== 'base' && key !== 'decide' && !HOOKS.includes(key)) throw new TypeError(`Bot strategy ${id}: unknown hook ${key}`);
   }
   const out = { id };
   for (const hook of HOOKS) {
     const fn = Object.hasOwn(definition, hook) ? definition[hook] : base[hook];
     if (typeof fn !== 'function') throw new TypeError(`Bot strategy ${id}: ${hook} must be a function`);
     out[hook] = fn;
+  }
+  const decide = Object.hasOwn(definition, 'decide') ? definition.decide : base.decide;
+  if (decide !== undefined) {
+    if (typeof decide !== 'function') throw new TypeError(`Bot strategy ${id}: decide must be a function`);
+    out.decide = decide;
   }
   return Object.freeze(/** @type {BotStrategy} */ (out));
 }

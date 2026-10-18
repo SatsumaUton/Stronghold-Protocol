@@ -113,8 +113,8 @@ Per match: pick stage (weighted among the mode's `config.modes[m].stages`, weigh
 ### 6.6 AI players (bot.js)
 
 Match selects a trusted server-side implementation through `botStrategies.js`: `opts.botStrategy` (registered ID
-or definition object), then `SP_BOT_STRATEGY`, then `legacy`. The initial registry contains only the unchanged
-`bot.js` adapter. `botStrategyContract.js` defines immutable strategy objects and pure registries; omitted hooks
+or definition object), then `SP_BOT_STRATEGY`, then `legacy`. The registry contains the unchanged
+`bot.js` adapter and the explicitly configured `external` adapter. `botStrategyContract.js` defines immutable strategy objects and pure registries; omitted hooks
 inherit an existing strategy (legacy by default). Invalid hooks, unknown IDs and duplicate registrations fail early.
 Registry additions do not reweight opening choices or consume RNG.
 An unset or empty `SP_BOT_STRATEGY` uses the original bot without a programmatic override. `startServer()` validates
@@ -129,6 +129,16 @@ bounty estimates. Prep hooks return synchronous iterators and preserve the exist
 including host delegation, cancellation and error cleanup. Definitions do not hold mutable per-room/player state.
 This is a development interface, not a new gameplay policy or a client code/plugin loading mechanism.
 See [the strategy guide](../BOT_STRATEGIES.md) for the contract, registration and testing steps.
+
+Maintainer decision 2026-10-17, requested 2026-10-19 (§35.8): `external`, a strategy of @HankDUMPLINGZhong's
+#673 framework (§35.7), sends exactly the seat's public/private views to operator-configured HTTP(S) or stdio,
+accepts human intents through the same schema and semantic validators, and falls back to legacy on failure.
+Requests run asynchronously within existing phase timers; default selection and golden results stay unchanged.
+[ASSUMED] Engineering policy: version `sp-ai/1`, 1000 ms total decision/request cap, half the remaining phase
+reserved for fallback, 64 intents, 64 KiB response, 3 consecutive failures to match-long legacy for that seat,
+1000 ms child restart backoff; limits configurable. One stdio child per match, no HTTP redirects, no client-set
+endpoint/command, gameplay actions only. Test journals record replies/failures; offline replay performs no IO.
+The complete policy and scope are in [External AI API](../EXTERNAL_AI.md).
 
 After the greedy layout is complete, `planLayoutSteps` rechecks self-range guards on enemy-road tiles. An isolated
 guard may move to a free legal road tile with allied damage covering both it and the preceding tile of every incoming

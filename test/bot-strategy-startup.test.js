@@ -75,3 +75,15 @@ test('the process entry exits with a clear configuration error for an invalid st
   assert.match(result.stderr, /Unset SP_BOT_STRATEGY/);
   assert.doesNotMatch(result.stdout, /Local:/);
 });
+
+test('external selection requires operator transport configuration before listening', async () => {
+  const previous = { strategy: process.env.SP_BOT_STRATEGY, transport: process.env.SP_EXTERNAL_AI_TRANSPORT };
+  try {
+    process.env.SP_BOT_STRATEGY = 'external';
+    delete process.env.SP_EXTERNAL_AI_TRANSPORT;
+    await assert.rejects(startServer({ port: 0, host: '127.0.0.1', quiet: true, dataDir: 'missing-external-test-data' }), /SP_EXTERNAL_AI_TRANSPORT/);
+  } finally {
+    if (previous.strategy == null) delete process.env.SP_BOT_STRATEGY; else process.env.SP_BOT_STRATEGY = previous.strategy;
+    if (previous.transport == null) delete process.env.SP_EXTERNAL_AI_TRANSPORT; else process.env.SP_EXTERNAL_AI_TRANSPORT = previous.transport;
+  }
+});

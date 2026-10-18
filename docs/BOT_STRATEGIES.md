@@ -2,7 +2,9 @@
 
 The strategy interface selects trusted server-side AI code per match. It keeps the original
 [`bot.js`](../server/match/bot.js) as the default, named `legacy`; registering another strategy does not change
-legacy's weights, RNG consumption, economy, placement or rehearsal. No alternative gameplay policy ships with this interface.
+legacy's weights, RNG consumption, economy, placement or rehearsal. The framework is PR #673 by
+@HankDUMPLINGZhong. The optional `external` adapter is documented in [External AI API](EXTERNAL_AI.md)
+and the [Chinese server-owner guide](EXTERNAL_AI_ZH.md).
 
 The contract lives in [`botStrategyContract.js`](../server/match/botStrategyContract.js); the built-in registry is
 [`botStrategies.js`](../server/match/botStrategies.js). Implementations import the contract, not the registry, to
@@ -47,8 +49,13 @@ frozen; `createBotRegistry` is pure, so tests can build a local registry without
 | `prepBegin` | `(match, player, { delegate })` | A synchronous iterator, returning a rehearsal job or `null` when done |
 | `prepEnd` | `(match, player, job)` | A synchronous iterator applying the finished layout and completing cleanup/Ready |
 | `bountyKillChance` | `(match, player, card)` | The strategy's kill estimate, or `null` if unavailable, for benchmark calibration |
+| `decide` (optional) | `(match, player, decision)` | Return `true` when an asynchronous adapter owns this decision, else use the existing hooks |
 
-Draft pickers run synchronously. Prep hooks are generators: yield between complete, valid actions so the scheduler
+Draft pickers run synchronously. The optional `decide` hook is a synchronous handoff before a band/card turn,
+prep or offer: its descriptor has `kind`, `valid()`, `complete()`, `fallback()` and optional window `key` / `deadline`.
+An adapter owns bounded asynchronous IO, stale-input rejection and invoking fallback; it must not return a Promise
+from a picker/generator or delay a phase timer. The built-in external runtime is match-owned and disposed at match end.
+Prep hooks are generators: yield between complete, valid actions so the scheduler
 can enforce its existing time slices. They are not async hooks. Return a rehearsal job from `prepBegin` only when
 it follows the existing job protocol; use the legacy implementation when retaining its layout rehearsal.
 
@@ -89,12 +96,15 @@ connections. An unknown ID prevents startup with an error naming `SP_BOT_STRATEG
 IDs, plus a reminder to unset the variable to use the original bot. Match construction also validates its selection.
 One match's selection does not change another match. The same strategy also handles humans under AI takeover.
 Strategy selection does not grant an AI seat priority in the band draft: the existing seat order and the room's
-existing AI-last option still apply. Only `legacy` is registered in this PR; other policies belong in separate PRs.
+existing AI-last option still apply. `legacy` and operator-enabled `external` are registered; the latter inherits
+all legacy hooks for fallback and requires transport configuration before startup.
 
 Test input journals record the resolved strategy ID as `init.options.botStrategy`, rather than serializing hooks.
 Replay uses that ID, or `legacy` for older journals without it, regardless of the replay host's environment.
 An unavailable recorded ID fails explicitly. A custom definition must be registered under the same ID and run
 with the same code to be replayed. Prep generators and rehearsal jobs retain the journal's slice step counts.
+External journals additionally record replies / failure outcomes and non-secret adapter limits; replay disables
+transport IO and feeds the recorded intents through the same validation path.
 
 ```powershell
 $env:SP_BOT_STRATEGY = 'my-bot'

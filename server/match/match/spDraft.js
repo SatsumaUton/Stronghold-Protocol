@@ -79,7 +79,11 @@ export class MatchSpDraft {
       if (!ps || !ps.botControlled) return;
       const avail = this.sp.cards.filter(c => this.spCardAvailable(c)).map(c => c.idx);
       if (!avail.length) return;
-      this._applyCard(ps, this.bot.pickCard(this, ps, this.sp.cards, avail));
+      const fallback = () => this._applyCard(ps, this.bot.pickCard(this, ps, this.sp.cards, avail));
+      if (this.bot.decide?.(this, ps, { kind: 'card',
+        valid: () => this.phase === PHASE.SP_DRAFT && token === this._turnToken,
+        complete: () => this.sp?.picks[ps.playerId] != null, fallback })) return;
+      fallback();
     });
   }
 

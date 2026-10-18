@@ -80,6 +80,8 @@ export function makeMatch(o = {}) {
     // simulation work of full-match suites; test/match/bot.test.js covers it
     botRehearsal: o.botRehearsal ?? 0,
     botStrategy: o.botStrategy,
+    externalAI: o.externalAI,
+    externalReplay: o.externalReplay,
     botSliceMs: o.botSliceMs,
     clientCombat: o.clientCombat ?? false,
     verify: o.verify ?? 'off',

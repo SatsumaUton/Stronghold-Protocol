@@ -1,8 +1,9 @@
 // Registry only: implementations import the contract, not this module, to avoid registration/import cycles.
 import { createBotRegistry, defineBotStrategy } from './botStrategyContract.js';
+import { EXTERNAL_BOT } from './externalAI.js';
 
-// Add imports and definitions here when a new strategy is ready; initially only the unchanged legacy bot ships.
-export const BOT_STRATEGIES = createBotRegistry();
+// Registration does not enable external IO: the operator must select and configure it.
+export const BOT_STRATEGIES = createBotRegistry([EXTERNAL_BOT]);
 
 /** @param {string | import('./botStrategyContract.js').BotStrategyDefinition} [selection] */
 export function getBotStrategy(selection = 'legacy', registry = BOT_STRATEGIES) {
