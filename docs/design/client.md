@@ -423,11 +423,10 @@ board is sized from its host, and `fieldHost.js hudBands` measures the HUD from 
 attribute: the page is exactly the unmoved one.
 Overrides are local listening preferences, absent from room loadouts and their exports.
 
-Screen wake lock (PR #574) is a client convenience; parity with the official game is unverified and remains for the
-maintainer to confirm. App requests it automatically for players and spectators when `isCombatPhase(phase)` holds
-for a valid ongoing match; an ended/absent room or an existing result does not qualify. 设置 →「全屏时保持屏幕常亮」
-(`fullscreenWakeLock`, default false) also requests it while fullscreen on any app screen and persists in
-`sp.pref.settings`. The old `screenWakeLock` preference is not migrated. One App-level hook owns both reasons, so
+Automatic combat screen wake lock restores the official mobile client's screen-awake experience. App requests it
+for players and spectators when `isCombatPhase(phase)` holds for a valid ongoing match; an ended/absent room or an
+existing result does not qualify. 设置 →「全屏时保持屏幕常亮」 (`fullscreenWakeLock`, default false) is an additional
+opt-in for fullscreen on any app screen, persisted in `sp.pref.settings`. One App-level hook owns both reasons, so
 overlapping combat and fullscreen keep the same lock. When neither reason holds, on hiding the page or unmounting,
 release the lock and cancel a pending gesture retry; returning visible while active requests again. A failed normal
 request retries once on the next pointer/touch gesture, and a failed retry stays silent. Late results are released.
