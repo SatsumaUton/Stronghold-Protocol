@@ -24,6 +24,9 @@ Picture-only outfits become wearable under the maintainer's 2026-10-18 option A 
 [§35.4](history/0.3.2.md#354-picture-only-outfits-b6): per-seat pictures with default battle models;
 current rendering rules are in [design/client.md](design/client.md) and [SKINS.md](SKINS.md).
 
+Re-entrant buff removal is specified in [§35.5](history/0.3.2.md#355-re-entrant-buff-removal): reverse-order candidates,
+current object lookup and actual removal counts; [ASSUMED] extension API policy. Current contract: [design/engine.md](design/engine.md) §5.3 and [SIM.md](SIM.md) §3.
+
 ## Where each section lives
 
 Optional selected-unit bond timers (#746, maintainer approved 2026-10-18) extend §9 in
