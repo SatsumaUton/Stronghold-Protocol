@@ -43,6 +43,34 @@ const at = (x, y) => `left:${x / 100}rem;top:${y / 100}rem`;
 export const INTRO_MS = 1500;
 const LEAVE_MS = 380;
 
+/** [ASSUMED] Fit translated text into #698's fixed title boxes without enlarging short labels (DESIGN §35.1). */
+export function titleScale(width, height, textWidth, textHeight) {
+  return Math.min(1, width / (textWidth || 1), height / (textHeight || 1));
+}
+
+function SettleTitle({ as: Tag = 'h1', class: cls, children }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const box = ref.current;
+    const text = box?.firstElementChild;
+    if (!text) return undefined;
+    const fit = () => box.style.setProperty('--title-scale', String(titleScale(box.clientWidth, box.clientHeight, text.offsetWidth, text.offsetHeight)));
+    fit();
+    // Observe the untransformed text too: late fonts and the text-size preference change its natural size.
+    const ro = new ResizeObserver(fit);
+    ro.observe(box);
+    ro.observe(text);
+    return () => ro.disconnect();
+  }, [children]);
+  return html`<${Tag} ref=${ref} class=${cx('settle__title', cls)}><span>${children}</span></${Tag}>`;
+}
+
+/** Official settle sprites (research 07-assets.json); CSS is used only for an absent/failed image. */
+export function SettleButtonArt({ ghost = false }) {
+  return html`<${Sprite} k=${ghost ? 'settle/btn_bg_02' : 'settle/btn_next_bg'} class="settle__btnbg"
+    fallback=${html`<span aria-hidden="true" class=${cx('settle__btnbg', ghost ? 'settle__btnbg--ghost' : 'settle__btnbg--primary')}></span>`} />`;
+}
+
 // ---- the level settlement ---------------------------------------------------------------------------------------------
 
 /**
@@ -445,7 +473,7 @@ function SelfPage({ r, res, raw, self, gd, prog, content, onNext }) {
       <${Logo} />
       <div class="sself__band">${self.bandId ? html`<${BandIcon} bandId=${self.bandId} size="lg" />` : html`<${PlayerAvatar} player=${self} self=${true} />`}<i aria-hidden="true"></i></div>
       <div class="sself__mode"><${ModePill} r=${r} /><${UnofficialMark} room=${content ? { content } : null} class="sself__modmark" /><${SettleTestMark} res=${res} /></div>
-      <h1 class="sself__title">${cleared ? t('模拟完成') : t('模拟中断')}</h1>
+      <${SettleTitle} class="sself__title">${cleared ? t('模拟完成') : t('模拟中断')}</${SettleTitle}>
       <div class="sself__rounds"><span>${t('通过回合')}</span><b class="num">${rounds}</b></div>
       ${medals.length ? html`<div class="sself__medals">${medals.map((m, i) => html`<${Medal} key=${m.kind} m=${m} i=${i} />`)}</div>` : null}
       <div class="splate">
@@ -464,7 +492,7 @@ function SelfPage({ r, res, raw, self, gd, prog, content, onNext }) {
       <div class="settle__barbg" aria-hidden="true"><${Sprite} k="settle/bottom_bg" /></div>
       ${Array.isArray(milestones) && milestones.length ? html`<${LevelStrip} prog=${prog} milestones=${milestones} />` : null}
       <button type="button" ref=${nextRef} class="settle__next" onClick=${next}>
-        <${Sprite} k="settle/btn_next_bg" class="settle__btnbg" />
+        <${SettleButtonArt} />
         <${Sprite} k="settle/next_icon" class="settle__nexticon" fallback=${html`<span class="settle__nexticon"><${Icon} name="chevronRight" /></span>`} /><span>${t('下一步')}</span>
       </button>
     </div>
@@ -542,7 +570,7 @@ function TeamPage({ r, res, gd, myId, at: when, content, backLabel, onBack, onDe
       <div class="settle__barbg steam__barbg" aria-hidden="true"><${Sprite} k="settle/bottom_bg" /></div>
       <div class="steam__outcome">
         <span class="steam__tags"><${ModePill} r=${r} /><${UnofficialMark} room=${content ? { content } : null} /><${SettleTestMark} res=${res} /></span>
-        <b class="steam__title">${r.victory ? t('模拟完成') : t('模拟中断')}</b>
+        <${SettleTitle} as="b" class="steam__title">${r.victory ? t('模拟完成') : t('模拟中断')}</${SettleTitle}>
       </div>
       <div class="steam__rounds"><span>${t('同盟通过回合')}</span><b class="num">${rounds}</b></div>
       <div class="steam__when">
@@ -550,9 +578,9 @@ function TeamPage({ r, res, gd, myId, at: when, content, backLabel, onBack, onDe
         <span class="steam__row"><${Sprite} k="settle/date_time_bg" class="steam__rowbg" /><${Sprite} k="settle/date_icon" class="steam__ico" />${fmtDate(when)}</span>
       </div>
       <button type="button" class="sbtn sbtn--ghost steam__detail" onClick=${onDetail}>
-        <${Sprite} k="settle/btn_bg_02" class="settle__btnbg" /><${Icon} name="chart" /><span>${t('数据详情')}</span></button>
+        <${SettleButtonArt} ghost=${true} /><${Icon} name="chart" /><span>${t('数据详情')}</span></button>
       <button type="button" ref=${backRef} class="sbtn sbtn--primary settle__back" onClick=${onBack}>
-        <${Sprite} k="settle/btn_next_bg" class="settle__btnbg" />
+        <${SettleButtonArt} />
         <${Sprite} k="settle/btn_back_icon_01" class="sbtn__mark" fallback=${html`<${Icon} name="chevronLeft" />`} /><span>${backLabel}</span></button>
       <div class="ui-slot steam__slot" data-ui-slot="result.tab" aria-label=${t('界面插件')} dangerouslySetInnerHTML=${{ __html: '' }}></div>
     </div>
