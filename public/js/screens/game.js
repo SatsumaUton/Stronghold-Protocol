@@ -1420,6 +1420,19 @@ function MatchScreen() {
     return () => screen.removeEventListener('pointerdown', onDown, true);
   }, []);
 
+  // The underframe belongs to the selected field piece. Keep it while using its own actions or
+  // tapping the field (which handles selection separately), but dismiss it on other HUD content.
+  useEffect(() => {
+    const screen = hudElRef.current?.parentElement;
+    if (!screen) return undefined;
+    const onDown = (e) => {
+      if (!live.current.sel || e.target?.closest?.('.uframe, .gm__field')) return;
+      setSel(null);
+    };
+    screen.addEventListener('pointerdown', onDown, true);
+    return () => screen.removeEventListener('pointerdown', onDown, true);
+  }, []);
+
   // ---- direction step (research 09 §1.2) and the selected piece's underframe ------------------------------------
   const heldRef = useRef(new Map());                     // uid → { row, col, t } committed placements awaiting m.private
   const releaseHold = useCallback((uid) => {
