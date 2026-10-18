@@ -712,7 +712,11 @@ export class UnitView {
     this.flash = 0;
     this.bob = Math.random() * Math.PI * 2;
     this.hovered = false; this.dimmed = false; this.lift = 0;
-    this.lastAtk = -1; this.atkSeen = false; this.atkInterval = startAtkInterval(info.atkInterval, defaultInterval(ctx, info));
+    this.lastAtk = -1; this.atkSeen = false;
+    // `atkKnown`: the interval came from the sim (the spawn info's atkInterval or a 'rate' event), so a measured gap must
+    // not overwrite it 鈥?a pause (a stop, a stun, a redeploy) is not a slower attack rhythm (render/attackRate.js).
+    this.atkKnown = Number.isFinite(Number(info.atkInterval)) && Number(info.atkInterval) > 0;
+    this.atkInterval = startAtkInterval(info.atkInterval, defaultInterval(ctx, info));
     this.shake = 0;
     this.screen = { x: 0, y: 0, s: 1, top: 0 };
     this.placed = false;          // set by the first update's projection: until then `screen` is not on screen (bounds)
@@ -1355,8 +1359,9 @@ export class UnitView {
     if (!once) {
       if (this.lastAtk >= 0) {
         // the real gap between two attacks: the first one replaces the estimate (no slow-motion ramp-in), later ones
-        // follow a real change at once and only smooth tick-sized wobble (render/attackRate.js)
-        const r = nextAtkInterval(this.atkInterval, now - this.lastAtk, this.atkSeen);
+        // follow a real change at once and only smooth tick-sized wobble (render/attackRate.js). With a sim-known
+        // interval only that small wobble is taken: a long gap is a pause, not a slower rhythm.
+        const r = nextAtkInterval(this.atkInterval, now - this.lastAtk, this.atkSeen, { authoritative: this.atkKnown });
         this.atkInterval = r.interval;
         if (r.measured) this.atkSeen = true;
       }
@@ -1388,6 +1393,7 @@ export class UnitView {
     if (!Number.isFinite(v) || v <= 0) return;
     this.atkInterval = clampAtkInterval(v);
     this.atkSeen = true;
+    this.atkKnown = true;      // the sim is authoritative from here on (the gaps measured later only smooth into it)
     if (this.actor) this.actor.interval = this.atkInterval;
     if (this.imp) this.imp.dirty = true;
   }

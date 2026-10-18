@@ -81,6 +81,9 @@ export class BattleLifecycle {
         for (const ps of this.players) ps.dp = Math.min(this.flags.dpMax, ps.dp + this.flags.dpPerSec * dt);
       });
       this._phase('buffs', () => this._tickBuffs(dt));
+      // the attack interval a skill / buff just changed -> a 'rate' event, so the view paces its clip right on the next
+      // swing instead of measuring two attacks first (render/attackRate.js)
+      this._phase('rate', () => this._emitRateChanges());
       // Allies whose attack comes off cooldown this tick keep the target they have now, before enemies move.
       this._phase('attackCommit', () => noteAttackCommit(this, dt));
       this._phase('enemies', () => {
