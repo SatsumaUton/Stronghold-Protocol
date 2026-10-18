@@ -664,6 +664,12 @@ mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, 
   法术伤害"), or a list of them = those types only (机械师's 屏障 `['phys', 'arts']`: BlockDamage PHYSICAL_AND_MAGICAL — true
   damage passes); none = every type (PRTS 术语释义 屏障 "若无特殊说明，屏障可吸收全种类伤害"). Shields are spent oldest first.
 - `visible: true` emits `['status', id, key, 1/0]` client events. `battle.removeBuff(unit, key|buff)`.
+- `removeBuff` fixes the matching instances in reverse order, then locates each in the current buff list before
+  removing it. Synchronous `onRemove` may remove other buffs: an absent candidate is skipped, its callback is not
+  repeated, and this call returns only its own actual removal count (null unit / no match = 0). Callbacks observe
+  each intermediate state through the existing removal path, including dirty stats, flags and last-instance status
+  events. Explicit removal calls `onRemove`, not `onExpire`; new same-key instances added by a callback wait for
+  another call. [ASSUMED] Extension API traversal policy, not an official gameplay rule (DESIGN §35.5).
 
 **Mod keys** — additive: `atkFlat atkPct atkFinal defFlat defPct hpFlat hpPct resFlat aspd batPct blockCnt rangeExtend
 defIgnoreFlat defIgnorePct resIgnoreFlat resIgnorePct dodgePhys dodgeArts spRecoveryFlat maxTargets taunt hpRegen
@@ -1689,6 +1695,13 @@ server's digests (DESIGN §32.14.16). The match adds phase credits into its sing
 
 ### Community follow-up contracts (DESIGN §29)
 
+- Optional snapshot `bondTimers: [[unitId, [{ id, count, remaining }]]]` (#746, DESIGN §35.3) carries declared timed
+  bond effects for living, deployed, visible allies. `remaining` is the next independent stack's remaining simulation
+  seconds, rounded upward to 0.1; `count` is the number of active instances. `shared/bondTimers.js` declares buff keys
+  or a recorded end-time plus data-defined window; `content/bonds/timers.js` only reads them. Siracusa's post-stealth
+  duration uses the same bond blackboard as `core.js`, not a UI constant. No state or event mutation; omitted when
+  empty and excluded by the existing golden snapshot canon. [ASSUMED] Optional numeric presentation absent from
+  the official HUD, approved by the maintainer 2026-10-18; the underlying durations are official bond rules.
 - Optional snapshot `coins: [[id, balance, cap]]` comes from `snapshot.js coinView`: a live allied Swire skill's nonnegative integer balance and blackboard cap, including zero. Invalid/missing entries are omitted; interpolation clears absent values.
 - Optional snapshot `energy: [[id, stored, cap]]` comes from `snapshot.js mysticView` (GitHub #633): a 秘术师's stored attack energies — the trait's `trait.stored` against its `profile.storeMax` (3 by default, 4 with 深靛's MSC-X module) — including zero. Invalid/missing entries are omitted; interpolation clears absent values. A kit whose store is its own (维伊's 转置能量, 黑键's elite energies) keeps no `trait.stored` and reports no row.
 - Raid's one reselect after a revive orders by taunt, then remaining route distance, then id, and jumps while the operator is not blocking (contact on the current tile is refreshed first). Ordinary polls keep remaining-distance order and the empty-range prerequisite.

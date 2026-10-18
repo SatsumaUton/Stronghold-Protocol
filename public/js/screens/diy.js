@@ -15,8 +15,8 @@
 
 import { useLayoutEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Icon, Button, TierChip, TextField } from '../ui/components.js';
-import { Img, BondGlyph } from '../ui/gameComponents.js';
-import { chessAvatarUrl, chessPortraitUrl, profIconUrl, subProfIconUrl, bondIconUrl, skillRecordIconUrl, moduleTypeIconUrl } from '../ui/assetUrls.js';
+import { OperatorImage, Img, BondGlyph } from '../ui/gameComponents.js';
+import { profIconUrl, subProfIconUrl, bondIconUrl, skillRecordIconUrl, moduleTypeIconUrl } from '../ui/assetUrls.js';
 import { data } from '../data.js';
 import { MODULE_NONE, PROF_NAME, skillLabel, moduleBadge, quickSkillTags, opsOf, chessOptions } from '../ui/loadoutModel.js';
 import { diySlotList, pickChoices, pickOptions, slotRecord, defaultPick } from '../ui/diyModel.js';
@@ -35,7 +35,7 @@ const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI'];
 export const diyData = () => ({ chess: data.get('chess'), backups: data.get('backups') });
 
 /** A unit summary's avatar / portrait URL (a backups.json unit or a composed record). */
-const avatarOf = (m, unit, elite = false) => chessAvatarUrl(m, unit && { charId: unit.charId, assets: { avatar: elite ? unit.assets?.avatarGolden : unit.assets?.avatar } });
+const avatarRecord = (unit, elite = false) => unit && { charId: unit.charId, assets: { avatar: elite ? unit.assets?.avatarGolden : unit.assets?.avatar } };
 const classLine = (u) => `${t(PROF_NAME[u?.profession] || '') || ''}${u?.subProfessionName ? ` · ${u.subProfessionName}` : ''}`;
 const bondName = (id) => data.lookup('bonds', id)?.name || id;
 
@@ -78,7 +78,7 @@ function SlotCard({ m, slot, pick, illegal, onOpen, onClear, ops = {}, onOps = n
   const sk = rec.skill;
   const mod = elite?.module?.active ? elite.module : null;
   return html`<div class=${cx('diy-slot', `diy-slot--t${slot.tier}`, illegal && 'is-bad')} data-slot=${slot.slotId} data-char=${rec.charId}>
-    <div class="diy-slot__art"><${Img} src=${chessPortraitUrl(m, elite || rec)} fallback=${html`<b>${[...(rec.name || '?')][0]}</b>`} /></div>
+    <div class="diy-slot__art"><${OperatorImage} m=${m} chess=${elite || rec} portrait fallback=${html`<b>${[...(rec.name || '?')][0]}</b>`} /></div>
     <div class="diy-slot__body">
       <div class="diy-slot__head"><${TierChip} tier=${slot.tier} size="sm" /><span class="diy-slot__label">${label}</span><${KindTag} proto=${proto} /></div>
       <b class="diy-slot__name">${rec.name}</b>
@@ -203,7 +203,7 @@ function DiyRow({ m, slot, opt, ch, takenTier, draft, selected, ops, onOps, onSe
       class=${cx('diy-opt', 'lo-card', `lo-card--t${slot.tier}`, selected && 'is-sel', taken && 'is-taken')} onClick=${onRowClick}>
     <button type="button" class="diy-opt__pick lo-card__pick" aria-pressed=${selected ? 'true' : 'false'} disabled=${taken}
         title=${note || name} onClick=${() => onSel(opt.charId)}>
-      <span class="lo-card__art"><${Img} src=${avatarOf(m, u)} fallback=${html`<span class="lo-card__glyph">${[...name][0]}</span>`} /></span>
+      <span class="lo-card__art"><${OperatorImage} m=${m} chess=${avatarRecord(u)} fallback=${html`<span class="lo-card__glyph">${[...name][0]}</span>`} /></span>
       <span class="lo-card__id">
         <span class="lo-card__name">${name}</span>
         <span class="lo-card__bonds">${(opt.bonds || []).map((b) => html`<${Img} key=${b} src=${bondIconUrl(m, b)} class="lo-card__bond" alt=${bondName(b)}
@@ -365,7 +365,7 @@ export function DiyPickerView({ m, slot, picks, kitted, onDone, onClose, filter,
           ${ch && unit && base ? html`
             <div class="lo-dhead">
               <div class=${cx('lo-dhead__art', `lo-dhead__art--t${slot.tier}`)}>
-                <${Img} src=${chessPortraitUrl(m, golden || base)} fallback=${html`<b class="diy-pick__glyph">${[...(unit.name || '?')][0]}</b>`} />
+                <${OperatorImage} m=${m} chess=${golden || base} portrait fallback=${html`<b class="diy-pick__glyph">${[...(unit.name || '?')][0]}</b>`} />
               </div>
               <div class="lo-dhead__info">
                 <div class="lo-dhead__chips"><${TierChip} tier=${slot.tier} size="md" /><${KindTag} proto=${ch.proto} /></div>
