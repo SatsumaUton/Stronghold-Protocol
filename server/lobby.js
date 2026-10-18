@@ -164,7 +164,7 @@
 import { randomBytes, randomInt } from 'node:crypto';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
-import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
+import { encode, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
 import { Match as DefaultMatch } from './match/Match.js';
 import { KITTED_CHARS } from './sim/content/kits/index.js';
@@ -1414,8 +1414,8 @@ export class Lobby {
         data,
         log: this.log,
         now: this.now,
-        send: (playerId, msg) => (ctx.live ? this.matchSend(room, ctx, playerId, msg) : false),
-        broadcast: (msg) => { if (ctx.live) this.matchBroadcast(room, ctx, msg); },
+        send: (playerId, msg, encoded) => (ctx.live ? this.matchSend(room, ctx, playerId, msg, encoded) : false),
+        broadcast: (msg, encoded) => { if (ctx.live) this.matchBroadcast(room, ctx, msg, encoded); },
         onEnd: (summary) => this.onMatchEnd(room, ctx, summary),
       };
       // a room with gameplay plugins plays in its content set's match host; every other room here, as always
@@ -1472,17 +1472,17 @@ export class Lobby {
   }
 
   /** Match unicast; m.result frames are also kept for the replay. */
-  matchSend(room, ctx, playerId, msg) {
+  matchSend(room, ctx, playerId, msg, encoded = null) {
     if (msg && msg.t === 'm.result') {
-      const data = encode(msg);
+      const data = encoded ?? encode(msg);
       if (data != null) ctx.results.set(playerId, data);
     }
-    return this.sendToPlayer(room, playerId, msg);
+    return this.sendToPlayer(room, playerId, msg, encoded);
   }
 
   /** Match broadcast; the latest m.public and a broadcast m.result are also kept for the replay. */
-  matchBroadcast(room, ctx, msg) {
-    const data = this.broadcastRoom(room, msg);
+  matchBroadcast(room, ctx, msg, encoded = null) {
+    const data = this.broadcastRoom(room, msg, encoded);
     if (data == null) return;
     if (msg.t === 'm.public') ctx.lastPublic = data;
     else if (msg.t === 'm.result') ctx.sharedResult = data;
@@ -1867,22 +1867,23 @@ export class Lobby {
   }
 
   /** Match broadcast: encode once, send to every connected member. @returns {string | null} the encoded frame */
-  broadcastRoom(room, msg) {
+  broadcastRoom(room, msg, encoded = null) {
     if (room.disposed) return null;
-    const data = encode(msg);
+    const data = encoded ?? encode(msg);
     if (data == null) { this.log.error(`[lobby] ${room.code} unserializable broadcast ${msg && msg.t}`); return null; }
-    const droppable = isDroppable(msg);
-    for (const session of this.memberSessions(room)) sendRaw(session.ws, data, { droppable });
+    // per connection: sendSession runs the state transport, which owns each socket's delta baseline (and the
+    // droppable/backpressure rules) - one shared byte string in, one frame per member out
+    for (const session of this.memberSessions(room)) sendSession(session, msg, data);
     return data;
   }
 
   /** Match unicast. @returns {boolean} */
-  sendToPlayer(room, playerId, msg) {
+  sendToPlayer(room, playerId, msg, encoded = null) {
     if (room.disposed) return false;
     const seat = room.seatOf(playerId) || room.spectatorOf(playerId);
     if (!seat || seat.isBot || seat.left) return false;
     const session = this.registry.byId(playerId);
     if (!session || session.roomCode !== room.code) return false;
-    return sendSession(session, msg);
+    return sendSession(session, msg, encoded);
   }
 }
