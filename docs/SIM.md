@@ -664,6 +664,12 @@ mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, 
   法术伤害"), or a list of them = those types only (机械师's 屏障 `['phys', 'arts']`: BlockDamage PHYSICAL_AND_MAGICAL — true
   damage passes); none = every type (PRTS 术语释义 屏障 "若无特殊说明，屏障可吸收全种类伤害"). Shields are spent oldest first.
 - `visible: true` emits `['status', id, key, 1/0]` client events. `battle.removeBuff(unit, key|buff)`.
+- `removeBuff` fixes the matching instances in reverse order, then locates each in the current buff list before
+  removing it. Synchronous `onRemove` may remove other buffs: an absent candidate is skipped, its callback is not
+  repeated, and this call returns only its own actual removal count (null unit / no match = 0). Callbacks observe
+  each intermediate state through the existing removal path, including dirty stats, flags and last-instance status
+  events. Explicit removal calls `onRemove`, not `onExpire`; new same-key instances added by a callback wait for
+  another call. [ASSUMED] Extension API traversal policy, not an official gameplay rule (DESIGN §35.5).
 
 **Mod keys** — additive: `atkFlat atkPct atkFinal defFlat defPct hpFlat hpPct resFlat aspd batPct blockCnt rangeExtend
 defIgnoreFlat defIgnorePct resIgnoreFlat resIgnorePct dodgePhys dodgeArts spRecoveryFlat maxTargets taunt hpRegen
