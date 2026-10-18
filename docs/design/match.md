@@ -128,7 +128,7 @@ Per match: pick stage (weighted among the mode's `config.modes[m].stages`, weigh
 
 Match selects a trusted server-side implementation through `botStrategies.js`: `opts.botStrategy` (registered ID
 or definition object), then `SP_BOT_STRATEGY`, then `legacy`. The registry contains the unchanged
-`bot.js` adapter and the explicitly configured `external` adapter. `botStrategyContract.js` defines immutable strategy objects and pure registries; omitted hooks
+`bot.js` adapter, the explicitly configured `external` adapter and the opt-in `ioleta`, `adaptive` and `ioleta-adaptive` strategies. `botStrategyContract.js` defines immutable strategy objects and pure registries; omitted hooks
 inherit an existing strategy (legacy by default). Invalid hooks, unknown IDs and duplicate registrations fail early.
 Registry additions do not reweight opening choices or consume RNG.
 An unset or empty `SP_BOT_STRATEGY` uses the original bot without a programmatic override. `startServer()` validates
@@ -143,6 +143,10 @@ bounty estimates. Prep hooks return synchronous iterators and preserve the exist
 including host delegation, cancellation and error cleanup. Definitions do not hold mutable per-room/player state.
 This is a development interface, not a new gameplay policy or a client code/plugin loading mechanism.
 See [the strategy guide](../BOT_STRATEGIES.md) for the contract, registration and testing steps.
+
+The opt-in `ioleta` strategy applies [ASSUMED] staged Russell procurement to Russell seats and legacy prep to other
+bands. Its seat-local plan, core-merge/reward ordering and affordable search rules are recorded in
+[§35.18](../history/0.3.2.md#3518-opt-in-russell-procurement-and-adaptive-placement-742). Placement candidates remain independently selectable.
 
 Maintainer decision 2026-10-17, requested 2026-10-19 (§35.8): `external`, a strategy of @HankDUMPLINGZhong's
 #673 framework (§35.7), sends the seat's existing public/private views to operator-configured HTTP(S) or stdio,
@@ -283,3 +287,11 @@ other owners do not replenish spent stock. [ASSUMED] Keep valid board cards in r
 index order, remove obsolete/excess cards and temp deadlines, and grant missing copies via normal overflow.
 These do not alter the default rules above. See
 [PLUGINS.md](../PLUGINS.md#rule-switches) for limits and assumptions.
+
+### Opt-in adaptive strategies
+
+[ASSUMED] The registered `adaptive` strategy keeps legacy band picking and procurement and adds map-independent
+layout search inside the five-hook contract; `ioleta-adaptive` composes Russell-only procurement with the same search. First three distinct contact candidates form the baseline; remaining legacy
+variants and contact repairs extend the list up to eight. Extension stops after a clean completed zero-leak result,
+or at a strict six-times-per-candidate total tick cap. Server and host Worker share RehearsalRun, limits and counters.
+Default legacy rules remain the baseline. See [BOT_STRATEGIES](../BOT_STRATEGIES.md).

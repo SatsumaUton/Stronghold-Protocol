@@ -12,7 +12,7 @@ const soloBot = (opts = {}) => makeMatch({ mode: 'solo', difficulty: 'NORMAL', f
   seats: [{ seat: 0, playerId: 'ai_0', name: 'AI', isBot: true, connected: true }], ...opts });
 
 test('the default strategy is the original bot functions with no wrapping or policy changes', () => {
-  assert.deepEqual(Object.keys(BOT_STRATEGIES), ['legacy', 'external']);
+  assert.deepEqual(Object.keys(BOT_STRATEGIES), ['legacy', 'external', 'ioleta', 'adaptive', 'ioleta-adaptive']);
   assert.equal(getBotStrategy(), LEGACY_BOT);
   assert.equal(getBotStrategy(''), LEGACY_BOT);
   assert.equal(LEGACY_BOT.pickBand, legacy.botPickBand);
@@ -72,7 +72,7 @@ test('strategies override individual hooks and inherit their base without mutati
   assert.ok(Object.isFrozen(registry));
   assert.equal(getBotStrategy('last-card', registry).pickCard, pickCard);
   assert.equal(getBotStrategy('legacy', registry), LEGACY_BOT);
-  assert.deepEqual(Object.keys(BOT_STRATEGIES), ['legacy', 'external'], 'a local registry cannot leak into other rooms');
+  assert.deepEqual(Object.keys(BOT_STRATEGIES), ['legacy', 'external', 'ioleta', 'adaptive', 'ioleta-adaptive'], 'a local registry cannot leak into other rooms');
 });
 
 test('unknown names, duplicate registrations, malformed hooks and misspellings fail early', () => {
@@ -99,6 +99,11 @@ test('each match resolves its own object; an explicit choice takes precedence ov
     const explicit = soloBot({ botStrategy: 'legacy' });
     assert.equal(explicit.m.bot, LEGACY_BOT); explicit.m.dispose();
     assert.throws(() => soloBot(), /Unknown bot strategy/);
+    process.env.SP_BOT_STRATEGY = '';
+    const empty = soloBot();
+    assert.equal(empty.m.bot, LEGACY_BOT); empty.m.dispose();
+    const explicitEmpty = soloBot({ botStrategy: '' });
+    assert.equal(explicitEmpty.m.bot, LEGACY_BOT); explicitEmpty.m.dispose();
   } finally {
     a?.m.dispose(); b?.m.dispose();
     if (previous == null) delete process.env.SP_BOT_STRATEGY; else process.env.SP_BOT_STRATEGY = previous;
@@ -171,4 +176,20 @@ test('an accidental async prep iterator fails safely instead of looping in the v
     assert.ok(h.logs.error.some((s) => s.includes('synchronous iterator')));
     checkInvariants(h.m);
   } finally { h.m.dispose(); }
+});
+
+for (const id of ['ioleta', 'adaptive', 'ioleta-adaptive']) test(`${id}: registered strategy exposes exactly five hooks and inherits unmodified hooks`, () => {
+  const strategy = getBotStrategy(id);
+  assert.deepEqual(Object.keys(strategy), ['id', 'pickBand', 'pickCard', 'prepBegin', 'prepEnd', 'bountyKillChance']);
+  assert.equal(strategy.pickCard, LEGACY_BOT.pickCard);
+  assert.equal(strategy.bountyKillChance, LEGACY_BOT.bountyKillChance);
+  assert.ok(Object.isFrozen(strategy));
+});
+
+test('adaptive is placement-only: legacy band picker and procurement; ioleta-adaptive keeps the Russell opener', () => {
+  const adaptive = getBotStrategy('adaptive'), ioleta = getBotStrategy('ioleta'), both = getBotStrategy('ioleta-adaptive');
+  assert.equal(adaptive.pickBand, LEGACY_BOT.pickBand);
+  assert.notEqual(adaptive.prepBegin, LEGACY_BOT.prepBegin);
+  assert.equal(both.pickBand, ioleta.pickBand);
+  assert.notEqual(both.prepBegin, ioleta.prepBegin);
 });
