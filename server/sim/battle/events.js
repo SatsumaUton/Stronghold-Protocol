@@ -2,6 +2,7 @@
 // meta, fx and the sim log.
 // Installed on Battle.prototype by server/sim/Battle.js (a method container: never instantiated; `this` is the battle).
 
+import { bondTimerView } from '../content/bonds/timers.js';
 import { EVENT_BUFFER_CAP } from '../constants.js';
 import { elementView } from '../damage.js';
 import { unitInfo, snapshotUnits, ammoView, wolfView, negView, coinView, mysticView, layerView, chargeView } from '../snapshot.js';
@@ -57,12 +58,14 @@ export class BattleEvents {
    *         effect it shows;
    *   charges: [[id, stored, maximum]] — the charges an ally's charge skill stores (snapshot.js chargeView: 卡涅利安's): the
    *         official sand armour of her charges;
+   *   bondTimers: [[id, [{ id: effectId, count, remaining }]]] — selected-unit timed bond readouts (#746);
+   *         count + next expiry in simulation seconds; omitted when no declared effect is active.
    *   stand: [[id, until]] — when each enemy's attack recovery ends (atkStandUntil; alive, deployed, visible, not
    *         feared or stunned) — display metadata (render/interp.js holds the position until then);
    *   standCut: [[id, at]] — the latest time each listed enemy's recovery was cut or ignored (_cutAttackStand), the
    *         dying ones in their death window included.
    * ammo / wolves / neg / energy / layers / charges / stand / standCut are display only: no sim state reads them, and the
-   * nine-field unit tuples are unchanged.
+   * nine-field unit tuples are unchanged. bondTimers is also display only (golden canon excludes it).
    */
   snapshot() {
     const snap = {
@@ -100,6 +103,8 @@ export class BattleEvents {
       if (u.side === 'enemy' && !u.s.flags.fear && !u.s.flags.stun && Number.isFinite(until) && until > snap.t) {
         (stand || (stand = [])).push([u.id, until]);
       }
+      const timers = bondTimerView(u, this.time);
+      if (timers.length) (snap.bondTimers || (snap.bondTimers = [])).push([u.id, timers]);
       const v = elementView(u, this.time);
       if (v) (elem || (elem = [])).push([u.id, v[0], v[1], v[2], v[3]]);
       const am = ammoView(u);

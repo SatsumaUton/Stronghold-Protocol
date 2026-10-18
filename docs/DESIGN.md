@@ -22,6 +22,11 @@ following the official mode's no-auto-close rule. Current contracts: [design/eng
 
 ## Where each section lives
 
+Optional selected-unit bond timers (#746, maintainer approved 2026-10-18) extend §9 in
+[§35.3](history/0.3.2.md#353-optional-selected-unit-bond-timers-746): default-off convenience HUD, independent Sargon
+stack expiry and separate Siracusa deployment/stealth/post-stealth effects, all read from simulation snapshots.
+The official game has no numeric timer HUD; the presentation is [ASSUMED]. Current contract: [design/client.md](design/client.md).
+
 Studio §32.9 gains five graphical gameplay templates and isolated Match exercises in
 [§34.29](history/0.3.1.md#3429-studio-templates-for-the-031-gameplay-features); the current UI contract is in
 [design/client.md](design/client.md#plugin-studio-gameplay-previews-3291).

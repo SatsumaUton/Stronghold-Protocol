@@ -297,6 +297,14 @@ Optional `coins: [[id, balance, cap]]` is an integer skill-currency readout (§2
 
 Optional `energy: [[id, stored, cap]]` is the 秘术师 trait's stored-attack-energy readout (§29.6, GitHub #633), display only: the count (`trait.stored`) against the trait's own `storeMax` (3, 4 with 深靛's MSC-X module), including zero, stepped between snapshots and cleared when omitted. A kit whose store is its own (维伊's 转置能量, 黑键's elite energies) keeps no `trait.stored` and sends no row.
 
+Optional `bondTimers: [[unitId, [{ id, count, remaining }]]]` (#746, §35.3) supplies the selected-unit convenience
+readout for declared Siracusa/Sargon effects. `count` is active instances; `remaining` is next expiry in simulation
+seconds, rounded up to 0.1. Only living, deployed, visible allies have rows, and omission clears previous values.
+The same snapshot travels through server combat, in-page combat and Worker packets; no events, stats RPC or client
+wall-clock countdown are required. `tools/golden.mjs` already excludes optional display fields from its canon.
+[ASSUMED] Numeric HUD and rounding are presentation choices (maintainer decision 2026-10-18); effect semantics are
+from official `activity_table` bond descriptions and `server/sim/content/bonds/core.js` (SIM.md).
+
 Preparation state carries read-only `prepMapChars` for 外勤医疗. The owner's entries can be clicked for a detail card
 and board-space range preview without adding a placement intent or a combat entity. Boss-mate and scouting metadata
 include them in displayed field coordinates. Draft cards expose optional `soldOut` when equipment stock is unavailable; the client
