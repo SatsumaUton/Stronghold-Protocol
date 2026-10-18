@@ -21,6 +21,8 @@ import { data } from '../data.js';
 import { MODULE_NONE, PROF_NAME, skillLabel, moduleBadge, quickSkillTags, opsOf, chessOptions } from '../ui/loadoutModel.js';
 import { diySlotList, pickChoices, pickOptions, slotRecord, defaultPick } from '../ui/diyModel.js';
 import { OperatorVoice } from '../ui/operatorVoice.js';
+// 皮肤 (docs/SKINS.md): the same self-contained section the 干员调配 detail draws, keyed by the operator being picked
+import { SkinSection } from '../ui/skinPicker.js';
 import { LoadoutStats } from '../ui/loadoutStats.js';
 import { CultivationSelects, CultivationSection } from './cultivation.js';
 import { SkillIcon, ModuleGlyph, SkillSection, ModuleSection, ProfFilter, rowControlHit } from './loadoutSections.js';
@@ -92,7 +94,7 @@ function SlotCard({ m, slot, pick, illegal, onOpen, onClear, ops = {}, onOps = n
       </span>
       ${proto ? html`<small class="diy-slot__cult t-dim">${t('原型干员没有潜能与练度')}</small>`
         : onOps ? html`<span class="diy-slot__cult"><${CultivationSelects} charId=${rec.charId} ops=${ops} onSet=${onOps} /></span>` : null}
-      <${OperatorVoice} charId=${rec.charId} />
+      <${OperatorVoice} charId=${rec.assets?.voice || rec.charId} />
       ${illegal ? html`<p class="diy-slot__bad"><${Icon} name="warn" />${t('这项自选在当前版本不可用，开局时会被移除')}</p>` : null}
     </div>
     <div class="diy-slot__acts">
@@ -379,6 +381,12 @@ export function DiyPickerView({ m, slot, picks, kitted, onDone, onClose, filter,
             </div>
             <div class="diy-pick__detail">
               <${OperatorVoice} charId=${draft.charId} />
+              ${/* 外观 (docs/SKINS.md, 0.3.1) sits directly under the operator's name and above 潜能与练度, the same place
+                   the 干员调配 detail puts it: the appearance belongs to the operator being picked, so the 0.3.1 row layout
+                   keeps it in this detail panel and not on the slot card. The key is draft.charId, which is what the
+                   manifest groups skins under and what the server stores (ps.skins[charId]), so a slot fielded as its
+                   golden form keeps the appearance. */ null}
+              <${SkinSection} charId=${draft.charId} />
               ${ch.proto
                 ? html`<p class="lo-locknote"><${Icon} name="info" />${t('原型干员没有潜能与练度')}</p>`
                 : onOps ? html`<${CultivationSection} charId=${draft.charId} ops=${ops} onSet=${onOps} />` : null}
