@@ -231,3 +231,30 @@ public/assets/ ─────────▶ public/js/render/, public/js/audio
 Before changing a rule, read the DESIGN section that owns it (module headers cite their sections; the table in
 DESIGN.md names the file that holds each) and the official source; a rule no source settles is marked `[ASSUMED]`
 ([CONTRIBUTING.md](../CONTRIBUTING.md) §3).
+
+## 7. The server-side worker pool
+
+`server/workers/pool.js` is where CPU-heavy work leaves the main thread. One pool owns a bounded set of worker
+threads; work is submitted as a task (a function name plus its arguments) and comes back as a promise.
+
+- **Bounded, not elastic.** The thread count never exceeds the configured maximum, so an overloaded server does not turn into a
+  thread storm: work that does not fit the queue is refused (`POOL_FULL`). The queue is bounded too and has a priority, so a
+  low-priority task cannot starve a player-visible one.
+- **Cancellation and timeouts** are first-class: a task can be cancelled before it starts, and one that runs longer
+  than its timeout is terminated and replaced, so a worker stuck on bad input cannot quietly wedge the pool.
+- **Thread reuse.** A worker is returned to the idle list after each task instead of being respawned, which matters on
+  Windows where thread start-up costs tens of milliseconds.
+- **What runs in it.** The pool is generic: it imports nothing from the game, the worker entry points do. The work
+  that moves onto it arrives as separate changes — a room's simulation tick, room-pinned lanes on top of the pool,
+  snapshot encoding with the state writes. Until those land, `pool.js`, the room-pinned lanes and the worker entry
+  point exist, but no match submits a task yet.
+- **A dead thread is replaced, not isolated.** A worker that exits abnormally or overruns its timeout is terminated
+  and replaced, and the task it was running is rejected (`WORKER_FAILED` / `TASK_TIMEOUT`), so the caller sees an error
+  instead of a hang; while it is stopping it still counts against the pool size, so the pool never runs more threads
+  than its size. This is not a safety boundary: a worker is a thread of the same process, so an out-of-memory kill or a
+  native crash there can still take the whole server down — a reason to keep a whole match off a single worker thread.
+  `stats()` reports the live threads, the queue depth and the tasks finished; the tests read it.
+
+The rule of thumb for new work: if it is pure CPU over data the worker can be given (a simulation step, an encode, a
+snapshot), it belongs in a task; if it touches sockets, timers or the lobby, it stays on the main thread.
+
