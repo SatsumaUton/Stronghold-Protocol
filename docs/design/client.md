@@ -570,6 +570,19 @@ lands in a hidden tab. Battle deploys keep the silent `onDeploy`; audio.handleBa
 
 ### Optional ammo and stored-energy counts (§31.9, §32.14.28, §34.3)
 
+Selected-unit bond timers (#746, [§35.3](../history/0.3.2.md#353-optional-selected-unit-bond-timers-746)) are a separate
+设置「盟约效果剩余时间」switch, default off (`sp.pref.settings.bondTimers`, only boolean true enables it).
+The maintainer approved it on 2026-10-18. [ASSUMED] A convenience readout absent from the official HUD, like the
+ammo count: labels, next-stack-expiry summary and upward rounding to 0.1 seconds are presentation choices.
+Official `activity_table` → `activity.AUTOCHESS_SEASON.act2autochess.bondInfoDict` says Sargon stacks expire
+independently, and Siracusa has deployment ASPD, equal-duration stealth and a separate ten-second post-stealth proc
+window. Show Sargon's stack count + next expiry, and separate Siracusa rows; never a bond-wide Sargon countdown.
+The card samples optional `b.snap.bondTimers` every 250 ms, holding the latest simulation values without wall-clock
+extrapolation. Pause/speed, early removal, death, reconnect, spectators and watched fields follow the same snapshots
+for in-page, Worker and server combat. No rows in prep, for expired effects or for dead/hidden/undeployed units.
+The field's latest snapshot replaces the list (omission clears it); field re-entry discards stale metadata.
+`shared/bondTimers.js` declares each exposed effect; currently only Siracusa/Sargon. No gameplay or golden change.
+
 设置 →「显示弹药与能量数量」 (`ammoEnergyCount`) is one switch, off by default. It replaces 「弹药数量」
 (`ammoCount`, PR #552 by @IceCodeNew) and 「秘术师能量」 (`mysticEnergy`, PR #636 by @zasx77771, GitHub #633).
 The official HUD has neither number (the maintainer's decisions of 2026-10-13 and 2026-10-15). A saved profile is
