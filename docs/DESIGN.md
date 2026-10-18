@@ -16,6 +16,11 @@ Studio presentation authoring extends §32.9 in [§34.30](history/0.3.1.md#3430-
 Blemishine S2 attack clips extend §9 in [§34.31](history/0.3.1.md#3431-official-effects-and-a-skill-clip-the-maintainer-reported-after-030):
 a verified mode mapping for 瑕光 S2 only, with or without the effects index; held skill loops and every other skill keep their roles.
 
+The verified list expands in [§35.20](history/0.3.2.md#3520-verified-skill-attack-clips): 德克萨斯 S1/S2, 伺夜 S1/S2,
+归溟幽灵鲨 S1, 焰影苇草 S2 and 耀骑士临光 S2 use their model's normal attack role across facings and skins.
+The earlier 郁金香 S2 candidate remains unimplemented for the identity mismatch documented in
+[§35.21](history/0.3.2.md#3521-tulips-s2-candidate-remains-unimplemented). Current contract: [design/client.md](design/client.md).
+
 The 0.3.1 sim investigation and rule correction are [§34.32](history/0.3.1.md#3432-瑕光-attacks-the-enemies-she-put-to-sleep-琳琅诗怀雅s-s3-keeps-its-coins):
 瑕光 S2 retains sleeper targeting and attack replay events; 琳琅诗怀雅 S3 keeps double attacks and coins at the cap,
 following the official mode's no-auto-close rule. Current contracts: [design/engine.md](design/engine.md).

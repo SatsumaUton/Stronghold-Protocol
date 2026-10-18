@@ -358,8 +358,11 @@ remain local; no official scene bytes belong in git or fixtures.
   - Then the animation-role resolver runs. See `tools/assets/anim-roles.mjs` and research 07 §5.4.
   - Runtime skill attacks (§34.31) distinguish a cast from a strike. Blemishine S2 uses the verified official
     mode's Attack / Attack_Down, S3 Skill_3; this does not request the optional effects index. Her Skill_2 has
-    OnAttack and therefore needs that verified mapping even without the index. Every other skill keeps its
-    existing role logic (held loops, own strikes, skill idles), with or without the index.
+    OnAttack and therefore needs that verified mapping even without the index. §35.20 also verifies normal attacks
+    for Texas S1/S2, Vigil S1/S2, Specter the Unchained S1, Reed the Flame Shadow S2 and Nearl the Radiant Knight S2.
+    They select the installed model's attack role (including Begin/End and downward variant), with or without the
+    index. Held loops, own strikes and skill idles retain their existing logic. The alleged Tulip S2 is not an
+    official skill in the local tables (§35.21); no mapping is added for it.
     Raw effects-index animKey values are not generally skeleton clip names: mode `_replaceAnimPairs` and skin
     `_animations` are not exported by the current index. Other indexed skills retain their existing roles until
     those mappings are available [ASSUMED]. No manifest or skeleton metadata is rewritten.

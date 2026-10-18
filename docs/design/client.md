@@ -543,9 +543,18 @@ the actor returns to base/skill idle. Late operator events still start at the st
 while `Skill_2` remains the cast; S3 retains `Skill_3`. Read only the effects index the field already loaded.
 The same verified S2 mapping applies without it: the manifest's cast has OnAttack, so absence of that event alone
 cannot identify this cast. The legacy index omits per-mode animation remaps and skin key-to-clip tables; until
-those are exported, every other skill retains its existing roles with or without the index [ASSUMED], rather than
+those are exported, unverified skills retain their existing roles with or without the index [ASSUMED], rather than
 treating every raw `Attack` key as the normal skeleton clip. Held loops (§34.4/§34.4.1) and distinct skill idles
-(§23.13) keep their rules. History §34.31 lists the further cross-checked candidates, unchanged in 0.3.1.
+(§23.13) keep their rules.
+§35.20 additionally verifies the normal attack role for 德克萨斯 S1/S2 (`Attack_Loop`), 伺夜 S1/S2 (`Attack`,
+Front DOWN `Attack_Down`), 归溟幽灵鲨 S1 (`Attack`, Front DOWN `Attack_Down`), 焰影苇草 S2 (`Attack`) and
+耀骑士临光 S2 (`Attack_Loop`). Both Front and Back use the same verified rule, including the cast clips that
+contain OnAttack. Index arrival/absence does not change this selection; Specter's initial Empty mode is a cast
+transition, not her subsequent attack mode. The model's normal role preserves its Begin/End and downward variant.
+[ASSUMED] Cosmetic models use their declared normal role; absent clips retain the old fallback. An explicitly
+different plugin skill in the same slot does not inherit the mapping. No form, held loop, own idle, skill-start/end
+animation or simulation timing changes. 郁金香's alleged S2 remains unimplemented (§35.21): the official tables
+give her only S1; the `Skill_2` animation belongs to that skill's empty-target branch.
 
 Connection recovery sits above the AI-away overlay and below global modals (§30.8), so a replaced session can
 be reclaimed by pointer while away. This does not change the stacking behavior of modals nested inside a screen.
