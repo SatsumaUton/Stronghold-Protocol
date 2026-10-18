@@ -935,7 +935,7 @@ export class UnitView {
         actor.setSkillIndex(this.skillIndex ?? undefined);
         // Query at attack time: late index loads, skill slots and facing changes need no new model or request.
         actor.skillAttackMode = () => {
-          // [ASSUMED] §34.31's cast heuristic is for operators; enemy abilities and token controllers keep their roles.
+          // §34.31 / §35.20 verify operator mappings only; enemy abilities and token controllers keep their roles.
           if (this.info.kind !== 'op') return { preserve: true };
           const mode = skillAttackMode(this.ctx.skillAttackIndex?.(), {
             info: this.info, rec: this.ctx.lookupDef?.(this.info), skillIndex: this.skillIndex,
