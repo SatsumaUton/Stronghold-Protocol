@@ -173,7 +173,7 @@
         "enemy_9011_acrefr": [12,2,6,24604,150624]
       },
       "hooks": [1,92,5700,1093,1093,1622,1636,119,52,80,27,28,0,27187,3893,57,74,28,1,52,0,1,6],
-      "events": {"atk":1194,"bounty":4,"cast":1,"deploy":18,"die":52,"dmg":1626,"engage":11,"fx":133,"heal":108,"leak":28,"rate":143,"skill":57,"spawn":86,"status":664},
+      "events": {"atk":1194,"bounty":4,"cast":1,"deploy":18,"die":52,"dmg":1626,"engage":11,"fx":133,"heal":108,"leak":28,"rate":147,"skill":57,"spawn":86,"status":664},
       "fx": {"aoe":30,"burst":1,"displace":3,"dodge":12,"dp":27,"phase":1,"slash":48,"sp":2,"spGain":9},
       "snaps": "530ce9ab 8b4db443 e3ba371a 7c6a966d b5f97732 3987ca2c 1b16fd07 8d2be1ea 0a2b6e65 a4019031 3afbc256 0e7928bb 8a82756d deae43a8 615c5a2d 5e8d5226 e0cc4dbf c0f237ae 3e122692"
     },
@@ -520,7 +520,7 @@
         "enemy_1329_cbshld": [39,39,0,1893,374400]
       },
       "hooks": [1,174,5980,803,803,1612,1749,168,159,159,37,35,0,29206,2579,58,158,0,1,159,3,1,18],
-      "events": {"atk":933,"bounty":4,"deploy":13,"die":159,"dmg":1735,"engage":6,"fx":326,"heal":128,"layer":3,"rate":405,"skill":72,"spawn":173,"status":315},
+      "events": {"atk":933,"bounty":4,"deploy":13,"die":159,"dmg":1735,"engage":6,"fx":326,"heal":128,"layer":3,"rate":404,"skill":72,"spawn":173,"status":315},
       "fx": {"aoe":4,"burst":1,"dodge":23,"dp":63,"garrison":3,"shieldBreak":60,"slash":159,"sp":13},
       "snaps": "fd4a478a a3c41591 cf59e713 ca3e0d63 6c12b953 9b5cf5f4 8dda6cd1 f8c3cbea e2240b6f 2e25264c 55eecf65 277936d4 fd22556b 6042dc63 2b94496f 5ac1f5d3 a182ac7e 76aa81e5 6b35f565 3abb97c1"
     },

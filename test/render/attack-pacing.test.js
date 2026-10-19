@@ -113,6 +113,46 @@ describe('a skill / buff change', () => {
   });
 });
 
+describe('a change in the SAME tick as the attack (the review case)', () => {
+  test('a same-tick skill change paces the FIRST swing with the new interval', async () => {
+    // the sim changed s.interval this tick (a skill that just started); the snapshot already carries it, while the
+    // 'rate' event for that change is one step behind. The look-ahead must pace from the snapshot.
+    const v = await view(unit({ atkInterval: 1.2 }));
+    assert.equal(v.atkInterval, 1.2);
+    // render/app.js keeps one info object per unit, and a later snapshot replaces its fields in place
+    v.info.atkInterval = 0.6;
+    v.sync({ x: 4, y: 9, hp: 1000, maxHp: 1000, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0 });
+    assert.equal(v.atkInterval, 0.6, 'the snapshot value is adopted before any rate event is applied');
+    assert.equal(v.atkKnown, true, 'and it stays authoritative');
+    assert.equal(v.actor.interval, 0.6, 'the actor paces that swing at 0.6 s');
+    v.setAtkInterval(0.6);                       // the following rate event for the same number is a no-op
+    assert.equal(v.atkInterval, 0.6);
+  });
+
+  test('the rate event carries the interval the current swing runs on (emitted after the skill tick)', () => {
+    const u = { id: 7, alive: true, deployed: true, _rateDirty: true, _rateSent: 0, s: { interval: 0.5 } };
+    const ev = new BattleEvents();          // a method container: the sim installs it on Battle.prototype
+    ev.recordEvents = true;
+    ev._evq = [];
+    ev.units = [u];
+    ev._emitRateChanges();
+    const rate = ev._evq.filter((e) => Array.isArray(e) && e[0] === 'rate');
+    assert.equal(rate.length, 1, 'one rate event');
+    assert.equal(rate[0][2], 0.5, 'and it carries the post-skill interval');
+  });
+});
+
+describe('the playback after the hit and the clip tail', () => {
+  test('the actor is paced at the sim interval, and a tail remains after the strike', async () => {
+    const v = await view(unit({ atkInterval: 0.8 }));
+    assert.equal(v.windUp(0.3, 'none'), true, 'a wind-up is accepted');
+    assert.ok(Math.abs(v.actor.interval - 0.8) < 1e-9, 'the clip runs over the sim interval');
+    v.onAttack({ x: 4, y: 12 }, 1, 'none', false);
+    const tail = Number(v.actor.attackUntil) - Number(v.actor.clock);
+    assert.ok(tail > 0, 'a tail remains after the strike');
+    assert.ok(tail <= 0.8 * 2 + 1e-6, 'and it is bounded by the interval');
+  });
+});
 describe('the intervals the renderer must not mistake for a rhythm', () => {
   test('a delayed batch (a late first attack) does not turn the sim interval into a slow one', async () => {
     const v = await view(unit({ atkInterval: 0.5 }));

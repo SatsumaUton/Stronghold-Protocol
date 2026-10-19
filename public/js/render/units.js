@@ -1182,6 +1182,11 @@ export class UnitView {
     if ((prevFlags ^ this.flags) & UF.SKILL) this.setSkill(!!(this.flags & UF.SKILL));
     if (this.anim === ANIM.DIE && this.alive) this.die();
     if (this.actor && this.alive) this.actor.setBase(this._baseFromAnim());
+    // The snapshot's interval is AUTHORITATIVE (server/sim/snapshot.js carries `s.interval` every tick): a skill or buff
+    // that changed it in the same tick as this attack makes the 'rate' event one step late, and the look-ahead would pace
+    // the first swing with the old value. Reading it here every frame keeps the preview in step with the sim.
+    const iv = Number(this.info && this.info.atkInterval);
+    if (Number.isFinite(iv) && iv > 0 && Math.abs(iv - this.atkInterval) > 1e-6) this.setAtkInterval(iv);
   }
 
   /** The way the model looks (−1 left, 1 right); a FIXED_FACING leader keeps its own way whatever turn it is given. */
