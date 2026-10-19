@@ -278,6 +278,8 @@ again after closing; the modal interaction is unchanged.
 Settlement layout (§35.1, #745): preserve #698's official art and positions. Both translated outcome headings fit
 inside bounded boxes; button backgrounds/inset decoration are missing-or-failed-sprite fallbacks only (keyboard
 focus remains visible). Each of the two equipment slots constrains its icon with `object-fit: contain`.
+The 下一步 button fits its 297×86 art by the face (rows 1–68, columns 1–268); its label follows the layout rem, not
+the 文字大小 `--t` root, so label/icon/box keep one proportion (test/ui/text-scale.test.js).
 [ASSUMED] Browser title budgets and uniform shrinking accommodate translation and text-size expansion; they are
 not measurements of the official client.
 
@@ -409,8 +411,9 @@ Settings persist `textSize` (sm/md/lg/xl; default sm), `voiceLang` (cn/jp/en/kr;
 (部署时收起商店; default true — only an explicit false turns the 0.3.0 deploy fold off) and `ammoEnergyCount`
 (显示弹药与能量数量; default false). A saved `ammoCount` or `mysticEnergy` of `true` migrates into `ammoEnergyCount`
 on read and is not written back. CSS text uses `--t`;
-the layout rem, camera and board geometry stay unchanged. Larger text and translated controls wrap within the settings
-modal. The normal roster detail and chosen DIY cards expose each operator's voice preference, shared across that
+the layout rem, camera and board geometry stay unchanged. The settlement 下一步 button's label is the one exception:
+it follows the layout rem so the official art's proportion survives the 文字大小 steps (NOT_SCALED; §35.1). Larger
+text and translated controls wrap within the settings modal. The normal roster detail and chosen DIY cards expose each operator's voice preference, shared across that
 charId's forms, listing only the dubs this server has and offering a preview. An absent override follows the global
 preference, then the own-language dub when the switch is on and the operator has one, then Chinese. A missing line
 falls back to the Chinese file of the same name. Changing the global language does not clear per-operator choices.
