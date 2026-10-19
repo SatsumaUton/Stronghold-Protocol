@@ -57,8 +57,8 @@ describe('spectator seats (community report #26, real server)', { skip: !ENABLED
       await spec.click('.join-row button', '观战');
       await spec.page.waitForSelector('.room-screen .specbar__who.is-me', { timeout: 10000 });
       const roomView = await spec.page.evaluate(() => ({
-        bar: document.querySelector('.room-bar__right .btn--xl')?.textContent || '',
-        barDisabled: !!document.querySelector('.room-bar__right .btn--xl')?.disabled,
+        bar: document.querySelector('.room-bar__right .rs-go')?.textContent || '',
+        barDisabled: !!document.querySelector('.room-bar__right .rs-go')?.disabled,
         status: document.querySelector('.room-bar__status')?.textContent || '',
         seats: [...document.querySelectorAll('.seat__name')].map((e) => e.textContent),
       }));

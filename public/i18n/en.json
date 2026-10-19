@@ -848,6 +848,12 @@
   "填入密钥（不会直接加入）": "Fill in the key (does not join yet)",
   "将该博士移出同盟": "Remove this Doctor from the Alliance",
   "移出该博士": "Remove this Doctor",
+  "名片干员": "Card Operator",
+  "搜索干员": "Search Operators",
+  "按博士编号自动分配": "Picked from your Doctor number",
+  "选择后，同盟里的博士都会看到这张立绘": "Once chosen, every Doctor in the room sees this portrait",
+  "更换立绘": "Change Portrait",
+  "更换名片干员": "Change the card operator",
   "观战席": "Spectators",
   "移出观战者 {name}": "Remove spectator {name}",
   "移出该观战者": "Remove this spectator",
@@ -2195,5 +2201,8 @@
   "成就统计": "Achievements",
   "本机记录：只保存在这个浏览器里": "Local records: kept in this browser only",
   "查看完整统计": "Full statistics",
-  "成就统计（本机记录）": "Achievements (this device's records)"
+  "成就统计（本机记录）": "Achievements (this device's records)",
+  "邀请": "Invite",
+  "复制同盟密钥以邀请队友": "Copy the Alliance Key to invite teammates",
+  "同盟设置": "Alliance Settings"
 }
