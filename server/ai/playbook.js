@@ -13,18 +13,25 @@ const source = 'activity_table autoChessData / act2autochess → data/bands.json
 const fields = c => [c.trait?.desc, c.skill?.desc, ...(c.talents || []).map(t => t.desc)].join(' ');
 const isBeacon = item => item?.buffs?.some(b => b.key === 'use_equip_recruit_new_char_and_give_char_to_player_most_bond');
 
+// Official chess fields: canHitFly, dmgType, position, stats.blockCnt, profession, subProfessionId
+// (character_table / act2autochess charChessDataDict, generated data/chess.json).
+export function operatorCaps(c) {
+  return {
+    air: c?.canHitFly === true && !['heal', 'none'].includes(c?.dmgType),
+    block: c?.position === 'MELEE' && c?.stats?.blockCnt > 0,
+    sustain: c?.profession === 'MEDIC' || c?.dmgType === 'heal',
+    elementRecovery: c?.subProfessionId === 'wandermedic',
+  };
+}
+
 function capabilities(c) {
   const text = fields(c);
   return {
-    air: c.canHitFly === true && !['heal', 'none'].includes(c.dmgType),
+    ...operatorCaps(c),
     // i18n-ignore: match official Chinese mechanical text, never player-facing strings
     reveal: /隐匿.{0,6}失效|无视.{0,6}隐匿|反隐/.test(text),
-    // Element offense is not mitigation. Only the wandering-medic trait establishes team recovery here.
-    elementRecovery: c.subProfessionId === 'wandermedic',
     // i18n-ignore: match official Chinese mechanical text
     elementDamage: /造成元素损伤|附带.{0,12}(凋亡|灼燃|神经|侵蚀)损伤/.test(text),
-    block: c.position === 'MELEE' && c.stats?.blockCnt > 0,
-    sustain: c.profession === 'MEDIC' || c.dmgType === 'heal',
   };
 }
 

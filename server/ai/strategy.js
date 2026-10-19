@@ -6,6 +6,23 @@ const unique = xs => [...new Set(xs)];
 const rank = (a, b) => b.score - a.score || a.id.localeCompare(b.id);
 const cheap = (a, b) => a.tier - b.tier || a.cost - b.cost || a.id.localeCompare(b.id);
 
+function collapseDirections(list) {
+  const groups = new Map(), named = [];
+  for (const c of list) {
+    if (c.build) { named.push(c); continue; }
+    const key = `${c.band}:${c.main}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(c);
+  }
+  const collapsed = [];
+  for (const [key, group] of groups) {
+    group.sort(rank);
+    const best = group[0];
+    collapsed.push({ ...best, id: key, subOptions: group.map(c => ({ subs: c.subs, score: c.score })) });
+  }
+  return [...collapsed, ...named];
+}
+
 export function enemyProfile(playbook, digest) {
   const types = new Set(digest.factions || []), ids = new Set((digest.upcoming || []).map(e => e.enemyKey));
   const boss = playbook.bosses.find(b => b.id === digest.boss?.id);
@@ -29,7 +46,9 @@ export function enemyProfile(playbook, digest) {
       ...(boss ? [playbook.lateRule, ...boss.abilities] : [])] };
 }
 
-/** [ASSUMED] Top four, or fewer when fewer legal distinct archetypes exist. Scores are fully decomposed. */
+// [ASSUMED] Band draft returns at most eight directions and keeps every uncontended community/maintainer
+// main that still fits. Prep collapses same band+main sub variants into one stable id. Scores stay decomposed.
+const DRAFT_CAP = 8, PREP_CAP = 4;
 export function strategyCandidates(playbook, digest, previousPlan = null) {
   if (!playbook) return { candidates: [], reason: 'No versioned playbook in this knowledge pack.' };
   const disabled = new Set([...playbook.inactiveBonds, ...(digest.availability?.disabledBonds || [])]);
@@ -126,10 +145,42 @@ export function strategyCandidates(playbook, digest, previousPlan = null) {
   all.push(...cycleCandidates(playbook, digest, { operators, disabled, held, teammates, bands, profile, previousMain }));
   all.push(...communityCandidates(playbook, digest, { operators, disabled, held, teammates, bands, profile, previousMain }));
   all.sort(rank);
-  // [ASSUMED] Prefer four different main directions; fill remaining slots from distinct band/main alternatives.
-  const selected = [], mains = new Set();
-  for (const c of all) if (!mains.has(c.main) && selected.length < 4) { selected.push(c); mains.add(c.main); }
-  for (const c of all) if (selected.length < 4 && !selected.includes(c)) selected.push(c);
+  const preparing = draft.length === 0;
+  // Named builds and cycles keep their own ids. Only the generic sub-variants (same band and main, different
+  // subs, identical stages) collapse. The id is band:main so a later sub reorder does not look like a new direction.
+  // Collapse appends named builds after the generics. Sort again so a higher-scoring recipe still
+  // occupies its main's slot the way the pre-collapse ranking did.
+  const pool = (preparing ? collapseDirections(all) : all).sort(rank);
+  const cap = preparing ? PREP_CAP : DRAFT_CAP;
+  const selected = [], chosen = new Set(), mains = new Set();
+  if (!preparing) {
+    const wanted = new Set();
+    for (const band of playbook.bands) {
+      if (band.communityMain?.main) wanted.add(`${band.id}:${band.communityMain.main}`);
+      for (const role of playbook.community?.roles || []) if (role.band === band.id && role.main) wanted.add(`${role.band}:${role.main}`);
+    }
+    const best = new Map();
+    for (const c of pool) {
+      const key = `${c.band}:${c.main}`;
+      if (!wanted.has(key) || contested(c.main) > 0) continue;
+      const prev = best.get(key);
+      if (!prev || rank(c, prev) < 0) best.set(key, c);
+    }
+    for (const c of [...best.values()].sort(rank)) {
+      if (selected.length >= cap) break;
+      selected.push(c); chosen.add(c.id); mains.add(c.main);
+    }
+  }
+  for (const c of pool) if (!mains.has(c.main) && selected.length < cap && !chosen.has(c.id)) {
+    selected.push(c); mains.add(c.main); chosen.add(c.id);
+  }
+  // Draft may still show another band once every uncontended community main that fits is present.
+  // Prep does not refill with another copy of the same generic direction; a named build may still take a free slot.
+  if (!preparing) {
+    for (const c of pool) if (selected.length < cap && !chosen.has(c.id)) { selected.push(c); chosen.add(c.id); }
+  } else {
+    for (const c of pool) if (c.build && selected.length < cap && !chosen.has(c.id)) { selected.push(c); chosen.add(c.id); }
+  }
   for (const c of selected) {
     // [ASSUMED] Cost/discount schedule supplies timing; stage keys supply required shop access. Public copy
     // shares, not fixed tier odds: staying low gives ZERO normal-roll chance for a higher-tier key operator.

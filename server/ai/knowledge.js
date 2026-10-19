@@ -12,6 +12,23 @@ const stable = x => Array.isArray(x) ? x.map(stable) : x && typeof x === 'object
   ? Object.fromEntries(Object.keys(x).sort().map(k => [k, stable(x[k])])) : x;
 // [ASSUMED] Short-form catalogue text retains at most 500 characters per effect.
 const short = s => String(s || '').replace(/<@[^>]*>|<\/>/g, '').slice(0, 500);
+// Ability rows in data/enemies.json are {text, textRaw, format} objects (enemy_handbook ability text).
+// Joining them with String() wrote "[object Object]" into the pack. Keep readable text fields only.
+export function effectText(value) {
+  const bits = [];
+  const walk = v => {
+    if (v == null || v === false) return;
+    if (typeof v === 'string' || typeof v === 'number') { bits.push(String(v)); return; }
+    if (Array.isArray(v)) { for (const x of v) walk(x); return; }
+    if (typeof v === 'object') {
+      if (typeof v.text === 'string') { bits.push(v.text); return; }
+      if (typeof v.desc === 'string') { bits.push(v.desc); return; }
+      for (const x of Object.values(v)) if (typeof x === 'string') bits.push(x);
+    }
+  };
+  walk(value);
+  return bits.join(' ').replace(/\s+/g, ' ').trim();
+}
 const cache = new WeakMap();
 let playing;
 // docs/PLAYING.md is absent from the Docker image (Dockerfile copies only the plugin docs): an install without it
@@ -100,7 +117,7 @@ export function knowledgePack(data, { language = 'zh-CN', modeId, rules = {}, of
       traits: (r.garrisonIds || []).map(id => short(localized.garrisons[id]?.desc)) })),
     items: rows('items', r => ({ tier: r.tier, cost: r.price, kind: r.kind, effect: short(r.desc), requiresBondId: r.requiresBondId })),
     bands: rows('bands', (r, id) => ({ lp: r.totalHp, effect: short(r.desc), carriesFunds: gd.leftoverKeptBands.includes(id), interest: interestRule(gd, id) })),
-    enemies: rows('enemies', r => ({ effect: short([r.desc, ...(r.abilities || [])].join(' ')), stats: r.stats, inactiveIn: r.inactiveIn })),
+    enemies: rows('enemies', r => ({ effect: short(effectText([r.desc, ...(r.abilities || [])])), stats: r.stats, inactiveIn: r.inactiveIn })),
     bosses: rows('bosses', r => ({ enemyKey: r.enemyKey, hpByDifficulty: r.bloodPoint, notes: r.abilities })),
     difficulties: Object.entries(data.config?.modes || {}).map(([id, r]) => ({ id, difficulty: r.difficulty,
       bossRound: r.bossRound, hiddenRound: r.hiddenRound, enemyScale: r.enemyScale, inactiveEnemies: r.inactiveEnemyKeys })),

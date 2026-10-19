@@ -316,7 +316,16 @@ current enemy/boss previews and opponents' **public scouted boards only**. No ot
 §35.13 adds `economy.expiringFunds` (0 for carry bands), effective `refreshPrice` (0 for a free charge),
 `upgradePrice` (cost to the next level), `frozenSlots` (unsold slot indices), and
 `bankOperators:[{uid,id,sellValue}]` (marked disposable bench singles; base refund before sale hooks).
-These fields and per-offer `frozen` survive the example's compact digest. The knowledge pack explains costs,
+These fields and per-offer `frozen` survive the example's compact digest.
+§35.15 adds further optional fields, omitted when unknown: chess on the board, bench, overflow and shop
+gain `name`, `class` (the official profession) and `caps:{air,block,sustain,elementRecovery}` from
+`canHitFly`, `dmgType`, `position`, `stats.blockCnt`, `profession` and `subProfessionId`
+(`charChessDataDict` / `data/chess.json`). Items gain `name`. Two operators share the name 锡人, so the id
+stays the key. Bounty cards gain `killChance` when the seat strategy's `bountyKillChance` returns a finite
+number (the existing legacy exposure model, not a new combat rule) and `enemy:{hp,def,res,motion,fly,effect}`
+from the catalogue row. `compactDigest` and `compactChoices` keep these fields. `sp-ai/1` and `sp-knowledge/1`
+otherwise keep their schemas. The example's system prompt uses a slim view of the pack; the hello still
+sends the full pack, and `strategyCandidates` still reads the full local playbook. The knowledge pack explains costs,
 no EXP, carry/interest per band, normal/elite sale values, freeze consumption at next round start, and manual
 refresh cancellation. Its playbook contains a recommended data-cost schedule and a labeled measured legacy
 reference; candidate curves state stage-key tiers, inaccessible keys and public copy shares. See
@@ -365,8 +374,9 @@ is used for repository validation.
 
 ### Committed round plans and private reasoning (§35.11)
 
-The example also receives a versioned, data-derived playbook and 2–4 scored draft/prep archetypes (§35.12;
-fewer only when legal alternatives run out). See [AI strategy method and regeneration](AI-STRATEGY.md) for
+The example also receives a versioned, data-derived playbook (§35.12). §35.15 sends at most eight scored
+band-draft directions, preferring uncontended community/maintainer mains, and collapses a prep band and main
+into one candidate with `subOptions` (fewer only when legal alternatives run out). See [AI strategy method and regeneration](AI-STRATEGY.md) for
 official field sources, the maintainer's 2026-10-19 community guidance, band implications, stage keys,
 public teammate contention, enemy coverage and [ASSUMED] score/timing formulas. `knowledge.playbook` is static;
 the adapter computes `strategy.candidates` from the seat digest and acknowledged prior plan. Future targets
@@ -393,9 +403,10 @@ The model is asked for:
   the game's validator, legacy executor and journal; metadata is never sent to another seat.
 - Keep at most **three** targets with priorities 1..5, highest first. Candidates must already have board/bench
   members and a completed or publicly reachable threshold. Prefer finishing thresholds, preserving pairs and
-  core units. With no candidates, build the board first. Changing the target set or priority order requires
-  `pivot:true` and a reason (unreachable bond, strong merge, boss/enemy needs). Without both, retain viable old
-  targets; removing unreachable old targets produces an explicit automatic pivot reason in diagnostics.
+  core units. With no candidates, build the board first. Changing the primary bond (the highest priority)
+  requires `pivot:true` and a reason (unreachable bond, strong merge, boss/enemy needs). Adding, removing or
+  reordering sub-bonds does not. Without both, retain viable old targets; removing unreachable old targets
+  produces an explicit automatic pivot reason in diagnostics.
   An explicitly empty plan remains unweighted legacy delegation, preserving §35.9's escape hatch.
 - The example caches the last confirmed and pending prep snapshots separately per match/player/knowledge version
   (32 seat scopes). Host acknowledgement prevents rejected/late plans being presented as accepted. Drafts and
@@ -405,9 +416,12 @@ The model is asked for:
   the host still supplies the accepted plan and retained events, but missing baseline counts are `null` and
   `eventsComplete:false`. Event sequence gaps are likewise explicit.
 - The compact digest lists shop cost/tier/bonds, owned stars/equipment/positions, bond count/next threshold/layers,
-  gold/interest/upgrade costs, enemies/factions/boss and public teammate bond summaries. Choice cards retain
-  their visible effects and prices. Raw duplicate views, geometry, placement alternatives, cosmetic fields and
-  repeated static names/base IDs/descriptions are omitted. The knowledge pack stays the stable system prefix.
+  gold/interest/upgrade costs, enemies/factions/boss and public teammate bond summaries. §35.15 also keeps
+  chess `name` / `class` / `caps` and item `name`, because ids alone are ambiguous, and bounty `killChance`
+  plus compact enemy stats. Choice cards retain their visible effects and prices. Raw duplicate views, geometry,
+  placement alternatives, cosmetic fields and long trait text stay out; that text lives in the slim prefix.
+  The full knowledge pack stays the hello payload. The example system prompt is the slim view, at most 200000
+  characters, and drops compact enemies only when a translated catalogue would exceed that.
 - Reachability is a conservative **estimate**: use public catalogue members eligible at the current shop level,
   excluding public bans, plus owned/displayed copies, capped by deployment capacity (except deck-counting bonds).
   Golden-only targets require already owned elites; special bonuses/plugin effects are not forecast. Bench
