@@ -39,6 +39,10 @@ direction-dependent classification. Current contract: [design/engine.md](design/
 
 ## Where each section lives
 
+The sourced freeze/redeployment advisor recipes in [§35.12](history/0.3.2.md#3512-regenerable-advisor-strategy-playbook)
+require reachable named core roles and distinct thresholds; current data overrides community shorthand.
+These are [ASSUMED] recommendations, specified in [AI-STRATEGY §9](AI-STRATEGY.md#9-sourced-freeze-and-redeployment-builds-assumed).
+
 Optional selected-unit bond timers (#746, maintainer approved 2026-10-18) extend §9 in
 [§35.3](history/0.3.2.md#353-optional-selected-unit-bond-timers-746): default-off convenience HUD, independent Sargon
 stack expiry and separate Siracusa deployment/stealth/post-stealth effects, all read from simulation snapshots.

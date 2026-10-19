@@ -176,7 +176,26 @@ export function buildPlaybook(data, { modeId, community = COMMUNITY } = {}) {
     if (validBond(e.main) && e.subs.every(validBond)) return true;
     warnings.push({ kind: 'unavailable-community-pair', ...e }); return false;
   });
-  const builds = (community.builds || []).map(e => ({ ...e, available: e.status !== 'unresolved' && e.bonds.every(validBond) }));
+  const builds = (community.builds || []).map(e => {
+    // Names/aliases are community evidence; only visible normal IDs become buy targets. Hidden forms remain
+    // traceable in records. No fuzzy name matching or invention of a substitute for an absent operator.
+    const members = (e.members || []).map(m => {
+      const op = operators.find(c => c.name === m.name);
+      return { ...m, id: op?.id || null, tier: op?.tier || null, bonds: op?.bonds || [],
+        records: Object.values(data.chess || {}).filter(c => !c.isGolden && c.name === m.name).map(c => c.chessId).sort() };
+    });
+    const coreGroups = (e.requiredRoles || []).map(role => ({ role, options: members.filter(m => m.role === role && m.id).map(m => m.id) }));
+    // Official activity_table act2autochess bond/effect/garrison/item/band records, regenerated in data/*.json.
+    // Preserve current parameters beside recipe differences so a changed version never relies on prose alone.
+    const mechanics = Object.fromEntries(Object.entries(e.evidence || {}).map(([kind, ids]) => [kind, ids.map(id => {
+      const r = data[kind]?.[id];
+      return { id, available: !!r, source: `data/${kind}.json:${id}`,
+        ...(r ? Object.fromEntries(Object.entries({ desc: r.desc, thresholds: r.thresholds, bb: r.bb, bbStr: r.bbStr, buffs: r.buffs,
+          event: r.eventType, giveBondId: r.giveBondId, canGiveBond: r.canGiveBond }).filter(([, value]) => value !== undefined)) : {}) };
+    })]));
+    return { ...e, ...(e.members ? { members, coreGroups, mechanics } : {}),
+      available: e.status !== 'unresolved' && e.bonds.every(validBond) && coreGroups.every(g => g.options.length) };
+  });
   return { schema: 'sp-playbook/1', policy: '[ASSUMED] advisory estimates and scores; no guaranteed timing, stock or combat outcome',
     sources: ['docs/AI-STRATEGY.md', source, 'data/chess.json: bonds/tier/price/profession/canHitFly/dmgType/trait/skill/talents/garrisonIds',
       'data/config.json modes/economy; server/match/pool.js; shared/constants.js BOSS_HIT_LIMIT'],
