@@ -128,6 +128,24 @@ export function strategyCandidates(playbook, digest, previousPlan = null) {
   const selected = [], mains = new Set();
   for (const c of all) if (!mains.has(c.main) && selected.length < 4) { selected.push(c); mains.add(c.main); }
   for (const c of all) if (selected.length < 4 && !selected.includes(c)) selected.push(c);
+  for (const c of selected) {
+    // [ASSUMED] Cost/discount schedule supplies timing; stage keys supply required shop access. Public copy
+    // shares, not fixed tier odds: staying low gives ZERO normal-roll chance for a higher-tier key operator.
+    c.levelCurve = [4, 7, 10, 13].map(round => {
+      const stage = c.stages.find(s => s.stage === (round <= 7 ? 'R4-7' : round <= 10 ? 'R8-10' : 'late'));
+      const requiredTier = Math.max(1, ...(stage?.keys || []).map(id => byId.get(id)?.tier || 1));
+      const baseline = playbook.recommendedSchedule.find(r => r.round === round)?.level || 1;
+      // Include future main/sub members and proposed counter repairs: a short cheap stage-key list alone
+      // must not recommend staying at L2 while the same build still needs a T5/6 member.
+      const targetTier = Math.max(requiredTier, ...operators.filter(op => op.bonds.some(b => [c.main, ...c.subs].includes(b)))
+        .map(op => op.tier), ...(c.coverageRepairs || []).flatMap(r => r.options.map(id => byId.get(id)?.tier || 1)));
+      const level = Math.min(c.shopHold || playbook.maxShopLevel, targetTier, baseline);
+      const eligible = operators.filter(op => op.tier <= level), total = eligible.reduce((n, op) => n + op.poolCopies, 0);
+      return { round, level, requiredTier, targetTier, inaccessibleKeys: (stage?.keys || []).filter(id => (byId.get(id)?.tier || 1) > level),
+        keyDrawShareBeforePurchases: total ? eligible.filter(op => stage?.keys?.includes(op.id)).reduce((n, op) => n + op.poolCopies, 0) / total : 0,
+        basis: '[ASSUMED] maintainer tempo with data income/upgrade discounts, stage-key tiers and public copy shares after bans; no live stock. Explain delays or a deliberate level hold in why' };
+    });
+  }
   return { policy: '[ASSUMED] heuristic scores; public catalogue only, remaining copies unknown',
     profile, teammates, candidates: selected.sort(rank),
     ...(selected.length < 2 ? { reason: 'Fewer than two legal distinct archetypes in this observation.' } : {}) };

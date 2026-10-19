@@ -20,7 +20,7 @@ export function compactChoices(d) {
 export function compactDigest(d, pack) {
   const board = (d.board || []).map(unit), bench = (d.bench || []).map(unit), overflow = (d.overflow || []).map(unit);
   const offers = (d.shop || []).filter(s => s && !s.sold);
-  const shop = offers.map(s => ({ ...pick(s, ['id', 'kind', 'slot', 'bonds']), cost: s.price, tier: s.tier }));
+  const shop = offers.map(s => ({ ...pick(s, ['id', 'kind', 'slot', 'bonds', 'frozen']), cost: s.price, tier: s.tier }));
   const held = [...(d.board || []), ...(d.bench || [])].filter(p => p.kind === 'chess');
   const disabled = new Set(d.availability?.disabledBonds || []);
   const banned = new Set([...(d.availability?.bannedChess || []), ...(d.availability?.diyBanned || [])]);
@@ -48,7 +48,7 @@ export function compactDigest(d, pack) {
       candidate: members.length > 0 && reachable };
   }).filter(b => b.count || b.held || b.shopOptions);
   return { ...pick(d, ['round', 'phase', 'lp', 'deployCap', 'factions']), band: d.band?.id,
-    economy: pick(d.economy, ['gold', 'interest', 'level', 'upgradePrice', 'refreshPrice']),
+    economy: pick(d.economy, ['gold', 'interest', 'level', 'upgradePrice', 'refreshPrice', 'expiringFunds', 'frozenSlots', 'bankOperators']),
     board, bench, overflow, shop, bonds,
     upcoming: (d.upcoming || []).map(e => pick(e, ['enemyKey', 'name', 'count', 'gate', 't', 'fly', 'elite', 'boss', 'source', 'mods'])),
     boss: pick(d.boss, ['id', 'name', 'round']),

@@ -352,3 +352,74 @@ The model prompt distinguishes this strategy from execution. The existing ID-lev
 arbitrary repeated buy/sell sequence or safely identify which duplicate to sell. It must not put every engine
 or feeder ID into `sell` to imitate the cycle. This change proposes and explains the archetype; it does not add
 an unbounded trade loop, guaranteed profit, hidden inventory access or a new gameplay mechanic.
+
+## Advisor economy (§35.13)
+
+The maintainer's live 娜仁图亚 / co-op 绝境 diagnosis (2026-10-19) found every plan asking for zero refreshes
+and L1 in R0–2, L2 in R3–6, L3 in R7–8. The executor treated those as hard caps. The maintainer's advice is
+first-hand strategy guidance, **not official text**: spend expiring funds, search for needed operators, freeze
+an unaffordable target, store sale value in cheap spare operators, and develop the shop on time. A deliberate
+罗素 elite farm or established 电表倒转 cycle may hold a level with a stated reason.
+
+Mechanical sources are the local official `activity_table.json`:
+
+- `autoChessData.constData.noMoneyTipsBand` names 坎诺特 as the carry exception; his `aceffect_band_34`
+  `coin_carry_over` parameters give interest. Inherited plugin bands follow `GameData.leftoverKeptBands`.
+- `activity.AUTOCHESS_SEASON.act2autochess.constData.shopRefreshPrice` is 1; free-refresh effects override it.
+  `shopLevelDataDict[mode]` gives upgrade prices/slot counts (绝境: 5/8/11/12/13); `shopCharChessInfoData`
+  gives purchase and sale prices (normally sale +1, also for elites). There is no EXP system. Upgrade cost
+  falls by 1 each round, resets after each upgrade, and opens empty slots (official footage BV1AXwuzdEys 1:39 / #332).
+- Public catalogue tiers/copy counts and the existing sourced `pool.js` reconstruction determine odds:
+  remaining eligible copies, tier ≤ level, no fixed tier-percentage table. An inaccessible tier has zero
+  normal-shop probability. The playbook's shares are public estimates after bans, before purchases.
+- Freeze is free, preserves unsold offers at the next round roll and is then consumed. Manual refresh
+  replaces those offers and cancels freeze (maintainer's official play observation, §32.14.7 / #584).
+  A full regular hand blocks purchases even if they would merge (PRTS 帮助, §6.2 / #82). Existing displayed
+  offer overdraw remains legal (§29.8); speculative bank buys additionally require available stock.
+
+**[ASSUMED] recommendations:** ordinary builds aim for access to T2/3/4/5/6 around R3/5/7/10/13. The
+`recommendedSchedule` simulates current-mode income, upgrade prices and discounts, without sales, gifts or
+carry; at these access deadlines it can spend the cheapest-piece reserve on the upgrade. In 绝境 its
+R4/7/10/13 levels are 2/4/5/6. This differs from the conservative `schedule` used for threshold-sighting
+estimates, which always reserves a purchase. Candidates limit suggested access to their main/sub roster and proposed counter tiers, and report required
+stage-key tiers, inaccessible keys and their eligible public copy share, so the model can explain whether its plan needs faster access or a
+reasoned hold. A cycle candidate's derived `shopHold` limits its recommendation; it must still explicitly
+request `economy.holdLevel:true` and `economy.why` to stop execution upgrades. The model must explain falling
+behind the recommended or measured legacy curve; the executor does not invent a cap from a small `level`.
+
+The spending policy is also **[ASSUMED]**: buy/keep targets and prioritized-bond members count as wanted
+(except explicit sell targets; bond-member acquisition stops after owning its elite). Existing lineup gain
+>2, completing merges and filling the deploy cap count as useful. Buy those first; freeze unaffordable
+wanted offers before another roll; refresh only with remaining eligible stock, bench room and funds for
+an effective-price purchase; then bank cheapest distinct spare singles with positive sale value. Leave one
+bench slot. Mark banks by UID; do not liquidate deployed, equipped, newly wanted or merge-completing copies,
+and only sell when their base refunds can fund the purchase. Each extra pass is bounded to 64 actions to
+contain free/effect cycles. Unspendable residuals can remain. Carry bands retain interest logic. Empty/absent
+plans retain legacy decisions and RNG; no official gameplay rule changes.
+
+Offline measurement, 2026-10-19, vanilla 1ca3921c baseline, seeds 1–3, rehearsal 0, one worker:
+
+```sh
+node tools/botbench.mjs --configs solo:HARD,coop4:HARD --seeds 3 --seed 1 --rehearsal 0 --jobs 1 --bot legacy --json "$BENCH_DIR/legacy.json"
+SP_EXTERNAL_AI_MODE=plan SP_EXTERNAL_AI_TRANSPORT=stdio SP_EXTERNAL_AI_COMMAND='["node","tools/ai/stdio.mjs"]' \
+  node tools/botbench.mjs --configs solo:HARD,coop4:HARD --seeds 3 --seed 1 --rehearsal 0 --jobs 1 --bot external --json "$BENCH_DIR/advisor.json"
+node tools/botbench.mjs --compare "$BENCH_DIR/legacy.json" "$BENCH_DIR/advisor.json"
+```
+
+Set `BENCH_DIR` to a permitted scratch directory. Both runs use the real sim; the example makes no API calls.
+The example picks first available draft choices, so bands differ from legacy and this is an integration
+comparison, not an isolated strength test of the economy policy or a reproduction of the watched model.
+`economy[]` in the benchmark JSON records every ended seat-prep, including eliminated seats' final prep;
+loss and refresh averages use these records. Level checkpoints use surviving seats, as before.
+
+| Mode | Agent | Funds lost/prep | Refreshes/prep | L at R4 / R7 / R10 / R13 | Mean survival round | Match wins |
+|---|---|---:|---:|---|---:|---:|
+| solo:HARD | legacy | 0.7143 | 1.7857 | 2 / 3.6667 / 5 / 6 | 14 | 2/3 |
+| solo:HARD | stdio advisor | 0.4762 | 1.6190 | 2 / 4 / 5 / 6 | 14 | 1/3 |
+| coop4:HARD | legacy | 0.6667 | 1.7358 | 2 / 3.9167 / 5 / 6 | 13.25 | 1/3 |
+| coop4:HARD | stdio advisor | 0.5092 | 1.5521 | 1.9167 / 3.9167 / 5 / 6 | 13.5833 | 1/3 |
+
+Advisor loses no more funds than legacy in either configuration (42/163 advisor preps versus 42/159 legacy).
+All runs have zero match errors and advisor fallbacks. This small sample establishes the spending regression
+check, not superior win rate; rerun for changed content. The knowledge pack labels these measured legacy
+values as a historical reference only for matching vanilla solo/co-op hard modes.

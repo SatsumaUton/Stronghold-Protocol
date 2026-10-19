@@ -3,6 +3,7 @@ import { FIELD, legalTiles, parseKey } from './board.js';
 import { interestDigest } from '../ai/knowledge.js';
 import { ruleOption } from '../../shared/plugins/rules.js';
 import { pieceBonds } from './bondsMeta.js';
+import { advisorBanks } from './aiEconomy.js';
 
 export function aiDigest(m, ps, kind, pub, own, pack = null) {
   const gd = ps.gd || m.gd;
@@ -79,7 +80,10 @@ export function aiDigest(m, ps, kind, pub, own, pack = null) {
     factions: pub.factions,
     ...(m.externalAI?.config.mode === 'plan' ? { feedback: m.externalAI.feedbackFor(ps) } : {}),
     economy: { gold: own.funds, interest: interestDigest(gd, own.bandId, own.funds), level: own.shop.level,
-      exp: null, upgradePrice: own.shop.upgradePrice, refreshPrice: own.shop.refreshPrice },
+      exp: null, upgradePrice: own.shop.upgradePrice, refreshPrice: own.shop.refreshPrice,
+      expiringFunds: gd.leftoverKeptBands.includes(own.bandId) ? 0 : own.funds,
+      frozenSlots: own.shop.slots.flatMap((s, slot) => s?.frozen && !s.sold ? [slot] : []),
+      bankOperators: advisorBanks(m, ps).map(p => ({ uid: p.uid, id: p.id, sellValue: gd.sellPrice(p.id) })) },
     bonds: own.bonds.map(b => ({ ...b, ...named(b.bondId), nextThreshold: b.thresholds?.find(n => n > b.count) ?? null })),
     shop: slots(own.shop.slots), rewards: slots(own.shop.rewardOffer?.slots), personalChoice: own.personalChoice,
     bench: own.hand.map((p, slot) => p && ({ ...piece(p), slot })).filter(Boolean),

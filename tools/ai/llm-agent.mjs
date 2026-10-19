@@ -43,8 +43,19 @@ Complete affordable merges, preserve core units and avoid scattered speculative 
 blocking, sustain and leader damage. Avoid redundant
 units competing with teammates. Spend expiring funds; save for interest only when the selected band carries funds.
 Balance immediate survival against future shop access. Leave detailed procurement and placement to legacy's rehearsal.
+Economy: digest.economy.expiringFunds will disappear at prep end. Refresh costs refreshPrice (free charges included).
+No EXP exists: upgradePrice is the next-level cost, discounted by 1 each round, reset after an upgrade.
+Read knowledge.economy.shop tier shares and strategy.candidates[].levelCurve alongside playbook.legacyReference.
+Needed T4/5/6 operators require L4/5/6 for normal rolls. Explain falling behind either curve in why; L3 at R7 is
+too slow for an ordinary build. economy.level means reach AT LEAST that level, then legacy may upgrade further.
+Only a deliberate low-level elite farm or established cycle should set holdLevel:true, level and economy.why.
+maxRefreshes/refreshAbove/reserve are preferences: expiring funds still buy useful targets, freeze an unaffordable
+wanted offer, search while a purchase remains affordable, then buy cheap spare bank operators. Sell those banks
+when needed to fund a wanted purchase. Sale refunds are sellValue, usually 1, not purchase cost. Respect bench
+room and shared stock. g.freeze preserves unsold offers across rounds; manual refresh cancels it. Carry bands
+keep funds for their actual interest thresholds. A different strategy is allowed with a concrete reason in why.
 Plan fields optional: bonds:[{id,priority:1..5}] (max 3); buy/keep/sell:[operator id, NEVER item id] (max 32 each);
-economy:{saveForInterest:boolean,reserve:0..100,level:0..6,maxRefreshes:0..16,refreshAbove:0..100};
+economy:{saveForInterest:boolean,reserve:0..100,level:0..6,holdLevel:boolean,why:nonempty reason (max 360 chars),maxRefreshes:0..16,refreshAbove:0..100};
 items:{keep:[item id],equip:[{id:item id,target:operator id}]}; placements:[{id:operator id,row,col,dir}];
 choice:an action ID from this observation for band/card/offer/reward. Prefer omitting placements. For drafts select
 one available choice; preserve the prep direction across drafts. During prep supply the round plan.

@@ -113,11 +113,27 @@ function accessSchedule(gd, operators) {
   });
 }
 
+// [ASSUMED] Maintainer 2026-10-19 tempo: unlock T2/3/4/5/6 by R3/5/7/10/13 when affordable.
+// Cost/income/discounts are data, deadlines are advice. At an access deadline skip the usual cheapest-piece
+// reserve instead of delaying the upgrade; no EXP, sales, grants, carried funds or guaranteed rolls are assumed.
+function recommendedSchedule(gd, operators) {
+  let level = 1, upgraded = 1;
+  const cheapest = Math.min(...operators.map(c => c.cost), Infinity);
+  return Array.from({ length: gd.lastRound }, (_, i) => {
+    const round = i + 1, target = round < 3 ? 1 : round < 5 ? 2 : round < 7 ? 3 : round < 10 ? 4 : round < 13 ? 5 : 6;
+    const cost = Math.max(0, (gd.upgradeBase(level) ?? Infinity) - (round - upgraded));
+    const reserve = [3, 5, 7, 10, 13].includes(round) ? 0 : cheapest;
+    const can = level < Math.min(target, gd.maxShopLevel) && cost <= gd.income(round) - reserve;
+    if (can) { level++; upgraded = round; }
+    return { round, level, upgradeCost: can ? cost : 0, purchaseBudget: gd.income(round) - (can ? cost : 0) };
+  });
+}
+
 export function buildPlaybook(data, { modeId, community = COMMUNITY } = {}) {
   const gd = new GameData(data, modeId);
   const operators = sorted(gd.visibleChess.map(id => {
     const c = gd.chess(id);
-    return { id, name: c.name, tier: c.tier, cost: gd.chessPrice(id), sellPrice: gd.sellPrice(id), bonds: c.bonds || [], profession: c.profession,
+    return { id, name: c.name, tier: c.tier, cost: gd.chessPrice(id), sellPrice: gd.sellPrice(id), poolCopies: gd.poolCopies(id), bonds: c.bonds || [], profession: c.profession,
       dmgType: c.dmgType, canHitFly: c.canHitFly, mergeCopies: gd.mergeCount(id), capabilities: capabilities(c),
       events: operatorEvents(data, c), eliteEvents: operatorEvents(data, gd.chess(c.goldenId)),
       traits: (c.garrisonIds || []).map(id => ({ id, effect: data.garrisons?.[id]?.desc || '' })) };
@@ -167,6 +183,16 @@ export function buildPlaybook(data, { modeId, community = COMMUNITY } = {}) {
     modeId: gd.modeId, maxShopLevel: gd.maxShopLevel, inactiveBonds: gd.mode.inactiveBondIds || [], operators, bonds, graph, bands,
     cycles: deriveCycles(data, operators, community.builds || []),
     schedule: schedule.map(({ round, level, purchaseBudget }) => ({ round, level, purchaseBudget })),
+    recommendedSchedule: recommendedSchedule(gd, operators),
+    // [ASSUMED] Historical measurement, not an official deadline or a prediction for different content/modes.
+    // No-plan bot from 1ca3921c; botbench solo:HARD,coop4:HARD --seeds 3 --seed 1 --rehearsal 0 --jobs 1.
+    legacyReference: ['mode_single_hard', 'mode_multi_hard'].includes(gd.modeId) ? {
+      source: 'docs/AI-STRATEGY.md § Advisor economy; measured 2026-10-19, legacy 1ca3921c, seeds 1–3, rehearsal 0',
+      config: gd.modeId === 'mode_single_hard' ? 'solo:HARD' : 'coop4:HARD',
+      checkpoints: [4, 7, 10, 13].map((round, i) => ({ round,
+        meanLevel: (gd.modeId === 'mode_single_hard' ? [2, 3.6667, 5, 6] : [2, 3.9167, 5, 6])[i] })),
+      caveat: 'Small vanilla sample, surviving seats only. Re-run botbench for changed content; explain falling behind, never treat it as a hard cap.',
+    } : null,
     community: { revision: community.revision, pairs, builds, roles: community.roles || [] }, warnings,
     enemies: sorted(Object.entries(data.enemies || {}).map(([id, e]) => ({ id, types: e.acTypes || [], fly: !!e.isFlyEnemy,
       def: e.stats?.def || 0, res: e.stats?.res || 0, inactiveIn: e.inactiveIn || [] }))),

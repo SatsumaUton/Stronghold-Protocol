@@ -15,6 +15,21 @@ const digest = (id = 'band_bldsk') => ({ playerId: 'self', round: 4, band: { id 
   board: [], bench: [], opponents: [], factions: [], economy: { level: 3 }, deployCap: 8 });
 const draft = extra => ({ ...digest(), actions: book.bands.map((b, i) => ({ id: `a${i}`, intent: { t: 'g.band', bandId: b.id } })), ...extra });
 
+test('recommended level curves use stage operator tiers and mode costs; measured legacy is scoped and labeled', () => {
+  const hard = buildPlaybook(DATA, { modeId: 'mode_multi_hard' });
+  assert.equal(hard.legacyReference.config, 'coop4:HARD');
+  assert.deepEqual(hard.legacyReference.checkpoints.map(c => c.round), [4, 7, 10, 13]);
+  assert.equal(book.legacyReference, null, 'do not pass hard-mode measurements off as normal-mode results');
+  const candidates = strategyCandidates(hard, digest()).candidates;
+  assert.ok(candidates.length);
+  for (const c of candidates) for (const r of c.levelCurve) {
+    assert.equal(r.level, Math.min(c.shopHold || hard.maxShopLevel, r.targetTier, hard.recommendedSchedule.find(s => s.round === r.round).level));
+    assert.ok(r.keyDrawShareBeforePurchases >= 0 && r.keyDrawShareBeforePurchases <= 1);
+    assert.match(r.basis, /ASSUMED/);
+  }
+  assert.deepEqual(hard.recommendedSchedule.filter(r => [4, 7, 10, 13].includes(r.round)).map(r => r.level), [2, 4, 5, 6]);
+});
+
 test('current data classifies engines and derives exact band implications from buff parameters', () => {
   assert.equal(band('band_duyaoy').roleClass, 'bond-engine');
   assert.deepEqual(band('band_duyaoy').bondIds, ['yanShip']);

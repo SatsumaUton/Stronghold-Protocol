@@ -47,7 +47,7 @@ export function repairPlan(input, pack, digest, choices) {
   if (input.economy !== undefined) {
     if (!object(input.economy)) throw new Error('plan');
     plan.economy = {};
-    cleanKeys(input.economy, ['saveForInterest', 'reserve', 'level', 'maxRefreshes', 'refreshAbove'], 'economy.');
+    cleanKeys(input.economy, ['saveForInterest', 'reserve', 'level', 'holdLevel', 'why', 'maxRefreshes', 'refreshAbove'], 'economy.');
     for (const [k, max] of Object.entries({ reserve: 100, level: 6, maxRefreshes: 16, refreshAbove: 100 })) {
       if (input.economy[k] === undefined) continue;
       const value = num(input.economy[k], 0, max, `economy.${k}`);
@@ -55,6 +55,11 @@ export function repairPlan(input, pack, digest, choices) {
     }
     if (typeof input.economy.saveForInterest === 'boolean') plan.economy.saveForInterest = input.economy.saveForInterest;
     else if (input.economy.saveForInterest !== undefined) drop('economy.saveForInterest', input.economy.saveForInterest);
+    const why = shortText(input.economy.why);
+    if (why) plan.economy.why = why;
+    if (typeof input.economy.holdLevel === 'boolean' && (!input.economy.holdLevel || (why && plan.economy.level >= 1)))
+      plan.economy.holdLevel = input.economy.holdLevel;
+    else if (input.economy.holdLevel !== undefined) drop('economy.holdLevel', input.economy.holdLevel, 'hold requires level >= 1 and economy.why');
   }
   if (input.items !== undefined) {
     if (!object(input.items)) throw new Error('plan');
