@@ -576,11 +576,8 @@ when that hook returns a finite number, plus catalogue enemy `hp, def, res, moti
 The exposure model is the legacy planner's, not a new combat rule. Handbook ability rows are `{text, textRaw,
 format}`; joining them used to write `[object Object]`. `effectText` keeps `text` or `desc`.
 
-The prompt also states the plan fields added on the parallel advisor-execution branch: `items.buy` (at most
-eight catalogue or current-shop item ids), `economy.freezeSearch`, a one-round `holdLevel` with `economy.why`,
-exact `keep`/`sell` ids (a `*_b` id is the elite), and `buy` only to finish a merge or add a distinct member.
-This branch's `validPlan` does not accept `items.buy` or `freezeSearch`. [ASSUMED] `repairPlan` keeps them
-when validation accepts them, and otherwise strips just those fields and records a repair, so either merge
-order still applies. Activated layers on every bond count; do not bench a stronger unit only to chase a
-6-threshold. Each prep, compare `digest.upcoming` fly and elite counts with `caps.air`. None of that changes
-`bot.js`, `aiPlan.js` or `aiEconomy.js`.
+The prompt also states the plan fields of history §35.14: `items.buy` (at most eight catalogue or current-shop
+item ids), `economy.freezeSearch`, a one-round `holdLevel` with `economy.why`, exact `keep`/`sell` ids (a `*_b`
+id is the elite), and `buy` only to finish a merge or add a distinct member; `repairPlan` keeps them after
+checking the ids. Activated layers on every bond count; do not bench a stronger unit only to chase a
+6-threshold. Each prep, compare `digest.upcoming` fly and elite counts with `caps.air`.

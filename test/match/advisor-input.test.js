@@ -159,7 +159,7 @@ test('only a primary-bond change needs a pivot; sub-bonds may be added', () => {
   assert.match(rejected.at(-1).reason, /primary-bond/);
 });
 
-test('repair accepts the parallel plan fields and strips them when validPlan does not', () => {
+test('repair keeps the advisor plan fields items.buy and economy.freezeSearch (§35.14)', () => {
   const pack = structuredClone(fixture.knowledge);
   pack.items = [...pack.items, ...Array.from({ length: 8 }, (_, i) => ({ id: `extra${i}` }))];
   const digest = structuredClone(fixture.digest);
@@ -167,14 +167,12 @@ test('repair accepts the parallel plan fields and strips them when validPlan doe
   const buy = ['item', 'plugin_item', 'support', 'missing', ...pack.items.filter(i => i.id.startsWith('extra')).map(i => i.id)];
   const { plan, repairs } = repairPlan({ items: { buy }, economy: { freezeSearch: true, reserve: 3 } }, pack, digest, []);
   assert.ok(validPlan(plan));
-  assert.equal(plan.items, undefined);
-  assert.equal(plan.economy.freezeSearch, undefined);
+  assert.equal(plan.items.buy.length, 8);
+  assert.ok(plan.items.buy.includes('plugin_item') && !plan.items.buy.includes('missing') && !plan.items.buy.includes('support'));
+  assert.equal(plan.economy.freezeSearch, true);
   assert.equal(plan.economy.reserve, 3);
   assert.ok(repairs.some(r => r.path === 'items.buy' && r.reason === 'list cap or duplicate'));
   assert.ok(repairs.some(r => r.path === 'items.buy' && String(r.value).includes('missing')));
-  const stripped = repairs.find(r => r.reason === 'current validPlan has no items.buy');
-  assert.equal(JSON.parse(stripped.value).length, 8);
-  assert.ok(repairs.some(r => r.path === 'economy.freezeSearch' && r.reason === 'current validPlan has no freezeSearch'));
   const held = repairPlan({ economy: { level: 2, holdLevel: true } }, pack, digest, []);
   assert.equal(held.plan.economy.holdLevel, undefined);
   assert.ok(held.repairs.some(r => r.path === 'economy.holdLevel'));

@@ -93,22 +93,6 @@ export function repairPlan(input, pack, digest, choices) {
     if (choices.some(c => c.id === input.choice)) plan.choice = input.choice;
     else drop('choice', input.choice);
   }
-  // codex/032-advisor-exec adds items.buy and economy.freezeSearch. This branch's validPlan does not know them.
-  // [ASSUMED] If those fields are the only rejection, drop them and record a repair so either merge order still applies.
-  if (!validPlan(plan)) {
-    const stripped = structuredClone(plan);
-    if (stripped.economy && Object.hasOwn(stripped.economy, 'freezeSearch')) {
-      drop('economy.freezeSearch', stripped.economy.freezeSearch, 'current validPlan has no freezeSearch');
-      delete stripped.economy.freezeSearch;
-      if (!Object.keys(stripped.economy).length) delete stripped.economy;
-    }
-    if (stripped.items && Object.hasOwn(stripped.items, 'buy')) {
-      drop('items.buy', JSON.stringify(stripped.items.buy), 'current validPlan has no items.buy');
-      delete stripped.items.buy;
-      if (!Object.keys(stripped.items).length) delete stripped.items;
-    }
-    if (!validPlan(stripped)) throw new Error('plan');
-    return { plan: stripped, repairs };
-  }
+  if (!validPlan(plan)) throw new Error('plan');
   return { plan, repairs };
 }
