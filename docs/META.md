@@ -378,6 +378,13 @@ economy or placement rule. [ASSUMED] Schema, scores, cache policy, shortcuts and
 [External AI API](EXTERNAL_AI.md). `tools/ai/run-match.mjs` waits for bounded external IO in both benchmark tools;
 `tools/ai/llm-agent.mjs` is an environment-configured, mock-tested compatible chat adapter with no default provider.
 
+Advisor execution (§35.14, maintainer 2026-10-20) applies only when `aiEconomy.economyPlan` is non-null:
+merge completion precedes an affordable level floor, which precedes filling. Exact keep/sell forms, merge-aware
+buy/bond weights, explicit-target freezing, `items.buy`, bounded `freezeSearch` and shared cleanup protection
+are specified in [EXTERNAL_AI](EXTERNAL_AI.md#advisor-mode-and-readable-observations-359). Cleanup compares
+actual bond thresholds through `computeBonds`; successful purchases track UIDs for this prep only. These are
+[ASSUMED] executor choices; ordinary PlayerState handlers and official economy/hand/merge rules are unchanged.
+
 See [Adding an AI strategy](BOT_STRATEGIES.md) for signatures, examples, state ownership and the validation workflow.
 
 ## 2. Effect registry (content API)

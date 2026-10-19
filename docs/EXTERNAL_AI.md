@@ -195,40 +195,57 @@ extra plugin windows/skips add calls, elimination/short modes remove calls. This
 Answer with this envelope (no `intents` or `done`):
 
 ```json
-{"v":"sp-ai/1","id":"ai-3","plan":{"bonds":[{"id":"siracusaShip","priority":4}],"buy":["chess_char_3_01_a"],"keep":[],"sell":[],"economy":{"saveForInterest":true,"level":3,"maxRefreshes":8,"refreshAbove":2},"items":{"keep":[],"equip":[]},"placements":[]},"usage":{"inputTokens":1500,"outputTokens":100,"cachedTokens":1000}}
+{"v":"sp-ai/1","id":"ai-3","plan":{"bonds":[{"id":"siracusaShip","priority":4}],"buy":["chess_char_3_01_a"],"keep":[],"sell":[],"economy":{"saveForInterest":true,"level":3,"maxRefreshes":8,"refreshAbove":2,"freezeSearch":false},"items":{"buy":["chess_item_1_01_e_a"],"keep":[],"equip":[]},"placements":[]},"usage":{"inputTokens":1500,"outputTokens":100,"cachedTokens":1000}}
 ```
 
 IDs in this example illustrate the schema, not a recommended build. Use the actual knowledge/digest IDs.
 Every plan field is optional; `{}` executes unchanged legacy. The schema and scoring choices below are
 **[ASSUMED] engineering policy**, not official strategy advice:
 
-- `bonds`: at most 8 `{id, priority: 1..5}` entries; +6 points per priority to member purchase/lineup values.
-- `buy`, `keep`, `sell`: at most 32 operator IDs each; base/elite IDs match the same operator. Purchase +24,
-  owned keep +18, sell −24. Keep also joins the existing keeper set. These are soft preferences: merge, bench
-  capacity, composition and emergency space cleanup can override them. Unknown/unavailable IDs have no effect.
-- `economy`: `level` 0..6 is a minimum target for this prep, subject to funds; 0 adds no minimum. Once reached,
+- `bonds`: at most 8 `{id, priority: 1..5}` entries; +6 points per priority to useful member purchase/lineup values.
+  Normal copies of an owned elite receive no bond priority bonus; the elite retains its lineup bonus.
+- `buy`, `keep`, `sell`: at most 32 operator IDs each. `keep` and `sell` match **exact IDs**: a normal `_a`
+  means normal copies only, `_b` means the elite only. Keep +18 and sell −24 remain scoring preferences;
+  `keep` protects owned pieces and does not itself request another copy. `buy` accepts either form, adding
+  +24 only to normal copies that progress a merge toward an unowned elite (the first copy starts progress),
+  or add a distinct plan-bond member. Neither explicit buys nor incidental prioritized bonds request copies
+  of an already owned elite. Unknown/unavailable IDs have no effect.
+- `economy`: `level` 0..6 is a minimum target for this prep, subject to funds; 0 adds no minimum. Affordable
+  floor upgrades precede fill-only purchases, but completing a merge comes first. Once reached,
   the bot resumes its legacy upgrade curve. Only `holdLevel:true` plus `level` 1..6 and a nonblank `why`
   (at most 360 characters, inside `economy`) caps upgrades, including free upgrades. Example:
-  `{"level":2,"holdLevel":true,"why":"Farm low-tier elites before leaving this level."}`.
+  `{"level":5,"holdLevel":true,"why":"Search now; reach L6 next prep at a lower price."}`.
+  Plans last one prep: a hold is also valid for a one-round delay, and must be renewed to keep holding.
   `maxRefreshes` 0..16 and `refreshAbove` 0..100 are first-pass preferences. Expiring funds override them in
   the final spending pass. `reserve` 0..100 overrides discretionary
   savings **only for a carry-over band**. `saveForInterest:false` releases its normal interest reserve.
   Board filling/merges can spend the reserve. Carry bands keep their existing interest logic. Non-carry seats
-  buy wanted/useful operators, freeze wanted unaffordable offers, refresh only while a stocked purchase can
-  still be afforded, then buy cheap spare operators for later sale. A manual refresh would discard frozen
+  buy wanted/useful operators, freeze unaffordable explicit `buy` targets or merge completions, refresh while
+  a stocked purchase can still be afforded, then buy cheap spare operators for later sale. Incidental bond
+  members, `keep` entries and copies of owned elites never trigger freezing.
+  `freezeSearch` is an optional boolean (default false): when an eligible explicit buy target is absent and
+  unaffordable after a refresh, still search while funds cover the effective refresh cost, then freeze it if
+  found unaffordable. This extra search respects `maxRefreshes` across the entire prep (default 16, including
+  free refreshes and previous ordinary refreshes); it cannot exceed the cap through repeated spending passes.
+  Ordinary affordable-purchase searches retain §35.13's expiring-funds override. A manual refresh would discard frozen
   offers, so those offers block further searching. Only these marked, still-disposable bench operators are
   sold to fund a wanted purchase; deployed/equipped/now-wanted operators and merge pairs are protected.
   Empty plans and seats without a plan retain the original legacy execution.
 
 The §35.13 spending order is maintainer guidance (2026-10-19), not official strategy text. **[ASSUMED]**
-implementation choices: existing lineup gain >2 defines usefulness, explicit buy/keep or prioritized-bond
-members define wanted operators (except explicit sell targets; bond members stop after an elite is held),
+implementation choices: existing lineup gain >2 defines usefulness; explicit buys or prioritized-bond
+members define wanted operators under the copy rules above (except exact sell targets),
 bank cheapest distinct singles with positive sale value and available shared stock, keep one free bench
 slot, and bound each extra pass to 64 actions for free-refresh/effect loops. Sale-value estimates exclude
 unexecuted sale hooks. Bank ownership is internal policy memory, reconstructed by offline replay. No hidden
 pool counts are sent to the model. Unsuitable/unaffordable offers, a full bench, preserving a freeze or the
 action bound can leave unusable funds; there is no gratuitous refresh solely to drive the loss metric to zero.
-- `items`: `keep` contains item IDs (32 max); `equip` contains `{id: itemId, target: operatorId}` (16 max).
+
+- `items`: `buy` contains up to **8 item IDs** to purchase from the shop when affordable and room remains;
+  `keep` contains item IDs (32 max); `equip` contains `{id: itemId, target: operatorId}` (16 max; either
+  operator form matches its base). Purchases use the usual handlers, followed by planned or legacy equipment selection. Explicit
+  requests may leave one free hand slot; an incidental item that cannot be equipped immediately must leave
+  at least two. Equipment is attempted between purchases so carrier slots are not promised twice.
   Existing inventory, slot and effect validators remain authoritative; invalid targets revert to ordinary selection.
 - `placements`: up to 16 `{id, row, col, dir?}` preferences, rows 0..12, columns 0..10, four uppercase cardinal
   directions. A legal matching tile/direction adds 0.05 to the exposure score; normal terrain/role preferences
@@ -237,6 +254,19 @@ action bound can leave unusable funds; there is no gratuitous refresh solely to 
   the normal legacy/default picker finish the window. The plan's choice is checked through the same human path.
 - Optional `usage` works in **both modes**: nonnegative integer `inputTokens`, `outputTokens`, `cachedTokens`,
   each at most 1 billion. Missing usage means unknown, not a claim of zero provider consumption.
+
+**Advisor hand-room protection (§35.14).** Only a nonempty advisor plan enables this policy; legacy and
+AI takeover without an advisor retain their original execution (maintainer decision **2026-10-20**).
+An elite, tier ≥4, exact `keep` piece, explicit buy target actually purchased this prep, or member whose
+removal drops an active plan-bond threshold is protected. The last check uses the real distinct/hand/morph
+bond counting rules. For room, sell unprotected copies of owned elites first, then bank operators, then
+low-tier off-plan singles, then other unprotected pieces; within each class use lowest piece value and UID.
+Next destroy the cheapest unequipped hand item costing at most 2 (UID breaks ties); only then fall back to
+legacy cleanup if every remaining option is protected. The protection applies to bench shedding, junk sales,
+board withdrawal, end-prep room and overflow resolution. A protected piece can still be benched.
+These priorities, the cheap-item cutoff, item space margins and 32-action cleanup bound are **[ASSUMED]**
+executor policy from the maintainer's seed-11 replay, not official strategy. Prices, merge forms, bond thresholds
+and hand/overflow/freeze mechanics retain their official `activity_table.json` / PRTS sources (§6.2–6.3).
 
 Malformed plans fail atomically and clear preferences before legacy. Accepted plans reset the failure streak
 and resume the #673 prep continuation, preserving slicing, rehearsal, Ready and deadline behavior. Preferences
