@@ -67,12 +67,12 @@ export function createSessionStack(opts, { data, log, content = null, plugins = 
   const lobbyOptions = lobbyOptionsFrom(opts);
   const lobby = new Lobby({ registry, log, MatchClass: opts.MatchClass, getData: () => data, seedFn: opts.seedFn, content, plugins, hosts, options: lobbyOptions });
   const network = new Network({ registry, handler: lobby, log, options: netOptions });
-  // the caps, printed once on boot: "cannot create a room" must be answerable from the deploy log alone
-  // (docs/DEPLOY.md §3.4). `log` is the quiet-aware logger, so a test server stays silent.
+  // The caps in effect, printed once when the stack is built, so the deploy log states the configuration the server is
+  // actually running with. A global cap of 0 is printed as 0 (it rejects every room / socket); a per-network 0 is
+  // printed as "unlimited". `log` is the quiet-aware logger, so a test server stays silent.
   log.info(`[http] limits: rooms ${lobby.opts.maxRooms} (${perNetwork(lobby.opts.maxRoomsPerAddr)}/network), `
     + `matches ${perNetwork(lobby.opts.maxMatchesPerAddr)}/network, `
-    + `sockets ${network.opts.maxConnections} (${perNetwork(network.opts.maxConnectionsPerAddr)}/network)`
-    + (network.opts.maxOnline > 0 ? `, online ${network.opts.maxOnline}` : ''));
+    + `sockets ${network.opts.maxConnections} (${perNetwork(network.opts.maxConnectionsPerAddr)}/network)`);
   return { registry, lobby, network };
 }
 
