@@ -2,6 +2,7 @@
 import { FIELD, legalTiles, parseKey } from './board.js';
 import { interestDigest } from '../ai/knowledge.js';
 import { ruleOption } from '../../shared/plugins/rules.js';
+import { pieceBonds } from './bondsMeta.js';
 
 export function aiDigest(m, ps, kind, pub, own, pack = null) {
   const gd = ps.gd || m.gd;
@@ -12,8 +13,10 @@ export function aiDigest(m, ps, kind, pub, own, pack = null) {
     const nameZh = raw?.name || r?.nameZh || id;
     return { name: r && r.nameZh === nameZh ? r.name : nameZh, nameZh };
   };
-  const piece = p => ({ ...p, ...named(p.id), items: (p.items || []).map(i => ({ ...i, ...named(i.id) })) });
-  const slots = list => (list || []).map((s, slot) => s && ({ ...s, slot, ...named(s.id), tier: gd.tierOf(s.id) }));
+  const operator = p => p.kind === 'chess' ? { baseId: gd.baseIdOf(p.id), bonds: pieceBonds(gd, p, m.rules),
+    stars: gd.isGolden(p.id) ? 2 : 1 } : {};
+  const piece = p => ({ ...p, ...named(p.id), ...operator(p), items: (p.items || []).map(i => ({ ...i, ...named(i.id) })) });
+  const slots = list => (list || []).map((s, slot) => s && ({ ...s, slot, ...named(s.id), ...operator(s), tier: gd.tierOf(s.id) }));
   const actions = [];
   const add = (intent, text) => actions.push({ id: `a${actions.length + 1}`, text, intent });
   if (kind === 'band' && pub.draft?.turn === ps.playerId) {
@@ -71,7 +74,10 @@ export function aiDigest(m, ps, kind, pub, own, pack = null) {
     if (own.canReady) add({ t: 'g.ready', ready: true }, 'ready');
   }
   return {
-    playerId: own.playerId, round: pub.round, phase: pub.phase, band: { id: own.bandId, ...named(own.bandId) },
+    playerId: own.playerId, round: pub.round, phase: pub.phase, lp: own.lp, band: { id: own.bandId, ...named(own.bandId) },
+    availability: { disabledBonds: pub.disabledBonds, bannedChess: pub.bannedChess, diyBanned: own.diyBanned },
+    factions: pub.factions,
+    ...(m.externalAI?.config.mode === 'plan' ? { feedback: m.externalAI.feedbackFor(ps) } : {}),
     economy: { gold: own.funds, interest: interestDigest(gd, own.bandId, own.funds), level: own.shop.level,
       exp: null, upgradePrice: own.shop.upgradePrice, refreshPrice: own.shop.refreshPrice },
     bonds: own.bonds.map(b => ({ ...b, ...named(b.bondId), nextThreshold: b.thresholds?.find(n => n > b.count) ?? null })),

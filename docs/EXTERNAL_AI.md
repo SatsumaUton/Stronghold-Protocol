@@ -265,6 +265,12 @@ The original `public` and `private` views keep their exact fields. Each observat
 and `context.mode`. Digest includes named shop prices/tiers, board coordinates, bench/overflow, bond count/next
 threshold, gold and band-specific interest now/at the next threshold, level/upgrade cost and explicit `exp:null`,
 current enemy/boss previews and opponents' **public scouted boards only**. No other private view or pool counts.
+§35.11 adds own LP, operator base IDs/bonds and `stars` (1 normal, 2 elite), public factions/bans, and, in
+plan mode only, `context.matchId` (opaque, unrelated to game RNG) and `digest.feedback`. Feedback retains the
+last 256 own successful buy/sell/merge events with monotonic `seq`, `through`, the last battle's round/LP/
+LP loss/counted leaks, and the last accepted prep plan `{id,round,plan}`. Buy/sell/merge events observe the
+existing meta hooks, including legacy's execution; inventory disappearance is never called a sale. The original
+human wire views keep exactly their existing fields. Feedback is scoped to the requested seat and match.
 
 `digest.actions` enumerates current-state shortcuts as `{id:'a1',text:'buy shop slot 2 (… , 3 gold)',intent:{…}}`.
 Shop/hand indices are zero-based. Direct agents can mix raw intents and IDs in `intents`, e.g. `["a1",{"t":"g.ready","ready":true}]`.
@@ -292,14 +298,74 @@ SP_LLM_API_KEY="$YOUR_KEY" npm start
 journaled. `SP_LLM_TIMEOUT_MS` defaults to 20000 (1..30000). The adapter has no default provider or model.
 `SP_LLM_MAX_TOKENS` caps one reply (default 6000, 256–32000; reasoning models spend completion tokens before the plan, so a small cap returns an empty reply); `SP_LLM_REASONING_EFFORT` (minimal / low / medium / high) is sent as `reasoning_effort` when set; `SP_LLM_DEBUG_FILE` appends one line per request with the failing stage, the reply head and the accepted plan, never the key or request headers.
 It keeps eight knowledge versions in memory as stable system prompts, with an original general-principles
-strategy prompt, and sends only the digest/choices per decision. Provider prompt caching can reuse that prefix;
+strategy prompt, and sends only compact digest/choices/continuity per decision. Provider prompt caching can reuse that prefix;
 it is provider-dependent and still requires sending the prefix with the compatible stateless chat API.
 It POSTs `/chat/completions`, uses `response_format:{type:'json_object'}`, validates the parsed plan locally,
 rejects truncation/redirects/oversized output, and forwards numeric usage only. JSON mode does not guarantee
 schema adherence ([official OpenAI documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat)).
-[ASSUMED] Example limits: 1200 output tokens, 256 KiB provider replies, 2 MiB input frames and four concurrent
+[ASSUMED] Example limits: 6000 output tokens (`SP_LLM_MAX_TOKENS`, 256–32000), 256 KiB provider replies, 2 MiB input frames and four concurrent
 requests. Catalogue effect summaries retain at most 500 characters each. Tests use a loopback mock; no real API
 is used for repository validation.
+
+### Committed round plans and private reasoning (§35.11)
+
+The maintainer requested this example-policy change on **2026-10-19** after the solo HARD seed-7 run kept
+changing targets, bought unrelated operators and rejected one plan. All behavior here is **[ASSUMED] advisor
+policy**, not an official strategy or a change to the generic eight-bond plan protocol or gameplay rules.
+The sources remain the local official `activity_table.json`: `autoChessData` and
+`activity.AUTOCHESS_SEASON.act2autochess`'s `bondInfoDict`, `charChessDataDict`, `shopLevelDataDict` and
+band/effect records, as described above. Public bans, visible prices, actual bond counts and band interest use
+the existing game builders. No live stock or other seat's private transactions are inspected.
+
+The model is asked for:
+
+```json
+{"why":"Complete the held pair and the nearest bond threshold.","pivot":false,"pivotReason":"","plan":{"bonds":[],"keep":[],"economy":{"maxRefreshes":2}}}
+```
+
+- `why` is at most three short sentences (stored at most 360 characters). `pivot` is a boolean;
+  `pivotReason` is one line, at most 160 characters. These are adapter-only metadata. Only `plan` reaches
+  the game's validator, legacy executor and journal; metadata is never sent to another seat.
+- Keep at most **three** targets with priorities 1..5, highest first. Candidates must already have board/bench
+  members and a completed or publicly reachable threshold. Prefer finishing thresholds, preserving pairs and
+  core units. With no candidates, build the board first. Changing the target set or priority order requires
+  `pivot:true` and a reason (unreachable bond, strong merge, boss/enemy needs). Without both, retain viable old
+  targets; removing unreachable old targets produces an explicit automatic pivot reason in diagnostics.
+  An explicitly empty plan remains unweighted legacy delegation, preserving §35.9's escape hatch.
+- The example caches the last confirmed and pending prep snapshots separately per match/player/knowledge version
+  (32 seat scopes). Host acknowledgement prevents rejected/late plans being presented as accepted. Drafts and
+  failed replies do not overwrite the prep direction. Each request includes the previous accepted plan and
+  observed buy/sell/merge events, bond counts before→after, LP before→after and the last battle; current board,
+  bench and overflow are in the digest. Old choice IDs are removed. Restart/eviction loses the local baseline:
+  the host still supplies the accepted plan and retained events, but missing baseline counts are `null` and
+  `eventsComplete:false`. Event sequence gaps are likewise explicit.
+- The compact digest lists shop cost/tier/bonds, owned stars/equipment/positions, bond count/next threshold/layers,
+  gold/interest/upgrade costs, enemies/factions/boss and public teammate bond summaries. Choice cards retain
+  their visible effects and prices. Raw duplicate views, geometry, placement alternatives, cosmetic fields and
+  repeated static names/base IDs/descriptions are omitted. The knowledge pack stays the stable system prefix.
+- Reachability is a conservative **estimate**: use public catalogue members eligible at the current shop level,
+  excluding public bans, plus owned/displayed copies, capped by deployment capacity (except deck-counting bonds).
+  Golden-only targets require already owned elites; special bonuses/plugin effects are not forecast. Bench
+  members are potential, not activated count. `poolOptions` counts catalogue entries, **not remaining copies**;
+  actual stock and future rolls remain unknown. This cannot guarantee a threshold will be completed.
+- Local repairs drop unknown/wrong-kind IDs, duplicate/capped entries and stale choices; clamp finite numeric
+  values to existing schema bounds (numeric strings/fractions normalize); normalize placement directions.
+  The resulting plan still passes the unchanged strict `validPlan`. Malformed structures, invalid JSON,
+  incomplete replies and transport errors still fail and use the existing bounded fallback. Bare §35.9 plans
+  remain accepted. No retry or extra provider request is introduced.
+
+Set `SP_LLM_DEBUG_FILE` to a local NDJSON path to record match/player/request/round, bounded `why`, pivot/reason,
+accepted output plan, repairs (field and dropped ID/value, up to 128 details plus total count), stage and latency.
+The plan is the adapter's validated output; the next host observation confirms acceptance. Failure entries
+may include a short reply head. Keep this file private; it contains seat strategy and model text. API keys,
+headers and the knowledge prefix are not logged. `SP_LLM_REASONING_EFFORT` optionally passes
+`minimal|low|medium|high`; provider cache hits and latency improvements are not guaranteed.
+
+Offline evaluation: `test/fixtures/llm-advisor.json` is an authored recorded mock trace of the observed failure
+patterns using synthetic IDs, not a copied official table or a real model benchmark.
+`test/match/external-llm-continuity.test.js` checks continuity, host-observed execution, isolation, pivots,
+three targets, private reasoning, repairs and prompt size. Existing transport, advisor and replay suites still
+exercise the unchanged execution path. No win-rate or real-provider latency improvement is claimed.
 
 ### Benchmarks
 

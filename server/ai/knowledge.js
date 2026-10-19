@@ -86,6 +86,7 @@ export function knowledgePack(data, { language = 'zh-CN', modeId, rules = {}, of
     bonds: rows('bonds', r => ({ thresholds: r.thresholds, countMode: r.countMode, countsGoldenOnly: r.countsGoldenOnly,
       thresholdTemplate: r.thresholdTemplate, effect: short(r.desc), layers: r.bb })),
     operators: rows('chess', (r, id) => ({ tier: r.tier, cost: gd.chessPrice(id), elite: !!r.isGolden,
+      baseId: gd.baseIdOf(id), poolEligible: gd.visibleChess.includes(id),
       class: r.profession, branch: r.subProfessionId, bonds: r.bonds, mergeCopies: gd.mergeCount(id),
       skill: { name: r.skill?.name, effect: short(r.skill?.desc), spCost: r.skill?.spCost },
       skills: (r.skills || []).map(s => ({ index: s.index, name: s.name, effect: short(s.desc), isDefault: s.isDefault })),

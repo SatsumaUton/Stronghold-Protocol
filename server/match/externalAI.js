@@ -8,6 +8,7 @@ import { httpDecision, StdioAI } from '../ai/transport.js';
 import { aiDigest } from './aiDigest.js';
 import { validPlan, validUsage } from './aiPlan.js';
 import { knowledgePack } from '../ai/knowledge.js';
+import { randomUUID } from 'node:crypto';
 
 export const AI_VERSION = 'sp-ai/1';
 // [ASSUMED] Only seat gameplay actions. Administration, test commands, battle reports, emotes and leaving are excluded.
@@ -26,7 +27,8 @@ export function aiObservation(m, ps, { id, kind, deadline, remaining }, results)
   return clone({ v: AI_VERSION, id, public: pub, private: own,
     digest: aiDigest(m, ps, kind, pub, own, pack),
     ...(pack ? { knowledgeVersion: pack.version } : {}),
-    context: { kind, phase: m.phase, round: m.round, deadline, remaining, legalActions: AI_ACTIONS[kind] }, results });
+    context: { kind, phase: m.phase, round: m.round, deadline, remaining, legalActions: AI_ACTIONS[kind],
+      ...(m.externalAI?.config.mode === 'plan' ? { matchId: m.externalAI.matchId } : {}) }, results });
 }
 
 export function validAIReply(reply, id, remaining) {
@@ -46,6 +48,8 @@ export class ExternalAI {
     this.config = externalConfig(input, process.env, replay);
     this.transport = !replay && this.config.transport === 'stdio' ? new StdioAI(this.config) : null;
     this.states = new Map();
+    // [ASSUMED] Opaque advisor memory scope, independent of game RNG/seeds; never used by replay decisions.
+    this.matchId = randomUUID();
     this.jobs = new Map();
     this.seq = 0;
     this.knowledge = this.config.knowledge ? knowledgePack(m.gd.raw, { language: this.config.language,
@@ -125,6 +129,32 @@ export class ExternalAI {
     return state?.prepRound === this.m.round && !state.disabled ? state.plan : null;
   }
 
+  observe(ps, hook, ev) {
+    // §35.11: only completed, own-seat actions/results a human can observe. No inference from missing pieces.
+    const state = this.states.get(ps?.playerId);
+    if (this.config.mode !== 'plan' || !state || state.disabled || ev.preview) return;
+    if (hook === 'onBattleResult') {
+      state.lastBattle = { round: this.m.round, lp: ps.lp, lpLoss: ev.lpLoss,
+        leaks: (ev.result?.leaked || []).filter(l => l && l.counted !== false).length };
+      return;
+    }
+    let event;
+    if (hook === 'onBuy') event = { type: 'buy', id: ev.slot.id, kind: ev.kind, cost: ev.price };
+    if (hook === 'onSold') event = { type: 'sell', id: ev.piece.id, uid: ev.piece.uid };
+    if (hook === 'onMerge') event = { type: 'merge', id: ev.piece.id, kind: ev.kind, baseId: ev.baseId || ev.itemId, consumed: ev.consumed?.slice() };
+    if (!event) return;
+    state.eventSeq = (state.eventSeq || 0) + 1;
+    (state.events ||= []).push({ seq: state.eventSeq, round: this.m.round, ...event });
+    // [ASSUMED] Keep the last 256 own events; expose the sequence so clients report gaps, never invent outcomes.
+    if (state.events.length > 256) state.events.shift();
+  }
+
+  feedbackFor(ps) {
+    const s = this.states.get(ps.playerId);
+    return { events: s?.events || [], through: s?.eventSeq || 0, lastBattle: s?.lastBattle || null,
+      acceptedPlan: s?.acceptedPlan || null };
+  }
+
   async exchange(observation, signal) {
     if (this.knowledge) {
       if (this.transport) {
@@ -161,7 +191,10 @@ export class ExternalAI {
     if (this.config.mode === 'plan') {
       if (!reply || !Object.keys(reply).every(k => ['v', 'id', 'plan', 'usage'].includes(k))
         || reply.v !== AI_VERSION || reply.id !== id || !validPlan(reply.plan) || !validUsage(reply.usage)) { this.fail(job); return; }
-      if (job.kind === 'prep') job.state.plan = clone(reply.plan);
+      if (job.kind === 'prep') {
+        job.state.plan = clone(reply.plan);
+        job.state.acceptedPlan = { id, round: this.m.round, plan: clone(reply.plan) };
+      }
       const choice = reply.plan.choice && job.actions.get(reply.plan.choice);
       if (choice && validateC2S(choice) === null && AI_ACTIONS[job.kind].includes(choice.t)
         && ['g.band', 'g.bandSkip', 'g.choice', 'g.offer', 'g.reward'].includes(choice.t)) {

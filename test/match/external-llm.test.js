@@ -20,7 +20,7 @@ async function mock(t, handler) {
 const envFor = url => ({ SP_LLM_BASE_URL: `${url}/v1`, SP_LLM_MODEL: 'mock-model', SP_LLM_API_KEY: 'test-secret', SP_LLM_TIMEOUT_MS: '2000' });
 const hello = { v: 'sp-ai/1', type: 'hello', id: 'hello-1', knowledge: pack };
 const observation = { v: 'sp-ai/1', id: 'ai-1', knowledgeVersion: pack.version, private: { secretDuplicate: true },
-  context: { mode: 'plan', kind: 'prep' }, digest: { economy: { gold: 6 }, geometry: { omitted: true },
+  context: { mode: 'plan', kind: 'prep', matchId: 'mock-match' }, digest: { playerId: 'one', economy: { gold: 6 }, geometry: { omitted: true },
     actions: [{ id: 'a1', intent: { t: 'g.move' } }, { id: 'a2', intent: { t: 'g.reward' } }] } };
 
 test('LLM adapter uses a stable cached system prefix, compact digest, JSON mode and numeric usage', async t => {
@@ -56,7 +56,7 @@ for (const bad of ['json', 'plan', 'truncated', 'redirect', 'oversize', 'timeout
     if (bad === 'redirect') { res.writeHead(302, { location: '/test-secret' }).end(); return; }
     if (bad === 'oversize') { res.end('x'.repeat(262145)); return; }
     res.end(JSON.stringify({ choices: [{ finish_reason: bad === 'truncated' ? 'length' : 'stop', message: {
-      content: bad === 'json' ? 'test-secret' : '{"economy":{"maxRefreshes":9999}}' } }] }));
+      content: bad === 'json' ? 'test-secret' : '{"economy":"invalid structure"}' } }] }));
     });
   });
   const agent = createLLMAgent({ ...envFor(url), SP_LLM_TIMEOUT_MS: bad === 'timeout' ? '20' : '2000' });
