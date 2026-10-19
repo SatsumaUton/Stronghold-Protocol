@@ -18,8 +18,8 @@ export const COMMUNITY = {
     ['kazimierzShip', ['raidShip', 'indomShip']], ['egirShip', ['raidShip', 'indomShip']],
   ].map(([main, subs]) => ({ main, subs, source })),
   builds: [
-    { name: '卡谢', bonds: ['kazimierzShip', 'kjeragShip'], status: 'community', source },
-    { id: 'meter-backwards', name: '电表倒转', bonds: ['visiShip', 'investShip'], status: 'community',
+    { name: '卡谢', bonds: ['kazimierzShip', 'kjeragShip'], status: 'community', source }, // i18n-ignore: AI knowledge data (community build / operator names matched against game data), never shown in the UI
+    { id: 'meter-backwards', name: '电表倒转', bonds: ['visiShip', 'investShip'], status: 'community', // i18n-ignore: AI knowledge data (community build / operator names matched against game data), never shown in the UI
       role: 'economy', archetype: 'cycle', source,
       // Maintainer-provided summaries of the community write-ups. Videos are references, not verified transcripts.
       sources: ['https://www.qieyou.com/content/148509', 'https://forum.gamer.com.tw/C.php?bsn=33651&snA=12316',
@@ -35,15 +35,15 @@ export const COMMUNITY = {
         { rule: 'foresightGlobalDiscount', value: 100, version: 'part 1', source: 'https://forum.gamer.com.tw/C.php?bsn=33651&snA=12316' },
         { rule: 'investorTriple', value: 70, version: 'part 1', source: 'https://forum.gamer.com.tw/C.php?bsn=33651&snA=12316' },
       ],
-      eventClaims: [{ operator: '山', event: 'SERVER_GAIN', source: 'https://www.qieyou.com/content/148509' }],
+      eventClaims: [{ operator: '山', event: 'SERVER_GAIN', source: 'https://www.qieyou.com/content/148509' }], // i18n-ignore: AI knowledge data (community build / operator names matched against game data), never shown in the UI
       variants: [
         { id: 'yan-victoria', damageBonds: ['yanShip', 'victoriaShip', 'arcaneShip'],
-          namedMembers: ['伊桑', '万顷', '林', '山', '琳琅诗怀雅'], package: true, source: 'https://www.qieyou.com/content/148509' },
-        { id: 'suzuran-pinus', damageBonds: ['kazimierzShip', 'swiftShip'], namedMembers: ['焰尾'], band: 'band_lisa',
+          namedMembers: ['伊桑', '万顷', '林', '山', '琳琅诗怀雅'], package: true, source: 'https://www.qieyou.com/content/148509' }, // i18n-ignore: AI knowledge data (community build / operator names matched against game data), never shown in the UI
+        { id: 'suzuran-pinus', damageBonds: ['kazimierzShip', 'swiftShip'], namedMembers: ['焰尾'], band: 'band_lisa', // i18n-ignore: AI knowledge data (community build / operator names matched against game data), never shown in the UI
           source: 'https://forum.gamer.com.tw/C.php?bsn=33651&snA=12316' },
-        { id: 'siracusa', damageBonds: ['siracusaShip', 'swiftShip'], namedMembers: ['忍冬'],
+        { id: 'siracusa', damageBonds: ['siracusaShip', 'swiftShip'], namedMembers: ['忍冬'], // i18n-ignore: AI knowledge data (community build / operator names matched against game data), never shown in the UI
           source: 'https://forum.gamer.com.tw/C.php?bsn=33651&snA=12316' },
-        { id: 'kjerag', damageBonds: ['kjeragShip', 'preciShip', 'skillfulShip'], namedMembers: ['雪猎', '银灰'],
+        { id: 'kjerag', damageBonds: ['kjeragShip', 'preciShip', 'skillfulShip'], namedMembers: ['雪猎', '银灰'], // i18n-ignore: AI knowledge data (community build / operator names matched against game data), never shown in the UI
           source: 'https://forum.gamer.com.tw/C.php?bsn=33651&snA=12316' },
       ],
     },
