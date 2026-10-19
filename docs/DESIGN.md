@@ -32,6 +32,11 @@ current rendering rules are in [design/client.md](design/client.md) and [SKINS.m
 Re-entrant buff removal is specified in [§35.5](history/0.3.2.md#355-re-entrant-buff-removal): reverse-order candidates,
 current object lookup and actual removal counts; [ASSUMED] extension API policy. Current contract: [design/engine.md](design/engine.md) §5.3 and [SIM.md](SIM.md) §3.
 
+Wild Mane S2's rear-target exception is superseded by the maintainer's official recordings in
+[§35.10](history/0.3.2.md#3510-wild-mane-s2-rear-push-782): radial away, force level −2, about 0.09 tile at weight 1.
+Front distances stay unchanged; using the effect column only behind her is [ASSUMED] scope, not an official
+direction-dependent classification. Current contract: [design/engine.md](design/engine.md) §5.4 and [SIM.md](SIM.md) §6.
+
 ## Where each section lives
 
 Optional selected-unit bond timers (#746, maintainer approved 2026-10-18) extend §9 in
