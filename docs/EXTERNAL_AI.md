@@ -72,8 +72,11 @@ Each request is a complete JSON observation:
   id: 'ai-3',                         // opaque request ID, unique within this match
   public: { t: 'm.public', /* existing publicView() fields */ },
   private: { t: 'm.private', /* this seat's privateView() fields */ },
+  digest: { /* readable state and short actions; see §35.9 below */ },
+  // knowledgeVersion: '<sha256>' when knowledge is enabled,
   context: {
     kind: 'prep',                     // band | card | prep | offer
+    mode: 'direct',                   // owner-selected direct | plan
     phase: 'PREP', round: 1,
     deadline: 1234567890000,          // absolute server clock ms: decision expires here
     remaining: 64,                    // remaining intent budget for this decision
@@ -175,3 +178,137 @@ Tests: [external-ai.test.js](../test/match/external-ai.test.js),
 [bot-strategy-startup.test.js](../test/bot-strategy-startup.test.js). They cover the envelope and human validation,
 view equality / isolation, both examples, bounds, timeouts, failure fallback, seat cutoff, cancellation, and full
 real-simulation matches with one external seat plus a legacy peer, replayed offline with matching state and RNG.
+
+## Advisor mode and readable observations (§35.9)
+
+The maintainer approved this opt-in extension on **2026-10-19**. Set `SP_EXTERNAL_AI_MODE=plan`
+(or `externalAI.mode: 'plan'`). The default external mode remains `direct`; the default strategy remains
+`legacy`. `SP_EXTERNAL_AI_LANGUAGE` / `language` selects `zh-CN` (default), `en`, `ja`, `ko` or `zh-TW`.
+`SP_EXTERNAL_AI_KNOWLEDGE=1` / `knowledge: true` enables the primer for direct agents too; it defaults on in
+plan mode and off in direct mode so older services need not implement a hello exchange.
+
+A plan agent receives one request per seat/prep round, plus each band turn, common-card turn and plugin offer
+window. A rescheduled prep does not call again. Personal choices and merge rewards produced during procurement
+are handled by legacy within that plan. A typical normal-length match needs roughly 15–20 decisions per seat;
+extra plugin windows/skips add calls, elimination/short modes remove calls. This is not a fixed call allowance.
+
+Answer with this envelope (no `intents` or `done`):
+
+```json
+{"v":"sp-ai/1","id":"ai-3","plan":{"bonds":[{"id":"siracusaShip","priority":4}],"buy":["chess_char_3_01_a"],"keep":[],"sell":[],"economy":{"saveForInterest":true,"level":3,"maxRefreshes":8,"refreshAbove":2},"items":{"keep":[],"equip":[]},"placements":[]},"usage":{"inputTokens":1500,"outputTokens":100,"cachedTokens":1000}}
+```
+
+IDs in this example illustrate the schema, not a recommended build. Use the actual knowledge/digest IDs.
+Every plan field is optional; `{}` executes unchanged legacy. The schema and scoring choices below are
+**[ASSUMED] engineering policy**, not official strategy advice:
+
+- `bonds`: at most 8 `{id, priority: 1..5}` entries; +6 points per priority to member purchase/lineup values.
+- `buy`, `keep`, `sell`: at most 32 operator IDs each; base/elite IDs match the same operator. Purchase +24,
+  owned keep +18, sell −24. Keep also joins the existing keeper set. These are soft preferences: merge, bench
+  capacity, composition and emergency space cleanup can override them. Unknown/unavailable IDs have no effect.
+- `economy`: `level` 0..6 caps the requested target (0 means no leveling); `maxRefreshes` 0..16 and
+  `refreshAbove` 0..100 bound refreshes and the gold left after them. `reserve` 0..100 overrides discretionary
+  savings **only for a carry-over band**. `saveForInterest:false` releases its normal interest reserve.
+  Board filling/merges can spend the reserve. Expiring funds are never banked merely to invent interest.
+- `items`: `keep` contains item IDs (32 max); `equip` contains `{id: itemId, target: operatorId}` (16 max).
+  Existing inventory, slot and effect validators remain authoritative; invalid targets revert to ordinary selection.
+- `placements`: up to 16 `{id, row, col, dir?}` preferences, rows 0..12, columns 0..10, four uppercase cardinal
+  directions. A legal matching tile/direction adds 0.05 to the exposure score; normal terrain/role preferences
+  and real rehearsal still choose the final layout. Impossible tiles are ignored.
+- `choice`: one short action ID for band/card/offer/reward selection, e.g. `"a2"`. A missing/unusable choice lets
+  the normal legacy/default picker finish the window. The plan's choice is checked through the same human path.
+- Optional `usage` works in **both modes**: nonnegative integer `inputTokens`, `outputTokens`, `cachedTokens`,
+  each at most 1 billion. Missing usage means unknown, not a claim of zero provider consumption.
+
+Malformed plans fail atomically and clear preferences before legacy. Accepted plans reset the failure streak
+and resume the #673 prep continuation, preserving slicing, rehearsal, Ready and deadline behavior. Preferences
+expire with the round; transport/malformed failures use ordinary legacy. Limits include the hello exchange;
+there is also a wall-clock decision cap so virtual-time benchmarks cannot wait indefinitely. Journals record
+plans/short IDs/usage and mode/language/knowledge settings, without endpoints, argv, API keys or remote errors.
+Replay rebuilds short IDs from the recorded state and applies the same plan with no transport IO.
+
+### Knowledge handshake
+
+`server/ai/knowledge.js` generates an immutable `sp-knowledge/1` pack from the active room data, room rule
+switches and authored plugin offers, with SHA-256 `version`. It contains the PLAYING §1–§7 rules summary and
+source digest, bonds/thresholds/effects, normal and elite operator costs/classes/skills/traits, item effects,
+bands, enemy notes/stats, boss HP by difficulty and difficulty scaling. The cache is keyed by immutable content,
+mode, content identity, language, rules and offers (at most 16 variants per content object). Existing stale-checked language
+overlays localize available game text; missing translations retain Chinese. Every named record also has `nameZh`.
+
+Sources: local official `activity_table.json` (`autoChessData`, `activity.AUTOCHESS_SEASON.act2autochess`:
+`bandDataListDict`, `shopLevelDataDict`, `charChessDataDict`, `trapChessDataDict`, `bondInfoDict`, `bossInfoDict`),
+`character_table.json`, `skill_table.json`, `enemy_handbook_table.json`, the generated `data/*.json`, and
+[PLAYING](PLAYING.md) / [DATA](DATA.md). Economy follows the existing implementation and its recorded evidence:
+no EXP; base upgrade costs from the selected mode, −1 per round; normally funds expire. `band_cannot`'s
+`aceffect_band_34` / `coin_carry_over` has capital 5, interest 1, max 1. Shop odds are **copy-weighted**, not a
+fixed tier table: per-level eligibility/slot counts and pristine-catalogue tier shares are given, explicitly
+before random bans, purchases and DIY stock. The formula is included; hidden live pool counts are never sent.
+These game rules are unchanged. Plugin descriptions/rules may differ from the vanilla summary.
+
+Before its first decision, the connection sends:
+
+```js
+{v:'sp-ai/1', type:'hello', id:'hello-ai-1', knowledge:{schema:'sp-knowledge/1', version:'<sha256>', /* ... */}}
+// agent acknowledges:
+{v:'sp-ai/1', type:'hello', id:'hello-ai-1', knowledgeVersion:'<same sha256>'}
+```
+
+HTTP uses a hello POST to the same endpoint; stdio uses an acknowledged NDJSON hello. Concurrent seats share
+one handshake per match. A restarted stdio child receives it again. Decisions contain only `knowledgeVersion`;
+a service may cache packs across matches by hash, but must acknowledge each match's hello. Bad/missing
+acknowledgements use the same failure budget. Direct mode with knowledge disabled has no extra request.
+
+### Digest and short IDs
+
+The original `public` and `private` views keep their exact fields. Each observation additionally has `digest`
+and `context.mode`. Digest includes named shop prices/tiers, board coordinates, bench/overflow, bond count/next
+threshold, gold and band-specific interest now/at the next threshold, level/upgrade cost and explicit `exp:null`,
+current enemy/boss previews and opponents' **public scouted boards only**. No other private view or pool counts.
+
+`digest.actions` enumerates current-state shortcuts as `{id:'a1',text:'buy shop slot 2 (… , 3 gold)',intent:{…}}`.
+Shop/hand indices are zero-based. Direct agents can mix raw intents and IDs in `intents`, e.g. `["a1",{"t":"g.ready","ready":true}]`.
+IDs are local to the request ID, not stable across observations; never infer an ID from a previous response.
+The saved mapping goes through the same C2S and human validation, so a previously affordable or available choice
+can still fail after another action/seat changes the state. Unknown IDs yield `BAD_MSG` and consume budget.
+
+[ASSUMED] The shortcut list is conservative, not exhaustive: it includes purchases, economy, sells, ordinary
+equipment, permitted unequip, empty-tile placements/facing/withdrawal, rewards and available draft/offer picks.
+Swaps, Arts, effect-dependent consumables, band focus and offer refresh retain the complete **raw intent API**.
+Arbitrary plugin effects cannot prove eligibility without executing; observation building never executes them
+as a legality probe. `actionScope` explicitly communicates this limitation. The LLM adapter omits low-level
+placement shortcuts and duplicate raw views from its provider request; legacy handles those actions.
+
+### Example language-model adapter
+
+```sh
+SP_BOT_STRATEGY=external SP_EXTERNAL_AI_MODE=plan SP_EXTERNAL_AI_TRANSPORT=stdio \
+SP_EXTERNAL_AI_COMMAND='["node","tools/ai/llm-agent.mjs"]' SP_EXTERNAL_AI_TIMEOUT_MS=30000 \
+SP_LLM_BASE_URL=http://127.0.0.1:8000/v1 SP_LLM_MODEL=your-model \
+SP_LLM_API_KEY="$YOUR_KEY" npm start
+```
+
+`SP_LLM_BASE_URL`, `SP_LLM_MODEL`, `SP_LLM_API_KEY` are required environment values; none are logged or
+journaled. `SP_LLM_TIMEOUT_MS` defaults to 20000 (1..30000). The adapter has no default provider or model.
+It keeps eight knowledge versions in memory as stable system prompts, with an original general-principles
+strategy prompt, and sends only the digest/choices per decision. Provider prompt caching can reuse that prefix;
+it is provider-dependent and still requires sending the prefix with the compatible stateless chat API.
+It POSTs `/chat/completions`, uses `response_format:{type:'json_object'}`, validates the parsed plan locally,
+rejects truncation/redirects/oversized output, and forwards numeric usage only. JSON mode does not guarantee
+schema adherence ([official OpenAI documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat)).
+[ASSUMED] Example limits: 1200 output tokens, 256 KiB provider replies, 2 MiB input frames and four concurrent
+requests. Catalogue effect summaries retain at most 500 characters each. Tests use a loopback mock; no real API
+is used for repository validation.
+
+### Benchmarks
+
+Both tools now wait for in-flight HTTP/stdio replies before stepping virtual time, while real matches continue
+using their ordinary timers. Fix seeds/config/rehearsal/content and change only the strategy. `--bot external`
+uses the same owner environment as the server; `SP_EXTERNAL_AI_SEATS` allows legacy peers. `botbench --json -`
+prints just JSON; `--json file.json` still writes the comparison artifact. Matchrun's `--json` includes the same
+per-seat `strategyMetrics`: strategy, survival round (elimination round or final round), passed rounds, final LP,
+damage dealt, leader damage, wins and external calls, reported tokens, usage-report count, latency and fallbacks.
+`external.helloCalls` counts handshakes separately. `calls` counts decision attempts, including failed hellos;
+latency includes handshake time. `fallbacks` counts failed decisions, not successful `{}` delegation or later
+decisions after the seat is disabled. Summary outcomes are means per seat; wins and IO counters are totals.
+No usage report means tokens are unknown; compare coverage alongside the totals. Wall time varies with load.

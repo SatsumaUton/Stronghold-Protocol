@@ -31,6 +31,7 @@
 //   node tools/matchrun.mjs --mode coop --difficulty HARD --players 4 --seeds 20
 //   node tools/matchrun.mjs --mode coop --difficulty ALL --players 4 --humans 2 --seeds 10 --check --errors
 
+import { runMatch, strategyMetrics, aggregateStrategies } from './ai/run-match.mjs';
 import { Match } from '../server/match/Match.js';
 import { VirtualScheduler } from '../server/match/scheduler.js';
 import { attachAudit } from '../server/match/audit.js';
@@ -101,7 +102,7 @@ class CountingBattle extends Battle {
 }
 
 // ---- one match ------------------------------------------------------------------------------------------------
-function runOne(seed, difficulty) {
+async function runOne(seed, difficulty) {
   current = { seed, difficulty, battle: 0 };
   const sched = new VirtualScheduler();
   const errors = [];
@@ -127,7 +128,7 @@ function runOne(seed, difficulty) {
   let last = '';
   const t0 = Date.now();
   m.start();
-  sched.runUntil(() => {
+  await runMatch(m, () => {
     const key = `${m.phase}:${m.round}`;
     if (key !== last) {
       last = key;
@@ -163,6 +164,7 @@ function runOne(seed, difficulty) {
   }
   m.dispose();
   return {
+    strategyMetrics: strategyMetrics(m, summary), external: m.externalAI?.metrics,
     seed, difficulty, summary, rounds, errors, matchErrors: m.errorCount, simErrors: m.simErrors, metaErrors: m.dispatcher.errors,
     ms: Date.now() - t0, stageId: m.stageId, bossId: m.bossId, frames, audit,
   };
@@ -172,7 +174,7 @@ function runOne(seed, difficulty) {
 const results = [];
 for (const difficulty of difficulties) {
   for (let i = 0; i < seeds; i++) {
-    const r = runOne(seed0 + i, difficulty);
+    const r = await runOne(seed0 + i, difficulty);
     results.push(r);
     if (!quiet && !opt.json) {
       const s = r.summary || {};
@@ -195,6 +197,7 @@ if (opt.json) {
   console.log(JSON.stringify(results.map((r) => ({
     seed: r.seed, difficulty: r.difficulty, stageId: r.stageId, bossId: r.bossId, victory: r.summary?.victory, roundsPassed: r.summary?.roundsPassed,
     reason: r.summary?.reason, rounds: r.rounds, errors: r.errors.length + r.matchErrors, simErrors: r.simErrors, metaErrors: r.metaErrors,
+    strategyMetrics: r.strategyMetrics, external: r.external,
     violations: r.audit ? r.audit.violations : undefined,
   })), null, 1));
 } else if (quiet) {
@@ -261,4 +264,6 @@ if (opt.errors) {
   }
 }
 
+if (!opt.json) console.log('strategy outcomes:', JSON.stringify(aggregateStrategies(results)));
+if (results.some(r => !r.summary)) exitCode = 1;
 process.exitCode = exitCode;

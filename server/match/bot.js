@@ -80,6 +80,7 @@
 // of kill rate and rehearsal adds ≈ 5 more; see docs/META.md §1.5. Old vs new decisions on the same seeds:
 // tools/botbench.mjs.
 
+import { advisorPlan, planContains, planUnitWeight, planPlacementWeight } from './aiPlan.js';
 import { ASPD_MIN } from '../sim/constants.js';
 import { rehearsalCap, RehearsalRun } from '../sim/rehearsal.js';
 import { freeSlot, countFree, legalTiles, canPlace, positionClass, placeClass, basePositionClass, parseKey, tileKey, FIELD, pieceDir, boardTileOf, BOSS_MIRROR_COL } from './board.js';
@@ -416,7 +417,7 @@ const mergeNeed = (m, base) => m.gd.mergeCount(base) || 3;
  * (every sale returns 1).
  */
 function keeperBases(m, ps, plan) {
-  const out = new Set();
+  const out = new Set((advisorPlan(m, ps)?.keep || []).map(id => m.gd.baseIdOf(id)));
   for (const p of ps.board.values()) if (p.kind === 'chess') out.add(m.gd.baseIdOf(p.id));
   for (const p of ps.allChess()) {
     const c = chessRec(m, p.id, ps);
@@ -501,7 +502,7 @@ function traitsOf(m, c) {
 function unitBase(m, piece, ctx) {
   const c = chessRec(m, piece.id, ctx.ps);
   if (!c) return 0;
-  let v = power(c) + (piece.items ? piece.items.length * 5 : 0);
+  let v = power(c) + (piece.items ? piece.items.length * 5 : 0) + planUnitWeight(m, ctx.ps, piece.id);
   if (m.round <= 11) v += traitsOf(m, c).recurring * 4;
   if (c.attackKind === 'none' && !isHealer(c)) v -= 6;
   if (ctx.fly > 0 && hitsFly(c)) v += 2;
@@ -598,7 +599,7 @@ function buyScore(m, ps, id, ctx) {
   const gd = ps?.gd || m.gd;
   const c = chessRec(m, id, ps);
   if (!c) return 0;
-  let s = power(c) * 0.6;
+  let s = power(c) * 0.6 + planUnitWeight(m, ps, id, true);
   const tr = traitsOf(m, c);
   if (m.round <= 11) s += tr.recurring * 3 + tr.gain * 2 + tr.econ * (m.round <= 7 ? 2 : 0);
   const base = gd.baseIdOf(id);
@@ -1042,7 +1043,7 @@ export function* planLayoutSteps(m, ps, pieces, params = LAYOUT_PARAMS, { occupi
         seen.add(sig);
         layout.units.push(u);
         const value = layout.value();
-        const v = value + noise;
+        const v = value + noise + planPlacementWeight(m, ps, p.id, r, c, dir);
         layout.units.pop();
         if (v > bestV) { bestV = v; best = [k, r, c, dir]; }
         // [ASSUMED] On boss ties cover damage not already covered by a previously placed medic (#315).
@@ -1518,6 +1519,12 @@ export function levelUp(m, ps, { spare = false } = {}) {
     if (ps.shop.level >= gd.maxShopLevel) return;
     const price = Math.max(0, ps.shop.upgradePrice);
     if (ps.funds < price) return;
+    const policy = advisorPlan(m, ps)?.economy;
+    if (policy?.level != null) {
+      if (ps.shop.level >= policy.level || ps.funds - price < fundsReserve(m, ps)) return;
+      if (!tryDo(() => ps.levelUp())) return;
+      continue;
+    }
     const r = m.round;
     const target = LEVEL_TARGET[Math.min(LEVEL_TARGET.length - 1, r)];
     const nextTarget = LEVEL_TARGET[Math.min(LEVEL_TARGET.length - 1, r + 1)];
@@ -1544,6 +1551,9 @@ function fundsReserve(m, ps) {
   if (!m.gd.leftoverKeptBands.includes(ps.bandId)) return 0;
   const band = m.gd.band(ps.bandId);
   const buff = band && Array.isArray(band.buffs) ? band.buffs.find((b) => b && b.key === 'coin_carry_over') : null;
+  const policy = advisorPlan(m, ps)?.economy;
+  if (policy?.reserve != null) return policy.reserve;
+  if (policy?.saveForInterest === false) return 0;
   const cap = Number(buff && buff.bb && buff.bb.capital);
   return Number.isFinite(cap) && cap > 0 ? cap : 5;
 }
@@ -1551,6 +1561,8 @@ function fundsReserve(m, ps) {
 /** Buying / rerolling toward the lineup; a step generator (yields after each purchase or reroll). */
 function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}) {
   const gd = ps?.gd || m.gd;
+  const policy = advisorPlan(m, ps)?.economy;
+  if (policy?.maxRefreshes != null) maxRefreshes = Math.min(maxRefreshes, policy.maxRefreshes);
   let refreshes = 0;
   const minPrice = 2;
   const reserve = fundsReserve(m, ps);
@@ -1629,7 +1641,7 @@ function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}) {
     // leftover funds are lost at prep end: reroll while a purchase stays affordable (a band that keeps them: down to its
     // reserve — a free refresh is always taken)
     const refreshCost = ps.shop.freeRefreshes > 0 ? 0 : gd.refreshPrice;
-    const canRefresh = refreshes < maxRefreshes && ps.funds >= refreshCost + (refreshCost > 0 ? Math.max(minPrice, reserve) : minPrice);
+    const canRefresh = refreshes < maxRefreshes && ps.funds - refreshCost >= (policy?.refreshAbove ?? 0) && ps.funds >= refreshCost + (refreshCost > 0 ? Math.max(minPrice, reserve) : minPrice);
     // a full board buys only what improves it (merge progress, a lineup upgrade), and only when it is worth more than
     // the refreshes its price would pay for (each may show the third copy of a held pair, refreshValue)
     let buy = best >= 0 && bestS >= (boardFull ? BUY_FULL_MIN : 3);
@@ -1862,10 +1874,15 @@ function lastPerfect(m, ps) {
  *     items, GitHub #263); a bond signature item (requiresBondId): a member of that bond;
  *   other equipment: the strongest deployed damage dealers with a free slot (SURVIVAL items blockers first).
  */
-export function itemTarget(m, ps, item, ctx = context(m, ps)) {
+export function itemTarget(m, ps, item, ctx = context(m, ps), usePlan = true) {
   const gd = ps?.gd || m.gd;
   const rec = gd.item(item.id);
   if (!rec) return null;
+  const planned = usePlan ? advisorPlan(m, ps)?.items : null;
+  if (planContains(m, planned?.keep, item.id)) return null;
+  const equip = planned?.equip?.find(e => e.id === item.id);
+  const preferred = equip && ps.allChess().find(p => planContains(m, [equip.target], p.id) && slotFree(m, ps, p, rec));
+  if (preferred) return preferred;
   const key = itemEffect(rec);
   const value = new Map();
   const val = (p) => { if (!value.has(p.uid)) value.set(p.uid, pieceValue(m, ps, p, ctx)); return value.get(p.uid); };
@@ -1964,12 +1981,16 @@ function equipItems(m, ps) {
     const item = [...ps.hand, ...ps.temp].find((p) => p && p.kind === 'item' && canUseItem(m, ps, p) && !tried.has(p.uid));
     if (!item) break;
     tried.add(item.uid);
+    if (planContains(m, advisorPlan(m, ps)?.items?.keep, item.id)) continue;
     const ctx = context(m, ps);
     const rec = gd.item(item.id);
     if (rec && rec.itemType === 'MAGIC') { useArt(m, ps, item, ctx); continue; }
     const target = itemTarget(m, ps, item, ctx);
     if (!target) continue;
-    tryDo(() => ps.equip(item.uid, target.uid));
+    if (!tryDo(() => ps.equip(item.uid, target.uid)) && advisorPlan(m, ps)?.items?.equip?.length) {
+      const fallback = itemTarget(m, ps, item, ctx, false);
+      if (fallback && fallback.uid !== target.uid) tryDo(() => ps.equip(item.uid, fallback.uid));
+    }
   }
 }
 
