@@ -17,6 +17,12 @@ test('knowledge is immutable, cached, content-addressed, language-aware and inde
   assert.ok(a.operators.some(p => p.skill.effect)); assert.ok(a.items.some(i => i.effect));
   assert.ok(a.bonds.every(b => b.thresholds.length)); assert.equal(a.economy.exp, null);
   assert.match(a.economy.shopOdds, /remaining/);
+  assert.match(a.economy.freezeRule, /unsold/);
+  assert.match(a.economy.refreshRule, /cancels freezing/);
+  assert.match(a.economy.sellRule, /not their purchase price/);
+  assert.ok(a.operators.every(p => p.sellValue >= 0));
+  assert.ok(a.bands.find(b => b.id === 'band_cannot').carriesFunds);
+  assert.equal(a.bands.find(b => b.id === 'band_narant').carriesFunds, false);
   for (const l of a.economy.shop) assert.ok(Math.abs(l.initialTierSharesBeforeBans.reduce((s, p) => s + p.probability, 0) - 1) < 1e-8);
   const copy = structuredClone(DATA);
   assert.equal(knowledgePack(copy, opts).version, a.version);

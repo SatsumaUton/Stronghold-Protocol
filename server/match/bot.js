@@ -81,6 +81,7 @@
 // tools/botbench.mjs.
 
 import { advisorPlan, planContains, planUnitWeight, planPlacementWeight } from './aiPlan.js';
+import { economyPlan, advisorWanted, advisorBanks, fundAdvisorPurchase } from './aiEconomy.js';
 import { ASPD_MIN } from '../sim/constants.js';
 import { rehearsalCap, RehearsalRun } from '../sim/rehearsal.js';
 import { freeSlot, countFree, legalTiles, canPlace, positionClass, placeClass, basePositionClass, parseKey, tileKey, FIELD, pieceDir, boardTileOf, BOSS_MIRROR_COL } from './board.js';
@@ -1377,7 +1378,9 @@ function sellJunk(m, ps) {
   const { bench } = chooseLineup(m, ps, ctx);
   const keep = [];
   const junk = [];
+  const banks = economyPlan(m, ps) ? new Set(advisorBanks(m, ps).map(p => p.uid)) : null;
   for (const p of bench) {
+    if (banks?.has(p.uid) || (banks && advisorWanted(m, ps, p.id))) continue;
     const c = chessRec(m, p.id, ps);
     if (!c) continue;
     const base = m.gd.baseIdOf(p.id);
@@ -1448,6 +1451,7 @@ export function* botPrepBeginSteps(m, ps, { delegate = false } = {}) {
   yield* buyLoopSteps(m, ps, { fillOnly: false, maxRefreshes: MAX_REFRESHES });
   takeOffers(m, ps);
   levelUp(m, ps, { spare: true });
+  yield* advisorSpendSteps(m, ps);
   maybeFreeze(m, ps);
   yield;
   // 3. placement, 4. items, placement again (item carriers gain value; rehearsed when the match allows it)
@@ -1469,6 +1473,18 @@ export function* botPrepEndSteps(m, ps, job = null) {
   // 5. temp → hand / sell / destroy; keep one hand slot free for next round's merges
   resolveTemp(m, ps);
   if (freeSlot(ps.hand) < 0) freeHandSlot(m, ps);
+  // Sales/consumables during final placement can leave new expiring funds. Recheck before Ready.
+  if (economyPlan(m, ps)) {
+    const before = ps.allChess().map(p => p.uid).join();
+    yield* advisorSpendSteps(m, ps);
+    if (before !== ps.allChess().map(p => p.uid).join()) {
+      takeOffers(m, ps);
+      yield* arrangeSteps(m, ps);
+      equipItems(m, ps);
+      resolveTemp(m, ps);
+    }
+    maybeFreeze(m, ps);
+  }
   // what the next prep's bench shed may judge by value: what is owned now (later gains wait for a placement step)
   rememberOwned(ps);
   m.autoPickPersonalChoice(ps, 'bot');
@@ -1501,7 +1517,8 @@ export function botPrep(m, ps) {
  */
 function maybeFreeze(m, ps) {
   if (ps.shop.frozen) return;
-  if (ps.shop.slots.some((s) => s && !s.sold && s.kind === 'chess' && ps.priceOf(s) > ps.funds && ps.completesChessMerge(s.id))) tryDo(() => ps.freeze());
+  if (ps.shop.slots.some((s) => s && !s.sold && s.kind === 'chess' && ps.priceOf(s) > ps.funds
+    && (ps.completesChessMerge(s.id) || advisorWanted(m, ps, s.id)))) tryDo(() => ps.freeze());
 }
 
 /** Whether level `lv` of the 调度中心 opens one of the player's slotted 自选 pieces with copies left (player/diy.js). */
@@ -1520,10 +1537,12 @@ export function levelUp(m, ps, { spare = false } = {}) {
     const price = Math.max(0, ps.shop.upgradePrice);
     if (ps.funds < price) return;
     const policy = advisorPlan(m, ps)?.economy;
+    if (policy?.holdLevel && ps.shop.level >= policy.level) return;
     if (policy?.level != null) {
-      if (ps.shop.level >= policy.level || ps.funds - price < fundsReserve(m, ps)) return;
-      if (!tryDo(() => ps.levelUp())) return;
-      continue;
+      if (ps.shop.level < policy.level) {
+        if (ps.funds - price < fundsReserve(m, ps) || !tryDo(() => ps.levelUp())) return;
+        continue;
+      }
     }
     const r = m.round;
     const target = LEVEL_TARGET[Math.min(LEVEL_TARGET.length - 1, r)];
@@ -1570,6 +1589,12 @@ function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}) {
   let memo = null;
   for (let guard = 0; guard < 40; guard++) {
     if (guard > 0) yield;
+    // Do not cash a bank for a non-merge during the initial merge-only pass: the intervening level-up
+    // could consume its refund before this pass is allowed to buy the target.
+    if (economyPlan(m, ps)) for (const slot of ps.shop.slots) {
+      if (!fillOnly || ps.allChess().length < ps.deployCap || (slot?.kind === 'chess' && ps.completesChessMerge(slot.id)))
+        fundAdvisorPurchase(m, ps, slot);
+    }
     const ctx = context(m, ps);
     const ownedN = ps.allChess().length;
     const ownKey = `${ps.allChess().map((p) => `${p.uid}:${p.id}:${(p.items || []).length}`).join()}|${ctx.focus}|${ctx.second}`;
@@ -1606,7 +1631,7 @@ function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}) {
         const base = gd.baseIdOf(s.id);
         if (boardFull && !merges && ps.funds - price < reserve) return; // banked (坎诺特)
         sc = buyScore(m, ps, s.id, ctx) - price;
-        if (boardFull && !merges) {
+        if (boardFull && !merges && !advisorWanted(m, ps, s.id)) {
           if (!ctx.copies.get(base)) {
             // with a full board a new operator must improve the lineup
             if (!cur) {
@@ -1654,11 +1679,64 @@ function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}) {
       continue;
     }
     if (canRefresh) {
+      // Manual g.refresh cancels freezing and replaces its cards. Save wanted unaffordable offers first.
+      if (economyPlan(m, ps) && ps.shop.slots.some(s => s && !s.sold && s.kind === 'chess'
+        && advisorWanted(m, ps, s.id) && ps.priceOf(s) > ps.funds)) { maybeFreeze(m, ps); return; }
       if (!tryDo(() => ps.refresh())) return;
       refreshes++;
       continue;
     }
     return;
+  }
+}
+
+/**
+ * Maintainer 2026-10-19 (§35.13): expiring funds buy useful pieces, preserve unaffordable targets, search,
+ * then hold cheap spare pieces for their sale value. [ASSUMED] 64 actions per pass bound free/effect loops;
+ * leave one bench slot for next round, never trade bank pieces merely to buy more bank pieces.
+ * Uses the ordinary buy/refresh/freeze/sell primitives (same handlers as g.*), preserving shared pool accounting.
+ */
+export function* advisorSpendSteps(m, ps) {
+  if (!economyPlan(m, ps) || m.gd.leftoverKeptBands.includes(ps.bandId)) return;
+  const gd = ps.gd || m.gd;
+  ps._advisorBankUids = new Set(advisorBanks(m, ps).map(p => p.uid));
+  for (let guard = 0; guard < 64; guard++) {
+    if (guard) yield;
+    for (const slot of ps.shop.slots) fundAdvisorPurchase(m, ps, slot);
+    const ctx = context(m, ps), cur = chooseLineup(m, ps, ctx);
+    const offers = ps.shop.slots.map((s, slot) => ({ s, slot }))
+      .filter(({ s }) => s && !s.sold && s.kind === 'chess');
+    const useful = offers.filter(({ s }) => ps.priceOf(s) <= ps.funds && (advisorWanted(m, ps, s.id)
+      || ps.completesChessMerge(s.id) || (ps.allChess().length < ps.deployCap)
+      || lineupGain(m, ps, s.id, ctx, cur) > 2))
+      .sort((a, b) => Number(advisorWanted(m, ps, b.s.id)) - Number(advisorWanted(m, ps, a.s.id))
+        || buyScore(m, ps, b.s.id, ctx) - buyScore(m, ps, a.s.id, ctx));
+    if (freeSlot(ps.hand) >= 0 && useful.length) {
+      if (!tryDo(() => ps.buy(useful[0].slot))) return;
+      takeOffers(m, ps);
+      continue;
+    }
+    const preserve = offers.some(({ s }) => ps.priceOf(s) > ps.funds
+      && (advisorWanted(m, ps, s.id) || ps.completesChessMerge(s.id)));
+    if (preserve) maybeFreeze(m, ps);
+    // Official draws require remaining eligible stock. Use effective prices, including free/discounted operators.
+    const eligible = [...m.pool.entries].filter(([, e]) => e.left > 0 && e.tier <= ps.shop.level).map(([id]) => id);
+    eligible.push(...(ps.diyRollEntries() || []).map(([id]) => id));
+    const minPrice = Math.min(...eligible.map(id => ps.priceOf({ kind: 'chess', id, basePrice: gd.chessPrice(id) })), Infinity);
+    const refreshPrice = ps.shop.freeRefreshes > 0 ? 0 : gd.refreshPrice;
+    if (!preserve && countFree(ps.hand) > 1 && ps.funds >= refreshPrice + minPrice) {
+      if (!tryDo(() => ps.refresh())) return;
+      continue;
+    }
+    // [ASSUMED] Bank only spare, non-merge singles with available shared stock; cheapest first.
+    const bank = offers.filter(({ s }) => ps.priceOf(s) <= ps.funds && gd.sellPrice(s.id) > 0
+      && !ps.allChess().some(p => gd.baseIdOf(p.id) === gd.baseIdOf(s.id))
+      && (!m.pool.has(s.id) || m.pool.left(s.id) > 0))
+      .sort((a, b) => ps.priceOf(a.s) - ps.priceOf(b.s) || a.slot - b.slot)[0];
+    if (countFree(ps.hand) <= 1 || !bank) return;
+    const before = new Set(ps.allChess().map(p => p.uid));
+    if (!tryDo(() => ps.buy(bank.slot))) return;
+    for (const p of ps.hand) if (p?.kind === 'chess' && p.id === bank.s.id && !before.has(p.uid)) ps._advisorBankUids.add(p.uid);
   }
 }
 

@@ -206,10 +206,28 @@ Every plan field is optional; `{}` executes unchanged legacy. The schema and sco
 - `buy`, `keep`, `sell`: at most 32 operator IDs each; base/elite IDs match the same operator. Purchase +24,
   owned keep +18, sell −24. Keep also joins the existing keeper set. These are soft preferences: merge, bench
   capacity, composition and emergency space cleanup can override them. Unknown/unavailable IDs have no effect.
-- `economy`: `level` 0..6 caps the requested target (0 means no leveling); `maxRefreshes` 0..16 and
-  `refreshAbove` 0..100 bound refreshes and the gold left after them. `reserve` 0..100 overrides discretionary
+- `economy`: `level` 0..6 is a minimum target for this prep, subject to funds; 0 adds no minimum. Once reached,
+  the bot resumes its legacy upgrade curve. Only `holdLevel:true` plus `level` 1..6 and a nonblank `why`
+  (at most 360 characters, inside `economy`) caps upgrades, including free upgrades. Example:
+  `{"level":2,"holdLevel":true,"why":"Farm low-tier elites before leaving this level."}`.
+  `maxRefreshes` 0..16 and `refreshAbove` 0..100 are first-pass preferences. Expiring funds override them in
+  the final spending pass. `reserve` 0..100 overrides discretionary
   savings **only for a carry-over band**. `saveForInterest:false` releases its normal interest reserve.
-  Board filling/merges can spend the reserve. Expiring funds are never banked merely to invent interest.
+  Board filling/merges can spend the reserve. Carry bands keep their existing interest logic. Non-carry seats
+  buy wanted/useful operators, freeze wanted unaffordable offers, refresh only while a stocked purchase can
+  still be afforded, then buy cheap spare operators for later sale. A manual refresh would discard frozen
+  offers, so those offers block further searching. Only these marked, still-disposable bench operators are
+  sold to fund a wanted purchase; deployed/equipped/now-wanted operators and merge pairs are protected.
+  Empty plans and seats without a plan retain the original legacy execution.
+
+The §35.13 spending order is maintainer guidance (2026-10-19), not official strategy text. **[ASSUMED]**
+implementation choices: existing lineup gain >2 defines usefulness, explicit buy/keep or prioritized-bond
+members define wanted operators (except explicit sell targets; bond members stop after an elite is held),
+bank cheapest distinct singles with positive sale value and available shared stock, keep one free bench
+slot, and bound each extra pass to 64 actions for free-refresh/effect loops. Sale-value estimates exclude
+unexecuted sale hooks. Bank ownership is internal policy memory, reconstructed by offline replay. No hidden
+pool counts are sent to the model. Unsuitable/unaffordable offers, a full bench, preserving a freeze or the
+action bound can leave unusable funds; there is no gratuitous refresh solely to drive the loss metric to zero.
 - `items`: `keep` contains item IDs (32 max); `equip` contains `{id: itemId, target: operatorId}` (16 max).
   Existing inventory, slot and effect validators remain authoritative; invalid targets revert to ordinary selection.
 - `placements`: up to 16 `{id, row, col, dir?}` preferences, rows 0..12, columns 0..10, four uppercase cardinal
@@ -265,6 +283,14 @@ The original `public` and `private` views keep their exact fields. Each observat
 and `context.mode`. Digest includes named shop prices/tiers, board coordinates, bench/overflow, bond count/next
 threshold, gold and band-specific interest now/at the next threshold, level/upgrade cost and explicit `exp:null`,
 current enemy/boss previews and opponents' **public scouted boards only**. No other private view or pool counts.
+§35.13 adds `economy.expiringFunds` (0 for carry bands), effective `refreshPrice` (0 for a free charge),
+`upgradePrice` (cost to the next level), `frozenSlots` (unsold slot indices), and
+`bankOperators:[{uid,id,sellValue}]` (marked disposable bench singles; base refund before sale hooks).
+These fields and per-offer `frozen` survive the example's compact digest. The knowledge pack explains costs,
+no EXP, carry/interest per band, normal/elite sale values, freeze consumption at next round start, and manual
+refresh cancellation. Its playbook contains a recommended data-cost schedule and a labeled measured legacy
+reference; candidate curves state stage-key tiers, inaccessible keys and public copy shares. See
+[advisor economy](AI-STRATEGY.md#advisor-economy-3513) for sources, assumptions and the offline benchmark.
 §35.11 adds own LP, operator base IDs/bonds and `stars` (1 normal, 2 elite), public factions/bans, and, in
 plan mode only, `context.matchId` (opaque, unrelated to game RNG) and `digest.feedback`. Feedback retains the
 last 256 own successful buy/sell/merge events with monotonic `seq`, `through`, the last battle's round/LP/
@@ -359,7 +385,7 @@ The model is asked for:
   actual stock and future rolls remain unknown. This cannot guarantee a threshold will be completed.
 - Local repairs drop unknown/wrong-kind IDs, duplicate/capped entries and stale choices; clamp finite numeric
   values to existing schema bounds (numeric strings/fractions normalize); normalize placement directions.
-  The resulting plan still passes the unchanged strict `validPlan`. Malformed structures, invalid JSON,
+  The resulting plan still passes the strict `validPlan`. Malformed structures, invalid JSON,
   incomplete replies and transport errors still fail and use the existing bounded fallback. Bare §35.9 plans
   remain accepted. No retry or extra provider request is introduced.
 

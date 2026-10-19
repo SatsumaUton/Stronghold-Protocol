@@ -10,9 +10,15 @@ export function validPlan(p) {
   for (const k of ['buy', 'keep', 'sell']) if (p[k] !== undefined && !ids(p[k])) return false;
   if (p.bonds !== undefined && (!Array.isArray(p.bonds) || p.bonds.length > 8 || !p.bonds.every(b =>
     keys(b, ['id', 'priority']) && ids([b.id]) && integer(b.priority, 5) && b.priority > 0))) return false;
-  if (p.economy !== undefined && (!keys(p.economy, ['saveForInterest', 'reserve', 'level', 'maxRefreshes', 'refreshAbove'])
-    || Object.entries(p.economy).some(([k, v]) => k === 'saveForInterest' ? typeof v !== 'boolean'
-      : !integer(v, k === 'level' ? 6 : k === 'maxRefreshes' ? 16 : 100)))) return false;
+  if (p.economy !== undefined) {
+    const e = p.economy;
+    if (!keys(e, ['saveForInterest', 'reserve', 'level', 'holdLevel', 'why', 'maxRefreshes', 'refreshAbove'])
+      || Object.entries(e).some(([k, v]) => ['saveForInterest', 'holdLevel'].includes(k) ? typeof v !== 'boolean'
+        : k === 'why' ? typeof v !== 'string' || !v.trim() || v.length > 360
+          : !integer(v, k === 'level' ? 6 : k === 'maxRefreshes' ? 16 : 100))) return false;
+    // Maintainer 2026-10-19 (§35.13): holding a low-level build is deliberate, with a stated reason.
+    if (e.holdLevel && (!(e.level >= 1) || !e.why?.trim())) return false;
+  }
   if (p.items !== undefined && (!keys(p.items, ['keep', 'equip'])
     || (p.items.keep !== undefined && !ids(p.items.keep))
     || (p.items.equip !== undefined && (!Array.isArray(p.items.equip) || p.items.equip.length > 16

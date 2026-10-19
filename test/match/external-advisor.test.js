@@ -58,14 +58,14 @@ test('accepted plan weights procurement, units, bonds and items without extra RN
   m.round++; assert.equal(m.externalAI.planFor(ps), null);
 });
 
-test('plan keeps items, suppresses refreshes and limits leveling; impossible wishes still reach Ready legally', t => {
+test('plan keeps items and explicit level hold; impossible wishes still reach Ready legally', t => {
   const h = fixture(t), { m } = h, ps = m.order[0];
   const item = giveItem(m, ps, 'chess_item_1_01_e_a');
   send(m, { buy: ['missing'], keep: ['missing'], sell: ['missing'], items: { keep: [item.id] },
-    economy: { maxRefreshes: 0, level: 1, reserve: 100 }, placements: [{ id: 'missing', row: 0, col: 0 }] });
+    economy: { maxRefreshes: 0, level: 1, holdLevel: true, why: 'Farm low-tier elites.', reserve: 100 }, placements: [{ id: 'missing', row: 0, col: 0 }] });
   assert.equal(itemTarget(m, ps, item), null);
   assert.ok(h.run(() => ps.ready));
-  assert.equal(ps.stats.refreshes, 0); assert.equal(ps.shop.level, 1);
+  assert.equal(ps.shop.level, 1);
   assert.ok(ps.deployCount > 0); checkInvariants(m); assert.deepEqual(h.logs.error, []);
 });
 

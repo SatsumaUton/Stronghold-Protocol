@@ -8,6 +8,14 @@ import { join } from 'node:path';
 import { createLLMAgent } from '../../tools/ai/llm-agent.mjs';
 import { compactDigest, compactChoices, continuity, focusPlan } from '../../tools/ai/llm-context.mjs';
 import { repairPlan } from '../../tools/ai/llm-plan.mjs';
+
+test('example repair preserves reasoned level holds and drops an unexplained hold', () => {
+  const economy = { level: 2, holdLevel: true, why: 'Farm low-tier elites.' };
+  assert.deepEqual(repairPlan({ economy }, pack, fixture.digest, []).plan.economy, economy);
+  const repaired = repairPlan({ economy: { level: 2, holdLevel: true } }, pack, fixture.digest, []);
+  assert.equal(repaired.plan.economy.holdLevel, undefined);
+  assert.ok(repaired.repairs.some(r => r.path === 'economy.holdLevel'));
+});
 import { validPlan } from '../../server/match/aiPlan.js';
 import { aiObservation } from '../../server/match/externalAI.js';
 import { makeMatch, give, chessOfTier } from './harness.js';
