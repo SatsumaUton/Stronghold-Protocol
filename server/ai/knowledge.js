@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { applyFileOverlay } from '../../shared/i18nData.js';
 import { deepFreeze } from '../data.js';
 import { GameData } from '../match/gamedata.js';
+import { buildPlaybook } from './playbook.js';
 
 const hash = s => createHash('sha256').update(s).digest('hex');
 const stable = x => Array.isArray(x) ? x.map(stable) : x && typeof x === 'object'
@@ -69,6 +70,7 @@ export function knowledgePack(data, { language = 'zh-CN', modeId, rules = {}, of
     // Retain the source economy table as Chinese reference, alongside localized prose and numeric rules.
     playingEconomy: source.split('## 2.')[1]?.split('## 3.')[0]?.split('\n').filter(line => line.startsWith('|')).join('\n') || '',
     roomRules: rules,
+    playbook: buildPlaybook(data, { modeId }),
     economy: { incomeByRound: Array.from({ length: gd.lastRound }, (_, i) => gd.income(i + 1)),
       exp: null, upgradePrices: gd.upgradePrices(), upgradeDiscountPerRound: 1, refreshPrice: gd.refreshPrice,
       interestFormula: 'carries ? min(max, floor(gold / capital) * interest) : 0; at round start',

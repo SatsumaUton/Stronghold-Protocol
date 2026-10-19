@@ -19,6 +19,7 @@ const observation = (digest, id, matchId = 'match-a', kind = 'prep') => ({ v: 's
 async function mock(t) {
   const calls = [], replies = [];
   const server = http.createServer((req, res) => {
+    req.setEncoding('utf8');
     let body = ''; req.on('data', b => { body += b; }); req.on('end', () => {
       calls.push(JSON.parse(body)); const reply = replies.shift();
       res.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(reply) } }] }));

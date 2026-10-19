@@ -309,6 +309,15 @@ is used for repository validation.
 
 ### Committed round plans and private reasoning (§35.11)
 
+The example also receives a versioned, data-derived playbook and 2–4 scored draft/prep archetypes (§35.12;
+fewer only when legal alternatives run out). See [AI strategy method and regeneration](AI-STRATEGY.md) for
+official field sources, the maintainer's 2026-10-19 community guidance, band implications, stage keys,
+public teammate contention, enemy coverage and [ASSUMED] score/timing formulas. `knowledge.playbook` is static;
+the adapter computes `strategy.candidates` from the seat digest and acknowledged prior plan. Future targets
+guide purchases but do not bypass the held/reachable three-target gate. Regenerate offline with
+`node tools/ai/playbook.mjs --data-dir data --mode mode_multi_normal`; optional `--community` and `--observation`
+JSON inputs support other versions and saved observations. Output includes input/policy hashes and score evidence.
+
 The maintainer requested this example-policy change on **2026-10-19** after the solo HARD seed-7 run kept
 changing targets, bought unrelated operators and rejected one plan. All behavior here is **[ASSUMED] advisor
 policy**, not an official strategy or a change to the generic eight-bond plan protocol or gameplay rules.

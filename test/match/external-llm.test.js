@@ -26,6 +26,8 @@ const observation = { v: 'sp-ai/1', id: 'ai-1', knowledgeVersion: pack.version, 
 test('LLM adapter uses a stable cached system prefix, compact digest, JSON mode and numeric usage', async t => {
   const calls = [];
   const url = await mock(t, (req, res) => {
+    // The playbook makes the prefix span more chunks; decode split Chinese UTF-8 sequences incrementally.
+    req.setEncoding('utf8');
     let body = ''; req.on('data', b => { body += b; }); req.on('end', () => {
       calls.push({ path: req.url, auth: req.headers.authorization, body: JSON.parse(body) });
       res.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: '{"economy":{"maxRefreshes":2}}' } }],
@@ -40,6 +42,7 @@ test('LLM adapter uses a stable cached system prefix, compact digest, JSON mode 
   assert.equal(reply.plan.economy.maxRefreshes, 2); assert.ok(!JSON.stringify(reply).includes('test-secret'));
   assert.equal(calls[0].path, '/v1/chat/completions'); assert.equal(calls[0].auth, 'Bearer test-secret');
   assert.equal(calls[0].body.messages[0].content, calls[1].body.messages[0].content);
+  assert.equal(calls[0].body.messages[0].content, `${STRATEGY_PROMPT}\nKnowledge:\n${JSON.stringify(pack)}`);
   assert.ok(calls[0].body.messages[0].content.startsWith(STRATEGY_PROMPT));
   assert.equal(calls[0].body.response_format.type, 'json_object');
   const user = calls[0].body.messages[1].content;
