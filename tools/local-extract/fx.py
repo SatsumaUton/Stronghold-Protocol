@@ -29,11 +29,11 @@ carrying its file's content hash):
                        roles (start / loop / range / hit / end …, from the skill prefab and the buff templates, with
                        the buffs' lives), its abilities' projectiles and the mode it switches to; the projectiles; the
                        generic keys (hits, deaths, deploy, status loops)
-  textures.json        texture key → size, wrap, filter, alpha, the WebP files
+  textures.json        texture key → size, wrap, filter, alpha, the WebP or PNG files
   prefabs/<file>.json  one descriptor per effect prefab: nodes (Unity-native transforms), ParticleSystems (every
                        enabled module), renderers, materials (shader name + resolved render state), decoded clips,
                        behaviours
-  tex/<key>.webp       textures (WebP q90, alpha kept); tex/half/<key>.webp the half-size copy of the light tier
+  tex/<key>.webp       textures (WebP q90 by default, --fx-texture-format png for PNG); tex/half/ the light tier
   mesh/<key>.json      meshes of mesh particles, MeshRenderers, SkinnedMeshRenderers and mesh shapes
 Everything is (c) Hypergryph; for private, non-commercial fan use only. Nothing of it is ever committed.
 """
@@ -861,10 +861,11 @@ def string_values(v, out):
 class Exporter:
     """Writes the descriptors, textures and meshes of the effect prefabs of one AssetEnv into <out>/fx."""
 
-    def __init__(self, env, out_root, log=print):
+    def __init__(self, env, out_root, log=print, texture_format='webp'):
         self.env = env
         self.out = Path(out_root) / FX_SUB
         self.log = log
+        self.texture_format = texture_format
         self.textures = {}      # key → meta
         self.meshes = {}        # key → meta
         self._tex_keys = {}     # (file id, path id) → key
@@ -899,21 +900,24 @@ class Exporter:
         has_alpha = 'A' in img.getbands() and img.getchannel('A').getextrema()[0] < 255
         img = img.convert('RGBA') if has_alpha else img.convert('RGB')
         tex_dir = self.out / 'tex'
-        full = tex_dir / f'{key}.webp'
-        half = tex_dir / 'half' / f'{key}.webp'
+        suffix = self.texture_format
+        full = tex_dir / f'{key}.{suffix}'
+        half = tex_dir / 'half' / f'{key}.{suffix}'
         meta = {'name': t.m_Name, 'w': t.m_Width, 'h': t.m_Height, 'format': TEXTURE_FORMATS.get(d.get('m_TextureFormat'), str(d.get('m_TextureFormat'))),
                 'mips': d.get('m_MipCount', 1), 'srgb': d.get('m_ColorSpace', 1) == 1, 'alpha': has_alpha,
-                'file': f'tex/{key}.webp', 'half': None}
+                'file': f'tex/{key}.{suffix}', 'half': None}
+        if suffix != 'webp':
+            meta['encoding'] = suffix
         ts = d.get('m_TextureSettings', {})
         meta.update({'wrapU': ['repeat', 'clamp', 'mirror', 'mirrorOnce'][min(3, ts.get('m_WrapU', 0))],
                      'wrapV': ['repeat', 'clamp', 'mirror', 'mirrorOnce'][min(3, ts.get('m_WrapV', 0))],
                      'filter': ['point', 'bilinear', 'trilinear'][min(2, ts.get('m_FilterMode', 1))], 'aniso': ts.get('m_Aniso', 0)})
-        save_webp(img, full)
+        save_texture(img, full, suffix)
         if t.m_Width >= HALF_MIN and t.m_Height >= HALF_MIN:
             size = (max(1, t.m_Width // 2), max(1, t.m_Height // 2))
             small = img.convert('RGBa').resize(size, Image.LANCZOS).convert('RGBA') if has_alpha else img.resize(size, Image.LANCZOS)
-            save_webp(small, half)
-            meta['half'] = f'tex/half/{key}.webp'
+            save_texture(small, half, suffix)
+            meta['half'] = f'tex/half/{key}.{suffix}'
         self.textures[key] = meta
         return key
 
@@ -1393,10 +1397,27 @@ class PrefabCtx:
                                    'property': c.get('attribute'), 'keys': enc_keys(c.get('curve'))})
 
 
-def save_webp(img, path):
+def check_texture_format(encoding):
+    """Reject unavailable encoders before an extraction can replace any existing output."""
+    if encoding not in ('png', 'webp'):
+        raise ValueError('effect texture format must be png or webp')
+    if encoding == 'webp':
+        from PIL import Image, features
+        if not features.check('webp'):
+            raise RuntimeError('Pillow WebP support is required for --fx-texture-format webp')
+        import io
+        Image.new('RGBA', (1, 1)).save(io.BytesIO(), 'WEBP', quality=WEBP_QUALITY, method=WEBP_METHOD)
+
+
+def save_texture(img, path, encoding='webp'):
     import io
     buf = io.BytesIO()
-    img.save(buf, 'WEBP', quality=WEBP_QUALITY, method=WEBP_METHOD)
+    if encoding == 'webp':
+        img.save(buf, 'WEBP', quality=WEBP_QUALITY, method=WEBP_METHOD)
+    elif encoding == 'png':
+        img.save(buf, 'PNG')
+    else:
+        raise ValueError('effect texture format must be png or webp')
     write_atomic(path, buf.getvalue())
 
 
@@ -2999,10 +3020,10 @@ def _export_worker(args, keys_all=None):
     (entries, textures meta, meshes meta, log lines)."""
     if keys_all is not None:
         _init_worker(keys_all)
-    ab_root, out_root, cabs, rel, keys = args
+    ab_root, out_root, cabs, rel, keys, texture_format = args
     lines = []
     env = AssetEnv(ab_root, cabs)
-    ex = Exporter(env, out_root, lines.append)
+    ex = Exporter(env, out_root, lines.append, texture_format=texture_format)
     entries = {}
     try:
         roots = env.prefabs(rel)
@@ -3149,11 +3170,13 @@ def _read_json(path):
         return None
 
 
-def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, jobs=None, root=None, fx_manifest=None):
+def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, jobs=None, root=None, fx_manifest=None,
+              texture_format='webp'):
     """The fx run (extract.py --only fx): writes <out_root>/fx/** and `fx_manifest` (default <root>/data/local-fx.json:
     the groups FX_GROUPS, every file); returns the number of files written. `manifest` (the groups of
     data/local-assets.json) gets nothing: extract.py drops the fx groups an earlier run left there (ran_groups). A
     --fx-keys run (`keys`) updates those prefabs in the earlier set's index and file list."""
+    check_texture_format(texture_format)
     t_start = time.time()
     ab_root = Path(ab_root)
     root = Path(root) if root else Path(__file__).resolve().parents[2]
@@ -3207,7 +3230,8 @@ def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, j
             for k in sorted(todo):
                 by_bundle.setdefault(eff[k], []).append(k)
             log(f'fx: pass {rounds}: exporting {len(todo)} prefabs from {len(by_bundle)} bundles ({jobs} processes)')
-            work = [(str(ab_root), str(out_root), cabs, rel, ks) for rel, ks in sorted(by_bundle.items(), key=lambda kv: -len(kv[1]))]
+            work = [(str(ab_root), str(out_root), cabs, rel, ks, texture_format)
+                    for rel, ks in sorted(by_bundle.items(), key=lambda kv: -len(kv[1]))]
             results = list(pool.map(_export_worker, work)) if jobs > 1 and len(work) > 1 else [_export_worker(w, tuple(eff)) for w in work]
             done |= todo
             for e, tx, me, lines in results:
@@ -3227,6 +3251,7 @@ def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, j
     groups = {
         'fx/prefabs': {k: {'path': url(v['file']), 'kind': 'FxPrefab'} for k, v in entries.items()},
         'fx/tex': {k: {'path': url(v['file']), 'w': v['w'], 'h': v['h'], 'kind': 'Texture2D',
+                       **({'encoding': v['encoding']} if 'encoding' in v else {}),
                        **({'half': url(v['half'])} if v.get('half') else {})} for k, v in textures.items()},
         'fx/mesh': {k: {'path': url(v['file']), 'kind': 'FxMesh', 'verts': v['verts']} for k, v in meshes.items()},
     }

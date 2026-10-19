@@ -517,6 +517,8 @@ describe('extract.py: the fx run is opt-in', { skip: !PY && 'no python3' }, () =
     assert.equal(fx.indexVersion, 3);
     assert.equal(fx.meshVersion, 2);
     assert.equal(fx.optIn, true);
+    assert.equal(fx.textureFormat, 'webp');
+    assert.deepEqual(fx.textureFormats, ['webp', 'png']);
     for (const k of ['common_hit_01', 'buff_stun', 'buff_autochess_frozen', 'inside_attack_01_trail_front', 'ifrit_skill_03_buff', 'enemy_tidmag_attack_01_hit']) {
       assert.ok(fx.sample.keys.includes(k), k);
     }
