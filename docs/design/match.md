@@ -149,9 +149,10 @@ endpoint/command, gameplay actions only. Test journals record replies/failures; 
 The complete policy and scope are in [External AI API](../EXTERNAL_AI.md).
 
 Maintainer request 2026-10-19 (§35.12): the example advisor's static knowledge includes a regenerable playbook
-from the active data and a sourced community overlay. [ASSUMED] Per-seat draft/prep scoring selects up to four
-band/main/sub archetypes with stage keys and counter gaps using only announced bans/enemies, public teammate
-boards and own progress. It does not inspect remaining stock or change execution. Mechanical facts, timing
+from the active data and a sourced community overlay. [ASSUMED] Per-seat scoring uses only announced
+bans/enemies, public teammate boards and own progress. §35.15: the band draft returns at most eight
+directions and prefers uncontended community/maintainer mains; prep collapses the same band and main into
+one candidate with `subOptions`. It does not inspect remaining stock or change execution. Mechanical facts, timing
 estimates, score weights and cross-version regeneration are specified in [AI strategy](../AI-STRATEGY.md).
 The §35.12 follow-up requires detailed sourced play for named builds: separate freeze/redeployment recipes
 check reachable core roles and distinct main thresholds, retaining current-data disagreements and substitutes.

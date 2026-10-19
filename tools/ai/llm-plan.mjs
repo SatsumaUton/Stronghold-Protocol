@@ -14,6 +14,11 @@ export function repairPlan(input, pack, digest, choices) {
   const pieces = [...(digest.board || []), ...(digest.bench || []), ...(digest.overflow || []), ...(digest.shop || []).filter(Boolean)];
   const ops = new Set([...pack.operators.map(p => p.id), ...pieces.filter(p => p.kind === 'chess').map(p => p.id)]);
   const items = new Set(pack.items.map(p => p.id)), bonds = new Set(pack.bonds.map(p => p.id));
+  // Shop rows cover plugin items absent from the static pack. Chess ids are not item buys.
+  const buyableItems = new Set(items);
+  for (const s of [...(digest.shop || []), ...(digest.rewards || [])].filter(Boolean)) {
+    if (s.kind === 'item' || items.has(s.id) || (s.kind !== 'chess' && !ops.has(s.id) && s.id)) buyableItems.add(s.id);
+  }
   const num = (value, min, max, path) => {
     const n = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
     if (!Number.isFinite(n)) { drop(path, value); return undefined; }
@@ -47,7 +52,7 @@ export function repairPlan(input, pack, digest, choices) {
   if (input.economy !== undefined) {
     if (!object(input.economy)) throw new Error('plan');
     plan.economy = {};
-    cleanKeys(input.economy, ['saveForInterest', 'reserve', 'level', 'holdLevel', 'why', 'maxRefreshes', 'refreshAbove'], 'economy.');
+    cleanKeys(input.economy, ['saveForInterest', 'reserve', 'level', 'holdLevel', 'why', 'maxRefreshes', 'refreshAbove', 'freezeSearch'], 'economy.');
     for (const [k, max] of Object.entries({ reserve: 100, level: 6, maxRefreshes: 16, refreshAbove: 100 })) {
       if (input.economy[k] === undefined) continue;
       const value = num(input.economy[k], 0, max, `economy.${k}`);
@@ -60,11 +65,14 @@ export function repairPlan(input, pack, digest, choices) {
     if (typeof input.economy.holdLevel === 'boolean' && (!input.economy.holdLevel || (why && plan.economy.level >= 1)))
       plan.economy.holdLevel = input.economy.holdLevel;
     else if (input.economy.holdLevel !== undefined) drop('economy.holdLevel', input.economy.holdLevel, 'hold requires level >= 1 and economy.why');
+    if (typeof input.economy.freezeSearch === 'boolean') plan.economy.freezeSearch = input.economy.freezeSearch;
+    else if (input.economy.freezeSearch !== undefined) drop('economy.freezeSearch', input.economy.freezeSearch);
   }
   if (input.items !== undefined) {
     if (!object(input.items)) throw new Error('plan');
-    plan.items = {}; cleanKeys(input.items, ['keep', 'equip'], 'items.');
+    plan.items = {}; cleanKeys(input.items, ['keep', 'equip', 'buy'], 'items.');
     if (input.items.keep !== undefined) plan.items.keep = ids(input.items.keep, items, 'items.keep');
+    if (input.items.buy !== undefined) plan.items.buy = list(input.items.buy, 'items.buy', 8, v => buyableItems.has(v) ? v : undefined);
     if (input.items.equip !== undefined) plan.items.equip = list(input.items.equip, 'items.equip', 16, e => {
       if (!object(e) || !items.has(e.id) || !ops.has(e.target)) return;
       cleanKeys(e, ['id', 'target'], 'items.equip.'); return { id: e.id, target: e.target };
@@ -85,6 +93,22 @@ export function repairPlan(input, pack, digest, choices) {
     if (choices.some(c => c.id === input.choice)) plan.choice = input.choice;
     else drop('choice', input.choice);
   }
-  if (!validPlan(plan)) throw new Error('plan');
+  // codex/032-advisor-exec adds items.buy and economy.freezeSearch. This branch's validPlan does not know them.
+  // [ASSUMED] If those fields are the only rejection, drop them and record a repair so either merge order still applies.
+  if (!validPlan(plan)) {
+    const stripped = structuredClone(plan);
+    if (stripped.economy && Object.hasOwn(stripped.economy, 'freezeSearch')) {
+      drop('economy.freezeSearch', stripped.economy.freezeSearch, 'current validPlan has no freezeSearch');
+      delete stripped.economy.freezeSearch;
+      if (!Object.keys(stripped.economy).length) delete stripped.economy;
+    }
+    if (stripped.items && Object.hasOwn(stripped.items, 'buy')) {
+      drop('items.buy', JSON.stringify(stripped.items.buy), 'current validPlan has no items.buy');
+      delete stripped.items.buy;
+      if (!Object.keys(stripped.items).length) delete stripped.items;
+    }
+    if (!validPlan(stripped)) throw new Error('plan');
+    return { plan: stripped, repairs };
+  }
   return { plan, repairs };
 }

@@ -7,6 +7,7 @@ import { httpDecision } from '../../server/ai/transport.js';
 import { validPlan } from '../../server/match/aiPlan.js';
 import { compactDigest, compactChoices, continuity, focusPlan } from './llm-context.mjs';
 import { repairPlan, shortText } from './llm-plan.mjs';
+import { slimKnowledge } from './llm-knowledge.mjs';
 import { strategyCandidates } from '../../server/ai/strategy.js';
 
 // [ASSUMED] Original strategy prompt, not an official guide. Stable prefix enables provider prompt caching
@@ -33,14 +34,17 @@ Keep distinct engine members and the package carrier. Do not sell all copies of 
 this plan API cannot automate an arbitrary repeated buy/sell sequence. Stop if funds or survival cannot sustain it.
 Choose at most THREE bonds, priority 1..5 (5 strongest), only from digest.bonds with candidate:true: they already
 have board/bench progress and a publicly reachable threshold. Account for accumulated layers before abandoning
-an investment. Prefer completing the nearest threshold over opening
+an investment. Activated layers across ALL bonds count, not only the three targets. Fill remaining deployment
+slots with units that activate extra bonds. Do not bench a stronger unit only to chase a 6-threshold.
+Prefer completing the nearest threshold over opening
 another bond. With no candidates, fill a useful board first and leave bonds empty. Remaining pool stock is UNKNOWN;
 poolOptions is only current-level catalogue eligibility, not available copies or a promise of a roll.
-Change the primary direction/target list only for an explicit reason: a bond is unreachable, a strong merge
-appeared, or boss/enemy factions demand it. Set pivot:true and give a one-line pivotReason for such a change;
-otherwise pivot:false and pivotReason:"". Small priority adjustments within the same order are not a pivot.
-Complete affordable merges, preserve core units and avoid scattered speculative buys. Check enemy air/armor,
-blocking, sustain and leader damage. Avoid redundant
+Change the primary bond (the highest-priority entry) only for an explicit reason: it is unreachable, a strong merge
+appeared, or boss/enemy factions demand it. Set pivot:true and give a one-line pivotReason for that change;
+otherwise pivot:false and pivotReason:"". Adding, removing or reordering sub-bonds is allowed and is not a pivot.
+Complete affordable merges, preserve core units and avoid scattered speculative buys. Each prep, compare
+digest.upcoming fly and elite counts with the air-capable units you will field (operator caps.air). Also check
+armor, blocking, sustain and leader damage. Avoid redundant
 units competing with teammates. Spend expiring funds; save for interest only when the selected band carries funds.
 Balance immediate survival against future shop access. Leave detailed procurement and placement to legacy's rehearsal.
 Economy: digest.economy.expiringFunds will disappear at prep end. Refresh costs refreshPrice (free charges included).
@@ -48,18 +52,28 @@ No EXP exists: upgradePrice is the next-level cost, discounted by 1 each round, 
 Read knowledge.economy.shop tier shares and strategy.candidates[].levelCurve alongside playbook.legacyReference.
 Needed T4/5/6 operators require L4/5/6 for normal rolls. Explain falling behind either curve in why; L3 at R7 is
 too slow for an ordinary build. economy.level means reach AT LEAST that level, then legacy may upgrade further.
-Only a deliberate low-level elite farm or established cycle should set holdLevel:true, level and economy.why.
+holdLevel defers levelling for this prep only. A one-round deferral is allowed when economy.why states the reason
+and level is the level being held; it is not reserved for a permanent low-level farm or an established cycle.
 maxRefreshes/refreshAbove/reserve are preferences: expiring funds still buy useful targets, freeze an unaffordable
-wanted offer, search while a purchase remains affordable, then buy cheap spare bank operators. Sell those banks
+wanted offer, search while a purchase remains affordable, then buy cheap spare bank operators. economy.freezeSearch
+true means refresh to find a buy target and freeze it if it is unaffordable. Sell those banks
 when needed to fund a wanted purchase. Sale refunds are sellValue, usually 1, not purchase cost. Respect bench
 room and shared stock. g.freeze preserves unsold offers across rounds; manual refresh cancels it. Carry bands
 keep funds for their actual interest thresholds. A different strategy is allowed with a concrete reason in why.
-Plan fields optional: bonds:[{id,priority:1..5}] (max 3); buy/keep/sell:[operator id, NEVER item id] (max 32 each);
-economy:{saveForInterest:boolean,reserve:0..100,level:0..6,holdLevel:boolean,why:nonempty reason (max 360 chars),maxRefreshes:0..16,refreshAbove:0..100};
-items:{keep:[item id],equip:[{id:item id,target:operator id}]}; placements:[{id:operator id,row,col,dir}];
+keep and sell match exact ids: a plain id means normal copies, a *_b id means the elite. buy wants further copies
+only while they progress a merge or add a new distinct member.
+Plan fields optional: bonds:[{id,priority:1..5}] (max 3); buy/keep/sell:[operator id] (max 32 each);
+economy:{saveForInterest:boolean,reserve:0..100,level:0..6,holdLevel:boolean,why:nonempty reason (max 360 chars),maxRefreshes:0..16,refreshAbove:0..100,freezeSearch:boolean};
+items:{keep:[item id],equip:[{id:item id,target:operator id}]}; items.buy:[item id] (max 8, catalogue or current shop); placements:[{id:operator id,row,col,dir}];
 choice:an action ID from this observation for band/card/offer/reward. Prefer omitting placements. For drafts select
 one available choice; preserve the prep direction across drafts. During prep supply the round plan.
 An empty plan delegates to legacy; only plan is applied. why/pivot/pivotReason are private diagnostics.`;
+
+// The model sees this string, not the hello pack. strategyCandidates keeps the full local playbook.
+export function advisorSystem(pack) {
+  const prefix = `${STRATEGY_PROMPT}\nKnowledge:\n`;
+  return prefix + JSON.stringify(slimKnowledge(pack, { maxChars: 200000 - prefix.length }));
+}
 
 // Injectable transport lets prompt/continuity tests run without opening sockets; the CLI keeps bounded HTTP.
 export function createLLMAgent(env = process.env, request = httpDecision) {
@@ -91,7 +105,7 @@ export function createLLMAgent(env = process.env, request = httpDecision) {
       if (!o.knowledge?.version || o.knowledge.schema !== 'sp-knowledge/1') throw new Error('knowledge');
       // [ASSUMED] Bound local cache to eight versions, never persist prompts or credentials.
       if (prompts.size >= 8) prompts.delete(prompts.keys().next().value);
-      prompts.set(o.knowledge.version, { system: `${STRATEGY_PROMPT}\nKnowledge:\n${JSON.stringify(o.knowledge)}`, pack: o.knowledge });
+      prompts.set(o.knowledge.version, { system: advisorSystem(o.knowledge), pack: o.knowledge });
       return { v: o.v, id: o.id, type: 'hello', knowledgeVersion: o.knowledge.version };
     }
     const cached = prompts.get(o.knowledgeVersion);

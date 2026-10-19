@@ -4,7 +4,7 @@ import http from 'node:http';
 import { once } from 'node:events';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { createLLMAgent, STRATEGY_PROMPT } from '../../tools/ai/llm-agent.mjs';
+import { createLLMAgent, STRATEGY_PROMPT, advisorSystem } from '../../tools/ai/llm-agent.mjs';
 import { knowledgePack } from '../../server/ai/knowledge.js';
 import { DATA } from './harness.js';
 import { exampleServer } from '../../tools/ai/http.mjs';
@@ -42,7 +42,7 @@ test('LLM adapter uses a stable cached system prefix, compact digest, JSON mode 
   assert.equal(reply.plan.economy.maxRefreshes, 2); assert.ok(!JSON.stringify(reply).includes('test-secret'));
   assert.equal(calls[0].path, '/v1/chat/completions'); assert.equal(calls[0].auth, 'Bearer test-secret');
   assert.equal(calls[0].body.messages[0].content, calls[1].body.messages[0].content);
-  assert.equal(calls[0].body.messages[0].content, `${STRATEGY_PROMPT}\nKnowledge:\n${JSON.stringify(pack)}`);
+  assert.equal(calls[0].body.messages[0].content, advisorSystem(pack));
   assert.ok(calls[0].body.messages[0].content.startsWith(STRATEGY_PROMPT));
   assert.equal(calls[0].body.response_format.type, 'json_object');
   const user = calls[0].body.messages[1].content;

@@ -91,10 +91,10 @@ test('another content version changes members, graph, mechanics and knowledge ha
   assert.notEqual(knowledgePack(data, { modeId }).version, knowledgePack(DATA, { modeId }).version);
 });
 
-test('draft and prep yield two to four legal variants, omit bans and use observation-local band choices', () => {
+test('draft keeps at most eight legal directions and prep collapses one band and main', () => {
   const d = draft({ availability: { disabledBonds: ['yanShip', 'preciShip'], bannedChess: ['chess_char_1_01_a'] } });
   const result = strategyCandidates(book, d);
-  assert.equal(result.candidates.length, 4);
+  assert.ok(result.candidates.length > 4 && result.candidates.length <= 8);
   for (const c of result.candidates) {
     assert.ok(!['yanShip', 'preciShip'].some(id => [c.main, ...c.subs].includes(id)));
     assert.notEqual(c.band, 'band_duyaoy');
@@ -102,8 +102,10 @@ test('draft and prep yield two to four legal variants, omit bans and use observa
     assert.equal(d.actions.find(a => a.id === c.choice).intent.bandId, c.band);
   }
   const prep = strategyCandidates(book, digest('band_duyaoy'));
-  assert.ok(prep.candidates.length >= 2 && prep.candidates.length <= 4);
+  assert.ok(prep.candidates.length >= 1 && prep.candidates.length <= 4);
   assert.ok(prep.candidates.every(c => c.band === 'band_duyaoy' && c.main === 'yanShip' && c.subs.length <= 2));
+  const direction = prep.candidates.find(c => c.id === 'band_duyaoy:yanShip');
+  assert.ok(direction.subOptions.length >= 2);
   assert.equal(new Set(prep.candidates.map(c => c.id)).size, prep.candidates.length);
 });
 
@@ -169,7 +171,9 @@ test('LLM mock receives staged candidates at draft and prep, preserving static p
       digest: kind === 'band' ? draft() : digest('band_duyaoy') });
     assert.equal(reply.why, undefined);
     const user = JSON.parse(calls.at(-1).messages[1].content);
-    assert.ok(user.strategy.candidates.length >= 2 && user.strategy.candidates.length <= 4);
+    const cap = kind === 'band' ? 8 : 4;
+    assert.ok(user.strategy.candidates.length >= 1 && user.strategy.candidates.length <= cap);
+    if (kind === 'band') assert.ok(user.strategy.candidates.length > 4);
     assert.ok(user.strategy.candidates.every(c => c.stages.length === 4 && c.pivotConditions.length));
   }
   assert.equal(calls[0].messages[0].content, calls[1].messages[0].content);

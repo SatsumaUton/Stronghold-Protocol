@@ -131,8 +131,14 @@ stacking bond. This is a conservative baseline: special count bonuses and custom
 
 For each main, rank legal sub-bonds by `4 × graph weight + 3 if community-preferred - 3 × competing teammates`.
 Keep the best three positive sub scores; enumerate their two-bond pairs and the best single sub. Use at most two
-subs. Retain four scored archetypes, preferring different main directions before filling with other band/sub
-variants; this gives professional bands multiple same-main options in prep. Fewer than two are reported explicitly
+subs. At the band draft, return at most eight directions (§35.15). [ASSUMED] Every uncontended
+community/maintainer main that is still a legal draft action is preferred over a second sub-variant of a band
+already listed. When more than eight qualify, keep the eight highest scores, one variant per band and main.
+On the current 绝境 catalogue an empty round-1 draft therefore keeps 佩佩, 潘格尼尼 and 克莱门莎 and cuts
+杜遥夜 (score 28.8, just under the eighth place at 29) and 埃芒加德 (no data bond engine, score 13). In prep,
+generic variants that share a band and a main collapse into one candidate. Its id is `band:main`, so a later
+sub change is not a new direction. `subOptions` lists each `{subs, score}`. Named community builds and cycle
+recipes keep their own ids and may take a free slot. Fewer than two distinct directions are reported explicitly
 when the legal space is too small. Never fabricate a banned alternative just to fill the list.
 
 The additive `scoreParts` are saved with each candidate:
@@ -175,8 +181,9 @@ and actual previews take precedence (e.g. an earlier FUNNY leader).
 At each decision: inspect last outcome and accepted plan → check bans/team claims/enemy needs → compare candidate
 scores and missing coverage → choose a role/main/sub set → verify what the current shop and board can accomplish
 → emit brief `why` and a bounded plan. Keep useful investments, including accumulated layers, through ordinary
-bad shops. Change direction only with `pivot:true` and a concrete `pivotReason`; existing plan repair retains
-viable previous targets when a pivot is unexplained. A future main can guide `buy/keep` but cannot be a prioritized
+bad shops. Change the primary bond (the highest priority) only with `pivot:true` and a concrete `pivotReason`.
+Adding, removing or reordering sub-bonds is not a pivot (§35.15). Existing plan repair retains
+viable previous targets when a primary change is unexplained. A future main can guide `buy/keep` but cannot be a prioritized
 `plan.bonds` target until the existing held/reachable gate accepts it. An empty plan still delegates to legacy.
 
 | Stage | Inputs and action priorities |
@@ -467,8 +474,8 @@ keys so a later-stage recommendation cannot imply a free low-level roll.
 
 Scores use 22 recipe points, +16 mechanical-band match, +8 community-main match, +5 per held named member
 (up to five), +14 previous-main continuity, −2 per shop level short, −24 per public teammate main competitor,
-−2 per contested named member, −9 per uncovered announced capability. The ordinary four-candidate diversity
-policy still applies. Explicit supplier/safety-net roles retain their existing policy. `core-held` means
+−2 per contested named member, −9 per uncovered announced capability. The §35.15 draft cap of eight and the
+prep collapse still apply. Explicit supplier/safety-net roles retain their existing policy. `core-held` means
 role members are owned and the main bond is active; it does **not** assert correct positioning, equipment,
 skill selection or successful combat. Sources, differences, substitutes and pivot conditions accompany the
 candidate. No gameplay rules, legacy decisions or automatic redeployment/equipment actions change.
@@ -543,3 +550,37 @@ Advisor loses no more funds than legacy in either configuration (42/163 advisor 
 All runs have zero match errors and advisor fallbacks. This small sample establishes the spending regression
 check, not superior win rate; rerun for changed content. The knowledge pack labels these measured legacy
 values as a historical reference only for matching vanilla solo/co-op hard modes.
+
+## Advisor input (§35.15)
+
+Maintainer playtest 2026-10-20 (coop4 HARD, seed 11, seat 0), played from the same JSON the example model
+receives. The system string was the strategy prompt plus the whole `sp-knowledge/1` pack (about 622000
+characters; measured runs were about 150–160k input tokens). Operators and enemies were stored twice, once
+on the pack and again inside `playbook`. The compact digest named chess and items by id only. Two catalogue
+rows share the name 锡人 (`chess_char_1_16_a` T1 and `chess_char_2_19_a` T2; character table /
+`charChessDataDict`).
+
+The example system prompt now uses `slimKnowledge`: one operator row (id, name, tier, cost, class, bonds,
+`caps` from `canHitFly` / `dmgType` / `position` / `stats.blockCnt` / `profession` / `subProfessionId`, first
+trait clipped to 120 characters, skill name), bonds, bands with insights, items, compact bosses, and compact
+enemies (`id, name, hp, def, res, motion, fly`). The playbook copy omits its operator and enemy tables and
+keeps community, cycles, graph, pairings, schedules, `legacyReference` and band insights. The hello pack
+served to third parties is unchanged apart from enemy `effect` text. `strategyCandidates` still reads the
+full local playbook. [ASSUMED] When the system text would exceed 200000 characters, compact enemies are
+omitted; the English funny catalogue is the current case. The observation's `upcoming` list still names
+that round's enemies.
+
+Digest additions are optional `sp-ai/1` fields: `name`, `class` and `caps` on board, bench, overflow and shop
+chess; `name` on items. Bounty cards add `killChance` from the seat strategy's existing `bountyKillChance`
+when that hook returns a finite number, plus catalogue enemy `hp, def, res, motion, fly` and a short effect.
+The exposure model is the legacy planner's, not a new combat rule. Handbook ability rows are `{text, textRaw,
+format}`; joining them used to write `[object Object]`. `effectText` keeps `text` or `desc`.
+
+The prompt also states the plan fields added on the parallel advisor-execution branch: `items.buy` (at most
+eight catalogue or current-shop item ids), `economy.freezeSearch`, a one-round `holdLevel` with `economy.why`,
+exact `keep`/`sell` ids (a `*_b` id is the elite), and `buy` only to finish a merge or add a distinct member.
+This branch's `validPlan` does not accept `items.buy` or `freezeSearch`. [ASSUMED] `repairPlan` keeps them
+when validation accepts them, and otherwise strips just those fields and records a repair, so either merge
+order still applies. Activated layers on every bond count; do not bench a stronger unit only to chase a
+6-threshold. Each prep, compare `digest.upcoming` fly and elite counts with `caps.air`. None of that changes
+`bot.js`, `aiPlan.js` or `aiEconomy.js`.

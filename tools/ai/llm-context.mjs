@@ -2,9 +2,9 @@
 // Counts/thresholds/costs come from the seat digest and knowledge generated from activity_table.json.
 const pick = (x, keys) => Object.fromEntries(keys.filter(k => x?.[k] !== undefined).map(k => [k, x[k]]));
 // The plan addresses operator IDs, not piece UIDs. Static names/base IDs already live in the cached prefix.
-const unit = p => ({ ...pick(p, ['id', 'stars', 'row', 'col', 'dir']),
-  ...(p.kind !== 'chess' ? pick(p, ['kind', 'count']) : {}),
-  ...(p.items?.length ? { items: p.items.map(i => i.id) } : {}) });
+const unit = p => ({ ...pick(p, ['id', 'name', 'stars', 'row', 'col', 'dir', 'class', 'caps']),
+  ...(p.kind !== 'chess' ? pick(p, ['kind', 'count', 'name']) : {}),
+  ...(p.items?.length ? { items: p.items.map(i => typeof i === 'string' ? i : pick(i, ['id', 'name'])) } : {}) });
 
 export function compactChoices(d) {
   return (d.actions || []).filter(a => ['g.band', 'g.bandSkip', 'g.choice', 'g.offer', 'g.reward'].includes(a.intent.t)).map(a => {
@@ -13,14 +13,14 @@ export function compactChoices(d) {
       : i.t === 'g.reward' ? d.rewards?.[i.idx]
         : i.t === 'g.offer' ? d.choices?.offers?.find(w => w.id === i.offerId && w.pluginId === i.pluginId && w.seq === i.seq)
           ?.seats.find(s => s.playerId === d.playerId)?.slots.find(c => c.idx === i.idx) : null;
-    return { ...a, ...(card ? { card: pick(card, ['id', 'name', 'desc', 'kind', 'price', 'tier', 'bonds', 'coin', 'payout', 'rounds', 'enemyKey', 'count', 'team']) } : {}) };
+    return { ...a, ...(card ? { card: pick(card, ['id', 'name', 'desc', 'kind', 'price', 'tier', 'bonds', 'coin', 'payout', 'rounds', 'enemyKey', 'count', 'team', 'killChance', 'enemy']) } : {}) };
   });
 }
 
 export function compactDigest(d, pack) {
   const board = (d.board || []).map(unit), bench = (d.bench || []).map(unit), overflow = (d.overflow || []).map(unit);
   const offers = (d.shop || []).filter(s => s && !s.sold);
-  const shop = offers.map(s => ({ ...pick(s, ['id', 'kind', 'slot', 'bonds', 'frozen']), cost: s.price, tier: s.tier }));
+  const shop = offers.map(s => ({ ...pick(s, ['id', 'name', 'kind', 'slot', 'bonds', 'frozen', 'class', 'caps']), cost: s.price, tier: s.tier }));
   const held = [...(d.board || []), ...(d.bench || [])].filter(p => p.kind === 'chess');
   const disabled = new Set(d.availability?.disabledBonds || []);
   const banned = new Set([...(d.availability?.bannedChess || []), ...(d.availability?.diyBanned || [])]);
@@ -82,15 +82,16 @@ export function focusPlan(plan, meta, digest, previousPlan, repairs) {
   const proposed = select(plan.bonds);
   for (const b of plan.bonds || []) if (!proposed.includes(b)) repairs.push({ path: 'bonds', id: b.id, reason: 'no held/reachable progress or three-bond cap' });
   const old = previousPlan?.bonds || [], viable = select(old);
-  const direction = bonds => bonds.slice().sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id)).map(b => b.id).join(',');
+  // Only the highest-priority bond is the direction. Adding, dropping or reordering sub-bonds is not a pivot.
+  const primaryId = bonds => (bonds || []).slice().sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))[0]?.id || '';
   let pivot = false, pivotReason = '';
   let bonds = proposed;
-  if (old.length && direction(old) !== direction(proposed)) {
+  if (old.length && primaryId(old) !== primaryId(proposed)) {
     if (meta.pivot === true && meta.pivotReason) { pivot = true; pivotReason = meta.pivotReason; }
     else {
       bonds = viable;
-      repairs.push({ path: 'bonds', reason: 'unexplained direction change; retain viable previous targets' });
-      if (direction(viable) !== direction(old)) { pivot = true; pivotReason = 'Previous targets no longer have held, publicly reachable progress.'; }
+      repairs.push({ path: 'bonds', reason: 'unexplained primary-bond change; retain viable previous targets' });
+      if (primaryId(viable) !== primaryId(old)) { pivot = true; pivotReason = 'Previous targets no longer have held, publicly reachable progress.'; }
     }
   }
   if (plan.bonds !== undefined || old.length) plan.bonds = bonds;
