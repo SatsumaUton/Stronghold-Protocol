@@ -1,6 +1,7 @@
 // §35.12. [ASSUMED] Reproducible candidate policy, not an optimizer or official build prescription.
 // Only a static playbook and the existing seat-visible digest enter this module. No Match/GameData/live pool.
 import { cycleCandidates } from './cycle-candidates.js';
+import { communityCandidates } from './community-candidates.js';
 const unique = xs => [...new Set(xs)];
 const rank = (a, b) => b.score - a.score || a.id.localeCompare(b.id);
 const cheap = (a, b) => a.tier - b.tier || a.cost - b.cost || a.id.localeCompare(b.id);
@@ -123,6 +124,7 @@ export function strategyCandidates(playbook, digest, previousPlan = null) {
     }
   }
   all.push(...cycleCandidates(playbook, digest, { operators, disabled, held, teammates, bands, profile, previousMain }));
+  all.push(...communityCandidates(playbook, digest, { operators, disabled, held, teammates, bands, profile, previousMain }));
   all.sort(rank);
   // [ASSUMED] Prefer four different main directions; fill remaining slots from distinct band/main alternatives.
   const selected = [], mains = new Set();

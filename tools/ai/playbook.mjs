@@ -25,7 +25,7 @@ try {
   const community = options['--community'] ? JSON.parse(readFileSync(options['--community'], 'utf8')) : COMMUNITY;
   const playbook = buildPlaybook(data, { modeId, community });
   const codeHashes = Object.fromEntries(['../../server/ai/playbook.js', '../../server/ai/strategy.js', '../../server/ai/cycles.js',
-    '../../server/ai/cycle-candidates.js', '../../server/match/gamedata.js',
+    '../../server/ai/cycle-candidates.js', '../../server/ai/community-candidates.js', '../../server/match/gamedata.js',
     '../../shared/bandBonds.js', '../../shared/constants.js', '../../docs/AI-STRATEGY.md'].map(p => [p, hash(readFileSync(new URL(p, import.meta.url)))]));
   const observation = options['--observation'] ? JSON.parse(readFileSync(options['--observation'], 'utf8')) : null;
   process.stdout.write(`${JSON.stringify({ schema: 'sp-strategy-audit/1', inputHashes, codeHashes, community, playbook,

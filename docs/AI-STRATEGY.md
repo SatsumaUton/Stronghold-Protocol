@@ -52,9 +52,11 @@ The maintainer's usual sub-bonds are:
 | 谢拉格 | 奥术 or 精准 / 灵巧 |
 | 卡西米尔 / 阿戈尔 | 突袭 / 不屈 |
 
-The named community build 卡谢 means 卡西米尔 + 谢拉格. The maintainer supplied the missing
-电表倒转 evidence on 2026-10-19; §8 records the version differences and its conditional economy/cycle candidates.
-卡谢 remains a reference annotation. A mechanical `bondIds` vs community-main
+The maintainer supplied detailed 电表倒转 evidence on 2026-10-19 (§8), then required named builds to have
+documented play or be removed. The unsupported two-core combination was removed: the supplied Bahamut
+盟约下 summary leaves the Kazimierz section unfinished and contains no write-up of that pairing.
+§9 records the separate 谢拉格冰冻叠层 and 卡西米尔部署叠层 recipes and their version differences.
+A mechanical `bondIds` vs community-main
 disagreement is emitted as `main-disagreement`; data wins for engine eligibility. Missing old-version bands,
 bonds or pair entries produce warnings instead of fictional replacements. An empty mechanical association is
 not a disagreement with a community suggestion.
@@ -352,6 +354,124 @@ The model prompt distinguishes this strategy from execution. The existing ID-lev
 arbitrary repeated buy/sell sequence or safely identify which duplicate to sell. It must not put every engine
 or feeder ID into `sell` to imitate the cycle. This change proposes and explains the archetype; it does not add
 an unbounded trade loop, guaranteed profit, hidden inventory access or a new gameplay mechanic.
+
+## 9. Sourced freeze and redeployment builds [ASSUMED]
+
+Maintainer decision **2026-10-19**: keep only named builds with detailed play. The following community summaries
+and URLs were supplied with that request; this task used **no network**, so pages and videos were not independently
+retrieved or transcribed. They support the strategy descriptions, not new official mechanics:
+
+- 谢拉格冰冻叠层: [Bahamut 盟约下 summary](https://forum.gamer.com.tw/C.php?bsn=33651&snA=12770),
+  [Bahamut comparison](https://forum.gamer.com.tw/C.php?bsn=33651&snA=12316),
+  [233乐园](https://www.233leyuan.com/post-detail/1993914451791876096),
+  [video reference](https://www.bilibili.com/video/BV1xVdBBWEuu/), [切游](https://www.qieyou.com/content/146194).
+- 卡西米尔部署叠层 / 突袭卡西米尔: the same Bahamut summary,
+  [TapTap](https://www.taptap.cn/moment/782049742673676589),
+  [video reference](https://www.bilibili.com/video/BV1XLwhz8ESa/).
+
+Official verification used local `activity_table.json` → `activity.AUTOCHESS_SEASON.act2autochess`:
+`bondInfoDict`, `effectInfoDataDict`/`effectBuffInfoDataDict`, `garrisonDataDict`, `charChessDataDict`,
+`charShopChessDatas` and `shopLevelDataDict`; character/skill tables supply operator skills. Current generated
+`data/bonds.json`, `chess.json`, `garrisons.json`, `items.json`, `bands.json` and the existing bond/garrison/item
+handlers win over community shorthand. `community.builds[].mechanics` retains their current descriptions,
+thresholds and effect parameters with record paths; `members` resolves names to visible normal IDs, preserves
+hidden normal records separately, and emits `id:null` for unavailable names. Elite forms use the corresponding
+`_b` IDs and their own data quantities; the numbers below describe normal forms unless stated otherwise.
+
+| Source name / alias | Current buy ID | Tier / role |
+|---|---|---|
+| 初雪 | `chess_char_3_14_a` | 3, freeze collector |
+| 银灰 | `chess_char_4_22_a` | 4, substitute collector / reveal |
+| 灵知 | `chess_char_4_13_a` | 4, charged S2 wide cold/freeze |
+| 耶拉 | `chess_char_3_20_a` | 3, grants 不融冰 on acquisition |
+| 角峰 | `chess_char_1_02_a` | 1, early Kjerag blocker [ASSUMED] substitute |
+| 空弦 | `chess_char_3_21_a` | 3, multi-hit ice carrier / prep-start layer support |
+| 魔王 | `chess_char_4_25_a` | 4, front operator's battle trait +1 layer |
+| 异鲨 / 归溟幽灵鲨 | `chess_char_5_13_a` | 5, optional Egir/Indomitable stacker, not innate Kjerag |
+| 阿斯卡纶 | absent from `data/chess.json` | Never invented as a buy ID or assumed DIY pick |
+| 异银 / 凛御银灰 | `chess_char_5_14_a` | 5, front Kjerag freeze-trait grant / Swift |
+| 妮芙 | `chess_char_5_22_a` | 5, prep-end Swift layers from bench count |
+| 远牙 | `chess_char_4_20_a` | 4, rightmost-in-row deployment-trait grant |
+| 砾 | `chess_char_2_12_a` | 2, deployment/death stacker |
+| 瑕光 | `chess_char_3_12_a` | 3, Kazimierz/Raid deployment stacker |
+| 野鬃 | `chess_char_1_19_a` | 1, cheap Kazimierz/Swift |
+| 灰毫 | `chess_char_2_18_a` | 2, cheap Kazimierz/Steadfast |
+| 焰尾 | `chess_char_4_19_a` | 4, acquisition grants a pool-dependent operator |
+| 铃兰 | `chess_char_5_10_a`; separately `band_lisa` | 5 operator / draft band, different timing and target |
+| 耀骑士临光 | `chess_char_6_17_a` | 6, late Kazimierz/Raid option [ASSUMED] |
+
+### Freeze play, stages and limits
+
+**Core:** one collector (初雪, or 银灰) plus 灵知 S2 and a third distinct Kjerag. At L3 prioritize 耶拉/初雪/空弦;
+at L4 add 灵知/魔王. Put freeze transitions inside the collector range; place that collector in front of 魔王
+for the extra trait layer. 耶拉 provides 不融冰 for cold overlap. At L5 prefer useful 凛御银灰/妮芙 elite merges,
+with 凛御银灰's recipient a Kjerag directly in front. These are purchase/positioning priorities, not promised rolls.
+
+**Stages [ASSUMED]:** R1–3 survive and gather cheap distinct members; R4–7 reach L3–4 and establish the freeze
+engine; R8–10 add L5 support/merges and secondary bonds; late aim for **谢讯** (Kjerag + Swift). Three Kjerag are
+the economical baseline; add 迅捷 / 灵巧 / 奥术 and useful stackers rather than blindly chasing six. Near-permanent
+freeze can contain melee enemies, but AoE can collapse the clustered engine and many stealth enemies require
+reveal. Immunity, poor cold overlap and excessive single-hit damage against the leader are additional limits.
+At high layers Arcane amplification can push hits into the existing 300000 leader void threshold.
+
+**Substitutes:** 银灰 replaces 初雪 as collector; 角峰 fills early membership. The supplied no-灵知 route is
+阿斯卡纶 plus two Kjerag 不融冰 carriers, but 阿斯卡纶 is absent here. Two owned ice-equipped attackers are only
+an **[ASSUMED] conditional fallback** requiring cold overlap; the scorer does not silently replace 灵知 with
+that unverified route. 异鲨 is optional support, not a replacement for a Kjerag collector.
+
+### Redeployment play, stages and limits
+
+**Core:** 远牙 + 砾 with at least three distinct active Kazimierz; put the redeploying receiver rightmost in
+远牙's row at battle start. 瑕光 can receive that grant instead when Raid triggers are feasible. Preserve cheap
+野鬃/灰毫 for thresholds and survival. Reach L3 for 瑕光 and L4 for 远牙/焰尾; the 铃兰 operator requires L5,
+whereas the 铃兰 band is a draft choice. Repeated real deployments raise the attack bonus and trigger the
+receiver's bounded trait gains; moving pieces during prep is not a battle deployment loop.
+At six distinct Kazimierz, `kazimierzShip` adds 120% ATK true damage around blocking members every 2s with
+0.1s stun; non-blocking members instead add 30% ATK true damage on attacks. Six is an optional threshold,
+not a prerequisite for the three-member deployment engine [ASSUMED] recommendation.
+
+**Stages [ASSUMED]:** R1–3 gather cheap members and blockers; R4–7 complete 远牙's positioning and prioritize
+坚守 for the community's 铳骑 stage; R8–10 develop 突袭/迅捷 and conditional economy; late aim for
+**卡突袭迅** (Kazimierz + Raid + Swift). The maintainer also recommends 不屈. Defensive 坚守 is situational:
+three members share damage and can delay 砾's deaths, trading cycle speed for survival. Raid needs a legal
+ground target and no enemy in range when its ten-second idle or skill-ready trigger occurs. AoE/ranged
+pressure, absent landing targets, trait caps and the leader hit limit constrain the engine.
+
+**Substitutes:** 瑕光 can replace 砾 as the receiver; without 远牙, both retain their own smaller deployment gains,
+but the named candidate is withheld. Cheap 野鬃/灰毫 preserve membership. 耀骑士临光 is a late Raid option.
+Giving 瑕光 Swift requires actual morph-plus-Swift equipment and an active Swift bond; do not sacrifice the
+survival board for it. 铃兰 + 焰尾 is a conditional copy/sale route, not guaranteed 1–2 funds each round.
+
+### Every community/data disagreement
+
+| Claim / shorthand | Current data takes priority |
+|---|---|
+| Freeze in the freezer's range gives layers; one stacker + freezer starts it | Three distinct active Kjerag are required. `garrison_28_a` on 初雪/银灰 rolls 50% for +1 when an enemy **enters** freeze in the **collector's** range. 凛御银灰 grants `garrison_29_a` to the front Kjerag: 60%, +1, cap 200/battle. The freezer and collector need not be the same unit. |
+| 空弦 / 异鲨 / 阿斯卡纶 are interchangeable engine members | 空弦 has no innate cold; `garrison_150_a` gives own/front active bonds +3 at prep start. 不融冰 gives 12% cold for 1.5s, elite item 20%. 异鲨's `garrison_40_a` gives active 阿戈尔/不屈 +5 on defeat or doll swaps, not Kjerag; a separately verified grant is needed to collect it. 阿斯卡纶 is absent. |
+| Three Kjerag give near-permanent freeze | `kjeragShip` at three gives damage ×1.25 normally or **instead** ×(1.35 + 0.01×layers) versus cold/frozen. Only six give the 25s wind, cold duration 20 + 0.1×layers seconds. Three require another cold source; no control uptime is guaranteed. |
+| Deployment produces unlimited stacking | `kazimierzShip`: +20% ATK per friendly deployment, capped at +(50 + layers)%; this is not itself a persistent layer grant. 砾 gives active Kazimierz +1; 远牙's `garrison_108_a` grants active Kazimierz/Precision +4, cap 24/battle; 瑕光's `garrison_106_a` grants own active bonds +4, cap 12/battle. |
+| Feed 瑕光 Swift and it joins her deployment layers | Her native bonds are Kazimierz/Raid. `bondsMeta.js` and `shared/plugins/rules.js` require 变形同构体 (`canGiveBond`) plus Swift-tagged equipment (`giveBondId`); 迅捷作战粮 alone grants SP, not a bond. Only active owned bonds receive her layers. |
+| 坚守 is essential everywhere | Community advice for 铳骑, not an official restriction. Two give HP, three share 40% of non-Steadfast damage. The older `bonds.kazimierzShip.spec.howToPlay` recommends avoiding it to accelerate 砾 deaths; neither recommendation overrides the mechanical survival/cycling tradeoff. |
+| 铃兰 + L4 Kazimierz cards pays 1–2 funds/round | `band_lisa` replays one on-field `SERVER_GAIN` at round start, rightmost then bottommost; T5 铃兰's `garrison_60_a` replays the front operator at prep start. T4 焰尾 grants a stock-dependent 野鬃/灰毫/远牙; 远牙 has no acquisition trigger. Surplus sales return current `sellPrice` and consume copies, not free guaranteed income. `band_mlynar` separately pays +1 **next round** per Kazimierz purchase, cap 3. |
+
+### Candidate eligibility [ASSUMED]
+
+`community-candidates.js` requires one reachable member per core role and enough distinct unbanned natural
+main-bond members. Reachability means future normal shop tiers up to the mode limit, or an already held
+higher-tier gift; it never assumes future gifts, available stock, free equipment or current affordability.
+The earliest feasible core level is exposed as `minimumShopLevel` (L4 for both vanilla recipes). Main bans,
+ordinary/DIY member bans and incompatible mechanical bands exclude the recipe. Sub-bonds independently
+need enough reachable members and at most two become priority targets; other listed subs remain alternatives.
+Stage keys exclude banned/absent members; R1–3 keys are T1–3. The existing level curve reports inaccessible
+keys so a later-stage recommendation cannot imply a free low-level roll.
+
+Scores use 22 recipe points, +16 mechanical-band match, +8 community-main match, +5 per held named member
+(up to five), +14 previous-main continuity, −2 per shop level short, −24 per public teammate main competitor,
+−2 per contested named member, −9 per uncovered announced capability. The ordinary four-candidate diversity
+policy still applies. Explicit supplier/safety-net roles retain their existing policy. `core-held` means
+role members are owned and the main bond is active; it does **not** assert correct positioning, equipment,
+skill selection or successful combat. Sources, differences, substitutes and pivot conditions accompany the
+candidate. No gameplay rules, legacy decisions or automatic redeployment/equipment actions change.
 
 ## Advisor economy (§35.13)
 

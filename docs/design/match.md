@@ -153,6 +153,8 @@ from the active data and a sourced community overlay. [ASSUMED] Per-seat draft/p
 band/main/sub archetypes with stage keys and counter gaps using only announced bans/enemies, public teammate
 boards and own progress. It does not inspect remaining stock or change execution. Mechanical facts, timing
 estimates, score weights and cross-version regeneration are specified in [AI strategy](../AI-STRATEGY.md).
+The §35.12 follow-up requires detailed sourced play for named builds: separate freeze/redeployment recipes
+check reachable core roles and distinct main thresholds, retaining current-data disagreements and substitutes.
 
 Maintainer approval 2026-10-19 (§35.9) adds owner-selected `mode: 'plan'` beside default `direct`.
 One prep plan per seat/round weights legacy procurement/lineup/placement; existing sliced rehearsal and legal
