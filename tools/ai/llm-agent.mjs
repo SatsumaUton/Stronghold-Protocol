@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// [ASSUMED] Example limits: 1200 output tokens, 256 KiB provider replies, 2 MiB input frames, four concurrent requests.
+// [ASSUMED] Example limits: 6000 output tokens by default (SP_LLM_MAX_TOKENS), 256 KiB provider replies, 2 MiB input frames, four concurrent requests.
 // §35.9. Explicit stdio adapter; importing this module never connects. No credentials/remote errors on stdout/stderr.
+import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { httpDecision } from '../../server/ai/transport.js';
 import { validPlan } from '../../server/match/aiPlan.js';
@@ -27,7 +28,20 @@ export function createLLMAgent(env = process.env) {
     || !env.SP_LLM_MODEL || !env.SP_LLM_API_KEY || /[\r\n]/.test(env.SP_LLM_API_KEY)) throw new Error('LLM configuration');
   const timeoutMs = Number(env.SP_LLM_TIMEOUT_MS || 20000);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error('LLM configuration');
+  // Reasoning models spend completion tokens before they write the plan: 1200 left most replies empty
+  // (finish_reason 'length'). [ASSUMED] default 6000, bounded; an optional OpenAI-style reasoning_effort.
+  const maxTokens = Number(env.SP_LLM_MAX_TOKENS || 6000);
+  if (!Number.isInteger(maxTokens) || maxTokens < 256 || maxTokens > 32000) throw new Error('LLM configuration');
+  const effort = env.SP_LLM_REASONING_EFFORT;
+  if (effort && !['minimal', 'low', 'medium', 'high'].includes(effort)) throw new Error('LLM configuration');
   const prompts = new Map();
+  // Optional per-request diagnostics for the operator (SP_LLM_DEBUG_FILE): the failing stage, the model's reply head
+  // and the accepted plan. Never the key, the request headers or the knowledge prefix.
+  const debugFile = env.SP_LLM_DEBUG_FILE;
+  const note = entry => {
+    if (!debugFile) return;
+    try { appendFileSync(debugFile, `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`); } catch { /* diagnostics only */ }
+  };
   return async o => {
     if (o.type === 'hello') {
       if (!o.knowledge?.version || o.knowledge.schema !== 'sp-knowledge/1') throw new Error('knowledge');
@@ -42,14 +56,20 @@ export function createLLMAgent(env = process.env) {
     const { geometry, actions, ...digest } = o.digest;
     void geometry;
     const choices = actions.filter(a => ['g.band', 'g.bandSkip', 'g.choice', 'g.offer', 'g.reward'].includes(a.intent.t));
-    const body = { model: env.SP_LLM_MODEL, response_format: { type: 'json_object' }, max_tokens: 1200,
+    const body = { model: env.SP_LLM_MODEL, response_format: { type: 'json_object' }, max_tokens: maxTokens, ...(effort ? { reasoning_effort: effort } : {}),
       messages: [{ role: 'system', content: system }, { role: 'user', content: JSON.stringify({ kind: o.context.kind, digest, choices }) }] };
     // Shared bounded transport rejects redirects, including credential forwarding; errors are intentionally generic.
-    const response = await httpDecision({ url: url.href, token: env.SP_LLM_API_KEY, timeoutMs, maxBytes: 262144 }, body, new AbortController().signal);
-    if (response.choices?.[0]?.finish_reason !== 'stop') throw new Error('incomplete');
+    const started = Date.now();
+    let response;
+    try { response = await httpDecision({ url: url.href, token: env.SP_LLM_API_KEY, timeoutMs, maxBytes: 262144 }, body, new AbortController().signal); }
+    catch (err) { note({ id: o.id, kind: o.context.kind, round: o.digest?.round, stage: 'http', error: err?.message, ms: Date.now() - started }); throw err; }
+    const content = String(response.choices?.[0]?.message?.content ?? '');
+    const finish = response.choices?.[0]?.finish_reason;
+    if (finish !== 'stop') { note({ id: o.id, kind: o.context.kind, round: o.digest?.round, stage: 'incomplete', finish, chars: content.length, head: content.slice(0, 300), ms: Date.now() - started }); throw new Error('incomplete'); }
     let plan;
-    try { plan = JSON.parse(response.choices[0].message.content); } catch { throw new Error('JSON'); }
-    if (!validPlan(plan)) throw new Error('plan');
+    try { plan = JSON.parse(content); } catch { note({ id: o.id, kind: o.context.kind, round: o.digest?.round, stage: 'json', chars: content.length, head: content.slice(0, 300), ms: Date.now() - started }); throw new Error('JSON'); }
+    if (!validPlan(plan)) { note({ id: o.id, kind: o.context.kind, round: o.digest?.round, stage: 'plan', plan: JSON.stringify(plan).slice(0, 2000), ms: Date.now() - started }); throw new Error('plan'); }
+    note({ id: o.id, kind: o.context.kind, round: o.digest?.round, stage: 'ok', plan, ms: Date.now() - started });
     const u = response.usage;
     const usage = u ? { inputTokens: u.prompt_tokens, outputTokens: u.completion_tokens, cachedTokens: u.prompt_tokens_details?.cached_tokens || 0 } : undefined;
     return { v: o.v, id: o.id, plan, ...(usage ? { usage } : {}) };

@@ -83,7 +83,7 @@ PowerShell 用 `$env:SP_BOT_STRATEGY = 'external'` 的形式逐个设置同名�
 
 `tools/ai/llm-agent.mjs` 通过 stdio 接入游戏，通过兼容的 `/chat/completions` 接口调用模型。
 需显式设置 `SP_LLM_BASE_URL`（包括 `/v1`）、`SP_LLM_MODEL`、`SP_LLM_API_KEY`，没有默认付费服务。
-密钥只从环境读取，不写日志／测试回放。`SP_LLM_TIMEOUT_MS` 默认 20000，上限 30000；游戏侧的
+密钥只从环境读取，不写日志／测试回放。`SP_LLM_MAX_TOKENS` 是单次回复的输出上限（默认 6000，256–32000）：会先“思考”的推理模型如果上限太小，思考就把额度用完，回复是空的；`SP_LLM_REASONING_EFFORT`（minimal / low / medium / high）可以让支持该参数的服务商少想一些、回得更快；`SP_LLM_DEBUG_FILE` 指定一个本地文件后，每次请求的失败环节、模型回复开头和采用的计划会逐行写进去，方便判断它为什么回退、每回合怎么想，从不写入密钥或请求头。`SP_LLM_TIMEOUT_MS` 默认 20000，上限 30000；游戏侧的
 总预算还包括握手，并保留一半阶段时间给回退。示例配置（先在本地或可信服务端设置环境变量）：
 
 ```sh

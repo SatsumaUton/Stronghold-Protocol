@@ -290,6 +290,7 @@ SP_LLM_API_KEY="$YOUR_KEY" npm start
 
 `SP_LLM_BASE_URL`, `SP_LLM_MODEL`, `SP_LLM_API_KEY` are required environment values; none are logged or
 journaled. `SP_LLM_TIMEOUT_MS` defaults to 20000 (1..30000). The adapter has no default provider or model.
+`SP_LLM_MAX_TOKENS` caps one reply (default 6000, 256–32000; reasoning models spend completion tokens before the plan, so a small cap returns an empty reply); `SP_LLM_REASONING_EFFORT` (minimal / low / medium / high) is sent as `reasoning_effort` when set; `SP_LLM_DEBUG_FILE` appends one line per request with the failing stage, the reply head and the accepted plan, never the key or request headers.
 It keeps eight knowledge versions in memory as stable system prompts, with an original general-principles
 strategy prompt, and sends only the digest/choices per decision. Provider prompt caching can reuse that prefix;
 it is provider-dependent and still requires sending the prefix with the compatible stateless chat API.
