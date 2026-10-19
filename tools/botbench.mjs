@@ -32,6 +32,7 @@
 import { performance } from 'node:perf_hooks';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
+import { runMatch, strategyMetrics, aggregateStrategies } from './ai/run-match.mjs';
 import { Match } from '../server/match/Match.js';
 import { defineBotStrategy } from '../server/match/botStrategyContract.js';
 import { VirtualScheduler } from '../server/match/scheduler.js';
@@ -70,7 +71,7 @@ const seeds = Math.max(1, Number(opt.seeds) || 10);
 const seed0 = Number(opt.seed) || 1;
 const rehearsal = opt.rehearsal != null && opt.rehearsal !== true ? Math.max(0, Math.floor(Number(opt.rehearsal) || 0)) : undefined;
 
-function runOne(cfg, seed) {
+async function runOne(cfg, seed) {
   const sched = new VirtualScheduler();
   const seats = [];
   for (let i = 0; i < cfg.players; i++) seats.push({ seat: i, playerId: `ai_${i}`, name: `AI-${i + 1}`, isBot: true, connected: true });
@@ -144,7 +145,7 @@ function runOne(cfg, seed) {
   let last = '';
   const t0 = performance.now();
   m.start();
-  sched.runUntil(() => {
+  await runMatch(m, () => {
     const key = `${m.phase}:${m.round}`;
     if (key !== last) {
       last = key;
@@ -178,6 +179,9 @@ function runOne(cfg, seed) {
     }
     return summary != null;
   }, { maxSteps: 5e6 });
+  if (!summary) errors.push('match did not end');
+  rec.strategyMetrics = strategyMetrics(m, summary);
+  rec.external = m.externalAI?.metrics;
   rec.ms = performance.now() - t0;
   rec.errors = errors.length + m.errorCount;
   // Keep diagnostics in the JSON so a nonzero benchmark count is actionable.
@@ -198,12 +202,12 @@ const tasks = [];
 for (const cfg of configs) for (let i = 0; i < seeds; i++) tasks.push([cfg, seed0 + i]);
 const jobs = Math.max(1, Math.min(16, Number(opt.jobs) || 1));
 if (!isMainThread) {
-  for (const i of workerData.indexes) parentPort.postMessage({ i, rec: runOne(...tasks[i]) });
+  for (const i of workerData.indexes) parentPort.postMessage({ i, rec: await runOne(...tasks[i]) });
 } else {
   const all = new Array(tasks.length);
   const note = (r) => { if (!opt.quiet) process.stderr.write(`${r.config} seed ${r.seed}: ${r.victory ? 'WIN ' : 'loss'} rounds ${r.roundsPassed} lp ${r.lpLeft} · ${Math.round(r.ms)} ms\n`); };
   if (jobs === 1) {
-    tasks.forEach((t, i) => { all[i] = runOne(...t); note(all[i]); });
+    for (let i = 0; i < tasks.length; i++) { all[i] = await runOne(...tasks[i]); note(all[i]); }
   } else {
     await Promise.all(Array.from({ length: jobs }, (_, j) => new Promise((resolve, reject) => {
       const indexes = tasks.map((_, i) => i).filter((i) => i % jobs === j);
@@ -213,8 +217,12 @@ if (!isMainThread) {
       w.on('exit', resolve);
     })));
   }
-  if (opt.json) writeFileSync(opt.json, JSON.stringify(all));
-  compare([all], ['run']);
+  if (opt.json === '-') { console.log(JSON.stringify(all)); process.exitCode = all.some(r => r.errors) ? 1 : 0; }
+  else {
+    if (opt.json) writeFileSync(opt.json, JSON.stringify(all));
+    compare([all], ['run']);
+    if (all.some(r => r.errors)) process.exitCode = 1;
+  }
 }
 
 // ---- tables ---------------------------------------------------------------------------------------------------
@@ -262,6 +270,8 @@ function stats(records) {
 }
 
 function compare(runs, names) {
+  console.log('strategy outcomes (means per seat; wins and IO totals):');
+  runs.forEach((records, i) => console.log(JSON.stringify({ run: names[i], strategies: aggregateStrategies(records) })));
   const cfgs = [...new Set(runs.flatMap((rs) => rs.map((r) => r.config)))];
   const f1 = (x) => x.toFixed(1);
   const f2 = (x) => x.toFixed(2);

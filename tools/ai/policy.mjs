@@ -1,6 +1,11 @@
 // [ASSUMED] Deliberately small example policy, not an official AI: first available draft/offer, then Ready.
 // One action per response allows inspection of its result before the next action. No hidden data or game imports.
 export function decide(o) {
+  if (o.type === 'hello') return { v: o.v, id: o.id, type: 'hello', knowledgeVersion: o.knowledge.version };
+  if (o.context.mode === 'plan') {
+    const choice = o.context.kind !== 'prep' ? o.digest.actions.find(a => ['g.band', 'g.choice', 'g.offer'].includes(a.intent.t))?.id : undefined;
+    return { v: o.v, id: o.id, plan: { ...(choice ? { choice } : {}), economy: { maxRefreshes: 8 } } };
+  }
   const p = o.private, pub = o.public;
   let intent;
   if (o.context.kind === 'band') {

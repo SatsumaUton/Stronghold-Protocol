@@ -46,7 +46,7 @@ test('observation keys exactly match the seat wire views; no private opponents, 
   const { m } = h, ps = m.order[2];
   m.order[0].funds = 123456789;
   const o = aiObservation(m, ps, { id: 'a', kind: 'prep', deadline: 123, remaining: 64 }, []);
-  assert.deepEqual(Object.keys(o).sort(), ['context', 'id', 'private', 'public', 'results', 'v']);
+  assert.deepEqual(Object.keys(o).sort(), ['context', 'digest', 'id', 'private', 'public', 'results', 'v']);
   assert.deepEqual(o.public, json(m.publicView())); assert.deepEqual(o.private, json(ps.privateView()));
   assert.deepEqual(Object.keys(o.context).sort(), ['deadline', 'kind', 'legalActions', 'phase', 'remaining', 'round']);
   assert.deepEqual(o.context.legalActions, AI_ACTIONS.prep);

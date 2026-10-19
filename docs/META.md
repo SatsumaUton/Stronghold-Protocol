@@ -368,6 +368,16 @@ plugin offers keep their phase timers. Legacy finishes incomplete/failed decisio
 replies and failures, replay without transport IO, and omit endpoint/command/credentials. See
 [External AI API](EXTERNAL_AI.md) and the [Chinese server-owner guide](EXTERNAL_AI_ZH.md).
 
+The maintainer's 2026-10-19 advisor extension (§35.9) adds `mode: 'plan'`: once per prep round the external
+agent returns bounded preferences and legacy executes its procurement and rehearsal. Band/card/offer replies
+can name a short human-action ID. `aiPlan.js` owns validation/soft weights; `aiDigest.js` names only human-visible
+state, including existing public scouting; `server/ai/knowledge.js` hashes the active static data, language and
+room rules into a cached primer. Default external mode remains direct; knowledge hello is opt-in there and
+on by default for plan. Unknown preferences degrade to ordinary choices, malformed replies to legacy; no new
+economy or placement rule. [ASSUMED] Schema, scores, cache policy, shortcuts and benchmark statistics are in
+[External AI API](EXTERNAL_AI.md). `tools/ai/run-match.mjs` waits for bounded external IO in both benchmark tools;
+`tools/ai/llm-agent.mjs` is an environment-configured, mock-tested compatible chat adapter with no default provider.
+
 See [Adding an AI strategy](BOT_STRATEGIES.md) for signatures, examples, state ownership and the validation workflow.
 
 ## 2. Effect registry (content API)

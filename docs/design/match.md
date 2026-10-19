@@ -131,7 +131,7 @@ This is a development interface, not a new gameplay policy or a client code/plug
 See [the strategy guide](../BOT_STRATEGIES.md) for the contract, registration and testing steps.
 
 Maintainer decision 2026-10-17, requested 2026-10-19 (§35.8): `external`, a strategy of @HankDUMPLINGZhong's
-#673 framework (§35.7), sends exactly the seat's public/private views to operator-configured HTTP(S) or stdio,
+#673 framework (§35.7), sends the seat's existing public/private views to operator-configured HTTP(S) or stdio,
 accepts human intents through the same schema and semantic validators, and falls back to legacy on failure.
 Requests run asynchronously within existing phase timers; default selection and golden results stay unchanged.
 [ASSUMED] Engineering policy: version `sp-ai/1`, 1000 ms total decision/request cap, half the remaining phase
@@ -139,6 +139,16 @@ reserved for fallback, 64 intents, 64 KiB response, 3 consecutive failures to ma
 1000 ms child restart backoff; limits configurable. One stdio child per match, no HTTP redirects, no client-set
 endpoint/command, gameplay actions only. Test journals record replies/failures; offline replay performs no IO.
 The complete policy and scope are in [External AI API](../EXTERNAL_AI.md).
+
+Maintainer approval 2026-10-19 (§35.9) adds owner-selected `mode: 'plan'` beside default `direct`.
+One prep plan per seat/round weights legacy procurement/lineup/placement; existing sliced rehearsal and legal
+handlers execute it. Draft/card/offer plans may select an observation-local action ID. Invalid plans clear
+preferences and resume ordinary legacy. [ASSUMED] Plan schema, weights and conservative action shortcuts are
+specified in the API guide. An opt-in hashed static knowledge hello includes active plugin data and language
+texts; observations retain raw views and add a named digest, public scouted boards and short action IDs.
+No hidden stock/private opponent views are added. Journals replay plans and IDs offline. Benchmarks await real
+IO before advancing virtual time and report strategy outcomes/IO metrics. The default bot and golden outcomes
+remain unchanged; no official gameplay rule is altered.
 
 After the greedy layout is complete, `planLayoutSteps` rechecks self-range guards on enemy-road tiles. An isolated
 guard may move to a free legal road tile with allied damage covering both it and the preceding tile of every incoming
