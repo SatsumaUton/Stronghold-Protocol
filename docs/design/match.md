@@ -140,6 +140,12 @@ reserved for fallback, 64 intents, 64 KiB response, 3 consecutive failures to ma
 endpoint/command, gameplay actions only. Test journals record replies/failures; offline replay performs no IO.
 The complete policy and scope are in [External AI API](../EXTERNAL_AI.md).
 
+Maintainer request 2026-10-19 (§35.12): the example advisor's static knowledge includes a regenerable playbook
+from the active data and a sourced community overlay. [ASSUMED] Per-seat draft/prep scoring selects up to four
+band/main/sub archetypes with stage keys and counter gaps using only announced bans/enemies, public teammate
+boards and own progress. It does not inspect remaining stock or change execution. Mechanical facts, timing
+estimates, score weights and cross-version regeneration are specified in [AI strategy](../AI-STRATEGY.md).
+
 Maintainer approval 2026-10-19 (§35.9) adds owner-selected `mode: 'plan'` beside default `direct`.
 One prep plan per seat/round weights legacy procurement/lineup/placement; existing sliced rehearsal and legal
 handlers execute it. Draft/card/offer plans may select an observation-local action ID. Invalid plans clear
