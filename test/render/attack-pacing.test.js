@@ -94,16 +94,21 @@ describe('a skill / buff change', () => {
 
   test('the sim emits rate only when the interval changed', () => {
     const evs = [];
-    // `_rateDirty` is raised by units.js _recalc when the recomputed interval moved (that is what keeps the per-tick cost
-    // at one property read per unit); the fake battle raises it the same way.
+    // The first computation only SEEDS the sent value: the spawn snapshot already carried this interval
+    // (unitInfo.atkInterval), so an event for it would be redundant.
     const u7 = { id: 7, alive: true, deployed: true, s: { interval: 0.5 }, _rateDirty: true };
     const battle = { recordEvents: true, units: [u7], _ev: (t) => evs.push(t) };
     BattleEvents.prototype._emitRateChanges.call(battle);
-    assert.deepEqual(evs, [['rate', 7, 0.5]]);
+    assert.deepEqual(evs, [], 'no event for the value the spawn already carried');
     assert.equal(u7._rateDirty, false, 'the flag is consumed');
     BattleEvents.prototype._emitRateChanges.call(battle);          // unchanged: nothing
+    assert.equal(evs.length, 0);
+    u7.s.interval = 0.35; u7._rateDirty = true;                    // a skill came on
+    BattleEvents.prototype._emitRateChanges.call(battle);
+    assert.deepEqual(evs, [['rate', 7, 0.35]]);
+    BattleEvents.prototype._emitRateChanges.call(battle);          // same value again: nothing
     assert.equal(evs.length, 1);
-    u7.s.interval = 1.0; u7._rateDirty = true;                     // a buff expired
+    u7.s.interval = 1; u7._rateDirty = true;                       // the buff expired
     BattleEvents.prototype._emitRateChanges.call(battle);
     assert.deepEqual(evs[1], ['rate', 7, 1]);
     // a unit that is not on the field, or has no interval, is skipped (and costs nothing when clean)
