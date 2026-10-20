@@ -1,0 +1,314 @@
+# External AI API (`sp-ai/1`)
+
+This implements the maintainer's **2026-10-17 decision**, requested on 2026-10-19: “observation → intents,
+validated like a human, timeout → built-in bot, runs on the host or a third-party service”, as a strategy of
+PR #673 by **@HankDUMPLINGZhong**. `legacy` remains the default. Nothing connects or spawns unless the server
+operator selects `external` and supplies its configuration. Room clients cannot select a URL, command or token.
+
+This is an extension of the remake, not an official AI protocol. Existing game rules and their sources remain
+in [DESIGN §6](design/match.md), [META](META.md) and [PRTS help](https://prts.wiki/w/卫戍协议/帮助).
+No economy, pool, placement, timer, draft-order or battle rule changes. All wire format, limits, action scope,
+transport lifecycle and example-policy choices below are **[ASSUMED] engineering policy**. The observation /
+human-validation / fallback requirements themselves are the maintainer's decision.
+
+## Enable it
+
+Environment configuration follows [the bot strategy selector](BOT_STRATEGIES.md). An explicit
+`new Match({ botStrategy: 'external', externalAI: { transport, url, command, seats, timeoutMs, maxIntents,
+maxBytes, failureLimit, backoffMs }, ... })` overrides the environment configuration as a whole. Omitted
+numeric fields use the defaults below. The bearer token is read only from `SP_EXTERNAL_AI_TOKEN`.
+Configuration is validated before server startup; an invalid configuration fails without printing credentials.
+
+| Variable | Meaning / default / bounds |
+|---|---|
+| `SP_BOT_STRATEGY` | `external` to enable; unset / empty selects `legacy` |
+| `SP_EXTERNAL_AI_TRANSPORT` | Required: `http` or `stdio` |
+| `SP_EXTERNAL_AI_URL` | HTTP(S) endpoint; no URL credentials or fragment |
+| `SP_EXTERNAL_AI_TOKEN` | Optional HTTP bearer token; environment only |
+| `SP_EXTERNAL_AI_COMMAND` | Required for stdio: JSON argv array, no shell; 1–64 nonempty strings, each ≤4096 characters |
+| `SP_EXTERNAL_AI_SEATS` | Optional comma-separated seat indices, 0–3; omitted means all bot-controlled seats |
+| `SP_EXTERNAL_AI_TIMEOUT_MS` | 1000; integer 1–30000, both request timeout and total decision budget |
+| `SP_EXTERNAL_AI_MAX_INTENTS` | 64; integer 1–256, cumulative across replies in one decision |
+| `SP_EXTERNAL_AI_MAX_BYTES` | 65536; integer 1–1048576, raw response bytes / stdio line, excluding newline |
+| `SP_EXTERNAL_AI_FAILURES` | 3; integer 1–20 consecutive failed decisions before match-long fallback |
+| `SP_EXTERNAL_AI_BACKOFF_MS` | 1000; integer 1–60000 before the next demand can restart a failed stdio child |
+
+Seat selection applies to AI teammates, opponent seats in modes that use them, and humans under AI takeover.
+Unselected seats use `legacy`. INFO_CHECK acknowledgement and combat simulation remain engine-owned; decision
+points are band turns, common card turns, prep (including personal choices/rewards), and plugin offer windows.
+
+Example HTTP service (two terminals, POSIX shell):
+
+```sh
+node tools/ai/http.mjs 8765
+```
+
+```sh
+SP_BOT_STRATEGY=external SP_EXTERNAL_AI_TRANSPORT=http \
+SP_EXTERNAL_AI_URL=http://127.0.0.1:8765 SP_EXTERNAL_AI_SEATS=1 npm start
+```
+
+Example stdio (the game server starts and stops the child):
+
+```sh
+SP_BOT_STRATEGY=external SP_EXTERNAL_AI_TRANSPORT=stdio \
+SP_EXTERNAL_AI_COMMAND='["node","tools/ai/stdio.mjs"]' npm start
+```
+
+In PowerShell set each variable with `$env:NAME = 'value'`, then run `npm start`. For a service installation use
+an absolute command / script path, since relative argv paths resolve against the server's working directory.
+The examples choose an untaken universal band, the first unsold card / available offer, personal choice zero,
+then Ready. They demonstrate the protocol, not strong play. The four example band IDs come from the public
+static `data/bands.json` catalogue; static game catalogues can be installed alongside any AI, just as clients
+load them. They are not hidden match state. The service binds only `127.0.0.1`; port `0` prints its assigned port.
+
+## Observation and response
+
+Each request is a complete JSON observation:
+
+```js
+{
+  v: 'sp-ai/1',
+  id: 'ai-3',                         // opaque request ID, unique within this match
+  public: { t: 'm.public', /* existing publicView() fields */ },
+  private: { t: 'm.private', /* this seat's privateView() fields */ },
+  digest: { /* readable state and short actions; see §35.9 below */ },
+  // knowledgeVersion: '<sha256>' when knowledge is enabled,
+  context: {
+    kind: 'prep',                     // band | card | prep | offer
+    mode: 'direct',                   // owner-selected direct | plan
+    phase: 'PREP', round: 1,
+    deadline: 1234567890000,          // absolute server clock ms: decision expires here
+    remaining: 64,                    // remaining intent budget for this decision
+    legalActions: ['g.buy', /* ... */ 'g.ready']
+  },
+  results: [
+    { intent: { t: 'g.freeze' }, ok: true },
+    { intent: { t: 'g.buy', slot: 15 }, error: 'BAD_TARGET' }
+  ]
+}
+```
+
+`public` and `private` are JSON copies of the existing human wire-view builders, including their exact keys;
+see [META §5](META.md). No RNG/seed, match object, shared stock counts, future rolls, or another seat's private
+view is added. Information already public, including public plugin offer cards, stays public. The normal
+public view's `serverNow` gives the clock reference; its `deadline` remains the phase deadline (zero if untimed).
+`context.deadline` is the adapter's earlier deadline. `results` carries accepted / rejected intents since the
+last observation of this seat, including the preceding decision's last batch; retained results are bounded to
+`maxIntents`. Validation returns the same `ok` / `error` / optional `detail` as human intents. The AI should
+inspect results and the new views rather than assume a submitted action worked.
+
+Respond with exactly these envelope fields:
+
+```json
+{"v":"sp-ai/1","id":"ai-3","intents":[{"t":"g.ready","ready":true}],"done":true}
+```
+
+`v` and `id` must match; `done` must be boolean; `intents` must be an array within the remaining budget.
+Unknown envelope keys, non-JSON replies, empty `done:false` batches and oversized batches fail the decision
+before applying any intent. `done:false` requests another observation after the batch. An accepted terminal
+action ends the decision even if `done:false`; subsequent intents in that batch receive `WRONG_PHASE`.
+Malformed individual intents are rejected with `BAD_MSG` and still count against the cap. Invalid legal-looking
+actions return their actual human error (`NO_FUNDS`, `SOLD_OUT`, `BAD_TARGET`, `WRONG_PHASE`, etc.).
+
+Intent objects use [shared/protocol.js](../shared/protocol.js), including optional `rid`. Each is checked with
+`validateC2S`, then the same `_handleSeatIntent` / `_handle` path as `Match.handle`. Bot-seat authorization is
+internal to the adapter: network clients still cannot call `handle` for a bot.
+
+| Decision | Allowed action kinds | Completion |
+|---|---|---|
+| `band` | `g.band`, `g.bandSkip`, `g.bandFocus` | Accepted band or skip ending this turn |
+| `card` | `g.choice` | Accepted common draft pick |
+| `offer` | `g.offer`, `g.offerRefresh` | Accepted pick in this window |
+| `prep` | `g.buy`, `g.sell`, `g.move`, `g.refresh`, `g.freeze`, `g.levelUp`, `g.equip`, `g.unequip`, `g.art`, `g.destroy`, `g.reward`, `g.choice`, `g.ready`, `g.offer`, `g.offerRefresh` | Accepted `g.ready { ready:true }` |
+
+`g.move` covers placement and movement, with the human `uid`, `to` and optional `dir` fields. Personal choices
+use `g.choice { idx, choiceId }`; offers require `offerId`, `pluginId`, `seq`, `idx` and optional `cardId`.
+`legalActions` lists kinds admitted for the context, not a promise that any target is affordable or legal now.
+Ownership, phase, funds, stock, board geometry, equipment, ready state, draft turn and offer freshness are all
+checked by existing handlers. Admin/test actions, pause, autoplay changes, leaving and battle-result reports
+are outside the API. No remote code is evaluated.
+
+## Transports, timing and fallback
+
+HTTP sends one `POST` per observation with `Content-Type: application/json` and optional
+`Authorization: Bearer …`. Only status 200 succeeds. All redirects are rejected, even to the same host;
+credentials are never forwarded. The raw response has the configured size cap and total request timeout
+(including connection and trickled bodies); compressed responses are not decoded.
+
+Stdio launches argv directly, without a shell, with one long-lived child per match. Each observation and reply
+occupies one UTF-8 JSON line. Several seats/windows may be in flight; echo IDs to correlate replies. Stdout is
+protocol-only. Stderr is discarded to avoid leaking secrets through server logs. A crash, bad/oversized line,
+unknown reply ID, cancellation or timeout kills the child and fails outstanding requests. A subsequent demand
+restarts it only after `backoffMs`; requests during backoff fail immediately. Shutdown uses SIGKILL to bound
+cleanup, including programs that ignore SIGTERM. The operator remains responsible for any grandchildren its
+own program starts. Match end and disposal terminate the child and cancel pending HTTP requests.
+
+A decision has one total budget across all batches: at most `timeoutMs`, further limited to half the remaining
+phase/offer time, reserving the rest for fallback. Untimed phases still use the adapter budget. Existing phase
+timers stay armed. Requests are asynchronous; no scheduler callback waits on network or child IO. No AI request
+can extend a phase. A reply after a phase/turn change, seat elimination or manual takeover cannot mutate state.
+
+Timeout, transport/protocol failure, reaching the intent cap without completion, or `done:true` without the
+required terminal action runs the unchanged legacy decision for that seat. Prep fallback retains sliced
+shopping/placement, the existing rehearsal/delegation path, cleanup and Ready. Accepted actions before a failure
+stay applied, so legacy continues from the current seat state. Offer fallback retains the existing window default.
+Three consecutive failed decisions (configurable) disable external decisions for that seat for the rest of the
+match and log the switch once; a completed decision resets the streak. Other seats keep their own counters.
+
+## Journals, security and tests
+
+Test mode's [§34.8 journal](history/0.3.1.md) records external replies (including produced/rejected intents),
+transport failure outcomes and ordinary scheduler execution/slice counts. Init records only non-secret policy
+limits and seat indices, never URL, argv or token. Replay builds pending decisions but performs no IO: recorded
+inputs drive the same validators and legacy fallback. It does not need the original program, credentials or
+environment. Existing journal size limits still apply. Older journals select `legacy`; normal golden scenarios
+remain unchanged. Virtual-time tools that advance without yielding for IO will naturally hit timeout/fallback;
+use the running server to try an external service, or replay a captured test journal offline.
+
+Only configure a service/program you intend to trust. Third parties receive the same public/own-private seat
+view a human could see, including player names and private shop/hand. Prefer HTTPS off the host. Local programs
+run with the server's OS permissions and inherited environment; this is not a script sandbox. Permission-limited
+plugin match hosts can refuse process/network access, in which case the normal bounded fallback applies.
+Tokens, transport errors, response bodies and commands are not written to normal server logs. Test journals
+intentionally contain AI replies and gameplay inputs; treat them as private debugging records.
+
+Tests: [external-ai.test.js](../test/match/external-ai.test.js),
+[external-transports.test.js](../test/match/external-transports.test.js),
+[bot-strategy-startup.test.js](../test/bot-strategy-startup.test.js). They cover the envelope and human validation,
+view equality / isolation, both examples, bounds, timeouts, failure fallback, seat cutoff, cancellation, and full
+real-simulation matches with one external seat plus a legacy peer, replayed offline with matching state and RNG.
+
+## Advisor mode and readable observations (§35.9)
+
+The maintainer approved this opt-in extension on **2026-10-19**. Set `SP_EXTERNAL_AI_MODE=plan`
+(or `externalAI.mode: 'plan'`). The default external mode remains `direct`; the default strategy remains
+`legacy`. `SP_EXTERNAL_AI_LANGUAGE` / `language` selects `zh-CN` (default), `en`, `ja`, `ko` or `zh-TW`.
+`SP_EXTERNAL_AI_KNOWLEDGE=1` / `knowledge: true` enables the primer for direct agents too; it defaults on in
+plan mode and off in direct mode so older services need not implement a hello exchange.
+
+A plan agent receives one request per seat/prep round, plus each band turn, common-card turn and plugin offer
+window. A rescheduled prep does not call again. Personal choices and merge rewards produced during procurement
+are handled by legacy within that plan. A typical normal-length match needs roughly 15–20 decisions per seat;
+extra plugin windows/skips add calls, elimination/short modes remove calls. This is not a fixed call allowance.
+
+Answer with this envelope (no `intents` or `done`):
+
+```json
+{"v":"sp-ai/1","id":"ai-3","plan":{"bonds":[{"id":"siracusaShip","priority":4}],"buy":["chess_char_3_01_a"],"keep":[],"sell":[],"economy":{"saveForInterest":true,"level":3,"maxRefreshes":8,"refreshAbove":2},"items":{"keep":[],"equip":[]},"placements":[]},"usage":{"inputTokens":1500,"outputTokens":100,"cachedTokens":1000}}
+```
+
+IDs in this example illustrate the schema, not a recommended build. Use the actual knowledge/digest IDs.
+Every plan field is optional; `{}` executes unchanged legacy. The schema and scoring choices below are
+**[ASSUMED] engineering policy**, not official strategy advice:
+
+- `bonds`: at most 8 `{id, priority: 1..5}` entries; +6 points per priority to member purchase/lineup values.
+- `buy`, `keep`, `sell`: at most 32 operator IDs each; base/elite IDs match the same operator. Purchase +24,
+  owned keep +18, sell −24. Keep also joins the existing keeper set. These are soft preferences: merge, bench
+  capacity, composition and emergency space cleanup can override them. Unknown/unavailable IDs have no effect.
+- `economy`: `level` 0..6 caps the requested target (0 means no leveling); `maxRefreshes` 0..16 and
+  `refreshAbove` 0..100 bound refreshes and the gold left after them. `reserve` 0..100 overrides discretionary
+  savings **only for a carry-over band**. `saveForInterest:false` releases its normal interest reserve.
+  Board filling/merges can spend the reserve. Expiring funds are never banked merely to invent interest.
+- `items`: `keep` contains item IDs (32 max); `equip` contains `{id: itemId, target: operatorId}` (16 max).
+  Existing inventory, slot and effect validators remain authoritative; invalid targets revert to ordinary selection.
+- `placements`: up to 16 `{id, row, col, dir?}` preferences, rows 0..12, columns 0..10, four uppercase cardinal
+  directions. A legal matching tile/direction adds 0.05 to the exposure score; normal terrain/role preferences
+  and real rehearsal still choose the final layout. Impossible tiles are ignored.
+- `choice`: one short action ID for band/card/offer/reward selection, e.g. `"a2"`. A missing/unusable choice lets
+  the normal legacy/default picker finish the window. The plan's choice is checked through the same human path.
+- Optional `usage` works in **both modes**: nonnegative integer `inputTokens`, `outputTokens`, `cachedTokens`,
+  each at most 1 billion. Missing usage means unknown, not a claim of zero provider consumption.
+
+Malformed plans fail atomically and clear preferences before legacy. Accepted plans reset the failure streak
+and resume the #673 prep continuation, preserving slicing, rehearsal, Ready and deadline behavior. Preferences
+expire with the round; transport/malformed failures use ordinary legacy. Limits include the hello exchange;
+there is also a wall-clock decision cap so virtual-time benchmarks cannot wait indefinitely. Journals record
+plans/short IDs/usage and mode/language/knowledge settings, without endpoints, argv, API keys or remote errors.
+Replay rebuilds short IDs from the recorded state and applies the same plan with no transport IO.
+
+### Knowledge handshake
+
+`server/ai/knowledge.js` generates an immutable `sp-knowledge/1` pack from the active room data, room rule
+switches and authored plugin offers, with SHA-256 `version`. It contains the PLAYING §1–§7 rules summary and
+source digest, bonds/thresholds/effects, normal and elite operator costs/classes/skills/traits, item effects,
+bands, enemy notes/stats, boss HP by difficulty and difficulty scaling. The cache is keyed by immutable content,
+mode, content identity, language, rules and offers (at most 16 variants per content object). Existing stale-checked language
+overlays localize available game text; missing translations retain Chinese. Every named record also has `nameZh`.
+
+Sources: local official `activity_table.json` (`autoChessData`, `activity.AUTOCHESS_SEASON.act2autochess`:
+`bandDataListDict`, `shopLevelDataDict`, `charChessDataDict`, `trapChessDataDict`, `bondInfoDict`, `bossInfoDict`),
+`character_table.json`, `skill_table.json`, `enemy_handbook_table.json`, the generated `data/*.json`, and
+[PLAYING](PLAYING.md) / [DATA](DATA.md). Economy follows the existing implementation and its recorded evidence:
+no EXP; base upgrade costs from the selected mode, −1 per round; normally funds expire. `band_cannot`'s
+`aceffect_band_34` / `coin_carry_over` has capital 5, interest 1, max 1. Shop odds are **copy-weighted**, not a
+fixed tier table: per-level eligibility/slot counts and pristine-catalogue tier shares are given, explicitly
+before random bans, purchases and DIY stock. The formula is included; hidden live pool counts are never sent.
+These game rules are unchanged. Plugin descriptions/rules may differ from the vanilla summary.
+
+Before its first decision, the connection sends:
+
+```js
+{v:'sp-ai/1', type:'hello', id:'hello-ai-1', knowledge:{schema:'sp-knowledge/1', version:'<sha256>', /* ... */}}
+// agent acknowledges:
+{v:'sp-ai/1', type:'hello', id:'hello-ai-1', knowledgeVersion:'<same sha256>'}
+```
+
+HTTP uses a hello POST to the same endpoint; stdio uses an acknowledged NDJSON hello. Concurrent seats share
+one handshake per match. A restarted stdio child receives it again. Decisions contain only `knowledgeVersion`;
+a service may cache packs across matches by hash, but must acknowledge each match's hello. Bad/missing
+acknowledgements use the same failure budget. Direct mode with knowledge disabled has no extra request.
+
+### Digest and short IDs
+
+The original `public` and `private` views keep their exact fields. Each observation additionally has `digest`
+and `context.mode`. Digest includes named shop prices/tiers, board coordinates, bench/overflow, bond count/next
+threshold, gold and band-specific interest now/at the next threshold, level/upgrade cost and explicit `exp:null`,
+current enemy/boss previews and opponents' **public scouted boards only**. No other private view or pool counts.
+
+`digest.actions` enumerates current-state shortcuts as `{id:'a1',text:'buy shop slot 2 (… , 3 gold)',intent:{…}}`.
+Shop/hand indices are zero-based. Direct agents can mix raw intents and IDs in `intents`, e.g. `["a1",{"t":"g.ready","ready":true}]`.
+IDs are local to the request ID, not stable across observations; never infer an ID from a previous response.
+The saved mapping goes through the same C2S and human validation, so a previously affordable or available choice
+can still fail after another action/seat changes the state. Unknown IDs yield `BAD_MSG` and consume budget.
+
+[ASSUMED] The shortcut list is conservative, not exhaustive: it includes purchases, economy, sells, ordinary
+equipment, permitted unequip, empty-tile placements/facing/withdrawal, rewards and available draft/offer picks.
+Swaps, Arts, effect-dependent consumables, band focus and offer refresh retain the complete **raw intent API**.
+Arbitrary plugin effects cannot prove eligibility without executing; observation building never executes them
+as a legality probe. `actionScope` explicitly communicates this limitation. The LLM adapter omits low-level
+placement shortcuts and duplicate raw views from its provider request; legacy handles those actions.
+
+### Example language-model adapter
+
+```sh
+SP_BOT_STRATEGY=external SP_EXTERNAL_AI_MODE=plan SP_EXTERNAL_AI_TRANSPORT=stdio \
+SP_EXTERNAL_AI_COMMAND='["node","tools/ai/llm-agent.mjs"]' SP_EXTERNAL_AI_TIMEOUT_MS=30000 \
+SP_LLM_BASE_URL=http://127.0.0.1:8000/v1 SP_LLM_MODEL=your-model \
+SP_LLM_API_KEY="$YOUR_KEY" npm start
+```
+
+`SP_LLM_BASE_URL`, `SP_LLM_MODEL`, `SP_LLM_API_KEY` are required environment values; none are logged or
+journaled. `SP_LLM_TIMEOUT_MS` defaults to 20000 (1..30000). The adapter has no default provider or model.
+It keeps eight knowledge versions in memory as stable system prompts, with an original general-principles
+strategy prompt, and sends only the digest/choices per decision. Provider prompt caching can reuse that prefix;
+it is provider-dependent and still requires sending the prefix with the compatible stateless chat API.
+It POSTs `/chat/completions`, uses `response_format:{type:'json_object'}`, validates the parsed plan locally,
+rejects truncation/redirects/oversized output, and forwards numeric usage only. JSON mode does not guarantee
+schema adherence ([official OpenAI documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat)).
+[ASSUMED] Example limits: 1200 output tokens, 256 KiB provider replies, 2 MiB input frames and four concurrent
+requests. Catalogue effect summaries retain at most 500 characters each. Tests use a loopback mock; no real API
+is used for repository validation.
+
+### Benchmarks
+
+Both tools now wait for in-flight HTTP/stdio replies before stepping virtual time, while real matches continue
+using their ordinary timers. Fix seeds/config/rehearsal/content and change only the strategy. `--bot external`
+uses the same owner environment as the server; `SP_EXTERNAL_AI_SEATS` allows legacy peers. `botbench --json -`
+prints just JSON; `--json file.json` still writes the comparison artifact. Matchrun's `--json` includes the same
+per-seat `strategyMetrics`: strategy, survival round (elimination round or final round), passed rounds, final LP,
+damage dealt, leader damage, wins and external calls, reported tokens, usage-report count, latency and fallbacks.
+`external.helloCalls` counts handshakes separately. `calls` counts decision attempts, including failed hellos;
+latency includes handshake time. `fallbacks` counts failed decisions, not successful `{}` delegation or later
+decisions after the seat is disabled. Summary outcomes are means per seat; wins and IO counters are totals.
+No usage report means tokens are unknown; compare coverage alongside the totals. Wall time varies with load.
