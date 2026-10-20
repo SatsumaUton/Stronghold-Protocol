@@ -9,7 +9,9 @@
 //     MAX_SPECTATORS spectator seats (观战: room.spectate, also while its match runs; community report #26, a remake
 //     feature — the official room has none).
 // Both dialogs are the project's Modal (focus trap, Esc, focus restored) styled to fill the screen; 选择模拟协议 opened
-// from 选择同盟方式 stacks on it, so Esc steps back one dialog at a time. The top bar shows connection status + ping.
+// from 选择同盟方式 stacks on it, so Esc steps back one dialog at a time. The top bar shows connection status + ping, and
+// 大厅背景与音乐 (ui/lobbyMedia.js, PR #643 split 8): a lobby scene, the player's own picture / video over the official
+// backdrop and own lobby music, kept in this browser only.
 //
 // Difficulty descriptions come from data/config.json `modes[modeId]` when present, else from the
 // official act2autochess `modeDataDict` texts embedded below (desc + effectDescList), so the
@@ -28,6 +30,7 @@ import { Sprite, Img } from '../ui/gameComponents.js';
 import { uiUrl } from '../ui/assetUrls.js';
 import { peekStatsRecords, trophyMedalOf } from '../ui/stats.js';
 import { levelProgress, levelOf } from './settle.js';
+import { OwnBackdrop, LobbyScene, LobbyMediaButton } from '../ui/lobbyMedia.js';
 import { toast, toastError } from '../ui/toasts.js';
 import { GuideButton, openGuide } from '../ui/guide.js';
 import { RadarScene, CreateArt, JoinArt } from '../ui/allyArt.js';
@@ -354,6 +357,8 @@ function HubBackdrop() {
     <${Sprite} k="entry/entry_bkg_01" class="hub-bg__glow" />
     <${Sprite} k="entry/entry_bkg_02" class="hub-bg__ship" />
     <span class="hub-bg__grid"></span>
+    <${LobbyScene} />
+    <${OwnBackdrop} />
   </div>`;
 }
 
@@ -591,6 +596,7 @@ export function LobbyScreen() {
           <${NoticesButton} />
           <${SettingsButton} class="lobby-settings" variant="secondary" square=${true} />
           <${GuideButton} class="lobby-guide" variant="secondary" square=${true} />
+          <${LobbyMediaButton} />
           <${PwaInstallButton} class="lobby-pwa" square=${true} />
         </div>
       </div>
