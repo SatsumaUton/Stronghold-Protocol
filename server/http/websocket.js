@@ -59,9 +59,9 @@ export function narrowDeflateOffer(header) {
  * @returns {{ registry: SessionRegistry, lobby: Lobby, network: Network }}
  */
 export function createSessionStack(opts, { data, log, content = null, plugins = null, hosts = null }) {
-  const netOptions = netOptionsFrom(opts);
+  const netOptions = netOptionsFrom(opts, log);
   const registry = new SessionRegistry({ reconnectWindowMs: netOptions.reconnectWindowMs ?? NET_DEFAULTS.reconnectWindowMs });
-  const lobbyOptions = lobbyOptionsFrom(opts);
+  const lobbyOptions = lobbyOptionsFrom(opts, log);
   const lobby = new Lobby({ registry, log, MatchClass: opts.MatchClass, getData: () => data, seedFn: opts.seedFn, content, plugins, hosts, options: lobbyOptions });
   const network = new Network({ registry, handler: lobby, log, options: netOptions });
   return { registry, lobby, network };
