@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const executable = process.env.CHROME_PATH;
-const remote = process.env.RECONNECT_URL;
+const executable = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const art = existsSync(new URL('../../data/local-assets.json', import.meta.url)) &&
   ['png', 'webp'].some(ext => existsSync(new URL(`../../public/assets/local/map/autochess/TX_autochessi_D.${ext}`, import.meta.url)));
 function rendered() {
@@ -15,12 +14,12 @@ function rendered() {
   return !listed || view.raw.debug.board3d.scenePacks.has(id);
 }
 test('closing and reopening a real match restores its scene and operator models', {
-  skip: process.env.RENDER_E2E !== '1' || !executable || !existsSync(executable) || (!remote && !art), timeout: 240000,
+  skip: process.env.RENDER_E2E !== '1' || !existsSync(executable) || !art, timeout: 240000,
 }, async t => {
   const { startServer } = await import('../../server/index.js');
   const puppeteer = (await import('puppeteer-core')).default;
-  const server = remote ? null : await startServer({ port: 0, host: '127.0.0.1', quiet: true, seedFn: () => 123 });
-  const base = remote || `http://127.0.0.1:${server.port}`;
+  const server = await startServer({ port: 0, host: '127.0.0.1', quiet: true, seedFn: () => 123 });
+  const base = `http://127.0.0.1:${server.port}`;
   console.info(`[reconnect] Testing ${base}`);
   const browser = await puppeteer.launch({ executablePath: executable, headless: true,
     args: ['--no-first-run', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -78,7 +77,7 @@ test('closing and reopening a real match restores its scene and operator models'
     await page.waitForFunction(() => [...window.__SP_VIEW__.raw.debug.views.values()].some(v => v.spineReady));
     const identity = await page.evaluate(() => ({ id: window.__SP__.store.get().me.playerId, code: window.__SP__.store.get().room.code }));
     t.diagnostic(`Initial ${JSON.stringify(await stats())}`);
-    for (const delayed of (process.env.RECONNECT_DELAY === '1' ? [false, true] : [false, false])) {
+    for (const delayed of [false, true]) {
       await page.close(); page = await open(delayed);
       // A fresh tab in 0.3.0 explicitly recovers a saved seat; do not bypass the normal identity/claim checks.
       await page.waitForFunction(code => window.__SP__.store.get().room?.code === code ||
