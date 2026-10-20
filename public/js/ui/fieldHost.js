@@ -329,7 +329,7 @@ export function useFieldView(hostRef) {
     document.addEventListener('visibilitychange', onRetry);
     return () => {
       dead = true;
-      clearTimeout(retryTimer);
+      if (retryTimer !== null) clearTimeout(retryTimer);
       controller.abort();
       unsub();
       unsubSkins();
