@@ -879,12 +879,14 @@ export function DifficultyTag({ difficulty, size = 'md', class: cls, code }) {
 }
 
 /**
- * Bracketed text input.
+ * Bracketed text input. `ariaLabel` names a field without a visible label; `modalFocus` marks the input as the one a
+ * surrounding `Modal` focuses when it opens (`data-autofocus`).
  * @param {{ label?: any, micro?: string, value: string, onInput: (v: string) => void, onEnter?: Function,
  *   placeholder?: string, maxLength?: number, transform?: (v: string) => string, autoFocus?: boolean,
- *   disabled?: boolean, size?: 'md'|'lg'|'code', icon?: string, class?: string, inputRef?: any, name?: string }} props
+ *   disabled?: boolean, size?: 'md'|'lg'|'code'|string, icon?: string, class?: string, inputRef?: any, name?: string,
+ *   ariaLabel?: string, modalFocus?: boolean }} props
  */
-export function TextField({ label, micro, value, onInput, onEnter, placeholder, maxLength, transform, autoFocus, disabled, size = 'md', icon, class: cls, inputRef, name, hint, invalid }) {
+export function TextField({ label, micro, value, onInput, onEnter, placeholder, maxLength, transform, autoFocus, disabled, size = 'md', icon, class: cls, inputRef, name, hint, invalid, ariaLabel, modalFocus = false }) {
   const localRef = useRef(null);
   const ref = inputRef || localRef;
   const composing = useRef(false);
@@ -906,6 +908,7 @@ export function TextField({ label, micro, value, onInput, onEnter, placeholder, 
       ${icon ? html`<${Icon} name=${icon} class="field__icon" />` : null}
       <input id=${id} ref=${ref} class="field__input" name=${name} value=${value} placeholder=${placeholder}
         maxLength=${maxLength} disabled=${disabled} autocomplete="off" spellcheck=${false}
+        aria-label=${ariaLabel} data-autofocus=${modalFocus ? '' : undefined}
         onInput=${handle}
         oncompositionstart=${() => { composing.current = true; }}
         oncompositionend=${(e) => { composing.current = false; handle(e); }}

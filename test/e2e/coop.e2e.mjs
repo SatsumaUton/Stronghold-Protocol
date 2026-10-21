@@ -1045,11 +1045,8 @@ describe('browser E2E against the real server', { skip: !ENABLED && 'needs Chrom
       await sleep(400);
       await host.shot('lobby');
       await openGuide(host, '.lobby-guide', 'guide-lobby');
-      await host.click('.mode-card', '同盟模拟');
-      await host.click('[data-testid="alliance-create"]');
-      await host.click('.diff-card', '险境模拟');
-      await host.click('.create-box button', '创建同盟');
-      const room = (await host.waitFor((s) => !!s.room?.code, 'room created')).room;
+      // 创建同盟 creates the room at once (标准); the host changes the difficulty in the room (the event's 联合模拟)
+      const room = await host.createCoop('险境模拟');
       await host.click('button', '添加 AI 队友');
       await guest.open(`?room=${room.code}`);
       await guest.shot('title');

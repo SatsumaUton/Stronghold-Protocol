@@ -1,9 +1,12 @@
-// test/ui/lobby-hub.test.js — the hub lobby (PR #643 split 6): the two entries (独立模拟 / 同盟模拟) open their dialogs,
-// 选择模拟协议 (the project's Modal, full screen: four difficulty cards with the 已选定 stamp, the selected one's scene —
-// its official picture on the drawn grid, ui/protocolScene.js — 开始独立模拟 / 创建同盟, the test-room box only in test mode) and 选择同盟方式 (the project's Modal, full screen:
-// 创建同盟, the key field with 观战, 加入同盟, recent keys that only fill it); the official art keys the hub asks for exist in data/assets.json; the css follows 文字大小 without !important; no
+// test/ui/lobby-hub.test.js — the hub lobby (PR #643 split 6, PR #812): the two entries (独立模拟 / 同盟模拟) open their
+// dialogs, 选择模拟协议 (the project's Modal, full screen: four difficulty cards with the 已选定 stamp, the selected one's
+// scene — its official picture on the drawn grid, ui/protocolScene.js — 开始独立模拟, the test-room box only in test mode;
+// the room's 确认 and read-only uses) and 选择同盟方式 (the project's Modal, full screen: 创建同盟 creating the room at once
+// at the remembered difficulty — the event's 联合模拟, the maintainer's decision of 2026-10-21 —, the key field (the
+// project's TextField) with 观战, 加入同盟, recent keys that only fill it); the 成就统计 card is the lobby's only statistics
+// entry; the official art keys the hub asks for exist in data/assets.json; the css follows 文字大小 without !important; no
 // account / matchmaking / federation code came along. Hook-free views drawn as vnode trees. (The browser side:
-// test/ui/lobby-hub.e2e.test.js.)
+// test/ui/lobby-hub.e2e.test.js, test/ui/room-settings.e2e.test.js.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -17,8 +20,8 @@ globalThis.fetch = async (url) => {
 };
 const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
-const { HubEntry, ProtocolSelect, AllianceSelect } = await import('../../public/js/screens/lobby.js');
-const { Modal } = await import('../../public/js/ui/components.js');
+const { HubEntry, ProtocolSelect, AllianceSelect, normalizeCode, codeArg } = await import('../../public/js/screens/lobby.js');
+const { Modal, TextField } = await import('../../public/js/ui/components.js');
 const { DIFFICULTIES } = await import('../../shared/constants.js');
 
 function* walk(v) {
@@ -81,7 +84,7 @@ test('选择模拟协议: the project Modal, four difficulty cards, the official
   assert.match(body.props.style, /--d-color:/);
 });
 
-test('选择模拟协议: 开始独立模拟 / 创建同盟, offline and busy states, the test-room box only in test mode', () => {
+test('选择模拟协议: 开始独立模拟, offline and busy states, the test-room box only in test mode; the room’s 确认', () => {
   const made = [];
   const solo = proto({ onCreate: () => made.push('solo') });
   const start = buttonText(solo, '开始独立模拟');
@@ -91,10 +94,12 @@ test('选择模拟协议: 开始独立模拟 / 创建同盟, offline and busy st
   assert.deepEqual(made, ['solo']);
   assert.equal(find(solo, (x) => x.props?.['data-testid'] === 'create-test').length, 0);
 
-  const coop = proto({ roomMode: 'coop', busy: 'create' });
-  assert.equal(buttonText(coop, '创建同盟').props['aria-busy'], 'true');
-  assert.ok(buttonText(coop, '创建同盟').props.disabled, 'no second click while it is made');
-  assert.ok(textOf(coop).includes('创建后可邀请好友或添加 AI 队友'));
+  // the room's change of difficulty (screens/room.js, the host): 确认 with the server rules as the hint, busy while sent
+  const room = proto({ roomMode: 'coop', busy: 'create', action: '确认', hint: '更改难度后，其他博士需要重新准备就绪' });
+  assert.equal(buttonText(room, '确认').props['aria-busy'], 'true');
+  assert.ok(buttonText(room, '确认').props.disabled, 'no second click while it is sent');
+  assert.ok(textOf(room).includes('更改难度后，其他博士需要重新准备就绪'));
+  assert.equal(buttonText(room, '创建同盟'), undefined, 'no 创建同盟 button inside a room');
   assert.ok(buttonText(proto({ online: false }), '开始独立模拟').props.disabled, 'offline: no create');
 
   const ticked = [];
@@ -107,27 +112,66 @@ test('选择模拟协议: 开始独立模拟 / 创建同盟, offline and busy st
   assert.deepEqual(ticked, [false]);
 });
 
+test('选择模拟协议 read-only (a room’s other doctors): the cards shown, not chosen, no button, 由创建者选择', () => {
+  const v = proto({ roomMode: 'coop', difficulty: 'ABYSS', readOnly: true, onCreate: () => assert.fail('sent') });
+  const cards = byClass(v, 'diff-card');
+  assert.equal(cards.length, DIFFICULTIES.length);
+  assert.ok(cards.every((c) => c.props.disabled === true), 'no card can be chosen');
+  assert.deepEqual(cards.map((c) => hasClass(c, 'is-selected')), DIFFICULTIES.map((d) => d === 'ABYSS'), 'the room’s difficulty');
+  assert.equal(byClass(v, 'proto-start').length, 0, 'no 确认 / 创建同盟 button');
+  assert.equal(find(v, (x) => x.props?.['data-testid'] === 'create-test').length, 0);
+  assert.ok(textOf(byClass(v, 'proto-hint--ro')[0]).includes('由创建者选择'));
+  assert.ok(proto({}).props && byClass(proto({}), 'diff-card').every((c) => !c.props.disabled), 'the host’s and the lobby’s cards stay live');
+});
+
 const ally = (props) => AllianceSelect({
   onClose: () => {}, onCreate: () => {}, code: '', onCode: () => {}, codeOk: false, online: true, busy: null,
   onJoin: () => {}, onSpectate: () => {}, recent: [], marks: [], focusKey: true, ...props,
 });
 
-test('选择同盟方式: 创建同盟 leads on to 选择模拟协议; the key field joins or watches once the key is whole', () => {
+test('选择同盟方式: 创建同盟 creates the room at once at the remembered difficulty (changed in the room); the test-room box in test mode', () => {
   const calls = [];
-  const v = ally({ onCreate: () => calls.push('create') });
+  const v = ally({ onCreate: (...a) => calls.push(['create', ...a]), difficulty: 'HARD' });
   assert.equal(v.type, Modal);
   assert.ok(hasClass(v, 'ally') && !hasClass(v, 'proto'), 'its own class: .modal__box.proto is 选择模拟协议 only');
   assert.equal(titleOf(v), '选择同盟方式');
   const create = find(v, (x) => x.props?.['data-testid'] === 'alliance-create')[0];
   assert.equal(create.type, 'button');
-  create.props.onClick();
-  assert.deepEqual(calls, ['create']);
+  assert.equal(create.props['data-difficulty'], 'HARD');
+  assert.ok(textOf(create).includes('难度：绝境模拟（可在同盟内更改）'), textOf(create));
+  assert.ok(!create.props.disabled);
+  create.props.onClick({ type: 'click' });
+  assert.deepEqual(calls, [['create']], 'no click event handed on, no difficulty step in between');
+  const busy = find(ally({ busy: 'create' }), (x) => x.props?.['data-testid'] === 'alliance-create')[0];
+  assert.ok(busy.props.disabled && busy.props['aria-busy'] === 'true', 'no second room while it is made');
+  assert.ok(find(ally({ online: false }), (x) => x.props?.['data-testid'] === 'alliance-create')[0].props.disabled, 'offline');
+  assert.equal(find(v, (x) => x.props?.['data-testid'] === 'create-test').length, 0, 'no test-room box outside test mode');
+  const ticked = [];
+  const test = ally({ testMode: true, asTest: true, onTest: (on) => ticked.push(on) });
+  const box = find(test, (x) => x.props?.['data-testid'] === 'create-test');
+  assert.equal(box.length, 1);
+  const input = find(box[0], (x) => x.type === 'input')[0];
+  assert.equal(input.props.checked, true);
+  input.props.onChange({ target: { checked: false } });
+  assert.deepEqual(ticked, [false]);
+});
+
+test('选择同盟方式: the key field is the project TextField (IME-safe Enter, normalised write-back, no length cap); join or watch once the key is whole', () => {
+  const calls = [];
+  const v = ally({ onCreate: () => calls.push('create') });
   const row = byClass(v, 'join-row');
   assert.equal(row.length, 1);
-  const field = find(row[0], (x) => x.type === 'input')[0];
+  assert.equal(find(row[0], (x) => x.type === 'input').length, 0, 'no raw <input>: TextField guards the IME composition');
+  const field = find(row[0], (x) => x.type === TextField)[0];
   assert.ok(field, 'the key field');
-  assert.equal(field.props['data-autofocus'], '', 'the Modal focuses it');
-  assert.equal(find(ally({ focusKey: false }), (x) => x.type === 'input')[0].props['data-autofocus'], undefined, 'not on a touch screen');
+  assert.equal(field.props.transform, normalizeCode, 'the normalised key is written back into the field');
+  assert.equal(field.props.maxLength, undefined, 'no cap before normalizeCode: a long pasted invite link must reach it whole');
+  assert.equal(field.props.modalFocus, true, 'the Modal focuses it');
+  assert.equal(field.props.ariaLabel, '同盟密钥');
+  assert.equal(find(ally({ focusKey: false }), (x) => x.type === TextField)[0].props.modalFocus, false, 'not on a touch screen');
+  const enter = [];
+  find(ally({ onJoin: (...a) => enter.push(a) }), (x) => x.type === TextField)[0].props.onEnter({ key: 'Enter' });
+  assert.deepEqual(enter, [[]], 'Enter joins with the field’s key (no event handed on as a key)');
   assert.ok(buttonText(v, '加入同盟').props.disabled, 'no key yet');
   assert.ok(buttonText(v, '观战').props.disabled);
 
@@ -138,7 +182,7 @@ test('选择同盟方式: 创建同盟 leads on to 选择模拟协议; the key f
   assert.ok(hasClass(watch, 'join-spectate'));
   join.props.onClick();
   watch.props.onClick();
-  assert.deepEqual(calls.slice(1), ['join', 'spectate']);
+  assert.deepEqual(calls, ['join', 'spectate']);
   assert.ok(buttonText(ally({ code: 'ABCD', codeOk: true, online: false }), '加入同盟').props.disabled, 'offline');
 });
 
@@ -157,6 +201,16 @@ test('选择同盟方式: a recent key fills the field (it never joins by itself
 const lobbySrc = readFileSync(path.join(ROOT, 'public/js/screens/lobby.js'), 'utf8');
 const lobbyCss = readFileSync(path.join(ROOT, 'public/css/screens/lobby.css'), 'utf8');
 
+test('the key: a pasted invite link of any length, a 5th character or a dash are normalised to the 4-letter key', () => {
+  const link = 'https://crops-flexible-wedding-trademarks.trycloudflare.com/?room=QWER';
+  assert.ok(link.length > 64);
+  assert.equal(normalizeCode(link), 'QWER', 'the whole link reaches normalizeCode (the old maxlength 64 made it "HTTP")');
+  assert.equal(normalizeCode(`${link} 凯尔希邀请你加入卫戍协议：盟约【标准模拟】`), 'QWER', 'the copied invitation line too');
+  assert.equal(normalizeCode('abcde'), 'ABCD');
+  assert.equal(normalizeCode('ab-'), 'AB');
+  assert.equal(codeArg({ type: 'click' }, 'abcd'), 'ABCD', 'a click event falls back to the field');
+});
+
 test('official art only: every key the hub and 选择模拟协议 ask for is in data/assets.json', () => {
   const ui = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).ui;
   const keys = [...lobbySrc.matchAll(/\sk="([^"$]+)"/g)].map((m) => m[1]);
@@ -165,10 +219,14 @@ test('official art only: every key the hub and 选择模拟协议 ask for is in 
   for (const d of ['funny', 'normal', 'hard', 'abyss']) assert.ok(ui[`modeChoice/${d}_rhodes_island`], d);
 });
 
-test('成就统计 card: this browser’s records read without writing, the official trophy medals, opens the 成就统计 window', () => {
+test('成就统计 card: the lobby’s only statistics entry (no top-bar 统计数据 chip); this browser’s records read without writing, the official trophy medals', () => {
   assert.match(lobbySrc, /<\$\{AchievementCard\} onOpen=\$\{\(\) => setAchOpen\(true\)\} \/>/);
   assert.match(lobbySrc, /achOpen \? html`<\$\{AchievementDialog\} onClose=/);
-  assert.match(lobbySrc, /levelProgress\(peekStatsRecords\(\)/);
+  assert.doesNotMatch(lobbySrc, /openStats/, 'the 统计数据 page opens from the window’s 查看完整统计 only');
+  assert.doesNotMatch(lobbySrc, /stats-entry|me-chip/, 'the top-bar chip is gone');
+  assert.match(lobbySrc, /const records = peekStatsRecords\(\);\s*return \{ prog: levelProgress\(records/);
+  assert.match(lobbySrc, /trophies: aggregateStats\(records\)\.trophies/, 'the same trophy count as the window’s 获得奖杯');
+  assert.match(lobbySrc, /\[cfg, statsOpen\]/, 'read again when 统计数据 closes (an import or 清空 there)');
   assert.doesNotMatch(lobbySrc, /loadStats\(/, 'loadStats moves a damaged value away: the 统计数据 page must still find it');
   const ui = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).ui;
   const medals = JSON.parse(readFileSync(path.join(ROOT, 'data/config.json'), 'utf8')).trophies.medals;
@@ -190,6 +248,21 @@ test('成就统计 window (screens/stats.js AchievementDialog): the project Moda
   assert.match(dlg, /peekStatsRecords\(\)/);
   assert.match(dlg, /openStats\(/);
   assert.doesNotMatch(dlg, /loadStats\(/);
+  // the lineup's portraits, 自选 units and gear: nothing on the lobby path loads chess / items / backups
+  assert.match(dlg, /useData\('config', 'bands', 'bonds', 'assets', 'chess', 'items', 'backups'\)/);
+  // no gameplay-plugin match in the peak or the strategy marks (checklist §二.6), like the tallies (aggregateStats)
+  assert.match(dlg, /achievementRecords\(records\)/);
+  assert.match(dlg, /highestBondRecord\(official\)/);
+  assert.match(dlg, /<\$\{StrategyRecords\}[^>]*records=\$\{official\}/);
+  // an alphabetic title gets ': ', as on the hub and the title screen
+  assert.match(dlg, /scriptOf\(t\('卫戍协议'\)\) === 'alphabetic' \? ': ' : '：'/);
+});
+
+test('选择同盟方式 creates the room itself: the lobby never stacks 选择模拟协议 for a 同盟', () => {
+  assert.match(lobbySrc, /onCreate=\$\{\(\) => create\('coop'\)\} difficulty=\$\{difficulty\}/);
+  assert.match(lobbySrc, /onCreate=\$\{\(\) => create\('solo'\)\}/);
+  assert.doesNotMatch(lobbySrc, /setProtocol\('coop'\)/);
+  assert.match(lobbySrc, /<\$\{ProtocolSelect\} roomMode="solo"/, '选择模拟协议 stays before 独立模拟');
 });
 
 test('no server-only features: accounts, friends, federation, matchmaking, 无限火力, Android', () => {

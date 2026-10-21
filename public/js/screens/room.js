@@ -2,8 +2,15 @@
 // 创建者, the ready state at the bottom, the name plate under the card; an empty seat offers 邀请 — copies the key — and,
 // to the host, 添加 AI 队友; the host's 移出 / 移除 AI 队友 at a card's top right), the top bar (leave, mode and ping, 统计 /
 // 设置 / 玩法说明, 干员调配 and the 同盟密钥 with 复制 / the link), the bottom: the ready count and status line, the
-// difficulty pill — the host opens 选择模拟协议 (screens/lobby.js ProtocolSelect) with 确认 — and ⚙ 同盟设置 (the
-// 「AI 队友最后选择」 switch, co-op), and the big 开始模拟 / 准备就绪 button.
+// difficulty pill and ⚙ 同盟设置 (co-op), and the big 开始模拟 / 准备就绪 button.
+// Room settings: a co-op room is created at once from the lobby's 创建同盟 (the event's 联合模拟, research 06 §3.2; the
+// maintainer's decision of 2026-10-21), so the difficulty is chosen here — the host's pill (or ⚙'s 模拟难度 row) opens
+// 选择模拟协议 (screens/lobby.js ProtocolSelect) whose 确认 sends room.setDifficulty; the dialog closes only once the
+// server took it (a refusal keeps it open with the error toast), and its hint states the server's rules: the other
+// doctors have to ready again, a plugin mode the host chose is left. ⚙ 同盟设置 lists the 模拟难度 and the
+// 「AI 队友最后选择」 switch. The other doctors (and spectators) open the same screens read-only — the cards shown,
+// not chosen, 由创建者选择 / 由创建者设置 — and a toast tells them when the host changed the difficulty [ASSUMED: a
+// remake aid, since the change reset their ready state; how the event tells the others is not recorded].
 //
 // Start rule (server/lobby.js): room.start needs every *other* human connected and ready; the
 // host's start counts as the host's ready. So 开始模拟 is enabled exactly then and sends room.start
@@ -276,8 +283,12 @@ function AiLastToggle({ option, busy, onToggle }) {
   </div>`;
 }
 
-/** ⚙ of the bottom pill (co-op): 同盟设置 — the 「AI 队友最后选择」 switch. Closes on a click outside it or Esc. */
-function RoomOptions({ option, busy, onAiLast, onClose }) {
+/**
+ * ⚙ of the bottom pill (co-op): 同盟设置 — the 模拟难度 (opens 选择模拟协议: the host's 确认, the others' read-only view)
+ * and the 「AI 队友最后选择」 switch. Closes on a click outside it or Esc.
+ */
+function RoomOptions({ option, room, isHost, busy, onAiLast, onDifficulty, onClose }) {
+  const info = difficultyInfo(room.mode, room.difficulty);
   useEffect(() => {
     const away = (e) => { if (!e.target.closest?.('.rs-opts, .rs-pill__gear')) onClose(); };
     const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
@@ -287,6 +298,15 @@ function RoomOptions({ option, busy, onAiLast, onClose }) {
   }, []);
   return html`<div class="rs-opts" role="dialog" aria-label=${t('同盟设置')}>
     <h4>${t('同盟设置')}</h4>
+    <div class="rs-opts__row" data-testid="room-opt-difficulty">
+      <span class="rs-opts__k">${t('模拟难度')}</span>
+      <button type="button" class="rs-opts__diff" disabled=${isHost && !!busy} onClick=${onDifficulty}
+          title=${isHost ? t('更改模拟难度') : t('由创建者选择')}>
+        <${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span>
+        ${isHost ? html`<em>${t('更改')}</em>` : null}
+      </button>
+      ${isHost ? null : html`<span class="t-dim">${t('由创建者选择')}</span>`}
+    </div>
     <${AiLastToggle} option=${option} busy=${busy} onToggle=${onAiLast} />
   </div>`;
 }
@@ -324,9 +344,22 @@ export function RoomScreen() {
   const cards = useMemo(() => cardContext(cardList), [cardList]);
   const [myCard, setMyCard] = useState(() => { const v = loadPref(CARD_PREF, ''); return typeof v === 'string' ? v : ''; });
   const [picking, setPicking] = useState(false);
-  // 选择模拟协议 over the room (the host's pick before 确认) and the ⚙ menu
-  const [proto, setProto] = useState(null);
+  // 选择模拟协议 over the room — open, and the host's pick before 确认 (the others read it: the room's difficulty) — and
+  // the ⚙ menu
+  const [protoOpen, setProtoOpen] = useState(false);
+  const [protoPick, setProtoPick] = useState(null);
   const [opts, setOpts] = useState(false);
+  // the host's change of difficulty, told to the others (see the header); never on entering a room or switching rooms
+  const seenDiff = useRef(room ? `${room.code}|${room.difficulty}` : '');
+  useEffect(() => {
+    if (!room) return;
+    const key = `${room.code}|${room.difficulty}`;
+    const before = seenDiff.current;
+    seenDiff.current = key;
+    if (!before || before === key || !before.startsWith(`${room.code}|`) || room.hostId === me.playerId) return;
+    const name = DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : room.difficulty;
+    toast(t('创建者已将模拟难度改为「{name}」', { name }), 'info');
+  }, [room?.code, room?.difficulty]);
   // the room sees one's pick once the server has it (seats[].card): sent, once the operators are loaded, whenever the
   // seat's card differs — a pick this client does not have counts as 默认, as on one's own card. One the server refuses
   // stays local and is not asked again until the pick, the room or its content changes (a rate refusal is retried at
@@ -352,12 +385,13 @@ export function RoomScreen() {
   const myReady = !!facts.mine?.ready;
   const info = difficultyInfo(room.mode, room.difficulty);
 
+  /** Runs one request at a time; resolves true once the server took it (false: not sent, or refused — toasted). */
   const run = async (kind, fn) => {
-    if (inFlight.current) return;
-    if (!online) { toast(t('连接中断，请稍候重试'), 'warn'); return; }
+    if (inFlight.current) return false;
+    if (!online) { toast(t('连接中断，请稍候重试'), 'warn'); return false; }
     inFlight.current = true;
     setBusy(kind);
-    try { await fn(); } catch (err) { toastError(err); } finally {
+    try { await fn(); return true; } catch (err) { toastError(err); return false; } finally {
       inFlight.current = false;
       if (alive.current) setBusy(null);
     }
@@ -423,12 +457,20 @@ export function RoomScreen() {
     if (ok) toast(what === 'code' ? t('已复制同盟密钥 {code}', { code: room.code }) : t('已复制邀请链接'), 'success');
     else toast(t('复制失败，请手动复制'), 'warn');
   };
-  // 选择模拟协议 over the room (the host): the difficulty is sent on 确认 (none when it did not change)
-  const confirmDifficulty = () => {
-    const d = proto;
-    if (!d || d === room.difficulty) { setProto(null); return; }
-    setDifficulty(d).then(() => { if (alive.current) setProto(null); });
+  // 选择模拟协议 over the room: the host picks and sends the difficulty on 确认 (nothing to send when it did not change —
+  // unless a plugin mode is on, which picking a difficulty leaves: server/lobby.js setDifficulty); it closes only once the
+  // server took it. Everybody else opens it read-only.
+  const openProto = () => { setOpts(false); setProtoPick(room.difficulty); setProtoOpen(true); };
+  const closeProto = () => { setProtoOpen(false); setProtoPick(null); };
+  const pluginMode = room.content?.modeId ? (room.content.modes || []).find((m) => m.id === room.content.modeId)?.name || room.content.modeId : null;
+  const confirmDifficulty = async () => {
+    const d = protoPick || room.difficulty;
+    if (d === room.difficulty && !pluginMode) { closeProto(); return; }
+    if (await setDifficulty(d) && alive.current) closeProto();
   };
+  const protoHint = pluginMode
+    ? t('确认后将退出插件模式「{name}」', { name: pluginMode })
+    : facts.humans.length > 1 ? t('更改难度后，其他博士需要重新准备就绪') : '';
   const aiLast = aiLastOption(room, me.playerId);
   const modeName = coop ? t('同盟模拟') : t('独立模拟');
 
@@ -441,7 +483,7 @@ export function RoomScreen() {
         <//>
         <div class="rs-clock">
           <b>${modeName}${room.test ? html` <${TestMark} />` : null}
-            ${room.content?.modeId ? html`<span class="rs-clock__sep"></span><span class="room-mode" data-testid="room-mode">${(room.content.modes || []).find((m) => m.id === room.content.modeId)?.name || room.content.modeId}</span>` : null}</b>
+            ${pluginMode ? html`<span class="rs-clock__sep"></span><span class="room-mode" data-testid="room-mode">${pluginMode}</span>` : null}</b>
           <span class="rs-clock__ping">${t('当前延迟')}<${PingPill} ms=${conn.ping} online=${online} /></span>
         </div>
         <div class="rs-tools">
@@ -487,11 +529,12 @@ export function RoomScreen() {
       <div class="rs-foot__center">
         <p class="rs-hint">${coop ? html`<span class="rs-ready num" title=${t('已就绪')}>${facts.humans.map((s) => html`<${Icon} key=${s.playerId} name="user" class=${facts.isReady(s) ? 'is-on' : ''} />`)}<b>${facts.readyHumans}</b>/${facts.humans.length}</span>` : null}<span class="room-bar__status">${statusLine}</span></p>
         <div class="rs-pill">
-          <button type="button" class="rs-pill__diff" disabled=${!facts.isHost || !!busy} onClick=${() => setProto(room.difficulty)}
-            title=${facts.isHost ? t('模拟难度') : t('由创建者选择')}><${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span></button>
+          <button type="button" class=${`rs-pill__diff${facts.isHost ? '' : ' is-ro'}`} disabled=${facts.isHost && !!busy} onClick=${openProto}
+            title=${facts.isHost ? t('更改模拟难度') : t('由创建者选择')}><${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span></button>
           ${aiLast ? html`<button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${t('同盟设置')} aria-label=${t('同盟设置')}
             aria-expanded=${opts ? 'true' : 'false'}><${GearGlyph} /></button>` : null}
-          ${opts && aiLast ? html`<${RoomOptions} option=${aiLast} busy=${busy} onAiLast=${setAiLast} onClose=${() => setOpts(false)} />` : null}
+          ${opts && aiLast ? html`<${RoomOptions} option=${aiLast} room=${room} isHost=${facts.isHost} busy=${busy} onAiLast=${setAiLast}
+            onDifficulty=${openProto} onClose=${() => setOpts(false)} />` : null}
         </div>
       </div>
       <div class="room-bar__right rs-foot__right">
@@ -506,8 +549,11 @@ export function RoomScreen() {
       </div>
     </footer>
     ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${data.get('assets')} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
-    ${proto ? html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${proto} onDifficulty=${setProto} onClose=${() => setProto(null)}
-      onCreate=${confirmDifficulty} busy=${busy === 'diff' ? 'create' : null} online=${online} action=${t('确认')} hint="" />` : null}
+    ${protoOpen ? facts.isHost
+      ? html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${protoPick || room.difficulty} onDifficulty=${setProtoPick} onClose=${closeProto}
+          onCreate=${confirmDifficulty} busy=${busy === 'diff' ? 'create' : null} online=${online} action=${t('确认')} hint=${protoHint} />`
+      : html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${room.difficulty} onDifficulty=${() => {}} onClose=${closeProto}
+          online=${online} readOnly=${true} />` : null}
   </div>`;
 }
 

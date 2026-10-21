@@ -31,9 +31,10 @@ import { toast, toastError } from '../ui/toasts.js';
 import {
   loadStats, peekStatsRecords, saveStats, emptyStats, importStats, exportStats, aggregateStats, countsTowardStats, selfRowOf, roundsOf, isModdedRecord,
   recordToResult, MAX_RECORDS, FULL_KEEP, IMPORT_MAX_CHARS,
-  trophyMedalOf, strategyBadgeIds, bondMemberChess, highestBondRecord,
+  trophyMedalOf, strategyBadgeIds, bondMemberChess, highestBondRecord, achievementRecords,
 } from '../ui/stats.js';
 import { t, N_ } from '../../../shared/i18n.js';
+import { scriptOf } from '../../../shared/i18nPacks.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -51,6 +52,8 @@ export function openStats() {
   statsStore.set({ open: true, tab: 'overview' });
 }
 export const closeStats = () => statsStore.set({ open: false });
+/** Whether 统计数据 is open (the lobby's 成就统计 card reads the records again when it closes). */
+export const useStatsOpen = () => useStore((s) => s.open, Object.is, statsStore);
 
 const TABS = [
   { id: 'overview', name: N_('总览'), micro: 'OVERVIEW' },
@@ -176,7 +179,10 @@ function ProfileBlock({ agg, gd, nickname }) {
     </div>`;
 }
 
-/** 总览: cards, the per-difficulty table, the six titles, and the line about what counts. */
+/**
+ * 总览: cards, the per-difficulty table, the six titles, and the line about what counts. `records`: the ones the
+ * achievement blocks read (ui/stats.js achievementRecords — no gameplay-plugin match unless 「含插件对局」).
+ */
 function Overview({ agg, gd, nickname, records }) {
   useData('chess', 'items', 'backups');
   const rows = DIFFICULTIES.filter((d) => agg.byDifficulty[d]).concat(Object.keys(agg.byDifficulty).filter((d) => !DIFFICULTIES.includes(d)));
@@ -363,7 +369,7 @@ function BondRecords({ agg, gd }) {
       </ul>` : null}`;
 }
 
-/** 策略记录: the three most used strategies and the ones with the special mark. */
+/** 策略记录: the three most used strategies and the ones with the special mark (`records`: ui/stats.js achievementRecords). */
 function StrategyRecords({ agg, gd, records }) {
   const badges = strategyBadgeIds(records, data.get('bands'));
   const rows = Object.entries(agg.bands).sort((a, b) => (b[1].games - a[1].games) || (b[1].wins - a[1].wins));
@@ -525,6 +531,8 @@ function StatsScreen({ tab }) {
 
   const withModded = useStore((s) => s.withModded, Object.is, statsStore);
   const agg = useMemo(() => aggregateStats(stats.records, { modded: withModded }), [stats, withModded]);
+  // 卫戍成就's peak and the strategy marks follow the same 「含插件对局」 switch as the tallies (the history lists them all)
+  const achRecords = useMemo(() => achievementRecords(stats.records, withModded), [stats, withModded]);
   const reload = () => setStats(loadStats());
 
   const doExport = () => {
@@ -601,26 +609,32 @@ function StatsScreen({ tab }) {
       ${!ready ? html`<div class="st-loading"><${Spinner} size="md" /></div>`
         : stats.newer ? html`<p class="st-empty">${t('检测到更新版本的统计数据，请先升级客户端再查看，以免覆盖数据。')}</p>`
           : empty ? html`<p class="st-empty">${t('还没有记录 —— 完成一局对局后，这里会开始积累。')}</p>`
-            : tab === 'bands' ? html`<${Bands} agg=${agg} gd=${gd} records=${stats.records} />`
+            : tab === 'bands' ? html`<${Bands} agg=${agg} gd=${gd} records=${achRecords} />`
               : tab === 'totals' ? html`<${CombatSums} agg=${agg} />`
                 : tab === 'history' ? html`<${History} records=${stats.records} gd=${gd} onOpen=${setReplay} />`
-                  : html`<${Overview} agg=${agg} gd=${gd} nickname=${nickname} records=${stats.records} />`}
+                  : html`<${Overview} agg=${agg} gd=${gd} nickname=${nickname} records=${achRecords} />`}
     </main>
   </div>`;
 }
 
 /**
- * 成就统计 (the lobby's achievement card, PR #643 — the event's 卫戍协议：盟约 achievement window, video 1:28–1:43): one
- * scrolling window under an orange banner — the doctor's line and titles, 卫戍成就 (the peak alliance's match and the
- * single-match records), 盟约记录 and 策略记录. It only reads this browser's records (`peekStatsRecords`: a damaged or
- * newer store is left for 统计数据 to handle); 查看完整统计 opens 统计数据.
+ * 成就统计 (the lobby's achievement card, PR #643 — the event's 卫戍协议：盟约 achievement window, video 1:28–1:43; the
+ * lobby's statistics entry by the maintainer's decision of 2026-10-21): one scrolling window under an orange banner — the
+ * doctor's line and titles, 卫戍成就 (the peak alliance's match and the single-match records), 盟约记录 and 策略记录. It
+ * only reads this browser's records (`peekStatsRecords`: a damaged or newer store is left for 统计数据 to handle) and,
+ * like 统计数据 with 「含插件对局」 off, leaves the gameplay-plugin matches out of every block (achievementRecords for the
+ * peak and the marks); 查看完整统计 opens 统计数据. The lineup's portraits, 自选 units and gear need chess / backups / items:
+ * loaded here, since nothing on the lobby path loads them.
  * @param {{ onClose: () => void }} props
  */
 export function AchievementDialog({ onClose }) {
-  const ready = useData('config', 'bands', 'bonds', 'assets');
+  const ready = useData('config', 'bands', 'bonds', 'assets', 'chess', 'items', 'backups');
   const gd = useMemo(() => makeLookups(ready), [ready, data.locale()]);
   const records = useMemo(() => peekStatsRecords(), []);
   const agg = useMemo(() => aggregateStats(records), [records]);
+  const official = useMemo(() => achievementRecords(records), [records]);
+  // a title in an alphabetic script (English …): ": " between its halves, as on the hub and the title screen
+  const colon = scriptOf(t('卫戍协议')) === 'alphabetic' ? ': ' : '：';
   const nickname = useStore((s) => s.me.name);
   const fonts = ready ? uiUrl(gd.m, 'statistics/fontStyles') : null;
   const more = () => { onClose(); openStats(); };
@@ -630,7 +644,7 @@ export function AchievementDialog({ onClose }) {
       <div class="achv__title">
         <span class="achv__mark" aria-hidden="true"><${Img} src=${ready ? uiUrl(gd.m, 'entry/season_logo') : null} /></span>
         <span class="achv__en" aria-hidden="true">ALLIANCE</span>
-        <h2 class="modal__title achv__name">${t('卫戍协议')}<span>：</span>${t('盟约')}</h2>
+        <h2 class="modal__title achv__name">${t('卫戍协议')}<span>${colon}</span>${t('盟约')}</h2>
       </div>
       <button type="button" class="achv__close" onClick=${onClose} aria-label=${t('关闭')} title=${t('关闭')}><${Icon} name="close" /></button>
     </header>
@@ -639,10 +653,10 @@ export function AchievementDialog({ onClose }) {
       ${!ready ? html`<div class="st-loading"><${Spinner} size="md" /></div>` : html`
         <${ProfileBlock} agg=${agg} gd=${gd} nickname=${nickname} />
         <${RecordHeading} title=${t('卫戍成就')} manifest=${gd.m} class="st-record-heading--achievement" />
-        <${BondAchievement} peak=${highestBondRecord(records)} gd=${gd} />
+        <${BondAchievement} peak=${highestBondRecord(official)} gd=${gd} />
         <${MatchRecords} maxima=${agg.maxima} manifest=${gd.m} />
         <${BondRecords} agg=${agg} gd=${gd} />
-        <${StrategyRecords} agg=${agg} gd=${gd} records=${records} />`}
+        <${StrategyRecords} agg=${agg} gd=${gd} records=${official} />`}
     </div>
     <footer class="achv__foot">
       <span><${Icon} name="info" />${t('本机记录：只保存在这个浏览器里')}</span>

@@ -484,6 +484,8 @@
 .rs-pill__code { font-size: calc(.13 * var(--t)); color: #9aa19e; }
 .rs-pill__diff:disabled { cursor: default; }
 .rs-pill__diff:hover:not(:disabled), .rs-pill__diff:focus-visible { filter: brightness(1.2); }
+/* another doctor's pill: opens the read-only 选择模拟协议 (the host chooses) */
+.rs-pill__diff.is-ro { cursor: help; }
 .rs-pill__gear {
   display: grid;
   place-items: center;
@@ -514,6 +516,18 @@
   box-shadow: 0 .1rem .4rem rgba(0, 0, 0, .7);
 }
 .rs-opts h4 { margin: 0; font-size: calc(.2 * var(--t)); }
+/* 同盟设置's 模拟难度 row: the difficulty (the host's 更改 opens 选择模拟协议; the others read it) */
+.rs-opts__row { display: flex; align-items: center; gap: .12rem; font-size: calc(.14 * var(--t)); }
+.rs-opts__k { color: var(--text-lo); }
+.rs-opts__diff {
+  display: inline-flex; align-items: center; gap: .06rem; height: .36rem; padding: 0 .14rem;
+  font: inherit; font-size: calc(.15 * var(--t)); font-weight: 700; white-space: nowrap;
+  color: var(--d-color); background: rgba(0, 0, 0, .3); border: 1px solid var(--line-2);
+}
+.rs-opts__diff .icon { width: 1.1em; height: 1.1em; }
+.rs-opts__diff em { margin-left: .06rem; font-style: normal; color: var(--text-hi); text-decoration: underline; text-underline-offset: 2px; }
+.rs-opts__diff:hover:not(:disabled), .rs-opts__diff:focus-visible { border-color: var(--d-color); }
+.rs-opts__diff:disabled { cursor: default; opacity: .6; }
 .room-bar__right { display: flex; align-items: center; justify-content: flex-end; gap: .14rem; min-width: 0; }
 .rs-go.proto-start { width: min(4.6rem, 40vw); }
 .rs-go__box { flex: none; display: grid; place-items: center; width: max(.5rem, 28px); height: max(.5rem, 28px); border: 3px solid currentColor; border-radius: 6px; }

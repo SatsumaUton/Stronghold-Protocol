@@ -479,11 +479,7 @@ describe('real server + real browsers', { skip: !ENABLED && 'set SP_REAL_E2E=1 (
       // ---- lobby & room --------------------------------------------------------------------------------------------
       await host.open();
       await host.enter('凯尔希');
-      await host.click('.mode-card', '同盟模拟');
-      await host.click('[data-testid="alliance-create"]');
-      await host.click('.diff-card', '险境模拟');
-      await host.click('.create-box button', '创建同盟');
-      const room = (await host.waitFor((s) => !!s.room?.code, 'room created')).room;
+      const room = await host.createCoop('险境模拟');
       await host.click('button', '添加 AI 队友');
       await guest.open(`?room=${room.code}`);
       await guest.enter('阿米娅');
