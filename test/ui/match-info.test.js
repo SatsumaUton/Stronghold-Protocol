@@ -182,7 +182,7 @@ test('#484: enemy information uses this match\'s announced leader, abilities, ba
     assert.ok(boss, 'the real match has an announced leader');
     assert.equal(textOf(nodes.find(v => hasClass(v, 'brief-boss__name'))), boss.name);
     assert.match(textOf(nodes.find(v => hasClass(v, 'brief-boss__when'))), /第 14 回合 · 最终攻势/);
-    assert.equal(nodes.find(v => v.type === Img && v.props.class === 'brief-boss__sil').props.src, enemyIconUrl(gd.m, boss.enemyKey));
+    assert.equal(nodes.find(v => v.type === Img && v.props.class === 'brief-boss__img').props.src, enemyIconUrl(gd.m, boss.enemyKey));
     assert.deepEqual(nodes.filter(v => v.type === RichText).map(v => v.props.text), boss.abilities.slice(0, 3));
     assert.equal(textOf(nodes.find(v => hasClass(v, 'brief-stage__name'))), gd.stage(pub.stageId).name);
     const factions = nodes.filter(v => hasClass(v, 'brief-faction'));
@@ -253,16 +253,24 @@ test('draftInfoStatus: the dialog repeats the turn and its seconds (warning at �
 
 test('the briefing, the strategy draft and the in-game 本局信息 tab all read ui/matchInfo.js (no second copy to drift)', () => {
   const brief = read('public/js/screens/briefing.js');
-  assert.match(brief, /import \{ MatchInfo, matchInfoModel \} from '\.\.\/ui\/matchInfo\.js';/);
-  assert.match(brief, /<section class="brief__right">\s*<\$\{MatchInfo\} model=\$\{info\} \/>\s*<\/section>/);
+  // (PR #643: the blocks one by one, each in its own section of the one column)
+  assert.match(brief, /import \{ MatchBondRow, MatchLegend, BannedOperators, matchInfoModel \} from '\.\.\/ui\/matchInfo\.js';/);
+  assert.match(brief, /<\$\{MatchBondRow\} title=\$\{t\('核心盟约'\)\} micro="CORE BONDS" bonds=\$\{info\.core\} model=\$\{info\} \/>/);
+  assert.match(brief, /<\$\{MatchBondRow\} title=\$\{t\('附加盟约'\)\} micro="ADD-ON BONDS" bonds=\$\{info\.addon\} model=\$\{info\} \/>\s*<\$\{MatchLegend\} model=\$\{info\} \/>/);
+  assert.match(brief, /<\$\{BannedOperators\} model=\$\{info\} \/>/);
   // (+ the viewer's 自选 pieces out of the shop: priv / diyData, 0.2.0 WE2)
   assert.match(brief, /const info = matchInfoModel\(pub, \{ bonds: gd\.list\('bonds'\), chess: gd\.chess, mode, priv, diyData: \{ chess: data\.get\('chess'\), backups: data\.get\('backups'\) \} \}\);/);
   assert.doesNotMatch(brief, /brief-legend|brief-banned|function BondRow|bannedPerBond|disabledBondSets/, 'no own copy of the blocks');
+  // (#484 / §35.6: the 本局遭遇敌方 section is ui/matchEnemies.js, also the draft dialog's enemy column)
+  assert.match(brief, /<section class="brief-sec brief-sec--enemy" style="--i:1">\s*<\$\{MatchEnemies\} pub=\$\{pub\} gd=\$\{gd\} \/>\s*<\/section>/);
+  assert.doesNotMatch(brief, /enemyIconUrl|factionIconUrl|brief-boss|brief-faction/, 'no own copy of the enemy section');
   const draft = read('public/js/screens/bandDraft.js');
   assert.match(draft, /import \{ MatchInfoDialog, matchInfoModel \} from '\.\.\/ui\/matchInfo\.js';/);
   assert.match(draft, /const info = infoOpen \? matchInfoModel\(pub, \{ bonds: gd\.list\('bonds'\), chess: gd\.chess, mode, priv, diyData: \{ chess: data\.get\('chess'\), backups: data\.get\('backups'\) \} \}\) : null;/);
-  assert.match(draft, /data-testid="match-info-open"[\s\S]*?onClick=\$\{\(\) => setInfoOpen\(true\)\}>\$\{t\('本局信息'\)\}</);
+  // (PR #643: 本局信息 in the step header, beside the difficulty)
+  assert.match(draft, /class="stephead__info" data-testid="match-info-open" aria-haspopup="dialog" onClick=\$\{\(\) => setInfoOpen\(true\)\}\n\s+title=\$\{t\('本局信息'\)\}><\$\{Icon\} name="search" \/><span>\$\{t\('本局信息'\)\}<\/span><\/button>/);
   assert.match(draft, /<\$\{MatchInfoDialog\} open=\$\{infoOpen\} onClose=\$\{\(\) => setInfoOpen\(false\)\} model=\$\{info\}/);
+  assert.match(draft, /enemies=\$\{infoOpen \? html`<\$\{MatchEnemies\} pub=\$\{pub\} gd=\$\{gd\} \/>` : null\}/);
   // a turn change or my pick closes it; the draft's end unmounts the screen
   assert.match(draft, /const turnKey = `\$\{draft\.turnPid \|\| ''\}\|\$\{myPick \|\| ''\}`;\n\s*useEffect\(\(\) => \{ setInfoOpen\(false\); \}, \[turnKey\]\);/);
   const drawer = read('public/js/ui/enemyDrawer.js');

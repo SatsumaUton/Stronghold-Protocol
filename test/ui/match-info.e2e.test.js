@@ -139,7 +139,7 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
         name: scope.querySelector('.brief-boss__name')?.textContent || '',
         when: scope.querySelector('.brief-boss__when')?.textContent || '',
         abilities: [...scope.querySelectorAll('.brief-boss__abil li')].map(el => el.textContent),
-        icon: scope.querySelector('.brief-boss__sil')?.getAttribute('src') || '',
+        icon: scope.querySelector('.brief-boss__img')?.getAttribute('src') || '',
       },
       battlefield: scope.querySelector('.brief-stage')?.textContent || '',
       factions: [...scope.querySelectorAll('.brief-faction')].map(el => ({
@@ -185,9 +185,9 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
     await page.evaluate(() => globalThis.__SP__.net.request('room.start', {}));
     const s0 = await waitSt(page, (s) => s.phase === 'INFO_CHECK', 'briefing');
     assert.equal(s0.modeId, 'mode_single_funny');
-    await page.waitForSelector('.brief__right .brief-banned', { visible: true, timeout: 15000 });
+    await page.waitForSelector('.brief__main .brief-banned', { visible: true, timeout: 15000 });
     await sleep(600);
-    const brief = await readInfo(page, '.brief');
+    const brief = await readInfo(page, '.brief__main');
     const want = await truth(page);
     assert.deepEqual(want.off, [...OFF_FUNNY].sort(), '标准模拟 switches the official 10 bonds off');
     assert.deepEqual(greyedOf(brief), want.greyed, 'the briefing greys D ∪ the mode\'s inactive bonds');
@@ -205,6 +205,9 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
     await page.waitForSelector('[data-testid="match-info-open"]', { visible: true, timeout: 10000 });
     assert.equal(await page.$eval('[data-testid="match-info-open"]', el => el.textContent.trim()), '本局信息');
     await shot(page, 'solo-draft');
+    // (PR #643: the wall highlights nothing until a portrait is tapped; the tap opens the detail pane with 确认选择)
+    await press(p, '.dband', '华法琳');
+    await page.waitForSelector('.draft-detail__btns .btn--primary', { visible: true, timeout: 5000 });
     const sel0 = await selBand(page);
     assert.ok(sel0, 'a highlighted band');
     const req0 = (await intents(page)).length;
@@ -265,6 +268,10 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
 
     // the in-game 本局信息 tab (left 🔍) lists the same greyed bonds, badges and banned operators (by tier)
     await waitSt(page, (s) => s.phase === 'PREP', 'the first prep', 60000);
+    // the held 已选定策略 (1.6 s) and 协议启动！ (at least 3 s, screens/game.js) stay over the board first, then the HUD
+    // comes in (PR #643: screens/game.js hudIn — .gm__hud.is-wait / .is-enter until its entry has played)
+    await page.waitForFunction(() => !document.querySelector('.screen.draft, [data-testid="protocol-boot"]'), { timeout: 15000 });
+    await page.waitForFunction(() => !!document.querySelector('.gm__hud') && !document.querySelector('.gm__hud.is-wait, .gm__hud.is-enter'), { timeout: 15000 });
     await page.waitForFunction(() => !document.querySelector('.pbanner'), { timeout: 10000 }); // the 休整期 banner has played
     await press(p, '.gtop__iconbtn');
     await page.waitForSelector('.edrawer .ibanned', { visible: true, timeout: 5000 });
@@ -289,13 +296,17 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
     await waitSt(page, s => !!s.room, 'solo room');
     await page.evaluate(() => globalThis.__SP__.net.request('room.start', {}));
     await waitSt(page, s => s.phase === 'INFO_CHECK', 'briefing');
-    await page.waitForSelector('.brief__right .brief-banned', { visible: true, timeout: 15000 });
+    await page.waitForSelector('.brief__main .brief-banned', { visible: true, timeout: 15000 });
     await sleep(500);
-    const brief = await readInfo(page, '.brief');
+    const brief = await readInfo(page, '.brief__main');
     assert.equal(brief.factions.length, 3, 'dire announces three special enemy types');
     await press(p, '.brief__foot .btn--primary', '准备就绪');
     await waitSt(page, s => s.phase === 'BAND_DRAFT', 'band draft');
+    // (PR #643: nothing is highlighted until a portrait is tapped; the first one stays in view at every width)
+    await press(p, '.dband');
+    await page.waitForSelector('.draft-detail__btns .btn--primary', { visible: true, timeout: 5000 });
     const selected = await selBand(page);
+    assert.ok(selected, 'a highlighted band');
     const requests = (await intents(page)).length;
 
     for (const [width, height] of [[1000, 600], [1001, 600], [1024, 768], [1120, 630], [1280, 720]]) {
@@ -361,11 +372,11 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
     for (const p of [a, b]) {
       const s = await waitSt(p.page, (x) => x.phase === 'INFO_CHECK', `${p.name}: briefing`);
       assert.equal(s.modeId, 'mode_multi_hard');
-      await p.page.waitForSelector('.brief__right .brief-banned', { timeout: 15000 });
+      await p.page.waitForSelector('.brief__main .brief-banned', { timeout: 15000 });
     }
     await sleep(500);
     const briefs = new Map();
-    for (const p of [a, b]) briefs.set(p, await readInfo(p.page, '.brief'));
+    for (const p of [a, b]) briefs.set(p, await readInfo(p.page, '.brief__main'));
     const want = await truth(a.page);
     assert.deepEqual(want.off, [], '绝境 switches no bond off');
     assert.equal(want.greyed.length, 7, '3 core + 4 add-on bonds drawn');
