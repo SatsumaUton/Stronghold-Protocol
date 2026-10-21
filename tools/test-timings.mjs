@@ -99,7 +99,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error('usage: node tools/test-timings.mjs <report.xml…> [--out <file.json>]');
     process.exit(2);
   }
-  const ms = perFileMsOf(reports.map((f) => fs.readFileSync(f, 'utf8')));
+  const texts = reports.map((f) => fs.readFileSync(f, 'utf8'));
+  // A JUnit report without `file` weighs nothing: `<testcase name time>` alone does not say which file a case ran in.
+  // Node 22's reporter writes no file attribute (22.22.0 measured), node 24's does, so a report from a node 22 run can
+  // only ever add nothing — say so instead of quietly returning an empty or half-filled table.
+  for (let i = 0; i < texts.length; i++) {
+    const cases = (texts[i].match(/<testcase\b/g) ?? []).length;
+    const withFile = (texts[i].match(/<testcase\b[^>]*\bfile="/g) ?? []).length;
+    if (cases && !withFile) {
+      console.error(`${reports[i]}: ${cases} <testcase> and none with file="…" — this Node.js version's JUnit reporter does not write the file attribute (node 22 does not, node 24 does), so this report weighs nothing`);
+    }
+  }
+  const ms = perFileMsOf(texts);
   const json = `${JSON.stringify(ms, null, 2)}\n`;
   if (out) fs.writeFileSync(out, json);
   else process.stdout.write(json);

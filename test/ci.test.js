@@ -8,10 +8,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   CI_SHARD_ENV, CI_TEST_ENV, ROOT, SKIPPED_CI_STEPS, SMOKE_PATHS, STEPS, TEST_FILES, binPath, formatDuration,
-  formatSummary, isSkippedCiStep, parseArgs, parseWorkflow, selectSteps, stepEnv,
+  formatSummary, isSkippedCiStep, parseArgs, parseMatrix, parseWorkflow, selectSteps, stepEnv,
 } from '../tools/ci.mjs';
+import { SHARD_COUNT } from '../tools/ci-shards.mjs';
 
-const workflow = parseWorkflow(fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8'));
+const CI_YML = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+const workflow = parseWorkflow(CI_YML);
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 
 /** ci.yml's smoke run block as smoke() in tools/ci.mjs mirrors it (lines trimmed, comments dropped). */
@@ -95,6 +97,38 @@ test('npm test runs every test file and nothing else under test/: no helper, no 
   for (const f of underTest.filter((x) => /\.[cm]?js$/.test(x) && !picked.includes(x))) {
     assert.doesNotMatch(fs.readFileSync(path.join(ROOT, f), 'utf8'), /['"]node:test['"]/, `${f} uses node:test but npm test does not run it`);
   }
+});
+
+test('the test matrix runs every shard exactly once, on both systems, for node 22', () => {
+  const matrix = parseMatrix(CI_YML);
+  assert.deepEqual(Object.keys(matrix), ['test'], 'only the test job is a matrix');
+  const m = matrix.test;
+  // The shard numbers, not the count: a matrix that listed [0, 1, 3] would run three quarters of the suite and stay
+  // green — the table's own guard (test/ci-shards.test.js) only proves the partition inside ci-shards.json.
+  assert.deepEqual((m.shard ?? []).map(Number), [...Array(SHARD_COUNT).keys()], 'matrix.shard must list 0..SHARD_COUNT-1 once each');
+  assert.deepEqual(m.os, ['ubuntu-latest', 'windows-latest']);
+  assert.deepEqual((m.node ?? []).map(Number), [22], 'the full suite runs on node 22; node 24 has its own lane');
+  // the job hands its shard to tools/test-run.mjs, which is what turns the number into files
+  assert.equal(workflow.jobs.test.env.SHARD, '${{ matrix.shard }}');
+  // the node 24 lane is a job of its own, with the guards and without the suite
+  assert.ok(workflow.jobs.node24, 'ci.yml has the node 24 lane');
+  assert.deepEqual(workflow.jobs.node24.env, {}, 'the node 24 lane needs no job env');
+  assert.ok(workflow.jobs.node24.steps.some((s) => s.run === 'npm run test:guards'), 'the node 24 lane runs the guards');
+  assert.ok(!workflow.jobs.node24.steps.some((s) => s.run === 'npm run test'), 'the node 24 lane does not run the suite');
+});
+
+test('the matrix reader: flow lists, block lists, include/exclude left out, other jobs ignored', () => {
+  const yml = [
+    'name: X', 'jobs:', '  a:', '    runs-on: x', '    strategy:', '      fail-fast: false', '      matrix:',
+    '        os: [ubuntu-latest, windows-latest]', '        node: [22]', "        shard: ['0', 1]", '        extra:',
+    '          - one', '          - "two"', '        include:', '          - os: z', '    steps:', '      - run: x',
+    '  b:', '    steps:', '      - run: y',
+  ].join('\r\n');
+  assert.deepEqual(parseMatrix(yml), {
+    a: { os: ['ubuntu-latest', 'windows-latest'], node: ['22'], shard: ['0', '1'], extra: ['one', 'two'] },
+  });
+  assert.deepEqual(parseMatrix('name: no jobs\n'), {});
+  assert.deepEqual(parseMatrix('jobs:\n  a:\n    steps:\n      - run: x\n'), {}, 'a job without a matrix is left out');
 });
 
 test('the workflow reader: jobs, flat env, named and uses steps, run blocks; comments and nested blocks skipped, other step keys named', () => {

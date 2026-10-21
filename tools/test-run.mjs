@@ -20,8 +20,8 @@ import { SHARD_COUNT, shardsOf, testFileList } from './ci-shards.mjs';
  * The arguments `node` is started with: `--test` and the files of the run.
  *
  * `JUNIT=<path>` adds a JUnit report beside the normal output (the reporter that carries `file` and `time` per case, see
- * tools/test-timings.mjs): ci.yml asks for it and uploads it as an artifact, which is how the shard table is re-weighed
- * from the times the runners actually take instead of this machine's.
+ * tools/test-timings.mjs). CI does not ask for one: its matrix is node 22, whose reporter writes no `file` attribute, so
+ * the report would weigh nothing. It is how the shard table is re-weighed from a node 24 run (`JUNIT=out.xml npm test`).
  * @param {Record<string, string | undefined>} [env]
  * @param {string} [root]
  * @returns {string[]}
@@ -51,6 +51,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const files = isShard ? shardsOf(ROOT).files[Number(shard)] : testFileList(ROOT);
     process.stdout.write(files.map((f) => `${f}\n`).join(''));
     process.exit(0);
+  }
+  // A report that weighs nothing is worse than no report: on node 22 the JUnit reporter writes no file attribute.
+  if (process.env.JUNIT && Number(process.versions.node.split('.')[0]) < 24) {
+    console.error(`JUNIT=${process.env.JUNIT}: node ${process.versions.node}'s JUnit reporter writes no file attribute, so tools/test-timings.mjs cannot weigh this report (node 24 does)`);
   }
   const r = spawnSync(process.execPath, runArgs(), { cwd: ROOT, stdio: 'inherit' });
   process.exit(r.status ?? 1);

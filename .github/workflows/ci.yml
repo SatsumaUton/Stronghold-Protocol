@@ -16,17 +16,16 @@ jobs:
   test:
     name: test (${{ matrix.os }}, node ${{ matrix.node }}, shard ${{ matrix.shard }})
     runs-on: ${{ matrix.os }}
-    # One shard is a quarter of the suite (ci-shards.json balances them by measured time), so a job is the slowest
-    # shard on the slowest runner: measured 2074 s of test work per shard, ~10 minutes of wall clock with the runner's
-    # parallelism, against the 19.7 min (ubuntu) / 22.4 min (windows) the single full run took in run 38777566530.
-    # 20 minutes keeps a margin and still fails a hung job long before the old 40.
+    # One shard is a quarter of the suite (ci-shards.json balances them by measured time): a job is the slowest shard
+    # on the slowest runner, measured 532 s of wall clock on windows (node 22, shard 0, run 39570345137) against the
+    # 22.4 min the single full run took in run 38777566530. 20 minutes keeps a margin and still fails a hung job.
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        # 22 and 24 = the maintained LTS lines (24 is what `winget install OpenJS.NodeJS.LTS` installs today)
-        node: [22, 24]
+        # 22 = the LTS line the whole suite runs on, one job per shard. Node 24 has its own light lane (job `node24`).
+        node: [22]
         # the shards of ci-shards.json: together they are exactly the full `npm test`, apart they are four shorter jobs
         shard: [0, 1, 2, 3]
     env:
@@ -38,8 +37,6 @@ jobs:
       NO_COLOR: '1'
       # tools/test-run.mjs runs this shard's files: `npm run test` stays the whole suite everywhere else
       SHARD: ${{ matrix.shard }}
-      # …and leaves a JUnit report, the only output that says which file each time belongs to (tools/test-timings.mjs)
-      JUNIT: junit-${{ matrix.os }}-${{ matrix.node }}-${{ matrix.shard }}.xml
     steps:
       - uses: actions/checkout@v7
 
@@ -58,17 +55,6 @@ jobs:
       # SHARD is unset). A bare `node --test` would also run every helper and fixture under test/.
       - name: Unit & integration tests
         run: npm run test
-
-      # The per-file times the shard table is re-weighed from: a job log has the test names but not the files they
-      # belong to, and a JUnit report has both (`node tools/test-timings.mjs <report.xml> …`).
-      - name: Test timings (JUnit)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: junit-${{ matrix.os }}-${{ matrix.node }}-${{ matrix.shard }}
-          path: junit-*.xml
-          retention-days: 7
-          if-no-files-found: warn
 
       - name: Server smoke test (boot, /healthz, index.html, doctor)
         shell: bash
@@ -89,6 +75,27 @@ jobs:
           curl -fsS -o /dev/null http://127.0.0.1:3000/vendor/pixi.min.js
           node tools/doctor.mjs || true
           kill $pid || true
+
+  # The node 24 lane: the other maintained LTS line gets a cheap check, not a second full suite. A full 24 run is the
+  # 20-minute job the shards were introduced to remove, so 24 runs the CI guards — the shard table and the wiring of
+  # this file — which are also the tests that exercise node's own test runner and glob.
+  node24:
+    name: node 24 (CI guards)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install (npm ci → postinstall copies public/vendor)
+        run: npm ci --no-audit --no-fund
+
+      - name: CI guard tests (sharding and workflow wiring)
+        run: npm run test:guards
 
   # Separate from the test matrix so lint / types / import boundaries run once, not four times.
   # Lint warnings do not fail the job (npm run lint does not pass --max-warnings=0).
