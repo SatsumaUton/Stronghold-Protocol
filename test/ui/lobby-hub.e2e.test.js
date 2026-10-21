@@ -9,7 +9,8 @@
 // the maintainer's decision of 2026-10-21) → in the room the host's difficulty pill opens 选择模拟协议 with 确认 (Esc
 // changes nothing; a refused change keeps it open; 绝境 → 确认 changes the room), ⚙ 同盟设置 lists the 模拟难度 and the
 // 「AI 队友最后选择」 switch. Phones 844×390 and 667×375 (touch): the hub (with the 成就统计 plate in place of the card),
-// 选择模拟协议, 选择同盟方式 and the room's 选择模拟协议 stay inside the screen, their buttons in view without scrolling.
+// 选择模拟协议, 选择同盟方式 (创建同盟 with its difficulty line) and the room's 选择模拟协议 stay inside the screen, their
+// buttons in view without scrolling.
 // The other doctors' read-only view: test/ui/room-settings.e2e.test.js.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/lobby-hub-*.png
 
@@ -291,6 +292,17 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
         await sleep(500);
         assert.deepEqual(await fit(page), { out: [], scrolls: false }, '选择同盟方式 fits');
         assert.equal(await page.evaluate(() => document.activeElement?.tagName === 'INPUT'), false, 'no keyboard pops up on a touch screen');
+        // 创建同盟 keeps its difficulty line on a short screen (§35.18's leftover): shown whole inside the bar, ≥ 11 px
+        const diff = await page.$eval('[data-testid="alliance-create"]', (card) => {
+          const sm = card.querySelector('.ally-card__bar small');
+          const r = sm.getBoundingClientRect(), b = card.querySelector('.ally-card__bar').getBoundingClientRect();
+          return { text: sm.textContent, shown: getComputedStyle(sm).display !== 'none' && r.width > 0 && r.height > 0,
+            whole: sm.scrollWidth <= sm.clientWidth + 1 && sm.scrollHeight <= sm.clientHeight + 1,
+            inside: r.left >= b.left - 1 && r.right <= b.right + 1 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1,
+            px: parseFloat(getComputedStyle(sm).fontSize) };
+        });
+        assert.ok(diff.shown && diff.whole && diff.inside && diff.px >= 11, `${w}×${h}: the difficulty line ${JSON.stringify(diff)}`);
+        assert.match(diff.text, /^难度：.+（可在同盟内更改）$/);
         await page.screenshot({ path: path.join(OUT, `lobby-hub-phone-${w}-alliance.png`) });
         // 创建同盟: the room at once; the host's 选择模拟协议 over it fits too
         await press(page, '[data-testid="alliance-create"]', true);

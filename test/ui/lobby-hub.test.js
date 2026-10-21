@@ -279,3 +279,16 @@ test('lobby.css: text follows 文字大小 (var(--t)), no !important, no :has()'
   assert.doesNotMatch(lobbyCss, /!important/);
   assert.doesNotMatch(lobbyCss, /:has\(/);
 });
+
+test('选择同盟方式 on a short screen (≤ 520 px tall): 创建同盟 keeps its difficulty line, wrapped under the name (§35.18)', () => {
+  const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  // the @media block, up to its own closing brace
+  const at = css.indexOf('@media (max-height: 520px) {');
+  let end = css.indexOf('{', at) + 1;
+  for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
+  const short = css.slice(at, end);
+  assert.ok(short.includes('.ally-card__bar {'), 'the short-screen block');
+  assert.doesNotMatch(short, /\.ally-card__bar small \{ display: none; \}/, 'no longer hidden');
+  assert.match(short, /\.ally-card--create \.ally-card__bar \{[^}]*flex-wrap: wrap;[^}]*height: auto;/);
+  assert.match(short, /\.ally-card--create \.ally-card__bar small \{[^}]*white-space: normal;[^}]*font-size: clamp\(11px, calc\(\.28 \* var\(--t\)\), 14px\);/);
+});
