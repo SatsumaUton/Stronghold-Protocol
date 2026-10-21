@@ -34,6 +34,13 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 /** The env of ci.yml's job `test` (test/ci.test.js compares it with the workflow). */
 export const CI_TEST_ENV = { SP_E2E: '0', SP_REAL_E2E: '0', RENDER_E2E: '0', NO_COLOR: '1' };
 
+/**
+ * What ci.yml's job `test` adds on top of CI_TEST_ENV: the shard of the matrix this job runs. tools/test-run.mjs turns
+ * it into that shard's test files; unset means the whole suite, which is what this machine runs (tools/ci.mjs sets
+ * nothing, so `npm run ci` still runs everything).
+ */
+export const CI_SHARD_ENV = { SHARD: '${{ matrix.shard }}' };
+
 /** The paths the smoke step requests (the curl URLs of ci.yml's smoke step; test/ci.test.js compares them). */
 export const SMOKE_PATHS = ['/healthz', '/', '/vendor/pixi.min.js'];
 
@@ -61,9 +68,8 @@ export const SKIPPED_CI_STEPS = [
  */
 export const STEPS = [
   { id: 'setup', ci: { job: 'test', name: 'Setup check (no downloads)' }, describe: 'node tools/setup.mjs --check --no-local' },
-  // (the globs quoted: no shell expands them — Node's test runner does, the same on every OS)
-  { id: 'test', ci: { job: 'test', name: 'Unit & integration tests' }, npm: 'test',
-    describe: `node --test ${TEST_FILES.map((g) => `"${g}"`).join(' ')}` },
+  // tools/test-run.mjs: the whole suite here (SHARD unset); one shard of it on CI, where the matrix sets SHARD
+  { id: 'test', ci: { job: 'test', name: 'Unit & integration tests' }, npm: 'test', describe: 'node tools/test-run.mjs' },
   { id: 'smoke', ci: { job: 'test', name: 'Server smoke test (boot, /healthz, index.html, doctor)' },
     describe: `server on a free port: GET ${SMOKE_PATHS.join(', ')}; node tools/doctor.mjs` },
   { id: 'lint', ci: { job: 'tooling', name: 'Lint (warnings allowed)' }, npm: 'lint', describe: 'eslint .' },

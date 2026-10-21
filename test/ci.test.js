@@ -7,8 +7,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  CI_TEST_ENV, ROOT, SKIPPED_CI_STEPS, SMOKE_PATHS, STEPS, TEST_FILES, binPath, formatDuration, formatSummary,
-  isSkippedCiStep, parseArgs, parseWorkflow, selectSteps, stepEnv,
+  CI_SHARD_ENV, CI_TEST_ENV, ROOT, SKIPPED_CI_STEPS, SMOKE_PATHS, STEPS, TEST_FILES, binPath, formatDuration,
+  formatSummary, isSkippedCiStep, parseArgs, parseWorkflow, selectSteps, stepEnv,
 } from '../tools/ci.mjs';
 
 const workflow = parseWorkflow(fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8'));
@@ -62,9 +62,10 @@ test('the commands match ci.yml: the run lines, the npm scripts ci.yml calls, th
   // here, so that smoke() in tools/ci.mjs is looked at and this copy updated with it.
   const normalized = smokeRun.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
   assert.deepEqual(normalized, SMOKE_CI_RUN, "ci.yml's smoke step changed: update smoke() in tools/ci.mjs and SMOKE_CI_RUN");
-  // job env: ci.yml's job test env is CI_TEST_ENV; any other job has none (stepEnv gives the tooling steps nothing)
+  // job env: ci.yml's job test env is CI_TEST_ENV plus the matrix's shard; any other job has none (stepEnv gives the
+  // tooling steps nothing)
   for (const [job, j] of Object.entries(workflow.jobs)) {
-    assert.deepEqual(j.env, job === 'test' ? CI_TEST_ENV : {}, `env of job ${job}`);
+    assert.deepEqual(j.env, job === 'test' ? { ...CI_TEST_ENV, ...CI_SHARD_ENV } : {}, `env of job ${job}`);
   }
   // per-step config (env, if, continue-on-error, working-directory, with, …) on a mirrored step is not mirrored
   for (const l of STEPS) {
@@ -76,8 +77,10 @@ test('the commands match ci.yml: the run lines, the npm scripts ci.yml calls, th
 });
 
 test('npm test runs every test file and nothing else under test/: no helper, no child-process entry, no Forge fixture', () => {
-  // the test step's command line is package.json's (checked above) and runs node --test over TEST_FILES
-  assert.equal(STEPS.find((s) => s.id === 'test').describe, `node --test ${TEST_FILES.map((g) => `"${g}"`).join(' ')}`);
+  // `npm test` is tools/test-run.mjs, which runs node --test over TEST_FILES (test/test-run.test.js checks that side:
+  // SHARD unset is the whole suite, SHARD=n is one shard of it)
+  assert.equal(pkg.scripts.test, 'node tools/test-run.mjs');
+  assert.equal(STEPS.find((s) => s.id === 'test').describe, 'node tools/test-run.mjs');
   // what Node's test runner expands them to (the same glob, node_modules left out the way --test leaves it out)
   const picked = fs.globSync(TEST_FILES, { cwd: ROOT, exclude: (p) => path.basename(String(p?.name ?? p)) === 'node_modules' })
     .map((f) => f.split(path.sep).join('/')).sort();
