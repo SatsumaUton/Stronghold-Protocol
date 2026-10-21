@@ -181,10 +181,13 @@
 @keyframes gtop-flip { from { transform: translateY(-55%); opacity: 0; } }
 /* a narrow screen (phone landscape 640×360 / 667×375: the root at its 40 px floor): the halves shrink to their content,
    so a boss round's wide capsule leaves room for the corners (the exit, latency and 观战席 pills at the left; the solo
-   clock and pause at the right) */
+   clock and pause at the right). The deco type's text stand-in (no art pack) is wider than the sprites it stands in for
+   and ran into itself over the narrowed band (§35.18's leftover): it gives way there — decoration only, aria-hidden; the
+   official sprites fit and stay */
 @media (max-width: 767px) {
   .gtop__band { grid-template-columns: minmax(1.2rem, auto) auto minmax(1.2rem, auto); }
   .gtop__half { padding: 0 .14rem; }
+  .gtop__decotxt { display: none; }
 }
 /* the two official 🔍 buttons (ui/hud.js CheckBtn): btn_check_player (mint, left) and btn_check_enemy (amber, right);
    sprites are 35×29 (plain) / 61×29 (with chevrons) → .555rem / .967rem × .46rem */

@@ -5,7 +5,8 @@
 // plate — with the round-1 回合开始 kettles playing in the capsule as it comes in (the maintainer's decision of 2026-10-21),
 // and the shop bar does not slide in a second time when the entry ends; the pending-leak red of the LP (GitHub #479) wins
 // over the top bar's white; a capsule scene stays on the capsule pill inside the plate; the official deco type
-// (hudPanel/frame_deco_txt*, aria-hidden; the same words as text without the art pack); a boss round on phone landscape
+// (hudPanel/frame_deco_txt*, aria-hidden; the same words as text without the art pack, which gives way on a narrow
+// screen — the sprites fit and stay, apart); a boss round on phone landscape
 // leaves the corners clear; reduced motion never hides the HUD. Static counterpart: test/ui/match-topbar.test.js.
 
 import { test, describe, before, after } from 'node:test';
@@ -64,6 +65,21 @@ describe('match top bar (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 (a
     return { page, problems, context };
   }
 
+  /** The deco type on screen (its sprite or text box has a size) and the pairs whose boxes cross. */
+  const decoLayout = (page) => page.evaluate(() => {
+    const boxes = [...document.querySelectorAll('.gtop__deco')].map((d) => {
+      const el = d.querySelector('img, .gtop__decotxt');
+      const r = el ? el.getBoundingClientRect() : { width: 0, height: 0 };
+      return { k: d.dataset.deco, r, on: r.width > 0 && r.height > 0 };
+    }).filter((b) => b.on);
+    const overlaps = [];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i].r, b = boxes[j].r;
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) overlaps.push(`${boxes[i].k}×${boxes[j].k}`);
+    }
+    return { shown: boxes.map((b) => b.k), overlaps };
+  });
+
   // first, and in one page (a later page of the same browser was once seen getting sprites past the interception)
   test('without the art pack: the deco type as text, hidden from screen readers; no 协议启动！ screen, so the HUD never waits', async () => {
     const { page, problems, context } = await open({ noart: true });
@@ -73,6 +89,14 @@ describe('match top bar (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 (a
       { hidden: 'true', text: 'STRONGHOLD PROTOCOL', img: false },
       { hidden: 'true', text: 'RHODES ISLAND TERMINAL SERVICE', img: false },
     ]);
+    // a narrow screen (phone landscape): the text stand-in, wider than its sprites, gives way rather than run into itself
+    // over the narrowed band (§35.18); back at full width it is there again
+    await page.setViewport({ width: 667, height: 375, deviceScaleFactor: 1 });
+    await sleep(300);
+    assert.deepEqual(await decoLayout(page), { shown: [], overlaps: [] }, '667 px: no deco text, nothing overlapping');
+    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+    await sleep(300);
+    assert.deepEqual((await decoLayout(page)).shown, ['txt1', 'txt2', 'txt3']);
     await page.evaluate(() => globalThis.__MOCK__.setPhase('BATTLE_CHECK'));
     await sleep(400);
     assert.equal(await page.$('[data-testid="protocol-boot"]'), null);
@@ -92,6 +116,10 @@ describe('match top bar (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 (a
     ]);
     const pseudo = await page.$eval('.gtop__band', (e) => [getComputedStyle(e, '::before').content, getComputedStyle(e, '::after').content]);
     assert.deepEqual(pseudo, ['none', 'none'], 'no CSS-generated words on the band');
+    // the sprites fit a phone's narrowed band: all three stay, none over another
+    await page.setViewport({ width: 667, height: 375, deviceScaleFactor: 1 });
+    await sleep(300);
+    assert.deepEqual(await decoLayout(page), { shown: ['txt1', 'txt2', 'txt3'], overlaps: [] }, '667 px: the official sprites, apart');
     assert.deepEqual(problems, []);
     await context.close();
   });

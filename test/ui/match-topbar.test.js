@@ -50,6 +50,9 @@ test('the deco type is the official hudPanel/frame_deco_txt* sprites (aria-hidde
   const { css } = blocks();
   for (const src of [hud, css]) assert.doesNotMatch(src, /STRONGHOLD TERMINAL SERVICE/, 'in no official art');
   assert.doesNotMatch(css, /\.gtop__band::(before|after)/, 'no CSS-generated words (a screen reader read them twice)');
+  // the text stand-in, wider than its sprites, ran into itself over a narrow screen's band (§35.18): it gives way there
+  assert.match(css, /@media \(max-width: 767px\) \{\n\s+\.gtop__band \{ grid-template-columns: minmax\(1\.2rem, auto\) auto minmax\(1\.2rem, auto\); \}\n\s+\.gtop__half \{ padding: 0 \.14rem; \}\n\s+\.gtop__decotxt \{ display: none; \}\n\}/);
+  assert.doesNotMatch(css, /\.gtop__decoimg[^{]*\{[^}]*display: none/, 'the official sprites stay');
 });
 
 test('css/screens/game.css: the centre and its 进场 — fixed HUD sizes, the pending red kept, the scene inside the plate, the shop once', () => {
