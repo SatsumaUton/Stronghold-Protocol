@@ -95,11 +95,21 @@
 //     Stored on the session and the seat. Unlike
 //     the settings above there is NO phase gate: a match receives seats[].skins when it starts AND takes a later change
 //     at once (match.setSkins, any phase), because the choice is public — a teammate sees your model — and cosmetic.
+//     The room's members see a seat's map as room.state seats[].skins (human seats with a non-empty map only, so a room
+//     without skins sends what it sent before): the waiting room's 名片干员 seat cards wear the outfit of the operator
+//     they show (the maintainer's decision 4 of 2026-10-21; the client picks that operator's entry — ui/seatArt.js
+//     seatCardSkin — exactly as a match card reads Match.publicView().players[].skins). A changed map is broadcast while
+//     the room waits; during a match its m.public carries it, and the room.state at the match's end.
 //   * 名片干员 (PR #643 split 6): room.card { charId } — the operator whose portrait fills the player's seat card in the
 //     waiting room, '' for none — is kept only when it is a visible charId of the room's chess.json (another id, a hidden
 //     preset, a stand-in body or a 自选-only operator: BAD_MSG, the stored one stays). Stored on the session (it follows the player into
 //     the next room) and the seat; the room's members see it as room.state seats[].card (human seats with a card only,
-//     so a room without one sends what it sent before). Cosmetic: no phase gate, never handed to a match.
+//     so a room without one sends what it sent before). Checked again when the player takes a seat (humanSeat): a card
+//     the room's content does not have (a plugin operator picked in a room with gameplay plugins) is left off that seat
+//     — the session keeps it, and the player's page sends the card it can show for the room (ui/loadoutSync.js
+//     installCardSync). Cosmetic: no phase gate, never handed to a match. [ASSUMED] A card picked in this browser stands
+//     in for the event's account assistant (名片形象, display_meta_table avatarTypeData ASSISTANT); the client's default
+//     for a seat without one is ui/seatArt.js'.
 //   * Content identity (DESIGN §32, the plugin system's first step): the lobby is given the server's vanilla content
 //     (server/plugins/identity.js; none in unit tests that build a Lobby without it). Every `welcome` carries
 //     `content: { vanilla: <cs> }` — and `plugins: <n>` when this server has n > 0 unofficial plugins (every class but a
@@ -292,6 +302,12 @@ function freezeSkins(skins, hasOperator) {
   return Object.freeze({ ...res.skins });
 }
 
+/** Do two skin selections hold the same pairs (a resend of the same map is not broadcast again)? */
+function sameSkins(a, b) {
+  const ka = a ? Object.keys(a) : [], kb = b ? Object.keys(b) : [];
+  return ka.length === kb.length && ka.every((k) => a[k] === b[k]);
+}
+
 /** One room: 4 seat slots, host, difficulty, optional running match. */
 export class Room {
   /** @param {string} code @param {'solo'|'coop'} mode @param {string} difficulty @param {number} now */
@@ -379,7 +395,10 @@ export class Room {
           // a room with gameplay plugins (header "Gameplay plugins"): has this player's page loaded and checked its content?
           ...(this.modded && !s.isBot ? { content: s.content || 'loading' } : {}),
           // 名片干员 (room.card): only a human seat with a card carries the key
-          ...(!s.isBot && s.card ? { card: s.card } : {}) }
+          ...(!s.isBot && s.card ? { card: s.card } : {}),
+          // 干员皮肤 (room.skins, PUBLIC like Match.publicView().players[].skins): the seat card's outfit (header);
+          // only a human seat with a non-empty map carries the key
+          ...(!s.isBot && s.skins && Object.keys(s.skins).length ? { skins: s.skins } : {}) }
         : null)),
       spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(this.modded ? { content: s.content || 'loading' } : {}) })),
       ...(this.content ? { content: this.content.trusted ? {...this.content, trusted:{...this.content.trusted, consent:Object.fromEntries(this.seats.filter(x => x && !x.isBot).map(x => [x.seat,x.consentCs === this.content.cs]))}} : this.content } : {}),
@@ -789,7 +808,7 @@ export class Lobby {
       else { room.content = r.content; this.holdContent(r.content); }
     }
     room.ownerKey = key;
-    room.seats[0] = this.humanSeat(0, session);
+    room.seats[0] = this.humanSeat(0, session, room);
     room.hostId = session.playerId;
     this.rooms.set(code, room);
     session.roomCode = code;
@@ -814,7 +833,7 @@ export class Lobby {
     const idx = room.freeSeat();
     if (idx < 0) return fail(ERR.ROOM_FULL);
     if (cur) this.removeMember(cur, session.playerId);
-    room.seats[idx] = this.humanSeat(idx, session);
+    room.seats[idx] = this.humanSeat(idx, session, room);
     session.roomCode = room.code;
     session.notice = null;
     session.pendingResult = null;
@@ -1264,7 +1283,8 @@ export class Lobby {
 
   /**
    * room.skins (docs/SKINS.md): store the appearances this player chose for their operators, on the session and the
-   * seat, and hand them to a running match.
+   * seat, and hand them to a running match. A waiting room is shown a changed map (room.state seats[].skins: its seat
+   * cards wear them — header 干员皮肤).
    *
    * Unlike room.loadout there is no phase gate. The loadout is frozen at INFO_CHECK because it changes what a unit
    * *does*; a skin changes only what it looks like, and it is public — a teammate switching model mid-match is
@@ -1278,7 +1298,12 @@ export class Lobby {
     session.skins = kept;
     if (!room) return OK;
     const seat = room.seatOf(session.playerId);
-    if (seat) seat.skins = kept;
+    if (seat) {
+      const changed = !sameSkins(seat.skins, kept);
+      seat.skins = kept;
+      // the waiting room's seat cards wear them (room.state seats[].skins, header); a match shows them in its m.public
+      if (changed && !room.match) this.broadcastState(room);
+    }
     if (!room.match || !seat) return OK;
     if (typeof room.match.setSkins !== 'function') return fail(ERR.ROOM_STARTED, 'stored for the next match');
     return matchAnswer(this.callMatch(room, 'setSkins', session.playerId, kept));
@@ -1738,8 +1763,14 @@ export class Lobby {
     return room;
   }
 
-  /** @returns {Seat} */
-  humanSeat(idx, session) {
+  /**
+   * A human seat for `session` in `room`. The card is checked against the room's operators (header 名片干员): one the
+   * room's content lacks is left off the seat, never cleared from the session.
+   * @param {number} idx @param {any} session @param {Room} room
+   * @returns {Seat}
+   */
+  humanSeat(idx, session, room) {
+    const card = session.card && chessCharIds(this.dataFor(room)).has(session.card) ? session.card : null;
     return {
       seat: idx, playerId: session.playerId, name: session.name, isBot: false, ready: false, connected: session.connected, left: false,
       loadout: session.loadout || null,
@@ -1750,7 +1781,7 @@ export class Lobby {
       // publishes them to teammates)
       skins: session.skins || null,
       // 名片干员 (room.card): the operator on this player's seat card (PUBLIC: room.state seats[].card)
-      card: session.card || null,
+      card,
       // the content each was checked for (header "Gameplay plugins": filtered at the match start when it is another)
       loadoutCs: session.loadoutCs ?? null,
       notOwnedCs: session.notOwnedCs ?? null,
