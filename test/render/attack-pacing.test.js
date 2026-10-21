@@ -134,6 +134,31 @@ describe('a change in the SAME tick as the attack (the review case)', () => {
     assert.equal(v.atkInterval, 0.6);
   });
 
+  test('a rate event outranks the stale spawn UnitInfo (it is spawn-time metadata)', async () => {
+    // The real entry: render/app.js spawns the view from UnitInfo, pushes every 'rate' event into setAtkInterval, and the
+    // frame loop then calls sync() with the next snapshot — whose info object still holds the SPAWN value.
+    const v = await view(unit({ atkInterval: 1.2 }));
+    assert.equal(v.atkInterval, 1.2, 'the spawn value paces the first swing');
+    const snap = { x: 4, y: 9, hp: 1000, maxHp: 1000, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0 };
+    v.setAtkInterval(0.6);                       // the 'rate' event of a skill that just started
+    assert.equal(v.atkInterval, 0.6);
+    assert.equal(v.actor.interval, 0.6, 'the actor paces that swing at 0.6 s');
+    v.sync(snap);                                // same frame: UnitInfo is spawn-time metadata, still 1.2
+    assert.equal(v.atkInterval, 0.6, 'the stale spawn value does not overwrite the event');
+    v.sync(snap);
+    assert.equal(v.atkInterval, 0.6, 'and it stays put on later frames');
+  });
+
+  test('without a rate event the snapshot value is still adopted', async () => {
+    const v = await view(unit({ atkInterval: 1.2 }));
+    v.info.atkInterval = 0.9;                    // stands in for a spawn info built from a later snapshot
+    v.sync({ x: 4, y: 9, hp: 1000, maxHp: 1000, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0 });
+    assert.equal(v.atkInterval, 0.9, 'no rate event yet: the snapshot value is used');
+    v.setAtkInterval(0.6);
+    v.sync({ x: 4, y: 9, hp: 1000, maxHp: 1000, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0 });
+    assert.equal(v.atkInterval, 0.6, 'after that event the stale info no longer wins');
+  });
+
   test('the rate event carries the interval the current swing runs on (emitted after the skill tick)', () => {
     const u = { id: 7, alive: true, deployed: true, _rateDirty: true, _rateSent: 0, s: { interval: 0.5 } };
     const ev = new BattleEvents();          // a method container: the sim installs it on Battle.prototype

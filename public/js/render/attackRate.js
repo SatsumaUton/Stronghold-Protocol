@@ -5,11 +5,14 @@
 //
 // The snapshot now carries the unit's real interval (`UnitInfo.atkInterval` = sim `s.interval`, buffs included), and the
 // first measured gap replaces the estimate outright, so the very first swing is already paced right.
-// Every constant in this file is RENDERER SIDE ONLY and has no official counterpart: the client is handed the interval
-// and never clamps it. They exist so that a broken value (a 0, a NaN, a gap across a hidden tab) cannot freeze or
-// explode a clip. [ASSUMED - not verified against the official client]
-export const ATK_MIN_S = 0.2;      // [ASSUMED] a sane lower bound (6 attacks / s)
-export const ATK_MAX_S = 6;        // [ASSUMED] and upper bound, as the old guess clamps
+// DISPLAY POLICY, not a rule of the game. The sim hands over the true interval and the client does not change what
+// happens in the battle; the numbers below only bound what this renderer is willing to show, so a broken value (a 0, a
+// NaN, a gap across a hidden tab) cannot freeze or explode a clip. `clampAtkInterval` IS applied to every value the view
+// takes — snapshot, 'rate' event and measured gap alike — and it is the ATK_MIN_S..ATK_MAX_S window that does it, hence the
+// clip of a unit attacking faster than 6 / s or slower than one per 6 s plays at the window edge. [ASSUMED - the window
+// itself has no official counterpart; the official client was not measured]
+export const ATK_MIN_S = 0.2;      // [ASSUMED] display lower bound (6 attacks / s)
+export const ATK_MAX_S = 6;        // [ASSUMED] display upper bound (1 attack / 6 s)
 export const ATK_DEFAULT_S = 1.2;  // [ASSUMED] nothing known at all
 export const ATK_SANE_S = [0.05, 6]; // [ASSUMED] a measured gap outside this is a stall (a hidden tab, a reconnect), not a rhythm
 /**

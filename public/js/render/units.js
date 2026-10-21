@@ -716,6 +716,10 @@ export class UnitView {
     // `atkKnown`: the interval came from the sim (the spawn info's atkInterval or a 'rate' event), so a measured gap must
     // not overwrite it 鈥?a pause (a stop, a stun, a redeploy) is not a slower attack rhythm (render/attackRate.js).
     this.atkKnown = Number.isFinite(Number(info.atkInterval)) && Number(info.atkInterval) > 0;
+    // `rateSeen`: a 'rate' event (render/app.js) carried an interval AFTER this view was spawned. UnitInfo is spawn-time
+    // metadata — ordinary snapshots do not refresh it — so once an event has spoken, the snapshot's copy is stale and must
+    // not overwrite it (the frame loop drains events BEFORE sync()).
+    this.rateSeen = false;
     this.atkInterval = startAtkInterval(info.atkInterval, defaultInterval(ctx, info));
     this.shake = 0;
     this.screen = { x: 0, y: 0, s: 1, top: 0 };
@@ -1182,11 +1186,18 @@ export class UnitView {
     if ((prevFlags ^ this.flags) & UF.SKILL) this.setSkill(!!(this.flags & UF.SKILL));
     if (this.anim === ANIM.DIE && this.alive) this.die();
     if (this.actor && this.alive) this.actor.setBase(this._baseFromAnim());
-    // The snapshot's interval is AUTHORITATIVE (server/sim/snapshot.js carries `s.interval` every tick): a skill or buff
-    // that changed it in the same tick as this attack makes the 'rate' event one step late, and the look-ahead would pace
-    // the first swing with the old value. Reading it here every frame keeps the preview in step with the sim.
-    const iv = Number(this.info && this.info.atkInterval);
-    if (Number.isFinite(iv) && iv > 0 && Math.abs(iv - this.atkInterval) > 1e-6) this.setAtkInterval(iv);
+    // The spawn-time interval stands in for the sim's value (#729): a skill or buff that changed it in the same tick as
+    // this attack makes the 'rate' event one step late, and the look-ahead would pace the swing with the old value.
+    // UnitInfo is NOT refreshed by ordinary snapshots, so once a 'rate' event has been applied this copy is stale —
+    // skip it, or the event would be overwritten on every frame that follows (the loop drains events, then sync()).
+    if (!this.rateSeen) {
+      const iv = Number(this.info && this.info.atkInterval);
+      if (Number.isFinite(iv) && iv > 0 && Math.abs(iv - this.atkInterval) > 1e-6) {
+        this.atkInterval = clampAtkInterval(iv);
+        this.atkKnown = true;
+        if (this.actor) this.actor.interval = this.atkInterval;
+      }
+    }
   }
 
   /** The way the model looks (−1 left, 1 right); a FIXED_FACING leader keeps its own way whatever turn it is given. */
@@ -1397,6 +1408,7 @@ export class UnitView {
     const v = Number(seconds);
     if (!Number.isFinite(v) || v <= 0) return;
     this.atkInterval = clampAtkInterval(v);
+    this.rateSeen = true;   // an event value outranks the spawn-time UnitInfo (see sync)
     this.atkSeen = true;
     this.atkKnown = true;      // the sim is authoritative from here on (the gaps measured later only smooth into it)
     if (this.actor) this.actor.interval = this.atkInterval;
