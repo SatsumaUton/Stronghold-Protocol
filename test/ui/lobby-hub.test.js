@@ -305,3 +305,56 @@ test('选择同盟方式 on a short screen (≤ 520 px tall): 创建同盟 keeps
   assert.match(short, /\.proto-title__mode \{[^}]*flex-wrap: wrap;[^}]*white-space: nowrap; \}/, 'the mode line breaks between its parts, never inside one');
   assert.match(short, /\.ally-side \{[^}]*overflow-x: hidden; overflow-y: auto;/, 'a column still too tall scrolls');
 });
+
+/** The short-screen @media block of lobby.css (comments dropped), up to its own closing brace. */
+function shortBlock() {
+  const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const at = css.indexOf('@media (max-height: 520px) {');
+  let end = css.indexOf('{', at) + 1;
+  for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
+  return css.slice(at, end);
+}
+
+test('选择模拟协议 on a short screen (§35.18 leftover: at 文字大小 中+ the cards ran under 开始独立模拟): one-line cards, the description in the brief, capped header and label', () => {
+  const short = shortBlock();
+  assert.match(short, /\.proto-body \{ grid-template-columns: minmax\(0, 1fr\) min\(7\.4rem, 50vw\);/, 'the column as wide as 选择同盟方式\'s');
+  assert.match(short, /\.pcard__desc, \.pcard__effects, \.pcard__meta \{ display: none; \}/, 'the cards keep only their names');
+  assert.doesNotMatch(short, /\.proto-brief p \{ display: none; \}/, 'the brief keeps its description');
+  assert.match(short, /\.proto-brief p \{[^}]*font-size: clamp\(11px, calc\(\.26 \* var\(--t\)\), 13px\);/);
+  assert.match(short, /\.pcard__name \{ min-width: 0; overflow: hidden; text-overflow: ellipsis;/);
+  assert.match(short, /\.pcard__name \{ font-size: clamp\(16px, calc\(\.4 \* var\(--t\)\), 20px\); \}/);
+  assert.match(short, /\.proto-title \.modal__title \{ font-size: min\(calc\(\.46 \* var\(--t\)\), 24px\); white-space: nowrap; \}/);
+  assert.match(short, /\.proto-title__mode, \.proto-title__mode i \{ font-size: min\(calc\(\.24 \* var\(--t\)\), 16px\); \}/);
+  // the button grows for a second line of its label instead of cutting it
+  assert.match(short, /\.proto-start \{ height: auto; min-height: 44px;/);
+  assert.match(short, /\.proto-start__label \{[^}]*white-space: normal; line-height: 1\.1; \}/);
+  assert.match(short, /\.proto-start__label \{ font-size: min\(calc\(\.5 \* var\(--t\)\), 20px\); \}/);
+  assert.match(short, /\.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), 16px\); \}/);
+  // the list still scrolls should a pack's names not fit (its base rule)
+  assert.match(lobbyCss, /\.proto-list \{[^}]*overflow-y: auto;/);
+  // the markup the rules rely on: the description on each card and in the brief, the name in its own element
+  const v = ProtocolSelect({ roomMode: 'solo', difficulty: 'ABYSS', onDifficulty: () => {}, onClose: () => {}, onCreate: () => {}, online: true });
+  assert.equal(byClass(v, 'pcard__name').length, 4);
+  assert.equal(byClass(byClass(v, 'proto-brief')[0], 'proto-brief__name').length, 1);
+  assert.ok(textOf(find(byClass(v, 'proto-brief')[0], (x) => x.type === 'p')[0]).length > 0, 'the brief\'s description');
+  assert.match(lobbyCss, /\[ASSUMED\] every cap/);
+});
+
+test('选择同盟方式 on a short screen (§35.18 leftover: the key field\'s placeholder ran under 观战 at 特大): the field\'s name as the placeholder, capped sizes', async () => {
+  const field = (props) => find(ally(props), (x) => x.type === TextField)[0];
+  assert.equal(field({}).props.placeholder, '输入同盟密钥 / 粘贴邀请链接', 'the whole sentence on a taller screen');
+  assert.equal(field({ short: true }).props.placeholder, '同盟密钥', 'the field\'s name on a short one');
+  assert.equal(field({ short: true }).props.ariaLabel, '同盟密钥');
+  const short = shortBlock();
+  assert.match(short, /\.ally-key input::placeholder \{ font-size: clamp\(11px, calc\(\.26 \* var\(--t\)\), 13px\); \}/);
+  assert.match(short, /\.ally-key__spec \{ font-size: min\(calc\(\.26 \* var\(--t\)\), 14px\); \}/, '观战 capped');
+  assert.match(lobbyCss, /\.ally-key input \{[^}]*text-overflow: ellipsis;/, 'an ellipsis, never a cut, should a pack\'s name still be longer');
+  // the lobby asks the same query as the stylesheet's block, kept current (a rotation)
+  const dev = await import('../../public/js/ui/device.js');
+  assert.equal(dev.SHORT_SCREEN_QUERY, '(max-height: 520px)');
+  assert.ok(lobbyCss.includes(`@media ${dev.SHORT_SCREEN_QUERY} {`));
+  assert.equal(typeof dev.useMediaQuery, 'function');
+  assert.match(lobbySrc, /const shortScreen = useMediaQuery\(SHORT_SCREEN_QUERY\);/);
+  assert.match(lobbySrc.match(/<\$\{AllianceSelect\}[\s\S]*? \/>/)[0], /short=\$\{shortScreen\} \/>$/);
+  assert.match(readFileSync(path.join(ROOT, 'public/js/ui/device.js'), 'utf8'), /m\.addEventListener\('change', sync\); return \(\) => m\.removeEventListener\('change', sync\);/);
+});

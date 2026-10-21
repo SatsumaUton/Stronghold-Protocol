@@ -856,6 +856,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   letter-spacing: .08em;
   text-align: center;
   text-transform: uppercase;
+  text-overflow: ellipsis;
   color: #f2f4f3;
   background: none;
   border: 0;
@@ -903,7 +904,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 
 /* ---- short landscape phones (≤ 520 CSS px tall) ---------------------------------------------------------- */
 /* The hub drops its left column and the radar; the dialogs keep the four cards and the button in view without scrolling
-   (the cards lose their effects and extras, the brief its text). */
+   at every 文字大小 (the cards keep only their names, the selected difficulty's description moves to the brief). */
 @media (max-height: 520px) {
   .lobby-hub { --hub-entry-w: 2.1rem; }
   .hub-stage {
@@ -924,22 +925,32 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .hub-entry { height: max(1.1rem, 64px); padding: .1rem .14rem; }
 
   .proto-top { padding-top: 8px; }
-  .proto-body { grid-template-columns: minmax(0, 1fr) min(5.6rem, 50vw); gap: 10px; padding-bottom: 10px; }
+  /* 选择模拟协议 (§35.18's leftover: at 文字大小 中 and above the four cards ran under 开始独立模拟 — 终极模拟 out of sight,
+     the label cut — in every language, 844×390 and smaller): a wider column (7.4rem as 选择同盟方式's, 296 px here), the cards one
+     line each — the name, 16–20 px, an ellipsis in the chosen card of a long language (the brief names it in full) —, the
+     chosen difficulty's description in the brief at the left (11–13 px, the event's own place for it, as on a desktop),
+     the header and the label capped (below) and the label wrapping onto a second line rather than being cut. The list
+     still scrolls should a pack's names not fit. [ASSUMED] every cap */
+  .proto-body { grid-template-columns: minmax(0, 1fr) min(7.4rem, 50vw); gap: 10px; padding-bottom: 10px; }
   .ally-body { grid-template-columns: minmax(0, 1fr) min(7.4rem, 54vw); }
-  .proto__pic { inset: 0 0 .7rem; }
-  .proto-brief p { display: none; }
+  .proto__pic { inset: 0 0 1.6rem; }
+  .proto-brief { max-width: min(6.4rem, 100%); padding: 6px 10px 7px; }
+  .proto-brief p { margin-top: 2px; font-size: clamp(11px, calc(.26 * var(--t)), 13px); line-height: 1.35; }
   .proto-list { gap: 6px; padding-left: 22px; justify-content: flex-start; }
-  .pcard { padding: 6px 12px; gap: 2px; border-radius: 10px; }
+  .pcard { padding: 6px 10px; gap: 2px; border-radius: 10px; }
   .pcard.is-on { transform: translateX(-16px); }
-  .pcard__effects, .pcard__meta { display: none; }
-  .pcard__desc { padding-bottom: 0; border-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pcard.is-on .pcard__head, .pcard.is-on .pcard__desc { padding-right: 58px; }
-  .pcard.is-on .pcard__stamp { right: 8px; width: 50px; height: 40px; }
+  .pcard__desc, .pcard__effects, .pcard__meta { display: none; }
+  .pcard__head { min-width: 0; }
+  .pcard__glyph { flex: none; }
+  .pcard__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+  .pcard.is-on .pcard__head { padding-right: 46px; }
+  .pcard.is-on .pcard__stamp { right: 6px; width: 40px; height: 34px; }
+  .pcard.is-on .pcard__tick { width: 22px; height: 22px; }
   .pcard__ok { display: none; }
   .proto-foot { padding-left: 22px; }
   .proto-hint { display: none; }
-  .proto-start { height: 44px; gap: 10px; padding-left: 10px; }
-  .proto-start__label { letter-spacing: .02em; }
+  .proto-start { height: auto; min-height: 44px; gap: 10px; padding: 3px 0 3px 10px; }
+  .proto-start__label { flex: 1 1 auto; padding-right: 8%; letter-spacing: .02em; white-space: normal; line-height: 1.1; }
   /* a column still taller than its space (a long language, the recent keys, the test-room box) scrolls rather than being
      cut off; the 4 px pad on the three other sides keeps the focus ring and the shadows inside the clip */
   .ally-side { gap: 8px; margin: -4px -4px -4px 0; padding: 4px 4px 4px 10px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
@@ -954,18 +965,19 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .hub-entry__group { height: auto; font-size: calc(.22 * var(--t)); }
   .hub-entry__en { font-size: calc(.16 * var(--t)); letter-spacing: .12em; }
   .hub-entry__name { font-size: calc(.42 * var(--t)); }
-  .proto-title .modal__title { font-size: calc(.46 * var(--t)); }
-  .proto-title__mode, .proto-title__mode i { font-size: calc(.24 * var(--t)); }
+  .proto-title .modal__title { font-size: min(calc(.46 * var(--t)), 24px); white-space: nowrap; }
+  .proto-title__mode, .proto-title__mode i { font-size: min(calc(.24 * var(--t)), 16px); }
   /* the mode line stays one line at a big 文字大小 in a long language (en 特大 broke 「Team Simulation」 in two, the
      header growing by a line the column needs): the decorative ALLIANCE / SOLO SIMULATION stops at 15 px [ASSUMED] and
      drops under as a whole if it still does not fit */
   .proto-title__mode { flex-wrap: wrap; justify-content: flex-end; row-gap: 0; white-space: nowrap; }
   .proto-title__mode i { font-size: min(calc(.24 * var(--t)), 15px); }
-  .proto-brief__code { font-size: calc(.22 * var(--t)); }
-  .proto-brief__name { font-size: calc(.34 * var(--t)); }
-  .pcard__name { font-size: calc(.4 * var(--t)); }
-  .pcard__desc { font-size: calc(.26 * var(--t)); }
-  .proto-start__label { font-size: calc(.5 * var(--t)); }
+  .proto-brief__code { font-size: min(calc(.22 * var(--t)), 14px); }
+  .proto-brief__name { font-size: min(calc(.34 * var(--t)), 20px); }
+  .pcard__name { font-size: clamp(16px, calc(.4 * var(--t)), 20px); }
+  .proto-start__label { font-size: min(calc(.5 * var(--t)), 20px); }
+  .proto-start__rook { font-size: min(calc(.36 * var(--t)), 16px); }
+  .proto-start__mark small { font-size: min(calc(.08 * var(--t)), 6px); }
   /* the bars' names 16–26 px here ([ASSUMED] the cap: en 「Create Alliance」 on its row at 特大, the column on the screen) */
   .ally-card__bar { font-size: clamp(16px, calc(.3 * var(--t)), 26px); }
   /* 创建同盟 keeps its difficulty line (§35.18's leftover: it was hidden here): two columns, the icon and the name on the
@@ -975,7 +987,11 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .ally-card--create .ally-card__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
   .ally-card--create .ally-card__bar small { grid-column: 2; margin-left: 0; overflow: visible; white-space: normal; font-size: clamp(11px, calc(.28 * var(--t)), 14px); line-height: 1.3; }
   .ally-key input { font-size: calc(.32 * var(--t)); }
-  .ally-key__spec { font-size: calc(.26 * var(--t)); }
+  /* the key field's placeholder fits beside 观战 (§35.18's leftover: clipped at 特大 in English and Japanese): the short
+     text (screens/lobby.js AllianceSelect `short`), 11–13 px, and 观战 at most 14 px; an ellipsis should a pack's
+     name still be longer. [ASSUMED] the caps */
+  .ally-key input::placeholder { font-size: clamp(11px, calc(.26 * var(--t)), 13px); }
+  .ally-key__spec { font-size: min(calc(.26 * var(--t)), 14px); }
   .ally-recent { font-size: min(calc(.24 * var(--t)), 14px); line-height: 1.35; } /* [ASSUMED] the cap, like the difficulty line's */
   .code-chip { font-size: calc(.28 * var(--t)); }
   .ally-guide { font-size: calc(.3 * var(--t)); }

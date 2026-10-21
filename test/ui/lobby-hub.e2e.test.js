@@ -11,7 +11,10 @@
 // 「AI 队友最后选择」 switch. Phones 844×390 and 667×375 (touch): the hub (with the 成就统计 plate in place of the card),
 // 选择模拟协议, 选择同盟方式 (创建同盟 with its difficulty line under the name) and the room's 选择模拟协议 stay inside the
 // screen, their buttons in view without scrolling; 选择同盟方式 too at 640×360 and 667×375 in English at 大 / 特大 and in
-// Japanese at 特大.
+// Japanese at 特大, its key field's placeholder whole beside 观战 (every language and 文字大小, §35.18's leftover).
+// 选择模拟协议 on phones 640×360 / 667×375 / 740×360 / 844×390 in all five languages at all four 文字大小 (§35.18's
+// leftover: at 中 and above the cards ran under 开始独立模拟): the four cards whole above the button without scrolling,
+// the button and its label whole, the names whole (the chosen card's in the brief), the description in the brief.
 // The other doctors' read-only view: test/ui/room-settings.e2e.test.js.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/lobby-hub-*.png
 
@@ -369,4 +372,114 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
       }
     });
   }
+
+  /** The key field's placeholder: its text width in the placeholder's own font against the input's inner width. */
+  const keyField = (page) => page.$eval('.ally-key input', (input) => {
+    const ph = getComputedStyle(input, '::placeholder');
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = `${ph.fontWeight} ${ph.fontSize} ${ph.fontFamily}`;
+    c.letterSpacing = ph.letterSpacing;
+    const cs = getComputedStyle(input);
+    const inner = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const spec = document.querySelector('.ally-key__spec').getBoundingClientRect(), r = input.getBoundingClientRect();
+    return { text: input.placeholder, textW: Math.ceil(c.measureText(input.placeholder).width), inner: Math.floor(inner), px: parseFloat(ph.fontSize),
+      beside: r.right <= spec.left + 1 };
+  });
+
+  // 选择同盟方式's key field on a short screen (§35.18's leftover: at 特大 the placeholder ran under 观战 in English and
+  // Japanese): the short placeholder (the field's name), whole, ≥ 11 px, in every language and 文字大小; the long one back
+  // where the screen is taller than 520 px
+  test('phones: 选择同盟方式\'s key field placeholder fits beside 观战 in every language at every 文字大小', { timeout: 300000 }, async () => {
+    const names = { zh: '同盟密钥', 'zh-TW': '同盟金鑰', en: 'Alliance Key', ja: '同盟コード', ko: '동맹 코드' };
+    for (const lang of ['zh', 'zh-TW', 'en', 'ja', 'ko']) {
+      for (const textSize of ['sm', 'md', 'lg', 'xl']) {
+        const { ctx, page, problems } = await open({ w: 640, h: 360, touch: true, lang: lang === 'zh' ? null : lang, textSize });
+        try {
+          await press(page, '.mode-card[data-mode="coop"]', true);
+          await page.waitForSelector('.modal__box.ally', { visible: true });
+          await page.evaluate(() => document.fonts.ready);
+          for (const [w, h] of [[640, 360], [667, 375], [740, 360], [844, 390]]) {
+            await page.setViewport({ width: w, height: h, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
+            await sleep(200);
+            const k = await keyField(page);
+            const what = `${lang} ${textSize} ${w}×${h}: ${JSON.stringify(k)}`;
+            assert.equal(k.text, names[lang], what);
+            assert.ok(k.textW <= k.inner && k.px >= 11 && k.beside, `the placeholder whole beside 观战 — ${what}`);
+          }
+          if (lang === 'en' && textSize === 'xl') {
+            await page.setViewport({ width: 1280, height: 800, hasTouch: true, isMobile: true, deviceScaleFactor: 1 }); // (a touch change reloads)
+            await page.waitForFunction(() => document.querySelector('.ally-key input')?.placeholder === 'Enter Alliance Key / paste invite link', { timeout: 3000 });
+            // (taller than 520 px the whole sentence is back; where it is still too long at 特大 it ends in an ellipsis)
+            assert.equal(await page.$eval('.ally-key input', (el) => getComputedStyle(el).textOverflow), 'ellipsis');
+            await page.setViewport({ width: 640, height: 360, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
+            await page.waitForFunction(() => document.querySelector('.ally-key input')?.placeholder === 'Alliance Key', { timeout: 3000 });
+            await page.screenshot({ path: path.join(OUT, 'lobby-hub-phone-640-alliance-key-en-xl.png') });
+          }
+          assert.deepEqual(problems, []);
+        } finally { await ctx.close(); }
+      }
+    }
+  });
+
+  /**
+   * 选择模拟协议 on a phone: the four cards whole inside their list, which does not scroll, above the button; the button
+   * and its label whole on the screen (each line of the label inside the button); the names whole but the chosen card's,
+   * which the brief names in full; the description shown in the brief.
+   */
+  const protoFit = (page) => page.evaluate(() => {
+    const box = (el) => el.getBoundingClientRect();
+    const list = document.querySelector('.proto-list'), l = box(list);
+    const cards = [...list.querySelectorAll('.diff-card')];
+    const start = document.querySelector('.proto-start'), s = box(start);
+    const label = start.querySelector('.proto-start__label');
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    const lines = [...range.getClientRects()].filter((r) => r.width > 0);
+    const whole = (el) => el.scrollWidth <= el.clientWidth + 1;
+    const brief = document.querySelector('.proto-brief'), desc = brief.querySelector('p'), bname = brief.querySelector('.proto-brief__name');
+    const stage = box(document.querySelector('.proto-stage'));
+    return {
+      cards: cards.length, listScrolls: list.scrollHeight > list.clientHeight + 1,
+      cardsIn: cards.every((c) => { const r = box(c); return r.top >= l.top - 1 && r.bottom <= l.bottom + 1; }),
+      aboveButton: l.bottom <= s.top + 1,
+      button: s.top >= 0 && s.bottom <= innerHeight && s.left >= 0 && s.right <= innerWidth,
+      label: whole(label) && lines.length > 0 && lines.every((r) => r.left >= s.left - 1 && r.right <= s.right + 1 && r.top >= s.top - 1 && r.bottom <= s.bottom + 1),
+      lines: lines.length,
+      names: cards.every((c) => c.classList.contains('is-on') || whole(c.querySelector('.pcard__name'))),
+      chosenInBrief: whole(bname) && cards.some((c) => c.classList.contains('is-on') && bname.textContent.trim() === c.querySelector('.pcard__name').textContent.trim()),
+      desc: getComputedStyle(desc).display !== 'none' && desc.textContent.trim().length > 0 && (() => { const r = box(desc); return r.left >= stage.left - 1 && r.right <= stage.right + 1 && r.bottom <= stage.bottom + 1; })(),
+      cardDescHidden: cards.every((c) => getComputedStyle(c.querySelector('.pcard__desc')).display === 'none'),
+    };
+  });
+  const protoOk = (d) => d.cards === 4 && !d.listScrolls && d.cardsIn && d.aboveButton && d.button && d.label && d.lines <= 2 && d.names && d.chosenInBrief && d.desc && d.cardDescHidden;
+
+  test('phones: 选择模拟协议\'s four cards and 开始独立模拟 fit in every language at every 文字大小 (640×360 – 844×390)', { timeout: 420000 }, async () => {
+    for (const lang of ['zh', 'zh-TW', 'en', 'ja', 'ko']) {
+      for (const textSize of ['sm', 'md', 'lg', 'xl']) {
+        const { ctx, page, problems } = await open({ w: 640, h: 360, touch: true, lang: lang === 'zh' ? null : lang, textSize });
+        try {
+          await press(page, '.mode-card[data-mode="solo"]', true);
+          await page.waitForSelector('.modal__box.proto', { visible: true });
+          await page.evaluate(() => document.fonts.ready);
+          for (const [w, h] of [[640, 360], [667, 375], [740, 360], [844, 390]]) {
+            await page.setViewport({ width: w, height: h, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
+            await sleep(200);
+            assert.deepEqual(await fit(page), { out: [], scrolls: false }, `${lang} ${textSize} ${w}×${h}: 选择模拟协议 fits`);
+            const d = await protoFit(page);
+            assert.ok(protoOk(d), `${lang} ${textSize} ${w}×${h}: ${JSON.stringify(d)}`);
+            if (lang === 'en' && textSize === 'xl' && w === 667) await page.screenshot({ path: path.join(OUT, 'lobby-hub-phone-667-protocol-en-xl.png') });
+          }
+          // 终极模拟, the last card, chosen on the smallest screen: still whole above the button, the brief names it
+          await page.setViewport({ width: 640, height: 360, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
+          assert.ok(await diffCard(page, (await page.$$eval('.diff-card .pcard__name', (els) => els[3].textContent))) === 3);
+          await page.tap('.diff-card[data-test-pick]');
+          await page.waitForFunction(() => document.querySelector('.proto__body')?.dataset.difficulty === 'ABYSS');
+          await sleep(300);
+          const d = await protoFit(page);
+          assert.ok(protoOk(d), `${lang} ${textSize} 640×360, 终极模拟: ${JSON.stringify(d)}`);
+          assert.deepEqual(problems, []);
+        } finally { await ctx.close(); }
+      }
+    }
+  });
 });
