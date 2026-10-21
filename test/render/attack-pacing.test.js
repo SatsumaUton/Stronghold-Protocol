@@ -149,6 +149,20 @@ describe('a change in the SAME tick as the attack (the review case)', () => {
     assert.equal(v.atkInterval, 0.6, 'and it stays put on later frames');
   });
 
+  test('a spawn that reuses the view re-seeds the pacing state (a 重生 / a second life)', async () => {
+    // app.js keeps the view when a spawn arrives for an id it already has, so the previous life's rate event must not hold
+    // the new life's interval: case 'spawn' calls respawn(info) on the reused view.
+    const v = await view(unit({ atkInterval: 1.2 }));
+    v.setAtkInterval(0.6);                       // the previous life's rate event
+    v.sync({ x: 4, y: 9, hp: 1000, maxHp: 1000, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0 });
+    assert.equal(v.atkInterval, 0.6);
+    v.respawn({ atkInterval: 0.9 });             // the new life's UnitInfo
+    assert.equal(v.atkInterval, 0.9, 'the new spawn value is taken');
+    assert.equal(v.rateSeen, false, 'and the next rate event counts again');
+    v.sync({ x: 4, y: 9, hp: 1000, maxHp: 1000, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0 });
+    assert.equal(v.atkInterval, 0.9, 'nothing overwrites it with the old life');
+  });
+
   test('without a rate event the snapshot value is still adopted', async () => {
     const v = await view(unit({ atkInterval: 1.2 }));
     v.info.atkInterval = 0.9;                    // stands in for a spawn info built from a later snapshot

@@ -1404,6 +1404,21 @@ export class UnitView {
    * of waiting for this view to measure two attacks by itself. Later measured gaps still smooth into it.
    * @param {number} seconds the sim's attack interval
    */
+  /**
+   * A spawn for a unit whose view already exists (#729): a 重生 or a second life reuses the object, so the pacing state
+   * starts over from this spawn's info. Without it `rateSeen` would keep the previous life's interval and skip the fresh
+   * UnitInfo — the one case where "an event outranks the spawn info" does not hold.
+   * @param {{ atkInterval?: number } | null | undefined} info the spawn's UnitInfo
+   */
+  respawn(info) {
+    if (info) this.info = info;
+    this.rateSeen = false;
+    this.atkSeen = false;
+    this.atkKnown = Number.isFinite(Number(this.info && this.info.atkInterval)) && Number(this.info.atkInterval) > 0;
+    this.atkInterval = startAtkInterval(this.info && this.info.atkInterval, this.atkInterval);
+    if (this.actor) this.actor.interval = this.atkInterval;
+  }
+
   setAtkInterval(seconds) {
     const v = Number(seconds);
     if (!Number.isFinite(v) || v <= 0) return;
