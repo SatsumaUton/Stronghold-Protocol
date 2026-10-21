@@ -48,7 +48,8 @@ test('screens/game.js: the screen at BATTLE_CHECK once its art is in, else the b
   assert.match(g, /<\$\{ProtocolBoot\} key=\$\{boot\.key\} players=\$\{players\} myId=\$\{myId\} leaving=\$\{bootLeaving\} \/>/);
   assert.match(g, /setBootLeaving\(true\);\n\s+out = setTimeout\(\(\) => \{ setBoot\(null\); setBootLeaving\(false\); \}, BOOT_LEAVE_MS\);\n\s+\}, Math\.max\(0, \(boot\.at \|\| 0\) \+ BOOT_MIN_MS - Date\.now\(\)\)\);/);
   // the round plate comes in as it starts to leave (under it: z-index), inside 回合开始's 2 s
-  assert.match(g, /\$\{roundPop && !hasOffers && \(!boot \|\| bootLeaving\) \? html`<\$\{RoundPopup\}/);
+  // (and with the HUD's entry: never over the hidden top bar — PR #827, the maintainer's decision 5)
+  assert.match(g, /\$\{roundPop && !hasOffers && \(!boot \|\| bootLeaving\) && hudIn !== 'wait' \? html`<\$\{RoundPopup\}/);
 });
 
 test('the pre-game end fits the official 3 s BATTLE_CHECK: the held draft + 协议启动！\'s minimum, its animation whole, the fade with the hold', () => {
