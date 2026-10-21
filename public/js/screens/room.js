@@ -2,7 +2,9 @@
 // 创建者, the ready state at the bottom, the name plate under the card; an empty seat offers 邀请 — copies the key — and,
 // to the host, 添加 AI 队友; the host's 移出 / 移除 AI 队友 at a card's top right), the top bar (leave, mode and ping, 统计 /
 // 设置 / 玩法说明, 干员调配 and the 同盟密钥 with 复制 / the link), the bottom: the ready count and status line, the
-// difficulty pill and ⚙ 同盟设置 (co-op), and the big 开始模拟 / 准备就绪 button.
+// difficulty pill and ⚙ 同盟设置 (co-op; the ⚙ sits where the event's pill has 快速搜寻 — matchmaking is dropped by the
+// maintainer's PR #643 keep / drop list of 2026-10-15), and the big 开始模拟 / 准备就绪 button (its disabled reason in
+// the project's Tooltip: hover, or a long press on touch; the status line says it too).
 // Room settings: a co-op room is created at once from the lobby's 创建同盟 (the event's 联合模拟, research 06 §3.2; the
 // maintainer's decision of 2026-10-21), so the difficulty is chosen here — the host's pill (or ⚙'s 模拟难度 row) opens
 // 选择模拟协议 (screens/lobby.js ProtocolSelect) whose 确认 sends room.setDifficulty; the dialog closes only once the
@@ -23,10 +25,16 @@
 // the host switches the room's plugins, everybody else reads them). With gameplay plugins (§32.6: a content set of its
 // own — the tag reads 「非官方」 too) every seat shows whether its page has loaded and checked the room's content
 // (seats[].content: 载入中 / 就绪 / 校验失败), 准备就绪 and 开始模拟 wait for it (the server refuses them before:
-// CONTENT_NOT_READY), and a plugin mode the host chose shows beside the difficulty.
+// CONTENT_NOT_READY), and a plugin mode the host chose shows beside the mode name in the top bar (the orange chip).
 // 名片干员 (PR #643 split 6): a doctor's seat card shows an operator's portrait — the one the player picked (更换立绘 on
-// one's own seat opens the picker: search, rarity, 默认; kept as a pref and sent as room.card, so the room sees it as
-// seats[].card), else one of the 5★/6★ operators chosen by the player id (ui/seatArt.js), the same on every client.
+// one's own seat opens the picker: search, rarity, 默认; kept as a pref — ui/seatArt.js cardStore — and sent as
+// room.card by ui/loadoutSync.js installCardSync, so the room sees it as seats[].card), else one of the 5★/6★ operators
+// chosen by the player id (ui/seatArt.js), the same on every client. [ASSUMED] The pick made here and kept in this
+// browser stands in for the event's account assistant (名片形象); [ASSUMED] the default by player id is a remake rule.
+// Outfits (docs/SKINS.md; the maintainer's decision 4 of 2026-10-21): the portrait wears the player's outfit — one's own
+// card this browser's choice at once, another doctor's the map that seat published (room.state seats[].skins) unless
+// 「显示其他玩家的皮肤」 is off; an outfit this page's appearance plugins do not have draws the default art (ui/seatArt.js
+// seatCardSkin). The picker is one's own picker, so its tiles wear one's own outfits too (like 干员调配's).
 // Without the art pack the card keeps its avatar frame; a bot keeps its robot frame.
 // Texts go through t() (docs/I18N.md).
 
@@ -46,10 +54,12 @@ import { LoadoutButton } from './loadout.js';
 import { PluginTag, isModdedRoom } from '../ui/pluginTag.js';
 import { hasScriptConsent, rememberScriptConsent } from '../content.js';
 import { net } from '../net.js';
-import { store, useStore, shallowEqual, emptyMatch, isSpectating, loadPref, savePref } from '../store.js';
+import { store, useStore, shallowEqual, emptyMatch, isSpectating } from '../store.js';
 import { data, useData } from '../data.js';
 import { chessAvatarUrl, chessPortraitUrl } from '../ui/assetUrls.js';
-import { CARD_PREF, cardOperators, cardContext, seatOperator } from '../ui/seatArt.js';
+import { CARD_KEY, cardStore, setCard, cardOperators, cardContext, seatOperator, seatCardSkin } from '../ui/seatArt.js';
+import { skinsStore, SKINS_KEY, ownerSkin } from '../ui/skins.js';
+import { settingsStore } from '../ui/settingsStore.js';
 import { difficultyInfo, ProtocolSelect } from './lobby.js';
 import { useRise } from '../ui/transitions.js';
 import { t, tc } from '../../../shared/i18n.js';
@@ -143,9 +153,10 @@ function CardThumb({ src, name }) {
 /**
  * 名片干员 picker (更换立绘 on one's own seat card): the operators a seat card can show (ui/seatArt.js cardOperators —
  * search by name, rarity tabs) and 默认, no pick: the card shows the operator chosen by the player id. Picking closes it;
- * the current choice takes the focus (no on-screen keyboard on a phone).
+ * the current choice takes the focus (no on-screen keyboard on a phone). A local picker: each tile wears this browser's
+ * outfit for that operator (`localSkins`, docs/SKINS.md), as the card will.
  */
-function CardPicker({ current, list, m, onPick, onClose }) {
+function CardPicker({ current, list, m, localSkins = {}, onPick, onClose }) {
   const [q, setQ] = useState('');
   const [star, setStar] = useState(0);
   const stars = useMemo(() => [...new Set(list.map((c) => c.rarity).filter((r) => r > 0))].sort((a, b) => b - a), [list]);
@@ -168,7 +179,7 @@ function CardPicker({ current, list, m, onPick, onClose }) {
         <span class="cardpick__img"><${Icon} name="refresh" /></span><span class="cardpick__name">${t('默认')}</span>
       </button>
       ${shown.map((c) => {
-        const src = chessAvatarUrl(m, c);
+        const src = chessAvatarUrl(m, c, { skin: ownerSkin(c.charId, { localSkins }) });
         const on = known && c.charId === current;
         return html`<button key=${c.charId} type="button" class=${`cardpick__op r${c.rarity}${on ? ' is-on' : ''}`} aria-pressed=${on ? 'true' : 'false'}
             data-char=${c.charId} data-autofocus=${on ? '' : undefined} title=${c.name} onClick=${() => onPick(c.charId)}>
@@ -188,10 +199,12 @@ function CardPicker({ current, list, m, onPick, onClose }) {
  * (`onPickCard`); the host gets 移出 / 移除 AI 队友 at the top right. An empty seat: 邀请 (copies the key) and, for the
  * host of a co-op room, 添加 AI 队友.
  */
-function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onKick, onInvite, portrait = null, operator = null, onPickCard = null }) {
+function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onKick, onInvite, portrait = null, operator = null, onPickCard = null, fresh = false }) {
   const [badArt, setBadArt] = useState(null);
   const coop = room.mode !== 'solo';
-  const flash = useRise(!!seat && (seat.ready || seat.isBot || seat.playerId === room.hostId));
+  // the 转场 flash: a seat that turns ready (or becomes the host's), and an AI teammate added while the room is open
+  // (`fresh`: this card mounted after the room was already on screen)
+  const flash = useRise(!!seat && (seat.ready || seat.isBot || seat.playerId === room.hostId), 700, fresh);
   if (!seat) {
     const canAdd = coop && facts.isHost;
     const invitable = coop && !facts.spectating;
@@ -311,14 +324,17 @@ function RoomOptions({ option, room, isHost, busy, onAiLast, onDifficulty, onClo
   </div>`;
 }
 
-/** A gear (the pill's ⚙). */
+/** A gear (the pill's ⚙, in the place of the event's 快速搜寻: matchmaking is dropped — the maintainer's PR #643 keep / drop list, 2026-10-15). */
 function GearGlyph() {
   return html`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M10.3 2h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9L2 13.7v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" /></svg>`;
 }
 
-/** The big button of the bottom right (开始模拟 / 准备就绪 / 已就绪 / 观战中), styled like 选择模拟协议's. */
-function GoButton({ label, onClick, disabled, loading = false, ready = null, title, icon = null }) {
-  return html`<button type="button" class=${`proto-start rs-go${ready ? ' is-ready' : ''}`} disabled=${disabled} onClick=${onClick} title=${title}
+/**
+ * The big button of the bottom right (开始模拟 / 准备就绪 / 已就绪 / 观战中), styled like 选择模拟协议's. A disabled reason goes in
+ * the project's Tooltip around it (review of PR #813: a native title never shows on touch).
+ */
+function GoButton({ label, onClick, disabled, loading = false, ready = null, icon = null }) {
+  return html`<button type="button" class=${`proto-start rs-go${ready ? ' is-ready' : ''}`} disabled=${disabled} onClick=${onClick}
       aria-busy=${loading ? 'true' : 'false'}>
     ${ready == null
       ? html`<span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>STRONGHOLD<br />PROTOCOL</small></span>`
@@ -337,13 +353,20 @@ export function RoomScreen() {
   const alive = useRef(true);
   const inFlight = useRef(false); // synchronous guard against double clicks (state updates are async)
   useEffect(() => () => { alive.current = false; }, []);
-  // 名片干员: the operators a seat card can show and the default pool (ui/seatArt.js), one's own pick (a pref)
+  // 名片干员: the operators a seat card can show and the default pool (ui/seatArt.js), one's own pick (a pref the sync
+  // engine sends: ui/loadoutSync.js installCardSync), and the outfits the cards wear — this browser's choices and the
+  // 「显示其他玩家的皮肤」 switch (docs/SKINS.md)
   useData('chess', 'assets');
   const chess = data.get('chess');
   const cardList = useMemo(() => cardOperators(data.list('chess')), [chess]);
   const cards = useMemo(() => cardContext(cardList), [cardList]);
-  const [myCard, setMyCard] = useState(() => { const v = loadPref(CARD_PREF, ''); return typeof v === 'string' ? v : ''; });
+  const myCard = useStore((s) => s[CARD_KEY], Object.is, cardStore);
+  const localSkins = useStore((s) => s[SKINS_KEY], Object.is, skinsStore);
+  const otherSkins = useStore((s) => s.otherSkins !== false, Object.is, settingsStore);
   const [picking, setPicking] = useState(false);
+  // the room whose seats are on screen: a seat card that mounts after its first render is new (an AI teammate added)
+  const shownRoom = useRef('');
+  useEffect(() => { shownRoom.current = room?.code || ''; });
   // 选择模拟协议 over the room — open, and the host's pick before 确认 (the others read it: the room's difficulty) — and
   // the ⚙ menu
   const [protoOpen, setProtoOpen] = useState(false);
@@ -360,23 +383,9 @@ export function RoomScreen() {
     const name = DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : room.difficulty;
     toast(t('创建者已将模拟难度改为「{name}」', { name }), 'info');
   }, [room?.code, room?.difficulty]);
-  // the room sees one's pick once the server has it (seats[].card): sent, once the operators are loaded, whenever the
-  // seat's card differs — a pick this client does not have counts as 默认, as on one's own card. One the server refuses
-  // stays local and is not asked again until the pick, the room or its content changes (a rate refusal is retried at
-  // the next room.state).
-  const mySeat = room ? roomFacts(room, me.playerId).mine : null;
-  const seatCard = mySeat?.card || '';
-  const seated = !!mySeat;
-  const sentCard = useRef('');
-  useEffect(() => {
-    if (!seated || conn.status !== 'online' || !cards.byChar.size) return;
-    const want = cards.byChar.has(myCard) ? myCard : '';
-    const key = `${room.code}|${room.content?.cs || ''}|${want}`;
-    if (seatCard === want || sentCard.current === key) return;
-    sentCard.current = key;
-    net.request('room.card', { charId: want }).catch((err) => { if (err?.code === 'RATE') sentCard.current = ''; });
-  }, [room?.code, room?.content?.cs, seated, seatCard, myCard, cards, conn.status]);
-  const pickCard = (charId) => { setMyCard(charId); savePref(CARD_PREF, charId); setPicking(false); };
+  // the room sees one's pick once the server has it (seats[].card): ui/loadoutSync.js installCardSync sends it after
+  // every pick, welcome and content change and retries a RATE / TIMEOUT / OFFLINE refusal (review of PR #813)
+  const pickCard = (charId) => { setCard(charId); setPicking(false); };
 
   if (!room) return null;
   const online = conn.status === 'online';
@@ -507,9 +516,12 @@ export function RoomScreen() {
     <main class=${`seats rs-seats${coop ? '' : ' seats--solo'}`}>
       ${facts.seats.map((s, i) => {
         const op = seatOperator(s, cards, { myId: me.playerId, myCard });
+        // the player's outfit for that operator (header "Outfits"); null = the default art
+        const skin = op ? seatCardSkin(s, op.chess.charId, { myId: me.playerId, localSkins, players: facts.occupied, otherSkins }) : null;
         return html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
           myId=${me.playerId} busy=${busy} onAddBot=${addBot} onRemoveBot=${removeBot} onKick=${kick} onInvite=${() => copy('code')}
-          portrait=${op ? chessPortraitUrl(data.get('assets'), op.chess) : null} operator=${op?.chess} onPickCard=${() => setPicking(true)} />`;
+          portrait=${op ? chessPortraitUrl(data.get('assets'), op.chess, { skin }) : null} operator=${op?.chess} onPickCard=${() => setPicking(true)}
+          fresh=${shownRoom.current === room.code} />`;
       })}
       ${coop ? null : html`<aside class="solo-brief rs-brief brackets">
         <${MicroLabel} tone="mint">BRIEFING<//>
@@ -539,16 +551,18 @@ export function RoomScreen() {
       </div>
       <div class="room-bar__right rs-foot__right">
         ${facts.isHost
-          ? html`<${GoButton} label=${t('开始模拟')} loading=${busy === 'start'} disabled=${!facts.canStart || !online || busy === 'start'} onClick=${start}
-              title=${facts.canStart ? undefined : !facts.contentReady ? t('仍有博士未载入房间的插件内容') : t('仍有博士未准备就绪')} />`
+          ? html`<${Tooltip} text=${facts.canStart ? null : !facts.contentReady ? t('仍有博士未载入房间的插件内容') : t('仍有博士未准备就绪')}>
+              <${GoButton} label=${t('开始模拟')} loading=${busy === 'start'} disabled=${!facts.canStart || !online || busy === 'start'} onClick=${start} />
+            <//>`
           : facts.spectating
             ? html`<${GoButton} label=${t('观战中')} icon="eye" disabled=${true} />`
-          : html`<${GoButton} label=${myReady ? t('已就绪') : t('准备就绪')} ready=${myReady} loading=${busy === 'ready'}
-              disabled=${!online || !facts.mine || busy === 'ready' || (!myReady && facts.myContent !== 'ready')} onClick=${toggleReady}
-              title=${!myReady && facts.myContent !== 'ready' ? t('房间的插件内容载入并通过校验后才能准备') : undefined} />`}
+          : html`<${Tooltip} text=${!myReady && facts.myContent !== 'ready' ? t('房间的插件内容载入并通过校验后才能准备') : null}>
+              <${GoButton} label=${myReady ? t('已就绪') : t('准备就绪')} ready=${myReady} loading=${busy === 'ready'}
+                disabled=${!online || !facts.mine || busy === 'ready' || (!myReady && facts.myContent !== 'ready')} onClick=${toggleReady} />
+            <//>`}
       </div>
     </footer>
-    ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${data.get('assets')} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
+    ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${data.get('assets')} localSkins=${localSkins} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
     ${protoOpen ? facts.isHost
       ? html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${protoPick || room.difficulty} onDifficulty=${setProtoPick} onClose=${closeProto}
           onCreate=${confirmDifficulty} busy=${busy === 'diff' ? 'create' : null} online=${online} action=${t('确认')} hint=${protoHint} />`

@@ -1,15 +1,17 @@
 // test/ui/seat-art.test.js — 名片干员 on the room's seat cards (PR #643 split 6, public/js/ui/seatArt.js): the pickable
 // operators (one per charId of the visible, non-自选 chess records, the elite form, 6★ first), the default pool (5★/6★ by
 // charId), the operator a seat shows (one's own local pick at once, a teammate's seats[].card, else one chosen by the
-// player id — the same whatever order the records arrive in; none for a bot or an empty seat), and room.css following
-// 文字大小 without !important. (The server's whitelist: test/lobby-card.test.js; the browser: test/ui/room-cards.e2e.test.js.)
+// player id — the same whatever order the records arrive in; none for a bot or an empty seat), the outfit it wears
+// (seatCardSkin, the maintainer's decision 4 of 2026-10-21), the pick's store, and room.css following 文字大小 without
+// !important. (The server's whitelist: test/lobby-card.test.js; the browser: test/ui/room-cards.e2e.test.js.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { CARD_PREF, cardOperators, cardContext, seatOperator } from '../../public/js/ui/seatArt.js';
+import { CARD_PREF, CARD_KEY, cardStore, setCard, parseStoredCard, cardOperators, cardContext, seatOperator, seatCardSkin } from '../../public/js/ui/seatArt.js';
+import { chessPortraitUrl } from '../../public/js/ui/assetUrls.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CHESS = Object.values(JSON.parse(readFileSync(path.join(ROOT, 'data/chess.json'), 'utf8')));
@@ -66,6 +68,50 @@ test('the operator a seat shows: own pick at once, a teammate\'s seats[].card, e
   assert.equal(CARD_PREF, 'room.card');
 });
 
+test('the outfit a seat card wears (decision 4 of 2026-10-21): one\'s own choice at once, another doctor\'s published map, the switch, the fallback', () => {
+  const OP = 'char_1012_skadi2';
+  const SKIN = `${OP}@test#1`;
+  const me = { playerId: 'p_me', isBot: false };
+  const mate = { playerId: 'p_mate', isBot: false, skins: { [OP]: SKIN } };
+  const bare = { playerId: 'p_bare', isBot: false };
+  const bot = { playerId: 'ai_1', isBot: true, skins: { [OP]: SKIN } };
+  const players = [me, mate, bare, bot];
+  const ctx = { myId: 'p_me', localSkins: { [OP]: 'mine#2' }, players, otherSkins: true };
+  // one's own card: this browser's choice (not the published map — it shows at once, before the sync)
+  assert.equal(seatCardSkin({ ...me, skins: { [OP]: 'old#1' } }, OP, ctx), 'mine#2');
+  assert.equal(seatCardSkin(me, 'char_498_inside', ctx), null, 'no choice for that operator: the default');
+  // another doctor's card: what that seat published (room.state seats[].skins, or a match's players[].skins)
+  assert.equal(seatCardSkin(mate, OP, ctx), SKIN);
+  assert.equal(seatCardSkin(bare, OP, ctx), null);
+  assert.equal(seatCardSkin(mate, OP, { ...ctx, players: [] }), null, 'a seat not in the list publishes nothing');
+  // 「显示其他玩家的皮肤」 off: the others' cards draw the default, one's own keeps its outfit
+  assert.equal(seatCardSkin(mate, OP, { ...ctx, otherSkins: false }), null);
+  assert.equal(seatCardSkin(me, OP, { ...ctx, otherSkins: false }), 'mine#2');
+  // a bot, an empty seat, no operator: nothing
+  assert.equal(seatCardSkin(bot, OP, ctx), null);
+  assert.equal(seatCardSkin(null, OP, ctx), null);
+  assert.equal(seatCardSkin(mate, null, ctx), null);
+  // the picture: the outfit's when this page's manifest has it, else the operator's own (an appearance plugin missing here)
+  const rec = { charId: OP, isGolden: true, assets: { portrait: `${OP}_2` } };
+  const withSkin = { chars: { [OP]: { portrait: '/p/skadi_1.png', portraitE2: '/p/skadi_2.png', skins: { [SKIN]: { name: 'T', portrait: '/p/skin.png' } } } } };
+  const without = { chars: { [OP]: { portrait: '/p/skadi_1.png', portraitE2: '/p/skadi_2.png' } } };
+  assert.equal(chessPortraitUrl(withSkin, rec, { skin: seatCardSkin(mate, OP, ctx) }), '/p/skin.png');
+  assert.equal(chessPortraitUrl(without, rec, { skin: seatCardSkin(mate, OP, ctx) }), '/p/skadi_2.png');
+});
+
+test('the pick\'s store: a string pref, \'\' for 默认; setCard persists and tells the store', () => {
+  assert.equal(parseStoredCard('char_1_a'), 'char_1_a');
+  for (const junk of [null, 7, {}, ['x']]) assert.equal(parseStoredCard(junk), '');
+  const seen = [];
+  const off = cardStore.subscribe((st) => seen.push(st[CARD_KEY]));
+  try {
+    setCard('char_498_inside');
+    setCard(42);
+  } finally { off(); }
+  assert.deepEqual(seen, ['char_498_inside', '']);
+  assert.equal(cardStore.get()[CARD_KEY], '');
+});
+
 test('room.css: the seat cards and the picker follow 文字大小, no !important / :has()', () => {
   const block = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
   const sizes = [...block.matchAll(/font-size:\s*([^;}]+)[;}]/g)].map((m) => m[1].trim());
@@ -74,4 +120,6 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   assert.ok(!/!important/.test(block) && !/:has\(/.test(block));
   assert.match(block, /\.rseat__art img \{[^}]*object-fit: cover/);
   assert.match(block, /\.cardpick__grid[\s\S]*overflow-y: auto/);
+  // the plugin mode's chip beside the mode name (review of PR #813: its only rule had been deleted)
+  assert.match(block, /\.rs-clock \.room-mode \{[^}]*border: 1px solid[^}]*text-overflow: ellipsis/);
 });
