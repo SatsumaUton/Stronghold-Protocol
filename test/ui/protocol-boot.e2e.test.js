@@ -92,7 +92,7 @@ describe('协议启动！ screen (headless Chrome)', { skip: !ENABLED && 'set SP
     await context.close();
   });
 
-  test('four doctors: a card each and 协议启动！; it goes once 回合开始 follows, not before it showed 3 s', async () => {
+  test('four doctors: a card each and 协议启动！; it goes once 回合开始 follows, not before BOOT_MIN_MS, the round plate coming in under its fade', async () => {
     const { page, problems, context } = await open();
     await battleCheck(page);
     await page.waitForSelector('[data-testid="protocol-boot"]', { timeout: 3000 });
@@ -107,11 +107,40 @@ describe('协议启动！ screen (headless Chrome)', { skip: !ENABLED && 'set SP
     assert.equal(s.title, '协议启动！');
     assert.ok(s.art >= 4, 'the official sprites drawn');
     await page.evaluate(() => globalThis.__MOCK__.setPhase('ROUND_START'));
-    // (PR #643: its animation plays whole — screens/game.js BOOT_MIN_MS 3000 — then it fades, BOOT_LEAVE_MS 350)
+    // (its animation plays whole — screens/game.js BOOT_MIN_MS 2300, with DRAFT_HOLD_MS inside the official 3 s
+    // BATTLE_CHECK — then it fades, BOOT_LEAVE_MS 350, while the round plate comes in under it)
     await new Promise((r) => setTimeout(r, 300));
     assert.ok(await page.$('[data-testid="protocol-boot"]'), 'still up right after 回合开始');
+    assert.equal(await page.$('[data-testid="round-popup"]'), null, 'no round plate before it starts to leave');
+    await page.waitForSelector('[data-testid="round-popup"]', { timeout: 4000 });
+    const atPlate = Date.now() - shownAt;
+    assert.ok(atPlate >= 2300, `the plate after the boot's minimum (${atPlate} ms)`);
+    assert.ok(await page.$('[data-testid="protocol-boot"].is-leaving'), 'the plate comes in while 协议启动！ fades, not after it');
     await page.waitForFunction(() => !document.querySelector('[data-testid="protocol-boot"]'), { timeout: 6000 });
-    assert.ok(Date.now() - shownAt >= 3000, `shown ${Date.now() - shownAt} ms`);
+    assert.ok(Date.now() - shownAt >= 2300, `shown ${Date.now() - shownAt} ms`);
+    assert.ok(await page.$('[data-testid="round-popup"]'), 'the plate plays on after it');
+    assert.deepEqual(problems, []);
+    await context.close();
+  });
+
+  test('solo: the 请选择策略 band plays with the 轮到你 sound, the same as co-op (the maintainer, 2026-10-21)', async () => {
+    const { page, problems, context } = await open({ phase: 'BAND_DRAFT', variant: 'solo' });
+    await page.evaluate(async () => {
+      const { audio } = await import('/js/audio.js');
+      globalThis.__sfx = [];
+      const sfx = audio.sfx.bind(audio);
+      audio.sfx = (name, ...rest) => { globalThis.__sfx.push(name); return sfx(name, ...rest); };
+    });
+    // a solo turn begins again: pick (已选定策略 shows), then the pick goes (m.private.bandId) — the band of the first
+    // turn, if its art came in time, has played by then
+    await page.waitForFunction(() => !document.querySelector('[data-testid="turn-banner"]'), { timeout: 4000 });
+    await page.evaluate(() => globalThis.__MOCK__.mutate((s) => { s.priv.bandId = 'band_bldsk'; }));
+    await page.waitForSelector('.draft-done', { timeout: 3000 });
+    await page.evaluate(() => { globalThis.__sfx.length = 0; globalThis.__MOCK__.mutate((s) => { s.priv.bandId = null; }); });
+    await page.waitForSelector('[data-testid="turn-banner"]', { timeout: 3000 });
+    await page.waitForFunction(() => globalThis.__sfx.includes('yourTurn'), { timeout: 2000 }).catch(() => null);
+    assert.ok((await page.evaluate(() => globalThis.__sfx)).includes('yourTurn'), 'the 轮到你 sound in solo too');
+    await page.waitForFunction(() => !document.querySelector('[data-testid="turn-banner"]'), { timeout: 4000 });
     assert.deepEqual(problems, []);
     await context.close();
   });

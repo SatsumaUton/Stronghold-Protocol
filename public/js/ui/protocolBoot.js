@@ -92,7 +92,7 @@ export function bootLayout(n) {
   });
 }
 
-/** An official sprite as a positioned image (no lazy loading: the screen lasts 3 s). */
+/** An official sprite as a positioned image (no lazy loading: the screen lasts about 2.3 s). */
 function Art({ k, class: cls, mask = false }) {
   const src = uiUrl(data.get('assets'), k);
   if (!src) return null;

@@ -55,7 +55,6 @@
 .dorder__name > span:not(.dorder__ai) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* the player's best trophy medal (local records) before the name, at the name's height */
 .dorder__medal { flex: none; width: .34rem; height: .34rem; object-fit: contain; filter: drop-shadow(0 1px 2px #000); }
-.dorder__name .acct-tag { flex: none; font-size: calc(.2 * var(--t)); font-weight: 400; color: rgba(255, 255, 255, .45); }
 .dorder__ai { flex: none; font-family: var(--font-num); font-size: calc(.11 * var(--t)); padding: 0 .04rem; background: #a9c3d8; color: #0b1520; }
 .dorder__state { font-size: calc(.15 * var(--t)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dorder__box { position: relative; width: 1.2rem; height: 1.2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .04rem; padding: 0;
@@ -67,7 +66,6 @@
 .dorder__box.is-band .bandicon { --bi: 100%; width: 100%; height: 100%; background: transparent; }
 .dorder__box.is-band:hover { box-shadow: inset 0 0 0 2px var(--mint-400); }
 .dorder__zoom { position: absolute; left: 50%; bottom: .04rem; width: .3rem; height: .3rem; transform: translateX(-50%); color: #fff; filter: drop-shadow(0 0 2px #000); }
-.dorder__n { position: absolute; right: .04rem; top: .02rem; font-size: calc(.14 * var(--t)); color: var(--mint-400); text-shadow: 0 0 2px #000; }
 .dorder__check { width: .44rem; height: .44rem; display: grid; place-items: center; }
 .dorder.is-done .dorder__check { border: .03rem solid var(--mint-400); border-radius: .06rem; background: rgba(23, 249, 183, .12); color: var(--mint-400); box-shadow: 0 0 .14rem rgba(23, 249, 183, .45); }
 .dorder__check .icon { width: 80%; height: 80%; }
@@ -139,12 +137,14 @@
   animation: dband-taken 420ms var(--pg-ease) backwards; }
 @keyframes dband-taken { from { opacity: 0; transform: scaleY(.2); filter: brightness(2); } }
 .dband.is-taken .dband__name { display: none; }
-/* an orange mark: this browser has cleared a run with it (已通过模拟 N 次) */
-.dband__medal { position: absolute; right: .12rem; top: .12rem; width: .36rem; height: .36rem; display: grid; place-items: center; color: #ffb03a;
-  background: rgba(70, 36, 4, .7); box-shadow: inset 0 0 0 .03rem #ff9a1f, 0 0 .1rem rgba(255, 150, 30, .4); pointer-events: none; }
+/* the official orange corner badge (statistics/strategyBadge) on a strategy that earned it — its victorCount of clears in
+   this browser's records (bandDraft.js draftRecords, ui/stats.js strategyBadgeIds) — placed as on the stats page's
+   已获得特殊标识的策略 (css/screens/stats.css .st-strategy-badge__mark); without the art pack an orange rook in a box */
+.dband__badge { position: absolute; top: -10.8%; right: -10.8%; width: 82.35%; height: 84.8%; pointer-events: none; }
+.dband__badge-art { display: block; width: 100%; height: 100%; object-fit: contain; }
+.dband__medal { position: absolute; right: 20%; top: 20%; width: .36rem; height: .36rem; display: grid; place-items: center; color: #ffb03a;
+  background: rgba(70, 36, 4, .7); box-shadow: inset 0 0 0 .03rem #ff9a1f, 0 0 .1rem rgba(255, 150, 30, .4); }
 .dband__medal .icon { width: 70%; height: 70%; }
-.dband__who { position: absolute; left: .1rem; top: .1rem; display: flex; flex-direction: column; gap: .02rem; pointer-events: none; }
-.dband__who .pavatar { --pa: .3rem; border-radius: 50%; overflow: hidden; border: 2px solid var(--mint-400); }
 /* a strategy built around a bond the mode switches off (bandDraft.js BandOffTag / BandOffNote, DESIGN §21.26 — the
    §21.7 本局禁用 look: dim, dashed, the bond struck through): information only, it stays selectable. Px floors keep it
    readable on phones (1rem = 40 px). */
@@ -235,9 +235,10 @@
   .dorder.is-flash::after, .draft-done::after { display: none; }
 }
 
-/* the draft over (screens/game.js DRAFT_HOLD_MS = 1600): 已选定策略 stays, then the screen goes to black for 协议启动！
-   (video 7:43.3–7:43.5) */
-.draft.is-held { animation: pg-out 220ms ease-in 1380ms forwards; }
+/* the draft over (screens/game.js DRAFT_HOLD_MS = 700, inside the official 3 s BATTLE_CHECK with 协议启动！'s
+   BOOT_MIN_MS): 已选定策略 / 策略选择完成 stays, then the screen goes to black for 协议启动！ (video 7:43.3–7:43.5) —
+   the fade ends with the hold (480 ms + 220 ms). Only to look at: the screen is inert (bandDraft.js). */
+.draft.is-held { pointer-events: none; animation: pg-out 220ms ease-in 480ms forwards; }
 @media (prefers-reduced-motion: reduce) { .draft.is-held { animation: none; } }
 
 /* ---- 本局信息 (GitHub issue #8 item 1, DESIGN §21.28): the read-only dialog (its entry: the step header's
@@ -289,7 +290,13 @@
 .minfo-dlg .brief-faction__icon img { width: 78%; height: 78%; object-fit: contain; filter: grayscale(1) brightness(1.6); }
 .minfo-dlg .brief-faction__text { display: flex; flex-direction: column; gap: .03rem; min-width: 0; overflow-wrap: anywhere; }
 .minfo-dlg .brief-faction__text b { font-size: max(calc(.2 * var(--t)), 12px); color: var(--amber); }
-.minfo-dlg .brief-faction__text span { font-size: max(calc(.15 * var(--t)), 10px); color: var(--text-lo); }
+.minfo-dlg .brief-faction__desc { font-size: max(calc(.15 * var(--t)), 10px); color: var(--text-lo);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* the 'tip' variant (ui/matchEnemies.js enemyDescMode): the name only, the description in the tooltip */
+.minfo-dlg .brief-faction__tt { min-width: 0; }
+.minfo-dlg .brief-faction__tt > .brief-faction { flex: 1; min-width: 0; }
+.minfo-dlg .brief-faction.is-tip { cursor: help; }
+.minfo-dlg .brief-faction.is-tip:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--mint-400); }
 .minfo-dlg .modal__actions { align-items: center; padding: .12rem .3rem; }
 .minfo-dlg .modal__actions .btn { height: max(.5rem, 30px); font-size: max(.18rem, 12px); }
 .minfo-dlg__status { margin-right: auto; min-width: 0; }

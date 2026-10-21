@@ -71,6 +71,10 @@ The existing portrait → illustration preference is retained; an illustration n
 map, or its unit's skin when the seat is unavailable, never the viewer's map. Unowned catalogue/statistics art stays
 unowned. `OperatorImage` subscribes to choices, visibility and the composed manifest, so open cards refresh on changes.
 Effective stand-in / DIY bodies are resolved before that lookup, preserving §34.23 and #686.
+The strategy draft's name cards (`screens/bandDraft.js` artOf: each doctor's 名片干员 art, as on the room's seat cards)
+follow the same rule with the doctor as the explicit owner: that seat's outfit for its card operator from
+`m.public.players[].skins`, nothing for another seat while the switch is off, default art when the outfit's pictures
+are missing here (the maintainer's decision of 2026-10-21 for the seat cards).
 
 ## The switch model: the owner installs, each player switches on
 
