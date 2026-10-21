@@ -54,7 +54,7 @@ import { LoadoutButton } from './loadout.js';
 import { PluginTag, isModdedRoom } from '../ui/pluginTag.js';
 import { hasScriptConsent, rememberScriptConsent } from '../content.js';
 import { net } from '../net.js';
-import { store, useStore, shallowEqual, emptyMatch, isSpectating } from '../store.js';
+import { store, useStore, shallowEqual, emptyMatch, isSpectating, savePref } from '../store.js';
 import { data, useData } from '../data.js';
 import { chessAvatarUrl, chessPortraitUrl } from '../ui/assetUrls.js';
 import { CARD_KEY, cardStore, setCard, cardOperators, cardContext, seatOperator, seatCardSkin } from '../ui/seatArt.js';
@@ -468,14 +468,17 @@ export function RoomScreen() {
   };
   // 选择模拟协议 over the room: the host picks and sends the difficulty on 确认 (nothing to send when it did not change —
   // unless a plugin mode is on, which picking a difficulty leaves: server/lobby.js setDifficulty); it closes only once the
-  // server took it. Everybody else opens it read-only.
+  // server took it, and the accepted pick becomes the remembered difficulty (`lobby.difficulty`, the one 创建同盟 and
+  // 独立模拟's 选择模拟协议 start from — README / PLAYING 难度沿用上次选的). Everybody else opens it read-only.
   const openProto = () => { setOpts(false); setProtoPick(room.difficulty); setProtoOpen(true); };
   const closeProto = () => { setProtoOpen(false); setProtoPick(null); };
   const pluginMode = room.content?.modeId ? (room.content.modes || []).find((m) => m.id === room.content.modeId)?.name || room.content.modeId : null;
   const confirmDifficulty = async () => {
     const d = protoPick || room.difficulty;
     if (d === room.difficulty && !pluginMode) { closeProto(); return; }
-    if (await setDifficulty(d) && alive.current) closeProto();
+    if (!(await setDifficulty(d))) return;
+    savePref('lobby.difficulty', d);
+    if (alive.current) closeProto();
   };
   const protoHint = pluginMode
     ? t('确认后将退出插件模式「{name}」', { name: pluginMode })

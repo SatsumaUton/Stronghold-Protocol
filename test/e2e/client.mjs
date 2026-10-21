@@ -365,8 +365,9 @@ export class Client {
     await this.click('.mode-card', '同盟模拟');
     await this.click('[data-testid="alliance-create"]');
     const room = (await this.waitFor((s) => !!s.room?.code, 'room created')).room;
-    if (difficulty) await this.roomDifficulty(difficulty);
-    return room;
+    if (!difficulty) return room;
+    await this.roomDifficulty(difficulty);
+    return this.page.evaluate(() => globalThis.__SP__.store.get().room); // the room state after the change
   }
 
   /** The host changes the room's difficulty in the room (the pill → 选择模拟协议 → 确认; `name` e.g. '绝境模拟'). */

@@ -81,6 +81,9 @@ describe('co-op room settings (real server)', { skip: !ENABLED && 'set SP_E2E=1 
       await host.shot('host-protocol');
       await host.click('.modal__box.proto .proto-start', '确认');
       await host.page.waitForSelector('.modal__box.proto', { hidden: true, timeout: 10000 });
+      // the accepted pick is the remembered difficulty: the next 创建同盟 starts there (README / PLAYING 难度沿用上次选的)
+      assert.equal(await host.page.evaluate(() => localStorage.getItem('sp.pref.lobby.difficulty')), '"ABYSS"');
+      assert.equal(await guest.page.evaluate(() => localStorage.getItem('sp.pref.lobby.difficulty')), null, 'a read-only guest remembers nothing');
       await guest.page.waitForFunction(() => globalThis.__SP__.store.get().room?.difficulty === 'ABYSS', { timeout: 10000 });
       assert.deepEqual(await roomOf(guest), { difficulty: 'ABYSS', aiPicksLast: false, ready: false }, 'the change un-readies the guest');
       await guest.page.waitForFunction(() => [...document.querySelectorAll('.toast')].some((el) => el.textContent.includes('创建者已将模拟难度改为「终极模拟」')), { timeout: 5000 });
