@@ -904,11 +904,15 @@ function kitQuintus(ab, e, b, tpl) {
   const stageSkills = [['Tidewater', 'Rockfall', 'SummonTentac'], ['TidewaterG1', 'RockfallG1', 'SummonTentacG1'], ['TidewaterG2', 'RockfallG2', 'SummonTentacG2', 'Doom']];
   const skills = [];
   const atkRatio = T(ab, 'epdamage.attack@ep_damage_ratio') ?? 0;
+  // 【大潮】 / 【崩坍】 are attack-class (prefab ability MeleeAttack like the Attack; PRTS 「触发索敌和普通攻击相同」): they take the
+  // place of a normal attack (enemies.js attackSlotSkill) — the third-form tide (cooldown 3.5 = the attack interval)
+  // alternates with the attack instead of coming on top of it every 3.5 s (DESIGN §35.19). 断裂生殖 / 物种爆发
+  // (AnimatedActionToOwnerAbility) keep their own timers.
   const mk = (name, stage) => {
     const s = ab.sk[name];
     if (!s) return null;
     const kind = name.replace(/G\d$/, '');
-    const a = { cd: s.cd, icd: s.icd, sk: s, stage, cond: () => P.stage === stage, fire: (b2, e2) => QUINTUS[kind](b2, e2, s, P, tpl) };
+    const a = { cd: s.cd, icd: s.icd, sk: s, stage, atk: QUINTUS_ATTACK_SKILLS.has(kind), cond: () => P.stage === stage, fire: (b2, e2) => QUINTUS[kind](b2, e2, s, P, tpl) };
     skills.push(a);
     return a;
   };
@@ -935,6 +939,8 @@ function kitQuintus(ab, e, b, tpl) {
   stageSkills.forEach((names, i) => names.forEach((n) => list.push(mk(n, i))));
   return list;
 }
+
+const QUINTUS_ATTACK_SKILLS = new Set(['Tidewater', 'Rockfall']);
 
 const QUINTUS = {
   Tidewater(b, e, s) { // 【大潮】 "对场上所有我方单位…": every operator it can select (fieldAllies): arts + neural

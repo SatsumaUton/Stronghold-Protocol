@@ -16,7 +16,8 @@
 //   before(c,…) (beforeAttack of e) · attack(c,…) · blocked(c,…) · killed(c,…) (return true = revived; the kill is then
 //   hidden from later 'kill' handlers) · death(c,…) · status(c,…) (statusApplied on e) · burst(c,…) (elementBurst on e)
 //   · tick(b,e,a,dt) every `iv` s (every tick when iv is 0) · skill: `cd`/`left`(=icd)/`cond`/`fire` (cooldown runs
-//   continuously; fires when ready, the enemy can act and `cond` holds). `sil: true` = the ability's handbook line
+//   continuously; fires when ready, the enemy can act and `cond` holds; `atk: true` = an attack-class skill, cast in
+//   place of a normal attack when ready at a swing's damage frame — attackSlotSkill). `sil: true` = the ability's handbook line
 //   is flagged SILENCE (沉默 disables it: exactly the data's `format: "SILENCE"` lines). 萨卡兹枯朽战士 / 组长's
 //   【污染秽蚀】 death fog is the one NORMAL line also silenced (archetypes.js kitPolluted, `enemy_1267_nhpbr` and
 //   `_2` only): the owner's official-play recall of 2026-10-12 is that a death while silenced creates no fog, and
@@ -212,7 +213,46 @@ function onDamaged(b, c) {
 
 function onBeforeAttack(b, c) {
   const a = c.attacker;
-  if (a && a.side === 'enemy' && a.mem.ab) dispatch(b, a, 'before', c);
+  if (!a || a.side !== 'enemy' || !a.mem.ab) return;
+  if (!c.isSkill && attackSlotSkill(b, a, c)) return;
+  dispatch(b, a, 'before', c);
+}
+
+/**
+ * An attack-class skill (`atk: true`: its official ability is a MeleeAttack / RangedAttack, the class of the normal
+ * attack — PRTS 「触发索敌和普通攻击相同」) takes the place of a normal attack instead of running on its own timer: when a
+ * swing reaches its damage frame and such a skill is ready (cooldown run out), castable and its `cond` holds, the skill
+ * is cast and the strike is not made; the attack cooldown restarts as after a strike. So it needs the attack's target
+ * and takes the attack's turn. The first ready one in list order (equal data priority). The skill that took the
+ * previous slot waits one: with a cooldown equal to the attack interval (盐风主教昆图斯's third-form 【大潮】 3.5 =
+ * baseAttackTime 3.5) it alternates with the attack — arknights.wiki.gg: never "Great Tide twice in a row". Why the
+ * official one is not ready at the very next slot (its cooldown counting from the end of its clip …) is [ASSUMED];
+ * so are the damage at the attack's frame (not the skill clip's) and no attack-clip stand after it (昆图斯 is 自缚).
+ */
+function attackSlotSkill(b, e, c) {
+  const ab = e.mem.ab;
+  let pick = null;
+  for (const a of ab.list) {
+    if (!a.atk || !a.fire || a.cd == null || a.left > 1e-9 || a === ab.lastSlot) continue;
+    if (!canCast(e, a.sil, b) || (a.cond && !safe(b, e, () => a.cond(b, e, a)))) continue;
+    pick = a;
+    break;
+  }
+  if (ab.lastSlot !== pick) ab.lastSlot = pick;
+  if (!pick) return false;
+  c.targets = [];
+  e.atkCd = e.s.interval;
+  castNow(b, e, pick);
+  return true;
+}
+
+/** Cast content skill `a` of enemy `e` now: its cooldown restarts, then it fires. */
+function castNow(b, e, a) {
+  a.left = Math.max(TICK, a.cd);
+  a.casts = (a.casts ?? 0) + 1;
+  e.skillAnimUntil = b.time + 0.5;
+  if (a.sk) castSlot(b, e, a.sk);   // display only: the skill slot it uses (render/app.js 'cast')
+  safe(b, e, () => a.fire(b, e, a));
 }
 
 function onKill(b, c) {
@@ -263,13 +303,8 @@ function onTick(b, dt) {
       }
       if (a.fire && a.cd != null) {
         a.left -= dt;
-        if (a.left <= 1e-9 && canCast(e, a.sil, b) && (!a.cond || safe(b, e, () => a.cond(b, e, a)))) {
-          a.left = Math.max(TICK, a.cd);
-          a.casts = (a.casts ?? 0) + 1;
-          e.skillAnimUntil = b.time + 0.5;
-          if (a.sk) castSlot(b, e, a.sk);   // display only: the skill slot it uses (render/app.js 'cast')
-          safe(b, e, () => a.fire(b, e, a));
-        }
+        // an attack-class skill (`atk`) waits for the attack's turn instead (attackSlotSkill)
+        if (!a.atk && a.left <= 1e-9 && canCast(e, a.sil, b) && (!a.cond || safe(b, e, () => a.cond(b, e, a)))) castNow(b, e, a);
       }
     }
   }

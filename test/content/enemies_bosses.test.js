@@ -2942,9 +2942,10 @@ test('盐风主教昆图斯: 2 highest-DEF targets + neural; 崩坍 / 大潮 / �
   assert.ok(h.unit('t_wall').stats.taken > 0 && h.unit('t_wall2').stats.taken > 0);
   assert.equal(h.unit('t_wall3').stats.taken, 0);
   assert.ok(h.unit('t_wall').elem.neural > 0);
-  h.run(skb('enemy_1521_dslily', 'Rockfall').initCooldown - h.b.time + ROCK);
+  // 崩坍 / 大潮 take the place of a normal attack (§35.19): the first swing after their initial cooldown
+  h.run(skb('enemy_1521_dslily', 'Rockfall').initCooldown - h.b.time + e.s.interval + ROCK);
   assert.ok(h.eventsOf('fx').some((f) => f[1] === 'rockfall'));
-  h.run(skb('enemy_1521_dslily', 'Tidewater').initCooldown - h.b.time + 0.2);
+  h.run(skb('enemy_1521_dslily', 'Tidewater').initCooldown - h.b.time + e.s.interval + 0.2);
   assert.ok(h.eventsOf('fx').some((f) => f[1] === 'tide') && h.unit('t_wall3').stats.taken > 0, 'global tide');
   h.run(skb('enemy_1521_dslily', 'SummonTentac').initCooldown - h.b.time + 0.2);
   assert.ok(h.eventsOf('fx').some((f) => f[1] === 'tentacle'));
