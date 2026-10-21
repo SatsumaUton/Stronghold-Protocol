@@ -694,10 +694,12 @@ export class Network {
         resumed = true;
         if (session.ws && session.ws !== conn.ws) this.detachReplaced(session.ws);
       } else {
-        // The online cap (SP_MAX_ONLINE) only decides a *new* player: a token that still resolves has resumed above and
-        // is never refused, so a full server does not lock out the people already playing. The socket cap
-        // (maxConnections) is the one that applies first — it is checked at the upgrade in server/http/websocket.js and
-        // answers 503 before a socket exists — and this check is what the player sees as 服务器已满 (ERR.SERVER_FULL).
+        // The online cap (SP_MAX_ONLINE) decides *new players only*: a token that still resolves resumed above and never
+        // reaches this check, so a full server does not lock out the people already playing. "A resume is never refused"
+        // holds at this layer alone — the socket cap (maxConnections, checked at the upgrade in
+        // server/http/websocket.js, answering 503 before a socket exists) still applies, and the `noReplace` / claimAt
+        // decision above still answers SESSION_IN_USE for a token whose session is live on another socket. This check is
+        // what the player sees as 服务器已满 (ERR.SERVER_FULL).
         if (this.opts.maxOnline > 0 && this.onlineCount >= this.opts.maxOnline) {
           this.reply(conn, errorMsg(ERR.SERVER_FULL, rid, 'server full (online cap)'));
           try { conn.ws.close(CLOSE.POLICY, 'server full'); } catch { /* ignore */ }

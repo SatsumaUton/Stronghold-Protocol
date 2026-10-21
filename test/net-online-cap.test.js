@@ -82,6 +82,32 @@ test('a real disconnect can come back with the original token even when the cap 
   });
 });
 
+test('at the cap a live token with noReplace is refused by the claim rule (SESSION_IN_USE), not by the online cap', async () => {
+  // The reviewer's case: "a resume is never refused" must mean *this layer*. A valid token whose session is still live on
+  // another socket asks for a takeover; `noReplace` says no. That answer has to be SESSION_IN_USE — not SERVER_FULL, and
+  // not a silent extra seat — so the client can tell "someone else is playing that session" from "the server is full".
+  await withServer({ maxOnline: 1 }, async ({ url }) => {
+    const alice = await TestClient.connect(url);
+    const a = await alice.hello('Alice');
+
+    const second = await TestClient.connect(url);
+    try {
+      await assert.rejects(() => second.hello('Alice', a.token, { noReplace: true }), (e) => {
+        assert.match(e.message, /SESSION_IN_USE/);
+        assert.doesNotMatch(e.message, /SERVER_FULL/);
+        return true;
+      });
+      // the first socket was not detached: the old player keeps the seat
+      assert.equal(alice.isOpen, true);
+      const again = await alice.request({ t: 'hello', name: 'Alice', version: 1 });
+      assert.equal(again.t, 'welcome');
+    } finally {
+      await second.close();
+      await alice.close();
+    }
+  });
+});
+
 test('an expired token is no longer a resume, so a full server refuses it as a new player', async () => {
   await withServer({ maxOnline: 1, reconnectWindowMs: 120 }, async ({ url }) => {
     const alice = await TestClient.connect(url);
