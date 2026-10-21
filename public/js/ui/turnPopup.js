@@ -8,9 +8,11 @@
 // prefers-reduced-motion — the draft's header says 当前轮到你决策. Styles: css/screens/game-panels.css (.sptp).
 // The cue (the disc and its sound) waits while a phase banner or plate is on screen — the 机变阶段 banner opens every
 // 机变 draft, and the disc that started with it played under it, its words hidden (§35.18's leftover) —, at most
-// TURN_CUE_WAIT_MS, so a draft that opens on the player's turn shows the banner, then the disc.
+// TURN_CUE_WAIT_MS per banner and TURN_CUE_PLATE_WAIT_MS for the round plate still up from ROUND_START (it holds the
+// banner back: the wait restarts as each one mounts), so a draft that opens on the player's turn shows the plate, the
+// banner, then the disc.
 // [ASSUMED] the sizes and the timing, measured frame by frame from that footage; the rings are plain CSS circles; the
-// order banner → disc and the wait's bound (the footage shows a turn coming round mid-draft, not a draft opening).
+// order plate → banner → disc and the wait's bounds (the footage shows a turn coming round mid-draft, not a draft opening).
 import { useEffect } from '../../vendor/hooks.module.js';
 import { html } from './components.js';
 import { uiUrl } from './assetUrls.js';
@@ -25,6 +27,12 @@ export const TURN_POPUP_MS = 1200;
  * close (components.js PhaseBanner), rounded up — a draft opening on the player's turn has its disc gone ≤ 3 s in.
  */
 export const TURN_CUE_WAIT_MS = 1800;
+
+/**
+ * The longest the cue waits for the round plate (ui/matchPopups.js RoundPopup: 1.7 s and its 0.28 s leave), rounded up;
+ * the banner it held back then gets its own TURN_CUE_WAIT_MS — plate, banner, disc gone ≤ 5 s after the turn at worst.
+ */
+export const TURN_CUE_PLATE_WAIT_MS = 2000;
 
 const ART = ['effectChoose/bg_circle', 'effectChoose/square_1', 'effectChoose/square_2', 'effectChoose/plus', 'effectChoose/bottom'];
 

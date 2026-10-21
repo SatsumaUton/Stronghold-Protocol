@@ -4,8 +4,10 @@
 // Through the dev mock's shared 机变 draft: the pick goes to p4, then back to me (p1) — the disc with the official cube
 // shows and leaves; a solo draft shows it (with the 轮到你 sound) as it opens, the same as co-op (the maintainer's
 // decision of 2026-10-22); a draft that opens on my turn (solo, and co-op with me first) plays the 机变阶段 banner, then
-// the disc and its sound — never both on screen, the disc in ≤ TURN_CUE_WAIT_MS (§35.18's leftover) —, while a turn
-// coming round mid-draft has it at once; none without the art pack or with reduced motion. Static counterpart:
+// the disc and its sound — never both on screen, the disc in ≤ TURN_CUE_WAIT_MS (§35.18's leftover) —, also on the
+// server's path from ROUND_START (the round plate, the banner it held back, then the disc; with the draft 2 s, 1.7 s and
+// 1 s after the plate: the wait runs from each overlay on screen, not from the turn), while a turn coming round mid-draft
+// has it at once; none without the art pack or with reduced motion. Static counterpart:
 // test/ui/turn-popup.test.js.
 
 import { test, describe, before, after } from 'node:test';
@@ -188,6 +190,60 @@ describe('轮到你选 disc (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=
         assert.ok(again != null && again - back < 600, `mid-draft the disc comes at once ${JSON.stringify(ev)}`);
         assert.equal(ev.filter(([t, n]) => t >= back && n.startsWith('banner:')).length, 0, 'no banner mid-draft');
       }
+      assert.deepEqual(problems, []);
+      await context.close();
+    });
+  }
+
+  // the server's own path (server/match/match/phases.js afterRoundStart): ROUND_START with the round plate, then SP_DRAFT
+  // on my turn DELAYS.ROUND_START (2 s) later — or sooner (1.7 s, 1 s), standing in for a plate that mounted late (a slow
+  // phone, render lag, network jitter). The plate holds the 机变阶段 banner back, so the disc waits for the plate, then the
+  // banner: a timeline of the plate, the banner (while leaving too: .pbanner stays until it is gone) and the disc
+  const fromRoundStart = (page, { gap, solo }) => page.evaluate(async (gap, solo) => {
+    const M = globalThis.__MOCK__;
+    const ev = [];
+    const t0 = performance.now();
+    const at = () => Math.round(performance.now() - t0);
+    const both = [];
+    const seen = { plate: false, banner: null, disc: false };
+    const look = () => {
+      const p = !!document.querySelector('[data-testid="round-popup"]');
+      const b = document.querySelector('.pbanner'), d = !!document.querySelector('[data-testid="turn-popup"]');
+      const title = b ? (b.querySelector('.pbanner__title')?.textContent || '?') + (b.classList.contains('is-leaving') ? ' (leaving)' : '') : null;
+      if (p !== seen.plate) { ev.push([at(), p ? 'plate+' : 'plate-']); seen.plate = p; }
+      if (title !== seen.banner) { ev.push([at(), title ? `banner:${title}` : 'banner-']); seen.banner = title; }
+      if (d !== seen.disc) { ev.push([at(), d ? 'disc+' : 'disc-']); seen.disc = d; }
+      if (d && (p || b)) both.push([at(), p ? 'plate' : title]);
+    };
+    const mo = new MutationObserver(look);
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    M.mutate((s) => { s.pub.phase = 'ROUND_START'; s.pub.round = 3; }); M.pushPublic();
+    await new Promise((r) => setTimeout(r, gap));
+    const draftAt = at();
+    M.mutate((s) => { s.pub.phase = 'SP_DRAFT'; if (!solo) s.pub.sp.turn = 'p1'; }); M.pushPublic();
+    await new Promise((r) => setTimeout(r, 5200));
+    mo.disconnect();
+    return { ev, both, draftAt };
+  }, gap, solo);
+
+  for (const [gap, solo] of [[2000, false], [1700, false], [1000, true]]) {
+    test(`from ROUND_START (${solo ? 'solo' : 'co-op, my turn first'}, SP_DRAFT ${gap} ms after it): the round plate, the 机变阶段 banner, then the disc — never two at once`, async (t) => {
+      const { TURN_CUE_WAIT_MS } = await import('../../public/js/ui/turnPopup.js');
+      const { page, problems, context } = await open({ variant: solo ? 'solo' : '' });
+      await sleep(2200); // the mount's own banner gone
+      const { ev, both, draftAt } = await fromRoundStart(page, { gap, solo });
+      t.diagnostic(`SP_DRAFT at ${draftAt}: ${JSON.stringify(ev)}`);
+      const when = (name, from = 0) => ev.find(([t, n]) => n === name && t >= from)?.[0];
+      const plateIn = when('plate+'), plateOut = when('plate-');
+      assert.ok(plateIn != null && plateIn < 300, `the round plate opens the round ${JSON.stringify(ev)}`);
+      assert.ok(when('banner:机变阶段') != null && when('banner:机变阶段') >= plateOut, `the 机变阶段 banner after the plate ${JSON.stringify(ev)}`);
+      const gone = when('banner-', plateOut);
+      const disc = when('disc+');
+      assert.deepEqual(both, [], `the disc never with the plate or the banner, leaving included ${JSON.stringify(ev)}`);
+      assert.ok(gone != null && disc != null && disc >= gone, `the disc after the banner is gone ${JSON.stringify(ev)}`);
+      assert.ok(disc >= draftAt, `the disc with the draft only ${JSON.stringify(ev)}`);
+      // the wait counts from the banner on screen (after the plate), not from the turn
+      assert.ok(disc - plateOut <= TURN_CUE_WAIT_MS + 400, `the disc ≤ ${TURN_CUE_WAIT_MS} ms (+ slack) after the plate: ${disc - plateOut} ms ${JSON.stringify(ev)}`);
       assert.deepEqual(problems, []);
       await context.close();
     });
