@@ -900,18 +900,19 @@ function MatchScreen() {
     }, Math.max(0, (boot.at || 0) + BOOT_MIN_MS - Date.now()));
     return () => { clearTimeout(id); clearTimeout(out); };
   }, [bootDone]);
-  // 进场 (PR #643, the event's match start): the HUD waits under 协议启动！ and the first round's plate, then comes in
-  // (css/screens/game.css .gm__hud.is-enter); a plate that never shows (an offer on screen) waits at most 4 s.
-  const [hudIn, setHudIn] = useState(() => (boot ? 'wait' : null)); // null | 'wait' | 'enter'
-  const roundPopShown = !!roundPop && !hasOffers;
-  useEffect(() => { if (boot) setHudIn('wait'); }, [!!boot]);
+  // 进场 (PR #827; the maintainer's decision of 2026-10-21): the HUD waits hidden only while 协议启动！ is on screen and
+  // comes in as soon as it starts to leave (ProtocolBoot `leaving`), so the first round's 回合开始 kettles and plate play
+  // over a visible top bar — the event's top bar is up from the end of 协议启动 (video 7:51) through the round-1 kettles
+  // (7:55–7:58) and plate (7:57–8:01). It waits for 协议启动！ alone, never for the plate. A plugin window over
+  // BATTLE_CHECK hides 协议启动！ (`boot && !hasOffers` below), so the HUD is not held behind that veil either. Without
+  // the art pack (no `boot`) or with reduced motion the HUD is simply there. [ASSUMED] the entry motion itself — its
+  // order and its ~1.2 s (css/screens/game.css 进场) — read off the footage by the PR's author.
+  const bootShown = !!boot && !hasOffers && !bootLeaving;
+  const [hudIn, setHudIn] = useState(() => (bootShown && !reducedMotion() ? 'wait' : null)); // null | 'wait' | 'enter'
   useEffect(() => {
-    if (hudIn !== 'wait' || boot) return undefined;
-    if (reducedMotion()) { setHudIn(null); return undefined; }
-    if (!roundPopShown) { setHudIn('enter'); return undefined; }
-    const id = setTimeout(() => setHudIn('enter'), 4000);
-    return () => clearTimeout(id);
-  }, [hudIn, !!boot, roundPopShown]);
+    if (bootShown) { if (!reducedMotion()) setHudIn('wait'); return; }
+    setHudIn((s) => (s === 'wait' ? 'enter' : s));
+  }, [bootShown]);
   useEffect(() => {
     if (hudIn !== 'enter') return undefined;
     const id = setTimeout(() => setHudIn(null), 1200);
@@ -1751,7 +1752,8 @@ function MatchScreen() {
         pen=${pen} penAvail=${penAvail} onPen=${togglePen} config=${gd.config} frozenAt=${frozenAt}
         pause=${canPause || paused ? { show: canPause, paused, busy: pauseBusy, onToggle: () => togglePause(!paused) } : null}
         live=${liveLpNow} spectator=${spectator}
-        spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom} />
+        spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom}
+        held=${hudIn === 'wait'} />
 
       <div class="gm__bonds">
         <button type="button" class="bonds-toggle" aria-expanded=${!bondsCollapsed} aria-controls="match-bond-strip"
