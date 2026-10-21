@@ -51,8 +51,8 @@ Three properties are load-bearing:
 ## Picture-only outfits (0.3.2, B6)
 
 The maintainer's 2026-10-18 **option A** makes a `skins` record with pictures but no Spine wearable.
-The picker labels it 「仅更换头像与立绘」. Its owner's avatars and portraits change, including loadout / DIY,
-shop / reward cards, detail panels, bond members, thumbnails, settlement / result rows, combat metrics and the DOM fallback field.
+The picker labels it 「仅更换头像与立绘」. Its owner's avatars and portraits change, including loadout (the list
+and the 卡片视图) / DIY, shop / reward cards, detail panels, bond members, thumbnails, settlement / result rows, combat metrics and the DOM fallback field.
 Battle Spine keeps the effective operator's default Front / Back. Missing image fields independently use the
 operator's existing normal / elite fallbacks; removing the plugin restores defaults without erasing the saved choice.
 Model outfits retain their model resolution and picture fallbacks. A replacement directly on `chars[charId]`

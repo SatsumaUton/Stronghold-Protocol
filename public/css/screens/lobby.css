@@ -38,7 +38,7 @@
 /* ---- 大厅背景与音乐 (PR #643 split 8, ui/lobbyMedia.js): the player's own picture / video over the official layers,
    darkened by its 暗度 (--own-dim) so the title and the entries stay readable; the dialog reuses the settings rows ---- */
 .hub-bg__own { position: absolute; inset: 0; background: #050807; animation: hub-own-in 400ms ease-out backwards; }
-.hub-bg__own img, .hub-bg__own video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.hub-bg__own img, .hub-bg__own video, .hub-bg__own canvas { display: block; width: 100%; height: 100%; object-fit: cover; }
 .hub-bg__own::after { content: ''; position: absolute; inset: 0; background: rgba(5, 8, 7, var(--own-dim, .35)); }
 @keyframes hub-own-in { from { opacity: 0; } }
 .lmedia .modal__body { display: flex; flex-direction: column; gap: .16rem; }

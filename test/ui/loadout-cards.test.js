@@ -1,8 +1,10 @@
 // test/ui/loadout-cards.test.js — the 干员调配 tab's optional 卡片视图 (laid out after the event's 物资调配处): the stored
-// view (the list stays the default), one operator card (portrait pick, the equipped skill and module, 潜能 as pips through
-// cultivationView, the 已调整 mark, the 替补 ribbon), the 快速配置 columns beside it (the list rows' own handlers), the
-// bottom bar's tier jumps, and the css rules of the view (text follows 文字大小, no !important). Hook-free views drawn as
-// vnode trees. (The browser side: test/ui/loadout-cards.e2e.test.js.)
+// view (the list stays the default), one operator card (an OperatorImage portrait — the owner's outfit, B6 —, the equipped
+// skill and module, 潜能 as pips through cultivationView, the 已调整 mark, the 替补 ribbon), the 快速配置 columns beside it
+// (the list rows' own handlers), the tier marker (the official shopLevelSprite tag, the CSS marker without it), the
+// bottom bar's tier jumps and lock chip, the ⓘ sheet's own name, and the css rules of the view (text follows 文字大小, no
+// !important, the 转场 only in the card view, no invented slogan). Hook-free views drawn as vnode trees. (The browser
+// side: test/ui/loadout-cards.e2e.test.js.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -16,8 +18,9 @@ globalThis.fetch = async (url) => {
 };
 const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
-const { OpCard, DeckBar, loadoutViewPref } = await import('../../public/js/screens/loadout.js');
+const { DeckCard, TierMark, DeckBar, DeckHelp, loadoutViewPref } = await import('../../public/js/screens/loadout.js');
 const { data } = await import('../../public/js/data.js');
+const { OperatorImage, Img } = await import('../../public/js/ui/gameComponents.js');
 await data.loadAll('chess', 'garrisons', 'assets', 'bonds', 'effects', 'backups');
 
 const get = (id) => data.lookup('chess', id);
@@ -36,7 +39,7 @@ const find = (tree, pred) => [...walk(tree)].filter(pred);
 const byClass = (tree, c) => find(tree, (v) => hasClass(v, c));
 const textOf = (v) => (v == null || typeof v === 'boolean' ? '' : typeof v !== 'object' ? String(v) : Array.isArray(v) ? v.map(textOf).join('') : textOf(v.props?.children));
 
-const card = (props) => OpCard({ m: null, chess: get(INSIDE), golden: get(get(INSIDE).goldenId), entries: {}, ops: {}, onPick: () => {}, onChange: () => {}, onOps: () => {}, ...props });
+const card = (props) => DeckCard({ m: null, chess: get(INSIDE), golden: get(get(INSIDE).goldenId), entries: {}, ops: {}, onPick: () => {}, onChange: () => {}, onOps: () => {}, ...props });
 
 test('the view: the list unless this browser chose the cards', () => {
   mem.clear();
@@ -77,6 +80,15 @@ test('a card: tier, both levels, the equipped skill and module, 潜能 pips, nam
   assert.equal(find(kit, (v) => v.type?.name === 'ModuleGlyph')[0].props.id, 'uniequip_002_inside');
 });
 
+test('a card\'s picture is an OperatorImage portrait (the owner\'s picture-only outfit, B6), its avatar the fallback', () => {
+  const imgs = find(card(), (v) => v.type === OperatorImage);
+  assert.equal(imgs.length, 1);
+  assert.equal(imgs[0].props.chess.chessId, INSIDE);
+  assert.equal(imgs[0].props.portrait, true);
+  assert.equal(imgs[0].props.avatarFallback, true);
+  assert.equal(imgs[0].props.ownerId, undefined, 'the local picker: this browser\'s own outfit');
+});
+
 test('a card follows the loadout: the chosen skill and module, a lower 潜能, the 已调整 mark, the 替补 ribbon', () => {
   const c = card({ entries: { [INSIDE]: { skill: 0, module: 'none' } }, ops: { [CHAR(INSIDE)]: { potential: 2, cultivate: 3 } }, selected: true, notOwned: true });
   assert.ok(hasClass(c, 'is-sel') && hasClass(c, 'is-changed') && hasClass(c, 'is-standin'));
@@ -109,7 +121,7 @@ test('快速配置: the skills, the elite\'s modules (不装备 first) or the �
   sel[0].props.onChange({ currentTarget: { value: '3' } });
   assert.deepEqual(sets, [[CHAR(INSIDE), { potential: 3 }]]);
   // a chess without an elite form has no modules to choose
-  const noElite = OpCard({ m: null, chess: get(INSIDE), golden: null, entries: {}, ops: {}, quick: 'module', onPick() {}, onChange() {}, onOps() {} });
+  const noElite = DeckCard({ m: null, chess: get(INSIDE), golden: null, entries: {}, ops: {}, quick: 'module', onPick() {}, onChange() {}, onOps() {} });
   assert.equal(byClass(noElite, 'lo-q--mod').length, 0);
   assert.equal(textOf(byClass(noElite, 'lo-op__none')[0]), '无精锐');
 });
@@ -132,6 +144,57 @@ test('the bottom bar: a tier with nothing is disabled, a jump names its tier, op
   const quickBar = DeckBar({ counts, active: 1, onJump() {}, diyOpen: {}, quick: 'skill', onConfirm: () => done.push(1) });
   byClass(quickBar, 'lo-confirm')[0].props.onClick();
   assert.deepEqual(done, [1]);
+});
+
+test('the tier marker: the official shopLevelSprite tag of that tier, the CSS marker (NO. and the numeral) without it', () => {
+  const m = { ui: { 'shopLevelSprite/shop_level_tag_5': '/assets/ui/shopLevelSprite/shop_level_tag_5.png' } };
+  const art = TierMark({ m, tier: 5, count: 18 });
+  assert.ok(hasClass(art, 'lo-tmark') && hasClass(art, 'tier--5'));
+  assert.equal(art.props['aria-hidden'], 'true');
+  const img = find(art, (v) => v.type === Img)[0];
+  assert.equal(img.props.src, '/assets/ui/shopLevelSprite/shop_level_tag_5.png');
+  assert.equal(img.props.class, 'lo-tmark__art');
+  assert.equal(textOf(byClass(art, 'lo-tmark__cnt')[0]), '18');
+  // the fallback: drawn when the manifest has no such sprite or the picture fails (Img)
+  const css = img.props.fallback;
+  assert.ok(hasClass(css, 'lo-tmark__css'));
+  assert.equal(textOf(byClass(css, 'lo-tmark__no')[0]), 'NO.');
+  assert.equal(textOf(byClass(css, 'lo-tmark__n')[0]), 'V');
+  assert.equal(find(TierMark({ m: null, tier: 2, count: 1 }), (v) => v.type === Img)[0].props.src, null, 'no manifest: the CSS marker');
+});
+
+test('the ⓘ sheet has its own name, not the official tutorial chapter\'s 调度手册', () => {
+  const sheet = DeckHelp({ onClose() {} });
+  assert.equal(sheet.props.title, '卡片视图说明');
+  assert.equal(sheet.props.micro, 'CARD VIEW');
+  assert.ok(!/调度手册|DISPATCH/.test(JSON.stringify(sheet.props.title) + sheet.props.micro));
+});
+
+test('the bottom bar says a locked loadout (its full text the title), with or without 快速配置', () => {
+  const counts = { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 };
+  const base = { counts, active: 1, onJump() {}, diyOpen: {}, onConfirm() {} };
+  assert.equal(byClass(DeckBar({ ...base, quick: null }), 'lo-bbar__lock').length, 0, 'not locked: no chip');
+  for (const quick of [null, 'cult']) {
+    const chip = byClass(DeckBar({ ...base, quick, locked: '本局的调配已锁定' }), 'lo-bbar__lock');
+    assert.equal(chip.length, 1);
+    assert.equal(chip[0].props.title, '本局的调配已锁定');
+    assert.equal(chip[0].props.role, 'status');
+    assert.equal(textOf(chip[0]), '本局已锁定 · 下一局生效');
+  }
+});
+
+test('the 转场 belong to the card view: the list keeps lo-in and its narrow-screen toggle replays nothing', () => {
+  const css = readFileSync(path.join(ROOT, 'public/css/screens/loadout.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sel: m[1].trim(), body: m[2] }));
+  const lo = rules.find((r) => r.sel === '.lo');
+  assert.match(lo.body, /animation:\s*lo-in 200ms/, 'the overlay opens as before');
+  assert.ok(!rules.some((r) => r.sel !== '.lo' && /(^|,)\s*\.lo\s*(,|$)/.test(r.sel) && /animation:(?!\s*none)/.test(r.body)), 'nothing else animates .lo');
+  for (const r of rules.filter((x) => /animation:\s*lo-tr-/.test(x.body))) {
+    for (const sel of r.sel.split(',')) assert.match(sel.trim(), /^\.lo--deck /, `${sel.trim()}: a 转场 rule scoped to the card view`);
+  }
+  assert.ok(!rules.some((r) => /\.lo-(roster|detail-wrap)\b/.test(r.sel) && /animation:(?!\s*none)/.test(r.body)), 'the list\'s roster / detail never animate');
+  assert.ok(!/lo-drawer-in|lo-tr-veil/.test(css), 'no dead or background-colour animation');
+  assert.ok(!/RHODES ISLAND|OPERATOR DISPATCH/.test(css), 'no invented slogan (the official tag carries its own line)');
 });
 
 test('the view\'s css: every text size follows 文字大小 (var(--t)), no !important', () => {
