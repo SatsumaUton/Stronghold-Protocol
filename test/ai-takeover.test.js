@@ -88,9 +88,11 @@ test('handover keeps seat results distinct from personal achievements and preser
  const row=result.players.find(p=>p.playerId===bot.playerId);
  assert.equal(row.name,'Late');assert.equal(row.stats.kills,123);assert.equal(row.aiTakeoverRound,1);
  assert.equal(row.title,null);assert.equal(row.trophies,0);assert.equal(row.reward,0);
- const {buildRecord,countsTowardStats,recordToResult,normalizeRecord}=await import('../public/js/ui/stats.js');
+ const {buildRecord,buildQuitRecord,compactRecord,countsTowardStats,recordToResult,normalizeRecord}=await import('../public/js/ui/stats.js');
  const rec=normalizeRecord(buildRecord(result,{myId:bot.playerId,roomMode:'coop',now:1}));
- assert.equal(countsTowardStats(rec),false);assert.equal(recordToResult(rec).players.find(p=>p.playerId===bot.playerId).aiTakeoverRound,1);
+ assert.equal(countsTowardStats(rec),false);assert.equal(countsTowardStats(normalizeRecord(compactRecord(rec))),false);
+ const quit=buildQuitRecord({me:{playerId:bot.playerId},room:{mode:'coop'},match:{public:m.publicView()}},{live:{active:true,startedAt:0,sawStart:true,aliveRound:1},now:10});assert.equal(quit.players[0].aiTakeoverRound,1);assert.equal(countsTowardStats(quit),false);
+ assert.equal(recordToResult(rec).players.find(p=>p.playerId===bot.playerId).aiTakeoverRound,1);
  const hostRec=buildRecord(result,{myId:host.id,roomMode:'coop',now:1});assert.equal(countsTowardStats(hostRec),true);
  const foreign=await player('Stranger');assert.notEqual(foreign.id,bot.playerId);
  await late.terminate();const resumed=await player('Late',token);assert.equal(resumed.id,bot.playerId);

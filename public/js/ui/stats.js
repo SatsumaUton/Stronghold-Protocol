@@ -351,6 +351,7 @@ export function compactRecord(rec) {
   out.players = self ? [{
     playerId: self.playerId, seat: self.seat, alive: self.alive, victory: self.victory, roundsPassed: self.roundsPassed,
     eliminatedRound: self.eliminatedRound, bandId: self.bandId, title: self.title, left: self.left, stats: self.stats,
+    ...(Number.isInteger(self.aiTakeoverRound) ? { aiTakeoverRound: self.aiTakeoverRound } : {}),
     trophies: self.trophies,
     reward: self.reward,
     ...(usedBondIds.length ? { usedBondIds } : {}),
