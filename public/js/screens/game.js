@@ -160,7 +160,7 @@ if (battleRunner) {
  * BOOT_MIN_MS — together the 3 s the server spends in BATTLE_CHECK, so 协议启动！ starts to leave as 回合开始 begins and
  * the round-1 plate plays inside 回合开始's 2 s. BOOT_MIN_MS is its own animation (ui/protocolBoot.js, css/screens/
  * protocol-boot.css: 正在连接… is in by 2.1 s) and a beat to read it. [ASSUMED] the split (PR #643 holds 1.6 s on the
- * draft and 3 s on 协议启动！, read off the footage, where the event's client also loads the battle behind 协议启动！ —
+ * draft and 3 s on 协议启动！, read off the footage, where the event's client presumably also loads the battle behind 协议启动！ —
  * 7:43–7:51 — which this client does not need; that overran the 3 s by ~2 s). The overrun left: 协议启动！'s 350 ms fade
  * (BOOT_LEAVE_MS) runs over the start of 回合开始, while the round-1 plate comes in under it.
  */
@@ -919,11 +919,16 @@ function MatchScreen() {
   // (7:55–7:58) and plate (7:57–8:01). It waits for 协议启动！ alone, never for the plate. A plugin window over
   // BATTLE_CHECK hides 协议启动！ (`boot && !hasOffers` below), so the HUD is not held behind that veil either. Without
   // the art pack (no `boot`) or with reduced motion the HUD is simply there. [ASSUMED] the entry motion itself — its
-  // order and its ~1.2 s (css/screens/game.css 进场) — read off the footage by the PR's author.
+  // order and its ~1.2 s (css/screens/game.css 进场) — read off the footage by the PR's author, and starting it as the
+  // fade starts rather than when it ends. The HUD comes in once per 协议启动！ (`hudCame`, its boot.key): when a plugin
+  // window over BATTLE_CHECK closes, 协议启动！ shows again for its fade, and the HUD that came in behind the window
+  // stays (l2 review nit: it used to hide and play the whole entry a second time).
   const bootShown = !!boot && !hasOffers && !bootLeaving;
+  const hudCame = useRef(null);
   const [hudIn, setHudIn] = useState(() => (bootShown && !reducedMotion() ? 'wait' : null)); // null | 'wait' | 'enter'
   useEffect(() => {
-    if (bootShown) { if (!reducedMotion()) setHudIn('wait'); return; }
+    if (bootShown) { if (!reducedMotion() && hudCame.current !== boot.key) setHudIn('wait'); return; }
+    if (boot) hudCame.current = boot.key;
     setHudIn((s) => (s === 'wait' ? 'enter' : s));
   }, [bootShown]);
   useEffect(() => {

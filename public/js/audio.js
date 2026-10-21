@@ -110,6 +110,7 @@ const BUFFER_BYTES = 64 * 1024 * 1024;
 /**
  * An idle buffer above this much PCM is a music track (≈ 44 s of 48 kHz stereo; a voice line is 0.4–1.3 MB): when the
  * budget is over, such tracks leave first, before the LRU walk would flush the small sounds older than them (_trimBuffers).
+ * [ASSUMED] The line (a quarter of the budget) is a remake choice, no official counterpart.
  */
 const BIG_BUFFER = BUFFER_BYTES / 4;
 /** Decoded PCM bytes of an AudioBuffer (float32 per channel). */

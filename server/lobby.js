@@ -10,7 +10,8 @@
 //     in a match, create/join of another room fails with ROOM_STARTED (send g.leave or room.leave first).
 //   * room.create {mode, difficulty?, test?}: ▸ without a difficulty the room starts at DEFAULT_DIFFICULTY (标准) and the
 //     host changes it in the room — the event's 联合模拟 creates the room first (research 06 §3.2), the starting
-//     difficulty is not recorded [ASSUMED: 标准, the first one unlocked]. The game's own lobby always sends the remembered one.
+//     difficulty is not recorded [ASSUMED: 标准, the first one unlocked; the event room research 06 §3.2 describes shows
+//     ♜ 标准模拟 in its footer pill]. The game's own lobby always sends the remembered one.
 //   * Host-only: room.setDifficulty, room.setAiPicksLast, room.addBot, room.removeBot, room.kick, room.start.
 //     ▸ Changing the difficulty or the AI-picks-last option (co-op only) un-readies the other humans.
 //     ▸ room.start requires every other human to be connected and ready; the host's start counts as the host's
@@ -99,7 +100,9 @@
 //     without skins sends what it sent before): the waiting room's 名片干员 seat cards wear the outfit of the operator
 //     they show (the maintainer's decision 4 of 2026-10-21; the client picks that operator's entry — ui/seatArt.js
 //     seatCardSkin — exactly as a match card reads Match.publicView().players[].skins). A changed map is broadcast while
-//     the room waits; during a match its m.public carries it, and the room.state at the match's end.
+//     the room waits; during a match its m.public carries it, and the room.state at the match's end. [ASSUMED] The whole
+//     map rides in room.state, not one skinId per card: a seat without a pick shows an operator its clients choose by
+//     player id (ui/seatArt.js seatOperator), which the server does not compute.
 //   * 名片干员 (PR #643 split 6): room.card { charId } — the operator whose portrait fills the player's seat card in the
 //     waiting room, '' for none — is kept only when it is a visible charId of the room's chess.json (another id, a hidden
 //     preset, a stand-in body or a 自选-only operator: BAD_MSG, the stored one stays). Stored on the session (it follows the player into
@@ -208,7 +211,8 @@ export const LOBBY_DEFAULTS = Object.freeze({
 
 /**
  * The difficulty of a room created without one (room.create's `difficulty` left out; see the header) [ASSUMED: 标准 —
- * the event's room is changed by its creator after 创建同盟, its starting difficulty is not recorded].
+ * the event's room is changed by its creator after 创建同盟, its starting difficulty is not recorded; the event room of
+ * research 06 §3.2 shows ♜ 标准模拟 in its footer pill].
  */
 export const DEFAULT_DIFFICULTY = 'FUNNY';
 

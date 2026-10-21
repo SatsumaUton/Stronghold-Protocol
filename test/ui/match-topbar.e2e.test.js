@@ -146,6 +146,47 @@ describe('match top bar (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 (a
     await context.close();
   });
 
+  test('real phase spacing: 协议启动！ inside the 3 s BATTLE_CHECK, so the round-1 kettles play over the bar and the entry ends before 准备', async () => {
+    // the server's own spacing (data/config.json timers.battleCheck 3, 回合开始 2 s; DESIGN §35.18): 协议启动！ comes
+    // DRAFT_HOLD_MS 0.7 s into BATTLE_CHECK, so 回合开始 follows it 2.3 s later, and 准备 2 s after that (the l2 review's
+    // integration gate for decisions 5 and 6 — the frozen 回合开始 of the test above cannot show a scene cut short)
+    const { page, problems, context } = await open();
+    await page.evaluate(() => {
+      const log = [];
+      globalThis.__spacingLog = log;
+      let t0 = null;
+      const tick = () => {
+        const boot = !!document.querySelector('[data-testid="protocol-boot"]');
+        if (t0 == null && boot) {
+          t0 = performance.now();
+          setTimeout(() => { log.push({ t: Math.round(performance.now() - t0), mark: 'ROUND_START' }); globalThis.__MOCK__.setPhase('ROUND_START'); }, 2300);
+          setTimeout(() => { log.push({ t: Math.round(performance.now() - t0), mark: 'PREP' }); globalThis.__MOCK__.setPhase('PREP'); }, 4300);
+        }
+        if (t0 != null) {
+          const st = { boot, hud: document.querySelector('.gm__hud')?.className || '', cap: document.querySelector('.gtop__cap')?.className || '' };
+          const last = log.filter((x) => !x.mark).pop();
+          if (!last || last.boot !== st.boot || last.hud !== st.hud || last.cap !== st.cap) log.push({ t: Math.round(performance.now() - t0), ...st });
+          if (performance.now() - t0 > 6500) return;
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      globalThis.__MOCK__.setPhase('BATTLE_CHECK');
+    });
+    await sleep(7200);
+    const log = await page.evaluate(() => globalThis.__spacingLog);
+    const prep = log.find((x) => x.mark === 'PREP');
+    const kettles = log.find((x) => !x.mark && x.cap.includes('is-fx-wait') && !x.hud.includes('is-wait'));
+    const rest = log.find((x) => !x.mark && x.cap.includes('is-fx-rest'));
+    const enter = log.find((x) => !x.mark && x.hud.includes('is-enter'));
+    const done = enter && log.find((x) => !x.mark && x.t > enter.t && !x.hud.includes('is-enter'));
+    assert.ok(prep && kettles && rest && enter && done, JSON.stringify(log));
+    assert.ok(rest.t - kettles.t >= 1500, `the round-1 kettles play ${rest.t - kettles.t} ms before 准备's scene: ${JSON.stringify(log)}`);
+    assert.ok(done.t <= prep.t + 50, `the entry is over (${done.t} ms) before 准备 (${prep.t} ms), so the plate does not drop in twice`);
+    assert.deepEqual(problems, []);
+    await context.close();
+  });
+
   test('reduced motion: the HUD is never hidden or animated in', async () => {
     const { page, problems, context } = await open({ reduce: true });
     await page.evaluate(() => globalThis.__MOCK__.setPhase('BATTLE_CHECK'));
