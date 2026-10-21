@@ -8,6 +8,9 @@
 //     Humans and bots take the lowest free seat index; seat indexes never compact.
 //   * ▸ Being in a LOBBY room and sending room.create / room.join implicitly leaves it. While your room is
 //     in a match, create/join of another room fails with ROOM_STARTED (send g.leave or room.leave first).
+//   * room.create {mode, difficulty?, test?}: ▸ without a difficulty the room starts at DEFAULT_DIFFICULTY (标准) and the
+//     host changes it in the room — the event's 联合模拟 creates the room first (research 06 §3.2), the starting
+//     difficulty is not recorded [ASSUMED: 标准, the first one unlocked]. The game's own lobby always sends the remembered one.
 //   * Host-only: room.setDifficulty, room.setAiPicksLast, room.addBot, room.removeBot, room.kick, room.start.
 //     ▸ Changing the difficulty or the AI-picks-last option (co-op only) un-readies the other humans.
 //     ▸ room.start requires every other human to be connected and ready; the host's start counts as the host's
@@ -192,6 +195,12 @@ export const LOBBY_DEFAULTS = Object.freeze({
   resyncMinGapMs: 1000,   // heavy resyncs (match state / result replay) per session at most this often on repeated hellos
   soloReconnectWindowMs: null, // a dropped solo run stays resumable this long (null = data singleReconnectTime, 24 h)
 });
+
+/**
+ * The difficulty of a room created without one (room.create's `difficulty` left out; see the header) [ASSUMED: 标准 —
+ * the event's room is changed by its creator after 创建同盟, its starting difficulty is not recorded].
+ */
+export const DEFAULT_DIFFICULTY = 'FUNNY';
 
 /** Official `singleReconnectTime` (s) when the data lacks it (constData, research 01 §1). */
 export const SOLO_RECONNECT_FALLBACK_SEC = 86_400;
@@ -749,7 +758,9 @@ export class Lobby {
   // room.* handlers
   // ---------------------------------------------------------------------------------------------------
 
-  create(session, { mode, difficulty, test } = {}) {
+  create(session, { mode, difficulty: asked, test } = {}) {
+    // left out: the default (header); the protocol refuses any other value that is not a difficulty
+    const difficulty = DIFFICULTIES.includes(asked) ? asked : DEFAULT_DIFFICULTY;
     // A test room exists only when the process switch allowed it. The check runs before the room is built.
     if (test === true && this.testEnabled !== true) return fail(ERR.TEST_DISABLED);
     const cur = this.roomOf(session);
