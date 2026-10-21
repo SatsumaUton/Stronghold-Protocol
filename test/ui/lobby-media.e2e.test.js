@@ -6,6 +6,10 @@
 // becomes the lobby's track (played when the page's audio runs) and switching it off gives the official track back;
 // the switches survive a reload. 删除 removes each. Esc closes the dialog
 // and gives the focus back; on a phone in landscape the dialog stays on screen. No console error (a CSP refusal is one).
+// The guards (#814 review, #643's limits): a still picture past 2560 px is scaled down to 2560 (transparency kept), a
+// moving one (APNG) that large, a 1440p video and music longer than 6 minutes (told by its metadata, or by its decode)
+// are refused with their own toast; with reduced motion a moving picture stands on its first frame (a canvas) and a
+// video is stopped on its first painted frame.
 //
 //   SP_E2E=1 node --test test/ui/lobby-media.e2e.test.js
 //
@@ -52,6 +56,56 @@ const pageFile = (c, kind) => c.page.evaluate(async (kind) => {
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }, kind).then((b64) => Buffer.from(b64, 'base64'));
+
+/** A PNG (or a 1440p-style WebM) of w×h drawn in the page; `clear`: the left quarter transparent. */
+const canvasFile = (c, { kind = 'png', w, h, clear = false }) => c.page.evaluate(async ({ kind, w, h, clear }) => {
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const g = cv.getContext('2d');
+  const paint = (k) => { g.clearRect(0, 0, w, h); g.fillStyle = `hsl(${(k * 50) % 360} 60% 45%)`; g.fillRect(clear ? w / 4 : 0, 0, w, h); };
+  let blob;
+  if (kind === 'png') { paint(1); blob = await new Promise((r) => cv.toBlob(r, 'image/png')); } else {
+    const rec = new MediaRecorder(cv.captureStream(10), { mimeType: 'video/webm' });
+    const parts = [];
+    rec.ondataavailable = (e) => parts.push(e.data);
+    const stopped = new Promise((r) => { rec.onstop = r; });
+    rec.start();
+    for (let k = 0; k < 6; k++) { paint(k); await new Promise((r) => setTimeout(r, 100)); }
+    rec.stop();
+    await stopped;
+    blob = new Blob(parts, { type: 'video/webm' });
+  }
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}, { kind, w, h, clear }).then((b64) => Buffer.from(b64, 'base64'));
+
+const CRC = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+const crc32 = (buf) => { let c = 0xffffffff; for (const b of buf) c = CRC[(c ^ b) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+const pngChunk = (type, data) => {
+  const head = Buffer.alloc(8);
+  head.writeUInt32BE(data.length, 0);
+  head.write(type, 4, 'latin1');
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), data])), 0);
+  return Buffer.concat([head, data, crc]);
+};
+/** The PNG as a one-frame APNG (acTL + fcTL before the first IDAT): a picture that may move, to this page. */
+function apng(png) {
+  const w = png.readUInt32BE(16), h = png.readUInt32BE(20);
+  const idat = png.indexOf('IDAT', 8, 'latin1') - 4;
+  const actl = Buffer.alloc(8); actl.writeUInt32BE(1, 0);
+  const fctl = Buffer.alloc(26);
+  fctl.writeUInt32BE(0, 0); fctl.writeUInt32BE(w, 4); fctl.writeUInt32BE(h, 8); fctl.writeUInt16BE(1, 20); fctl.writeUInt16BE(10, 22);
+  return Buffer.concat([png.subarray(0, idat), pngChunk('acTL', actl), pngChunk('fcTL', fctl), png.subarray(idat)]);
+}
+/**
+ * The page's problems, less the reads it cancels itself: a check stops reading a chosen file once its metadata answers
+ * (a video's size, the music's length), and the browser reports the rest of that blob: read as aborted.
+ */
+const pageProblems = (c) => problemsOf([c]).filter((p) => !/requestfailed: blob:\S+ net::ERR_ABORTED$/.test(p));
+const toastWith = (c, re) => c.page.waitForFunction((src) => [...document.querySelectorAll('.toast')].some((t) => new RegExp(src).test(t.textContent)), { timeout: 30000 }, re.source);
 
 const media = (c) => c.page.evaluate(async () => {
   const { audio } = await import('/js/audio.js');
@@ -199,7 +253,81 @@ describe('自定义大厅背景与音乐 (real server)', { skip: !ENABLED && 'se
       assert.equal(m.musicName, '默认音乐');
       assert.equal(await c.page.$('[data-testid="media-backdrop-remove"]'), null);
 
-      assert.deepEqual(problemsOf([c]), []);
+      assert.deepEqual(pageProblems(c), []);
+    } finally {
+      await c.close();
+      await srv.stop();
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+  test('the guards: a large picture scaled down; a moving one, 1440p video and long music refused; reduced motion stills', { timeout: 4 * 60 * 1000 }, async () => {
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'lobby-media-e2e-'));
+    const srv = await startRealServer();
+    const P = (await import('puppeteer-core')).default;
+    const c = new Client(P, srv.base, 'guards', { prefix: 'lobby-media-guards' });
+    try {
+      await c.open();
+      await c.enter('凯尔希');
+      const big = await canvasFile(c, { w: 3000, h: 600, clear: true });
+      const files = {
+        big: path.join(tmp, 'wide.png'), bigMoving: path.join(tmp, 'wide-moving.png'), moving: path.join(tmp, 'moving.png'),
+        video1440: path.join(tmp, 'qhd.webm'), small: path.join(tmp, 'small.webm'),
+        long: path.join(tmp, 'long.wav'), longish: path.join(tmp, 'longish.wav'),
+      };
+      writeFileSync(files.big, big);
+      writeFileSync(files.bigMoving, apng(big));
+      writeFileSync(files.moving, apng(await canvasFile(c, { w: 320, h: 180 })));
+      writeFileSync(files.video1440, await canvasFile(c, { kind: 'webm', w: 2560, h: 1440 }));
+      writeFileSync(files.small, await canvasFile(c, { kind: 'webm', w: 320, h: 180 }));
+      writeFileSync(files.long, wav(400, 8000)); // 6 min 40 s: its metadata says too long, nothing decoded
+      writeFileSync(files.longish, wav(370, 8000)); // 6 min 10 s: decoded, then refused by its decoded length
+      await openDialog(c);
+
+      // a still picture past 2560 px: scaled down to 2560 on its longest side, its transparency kept
+      await upload(c, 'backdrop', files.big);
+      await c.page.waitForFunction(() => document.querySelector('[data-testid="own-backdrop"] img')?.naturalWidth > 0, { timeout: 15000 });
+      const shown = await c.page.evaluate(() => {
+        const img = document.querySelector('[data-testid="own-backdrop"] img');
+        const cv = document.createElement('canvas');
+        cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+        const g = cv.getContext('2d');
+        g.drawImage(img, 0, 0);
+        return { w: img.naturalWidth, h: img.naturalHeight, clear: g.getImageData(10, 10, 1, 1).data[3], solid: g.getImageData(2000, 10, 1, 1).data[3] };
+      });
+      assert.deepEqual(shown, { w: 2560, h: 512, clear: 0, solid: 255 });
+      assert.equal((await media(c)).bgName, 'wide.png');
+
+      // refused, each with its own reason; the picture stays
+      await upload(c, 'backdrop', files.bigMoving);
+      await toastWith(c, /2560/);
+      await upload(c, 'backdrop', files.video1440);
+      await toastWith(c, /1080p/);
+      assert.equal((await media(c)).bgName, 'wide.png');
+      await upload(c, 'music', files.long);
+      await toastWith(c, /6 分钟/);
+      await c.page.waitForFunction(async () => (await import('/js/ui/lobbyMedia.js')).mediaStore.get().busy == null);
+      // (the same text again while it shows would only count up on that toast: wait until it is gone)
+      await c.page.waitForFunction(() => ![...document.querySelectorAll('.toast')].some((t) => /6 分钟/.test(t.textContent)), { timeout: 15000 });
+      await upload(c, 'music', files.longish);
+      await toastWith(c, /6 分钟/);
+      await c.page.waitForFunction(async () => (await import('/js/ui/lobbyMedia.js')).mediaStore.get().busy == null);
+      assert.equal((await media(c)).musicName, '默认音乐');
+
+      // reduced motion: a moving picture stands on its first frame, a video stops on its first painted frame
+      await c.page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+      await upload(c, 'backdrop', files.moving);
+      await c.page.waitForFunction(() => document.querySelector('[data-testid="own-backdrop"] canvas')?.width === 320, { timeout: 15000 });
+      assert.equal(await c.page.$('[data-testid="own-backdrop"] img'), null);
+      await upload(c, 'backdrop', files.small);
+      await c.page.waitForFunction(() => {
+        const v = document.querySelector('[data-testid="own-backdrop"] video');
+        return v && v.readyState >= 2 && v.paused;
+      }, { timeout: 15000 });
+      await c.page.emulateMediaFeatures([]);
+
+      await c.click('[data-testid="media-backdrop-remove"]');
+      await c.page.waitForFunction(() => !document.querySelector('[data-testid="own-backdrop"]'));
+      assert.deepEqual(pageProblems(c), []);
     } finally {
       await c.close();
       await srv.stop();

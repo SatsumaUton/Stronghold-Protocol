@@ -26,7 +26,7 @@ function ridgePoints(seed, base, amp, rough) {
   const rnd = rng(seed);
   let pts = [base + (rnd() - 0.5) * amp, base + (rnd() - 0.5) * amp];
   let disp = amp;
-  while (pts.length < 65) {
+  while (pts.length < 65) { // loop-cap: doubles from 2 to 65 points in 6 passes
     const next = [];
     for (let i = 0; i < pts.length - 1; i++) next.push(pts[i], (pts[i] + pts[i + 1]) / 2 + (rnd() - 0.5) * disp);
     next.push(pts[pts.length - 1]);
