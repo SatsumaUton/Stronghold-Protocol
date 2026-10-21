@@ -136,7 +136,7 @@ import { screenStrip, playerBonds, playerLayer, detailBondOwner, toggleBond, pop
 import { data, getMode } from '../data.js';
 import { audio, resultSpeaker, resultVoiceSlot } from '../audio.js';
 import { useDocClass, FullscreenButton, reducedMotion } from '../ui/device.js';
-import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady } from '../ui/turnPopup.js';
+import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady, TURN_CUE_WAIT_MS } from '../ui/turnPopup.js';
 // MatchEnded, PausedOverlay, the highlight styles and keepEarly live in ./game/*.js.
 import { HUD_HZ_MS, MERGE_HL, SEL_RANGE, cx } from './game/marks.js';
 import { keepEarly, audioEarly } from './game/early.js';
@@ -1001,15 +1001,26 @@ function MatchScreen() {
 
   // your turn cue in the 机变 draft, and the official 轮到你选 disc over the cards (ui/turnPopup.js) once its art is in —
   // a shared draft's turn, and a solo draft as it opens (the maintainer's decision of 2026-10-22, decision 7 extended: as
-  // the strategy draft's 请选择策略 band, screens/bandDraft.js)
+  // the strategy draft's 请选择策略 band, screens/bandDraft.js). The cue comes due with the turn and plays once no phase
+  // banner or plate is on screen (the 机变阶段 banner that opens the draft hid the disc's words: §35.18's leftover), at
+  // most TURN_CUE_WAIT_MS later; a pick (or the turn moving on) before then drops it. [ASSUMED] the order and the bound
   const spMine = !!sp && (solo || sp.turnPid === myId) && !sp.pickOf.has(myId);
   const [turnPop, setTurnPop] = useState(0);
+  const [turnDue, setTurnDue] = useState(0);             // > 0: the cue is waiting to play (re-counted per turn)
   useEffect(() => { preloadTurnPopupArt(); }, []);
+  useEffect(() => { if (spMine) setTurnDue((n) => n + 1); else setTurnDue(0); }, [spMine]);
+  const phaseOverlay = !hasOffers && !!(banner || roundPop);
   useEffect(() => {
-    if (!spMine) return;
-    audio.sfx('yourTurn');
-    if (turnPopupArtReady() && !reducedMotion()) setTurnPop((n) => n + 1);
-  }, [spMine]);
+    if (!turnDue) return undefined;
+    const play = () => {
+      setTurnDue(0);
+      audio.sfx('yourTurn');
+      if (turnPopupArtReady() && !reducedMotion()) setTurnPop((n) => n + 1);
+    };
+    if (!phaseOverlay) { play(); return undefined; }
+    const id = setTimeout(play, TURN_CUE_WAIT_MS);
+    return () => clearTimeout(id);
+  }, [turnDue, phaseOverlay]);
 
   // promotion (merge reward offered) and bond activation cues; a special refresh's offer (凯瑟琳 定向投放 …) plays the
   // shop's refresh sound instead of the promotion cue
