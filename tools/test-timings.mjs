@@ -20,6 +20,31 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 /** One attribute of a tag, or undefined. @param {string} attrs @param {string} name */
 const attr = (attrs, name) => new RegExp(`(?:^|\\s)${name}="([^"]*)"`).exec(attrs)?.[1];
 
+/** The repository folders a report's `file` can name a test file from: the suite's two roots. */
+const TEST_ROOTS = ['test/', 'plugins/'];
+
+/**
+ * A report's `file` as a path inside the repository. A report made by another machine (CI checks out to
+ * /home/runner/work/… and D:\a\…) is still ours: its path inside the repository is taken from the suite root on, and
+ * only a file that names none of them is dropped.
+ * @param {string} file @param {string} root
+ */
+function relOf(file, root) {
+  const norm = file.split('\\').join('/');
+  // a relative path: the report was made here (or says how to get here)
+  if (!norm.startsWith('/') && !/^[A-Za-z]:\//.test(norm)) {
+    return path.relative(root, path.resolve(root, norm)).split(path.sep).join('/');
+  }
+  // an absolute path: another checkout (CI) unless it is this one
+  const here = path.relative(root, norm).split(path.sep).join('/');
+  if (here && !here.startsWith('..') && !path.isAbsolute(here)) return here;
+  for (const k of TEST_ROOTS) {
+    const at = norm.lastIndexOf(`/${k}`);
+    if (at >= 0) return norm.slice(at + 1);
+  }
+  return ''; // an absolute path with no suite root in it: not one of ours
+}
+
 /**
  * The time each test file took, in milliseconds, from a JUnit report (`--test-reporter=junit`).
  * @param {string} xml
@@ -33,8 +58,8 @@ export function perFileMs(xml, root = ROOT) {
     const file = attr(m[1], 'file');
     const time = Number(attr(m[1], 'time'));
     if (!file || !Number.isFinite(time)) continue;
-    const rel = path.relative(root, path.resolve(root, file)).split(path.sep).join('/');
-    if (rel.startsWith('..')) continue; // another checkout's file: not one of ours
+    const rel = relOf(file, root);
+    if (!rel || rel.startsWith('..')) continue; // not a test file of this repository
     out[rel] = (out[rel] || 0) + time * 1000;
   }
   for (const k of Object.keys(out)) out[k] = Math.round(out[k]);

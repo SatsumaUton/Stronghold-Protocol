@@ -61,16 +61,19 @@ test('assignShards: the heaviest files spread over the shards, the lightest fill
   assert.ok(s.imbalance <= MAX_IMBALANCE);
 });
 
-test('perFileMs: a file sums its cases, other checkouts are dropped, paths are relative and whole milliseconds', () => {
+test('perFileMs: a file sums its cases, another checkout\'s prefix is cut to the path inside the repo, whole milliseconds', () => {
   const xml = [
     '<?xml version="1.0" encoding="utf-8"?>', '<testsuites>',
     `<testcase name="one" time="0.5" classname="test" file="${ROOT}/test/a.test.js"/>`,
     `<testcase name="two" time="0.25" classname="test" file="${ROOT}/test/a.test.js"/>`,
-    '<testcase name="three" time="1.5" classname="test" file="/elsewhere/test/b.test.js"/>',
+    // CI checks out to /home/runner/work/… and D:\a\…: the same file by the path that starts at the suite root
+    '<testcase name="three" time="0.4" classname="test" file="/home/runner/work/Stronghold-Protocol/Stronghold-Protocol/test/b.test.js"/>',
+    '<testcase name="four" time="0.6" classname="test" file="D:\\a\\Stronghold-Protocol\\Stronghold-Protocol\\test\\b.test.js"/>',
+    '<testcase name="five" time="1.5" classname="test" file="/elsewhere/src/c.test.js"/>',
     '<testcase name="suite" time="9" classname="test"/>',
     '</testsuites>',
   ].join('\n');
-  assert.deepEqual(perFileMs(xml), { 'test/a.test.js': 750 });
+  assert.deepEqual(perFileMs(xml), { 'test/a.test.js': 750, 'test/b.test.js': 1000 });
 });
 
 test('perFileMsOf: one value per file, the median of the reports that ran it', () => {
