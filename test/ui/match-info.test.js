@@ -25,7 +25,7 @@ globalThis.fetch = async (url) => {
 };
 
 const { matchInfoModel, MatchBondRow, MatchLegend, BannedOperators, MatchInfo, MatchInfoDialog } = await import('../../public/js/ui/matchInfo.js');
-const { MatchEnemies, enemyDescMode, ENEMY_DESC_MODES } = await import('../../public/js/ui/matchEnemies.js');
+const { MatchEnemies, factionDescId } = await import('../../public/js/ui/matchEnemies.js');
 const { briefingBondTip } = await import('../../public/js/ui/gameLogic.js');
 const { BondDisc, Tooltip, Modal, Button } = await import('../../public/js/ui/components.js');
 const { UnitThumb, Img, RichText, makeLookups } = await import('../../public/js/ui/gameComponents.js');
@@ -187,42 +187,62 @@ test('#484: enemy information uses this match\'s announced leader, abilities, ba
     assert.equal(textOf(nodes.find(v => hasClass(v, 'brief-stage__name'))), gd.stage(pub.stageId).name);
     const factions = nodes.filter(v => hasClass(v, 'brief-faction'));
     assert.deepEqual(factions.map(v => v.props['data-faction']), pub.factions, 'only the announced types, in briefing order');
-    for (const faction of factions) {
+    // (the maintainer's decision of 2026-10-22: the name under the icon, the description in the tooltip around the cell)
+    const tips = nodes.filter(v => v.type === Tooltip);
+    assert.equal(tips.length, factions.length, 'one tooltip per special enemy type');
+    for (const [i, faction] of factions.entries()) {
       const type = gd.factions.types[faction.props['data-faction']];
-      assert.equal(textOf(faction), type.name + type.desc);
+      assert.ok(type.desc, `${type.name}: the data has a description`);
+      assert.equal(tips[i].props.text, type.desc, `${type.name}: its tooltip says the description`);
+      assert.ok([...walk(tips[i].props.children)].includes(faction), 'the tooltip wraps the cell');
+      assert.equal(textOf([...walk(faction)].find(v => hasClass(v, 'brief-faction__text'))), type.name, 'the name under the icon');
       assert.equal([...walk(faction)].find(v => v.type === Img).props.src, factionIconUrl(gd.m, type.icon));
     }
   } finally { h.m.dispose(); }
 });
 
-test('特训敌人 description, both variants behind the temporary switch (the maintainer, 2026-10-21): inline (default, 2 lines) or a tooltip', () => {
-  assert.deepEqual(ENEMY_DESC_MODES, ['inline', 'tip']);
-  assert.equal(enemyDescMode(), 'inline', 'the default until the maintainer picks');
+test('特训敌人 description in a tooltip only (the maintainer, 2026-10-22): hover / keyboard focus / long press, described for screen readers', () => {
   const pub = { bossId: null, stageId: null, lastRound: 14, factions: ['FLY', 'TIMES'] };
   const gd = makeLookups();
-  const inline = [...walk(MatchEnemies({ pub, gd }))];
-  assert.equal(inline.filter((v) => v.type === Tooltip).length, 0);
-  const cells = inline.filter((v) => hasClass(v, 'brief-faction'));
-  assert.deepEqual(cells.map((v) => v.props.title), pub.factions.map((ty) => gd.factions.types[ty].desc), 'the full text in the title (a clamped line)');
-  assert.ok(inline.some((v) => hasClass(v, 'brief-factions--inline')));
-  globalThis.__SP_ENEMY_DESC__ = 'tip';
-  try {
-    assert.equal(enemyDescMode(), 'tip');
-    const nodes = [...walk(MatchEnemies({ pub, gd }))];
-    const tips = nodes.filter((v) => v.type === Tooltip);
-    assert.deepEqual(tips.map((v) => v.props.text), pub.factions.map((ty) => gd.factions.types[ty].desc), 'the description in the tooltip');
-    const tipCells = nodes.filter((v) => hasClass(v, 'brief-faction'));
-    assert.deepEqual(tipCells.map((v) => v.props['data-faction']), pub.factions);
-    for (const cell of tipCells) {
-      const type = gd.factions.types[cell.props['data-faction']];
-      assert.ok(hasClass(cell, 'is-tip') && cell.props.tabindex === '0', 'reachable by keyboard');
-      assert.equal(textOf(cell), type.name + type.desc, 'still in the markup');
-      assert.ok(hasClass([...walk(cell)].find((v) => hasClass(v, 'brief-faction__desc')), 'sr-only'), 'for screen readers only');
-    }
-  } finally { delete globalThis.__SP_ENEMY_DESC__; }
-  // the clamp in both places the block is shown
-  assert.match(read('public/css/screens/briefing.css'), /\.brief \.brief-faction__desc \{[^}]*-webkit-line-clamp: 2;/);
-  assert.match(read('public/css/screens/draft.css'), /\.minfo-dlg \.brief-faction__desc \{[^}]*-webkit-line-clamp: 2;/);
+  const nodes = [...walk(MatchEnemies({ pub, gd }))];
+  const tips = nodes.filter((v) => v.type === Tooltip);
+  assert.deepEqual(tips.map((v) => v.props.text), pub.factions.map((ty) => gd.factions.types[ty].desc), 'the description in the tooltip');
+  assert.ok(tips.every((v) => v.props.block === true && v.props.class === 'brief-faction__tt' && v.props.tipClass === 'brief-faction__tip'));
+  // the only place the text is shown: readable on a phone (1rem = 40 px there) — the dialog's former 10 px floor
+  assert.match(read('public/css/screens/briefing.css'), /\n\.tooltip\.brief-faction__tip \{[^}]*font-size: max\(calc\(\.15 \* var\(--t\)\), 10px\);/);
+  const cells = nodes.filter((v) => hasClass(v, 'brief-faction'));
+  assert.deepEqual(cells.map((v) => v.props['data-faction']), pub.factions);
+  for (const cell of cells) {
+    const ty = cell.props['data-faction'];
+    const type = gd.factions.types[ty];
+    assert.equal(cell.props.title, undefined, 'no native title beside the tooltip');
+    assert.equal(cell.props.tabindex, undefined, 'the icon takes the focus, not the cell');
+    // the icon: focusable (keyboard focus shows the tooltip), named by the type, described by the text
+    const icon = [...walk(cell)].find((v) => hasClass(v, 'brief-faction__icon'));
+    assert.deepEqual([icon.props.tabindex, icon.props.role, icon.props['aria-label']], ['0', 'img', type.name]);
+    assert.equal(icon.props['aria-describedby'], factionDescId('brief', ty));
+    const desc = [...walk(cell)].find((v) => v.props?.id === icon.props['aria-describedby']);
+    assert.ok(desc && hasClass(desc, 'sr-only') && hasClass(desc, 'brief-faction__desc'), 'an .sr-only copy for screen readers');
+    assert.equal(textOf(desc), type.desc);
+    assert.equal(textOf([...walk(cell)].find((v) => hasClass(v, 'brief-faction__text'))), type.name, 'only the name is shown');
+  }
+  // the draft dialog's copy keeps its own ids
+  const dlg = [...walk(MatchEnemies({ pub, gd, idScope: 'minfo' }))].filter((v) => hasClass(v, 'brief-faction__icon'));
+  assert.deepEqual(dlg.map((v) => v.props['aria-describedby']), pub.factions.map((ty) => factionDescId('minfo', ty)));
+  assert.notEqual(factionDescId('minfo', 'FLY'), factionDescId('brief', 'FLY'));
+  // a type without a description: no tooltip text, nothing to point at
+  const bare = [...walk(MatchEnemies({ pub: { ...pub, factions: ['NOPE'] }, gd }))];
+  assert.equal(bare.find((v) => v.type === Tooltip).props.text, null);
+  assert.equal(bare.find((v) => hasClass(v, 'brief-faction__icon')).props['aria-describedby'], undefined);
+  assert.equal(bare.filter((v) => hasClass(v, 'brief-faction__desc')).length, 0);
+  // the temporary switch and the inline variant are gone (code and CSS)
+  const js = read('public/js/ui/matchEnemies.js');
+  assert.doesNotMatch(js, /enemyDescMode|ENEMY_DESC_MODES|__SP_ENEMY_DESC__|enemyDesc=|'inline'/);
+  for (const f of ['public/css/screens/briefing.css', 'public/css/screens/draft.css']) {
+    const css = read(f);
+    assert.doesNotMatch(css, /brief-faction__desc|brief-factions--|\.is-tip/, `${f}: no inline description, no variant rules`);
+    assert.match(css, /\.brief-faction__icon:focus-visible \{/, `${f}: the focused icon is marked`);
+  }
 });
 
 test('#484: missing enemy data stays readable and UI labels follow the language', () => {
@@ -300,7 +320,7 @@ test('the briefing, the strategy draft and the in-game 本局信息 tab all read
   // (PR #643: 本局信息 in the step header, beside the difficulty)
   assert.match(draft, /class="stephead__info" data-testid="match-info-open" aria-haspopup="dialog" onClick=\$\{\(\) => setInfoOpen\(true\)\}\n\s+title=\$\{t\('本局信息'\)\}><\$\{Icon\} name="search" \/><span>\$\{t\('本局信息'\)\}<\/span><\/button>/);
   assert.match(draft, /<\$\{MatchInfoDialog\} open=\$\{infoOpen\} onClose=\$\{\(\) => setInfoOpen\(false\)\} model=\$\{info\}/);
-  assert.match(draft, /enemies=\$\{infoOpen \? html`<\$\{MatchEnemies\} pub=\$\{pub\} gd=\$\{gd\} \/>` : null\}/);
+  assert.match(draft, /enemies=\$\{infoOpen \? html`<\$\{MatchEnemies\} pub=\$\{pub\} gd=\$\{gd\} idScope="minfo" \/>` : null\}/);
   // a turn change or my pick closes it; the draft's end unmounts the screen
   assert.match(draft, /const turnKey = `\$\{draft\.turnPid \|\| ''\}\|\$\{myPick \|\| ''\}`;\n\s*useEffect\(\(\) => \{ setInfoOpen\(false\); \}, \[turnKey\]\);/);
   const drawer = read('public/js/ui/enemyDrawer.js');

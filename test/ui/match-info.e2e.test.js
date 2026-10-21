@@ -11,9 +11,12 @@
 // 2. Co-op 绝境 with two humans — desktop (mouse) and a phone (touch, 844×390, then 756×366): both briefings agree with
 //    the server; the waiting player's dialog shows whose turn it is with the live countdown and closes by itself when the
 //    picker — whose own dialog counted its seconds down and was closed (Esc / 关闭) — confirms; on the next turn the
-//    phone's dialog fits both screens, its text stays ≥ 9 px, a swipe scrolls its body to the banned operators and a tap
-//    outside closes it; the player who already picked keeps its dialog open while the last strategy is confirmed, and
-//    the end of the draft takes it away.
+//    phone's dialog fits both screens, its text stays ≥ 9 px, a long press on a special enemy's icon shows its
+//    description, a swipe scrolls its body to the banned operators and a tap outside closes it; the player who already
+//    picked keeps its dialog open while the last strategy is confirmed, and the end of the draft takes it away.
+// 3. Solo 绝境 at 1000–1280 px: a special enemy's description shows in the tooltip on hover and on keyboard focus of its
+//    icon (the maintainer's decision of 2026-10-22; the icon's aria-describedby points at the same text); the dialog fits
+//    and scrolls at every width and closing it keeps the highlighted strategy.
 // Zero console errors / page errors / failed requests. Screenshots: test/e2e/out/match-info-*.png
 
 import { test, describe, before, after } from 'node:test';
@@ -142,11 +145,17 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
         icon: scope.querySelector('.brief-boss__img')?.getAttribute('src') || '',
       },
       battlefield: scope.querySelector('.brief-stage')?.textContent || '',
-      factions: [...scope.querySelectorAll('.brief-faction')].map(el => ({
-        type: el.dataset.faction, name: el.querySelector('.brief-faction__text b')?.textContent || '',
-        desc: el.querySelector('.brief-faction__text span')?.textContent || '',
-        icon: el.querySelector('img')?.getAttribute('src') || '',
-      })),
+      // (the description: the tooltip's text, also what the icon's aria-describedby points at — the maintainer's
+      // decision of 2026-10-22)
+      factions: [...scope.querySelectorAll('.brief-faction')].map(el => {
+        const icon = el.querySelector('.brief-faction__icon');
+        return {
+          type: el.dataset.faction, name: el.querySelector('.brief-faction__text b')?.textContent || '',
+          desc: document.getElementById(icon?.getAttribute('aria-describedby') || '')?.textContent || '',
+          label: icon?.getAttribute('aria-label') || '', focusable: icon?.tabIndex === 0,
+          icon: el.querySelector('img')?.getAttribute('src') || '',
+        };
+      }),
       emptyFactions: scope.querySelector('.brief-factions .t-dim')?.textContent || '',
       bonds: [...scope.querySelectorAll('.brief-bond')].map((el) => ({
         id: el.dataset.bond, name: el.querySelector('.bond__name')?.textContent || '',
@@ -300,6 +309,22 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
     await sleep(500);
     const brief = await readInfo(page, '.brief__main');
     assert.equal(brief.factions.length, 3, 'dire announces three special enemy types');
+    // the description in the tooltip (the maintainer's decision of 2026-10-22): on hover, then on keyboard focus of the icon
+    const first = brief.factions[0];
+    assert.ok(first.desc && first.focusable && first.label === first.name, JSON.stringify(first));
+    const tipText = () => page.$eval('.tooltip.is-shown', (el) => el.textContent);
+    const noTip = () => page.waitForFunction(() => !document.querySelector('.tooltip.is-shown'), { timeout: 3000 });
+    const iconPt = await centre(page, '.brief__main .brief-faction__icon');
+    await page.mouse.move(iconPt.x, iconPt.y);
+    await page.waitForSelector('.tooltip.is-shown', { visible: true, timeout: 3000 });
+    assert.equal(await tipText(), first.desc, 'hover: the description');
+    await page.mouse.move(5, 5);
+    await noTip();
+    await page.$eval('.brief__main .brief-faction__icon', (el) => el.focus());
+    await page.waitForSelector('.tooltip.is-shown', { visible: true, timeout: 3000 });
+    assert.equal(await tipText(), first.desc, 'keyboard focus: the description');
+    await page.$eval('.brief__main .brief-faction__icon', (el) => el.blur());
+    await noTip();
     await press(p, '.brief__foot .btn--primary', '准备就绪');
     await waitSt(page, s => s.phase === 'BAND_DRAFT', 'band draft');
     // (PR #643: nothing is highlighted until a portrait is tapped; the first one stays in view at every width)
@@ -326,7 +351,7 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
         const body = box.querySelector('.modal__body');
         const failures = [];
         if (body.scrollWidth > body.clientWidth + 1) failures.push('horizontal overflow');
-        const selectors = '.brief-boss__name, .brief-boss__when, .brief-boss__abil li, .brief-stage__name, .brief-faction__text b, .brief-faction__text span, .brief-bonds .brief-h, .brief-bond .bond__name, .brief-banned .brief-h, .brief-banned__grid .uthumb';
+        const selectors = '.brief-boss__name, .brief-boss__when, .brief-boss__abil li, .brief-stage__name, .brief-faction__text b, .brief-bonds .brief-h, .brief-bond .bond__name, .brief-banned .brief-h, .brief-banned__grid .uthumb';
         for (const el of box.querySelectorAll(selectors)) {
           el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
           const r = el.getBoundingClientRect(), b = body.getBoundingClientRect();
@@ -455,7 +480,7 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
         return {
           box: [r.left, r.top, r.right, r.bottom], vw: innerWidth, vh: innerHeight, scrolls: body.scrollHeight > body.clientHeight + 4,
           overflow: getComputedStyle(body).overflowY, name: px('.bond__name'), legend: px('.brief-legend'), title: px('.modal__title'),
-          badge: px('.brief-bond__ban'), enemyName: px('.brief-faction__text b'), enemyDesc: px('.brief-faction__text span'),
+          badge: px('.brief-bond__ban'), enemyName: px('.brief-faction__text b'),
           bossName: px('.brief-boss__name'), bossAbilities: px('.brief-boss__abil'),
           horizontalOverflow: body.scrollWidth > body.clientWidth + 1,
           status: vis('[data-testid="match-info-status"]'), close: vis('[data-testid="match-info-close"]'),
@@ -463,7 +488,21 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
       });
       assert.ok(lay.box[0] >= 0 && lay.box[1] >= 0 && lay.box[2] <= lay.vw && lay.box[3] <= lay.vh, `${w}×${h}: the dialog inside the screen ${JSON.stringify(lay.box)}`);
       assert.ok(lay.name >= 9 && lay.legend >= 9 && lay.badge >= 9 && lay.title >= 14, `${w}×${h}: readable text ${JSON.stringify(lay)}`);
-      assert.ok(lay.enemyName >= 12 && lay.enemyDesc >= 10 && lay.bossName >= 16 && lay.bossAbilities >= 10, `${w}×${h}: readable enemy information`);
+      assert.ok(lay.enemyName >= 12 && lay.bossName >= 16 && lay.bossAbilities >= 10, `${w}×${h}: readable enemy information`);
+      // a long press on a special enemy's icon shows its description (≥ 10 px, inside the screen); it expires after the release
+      const fdesc = briefs.get(ph).factions[0].desc;
+      const fPt = await centre(ph.page, '.minfo-dlg .brief-faction__icon');
+      await ph.page.touchscreen.touchStart(fPt.x, fPt.y);
+      await sleep(700);
+      await ph.page.touchscreen.touchEnd();
+      await ph.page.waitForSelector('.tooltip.is-shown', { visible: true, timeout: 3000 });
+      const tip = await ph.page.$eval('.tooltip.is-shown', (el) => {
+        const r = el.getBoundingClientRect();
+        return { text: el.textContent, px: parseFloat(getComputedStyle(el).fontSize), inside: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight };
+      });
+      assert.deepEqual(tip, { text: fdesc, px: tip.px, inside: true }, `${w}×${h}: the long press shows the description`);
+      assert.ok(tip.px >= 10, `${w}×${h}: the tooltip's text ${tip.px} px`);
+      await ph.page.waitForFunction(() => !document.querySelector('.tooltip.is-shown'), { timeout: 4000 });
       assert.equal(lay.horizontalOverflow, false, `${w}×${h}: no horizontal scrolling`);
       assert.ok(lay.status && lay.close, `${w}×${h}: the status line and 关闭 stay in view`);
       assert.ok(lay.scrolls && lay.overflow === 'auto', `${w}×${h}: the body scrolls`);

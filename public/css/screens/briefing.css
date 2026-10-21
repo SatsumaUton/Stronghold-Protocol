@@ -143,24 +143,21 @@
 .brief .brief-stage__name { color: var(--text-hi); }
 .brief .brief-stage__pool { color: var(--text-dim); }
 .brief .brief-factions { display: flex; align-items: flex-start; gap: .3rem; padding-right: .3rem; }
-.brief .brief-faction { display: flex; flex-direction: column; align-items: center; gap: .14rem; width: 1.9rem; outline: none; }
+.brief .brief-faction { display: flex; flex-direction: column; align-items: center; gap: .14rem; width: 1.9rem; cursor: help; }
 .brief .brief-faction__icon {
-  width: 1.12rem; height: 1.12rem; display: grid; place-items: center; border-radius: 50%;
+  width: 1.12rem; height: 1.12rem; display: grid; place-items: center; border-radius: 50%; outline: none; transition: box-shadow var(--t-fast);
   background: radial-gradient(circle at 50% 45%, #2a3a38, #121817 70%); box-shadow: 0 0 .22rem rgba(140, 255, 225, .14), inset 0 0 .16rem rgba(0, 0, 0, .7);
 }
 .brief .brief-faction__icon img { width: 78%; height: 78%; object-fit: contain; filter: grayscale(1) brightness(1.6) drop-shadow(0 0 .06rem rgba(160, 255, 230, .6)); }
-/* name and description under the icon (GitHub #484: every special enemy type with its description). The description
-   (ui/matchEnemies.js enemyDescMode, the maintainer's decision of 2026-10-21 — both variants until one is picked):
-   'inline', the default, two lines at most (the full text in the cell's title); 'tip', the name only and the text in a
-   tooltip (hover, keyboard focus, a long press on touch) */
+.brief .brief-faction:hover .brief-faction__icon { box-shadow: 0 0 .26rem rgba(140, 255, 225, .32), inset 0 0 .16rem rgba(0, 0, 0, .7); }
+.brief .brief-faction__icon:focus-visible { box-shadow: 0 0 0 .03rem var(--mint-400), 0 0 .26rem rgba(140, 255, 225, .32), inset 0 0 .16rem rgba(0, 0, 0, .7); }
+/* the name under the icon; the description (GitHub #484: every special enemy type with its description) in the tooltip —
+   hover, keyboard focus on the icon, a long press on touch — the maintainer's decision of 2026-10-22 (ui/matchEnemies.js) */
 .brief .brief-faction__text { display: flex; flex-direction: column; align-items: center; gap: .04rem; min-width: 0; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
 .brief .brief-faction__text b { font-size: calc(.22 * var(--t)); font-weight: 700; color: #e6eaea; }
-.brief .brief-faction__desc { font-size: calc(.15 * var(--t)); line-height: 1.4; color: var(--text-lo);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.brief .brief-faction.is-tip { cursor: help; border-radius: .08rem; }
-.brief .brief-faction.is-tip:focus-visible { box-shadow: 0 0 0 .03rem var(--mint-400); }
-.brief .brief-faction.is-tip .brief-faction__icon { transition: box-shadow var(--t-fast); }
-.brief .brief-faction.is-tip:hover .brief-faction__icon { box-shadow: 0 0 .26rem rgba(140, 255, 225, .32), inset 0 0 .16rem rgba(0, 0, 0, .7); }
+/* that tooltip (ui/components.js TooltipLayer, outside .brief: also the draft dialog's): the only place the description is
+   shown, so it keeps the dialog's former 10 px floor on a phone, where 1rem is 40 px — [ASSUMED] the floor and width */
+.tooltip.brief-faction__tip { max-width: max(3.8rem, min(240px, calc(100vw - 16px))); font-size: max(calc(.15 * var(--t)), 10px); }
 /* the bond rows and banned operators at the event's size */
 .brief .brief-bonds__row { gap: .24rem .3rem; padding: .32rem .4rem .3rem .78rem; }
 .brief .brief-bond { min-width: 1.3rem; }

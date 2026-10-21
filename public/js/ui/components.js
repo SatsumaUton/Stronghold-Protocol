@@ -538,19 +538,20 @@ export function DialogHost() {
 
 // ---- Tooltip -----------------------------------------------------------------------------------
 
-let tipState = null; // { id, content, aside, rect, placement }
+let tipState = null; // { id, content, aside, rect, placement, tipClass }
 let tipSeq = 0;
 const tipListeners = new Set();
 const setTip = (s) => { tipState = s; for (const fn of [...tipListeners]) fn(); };
 
 /**
  * Hover/focus tooltip around its children. Content renders in <TooltipLayer/> (fixed, viewport-clamped).
- * `aside`: a second section in the same clamped, scrollable box; stacked on narrow screens.
- * @param {{ text: any, aside?: any, placement?: 'top'|'bottom', delay?: number, block?: boolean, class?: string, children?: any }} props
+ * `aside`: a second section in the same clamped, scrollable box; stacked on narrow screens. `tipClass`: a class on the
+ * tooltip box itself (`class` goes on the anchor around the children).
+ * @param {{ text: any, aside?: any, placement?: 'top'|'bottom', delay?: number, block?: boolean, class?: string, tipClass?: string, children?: any }} props
  */
 const TOUCH_TIP_MS = 450;
 
-export function Tooltip({ text, aside = null, placement = 'top', delay = 120, block = false, class: cls, children }) {
+export function Tooltip({ text, aside = null, placement = 'top', delay = 120, block = false, class: cls, tipClass = null, children }) {
   const ref = useRef(null);
   const idRef = useRef(0);
   const timer = useRef(null);
@@ -567,7 +568,7 @@ export function Tooltip({ text, aside = null, placement = 'top', delay = 120, bl
       const el = ref.current;
       const content = textRef.current; // the text of the render current when the delay ends (a click may change it)
       if (!el || !el.isConnected || content == null || content === '') return;
-      setTip({ id: idRef.current, content, aside: asideRef.current, rect: el.getBoundingClientRect(), placement,
+      setTip({ id: idRef.current, content, aside: asideRef.current, rect: el.getBoundingClientRect(), placement, tipClass,
         hold: () => clearTimeout(timer.current), hide });
     }, delay);
   };
@@ -655,7 +656,7 @@ export function TooltipLayer() {
   const ready = pos && pos.id === tipState.id;
   const hasAside = tipState.aside != null && tipState.aside !== '';
   const off = 'top:-9999px;left:-9999px';
-  return html`<div ref=${boxRef} class=${cx('tooltip', hasAside && 'tooltip--compound', ready && 'is-shown', ready && `tooltip--${pos.place}`)} role="tooltip"
+  return html`<div ref=${boxRef} class=${cx('tooltip', tipState.tipClass, hasAside && 'tooltip--compound', ready && 'is-shown', ready && `tooltip--${pos.place}`)} role="tooltip"
     tabIndex=${hasAside ? 0 : undefined} onMouseEnter=${() => tipState?.hold?.()} onMouseLeave=${() => tipState?.hide?.()}
     onFocusIn=${() => tipState?.hold?.()} onPointerDown=${() => tipState?.hold?.()}
     onFocusOut=${(e) => { if (!e.currentTarget.contains(e.relatedTarget)) tipState?.hide?.(); }}
