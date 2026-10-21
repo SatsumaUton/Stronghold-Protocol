@@ -16,9 +16,9 @@ jobs:
   test:
     name: test (${{ matrix.os }}, node ${{ matrix.node }}, shard ${{ matrix.shard }})
     runs-on: ${{ matrix.os }}
-    # One shard is a quarter of the suite (ci-shards.json balances them by measured time): a job is the slowest shard
-    # on the slowest runner, measured 532 s of wall clock on windows (node 22, shard 0, run 39570345137) against the
-    # 22.4 min the single full run took in run 38777566530. 20 minutes keeps a margin and still fails a hung job.
+    # One shard is a quarter of the suite (ci-shards.json balances them by measured time): in run 39612686697 the
+    # slowest job took 701 s of wall clock (windows, shard 1), the full run it replaces took 22.4 min (run 38777566530).
+    # 20 minutes keeps a margin and still fails a hung job.
     timeout-minutes: 20
     strategy:
       fail-fast: false
