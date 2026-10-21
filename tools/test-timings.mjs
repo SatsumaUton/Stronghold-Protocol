@@ -31,13 +31,12 @@ const TEST_ROOTS = ['test/', 'plugins/'];
  */
 function relOf(file, root) {
   const norm = file.split('\\').join('/');
-  // a relative path: the report was made here (or says how to get here)
-  if (!norm.startsWith('/') && !/^[A-Za-z]:\//.test(norm)) {
-    return path.relative(root, path.resolve(root, norm)).split(path.sep).join('/');
-  }
-  // an absolute path: another checkout (CI) unless it is this one
-  const here = path.relative(root, norm).split(path.sep).join('/');
-  if (here && !here.startsWith('..') && !path.isAbsolute(here)) return here;
+  const absolute = norm.startsWith('/') || /^[A-Za-z]:\//.test(norm);
+  // a relative path: the report was made in this checkout
+  if (!absolute) return path.posix.normalize(norm);
+  // an absolute path: this checkout, or another machine's — the file is still ours by the path inside the repository
+  const here = root.split('\\').join('/').replace(/\/*$/, '/');
+  if (norm.toLowerCase().startsWith(here.toLowerCase())) return norm.slice(here.length);
   for (const k of TEST_ROOTS) {
     const at = norm.lastIndexOf(`/${k}`);
     if (at >= 0) return norm.slice(at + 1);
