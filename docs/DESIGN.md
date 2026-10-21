@@ -16,6 +16,11 @@ Studio presentation authoring extends §32.9 in [§34.30](history/0.3.1.md#3430-
 Blemishine S2 attack clips extend §9 in [§34.31](history/0.3.1.md#3431-official-effects-and-a-skill-clip-the-maintainer-reported-after-030):
 a verified mode mapping for 瑕光 S2 only, with or without the effects index; held skill loops and every other skill keep their roles.
 
+The verified list expands in [§35.20](history/0.3.2.md#3520-verified-skill-attack-clips): 德克萨斯 S1/S2, 伺夜 S1/S2,
+归溟幽灵鲨 S1, 焰影苇草 S2 and 耀骑士临光 S2 use their model's normal attack role across facings and skins.
+The earlier 郁金香 S2 candidate remains unimplemented for the identity mismatch documented in
+[§35.21](history/0.3.2.md#3521-tulips-s2-candidate-remains-unimplemented). Current contract: [design/client.md](design/client.md).
+
 The 0.3.1 sim investigation and rule correction are [§34.32](history/0.3.1.md#3432-瑕光-attacks-the-enemies-she-put-to-sleep-琳琅诗怀雅s-s3-keeps-its-coins):
 瑕光 S2 retains sleeper targeting and attack replay events; 琳琅诗怀雅 S3 keeps double attacks and coins at the cap,
 following the official mode's no-auto-close rule. Current contracts: [design/engine.md](design/engine.md).
@@ -26,6 +31,11 @@ current rendering rules are in [design/client.md](design/client.md) and [SKINS.m
 
 Re-entrant buff removal is specified in [§35.5](history/0.3.2.md#355-re-entrant-buff-removal): reverse-order candidates,
 current object lookup and actual removal counts; [ASSUMED] extension API policy. Current contract: [design/engine.md](design/engine.md) §5.3 and [SIM.md](SIM.md) §3.
+
+Wild Mane S2's rear-target exception is superseded by the maintainer's official recordings in
+[§35.10](history/0.3.2.md#3510-wild-mane-s2-rear-push-782): radial away, force level −2, about 0.09 tile at weight 1.
+Front distances stay unchanged; using the effect column only behind her is [ASSUMED] scope, not an official
+direction-dependent classification. Current contract: [design/engine.md](design/engine.md) §5.4 and [SIM.md](SIM.md) §6.
 
 ## Where each section lives
 
@@ -78,4 +88,4 @@ Offline checks and game runtime never fetch them; derived records and the plugin
 | §32 | [history/0.3.0.md](history/0.3.0.md) | 0.3.0 — the plugin system (插件) and the fixes after 0.2.6 (2026-10-14) |
 | §33 | [design/vfx-format.md](design/vfx-format.md) | Official battle effects (特效): the extracted format the runtime reads |
 | §34 | [history/0.3.1.md](history/0.3.1.md) | 0.3.1 — released 2026-10-18, after the 0.3.0 release (2026-10-16): the effects audit's R18–R21, Forge import U1–U6, settings, Spine skill loops, lingering areas and standing effects under the official effects, 阻隔工事's client model (#663), the test console, 高台 placement in every language (#676), skill attack sounds by mode (#679), local-extract checks (#665), lossless scene maps and emission (#658), theme variables and announcements (§34.14), four plugin rule switches (§34.15), new gameplay records and official operators outside the roster (§34.16), a Forge panel compatibility layer (§34.17), plugin operator effects (§34.18), the 联防 billing of the escaped wave only (§34.19, #675), plugin interaction windows (§34.20, #682), the boss centre-column check warning (§34.21, #659), 凯瑟琳's 突变细胞 once per player per match (§34.22, #677), operator skins (§34.23, #685 / #686), exactly duplicated scene renderers dropped (§34.24, #684), attack / hit sounds by the official audio pools (§34.25, #680), custom operator traits (§34.26, #671), plugin polish after the end-to-end checks (§34.27), official art for plugin operators outside the roster (§34.28), studio templates for the gameplay features (§34.29), studio templates for the presentation features (§34.30), reported effects and 瑕光's skill clip (§34.31), 瑕光's sleepers and 琳琅诗怀雅's coins (§34.32), official tables when needed (§34.33), the split of the old UI PR #643 (§34.34) |
-| §35 | [history/0.3.2.md](history/0.3.2.md) | 0.3.2 — unreleased, fixes after 0.3.1 |
+| §35 | [history/0.3.2.md](history/0.3.2.md) | 0.3.2 — unreleased, fixes after 0.3.1; AI strategy framework (§35.7), external AI (§35.8; [API](EXTERNAL_AI.md)); opt-in advisor plans, knowledge and benchmarks (§35.9) |
