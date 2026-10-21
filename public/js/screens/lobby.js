@@ -30,7 +30,7 @@
 
 import { TestMark } from '../ui/testConsole.js';
 import { ResumeMatchButton } from '../ui/resumeMatch.js';
-import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor, ERR } from '../../../shared/constants.js';
 import { html, confirmDialog, Button, Icon, MicroLabel, Modal, PingPill, Spinner, DifficultyIcon, TextField } from '../ui/components.js';
 import { Sprite, Img } from '../ui/gameComponents.js';
@@ -257,6 +257,14 @@ function StampRing() {
   </svg>`;
 }
 
+/** A difficulty's rounds (+ 隐秘核心) and battlefields: on its card's meta line, and in the brief when the cards show only their names. */
+function DifficultyRounds({ info }) {
+  return [
+    html`<span key="r"><b class="num">${info.rounds}</b> ${tc('rounds', '回合')}${info.hidden ? html` ${t('+ 隐秘核心')}` : null}</span>`,
+    info.stageNote ? html`<span key="s" class="pcard__stage"><${Icon} name="rook" />${info.stageNote}</span>` : null,
+  ];
+}
+
 /**
  * One difficulty of 选择模拟协议: name, text, effects, then code / rounds / 隐秘核心 / battlefields; the selected one slides
  * out with a glow in the difficulty's colour and the 已选定 stamp. `disabled`: shown, not chosen (a room's other doctors).
@@ -274,11 +282,53 @@ function DifficultyCard({ roomMode, difficulty, selected, onSelect, disabled = f
     <span class="pcard__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}</span>
     <span class="pcard__meta">
       ${info.code ? html`<span class="num">${info.code}</span>` : null}
-      <span><b class="num">${info.rounds}</b> ${tc('rounds', '回合')}${info.hidden ? html` ${t('+ 隐秘核心')}` : null}</span>
-      ${info.stageNote ? html`<span class="pcard__stage"><${Icon} name="rook" />${info.stageNote}</span>` : null}
+      <${DifficultyRounds} info=${info} />
     </span>
     <span class="pcard__stamp" aria-hidden="true"><${StampRing} /><span class="pcard__tick"><${Icon} name="check" /></span><span class="pcard__ok">${t('已选定')}</span></span>
   </button>`;
+}
+
+/**
+ * How much 选择模拟协议's cards show on a screen taller than 520 px (§35.18's leftover there: at 大 / 特大, in a small
+ * window or a long language the four cards ran under 开始独立模拟, 终极模拟 out of view, even at 小 in 16:9 by a few px):
+ * the first level at which they fit their column — 'full' (the name, the description, the effects, the rounds), 'brief'
+ * (the description only in the brief at the left, where the chosen difficulty's already is), 'names' (a line each, as on
+ * a phone; the brief adds the chosen difficulty's effects and rounds). A list that still does not fit scrolls.
+ * `overflows(level)` lays the cards out at that level and says whether they spill. [ASSUMED] the levels and their order
+ */
+export const CARD_FIT_LEVELS = ['full', 'brief', 'names'];
+export function pickCardFit(overflows) {
+  return CARD_FIT_LEVELS.find((level) => !overflows(level)) || CARD_FIT_LEVELS[CARD_FIT_LEVELS.length - 1];
+}
+
+/**
+ * Sets 选择模拟协议's `data-fit` (pickCardFit; css/screens/lobby.css) before the screen paints: at every render (a new
+ * difficulty, language or label), when the list's box changes (the window, 文字大小 through the header and the button) and
+ * whenever a font finishes loading (a web font that arrives late — after a resize, say — makes the lines taller). A level
+ * only changes what the cards show, never the list's box, so measuring cannot loop.
+ */
+function ProtoFit() {
+  const ref = useRef(null);
+  const fit = () => {
+    const body = ref.current?.closest('.proto__body');
+    const list = body?.querySelector('.proto-list');
+    if (!list) return;
+    body.dataset.fit = pickCardFit((level) => { body.dataset.fit = level; return list.scrollHeight > list.clientHeight + 1; });
+  };
+  useLayoutEffect(fit);
+  useLayoutEffect(() => {
+    const list = ref.current?.closest('.proto__body')?.querySelector('.proto-list');
+    if (!list) return undefined;
+    let live = true;
+    const refit = () => { if (live) fit(); };
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(refit) : null;
+    ro?.observe(list);
+    const fonts = document.fonts;
+    fonts?.ready?.then(refit);
+    fonts?.addEventListener?.('loadingdone', refit);
+    return () => { live = false; ro?.disconnect(); fonts?.removeEventListener?.('loadingdone', refit); };
+  }, []);
+  return html`<i ref=${ref} class="proto__fit" hidden></i>`;
 }
 
 /** One of the two entries at the bottom right of the hub (独立模拟 / 同盟模拟), with its line above it: opens its dialog. */
@@ -447,6 +497,7 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
   return html`<${Modal} open=${true} onClose=${onClose} class="proto" veilClass="proto-veil">
     <div class="proto__body" style=${`--d-color:${DIFFICULTY_COLORS[difficulty]}`} data-difficulty=${difficulty} data-mode=${roomMode}>
       <div class="proto__bg" aria-hidden="true"></div>
+      <${ProtoFit} />
       <header class="proto-top">
         <${BackPlate} onClick=${onClose} class="proto__back" />
         <div class="proto-title">
@@ -461,6 +512,10 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
             <span class="proto-brief__code num">${info.code}</span>
             <b class="proto-brief__name">${t(DIFFICULTY_NAMES[difficulty])}</b>
             <p>${info.desc}</p>
+            <div class="proto-brief__more" data-testid="proto-brief-more">
+              <span class="proto-brief__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}</span>
+              <span class="proto-brief__meta"><${DifficultyRounds} info=${info} /></span>
+            </div>
           </div>
         </section>
         <section class="proto-side">
@@ -501,6 +556,9 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
  * useMediaQuery(SHORT_SCREEN_QUERY)) — the key field, beside 观战 in a column about 300 px wide, is about 150 px there,
  * so its placeholder is the field's name alone (同盟密钥) instead of the whole 输入同盟密钥 / 粘贴邀请链接, which ran under
  * 观战 at 特大 in English and Japanese (§35.18's leftover); the line under the field still tells where a key comes from.
+ * On a taller screen the field's name stands in too wherever the whole sentence does not fit the field (TextField
+ * `placeholderShort`, by the field's width: English and Japanese at 特大 on every desktop, the default Chinese at 特大
+ * in a 1024 px window — it ended in an ellipsis there).
  */
 export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, onCode, codeOk, online, busy, onJoin, onSpectate, recent, marks, focusKey,
   testMode = false, asTest = false, onTest = () => {}, short = false }) {
@@ -536,7 +594,8 @@ export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, 
             <span class="ally-card__art"><${JoinArt} /></span>
             <div class="ally-key">
               <${TextField} class="ally-key__field" size="key" icon="key" value=${code} transform=${normalizeCode} onInput=${onCode} onEnter=${() => onJoin()}
-                placeholder=${short ? t('同盟密钥') : t('输入同盟密钥 / 粘贴邀请链接')} ariaLabel=${t('同盟密钥')} modalFocus=${!!focusKey} />
+                placeholder=${short ? t('同盟密钥') : t('输入同盟密钥 / 粘贴邀请链接')} placeholderShort=${t('同盟密钥')} ariaLabel=${t('同盟密钥')}
+                modalFocus=${!!focusKey} />
               <button type="button" class="ally-key__spec join-spectate" disabled=${!codeOk || !online || busy === 'spectate'} onClick=${() => onSpectate()}
                 title=${t('以观战者身份进入：不占博士席位，只能观看（每个同盟最多 {MAX_SPECTATORS} 名，模拟进行中也可进入）', { MAX_SPECTATORS })}>
                 ${busy === 'spectate' ? html`<${Spinner} size="sm" />` : html`<${Icon} name="eye" />`}${t('观战')}</button>

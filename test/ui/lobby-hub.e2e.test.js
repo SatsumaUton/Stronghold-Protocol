@@ -20,7 +20,7 @@
 
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -79,12 +79,13 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
     .some((a) => /^(tr|ps)-/.test(String(a.animationName)) && a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity));
   /**
    * Elements of the screen (and an open dialog) that leave the viewport, and whether the dialog body scrolls. The backdrop
-   * layers (.hub-bg, decorative, clipped by its overflow) and 选择模拟协议's scene (.ps, decorative: it reaches under the
-   * cards like the event's) may run past the edges on purpose.
+   * layers (.hub-bg, decorative, clipped by its overflow) and 选择模拟协议's picture with its scene (.proto__pic / .ps,
+   * decorative: on a desktop it reaches past the stage and under the cards like the event's) may run past the edges on
+   * purpose.
    */
   const fit = async (page) => { await settle(page); return page.evaluate(() => {
     const out = [];
-    for (const el of document.querySelectorAll('.lobby-screen *:not(.hub-bg *, .ps, .ps *), .modal__box *:not(.ps, .ps *)')) {
+    for (const el of document.querySelectorAll('.lobby-screen *:not(.hub-bg *, .proto__pic, .proto__pic *, .ps, .ps *), .modal__box *:not(.proto__pic, .proto__pic *, .ps, .ps *)')) {
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height || getComputedStyle(el).visibility === 'hidden') continue;
       if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) out.push(`${el.className?.baseVal ?? el.className ?? el.tagName}`);
@@ -408,8 +409,9 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
           }
           if (lang === 'en' && textSize === 'xl') {
             await page.setViewport({ width: 1280, height: 800, hasTouch: true, isMobile: true, deviceScaleFactor: 1 }); // (a touch change reloads)
-            await page.waitForFunction(() => document.querySelector('.ally-key input')?.placeholder === 'Enter Alliance Key / paste invite link', { timeout: 3000 });
-            // (taller than 520 px the whole sentence is back; where it is still too long at 特大 it ends in an ellipsis)
+            // (taller than 520 px the whole sentence is back where it fits; at 特大 in English it does not, so the field's
+            // name stays — decided by the field's width: the desktop test below)
+            await page.waitForFunction(() => document.querySelector('.ally-key input')?.placeholder === 'Alliance Key', { timeout: 3000 });
             assert.equal(await page.$eval('.ally-key input', (el) => getComputedStyle(el).textOverflow), 'ellipsis');
             await page.setViewport({ width: 640, height: 360, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
             await page.waitForFunction(() => document.querySelector('.ally-key input')?.placeholder === 'Alliance Key', { timeout: 3000 });
@@ -419,6 +421,44 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
         } finally { await ctx.close(); }
       }
     }
+  });
+
+  // 选择同盟方式's key field on a desktop (§35.18's leftover: above 520 px the whole sentence ended in an ellipsis at 特大
+  // in English and Japanese, and in Chinese / Korean in a 1024 px window): the placeholder shown fits the field, and it is
+  // the whole sentence wherever the whole sentence fits (TextField placeholderShort, by the field's width)
+  test('desktop: 选择同盟方式\'s key field shows the whole sentence where it fits, else the field\'s name — never cut', { timeout: 300000 }, async () => {
+    const packs = Object.fromEntries(['zh-TW', 'en', 'ja', 'ko'].map((l) => [l, JSON.parse(readFileSync(path.join(ROOT, `public/i18n/${l}.json`), 'utf8'))]));
+    const tr = (lang, id) => (lang === 'zh' ? id : (packs[lang][id] ?? packs[lang].strings?.[id]));
+    let short = 0, whole = 0;
+    for (const lang of ['zh', 'zh-TW', 'en', 'ja', 'ko']) {
+      const full = tr(lang, '输入同盟密钥 / 粘贴邀请链接'), name = tr(lang, '同盟密钥');
+      for (const textSize of ['sm', 'xl']) {
+        const { ctx, page, problems } = await open({ w: 1920, h: 1080, lang: lang === 'zh' ? null : lang, textSize });
+        try {
+          await press(page, '.mode-card[data-mode="coop"]');
+          await page.waitForSelector('.modal__box.ally', { visible: true });
+          for (const [w, h] of [[1920, 1080], [1440, 900], [1280, 720], [1024, 600]]) {
+            await page.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
+            await sleep(150); await page.evaluate(() => document.fonts.ready); await sleep(150);
+            const k = await keyField(page);
+            const fullW = await page.$eval('.ally-key input', (input, text) => {
+              const ph = getComputedStyle(input, '::placeholder');
+              const c = document.createElement('canvas').getContext('2d');
+              c.font = `${ph.fontWeight} ${ph.fontSize} ${ph.fontFamily}`;
+              c.letterSpacing = ph.letterSpacing;
+              return Math.ceil(c.measureText(text).width);
+            }, full);
+            const what = `${lang} ${textSize} ${w}×${h}: ${JSON.stringify(k)} (whole sentence ${fullW} px)`;
+            assert.ok(k.textW <= k.inner && k.beside, `the placeholder whole beside 观战 — ${what}`);
+            if (fullW <= k.inner - 2) assert.equal(k.text, full, `the whole sentence where it fits — ${what}`);
+            else if (fullW > k.inner + 2) assert.equal(k.text, name, `the field's name where it does not — ${what}`);
+            if (k.text === full) whole++; else short++;
+          }
+          assert.deepEqual(problems, []);
+        } finally { await ctx.close(); }
+      }
+    }
+    assert.ok(whole > 0 && short > 0, `both seen (whole ${whole}, short ${short})`);
   });
 
   /**
@@ -477,6 +517,83 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
           await sleep(300);
           const d = await protoFit(page);
           assert.ok(protoOk(d), `${lang} ${textSize} 640×360, 终极模拟: ${JSON.stringify(d)}`);
+          assert.deepEqual(problems, []);
+        } finally { await ctx.close(); }
+      }
+    }
+  });
+
+  /**
+   * 选择模拟协议 on a desktop (taller than 520 px): the four cards whole inside their list, which does not scroll, above the
+   * button; the button on the screen with its label whole inside it (at most two lines); the names whole and inside their
+   * cards but the chosen card's beside its stamp once the cards are compact (the brief names it in full); the level
+   * (`data-fit`) the first that fits — the one before it spills —, the brief's description always, and the chosen
+   * difficulty's effects in the brief only at 'names'.
+   */
+  const protoDesk = (page) => page.evaluate(() => {
+    const box = (el) => el.getBoundingClientRect();
+    const body = document.querySelector('.proto__body'), level = body.dataset.fit;
+    const list = document.querySelector('.proto-list'), l = box(list);
+    const cards = [...list.querySelectorAll('.diff-card')];
+    const start = document.querySelector('.proto-start'), s = box(start);
+    const label = start.querySelector('.proto-start__label'), lb = box(label);
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
+    const brief = document.querySelector('.proto-brief'), bname = brief.querySelector('.proto-brief__name'), more = brief.querySelector('.proto-brief__more');
+    const chosen = cards.find((c) => c.classList.contains('is-on'));
+    const spills = () => list.scrollHeight > list.clientHeight + 1;
+    const levels = ['full', 'brief', 'names'];
+    const i = levels.indexOf(level);
+    let firstFit = !spills();
+    if (i > 0) { body.dataset.fit = levels[i - 1]; firstFit = firstFit && spills(); body.dataset.fit = level; }
+    return {
+      level, firstFit, cards: cards.length, listScrolls: spills(),
+      cardsIn: cards.every((c) => { const r = box(c); return r.top >= l.top - 1 && r.bottom <= l.bottom + 1; }),
+      aboveButton: l.bottom <= s.top + 1,
+      button: s.top >= 0 && s.bottom <= innerHeight && s.left >= 0 && s.right <= innerWidth,
+      label: label.scrollWidth <= label.clientWidth + 1 && lb.left >= s.left - 1 && lb.right <= s.right + 1 && lb.top >= s.top - 1 && lb.bottom <= s.bottom + 1,
+      lines,
+      names: cards.every((c) => {
+        const n = c.querySelector('.pcard__name');
+        if (n.scrollWidth <= n.clientWidth + 1 && box(n).right <= box(c).right - 2) return true;
+        return c === chosen && level !== 'full' && getComputedStyle(n).textOverflow === 'ellipsis';
+      }),
+      chosenInBrief: !!chosen && bname.textContent.trim() === chosen.querySelector('.pcard__name').textContent.trim() && bname.scrollWidth <= bname.clientWidth + 1,
+      desc: brief.querySelector('p').textContent.trim().length > 0 && getComputedStyle(brief.querySelector('p')).display !== 'none',
+      more: getComputedStyle(more).display !== 'none' ? more.querySelectorAll('.proto-brief__effects > span').length : 0,
+      effects: chosen ? chosen.querySelectorAll('.pcard__effects > span').length : -1,
+    };
+  });
+  const deskOk = (d) => ['full', 'brief', 'names'].includes(d.level) && d.firstFit && d.cards === 4 && !d.listScrolls && d.cardsIn && d.aboveButton
+    && d.button && d.label && d.lines <= 2 && d.names && d.chosenInBrief && d.desc && d.more === (d.level === 'names' ? d.effects : 0) && d.effects > 0;
+
+  test('desktop: 选择模拟协议\'s four cards and 开始独立模拟 fit at 小 and 特大 in Chinese and English (1280×720 – 1920×1080)', { timeout: 300000 }, async () => {
+    for (const lang of ['zh', 'en']) {
+      for (const textSize of ['sm', 'xl']) {
+        const { ctx, page, problems } = await open({ w: 1920, h: 1080, lang: lang === 'zh' ? null : lang, textSize });
+        try {
+          await press(page, '.mode-card[data-mode="solo"]');
+          await page.waitForSelector('.modal__box.proto', { visible: true });
+          await page.evaluate(() => document.fonts.ready);
+          // (a web font that arrives late — a new size or a new difficulty's text asks for more of them — re-fits the cards:
+          // measured once the fonts are in)
+          const fontsIn = async () => { await sleep(150); await page.evaluate(() => document.fonts.ready); await sleep(150); };
+          for (const [w, h] of [[1920, 1080], [1440, 900], [1280, 720]]) {
+            await page.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
+            await fontsIn();
+            assert.deepEqual(await fit(page), { out: [], scrolls: false }, `${lang} ${textSize} ${w}×${h}: 选择模拟协议 fits`);
+            const d = await protoDesk(page);
+            assert.ok(deskOk(d), `${lang} ${textSize} ${w}×${h}: ${JSON.stringify(d)}`);
+            if (lang === 'en' && w === 1440) await page.screenshot({ path: path.join(OUT, `lobby-hub-desktop-1440-protocol-en-${textSize}.png`) });
+          }
+          // 终极模拟, the last card, chosen at 1280×720: the level fits again, the brief names it
+          assert.ok(await diffCard(page, (await page.$$eval('.diff-card .pcard__name', (els) => els[3].textContent))) === 3);
+          await page.click('.diff-card[data-test-pick]');
+          await page.waitForFunction(() => document.querySelector('.proto__body')?.dataset.difficulty === 'ABYSS');
+          await fontsIn();
+          const d = await protoDesk(page);
+          assert.ok(deskOk(d), `${lang} ${textSize} 1280×720, 终极模拟: ${JSON.stringify(d)}`);
           assert.deepEqual(problems, []);
         } finally { await ctx.close(); }
       }

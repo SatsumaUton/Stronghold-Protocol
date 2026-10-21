@@ -340,9 +340,96 @@ test('选择模拟协议 on a short screen (§35.18 leftover: at 文字大小 �
   assert.match(lobbyCss, /\[ASSUMED\] every cap/);
 });
 
+test('TextField placeholderShort: placeholderFits measures the text in the ::placeholder font (letter spacing included) against the inner width', async () => {
+  const { placeholderFits } = await import('../../public/js/ui/components.js');
+  const saved = { gcs: globalThis.getComputedStyle, doc: globalThis.document };
+  try {
+    // 10 px a character in the canvas, + 1 px letter spacing; the input 200 px wide with 10 px padding each side → 180 px
+    const ph = { fontStyle: 'normal', fontWeight: '500', fontSize: '20px', fontFamily: 'x', letterSpacing: '1px' };
+    const own = { fontStyle: 'normal', fontWeight: '700', fontSize: '20px', fontFamily: 'x', letterSpacing: '2px', paddingLeft: '10px', paddingRight: '10px' };
+    let font = '';
+    globalThis.document = { createElement: () => ({ getContext: () => ({ set font(f) { font = f; }, measureText: (s) => ({ width: s.length * 10 }) }) }) };
+    globalThis.getComputedStyle = (el, pseudo) => (pseudo === '::placeholder' ? ph : own);
+    const input = { clientWidth: 200 };
+    assert.equal(placeholderFits(input, 'x'.repeat(16)), true, '16 × 11 = 176 ≤ 180');
+    assert.equal(placeholderFits(input, 'x'.repeat(17)), false, '17 × 11 = 187 > 180');
+    assert.equal(font, 'normal 500 20px x', 'the placeholder\'s own font');
+    // no ::placeholder style (an older engine): the input's own font and spacing stand in
+    globalThis.getComputedStyle = (el, pseudo) => (pseudo ? {} : own);
+    assert.equal(placeholderFits(input, 'x'.repeat(15)), true, '15 × 12 = 180');
+    assert.equal(placeholderFits(input, 'x'.repeat(16)), false);
+    // nothing to measure with: the whole placeholder stays
+    globalThis.getComputedStyle = () => { throw new Error('no layout'); };
+    assert.equal(placeholderFits(input, 'x'.repeat(99)), true);
+  } finally { globalThis.getComputedStyle = saved.gcs; globalThis.document = saved.doc; }
+  const comp = readFileSync(path.join(ROOT, 'public/js/ui/components.js'), 'utf8');
+  assert.match(comp, /const check = \(\) => \{ if \(live\) setPhShort\(!placeholderFits\(el, placeholder\)\); \};/);
+  assert.match(comp, /ro\?\.observe\(el\);\n\s+const fonts = globalThis\.document\?\.fonts;\n\s+fonts\?\.addEventListener\?\.\('loadingdone', check\);/);
+  assert.match(comp, /placeholder=\$\{phShort && placeholderShort \? placeholderShort : placeholder\}/);
+});
+
+/** A top-level @media block of lobby.css (comments dropped), up to its own closing brace. */
+function mediaBlock(query) {
+  const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const at = css.indexOf(`@media ${query} {`);
+  assert.ok(at >= 0, query);
+  let end = css.indexOf('{', at) + 1;
+  for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
+  return css.slice(at, end);
+}
+
+test('选择模拟协议 above 520 px tall (§35.18 leftover: the label cut, the cards under the button at 大 / 特大): the label wraps and stops at .46rem, the cards fit by levels', async () => {
+  const { pickCardFit, CARD_FIT_LEVELS } = await import('../../public/js/screens/lobby.js');
+  // the first level whose cards do not spill; the last when none fits (the list then scrolls)
+  assert.deepEqual(CARD_FIT_LEVELS, ['full', 'brief', 'names']);
+  const tried = [];
+  assert.equal(pickCardFit((lv) => { tried.push(lv); return lv !== 'brief'; }), 'brief');
+  assert.deepEqual(tried, ['full', 'brief'], 'stops at the first that fits');
+  assert.equal(pickCardFit(() => false), 'full');
+  assert.equal(pickCardFit(() => true), 'names');
+  const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const base = css.slice(0, css.indexOf('@media (max-aspect-ratio: 1/1) {'));
+  // the label: wraps (the button grows from its old height) and stops at 大's size; the rook too; the names at .36rem
+  assert.match(base, /\n\.proto-start \{[^}]*\n {2}min-height: max\(1\.04rem, 54px\);/);
+  assert.doesNotMatch(base.match(/\n\.proto-start \{[^}]*\}/)[0], /\n {2}height:/, 'no fixed height');
+  assert.match(base, /\n\.proto-start__label \{[^}]*flex: 1 1 auto;[^}]*font-size: min\(calc\(\.4 \* var\(--t\)\), \.46rem\);[^}]*white-space: normal; line-height: 1\.1; \}/);
+  assert.match(base, /\n\.proto-start__rook \{[^}]*font-size: min\(calc\(\.36 \* var\(--t\)\), \.4rem\);/);
+  assert.match(base, /\n\.pcard__name \{ font-size: min\(calc\(\.28 \* var\(--t\)\), \.36rem\);/);
+  // the portrait layout's cards and button span the width: the caps give way there
+  const narrow = mediaBlock('(max-aspect-ratio: 1/1)');
+  assert.match(narrow, /\.pcard__name \{ font-size: calc\(\.28 \* var\(--t\)\); \}/);
+  assert.match(narrow, /\.proto-start__label \{ font-size: calc\(\.4 \* var\(--t\)\); \}/);
+  // the levels, above 520 px only (the short-screen block has its own one-line cards)
+  const tall = mediaBlock('(min-height: 521px)');
+  assert.match(tall, /\.proto__body\[data-fit="brief"\] \.pcard__desc,\s*\.proto__body\[data-fit="names"\] \.pcard__desc, \.proto__body\[data-fit="names"\] \.pcard__effects, \.proto__body\[data-fit="names"\] \.pcard__meta \{ display: none; \}/);
+  assert.match(tall, /\.proto__body\[data-fit="brief"\] \.pcard__name, \.proto__body\[data-fit="names"\] \.pcard__name \{ min-width: 0; overflow: hidden; text-overflow: ellipsis;/);
+  assert.match(tall, /\.proto__body\[data-fit="names"\] \.proto-brief__more \{ display: flex;/);
+  assert.match(base, /\n\.proto-brief__more \{ display: none; \}/, 'the brief\'s extra lines only at names');
+  assert.doesNotMatch(tall, /\.proto-list \{|\.proto-body \{|\.proto-side \{/, 'a level never changes the list\'s box (no measuring loop)');
+  // the markup: the fit element inside the body, the brief's effects and rounds, the list's tighter rhythm
+  const v = ProtocolSelect({ roomMode: 'solo', difficulty: 'HARD', onDifficulty: () => {}, onClose: () => {}, onCreate: () => {}, online: true });
+  const body = byClass(v, 'proto__body')[0];
+  assert.equal(find(body, (x) => typeof x.type === 'function' && x.type.name === 'ProtoFit').length, 1);
+  const more = byClass(v, 'proto-brief__more')[0];
+  assert.ok(byClass(more, 'proto-brief__effects')[0].props.children.length > 0, 'the chosen difficulty\'s effects');
+  assert.equal(byClass(more, 'proto-brief__meta').length, 1);
+  assert.match(base, /\n\.proto-list \{[^}]*gap: \.1rem;\n {2}padding: \.07rem \.06rem \.07rem \.5rem;/);
+  assert.match(base, /\n\.pcard \{[^}]*padding: \.08rem \.26rem \.09rem;/);
+  // re-fitted at every render, on the list's resize and on every font load (late web fonts make the lines taller)
+  assert.match(lobbySrc, /body\.dataset\.fit = pickCardFit\(\(level\) => \{ body\.dataset\.fit = level; return list\.scrollHeight > list\.clientHeight \+ 1; \}\);/);
+  assert.match(lobbySrc, /useLayoutEffect\(fit\);/);
+  assert.match(lobbySrc, /ro\?\.observe\(list\);/);
+  assert.match(lobbySrc, /fonts\?\.addEventListener\?\.\('loadingdone', refit\);/);
+  assert.match(lobbySrc, /fonts\?\.removeEventListener\?\.\('loadingdone', refit\);/);
+  assert.match(lobbyCss, /\[ASSUMED\] the levels and the sizes/);
+  assert.match(lobbyCss, /\[ASSUMED\] the cap \*\//);
+  assert.match(lobbyCss, /\[ASSUMED\] the spacing \*\//);
+});
+
 test('选择同盟方式 on a short screen (§35.18 leftover: the key field\'s placeholder ran under 观战 at 特大): the field\'s name as the placeholder, capped sizes', async () => {
   const field = (props) => find(ally(props), (x) => x.type === TextField)[0];
   assert.equal(field({}).props.placeholder, '输入同盟密钥 / 粘贴邀请链接', 'the whole sentence on a taller screen');
+  assert.equal(field({}).props.placeholderShort, '同盟密钥', '… the field\'s name where it does not fit the field (TextField, by its width)');
   assert.equal(field({ short: true }).props.placeholder, '同盟密钥', 'the field\'s name on a short one');
   assert.equal(field({ short: true }).props.ariaLabel, '同盟密钥');
   const short = shortBlock();

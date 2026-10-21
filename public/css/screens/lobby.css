@@ -577,7 +577,9 @@
 .proto-brief p { margin: .04rem 0 0; font-size: calc(.16 * var(--t)); line-height: 1.5; color: #b7bcba; }
 
 /* the difficulty cards: the chosen one slides out with a glow and the 已选定 stamp; centred while they fit (auto margins, so
-   a list taller than the column still scrolls from its top) */
+   a list taller than the column still scrolls from its top). The gaps and pads a little tighter than #643's (.14rem, .1rem
+   and .1 / .11rem) so the full cards fit at 小 in a 16:9 window (they were 2–26 px too tall at 1280x720 – 1920x1080:
+   §35.18's leftover). [ASSUMED] the spacing */
 .proto-side { min-height: 0; display: flex; flex-direction: column; gap: .14rem; }
 .proto-list {
   flex: 1 1 auto;
@@ -586,8 +588,8 @@
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: .14rem;
-  padding: .1rem .06rem .1rem .5rem;
+  gap: .1rem;
+  padding: .07rem .06rem .07rem .5rem;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, .25) transparent;
 }
@@ -599,7 +601,7 @@
   display: flex;
   flex-direction: column;
   gap: .04rem;
-  padding: .1rem .26rem .11rem;
+  padding: .08rem .26rem .09rem;
   overflow: hidden;
   font: inherit;
   text-align: left;
@@ -629,7 +631,7 @@
 .pcard.is-on .pcard__head, .pcard.is-on .pcard__desc, .pcard.is-on .pcard__effects, .pcard.is-on .pcard__meta { padding-right: max(1.3rem, 70px); }
 .pcard__head { display: flex; align-items: center; gap: .08rem; }
 .pcard__glyph { width: max(.3rem, 18px); height: max(.3rem, 18px); color: var(--d-color); }
-.pcard__name { font-size: calc(.28 * var(--t)); font-weight: 900; letter-spacing: .04em; color: var(--d-color); text-shadow: 0 0 .1rem rgba(0, 0, 0, .6); white-space: nowrap; }
+.pcard__name { font-size: min(calc(.28 * var(--t)), .36rem); font-weight: 900; letter-spacing: .04em; color: var(--d-color); text-shadow: 0 0 .1rem rgba(0, 0, 0, .6); white-space: nowrap; }
 .pcard__desc { padding-bottom: .05rem; font-size: calc(.16 * var(--t)); color: #9a9f9d; border-bottom: 1px solid rgba(255, 255, 255, .18); }
 .pcard__effects { display: flex; flex-direction: column; padding-top: .04rem; font-size: calc(.17 * var(--t)); line-height: 1.4; }
 .pcard__effects span::before { content: '·'; margin-right: .06rem; }
@@ -680,8 +682,8 @@
   align-items: center;
   gap: .26rem;
   width: 100%;
-  height: max(1.04rem, 54px);
-  padding: 0 0 0 .26rem;
+  min-height: max(1.04rem, 54px);
+  padding: .03rem 0 .03rem .26rem;
   overflow: hidden;
   font: inherit;
   color: #0d2a23;
@@ -695,11 +697,15 @@
 .proto-start:focus-visible { outline: 2px solid #eef0ef; outline-offset: 2px; }
 .proto-start:disabled { filter: grayscale(.8) brightness(.6); cursor: default; }
 .proto-start__mark { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; }
-.proto-start__rook { display: inline-flex; align-items: center; gap: 2px; font-size: calc(.36 * var(--t)); font-weight: 300; line-height: 1; }
+.proto-start__rook { display: inline-flex; align-items: center; gap: 2px; font-size: min(calc(.36 * var(--t)), .4rem); font-weight: 300; line-height: 1; }
 .proto-start__rook i { font-style: normal; }
 .proto-start__rook .icon { width: max(.34rem, 19px); height: max(.34rem, 19px); }
 .proto-start__mark small { font-family: var(--font-display); font-size: calc(.08 * var(--t)); font-weight: 800; letter-spacing: .06em; line-height: 1.1; text-align: center; }
-.proto-start__label { position: relative; display: inline-flex; align-items: center; gap: .1rem; min-width: 0; font-size: calc(.4 * var(--t)); font-weight: 900; letter-spacing: .08em; white-space: nowrap; }
+/* the label wraps onto a second line (the button grows) rather than being cut, and stops at .46rem — 大's size — on a
+   screen taller than 520 px (§35.18's leftover: English 开始独立模拟 was cut at every desktop size, even at 小 at 1440x900;
+   the short-screen block has its own cap). [ASSUMED] the cap */
+.proto-start__label { position: relative; flex: 1 1 auto; display: inline-flex; align-items: center; gap: .1rem; min-width: 0; padding-right: 8%;
+  font-size: min(calc(.4 * var(--t)), .46rem); font-weight: 900; letter-spacing: .08em; white-space: normal; line-height: 1.1; }
 .proto-start__deco {
   position: absolute;
   right: 0;
@@ -893,6 +899,32 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 }
 .code-chip:hover { border-color: var(--amber); background: rgba(246, 163, 41, .08); }
 
+/* ---- 选择模拟协议's cards when they do not fit their column (screens/lobby.js pickCardFit: data-fit), above 520 px tall --
+   (§35.18's leftover there: at 大 / 特大, in a small window or a long language the list ran under 开始独立模拟 with 终极模拟
+   out of view.) 'brief': the description only in the brief at the left, where the chosen difficulty's already is;
+   'names': a line each, and the brief adds the chosen difficulty's effects and rounds. At both, the chosen card's name
+   ends in an ellipsis beside the stamp should a long language need it (the brief names it in full); the names stop at
+   .36rem (base rule: at 特大 in a 1024 px window English ran past the cards). The short-screen block below has its own
+   one-line cards. [ASSUMED] the levels and the sizes */
+.proto-brief__more { display: none; }
+@media (min-height: 521px) {
+  .proto__body[data-fit="brief"] .pcard__desc,
+  .proto__body[data-fit="names"] .pcard__desc, .proto__body[data-fit="names"] .pcard__effects, .proto__body[data-fit="names"] .pcard__meta { display: none; }
+  .proto__body[data-fit="names"] .pcard { padding-top: .08rem; padding-bottom: .08rem; }
+  .proto__body[data-fit="brief"] .pcard__head, .proto__body[data-fit="names"] .pcard__head { min-width: 0; }
+  .proto__body[data-fit="brief"] .pcard__glyph, .proto__body[data-fit="names"] .pcard__glyph { flex: none; }
+  .proto__body[data-fit="brief"] .pcard__name, .proto__body[data-fit="names"] .pcard__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+  .proto__body[data-fit="names"] .pcard.is-on .pcard__head { padding-right: max(.9rem, 46px); }
+  .proto__body[data-fit="names"] .pcard.is-on .pcard__stamp { right: .1rem; width: max(.8rem, 40px); height: max(.64rem, 34px); }
+  .proto__body[data-fit="names"] .pcard.is-on .pcard__tick { width: max(.4rem, 22px); height: max(.4rem, 22px); }
+  .proto__body[data-fit="names"] .pcard__ok { display: none; }
+  .proto__body[data-fit="names"] .proto-brief__more { display: flex; flex-direction: column; gap: .04rem; margin-top: .06rem; padding-top: .06rem; border-top: 1px solid rgba(255, 255, 255, .18); }
+  .proto-brief__effects { display: flex; flex-direction: column; font-size: calc(.16 * var(--t)); line-height: 1.4; color: #e9eceb; }
+  .proto-brief__effects span::before { content: '·'; margin-right: .06rem; }
+  .proto-brief__meta { display: flex; flex-wrap: wrap; align-items: center; gap: .04rem .14rem; font-size: calc(.13 * var(--t)); color: #7f8583; }
+  .proto-brief__meta b { color: #cfd3d1; }
+}
+
 /* ---- narrow windows: the dialogs stack their halves ------------------------------------------------- */
 @media (max-aspect-ratio: 1/1) {
   .proto-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, .7fr) minmax(0, 1.3fr); }
@@ -900,6 +932,10 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .proto__pic { inset: 0 0 .9rem; }
   .proto-list, .proto-foot { padding-left: .1rem; }
   .ally-side { padding-left: 0; }
+  /* the cards and the button span the width here: the caps for the landscape column (a 5.6rem column) give way */
+  .pcard__name { font-size: calc(.28 * var(--t)); }
+  .proto-start__label { font-size: calc(.4 * var(--t)); }
+  .proto-start__rook { font-size: calc(.36 * var(--t)); }
 }
 
 /* ---- short landscape phones (≤ 520 CSS px tall) ---------------------------------------------------------- */

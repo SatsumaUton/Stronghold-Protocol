@@ -945,21 +945,60 @@ export function DifficultyTag({ difficulty, size = 'md', class: cls, code }) {
   </span>`;
 }
 
+let measureCanvas = null;
+
+/**
+ * Whether `text` fits an input's inner width in the input's own ::placeholder font (TextField `placeholderShort`); the
+ * letter spacing is added per character, as a canvas measures without it. Where the pseudo-element's style cannot be
+ * read the input's own font stands in; where nothing can be measured, it fits (the whole placeholder stays).
+ * @param {HTMLInputElement} input
+ * @param {string} text
+ */
+export function placeholderFits(input, text) {
+  try {
+    let st = null;
+    try { st = getComputedStyle(input, '::placeholder'); } catch { st = null; }
+    if (!st?.fontSize) st = getComputedStyle(input);
+    measureCanvas ||= document.createElement('canvas');
+    const ctx = measureCanvas.getContext('2d');
+    if (!ctx) return true;
+    ctx.font = `${st.fontStyle} ${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
+    const width = ctx.measureText(text).width + (parseFloat(st.letterSpacing) || 0) * [...text].length;
+    const cs = getComputedStyle(input);
+    return width <= input.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0');
+  } catch { return true; }
+}
+
 /**
  * Bracketed text input. `ariaLabel` names a field without a visible label; `modalFocus` marks the input as the one a
- * surrounding `Modal` focuses when it opens (`data-autofocus`).
+ * surrounding `Modal` focuses when it opens (`data-autofocus`); `placeholderShort` stands in for `placeholder` while the
+ * whole one does not fit the field (placeholderFits — checked as the field resizes, e.g. a window or 文字大小 change
+ * that moves a neighbour, and as web fonts arrive).
  * @param {{ label?: any, micro?: string, value: string, onInput: (v: string) => void, onEnter?: Function,
- *   placeholder?: string, maxLength?: number, transform?: (v: string) => string, autoFocus?: boolean,
+ *   placeholder?: string, placeholderShort?: string, maxLength?: number, transform?: (v: string) => string, autoFocus?: boolean,
  *   disabled?: boolean, size?: 'md'|'lg'|'code'|string, icon?: string, class?: string, inputRef?: any, name?: string,
  *   ariaLabel?: string, modalFocus?: boolean }} props
  */
-export function TextField({ label, micro, value, onInput, onEnter, placeholder, maxLength, transform, autoFocus, disabled, size = 'md', icon, class: cls, inputRef, name, hint, invalid, ariaLabel, modalFocus = false }) {
+export function TextField({ label, micro, value, onInput, onEnter, placeholder, placeholderShort, maxLength, transform, autoFocus, disabled, size = 'md', icon, class: cls, inputRef, name, hint, invalid, ariaLabel, modalFocus = false }) {
   const localRef = useRef(null);
   const ref = inputRef || localRef;
   const composing = useRef(false);
   useEffect(() => {
     if (autoFocus) setTimeout(() => ref.current?.focus(), 60);
   }, []);
+  const [phShort, setPhShort] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!placeholderShort || !placeholder || !el) { setPhShort(false); return undefined; }
+    let live = true;
+    const check = () => { if (live) setPhShort(!placeholderFits(el, placeholder)); };
+    check();
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(check) : null;
+    ro?.observe(el);
+    const fonts = globalThis.document?.fonts;
+    fonts?.addEventListener?.('loadingdone', check);
+    return () => { live = false; ro?.disconnect(); fonts?.removeEventListener?.('loadingdone', check); };
+  }, [placeholder, placeholderShort]);
   const handle = (e) => {
     let v = e.currentTarget.value;
     if (!composing.current && transform) {
@@ -973,7 +1012,7 @@ export function TextField({ label, micro, value, onInput, onEnter, placeholder, 
     ${label || micro ? html`<span class="field__label">${label}${micro ? html`<span class="micro">${micro}</span>` : null}</span>` : null}
     <span class="field__box brackets">
       ${icon ? html`<${Icon} name=${icon} class="field__icon" />` : null}
-      <input id=${id} ref=${ref} class="field__input" name=${name} value=${value} placeholder=${placeholder}
+      <input id=${id} ref=${ref} class="field__input" name=${name} value=${value} placeholder=${phShort && placeholderShort ? placeholderShort : placeholder}
         maxLength=${maxLength} disabled=${disabled} autocomplete="off" spellcheck=${false}
         aria-label=${ariaLabel} data-autofocus=${modalFocus ? '' : undefined}
         onInput=${handle}
