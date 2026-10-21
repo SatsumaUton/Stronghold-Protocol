@@ -1,10 +1,13 @@
 // Browser E2E of the 干员调配 overlay's optional 卡片视图 against the real server, headless Chrome (puppeteer-core + system
 // Chrome). Opt-in: SP_E2E=1 node --test test/ui/loadout-cards.e2e.test.js
 //
-// Desktop 1920×1080: the overlay opens in the list (the default) → 卡片视图 → tier groups of cards with the 甄选干员 cards
-// closing tiers 5 / 6, the choice kept across a reopen → a card opens the detail in the drawer, the same card again closes
-// it → 快速配置: S1 on 隐现's card is stored like the list's quick choice → Esc peels back 快速配置, the drawer, then the
-// overlay → a tier jump scrolls the deck → 筛选 → 列表 goes back. Phone 844×390 (touch): the cards, the drawer over them.
+// Desktop 1920×1080: the overlay opens in the list (the default) → 卡片视图 → tier groups of cards behind the official
+// tier tags (or the CSS marker) with the 甄选干员 cards closing tiers 5 / 6, the choice kept across a reopen → a card opens
+// the detail in the drawer, the same card again closes it → 快速配置: S1 on 隐现's card is stored like the list's quick
+// choice → Esc peels back 快速配置, the drawer, then the overlay → a tier jump scrolls the deck → leaving the tab (the
+// 甄选干员 card, 干员持有) closes 快速配置 and the drawer, so one Esc there closes the overlay → ⓘ 卡片视图说明 → 筛选 → 列表
+// goes back. Phone 844×390 (touch): the cards, the drawer over them, a locked loadout said in the bottom bar (with
+// 快速配置 too). The list at 844×390 keeps its own opening: lo-in, no 转场, nothing replayed by the detail toggle.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/loadout-cards-*.png
 
 import { test, describe, before, after } from 'node:test';
@@ -78,6 +81,9 @@ describe('干员调配 卡片视图 (real server, headless Chrome)', { skip: !EN
         bar: document.querySelectorAll('.lo-bbar__tier').length,
         stored: localStorage.getItem('sp.pref.loadout.view'),
         layers: [...document.querySelector('.lo').children].filter((c) => !c.classList.contains('lo__bg')).map((c) => getComputedStyle(c).position),
+        marks: [...document.querySelectorAll('.lo-tmark')].map((mk) => (mk.querySelector('img.lo-tmark__art') ? 'art' : mk.querySelector('.lo-tmark__css') ? 'css' : '?')),
+        slogan: getComputedStyle(document.querySelector('.lo-tmark'), '::after').content,
+        tagInManifest: !!globalThis.__SP__.data.get('assets')?.ui?.['shopLevelSprite/shop_level_tag_1'],
       }));
       assert.equal(deck.cards, 112, 'every visible chess as a card');
       assert.deepEqual(deck.groups, [1, 2, 3, 4, 5, 6]);
@@ -87,6 +93,18 @@ describe('干员调配 卡片视图 (real server, headless Chrome)', { skip: !EN
       assert.equal(deck.bar, 6);
       assert.equal(deck.stored, '"deck"');
       assert.ok(deck.layers.every((p) => p === 'relative'), `every layer stacks above the background ${deck.layers}`);
+      assert.equal(deck.marks.length, 6);
+      assert.ok(deck.marks.every((k) => k === 'art' || k === 'css'), `a tier tag or the CSS marker before every group ${deck.marks}`);
+      assert.ok(deck.slogan === 'none' || deck.slogan === 'normal', `no invented slogan on the marker (${deck.slogan})`);
+      if (deck.tagInManifest) {
+        // the official shopLevelSprite tag, drawn at its own proportions (150 × 595)
+        await page.waitForFunction(() => document.querySelector('.lo-tgroup[data-tier="1"] img.lo-tmark__art')?.complete, { timeout: 10000 });
+        const tag = await page.$eval('.lo-tgroup[data-tier="1"] img.lo-tmark__art', (img) => ({ w: img.naturalWidth, h: img.naturalHeight, src: img.getAttribute('src') }));
+        assert.ok(/shop_level_tag_1\.png$/.test(tag.src), tag.src);
+        assert.deepEqual([tag.w, tag.h], [150, 595]);
+      }
+      await page.waitForFunction(() => !document.querySelector('.lo')?.getAnimations({ subtree: true })
+        .some((a) => /^lo-tr-/.test(String(a.animationName)) && a.playState === 'running'));
       await page.screenshot({ path: path.join(OUT, 'loadout-cards-desktop.png') });
 
       // a card opens the drawer with the list's own detail; the same card again closes it
@@ -136,12 +154,36 @@ describe('干员调配 卡片视图 (real server, headless Chrome)', { skip: !EN
       }, { timeout: 5000 });
       await page.waitForFunction(() => document.querySelector('.lo-bbar__tier.is-on')?.dataset.tier === '6', { timeout: 5000 });
 
-      // 调度手册, then 筛选 → 列表: back to the rows, stored
+      // leaving the tab closes the card view's layers: 快速配置 → the 甄选干员 card (自选编队) → back: no 快速配置 columns
+      await clickSel(page, '[data-testid="loadout-quick"]');
+      await page.waitForSelector('.lo-op__quick', { visible: true });
+      await page.click('.lo-op--diy[data-diy-tier="6"]');
+      await page.waitForFunction(() => document.querySelector('.lo-top__title')?.textContent.trim() === '自选编队', { timeout: 5000 });
+      await page.click('.lo-back');
+      await page.waitForSelector('[data-testid="loadout-quick"]', { visible: true });
+      assert.equal(await page.$('.lo-op__quick'), null, '快速配置 did not come back stale');
+      // the drawer open → 干员持有 → ONE Esc closes the overlay (no hidden layer swallows it)
+      await page.click(`.lo-op[data-chess="${INSIDE}"] .lo-op__pick`);
+      await page.waitForSelector('[data-testid="loadout-drawer"]', { visible: true });
+      await page.click('[data-testid="loadout-ownership"]');
+      await page.waitForFunction(() => document.querySelector('.lo-top__title')?.textContent.trim() === '干员持有', { timeout: 5000 });
+      await escape(page);
+      await page.waitForFunction(() => !document.querySelector('.lo'), { timeout: 3000 });
+      // (the overlay reopens on the last tab, 干员持有; its back button returns to the deck — no drawer left open)
+      await clickSel(page, '.lobby-screen [data-testid="loadout-open"]');
+      await page.waitForFunction(() => document.querySelector('.lo-top__title')?.textContent.trim() === '干员持有', { timeout: 5000 });
+      await page.click('.lo-back');
+      await page.waitForSelector('[data-testid="loadout-deck"]', { visible: true });
+      assert.equal(await page.$('[data-testid="loadout-drawer"]'), null);
+
+      // ⓘ 卡片视图说明 (not the official chapter's name), then 筛选 → 列表: back to the rows, stored
       await clickSel(page, '[data-testid="loadout-help"]');
       await page.waitForSelector('.modal .lo-help', { visible: true });
+      const sheet = await page.$eval('.modal', (el) => el.textContent);
+      assert.ok(sheet.includes('卡片视图说明') && !sheet.includes('调度手册'), sheet.slice(0, 80));
       await escape(page);
       await page.waitForSelector('.modal', { hidden: true });
-      assert.ok(await page.$('.lo'), 'Esc closes only the 调度手册');
+      assert.ok(await page.$('.lo'), 'Esc closes only the 卡片视图说明');
       await clickSel(page, '[data-testid="loadout-filter"]');
       await page.waitForSelector('.lo-pop--filter .lo-search input', { visible: true });
       await page.type('.lo-pop--filter .lo-search input', '隐现');
@@ -176,6 +218,50 @@ describe('干员调配 卡片视图 (real server, headless Chrome)', { skip: !EN
       await page.screenshot({ path: path.join(OUT, 'loadout-cards-phone.png') });
       await page.tap('.lo-drawer__close');
       await page.waitForSelector('[data-testid="loadout-drawer"]', { hidden: true });
+
+      // a locked loadout (the server's 'locked'): the top bar's note is hidden at this width, the bottom bar says it —
+      // with 快速配置 open too
+      assert.equal(await page.$('[data-testid="loadout-deck-locked"]'), null);
+      await page.evaluate(async () => { (await import('/js/ui/loadoutSync.js')).loadoutStore.set({ sync: 'locked' }); });
+      await page.waitForSelector('[data-testid="loadout-deck-locked"]', { visible: true, timeout: 5000 });
+      await page.tap('[data-testid="loadout-quick"]');
+      await page.waitForSelector('[data-testid="loadout-quick-done"]', { visible: true });
+      const lock = await page.evaluate(() => {
+        const r = document.querySelector('[data-testid="loadout-deck-locked"]').getBoundingClientRect();
+        const done = document.querySelector('[data-testid="loadout-quick-done"]').getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, w: r.width, vw: window.innerWidth, vh: window.innerHeight, doneLeft: done.left,
+          title: document.querySelector('[data-testid="loadout-deck-locked"]').title };
+      });
+      assert.ok(lock.w > 40 && lock.right <= lock.doneLeft + 1 && lock.top < lock.vh, `the chip is on screen beside 确认配置 ${JSON.stringify(lock)}`);
+      assert.ok(lock.title.includes('下一局生效'), lock.title);
+      await page.screenshot({ path: path.join(OUT, 'loadout-cards-phone-locked.png') });
+      assert.deepEqual(problems, []);
+    } finally { await ctx.close(); }
+  });
+
+  test('the list (the default) keeps its own opening at 844×390: lo-in, no 转场, the detail toggle replays nothing', async () => {
+    const { ctx, page, problems } = await open({ w: 844, h: 390, touch: true });
+    try {
+      await openOverlay(page);
+      await page.waitForSelector('.lo .lo-card', { visible: true });
+      const opening = await page.evaluate(() => ({
+        lo: getComputedStyle(document.querySelector('.lo')).animationName,
+        moving: [...document.querySelectorAll('.lo-top, .lo-top__center, .lo-top__right, .lo-note, .lo-roster, .lo__bg')]
+          .map((el) => getComputedStyle(el).animationName).filter((n) => n !== 'none'),
+      }));
+      assert.equal(opening.lo, 'lo-in', 'the overlay fades in as before');
+      assert.deepEqual(opening.moving, [], 'nothing of the 转场 in the list');
+      await page.tap(`.lo-card[data-chess="${INSIDE}"] .lo-card__pick`);
+      await page.waitForSelector('.lo-body.is-detail .lo-detail-wrap', { visible: true });
+      const detail = await page.evaluate(() => ({
+        name: getComputedStyle(document.querySelector('.lo-detail-wrap')).animationName,
+        running: document.querySelector('.lo-detail-wrap').getAnimations({ subtree: false }).length,
+        opacity: getComputedStyle(document.querySelector('.lo-detail-wrap')).opacity,
+      }));
+      assert.deepEqual(detail, { name: 'none', running: 0, opacity: '1' }, 'the detail shows at once');
+      await page.tap('.lo-detail-back');
+      await page.waitForSelector('.lo-roster', { visible: true });
+      assert.equal(await page.$eval('.lo-roster', (el) => getComputedStyle(el).animationName + el.getAnimations().length), 'none0', 'the roster comes back at once');
       assert.deepEqual(problems, []);
     } finally { await ctx.close(); }
   });

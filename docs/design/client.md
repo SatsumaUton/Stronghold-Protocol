@@ -423,13 +423,26 @@ board is sized from its host, and `fieldHost.js hudBands` measures the HUD from 
 attribute: the page is exactly the unmoved one.
 Overrides are local listening preferences, absent from room loadouts and their exports.
 
-干员调配's 卡片视图 (`screens/loadout.js` DeckView / OpCard / DeckBar, optional) persists `sp.pref.loadout.view` —
-`'list'` (the default, the aligned rows) or `'deck'` — in this browser only. The deck lays the 干员调配 tab out after the
-event's 物资调配处: a group per tier scrolling sideways (two rows behind a tall tier marker), the 甄选干员 cards of the
-自选编队 slots closing tiers 5 and 6 (they open that tab), a bottom bar jumping to a tier, and 快速配置 — a column of
-the skills, the elite's modules or the 潜能 / 练度 selects beside every card, with the list rows' own handlers. A card
-opens the list's Detail in a drawer over the deck's left; Esc closes a popover, 快速配置, the drawer, then the overlay.
-Both views read and write the same loadout store, so the room and the server see nothing new.
+干员调配's 卡片视图 (`screens/loadout.js` DeckView / DeckCard / TierMark / DeckBar, optional; PR #811) persists
+`sp.pref.loadout.view` — `'list'` (the default, the aligned rows) or `'deck'` — in this browser only. The deck lays the
+干员调配 tab out after the event's 物资调配处: a group per tier scrolling sideways (two rows behind a tall tier marker),
+the 甄选干员 cards of the 自选编队 slots closing tiers 5 and 6 (they open that tab), a bottom bar jumping to a tier, and
+快速配置 — a column of the skills, the elite's modules or the 潜能 / 练度 selects beside every card, with the list rows'
+own handlers. A card's picture is an `OperatorImage` portrait (the owner's picture-only outfit, B6). A card opens the
+list's Detail in a drawer over the deck's left; on that tab Esc closes a popover, 快速配置, the drawer, then the
+overlay, and leaving the tab (干员持有, the 甄选干员 card, `openLoadout(…, tab)`) closes all three, so one Esc there
+closes the overlay. The tier marker is the official `shopLevelSprite/shop_level_tag_N` (data/assets.json) at its
+design size, a CSS marker (NO. and the numeral, no slogan of our own) its fallback; [ASSUMED] that the event screen
+draws this sprite (its name and look; activity_table `shopLevelDisplayDataDict` confirms one group per shop level).
+While the match's loadout is locked the bottom bar carries a 「本局已锁定 · 下一局生效」 chip — the top bar's note is cut
+short or hidden on narrow screens and gives way to the hints in 快速配置. The bar holds the tier at the deck's left edge
+as its own state (DeckBarLive), so a scroll across tiers redraws the bar, not the 112 cards. ⓘ opens 「卡片视图说明」,
+the remake's own tips (the official tutorial chapter keeps the name 调度手册). The opening 转场 is the card view's only
+(maintainer's decision, 2026-10-21): the list keeps its 200 ms `lo-in`, and its ≤1000 px roster / detail toggle replays
+nothing. [ASSUMED], with no screenshot or video of the event screen offline: the card frame and colours, the two-row
+flow, the bottom bar, the 快速配置 columns, the 转场 timings, and ONE combined 甄选干员 card per tier where the official
+data lists two DIY slots (`charChessDiySlotIdList`). Both views read and write the same loadout store, so the room and
+the server see nothing new.
 
 The title and lobby offer explicit recovery of a previously saved local match seat. `sp.matches` stores bounded name /
 room-code metadata indexed by token hash; the existing four-entry `sp.tokens` ring remains the authority. Recovery

@@ -21,17 +21,25 @@
 // The third tab, 自选编队 (0.2.0 DIY, screens/diy.js): the operators of the four DIY slots (room.diy; ui/diyModel.js) —
 // with its own 导出 / 导入 / 全部清空.
 // Keyboard: Esc closes, ←/→ move through the (filtered) roster when focus is not in the search field (干员调配 tab).
-// 卡片视图 (optional, PR #643 split item 5; the list stays the default): the 干员调配 tab laid out after the event's
-// 物资调配处 — the roster as cards in tier groups scrolling sideways (two rows a group, a tall tier marker before each),
-// the 甄选干员 cards (自选编队) closing tiers 5 and 6, a bottom bar jumping to a tier, and 快速配置 (skills, modules, or
-// 潜能 · 练度 beside every card). A card opens the same Detail as the list, in a drawer over the left of the deck; Esc
-// peels back one layer at a time (a popover, 快速配置, the drawer, then the overlay). The choice is kept in this browser
-// (loadPref 'loadout.view').
+// 卡片视图 (optional, PR #643 split item 5 / PR #811; the list stays the default): the 干员调配 tab laid out after the
+// event's 物资调配处 — the roster as cards in tier groups scrolling sideways (two rows a group, a tall tier marker before
+// each), the 甄选干员 cards (自选编队) closing tiers 5 and 6, a bottom bar jumping to a tier, and 快速配置 (skills,
+// modules, or 潜能 · 练度 beside every card). A card opens the same Detail as the list, in a drawer over the left of the
+// deck; Esc peels back one layer at a time on this tab (a popover, 快速配置, the drawer, then the overlay), and leaving
+// the tab closes them. The choice is kept in this browser (loadPref 'loadout.view').
+// Sources: the tier marker is the official shopLevelSprite/shop_level_tag_1..6 (data/assets.json; also in the local
+// client's ui/outer set) with a CSS marker as its fallback — [ASSUMED] that the event's 物资调配处 draws this sprite (its
+// name and its look: 'NO.' and the framed Roman numeral), shown at its design size (150 × 595 design px). The official
+// activity_table act2autochess.shopLevelDisplayDataDict confirms one display group per shop level (1–6) and lists two
+// DIY slots in tiers 5 and 6 (charChessDiySlotIdList). [ASSUMED] (no screenshot or video of the event screen offline):
+// the card frame and its colours, the two-row flow, the bottom tier bar, the 快速配置 columns, the 转场 timings
+// (css/screens/loadout.css) and ONE combined 甄选干员 card per tier showing filled / total, where the official data
+// lists two slots.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Icon, MicroLabel, Button, TierChip, TextField, Countdown, Spinner, confirmDialog, hasDeadline, Modal, Fragment } from '../ui/components.js';
 import { OperatorImage, Img, RichText, UnitThumb } from '../ui/gameComponents.js';
-import { subProfIconUrl, bondIconUrl, moduleTypeIconUrl } from '../ui/assetUrls.js';
+import { subProfIconUrl, bondIconUrl, moduleTypeIconUrl, uiUrl } from '../ui/assetUrls.js';
 import { GarrisonBlock } from '../ui/detailPanel.js';
 import { data, useData, localAsset, DATA_FILES } from '../data.js';
 import { useStore, loadPref, savePref } from '../store.js';
@@ -59,6 +67,7 @@ import { diyCount, sanitizeDiyPicks, setPick, serializeDiy, parseDiyImport, DIY_
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 import { copyText } from '../ui/clipboard.js';
 import { toast } from '../ui/toasts.js';
+import { reducedMotion } from '../ui/device.js';
 
 export { openLoadout, closeLoadout };
 
@@ -437,7 +446,8 @@ function Filters({ m, filters, onFilters, bonds, onDeck = null }) {
 
 // ---- 卡片视图 (物资调配处) ------------------------------------------------------------------------------------------------
 //
-// The optional view of the 干员调配 tab (see the header). OpCard / DeckBar / DeckHelp are hook-free (the tests draw them).
+// The optional view of the 干员调配 tab (see the header). DeckCard / TierMark / DeckBar / DeckHelp are hook-free (the
+// tests draw them).
 
 const VIEW_PREF = 'loadout.view';
 /** The stored view: 'list' (the aligned rows, the default) or 'deck' (the cards). */
@@ -452,9 +462,10 @@ function PotPips({ n }) {
 /**
  * One operator card: tier, the normal / elite levels, the half-body portrait with its branch icon, the equipped skill and
  * module, 潜能 (when editable: cultivationView), name and bonds; a 替补 ribbon when marked not owned. `quick` ('skill' |
- * 'module' | 'cult') adds a column of quick choices beside the card — the same handlers as the list's RosterRow.
+ * 'module' | 'cult') adds a column of quick choices beside the card — the same handlers as the list's RosterRow. The
+ * portrait is an OperatorImage, so the owner's picture-only outfit shows here as everywhere else (docs/SKINS.md B6).
  */
-export function OpCard({ m, chess, golden, entries, ops = {}, selected = false, quick = null, onPick, onChange, onOps, notOwned = false }) {
+export function DeckCard({ m, chess, golden, entries, ops = {}, selected = false, quick = null, onPick, onChange, onOps, notOwned = false }) {
   const choice = effectiveChoice(entries, chess, golden);
   const opt = chessOptions(chess, golden);
   const cv = cultivationView(chess.charId, ops);
@@ -499,6 +510,18 @@ export function OpCard({ m, chess, golden, entries, ops = {}, selected = false, 
           onPick=${(module) => onChange(chess.chessId, { module })} />`) : html`<span class="lo-op__none">${t('无精锐')}</span>`}
       </div>`
       : quick === 'cult' ? html`<div class="lo-op__quick lo-op__quick--cult"><${CultivationSelects} charId=${chess.charId} ops=${ops} onSet=${onOps} note=${standInNote} /></div>` : null}
+  </div>`;
+}
+
+/**
+ * A tier group's tall marker: the official shopLevelSprite/shop_level_tag_N (it carries 'NO.', the numeral and the
+ * event's own vertical line) or, without that art, the CSS marker (NO. and the Roman numeral); the group's count below.
+ */
+export function TierMark({ m, tier, count }) {
+  return html`<div class=${cx('lo-tmark', `tier--${tier}`)} aria-hidden="true">
+    <${Img} src=${uiUrl(m, `shopLevelSprite/shop_level_tag_${tier}`)} class="lo-tmark__art"
+      fallback=${html`<span class="lo-tmark__css"><span class="lo-tmark__no">NO.</span><b class="lo-tmark__n">${ROMAN[tier]}</b></span>`} />
+    <span class="lo-tmark__cnt num">${count}</span>
   </div>`;
 }
 
@@ -565,6 +588,7 @@ function DeckView({ m, list, getChess, st, selId, quick, onPick, onChange, onOps
   const groups = DECK_TIERS.map((tier) => ({ tier, items: list.filter((c) => c.tier === tier) }))
     .filter((g) => g.items.length || (!filtered && diySlots.some((s) => s.tier === g.tier)));
   const raf = useRef(0);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []); // no tier report after the deck is gone
   const dragScroll = useDragScroll();
   const onScroll = (e) => {
     const el = e.currentTarget;
@@ -587,13 +611,9 @@ function DeckView({ m, list, getChess, st, selId, quick, onPick, onChange, onOps
   return html`<div class=${cx('lo-deck', drawer && 'has-drawer', quick && 'is-quick')} ref=${deckRef} onScroll=${onScroll} onWheel=${onWheel} ...${dragScroll}
       role="list" aria-label=${t('干员列表')} data-testid="loadout-deck">
     ${groups.map((g) => html`<section key=${g.tier} class=${cx('lo-tgroup', `lo-tgroup--t${g.tier}`)} data-tier=${g.tier}>
-      <div class=${cx('lo-tmark', `tier--${g.tier}`)} aria-hidden="true">
-        <span class="lo-tmark__no">NO.</span>
-        <b class="lo-tmark__n">${ROMAN[g.tier]}</b>
-        <span class="lo-tmark__cnt num">${g.items.length}</span>
-      </div>
+      <${TierMark} m=${m} tier=${g.tier} count=${g.items.length} />
       <div class="lo-tgrid">
-        ${g.items.map((c) => html`<${OpCard} key=${c.chessId} m=${m} chess=${c} golden=${c.goldenId ? getChess(c.goldenId) : null}
+        ${g.items.map((c) => html`<${DeckCard} key=${c.chessId} m=${m} chess=${c} golden=${c.goldenId ? getChess(c.goldenId) : null}
           entries=${st.entries} ops=${st.ops} selected=${c.chessId === selId} quick=${quick} onPick=${onPick} onChange=${onChange} onOps=${onOps}
           notOwned=${(st.notOwned || []).includes(c.chessId)} />`)}
         ${!filtered ? html`<${DiyDeckCard} m=${m} tier=${g.tier} slots=${diySlots} picks=${diyPicks} onOpen=${onDiy} />` : null}
@@ -602,8 +622,12 @@ function DeckView({ m, list, getChess, st, selId, quick, onPick, onChange, onOps
   </div>`;
 }
 
-/** The deck's bottom bar: jump to a tier (the open 自选 slots above 5 / 6), 确认配置 while 快速配置 is on. */
-export function DeckBar({ counts, active, onJump, diyOpen, quick, onConfirm }) {
+/**
+ * The deck's bottom bar: jump to a tier (the open 自选 slots above 5 / 6), 确认配置 while 快速配置 is on, and — while this
+ * match's loadout is locked (`locked`: the full notice, its title) — a 「本局已锁定 · 下一局生效」 chip: the bar is the one
+ * strip every width and 快速配置 keep on screen (the top bar's note is cut short or hidden on narrow screens).
+ */
+export function DeckBar({ counts, active, onJump, diyOpen, quick, onConfirm, locked = null }) {
   return html`<nav class="lo-bbar" aria-label=${t('按阶级跳转')}>
     <div class="lo-bbar__tiers">
       ${DECK_TIERS.map((tier) => html`<button key=${tier} type="button" class=${cx('lo-bbar__tier', active === tier && 'is-on')} disabled=${!counts[tier]}
@@ -612,11 +636,27 @@ export function DeckBar({ counts, active, onJump, diyOpen, quick, onConfirm }) {
         <span class="lo-bbar__roman num">${ROMAN[tier]}</span><span>${t('{tier}阶', { tier })}</span>
       </button>`)}
     </div>
+    ${locked ? html`<span class="lo-bbar__lock" role="status" data-testid="loadout-deck-locked" title=${locked}><${Icon} name="info" /><span>${t('本局已锁定 · 下一局生效')}</span></span>` : null}
     ${quick ? html`<button type="button" class="lo-confirm" data-testid="loadout-quick-done" onClick=${onConfirm}><${Icon} name="check" />${t('确认配置')}</button>` : null}
   </nav>`;
 }
 
-/** The ⓘ sheet: how the card view works (msgids, translated where shown). */
+/**
+ * DeckBar with the tier at the deck's left edge as its own state: the deck reports a crossing through `sink` while it
+ * scrolls, so only the bar redraws — not the overlay and its 112 cards (PR #811 review).
+ * @param {{ sink: { current: ((tier: number) => void) | null } } & Record<string, any>} props
+ */
+function DeckBarLive({ sink, ...props }) {
+  const [active, setActive] = useState(1);
+  sink.current = setActive;
+  useEffect(() => () => { if (sink.current === setActive) sink.current = null; }, []);
+  return html`<${DeckBar} ...${props} active=${active} />`;
+}
+
+/**
+ * The ⓘ sheet: how the card view works (msgids, translated where shown). Titled 「卡片视图说明」: these are the remake's
+ * own tips, so they do not borrow 调度手册, the name of the official tutorial chapter (玩法说明 → 调度手册, ui/guide.js).
+ */
 const DECK_HELP = Object.freeze([
   [N_('卡片视图'), N_('干员按阶级横向排列；点干员卡在左侧打开详情（与列表视图相同）。←/→ 切换干员，Esc 逐层收起。')],
   [N_('快速配置'), N_('在每张卡旁直接切换技能、模组，或潜能·练度；改动即时保存，点「确认配置」收起。')],
@@ -624,8 +664,8 @@ const DECK_HELP = Object.freeze([
   [N_('甄选干员'), N_('5阶、6阶末尾的卡片即自选编队：持有的 6★ 干员或原型干员，只进入你自己的商店。')],
   [N_('筛选与导入导出'), N_('「筛选」按阶级、职业、盟约、名字查找，或切换回列表视图；「更多」里导出 / 导入调配、全部恢复默认。')],
 ]);
-function DeckHelp({ onClose }) {
-  return html`<${Modal} open=${true} onClose=${onClose} title=${t('调度手册')} micro="DISPATCH MANUAL"
+export function DeckHelp({ onClose }) {
+  return html`<${Modal} open=${true} onClose=${onClose} title=${t('卡片视图说明')} micro="CARD VIEW"
       actions=${html`<${Button} variant="primary" onClick=${onClose}>${t('知道了')}<//>`}>
     <dl class="lo-help">${DECK_HELP.map(([k, v]) => html`<${Fragment} key=${k}><dt>${t(k)}</dt><dd>${t(v)}</dd><//>`)}</dl>
   <//>`;
@@ -732,13 +772,17 @@ function LoadoutScreen({ st }) {
   const [menu, setMenu] = useState(null);                  // null | 'filter' | 'more'
   const setView = (v) => { setViewState(v); savePref(VIEW_PREF, v); setDrawer(false); setQuick(null); setMenu(null); };
   const [help, setHelp] = useState(false);
-  const [activeTier, setActiveTier] = useState(1);
+  const tierSink = useRef(null);                           // the bottom bar's tier (DeckBarLive), set without a redraw here
+  const setActiveTier = (tier) => tierSink.current?.(tier);
   const deckRef = useRef(null);
   const ui = useRef({});
   ui.current = { drawer, menu, quick, setDrawer, setMenu, setQuick };
   const diySlots = ready ? diySlotList(diyData()) : [];
 
   const tab = st.tab === 'ownership' || st.tab === 'diy' ? st.tab : 'loadout';
+  // leaving 干员调配 (干员持有, the 甄选干员 card, or openLoadout naming a tab) closes the card view's layers: hidden, they
+  // used to swallow the first Esc there and came back stale on return (PR #811 review)
+  useEffect(() => { if (tab !== 'loadout') { setDrawer(false); setQuick(null); setMenu(null); } }, [tab]);
   const lost = ready ? missingGameData(tab) : [];
   const ownRoster = useOwnershipRoster(ready);
   const nNotOwned = notOwnedCount(st.notOwned, ownRoster);
@@ -759,10 +803,11 @@ function LoadoutScreen({ st }) {
     if (ok) setNotOwned([]);
   };
   // the cards: a card opens the drawer, the open card again closes it
+  // (the list's phone 'detail over the list' state stays off here: 筛选 → 列表 would reopen the detail)
   const pick = (id) => {
     if (view === 'deck' && drawer && loadoutStore.get().sel === id) { setDrawer(false); return; }
-    loadoutStore.set({ sel: id }); setNarrowDetail(true);
-    if (view === 'deck') setDrawer(true);
+    loadoutStore.set({ sel: id });
+    if (view === 'deck') setDrawer(true); else setNarrowDetail(true);
   };
   // a row's quick choice (PR #301): the same setChoice / setEntries path; the row becomes the selection, a phone stays on the list
   const quickChange = (id, patch) => {
@@ -865,11 +910,13 @@ function LoadoutScreen({ st }) {
       const typing = e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
       if (e.key === 'Escape') {
         e.preventDefault(); e.stopImmediatePropagation();
-        // the card view peels back one layer at a time: a popover, 快速配置, the drawer, then the overlay
+        // the card view peels back one layer at a time on its tab: a popover, 快速配置, the drawer, then the overlay
+        // (on 干员持有 / 自选编队 none of them is drawn, so the first Esc closes the overlay, as in the list)
         const u = ui.current;
-        if (u.menu) { u.setMenu(null); return; }
-        if (u.quick) { u.setQuick(null); return; }
-        if (u.drawer) { u.setDrawer(false); return; }
+        const onDeckTab = loadoutStore.get().tab !== 'ownership' && loadoutStore.get().tab !== 'diy';
+        if (onDeckTab && u.menu) { u.setMenu(null); return; }
+        if (onDeckTab && u.quick) { u.setQuick(null); return; }
+        if (onDeckTab && u.drawer) { u.setDrawer(false); return; }
         closeLoadout(); return;
       }
       if (typing) return;
@@ -920,7 +967,7 @@ function LoadoutScreen({ st }) {
     const deck = deckRef.current;
     const sec = deck?.querySelector(`.lo-tgroup[data-tier="${tier}"]`);
     if (!deck || !sec) return;
-    deck.scrollTo({ left: Math.max(0, sec.offsetLeft - (drawer ? deck.clientWidth * 0.4 : 0)), behavior: 'smooth' });
+    deck.scrollTo({ left: Math.max(0, sec.offsetLeft - (drawer ? deck.clientWidth * 0.4 : 0)), behavior: reducedMotion() ? 'auto' : 'smooth' });
     setActiveTier(tier);
   };
   const nFilters = ['tier', 'prof', 'bond', 'changedOnly'].filter((k) => !!st.filters?.[k]).length + (String(st.filters?.query || '').trim() ? 1 : 0);
@@ -940,6 +987,9 @@ function LoadoutScreen({ st }) {
 
   const deck = view === 'deck';
   const lockedText = t('本局的调配已锁定（确认本局信息后无法修改），修改将在下一局生效');
+  // the card view's top-bar note (cut short on narrow screens: its title holds it whole; the lock also rides the bottom bar)
+  const deckNote = quick === 'cult' ? t('潜能与练度按干员保存，普通、精锐形态与自选共用')
+    : quick ? t('快速编辑：展示干员精锐形态的技能与模组，改动即时保存') : locked ? lockedText : fromText;
   const loadoutDetail = html`<${Detail} m=${m} chess=${base} golden=${golden} entries=${st.entries} ops=${st.ops} onChange=${change} onOps=${setOpsOf} onReset=${resetOne} locked=${locked}
     level=${golden ? previewLevel : 'normal'} onLevel=${setPreviewLevel}
     notOwned=${!!base && (st.notOwned || []).includes(base.chessId)} />`;
@@ -952,12 +1002,11 @@ function LoadoutScreen({ st }) {
         ${deck && tab !== 'loadout'
           ? html`<${Button} variant="ghost" size="md" icon="chevronLeft" class="lo-back" onClick=${() => setTab('loadout')} title=${t('返回干员调配')}>${t('干员调配')}<//>`
           : html`<${Button} variant="ghost" size="md" icon="chevronLeft" class="lo-back" onClick=${closeLoadout} aria-label=${t('返回')} title=${t('返回 (Esc)')}>${t('返回')}<//>`}
-        ${deck ? html`<button type="button" class="lo-info" data-testid="loadout-help" onClick=${() => setHelp(true)} aria-label=${t('调度手册')} title=${t('调度手册')}><${Icon} name="info" /></button>` : null}
+        ${deck ? html`<button type="button" class="lo-info" data-testid="loadout-help" onClick=${() => setHelp(true)} aria-label=${t('卡片视图说明')} title=${t('卡片视图说明')}><${Icon} name="info" /></button>` : null}
       </div>
       ${deck ? html`<div class="lo-top__center">
         ${tab === 'loadout' ? html`<${MicroLabel} tone="mint">${quick ? 'QUICK ASSEMBLE' : 'OPERATOR LOADOUT'}<//>
-          <p class=${cx('lo-top__note', locked && 'is-locked')}>${quick === 'cult' ? t('潜能与练度按干员保存，普通、精锐形态与自选共用')
-            : quick ? t('快速编辑：展示干员精锐形态的技能与模组，改动即时保存') : locked ? lockedText : fromText}</p>`
+          <p class=${cx('lo-top__note', !quick && locked && 'is-locked')} title=${deckNote}>${deckNote}</p>`
         : html`<${MicroLabel} tone="mint">${tab === 'ownership' ? 'OPERATOR ROSTER' : 'SELF-SELECT SQUAD'}<//>
           <h2 class="lo-top__title">${tab === 'ownership' ? t('干员持有') : t('自选编队')}</h2>`}
       </div>` : html`<div class="lo-top__center">
@@ -987,8 +1036,8 @@ function LoadoutScreen({ st }) {
         ${inMatch && hasDeadline(infoDeadline) ? html`<${Countdown} deadline=${infoDeadline} size="sm" gauge=${false} label=${t('调配截止')} class="lo-deadline" />` : null}
         ${quick ? html`<span class="lo-qbar__k">${t('快速编辑')}</span>
           <div class="lo-qseg" role="tablist" aria-label=${t('快速编辑')}>
-            ${[['skill', N_('技能')], ['module', N_('模组')], ['cult', N_('潜能·练度')]].map(([k, l]) => html`<button key=${k} type="button" role="tab"
-              data-quick=${k} aria-selected=${quick === k ? 'true' : 'false'} class=${cx(quick === k && 'is-on')} onClick=${() => setQuick(k)}>${t(l)}</button>`)}
+            ${[['skill', t('技能')], ['module', t('模组')], ['cult', `${t('潜能')} · ${t('练度')}`]].map(([k, l]) => html`<button key=${k} type="button" role="tab"
+              data-quick=${k} aria-selected=${quick === k ? 'true' : 'false'} class=${cx(quick === k && 'is-on')} onClick=${() => setQuick(k)}>${l}</button>`)}
           </div>`
         : html`${syncText ? html`<span class=${cx('lo-sync', syncCls)} role="status">${t(syncText)}</span>` : null}
           <span class="lo-count">${t('已调整')} <b class="num">${nChanged}</b><span class="num t-dim">/${roster.length}</span></span>
@@ -1057,7 +1106,8 @@ function LoadoutScreen({ st }) {
           ${loadoutDetail}
         </div>` : null}
       </main>
-      <${DeckBar} counts=${tierCounts} active=${activeTier} onJump=${jumpTier} diyOpen=${diyOpen} quick=${quick} onConfirm=${() => setQuick(null)} />`
+      <${DeckBarLive} sink=${tierSink} counts=${tierCounts} onJump=${jumpTier} diyOpen=${diyOpen} quick=${quick} onConfirm=${() => setQuick(null)}
+        locked=${locked ? lockedText : null} />`
       : html`<main class=${cx('lo-body', narrowDetail && 'is-detail')}>
       <section class="lo-roster">
         <${Filters} m=${m} filters=${st.filters} bonds=${bonds} onFilters=${(filters) => loadoutStore.set({ filters })} onDeck=${() => setView('deck')} />

@@ -709,9 +709,12 @@
 }
 
 /* ==========================================================================================
-   卡片视图 (optional; js/screens/loadout.js DeckView / OpCard / DeckBar): the 干员调配 tab laid out after the event's
-   物资调配处 — tier groups of cards scrolling sideways, a bottom bar of tier jumps, 快速配置 columns beside the cards,
-   and the detail in a drawer over the left of the deck. The list (.lo-body above) stays the default.
+   卡片视图 (optional; js/screens/loadout.js DeckView / DeckCard / TierMark / DeckBar): the 干员调配 tab laid out after
+   the event's 物资调配处 — tier groups of cards scrolling sideways, a bottom bar of tier jumps, 快速配置 columns beside
+   the cards, and the detail in a drawer over the left of the deck. The list (.lo-body above) stays the default.
+   The tier marker is the official shopLevelSprite/shop_level_tag_N; the rest is drawn here [ASSUMED]: the card frame
+   and its colours, the CSS tier marker (the sprite's fallback), the bottom bar, the 快速配置 columns (see the
+   loadout.js header for the sources).
    ========================================================================================== */
 .lo--deck {
   --drawer-w: min(6.4rem, 92vw);
@@ -729,6 +732,9 @@
 }
 
 /* ---- top bar ---- */
+/* above the deck: while a 转场 runs (a transform), the top-right block is its own stacking context, and its 筛选 / ⋯
+   popovers fell behind the tier groups drawn after it (a quick 筛选 right after coming back from 干员持有) */
+.lo-top--deck { z-index: 6; }
 .lo-info { display: grid; place-items: center; width: max(.5rem, 32px); height: max(.5rem, 32px); padding: 0; color: var(--text-hi);
   background: rgba(255, 255, 255, .06); border: 1px solid var(--line-2); cursor: pointer; }
 .lo-info:hover { border-color: var(--mint-500); color: var(--mint-400); }
@@ -789,15 +795,17 @@
 .lo-deck--empty { align-items: center; justify-content: center; }
 .lo-deck.has-drawer { padding-left: calc(var(--drawer-w) + .3rem); scroll-padding-left: calc(var(--drawer-w) + .2rem); }
 .lo-tgroup { flex: none; display: flex; align-items: stretch; gap: .18rem; }
-.lo-tmark { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: .04rem; width: max(.86rem, 44px);
-  padding: .12rem 0 .14rem; overflow: hidden; background: linear-gradient(180deg, #2a2f2d, #151918 60%, #101312);
+/* the group's marker: the official sprite (150 × 595 design px: 'NO.', the numeral, the event's vertical line; at its
+   design size [ASSUMED], shrunk to fit a short deck, the count below it) or the CSS marker when that art is missing */
+.lo-tmark { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; min-height: 0; }
+.lo-tmark__art { display: block; width: 1.5rem; height: 5.95rem; max-height: calc(100% - max(.3rem, 18px)); object-fit: contain; object-position: 50% 0; }
+.lo-tmark__css { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: .04rem; width: max(.86rem, 44px);
+  padding: .12rem 0 max(.34rem, 20px); overflow: hidden; background: linear-gradient(180deg, #2a2f2d, #151918 60%, #101312);
   border: 1px solid rgba(255, 255, 255, .1); box-shadow: inset 0 3px 0 var(--tc), 0 .06rem .2rem rgba(0, 0, 0, .4); }
 .lo-tmark__no { font-family: var(--font-display); font-size: max(calc(.1 * var(--t)), 8px); letter-spacing: .12em; color: var(--text-dim); }
 .lo-tmark__n { display: grid; place-items: center; width: 76%; aspect-ratio: 1 / 1.3; font-family: var(--font-num); font-size: max(calc(.38 * var(--t)), 20px); font-weight: 900;
   line-height: 1; color: var(--tc); border: 1px solid rgba(255, 255, 255, .22); background: rgba(0, 0, 0, .35); }
-.lo-tmark__cnt { margin-top: auto; font-size: max(calc(.15 * var(--t)), 10px); color: var(--text-lo); }
-.lo-tmark::after { content: "RHODES ISLAND \00B7 OPERATOR DISPATCH"; position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%) rotate(180deg);
-  writing-mode: vertical-rl; font-family: var(--font-display); font-size: max(calc(.09 * var(--t)), 7px); letter-spacing: .3em; color: rgba(255, 255, 255, .12); white-space: nowrap; }
+.lo-tmark__cnt { position: absolute; left: 0; right: 0; bottom: max(.08rem, 4px); text-align: center; font-size: max(calc(.15 * var(--t)), 10px); color: var(--text-lo); }
 .lo-tgrid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, minmax(0, 1fr)); grid-auto-columns: max-content; gap: .16rem .14rem; min-height: 0; }
 
 /* ---- an operator card ---- */
@@ -870,8 +878,9 @@
 
 /* ---- the detail drawer ---- */
 .lo-drawer { position: absolute; left: 0; top: 0; bottom: 0; z-index: 4; width: var(--drawer-w); display: flex; flex-direction: column;
-  background: #0e1211; border-right: 1px solid var(--line-2); box-shadow: .1rem 0 .4rem rgba(0, 0, 0, .55); animation: lo-drawer-in 200ms var(--ease-out) backwards; }
-@keyframes lo-drawer-in { from { transform: translateX(-24px); opacity: 0; } }
+  background: #0e1211; border-right: 1px solid var(--line-2); box-shadow: .1rem 0 .4rem rgba(0, 0, 0, .55);
+  animation: lo-drawer-slide 320ms cubic-bezier(.16, .84, .3, 1) backwards; }
+@keyframes lo-drawer-slide { from { transform: translateX(-.6rem); opacity: 0; } }
 .lo-drawer__close { flex: none; display: flex; align-items: center; gap: .06rem; height: max(.42rem, 30px); padding: 0 .16rem; font: inherit;
   font-size: max(calc(.15 * var(--t)), 11px); font-weight: 700; color: var(--text-md); background: #161b19; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .lo-drawer__close:hover { color: var(--mint-400); }
@@ -897,8 +906,13 @@
   font-size: max(calc(.2 * var(--t)), 13px); font-weight: 900; color: #111614; background: #eef1ef; border: 0; cursor: pointer; }
 .lo-confirm .icon { width: max(.26rem, 16px); height: max(.26rem, 16px); padding: 2px; color: #eef1ef; background: #1a1f1d; }
 .lo-confirm:hover { background: #fff; }
+/* the match's loadout is locked: said in the bar, which every width and 快速配置 keep on screen */
+.lo-bbar__lock { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: .06rem; padding: 0 max(.12rem, 6px); height: max(.4rem, 26px);
+  font-size: max(calc(.14 * var(--t)), 10px); font-weight: 700; color: var(--amber); background: rgba(246, 163, 41, .12); border: 1px solid rgba(246, 163, 41, .4); white-space: nowrap; }
+.lo-bbar__lock > span { overflow: hidden; text-overflow: ellipsis; }
+.lo-bbar__lock .icon { flex: none; width: max(.16rem, 11px); height: max(.16rem, 11px); }
 
-/* ---- ⓘ 调度手册 ---- */
+/* ---- ⓘ 卡片视图说明 (the remake's own tips: not the official 调度手册 chapter) ---- */
 .lo-help { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .1rem .2rem; margin: 0; font-size: max(calc(.16 * var(--t)), 12px); line-height: 1.6; }
 .lo-help dt { font-weight: 800; color: var(--mint-400); white-space: nowrap; }
 .lo-help dd { margin: 0; color: var(--text-md); }
@@ -916,37 +930,33 @@
 @media (max-height: 520px) {
   .lo-deck { padding-top: .12rem; padding-bottom: .1rem; gap: .2rem; }
   .lo-tgrid { gap: .1rem; }
-  .lo-tmark::after { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .lo-drawer, .lo-op__quick, .lo-pop { animation: none; } .lo-op__card { transition: none; } }
 
-/* ---- 转场 (PR #643, like the hub's screens): what is below darkens to black, then the backdrop, the top bar, the tier
-   groups one after another (from the right) and the bottom bar come up; the list view's roster and detail slide in from
-   their sides; a tab's content comes up when opened; the drawer slides out of the left edge ---- */
-.lo { --tr-ease: cubic-bezier(.16, .84, .3, 1); animation: lo-tr-veil 150ms linear backwards; }
-@keyframes lo-tr-veil { from { background-color: transparent; } }
+/* ---- 转场 (PR #643 / PR #811, like the hub's screens) — the card view only (maintainer's decision, 2026-10-21): the
+   default list keeps its 200 ms lo-in above, and its ≤1000 px roster / detail toggle (display: none) replays nothing.
+   On opening the card view the backdrop, the top bar, the tier groups one after another (from the right) and the bottom
+   bar come up; 干员持有 / 自选编队 come up when opened from the deck. Timings and order [ASSUMED] (no official source);
+   opacity / transform only. The drawer's slide is with .lo-drawer above. ---- */
+.lo--deck { --tr-ease: cubic-bezier(.16, .84, .3, 1); }
 @keyframes lo-tr-fade { from { opacity: 0; } }
 @keyframes lo-tr-right { from { opacity: 0; transform: translateX(.36rem); } }
-@keyframes lo-tr-left { from { opacity: 0; transform: translateX(-.36rem); } }
 @keyframes lo-tr-rise { from { opacity: 0; transform: translateY(.22rem); } }
-.lo__bg { animation: lo-tr-fade 340ms ease-out 140ms backwards; }
-.lo-top { animation: lo-tr-fade 260ms ease-out 170ms backwards; }
-.lo-top__center { animation: lo-tr-right 400ms var(--tr-ease) 200ms backwards; }
-.lo-top__right { animation: lo-tr-right 420ms var(--tr-ease) 250ms backwards; }
-.lo-note { animation: lo-tr-fade 300ms ease-out 230ms backwards; }
-.lo-tgroup { animation: lo-tr-right 440ms var(--tr-ease) backwards; animation-delay: calc(240ms + var(--g, 0) * 70ms); }
-.lo-tgroup:nth-child(2) { --g: 1; }
-.lo-tgroup:nth-child(3) { --g: 2; }
-.lo-tgroup:nth-child(4) { --g: 3; }
-.lo-tgroup:nth-child(5) { --g: 4; }
-.lo-tgroup:nth-child(6) { --g: 5; }
-.lo-tgroup:nth-child(n+7) { --g: 6; }
-.lo-bbar { animation: lo-tr-rise 420ms var(--tr-ease) 380ms backwards; }
-.lo-roster { animation: lo-tr-left 440ms var(--tr-ease) 220ms backwards; }
-.lo-detail-wrap { animation: lo-tr-right 440ms var(--tr-ease) 280ms backwards; }
-.own, .diy { animation: lo-tr-fade 300ms ease-out 150ms backwards; }
-.lo-drawer { animation: lo-drawer-slide 320ms var(--tr-ease) backwards; }
-@keyframes lo-drawer-slide { from { transform: translateX(-.6rem); opacity: 0; } }
+.lo--deck .lo__bg { animation: lo-tr-fade 340ms ease-out 140ms backwards; }
+.lo--deck .lo-top { animation: lo-tr-fade 260ms ease-out 170ms backwards; }
+.lo--deck .lo-top__center { animation: lo-tr-right 400ms var(--tr-ease) 200ms backwards; }
+.lo--deck .lo-top__right { animation: lo-tr-right 420ms var(--tr-ease) 250ms backwards; }
+.lo--deck .lo-note { animation: lo-tr-fade 300ms ease-out 230ms backwards; }
+.lo--deck .lo-tgroup { animation: lo-tr-right 440ms var(--tr-ease) backwards; animation-delay: calc(240ms + var(--g, 0) * 70ms); }
+.lo--deck .lo-tgroup:nth-child(2) { --g: 1; }
+.lo--deck .lo-tgroup:nth-child(3) { --g: 2; }
+.lo--deck .lo-tgroup:nth-child(4) { --g: 3; }
+.lo--deck .lo-tgroup:nth-child(5) { --g: 4; }
+.lo--deck .lo-tgroup:nth-child(6) { --g: 5; }
+.lo--deck .lo-tgroup:nth-child(n+7) { --g: 6; }
+.lo--deck .lo-bbar { animation: lo-tr-rise 420ms var(--tr-ease) 380ms backwards; }
+.lo--deck .own, .lo--deck .diy { animation: lo-tr-fade 300ms ease-out 150ms backwards; }
 @media (prefers-reduced-motion: reduce) {
-  .lo, .lo__bg, .lo-top, .lo-top__center, .lo-top__right, .lo-note, .lo-tgroup, .lo-bbar, .lo-roster, .lo-detail-wrap, .own, .diy, .lo-drawer { animation: none; }
+  .lo--deck .lo__bg, .lo--deck .lo-top, .lo--deck .lo-top__center, .lo--deck .lo-top__right, .lo--deck .lo-note, .lo--deck .lo-tgroup,
+  .lo--deck .lo-bbar, .lo--deck .own, .lo--deck .diy { animation: none; }
 }
