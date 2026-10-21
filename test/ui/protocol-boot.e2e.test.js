@@ -3,7 +3,9 @@
 //
 // Through the dev mock: PREP → BATTLE_CHECK shows the screen (a card per doctor, 协议启动！), and it goes once
 // 回合开始 follows; one card for a solo run; with reduced motion it shows without motion; without the art pack the 0.3.0
-// banner stays. The band draft: the 请选择策略 band when the pick becomes mine — none without the art or with reduced motion. Static counterpart: test/ui/protocol-boot.test.js.
+// banner stays. The band draft: the 请选择策略 band when the pick becomes mine — also when its sprites arrive late (a cold
+// cache: it plays once they are in, never taking a click) — none without the art or with reduced motion. Static
+// counterpart: test/ui/protocol-boot.test.js.
 
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -153,6 +155,42 @@ describe('协议启动！ screen (headless Chrome)', { skip: !ENABLED && 'set SP
     await page.waitForSelector('[data-testid="turn-banner"]', { timeout: 3000 });
     await page.waitForFunction(() => globalThis.__sfx.includes('yourTurn'), { timeout: 2000 }).catch(() => null);
     assert.ok((await page.evaluate(() => globalThis.__sfx)).includes('yourTurn'), 'the 轮到你 sound in solo too');
+    await page.waitForFunction(() => !document.querySelector('[data-testid="turn-banner"]'), { timeout: 4000 });
+    assert.deepEqual(problems, []);
+    await context.close();
+  });
+
+  test('solo with a cold cache: the band\'s sprites arrive 2 s after the turn began — it plays once they are in, never taking a click (§35.18)', async () => {
+    const context = await browser.createBrowserContext();
+    const page = await context.newPage();
+    await page.setBypassServiceWorker(true);
+    await page.setViewport({ width: 1920, height: 1080 });
+    const problems = [];
+    page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
+    page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
+    // the page's own clock: when the draft screen (its first turn: solo) and the band reach the DOM
+    await page.evaluateOnNewDocument(() => {
+      const t = (globalThis.__bandT = {});
+      new MutationObserver(() => {
+        if (t.draft == null && document.querySelector('.screen.draft')) t.draft = performance.now();
+        if (t.band == null && document.querySelector('[data-testid="turn-banner"]')) t.band = performance.now();
+      }).observe(document, { childList: true, subtree: true });
+    });
+    // the pre-game sprites held back 2 s (a cold cache on a slow line); everything else at once
+    await page.setRequestInterception(true);
+    page.on('request', (r) => {
+      if (/battleReady\/|settle\/common_logo|roundStartDialog\/round_emoji_head/.test(r.url())) setTimeout(() => r.continue().catch(() => {}), 2000);
+      else r.continue().catch(() => {});
+    });
+    await page.goto(`${base}/dev/game-mock.html?shot=1&render=fallback&phase=BAND_DRAFT&variant=solo`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForSelector('.screen.draft', { timeout: 30000 });
+    await page.waitForSelector('[data-testid="turn-banner"]', { timeout: 15000 });
+    const t = await page.evaluate(() => globalThis.__bandT);
+    const late = Math.round(t.band - t.draft);
+    assert.ok(late > 1000, `the band came after the old 1 s limit, not skipped (${late} ms)`);
+    assert.ok(late <= 5000, `inside TURN_BANNER_LATE_MS (${late} ms)`);
+    assert.equal(await page.$eval('[data-testid="turn-banner"]', (e) => getComputedStyle(e).pointerEvents), 'none', 'the draft stays usable under it');
+    assert.ok(await page.$eval('.tbanner__head', (e) => e.naturalWidth > 0), 'the official robot head');
     await page.waitForFunction(() => !document.querySelector('[data-testid="turn-banner"]'), { timeout: 4000 });
     assert.deepEqual(problems, []);
     await context.close();

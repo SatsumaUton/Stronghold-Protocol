@@ -44,13 +44,15 @@ export function onBootArt(fn) {
 }
 
 /**
- * Fetch the sprites when the match screen opens (screens/game.js, once per page; the band draft before BATTLE_CHECK
- * leaves them time). A missing pack never turns ready.
+ * Fetch the sprites early — as a room is entered (main.js warmGameData, once the art list is in), when the match screen
+ * opens (screens/game.js) and when the band draft mounts (screens/bandDraft.js) —, once per page; the first call that
+ * finds the art list loaded starts it. A missing pack never turns ready.
  */
 export function preloadBootArt() {
   if (bootArt !== null || typeof Image !== 'function') return;
-  bootArt = false;
   const assets = data.get('assets');
+  if (!assets) return; // the art list is not in yet: a later call starts it
+  bootArt = false;
   const urls = ART.map((k) => uiUrl(assets, k));
   if (!urls.every(Boolean)) return;
   let left = urls.length;

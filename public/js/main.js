@@ -47,6 +47,7 @@ import { TitleScreen, sanitizeName } from './screens/title.js';
 import { LobbyScreen, rememberRoom, parseRoomParam, joinKnown } from './screens/lobby.js';
 import { RoomScreen, TrustedNotice } from './screens/room.js';
 import { GameScreen } from './screens/game.js';
+import { preloadBootArt } from './ui/protocolBoot.js';
 import { audio, installAudio } from './audio.js';
 import { installLobbyMedia } from './ui/lobbyMedia.js';
 import { settingsStore } from './ui/settings.js';
@@ -297,14 +298,20 @@ function wireNet() {
 
 /**
  * Download every data file of the match UI (gameComponents GAME_FILES: operators, skills, bonds, items, enemies, 特质 …)
- * in the background once the player is in a room — a match is near (the lobby alone never downloads them). The game's
+ * and the pre-game sprites in the background once the player is in a room — a match is near (the lobby alone never
+ * downloads them). The game's
  * texts are static data loaded once per page — never fetched during a match — and the match screen waits for these
  * files, so with them warmed it opens at once and no text ever appears late (user playtest #3 item 9). Idempotent (the
  * data store shares each file's promise).
  */
 function warmGameData() {
-  // a room with gameplay plugins: content.js downloads its content set's files instead (DESIGN §32.6)
-  const go = () => { if (store.get().room?.content?.vanilla === false) return; data.loadAll(GAME_FILES).catch(() => {}); };
+  // a room with gameplay plugins: content.js downloads its content set's files instead (DESIGN §32.6). With the art list
+  // in, the pre-game sprites (协议启动！ and the 请选择策略 band, ui/protocolBoot.js) start too: a solo player who starts
+  // at once and skips through the briefing meets the band draft's first turn with them at hand (§35.18's leftover)
+  const go = () => {
+    if (store.get().room?.content?.vanilla === false) return;
+    data.loadAll(GAME_FILES).then(() => preloadBootArt(), () => {});
+  };
   if (typeof globalThis.requestIdleCallback === 'function') globalThis.requestIdleCallback(go, { timeout: 2500 });
   else setTimeout(go, 600);
 }

@@ -78,14 +78,23 @@ test('the pre-game end fits the official 3 s BATTLE_CHECK: the held draft + 协�
 
 test('screens/bandDraft.js: the 请选择策略 band and the 轮到你 sound, co-op and solo alike (the maintainer, 2026-10-21), once the art is in — at most TURN_BANNER_LATE_MS late — never with reduced motion', () => {
   const d = read('public/js/screens/bandDraft.js');
+  // (§35.18's leftover: a cold cache skipped the solo band at 1 s — the sprites are fetched early, the band waits for them)
+  assert.match(d, /useEffect\(\(\) => \{ preloadBootArt\(\); \}, \[\]\);\n\s+const \[turnBanner, setTurnBanner\] = useState\(0\);/, 'fetched as the draft mounts');
   assert.match(d, /if \(!myTurn\) return undefined;\n\s+setPeek\(null\);\n\s+audio\.sfx\('yourTurn'\);\n\s+if \(reducedMotion\(\)\) return undefined;\n\s+const since = Date\.now\(\);\n\s+return onBootArt\(\(\) => \{ if \(Date\.now\(\) - since <= TURN_BANNER_LATE_MS\) setTurnBanner\(\(n\) => n \+ 1\); \}\);/);
   assert.doesNotMatch(d, /if \(!solo\) audio\.sfx\('yourTurn'\)/, 'no co-op-only sound');
   const banner = read('public/js/ui/turnBanner.js');
-  assert.match(banner, /export const TURN_BANNER_LATE_MS = 1000;/);
+  assert.match(banner, /export const TURN_BANNER_LATE_MS = 5000;/, 'a bounded wait [ASSUMED], not the 1 s that skipped a cold cache');
+  assert.match(banner, /pointer-events none/);
+  // the band never takes a click while it plays late over a turn under way
+  assert.match(read('public/css/screens/protocol-boot.css'), /\.tbanner \{[^}]*pointer-events: none;/);
   assert.doesNotMatch(banner, /co-op only/);
   assert.match(banner, /\[ASSUMED\] for solo/);
   const boot = read('public/js/ui/protocolBoot.js');
   assert.match(boot, /export function onBootArt\(fn\) \{/);
+  // an early call before the art list is in starts nothing and leaves the next call free to start it
+  assert.match(boot, /if \(bootArt !== null \|\| typeof Image !== 'function'\) return;\n\s+const assets = data\.get\('assets'\);\n\s+if \(!assets\) return;[^\n]*\n\s+bootArt = false;/);
+  // main.js: a room entered (a match is near) starts them once the art list is in
+  assert.match(read('public/js/main.js'), /data\.loadAll\(GAME_FILES\)\.then\(\(\) => preloadBootArt\(\), \(\) => \{\}\);/);
   assert.match(d, /<\$\{TurnBanner\} key=\$\{turnBanner\} onDone=\$\{\(\) => setTurnBanner\(0\)\} \/>/);
 });
 

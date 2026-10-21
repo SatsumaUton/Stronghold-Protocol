@@ -46,7 +46,7 @@ import { useStore } from '../store.js';
 import { data } from '../data.js';
 import { audio } from '../audio.js';
 import { TurnBanner, TURN_BANNER_LATE_MS } from '../ui/turnBanner.js';
-import { onBootArt } from '../ui/protocolBoot.js';
+import { onBootArt, preloadBootArt } from '../ui/protocolBoot.js';
 import { reducedMotion } from '../ui/device.js';
 import { useRise } from '../ui/transitions.js';
 import { CARD_KEY, cardStore, cardOperators, cardContext, seatOperator, seatCardSkin } from '../ui/seatArt.js';
@@ -291,9 +291,11 @@ export function BandDraftScreen({ held = null } = {}) {
     if (next !== sel) setSel(next);
   }, [bands.length, myPick, myTurn, takenKey]);
   // "your turn" cue: the sound and the event's 请选择策略 band (ui/turnBanner.js) once its art is in — co-op and solo
-  // alike (the maintainer's decision of 2026-10-21, as in PR #643; [ASSUMED] for solo, see the header). A turn whose art
-  // comes in later than TURN_BANNER_LATE_MS (the sprites screens/game.js fetches while the briefing runs) skips the band
-  // rather than covering a turn already under way; the header's 请选择策略 says it anyway.
+  // alike (the maintainer's decision of 2026-10-21, as in PR #643; [ASSUMED] for solo, see the header). The sprites are
+  // fetched early (a room entered, the match screen, this screen's mount); a turn whose art is still loading plays the
+  // band as soon as it arrives — never blocking input — up to TURN_BANNER_LATE_MS after the turn began, past which the
+  // header's 请选择策略 says it alone.
+  useEffect(() => { preloadBootArt(); }, []);
   const [turnBanner, setTurnBanner] = useState(0);
   useEffect(() => {
     if (!myTurn) return undefined;
