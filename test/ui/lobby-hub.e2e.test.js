@@ -1,11 +1,16 @@
 // Browser E2E of the hub lobby (PR #643 split 6) against the real server, headless Chrome (puppeteer-core + system
 // Chrome). Opt-in: SP_E2E=1 node --test test/ui/lobby-hub.e2e.test.js
 //
-// Desktop 1920×1080: the hub (title, 独立模拟 / 同盟模拟, the S.W.E.E.P. / 干员调配 plates) → 独立模拟 opens 选择模拟协议 (a
-// Modal with the focus inside; a difficulty is remembered and redraws the picture) → Esc returns the focus to the entry →
-// 同盟模拟 opens 选择同盟方式 with the key field focused (a pasted key is normalised) → 创建同盟 stacks 选择模拟协议 on it, Esc
-// steps back one dialog at a time → 创建同盟 at 绝境 opens the room at that difficulty. Phones 844×390 and 667×375 (touch):
-// the hub and both dialogs stay inside the screen, the dialogs' buttons in view without scrolling.
+// Desktop 1920×1080: the hub (title, 独立模拟 / 同盟模拟, the S.W.E.E.P. / 干员调配 plates, no top-bar 统计数据 chip) →
+// 独立模拟 opens 选择模拟协议 (a Modal with the focus inside; a difficulty is remembered and redraws the picture) → Esc
+// returns the focus to the entry → 同盟模拟 opens 选择同盟方式 with the key field focused (the project's TextField: a typed
+// key is normalised and written back, a 5th character or a dash is dropped, a pasted invite link longer than 64
+// characters still gives its key) → 创建同盟 creates the room at once at the remembered difficulty (the event's 联合模拟,
+// the maintainer's decision of 2026-10-21) → in the room the host's difficulty pill opens 选择模拟协议 with 确认 (Esc
+// changes nothing; a refused change keeps it open; 绝境 → 确认 changes the room), ⚙ 同盟设置 lists the 模拟难度 and the
+// 「AI 队友最后选择」 switch. Phones 844×390 and 667×375 (touch): the hub (with the 成就统计 plate in place of the card),
+// 选择模拟协议, 选择同盟方式 and the room's 选择模拟协议 stay inside the screen, their buttons in view without scrolling.
+// The other doctors' read-only view: test/ui/room-settings.e2e.test.js.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/lobby-hub-*.png
 
 import { test, describe, before, after } from 'node:test';
@@ -81,7 +86,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
     return { out: out.slice(0, 6), scrolls: bodies.some((b) => b.scrollHeight > b.clientHeight + 1) };
   }); };
 
-  test('desktop: hub → 选择模拟协议 (remembered, Esc) → 选择同盟方式 → stacked 选择模拟协议 → a room at 绝境', async () => {
+  test('desktop: hub → 选择模拟协议 (remembered, Esc) → 选择同盟方式 (the key field) → 创建同盟: the room at once → the host changes the difficulty in the room', async () => {
     const { ctx, page, problems } = await open();
     try {
       const hub = await page.evaluate(() => ({
@@ -91,6 +96,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
         dialogs: document.querySelectorAll('.modal').length,
       }));
       assert.equal(hub.title, '卫戍协议：盟约');
+      assert.equal(await page.$('.lobby-screen .topbar .stats-entry'), null, 'no top-bar 统计数据 chip: the 成就统计 card is the entry');
       assert.deepEqual(hub.entries, ['solo', 'coop']);
       assert.deepEqual(hub.plates, [true, true]);
       assert.equal(hub.dialogs, 0);
@@ -143,35 +149,89 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
       }));
       assert.equal(st.value, 'ABCD');
       assert.deepEqual(st.join, [['加入同盟', false], ['观战', false]]);
+      // the normalised key is written back: a 5th character or a dash never shows
+      await page.keyboard.type('e-');
+      assert.equal(await page.$eval('.join-row input', (el) => el.value), 'ABCD');
+      // a pasted invite link longer than 64 characters still gives its key (the old maxlength cut it to "HTTP")
+      const link = 'https://crops-flexible-wedding-trademarks.trycloudflare.com/?room=QWER';
+      assert.ok(link.length > 64);
+      await page.$eval('.join-row input', (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, link);
+      await page.waitForFunction(() => document.querySelector('.join-row input').value === 'QWER');
+      st = await page.evaluate(() => ({
+        create: document.querySelector('[data-testid="alliance-create"]')?.textContent.replace(/\s+/g, ' ').trim(),
+        maxLength: document.querySelector('.join-row input').maxLength,
+        label: document.querySelector('.join-row input').getAttribute('aria-label'),
+      }));
+      assert.ok(st.create.includes('难度：险境模拟（可在同盟内更改）'), st.create);
+      assert.equal(st.maxLength, -1, 'no maxlength');
+      assert.equal(st.label, '同盟密钥');
+      await settle(page);
       await page.screenshot({ path: path.join(OUT, 'lobby-hub-alliance.png') });
 
-      // 创建同盟 → 选择模拟协议 on top; Esc steps back one dialog at a time
+      // 创建同盟 → the room at once, at the remembered difficulty (险境); no 选择模拟协议 on the way
       await press(page, '[data-testid="alliance-create"]');
+      await page.waitForSelector('.room-screen', { timeout: 15000 });
+      let room = await page.evaluate(() => { const r = globalThis.__SP__.store.get().room; return { mode: r?.mode, difficulty: r?.difficulty }; });
+      assert.deepEqual(room, { mode: 'coop', difficulty: 'NORMAL' });
+      assert.equal(await page.evaluate(() => document.querySelectorAll('.modal').length), 0, 'no dialog left over the room');
+
+      // the host's pill → 选择模拟协议 with 确认 (the room's difficulty selected); Esc changes nothing
+      await press(page, '.rs-pill__diff');
       await page.waitForSelector('.modal__box.proto', { visible: true });
       st = await page.evaluate(() => ({
-        dialogs: document.querySelectorAll('.modal').length,
         mode: document.querySelector('.proto__body')?.dataset.mode,
         selected: document.querySelector('.proto__body')?.dataset.difficulty,
         start: document.querySelector('.proto .proto-start__label')?.textContent.trim(),
+        live: [...document.querySelectorAll('.modal__box.proto .diff-card')].every((b) => !b.disabled),
+        test: !!document.querySelector('[data-testid="create-test"]'),
       }));
-      assert.deepEqual(st, { dialogs: 2, mode: 'coop', selected: 'NORMAL', start: '创建同盟' });
+      assert.deepEqual(st, { mode: 'coop', selected: 'NORMAL', start: '确认', live: true, test: false });
+      assert.ok(await diffCard(page, '终极模拟') >= 0);
+      await page.click('.diff-card[data-test-pick]');
       await escape(page);
       await page.waitForSelector('.modal__box.proto', { hidden: true });
-      assert.ok(await page.$('.modal__box.ally'), 'Esc closed 选择模拟协议 only');
-      await escape(page);
-      await page.waitForSelector('.modal', { hidden: true });
+      assert.equal(await page.evaluate(() => globalThis.__SP__.store.get().room.difficulty), 'NORMAL', 'Esc sent nothing');
 
-      // a 同盟 at 绝境
-      await press(page, '.mode-card[data-mode="coop"]');
-      await press(page, '[data-testid="alliance-create"]');
+      // a refused change keeps the dialog open (with the error toast)
+      await press(page, '.rs-pill__diff');
       await page.waitForSelector('.modal__box.proto', { visible: true });
+      await page.evaluate(async () => {
+        const { net } = await import('/js/net.js');
+        const real = net.request.bind(net);
+        net.request = (type, body) => {
+          if (type !== 'room.setDifficulty') return real(type, body);
+          net.request = real;
+          return Promise.reject(Object.assign(new Error('refused'), { code: 'RATE' }));
+        };
+      });
       assert.ok(await diffCard(page, '绝境模拟') >= 0);
       await page.click('.diff-card[data-test-pick]');
       await page.click('.proto .proto-start');
-      await page.waitForSelector('.room-screen', { timeout: 15000 });
-      const room = await page.evaluate(() => { const r = globalThis.__SP__.store.get().room; return { mode: r?.mode, difficulty: r?.difficulty }; });
-      assert.deepEqual(room, { mode: 'coop', difficulty: 'HARD' });
-      assert.equal(await page.evaluate(() => document.querySelectorAll('.modal').length), 0, 'no dialog left over the room');
+      await page.waitForSelector('.toast', { visible: true, timeout: 5000 });
+      await sleep(300);
+      assert.ok(await page.$('.modal__box.proto'), 'still open after the refusal');
+      assert.equal(await page.evaluate(() => globalThis.__SP__.store.get().room.difficulty), 'NORMAL');
+      // 确认 again (the request goes through now): the room is at 绝境 and the dialog closes
+      await page.click('.proto .proto-start');
+      await page.waitForFunction(() => globalThis.__SP__.store.get().room?.difficulty === 'HARD', { timeout: 10000 });
+      await page.waitForSelector('.modal__box.proto', { hidden: true });
+      assert.match(await page.$eval('.rs-pill__diff', (el) => el.textContent), /绝境模拟/);
+
+      // ⚙ 同盟设置: the 模拟难度 (更改 opens 选择模拟协议) and the 「AI 队友最后选择」 switch, both the host's
+      await press(page, '.rs-pill__gear');
+      await page.waitForSelector('.rs-opts', { visible: true });
+      st = await page.evaluate(() => ({
+        diff: document.querySelector('[data-testid="room-opt-difficulty"]')?.textContent.replace(/\s+/g, ' ').trim(),
+        ailast: [...document.querySelectorAll('.rs-opts [role="switch"]')].map((b) => [b.textContent.trim(), b.disabled]),
+      }));
+      assert.ok(st.diff.includes('绝境模拟') && st.diff.includes('更改') && !st.diff.includes('由创建者选择'), st.diff);
+      assert.deepEqual(st.ailast, [['AI 队友最后选择', false]]);
+      await page.screenshot({ path: path.join(OUT, 'lobby-hub-room-settings.png') });
+      await press(page, '.rs-opts__diff');
+      await page.waitForSelector('.modal__box.proto', { visible: true });
+      assert.equal(await page.$('.rs-opts'), null, 'the menu closes under the dialog');
+      await escape(page);
+      await page.waitForSelector('.modal__box.proto', { hidden: true });
       assert.deepEqual(problems, []);
     } finally { await ctx.close(); }
   });
@@ -202,6 +262,18 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
         assert.deepEqual((await fit(page)).out, [], 'the hub fits');
         assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.hub-side')).display), 'none', '作战提示 gives way');
         await page.screenshot({ path: path.join(OUT, `lobby-hub-phone-${w}.png`) });
+        // the left column's 成就统计 card gives way too: the plate keeps the statistics entry
+        await press(page, '.hub-plate--ach', true);
+        await page.waitForSelector('.modal__box.achv [data-testid="achievement-dialog"]', { visible: true });
+        await settle(page);
+        // the window fits the screen (its records scroll inside it), its close and 查看完整统计 in view
+        assert.deepEqual(await page.evaluate(() => ['.modal__box.achv', '.achv__close', '.achv__more'].map((q) => {
+          const r = document.querySelector(q).getBoundingClientRect();
+          return r.width > 0 && r.left >= -1 && r.top >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1;
+        })), [true, true, true], 'the 成就统计 window fits');
+        await page.screenshot({ path: path.join(OUT, `lobby-hub-phone-${w}-achievements.png`) });
+        await press(page, '.modal__box.achv .achv__close', true);
+        await page.waitForSelector('.modal', { hidden: true });
 
         await press(page, '.mode-card[data-mode="solo"]', true);
         await page.waitForSelector('.modal__box.proto', { visible: true });
@@ -220,10 +292,15 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
         assert.deepEqual(await fit(page), { out: [], scrolls: false }, '选择同盟方式 fits');
         assert.equal(await page.evaluate(() => document.activeElement?.tagName === 'INPUT'), false, 'no keyboard pops up on a touch screen');
         await page.screenshot({ path: path.join(OUT, `lobby-hub-phone-${w}-alliance.png`) });
+        // 创建同盟: the room at once; the host's 选择模拟协议 over it fits too
         await press(page, '[data-testid="alliance-create"]', true);
+        await page.waitForSelector('.room-screen', { timeout: 15000 });
+        await press(page, '.rs-pill__diff', true);
         await page.waitForSelector('.modal__box.proto', { visible: true });
         await sleep(500);
-        assert.deepEqual(await fit(page), { out: [], scrolls: false }, 'the stacked 选择模拟协议 fits');
+        assert.deepEqual(await fit(page), { out: [], scrolls: false }, 'the room’s 选择模拟协议 fits');
+        assert.ok(await page.$eval('.proto .proto-start', (b) => { const r = b.getBoundingClientRect(); return r.bottom <= innerHeight && r.width > 0; }), '确认 in view');
+        await page.screenshot({ path: path.join(OUT, `lobby-hub-phone-${w}-room-protocol.png`) });
         assert.deepEqual(problems, []);
       } finally { await ctx.close(); }
     });

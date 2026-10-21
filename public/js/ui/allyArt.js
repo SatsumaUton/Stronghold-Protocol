@@ -5,11 +5,16 @@
 // Decorative only (aria-hidden). Styles: css/screens/lobby.css (mf-*).
 import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { html } from './components.js';
+import { reducedMotion } from './device.js';
 
-/** 选择同盟方式's radar: rings, a sweep, blips and bearing / range read-outs that keep changing. */
+/**
+ * 选择同盟方式's radar: rings, a sweep, blips and bearing / range read-outs that keep changing — held still under
+ * 减少动态效果 (prefers-reduced-motion: the CSS stops the sweep and the blips, this the read-outs).
+ */
 export function RadarScene() {
   const [read, setRead] = useState({ deg: 139, range: 2732 });
   useEffect(() => {
+    if (reducedMotion()) return undefined;
     const id = setInterval(() => setRead((r) => ({ deg: (r.deg + 37) % 360, range: 2600 + Math.floor(Math.random() * 260) })), 1400);
     return () => clearInterval(id);
   }, []);

@@ -1,9 +1,12 @@
 // Real-server browser E2E — 名片干员 on the room's seat cards (PR #643 split 6). Two doctors in a co-op room: every
 // doctor's card shows a portrait (the default chosen by the player id — the same operator on both screens), a bot keeps
-// its robot frame, only one's own card has 更换立绘; the picker (the project's Modal) opens with the current choice
-// focused, filters by name and rarity, a pick shows at once on one's own card, reaches the teammate through room.card
-// (room.state seats[].card) and survives a reload; 默认 clears it; Esc closes the picker and gives the focus back; on a
-// phone in landscape the picker fits the screen and its grid scrolls inside it, with no on-screen keyboard.
+// its robot frame and flashes once when it is added (only it), only one's own card has 更换立绘; the picker (the
+// project's Modal) opens with the current choice focused, filters by name and rarity, a pick shows at once on one's own
+// card, reaches the teammate through room.card (room.state seats[].card) and survives a reload; the card wears its
+// player's outfit (the maintainer's decision 4 of 2026-10-21: one's own at once, the teammate's through room.skins →
+// room.state seats[].skins once the teammate's page has that appearance, the default without it or with
+// 「显示其他玩家的皮肤」 off); 默认 clears the pick; Esc closes the picker and gives the focus back; on a phone in landscape
+// the picker fits the screen and its grid scrolls inside it, with no on-screen keyboard.
 // The rooms are made through net (room.create / room.join), so the test does not depend on the lobby's layout.
 // Server side: test/lobby-card.test.js; the pure rules: test/ui/seat-art.test.js.
 //
@@ -43,6 +46,25 @@ const waitOp = (c, name, op, what) => c.page.waitForFunction((name, op) => {
   return !!img && img.complete && img.naturalWidth > 0 && (op == null || el.querySelector('.seat__op')?.textContent === op);
 }, { timeout: 10000 }, name, op).catch((e) => { throw new Error(`${c.label}: ${what}: ${e.message}`); });
 
+/** The src of `name`'s portrait on `c`'s screen once it is `src` (an outfit or the default art). */
+const waitArt = (c, name, src, what) => c.page.waitForFunction((name, src) => {
+  const el = [...document.querySelectorAll('.seats .seat')].find((x) => x.querySelector('.seat__name')?.textContent === name);
+  return el?.querySelector('img.seat__portrait')?.getAttribute('src') === src;
+}, { timeout: 10000 }, name, src).catch((e) => { throw new Error(`${c.label}: ${what}: ${e.message}`); });
+
+/**
+ * Lays an outfit of `charId` over this page's art manifest, as an appearance plugin composes one (data.js setView): its
+ * portrait is another operator's real one, so it loads. Returns that URL (the same on every page: the same manifest).
+ */
+const addOutfit = (c, charId, skinId) => c.page.evaluate(async (charId, skinId) => {
+  const { data } = await import('/js/data.js');
+  const m = data.get('assets');
+  const url = Object.entries(m.chars).find(([id, e]) => id !== charId && typeof e?.portrait === 'string')[1].portrait;
+  data.setView('assets', (v) => ({ ...v, chars: { ...v.chars,
+    [charId]: { ...v.chars[charId], skins: { ...(v.chars[charId].skins || {}), [skinId]: { name: 'E2E', portrait: url, portraitE2: url } } } } }));
+  return url;
+}, charId, skinId);
+
 const picker = (c) => c.page.evaluate(() => {
   const box = document.querySelector('.modal__box.cardpick');
   if (!box) return null;
@@ -76,9 +98,13 @@ describe('名片干员 seat cards (real server)', { skip: !ENABLED && 'set SP_E2
       await guest.enter('阿米娅');
       assert.equal(await request(guest, 'room.join', { code }), 'ok');
       await guest.page.waitForSelector('.room-screen .seat.is-me');
+      // an AI teammate added while the room is open flashes once on both screens (转场, ui/transitions.js useRise), alone
+      const guestFlash = guest.page.waitForSelector('.seat.is-bot.is-flash', { timeout: 5000 }).then(() => null, (e) => e);
       await host.click('.seat--empty button', '添加 AI 队友');
-      await host.page.waitForSelector('.seat.is-bot');
-      await guest.page.waitForSelector('.seat.is-bot');
+      await host.page.waitForSelector('.seat.is-bot.is-flash', { timeout: 5000 });
+      assert.equal(await host.page.$$eval('.seat.is-flash', (els) => els.length), 1, 'only the new card flashes');
+      assert.equal(await guestFlash, null, 'the teammate\'s screen flashes the new card too');
+      for (const c of [host, guest]) await c.page.waitForSelector('.seat.is-flash', { hidden: true, timeout: 3000 });
 
       // default portraits: every doctor has one, the same on both screens; a bot keeps its frame; 更换立绘 only on one's own
       for (const c of [host, guest]) for (const name of ['凯尔希', '阿米娅']) await waitOp(c, name, null, `${name}'s portrait`);
@@ -116,8 +142,8 @@ describe('名片干员 seat cards (real server)', { skip: !ENABLED && 'set SP_E2
       await host.page.keyboard.type('斯卡蒂');
       await host.page.waitForFunction(() => document.querySelectorAll('.cardpick__op[data-char]:not([data-char=""])').length === 2);
       assert.deepEqual((await picker(host)).names.sort(), ['斯卡蒂', '浊心斯卡蒂'].sort());
-      await host.click('.cardpick__search input');
-      await host.page.keyboard.down('Control'); await host.page.keyboard.press('KeyA'); await host.page.keyboard.up('Control');
+      // (the field's text selected by the page, then deleted by a key: Ctrl+A only moves the caret on macOS)
+      await host.page.$eval('.cardpick__search input', (el) => { el.focus(); el.select(); });
       await host.page.keyboard.press('Backspace');
       await host.page.waitForFunction(() => document.querySelectorAll('.cardpick__op[data-char]:not([data-char=""])').length > 100);
       await host.click('.cardpick__stars button', '5★');
@@ -135,6 +161,30 @@ describe('名片干员 seat cards (real server)', { skip: !ENABLED && 'set SP_E2
       assert.equal(await host.page.evaluate(() => localStorage.getItem('sp.pref.room.card')), JSON.stringify(PICK));
       assert.equal(await guest.page.evaluate(() => globalThis.__SP__.store.get().room.seats.find((s) => s?.name === '凯尔希')?.card), PICK);
       await guest.shot('room-picked');
+
+      // outfits (decision 4): one's own card wears one's own at once; the teammate's page shows it once it has that
+      // appearance (room.skins → room.state seats[].skins), the default before, and with 「显示其他玩家的皮肤」 off
+      const SKIN = `${PICK}@e2e#1`;
+      const plain = (await seatNamed(guest, '凯尔希')).art;
+      const outfit = await addOutfit(host, PICK, SKIN);
+      assert.notEqual(outfit, plain);
+      await host.page.evaluate(async (id, skin) => (await import('/js/ui/skins.js')).setSkin(id, skin), PICK, SKIN);
+      await waitArt(host, '凯尔希', outfit, 'one\'s own card wears one\'s outfit');
+      await guest.page.waitForFunction((id, skin) => globalThis.__SP__.store.get().room.seats.find((s) => s?.name === '凯尔希')?.skins?.[id] === skin,
+        { timeout: 10000 }, PICK, SKIN);
+      assert.equal((await seatNamed(guest, '凯尔希')).art, plain, 'an outfit this page has no appearance for: the default art');
+      assert.equal(await addOutfit(guest, PICK, SKIN), outfit);
+      await waitArt(guest, '凯尔希', outfit, 'the teammate sees the outfit');
+      await guest.shot('room-outfit');
+      const otherSkins = (on) => guest.page.evaluate(async (on) => (await import('/js/ui/settingsStore.js')).settingsStore.set({ otherSkins: on }), on);
+      await otherSkins(false);
+      await waitArt(guest, '凯尔希', plain, '显示其他玩家的皮肤 off');
+      assert.equal((await seatNamed(host, '凯尔希')).art, outfit, 'the switch is the guest\'s alone');
+      await otherSkins(true);
+      await waitArt(guest, '凯尔希', outfit, '显示其他玩家的皮肤 on again');
+      await host.page.evaluate(async (id) => (await import('/js/ui/skins.js')).clearSkin(id), PICK);
+      await waitArt(guest, '凯尔希', plain, 'the outfit taken off');
+      assert.equal(await guest.page.evaluate(() => 'skins' in globalThis.__SP__.store.get().room.seats.find((s) => s?.name === '凯尔希')), false);
 
       // reopening: the pick is the choice; Esc closes the picker and gives the focus back to 更换立绘
       await host.click('[data-testid="seat-card-pick"]');

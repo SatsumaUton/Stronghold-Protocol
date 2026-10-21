@@ -33,14 +33,16 @@ import { MatchInfoDialog, matchInfoModel } from '../ui/matchInfo.js';
 import { MatchEnemies } from '../ui/matchEnemies.js';
 import { actions, act } from '../ui/gameActions.js';
 import { normalizeDraft, sortedPlayers } from '../ui/gameLogic.js';
-import { useStore, loadPref } from '../store.js';
+import { useStore } from '../store.js';
 import { data } from '../data.js';
 import { audio } from '../audio.js';
 import { TurnBanner } from '../ui/turnBanner.js';
 import { onBootArt } from '../ui/protocolBoot.js';
 import { reducedMotion } from '../ui/device.js';
 import { useRise } from '../ui/transitions.js';
-import { CARD_PREF, cardOperators, cardContext, seatOperator } from '../ui/seatArt.js';
+import { CARD_KEY, cardStore, cardOperators, cardContext, seatOperator, seatCardSkin } from '../ui/seatArt.js';
+import { skinsStore, SKINS_KEY } from '../ui/skins.js';
+import { settingsStore } from '../ui/settingsStore.js';
 import { chessPortraitUrl, uiUrl } from '../ui/assetUrls.js';
 import { aggregateStats, peekStatsRecords, trophyMedalOf } from '../ui/stats.js';
 import { modeOffBonds, bandOffBonds, bandOffLine } from '../ui/gameLogic.js';
@@ -324,14 +326,18 @@ export function BandDraftScreen({ held = null } = {}) {
   const infoStatus = infoOpen ? draftInfoStatus({ myPick, pickName: myPick ? gd.band(myPick)?.name : null, myTurn, turnName, secs: turnSecs,
     waiting: !solo && !draft.done }) : null;
 
-  // 名片干员 art of the order rows (as on the room's seat cards: the doctor's pick, else one chosen by the player id)
+  // 名片干员 art of the order rows (as on the room's seat cards: the doctor's pick, else one chosen by the player id), in
+  // the doctor's outfit (ui/seatArt.js seatCardSkin: one's own choice, a teammate's from the match's public players)
   const cards = useMemo(() => cardContext(cardOperators(gd.list('chess'))), [gd.ready]);
-  const myCard = useMemo(() => { const v = loadPref(CARD_PREF, ''); return typeof v === 'string' ? v : ''; }, []);
+  const myCard = useStore((s) => s[CARD_KEY], Object.is, cardStore);
+  const localSkins = useStore((s) => s[SKINS_KEY], Object.is, skinsStore);
+  const otherSkins = useStore((s) => s.otherSkins !== false, Object.is, settingsStore);
   const artOf = (p) => {
     if (p.isBot) return null;
     const seat = (Array.isArray(roomSeats) && roomSeats.find((x) => x && x.playerId === p.playerId)) || { playerId: p.playerId };
     const op = seatOperator(seat, cards, { myId, myCard });
-    return op ? chessPortraitUrl(data.get('assets'), op.chess) : null;
+    const skin = op ? seatCardSkin(p, op.chess.charId, { myId, localSkins, players, otherSkins }) : null;
+    return op ? chessPortraitUrl(data.get('assets'), op.chess, { skin }) : null;
   };
   const local = useMemo(localRecords, []);
   const myMedal = useMemo(() => {

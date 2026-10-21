@@ -1,9 +1,9 @@
 /* ==========================================================================================
-   screens/lobby.css — the hub (official entry backdrop, the emblem in its radar and the title, 统计数据 / 密钥加入 /
+   screens/lobby.css — the hub (official entry backdrop, the emblem in its radar and the title, 成就统计 / 密钥加入 /
    作战提示 at the left, the light S.W.E.E.P.报告 / 干员调配 plates at the right, the 独立模拟 / 同盟模拟 entries at the
    bottom right), and the two full-screen dialogs (the project's Modal): 选择模拟协议 (official picture, difficulty cards
-   with the 已选定 stamp, 开始独立模拟 / 创建同盟) and 选择同盟方式 (radar, 创建同盟 and 加入同盟 cards).
-   Text follows 文字大小 (calc(k * var(--t))).
+   with the 已选定 stamp, 开始独立模拟 — or the room's 确认 / read-only view) and 选择同盟方式 (radar, 创建同盟 and 加入同盟
+   cards). Text follows 文字大小 (calc(k * var(--t))).
    ========================================================================================== */
 
 /* ---- hub backdrop ------------------------------------------------------------------------------------- */
@@ -17,7 +17,8 @@
     radial-gradient(55% 60% at 50% 48%, rgba(96, 170, 186, .14), transparent 72%),
     linear-gradient(180deg, #08100f, #040606 82%);
 }
-/* the official layers are drawn on black: `screen` keeps only their light */
+/* the official layers are drawn on black: `screen` keeps only their light. Their place, size and opacity below are
+   eyeballed from the event video [ASSUMED: no official layout data] */
 .hub-bg__glow, .hub-bg__ship { position: absolute; left: 50%; height: auto; transform: translate(-50%, -50%); mix-blend-mode: screen; }
 .hub-bg__glow { top: 46%; width: 9.6rem; opacity: .2; }
 .hub-bg__ship { top: 54%; width: 13.4rem; opacity: .4; animation: hub-ship 18s ease-in-out infinite alternate; }
@@ -369,6 +370,9 @@
 .hub-plate__label, .lobby-hub .hub-plate .btn__label { font-weight: 900; letter-spacing: .04em; color: #111816; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hub-plate__tag { margin-left: auto; padding: .03rem .07rem; font-size: calc(.11 * var(--t)); font-weight: 700; letter-spacing: .12em; color: rgba(17, 24, 22, .6); border: 1px solid rgba(17, 24, 22, .28); white-space: nowrap; }
 .lobby-hub .hub-plate .lo-entry__n { margin-left: auto; }
+/* 成就统计 as a plate: only on short screens, where the left column with its card gives way (see the media block) */
+.lobby-hub .hub-plate--ach { display: none; }
+.hub-plate--ach .hub-plate__glyph svg { fill: currentColor; }
 
 /* ---- entries (独立模拟 / 同盟模拟), bottom right ----------------------------------------------------------- */
 .hub-entries { grid-area: entries; position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: flex-end; gap: var(--hub-gap); min-width: 0; }
@@ -556,7 +560,6 @@
 .ps-call line { stroke: currentColor; stroke-width: 1.5; stroke-opacity: .8; }
 .ps-call rect.ps-call__icon { fill: currentColor; fill-opacity: .25; }
 .ps-call__man { fill: currentColor; }
-.ps-call text { fill: currentColor; font-family: var(--font-num, monospace); font-weight: 700; letter-spacing: 2px; }
 .ps-call { animation: ps-fig 420ms var(--ease-out) 420ms backwards; }
 .ps-scan { stroke: currentColor; stroke-opacity: .2; stroke-width: 2; animation: ps-scan 7s linear infinite; }
 @keyframes ps-scan { from { transform: translateY(40px); } to { transform: translateY(620px); } }
@@ -608,6 +611,9 @@
   transition: transform 220ms var(--ease-out), border-color 220ms;
 }
 .pcard:hover:not(.is-on), .pcard:focus-visible:not(.is-on) { border-color: #7b7f81; }
+/* the room's read-only view (another doctor's: the host chooses): shown, not chosen */
+.pcard:disabled { cursor: default; }
+.pcard:disabled:hover:not(.is-on) { border-color: #55585a; }
 .pcard.is-on { transform: translateX(-.44rem); border-color: #8f9496; }
 .pcard__glow {
   position: absolute;
@@ -666,6 +672,8 @@
   .create-box__test em { font-size: 14px; }
 }
 .proto-hint { display: flex; align-items: center; gap: .08rem; min-height: .24rem; margin: 0; font-size: calc(.14 * var(--t)); color: #858b89; }
+.proto-hint .icon { flex: none; width: 1.1em; height: 1.1em; }
+.proto-hint--ro { min-height: max(.64rem, 38px); font-size: calc(.18 * var(--t)); color: #b9bfbd; }
 .proto-start {
   position: relative;
   display: flex;
@@ -806,11 +814,17 @@ button.ally-card:hover, button.ally-card:focus-visible { border-color: rgba(93, 
   border: 0;
 }
 .ally-card__bar small { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: calc(.14 * var(--t)); font-weight: 700; letter-spacing: 0; color: rgba(8, 34, 27, .75); }
+button.ally-card:disabled { cursor: default; }
+button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8); }
+/* the test-room box under 创建同盟 (test mode only) */
+.ally-test { padding: 0 .2rem; }
 .ally-card__bar--join { width: 100%; color: #2a1404; background: linear-gradient(180deg, #ffb24f, #f08a26); }
 .ally-card__bar--join:disabled { filter: grayscale(.6) brightness(.75); cursor: default; }
 .ally-card__bar--join:hover:not(:disabled), .ally-card__bar--join:focus-visible { filter: brightness(1.06); }
 .ally-card__icon { flex: none; display: grid; place-items: center; width: max(.36rem, 22px); height: max(.36rem, 22px); color: currentColor; background: rgba(0, 0, 0, .14); border: 2px solid currentColor; border-radius: 4px; }
 .ally-card__icon .icon { width: 74%; height: 74%; }
+/* the key field: the project's TextField (.field / .field__box / .field__input) restyled as the event's grey bar, with
+   观战 beside it inside the same bar */
 .ally-key {
   display: flex;
   align-items: center;
@@ -823,7 +837,11 @@ button.ally-card:hover, button.ally-card:focus-visible { border-color: rgba(93, 
   border-radius: .06rem;
 }
 .ally-key:focus-within { border-color: #ff9a3c; }
-.ally-key > .icon { flex: none; width: max(.24rem, 15px); height: max(.24rem, 15px); color: #c9cecc; }
+.ally-key .field { flex: 1 1 auto; height: 100%; gap: 0; }
+.ally-key .field__box { height: 100%; padding: 0; gap: .1rem; background: none; border: 0; box-shadow: none; }
+.ally-key .field__box::after { display: none; }
+.ally-key .field__icon { flex: none; width: max(.24rem, 15px); height: max(.24rem, 15px); color: #c9cecc; }
+.ally-key .field__box:focus-within .field__icon { color: #ff9a3c; }
 .ally-key input {
   flex: 1 1 auto;
   min-width: 0;
@@ -839,7 +857,7 @@ button.ally-card:hover, button.ally-card:focus-visible { border-color: rgba(93, 
   border: 0;
   outline: none;
 }
-.ally-key input::placeholder { color: #8d9391; font-weight: 500; letter-spacing: .04em; text-transform: none; }
+.ally-key input::placeholder { color: #8d9391; font-family: inherit; font-size: calc(.22 * var(--t)); font-weight: 500; letter-spacing: .04em; text-transform: none; }
 .ally-key__spec {
   flex: none;
   display: inline-flex;
@@ -898,6 +916,7 @@ button.ally-card:hover, button.ally-card:focus-visible { border-color: rgba(93, 
   .hub-center__title { font-size: calc(.46 * var(--t)); }
   .hub-right { padding-top: .1rem; }
   .lobby-hub .hub-plate { height: max(.7rem, 40px); }
+  .lobby-hub .hub-plate--ach { display: flex; }
   .hub-entry { height: max(1.1rem, 64px); padding: .1rem .14rem; }
 
   .proto-top { padding-top: 8px; }

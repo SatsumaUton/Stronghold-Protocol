@@ -5,8 +5,9 @@
 // per-browser not-owned list of the 干员持有 tab (`notOwned`, likewise), the 自选编队 picks (`diy`, likewise; with
 // `diyKitted` = the operators the server lets a DIY slot field, from every `welcome`) and the overlay's screen state
 // (open / origin / tab / selection / filters). `installLoadoutSync()` / `installOwnershipSync()` / `installDiySync()` /
-// `installSkinsSync()` (called once by main.js) keep the server's copies current — one sync engine (installPrefSync),
-// four settings: after every `welcome` (new or resumed
+// `installSkinsSync()` / `installCardSync()` (called once by main.js) keep the server's copies current — one sync engine
+// (installPrefSync), five settings (the fifth, room.card — the 名片干员 of ui/seatArt.js —, is described at
+// installCardSync): after every `welcome` (new or resumed
 // session — the server keeps them on the session and on the seat, so joining a room needs no resend) and after every
 // edit (debounced; a pending edit goes out at once when the overlay closes), they send `room.loadout { entries, ops }`
 // (sanitised against the loaded data/chess.json: ui/loadoutModel.js sanitizeEntries — a stale entry is dropped, never
@@ -35,6 +36,7 @@ import { ruleOption } from '../../../shared/plugins/rules.js';
 import { OWNERSHIP_PREF, parseStoredOwnership, toStoredOwnership, cleanIds, sanitizeNotOwned } from './ownershipModel.js';
 import { DIY_PREF, parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks } from './diyModel.js';
 import { skinsStore, SKINS_KEY, SKINS_SYNC_KEY, parseStoredSkins } from './skins.js';
+import { cardStore, CARD_KEY, CARD_SYNC_KEY, cardOperators } from './seatArt.js';
 import { toast } from './toasts.js';
 import { t, N_ } from '../../../shared/i18n.js';
 
@@ -233,7 +235,7 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
           // the server stored it for the next match; the running one keeps what it took
           lastSent = json;
           setState('locked');
-          if (wasEdit) tell(lockedText);
+          if (wasEdit && lockedText) tell(lockedText);
         } else if (code === 'RATE' || code === 'TIMEOUT' || code === 'OFFLINE') { edited = edited || wasEdit; schedule(RETRY_MS); }
         else { console.warn(`[${tag}] ${msgType} refused`, code, err && err.detail); setState('error'); }
       }
@@ -355,6 +357,32 @@ export function installSkinsSync({ net, timers, target = skinsStore, notify } = 
     net, timers, target, notify, key: SKINS_KEY, stateKey: SKINS_SYNC_KEY, msgType: 'room.skins', field: 'skins', tag: 'skins',
     lockedText: N_('这台服务器不接受皮肤选择，只有本机保存'),
     prepare: async () => parseStoredSkins(target.get()[SKINS_KEY]),
+  });
+}
+
+/**
+ * Wire the 名片干员 sync once (PR #643 split 6, ui/seatArt.js): `room.card { charId }` after every welcome, every pick
+ * and whenever the room's content set arrives or goes — the server keeps it on the session, so it follows the player
+ * into every room (server/lobby.js card / humanSeat), and the room sees it as room.state seats[].card. A pick the data
+ * shown now does not list (a plugin operator, the room left) goes out as '' (默认), as one's own card draws it; the pref
+ * keeps it. The engine retries RATE / TIMEOUT / OFFLINE (review fix of PR #813: the room's own effect gave up after
+ * them, so teammates kept the old card); BAD_MSG is final ('error', logged).
+ * @param {{ net: any, timers?: { setTimeout: Function, clearTimeout: Function }, target?: ReturnType<typeof createStore>,
+ *   getChessReady?: () => Promise<any>, listChess?: () => any[], notify?: (text: string) => void, content?: any }} deps
+ */
+export function installCardSync({ net, timers, target = cardStore, getChessReady, listChess, notify, content = appContentSet } = {}) {
+  const ready = getChessReady || (() => data.load('chess'));
+  const list = listChess || (() => data.list('chess'));
+  return installPrefSync({
+    net, timers, target, notify, key: CARD_KEY, stateKey: CARD_SYNC_KEY, msgType: 'room.card', field: null, tag: 'card',
+    lockedText: null, // room.card has no phase gate: never WRONG_PHASE / ROOM_STARTED
+    content,
+    async prepare() {
+      const want = target.get()[CARD_KEY];
+      if (!want) return { charId: '' };
+      if (await ready() == null) return null;
+      return { charId: cardOperators(list()).some((c) => c.charId === want) ? want : '' };
+    },
   });
 }
 

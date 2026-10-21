@@ -1,9 +1,11 @@
-// 选择模拟协议's left picture (PR #643, the event's screen after 独立模拟 — video 5:00–5:16): the official Rhodes Island
-// (`modeChoice/<difficulty>_rhodes_island`, already in the difficulty's colour) on an isometric survey grid, two squares
-// of defenders beside it (the harder the difficulty, the more), the cable from the top with a light running down it and
-// the callout — drawn in the selected difficulty's colour (`currentColor`, set by the caller through --d-color). Without
-// the art pack (or when the picture fails) the PR's own stepped wireframe hull stands in. Choosing another difficulty
-// remounts it (key): it comes up from dark in the new colour.
+// 选择模拟协议's left picture (PR #643 / PR #812, after the event's screen — video 5:00–5:16). Official: only the
+// picture, `modeChoice/<difficulty>_rhodes_island` (the Rhodes Island ship and its crane, already in the difficulty's
+// colour; research 06 §3.3 records no more than "a gold hologram"). Everything around it is an original drawing
+// [ASSUMED: no official source]: the isometric survey grid, the two squares of defenders beside the ship (more of them
+// the harder the difficulty — decoration, not a game number), the cable from the top with a light running down it, and
+// the callout. All of it is drawn in the selected difficulty's colour (`currentColor`, set by the caller through
+// --d-color). Without the art pack (or when the picture fails) the PR's own stepped wireframe hull stands in. Choosing
+// another difficulty remounts it (key): it comes up from dark in the new colour.
 import { html } from './components.js';
 import { useState } from '../../vendor/hooks.module.js';
 
@@ -43,8 +45,9 @@ const PADS = [
   { from: [3, -13], to: [19, -3.5] },
   { from: [12, 12], to: [30, 20.5] },
 ];
-/** With the official picture the front square sits clear of the ship, below its bow (as in the event's screen). */
+/** With the official picture the front square sits clear of the ship, below its bow [ASSUMED: placement eyeballed]. */
 const PADS_ART = [PADS[0], { from: [8, 20], to: [20, 29] }];
+/** Defenders drawn per difficulty [ASSUMED: decoration only — no game number; nothing on the screen shows it]. */
 const COUNT = { FUNNY: 10, NORMAL: 18, HARD: 26, ABYSS: 34 };
 const SPIKES = { FUNNY: 1, NORMAL: 3, HARD: 5, ABYSS: 7 };
 
@@ -133,7 +136,7 @@ export function ProtocolScene({ difficulty, art = null }) {
       <line x1=${callAt[0] + 40} y1=${callAt[1] + 16} x2=${callAt[0] + 86} y2=${callAt[1] + 16} />
       <line x1=${callAt[0] + 40} y1=${callAt[1] + 28} x2=${callAt[0] + 76} y2=${callAt[1] + 28} />
       <line x1=${callAt[0] + 40} y1=${callAt[1] + 40} x2=${callAt[0] + 82} y2=${callAt[1] + 40} />
-      <text x=${callAt[0] + 40} y=${callAt[1] + 60} font-size="11">DEF ${String(n).padStart(2, '0')}</text>
+      <line x1=${callAt[0] + 40} y1=${callAt[1] + 52} x2=${callAt[0] + 70} y2=${callAt[1] + 52} />
     </g>
     <line class="ps-scan" x1="0" y1="0" x2="1000" y2="0" />
   </svg>`;

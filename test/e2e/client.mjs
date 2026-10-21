@@ -356,6 +356,28 @@ export class Client {
     return file;
   }
 
+  /**
+   * Lobby → a new co-op room: 同盟模拟 → 选择同盟方式 → 创建同盟 creates it at once (the event's 联合模拟; the remembered
+   * difficulty, 标准 in a fresh browser) → with `difficulty` (a difficulty name, e.g. '险境模拟'), the host changes it in the
+   * room: the difficulty pill → 选择模拟协议 → 确认. Resolves with the room state.
+   */
+  async createCoop(difficulty = null) {
+    await this.click('.mode-card', '同盟模拟');
+    await this.click('[data-testid="alliance-create"]');
+    const room = (await this.waitFor((s) => !!s.room?.code, 'room created')).room;
+    if (difficulty) await this.roomDifficulty(difficulty);
+    return room;
+  }
+
+  /** The host changes the room's difficulty in the room (the pill → 选择模拟协议 → 确认; `name` e.g. '绝境模拟'). */
+  async roomDifficulty(name) {
+    await this.click('.rs-pill__diff');
+    await this.click('.modal__box.proto .diff-card', name);
+    await this.click('.modal__box.proto .proto-start', '确认');
+    await this.page.waitForFunction(() => !document.querySelector('.modal__box.proto'), { timeout: 10000 });
+    await this.page.waitForFunction((n) => document.querySelector('.rs-pill__diff')?.textContent.includes(n), { timeout: 10000 }, name);
+  }
+
   /** Title → lobby with a callsign. */
   async enter(name) {
     await this.page.waitForSelector('.title-login input', { timeout: 20000 });

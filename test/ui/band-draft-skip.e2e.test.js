@@ -87,8 +87,8 @@ describe('strategy skip eligibility (real server, normal browser operations)', {
     const clients = [await player('轮选测试1')];
     const host = clients[0].page;
     await click(host, '.mode-card', mode === 'solo' ? '独立模拟' : '同盟模拟');
-    if (mode !== 'solo') await click(host, '[data-testid="alliance-create"]');
-    await click(host, '.create-box button', mode === 'solo' ? '开始独立模拟' : '创建同盟');
+    // 独立模拟 → 选择模拟协议 → 开始独立模拟; 创建同盟 creates the co-op room at once
+    await click(host, ...(mode === 'solo' ? ['.create-box button', '开始独立模拟'] : ['[data-testid="alliance-create"]']));
     await host.waitForFunction(() => !!globalThis.__SP__.store.get().room?.code);
     const code = (await state(host)).code;
     for (let i = 1; i < humans; i++) {

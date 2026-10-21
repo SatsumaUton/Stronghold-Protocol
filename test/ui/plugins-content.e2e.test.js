@@ -42,11 +42,7 @@ describe('a room\'s content set in the browser (P1c)', { skip: !ENABLED && 'set 
     try {
       await host.open();
       await host.enter('凯尔希');
-      await host.click('.mode-card', '同盟模拟');
-      await host.click('[data-testid="alliance-create"]');
-      await host.click('.diff-card', '标准模拟');
-      await host.click('.create-box button', '创建同盟');
-      const code = (await host.waitFor((s) => !!s.room?.code, 'room created')).room.code;
+      const { code } = await host.createCoop();
       await guest.open();
       await guest.enter('阿米娅');
       await guest.click('.mode-card', '同盟模拟');

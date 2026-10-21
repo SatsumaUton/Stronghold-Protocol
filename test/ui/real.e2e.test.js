@@ -479,11 +479,14 @@ describe('real server + real browsers', { skip: !ENABLED && 'set SP_REAL_E2E=1 (
       // ---- lobby & room --------------------------------------------------------------------------------------------
       await host.open();
       await host.enter('凯尔希');
+      // 创建同盟 creates the room at once (标准 in a fresh browser); the host changes the difficulty in the room
       await host.click('.mode-card', '同盟模拟');
       await host.click('[data-testid="alliance-create"]');
-      await host.click('.diff-card', '险境模拟');
-      await host.click('.create-box button', '创建同盟');
       const room = (await host.waitFor((s) => !!s.room?.code, 'room created')).room;
+      await host.click('.rs-pill__diff');
+      await host.click('.modal__box.proto .diff-card', '险境模拟');
+      await host.click('.modal__box.proto .proto-start', '确认');
+      await host.page.waitForFunction(() => globalThis.__SP__.store.get().room?.difficulty === 'NORMAL' && !document.querySelector('.modal__box.proto'), { timeout: 10000 });
       await host.click('button', '添加 AI 队友');
       await guest.open(`?room=${room.code}`);
       await guest.enter('阿米娅');
