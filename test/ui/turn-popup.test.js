@@ -1,6 +1,7 @@
 // 「轮到你选」 (ui/turnPopup.js, css/screens/game-panels.css .sptp): the official effectChoose sprites it draws, the
-// wiring in screens/game.js (the shared draft's own turn, with the 轮到你 sound, once the art is in, never with reduced
-// motion) and the stylesheet's rules. In a browser: test/ui/turn-popup.e2e.test.js.
+// wiring in screens/game.js (the shared draft's own turn and a solo draft as it opens — the maintainer's decision of
+// 2026-10-22 —, with the 轮到你 sound, once the art is in, never with reduced motion) and the stylesheet's rules. In a
+// browser: test/ui/turn-popup.e2e.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -23,9 +24,15 @@ test('the official effectChoose sprites, all in the asset list; no drawn stand-i
   assert.equal(P.TURN_POPUP_MS, 1200);
 });
 
-test('screens/game.js: the disc on the shared draft\'s own turn, with the 轮到你 sound, once the art is in, never with reduced motion', () => {
+test('screens/game.js: the disc on the shared draft\'s own turn and in solo (the maintainer, 2026-10-22), with the 轮到你 sound, once the art is in, never with reduced motion', () => {
   const g = read('public/js/screens/game.js');
-  assert.match(g, /const spMine = !!sp && !solo && sp\.turnPid === myId && !sp\.pickOf\.has\(myId\);/);
+  // (solo: the draft is the player's from its start — the same test as the timer ticks' myPick)
+  assert.match(g, /const spMine = !!sp && \(solo \|\| sp\.turnPid === myId\) && !sp\.pickOf\.has\(myId\);/);
+  assert.match(g, /const myPick = sp && \(solo \|\| sp\.turnPid === myId\) && !sp\.pickOf\.has\(myId\);/);
+  assert.doesNotMatch(g, /!!sp && !solo/, 'no co-op-only disc');
+  const tp = read('public/js/ui/turnPopup.js');
+  assert.doesNotMatch(tp, /a shared draft only/);
+  assert.match(tp, /\[ASSUMED\] for solo/);
   assert.match(g, /useEffect\(\(\) => \{ preloadTurnPopupArt\(\); \}, \[\]\);/);
   assert.match(g, /if \(!spMine\) return;\n\s+audio\.sfx\('yourTurn'\);\n\s+if \(turnPopupArtReady\(\) && !reducedMotion\(\)\) setTurnPop\(\(n\) => n \+ 1\);/);
   assert.match(g, /<\$\{TurnPopup\} key=\$\{turnPop\} onDone=\$\{\(\) => setTurnPop\(0\)\} \/>/);

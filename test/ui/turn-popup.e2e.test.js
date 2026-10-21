@@ -2,7 +2,8 @@
 //   SP_E2E=1 CHROME_PATH=… node --test test/ui/turn-popup.e2e.test.js
 //
 // Through the dev mock's shared 机变 draft: the pick goes to p4, then back to me (p1) — the disc with the official cube
-// shows and leaves; none without the art pack, in a solo draft or with reduced motion. Static counterpart:
+// shows and leaves; a solo draft shows it (with the 轮到你 sound) as it opens, the same as co-op (the maintainer's
+// decision of 2026-10-22); none without the art pack or with reduced motion. Static counterpart:
 // test/ui/turn-popup.test.js.
 
 import { test, describe, before, after } from 'node:test';
@@ -93,11 +94,30 @@ describe('轮到你选 disc (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=
     await context.close();
   });
 
-  test('a solo draft: no disc', async () => {
+  test('a solo draft: the disc and the 轮到你 sound as it opens, the same as co-op (the maintainer, 2026-10-22)', async () => {
     const { page, problems, context } = await open({ variant: 'solo' });
-    await myTurnAgain(page);
+    await page.evaluate(async () => {
+      const { audio } = await import('/js/audio.js');
+      globalThis.__sfx = [];
+      const sfx = audio.sfx.bind(audio);
+      audio.sfx = (name, ...rest) => { globalThis.__sfx.push(name); return sfx(name, ...rest); };
+    });
+    // a solo turn has no turn order: the next 机变 draft opens (the phase leaves SP_DRAFT, then comes back)
+    await page.evaluate(async () => {
+      const M = globalThis.__MOCK__;
+      M.mutate((s) => { s.pub.phase = 'PREP'; }); M.pushPublic();
+      await new Promise((r) => setTimeout(r, 300));
+      M.mutate((s) => { s.pub.phase = 'SP_DRAFT'; }); M.pushPublic();
+    });
+    await page.waitForSelector('[data-testid="turn-popup"]', { timeout: 3000 });
+    assert.equal(await page.$eval('[data-testid="turn-popup"] .sptp__text', (e) => e.textContent), '轮到你选');
+    assert.ok((await page.evaluate(() => globalThis.__sfx)).includes('yourTurn'), 'the 轮到你 sound in solo too');
+    await page.waitForFunction(() => !document.querySelector('[data-testid="turn-popup"]'), { timeout: 3000 });
+    // a pick ends it: the next draft's disc comes with the next draft only
+    await page.evaluate(() => { globalThis.__sfx.length = 0; globalThis.__MOCK__.mutate((s) => { s.pub.sp.picks = { p1: 0 }; }); globalThis.__MOCK__.pushPublic(); });
     await sleep(500);
     assert.equal(await page.$('[data-testid="turn-popup"]'), null);
+    assert.deepEqual(await page.evaluate(() => globalThis.__sfx.filter((n) => n === 'yourTurn')), []);
     assert.deepEqual(problems, []);
     await context.close();
   });

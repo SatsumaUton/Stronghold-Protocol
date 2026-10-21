@@ -2,9 +2,11 @@
 // 10:07.7–10:08.9), drawn with the official effectChoose/* sprites: the dark disc (bg_circle) inside two teal rings, the
 // winking cube (square_1) with its spark (square_2), 轮到你选 under it on the STRONGHOLD PROTOCOL bar (bottom) and the four
 // crosses (plus). It pops in (≈ 0.2 s), holds and fades (≈ 1.2 s in all); pointer-events none — the cards stay usable.
-// screens/game.js shows it with the 轮到你 sound (a shared draft only), once the sprites are in (turnPopupArtReady);
-// never with prefers-reduced-motion — the draft's header says 当前轮到你决策. Styles: css/screens/game-panels.css
-// (.sptp). [ASSUMED] the sizes and the timing, measured frame by frame from that footage; the rings are plain CSS circles.
+// screens/game.js shows it with the 轮到你 sound on a shared draft's own turn and as a solo (独立模拟) draft opens — the
+// maintainer's decision of 2026-10-22 (decision 7 of 2026-10-21 extended: as the strategy draft's 请选择策略 band;
+// [ASSUMED] for solo, the footage shows a co-op draft) —, once the sprites are in (turnPopupArtReady); never with
+// prefers-reduced-motion — the draft's header says 当前轮到你决策. Styles: css/screens/game-panels.css (.sptp).
+// [ASSUMED] the sizes and the timing, measured frame by frame from that footage; the rings are plain CSS circles.
 import { useEffect } from '../../vendor/hooks.module.js';
 import { html } from './components.js';
 import { uiUrl } from './assetUrls.js';
