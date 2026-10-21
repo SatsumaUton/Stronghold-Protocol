@@ -740,7 +740,6 @@
 .lo-info:hover { border-color: var(--mint-500); color: var(--mint-400); }
 .lo-info .icon { width: 56%; height: 56%; }
 .lo-top__note { margin: 0; max-width: 8.4rem; font-size: max(calc(.15 * var(--t)), 10px); color: var(--text-lo); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lo-top__note.is-locked { color: var(--amber); }
 .lo-tbtn { position: relative; display: inline-flex; align-items: center; gap: .06rem; height: max(.4rem, 28px); padding: 0 max(.14rem, 8px);
   font: inherit; font-size: max(calc(.15 * var(--t)), 11px); font-weight: 700; color: var(--text-md); background: rgba(255, 255, 255, .04);
   border: 1px solid var(--line-2); cursor: pointer; white-space: nowrap; }

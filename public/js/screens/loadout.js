@@ -987,10 +987,12 @@ function LoadoutScreen({ st }) {
 
   const deck = view === 'deck';
   const lockedText = t('本局的调配已锁定（确认本局信息后无法修改），修改将在下一局生效');
-  // the card view's top-bar note (cut short on narrow screens: its title holds it whole; the lock also rides the bottom bar)
+  // the card view's top-bar note (cut short on narrow screens: its title holds it whole). A locked loadout is said once
+  // in the card view: the bottom bar's chip, which every width and 快速配置 keep on screen — not again in this note, the
+  // sync chip beside it or the drawer's detail (§35.18's leftover: three times on a wide screen)
   const deckNote = quick === 'cult' ? t('潜能与练度按干员保存，普通、精锐形态与自选共用')
-    : quick ? t('快速编辑：展示干员精锐形态的技能与模组，改动即时保存') : locked ? lockedText : fromText;
-  const loadoutDetail = html`<${Detail} m=${m} chess=${base} golden=${golden} entries=${st.entries} ops=${st.ops} onChange=${change} onOps=${setOpsOf} onReset=${resetOne} locked=${locked}
+    : quick ? t('快速编辑：展示干员精锐形态的技能与模组，改动即时保存') : locked ? null : fromText;
+  const loadoutDetail = html`<${Detail} m=${m} chess=${base} golden=${golden} entries=${st.entries} ops=${st.ops} onChange=${change} onOps=${setOpsOf} onReset=${resetOne} locked=${locked && !deck}
     level=${golden ? previewLevel : 'normal'} onLevel=${setPreviewLevel}
     notOwned=${!!base && (st.notOwned || []).includes(base.chessId)} />`;
 
@@ -1006,7 +1008,7 @@ function LoadoutScreen({ st }) {
       </div>
       ${deck ? html`<div class="lo-top__center">
         ${tab === 'loadout' ? html`<${MicroLabel} tone="mint">${quick ? 'QUICK ASSEMBLE' : 'OPERATOR LOADOUT'}<//>
-          <p class=${cx('lo-top__note', !quick && locked && 'is-locked')} title=${deckNote}>${deckNote}</p>`
+          ${deckNote ? html`<p class="lo-top__note" title=${deckNote}>${deckNote}</p>` : null}`
         : html`<${MicroLabel} tone="mint">${tab === 'ownership' ? 'OPERATOR ROSTER' : 'SELF-SELECT SQUAD'}<//>
           <h2 class="lo-top__title">${tab === 'ownership' ? t('干员持有') : t('自选编队')}</h2>`}
       </div>` : html`<div class="lo-top__center">
@@ -1039,7 +1041,7 @@ function LoadoutScreen({ st }) {
             ${[['skill', t('技能')], ['module', t('模组')], ['cult', `${t('潜能')} · ${t('练度')}`]].map(([k, l]) => html`<button key=${k} type="button" role="tab"
               data-quick=${k} aria-selected=${quick === k ? 'true' : 'false'} class=${cx(quick === k && 'is-on')} onClick=${() => setQuick(k)}>${l}</button>`)}
           </div>`
-        : html`${syncText ? html`<span class=${cx('lo-sync', syncCls)} role="status">${t(syncText)}</span>` : null}
+        : html`${syncText && st.sync !== 'locked' ? html`<span class=${cx('lo-sync', syncCls)} role="status">${t(syncText)}</span>` : null}
           <span class="lo-count">${t('已调整')} <b class="num">${nChanged}</b><span class="num t-dim">/${roster.length}</span></span>
           <div class="lo-popwrap">
             <button type="button" class=${cx('lo-tbtn', 'lo-popbtn', (menu === 'filter' || nFilters) && 'is-on')} aria-expanded=${menu === 'filter' ? 'true' : 'false'}

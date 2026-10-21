@@ -6,8 +6,8 @@
 // the detail in the drawer, the same card again closes it → 快速配置: S1 on 隐现's card is stored like the list's quick
 // choice → Esc peels back 快速配置, the drawer, then the overlay → a tier jump scrolls the deck → leaving the tab (the
 // 甄选干员 card, 干员持有) closes 快速配置 and the drawer, so one Esc there closes the overlay → ⓘ 卡片视图说明 → 筛选 → 列表
-// goes back. Phone 844×390 (touch): the cards, the drawer over them, a locked loadout said in the bottom bar (with
-// 快速配置 too). The list at 844×390 keeps its own opening: lo-in, no 转场, nothing replayed by the detail toggle.
+// goes back; a locked loadout said once, in the bottom bar (not again in the top bar, its sync chip or the drawer). Phone
+// 844×390 (touch): the cards, the drawer over them, a locked loadout said in the bottom bar (with 快速配置 too). The list at 844×390 keeps its own opening: lo-in, no 转场, nothing replayed by the detail toggle.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/loadout-cards-*.png
 
 import { test, describe, before, after } from 'node:test';
@@ -175,6 +175,36 @@ describe('干员调配 卡片视图 (real server, headless Chrome)', { skip: !EN
       await page.click('.lo-back');
       await page.waitForSelector('[data-testid="loadout-deck"]', { visible: true });
       assert.equal(await page.$('[data-testid="loadout-drawer"]'), null);
+
+      // a locked loadout (the server's 'locked') is said once on a wide screen — the bottom bar's chip — not again in the
+      // top bar's note, its sync chip or the drawer's detail (§35.18's leftover: three times); with 快速配置 too
+      const lockSays = () => page.evaluate(() => [...document.querySelectorAll('.lo *')].filter((el) => {
+        if (![...el.childNodes].some((n) => n.nodeType === 3 && /锁定/.test(n.textContent))) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+      }).map((el) => (el.closest('[data-testid="loadout-deck-locked"]') ? 'chip' : el.closest('[class]')?.className || el.tagName)));
+      assert.deepEqual(await lockSays(), [], 'not locked: nothing said');
+      const unlockedNote = await page.$eval('.lo-top__note', (el) => el.textContent);
+      await page.evaluate(async () => { (await import('/js/ui/loadoutSync.js')).loadoutStore.set({ sync: 'locked' }); });
+      await page.waitForSelector('[data-testid="loadout-deck-locked"]', { visible: true, timeout: 5000 });
+      assert.deepEqual(await lockSays(), ['chip'], 'locked: once, in the bottom bar');
+      assert.equal(await page.$('.lo-top__note'), null, 'the top bar drops its note');
+      assert.ok(unlockedNote && !/锁定/.test(unlockedNote), unlockedNote);
+      assert.ok((await page.$eval('[data-testid="loadout-deck-locked"]', (el) => el.title)).includes('下一局生效'), 'the full notice in the chip\'s title');
+      await page.click(`.lo-op[data-chess="${INSIDE}"] .lo-op__pick`);
+      await page.waitForSelector('[data-testid="loadout-drawer"] .lo-detail .lo-skill', { visible: true });
+      assert.deepEqual(await lockSays(), ['chip'], 'the drawer adds no second notice');
+      await page.waitForFunction(() => !document.querySelector('.lo')?.getAnimations({ subtree: true })
+        .some((an) => an.playState === 'running' && an.effect?.getTiming().iterations !== Infinity), { timeout: 5000 });
+      await page.screenshot({ path: path.join(OUT, 'loadout-cards-locked.png') });
+      await page.click(`.lo-op[data-chess="${INSIDE}"] .lo-op__pick`);
+      await page.waitForSelector('[data-testid="loadout-drawer"]', { hidden: true });
+      await clickSel(page, '[data-testid="loadout-quick"]');
+      await page.waitForSelector('.lo-op__quick', { visible: true });
+      assert.deepEqual(await lockSays(), ['chip'], '快速配置: still once');
+      await escape(page);
+      await page.evaluate(async () => { (await import('/js/ui/loadoutSync.js')).loadoutStore.set({ sync: 'idle' }); });
+      await page.waitForSelector('[data-testid="loadout-deck-locked"]', { hidden: true, timeout: 5000 });
 
       // ⓘ 卡片视图说明 (not the official chapter's name), then 筛选 → 列表: back to the rows, stored
       await clickSel(page, '[data-testid="loadout-help"]');

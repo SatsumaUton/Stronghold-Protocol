@@ -183,6 +183,18 @@ test('the bottom bar says a locked loadout (its full text the title), with or wi
   }
 });
 
+test('the card view says a locked loadout once — the bottom bar\'s chip —, not in the top note, the sync chip or the drawer (§35.18)', () => {
+  const src = readFileSync(path.join(ROOT, 'public/js/screens/loadout.js'), 'utf8');
+  assert.match(src, /: quick \? t\('快速编辑：展示干员精锐形态的技能与模组，改动即时保存'\) : locked \? null : fromText;/, 'no lock text in the top note');
+  assert.match(src, /\$\{deckNote \? html`<p class="lo-top__note" title=\$\{deckNote\}>\$\{deckNote\}<\/p>` : null\}/);
+  assert.match(src, /onReset=\$\{resetOne\} locked=\$\{locked && !deck\}/, 'the drawer\'s detail adds no notice in the card view');
+  assert.match(src, /: html`\$\{syncText && st\.sync !== 'locked' \? html`<span class=\$\{cx\('lo-sync', syncCls\)\} role="status">/, 'nor the card view\'s sync chip');
+  assert.match(src, /locked=\$\{locked \? lockedText : null\} \/>`/, 'the bottom bar keeps it, its full text the title');
+  // the list view keeps its own note and the detail's
+  assert.match(src, /: html`<p class=\$\{cx\('lo-note', locked && 'is-locked'\)\}><\$\{Icon\} name="info" \/>\$\{locked \? lockedText : fromText\}<\/p>`\}/);
+  assert.doesNotMatch(readFileSync(path.join(ROOT, 'public/css/screens/loadout.css'), 'utf8'), /lo-top__note\.is-locked/);
+});
+
 test('the 转场 belong to the card view: the list keeps lo-in and its narrow-screen toggle replays nothing', () => {
   const css = readFileSync(path.join(ROOT, 'public/css/screens/loadout.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sel: m[1].trim(), body: m[2] }));
