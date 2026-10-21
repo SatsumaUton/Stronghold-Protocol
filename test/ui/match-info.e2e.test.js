@@ -17,6 +17,9 @@
 // 3. Solo 绝境 at 1000–1280 px: a special enemy's description shows in the tooltip on hover and on keyboard focus of its
 //    icon (the maintainer's decision of 2026-10-22; the icon's aria-describedby points at the same text); the dialog fits
 //    and scrolls at every width and closing it keeps the highlighted strategy.
+// 4. The dev mock's 确认本局信息 and 本局信息 dialog at 1440×900 (hover) and on phones 667×375 / 844×390 (long press): each
+//    special enemy's tooltip sits 8 px above or below its own icon, over it, inside the dialog and the screen, and covers
+//    nothing of the leader block (§35.18's leftover: in the dialog it was centred over the whole row, over the 战场 line).
 // Zero console errors / page errors / failed requests. Screenshots: test/e2e/out/match-info-*.png
 
 import { test, describe, before, after } from 'node:test';
@@ -554,5 +557,72 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
     assert.equal(await dialogOpen(a.page) || await dialogOpen(b.page), false, 'no dialog outlives the draft');
     await sleep(500);
     assert.deepEqual([...a.problems, ...b.problems], []);
+  });
+
+  test('the 特训敌人 tooltip at its own icon in both places (dev mock; desktop hover, phone long press)', { timeout: 180000 }, async () => {
+    const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ARGS, protocolTimeout: 90000 });
+    browsers.push(browser);
+    const views = { '1440x900': { width: 1440, height: 900, deviceScaleFactor: 1 }, '667x375': PHONE(667, 375), '844x390': PHONE(844, 390) };
+    for (const [view, viewport] of Object.entries(views)) {
+      const ctx = await browser.createBrowserContext();
+      const page = await ctx.newPage();
+      await page.setBypassServiceWorker(true);
+      await page.setViewport(viewport);
+      const problems = [];
+      page.on('console', (m) => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.location()?.url || '')) problems.push(`console: ${m.text()}`); });
+      page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
+      await page.evaluateOnNewDocument(() => { localStorage.setItem('sp.name', '凯尔希'); sessionStorage.setItem('sp.entered', '1'); });
+      for (const [phase, scope] of [['INFO_CHECK', '.brief__main'], ['BAND_DRAFT', '.minfo-dlg']]) {
+        await page.goto(`${base}/dev/game-mock.html?shot=1&render=fallback&phase=${phase}`, { waitUntil: 'networkidle0', timeout: 60000 });
+        if (phase === 'BAND_DRAFT') {
+          await page.waitForSelector('[data-testid="match-info-open"]', { visible: true, timeout: 20000 });
+          await page.waitForFunction(() => !document.querySelector('[data-testid="turn-banner"]'), { timeout: 8000 }).catch(() => {});
+          await sleep(300);
+          await page.$eval('[data-testid="match-info-open"]', (el) => el.click());
+          await page.waitForSelector('.minfo-dlg .brief-faction__icon', { visible: true, timeout: 8000 });
+        } else await page.waitForSelector('.brief__main .brief-faction__icon', { visible: true, timeout: 20000 });
+        await sleep(900);
+        const n = await page.$$eval(`${scope} .brief-faction__icon`, (els) => els.length);
+        assert.ok(n >= 2, `${view} ${phase}: the mock's special enemies (${n})`);
+        for (let i = 0; i < n; i++) {
+          const pt = await page.evaluate((scope, i) => {
+            const el = document.querySelectorAll(`${scope} .brief-faction__icon`)[i];
+            el.scrollIntoView({ block: 'center' });
+            const r = el.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+          }, scope, i);
+          await sleep(250);
+          if (viewport.hasTouch) { await page.touchscreen.touchStart(pt.x, pt.y); await sleep(700); } else await page.mouse.move(pt.x, pt.y);
+          await page.waitForSelector('.tooltip.is-shown', { visible: true, timeout: 3000 });
+          await sleep(200); // its fade-in
+          const at = await page.evaluate((scope, i) => {
+            const box = (el) => el.getBoundingClientRect();
+            const icon = box(document.querySelectorAll(`${scope} .brief-faction__icon`)[i]);
+            const tipEl = document.querySelector('.tooltip.is-shown');
+            const tip = box(tipEl);
+            const dlg = document.querySelector(scope).closest('.modal__box');
+            const area = dlg ? box(dlg) : { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+            const over = (a, b) => a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+            const lead = [...document.querySelectorAll(`${scope} .brief-boss, ${scope} .brief-boss__text > *`)].map(box);
+            const gap = tip.bottom <= icon.top + 0.5 ? icon.top - tip.bottom : tip.top >= icon.bottom - 0.5 ? tip.top - icon.bottom : -1;
+            return { text: tipEl.textContent, desc: document.getElementById(document.querySelectorAll(`${scope} .brief-faction__icon`)[i].getAttribute('aria-describedby'))?.textContent,
+              gap: Math.round(gap), overIcon: tip.left < icon.right && tip.right > icon.left, leader: lead.length,
+              inside: tip.left >= area.left - 0.5 && tip.right <= area.right + 0.5 && tip.top >= area.top - 0.5 && tip.bottom <= area.bottom + 0.5
+                && tip.left >= 0 && tip.top >= 0 && tip.right <= innerWidth && tip.bottom <= innerHeight,
+              coversLeader: lead.some((r) => over(tip, r)) };
+          }, scope, i);
+          const what = `${view} ${phase} #${i}: ${JSON.stringify(at)}`;
+          assert.equal(at.text, at.desc, what);
+          assert.ok(at.gap >= 6 && at.gap <= 12, `next to its icon — ${what}`);
+          assert.ok(at.overIcon && at.inside && at.leader >= 3, what);
+          assert.equal(at.coversLeader, false, `clear of the leader block — ${what}`);
+          if (i === 0) await shot(page, `faction-tip-${phase === 'BAND_DRAFT' ? 'dialog' : 'briefing'}-${view}`);
+          if (viewport.hasTouch) await page.touchscreen.touchEnd(); else await page.mouse.move(2, 2);
+          await page.waitForFunction(() => !document.querySelector('.tooltip.is-shown'), { timeout: 4000 });
+        }
+      }
+      assert.deepEqual(problems, [], view);
+      await ctx.close();
+    }
   });
 });

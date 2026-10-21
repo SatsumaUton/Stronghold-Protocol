@@ -538,20 +538,91 @@ export function DialogHost() {
 
 // ---- Tooltip -----------------------------------------------------------------------------------
 
-let tipState = null; // { id, content, aside, rect, placement, tipClass }
+let tipState = null; // { id, content, aside, rect, placement, tipClass, bounds, avoid }
 let tipSeq = 0;
 const tipListeners = new Set();
 const setTip = (s) => { tipState = s; for (const fn of [...tipListeners]) fn(); };
 
+/** @typedef {{ left: number, top: number, right: number, bottom: number, width: number, height: number }} TipRect */
+
+/**
+ * Where the tooltip box goes (TooltipLayer; pure). Without `bounds` / `avoid` (every tooltip but the 特训敌人's): the
+ * `placement` side of the anchor, flipped when it leaves the viewport, centred on the anchor and clamped into the
+ * viewport (8 px margin) — the rule as it always was. With them (ui/matchEnemies.js): the area is the viewport narrowed
+ * to `bounds` (a dialog's box) wherever the box still fits in it; a side is taken only when the box fits there, and only
+ * when it covers none of `avoid` (the leader block's text) — else it slides sideways past what it covers while still
+ * over the anchor, else the other side is tried; then the same in the whole viewport (out of the dialog rather than
+ * over the leader); when no side is clean, the side that fits (or the roomier one) covering the least of `avoid`.
+ * @param {TipRect} r the anchor's box
+ * @param {{ width: number, height: number }} b the tooltip box's size
+ * @param {{ placement?: 'top'|'bottom', vw: number, vh: number, m?: number, bounds?: TipRect|null, avoid?: TipRect[] }} o
+ * @returns {{ top: number, left: number, place: 'top'|'bottom' }}
+ */
+export function placeTooltip(r, b, { placement = 'top', vw, vh, m = 8, bounds = null, avoid = [] }) {
+  if (!bounds && !avoid.length) {
+    let place = placement;
+    let top = place === 'bottom' ? r.bottom + m : r.top - b.height - m;
+    if (place === 'top' && top < m) { place = 'bottom'; top = r.bottom + m; }
+    if (place === 'bottom' && top + b.height > vh - m) { place = 'top'; top = Math.max(m, r.top - b.height - m); }
+    let left = r.left + r.width / 2 - b.width / 2;
+    left = Math.max(m, Math.min(vw - b.width - m, left));
+    top = Math.max(m, Math.min(vh - b.height - m, top));
+    return { top: Math.round(top), left: Math.round(left), place };
+  }
+  const screen = { left: m, top: m, right: vw - m, bottom: vh - m };
+  const area = { ...screen };
+  if (bounds) {
+    const l = Math.max(area.left, bounds.left + m), rr = Math.min(area.right, bounds.right - m);
+    if (rr - l >= b.width) { area.left = l; area.right = rr; }
+    const tp = Math.max(area.top, bounds.top + m), bt = Math.min(area.bottom, bounds.bottom - m);
+    if (bt - tp >= b.height) { area.top = tp; area.bottom = bt; }
+  }
+  const hits = (x, y) => avoid.filter((a) => x < a.right && x + b.width > a.left && y < a.bottom && y + b.height > a.top);
+  const covered = (x, y) => avoid.reduce((sum, a) => sum
+    + Math.max(0, Math.min(x + b.width, a.right) - Math.max(x, a.left)) * Math.max(0, Math.min(y + b.height, a.bottom) - Math.max(y, a.top)), 0);
+  const out = (top, left, place) => ({ top: Math.round(top), left: Math.round(left), place });
+  const yOf = (place) => (place === 'top' ? r.top - b.height - m : r.bottom + m);
+  const fitsIn = (A, place) => yOf(place) >= A.top - 0.5 && yOf(place) + b.height <= A.bottom + 0.5;
+  const centreIn = (A) => Math.max(A.left, Math.min(A.right - b.width, r.left + r.width / 2 - b.width / 2));
+  const sides = placement === 'bottom' ? ['bottom', 'top'] : ['top', 'bottom'];
+  const clean = (A) => {
+    for (const place of sides) {
+      if (!fitsIn(A, place)) continue;
+      const top = yOf(place);
+      const x0 = centreIn(A);
+      const hit = hits(x0, top);
+      if (!hit.length) return out(top, x0, place);
+      // past the right edge of what it covers, or before its left edge — still over the anchor
+      for (const x of [Math.max(...hit.map((a) => a.right)) + m, Math.min(...hit.map((a) => a.left)) - m - b.width]) {
+        if (x < A.left || x + b.width > A.right || x >= r.right || x + b.width <= r.left) continue;
+        if (!hits(x, top).length) return out(top, x, place);
+      }
+    }
+    return null;
+  };
+  const found = clean(area) || (bounds ? clean(screen) : null);
+  if (found) return found;
+  const open = sides.filter((place) => fitsIn(area, place));
+  const tries = open.length ? open : [r.top - area.top >= area.bottom - r.bottom ? 'top' : 'bottom'];
+  const x0 = centreIn(area);
+  const best = tries.map((place) => ({ place, top: Math.max(area.top, Math.min(area.bottom - b.height, yOf(place))) }))
+    .reduce((a, c) => (covered(x0, c.top) < covered(x0, a.top) ? c : a));
+  return out(best.top, x0, best.place);
+}
+
 /**
  * Hover/focus tooltip around its children. Content renders in <TooltipLayer/> (fixed, viewport-clamped).
  * `aside`: a second section in the same clamped, scrollable box; stacked on narrow screens. `tipClass`: a class on the
- * tooltip box itself (`class` goes on the anchor around the children).
- * @param {{ text: any, aside?: any, placement?: 'top'|'bottom', delay?: number, block?: boolean, class?: string, tipClass?: string, children?: any }} props
+ * tooltip box itself (`class` goes on the anchor around the children). Where it points (placeTooltip): by default the
+ * whole anchor; `anchor` — a selector of the element inside it the box points at instead (a row's icon); `within` — a
+ * selector of an ancestor whose box bounds it too (a dialog); `avoid(anchorEl)` — the elements it must not cover.
+ * @param {{ text: any, aside?: any, placement?: 'top'|'bottom', delay?: number, block?: boolean, class?: string, tipClass?: string,
+ *   anchor?: string, within?: string, avoid?: (el: Element) => Iterable<Element>, children?: any }} props
  */
 const TOUCH_TIP_MS = 450;
 
-export function Tooltip({ text, aside = null, placement = 'top', delay = 120, block = false, class: cls, tipClass = null, children }) {
+export function Tooltip({ text, aside = null, placement = 'top', delay = 120, block = false, class: cls, tipClass = null,
+  anchor = null, within = null, avoid = null, children }) {
   const ref = useRef(null);
   const idRef = useRef(0);
   const timer = useRef(null);
@@ -568,7 +639,12 @@ export function Tooltip({ text, aside = null, placement = 'top', delay = 120, bl
       const el = ref.current;
       const content = textRef.current; // the text of the render current when the delay ends (a click may change it)
       if (!el || !el.isConnected || content == null || content === '') return;
-      setTip({ id: idRef.current, content, aside: asideRef.current, rect: el.getBoundingClientRect(), placement, tipClass,
+      const at = (anchor && el.querySelector(anchor)) || el;
+      const box = within ? el.closest(within) : null;
+      let keepOff;
+      try { keepOff = avoid ? [...avoid(el)].map((x) => x.getBoundingClientRect()).filter((x) => x.width > 0 && x.height > 0) : []; } catch { keepOff = []; }
+      setTip({ id: idRef.current, content, aside: asideRef.current, rect: at.getBoundingClientRect(), placement, tipClass,
+        bounds: box ? box.getBoundingClientRect() : null, avoid: keepOff,
         hold: () => clearTimeout(timer.current), hide });
     }, delay);
   };
@@ -637,19 +713,9 @@ export function TooltipLayer() {
   useLayoutEffect(() => {
     const el = boxRef.current;
     if (!tipState || !el) { if (pos) setPos(null); return; }
-    const r = tipState.rect;
     const b = el.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const m = 8;
-    let place = tipState.placement;
-    let top = place === 'bottom' ? r.bottom + m : r.top - b.height - m;
-    if (place === 'top' && top < m) { place = 'bottom'; top = r.bottom + m; }
-    if (place === 'bottom' && top + b.height > vh - m) { place = 'top'; top = Math.max(m, r.top - b.height - m); }
-    let left = r.left + r.width / 2 - b.width / 2;
-    left = Math.max(m, Math.min(vw - b.width - m, left));
-    top = Math.max(m, Math.min(vh - b.height - m, top));
-    const next = { top: Math.round(top), left: Math.round(left), place, id: tipState.id };
+    const next = { ...placeTooltip(tipState.rect, b, { placement: tipState.placement, vw: window.innerWidth, vh: window.innerHeight,
+      bounds: tipState.bounds, avoid: tipState.avoid || [] }), id: tipState.id };
     if (!pos || pos.top !== next.top || pos.left !== next.left || pos.id !== next.id || pos.place !== next.place) setPos(next);
   });
   if (!tipState) return null;

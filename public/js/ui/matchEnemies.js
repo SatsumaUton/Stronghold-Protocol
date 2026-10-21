@@ -5,7 +5,10 @@
 // The 特训敌人 description — the maintainer's decision of 2026-10-22 (decision 8 of 2026-10-21, variant (b), PR #828's):
 // the name under each icon, the description in a Tooltip on hover, keyboard focus (the icon is focusable) and a long press
 // (≥ 450 ms) on touch; for screen readers the icon names the type and points at the description (aria-describedby an
-// .sr-only copy). [ASSUMED] no official screenshot of INFO_CHECK's 特训敌人 is in the repo.
+// .sr-only copy). The tooltip points at the icon, not at the cell (in the dialog a cell is a whole row, and the box
+// centred over it sat far from the icon, over the 战场 line — §35.18's leftover): above it, or below when it does not
+// fit there or would cover the leader block (portrait and text), inside the dialog and the screen (components.js
+// placeTooltip). [ASSUMED] no official screenshot of INFO_CHECK's 特训敌人 is in the repo; the placement rule.
 // One copy for both screens: the briefing's .brief-sec--enemy (css/screens/briefing.css, scoped under .brief) and the
 // draft's 本局信息 dialog (screens/bandDraft.js → ui/matchInfo.js MatchInfoDialog; css/screens/draft.css .minfo-dlg
 // stacks the same markup into its narrower column).
@@ -24,9 +27,13 @@ import { t, tParts } from '../../../shared/i18n.js';
  */
 export const factionDescId = (scope, type) => `${scope}-fdesc-${String(type).replace(/[^A-Za-z0-9_-]/g, '_')}`;
 
+/** What a 特训敌人 tooltip keeps clear of: the leader block — the portrait with its tag, and each line of its text. */
+export const leaderBlockOf = (el) => el.closest('.brief-enemy')?.querySelectorAll('.brief-boss, .brief-boss__text > *') || [];
+
 /**
  * One 特训敌人 type: the round icon (focusable, named by the type, described by its text) and the name; the description
- * in the Tooltip (hover, keyboard focus, a long press on touch) and in an .sr-only copy. A plain function (called, not a
+ * in the Tooltip (hover, keyboard focus, a long press on touch — anywhere on the cell; the box points at the icon, inside
+ * the dialog when there is one, clear of the leader block) and in an .sr-only copy. A plain function (called, not a
  * component), so the markup sits in MatchEnemies' own tree.
  * @param {{ type: string, info: any, m: any, scope: string }} o
  */
@@ -34,7 +41,8 @@ function factionCell({ type, info, m, scope }) {
   const name = info?.name || type;
   const desc = info?.desc || '';
   const descId = desc ? factionDescId(scope, type) : undefined;
-  return html`<${Tooltip} key=${type} text=${desc || null} block=${true} class="brief-faction__tt" tipClass="brief-faction__tip">
+  return html`<${Tooltip} key=${type} text=${desc || null} block=${true} class="brief-faction__tt" tipClass="brief-faction__tip"
+      anchor=".brief-faction__icon" within=".modal__box" avoid=${leaderBlockOf}>
     <div class="brief-faction" data-faction=${type}>
       <span class="brief-faction__icon" tabindex="0" role="img" aria-label=${name} aria-describedby=${descId}><${Img} src=${factionIconUrl(m, info?.icon)} /></span>
       <span class="brief-faction__text"><b>${name}</b></span>

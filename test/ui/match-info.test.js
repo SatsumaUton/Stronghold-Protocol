@@ -25,9 +25,9 @@ globalThis.fetch = async (url) => {
 };
 
 const { matchInfoModel, MatchBondRow, MatchLegend, BannedOperators, MatchInfo, MatchInfoDialog } = await import('../../public/js/ui/matchInfo.js');
-const { MatchEnemies, factionDescId } = await import('../../public/js/ui/matchEnemies.js');
+const { MatchEnemies, factionDescId, leaderBlockOf } = await import('../../public/js/ui/matchEnemies.js');
 const { briefingBondTip } = await import('../../public/js/ui/gameLogic.js');
-const { BondDisc, Tooltip, Modal, Button } = await import('../../public/js/ui/components.js');
+const { BondDisc, Tooltip, Modal, Button, placeTooltip } = await import('../../public/js/ui/components.js');
 const { UnitThumb, Img, RichText, makeLookups } = await import('../../public/js/ui/gameComponents.js');
 const { enemyIconUrl, factionIconUrl } = await import('../../public/js/ui/assetUrls.js');
 const { setLang, setMessages } = await import('../../shared/i18n.js');
@@ -243,6 +243,58 @@ test('特训敌人 description in a tooltip only (the maintainer, 2026-10-22): h
     assert.doesNotMatch(css, /brief-faction__desc|brief-factions--|\.is-tip/, `${f}: no inline description, no variant rules`);
     assert.match(css, /\.brief-faction__icon:focus-visible \{/, `${f}: the focused icon is marked`);
   }
+});
+
+test('特训敌人 tooltip at its icon (§35.18 leftover): the cell keeps the triggers, the box points at the icon, inside the dialog, clear of the leader block', () => {
+  const pub = { bossId: null, stageId: null, lastRound: 14, factions: ['FLY', 'TIMES', 'SPECIAL'] };
+  const tips = [...walk(MatchEnemies({ pub, gd: makeLookups() }))].filter((v) => v.type === Tooltip);
+  assert.equal(tips.length, 3);
+  for (const tip of tips) {
+    assert.equal(tip.props.anchor, '.brief-faction__icon', 'the box points at the icon (in the dialog the cell is a whole row)');
+    assert.equal(tip.props.within, '.modal__box', 'inside the 本局信息 dialog (the briefing has none: the screen)');
+    assert.equal(tip.props.avoid, leaderBlockOf);
+    assert.ok([...walk(tip.props.children)].some((v) => hasClass(v, 'brief-faction')), 'hover / long press anywhere on the cell');
+  }
+  // the leader block: the portrait with its tag and every line of its text, in the same 本局遭遇敌方 block
+  const asked = [];
+  const scope = { querySelectorAll: (q) => { asked.push(q); return ['a', 'b']; } };
+  assert.deepEqual(leaderBlockOf({ closest: (q) => (q === '.brief-enemy' ? scope : null) }), ['a', 'b']);
+  assert.deepEqual(asked, ['.brief-boss, .brief-boss__text > *']);
+  assert.deepEqual([...leaderBlockOf({ closest: () => null })], []);
+
+  const R = (left, top, w, h) => ({ left, top, right: left + w, bottom: top + h, width: w, height: h });
+  const box = { width: 160, height: 30 };
+  // every other tooltip: the rule as it was — above and centred, flipped at the top edge, clamped into the viewport
+  assert.deepEqual(placeTooltip(R(300, 200, 40, 20), box, { vw: 800, vh: 600 }), { top: 162, left: 240, place: 'top' });
+  assert.deepEqual(placeTooltip(R(300, 10, 40, 20), box, { vw: 800, vh: 600 }), { top: 38, left: 240, place: 'bottom' });
+  assert.deepEqual(placeTooltip(R(2, 200, 40, 20), box, { vw: 800, vh: 600 }), { top: 162, left: 8, place: 'top' });
+  // the dialog's first row (667×375): above the icon is the 战场 line (the leader text spans the column) — below the
+  // icon, 8 px off it, and inside the dialog's box rather than at the screen's edge
+  const dlg = R(30, 10, 600, 350);
+  const icon = R(60, 180, 30, 30);
+  const leader = [R(40, 40, 70, 90), R(130, 40, 490, 30), R(130, 75, 490, 50), R(130, 140, 490, 20)];
+  assert.deepEqual(placeTooltip(icon, box, { vw: 667, vh: 375, bounds: dlg, avoid: leader }), { top: 218, left: 38, place: 'bottom' });
+  // the next row: above the icon covers only the row above — above it is
+  assert.deepEqual(placeTooltip(R(60, 225, 30, 30), box, { vw: 667, vh: 375, bounds: dlg, avoid: leader }), { top: 187, left: 38, place: 'top' });
+  // the briefing (desktop): the leader's name line ends left of the icon but under the centred box — the box slides right
+  // past it, still over the icon
+  const icon2 = R(400, 120, 50, 50);
+  assert.deepEqual(placeTooltip(icon2, box, { vw: 1440, vh: 900, avoid: [R(150, 95, 270, 30)] }), { top: 82, left: 428, place: 'top' });
+  // kept inside the dialog: an icon at its right edge
+  assert.deepEqual(placeTooltip(R(590, 200, 30, 30), box, { vw: 1440, vh: 900, bounds: dlg, avoid: leader }), { top: 162, left: 462, place: 'top' });
+  // no side clean inside the dialog (it ends under the row): out of the dialog, on the screen, rather than over the leader
+  const short = R(30, 10, 600, 240);
+  assert.deepEqual(placeTooltip(icon, box, { vw: 667, vh: 375, bounds: short, avoid: leader }), { top: 218, left: 8, place: 'bottom' });
+  // nor on the screen: the side that fits, covering what it must (the least of the leader block)
+  assert.deepEqual(placeTooltip(icon, box, { vw: 667, vh: 240, bounds: short, avoid: leader }), { top: 142, left: 38, place: 'top' });
+  // a dialog narrower than the box: the viewport bounds it instead
+  assert.equal(placeTooltip(R(100, 200, 30, 30), box, { vw: 800, vh: 600, bounds: R(90, 100, 120, 300) }).left, 35);
+  // the components.js wiring: the anchor, the dialog's box and the leader rects are read when the tip opens
+  const c = read('public/js/ui/components.js');
+  assert.match(c, /const at = \(anchor && el\.querySelector\(anchor\)\) \|\| el;/);
+  assert.match(c, /rect: at\.getBoundingClientRect\(\)/);
+  assert.match(c, /bounds: box \? box\.getBoundingClientRect\(\) : null, avoid: keepOff,/);
+  assert.match(c, /placeTooltip\(tipState\.rect, b, \{ placement: tipState\.placement, vw: window\.innerWidth, vh: window\.innerHeight,\n\s+bounds: tipState\.bounds, avoid: tipState\.avoid \|\| \[\] \}\)/);
 });
 
 test('#484: missing enemy data stays readable and UI labels follow the language', () => {
