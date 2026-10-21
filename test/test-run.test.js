@@ -30,13 +30,13 @@ test('a shard outside the matrix is refused, not silently run as the whole suite
 
 test('JUNIT: a report beside the normal output, and nothing extra without it', () => {
   const args = runArgs({ SHARD: '1', JUNIT: 'junit-a.xml' });
-  const at = args.indexOf('--test-reporter=spec');
-  assert.equal(args[0], '--test', 'still node --test');
-  assert.deepEqual(args.slice(1, at), shardsOf().files[1], 'still exactly that shard\u2019s files');
-  assert.deepEqual(args.slice(at), [
+  const split = shardsOf();
+  assert.deepEqual(args.slice(0, 5), [
+    '--test',
     '--test-reporter=spec', '--test-reporter-destination=stdout',
     '--test-reporter=junit', '--test-reporter-destination=junit-a.xml',
-  ]);
+  ], 'the reporters come before the files: node ignores a --test-reporter after a positional test file');
+  assert.deepEqual(args.slice(5), split.files[1], 'and the files are still exactly that shard');
   assert.deepEqual(runArgs({}), ['--test', ...TEST_FILES], 'no JUNIT, no reporter arguments');
 });
 

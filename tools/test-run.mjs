@@ -28,18 +28,16 @@ import { SHARD_COUNT, shardsOf, testFileList } from './ci-shards.mjs';
  */
 export function runArgs(env = process.env, root = ROOT) {
   const shard = env.SHARD;
-  const args = shard === undefined || shard === ''
-    ? ['--test', ...TEST_FILES]
-    : (() => {
-      if (!/^\d+$/.test(shard) || Number(shard) >= SHARD_COUNT) {
-        throw new Error(`SHARD=${shard}: expected 0..${SHARD_COUNT - 1} (or unset for the whole suite)`);
-      }
-      return ['--test', ...shardsOf(root).files[Number(shard)]];
-    })();
-  // spec first: with --test-reporter given at all the default one is gone, and the job log should keep its summary
-  if (env.JUNIT) args.push('--test-reporter=spec', '--test-reporter-destination=stdout',
-    '--test-reporter=junit', `--test-reporter-destination=${env.JUNIT}`);
-  return args;
+  // the reporters must come before the file list: node ignores a --test-reporter after a positional test file
+  const reporters = env.JUNIT
+    ? ['--test-reporter=spec', '--test-reporter-destination=stdout',
+      '--test-reporter=junit', `--test-reporter-destination=${env.JUNIT}`]
+    : [];
+  if (shard === undefined || shard === '') return ['--test', ...reporters, ...TEST_FILES];
+  if (!/^\d+$/.test(shard) || Number(shard) >= SHARD_COUNT) {
+    throw new Error(`SHARD=${shard}: expected 0..${SHARD_COUNT - 1} (or unset for the whole suite)`);
+  }
+  return ['--test', ...reporters, ...shardsOf(root).files[Number(shard)]];
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
