@@ -4,9 +4,10 @@
 // a teal fill wipes over it with 请选择策略 and the ring (battleReady/bg_ring), and the band folds shut (≈ 1.7 s). The
 // teal square at its right end carries the round plate's robot head (roundStartDialog/round_emoji_head) — [ASSUMED] the
 // footage's face there (a winking cube) has no sprite of its own in the extraction.
-// screens/bandDraft.js shows it with the 轮到你 sound (co-op only), once the art is in (ui/protocolBoot.js
-// bootArtReady); never with prefers-reduced-motion — the draft's header says whose turn it is. Styles:
-// css/screens/protocol-boot.css (.tbanner).
+// screens/bandDraft.js shows it with the 轮到你 sound in co-op and in 独立模拟 alike (the maintainer's decision of
+// 2026-10-21, as in PR #643; [ASSUMED] for solo — the footage above shows co-op turns only), once the art is in
+// (ui/protocolBoot.js onBootArt) and at most TURN_BANNER_LATE_MS after the turn began; never with prefers-reduced-motion —
+// the draft's header says whose turn it is. Styles: css/screens/protocol-boot.css (.tbanner).
 import { useEffect } from '../../vendor/hooks.module.js';
 import { html } from './components.js';
 import { uiUrl } from './assetUrls.js';
@@ -15,6 +16,13 @@ import { t } from '../../../shared/i18n.js';
 
 /** How long the band stays (its animation's length). */
 export const TURN_BANNER_MS = 1700;
+
+/**
+ * The latest the band still starts after the turn began, when its sprites were still loading (ms): later, the turn is
+ * under way and the band would only cover it. [ASSUMED] (the review's suggestion; no official counterpart — the event's
+ * client has its art at hand).
+ */
+export const TURN_BANNER_LATE_MS = 1000;
 
 /** An official sprite: an image, or (`mask`) a box its shape is painted through in the CSS colour. */
 function Art({ k, class: cls, mask = false }) {

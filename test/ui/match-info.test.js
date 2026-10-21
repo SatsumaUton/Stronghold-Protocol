@@ -25,7 +25,7 @@ globalThis.fetch = async (url) => {
 };
 
 const { matchInfoModel, MatchBondRow, MatchLegend, BannedOperators, MatchInfo, MatchInfoDialog } = await import('../../public/js/ui/matchInfo.js');
-const { MatchEnemies } = await import('../../public/js/ui/matchEnemies.js');
+const { MatchEnemies, enemyDescMode, ENEMY_DESC_MODES } = await import('../../public/js/ui/matchEnemies.js');
 const { briefingBondTip } = await import('../../public/js/ui/gameLogic.js');
 const { BondDisc, Tooltip, Modal, Button } = await import('../../public/js/ui/components.js');
 const { UnitThumb, Img, RichText, makeLookups } = await import('../../public/js/ui/gameComponents.js');
@@ -193,6 +193,36 @@ test('#484: enemy information uses this match\'s announced leader, abilities, ba
       assert.equal([...walk(faction)].find(v => v.type === Img).props.src, factionIconUrl(gd.m, type.icon));
     }
   } finally { h.m.dispose(); }
+});
+
+test('特训敌人 description, both variants behind the temporary switch (the maintainer, 2026-10-21): inline (default, 2 lines) or a tooltip', () => {
+  assert.deepEqual(ENEMY_DESC_MODES, ['inline', 'tip']);
+  assert.equal(enemyDescMode(), 'inline', 'the default until the maintainer picks');
+  const pub = { bossId: null, stageId: null, lastRound: 14, factions: ['FLY', 'TIMES'] };
+  const gd = makeLookups();
+  const inline = [...walk(MatchEnemies({ pub, gd }))];
+  assert.equal(inline.filter((v) => v.type === Tooltip).length, 0);
+  const cells = inline.filter((v) => hasClass(v, 'brief-faction'));
+  assert.deepEqual(cells.map((v) => v.props.title), pub.factions.map((ty) => gd.factions.types[ty].desc), 'the full text in the title (a clamped line)');
+  assert.ok(inline.some((v) => hasClass(v, 'brief-factions--inline')));
+  globalThis.__SP_ENEMY_DESC__ = 'tip';
+  try {
+    assert.equal(enemyDescMode(), 'tip');
+    const nodes = [...walk(MatchEnemies({ pub, gd }))];
+    const tips = nodes.filter((v) => v.type === Tooltip);
+    assert.deepEqual(tips.map((v) => v.props.text), pub.factions.map((ty) => gd.factions.types[ty].desc), 'the description in the tooltip');
+    const tipCells = nodes.filter((v) => hasClass(v, 'brief-faction'));
+    assert.deepEqual(tipCells.map((v) => v.props['data-faction']), pub.factions);
+    for (const cell of tipCells) {
+      const type = gd.factions.types[cell.props['data-faction']];
+      assert.ok(hasClass(cell, 'is-tip') && cell.props.tabindex === '0', 'reachable by keyboard');
+      assert.equal(textOf(cell), type.name + type.desc, 'still in the markup');
+      assert.ok(hasClass([...walk(cell)].find((v) => hasClass(v, 'brief-faction__desc')), 'sr-only'), 'for screen readers only');
+    }
+  } finally { delete globalThis.__SP_ENEMY_DESC__; }
+  // the clamp in both places the block is shown
+  assert.match(read('public/css/screens/briefing.css'), /\.brief \.brief-faction__desc \{[^}]*-webkit-line-clamp: 2;/);
+  assert.match(read('public/css/screens/draft.css'), /\.minfo-dlg \.brief-faction__desc \{[^}]*-webkit-line-clamp: 2;/);
 });
 
 test('#484: missing enemy data stays readable and UI labels follow the language', () => {

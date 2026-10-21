@@ -47,13 +47,43 @@ test('screens/game.js: the screen at BATTLE_CHECK once its art is in, else the b
   assert.match(g, /const \[boot, setBoot\] = useState\(\(\) => \(pub\?\.phase === PHASE\.BATTLE_CHECK && bootArtReady\(\) \? \{ key: `\$\{pub\.phase\}:\$\{pub\.round\}`, at: Date\.now\(\) \} : null\)\);/);
   assert.match(g, /<\$\{ProtocolBoot\} key=\$\{boot\.key\} players=\$\{players\} myId=\$\{myId\} leaving=\$\{bootLeaving\} \/>/);
   assert.match(g, /setBootLeaving\(true\);\n\s+out = setTimeout\(\(\) => \{ setBoot\(null\); setBootLeaving\(false\); \}, BOOT_LEAVE_MS\);\n\s+\}, Math\.max\(0, \(boot\.at \|\| 0\) \+ BOOT_MIN_MS - Date\.now\(\)\)\);/);
-  // the round plate waits for it
-  assert.match(g, /\$\{roundPop && !hasOffers && !boot \? html`<\$\{RoundPopup\}/);
+  // the round plate comes in as it starts to leave (under it: z-index), inside 回合开始's 2 s
+  // (and with the HUD's entry: never over the hidden top bar — PR #827, the maintainer's decision 5)
+  assert.match(g, /\$\{roundPop && !hasOffers && \(!boot \|\| bootLeaving\) && hudIn !== 'wait' \? html`<\$\{RoundPopup\}/);
 });
 
-test('screens/bandDraft.js: the 请选择策略 band (solo too, PR #643) once the art is in — waiting for it — with the 轮到你 sound in co-op, never with reduced motion', () => {
+test('the pre-game end fits the official 3 s BATTLE_CHECK: the held draft + 协议启动！\'s minimum, its animation whole, the fade with the hold', () => {
+  const g = read('public/js/screens/game.js');
+  const num = (name) => Number(g.match(new RegExp(`export const ${name} = (\\d+);`))[1]);
+  const hold = num('DRAFT_HOLD_MS');
+  const min = num('BOOT_MIN_MS');
+  // activity_table autoChessData.enterStepList BATTLE_CHECK (协议启动) time 3 → data/config.json timers.battleCheck
+  const config = JSON.parse(read('data/config.json'));
+  assert.equal(config.timers.battleCheck, 3);
+  assert.deepEqual(config.timers.enterSteps.find((s) => s.step === 'BATTLE_CHECK'), { step: 'BATTLE_CHECK', time: 3, hint: 0, title: '协议启动' });
+  assert.ok(hold + min <= config.timers.battleCheck * 1000, `${hold} + ${min} ms inside BATTLE_CHECK`);
+  assert.ok(hold >= 500, 'the last pick still lands on screen');
+  // BOOT_MIN_MS covers the whole entrance: the last element's delay + duration (正在连接…, pboot-in 200ms 1900ms)
+  const css = read('public/css/screens/protocol-boot.css');
+  const ends = [...css.matchAll(/animation: pboot-[a-z-]+ (\d+)ms (?:calc\()?(\d+)ms/g)].map((m) => Number(m[1]) + Number(m[2]));
+  assert.ok(ends.length >= 6, ends.join(','));
+  assert.ok(Math.max(...ends) <= min, `the entrance ends by ${Math.max(...ends)} ms, BOOT_MIN_MS ${min}`);
+  // the draft screen's fade to black ends with the hold
+  const draft = read('public/css/screens/draft.css');
+  const [, dur, delay] = draft.match(/\.draft\.is-held \{ pointer-events: none; animation: pg-out (\d+)ms ease-in (\d+)ms forwards; \}/);
+  assert.equal(Number(dur) + Number(delay), hold);
+  // the held screen is only to look at
+  assert.match(read('public/js/screens/bandDraft.js'), /inert=\$\{held \? true : undefined\}/);
+});
+
+test('screens/bandDraft.js: the 请选择策略 band and the 轮到你 sound, co-op and solo alike (the maintainer, 2026-10-21), once the art is in — at most TURN_BANNER_LATE_MS late — never with reduced motion', () => {
   const d = read('public/js/screens/bandDraft.js');
-  assert.match(d, /if \(!myTurn\) return undefined;\n\s+setPeek\(null\);\n\s+if \(!solo\) audio\.sfx\('yourTurn'\);\n\s+if \(reducedMotion\(\)\) return undefined;\n\s+return onBootArt\(\(\) => setTurnBanner\(\(n\) => n \+ 1\)\);/);
+  assert.match(d, /if \(!myTurn\) return undefined;\n\s+setPeek\(null\);\n\s+audio\.sfx\('yourTurn'\);\n\s+if \(reducedMotion\(\)\) return undefined;\n\s+const since = Date\.now\(\);\n\s+return onBootArt\(\(\) => \{ if \(Date\.now\(\) - since <= TURN_BANNER_LATE_MS\) setTurnBanner\(\(n\) => n \+ 1\); \}\);/);
+  assert.doesNotMatch(d, /if \(!solo\) audio\.sfx\('yourTurn'\)/, 'no co-op-only sound');
+  const banner = read('public/js/ui/turnBanner.js');
+  assert.match(banner, /export const TURN_BANNER_LATE_MS = 1000;/);
+  assert.doesNotMatch(banner, /co-op only/);
+  assert.match(banner, /\[ASSUMED\] for solo/);
   const boot = read('public/js/ui/protocolBoot.js');
   assert.match(boot, /export function onBootArt\(fn\) \{/);
   assert.match(d, /<\$\{TurnBanner\} key=\$\{turnBanner\} onDone=\$\{\(\) => setTurnBanner\(0\)\} \/>/);

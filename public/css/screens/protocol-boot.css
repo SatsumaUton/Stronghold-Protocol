@@ -1,10 +1,12 @@
 /* The pre-game screens. 「协议启动！」 over BATTLE_CHECK (ui/protocolBoot.js): the official battleReady/* sprites and settle/common_logo on one
    1920×1080 stage. --px is one design px, fitted to the viewport (positions and sizes measured from the event's
-   footage, video 7:43–7:51; [ASSUMED] the timings, estimated frame by frame). Timeline: the ship zooms out of the screen (0–1 s), the panel flashes up (1–1.45 s), and
-   it holds until BATTLE_CHECK ends; then it fades (.is-leaving, BOOT_LEAVE_MS).
+   footage, video 7:43–7:51; [ASSUMED] the timings, estimated frame by frame).
    PR #643 (frame by frame, video 7:43.3–7:46): from black the ship builds up out of torn blocks, near white (0.1–0.4 s),
    shrinks into the ring as it darkens (to 1.2 s); the panel comes with a teal wash over the screen (1.2–1.9 s), the cards
-   open out from their avatars, white first, 协议启动！ settles from large, 正在连接… last (1.9 s). */
+   open out from their avatars, white first, 协议启动！ settles from large, 正在连接… last (in by 2.1 s). It stays at least
+   screens/game.js BOOT_MIN_MS (2.3 s: the animation and a beat) and until BATTLE_CHECK ends — after the held draft
+   screen (DRAFT_HOLD_MS 0.7 s) both end with the official 3 s — then fades (.is-leaving, BOOT_LEAVE_MS 350 ms) while
+   the round-1 plate comes in under it. */
 .pboot {
   --px: min(.01rem, calc(100vw / 1920), calc(100vh / 1080));
   --teal: #3fd6b4;

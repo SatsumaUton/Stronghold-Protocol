@@ -268,7 +268,7 @@ describe('GitHub #8 and #484: 本局信息 in the strategy draft (real server, h
 
     // the in-game 本局信息 tab (left 🔍) lists the same greyed bonds, badges and banned operators (by tier)
     await waitSt(page, (s) => s.phase === 'PREP', 'the first prep', 60000);
-    // the held 已选定策略 (1.6 s) and 协议启动！ (at least 3 s, screens/game.js) stay over the board first, then the HUD
+    // the held 已选定策略 and 协议启动！ (screens/game.js DRAFT_HOLD_MS + BOOT_MIN_MS, inside BATTLE_CHECK) stay over the board first, then the HUD
     // comes in (PR #643: screens/game.js hudIn — .gm__hud.is-wait / .is-enter until its entry has played)
     await page.waitForFunction(() => !document.querySelector('.screen.draft, [data-testid="protocol-boot"]'), { timeout: 15000 });
     await page.waitForFunction(() => !!document.querySelector('.gm__hud') && !document.querySelector('.gm__hud.is-wait, .gm__hud.is-enter'), { timeout: 15000 });

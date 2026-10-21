@@ -1,11 +1,12 @@
-// Band draft — BAND_DRAFT "2/2 选择策略" (research 06 §4.2, D1): left = draft order (avatar, name, state:
-// … waiting / ⌛ 决策中 / chosen band ✓), current picker highlighted; centre = grid of every band allowed
-// for the mode type (icon, name, LP); a band a teammate already picked carries the picker's avatar and is marked
-// 队友已选 — it cannot be chosen again (research 09 §5, guidebook 策略与轮选; the server refuses it too); right =
-// detail pane (icon, 初始生命值, name, effect name + rich description) with 跳过 (co-op, once) and 确认选择.
+// Band draft — BAND_DRAFT "2/2 选择策略" (research 06 §4.2, D1). Left = the draft order as name cards (OrderRow: the
+// doctor's 名片干员 art, avatar, name, state 等待中 / 决策中 / the picked strategy, the strategy box and ✓), the current
+// picker framed; centre = the wall of every strategy allowed for the mode type (portrait and name); one a teammate already
+// picked reads 已被选择 and cannot be chosen again (research 09 §5, guidebook 策略与轮选; the server refuses it too);
+// right = the detail pane once a portrait is tapped (icon, 初始生命值, name, effect name + rich description) with
+// 确认选择. 跳过选择 / 无法跳过 (co-op, once) sits in the step header's turn line on the player's own turn.
 // One countdown (user playtest #4 item 4): every turn has the same clock (Match BAND_TURN_SECONDS, m.public.draft
-// turnSeconds) and the step header counts it down — m.public.deadline IS the turn's end, the same number as the
-// current picker's row. The highlighted band (the detail pane's) is what a turn that runs out takes: every change of it
+// turnSeconds) and the step header counts it down — m.public.deadline IS the turn's end; the order rows carry no
+// seconds of their own. The highlighted band (the detail pane's) is what a turn that runs out takes: every change of it
 // is reported (g.bandFocus) and the server assigns it while it is free, else 「华法琳」, else the first free strategy
 // (timeoutBand). It starts on that default, so the tip under the order list always names what a timeout gives.
 // Solo, and a co-op match with a single human (the server's soloUntimed: draft.untimed): no clock at all.
@@ -21,9 +22,17 @@
 // 跳过选择 / 无法跳过, X 正在选择策略…, 策略选择完成 · 正在进入模拟…) and carries 本局信息 beside the difficulty; the order rows
 // are name cards (the doctor's 名片干员 art — ui/seatArt.js, as on the room's seat cards — avatar, name, state) with the
 // strategy box beside them (⌛ 决策中, •••, or the picked strategy with 🔍 — it opens that strategy read-only) and ✓
-// outside; the grid is a 4-wide wall of portraits (已被选择 across a teammate's, an orange mark on a strategy this browser
-// has cleared a run with — ui/stats.js); the detail pane slides in only once a portrait is tapped (the order list
-// narrows); after the pick the wall gives way to 已选定策略, and a beam runs along a row when its pick lands.
+// outside; the grid is a 4-wide wall of portraits (已被选择 across a teammate's; the official orange corner badge,
+// statistics/strategyBadge, on a strategy that has earned it — the official bands victorCount, 3 for all 40, counted
+// over this browser's records by ui/stats.js strategyBadgeIds, the stats page's own rule); the detail pane slides in
+// only once a portrait is tapped (the order list narrows) and says 已通过模拟 N 次 for a strategy won with here;
+// after the pick the wall gives way to 已选定策略, and a beam runs along a row when its pick lands. When the pick becomes
+// the player's, the 轮到你 sound and the official 请选择策略 band (ui/turnBanner.js) play — in 独立模拟 too, the same as
+// co-op (the maintainer's decision of 2026-10-21; [ASSUMED] the official solo draft does so: the footage shows co-op
+// turns only). After the draft screens/game.js keeps this screen on 已选定策略 for a moment (`held`, DRAFT_HOLD_MS),
+// inert, before 协议启动！.
+// [ASSUMED] the corner badge, the count and the name card's trophy medal read this browser's records (ui/stats.js,
+// read once after the screen is up) in place of the event's account data — there are no accounts here.
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Icon, useTicker, secondsLeft } from '../ui/components.js';
@@ -36,7 +45,7 @@ import { normalizeDraft, sortedPlayers } from '../ui/gameLogic.js';
 import { useStore } from '../store.js';
 import { data } from '../data.js';
 import { audio } from '../audio.js';
-import { TurnBanner } from '../ui/turnBanner.js';
+import { TurnBanner, TURN_BANNER_LATE_MS } from '../ui/turnBanner.js';
 import { onBootArt } from '../ui/protocolBoot.js';
 import { reducedMotion } from '../ui/device.js';
 import { useRise } from '../ui/transitions.js';
@@ -44,7 +53,7 @@ import { CARD_KEY, cardStore, cardOperators, cardContext, seatOperator, seatCard
 import { skinsStore, SKINS_KEY } from '../ui/skins.js';
 import { settingsStore } from '../ui/settingsStore.js';
 import { chessPortraitUrl, uiUrl } from '../ui/assetUrls.js';
-import { aggregateStats, peekStatsRecords, trophyMedalOf } from '../ui/stats.js';
+import { aggregateStats, peekStatsRecords, strategyBadgeIds, trophyMedalOf } from '../ui/stats.js';
 import { modeOffBonds, bandOffBonds, bandOffLine } from '../ui/gameLogic.js';
 import { t, tParts, tName } from '../../../shared/i18n.js';
 
@@ -180,13 +189,24 @@ export function draftInfoStatus({ myPick = null, pickName = null, myTurn, turnNa
   return { text: turnName ? t('{turnName} 决策中', { turnName }) : t('等待轮到你'), secs: s, tone: s != null ? tone : 'dim' };
 }
 
-/** This browser's runs won with each strategy (ui/stats.js, read only) — bandId → wins; and the trophy medal of them. */
-function localRecords() {
+/** Nothing known yet (before the records are read, or none). */
+const NO_RECORDS = Object.freeze({ won: Object.freeze({}), badges: new Set(), trophies: 0 });
+
+/**
+ * What the wall shows from this browser's records (ui/stats.js): `won` bandId → runs won with it (the detail pane's
+ * 已通过模拟 N 次), `badges` the strategies with the official corner badge — strategyBadgeIds, the stats page's rule: the
+ * band's own victorCount (3 for all 40 in activity_table / data/bands.json) of clears, quit, test and 入门协议 runs left
+ * out — and `trophies` for the name card's medal.
+ * @param {any[]} records peekStatsRecords()
+ * @param {Record<string, any>|any[]} bands data.get('bands')
+ * @returns {{ won: Record<string, number>, badges: Set<string>, trophies: number }}
+ */
+export function draftRecords(records, bands) {
   try {
-    const agg = aggregateStats(peekStatsRecords());
+    const agg = aggregateStats(records);
     const won = Object.fromEntries(Object.entries(agg.bands || {}).map(([id, b]) => [id, b.wins | 0]).filter(([, n]) => n > 0));
-    return { won, trophies: agg.trophies || 0 };
-  } catch { return { won: {}, trophies: 0 }; }
+    return { won, badges: new Set(strategyBadgeIds(records, bands)), trophies: agg.trophies || 0 };
+  } catch { return NO_RECORDS; }
 }
 
 /** 「【effect】 description」 of a strategy (the data's description usually opens with the 【effect】 already). */
@@ -270,20 +290,25 @@ export function BandDraftScreen({ held = null } = {}) {
     const next = draftSelection(sel, { bands, taken, myPick, myTurn, defaultId });
     if (next !== sel) setSel(next);
   }, [bands.length, myPick, myTurn, takenKey]);
-  // "your turn" cue: the sound (with teammates), and the event's 请选择策略 band (ui/turnBanner.js) once its art is in —
-  // a solo draft too, as in PR #643; the first turn waits for the art screens/game.js starts fetching after this mounts
+  // "your turn" cue: the sound and the event's 请选择策略 band (ui/turnBanner.js) once its art is in — co-op and solo
+  // alike (the maintainer's decision of 2026-10-21, as in PR #643; [ASSUMED] for solo, see the header). A turn whose art
+  // comes in later than TURN_BANNER_LATE_MS (the sprites screens/game.js fetches while the briefing runs) skips the band
+  // rather than covering a turn already under way; the header's 请选择策略 says it anyway.
   const [turnBanner, setTurnBanner] = useState(0);
   useEffect(() => {
     if (!myTurn) return undefined;
     setPeek(null);
-    if (!solo) audio.sfx('yourTurn');
+    audio.sfx('yourTurn');
     if (reducedMotion()) return undefined;
-    return onBootArt(() => setTurnBanner((n) => n + 1));
+    const since = Date.now();
+    return onBootArt(() => { if (Date.now() - since <= TURN_BANNER_LATE_MS) setTurnBanner((n) => n + 1); });
   }, [myTurn]);
   // the 本局信息 dialog never outlives the turn it was opened in: a turn change (a pick, a skip, a turn that ran out, an
   // AI pick) or my pick closes it, so whoever's turn begins sees the draft
   const turnKey = `${draft.turnPid || ''}|${myPick || ''}`;
   useEffect(() => { setInfoOpen(false); }, [turnKey]);
+  // the held screen (inert) keeps no dialog open over it
+  useEffect(() => { if (held) { setInfoOpen(false); setExit(false); } }, [!!held]);
 
   // one countdown (user playtest #4 item 4): the current turn's — m.public.deadline
   const clock = solo ? null : draftClock(pub);
@@ -327,7 +352,10 @@ export function BandDraftScreen({ held = null } = {}) {
     waiting: !solo && !draft.done }) : null;
 
   // 名片干员 art of the order rows (as on the room's seat cards: the doctor's pick, else one chosen by the player id), in
-  // the doctor's outfit (ui/seatArt.js seatCardSkin: one's own choice, a teammate's from the match's public players)
+  // the doctor's outfit for that operator (B6 picture-only outfits, docs/SKINS.md; the maintainer's decision 4 of 2026-10-21
+  // for the seat cards; ui/seatArt.js seatCardSkin): one's own choice at once, a teammate's from the match's public
+  // players (m.public.players[].skins), none for another seat while 「显示其他玩家的皮肤」 is off, the default art when the
+  // outfit's pictures are not here (chessPortraitUrl)
   const cards = useMemo(() => cardContext(cardOperators(gd.list('chess'))), [gd.ready]);
   const myCard = useStore((s) => s[CARD_KEY], Object.is, cardStore);
   const localSkins = useStore((s) => s[SKINS_KEY], Object.is, skinsStore);
@@ -339,11 +367,19 @@ export function BandDraftScreen({ held = null } = {}) {
     const skin = op ? seatCardSkin(p, op.chess.charId, { myId, localSkins, players, otherSkins }) : null;
     return op ? chessPortraitUrl(data.get('assets'), op.chess, { skin }) : null;
   };
-  const local = useMemo(localRecords, []);
+  // this browser's records (up to the stats store's size): read once, after the screen and its entry are up, not while
+  // it mounts
+  const [local, setLocal] = useState(NO_RECORDS);
+  useEffect(() => {
+    const later = globalThis.requestIdleCallback ? (fn) => globalThis.requestIdleCallback(fn, { timeout: 1200 }) : (fn) => setTimeout(fn, 300);
+    const cancel = globalThis.cancelIdleCallback && globalThis.requestIdleCallback ? (id) => globalThis.cancelIdleCallback(id) : (id) => clearTimeout(id);
+    const id = later(() => setLocal(draftRecords(peekStatsRecords(), data.get('bands'))));
+    return () => cancel(id);
+  }, []);
   const myMedal = useMemo(() => {
     const medal = trophyMedalOf(local.trophies, gd.config?.trophies?.medals);
     return medal ? uiUrl(data.get('assets'), `medalIcon/${medal.iconId}`) : null;
-  }, [gd.ready]);
+  }, [gd.ready, local]);
 
   // what the right side shows: 已选定策略 after my pick, else the detail pane once opened, else only the wall
   const allPicked = !!draft.done || (draft.order.length > 0 && draft.order.every((pid) => draft.picks.has(pid)));
@@ -363,7 +399,9 @@ export function BandDraftScreen({ held = null } = {}) {
     : turnName ? html`<div class="dturn"><span class="dturn__txt"><b>${turnName}</b><span>${t('正在选择策略…')}</span></span><${Icon} name="hourglass" class="dturn__glass" /></div>`
     : null;
 
-  return html`<div class=${cx('screen draft', `draft--${view}`, held && 'is-held')}>
+  // held after the draft (the server is already in BATTLE_CHECK): only to look at — 离开, 本局信息 and the 🔍 boxes would
+  // open dialogs the match screen tears down a moment later
+  return html`<div class=${cx('screen draft', `draft--${view}`, held && 'is-held')} inert=${held ? true : undefined} aria-busy=${held ? 'true' : undefined}>
     <div class="brief__bg" aria-hidden="true"></div>
     <${StepHeader} step=${2} of=${2} title=${t('选择策略')} micro="STRATEGY // BAND CHECK" pub=${clock ? { ...pub, deadline: clock.deadline } : { ...pub, deadline: 0 }}
       total=${clock ? clock.total : null} onExit=${() => setExit(true)}
@@ -401,14 +439,15 @@ export function BandDraftScreen({ held = null } = {}) {
             const isTaken = taken.has(b.bandId);
             const offNames = bandOffBonds(b, offBonds).map((id) => gd.bond(id)?.name || id); // 本局禁用 (still selectable)
             const on = view === 'detail' && !peek && sel === b.bandId;
-            const wins = local.won[b.bandId] || 0;
+            const badged = local.badges.has(b.bandId); // (the count is the detail pane's 已通过模拟 N 次)
             return html`<button key=${b.bandId} type="button" role="option" aria-selected=${on ? 'true' : 'false'} data-band=${b.bandId}
                 aria-disabled=${isTaken ? 'true' : 'false'} title=${isTaken ? t('已被选择') : offNames.length ? bandOffLine(offNames) : b.name}
                 class=${cx('dband', on && 'is-sel', myPick === b.bandId && 'is-mine', isTaken && 'is-taken', offNames.length && 'is-off')} style=${`--n:${Math.min(i, 15)}`}
                 onClick=${() => pickTile(b.bandId)}>
               <span class="dband__frame"><${BandIcon} bandId=${b.bandId} size="lg" /></span>
               <span class="dband__name">${b.name}</span>
-              ${wins ? html`<span class="dband__medal" title=${t('已通过模拟{n}次', { n: wins })}><${Icon} name="rook" /></span>` : null}
+              ${badged ? html`<span class="dband__badge" data-testid="band-badge" aria-hidden="true">
+                <${Sprite} k="statistics/strategyBadge" class="dband__badge-art" fallback=${html`<span class="dband__medal"><${Icon} name="rook" /></span>`} /></span>` : null}
               <${BandOffTag} names=${offNames} />
               ${isTaken ? html`<span class="dband__taken">${t('已被选择')}</span>` : null}
               ${on ? html`<span class="dband__selmark" aria-hidden="true">SELECTED</span>` : null}

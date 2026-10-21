@@ -7,8 +7,9 @@
 // ui/matchEnemies.js MatchEnemies (GitHub #484, DESIGN §35.6).
 // The event's layout (PR #643, video 6:29–7:51): one scrolling column of sections under grey header bars — 本局遭遇敌方
 // (MatchEnemies: the leader's framed portrait over 敌方领袖, its text with the battlefield, the 特训敌人 as round icons
-// with name and description), 核心盟约, 附加盟约 (the legend under it), 本局禁用干员 — with 已就绪 x/N over the person
-// pips and the big 准备就绪 in the bottom-right corner. The sections come in from the right one after another
+// with name and description — inline or in a tooltip, ui/matchEnemies.js enemyDescMode), 核心盟约, 附加盟约 (the legend
+// under it), 本局禁用干员 — with 已就绪 x/N over the person pips (已就绪 2/4 as research 06 §4.1 reads it, no colon) and
+// the big 准备就绪 in the bottom-right corner. The sections come in from the right one after another
 // (css/screens/briefing.css 开局转场).
 
 import { useState } from '../../vendor/hooks.module.js';
@@ -76,7 +77,7 @@ export function BriefingScreen() {
     <footer class="brief__foot">
       <${LoadoutButton} from="briefing" size="lg" class="brief-loadout" />
       <div class="brief-ready">
-        <span class="brief-ready__txt">${t('已就绪')}:<b class="num">${readyN}</b><span class="num">/${players.length}</span></span>
+        <span class="brief-ready__txt">${t('已就绪')}<b class="num">${readyN}</b><span class="num">/${players.length}</span></span>
         <span class="brief-ready__pips">${players.map((p) => html`<i key=${p.playerId} class=${cx(p.ready && 'on', p.playerId === myId && 'me')} title=${p.name}><${Icon} name="user" /></i>`)}</span>
       </div>
       <${Button} variant="primary" size="xl" class="brief-go" icon=${me?.ready ? 'check' : me ? 'play' : 'eye'} active=${!!me?.ready} loading=${busy}

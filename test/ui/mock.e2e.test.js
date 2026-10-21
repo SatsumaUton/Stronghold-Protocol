@@ -484,10 +484,16 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
 
     ({ page, problems } = await open('phase=BAND_DRAFT'));
     const bands = await page.$$('.dband');
+    const bandId = await bands[5].evaluate((el) => el.dataset.band);
     await bands[5].click();
     await page.click('.draft-detail__btns .btn--primary');
     await sleep(300);
-    assert.ok(await page.$('.dband.is-mine'), 'band picked');
+    // (PR #828: after the own pick the wall gives way to 已选定策略 with the picked strategy)
+    await page.waitForSelector('.draft-done', { timeout: 3000 });
+    const done = await page.$eval('.draft-done', (el) => ({ title: el.querySelector('.draft-done__title')?.textContent, name: el.querySelector('.draft-done__name')?.textContent }));
+    assert.equal(done.title, '已选定策略', 'band picked');
+    const pickedName = await page.evaluate(async (id) => (await import('/js/data.js')).data.lookup('bands', id)?.name, bandId);
+    assert.equal(done.name, pickedName, 'the picked strategy');
     assert.deepEqual(problems, []);
     await page.close();
 
