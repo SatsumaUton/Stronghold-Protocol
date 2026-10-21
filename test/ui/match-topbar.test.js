@@ -89,7 +89,8 @@ test('screens/game.js: the HUD waits only while 协议启动！ shows, comes in 
   const g = read('public/js/screens/game.js');
   assert.match(g, /const bootShown = !!boot && !hasOffers && !bootLeaving;/);
   assert.match(g, /const \[hudIn, setHudIn\] = useState\(\(\) => \(bootShown && !reducedMotion\(\) \? 'wait' : null\)\);/);
-  assert.match(g, /useEffect\(\(\) => \{\n\s+if \(bootShown\) \{ if \(!reducedMotion\(\)\) setHudIn\('wait'\); return; \}\n\s+setHudIn\(\(s\) => \(s === 'wait' \? 'enter' : s\)\);\n\s+\}, \[bootShown\]\);/);
+  // once per 协议启动！ (its boot.key): a plugin window's close re-shows it for the fade, and the HUD stays in
+  assert.match(g, /useEffect\(\(\) => \{\n\s+if \(bootShown\) \{ if \(!reducedMotion\(\) && hudCame\.current !== boot\.key\) setHudIn\('wait'\); return; \}\n\s+if \(boot\) hudCame\.current = boot\.key;\n\s+setHudIn\(\(s\) => \(s === 'wait' \? 'enter' : s\)\);\n\s+\}, \[bootShown\]\);/);
   assert.match(g, /if \(hudIn !== 'enter'\) return undefined;\n\s+const id = setTimeout\(\(\) => setHudIn\(null\), 1200\);/);
   assert.doesNotMatch(g, /roundPopShown|setHudIn\('enter'\), 4000/, 'no wait for the round plate, no 4 s cap');
   assert.match(g, /<div class=\$\{cx\('gm__hud', hudIn && `is-\$\{hudIn\}`\)\} ref=\$\{hudElRef\}>/);
