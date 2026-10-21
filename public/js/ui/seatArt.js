@@ -107,3 +107,16 @@ export function seatCardSkin(seat, charId, { myId = null, localSkins = {}, playe
   if (seat.playerId === myId) return ownerSkin(charId, { localSkins });
   return ownerSkin(charId, { ownerId: seat.playerId, myId, players: Array.isArray(players) ? players.filter(Boolean) : [], otherSkins });
 }
+
+/**
+ * The picture a seat card draws: the first of `srcs` — the outfit's portrait, then the operator's default portrait — that
+ * has not failed to load in this card (`failed`); null when none is left, and the card shows its avatar frame (§35.18's
+ * leftover: an outfit file that failed went straight to the frame).
+ * @param {(string | null | undefined)[]} srcs in order of preference
+ * @param {readonly string[]} [failed]
+ * @returns {string | null}
+ */
+export function seatArtSrc(srcs, failed = []) {
+  for (const src of Array.isArray(srcs) ? srcs : []) if (src && !failed.includes(src)) return src;
+  return null;
+}

@@ -2,15 +2,16 @@
 // operators (one per charId of the visible, non-自选 chess records, the elite form, 6★ first), the default pool (5★/6★ by
 // charId), the operator a seat shows (one's own local pick at once, a teammate's seats[].card, else one chosen by the
 // player id — the same whatever order the records arrive in; none for a bot or an empty seat), the outfit it wears
-// (seatCardSkin, the maintainer's decision 4 of 2026-10-21), the pick's store, and room.css following 文字大小 without
-// !important. (The server's whitelist: test/lobby-card.test.js; the browser: test/ui/room-cards.e2e.test.js.)
+// (seatCardSkin, the maintainer's decision 4 of 2026-10-21), the picture a card falls back to when one fails to load
+// (seatArtSrc: the outfit, the default portrait, the avatar frame), the pick's store, and room.css following 文字大小
+// without !important. (The server's whitelist: test/lobby-card.test.js; the browser: test/ui/room-cards.e2e.test.js.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { CARD_PREF, CARD_KEY, cardStore, setCard, parseStoredCard, cardOperators, cardContext, seatOperator, seatCardSkin } from '../../public/js/ui/seatArt.js';
+import { CARD_PREF, CARD_KEY, cardStore, setCard, parseStoredCard, cardOperators, cardContext, seatOperator, seatCardSkin, seatArtSrc } from '../../public/js/ui/seatArt.js';
 import { chessPortraitUrl } from '../../public/js/ui/assetUrls.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -97,6 +98,23 @@ test('the outfit a seat card wears (decision 4 of 2026-10-21): one\'s own choice
   const without = { chars: { [OP]: { portrait: '/p/skadi_1.png', portraitE2: '/p/skadi_2.png' } } };
   assert.equal(chessPortraitUrl(withSkin, rec, { skin: seatCardSkin(mate, OP, ctx) }), '/p/skin.png');
   assert.equal(chessPortraitUrl(without, rec, { skin: seatCardSkin(mate, OP, ctx) }), '/p/skadi_2.png');
+});
+
+test('a picture that fails to load: the outfit gives way to the default portrait, that to the avatar frame (§35.18)', () => {
+  const OUTFIT = '/assets/chars/outfit.png';
+  const PLAIN = '/assets/chars/plain.png';
+  assert.equal(seatArtSrc([OUTFIT, PLAIN]), OUTFIT, 'the outfit first');
+  assert.equal(seatArtSrc([OUTFIT, PLAIN], [OUTFIT]), PLAIN, 'the outfit failed: the default portrait');
+  assert.equal(seatArtSrc([OUTFIT, PLAIN], [OUTFIT, PLAIN]), null, 'both failed: the avatar frame');
+  assert.equal(seatArtSrc([PLAIN, null]), PLAIN, 'no outfit worn: the default only');
+  assert.equal(seatArtSrc([PLAIN, PLAIN], [PLAIN]), null, 'an outfit this page lacks drew the default already: no second try');
+  assert.equal(seatArtSrc([null, null]), null);
+  assert.equal(seatArtSrc(undefined), null);
+  // screens/room.js: the card gets both pictures and walks them on each failed load
+  const room = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
+  assert.match(room, /const art = seat\.isBot \? null : seatArtSrc\(\[portrait, portraitDefault\], badArt\);/);
+  assert.match(room, /onError=\$\{\(\) => setBadArt\(\(b\) => \(b\.includes\(art\) \? b : \[\.\.\.b, art\]\)\)\}/);
+  assert.match(room, /portraitDefault=\$\{op && skin \? chessPortraitUrl\(data\.get\('assets'\), op\.chess\) : null\}/);
 });
 
 test('the pick\'s store: a string pref, \'\' for 默认; setCard persists and tells the store', () => {

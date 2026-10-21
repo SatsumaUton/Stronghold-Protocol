@@ -5,7 +5,8 @@
 // card, reaches the teammate through room.card (room.state seats[].card) and survives a reload; the card wears its
 // player's outfit (the maintainer's decision 4 of 2026-10-21: one's own at once, the teammate's through room.skins →
 // room.state seats[].skins once the teammate's page has that appearance, the default without it or with
-// 「显示其他玩家的皮肤」 off); 默认 clears the pick; Esc closes the picker and gives the focus back; on a phone in landscape
+// 「显示其他玩家的皮肤」 off; an outfit picture that fails to load gives way to the default portrait, not the avatar
+// frame); 默认 clears the pick; Esc closes the picker and gives the focus back; on a phone in landscape
 // the picker fits the screen and its grid scrolls inside it, with no on-screen keyboard.
 // The rooms are made through net (room.create / room.join), so the test does not depend on the lobby's layout.
 // Server side: test/lobby-card.test.js; the pure rules: test/ui/seat-art.test.js.
@@ -185,6 +186,22 @@ describe('名片干员 seat cards (real server)', { skip: !ENABLED && 'set SP_E2
       await host.page.evaluate(async (id) => (await import('/js/ui/skins.js')).clearSkin(id), PICK);
       await waitArt(guest, '凯尔希', plain, 'the outfit taken off');
       assert.equal(await guest.page.evaluate(() => 'skins' in globalThis.__SP__.store.get().room.seats.find((s) => s?.name === '凯尔希')), false);
+      // an outfit whose picture fails to load (a broken file) gives way to the default portrait, not the avatar frame
+      // (§35.18's leftover)
+      const BROKEN = `${PICK}@e2e#broken`;
+      const brokenUrl = await host.page.evaluate(async (charId, skinId) => {
+        const { data } = await import('/js/data.js');
+        const url = 'data:image/png;base64,AAAA'; // not an image: the load fails without a request
+        data.setView('assets', (v) => ({ ...v, chars: { ...v.chars,
+          [charId]: { ...v.chars[charId], skins: { ...(v.chars[charId].skins || {}), [skinId]: { name: 'E2E', portrait: url, portraitE2: url } } } } }));
+        (await import('/js/ui/skins.js')).setSkin(charId, skinId);
+        return url;
+      }, PICK, BROKEN);
+      await waitArt(host, '凯尔希', plain, 'a broken outfit picture: the default portrait');
+      await waitOp(host, '凯尔希', '浊心斯卡蒂', 'the default portrait loaded');
+      assert.equal((await seatNamed(host, '凯尔希')).frame, false, 'not the avatar frame');
+      assert.notEqual(plain, brokenUrl);
+      await host.page.evaluate(async (id) => (await import('/js/ui/skins.js')).clearSkin(id), PICK);
 
       // reopening: the pick is the choice; Esc closes the picker and gives the focus back to 更换立绘
       await host.click('[data-testid="seat-card-pick"]');
