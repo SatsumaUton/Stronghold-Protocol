@@ -21,6 +21,10 @@ test('a spectator requests an AI in the browser, receives majority approval and 
   await host.request({t:'room.aiVote',voteId:vote.id,approve:true});await mate.request({t:'room.aiVote',voteId:vote.id,approve:true});
   await page.waitForFunction(async id=>{const {store}=await import('/js/store.js');const s=store.get();return s.me.playerId===id&&s.match.private?.playerId===id&&!s.ui.restoring;},{},bot.playerId);
   assert.equal(bot.isBot,false);await page.reload();await page.waitForFunction(async id=>{const {store}=await import('/js/store.js');return store.get().me.playerId===id&&store.get().match.private?.playerId===id;},{},bot.playerId);
-  assert.equal(bot.funds,71);assert.deepEqual(errors,[]);
+  assert.equal(bot.funds,71);
+  m.finish({victory:false,reason:'test'});
+  await page.waitForFunction(async id=>{const {store}=await import('/js/store.js');return store.get().match.result?.players?.some(p=>p.playerId===id&&p.aiTakeoverRound===1);},{},bot.playerId);
+  const history=await page.evaluate(async id=>{const {loadStats,countsTowardStats,recordToResult}=await import('/js/ui/stats.js');const records=loadStats().records;const own=records.find(r=>r.selfId===id);return {found:!!own,counts:countsTowardStats(own),round:recordToResult(own)?.players?.find(p=>p.playerId===id)?.aiTakeoverRound};},bot.playerId);
+  assert.deepEqual(history,{found:true,counts:false,round:1});assert.deepEqual(errors,[]);
  }finally{await browser.close();for(const c of clients)await c.terminate().catch(()=>{});await srv.close();}
 });

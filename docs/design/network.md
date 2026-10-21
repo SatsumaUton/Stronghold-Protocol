@@ -348,3 +348,8 @@ Successful transfer retains the AI player ID, funds and inventory, rebinds the a
 and sends `welcome.takeoverFrom` followed by ordinary room/match resynchronization. Test-room admission still
 requires the existing acknowledgement before spectating. Isolated gameplay-plugin rooms are unsupported.
 These are proposed remake-only cooperation rules, not official combat rules; battle goldens are unaffected.
+
+The [pending 0.3.2 AI handover revision](../history/0.3.2/ai-handover.md) binds requests to a match, round and
+unchanged electorate; disconnect/leave, autoplay eligibility, target elimination, phase changes and expiry cancel
+and clear timers. No shrinking-electorate auto-approval. `aiTakeoverRound` is optional in public/private and result
+player rows; local history retains it. [ASSUMED] inherited seat totals do not grant personal awards or aggregates.

@@ -41,3 +41,61 @@ test('0.3.1 test-room acknowledgement and host-only controls survive AI handover
  assert.equal((await late.request({t:'g.test',cmd:'funds',args:{amount:99}})).t,'error','new teammate does not acquire host privileges');
  assert.equal((await late.request({t:'g.refresh'})).t,'ok');
 });
+
+for (const change of ['applicant leaves', 'applicant disconnects', 'voter disconnects', 'voter enables autoplay', 'phase changes', 'round changes', 'AI eliminated', 'expires']) {
+ test(`pending AI request is cancelled when ${change}`,async t=>{
+  const {srv,room,m,host,mate,late}=await fixture(t),bot=m.order[2];
+  await late.request({t:'room.aiRequest',botId:bot.playerId});const vote=room.aiTakeoverVotes[0];
+  await host.request({t:'room.aiVote',voteId:vote.id,approve:true});
+  switch(change){
+   case 'applicant leaves': await late.request({t:'room.leave'});break;
+   case 'applicant disconnects': await late.terminate();break;
+   case 'voter disconnects': await mate.terminate();break;
+   case 'voter enables autoplay': assert.equal((await mate.request({t:'g.autoplay',on:true})).t,'ok');break;
+   case 'phase changes': m.phase='COMBAT';m.markPublic();m.flush(true);break;
+   case 'round changes': m.round++;m.markPublic();m.flush(true);break;
+   case 'AI eliminated': bot.alive=false;m.markPublic();m.flush(true);break;
+   case 'expires': t.mock.method(Date,'now',()=>vote.expiresAt+1);srv.lobby.broadcastState(room);break;
+  }
+  // Socket closes reach the server asynchronously; no extra room action is needed to clear the request.
+  for(let i=0;i<50&&room.aiTakeoverVotes.length;i++)await new Promise(r=>setTimeout(r,10));
+  assert.equal(room.aiTakeoverVotes.length,0,change);assert.equal(bot.isBot,true);
+  assert.equal((await host.request({t:'room.aiVote',voteId:vote.id,approve:true})).t,'error');
+  if(change==='phase changes'){m.phase='PREP';assert.equal((await mate.request({t:'room.aiVote',voteId:vote.id,approve:true})).t,'error');}
+ });
+}
+
+test('no eligible teammates falls back to the online host, without borrowing earlier votes',async t=>{
+ const {room,m,host,mate,late}=await fixture(t),bot=m.order[2];
+ await host.request({t:'g.autoplay',on:true});await mate.request({t:'g.autoplay',on:true});
+ await late.request({t:'room.aiRequest',botId:bot.playerId});const vote=room.aiTakeoverVotes[0];
+ assert.deepEqual(vote.eligible,[host.id]);assert.equal((await mate.request({t:'room.aiVote',voteId:vote.id,approve:true})).t,'error');
+ late.clearInbox();assert.equal((await host.request({t:'room.aiVote',voteId:vote.id,approve:true})).t,'ok');
+ await late.waitFor('welcome',w=>w.playerId===bot.playerId);assert.equal(bot.isBot,false);
+});
+
+test('handover keeps seat results distinct from personal achievements and preserves reconnect/replay identity',async t=>{
+ const {srv,room,m,host,mate,late,player}=await fixture(t),bot=m.order[2],oldId=late.id,token=late.token;
+ bot.stats.kills=123;bot.stats.dmgDealt=456;const stock=m.pool;
+ await late.request({t:'room.aiRequest',botId:bot.playerId});const vote=room.aiTakeoverVotes[0];
+ await host.request({t:'room.aiVote',voteId:vote.id,approve:true});late.clearInbox();
+ await mate.request({t:'room.aiVote',voteId:vote.id,approve:true});await late.waitFor('welcome',w=>w.playerId===bot.playerId);
+ assert.equal(m.pool,stock);assert.equal(m.spectators.has(oldId),false);assert.equal(bot.aiTakeoverRound,1);
+ assert.equal(srv.network.conns.get(srv.registry.byToken(token).ws).session.playerId,bot.playerId);
+ assert.equal(bot.privateView().aiTakeoverRound,1);assert.equal(bot.stats.kills,123);
+ const {buildResult}=await import('../server/match/results.js');
+ const result=buildResult(m,{victory:true,hiddenReached:true,hiddenCleared:true,reason:'hidden_cleared'});
+ const row=result.players.find(p=>p.playerId===bot.playerId);
+ assert.equal(row.name,'Late');assert.equal(row.stats.kills,123);assert.equal(row.aiTakeoverRound,1);
+ assert.equal(row.title,null);assert.equal(row.trophies,0);assert.equal(row.reward,0);
+ const {buildRecord,countsTowardStats,recordToResult,normalizeRecord}=await import('../public/js/ui/stats.js');
+ const rec=normalizeRecord(buildRecord(result,{myId:bot.playerId,roomMode:'coop',now:1}));
+ assert.equal(countsTowardStats(rec),false);assert.equal(recordToResult(rec).players.find(p=>p.playerId===bot.playerId).aiTakeoverRound,1);
+ const hostRec=buildRecord(result,{myId:host.id,roomMode:'coop',now:1});assert.equal(countsTowardStats(hostRec),true);
+ const foreign=await player('Stranger');assert.notEqual(foreign.id,bot.playerId);
+ await late.terminate();const resumed=await player('Late',token);assert.equal(resumed.id,bot.playerId);
+ m.finish({victory:false,reason:'test'});const replay=await resumed.waitFor('m.result');
+ assert.equal(replay.playerId,bot.playerId);assert.equal(replay.players.find(p=>p.playerId===bot.playerId).aiTakeoverRound,1);
+ await resumed.terminate();const again=await player('Late',token);assert.equal(again.id,bot.playerId);
+ const replayed=await again.waitFor('m.result');assert.equal(replayed.playerId,bot.playerId);
+});

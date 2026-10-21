@@ -1,4 +1,4 @@
-import { aiTakeover, resetAiTakeover } from './aiTakeover.js';
+import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.js';
 // server/lobby.js — rooms, seats, host, AI seats, ready/start, reconnect, and room → Match wiring
 // (DESIGN §2, §6.1 LOBBY, §8.1). Implements the handler interface consumed by server/net.js.
 //
@@ -1486,6 +1486,7 @@ export class Lobby {
 
   /** Match broadcast; the latest m.public and a broadcast m.result are also kept for the replay. */
   matchBroadcast(room, ctx, msg) {
+    if (msg.t === 'm.public' && reconcileAiTakeover(this, room)) this.broadcastState(room);
     const data = this.broadcastRoom(room, msg);
     if (data == null) return;
     if (msg.t === 'm.public') ctx.lastPublic = data;
@@ -1626,6 +1627,7 @@ export class Lobby {
     let res;
     try {
       res = room.match.handle(session.playerId, msg);
+      if (reconcileAiTakeover(this, room)) this.broadcastState(room);
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match.handle(${msg.t}) threw`, e);
       return fail(ERR.INTERNAL);
@@ -1852,6 +1854,7 @@ export class Lobby {
 
   broadcastState(room) {
     if (room.disposed) return;
+    reconcileAiTakeover(this, room);
     if (this.trustedRuntime) {
       const state = room.toState(), prev = room.trustedPrevious;
       const event = (name,extra={}) => this.trustedRuntime.event(name,{room:state,...extra});
