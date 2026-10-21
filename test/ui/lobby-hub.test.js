@@ -280,8 +280,16 @@ test('lobby.css: text follows 文字大小 (var(--t)), no !important, no :has()'
   assert.doesNotMatch(lobbyCss, /:has\(/);
 });
 
-test('选择同盟方式 on a short screen (≤ 520 px tall): 创建同盟 keeps its difficulty line, wrapped under the name (§35.18)', () => {
+test('选择同盟方式 on a short screen (≤ 520 px tall): 创建同盟 keeps its difficulty line under the name, the column fits or scrolls (§35.18)', () => {
+  // the name is an element of its own, so the icon and the name stay on the first row (a bare text node became a
+  // flex item that wrapped under the icon in English at 大 — the 2026-10-22 review)
+  const bar = byClass(find(ally({ difficulty: 'HARD' }), (x) => x.props?.['data-testid'] === 'alliance-create')[0], 'ally-card__bar')[0];
+  const kids = [bar.props.children].flat(Infinity).filter((x) => x && typeof x === 'object');
+  assert.deepEqual(kids.map((x) => x.props?.class ?? x.type), ['ally-card__icon', 'ally-card__name', 'small']);
+  assert.equal(textOf(kids[1]), '创建同盟');
   const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  // the column centres with auto margins (they give way when it is too tall; justify-content: center spilled it past both ends)
+  assert.match(css, /\n\.ally-side \{(?![^}]*justify-content)[^}]*\}\n\.ally-side > :first-child \{ margin-top: auto; \}\n\.ally-side > :last-child \{ margin-bottom: auto; \}/);
   // the @media block, up to its own closing brace
   const at = css.indexOf('@media (max-height: 520px) {');
   let end = css.indexOf('{', at) + 1;
@@ -289,6 +297,11 @@ test('选择同盟方式 on a short screen (≤ 520 px tall): 创建同盟 keeps
   const short = css.slice(at, end);
   assert.ok(short.includes('.ally-card__bar {'), 'the short-screen block');
   assert.doesNotMatch(short, /\.ally-card__bar small \{ display: none; \}/, 'no longer hidden');
-  assert.match(short, /\.ally-card--create \.ally-card__bar \{[^}]*flex-wrap: wrap;[^}]*height: auto;/);
-  assert.match(short, /\.ally-card--create \.ally-card__bar small \{[^}]*white-space: normal;[^}]*font-size: clamp\(11px, calc\(\.28 \* var\(--t\)\), 14px\);/);
+  assert.match(short, /\.ally-card__bar \{ font-size: clamp\(16px, calc\(\.3 \* var\(--t\)\), 26px\); \}/, 'the names a step smaller, capped');
+  assert.match(short, /\.ally-card--create \.ally-card__bar \{[^}]*display: grid; grid-template-columns: auto minmax\(0, 1fr\);[^}]*height: auto;/);
+  assert.match(short, /\.ally-card--create \.ally-card__name \{[^}]*min-width: 0;[^}]*text-overflow: ellipsis;/);
+  assert.match(short, /\.ally-card--create \.ally-card__bar small \{[^}]*grid-column: 2;[^}]*white-space: normal;[^}]*font-size: clamp\(11px, calc\(\.28 \* var\(--t\)\), 14px\);/);
+  assert.match(short, /\.ally-recent \{ font-size: min\(calc\(\.24 \* var\(--t\)\), 14px\);/);
+  assert.match(short, /\.proto-title__mode \{[^}]*flex-wrap: wrap;[^}]*white-space: nowrap; \}/, 'the mode line breaks between its parts, never inside one');
+  assert.match(short, /\.ally-side \{[^}]*overflow-x: hidden; overflow-y: auto;/, 'a column still too tall scrolls');
 });

@@ -9,8 +9,9 @@
 // the maintainer's decision of 2026-10-21) → in the room the host's difficulty pill opens 选择模拟协议 with 确认 (Esc
 // changes nothing; a refused change keeps it open; 绝境 → 确认 changes the room), ⚙ 同盟设置 lists the 模拟难度 and the
 // 「AI 队友最后选择」 switch. Phones 844×390 and 667×375 (touch): the hub (with the 成就统计 plate in place of the card),
-// 选择模拟协议, 选择同盟方式 (创建同盟 with its difficulty line) and the room's 选择模拟协议 stay inside the screen, their
-// buttons in view without scrolling.
+// 选择模拟协议, 选择同盟方式 (创建同盟 with its difficulty line under the name) and the room's 选择模拟协议 stay inside the
+// screen, their buttons in view without scrolling; 选择同盟方式 too at 640×360 and 667×375 in English at 大 / 特大 and in
+// Japanese at 特大.
 // The other doctors' read-only view: test/ui/room-settings.e2e.test.js.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/lobby-hub-*.png
 
@@ -40,7 +41,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
   });
   after(async () => { await browser?.close(); await srv?.close(); });
 
-  async function open({ w = 1920, h = 1080, touch = false } = {}) {
+  async function open({ w = 1920, h = 1080, touch = false, lang = null, textSize = null } = {}) {
     const ctx = await browser.createBrowserContext();
     const page = await ctx.newPage();
     await page.setViewport({ width: w, height: h, hasTouch: touch, isMobile: touch, deviceScaleFactor: 1 });
@@ -49,10 +50,12 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
     page.on('requestfailed', (r) => { if (!/fonts\.(googleapis|gstatic)/.test(r.url())) problems.push(`requestfailed: ${r.url()} ${r.failure()?.errorText}`); });
     page.on('response', (r) => { if (r.status() >= 400) problems.push(`http ${r.status()}: ${r.url()}`); });
-    await page.evaluateOnNewDocument(() => {
+    await page.evaluateOnNewDocument((l, ts) => {
       localStorage.setItem('sp.name', '大厅测试');
       sessionStorage.setItem('sp.entered', '1');
-    });
+      if (l) localStorage.setItem('sp.pref.lang', JSON.stringify(l));
+      if (ts) localStorage.setItem('sp.pref.settings', JSON.stringify({ textSize: ts }));
+    }, lang, textSize);
     await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => globalThis.__SP__?.store.get().connection.status === 'online' && !!document.querySelector('.lobby-screen .hub-entries'), { timeout: 30000 });
     return { ctx, page, problems };
@@ -86,6 +89,25 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
     const bodies = [...document.querySelectorAll('.modal__body')];
     return { out: out.slice(0, 6), scrolls: bodies.some((b) => b.scrollHeight > b.clientHeight + 1) };
   }); };
+
+  /**
+   * 创建同盟's bar on a short screen: the icon and the name on the first row (the name whole), the difficulty line under
+   * the name — shown whole inside the bar, ≥ 11 px — and whether 选择同盟方式's column has to scroll.
+   */
+  const createBar = (page) => page.$eval('[data-testid="alliance-create"]', (card) => {
+    const box = (el) => el.getBoundingClientRect();
+    const bar = card.querySelector('.ally-card__bar'), b = box(bar), icon = box(bar.querySelector('.ally-card__icon'));
+    const name = bar.querySelector('.ally-card__name'), n = box(name), sm = bar.querySelector('small'), r = box(sm);
+    const side = document.querySelector('.ally-side');
+    return { text: sm.textContent, shown: getComputedStyle(sm).display !== 'none' && r.width > 0 && r.height > 0,
+      whole: sm.scrollWidth <= sm.clientWidth + 1 && sm.scrollHeight <= sm.clientHeight + 1,
+      inside: r.left >= b.left - 1 && r.right <= b.right + 1 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1,
+      px: parseFloat(getComputedStyle(sm).fontSize),
+      nameRow: Math.abs((n.top + n.bottom) / 2 - (icon.top + icon.bottom) / 2) < 4 && n.left >= icon.right && n.bottom <= r.top + 1,
+      nameWhole: name.scrollWidth <= name.clientWidth + 1, underName: Math.abs(r.left - n.left) < 2,
+      sideScrolls: side.scrollHeight > side.clientHeight + 1 };
+  });
+  const barOk = (d) => d.shown && d.whole && d.inside && d.px >= 11 && d.nameRow && d.nameWhole && d.underName && !d.sideScrolls;
 
   test('desktop: hub → 选择模拟协议 (remembered, Esc) → 选择同盟方式 (the key field) → 创建同盟: the room at once → the host changes the difficulty in the room', async () => {
     const { ctx, page, problems } = await open();
@@ -292,16 +314,9 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
         await sleep(500);
         assert.deepEqual(await fit(page), { out: [], scrolls: false }, '选择同盟方式 fits');
         assert.equal(await page.evaluate(() => document.activeElement?.tagName === 'INPUT'), false, 'no keyboard pops up on a touch screen');
-        // 创建同盟 keeps its difficulty line on a short screen (§35.18's leftover): shown whole inside the bar, ≥ 11 px
-        const diff = await page.$eval('[data-testid="alliance-create"]', (card) => {
-          const sm = card.querySelector('.ally-card__bar small');
-          const r = sm.getBoundingClientRect(), b = card.querySelector('.ally-card__bar').getBoundingClientRect();
-          return { text: sm.textContent, shown: getComputedStyle(sm).display !== 'none' && r.width > 0 && r.height > 0,
-            whole: sm.scrollWidth <= sm.clientWidth + 1 && sm.scrollHeight <= sm.clientHeight + 1,
-            inside: r.left >= b.left - 1 && r.right <= b.right + 1 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1,
-            px: parseFloat(getComputedStyle(sm).fontSize) };
-        });
-        assert.ok(diff.shown && diff.whole && diff.inside && diff.px >= 11, `${w}×${h}: the difficulty line ${JSON.stringify(diff)}`);
+        // 创建同盟 keeps its difficulty line on a short screen (§35.18's leftover): under the name, whole inside the bar
+        const diff = await createBar(page);
+        assert.ok(barOk(diff), `${w}×${h}: 创建同盟 ${JSON.stringify(diff)}`);
         assert.match(diff.text, /^难度：.+（可在同盟内更改）$/);
         await page.screenshot({ path: path.join(OUT, `lobby-hub-phone-${w}-alliance.png`) });
         // 创建同盟: the room at once; the host's 选择模拟协议 over it fits too
@@ -315,6 +330,43 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
         await page.screenshot({ path: path.join(OUT, `lobby-hub-phone-${w}-room-protocol.png`) });
         assert.deepEqual(problems, []);
       } finally { await ctx.close(); }
+    });
+  }
+
+  // the long languages at a big 文字大小 (the 2026-10-22 review: in English at 大 the name wrapped under the icon, the bar
+  // grew to three rows and 加入同盟 left a 360 px-tall screen; at 特大 the mode line broke too)
+  for (const [lang, textSize] of [['en', 'lg'], ['en', 'xl'], ['ja', 'xl']]) {
+    test(`phones 640×360 / 667×375, ${lang} at 文字大小 ${textSize}: 选择同盟方式 fits, 创建同盟 on two rows with its whole difficulty line`, async () => {
+      for (const [w, h] of [[640, 360], [667, 375]]) {
+        const { ctx, page, problems } = await open({ w, h, touch: true, lang, textSize });
+        try {
+          assert.deepEqual(await page.evaluate(() => [document.documentElement.lang, document.documentElement.dataset.text]), [lang, textSize]);
+          await press(page, '.mode-card[data-mode="coop"]', true);
+          await page.waitForSelector('.modal__box.ally', { visible: true });
+          assert.deepEqual(await fit(page), { out: [], scrolls: false }, `${w}×${h}: 选择同盟方式 fits`);
+          const diff = await createBar(page);
+          assert.ok(barOk(diff), `${w}×${h}: 创建同盟 ${JSON.stringify(diff)}`);
+          // 加入同盟 whole on the screen, below the mode line, nothing over its middle
+          const join = await page.$eval('.ally-card__bar--join', (el) => {
+            const r = el.getBoundingClientRect(), mode = document.querySelector('.ally__mode').getBoundingClientRect();
+            const card = document.querySelector('[data-testid="alliance-create"]').getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            return { onScreen: r.top >= 0 && r.bottom <= innerHeight, hit: el.contains(hit), cardBelowMode: card.top >= mode.bottom - 1 };
+          });
+          assert.deepEqual(join, { onScreen: true, hit: true, cardBelowMode: true }, `${w}×${h}: 加入同盟`);
+          await page.screenshot({ path: path.join(OUT, `lobby-hub-phone-${w}-alliance-${lang}-${textSize}.png`) });
+          // a column still taller than its space (more recent keys, the test-room box) scrolls from 创建同盟 down to 加入同盟
+          // instead of spilling past both ends (stood in for by a taller hint line)
+          await page.addStyleTag({ content: '.ally-recent { min-height: 260px; }' });
+          assert.deepEqual(await page.$eval('.ally-side', (side) => {
+            const s = side.getBoundingClientRect(), top = side.querySelector('[data-testid="alliance-create"]').getBoundingClientRect().top;
+            side.scrollTop = side.scrollHeight;
+            const join = side.querySelector('.ally-card__bar--join').getBoundingClientRect();
+            return { scrolls: side.scrollHeight > side.clientHeight + 1, createAtTop: top >= s.top && top <= s.top + 8, joinReached: join.bottom <= s.bottom };
+          }), { scrolls: true, createAtTop: true, joinReached: true }, `${w}×${h}: a tall column scrolls`);
+          assert.deepEqual(problems, []);
+        } finally { await ctx.close(); }
+      }
     });
   }
 });

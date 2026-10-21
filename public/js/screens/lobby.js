@@ -521,7 +521,7 @@ export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, 
           <button type="button" class="ally-card ally-card--create ally-create" data-testid="alliance-create" data-difficulty=${difficulty}
               disabled=${!online || busy === 'create'} aria-busy=${busy === 'create' ? 'true' : 'false'} onClick=${() => onCreate()}>
             <span class="ally-card__art"><${CreateArt} /></span>
-            <span class="ally-card__bar"><span class="ally-card__icon">${busy === 'create' ? html`<${Spinner} size="sm" />` : html`<${Icon} name="plus" />`}</span>${t('创建同盟')}
+            <span class="ally-card__bar"><span class="ally-card__icon">${busy === 'create' ? html`<${Spinner} size="sm" />` : html`<${Icon} name="plus" />`}</span><span class="ally-card__name">${t('创建同盟')}</span>
               <small>${online ? t('难度：{name}（可在同盟内更改）', { name: diffName }) : t('正在连接服务器…')}</small></span>
           </button>
           ${testMode ? html`<label class="create-box__test ally-test" data-testid="create-test">
