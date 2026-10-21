@@ -94,9 +94,21 @@ describe('协议启动！ screen (headless Chrome)', { skip: !ENABLED && 'set SP
 
   test('four doctors: a card each and 协议启动！; it goes once 回合开始 follows, not before BOOT_MIN_MS, the round plate coming in under its fade', async () => {
     const { page, problems, context } = await open();
+    // the page's own clock: when 协议启动！ and the round plate reach the DOM, and when 协议启动！ has gone (a Node-side
+    // clock started after the waitForSelector round trip made the measured span tens of ms short under load)
+    await page.evaluate(() => {
+      const t = (globalThis.__pbT = {});
+      const mark = () => {
+        const boot = document.querySelector('[data-testid="protocol-boot"]');
+        if (t.boot == null && boot) t.boot = performance.now();
+        if (t.plate == null && document.querySelector('[data-testid="round-popup"]')) t.plate = performance.now();
+        if (t.boot != null && t.gone == null && !boot) t.gone = performance.now();
+      };
+      new MutationObserver(mark).observe(document.body, { childList: true, subtree: true });
+      mark();
+    });
     await battleCheck(page);
     await page.waitForSelector('[data-testid="protocol-boot"]', { timeout: 3000 });
-    const shownAt = Date.now();
     assert.equal(await page.$('.pbanner'), null, 'the screen, not the banner');
     const s = await page.$eval('[data-testid="protocol-boot"]', (el) => ({
       cards: [...el.querySelectorAll('.pboot__num')].map((n) => n.textContent),
@@ -113,11 +125,12 @@ describe('协议启动！ screen (headless Chrome)', { skip: !ENABLED && 'set SP
     assert.ok(await page.$('[data-testid="protocol-boot"]'), 'still up right after 回合开始');
     assert.equal(await page.$('[data-testid="round-popup"]'), null, 'no round plate before it starts to leave');
     await page.waitForSelector('[data-testid="round-popup"]', { timeout: 4000 });
-    const atPlate = Date.now() - shownAt;
-    assert.ok(atPlate >= 2300, `the plate after the boot's minimum (${atPlate} ms)`);
     assert.ok(await page.$('[data-testid="protocol-boot"].is-leaving'), 'the plate comes in while 协议启动！ fades, not after it');
     await page.waitForFunction(() => !document.querySelector('[data-testid="protocol-boot"]'), { timeout: 6000 });
-    assert.ok(Date.now() - shownAt >= 2300, `shown ${Date.now() - shownAt} ms`);
+    const t = await page.evaluate(() => globalThis.__pbT);
+    // BOOT_MIN_MS counts from boot.at, set just before the screen's first render: up to 100 ms of render time allowed
+    assert.ok(t.plate - t.boot >= 2300 - 100, `the plate after the boot's minimum (${Math.round(t.plate - t.boot)} ms)`);
+    assert.ok(t.gone - t.boot >= 2300, `shown ${Math.round(t.gone - t.boot)} ms`);
     assert.ok(await page.$('[data-testid="round-popup"]'), 'the plate plays on after it');
     assert.deepEqual(problems, []);
     await context.close();

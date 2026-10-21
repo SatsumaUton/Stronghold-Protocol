@@ -7,7 +7,7 @@
 // the switches survive a reload. 删除 removes each. Esc closes the dialog
 // and gives the focus back; on a phone in landscape the dialog stays on screen. No console error (a CSP refusal is one).
 // The guards (#814 review, #643's limits): a still picture past 2560 px is scaled down to 2560 (transparency kept), a
-// moving one (APNG) that large, a 1440p video and music longer than 6 minutes (told by its metadata, or by its decode)
+// moving one (APNG) that large, a video past 1080p (1952 px wide) and music longer than 6 minutes (told by its metadata, or by its decode)
 // are refused with their own toast; with reduced motion a moving picture stands on its first frame (a canvas) and a
 // video is stopped on its first painted frame.
 //
@@ -57,7 +57,7 @@ const pageFile = (c, kind) => c.page.evaluate(async (kind) => {
   return btoa(s);
 }, kind).then((b64) => Buffer.from(b64, 'base64'));
 
-/** A PNG (or a 1440p-style WebM) of w×h drawn in the page; `clear`: the left quarter transparent. */
+/** A PNG (or a WebM) of w×h drawn in the page; `clear`: the left quarter transparent. */
 const canvasFile = (c, { kind = 'png', w, h, clear = false }) => c.page.evaluate(async ({ kind, w, h, clear }) => {
   const cv = document.createElement('canvas');
   cv.width = w; cv.height = h;
@@ -260,7 +260,7 @@ describe('自定义大厅背景与音乐 (real server)', { skip: !ENABLED && 'se
       rmSync(tmp, { recursive: true, force: true });
     }
   });
-  test('the guards: a large picture scaled down; a moving one, 1440p video and long music refused; reduced motion stills', { timeout: 4 * 60 * 1000 }, async () => {
+  test('the guards: a large picture scaled down; a moving one, a video past 1080p and long music refused; reduced motion stills', { timeout: 4 * 60 * 1000 }, async () => {
     const tmp = mkdtempSync(path.join(os.tmpdir(), 'lobby-media-e2e-'));
     const srv = await startRealServer();
     const P = (await import('puppeteer-core')).default;
@@ -271,13 +271,17 @@ describe('自定义大厅背景与音乐 (real server)', { skip: !ENABLED && 'se
       const big = await canvasFile(c, { w: 3000, h: 600, clear: true });
       const files = {
         big: path.join(tmp, 'wide.png'), bigMoving: path.join(tmp, 'wide-moving.png'), moving: path.join(tmp, 'moving.png'),
-        video1440: path.join(tmp, 'qhd.webm'), small: path.join(tmp, 'small.webm'),
+        videoWide: path.join(tmp, 'wide.webm'), small: path.join(tmp, 'small.webm'),
         long: path.join(tmp, 'long.wav'), longish: path.join(tmp, 'longish.wav'),
       };
       writeFileSync(files.big, big);
       writeFileSync(files.bigMoving, apng(big));
       writeFileSync(files.moving, apng(await canvasFile(c, { w: 320, h: 180 })));
-      writeFileSync(files.video1440, await canvasFile(c, { kind: 'webm', w: 2560, h: 1440 }));
+      // past MAX_VIDEO's 1920 px edge but cheap to encode: a 2560×1440 recording came out as an empty 110-byte WebM on a
+      // loaded machine (the 1080p toast never came; the pixel-count branch is unit-tested in lobby-media.test.js)
+      const wide = await canvasFile(c, { kind: 'webm', w: 1952, h: 208 });
+      assert.ok(wide.length > 1000, `the video fixture recorded frames (${wide.length} bytes)`);
+      writeFileSync(files.videoWide, wide);
       writeFileSync(files.small, await canvasFile(c, { kind: 'webm', w: 320, h: 180 }));
       writeFileSync(files.long, wav(400, 8000)); // 6 min 40 s: its metadata says too long, nothing decoded
       writeFileSync(files.longish, wav(370, 8000)); // 6 min 10 s: decoded, then refused by its decoded length
@@ -300,7 +304,7 @@ describe('自定义大厅背景与音乐 (real server)', { skip: !ENABLED && 'se
       // refused, each with its own reason; the picture stays
       await upload(c, 'backdrop', files.bigMoving);
       await toastWith(c, /2560/);
-      await upload(c, 'backdrop', files.video1440);
+      await upload(c, 'backdrop', files.videoWide);
       await toastWith(c, /1080p/);
       assert.equal((await media(c)).bgName, 'wide.png');
       await upload(c, 'music', files.long);
@@ -318,10 +322,13 @@ describe('自定义大厅背景与音乐 (real server)', { skip: !ENABLED && 'se
       await upload(c, 'backdrop', files.moving);
       await c.page.waitForFunction(() => document.querySelector('[data-testid="own-backdrop"] canvas')?.width === 320, { timeout: 15000 });
       assert.equal(await c.page.$('[data-testid="own-backdrop"] img'), null);
+      // (a media 'play' seen in the capture phase: desktop Chrome paints a paused preload=auto video's first frame
+      // anyway, so only the play-then-pause itself shows the iOS path ran)
+      await c.page.evaluate(() => { globalThis.__ownPlays = 0; document.addEventListener('play', () => { globalThis.__ownPlays++; }, true); });
       await upload(c, 'backdrop', files.small);
       await c.page.waitForFunction(() => {
         const v = document.querySelector('[data-testid="own-backdrop"] video');
-        return v && v.readyState >= 2 && v.paused;
+        return v && v.readyState >= 2 && v.paused && globalThis.__ownPlays > 0;
       }, { timeout: 15000 });
       await c.page.emulateMediaFeatures([]);
 
