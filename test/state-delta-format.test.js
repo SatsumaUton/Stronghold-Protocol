@@ -56,7 +56,7 @@ const fakeWs = () => ({});
 test('every frame a connection is given moves its sequence forward, full frames included', () => {
   const ws = fakeWs();
   negotiateStateDelta(ws, 1);
-  const msg = { t: 'm.private', playerId: 'p1', funds: 10, padding: 'x'.repeat(500) };
+  const msg = { t: 'm.public', players: [{ hp: 10 }], padding: 'x'.repeat(500) };
   const first = prepareStateFrame(ws, msg, JSON.stringify(msg));
   assert.equal(wire(first.data).seq, 1);
   assert.ok('full' in wire(first.data), 'the first frame of a connection is a full one');
@@ -69,16 +69,49 @@ test('every frame a connection is given moves its sequence forward, full frames 
   repeated.commit();
 
   // new content: a delta based on the frame the client actually holds
-  msg.funds = 11;
+  msg.players[0].hp = 11;
   const delta = prepareStateFrame(ws, msg, JSON.stringify(msg));
   assert.equal(wire(delta.data).seq, 3);
   assert.equal(wire(delta.data).base, 2);
   delta.commit();
 
   // content that goes back to an earlier encoding must not reuse that encoding's old number
-  msg.funds = 10;
+  msg.players[0].hp = 10;
   const back = prepareStateFrame(ws, msg, JSON.stringify(msg));
   assert.equal(wire(back.data).seq, 4, 'the number never rewinds to a snapshot created earlier');
+});
+
+test('a state frame older than the channel baseline is dropped, never applied as a new baseline', () => {
+  const receiver = new StateReceiver();
+  const newer = { t: 'm.public', round: 3 };
+  assert.equal(receiver.receive({ kind: 'm.public', seq: 9, full: newer }).message, newer);
+  // a reordered / re-sent full frame from before that baseline would rewind it and fail every following delta
+  const stale = { t: 'm.public', round: 1 };
+  const older = receiver.receive({ kind: 'm.public', seq: 4, full: stale });
+  assert.equal(older.message, null, 'an older full frame is not a baseline');
+  assert.equal(older.resync, true, 'and it blocks the channel like any other gap');
+  assert.equal(receiver.receive({ kind: 'm.public', seq: 10, base: 9, patch: [] }).message, null,
+    'the channel waits for a full frame instead of applying deltas to a mixed baseline');
+  const recovered = { t: 'm.public', round: 4 };
+  assert.equal(receiver.receive({ kind: 'm.public', seq: 11, full: recovered }).message, recovered,
+    'a full frame ahead of the baseline puts it back in service');
+  const next = { t: 'm.public', round: 5 };
+  assert.deepEqual(receiver.receive({ kind: 'm.public', seq: 12, base: 11, patch: diffState(recovered, next) }).message, next);
+  // the same number is a duplicate, and never re-emitted
+  assert.equal(receiver.receive({ kind: 'm.public', seq: 12, full: next }).message, null);
+});
+
+test('only the public view is compressed today; a private view keeps the bytes it is given', () => {
+  const ws = fakeWs();
+  negotiateStateDelta(ws, 1);
+  const view = { t: 'm.private', playerId: 'p1', funds: 10, padding: 'q'.repeat(500) };
+  const encoded = JSON.stringify(view);
+  const first = prepareStateFrame(ws, view, encoded);
+  assert.equal(first.data, encoded, 'm.private is not a delta channel yet');
+  first.commit();
+  view.funds = 11;
+  const next = JSON.stringify(view);
+  assert.equal(prepareStateFrame(ws, view, next).data, next, 'still plain on the second frame');
 });
 
 test('a repeated hello keeps the baseline, and a reset never rewinds the sequence', () => {

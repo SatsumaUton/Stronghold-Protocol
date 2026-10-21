@@ -657,6 +657,10 @@ export class Lobby {
       case 'room.setMode': return this.setMode(session, msg);
       case 'room.contentReady': return this.contentReady(session, msg, ctx);
       case 'room.consent': return this.consent(session,msg);
+      // A client that missed a state-delta frame asks for a full one (shared/stateDelta.js StateReceiver; server/net.js
+      // throttles it like the other resend-heavy intents). This is the same heavy resync a repeated hello runs, so it
+      // draws from the same per-session budget: the match resends its full state, or the lobby its room state.
+      case 'state.resync': return this.resync(session, true) ?? { ok: true };
       default:
         if (typeof msg.t === 'string' && msg.t.startsWith('g.')) return this.routeGameNow(session, msg);
         return fail(ERR.BAD_MSG, `unhandled type ${String(msg.t).slice(0, 32)}`);

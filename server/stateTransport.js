@@ -6,6 +6,13 @@
 // a full frame is always ahead of what came before it. The receiver keys its baseline on those numbers.
 import { diffState, isStateKind, STATE_DELTA_VERSION } from '../shared/stateDelta.js';
 
+/**
+ * The channels this build compresses. Only the public view for now: it is the frame every member of a room receives, so
+ * a client that cannot apply one loses nothing it cannot get back from the next full frame, while m.private is per
+ * player and gets its opt-in only after the round-trip is proven in a whole match.
+ */
+export const DELTA_KINDS = new Set(['m.public']);
+
 const connections = new WeakMap();   // ws -> { seq, kinds: Map<kind, { snapshot, seq }> }
 const snapshots = new WeakMap();     // msg -> { encoded, view, patches: WeakMap<previousSnapshot, opsJson | false> }
 
@@ -27,7 +34,7 @@ export function resetStateDelta(ws) { connections.get(ws)?.kinds.clear(); }
 /** Return an encoded state and commit its baseline ONLY after the caller successfully queues the reliable frame. */
 export function prepareStateFrame(ws, msg, encoded) {
   const connection = connections.get(ws);
-  if (!connection || !isStateKind(msg?.t)) return { data: encoded, commit() {} };
+  if (!connection || !isStateKind(msg?.t) || !DELTA_KINDS.has(msg.t)) return { data: encoded, commit() {} };
   let snapshot = snapshots.get(msg);
   // The encoding, not mutable game objects, owns this immutable baseline.
   if (!snapshot || snapshot.encoded !== encoded) {
