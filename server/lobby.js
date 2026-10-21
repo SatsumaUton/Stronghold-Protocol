@@ -381,7 +381,7 @@ export class Lobby {
    *   plugins", "Gameplay plugins"); hosts: the match hosts a room with gameplay plugins runs its match in
    *   (server/match/host/index.js; none: such a match runs here, unit tests)
    */
-  constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, content = null, plugins = null, hosts = null, options = {} }) {
+  constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, content = null, plugins = null, hosts = null, simPool = null, options = {} }) {
     this.registry = registry;
     /** the vanilla content set every room plays (header "Content identity"), or null */
     this.vanilla = content && isContentHash(content.cs) ? Object.freeze({ cs: content.cs, vanilla: true, plugins: Object.freeze([]) }) : null;
@@ -389,6 +389,11 @@ export class Lobby {
     this.plugins = plugins;
     /** the match hosts (header "Gameplay plugins"), or null */
     this.hosts = hosts;
+    /**
+     * The server's own simulation pool for bot rehearsals (server/workers/roomPool.js), or null when the operator
+     * started none — then every rehearsal stays on this thread, exactly as before.
+     */
+    this.simPool = simPool;
     this.log = log;
     this.MatchClass = MatchClass;
     this.getData = getData;
@@ -1410,6 +1415,9 @@ export class Lobby {
         data,
         log: this.log,
         now: this.now,
+        // the server's own simulation pool (server/workers/roomPool.js) for bot rehearsals, when the operator started
+        // one: null keeps every rehearsal on this thread, exactly as before (Match.simPool / MatchRehearsal.poolRehearsal)
+        ...(this.simPool ? { simPool: this.simPool } : {}),
         send: (playerId, msg) => (ctx.live ? this.matchSend(room, ctx, playerId, msg) : false),
         broadcast: (msg) => { if (ctx.live) this.matchBroadcast(room, ctx, msg); },
         onEnd: (summary) => this.onMatchEnd(room, ctx, summary),

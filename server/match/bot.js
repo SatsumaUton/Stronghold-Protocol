@@ -1223,7 +1223,7 @@ export function createRehearsal(m, ps, chosen, plans) {
  * browser (Match.delegateRehearsal — an AI teammate's prep only, and never a gameplay-plugin room). Nothing is built
  * here in that case; a synchronous caller leaves it off and simulates on the server.
  */
-export function* createRehearsalSteps(m, ps, chosen, plans, { delegate = false } = {}) {
+export function* createRehearsalSteps(m, ps, chosen, plans, { delegate = false, pooled = false } = {}) {
   const wave = m.wave;
   const distinct = distinctPlans(plans);
   if (!wave || distinct.length < 2 || !(m.botRehearsal > 0)) return null;
@@ -1231,13 +1231,15 @@ export function* createRehearsalSteps(m, ps, chosen, plans, { delegate = false }
   const byUid = new Map(chosen.map((p) => [p.uid, p]));
   const inputs = [];
   const battles = [];
+  // A rehearsal that may leave this thread — the host's browser (delegate) or the server's own pool (pooled) — builds
+  // nothing here: those paths simulate the inputs and the takeover builds them later. Only a run that stays inline
+  // builds each candidate Battle in this generator step, at the point 0.3.0 built it.
+  const remote = delegate || pooled;
   for (const plan of cands) {
     try {
       const opts = candidateOpts(m, ps, byUid, plan);
       inputs.push(opts);
-      // The default path builds now, in this generator step, as 0.3.0 did. Delegation builds nothing: the host
-      // simulates the specs, and a takeover builds these same inputs later.
-      if (!delegate) battles.push(m.newBattle(opts, { preview: true }));
+      if (!remote) battles.push(m.newBattle(opts, { preview: true }));
     } catch {
       // A failed estimate cannot affect the match's error log or displace its default plan.
       break;
@@ -1248,7 +1250,15 @@ export function* createRehearsalSteps(m, ps, chosen, plans, { delegate = false }
     const job = m.delegateRehearsal({ ps, chosen, plans: cands, inputs });
     if (job) return job;
   }
-  return createRehearsalJob(m, ps, chosen, cands, inputs, delegate ? null : battles);
+  // the server's own simulation pool (server/workers/roomPool.js), when the operator started one: the same candidates,
+  // run on a thread instead of this one. A pool that is off, busy or broken returns null and the local run below takes
+  // over — a refusal costs latency, never a different layout (MatchRehearsal.poolRehearsal). Only the asynchronous bot
+  // prep driver asks for it (`pooled`): a synchronous caller cannot wait for a thread, so it keeps simulating inline.
+  if (pooled && typeof m.poolRehearsal === 'function') {
+    const job = m.poolRehearsal({ ps, chosen, plans: cands, inputs });
+    if (job) return job;
+  }
+  return createRehearsalJob(m, ps, chosen, cands, inputs, remote ? null : battles);
 }
 
 /**
@@ -1443,10 +1453,11 @@ export function botPrepBegin(m, ps) {
  * botPrepBegin as a step generator (the same actions in the same order, hence the same rng draws and decisions): it
  * yields between whole prep actions — never while the board holds a transient layout — so Match.scheduleBotPrep runs
  * it in wall-clock-bounded slices like the rehearsal (50–120 ms of planning in one callback late in a 4-bot match
- * otherwise). `delegate` (the async driver): offer the final rehearsal to the current host's browser.
+ * otherwise). `delegate` (the async driver): offer the final rehearsal to the current host's browser; `pooled` (the
+ * same driver): offer it to the server's own simulation pool instead of simulating it in this thread.
  * Returns the rehearsal job (or null).
  */
-export function* botPrepBeginSteps(m, ps, { delegate = false } = {}) {
+export function* botPrepBeginSteps(m, ps, { delegate = false, pooled = false } = {}) {
   if (!ps.alive || ps.ready) return null;
   m.autoPickPersonalChoice(ps, 'bot');
   // 1. reward offers (free)
@@ -1470,7 +1481,7 @@ export function* botPrepBeginSteps(m, ps, { delegate = false } = {}) {
   yield* arrangeSteps(m, ps);
   equipItems(m, ps);
   yield;
-  return yield* arrangeSteps(m, ps, { final: true, defer: true, delegate });
+  return yield* arrangeSteps(m, ps, { final: true, defer: true, delegate, pooled });
 }
 
 /** Prep routine, end: the rehearsed layout (when it beat the default plan), temp, a free hand slot, Ready. */
@@ -1844,7 +1855,7 @@ export function arrange(m, ps, opts = {}) {
 }
 
 /** arrange as a step generator (yields inside the layout planning, see planLayoutSteps). */
-export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = false } = {}) {
+export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = false, pooled = false } = {}) {
   const ctx = context(m, ps);
   let chosen = chooseLineup(m, ps, ctx).set;
   let chosenSet = new Set(chosen.map((p) => p.uid));
@@ -1875,7 +1886,7 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
     plans.push(yield* planLayoutSteps(m, ps, chosen));
   }
   if (defer && plans.length > 1) {
-    const job = yield* createRehearsalSteps(m, ps, chosen, plans, { delegate });
+    const job = yield* createRehearsalSteps(m, ps, chosen, plans, { delegate, pooled });
     yield* applyPlanSteps(m, ps, chosen, plans[0]);
     return job;
   }

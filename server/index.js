@@ -62,6 +62,7 @@ import { createAssetIndex } from './http/assetIndex.js';
 import { createManifestViews } from './http/assetViews.js';
 import { answerClientError } from './http/common.js';
 import { createEventLoopMonitor } from './health/eventLoop.js';
+import { createRoomWorkerPool } from './workers/roomPool.js';
 import { lanUrls, displayHost, isProcessEntry, runMain } from './http/boot.js';
 
 // The public API of this module (tests and tools import it from here); the code lives in ./http/.
@@ -135,7 +136,12 @@ export async function startServer(opts = {}) {
   // an out-of-memory abort in a worker thread ends the whole server)
   const transport = String(process.env.SP_MATCH_HOST || '').trim().toLowerCase() === 'worker' ? 'worker' : 'process';
   const hosts = createMatchHosts({ contents, log, options: { transport, maxWorkers: Math.max(1, policy.get().maxSets), ...(opts.matchHost || {}) } });
-  const { registry, lobby, network } = createSessionStack(opts, { data, log, content, plugins: roomSets, hosts });
+  // The server's own simulation pool for bot layout rehearsals (server/workers/roomPool.js), null unless SP_WORKERS
+  // names a size: a pool per room would multiply the thread count, so every room submits into this one. Refusals are
+  // per-rehearsal only — Match.poolRehearsal runs those candidates here instead — so a busy pool costs latency, never a
+  // different layout. `[loop]` above is what says whether that latency is the rehearsal or the battle slice.
+  const simPool = createRoomWorkerPool({ data, log });
+  const { registry, lobby, network } = createSessionStack(opts, { data, log, content, plugins: roomSets, hosts, simPool });
   // Main-thread event-loop delay sampling (server/health/eventLoop.js): on by default, no worker pool involved, and a
   // LOCAL log line per window (`[loop] p50=… p95=… p99=… max=… cpu=… mem=… rooms=… humans=… phase=…`) — deliberately not
   // part of /healthz. This is what tells an operator whether a stall is the rehearsal / battle slice or something else.
@@ -205,6 +211,7 @@ export async function startServer(opts = {}) {
     assetIndex?.close();
     studio?.close();
     eventLoop?.close();
+    await simPool?.close();
     await trustedRuntime?.close();
     throw e;
   }
@@ -223,6 +230,8 @@ export async function startServer(opts = {}) {
     closing = (async () => {
       try { lobby.shutdown('shutdown'); } catch (e) { log.error('[shutdown] lobby', e); }
       try { hosts.close(); } catch (e) { log.error('[shutdown] match hosts', e); }
+      // after the lobby: every room is gone, so no rehearsal can still be waiting on a thread
+      try { await simPool?.close(); } catch (e) { log.error('[shutdown] simulation pool', e); }
       eventLoop?.close();
       network.close();
       assetIndex?.close();
@@ -238,7 +247,7 @@ export async function startServer(opts = {}) {
     return closing;
   }
 
-  return { port: actualPort, host: boundHost, url, server, wss, lobby, network, registry, packs, content, visual, contents, hosts, traffic, assetIndex, views, studio, eventLoop, close };
+  return { port: actualPort, host: boundHost, url, server, wss, lobby, network, registry, packs, content, visual, contents, hosts, traffic, assetIndex, views, studio, eventLoop, simPool, close };
 }
 
 // `node server/index.js` / npm start: listen, print the banner, stop on SIGINT / SIGTERM (http/boot.js).
