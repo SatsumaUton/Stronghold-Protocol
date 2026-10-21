@@ -583,6 +583,37 @@ for a dodge fx whose payload is `num: 'm'` (PRTS 作战机制 「伤害红字（
 digits in that mode. The mark is computed in the sim; the random offset above the model is client-side. The
 simplified board uses the same mark with a fixed slot. The title footer links the project repository in a new tab.
 
+### Lobby backdrop and music (PR #643 split 8)
+
+`ui/lobbyMedia.js`, a remake feature the event does not have (the Screens line above has its place in the lobby). The
+files live in IndexedDB `sp-lobby-media` (one record per slot), the switches, scene and 暗度 in the pref `lobby.media`.
+The database is opened at start only when the own backdrop or music is on, else when the dialog opens, so a visitor
+who never opens it never creates it; every open and write has a timeout [ASSUMED: 8 s / 30 s], and a failed save says
+「浏览器存储空间不足」 only for a `QuotaExceededError` (else 「浏览器存储不可用」). Checks when a file is chosen (the
+limits [ASSUMED]; the pixel caps are #643's): 20 / 60 / 20 MB for picture / video / music; a still picture past 2560 px
+on its longest side is re-encoded to 2560 on a canvas (a JPEG stays JPEG, anything else WebP — PNG where the browser
+cannot write WebP — so transparency survives), while one that may move (any GIF, an APNG's `acTL`, the WebP VP8X
+animation flag, an AVIF `avis` brand: `isAnimatedImage`, sniffed from the first 64 KiB) is never re-encoded and is
+refused past 2560 px; a video is read up to `loadedmetadata` (iOS loads no more before playback) and refused above
+1920×1080 pixels or 1920 on a side; music is refused past 6 minutes [ASSUMED] — first by its `<audio>` metadata when that
+says it is more than 30 s longer, so a long file is never decoded, then by its decoded length. The music is decoded
+once, in the audio manager's context (`audio.decodeBytes`), and that buffer is handed to `setLobbyTrack` as `decoded`
+(no second decode); before any gesture it is checked in an OfflineAudioContext instead. A timeout and a file that does
+not decode have their own messages. With reduced motion the video is started and paused at once (iOS paints no frame
+before playback) and a moving picture is drawn once on a canvas (its first frame); the generated scene renders nothing
+while the own backdrop covers it.
+
+The own track sits in the audio manager's buffer cache like any track. `_buffer` records a decoded size only while its
+entry is still cached, and `_trimBuffers` drops a size without its entry, so a track switched off, deleted or replaced
+while it was read or decoding can no longer leave its PCM in the budget (a 4-minute song is ~90 MB, past the whole
+budget: every sound was then evicted right after it was added, until a reload; #814 review). The loop that plays or is
+being started (`bgmStarting`) is never evicted; it counts toward the 64 MB budget, but the other sounds always keep at
+least half of it [ASSUMED], and when the budget is over, idle buffers above 16 MB (music) leave before the LRU walk. Before, a track past the budget — the official 190.9 s
+m_bat_kazimierz2_2_loop, or a long own song — flushed every sound and then itself on each start, because `bgm` is still
+null while a track loads. The own music replaces every `lobby`-key screen and, in this browser, a cosmetic plugin's
+`audio.bgm.lobby`; leaving the lobby screens, it is re-read from the stored file and decoded again on return when the
+battle's sounds have pushed it out.
+
 ### Deploy animation replays (§31.8)
 
 PR #416 by @Cromemadnd. A prep piece that lands plays its Start clip again with its landing sound, once per landing
