@@ -38,9 +38,10 @@ npm run lint && npm run check:imports && npm run typecheck       # 代码检查�
 
 `ci-shards.json` 是把 `npm test` 的全量切成 4 片的权重表，每个测试文件恰好属于一片，按测到的耗时均衡：`npm run shards -- --check`
 打印每片的负载和偏差，`--print 0` 列出某片的文件，`--run 0` 只跑那一片。新增测试文件不用重新测量，按默认权重落进最轻的一片；
-一个文件明显变慢之后用 `node tools/ci-shards.mjs --write --timings report.xml` 重新计权（report 由
-`node --test --test-reporter=junit --test-reporter-destination=report.xml …` 生成）。`test/ci-shards.test.js` 守着
-「每个文件恰好一片」和「偏差不超过 1.3×」。
+权重表按 CI 实跑的时间重新计权：从 16 个 job 的 JUnit artifact 下载 `junit-*.xml`，然后
+`node tools/ci-shards.mjs --write --timings junit-*.xml`（一个文件出现在几个 job 里就取中位数，避免单次抖动）。
+本机想自己出一份报告可以用 `node --test --test-reporter=junit --test-reporter-destination=report.xml …`，但本机与
+runner 的快慢不同，表以 CI 为准。`test/ci-shards.test.js` 守着「每个文件恰好一片」和「偏差不超过 1.3×」。
 
 CI 的 `test` job 用的就是这套切分：ubuntu/windows × node 22/24 各跑 4 片，16 个 job 合起来才是完整的 `npm test`。
 `npm test` 自己（`node tools/test-run.mjs`）在不设 `SHARD` 时仍然跑全量，所以本地命令和以前一样；想复现某个 CI job 用

@@ -18,17 +18,28 @@ import { SHARD_COUNT, shardsOf, testFileList } from './ci-shards.mjs';
 
 /**
  * The arguments `node` is started with: `--test` and the files of the run.
+ *
+ * `JUNIT=<path>` adds a JUnit report beside the normal output (the reporter that carries `file` and `time` per case, see
+ * tools/test-timings.mjs): ci.yml asks for it and uploads it as an artifact, which is how the shard table is re-weighed
+ * from the times the runners actually take instead of this machine's.
  * @param {Record<string, string | undefined>} [env]
  * @param {string} [root]
  * @returns {string[]}
  */
 export function runArgs(env = process.env, root = ROOT) {
   const shard = env.SHARD;
-  if (shard === undefined || shard === '') return ['--test', ...TEST_FILES];
-  if (!/^\d+$/.test(shard) || Number(shard) >= SHARD_COUNT) {
-    throw new Error(`SHARD=${shard}: expected 0..${SHARD_COUNT - 1} (or unset for the whole suite)`);
-  }
-  return ['--test', ...shardsOf(root).files[Number(shard)]];
+  const args = shard === undefined || shard === ''
+    ? ['--test', ...TEST_FILES]
+    : (() => {
+      if (!/^\d+$/.test(shard) || Number(shard) >= SHARD_COUNT) {
+        throw new Error(`SHARD=${shard}: expected 0..${SHARD_COUNT - 1} (or unset for the whole suite)`);
+      }
+      return ['--test', ...shardsOf(root).files[Number(shard)]];
+    })();
+  // spec first: with --test-reporter given at all the default one is gone, and the job log should keep its summary
+  if (env.JUNIT) args.push('--test-reporter=spec', '--test-reporter-destination=stdout',
+    '--test-reporter=junit', `--test-reporter-destination=${env.JUNIT}`);
+  return args;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

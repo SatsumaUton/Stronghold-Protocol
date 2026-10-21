@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, TEST_FILES } from '../tools/ci.mjs';
 import { MAX_IMBALANCE, SHARD_COUNT, TABLE, assignShards, loadTable, shardsOf, testFileList } from '../tools/ci-shards.mjs';
-import { perFileMs } from '../tools/test-timings.mjs';
+import { perFileMs, perFileMsOf } from '../tools/test-timings.mjs';
 
 const files = testFileList();
 const table = loadTable();
@@ -71,6 +71,15 @@ test('perFileMs: a file sums its cases, other checkouts are dropped, paths are r
     '</testsuites>',
   ].join('\n');
   assert.deepEqual(perFileMs(xml), { 'test/a.test.js': 750 });
+});
+
+test('perFileMsOf: one value per file, the median of the reports that ran it', () => {
+  const one = (file, time) => `<testcase name="x" time="${time}" classname="test" file="${ROOT}/${file}"/>`;
+  const slow = `<testsuites>${one('test/a.test.js', '9')}${one('test/b.test.js', '1')}</testsuites>`;
+  const fast = `<testsuites>${one('test/a.test.js', '1')}</testsuites>`;
+  const mid = `<testsuites>${one('test/a.test.js', '3')}</testsuites>`;
+  // a: 1s, 3s, 9s → 3s; b ran in one report only and keeps that value
+  assert.deepEqual(perFileMsOf([slow, fast, mid]), { 'test/a.test.js': 3000, 'test/b.test.js': 1000 });
 });
 
 test('the command line: --print <n> is that shard\'s list, a shard number outside the matrix is an error', () => {

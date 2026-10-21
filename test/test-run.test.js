@@ -28,6 +28,18 @@ test('a shard outside the matrix is refused, not silently run as the whole suite
   for (const bad of ['4', '9', '-1', '1.5', 'two']) assert.throws(() => runArgs({ SHARD: bad }), /SHARD=/);
 });
 
+test('JUNIT: a report beside the normal output, and nothing extra without it', () => {
+  const args = runArgs({ SHARD: '1', JUNIT: 'junit-a.xml' });
+  const at = args.indexOf('--test-reporter=spec');
+  assert.equal(args[0], '--test', 'still node --test');
+  assert.deepEqual(args.slice(1, at), shardsOf().files[1], 'still exactly that shard\u2019s files');
+  assert.deepEqual(args.slice(at), [
+    '--test-reporter=spec', '--test-reporter-destination=stdout',
+    '--test-reporter=junit', '--test-reporter-destination=junit-a.xml',
+  ]);
+  assert.deepEqual(runArgs({}), ['--test', ...TEST_FILES], 'no JUNIT, no reporter arguments');
+});
+
 test('the command line: --list prints the files of the run, and a bad SHARD exits 2', () => {
   const run = (shard) => {
     const env = { ...process.env };

@@ -35,11 +35,15 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 export const CI_TEST_ENV = { SP_E2E: '0', SP_REAL_E2E: '0', RENDER_E2E: '0', NO_COLOR: '1' };
 
 /**
- * What ci.yml's job `test` adds on top of CI_TEST_ENV: the shard of the matrix this job runs. tools/test-run.mjs turns
- * it into that shard's test files; unset means the whole suite, which is what this machine runs (tools/ci.mjs sets
- * nothing, so `npm run ci` still runs everything).
+ * What ci.yml's job `test` adds on top of CI_TEST_ENV: the shard of the matrix this job runs, and the JUnit report it
+ * leaves for the upload step. tools/test-run.mjs turns SHARD into that shard's test files (unset means the whole suite,
+ * which is what this machine runs — tools/ci.mjs sets neither, so `npm run ci` still runs everything and writes no
+ * report).
  */
-export const CI_SHARD_ENV = { SHARD: '${{ matrix.shard }}' };
+export const CI_SHARD_ENV = {
+  SHARD: '${{ matrix.shard }}',
+  JUNIT: 'junit-${{ matrix.os }}-${{ matrix.node }}-${{ matrix.shard }}.xml',
+};
 
 /** The paths the smoke step requests (the curl URLs of ci.yml's smoke step; test/ci.test.js compares them). */
 export const SMOKE_PATHS = ['/healthz', '/', '/vendor/pixi.min.js'];
@@ -58,6 +62,7 @@ export const SKIPPED_CI_STEPS = [
   { uses: 'actions/checkout', why: 'GitHub runner: the checkout is this folder' },
   { uses: 'actions/setup-node', why: 'GitHub runner: the Node.js of this machine is used' },
   { name: 'Install (npm ci → postinstall copies public/vendor)', why: 'run `npm ci` yourself; it is not a check' },
+  { uses: 'actions/upload-artifact', why: 'GitHub runner: only the JUnit timings the shard table is re-weighed from' },
 ];
 
 /**

@@ -41,21 +41,46 @@ export function perFileMs(xml, root = ROOT) {
   return out;
 }
 
+/**
+ * The time each test file took, in milliseconds, from several JUnit reports: one value per file, the median of the
+ * reports that mention it. A file is measured once per CI job that ran it (ubuntu and windows, node 22 and 24), so the
+ * median is what one runner takes without trusting a single slow or fast job — and a file a report does not mention
+ * (a shard that did not run, a report cut short) keeps the others' value instead of vanishing.
+ * @param {string[]} xmls
+ * @param {string} [root]
+ * @returns {Record<string, number>}
+ */
+export function perFileMsOf(xmls, root = ROOT) {
+  const per = xmls.map((x) => perFileMs(x, root));
+  const files = [...new Set(per.flatMap((m) => Object.keys(m)))].sort();
+  /** @type {Record<string, number>} */
+  const out = {};
+  for (const f of files) {
+    const seen = per.map((m) => m[f]).filter((v) => v !== undefined).sort((a, b) => a - b);
+    out[f] = seen[(seen.length - 1) >> 1];
+  }
+  return out;
+}
+
 // The command line: a report, and where the JSON goes (stdout by default).
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  const file = args.find((a) => !a.startsWith('-'));
-  const outAt = args.indexOf('--out');
-  if (!file) {
-    console.error('usage: node tools/test-timings.mjs <report.xml> [--out <file.json>]');
+  const reports = [];
+  let out = '';
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--out') out = args[++i] ?? '';
+    else reports.push(args[i]);
+  }
+  if (!reports.length) {
+    console.error('usage: node tools/test-timings.mjs <report.xml…> [--out <file.json>]');
     process.exit(2);
   }
-  const ms = perFileMs(fs.readFileSync(file, 'utf8'));
+  const ms = perFileMsOf(reports.map((f) => fs.readFileSync(f, 'utf8')));
   const json = `${JSON.stringify(ms, null, 2)}\n`;
-  if (outAt >= 0) fs.writeFileSync(args[outAt + 1], json);
+  if (out) fs.writeFileSync(out, json);
   else process.stdout.write(json);
   if (!Object.keys(ms).length) {
-    console.error(`${file}: no <testcase file="…"> found — was the report made with --test-reporter=junit?`);
+    console.error(`${reports.join(', ')}: no <testcase file="…"> found — was the report made with --test-reporter=junit?`);
     process.exit(1);
   }
 }

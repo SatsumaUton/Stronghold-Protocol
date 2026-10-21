@@ -38,6 +38,8 @@ jobs:
       NO_COLOR: '1'
       # tools/test-run.mjs runs this shard's files: `npm run test` stays the whole suite everywhere else
       SHARD: ${{ matrix.shard }}
+      # …and leaves a JUnit report, the only output that says which file each time belongs to (tools/test-timings.mjs)
+      JUNIT: junit-${{ matrix.os }}-${{ matrix.node }}-${{ matrix.shard }}.xml
     steps:
       - uses: actions/checkout@v7
 
@@ -56,6 +58,17 @@ jobs:
       # SHARD is unset). A bare `node --test` would also run every helper and fixture under test/.
       - name: Unit & integration tests
         run: npm run test
+
+      # The per-file times the shard table is re-weighed from: a job log has the test names but not the files they
+      # belong to, and a JUnit report has both (`node tools/test-timings.mjs <report.xml> …`).
+      - name: Test timings (JUnit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.os }}-${{ matrix.node }}-${{ matrix.shard }}
+          path: junit-*.xml
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: Server smoke test (boot, /healthz, index.html, doctor)
         shell: bash
