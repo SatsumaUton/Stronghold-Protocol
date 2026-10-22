@@ -54,6 +54,33 @@ function garrisonIdsOf(u) {
   return Array.isArray(list) ? list : EMPTY;
 }
 
+/** 远牙: the trait its own traits grant also gains on body / substitute switches (act2autochess_gar_event_onstart). */
+const FAR_TOOTH_CHAR = 'char_430_fartth';
+let FAR_TOOTH = null;
+let FAR_TOOTH_DATA = null;
+const FAR_TOOTH_DEFAULT = Object.freeze(new Set(['garrison_108_a', 'garrison_108_b']));
+/**
+ * The garrison ids 远牙's own traits grant (bbStr.give_garrison_id): garrison_108_a/b (granted by garrison_148_a/b), or
+ * on another version's build (S.isVersionData) the grants found by charId over its official chess records — garrison
+ * and chess ids are season-local.
+ */
+function farToothGrants() {
+  const d = S.gameData();
+  if (!S.isVersionData(d)) return FAR_TOOTH_DEFAULT;
+  if (FAR_TOOTH_DATA !== d) {
+    FAR_TOOTH_DATA = d;
+    FAR_TOOTH = new Set();
+    for (const [id, c] of Object.entries(d.chess || {})) {
+      if (c?.charId !== FAR_TOOTH_CHAR || !S.isOfficialId('chess', id) || !Array.isArray(c.garrisonIds)) continue;
+      for (const gid of c.garrisonIds) {
+        const give = S.garrisonRecord(gid)?.bbStr?.give_garrison_id;
+        if (typeof give === 'string' && give) FAR_TOOTH.add(give);
+      }
+    }
+  }
+  return FAR_TOOTH;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // install
 
@@ -318,7 +345,8 @@ const INSTALLERS = {
     });
     // Player-confirmed: 远牙's granted trait also gains on each body / substitute switch (DESIGN §28.5).
     // Restrict this extra trigger to that trait; use its existing amounts, active-bond checks and battle cap.
-    const farTooth = byUnit(list.filter((it) => it.gid === 'garrison_108_a' || it.gid === 'garrison_108_b'));
+    const granted = farToothGrants();
+    const farTooth = byUnit(list.filter((it) => granted.has(it.gid)));
     if (farTooth.size) battle.on('dollSwap', ({ unit }) => {
       const arr = farTooth.get(unit);
       if (arr) for (const it of arr) fireGain(battle, it);

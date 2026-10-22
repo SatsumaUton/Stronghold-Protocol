@@ -9,11 +9,15 @@ import { startCountdown } from '../../tokens.js';
 import {
   num, bv, tbb, tdesc, moduleBb, parseN, live, enemiesIn, isTok, onDefaultSkill, selectedSkill, aura,
 } from '../shared/tier6.js';
+import { abyssalOf } from '../shared/tier5.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
-/** 深海猎人 (character_table groupId "abyssal" — checked against the official table; data/chess.json has no group id). */
-const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
+/**
+ * 深海猎人 (character_table groupId "abyssal" — checked against the official table; data/chess.json has no group id): the
+ * list of the loaded data (../shared/tier5.js abyssalOf), by charId only.
+ */
+export const isAbyssal = (u) => abyssalOf().has(u?.def?.charId);
 
 /**
  * 鼓舞 (ba.inspire "获得额外附加的基础属性加成（同类属性取最高）"): +`val` ATK after the target's own multipliers (flat
@@ -178,7 +182,7 @@ function skadi2(bb, chess, def) {
         aura(battle, unit, 0.5, () => {
           const toks = seaborns(battle, unit);
           const ops = covered(battle, unit, toks).filter((a) => a !== unit && a.kind === 'op');
-          const val = ops.some((a) => ABYSSAL.has(a.def?.charId)) ? a2 : ops.length ? a1 : 0;
+          const val = ops.some(isAbyssal) ? a2 : ops.length ? a1 : 0;
           const own = battle.alliesInGrid(unit).filter((a) => a !== unit && a.kind === 'op').length;
           const total = val + (own >= mCnt ? mAtk : 0);
           const dPct = ops.length ? d1 : 0;

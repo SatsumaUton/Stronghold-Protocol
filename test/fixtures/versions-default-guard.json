@@ -1,0 +1,68 @@
+{
+  "_": "Default-version guard (test/versions-default-guard.test.js); an intended change of the default version must regenerate test/fixtures/versions-default-guard.json with SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js and give the reason in the commit.",
+  "data": {
+    "data/assets.json": "b0550f8b05742b25007dba1db433b797a5d3fea2cf80809ee4061de034693b03",
+    "data/backups.json": "3df06b7d5bfacba9d3d5a7afafb98adb799a32b0fadf7dd1ddea435144195854",
+    "data/bands.json": "8f18abc99eb50639a1f2fc679a84015d6d8cc8aa3ff7c7d22ad6db5dc347053b",
+    "data/bonds.json": "53a22f4724771b6ff40041635e907c0af39790731f661b0439fc593f5a91c94c",
+    "data/bosses.json": "427c12bcdb23c449ab2d423129b1d339ecd76cc7c70a181a3d2b5a4af88b96a9",
+    "data/chess.json": "0b88903c065fc8974158bba2298147844826820d862637990494dc2635cba064",
+    "data/choices.json": "ed4572cac6905a56a14faebfd1f69ab4e2e5710573a27e486bd8e9be4f2b7100",
+    "data/config.json": "3a51093bbbec4578e1d4161e73b90647093fd7a3c7395e4dfc5be1fb864e3888",
+    "data/effects.json": "96e28be614f04da6d58c9e95706d742863c756b94dcad498e808c3410ba620e3",
+    "data/emotes.json": "1c63ef4c57c1184b140d7830d1ada3ee4f1e4db7bb877570ab033399f7565aa4",
+    "data/enemies.json": "043fdad2dd0dc210f285355d6a4db70f5466c898c6bbcd0d56ee9b219f6e1f45",
+    "data/factions.json": "d1bdf2a40ce5fa1e082551f12ce764a7ec3bfbef75c8a306e5b2b50fb34d797b",
+    "data/garrisons.json": "f5b1f5558a263c95abcf36411c31e781efd3ebb1bebdced99ad1f242c2a960e3",
+    "data/i18n/en.json": "3359e632a6ca9412c0fcfcde32f437fd6d8d557fe91c01be85108cbb171391ed",
+    "data/i18n/ja.json": "7e4d607833eb48d5f977598d9490100e5fb279db21d11f2866427fa4e9d038ff",
+    "data/i18n/ko.json": "d6a20b7f0a7ce7d646ad965ca5f1458d50e878d37211b86806c9bd56ddcc2276",
+    "data/i18n/zh-TW.json": "810e7c5fa53cb901f51dac07016b0bb185e4964ae18ce3574a6ca04244316252",
+    "data/items.json": "6122a3cd75531f551a03082f000426a2d6b8028788fbd1abbaea5286592fbba4",
+    "data/stages.json": "1939b85b5b34bd943a334244ae62806b296f5a5a614b3e0876a84ef801be40df",
+    "data/tokens.json": "9e3501357b07d754711fcfd8506286efa32b7774d98e419fdcff48c1f6729b39",
+    "data/tuning.json": "931253292844e51327e5273197dc03fb425bc966b65cb496f1f55f26832da3fd",
+    "data/waves.json": "80cb535958f22a1bf4ea71b26155c6f92ee1b49dd24b88acf4b2bcdf73d80e68"
+  },
+  "golden": {
+    "test/golden/bonds.json": "873e039d862eae11e3e67101736942cdefca2d92b5d4092b4874162a813a784b",
+    "test/golden/diy.json": "22123f7935353523e0476f719813ad806d4c22d02a8d6300d63669d63856c431",
+    "test/golden/fields.json": "28650e3cac6fdcc3b589456c2e4a35b3b4ac2ad7f298d0b47b0ae43bc5b01035",
+    "test/golden/matches.json": "6a44edc1a23713ee2508bfd9e31bc586cbdc84c177642be31a24ddd067f1be93",
+    "test/golden/roster.json": "eb4cde7ae9226633ef76a2db001687e61dc39dc49dd0f86d4903e4865ffbc734",
+    "test/golden/standins.json": "4dd432566bbb024226b9cac3b1f42049f683fe0b6bd2a7a1c94c8e10441465cc"
+  },
+  "kat": {
+    "cs": "7d6565abd4c1ec7ceaf979a2d82f90a04f5fe3a11a03d822c6775b2a6c632309",
+    "sim": "f03a3610c2c41607ef1c8fe00e88ed771c6cfdab0b0a164dbbc4d7d2deeb304f",
+    "contentHashVersion": 1
+  },
+  "roomState": {
+    "t": "room.state",
+    "code": "<code>",
+    "hostId": "<player>",
+    "mode": "coop",
+    "difficulty": "NORMAL",
+    "aiPicksLast": false,
+    "inMatch": false,
+    "seats": [
+      {
+        "seat": 0,
+        "playerId": "<player>",
+        "name": "<name>",
+        "isBot": false,
+        "ready": false,
+        "connected": true
+      },
+      null,
+      null,
+      null
+    ],
+    "spectators": [],
+    "content": {
+      "cs": "<vanilla cs>",
+      "vanilla": true,
+      "plugins": []
+    }
+  }
+}

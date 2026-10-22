@@ -100,6 +100,11 @@ import { SKILL_SUMMON_START_DEPLOY } from '../../../shared/constants.js';
 import { hypot } from '../detmath.js';
 import { atPotential } from '../../../shared/potential.js';
 import { textFinite } from '../../../shared/plugins/textNumber.js';
+import { isOfficialId, isVersionData } from './support/index.js';
+
+// Re-exported for the kits, which never import an index module (test/content/kits_layout.test.js): the group lists that
+// grow on another version's build only (DESIGN §35.22.4).
+export { isVersionData };
 
 const num = (v, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : (typeof v === 'string' && v.trim() !== '' && Number.isFinite(+v) ? +v : d));
 const GRID_3X3 = Object.freeze([[1, -1], [1, 0], [1, 1], [0, -1], [0, 0], [0, 1], [-1, -1], [-1, 0], [-1, 1]]);
@@ -195,6 +200,8 @@ const ownerOf = (u) => (u.ownerUnit && u.ownerUnit.side === 'ally' ? u.ownerUnit
  */
 const managed = (u) => !!(u.ownerUnit && u.ownerUnit.kit && u.ownerUnit.kit.generic !== true);
 const baseKey = (id) => String(id ?? '').replace(/_[ab]$/, '');
+/** 夕 (char_2015_dusk): her generic-kit fallback summons 小自在 at the first target (install). */
+const DUSK_CHAR = 'char_2015_dusk';
 
 function onDeploy(battle, unit, fn, priority = 0) {
   battle.on('deploy', (ctx) => { if (ctx.unit === unit) fn(ctx); }, { owner: unit, priority });
@@ -1790,7 +1797,10 @@ export function install(battle) {
       }
     }
     if (!kitGeneric) continue;
-    if (toks.includes(TOKEN_IDS.duskDragon) && base === 'chess_char_5_12') {
+    // 夕: chess_char_5_12, or on another version's build by charId (上半 gives chess_char_5_12 to 林) and an official
+    // chess only (a plugin chess_x_ record keeps its own kit's behaviour)
+    const isDusk = isVersionData() ? owner.def?.charId === DUSK_CHAR && isOfficialId('chess', base) : base === 'chess_char_5_12';
+    if (toks.includes(TOKEN_IDS.duskDragon) && isDusk) {
       const life = num(owner.def?.talents?.find((t) => t.tokenKey === TOKEN_IDS.duskDragon)?.bb?.['attack@tokenduration'], 0);
       battle.on('deploy', (ctx) => { if (ctx.unit === owner) owner.mem.duskPending = true; }, { owner });
       battle.on('attack', (ctx) => {

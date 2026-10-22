@@ -73,7 +73,9 @@ function bandProfile(id, band, data, gd) {
       'Useful against uneven DEF/RES; does not remove the leader hit limit.');
     if (/coin|price_change/.test(b.key)) classes.push('economy');
     if (/copy_max/.test(b.key)) classes.push('elite-merge');
-    if (b.key === 'auto_chess_change_map' || b.key === 'round_start_all_player_change_enemy_2') classes.push('team-support');
+    // Touch's map characters only: 上半's 森蚺 names a device (trap_1104_aclasert#n) under the same key (DESIGN §35.22.5)
+    const mapChars = b.key === 'auto_chess_change_map' && Object.keys(b.bb || {}).some(k => k.startsWith('char_') && k.includes('#'));
+    if (mapChars || b.key === 'round_start_all_player_change_enemy_2') classes.push('team-support');
     if (b.key === 'round_start_all_player_change_enemy_2') add('team-enemies', 'team-support', p,
       `From R${p.round}, replace ${p.min}–${p.max} eligible ground enemies on each living player's field with the listed bounty enemies.`,
       'Review teammates\' early survival before choosing enemy replacement for its income.');
@@ -136,7 +138,13 @@ function recommendedSchedule(gd, operators) {
   });
 }
 
-export function buildPlaybook(data, { modeId, community = COMMUNITY } = {}) {
+/**
+ * The community evidence (strategy-community.js) lists default-data (下半) ids, which another official version gives to
+ * other operators and items: a non-default version's data (config.version) gets none until it has its own (M3).
+ */
+const NO_COMMUNITY = Object.freeze({ revision: null, mains: [], pairs: [], builds: [], roles: [] });
+
+export function buildPlaybook(data, { modeId, community = data?.config?.version ? NO_COMMUNITY : COMMUNITY } = {}) {
   const gd = new GameData(data, modeId);
   const operators = sorted(gd.visibleChess.map(id => {
     const c = gd.chess(id);
