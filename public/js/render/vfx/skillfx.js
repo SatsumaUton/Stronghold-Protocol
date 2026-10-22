@@ -891,6 +891,9 @@ export class SkillFx {
       this.tloops.clear();
       for (const t of this.aloops.values()) t.h.stop();
       this.aloops.clear();
+      // the held crosshairs too (PR #862 review): their handles died with the effects, a later lock starts afresh
+      for (const L of this.locks) this._endLock(L);
+      this.locks.length = 0;
       this.tier = tier;
       this.wasActive = active;
     }
