@@ -3,7 +3,7 @@
 // draft opens. server/sim/content/bands/meta.js header.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeMatch, DATA } from './harness.js';
+import { makeMatch, DATA, give, legalTileFor } from './harness.js';
 import { createRegistry } from '../../server/match/effectsMeta.js';
 
 const REG = createRegistry({ log: { warn() {}, error() {}, info() {} } });
@@ -39,5 +39,30 @@ test('#851 single NORMAL (R3 not a 机变 round): 老鲤 still grants at the R3 
   assert.ok(!m.gd.spRounds().includes(3));
   h.toPrep(3);
   assert.deepEqual(grants.map(([ph, r, t]) => `${ph} R${r} T${t}`).sort(), ['PREP R3 T2', 'PREP R3 T4']);
+  m.dispose();
+});
+
+// DESIGN §35.35: the operators' traits with 「<进入休整期时>」 (SERVER_PREP_START) run at the prep start as well — research 01
+// §4.1 step 6 and appendix A1 (「进入此阶段时，触发<进入休整期时>的效果」), after the round's 机变 draft. Until 0.3.2 they ran
+// on the round start, before the draft opened (the strategies' grants moved in §35.24).
+test('§35.35 同盟 NORMAL: an operator\'s 「进入休整期时」 trait (缄默德克萨斯: a free refresh) runs at the R3 prep start, after the 机变 draft', () => {
+  const h = makeMatch({ mode: 'coop', difficulty: 'NORMAL', humans: 1, bots: 1, seed: 5, registry: REG, fake: true }).start();
+  const m = h.m;
+  h.toPrep(2);
+  const ps = h.ps('p_0');
+  give(m, ps, 'chess_char_4_16_a', 'board', legalTileFor(m, ps, 'chess_char_4_16_a'));
+  const runs = [];
+  const orig = m.dispatcher._call.bind(m.dispatcher);
+  m.dispatcher._call = (p, key, hnd, hook, src, ev, ...rest) => {
+    if (p === ps && src && src.kind === 'garrison' && src.garrison && src.garrison.garrisonId === 'garrison_114_a') runs.push(`${m.phase} R${m.round} ${hook}`);
+    return orig(p, key, hnd, hook, src, ev, ...rest);
+  };
+  assert.ok(m.gd.spRounds().includes(3));
+  assert.ok(h.drive(() => m.phase === 'ROUND_START' && m.round === 3));
+  assert.deepEqual(runs, [], 'nothing at the R3 round start');
+  assert.ok(h.drive(() => m.phase === 'SP_DRAFT' && m.round === 3, { ready: true }));
+  assert.deepEqual(runs, [], 'nothing while the R3 draft is open');
+  h.toPrep(3);
+  assert.deepEqual(runs, ['PREP R3 onPrepStart']);
   m.dispose();
 });

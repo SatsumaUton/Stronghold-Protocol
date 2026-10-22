@@ -1052,8 +1052,10 @@ function lucienCore(ab, e) {
     s && {
       // cast with a target in the radius (PRTS 技能 "需要目标"; 不祥幻影 "仅在半径2范围内存在我方单位时触发"): the trigger
       // selection (targetsNear — PRTS 选择器 "所有触发选择器通常不无视迷彩"): an airborne (起飞) operator evades a ground
-      // leader (对地规避 — counting her spent the skill on nobody, §21.22), nor does an unblocking 隐匿 or 迷彩 one count
-      cd: s.cd, icd: s.icd, sk: s, ...atkSkill(e, 'aoe'), cond: (b) => targetsNear(b, e, LUCIEN_AOE_RADIUS).length > 0, // in the attack's turn
+      // leader (对地规避 — counting her spent the skill on nobody, §21.22), nor does an unblocking 隐匿 or 迷彩 one count.
+      // In the attack's turn: a swing's (blocked) or, with that selector of its own (`own`), the ready attack of an
+      // unblocked one (enemies.js onTick; DESIGN §35.29)
+      cd: s.cd, icd: s.icd, sk: s, ...atkSkill(e, 'aoe'), own: true, cond: (b) => targetsNear(b, e, LUCIEN_AOE_RADIUS).length > 0,
       fire(b, e2) {
         // "该技能伤害无视迷彩": an area selection (areaAllies) — a 迷彩 operator is hit, an unblocking 隐匿 one not
         b.fx('explode', { x: e2.x, y: e2.y, r: LUCIEN_AOE_RADIUS, kind: 'crimsonAoe' });

@@ -1,7 +1,7 @@
 // server/sim/content/kits/ops/chess_char_6_13-angel2.js — 新约能天使 (char_1041_angel2) kit, tier 6.
 // Conventions of the tier-6 kits: ../shared/tier6.js; kit contract and rules: ../README.md.
 
-import { sortEnemyTargets, aggroCmp } from '../../../targeting.js';
+import { sortEnemyTargets, aggroCmp, absoluteRangeKeys } from '../../../targeting.js';
 import { summonToken, TOKEN_IDS } from '../../tokens.js';
 import { num, bv, tbb, live, hasBond, ANY, isTok, selectedSkill, batOf, aura } from '../shared/tier6.js';
 
@@ -148,7 +148,8 @@ function angel2(bb, chess, def) {
         // PRTS 备注: one round per consumption (the bullets one action spends: the engine's 1st and a kit's further ones
         // in the same tick); each bullet heals and rolls the chance, and each success adds a bombing to the round; the
         // target is chosen once per round, by her (her default targeting, 「始终使用默认索敌逻辑」) among the enemies of the
-        // consumer's range (its own range, 「不受对方的攻击距离增减」: baseRangeKeys); the bombings land BOMB_GAP apart,
+        // consumer's range (its own grid, 「不受对方的攻击距离增减」: no 攻击距离 change counts, a permanent one — talents,
+        // modules, bonds, baseRangeKeys' extension — neither [ASSUMED: the note names no exception]); the bombings land BOMB_GAP apart,
         // radius BOMB_RADIUS around the target (附着型弹道: it follows the target), with the damage computed when the round
         // is made (「预计算的物理普通伤害」). Until 0.3.2 every success chose its own target with the consumer's sort and hit
         // radius 1 at once (DESIGN §35.28).
@@ -170,7 +171,7 @@ function angel2(bb, chess, def) {
           if (!(prob > 0) || !(sc > 0) || battle.rng() >= prob) return;
           let r = rounds.get(u);
           if (!r || r.t !== battle.time) {
-            const cands = battle.enemiesInKeys(u.baseRangeKeys || u.rangeKeys || [], unit, ANY);
+            const cands = battle.enemiesInKeys(absoluteRangeKeys(u.rangeGrid || [[0, 0]], u.tileR, u.tileC, u.dir, 0), unit, ANY);
             if (!cands.length) { rounds.delete(u); return; }
             sortEnemyTargets(battle, unit, cands, null);
             r = { t: battle.time, target: cands[0], x: cands[0].x, y: cands[0].y, n: 0, amount: unit.s.atk * sc };

@@ -131,3 +131,26 @@ test('the skill slots that a skill window plays: 泥岩 RefreshShield Skill_2, �
   blade.setSkill(true);
   assert.equal(blade.actor.current, 'Launch_Begin', '掷剑');
 });
+
+// The wind-up look-ahead (render/app/windup.js, render/app.js windUpAttacks): a ['cast', id, slot] queued in the tick of
+// that enemy's 'atk' winds the attack up on the slot (UnitView.windUp's third argument); a cast of another tick does not.
+test('the look-ahead passes a cast of the attack\'s own tick to windUp, null for a cast of another tick', async () => {
+  const { createWindUpLookahead } = await import('../../public/js/render/app/windup.js');
+  const calls = [], starts = [];
+  const view = { actor: null, windUp(dt, kind, slot) { calls.push({ dt: Math.round(dt * 1000) / 1000, kind, slot }); return true; } };
+  const views = new Map([[1, view]]);
+  const la = createWindUpLookahead({ views, woundUp: new WeakSet(), castStart: (v, tv, kind) => starts.push(kind) });
+  const queue = (evs) => ({ forEachUpcoming(a, b, fn) { for (const [e, t] of evs) if (t > a && t <= b) fn(e, t); } });
+  la.run(queue([[['cast', 1, 1], 2.2], [['atk', 1, 9, 'enemy'], 2.2]]), 2);
+  assert.deepEqual(calls.pop(), { dt: 0.2, kind: 'enemy', slot: 1 }, 'the strike slot of the attack\'s tick');
+  la.run(queue([[['cast', 1, 0], 2.1], [['atk', 1, 9, 'enemy'], 2.2]]), 2);
+  assert.deepEqual(calls.pop(), { dt: 0.2, kind: 'enemy', slot: null }, 'a cast of an earlier tick: a plain wind-up');
+  la.run(queue([[['atk', 1, 9, 'enemy'], 2.3]]), 2);
+  assert.equal(calls.pop().slot, null, 'no cast: plain');
+  // a tuple wound up once is not wound up again
+  const e = ['atk', 1, 9, 'enemy'];
+  la.run(queue([[e, 2.2]]), 2);
+  la.run(queue([[e, 2.2]]), 2.05);
+  assert.equal(calls.length, 1);
+  assert.equal(starts.length, 4, 'the cast effects start with each wind-up');
+});

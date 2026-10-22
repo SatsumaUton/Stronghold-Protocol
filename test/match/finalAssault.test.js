@@ -77,6 +77,30 @@ test('boss preview and actual fields share each round\'s draw; the Hidden Core d
   assert.ok(changed > 0, 'some Hidden Core pairs or sides differ from the Final Assault\'s');
 });
 
+// A departure during the Hidden Core's round start / prep re-plans the pairs (platform.js _quit); only the round's first
+// plan draws anew, so the pair the departed player was not in stays whole, as in the Final Assault (DESIGN §35.27).
+test('a departure in the Hidden Core prep keeps the intact pair and re-pairs only the orphan (#845)', () => {
+  for (const seed of [31, 32, 33, 34, 35, 36, 37, 38]) {
+    const h = makeMatch({ mode: 'coop', difficulty: 'HARD', humans: 4, seed, fake: true,
+      script: b => ['boss', 'hidden'].includes(b.kind) ? { bossDps: 1e9 } : {} }).start();
+    try {
+      h.drive(() => h.m.phase === PHASE.PREP && h.m.round === 14);
+      const m = h.m;
+      for (const p of m.order) { p.bondCountBonus.yanShip = 3; p.layers.yanShip = 400; p.recompute(); }
+      h.drive(() => m.phase === PHASE.PREP && m.round === 15);
+      const before = structuredClone(m.bossPairs);
+      assert.equal(before.length, 2);
+      const [gone, orphan] = before[0];
+      m.onLeave(gone);
+      assert.equal(m.players.get(gone).alive, false);
+      assert.deepEqual(m.bossPairs, [before[1], [orphan]], `seed ${seed}: the whole pair stays, the orphan alone`);
+      assert.deepEqual(m.bossWaves.map(w => w.players), m.bossPairs, 'the prep preview follows the re-plan');
+      h.drive(() => m.phase === PHASE.HIDDEN_CORE);
+      assert.deepEqual(m.fields.map(f => f.players), m.bossPairs);
+    } finally { h.m.dispose(); }
+  }
+});
+
 test('boss pool = bloodPoint[difficulty] × the players alive at the fight\'s start (solo × 1) × tuning; config restores the fixed pool; shared and never negative', () => {
   // DESIGN §25.13.4: the owner's decision of 2026-10-06 adopts PR #209 by @qingjingshenghuo (bloodPoint is one player's
   // share) and replaces the fixed pool of 「保持固定血量」 — config bossHpScale (perPlayer false, solo 0.25) restores it.

@@ -98,9 +98,10 @@
 }
 .brief-sec { flex: none; display: flex; flex-direction: column; background: linear-gradient(180deg, rgba(30, 33, 34, .55), rgba(14, 16, 16, .35)); }
 .brief-sec > .brief-bonds, .brief-sec > .brief-banned { padding: 0; background: none; border: 0; }
-/* the grey header bar: icon, title, a faint plate on the right */
+/* the grey header bar: icon, title, a faint plate on the right; it grows with its title (§35.33 and its review: cut 2 px
+   at 大 on phones and at 特大 in a 1024×600 window — at 小 / 中 the bar keeps its .66rem) */
 .brief .brief-h {
-  position: relative; display: flex; align-items: center; gap: .14rem; margin: 0; height: .66rem; padding: 0 .3rem 0 .22rem;
+  position: relative; display: flex; align-items: center; gap: .14rem; margin: 0; height: auto; min-height: .66rem; padding: 0 .3rem 0 .22rem;
   font-size: calc(.32 * var(--t)); font-weight: 700; letter-spacing: .06em; color: #f2f4f4;
   background: linear-gradient(90deg, rgba(122, 126, 128, .5), rgba(92, 96, 98, .42) 60%, rgba(80, 84, 86, .36));
 }
@@ -155,6 +156,8 @@
    hover, keyboard focus on the icon, a long press on touch — the maintainer's decision of 2026-10-22 (ui/matchEnemies.js) */
 .brief .brief-faction__text { display: flex; flex-direction: column; align-items: center; gap: .04rem; min-width: 0; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
 .brief .brief-faction__text b { font-size: calc(.22 * var(--t)); font-weight: 700; color: #e6eaea; }
+/* Korean breaks a faction's name between words (§35.33 review: 「특훈 적 - 비|행」 on phones at 中) */
+.brief .brief-faction__text:lang(ko) { word-break: keep-all; }
 /* that tooltip (ui/components.js TooltipLayer, outside .brief: also the draft dialog's): the only place the description is
    shown, so it keeps the dialog's former 10 px floor on a phone, where 1rem is 40 px — [ASSUMED] the floor and width */
 .tooltip.brief-faction__tip { max-width: max(3.8rem, min(240px, calc(100vw - 16px))); font-size: max(calc(.15 * var(--t)), 10px); }
@@ -216,12 +219,16 @@
 
 /* short landscape phones (≤ 520 CSS px tall) at a big 文字大小 (§35.33; §35.18's leftovers): the header's decorative
    BRIEFING // INFO CHECK gives way (cut at its end and over COUNTDOWN at 大 / 特大), 玩法说明 keeps its book (its label was
-   cut 4–7 px at 特大; the name stays its title and accessible name), and the sections' bars grow with their titles
-   (cut 2 px at 大) */
+   cut 4–7 px at 特大; the name stays its title and accessible name) */
 @media (max-height: 520px) {
   .stephead__micro { display: none; }
   .stephead__guide .btn__label { display: none; }
-  .brief .brief-h { height: auto; min-height: .66rem; }
+}
+/* … and in a short desktop window (≤ 640 px tall: 1024×600) at 大 / 特大 (§35.33 review: the micro cut and over 玩法说明 there) */
+@media (max-height: 640px) {
+  :root[data-text="lg"] .stephead__micro, :root[data-text="xl"] .stephead__micro { display: none; }
+  /* 玩法说明 keeps its book there too (English 「How to Play」 ran past its button on the draft) */
+  :root[data-text="lg"] .stephead__guide .btn__label, :root[data-text="xl"] .stephead__guide .btn__label { display: none; }
 }
 
 /* the pre-game screens' motion (also css/screens/draft.css); none with reduced motion */

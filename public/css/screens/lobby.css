@@ -886,9 +886,16 @@ button.ally-card:hover, button.ally-card:focus-visible { border-color: rgba(93, 
   border: 0;
 }
 /* the difficulty line wraps at the bar's right rather than ending in an ellipsis (§35.33: English 「Difficulty: Standard
-   Simulat…」 at 1280–1440 px, Japanese at 1024×600 特大) */
-.ally-card__bar small { margin-left: auto; min-width: 0; white-space: normal; text-align: right; text-wrap: balance; line-height: 1.2;
-  font-size: calc(.14 * var(--t)); font-weight: 700; letter-spacing: 0; color: rgba(8, 34, 27, .75); }
+   Simulat…」 at 1280–1440 px, Japanese at 1024×600 特大). It keeps a column of at least 10em beside the name, else it
+   takes a row of its own under the name and the bar grows (§35.33 review: squeezed into the 96 px the name left in
+   English at 特大 on 1024×600, six lines ran out of the 42 px bar); Korean breaks between words only (the review:
+   「시뮬레이|션」 once balanced), Japanese by its line-breaking rules */
+.ally-card--create .ally-card__bar { flex-wrap: wrap; align-content: center; row-gap: 1px; height: auto; min-height: max(.74rem, 42px);
+  padding-top: 4px; padding-bottom: 4px; }
+.ally-card__bar small { flex: 0 1 auto; margin-left: auto; min-width: min(100%, 10em); white-space: normal; text-align: right; text-wrap: balance;
+  line-height: 1.2; font-size: calc(.14 * var(--t)); font-weight: 700; letter-spacing: 0; color: rgba(8, 34, 27, .75); }
+.ally-card__bar small:lang(ko) { word-break: keep-all; overflow-wrap: break-word; }
+.ally-card__bar small:lang(ja) { line-break: strict; }
 button.ally-card:disabled { cursor: default; }
 button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8); }
 /* the test-room box under 创建同盟 (test mode only) */

@@ -403,6 +403,10 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .spov__desc { grid-row: 1; grid-column: 3; align-self: end; font-size: calc(.26 * var(--t)); font-weight: 700; color: #d6fbef; letter-spacing: .04em; text-shadow: none; }
 .spov__sub { grid-row: 2; grid-column: 3; align-self: start; font-size: calc(.15 * var(--t)); color: #a2aaa8; }
 .spov__turn { display: flex; align-items: center; gap: .24rem; }
+/* the header's text keeps each language's breaking rules, as the room and the hub do (§35.33 review: on phones the
+   narrower column moved Korean 「처|치」 and Japanese 「カ|ード」 breaks around) */
+.spov__head:lang(ko) { word-break: keep-all; overflow-wrap: break-word; }
+.spov__head:lang(ja) { line-break: strict; }
 .spov__turntxt { display: flex; align-items: center; gap: .08rem; font-size: calc(.24 * var(--t)); font-weight: 700; color: var(--text-md); }
 .spov__turntxt .icon { width: .26rem; height: .26rem; }
 .spov__turntxt.is-mine { color: var(--mint-400); text-shadow: 0 0 .16rem rgba(23, 249, 183, .45); animation: blink 1.2s ease-in-out infinite; }

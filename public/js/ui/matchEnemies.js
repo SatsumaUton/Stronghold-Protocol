@@ -37,6 +37,10 @@ export const leaderBlockOf = (el) => el.closest('.brief-enemy')?.querySelectorAl
  * component), so the markup sits in MatchEnemies' own tree.
  * @param {{ type: string, info: any, m: any, scope: string }} o
  */
+/** A faction's name with a break opportunity after each '/' (「特训敌人/飞行」: English 「Tactical Training/Flying」 broke
+ * inside 「Flying」, a slash between letters giving none — §35.33 review); its text and accessible name unchanged. */
+const slashBreaks = (s) => String(s).split('/').flatMap((part, i) => (i ? [html`/<wbr />`, part] : [part]));
+
 function factionCell({ type, info, m, scope }) {
   const name = info?.name || type;
   const desc = info?.desc || '';
@@ -45,7 +49,7 @@ function factionCell({ type, info, m, scope }) {
       anchor=".brief-faction__icon" within=".modal__box" avoid=${leaderBlockOf}>
     <div class="brief-faction" data-faction=${type}>
       <span class="brief-faction__icon" tabindex="0" role="img" aria-label=${name} aria-describedby=${descId}><${Img} src=${factionIconUrl(m, info?.icon)} /></span>
-      <span class="brief-faction__text"><b>${name}</b></span>
+      <span class="brief-faction__text"><b>${slashBreaks(name)}</b></span>
       ${desc ? html`<span id=${descId} class="brief-faction__desc sr-only">${desc}</span>` : null}
     </div>
   <//>`;

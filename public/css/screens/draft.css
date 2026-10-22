@@ -143,10 +143,36 @@
   /* the header's status (请选择策略 over 跳过选择, whose turn it is, 策略选择完成) takes the step's name's place: at 大 / 特大
      it ran over 选择策略 and 跳过选择 broke into two lines (§35.33); 2/2 stays, and the status says what the step is */
   .draft.has-status .stephead__name { display: none; }
-  .draft-skip { height: auto; min-height: .44rem; white-space: nowrap; font-size: min(calc(.22 * var(--t)), calc(13px + var(--t-step) / 2)); }
+  /* … and the row gives the status real room (§35.33 review: at 中 – 特大 the status still ran over 2/2 in English,
+     Japanese and Korean, the mode tag over 本局信息, 跳过选择 over 2/2; the row itself: below, at every size): here the
+     mode tag, 本局信息 and 2/2 are capped, the status line too, beside 跳过选择 sized to its text. (`.draft` raises these
+     above the base rules written further down: the §35.33 version of the 跳过选择 rule lost to its base `height: .44rem`) */
+  .draft .stephead__mode .dtag { font-size: min(calc(.26 * var(--t)), calc(13px + var(--t-step))); }
+  .draft .stephead__info { height: auto; min-height: .4rem; font-size: min(calc(.2 * var(--t)), calc(12px + var(--t-step))); }
+  /* above 小 本局信息 shows its magnifier only (its name stays the button's title), leaving the status its line */
+  :root:not([data-text="sm"]) .draft .stephead__info > span { display: none; }
+  .draft .stephead__title b { font-size: min(calc(.54 * var(--t)), calc(26px + 2 * var(--t-step))); }
+  .draft .stephead__of { font-size: min(calc(.34 * var(--t)), calc(17px + var(--t-step))); }
+  .draft .dturn__go b { white-space: normal; text-wrap: balance; line-height: 1.15; font-size: min(calc(.4 * var(--t)), calc(15px + var(--t-step))); }
+  /* above 小 the pointing finger gives the status line its width (the line says it is the player's turn) */
+  :root:not([data-text="sm"]) .draft .dturn__finger { display: none; }
+  .draft .dturn__txt b { font-size: min(calc(.28 * var(--t)), calc(14px + var(--t-step))); text-align: right; }
+  .draft .dturn__txt span { font-size: min(calc(.24 * var(--t)), calc(12px + var(--t-step))); text-align: right; }
+  .draft .draft-skip { white-space: nowrap; font-size: min(calc(.22 * var(--t)), calc(13px + var(--t-step) / 2)); }
+  /* the order box's 选择中 / Deciding under its icon (English 「Deciding」 ran 2–6 px past the box at 大 / 特大) */
+  .draft .dorder__box span { max-width: 100%; letter-spacing: 0; font-size: min(calc(.18 * var(--t)), calc(10px + var(--t-step) / 2)); }
+  /* the decorative STRONGHOLD PROTOCOL / COLLABORATIVE SYSTEM gives way at 大 / 特大 (it ran past its .34rem strip) */
+  :root[data-text="lg"] .draft-order__deco span, :root[data-text="xl"] .draft-order__deco span { display: none; }
   .dband__taken { white-space: nowrap; letter-spacing: 0; font-size: min(calc(.21 * var(--t)), calc(12px + var(--t-step) / 2)); }
   .dband__name { white-space: normal; text-wrap: balance; line-height: 1.1; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
     font-size: min(calc(.15 * var(--t)), calc(11px + var(--t-step) / 2)); }
+  /* the two lines keep each language's breaking rules, as the room and the hub do (§35.33 review: 「ワルフ|ァリン」,
+     「オーキ|ッド」, 「ムリナ|ール」 broke before a small kana or ー; Korean 「에르망|가르드」 between syllables): Japanese never
+     starts a line with a small kana, ー or a closing mark; a Korean name stays on one line (its words are single long
+     words here: 「클레멘티아」 cannot break between words) and ends in an ellipsis when longer than the tile, as before
+     §35.33 [ASSUMED: one line rather than a break inside the word] */
+  .dband__name:lang(ja) { line-break: strict; }
+  .dband__name:lang(ko) { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 .dband.is-taken .dband__name { display: none; }
 /* the official orange corner badge (statistics/strategyBadge) on a strategy that earned it — its victorCount of clears in
@@ -240,6 +266,25 @@
 .draft-skip:disabled { cursor: default; color: rgba(236, 238, 238, .45); background: rgba(50, 54, 56, .55); }
 .draft-skip .icon { width: .28rem; height: .28rem; fill: currentColor; }
 .draft-skip[aria-busy="true"] { opacity: .6; }
+/* the header's row at every size (§35.33 review): the left part (离开, the mode capsule with 本局信息, 2/2) keeps its width,
+   the right part takes the rest and the status line wraps in it, balanced, instead of running over 2/2 (English 「Choose
+   Your Strategy」 at 中 – 特大 on phones — where it wraps, ≤ 520 px —, over 选择策略 in 1024–1280 px windows at 大 / 特大); the capsule grows with its
+   tag (「绝境模拟」 cut at 特大 in a 1024×600 window); Korean breaks between words */
+.draft .stephead__left { flex: none; }
+.draft .stephead__right { flex: 1 1 0; justify-content: flex-end; }
+.draft .stephead__status, .draft .dturn, .draft .dturn__go, .draft .dturn__txt { min-width: 0; }
+.draft .stephead__mode.has-extra { height: auto; min-height: .52rem; }
+.draft .dturn__go b { text-align: right; }
+/* the header grows rather than cut its status (two lines in English at 特大 on a 640 px phone) and 跳过选择 sizes to its
+   text (cut at 特大 in a 1024×600 window) */
+.draft .stephead { height: auto; min-height: 1.3rem; }
+.draft .draft-skip { height: auto; min-height: .44rem; padding-top: 2px; padding-bottom: 2px; line-height: 1.25; }
+.dturn:lang(ko), .draft-order__tip:lang(ko) { word-break: keep-all; overflow-wrap: break-word; }
+/* … and while the status shows, the step's name gives way to it in windows up to 1440 px wide or 640 px tall, as on short
+   screens (the 2/2 stays) */
+@media (max-width: 1440px), (max-height: 640px) {
+  .draft.has-status .stephead__name { display: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .draft-order, .dorder, .dorder.is-cur::before, .dorder.is-flash .dorder__box, .dorder.is-flash .dorder__check, .dband, .dband.is-sel::before, .dband__taken,

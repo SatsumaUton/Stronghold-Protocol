@@ -93,6 +93,35 @@ test('卢西恩 / 不祥幻影 (lucienCore): the aoe takes an attack\'s turn —
   assert.equal(abilityOf(lone, 'aoe').casts ?? 0, 0);
 });
 
+test('卢西恩 / 不祥幻影: unblocked, the aoe still takes the ready attack\'s turn with an operator within radius 2 (its own trigger selector)', () => {
+  // PRTS 不祥幻影 「仅在半径2范围内存在我方单位时触发」: the trigger is any selectable operator in the radius, not the attack's
+  // own target — a melee enemy nobody blocks has none (卢西恩 past his blocker). Its turn comes when the attack is ready
+  // and no swing started (enemies.js onTick, `own`); the attack cooldown restarts as after a strike (DESIGN §35.29).
+  for (const key of ['enemy_2017_csphts', 'enemy_2016_csphtm']) {
+    const h = field([{ chessId: 't_wall', row: 11, col: 8 }], { kind: 'normal' });
+    const e = put(h, key, [10, 9], { tag: null });
+    const a = abilityOf(e, 'aoe');
+    assert.ok(a.own, `${key}: the aoe has a trigger selector of its own`);
+    const log = actions(h, e, 30, ['aoe']);
+    assert.equal(e.blockedBy, null, `${key}: nobody blocks it`);
+    assert.equal(e.stats.attacks, 0, `${key}: no normal attack (melee, unblocked)`);
+    const aoes = log.filter((x) => x.what === 'aoe');
+    assert.ok(aoes.length >= 2, `${key}: aoe ${aoes.length}`);
+    assert.ok(aoes[0].t >= sk(key, 'aoe').initCooldown - 1e-6, `${key}: not before its initial cooldown`);
+    const ready = sk(key, 'aoe').cooldown + ATTACK_SKILL_CLIP[key].aoe;
+    for (let i = 1; i < aoes.length; i++) assert.ok(aoes[i].t - aoes[i - 1].t >= ready - 1e-6, `${key}: aoe gap`);
+    // a cast restarts the attack cooldown (the attack's turn spent)
+    const before = a.casts;
+    while (a.casts === before && h.b.time < 120) h.step();
+    assert.ok(Math.abs(e.atkCd - e.s.interval) < 1e-9, `${key}: atkCd ${e.atkCd} after the cast`);
+    // out of the radius: no turn for the aoe
+    const q = field([{ chessId: 't_wall', row: 4, col: 2 }], { kind: 'normal' });
+    const far = put(q, key, [10, 9], { tag: null });
+    q.run(40);
+    assert.equal(abilityOf(far, 'aoe').casts ?? 0, 0, `${key}: nobody within radius 2`);
+  }
+});
+
 test('假想敌：胄: 【灭顶之灾】 replaces an attack (priority 1); 死亡集群 keeps its own timer', () => {
   const key = 'enemy_9013_acstmk';
   const h = field([{ chessId: 't_wall', row: 10, col: 6 }, { chessId: 't_wall2', row: 12, col: 4 }], { tpl: 'act1autochess_h07_01' });
@@ -152,6 +181,22 @@ test('阿利斯泰尔: 【王权号令】 with full SP takes the next attack\'s 
   // between two decrees at least one attack (the SP refills over cost s, at least one turn at the 8.2 s interval)
   for (let i = 1; i < decrees.length; i++) assert.ok(log.some((a) => a.what === 'ATTACK' && a.t > decrees[i - 1].t && a.t < decrees[i].t), `an attack between decrees ${i - 1} and ${i}`);
   assert.ok(log.some((a) => a.what === 'Suicide' && a.t >= 60), '斥退 at a turn after its initial cooldown');
+});
+
+test('阿利斯泰尔: 【王权号令】 needs a target in its own range — an attack whose target only the collider reach takes keeps its turn', () => {
+  // the attack's reach adds the operator's collider (3.4 + 0.25), the decree selects within 3.4 (targetsNear): an operator
+  // √13 ≈ 3.61 tiles away is attacked, but the decree has no target, so the full SP waits and the turn stays an attack
+  // (without the target check in `cond` the turn would be spent on nothing and the SP kept)
+  const key = 'enemy_9032_aclionk';
+  const ov = JSON.parse(JSON.stringify(W.act1autochess_h07_06.overrides));
+  ov[key].skills.find((s) => s.prefabKey === 'Suicide').initCooldown = 600;
+  const h = field([{ chessId: 't_wall', row: 5, col: 14 }], { overrides: ov });
+  const e = put(h, key, [3, 11]);
+  const decree = e.mem.ab.list.find((a) => a && a.atk && !a.sk);
+  const cost = ov[key].skills.find((s) => s.prefabKey === 'equip').spCost;
+  h.run(cost + 4 * e.s.interval);
+  assert.equal(decree.casts ?? 0, 0, 'no decree without a target in its range');
+  assert.ok(e.stats.attacks >= 4, `the turns stay attacks (${e.stats.attacks})`);
 });
 
 test('“萨米的意志”: 【自然涌动】 takes a 冰凌 turn', () => {

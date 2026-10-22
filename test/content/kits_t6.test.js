@@ -21,6 +21,7 @@ const DEFS = {
       id: 'test_lat_a', profession: 'SNIPER', bonds: ['lateranoShip'], skill: null, stats: { atk: 1 },
       rangeGrid: Array.from({ length: 11 }, (_, c) => [0, c]).concat(Array.from({ length: 11 }, (_, c) => [-2, c]), Array.from({ length: 11 }, (_, c) => [2, c])),
     }),
+    test_short_a: chessRec({ id: 'test_short_a', profession: 'SNIPER', skill: null, stats: { atk: 1 }, rangeGrid: [[0, 0], [0, 1]] }),
   },
 };
 
@@ -612,6 +613,38 @@ test('新约能天使 火力电台 (PRTS 备注, DESIGN §35.28): one target per
   assert.equal(onB.length, 3, 'radius 1.3 reaches the enemy 1.22 tiles away (radius 1 did not)');
   onA.forEach((t, k) => assert.ok(Math.abs(t - 0.1 * k) < 0.04, `bombing ${k} at +${t.toFixed(3)} s`));
   assert.ok(near(hits[0].amount, hits[2].amount), 'the round\'s damage computed once');
+  // 「预计算的物理普通伤害」: an ATK buff after the round's first bombing leaves its later bombings at the first amount
+  h.b.rng = Object.assign(() => 0, rng);
+  const t1 = h.b.time;
+  for (let i = 0; i < 3; i++) h.b.emit('ammoUsed', { unit: lat, left: 7 - i, skill: lat.skill });
+  h.b.rng = rng;
+  h.b.addBuff(u, { key: 'test:atk', mods: { atkPct: 1 }, duration: 5 });
+  h.run(0.6);
+  const round2 = h.dmg.filter((d) => d.src === u.id && d.tags.includes('airstrike') && d.tgt === a.id && d.t >= t1 - 1e-9);
+  assert.equal(round2.length, 3);
+  assert.ok(near(round2[1].amount, round2[0].amount) && near(round2[2].amount, round2[0].amount), 'the round keeps the damage it was made with');
+});
+
+test('新约能天使 火力电台: the target among the enemies of the consumer\'s own grid — a permanent 攻击距离 extension does not count', () => {
+  // PRTS 「不受对方的攻击距离增减」: baseRangeKeys carries the permanent extension (talents, modules, bonds), the bombing's
+  // search takes the consumer's grid alone (DESIGN §35.28)
+  const h = battle({
+    units: [{ chessId: 'chess_char_6_13_a', row: 10, col: 1 }, { chessId: 'test_short_a', row: 10, col: 3 }],
+    enemies: [{ key: 'enemy_dummy', pos: [10, 5] }],
+  });
+  const u = h.unit('chess_char_6_13_a'), sh = h.unit('test_short_a');
+  h.step();
+  h.b.addBuff(sh, { key: 'test:range', persist: true, duration: Infinity, mods: { rangeExtend: 1 } });
+  h.step();
+  const d = enemyAt(h, 'enemy_dummy');
+  assert.ok(h.b.enemiesInKeys(sh.baseRangeKeys, u).includes(d), 'the permanent extension reaches the dummy');
+  const rng = h.b.rng;
+  h.b.rng = Object.assign(() => 0, rng);
+  const t0 = h.b.time;
+  h.b.emit('ammoUsed', { unit: sh, left: 4, skill: sh.skill });
+  h.b.rng = rng;
+  h.run(0.3);
+  assert.equal(h.dmg.filter((x) => x.src === u.id && x.tags.includes('airstrike') && x.t >= t0 - 1e-9).length, 0, 'no target in the consumer\'s own grid: no bombing');
 });
 
 test('新约能天使: S2 steals 70 ASPD from an ally in range, shields both, 35+5 ammo; 火力电台 heals per ammo', () => {

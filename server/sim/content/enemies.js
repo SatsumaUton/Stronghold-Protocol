@@ -18,7 +18,8 @@
 //   · tick(b,e,a,dt) every `iv` s (every tick when iv is 0) · skill: `cd`/`left`(=icd)/`cond`/`fire` (cooldown runs
 //   continuously; fires when ready, the enemy can act and `cond` holds; `clip` = the skill's clip length in s, its
 //   cooldown then counting from the clip's end — castNow; `atk: true` = an attack-class skill, cast in place of a
-//   normal attack when ready at a swing's damage frame — attackSlotSkill). `sil: true` = the ability's handbook line
+//   normal attack when ready at a swing's damage frame — attackSlotSkill; `own: true` with it = the skill has a trigger
+//   selector of its own (`cond`), so its turn also comes with the attack ready and no swing — onTick). `sil: true` = the ability's handbook line
 //   is flagged SILENCE (沉默 disables it: exactly the data's `format: "SILENCE"` lines). 萨卡兹枯朽战士 / 组长's
 //   【污染秽蚀】 death fog is the one NORMAL line also silenced (archetypes.js kitPolluted, `enemy_1267_nhpbr` and
 //   `_2` only): the owner's official-play recall of 2026-10-12 is that a death while silenced creates no fog, and
@@ -248,14 +249,15 @@ function attackSlotSkill(b, e, c) {
  * the data's `sk.pr`), equal ones at random (`b.rng`) — and return true, or return false (the turn goes to the attack).
  * The engine's swing calls it at the damage frame (attackSlotSkill); a kit whose leader attacks through its own loop
  * (假想敌：管 / 弦's strikes on 余音, “萨米的意志”'s 【冰凌】: bosses.js) calls it when that loop's attack is due and has a
- * target, and skips the attack when it returns true (DESIGN §35.29).
+ * target, and skips the attack when it returns true (DESIGN §35.29). `ownOnly`: only the skills with a trigger selector
+ * of their own (`own`) — the turn of an attack that is ready with no swing (onTick).
  */
-export function attackTurnSkill(b, e) {
+export function attackTurnSkill(b, e, ownOnly = false) {
   const ab = e.mem.ab;
   if (!ab) return false;
   let ready = null, top = -Infinity;
   for (const a of ab.list) {
-    if (!a || !a.atk || !a.fire || a.cd == null || a.left > 1e-9) continue;
+    if (!a || !a.atk || !a.fire || a.cd == null || a.left > 1e-9 || (ownOnly && !a.own)) continue;
     if (!canCast(e, a.sil, b) || (a.cond && !safe(b, e, () => a.cond(b, e, a)))) continue;
     const pr = a.pr ?? ((a.sk && a.sk.pr) || 0);
     if (pr > top) { top = pr; ready = [a]; } else if (pr === top) ready.push(a);
@@ -329,6 +331,15 @@ function onTick(b, dt) {
         if (!a.atk && a.left <= 1e-9 && canCast(e, a.sil, b) && (!a.cond || safe(b, e, () => a.cond(b, e, a)))) castNow(b, e, a);
       }
     }
+    // An attack-class skill with a trigger selector of its own (`own`: 卢西恩 / 不祥幻影's aoe, 「仅在半径2范围内存在我方单位时
+    // 触发」) also takes a turn when the attack is ready and no swing started this tick — the attack has no target (a melee
+    // enemy nobody blocks: 卢西恩 past his blocker) —, PRTS 「可以攻击时不进行攻击，改为触发技能」 read as the attack's
+    // cooldown being over (DESIGN §35.29). The attack cooldown restarts as after a strike. [ASSUMED] the effect comes at
+    // once (no wind-up: no swing), and the refusals of a normal attack hold (恐惧 / 缴械 / 战栗 while blocked); an enemy
+    // that makes no normal attack (`profile.noAttack`) has none to give up, its cooldown still running out.
+    if (ab.ownTurn && e.alive && !e.swing && !(e.atkCd > 0)
+      && !e.s.flags.fear && !e.s.flags.disarm && !(e.s.flags.tremble && e.blockedBy)
+      && attackTurnSkill(b, e, true)) e.atkCd = e.s.interval;
   }
 }
 

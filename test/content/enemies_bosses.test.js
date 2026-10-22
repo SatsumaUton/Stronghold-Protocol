@@ -31,6 +31,11 @@ const CHESS = {
 const NOATK = () => ({ trait: { noAttack: true } });
 const KITSIN = { t_wall: NOATK, t_wall2: NOATK, t_wall3: NOATK, t_wall4: NOATK };
 
+/** The ability of enemy `e` built for its skill `prefabKey` (its `sk` entry). */
+const abl = (e, prefabKey) => e.mem.ab.list.find((a) => a && a.sk && a.sk === e.mem.ab.sk[prefabKey]);
+/** Casts of `e`'s skill `prefabKey` so far. */
+const casts = (e, prefabKey) => abl(e, prefabKey)?.casts ?? 0;
+
 function arena(o = {}) {
   const { chess = {}, kits = {}, enemies = [], ...rest } = o;
   return makeBattle({
@@ -635,7 +640,10 @@ test(`${nm('enemy_1275_dwlock_2')}: apoptosis on hit; DeathEye channels arts dam
   h.step();
   const e = put(h, 'enemy_1275_dwlock_2', [9, 7]);
   const s = skb('enemy_1275_dwlock_2', 'DeathEye');
-  h.run(s.initCooldown + s.bb.hit_duration + 1);
+  // an attack-class skill: cast in the first attack's turn after its initial cooldown (DESIGN §35.34)
+  h.runUntil(() => casts(e, 'DeathEye') > 0, s.initCooldown + 2 * e.s.interval + 1);
+  assert.ok(h.b.time >= s.initCooldown - 1e-6);
+  h.run(s.bb.hit_duration + 1);
   assert.ok(h.eventsOf('fx').some((f) => f[1] === 'beam' && f[4].kind === 'deathEye'));
   const w2 = h.unit('t_wall2');
   assert.ok(w2.elem.apoptosis >= e.s.atk * s.bb.ep_damage_ratio - 1e-6 || w2.findBuff('apoptosisBurst'));
@@ -1998,7 +2006,9 @@ test(`${nm('enemy_1513_dekght')}: 蓄力攻击 — ${skb('enemy_1513_dekght', 'C
   h.step();
   const e = put(h, 'enemy_1513_dekght', [10, 5]);
   const s = skb('enemy_1513_dekght', 'ChargeAttack');
-  h.run(s.initCooldown + 0.1);
+  // cast in place of an attack on its blocker, the first turn after its initial cooldown (DESIGN §35.34)
+  h.runUntil(() => casts(e, 'ChargeAttack') > 0, s.initCooldown + 2 * e.s.interval + 1);
+  assert.ok(h.b.time >= s.initCooldown - 1e-6);
   assert.ok(h.eventsOf('fx').some((f) => f[1] === 'telegraph' && f[4].kind === 'chargeAttack'));
   const n0 = e.stats.attacks;
   h.run(s.bb.duration - 0.2);
@@ -2235,10 +2245,13 @@ test(`${nm('enemy_1517_xi')}: 纬地经天 cross on the nearest unit; 破桎而�
   assert.equal(h.unit('t_wall3').stats.taken, 0, 'outside the cross');
   h.run(sb.initCooldown - h.b.time + 0.1);
   approx(e.s.shield, sb.bb.dynamic);
-  const w0 = h.unit('t_wall').stats.taken;
+  const w0 = h.unit('t_wall').stats.taken, c0 = casts(e, 'CrossAttack');
   h.run(sb.bb.duration);
   assert.ok(h.eventsOf('fx').some((f) => f[1] === 'explode' && f[4].kind === 'breakFree'));
-  approx(h.unit('t_wall').stats.taken - w0, e.s.atk * (sb.bb.atk_scale + cr.bb.atk_scale), 1e-6, 'barrier held ⇒ blast (+ the next cross)');
+  // the burst and the crosses share the attack's turns (DESIGN §35.34): the crosses cast meanwhile, at most one a turn
+  const nc = casts(e, 'CrossAttack') - c0;
+  assert.ok(nc <= Math.ceil(sb.bb.duration / e.s.interval));
+  approx(h.unit('t_wall').stats.taken - w0, e.s.atk * (sb.bb.atk_scale + nc * cr.bb.atk_scale), 1e-6, 'barrier held ⇒ blast (+ the crosses meanwhile)');
   // a broken barrier never blasts
   const h3 = arena({ units: [{ chessId: 't_wall', row: 10, col: 6 }] });
   h3.step();

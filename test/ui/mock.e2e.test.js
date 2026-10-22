@@ -19,6 +19,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { aimedDrag, groundAnchor, anchorPoint, cameraSettled } from '../e2e/client.mjs';
+import { textProblems } from '../e2e/text-fit.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
@@ -57,9 +58,9 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
     await srv?.close();
   });
 
-  async function open(query, { w = 1920, h = 1080, render = RENDER } = {}) {
+  async function open(query, { w = 1920, h = 1080, render = RENDER, touch = false } = {}) {
     const page = await browser.newPage();
-    await page.setViewport({ width: w, height: h });
+    await page.setViewport(touch ? { width: w, height: h, hasTouch: true, isMobile: true, deviceScaleFactor: 1 } : { width: w, height: h });
     const problems = [];
     page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
@@ -923,6 +924,50 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
       await page.close();
     });
   }
+
+  // §35.33: under the 机变 overlay (.gm.has-sp) every button of the corner (交流, ⚙, 📖 玩法说明, ⛶ 全屏) stays on top — the
+  // element at its centre is the button — in wide windows, where the corner's one row reached under the veil, and on a
+  // coarse phone, where the overlay starts past the corner's wrapped width
+  for (const [w, h, touch] of [[1280, 720, false], [1440, 900, false], [1920, 1080, false], [667, 375, true]]) {
+    test(`the 机变 overlay leaves every corner button clickable (${w}×${h}${touch ? ', touch' : ''})`, async () => {
+      const { page, problems } = await open('phase=SP_DRAFT&variant=supply', { w, h, touch, render: 'fallback' });
+      await page.waitForSelector('.gm.has-sp .spov', { visible: true });
+      const hits = await page.$$eval('.gm__corner button', (btns) => btns.filter((b) => b.getClientRects().length && getComputedStyle(b).visibility !== 'hidden')
+        .map((b) => { const r = b.getBoundingClientRect(); const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return { btn: b.getAttribute('aria-label') || b.className, top: !!at && b.contains(at), over: at && !b.contains(at) ? String(at.className?.baseVal ?? at.className) : null }; }));
+      assert.ok(hits.length >= 3, `corner buttons ${JSON.stringify(hits)}`);
+      assert.deepEqual(hits.filter((x) => !x.top), [], 'every corner button on top');
+      assert.deepEqual(problems, []);
+      await page.close();
+    });
+  }
+
+  // §35.33 review: on short phones a strategy's name takes two lines — Japanese never starts one with a small kana, ー or a
+  // closing mark (「ワルフ|ァリン」), a Korean name stays whole on one line or ends in an ellipsis (「에르망|가르드」 broke
+  // between syllables) — and the header's status no longer runs over 2/2; the team and the solo draft, 中 – 特大
+  test('选择策略 on 640×360 / 667×375 phones in Japanese and Korean at 中 – 特大: the names break by the rules, the header\'s status clear of 2/2', { timeout: 300000 }, async () => {
+    const bad = [];
+    for (const variant of ['', '&variant=solo']) for (const lang of ['ja', 'ko']) for (const textSize of ['md', 'lg', 'xl']) for (const [w, h] of [[640, 360], [667, 375]]) {
+      const page = await browser.newPage();
+      await page.setViewport({ width: w, height: h, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
+      await page.evaluateOnNewDocument((l, ts) => {
+        localStorage.setItem('sp.pref.lang', JSON.stringify(l));
+        localStorage.setItem('sp.pref.settings', JSON.stringify({ textSize: ts }));
+      }, lang, textSize);
+      await page.goto(`${base}/dev/game-mock.html?shot=1&render=fallback&phase=BAND_DRAFT${variant}`, { waitUntil: 'networkidle0' });
+      await page.waitForFunction(() => !!document.querySelector('.screen.draft'), { timeout: 15000 });
+      // the harness renders without the app's language setup: load the pack, then re-render
+      await page.evaluate(async () => { const m = await import('/js/ui/lang.js'); await m.initLang(); globalThis.__MOCK__.mutate(() => {}); });
+      await sleep(900);
+      await page.evaluate(() => document.fonts.ready);
+      assert.deepEqual(await page.evaluate(() => [document.documentElement.lang, document.documentElement.dataset.text]), [lang, textSize]);
+      const found = (await page.evaluate(textProblems, '.draft'))
+        .filter((p) => /dband__name/.test(p) && /line starts with|inside a word/.test(p) || /^over: .*(b\.num|span\.num)/.test(p));
+      for (const p of found) bad.push(`${variant ? 'solo' : 'team'} ${lang} ${textSize} ${w}×${h}: ${p}`);
+      await page.close();
+    }
+    assert.deepEqual(bad, []);
+  });
 
   test('session replacement: recovery action stays clickable above the AI away overlay', async () => {
     const { page, problems } = await open('phase=PREP', { render: 'fallback' });
