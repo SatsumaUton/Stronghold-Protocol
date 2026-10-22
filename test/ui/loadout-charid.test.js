@@ -138,13 +138,19 @@ test('the sync waits for the data the server checks against (canSendSettings)', 
   const CS = 'ab'.repeat(32);
   const v1Room = { code: 'A', version: 'act1autochess', content: { cs: CS, vanilla: true, version: 'act1autochess' } };
   assert.equal(S.canSendSettings({ store: app(null), content: content({}), contentId: () => null }), true, 'the lobby on 第二期下半\'s own files');
-  assert.equal(S.canSendSettings({ store: app(null), content: content({ cs: CS, kind: 'version', status: 'ready' }), contentId: () => CS }), false, 'a lobby of another version: never (the server checks 第二期下半)');
+  assert.equal(S.canSendSettings({ store: app(null), content: content({ cs: CS, kind: 'version', status: 'ready' }), contentId: () => CS }), false, 'a lobby of another version: never (the server checks its default, 第二期下半)');
   assert.equal(S.canSendSettings({ store: app(null), content: content({ cs: CS, kind: 'version', status: 'loading' }), contentId: () => null }), false, 'while loading');
   assert.equal(S.canSendSettings({ store: app(v1Room), content: content({ cs: CS, kind: 'version', status: 'loading' }), contentId: () => null }), false, 'a version room before its data');
   assert.equal(S.canSendSettings({ store: app(v1Room), content: content({ cs: CS, kind: 'version', status: 'ready' }), contentId: () => CS }), true, 'a version room once it is on the page');
   const plain = { code: 'B', content: { cs: 'cd'.repeat(32), vanilla: true, plugins: [] } };
   assert.equal(S.canSendSettings({ store: app(plain), content: content({ cs: CS, kind: 'version', status: 'ready' }), contentId: () => CS }), false, 'a 第二期下半 room while the lobby\'s version is still shown');
   assert.equal(S.canSendSettings({ store: app(plain), content: content({}), contentId: () => null }), true);
+  // A server whose default is another version (SP_VERSIONS=act1autochess SP_VERSION_DEFAULT=act1autochess) checks the
+  // lobby's settings against that version's data (lobby.js dataFor / csOf): the lobby sends once that set is shown.
+  const v1Default = { get: () => ({ room: null, versions: [{ id: 'act1autochess', cs: CS, default: true }] }) };
+  assert.equal(S.canSendSettings({ store: v1Default, content: content({ cs: CS, kind: 'version', version: 'act1autochess', status: 'ready' }), contentId: () => CS }), true, 'the server\'s default version shown');
+  assert.equal(S.canSendSettings({ store: v1Default, content: content({}), contentId: () => null }), false, 'the server\'s own files are not its default version');
+  assert.equal(S.canSendSettings({ store: v1Default, content: content({ cs: 'ef'.repeat(32), kind: 'version', version: 'act1autochess', status: 'ready' }), contentId: () => 'ef'.repeat(32) }), false, 'another cs');
 });
 
 test('the sync engine: no send while the gate is shut; the content\'s arrival, and entering a room after a shut gate, send it', async () => {

@@ -670,8 +670,9 @@ picks are per version (`diyModel.diyPrefKey`: `sp.pref.diy` for 第二期下半,
 `pageVersion()`). 导出 writes v2 (`byChar`, `notOwnedChars`; 自选 names a non-default `version`); 导入 reads v1 (mapped
 through 第二期下半's chess, `importedEntries` / `importedNotOwned`) and v2. Every sync (loadout, 干员持有, 自选, skins, card)
 waits for the data the server checks against (`canSendSettings`): never while the page's content loads; in a room once
-the room's content is on the page; outside a room only while the page shows the server's own files (the server checks
-outside-room settings against 第二期下半, the code constant, whatever its default version) — and a room entered after the
+the room's content is on the page; outside a room only while the page shows the server's default version (the server
+checks outside-room settings against that version's data, `server/lobby.js dataFor` / `csOf`: 第二期下半's own files, or
+on a server whose `SP_VERSION_DEFAULT` names another version that version's checked set) — and a room entered after the
 lobby could not send them sends them then (not at every room entry: the server keeps the session's copy, and five sends
 at once would spend the server's heavy-message budget an edit needs). The wire keys of `room.loadout` / `room.ownership`
 stay the chess ids of the room's data.

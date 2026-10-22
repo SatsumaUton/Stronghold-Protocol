@@ -30,7 +30,8 @@
 // written back through the map of the view it was made on (setEntries / setNotOwned `base`). A v1 store is migrated
 // through 第二期下半's chess.json (migrateSettings; nothing is sent before). The 自选 picks are the version's own
 // (diyModel.js diyPrefKey). Every sync waits for the data the server checks against (canSendSettings): never while the
-// page's content loads, in a room once the room's content is on the page, outside a room only on 第二期下半's own files;
+// page's content loads, in a room once the room's content is on the page, outside a room only on the server's default
+// version (第二期下半's own files unless welcome.versions names another default);
 // a room entered after the lobby could not send them sends them then (not at every room entry: the server keeps the
 // session's copy, and the heavy-message budget is an edit's too).
 
@@ -48,7 +49,7 @@ import { OWNERSHIP_PREF, parseStoredOwnership, parseStoredOwnershipChars, toStor
 import { parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks, diyPrefKey } from './diyModel.js';
 import { skinsStore, SKINS_KEY, SKINS_SYNC_KEY, parseStoredSkins } from './skins.js';
 import { cardStore, CARD_KEY, CARD_SYNC_KEY, cardOperators } from './seatArt.js';
-import { needsContent } from '../versions.js';
+import { needsContent, serverDefaultVersion } from '../versions.js';
 import { DEFAULT_VERSION } from '../../../shared/versions.js';
 import { toast } from './toasts.js';
 import { t, N_ } from '../../../shared/i18n.js';
@@ -376,9 +377,10 @@ export const closeLoadout = () => loadoutStore.set({ open: false });
 
 /**
  * Whether the page may send its settings now (DESIGN §35.23; the server checks them against the data of the room, or
- * outside a room against 第二期下半's — the code constant, whatever the server's default version): never while the
- * page's content is loading; in a room once the room's content is on the page (its version or plugin set checked, or a
- * room of the server's own files showing them); outside a room only while the page shows 第二期下半's own files.
+ * outside a room against the server's default version's — lobby.js dataFor / csOf: 第二期下半's own files unless
+ * welcome.versions names another default): never while the page's content is loading; in a room once the room's content
+ * is on the page (its version or plugin set checked, or a room of the server's own files showing them); outside a room
+ * only while the page shows the server's default version (its own files, or that version's checked set).
  * @param {{ store?: typeof store, content?: typeof appContentSet, contentId?: () => string|null }} [deps]
  */
 export function canSendSettings({ store: app = store, content = appContentSet, contentId = () => data.contentId() } = {}) {
@@ -386,6 +388,15 @@ export function canSendSettings({ store: app = store, content = appContentSet, c
   if (c && c.status === 'loading') return false;
   const room = app?.get?.()?.room;
   if (room && needsContent(room)) return !!c && c.status === 'ready' && c.cs === room.content?.cs && contentId() === c.cs;
+  if (!room) {
+    // A server whose default is another version checks outside-room settings against that version's data.
+    const s = app?.get?.();
+    const def = serverDefaultVersion(s);
+    if (def !== DEFAULT_VERSION) {
+      const entry = Array.isArray(s?.versions) ? s.versions.find((e) => e.id === def) : null;
+      return !!c && !!entry && c.status === 'ready' && c.kind === 'version' && c.version === def && c.cs === entry.cs && contentId() === c.cs;
+    }
+  }
   return contentId() == null;
 }
 
