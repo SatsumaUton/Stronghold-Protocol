@@ -7,6 +7,9 @@
 //   a faulty content module is logged and skipped, never crashing the battle.
 // setupUnitKit(battle, unit, mode) — resolves a unit's Kit: kits[baseChessId]?.(bb, chess, def) ?? generic.
 //   Battle opts.kits ({ [baseChessId]: kitFn }) take precedence (tests / sandboxes).
+//   An official kit is checked against the operator it was written for (officialKitKey, kits/index.js KIT_CHAR_IDS):
+//   another official version gives some chess ids to other operators, whose kit is then found by charId (the tier kit
+//   of the record's tier, else a 自选 op-* kit), or none (generic). The default data maps every chess to its own kit.
 //   补位 stand-ins (isStandInDef: the def of simdata getStandIn — the chess's ids, another character's body): the kit is
 //   kits[def.charId] (the stand-in's own, kits/ops/standin-<codename>.js), never the chess id's — that is the replaced
 //   operator's kit; without one, the generic kit plus the talents it can apply exactly (generic.js genericTalents).
@@ -32,6 +35,7 @@ import { compileDsl } from './dsl/compile.js';
 import { validateSkillSpec, matchesSchema, MODS_SCHEMA } from '../../../shared/plugins/skillSpec.js';
 import { withUnitLoadouts } from '../simdata.js';
 import { isPotential } from '../../../shared/potential.js';
+import { RECORD_MAPS } from '../../../shared/plugins/dataUtils.js';
 
 // Content files are loaded with guarded dynamic imports: a module that fails to load (syntax error, throwing
 // top-level code, missing file) is logged and replaced by an empty module instead of breaking the server.
@@ -77,14 +81,56 @@ export function isDiyDef(def) {
 /** A def whose body is another character than its chess id names (补位 stand-in, 自选 piece): its kit is keyed by charId. */
 const isOtherBody = (def) => isStandInDef(def) || isDiyDef(def);
 
+/** Tier kit key → the charId it was written for (kits/index.js). */
+const KIT_CHAR_IDS = KIT_REGISTRY.KIT_CHAR_IDS ?? Object.freeze({});
+/** charId → its tier kit keys, in KIT_FILES order (kits/index.js). */
+const TIER_KIT_KEYS_BY_CHAR = KIT_REGISTRY.TIER_KIT_KEYS_BY_CHAR ?? Object.freeze({});
+const tierOfKitKey = (key) => Number(/^chess_char_(\d+)_/.exec(key)?.[1]);
+/** A plugin's chess record (shared/plugins/dataUtils.js RECORD_MAPS: chess_x_ ids). */
+const isPluginChess = (id) => String(id ?? '').startsWith(`${RECORD_MAPS.chess[0]}_`);
+
+/**
+ * The official kit of operator `charId`: its tier kit of `tier`, else its first tier kit, else a kit registered under
+ * the charId itself (a 自选 op-* or stand-in kit), else null.
+ */
+function kitKeyForChar(charId, tier) {
+  const keys = TIER_KIT_KEYS_BY_CHAR[charId];
+  if (keys?.length) return keys.find((k) => tierOfKitKey(k) === tier) ?? keys[0];
+  return Object.hasOwn(KITS, charId) ? charId : null;
+}
+
+/**
+ * The key of `def`'s kit in KITS, or null (generic). A stand-in's and a 自选 piece's: its charId (isOtherBody). Any
+ * other def: the kit of its id (baseId, the exact id, or the suffix-less id) when that kit was written for the def's
+ * charId (KIT_CHAR_IDS), else the kit found by its charId (kitKeyForChar). Only an official record with a real charId
+ * takes that second path: test fixtures (charId defaults to the chess id) and plugin chess (chess_x_ ids; forgeImport
+ * leaves `kitRef` out on purpose to keep the generic kit) keep the by-id lookup. Under the default data every chess
+ * resolves to its own id's kit (test/versions-keying.test.js).
+ */
+export function officialKitKey(def) {
+  if (!def) return null;
+  if (isOtherBody(def)) return Object.hasOwn(KITS, def.charId) ? def.charId : null;
+  const bare = String(def.baseId ?? def.id ?? '').replace(/_[ab]$/, '');
+  const byId = [def.baseId, def.id, bare].find((k) => k != null && Object.hasOwn(KITS, k) && KITS[k]) ?? null;
+  const real = typeof def.charId === 'string' && def.charId.startsWith('char_') && !def.charId.startsWith('char_x_') ? def.charId : null;
+  if (!real || isPluginChess(def.baseId ?? def.id)) return byId;
+  if (byId && (KIT_CHAR_IDS[byId] ?? real) === real) return byId;
+  return kitKeyForChar(real, def.tier);
+}
+
 /**
  * The kit builder of an operator def in `reg` ({ [key]: (bb, chess, def) => Kit }), or undefined. A stand-in's and a
  * 自选 piece's kit is keyed by its charId (`char_609_acguad`, `char_112_siege`) and by nothing else: the chess id it keeps
  * names the replaced operator's kit (a DIY slot has none). Any other def: baseId (`…_a`, data/SIM.md), the exact id, or
- * the suffix-less id of DESIGN §5.6's example.
+ * the suffix-less id of DESIGN §5.6's example. The official registry (KITS) goes through officialKitKey, which also
+ * checks the operator; EXTENSIONS and injected Battle opts.kits keep the plain lookup.
  */
 function registeredKit(def, reg) {
   if (!def || !reg) return undefined;
+  if (reg === KITS) {
+    const key = officialKitKey(def);
+    return key == null ? undefined : KITS[key];
+  }
   if (isOtherBody(def)) return Object.prototype.hasOwnProperty.call(reg, def.charId) ? reg[def.charId] : undefined;
   const bare = String(def.baseId ?? def.id ?? '').replace(/_[ab]$/, '');
   return [def.baseId, def.id, bare].map(k => Object.hasOwn(reg, k) ? reg[k] : undefined).find(Boolean);

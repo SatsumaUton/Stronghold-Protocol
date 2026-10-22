@@ -9,7 +9,7 @@ operators, the self-select 6★ operators, contributions from GitHub issue #136 
 
 | path | what |
 |---|---|
-| `index.js` | the registry: `KIT_FILES` lists every kit file, grouped by tier, `STANDIN_KIT_FILES` the 补位 stand-in kits and `OPERATOR_KIT_FILES` the 自选 operator kits; `KITS` (base chess id → kit builder, then stand-in charId → kit builder, then operator charId → kit builder), `TIER_KITS` (one registry per tier group), `STANDIN_KITS`, `OPERATOR_KITS` and `KITTED_CHARS` (who a 自选 slot may field) are built from them |
+| `index.js` | the registry: `KIT_FILES` lists every kit file, grouped by tier, `STANDIN_KIT_FILES` the 补位 stand-in kits and `OPERATOR_KIT_FILES` the 自选 operator kits; `KITS` (base chess id → kit builder, then stand-in charId → kit builder, then operator charId → kit builder), `TIER_KITS` (one registry per tier group), `STANDIN_KITS`, `OPERATOR_KITS` and `KITTED_CHARS` (who a 自选 slot may field) are built from them; `KIT_CHAR_IDS` names the charId each tier kit was written for (`TIER_KIT_KEYS_BY_CHAR` is its reverse), `PENDING_KIT_CHARS` the operators of another official version that have no kit yet |
 | `ops/<chessId>-<codename>.js` | one kit per file, with the helpers and constants only that kit uses |
 | `ops/standin-<codename>.js` | one 补位 stand-in kit per file (below: "Stand-in kits") |
 | `ops/op-<codename>.js` | one 自选 operator kit per file (below: "How to add an operator (自选)") |
@@ -21,6 +21,9 @@ operators, the self-select 6★ operators, contributions from GitHub issue #136 
 id), else the generic kit built from the skill blackboard (`content/generic.js`, docs/SIM.md §7.4). A 补位 stand-in's
 and a 自选 piece's kit is `KITS[def.charId]` and nothing else (`content/index.js kitOf`): it keeps the chess's (the DIY
 slot's) ids, which name the replaced operator's kit (a slot has none).
+The by-id kit is used only when `KIT_CHAR_IDS` names the record's charId (official versions M0, after 0.3.2): another
+official version gives some chess ids to other operators, whose kit is then found by charId (`content/index.js
+officialKitKey`, docs/SIM.md §7.2).
 
 ## Naming
 
@@ -102,6 +105,9 @@ export default {
 3. Append its file name to its tier's group in `index.js` `KIT_FILES` (never reorder the existing entries). Each file
    is loaded with a guarded dynamic import: a file that fails to load is logged and its chess falls back to the
    generic kit, so check the server log when a kit seems to do nothing.
+   Add its line to `KIT_CHAR_IDS` at the same place (`chess_char_3_04_a: 'char_1033_swire2', // 琳琅诗怀雅` — the
+   charId the file's first line names); a kit for an operator listed in `PENDING_KIT_CHARS` also removes it from that
+   list. `node --test test/versions-keying.test.js` checks both.
 4. `node --test test/content/kits_layout.test.js` checks the name, the registry entry and the imports;
    `node tools/kit-coverage.mjs --missing` lists selectable skills that still fall back to the generic spec.
 
