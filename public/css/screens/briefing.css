@@ -241,3 +241,6 @@
   .brief .stephead, .draft .stephead, .stephead__title, .brief-sec, .brief-sec .brief-bonds__row > *, .brief-sec .brief-banned__grid > *,
   .brief__foot .brief-ready, .brief__foot .brief-loadout, .brief-go, .brief-ready__pips i.on { animation: none; }
 }
+
+/* official versions (DESIGN §35.23): the version's tag beside the 非官方 mark */
+.brief__vertag { position: relative; z-index: 2; align-self: flex-start; margin: .06rem .5rem 0; }

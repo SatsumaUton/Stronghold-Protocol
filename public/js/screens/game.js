@@ -19,6 +19,10 @@
 // legality reads the player's half of the boss field (gameLogic deployFieldOf, user playtest #5 item 7).
 // Shortcuts: R refresh, F freeze, D level-up, Space ready, Esc closes the topmost popup.
 // The UI never mutates match state locally; it re-renders from m.public / m.private / m.field pushes.
+// Official versions (DESIGN §35.23): a match of another version waits (正在载入模拟数据…) until the page shows that
+// version's checked data (content.js — a spectator joining a running match, a reload or a resume would otherwise draw
+// the frames with the lobby's data, whose chess ids name other operators); the settlement screen shows the room's
+// version vote (ui/versionVote.js), so a doctor still reading the result can vote.
 // Client-side combat (DESIGN §14, m.public.combatMode 'client'): battles are simulated in this browser by
 // battle/runner.js, which publishes the battle's field meta into store.match.field and feeds the view the same b.snap /
 // b.ev frames the server used to stream. Observing follows research 09 §3.1 (battle/observe.js): no looking elsewhere
@@ -143,6 +147,9 @@ import { keepEarly, audioEarly } from './game/early.js';
 import { MatchEnded, PausedOverlay } from './game/overlays.js';
 import { inspectRange } from './game/range.js';
 import { t, tParts } from '../../../shared/i18n.js';
+import { contentSet } from '../content.js';
+import { DEFAULT_VERSION, shownVersion } from '../versions.js';
+import { VersionVote } from '../ui/versionVote.js';
 import { TestConsole } from '../ui/testConsole.js';
 
 // 作战统计 is opt-in (settings `combatMetrics`, default off). The runner does not import the settings store;
@@ -175,6 +182,11 @@ export function GameScreen() {
   const away = useStore((s) => s.away, Object.is, awayStore);
   const autoplay = useStore((s) => !!(Array.isArray(s.match.public?.players) && s.match.public.players.find((p) => p && p.playerId === s.me.playerId)?.autoplay));
   const gd = useGameData();
+  // another official version: its checked data on the page first (see the header)
+  const version = useStore((s) => { const v = shownVersion(s); return v !== DEFAULT_VERSION ? v : null; });
+  const versionState = useStore((c) => (c.kind === 'version' && c.version === version ? c.status : 'loading'), Object.is, contentSet);
+  const versionReady = !version || versionState === 'ready';
+  const voteRoom = useStore((s) => (s.room?.versionVote && !s.room.inMatch ? s.room : null));
   // 协议启动！'s official sprites (ui/protocolBoot.js), fetched while the briefing and the band draft run
   useEffect(() => { if (gd.ready) preloadBootArt(); }, [gd.ready]);
   // 已选定策略 (PR #643, the event's draft end, video 7:36–7:44): once the draft is over the screen stays DRAFT_HOLD_MS on
@@ -196,10 +208,10 @@ export function GameScreen() {
     const id = setTimeout(() => { hold.current = null; endHold((n) => n + 1); }, Math.max(0, hold.current.until - Date.now()));
     return () => clearTimeout(id);
   }, [held]);
-  if (!pub || !gd.ready) {
+  if (!pub || !gd.ready || !versionReady) {
     return html`<div class="screen gload">
       <${Spinner} size="lg" label=${pub ? 'LOADING DATA' : 'ENTERING SIMULATION'} />
-      <p class="t-lo">${pub ? t('正在载入模拟数据…') : t('正在进入模拟…')}</p>
+      <p class="t-lo">${versionState === 'failed' && version ? t('版本数据未能通过校验，请刷新页面重试') : pub ? t('正在载入模拟数据…') : t('正在进入模拟…')}</p>
     </div>`;
   }
   const mode = phaseMode(pub.phase);
@@ -209,6 +221,7 @@ export function GameScreen() {
   else if (mode === 'draft' || held) body = html`<${BandDraftScreen} held=${held} />`;
   else body = html`<${MatchScreen} />`;
   return html`${body}
+    ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} room=${voteRoom} class="vervote--float" />` : null}
     ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
     ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${TestConsole} />` : null}`;

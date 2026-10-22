@@ -412,3 +412,10 @@
 @media (prefers-reduced-motion: reduce) {
   .modal__box.achv, .achv__scroll > * { animation: none; }
 }
+
+/* official versions (DESIGN §35.23): the version filter under the note lines */
+.st-verfilter { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: .06rem; padding: .08rem .36rem; font-size: calc(.14 * var(--t)); }
+.st-verfilter__k { color: var(--text-lo); margin-right: .06rem; }
+.st-verfilter .dpick__opt { --d-color: #9fd3ff; height: .4rem; padding: 0 .14rem; border: 1px solid var(--line-2); font-size: calc(.14 * var(--t)); letter-spacing: .02em; }
+@media (max-width: 760px) { .st-verfilter { padding-inline: .16rem; } }
+.sp-coarse .st-verfilter .dpick__opt { min-height: 36px; }

@@ -19,7 +19,7 @@ import { StepHeader, ExitModal } from '../ui/matchChrome.js';
 import { MatchBondRow, MatchLegend, BannedOperators, matchInfoModel } from '../ui/matchInfo.js';
 import { MatchEnemies } from '../ui/matchEnemies.js';
 import { LoadoutButton } from './loadout.js';
-import { UnofficialMark } from '../ui/pluginTag.js';
+import { UnofficialMark, VersionTag } from '../ui/pluginTag.js';
 import { SetupReroll } from '../ui/setupReroll.js';
 import { actions } from '../ui/gameActions.js';
 import { sortedPlayers, phaseTotalSeconds } from '../ui/gameLogic.js';
@@ -60,7 +60,7 @@ export function BriefingScreen() {
     <div class="brief__bg" aria-hidden="true"></div>
     <${StepHeader} step=${1} of=${2} title=${t('确认本局信息')} micro="BRIEFING // INFO CHECK" pub=${pub}
       total=${phaseTotalSeconds(pub, gd.config)} onExit=${() => setExit(true)} />
-    <${UnofficialMark} room=${room} class="brief__modmark" />
+    <${UnofficialMark} room=${room} class="brief__modmark" /><${VersionTag} room=${room} class="brief__vertag" />
     <main class="brief__main">
       <section class="brief-sec brief-sec--enemy" style="--i:1">
         <${MatchEnemies} pub=${pub} gd=${gd} />

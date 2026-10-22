@@ -125,7 +125,8 @@ describe('干员调配 卡片视图 (real server, headless Chrome)', { skip: !EN
       await clickSel(page, '[data-testid="loadout-quick"]');
       await page.waitForSelector(`.lo-op[data-chess="${INSIDE}"] .lo-op__quick .lo-q--skill[data-skill="0"]`, { visible: true });
       await page.click(`.lo-op[data-chess="${INSIDE}"] .lo-op__quick .lo-q--skill[data-skill="0"]`);
-      await page.waitForFunction((id) => JSON.parse(localStorage.getItem('sp.pref.loadout') || '{}').entries?.[id]?.skill === 0, {}, INSIDE);
+      // (stored by operator: sp.pref.loadout v2, DESIGN §35.23 — 隐现 is char_498_inside)
+      await page.waitForFunction((id) => JSON.parse(localStorage.getItem('sp.pref.loadout') || '{}').byChar?.[id]?.skill === 0, {}, 'char_498_inside');
       await clickSel(page, '.lo-qseg [data-quick="cult"]');
       await page.waitForSelector(`.lo-op[data-chess="${INSIDE}"] .lo-op__quick--cult select`, { visible: true });
       await page.screenshot({ path: path.join(OUT, 'loadout-cards-quick.png') });

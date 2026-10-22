@@ -536,7 +536,8 @@ The stats page, the lobby's achievement dialog and the strategy draft's wall (`s
 [ASSUMED] Alliance usage means active in the local player's final settlement: once per match, independent of layers;
 inactive bonds retaining layers, teammates and partial quit snapshots do not count. The 0.3.0 storage version (v2, the
 same step as the content set of §32.6) keeps `usedBondIds` when discarding full replay details; v1 full rows still work,
-but discarded old bond data is not reconstructed. Records whose room mode is unknown (`roomMode` null) count in the
+but discarded old bond data is not reconstructed. v3 (0.3.2, DESIGN §35.23) adds a record's official `version` (see
+"Official versions" below). Records whose room mode is unknown (`roomMode` null) count in the
 total but in neither mode row: a line under the rows gives their number (DESIGN §32.14.16).
 
 Title-count display uses the following 20-award boundary, confirmed in the official statistics template:
@@ -597,6 +598,96 @@ while 「显示伤害数字」 is also on, the field draws a red integer for a `
 for a dodge fx whose payload is `num: 'm'` (PRTS 作战机制 「伤害红字（暴击）」). Ordinary hits and heals draw no
 digits in that mode. The mark is computed in the sim; the random offset above the model is client-side. The
 simplified board uses the same mark with a fixed slot. The title footer links the project repository in a new tab.
+
+### Official versions (DESIGN §35.23, M1)
+
+The page shows one official version's data at a time (`public/js/versions.js`): in the lobby this browser's choice
+(`sp.pref.lobby.version`, a registry id of `shared/versions.js`) when welcome lists it, else the server's default
+(welcome.versions' `default`), else 第二期下半 (`DEFAULT_VERSION`, a code constant); in a room the room's version
+(`room.state.version`, absent = 第二期下半); a result shown after its room is gone (a kick, a grace timeout, a settlement
+left open) keeps the version of the last room seen (the store's `matchVersion`, set by every room.state). Without
+welcome.versions (a default server, G4) the switch does not exist and nothing below runs.
+
+**Data.** `content.js installContentSet` follows the version shown: 第二期下半 → the server's own files
+(`data.setContent(null)`); another version → `loadVersionSet(cs, id)`: the version's `/cs/<cs16>/index.json` (it must
+be `vanilla: true`, name the version expected, carry no plugins and no settings, and its composition must hash to the
+cs — the room's `room.state.content.cs` in a room, welcome's entry in the lobby), every data file it lists — only under
+`/data/versions/<slug>/`, no `..` — and its official-bounds snapshot under `/cs/<cs16>/`, each checked by size and
+SHA-256 of its bytes before it is decoded. `data.js` then shows the files (`setContent({ id: cs, values })`; a
+version's files take only the Chinese texts — `versionFiles`, the language folder is keyed by 第二期下半's ids — until
+M3), and `contentSet` says `{ cs, kind: 'version', version, status, loaded, total }`. The set on screen stays until the
+next one is checked (lobby 第一期 → a room of 第二期上半 never shows 第二期下半 in between); a gameplay plugin room still
+starts from the server's files (its own path, `kind: 'plugins'`, unchanged). The last two checked version sets are kept
+(`VERSION_CACHE`): a lobby ⇄ room round trip downloads and checks nothing twice. `room.contentReady { cs }` is sent only
+for the room's own content (never from the lobby), again whenever this page's seat or spectator entry shows another
+state (a reconnect, a page returning to a kept set). A set that fails is said once per set (「版本数据未能通过校验…」),
+told `{ ok: false }`, and the page falls back to the server's files; the lobby chip offers 重试 (`retryContentSet`).
+`pageVersion()` is the version of the data on screen. The battle runner simulates a version set on the page's own
+Battle (`simContent` carries `version` and the bounds; no Worker: the set runs no script, so 作战统计 works) and warms up
+on `room.content.cs` for a version room. `main.js warmGameData` fetches only the art list in a version room (the set
+brings the game files). GameScreen waits for the version set (a spectator joining a running match, a reload or a
+resume would otherwise draw frames with the lobby's data, whose chess ids name other operators). `diag.js contentLine`
+adds ` version=<id>`.
+
+**Lobby.** `ui/versionPicker.js`: VersionSwitch (the chip before 恢复本机对局; a single non-default entry is a plain tag;
+载入中 n% / 校验失败 + 重试) and VersionPicker (the project's Modal: one row per enabled version — its name, the official
+period line, 当前 / 服务器默认 / 预览 with 「部分规则仍按第二期下半，正在逐步复刻」 [ASSUMED], and in a language other than
+Simplified Chinese that its game texts are Chinese for now). The title shows a non-default version under 盟约.
+选择模拟协议 lists `offeredDifficulties(config, roomMode)` of the version shown (its config's modes) and selects
+`fallbackDifficulty` (the server's rule: the highest offered below, else the lowest) when the remembered difficulty is
+not offered — `sp.pref.lobby.difficulty` changes only on a pick; the cards wait (spinner, disabled) while the version
+loads. `room.create` carries `version` only when welcome.versions exists. The 成就统计 card counts the season of the
+version shown.
+
+**Room.** `roomFacts.needsContent` (gameplay plugins or another version) gates ready, start, the seat tags and the
+status line; `modded` stays the 非官方 mark. A version room's words: 版本数据载入中 / 就绪 / 校验失败, 「等待所有博士载入
+「{version}」的数据」, the two GoButton tooltips, the invite 「…盟约·{version}【…】」. `ui/pluginTag.js VersionTag` (nothing for
+第二期下半) sits beside the mode in the top bar and beside UnofficialMark in the briefing, the settlement and the result
+[ASSUMED placement]. The version pill beside the difficulty and ⚙'s 版本 row open the picker in room mode: the host's pick
+sends `room.proposeVersion` (a RATE right after a switch — every page resends its settings, which share the server's
+heavy-message budget — is tried once more after 1.2 s [ASSUMED]); off during a vote, with gameplay plugins (「请先关闭改变
+玩法的插件」) and offline; read-only for everybody else. `ui/versionVote.js` (modelled on `ui/setupReroll.js`): the
+strip between the 观战席 and the footer — title with agreed / voters, a countdown anchored at receipt from
+`remainingMs`, the voters' chips, 同意切换 / 拒绝切换 for a voter who has not agreed, 取消投票 for the host, one request at a
+time; on a short screen it floats over the seats. The settlement screen shows the same strip (`vervote--float`), so a
+doctor still reading the result can vote. A change of `room.version` toasts 「同盟已切换到「{version}」」 (never on entering
+a room) and closes a result of the old version still on screen (`main.js onRoomState`). When the room's version is not
+the lobby's, a banner says leaving restores it (a short screen gives the line up: the pill's tooltip says it). The plugin
+panel disables the gameplay switches in a version room (「改变玩法的插件只能在第二期下半使用」) and shows only a
+`kind: 'plugins'` set's download state.
+
+**Settings by operator.** Chess ids are reused for other operators across versions (第一期下半's `chess_char_1_02_a` is
+讯使, 第二期下半's 角峰), so `sp.pref.loadout` = `{ v: 2, byChar, ops }` and `sp.pref.ownership` = `{ v: 2, notOwnedChars }`
+are keyed by charId and shared by every version. `loadoutStore.entries` / `notOwned` stay views by the chess ids of the
+data on screen (`loadoutModel.charKeyMap` — a chess id → its operator, an operator → its loadout slot first —,
+`entriesView`, `ownershipModel.notOwnedView`), rebuilt whenever that data changes (`installSettingsViews`, main.js) and
+before a send; an edit is written back through the map of the view it was made on (`setEntries` / `setNotOwned` `base`;
+`rebaseByChar` / `rebaseChars`), so an edit of a stale view is re-based, never filed under another version's operator;
+operators the view does not show are kept. A v1 store (by 第二期下半's chess ids) migrates through 第二期下半's
+`/data/chess.json`, fetched directly (`loadDefaultCharMap`, never through data.js, which may show another version);
+nothing is sent before it settles, and a store that could not migrate is not sent against another version's data. 自选
+picks are per version (`diyModel.diyPrefKey`: `sp.pref.diy` for 第二期下半, `sp.pref.diy.<slug>` else; `diyVersion` =
+`pageVersion()`). 导出 writes v2 (`byChar`, `notOwnedChars`; 自选 names a non-default `version`); 导入 reads v1 (mapped
+through 第二期下半's chess, `importedEntries` / `importedNotOwned`) and v2. Every sync (loadout, 干员持有, 自选, skins, card)
+waits for the data the server checks against (`canSendSettings`): never while the page's content loads; in a room once
+the room's content is on the page; outside a room only while the page shows the server's own files (the server checks
+outside-room settings against 第二期下半, the code constant, whatever its default version) — and a room entered after the
+lobby could not send them sends them then (not at every room entry: the server keeps the session's copy, and five sends
+at once would spend the server's heavy-message budget an edit needs). The wire keys of `room.loadout` / `room.ownership`
+stay the chess ids of the room's data.
+
+**Statistics.** Records of another version carry `version` (a registry id, never 第二期下半; not part of the record id;
+`STATS_VERSION` 3, `MIGRATIONS[2]` rewrites nothing — a record without one played 第二期下半). 统计数据 has a version filter
+(the version shown by default, every version with records, 全部版本: `recordsOfVersion`) narrowing every tab; history rows
+carry the VersionTag. Re-viewing another version's settlement needs that version's data: outside a room the row offers
+「切换到「X」查看」 (the lobby switches, the settlement opens once its data is checked), in a room it is disabled with a hint.
+The levels (`settle.js levelProgress` `season`), the lobby card and 成就统计 count one season (`recordsOfSeason`:
+第一期 = both act1autochess versions, 第二期 = both act2autochess).
+
+The guide shows 「玩法说明的图片来自第二期下半，「{version}」中部分规则不同」 for another version [ASSUMED: until the version
+notes page of M3]. Tests: `test/ui/versions.test.js`, `version-content.test.js`, `loadout-charid.test.js`,
+`version-vote.test.js`, `stats.test.js` / `lobby-hub.test.js` (versions), and in the browser `versions.e2e.test.js` and
+the text-fit matrix `versions-fit.e2e.test.js` (four phones and two desktops, five languages, four 文字大小).
 
 ### Lobby backdrop and music (PR #643 split 8)
 
@@ -739,7 +830,8 @@ prep keeps it usable.
 `screens/game.js` pushes the switch with `setCombatMetrics` (the runner does not import the settings store). A
 gameplay-plugin room (`room.content.vanilla === false`) simulates in a Worker: the page holds wire state only (time
 and ids, no `damaged` hook and no `heal`), so the meter is not attached and the button stays hidden. A cosmetic plugin
-keeps the vanilla content set and the in-page host, so the meter still runs. A `hud.right` ui-slot is a separate node
+keeps the vanilla content set and the in-page host, so the meter still runs, and so does a room of another official
+version (DESIGN §35.23: its set is data only and runs on the in-page host). A `hud.right` ui-slot is a separate node
 and is not gated by this setting. Turning the setting off mid-battle detaches the hook and restores `heal`. Turning it
 on does not backfill a battle already prepared ([ASSUMED]: the hooks would have missed damage already dealt); the next
 battle prepared after the switch is the first one counted.

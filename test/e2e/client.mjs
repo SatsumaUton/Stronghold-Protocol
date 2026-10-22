@@ -139,13 +139,14 @@ export function freePort() {
 /**
  * Start the real server (`node server/index.js`, or test/e2e/fastServer.mjs with `fast` speed-ups) on a free port (or
  * `port`: e.g. the port of a server just stopped — a server restart the open clients reconnect to).
- * @param {{ port?: number, pluginsDir?: string, fast?: { timerScale?: number, combatSpeed?: number, startRound?: 'boss'|'hidden'|number, kit?: number, chess?: string[],
+ * @param {{ port?: number, pluginsDir?: string, env?: Record<string, string|null>, fast?: { timerScale?: number, combatSpeed?: number, startRound?: 'boss'|'hidden'|number, kit?: number, chess?: string[],
  *   items?: string[], idleBots?: boolean, kits?: string[][], botChess?: string[], autoPlace?: boolean, eliminate?: number[], stage?: string,
  *   finishAfter?: number, slowSpawns?: string } }} [opts]
  *   kits: per-human starter kits (seat order); botChess: the AI seats' kit; autoPlace: the kits go onto the board at the
  *   first prep; eliminate: humans (seat order) eliminated at the jump; stage: the stage of every match; finishAfter: the
  *   match ends (RESULT) once that round has settled; slowSpawns: '<humanIdx>:<factor>' — that human's normal battles
- *   spawn at factor × the scheduled times — fastServer.mjs hooks; pluginsDir (with `fast`): the server's plugin folders
+ *   spawn at factor × the scheduled times — fastServer.mjs hooks; pluginsDir (with `fast`): the server's plugin folders;
+ *   env: more of the server's environment (SP_VERSIONS …; null unsets a variable)
  * @returns {Promise<{ base: string, port: number, logs: string[], stop: (o?: { hard?: boolean }) => Promise<void> }>}
  */
 export async function startRealServer(opts = {}) {
@@ -175,6 +176,8 @@ export async function startRealServer(opts = {}) {
     if (opts.fast.slowSpawns) env.SP_SLOW_SPAWNS = String(opts.fast.slowSpawns);
     if (opts.pluginsDir) env.SP_PLUGINS_DIR = opts.pluginsDir;
   }
+  // extra environment for the server (e.g. { SP_VERSIONS: 'all' } — the official versions, DESIGN §35.23); a null value unsets
+  if (opts.env && typeof opts.env === 'object') for (const [k, v] of Object.entries(opts.env)) { if (v == null) delete env[k]; else env[k] = String(v); }
   const child = spawn(process.execPath, [entry], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const logs = [];
   const onData = (buf) => { for (const line of String(buf).split('\n')) if (line.trim()) logs.push(line); if (logs.length > 400) logs.splice(0, logs.length - 400); };

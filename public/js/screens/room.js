@@ -36,6 +36,15 @@
 // 「显示其他玩家的皮肤」 is off; an outfit this page's appearance plugins do not have draws the default art (ui/seatArt.js
 // seatCardSkin). The picker is one's own picker, so its tiles wear one's own outfits too (like 干员调配's).
 // Without the art pack the card keeps its avatar frame; a bot keeps its robot frame.
+// Official versions (DESIGN §35.23, M1; versions.js): a room plays one version (room.state.version; absent = 第二期下半).
+// Another version's name shows beside the mode in the top bar (ui/pluginTag.js VersionTag) and every page loads and checks
+// its data like a gameplay plugin's content set (content.js) — the seat tags read 版本数据载入中 / 就绪 / 校验失败 and
+// 准备就绪 / 开始模拟 wait for it (needsContent: gameplay plugins or another version; 非官方 stays the plugins' alone).
+// The version pill beside the difficulty (and ⚙'s 版本 row in co-op) opens the version picker (ui/versionPicker.js): the
+// host's pick proposes the switch (room.proposeVersion: a lone human's room switches at once; otherwise the seated humans
+// vote — ui/versionVote.js, the strip between the 观战席 and the footer); everybody else reads it (由创建者发起). It is off
+// during a vote, with gameplay plugins on (they play 第二期下半 only) and offline. A switch is told to everybody (a toast,
+// never on entering a room), and a room whose version is not this browser's lobby choice says that leaving restores it.
 // Texts go through t() (docs/I18N.md).
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
@@ -51,11 +60,14 @@ import { GuideButton } from '../ui/guide.js';
 import { openStats } from './stats.js';
 import { SettingsButton } from '../ui/settings.js';
 import { LoadoutButton } from './loadout.js';
-import { PluginTag, isModdedRoom } from '../ui/pluginTag.js';
-import { hasScriptConsent, rememberScriptConsent } from '../content.js';
+import { PluginTag, VersionTag, isModdedRoom } from '../ui/pluginTag.js';
+import { VersionVote, versionVoteOf } from '../ui/versionVote.js';
+import { VersionPicker } from '../ui/versionPicker.js';
+import { DEFAULT_VERSION, lobbyVersion, needsContent, offeredDifficulties, roomVersion, serverDefaultVersion, versionLabel } from '../versions.js';
+import { hasScriptConsent, rememberScriptConsent, pageVersion } from '../content.js';
 import { net } from '../net.js';
 import { store, useStore, shallowEqual, emptyMatch, isSpectating, savePref } from '../store.js';
-import { data, useData } from '../data.js';
+import { data, useData, getConfig } from '../data.js';
 import { chessAvatarUrl, chessPortraitUrl } from '../ui/assetUrls.js';
 import { CARD_KEY, cardStore, setCard, cardOperators, cardContext, seatOperator, seatCardSkin, seatArtSrc } from '../ui/seatArt.js';
 import { skinsStore, SKINS_KEY, ownerSkin } from '../ui/skins.js';
@@ -97,17 +109,22 @@ export function roomFacts(room, myId) {
   const isReady = (s) => !!s.ready || s.playerId === room?.hostId;
   const readyHumans = humans.filter(isReady).length;
   const othersReady = others.every((s) => s.ready && s.connected !== false);
-  // a room with gameplay plugins (DESIGN §32.6): every player's page has loaded and checked its content (the host's too)
+  // a room with gameplay plugins (DESIGN §32.6) or another official version (§35.23): every player's page has loaded and
+  // checked its content (the host's too); `modded` (非官方) is the plugins' alone
   const modded = isModdedRoom(room);
-  const contentReady = !modded || humans.every((s) => s.content === 'ready');
+  const loadsContent = needsContent(room);
+  const contentReady = !loadsContent || humans.every((s) => s.content === 'ready');
   return {
     seats, occupied, humans, mine, isHost, readyHumans, isReady,
     emptySeats: seats.filter((s) => !s).length,
     canStart: isHost && othersReady && !!mine && contentReady && (!room?.content?.trusted || humans.every(s => room.content.trusted.consent[s.seat])),
     othersReady,
     modded,
+    needsContent: loadsContent,
+    // another official version (its seat tags and texts; a gameplay plugin room keeps the plugins' words)
+    versionRoom: loadsContent && !modded,
     contentReady,
-    myContent: modded ? (mine?.content || 'loading') : 'ready',
+    myContent: loadsContent ? (mine?.content || 'loading') : 'ready',
     // spectator seats (never players: not in `humans`, never counted for ready / start)
     spectators: Array.isArray(room?.spectators) ? room.spectators.filter((s) => s && typeof s === 'object') : [],
     spectating: isSpectating(room, myId),
@@ -246,8 +263,10 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
       ${canPick ? html`<button type="button" class="rseat__pick" data-testid="seat-card-pick" onClick=${onPickCard}
         title=${t('更换名片干员')} aria-label=${t('更换名片干员')}><${Icon} name="edit" /><span>${t('更换立绘')}</span></button>` : null}
       ${consent ? html`<span class="rseat__tag" data-testid="script-consented">${t('已同意')}</span>` : null}
-      ${facts.modded && !seat.isBot ? html`<span class=${`rseat__tag seat__content is-${seat.content || 'loading'}`} data-testid="seat-content">
-        ${seat.content === 'ready' ? t('插件内容就绪') : seat.content === 'failed' ? t('插件内容校验失败') : t('插件内容载入中')}
+      ${facts.needsContent && !seat.isBot ? html`<span class=${`rseat__tag seat__content is-${seat.content || 'loading'}`} data-testid="seat-content">
+        ${facts.versionRoom
+          ? seat.content === 'ready' ? t('版本数据就绪') : seat.content === 'failed' ? t('版本数据校验失败') : t('版本数据载入中')
+          : seat.content === 'ready' ? t('插件内容就绪') : seat.content === 'failed' ? t('插件内容校验失败') : t('插件内容载入中')}
       </span>` : null}
       ${offline ? html`<span class="rseat__lost"><${Icon} name="wifiOff" />${t('连接中断')}</span>` : null}
       <span class=${`rseat__state seat__state--${state}`}>
@@ -301,7 +320,7 @@ function AiLastToggle({ option, busy, onToggle }) {
  * ⚙ of the bottom pill (co-op): 同盟设置 — the 模拟难度 (opens 选择模拟协议: the host's 确认, the others' read-only view)
  * and the 「AI 队友最后选择」 switch. Closes on a click outside it or Esc.
  */
-function RoomOptions({ option, room, isHost, busy, onAiLast, onDifficulty, onClose }) {
+function RoomOptions({ option, room, isHost, busy, onAiLast, onDifficulty, onClose, version = null }) {
   const info = difficultyInfo(room.mode, room.difficulty);
   useEffect(() => {
     const away = (e) => { if (!e.target.closest?.('.rs-opts, .rs-pill__gear')) onClose(); };
@@ -321,6 +340,16 @@ function RoomOptions({ option, room, isHost, busy, onAiLast, onDifficulty, onClo
       </button>
       ${isHost ? null : html`<span class="t-dim">${t('由创建者选择')}</span>`}
     </div>
+    ${version ? html`<div class="rs-opts__row" data-testid="room-opt-version">
+      <span class="rs-opts__k">${t('版本')}</span>
+      <${Tooltip} text=${version.why}>
+        <button type="button" class="rs-opts__diff rs-opts__ver" disabled=${version.disabled} onClick=${version.onOpen}
+            title=${version.editable ? t('发起切换版本') : t('由创建者发起')}>
+          <${Icon} name="hourglass" />${versionLabel(version.id)}${version.editable ? html`<em>${t('切换')}</em>` : null}
+        </button>
+      <//>
+      ${version.editable ? null : html`<span class="t-dim">${t('由创建者发起')}</span>`}
+    </div>` : null}
     <${AiLastToggle} option=${option} busy=${busy} onToggle=${onAiLast} />
   </div>`;
 }
@@ -344,6 +373,9 @@ function GoButton({ label, onClick, disabled, loading = false, ready = null, ico
     <span class="proto-start__deco" aria-hidden="true"></span>
   </button>`;
 }
+
+/** How long a version proposal refused as too frequent (RATE) waits before it is sent once more [ASSUMED]. */
+const PROPOSE_RETRY_MS = 1200;
 
 /** Room screen component. */
 export function RoomScreen() {
@@ -384,6 +416,22 @@ export function RoomScreen() {
     const name = DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : room.difficulty;
     toast(t('创建者已将模拟难度改为「{name}」', { name }), 'info');
   }, [room?.code, room?.difficulty]);
+  // official versions (DESIGN §35.23): the room's switch is told to everybody (the host's own page included — a vote's
+  // result arrives later than the pick); never on entering a room or switching rooms
+  const versions = useStore((s) => s.versions);
+  const myLobby = useStore(lobbyVersion);
+  const serverDefault = useStore(serverDefaultVersion);
+  const [versionOpen, setVersionOpen] = useState(false);
+  const seenVersion = useRef(room ? `${room.code}|${roomVersion(room)}` : '');
+  useEffect(() => {
+    if (!room) return;
+    const key = `${room.code}|${roomVersion(room)}`;
+    const before = seenVersion.current;
+    seenVersion.current = key;
+    if (!before || before === key || !before.startsWith(`${room.code}|`)) return;
+    setVersionOpen(false);
+    toast(t('同盟已切换到「{version}」', { version: versionLabel(roomVersion(room)) }), 'success');
+  }, [room?.code, room?.version]);
   // the room sees one's pick once the server has it (seats[].card): ui/loadoutSync.js installCardSync sends it after
   // every pick, welcome and content change and retries a RATE / TIMEOUT / OFFLINE refusal (review of PR #813)
   const pickCard = (charId) => { setCard(charId); setPicking(false); };
@@ -450,7 +498,9 @@ export function RoomScreen() {
       ? html`<span class="t-lo"><${Icon} name="eye" />${t('观战中 · 不占博士席位，模拟开始后可切换观看各位博士')}</span>`
     : !coop
       ? html`<span class="t-mint">${t('*模拟协议已就绪，准许进入模拟')}</span>`
-    : facts.modded && !facts.contentReady
+    : facts.versionRoom && !facts.contentReady
+      ? html`<span class="t-lo">${t('等待所有博士载入「{version}」的数据', { version: versionLabel(roomVersion(room)) })}</span>`
+    : facts.needsContent && !facts.contentReady
       ? html`<span class="t-lo">${t('等待所有博士载入房间的插件内容')}</span>`
     : facts.isHost
       ? facts.canStart
@@ -461,8 +511,12 @@ export function RoomScreen() {
         : html`<span class="t-lo">${t('准备就绪后，创建者即可开始模拟')}</span>`;
 
   const copy = async (what) => {
-    // the copied link carries an invitation line (#103): 「{name}邀请你加入卫戍协议：盟约【{difficulty}】」
-    const invite = t('{name}邀请你加入卫戍协议：盟约【{difficulty}】', { name: me.name ?? '', difficulty: DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : '' });
+    // the copied link carries an invitation line (#103): 「{name}邀请你加入卫戍协议：盟约【{difficulty}】」 — with the
+    // version's name for another official version (DESIGN §35.23)
+    const params = { name: me.name ?? '', difficulty: DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : '' };
+    const invite = roomVersion(room) !== DEFAULT_VERSION
+      ? t('{name}邀请你加入卫戍协议：盟约·{version}【{difficulty}】', { ...params, version: versionLabel(roomVersion(room)) })
+      : t('{name}邀请你加入卫戍协议：盟约【{difficulty}】', params);
     const ok = await copyText(what === 'code' ? room.code : `${inviteLink(room.code)} ${invite}`);
     if (ok) toast(what === 'code' ? t('已复制同盟密钥 {code}', { code: room.code }) : t('已复制邀请链接'), 'success');
     else toast(t('复制失败，请手动复制'), 'warn');
@@ -481,11 +535,45 @@ export function RoomScreen() {
     savePref('lobby.difficulty', d);
     if (alive.current) closeProto();
   };
+  // the difficulties the room's version offers (its config's modes, versions.js) — the page shows that version's data
+  // once it is loaded; until then (or for a gameplay plugin room's own modes) all four
+  const protoDifficulties = offeredDifficulties(pageVersion() === roomVersion(room) ? getConfig() : null, room.mode);
   const protoHint = pluginMode
     ? t('确认后将退出插件模式「{name}」', { name: pluginMode })
     : facts.humans.length > 1 ? t('更改难度后，其他博士需要重新准备就绪') : '';
   const aiLast = aiLastOption(room, me.playerId);
   const modeName = coop ? t('同盟模拟') : t('独立模拟');
+  // the room's version (DESIGN §35.23): the pill and ⚙'s row on a server that enables versions (or in a version room)
+  const vote = versionVoteOf(room);
+  const curVersion = roomVersion(room);
+  const showVersion = Array.isArray(versions) || curVersion !== DEFAULT_VERSION;
+  const versionWhy = !online ? t('连接中断，请稍候重试')
+    : vote ? t('切换版本投票进行中，请等投票结束')
+    : facts.modded ? t('请先关闭改变玩法的插件')
+    : !Array.isArray(versions) || versions.length < 2 ? t('本服务器只启用了这一个版本') : null;
+  const versionEditable = facts.isHost && !facts.spectating && !room.inMatch;
+  // the room's version is not this browser's lobby choice: the banner says leaving restores it (on a short screen, where
+  // the banner gives its room to the seats, the pill's tooltip says it)
+  const bannerText = curVersion !== myLobby && Array.isArray(versions) ? t('本房间为「{room}」，离开后恢复你的大厅版本「{mine}」', { room: versionLabel(curVersion), mine: versionLabel(myLobby) }) : null;
+  const versionCtl = showVersion ? {
+    id: curVersion, editable: versionEditable, why: [versionEditable ? versionWhy : t('由创建者发起'), bannerText].filter(Boolean).join(' · ') || null,
+    disabled: versionEditable ? !!versionWhy || !!busy : !Array.isArray(versions),
+    onOpen: () => { setOpts(false); setVersionOpen(true); },
+  } : null;
+  // (a switch makes every page send its settings again, which share the server's budget of heavy messages with
+  // room.proposeVersion: a RATE right after one is tried once more a moment later; the server's own 5 s pause after a
+  // declined or expired vote answers RATE again and is told)
+  const proposeVersion = async (version) => {
+    const send = () => net.request('room.proposeVersion', { version });
+    const sent = await run('version', async () => {
+      try { await send(); } catch (err) {
+        if (err?.code !== 'RATE') throw err;
+        await new Promise((r) => setTimeout(r, PROPOSE_RETRY_MS));
+        await send();
+      }
+    });
+    if (sent && alive.current) setVersionOpen(false);
+  };
 
   return html`<div class=${`screen room-screen rs${coop ? '' : ' rs--solo'}`} style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}; --n:${facts.seats.length}`}>
     <div class="rs__bg" aria-hidden="true"></div>
@@ -495,7 +583,7 @@ export function RoomScreen() {
           <button type="button" class="rs-exit" disabled=${busy === 'leave'} onClick=${leave} aria-label=${t('离开同盟')}><${Icon} name="exit" /></button>
         <//>
         <div class="rs-clock">
-          <b>${modeName}${room.test ? html` <${TestMark} />` : null}
+          <b>${modeName}${room.test ? html` <${TestMark} />` : null}<${VersionTag} room=${room} class="rs-clock__ver" />
             ${pluginMode ? html`<span class="rs-clock__sep"></span><span class="room-mode" data-testid="room-mode">${pluginMode}</span>` : null}</b>
           <span class="rs-clock__ping">${t('当前延迟')}<${PingPill} ms=${conn.ping} online=${online} /></span>
         </div>
@@ -540,6 +628,8 @@ export function RoomScreen() {
       </aside>`}
     </main>
     <${SpectatorBar} facts=${facts} myId=${me.playerId} busy=${busy} onRemove=${removeSpectator} onSit=${sit} />
+    <${VersionVote} room=${room} />
+    ${bannerText ? html`<p class="rs-verbanner" data-testid="version-banner"><${Icon} name="info" />${bannerText}</p>` : null}
 
     <footer class="room-bar rs-foot">
       <div class="rs-foot__left" aria-hidden="true"></div>
@@ -548,20 +638,22 @@ export function RoomScreen() {
         <div class="rs-pill">
           <button type="button" class=${`rs-pill__diff${facts.isHost ? '' : ' is-ro'}`} disabled=${facts.isHost && !!busy} onClick=${openProto}
             title=${facts.isHost ? t('更改模拟难度') : t('由创建者选择')}><${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span></button>
+          ${versionCtl ? html`<${Tooltip} text=${versionCtl.why}><button type="button" class=${`rs-pill__ver${versionCtl.editable ? '' : ' is-ro'}`} data-testid="room-version"
+            disabled=${versionCtl.disabled} onClick=${versionCtl.onOpen} aria-label=${t('游戏版本：{name}', { name: versionLabel(curVersion) })}><${Icon} name="hourglass" /><span class="rs-pill__vername">${versionLabel(curVersion)}</span></button><//>` : null}
           ${aiLast ? html`<button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${t('同盟设置')} aria-label=${t('同盟设置')}
             aria-expanded=${opts ? 'true' : 'false'}><${GearGlyph} /></button>` : null}
           ${opts && aiLast ? html`<${RoomOptions} option=${aiLast} room=${room} isHost=${facts.isHost} busy=${busy} onAiLast=${setAiLast}
-            onDifficulty=${openProto} onClose=${() => setOpts(false)} />` : null}
+            onDifficulty=${openProto} onClose=${() => setOpts(false)} version=${versionCtl} />` : null}
         </div>
       </div>
       <div class="room-bar__right rs-foot__right">
         ${facts.isHost
-          ? html`<${Tooltip} text=${facts.canStart ? null : !facts.contentReady ? t('仍有博士未载入房间的插件内容') : t('仍有博士未准备就绪')}>
-              <${GoButton} label=${t('开始模拟')} loading=${busy === 'start'} disabled=${!facts.canStart || !online || busy === 'start'} onClick=${start} />
+          ? html`<${Tooltip} text=${facts.canStart ? null : vote ? t('切换版本投票进行中，请等投票结束') : !facts.contentReady ? (facts.versionRoom ? t('仍有博士未载入「{version}」的数据', { version: versionLabel(curVersion) }) : t('仍有博士未载入房间的插件内容')) : t('仍有博士未准备就绪')}>
+              <${GoButton} label=${t('开始模拟')} loading=${busy === 'start'} disabled=${!facts.canStart || !online || busy === 'start' || !!vote} onClick=${start} />
             <//>`
           : facts.spectating
             ? html`<${GoButton} label=${t('观战中')} icon="eye" disabled=${true} />`
-          : html`<${Tooltip} text=${!myReady && facts.myContent !== 'ready' ? t('房间的插件内容载入并通过校验后才能准备') : null}>
+          : html`<${Tooltip} text=${!myReady && facts.myContent !== 'ready' ? (facts.versionRoom ? t('「{version}」的数据载入并通过校验后才能准备', { version: versionLabel(curVersion) }) : t('房间的插件内容载入并通过校验后才能准备')) : null}>
               <${GoButton} label=${myReady ? t('已就绪') : t('准备就绪')} ready=${myReady} loading=${busy === 'ready'}
                 disabled=${!online || !facts.mine || busy === 'ready' || (!myReady && facts.myContent !== 'ready')} onClick=${toggleReady} />
             <//>`}
@@ -570,9 +662,13 @@ export function RoomScreen() {
     ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${data.get('assets')} localSkins=${localSkins} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
     ${protoOpen ? facts.isHost
       ? html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${protoPick || room.difficulty} onDifficulty=${setProtoPick} onClose=${closeProto}
-          onCreate=${confirmDifficulty} busy=${busy === 'diff' ? 'create' : null} online=${online} action=${t('确认')} hint=${protoHint} />`
+          onCreate=${confirmDifficulty} busy=${busy === 'diff' ? 'create' : null} online=${online} action=${t('确认')} hint=${protoHint} difficulties=${protoDifficulties} />`
       : html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${room.difficulty} onDifficulty=${() => {}} onClose=${closeProto}
-          online=${online} readOnly=${true} />` : null}
+          online=${online} readOnly=${true} difficulties=${protoDifficulties} />` : null}
+    ${versionOpen && versionCtl ? html`<${VersionPicker} mode="room" versions=${versions || [{ id: curVersion, roomModes: [room.mode] }]} current=${curVersion}
+      serverDefault=${serverDefault} roomMode=${room.mode} editable=${versionEditable && !versionWhy} busy=${busy === 'version'}
+      note=${versionEditable ? versionWhy || (facts.humans.length > 1 ? t('其他博士同意后才会切换；切换后需要重新准备。') : null) : t('由创建者发起')}
+      onPick=${proposeVersion} onClose=${() => setVersionOpen(false)} />` : null}
   </div>`;
 }
 

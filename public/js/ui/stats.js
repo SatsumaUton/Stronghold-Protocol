@@ -35,6 +35,11 @@
 // (cosmetic plugins only included; a record from before 0.3.0: null — format v2, MIGRATIONS[1]). Such a match is
 // unofficial: the aggregates leave it out unless asked to take it in (aggregateStats `modded` — the overview's
 // 「含插件对局」 switch); the history lists it with its mark.
+// Official versions (DESIGN §35.23, M1): every record of another version names it — `version` (a registry id, only when
+// it is not 第二期下半; format v3, MIGRATIONS[2]: a record without one played 第二期下半) — and its id does not include
+// it (a record's id stays what it was). 统计数据 filters by version (recordsOfVersion: the version shown by default,
+// 全部版本 on request) and the levels count the records of one season (recordsOfSeason: 第一期 / 第二期 each have their own
+// 卫戍认证 table).
 // Test matches (DESIGN §34.8) never create local records, including quits. Server awards are
 // zero; a live marker latches until the next match. Legacy marked imports are dropped on load
 // and merge, and pure aggregates/badge helpers exclude them even if handed a raw record.
@@ -50,9 +55,10 @@
 
 import { PHASE } from '../../../shared/constants.js';
 import { sanitizeName } from './playerName.js';
+import { DEFAULT_VERSION, versionById } from '../../../shared/versions.js';
 
 /** Current record-envelope version (bump + add a MIGRATIONS step when the record shape changes). */
-export const STATS_VERSION = 2;
+export const STATS_VERSION = 3;
 /** localStorage key under the app's `sp.pref.` prefix (store.js loadPref). */
 export const STATS_PREF_KEY = 'stats';
 /** Oldest records are dropped beyond this many matches. */
@@ -87,6 +93,31 @@ export function contentOf(c) {
 }
 /** Did the record's match play gameplay plugins (unofficial)? @param {any} rec */
 export const isModdedRecord = (rec) => !!(isObj(rec) && rec.content);
+
+/** A record's official version field (see the header): a registry id other than 第二期下半, else null. @param {unknown} v */
+export const versionOf = (v) => (typeof v === 'string' && v !== DEFAULT_VERSION && versionById(v) ? v : null);
+
+/** The official version a record played (第二期下半 without `version`). @param {any} rec */
+export const recordVersion = (rec) => versionOf(rec?.version) ?? DEFAULT_VERSION;
+
+/**
+ * The records of one official version (see the header): `version` a registry id, or 'all' / null — every record.
+ * @param {any[]} records @param {string|null} version
+ */
+export function recordsOfVersion(records, version) {
+  const list = Array.isArray(records) ? records : [];
+  return !version || version === 'all' ? list : list.filter((r) => recordVersion(r) === version);
+}
+
+/**
+ * The records of one season (see the header: 第一期 / 第二期 — the activity a version belongs to), every record when
+ * `season` is null.
+ * @param {any[]} records @param {string|null} season
+ */
+export function recordsOfSeason(records, season) {
+  const list = Array.isArray(records) ? records : [];
+  return season ? list.filter((r) => (versionById(recordVersion(r))?.season ?? DEFAULT_VERSION) === season) : list;
+}
 /**
  * The records the achievement blocks read — 卫戍成就's peak alliance (highestBondRecord) and 策略记录's special marks
  * (strategyBadgeIds), on 统计数据 and in the lobby's 成就统计 window: a match with gameplay plugins is unofficial and stays
@@ -253,6 +284,8 @@ export function normalizeRecord(raw) {
     vs: vsOf(r.vs),
     // the room's gameplay plugins (see the header): its content set, null for the original game
     content: contentOf(r.content),
+    // the official version it played (see the header): a registry id other than 第二期下半, else left out
+    ...(versionOf(r.version) ? { version: versionOf(r.version) } : {}),
     players,
   };
   // Only the literal true. A hand-edited string cannot mark a real match as a test, and a missing key leaves
@@ -262,7 +295,7 @@ export function normalizeRecord(raw) {
   if (r.compact === true) rec.compact = true;
   // an id-less (hand-made) record gets a content id, so both copies of it land on the same key (`vs` and `content` left
   // out: the id of a record from before 0.3.0 stays the same)
-  if (!rec.id) rec.id = `c.${fnv1a(JSON.stringify({ ...rec, vs: undefined, content: undefined }))}`;
+  if (!rec.id) rec.id = `c.${fnv1a(JSON.stringify({ ...rec, vs: undefined, content: undefined, version: undefined }))}`;
   return rec;
 }
 
@@ -277,6 +310,9 @@ export function normalizeRecord(raw) {
  */
 export const MIGRATIONS = {
   1: (stats) => ({ v: 2, records: (Array.isArray(stats.records) ? stats.records : []).map((r) => (isObj(r) ? { ...r, content: null } : r)) }),
+  // 2 → 3 (0.3.2, DESIGN §35.23): records name another official version (`version`); one without played 第二期下半 —
+  // nothing to rewrite, the version keeps an older build from stripping the field
+  2: (stats) => ({ v: 3, records: Array.isArray(stats.records) ? stats.records : [] }),
 };
 
 /** Newest first (the stored order): by time, then id. */
@@ -360,7 +396,7 @@ export function peekStatsRecords() {
 // ---- compaction + the storage budget ---------------------------------------------------------------------------
 
 const COMPACT_FRAME = ['id', 'v', 't', 'end', 'victory', 'roundsPassed', 'lastRound', 'hiddenReached', 'hiddenCleared', 'reason', 'modeId',
-  'difficulty', 'roomMode', 'durationMs', 'selfId', 'vs', 'content', 'test', 'testActions'];
+  'difficulty', 'roomMode', 'durationMs', 'selfId', 'vs', 'content', 'version', 'test', 'testActions'];
 
 /**
  * The compact form of a record: the frame and the player's OWN row without lineup, bonds and name — everything the
@@ -460,9 +496,9 @@ export function roomModeOf(modeId, roomMode) {
  * without players (the error-path settlement) or matches the local player did not take part in (spectator
  * seats get every result pushed too — eliminated players, who ARE in players[], keep recording).
  * @param {any} res raw m.result payload
- * @param {{ myId?: string|null, roomMode?: string|null, vs?: string|null, content?: any, now?: number }} ctx
+ * @param {{ myId?: string|null, roomMode?: string|null, vs?: string|null, content?: any, version?: string|null, now?: number }} ctx
  *   vs: the room's visual set (room.state.content.vs); content: room.state.content (its content set when it played
- *   gameplay plugins) — see the header
+ *   gameplay plugins); version: the official version it played (null / 第二期下半: left out) — see the header
  * @returns {any|null}
  */
 export function buildRecord(res, ctx = {}) {
@@ -494,6 +530,7 @@ export function buildRecord(res, ctx = {}) {
     selfId: myId,
     vs: vsOf(ctx.vs),
     content: contentOf(ctx.content),
+    version: ctx.version ?? null,
     players: r.players,
   });
 }
@@ -599,6 +636,7 @@ export function buildQuitRecord(state, ctx = {}) {
     selfId: myId,
     vs: vsOf(state.room?.content?.vs),
     content: contentOf(state.room?.content),
+    version: state.room ? state.room.version ?? null : state.matchVersion ?? null,
     players: [{
       playerId: myId, seat: row.seat, name: row.name, isBot: false, left: true, alive, victory: false, roundsPassed,
       eliminatedRound: alive ? null : live.aliveRound, lp: row.lp, bandId: row.bandId,

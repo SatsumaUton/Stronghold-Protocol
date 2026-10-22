@@ -15,6 +15,9 @@
 //   ticker      – recent `m.ticker` lines, emotes – recent `m.emote` events
 //   clock       – { offset, rtt } server clock correction: serverNow ≈ Date.now() + offset
 //   ui          – small bits of local UI state shared between screens
+//   versions    – welcome.versions (the official versions the server enables, versions.js sanitizeVersions) or null: the
+//                 lobby's version switch is off; lobbyVersion – this browser's choice (`sp.pref.lobby.version`, an id);
+//                 matchVersion – the version of the last room seen (a result shown after its room is gone) — versions.js
 //
 // The store is framework-agnostic (get/set/subscribe); `useStore(selector)` binds it to Preact.
 // Updates are immutable at the top level: `set` shallow-merges a patch object, `patch(key, obj)`
@@ -92,6 +95,11 @@ export const initialState = Object.freeze({
   emotes: [],
   clock: { offset: 0, rtt: null, synced: false },
   ui: { pendingJoin: null, restoring: false, buildStale: false },
+  // official versions (DESIGN §35.23, versions.js): welcome.versions (null: the switch is off), this browser's lobby choice
+  // (the pref as stored — versions.js lobbyVersion checks it against the list) and the last room's version
+  versions: null,
+  lobbyVersion: (() => { const v = loadPref('lobby.version', null); return typeof v === 'string' && v.length <= 40 ? v : null; })(),
+  matchVersion: null,
 });
 
 /** The app-wide store singleton. */
