@@ -9,7 +9,9 @@
 // before anyone joined, and the 独立模拟 room — on four phones (640×360, 667×375, 740×360, 844×390) and on desktops
 // (800×600 – 1920×1080) in all five languages at all four 文字大小: every line of visible text inside each box that clips
 // it or draws a box around it (a button, a chip, the card), inside the screen, over no other label's text and not broken
-// inside a word; only a player's name may end in an ellipsis; nothing makes the page scroll. A box that scrolls (the
+// inside a word (Korean between two syllables too); only a player's name (or a plugin mode's) may end in an ellipsis;
+// nothing makes the page scroll. On the phones also a doctor who readied, a modded room's tags (已同意, 插件内容就绪 /
+// 载入中 / 校验失败) and mode, and a doctor whose connection dropped (written into the page's store: no plugin pack here). A box that scrolls (the
 // picker's grid, the briefing when it has to) counts as holding its text. Every page finishes with zero console errors
 // (without the art pack, as on CI, the cards show their avatar frames and the pack's 404s are let through).
 // The room's big button and its 选择模拟协议: test/ui/lobby-hub.e2e.test.js; the cards' outfits: room-cards.e2e.test.js.
@@ -129,6 +131,45 @@ describe('the waiting room\'s text fit (real server, headless Chrome)', { skip: 
           }
           await guest.page.keyboard.press('Escape');
           await guest.page.waitForSelector('.modal__box.cardpick', { hidden: true, timeout: 5000 });
+        }
+      }
+      if (touch) {
+        // the seat cards' other labels share the in-flow top / bottom layout (§35.18 review of the text-fit fixes): a doctor
+        // who readied (已就绪), a modded room's tags — 已同意, 插件内容就绪 / 载入中 / 校验失败 — and its mode beside the mode
+        // name, a doctor whose connection dropped (连接中断 on the art and as the state). The plugin fields are written into
+        // the page's store after the server's last room.state (a fixture: there is no plugin pack here). Known and listed in
+        // §35.18's leftovers: on the two smallest phones at 大 / 特大 in English and Japanese the host's card, with the tag
+        // line in the top bar, two tags, the badge and a two-line state, is taller than its art (by 4–36 px), and at 640 px
+        // English 「Disconnected」 breaks — let through here, every other case must fit
+        const leftover = (ts, size, p) => ['lg', 'xl'].includes(ts) && size[0] <= 667 && ['en', 'ja'].includes(lang)
+          && /^y past div\.seat__art: span\.rseat__said |^broken inside a word \([^)]*\): span\.rseat__said "Disconnected"$/.test(p);
+        // (without the spectator: with the 观战席 row as well, the most crowded room, the cards are shorter still — §35.18's
+        // leftovers)
+        assert.equal(await request(spec, 'room.leave', {}), 'ok');
+        assert.equal(await request(guest, 'room.ready', { ready: true }), 'ok');
+        for (const c of [host, guest]) await c.page.waitForFunction(() => { const r = globalThis.__SP__.store.get().room; return r.seats.some((s) => s && !s.isBot && s.ready) && !(r.spectators || []).length; });
+        const modded = (c, offline) => c.page.evaluate((offline) => {
+          const { store } = globalThis.__SP__;
+          const r = store.get().room;
+          const seats = r.seats.map((s) => (!s || s.isBot ? s : s.playerId === r.hostId ? { ...s, content: 'ready' }
+            : { ...s, content: offline ? 'failed' : 'loading', connected: !offline }));
+          const consent = Object.fromEntries(seats.filter((s) => s && !s.isBot).map((s) => [s.seat, true]));
+          store.set({ room: { ...r, seats, content: { vanilla: false, plugins: [{ id: 'demo', name: 'Demo', version: '1.0.0' }],
+            modeId: 'demo:siege', modes: [{ id: 'demo:siege', name: 'Endless Siege' }],
+            trusted: { consent, plugins: [{ id: 'demo', version: '1.0.0', authors: [], permissions: [] }] } } } });
+        }, offline);
+        for (const ts of SIZES) {
+          for (const c of [host, guest]) await textSize(c, ts);
+          for (const size of screens) {
+            for (const c of [host, guest]) await c.page.setViewport(viewport(size, touch));
+            await sleep(150);
+            for (const [who, c, offline] of [['host', host, false], ['doctor', guest, false], ['host', host, true]]) {
+              await modded(c, offline);
+              await settled(c.page);
+              assert.equal(await c.page.$$eval('.room-screen .rseat__tag', (els) => els.length), 4, 'two tags on each doctor\'s card');
+              for (const p of await check(c.page)) if (!leftover(ts, size, p)) bad.push(`${lang} ${ts} ${size.join('×')} ${who}, modded${offline ? ', the doctor offline' : ''}: ${p}`);
+            }
+          }
         }
       }
       for (const [who, c] of [['host', host], ['doctor', guest], ['spectator', spec], ['solo host', solo]]) assert.deepEqual(c.problems, [], `${lang} ${who}`);

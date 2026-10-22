@@ -6,7 +6,10 @@
  * height) against every ancestor up to the root that clips (overflow) or draws a box (background, border, a button) —
  * 2 px of slack for hairlines —, an ancestor that scrolls on that axis ending the climb; the viewport; the other labels'
  * text as it shows (clipped by its clipping ancestors); a line break inside a word (not at a space, a hyphen or between
- * CJK / kana / Hangul); an ellipsis anywhere but a player's name (.seat__name, .specbar__who); the page scrolling.
+ * CJK / kana; Korean puts spaces between its words, so a break between two Hangul syllables — or a syllable and a latin
+ * letter or digit — is inside a word too, keep-all or not: under word-break: keep-all such a break is the overflow-wrap
+ * fallback of a word too long for its box); an ellipsis anywhere but a player's name (.seat__name, .specbar__who) or a
+ * plugin mode's own name (.room-mode, cut by design like a name); the page scrolling.
  */
 export function textProblems(rootSel) {
   const TOL = 2;
@@ -17,6 +20,12 @@ export function textProblems(rootSel) {
     || ['Top', 'Right', 'Bottom', 'Left'].some((s) => parseFloat(cs[`border${s}Width`]) > 0 && cs[`border${s}Style`] !== 'none');
   const scrolls = (v) => v === 'auto' || v === 'scroll';
   const cjk = /[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/;
+  const hangul = /[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/;
+  const letter = /[\p{L}\p{N}]/u;
+  // may a line break between p and c? a space / hyphen / slash / dot before it; between CJK or kana; at Hangul only where
+  // one side is not a letter or digit (punctuation such as ：)
+  const breakOk = (p, c) => /[\s\-\u2010\u2013\u2014/\u00b7\u30fb]/.test(p)
+    || (hangul.test(p) || hangul.test(c) ? !(letter.test(p) && letter.test(c)) : cjk.test(p) || cjk.test(c));
   for (const root of document.querySelectorAll(rootSel)) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
@@ -34,7 +43,7 @@ export function textProblems(rootSel) {
       // an ellipsis: allowed for a player's name only; what shows is the element's box
       const cut = [el, el.parentElement].find((a) => a && getComputedStyle(a).textOverflow === 'ellipsis' && a.scrollWidth > a.clientWidth + 1);
       if (cut) {
-        if (!cut.matches('.seat__name, .specbar__who')) out.push(`ellipsis ${label}`);
+        if (!cut.matches('.seat__name, .specbar__who, .room-mode')) out.push(`ellipsis ${label}`);
         const ar = cut.getBoundingClientRect();
         boxes = boxes.map((b) => ({ ...b, l: Math.max(b.l, ar.left), r: Math.min(b.r, ar.right) }));
       }
@@ -76,7 +85,7 @@ export function textProblems(rootSel) {
           const rr = [...cr.getClientRects()].find((r) => r.width > 0);
           if (!rr) continue;
           const p = n.textContent[i - 1] || ' ';
-          if (prevTop != null && rr.top > prevTop + rr.height / 2 && !/[\s\-\u2010\u2013\u2014/\u00b7\u30fb]/.test(p) && !cjk.test(p) && !cjk.test(c)) {
+          if (prevTop != null && rr.top > prevTop + rr.height / 2 && !breakOk(p, c)) {
             out.push(`broken inside a word (${n.textContent.slice(Math.max(0, i - 6), i)}|${n.textContent.slice(i, i + 6)}): ${label}`);
             break;
           }

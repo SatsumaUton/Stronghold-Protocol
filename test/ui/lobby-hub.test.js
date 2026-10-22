@@ -451,14 +451,14 @@ test('the room\'s 开始模拟 / 准备就绪 (screens/room.js GoButton, `.proto
   assert.match(base, /\n\.rs-go \.proto-start__label \{ flex: 1 1 auto; padding-right: 8%; font-size: min\(calc\(\.4 \* var\(--t\)\), \.46rem\); white-space: normal; line-height: 1\.1; \}/);
   assert.match(base, /\n\.rs-go \.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), \.4rem\); \}/);
   assert.match(base, /\n\.rs-go \.proto-start__mark small \{ font-size: min\(calc\(\.08 \* var\(--t\)\), \.1rem\); \}/);
-  // on a short screen: at least 46 px and taller for the second line (it was a fixed 46 px), the label 18–20 px (it was
+  // on a short screen: at least 46 px and taller for the second line (it was a fixed 46 px), the label 18–20 px at 小 / 中 and a px more a step above (it was
   // .46 × --t, 40 px at 特大)
   let end = css.indexOf('{', at) + 1;
   for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
   const short = css.slice(at, end);
   assert.match(short, /\.rs-go\.proto-start \{ height: auto; min-height: 46px; \}/);
   assert.doesNotMatch(short, /\.rs-go\.proto-start \{ height: 46px; \}/);
-  assert.match(short, /\.rs-go \.proto-start__label \{ font-size: min\(calc\(\.46 \* var\(--t\)\), 20px\); \}/);
+  assert.match(short, /\.rs-go \.proto-start__label \{ font-size: min\(calc\(\.46 \* var\(--t\)\), calc\(20px \+ var\(--t-step\)\)\); \}/);
   assert.match(short, /\.rs-go \.proto-start__mark \{ display: none; \}/);
   // the markup the rules rely on
   const room = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
@@ -488,20 +488,37 @@ test('选择同盟方式 on a short screen (§35.18 leftover: the key field\'s p
   assert.match(readFileSync(path.join(ROOT, 'public/js/ui/device.js'), 'utf8'), /m\.addEventListener\('change', sync\); return \(\) => m\.removeEventListener\('change', sync\);/);
 });
 
-test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simulation」 cut by the cards at 小): the name wraps under a .3rem cap, the plate labels wrap, the title stops at its caps; on a short screen 128 px cards that grow and capped text', () => {
+test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simulation」 cut by the cards at 小): the name wraps in a card that follows 文字大小, the plate labels wrap beside their glyph, the title follows 文字大小 while it fits on one line; on a short screen 128 px cards and caps that still grow a step', () => {
   const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
-  const rule = (sel) => css.match(new RegExp(`\\n${sel.replace(/[.*]/g, '\\$&')} \\{[^}]*\\}`))?.[0] || '';
-  assert.match(rule('.hub-entry__name'), /font-size: min\(calc\(\.3 \* var\(--t\)\), \.3rem\);[^}]*line-height: 1\.1;/);
+  const rule = (sel) => css.match(new RegExp(`\\n${sel.replace(/[.*()]/g, '\\$&')} \\{[^}]*\\}`))?.[0] || '';
+  // the card, its icon and its name follow 文字大小 together (review: the names had been pinned at 小's .3rem)
+  assert.match(css, /\.lobby-hub \{ --hub-entry-w: calc\(2\.3 \* var\(--t\)\);/);
+  assert.match(rule('.hub-entry__name'), /font-size: calc\(\.3 \* var\(--t\)\);[^}]*line-height: 1\.1;/);
   assert.doesNotMatch(rule('.hub-entry__name'), /nowrap/, 'the name wraps between words');
+  assert.match(rule('.hub-entry'), /min-height: calc\(1\.34 \* var\(--t\)\);/);
+  assert.doesNotMatch(rule('.hub-entry'), /[^-]height: 1\.34rem/, 'the card grows for a second line');
+  assert.match(rule('.hub-entry'), /flex: 1 0 auto;/, 'both cards the taller one\'s height');
+  assert.match(rule('.hub-entries'), /align-items: stretch;/);
+  assert.match(rule('.hub-entry__icon .icon'), /width: calc\(\.42 \* var\(--t\)\);/);
+  assert.match(rule('.hub-entry__en'), /padding-right: calc\(\.42 \* var\(--t\) \+ \.02rem\);/, 'the decorative line wraps before the icon');
+  // Korean breaks between words (review: 「독립 시뮬레이|션」)
+  assert.match(css, /\.lobby-hub:lang\(ko\) \.hub-stage \{ word-break: keep-all; overflow-wrap: break-word; \}/);
   assert.match(rule('.lobby-hub .hub-plate'), /min-height: \.7rem;/, 'a plate grows for a second line');
-  assert.doesNotMatch(rule('.hub-plate__label, .lobby-hub .hub-plate .btn__label'), /ellipsis|nowrap/);
-  assert.match(rule('.hub-center__title'), /font-size: min\(calc\(\.56 \* var\(--t\)\), \.56rem\);/);
+  const label = rule('.hub-plate__label, .lobby-hub .hub-plate .btn__label');
+  assert.doesNotMatch(label, /ellipsis|nowrap/);
+  assert.match(label, /flex: 1 1 0; min-width: min-content;/, 'the label wraps beside its glyph, only the tag drops');
+  // the title: one line beside the side columns, following 文字大小 (review: pinned at 小's .56rem / .46rem)
+  assert.match(css, /font-size: min\(calc\(\.56 \* var\(--t\)\), calc\(\(100vw - 9\.52rem\) \/ 8\.2\)\);/);
+  assert.match(css, /\n\.hub-center__title--latin \{ font-size: min\(calc\(\.46 \* var\(--t\)\), calc\(\(100vw - 9\.52rem\) \/ 20\.2\)\); \}/);
+  assert.doesNotMatch(rule('.hub-center__title'), /\.56rem\)/);
+  // the top bar's ping grows here, not everywhere (review: the global min-height outgrew title.css's own height)
+  assert.match(css, /\.lobby-hub > \.topbar \.ping \{ height: auto; min-height: \.32rem;/);
   const short = shortBlock();
   assert.match(short, /\.lobby-hub \{ --hub-entry-w: max\(2\.1rem, 128px\); \}/);
-  assert.match(rule('.hub-entry'), /min-height: 1\.34rem;/);
-  assert.doesNotMatch(rule('.hub-entry'), /[^-]height: 1\.34rem/, 'the card grows for a second line');
   assert.match(short, /\.hub-entry \{ min-height: max\(1\.1rem, 64px\);/);
-  assert.match(short, /\.lobby-hub \.hub-plate \{ font-size: min\(calc\(\.3 \* var\(--t\)\), 18px\); \}/);
-  assert.match(short, /\.hub-entry__en \{ font-size: min\(calc\(\.16 \* var\(--t\)\), 10px\);/);
-  assert.match(short, /\.hub-entry__name \{ font-size: min\(calc\(\.42 \* var\(--t\)\), 18px\); \}/);
+  assert.match(short, /\.hub-entry \{ width: calc\(var\(--hub-entry-w\) \+ 7 \* max\(0px, var\(--t-step\)\)\); \}/);
+  assert.match(short, /\.lobby-hub \.hub-plate \{ font-size: min\(calc\(\.3 \* var\(--t\)\), calc\(18px \+ var\(--t-step\)\)\); \}/);
+  assert.match(short, /\.hub-entry__en \{ padding-right: \.44rem; font-size: min\(calc\(\.16 \* var\(--t\)\), calc\(10px \+ var\(--t-step\)\)\);/);
+  assert.match(short, /\.hub-entry__name \{ font-size: min\(calc\(\.42 \* var\(--t\)\), calc\(18px \+ var\(--t-step\)\)\); \}/);
+  assert.match(readFileSync(path.join(ROOT, 'public/css/theme.css'), 'utf8'), /:root \{ --t-step: calc\(\(var\(--t\) - 64px\) \/ 12\); \}/);
 });

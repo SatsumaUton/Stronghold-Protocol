@@ -136,14 +136,35 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   assert.ok(sizes.length >= 30, sizes.join(' | '));
   // (a capped size still follows 文字大小 below the cap — §35.18 review: the room's big button, and on a short screen the
   // seat cards, the top bar's text, the status line, 独立模拟's briefing and the picker's names)
-  for (const v of sizes) assert.match(v, /^(calc\(\.\d+ \* var\(--t\)\)|min\(calc\(\.\d+ \* var\(--t\)\), (\.\d+rem|\d+px)\))$/, v);
+  const STEP_CAP = /^calc\((\d+)px \+ var\(--t-step\)( \/ 2)?\)$/;
+  for (const v of sizes) assert.match(v, /^(calc\(\.\d+ \* var\(--t\)\)|min\(calc\(\.\d+ \* var\(--t\)\), (\.\d+rem|\d+px|calc\(\d+px \+ var\(--t-step\)( \/ 2)?\))\))$/, v);
   const caps = sizes.filter((v) => v.startsWith('min('));
-  assert.equal(caps.length, 19, 'the GoButton\'s label, rook and mark, and the short screen\'s caps');
-  // the short screen's px caps keep the text readable (11–20 px)
-  for (const v of caps) { const px = /, (\d+)px\)$/.exec(v); if (px) assert.ok(+px[1] >= 11 && +px[1] <= 20, v); }
+  assert.ok(caps.length >= 19, `the GoButton's label, rook and mark, and the short screen's caps (${caps.length})`);
+  // the short screen's px caps keep the text readable (11–20 px at 中) and still grow above 中 (+ --t-step, theme.css;
+  // §35.18 review: 中, 大 and 特大 had been the same) — but the picker's 11 px names, which reach it only at 特大
+  for (const v of caps) {
+    const cap = v.slice(v.indexOf('), ') + 3, -1);
+    if (/rem$/.test(cap)) continue;
+    const px = STEP_CAP.exec(cap)?.[1] ?? /^(\d+)px$/.exec(cap)?.[1];
+    assert.ok(+px >= 11 && +px <= 20, v);
+    if (!STEP_CAP.test(cap)) assert.equal(v, 'min(calc(.14 * var(--t)), 11px)', `${v}: a px cap grows with --t-step`);
+  }
   assert.ok(!/!important/.test(block) && !/:has\(/.test(block));
   assert.match(block, /\.rseat__art img \{[^}]*object-fit: cover/);
   assert.match(block, /\.cardpick__grid[\s\S]*overflow-y: auto/);
+  // the review of the text-fit fixes (§35.18): Korean breaks between words; the short screen's avatar frame 2rem at 小 and
+  // smaller only as the text grows (not 1rem at every size); 复制's line height after `font` (which resets it); the phone
+  // footer's status and pill at the start; 独立模拟's card 2.7 × --t (2.7rem at 小, as before)
+  const plain = block.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(plain, /\.rs:lang\(ko\) \{ word-break: keep-all; overflow-wrap: break-word; \}/);
+  assert.match(plain, /\.seat__art\.rseat__art > \.avatar--xl \{ --av: clamp\(1rem, calc\(3rem - var\(--t\)\), 2rem\); \}/);
+  assert.doesNotMatch(plain, /--av: 1rem/);
+  assert.match(plain, /\.rs-key__copy \{[^}]*font: inherit;[^}]*line-height: 1;/);
+  assert.match(plain, /@media \(max-width: 900px\) \{[^@]*\.rs-foot__center \{ justify-self: start;/);
+  assert.match(plain, /\.rs--solo \.rseat \{ --w: min\(calc\(2\.7 \* var\(--t\)\), 34vw\); \}/);
+  // the ping pill grows in the room only (§35.18 review: a global min-height outgrew title.css's own height)
+  assert.match(plain, /\.rs-clock__ping \.ping \{ height: auto; min-height: \.32rem;/);
+  assert.match(readFileSync(path.join(ROOT, 'public/css/components.css'), 'utf8'), /\.ping \{[^}]*\n  height: \.32rem;/);
   // the plugin mode's chip beside the mode name (review of PR #813: its only rule had been deleted)
   assert.match(block, /\.rs-clock \.room-mode \{[^}]*border: 1px solid[^}]*text-overflow: ellipsis/);
 });

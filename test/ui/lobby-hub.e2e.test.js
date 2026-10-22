@@ -21,7 +21,9 @@
 // review: it had taken 选择模拟协议's wrapping label, cut in its fixed 46 px).
 // The hub on the four phones and on desktops 800×600 – 1920×1080 in five languages at four sizes: every line of its text
 // inside its box (test/e2e/text-fit.mjs; §35.18 review: English 「Solo Simulation」 / 「Team Simulation」 were cut by their
-// cards at 小 in every window, the plates ended in an ellipsis at 大 / 特大 on phones, the title ran under the tips).
+// cards at 小 in every window, the plates ended in an ellipsis at 大 / 特大 on phones, the title ran under the tips; and
+// in its review: Korean names broken between syllables, the decorative line and the names under the people icon, a
+// plate's label under its glyph, the two cards' tops apart).
 // The other doctors' read-only view: test/ui/room-settings.e2e.test.js.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/lobby-hub-*.png
 
@@ -767,6 +769,29 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
   // §35.18 review: the hub's cards cut English 「Solo Simulation」 / 「Team Simulation」 at 小 in every window (25–40 px past
   // the 2.3rem card; 95 px of 「Simulation」 in an 84 px card on a phone), its plates ended in an ellipsis at 大 / 特大 on a
   // phone and its title ran under the left column's tips at 大 / 特大 in a 1280×720 window
+  // what text-fit.mjs cannot see, as the review of those fixes found it: the entries' decorative line and names running
+  // under the card's people icon (not text), a plate's label dropping under its glyph instead of wrapping beside it, the
+  // two cards' tops apart
+  const hubShapes = () => {
+    const R = (e) => e.getBoundingClientRect();
+    const lines = (e) => { const r = document.createRange(); r.selectNodeContents(e); return [...r.getClientRects()]; };
+    const area = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    const out = [];
+    const cards = [...document.querySelectorAll('.lobby-hub .hub-entry')];
+    for (const c of cards) {
+      const icon = R(c.querySelector('.hub-entry__icon .icon'));
+      for (const sel of ['.hub-entry__en', '.hub-entry__name']) {
+        const a = lines(c.querySelector(sel)).reduce((m, q) => m + area(q, icon), 0);
+        if (a > 4) out.push(`${sel} under the icon (${Math.round(a)} px²)`);
+      }
+    }
+    if (cards.length === 2 && Math.abs(R(cards[0]).top - R(cards[1]).top) > 1) out.push(`the cards' tops ${Math.round(R(cards[0]).top)} / ${Math.round(R(cards[1]).top)}`);
+    for (const p of document.querySelectorAll('.lobby-hub .hub-plate')) {
+      const g = p.querySelector('.hub-plate__glyph, .lo-entry__icon, .btn__icon'), l = p.querySelector('.hub-plate__label, .btn__label');
+      if (g && l && p.checkVisibility() && R(l).top >= R(g).bottom - 1) out.push(`a plate's label under its glyph: ${l.textContent.trim()}`);
+    }
+    return out;
+  };
   test('phones and desktops: every label of the hub inside its box in every language at every 文字大小', { timeout: 900000 }, async () => {
     const phones = [[640, 360], [667, 375], [740, 360], [844, 390]];
     const desks = [[1920, 1080], [1440, 900], [1280, 720], [1100, 530], [1024, 600], [960, 540], [800, 600]];
@@ -781,6 +806,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
               await page.setViewport({ width: w, height: h, hasTouch: touch, isMobile: touch, deviceScaleFactor: 1 });
               await sleep(150); await settle(page); await page.evaluate(() => document.fonts.ready);
               for (const p of await page.evaluate(textProblems, '.lobby-screen')) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
+              for (const p of await page.evaluate(hubShapes)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               if (lang === 'en' && textSize === 'xl' && (w === 667 || w === 1280)) await page.screenshot({ path: path.join(OUT, `lobby-hub-fit-${w}-en-xl.png`) });
             }
           }

@@ -856,9 +856,8 @@
   display: inline-flex;
   align-items: center;
   gap: .04rem;
-  /* at least .32rem, taller when 大 / 特大 outgrows it (12.8 px on a phone held a 15.8 px line — §35.18 review) */
-  min-height: .32rem;
-  padding: 1px .14rem 1px .11rem;
+  height: .32rem;
+  padding: 0 .14rem 0 .11rem;
   border-radius: 99px;
   background: rgba(0, 0, 0, .5);
   border: 1px solid var(--line);

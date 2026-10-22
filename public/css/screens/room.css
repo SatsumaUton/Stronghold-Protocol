@@ -5,6 +5,9 @@
    ========================================================================================== */
 
 .rs { background: #0a0b0b; color: #eef0ef; }
+/* Korean breaks between words, not between the syllables of one (§35.18 review: 「시뮬레이션 시|작」 on the big button, and
+   the seat cards' labels once they wrap); a word too long for its box still breaks rather than running out of it */
+.rs:lang(ko) { word-break: keep-all; overflow-wrap: break-word; }
 .rs__bg {
   position: absolute;
   inset: 0;
@@ -62,6 +65,9 @@
   text-overflow: ellipsis;
 }
 .rs-clock__ping { display: inline-flex; align-items: center; gap: .08rem; font-size: calc(.15 * var(--t)); color: #9aa19e; }
+/* the shared ping pill has a fixed .32rem (12.8 px on a phone) its text outgrows at 大 / 特大: in the room's top bar it
+   grows with it (§35.18 review; older than the event UI). Scoped: title.css and the match's bars size their own pill */
+.rs-clock__ping .ping { height: auto; min-height: .32rem; padding-top: 1px; padding-bottom: 1px; }
 .rs-tools { display: flex; gap: .08rem; margin-left: .1rem; }
 .rs-top__right { display: flex; align-items: center; gap: .14rem; }
 .rs .rs-loadout {
@@ -104,11 +110,13 @@
 .rs-key__code { font-size: calc(.28 * var(--t)); letter-spacing: .06em; color: #f2f4f3; white-space: nowrap; }
 .rs-key__copy {
   height: 78%;
-  line-height: 1;
   padding: 0 .26rem;
   font: inherit;
   font-size: calc(.2 * var(--t));
   font-weight: 800;
+  /* after `font` (which resets it): a 1.5 line taller than the 78% button set the label at its top and cut its lower half
+     at 大 / 特大 on a phone (§35.18 review) */
+  line-height: 1;
   white-space: nowrap;
   color: #1b1e1d;
   background: linear-gradient(180deg, #e9edeb, #c3cac7);
@@ -177,9 +185,9 @@
   100% { opacity: 0; transform: translateX(-50%) scaleY(1.3); } }
 .rseat.is-flash .rseat__state { animation: rseat-pop 380ms cubic-bezier(.3, 1.7, .5, 1) 100ms backwards; }
 @keyframes rseat-pop { from { opacity: 0; transform: scale(.4); } }
-/* (3.4rem as a co-op card's: at 2.7rem 独立模拟's single card was the narrowest, and its 「Standing by」 broke inside the word
-   at 特大 in an 800–1100 px window — §35.18 review) */
-.rs--solo .rseat { --w: min(3.4rem, 34vw); }
+/* 2.7 × --t: 2.7rem at 小 as before, wider with the text (§35.18 review: at a fixed 2.7rem 独立模拟's single card was the
+   narrowest, and its 「Standing by」 broke inside the word at 特大 in an 800–1100 px window) */
+.rs--solo .rseat { --w: min(calc(2.7 * var(--t)), 34vw); }
 .rseat__clip { position: absolute; left: 50%; top: -.14rem; z-index: 2; width: .16rem; height: .2rem; transform: translateX(-50%); background: #3a3e3d; border: 2px solid #1a1c1c; }
 .rseat.is-lit .rseat__clip { background: #4fe8c0; }
 .rseat__strip { position: relative; display: flex; align-items: center; justify-content: space-between; height: max(.26rem, 16px); padding: 0 .08rem; background: #2b2e2e; }
@@ -259,11 +267,11 @@
 .seat__content.is-ready { border-color: #4fe8c0; color: #8ff3d6; }
 .seat__content.is-failed { border-color: #ff7a8a; color: #ff9aa6; }
 .rseat__lost {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 40%;
+  /* in flow between the top and the bottom text, across the art (§35.18 review: at 40% from the top it ran over the state
+     below and the tags above once the card was short) */
+  position: relative;
   z-index: 1;
+  margin: 0 -.08rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -365,7 +373,7 @@
 .rseat__invite:focus-visible .rseat__plus::before, .rseat__invite:focus-visible .rseat__plus::after { background: #5df0c6; }
 .rseat__add { align-self: start; max-width: calc(100% - .12rem); height: auto; min-height: .36rem; padding-block: .03rem; margin-top: .1rem; white-space: normal; line-height: 1.1; text-align: center; }
 .rseat__wait { display: flex; flex-direction: column; align-items: center; gap: .1rem; color: #b7bdbb; }
-.rseat__wait small { font-size: calc(.16 * var(--t)); }
+.rseat__wait small { font-size: calc(.16 * var(--t)); text-align: center; }
 .rseat__noinfo { position: absolute; right: .12rem; bottom: .14rem; font-family: var(--font-display); font-size: calc(.12 * var(--t)); letter-spacing: .1em; color: rgba(255, 255, 255, .15); }
 
 /* 独立模拟: the briefing beside the single seat */
@@ -633,20 +641,30 @@
   .rseat__plate { min-height: 36px; margin-top: 4px; }
   .rseat__doc, .rseat__noinfo, .rseat__invite small, .seat__op { display: none; }
   /* the seat cards' text capped (§35.18 review: at 大 / 特大 the .26–.34 × --t sizes, 23–30 px in a card about 120 px wide
-     and 100 px tall, ran 「Standing by」 / 「AI Teammate」 / 「Add AI Teammate」 past the card and the badge over the state);
-     the avatar frame of a bot or a card without the art pack at 1rem. [ASSUMED] the caps */
+     and 100 px tall, ran 「Standing by」 / 「AI Teammate」 / 「Add AI Teammate」 past the card and the badge over the state).
+     Each cap is its size at 中 and grows half a pixel a step above it (--t-step, theme.css; a whole pixel ran 「Standing」
+     past a 640 px phone's card at 特大), so 大 and 特大 still change the text. The avatar frame of a bot or a card without
+     the art pack is 2rem at 小 as everywhere (80 px) and 1rem less the text's growth above it (56 / 44 / 40 px at 中 / 大 /
+     特大), its AI tag with it; it gives way (flex) only when the text needs the height. [ASSUMED] the caps and the frame */
   .seat__art.rseat__art { gap: 2px; padding: 4px 3px; }
-  .seat__art.rseat__art > .avatar--xl { --av: 1rem; }
-  .rseat__host, .rseat__bot { padding: 1px 6px; font-size: min(calc(.26 * var(--t)), 15px); }
-  .rseat__state { gap: 4px; font-size: min(calc(.34 * var(--t)), 17px); }
-  .rseat:not(.is-lit) .rseat__state { font-size: min(calc(.28 * var(--t)), 15px); }
+  .seat__art.rseat__art > .avatar--xl { --av: clamp(1rem, calc(3rem - var(--t)), 2rem); }
+  .rseat__host, .rseat__bot { padding: 1px 6px; font-size: min(calc(.26 * var(--t)), calc(15px + var(--t-step) / 2)); }
+  .rseat__state { gap: 4px; font-size: min(calc(.34 * var(--t)), calc(17px + var(--t-step) / 2)); }
+  .rseat:not(.is-lit) .rseat__state { font-size: min(calc(.28 * var(--t)), calc(15px + var(--t-step) / 2)); }
   .rseat__box { width: 18px; height: 18px; }
-  .rseat__who { font-size: min(calc(.28 * var(--t)), 18px); }
-  .rseat__pick { min-height: 22px; font-size: min(calc(.22 * var(--t)), 16px); }
+  .rseat__who { font-size: min(calc(.28 * var(--t)), calc(18px + var(--t-step) / 2)); }
+  .rseat__pick { min-height: 22px; font-size: min(calc(.22 * var(--t)), calc(16px + var(--t-step) / 2)); }
   .rseat__pick span { display: none; }
+  /* the badge and 更换立绘 share a row, the tags wrap under them; the 连接中断 band gives way to the state, which says the
+     same, and an offline doctor's state drops its empty box (§35.18 review: a modded room's two tags and an offline
+     doctor's card ran past the art) */
+  .rseat__top { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .rseat__top > .rseat__pick, .rseat__top > .rseat__tag { align-self: auto; }
+  .rseat__lost, .rseat.is-offline .rseat__box { display: none; }
   .rseat--empty .rseat__art { padding-bottom: 6px; }
   .rseat__invite { gap: 2px; padding: 2px 4px; }
-  .rseat__invite b { font-size: min(calc(.34 * var(--t)), 18px); line-height: 1.15; }
+  .rseat__invite b { font-size: min(calc(.34 * var(--t)), calc(18px + var(--t-step) / 2)); line-height: 1.15; }
+  .rseat__wait small { font-size: min(calc(.16 * var(--t)), calc(15px + var(--t-step) / 2)); }
   .rseat__add { margin-top: 2px; }
   .rseat__plus { width: 26px; height: 26px; }
   .rseat__plus::before { width: 5px; }
@@ -655,31 +673,36 @@
   .cardpick__grid, .cardpick__name { font-size: min(calc(.14 * var(--t)), 11px); }
   .rs-foot { padding-bottom: 8px; gap: 8px; }
   /* the mode line, the status line (a spectator's runs to two lines) and 独立模拟's briefing, capped so the seat cards keep
-     their height (at 特大 the .28 × --t status took four lines on a 640×360 phone and left the cards 40 px). [ASSUMED] the
-     caps */
-  .rs-clock > b { font-size: min(calc(.28 * var(--t)), 20px); }
-  .rs-clock__ping, .rs-ready { font-size: min(calc(.22 * var(--t)), 15px); }
-  .rs-hint { font-size: min(calc(.28 * var(--t)), 14px); }
-  .rs-brief { max-width: min(8rem, 54vw); padding: 6px 12px; }
-  .rs-brief h2 { font-size: min(calc(.32 * var(--t)), 20px); }
-  .rs-brief p { font-size: min(calc(.17 * var(--t)), 14px); }
-  .rs-brief ul { font-size: min(calc(.16 * var(--t)), 13px); line-height: 1.35; }
-  /* the difficulty's name in its 40 px pill and the key's 复制 in its 26 px button: capped so the line stays inside.
+     their height (at 特大 the .28 × --t status took four lines on a 640×360 phone and left the cards 40 px); each a pixel
+     more a step above 中, the status line half a pixel (a whole one took a third line for a spectator on 640×360 at 特大).
      [ASSUMED] the caps */
-  .rs-pill__diff { font-size: min(calc(.28 * var(--t)), 20px); }
+  .rs-clock > b { font-size: min(calc(.28 * var(--t)), calc(20px + var(--t-step))); }
+  .rs-clock__ping, .rs-ready { font-size: min(calc(.22 * var(--t)), calc(15px + var(--t-step))); }
+  .rs-hint { font-size: min(calc(.28 * var(--t)), calc(14px + var(--t-step) / 2)); }
+  .rs-brief { max-width: min(8rem, 54vw); padding: 6px 12px; }
+  .rs-brief h2 { font-size: min(calc(.32 * var(--t)), calc(20px + var(--t-step))); }
+  .rs-brief p { font-size: min(calc(.17 * var(--t)), calc(14px + var(--t-step))); }
+  .rs-brief ul { font-size: min(calc(.16 * var(--t)), calc(13px + var(--t-step))); line-height: 1.35; }
+  /* the difficulty's name in its 40 px pill and the key's 复制 in its 26 px button: capped so the line stays inside (a
+     pixel more a step above 中). [ASSUMED] the caps */
+  .rs-pill__diff { font-size: min(calc(.28 * var(--t)), calc(20px + var(--t-step))); }
   .rs-key__code { font-size: calc(.36 * var(--t)); }
-  .rs-key__copy { font-size: min(calc(.26 * var(--t)), 18px); }
-  /* the button at least 46 px, taller for a second line; the label 18–20 px (as 选择模拟协议's here: it was .46 × --t, 40 px
-     at 特大, which cut 开始模拟 in English, Japanese and Korean, and at 特大 in Chinese once it wrapped). [ASSUMED] the cap */
+  .rs-key__copy { font-size: min(calc(.26 * var(--t)), calc(18px + var(--t-step))); }
+  /* the button at least 46 px, taller for a second line; the label 18–20 px at 小 / 中, a pixel more a step above (as
+     选择模拟协议's here: it was .46 × --t, 40 px at 特大, which cut 开始模拟 in English, Japanese and Korean, and at 特大 in
+     Chinese once it wrapped). [ASSUMED] the cap */
   .rs-go.proto-start { height: auto; min-height: 46px; }
   .rs-go .proto-start__mark { display: none; }
-  .rs-go .proto-start__label { font-size: min(calc(.46 * var(--t)), 20px); }
+  .rs-go .proto-start__label { font-size: min(calc(.46 * var(--t)), calc(20px + var(--t-step))); }
   .rs .rs-loadout .btn__label { display: none; }
   .rs-tools, .rs-key__k { display: none; }
 }
 @media (max-width: 900px) {
+  /* the centre column takes what the button leaves (it keeps its width); the status line and the pill sit at its start, as
+     narrow as their text (left-aligned, as before the §35.18 review) */
   .rs-foot { grid-template-columns: minmax(0, 1fr) auto; }
   .rs-foot__left { display: none; }
+  .rs-foot__center { justify-self: start; max-width: 100%; }
 }
 @media (max-aspect-ratio: 1/1) {
   .rs-seats { justify-content: flex-start; }
