@@ -148,6 +148,36 @@ test('昆图斯 third form at attack interval 2.0 (attack speed +75): a tide eve
   for (const x of plain) { const prev = tides[tides.indexOf(x) - 1]; assert.ok(Math.abs(x.t - prev.t - 3 * iv) < 0.06, `gap ${(x.t - prev.t).toFixed(3)} at ${x.t.toFixed(3)}`); }
 });
 
+test('昆图斯 third form under 寒冷 (interval 5.0): still alternating; 寒冷 plus any further attack-speed cut: a tide at every turn, no normal attack', () => {
+  // [ASSUMED] the tide's 1.667 s clip keeps its length when the attack speed is cut (as the engine's attack clip, ai.js
+  // clipSpeed: never slower), so the tide is ready 3.5 + 1.667 = 5.167 s after its cast whatever the slow: 寒冷's −30
+  // (interval 3.5 × 100 / 70 = 5.0) is 0.167 s short of that and keeps the alternation; 寒冷 with 引星棘刺's 视界 −5 (the
+  // repro's field, interval 5.385) makes every turn a tide. DESIGN §35.19 states it; if a slow is to stretch the clip
+  // (the abilities' `_affectedBySlowDown` 1), the second half of this test changes.
+  const ready = sk('TidewaterG2').cooldown + QUINTUS_CLIP.Tidewater;
+  const { h, e } = quintus(TWO());
+  thirdForm(h);
+  assert.ok(h.b.applyStatus(e, 'cold', { duration: 600 }), '寒冷 lands on the leader');
+  h.run(0.5);
+  assert.ok(Math.abs(e.s.interval - 5) < 1e-6 && e.s.interval < ready, `寒冷: interval ${e.s.interval} (ready ${ready.toFixed(3)})`);
+  const cold = actions(h, e, 70);
+  const coldTides = tideRule(cold);
+  assert.ok(cold.filter((a) => a.what === 'ATTACK').length >= 4, 'normal attacks between the tides');
+  const plain = coldTides.filter((x, i) => i > 0 && !cold.some((a) => /^Rockfall/.test(a.what) && a.t > coldTides[i - 1].t && a.t < x.t));
+  assert.ok(plain.length >= 3, `${plain.length} tide gaps without 崩坍`);
+  for (const x of plain) { const prev = coldTides[coldTides.indexOf(x) - 1]; assert.ok(Math.abs(x.t - prev.t - 2 * e.s.interval) < 0.06, `寒冷: gap ${(x.t - prev.t).toFixed(3)} at ${x.t.toFixed(3)}`); }
+  h.b.addBuff(e, { key: 'test:vision', persist: true, mods: { aspd: -5 } });
+  h.run(2 * e.s.interval);
+  const iv = e.s.interval;
+  assert.ok(Math.abs(iv - 3.5 * 100 / 65) < 1e-6 && iv > ready, `寒冷 + −5: interval ${iv}`);
+  const slow = actions(h, e, 70);
+  const slowTides = tideRule(slow);
+  assert.equal(slow.filter((a) => a.what === 'ATTACK').length, 0, 'every turn goes to a skill');
+  assert.ok(slowTides.length >= 10, `${slowTides.length} tides`);
+  const turns = slow.filter((a) => /^(Tidewater|Rockfall)/.test(a.what));
+  for (let i = 1; i < turns.length; i++) assert.ok(Math.abs(turns[i].t - turns[i - 1].t - iv) < 0.06, `turn gap ${(turns[i].t - turns[i - 1].t).toFixed(3)} at ${turns[i].t.toFixed(3)}`);
+});
+
 test('昆图斯 third form: after a stretch with no target, the first turn is the tide (ready all along)', () => {
   const { h, e } = quintus(TWO());
   thirdForm(h);

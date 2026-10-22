@@ -963,7 +963,11 @@ const QUINTUS_ATTACK_SKILLS = new Set(['Tidewater', 'Rockfall']);
  * enemy_1521_dslily.skills: tidewater* Skill_02, rockfall* Skill_01, summontentac* Skill_03, doom Skill_04; not
  * looping, `_maxAnimScale` 1.0: never faster) → that clip's length in the model (data/assets.json
  * enemies.enemy_1521_dslily.spine.animations). The skill's cooldown counts from the clip's end (enemies.js castNow).
- * [ASSUMED] the length holds under a slow too (the abilities' `_affectedBySlowDown` 1 allows a slower clip).
+ * [ASSUMED] the length holds under an attack-speed cut too, as the engine's normal attack clip does (ai.js clipSpeed);
+ * the skills' abilities share the timing fields of 昆图斯's own Attack (`_timeMode` 0, `_maxAnimScale` 1.0), but their
+ * `_affectedBySlowDown` 1 allows a slower clip. So the third-form tide is ready 3.5 + 1.667 = 5.167 s after its cast
+ * whatever the slow: an attack interval past that (寒冷's −30 gives 5.0 s; 寒冷 plus any further cut crosses it) makes
+ * every turn a tide, with no normal attack (DESIGN §35.19, CHANGELOG 0.3.2).
  */
 export const QUINTUS_CLIP = Object.freeze({ Tidewater: 1.667, Rockfall: 3, SummonTentac: 2, Doom: 4.467 });
 
