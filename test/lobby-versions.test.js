@@ -13,6 +13,7 @@ import { Lobby } from '../server/lobby.js';
 import { SessionRegistry } from '../server/net.js';
 import { DATA_DIR, ROOT, getData, getVersionData, lookup } from '../server/data.js';
 import { createVersionSets } from '../server/versions.js';
+import { createRoomSets } from '../server/plugins/roomSets.js';
 import { computeVanillaContent } from '../server/plugins/identity.js';
 import { DATA_SHIM_JS } from '../server/http/static.js';
 import { DIFFICULTIES, ERR, modeIdFor } from '../shared/constants.js';
@@ -583,4 +584,24 @@ test('the real version service: a room of 第一期上半 names its real cs and 
   assert.equal(Rec.last.version, 'act1autochess@V1_1');
   assert.equal(Rec.last.modeId, 'mode_multi_hard');
   lobby.shutdown();
+});
+
+test('server/plugins/roomSets.js resolve({ gameplay: false }): a content / script / trusted plugin in the closed list → VERSION_UNSUPPORTED, nothing built', () => {
+  const built = [];
+  const plugin = (id, cls, extra = {}) => ({ id, class: cls, status: 'loaded', content: cls !== 'cosmetic' ? {} : undefined, visual: cls === 'cosmetic' ? {} : undefined,
+    manifest: { version: '1.0.0', scope: ['room'], ...extra } });
+  const list = { skin: plugin('skin', 'cosmetic'), rules: plugin('rules', 'content'), needs: plugin('needs', 'cosmetic', { requires: { rules: '*' } }) };
+  const sets = createRoomSets({
+    registry: { plugin: (id) => list[id] || null },
+    visual: { resolve: (ids) => { built.push(['visual', ids]); return { ok: true, set: { vs: 'ff'.repeat(32), plugins: ids.map((id) => ({ id, hash: 'ab' })), warnings: [], bytes: 1 } }; } },
+    contents: { resolve: (ids) => { built.push(['content', ids]); return { ok: true, set: { cs: 'ee'.repeat(32), plugins: [], dataBytes: 0, modes: [], kitted: [] } }; } },
+    policy: null,
+  });
+  for (const ids of [['rules'], ['needs'], ['skin', 'rules']]) {
+    const r = sets.resolve(ids, { gameplay: false });
+    assert.equal(r.error, ERR.VERSION_UNSUPPORTED, `${ids}: ${JSON.stringify(r)}`);
+  }
+  assert.deepEqual(built, [], 'refused before any set is built');
+  assert.equal(sets.resolve(['skin'], { gameplay: false }).ok, true);
+  assert.equal(sets.resolve(['rules']).ok, true, 'the default keeps gameplay plugins');
 });

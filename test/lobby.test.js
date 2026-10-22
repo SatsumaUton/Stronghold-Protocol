@@ -1274,6 +1274,7 @@ describe('websocket lobby', () => {
     assert.ok(h.rooms >= 1);
     assert.ok(h.sockets >= 1);
     assert.ok(h.sessions >= 1);
+    assert.equal(Object.hasOwn(h, 'versions'), false, 'only 第二期下半 enabled: no versions block (DESIGN §35.23)');
   });
 });
 
