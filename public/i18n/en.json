@@ -180,6 +180,7 @@
   "终极模拟": "Ultimate Simulation",
   "无效的请求": "Invalid request",
   "操作过于频繁": "Too many actions, slow down",
+  "每人 30 秒内只能发起一次重刷投票": "Each player can start a reroll vote once every 30 seconds",
   "你不在房间中": "You are not in a room",
   "未找到该同盟密钥对应的房间": "No room found for this Alliance Key",
   "房间已满": "Room is full",

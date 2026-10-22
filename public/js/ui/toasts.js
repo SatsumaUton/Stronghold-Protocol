@@ -107,6 +107,8 @@ export function describeError(err) {
       return t('「{a}」和「{b}」的规则开关「{rule}」选项冲突', { a: name(match[2]), b: name(match[3]), rule: t(labels[match[1]]) });
     }
   }
+  // the per-seat 重刷本局 cooldown (PR #860, DESIGN §28.21): say which limit it is, not the generic RATE text
+  if (err.code === 'RATE' && err.detail === 'setup reroll cooldown') return t('每人 30 秒内只能发起一次重刷投票');
   if (err.code && Object.hasOwn(ERR_TEXT, err.code)) return t(ERR_TEXT[err.code]);
   if (typeof err.message === 'string' && err.message) return t(err.message);
   if (typeof err.msg === 'string' && err.msg) return t(err.msg);

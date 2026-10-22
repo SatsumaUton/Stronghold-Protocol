@@ -1,7 +1,8 @@
 // INFO_CHECK full setup reroll: unanimous human consent, keeping the room and player settings.
-// [ASSUMED] Remake convenience: any seated player may open or cancel the vote; each seat may open one every 30 s, and
-// a completed reroll opens a fresh window (a cancelled vote does not give the cooldown back). These are not official
-// mode rules; DESIGN §28.21.
+// [ASSUMED] Remake convenience, not official mode rules (DESIGN §28.21): the unanimous human vote, the INFO_CHECK
+// timer paused during the vote and resumed with its remaining time, the independent reroll stream; and (PR #860) any
+// seated player may open or cancel the vote, each seat may open one every 30 s, a completed reroll opens a fresh window
+// (a cancelled or rejected vote does not give the cooldown back).
 // Installed on Match.prototype like the other method containers. The lobby only refuses spectators and absent seats.
 import { PHASE, ERR } from '../../../shared/constants.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';

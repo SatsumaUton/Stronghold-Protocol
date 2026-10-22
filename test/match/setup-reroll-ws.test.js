@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { describeError } from '../../public/js/ui/toasts.js';
 import { startServer } from '../../server/index.js';
 import { TestClient } from '../helpers/wsClient.js';
 import { ERR } from '../../shared/constants.js';
@@ -85,7 +86,11 @@ test('real four-player sockets: any seat proposes, unanimous sync, reconnect and
   const again = await host.waitFor('m.public', (p) => p.rerollVote && p.rerollVote.id > voteId);
   await ok(guests[1], { t: 'room.cancelReroll', voteId: again.rerollVote.id });
   await host.waitFor('m.public', (p) => !p.rerollVote && p.deadline > 0);
-  await err(host, { t: 'room.rerollSetup', setupRevision: 1 }, ERR.RATE); // the cancelled vote keeps the cooldown
+  // the cancelled vote keeps the cooldown; the toast names that limit, not the generic RATE text (PR #860 review)
+  const cooled = await host.request({ t: 'room.rerollSetup', setupRevision: 1 });
+  assert.deepEqual([cooled.t, cooled.code, cooled.detail], ['error', ERR.RATE, 'setup reroll cooldown']);
+  assert.equal(describeError(cooled), '每人 30 秒内只能发起一次重刷投票');
+  assert.equal(describeError({ code: ERR.RATE }), '操作过于频繁', 'other RATE refusals keep the generic text');
   // Disconnect/reconnect retains this room and returns the current full setup.
   const guest = guests[2];
   await guest.terminate();

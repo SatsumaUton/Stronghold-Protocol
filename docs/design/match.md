@@ -258,7 +258,9 @@ disconnect or leaving cancels it and restores the remaining time / prior Ready s
 seats, settings and connections, redraws the complete opening, resets Ready, and starts the full original timer
 (single-human matches remain untimed). Fixed stage/bans remain fixed and random results can repeat. A separate
 seed-derived stream leaves shop/draft RNG untouched; each seat may start one vote per 30 s (a completed reroll opens a
-fresh window, a cancelled vote does not give the cooldown back), and stale revisions or vote identities are refused.
+fresh window, a cancelled or rejected vote does not give the cooldown back; the refusal is RATE with the detail `setup
+reroll cooldown`, which the client shows as 「每人 30 秒内只能发起一次重刷投票」), and stale revisions or vote identities
+are refused.
 All new setup data and player DIY stocks are prepared before mutation; data preparation failure leaves the old opening
 intact. This is a remake convenience, not an official mode rule. Unrelated result-screen changes from PR #408 are not
 included.
