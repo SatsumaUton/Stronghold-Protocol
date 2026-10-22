@@ -590,3 +590,41 @@ item ids), `economy.freezeSearch`, a one-round `holdLevel` with `economy.why`, e
 id is the elite), and `buy` only to finish a merge or add a distinct member; `repairPlan` keeps them after
 checking the ids. Activated layers on every bond count; do not bench a stronger unit only to chase a
 6-threshold. Each prep, compare `digest.upcoming` fly and elite counts with `caps.air`.
+
+## 终极 (ABYSS) push (§35.23)
+
+Goal (maintainer, 2026-10-23): LLM-played seats clear the 终极 Final Assault close to always, solo and 4-player
+co-op, and the lessons go back into the bots. Everything below reads seat-visible state only.
+
+Official facts the prompt now states: starting LP is `bands.json totalHp`; from 150 real seconds of a Final Assault
+the team loses 1 LP per real second and LP 0 loses; no in-battle layer gains in the Final Assault; a leader hit of
+300000 or more is voided. So LP is both the R5–R13 leak budget and the Final Assault clock, and in-battle stackers
+add nothing in the boss round.
+
+Candidate changes:
+
+- Bands carry `lp`. Every candidate (generic, community build, cycle) has `scoreParts.survival = (lp − 26) × 1.5`
+  [ASSUMED]. Measured before the change: the model followed the ranking to 23–24 LP bands in 6/6 solo matches and
+  died before the Final Assault on three of them, where legacy's 25–45 LP picks arrived.
+- The band draft keeps one of its eight slots for the best direction of a band without a community main [ASSUMED].
+  Every community band starts with 23–29 LP; without the slot no 45 LP opening (歌利亚) was ever listed.
+- The model sees two prep candidates, not four, and one copy of the level-curve basis sentence. Latency, not input
+  size, was the limit: the user text grew only from 18.7k to 29.5k characters over a match, while successful replies
+  averaged about 2000 output tokens and from R5 every solo prep hit the 28 s HTTP limit.
+- Level holds: waiting a round saves exactly 1 fund and costs a round of higher-tier rolls. `repairPlan` drops a hold
+  below the slow community rhythm 3-5-7-9 (L2 by R3, L3 by R5, L4 by R7, L5 by R9; BV19UXZBJExQ reply) unless one of the
+  seat's candidates holds that level (二本叙 holds L2: BV1AdXKB9Ebt pinned).
+- A candidate's main may lead the plan before any member is owned, so 玛恩纳 can name 卡西米尔 from its first prep.
+  An accepted plan's primary core bond becomes legacy's focus (`bondPlan`).
+- A prep that fails or is late keeps the last accepted direction (`carryPlan`), and only protocol errors count toward
+  the seat's `failureLimit` (history §35.23).
+
+Bot changes from the same diagnosis: legacy lineups now reach a 6-member (阿戈尔 5) core bond when the members are
+owned (a climb seeded from the full threshold, +30 for a core bond's second tier) and keep bench members of a core
+bond with 4+ distinct owned members. Measured, seeds 1–20: solo ABYSS mean leader damage 504k → 515k, co-op 108k →
+128k per seat, still 0/20 both; FUNNY / NORMAL / HARD wins unchanged or better (solo NORMAL 6 → 7 of 10).
+
+Not yet solved: the bots bank about 230 layers by R13 and deal 6–39 % of a solo leader pool; the community boards hold
+several hundred (「400层保底」, BV1ohDNBPEcx comment; 999 谢拉格, BV1xVdBBWEuu). Measured against a ×K scaling of the
+bot's own layers, wins start around 4–6× (handoff/round51, local). Layer engines, a Final Assault lineup and the
+co-op cover seat are the next levers.

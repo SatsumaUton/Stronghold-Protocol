@@ -125,6 +125,13 @@ skips the original picker's RNG draw). Regenerate both comparison runs with this
 Keep seeds, difficulty and rehearsal counts
 identical in comparisons; use `--jobs 1` for timing, since parallel load inflates the timings.
 
+终极 (ABYSS) is the hard target for both kinds of seat (history §35.23): compare with
+`node tools/botbench.mjs --configs solo:ABYSS,coop4:ABYSS --seeds 20 --seed 1 --json …`, and keep FUNNY / NORMAL /
+HARD from getting worse (`--configs solo:FUNNY,solo:NORMAL,solo:HARD,coop4:FUNNY,coop4:NORMAL,coop4:HARD --seeds 10`).
+A win is clearing the round-14 Final Assault (`victory`); round 15 is the optional Hidden Core. An `external` seat in
+plan mode runs the legacy executor with the plan's weights, so a legacy change moves plan seats too: since §35.23 the
+plan's primary core bond is legacy's focus, and legacy lineups can field a 6-member core bond.
+
 The match harness accepts `botStrategy` objects, so an implementation can be tested before registration. See
 [`bot-strategies.test.js`](../test/match/bot-strategies.test.js) for real draft, sliced prep, personal-choice and
 failure-cleanup tests; the existing delegated-rehearsal tests exercise the unchanged default path. Test legal actions
