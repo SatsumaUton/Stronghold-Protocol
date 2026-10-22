@@ -905,6 +905,12 @@ the briefing, the result and the HUD, and left out of the statistics overview un
 cosmetic plugins only still plays the vanilla `cs` and counts as the original game (§9). DESIGN §32.6 keeps the
 decisions, the measurements and the open points.
 
+Gameplay plugins (content, script and trusted) work only in rooms of 第二期下半, the default version. On a server that
+enables the official versions (`SP_VERSIONS`, DESIGN §35.23), a room of another version refuses them: room.create,
+room.setPlugins and a version proposal answer VERSION_UNSUPPORTED (`roomSets.resolve({ gameplay: false })`), and the
+插件 panel disables their switches. Cosmetic plugins carry over to every version; a proposal whose cosmetic plugins do not
+resolve on the target version is refused as well.
+
 | File | Role |
 |---|---|
 | `server/plugins/roomSets.js` | what a room's plugin list makes: closed over requirements, ordered, split into the visual set and the content set, the policy's refusals |
@@ -1226,7 +1232,8 @@ same registered extensions in the set's child; script sets always use a process 
 entries run at startup in one separate child, never the HTTP process. `api.http.route('/x/<id>/…', fn)` registers an
 exact path whose handler receives a frozen `{ method, path, url }` and returns a JSON value. No live request/socket is
 passed. `api.lobby.on(name, fn)` receives frozen copies for `roomCreated`, `playerJoined`, `playerLeft`, `matchStarted`,
-`roomClosed`. `api.health.extend(value)` replaces that plugin's JSON under `/healthz.plugins[id]`. Routes never leave
+`roomClosed`; their `room` is the room.state the members get, so on a server that enables official versions it carries
+`version` and, while a version vote is open, `versionVote` (DESIGN §35.23; absent in 第二期下半 rooms). `api.health.extend(value)` replaces that plugin's JSON under `/healthz.plugins[id]`. Routes never leave
 `/x/<id>/`: both the child API and parent IPC receiver check the loaded plugin id, reject `..`, `%2e` in any
 letter case and backslashes, and dispatch by the same raw path used by the HTTP handler (query excluded). A nonmatch
 continues to the original health/static handler. `health.extend` accepts at most 16 KiB of serialized UTF-8 JSON per
