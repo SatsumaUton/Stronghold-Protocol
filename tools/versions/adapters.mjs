@@ -1,0 +1,65 @@
+// tools/versions/adapters.mjs — field adapters for an older activity_table (docs/DATA.md "Official versions (M0)"): pure
+// functions that rewrite a loaded season section in place into the shape tools/build-data.mjs reads (the 下半 schema).
+// tools/build-data.mjs applies a profile's `adapters` right after it finds the season section, never for the default
+// profile. Each one throws on a shape it does not know, so a new table cannot pass through half-converted.
+//
+//   bondActiveType    上半's bondInfoDict activates by `activeType` (BATTLE / ALL / MANI) + `isActiveInDeck`; 下半 by
+//                     `activeCondition` + `activeConditionTemplate` + `activeParamList` + `maxInactiveBondCount`. The three
+//                     上半 shapes map to what 下半 writes for the same bonds (checked on 21b1f240 / 8303c922 against
+//                     86da4cfa): ALL + deck (投资人, 远见, 奇迹) → BOARD_AND_DECK; BATTLE → BOARD; MANI (调和, maniShip) →
+//                     BOARD; every one count_threshold_upward on [activeCount], maxInactiveBondCount −1.
+//   selfBackupPreset  a NORMAL shop row that backs itself up (backupCharId = charId) is a PRESET: 下半 marks it so, and
+//                     like every PRESET row of both halves its backup carries the default skill and module (上半 left the
+//                     module out). In 上半 only chess_char_1_15 (盟约·辅助干员, hidden, granted by 优等生) qualifies; 下半's
+//                     row reads PRESET with backupCharUniEquipId uniequip_002_pithst. [ASSUMED]
+
+/** activeType (+ isActiveInDeck) → 下半's activeCondition. */
+const ACTIVE_CONDITION = Object.freeze({ 'ALL+deck': 'BOARD_AND_DECK', BATTLE: 'BOARD', MANI: 'BOARD' });
+
+/**
+ * @param {{ bondInfoDict: Record<string, any> }} act the season section (activity.AUTOCHESS_SEASON[season])
+ */
+export function bondActiveType(act) {
+  for (const [id, b] of Object.entries(act.bondInfoDict || {})) {
+    if (b.activeCondition !== undefined) continue;
+    const key = b.activeType === 'ALL' && b.isActiveInDeck === true ? 'ALL+deck'
+      : b.isActiveInDeck === false && b.activeType !== 'ALL' ? b.activeType : null;
+    const cond = key && ACTIVE_CONDITION[key];
+    if (!cond || !Number.isInteger(b.activeCount) || b.activeCount < 1) {
+      throw new Error(`adapter bondActiveType: bond ${id} has an unknown shape (activeType ${b.activeType}, isActiveInDeck ${b.isActiveInDeck}, activeCount ${b.activeCount})`);
+    }
+    b.activeCondition = cond;
+    b.activeConditionTemplate = 'count_threshold_upward';
+    b.activeParamList = [String(b.activeCount)];
+    b.maxInactiveBondCount = -1;
+  }
+}
+
+/**
+ * @param {{ charShopChessDatas: Record<string, any> }} act
+ */
+export function selfBackupPreset(act) {
+  for (const [id, s] of Object.entries(act.charShopChessDatas || {})) {
+    if (!s || typeof s.chessType !== 'string') throw new Error(`adapter selfBackupPreset: shop row ${id} has no chessType`);
+    if (s.chessType !== 'NORMAL' || !s.charId || s.backupCharId !== s.charId) continue;
+    s.chessType = 'PRESET';
+    s.backupCharSkillIndex = s.defaultSkillIndex ?? 0;
+    s.backupCharUniEquipId = s.defaultUniEquipId ?? null;
+  }
+}
+
+/** Every adapter by the name a profile lists. */
+export const ADAPTERS = Object.freeze({ bondActiveType, selfBackupPreset });
+
+/**
+ * Apply a profile's adapters, in order, to the season section.
+ * @param {object} act
+ * @param {readonly string[]} names
+ */
+export function applyAdapters(act, names) {
+  for (const name of names) {
+    const fn = ADAPTERS[name];
+    if (!fn) throw new Error(`unknown adapter ${name} (known: ${Object.keys(ADAPTERS).join(', ')})`);
+    fn(act);
+  }
+}

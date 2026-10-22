@@ -848,11 +848,12 @@ test('the deliberate trigger deviation (DESIGN §21.29): six 重装 skills DEFAU
   assert.match(DESIGN, /every MANUAL 重装 skill, §21\.12 — but the six of the deliberate deviation, §21\.29/);
   assert.match(DESIGN, /\*\*partly reverted by §21\.29\*\*/);
   assert.match(DESIGN, /\| Six 重装 skills' trigger \(§21\.29\) \|/);
-  // the builder's table is per chess (灰毫 S1 is the generic skcom_atk_up[3]) and the data follows it
+  // the builder's table is per operator charId and skill (灰毫 S1 is the generic skcom_atk_up[3]; the seasons reuse chess
+  // ids for other operators) and the data follows it
   assert.match(doc('tools/build-data.mjs'), /import \{ createOfficialUnitBuilders \} from '\.\.\/server\/plugins\/officialUnitBuilder\.js'/);
   const bd = doc('server/plugins/officialUnitBuilder.js');
   assert.match(bd, /const TRIGGER_DEVIATIONS = Object\.freeze\(\{/);
-  for (const k of ["chess_char_1_04_a: { skchr_udflow_2: 'DEFAULT' }", "chess_char_1_20_a: { skchr_liskam_2: 'DEFAULT' }", "chess_char_2_18_a: { 'skcom_atk_up[3]': 'DEFAULT', skchr_ashlok_2: 'DEFAULT' }", "chess_char_5_08_a: { skchr_horn_2: 'DEFAULT', skchr_horn_3: 'DEFAULT' }"]) assert.ok(bd.includes(k), k);
+  for (const k of ["char_4137_udflow: { skchr_udflow_2: 'DEFAULT' },", "char_107_liskam: { skchr_liskam_2: 'DEFAULT' },", "char_431_ashlok: { 'skcom_atk_up[3]': 'DEFAULT', skchr_ashlok_2: 'DEFAULT' },", "char_4039_horn: { skchr_horn_2: 'DEFAULT', skchr_horn_3: 'DEFAULT' },", "char_2026_yu: { skchr_yu_2: 'SKILL_RANGE' },"]) assert.ok(bd.includes(k), k);
   for (const id of ['chess_char_1_04_b', 'chess_char_2_18_b', 'chess_char_5_08_b']) {
     for (const s of DATA.chess[id].skills.filter((x) => x.trigger.rawRule === 'TAKE_DAMAGE' && x.trigger.rule === 'DEFAULT')) assert.ok(bd.includes(s.skillId), `${id} ${s.skillId}`);
   }
