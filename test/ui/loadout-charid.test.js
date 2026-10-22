@@ -173,3 +173,15 @@ test('the sync engine: no send while the gate is shut; the content\'s arrival an
   assert.equal(sent.length, 2, 'not on every push of the same room');
   sync.dispose();
 });
+
+test('a write-back changes only what the edit changed: an edit made on an older copy of the view never undoes a newer one', () => {
+  const map = M.charKeyMap(listOf(DEF));
+  const charOf = (id) => map.toChar.get(id);
+  const older = { chess_char_1_02_a: { skill: 0 } };
+  // meanwhile 能天使 got a choice (a newer edit); the older copy then changes 角峰 only
+  const byChar = { [YAK]: { skill: 0 }, [ANGEL]: { skill: 1 } };
+  assert.deepEqual(M.rebaseByChar(byChar, older, { chess_char_1_02_a: { skill: 2 } }, charOf), { [YAK]: { skill: 2 }, [ANGEL]: { skill: 1 } });
+  // 干员持有: the older copy marked 角峰 not owned; 能天使 was marked since and stays so
+  assert.deepEqual(O.rebaseChars([YAK, ANGEL], ['chess_char_1_02_a'], [], charOf), [ANGEL]);
+  assert.deepEqual(O.rebaseChars([ANGEL], [], ['chess_char_1_02_a'], charOf), [ANGEL, YAK].sort());
+});

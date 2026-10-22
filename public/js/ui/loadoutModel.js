@@ -151,17 +151,20 @@ export function entriesView(byChar, map) {
 }
 
 /**
- * Write an edit of a view back by operator: every chess the edit removed from the view (`prev` → `next`) clears its
- * operator, every chess of `next` sets its operator — `charOf` of the data the view was built from, so an edit is never
- * filed under another version's operator; a chess it cannot map is left out. Operators the view did not show stay.
+ * Write an edit of a view back by operator — only what the edit changed (`prev` → `next`): a chess it removed clears its
+ * operator, a chess it added or changed sets its operator, through `charOf` of the data the view was built from, so an
+ * edit is never filed under another version's operator and an edit made on an older copy of the view never undoes a
+ * newer one; a chess it cannot map is left out. Operators the view did not show stay.
  * @param {Record<string, any>} byChar @param {Record<string, any>} prev @param {Record<string, any>} next
  * @param {(chessId: string) => string|null|undefined} charOf
  * @returns {Record<string, any>} a new map
  */
 export function rebaseByChar(byChar, prev, next, charOf) {
   const out = { ...(byChar || {}) };
-  for (const id of Object.keys(prev || {})) if (!Object.hasOwn(next || {}, id)) { const c = charOf(id); if (c) delete out[c]; }
+  const before = prev || {};
+  for (const id of Object.keys(before)) if (!Object.hasOwn(next || {}, id)) { const c = charOf(id); if (c) delete out[c]; }
   for (const [id, e] of Object.entries(next || {})) {
+    if (Object.hasOwn(before, id) && JSON.stringify(before[id]) === JSON.stringify(e)) continue;
     const c = charOf(id);
     if (typeof c === 'string' && c && !UNSAFE_IDS.has(c) && isObj(e)) out[c] = { ...e };
   }

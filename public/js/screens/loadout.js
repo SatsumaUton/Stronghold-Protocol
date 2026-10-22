@@ -796,7 +796,7 @@ function LoadoutScreen({ st }) {
     if (ok) setDiyPicks({});
   };
   const setTab = (t) => loadoutStore.set({ tab: t });
-  const toggleOwned = (id, owned) => setNotOwned(setOwned(loadoutStore.get().notOwned, id, owned));
+  const toggleOwned = (id, owned) => setNotOwned(setOwned(st.notOwned, id, owned), { base: st.notOwned });
   const ownAll = async () => {
     if (!nNotOwned) return;
     const ok = await confirmDialog({ title: t('全部持有'), text: t('将 {nNotOwned} 名未持有的干员恢复为持有（由本人上场）？', { nNotOwned }), okText: t('全部持有') });
@@ -810,18 +810,21 @@ function LoadoutScreen({ st }) {
     if (view === 'deck') setDrawer(true); else setNarrowDetail(true);
   };
   // a row's quick choice (PR #301): the same setChoice / setEntries path; the row becomes the selection, a phone stays on the list
+  // (the edit is made on the view this render drew, with this render's records: written back through that view's map —
+  // a click that lands while another version's data replaces it is re-based, never filed under another operator,
+  // DESIGN §35.23)
   const quickChange = (id, patch) => {
     const recs = recordsOf(id, getChess);
-    setEntries(setChoice(loadoutStore.get().entries, recs.base, recs.golden, patch));
+    setEntries(setChoice(st.entries, recs.base, recs.golden, patch), { base: st.entries });
     loadoutStore.set({ sel: id });
   };
-  const change = (patch) => { if (base) setEntries(setChoice(loadoutStore.get().entries, base, golden, patch)); };
+  const change = (patch) => { if (base) setEntries(setChoice(st.entries, base, golden, patch), { base: st.entries }); };
   // 0.2.2: an operator's 潜能 / 练度 (by charId: its normal, elite and 自选 forms share them)
   const setOpsOf = (charId, patch) => setOpsMap(setOps(loadoutStore.get().ops, charId, patch));
   const resetOne = () => {
     if (!base) return;
     setOpsMap(resetOps(loadoutStore.get().ops, base.charId));
-    setEntries(resetChoice(loadoutStore.get().entries, base.chessId));
+    setEntries(resetChoice(st.entries, base.chessId), { base: st.entries });
   };
   const resetAll = async () => {
     if (!nChanged) return;

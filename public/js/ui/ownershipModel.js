@@ -75,15 +75,16 @@ export function notOwnedView(chars, map) {
 }
 
 /**
- * Write an edit of a view back by operator (like ui/loadoutModel.js rebaseByChar): chess the edit removed clear their
- * operator, chess of `next` add theirs; operators the view did not show stay.
+ * Write an edit of a view back by operator (like ui/loadoutModel.js rebaseByChar) — only what the edit changed: chess it
+ * removed clear their operator, chess it added add theirs; operators the view did not show stay.
  * @param {string[]} chars @param {string[]} prev @param {string[]} next @param {(chessId: string) => string|null|undefined} charOf
  */
 export function rebaseChars(chars, prev, next, charOf) {
   const out = new Set(chars || []);
   const keep = new Set(next || []);
-  for (const id of prev || []) if (!keep.has(id)) { const c = charOf(id); if (c) out.delete(c); }
-  for (const id of next || []) { const c = charOf(id); if (typeof c === 'string' && c) out.add(c); }
+  const had = new Set(prev || []);
+  for (const id of had) if (!keep.has(id)) { const c = charOf(id); if (c) out.delete(c); }
+  for (const id of keep) if (!had.has(id)) { const c = charOf(id); if (typeof c === 'string' && c) out.add(c); }
   return cleanIds([...out]);
 }
 
