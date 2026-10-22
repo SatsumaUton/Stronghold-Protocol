@@ -364,7 +364,25 @@ DSL plugin budget and attribution. Vanilla registrations remain empty; no offici
 The same SDK and scriptGuard apply inside SES in sandbox mode (DESIGN §32.11); the evaluator consumes verified
 script descriptors. SDK-owned results are frozen copies; live Battle/Unit objects are not hardened.
 
-### Damage penetration
+### Settlement consumers and evidence
 
-Subtract fixed DEF/RES penetration, clamp at zero, then apply percentage penetration.
-Source: [PRTS damage formula](https://prts.wiki/w/游戏数据基础#伤害公式).
+The damage pipeline and event contracts are specified in [SIM §4](../SIM.md#4-damage--heal-pipeline).
+Injury effects follow priority then acquisition order; cancellation stops later defensive resource consumption
+while eligible observers retain their position. Fixed reduction applies at its injury position, after source
+scaling. Special HP changes the final HP delta, not barrier consumption or damage-based riders.
+Sources: [伤判效果](https://prts.wiki/w/伤判效果), [伤害分类](https://prts.wiki/w/伤害分类),
+[游戏数据基础](https://prts.wiki/w/游戏数据基础), and the fixed
+[buff templates](https://github.com/yuanyan3060/ArknightsGameResource/blob/9bf239661e37766fba585806fb9fa67e79bb679e/gamedata/battle/buff_template_data.json).
+
+| Consumer | Rule and reference |
+|---|---|
+| Defense/counters | Each held effect owns its injury filter, priority and lifetime. Enemy-source filters inspect actual source, not credit or counter/reflect tags. Ordinary reflection observers may run after cancellation; success-only effects may not. Template examples: `inverse_damage`, `bubble_s_2`, `judge_t_2`, `hsgma2_s_1`. |
+| Profession healing | Musha uses source output; reaper output admits up to block count in a 0.05 s window and delivers heals at 0.12 s intervals. Incantationmedic uses successful HP damage amount, not actual HP removed; HP loss and gauge intake do not qualify. Templates: `helage_trait`, `excu2_trait[heal_fake]/[heal]`, `vendla_tr/reed2_tr/titi_tr`. |
+| [纯烬艾雅法拉](https://prts.wiki/w/纯烬艾雅法拉) S2 | Reapplication from one source resets its shared elemental pool and duration; different sources keep independent pools. Absorption has priority −2000. |
+| [浊心斯卡蒂](https://prts.wiki/w/浊心斯卡蒂) S1 | Priority −2000; reserve a share after the patient's barriers, then apply HP loss to Skadi. Ordinary HP loss cannot be transferred again. |
+
+[ASSUMED] Mode hit-limit placement, Stead/barrier order and mixed parallel sharing, initial acquisition/reapplication
+ties, some inherited cancellation masks, literal-zero dispatch, exact 30 Hz deadlines and projectile sampling remain
+qualified in code. Template filters and delays do not prove every client frame; Skadi's sourced split rule does not
+establish the native algorithm for combining it with Stead. Regression tests under `test/sim/attack-*.test.js` and
+`test/content/` specify the implemented edge cases.

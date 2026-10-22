@@ -1,3 +1,4 @@
+import { mitigate } from '../../attack.js';
 // server/sim/content/enemies/helpers.js — shared helpers of the enemy kits (split from content/enemies.js; the module
 // map is in its header): the constants several families use, the per-battle state, the ability bookkeeping (abOf /
 // attach / dispatch, T, canCast …) and the selection and damage helpers (elem, hurt, areaAllies & friends, zone,
@@ -5,7 +6,6 @@
 
 import { ELEMENT } from '../../constants.js';
 import { canTargetAlly, sortAllyTargets, areaSelectable, auraSelectable } from '../../targeting.js';
-import { mitigate } from '../../attack.js';
 import { hypot } from '../../detmath.js';
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -97,8 +97,24 @@ export function abOf(b, e) {
     const at = base.findIndex((x) => x && x.prefabKey === s.prefabKey);
     sk[s.prefabKey] = { cd: num(s.cooldown, 0), icd: num(s.initCooldown, 0), sp: num(s.spCost, 0), pr: num(s.priority, 0), bb: s.bb || {}, bs: s.bbStr || {}, slot: at >= 0 ? at : i };
   });
-  e.mem.ab = { key, t, tS, sk, list: [], times: null, hitShield: 0, atkType: null, immune: null, origMaxHp: e.base.maxHp };
+  e.mem.ab = { key, t, tS, sk, list: [], times: null, atkType: null, immune: null, origMaxHp: e.base.maxHp };
   return e.mem.ab;
+}
+
+/** Native ordinary-priority phys/arts count shield; repeated grants keep the held instance and stronger count. */
+export function grantHitShield(battle, enemy, count) {
+  if (!Number.isFinite(count) || !(count > 0)) return null;
+  const key = 'ab:hitShield';
+  const held = enemy.findBuff(key);
+  if (held) {
+    held.shieldHits = Math.max(held.shieldHits, count);
+    enemy.markDirty();
+    return held;
+  }
+  return battle.addBuff(enemy, { key, shieldHits: count, shieldType: ['phys', 'arts'],
+    onRemove({ buff }) {
+      if (!(buff.shieldHits > 0)) battle.fx('shieldBreak', { x: enemy.x, y: enemy.y, id: enemy.id });
+    } });
 }
 
 /**
@@ -377,6 +393,25 @@ export function expose(b, u, dur, scale) {
   b.fx('expose', { x: u.x, y: u.y, id: u.id });
 }
 
+/** Timed buff on each unit (same key never stacks: aura semantics). */
+function auraBuff(b, u, key, iv, mods, flags = null, visible = false) {
+  b.addBuff(u, { key, duration: iv + 0.1, refresh: 'replace', mods, flags, visible });
+}
+
+/** Mark an ally/enemy ability as watching every death on the field. */
+function watchDeaths(b, e) { stOf(b).deathWatch.add(e); }
+
+const tileOf = (u) => [Math.round(u.y), Math.round(u.x)];
+
+const onTerrain = (b, u, terrain) => { const [r, c] = tileOf(u); return b.grid.tile(r, c).terrain === terrain; };
+
+// used by the other enemy modules (content/enemies.js and content/enemies/*.js)
+export {
+  BOOM_RADIUS, POLLUTION_INTERVAL, STEALTH_RESTORE_BY_KEY, DUCK_STEALTH_RESTORE, TEA_SPLASH_RADIUS, SHELL_SPLASH_RADIUS, stOf, safe, dispatch,
+  num, auraBuff, watchDeaths, onTerrain,
+};
+
+// Transitional support for the unconverted Spring boss; removed in group 05.
 /**
  * Final HP damage the pipeline would deal for a phys/arts/true/elemental `dmg` before shields (mitigation is linear in
  * the amount) — the same terms as damage.js dealDamage (元素伤害: 元素抗性 + elementalTakenMul, no dmgTakenMul).
@@ -408,21 +443,3 @@ export function absorbArts(c, left) {
   else c.dmg.amount *= (f - take) / f;
   return take;
 }
-
-/** Timed buff on each unit (same key never stacks: aura semantics). */
-function auraBuff(b, u, key, iv, mods, flags = null, visible = false) {
-  b.addBuff(u, { key, duration: iv + 0.1, refresh: 'replace', mods, flags, visible });
-}
-
-/** Mark an ally/enemy ability as watching every death on the field. */
-function watchDeaths(b, e) { stOf(b).deathWatch.add(e); }
-
-const tileOf = (u) => [Math.round(u.y), Math.round(u.x)];
-
-const onTerrain = (b, u, terrain) => { const [r, c] = tileOf(u); return b.grid.tile(r, c).terrain === terrain; };
-
-// used by the other enemy modules (content/enemies.js and content/enemies/*.js)
-export {
-  BOOM_RADIUS, POLLUTION_INTERVAL, STEALTH_RESTORE_BY_KEY, DUCK_STEALTH_RESTORE, TEA_SPLASH_RADIUS, SHELL_SPLASH_RADIUS, stOf, safe, dispatch,
-  num, auraBuff, watchDeaths, onTerrain,
-};
