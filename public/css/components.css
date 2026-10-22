@@ -1149,3 +1149,70 @@
 .plugin-settings__row { display: flex; gap: .1rem; align-items: center; justify-content: space-between; }
 .plugin-settings input, .plugin-settings select { color: var(--text-hi); background: var(--bg-2); border: 1px solid var(--line-2); padding: .03rem .06rem; max-width: 2rem; }
 .plugin-settings input[aria-invalid="true"] { border-color: var(--orange); }
+
+/* ---- official versions (DESIGN §35.23): the tag (ui/pluginTag.js VersionTag), the lobby chip and the picker
+   (ui/versionPicker.js), the vote strip (ui/versionVote.js). Names may be long in English: the chip and the tag end in
+   an ellipsis, the strip and the picker wrap. ---- */
+.vertag {
+  display: inline-flex; align-items: center; max-width: 3.2rem; height: .26rem; padding: 0 .1rem; overflow: hidden;
+  border: 1px solid rgba(120, 196, 255, .65); background: rgba(120, 196, 255, .12); color: #9fd3ff;
+  font-size: calc(.13 * var(--t)); font-weight: 700; letter-spacing: .04em; white-space: nowrap; text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.vertag--compact { height: .2rem; padding: 0 .06rem; font-size: calc(.11 * var(--t)); }
+.verchip-wrap { display: inline-flex; align-items: center; gap: .06rem; min-width: 0; }
+.verchip {
+  display: inline-flex; align-items: center; gap: .06rem; min-width: 0; max-width: 3.6rem; height: max(.42rem, 28px); padding: 0 .14rem;
+  border: 1px solid var(--line-2); background: rgba(0, 0, 0, .45); color: var(--text-md);
+  font: inherit; font-size: calc(.14 * var(--t)); font-weight: 700; white-space: nowrap;
+}
+.verchip .icon { flex: none; width: 1.1em; height: 1.1em; color: #9fd3ff; }
+.verchip__k { flex: none; color: var(--text-lo); font-weight: 400; }
+.verchip__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.verchip__state { flex: none; color: var(--text-lo); font-size: calc(.12 * var(--t)); font-weight: 400; }
+.verchip.is-other { border-color: rgba(120, 196, 255, .6); color: #cfe9ff; }
+.verchip.is-failed { border-color: rgba(255, 106, 61, .7); }
+.verchip.is-failed .verchip__state { color: #ff8a5c; }
+.verchip:hover:not(.verchip--ro), .verchip:focus-visible { filter: brightness(1.2); }
+.verchip--ro { cursor: default; }
+.verchip__retry { flex: none; height: max(.42rem, 28px); padding: 0 .12rem; border: 1px solid rgba(255, 106, 61, .7); background: rgba(255, 106, 61, .14); color: #ffb39a; font: inherit; font-size: calc(.13 * var(--t)); }
+.sp-coarse .verchip, .sp-coarse .verchip__retry { min-height: 40px; }
+.verpick__lead { margin: 0 0 .12rem; color: var(--text-md); font-size: calc(.15 * var(--t)); line-height: 1.6; }
+.verpick__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .08rem; max-height: 4.8rem; overflow: auto; }
+.verpick__row { border: 1px solid var(--line); background: rgba(0, 0, 0, .25); }
+.verpick__row.is-on { border-color: rgba(120, 196, 255, .7); background: rgba(120, 196, 255, .08); }
+.verpick__pick {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .04rem .12rem; width: 100%; padding: .12rem .16rem;
+  border: 0; background: none; color: var(--text-hi); font: inherit; text-align: left;
+}
+.verpick__pick:disabled { cursor: default; }
+.verpick__pick:hover:not(:disabled), .verpick__pick:focus-visible { background: rgba(255, 255, 255, .04); }
+.verpick__name { font-size: calc(.2 * var(--t)); font-weight: 800; overflow-wrap: anywhere; }
+.verpick__badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .06rem; }
+.verpick__badge { padding: 0 .06rem; border: 1px solid var(--line-2); color: var(--text-lo); font-size: calc(.12 * var(--t)); white-space: nowrap; }
+.verpick__badge.is-current { color: #9fd3ff; border-color: rgba(120, 196, 255, .6); }
+.verpick__badge.is-preview { color: #ffb066; border-color: rgba(255, 159, 67, .5); }
+.verpick__period, .verpick__note { grid-column: 1 / -1; font-size: calc(.13 * var(--t)); line-height: 1.5; overflow-wrap: anywhere; }
+.verpick__note.is-warn { color: #ffb066; }
+.verpick__hint { display: flex; align-items: center; gap: .08rem; margin: .1rem 0 0; color: var(--text-lo); font-size: calc(.14 * var(--t)); }
+.verpick__hint .icon { flex: none; width: 1.1em; height: 1.1em; color: var(--mint-500); }
+.vervote {
+  position: relative; z-index: 3; flex: none;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .14rem .2rem;
+  margin: 0 .6rem .12rem; padding: .12rem .2rem;
+  background: rgba(12, 15, 14, .92); border: 1px solid rgba(120, 196, 255, .6);
+}
+.vervote__text { display: flex; flex-direction: column; gap: .04rem; min-width: 0; flex: 1 1 4rem; font-size: calc(.15 * var(--t)); }
+.vervote__text strong { color: #9fd3ff; font-size: calc(.19 * var(--t)); overflow-wrap: anywhere; }
+.vervote__time { display: inline-flex; align-items: center; gap: .04rem; color: var(--text-md); }
+.vervote__time .icon { width: 1em; height: 1em; }
+.vervote__hint { overflow-wrap: anywhere; }
+.vervote__players { display: flex; flex-wrap: wrap; gap: .06rem .18rem; color: var(--text-dim); }
+.vervote__players .is-agreed { color: var(--mint-400); }
+.vervote__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .1rem; flex-shrink: 0; }
+/* on the settlement screen: over the page's bottom edge (the vote must stay in view) */
+.vervote--float { position: fixed; left: 50%; bottom: max(.2rem, env(safe-area-inset-bottom)); z-index: 40; width: min(9rem, calc(100vw - 32px)); margin: 0; transform: translateX(-50%); }
+@media (max-width: 900px), (max-height: 520px) {
+  .vervote { margin-inline: .2rem; padding: .08rem .12rem; }
+  .vervote__actions .btn { min-height: 40px; padding-inline: .12rem; }
+}

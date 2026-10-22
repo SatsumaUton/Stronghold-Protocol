@@ -31,6 +31,10 @@
 // Cosmetic plugins (DESIGN §32 P1a): installContent (content.js) lays the room's visual set and the player's personal
 // plugins over the art manifest every screen reads. Gameplay plugins (§32.6): installContentSet (content.js) downloads and
 // checks a room's content set and makes it the data every screen and the battle runner read.
+// Official versions (DESIGN §35.23, versions.js): welcome.versions turns the lobby's version switch on; installContentSet
+// also loads and checks the version the page shows (the lobby's choice, a room's version). A room whose version changes
+// while a result is on screen drops that result (the server dropped the room's replay: its chess ids are the old
+// version's), and a result that arrives after the room is gone keeps the version of the room it came from (matchVersion).
 
 // Polyfills first (older Safari / Firefox ESR): every module evaluated after this one sees them.
 import './ui/compat.js';
@@ -58,13 +62,14 @@ import { LoadoutHost } from './screens/loadout.js';
 import { StatsHost } from './screens/stats.js';
 import { installRehearsal } from './battle/rehearsal.js';
 import { recordResult, installStatsRecorder } from './ui/stats.js';
-import { installLoadoutSync, installOwnershipSync, installDiySync, installSkinsSync, installCardSync } from './ui/loadoutSync.js';
+import { installLoadoutSync, installOwnershipSync, installDiySync, installSkinsSync, installCardSync, installSettingsViews } from './ui/loadoutSync.js';
 import { startBuildGuard } from './ui/buildGuard.js';
 import { initLang, useLang, tickerText } from './ui/lang.js';
 import { t, N_, translateWire } from '../../shared/i18n.js';
 import { recordError, installTrafficMeter } from './diag.js';
 import { installContent, installContentSet } from './content.js';
 import { cosmetics } from './cosmetics.js';
+import { sanitizeVersions, roomVersion, isDefaultVersion } from './versions.js';
 
 const RESTORE_GRACE_MS = 1500;
 const JOIN_DELAY_MS = 350;
@@ -173,6 +178,8 @@ function onWelcome(msg) {
     installedPlugins: pluginCount(msg.content),
     installedNotices: msg.content?.notices === true,
     testMode: msg.testMode === true,
+    // the official versions the server enables (protocol §2; absent: the switch is off — versions.js)
+    versions: sanitizeVersions(msg.versions),
   });
   welcomeAt = Date.now();
 
@@ -212,7 +219,10 @@ function onRoomState(msg) {
   const prevRoom = store.get().room;
   // A (new) match starts: forget the previous match's state so stale results never show.
   if (room.inMatch && !(prevRoom && prevRoom.inMatch && prevRoom.code === room.code)) store.set({ match: emptyMatch() });
-  store.set({ room });
+  // The room switched its version (DESIGN §35.23): a result still on screen (a settlement, a spectator's view) names the old
+  // version's chess ids, and the server dropped the room's replay — it closes, back to the room.
+  else if (prevRoom && prevRoom.code === room.code && !room.inMatch && roomVersion(prevRoom) !== roomVersion(room) && store.get().match.public) store.set({ match: emptyMatch() });
+  store.set({ room, matchVersion: roomVersion(room) });
   identity.rememberMatch(room.inMatch && seats.some((seat) => seat?.playerId === myId)
     ? { name: store.get().me.name, code: room.code || '' } : null);
   if (room.mode === 'coop' && typeof room.code === 'string') rememberRoom(room.code, room.test === true);
@@ -263,7 +273,11 @@ function wireNet() {
     // replays dedupe by content id inside recordResult (spectator seats' copies build no record at all)
     // (`vs`: the room's cosmetic plugins, recorded — such a match still counts as the original game: ui/stats.js)
     // (`content`: the room's content set when it played gameplay plugins — such a match is unofficial: ui/stats.js)
-    if (store.get().room?.test !== true && store.get().match.public?.test !== true) recordResult(res, { myId: store.get().me.playerId, roomMode: store.get().room?.mode ?? null, vs: store.get().room?.content?.vs ?? null, content: store.get().room?.content ?? null, now: Date.now() });
+    // (`version`: the official version the match played, DESIGN §35.23 — the room's, or the last room's when the result
+    // arrives after it is gone; only a non-default one is written)
+    const s = store.get();
+    const version = s.room ? roomVersion(s.room) : s.matchVersion;
+    if (s.room?.test !== true && s.match.public?.test !== true) recordResult(res, { myId: s.me.playerId, roomMode: s.room?.mode ?? null, vs: s.room?.content?.vs ?? null, content: s.room?.content ?? null, version: isDefaultVersion(version) ? null : version, now: Date.now() });
   });
   net.on('m.toast', (msg) => {
     const kind = ['info', 'success', 'warn', 'error'].includes(msg.kind) ? msg.kind : 'info';
@@ -308,8 +322,12 @@ function warmGameData() {
   // a room with gameplay plugins: content.js downloads its content set's files instead (DESIGN §32.6). With the art list
   // in, the pre-game sprites (协议启动！ and the 请选择策略 band, ui/protocolBoot.js) start too: a solo player who starts
   // at once and skips through the briefing meets the band draft's first turn with them at hand (§35.18's leftover)
+  // Another official version's room (DESIGN §35.23): its version set brings those files (content.js) — the server's
+  // default ones would race it; only the art list the sprites need is fetched.
   const go = () => {
-    if (store.get().room?.content?.vanilla === false) return;
+    const room = store.get().room;
+    if (room?.content?.vanilla === false) return;
+    if (typeof room?.version === 'string') { data.load('assets').then(() => preloadBootArt(), () => {}); return; }
     data.loadAll(GAME_FILES).then(() => preloadBootArt(), () => {});
   };
   if (typeof globalThis.requestIdleCallback === 'function') globalThis.requestIdleCallback(go, { timeout: 2500 });
@@ -403,6 +421,8 @@ async function boot() {
 
   wireNet();
   installStatsRecorder(store); // follows the match on screen, so a 放弃模拟 can be recorded (ui/stats.js)
+  // the loadout / 干员持有 / 自选 settings by operator, shown for the data on screen (DESIGN §35.23; a v1 store migrates)
+  installSettingsViews();
   installLoadoutSync({ net });
   installOwnershipSync({ net });
   installDiySync({ net });

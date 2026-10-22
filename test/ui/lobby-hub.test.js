@@ -225,9 +225,10 @@ test('成就统计 card: the lobby’s only statistics entry (no top-bar 统计�
   assert.match(lobbySrc, /achOpen \? html`<\$\{AchievementDialog\} onClose=/);
   assert.doesNotMatch(lobbySrc, /openStats/, 'the 统计数据 page opens from the window’s 查看完整统计 only');
   assert.doesNotMatch(lobbySrc, /stats-entry|me-chip/, 'the top-bar chip is gone');
-  assert.match(lobbySrc, /const records = peekStatsRecords\(\);\s*return \{ prog: levelProgress\(records/);
+  // (the season of the version shown: DESIGN §35.23 — every record on a server without versions)
+  assert.match(lobbySrc, /const records = recordsOfSeason\(peekStatsRecords\(\), season\);\s*return \{ prog: levelProgress\(records/);
   assert.match(lobbySrc, /trophies: aggregateStats\(records\)\.trophies/, 'the same trophy count as the window’s 获得奖杯');
-  assert.match(lobbySrc, /\[cfg, statsOpen\]/, 'read again when 统计数据 closes (an import or 清空 there)');
+  assert.match(lobbySrc, /\[cfg, statsOpen, season\]/, 'read again when 统计数据 closes (an import or 清空 there) or the version changes');
   assert.doesNotMatch(lobbySrc, /loadStats\(/, 'loadStats moves a damaged value away: the 统计数据 page must still find it');
   const ui = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).ui;
   const medals = JSON.parse(readFileSync(path.join(ROOT, 'data/config.json'), 'utf8')).trophies.medals;
@@ -260,7 +261,8 @@ test('成就统计 window (screens/stats.js AchievementDialog): the project Moda
 });
 
 test('选择同盟方式 creates the room itself: the lobby never stacks 选择模拟协议 for a 同盟', () => {
-  assert.match(lobbySrc, /onCreate=\$\{\(\) => create\('coop'\)\} difficulty=\$\{difficulty\}/);
+  // (the remembered difficulty, or the server's fallback when the lobby's version lacks it: DESIGN §35.23)
+  assert.match(lobbySrc, /onCreate=\$\{\(\) => create\('coop'\)\} difficulty=\$\{shownCoop\}/);
   assert.match(lobbySrc, /onCreate=\$\{\(\) => create\('solo'\)\}/);
   assert.doesNotMatch(lobbySrc, /setProtocol\('coop'\)/);
   assert.match(lobbySrc, /<\$\{ProtocolSelect\} roomMode="solo"/, '选择模拟协议 stays before 独立模拟');
@@ -486,4 +488,21 @@ test('选择同盟方式 on a short screen (§35.18 leftover: the key field\'s p
   assert.match(lobbySrc, /const shortScreen = useMediaQuery\(SHORT_SCREEN_QUERY\);/);
   assert.match(lobbySrc.match(/<\$\{AllianceSelect\}[\s\S]*? \/>/)[0], /short=\$\{shortScreen\} \/>$/);
   assert.match(readFileSync(path.join(ROOT, 'public/js/ui/device.js'), 'utf8'), /m\.addEventListener\('change', sync\); return \(\) => m\.removeEventListener\('change', sync\);/);
+});
+
+test('official versions (DESIGN §35.23): the cards of the version shown, the wait while it loads, room.create names the version', () => {
+  // 第一期 / 第二期上半 offer three difficulties: the cards follow (versions.js offeredDifficulties)
+  const three = proto({ difficulty: 'HARD', difficulties: ['FUNNY', 'NORMAL', 'HARD'] });
+  assert.deepEqual(byClass(three, 'diff-card').map((c) => c.props.style.match(/--d-color:(#\w+)/)[1]).length, 3);
+  assert.equal(byClass(three, 'diff-card').filter((c) => hasClass(c, 'is-selected')).length, 1);
+  const waiting = proto({ difficulty: 'FUNNY', loading: true });
+  assert.ok(find(waiting, (x) => x.props?.['data-testid'] === 'proto-loading').length, 'a spinner while the version loads');
+  assert.ok(byClass(waiting, 'diff-card').every((c) => c.props.disabled === true), 'the cards wait');
+  assert.equal(buttons(waiting).find((b) => hasClass(b, 'proto-start')).props.disabled, true, 'so does 开始独立模拟');
+  // the lobby: the version only on a server that enables versions; the shown difficulty (the fallback) is the one sent
+  assert.match(lobbySrc, /mode, difficulty: mode === 'solo' \? shownSolo : shownCoop, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\), \.\.\.\(versions \? \{ version \} : \{\}\),/);
+  assert.match(lobbySrc, /const shownSolo = fallbackDifficulty\(solo, difficulty\);/);
+  assert.match(lobbySrc, /const pickDifficulty = \(d\) => \{ setDifficulty\(d\); savePref\('lobby\.difficulty', d\); \};/, 'the pref changes only on a pick');
+  assert.match(lobbySrc, /<\$\{VersionSwitch\} \/>\s*<\$\{ResumeMatchButton\} \/>/, 'the chip before 恢复本机对局');
+  assert.match(lobbySrc, /data-testid="hub-version"/);
 });
