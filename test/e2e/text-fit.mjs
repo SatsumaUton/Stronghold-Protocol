@@ -5,7 +5,7 @@
  * In the page: the text problems under `rootSel`. Each visible text node's line boxes (a glyph box's middle ± half the line
  * height) against every ancestor up to the root that clips (overflow) or draws a box (background, border, a button) —
  * 2 px of slack for hairlines —, an ancestor that scrolls on that axis ending the climb; the viewport; the other labels'
- * text as it shows (clipped by its clipping ancestors); a line break inside a word (not at a space, a hyphen or between
+ * text as it shows (clipped by its clipping ancestors); a line break inside a word (not at a space, a hyphen — unless a digit follows it — or between
  * CJK / kana; Korean puts spaces between its words, so a break between two Hangul syllables — or a syllable and a latin
  * letter or digit — is inside a word too, keep-all or not: under word-break: keep-all such a break is the overflow-wrap
  * fallback of a word too long for its box); a line that starts with a small kana, ー, an iteration mark or a closing
@@ -28,7 +28,8 @@ export function textProblems(rootSel) {
   const noStart = /[ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶㇰ-ㇿーゝゞヽヾ々、。，．・：；！？）」』】〉》〕］｝〗〙]/;
   // may a line break between p and c? a space / hyphen / slash / dot before it; between CJK or kana; at Hangul only where
   // one side is not a letter or digit (punctuation such as ：)
-  const breakOk = (p, c) => /[\s\-\u2010\u2013\u2014/\u00b7\u30fb]/.test(p)
+  // (a hyphen before a digit is part of a code such as AC-2, not a place to break: §35.18 review of the text-fit fixes)
+  const breakOk = (p, c) => (/[\s\-\u2010\u2013\u2014/\u00b7\u30fb]/.test(p) && !(/[-\u2010]/.test(p) && /\d/.test(c)))
     || (hangul.test(p) || hangul.test(c) ? !(letter.test(p) && letter.test(c)) : cjk.test(p) || cjk.test(c));
   for (const root of document.querySelectorAll(rootSel)) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);

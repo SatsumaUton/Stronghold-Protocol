@@ -25,7 +25,7 @@
 // in its review: Korean names broken between syllables, the decorative line and the names under the people icon, a
 // plate's label under its glyph, the two cards' tops apart — and in the review of that, the same shapes with one card's
 // name and one plate's label made longer in the page, the cards' tops and bottoms; a Japanese line starting with a small
-// kana or ー).
+// kana or ー; every one of the 21 tips, stepped through with the pager).
 // The other doctors' read-only view: test/ui/room-settings.e2e.test.js.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/lobby-hub-*.png
 
@@ -820,7 +820,34 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
     // bottom-aligned text up under it)
     return out.filter((p) => !/under the icon/.test(p)).map((p) => `a longer name and label: ${p}`);
   };
-  test('phones and desktops: every label of the hub inside its box in every language at every 文字大小', { timeout: 900000 }, async () => {
+  // every tip in turn (§35.18 review of the text-fit fixes: TipsPanel starts at a random tip of 21 and turns every 5 s, so
+  // each case checked one random tip — a tip-specific overflow, such as a Japanese line starting with ー where only two
+  // tips wrap there, made the test flaky rather than red): the pager steps through them, each checked with its entry
+  // animation finished; a step the 5 s turn lands in is checked again. A problem the case already shows is not repeated
+  const tipProblems = async (page, known) => {
+    const now = () => page.evaluate(() => {
+      const p = document.querySelector('.lobby-hub .tips__text');
+      if (!p?.checkVisibility()) return null;
+      for (const a of p.getAnimations()) a.finish();
+      const [i, n] = document.querySelector('.lobby-hub .tips__idx').textContent.split('/').map(Number);
+      return { i, n };
+    });
+    const out = [];
+    const seen = new Set();
+    for (let k = 0; k < 80; k++) {
+      const a = await now();
+      if (!a || seen.size >= a.n) break;
+      const probs = await page.evaluate(textProblems, '.lobby-screen');
+      if ((await now())?.i === a.i && !seen.has(a.i)) {
+        seen.add(a.i);
+        for (const p of probs) if (!known.has(p)) { known.add(p); out.push(`tip ${a.i}: ${p}`); }
+      }
+      if (seen.size >= a.n) break;
+      await page.$eval('.lobby-hub .tips__nav:last-child', (b) => b.click());
+    }
+    return out;
+  };
+  test('phones and desktops: every label of the hub inside its box in every language at every 文字大小', { timeout: 1500000 }, async () => {
     const phones = [[640, 360], [667, 375], [740, 360], [844, 390]];
     const desks = [[1920, 1080], [1440, 900], [1280, 720], [1100, 530], [1024, 600], [960, 540], [800, 600]];
     const bad = [];
@@ -833,7 +860,9 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
             for (const [w, h] of screens) {
               await page.setViewport({ width: w, height: h, hasTouch: touch, isMobile: touch, deviceScaleFactor: 1 });
               await sleep(150); await settle(page); await page.evaluate(() => document.fonts.ready);
-              for (const p of await page.evaluate(textProblems, '.lobby-screen')) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
+              const plain = await page.evaluate(textProblems, '.lobby-screen');
+              for (const p of plain) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
+              for (const p of await tipProblems(page, new Set(plain))) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               for (const p of await page.evaluate(hubShapes)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               for (const p of await forcedShapes(page)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               if (lang === 'en' && textSize === 'xl' && (w === 667 || w === 1280)) await page.screenshot({ path: path.join(OUT, `lobby-hub-fit-${w}-en-xl.png`) });

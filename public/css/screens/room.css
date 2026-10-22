@@ -12,6 +12,10 @@
    button, 「ドクタ|ーの画面」 in a spectator's status line, 「シークレ|ットコア」 in 独立模拟's briefing — line-break: normal
    allows a break before a small kana and ー) */
 .rs:lang(ja) { line-break: strict; }
+/* a paragraph's last line keeps more than one character where a line above can give it one (§35.18 review of the text-fit
+   fixes: 「…各位博|士」 in a spectator's status line, 「添加AI队|友」, 「単独演算を開|始」; Chrome, Safari — Firefox wraps as
+   before). As on the hub and in the lobby's dialogs (lobby.css, components.css) */
+.rs { text-wrap: pretty; }
 .rs__bg {
   position: absolute;
   inset: 0;
@@ -292,6 +296,9 @@
   align-items: center;
   justify-content: center;
   gap: .1rem;
+  /* the art's side padding back, so the state is as wide as when it was placed across the card (§35.18 review of the
+     text-fit fixes: in flow it was 12–16 px narrower on desktops at 小) */
+  margin: 0 -.08rem;
   font-size: calc(.26 * var(--t));
   font-weight: 900;
   line-height: 1.1;
@@ -383,6 +390,12 @@
 /* 独立模拟: the briefing beside the single seat */
 .rs-brief { align-self: center; max-width: min(5rem, 46vw); max-height: 100%; overflow-y: auto; scrollbar-width: thin; padding: .24rem .3rem; background: rgba(10, 13, 12, .8); border: 1px solid var(--line); }
 .rs-brief h2 { margin: .06rem 0; font-size: calc(.32 * var(--t)); color: var(--d-color); }
+/* the difficulty's code on one line: the title breaks before it, not after its hyphen (§35.18 review of the text-fit fixes:
+   「Perilous Simulation AC-」 / 「2」 in a window ≤ 640 px tall at 特大, the briefing wider since its review). The title
+   wraps plainly: with .rs's text-wrap: pretty and the nowrap code, Chrome broke 「Perilous Simulation / AC-2」 in a
+   1024×600 window at 小, where it fits on one line */
+.rs-brief h2 { text-wrap: wrap; }
+.rs-brief h2 .num { white-space: nowrap; }
 .rs-brief p { margin: 0 0 .1rem; font-size: calc(.17 * var(--t)); color: var(--text-md); }
 .rs-brief ul { margin: 0; padding-left: .24rem; font-size: calc(.16 * var(--t)); color: var(--text-lo); line-height: 1.7; }
 
@@ -644,8 +657,8 @@
   .rs-seats { padding-top: 14px; gap: 12px; }
   .rseat__plate { min-height: 36px; margin-top: 4px; }
   /* 独立模拟's card no wider than a co-op one here (3.4rem, 136 px; §35.18 review: the 2.7 × --t of a 64 / 76 / 88 px --t
-     made it 173–238 px at 中 / 大 / 特大, as wide as it is tall, while its text stays capped — the portrait a strip and the
-     briefing beside it scrolling at 特大) */
+     made it 173–238 px at 中 / 大 / 特大, as wide as it is tall, while its text stays capped — the portrait a strip. The
+     briefing beside it scrolled at 特大 for another reason, see .rs-brief below) */
   .rs--solo .rseat { --w: min(calc(2.7 * var(--t)), 3.4rem, 34vw); }
   .rseat__doc, .rseat__noinfo, .rseat__invite small, .seat__op { display: none; }
   /* the seat cards' text capped (§35.18 review: at 大 / 特大 the .26–.34 × --t sizes, 23–30 px in a card about 120 px wide
@@ -657,10 +670,15 @@
   .seat__art.rseat__art { gap: 2px; padding: 4px 3px; }
   .seat__art.rseat__art > .avatar--xl { --av: clamp(1rem, calc(3rem - var(--t)), 2rem); }
   .rseat__host, .rseat__bot { padding: 1px 6px; font-size: min(calc(.26 * var(--t)), calc(15px + var(--t-step) / 2)); }
-  .rseat__state { gap: 4px; font-size: min(calc(.34 * var(--t)), calc(17px + var(--t-step) / 2)); }
+  /* the state takes the art's 3 px side padding back here too (§35.18 review of the text-fit fixes: in flow it had 98 px of
+     独立模拟's 108 px card at 小, against 104 px before, and English 「Standing / by」 took two lines on every phone) */
+  .rseat__state { gap: 4px; margin-inline: -3px; font-size: min(calc(.34 * var(--t)), calc(17px + var(--t-step) / 2)); }
   .rseat:not(.is-lit) .rseat__state { font-size: min(calc(.28 * var(--t)), calc(15px + var(--t-step) / 2)); }
   .rseat__box { width: 18px; height: 18px; }
   .rseat__who { font-size: min(calc(.28 * var(--t)), calc(18px + var(--t-step) / 2)); }
+  /* your own plate drops its 你 tag here: the mint corner mark (.rseat__me) already marks it, and the name gets the tag's
+     ~35 px back (§35.18 review of the text-fit fixes: 「Kal'…」, 「ケ…」 at 特大 in a card about 120 px wide). [ASSUMED] */
+  .rseat__who .seat__you { display: none; }
   .rseat__pick { min-height: 22px; font-size: min(calc(.22 * var(--t)), calc(16px + var(--t-step) / 2)); }
   .rseat__pick span { display: none; }
   /* the badge and 更换立绘 share a row, the tags wrap under them; the 连接中断 band gives way to the state, which says the

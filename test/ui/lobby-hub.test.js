@@ -507,6 +507,12 @@ test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simul
   // Korean breaks between words (review: 「독립 시뮬레이|션」)
   assert.match(css, /\.lobby-hub:lang\(ko\) \.hub-stage \{ word-break: keep-all; overflow-wrap: break-word; \}/);
   assert.match(css, /\.lobby-hub:lang\(ja\) \.hub-stage \{ line-break: strict; \}/, 'no line starts with a small kana or ー');
+  // a paragraph's last line not a single character on the hub and in the lobby's dialogs (the picker's 「アンジェリー|ナ」),
+  // the dialogs' Japanese strict as the room's and the hub's (§35.18 review of the review of the text-fit fixes)
+  assert.match(css, /\.lobby-screen \{ text-wrap: pretty; \}/);
+  const comp = readFileSync(path.join(ROOT, 'public/css/components.css'), 'utf8');
+  assert.match(comp, /\.modal__box \{ text-wrap: pretty; \}/);
+  assert.match(comp, /\.modal__box:lang\(ja\) \{ line-break: strict; \}/);
   assert.match(rule('.lobby-hub .hub-plate'), /min-height: \.7rem;/, 'a plate grows for a second line');
   const label = rule('.hub-plate__label, .lobby-hub .hub-plate .btn__label');
   assert.doesNotMatch(label, /ellipsis|nowrap/);

@@ -16,6 +16,8 @@
 /* Japanese never starts a line with a small kana, ー or a closing mark (§35.18 review: the tips' 「オペレ|ーター」 at 中 / 特大
    in a 1024×600 window; line-break: normal allows a break before them), as in the room */
 .lobby-hub:lang(ja) .hub-stage { line-break: strict; }
+/* a paragraph's last line keeps more than one character where a line above can give it one, as in the room (room.css) */
+.lobby-screen { text-wrap: pretty; }
 /* the top bar's ping pill grows with its text at 大 / 特大, as in the room (§35.18 review: its fixed .32rem cut it) */
 .lobby-hub > .topbar .ping { height: auto; min-height: .32rem; padding-top: 1px; padding-bottom: 1px; }
 .hub-bg {

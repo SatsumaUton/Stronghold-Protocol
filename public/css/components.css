@@ -460,6 +460,12 @@
   box-shadow: 0 .3rem .9rem rgba(0, 0, 0, .65), 0 0 .4rem rgba(23, 249, 183, .06);
   animation: modal-in var(--t-slow) var(--ease-out);
 }
+/* a paragraph's last line keeps more than one character where a line above can give it one (§35.18 review of the text-fit
+   fixes: the 名片干员 picker's 「アンジェリー|ナ」, 「维娜·维多利|亚」 at every 文字大小, 选择模拟协议's 「…シミュレーショ|ン」),
+   and Japanese never starts a line with a small kana or ー, as in the room and on the hub (「シミュレーシ|ョン」 once the last
+   line is fuller). Chrome, Safari — Firefox wraps as before */
+.modal__box { text-wrap: pretty; }
+.modal__box:lang(ja) { line-break: strict; }
 .modal__box--red { --bk-c: var(--red-premium); --mstripe: var(--red); }
 .modal__box--amber { --bk-c: var(--amber); --mstripe: var(--amber); }
 .modal__box--orange { --bk-c: var(--orange-hi); --mstripe: var(--orange); }

@@ -539,7 +539,7 @@ export function RoomScreen() {
       })}
       ${coop ? null : html`<aside class="solo-brief rs-brief brackets">
         <${MicroLabel} tone="mint">BRIEFING<//>
-        <h2>${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num t-dim"> ${info.code}</span></h2>
+        <h2>${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''} <span class="num t-dim">${info.code}</span></h2>
         <p>${info.desc}</p>
         <ul>
           ${info.effects.map((e) => html`<li key=${e}>${e}</li>`)}

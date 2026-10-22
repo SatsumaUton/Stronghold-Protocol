@@ -172,6 +172,16 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   assert.match(short, /\.rs-brief h2 \{[^}]*line-height: calc\(1\.5em - 3 \* max\(0px, var\(--t-step\)\)\);/);
   assert.match(short, /\.rs-brief ul \{[^}]*line-height: calc\(1\.35em - max\(0px, var\(--t-step\)\)\);/);
   assert.match(short, /\.seat__content\.is-ready \{ display: none; \}/);
+  // the review of the review: the briefing's difficulty code on one line (「AC-」 / 「2」); a paragraph's last line not a
+  // single character; the state as wide as before it went in flow (「Standing / by」 in 独立模拟's 108 px card on phones);
+  // on a phone your plate without its 你 tag (the corner mark says it)
+  assert.match(plain, /\.rs-brief h2 \{ text-wrap: wrap; \}\n\.rs-brief h2 \.num \{ white-space: nowrap; \}/);
+  assert.match(plain, /\.rs \{ text-wrap: pretty; \}/);
+  assert.match(plain, /\.rseat__state \{[^}]*margin: 0 -\.08rem;/);
+  assert.match(short, /\.rseat__state \{[^}]*margin-inline: -3px;/);
+  assert.match(short, /\.rseat__who \.seat__you \{ display: none; \}/);
+  assert.match(readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8'), /\} <span class="num t-dim">\$\{info\.code\}<\/span><\/h2>/,
+    'the space before the code outside its nowrap span, so the title can still break there');
   // the ping pill grows in the room only (§35.18 review: a global min-height outgrew title.css's own height)
   assert.match(plain, /\.rs-clock__ping \.ping \{ height: auto; min-height: \.32rem;/);
   assert.match(readFileSync(path.join(ROOT, 'public/css/components.css'), 'utf8'), /\.ping \{[^}]*\n  height: \.32rem;/);

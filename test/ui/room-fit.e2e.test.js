@@ -118,12 +118,21 @@ describe('the waiting room\'s text fit (real server, headless Chrome)', { skip: 
             await settled(c.page);
             for (const p of await check(c.page)) bad.push(`${lang} ${ts} ${size.join('×')} ${who}: ${p}`);
           }
-          // on a phone 独立模拟's briefing holds its text without scrolling (§35.18 review of the text-fit fixes: a 2.7 × --t
-          // card, 218–238 px at 特大, left it too narrow and its last bullet half cut at the bottom edge — the check above lets
-          // a scrolling box through)
+          // on a phone 独立模拟's briefing holds its text without scrolling (§35.18 review of the text-fit fixes: it was at its
+          // 320 px cap whatever the card's width, and above 中 its text grew a pixel a step while the bars above and below took
+          // height from it — at 特大 its last bullet sat half cut at the bottom edge; the check above lets a scrolling box
+          // through). At 小 the host's 「Standing by」 keeps one line in 独立模拟's 108 px card, as before the text-fit work
+          // (in its review: in flow it had 98 px and took two)
           if (touch) {
             const sc = await solo.page.$eval('.rs-brief', (e) => [e.scrollHeight, e.clientHeight]);
             if (sc[0] > sc[1] + 1) bad.push(`${lang} ${ts} ${size.join('×')} solo host: the briefing scrolls (${sc.join(' / ')})`);
+            if (ts === 'sm') {
+              const lines = await solo.page.$eval('.rs--solo .rseat__said', (e) => {
+                const r = document.createRange(); r.selectNodeContents(e);
+                return new Set([...r.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top))).size;
+              });
+              if (lines > 1) bad.push(`${lang} ${ts} ${size.join('×')} solo host: the state takes ${lines} lines`);
+            }
           }
           await host.page.$eval('.rs-pill__gear', (b) => b.click());
           await host.page.waitForSelector('.rs-opts', { visible: true, timeout: 3000 });
