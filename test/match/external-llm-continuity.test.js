@@ -26,6 +26,8 @@ test('§35.23 repair drops level holds below the slow curve unless a candidate h
   assert.ok(dropped.repairs.some(r => r.path === 'economy.holdLevel' && /floor L3/.test(r.reason)));
   assert.equal(repairPlan({ economy }, pack, late, [], { holds: [2] }).plan.economy.holdLevel, true);
   assert.equal(repairPlan({ economy }, pack, { ...late, round: 4 }, []).plan.economy.holdLevel, true);
+  // Levelling to the floor first and holding there is at the curve, not below it.
+  assert.equal(repairPlan({ economy: { ...economy, level: 3 } }, pack, late, []).plan.economy.holdLevel, true);
   const moved = repairPlan({ buy: ['lead', 'item'], items: { buy: [] } }, pack, fixture.digest, []);
   assert.deepEqual(moved.plan.buy, ['lead']);
   assert.deepEqual(moved.plan.items.buy, ['item']);

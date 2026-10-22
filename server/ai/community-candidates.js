@@ -3,7 +3,7 @@
 const unique = xs => [...new Set(xs)];
 const cheap = (a, b) => a.tier - b.tier || a.cost - b.cost || a.id.localeCompare(b.id);
 // §35.23 [ASSUMED]: 26 LP is the median band; each LP above it is one more leaked enemy (R5–R13) or one more second of
-// Final Assault overtime. Measured on ABYSS: 23–24 LP picks died before the FA where 27–45 LP picks survived.
+// Final Assault overtime. Measured on ABYSS: 23–24 LP picks died before the FA where legacy's 25–45 LP picks arrived (seeds 4–6).
 export const survivalScore = band => Number.isFinite(band?.lp) ? +((band.lp - 26) * 1.5).toFixed(2) : 0;
 
 export function communityCandidates(book, digest, { operators, disabled, held, teammates, bands, profile, previousMain }) {

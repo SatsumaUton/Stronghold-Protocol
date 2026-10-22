@@ -70,11 +70,13 @@ export function repairPlan(input, pack, digest, choices, { holds = [] } = {}) {
     else if (input.economy.saveForInterest !== undefined) drop('economy.saveForInterest', input.economy.saveForInterest);
     const why = shortText(input.economy.why);
     if (why) plan.economy.why = why;
-    const level = digest.economy?.level, floor = holdFloor(digest.round || 1);
+    // The level held is the higher of the current level and economy.level (legacy first levels up to economy.level).
+    const now = digest.economy?.level, floor = holdFloor(digest.round || 1);
+    const level = Number.isInteger(now) ? Math.max(now, plan.economy.level ?? 0) : undefined;
     const belowCurve = input.economy.holdLevel === true && Number.isInteger(level) && level < floor && !holds.includes(level);
     if (typeof input.economy.holdLevel === 'boolean' && !belowCurve && (!input.economy.holdLevel || (why && plan.economy.level >= 1)))
       plan.economy.holdLevel = input.economy.holdLevel;
-    else if (belowCurve) drop('economy.holdLevel', true, `shop level ${level} is below the R${digest.round} floor L${floor}`);
+    else if (belowCurve) drop('economy.holdLevel', true, `held level ${level} is below the R${digest.round} floor L${floor}`);
     else if (input.economy.holdLevel !== undefined) drop('economy.holdLevel', input.economy.holdLevel, 'hold requires level >= 1 and economy.why');
     if (typeof input.economy.freezeSearch === 'boolean') plan.economy.freezeSearch = input.economy.freezeSearch;
     else if (input.economy.freezeSearch !== undefined) drop('economy.freezeSearch', input.economy.freezeSearch);
