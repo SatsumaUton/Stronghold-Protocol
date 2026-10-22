@@ -13,6 +13,8 @@
 //     undefined, false, '' or Infinity) is flagged.
 //   * code-named buff keys absent in the version: a buff key the code names (string literals, BY_BUFF / K.* / object
 //     keys) that the base data has and the version lacks — its behaviour then never runs there.
+//   * unknown trigger rules: a skill trigger rule of the version's chess / backups / tokens records that the engine does
+//     not implement (shared/plugins/skillSpec.js TRIGGER_RULES) — 上半's 斩业星熊 S3 uses AUTO_STOP.
 // Code reads: server/sim/content/**/*.js (but the operator kits, which read skill blackboards) and server/match/**/*.js
 // — `num|int|numOr(<expr>.<field>, <default>)`, `<expr>.<field> ?? <default>`, and plain mentions (`.field`,
 // `'field'`, no default). Field names are matched by name, so a read of the same name in another table is listed too.
@@ -21,14 +23,15 @@
 // Usage: node tools/bb-audit.mjs [--base data] --data <dir> [--data <dir>…] [--json] [--strict]
 //   --base    the reference data directory (default: data/)
 //   --data    a version's data directory (repeatable)
-//   --json    machine-readable report on stdout: [{ dir, findings: [...], missingBuffKeys: [...] }]
-//   --strict  exit code 1 when any finding or missing buff key is listed (M2: every one reviewed)
+//   --json    machine-readable report on stdout: [{ dir, findings: [...], missingBuffKeys: [...], unknownTriggerRules: [...] }]
+//   --strict  exit code 1 when any finding, missing buff key or unknown trigger rule is listed (M2: every one reviewed)
 // Unknown options are errors (exit code 2).
 
 import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadData } from '../server/data.js';
+import { TRIGGER_RULES } from '../shared/plugins/skillSpec.js';
 import { maskComments } from './check-imports.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -218,9 +221,44 @@ export function dataBuffKeys(data) {
   return out;
 }
 
+/** The data files whose records carry skills with a `trigger` (chess, backup forms, tokens). */
+const SKILL_TABLES = Object.freeze(['chess', 'backups', 'tokens']);
+
+/**
+ * Skill trigger rules of `data` outside `known` (default: the engine's TRIGGER_RULES): [{ rule, table, skillId,
+ * owners }] sorted, one entry per rule, table and skill; `owners` = the records that carry it (the record id, for
+ * backups the unit / token id under its group).
+ */
+export function unknownTriggerRules(data, known = TRIGGER_RULES) {
+  const ok = new Set(known);
+  const found = new Map();
+  const walk = (v, table, owner, skillId) => {
+    if (Array.isArray(v)) { for (const x of v) walk(x, table, owner, skillId); return; }
+    if (!v || typeof v !== 'object') return;
+    const sid = typeof v.skillId === 'string' ? v.skillId : skillId;
+    const rule = v.trigger && typeof v.trigger === 'object' ? v.trigger.rule : null;
+    if (typeof rule === 'string' && !ok.has(rule)) {
+      const k = `${rule}|${table}|${sid ?? ''}`;
+      if (!found.has(k)) found.set(k, { rule, table, skillId: sid ?? null, owners: new Set() });
+      found.get(k).owners.add(owner);
+    }
+    for (const x of Object.values(v)) walk(x, table, owner, sid);
+  };
+  const d = obj(data);
+  for (const table of SKILL_TABLES) {
+    for (const [id, rec] of Object.entries(obj(d[table]))) {
+      if (table === 'backups') { for (const [sub, r] of Object.entries(obj(rec))) walk(r, table, sub, null); }
+      else walk(rec, table, id, null);
+    }
+  }
+  return [...found.values()].map((f) => ({ ...f, owners: [...f.owners].sort() }))
+    .sort((x, y) => `${x.rule}|${x.table}|${x.skillId}`.localeCompare(`${y.rule}|${y.table}|${y.skillId}`));
+}
+
 /**
  * The audit of one version against the base: `findings` = the gaps the code reads ([{ table, key, buff, field, reads,
- * nonNeutral }]), `missingBuffKeys` = the code-named buff keys of the base the version lacks ([{ key, refs }]).
+ * nonNeutral }]), `missingBuffKeys` = the code-named buff keys of the base the version lacks ([{ key, refs }]),
+ * `unknownTriggerRules` = the version's trigger rules the engine does not implement (unknownTriggerRules).
  */
 export function audit(base, version, { reads = codeReads(), keys = null } = {}) {
   const findings = [];
@@ -236,7 +274,7 @@ export function audit(base, version, { reads = codeReads(), keys = null } = {}) 
       if (inBase.has(key) && !inVersion.has(key)) missingBuffKeys.push({ key, refs });
     }
   }
-  return { findings, missingBuffKeys };
+  return { findings, missingBuffKeys, unknownTriggerRules: unknownTriggerRules(version) };
 }
 
 function parseArgs(argv) {
@@ -270,16 +308,17 @@ function main(argv) {
   else {
     for (const r of reports) {
       const flagged = r.findings.filter((f) => f.nonNeutral).length;
-      console.log(`${r.dir}: ${r.findings.length} field gap(s) the code reads (${flagged} with a non-neutral default), ${r.missingBuffKeys.length} code-named buff key(s) absent`);
+      console.log(`${r.dir}: ${r.findings.length} field gap(s) the code reads (${flagged} with a non-neutral default), ${r.missingBuffKeys.length} code-named buff key(s) absent, ${r.unknownTriggerRules.length} unknown trigger rule(s)`);
       for (const f of r.findings) {
         console.log(`  ${f.nonNeutral ? '!' : ' '} ${f.table} ${f.key} ${f.buff} .${f.field}: ${f.reads.slice(0, 4).map(fmtRead).join(', ')}${f.reads.length > 4 ? ` … +${f.reads.length - 4}` : ''}`);
       }
       for (const k of r.missingBuffKeys) {
         console.log(`  - buff key ${k.key} absent: ${k.refs.slice(0, 3).map((x) => `${x.file}:${x.line}`).join(', ')}${k.refs.length > 3 ? ` … +${k.refs.length - 3}` : ''}`);
       }
+      for (const u of r.unknownTriggerRules) console.log(`  ? trigger rule ${u.rule} (${u.table} ${u.skillId ?? '-'}): ${u.owners.join(', ')}`);
     }
   }
-  const any = reports.some((r) => r.findings.length || r.missingBuffKeys.length);
+  const any = reports.some((r) => r.findings.length || r.missingBuffKeys.length || r.unknownTriggerRules.length);
   return o.strict && any ? 1 : 0;
 }
 
