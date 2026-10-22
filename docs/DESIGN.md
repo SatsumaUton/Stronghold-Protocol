@@ -20,6 +20,10 @@ The 0.3.1 sim investigation and rule correction are [§34.32](history/0.3.1.md#3
 瑕光 S2 retains sleeper targeting and attack replay events; 琳琅诗怀雅 S3 keeps double attacks and coins at the cap,
 following the official mode's no-auto-close rule. Current contracts: [design/engine.md](design/engine.md).
 
+Q / X prefer the selected operator, otherwise the hovered operator, per the maintainer's correction in
+[§34.35](history/0.3.1.md#3435-q--x-prefer-the-selected-operator-otherwise-use-hover).
+Current interaction contract: [design/client.md](design/client.md).
+
 ## Where each section lives
 
 Studio §32.9 gains five graphical gameplay templates and isolated Match exercises in
