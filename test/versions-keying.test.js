@@ -10,7 +10,8 @@
 //     the kitted gate (KITTED_CHARS) then drops;
 //   * dispatch every item to the handler of its own effectId, and bind each meta override only to item keys whose
 //     record carries its effectId and the buff it reads;
-//   * match its pinned resolution counts (EXPECT; a directory without an entry fails until it gets one).
+//   * match its pinned resolution counts (EXPECT; a directory without an entry fails until it gets one);
+//   * match its pinned members of the kits' hand-written group lists, 深海猎人 and 莱茵生命 (GROUPS; likewise).
 // The default data must keep exactly the old item lookups (test/fixtures/versions-keying-baseline.json, frozen on
 // db8e226d before the change). These tests check WHICH handler key an item dispatches to, not the handler's body: a
 // swapped body is caught by test/golden.test.js. Also: a missing bond threshold is not reached on a version's build (炎
@@ -45,10 +46,10 @@ import { hasBattlePart as bandHasBattlePart } from '../server/sim/content/bands/
 import { bandMetaHandler } from '../server/sim/content/bands/meta.js';
 import { createDataStore, DATA_FILES } from '../public/js/data.js';
 import { ABYSSAL as ABYSSAL_SKADI } from '../server/sim/content/kits/ops/chess_char_3_05-skadi.js';
-import { ABYSSAL as ABYSSAL_GLADY } from '../server/sim/content/kits/ops/chess_char_4_12-glady.js';
-import { ABYSSAL as ABYSSAL_SKADI2 } from '../server/sim/content/kits/ops/chess_char_6_04-skadi2.js';
-import { ABYSSAL as ABYSSAL_TIER5 } from '../server/sim/content/kits/shared/tier5.js';
-import { RHINE as RHINE_MLYSS } from '../server/sim/content/kits/ops/chess_char_6_11-mlyss.js';
+import { abyssalOf as abyssalGlady } from '../server/sim/content/kits/ops/chess_char_4_12-glady.js';
+import { abyssalOf as abyssalSkadi2 } from '../server/sim/content/kits/ops/chess_char_6_04-skadi2.js';
+import { abyssalOf as abyssalTier5, isAbyssal } from '../server/sim/content/kits/shared/tier5.js';
+import { rhineOf } from '../server/sim/content/kits/ops/chess_char_6_11-mlyss.js';
 import { RHINE as RHINE_ALL } from '../server/sim/content/kits/ops/op-slent2.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -290,7 +291,8 @@ for (const dir of DIRS) {
 
 // The kits' hand-written group lists (character_table groupId; no built record carries it): 深海猎人 for 斯卡蒂, 歌蕾蒂娅,
 // 浊心斯卡蒂 and the tier-5 kits (归溟幽灵鲨, 乌尔比安), 莱茵生命 for 缪尔赛思. Per directory, the shop chess and 自选 operators
-// each list sees, as literals: a roster that brings in a new member fails until the list follows (DESIGN §35.22.4).
+// each list sees, as literals: a roster that brings in a new member fails until the list follows (DESIGN §35.22.4). The
+// additions of M0 (安哲拉, 星源) apply on a version's build only.
 const GROUPS = Object.freeze({
   'data': { abyssal: ['char_1023_ghost2', 'char_143_ghost', 'char_263_skadi', 'char_4145_ulpia', 'char_474_glady'], rhineMissed: [] },
   'data/versions/act1autochess': {
@@ -305,10 +307,37 @@ const GROUPS = Object.freeze({
   'data/versions/act2autochess-v2_1': { abyssal: ['char_1023_ghost2', 'char_143_ghost', 'char_263_skadi', 'char_4145_ulpia', 'char_474_glady'], rhineMissed: [] },
 });
 
-test('深海猎人 lists: the four kits list the same six operators (every character_table groupId "abyssal" member)', () => {
-  const want = ['char_1023_ghost2', 'char_143_ghost', 'char_218_cuttle', 'char_263_skadi', 'char_4145_ulpia', 'char_474_glady'];
-  for (const [name, list] of Object.entries({ ABYSSAL_SKADI, ABYSSAL_GLADY, ABYSSAL_SKADI2, ABYSSAL_TIER5 })) assert.deepEqual([...list].sort(), want, name);
-  for (const c of RHINE_MLYSS) assert.ok(RHINE_ALL.has(c), `缪尔赛思's ${c} is no 莱茵生命 member`);
+test('深海猎人 lists: on a version\'s build the four kits list the same six operators (every character_table groupId "abyssal" member); without config.version the lists of before M0', () => {
+  const six = ['char_1023_ghost2', 'char_143_ghost', 'char_218_cuttle', 'char_263_skadi', 'char_4145_ulpia', 'char_474_glady'];
+  const five = six.filter((c) => c !== 'char_218_cuttle');
+  const def = dataOf(DEFAULT_DIR);
+  const ver = versioned(def);
+  for (const [name, of] of Object.entries({ abyssalGlady, abyssalSkadi2, abyssalTier5 })) {
+    assert.deepEqual([...of(ver)].sort(), six, name);
+    assert.deepEqual([...of(def)].sort(), five, name);
+  }
+  assert.deepEqual([...ABYSSAL_SKADI].sort(), six, '斯卡蒂\'s list named 安哲拉 before M0, on every data');
+  assert.deepEqual([...rhineOf(ver)].filter((c) => !rhineOf(def).has(c)), ['char_135_halo']);
+  for (const c of rhineOf(ver)) assert.ok(RHINE_ALL.has(c), `缪尔赛思's ${c} is no 莱茵生命 member`);
+});
+
+test('group lists: a plugin content set on the default data that fields 安哲拉 / 星源 as official operators keeps the lists of before M0', (t) => {
+  // a Forge chess or §34.16 record of an official operator outside the roster carries the charId and no groupId
+  const data = clone(dataOf(DEFAULT_DIR));
+  for (const [id, charId] of [['chess_x_t_cuttle_a', 'char_218_cuttle'], ['chess_x_t_halo_a', 'char_135_halo']]) {
+    data.chess[id] = { ...data.chess.chess_char_1_02_a, chessId: id, baseId: id, goldenId: null, upgradeChessId: null, charId };
+  }
+  assert.equal(Object.hasOwn(data.config, 'version'), false);
+  setGameData(data);
+  t.after(() => setGameData(null));
+  const cuttle = { kind: 'op', def: { charId: 'char_218_cuttle', raw: {} } };
+  assert.equal(isAbyssal(cuttle), false, 'tier5 (归溟幽灵鲨, 乌尔比安)');
+  for (const of of [abyssalGlady, abyssalSkadi2]) assert.equal(of().has('char_218_cuttle'), false);
+  assert.equal(rhineOf().has('char_135_halo'), false, '缪尔赛思');
+  setGameData(versioned(data));
+  assert.equal(isAbyssal(cuttle), true);
+  for (const of of [abyssalGlady, abyssalSkadi2]) assert.equal(of().has('char_218_cuttle'), true);
+  assert.equal(rhineOf().has('char_135_halo'), true);
 });
 
 for (const dir of DIRS) {
@@ -318,8 +347,8 @@ for (const dir of DIRS) {
     const roster = new Set([...shop, ...Object.keys(data.backups?.diy?.operators || {})]);
     const want = GROUPS[label(dir)];
     assert.ok(want, `${label(dir)} has no GROUPS entry: pin its group members`);
-    assert.deepEqual([...roster].filter((c) => ABYSSAL_GLADY.has(c)).sort(), want.abyssal);
-    assert.deepEqual([...shop].filter((c) => RHINE_ALL.has(c) && !RHINE_MLYSS.has(c)).sort(), want.rhineMissed);
+    assert.deepEqual([...roster].filter((c) => abyssalGlady(data).has(c)).sort(), want.abyssal);
+    assert.deepEqual([...shop].filter((c) => RHINE_ALL.has(c) && !rhineOf(data).has(c)).sort(), want.rhineMissed);
   });
 }
 

@@ -209,10 +209,11 @@ for (const v of OTHERS) {
 // rebuild that changes one of the compared fields fails here, and the hand-written list is reviewed with the new set.
 // Compared: every field of bands, effects, enemies and tokens; the waves' routes; the chess records' whole modules (ids,
 // attr, traitOverride, talentChanges with their blackboards and texts) and their skill / talent texts; the 自选 operators'
-// powers and bonds and the 自选 forms' module ids (backups.json). Not compared: the chess fields the shop changes rewrite
+// powers and bonds, the 自选 forms' module ids and the 自选 operators / ownedPool / excluded sets against today's
+// (backups.json). Not compared: the chess fields the shop changes rewrite
 // (visible, isHidden, bonds, garrisons, identifier, shopSortId: the DIY slots chess_char_5_diy1 / diy2 are 22 / 23 in V2_1,
-// 24 / 25 today), the waves' usedBy (终极 dropped), the 自选 forms' texts, and the backups.json fields derived from the
-// roster (units[].standsIn, the diy pools ownedPool / excluded / locked, tokens).
+// 24 / 25 today), the waves' usedBy (终极 dropped), the 自选 forms' texts, and the other backups.json fields derived from
+// the roster (units[].standsIn, the order of the diy pools, locked, tokens).
 test('data/versions/act2autochess-v2_1: the same-id records that differ from today\'s are the listed ones', () => {
   const read = (dir, name) => readJson(join(ROOT, 'data', dir), name);
   const changed = (name, pick = (x) => x) => {
@@ -260,6 +261,15 @@ test('data/versions/act2autochess-v2_1: the same-id records that differ from tod
     'char_4055_bgsnow', 'char_4132_ascln', 'char_4133_logos', 'char_4195_radian', 'char_4204_mantra']);
   assert.deepEqual(changedIn((b) => b.units, (u) => Object.values(u.forms || {}).map((f) => (f.modules || []).map((m) => m.uniEquipId))),
     ['char_2012_typhon', 'char_2025_shu', 'char_300_phenxi', 'char_4138_narant']);
+  // the 自选 pools: the 9 operators released after 03-14 are absent (怒潮凛冬 among them); 银灰, 空弦, 卡涅利安 and 伺夜 are
+  // V2_1-only 自选 picks (pending: the kitted gate drops them); 焰狐龙梓兰 and 结城理 are not excluded yet
+  const minus = (a, b) => a.filter((c) => !b.includes(c)).sort();
+  const later = ['char_1015_aglna2', 'char_1051_headb2', 'char_1052_kalts2', 'char_4226_veen', 'char_4228_closur', 'char_4229_aphris',
+    'char_4230_mcnist', 'char_4231_clemnt', 'char_4235_thumpy'];
+  const own = ['char_172_svrash', 'char_332_archet', 'char_426_billro', 'char_427_vigil'];
+  assert.deepEqual([minus(Object.keys(today.diy.operators), Object.keys(v21b.diy.operators)), minus(Object.keys(v21b.diy.operators), Object.keys(today.diy.operators))], [later, own]);
+  assert.deepEqual([minus(today.diy.ownedPool, v21b.diy.ownedPool), minus(v21b.diy.ownedPool, today.diy.ownedPool), v21b.diy.ownedPool.length], [later, own, 67]);
+  assert.deepEqual([minus(today.diy.excluded, v21b.diy.excluded), minus(v21b.diy.excluded, today.diy.excluded)], [['char_1048_orchd2', 'char_4217_makoto'], []]);
   const v21 = read('versions/act2autochess-v2_1', 'enemies');
   assert.deepEqual([v21.enemy_2085_skzjxd.rank, v21.enemy_10040_cnvbln.notCountInTotal], ['NORMAL', true]);
 });

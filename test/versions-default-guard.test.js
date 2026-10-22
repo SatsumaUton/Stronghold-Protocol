@@ -6,10 +6,10 @@
 //       is deleted when M1 starts (DESIGN §35.22.2; afterwards test/golden.test.js and test/data.test.js guard them). Until
 //       then an intended golden update or data rebuild also refreshes the fixture (test/golden/README.md). The hashes are
 //       db8e226d's: when the base M0 merges into has moved a pinned file since (the 0.3.2 integration branch's §35.19
-//       assets and goldens), G1 fails on the merged tree. Then (1) check that
-//       git diff $(git merge-base <base> claude/040-ver-m0) claude/040-ver-m0 -- ':(glob)data/*.json' data/i18n test/golden
-//       is empty, (2) run node tools/golden.mjs on the merged tree, and only then (3) regenerate with SP_UPDATE_GUARD=1 in
-//       the merge commit, naming the base's changes (DESIGN §35.22.2)
+//       assets and goldens), G1 fails on the merged tree. Then, with <m0> the M0 branch tip, (1) check that
+//       git diff $(git merge-base <base> <m0>) <m0> -- ':(glob)data/*.json' ':(glob)data/i18n/*.json' ':(glob)test/golden/*.json'
+//       (exactly the files G1 pins) is empty, (2) run node tools/golden.mjs on the merged tree, and only then (3)
+//       regenerate with SP_UPDATE_GUARD=1 in the merge commit, naming the base's changes (DESIGN §35.22.2)
 //   G2  the default config.json has no `version`, and cs reads exactly the top-level gameplay files
 //   G3  the cs formula (known-answer vectors of shared/plugins/identity.js), not the vanilla cs itself, which changes with
 //       any code change (server/plugins/identity.js)

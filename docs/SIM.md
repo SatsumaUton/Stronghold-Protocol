@@ -1131,8 +1131,10 @@ the generic kit) keep the by-id lookup, and stand-ins / 自选 pieces keep their
 shop chess (银灰, 空弦, 卡涅利安, 伺夜): their kit is a tier kit only, so they are listed in `kits/index.js`
 `PENDING_DIY_KIT_CHARS`, stay out of `KITTED_CHARS` and are left out of those versions' 自选 by the kitted gate [ASSUMED]
 until M2 reviews the tier kit as a 自选 kit or writes one. The default data
-and the plugin content sets built on it carry no `config.version` and keep the by-id lookup of before M0, so nothing
-changes there, not even for a plugin that patches an official record's `charId` (DESIGN §35.22.3). On the 上半 data (measured on a dry build of
+and the plugin content sets built on it carry no `config.version` and keep the by-id lookup of before M0, so the kit
+lookup does not change there, not even for a plugin that patches an official record's `charId`. Two M0 fixes do reach
+those content sets: 蒸汽之心's hammers per data object and the map-character shape check of `auto_chess_change_map`
+(below; DESIGN §35.22.3). On the 上半 data (measured on a dry build of
 `@21b1f240`, 96 normal shop records): 46 keep their id with the same operator, 19 resolve to a tier kit by charId, 12 to a
 自选 `op-*` kit (菲亚梅塔, 森蚺, 煌, 左乐, 涤火杰西卡, 林, 提丰, 娜仁图亚, 澄闪, 死芒, 伊芙利特, 淬羽赫默 — written for 自选, to be
 reviewed as shop chess), and 19 have no kit yet: 讯使, 梅, 远山, 狮蝎, 暴行, 布丁, 万顷, 暴雨, 锡兰, 芳汀, 极光, 槐琥, 海蒂, 蜜莓, 安哲拉,
@@ -1168,10 +1170,12 @@ whose `auto_chess_change_map` names device aliases has no battle part and no tea
 nothing in battle; at db8e226d the key alone made it team support). The audit does not compare the talents of
 `enemies.json` / `tokens.json`: V1_1's 炎佑 (`enemy_9012_acloon`) has `2.ep_damage_scale` 1.15 instead of `2.damage_scale`
 1.2, which `content/tokens.js` reads with 1, so its 元素脆弱 aura is off on V1_1 (an M2 item, DESIGN §35.22.5). The kits'
-group lists are hand-written (no built record carries character_table's `groupId`): the 深海猎人 lists of 斯卡蒂, 歌蕾蒂娅,
-浊心斯卡蒂 and `shared/tier5.js` (归溟幽灵鲨, 乌尔比安) name all six members, 安哲拉 included (shop chess in 第一期); 缪尔赛思's
-莱茵生命 list names the shop members (today's five and 第一期's 星源) but not 伊芙利特 and 淬羽赫默, shop chess in 第一期 and 自选
-picks today, nor today's other 自选 members, while 淬羽赫默's own list (`op-slent2.js`) counts every member; whether 自选
+group lists are hand-written (no built record carries character_table's `groupId`). On a version's build the 深海猎人
+lists of 斯卡蒂, 歌蕾蒂娅, 浊心斯卡蒂 and `shared/tier5.js` (归溟幽灵鲨, 乌尔比安) name all six members, 安哲拉 included (shop
+chess in 第一期), and 缪尔赛思's 莱茵生命 list names the shop members (today's five and 第一期's 星源); data without
+`config.version` keeps the lists of before M0 (斯卡蒂's already named 安哲拉), so a Forge pack or plugin official operator
+fielding 安哲拉 or 星源 on the default data counts as before (`abyssalOf` / `rhineOf`). 缪尔赛思's list leaves out
+伊芙利特 and 淬羽赫默, shop chess in 第一期 and 自选 picks today, nor today's other 自选 members, while 淬羽赫默's own list (`op-slent2.js`) counts every member; whether 自选
 members count for 缪尔赛思 is an M2 question. `test/versions-keying.test.js` pins, per data directory, the members each
 list sees.
 Plugin dispatch (DESIGN §32.5, C2): extension registry → `def.raw.dsl` → `def.raw.skillSpec` → `def.raw.kitRef` → official registry → generic; explicit Battle test kits still take precedence. The extension registry stays empty for vanilla; P3a script compositions register SDK kits, enemy installs and battle modules (PLUGINS §13). `kitOf` calls `compileDsl` when the record carries `dsl`. The content-set builder stamps `pluginId`. A bad spec is refused at build. If compilation still throws (`PLUGIN_DSL_*`, or any throw while `raw.dsl` is set), the battle ends `forced` with `content:dsl` and does not field an empty or generic kit (DESIGN §32.7). Any other kit throw still falls back to generic. A one-skill DSL kit binds that default spec for a 自选 piece and a 补位 stand-in. The JSON SkillSpec allowlist is §7.3 without functions (validated by `shared/plugins/skillSpec.js`); `talentMods` adds permanent numeric mods. `kitRef` accepts an official key or file stem, never an import path.

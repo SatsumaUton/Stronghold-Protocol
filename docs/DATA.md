@@ -532,7 +532,7 @@ Glyph legend (`rows`):
 | `variants[o].byModule[m]` | `{"stats":{…},"immunities":{…},"trait":{…},"talents":[…]}` | golden owner with another module `m` or `'none'`: the token as that module makes it (module `tokenAttributeBlackboard`, `isToken` trait/talent parts) |
 | `assets` | `{"avatar":"token_10028_vigil_wolf","spine":"token_10028_vigil_wolf"}` | |
 | mapChar extras | `phase`, `level`, `trait`, `talents`, `positions:[{"alias":"char_613_acmedc#2_multi_only","pos":[10,10],"dir":"RIGHT","multiOnly":true}]`, `source` | |
-| bondSummon extras | `bondId`, `motion`, `skills`, `talents`, `assets.isEnemyModel` | 炎佑 base template (600 ATK / 12000 HP; 第一期上半 V1_1: 300 / 6000 and `2.ep_damage_scale` 1.15 instead of `2.damage_scale`, DESIGN §35.22.5); at battle start 30 % of the 炎 operators' ATK / HP sums are **added** to it (PRTS "（最终加算）", bonds.yanShip; the 9-炎 ATK ×1.5 on the whole ATK [ASSUMED]) |
+| bondSummon extras | `bondId`, `motion`, `skills`, `talents`, `assets.isEnemyModel` | 炎佑 base template (600 ATK / 12000 HP; 第一期上半 V1_1: 300 / 6000, skills' cooldown 25 s instead of 15 s and `2.ep_damage_scale` 1.15 instead of `2.damage_scale` (its 炎 text: 15% 元素脆弱), DESIGN §35.22.5); at battle start 30 % of the 炎 operators' ATK / HP sums are **added** to it (PRTS "（最终加算）", bonds.yanShip; the 9-炎 ATK ×1.5 on the whole ATK [ASSUMED]) |
 
 ---
 
@@ -804,7 +804,7 @@ a file name uses `versionSlug(entry)` — the last segment of `dir` (lowercase, 
 `versionOfData(data)` reads `config.version.id`, else the default. The 2024 卫戍协议 (`act1vautochess`) is not a version
 (the maintainer's decision of 2026-10-22).
 
-Two deliberate differences from the round-50 design draft: there is no `data/versions/index.json` (the registry is the
+Two deliberate differences from the round-50 design draft (local notes, not in the repository): there is no `data/versions/index.json` (the registry is the
 index; M1 reads `shared/versions.js`), and a version's directory is named by its slug, not its id (`@` is not safe in
 every file system and URL).
 
@@ -963,8 +963,10 @@ have 3 checkpoints, not today's 19-checkpoint loops (04-14); 13 elite records la
 `chess_char_6_05_b`'s RA-A module `uniequip_004_pasngr` changes 机理分析 to ×1.2 at every potential (the `1457587e`
 battle_equip has only its rank-0 candidate; today ×1.25 from 潜能 5, the base talent's value); the
 自选 operators' powers and bonds are the 03-14 character_table's, so 鸿雪 and 真言 are 盟约·辅助干员 (`emptyShip`), not 萨尔贡
-(`sargonShip`), and seven more 自选 operators have one power fewer; and a few texts differ (skills, talents, enemy
-abilities, one bounty card).
+(`sargonShip`), and seven more 自选 operators have one power fewer; the 9 自选 operators released after 03-14 (予愿安洁莉娜,
+怒潮凛冬, 凯尔希·思衡托, 维伊, 可露希尔, 谬因, 机械师, 克莱门莎, 珊比) are absent, so `diy.ownedPool` holds 67 against 72 (its
+4 V2_1-only picks 银灰, 空弦, 卡涅利安 and 伺夜 are pending, and the kitted gate drops them) and `diy.excluded` 5 against 7
+(焰狐龙梓兰 and 结城理 came later); and a few texts differ (skills, talents, enemy abilities, one bounty card).
 
 V2_1's warnings: the research name annotation dropped from 战场#01 (as the default) and `DIY_EXCLUDED_TEAMS` team `sees` with no owned-6★ pick (as in 上半). The 上半 builds' remaining warnings: research falling back to
 下半 (6 files, [ASSUMED]); `DIY_EXCLUDED_TEAMS` team `sees` has no owned-6★ pick; two `STATIC_BODIES` enemies (`hummbd`,

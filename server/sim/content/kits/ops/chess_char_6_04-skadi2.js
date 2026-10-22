@@ -5,7 +5,7 @@ import { aggregateMods } from '../../../buffs.js';
 import { applyRedirectCut, redirectShare } from '../../../damage.js';
 import { COLS } from '../../../constants.js';
 import { bardRegen } from '../../../professions.js';
-import { startCountdown } from '../../tokens.js';
+import { startCountdown, isVersionData } from '../../tokens.js';
 import {
   num, bv, tbb, tdesc, moduleBb, parseN, live, enemiesIn, isTok, onDefaultSkill, selectedSkill, aura,
 } from '../shared/tier6.js';
@@ -13,10 +13,14 @@ import {
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 /**
- * 深海猎人 (character_table groupId "abyssal" — checked against the official table; data/chess.json has no group id; 安哲拉
- * is shop chess in 第一期, DESIGN §35.22.4).
+ * 深海猎人 (character_table groupId "abyssal" — checked against the official table; data/chess.json has no group id), the
+ * list of before versions M0: data without config.version (the default data and the plugin content sets on it) keeps it.
+ * On another version's build (support isVersionData) also 安哲拉, shop chess in 第一期 (DESIGN §35.22.4).
  */
-export const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_218_cuttle', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
+const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
+const ABYSSAL_VERSION = new Set([...ABYSSAL, 'char_218_cuttle']);
+/** The 深海猎人 list of `data` (default: the loaded data). */
+export const abyssalOf = (data) => (isVersionData(data) ? ABYSSAL_VERSION : ABYSSAL);
 
 /**
  * 鼓舞 (ba.inspire "获得额外附加的基础属性加成（同类属性取最高）"): +`val` ATK after the target's own multipliers (flat
@@ -181,7 +185,7 @@ function skadi2(bb, chess, def) {
         aura(battle, unit, 0.5, () => {
           const toks = seaborns(battle, unit);
           const ops = covered(battle, unit, toks).filter((a) => a !== unit && a.kind === 'op');
-          const val = ops.some((a) => ABYSSAL.has(a.def?.charId)) ? a2 : ops.length ? a1 : 0;
+          const val = ops.some((a) => abyssalOf().has(a.def?.charId)) ? a2 : ops.length ? a1 : 0;
           const own = battle.alliesInGrid(unit).filter((a) => a !== unit && a.kind === 'op').length;
           const total = val + (own >= mCnt ? mAtk : 0);
           const dPct = ops.length ? d1 : 0;
