@@ -9,10 +9,11 @@
 // before anyone joined, and the 独立模拟 room — on four phones (640×360, 667×375, 740×360, 844×390) and on desktops
 // (800×600 – 1920×1080) in all five languages at all four 文字大小: every line of visible text inside each box that clips
 // it or draws a box around it (a button, a chip, the card), inside the screen, over no other label's text and not broken
-// inside a word (Korean between two syllables too); only a player's name (or a plugin mode's) may end in an ellipsis;
-// nothing makes the page scroll. On the phones also a doctor who readied, a modded room's tags (已同意, 插件内容就绪 /
-// 载入中 / 校验失败) and mode, and a doctor whose connection dropped (written into the page's store: no plugin pack here). A box that scrolls (the
-// picker's grid, the briefing when it has to) counts as holding its text. Every page finishes with zero console errors
+// inside a word (Korean between two syllables too), no line starting with a small kana, ー or a closing mark; only a
+// player's name (or a plugin mode's) may end in an ellipsis; nothing makes the page scroll. On the phones also a doctor
+// who readied, a modded room's tags (已同意, 插件内容就绪 / 载入中 / 校验失败) and mode, and a doctor whose connection
+// dropped (written into the page's store: no plugin pack here). A box that scrolls (the picker's grid) counts as holding
+// its text; on the phones 独立模拟's briefing must not scroll. Every page finishes with zero console errors
 // (without the art pack, as on CI, the cards show their avatar frames and the pack's 404s are let through).
 // The room's big button and its 选择模拟协议: test/ui/lobby-hub.e2e.test.js; the cards' outfits: room-cards.e2e.test.js.
 // Screenshots: test/e2e/out/room-fit-*.png.
@@ -117,6 +118,13 @@ describe('the waiting room\'s text fit (real server, headless Chrome)', { skip: 
             await settled(c.page);
             for (const p of await check(c.page)) bad.push(`${lang} ${ts} ${size.join('×')} ${who}: ${p}`);
           }
+          // on a phone 独立模拟's briefing holds its text without scrolling (§35.18 review of the text-fit fixes: a 2.7 × --t
+          // card, 218–238 px at 特大, left it too narrow and its last bullet half cut at the bottom edge — the check above lets
+          // a scrolling box through)
+          if (touch) {
+            const sc = await solo.page.$eval('.rs-brief', (e) => [e.scrollHeight, e.clientHeight]);
+            if (sc[0] > sc[1] + 1) bad.push(`${lang} ${ts} ${size.join('×')} solo host: the briefing scrolls (${sc.join(' / ')})`);
+          }
           await host.page.$eval('.rs-pill__gear', (b) => b.click());
           await host.page.waitForSelector('.rs-opts', { visible: true, timeout: 3000 });
           for (const p of await check(host.page, '.rs-opts')) bad.push(`${lang} ${ts} ${size.join('×')} ⚙ 同盟设置: ${p}`);
@@ -137,12 +145,13 @@ describe('the waiting room\'s text fit (real server, headless Chrome)', { skip: 
         // the seat cards' other labels share the in-flow top / bottom layout (§35.18 review of the text-fit fixes): a doctor
         // who readied (已就绪), a modded room's tags — 已同意, 插件内容就绪 / 载入中 / 校验失败 — and its mode beside the mode
         // name, a doctor whose connection dropped (连接中断 on the art and as the state). The plugin fields are written into
-        // the page's store after the server's last room.state (a fixture: there is no plugin pack here). Known and listed in
-        // §35.18's leftovers: on the two smallest phones at 大 / 特大 in English and Japanese the host's card, with the tag
-        // line in the top bar, two tags, the badge and a two-line state, is taller than its art (by 4–36 px), and at 640 px
-        // English 「Disconnected」 breaks — let through here, every other case must fit
-        const leftover = (ts, size, p) => ['lg', 'xl'].includes(ts) && size[0] <= 667 && ['en', 'ja'].includes(lang)
-          && /^y past div\.seat__art: span\.rseat__said |^broken inside a word \([^)]*\): span\.rseat__said "Disconnected"$/.test(p);
+        // the page's store after the server's last room.state (a fixture: there is no plugin pack here). On a phone the
+        // 插件内容就绪 tag gives way (§35.18 review of the text-fit fixes: with it the host's state sat below the art on the
+        // 640 / 667 px phones at 大 / 特大 in English and Japanese). Known and listed in §35.18's leftovers: on the 640 px
+        // phone at 大 / 特大 in English an offline doctor's 「Disconnected」 is wider than the card (it breaks, and at 特大
+        // also runs below the art) — let through here, every other case must fit
+        const leftover = (ts, size, p) => ['lg', 'xl'].includes(ts) && size[0] <= 640 && lang === 'en'
+          && /^(y past div\.seat__art|broken inside a word \([^)]*\)): span\.rseat__said "Disconnected"$/.test(p);
         // (without the spectator: with the 观战席 row as well, the most crowded room, the cards are shorter still — §35.18's
         // leftovers)
         assert.equal(await request(spec, 'room.leave', {}), 'ok');

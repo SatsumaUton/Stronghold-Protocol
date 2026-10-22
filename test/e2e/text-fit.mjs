@@ -8,7 +8,9 @@
  * text as it shows (clipped by its clipping ancestors); a line break inside a word (not at a space, a hyphen or between
  * CJK / kana; Korean puts spaces between its words, so a break between two Hangul syllables — or a syllable and a latin
  * letter or digit — is inside a word too, keep-all or not: under word-break: keep-all such a break is the overflow-wrap
- * fallback of a word too long for its box); an ellipsis anywhere but a player's name (.seat__name, .specbar__who) or a
+ * fallback of a word too long for its box); a line that starts with a small kana, ー, an iteration mark or a closing
+ * mark (Japanese line-breaking rules, 禁則; also Chinese for the closing marks — line-break: normal lets Chrome break
+ * before a small kana and ー); an ellipsis anywhere but a player's name (.seat__name, .specbar__who) or a
  * plugin mode's own name (.room-mode, cut by design like a name); the page scrolling.
  */
 export function textProblems(rootSel) {
@@ -22,6 +24,8 @@ export function textProblems(rootSel) {
   const cjk = /[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/;
   const hangul = /[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/;
   const letter = /[\p{L}\p{N}]/u;
+  // may not start a line: small kana, the prolonged sound mark, iteration marks, closing brackets and punctuation
+  const noStart = /[ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶㇰ-ㇿーゝゞヽヾ々、。，．・：；！？）」』】〉》〕］｝〗〙]/;
   // may a line break between p and c? a space / hyphen / slash / dot before it; between CJK or kana; at Hangul only where
   // one side is not a letter or digit (punctuation such as ：)
   const breakOk = (p, c) => /[\s\-\u2010\u2013\u2014/\u00b7\u30fb]/.test(p)
@@ -85,9 +89,10 @@ export function textProblems(rootSel) {
           const rr = [...cr.getClientRects()].find((r) => r.width > 0);
           if (!rr) continue;
           const p = n.textContent[i - 1] || ' ';
-          if (prevTop != null && rr.top > prevTop + rr.height / 2 && !breakOk(p, c)) {
-            out.push(`broken inside a word (${n.textContent.slice(Math.max(0, i - 6), i)}|${n.textContent.slice(i, i + 6)}): ${label}`);
-            break;
+          if (prevTop != null && rr.top > prevTop + rr.height / 2) {
+            const at = `${n.textContent.slice(Math.max(0, i - 6), i)}|${n.textContent.slice(i, i + 6)}`;
+            if (!breakOk(p, c)) { out.push(`broken inside a word (${at}): ${label}`); break; }
+            if (noStart.test(c)) { out.push(`a line starts with ${c} (${at}): ${label}`); break; }
           }
           prevTop = rr.top;
         }

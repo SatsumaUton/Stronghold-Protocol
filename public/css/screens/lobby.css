@@ -13,6 +13,9 @@
    long for its box still breaks rather than running out of it. The hub's own stage only: 选择模拟协议's button keeps its
    two lines (「독립 시뮬레이션 시작」 took three at 特大 in a 1024×600 window by words) */
 .lobby-hub:lang(ko) .hub-stage { word-break: keep-all; overflow-wrap: break-word; }
+/* Japanese never starts a line with a small kana, ー or a closing mark (§35.18 review: the tips' 「オペレ|ーター」 at 中 / 特大
+   in a 1024×600 window; line-break: normal allows a break before them), as in the room */
+.lobby-hub:lang(ja) .hub-stage { line-break: strict; }
 /* the top bar's ping pill grows with its text at 大 / 特大, as in the room (§35.18 review: its fixed .32rem cut it) */
 .lobby-hub > .topbar .ping { height: auto; min-height: .32rem; padding-top: 1px; padding-bottom: 1px; }
 .hub-bg {
@@ -416,6 +419,8 @@
   max-width: 100%;
   min-height: calc(1.34 * var(--t));
   padding: .14rem .16rem;
+  /* the icon's height kept above the text (below) */
+  padding-top: calc(.12rem + .42 * var(--t) + .04rem);
   overflow: hidden;
   text-align: left;
   color: var(--text-hi);
@@ -428,10 +433,12 @@
 .hub-entry:active { transform: translateY(1px); }
 .hub-entry__icon { position: absolute; right: .14rem; top: .12rem; color: var(--mint-a35); }
 .hub-entry__icon .icon { width: calc(.42 * var(--t)); height: calc(.42 * var(--t)); }
-/* the card, its icon and its text follow 文字大小 together (2.3 × 1.34 --t, the icon .42 --t), as at 小; the decorative
-   line keeps clear of the icon (.14rem from the right edge, past the card's .16rem padding, and a gap): it wraps before
-   reaching it (§35.18 review: 「ALLIANCE SIMULATION」 ran under the people icon, Korean names under it at 大 / 特大) */
-.hub-entry__en { padding-right: calc(.42 * var(--t) + .02rem); font-family: ui-monospace, Consolas, monospace; font-size: calc(.11 * var(--t)); font-weight: 700; letter-spacing: .22em; color: var(--mint-400); }
+/* the card, its icon and its text follow 文字大小 together (2.3 × 1.34 --t, the icon .42 --t), as at 小; the text stays
+   below the icon — the card's top padding is the icon's .12rem offset, its height and a gap — so a long name or the
+   decorative line grows the card rather than running under it (§35.18 review: 「ALLIANCE SIMULATION」 ran under the
+   people icon in English, Korean names under it at 大 / 特大; a padding beside it instead wrapped the line in every
+   language, Chinese 「ALLIANCE / SIMULATION」 at 小, which never reached the icon). A short card keeps its min-height */
+.hub-entry__en { font-family: ui-monospace, Consolas, monospace; font-size: calc(.11 * var(--t)); font-weight: 700; letter-spacing: .22em; color: var(--mint-400); }
 /* the name wraps between words (§35.18 review: on one line English 「Solo Simulation」 / 「Team Simulation」 ran 25–40 px
    past the 2.3rem card at 小 in every window and 84–100 px at 特大, the card cutting it); 「Simulation」 alone is ~6.2em,
    and the card (2.3 × --t) keeps ~1.98 × --t inside for the .3 × --t name */
@@ -1001,6 +1008,9 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .hub-right { padding-top: .1rem; }
   .lobby-hub .hub-plate { min-height: max(.7rem, 40px); }
   .lobby-hub .hub-plate--ach { display: flex; }
+  /* (here the hub's height is the limit: a top padding for the icon made the English and Korean cards so tall at 大 /
+     特大 that the line above them ran into the title on a 640 / 740 px phone. The decorative line keeps clear of the icon
+     beside it instead, .44rem — at 小 it stays on one line there in every language) */
   .hub-entry { min-height: max(1.1rem, 64px); padding: .1rem .14rem; }
   .hub-entry__icon .icon { width: .42rem; height: .42rem; }
 

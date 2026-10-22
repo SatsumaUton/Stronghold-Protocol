@@ -500,9 +500,13 @@ test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simul
   assert.match(rule('.hub-entry'), /flex: 1 0 auto;/, 'both cards the taller one\'s height');
   assert.match(rule('.hub-entries'), /align-items: stretch;/);
   assert.match(rule('.hub-entry__icon .icon'), /width: calc\(\.42 \* var\(--t\)\);/);
-  assert.match(rule('.hub-entry__en'), /padding-right: calc\(\.42 \* var\(--t\) \+ \.02rem\);/, 'the decorative line wraps before the icon');
+  // the text stays below the icon (the card's top padding is the icon's offset, height and a gap), not beside it (review of
+  // the review: a padding beside it wrapped 「ALLIANCE / SIMULATION」 in Chinese at 小, which never reached the icon)
+  assert.match(rule('.hub-entry'), /padding-top: calc\(\.12rem \+ \.42 \* var\(--t\) \+ \.04rem\);/, 'the text below the icon');
+  assert.doesNotMatch(rule('.hub-entry__en'), /padding-right/);
   // Korean breaks between words (review: 「독립 시뮬레이|션」)
   assert.match(css, /\.lobby-hub:lang\(ko\) \.hub-stage \{ word-break: keep-all; overflow-wrap: break-word; \}/);
+  assert.match(css, /\.lobby-hub:lang\(ja\) \.hub-stage \{ line-break: strict; \}/, 'no line starts with a small kana or ー');
   assert.match(rule('.lobby-hub .hub-plate'), /min-height: \.7rem;/, 'a plate grows for a second line');
   const label = rule('.hub-plate__label, .lobby-hub .hub-plate .btn__label');
   assert.doesNotMatch(label, /ellipsis|nowrap/);
@@ -515,7 +519,7 @@ test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simul
   assert.match(css, /\.lobby-hub > \.topbar \.ping \{ height: auto; min-height: \.32rem;/);
   const short = shortBlock();
   assert.match(short, /\.lobby-hub \{ --hub-entry-w: max\(2\.1rem, 128px\); \}/);
-  assert.match(short, /\.hub-entry \{ min-height: max\(1\.1rem, 64px\);/);
+  assert.match(short, /\.hub-entry \{ min-height: max\(1\.1rem, 64px\); padding: \.1rem \.14rem; \}/, 'no room above the text on a phone');
   assert.match(short, /\.hub-entry \{ width: calc\(var\(--hub-entry-w\) \+ 7 \* max\(0px, var\(--t-step\)\)\); \}/);
   assert.match(short, /\.lobby-hub \.hub-plate \{ font-size: min\(calc\(\.3 \* var\(--t\)\), calc\(18px \+ var\(--t-step\)\)\); \}/);
   assert.match(short, /\.hub-entry__en \{ padding-right: \.44rem; font-size: min\(calc\(\.16 \* var\(--t\)\), calc\(10px \+ var\(--t-step\)\)\);/);

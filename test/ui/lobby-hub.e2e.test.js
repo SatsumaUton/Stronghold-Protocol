@@ -23,7 +23,9 @@
 // inside its box (test/e2e/text-fit.mjs; §35.18 review: English 「Solo Simulation」 / 「Team Simulation」 were cut by their
 // cards at 小 in every window, the plates ended in an ellipsis at 大 / 特大 on phones, the title ran under the tips; and
 // in its review: Korean names broken between syllables, the decorative line and the names under the people icon, a
-// plate's label under its glyph, the two cards' tops apart).
+// plate's label under its glyph, the two cards' tops apart — and in the review of that, the same shapes with one card's
+// name and one plate's label made longer in the page, the cards' tops and bottoms; a Japanese line starting with a small
+// kana or ー).
 // The other doctors' read-only view: test/ui/room-settings.e2e.test.js.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/lobby-hub-*.png
 
@@ -771,7 +773,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
   // phone and its title ran under the left column's tips at 大 / 特大 in a 1280×720 window
   // what text-fit.mjs cannot see, as the review of those fixes found it: the entries' decorative line and names running
   // under the card's people icon (not text), a plate's label dropping under its glyph instead of wrapping beside it, the
-  // two cards' tops apart
+  // two cards not one height (their tops or bottoms apart)
   const hubShapes = () => {
     const R = (e) => e.getBoundingClientRect();
     const lines = (e) => { const r = document.createRange(); r.selectNodeContents(e); return [...r.getClientRects()]; };
@@ -785,12 +787,38 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
         if (a > 4) out.push(`${sel} under the icon (${Math.round(a)} px²)`);
       }
     }
-    if (cards.length === 2 && Math.abs(R(cards[0]).top - R(cards[1]).top) > 1) out.push(`the cards' tops ${Math.round(R(cards[0]).top)} / ${Math.round(R(cards[1]).top)}`);
+    if (cards.length === 2 && ['top', 'bottom'].some((k) => Math.abs(R(cards[0])[k] - R(cards[1])[k]) > 1)) {
+      out.push(`the cards' tops / bottoms ${cards.map((c) => `${Math.round(R(c).top)}–${Math.round(R(c).bottom)}`).join(' / ')}`);
+    }
     for (const p of document.querySelectorAll('.lobby-hub .hub-plate')) {
       const g = p.querySelector('.hub-plate__glyph, .lo-entry__icon, .btn__icon'), l = p.querySelector('.hub-plate__label, .btn__label');
       if (g && l && p.checkVisibility() && R(l).top >= R(g).bottom - 1) out.push(`a plate's label under its glyph: ${l.textContent.trim()}`);
     }
     return out;
+  };
+  // the same shapes with one card's name and one plate's label made longer in the page (a text node added, then removed):
+  // the matrix's own texts no longer reach the two rules that keep both cards one height (`.hub-entries` stretching,
+  // `.hub-entry` filling its column) nor the label's `flex: 1 1 0; min-width: min-content` once the cards and plates follow
+  // --t (§35.18 review of the text-fit fixes: with those rules removed the plain matrix still passed)
+  const forcedShapes = async (page) => {
+    await page.evaluate(() => {
+      const add = (el, s) => { if (!el) return; const n = document.createTextNode(s); n.__spTest = true; el.append(n); };
+      add(document.querySelector('.lobby-hub .hub-entry__name'), ' Simulation Simulation');
+      const plate = [...document.querySelectorAll('.lobby-hub .hub-plate')].find((p) => p.checkVisibility() && p.querySelector('.hub-plate__label'));
+      const l = plate?.querySelector('.hub-plate__label');
+      if (l) add(l, ` ${l.textContent.trim()} ${l.textContent.trim()}`);
+    });
+    await sleep(50);
+    const out = await page.evaluate(hubShapes);
+    await page.evaluate(() => {
+      const w = document.createTreeWalker(document.querySelector('.lobby-hub'), NodeFilter.SHOW_TEXT);
+      const added = [];
+      for (let n = w.nextNode(); n; n = w.nextNode()) if (n.__spTest) added.push(n);
+      for (const n of added) n.remove();
+    });
+    // (the icon is left to the plain check: on a phone the longer name is taller than the card can grow, which pushes the
+    // bottom-aligned text up under it)
+    return out.filter((p) => !/under the icon/.test(p)).map((p) => `a longer name and label: ${p}`);
   };
   test('phones and desktops: every label of the hub inside its box in every language at every 文字大小', { timeout: 900000 }, async () => {
     const phones = [[640, 360], [667, 375], [740, 360], [844, 390]];
@@ -807,6 +835,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
               await sleep(150); await settle(page); await page.evaluate(() => document.fonts.ready);
               for (const p of await page.evaluate(textProblems, '.lobby-screen')) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               for (const p of await page.evaluate(hubShapes)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
+              for (const p of await forcedShapes(page)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               if (lang === 'en' && textSize === 'xl' && (w === 667 || w === 1280)) await page.screenshot({ path: path.join(OUT, `lobby-hub-fit-${w}-en-xl.png`) });
             }
           }

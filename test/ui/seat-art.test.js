@@ -162,6 +162,16 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   assert.match(plain, /\.rs-key__copy \{[^}]*font: inherit;[^}]*line-height: 1;/);
   assert.match(plain, /@media \(max-width: 900px\) \{[^@]*\.rs-foot__center \{ justify-self: start;/);
   assert.match(plain, /\.rs--solo \.rseat \{ --w: min\(calc\(2\.7 \* var\(--t\)\), 34vw\); \}/);
+  // the review of those fixes: Japanese never starts a line with a small kana or ー (「シミュレーシ|ョン開始」); on a short
+  // screen 独立模拟's card no wider than a co-op one (2.7 × --t had made it 173–238 px above 小), its briefing wider and
+  // tighter above 中 so it does not scroll, and a modded room's 插件内容就绪 tag giving way to the state
+  assert.match(plain, /\.rs:lang\(ja\) \{ line-break: strict; \}/);
+  const short = plain.slice(plain.indexOf('@media (max-height: 520px) {'));
+  assert.match(short, /\.rs--solo \.rseat \{ --w: min\(calc\(2\.7 \* var\(--t\)\), 3\.4rem, 34vw\); \}/);
+  assert.match(short, /\.rs-brief \{ max-width: min\(11rem, 62vw\); padding: calc\(6px - max\(0px, var\(--t-step\)\)\) 12px; \}/);
+  assert.match(short, /\.rs-brief h2 \{[^}]*line-height: calc\(1\.5em - 3 \* max\(0px, var\(--t-step\)\)\);/);
+  assert.match(short, /\.rs-brief ul \{[^}]*line-height: calc\(1\.35em - max\(0px, var\(--t-step\)\)\);/);
+  assert.match(short, /\.seat__content\.is-ready \{ display: none; \}/);
   // the ping pill grows in the room only (§35.18 review: a global min-height outgrew title.css's own height)
   assert.match(plain, /\.rs-clock__ping \.ping \{ height: auto; min-height: \.32rem;/);
   assert.match(readFileSync(path.join(ROOT, 'public/css/components.css'), 'utf8'), /\.ping \{[^}]*\n  height: \.32rem;/);

@@ -8,6 +8,10 @@
 /* Korean breaks between words, not between the syllables of one (§35.18 review: 「시뮬레이션 시|작」 on the big button, and
    the seat cards' labels once they wrap); a word too long for its box still breaks rather than running out of it */
 .rs:lang(ko) { word-break: keep-all; overflow-wrap: break-word; }
+/* Japanese never starts a line with a small kana, ー or a closing mark (§35.18 review: 「シミュレーシ|ョン開始」 on the big
+   button, 「ドクタ|ーの画面」 in a spectator's status line, 「シークレ|ットコア」 in 独立模拟's briefing — line-break: normal
+   allows a break before a small kana and ー) */
+.rs:lang(ja) { line-break: strict; }
 .rs__bg {
   position: absolute;
   inset: 0;
@@ -187,7 +191,7 @@
 @keyframes rseat-pop { from { opacity: 0; transform: scale(.4); } }
 /* 2.7 × --t: 2.7rem at 小 as before, wider with the text (§35.18 review: at a fixed 2.7rem 独立模拟's single card was the
    narrowest, and its 「Standing by」 broke inside the word at 特大 in an 800–1100 px window) */
-.rs--solo .rseat { --w: min(calc(2.7 * var(--t)), 34vw); }
+.rs--solo .rseat { --w: min(calc(2.7 * var(--t)), 34vw); }  /* (capped on a short screen: below) */
 .rseat__clip { position: absolute; left: 50%; top: -.14rem; z-index: 2; width: .16rem; height: .2rem; transform: translateX(-50%); background: #3a3e3d; border: 2px solid #1a1c1c; }
 .rseat.is-lit .rseat__clip { background: #4fe8c0; }
 .rseat__strip { position: relative; display: flex; align-items: center; justify-content: space-between; height: max(.26rem, 16px); padding: 0 .08rem; background: #2b2e2e; }
@@ -639,6 +643,10 @@
   .rs .rs-top { padding-top: 6px; }
   .rs-seats { padding-top: 14px; gap: 12px; }
   .rseat__plate { min-height: 36px; margin-top: 4px; }
+  /* 独立模拟's card no wider than a co-op one here (3.4rem, 136 px; §35.18 review: the 2.7 × --t of a 64 / 76 / 88 px --t
+     made it 173–238 px at 中 / 大 / 特大, as wide as it is tall, while its text stays capped — the portrait a strip and the
+     briefing beside it scrolling at 特大) */
+  .rs--solo .rseat { --w: min(calc(2.7 * var(--t)), 3.4rem, 34vw); }
   .rseat__doc, .rseat__noinfo, .rseat__invite small, .seat__op { display: none; }
   /* the seat cards' text capped (§35.18 review: at 大 / 特大 the .26–.34 × --t sizes, 23–30 px in a card about 120 px wide
      and 100 px tall, ran 「Standing by」 / 「AI Teammate」 / 「Add AI Teammate」 past the card and the badge over the state).
@@ -661,6 +669,11 @@
   .rseat__top { flex-direction: row; flex-wrap: wrap; justify-content: center; }
   .rseat__top > .rseat__pick, .rseat__top > .rseat__tag { align-self: auto; }
   .rseat__lost, .rseat.is-offline .rseat__box { display: none; }
+  /* in a modded room the 插件内容就绪 tag gives way here, the expected state (载入中 / 校验失败 stay, and the status line
+     waits for every doctor's content): with 已同意 as well, the badge and the tag's two lines left no room for the state —
+     the host's 「Standing by」 / 待機中 below the art at 大 / 特大 on the 640 / 667 px phones (§35.18 review of the text-fit
+     fixes). [ASSUMED] */
+  .seat__content.is-ready { display: none; }
   .rseat--empty .rseat__art { padding-bottom: 6px; }
   .rseat__invite { gap: 2px; padding: 2px 4px; }
   .rseat__invite b { font-size: min(calc(.34 * var(--t)), calc(18px + var(--t-step) / 2)); line-height: 1.15; }
@@ -679,10 +692,15 @@
   .rs-clock > b { font-size: min(calc(.28 * var(--t)), calc(20px + var(--t-step))); }
   .rs-clock__ping, .rs-ready { font-size: min(calc(.22 * var(--t)), calc(15px + var(--t-step))); }
   .rs-hint { font-size: min(calc(.28 * var(--t)), calc(14px + var(--t-step) / 2)); }
-  .rs-brief { max-width: min(8rem, 54vw); padding: 6px 12px; }
-  .rs-brief h2 { font-size: min(calc(.32 * var(--t)), calc(20px + var(--t-step))); }
+  /* 独立模拟's briefing holds its text without scrolling at every size (§35.18 review of the text-fit fixes: from 大 its
+     text grows a pixel a step while the bars above and below take height from it, and at 特大 on the 640–740 px phones its
+     last bullet sat half cut at the bottom, 214–217 px of text in 197–212): it may be up to 11rem / 62vw wide (at 小 it
+     stays narrower, as wide as its text), and above 中 its padding, the title's and the list's line heights give a pixel,
+     three and a pixel a step. [ASSUMED] the width and the spacing */
+  .rs-brief { max-width: min(11rem, 62vw); padding: calc(6px - max(0px, var(--t-step))) 12px; }
+  .rs-brief h2 { font-size: min(calc(.32 * var(--t)), calc(20px + var(--t-step))); line-height: calc(1.5em - 3 * max(0px, var(--t-step))); }
   .rs-brief p { font-size: min(calc(.17 * var(--t)), calc(14px + var(--t-step))); }
-  .rs-brief ul { font-size: min(calc(.16 * var(--t)), calc(13px + var(--t-step))); line-height: 1.35; }
+  .rs-brief ul { font-size: min(calc(.16 * var(--t)), calc(13px + var(--t-step))); line-height: calc(1.35em - max(0px, var(--t-step))); }
   /* the difficulty's name in its 40 px pill and the key's 复制 in its 26 px button: capped so the line stays inside (a
      pixel more a step above 中). [ASSUMED] the caps */
   .rs-pill__diff { font-size: min(calc(.28 * var(--t)), calc(20px + var(--t-step))); }
