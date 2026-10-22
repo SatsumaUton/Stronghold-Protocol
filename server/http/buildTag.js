@@ -25,6 +25,12 @@ export const BUILD_INPUTS = Object.freeze(['public/index.html', 'public/js', 'pu
 /** Names the static server never serves: dot files (`.DS_Store`, `.main.js.swp`) and editor backups (`main.js~`). */
 const isIgnoredBuildName = (name) => name.startsWith('.') || name.endsWith('~');
 
+/**
+ * Trees under BUILD_INPUTS the browser is never served: another official version's data (DESIGN §35.22), which the
+ * static server answers 404 for until M1, so rebuilding only it is no new build.
+ */
+const UNSERVED_BUILD_DIRS = new Set(['data/versions']);
+
 /** @type {{ tag: string|null }|null} */
 let buildCache = null;
 
@@ -40,7 +46,7 @@ function buildEntries(abs, rel, out) {
     if (isIgnoredBuildName(d.name)) continue;
     const child = path.join(abs, d.name);
     const childRel = rel ? `${rel}/${d.name}` : d.name;
-    if (d.isDirectory()) buildEntries(child, childRel, out);
+    if (d.isDirectory()) { if (!UNSERVED_BUILD_DIRS.has(childRel)) buildEntries(child, childRel, out); }
     else if (d.isFile()) { try { const s = fs.statSync(child); out.push([childRel, s.size, s.mtimeMs]); } catch { /* ignore */ } }
   }
 }

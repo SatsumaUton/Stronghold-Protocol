@@ -8,7 +8,8 @@ import {
 } from '../shared/tier4.js';
 import { hypot } from '../../../detmath.js';
 
-const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
+/** 深海猎人 (character_table groupId "abyssal"; 安哲拉 is shop chess in 第一期, DESIGN §35.22.4). */
+export const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_218_cuttle', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
 const isAbyssal = (u) => u?.def?.raw?.groupId === 'abyssal' || ABYSSAL.has(u?.def?.charId ?? u?.def?.raw?.charId);
 
 export default withDefaults({

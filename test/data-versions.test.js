@@ -207,10 +207,12 @@ for (const v of OTHERS) {
 // 第二期上半's records that keep today's id but differ from today's data (DESIGN §35.22.5 lists each). Today's data is V2_2
 // with the 04-14 level and text fixes (86da4cfa) and the modules added after 03-14, so the list is not only V2_2's. A
 // rebuild that changes one of the compared fields fails here, and the hand-written list is reviewed with the new set.
-// Compared: every field of bands, effects, enemies and tokens; the waves' routes; the chess records' modules and their
-// skill / talent texts; the 自选 operators' powers and bonds and the 自选 forms' modules (backups.json). Not compared: the
-// chess fields the shop changes rewrite (visible, bonds, garrisons, identifier), the waves' usedBy (终极 dropped) and the
-// 自选 forms' texts.
+// Compared: every field of bands, effects, enemies and tokens; the waves' routes; the chess records' whole modules (ids,
+// attr, traitOverride, talentChanges with their blackboards and texts) and their skill / talent texts; the 自选 operators'
+// powers and bonds and the 自选 forms' module ids (backups.json). Not compared: the chess fields the shop changes rewrite
+// (visible, isHidden, bonds, garrisons, identifier, shopSortId: the DIY slots chess_char_5_diy1 / diy2 are 22 / 23 in V2_1,
+// 24 / 25 today), the waves' usedBy (终极 dropped), the 自选 forms' texts, and the backups.json fields derived from the
+// roster (units[].standsIn, the diy pools ownedPool / excluded / locked, tokens).
 test('data/versions/act2autochess-v2_1: the same-id records that differ from today\'s are the listed ones', () => {
   const read = (dir, name) => readJson(join(ROOT, 'data', dir), name);
   const changed = (name, pick = (x) => x) => {
@@ -233,6 +235,14 @@ test('data/versions/act2autochess-v2_1: the same-id records that differ from tod
   assert.deepEqual(changed('chess', (c) => (c.modules || []).map((m) => m.uniEquipId)), ['chess_char_3_18_b', 'chess_char_4_01_b', 'chess_char_4_16_b',
     'chess_char_5_03_b', 'chess_char_5_05_b', 'chess_char_5_07_b', 'chess_char_5_13_b', 'chess_char_5_18_b', 'chess_char_6_04_b', 'chess_char_6_08_b',
     'chess_char_6_10_b', 'chess_char_6_15_b', 'chess_char_6_19_b']);
+  // whole modules: the 13 above plus 异客's RA-A module uniequip_004_pasngr, whose 1457587e battle_equip has only the rank-0
+  // 机理分析 (×1.2 at every potential; today ×1.25 from 潜能 5)
+  assert.deepEqual(changed('chess', (c) => c.modules || []), ['chess_char_3_18_b', 'chess_char_4_01_b', 'chess_char_4_16_b',
+    'chess_char_5_03_b', 'chess_char_5_05_b', 'chess_char_5_07_b', 'chess_char_5_13_b', 'chess_char_5_18_b', 'chess_char_6_04_b', 'chess_char_6_05_b',
+    'chess_char_6_08_b', 'chess_char_6_10_b', 'chess_char_6_15_b', 'chess_char_6_19_b']);
+  const v21chess = read('versions/act2autochess-v2_1', 'chess');
+  const pasngr = v21chess.chess_char_6_05_b.modules.find((m) => m.uniEquipId === 'uniequip_004_pasngr');
+  assert.equal(pasngr.talentChanges[1].bb['pasngr_t_1[enhance].damage_scale'], 1.2);
   // the skill or talent texts of 菲莱, 忍冬, 阿罗玛, 乌尔比安, 圣聆初雪 and 焰影苇草 (term markup, 攻击力 30%, （+2） / （+2%）)
   assert.deepEqual(changed('chess', (c) => [c.skill, c.skills, c.talents, c.talentsBase]), ['chess_char_3_06_a', 'chess_char_3_06_b',
     'chess_char_3_18_a', 'chess_char_3_18_b', 'chess_char_4_10_a', 'chess_char_4_10_b', 'chess_char_5_05_a', 'chess_char_5_05_b',

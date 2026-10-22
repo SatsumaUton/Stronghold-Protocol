@@ -45,10 +45,10 @@ import { hypot } from '../../../detmath.js';
 const HALF_HP = 0.5;
 /**
  * Abyssal Hunters (【深海猎人】 = character_table groupId `abyssal`; data/chess.json has no groupId, the charIds come from
- * docs/research/03-operators.json): 幽灵鲨, 斯卡蒂, 歌蕾蒂娅, 乌尔比安, 归溟幽灵鲨. 浊心斯卡蒂 (char_1012_skadi2) has groupId
- * null in the official data — she is NOT an Abyssal Hunter for these talents.
+ * docs/research/03-operators.json): 幽灵鲨, 斯卡蒂, 安哲拉 (shop chess in 第一期, DESIGN §35.22.4), 歌蕾蒂娅, 乌尔比安, 归溟幽灵鲨.
+ * 浊心斯卡蒂 (char_1012_skadi2) has groupId null in the official data — she is NOT an Abyssal Hunter for these talents.
  */
-const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
+const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_218_cuttle', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
 /** Never auto-fires (CUSTOM_RANGE with an empty trigger grid): the kit activates the skill itself. */
 const NEVER = Object.freeze({ rule: 'CUSTOM_RANGE', grid: Object.freeze([]) });
 const AURA_IV = 0.25;
@@ -201,6 +201,6 @@ function enemiesInGrid(battle, unit, grid, n = 0, { ignoreStealth = false } = {}
 
 export {
   HALF_HP, NEVER, AURA_IV, AURA_DUR, RING1, num, on, inRange, talent, talentRec, traitBb, skillGrid, maxCharges, batPct,
-  mods, dist, inFaction, isAbyssal, isOp, selectedId, lazySkills, instantKind, skillRange, burstSpUp,
+  mods, dist, inFaction, ABYSSAL, isAbyssal, isOp, selectedId, lazySkills, instantKind, skillRange, burstSpUp,
   leaderOf, elementHit, whileOn, spAura, burstDamageUp, lowHpHealUp, moduleRangeUp, permBuff, enemiesInGrid,
 };

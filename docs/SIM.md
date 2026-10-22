@@ -1165,7 +1165,15 @@ reaches 高台 operators only, `bands/battle.js` every operator as in V2_2 (DESI
 map-character shape, so 森蚺 has no battle part (nor the AI's team-support class) until M2 builds its device switch. The
 shape check is not gated on `config.version`: it applies to every data set, so a plugin band on the default data
 whose `auto_chess_change_map` names device aliases has no battle part and no team-support class either (it spawns
-nothing in battle; at db8e226d the key alone made it team support).
+nothing in battle; at db8e226d the key alone made it team support). The audit does not compare the talents of
+`enemies.json` / `tokens.json`: V1_1's 炎佑 (`enemy_9012_acloon`) has `2.ep_damage_scale` 1.15 instead of `2.damage_scale`
+1.2, which `content/tokens.js` reads with 1, so its 元素脆弱 aura is off on V1_1 (an M2 item, DESIGN §35.22.5). The kits'
+group lists are hand-written (no built record carries character_table's `groupId`): the 深海猎人 lists of 斯卡蒂, 歌蕾蒂娅,
+浊心斯卡蒂 and `shared/tier5.js` (归溟幽灵鲨, 乌尔比安) name all six members, 安哲拉 included (shop chess in 第一期); 缪尔赛思's
+莱茵生命 list names the shop members (today's five and 第一期's 星源) but not 伊芙利特 and 淬羽赫默, shop chess in 第一期 and 自选
+picks today, nor today's other 自选 members, while 淬羽赫默's own list (`op-slent2.js`) counts every member; whether 自选
+members count for 缪尔赛思 is an M2 question. `test/versions-keying.test.js` pins, per data directory, the members each
+list sees.
 Plugin dispatch (DESIGN §32.5, C2): extension registry → `def.raw.dsl` → `def.raw.skillSpec` → `def.raw.kitRef` → official registry → generic; explicit Battle test kits still take precedence. The extension registry stays empty for vanilla; P3a script compositions register SDK kits, enemy installs and battle modules (PLUGINS §13). `kitOf` calls `compileDsl` when the record carries `dsl`. The content-set builder stamps `pluginId`. A bad spec is refused at build. If compilation still throws (`PLUGIN_DSL_*`, or any throw while `raw.dsl` is set), the battle ends `forced` with `content:dsl` and does not field an empty or generic kit (DESIGN §32.7). Any other kit throw still falls back to generic. A one-skill DSL kit binds that default spec for a 自选 piece and a 补位 stand-in. The JSON SkillSpec allowlist is §7.3 without functions (validated by `shared/plugins/skillSpec.js`); `talentMods` adds permanent numeric mods. `kitRef` accepts an official key or file stem, never an import path.
 
 Missing kit ⇒ `content/generic.js` builds one from the blackboard (§7.4), so every chess always fights.

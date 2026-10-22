@@ -12,8 +12,11 @@ import {
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
-/** 深海猎人 (character_table groupId "abyssal" — checked against the official table; data/chess.json has no group id). */
-const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
+/**
+ * 深海猎人 (character_table groupId "abyssal" — checked against the official table; data/chess.json has no group id; 安哲拉
+ * is shop chess in 第一期, DESIGN §35.22.4).
+ */
+export const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_218_cuttle', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
 
 /**
  * 鼓舞 (ba.inspire "获得额外附加的基础属性加成（同类属性取最高）"): +`val` ATK after the target's own multipliers (flat

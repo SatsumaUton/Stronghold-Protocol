@@ -6,6 +6,8 @@
 // seasons with level_autochess_enemy_data (levels changed next at a24a8ad1, 2026-04-08). No file the build reads
 // changed between 1457587e and 86b6e749 (V2_2): the GitHub history of each path, checked 2026-10-22; range, uniequip,
 // battle_equip and enemy_database last changed at 12e0a020 (2026-03-10), so their 1457587e copy is also V2_1's.
+// 987b4cd5 (03-17) changed only battle/buff_template_data.json (精准's ATK and five flags), not a build input: 第二期上半
+// stands for V2_1 with that fix [ASSUMED]; 03-17 vs 03-27 is open for the maintainer (DESIGN §35.22).
 //
 // What carries over from the default build (same season, measured on V2_2) and what does not:
 //   adapters  launchModes: the 1457587e table already lists the 终极 modes (startTime 2026-03-27 16:00); they open with

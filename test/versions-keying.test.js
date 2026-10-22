@@ -44,6 +44,12 @@ import { knowledgePack } from '../server/ai/knowledge.js';
 import { hasBattlePart as bandHasBattlePart } from '../server/sim/content/bands/battle.js';
 import { bandMetaHandler } from '../server/sim/content/bands/meta.js';
 import { createDataStore, DATA_FILES } from '../public/js/data.js';
+import { ABYSSAL as ABYSSAL_SKADI } from '../server/sim/content/kits/ops/chess_char_3_05-skadi.js';
+import { ABYSSAL as ABYSSAL_GLADY } from '../server/sim/content/kits/ops/chess_char_4_12-glady.js';
+import { ABYSSAL as ABYSSAL_SKADI2 } from '../server/sim/content/kits/ops/chess_char_6_04-skadi2.js';
+import { ABYSSAL as ABYSSAL_TIER5 } from '../server/sim/content/kits/shared/tier5.js';
+import { RHINE as RHINE_MLYSS } from '../server/sim/content/kits/ops/chess_char_6_11-mlyss.js';
+import { RHINE as RHINE_ALL } from '../server/sim/content/kits/ops/op-slent2.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const QUIET = Object.freeze({ warn() {}, error() {}, info() {} });
@@ -279,6 +285,41 @@ for (const dir of DIRS) {
     assert.ok(want, `${label(dir)} has no EXPECT entry: pin its counts`);
     assert.deepEqual({ kitted: diy.kitted.size, generic: diy.generic.size, pending: diy.pending.size }, want.diy);
     assert.deepEqual(standIns, want.standIns);
+  });
+}
+
+// The kits' hand-written group lists (character_table groupId; no built record carries it): 深海猎人 for 斯卡蒂, 歌蕾蒂娅,
+// 浊心斯卡蒂 and the tier-5 kits (归溟幽灵鲨, 乌尔比安), 莱茵生命 for 缪尔赛思. Per directory, the shop chess and 自选 operators
+// each list sees, as literals: a roster that brings in a new member fails until the list follows (DESIGN §35.22.4).
+const GROUPS = Object.freeze({
+  'data': { abyssal: ['char_1023_ghost2', 'char_143_ghost', 'char_263_skadi', 'char_4145_ulpia', 'char_474_glady'], rhineMissed: [] },
+  'data/versions/act1autochess': {
+    abyssal: ['char_1023_ghost2', 'char_143_ghost', 'char_218_cuttle', 'char_263_skadi', 'char_4145_ulpia', 'char_474_glady'],
+    // 伊芙利特 and 淬羽赫默: shop chess in 第一期, 自选 picks today; whether 自选 members count is open (M2, DESIGN §35.22.5)
+    rhineMissed: ['char_1031_slent2', 'char_134_ifrit'],
+  },
+  'data/versions/act1autochess-v1_1': {
+    abyssal: ['char_1023_ghost2', 'char_143_ghost', 'char_218_cuttle', 'char_263_skadi', 'char_4145_ulpia', 'char_474_glady'],
+    rhineMissed: ['char_1031_slent2', 'char_134_ifrit'],
+  },
+  'data/versions/act2autochess-v2_1': { abyssal: ['char_1023_ghost2', 'char_143_ghost', 'char_263_skadi', 'char_4145_ulpia', 'char_474_glady'], rhineMissed: [] },
+});
+
+test('深海猎人 lists: the four kits list the same six operators (every character_table groupId "abyssal" member)', () => {
+  const want = ['char_1023_ghost2', 'char_143_ghost', 'char_218_cuttle', 'char_263_skadi', 'char_4145_ulpia', 'char_474_glady'];
+  for (const [name, list] of Object.entries({ ABYSSAL_SKADI, ABYSSAL_GLADY, ABYSSAL_SKADI2, ABYSSAL_TIER5 })) assert.deepEqual([...list].sort(), want, name);
+  for (const c of RHINE_MLYSS) assert.ok(RHINE_ALL.has(c), `缪尔赛思's ${c} is no 莱茵生命 member`);
+});
+
+for (const dir of DIRS) {
+  test(`group lists of ${label(dir)}: the 深海猎人 members each list sees and the shop 莱茵生命 members 缪尔赛思's list misses`, () => {
+    const data = dataOf(dir);
+    const shop = new Set(Object.values(data.chess || {}).map((c) => c.charId).filter(Boolean));
+    const roster = new Set([...shop, ...Object.keys(data.backups?.diy?.operators || {})]);
+    const want = GROUPS[label(dir)];
+    assert.ok(want, `${label(dir)} has no GROUPS entry: pin its group members`);
+    assert.deepEqual([...roster].filter((c) => ABYSSAL_GLADY.has(c)).sort(), want.abyssal);
+    assert.deepEqual([...shop].filter((c) => RHINE_ALL.has(c) && !RHINE_MLYSS.has(c)).sort(), want.rhineMissed);
   });
 }
 
