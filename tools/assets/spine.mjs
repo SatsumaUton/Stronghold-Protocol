@@ -135,9 +135,27 @@ const PRISONER_GREY_3 = Object.freeze({
  */
 const UTAGE_S1 = Object.freeze({ begin: 'Skill_Start', loop: 'Skill_Loop', end: 'Skill_End', index: 0, idle: null });
 const UTAGE_S2 = Object.freeze({ ...clipOf('Attack', 'attack'), index: 1, idle: null });
+/**
+ * An enemy's skill slots (`anims.skills`: the slot = the skill's index in data/enemies.json `skills[]`, what a sim
+ * ['cast', id, slot] event names) → the clip of that skill's official ability: the prefab's EnemySkill ability
+ * `_animKey` (fx/index.json `units.<key>.skills.<prefabKey>.abilities[].animKey`, read from the same battle prefab). The
+ * resolver pairs the numbered clips with the slots by name (Skill_n = slot n−1), which these prefabs do not follow.
+ */
+const slotClips = (clips) => Object.freeze(Object.fromEntries(clips.map((loop, index) => [index, Object.freeze({ begin: null, loop, end: null, index, idle: null })])));
+// 假想敌：胄 (enm_pfb_28.ab; enemy_9013_acstmk_2 shares the model): skills "1" (灭顶之灾) Skill_1, "2" (死亡集群)
+// Skill_3 — not Skill_2 —, "3" (_2 only) Revive
+const HELM_SKILLS = slotClips(['Skill_1', 'Skill_3', 'Revive']);
+// 盐风主教昆图斯 (enm_pfb_18.ab): Tidewater* (大潮) Skill_02, Rockfall* (崩坍) Skill_01, SummonTentac* (断裂生殖) Skill_03 in
+// every form, Doom (物种爆发) Skill_04 — the slots run Tidewater, Rockfall, SummonTentac, …G1, …G2, Doom
+const QUINTUS_SKILLS = slotClips(['Skill_02', 'Skill_01', 'Skill_03', 'Skill_02', 'Skill_01', 'Skill_03', 'Skill_02', 'Skill_01', 'Skill_03', 'Skill_04']);
+// 阿利斯泰尔 (enm_pfb_29.ab): equip / equipA Skill_1, store / storeA Skill_2, Suicide Skill_3
+const LION_SKILLS = slotClips(['Skill_1', 'Skill_2', 'Skill_2', 'Skill_1', 'Skill_3']);
 export const PREFAB_SPINE_ROLES = Object.freeze({
   enemy_1116_liprr: PRISONER_GREY_3,
   enemy_1116_liprr_2: PRISONER_GREY_3,
+  enemy_9013_acstmk: { skills: HELM_SKILLS },
+  enemy_1521_dslily: { skill: QUINTUS_SKILLS[0], skills: QUINTUS_SKILLS },
+  enemy_9032_aclionk: { skills: LION_SKILLS },
   // operators by character id: both the front and the back model
   char_337_utage: { skill: UTAGE_S2, skills: { 0: UTAGE_S1, 1: UTAGE_S2 } },
 });
@@ -155,9 +173,11 @@ export function applyRoleFix(roles, fix, durations) {
   const out = { ...roles };
   const missing = [];
   const has = (n) => n == null || Object.hasOwn(durations || {}, n);
+  const clipOk = (c) => !!c && typeof c === 'object' && [c.begin, c.loop, c.end, c.idle].every(has);
   for (const [role, v] of Object.entries(fix)) {
-    const names = typeof v === 'string' ? [v] : v && typeof v === 'object' ? [v.begin, v.loop, v.end, v.idle] : [null];
-    if (names.every(has)) out[role] = v;
+    // a clip name, a clip, null (no such role) — or for `skills` a map slot → clip, every slot's clips checked
+    const ok = typeof v === 'string' ? has(v) : v == null ? true : role === 'skills' ? Object.values(v).every(clipOk) : clipOk(v);
+    if (ok) out[role] = v;
     else missing.push(role);
   }
   return { roles: out, missing };

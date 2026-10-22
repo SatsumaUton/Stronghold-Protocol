@@ -243,7 +243,11 @@ test('item 52: each leader attacks at its data interval while it has a target (1
     h.run(150);
     const boss = h.b.enemies.find((e) => e.isBoss);
     const max = Math.floor(150 / boss.s.interval);
-    assert.ok(boss.stats.attacks >= max - 1, `${bossId} ${L.enemyKey}: ${boss.stats.attacks} attacks, ${max} at its ${boss.s.interval} s interval`);
+    // an attack-class skill takes an attack's turn (昆图斯's 崩坍 / 大潮, §35.19): it counts as one of the attacks here
+    const slots = (boss.mem.ab ? boss.mem.ab.list : []).filter((a) => a && a.atk).reduce((n, a) => n + (a.casts ?? 0), 0);
+    const turns = boss.stats.attacks + slots;
+    assert.ok(turns >= max - 1, `${bossId} ${L.enemyKey}: ${boss.stats.attacks} attacks + ${slots} attack-class casts, ${max} at its ${boss.s.interval} s interval`);
+    if (bossId === 'boss_4') assert.ok(slots > 0, 'boss_4: 崩坍 / 大潮 took attack turns');
   }
 });
 

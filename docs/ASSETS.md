@@ -369,7 +369,10 @@ remain local; no official scene bytes belong in git or fixtures.
   - A web enemy model whose clip names mislead the resolver gets the roles of its official battle prefab
     (`tools/assets/spine.mjs PREFAB_SPINE_ROLES`, read from the local client's `battle/enm_pfb_*.ab`: the prefab's anim
     key → clip table and the clip its Spine starts on): 普通囚犯 / 老练囚犯 start on their grey `*3` set (【禁锢】), not
-    the unnumbered red one (【解放】) the names point to.
+    the unnumbered red one (【解放】) the names point to. 盐风主教昆图斯, 假想敌：胄 (both records) and 阿利斯泰尔 get
+    `skills` per data slot from their EnemySkill abilities' `_animKey` (fx/index.json `units.<key>.skills.*.abilities`):
+    the resolver's "Skill_n = slot n−1" swapped 大潮 / 崩坍 and gave 死亡集群 `Skill_2` for `Skill_3` (0.3.2, history
+    §35.19). `applyRoleFix` checks every clip of a `skills` map; a fix naming a missing clip keeps the resolved roles.
 - **Fonts:** OTF/TTF files are converted to WOFF2 by a built-in encoder (`tools/assets/woff2.mjs`: Brotli with null transforms).
   - Its output was verified lossless against Google's reference `woff2` decoder.
   - `fonts.css` lists WOFF2 first and falls back to the original file.
@@ -518,7 +521,8 @@ Roles = {
   attackDown: Clip|null,   // _Down variants (target below the unit)
   skill: SkillClip|null,   // for the chess's default skill (primary index)
   skills?: { [index]: SkillClip },   // when the char is used with several default skills (backups); an enemy: every
-                           //   numbered skill clip (Skill_01..04 of 盐风主教昆图斯 — the slot a sim `cast` event names, PR #275)
+                           //   numbered skill clip as slot n−1 (the slot a sim `cast` event names, PR #275) — or, from
+                           //   PREFAB_SPINE_ROLES, the clip of each data slot's official ability (盐风主教昆图斯, 胄, 阿利斯泰尔)
   die: string|null,        // null ⇒ a Back model gives way to the Front model's Die (DESIGN §22.1); any other
                            //   skeleton holds its idle's first frame while it fades out
   move: Clip|null,         // enemies: Move_Begin|Move_Start + Move_Loop|Move + Move_End → Run_*

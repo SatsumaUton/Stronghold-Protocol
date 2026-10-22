@@ -95,7 +95,7 @@ export function abOf(b, e) {
   list.forEach((s, i) => {
     if (!s || s.prefabKey == null) return;
     const at = base.findIndex((x) => x && x.prefabKey === s.prefabKey);
-    sk[s.prefabKey] = { cd: num(s.cooldown, 0), icd: num(s.initCooldown, 0), sp: num(s.spCost, 0), bb: s.bb || {}, bs: s.bbStr || {}, slot: at >= 0 ? at : i };
+    sk[s.prefabKey] = { cd: num(s.cooldown, 0), icd: num(s.initCooldown, 0), sp: num(s.spCost, 0), pr: num(s.priority, 0), bb: s.bb || {}, bs: s.bbStr || {}, slot: at >= 0 ? at : i };
   });
   e.mem.ab = { key, t, tS, sk, list: [], times: null, hitShield: 0, atkType: null, immune: null, origMaxHp: e.base.maxHp };
   return e.mem.ab;

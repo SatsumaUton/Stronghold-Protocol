@@ -37,6 +37,11 @@ Wild Mane S2's rear-target exception is superseded by the maintainer's official 
 Front distances stay unchanged; using the effect column only behind her is [ASSUMED] scope, not an official
 direction-dependent classification. Current contract: [design/engine.md](design/engine.md) §5.4 and [SIM.md](SIM.md) §6.
 
+盐风主教昆图斯's attack-class 大潮 / 崩坍 take the normal attack's turn under PRTS's skill rules in
+[§35.19](history/0.3.2.md#3519-quintuss-tide-takes-the-attacks-turn-maintainer-recordings-2026-10-22): cooldowns
+from the clip's end, equal priorities at random, 断裂生殖 limited to its level branch; the other leaders' attack-class
+skills are a known deviation. Current contract: [SIM.md](SIM.md) §1.2 and [design/engine.md](design/engine.md) §7.
+
 ## Where each section lives
 
 The sourced freeze/redeployment advisor recipes in [§35.12](history/0.3.2.md#3512-regenerable-advisor-strategy-playbook)
