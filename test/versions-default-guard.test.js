@@ -2,13 +2,15 @@
 // the official version switch (DESIGN §36.2, docs/DATA.md "Official versions (M0)"). The fixture
 // test/fixtures/versions-default-guard.json pins:
 //   G1  the sha256 of every tracked default data file (top-level data/*.json and data/i18n/*.json, never data/versions/)
-//       and of the golden corpus test/golden/*.json
+//       and of the golden corpus test/golden/*.json — the M0 merge check: it proves the M0 commits moved neither, and
+//       is deleted when M1 starts (DESIGN §36.2; afterwards test/golden.test.js and test/data.test.js guard them). Until
+//       then an intended golden update or data rebuild also refreshes the fixture (test/golden/README.md)
 //   G2  the default config.json has no `version`, and cs reads exactly the top-level gameplay files
 //   G3  the cs formula (known-answer vectors of shared/plugins/identity.js), not the vanilla cs itself, which changes with
 //       any code change (server/plugins/identity.js)
 //   G4  a fresh co-op/NORMAL room's room.state (code, ids, name and content.cs normalised) and a welcome without
 //       `versions`
-// An intended change of the default must regenerate the fixture on purpose and say why in the commit:
+// G2–G4 stay. An intended change of the default must regenerate the fixture on purpose and say why in the commit:
 //   SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js
 
 import { test } from 'node:test';
@@ -108,15 +110,15 @@ if (UPDATE) {
 } else {
   const fixture = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
 
-  test('G1: the tracked default data files are byte-identical', () => {
+  test('G1 (until M1): the tracked default data files are byte-identical', () => {
     const tracked = trackedDataFiles();
     const names = Object.keys(fixture.data).sort();
-    assert.equal(names.length, 22, 'the fixture pins 22 default data files');
+    assert.ok(names.length > 0, 'the fixture pins the default data files');
     if (tracked) assert.deepEqual(tracked, names, `the tracked default data files changed; ${HOW}`);
     for (const f of names) assert.equal(sha(path.join(ROOT, f)), fixture.data[f], `${f} changed; ${HOW}`);
   });
 
-  test('G1: the golden corpus is unchanged', () => {
+  test('G1 (until M1): the golden corpus is unchanged', () => {
     assert.deepEqual(goldenFiles(), Object.keys(fixture.golden).sort(), `the golden files changed; ${HOW}`);
     for (const [f, h] of Object.entries(fixture.golden)) assert.equal(sha(path.join(ROOT, f)), h, `${f} changed; ${HOW}`);
   });
