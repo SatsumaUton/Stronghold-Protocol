@@ -150,12 +150,43 @@ const HELM_SKILLS = slotClips(['Skill_1', 'Skill_3', 'Revive']);
 const QUINTUS_SKILLS = slotClips(['Skill_02', 'Skill_01', 'Skill_03', 'Skill_02', 'Skill_01', 'Skill_03', 'Skill_02', 'Skill_01', 'Skill_03', 'Skill_04']);
 // 阿利斯泰尔 (enm_pfb_29.ab): equip / equipA Skill_1, store / storeA Skill_2, Suicide Skill_3
 const LION_SKILLS = slotClips(['Skill_1', 'Skill_2', 'Skill_2', 'Skill_1', 'Skill_3']);
+// The other prefabs whose numbered clips do not follow their slots (DESIGN §35.29, the §35.19 list), checked against
+// each kit's casts (castSlot / castNow). 泥岩 (RefreshShield, occupy): Skill_2 / Skill_1 — swapped by the resolver.
+const MDROCK_SKILLS = slotClips(['Skill_2', 'Skill_1']);
+// 杰斯顿·威廉姆斯 (ironsandstorm, armorpiercing — the (sp+1)-th attack of each form): C1_Skill / C2_Skill.
+const JAKILL_SKILLS = slotClips(['C1_Skill', 'C2_Skill']);
+// 斩胄之剑 / 破胄之锤 (1 掷剑 / 掷锤, 2): Launch_Begin / Back_End (EmptyAnimatedAbility; the kit casts only 1).
+const BLADE_SKILLS = slotClips(['Launch_Begin', 'Back_End']);
+// “碎铳之簧” b / c (1, the shielded (sp+1)-th attack): Skill_b / Skill_c.
+const SPRING_B_SKILLS = slotClips(['Skill_b']);
+const SPRING_C_SKILLS = slotClips(['Skill_c']);
+/** A slot whose ability names no clip: the begin / end pair of its clip set, played once [ASSUMED: by the clip names]. */
+const pairClip = (begin, end, index) => Object.freeze({ begin, loop: end, end: null, index, idle: null });
+// 锏 (CircleAttack, Blink, CircleAttack2, Blink2): A_Skill2, B_Skill2 for the circles (MeleeAttack / MultiMeleeAttack);
+// the blinks name no clip — their A_ / B_Skill1_Begin → _End pair [ASSUMED].
+const MACE_SKILLS = Object.freeze({
+  0: slotClips(['A_Skill2'])[0], 1: pairClip('A_Skill1_Begin', 'A_Skill1_End', 1),
+  2: Object.freeze({ begin: null, loop: 'B_Skill2', end: null, index: 2, idle: null }), 3: pairClip('B_Skill1_Begin', 'B_Skill1_End', 3),
+});
+// “自在” (CrossAttack, ShieldBurst, ShieldBurstReborn, …): CrossAttack's RangedAttackWithExtraActions plays Skill_01_02;
+// the two 破桎而出 (MeleeAttack, no `_animKey`) keep the Skill_02 Begin / Loop / End set the resolver gave slot 1, and the
+// reborn one has it too [ASSUMED: by the clip names]; the marks (3, 4) are never cast.
+const XI_SKILL_02 = (index) => Object.freeze({ begin: 'Skill_02_Begin', loop: 'Skill_02_Loop', end: 'Skill_02_End', index, idle: null });
+const XI_SKILLS = Object.freeze({ 0: slotClips(['Skill_01_02'])[0], 1: XI_SKILL_02(1), 2: XI_SKILL_02(2) });
 export const PREFAB_SPINE_ROLES = Object.freeze({
   enemy_1116_liprr: PRISONER_GREY_3,
   enemy_1116_liprr_2: PRISONER_GREY_3,
   enemy_9013_acstmk: { skills: HELM_SKILLS },
   enemy_1521_dslily: { skill: QUINTUS_SKILLS[0], skills: QUINTUS_SKILLS },
   enemy_9032_aclionk: { skills: LION_SKILLS },
+  enemy_1511_mdrock: { skill: MDROCK_SKILLS[0], skills: MDROCK_SKILLS },
+  enemy_1516_jakill: { skill: JAKILL_SKILLS[0], skills: JAKILL_SKILLS },
+  enemy_9014_acstma: { skill: BLADE_SKILLS[0], skills: BLADE_SKILLS },
+  enemy_9015_acstmb: { skill: BLADE_SKILLS[0], skills: BLADE_SKILLS },
+  enemy_9019_actrpb: { skill: SPRING_B_SKILLS[0], skills: SPRING_B_SKILLS },
+  enemy_9020_actrpc: { skill: SPRING_C_SKILLS[0], skills: SPRING_C_SKILLS },
+  enemy_1525_blkswb: { skill: MACE_SKILLS[0], skills: MACE_SKILLS },
+  enemy_1517_xi: { skill: XI_SKILLS[0], skills: XI_SKILLS },
   // operators by character id: both the front and the back model
   char_337_utage: { skill: UTAGE_S2, skills: { 0: UTAGE_S1, 1: UTAGE_S2 } },
 });

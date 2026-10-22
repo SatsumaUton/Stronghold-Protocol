@@ -591,6 +591,29 @@ test('迷迭香: S2 adds 2 aftershocks per attack, ignores 160 DEF (talent)', ()
   assert.equal(u.profile.shockTimes, u.def.traitBb['attack@times'], 'restored after the skill');
 });
 
+test('新约能天使 火力电台 (PRTS 备注, DESIGN §35.28): one target per round, a bombing per success 0.1 s apart, radius 1.3', () => {
+  const h = battle({
+    units: [{ chessId: 'chess_char_6_13_a', row: 10, col: 1 }, { chessId: 'test_lat_a', row: 10, col: 2 }],
+    enemies: [{ key: 'enemy_dummy', pos: [10, 8] }, { key: 'enemy_dummy2', pos: [9, 8.7] }],
+  });
+  const u = h.unit('chess_char_6_13_a'), lat = h.unit('test_lat_a');
+  h.step();
+  const a = enemyAt(h, 'enemy_dummy'), b = enemyAt(h, 'enemy_dummy2');
+  assert.ok(h.b.enemiesInKeys(lat.rangeKeys, u).includes(a) && !h.b.enemiesInKeys(lat.rangeKeys, u).includes(b), 'only the first one in the consumer\'s range');
+  const rng = h.b.rng;
+  h.b.rng = Object.assign(() => 0, rng); // every chance succeeds
+  const t0 = h.b.time;
+  for (let i = 0; i < 3; i++) h.b.emit('ammoUsed', { unit: lat, left: 10 - i, skill: lat.skill }); // one action spends 3 bullets
+  h.run(0.6);
+  h.b.rng = rng;
+  const hits = h.dmg.filter((d) => d.src === u.id && d.tags.includes('airstrike'));
+  const onA = hits.filter((d) => d.tgt === a.id).map((d) => d.t - t0), onB = hits.filter((d) => d.tgt === b.id).map((d) => d.t - t0);
+  assert.equal(onA.length, 3, 'three successes: three bombings of the round');
+  assert.equal(onB.length, 3, 'radius 1.3 reaches the enemy 1.22 tiles away (radius 1 did not)');
+  onA.forEach((t, k) => assert.ok(Math.abs(t - 0.1 * k) < 0.04, `bombing ${k} at +${t.toFixed(3)} s`));
+  assert.ok(near(hits[0].amount, hits[2].amount), 'the round\'s damage computed once');
+});
+
 test('新约能天使: S2 steals 70 ASPD from an ally in range, shields both, 35+5 ammo; 火力电台 heals per ammo', () => {
   const h = battle({
     units: [{ chessId: 'chess_char_6_13_a', row: 10, col: 3, carryState: { sp: 29 } }, { chessId: 'test_guard_a', row: 10, col: 4 }],

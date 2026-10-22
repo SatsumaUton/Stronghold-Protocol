@@ -52,3 +52,36 @@ test('PREFAB_SPINE_ROLES skill slots = the official ability animKey of each slot
     });
   }
 });
+
+// DESIGN §35.29: the rest of §35.19's list — 泥岩 (slots swapped), “自在” CrossAttack, 斩胄之剑 / 破胄之锤, 碎铳之簧 b / c,
+// 杰斯顿·威廉姆斯, 锏 (each checked against its kit's casts). A slot whose ability names a clip plays it; the blinks of 锏
+// and 自在's 破桎而出 name none and keep a clip set by name [ASSUMED].
+const MORE = ['enemy_1511_mdrock', 'enemy_1517_xi', 'enemy_9014_acstma', 'enemy_9015_acstmb', 'enemy_9019_actrpb', 'enemy_9020_actrpc', 'enemy_1516_jakill', 'enemy_1525_blkswb'];
+
+test('PREFAB_SPINE_ROLES, the §35.19 list: every slot clip in the model and in data/assets.json; `skill` = slot 0', () => {
+  for (const id of MORE) {
+    const fix = PREFAB_SPINE_ROLES[id];
+    const sp = A.enemies[id].spine;
+    for (const [slot, c] of Object.entries(fix.skills)) {
+      for (const n of [c.begin, c.loop, c.end]) if (n) assert.ok(Object.hasOwn(sp.animations, n), `${id} slot ${slot}: ${n} in the model`);
+      assert.deepEqual(sp.anims.skills[slot], c, `${id} slot ${slot}: data/assets.json (node tools/fetch-assets.mjs --offline)`);
+      assert.ok(Number(slot) < E[id].skills.length, `${id} slot ${slot}: a data skill`);
+    }
+    assert.deepEqual(sp.anims.skill, fix.skills[0], `${id}: the primary skill role is slot 0's clip`);
+  }
+  assert.equal(A.enemies.enemy_1511_mdrock.spine.anims.skills[0].loop, 'Skill_2', '泥岩 RefreshShield (slot 0)');
+  assert.equal(A.enemies.enemy_1511_mdrock.spine.anims.skills[1].loop, 'Skill_1', '泥岩 occupy (slot 1)');
+});
+
+test('the §35.19 list = the official ability animKey of each slot that names one (local fx index, when extracted)', { skip: !existsSync(FX_INDEX) && 'no public/assets/local/fx/index.json' }, () => {
+  const units = JSON.parse(readFileSync(FX_INDEX, 'utf8')).units || {};
+  for (const id of MORE) {
+    const fix = PREFAB_SPINE_ROLES[id].skills;
+    E[id].skills.forEach((s, slot) => {
+      const ab = (units[id].skills[String(s.prefabKey).toLowerCase()] || {}).abilities || [];
+      const key = (ab.find((a) => a && a.animKey) || {}).animKey;
+      if (key) assert.equal(fix[slot].loop, key, `${id} slot ${slot} (${s.prefabKey})`);
+      else if (fix[slot]) assert.ok(fix[slot].begin || fix[slot].loop, `${id} slot ${slot} (${s.prefabKey}): a clip set by name`);
+    });
+  }
+});

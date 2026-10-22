@@ -1,7 +1,7 @@
 {
   "_": "Default-version guard (test/versions-default-guard.test.js); an intended change of the default version must regenerate test/fixtures/versions-default-guard.json with SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js and give the reason in the commit.",
   "data": {
-    "data/assets.json": "b0550f8b05742b25007dba1db433b797a5d3fea2cf80809ee4061de034693b03",
+    "data/assets.json": "f69daf261e06907ed5e36b592a0a7f41585bec1eb85e73f91ba4009d0b72ae7a",
     "data/backups.json": "3df06b7d5bfacba9d3d5a7afafb98adb799a32b0fadf7dd1ddea435144195854",
     "data/bands.json": "8f18abc99eb50639a1f2fc679a84015d6d8cc8aa3ff7c7d22ad6db5dc347053b",
     "data/bonds.json": "53a22f4724771b6ff40041635e907c0af39790731f661b0439fc593f5a91c94c",
@@ -27,9 +27,9 @@
   "golden": {
     "test/golden/bonds.json": "873e039d862eae11e3e67101736942cdefca2d92b5d4092b4874162a813a784b",
     "test/golden/diy.json": "22123f7935353523e0476f719813ad806d4c22d02a8d6300d63669d63856c431",
-    "test/golden/fields.json": "28650e3cac6fdcc3b589456c2e4a35b3b4ac2ad7f298d0b47b0ae43bc5b01035",
-    "test/golden/matches.json": "6a44edc1a23713ee2508bfd9e31bc586cbdc84c177642be31a24ddd067f1be93",
-    "test/golden/roster.json": "eb4cde7ae9226633ef76a2db001687e61dc39dc49dd0f86d4903e4865ffbc734",
+    "test/golden/fields.json": "94d425043568e9f2a405196e87af5ddc1bb580419ce2b12d27c1a3721af2a8d1",
+    "test/golden/matches.json": "32977bc9b915ec5d560483ea130dea86f43343212ffb78d4b3f079af3c775c0a",
+    "test/golden/roster.json": "32ac819c6bbddd0a37ff2758b1a360f39f95d66a4f8c04bdecdc4750de157b11",
     "test/golden/standins.json": "4dd432566bbb024226b9cac3b1f42049f683fe0b6bd2a7a1c94c8e10441465cc"
   },
   "kat": {

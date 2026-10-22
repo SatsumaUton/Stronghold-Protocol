@@ -74,7 +74,7 @@ import { normalizeRoute } from '../simdata.js';
 import {
   ensureInstalled, abOf, attach, T, elem, hurt, targetsNear, allTargets, byPriority, areaAllies, areaAlliesInTiles, fieldAllies,
   remainingRoute, stayRoute, stepToward, setHits, hitCount, lpLoss, blinkForward, canCast, unbalancedNow, absorbArts, nthOf,
-  castSlot,
+  castSlot, attackTurnSkill,
 } from './enemies.js';
 import { hypot, powi } from '../detmath.js';
 
@@ -155,6 +155,31 @@ export const SELF_BOUND = Object.freeze([
 const ENEMY_SP_PER_SEC = 1, ANIMATE_DELAY = 2;
 const EQUIP_KEYS = Object.freeze(['enemy_10028_vtswd', 'enemy_10029_vtshld', 'enemy_10030_vtwand']);
 const SHELL_KEY = 'enemy_9016_acstmr', ECHO_KEY = 'enemy_9023_acdums', PHANTOM_KEY = 'enemy_2017_csphts';
+/**
+ * The attack-class skills of the leaders and parts other than 昆图斯 (QUINTUS_CLIP): enemy key → skill prefabKey → the
+ * length in s of the clip its official ability plays (prefab ability `_animKey`: fx/index.json units.<key>.skills.
+ * <prefabKey>.abilities[].animKey → data/assets.json enemies.<key>.spine.animations), or 0 when the ability names no
+ * clip. Each one is cast in place of a normal attack (`atk`, enemies.js attackTurnSkill — PRTS's skill rules,
+ * 「大多数技能自动触发会占用攻击间隔」) and its cooldown counts from its clip's end (「同一技能的冷却时间于该技能结束时开始
+ * 计时」). The class of each official ability: 卢西恩 / 不祥幻影 `aoe` MeleeAttack (Skill_2 / Skill), 胄 `1` (灭顶之灾)
+ * RangedAttack Skill_1, 管 `1` (裂管之奏) MultiRangedAttack Skill, 弦 `1` (断弦之奏) RangedAttack Skill, 阿利斯泰尔 `equip` /
+ * `equipA` (王权号令) RangedAttack Skill_1 and `Suicide` (斥退) MeleeAttack Skill_3, “萨米的意志” `Lasso` (自然涌动)
+ * RangedAttack with no `_animKey` [ASSUMED: no clip, cooldown from the cast — its clips Skill_01_Begin / _Loop / _End
+ * are a channel whose length the prefab does not give] and `Doom` MeleeAttack Skill_02 (DESIGN §35.29).
+ */
+export const ATTACK_SKILL_CLIP = Object.freeze({
+  enemy_2016_csphtm: { aoe: 1.8 },
+  enemy_2017_csphts: { aoe: 1.8 },
+  enemy_9013_acstmk: { 1: 2.333 },
+  enemy_9013_acstmk_2: { 1: 2.333 },
+  enemy_9021_acduml: { 1: 4.167 },
+  enemy_9021_acduml_2: { 1: 4.167 },
+  enemy_9022_acdumm: { 1: 3.333 },
+  enemy_9032_aclionk: { equip: 3.667, equipA: 3.667, Suicide: 5.667 },
+  enemy_9033_acdeer: { Lasso: 0, Doom: 2.667 },
+});
+/** The `atk` / `clip` fields of attack-class skill `prefabKey` of enemy `e` (ATTACK_SKILL_CLIP). */
+const atkSkill = (e, prefabKey) => ({ atk: true, clip: ATTACK_SKILL_CLIP[e.defId]?.[prefabKey] ?? 0 });
 
 // ---------------------------------------------------------------------------------------------------------------
 // per-battle state, template resolution
@@ -404,7 +429,7 @@ function kitHelm(ab, e, b, tpl) {
       },
     },
     s1 && {
-      cd: s1.cd, icd: s1.icd, sk: s1, cond: (b2) => shellTargets(b2).length > 0,
+      cd: s1.cd, icd: s1.icd, sk: s1, ...atkSkill(e, '1'), cond: (b2) => shellTargets(b2).length > 0, // in the attack's turn
       // 【灭顶之灾】 one shell, also below 20 %: the handbook's "额外发射<刺胄之弹>" is wrong in game (PRTS 能力修正 原因 6
       // "描述与游戏实际表现不符合": "【灭顶之灾】不会额外发射") and no blackboard holds a second shell (skill 1 has none)
       fire(b2, e2) {
@@ -847,6 +872,7 @@ function pipeCore(ab, e, b, tpl, { form, prefix }) {
       const t = b2.rng.pick(echoesOf(b2, form));                 // 优先攻击…形态余音
       if (!t) return;
       P.atk = 0;
+      if (attackTurnSkill(b2, e2)) return;                       // 裂管之奏 / 断弦之奏 take this attack's turn (DESIGN §35.29)
       e2.lastAttackAt = b2.time;
       e2.stats.attacks++;
       b2.fx('beam', { x: e2.x, y: e2.y, from: e2.id, to: t.id, kind: `${prefix}Strike` });
@@ -863,7 +889,7 @@ function kitPipe(ab, e, b, tpl) {
       death(c, b2) { for (const o of b2.aliveEnemies()) if (o.defId === 'enemy_9022_acdumm') b2.kill(o, null); }, // 弦 leaves with 管
     },
     s && {
-      cd: s.cd, icd: s.icd, sk: s, cond: (b2) => echoesOf(b2, 'dark').length > 0,
+      cd: s.cd, icd: s.icd, sk: s, ...atkSkill(e, '1'), cond: (b2) => echoesOf(b2, 'dark').length > 0,
       fire(b2, e2) { // 【裂管之奏】 three strikes on every dark echo
         const r = s.bb.range_radius ?? 0, ep = s.bb.ep_damage_ratio ?? 0;
         for (const echo of echoesOf(b2, 'dark')) for (let k = 0; k < 3; k++) b2.after(k * PIPE_STRIKE_GAP, () => {
@@ -883,7 +909,7 @@ function kitString(ab, e, b, tpl) {
     pipeCore(ab, e, b, tpl, { form: 'gold', prefix: 'acdumm' }),
     { spawn(b2, e2) { b2.addBuff(e2, { key: 'boss:eternal', persist: true, flags: { invulnerable: true, untargetable: true } }); } }, // 永久无敌
     s && {
-      cd: s.cd, icd: s.icd, sk: s, cond: (b2) => echoesOf(b2, 'gold').length > 0,
+      cd: s.cd, icd: s.icd, sk: s, ...atkSkill(e, '1'), cond: (b2) => echoesOf(b2, 'gold').length > 0,
       fire(b2, e2) { // 【断弦之奏】 AoE on every gold echo, which then turns dark
         const r = s.bb.range_radius ?? 0, ep = s.bb.ep_damage_ratio ?? 0;
         for (const echo of echoesOf(b2, 'gold')) {
@@ -1027,7 +1053,7 @@ function lucienCore(ab, e) {
       // cast with a target in the radius (PRTS 技能 "需要目标"; 不祥幻影 "仅在半径2范围内存在我方单位时触发"): the trigger
       // selection (targetsNear — PRTS 选择器 "所有触发选择器通常不无视迷彩"): an airborne (起飞) operator evades a ground
       // leader (对地规避 — counting her spent the skill on nobody, §21.22), nor does an unblocking 隐匿 or 迷彩 one count
-      cd: s.cd, icd: s.icd, sk: s, cond: (b) => targetsNear(b, e, LUCIEN_AOE_RADIUS).length > 0,
+      cd: s.cd, icd: s.icd, sk: s, ...atkSkill(e, 'aoe'), cond: (b) => targetsNear(b, e, LUCIEN_AOE_RADIUS).length > 0, // in the attack's turn
       fire(b, e2) {
         // "该技能伤害无视迷彩": an area selection (areaAllies) — a 迷彩 operator is hit, an unblocking 隐匿 one not
         b.fx('explode', { x: e2.x, y: e2.y, r: LUCIEN_AOE_RADIUS, kind: 'crimsonAoe' });
@@ -1112,7 +1138,6 @@ function kitLion(ab, e, b) {
         }
         if (!canCast(e2, false, b2)) return;
         P.sp += dt * ENEMY_SP_PER_SEC;
-        if (P.sp >= cost && decree(b2, e2)) P.sp = 0;
         // 【莫非王土】: ANIMATE_DELAY s after equipment first lies on the field, then once per 王权号令 cycle
         const has = equipment(b2).length > 0;
         if (!has) { P.nextAnim = null; return; }
@@ -1126,8 +1151,15 @@ function kitLion(ab, e, b) {
       hitOut(c, b2, e2) { if (P.wand && c.dmg.isAttack) c.dmg.type = 'arts'; },
       dealt(c, b2, e2) { if (!P.wand) return; P.wand = false; if (disarm > 0) b2.applyStatus(c.target, 'disarm', { duration: disarm, source: e2 }); },
     },
+    // 【王权号令】 (equip / equipA, RangedAttack, priority 1): with its SP full, cast in the attack's turn (DESIGN §35.29;
+    // until 0.3.2 at once, on top of the attacks); the SP restarts at the cast
+    eq && {
+      cd: 0, icd: 0, pr: eq.pr ?? 0, atk: true, clip: ATTACK_SKILL_CLIP[e.defId]?.equip ?? 0,
+      cond: (b2, e2) => P.sp >= cost && targetsNear(b2, e2, range()).length > 0,
+      fire(b2, e2) { if (decree(b2, e2)) P.sp = 0; },
+    },
     su && {
-      cd: su.cd, icd: su.icd, sk: su,
+      cd: su.cd, icd: su.icd, sk: su, ...atkSkill(e, 'Suicide'),
       fire(b2, e2) { // 【斥退】 "对场上所有我方单位…": every operator it can select (fieldAllies)
         b2.fx('telegraph', { x: e2.x, y: e2.y, r: 99, kind: 'repel', id: e2.id });
         for (const u of fieldAllies(b2, e2)) hurt(b2, e2, u, e2.s.atk * (su.bb.atk_scale ?? 0), 'arts');
@@ -1164,6 +1196,7 @@ function kitDeer(ab, e) {
         const cands = fairOrder(b, e2, allTargets(b, e2), P);
         if (!cands.length) return;
         P.acc = 0;
+        if (attackTurnSkill(b, e2)) return;                        // 自然涌动 / Doom take this attack's turn (DESIGN §35.29)
         const cols = [];
         for (const t of cands) { if (!cols.includes(t.tileC)) cols.push(t.tileC); if (cols.length >= (P.low ? atkN : 1)) break; }
         for (const c of cols) { // 【冰凌】 its normal attack: the whole column (an area selection: no unblocking 隐匿 operator)
@@ -1176,7 +1209,7 @@ function kitDeer(ab, e) {
       },
     },
     lasso && {
-      cd: lasso.cd, icd: lasso.icd, sk: lasso, cond: (b) => allTargets(b, e).length > 0,
+      cd: lasso.cd, icd: lasso.icd, sk: lasso, ...atkSkill(e, 'Lasso'), cond: (b) => allTargets(b, e).length > 0,
       fire(b, e2) { // 【自然涌动】 stun + arts per second
         const n = P.low ? skN : (lasso.bb.max_target ?? 1);
         const dur = lasso.bb.projectile_life_time ?? 0;
@@ -1189,7 +1222,7 @@ function kitDeer(ab, e) {
       },
     },
     doom && {
-      cd: doom.cd, icd: doom.icd, sk: doom,
+      cd: doom.cd, icd: doom.icd, sk: doom, ...atkSkill(e, 'Doom'),
       fire(b, e2) {
         b.fx('telegraph', { x: e2.x, y: e2.y, r: 99, kind: 'samiDoom', id: e2.id });
         for (const u of fieldAllies(b, e2)) hurt(b, e2, u, e2.s.atk * (doom.bb.atk_scale ?? 0), 'arts');

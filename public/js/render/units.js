@@ -364,6 +364,9 @@ const STATUE = Object.freeze({
   fly: Object.freeze({ change: null, roles: clipSet('Idle_2', 'Move_2', 'Die_2', 'Attack_2') }),
 });
 const JAKILL2 = clipSet('C2_Idle', 'C2_Move', 'C2_Die', 'C2_Attack');
+/** A second form's clip set without its `skill` role: the skill slot's own clip (anims.skills, tools/assets/spine.mjs
+ *  PREFAB_SPINE_ROLES — 杰斯顿 C2_Skill, 锏 B_Skill2) plays its casts, not the form's attack (DESIGN §35.29). */
+const slotSkill = (roles) => { const { skill, ...rest } = roles; void skill; return Object.freeze(rest); };
 /** A prisoner's 'warning' (mode R) and 'liberty' (mode L) clip sets: the clip-name suffix of each (see the list above). */
 const prisoner = (warn, free) => Object.freeze({
   warning: Object.freeze({ change: null, roles: clipSet(`Idle${warn}`, `Move${warn}`, `Die${warn}`, `Attack${warn}`) }),
@@ -416,7 +419,7 @@ export const FORMS = Object.freeze({
     husk: Object.freeze({ change: 'A_Die', end: 'B_Revive', next: 'revived', roles: clipSet('B_Idle', 'B_Move', 'B_Die') }),
     revived: Object.freeze({ change: null, roles: Object.freeze({}) }),
   }),
-  enemy_1525_blkswb: rebirth('Revive1', 'Revive2', 'Revive3', clipSet('B_Idle', 'B_Move', 'B_Die', 'B_Attack')),
+  enemy_1525_blkswb: rebirth('Revive1', 'Revive2', 'Revive3', slotSkill(clipSet('B_Idle', 'B_Move', 'B_Die', 'B_Attack'))),
   enemy_1535_wlfmster: rebirth('A_revive_1', 'A_revive_2', 'A_revive_3', clipSet('B_Idle', 'B_Move', 'B_Die', 'B_Attack')),
   enemy_1539_reid: rebirth('Revive_Begin', 'Revive_Loop', 'Revive_End'),
   // 重生 on the skeleton's own Revive clip (PR #275 by @xcdoge; content/enemies/leaders.js kitUglyThing / kitXi): 巨大的丑东西
@@ -433,7 +436,7 @@ export const FORMS = Object.freeze({
   }),
   enemy_1516_jakill: Object.freeze({
     reborn: Object.freeze({ change: 'C1_Die', roles: JAKILL2 }),
-    form2: Object.freeze({ change: null, roles: JAKILL2 }),
+    form2: Object.freeze({ change: null, roles: slotSkill(JAKILL2) }),
   }),
   enemy_1172_dugago: STATUE,
   enemy_1172_dugago_2: STATUE,

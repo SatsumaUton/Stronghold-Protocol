@@ -6,7 +6,7 @@
 
 import { PHASE, ERR } from '../../../shared/constants.js';
 import { buildNormalWave, buildBossWave } from '../waves.js';
-import { pairPlayers } from '../finalAssault.js';
+import { pairPlayers, bossPairSalt } from '../finalAssault.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
 import { OK, fail, DELAYS, BAND_TURN_SECONDS } from './common.js';
 
@@ -315,12 +315,17 @@ export class MatchPhases {
     for (const ps of this._viewers()) this._followScout(ps);
   }
 
-  /** Stable per-match pairs and their templates, generated before the prep preview / board validation. */
+  /** The round's pairs and their templates, generated before the prep preview / board validation. */
   _planBossWaves() {
     const r = this.round;
-    const bossId = r === this.gd.hiddenRound && r !== this.gd.bossRound ? this.hiddenBossId : this.bossId;
-    // Pairing uses an independent seeded draw, consuming no shop, wave, draft or battle randomness.
-    const groups = pairPlayers(this.alivePlayers(), createRng(deriveSeed(this.seed, 'boss-pairs')), this.bossPairs);
+    const hidden = r === this.gd.hiddenRound && r !== this.gd.bossRound;
+    const bossId = hidden ? this.hiddenBossId : this.bossId;
+    // Pairing uses an independent seeded draw, consuming no shop, wave, draft or battle randomness. The Hidden Core
+    // draws its pairs and sides anew (GitHub #845: the official R15 of BV1VCXyBjEN1 p1 pairs 1-2 / 3-4 after an R14 of
+    // 1-4 / 2-3; DESIGN §35.27, superseding §30.12's kept partners) from a stream of its own, so the Final Assault's
+    // draw is unchanged; a player who changes half keeps the board (bossFieldPlacement mirrors it, the halves' deploy
+    // maps are identical).
+    const groups = pairPlayers(this.alivePlayers(), createRng(deriveSeed(this.seed, bossPairSalt(this.gd, r))), hidden ? null : this.bossPairs);
     this.bossPairs = groups.map(g => g.map(p => p.playerId));
     this.bossWaves = groups.map((g) => ({
       players: g.map((p) => p.playerId),
