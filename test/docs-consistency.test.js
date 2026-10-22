@@ -606,7 +606,7 @@ test('playtest6b follow-up (DESIGN §20.10–§20.13): leader HP, 直接乘算, 
   const s63 = DESIGN.slice(DESIGN.indexOf('### 6.3'), DESIGN.indexOf('### 6.4'));
   assert.match(s52, /are 直接乘算 and go into `Σpct`/);
   assert.match(s53, /`Battle\.applyStrongest`/);
-  assert.match(s55, /\*\*限伤\*\*[^\n]*`ceil\(final\) ≥ 300000` is cancelled[^\n]*before HP shields/);
+  assert.match(s55, /\*\*限伤\*\*[^\n]*`ceil\(estimate\) ≥ 300000` is cancelled[^\n]*before the injury effects/);
   assert.match(s62, /elite onto the consumed deployed copy's tile, else to the hand \(§20\.11\)/);
   assert.ok(!/A merge's elite always goes to the hand/.test(DESIGN), '§6.2: the hand-first wording is gone');
   assert.match(s63, /`BOND_LAYER_CAP` = 999 layers \(the client's `MAX_GARRISON_STACK`/);

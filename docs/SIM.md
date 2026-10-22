@@ -836,7 +836,10 @@ Use the object-request operations on `battle`; public helper imports come from `
 and kills. `source: null, credit: owner` expresses attributed source-less damage. `type: 'elemental'` removes HP;
 `dealElementDamage` changes a gauge. True damage still undergoes ordinary injury processing, unlike HP loss.
 Legacy positional calls remain supported, including the old `sourceless` descriptor convention and `loseHp` /
-`reduceElement` aliases. Legacy `loseHp` takes an already processed value; typed object HP loss performs mitigation.
+`reduceElement` aliases. Both HP-loss forms share one path (`attack/health.js loseHp`): `type` 'phys' / 'arts' is first
+reduced by DEF / RES, 'true' — the default, and what a positional `dealHPLose(target, amount, opts)` / `loseHp` without
+`opts.type` passes — is an already processed amount. A refused request (an unknown type, route, mode …) is reported as an
+internal error and returns 0 on every Battle entry point.
 
 `attackType` describes native class (`NONE/NORMAL/SPLASH/BUFF/ADDITION`, default NORMAL in object requests),
 `applyWay` describes the instance route, and `isAttack` independently describes attack behavior. Tags do not set
@@ -859,7 +862,10 @@ stages; gauge intake has its own pipeline.
 Final HP handling includes special-HP mapping, `fatal` prevention, statistics, `hpChanged` for nonzero HP loss,
 `modifierApplied`/`damageApplied` for positive ordinary damage, legacy `damaged`, hurt-SP and death handling.
 `amount` and `hpRemoved` are different quantities: a positive damage instance can remove zero HP under special
-HP rules. `onApplied` runs after successful settlement and fatal/kill processing; a fully absorbed/cancelled hit
+HP rules. The client's damage number shows `amount`, and its red mark compares that final damage — after barriers,
+fixed reductions and `hpDamage` — with the expected damage (`attack/hit.js officialDamageMark`; PRTS 作战机制 「伤害红字」:
+the expected damage leaves out 屏障吸收 and the other 后置增益, the number is the final damage, which can differ from the
+HP change); a yellow MISS uses the amount left at the dodging effect's position. `onApplied` runs after successful settlement and fatal/kill processing; a fully absorbed/cancelled hit
 does not call it. Legacy `damaged` also includes zero values and HP loss, so it is not a universal success event.
 
 Object healing defaults to `mode: 'heal'`; `regen` bypasses healing modifiers and retains regen notifications;
