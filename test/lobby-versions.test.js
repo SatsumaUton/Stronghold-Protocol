@@ -410,6 +410,27 @@ test('gameplay plugins: refused in a version room and for a proposal while on; c
   assert.deepEqual(st.content.plugins.map((x) => x.id), ['skin']);
   assert.equal(resolved.at(-1)[1], false, 'resolved without gameplay plugins');
   refused(h.lobby.setPlugins(p, { plugins: [{ id: 'rules' }] }), ERR.VERSION_UNSUPPORTED);
+  // cosmetic plugins that do not resolve on the target (the owner's policy, a refused plugin): the proposal is refused
+  h.clock.t += 1000;
+  ok(h.lobby.proposeVersion(p, { version: DEFAULT_VERSION }));
+  ok(h.lobby.setPlugins(p, { plugins: [{ id: 'old-skin' }] }));
+  const resolve = plugins.resolve;
+  plugins.resolve = (ids, opts) => (ids.includes('old-skin') && opts.gameplay === false ? { error: ERR.PLUGIN_BLOCKED, detail: 'not here' } : resolve(ids, opts));
+  h.clock.t += 1000;
+  refused(h.lobby.proposeVersion(p, { version: 'act1autochess' }), ERR.VERSION_UNSUPPORTED);
+  assert.equal(room.version, DEFAULT_VERSION);
+  // …and when they stop resolving between a vote and its end, the switch keeps the version's base without them
+  plugins.resolve = resolve;
+  h.clock.t += 1000;
+  const g = h.player('Guest');
+  room.mode = 'coop'; // (a second human for a vote)
+  ok(h.lobby.join(g, { code: room.code }));
+  ok(h.lobby.proposeVersion(p, { version: 'act1autochess' }));
+  plugins.resolve = (ids, opts) => (opts.gameplay === false ? { error: ERR.PLUGIN_BLOCKED } : resolve(ids, opts));
+  ok(h.lobby.versionVote(g, { voteId: room.versionVote.id, agree: true }));
+  assert.equal(room.version, 'act1autochess');
+  assert.deepEqual(room.content, { cs: CS.act1autochess, vanilla: true, version: 'act1autochess', plugins: [] });
+  plugins.resolve = resolve;
   // a room-sets object that ignores the option still cannot slip a gameplay set into a version room
   const lax = harness({ plugins: { ...plugins, resolve: (ids) => plugins.resolve(ids, { gameplay: true }) } });
   const q = lax.player('B');
