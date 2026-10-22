@@ -33,7 +33,7 @@ const REBUILD_ALL = `rebuild every version: ${VERSIONS.map((v) => `node tools/bu
  */
 const PINNED = Object.freeze({
   act1autochess: { bonds: 18, bands: 30, visibleNonDiy: 95, chess: 200, items: 89, effects: 281, hiddenCore: [300, 1000] },
-  'act1autochess@V1_1': { bonds: 18, bands: 20, visibleNonDiy: 95, chess: 200, items: 89, effects: 279, hiddenCore: [300, 1000] },
+  'act1autochess@V1_1': { bonds: 18, bands: 20, visibleNonDiy: 95, chess: 200, items: 89, effects: 281, hiddenCore: [300, 1000] },
 });
 
 const readJson = (dir, name) => JSON.parse(readFileSync(join(dir, `${name}.json`), 'utf8'));
@@ -87,8 +87,13 @@ test('profiles: the default is today\'s build; pins pick a commit per file group
   assert.equal(pinnedShaOf(v12, 'levels/enemydata/enemy_database.json'), 'ee2cabffd45de01548cc6dceb23129ce93ac7926');
   assert.equal(pinnedShaOf(v12, 'excel/enemy_handbook_table.json'), 'ee2cabffd45de01548cc6dceb23129ce93ac7926');
   const { profile: v11 } = await loadProfile('act1autochess@V1_1');
-  assert.deepEqual(Object.keys(v11.pins), ['default'], 'V1_1 has no enemy pin: V1_2\'s ee2cabff would leak V1_2 enemies');
-  for (const rel of ['excel/activity_table.json', 'excel/skill_table.json', 'levels/enemydata/enemy_database.json']) {
+  // V1_1 with the 11-18 hotfix (the maintainer, 2026-10-22): activity_table and skill_table at ea164ef7, the rest at the
+  // launch; no enemy pin: V1_2's ee2cabff would leak V1_2 enemies
+  assert.deepEqual(Object.keys(v11.pins), ['default', 'activity', 'character']);
+  for (const rel of ['excel/activity_table.json', 'excel/skill_table.json', 'excel/character_table.json']) {
+    assert.equal(pinnedShaOf(v11, rel), 'ea164ef70736ca2d1a356b3bf7b1cd7540960dc1', rel);
+  }
+  for (const rel of ['levels/enemydata/enemy_database.json', 'excel/range_table.json', 'levels/activities/act1autochess/level_act1autochess_m01.json']) {
     assert.equal(pinnedShaOf(v11, rel), '8303c922f749f0dcf08e03671519421ef6a7748b', rel);
   }
   assert.equal(pinGroupOf('excel/uniequip_table.json'), 'character');
