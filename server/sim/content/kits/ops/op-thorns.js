@@ -57,7 +57,7 @@
 
 import { num, talentBb, traitBb, skillRec, up } from '../shared/tier1.js';
 import { absoluteRangeKeys, sortEnemyTargets } from '../../../targeting.js';
-import { hasHp, isHpLoss } from '../../../damage.js';
+import { hasHp, isHpLoss } from '../../../attack.js';
 
 const S1 = 'skcom_atk_up[3]';
 const S2 = 'skchr_thorns_2';

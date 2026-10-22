@@ -55,7 +55,7 @@
 import { num, talentBb, traitBb, skillRec, statBuff, toggleBuff, up } from '../shared/tier1.js';
 import { absoluteRangeKeys, canTargetEnemy } from '../../../targeting.js';
 import { bodyDist } from '../../../body.js';
-import { isHpLoss } from '../../../damage.js';
+import { isHpLoss } from '../../../attack.js';
 import { weaknessRetype } from '../../items/battle.js';
 
 const S1 = 'skchr_chen3_1';

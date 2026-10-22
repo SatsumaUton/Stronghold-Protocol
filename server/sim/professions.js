@@ -41,7 +41,7 @@
 // (`dir`, sim/dir.js): offsets are compared in its facing-RIGHT frame.
 
 import { toLocal, frontOf } from './dir.js';
-import { isHpLoss } from './damage.js';
+import { isHpLoss } from './attack.js';
 import { absoluteRangeKeys } from './targeting.js';
 import { bodyKeys, bodyInRange, bodyInRangeTile } from './body.js';
 import { COLS, CHAIN_RADIUS } from './constants.js';

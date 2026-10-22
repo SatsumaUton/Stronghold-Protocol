@@ -48,7 +48,7 @@
 //   capped), then `duration` s ATK +atk, attack interval +base_attack_time s (a flat +0.9 on 1.6 s), taunt +taunt_level.
 
 import { num, traitBb, talentBb, skillRec, toggleBuff, batMod, up, enemiesInGrid, holdProtect, PROTECT } from '../shared/tier1.js';
-import { isHpLoss } from '../../../damage.js';
+import { isHpLoss } from '../../../attack.js';
 
 const S1 = 'skchr_judge_1';
 const S2 = 'skchr_judge_2';

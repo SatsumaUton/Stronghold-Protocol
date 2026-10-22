@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeBattle } from '../helpers/battleHarness.js';
-import { elementView } from '../../server/sim/damage.js';
+import { elementView } from '../../server/sim/attack.js';
 import { ELEMENT_ORDER } from '../../server/sim/constants.js';
 
 const OP = 'chess_char_1_10_a'; // 古米 (T1 defender, real kit)

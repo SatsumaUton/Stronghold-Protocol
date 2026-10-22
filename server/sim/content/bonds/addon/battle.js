@@ -74,7 +74,7 @@
 import { canTargetEnemy, enemyStealthed, extendedGrid } from '../../../targeting.js';
 import { normDir, rotateOffset, localOrder, localBefore } from '../../../dir.js';
 import { bodyKeys, bodyInRange } from '../../../body.js';
-import { applyRedirectCut, isHpLoss, redirectShare } from '../../../damage.js';
+import { applyRedirectCut, isHpLoss, redirectShare } from '../../../attack.js';
 import { BOSS_ROW_OFFSET } from '../../../constants.js';
 import { GEO } from '../../../../../shared/constants.js';
 import {
