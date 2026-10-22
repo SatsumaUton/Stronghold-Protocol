@@ -44,7 +44,7 @@
   animation: pg-left 420ms var(--pg-ease) backwards; animation-delay: calc(180ms + var(--i, 0) * 70ms); }
 .dorder__card { position: relative; height: 100%; display: flex; align-items: center; gap: .16rem; min-width: 0; padding: 0 .16rem 0 .2rem; overflow: hidden;
   background: linear-gradient(90deg, #1d2223, #262b2c); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); }
-.dorder__art { position: absolute; inset: 0 0 0 28%; background-size: cover; background-position: 50% 16%; opacity: .62; pointer-events: none;
+.dorder__art { position: absolute; inset: 0 0 0 28%; width: 72%; height: 100%; object-fit: cover; object-position: 50% 16%; opacity: .62; pointer-events: none;
   -webkit-mask: linear-gradient(90deg, transparent, #000 45%); mask: linear-gradient(90deg, transparent, #000 45%); }
 .dorder__face { position: relative; flex: none; }
 .dorder .pavatar { --pa: .9rem; box-shadow: 0 0 0 .03rem #e6e9e9; border: 0; }
@@ -136,6 +136,18 @@
   background: linear-gradient(180deg, rgba(140, 20, 16, .35), rgba(176, 26, 20, .88)); box-shadow: inset 0 -.03rem 0 #ff4a3a, 0 0 .16rem rgba(255, 60, 40, .25);
   animation: dband-taken 420ms var(--pg-ease) backwards; }
 @keyframes dband-taken { from { opacity: 0; transform: scaleY(.2); filter: brightness(2); } }
+/* short landscape phones (≤ 520 CSS px tall; tiles about 60 px wide): 已被选择 stays on one line in its band (§35.33: at 大 /
+   特大 it broke into 「已被 / 选择」, cut 21–29 px), and a strategy's name takes two lines before its ellipsis (「伊奥莱塔·罗素」,
+   「“变形者集群”」 ended in one at 大). Each cap grows half a pixel a step above 中 (--t-step). [ASSUMED] the caps */
+@media (max-height: 520px) {
+  /* the header's status (请选择策略 over 跳过选择, whose turn it is, 策略选择完成) takes the step's name's place: at 大 / 特大
+     it ran over 选择策略 and 跳过选择 broke into two lines (§35.33); 2/2 stays, and the status says what the step is */
+  .draft.has-status .stephead__name { display: none; }
+  .draft-skip { height: auto; min-height: .44rem; white-space: nowrap; font-size: min(calc(.22 * var(--t)), calc(13px + var(--t-step) / 2)); }
+  .dband__taken { white-space: nowrap; letter-spacing: 0; font-size: min(calc(.21 * var(--t)), calc(12px + var(--t-step) / 2)); }
+  .dband__name { white-space: normal; text-wrap: balance; line-height: 1.1; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+    font-size: min(calc(.15 * var(--t)), calc(11px + var(--t-step) / 2)); }
+}
 .dband.is-taken .dband__name { display: none; }
 /* the official orange corner badge (statistics/strategyBadge) on a strategy that earned it — its victorCount of clears in
    this browser's records (bandDraft.js draftRecords, ui/stats.js strategyBadgeIds) — placed as on the stats page's

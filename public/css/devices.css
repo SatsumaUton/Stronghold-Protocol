@@ -128,12 +128,21 @@ html:not(.sp-in-match) .toast-host { margin-top: var(--sa-t); }
 }
 @media (max-width: 767px) and (pointer: coarse), (max-width: 767px) and (any-pointer: coarse) {
   .gm__corner { width: max(96px, calc(3 * max(.56rem, 34px) + .2rem)); }
+  /* the 机变 overlay starts right of that corner (§35.33: at 2.8rem, 112 px on a 667 px phone, it covered 8 px of ⛶) */
+  .gm.has-sp > .spov { left: calc(max(2.8rem, .24rem + max(96px, 3 * max(.56rem, 34px) + .2rem) + 2px) + var(--sa-l)); }
   .dpanel:not(.dpanel--right) { bottom: calc(.44rem + max(1.51rem, 96px) * 55 / 151 + max(.56rem, 34px)); }
 }
 /* With the shop folded (收起) no bar covers the corner: one row again, so the folded shop's prep camera, which keeps the
    bench above the corner's hit areas (ui/fieldHost.js hudBands), grows the board on narrow phones too (public issue #5). */
 @media (max-width: 767px) {
   .gm.is-collapsed .gm__corner { flex-wrap: nowrap; width: auto; }
+}
+/* … but not under the 机变 overlay, which starts at the corner's wrapped width (§35.33) */
+@media (max-width: 767px) {
+  .gm.is-collapsed.has-sp .gm__corner { flex-wrap: wrap-reverse; width: max(72px, calc(3 * .56rem + .2rem)); }
+}
+@media (max-width: 767px) and (pointer: coarse), (max-width: 767px) and (any-pointer: coarse) {
+  .gm.is-collapsed.has-sp .gm__corner { width: max(96px, calc(3 * max(.56rem, 34px) + .2rem)); }
 }
 
 /* Short landscape phones (≤ 460 CSS px tall, 1rem = 40 px): the detail card's header is shorter (no romanised name,

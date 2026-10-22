@@ -87,7 +87,8 @@ draft's name cards (`public/js/screens/bandDraft.js`) wears the player's outfit 
   during a match the match carries it, and the `room.state` at its end;
 - with **「显示其他玩家的皮肤」 off** the others' cards draw the default and one's own keeps its outfit;
 - an outfit **this page does not have** (a teammate's appearance plugin this browser lacks, or switched off) draws the
-  operator's own art — `chessPortraitUrl(m, chess, { skin })` falls back — never a placeholder.
+  operator's own art — `chessPortraitUrl(m, chess, { skin })` falls back — never a placeholder; an outfit picture that
+  **fails to load** falls back to the operator's default one on both (`seatArtSrc`; the draft's name cards since §35.33).
 
 `ui/seatArt.js seatCardSkin` is that rule, on top of `ownerSkin`. The 名片干员 picker is one's own picker: its tiles wear
 this browser's outfits, as 干员调配's roster does. [ASSUMED] The whole map rides in `room.state`, not one skinId per card:

@@ -127,6 +127,18 @@ export function aiLastOption(room, myId) {
   return { on: room.aiPicksLast === true, editable: room.hostId != null && room.hostId === myId };
 }
 
+/**
+ * An AI teammate's name split into its 「AI·」 prefix and the rest, for the plate (room.css hides the prefix on a phone:
+ * the avatar's badge and the card's AI 队友 tag say it, and at 特大 the prefix left one character of the name,
+ * 「AI·华…」). Null for a human seat and for a name that is only a number after the prefix (`AI·2`).
+ * @param {{ isBot?: boolean, name?: string } | null | undefined} seat
+ * @returns {[string, string] | null}
+ */
+export function botNameParts(seat) {
+  const m = seat?.isBot ? /^(AI\s*·\s*)(\D.*)$/su.exec(seat.name || '') : null;
+  return m ? [m[1], m[2]] : null;
+}
+
 /** Invite link for a room code (current page URL with ?room=CODE). */
 export function inviteLink(code) {
   const loc = globalThis.location;
@@ -195,7 +207,9 @@ function CardPicker({ current, list, m, localSkins = {}, onPick, onClose }) {
 
 /**
  * One seat: a tall card — the top strip (P#), the 名片干员 portrait (or the avatar frame: a bot, no art pack), 创建者, the
- * state at the bottom (准备中 / 待命中 / 已就绪 with its box) — and the name plate under it. One's own card offers 更换立绘
+ * state at the bottom (准备中 / 待命中 / 已就绪 with its box) — and the name plate under it. The art's text sits in two
+ * groups in flow, `.rseat__top` (the badge, 更换立绘, the tags) and `.rseat__low` (the operator's name, the state), so a
+ * larger 文字大小 wraps and pushes them apart rather than drawing one over another (§35.18 review). One's own card offers 更换立绘
  * (`onPickCard`); the host gets 移出 / 移除 AI 队友 at the top right. An empty seat: 邀请 (copies the key) and, for the
  * host of a co-op room, 添加 AI 队友. `portrait` is the outfit's picture, `portraitDefault` the operator's default one
  * (given when an outfit is worn): a picture that fails to load gives way to the next, the last to the avatar frame.
@@ -232,6 +246,8 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
   const lit = state === 'ready' || state === 'host';
   const art = seat.isBot ? null : seatArtSrc([portrait, portraitDefault], badArt);
   const canPick = isMe && !seat.isBot && !!onPickCard;
+  // an AI teammate's name without its 「AI·」 prefix on a phone (room.css; botNameParts)
+  const botPrefix = botNameParts(seat);
   return html`<article class=${`seat rseat${isMe ? ' is-me' : ''}${isHostSeat ? ' is-host' : ''}${seat.isBot ? ' is-bot' : ''}${art ? ' has-art' : ''}${lit ? ' is-lit' : ''}${flash ? ' is-flash' : ''} is-${state}`}
       style=${`--i:${index}`}>
     <span class="rseat__clip" aria-hidden="true"></span>
@@ -240,29 +256,33 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
       ${art
         ? html`<img key=${art} class="seat__portrait" src=${art} alt="" draggable=${false} onError=${() => setBadArt((b) => (b.includes(art) ? b : [...b, art]))} />`
         : html`<${AvatarFrame} size="xl" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} ready=${state === 'ready'} offline=${offline} />`}
-      ${art ? html`<span class="seat__op">${operator?.name || ''}</span>` : null}
-      ${isHostSeat ? html`<span class="rseat__host"><${Icon} name="crown" />${t('创建者')}</span>` : null}
-      ${seat.isBot ? html`<span class="rseat__bot"><${Icon} name="robot" />${t('AI 队友')}</span>` : null}
-      ${canPick ? html`<button type="button" class="rseat__pick" data-testid="seat-card-pick" onClick=${onPickCard}
-        title=${t('更换名片干员')} aria-label=${t('更换名片干员')}><${Icon} name="edit" /><span>${t('更换立绘')}</span></button>` : null}
-      ${consent ? html`<span class="rseat__tag" data-testid="script-consented">${t('已同意')}</span>` : null}
-      ${facts.modded && !seat.isBot ? html`<span class=${`rseat__tag seat__content is-${seat.content || 'loading'}`} data-testid="seat-content">
-        ${seat.content === 'ready' ? t('插件内容就绪') : seat.content === 'failed' ? t('插件内容校验失败') : t('插件内容载入中')}
-      </span>` : null}
+      <div class="rseat__top">
+        ${isHostSeat ? html`<span class="rseat__host"><${Icon} name="crown" />${t('创建者')}</span>` : null}
+        ${seat.isBot ? html`<span class="rseat__bot"><${Icon} name="robot" />${t('AI 队友')}</span>` : null}
+        ${canPick ? html`<button type="button" class="rseat__pick" data-testid="seat-card-pick" onClick=${onPickCard}
+          title=${t('更换名片干员')} aria-label=${t('更换名片干员')}><${Icon} name="edit" /><span>${t('更换立绘')}</span></button>` : null}
+        ${consent ? html`<span class="rseat__tag" data-testid="script-consented">${t('已同意')}</span>` : null}
+        ${facts.modded && !seat.isBot ? html`<span class=${`rseat__tag seat__content is-${seat.content || 'loading'}`} data-testid="seat-content">
+          ${seat.content === 'ready' ? t('插件内容就绪') : seat.content === 'failed' ? t('插件内容校验失败') : t('插件内容载入中')}
+        </span>` : null}
+      </div>
       ${offline ? html`<span class="rseat__lost"><${Icon} name="wifiOff" />${t('连接中断')}</span>` : null}
-      <span class=${`rseat__state seat__state--${state}`}>
-        <span class="rseat__box">${lit ? html`<${Icon} name="check" />` : null}</span>
-        ${state === 'ready' ? t('已就绪') : state === 'host' ? t('待命中') : state === 'offline' ? t('连接中断') : t('准备中')}
-      </span>
+      <div class="rseat__low">
+        ${art ? html`<span class="seat__op">${operator?.name || ''}</span>` : null}
+        <span class=${`rseat__state seat__state--${state}`}>
+          <span class="rseat__box">${lit ? html`<${Icon} name="check" />` : null}</span>
+          <span class="rseat__said">${state === 'ready' ? t('已就绪') : state === 'host' ? t('待命中') : state === 'offline' ? t('连接中断') : t('准备中')}</span>
+        </span>
+      </div>
     </div>
     ${seat.isBot && facts.isHost ? html`<button type="button" class="rseat__kick" disabled=${busy === `rm${index}`} onClick=${() => onRemoveBot(index)}
       title=${t('移除该 AI 队友')} aria-label=${t('移除 AI 队友')}><${Icon} name="robot" /><${Icon} name="close" /></button>` : null}
     ${!seat.isBot && !isMe && facts.isHost ? html`<button type="button" class="rseat__kick" disabled=${busy === `kick${index}`}
       onClick=${() => onKick(index, seat.name, seat.playerId)} title=${t('将该博士移出同盟')} aria-label=${t('移出该博士')}><${Icon} name="user" /><${Icon} name="close" /></button>` : null}
     <div class="rseat__plate">
-      ${isMe ? html`<span class="rseat__me" title=${t('你')}><${Icon} name="info" /></span>` : null}
+      ${isMe ? html`<span class="rseat__me" role="img" aria-label=${t('你')} title=${t('你')}><${Icon} name="info" /></span>` : null}
       <${AvatarFrame} size="sm" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} />
-      <span class="rseat__who"><b class="seat__name">${seat.name || t('博士')}</b>${isMe ? html`<span class="seat__you">${t('你')}</span>` : null}</span>
+      <span class="rseat__who"><b class="seat__name">${botPrefix ? html`<span class="seat__name-pre">${botPrefix[0]}</span>${botPrefix[1]}` : seat.name || t('博士')}</b>${isMe ? html`<span class="seat__you" aria-hidden="true">${t('你')}</span>` : null}</span>
       <small class="rseat__doc">${seat.isBot ? 'AUTONOMOUS UNIT' : `DOCTOR #${doctorNo(seat.playerId)}`}</small>
     </div>
   </article>`;
@@ -337,10 +357,13 @@ function GearGlyph() {
 function GoButton({ label, onClick, disabled, loading = false, ready = null, icon = null }) {
   return html`<button type="button" class=${`proto-start rs-go${ready ? ' is-ready' : ''}`} disabled=${disabled} onClick=${onClick}
       aria-busy=${loading ? 'true' : 'false'}>
-    ${ready == null
-      ? html`<span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>STRONGHOLD<br />PROTOCOL</small></span>`
-      : html`<span class="rs-go__box" aria-hidden="true">${ready ? html`<${Icon} name="check" />` : null}</span>`}
-    <span class="proto-start__label">${loading ? html`<${Spinner} size="sm" />` : icon ? html`<${Icon} name=${icon} />` : null}${label}</span>
+    ${ready != null
+      ? html`<span class="rs-go__box" aria-hidden="true">${ready ? html`<${Icon} name="check" />` : null}</span>`
+      : icon
+        // (a spectator's 观战中: its eye in the mark's place, so the label keeps the width — §35.18 review)
+        ? html`<span class="rs-go__icon" aria-hidden="true"><${Icon} name=${icon} /></span>`
+        : html`<span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>STRONGHOLD<br />PROTOCOL</small></span>`}
+    <span class="proto-start__label">${loading ? html`<${Spinner} size="sm" />` : null}${label}</span>
     <span class="proto-start__deco" aria-hidden="true"></span>
   </button>`;
 }
@@ -479,6 +502,8 @@ export function RoomScreen() {
     if (d === room.difficulty && !pluginMode) { closeProto(); return; }
     if (!(await setDifficulty(d))) return;
     savePref('lobby.difficulty', d);
+    // the plugin mode is gone: said, as a same-difficulty 确认 changes nothing else the host sees (§35.33; §35.18's nit)
+    if (pluginMode) toast(t('已退出插件模式「{name}」', { name: pluginMode }), 'info');
     if (alive.current) closeProto();
   };
   const protoHint = pluginMode
@@ -530,7 +555,7 @@ export function RoomScreen() {
       })}
       ${coop ? null : html`<aside class="solo-brief rs-brief brackets">
         <${MicroLabel} tone="mint">BRIEFING<//>
-        <h2>${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num t-dim"> ${info.code}</span></h2>
+        <h2>${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''} <span class="num t-dim">${info.code}</span></h2>
         <p>${info.desc}</p>
         <ul>
           ${info.effects.map((e) => html`<li key=${e}>${e}</li>`)}

@@ -49,7 +49,7 @@ import { TurnBanner, TURN_BANNER_LATE_MS } from '../ui/turnBanner.js';
 import { onBootArt, preloadBootArt } from '../ui/protocolBoot.js';
 import { reducedMotion } from '../ui/device.js';
 import { useRise } from '../ui/transitions.js';
-import { CARD_KEY, cardStore, cardOperators, cardContext, seatOperator, seatCardSkin } from '../ui/seatArt.js';
+import { CARD_KEY, cardStore, cardOperators, cardContext, seatOperator, seatCardSkin, seatArtSrc } from '../ui/seatArt.js';
 import { skinsStore, SKINS_KEY } from '../ui/skins.js';
 import { settingsStore } from '../ui/settingsStore.js';
 import { chessPortraitUrl, uiUrl } from '../ui/assetUrls.js';
@@ -219,15 +219,20 @@ function BandText({ band, class: cls }) {
 /**
  * One doctor of the draft order: the name card (the 名片干员 art, avatar, name, state), the strategy box (⌛ 决策中 / •••
  * / the pick with 🔍, which opens it) and ✓ outside it; a beam runs along the row when the pick lands (useRise).
- * @param {{ p: any, i: number, picked: string|null, cur: boolean, self: boolean, art: string|null, medal: string|null,
+ * `arts`: the 名片干员 pictures in order of preference (the outfit's, then the operator's default — an outfit file that fails
+ * to load falls back to the default as on the seat cards, §35.33), null for none.
+ * @param {{ p: any, i: number, picked: string|null, cur: boolean, self: boolean, arts: (string|null)[]|null, medal: string|null,
  *   gd: any, onPeek: (bandId: string) => void }} props
  */
-function OrderRow({ p, i, picked, cur, self, art, medal, gd, onPeek }) {
+function OrderRow({ p, i, picked, cur, self, arts, medal, gd, onPeek }) {
   const flash = useRise(!!picked, 1100);
+  const [badArt, setBadArt] = useState([]);
+  const art = seatArtSrc(arts, badArt);
   const pband = picked ? gd.band(picked) : null;
   return html`<div class=${cx('dorder', cur && 'is-cur', picked && 'is-done', self && 'is-self', flash && 'is-flash')} style=${`--i:${i}`}>
     <div class="dorder__card">
-      ${art ? html`<span class="dorder__art" style=${`background-image:url("${art}")`} aria-hidden="true"></span>` : null}
+      ${art ? html`<img key=${art} class="dorder__art" src=${art} alt="" aria-hidden="true" draggable=${false}
+        onError=${() => setBadArt((b) => (b.includes(art) ? b : [...b, art]))} />` : null}
       <span class="dorder__face"><${PlayerAvatar} player=${p} self=${self} />${self ? html`<span class="dorder__me" title=${t('你')}><${Icon} name="user" /></span>` : null}</span>
       <div class="dorder__text">
         <b class="dorder__name">${medal ? html`<${Img} src=${medal} class="dorder__medal" />` : null}<span>${p.name || t('博士')}</span>${p.isBot ? html`<span class="dorder__ai">AI</span>` : null}</b>
@@ -357,7 +362,7 @@ export function BandDraftScreen({ held = null } = {}) {
   // the doctor's outfit for that operator (B6 picture-only outfits, docs/SKINS.md; the maintainer's decision 4 of 2026-10-21
   // for the seat cards; ui/seatArt.js seatCardSkin): one's own choice at once, a teammate's from the match's public
   // players (m.public.players[].skins), none for another seat while 「显示其他玩家的皮肤」 is off, the default art when the
-  // outfit's pictures are not here (chessPortraitUrl)
+  // outfit's pictures are not here (chessPortraitUrl) — or fail to load (the row falls back to them: §35.33)
   const cards = useMemo(() => cardContext(cardOperators(gd.list('chess'))), [gd.ready]);
   const myCard = useStore((s) => s[CARD_KEY], Object.is, cardStore);
   const localSkins = useStore((s) => s[SKINS_KEY], Object.is, skinsStore);
@@ -367,7 +372,7 @@ export function BandDraftScreen({ held = null } = {}) {
     const seat = (Array.isArray(roomSeats) && roomSeats.find((x) => x && x.playerId === p.playerId)) || { playerId: p.playerId };
     const op = seatOperator(seat, cards, { myId, myCard });
     const skin = op ? seatCardSkin(p, op.chess.charId, { myId, localSkins, players, otherSkins }) : null;
-    return op ? chessPortraitUrl(data.get('assets'), op.chess, { skin }) : null;
+    return op ? [chessPortraitUrl(data.get('assets'), op.chess, { skin }), skin ? chessPortraitUrl(data.get('assets'), op.chess) : null] : null;
   };
   // this browser's records (up to the stats store's size): read once, after the screen and its entry are up, not while
   // it mounts
@@ -403,7 +408,7 @@ export function BandDraftScreen({ held = null } = {}) {
 
   // held after the draft (the server is already in BATTLE_CHECK): only to look at — 离开, 本局信息 and the 🔍 boxes would
   // open dialogs the match screen tears down a moment later
-  return html`<div class=${cx('screen draft', `draft--${view}`, held && 'is-held')} inert=${held ? true : undefined} aria-busy=${held ? 'true' : undefined}>
+  return html`<div class=${cx('screen draft', `draft--${view}`, held && 'is-held', head && 'has-status')} inert=${held ? true : undefined} aria-busy=${held ? 'true' : undefined}>
     <div class="brief__bg" aria-hidden="true"></div>
     <${StepHeader} step=${2} of=${2} title=${t('选择策略')} micro="STRATEGY // BAND CHECK" pub=${clock ? { ...pub, deadline: clock.deadline } : { ...pub, deadline: 0 }}
       total=${clock ? clock.total : null} onExit=${() => setExit(true)}
@@ -418,7 +423,7 @@ export function BandDraftScreen({ held = null } = {}) {
             const picked = draft.picks.get(p.playerId) || (p.playerId === myId ? myPick : p.bandId) || null;
             const cur = !picked && !allPicked && (solo || draft.turnPid === p.playerId);
             return html`<${OrderRow} key=${p.playerId} p=${p} i=${i} picked=${picked} cur=${cur} self=${p.playerId === myId}
-              art=${artOf(p)} medal=${p.playerId === myId ? myMedal : null} gd=${gd} onPeek=${peekBand} />`;
+              arts=${artOf(p)} medal=${p.playerId === myId ? myMedal : null} gd=${gd} onPeek=${peekBand} />`;
           })}
         </div>
         ${!solo ? html`<p class="draft-order__tip" data-testid="draft-tip">${draftTip({ timed, turnSeconds: turnLen, autoName: myPick ? null : autoName, selected: open && autoId === sel })}</p>` : null}

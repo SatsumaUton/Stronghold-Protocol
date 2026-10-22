@@ -134,12 +134,98 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   const block = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
   const sizes = [...block.matchAll(/font-size:\s*([^;}]+)[;}]/g)].map((m) => m[1].trim());
   assert.ok(sizes.length >= 30, sizes.join(' | '));
-  // (the room's big button caps its label and mark: it still follows 文字大小 below the cap — §35.18 review)
-  for (const v of sizes) assert.match(v, /^(calc\(\.\d+ \* var\(--t\)\)|min\(calc\(\.\d+ \* var\(--t\)\), (\.\d+rem|\d+px)\))$/, v);
-  assert.equal(sizes.filter((v) => v.startsWith('min(')).length, 4, 'the caps: the GoButton\'s label, rook and mark, and its label on a short screen');
+  // (a capped size still follows 文字大小 below the cap — §35.18 review: the room's big button, and on a short screen the
+  // seat cards, the top bar's text, the status line, 独立模拟's briefing and the picker's names)
+  const STEP_CAP = /^calc\((\d+)px \+ var\(--t-step\)( \/ 2)?\)$/;
+  for (const v of sizes) assert.match(v, /^(calc\(\.\d+ \* var\(--t\)\)|min\(calc\(\.\d+ \* var\(--t\)\), (\.\d+rem|\d+px|calc\(\d+px \+ var\(--t-step\)( \/ 2)?\))\))$/, v);
+  const caps = sizes.filter((v) => v.startsWith('min('));
+  assert.ok(caps.length >= 19, `the GoButton's label, rook and mark, and the short screen's caps (${caps.length})`);
+  // the short screen's px caps keep the text readable (11–20 px at 中) and still grow above 中 (+ --t-step, theme.css;
+  // §35.18 review: 中, 大 and 特大 had been the same) — but the picker's 11 px names, which reach it only at 特大
+  for (const v of caps) {
+    const cap = v.slice(v.indexOf('), ') + 3, -1);
+    if (/rem$/.test(cap)) continue;
+    const px = STEP_CAP.exec(cap)?.[1] ?? /^(\d+)px$/.exec(cap)?.[1];
+    assert.ok(+px >= 11 && +px <= 20, v);
+    if (!STEP_CAP.test(cap)) assert.equal(v, 'min(calc(.14 * var(--t)), 11px)', `${v}: a px cap grows with --t-step`);
+  }
   assert.ok(!/!important/.test(block) && !/:has\(/.test(block));
   assert.match(block, /\.rseat__art img \{[^}]*object-fit: cover/);
   assert.match(block, /\.cardpick__grid[\s\S]*overflow-y: auto/);
+  // the review of the text-fit fixes (§35.18): Korean breaks between words; the short screen's avatar frame 2rem at 小 and
+  // smaller only as the text grows (not 1rem at every size); 复制's line height after `font` (which resets it); the phone
+  // footer's status and pill at the start; 独立模拟's card 2.7 × --t (2.7rem at 小, as before)
+  const plain = block.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(plain, /\.rs:lang\(ko\) \{ word-break: keep-all; overflow-wrap: break-word; \}/);
+  assert.match(plain, /\.seat__art\.rseat__art > \.avatar--xl \{ --av: clamp\(1rem, calc\(3rem - var\(--t\)\), 2rem\); \}/);
+  assert.doesNotMatch(plain, /--av: 1rem/);
+  assert.match(plain, /\.rs-key__copy \{[^}]*font: inherit;[^}]*line-height: 1;/);
+  assert.match(plain, /@media \(max-width: 900px\) \{[^@]*\.rs-foot__center \{ justify-self: start;/);
+  assert.match(plain, /\.rs--solo \.rseat \{ --w: min\(calc\(2\.7 \* var\(--t\)\), 34vw\); \}/);
+  // the review of those fixes: Japanese never starts a line with a small kana or ー (「シミュレーシ|ョン開始」); on a short
+  // screen 独立模拟's card no wider than a co-op one (2.7 × --t had made it 173–238 px above 小), its briefing wider and
+  // tighter above 中 so it does not scroll, and a modded room's 插件内容就绪 tag giving way to the state
+  assert.match(plain, /\.rs:lang\(ja\) \{ line-break: strict; \}/);
+  const short = plain.slice(plain.indexOf('@media (max-height: 520px) {'));
+  assert.match(short, /\.rs--solo \.rseat \{ --w: min\(calc\(2\.7 \* var\(--t\)\), 3\.4rem, 34vw\); \}/);
+  assert.match(short, /\.rs-brief \{ max-width: min\(11rem, 62vw\); padding: calc\(6px - max\(0px, var\(--t-step\)\)\) 12px; \}/);
+  assert.match(short, /\.rs-brief h2 \{[^}]*line-height: calc\(1\.5em - 3 \* max\(0px, var\(--t-step\)\)\);/);
+  assert.match(short, /\.rs-brief ul \{[^}]*line-height: calc\(1\.35em - max\(0px, var\(--t-step\)\)\);/);
+  assert.match(short, /\.seat__content\.is-ready \{ display: none; \}/);
+  // the review of the review: the briefing's difficulty code on one line (「AC-」 / 「2」); a paragraph's last line not a
+  // single character; the state as wide as before it went in flow (「Standing / by」 in 独立模拟's 108 px card on phones);
+  // on a phone your plate without its 你 tag (the corner mark says it)
+  assert.match(plain, /\.rs-brief h2 \.num \{ white-space: nowrap; \}/);
+  assert.doesNotMatch(plain, /\.rs-brief h2[^{]*\{[^}]*text-wrap/,
+    'the briefing title wraps plainly (with pretty and the nowrap code Chrome broke 「…Simulation / AC-2」 where it fits)');
+  // review of that review: `pretty` on the paragraphs only, `balance` on the short labels and the picker's names — WebKit's
+  // `pretty` adds lines to short labels (「AI同盟者を追加」 cut at 特大 on a 640×360 phone) and kept 「アンジェリー|ナ」
+  assert.doesNotMatch(plain, /^\.rs \{ text-wrap/m, 'no text-wrap on the whole room');
+  assert.match(plain, /\.rs-hint, \.rs-brief p, \.rs-brief li \{ text-wrap: pretty; \}/);
+  assert.match(plain, /\.rseat__add, \.rseat__wait small, \.rseat__invite small \{ text-wrap: balance; \}/);
+  assert.match(plain, /\.cardpick__name \{ text-wrap: balance; \}/);
+  // review of 6f34f380: `balance` broke Japanese 「AI同盟|者を追加」 inside the word at 特大 on the phones — phrase breaks
+  assert.match(plain, /\.rseat__add:lang\(ja\) \{ word-break: auto-phrase; \}/);
+  assert.match(plain, /\.rseat__state \{[^}]*margin: 0 -\.08rem;/);
+  // 2 of the art's 3 px on a phone beside a 16 px box and a 3 px gap (all 3 px put the box and 「by」 against the card's
+  // border on a 640×360 phone)
+  assert.match(short, /\.rseat__state \{ gap: 3px; margin-inline: -2px;/);
+  assert.match(short, /\.rseat__box \{ width: 16px; height: 16px; \}/);
+  assert.match(short, /\.rseat__who \.seat__you \{ display: none; \}/);
+  // §35.33: on a phone at least 370 px tall a long name takes two lines (then its ellipsis), every plate two lines tall
+  assert.match(plain, /@media \(max-height: 520px\) and \(min-height: 370px\) \{\n  \.rseat__plate/);
+  assert.match(short, /\.rseat__who \.seat__name \{ white-space: normal;[^}]*-webkit-line-clamp: 2;/);
+  assert.match(short, /\.rseat__plate \{ min-height: max\(36px, calc\(2\.2 \* min\(calc\(\.28 \* var\(--t\)\), calc\(18px \+ var\(--t-step\) \/ 2\)\) \+ 8px\)\); \}/);
+  // the corner mark is what screen readers hear as 你 (the tag, hidden on a phone, is aria-hidden everywhere)
+  const roomJs = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
+  assert.match(roomJs, /<span class="rseat__me" role="img" aria-label=\$\{t\('你'\)\}/);
+  assert.match(roomJs, /<span class="rseat__who"><b class="seat__name">[^\n]*<span class="seat__you" aria-hidden="true">/);
+  // review of 6f34f380: on a phone an AI teammate's plate without its 「AI·」 prefix (「AI·华…」 at 特大; the badge and
+  // the AI 队友 tag say it), the prefix in its own span (botNameParts); desktops keep it
+  assert.match(short, /\.seat__name-pre \{ display: none; \}/);
+  assert.doesNotMatch(plain.slice(0, plain.indexOf('@media (max-height: 520px) {')), /\.seat__name-pre/);
+  assert.match(roomJs, /<b class="seat__name">\$\{botPrefix \? html`<span class="seat__name-pre">\$\{botPrefix\[0\]\}<\/span>\$\{botPrefix\[1\]\}`/);
+  // review of 7aa59703: English 「Copy」 set higher a pixel a step above 中 only (a fixed 4 px put it 2 px high at 小)
+  assert.match(short, /\.rs-key__copy:lang\(en\) \{ padding-bottom: calc\(2 \* max\(0px, var\(--t-step\)\)\); \}/);
+  assert.match(readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8'), /\} <span class="num t-dim">\$\{info\.code\}<\/span><\/h2>/,
+    'the space before the code outside its nowrap span, so the title can still break there');
+  // the ping pill grows in the room only (§35.18 review: a global min-height outgrew title.css's own height)
+  assert.match(plain, /\.rs-clock__ping \.ping \{ height: auto; min-height: \.32rem;/);
+  assert.match(readFileSync(path.join(ROOT, 'public/css/components.css'), 'utf8'), /\.ping \{[^}]*\n  height: \.32rem;/);
   // the plugin mode's chip beside the mode name (review of PR #813: its only rule had been deleted)
   assert.match(block, /\.rs-clock \.room-mode \{[^}]*border: 1px solid[^}]*text-overflow: ellipsis/);
+});
+
+test('an AI teammate\'s name split for the plate: 「AI·」 + the rest; a number-only name and a human seat unsplit (botNameParts)', async () => {
+  const { botNameParts } = await import('../../public/js/screens/room.js');
+  assert.deepEqual(botNameParts({ isBot: true, name: 'AI·华法琳' }), ['AI·', '华法琳']);
+  assert.deepEqual(botNameParts({ isBot: true, name: 'AI · Warfarin' }), ['AI · ', 'Warfarin']);
+  assert.deepEqual(botNameParts({ isBot: true, name: 'AI·Kal\'tsit\nx' }), ['AI·', 'Kal\'tsit\nx']);
+  assert.equal(botNameParts({ isBot: true, name: 'AI·2' }), null, 'only a number after the prefix keeps it');
+  assert.equal(botNameParts({ isBot: true, name: '华法琳' }), null);
+  assert.equal(botNameParts({ isBot: true, name: 'AI·' }), null);
+  assert.equal(botNameParts({ isBot: true }), null);
+  assert.equal(botNameParts({ isBot: false, name: 'AI·x' }), null, 'a doctor named 「AI·x」 keeps the whole name');
+  assert.equal(botNameParts({ name: 'AI·x' }), null);
+  assert.equal(botNameParts(null), null);
 });

@@ -249,7 +249,7 @@ export function InstalledPlugins({ open, onClose }) {
         ${plugins.map((p) => html`<li key=${p.id} class="plugrow" data-plugin=${p.id}>
           <div class="plugrow__body">
             <div class="plugrow__name"><b>${pluginName(p)}</b>${p.version ? html`<span class="num t-dim">v${p.version}</span>` : null}
-              <span class="plugrow__badge">${p.execution === 'sandbox' ? t('脚本（沙箱）') : t(CLASS_NAMES[p.class] || '插件')}</span><span class="plugrow__badge is-unofficial">${t('非官方')}</span></div>
+              <span class="plugrow__badge">${p.execution === 'sandbox' ? t('脚本（沙箱）') : (CLASS_NAMES[p.class] ? t(CLASS_NAMES[p.class]) : t('插件'))}</span><span class="plugrow__badge is-unofficial">${t('非官方')}</span></div>
             <div class="plugrow__meta t-dim">
               <span>${p.status === 'loaded' ? t('可以使用') : t('本版本不支持')}</span>
               ${Array.isArray(p.authors) && p.authors.length ? html`<span>${t('作者 {names}', { names: p.authors.join(', ') })}</span>` : null}

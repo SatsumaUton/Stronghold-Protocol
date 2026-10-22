@@ -214,6 +214,16 @@
   .brief-reroll__actions .btn { min-height: .44rem; padding-inline: .12rem; }
 }
 
+/* short landscape phones (≤ 520 CSS px tall) at a big 文字大小 (§35.33; §35.18's leftovers): the header's decorative
+   BRIEFING // INFO CHECK gives way (cut at its end and over COUNTDOWN at 大 / 特大), 玩法说明 keeps its book (its label was
+   cut 4–7 px at 特大; the name stays its title and accessible name), and the sections' bars grow with their titles
+   (cut 2 px at 大) */
+@media (max-height: 520px) {
+  .stephead__micro { display: none; }
+  .stephead__guide .btn__label { display: none; }
+  .brief .brief-h { height: auto; min-height: .66rem; }
+}
+
 /* the pre-game screens' motion (also css/screens/draft.css); none with reduced motion */
 .brief, .draft { --pg-ease: cubic-bezier(.16, .84, .3, 1); }
 @keyframes pg-fade { from { opacity: 0; } }
