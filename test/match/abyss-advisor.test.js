@@ -85,7 +85,8 @@ test('a carry candidate leads with a core bond; the announced leader adds its co
   assert.ok(plain.filter(c => c.role === 'carry').every(c => core.has(c.main)), plain.map(c => c.main).join());
   const lucien = prep('boss_5').find(c => c.main === 'siracusaShip' && !c.build);
   const other = plain.find(c => c.main === 'siracusaShip' && !c.build);
-  if (lucien && other) assert.equal(lucien.scoreParts.finalAssault - other.scoreParts.finalAssault, 8);
+  assert.ok(lucien && other, 'a generic 叙拉古 carry is offered against both leaders');
+  assert.equal(lucien.scoreParts.finalAssault - other.scoreParts.finalAssault, 8);
   assert.ok(book.community.bossCounters.every(e => e.sources.length && e.bonds.every(id => core.has(id))));
 });
 

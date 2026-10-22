@@ -466,9 +466,12 @@ function gainLayers(gd, c) {
   }
   return n;
 }
-function tradeOnce(m, ps, ctx) {
+function tradeOnce(m, ps, ctxOf) {
   if (m.round < TRADE_FROM || m.gd.leftoverKeptBands.includes(ps.bandId) || freeSlot(ps.hand) < 0) return false;
   const gd = ps.gd || m.gd;
+  // the buy loop's context is built only when the shop shows an affordable layer unit (it runs every loop step)
+  if (!ps.shop.slots.some((sl) => sl && !sl.sold && sl.kind === 'chess' && ps.priceOf(sl) <= ps.funds && gainLayers(gd, gd.chess(sl.id) || {}))) return false;
+  const ctx = ctxOf();
   const active = new Set(Object.entries(ps.bonds).filter(([, b]) => b && b.active).map(([id]) => id));
   if (ctx.focus) active.add(ctx.focus);
   let best = -1;
@@ -1822,7 +1825,7 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}
   let memo = null;
   for (let guard = 0; guard < 40; guard++) {
     if (guard > 0) yield;
-    if (!fillOnly && tradeOnce(m, ps, context(m, ps))) continue;
+    if (!fillOnly && tradeOnce(m, ps, () => context(m, ps))) continue;
     // Do not cash a bank for a non-merge during the initial merge-only pass: the intervening level-up
     // could consume its refund before this pass is allowed to buy the target.
     // §35.14: complete merges first, then the affordable floor, before any fill-only single can spend it.
