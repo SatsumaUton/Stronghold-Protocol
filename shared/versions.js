@@ -15,8 +15,9 @@
 //              versions/<slug>/ — lowercase and safe on every OS (no '@'); a path or a file name uses versionSlug()
 //
 // The default is a code constant, never a server setting: data, rooms and logs without a version mean act2autochess.
-// tools/versions/<slug>.mjs holds each version's build profile (pins, adapters, expected counts). M0 builds the data
-// only; nothing at run time reads a non-default version yet.
+// tools/versions/<slug>.mjs holds each version's build profile (pins, adapters, expected counts). M0 built the data;
+// since M1 (DESIGN §35.23) a server that enables a version (SP_VERSIONS) serves it, plays its rooms in version match
+// hosts, and the page loads its data (server/versions.js, public/js/versions.js).
 
 import { N_ } from './i18n.js';
 

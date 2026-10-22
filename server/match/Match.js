@@ -55,7 +55,8 @@
 //   opts.version     string (optional)          a non-default official version's registry id (DESIGN §35.23,
 //                                              shared/versions.js; the lobby passes it for such a room only, the match
 //                                              then runs in that version's match host on its data): this.version, the
-//                                              test journal's init.options.version, the external AI's context.gameVersion.
+//                                              test journal's init.options.version, the external AI's context.gameVersion,
+//                                              m.public / m.result `version` (the page reads a replayed result with it).
 //                                              Absent, unknown or 'act2autochess' ⇒ this.version null (the default)
 //   opts.data        frozen game data (server/data.js getData()); may lack keys while data is generated
 //   opts.log         { info, warn, error, debug }

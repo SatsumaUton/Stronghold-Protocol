@@ -54,6 +54,16 @@ function matchOpts(cs, version, seats, out, extra = {}) {
     ...extra,
   };
 }
+/** Resolve once `list` has not grown for `ms` (at most `cap` ms in all). */
+async function logQuiet(list, ms, cap) {
+  const t0 = Date.now();
+  let n = list.length;
+  let since = t0;
+  while (Date.now() - t0 < cap) {
+    await new Promise((r) => { setTimeout(r, 25); });
+    if (list.length !== n) { n = list.length; since = Date.now(); } else if (Date.now() - since >= ms) return;
+  }
+}
 /** A logger that keeps the test journal lines: the host prefixes each with its label (`[act1autochess] [test-input …`). */
 function journalLog() {
   const entries = [];
@@ -152,6 +162,10 @@ test('(d) a test match\'s journal from the host log carries its version and repl
     m.start();
     summary = await Promise.race([out.end, giveUp(250_000)]);
     assert.ok(summary, 'the match ended');
+    // the journal logs the timer that ended the match after its callback ran (testTrace records its steps), so that last
+    // line reaches this process after 'end': wait until the log is quiet before the host goes — a harness race only
+    // (a production host outlives its match by minutes, and its later lines still reach the log)
+    await logQuiet(j.entries, 300, 10_000);
     m.dispose();
   } finally { hosts.close(); }
   assert.ok(j.lines.some((l) => l.startsWith('[act1autochess] [test-input ')), 'the host labels its lines with the version');

@@ -18,6 +18,9 @@
 // for the data on screen (charKeyMap / entriesView) and writes an edit back through the map of the data the view was
 // built from (rebaseByChar). A stored v1 loadout ({ v: 1, entries } by 第二期下半's chess ids) is migrated through
 // 第二期下半's chess.json (entriesToChar); 导出 writes v2 (byChar), 导入 reads v1 (chess ids of 第二期下半) and v2.
+// A v2 store also carries `entries` — the same choices by 第二期下半's chess ids, when the page has that map — which this
+// build ignores (v === 2) and an older build on the same origin (a rollback, builds side by side) still reads, so its
+// 干员调配 does not look reset.
 
 import { loadoutOptions, checkLoadout, checkLoadoutOps, resolveLoadout, MODULE_NONE, LOADOUT_LIMITS } from '../../../shared/protocol.js';
 import { isPotential, isCultivate, POTENTIAL_DEFAULT, CULTIVATE_DEFAULT } from '../../../shared/potential.js';
@@ -97,8 +100,12 @@ export function parseStoredByChar(raw) {
   return isObj(raw) && raw.v === 2 && isObj(raw.byChar) ? parseStored({ entries: raw.byChar }) : {};
 }
 
-/** Serialised form for localStorage (v2: the choices by charId; `ops`: the per-operator 潜能 / 练度, 0.2.2). */
-export const toStored = (byChar, ops = {}) => ({ v: LOADOUT_VERSION, byChar: byChar || {}, ops: ops || {} });
+/**
+ * Serialised form for localStorage (v2: the choices by charId; `ops`: the per-operator 潜能 / 练度, 0.2.2; `entries`: the
+ * copy by 第二期下半's chess ids for older builds — omitted when not given; this build never reads it from a v2 store).
+ */
+export const toStored = (byChar, ops = {}, entries = undefined) => ({ v: LOADOUT_VERSION, byChar: byChar || {}, ops: ops || {},
+  ...(isObj(entries) ? { entries } : {}) });
 /** The v1 form (by chess id), written only while a v1 store still waits for its migration (ui/loadoutSync.js). */
 export const toStoredV1 = (entries, ops = {}) => ({ v: 1, entries: entries || {}, ops: ops || {} });
 

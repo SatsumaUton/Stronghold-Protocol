@@ -249,9 +249,13 @@ constant: a message or a record without a version means it, whatever the server'
   `/cs/<cs16>/`, and every file's bytes and sha256 match;
 - errors: `VERSION_UNKNOWN`, `VERSION_UNSUPPORTED`, `VERSION_VOTE` (ERR_TEXT: 本服务器没有启用该版本 ·
   该版本不能用于当前房间（例如房间开着改变玩法的插件） · 切换版本投票进行中，请等投票结束).
+- match frames: `m.public` and `m.result` carry `version` (the registry id) in a non-default version's match only, so a
+  page that never saw the room — the lobby's result replay after a kick or a grace timeout, also to a reloaded page —
+  records the settlement under that version and draws it with that version's data; the default's frames are
+  byte-identical (no key).
 - tools: Match opts `version` (non-default only, forwarded by the match host's wireOptions), the test journal's
-  `init.options.version`, the external AI observation's `context.gameVersion` and the knowledge pack's `gameVersion`
-  (non-default only), `/healthz` `versions` (only when a non-default version is enabled). BattleSpec is unchanged (`cs`
+  `init.options.version`, the external AI observation's `context.gameVersion` (its `public` is `m.public`, so it carries
+  `version` too) and the knowledge pack's `gameVersion` (non-default only), `/healthz` `versions` (only when a non-default version is enabled). BattleSpec is unchanged (`cs`
   already names the content).
 
 ---

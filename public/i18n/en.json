@@ -2346,7 +2346,7 @@
   "切换大厅版本（只影响本机）": "Switch the lobby version (this device only)",
   "切换版本投票": "Version vote",
   "切换到「{version}」投票：{agreed}/{total}": "Vote to switch to “{version}”: {agreed}/{total}",
-  "全员同意后切换；切换后需要重新准备，结算记录会清除。": "Switches once everyone agrees; afterwards everyone gets ready again and the room's settlement replay is cleared.",
+  "全员同意后切换；切换后需要重新准备，本同盟上一局的结算回放会清除。": "Switches once everyone agrees; afterwards everyone gets ready again and the Alliance's last settlement replay is cleared.",
   "同意切换": "Agree to switch",
   "拒绝切换": "Reject the switch",
   "官方「盟约·上半」{sub}（{from} – {to}）": "Official “Alliance” first half, {sub} ({from} – {to})",

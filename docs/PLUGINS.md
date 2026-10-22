@@ -906,9 +906,10 @@ cosmetic plugins only still plays the vanilla `cs` and counts as the original ga
 decisions, the measurements and the open points.
 
 Gameplay plugins (content, script and trusted) work only in rooms of 第二期下半, the default version. On a server that
-enables the official versions (`SP_VERSIONS`, DESIGN §35.23), a room of another version refuses them: room.create,
-room.setPlugins and a version proposal answer VERSION_UNSUPPORTED (`roomSets.resolve({ gameplay: false })`), and the
-插件 panel disables their switches. Cosmetic plugins carry over to every version; a proposal whose cosmetic plugins do not
+enables the official versions (`SP_VERSIONS`, DESIGN §35.23), a room of another version refuses them: room.setPlugins
+and a version proposal answer VERSION_UNSUPPORTED (`roomSets.resolve({ gameplay: false })`); room.create of such a room
+leaves the server's default gameplay plugins off (warned once in the log), or answers VERSION_UNSUPPORTED when
+`plugins/config.json` fixes every room's plugins (`rooms: "fixed"`); the 插件 panel disables their switches. Cosmetic plugins carry over to every version; a proposal whose cosmetic plugins do not
 resolve on the target version is refused as well.
 
 | File | Role |

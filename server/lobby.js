@@ -196,9 +196,10 @@
 //     without one, unless a test gave its own MatchClass).
 //     The version switch, before the match, modelled on 重刷 (server/match/match/setupVote.js): the host proposes
 //     (room.proposeVersion { version }: refused NOT_IN_ROOM, SPECTATOR, NOT_HOST, ROOM_STARTED, VERSION_UNKNOWN,
-//     VERSION_UNSUPPORTED — the room mode, or gameplay plugins on and the target not 第二期下半, or the room's cosmetic
-//     plugins not resolving on the target —, ALREADY, VERSION_VOTE, RATE — `versionProposeGapMs` (300 ms) since the last
-//     proposal, `versionRetryMs` (5 s) after a declined or expired vote [ASSUMED] —, NOT_READY — a seated human offline);
+//     VERSION_UNSUPPORTED — the room mode, or gameplay plugins on and the target not 第二期下半 —, ALREADY, VERSION_VOTE,
+//     RATE — `versionProposeGapMs` (300 ms) since the last proposal, `versionRetryMs` (5 s) after a declined or expired
+//     vote [ASSUMED] —, NOT_READY — a seated human offline —, and VERSION_UNSUPPORTED again when the room's cosmetic
+//     plugins do not resolve on the target, checked last);
 //     ▸ a lone active human switches at once; otherwise a vote opens: voters = the seated humans then (seat order; AI and
 //     spectators never vote), the host counted as agreed, `versionVoteMs` (60 s [ASSUMED]: a room has no clock to pause,
 //     unlike 重刷) to answer. room.versionVote { voteId, agree }: a decline cancels (toast to every member), the last
@@ -1652,7 +1653,7 @@ export class Lobby {
       try {
         const d = this.versions?.data(v);
         if (d) return d;
-        this.log.error(`[lobby] ${room?.code ?? '----'} the data of ${v} is not available`);
+        this.warnOnce(`[lobby] the data of ${v} is not available`);
       } catch (e) { this.log.error(`[lobby] ${room?.code ?? '----'} the data of ${v} failed`, e); }
       return Object.freeze({});
     }
@@ -2229,7 +2230,8 @@ export class Lobby {
     const prev = room.hostId;
     room.hostId = pick ? pick.playerId : null;
     if (pick && prev !== pick.playerId) this.log.info(`[lobby] ${room.code} host → ${pick.name}`);
-    // a host change voids the version vote (header "Official versions")
+    // a host change voids the version vote (header "Official versions") — defensive: while a vote is open (no match) the
+    // host only changes by leaving, kick or grace timeout, whose freed seat voided it already (removeMember)
     if (room.hostId !== prev && room.versionVote) this.voidVersionVote(room, 'members');
     // a running match follows the host change: its delegated bot rehearsals fall back to the server and later ones ask
     // the new host (DESIGN §14, Match.setHost)

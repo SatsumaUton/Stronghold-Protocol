@@ -17,8 +17,10 @@
 // Official versions (DESIGN §35.23, M1): a version filter above the tabs — the version the page shows by default, every
 // version that has records, and 全部版本 — narrows every tab (ui/stats.js recordsOfVersion); a row of another version
 // carries its tag (ui/pluginTag.js VersionTag). Re-viewing a settlement needs that version's data on the page: outside a
-// room the row offers 切换到「X」查看 (the lobby switches to it, the settlement opens once its data is checked); in a room
-// it says the room's version decides the data. 成就统计 counts the season of the version shown.
+// room the row offers 切换到「X」查看 (the page shows that version while the replay is open — the store's `replayVersion`,
+// versions.js shownVersion — and the settlement opens once its data is checked; closing the replay or 统计数据 clears it,
+// the lobby preference is never touched); in a room it says the room's version decides the data. 成就统计 counts the
+// season of the version shown.
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
@@ -42,7 +44,7 @@ import { t, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { VersionTag } from '../ui/pluginTag.js';
 import { contentSet } from '../content.js';
-import { DEFAULT_VERSION, setLobbyVersion, shownVersion, seasonOf, versionLabel } from '../versions.js';
+import { DEFAULT_VERSION, shownVersion, seasonOf, versionLabel } from '../versions.js';
 import { VERSIONS } from '../../../shared/versions.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -542,6 +544,11 @@ function Replay({ rec, onBack }) {
     content=${rec.content ? { cs: rec.content.cs, vanilla: false, plugins: rec.content.plugins } : null} version=${rec.version ?? null} />`;
 }
 
+/** 统计数据's replay closed (or the overlay): the page shows its own version again (versions.js shownVersion). */
+function clearReplayVersion() {
+  if (store.get().replayVersion != null) store.set({ replayVersion: null });
+}
+
 /** The overlay, rendered while open (its data hooks run only then). */
 function StatsScreen({ tab }) {
   const ready = useData('config', 'bands', 'bonds', 'assets');
@@ -562,7 +569,7 @@ function StatsScreen({ tab }) {
     const onKey = (e) => {
       if (e.key !== 'Escape' || document.querySelector('.modal')) return; // a confirm dialog on top takes the Esc
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      if (replayRef.current) setReplay(null); else closeStats();
+      if (replayRef.current) { setReplay(null); clearReplayVersion(); } else closeStats();
     };
     window.addEventListener('keydown', onKey, true);
     const timer = setTimeout(() => boxRef.current?.focus?.(), 30);
@@ -578,15 +585,17 @@ function StatsScreen({ tab }) {
   const agg = useMemo(() => aggregateStats(recs, { modded: withModded }), [recs, withModded]);
   // 卫戍成就's peak and the strategy marks follow the same 「含插件对局」 switch as the tallies (the history lists them all)
   const achRecords = useMemo(() => achievementRecords(recs, withModded), [recs, withModded]);
-  // a row of another version (outside a room): the lobby switches to it, the replay waits for its data
+  // a row of another version (outside a room): the page shows it while the replay is open (`replayVersion`, a transient
+  // override — the lobby preference stays), set before the replay mounts so its data hooks load that version's files;
+  // the replay waits for its data
   const openRecord = (rec) => {
     const v = recordVersion(rec);
-    if (v !== shownVersion(store.get())) {
-      if (store.get().room) return;
-      setLobbyVersion(v);
-    }
+    if (v !== shownVersion(store.get()) && store.get().room) return;
+    if (!store.get().room && store.get().replayVersion !== v) store.set({ replayVersion: v });
     setReplay(rec);
   };
+  const closeReplay = () => { setReplay(null); clearReplayVersion(); };
+  useEffect(() => clearReplayVersion, []);
   const reload = () => setStats(loadStats());
 
   const doExport = () => {
@@ -630,7 +639,7 @@ function StatsScreen({ tab }) {
   };
 
   if (replay) return html`<div class="st st--replay" ref=${boxRef} tabindex="-1" role="dialog" aria-modal="true" aria-label=${t('统计数据')}>
-    <${Replay} rec=${replay} onBack=${() => setReplay(null)} />
+    <${Replay} rec=${replay} onBack=${closeReplay} />
   </div>`;
 
   const tabInfo = TABS.find((x) => x.id === tab) || TABS[0];

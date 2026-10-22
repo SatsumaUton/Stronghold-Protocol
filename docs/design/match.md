@@ -224,8 +224,9 @@ singleton (the kits, builtinMeta, the meta registry, the official-bounds cache) 
   `opts.requireCs: true` (a client b.result must name the version's `cs`; the bot layout rehearsal is never delegated to
   a browser, `match/rehearsal.js`), never `kitted`. A version room without a version host refuses to start (`INTERNAL`):
   the server process's singletons hold 第二期下半's data. `Match.version` is the registry id (null for the default); the
-  test journal's `init.options.version`, the external AI's `context.gameVersion` and the knowledge pack's `gameVersion`
-  carry it. Both kinds: heartbeat watchdog 10 s, idle stop after 10 minutes, `diag()` (tests) reports `version` too.
+  test journal's `init.options.version`, `m.public` / `m.result` `version` (`views.js` / `results.js`: the page reads a
+  replayed result with it), the external AI's `context.gameVersion` and the knowledge pack's `gameVersion` carry it (all
+  non-default only). Both kinds: heartbeat watchdog 10 s, idle stop after 10 minutes, `diag()` (tests) reports `version` too.
 
 ---
 

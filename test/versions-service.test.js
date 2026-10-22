@@ -148,3 +148,26 @@ test('a version whose directory is missing or incomplete stays disabled, with a 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('a version whose data passed the boot checks but fails to load is remembered: logged once, null from then on, no manifest', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-versions-'));
+  try {
+    const dir = path.join(tmp, 'versions', 'act1autochess');
+    fs.cpSync(versionDataDir('act1autochess'), dir, { recursive: true });
+    const errors = [];
+    const v = createVersionSets({ enabled: ['act2autochess', 'act1autochess'], dataDir: tmp, vanilla, defaultData: getData(), log: { ...quiet, error: (m) => errors.push(m) } });
+    assert.deepEqual([...v.ids], ['act2autochess', 'act1autochess'], 'the boot checks hash the files: enabled');
+    fs.writeFileSync(path.join(dir, 'chess.json'), '{ not json'); // a file that does not parse (the boot checks only hash it)
+    assert.equal(v.data('act1autochess'), null);
+    assert.equal(errors.filter((m) => /act1autochess data failed to load/.test(m)).length, 1, errors.join('\n'));
+    fs.rmSync(dir, { recursive: true, force: true }); // never read again: the failure is remembered
+    assert.equal(v.data('act1autochess'), null);
+    assert.equal(v.dataOfCs(v.csOf('act1autochess')), null);
+    assert.equal(v.file(csUrlPart(v.csOf('act1autochess')), 'index.json'), null);
+    assert.equal(v.file(csUrlPart(v.csOf('act1autochess')), 'bounds/official.json'), null);
+    assert.equal(errors.filter((m) => /act1autochess data failed to load/.test(m)).length, 1, 'logged once');
+    assert.equal(v.stats().loaded, 0);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

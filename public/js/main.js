@@ -34,7 +34,8 @@
 // Official versions (DESIGN §35.23, versions.js): welcome.versions turns the lobby's version switch on; installContentSet
 // also loads and checks the version the page shows (the lobby's choice, a room's version). A room whose version changes
 // while a result is on screen drops that result (the server dropped the room's replay: its chess ids are the old
-// version's), and a result that arrives after the room is gone keeps the version of the room it came from (matchVersion).
+// version's), and a result that arrives after the room is gone keeps the version its frames name (m.result / m.public
+// `version`, versions.js matchFrameVersion), also on a freshly loaded page that never saw the room.
 
 // Polyfills first (older Safari / Firefox ESR): every module evaluated after this one sees them.
 import './ui/compat.js';
@@ -69,7 +70,7 @@ import { t, N_, translateWire } from '../../shared/i18n.js';
 import { recordError, installTrafficMeter } from './diag.js';
 import { installContent, installContentSet } from './content.js';
 import { cosmetics } from './cosmetics.js';
-import { sanitizeVersions, roomVersion, isDefaultVersion } from './versions.js';
+import { sanitizeVersions, roomVersion, isDefaultVersion, matchFrameVersion } from './versions.js';
 
 const RESTORE_GRACE_MS = 1500;
 const JOIN_DELAY_MS = 350;
@@ -273,10 +274,10 @@ function wireNet() {
     // replays dedupe by content id inside recordResult (spectator seats' copies build no record at all)
     // (`vs`: the room's cosmetic plugins, recorded — such a match still counts as the original game: ui/stats.js)
     // (`content`: the room's content set when it played gameplay plugins — such a match is unofficial: ui/stats.js)
-    // (`version`: the official version the match played, DESIGN §35.23 — the room's, or the last room's when the result
-    // arrives after it is gone; only a non-default one is written)
+    // (`version`: the official version the match played, DESIGN §35.23 — the room's, or the result's own `version` when
+    // it arrives after the room is gone, also to a freshly loaded page; only a non-default one is written)
     const s = store.get();
-    const version = s.room ? roomVersion(s.room) : s.matchVersion;
+    const version = s.room ? roomVersion(s.room) : matchFrameVersion({ result: res, public: s.match.public });
     if (s.room?.test !== true && s.match.public?.test !== true) recordResult(res, { myId: s.me.playerId, roomMode: s.room?.mode ?? null, vs: s.room?.content?.vs ?? null, content: s.room?.content ?? null, version: isDefaultVersion(version) ? null : version, now: Date.now() });
   });
   net.on('m.toast', (msg) => {

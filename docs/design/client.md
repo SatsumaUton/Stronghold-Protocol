@@ -605,7 +605,10 @@ The page shows one official version's data at a time (`public/js/versions.js`): 
 (`sp.pref.lobby.version`, a registry id of `shared/versions.js`) when welcome lists it, else the server's default
 (welcome.versions' `default`), else 第二期下半 (`DEFAULT_VERSION`, a code constant); in a room the room's version
 (`room.state.version`, absent = 第二期下半); a result shown after its room is gone (a kick, a grace timeout, a settlement
-left open) keeps the version of the last room seen (the store's `matchVersion`, set by every room.state). Without
+left open — also on a reloaded page that never saw the room) keeps the version its frames name (`m.result` / `m.public`
+`version`, non-default only: `versions.js matchFrameVersion`; absent = 第二期下半, never the lobby's), and main.js records
+it under that version; 统计数据's replay of a stored match of another version shows that version while it is open (the
+store's `replayVersion`, cleared when the replay or 统计数据 closes — the lobby preference is never changed). Without
 welcome.versions (a default server, G4) the switch does not exist and nothing below runs.
 
 **Data.** `content.js installContentSet` follows the version shown: 第二期下半 → the server's own files
@@ -668,20 +671,30 @@ operators the view does not show are kept. A v1 store (by 第二期下半's ches
 nothing is sent before it settles, and a store that could not migrate is not sent against another version's data. 自选
 picks are per version (`diyModel.diyPrefKey`: `sp.pref.diy` for 第二期下半, `sp.pref.diy.<slug>` else; `diyVersion` =
 `pageVersion()`). 导出 writes v2 (`byChar`, `notOwnedChars`; 自选 names a non-default `version`); 导入 reads v1 (mapped
-through 第二期下半's chess, `importedEntries` / `importedNotOwned`) and v2. Every sync (loadout, 干员持有, 自选, skins, card)
+through 第二期下半's chess, `importedEntries` / `importedNotOwned`) and v2. A v1 id that is not its operator's own chess in
+第二期下半 (two operators have a hidden droppable chess there, chess_char_5_18_a / chess_char_6_10_a — the visible ones of
+第二期上半) is dropped by the migration and a v1 import, so a mark on it never marks the visible chess. The v2 stores also
+carry the v1 fields (`entries`, `notOwned`) by 第二期下半's chess ids whenever the page has that map (loaded for the
+migration or a v1 import, or the server's own files on screen; else the copy stored before), which this build ignores
+and an older build on the same origin reads (a rollback, builds side by side); older builds refuse a v2 export
+(来自更新的版本). Every sync (loadout, 干员持有, 自选, skins, card)
 waits for the data the server checks against (`canSendSettings`): never while the page's content loads; in a room once
 the room's content is on the page; outside a room only while the page shows the server's default version (the server
 checks outside-room settings against that version's data, `server/lobby.js dataFor` / `csOf`: 第二期下半's own files, or
 on a server whose `SP_VERSION_DEFAULT` names another version that version's checked set) — and a room entered after the
 lobby could not send them sends them then (not at every room entry: the server keeps the session's copy, and five sends
-at once would spend the server's heavy-message budget an edit needs). The wire keys of `room.loadout` / `room.ownership`
+at once would spend the server's heavy-message budget an edit needs). A content change (a version switch, a room's set)
+sends the seat-bound settings again (loadout, 干员持有, 自选: the server checks them against the room's data and drops them
+on a switch); skins and the card are kept on the session, so they go out then only when their payload changed
+(`installPrefSync` `seatBound: false`). The wire keys of `room.loadout` / `room.ownership`
 stay the chess ids of the room's data.
 
 **Statistics.** Records of another version carry `version` (a registry id, never 第二期下半; not part of the record id;
 `STATS_VERSION` 3, `MIGRATIONS[2]` rewrites nothing — a record without one played 第二期下半). 统计数据 has a version filter
 (the version shown by default, every version with records, 全部版本: `recordsOfVersion`) narrowing every tab; history rows
 carry the VersionTag. Re-viewing another version's settlement needs that version's data: outside a room the row offers
-「切换到「X」查看」 (the lobby switches, the settlement opens once its data is checked), in a room it is disabled with a hint.
+「切换到「X」查看」 (the page shows that version while the replay is open, `replayVersion`; the settlement opens once its data
+is checked), in a room it is disabled with a hint.
 The levels (`settle.js levelProgress` `season`), the lobby card and 成就统计 count one season (`recordsOfSeason`:
 第一期 = both act1autochess versions, 第二期 = both act2autochess).
 

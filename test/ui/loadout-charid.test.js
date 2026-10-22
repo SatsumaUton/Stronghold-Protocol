@@ -67,7 +67,9 @@ test('views and write-back (pure): the same operator under each version\'s id; a
 });
 
 test('migration: a v1 store moves to v2 through 第二期下半\'s chess.json (fetched directly); a failed fetch keeps it and tries again', async () => {
-  const target = createStore({ entries: { chess_char_1_02_a: { skill: 1 }, chess_nope_99: { skill: 0 } }, byChar: null, ops: {}, notOwned: ['chess_char_3_01_a'], notOwnedChars: null, diy: {}, diyVersion: 'act2autochess' });
+  // chess_char_5_18_a is 第二期下半's hidden droppable chess of an operator whose visible one is chess_char_4_23_a: a v1
+  // mark on it showed nothing, and must not mark the visible chess now
+  const target = createStore({ entries: { chess_char_1_02_a: { skill: 1 }, chess_nope_99: { skill: 0 } }, byChar: null, ops: {}, notOwned: ['chess_char_3_01_a', 'chess_char_5_18_a'], notOwnedChars: null, diy: {}, diyVersion: 'act2autochess' });
   let calls = 0;
   const failing = async () => { calls++; return { ok: false, status: 503 }; };
   assert.equal(await S.migrateSettings({ fetch: failing, target }), false);
@@ -76,8 +78,10 @@ test('migration: a v1 store moves to v2 through 第二期下半\'s chess.json (f
   assert.equal(await S.migrateSettings({ fetch: fetchFn, target }), true);
   assert.deepEqual(target.get().byChar, { [YAK]: { skill: 1 } });
   assert.deepEqual(target.get().notOwnedChars, [ANGEL]);
-  assert.deepEqual(JSON.parse(mem.get('sp.pref.loadout')), { v: 2, byChar: { [YAK]: { skill: 1 } }, ops: {} });
-  assert.deepEqual(JSON.parse(mem.get('sp.pref.ownership')), { v: 2, notOwnedChars: [ANGEL] });
+  // the v2 stores also carry the v1 fields by 第二期下半's chess ids, which an older build on the same origin reads
+  assert.deepEqual(JSON.parse(mem.get('sp.pref.loadout')), { v: 2, byChar: { [YAK]: { skill: 1 } }, ops: {}, entries: { chess_char_1_02_a: { skill: 1 } } });
+  assert.deepEqual(JSON.parse(mem.get('sp.pref.ownership')), { v: 2, notOwnedChars: [ANGEL], notOwned: ['chess_char_3_01_a'] });
+  assert.deepEqual(M.parseStored(JSON.parse(mem.get('sp.pref.loadout'))), { chess_char_1_02_a: { skill: 1 } }, 'what an older build reads');
   assert.equal(await S.migrateSettings({ fetch: fetchFn, target }), true, 'done: at once');
   assert.equal(calls, 2);
   assert.equal(S.defaultCharMap().toChar.get('chess_char_1_02_a'), YAK, 'the map stays for a v1 import');
@@ -107,13 +111,15 @@ test('the app\'s views follow the data on screen; a write-back on a stale view i
   assert.deepEqual(loadoutStore.get().byChar, { [YAK]: { skill: 2 } }, '讯使 reset from the 第一期下半 view');
   setNotOwned(['chess_char_1_02_a']);
   assert.deepEqual(loadoutStore.get().notOwnedChars, [BLACKD]);
-  assert.deepEqual(JSON.parse(mem.get('sp.pref.ownership')), { v: 2, notOwnedChars: [BLACKD] });
+  assert.deepEqual(JSON.parse(mem.get('sp.pref.ownership')), { v: 2, notOwnedChars: [BLACKD], notOwned: [] }, '讯使 has no chess in 第二期下半: an older build sees everyone owned');
   // a v1 import (第二期下半's chess ids) as entries of the view on screen is importedEntries' job; a v2 one maps directly
   assert.deepEqual(S.importedEntries({ byChar: { [YAK]: { skill: 1 } } }), { chess_char_2_03_a: { skill: 1 } });
   show(DEF, 'def');
   refreshViews();
   assert.deepEqual(loadoutStore.get().entries, { chess_char_1_02_a: { skill: 2 } });
   assert.deepEqual(loadoutStore.get().notOwned, [], '讯使 is not in 第二期下半');
+  // a v1 ownership import: a hidden chess (see the migration) is dropped, not filed under the visible chess's operator
+  assert.deepEqual(S.importedNotOwned({ notOwned: ['chess_char_5_18_a', 'chess_char_6_10_a', 'chess_char_3_01_a'] }), ['chess_char_3_01_a']);
   data.setContent(null);
 });
 

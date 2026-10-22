@@ -157,6 +157,28 @@ export function loadDefaultCharMap({ fetch: doFetch = (...a) => globalThis.fetch
 /** The map loaded so far (null until loadDefaultCharMap resolved). */
 export const defaultCharMap = () => defaultMap;
 
+/**
+ * The v1 copy a v2 store also carries for older builds (ui/loadoutModel.js toStored, ownershipModel.js toStoredOwnership):
+ * the settings by 第二期下半's chess ids through its map when the page has it (loaded for the migration or a v1 import, or
+ * the server's own files on screen), else the copy stored before (undefined when there is none).
+ * @param {string} key @param {string} field @param {(map: { toChar: Map<string, string>, toChess: Map<string, string> }) => any} view
+ */
+function legacyCopy(key, field, view) {
+  const map = defaultCharMap() || (appContentSet.get().kind == null ? shownCharMap() : null);
+  if (map) return view(map);
+  const prev = readPref(key);
+  return prev && prev.v === 2 && prev[field] != null ? prev[field] : undefined;
+}
+const storeLoadout = (byChar, ops) => savePref(LOADOUT_PREF, toStored(byChar, ops, legacyCopy(LOADOUT_PREF, 'entries', (m) => entriesView(byChar, m))));
+const storeOwnership = (chars) => savePref(OWNERSHIP_PREF, toStoredOwnership(chars, legacyCopy(OWNERSHIP_PREF, 'notOwned', (m) => notOwnedView(chars, m))));
+/**
+ * A v1 id that is its operator's own chess in 第二期下半 (toChess(toChar(id)) === id): two operators also have a hidden
+ * droppable chess there (chess_char_5_18_a, chess_char_6_10_a — the visible ones of 第二期上半), and a mark on it, which
+ * showed nothing before, must not become a mark on the visible chess of that operator.
+ * @param {{ toChar: Map<string, string>, toChess: Map<string, string> }} map
+ */
+const ownChessOf = (map) => (id) => map.toChess.get(map.toChar.get(id)) === id;
+
 let migration = null;
 /**
  * Migrate a v1 store (chess ids of 第二期下半) to v2 by operator (see the header of ui/loadoutModel.js): resolves true
@@ -175,12 +197,12 @@ export function migrateSettings({ fetch: doFetch, target = loadoutStore } = {}) 
     const charOf = (id) => map.toChar.get(id);
     const patch = {};
     if (!cur.byChar) {
-      patch.byChar = entriesToChar(cur.entries, charOf, (id) => map.toChess.get(map.toChar.get(id)) === id);
-      savePref(LOADOUT_PREF, toStored(patch.byChar, cur.ops));
+      patch.byChar = entriesToChar(cur.entries, charOf, ownChessOf(map));
+      storeLoadout(patch.byChar, cur.ops);
     }
     if (!cur.notOwnedChars) {
-      patch.notOwnedChars = cleanIds(cur.notOwned.map(charOf).filter(Boolean));
-      savePref(OWNERSHIP_PREF, toStoredOwnership(patch.notOwnedChars));
+      patch.notOwnedChars = cleanIds(cur.notOwned.filter(ownChessOf(map)).map(charOf).filter(Boolean));
+      storeOwnership(patch.notOwnedChars);
     }
     target.set(patch);
     if (target === loadoutStore) refreshViews({ target });
@@ -206,7 +228,7 @@ function charOfFor(map, lookup) {
 }
 
 function persistLoadout(s) {
-  savePref(LOADOUT_PREF, s.byChar ? toStored(s.byChar, s.ops) : toStoredV1(s.entries, s.ops));
+  if (s.byChar) storeLoadout(s.byChar, s.ops); else savePref(LOADOUT_PREF, toStoredV1(s.entries, s.ops));
 }
 
 /**
@@ -228,7 +250,7 @@ export function setEntries(entries, { base, lookup } = {}) {
   }
   const map = viewMaps.get(from) || (from === s.entries ? shownCharMap() : null);
   const byChar = rebaseByChar(s.byChar, from, next, charOfFor(map, lookup));
-  savePref(LOADOUT_PREF, toStored(byChar, s.ops));
+  storeLoadout(byChar, s.ops);
   if (from === s.entries) {
     if (map) viewMaps.set(next, map);
     loadoutStore.set({ entries: next, byChar });
@@ -257,15 +279,16 @@ export function importedEntries(parsed) {
   const entries = parsed?.entries || {};
   const def = defaultCharMap();
   if (!map || !def || pageVersion() === DEFAULT_VERSION) return entries;
-  return entriesView(entriesToChar(entries, (id) => def.toChar.get(id)), map);
+  return entriesView(entriesToChar(entries, (id) => def.toChar.get(id), ownChessOf(def)), map);
 }
 
 /** Like importedEntries for a 干员持有 import: chess ids of the view on screen. @param {{ notOwned?: string[], notOwnedChars?: string[] }} parsed */
 export function importedNotOwned(parsed) {
   const map = shownCharMap();
   if (parsed?.notOwnedChars) return map ? notOwnedView(parsed.notOwnedChars, map) : [];
-  const list = parsed?.notOwned || [];
   const def = defaultCharMap();
+  // a v1 list's hidden chess (see ownChessOf) is dropped, here too on 第二期下半: setNotOwned would file it under the operator
+  const list = (parsed?.notOwned || []).filter((id) => !def || !def.toChar.has(id) || ownChessOf(def)(id));
   if (!map || !def || pageVersion() === DEFAULT_VERSION) return list;
   return notOwnedView(list.map((id) => def.toChar.get(id)).filter(Boolean), map);
 }
@@ -314,7 +337,7 @@ export function setNotOwned(list, { base, lookup } = {}) {
   }
   const map = viewMaps.get(from) || (from === s.notOwned ? shownCharMap() : null);
   const chars = rebaseChars(s.notOwnedChars, from, next, charOfFor(map, lookup));
-  savePref(OWNERSHIP_PREF, toStoredOwnership(chars));
+  storeOwnership(chars);
   if (from === s.notOwned) {
     if (map) viewMaps.set(next, map);
     loadoutStore.set({ notOwned: next, notOwnedChars: chars });
@@ -404,9 +427,12 @@ export function canSendSettings({ store: app = store, content = appContentSet, c
  * One setting kept in sync with the server (see the header): `key` = the store field (or a list of them: the loadout's
  * `entries` and `ops`), `stateKey` = its sync state field, `msgType` / `field` = the C2S message (`field` null: the payload
  * is the message body), `prepare()` → the payload to send (may await data; null = the data is missing: nothing is sent,
- * state 'error'), `lockedText` = what a refused edit tells the player.
+ * state 'error'), `lockedText` = what a refused edit tells the player. `seatBound` (default true): the server keeps the
+ * setting per room data — it checks it against the room's content and drops it on a version switch —, so a content
+ * change sends it again; false (skins, the card: kept on the session whatever the room plays) sends it on a content change
+ * only when the payload changed (a version switch or a room's arrival then spends no heavy-message budget on them).
  */
-function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, field, prepare, lockedText, tag, content = appContentSet, gate = null, app = store }) {
+function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, field, prepare, lockedText, tag, content = appContentSet, gate = null, app = store, seatBound = true }) {
   const T = timers || { setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms), clearTimeout: (id) => globalThis.clearTimeout(id) };
   // (`lockedText` is a msgid: the toast is translated when it shows — docs/I18N.md)
   const tell = notify || ((text) => toast(t(text), 'warn'));
@@ -499,13 +525,14 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
     roomCode = code;
     if (code && gated) { revision++; lastSent = null; schedule(50); }
   }) : null;
-  // the room's content set arrived or went (DESIGN §32.6): sent again, checked against the data the room plays now
+  // the room's content set arrived or went (DESIGN §32.6): sent again, checked against the data the room plays now (a
+  // setting that is not seat-bound only when its payload changed: `seatBound`)
   let contentKey = content ? `${content.get().cs}|${content.get().status}` : '';
   const offContent = content ? content.subscribe((c) => {
     const k = `${c.cs}|${c.status}`;
     if (k === contentKey) return;
     contentKey = k;
-    if (c.status === 'ready' || c.status === 'idle') { revision++; lastSent = null; schedule(50); }
+    if (c.status === 'ready' || c.status === 'idle') { revision++; if (seatBound) lastSent = null; schedule(50); }
   }) : null;
 
   return {
@@ -611,7 +638,7 @@ export function installOwnershipSync({ net, timers, target = loadoutStore, notif
  */
 export function installSkinsSync({ net, timers, target = skinsStore, notify, content = appContentSet, app = store, gate = null } = {}) {
   return installPrefSync({
-    net, timers, target, notify, content, app, gate, key: SKINS_KEY, stateKey: SKINS_SYNC_KEY, msgType: 'room.skins', field: 'skins', tag: 'skins',
+    net, timers, target, notify, content, app, gate, seatBound: false, key: SKINS_KEY, stateKey: SKINS_SYNC_KEY, msgType: 'room.skins', field: 'skins', tag: 'skins',
     lockedText: N_('这台服务器不接受皮肤选择，只有本机保存'),
     prepare: async () => parseStoredSkins(target.get()[SKINS_KEY]),
   });
@@ -633,7 +660,7 @@ export function installCardSync({ net, timers, target = cardStore, getChessReady
   return installPrefSync({
     net, timers, target, notify, key: CARD_KEY, stateKey: CARD_SYNC_KEY, msgType: 'room.card', field: null, tag: 'card',
     lockedText: null, // room.card has no phase gate: never WRONG_PHASE / ROOM_STARTED
-    content, app, gate,
+    content, app, gate, seatBound: false,
     async prepare() {
       const want = target.get()[CARD_KEY];
       if (!want) return { charId: '' };

@@ -233,13 +233,15 @@ test('refusals of room.proposeVersion, in their order', () => {
   h.lobby.shutdown();
 });
 
-test('what voids a vote (toast to every member): a join, a spectator sitting down, a leave, a kick, a host change, a voter dropping', () => {
+test('what voids a vote (toast to every member): a join, a spectator sitting down, a leave, a kick, the host leaving (its freed seat), a voter dropping', () => {
   const cases = {
     join: (h, { room }) => ok(h.lobby.join(h.player('Late'), { code: room.code })),
     sit: (h, { room, spy }) => ok(h.lobby.join(spy, { code: room.code })),
     leave: (h, { people }) => ok(h.lobby.leave(people[2])),
     kick: (h, { people, room }) => ok(h.lobby.kick(people[0], { seat: room.seatOf(people[2].playerId).seat, playerId: people[2].playerId })),
-    host: (h, { people }) => ok(h.lobby.leave(people[0])),
+    // the host leaving frees its seat, which voids the vote before migrateHost runs (migrateHost's own void is defensive:
+    // while a vote is open the host changes no other way)
+    hostLeaves: (h, { people }) => ok(h.lobby.leave(people[0])),
     drop: (h, { people }) => { people[1].connected = false; h.lobby.onDisconnect(people[1]); },
   };
   for (const [name, act] of Object.entries(cases)) {
@@ -259,7 +261,7 @@ test('what voids a vote (toast to every member): a join, a spectator sitting dow
   }
 });
 
-test('what does not void a vote: spectators coming and going, AI seats added and removed', () => {
+test('what does not void a vote: spectators coming and going (a spectator\'s socket dropping too), AI seats added and removed', () => {
   const h = harness();
   const { people: [a], room } = coop(h, 2);
   ok(h.lobby.proposeVersion(a, { version: 'act1autochess' }));
@@ -271,6 +273,10 @@ test('what does not void a vote: spectators coming and going, AI seats added and
   ok(h.lobby.leave(spy2));
   ok(h.lobby.addBot(a));
   ok(h.lobby.removeBot(a, { seat: room.seats.findIndex((s) => s && s.isBot) }));
+  const spy3 = h.player('Spy3');
+  ok(h.lobby.spectate(spy3, { code: room.code }));
+  spy3.connected = false;
+  h.lobby.onDisconnect(spy3);
   assert.equal(room.versionVote?.id, 1);
   h.lobby.shutdown();
 });
@@ -466,6 +472,11 @@ test('the content gate: contentReady flips the seat, ready / start wait for it; 
 test('a switch: others un-readied, settings cleared, a card the version lacks dropped, replay gone, every page loading', () => {
   const h = harness();
   const { people: [a, b], room } = coop(h, 2);
+  const spy = h.player('Spy');
+  ok(h.lobby.spectate(spy, { code: room.code }));
+  // the last match's replay, still owed to everyone — a spectator too (buildReplay): the old version's chess ids, so the
+  // WHOLE replay goes with the switch, not only the proposer's (proposeVersion drops that one itself)
+  room.replay = { publicFrame: null, frames: new Map([[a.playerId, '{}'], [b.playerId, '{}'], [spy.playerId, '{}']]), pending: new Set([a.playerId, b.playerId, spy.playerId]) };
   ok(h.lobby.card(b, { charId: 'char_494_vendla' }));
   ok(h.lobby.card(a, { charId: 'char_102_texas' }));
   ok(h.lobby.loadout(b, { entries: { chess_char_1_02_a: { skill: 0 } } }));
@@ -482,6 +493,8 @@ test('a switch: others un-readied, settings cleared, a card the version lacks dr
   assert.equal(room.seatOf(a.playerId).card, 'char_102_texas');
   assert.equal(b.loadout?.chess_char_1_02_a?.skill, 0, 'the session keeps its own copy (the page sends again)');
   assert.deepEqual(h.last(a).seats.filter(Boolean).map((s) => s.content), ['loading', 'loading']);
+  assert.equal(room.replay, null, 'the replay is gone');
+  assert.equal(h.lobby.replayFor(room, spy.playerId), null, 'a spectator is never replayed the old version\'s result');
   h.lobby.shutdown();
 });
 

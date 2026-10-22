@@ -13,7 +13,8 @@
 // By operator (DESIGN §35.23, M1): stored as charIds — `sp.pref.ownership` = { v: 2, notOwnedChars } — so 第一期's reused
 // chess ids never mark another operator; ui/loadoutSync.js shows `notOwned` (chess ids of the data on screen) as a view
 // (notOwnedView) and writes an edit back by operator (rebaseChars). A v1 list (chess ids of 第二期下半) is migrated
-// through 第二期下半's chess.json; 导出 writes v2, 导入 reads v1 and v2.
+// through 第二期下半's chess.json; 导出 writes v2, 导入 reads v1 and v2. A v2 store also carries `notOwned` (the same list by
+// 第二期下半's chess ids, when the page has that map) for an older build on the same origin; this build ignores it.
 
 import { checkNotOwned, OWNERSHIP_LIMITS } from '../../../shared/protocol.js';
 import { isDroppableChess, standInRecord } from '../../../shared/standIn.js';
@@ -61,8 +62,9 @@ export function parseStoredOwnershipChars(raw) {
   return isObj(raw) && raw.v === 2 ? cleanIds(raw.notOwnedChars) : [];
 }
 
-/** Serialised form for localStorage (v2: charIds). */
-export const toStoredOwnership = (notOwnedChars) => ({ v: OWNERSHIP_VERSION, notOwnedChars: cleanIds(notOwnedChars) });
+/** Serialised form for localStorage (v2: charIds; `notOwned`: the copy by 第二期下半's chess ids for older builds, when given). */
+export const toStoredOwnership = (notOwnedChars, notOwned = undefined) => ({ v: OWNERSHIP_VERSION, notOwnedChars: cleanIds(notOwnedChars),
+  ...(Array.isArray(notOwned) ? { notOwned: cleanIds(notOwned) } : {}) });
 /** The v1 form (chess ids), written only while a v1 store still waits for its migration. */
 export const toStoredOwnershipV1 = (notOwned) => ({ v: 1, notOwned: cleanIds(notOwned) });
 

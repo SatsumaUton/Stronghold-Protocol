@@ -6,9 +6,12 @@
 //     welcome.versions the switch is off and the page shows the default data, as before M1.
 //   * A room: the room's version (room.state.version; absent = 第二期下半), whatever the preference — joining a room of
 //     another version loads that version, leaving restores the preference.
-//   * A result shown after the room is gone (a kick, a grace timeout: the lobby replays the result after room.closed;
-//     a settlement screen left open) keeps the version of the room it came from (the store's `matchVersion`, main.js), so
-//     its operators are read from the data they played.
+//   * A result shown after the room is gone (a kick, a grace timeout: the lobby replays the result after room.closed,
+//     also to a freshly loaded page; a settlement screen left open) keeps the version of the match it came from: the
+//     frames say it (m.public / m.result `version`, a non-default match only), so its operators are read from the data
+//     they played.
+//   * 统计数据's replay of a stored match of another version (outside a room): the store's `replayVersion` while it is
+//     open (screens/stats.js) — the lobby preference is not touched.
 // The difficulties a version offers (its config's modes) and the fallback for one it does not offer follow the server's
 // rule (the highest offered one below it, else the lowest offered: ABYSS → HARD), re-implemented here because the page
 // imports no server code. content.js loads and checks the version's data (loadVersionSet); every screen reads it through
@@ -76,13 +79,23 @@ export function lobbyVersion(s) {
 export const roomVersion = (room) => (typeof room?.version === 'string' && room.version ? room.version : DEFAULT_VERSION);
 
 /**
- * The version the page shows: the room's in a room; a result's after its room is gone (the store's `matchVersion` while
- * m.public / m.result are on screen); else the lobby's.
+ * The version a match's frames say they played (m.result / m.public `version`; absent = 第二期下半, the server writes it
+ * for a non-default match only). @param {any} match the store's `match`
+ */
+export function matchFrameVersion(match) {
+  const v = match?.result?.version ?? match?.public?.version;
+  return typeof v === 'string' && versionById(v) ? v : DEFAULT_VERSION;
+}
+
+/**
+ * The version the page shows: the room's in a room; a stored match's while 统计数据 replays it (`replayVersion`); a
+ * result's after its room is gone (its frames' version while m.public / m.result are on screen); else the lobby's.
  * @param {any} s the app store's state
  */
 export function shownVersion(s) {
   if (s?.room) return roomVersion(s.room);
-  if ((s?.match?.public || s?.match?.result) && typeof s?.matchVersion === 'string') return s.matchVersion;
+  if (typeof s?.replayVersion === 'string' && versionById(s.replayVersion)) return s.replayVersion;
+  if (s?.match?.public || s?.match?.result) return matchFrameVersion(s.match);
   return lobbyVersion(s);
 }
 

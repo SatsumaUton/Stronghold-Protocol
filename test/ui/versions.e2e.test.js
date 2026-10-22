@@ -164,6 +164,16 @@ describe('official versions (real server, SP_VERSIONS=all)', { skip: !ENABLED &&
       await host.click('[data-testid="stats-version"] [data-version="all"]');
       await host.page.waitForFunction(() => document.querySelectorAll('.st-table--history tbody tr').length === 2);
       await host.shot('stats');
+      // re-viewing the 第二期下半 record from the 第一期下半 lobby shows 第二期下半 while it is open, and the lobby's own
+      // choice stays (the store's replayVersion; the row used to switch the lobby for good)
+      await host.click('.st-table--history tr[data-version="act2autochess"]');
+      await waitState(host, (s) => s.kind === null && s.lobby === 'act1autochess', 'the replay shows 第二期下半');
+      await host.page.waitForSelector('.st--replay', { visible: true });
+      await host.page.waitForFunction(() => !document.querySelector('.st--replay .st-loading'), { timeout: 20000 });
+      assert.equal(await host.page.evaluate(() => localStorage.getItem('sp.pref.lobby.version')), '"act1autochess"', 'the lobby preference is untouched');
+      await host.page.keyboard.press('Escape');
+      await waitState(host, (s) => s.kind === 'version' && s.version === 'act1autochess' && s.status === 'ready', 'closing the replay shows the lobby\'s version again');
+      assert.equal(await host.page.evaluate(() => globalThis.__SP__.store.get().replayVersion), null);
 
       assert.deepEqual(problemsOf([host, guest]), []);
     } catch (err) {

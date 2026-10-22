@@ -44,7 +44,7 @@ test('lobbyVersion: the preference when welcome lists it, else the server\'s def
   assert.equal(V.lobbyVersion({ versions: V.sanitizeVersions([{ id: 'act1autochess', cs: CS('b') }]), lobbyVersion: null }), 'act2autochess', 'no default marked: 第二期下半');
 });
 
-test('roomVersion / shownVersion: a room plays its version; a result keeps the last room\'s once the room is gone; else the lobby', () => {
+test('roomVersion / shownVersion: a room plays its version; a result keeps its frames\' version once the room is gone; a stats replay its own; else the lobby', () => {
   assert.equal(V.roomVersion(null), 'act2autochess');
   assert.equal(V.roomVersion({ code: 'A' }), 'act2autochess', 'absent = 第二期下半');
   assert.equal(V.roomVersion({ version: 'act1autochess' }), 'act1autochess');
@@ -52,8 +52,18 @@ test('roomVersion / shownVersion: a room plays its version; a result keeps the l
   assert.equal(V.shownVersion(s), 'act1autochess@V1_1');
   assert.equal(V.shownVersion({ ...s, room: { code: 'A' } }), 'act2autochess', 'a default room overrides the lobby');
   assert.equal(V.shownVersion({ ...s, room: { code: 'A', version: 'act1autochess' } }), 'act1autochess');
-  assert.equal(V.shownVersion({ ...s, room: null, matchVersion: 'act1autochess', match: { public: { phase: 'RESULT' } } }), 'act1autochess', 'a result after the room is gone');
+  assert.equal(V.shownVersion({ ...s, room: null, matchVersion: 'act1autochess', match: { public: { phase: 'RESULT', version: 'act1autochess' } } }), 'act1autochess', 'a result after the room is gone');
+  // a freshly loaded page that never saw the room (the lobby's replay after a kick / grace timeout): the frames say it
+  assert.equal(V.shownVersion({ ...s, room: null, matchVersion: null, match: { public: null, result: { victory: true, version: 'act1autochess' } } }), 'act1autochess', 'a replayed result on a fresh page');
+  assert.equal(V.shownVersion({ ...s, room: null, matchVersion: null, match: { public: { phase: 'RESULT' }, result: { victory: true } } }), 'act2autochess', 'frames without `version`: 第二期下半, not the lobby\'s');
+  assert.equal(V.shownVersion({ ...s, room: null, match: { public: null, result: { version: 'act9' } } }), 'act2autochess', 'an unknown id: the default');
   assert.equal(V.shownVersion({ ...s, room: null, matchVersion: 'act1autochess', match: { public: null, result: null } }), 'act1autochess@V1_1', 'the result closed: the lobby again');
+  // 统计数据's replay: a transient override, the lobby preference untouched; a room still wins
+  assert.equal(V.shownVersion({ ...s, replayVersion: 'act2autochess@V2_1' }), 'act2autochess@V2_1', 'a stats replay of another version');
+  assert.equal(V.shownVersion({ ...s, replayVersion: 'act2autochess@V2_1', room: { code: 'A', version: 'act1autochess' } }), 'act1autochess', 'a room wins over a replay');
+  assert.equal(V.shownVersion({ ...s, replayVersion: 'act9' }), 'act1autochess@V1_1', 'an unknown replay id is ignored');
+  assert.equal(V.matchFrameVersion({ result: { version: 'act1autochess@V1_1' }, public: { version: 'act1autochess' } }), 'act1autochess@V1_1', 'the result\'s own first');
+  assert.equal(V.matchFrameVersion(null), 'act2autochess');
 });
 
 test('setLobbyVersion: saved as sp.pref.lobby.version and shown at once; an unknown id is ignored', () => {

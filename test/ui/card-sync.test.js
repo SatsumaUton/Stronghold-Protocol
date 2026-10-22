@@ -118,3 +118,22 @@ test('card sync: offline it waits for the next welcome (no request)', async (t) 
   await h.timers.advance(50);
   assert.deepEqual(h.net.sent, [{ t: 'room.card', charId: 'char_1_a' }]);
 });
+
+test('card sync: a content change (a version switch, a room\'s set) with the same payload sends nothing — the session keeps the card (DESIGN §35.23)', async (t) => {
+  const h = harness({ card: 'char_1_a' });
+  t.after(h.dispose);
+  await h.flush();
+  assert.equal(h.net.sent.length, 1);
+  h.content.set({ cs: 'd'.repeat(64), status: 'loading' });
+  h.content.set({ cs: 'd'.repeat(64), status: 'ready' });
+  await h.timers.advance(50);
+  h.content.set({ cs: null, status: 'idle' });
+  await h.timers.advance(50);
+  assert.equal(h.net.sent.length, 1, 'no heavy message spent on an unchanged card');
+  assert.equal(h.target.get()[CARD_SYNC_KEY], 'synced');
+  // the set no longer lists the operator: the payload changed, so it goes out
+  h.setList(CHESS.filter((c) => c.charId !== 'char_1_a'));
+  h.content.set({ cs: 'e'.repeat(64), status: 'ready' });
+  await h.timers.advance(50);
+  assert.deepEqual(h.net.sent.at(-1), { t: 'room.card', charId: '' });
+});

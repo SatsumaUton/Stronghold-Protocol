@@ -88,22 +88,37 @@ export function createVersionSets({ enabled, defaultId = DEFAULT_VERSION, dataDi
   /** @type {Map<string, Readonly<Record<string, any>>>} */
   const contents = new Map();
 
-  /** The version's data, loaded once (deep-frozen by loadData). */
+  /**
+   * The version's data, loaded once (deep-frozen by loadData). A load that throws or leaves a data file out (it passed the
+   * boot checks: those hash the files and parse config.json only) is remembered: logged once, null from then on — the
+   * 4.6–5.2 MB directory is never read again on the event loop at every room message.
+   */
   const load = (id) => {
     const v = others.get(id);
-    if (!v) return null;
+    if (!v || v.failed) return null;
     if (!v.data) {
-      v.data = loadData(v.dir, { log: /** @type {any} */ (log), expected: VERSION_DATA_FILES });
+      try {
+        const data = loadData(v.dir, { log: /** @type {any} */ (log), expected: VERSION_DATA_FILES });
+        const missing = VERSION_DATA_FILES.filter((f) => !(f in data));
+        if (missing.length) throw new Error(`${missing.map((f) => `${f}.json`).join(', ')} not loaded`);
+        v.data = data;
+      } catch (e) {
+        v.failed = e;
+        log.error(`[versions] ${id} data failed to load from ${v.dir} — unavailable until the server restarts`, e);
+        return null;
+      }
       log.info?.(`[versions] ${id} data loaded (${Object.keys(v.data).length} files)`);
     }
     return v.data;
   };
-  /** Its official-bounds snapshot and the served body (canonical JSON). */
+  /** Its official-bounds snapshot and the served body (canonical JSON); null when its data failed to load. */
   const boundsOf = (id) => {
     const v = others.get(id);
     if (!v) return null;
     if (!v.bounds) {
-      v.bounds = officialBoundsOf(load(id));
+      const data = load(id);
+      if (!data) return null;
+      v.bounds = officialBoundsOf(data);
       v.boundsBody = Buffer.from(canonicalJson(v.bounds));
     }
     return v.bounds;
@@ -112,7 +127,7 @@ export function createVersionSets({ enabled, defaultId = DEFAULT_VERSION, dataDi
     const v = others.get(id);
     if (!v) return null;
     if (!v.index) {
-      boundsOf(id);
+      if (!boundsOf(id)) return null;
       const body = /** @type {Buffer} */ (v.boundsBody);
       const cs16 = csUrlPart(v.content.cs);
       v.index = Buffer.from(JSON.stringify(contentIndexOf(/** @type {any} */ (v.content), {
