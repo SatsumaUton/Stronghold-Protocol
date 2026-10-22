@@ -363,3 +363,8 @@ DSL plugin budget and attribution. Vanilla registrations remain empty; no offici
 
 The same SDK and scriptGuard apply inside SES in sandbox mode (DESIGN §32.11); the evaluator consumes verified
 script descriptors. SDK-owned results are frozen copies; live Battle/Unit objects are not hardened.
+
+### Damage penetration
+
+Subtract fixed DEF/RES penetration, clamp at zero, then apply percentage penetration.
+Source: [PRTS damage formula](https://prts.wiki/w/游戏数据基础#伤害公式).

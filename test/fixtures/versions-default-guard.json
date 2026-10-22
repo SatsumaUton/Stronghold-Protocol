@@ -26,11 +26,11 @@
   },
   "golden": {
     "test/golden/bonds.json": "873e039d862eae11e3e67101736942cdefca2d92b5d4092b4874162a813a784b",
-    "test/golden/diy.json": "22123f7935353523e0476f719813ad806d4c22d02a8d6300d63669d63856c431",
-    "test/golden/fields.json": "28650e3cac6fdcc3b589456c2e4a35b3b4ac2ad7f298d0b47b0ae43bc5b01035",
-    "test/golden/matches.json": "6a44edc1a23713ee2508bfd9e31bc586cbdc84c177642be31a24ddd067f1be93",
-    "test/golden/roster.json": "eb4cde7ae9226633ef76a2db001687e61dc39dc49dd0f86d4903e4865ffbc734",
-    "test/golden/standins.json": "4dd432566bbb024226b9cac3b1f42049f683fe0b6bd2a7a1c94c8e10441465cc"
+    "test/golden/diy.json": "f449c192feb69cbd484ecf33de2de3f16ddc10030a4e6cec93ac6ca84ddebaf5",
+    "test/golden/fields.json": "46559757ab135080599c4cb693dcd22959413b29c2237615228efb457a8833e3",
+    "test/golden/matches.json": "67926adcaca909bffc6159f824e2e8cc05ba51714b54ccc4202837168b748cda",
+    "test/golden/roster.json": "664641e2e7bebcdf0fa9ffe4e781f264c5b3c8d9975f3d70ebf571abe472ae5a",
+    "test/golden/standins.json": "5181e307ab5f0fee7de2ae8cc4ec13473ad6348475494f5ea756eea50343e4ad"
   },
   "kat": {
     "cs": "7d6565abd4c1ec7ceaf979a2d82f90a04f5fe3a11a03d822c6775b2a6c632309",
