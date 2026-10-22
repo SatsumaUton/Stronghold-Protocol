@@ -856,8 +856,9 @@
   display: inline-flex;
   align-items: center;
   gap: .04rem;
-  height: .32rem;
-  padding: 0 .14rem 0 .11rem;
+  /* at least .32rem, taller when 大 / 特大 outgrows it (12.8 px on a phone held a 15.8 px line — §35.18 review) */
+  min-height: .32rem;
+  padding: 1px .14rem 1px .11rem;
   border-radius: 99px;
   background: rgba(0, 0, 0, .5);
   border: 1px solid var(--line);
@@ -1078,8 +1079,9 @@
 .crash__box h2 { font-size: calc(.3 * var(--t)); }
 
 /* ---- plugins (DESIGN §32 P1a): the room's tag 原版 / 插件 ×N (ui/pluginTag.js), its 插件 panel and the title's list (ui/pluginPanel.js) ---- */
+/* (min-height: the tag grows when 大 / 特大 outgrows its .3rem — §35.18 review) */
 .plugtag {
-  display: inline-flex; align-items: center; gap: .06rem; height: .3rem; padding: 0 .12rem;
+  display: inline-flex; align-items: center; gap: .06rem; min-height: .3rem; padding: 1px .12rem;
   border: 1px solid var(--line-2); background: rgba(0, 0, 0, .3); color: var(--text-lo);
   font-size: calc(.13 * var(--t)); letter-spacing: .06em;
 }

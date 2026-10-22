@@ -202,7 +202,9 @@
 .hub-center__title {
   position: relative;
   margin: 0;
-  font-size: calc(.56 * var(--t));
+  /* stops at .56rem, 小's size (larger, it ran under the left column's tips — §35.18 review; the latin title below).
+     [ASSUMED] the cap */
+  font-size: min(calc(.56 * var(--t)), .56rem);
   font-weight: 900;
   letter-spacing: .14em;
   line-height: 1.15;
@@ -212,6 +214,12 @@
 }
 .hub-center__title em { font-style: normal; color: var(--mint-400); }
 .hub-center__title--latin { font-family: var(--font-display); letter-spacing: .04em; text-transform: uppercase; }
+/* the title is centred over the whole stage: it keeps clear of the side columns (4rem and its gap each side), and the
+   latin one — 「STRONGHOLD PROTOCOL: ALLIANCE」, 18.3em of the display font — is .46rem, which keeps it on one line inside
+   that in any landscape window (§35.18 review: at .56rem it reached under the left column's tips in English, at 大 / 特大
+   in 800–1280 px windows). [ASSUMED] the .46rem */
+.hub-center__title { max-width: calc(100% - 8.8rem); }
+.hub-center__title--latin { font-size: min(calc(.46 * var(--t)), .46rem); }
 /* the radar rings around the emblem (original drawing) */
 .hub-radar { position: absolute; left: 50%; top: 50%; width: 4.6rem; height: 4.6rem; transform: translate(-50%, -50%); }
 .hub-radar svg { width: 100%; height: 100%; overflow: visible; fill: none; stroke: rgba(89, 244, 202, .15); stroke-width: 1; }
@@ -279,18 +287,18 @@
 }
 .hub-ach__medal { width: .44rem; height: .44rem; object-fit: contain; }
 .hub-ach__rank > .icon { width: .3rem; height: .3rem; color: #eef3f1; }
-.hub-ach__rank small { display: inline-flex; align-items: center; gap: .02rem; font-size: calc(.13 * var(--t)); color: #e6ebe9; }
+.hub-ach__rank small { display: inline-flex; align-items: center; gap: .02rem; font-size: min(calc(.13 * var(--t)), .15rem); color: #e6ebe9; }
 .hub-ach__rank small .icon { width: .12rem; height: .12rem; }
 .hub-ach__label {
   position: relative;
   display: flex;
   align-items: center;
   gap: .08rem;
-  height: .46rem;
-  padding: 0 .16rem;
+  flex-wrap: wrap;
+  min-height: .46rem;
+  padding: .02rem .16rem;
   font-size: calc(.21 * var(--t));
   font-weight: 700;
-  white-space: nowrap;
   background: linear-gradient(90deg, rgba(20, 26, 25, .96), rgba(14, 18, 17, .96));
   border-top: 1px solid rgba(220, 230, 226, .14);
 }
@@ -328,13 +336,15 @@
   --bk-c: var(--mint-400);
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: .14rem;
   width: 100%;
-  height: .7rem;
+  height: auto;
+  min-height: .7rem;
   min-width: 0;
-  padding: 0 .22rem 0 .2rem;
+  padding: .04rem .22rem .04rem .2rem;
   font: inherit;
   font-size: calc(.2 * var(--t));
   letter-spacing: .04em;
@@ -367,7 +377,9 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
 }
 .hub-plate__glyph svg { width: 100%; height: 100%; }
-.hub-plate__label, .lobby-hub .hub-plate .btn__label { font-weight: 900; letter-spacing: .04em; color: #111816; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* (a label too long for its plate takes a second line and the plate grows, its tag moving under it if need be, rather
+   than an ellipsis — §35.18 review: Japanese S.W.E.E.P.レポート beside its tag at 特大 in 800–1280 px windows) */
+.hub-plate__label, .lobby-hub .hub-plate .btn__label { font-weight: 900; letter-spacing: .04em; line-height: 1.15; white-space: normal; color: #111816; }
 .hub-plate__tag { margin-left: auto; padding: .03rem .07rem; font-size: calc(.11 * var(--t)); font-weight: 700; letter-spacing: .12em; color: rgba(17, 24, 22, .6); border: 1px solid rgba(17, 24, 22, .28); white-space: nowrap; }
 .lobby-hub .hub-plate .lo-entry__n { margin-left: auto; }
 /* 成就统计 as a plate: only on short screens, where the left column with its card gives way (see the media block) */
@@ -375,10 +387,12 @@
 .hub-plate--ach .hub-plate__glyph svg { fill: currentColor; }
 
 /* ---- entries (独立模拟 / 同盟模拟), bottom right ----------------------------------------------------------- */
+/* (the card, the line above it, the tips' head and the 成就统计 card's label grow or wrap rather than cut their text at
+   大 / 特大 in a small window — §35.18 review; the trophy count under the medal stops at .15rem, 大's size [ASSUMED]) */
 .hub-entries { grid-area: entries; position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: flex-end; gap: var(--hub-gap); min-width: 0; }
 .hub-entry-wrap { display: flex; flex-direction: column; gap: .05rem; min-width: 0; animation: card-in var(--t-slow) var(--ease-out) backwards; }
 .hub-entry-wrap:nth-child(2) { animation-delay: 60ms; }
-.hub-entry__group { display: flex; align-items: center; gap: .06rem; height: .22rem; padding-left: .04rem; font-size: calc(.13 * var(--t)); color: rgba(223, 230, 226, .7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hub-entry__group { display: flex; align-items: center; gap: .06rem; min-height: .22rem; padding-left: .04rem; font-size: calc(.13 * var(--t)); color: rgba(223, 230, 226, .7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hub-entry__group .icon { flex: none; width: .16rem; height: .16rem; color: var(--mint-400); }
 .hub-entry {
   position: relative;
@@ -388,7 +402,7 @@
   align-items: flex-start;
   width: var(--hub-entry-w);
   max-width: 100%;
-  height: 1.34rem;
+  min-height: 1.34rem;
   padding: .14rem .16rem;
   overflow: hidden;
   text-align: left;
@@ -403,7 +417,10 @@
 .hub-entry__icon { position: absolute; right: .14rem; top: .12rem; color: var(--mint-a35); }
 .hub-entry__icon .icon { width: .42rem; height: .42rem; }
 .hub-entry__en { font-family: ui-monospace, Consolas, monospace; font-size: calc(.11 * var(--t)); font-weight: 700; letter-spacing: .22em; color: var(--mint-400); }
-.hub-entry__name { margin-top: .04rem; font-size: calc(.3 * var(--t)); font-weight: 900; letter-spacing: .06em; white-space: nowrap; }
+/* the name wraps between words and stops at .3rem, 小's size (§35.18 review: on one line English 「Solo Simulation」 /
+   「Team Simulation」 ran 25–40 px past the 2.3rem card at 小 in every window and 84–100 px at 特大, the card cutting it;
+   「Simulation」 alone is ~6.2em, the card's inside ~1.96rem). [ASSUMED] the cap */
+.hub-entry__name { margin-top: .04rem; font-size: min(calc(.3 * var(--t)), .3rem); font-weight: 900; letter-spacing: .06em; line-height: 1.1; }
 .hub-entry__corner { position: absolute; right: 0; bottom: 0; width: .3rem; height: .3rem; background: linear-gradient(135deg, transparent 50%, var(--mint-500) 50%); opacity: .8; }
 /* 同盟模拟, the main way to play: bright */
 .hub-entry--coop { background: linear-gradient(160deg, var(--mint-500), #1f8f72); color: #04140f; border-color: var(--mint-400); }
@@ -420,9 +437,11 @@
   background: rgba(8, 10, 9, .55);
   border: 1px solid var(--line);
 }
-.tips__head { display: flex; align-items: center; gap: .1rem; font-size: calc(.16 * var(--t)); font-weight: 700; color: var(--text-md); }
+.tips__head { display: flex; flex-wrap: wrap; align-items: center; gap: .1rem; font-size: calc(.16 * var(--t)); font-weight: 700; color: var(--text-md); }
 .tips__head > .icon { width: .2rem; height: .2rem; color: var(--mint-500); }
-.tips__idx { margin-left: auto; font-size: calc(.16 * var(--t)); color: var(--text-md); }
+/* the count and its arrows move to a line of their own, together, when the head is too narrow for them (§35.18 review) */
+.tips__pager { display: inline-flex; align-items: center; gap: .1rem; margin-left: auto; }
+.tips__idx { font-size: calc(.16 * var(--t)); color: var(--text-md); }
 .tips__nav {
   display: grid;
   place-items: center;
@@ -949,7 +968,9 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 /* The hub drops its left column and the radar; the dialogs keep the four cards and the button in view without scrolling
    at every 文字大小 (the cards keep only their names, the selected difficulty's description moves to the brief). */
 @media (max-height: 520px) {
-  .lobby-hub { --hub-entry-w: 2.1rem; }
+  /* the entries span the screen's width here: at least 128 px each, so a wrapped English name has a line of its own
+     (at 2.1rem, 84 px, 「Simulation」 was 95 px at 小). [ASSUMED] the width */
+  .lobby-hub { --hub-entry-w: max(2.1rem, 128px); }
   .hub-stage {
     grid-template-columns: minmax(0, 1fr) minmax(0, calc(var(--hub-entry-w) * 2 + var(--hub-gap)));
     grid-template-areas: "center right" "entries entries";
@@ -961,11 +982,11 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .hub-center__mark { min-height: 0; margin-bottom: 0; }
   .hub-center__logo { width: .9rem; }
   .hub-center__mark .emblem__svg { width: .9rem; height: 1rem; }
-  .hub-center__title { font-size: calc(.46 * var(--t)); }
+  .hub-center__title { max-width: none; font-size: calc(.46 * var(--t)); }
   .hub-right { padding-top: .1rem; }
-  .lobby-hub .hub-plate { height: max(.7rem, 40px); }
+  .lobby-hub .hub-plate { min-height: max(.7rem, 40px); }
   .lobby-hub .hub-plate--ach { display: flex; }
-  .hub-entry { height: max(1.1rem, 64px); padding: .1rem .14rem; }
+  .hub-entry { min-height: max(1.1rem, 64px); padding: .1rem .14rem; }
 
   .proto-top { padding-top: 8px; }
   /* 选择模拟协议 (§35.18's leftover: at 文字大小 中 and above the four cards ran under 开始独立模拟 — 终极模拟 out of sight,
@@ -1003,11 +1024,13 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .mf-radar { inset: 0 0 .6rem; height: calc(100% - .6rem); }
   /* 1rem is ~40 px here: the text gets its own sizes (still following 文字大小) */
   .hub-center__en { font-size: calc(.24 * var(--t)); }
-  .lobby-hub .hub-plate { font-size: calc(.3 * var(--t)); }
+  /* the plates' labels, the entries' names and their decorative English capped so they stay whole (§35.18 review: at 大 /
+     特大 the plates ended in an ellipsis and the entries cut both lines). [ASSUMED] the caps */
+  .lobby-hub .hub-plate { font-size: min(calc(.3 * var(--t)), 18px); }
   .hub-plate__tag { display: none; }
   .hub-entry__group { height: auto; font-size: calc(.22 * var(--t)); }
-  .hub-entry__en { font-size: calc(.16 * var(--t)); letter-spacing: .12em; }
-  .hub-entry__name { font-size: calc(.42 * var(--t)); }
+  .hub-entry__en { font-size: min(calc(.16 * var(--t)), 10px); letter-spacing: .12em; }
+  .hub-entry__name { font-size: min(calc(.42 * var(--t)), 18px); }
   .proto-title .modal__title { font-size: min(calc(.46 * var(--t)), 24px); white-space: nowrap; }
   .proto-title__mode, .proto-title__mode i { font-size: min(calc(.24 * var(--t)), 16px); }
   /* the mode line stays one line at a big 文字大小 in a long language (en 特大 broke 「Team Simulation」 in two, the

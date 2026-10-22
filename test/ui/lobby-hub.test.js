@@ -487,3 +487,21 @@ test('选择同盟方式 on a short screen (§35.18 leftover: the key field\'s p
   assert.match(lobbySrc.match(/<\$\{AllianceSelect\}[\s\S]*? \/>/)[0], /short=\$\{shortScreen\} \/>$/);
   assert.match(readFileSync(path.join(ROOT, 'public/js/ui/device.js'), 'utf8'), /m\.addEventListener\('change', sync\); return \(\) => m\.removeEventListener\('change', sync\);/);
 });
+
+test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simulation」 cut by the cards at 小): the name wraps under a .3rem cap, the plate labels wrap, the title stops at its caps; on a short screen 128 px cards that grow and capped text', () => {
+  const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rule = (sel) => css.match(new RegExp(`\\n${sel.replace(/[.*]/g, '\\$&')} \\{[^}]*\\}`))?.[0] || '';
+  assert.match(rule('.hub-entry__name'), /font-size: min\(calc\(\.3 \* var\(--t\)\), \.3rem\);[^}]*line-height: 1\.1;/);
+  assert.doesNotMatch(rule('.hub-entry__name'), /nowrap/, 'the name wraps between words');
+  assert.match(rule('.lobby-hub .hub-plate'), /min-height: \.7rem;/, 'a plate grows for a second line');
+  assert.doesNotMatch(rule('.hub-plate__label, .lobby-hub .hub-plate .btn__label'), /ellipsis|nowrap/);
+  assert.match(rule('.hub-center__title'), /font-size: min\(calc\(\.56 \* var\(--t\)\), \.56rem\);/);
+  const short = shortBlock();
+  assert.match(short, /\.lobby-hub \{ --hub-entry-w: max\(2\.1rem, 128px\); \}/);
+  assert.match(rule('.hub-entry'), /min-height: 1\.34rem;/);
+  assert.doesNotMatch(rule('.hub-entry'), /[^-]height: 1\.34rem/, 'the card grows for a second line');
+  assert.match(short, /\.hub-entry \{ min-height: max\(1\.1rem, 64px\);/);
+  assert.match(short, /\.lobby-hub \.hub-plate \{ font-size: min\(calc\(\.3 \* var\(--t\)\), 18px\); \}/);
+  assert.match(short, /\.hub-entry__en \{ font-size: min\(calc\(\.16 \* var\(--t\)\), 10px\);/);
+  assert.match(short, /\.hub-entry__name \{ font-size: min\(calc\(\.42 \* var\(--t\)\), 18px\); \}/);
+});

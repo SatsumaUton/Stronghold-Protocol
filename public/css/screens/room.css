@@ -62,9 +62,6 @@
   text-overflow: ellipsis;
 }
 .rs-clock__ping { display: inline-flex; align-items: center; gap: .08rem; font-size: calc(.15 * var(--t)); color: #9aa19e; }
-/* the shared ping pill and 原版 / 插件 tag have a fixed height (.32rem / .3rem, 12–13 px on a phone) their text outgrows at
-   大 / 特大: in the room's top bar they grow with it (§35.18 review; older than the event UI) */
-.rs-clock__ping .ping, .rs-top .plugtag { height: auto; min-height: .3rem; padding-top: 1px; padding-bottom: 1px; }
 .rs-tools { display: flex; gap: .08rem; margin-left: .1rem; }
 .rs-top__right { display: flex; align-items: center; gap: .14rem; }
 .rs .rs-loadout {

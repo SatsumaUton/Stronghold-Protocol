@@ -19,6 +19,9 @@
 // the cards not chosen whole (§35.18 review). The room's big button (开始模拟 / 准备就绪) on the four phones in every
 // language and 文字大小, and on desktops in English / Japanese / Korean: each line of its label inside the button (§35.18
 // review: it had taken 选择模拟协议's wrapping label, cut in its fixed 46 px).
+// The hub on the four phones and on desktops 800×600 – 1920×1080 in five languages at four sizes: every line of its text
+// inside its box (test/e2e/text-fit.mjs; §35.18 review: English 「Solo Simulation」 / 「Team Simulation」 were cut by their
+// cards at 小 in every window, the plates ended in an ellipsis at 大 / 特大 on phones, the title ran under the tips).
 // The other doctors' read-only view: test/ui/room-settings.e2e.test.js.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/lobby-hub-*.png
 
@@ -27,6 +30,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { textProblems } from '../e2e/text-fit.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
@@ -759,5 +763,31 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
         assert.deepEqual(problems, []);
       } finally { await ctx.close(); }
     }
+  });
+  // §35.18 review: the hub's cards cut English 「Solo Simulation」 / 「Team Simulation」 at 小 in every window (25–40 px past
+  // the 2.3rem card; 95 px of 「Simulation」 in an 84 px card on a phone), its plates ended in an ellipsis at 大 / 特大 on a
+  // phone and its title ran under the left column's tips at 大 / 特大 in a 1280×720 window
+  test('phones and desktops: every label of the hub inside its box in every language at every 文字大小', { timeout: 900000 }, async () => {
+    const phones = [[640, 360], [667, 375], [740, 360], [844, 390]];
+    const desks = [[1920, 1080], [1440, 900], [1280, 720], [1100, 530], [1024, 600], [960, 540], [800, 600]];
+    const bad = [];
+    for (const lang of ['zh', 'zh-TW', 'en', 'ja', 'ko']) {
+      for (const [screens, touch] of [[phones, true], [desks, false]]) {
+        const { ctx, page, problems } = await open({ w: screens[0][0], h: screens[0][1], touch, lang: lang === 'zh' ? null : lang });
+        try {
+          for (const textSize of ['sm', 'md', 'lg', 'xl']) {
+            await page.evaluate(async (ts) => (await import('/js/ui/settings.js')).updateSettings({ textSize: ts }), textSize);
+            for (const [w, h] of screens) {
+              await page.setViewport({ width: w, height: h, hasTouch: touch, isMobile: touch, deviceScaleFactor: 1 });
+              await sleep(150); await settle(page); await page.evaluate(() => document.fonts.ready);
+              for (const p of await page.evaluate(textProblems, '.lobby-screen')) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
+              if (lang === 'en' && textSize === 'xl' && (w === 667 || w === 1280)) await page.screenshot({ path: path.join(OUT, `lobby-hub-fit-${w}-en-xl.png`) });
+            }
+          }
+          assert.deepEqual(problems, [], `${lang}`);
+        } finally { await ctx.close(); }
+      }
+    }
+    assert.deepEqual(bad.slice(0, 40), [], `${bad.length} problems`);
   });
 });
