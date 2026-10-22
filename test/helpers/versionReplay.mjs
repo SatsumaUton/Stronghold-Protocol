@@ -6,6 +6,8 @@
 import fs from 'node:fs';
 
 const [id, file] = process.argv.slice(2);
+// a bare `node --test` also loads this helper as a test file, without arguments: nothing to replay
+if (!id || !file) process.exit(0);
 const quiet = { info() {}, warn() {}, error() {}, debug() {} };
 const { getVersionData, setData } = await import('../../server/data.js');
 const data = setData(getVersionData(id, { log: quiet }));
