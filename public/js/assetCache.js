@@ -102,8 +102,8 @@ function pathnameOf(url) {
 export const IMPORTED_INDEX_URL = '/sp-imported-index.json';
 
 // CacheStorage is shared by tabs, but its read/merge/put sequence is not atomic. Use one origin-wide lock for
-// both index writers. Web Locks is available at the supported browser floors (Chrome 90, Firefox 108, Safari 16.4).
-// Keep the existing sequential behavior in environments without it, including Node 22's Cache API test adapters.
+// both index writers. A browser without Web Locks (navigator.locks), and Node 22's Cache API test adapters, keep the
+// previous sequential behaviour: the same updates, without cross-tab serialization.
 function withImportIndexLock(update) {
   const locks = globalThis.navigator?.locks;
   return locks?.request ? locks.request(`${IMPORTED_ASSET_CACHE}:index`, update) : update();

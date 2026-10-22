@@ -32,6 +32,7 @@
 
 - 插件 SDK：`kit.onHitBy` / `onHitOn` 在伤害计算与伤判之前触发，`kit.onDamagedOn` 在扣血之后触发（被屏障完全吸收时为 0，被闪避时不触发）；`kit.byEnemyAttack` 不再排除带 counter / reflect 标签的敌方伤害；`battle.dealHPLose(目标, 数值, { type })` 与对象写法一样按 type 计算防御 / 法抗，结算入口收到无效请求时记录错误并返回 0（PLUGINS.md「SDK hit and damage helpers」，PR #802 合入时的修订，§35.32）。
 - 修复插件或技能同步移除增益时的重入异常：回调再移除同单位的其他增益后，批量清除仍按原逆序继续，回调只执行一次，返回值只计实际移除数（§35.5）。
+- 修复两个标签页同时导入素材包时已缓存计数少算、清理旧版本素材漏删（PR #853，感谢 @Xinglan233，§35.37）。
 
 - 官方数值边界扫描复用正则读取器，模拟初始化时这一步从约 88 ms 降到约 14 ms（PR #823，@hesperine）。
 ### 工具

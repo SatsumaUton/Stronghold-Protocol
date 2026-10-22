@@ -478,8 +478,8 @@ localhost and browser support still govern installation.
 
 Imported-art index additions and old-version pruning serialize their full read/modify/write operations with the same
 origin-wide Web Lock (`sp-imported-assets-v1:index`); the cache name and index JSON format stay unchanged. This prevents
-cooperating tabs from losing index updates. It does not lock an import's file writes or cache clearing. ASSETS.md
-records the supported browser versions and the sequential fallback when Web Locks is unavailable.
+cooperating tabs from losing index updates. It does not lock an import's file writes or cache clearing. A browser
+without Web Locks keeps the previous sequential behaviour, without cross-tab serialization (ASSETS.md).
 
 ### Skill-mode sound and delayed models (§28.17, §28.22)
 
