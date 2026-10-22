@@ -111,26 +111,29 @@ test('MANIFEST.json and UPDATE.json pass the personal-info scan: paths are scann
 // Bases and a whole round trip on a temporary checkout (tools/package.mjs, --no-install)
 
 // What this machine can really do, not what it has: zip a probe folder and find the name in the bytes. `zip -v`
-// succeeding says nothing about a name the tool cannot spell — that is how #840 failed on some runners and not others.
+// succeeding says nothing about a name the tool cannot spell (#840 was the Windows runner image's tar, 20261018.275.1).
+// Three outcomes: the name is in the bytes ('wrote'); zipFolder threw ('threw', with its error — the tools it tried and
+// their own words); or a tool succeeded but the name is not in the bytes ('missing': the silent `??` loss #311 fixed,
+// which must fail the suite, never fall back).
 function zipProbe(names) {
   const dir = tmp('zip-probe');
   try {
     for (const n of names) put(dir, `${FOLDER}/public/assets/${n}`, 'probe');
     const zip = path.join(dir, 'probe.zip');
-    zipFolder(dir, zip);
+    try { zipFolder(dir, zip); } catch (e) { return { result: 'threw', error: String(e?.message || e) }; }
     const bytes = fs.readFileSync(zip);
-    return names.every((n) => bytes.includes(Buffer.from(n, 'utf8')));
-  } catch {
-    return false;
+    return { result: names.every((n) => bytes.includes(Buffer.from(n, 'utf8'))) ? 'wrote' : 'missing', error: '' };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
-const hasZipTool = zipProbe(['a.png']);
-const hasUtf8ZipTool = hasZipTool && zipProbe(['卫戍 a.png']);
-// The name the zipper here can spell: the UTF-8 one where it writes UTF-8 names (Info-ZIP, bsdtar with hdrcharset), an
-// ASCII one where it cannot. The packing side refuses loudly instead of writing a mangled name, so an ASCII run does
-// not hide a silent loss: `zipFolder` throws before a package with `??` in it is built.
+const asciiProbe = zipProbe(['a.png']);
+const hasZipTool = asciiProbe.result === 'wrote';
+const utf8Probe = hasZipTool ? zipProbe(['卫戍 a.png']) : asciiProbe;
+const hasUtf8ZipTool = utf8Probe.result === 'wrote';
+// The name the zipper here can spell: the UTF-8 one where it writes UTF-8 names (Info-ZIP, bsdtar with hdrcharset); the
+// ASCII one only where zipFolder threw on the UTF-8 name (its error is the skip reason below). A tool that exits 0 and
+// drops the name is the 'missing' case: its own test fails, so an ASCII run cannot hide it.
 const ASSET = hasUtf8ZipTool ? '卫戍 a.png' : 'a.png';
 const ASSET_RE = ASSET.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
@@ -356,6 +359,28 @@ test('the zip reader: stored and deflated entries, zip64, UTF-8 names; damaged a
     const z = spawnSync('zip', ['-q', '-r', 'foreign.zip', 'other'], { cwd: dir });
     if (!z.error && z.status === 0) assert.throws(() => readBase(path.join(dir, 'foreign.zip')), /outside the Stronghold-Protocol\/ folder/);
   } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('zipFolder writes a UTF-8 name on this machine (or says why it cannot)', {
+  skip: asciiProbe.result === 'threw' ? `no zip tool writes here: ${asciiProbe.error}`
+    : utf8Probe.result === 'threw' ? `zipFolder refused the UTF-8 name: ${utf8Probe.error}` : false,
+}, () => {
+  // 'missing': a tool exited 0 but the name is not in the zip — the #311 loss, never a fallback to the ASCII sample
+  assert.equal(utf8Probe.result, 'wrote', 'the UTF-8 name is in the zip\'s bytes');
+});
+
+test('zipFolder\'s error names every attempt and keeps the install hint only when no tool exists', () => {
+  const dir = tmp('zip-hint');
+  const PATH = process.env.PATH;
+  try {
+    put(dir, `${FOLDER}/package.json`, '{"version":"0.2.0"}');
+    process.env.PATH = path.join(dir, 'no-such-bin');
+    assert.throws(() => zipFolder(dir, path.join(dir, 'out.zip')),
+      /^Error: zipping failed: zip: ENOENT; tar: ENOENT — install `zip` \(or a bsdtar `tar`\)$/);
+  } finally {
+    process.env.PATH = PATH;
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });

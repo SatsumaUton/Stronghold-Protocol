@@ -667,11 +667,14 @@ export function zipFolder(cwd, zipPath, folder = FOLDER) {
     fs.rmSync(zipPath, { force: true });
     const r = spawnSync(cmd, args, { cwd, encoding: 'utf8' });
     if (!r.error && r.status === 0 && isFile(zipPath)) return;
-    const why = r.error ? String(r.error.code || r.error.message) : `exit ${r.status}${errLine(r.stderr) ? ` (${errLine(r.stderr)})` : ''}`;
-    failed.push(`${cmd}: ${why}`);
+    const end = r.status === null && r.signal ? `signal ${r.signal}` : `exit ${r.status}`;
+    const why = r.error ? String(r.error.code || r.error.message) : `${end}${errLine(r.stderr) ? ` (${errLine(r.stderr)})` : ''}`;
+    failed.push({ text: `${cmd}: ${why}`, missing: r.error?.code === 'ENOENT' });
   }
   fs.rmSync(zipPath, { force: true });
-  throw new Error(`zipping failed: ${failed.join('; ')}`);
+  // neither tool exists at all: the old hint still says what to do
+  const hint = failed.every((f) => f.missing) ? ' — install `zip` (or a bsdtar `tar`)' : '';
+  throw new Error(`zipping failed: ${failed.map((f) => f.text).join('; ')}${hint}`);
 }
 
 const isLib = (f) => f.startsWith('node_modules/') || f.startsWith('public/vendor/');
