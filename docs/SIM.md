@@ -673,7 +673,12 @@ damageReduction, reductionGroup, injury(event), observeInjury(event), injuryPrio
     buffs share a `reductionGroup` (浊心斯卡蒂's aura: `'skadi2:reduction'`; DESIGN §35.44).
   - `injury(event)`: `{ amount, type, dodge(p), block(p), defer(fn), source, target, buff, … }` — it may lower or raise
     `event.amount`, call `dodge(p)` / `block(p)` to cancel the hit with probability `p` (omitted = always), and `defer`
-    a cleanup that runs after the settlement even when a later effect cancels it.
+    a cleanup that runs after the settlement even when a later effect cancels it. Both return true when the attempt
+    succeeds, which is not always a cancellation: `dodge()` is skipped (returns false) on an instance that cannot be
+    dodged (`dodgeMode: 'ignore'`, i.e. `canDodge: false`), and under a cancellation mask (`dodgeMode: 'uncancellable'` or
+    `ignoreCancelReasons` naming `'dodge'` for `dodge()`, `ignoreCancelReasons` naming `'block'` for `block()`) it
+    returns true without cancelling. Whether the hit was cancelled shows in `observeInjury`'s `cancelled` /
+    `outcome` (or the dodge / block hook's `ctx.cancelled`).
   - `observeInjury(event)`: `{ amount, type, cancelled, outcome, … }`, a read-only snapshot; it keeps its place in the
     order and still runs after a cancellation.
   - `keepEmptyShield: true`: an emptied `shield` / `shieldHits` buff is not removed — it keeps its acquisition position

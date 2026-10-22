@@ -139,17 +139,17 @@ function skadi2(bb, chess, def) {
           });
         }, { owner: unit, priority: -2000 });
       }
-    // PRTS 伤害减免: per-type strongest flat reduction, at the aura buff's acquisition position.
-    const flat = -num(mod.damage_resistance);
-    if (flat > 0) {
-      installInjuryAura(battle, unit, {
-        key: `skadi2:reduction:${unit.id}`,
-        covers: target => target.side === 'ally' && target.kind !== 'device' && live(target)
-          && live(unit) && unit.skill?.active && inCover(battle, unit, target),
-        // one name for every 浊心斯卡蒂's aura: two of them covering a unit keep only the stronger (PRTS 伤害减免)
-        effect: { damageReduction: { phys: flat, arts: flat }, reductionGroup: 'skadi2:reduction' },
-      });
-    }
+      // PRTS 伤害减免: per-type strongest flat reduction, at the aura buff's acquisition position.
+      const flat = -num(mod.damage_resistance);
+      if (flat > 0) {
+        installInjuryAura(battle, unit, {
+          key: `skadi2:reduction:${unit.id}`,
+          covers: target => target.side === 'ally' && target.kind !== 'device' && live(target)
+            && live(unit) && unit.skill?.active && inCover(battle, unit, target),
+          // one name for every 浊心斯卡蒂's aura: two of them covering a unit keep only the stronger (PRTS 伤害减免)
+          effect: { damageReduction: { phys: flat, arts: flat }, reductionGroup: 'skadi2:reduction' },
+        });
+      }
     },
     talents: [
       { install(battle, unit) { // 远古血亲: the seaborn is an inert range extension with a limited life

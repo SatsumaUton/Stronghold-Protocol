@@ -355,7 +355,7 @@ export function setHits(e, n) {
 
 const HIT_COUNT_KEY = 'ab:hitCount';
 
-/** 频次 on/off: every damage instance removes exactly 1 HP (engine flag; `artsOnly` = 茶器, physical instances remove 0). */
+/** 频次 on/off: every damage instance removes exactly 1 HP (engine flag; `artsOnly` = 茶器: only arts and true instances remove 1, phys and 元素伤害 remove 0 — DESIGN §35.32, PRTS 青瓷茶器). */
 export function hitCount(b, e, on, artsOnly = false) {
   if (!on) { b.removeBuff(e, HIT_COUNT_KEY); return; }
   b.addBuff(e, { key: HIT_COUNT_KEY, persist: true, flags: artsOnly ? { hitCountArts: true } : { hitCount: true } });

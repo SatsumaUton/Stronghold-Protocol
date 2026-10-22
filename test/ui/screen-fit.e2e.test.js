@@ -237,4 +237,51 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
     assert.deepEqual(problems, []);
     await page.close();
   });
+
+  test('界面大小: each way out of a drag — pointerup alone applies, pointercancel drops the reading, a size changed elsewhere replaces it', async () => {
+    const { page, problems } = await open('phase=PREP&variant=settings', { width: 1280, height: 720 }, { l: 0, r: 0, t: 0, b: 0, ui: 85 });
+    await page.waitForSelector('[data-testid="ui-size-range"]', { timeout: 10000 });
+    const row = () => page.evaluate(() => ({
+      pct: document.querySelector('[data-testid="ui-size-pct"]').textContent,
+      k: document.documentElement.style.getPropertyValue('--sp-ui'),
+      stored: JSON.parse(localStorage.getItem('sp.pref.screenFit') || 'null')?.ui ?? null,
+    }));
+    /** A drag's reading: the range's value plus `input`, with no release. */
+    const drag = (v) => page.evaluate((val) => {
+      const r = document.querySelector('[data-testid="ui-size-range"]');
+      r.value = String(val);
+      r.dispatchEvent(new Event('input', { bubbles: true }));
+    }, v);
+    const fire = (type) => page.evaluate((ty) => {
+      document.querySelector('[data-testid="ui-size-range"]').dispatchEvent(new PointerEvent(ty, { bubbles: true, pointerId: 1 }));
+    }, type);
+    // pointerup with no `change` (Chrome's drag that ends on its start value, then moved by script) applies the reading
+    await drag(90);
+    await sleep(150);
+    assert.deepEqual(await row(), { pct: '90%', k: '0.85', stored: 85 }, 'the reading moves, the size does not');
+    await fire('pointerup');
+    await sleep(200);
+    assert.deepEqual(await row(), { pct: '90%', k: '0.9', stored: 90 }, 'pointerup applies it');
+    // a touch drag turned into a scroll: pointercancel, no pointerup / change — the row goes back to the stored size
+    await drag(75);
+    await sleep(150);
+    assert.equal((await row()).pct, '75%');
+    await fire('pointercancel');
+    await sleep(200);
+    assert.deepEqual(await row(), { pct: '90%', k: '0.9', stored: 90 }, 'pointercancel drops the reading');
+    // a reading left behind (no release event at all) yields to a size stored by anything else
+    await drag(80);
+    await sleep(150);
+    assert.equal((await row()).pct, '80%');
+    await page.evaluate(async () => (await import('/js/ui/screenFit.js')).updateFit({ ui: 95 }));
+    await sleep(200);
+    assert.deepEqual(await row(), { pct: '95%', k: '0.95', stored: 95 }, 'the row follows the stored size, not the stale reading');
+    // a plain click on the thumb (pointerup on the stored value) stores nothing
+    await page.evaluate(() => localStorage.removeItem('sp.pref.screenFit'));
+    await fire('pointerup');
+    await sleep(200);
+    assert.deepEqual(await row(), { pct: '95%', k: '0.95', stored: null }, 'an unchanged value is not saved again');
+    assert.deepEqual(problems, []);
+    await page.close();
+  });
 });

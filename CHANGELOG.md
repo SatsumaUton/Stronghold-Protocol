@@ -36,7 +36,7 @@
 ### 插件／稳定性
 
 - 插件 SDK：`kit.onHitBy` / `onHitOn` 在伤害计算与伤判之前触发，`kit.onDamagedOn` 在扣血之后触发（被屏障完全吸收时为 0，被闪避时不触发）；`kit.byEnemyAttack` 不再排除带 counter / reflect 标签的敌方伤害；`battle.dealHPLose(目标, 数值, { type })` 与对象写法一样按 type 计算防御 / 法抗，结算入口收到无效请求时记录错误并返回 0（PLUGINS.md「SDK hit and damage helpers」，PR #802 合入时的修订，§35.32）。
-- 插件文档：SIM.md §3 的 `addBuff` 补全伤判字段（`damageReduction`、`reductionGroup`、`injury`、`observeInjury`、`injuryPriority`、`keepEmptyShield`）与加算属性 `artsAttackAddition`；固定减伤改为同名取最高、不同名叠加（名称为 `reductionGroup`，否则为增益的 key），按单位生成 key 的减伤需共用 `reductionGroup` 才不叠加（§35.44–§35.45）。
+- 插件文档：SIM.md §3 的 `addBuff` 补全伤判字段（`damageReduction`、`reductionGroup`、`injury`、`observeInjury`、`injuryPriority`、`keepEmptyShield`）与加算属性 `artsAttackAddition`；固定减伤 `damageReduction` 同名取最高、不同名叠加（名称为 `reductionGroup`，否则为增益的 key），按单位生成 key 的减伤需共用 `reductionGroup` 才不叠加（§35.44–§35.46）。
 - 修复插件或技能同步移除增益时的重入异常：回调再移除同单位的其他增益后，批量清除仍按原逆序继续，回调只执行一次，返回值只计实际移除数（§35.5）。
 - 修复两个标签页同时导入素材包时已缓存计数少算、清理旧版本素材漏删（PR #853，感谢 @Xinglan233，§35.37）。
 

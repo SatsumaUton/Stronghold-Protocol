@@ -61,7 +61,8 @@
 // Special types (factions.json):
 //   FLY        — engine (FLY motion, ranged-only targeting). Flyer kits in enemies/fly.js (御4, 护障, 寒霜, 萨科塔之翼/眼, 黑云 …).
 //   TIMES 频次 — "需要N次伤害击倒": maxHp := N hits; engine buff flag hitCount — every damage instance (any type, element
-//                bursts included) removes exactly 1 on its own DamageInfo (茶器 hitCountArts: phys removes 0); HP loss
+//                bursts included) removes exactly 1 on its own DamageInfo (茶器 hitCountArts: only arts and true
+//                instances remove 1, phys and 元素伤害 remove 0 — DESIGN §35.32, PRTS 青瓷茶器); HP loss
 //                (loseHp) bypasses the rule. The faction's enemies
 //                create those units (death spawns, embers, blades, 再生).
 //   ELEMENT    — element damage on hit = ATK × ep_damage_ratio into the ally's gauge. 侵蚀 (erosion) is an engine

@@ -19,7 +19,9 @@
 // Only at 文字大小 小: the kept 64 / 76 / 88 px text floors of 中 and above outgrew their shrinking boxes (clipped labels,
 // the merge review of 2026-10-23), so there the row is disabled and the interface stays at 100 % — the stored size is
 // kept and applies again at 小 (effectiveUi). While the slider is dragged only its reading follows; the size applies on
-// release (`change`), so the settings modal does not resize the track under the finger.
+// release (`pointerup` or `change`), so the settings modal does not resize the track under the finger. The reading is
+// dropped on pointercancel / blur and by −, + and 重置, and ignored once the stored size changes (Chrome fires no
+// `change` when a drag ends on its start value; a touch drag can turn into a scroll — DESIGN §35.45).
 
 import { useState } from '../../vendor/hooks.module.js';
 import { html, Button, MicroLabel } from './components.js';
@@ -107,7 +109,9 @@ export function ScreenFitSection() {
   const ui = sanitizeUi(f.ui);
   const allowed = uiAllowed(textSize);
   const shown = allowed ? sanitizeUi(preview && preview.from === ui ? preview.v : ui) : 100;
-  const setUi = (v) => { setPreview(null); updateFit({ ui: Number(v) }); };
+  // applies only a new size: a plain click on the thumb, or the `change` after a `pointerup` that already applied it,
+  // stores nothing and re-measures nothing (applyFit sends a window resize)
+  const setUi = (v) => { setPreview(null); if (sanitizeUi(v) !== ui) updateFit({ ui: Number(v) }); };
   const any = FIT_SIDES.some((k) => f[k] !== 0) || ui !== 100;
   return html`<section class="set-fit" aria-labelledby="set-fit-title" data-testid="screen-fit">
     <div class="set-keys__head">
