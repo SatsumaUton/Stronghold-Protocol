@@ -810,7 +810,11 @@ prefer START over ON, then plain/numeric order; this is a deterministic approxim
 runtime ability graph. Mixed-letter banks are skipped, and so is a bank of plain `_n` files — except a numbered mode bank that plays a file the unit's
 normal attack (the bare ability bank, or a numbered default `attack.0`) never does: 宴's S2 impact `p_imp_darksword_n` beside her
 normal `p_imp_sword_n` is that mode's sound, while 银灰's S3 swing `p_atk_silver_n` (no plain swing bank to compare with) stays
-out. Judged per kind (swing / impact), so a mode may keep the normal swing and only replace the impact. Preserve `mixOf` for
+out. Judged per kind (swing / impact), so a mode may keep the normal swing and only replace the impact. The normal files
+are the bare bank and every mode 0 bank (`attack.0`, `combat.0.1`, …). Such a plain bank only fills a skill that no
+lettered bank fills (假日威龙陈's START `p_atk_watergun_d_cast` never displaces her ON `p_atk_watergun_d`), and only for
+the mode the skill itself links, never as a phase fill (乌尔比安's `S3_Respawn_A`). The rule reaches beyond 宴: on the
+official banks it adds 29 swing / impact slots on 22 operators (DESIGN §35.38 lists them). Preserve `mixOf` for
 each selected bank separately; `attacks`/`hits` and `attackMix`/`hitMix` use matching skill keys. Regenerate the current
 manifest instead of importing an older PR's full JSON, preserving JP voices and current operators. See DESIGN §34.3.
 

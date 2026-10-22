@@ -301,6 +301,8 @@ function phaseOfModeName(name) {
  * ability bank, or a numbered default `attack.0`) never does — 宴's S2 impact `p_imp_darksword_n` beside her normal
  * `p_imp_sword_n` is that mode's sound, while 银灰's S3 swing `p_atk_silver_n` (no plain swing bank to compare with)
  * still stays out. Judged per kind (swing / impact); without the local fx mode links nothing is assigned, as before.
+ * Such a plain bank only fills a skill no lettered bank fills, and only for the skill's own mode, never as a phase
+ * fill (PR #848 review, DESIGN §35.38).
  *
  * @param {Map<string,string[]>|undefined} banks unit bank table (indexAudio().unitBanks)
  * @param {{index:number, skillId?:string|null, mode?:number|null, start?:string|null}[]} skills planned skills
@@ -341,7 +343,8 @@ export function assignSkillModeSfx(banks, skills, modes = null, allLinks = null)
       const ability = name.slice(ev.length + 1).split('.')[0];
       if (!/attack|combat/i.test(ability)) continue;
       const rest = name.slice(ev.length + 1 + ability.length);
-      if (rest === '' || rest === '.0') for (const p of paths) normalFiles.add(p);
+      // mode 0's sub-abilities count too (仇白's `combat.0.1` stab plays in her S2 mode as well)
+      if (rest === '' || /^\.0(?:\.\d+)*$/.test(rest)) for (const p of paths) normalFiles.add(p);
     }
     for (const [name, paths] of banks) {
       const ev = events.find((e) => name.startsWith(e + '.'));
@@ -363,14 +366,18 @@ export function assignSkillModeSfx(banks, skills, modes = null, allLinks = null)
       // never does: 宴's S2 impact `p_imp_darksword_n` beside her normal `p_imp_sword_n`, 银灰's S2/S3 `p_imp_sword_n`
       // beside the Combat `p_imp_spear_n`. Judged per kind, so his S3 swing (no plain swing bank to compare with) stays
       // out, and the client's normal-attack gate is untouched.
-      const ownPlain = !uniform && !letter && Number.isInteger(modeIndex) && modeIndex > 0 && normalFiles.size > 0
-        && paths.some((p) => !normalFiles.has(p));
+      // Every file plain: a mixed bank (a plain first file, a lettered later one) stays skipped, as ASSETS.md says.
+      const ownPlain = !uniform && paths.every((p) => !skillModeLetter(p)) && Number.isInteger(modeIndex) && modeIndex > 0
+        && normalFiles.size > 0 && paths.some((p) => !normalFiles.has(p));
       if (!uniform && !ownPlain) continue;
-      found.push({ rank, rest, paths, letter, modeIndex, bare: rest === '' });
+      found.push({ rank, rest, paths, letter, modeIndex, bare: rest === '', plain: ownPlain });
     }
     return found;
   };
-  const best = (cands) => cands.slice().sort((a, b) => (a.rank !== b.rank ? (a.rank < b.rank ? -1 : 1) : abilityOrder(a.rest, b.rest)))[0];
+  // A lettered bank beats a plain one for the same skill: a plain mode bank only fills a skill no `_d` / `_h` / `_s`
+  // bank does (假日威龙陈's START `p_atk_watergun_d_cast` never displaces her ON `p_atk_watergun_d`, PR #848 review).
+  const best = (cands) => cands.slice().sort((a, b) => (a.plain !== b.plain ? (a.plain ? 1 : -1)
+    : a.rank !== b.rank ? (a.rank < b.rank ? -1 : 1) : abilityOrder(a.rest, b.rest)))[0];
   const assignKind = (events) => {
     const bySkill = new Map();
     const phase = new Map();
@@ -389,6 +396,9 @@ export function assignSkillModeSfx(banks, skills, modes = null, allLinks = null)
       const ph = Array.isArray(modes) && Number.isInteger(c.modeIndex) && c.modeIndex >= 0 && c.modeIndex < modes.length
         ? phaseOfModeName(modes[c.modeIndex]?.name) : null;
       if (ph && !ph.end) {
+        // a plain bank speaks only for its own linked mode, never as a phase fill (乌尔比安's S3_Respawn_A swing is not
+        // her S3 mode's sound, which is the normal `_n` file)
+        if (c.plain) continue;
         if (!phase.has(ph.index)) phase.set(ph.index, []);
         phase.get(ph.index).push(c);
       } else unclaimed.push(c);
