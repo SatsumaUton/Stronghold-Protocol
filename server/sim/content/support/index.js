@@ -19,6 +19,7 @@
 
 import { getData } from '../../../data.js';
 import { grantedBondsByMorph } from '../../../../shared/plugins/rules.js';
+import { RECORD_MAPS } from '../../../../shared/plugins/dataUtils.js';
 import { COLS, DIRECT_BONUS_STACKING } from '../../constants.js';
 import { frontOf, offsetTile } from '../../dir.js';
 import { bodyInKeys, bodyDist, bodyInRadius, bodyOnTile, bodyTileReach, bodyInRange } from '../../body.js';
@@ -44,7 +45,7 @@ export function gameData() {
   return DATA;
 }
 /** Tests only: swap the data object (null → reload the singleton). Also drops derived caches. */
-export function setGameData(d) { DATA = d ?? null; CORE = null; }
+export function setGameData(d) { DATA = d ?? null; CORE = null; EFFECT_ITEMS = new WeakMap(); }
 
 export const bondRecord = (id) => own(gameData().bonds, id);
 export const itemRecord = (id) => own(gameData().items, id);
@@ -58,6 +59,59 @@ export const chessRecord = (id) => own(gameData().chess, id);
 export const itemKeyOf = (id) => String(itemRecord(id)?.effectRef ?? id ?? '').replace(/_[ab]$/, '');
 /** True for golden (进阶) items / elite chess ids. */
 export const isGoldenId = (id) => /_b$/.test(String(id ?? ''));
+
+/**
+ * Whether `id` names an official record of data file `file` (`chess`, `items` …), not a plugin's namespaced one
+ * (shared/plugins/dataUtils.js RECORD_MAPS: chess_x_ / item_x_ …).
+ */
+export const isOfficialId = (file, id) => !String(id ?? '').startsWith(`${RECORD_MAPS[file]?.[0] ?? '\0'}_`);
+
+/**
+ * The behaviour of an item is named by the normal record's effectId (versions M0, docs/SIM.md §7.2): another official
+ * version reuses item ids for other effects, while an effectId keeps its meaning. A golden record (effectId
+ * eff_acgarmNNN) counts as its normal one (baseId); a plugin record follows its effectRef; a plugin record without one
+ * (item_x_) has no official behaviour (null). itemKeyOf stays the item's identity (combo partners, buff keys, labels).
+ */
+export function itemEffectKey(id) {
+  let rec = itemRecord(id);
+  if (!rec) return null;
+  if (rec.effectRef != null) rec = itemRecord(rec.effectRef);
+  else if (!isOfficialId('items', rec.id ?? id)) return null;
+  if (rec && rec.baseId && rec.baseId !== rec.id) rec = itemRecord(rec.baseId);
+  return typeof rec?.effectId === 'string' ? rec.effectId : null;
+}
+
+/**
+ * Ids of the official item records of `items` ({ id: record }) whose behaviour is `effectId` (itemEffectKey), in data
+ * order: no plugin record (item_x_, or one that carries an effectRef — it copies its base's effectId). `normalOnly`
+ * drops the golden records.
+ */
+export function officialItemIdsWithEffect(items, effectId, { normalOnly = false } = {}) {
+  const out = [];
+  if (!items || typeof items !== 'object' || typeof effectId !== 'string') return out;
+  for (const [id, rec] of Object.entries(items)) {
+    if (!rec || typeof rec !== 'object' || rec.effectRef != null || !isOfficialId('items', id)) continue;
+    const golden = !!rec.baseId && rec.baseId !== id;
+    if (golden ? !normalOnly && own(items, rec.baseId)?.effectId === effectId : rec.effectId === effectId) out.push(id);
+  }
+  return out;
+}
+
+let EFFECT_ITEMS = new WeakMap();
+/** officialItemIdsWithEffect over the loaded data (gameData()), cached per data object. */
+export function itemIdsWithEffect(effectId, { normalOnly = false } = {}) {
+  const d = gameData();
+  let m = EFFECT_ITEMS.get(d);
+  if (!m) { m = new Map(); EFFECT_ITEMS.set(d, m); }
+  const k = `${normalOnly ? 'n' : 'a'}:${effectId}`;
+  if (!m.has(k)) m.set(k, Object.freeze(officialItemIdsWithEffect(d.items, effectId, { normalOnly })));
+  return m.get(k);
+}
+
+/** 突变细胞's effect: 凯瑟琳's one-cell allowance (bands/meta.js, server/match/player/prep.js) counts its normal records. */
+export const MUTATION_CELL_EFFECT = 'eff_acarm072';
+/** Whether item record `rec` is an official normal 突变细胞 (not golden, not a plugin record). */
+export const isMutationCell = (rec) => !!rec && rec.effectRef == null && isOfficialId('items', rec.id) && rec.effectId === MUTATION_CELL_EFFECT;
 
 /**
  * Buffs of a data record (bond / item / band / effect / garrison-like) as `{ key, bbKey, p }` where `key` is the

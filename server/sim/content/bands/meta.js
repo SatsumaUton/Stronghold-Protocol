@@ -36,7 +36,7 @@
 import { GEO } from '../../../../shared/constants.js';
 import { bbCap } from '../../../../shared/plugins/officialBounds.js';
 import { burstLimit } from '../../../../shared/plugins/steps.js';
-import { buffsOf, num, bandRecord, bandEffectId, gameData } from '../support/index.js';
+import { buffsOf, num, bandRecord, bandEffectId, gameData, officialItemIdsWithEffect, MUTATION_CELL_EFFECT } from '../support/index.js';
 import { metaBonds } from '../support/meta.js';
 import * as garrisons from '../garrisons.js';
 
@@ -289,7 +289,10 @@ K.up_shop_add_special_goods = (ps, bandId) => ({
     const p = ps[0];
     // effectRef inherits the behaviour (DESIGN §32.5); concrete parameters still come from this band's buffs.
     const cathy = bandEffectId(bandId) === 'band_cathy';
-    const exclude = cathy && ctx.counter('band:cathy:cellTaken') ? ['chess_item_5_08_e_a'] : [];
+    // the cell by its effect (another official version gives it another id and tier): the official normal records of
+    // the match's data — default data: chess_item_5_08_e_a alone, so the draws are unchanged
+    const exclude = cathy && ctx.counter('band:cathy:cellTaken')
+      ? officialItemIdsWithEffect(ctx.data?.items ?? gameData().items, MUTATION_CELL_EFFECT, { normalOnly: true }) : [];
     const ids = rollItems(ctx, p.pool, timesOf(p.count, 3), exclude);
     if (ids.length) ctx.offerItems(ids, { source: cathy ? 'band:band_cathy' : 'band' });
   },

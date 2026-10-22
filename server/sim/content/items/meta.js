@@ -30,8 +30,13 @@
 //               (seat order, cyclic)
 //   天师古鼎     equip_with_another_gain_coin_when_gain_char: a 【炎】 carrier also holding 炎国短刀 (either quality)
 //               gains `count` funds every time the player gains an operator, at most `max` times per round per item
+//
+// Each override is declared by its item's effectId (wrapEffect; versions M0, docs/META.md §2.1) and bound when the
+// registry is built to the item keys of the loaded data that carry it (support itemIdsWithEffect): another official
+// version gives these ids to other items. The registry keys stay `item:<item key>`, as builtinMeta and the dispatcher
+// expect. An effect the data does not have binds nothing.
 
-import { itemKeyOf, isCoreBond } from '../support/index.js';
+import { itemKeyOf, itemIdsWithEffect, isCoreBond } from '../support/index.js';
 import { metaBonds } from '../support/meta.js';
 import { msg, dn } from '../../../../shared/i18n.js';
 
@@ -69,9 +74,25 @@ function wrap(registry, key, hooks) {
   registry.item(key, { ...base, ...hooks(base) });
 }
 
+/** The item keys of the loaded data whose normal record carries `effectId`, in data order. */
+const keysOfEffect = (effectId) => [...new Set(itemIdsWithEffect(effectId, { normalOnly: true }).map((id) => itemKeyOf(id)))];
+
+/** wrap() on every item key of the loaded data that carries `effectId` (none: nothing is bound). */
+function wrapEffect(registry, effectId, hooks) {
+  for (const key of keysOfEffect(effectId)) wrap(registry, key, hooks);
+}
+
+/** The effectIds registerMeta binds, in registration order (a repeated one once). */
+const META_EFFECTS = Object.freeze(['eff_acarm115', 'eff_acarm075', 'eff_acchal', 'eff_acdisney', 'eff_accopy', 'eff_acarm077']);
+
+/** Tests: each effectId registerMeta binds and the item keys of the loaded data it binds to. */
+export function itemMetaBindings() {
+  return META_EFFECTS.map((effectId) => ({ effectId, keys: keysOfEffect(effectId) }));
+}
+
 export function registerMeta(registry) {
-  // 紧急调度券 — use_equip_reward_random_char_chess_in_shop {count}
-  wrap(registry, 'chess_item_2_02_e', () => ({
+  // 紧急调度券 (default chess_item_2_02_e) — use_equip_reward_random_char_chess_in_shop {count}
+  wrapEffect(registry, 'eff_acarm115', () => ({
     onEquip(ctx, ev) {
       const p = buffP(ctx, ev.item && ev.item.id, 'use_equip_reward_random_char_chess_in_shop') || {};
       const n = Math.max(1, int(p.count, 1));
@@ -88,8 +109,8 @@ export function registerMeta(registry) {
     },
   }));
 
-  // 寻呼模块 — use_equip_reward_special_goods_char_chess {refresh_cnt, choice_cnt}
-  wrap(registry, 'chess_item_4_01_e', () => ({
+  // 寻呼模块 (default chess_item_4_01_e) — use_equip_reward_special_goods_char_chess {refresh_cnt, choice_cnt}
+  wrapEffect(registry, 'eff_acarm075', () => ({
     onEquip(ctx, ev) {
       const p = buffP(ctx, ev.item && ev.item.id, 'use_equip_reward_special_goods_char_chess') || {};
       const n = Math.max(1, int(p.refresh_cnt, 3));
@@ -108,16 +129,16 @@ export function registerMeta(registry) {
     },
   }));
 
-  // 教鞭 — trap_create_self_choice {choice_event}: the server keeps the offered 战术特训 cards until confirmed.
-  wrap(registry, 'chess_item_6_03_m', () => ({
+  // 教鞭 (default chess_item_6_03_m) — trap_create_self_choice {choice_event}: the server keeps the offered 战术特训 cards until confirmed.
+  wrapEffect(registry, 'eff_acchal', () => ({
     onArt(ctx, ev) {
       const result = ctx.offerBountyChoice(bountyCards(ctx, isTraining), ev.item.id);
       if (!result.ok) { ev.error = result.error; ev.detail = result.detail; }
     },
   }));
 
-  // “神秘顾客” — a random band bounty (enemyeffect_b_*).
-  wrap(registry, 'chess_item_6_01_m', (base) => ({
+  // “神秘顾客” (default chess_item_6_01_m) — a random band bounty (enemyeffect_b_*).
+  wrapEffect(registry, 'eff_acdisney', (base) => ({
     onArt(ctx, ev) {
       const cards = bountyCards(ctx, isBandBounty);
       if (!cards.length) { if (typeof base.onArt === 'function') base.onArt.call(base, ctx, ev); return; }
@@ -127,7 +148,7 @@ export function registerMeta(registry) {
     },
   }));
 
-  // 画卷 — trap_copy_front_char: copy the operator in range (elite status included) and its equipment. The copied items
+  // 画卷 (default chess_item_6_02_m) — trap_copy_front_char: copy the operator in range (elite status included) and its equipment. The copied items
   // are gained unequipped, like any gained item — the hand, overflow temp, destroyed with the usual toast when both are
   // full — never put on the copy (PRTS 画卷 备注 "使用后销毁，获得的装备为未装备状态"; until 0.2.2 a copied item that did
   // not merge was equipped onto the copy). A copied normal item that completes a pair with an owned one merges at once,
@@ -135,7 +156,7 @@ export function registerMeta(registry) {
   // completes a three-copy merge (GitHub #389, PR #390): the promotion returns the copies' equipment to the hand too
   // (PRTS 帮助 "在失去该干员（…合并等）…时自动卸除"), so the elite wears nothing and a copied normal item merges with the
   // returned original.
-  wrap(registry, 'chess_item_6_02_m', () => ({
+  wrapEffect(registry, 'eff_accopy', () => ({
     onArt(ctx, ev) {
       const target = (ev.targets || []).find((p) => p && p.kind === 'chess');
       if (!target) { ev.error = 'BAD_TARGET'; ev.detail = 'no operator in range'; return; }
@@ -149,8 +170,8 @@ export function registerMeta(registry) {
     },
   }));
 
-  // “神秘顾客” — trap_create_self_choice (bounty above) + trap_disney_special {count}
-  wrap(registry, 'chess_item_6_01_m', () => ({
+  // “神秘顾客” (default chess_item_6_01_m) — trap_create_self_choice (bounty above) + trap_disney_special {count}
+  wrapEffect(registry, 'eff_acdisney', () => ({
     onDestroy(ctx, ev) {
       if (!ev || ev.reason !== 'player') return;
       const item = ev.item || ctx.source.piece;
@@ -166,8 +187,8 @@ export function registerMeta(registry) {
     },
   }));
 
-  // 天师古鼎 — equip_with_another_gain_coin_when_gain_char {count, max} {other_equip, bond}
-  wrap(registry, 'chess_item_6_03_e', (base) => ({
+  // 天师古鼎 (default chess_item_6_03_e) — equip_with_another_gain_coin_when_gain_char {count, max} {other_equip, bond}
+  wrapEffect(registry, 'eff_acarm077', (base) => ({
     onGain(ctx, ev) {
       if (typeof base.onGain === 'function') base.onGain.call(base, ctx, ev);
       if (!ev || ev.kind !== 'chess' || !ev.piece) return;
