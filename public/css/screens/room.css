@@ -62,6 +62,9 @@
   text-overflow: ellipsis;
 }
 .rs-clock__ping { display: inline-flex; align-items: center; gap: .08rem; font-size: calc(.15 * var(--t)); color: #9aa19e; }
+/* the shared ping pill and 原版 / 插件 tag have a fixed height (.32rem / .3rem, 12–13 px on a phone) their text outgrows at
+   大 / 特大: in the room's top bar they grow with it (§35.18 review; older than the event UI) */
+.rs-clock__ping .ping, .rs-top .plugtag { height: auto; min-height: .3rem; padding-top: 1px; padding-bottom: 1px; }
 .rs-tools { display: flex; gap: .08rem; margin-left: .1rem; }
 .rs-top__right { display: flex; align-items: center; gap: .14rem; }
 .rs .rs-loadout {
@@ -104,6 +107,7 @@
 .rs-key__code { font-size: calc(.28 * var(--t)); letter-spacing: .06em; color: #f2f4f3; white-space: nowrap; }
 .rs-key__copy {
   height: 78%;
+  line-height: 1;
   padding: 0 .26rem;
   font: inherit;
   font-size: calc(.2 * var(--t));
@@ -176,7 +180,9 @@
   100% { opacity: 0; transform: translateX(-50%) scaleY(1.3); } }
 .rseat.is-flash .rseat__state { animation: rseat-pop 380ms cubic-bezier(.3, 1.7, .5, 1) 100ms backwards; }
 @keyframes rseat-pop { from { opacity: 0; transform: scale(.4); } }
-.rs--solo .rseat { --w: min(2.7rem, 34vw); }
+/* (3.4rem as a co-op card's: at 2.7rem 独立模拟's single card was the narrowest, and its 「Standing by」 broke inside the word
+   at 特大 in an 800–1100 px window — §35.18 review) */
+.rs--solo .rseat { --w: min(3.4rem, 34vw); }
 .rseat__clip { position: absolute; left: 50%; top: -.14rem; z-index: 2; width: .16rem; height: .2rem; transform: translateX(-50%); background: #3a3e3d; border: 2px solid #1a1c1c; }
 .rseat.is-lit .rseat__clip { background: #4fe8c0; }
 .rseat__strip { position: relative; display: flex; align-items: center; justify-content: space-between; height: max(.26rem, 16px); padding: 0 .08rem; background: #2b2e2e; }
@@ -197,14 +203,29 @@
   border-top: 0;
 }
 .rseat.is-lit .rseat__art { border-color: #4fe8c0; box-shadow: 0 0 .2rem rgba(79, 232, 192, .35); }
+/* an occupied card's art: the badge (创建者 / AI 队友), 更换立绘 and the tags at the top, the avatar frame (a bot, no art pack)
+   between, the operator's name and the state at the bottom — in flow, so a larger 文字大小 or a longer language pushes
+   them apart and wraps them instead of drawing one over another (§35.18 review: they were placed by fixed offsets, and on
+   a phone at 大 / 特大 「Standing by」 ran past the card and over 创建者) */
+.seat__art.rseat__art {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: .04rem;
+  padding: .14rem .08rem;
+}
+/* the avatar frame gives way first (it shrinks, square, when the text above and below needs the height) */
+.seat__art.rseat__art > .avatar { align-self: center; flex: 0 1 var(--av); width: auto; height: auto; min-height: 0; aspect-ratio: 1; }
+.rseat__top, .rseat__low { position: relative; z-index: 1; display: flex; flex-direction: column; gap: .04rem; min-width: 0; }
+.rseat__top { order: -1; align-items: center; }
+.rseat__low { align-items: stretch; }
 .rseat__art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
 .rseat.is-lit .rseat__art::after { content: ''; position: absolute; inset: 50% 0 0; background: linear-gradient(180deg, transparent, rgba(47, 207, 159, .85)); pointer-events: none; }
 .rseat.is-offline .rseat__art img { filter: grayscale(.8) brightness(.6); }
 .seat__op {
-  position: absolute;
-  left: .1rem;
-  bottom: .7rem;
-  z-index: 1;
+  align-self: flex-start;
+  max-width: 100%;
   padding: .02rem .08rem;
   font-size: calc(.14 * var(--t));
   font-weight: 700;
@@ -213,36 +234,31 @@
   border-left: 2px solid #4fe8c0;
 }
 .rseat__host, .rseat__bot {
-  position: absolute;
-  top: .14rem;
-  left: 50%;
-  z-index: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: .04rem;
+  max-width: 100%;
   padding: .02rem .18rem;
-  transform: translateX(-50%);
   font-size: calc(.18 * var(--t));
   font-weight: 800;
-  white-space: nowrap;
+  line-height: 1.15;
+  text-align: center;
   color: #08221b;
   background: #4fe8c0;
   border-radius: .04rem;
 }
 .rseat__bot { background: #c9cecc; }
-.rseat__host .icon, .rseat__bot .icon { width: 1em; height: 1em; }
+.rseat__host .icon, .rseat__bot .icon { flex: none; width: 1em; height: 1em; }
 .rseat__tag {
-  position: absolute;
-  left: .08rem;
-  top: .56rem;
-  z-index: 1;
+  align-self: flex-start;
+  max-width: 100%;
   padding: .02rem .08rem;
   font-size: calc(.13 * var(--t));
   color: #eef0ef;
   background: rgba(0, 0, 0, .6);
   border: 1px solid rgba(255, 255, 255, .25);
 }
-.rseat__tag + .rseat__tag { top: .9rem; }
 .seat__content.is-ready { border-color: #4fe8c0; color: #8ff3d6; }
 .seat__content.is-failed { border-color: #ff7a8a; color: #ff9aa6; }
 .rseat__lost {
@@ -263,22 +279,20 @@
 }
 .rseat__lost .icon { width: 1.2em; height: 1.2em; }
 .rseat__state {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: .14rem;
-  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: .1rem;
   font-size: calc(.26 * var(--t));
   font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
   color: #fff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
 }
 .rseat:not(.is-lit) .rseat__state { font-size: calc(.2 * var(--t)); color: #c9cecc; }
-.rseat__box { display: grid; place-items: center; width: max(.34rem, 20px); height: max(.34rem, 20px); background: rgba(0, 0, 0, .25); border: 2px solid currentColor; border-radius: 4px; }
+.rseat__said { min-width: 0; overflow-wrap: break-word; }
+.rseat__box { flex: none; display: grid; place-items: center; width: max(.34rem, 20px); height: max(.34rem, 20px); background: rgba(0, 0, 0, .25); border: 2px solid currentColor; border-radius: 4px; }
 .rseat__box .icon { width: 80%; height: 80%; }
 .rseat__kick {
   position: absolute;
@@ -298,26 +312,26 @@
 .rseat__kick .icon + .icon { width: max(.14rem, 9px); margin-left: -2px; }
 .rseat__kick:hover:not(:disabled), .rseat__kick:focus-visible { filter: brightness(1.3); }
 .rseat__pick {
-  position: absolute;
-  right: .08rem;
-  top: .5rem;
-  z-index: 2;
+  align-self: flex-end;
   display: inline-flex;
   align-items: center;
   gap: .04rem;
-  height: max(.36rem, 22px);
-  padding: 0 .1rem;
+  max-width: 100%;
+  min-height: max(.36rem, 22px);
+  padding: .02rem .1rem;
   font: inherit;
   font-size: calc(.14 * var(--t));
   font-weight: 700;
+  line-height: 1.1;
+  text-align: left;
   color: #eef0ef;
   background: rgba(0, 0, 0, .55);
   border: 1px solid rgba(255, 255, 255, .3);
-  border-radius: 999px;
+  border-radius: max(.18rem, 11px);
   opacity: .8;
   transition: opacity var(--t-fast), border-color var(--t-fast);
 }
-.rseat__pick .icon { width: 1.1em; height: 1.1em; }
+.rseat__pick .icon { flex: none; width: 1.1em; height: 1.1em; }
 .rseat__art:hover .rseat__pick, .rseat__pick:focus-visible { opacity: 1; border-color: #5df0c6; }
 .rseat__plate {
   position: relative;
@@ -352,16 +366,23 @@
 .rseat__invite small { font-size: calc(.15 * var(--t)); color: #8d9391; text-align: center; }
 .rseat__invite:hover .rseat__plus::before, .rseat__invite:hover .rseat__plus::after,
 .rseat__invite:focus-visible .rseat__plus::before, .rseat__invite:focus-visible .rseat__plus::after { background: #5df0c6; }
-.rseat__add { align-self: start; margin-top: .1rem; }
+.rseat__add { align-self: start; max-width: calc(100% - .12rem); height: auto; min-height: .36rem; padding-block: .03rem; margin-top: .1rem; white-space: normal; line-height: 1.1; text-align: center; }
 .rseat__wait { display: flex; flex-direction: column; align-items: center; gap: .1rem; color: #b7bdbb; }
 .rseat__wait small { font-size: calc(.16 * var(--t)); }
 .rseat__noinfo { position: absolute; right: .12rem; bottom: .14rem; font-family: var(--font-display); font-size: calc(.12 * var(--t)); letter-spacing: .1em; color: rgba(255, 255, 255, .15); }
 
 /* 独立模拟: the briefing beside the single seat */
-.rs-brief { align-self: center; max-width: min(5rem, 46vw); padding: .24rem .3rem; background: rgba(10, 13, 12, .8); border: 1px solid var(--line); }
+.rs-brief { align-self: center; max-width: min(5rem, 46vw); max-height: 100%; overflow-y: auto; scrollbar-width: thin; padding: .24rem .3rem; background: rgba(10, 13, 12, .8); border: 1px solid var(--line); }
 .rs-brief h2 { margin: .06rem 0; font-size: calc(.32 * var(--t)); color: var(--d-color); }
 .rs-brief p { margin: 0 0 .1rem; font-size: calc(.17 * var(--t)); color: var(--text-md); }
 .rs-brief ul { margin: 0; padding-left: .24rem; font-size: calc(.16 * var(--t)); color: var(--text-lo); line-height: 1.7; }
+
+/* a short window (≤ 640 px tall, phones below): the briefing wider and its list tighter, so its text fits beside the seat
+   at 特大 instead of scrolling (§35.18 review: 1100×530 at 特大 hid 55 px). [ASSUMED] the widths */
+@media (max-height: 640px) {
+  .rs-brief { max-width: min(7rem, 46vw); }
+  .rs-brief ul { line-height: 1.45; }
+}
 
 /* ---- spectator seats (观战席, community report #26) -------------------------------------------------------------- */
 .specbar {
@@ -415,7 +436,10 @@
   min-height: 0;
   max-height: 5.2rem;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(.96rem, 1fr));
+  /* a tile at least as wide as a long one-word name at the names' size (em of this font), so the names wrap whole rather
+     than end in an ellipsis (§35.18 review: at 特大 a phone showed 「Ang…」). [ASSUMED] the 6.6em */
+  font-size: calc(.14 * var(--t));
+  grid-template-columns: repeat(auto-fill, minmax(max(.96rem, 6.6em), 1fr));
   align-content: start;
   gap: .08rem;
   padding: 2px;
@@ -440,7 +464,7 @@
 .cardpick__img img { width: 100%; height: 100%; object-fit: cover; }
 .cardpick__img .icon { width: 45%; height: 45%; color: var(--mint-400); }
 .cardpick__glyph { font-size: calc(.36 * var(--t)); font-weight: 900; color: rgba(255, 255, 255, .3); }
-.cardpick__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; font-size: calc(.14 * var(--t)); }
+.cardpick__name { text-align: center; font-size: calc(.14 * var(--t)); line-height: 1.15; }
 .cardpick__star { position: absolute; top: .04rem; right: .04rem; padding: 0 .04rem; background: #d9dedc; color: #111; font-size: calc(.12 * var(--t)); font-weight: 800; }
 .cardpick__op.r6 .cardpick__star { background: #ffcf5a; }
 .cardpick__op.r5 .cardpick__star { background: #f2e06b; }
@@ -452,14 +476,16 @@
 .rs-foot {
   flex: none;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  /* the side columns at least their content (the big button keeps its width: a spectator's 观战中 was squeezed to a few px
+     by a long status line in the centre's auto column, §35.18 review), the centre's text wraps in what is left */
+  grid-template-columns: minmax(min-content, 1fr) auto minmax(min-content, 1fr);
   align-items: end;
   gap: .2rem;
   padding: .1rem .3rem .2rem .22rem;
   z-index: 2;
 }
 .rs-foot__left { min-width: 0; }
-.rs-foot__center { display: flex; flex-direction: column; align-items: center; gap: .08rem; }
+.rs-foot__center { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: .08rem; }
 .rs-hint { margin: 0; font-size: calc(.18 * var(--t)); color: #d6dad8; text-align: center; }
 .room-bar__status .icon { width: 1.1em; height: 1.1em; margin-right: 4px; vertical-align: -2px; }
 .rs-ready { display: inline-flex; align-items: center; gap: 2px; margin-right: .14rem; font-size: calc(.16 * var(--t)); color: #9aa19e; vertical-align: middle; }
@@ -534,7 +560,7 @@
 .rs-opts__row { display: flex; align-items: center; gap: .12rem; font-size: calc(.14 * var(--t)); }
 .rs-opts__k { color: var(--text-lo); }
 .rs-opts__diff {
-  display: inline-flex; align-items: center; gap: .06rem; height: .36rem; padding: 0 .14rem;
+  display: inline-flex; align-items: center; gap: .06rem; min-height: .36rem; padding: .02rem .14rem;
   font: inherit; font-size: calc(.15 * var(--t)); font-weight: 700; white-space: nowrap;
   color: var(--d-color); background: rgba(0, 0, 0, .3); border: 1px solid var(--line-2);
 }
@@ -542,8 +568,8 @@
 .rs-opts__diff em { margin-left: .06rem; font-style: normal; color: var(--text-hi); text-decoration: underline; text-underline-offset: 2px; }
 .rs-opts__diff:hover:not(:disabled), .rs-opts__diff:focus-visible { border-color: var(--d-color); }
 .rs-opts__diff:disabled { cursor: default; opacity: .6; }
-.room-bar__right { display: flex; align-items: center; justify-content: flex-end; gap: .14rem; min-width: 0; }
-.rs-go.proto-start { width: min(4.6rem, 40vw); }
+.room-bar__right { display: flex; align-items: center; justify-content: flex-end; gap: .14rem; }
+.rs-go.proto-start { flex: none; width: min(4.6rem, 40vw); }
 /* the label (§35.18 review: it shared 选择模拟协议's wrapping label by accident, and on a phone a fixed 46 px button then cut
    every line): like the dialog's, it wraps onto a second line and the button grows (`.proto-start` min-height) rather than
    cutting it — on one line English 开始模拟 ran off the right at 中 and above at every desktop size, Japanese and Korean
@@ -556,6 +582,8 @@
 .rs-go .proto-start__mark small { font-size: min(calc(.08 * var(--t)), .1rem); }
 .rs-go__box { flex: none; display: grid; place-items: center; width: max(.5rem, 28px); height: max(.5rem, 28px); border: 3px solid currentColor; border-radius: 6px; }
 .rs-go__box .icon { width: 80%; height: 80%; }
+.rs-go__icon { flex: none; display: grid; place-items: center; width: max(.5rem, 28px); height: max(.5rem, 28px); }
+.rs-go__icon .icon { width: 100%; height: 100%; }
 .rs-go.is-ready { background: linear-gradient(180deg, #7ff3d4, #4fe0bf); }
 
 /* the plugin panel's mode picker (ui/pluginPanel.js) and the 「AI 队友最后选择」 switch share these */
@@ -590,7 +618,7 @@
 .dpick__opt.is-active .icon { opacity: 1; filter: drop-shadow(0 0 5px var(--d-color)); }
 .dpick--ro { border: 0; background: none; gap: .18rem; align-items: center; font-size: calc(.14 * var(--t)); }
 .ailast { display: flex; align-items: center; gap: .12rem; font-size: calc(.14 * var(--t)); }
-.ailast__opt { --d-color: var(--mint-400); height: .36rem; padding: 0 .14rem; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .3); font-size: calc(.15 * var(--t)); letter-spacing: .04em; }
+.ailast__opt { --d-color: var(--mint-400); height: auto; min-height: .36rem; padding: .02rem .14rem; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .3); font-size: calc(.15 * var(--t)); letter-spacing: .04em; }
 .ailast__opt:last-child { border-right: 1px solid var(--line-2); }
 .ailast__opt .icon { opacity: .25; }
 .ailast__opt .icon.is-on { opacity: 1; }
@@ -607,19 +635,43 @@
   .rs-seats { padding-top: 14px; gap: 12px; }
   .rseat__plate { min-height: 36px; margin-top: 4px; }
   .rseat__doc, .rseat__noinfo, .rseat__invite small, .seat__op { display: none; }
-  .rseat__host, .rseat__bot { top: 6px; font-size: calc(.26 * var(--t)); }
-  .rseat__state { font-size: calc(.34 * var(--t)); }
-  .rseat:not(.is-lit) .rseat__state { font-size: calc(.28 * var(--t)); }
-  .rseat__who { font-size: calc(.28 * var(--t)); }
-  .rseat__pick { top: 30px; font-size: calc(.22 * var(--t)); }
+  /* the seat cards' text capped (§35.18 review: at 大 / 特大 the .26–.34 × --t sizes, 23–30 px in a card about 120 px wide
+     and 100 px tall, ran 「Standing by」 / 「AI Teammate」 / 「Add AI Teammate」 past the card and the badge over the state);
+     the avatar frame of a bot or a card without the art pack at 1rem. [ASSUMED] the caps */
+  .seat__art.rseat__art { gap: 2px; padding: 4px 3px; }
+  .seat__art.rseat__art > .avatar--xl { --av: 1rem; }
+  .rseat__host, .rseat__bot { padding: 1px 6px; font-size: min(calc(.26 * var(--t)), 15px); }
+  .rseat__state { gap: 4px; font-size: min(calc(.34 * var(--t)), 17px); }
+  .rseat:not(.is-lit) .rseat__state { font-size: min(calc(.28 * var(--t)), 15px); }
+  .rseat__box { width: 18px; height: 18px; }
+  .rseat__who { font-size: min(calc(.28 * var(--t)), 18px); }
+  .rseat__pick { min-height: 22px; font-size: min(calc(.22 * var(--t)), 16px); }
   .rseat__pick span { display: none; }
-  .rseat__invite b { font-size: calc(.34 * var(--t)); }
-  .rseat__plus { width: 30px; height: 30px; }
+  .rseat--empty .rseat__art { padding-bottom: 6px; }
+  .rseat__invite { gap: 2px; padding: 2px 4px; }
+  .rseat__invite b { font-size: min(calc(.34 * var(--t)), 18px); line-height: 1.15; }
+  .rseat__add { margin-top: 2px; }
+  .rseat__plus { width: 26px; height: 26px; }
+  .rseat__plus::before { width: 5px; }
+  .rseat__plus::after { height: 5px; }
+  /* the picker's names (and with them its tiles, 6.6em wide) capped, so a phone at 特大 keeps five tiles a row. [ASSUMED] */
+  .cardpick__grid, .cardpick__name { font-size: min(calc(.14 * var(--t)), 11px); }
   .rs-foot { padding-bottom: 8px; gap: 8px; }
-  .rs-hint, .rs-pill__diff, .rs-clock > b { font-size: calc(.28 * var(--t)); }
-  .rs-clock__ping, .rs-ready { font-size: calc(.22 * var(--t)); }
+  /* the mode line, the status line (a spectator's runs to two lines) and 独立模拟's briefing, capped so the seat cards keep
+     their height (at 特大 the .28 × --t status took four lines on a 640×360 phone and left the cards 40 px). [ASSUMED] the
+     caps */
+  .rs-clock > b { font-size: min(calc(.28 * var(--t)), 20px); }
+  .rs-clock__ping, .rs-ready { font-size: min(calc(.22 * var(--t)), 15px); }
+  .rs-hint { font-size: min(calc(.28 * var(--t)), 14px); }
+  .rs-brief { max-width: min(8rem, 54vw); padding: 6px 12px; }
+  .rs-brief h2 { font-size: min(calc(.32 * var(--t)), 20px); }
+  .rs-brief p { font-size: min(calc(.17 * var(--t)), 14px); }
+  .rs-brief ul { font-size: min(calc(.16 * var(--t)), 13px); line-height: 1.35; }
+  /* the difficulty's name in its 40 px pill and the key's 复制 in its 26 px button: capped so the line stays inside.
+     [ASSUMED] the caps */
+  .rs-pill__diff { font-size: min(calc(.28 * var(--t)), 20px); }
   .rs-key__code { font-size: calc(.36 * var(--t)); }
-  .rs-key__copy { font-size: calc(.26 * var(--t)); }
+  .rs-key__copy { font-size: min(calc(.26 * var(--t)), 18px); }
   /* the button at least 46 px, taller for a second line; the label 18–20 px (as 选择模拟协议's here: it was .46 × --t, 40 px
      at 特大, which cut 开始模拟 in English, Japanese and Korean, and at 特大 in Chinese once it wrapped). [ASSUMED] the cap */
   .rs-go.proto-start { height: auto; min-height: 46px; }
@@ -629,7 +681,7 @@
   .rs-tools, .rs-key__k { display: none; }
 }
 @media (max-width: 900px) {
-  .rs-foot { grid-template-columns: auto minmax(0, 1fr); }
+  .rs-foot { grid-template-columns: minmax(0, 1fr) auto; }
   .rs-foot__left { display: none; }
 }
 @media (max-aspect-ratio: 1/1) {

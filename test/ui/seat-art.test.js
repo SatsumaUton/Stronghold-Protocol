@@ -134,9 +134,13 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   const block = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
   const sizes = [...block.matchAll(/font-size:\s*([^;}]+)[;}]/g)].map((m) => m[1].trim());
   assert.ok(sizes.length >= 30, sizes.join(' | '));
-  // (the room's big button caps its label and mark: it still follows 文字大小 below the cap — §35.18 review)
+  // (a capped size still follows 文字大小 below the cap — §35.18 review: the room's big button, and on a short screen the
+  // seat cards, the top bar's text, the status line, 独立模拟's briefing and the picker's names)
   for (const v of sizes) assert.match(v, /^(calc\(\.\d+ \* var\(--t\)\)|min\(calc\(\.\d+ \* var\(--t\)\), (\.\d+rem|\d+px)\))$/, v);
-  assert.equal(sizes.filter((v) => v.startsWith('min(')).length, 4, 'the caps: the GoButton\'s label, rook and mark, and its label on a short screen');
+  const caps = sizes.filter((v) => v.startsWith('min('));
+  assert.equal(caps.length, 19, 'the GoButton\'s label, rook and mark, and the short screen\'s caps');
+  // the short screen's px caps keep the text readable (11–20 px)
+  for (const v of caps) { const px = /, (\d+)px\)$/.exec(v); if (px) assert.ok(+px[1] >= 11 && +px[1] <= 20, v); }
   assert.ok(!/!important/.test(block) && !/:has\(/.test(block));
   assert.match(block, /\.rseat__art img \{[^}]*object-fit: cover/);
   assert.match(block, /\.cardpick__grid[\s\S]*overflow-y: auto/);
