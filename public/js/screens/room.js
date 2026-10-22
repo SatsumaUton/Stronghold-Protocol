@@ -127,6 +127,18 @@ export function aiLastOption(room, myId) {
   return { on: room.aiPicksLast === true, editable: room.hostId != null && room.hostId === myId };
 }
 
+/**
+ * An AI teammate's name split into its 「AI·」 prefix and the rest, for the plate (room.css hides the prefix on a phone:
+ * the avatar's badge and the card's AI 队友 tag say it, and at 特大 the prefix left one character of the name,
+ * 「AI·华…」). Null for a human seat and for a name that is only a number after the prefix (`AI·2`).
+ * @param {{ isBot?: boolean, name?: string } | null | undefined} seat
+ * @returns {[string, string] | null}
+ */
+export function botNameParts(seat) {
+  const m = seat?.isBot ? /^(AI\s*·\s*)(\D.*)$/su.exec(seat.name || '') : null;
+  return m ? [m[1], m[2]] : null;
+}
+
 /** Invite link for a room code (current page URL with ?room=CODE). */
 export function inviteLink(code) {
   const loc = globalThis.location;
@@ -234,9 +246,8 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
   const lit = state === 'ready' || state === 'host';
   const art = seat.isBot ? null : seatArtSrc([portrait, portraitDefault], badArt);
   const canPick = isMe && !seat.isBot && !!onPickCard;
-  // an AI teammate's name without its 「AI·」 prefix on a phone (room.css): the avatar's badge and the card's AI 队友 tag say
-  // it, and at 特大 the prefix left one character of the name (「AI·华…」). Kept when only a number follows (`AI·2`)
-  const botPrefix = seat.isBot ? /^(AI\s*·\s*)(\D.*)$/su.exec(seat.name || '') : null;
+  // an AI teammate's name without its 「AI·」 prefix on a phone (room.css; botNameParts)
+  const botPrefix = botNameParts(seat);
   return html`<article class=${`seat rseat${isMe ? ' is-me' : ''}${isHostSeat ? ' is-host' : ''}${seat.isBot ? ' is-bot' : ''}${art ? ' has-art' : ''}${lit ? ' is-lit' : ''}${flash ? ' is-flash' : ''} is-${state}`}
       style=${`--i:${index}`}>
     <span class="rseat__clip" aria-hidden="true"></span>
@@ -271,7 +282,7 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
     <div class="rseat__plate">
       ${isMe ? html`<span class="rseat__me" role="img" aria-label=${t('你')} title=${t('你')}><${Icon} name="info" /></span>` : null}
       <${AvatarFrame} size="sm" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} />
-      <span class="rseat__who"><b class="seat__name">${botPrefix ? html`<span class="seat__name-pre">${botPrefix[1]}</span>${botPrefix[2]}` : seat.name || t('博士')}</b>${isMe ? html`<span class="seat__you" aria-hidden="true">${t('你')}</span>` : null}</span>
+      <span class="rseat__who"><b class="seat__name">${botPrefix ? html`<span class="seat__name-pre">${botPrefix[0]}</span>${botPrefix[1]}` : seat.name || t('博士')}</b>${isMe ? html`<span class="seat__you" aria-hidden="true">${t('你')}</span>` : null}</span>
       <small class="rseat__doc">${seat.isBot ? 'AUTONOMOUS UNIT' : `DOCTOR #${doctorNo(seat.playerId)}`}</small>
     </div>
   </article>`;

@@ -740,9 +740,10 @@
   .rs-pill__diff { font-size: min(calc(.28 * var(--t)), calc(20px + var(--t-step))); }
   .rs-key__code { font-size: calc(.36 * var(--t)); }
   .rs-key__copy { font-size: min(calc(.26 * var(--t)), calc(18px + var(--t-step))); }
-  /* English 「Copy」 sat low (its descenders 0.1 px above the button's bottom at 特大, 5 px free above; the CJK labels are
-     centred): set 2 px higher. [ASSUMED] */
-  .rs-key__copy:lang(en) { padding-bottom: 4px; }
+  /* English 「Copy」's descenders came within 0.1 px of the button's bottom at 特大 (its cap top 7.4 px below the top): set
+     a pixel higher a step above 中, 2 px at 特大, so at 小 / 中, where it was centred, it stays put (review of 7aa59703:
+     a fixed 4 px set it 2 px high at 小). [ASSUMED] */
+  .rs-key__copy:lang(en) { padding-bottom: calc(2 * max(0px, var(--t-step))); }
   /* the button at least 46 px, taller for a second line; the label 18–20 px at 小 / 中, a pixel more a step above (as
      选择模拟协议's here: it was .46 × --t, 40 px at 特大, which cut 开始模拟 in English, Japanese and Korean, and at 特大 in
      Chinese once it wrapped). [ASSUMED] the cap */

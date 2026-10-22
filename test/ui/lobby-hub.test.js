@@ -44,6 +44,21 @@ const MODES = {
   coop: { id: 'coop', name: '同盟模拟', en: 'ALLIANCE SIMULATION', icon: 'users', desc: '同盟', points: ['联防'] },
 };
 
+
+/** Every plain rule of a style sheet as [selector, body], comments stripped; @-rule preludes are not selectors. */
+function* cssRules(src) {
+  for (const m of src.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?<=^|[{}])\s*([^{}@]+)\{([^{}]*)\}/g)) yield [m[1].trim(), m[2]];
+}
+/** Whether a selector reaches the room's big button (GoButton: .proto-start.rs-go > .proto-start__label, in
+ *  .rs-foot__right / .room-bar__right of the .rs-foot / .room-bar footer of .rs): the button or anything inside it, or one
+ *  of its ancestors as the subject; 选择模拟协议's own button (.proto-foot .proto-start__label) is not the room's. */
+function wrapsRoomGo(sel) {
+  const x = sel.trim();
+  if (/^\.proto-foot \.proto-start__label$/.test(x)) return false;
+  if (/\.(?:rs-go|proto-start|proto-start__label)(?![\w-])/.test(x)) return true;
+  const subject = x.split(/\s*[\s>+~]\s*/).pop();
+  return /\.(?:rs|rs-foot|rs-foot__right|room-bar|room-bar__right)(?![\w-])/.test(subject);
+}
 test('the entries: 独立模拟 / 同盟模拟 keep the .mode-card hook and open their own dialog', () => {
   for (const id of ['solo', 'coop']) {
     const opened = [];
@@ -514,12 +529,29 @@ test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simul
   // at 小 on the phones (review of 6f34f380)
   assert.match(css, /\.tips__text, \.proto-brief p, \.proto-hint, \.proto-foot \.proto-start__label \{ text-wrap: pretty; \}/);
   assert.doesNotMatch(css, /\.proto-start__label[^{]*\{[^}]*text-wrap: balance/, 'balance broke 「シミュレー|ション開始」');
-  for (const [, sel, body] of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\})\s*([^{}@]+)\{([^}]*)\}/g)) {
-    if (!/text-wrap/.test(body)) continue;
-    for (const x of sel.split(',')) assert.ok(!/\.proto-start__label/.test(x) || /\.proto-foot \.proto-start__label/.test(x), `the room's button wraps plainly: ${x.trim()}`);
-  }
+  // every rule of lobby.css and room.css, the first in a block and back-to-back ones too (a pattern that consumed the
+  // previous rule's `}` saw every second rule only; review of 7aa59703): no `text-wrap` on the room's button, on anything
+  // inside it, nor on an ancestor it would inherit it from (the footer's right cell, the footer, the whole room)
   const roomCss = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
-  assert.doesNotMatch(roomCss, /\.proto-start__label[^{]*\{[^}]*text-wrap/, 'no text-wrap on the room\'s button');
+  for (const [file, src] of [['lobby.css', css], ['room.css', roomCss]]) {
+    const all = [...cssRules(src)];
+    const plain = src.replace(/\/\*[\s\S]*?\*\//g, '');
+    const blocks = (plain.match(/\{/g) || []).length - (plain.match(/@[a-z-]+[^{;]*\{/g) || []).length;
+    assert.equal(all.length, blocks, `${file}: every rule seen (${all.length} of ${blocks})`);
+    for (const [sel, body] of all) {
+      if (!/text-wrap/.test(body)) continue;
+      for (const x of sel.split(',')) assert.ok(!wrapsRoomGo(x), `${file}: the room's button wraps plainly: ${x.trim()}`);
+    }
+  }
+  // the scan itself: a rule after another, the first in an @media block, an ancestor's text-wrap
+  for (const bad of ['.rs-go .proto-start__label { text-wrap: pretty; }', '.proto-start__label { text-wrap: pretty; }',
+    '.rs-go { text-wrap: balance; }', '.rs-foot__right { text-wrap: pretty; }', '.room-bar .rs-go span { text-wrap: pretty; }']) {
+    for (const src of [`a{x:1}\n${bad}\nb{y:2}`, `@media (max-height: 520px) {\n  ${bad}\n  b{y:2}\n}`, bad]) {
+      assert.ok([...cssRules(src)].some(([sel, body]) => /text-wrap/.test(body) && sel.split(',').some(wrapsRoomGo)), `caught: ${src}`);
+    }
+  }
+  assert.ok(![...cssRules('.proto-foot .proto-start__label { text-wrap: pretty; } .rs-hint { text-wrap: pretty; }')]
+    .some(([sel, body]) => /text-wrap/.test(body) && sel.split(',').some(wrapsRoomGo)), 'the dialog\'s button and the room\'s paragraphs may');
   // 选择同盟方式's Japanese note breaks between phrases (Chrome; 「…教えてもらう|か、招待リンク…」 at 特大)
   assert.match(css, /\.ally-recent:lang\(ja\) \{ word-break: auto-phrase; \}/);
   assert.doesNotMatch(css, /\.lobby-screen \{ text-wrap/);

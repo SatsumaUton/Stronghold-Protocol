@@ -196,6 +196,13 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   const roomJs = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
   assert.match(roomJs, /<span class="rseat__me" role="img" aria-label=\$\{t\('你'\)\}/);
   assert.match(roomJs, /<span class="rseat__who"><b class="seat__name">[^\n]*<span class="seat__you" aria-hidden="true">/);
+  // review of 6f34f380: on a phone an AI teammate's plate without its 「AI·」 prefix (「AI·华…」 at 特大; the badge and
+  // the AI 队友 tag say it), the prefix in its own span (botNameParts); desktops keep it
+  assert.match(short, /\.seat__name-pre \{ display: none; \}/);
+  assert.doesNotMatch(plain.slice(0, plain.indexOf('@media (max-height: 520px) {')), /\.seat__name-pre/);
+  assert.match(roomJs, /<b class="seat__name">\$\{botPrefix \? html`<span class="seat__name-pre">\$\{botPrefix\[0\]\}<\/span>\$\{botPrefix\[1\]\}`/);
+  // review of 7aa59703: English 「Copy」 set higher a pixel a step above 中 only (a fixed 4 px put it 2 px high at 小)
+  assert.match(short, /\.rs-key__copy:lang\(en\) \{ padding-bottom: calc\(2 \* max\(0px, var\(--t-step\)\)\); \}/);
   assert.match(readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8'), /\} <span class="num t-dim">\$\{info\.code\}<\/span><\/h2>/,
     'the space before the code outside its nowrap span, so the title can still break there');
   // the ping pill grows in the room only (§35.18 review: a global min-height outgrew title.css's own height)
@@ -203,4 +210,18 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   assert.match(readFileSync(path.join(ROOT, 'public/css/components.css'), 'utf8'), /\.ping \{[^}]*\n  height: \.32rem;/);
   // the plugin mode's chip beside the mode name (review of PR #813: its only rule had been deleted)
   assert.match(block, /\.rs-clock \.room-mode \{[^}]*border: 1px solid[^}]*text-overflow: ellipsis/);
+});
+
+test('an AI teammate\'s name split for the plate: 「AI·」 + the rest; a number-only name and a human seat unsplit (botNameParts)', async () => {
+  const { botNameParts } = await import('../../public/js/screens/room.js');
+  assert.deepEqual(botNameParts({ isBot: true, name: 'AI·华法琳' }), ['AI·', '华法琳']);
+  assert.deepEqual(botNameParts({ isBot: true, name: 'AI · Warfarin' }), ['AI · ', 'Warfarin']);
+  assert.deepEqual(botNameParts({ isBot: true, name: 'AI·Kal\'tsit\nx' }), ['AI·', 'Kal\'tsit\nx']);
+  assert.equal(botNameParts({ isBot: true, name: 'AI·2' }), null, 'only a number after the prefix keeps it');
+  assert.equal(botNameParts({ isBot: true, name: '华法琳' }), null);
+  assert.equal(botNameParts({ isBot: true, name: 'AI·' }), null);
+  assert.equal(botNameParts({ isBot: true }), null);
+  assert.equal(botNameParts({ isBot: false, name: 'AI·x' }), null, 'a doctor named 「AI·x」 keeps the whole name');
+  assert.equal(botNameParts({ name: 'AI·x' }), null);
+  assert.equal(botNameParts(null), null);
 });
