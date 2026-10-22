@@ -1,7 +1,7 @@
 // Explicit settlement API. Each request carries actual source, target and independent credit.
 import { makeDamageInfo } from './attack/helpers.js';
 import { resolveDamage } from './attack/hit.js';
-import { applyHpDecrease, leaderHitCancelled } from './attack/health.js';
+import { loseHp } from './attack/health.js';
 import { mitigate } from './attack/calculation.js';
 import { heal as applyHeal } from './attack/heal.js';
 import { healElement as recoverElement } from './attack/element.js';
@@ -49,23 +49,21 @@ export function dealElementDamage(battle, request) {
 }
 
 /**
- * Typed HP loss: mitigation only, then HP bookkeeping; no barriers or damage-triggered SP.
+ * Typed HP loss (流失): `type` 'phys' / 'arts' is first reduced by the target's DEF / RES, 'true' (the default) is not;
+ * then 限伤 and HP bookkeeping — no barriers or damage-triggered SP. The positional Battle.dealHPLose(target, amount,
+ * opts) is the same path (attack/health.js loseHp) with `opts.type`, 'true' by default.
  * @param {object} battle
  * @param {import('../../types/attack.js').HPLossRequest} request
  */
 export function dealHPLose(battle, request) {
   if (request.type != null && !['phys', 'arts', 'true'].includes(request.type)) throw new TypeError('HP loss supports phys, arts or true');
   const ctx = context(request, 'true');
-  const { target, dmg } = ctx;
-  if (!target || !target.alive || !(dmg.amount > 0)) return 0;
-  const amount = mitigate(dmg.amount, dmg.type, target.s, dmg);
-  if (!Number.isFinite(amount) || !(amount > 0)) return 0;
-  if (!request.noHitLimit && leaderHitCancelled(battle, target, amount)) return 0;
+  const { dmg } = ctx;
   dmg.tags = [...new Set(['hpLoss', ...(request.origin?.tags ?? []), ...dmg.tags])];
   dmg.noSp = true;
   dmg.silent = !!request.silent;
   dmg.origin = request.origin ?? null;
-  return applyHpDecrease(battle, { ...ctx, kind: 'hpLoss' }, amount);
+  return loseHp(battle, ctx, dmg.amount, { noHitLimit: !!request.noHitLimit });
 }
 
 /**

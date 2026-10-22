@@ -1,7 +1,7 @@
 // Compatibility boundary for existing positional Battle calls. New code uses attack.js object requests.
 import { makeDamageInfo } from './helpers.js';
 import { resolveDamage } from './hit.js';
-import { applyHpDecrease, leaderHitCancelled } from './health.js';
+import { loseHp } from './health.js';
 import { heal as applyHeal } from './heal.js';
 
 export function legacyDamage(battle, source, target, damage, opts = {}) {
@@ -16,11 +16,14 @@ export function legacyHeal(battle, source, target, amount, opts = {}) {
   return applyHeal(battle, source, target, amount, opts);
 }
 
-/** Old amounts have already been mitigated by their callers. Never mitigate them again. */
-export function legacyHPLose(battle, target, amount, { source = null, silent = false, tags = [], from = null, sourceless = false, noHitLimit = false } = {}) {
-  if (!target || !target.alive || !(amount > 0)) return 0;
-  if (!noHitLimit && leaderHitCancelled(battle, target, amount)) return 0;
-  const dmg = { type: 'true', tags: [...new Set(['hpLoss', ...(from?.tags ?? []), ...(tags ?? [])])], noSp: true,
+/**
+ * The positional HP loss: `type` as in the object request (attack.js dealHPLose) — 'true' by default, an amount the
+ * caller already mitigated, which is never mitigated again; 'phys' / 'arts' take the target's DEF / RES (attack/health.js
+ * loseHp, the one path of both forms).
+ */
+export function legacyHPLose(battle, target, amount, { source = null, silent = false, tags = [], from = null, sourceless = false, noHitLimit = false, type = 'true' } = {}) {
+  if (!['phys', 'arts', 'true'].includes(type)) throw new TypeError('HP loss supports phys, arts or true');
+  const dmg = { type, tags: [...new Set(['hpLoss', ...(from?.tags ?? []), ...(tags ?? [])])], noSp: true,
     silent, origin: from, sourceless: !!sourceless || !!from?.sourceless };
-  return applyHpDecrease(battle, { source: dmg.sourceless ? null : source, credit: source, target, dmg, kind: 'hpLoss' }, amount);
+  return loseHp(battle, { source: dmg.sourceless ? null : source, credit: source, target, dmg }, amount, { noHitLimit });
 }

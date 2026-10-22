@@ -1,5 +1,6 @@
 // Final HP application and HP loss (流失). Shared by damage and the explicit HP-loss entry.
 import { BOSS_HIT_LIMIT } from '../../../shared/constants.js';
+import { mitigate } from './calculation.js';
 
 /**
  * 限伤 — the official boss-hit limit (shared/constants.js BOSS_HIT_LIMIT, docs/research/11-limits-official.md §2;
@@ -22,7 +23,23 @@ export function leaderHitCancelled(battle, target, amount) {
 }
 
 /**
- * Remove HP (after mitigation) and run damaged/fatal/kill bookkeeping. Also used by `battle.dealHPLose` (流失).
+ * 流失 (HP loss) — the one path of both Battle.dealHPLose forms (attack.js dealHPLose, the object request; attack/legacy.js
+ * legacyHPLose, the positional call): the target's DEF / RES for a `dmg.type` 'phys' / 'arts' loss (阿戈尔's devour, a
+ * 物理流失, §21.19; mitigate's 5 % floor included), none for 'true' — an amount its caller already mitigated; then 限伤 and
+ * the HP bookkeeping. No barrier, shield, dodge, hit / output / injury stage or damage-triggered SP (PRTS 作战机制
+ * "生命流失…跳过所有结算与伤判效果").
+ */
+export function loseHp(battle, ctx, amount, { noHitLimit = false } = {}) {
+  const { target, dmg } = ctx;
+  if (!target || !target.alive || !(amount > 0)) return 0;
+  const lost = dmg.type === 'phys' || dmg.type === 'arts' ? mitigate(amount, dmg.type, target.s, dmg) : amount;
+  if (!Number.isFinite(lost) || !(lost > 0)) return 0;
+  if (!noHitLimit && leaderHitCancelled(battle, target, lost)) return 0;
+  return applyHpDecrease(battle, { ...ctx, kind: 'hpLoss' }, lost);
+}
+
+/**
+ * Remove HP (after mitigation) and run damaged/fatal/kill bookkeeping. Also used by `loseHp` (流失).
  */
 export function applyHpDecrease(battle, ctx, amount, mark) {
   const { source, credit, target, dmg, kind = 'damage' } = ctx;

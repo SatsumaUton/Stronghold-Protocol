@@ -121,6 +121,38 @@ test('legacy HP-loss and element-recovery aliases remain available for independe
   assert.equal(u.elem.burn, 40);
 });
 
+test('both HP-loss forms share one path: `type` selects the mitigation, a positional loss without it stays already mitigated', () => {
+  for (const type of ['phys', 'arts', 'true', undefined]) {
+    const object = arena(), positional = arena();
+    for (const { b, e } of [object, positional]) b.addBuff(e, { key: 'armour', mods: { defFlat: 300 - e.s.def, resFlat: 40 - e.s.res } });
+    const lost = object.b.dealHPLose({ source: object.u, target: object.e, amount: 1000, type });
+    const lostPositional = positional.b.dealHPLose(positional.e, 1000, { source: positional.u, ...(type ? { type } : {}) });
+    assert.equal(lostPositional, lost, String(type));
+    assert.equal(lost, type === 'phys' ? 700 : type === 'arts' ? 600 : 1000, String(type));
+    for (const { b, u, e } of [object, positional]) {
+      assert.equal(e.stats.taken, lost);
+      assert.equal(u.stats.dmg, lost);
+      assert.deepEqual(b.errors, []);
+    }
+  }
+});
+
+test('Battle settlement entry points report a refused request as an internal error and return 0 instead of throwing', () => {
+  const { b, u, e } = arena();
+  const hp = e.hp;
+  assert.equal(b.dealHPLose({ target: e, amount: 10, type: 'element' }), 0);
+  assert.equal(b.dealHPLose(e, 10, { type: 'element' }), 0);
+  assert.equal(b.dealElementDamage({ source: u, target: e, amount: 10, element: 'burn', attackType: 'MAGIC' }), 0);
+  assert.equal(b.healElement(null), 0);
+  assert.equal(b.dealDamage({ source: u, target: e, amount: 10, type: 'element' }), 0);
+  assert.equal(b.heal({ source: u, target: u, amount: 10, mode: 'overflow' }), 0);
+  assert.equal(e.hp, hp);
+  // six refusals (the two HP-loss ones share a message, so the error list records it once)
+  assert.equal(b.errorCount, 6);
+  assert.deepEqual(b.errors.map(x => x.label), ['internal:dealHPLose', 'internal:dealElementDamage', 'internal:healElement',
+    'internal:dealDamage', 'internal:heal']);
+});
+
 test('object requests keep sourced damage attribution independent of its attacker', () => {
   const { b, u, e } = arena();
   b.addBuff(e, { key: 'source', mods: { dmgDealtMul: 2 } });

@@ -43,7 +43,8 @@ export class BattleCombat {
    * @param {import('../../../types/attack.js').HPLossRequest} request
    * @returns {number}
    */
-  /** Legacy positional signature; amounts are already mitigated. Prefer dealHPLose({source, credit, target, amount, type}).
+  /** Legacy positional signature; prefer dealHPLose({source, credit, target, amount, type}). The same path: `opts.type`
+   * 'phys' / 'arts' takes the target's DEF / RES, 'true' (the default) is an amount the caller already mitigated.
    * @overload
    * @param {object} target
    * @param {number} amount
@@ -51,7 +52,7 @@ export class BattleCombat {
    * @returns {number}
    */
   dealHPLose(target, amount = undefined, opts = {}) {
-    return arguments.length === 1 ? attack.dealHPLose(this, target) : legacyHPLose(this, target, amount, opts);
+    try { return arguments.length === 1 ? attack.dealHPLose(this, target) : legacyHPLose(this, target, amount, opts); } catch (e) { this._internalError('dealHPLose', e); return 0; }
   }
 
   /** @overload
@@ -65,10 +66,14 @@ export class BattleCombat {
    * @param {string|null} [element]
    * @returns {number}
    */
-  healElement(target, amount = undefined, element = null) { return attack.healElement(this, arguments.length === 1 ? target : { target, amount, element }); }
+  healElement(target, amount = undefined, element = null) {
+    try { return attack.healElement(this, arguments.length === 1 ? target : { target, amount, element }); } catch (e) { this._internalError('healElement', e); return 0; }
+  }
 
   /** @param {import('../../../types/attack.js').ElementDamageRequest} request */
-  dealElementDamage(request) { return attack.dealElementDamage(this, request); }
+  dealElementDamage(request) {
+    try { return attack.dealElementDamage(this, request); } catch (e) { this._internalError('dealElementDamage', e); return 0; }
+  }
 
   /** @deprecated Use dealHPLose. */
   loseHp(target, amount, opts = {}) { return this.dealHPLose(target, amount, opts); }
