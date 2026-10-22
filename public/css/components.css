@@ -460,6 +460,9 @@
   box-shadow: 0 .3rem .9rem rgba(0, 0, 0, .65), 0 0 .4rem rgba(23, 249, 183, .06);
   animation: modal-in var(--t-slow) var(--ease-out);
 }
+/* Japanese never starts a line with a small kana or ー in a dialog, as in the room and on the hub (§35.18 review of the
+   text-fit fixes: 选择模拟协议's 「シミュレーシ|ョン」 on a phone at 特大 once its paragraph wraps `pretty`, lobby.css) */
+.modal__box:lang(ja) { line-break: strict; }
 .modal__box--red { --bk-c: var(--red-premium); --mstripe: var(--red); }
 .modal__box--amber { --bk-c: var(--amber); --mstripe: var(--amber); }
 .modal__box--orange { --bk-c: var(--orange-hi); --mstripe: var(--orange); }
@@ -1078,8 +1081,9 @@
 .crash__box h2 { font-size: calc(.3 * var(--t)); }
 
 /* ---- plugins (DESIGN §32 P1a): the room's tag 原版 / 插件 ×N (ui/pluginTag.js), its 插件 panel and the title's list (ui/pluginPanel.js) ---- */
+/* (min-height: the tag grows when 大 / 特大 outgrows its .3rem — §35.18 review) */
 .plugtag {
-  display: inline-flex; align-items: center; gap: .06rem; height: .3rem; padding: 0 .12rem;
+  display: inline-flex; align-items: center; gap: .06rem; min-height: .3rem; padding: 1px .12rem;
   border: 1px solid var(--line-2); background: rgba(0, 0, 0, .3); color: var(--text-lo);
   font-size: calc(.13 * var(--t)); letter-spacing: .06em;
 }

@@ -44,6 +44,21 @@ const MODES = {
   coop: { id: 'coop', name: '同盟模拟', en: 'ALLIANCE SIMULATION', icon: 'users', desc: '同盟', points: ['联防'] },
 };
 
+
+/** Every plain rule of a style sheet as [selector, body], comments stripped; @-rule preludes are not selectors. */
+function* cssRules(src) {
+  for (const m of src.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?<=^|[{}])\s*([^{}@]+)\{([^{}]*)\}/g)) yield [m[1].trim(), m[2]];
+}
+/** Whether a selector reaches the room's big button (GoButton: .proto-start.rs-go > .proto-start__label, in
+ *  .rs-foot__right / .room-bar__right of the .rs-foot / .room-bar footer of .rs): the button or anything inside it, or one
+ *  of its ancestors as the subject; 选择模拟协议's own button (.proto-foot .proto-start__label) is not the room's. */
+function wrapsRoomGo(sel) {
+  const x = sel.trim();
+  if (/^\.proto-foot \.proto-start__label$/.test(x)) return false;
+  if (/\.(?:rs-go|proto-start|proto-start__label)(?![\w-])/.test(x)) return true;
+  const subject = x.split(/\s*[\s>+~]\s*/).pop();
+  return /\.(?:rs|rs-foot|rs-foot__right|room-bar|room-bar__right)(?![\w-])/.test(subject);
+}
 test('the entries: 独立模拟 / 同盟模拟 keep the .mode-card hook and open their own dialog', () => {
   for (const id of ['solo', 'coop']) {
     const opened = [];
@@ -451,14 +466,14 @@ test('the room\'s 开始模拟 / 准备就绪 (screens/room.js GoButton, `.proto
   assert.match(base, /\n\.rs-go \.proto-start__label \{ flex: 1 1 auto; padding-right: 8%; font-size: min\(calc\(\.4 \* var\(--t\)\), \.46rem\); white-space: normal; line-height: 1\.1; \}/);
   assert.match(base, /\n\.rs-go \.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), \.4rem\); \}/);
   assert.match(base, /\n\.rs-go \.proto-start__mark small \{ font-size: min\(calc\(\.08 \* var\(--t\)\), \.1rem\); \}/);
-  // on a short screen: at least 46 px and taller for the second line (it was a fixed 46 px), the label 18–20 px (it was
+  // on a short screen: at least 46 px and taller for the second line (it was a fixed 46 px), the label 18–20 px at 小 / 中 and a px more a step above (it was
   // .46 × --t, 40 px at 特大)
   let end = css.indexOf('{', at) + 1;
   for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
   const short = css.slice(at, end);
   assert.match(short, /\.rs-go\.proto-start \{ height: auto; min-height: 46px; \}/);
   assert.doesNotMatch(short, /\.rs-go\.proto-start \{ height: 46px; \}/);
-  assert.match(short, /\.rs-go \.proto-start__label \{ font-size: min\(calc\(\.46 \* var\(--t\)\), 20px\); \}/);
+  assert.match(short, /\.rs-go \.proto-start__label \{ font-size: min\(calc\(\.46 \* var\(--t\)\), calc\(20px \+ var\(--t-step\)\)\); \}/);
   assert.match(short, /\.rs-go \.proto-start__mark \{ display: none; \}/);
   // the markup the rules rely on
   const room = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
@@ -486,4 +501,79 @@ test('选择同盟方式 on a short screen (§35.18 leftover: the key field\'s p
   assert.match(lobbySrc, /const shortScreen = useMediaQuery\(SHORT_SCREEN_QUERY\);/);
   assert.match(lobbySrc.match(/<\$\{AllianceSelect\}[\s\S]*? \/>/)[0], /short=\$\{shortScreen\} \/>$/);
   assert.match(readFileSync(path.join(ROOT, 'public/js/ui/device.js'), 'utf8'), /m\.addEventListener\('change', sync\); return \(\) => m\.removeEventListener\('change', sync\);/);
+});
+
+test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simulation」 cut by the cards at 小): the name wraps in a card that follows 文字大小, the plate labels wrap beside their glyph, the title follows 文字大小 while it fits on one line; on a short screen 128 px cards and caps that still grow a step', () => {
+  const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rule = (sel) => css.match(new RegExp(`\\n${sel.replace(/[.*()]/g, '\\$&')} \\{[^}]*\\}`))?.[0] || '';
+  // the card, its icon and its name follow 文字大小 together (review: the names had been pinned at 小's .3rem)
+  assert.match(css, /\.lobby-hub \{ --hub-entry-w: calc\(2\.3 \* var\(--t\)\);/);
+  assert.match(rule('.hub-entry__name'), /font-size: calc\(\.3 \* var\(--t\)\);[^}]*line-height: 1\.1;/);
+  assert.doesNotMatch(rule('.hub-entry__name'), /nowrap/, 'the name wraps between words');
+  assert.match(rule('.hub-entry'), /min-height: calc\(1\.34 \* var\(--t\)\);/);
+  assert.doesNotMatch(rule('.hub-entry'), /[^-]height: 1\.34rem/, 'the card grows for a second line');
+  assert.match(rule('.hub-entry'), /flex: 1 0 auto;/, 'both cards the taller one\'s height');
+  assert.match(rule('.hub-entries'), /align-items: stretch;/);
+  assert.match(rule('.hub-entry__icon .icon'), /width: calc\(\.42 \* var\(--t\)\);/);
+  // the text stays below the icon (the card's top padding is the icon's offset, height and a gap), not beside it (review of
+  // the review: a padding beside it wrapped 「ALLIANCE / SIMULATION」 in Chinese at 小, which never reached the icon)
+  assert.match(rule('.hub-entry'), /padding-top: calc\(\.12rem \+ \.42 \* var\(--t\) \+ \.04rem\);/, 'the text below the icon');
+  assert.doesNotMatch(rule('.hub-entry__en'), /padding-right/);
+  // Korean breaks between words (review: 「독립 시뮬레이|션」)
+  assert.match(css, /\.lobby-hub:lang\(ko\) \.hub-stage \{ word-break: keep-all; overflow-wrap: break-word; \}/);
+  assert.match(css, /\.lobby-hub:lang\(ja\) \.hub-stage \{ line-break: strict; \}/, 'no line starts with a small kana or ー');
+  // a last line not a single character: `pretty` on the tips, the protocol dialog's paragraphs and its big button's label;
+  // not on the whole lobby nor every dialog (WebKit's `pretty` adds lines to short labels; the other
+  // dialogs not measured); the dialogs' Japanese strict as the room's and the hub's (§35.18 review of the review). The
+  // room's big button shares the label's class and wraps plainly: in Safari `pretty` broke its 「シミュレー|ション開始」
+  // at 小 on the phones (review of 6f34f380)
+  assert.match(css, /\.tips__text, \.proto-brief p, \.proto-hint, \.proto-foot \.proto-start__label \{ text-wrap: pretty; \}/);
+  assert.doesNotMatch(css, /\.proto-start__label[^{]*\{[^}]*text-wrap: balance/, 'balance broke 「シミュレー|ション開始」');
+  // every rule of lobby.css and room.css, the first in a block and back-to-back ones too (a pattern that consumed the
+  // previous rule's `}` saw every second rule only; review of 7aa59703): no `text-wrap` on the room's button, on anything
+  // inside it, nor on an ancestor it would inherit it from (the footer's right cell, the footer, the whole room)
+  const roomCss = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
+  for (const [file, src] of [['lobby.css', css], ['room.css', roomCss]]) {
+    const all = [...cssRules(src)];
+    const plain = src.replace(/\/\*[\s\S]*?\*\//g, '');
+    const blocks = (plain.match(/\{/g) || []).length - (plain.match(/@[a-z-]+[^{;]*\{/g) || []).length;
+    assert.equal(all.length, blocks, `${file}: every rule seen (${all.length} of ${blocks})`);
+    for (const [sel, body] of all) {
+      if (!/text-wrap/.test(body)) continue;
+      for (const x of sel.split(',')) assert.ok(!wrapsRoomGo(x), `${file}: the room's button wraps plainly: ${x.trim()}`);
+    }
+  }
+  // the scan itself: a rule after another, the first in an @media block, an ancestor's text-wrap
+  for (const bad of ['.rs-go .proto-start__label { text-wrap: pretty; }', '.proto-start__label { text-wrap: pretty; }',
+    '.rs-go { text-wrap: balance; }', '.rs-foot__right { text-wrap: pretty; }', '.room-bar .rs-go span { text-wrap: pretty; }']) {
+    for (const src of [`a{x:1}\n${bad}\nb{y:2}`, `@media (max-height: 520px) {\n  ${bad}\n  b{y:2}\n}`, bad]) {
+      assert.ok([...cssRules(src)].some(([sel, body]) => /text-wrap/.test(body) && sel.split(',').some(wrapsRoomGo)), `caught: ${src}`);
+    }
+  }
+  assert.ok(![...cssRules('.proto-foot .proto-start__label { text-wrap: pretty; } .rs-hint { text-wrap: pretty; }')]
+    .some(([sel, body]) => /text-wrap/.test(body) && sel.split(',').some(wrapsRoomGo)), 'the dialog\'s button and the room\'s paragraphs may');
+  // 选择同盟方式's Japanese note breaks between phrases (Chrome; 「…教えてもらう|か、招待リンク…」 at 特大)
+  assert.match(css, /\.ally-recent:lang\(ja\) \{ word-break: auto-phrase; \}/);
+  assert.doesNotMatch(css, /\.lobby-screen \{ text-wrap/);
+  const comp = readFileSync(path.join(ROOT, 'public/css/components.css'), 'utf8');
+  assert.doesNotMatch(comp, /\.modal__box \{ text-wrap/);
+  assert.match(comp, /\.modal__box:lang\(ja\) \{ line-break: strict; \}/);
+  assert.match(rule('.lobby-hub .hub-plate'), /min-height: \.7rem;/, 'a plate grows for a second line');
+  const label = rule('.hub-plate__label, .lobby-hub .hub-plate .btn__label');
+  assert.doesNotMatch(label, /ellipsis|nowrap/);
+  assert.match(label, /flex: 1 1 0; min-width: min-content;/, 'the label wraps beside its glyph, only the tag drops');
+  // the title: one line beside the side columns, following 文字大小 (review: pinned at 小's .56rem / .46rem)
+  assert.match(css, /font-size: min\(calc\(\.56 \* var\(--t\)\), calc\(\(100vw - 9\.52rem\) \/ 8\.2\)\);/);
+  assert.match(css, /\n\.hub-center__title--latin \{ font-size: min\(calc\(\.46 \* var\(--t\)\), calc\(\(100vw - 9\.52rem\) \/ 20\.2\)\); \}/);
+  assert.doesNotMatch(rule('.hub-center__title'), /\.56rem\)/);
+  // the top bar's ping grows here, not everywhere (review: the global min-height outgrew title.css's own height)
+  assert.match(css, /\.lobby-hub > \.topbar \.ping \{ height: auto; min-height: \.32rem;/);
+  const short = shortBlock();
+  assert.match(short, /\.lobby-hub \{ --hub-entry-w: max\(2\.1rem, 128px\); \}/);
+  assert.match(short, /\.hub-entry \{ min-height: max\(1\.1rem, 64px\); padding: \.1rem \.14rem; \}/, 'no room above the text on a phone');
+  assert.match(short, /\.hub-entry \{ width: calc\(var\(--hub-entry-w\) \+ 7 \* max\(0px, var\(--t-step\)\)\); \}/);
+  assert.match(short, /\.lobby-hub \.hub-plate \{ font-size: min\(calc\(\.3 \* var\(--t\)\), calc\(18px \+ var\(--t-step\)\)\); \}/);
+  assert.match(short, /\.hub-entry__en \{ padding-right: \.44rem; font-size: min\(calc\(\.16 \* var\(--t\)\), calc\(10px \+ var\(--t-step\)\)\);/);
+  assert.match(short, /\.hub-entry__name \{ font-size: min\(calc\(\.42 \* var\(--t\)\), calc\(18px \+ var\(--t-step\)\)\); \}/);
+  assert.match(readFileSync(path.join(ROOT, 'public/css/theme.css'), 'utf8'), /:root \{ --t-step: calc\(\(var\(--t\) - 64px\) \/ 12\); \}/);
 });

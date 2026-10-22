@@ -19,6 +19,13 @@
 // the cards not chosen whole (§35.18 review). The room's big button (开始模拟 / 准备就绪) on the four phones in every
 // language and 文字大小, and on desktops in English / Japanese / Korean: each line of its label inside the button (§35.18
 // review: it had taken 选择模拟协议's wrapping label, cut in its fixed 46 px).
+// The hub on the four phones and on desktops 800×600 – 1920×1080 in five languages at four sizes: every line of its text
+// inside its box (test/e2e/text-fit.mjs; §35.18 review: English 「Solo Simulation」 / 「Team Simulation」 were cut by their
+// cards at 小 in every window, the plates ended in an ellipsis at 大 / 特大 on phones, the title ran under the tips; and
+// in its review: Korean names broken between syllables, the decorative line and the names under the people icon, a
+// plate's label under its glyph, the two cards' tops apart — and in the review of that, the same shapes with one card's
+// name and one plate's label made longer in the page, the cards' tops and bottoms; a Japanese line starting with a small
+// kana or ー; every one of the 21 tips, stepped through with the pager).
 // The other doctors' read-only view: test/ui/room-settings.e2e.test.js.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/lobby-hub-*.png
 
@@ -27,6 +34,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { textProblems } from '../e2e/text-fit.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
@@ -759,5 +767,119 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
         assert.deepEqual(problems, []);
       } finally { await ctx.close(); }
     }
+  });
+  // §35.18 review: the hub's cards cut English 「Solo Simulation」 / 「Team Simulation」 at 小 in every window (25–40 px past
+  // the 2.3rem card; 95 px of 「Simulation」 in an 84 px card on a phone), its plates ended in an ellipsis at 大 / 特大 on a
+  // phone and its title ran under the left column's tips at 大 / 特大 in a 1280×720 window
+  // what text-fit.mjs cannot see, as the review of those fixes found it: the entries' decorative line and names running
+  // under the card's people icon (not text), a plate's label dropping under its glyph instead of wrapping beside it, the
+  // two cards not one height (their tops or bottoms apart)
+  const hubShapes = () => {
+    const R = (e) => e.getBoundingClientRect();
+    const lines = (e) => { const r = document.createRange(); r.selectNodeContents(e); return [...r.getClientRects()]; };
+    const area = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    const out = [];
+    const cards = [...document.querySelectorAll('.lobby-hub .hub-entry')];
+    for (const c of cards) {
+      const icon = R(c.querySelector('.hub-entry__icon .icon'));
+      for (const sel of ['.hub-entry__en', '.hub-entry__name']) {
+        const a = lines(c.querySelector(sel)).reduce((m, q) => m + area(q, icon), 0);
+        if (a > 4) out.push(`${sel} under the icon (${Math.round(a)} px²)`);
+      }
+    }
+    if (cards.length === 2 && ['top', 'bottom'].some((k) => Math.abs(R(cards[0])[k] - R(cards[1])[k]) > 1)) {
+      out.push(`the cards' tops / bottoms ${cards.map((c) => `${Math.round(R(c).top)}–${Math.round(R(c).bottom)}`).join(' / ')}`);
+    }
+    for (const p of document.querySelectorAll('.lobby-hub .hub-plate')) {
+      const g = p.querySelector('.hub-plate__glyph, .lo-entry__icon, .btn__icon'), l = p.querySelector('.hub-plate__label, .btn__label');
+      if (g && l && p.checkVisibility() && R(l).top >= R(g).bottom - 1) out.push(`a plate's label under its glyph: ${l.textContent.trim()}`);
+    }
+    return out;
+  };
+  // the same shapes with one card's name and one plate's label made longer in the page (a text node added, then removed):
+  // the matrix's own texts no longer reach the two rules that keep both cards one height (`.hub-entries` stretching,
+  // `.hub-entry` filling its column) nor the label's `flex: 1 1 0; min-width: min-content` once the cards and plates follow
+  // --t (§35.18 review of the text-fit fixes: with those rules removed the plain matrix still passed)
+  const forcedShapes = async (page) => {
+    await page.evaluate(() => {
+      const add = (el, s) => { if (!el) return; const n = document.createTextNode(s); n.__spTest = true; el.append(n); };
+      add(document.querySelector('.lobby-hub .hub-entry__name'), ' Simulation Simulation');
+      const plate = [...document.querySelectorAll('.lobby-hub .hub-plate')].find((p) => p.checkVisibility() && p.querySelector('.hub-plate__label'));
+      const l = plate?.querySelector('.hub-plate__label');
+      if (l) add(l, ` ${l.textContent.trim()} ${l.textContent.trim()}`);
+    });
+    await sleep(50);
+    const out = await page.evaluate(hubShapes);
+    await page.evaluate(() => {
+      const w = document.createTreeWalker(document.querySelector('.lobby-hub'), NodeFilter.SHOW_TEXT);
+      const added = [];
+      for (let n = w.nextNode(); n; n = w.nextNode()) if (n.__spTest) added.push(n);
+      for (const n of added) n.remove();
+    });
+    // (the icon is left to the plain check: on a phone the longer name is taller than the card can grow, which pushes the
+    // bottom-aligned text up under it)
+    return out.filter((p) => !/under the icon/.test(p)).map((p) => `a longer name and label: ${p}`);
+  };
+  // every tip in turn (§35.18 review of the text-fit fixes: TipsPanel starts at a random tip of 21 and turns every 5 s, so
+  // each case checked one random tip — a tip-specific overflow, such as a Japanese line starting with ー where only two
+  // tips wrap there, made the test flaky rather than red): the pager steps through them, each checked with its entry
+  // animation finished; a step the 5 s turn lands in is checked again. A problem the case already shows is not repeated
+  const tipProblems = async (page, known, h) => {
+    const now = () => page.evaluate(() => {
+      const p = document.querySelector('.lobby-hub .tips__text');
+      if (!p?.checkVisibility()) return null;
+      for (const a of p.getAnimations()) a.finish();
+      const [i, n] = document.querySelector('.lobby-hub .tips__idx').textContent.split('/').map(Number);
+      return { i, n };
+    });
+    const out = [];
+    const seen = new Set();
+    let total = 0;
+    for (let k = 0; k < 80; k++) {
+      const a = await now();
+      if (!a) break;
+      total = a.n;
+      if (!(a.n > 0) || seen.size >= a.n) break;
+      const probs = await page.evaluate(textProblems, '.lobby-screen');
+      if ((await now())?.i === a.i && !seen.has(a.i)) {
+        seen.add(a.i);
+        for (const p of probs) if (!known.has(p)) { known.add(p); out.push(`tip ${a.i}: ${p}`); }
+      }
+      if (seen.size >= a.n) break;
+      await page.$eval('.lobby-hub .tips__nav:last-child', (b) => b.click());
+    }
+    // a pager that stopped advancing, or clicks that kept racing the 5 s turn, must not pass with tips unchecked
+    if (total && seen.size < total) out.push(`only ${seen.size}/${total} tips checked`);
+    // nor a tips panel that is not shown, or an index that no longer reads n/21, in a window over 520 px tall (lobby.css
+    // hides the panel only below that)
+    if (h > 520 && !(total > 0)) out.push(`no tip checked (index ${total})`);
+    return out;
+  };
+  test('phones and desktops: every label of the hub inside its box in every language at every 文字大小', { timeout: 1500000 }, async () => {
+    const phones = [[640, 360], [667, 375], [740, 360], [844, 390]];
+    const desks = [[1920, 1080], [1440, 900], [1280, 720], [1100, 530], [1024, 600], [960, 540], [800, 600]];
+    const bad = [];
+    for (const lang of ['zh', 'zh-TW', 'en', 'ja', 'ko']) {
+      for (const [screens, touch] of [[phones, true], [desks, false]]) {
+        const { ctx, page, problems } = await open({ w: screens[0][0], h: screens[0][1], touch, lang: lang === 'zh' ? null : lang });
+        try {
+          for (const textSize of ['sm', 'md', 'lg', 'xl']) {
+            await page.evaluate(async (ts) => (await import('/js/ui/settings.js')).updateSettings({ textSize: ts }), textSize);
+            for (const [w, h] of screens) {
+              await page.setViewport({ width: w, height: h, hasTouch: touch, isMobile: touch, deviceScaleFactor: 1 });
+              await sleep(150); await settle(page); await page.evaluate(() => document.fonts.ready);
+              const plain = await page.evaluate(textProblems, '.lobby-screen');
+              for (const p of plain) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
+              for (const p of await tipProblems(page, new Set(plain), h)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
+              for (const p of await page.evaluate(hubShapes)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
+              for (const p of await forcedShapes(page)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
+              if (lang === 'en' && textSize === 'xl' && (w === 667 || w === 1280)) await page.screenshot({ path: path.join(OUT, `lobby-hub-fit-${w}-en-xl.png`) });
+            }
+          }
+          assert.deepEqual(problems, [], `${lang}`);
+        } finally { await ctx.close(); }
+      }
+    }
+    assert.deepEqual(bad.slice(0, 40), [], `${bad.length} problems`);
   });
 });
