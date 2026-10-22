@@ -27,8 +27,8 @@
   "golden": {
     "test/golden/bonds.json": "2fd7f7cd3f8dbe0cecd4940ed60030dc2679514c577b56e7fecdbbafd2215328",
     "test/golden/diy.json": "66b28fbfee27ee592e899e78b104ca2d3f110966935c7823ac891baff6826286",
-    "test/golden/fields.json": "cfb76ce3cf6840c6deac83f8c1b45f33e99c195c52faa679030f1b734852bc9a",
-    "test/golden/matches.json": "ba3a01c7cd8a9d331a820c1caf7f7f5e78ad8bcca8d8076357acf0908cd86b81",
+    "test/golden/fields.json": "874a416977d61ad72b231529a0e01743651bfe610ea9e2963966b3856d55fe43",
+    "test/golden/matches.json": "3e79affcdc5fc098fca844ab59fe07ce53db09a2b283c1241833298197f08a47",
     "test/golden/roster.json": "8b27e579dd7d05b9823d30e13aa735a60eb78079baa51a77e7ef62c71f2ee228",
     "test/golden/standins.json": "ea4a83318a3c105b4325d9ff670bb7950d54f9a1fa6ea3e84b809e75bc1c5c09"
   },

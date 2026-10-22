@@ -361,6 +361,3 @@ function chaliceShare(b, c) {
     break;
   }
 }
-
-// Compatibility until group 05 migrates the Spring barrier.
-export { expectedFinal, absorbArts } from './enemies/helpers.js';

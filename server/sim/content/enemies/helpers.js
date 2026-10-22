@@ -1,4 +1,3 @@
-import { mitigate } from '../../attack.js';
 // server/sim/content/enemies/helpers.js — shared helpers of the enemy kits (split from content/enemies.js; the module
 // map is in its header): the constants several families use, the per-battle state, the ability bookkeeping (abOf /
 // attach / dispatch, T, canCast …) and the selection and damage helpers (elem, hurt, areaAllies & friends, zone,
@@ -410,36 +409,3 @@ export {
   BOOM_RADIUS, POLLUTION_INTERVAL, STEALTH_RESTORE_BY_KEY, DUCK_STEALTH_RESTORE, TEA_SPLASH_RADIUS, SHELL_SPLASH_RADIUS, stOf, safe, dispatch,
   num, auraBuff, watchDeaths, onTerrain,
 };
-
-// Transitional support for the unconverted Spring boss; removed in group 05.
-/**
- * Final HP damage the pipeline would deal for a phys/arts/true/elemental `dmg` before shields (mitigation is linear in
- * the amount) — the terms of the v0.3.1 settlement (元素伤害: 元素抗性 + elementalTakenMul, no dmgTakenMul).
- */
-export function expectedFinal(src, tgt, dmg) {
-  const ts = tgt.s, ss = src && src.s && !dmg.sourceless ? src.s : null, ty = dmg.type; // 无来源 (bursts): no source stats
-  const v = mitigate(dmg.amount, ty, ts, {
-    defIgnorePct: (dmg.defIgnorePct || 0) + (ss ? ss.defIgnorePct : 0), defIgnoreFlat: (dmg.defIgnoreFlat || 0) + (ss ? ss.defIgnoreFlat : 0),
-    resIgnorePct: (dmg.resIgnorePct || 0) + (ss ? ss.resIgnorePct : 0), resIgnoreFlat: (dmg.resIgnoreFlat || 0) + (ss ? ss.resIgnoreFlat : 0),
-    elementalRes: ty === 'elemental' ? (tgt.def?.epDamageResistance ?? 0) : 0,
-  });
-  let mul = (dmg.mul ?? 1) * (ty === 'elemental' ? 1 : ts.dmgTakenMul); // 脆弱 skips 元素伤害
-  if (ss) mul *= ss.dmgDealtMul * (ty === 'phys' ? ss.physDealtMul : ty === 'arts' ? ss.artsDealtMul : 1);
-  mul *= ty === 'phys' ? ts.physTakenMul : ty === 'arts' ? ts.artsTakenMul : ty === 'elemental' ? ts.elementalTakenMul : ts.trueTakenMul;
-  const f = v * mul;
-  return Number.isFinite(f) && f > 0 ? f : 0;
-}
-
-/**
- * "吸收法术伤害的屏障": absorb up to `left` of an arts instance in a `hit` handler (after RES, like a shield) by scaling
- * the instance down (cancelled when fully absorbed). Returns the amount absorbed.
- */
-export function absorbArts(c, left) {
-  if (!c || c.dmg.type !== 'arts' || !(left > 0) || c.dmg.cancel) return 0;
-  const f = expectedFinal(c.source, c.target, c.dmg);
-  if (!(f > 0)) return 0;
-  const take = Math.min(left, f);
-  if (take >= f - 1e-9) c.dmg.cancel = true;
-  else c.dmg.amount *= (f - take) / f;
-  return take;
-}
