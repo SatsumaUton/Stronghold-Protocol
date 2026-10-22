@@ -229,8 +229,10 @@ function onBeforeAttack(b, c) {
  * 触发，优先级相同则随机触发其中之一」. Its cooldown counts from the end of its clip (`clip`, castNow: 「同一技能的冷却时间
  * 于该技能结束时开始计时」), so 盐风主教昆图斯's third-form 【大潮】 (cooldown 3.5 + its 1.667 s clip, attack interval 3.5)
  * is not ready at the next turn and alternates with the attack — arknights.wiki.gg: never "Great Tide twice in a row".
- * [ASSUMED] (no source): the attack cooldown restarting at the skill (not at its clip's end; the next swing does not wait
- * for a clip longer than the interval), the skill's effect at the attack's damage frame (not its own clip's), no
+ * [ASSUMED] (no source): readiness checked at the damage frame, not when the swing starts (a skill that becomes ready
+ * during the wind-up takes that turn; PRTS 「可以攻击时」 reads as the swing's start, where the attack would go ahead and
+ * the skill wait one turn), the attack cooldown restarting at the skill (not at its clip's end; the next swing does not
+ * wait for a clip longer than the interval), the skill's effect at the attack's damage frame (not its own clip's), no
  * attack-clip stand after it (昆图斯 is 自缚).
  */
 function attackSlotSkill(b, e, c) {

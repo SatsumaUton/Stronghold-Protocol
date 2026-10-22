@@ -908,8 +908,9 @@ function kitQuintus(ab, e, b, tpl) {
   // attack's turn (enemies.js attackSlotSkill; PRTS 「大多数技能自动触发会占用攻击间隔」), equal priorities at random. Every
   // skill's cooldown counts from the end of its clip (QUINTUS_CLIP; PRTS 「同一技能的冷却时间于该技能结束时开始计时」): the
   // third-form tide (3.5 + 1.667 s) alternates with the attack instead of coming on top of it every 3.5 s (DESIGN §35.19).
-  // 断裂生殖 / 物种爆发 (AnimatedActionToOwnerAbility) keep their own timers [ASSUMED: no source says they skip the
-  // attack's turn], so they can come during or in the tick of a tide, 崩坍 or attack. 断裂生殖 「仅仍有未执行的小队动作指令时
+  // 断裂生殖 / 物种爆发 (AnimatedActionToOwnerAbility) keep their own timers, so they can come during or in the tick of a
+  // tide, 崩坍 or attack [ASSUMED: a deviation kept to limit scope — PRTS's default has most skills take the attack's
+  // turn, and arknights.wiki.gg has one action between two tides; DESIGN §35.19]. 断裂生殖 「仅仍有未执行的小队动作指令时
   // 可触发」: its level branch (blackboard branch_id; prefab MoveNextLevelBranch, not looping) is shared by the three forms
   // and used up after its last phase (7 in act1autochess_h07_04 / _s); a template without the branch keeps the
   // random-target fallback with no limit.
@@ -946,7 +947,8 @@ function kitQuintus(ab, e, b, tpl) {
   const grow = (b2, e2, n) => {
     P.stage = n; P.stageAt = b2.time;
     // one form's bonus at a time (the key is shared): the official AtkUp1 / AtkUp2 are mode-scoped talents (G1 / G2),
-    // so the third form is +70 %, not 40 + 70 (arknights.wiki.gg's +110 %, unsourced; DESIGN §35.19)
+    // so the third form is +70 %, not 40 + 70 (arknights.wiki.gg's +110 %, unsourced) [ASSUMED: inferred from where the
+    // talents sit; footage of the third-form panel ATK at base × 2.1 would make it one key per form; DESIGN §35.19]
     b2.addBuff(e2, { key: 'boss:grow', persist: true, visible: true, mods: { atkPct: T(ab, `atkup${n}.atk`) ?? 0 } });
     for (const a of skills) if (a.stage === n) a.left = a.icd;   // the new form's skills start from their initial cooldown
     b2.fx('grow', { x: e2.x, y: e2.y, id: e2.id, stage: n });
@@ -958,9 +960,10 @@ function kitQuintus(ab, e, b, tpl) {
 const QUINTUS_ATTACK_SKILLS = new Set(['Tidewater', 'Rockfall']);
 /**
  * The clip of each 昆图斯 skill, in s: its official ability's animKey (prefab battle/enm_pfb_18.ab — fx/index.json units.
- * enemy_1521_dslily.skills: tidewater* Skill_02, rockfall* Skill_01, summontentac* Skill_03, doom Skill_04; played at
- * speed 1, not looping) → that clip's length in the model (data/assets.json enemies.enemy_1521_dslily.spine.animations).
- * The skill's cooldown counts from the clip's end (enemies.js castNow).
+ * enemy_1521_dslily.skills: tidewater* Skill_02, rockfall* Skill_01, summontentac* Skill_03, doom Skill_04; not
+ * looping, `_maxAnimScale` 1.0: never faster) → that clip's length in the model (data/assets.json
+ * enemies.enemy_1521_dslily.spine.animations). The skill's cooldown counts from the clip's end (enemies.js castNow).
+ * [ASSUMED] the length holds under a slow too (the abilities' `_affectedBySlowDown` 1 allows a slower clip).
  */
 export const QUINTUS_CLIP = Object.freeze({ Tidewater: 1.667, Rockfall: 3, SummonTentac: 2, Doom: 4.467 });
 

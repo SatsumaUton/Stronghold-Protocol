@@ -178,6 +178,24 @@ test('昆图斯: two attack-class skills ready on one turn — one at random (eq
   assert.deepEqual([...first].sort(), ['RockfallG2', 'TidewaterG2']);
 });
 
+test('attack-class skills ready on one turn — the highest data priority first, whatever the seed (PRTS 「优先级最高的技能优先触发」)', () => {
+  // every 昆图斯 skill has priority 0; other leaders' data do not (假想敌：胄 "1" 1, 阿利斯泰尔 equip 1 / Suicide 5), so
+  // either skill raised to 1 here (ab.sk[*].pr, from skills[].priority) must take the first turn, the other the next
+  for (const top of ['RockfallG2', 'TidewaterG2']) {
+    for (let seed = 1; seed <= 8; seed++) {
+      const { h, e } = quintus(TWO(), { seed });
+      thirdForm(h);
+      const ab = e.mem.ab;
+      ab.sk[top].pr = 1;
+      const tide = ab.list.find((a) => a.sk === ab.sk.TidewaterG2), rock = ab.list.find((a) => a.sk === ab.sk.RockfallG2);
+      tide.left = 0; rock.left = 0;
+      const log = actions(h, e, 4 * e.s.interval).filter((a) => a.what === 'ATTACK' || /^(Tidewater|Rockfall)/.test(a.what));
+      assert.equal(log[0].what, top, `seed ${seed}: priority 1 first`);
+      assert.equal(log[1].what, top === 'TidewaterG2' ? 'RockfallG2' : 'TidewaterG2', `seed ${seed}: the other one at the next turn`);
+    }
+  }
+});
+
 test('昆图斯 【断裂生殖】: no cast once the 7 squad actions of the level branch are used (PRTS 「仅仍有未执行的小队动作指令时可触发」)', () => {
   const br = W[TPL].branches.dslily_dstnta;
   assert.equal(br.length, 7);

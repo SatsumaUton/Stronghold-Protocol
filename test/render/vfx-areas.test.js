@@ -276,6 +276,15 @@ describe('an enemy\'s zone under the official layer', () => {
     lite.frame();
     lite.w.enemyCast(b3, 0);
     assert.equal(lite.w.simFx('tide', 10, 5, { id: 1 }), false, "the wave's prefabs not installed: the procedural tide");
+    // the window open with its attack's rows planned, but those rows no longer installed: the install check decides
+    const gone = await setup();
+    const b5 = gone.view(1, 'enemy_1521_dslily', 10, 5);
+    gone.frame();
+    gone.w.enemyCast(b5, 0);
+    const win = gone.w.skills.units.get(1)?.ewin;
+    assert.ok(win && !win.draws && win.plan?.attacks?.[0], 'the window is open, has not drawn, and plans its attack');
+    for (const k of ['enemy_dslily_skill_02_start_l', 'enemy_dslily_skill_02_range']) delete gone.index.prefabs[k];
+    assert.equal(gone.w.simFx('tide', 10, 5, { id: 1 }), false, "the tide's window with its rows uninstalled: the procedural tide");
     const off = await setup({ active: false });
     const b4 = off.view(1, 'enemy_1521_dslily', 10, 5);
     off.frame();

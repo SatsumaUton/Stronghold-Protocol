@@ -1511,8 +1511,9 @@ export function coverOf(skillId, kind) {
 /**
  * FX_COVER for an enemy's skill window (skillfx.js rule 5): unit key → prefabKey (lower case) → kit 'fx' kinds the
  * window's official effects stand for. Keyed by unit, since enemy prefabKeys repeat across units ('doom', '1', '2' …).
- * Covered only while that skill's window is open and drew (`ewin.draws`): with 官方特效 off or the prefabs missing the
- * procedural fx stays.
+ * Covered only while that skill's window is open and shows its effects (skillfx.js `_ewinDraws`: the window drew, or the
+ * skill's attack's cast / range rows are installed — they play at the next sync): with 官方特效 off or the prefabs
+ * missing the procedural fx stays.
  */
 export const ENEMY_FX_COVER = Object.freeze({
   // 盐风主教昆图斯 【大潮】 (server/sim/content/bosses.js QUINTUS.Tidewater: 'tide' at the boss in the tick of its 'cast'):

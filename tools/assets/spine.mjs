@@ -142,7 +142,7 @@ const UTAGE_S2 = Object.freeze({ ...clipOf('Attack', 'attack'), index: 1, idle: 
  * resolver pairs the numbered clips with the slots by name (Skill_n = slot n−1), which these prefabs do not follow.
  */
 const slotClips = (clips) => Object.freeze(Object.fromEntries(clips.map((loop, index) => [index, Object.freeze({ begin: null, loop, end: null, index, idle: null })])));
-// 假想敌：胄 (enm_pfb_28.ab; enemy_9013_acstmk_2 shares the model): skills "1" (the ray volley) Skill_1, "2" (死亡集群)
+// 假想敌：胄 (enm_pfb_28.ab; enemy_9013_acstmk_2 shares the model): skills "1" (灭顶之灾) Skill_1, "2" (死亡集群)
 // Skill_3 — not Skill_2 —, "3" (_2 only) Revive
 const HELM_SKILLS = slotClips(['Skill_1', 'Skill_3', 'Revive']);
 // 盐风主教昆图斯 (enm_pfb_18.ab): Tidewater* (大潮) Skill_02, Rockfall* (崩坍) Skill_01, SummonTentac* (断裂生殖) Skill_03 in

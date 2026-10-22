@@ -1054,7 +1054,7 @@ export class SkillFx {
 
   /**
    * (5) FX_COVER: the fx's owner (`src`, else `id`) has a skill that covers this kind, lasting, with its effects installed
-   * — or, an enemy, a skill window open that drew and covers it (ENEMY_FX_COVER).
+   * — or, an enemy, a skill window open that shows its effects (_ewinDraws) and covers it (ENEMY_FX_COVER).
    */
   _covered(kind, extra) {
     for (const field of ['src', 'id']) {
