@@ -15,6 +15,11 @@
 //     keys) that the base data has and the version lacks — its behaviour then never runs there.
 //   * unknown trigger rules: a skill trigger rule of the version's chess / backups / tokens records that the engine does
 //     not implement (shared/plugins/skillSpec.js TRIGGER_RULES) — 上半's 斩业星熊 S3 uses AUTO_STOP.
+//   * version-only keys no code names: a buff key / bbStr.key (bands, bonds, items, effects) or a garrison effectType /
+//     effectKey / battleRuneKey / bbStr.key the version carries, the base data lacks and no code under server/ or
+//     shared/ names (kits included) — a mechanic that is silently inert there (garrisons/meta.js runs H[effectType] and
+//     garrisons/battle.js INSTALLERS[key] only when a handler exists). The by-id comparisons above never see these: 上半's
+//     煌 SERVER_GAIN_CHAR, the 标准模拟 clause act1autochess_band31_buff on bands 下半 also has.
 // Code reads: server/sim/content/**/*.js (but the operator kits, which read skill blackboards) and server/match/**/*.js
 // — `num|int|numOr(<expr>.<field>, <default>)`, `<expr>.<field> ?? <default>`, and plain mentions (`.field`,
 // `'field'`, no default). Field names are matched by name, so a read of the same name in another table is listed too.
@@ -23,8 +28,10 @@
 // Usage: node tools/bb-audit.mjs [--base data] --data <dir> [--data <dir>…] [--json] [--strict]
 //   --base    the reference data directory (default: data/)
 //   --data    a version's data directory (repeatable)
-//   --json    machine-readable report on stdout: [{ dir, findings: [...], missingBuffKeys: [...], unknownTriggerRules: [...] }]
-//   --strict  exit code 1 when any finding, missing buff key or unknown trigger rule is listed (M2: every one reviewed)
+//   --json    machine-readable report on stdout: [{ dir, findings: [...], missingBuffKeys: [...], unknownTriggerRules: [...],
+//             versionOnlyKeys: [...] }]
+//   --strict  exit code 1 when any finding, missing buff key, unknown trigger rule or version-only key is listed (M2:
+//             every one reviewed)
 // Unknown options are errors (exit code 2).
 
 import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -43,13 +50,15 @@ export const READ_DIRS = Object.freeze(['server/sim/content', 'server/match']);
 const SKIP = [/^server\/sim\/content\/kits\//];
 /** Further directories scanned for buff keys only. */
 export const KEY_DIRS = Object.freeze(['server/ai', 'shared']);
+/** Directories scanned (nothing skipped) for the names of version-only keys. */
+export const NAME_DIRS = Object.freeze(['server', 'shared']);
 
 const IDENT = '[A-Za-z_][A-Za-z0-9_@]*';
 const FIELD = `(?:\\.(${IDENT})|\\[['"]([^'"\\]]+)['"]\\])`;
 const CALL_RE = new RegExp(`\\b(?:num|int|numOr)\\(\\s*[A-Za-z_$][\\w$.?\\[\\]'"]*?${FIELD}\\s*,\\s*([^,()]+?)\\s*\\)`, 'g');
 const NULLISH_RE = new RegExp(`${FIELD}\\s*\\?\\?\\s*([^,;)\\]}?:]+)`, 'g');
 const MENTION_RE = /\.([a-z][a-z0-9_@]*)\b|'([a-z][a-z0-9_@]*)'/g;
-const KEY_RE = /['"`]([A-Za-z][A-Za-z0-9_]*(?:\[[a-z0-9_]+\])?)['"`]|\bK\.([A-Za-z0-9_]+)|^\s+([a-z][a-z0-9_]+)\s*[(:]/g;
+const KEY_RE = /['"`]([A-Za-z][A-Za-z0-9_]*(?:\[[a-z0-9_]+\])?)['"`]|\bK\.([A-Za-z0-9_]+)|^\s+([a-z][a-z0-9_]+)\s*[(:]|\.([A-Z][A-Z0-9]*_[A-Z0-9_]+)\b/g;
 
 /** Every `.js` file under `dir` (recursive, sorted), as paths relative to `root`. */
 function jsFiles(root, dir) {
@@ -68,8 +77,8 @@ function jsFiles(root, dir) {
 }
 
 /** The repo's sources: [{ file, text }] of `dirs` (comments masked, line numbers kept). */
-export function repoSources(root = ROOT, dirs = READ_DIRS) {
-  return dirs.flatMap((d) => jsFiles(root, d)).filter((f) => !SKIP.some((re) => re.test(f)))
+export function repoSources(root = ROOT, dirs = READ_DIRS, skip = SKIP) {
+  return dirs.flatMap((d) => jsFiles(root, d)).filter((f) => !skip.some((re) => re.test(f)))
     .map((file) => ({ file, text: maskComments(readFileSync(path.join(root, file), 'utf8')) }));
 }
 
@@ -117,13 +126,16 @@ export function codeReads(sources = repoSources()) {
   return out;
 }
 
-/** Buff keys the code names: Map key → [{ file, line }] (string literals, `K.<key>`, object keys at a line start). */
+/**
+ * Buff keys the code names: Map key → [{ file, line }] (string literals, `K.<key>`, object keys at a line start,
+ * `<expr>.<UPPER_KEY>` such as garrisons/meta.js `H.SERVER_ADD_BOND`).
+ */
 export function codeBuffKeys(sources = repoSources(ROOT, [...READ_DIRS, ...KEY_DIRS])) {
   const out = new Map();
   for (const { file, text } of sources) {
     String(text).split('\n').forEach((src, i) => {
       for (const m of src.matchAll(KEY_RE)) {
-        const key = m[1] ?? m[2] ?? m[3];
+        const key = m[1] ?? m[2] ?? m[3] ?? m[4];
         if (!key) continue;
         let list = out.get(key);
         if (!list) { list = []; out.set(key, list); }
@@ -221,6 +233,45 @@ export function dataBuffKeys(data) {
   return out;
 }
 
+/**
+ * Every behaviour key of `data` with the records carrying it: Map key → [{ table, id }] (sorted) — the buff key and
+ * bbStr.key of every band, bond, item and effect buff, and each garrison's effectType, effectKey, battleRuneKey and
+ * bbStr.key.
+ */
+export function dataKeyRecords(data) {
+  const d = obj(data);
+  const out = new Map();
+  const add = (key, table, id) => {
+    if (typeof key !== 'string' || !key) return;
+    let list = out.get(key);
+    if (!list) { list = []; out.set(key, list); }
+    if (!list.some((r) => r.table === table && r.id === id)) list.push({ table, id });
+  };
+  for (const table of ['bands', 'bonds', 'items', 'effects']) {
+    for (const [id, rec] of Object.entries(obj(d[table]))) {
+      for (const b of Array.isArray(rec?.buffs) ? rec.buffs : []) { add(b?.key, table, id); add(b?.bbStr?.key, table, id); }
+    }
+  }
+  for (const [id, g] of Object.entries(obj(d.garrisons))) {
+    for (const k of [g?.effectType, g?.effectKey, g?.battleRuneKey, g?.bbStr?.key]) add(k, 'garrisons', id);
+  }
+  for (const list of out.values()) list.sort((x, y) => `${x.table}|${x.id}`.localeCompare(`${y.table}|${y.id}`));
+  return out;
+}
+
+/**
+ * Keys the version carries that the base data lacks and `named` (a Map / Set of the keys the code names) does not hold:
+ * [{ key, records: [{ table, id }] }] sorted by key.
+ */
+export function versionOnlyKeys(base, version, named) {
+  const inBase = dataKeyRecords(base);
+  const out = [];
+  for (const [key, records] of dataKeyRecords(version)) {
+    if (!inBase.has(key) && !named.has(key)) out.push({ key, records });
+  }
+  return out.sort((x, y) => x.key.localeCompare(y.key));
+}
+
 /** The data files whose records carry skills with a `trigger` (chess, backup forms, tokens). */
 const SKILL_TABLES = Object.freeze(['chess', 'backups', 'tokens']);
 
@@ -258,9 +309,11 @@ export function unknownTriggerRules(data, known = TRIGGER_RULES) {
 /**
  * The audit of one version against the base: `findings` = the gaps the code reads ([{ table, key, buff, field, reads,
  * nonNeutral }]), `missingBuffKeys` = the code-named buff keys of the base the version lacks ([{ key, refs }]),
- * `unknownTriggerRules` = the version's trigger rules the engine does not implement (unknownTriggerRules).
+ * `unknownTriggerRules` = the version's trigger rules the engine does not implement (unknownTriggerRules),
+ * `versionOnlyKeys` = the version's keys the base lacks and no code names (versionOnlyKeys; only with `names`, the
+ * codeBuffKeys of NAME_DIRS).
  */
-export function audit(base, version, { reads = codeReads(), keys = null } = {}) {
+export function audit(base, version, { reads = codeReads(), keys = null, names = null } = {}) {
   const findings = [];
   for (const g of gaps(base, version)) {
     const r = reads.get(g.field);
@@ -274,7 +327,10 @@ export function audit(base, version, { reads = codeReads(), keys = null } = {}) 
       if (inBase.has(key) && !inVersion.has(key)) missingBuffKeys.push({ key, refs });
     }
   }
-  return { findings, missingBuffKeys, unknownTriggerRules: unknownTriggerRules(version) };
+  return {
+    findings, missingBuffKeys, unknownTriggerRules: unknownTriggerRules(version),
+    versionOnlyKeys: names ? versionOnlyKeys(base, version, names) : [],
+  };
 }
 
 function parseArgs(argv) {
@@ -303,12 +359,13 @@ function main(argv) {
   const base = loadData(o.base, { log: QUIET });
   const reads = codeReads();
   const keys = codeBuffKeys();
-  const reports = o.data.map((dir) => ({ dir: path.relative(ROOT, dir) || dir, ...audit(base, loadData(dir, { log: QUIET }), { reads, keys }) }));
+  const names = codeBuffKeys(repoSources(ROOT, NAME_DIRS, []));
+  const reports = o.data.map((dir) => ({ dir: path.relative(ROOT, dir) || dir, ...audit(base, loadData(dir, { log: QUIET }), { reads, keys, names }) }));
   if (o.json) console.log(JSON.stringify(reports, (k, v) => (v === Infinity ? 'Infinity' : v), 2));
   else {
     for (const r of reports) {
       const flagged = r.findings.filter((f) => f.nonNeutral).length;
-      console.log(`${r.dir}: ${r.findings.length} field gap(s) the code reads (${flagged} with a non-neutral default), ${r.missingBuffKeys.length} code-named buff key(s) absent, ${r.unknownTriggerRules.length} unknown trigger rule(s)`);
+      console.log(`${r.dir}: ${r.findings.length} field gap(s) the code reads (${flagged} with a non-neutral default), ${r.missingBuffKeys.length} code-named buff key(s) absent, ${r.unknownTriggerRules.length} unknown trigger rule(s), ${r.versionOnlyKeys.length} version-only key(s) no code names`);
       for (const f of r.findings) {
         console.log(`  ${f.nonNeutral ? '!' : ' '} ${f.table} ${f.key} ${f.buff} .${f.field}: ${f.reads.slice(0, 4).map(fmtRead).join(', ')}${f.reads.length > 4 ? ` … +${f.reads.length - 4}` : ''}`);
       }
@@ -316,9 +373,12 @@ function main(argv) {
         console.log(`  - buff key ${k.key} absent: ${k.refs.slice(0, 3).map((x) => `${x.file}:${x.line}`).join(', ')}${k.refs.length > 3 ? ` … +${k.refs.length - 3}` : ''}`);
       }
       for (const u of r.unknownTriggerRules) console.log(`  ? trigger rule ${u.rule} (${u.table} ${u.skillId ?? '-'}): ${u.owners.join(', ')}`);
+      for (const v of r.versionOnlyKeys) {
+        console.log(`  + key ${v.key} (no code): ${v.records.slice(0, 4).map((x) => `${x.table} ${x.id}`).join(', ')}${v.records.length > 4 ? ` … +${v.records.length - 4}` : ''}`);
+      }
     }
   }
-  const any = reports.some((r) => r.findings.length || r.missingBuffKeys.length || r.unknownTriggerRules.length);
+  const any = reports.some((r) => r.findings.length || r.missingBuffKeys.length || r.unknownTriggerRules.length || r.versionOnlyKeys.length);
   return o.strict && any ? 1 : 0;
 }
 

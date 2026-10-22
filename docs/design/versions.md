@@ -235,21 +235,26 @@ the bound keys for each directory (`EXPECT`); a directory without an entry fails
 
 ### 36.5 The blackboard audit (the M2 work list)
 
-`node tools/bb-audit.mjs --data <dir>…` (with `--json` and `--strict`) reports three kinds of gap for each version
+`node tools/bb-audit.mjs --data <dir>…` (with `--json` and `--strict`) reports four kinds of gap for each version
 directory, compared with the default data:
 
 - the blackboard fields the version lacks that the code reads with a default, flagged when the default is not neutral;
 - the buff keys the code names that the version lacks;
 - the skill trigger rules of its chess, backups and tokens that the engine does not implement
-  (`shared/plugins/skillSpec.js TRIGGER_RULES`).
+  (`shared/plugins/skillSpec.js TRIGGER_RULES`);
+- the keys the version carries that the default data lacks and no code under `server/` or `shared/` names, each with
+  its records: the buff key and `bbStr.key` of bands, bonds, items and effects, and each garrison's `effectType`,
+  `effectKey`, `battleRuneKey` and `bbStr.key`. The first three compare records by id or key, so they never see these.
+  Such a mechanic is silently inert: `garrisons/meta.js` runs `H[effectType]` and `garrisons/battle.js`
+  `INSTALLERS[key]` only when a handler exists, without a warning.
 
-`kits/` is skipped, because kits read skill blackboards. Fields are matched by name across tables, so the audit
+`kits/` is skipped for the first three, because kits read skill blackboards. Fields are matched by name across tables, so the audit
 over-reports (for example `atk`) [ASSUMED]. The default data audited against itself has no finding.
 
-| | field gaps (non-neutral default) | absent code-named buff keys | unknown trigger rules |
-|---|---|---|---|
-| 盟约·上半 V1_2 | 32 (9) | 39 | 1 |
-| 盟约·上半 V1_1 | 36 (9) | 41 | 1 |
+| | field gaps (non-neutral default) | absent code-named buff keys | unknown trigger rules | version-only keys no code names |
+|---|---|---|---|---|
+| 盟约·上半 V1_2 | 32 (9) | 43 | 1 | 14 |
+| 盟约·上半 V1_1 | 36 (9) | 45 | 1 | 14 |
 
 The non-neutral gaps are listed below. Each would silently apply the 下半 meaning and is an M2 item:
 
@@ -272,12 +277,27 @@ Besides those:
   map character. `bands/battle.js isMapCharBuff` accepts only Touch's map-character shape, so 森蚺 reports no battle part
   and the AI playbook does not class it as team support. M2 builds the device switch (`server/sim/content/devices.js`
   already implements the 双眼皮).
+- **Version-only keys** (the same 14 in both builds; each is an M2 item):
+  - four 上半 traits with no handler: 煌's `SERVER_GAIN_CHAR` (`garrison_52_a` / `_b`, 售出时 she becomes 烛煌, who counts
+    as both 炎 and 维多利亚), 蜜莓's `SERVER_ADD_BOND_ACTIVATED_RANDOM` (`garrison_58`), 伊芙利特's
+    `SERVER_ADD_BOND_FRONT_ALL_LAYER` (`garrison_83`) and 极光's `act1autochess_gar_event_recoverhp_enemy_abflag_inrange`
+    (`garrison_27`);
+  - 华法琳 / 寒芒克洛丝's grant to the operator in front (`garrison_72` / `_73`, `battleRuneKey` `give_garrion_to_front`):
+    上半 spells the field `give_garrion_id`, and `garrisons/battle.js` reads `give_garrison_id`, so the trait is never
+    granted;
+  - the 标准模拟 band clause `act1autochess_band31_buff` ("<标准模拟> +30% ATK/DEF/HP") on `band_bldsk`, `band_amiya`,
+    `band_duyaoy` and `band_sarkazb`, bandIds 下半 also has;
+  - 灵巧's 20-layer award `bond_layer_refresh_shop_award_equip` (the first refreshed equipment of a prep costs 1) and
+    远见's 100-layer `bond_layer_char_goods_price_discount` (every operator in the shop costs 1 less);
+  - six 上半 equipment keys: `sell_char_count_gain_equip_owner_original` (商业包装方案, `eff_acarm074`),
+    `use_equip_give_char_to_player_most_bond` (信标, `eff_acarm109`), `use_equip_add_goods_rule_with_refresh_shop`
+    (寻呼模块, above) and `act1autochess_equip_acarm055` / `078` / `102_global_buff`.
 - **`AUTO_STOP`.** 上半's 斩业星熊 (`char_1044_hsgma2`, a 自选 operator) S3 `skchr_hsgma2_3` triggers on `AUTO_STOP`, one
   of the 15 rows of 上半's skillTriggerDataList. The engine does not implement it (`server/sim/skills.js`), and
   `validateAll` accepts it. M2 builds it; until then 上半's 自选 must not offer 斩业星熊 (round-50 design §2.9).
 
-`test/versions-bb-audit.test.js` pins the 突袭 and 炎 findings and the unknown trigger rules (exactly `AUTO_STOP`) on
-every version directory.
+`test/versions-bb-audit.test.js` pins the 突袭 and 炎 findings, the unknown trigger rules (exactly `AUTO_STOP`) and the
+version-only keys with their records on every version directory.
 
 ### 36.6 Tests and what stays open
 
