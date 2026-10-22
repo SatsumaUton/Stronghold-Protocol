@@ -380,6 +380,13 @@ Sources: [伤判效果](https://prts.wiki/w/伤判效果), [伤害分类](https:
 | Profession healing | Musha uses source output; reaper output admits up to block count in a 0.05 s window and delivers heals at 0.12 s intervals. Incantationmedic uses successful HP damage amount, not actual HP removed; HP loss and gauge intake do not qualify. Templates: `helage_trait`, `excu2_trait[heal_fake]/[heal]`, `vendla_tr/reed2_tr/titi_tr`. |
 | [纯烬艾雅法拉](https://prts.wiki/w/纯烬艾雅法拉) S2 | Reapplication from one source resets its shared elemental pool and duration; different sources keep independent pools. Absorption has priority −2000. |
 | [浊心斯卡蒂](https://prts.wiki/w/浊心斯卡蒂) S1 | Priority −2000; reserve a share after the patient's barriers, then apply HP loss to Skadi. Ordinary HP loss cannot be transferred again. |
+| [锡人](https://prts.wiki/w/锡人) | Cached ATK produces source-less, precomputed BUFF arts damage with independent statistical credit and ordinary dodge. The talent uses its authored injury type/position and strongest applicable source. Templates: `tinman_t_2`, `tinman_s_1[dot]`, `tinman_s_2[buff]`. |
+| [逻各斯](https://prts.wiki/w/逻各斯) | Source calculation, target arts addition and successful arts-damage riders use separate stages; HP loss does not generate the damage rider. S1 checks execution death before the talent and inherited-HP follow-up. Templates: `logos_t_2/core`, `logos_s_1`. |
+| [娜仁图亚](https://prts.wiki/w/娜仁图亚) | Attribute theft follows calculation but precedes target injury; it does not recalculate this instance's already computed base damage. |
+| Lord additions | Use each operator's template inputs and eligibility; precomputed ADDITION skips the source calculation event, retains target calculation and DEF/RES, and remains distinct from attack behavior. No profession-wide guess replaces per-template filters. |
+| [棘刺](https://prts.wiki/w/棘刺) | Fixed BUFF poison is precomputed and ordinarily dodgeable; S2 filters native type and counters after 0.5 s; Delta derives gauge intake from source output. |
+| [仇白](https://prts.wiki/w/仇白) | Check control after the authored 0.1 s delay, then issue precomputed ADDITION; first-hit marks are deployment-local. |
+| Weakness selection | Compare only attack input/scales, target input addition, penetration and DEF/RES, without dispatching speculative events. Source: [下半盟约记录](https://prts.wiki/w/卫戍协议：盟约_下半/PRTS盟约记录). |
 
 [ASSUMED] Mode hit-limit placement, Stead/barrier order and mixed parallel sharing, initial acquisition/reapplication
 ties, some inherited cancellation masks, literal-zero dispatch, exact 30 Hz deadlines and projectile sampling remain
