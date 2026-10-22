@@ -315,8 +315,8 @@
         ["-","~2","device","trap_1105_accrate",null,null,100,1,2,0,0,0,0,0,null]
       ],
       "enemies": {"enemy_1045_hammer_2":[2,2,0,3824,46080],"enemy_1061_zomshd":[11,11,0,384,173588]},
-      "hooks": [1,23,3868,286,286,528,519,7614,13,13,14,13,0,5882,8,21,13,0,1,18,0,0,0],
-      "events": {"atk":343,"cast":7,"deploy":8,"die":13,"dmg":509,"engage":5,"fx":101,"heal":18,"skill":29,"spawn":23,"status":26},
+      "hooks": [1,23,3868,286,286,528,518,7614,13,13,14,13,0,5882,8,21,13,0,1,13,0,0,0],
+      "events": {"atk":343,"cast":7,"deploy":8,"die":13,"dmg":508,"engage":5,"fx":101,"heal":18,"skill":29,"spawn":23,"status":26},
       "fx": {"block":9,"garrisonGrant":1,"rockslide":6,"shieldBreak":10,"slash":40,"thorns":33,"truesilver":2},
       "snaps": "d37ac5a4 202b872f 58da4f2f 8999056d 92b1c231 42e30961 4235356c f646ba09 4719f5c6 8bb7ec60 b0bce512 b1897bd4 79652805"
     },
@@ -1103,7 +1103,7 @@
         ["p1",8,"op","chess_char_4_25_b",2,"uniequip_002_cetsyr",1838.1,1,1,0,0,0,0,0,1]
       ],
       "enemies": {"enemy_1006_shield_3":[3,3,0,2550,138240],"enemy_1043_zomsbr":[23,23,0,0,69549],"enemy_1402_tgshd_2":[4,4,0,1251,59904]},
-      "hooks": [1,38,2451,153,153,402,402,1257,31,31,14,14,0,6364,0,4,30,0,1,40,0,0,0],
+      "hooks": [1,38,2451,153,153,402,402,1257,31,31,14,14,0,6364,0,4,30,0,1,31,0,0,0],
       "events": {"atk":183,"deploy":8,"die":31,"dmg":402,"engage":3,"fx":110,"skill":28,"spawn":38,"status":39},
       "fx": {"expose":58,"jungleSoul":1,"mote":14,"redistribute":15,"reweave":1,"slash":20,"truesilver":1},
       "snaps": "d252a2b9 064fa22f 580a6127 7aa0fda2 7d9756ef 83afcde8 4d5eb42c 70dce04a 2f1eb619"

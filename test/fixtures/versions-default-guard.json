@@ -25,11 +25,11 @@
     "data/waves.json": "80cb535958f22a1bf4ea71b26155c6f92ee1b49dd24b88acf4b2bcdf73d80e68"
   },
   "golden": {
-    "test/golden/bonds.json": "3acf43337a7bf36f79ca0d6f75c845d1eb7d409371aac1a18a40b9491cd69d0e",
-    "test/golden/diy.json": "a566ec0d3e2d889a914b32cbd1cc678801cd0d7f36d8d82ff5bf24e87c2a7d29",
-    "test/golden/fields.json": "bdeac849affc232ea1cd464d42ae6a89b5493f9064b31b5066a1ac007ee88cc7",
-    "test/golden/matches.json": "8a27f07a38350c41cc9021ddfc608ea6ad372ec72c7f41317b92562cf655d7bd",
-    "test/golden/roster.json": "f7c458b2694f6056a6c0064eca650424378324f5cf8793a74ea85538df77d199",
+    "test/golden/bonds.json": "2fd7f7cd3f8dbe0cecd4940ed60030dc2679514c577b56e7fecdbbafd2215328",
+    "test/golden/diy.json": "66b28fbfee27ee592e899e78b104ca2d3f110966935c7823ac891baff6826286",
+    "test/golden/fields.json": "cfb76ce3cf6840c6deac83f8c1b45f33e99c195c52faa679030f1b734852bc9a",
+    "test/golden/matches.json": "ba3a01c7cd8a9d331a820c1caf7f7f5e78ad8bcca8d8076357acf0908cd86b81",
+    "test/golden/roster.json": "8b27e579dd7d05b9823d30e13aa735a60eb78079baa51a77e7ef62c71f2ee228",
     "test/golden/standins.json": "ea4a83318a3c105b4325d9ff670bb7950d54f9a1fa6ea3e84b809e75bc1c5c09"
   },
   "kat": {
