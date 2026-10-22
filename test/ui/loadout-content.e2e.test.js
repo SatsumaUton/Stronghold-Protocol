@@ -27,11 +27,9 @@ test('mounted rosters follow the room content without a language switch', { skip
   const guest = new Client(P, srv.url, 'guest', { prefix: 'loadout-content', w: 1600, h: 900 });
   try {
     await host.open(); await host.enter('Roster host');
-    await host.click('.mode-card', '同盟模拟'); await host.click('.diff-card', '标准模拟');
-    await host.click('.create-box button', '创建同盟');
-    const code = (await host.waitFor(s => !!s.room?.code, 'room created')).room.code;
+    const { code } = await host.createCoop(); // the 0.3.2 lobby (§35.18): 同盟模拟 → 创建同盟 enters the room at once
     await guest.open(); await guest.enter('Roster guest');
-    await guest.click('.join-row input'); await guest.page.keyboard.type(code);
+    await guest.click('.mode-card', '同盟模拟'); await guest.click('.join-row input'); await guest.page.keyboard.type(code);
     await guest.click('.join-row button', '加入同盟');
     await guest.page.waitForSelector('.room-screen');
     await host.click('[data-testid="plugin-tag"]');
