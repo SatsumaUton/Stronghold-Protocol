@@ -34,10 +34,17 @@ export function injuryEffects(battle, target, amount, type, { dodgeMode = 'ignor
   const takenKey = type === 'phys' ? 'physTakenMul' : type === 'arts' ? 'artsTakenMul' : type === 'elemental' ? 'elementalTakenMul' : 'trueTakenMul';
   const buffs = target.buffs.filter(b => typeof b.injury === 'function' || typeof b.observeInjury === 'function' || b.damageReduction?.[type] > 0 || b.shieldHits > 0 || b.shield > 0 || b.mods?.dodgePhys > 0 || b.mods?.dodgeArts > 0
     || b.mods?.dmgTakenMul != null || b.mods?.[takenKey] != null).sort((a, b) => (b.injuryPriority ?? 0) - (a.injuryPriority ?? 0) || a.seq - b.seq);
-  // PRTS 伤害减免: same-named reductions take the highest value independently for each HP damage type.
-  let reduction = null;
-  for (const buff of buffs) if (Number.isFinite(buff.damageReduction?.[type]) && buff.damageReduction[type] > 0
-    && (!reduction || buff.damageReduction[type] > reduction.damageReduction[type])) reduction = buff;
+  // PRTS 伤害减免: same-named reductions take the highest value independently for each HP damage type; differently
+  // named ones stack. The name is the buff's `reductionGroup`, else its key; only the strongest of a name subtracts.
+  const strongest = new Map();
+  for (const buff of buffs) {
+    const v = buff.damageReduction?.[type];
+    if (!Number.isFinite(v) || !(v > 0)) continue;
+    const name = buff.reductionGroup ?? buff.key;
+    const held = strongest.get(name);
+    if (!held || v > held.damageReduction[type]) strongest.set(name, buff);
+  }
+  const reductions = new Set(strongest.values());
   for (const buff of buffs) {
     // An earlier callback may have removed an effect from this instance's snapshot.
     if (!target.buffs.includes(buff)) continue;
@@ -47,7 +54,7 @@ export function injuryEffects(battle, target, amount, type, { dodgeMode = 'ignor
       const multiplier = (type === 'elemental' ? 1 : mod('dmgTakenMul')) * mod(takenKey);
       for (let i = 0; i < buff.stacks; i++) rest *= multiplier;
       if (!Number.isFinite(rest) || rest < 0) rest = 0;
-      if (buff === reduction) rest = Math.max(0, rest - buff.damageReduction[type]);
+      if (reductions.has(buff)) rest = Math.max(0, rest - buff.damageReduction[type]);
       const absorbs = !buff.shieldType || (Array.isArray(buff.shieldType) ? buff.shieldType.includes(type) : buff.shieldType === type);
       const beforeShield = rest;
       if (rest > 0 && absorbs && buff.shieldHits > 0) {

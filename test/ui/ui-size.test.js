@@ -4,8 +4,9 @@
 // page is exactly the design); the layout root and the 异形屏适配 root multiplied by it; the 文字大小 floors of 中 / 大 /
 // 特大 (64 / 76 / 88 px) never shrinking, while 小 (1rem, no floor) follows the layout; and
 // the stylesheet guard: every max(<rem>, <N>px) floor in public/css carries the factor — a size floor (width, height,
-// min-*, flex, grid tracks, custom properties) never below min(N, 32) px, so a touch target ≥ 32 px stays ≥ 32 px —
-// or is a listed exemption (the readability properties: font-size, line-height, letter-spacing, --t).
+// min-*, flex, grid tracks, custom properties) above 32 px as max(<rem>, 32px, calc(Npx * var(--sp-ui, 1))), so a touch
+// target ≥ 32 px stays ≥ 32 px, one of 32 px or less stays bare px (it never shrinks), and a value that mirrors a size
+// floor copies it exactly — or is a listed exemption (the readability properties: font-size, line-height, letter-spacing, --t).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -58,6 +59,27 @@ describe('applyFit on <html>', () => {
       assert.equal(props.get('--sp-ui'), '0.9');
       assert.equal(props.get('--fit-l'), '6px');
     });
+  });
+});
+
+describe('文字大小 中 and above turn the size off', () => {
+  test('effectiveUi: the stored size at 小 (or no text size), 100 at 中 / 大 / 特大 — their kept text floors clipped in shrinking boxes', () => {
+    assert.equal(F.effectiveUi(80, 'sm'), 80);
+    assert.equal(F.effectiveUi(80, undefined), 80);
+    for (const k of ['md', 'lg', 'xl']) { assert.equal(F.effectiveUi(80, k), 100, k); assert.equal(F.uiAllowed(k), false); }
+    assert.equal(F.effectiveUi(83, 'sm'), 85, 'sanitized');
+  });
+  test('applyFit at 中: no --sp-ui for a stored 75 %; at 小 it is back', () => {
+    const g = globalThis, saved = { document: g.document, dispatchEvent: g.dispatchEvent };
+    const props = new Map();
+    g.document = { documentElement: { dataset: {}, style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k) } } };
+    g.dispatchEvent = () => true;
+    try {
+      F.applyFit({ l: 0, r: 0, t: 0, b: 0, ui: 75 }, 'md');
+      assert.equal(props.size, 0);
+      F.applyFit({ l: 0, r: 0, t: 0, b: 0, ui: 75 }, 'sm');
+      assert.equal(props.get('--sp-ui'), '0.75');
+    } finally { g.document = saved.document; g.dispatchEvent = saved.dispatchEvent; }
   });
 });
 
@@ -124,32 +146,68 @@ describe('the stylesheet side', () => {
     }
     return out;
   }
+  const isSize = (prop) => SIZE.has(prop) || prop.startsWith('--');
+  const SCALED = /^calc\((\d*\.?\d+)px \* var\(--sp-ui, 1\)\)$/;
+  const remArg = (args) => args.find((a) => /rem|var\(--t\b|\dem\b/.test(a));
+  /** `file|rem|N` and `rem|N` of every scaled size floor N > 32 px (which keeps 32 px): another property repeating it mirrors that size. */
+  function sizeSignatures(all) {
+    const out = new Set();
+    for (const f of all) {
+      if (!isSize(f.prop) || EXEMPT.has(f.prop)) continue;
+      for (const a of f.args) {
+        const m = SCALED.exec(a);
+        if (m && Number(m[1]) > 32) { out.add(`${f.file}|${remArg(f.args)}|${Number(m[1])}`); out.add(`${remArg(f.args)}|${Number(m[1])}`); }
+      }
+    }
+    return out;
+  }
   test('guard: every max(<rem>, <N>px) floor in public/css carries --sp-ui or is a listed exemption', () => {
     const all = floors();
     assert.ok(all.length > 400, `the scan finds the floors (${all.length})`);
+    const sigs = sizeSignatures(all);
     const bad = [];
     for (const f of all) {
       if (EXEMPT.has(f.prop)) continue;
       for (const a of f.args) {
         if (/rem|var\(--t\b|--sp-ui/.test(a) || !/[1-9][\d.]*px/.test(a)) continue;
-        // a bare px length left in a size floor must be the unscaled min(N, 32) beside its scaled N (checked below)
-        if (/^\d*\.?\d+px$/.test(a) && (SIZE.has(f.prop) || f.prop.startsWith('--'))
-          && f.args.some((b) => new RegExp(`^calc\\(\\d*\\.?\\d+px \\* var\\(--sp-ui, 1\\)\\)$`).test(b))) continue;
+        const bare = /^(\d*\.?\d+)px$/.exec(a);
+        // a size floor of 32 px or less never shrinks: it stays bare px (the touch minimum, checked below for larger ones)
+        if (bare && isSize(f.prop) && Number(bare[1]) <= 32) continue;
+        // a non-size value mirroring a scaled size floor (any file: the 交流 width is emotes.css's) copies it exactly,
+        // its 32 px included (same-file mirrors are enforced below)
+        if (a === '32px' && !isSize(f.prop) && f.args.some((b) => {
+          const m = SCALED.exec(b); return m && sigs.has(`${remArg(f.args)}|${Number(m[1])}`);
+        })) continue;
         if (LISTED.has(`${f.file}:${f.prop}:${a}`)) continue;
         bad.push(`${f.file}:${f.line} ${f.prop}: max(${f.args.join(', ')})`);
       }
     }
     assert.deepEqual(bad, [], 'scale the px floor by var(--sp-ui, 1), or list the exemption with its reason');
   });
-  test('guard: a scaled size floor keeps min(N, 32) px unscaled — touch targets ≥ 32 px stay ≥ 32 px, smaller ones never shrink', () => {
+  test('guard: a size floor above 32 px scales and keeps 32 px unscaled — touch targets ≥ 32 px stay ≥ 32 px; one of 32 px or less stays bare px', () => {
     const bad = [];
     for (const f of floors()) {
-      if (!(SIZE.has(f.prop) || f.prop.startsWith('--')) || EXEMPT.has(f.prop)) continue;
+      if (!isSize(f.prop) || EXEMPT.has(f.prop)) continue;
       for (const a of f.args) {
-        const m = /^calc\((\d*\.?\d+)px \* var\(--sp-ui, 1\)\)$/.exec(a);
+        const m = SCALED.exec(a);
         if (!m) continue;
-        const keep = `${Math.min(Number(m[1]), 32)}px`;
-        if (!f.args.includes(keep)) bad.push(`${f.file}:${f.line} ${f.prop}: max(${f.args.join(', ')}) lacks ${keep}`);
+        if (Number(m[1]) <= 32) bad.push(`${f.file}:${f.line} ${f.prop}: max(${f.args.join(', ')}) — ${m[1]}px never shrinks: write it bare`);
+        else if (!f.args.includes('32px')) bad.push(`${f.file}:${f.line} ${f.prop}: max(${f.args.join(', ')}) lacks 32px`);
+      }
+    }
+    assert.deepEqual(bad, []);
+  });
+  test('guard: a value mirroring a scaled size floor of its file (same rem, same N) copies it exactly, 32 px included', () => {
+    // devices.css's narrow-touch .dpanel bottom mirrors the 交流 / ⚙ heights, sweep.css's header band the header: without
+    // the 32 px the card ended 6.5 px below the ⚙ row at 75 % (the merge review of 2026-10-23)
+    const all = floors();
+    const sigs = sizeSignatures(all);
+    const bad = [];
+    for (const f of all) {
+      if (isSize(f.prop) || EXEMPT.has(f.prop)) continue;
+      for (const a of f.args) {
+        const m = SCALED.exec(a);
+        if (m && sigs.has(`${f.file}|${remArg(f.args)}|${Number(m[1])}`) && !f.args.includes('32px')) bad.push(`${f.file}:${f.line} ${f.prop}: max(${f.args.join(', ')})`);
       }
     }
     assert.deepEqual(bad, []);

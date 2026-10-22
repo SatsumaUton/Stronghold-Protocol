@@ -168,6 +168,23 @@ test('physical/arts element-burst damage uses normal dodge while burst status an
   }
 });
 
+// Native ep_break_* NoSourceDamage carries no cancellation mask: the burst's HP damage is ordinary, the necrosis tick too
+// (it had dodgeMode 'ignore' until the merge review of 2026-10-23; DESIGN §35.32).
+test('the necrosis burst tick is ordinary 无来源 damage: an injury dodge effect cancels it, the burst stays', () => {
+  const h = makeBattle({ defs: { chess: { probe: chessRec({ id: 'probe', stats: { maxHp: 100000, def: 0 }, skill: null }) } },
+    units: [{ uid: 'probe', chessId: 'probe', row: 10, col: 5 }], content: 'none', autoFinish: false });
+  h.step();
+  const u = h.unit('probe'), hp = u.hp;
+  assert.ok('necrosis' in u.elem);
+  let tries = 0;
+  h.b.addBuff(u, { key: 'dodger', injury: (e) => { tries++; e.dodge(); } });
+  h.b.dealElementDamage({ target: u, amount: u.gaugeMax, element: 'necrosis' });
+  h.run(2.01);
+  assert.ok(u.findBuff('necrosisBurst'), 'dodging HP damage does not cancel the burst');
+  assert.ok(tries >= 2, `every tick reaches the injury effects (${tries})`);
+  assert.equal(u.hp, hp);
+});
+
 // PRTS 游戏数据基础 + 数值范围: fixed penetration is subtracted before percentage penetration.
 test('fixed/percentage penetration order: the PRTS formula (v0.3.1 gave 900 for both first cases)', () => {
   const target = { def: 300, res: 40 };

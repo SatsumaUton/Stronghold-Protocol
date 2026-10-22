@@ -114,7 +114,7 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
       k: document.documentElement.style.getPropertyValue('--sp-ui') };
   });
 
-  test('界面大小: a stored 75 % shrinks the layout root and 小\'s text with it, keeps 中\'s 64 px text floor and the 32 px touch floor; the board fills its host', async () => {
+  test('界面大小: a stored 75 % shrinks the layout root and 小\'s text with it and keeps the 32 px touch floor; 中 turns it off (100 %, its 64 px floor); the board fills its host', async () => {
     const phone = await open('phase=PREP', { width: 844, height: 390, hasTouch: true, isMobile: true }, { l: 0, r: 0, t: 0, b: 0, ui: 75 });
     await phone.page.waitForSelector('.gm__field canvas', { timeout: 60000 });
     await sleep(500);
@@ -125,7 +125,13 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
     assert.ok(p.ready >= 32, `the ready button keeps a 32 px touch target (${p.ready})`);
     await phone.page.evaluate(async () => (await import('/js/ui/settings.js')).updateSettings({ textSize: 'md' }));
     await sleep(200);
-    assert.equal((await sizes(phone.page)).t, 64, '中 keeps its 64 px floor');
+    const md = await sizes(phone.page);
+    assert.equal(md.k, '', '中 and above: no factor (the kept text floors clipped in shrinking boxes)');
+    assert.equal(md.rem, 40, 'the design root again');
+    assert.equal(md.t, 64, '中 keeps its 64 px floor');
+    await phone.page.evaluate(async () => (await import('/js/ui/settings.js')).updateSettings({ textSize: 'sm' }));
+    await sleep(200);
+    assert.equal((await sizes(phone.page)).k, '0.75', 'back at 小 the stored size applies again');
     const b = await boxes(phone.page);
     assert.deepEqual(b.field, b.app, 'the board\'s host fills the screen box');
     assert.deepEqual(b.canvas, b.app);
@@ -151,6 +157,39 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
     const back = await sizes(page);
     assert.equal(back.k, '');
     assert.ok(Math.abs(back.rem - 1280 / 19.2) < 0.01);
+    assert.deepEqual(problems, []);
+    await page.close();
+  });
+
+  test('界面大小 at 文字大小 中: the row is disabled at 100 % with its note; a drag shows the reading and applies on release', async () => {
+    const { page, problems } = await open('phase=PREP&variant=settings', { width: 1280, height: 720 }, { l: 0, r: 0, t: 0, b: 0, ui: 85 });
+    await page.waitForSelector('[data-testid="ui-size"]', { timeout: 10000 });
+    assert.equal((await sizes(page)).k, '0.85');
+    await page.evaluate(async () => (await import('/js/ui/settings.js')).updateSettings({ textSize: 'md' }));
+    await sleep(200);
+    const row = () => page.evaluate(() => ({
+      range: document.querySelector('[data-testid="ui-size-range"]').disabled,
+      steps: [...document.querySelectorAll('[data-testid="ui-size"] .set-fit__step')].map((b) => b.disabled),
+      pct: document.querySelector('[data-testid="ui-size-pct"]').textContent,
+      note: !!document.querySelector('[data-testid="ui-size-locked"]'),
+      k: document.documentElement.style.getPropertyValue('--sp-ui'),
+    }));
+    assert.deepEqual(await row(), { range: true, steps: [true, true], pct: '100%', note: true, k: '' });
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('sp.pref.screenFit')).ui), 85, 'the stored size is kept');
+    await page.evaluate(async () => (await import('/js/ui/settings.js')).updateSettings({ textSize: 'sm' }));
+    await sleep(200);
+    assert.deepEqual(await row(), { range: false, steps: [false, false], pct: '85%', note: false, k: '0.85' });
+    // a drag: `input` moves the reading only, `change` (the release) applies it
+    await page.evaluate(() => {
+      const r = document.querySelector('[data-testid="ui-size-range"]');
+      r.value = '75';
+      r.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await sleep(150);
+    assert.deepEqual([(await row()).pct, (await row()).k], ['75%', '0.85'], 'while dragging the interface keeps its size');
+    await page.evaluate(() => document.querySelector('[data-testid="ui-size-range"]').dispatchEvent(new Event('change', { bubbles: true })));
+    await sleep(200);
+    assert.deepEqual([(await row()).pct, (await row()).k], ['75%', '0.75']);
     assert.deepEqual(problems, []);
     await page.close();
   });

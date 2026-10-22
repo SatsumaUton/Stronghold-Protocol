@@ -4,15 +4,15 @@
 // seated player may open or cancel the vote, each seat may open one every 30 s, a completed reroll opens a fresh window
 // (a cancelled or rejected vote does not give the cooldown back).
 // Installed on Match.prototype like the other method containers. The lobby only refuses spectators and absent seats.
-import { PHASE, ERR } from '../../../shared/constants.js';
+import { PHASE, ERR, SETUP_REROLL_COOLDOWN_MS as REROLL_COOLDOWN_MS } from '../../../shared/constants.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
 import { setupMatchWaves } from '../waves.js';
 import { drawDisabledBonds, SharedPool } from '../pool.js';
 import { OK, fail } from './common.js';
 
 // One start per seat per cooldown: the vote freezes the INFO_CHECK countdown, so an endless restart loop would stall
-// the opening. A completed reroll starts a new opening and therefore a new window.
-const REROLL_COOLDOWN_MS = 30_000;
+// the opening. A completed reroll starts a new opening and therefore a new window. (SETUP_REROLL_COOLDOWN_MS, 30 s, lives
+// in shared/constants.js so the client's refusal toast names the same value.)
 
 export class MatchSetupVote {
   requestSetupReroll(playerId, revision) {

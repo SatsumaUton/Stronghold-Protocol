@@ -6,8 +6,8 @@
    whole UI is authored in design pixels ÷ 100 (e.g. 24px → .24rem). The rule never drops below
    40px, which keeps it clear of CJK browsers' minimum-font-size clamping. 1px hairlines stay px.
    设置 → 异形屏适配 →「界面大小」 (ui/screenFit.js, DESIGN §35.43) multiplies the root by --sp-ui
-   (75–100 %, unset = 1: the design itself); every max(rem, px) floor carries the same factor, a
-   size floor never below min(its px, 32px), the font-size floors never (test/ui/ui-size.test.js).
+   (75–100 %, unset = 1: the design itself; only at 文字大小 小); every max(rem, px) floor carries the
+   same factor, a size floor never below min(its px, 32px), the font-size floors never (test/ui/ui-size.test.js).
    ========================================================================================== */
 
 :root {
@@ -138,9 +138,10 @@ html {
    clientHeight (render/app.js), which no font-size can reach.
    小 = 1rem reproduces the design's own sizes exactly, on every device. The other steps keep the
    desktop gentle and lift the phone: 1rem there is clamped at 40 px by the rule above, which is what
-   made the .18rem body text 7.2 CSS px. 界面大小 (--sp-ui, at most 1) never shrinks these px floors:
-   中 / 大 / 特大 keep their 64 / 76 / 88 px; 小 has no floor and follows the layout, which keeps every
-   label in its box (DESIGN §35.43 measured the phones). */
+   made the .18rem body text 7.2 CSS px. 界面大小 (--sp-ui, at most 1) never shrinks these px floors, and
+   it applies at 小 only (ui/screenFit.js effectiveUi): the kept 64 / 76 / 88 px floors of 中 / 大 / 特大
+   outgrew boxes that shrank, so those steps keep 100 %. 小 has no floor and follows the layout, which keeps
+   every label in its box (body text ≈ 5.4 CSS px at 75 % on a phone; DESIGN §35.43, [ASSUMED]). */
 :root { --t: 1rem; }
 :root[data-text="md"] { --t: max(1rem, 64px); }
 :root[data-text="lg"] { --t: max(calc(1rem * 1.15), 76px); }

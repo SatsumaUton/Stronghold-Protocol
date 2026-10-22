@@ -167,6 +167,8 @@ export function makeBuff(b) {
     injury: b.injury ?? null,
     observeInjury: b.observeInjury ?? null,
     damageReduction: b.damageReduction ?? null,
+    // PRTS 伤害减免: reductions of one name keep only the strongest (attack/effects.js); the name, when not the key
+    reductionGroup: b.reductionGroup ?? null,
     tags: b.tags ?? [],
     shield: b.shield ?? (b.mods && b.mods.shield) ?? 0,
     shieldHits: b.shieldHits ?? 0,

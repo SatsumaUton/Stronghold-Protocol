@@ -194,14 +194,24 @@ test('guaranteed held dodge consumes its charge without a probability draw; igno
 
 test('same-named flat reduction takes the strongest value separately for each HP damage type', () => {
   const { b, t } = fixture();
-  b.addBuff(t, { key: 'one', damageReduction: { phys: 75, arts: 20, true: 10, elemental: 5 } });
-  b.addBuff(t, { key: 'two', damageReduction: { phys: 30, arts: 40 } });
+  b.addBuff(t, { key: 'one', reductionGroup: 'same', damageReduction: { phys: 75, arts: 20, true: 10, elemental: 5 } });
+  b.addBuff(t, { key: 'two', reductionGroup: 'same', damageReduction: { phys: 30, arts: 40 } });
   for (const [type, expected] of [['phys', 25], ['arts', 60], ['true', 90], ['elemental', 95]]) {
     assert.equal(b.dealDamage({ target: t, amount: 100, type }), expected, type);
   }
   assert.equal(b.dealHPLose({ target: t, amount: 100 }), 100, 'loss skips injury reduction');
   b.removeBuff(t, 'one');
   assert.equal(b.dealDamage({ target: t, amount: 100, type: 'phys' }), 70, 'weaker surviving source resumes');
+});
+
+// PRTS 伤害减免: reductions of different names stack; the name is `reductionGroup`, else the buff key (DESIGN §35.32).
+test('differently named flat reductions stack, one name keeps its strongest', () => {
+  const { b, t } = fixture();
+  b.addBuff(t, { key: 'a', damageReduction: { phys: 30 } });
+  b.addBuff(t, { key: 'b', damageReduction: { phys: 20 } });
+  assert.equal(b.dealDamage({ target: t, amount: 100, type: 'phys' }), 50, 'two names: both subtract');
+  b.addBuff(t, { key: 'c', reductionGroup: 'a', damageReduction: { phys: 40 } });
+  assert.equal(b.dealDamage({ target: t, amount: 100, type: 'phys' }), 40, "'c' joins 'a': 40 replaces 30");
 });
 
 test('flat reduction follows its buff priority/acquisition position and can remove the mitigation floor', () => {

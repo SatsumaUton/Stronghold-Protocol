@@ -10,8 +10,11 @@ import { writePlugin } from '../helpers/pluginFixtures.js';
 
 const ENABLED = process.env.SP_E2E === '1' && hasChrome();
 const IDS = ['chess_char_3_01_a', 'chess_char_3_04_a']; // visible NORMAL chess, on both roster tabs
+// Generous waits: on a loaded machine (a parallel browser sweep, a busy CI runner) one step once took ~50 s and failed
+// under puppeteer's 30 s default, while the test passes in ~7 s alone (the merge review of 2026-10-23).
+const WAIT = 90000;
 
-test('mounted rosters follow the room content without a language switch', { skip: !ENABLED && 'set SP_E2E=1 (and have Chrome)', timeout: 180000 }, async (t) => {
+test('mounted rosters follow the room content without a language switch', { skip: !ENABLED && 'set SP_E2E=1 (and have Chrome)', timeout: 420000 }, async (t) => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-loadout-content-'));
   // Derive the data-only manifest from the shipped content template. No art, scripts or personal data.
   const { operators: _operators, dsl: _dsl, ...template } = JSON.parse(fs.readFileSync(path.join(ROOT, 'plugins/_template/content/plugin.json')));
@@ -26,9 +29,9 @@ test('mounted rosters follow the room content without a language switch', { skip
   const host = new Client(P, srv.url, 'host', { prefix: 'loadout-content', w: 1600, h: 900 });
   const guest = new Client(P, srv.url, 'guest', { prefix: 'loadout-content', w: 1600, h: 900 });
   try {
-    await host.open(); await host.enter('Roster host');
+    await host.open(); host.page.setDefaultTimeout(WAIT); await host.enter('Roster host');
     const { code } = await host.createCoop(); // the 0.3.2 lobby (§35.18): 同盟模拟 → 创建同盟 enters the room at once
-    await guest.open(); await guest.enter('Roster guest');
+    await guest.open(); guest.page.setDefaultTimeout(WAIT); await guest.enter('Roster guest');
     await guest.click('.mode-card', '同盟模拟'); await guest.click('.join-row input'); await guest.page.keyboard.type(code);
     await guest.click('.join-row button', '加入同盟');
     await guest.page.waitForSelector('.room-screen');
@@ -49,27 +52,27 @@ test('mounted rosters follow the room content without a language switch', { skip
         if (!el || getComputedStyle(el).visibility !== 'visible') return false;
         const { x, y, width, height } = el.getBoundingClientRect();
         return width > 0 && height > 0 && el.contains(document.elementFromPoint(x + width / 2, y + height / 2));
-      });
-      await guest.click('[data-testid="loadout-open"]');
-      await guest.click('[data-tab="loadout"]');
+      }, { timeout: WAIT });
+      await guest.click('[data-testid="loadout-open"]', null, { timeout: WAIT });
+      await guest.click('[data-tab="loadout"]', null, { timeout: WAIT });
       await guest.page.waitForSelector('.lo-card');
       await guest.click('.lo-chip--t3[aria-pressed="false"]', null, { optional: true, timeout: 500 });
       return guest.page.$('.lo');
     };
     const close = async (overlay) => {
-      await guest.click('.lo-back');
+      await guest.click('.lo-back', null, { timeout: WAIT });
       await guest.page.waitForSelector('.lo', { hidden: true });
       await overlay.dispose();
     };
     const toggle = async (id) => {
       const old = (await snapshot()).content;
-      await host.click(`[data-plugin="${id}"] button[role="switch"]`);
+      await host.click(`[data-plugin="${id}"] button[role="switch"]`, null, { timeout: WAIT });
       await guest.page.waitForFunction((old) => {
         const d = globalThis.__SP__.data, c = globalThis.__SP_CONTENT__.state();
         const r = globalThis.__SP__.store.get().room;
         return r.content.vanilla ? d.contentId() === null && old !== null
           : c.status === 'ready' && d.contentId() === r.content.cs && d.contentId() !== old;
-      }, { timeout: 45000 }, old);
+      }, { timeout: WAIT }, old);
       await guest.page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     };
     const verify = async (label, overlay, before) => {
@@ -81,7 +84,7 @@ test('mounted rosters follow the room content without a language switch', { skip
       // Capture both tabs before asserting, so one failure cannot hide the other stale roster.
       const shown = {};
       for (const tab of ['loadout', 'ownership']) {
-        await guest.click(`[data-tab="${tab}"]`);
+        await guest.click(`[data-tab="${tab}"]`, null, { timeout: WAIT });
         const card = tab === 'loadout' ? '.lo-card' : '.own-card';
         const name = tab === 'loadout' ? '.lo-card__name' : '.own-card__name';
         shown[tab] = await guest.page.evaluate((ids, card, name) => ids.map(id => ({ id,

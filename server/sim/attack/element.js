@@ -14,6 +14,10 @@
 //   enemies (operator damage, "·我方"): burn 7000 元素伤害 + RES −20 (10 s) · neural 3 麻痹, then 6000 元素伤害 (10 s) ·
 //     apoptosis 15 s: 50 % weaken recovering over the burst + 800 元素伤害/s · erosion 5000 元素伤害 + permanent DEF −120 (8 s).
 //   necrosis (legacy spare gauge): 12 s of 100 true dmg/s and ATK −20 %.
+//   The HP damage of a burst is ordinary 无来源 damage, not undodgeable (v0.3.1's canDodge false): on an operator a phys /
+//   arts dodge or an injury-dodge effect cancels burn's 1200, erosion's 800 and apoptosis's 100/s while the status and
+//   cooldown stay (native ep_break_* NoSourceDamage, `_ignoreCancelReasonMask` NONE; DESIGN §35.32). necrosis, with no
+//   official template of its own, follows the same rule (its true damage is outside the phys / arts dodge stats).
 // Burst damage is 无来源 (PRTS 元素 "元素爆发通常造成无来源的伤害"; PRTS 伤害分类: 无来源 = "无法被追溯伤害来源", yet "无来源
 // 伤害的击杀也能追溯击杀来源"): DamageInfo `sourceless` — the damage-dealt multipliers and penetration of the unit that
 // filled the gauge do not apply (the target's own RES cuts do, "可享受法抗减少效果"), and the `hit` / `damaged` / `fatal`
@@ -149,7 +153,10 @@ function resolveBurst(battle, source, target, el, credit) {
   if (!target.alive) { reset(); return; }
   const tags = ['burst', el];
   // Burst damage is source-less; its statistics/kill credit is inherited independently.
-  // Native ep_break_* uses ordinary NoSourceDamage without a cancellation override (resource snapshot 9bf2396).
+  // Native ep_break_* uses ordinary NoSourceDamage without a cancellation override (resource snapshot 9bf2396:
+  // ep_break_fire_char MAGICAL, ep_break_water_char PHYSICAL, ep_break_anger_char PURE, the dark char's
+  // periodic_magic_damage MAGICAL BUFF — all `_ignoreCancelReasonMask` NONE), so a dodge may cancel the HP damage while
+  // the burst status and cooldown stay. v0.3.1 made it undodgeable (DESIGN §35.32).
   const hit = (amount, type, extra = {}) => battle.dealDamage({ source: null, credit, target, amount, type, element: el, tags, ...extra });
   const lock = (duration, extra = {}) => {
     if (!(duration > 0)) { reset(); return null; }
@@ -158,7 +165,7 @@ function resolveBurst(battle, source, target, el, credit) {
   if (el === 'necrosis') {
     lock(cfg.duration, {
       mods: { atkMul: 1 - cfg.atkDownPct }, interval: 1,
-      onTick: () => battle.dealDamage({ source: null, credit, target, amount: cfg.dps, type: 'true', attackType: 'BUFF', dodgeMode: 'ignore', tags: ['burst', 'necrosis'] }),
+      onTick: () => battle.dealDamage({ source: null, credit, target, amount: cfg.dps, type: 'true', attackType: 'BUFF', tags: ['burst', 'necrosis'] }),
     });
     return;
   }

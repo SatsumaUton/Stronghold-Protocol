@@ -16,9 +16,15 @@
 // floors, the 文字大小 --t floors of 中 / 大 / 特大) never shrink, while 小's text (1rem, no floor) follows the layout
 // (test/ui/ui-size.test.js). Above 100 % is not offered [ASSUMED]: measured on the §35.18 phones it overlaps the
 // screens (the hub's 成就统计 under the mode cards at 150 %), and larger text is what 文字大小 is for (DESIGN §35.43).
+// Only at 文字大小 小: the kept 64 / 76 / 88 px text floors of 中 and above outgrew their shrinking boxes (clipped labels,
+// the merge review of 2026-10-23), so there the row is disabled and the interface stays at 100 % — the stored size is
+// kept and applies again at 小 (effectiveUi). While the slider is dragged only its reading follows; the size applies on
+// release (`change`), so the settings modal does not resize the track under the finger.
 
+import { useState } from '../../vendor/hooks.module.js';
 import { html, Button, MicroLabel } from './components.js';
 import { createStore, useStore, loadPref, savePref } from '../store.js';
+import { settingsStore } from './settingsStore.js';
 import { t, N_ } from '../../../shared/i18n.js';
 
 export const FIT_SIDES = ['l', 'r', 't', 'b'];
@@ -53,11 +59,16 @@ export const pxOf = (v) => (Number(v) - MID) * PX_PER_STEP;
 
 export const fitStore = createStore(sanitizeFit(loadPref('screenFit', null)));
 
+/** 界面大小 applies at 文字大小 小 only (see the header); `textSize` missing = 小. */
+export const uiAllowed = (textSize) => textSize == null || textSize === 'sm';
+/** The size on screen: the stored one at 小, 100 at 中 and above. */
+export const effectiveUi = (ui, textSize) => (uiAllowed(textSize) ? sanitizeUi(ui) : 100);
+
 /** Put the offsets and the size on <html> (no attribute while all four are 0, no --sp-ui at 100 %: the page as before). */
-export function applyFit(f) {
+export function applyFit(f, textSize = settingsStore.get().textSize) {
   const el = globalThis.document?.documentElement;
   if (!el) return;
-  const ui = sanitizeUi(f.ui);
+  const ui = effectiveUi(f.ui, textSize);
   if (ui !== 100) el.style.setProperty('--sp-ui', String(ui / 100));
   else el.style.removeProperty('--sp-ui');
   const on = FIT_SIDES.some((k) => f[k] !== 0);
@@ -73,6 +84,9 @@ export function applyFit(f) {
 }
 
 fitStore.subscribe((f) => { savePref('screenFit', f); applyFit(f); });
+// a 文字大小 change turns the stored size on (小) or off (中 and above)
+let appliedText = settingsStore.get().textSize;
+settingsStore.subscribe((s) => { if (s.textSize !== appliedText) { appliedText = s.textSize; applyFit(fitStore.get(), s.textSize); } });
 applyFit(fitStore.get());
 
 /** @param {Partial<{l:number,r:number,t:number,b:number,ui:number}>} patch pixel offsets, the size in percent */
@@ -85,7 +99,11 @@ const LO = sliderOf(FIT_MIN), HI = sliderOf(FIT_MAX);
 /** The settings section: one 0–100 slider per edge (50 = unchanged), −/+ one step for a fine touch, 界面大小, 重置. */
 export function ScreenFitSection() {
   const f = useStore((s) => s, Object.is, fitStore);
+  const textSize = useStore((s) => s.textSize, Object.is, settingsStore);
+  const [preview, setPreview] = useState(null);
   const ui = sanitizeUi(f.ui);
+  const allowed = uiAllowed(textSize);
+  const shown = allowed ? sanitizeUi(preview ?? ui) : 100;
   const any = FIT_SIDES.some((k) => f[k] !== 0) || ui !== 100;
   return html`<section class="set-fit" aria-labelledby="set-fit-title" data-testid="screen-fit">
     <div class="set-keys__head">
@@ -104,14 +122,17 @@ export function ScreenFitSection() {
         <span class="set-row__val num">${v}</span>
       </div>`;
     })}
-    <div class="set-row set-fit__row" data-testid="ui-size">
+    <div class=${`set-row set-fit__row${allowed ? '' : ' is-disabled'}`} data-testid="ui-size">
       <span class="set-row__label">${t('界面大小')}<${MicroLabel}>UI SIZE<//></span>
-      <button type="button" class="set-fit__step" aria-label=${t('减少')} disabled=${ui <= UI_MIN} onClick=${() => updateFit({ ui: ui - UI_STEP })}>−</button>
-      <input class="set-range" type="range" min=${UI_MIN} max=${UI_MAX} step=${UI_STEP} value=${ui} style=${`--pct:${((ui - UI_MIN) / (UI_MAX - UI_MIN)) * 100}%`}
-        aria-label=${t('界面大小')} data-testid="ui-size-range" onInput=${(e) => updateFit({ ui: Number(e.currentTarget.value) })} />
-      <button type="button" class="set-fit__step" aria-label=${t('增加')} disabled=${ui >= UI_MAX} onClick=${() => updateFit({ ui: ui + UI_STEP })}>+</button>
-      <span class="set-row__val num" data-testid="ui-size-pct">${ui}%</span>
+      <button type="button" class="set-fit__step" aria-label=${t('减少')} disabled=${!allowed || ui <= UI_MIN} onClick=${() => updateFit({ ui: ui - UI_STEP })}>−</button>
+      <input class="set-range" type="range" min=${UI_MIN} max=${UI_MAX} step=${UI_STEP} value=${shown} disabled=${!allowed}
+        style=${`--pct:${((shown - UI_MIN) / (UI_MAX - UI_MIN)) * 100}%`} aria-label=${t('界面大小')} data-testid="ui-size-range"
+        onInput=${(e) => setPreview(Number(e.currentTarget.value))}
+        onChange=${(e) => { setPreview(null); updateFit({ ui: Number(e.currentTarget.value) }); }} />
+      <button type="button" class="set-fit__step" aria-label=${t('增加')} disabled=${!allowed || ui >= UI_MAX} onClick=${() => updateFit({ ui: ui + UI_STEP })}>+</button>
+      <span class="set-row__val num" data-testid="ui-size-pct">${shown}%</span>
     </div>
-    <p class="set-hint">${t('界面大小：缩小按钮、面板和商店条，给棋盘多留空间（100% 为原尺寸）。文字大小为「小」时文字随界面缩小，「中」及以上保持原字号；按钮保持可点的大小。')}</p>
+    <p class="set-hint">${t('界面大小：缩小按钮、面板、商店条和文字，给棋盘多留空间（100% 为原尺寸）；按钮保持可点的大小。')}</p>
+    ${allowed ? null : html`<p class="set-hint" data-testid="ui-size-locked">${t('文字大小为「中」及以上时不可缩小界面')}</p>`}
   </section>`;
 }

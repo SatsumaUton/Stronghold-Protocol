@@ -1,7 +1,7 @@
 {
   "_": "Default-version guard (test/versions-default-guard.test.js); an intended change of the default version must regenerate test/fixtures/versions-default-guard.json with SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js and give the reason in the commit.",
   "data": {
-    "data/assets.json": "b0550f8b05742b25007dba1db433b797a5d3fea2cf80809ee4061de034693b03",
+    "data/assets.json": "2399ba7da0bc99be9a0f0a0066d4e249be1aeb03275d3e63e5129e512b9ae55f",
     "data/backups.json": "3df06b7d5bfacba9d3d5a7afafb98adb799a32b0fadf7dd1ddea435144195854",
     "data/bands.json": "8f18abc99eb50639a1f2fc679a84015d6d8cc8aa3ff7c7d22ad6db5dc347053b",
     "data/bonds.json": "53a22f4724771b6ff40041635e907c0af39790731f661b0439fc593f5a91c94c",

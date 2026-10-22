@@ -146,7 +146,8 @@ function skadi2(bb, chess, def) {
         key: `skadi2:reduction:${unit.id}`,
         covers: target => target.side === 'ally' && target.kind !== 'device' && live(target)
           && live(unit) && unit.skill?.active && inCover(battle, unit, target),
-        effect: { damageReduction: { phys: flat, arts: flat } },
+        // one name for every 浊心斯卡蒂's aura: two of them covering a unit keep only the stronger (PRTS 伤害减免)
+        effect: { damageReduction: { phys: flat, arts: flat }, reductionGroup: 'skadi2:reduction' },
       });
     }
     },

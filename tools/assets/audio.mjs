@@ -501,13 +501,23 @@ export function pickUnitSfx(banks, opts = {}) {
     if (banks.get('ON_UNIT_BORN')?.length) out.born = banks.get('ON_UNIT_BORN');
     return out;
   }
-  // operators: the plain ability of either event before any numbered variant
+  // operators: the plain ability of either event before any numbered variant, then the default mode's banks (attack.0,
+  // attack.0.1 …) before any other number — firstMatching orders by depth, so 弑君者's S3 `attack.3` (p_imp_asndgrsmk) and S2
+  // `attack.4` (p_atk_asndgrbm) outranked her normal `attack.0.1` / `attack.0.2` (p_*_asndgr_n) and rang on every normal
+  // attack; 望 / 莱伊 / 灰毫 kept a skill's START swing over their mode-0 ON swing (the #848 merge review, DESIGN §35.38;
+  // assignSkillModeSfx already counts every mode 0 bank as the normal attack)
+  const mode0 = (event) => {
+    if (!opts.operator) return null;
+    const keys = [...banks.keys()].filter((k) => new RegExp(`^${event}\\.(attack|combat)\\.0(\\.\\d+)*$`).test(k)).sort(abilityOrder);
+    for (const k of keys) if (banks.get(k)?.length && ok(banks.get(k))) return banks.get(k);
+    return null;
+  };
   const plain = opts.operator ? exact('ON_ABILITY_START') ?? exact('ON_ABILITY_ON') : null;
-  const attack = plain
+  const attack = plain ?? mode0('ON_ABILITY_START') ?? mode0('ON_ABILITY_ON')
     ?? firstMatching(banks, 'ON_ABILITY_START', ['attack', 'combat'], ok)
     ?? firstMatching(banks, 'ON_ABILITY_ON', ['attack', 'combat'], ok)
     ?? own(proj.born) ?? attackLike('ON_ABILITY_START') ?? attackLike('ON_ABILITY_ON');
-  const hit = firstMatching(banks, 'ON_ABILITY_HIT', ['attack', 'combat'], ok) ?? own(proj.hit) ?? attackLike('ON_ABILITY_HIT');
+  const hit = mode0('ON_ABILITY_HIT') ?? firstMatching(banks, 'ON_ABILITY_HIT', ['attack', 'combat'], ok) ?? own(proj.hit) ?? attackLike('ON_ABILITY_HIT');
   if (attack) out.attack = attack;
   if (hit) out.hit = hit;
   if (banks.get('ON_UNIT_DEAD')?.length) out.die = banks.get('ON_UNIT_DEAD');

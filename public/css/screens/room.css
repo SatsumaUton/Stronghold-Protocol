@@ -82,8 +82,8 @@
 }
 .rs .rs-loadout:not(:disabled):hover { border-color: #fff; filter: brightness(1.05); }
 .rs .rs-loadout .lo-entry__icon, .rs .rs-loadout > .btn__icon {
-  width: max(.36rem, 22px, calc(22px * var(--sp-ui, 1)));
-  height: max(.36rem, 22px, calc(22px * var(--sp-ui, 1)));
+  width: max(.36rem, 22px);
+  height: max(.36rem, 22px);
   padding: .04rem;
   box-sizing: border-box;
   color: var(--mint-400);
@@ -118,7 +118,7 @@
 .rs-key__link {
   display: grid;
   place-items: center;
-  width: max(.44rem, 28px, calc(28px * var(--sp-ui, 1)));
+  width: max(.44rem, 28px);
   height: 78%;
   padding: 0;
   color: #c9cecc;
@@ -179,7 +179,7 @@
 .rs--solo .rseat { --w: min(2.7rem, 34vw); }
 .rseat__clip { position: absolute; left: 50%; top: -.14rem; z-index: 2; width: .16rem; height: .2rem; transform: translateX(-50%); background: #3a3e3d; border: 2px solid #1a1c1c; }
 .rseat.is-lit .rseat__clip { background: #4fe8c0; }
-.rseat__strip { position: relative; display: flex; align-items: center; justify-content: space-between; height: max(.26rem, 16px, calc(16px * var(--sp-ui, 1))); padding: 0 .08rem; background: #2b2e2e; }
+.rseat__strip { position: relative; display: flex; align-items: center; justify-content: space-between; height: max(.26rem, 16px); padding: 0 .08rem; background: #2b2e2e; }
 .rseat__strip i { width: .5rem; height: 4px; background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .45) 0 3px, transparent 3px 5px); }
 .rseat__strip span { font-size: calc(.12 * var(--t)); color: #8d9391; }
 .rseat.is-lit .rseat__strip { background: #4fe8c0; }
@@ -278,7 +278,7 @@
   text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
 }
 .rseat:not(.is-lit) .rseat__state { font-size: calc(.2 * var(--t)); color: #c9cecc; }
-.rseat__box { display: grid; place-items: center; width: max(.34rem, 20px, calc(20px * var(--sp-ui, 1))); height: max(.34rem, 20px, calc(20px * var(--sp-ui, 1))); background: rgba(0, 0, 0, .25); border: 2px solid currentColor; border-radius: 4px; }
+.rseat__box { display: grid; place-items: center; width: max(.34rem, 20px); height: max(.34rem, 20px); background: rgba(0, 0, 0, .25); border: 2px solid currentColor; border-radius: 4px; }
 .rseat__box .icon { width: 80%; height: 80%; }
 .rseat__kick {
   position: absolute;
@@ -287,15 +287,15 @@
   z-index: 3;
   display: inline-flex;
   align-items: center;
-  height: max(.4rem, 24px, calc(24px * var(--sp-ui, 1)));
+  height: max(.4rem, 24px);
   padding: 0 .1rem;
   color: #ff8a96;
   background: #3b1218;
   border: 1px solid rgba(255, 120, 130, .6);
   border-radius: 999px;
 }
-.rseat__kick .icon { width: max(.2rem, 12px, calc(12px * var(--sp-ui, 1))); height: max(.2rem, 12px, calc(12px * var(--sp-ui, 1))); }
-.rseat__kick .icon + .icon { width: max(.14rem, 9px, calc(9px * var(--sp-ui, 1))); margin-left: -2px; }
+.rseat__kick .icon { width: max(.2rem, 12px); height: max(.2rem, 12px); }
+.rseat__kick .icon + .icon { width: max(.14rem, 9px); margin-left: -2px; }
 .rseat__kick:hover:not(:disabled), .rseat__kick:focus-visible { filter: brightness(1.3); }
 .rseat__pick {
   position: absolute;
@@ -305,7 +305,7 @@
   display: inline-flex;
   align-items: center;
   gap: .04rem;
-  height: max(.36rem, 22px, calc(22px * var(--sp-ui, 1)));
+  height: max(.36rem, 22px);
   padding: 0 .1rem;
   font: inherit;
   font-size: calc(.14 * var(--t));
@@ -339,7 +339,7 @@
 .seat__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat__you { flex: none; padding: 0 .06rem; font-size: calc(.12 * var(--t)); font-weight: 700; color: var(--text-on-mint); background: var(--mint-500); }
 .rseat__doc { font-size: calc(.11 * var(--t)); letter-spacing: .1em; color: #7f8583; }
-.rseat__me { position: absolute; left: -.1rem; top: -.1rem; display: grid; place-items: center; width: max(.26rem, 16px, calc(16px * var(--sp-ui, 1))); height: max(.26rem, 16px, calc(16px * var(--sp-ui, 1))); color: #08221b; background: #4fe8c0; border-radius: 3px; }
+.rseat__me { position: absolute; left: -.1rem; top: -.1rem; display: grid; place-items: center; width: max(.26rem, 16px); height: max(.26rem, 16px); color: #08221b; background: #4fe8c0; border-radius: 3px; }
 .rseat__me .icon { width: 80%; height: 80%; }
 .rseat__plate--empty { display: flex; justify-content: center; border-style: dashed; border-color: rgba(255, 255, 255, .12); background: none; font-size: calc(.15 * var(--t)); }
 .rseat--empty .rseat__art { grid-template-rows: 1fr auto; padding-bottom: .5rem; background: linear-gradient(135deg, transparent 47%, rgba(255, 255, 255, .06) 50%, transparent 53%), #141616; }
@@ -463,7 +463,7 @@
 .rs-hint { margin: 0; font-size: calc(.18 * var(--t)); color: #d6dad8; text-align: center; }
 .room-bar__status .icon { width: 1.1em; height: 1.1em; margin-right: 4px; vertical-align: -2px; }
 .rs-ready { display: inline-flex; align-items: center; gap: 2px; margin-right: .14rem; font-size: calc(.16 * var(--t)); color: #9aa19e; vertical-align: middle; }
-.rs-ready .icon { width: max(.2rem, 13px, calc(13px * var(--sp-ui, 1))); height: max(.2rem, 13px, calc(13px * var(--sp-ui, 1))); color: #4b504e; }
+.rs-ready .icon { width: max(.2rem, 13px); height: max(.2rem, 13px); color: #4b504e; }
 .rs-ready .icon.is-on { color: #4fe8c0; }
 .rs-ready b { margin-left: .06rem; color: #eef0ef; }
 .rs-pill {
@@ -503,8 +503,8 @@
 .rs-pill__gear {
   display: grid;
   place-items: center;
-  width: max(.52rem, 32px, calc(32px * var(--sp-ui, 1)));
-  height: max(.52rem, 32px, calc(32px * var(--sp-ui, 1)));
+  width: max(.52rem, 32px);
+  height: max(.52rem, 32px);
   padding: 0;
   color: #1b1e1d;
   background: linear-gradient(180deg, #e9edeb, #c3cac7);
@@ -554,7 +554,7 @@
 .rs-go .proto-start__label { flex: 1 1 auto; padding-right: 8%; font-size: min(calc(.4 * var(--t)), .46rem); white-space: normal; line-height: 1.1; }
 .rs-go .proto-start__rook { font-size: min(calc(.36 * var(--t)), .4rem); }
 .rs-go .proto-start__mark small { font-size: min(calc(.08 * var(--t)), .1rem); }
-.rs-go__box { flex: none; display: grid; place-items: center; width: max(.5rem, 28px, calc(28px * var(--sp-ui, 1))); height: max(.5rem, 28px, calc(28px * var(--sp-ui, 1))); border: 3px solid currentColor; border-radius: 6px; }
+.rs-go__box { flex: none; display: grid; place-items: center; width: max(.5rem, 28px); height: max(.5rem, 28px); border: 3px solid currentColor; border-radius: 6px; }
 .rs-go__box .icon { width: 80%; height: 80%; }
 .rs-go.is-ready { background: linear-gradient(180deg, #7ff3d4, #4fe0bf); }
 
