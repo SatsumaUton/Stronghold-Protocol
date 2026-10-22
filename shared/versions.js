@@ -30,6 +30,7 @@ export const DEFAULT_VERSION = 'act2autochess';
 /** @type {readonly OfficialVersion[]} */
 export const VERSIONS = Object.freeze([
   { id: 'act2autochess', season: 'act2autochess', family: 'covenant', label: N_('第二期下半'), roomModes: ['solo', 'coop'], dir: '' },
+  { id: 'act2autochess@V2_1', season: 'act2autochess', family: 'covenant', label: N_('第二期上半'), roomModes: ['solo', 'coop'], dir: 'versions/act2autochess-v2_1/' },
   { id: 'act1autochess', season: 'act1autochess', family: 'covenant', label: N_('第一期下半'), roomModes: ['solo', 'coop'], dir: 'versions/act1autochess/' },
   { id: 'act1autochess@V1_1', season: 'act1autochess', family: 'covenant', label: N_('第一期上半'), roomModes: ['solo', 'coop'], dir: 'versions/act1autochess-v1_1/' },
 ].map((v) => /** @type {OfficialVersion} */ (Object.freeze({ ...v, roomModes: Object.freeze(v.roomModes) }))));

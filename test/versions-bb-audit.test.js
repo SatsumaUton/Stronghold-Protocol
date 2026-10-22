@@ -104,11 +104,11 @@ test('version-only keys: a buff key / bbStr.key or garrison key the base lacks a
 });
 
 // 上半's 斩业星熊 S3 (skchr_hsgma2_3, 自选) triggers on AUTO_STOP, which the engine does not implement: M2 builds it or
-// keeps 斩业星熊 out of 上半's 自选 (DESIGN §36.5). A version adding another unknown rule fails here.
+// keeps 斩业星熊 out of 上半's 自选 (DESIGN §35.22.5). A version adding another unknown rule fails here.
 const UNKNOWN_RULES_SHANG = Object.freeze([{ rule: 'AUTO_STOP', table: 'backups', skillId: 'skchr_hsgma2_3', owners: ['char_1044_hsgma2'] }]);
 const UNKNOWN_RULES = Object.freeze({ 'data/versions/act1autochess': UNKNOWN_RULES_SHANG, 'data/versions/act1autochess-v1_1': UNKNOWN_RULES_SHANG });
 
-// 上半's keys that 下半 lacks and no code names: each is an inert mechanic there until M2 (DESIGN §36.5) — 煌 / 蜜莓 /
+// 上半's keys that 下半 lacks and no code names: each is an inert mechanic there until M2 (DESIGN §35.22.5) — 煌 / 蜜莓 /
 // 伊芙利特 / 极光's traits, 华法琳 / 寒芒克洛丝's grant (上半 spells its field give_garrion_id, garrisons/battle.js reads
 // give_garrison_id), the 标准模拟 band clause, 灵巧 / 远见's layer awards and six 上半 equipment keys. A new one fails here.
 const rec = (spec) => spec.split(' | ').flatMap((part) => { const [table, ids] = part.split(': '); return ids.split(' ').map((id) => ({ table, id })); });
@@ -128,11 +128,31 @@ const VERSION_ONLY_SHANG = Object.freeze(Object.entries({
   use_equip_add_goods_rule_with_refresh_shop: 'effects: eff_acarm075 eff_acgarm075 | items: chess_item_5_03_e_a chess_item_5_03_e_b',
   use_equip_give_char_to_player_most_bond: 'effects: eff_acarm109 eff_acgarm109 | items: chess_item_5_04_e_a chess_item_5_04_e_b',
 }).map(([key, spec]) => ({ key, records: rec(spec) })));
-const VERSION_ONLY = Object.freeze({ 'data/versions/act1autochess': VERSION_ONLY_SHANG, 'data/versions/act1autochess-v1_1': VERSION_ONLY_SHANG });
+// 下半 V2_1's 远见 (visiShip) reads 上半's two discount keys, not V2_2's bond_multi_layer_char_goods_price_bond_discount:
+// its 80 / 150-layer discounts are inert there until M2 (DESIGN §35.22.5).
+const VERSION_ONLY_V21 = Object.freeze(Object.entries({
+  bond_layer_char_goods_price_bond_discount: 'bonds: visiShip | effects: bondeffect_visi',
+  bond_layer_char_goods_price_discount: 'bonds: visiShip | effects: bondeffect_visi',
+}).map(([key, spec]) => ({ key, records: rec(spec) })));
+const VERSION_ONLY = Object.freeze({
+  'data/versions/act1autochess': VERSION_ONLY_SHANG, 'data/versions/act1autochess-v1_1': VERSION_ONLY_SHANG, 'data/versions/act2autochess-v2_1': VERSION_ONLY_V21,
+});
+// 下半 V2_1's code-named keys it lacks: 远见's V2_2 discount (above), the trait type SERVER_ADD_MULTIPLE_BOND (V2_2's new
+// traits) and 奥术法阵's 失能 (silence_attachment, added on 2026-03-27: V2_1's 奥术法阵 does not silence, as the data says)
+const MISSING_KEYS = Object.freeze({
+  'data/versions/act2autochess-v2_1': ['bond_multi_layer_char_goods_price_bond_discount', 'SERVER_ADD_MULTIPLE_BOND', 'silence_attachment'],
+});
 
 for (const dir of VERSION_DIRS) {
-  test(`${path.relative(ROOT, dir) || dir}: 突袭's no_attack_duration (default 10) and 炎's 9-member fields are reported`, () => {
-    const { findings } = audit(getData({ log: QUIET }), loadData(dir, { log: QUIET }), { reads: codeReads() });
+  test(`${path.relative(ROOT, dir) || dir}: the field gaps — 上半: 突袭's no_attack_duration (default 10) and 炎's 9-member fields; 下半 V2_1: none`, () => {
+    const data = loadData(dir, { log: QUIET });
+    const { findings, missingBuffKeys } = audit(getData({ log: QUIET }), data, { reads: codeReads(), keys: codeBuffKeys() });
+    const rel = path.relative(ROOT, dir).split(path.sep).join('/');
+    if (MISSING_KEYS[rel]) assert.deepEqual(missingBuffKeys.map((k) => k.key), MISSING_KEYS[rel], `${rel}: code-named keys it lacks`);
+    if (data.config?.season !== 'act1autochess') {
+      assert.deepEqual(findings, [], `${rel}: same-season data, no field gap`);
+      return;
+    }
     const has = (key, field) => findings.find((f) => f.table === 'bonds' && f.key === key && f.field === field);
     const idle = has('raidShip', 'no_attack_duration');
     assert.ok(idle?.nonNeutral, 'raidShip.no_attack_duration');

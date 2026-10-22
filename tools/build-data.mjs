@@ -1799,7 +1799,7 @@ function buildEnemies(ctx) {
     const modelScaleY = MODEL_STRETCH_Y_BY_PREFAB.get(mv(data.prefabKey) || key) ?? null;
     const attackAnim = enemyAttackAnim(ctx.manifest, mv(data.prefabKey) || key);
     // a version's enemy whose model data/assets.json (built from 下半's models) lacks gets no attack clip: the sim keeps
-    // ATTACK_PAUSE for it — an M2 item (DESIGN §36.5); the default build stays silent (its manifest covers its modes)
+    // ATTACK_PAUSE for it — an M2 item (DESIGN §35.22.5); the default build stays silent (its manifest covers its modes)
     if (!IS_DEFAULT && !ctx.manifest?.enemies?.[mv(data.prefabKey) || key]) warn(`enemy ${key}: model ${mv(data.prefabKey) || key} not in data/assets.json, no attackAnim (sim keeps ATTACK_PAUSE) [M2]`);
     out[key] = {
       key, name, level: wantLevel, rank: mv(data.levelType, 'NORMAL'), handbookIndex: hb?.enemyIndex || null,
@@ -3095,7 +3095,7 @@ function buildConfig(ctx, waves, stages, bands, chess, items) {
     constants: {
       maxLevelCnt: ac.constData?.maxLevelCnt ?? 15, bossTrailerStartRound: ac.constData?.bossTrailerStartRound ?? 3,
       // 下半's constData has it (24 h); 上半's has none (12e0a020 added it): another version keeps null rather than the
-      // 下半 value, and the lobby's own fallback applies (server/lobby.js SOLO_RECONNECT_FALLBACK_SEC; DESIGN §36.3)
+      // 下半 value, and the lobby's own fallback applies (server/lobby.js SOLO_RECONNECT_FALLBACK_SEC; DESIGN §35.22.3)
       singleReconnectTime: ac.constData?.singleReconnectTime ?? (IS_DEFAULT ? 86400 : null), trainingModeId: act.constData.trainingModeId || null,
       discountColor: ac.constData?.discountColor || '#59f4ca', premiumColor: ac.constData?.premiumColor || '#ff5454', normalColor: ac.constData?.normalColor || '#ffc600',
       pingConds: (ac.constData?.pingConds || []).map((p) => ({ minMs: p.cond, textRaw: p.txt })),
@@ -3222,9 +3222,11 @@ function validateAll(f) {
   if (visible.length !== want.visibleNonDiy) err(`expected ${want.visibleNonDiy} visible non-DIY chess, got ${visible.length}`);
   // the deliberate trigger deviations (DESIGN §21.29, §22.10) still override an official TAKE_DAMAGE row, on the normal
   // chess and its elite alike (a DEFAULT one may resolve to the owner's ACTIVE_RANGE on top: 深巡 S2). A version without
-  // the TANK row ('none': 上半) has no TAKE_DAMAGE row at all, so no deviation can apply there.
+  // the TANK row ('none': 上半) has no TAKE_DAMAGE row at all, so no deviation can apply there; 'present' (下半 V2_1)
+  // checks the entries of the operators the version has (雷蛇 joined with V2_2).
   const deviationHolds = (rule, trig) => trig.rawRule === 'TAKE_DAMAGE' && (trig.rule === rule || (ACTIVE_RANGE_OVER.has(rule) && trig.rule === 'ACTIVE_RANGE'));
-  const checkDeviations = want.triggerDeviations === 'default';
+  const checkDeviations = want.triggerDeviations === 'default' || want.triggerDeviations === 'present';
+  const onlyPresent = want.triggerDeviations === 'present';
   if (!checkDeviations) {
     for (const c of Object.values(chess)) for (const s of c.skills || []) if (s.trigger?.rawRule === 'TAKE_DAMAGE') err(`chess ${c.chessId} ${s.skillId}: a TAKE_DAMAGE row in a version whose profile expects none`);
     for (const [id, u] of Object.entries(backups?.units || {})) {
@@ -3233,6 +3235,7 @@ function validateAll(f) {
   }
   for (const [charId, skillsOf] of checkDeviations ? Object.entries(TRIGGER_DEVIATIONS) : []) {
     const recs = Object.values(chess).filter((c) => c.charId === charId);
+    if (onlyPresent && !recs.length) continue;
     if (recs.length !== 2) err(`trigger deviation ${charId}: expected the normal and the elite record, got ${recs.length}`);
     for (const [skillId, rule] of Object.entries(skillsOf)) {
       for (const c of recs) {
@@ -3258,6 +3261,7 @@ function validateAll(f) {
     // the 重装 stand-ins' deviations (STANDIN_TRIGGER_DEVIATIONS) still override an official TAKE_DAMAGE row, on every form
     for (const [charId, skillsOf] of Object.entries(STANDIN_TRIGGER_DEVIATIONS)) {
       const forms = Object.values(backups.units[charId]?.forms || {});
+      if (onlyPresent && !forms.length) continue;
       if (!forms.length) err(`stand-in trigger deviation ${charId}: no unit in backups.json`);
       for (const [skillId, rule] of Object.entries(skillsOf)) {
         for (const f of forms) {

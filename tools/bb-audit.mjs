@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // tools/bb-audit.mjs — blackboard audit of another official version's data against the default (versions M0,
-// DESIGN §36.5, docs/SIM.md §7.2).
+// DESIGN §35.22.5, docs/SIM.md §7.2).
 //
 // The hand-written content reads blackboard fields with a default for a missing one (`num(bb.no_attack_duration, 10)`).
 // When another version's record lacks a field the default data has, that default — the 下半 meaning — silently applies
@@ -20,6 +20,8 @@
 //     shared/ names (kits included) — a mechanic that is silently inert there (garrisons/meta.js runs H[effectType] and
 //     garrisons/battle.js INSTALLERS[key] only when a handler exists). The by-id comparisons above never see these: 上半's
 //     煌 SERVER_GAIN_CHAR, the 标准模拟 clause act1autochess_band31_buff on bands 下半 also has.
+// Not seen by any class: a record whose text changed under the same keys and blackboard fields (下半 V2_1's 陈
+// 以己之长 reaches 高台 operators only, the code every operator as in V2_2); DESIGN §35.22.5 lists those by hand.
 // Code reads: server/sim/content/**/*.js (but the operator kits, which read skill blackboards) and server/match/**/*.js
 // — `num|int|numOr(<expr>.<field>, <default>)`, `<expr>.<field> ?? <default>`, and plain mentions (`.field`,
 // `'field'`, no default). Field names are matched by name, so a read of the same name in another table is listed too.

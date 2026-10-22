@@ -1,4 +1,4 @@
-// Versions M0 (docs/SIM.md §7.2, DESIGN §36.3): on another official version's build (config.version) hand-written
+// Versions M0 (docs/SIM.md §7.2, DESIGN §35.22.3): on another official version's build (config.version) hand-written
 // behaviour is found by the operator's charId and the item's effectId, not by the default data's chess / item ids —
 // 上半 (act1autochess) gives 50 of its 100 chess ids and most item ids to other operators and effects. The default data
 // and the plugin content sets built on it (no config.version) keep the by-id lookups of before M0. Every data directory
@@ -108,6 +108,14 @@ const EXPECT = Object.freeze({
   },
   'data/versions/act1autochess': SHANG,
   'data/versions/act1autochess-v1_1': { ...SHANG, diy: { kitted: 56, generic: 6, pending: 24 } },
+  // 下半 V2_1: the chess and item ids of today's data, 13 chess entries fewer (V2_2's 5 new operators and 8 re-tiered
+  // entries); 4 owned 自选 picks whose only kit is the shop chess kit V2_2 added (银灰, 空弦, 卡涅利安, 伺夜)
+  'data/versions/act2autochess-v2_1': {
+    kits: { own: 116, tier: 0, op: 0, pending: 0 }, diy: { kitted: 72, generic: 6, pending: 4 }, standIns: { kitted: 74, generic: 26 },
+    items: 54, handlers: 27, battleEffect: 82,
+    hammers: ['chess_item_4_09_e', 'chess_item_3_09_e', 'chess_item_3_10_e', 'chess_item_2_03_e'], meta: DEFAULT_META,
+    cells: ['chess_item_5_08_e_a'],
+  },
 });
 
 /** The behaviour of each default item key (C in the plan): BY_ITEM key → effectId. */
@@ -499,7 +507,10 @@ test('凯瑟琳: picking the cell of the match\'s data from her offer uses the a
   for (const dir of DIRS.filter((d) => !isDefault(d))) {
     const data = dataOf(dir);
     for (const id of mutationCellIds(data)) assert.equal(pick(data, id), true, `${label(dir)} ${id}`);
-    if (data.items.chess_item_5_08_e_a) assert.equal(pick(data, 'chess_item_5_08_e_a'), false, `${label(dir)}: the default id is another item`);
+    // 上半 gives the default cell's id to another item; 下半 V2_1 keeps it
+    if (data.items.chess_item_5_08_e_a && !mutationCellIds(data).includes('chess_item_5_08_e_a')) {
+      assert.equal(pick(data, 'chess_item_5_08_e_a'), false, `${label(dir)}: the default id is another item`);
+    }
   }
 });
 
@@ -513,8 +524,9 @@ for (const dir of DIRS) {
     const h = bandMetaHandler('band_cathy');
     assert.equal(typeof h?.onLevelUp, 'function', 'band_cathy offers on level-up');
     // a stub pool: the first id not excluded; it holds the data's cell, the default cell id (another item, or none, in a
-    // version) and enough filler for a full offer
-    const pool = [...cells, ...(isDefault(dir) ? [] : ['chess_item_5_08_e_a']), 'filler_1', 'filler_2', 'filler_3'];
+    // 上半 version; the same cell in 下半 V2_1) and enough filler for a full offer
+    const otherId = !cells.includes('chess_item_5_08_e_a');
+    const pool = [...cells, ...(otherId ? ['chess_item_5_08_e_a'] : []), 'filler_1', 'filler_2', 'filler_3'];
     const offer = (taken) => {
       const out = [];
       h.onLevelUp({
@@ -528,7 +540,7 @@ for (const dir of DIRS) {
     const after = offer(1);
     assert.equal(after.length, 3, 'a full offer');
     for (const c of cells) assert.ok(!after.includes(c), `${c} left out once taken`);
-    if (!isDefault(dir)) assert.ok(after.includes('chess_item_5_08_e_a'), 'the default cell id is not left out on another version');
+    if (otherId) assert.ok(after.includes('chess_item_5_08_e_a'), 'the default cell id is not left out on a version that gives it to another item');
   });
 }
 
@@ -607,7 +619,8 @@ test('auto_chess_change_map: Touch\'s map characters have a battle part and coun
     const data = dataOf(dir);
     setGameData(data);
     const holders = Object.keys(data.bands || {}).filter((id) => (data.bands[id].buffs || []).some((b) => b.key === 'auto_chess_change_map'));
-    assert.deepEqual(holders, isDefault(dir) ? ['band_amedic'] : ['band_zumama'], label(dir));
+    // 下半 (the default and V2_1): Touch; 上半: 森蚺
+    assert.deepEqual(holders, data.config?.season === 'act1autochess' ? ['band_zumama'] : ['band_amedic'], label(dir));
     const roles = new Map(buildPlaybook(data, { modeId: 'mode_single_normal' }).bands.map((b) => [b.id, b.roleClasses]));
     for (const id of holders) {
       assert.equal(bandHasBattlePart(id), want[id], `${label(dir)} ${id}: battle part`);
@@ -619,7 +632,7 @@ test('auto_chess_change_map: Touch\'s map characters have a battle part and coun
 /**
  * The band ids code keys behaviour by on every data (bands/meta.js band_cathy / DUCK_BAND, bands/battle.js AMEDIC_BAND,
  * server/match/gamedata.js band_bldsk / band_cannot). Bond ids are all keyed by id too (bonds/core.js INSTALLERS,
- * memberOf(…, 'yanShip'), addon …): DESIGN §36.4 relies on a version reusing them only for the same band or bond.
+ * memberOf(…, 'yanShip'), addon …): DESIGN §35.22.4 relies on a version reusing them only for the same band or bond.
  */
 const CODE_KEYED_BANDS = Object.freeze(['band_cathy', 'band_ducklord', 'band_amedic', 'band_bldsk', 'band_cannot']);
 for (const dir of DIRS.filter((d) => !isDefault(d))) {

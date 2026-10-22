@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import { DEFAULT_VERSION, VERSIONS, versionById, versionSlug, versionOfData } from '../shared/versions.js';
 import { loadProfile, pinGroupOf, pinnedShaOf } from '../tools/versions/profiles.mjs';
-import { bondActiveType, selfBackupPreset, applyAdapters } from '../tools/versions/adapters.mjs';
+import { bondActiveType, selfBackupPreset, launchModes, applyAdapters } from '../tools/versions/adapters.mjs';
 import { validateReferences } from '../shared/plugins/validate.js';
 import { DATA_DIR, VERSION_DATA_FILES, getData, getVersionData, loadData, resetVersionData, versionDataDir } from '../server/data.js';
 
@@ -28,10 +28,12 @@ const OTHERS = VERSIONS.filter((v) => v.id !== DEFAULT_VERSION);
 const REBUILD_ALL = `rebuild every version: ${VERSIONS.map((v) => `node tools/build-data.mjs --version ${v.id}`).join('; ')} `
   + '(a version also reads data/assets.json, data/tuning.json and docs/research/*.json, so a default-side change to those can make it stale)';
 /**
- * The expected counts of each non-default build, written out (DESIGN §36.3), independent of the
- * profile's `expect` / `config` that the build and validateAll read: a typo in a profile fails here.
+ * The expected counts of each non-default build, written out (DESIGN §35.22.3), independent of the
+ * profile's `expect` / `config` that the build and validateAll read: a typo in a profile fails here. V2_1: 36 strategies,
+ * 120 chess (119 visible with the 4 DIY slots), no 终极 mode (it opened with V2_2): activity_table @1457587e.
  */
 const PINNED = Object.freeze({
+  'act2autochess@V2_1': { bonds: 23, bands: 36, visibleNonDiy: 115, chess: 240, items: 115, effects: 361, hiddenCore: [350, 1200] },
   act1autochess: { bonds: 18, bands: 30, visibleNonDiy: 95, chess: 200, items: 89, effects: 281, hiddenCore: [300, 1000] },
   'act1autochess@V1_1': { bonds: 18, bands: 20, visibleNonDiy: 95, chess: 200, items: 89, effects: 281, hiddenCore: [300, 1000] },
 });
@@ -64,6 +66,11 @@ test('registry: unique ids, one default with dir \'\', OS-safe unique dirs, msgi
   }
   assert.equal(versionSlug(versionById(DEFAULT_VERSION)), DEFAULT_VERSION);
   assert.equal(versionSlug(versionById('act1autochess@V1_1')), 'act1autochess-v1_1');
+  assert.equal(versionSlug(versionById('act2autochess@V2_1')), 'act2autochess-v2_1');
+  // the maintainer's names by period (2026-10-22): 第一期 = act1autochess, 第二期 = act2autochess, 上半 / 下半 = V*_1 / V*_2
+  assert.deepEqual(Object.fromEntries(VERSIONS.map((v) => [v.id, v.label])), {
+    act2autochess: '第二期下半', 'act2autochess@V2_1': '第二期上半', act1autochess: '第一期下半', 'act1autochess@V1_1': '第一期上半',
+  });
   assert.equal(versionById('nope'), null);
   assert.equal(versionOfData({ config: { version: { id: 'act1autochess' } } }), 'act1autochess');
   assert.equal(versionOfData({ config: {} }), DEFAULT_VERSION);
@@ -96,6 +103,17 @@ test('profiles: the default is today\'s build; pins pick a commit per file group
   for (const rel of ['levels/enemydata/enemy_database.json', 'excel/range_table.json', 'levels/activities/act1autochess/level_act1autochess_m01.json']) {
     assert.equal(pinnedShaOf(v11, rel), '8303c922f749f0dcf08e03671519421ef6a7748b', rel);
   }
+  const { profile: v21 } = await loadProfile('act2autochess@V2_1');
+  assert.deepEqual(Object.keys(v21.pins), ['default'], 'V2_1: every file at its launch commit (none changed before V2_2)');
+  for (const rel of ['excel/activity_table.json', 'excel/skill_table.json', 'excel/range_table.json', 'levels/enemydata/enemy_database.json',
+    'levels/activities/act1autochess/level_autochess_enemy_data.json', 'levels/activities/act2autochess/level_act2autochess_m01.json']) {
+    assert.equal(pinnedShaOf(v21, rel), '1457587e48fe65361f523821d24e6d14c3b91713', rel);
+  }
+  assert.deepEqual(v21.adapters, ['launchModes']);
+  assert.equal(v21.research, 'docs/research/', 'the 下半 research applies by id');
+  assert.equal(v21.tables, 'default', 'the 下半-measured tables apply by id / name');
+  assert.deepEqual(v21.config.rules, {}, 'the default\'s rules');
+  assert.equal(v21.expect.triggerDeviations, 'present');
   assert.equal(pinGroupOf('excel/uniequip_table.json'), 'character');
   assert.equal(pinGroupOf('excel/range_table.json'), 'range');
   assert.equal(pinGroupOf('levels/activities/act2autochess/level_act2autochess_m01.json'), 'levels');
@@ -125,6 +143,10 @@ for (const v of OTHERS) {
     assert.equal(f.config.hiddenCore.multi, profile.config.hiddenCore.multi);
     // 上半's constData has no singleReconnectTime (12e0a020 added it): null, never the 下半 value (server/lobby.js falls back)
     if (v.season === 'act1autochess') assert.equal(f.config.constants.singleReconnectTime, null, 'no 下半 constant as official data');
+    // no 终极 mode before V2_2 (上半 has none; V2_1's table lists it with a later startTime, adapter launchModes)
+    assert.ok(Object.values(f.config.modes).every((m) => m.difficulty !== 'ABYSS'), `${v.id}: no 终极 mode`);
+    assert.ok(Object.keys(f.config.modes).every((id) => !/abyss/.test(id)), `${v.id}: no abyss mode id`);
+    for (const st of Object.values(f.stages)) assert.ok(st.modes.every((id) => f.config.modes[id]), `${v.id} ${st.id}: a stage mode the version lacks`);
     assert.equal(Object.keys(f.bonds).length, profile.expect.bonds);
     assert.equal(Object.keys(f.bands).length, profile.expect.bands);
     assert.equal(Object.values(f.chess).filter((c) => !c.isGolden && c.visible).length, profile.expect.visibleNonDiy);
@@ -137,6 +159,12 @@ for (const v of OTHERS) {
     }, pin, `${v.id}: the pinned counts`);
     for (const [file, recs] of [['items', f.items], ['bands', f.bands]]) {
       for (const r of Object.values(recs)) assert.ok(!Object.hasOwn(r, 'effectRef'), `${file} ${r.id ?? r.bandId}: no effectRef (it would name a default-version id)`);
+    }
+    if (profile.expect.triggerDeviations === 'present') {
+      // the deliberate deviations (DESIGN §21.29) of the operators the version has, on their TAKE_DAMAGE rows
+      const devs = Object.values(f.chess).filter((c) => c.skills?.some((s) => s.trigger?.rawRule === 'TAKE_DAMAGE' && s.trigger.rule !== 'TAKE_DAMAGE'));
+      assert.ok(devs.length > 0 && devs.length % 2 === 0, `${v.id}: normal and elite records under a deviation (${devs.length})`);
+      assert.ok(!Object.values(f.chess).some((c) => c.charId === 'char_107_liskam'), '雷蛇 joined with V2_2');
     }
     if (profile.expect.triggerDeviations === 'none') {
       const td = [];
@@ -260,6 +288,23 @@ test('adapter selfBackupPreset: a NORMAL row backing itself up becomes a PRESET 
   assert.equal(JSON.stringify([act.charShopChessDatas.chess_char_1_01_a, act.charShopChessDatas.chess_char_1_02_a, act.charShopChessDatas.chess_char_1_03_a]), others);
   assert.throws(() => selfBackupPreset({ charShopChessDatas: { x: {} } }), /no chessType/);
   assert.throws(() => applyAdapters(act, ['noAbyss']), /unknown adapter/);
+});
+
+test('adapter launchModes: modes opening after the earliest one leave modeDataDict, battleDataDict and the stage lists', () => {
+  const act = {
+    modeDataDict: { mode_single_normal: { startTime: 100 }, mode_multi_normal: { startTime: 100 }, mode_single_abyss: { startTime: 200 } },
+    battleDataDict: { mode_single_normal: { 1: [] }, mode_multi_normal: { 1: [] }, mode_single_abyss: { 1: [] } },
+    stageDatasDict: { s1: { mode: ['mode_single_normal', 'mode_single_abyss'] }, s2: { mode: ['mode_single_abyss'] } },
+  };
+  launchModes(act);
+  assert.deepEqual(Object.keys(act.modeDataDict), ['mode_single_normal', 'mode_multi_normal']);
+  assert.deepEqual(Object.keys(act.battleDataDict), ['mode_single_normal', 'mode_multi_normal']);
+  assert.deepEqual(act.stageDatasDict.s1.mode, ['mode_single_normal']);
+  assert.deepEqual(act.stageDatasDict.s2.mode, []);
+  const same = { modeDataDict: { a: { startTime: 5 }, b: { startTime: 5 } }, battleDataDict: { a: {}, b: {} }, stageDatasDict: {} };
+  launchModes(same);
+  assert.deepEqual(Object.keys(same.modeDataDict), ['a', 'b'], 'one launch time: nothing dropped');
+  assert.throws(() => launchModes({ modeDataDict: { a: {} }, battleDataDict: {}, stageDatasDict: {} }), /no startTime/);
 });
 
 // ---------------------------------------------------------------------------------------------------

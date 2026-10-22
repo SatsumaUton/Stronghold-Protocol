@@ -8,7 +8,10 @@
 //   research  the version's research directory (falls back to docs/research/, with a warning) or null = docs/research/
 //   tables    'default' (the 下半-measured tables of tools/build-data.mjs) or { stock, shopDraft, tacticDraft,
 //             bountyDrafts } with null = left out
-//   config    hiddenCore thresholds; `rules` makes a non-default build emit config.version = { id, family, rules }
+//   config    hiddenCore thresholds; `rules` the rule switches a non-default build writes into config.version =
+//             { id, family, rules } ({} = the default's rules)
+//   expect    the counts validateAll checks; triggerDeviations 'default' (every deliberate deviation meets its official
+//             TAKE_DAMAGE row), 'present' (those of the operators the version has) or 'none' (no TAKE_DAMAGE row at all)
 
 import { VERSIONS, versionById, versionSlug } from '../../shared/versions.js';
 
