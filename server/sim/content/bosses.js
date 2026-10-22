@@ -31,11 +31,14 @@
 //   boss_2/9 假想敌：铳      unblockable; highest-DEF target in range; erosion; ASPD ramp (+80 × 5) on the same target
 //                            (floor 20); 最终之罚 charge at the highest-DEF ground unit (disabled by the h07_02 override).
 //                            boss_9: damage ×0.2 while springs live, 盲信之誓 links (100 phys/s on the lines), 末日布道 dash.
-//   碎铳之簧 a/b/c           arts barrier (absorbs arts after RES; phys ×0.1, counter phys + erosion) / element shield
-//                            (phys+arts ×0.1, broken by its own element burst; every (spCost+1)-th attack a bouncing erosion
-//                            shot) / 5-hit shield (every (spCost+1)-th attack a ten-hit combo); unblockable while shielded;
-//                            shield back 25 s after breaking; every damage taken costs 铳 as much (PART_TRANSFER, 无来源)
-//                            and, split, the other springs.
+//   碎铳之簧 a/b/c           arts barrier (a held barrier in the ordered injury chain: absorbs arts after RES; NORMAL phys
+//                            ×0.1 and a 无来源 phys ADDITION counter on its attacker, erosion only when the counter lands) /
+//                            element shield (phys+arts ×0.1, broken by its own element burst; every (spCost+1)-th attack a
+//                            bouncing erosion shot) / 5-hit count shield (every (spCost+1)-th attack a ten-hit combo); always
+//                            unblockable (PRTS 能力修正: also without the shield); shield back 25 s after breaking. It passes
+//                            on as 无来源 HP loss to the highest-hatred 铳 (PART_TRANSFER) and, split, the other springs: the
+//                            arts variant every applied modifier — damage, heals, element (actrpa_passive ON_APPLIED_MODIFIER)
+//                            —, the others the damage they take at their injury stage (§35.34).
 //   boss_3/10 假想敌：管     summons 余音 (dark) every 40 s (20 s < 50 %); normal attacks strike dark 余音 (their pulse hurts
 //                            operators); 裂管之奏 3 strikes on every dark 余音 (AoE arts + apoptosis). boss_10 + 假想敌：弦
 //                            (invulnerable, gold 余音, 断弦之奏 AoE + flips them dark; leaves with 管).
@@ -85,13 +88,14 @@ import { damageAttackType, isHpLoss } from '../attack.js';
 /**
  * Share of the damage a 剑/锤 or a 碎铳之簧 takes that its leader loses: 1, 等量 — PRTS talents (“斩胄之剑” / “破胄之锤”
  * "受到伤害时令假想敌：胄受到等量的无来源生命流失"; 碎铳之簧 (all three) "…令全场范围内仇恨值最高的1名假想敌：铳受到等量的无来源
- * 生命流失"); the enemy data carries no ratio blackboard (the handbook's "以一定比例" is that 1). The loss is 无来源 (hooks see
+ * 生命流失"; the arts variant's "被施加调整值后（调整值包括伤害、治疗、元素损伤等）"); the enemy data carries no ratio blackboard
+ * (the handbook's "以一定比例" is that 1). The loss is 无来源 (hooks see
  * no source; the attacker keeps the credit — stats, the per-player pool tally) and follows EVERY damage taken: a
  * 剑/锤 only takes damage outside its invulnerable 初始模式 (its 出击模式 dive and 【瘫痪】). The two official texts
  * disagree on the dive: the PRTS talent says "受到伤害时" (any damage), the in-game handbook (data/enemies.json abilities,
  * PRTS 能力) "被击落时受到伤害以一定比例传递" (only once shot down) — the dive hits passing on is [ASSUMED] (the talent
  * text; ≤ 15 hits per dive). A loss passed on to a leader is one hit for 限伤 (sim/attack/health.js leaderHitCancelled, via
- * Battle.loseHp). v2.5: 0.5 [ASSUMED], and a 剑/锤 passed damage on only while grounded (DESIGN §20.10, §20.13).
+ * Battle.dealHPLose). v2.5: 0.5 [ASSUMED], and a 剑/锤 passed damage on only while grounded (DESIGN §20.10, §20.13).
  */
 export const PART_TRANSFER = 1;
 /** The 斩胄之剑 / 破胄之锤 share — the same PRTS 等量 as PART_TRANSFER (kept as a name for the blade kit and its tests). */
@@ -707,6 +711,8 @@ function kitSpring(ab, e) {
     if (!(c.amount > 0) || c.cancelled || isHpLoss(c.dmg) || c.dmg?.tags?.includes(SPRING_SHARE_TAG)) return;
     const credited = c.source || c.credit;
     const credit = credited?.side === 'ally' ? credited : null;
+    // 仇恨值最高 (PRTS): the official BossSelector's logic is not in our data, so the hatred order is the engine's targeting
+    // one (targeting.js aggroCmp: taunt, then the latest arrival) applied to the guns — [ASSUMED] for enemy guns and ties.
     const g = b.enemies.filter(o => o.alive && isGun(o)).sort(aggroCmp)[0];
     const amount = c.amount * PART_TRANSFER;
     if (g) b.dealHPLose({ source: null, credit, target: g, amount, origin: c.dmg });

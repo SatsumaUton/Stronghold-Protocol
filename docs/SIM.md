@@ -973,9 +973,10 @@ DESIGN §35.32): the official ones fire on every damage instance from an enemy s
 skill hit, 深溟巢涌者's pulse; never a 流失 or a 无来源 hit), so they answer `kits/shared/tier1.js byEnemyDamage`
 (`byEnemyAttack` is its deprecated alias; 星熊 S2, 泡泡, 刺玫 S2, 余 S1, 玛恩纳 无动于衷, 年 S2, 斩业星熊, 斥罪; 菲莱 S2 any
 instance). A descriptive `'counter'` / `'reflect'` tag no longer excludes an enemy source — the official templates filter
-by source side, attack type and route, not by such tags (no ally counter answers ally damage; an enemy counter with a
-source can set one off, and the nesting guard ends such an exchange). When the guard trips, the logged error names the
-open frames (`chain: hit(enemy_x→chess_y) > damaged(chess_y) > …`).
+by source side, attack type and route, not by such tags: no ally counter answers ally damage, and the enemy counters
+of this mode are 无来源 (碎铳之簧's physical ADDITION, §4 / DESIGN §35.34), which no enemy-source filter answers; an enemy
+counter that kept a source could set one off, and the nesting guard would end the exchange. When the guard trips, the
+logged error names the open frames (`chain: hit(enemy_x→chess_y) > damaged(chess_y) > …`).
 
 ---
 
