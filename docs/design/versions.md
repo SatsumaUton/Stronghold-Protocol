@@ -136,8 +136,8 @@ keyed build tables, the hidden inputs and the warning classes.
   is a pinned build input, but the build does not read those rows. It also added a client drag fix, which is not a build
   input. One added pin (`activity: ea164ef7…`) builds the hotfixed state instead. That switch also updates the V1_1 row of
   `test/data-versions.test.js` (`PINNED` effects 279 → 281, as `aceffect_enemy_4` / `_5` come in, and the assertion that
-  V1_1's pins hold only `default`) and the V1_1 row of the table above (effects 281, 4 756 757 bytes). The bb-audit
-  and keying expectations do not change.
+  V1_1's pins hold only `default`), the V1_1 row of the table above (effects 281, 4 756 757 bytes) and the V1_1 row of
+  DATA.md's Counts table (effects 279 → 281, 4.75 → 4.76 MB). The bb-audit and keying expectations do not change.
 - **Adapters.** `bondActiveType` converts 上半's bond activation (ALL with the deck → BOARD_AND_DECK; MANI → BOARD with
   `['1']`, as 下半's maniShip) [ASSUMED]. `selfBackupPreset` makes 盟约·辅助干员 a PRESET backup with its default skill
   and module, as 下半 writes it [ASSUMED].
@@ -148,7 +148,8 @@ keyed build tables, the hidden inputs and the warning classes.
   - `TRIGGER_DEVIATIONS` (§21.29) is keyed by charId and applies only over an official TAKE_DAMAGE row. 上半 has no TANK
     row, so neither 上半 build carries a deviated skill.
 - **Left out for 上半.** The four tables measured on 下半 (the stock overrides, the shop draft, the tactic draft and the
-  bounty drafts) do not apply, so those draws are uniform [ASSUMED]. Every research-derived 上半 field keeps its 下半
+  bounty drafts) do not apply, so those draws are uniform [ASSUMED]. Leaving out the stock table removes only the
+  per-identity overrides: the tier copies stay the literals cited for 下半 (below). Every research-derived 上半 field keeps its 下半
   value until a per-version research folder exists [ASSUMED]. For V1_1 that is wrong in one more way: PRTS dates the
   solo 70% / co-op 80% enemy multipliers from 11-18. The research overlays keyed by bondId and trapId also write 下半's
   descriptive texts into 上半: `bonds.json` `spec` (上半's 炎 gets 下半's third tier and "hits up to 3 targets") and the
@@ -163,11 +164,16 @@ keyed build tables, the hidden inputs and the warning classes.
   full-bench swap and no shared boss. 上半's constData has no `singleReconnectTime` (`12e0a020` added it), so both 上半
   builds write `constants.singleReconnectTime: null` instead of the 下半 value. The lobby's own fallback then keeps a
   dropped solo run resumable for 24 h [ASSUMED] until 上半's solo exit rule is decided, together with the timed solo.
-- **Config carried over unreviewed [ASSUMED].** `tools/build-data.mjs` writes several rule constants as literals, and
-  both 上半 builds copy them as measured on 下半: `bans` (NORMAL / HARD 3 core + 4 addon; 下半 has 8 core bonds, 上半 6,
+- **Config carried over unreviewed [ASSUMED].** `tools/build-data.mjs` writes many rule constants as literals (its
+  `buildConfig` return block is the full set), and both 上半 builds copy them as measured on 下半. Among them: `bans` (NORMAL / HARD 3 core + 4 addon; 下半 has 8 core bonds, 上半 6,
   so the same draw bans half of 上半's), the `hiddenCore` extras (`minTeamLpExclusive`, `checkedAfterRound`, and
   `difficulties`, which names ABYSS although 上半 has no ABYSS mode), `trophies`, the boss overtime and HP scale,
-  `unite`, `finalAssault` and `bandDraft`. They equal the default, so the blackboard audit cannot list them (§36.5).
+  `unite`, `finalAssault` and `bandDraft`; the economy literals (the tier and item copies `poolCopies` /
+  `itemPoolCopies`, which every 上半 chess and item uses with the stock table left out, the golden and merge counts, the
+  co-op pool multiplier, the reward offer, the freeze, the temp / equipment / arts-per-round sizes and the alternative
+  income cap); `dp` {10, 1, 99}; the timer literals `spFirst` 30, `bandTurn` 50 (the owner's 下半 report of
+  2026-10-10) and `soloPrepTimeData` 300 (tied to 上半's timed solo, Q7); and the title stat rules. They equal the
+  default, so the blackboard audit cannot list them (§36.5). DATA.md `config` lists the values.
 - **Loader.** `server/data.js` provides `versionDataDir`, `getVersionData` (lazy, cached and frozen) and
   `resetVersionData`. Nothing at run time calls them in M0. `loadData(DATA_DIR)` reads the top level only.
 - **`config.version` is the gate.** Data that carries it (a version's build) finds hand-written behaviour by charId and
@@ -287,7 +293,24 @@ Besides those:
   (`trap_1104_aclasert#1`…`#4`: one 双眼皮 on every field, the alias format of 机变 cards). It is a device switch, not a
   map character. `bands/battle.js isMapCharBuff` accepts only Touch's map-character shape, so 森蚺 reports no battle part
   and the AI playbook does not class it as team support. M2 builds the device switch (`server/sim/content/devices.js`
-  already implements the 双眼皮).
+  already implements the 双眼皮). This shape check (map characters `char_*#n`) is not gated on `config.version`: it
+  applies to every data set, so a plugin band on the default data whose `auto_chess_change_map` names device aliases is
+  no longer team support either (it was at db8e226d). Such a band spawns nothing in battle, so the new class is the
+  accurate one; it is the one by-shape rule of M0 that reaches default content sets.
+- **协防干员's damage clause.** In V1_2, 上半's emptyShip has 下半's keys (`damage_resistance`, `damage_scale_normal`
+  1.2, `damage_scale_extra` 1.4), but its text drops 下半's 【协防干员】 scope: "所有干员受到的物理和法术伤害-20%，造成伤害提升至
+  120%，若为精锐状态则改为造成伤害提升至140%". `bonds/addon/battle.js` gives the 1.2 / 1.4 to emptyShip members only. If 上半
+  meant every operator, the 下半 meaning applies silently. PRTS records the clause as a mid-season "盟约效果追加" without
+  saying who receives it. M2 question: all operators or only members? (Its `activeCount` is 3 in 上半 against 2 in 下半;
+  `bonds.json` `spec` still says "2 distinct", the research-overlay note of §36.3.)
+- **The 6 上半-only enemies have no attack clip.** 墨浪 `enemy_1201_sfzhi`, 莱茵生命防卫科成员 `enemy_1249_lysdb`, 实验用动力装甲
+  `enemy_1254_lypa`, 萨卡兹王庭军术师 `enemy_1275_dwlock`, 巫王乐团圆号手 `enemy_1373_ltnhor_2` and 残党乐团鼓手
+  `enemy_1376_ltndru` (both builds) are absent from `data/enemies.json`, and `data/assets.json`, the manifest
+  `enemyAttackAnim` reads, holds only 下半's models. They get no `attackAnim`, so the sim uses `ATTACK_PAUSE` instead of
+  the clip timing (`attackStand` / `attackWindup`); 墨浪, 军术师 and 圆号手 are ranged (range 2 / 2.5 / 1.5). This changes
+  sim behaviour, so it is M2 work, not M3's visual asset union. Adding their models edits `data/assets.json`, a default
+  data file hashed by G1, and needs the G1 refresh. A non-default build warns once per enemy whose model the manifest
+  lacks, so the list stays visible in `.cache/build-data-report.<slug>.json`.
 - **Version-only keys** (the same 14 in both builds; each is an M2 item):
   - four 上半 traits with no handler: 煌's `SERVER_GAIN_CHAR` (`garrison_52_a` / `_b`, 售出时 she becomes 烛煌, who counts
     as both 炎 and 维多利亚), 蜜莓's `SERVER_ADD_BOND_ACTIVATED_RANDOM` (`garrison_58`), 伊芙利特's
@@ -343,7 +366,8 @@ The per-version rebuild tests need the pinned caches `.cache/gamedata@<sha>/` an
 
 - V1_1 without the 11-18 hotfix, and its enemy multipliers.
 - The labels.
-- The 下半 rule constants of `config.json` (`bans` and the rest, §36.3).
+- The 下半 rule constants of `config.json` (`bans`, the economy literals with the tier copies, `dp`, the timer literals
+  `spFirst` / `bandTurn` / `soloPrepTimeData`, the title rules and the rest, §36.3).
 - The two adapters.
 - The left-out 下半 tables and the research fallback.
 - Pool entries dropped.
@@ -363,6 +387,17 @@ The per-version rebuild tests need the pinned caches `.cache/gamedata@<sha>/` an
 A version build also reads default-side inputs: the committed `data/assets.json`, `data/tuning.json` (byte-copied) and
 `docs/research/*.json`, the fallback. A change to any of them needs every version rebuilt. The rebuild test's failure
 message says so; outside a machine with the pinned caches only the `tuning.json` copy is checked.
+
+**Open (for M1):**
+
+- **Browser settings keyed by chess id.** The per-browser loadout (`public/js/ui/loadoutModel.js`,
+  `{ [baseChessId]: { skill?, module? } }` in `sp.pref.loadout`) and ownership (`public/js/ui/ownershipModel.js`,
+  `notOwned`, a list of base chess ids), and the `room.loadout` / `room.ownership` payloads that carry them
+  (`shared/protocol.js checkLoadout` checks each entry against the room data's record of that chess id), are keyed by
+  chess id. In a 上半 room `chess_char_1_02` is 讯使, not 角峰: a 下半 choice of 角峰's skill 1 would pass and select 讯使's
+  second skill, and 角峰 marked not owned would field 讯使's stand-in. M1 re-keys them by charId, migrating old keys
+  through 下半's mapping, before a version room accepts them (round-50 design §2.8). Nothing serves a version room in
+  M0, so nothing breaks today.
 
 **Open (for the maintainer):**
 

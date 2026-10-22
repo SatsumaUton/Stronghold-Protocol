@@ -826,11 +826,13 @@ every file system and URL).
   the `character` group), and added a client Lua fix of a drag state, not a build input. The profile follows the
   maintainer's default (launch day, `8303c922`); adding `activity: 'ea164ef7…'` to its pins builds the hotfixed V1_1. That switch also updates the V1_1 row of
   `test/data-versions.test.js` (`PINNED` effects 279 → 281, as `aceffect_enemy_4` / `_5` come in, and the assertion that
-  V1_1's pins hold only `default`) and the V1_1 row of DESIGN §36.3's counts table (effects 281, 4 756 757 bytes); the
-  bb-audit and keying expectations stay as they are.
+  V1_1's pins hold only `default`), the V1_1 row of DESIGN §36.3's counts table (effects 281, 4 756 757 bytes) and the
+  V1_1 row of the **Counts** table below (effects 279 → 281, 4.75 → 4.76 MB; every other column stays); the bb-audit and
+  keying expectations stay as they are.
 - **Cache**: a pinned file is cached in `.cache/gamedata@<sha>/<repo path>` and downloaded from
-  `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/<sha>/zh_CN/gamedata/<path>` (about 50–60 MB per commit:
-  the 8 tables and the 43 `act1autochess` level files). `--offline` / `--refresh` keep their per-file meaning; `--cache
+  `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/<sha>/zh_CN/gamedata/<path>` (about 60 MB per version:
+  the 8 tables and the 43 `act1autochess` level files; V1_1 in one commit, `8303c922` 61 MB, V1_2 over two, `21b1f240`
+  49 MB with 6 tables and the levels plus `ee2cabff` 13 MB with the 2 enemy tables). `--offline` / `--refresh` keep their per-file meaning; `--cache
   <dir>` moves every cache (`<dir>` and `<dir>@<sha>`).
 - **`adapters`** (`tools/versions/adapters.mjs`, applied to the season section right after it is loaded, never for the
   default; each throws on a shape it does not know):
@@ -850,7 +852,9 @@ every file system and URL).
   them as 上半 rules. For V1_1 this is wrong in one more way: the solo 70% / co-op 80% enemy
   multipliers of 上半 date from the 11-18 hotfix (PRTS 卫戍协议：盟约), so pre-hotfix V1_1 had neither.
 - **`tables`**: `'default'` runs the 下半-measured tables of the build; `null` leaves one out [ASSUMED] for M2 —
-  `stock` (`economy.poolCopiesOverrides` / `itemPoolCopiesOverrides` become `{}`), `shopDraft`, `tacticDraft` and
+  `stock` (only the per-identity overrides `economy.poolCopiesOverrides` / `itemPoolCopiesOverrides` become `{}`: the
+  tier copies `poolCopies` / `itemPoolCopies` stay the literals cited for 下半 in §1, so every 上半 chess and item uses
+  下半's base copies of its tier), `shopDraft`, `tacticDraft` and
   `bountyDrafts` (the `choices.json` key is omitted, and with `bountyDrafts` the boss-card gating and the draft-set
   checks are skipped). The match already draws uniformly when a key is absent. Both 上半 profiles leave all four out.
   The bounty cards' own `draft` / `draftPool` classification still runs for 上半 [ASSUMED]: `HIDDEN_BOUNTY_IDS` and the
@@ -866,12 +870,19 @@ every file system and URL).
   rewrite `12e0a020` added it), so the build writes no 下半 value as official data. The lobby's own fallback then keeps a
   dropped solo run resumable for 24 h (`server/lobby.js SOLO_RECONNECT_FALLBACK_SEC`) [ASSUMED] until 上半's solo exit
   rule is decided (M1 / M2, with the timed 上半 solo).
-  **Carried over unreviewed [ASSUMED]**: the rule constants `tools/build-data.mjs` writes as literals go into 上半's
-  `config.json` as measured on 下半 — `bans` (NORMAL / HARD 3 core + 4 addon: 下半 has 8 core bonds, 上半 6, so the same
+  **Carried over unreviewed [ASSUMED]**: the rule constants `tools/build-data.mjs` writes as literals (its `buildConfig`
+  return block is the full set; a script comparing `data/config.json` with both 上半 configs finds them equal) go into
+  上半's `config.json` as measured on 下半. Among them: `bans` (NORMAL / HARD 3 core + 4 addon: 下半 has 8 core bonds, 上半 6, so the same
   draw bans half of 上半's), the `hiddenCore` extras (`minTeamLpExclusive`, `checkedAfterRound`, and `difficulties`,
   which names ABYSS although 上半 has no ABYSS mode), `trophies`, `bossOvertimeAfter` / `bossOvertimeDrainPerSec` /
-  `bossHpScale`, `unite`, `finalAssault` and `bandDraft`. They equal the default, so `tools/bb-audit.mjs` cannot list
-  them; `bans` is an M2 item (DESIGN §36.5).
+  `bossHpScale`, `unite`, `finalAssault` and `bandDraft`; the economy literals — the tier stock `poolCopies`
+  {12, 14, 18, 16, 8, 5} and `itemPoolCopies` {4, 6, 7, 8, 7, 3} (with `stock` left out every 上半 chess and item uses
+  them), `coopPoolMultiplier` 2, `goldenCopies` 3, `mergeCount` 3 / `itemMergeCount` 2, `rewardOffer`, `freeze`,
+  `tempSize` 5, `equipPerChess` 2, `maxArtsPerRound` 2 and `incomeCapAlternative` / `incomeAssumedAfterRound`; `dp`
+  {10, 1, 99}; the timer literals `timers.spFirst` 30, `bandTurn` 50 (the owner's official-play report of 2026-10-10,
+  下半) and `soloPrepTimeData` 300 (it bears on 上半's timed solo, `rules.soloTimed`); and the title stat rules
+  (`titles[].stat` / `rule`, `titleRule`). They equal the default, so `tools/bb-audit.mjs` cannot list them; `bans` is
+  an M2 item (DESIGN §36.5).
 - **`config.version`**: a non-default build appends `version: { id, family, rules }` as the last key of `config.json`;
   `data/config.json` never has it. A non-default directory also carries `tuning.json`, a byte copy of the hand-maintained
   `data/tuning.json` (a gameplay file `loadData` and the content hash read) [ASSUMED] the same tuning.
@@ -903,7 +914,9 @@ there):
 
 The 6 MB limit applies per version (the 15 built files). The 上半 builds' remaining warnings: research falling back to
 下半 (6 files, [ASSUMED]); `DIY_EXCLUDED_TEAMS` team `sees` has no owned-6★ pick; two `STATIC_BODIES` enemies (`hummbd`,
-`cnvbln`) absent from the 上半 modes; the research name annotation dropped from 战场#01; the 野鬃 / 灰毫 / 远牙 pool
+`cnvbln`) absent from the 上半 modes; the 6 上半-only enemies whose model `data/assets.json` lacks (墨浪 `enemy_1201_sfzhi`,
+`enemy_1249_lysdb`, `enemy_1254_lypa`, `enemy_1275_dwlock`, `enemy_1373_ltnhor_2`, `enemy_1376_ltndru`: no `attackAnim`,
+one warning each, DESIGN §36.5); the research name annotation dropped from 战场#01; the 野鬃 / 灰毫 / 远牙 pool
 entries.
 
 **Build and verify**:
@@ -917,7 +930,10 @@ node --test test/data-versions.test.js test/versions-default-guard.test.js
 
 `test/data-versions.test.js` rebuilds each version offline and compares all 16 files; without the pinned caches it skips
 and names the missing `.cache/gamedata@<sha>/`. **Hidden inputs**: a version build also reads the committed
-`data/assets.json` (the enemies' attack clips), `data/tuning.json` (its byte copy; `test/data-versions.test.js` fails
+`data/assets.json` (the enemies' attack clips: a manifest of 下半's models, so the 6 上半-only enemies above have no
+`attackAnim` and the sim keeps `ATTACK_PAUSE` for them — 墨浪, 萨卡兹王庭军术师 and 巫王乐团圆号手 are ranged, so their
+attack timing is off — until M2 adds their models; that is a default data file change and needs the G1 refresh),
+`data/tuning.json` (its byte copy; `test/data-versions.test.js` fails
 while a copy differs) and, while it has no research copy, `docs/research/*.json` — a default-side change to those makes
 the version directories stale with no version-related cause. Rebuild every version then
 (`--version` for each id). `server/data.js`: `versionDataDir(id)`, `getVersionData(id)` (the default returns `getData()`;

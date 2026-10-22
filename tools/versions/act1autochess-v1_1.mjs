@@ -14,7 +14,8 @@
 // skill_table's two sktok_acarm069 descriptions, rows the build does not read; the client drag fix is not a build
 // input. To build the hotfixed V1_1 instead, add
 // `activity: 'ea164ef70736ca2d1a356b3bf7b1cd7540960dc1'` to the pins below and rebuild; then update the V1_1 row of
-// test/data-versions.test.js (PINNED effects 279 → 281, the pins-keys assertion) and of the counts table in DESIGN §36.3.
+// test/data-versions.test.js (PINNED effects 279 → 281, the pins-keys assertion), of the counts table in DESIGN §36.3
+// (effects 281, 4 756 757 bytes) and of docs/DATA.md's Counts table (effects 279 → 281, 4.75 → 4.76 MB).
 // The rest is as tools/versions/act1autochess.mjs.
 
 export default Object.freeze({

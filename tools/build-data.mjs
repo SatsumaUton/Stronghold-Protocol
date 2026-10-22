@@ -1798,6 +1798,9 @@ function buildEnemies(ctx) {
     const modelScale = MODEL_SCALE_BY_PREFAB.get(mv(data.prefabKey) || key) ?? null;
     const modelScaleY = MODEL_STRETCH_Y_BY_PREFAB.get(mv(data.prefabKey) || key) ?? null;
     const attackAnim = enemyAttackAnim(ctx.manifest, mv(data.prefabKey) || key);
+    // a version's enemy whose model data/assets.json (built from 下半's models) lacks gets no attack clip: the sim keeps
+    // ATTACK_PAUSE for it — an M2 item (DESIGN §36.5); the default build stays silent (its manifest covers its modes)
+    if (!IS_DEFAULT && !ctx.manifest?.enemies?.[mv(data.prefabKey) || key]) warn(`enemy ${key}: model ${mv(data.prefabKey) || key} not in data/assets.json, no attackAnim (sim keeps ATTACK_PAUSE) [M2]`);
     out[key] = {
       key, name, level: wantLevel, rank: mv(data.levelType, 'NORMAL'), handbookIndex: hb?.enemyIndex || null,
       desc: stripRich(descRaw), descRaw: richRaw(descRaw),
