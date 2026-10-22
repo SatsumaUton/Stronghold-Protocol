@@ -7,7 +7,7 @@
 // data are named constants (enemies/helpers.js when several kit families use them, else in the family's file), marked
 // [ASSUMED] or sourced from the official term table (gamedata_const termDescriptionDict) / PRTS.
 //
-// Runtime model: `enemy.mem.ab = { key, t (talent bb), tS (talent bbStr), sk {prefabKey → {cd, icd, sp, bb, bs}},
+// Runtime model: `enemy.mem.ab = { key, t (talent bb), tS (talent bbStr), sk {prefabKey → {cd, icd, sp, pr (priority), bb, bs}},
 //   list [abilities], times, hitShield, atkType, immune, … }`. An ability is a plain object with optional methods
 //   spawn(b,e,a,ab) · dealt(c,…) ('damaged' by one of e's ATTACKS on an ally, non-element) · taken(c,…) ('damaged' on e,
 //   non-element) · hitIn(c,…) ('hit' on e, late: after every other hit handler) · hitOut(c,…) ('hit' from e, early) ·
@@ -16,8 +16,9 @@
 //   before(c,…) (beforeAttack of e) · attack(c,…) · blocked(c,…) · killed(c,…) (return true = revived; the kill is then
 //   hidden from later 'kill' handlers) · death(c,…) · status(c,…) (statusApplied on e) · burst(c,…) (elementBurst on e)
 //   · tick(b,e,a,dt) every `iv` s (every tick when iv is 0) · skill: `cd`/`left`(=icd)/`cond`/`fire` (cooldown runs
-//   continuously; fires when ready, the enemy can act and `cond` holds; `atk: true` = an attack-class skill, cast in
-//   place of a normal attack when ready at a swing's damage frame — attackSlotSkill). `sil: true` = the ability's handbook line
+//   continuously; fires when ready, the enemy can act and `cond` holds; `clip` = the skill's clip length in s, its
+//   cooldown then counting from the clip's end — castNow; `atk: true` = an attack-class skill, cast in place of a
+//   normal attack when ready at a swing's damage frame — attackSlotSkill). `sil: true` = the ability's handbook line
 //   is flagged SILENCE (沉默 disables it: exactly the data's `format: "SILENCE"` lines). 萨卡兹枯朽战士 / 组长's
 //   【污染秽蚀】 death fog is the one NORMAL line also silenced (archetypes.js kitPolluted, `enemy_1267_nhpbr` and
 //   `_2` only): the owner's official-play recall of 2026-10-12 is that a death while silenced creates no fog, and
@@ -220,35 +221,41 @@ function onBeforeAttack(b, c) {
 
 /**
  * An attack-class skill (`atk: true`: its official ability is a MeleeAttack / RangedAttack, the class of the normal
- * attack — PRTS 「触发索敌和普通攻击相同」) takes the place of a normal attack instead of running on its own timer: when a
- * swing reaches its damage frame and such a skill is ready (cooldown run out), castable and its `cond` holds, the skill
- * is cast and the strike is not made; the attack cooldown restarts as after a strike. So it needs the attack's target
- * and takes the attack's turn. The first ready one in list order (equal data priority). The skill that took the
- * previous slot waits one: with a cooldown equal to the attack interval (盐风主教昆图斯's third-form 【大潮】 3.5 =
- * baseAttackTime 3.5) it alternates with the attack — arknights.wiki.gg: never "Great Tide twice in a row". Why the
- * official one is not ready at the very next slot (its cooldown counting from the end of its clip …) is [ASSUMED];
- * so are the damage at the attack's frame (not the skill clip's) and no attack-clip stand after it (昆图斯 is 自缚).
+ * attack — PRTS 「触发索敌和普通攻击相同」) takes the attack's turn instead of running beside it — PRTS 盐风主教昆图斯, the
+ * site's 「关于技能」 rules: 「大多数技能自动触发会占用攻击间隔（即可以攻击时不进行攻击，改为触发技能…）」. When a swing
+ * reaches its damage frame and such a skill is ready (cooldown run out), castable and its `cond` holds, the skill is cast
+ * and the strike is not made, the attack cooldown restarting as after a strike; no target, no swing, no skill. Several
+ * ready: the highest data priority, equal ones at random (`b.rng`) — 「同时存在多个可触发的技能时，优先级最高的技能优先
+ * 触发，优先级相同则随机触发其中之一」. Its cooldown counts from the end of its clip (`clip`, castNow: 「同一技能的冷却时间
+ * 于该技能结束时开始计时」), so 盐风主教昆图斯's third-form 【大潮】 (cooldown 3.5 + its 1.667 s clip, attack interval 3.5)
+ * is not ready at the next turn and alternates with the attack — arknights.wiki.gg: never "Great Tide twice in a row".
+ * [ASSUMED] (no source): the attack cooldown restarting at the skill (not at its clip's end; the next swing does not wait
+ * for a clip longer than the interval), the skill's effect at the attack's damage frame (not its own clip's), no
+ * attack-clip stand after it (昆图斯 is 自缚).
  */
 function attackSlotSkill(b, e, c) {
   const ab = e.mem.ab;
-  let pick = null;
+  let ready = null, top = -Infinity;
   for (const a of ab.list) {
-    if (!a.atk || !a.fire || a.cd == null || a.left > 1e-9 || a === ab.lastSlot) continue;
+    if (!a.atk || !a.fire || a.cd == null || a.left > 1e-9) continue;
     if (!canCast(e, a.sil, b) || (a.cond && !safe(b, e, () => a.cond(b, e, a)))) continue;
-    pick = a;
-    break;
+    const pr = (a.sk && a.sk.pr) || 0;
+    if (pr > top) { top = pr; ready = [a]; } else if (pr === top) ready.push(a);
   }
-  if (ab.lastSlot !== pick) ab.lastSlot = pick;
-  if (!pick) return false;
+  if (!ready) return false;
+  const pick = ready.length > 1 ? b.rng.pick(ready) : ready[0];
   c.targets = [];
   e.atkCd = e.s.interval;
   castNow(b, e, pick);
   return true;
 }
 
-/** Cast content skill `a` of enemy `e` now: its cooldown restarts, then it fires. */
+/**
+ * Cast content skill `a` of enemy `e` now: its cooldown restarts — counted from the end of its clip when the kit gives
+ * its length (`a.clip`, s: PRTS 「同一技能的冷却时间于该技能结束时开始计时」), else from the cast —, then it fires.
+ */
 function castNow(b, e, a) {
-  a.left = Math.max(TICK, a.cd);
+  a.left = Math.max(TICK, a.cd + (a.clip > 0 ? a.clip : 0));
   a.casts = (a.casts ?? 0) + 1;
   e.skillAnimUntil = b.time + 0.5;
   if (a.sk) castSlot(b, e, a.sk);   // display only: the skill slot it uses (render/app.js 'cast')
