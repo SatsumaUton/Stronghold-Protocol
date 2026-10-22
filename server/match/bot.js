@@ -106,6 +106,14 @@ export function runSteps(gen) {
 
 /** Lineup value of each deployed member of the focus bond (up to its top threshold). */
 const FOCUS_MEMBER = 4;
+/**
+ * [ASSUMED] §35.23: lineup value of a core bond at its second tier or above (6 拉特兰 / 叙拉古 …, 5 阿戈尔), on top of the
+ * linear tier weight. The guides build around a 6-member main (handoff/round51 RESEARCH §2); measured on ABYSS solo, a
+ * linear weight never fielded one (boards stayed 3 + 3 + 3) even with 6 distinct members owned.
+ */
+const CORE_TOP_TIER = 30;
+/** [ASSUMED] §35.23: bench members of a core bond with at least this many distinct owned members are not sold as junk. */
+const CORE_KEEP_OWNED = 4;
 /** Value per unit of armour fit (the share of a dealer's damage the round's DEF / RES lets through, armorFit). */
 const ARMOR_WEIGHT = 10;
 /** Least buy score of a purchase once the board is full (below it the bot refreshes instead). */
@@ -366,11 +374,15 @@ function mainCoreBond(m, p) {
  * its public bond strip, mainCoreBond — the shop pool is shared) or has selected that bond's opening strategy, even
  * before anyone is deployed. The strategy reservation ends when that teammate is eliminated. `second` = the other live
  * bond (core or add-on) with the most owned members whose next threshold is within reach (≥ 1 owned member).
- * `ps._botFocusId` keeps the focus across rounds.
+ * `ps._botFocusId` keeps the focus across rounds. §35.23: an accepted advisor plan's primary core bond (its highest
+ * priority) is the focus, owned members or not: the plan's direction leads legacy's procurement instead of competing with
+ * it at +6..+30 per member.
  */
 export function bondPlan(m, ps, owned = ownedBonds(m, ps)) {
   const livingBands = m.alivePlayers().filter((p) => p !== ps).flatMap((p) => m.gd.bandBondIds(p.bandId)).sort().join();
-  const key = `${m.round}|${ps.shop.level}|${[...owned.counts.entries()].map(([k, v]) => k + v).join()}|${livingBands}`;
+  const planMain = (advisorPlan(m, ps)?.bonds || []).slice().sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))
+    .map((b) => b.id).find((id) => m.gd.bond(id)?.isCore && !m.gd.modeInactiveBonds.has(id)) ?? null;
+  const key = `${m.round}|${ps.shop.level}|${[...owned.counts.entries()].map(([k, v]) => k + v).join()}|${livingBands}|${planMain}`;
   if (ps._botFocus && ps._botFocus.key === key) return ps._botFocus;
   const prev = ps._botFocusId ?? null;
   const mates = new Set();
@@ -392,6 +404,7 @@ export function bondPlan(m, ps, owned = ownedBonds(m, ps)) {
       + (id === prev ? 6 : 0) - (mates.has(id) ? 6 : 0) + Math.min(0.9, (pool.supply.get(id) || 0) / 100);
     if (s > bestS) { bestS = s; focus = id; }
   }
+  if (planMain) focus = planMain;
   let second = null;
   let bestK = 0;
   for (const id of m.gd.bondIds) {
@@ -543,7 +556,7 @@ function lineupScore(m, ps, set, ctx, handSlots = countFree(ps.hand)) {
     if (!b.tier) continue;
     const bond = gd.bond(id);
     const w = bond && bond.isCore ? 14 : 9;
-    v += b.tier * w + Math.min(12, (b.layers || 0) * 0.1) + (id === ctx.focus ? 6 : 0);
+    v += b.tier * w + Math.min(12, (b.layers || 0) * 0.1) + (id === ctx.focus ? 6 : 0) + (bond?.isCore && b.tier >= 2 ? CORE_TOP_TIER : 0);
   }
   let blockers = 0;
   let air = 0;
@@ -555,14 +568,44 @@ function lineupScore(m, ps, set, ctx, handSlots = countFree(ps.hand)) {
   return v;
 }
 
-/** Best deployable set of at most `cap` owned chess: greedy seed + swap hill-climbing on lineupScore. */
+/**
+ * Best deployable set of at most `cap` owned chess: greedy seed + swap hill-climbing on lineupScore. §35.23: one swap at
+ * a time cannot carry a core bond from 3 to 6 deployed members (every intermediate swap scores lower), so each core bond
+ * with enough distinct owned members for a threshold above 3 also seeds a climb from that full threshold; the best
+ * climb wins.
+ */
 function chooseLineup(m, ps, ctx) {
+  const gd = ps?.gd || m.gd;
   const all = ps.allChess();
   const cap = Math.min(ps.deployCap, all.length);
   const value = new Map(all.map((p) => [p.uid, pieceValue(m, ps, p, ctx)]));
   const seed = all.slice().sort((a, b) => value.get(b.uid) - value.get(a.uid) || a.uid - b.uid);
-  let set = seed.slice(0, cap);
-  let bench = seed.slice(cap);
+  let best = climbLineup(m, ps, ctx, seed.slice(0, cap), seed.slice(cap));
+  for (const id of gd.bondIds) {
+    const bond = gd.bond(id);
+    if (!bond || !bond.isCore || gd.modeInactiveBonds.has(id) || !Array.isArray(bond.thresholds)) continue;
+    const members = [];
+    const bases = new Set();
+    for (const p of seed) {
+      const base = gd.baseIdOf(p.id);
+      if (bases.has(base) || !(chessRec(m, p.id, ps)?.bonds || []).includes(id)) continue;
+      bases.add(base);
+      members.push(p);
+    }
+    const t = bond.thresholds.filter((x) => x > 3 && x <= Math.min(cap, members.length)).pop();
+    if (!t) continue;
+    const core = new Set(members.slice(0, t).map((p) => p.uid));
+    const start = members.slice(0, t).concat(seed.filter((p) => !core.has(p.uid))).slice(0, cap);
+    const used = new Set(start.map((p) => p.uid));
+    const run = climbLineup(m, ps, ctx, start, seed.filter((p) => !used.has(p.uid)));
+    if (run.score > best.score + 0.5) best = run;
+  }
+  return best;
+}
+
+function climbLineup(m, ps, ctx, set0, bench0) {
+  let set = set0.slice();
+  let bench = bench0.slice();
   let score = lineupScore(m, ps, set, ctx);
   // identical pieces (same chess, same items — a bond can hang on an item pair) score alike: only the first is tried
   const sig = (p) => `${p.id}|${(p.items || []).map((it) => it.id).sort().join('+')}`;
@@ -1392,7 +1435,8 @@ export function sellJunk(m, ps) {
     const copies = c.isGolden ? 0 : ctx.copies.get(base) || 0;
     // a pair whose third copy can still come (the merge's reward is worth it for any pair)
     const pairLive = copies + 1 >= mergeNeed(m, base) && (m.pool.left(base) > 0 || !m.pool.has(base));
-    const useful = c.isGolden || pairLive || ctx.keep.has(base) || (copies >= 2 && m.round <= 6);
+    const coreReady = (c.bonds || []).some((b) => m.gd.bond(b)?.isCore && (ctx.owned.counts.get(b) || 0) >= CORE_KEEP_OWNED);
+    const useful = c.isGolden || pairLive || ctx.keep.has(base) || coreReady || (copies >= 2 && m.round <= 6);
     (useful ? keep : junk).push({ p, v: pieceValue(m, ps, p, ctx) + (pairLive ? 150 : useful ? 100 : 0) });
   }
   // bench budget: at most BENCH_BUDGET spare units beyond the lineup (pairs first)
