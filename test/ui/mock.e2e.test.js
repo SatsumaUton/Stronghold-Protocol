@@ -295,7 +295,7 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
     } finally { await page.close(); }
   });
 
-  // Q / X prefer the underframe's selection, otherwise use hover (DESIGN §34.35).
+  // Q / X prefer the underframe's selection, otherwise use hover (DESIGN §35.22).
   test('prep: Q/X use selection before hover', async () => {
     const { page, problems } = await open('phase=PREP', { render: 'fallback' });
     const initial = await mockState(page);
