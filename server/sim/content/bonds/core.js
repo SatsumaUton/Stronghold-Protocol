@@ -76,7 +76,10 @@ export function reached(battle, pid, bondId, cnt) {
   const st = S.bondState(battle, pid, bondId);
   if (!st || !st.active) return false;
   const need = num(cnt, 0);
-  if (!(need > 0)) return true;
+  // A threshold the record lacks is a tier this data does not have: not reached. 上半's 炎 has no 9-member tier (no
+  // ex_bond_char_cnt); counting it as reached gave 6 炎 the 9-member tier's 2 炎佑. Every default core bond's main buff
+  // carries power_bond_char_cnt and 炎's ex_bond_char_cnt is 9, so the default data never gets here.
+  if (!(need > 0)) return false;
   if (num(st.count, 0) >= need) return true;
   const th = S.bondRecord(bondId)?.thresholds;
   const idx = Array.isArray(th) ? th.indexOf(need) : -1;

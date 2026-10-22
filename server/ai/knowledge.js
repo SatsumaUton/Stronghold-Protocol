@@ -68,7 +68,9 @@ export function knowledgePack(data, { language = 'zh-CN', modeId, rules = {}, of
   let entries = cache.get(data);
   if (!entries) { entries = new Map(); cache.set(data, entries); }
   if (entries.has(key)) return entries.get(key);
-  if (!overlay && language !== 'zh-CN') {
+  // the fixed overlay is keyed by default-data record ids: another official version's data (config.version) keeps its
+  // Chinese names until it has its own overlay
+  if (!overlay && language !== 'zh-CN' && !data?.config?.version) {
     try { overlay = JSON.parse(readFileSync(new URL(`../../data/i18n/${language}.json`, import.meta.url), 'utf8')); }
     catch { overlay = {}; }
   }
