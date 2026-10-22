@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// [ASSUMED] Example limits: 6000 output tokens by default (SP_LLM_MAX_TOKENS), 256 KiB provider replies, 2 MiB input frames, four concurrent requests.
+// [ASSUMED] Example limits: 6000 output tokens by default (SP_LLM_MAX_TOKENS), 256 KiB provider replies, 2 MiB input frames,
+// 16 concurrent requests (§35.23: four seats plus requests the host abandoned that are still finishing).
 // §35.9. Explicit stdio adapter; importing this module never connects. No credentials/remote errors on stdout/stderr.
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -32,8 +33,9 @@ For economy/cycle candidates, read preconditions and safeguards: shopHold means 
 Investors amplify only SERVER_GAIN traits; prep-end acquisition counters and next-round funds are separate.
 Keep distinct engine members and the package carrier. Do not sell all copies of an ID to express a cycle;
 this plan API cannot automate an arbitrary repeated buy/sell sequence. Stop if funds or survival cannot sustain it.
-Choose at most THREE bonds, priority 1..5 (5 strongest), only from digest.bonds with candidate:true: they already
-have board/bench progress and a publicly reachable threshold. Account for accumulated layers before abandoning
+Choose at most THREE bonds, priority 1..5 (5 strongest), only from digest.bonds with candidate:true (they already
+have board/bench progress and a publicly reachable threshold) or the main of a strategy candidate: name the band's
+main from the first prep even before you own a member, so purchases favour it. Account for accumulated layers before abandoning
 an investment. Activated layers across ALL bonds count, not only the three targets. Fill remaining deployment
 slots with units that activate extra bonds. Do not bench a stronger unit only to chase a 6-threshold.
 Prefer completing the nearest threshold over opening
@@ -48,12 +50,21 @@ armor, blocking, sustain and leader damage. Avoid redundant
 units competing with teammates. Spend expiring funds; save for interest only when the selected band carries funds.
 Balance immediate survival against future shop access. Leave detailed procurement and placement to legacy's rehearsal.
 Economy: digest.economy.expiringFunds will disappear at prep end. Refresh costs refreshPrice (free charges included).
-No EXP exists: upgradePrice is the next-level cost, discounted by 1 each round, reset after an upgrade.
+No EXP exists: upgradePrice is the next-level cost, discounted by 1 each round, reset after an upgrade. Waiting one
+round saves exactly 1 fund and costs a whole round of rolls at the higher tier: the price always falls, so a lower
+price next round is never by itself a reason for holdLevel.
 Read knowledge.economy.shop tier shares and strategy.candidates[].levelCurve alongside playbook.legacyReference.
 Needed T4/5/6 operators require L4/5/6 for normal rolls. Explain falling behind either curve in why; L3 at R7 is
 too slow for an ordinary build. economy.level means reach AT LEAST that level, then legacy may upgrade further.
 holdLevel defers levelling for this prep only. A one-round deferral is allowed when economy.why states the reason
 and level is the level being held; it is not reserved for a permanent low-level farm or an established cycle.
+Holds below L2 by R3, L3 by R5, L4 by R7 or L5 by R9 are dropped unless a candidate's shopHold is that level.
+LP and the Final Assault: knowledge bands[].lp is the starting LP, the leak budget for R5-R13 and the Final Assault
+clock: from 150 real seconds the team loses 1 LP per second, and LP 0 loses. At the band draft read
+scoreParts.survival; on ABYSS (终极) 23-24 LP bands often die before the Final Assault. The Final Assault (bossRound)
+has no in-battle layer gains, so in-battle stackers add nothing there; field damage dealers and keep the layers
+already banked. A leader hit of 300000 or more is voided (leaderHitLimit). Layers banked by prep-time traits,
+reinforcements and band engines carry the damage: on ABYSS a winning board holds several hundred activated layers.
 maxRefreshes/refreshAbove/reserve are preferences: expiring funds still buy useful targets, freeze an unaffordable
 wanted offer, search while a purchase remains affordable, then buy cheap spare bank operators. economy.freezeSearch
 true means refresh to find a buy target and freeze it if it is unaffordable. Sell those banks
@@ -75,6 +86,24 @@ export function advisorSystem(pack) {
   return prefix + JSON.stringify(slimKnowledge(pack, { maxChars: 200000 - prefix.length }));
 }
 
+// §35.23: the model sees at most two prep candidates (latency grows with the reply, and the third and fourth were
+// rarely chosen) and one copy of the level-curve basis sentence instead of one per checkpoint.
+export function modelStrategy(strategy, kind) {
+  const candidates = strategy.candidates || [];
+  const basis = candidates.find(c => c.levelCurve?.length)?.levelCurve[0].basis;
+  return { ...strategy, ...(basis ? { levelCurveBasis: basis } : {}),
+    candidates: candidates.slice(0, kind === 'band' ? candidates.length : 2)
+      .map(c => c.levelCurve ? { ...c, levelCurve: c.levelCurve.map(({ basis: _basis, ...r }) => r) } : c) };
+}
+
+// Models sometimes wrap the JSON object in a code fence or a sentence despite response_format.
+export function parseReply(content) {
+  try { return JSON.parse(content); } catch { /* fall through */ }
+  const start = content.indexOf('{'), end = content.lastIndexOf('}');
+  if (start < 0 || end <= start) throw new Error('JSON');
+  return JSON.parse(content.slice(start, end + 1));
+}
+
 // Injectable transport lets prompt/continuity tests run without opening sockets; the CLI keeps bounded HTTP.
 export function createLLMAgent(env = process.env, request = httpDecision) {
   // Deliberately no default destination/model: starting the example cannot silently spend a real account's money.
@@ -83,7 +112,7 @@ export function createLLMAgent(env = process.env, request = httpDecision) {
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash || url.search
     || !env.SP_LLM_MODEL || !env.SP_LLM_API_KEY || /[\r\n]/.test(env.SP_LLM_API_KEY)) throw new Error('LLM configuration');
   const timeoutMs = Number(env.SP_LLM_TIMEOUT_MS || 20000);
-  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error('LLM configuration');
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 300000) throw new Error('LLM configuration');
   // Reasoning models spend completion tokens before they write the plan: 1200 left most replies empty
   // (finish_reason 'length'). [ASSUMED] default 6000, bounded; an optional OpenAI-style reasoning_effort.
   const maxTokens = Number(env.SP_LLM_MAX_TOKENS || 6000);
@@ -124,10 +153,11 @@ export function createLLMAgent(env = process.env, request = httpDecision) {
     const digest = compactDigest(o.digest, pack);
     const history = continuity(o.digest, state.confirmed);
     const strategy = strategyCandidates(pack.playbook, o.digest, history?.previousPlan);
+    const shown = modelStrategy(strategy, o.context.kind);
     const choices = compactChoices(o.digest);
     const info = { id: o.id, matchId: o.context.matchId, playerId: o.digest.playerId, kind: o.context.kind, round: o.digest.round };
     const body = { model: env.SP_LLM_MODEL, response_format: { type: 'json_object' }, max_tokens: maxTokens, ...(effort ? { reasoning_effort: effort } : {}),
-      messages: [{ role: 'system', content: system }, { role: 'user', content: JSON.stringify({ kind: o.context.kind, digest, continuity: history, strategy, choices }) }] };
+      messages: [{ role: 'system', content: system }, { role: 'user', content: JSON.stringify({ kind: o.context.kind, digest, continuity: history, strategy: shown, choices }) }] };
     // Shared bounded transport rejects redirects, including credential forwarding; errors are intentionally generic.
     const started = Date.now();
     let response;
@@ -135,27 +165,30 @@ export function createLLMAgent(env = process.env, request = httpDecision) {
     catch (err) { note({ ...info, stage: 'http', error: err?.message, ms: Date.now() - started }); throw err; }
     const content = String(response.choices?.[0]?.message?.content ?? '');
     const finish = response.choices?.[0]?.finish_reason;
-    if (finish !== 'stop') { note({ ...info, stage: 'incomplete', finish, chars: content.length, head: content.slice(0, 300), ms: Date.now() - started }); throw new Error('incomplete'); }
+    const u = response.usage;
+    const usage = u ? { inputTokens: u.prompt_tokens, outputTokens: u.completion_tokens, cachedTokens: u.prompt_tokens_details?.cached_tokens || 0 } : undefined;
+    // Usage goes into every diagnostic line: a reply the host already abandoned still cost tokens.
+    if (finish !== 'stop') { note({ ...info, stage: 'incomplete', finish, chars: content.length, head: content.slice(0, 300), usage, ms: Date.now() - started }); throw new Error('incomplete'); }
     let parsed;
-    try { parsed = JSON.parse(content); } catch { note({ ...info, stage: 'json', chars: content.length, head: content.slice(0, 300), ms: Date.now() - started }); throw new Error('JSON'); }
+    try { parsed = parseReply(content); } catch { note({ ...info, stage: 'json', chars: content.length, head: content.slice(0, 300), usage, ms: Date.now() - started }); throw new Error('JSON'); }
     let plan, repairs, why, pivot;
     try {
       // Bare plans remain compatible with §35.9. Metadata never enters validPlan or the game's reply/journal.
       const wrapped = parsed && Object.hasOwn(parsed, 'plan');
       if (wrapped && typeof parsed.why !== 'string') throw new Error('plan');
       why = shortText(wrapped ? parsed.why : '').match(/[^.!?。！？]+[.!?。！？]*/gu)?.slice(0, 3).join('').trim() || '';
-      ({ plan, repairs } = repairPlan(wrapped ? parsed.plan : parsed, pack, o.digest, choices));
-      pivot = focusPlan(plan, { pivot: parsed?.pivot, pivotReason: shortText(parsed?.pivotReason, 160) }, digest, history?.previousPlan, repairs);
+      const holds = (strategy.candidates || []).map(c => c.shopHold).filter(Number.isInteger);
+      ({ plan, repairs } = repairPlan(wrapped ? parsed.plan : parsed, pack, o.digest, choices, { holds }));
+      pivot = focusPlan(plan, { pivot: parsed?.pivot, pivotReason: shortText(parsed?.pivotReason, 160) }, digest, history?.previousPlan, repairs,
+        (shown.candidates || []).map(c => c.main).filter(Boolean));
       if (!validPlan(plan)) throw new Error('plan');
     } catch {
-      note({ ...info, stage: 'plan', head: content.slice(0, 300), ms: Date.now() - started }); throw new Error('plan');
+      note({ ...info, stage: 'plan', head: content.slice(0, 300), usage, ms: Date.now() - started }); throw new Error('plan');
     }
     if (o.context.kind === 'prep' && state.latest === o.id) state.pending = {
       id: o.id, round: digest.round, plan: structuredClone(plan), digest, through: o.digest.feedback?.through,
     };
-    note({ ...info, stage: 'ok', why, ...pivot, plan, repairs: repairs.slice(0, 128), repairCount: repairs.length, ms: Date.now() - started });
-    const u = response.usage;
-    const usage = u ? { inputTokens: u.prompt_tokens, outputTokens: u.completion_tokens, cachedTokens: u.prompt_tokens_details?.cached_tokens || 0 } : undefined;
+    note({ ...info, stage: 'ok', why, ...pivot, plan, repairs: repairs.slice(0, 128), repairCount: repairs.length, usage, ms: Date.now() - started });
     return { v: o.v, id: o.id, plan, ...(usage ? { usage } : {}) };
   };
 }
@@ -165,8 +198,8 @@ export function serveAgent(decide, input = process.stdin, output = process.stdou
   input.on('data', chunk => {
     buffer = Buffer.concat([buffer, chunk]);
     let end;
-    while ((end = buffer.indexOf(10)) !== -1) { // loop-cap: bounded input bytes, at most four concurrent seats
-      if (end > 2097152 || pending >= 4) { input.destroy(); return; }
+    while ((end = buffer.indexOf(10)) !== -1) { // loop-cap: bounded input bytes, at most 16 concurrent requests
+      if (end > 2097152 || pending >= 16) { input.destroy(); return; }
       let o;
       try { o = JSON.parse(buffer.subarray(0, end).toString('utf8')); } catch { input.destroy(); return; }
       buffer = buffer.subarray(end + 1);

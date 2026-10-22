@@ -90,7 +90,8 @@ function bandProfile(id, band, data, gd) {
     mechanic: 'Beacon consumes the carrier, offers same-tier replacements, and sends the original next round to the teammate with most matching bond members (random ties).',
     advice: '[ASSUMED] Buy a missing teammate core only when the automatic recipient and delivery timing fit.' });
   const roleClasses = uniq(classes.length ? classes : ['combat-modifier']);
-  return { id, name: band.name, effect: effective.desc || '', bondIds: bonds, roleClass: roleClasses[0], roleClasses, insights,
+  // §35.23: starting LP (bands.json totalHp) is the leak budget and, in a Final Assault, the overtime clock.
+  return { id, name: band.name, lp: gd.startLp(id), effect: effective.desc || '', bondIds: bonds, roleClass: roleClasses[0], roleClasses, insights,
     grantedItems: buffs.map(b => b.bbStr?.chess).filter(id => data.items?.[id]),
     carriesFunds: gd.leftoverKeptBands.includes(id), beaconRounds };
 }

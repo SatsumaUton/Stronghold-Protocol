@@ -2,6 +2,9 @@
 // Official mechanics and the maintainer-supplied sources/disagreements stay in the versioned playbook.
 const unique = xs => [...new Set(xs)];
 const cheap = (a, b) => a.tier - b.tier || a.cost - b.cost || a.id.localeCompare(b.id);
+// §35.23 [ASSUMED]: 26 LP is the median band; each LP above it is one more leaked enemy (R5–R13) or one more second of
+// Final Assault overtime. Measured on ABYSS: 23–24 LP picks died before the FA where 27–45 LP picks survived.
+export const survivalScore = band => Number.isFinite(band?.lp) ? +((band.lp - 26) * 1.5).toFixed(2) : 0;
 
 export function communityCandidates(book, digest, { operators, disabled, held, teammates, bands, profile, previousMain }) {
   const all = [], draft = (digest.actions || []).filter(a => a.intent.t === 'g.band');
@@ -34,7 +37,7 @@ export function communityCandidates(book, digest, { operators, disabled, held, t
       if (book.community.roles.some(r => r.band === band.id)) continue; // Preserve the explicit safety-net/supplier policy.
       // [ASSUMED] Specific actionable recipes compete with generic variants, but lose priority to public
       // contention and missing counters. These weights are not measured win-rate or official balance claims.
-      const scoreParts = { recipe: 22, engine: band.bondIds.includes(main) ? 16 : 0,
+      const scoreParts = { recipe: 22, survival: survivalScore(band), engine: band.bondIds.includes(main) ? 16 : 0,
         community: band.communityMain?.main === main ? 8 : 0,
         progress: Math.min(5, members.filter(m => held.has(m.id)).length) * 5,
         continuity: previousMain === main ? 14 : 0,

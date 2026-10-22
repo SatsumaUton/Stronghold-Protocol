@@ -28,9 +28,9 @@ function slimView(pack) {
     operators: (pack.operators || []).map(o => ({ id: o.id, name: o.name, tier: o.tier, cost: o.cost, class: o.class,
       bonds: o.bonds || [], caps: capsOf(o, byId), trait: trait(o), skill: o.skill?.name || '' })),
     items: (pack.items || []).map(i => ({ id: i.id, name: i.name, cost: i.cost, effect: i.effect })),
-    bands: (pack.bands || []).map(b => ({ id: b.id, name: b.name, effect: b.effect, carriesFunds: b.carriesFunds,
+    bands: (pack.bands || []).map(b => ({ id: b.id, name: b.name, lp: b.lp, effect: b.effect, carriesFunds: b.carriesFunds,
       insights: insights.get(b.id) || [] })),
-    bosses: (pack.bosses || []).map(b => ({ id: b.id, name: b.name, enemyKey: b.enemyKey,
+    bosses: (pack.bosses || []).map(b => ({ id: b.id, name: b.name, enemyKey: b.enemyKey, hpByDifficulty: b.hpByDifficulty,
       // Pack notes stay ability objects (sp-knowledge/1). The prompt view keeps their readable text only.
       notes: Array.isArray(b.notes) ? b.notes.map(n => typeof n === 'string' ? n : (n && (n.text || n.desc)) || '').filter(Boolean).join(' ').slice(0, 240) : '' })),
     enemies: (pack.enemies || []).map(e => ({ id: e.id, name: e.name, hp: e.stats?.maxHp || 0, def: e.stats?.def || 0,

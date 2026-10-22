@@ -1,7 +1,7 @@
 // §35.12. [ASSUMED] Reproducible candidate policy, not an optimizer or official build prescription.
 // Only a static playbook and the existing seat-visible digest enter this module. No Match/GameData/live pool.
 import { cycleCandidates } from './cycle-candidates.js';
-import { communityCandidates } from './community-candidates.js';
+import { communityCandidates, survivalScore } from './community-candidates.js';
 const unique = xs => [...new Set(xs)];
 const rank = (a, b) => b.score - a.score || a.id.localeCompare(b.id);
 const cheap = (a, b) => a.tier - b.tier || a.cost - b.cost || a.id.localeCompare(b.id);
@@ -100,6 +100,7 @@ export function strategyCandidates(playbook, digest, previousPlan = null) {
         const earlyMissing = profile.needs.filter(k => !early.some(c => c.capabilities[k]));
         const progress = members.filter(c => held.has(c.id)).length;
         const scoreParts = {
+          survival: survivalScore(band),
           engine: band.bondIds.includes(main.id) ? 16 : 0,
           community: band.communityMain?.main === main.id ? 8 : 0,
           earlyAccess: Math.min(early.length, 5) * 2,
@@ -166,10 +167,14 @@ export function strategyCandidates(playbook, digest, previousPlan = null) {
       const prev = best.get(key);
       if (!prev || rank(c, prev) < 0) best.set(key, c);
     }
+    // §35.23 [ASSUMED]: every community band starts with 23–29 LP; keep one slot for the best direction of another
+    // band (歌利亚 45 LP, 鸭爵 29 …) so a sturdy opening is always on the list.
+    const sturdy = pool.find(c => ![...wanted].some(key => key.startsWith(`${c.band}:`)));
     for (const c of [...best.values()].sort(rank)) {
-      if (selected.length >= cap) break;
+      if (selected.length >= cap - (sturdy ? 1 : 0)) break;
       selected.push(c); chosen.add(c.id); mains.add(c.main);
     }
+    if (sturdy) { selected.push(sturdy); chosen.add(sturdy.id); mains.add(sturdy.main); }
   }
   for (const c of pool) if (!mains.has(c.main) && selected.length < cap && !chosen.has(c.id)) {
     selected.push(c); mains.add(c.main); chosen.add(c.id);

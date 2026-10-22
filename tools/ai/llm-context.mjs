@@ -74,10 +74,13 @@ export function continuity(d, previous) {
       lp: { before: confirmed?.digest.lp ?? null, after: d.lp ?? null }, lastBattle: feedback?.lastBattle || null } };
 }
 
-export function focusPlan(plan, meta, digest, previousPlan, repairs) {
+// §35.23 [ASSUMED]: the band draft sets a direction before any member is owned (玛恩纳 → 卡西米尔 waited until R6 for a
+// first copy). `intent` lists the mains of the current strategy candidates: those bonds may lead the plan without a
+// held member. A primary change still needs pivot:true and a reason.
+export function focusPlan(plan, meta, digest, previousPlan, repairs, intent = []) {
   // §35.9's explicit empty-plan delegation remains unweighted, even when an earlier plan had targets.
   if (!Object.keys(plan).length) return { pivot: false, pivotReason: '' };
-  const candidates = new Set(digest.bonds.filter(b => b.candidate).map(b => b.id));
+  const candidates = new Set([...digest.bonds.filter(b => b.candidate).map(b => b.id), ...intent]);
   const select = bonds => (bonds || []).filter(b => candidates.has(b.id)).sort((a, b) => b.priority - a.priority).slice(0, 3);
   const proposed = select(plan.bonds);
   for (const b of plan.bonds || []) if (!proposed.includes(b)) repairs.push({ path: 'bonds', id: b.id, reason: 'no held/reachable progress or three-bond cap' });
