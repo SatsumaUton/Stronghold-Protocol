@@ -14,8 +14,9 @@
 // The default data must keep exactly the old item lookups (test/fixtures/versions-keying-baseline.json, frozen on
 // db8e226d before the change). These tests check WHICH handler key an item dispatches to, not the handler's body: a
 // swapped body is caught by test/golden.test.js. Also: a missing bond threshold is not reached on a version's build (炎
-// without its 9-member tier), 远牙's granted trait, 夕's generic dragon, 凯瑟琳's cell and the AI's community / i18n
-// overlays follow a version's data, not the default ids.
+// without its 9-member tier), 远牙's granted trait, 夕's generic dragon, 凯瑟琳's cell, 蒸汽之心's hammers and the AI's
+// community / i18n overlays (server and client) follow a version's data, not the default ids, while the default data and
+// plugin content sets on it keep the by-id answers; band and bond ids, still keyed by id, keep the default's entities.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -42,6 +43,7 @@ import { buildPlaybook } from '../server/ai/playbook.js';
 import { knowledgePack } from '../server/ai/knowledge.js';
 import { hasBattlePart as bandHasBattlePart } from '../server/sim/content/bands/battle.js';
 import { bandMetaHandler } from '../server/sim/content/bands/meta.js';
+import { createDataStore, DATA_FILES } from '../public/js/data.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const QUIET = Object.freeze({ warn() {}, error() {}, info() {} });
@@ -322,6 +324,67 @@ test('kits and items: a plugin content set on the default data that patches an o
   assert.deepEqual(itemMetaBindings().find((b) => b.name === 'pager').keys, []);
 });
 
+test('cells, hammers, 远牙 and 夕: a plugin content set on the default data that patches an official charId / effectId keeps the old lookups', (t) => {
+  const { data, problems } = applyPatches(clone(dataOf(DEFAULT_DIR)), [
+    { op: 'set', file: 'items', id: 'chess_item_5_08_e_a', path: ['effectId'], value: 'eff_acarm999' },
+    { op: 'set', file: 'items', id: 'chess_item_6_08_e_a', path: ['effectId'], value: 'eff_acarm072' },
+    { op: 'set', file: 'items', id: 'chess_item_6_05_e_a', path: ['effectId'], value: 'eff_acarm998' },
+    { op: 'set', file: 'chess', id: 'chess_char_4_20_a', path: ['charId'], value: 'char_198_blackd' },
+    { op: 'set', file: 'chess', id: 'chess_char_4_20_b', path: ['charId'], value: 'char_198_blackd' },
+  ], { pluginId: 'demo' });
+  assert.equal(problems.length, 0);
+  assert.equal(Object.hasOwn(data.config, 'version'), false);
+  setGameData(data);
+  t.after(() => setGameData(null));
+  // 凯瑟琳's cell (support/index.js isMutationCell / mutationCellIds, used by prep.js and bands/meta.js): by id
+  assert.deepEqual(mutationCellIds(data), ['chess_item_5_08_e_a']);
+  assert.equal(isMutationCell('chess_item_5_08_e_a', data), true);
+  assert.equal(isMutationCell('chess_item_6_08_e_a', data), false);
+  // 蒸汽之心's hammers (items/battle.js hammerInfo): read from chess_item_6_05_e_a whatever its effectId
+  assert.deepEqual(hammerKeys(), EXPECT.data.hammers);
+  // 远牙's granted trait (garrisons/battle.js farToothGrants): garrison_108_a/b, not found by charId
+  const bond = { count: 3, active: true, tier: 1, layers: 0 };
+  const h = makeBattle({
+    data: new DataSource(data, null),
+    units: [{ chessId: 'chess_char_4_20_a', row: 10, col: 3 }, { chessId: 'chess_char_2_11_a', row: 10, col: 8 }],
+    bonds: { kazimierzShip: bond, preciShip: bond }, autoFinish: false, timeLimit: 300,
+  });
+  h.step();
+  const u = h.unit('chess_char_2_11_a');
+  assert.deepEqual(h.result().perPlayer.p1.layerGains, { kazimierzShip: 4, preciShip: 4 }, 'initial deployment');
+  h.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
+  assert.ok(u.alive && u.trait.doll, 'the lethal hit switches to a substitute');
+  assert.deepEqual(h.result().perPlayer.p1.layerGains, { kazimierzShip: 8, preciShip: 8 }, '远牙 with a patched charId still gains on the switch');
+  checkInvariants(h.b);
+  // 夕's generic-kit dragon (tokens.js): chess_char_5_12 whatever its charId; her charId under another id gives none
+  const raw = new DataSource(getData({ log: QUIET }), null).rawChess('chess_char_5_12_a');
+  for (const [id, charId, want] of [['chess_char_5_12_a', 'char_4080_lin', true], ['chess_char_5_99_a', raw.charId, false]]) {
+    const hd = makeBattle({
+      defs: { chess: { [id]: { ...raw, chessId: id, baseId: id, goldenId: null, charId } }, enemies: { e_dummy: enemyRec({ key: 'e_dummy', hp: 1e8, speed: 0 }) } },
+      kits: { [id]: genericKit }, units: [{ chessId: id, row: 10, col: 3 }], enemies: [{ key: 'e_dummy', pos: [10, 5] }],
+      autoFinish: false, timeLimit: 30,
+    });
+    assert.equal(hd.runUntil(() => hd.b.allyUnits.some((x) => x.defId === TOKEN_IDS.duskDragon), 10), want, `${id} ${charId}`);
+    checkInvariants(hd.b);
+  }
+});
+
+test('officialKitKey on a version\'s build: a tier kit that failed to load stays generic (never the operator\'s other tier kit); a char_x_ charId keeps the by-id kit', () => {
+  const data = versioned(dataOf(DEFAULT_DIR));
+  const ds = new DataSource(dataOf(DEFAULT_DIR), null);
+  const tin2 = { ...ds.getChess('chess_char_1_02_a'), id: 'chess_char_2_19_a', baseId: 'chess_char_2_19_a', charId: 'char_4151_tinman', tier: 2 };
+  assert.equal(officialKitKey(tin2, data), 'chess_char_2_19_a');
+  // 锡人's tier-2 kit file failed to load: KITS and TIER_KIT_KEYS_BY_CHAR ("whose file loaded") lack it
+  const kits = { ...KITS }; delete kits.chess_char_2_19_a;
+  const tierKeys = { ...TIER_KIT_KEYS_BY_CHAR, char_4151_tinman: TIER_KIT_KEYS_BY_CHAR.char_4151_tinman.filter((k) => k !== 'chess_char_2_19_a') };
+  assert.deepEqual(tierKeys.char_4151_tinman, ['chess_char_1_16_a']);
+  assert.equal(officialKitKey(tin2, data, { kits, tierKeys }), null, 'generic, not chess_char_1_16_a');
+  // under another chess id the operator's remaining tier kit is found by charId
+  assert.equal(officialKitKey({ ...tin2, id: 'chess_char_2_98_a', baseId: 'chess_char_2_98_a' }, data, { kits, tierKeys }), 'chess_char_1_16_a');
+  // a plugin charId (char_x_) on an official chess id keeps the by-id kit
+  assert.equal(officialKitKey({ ...ds.getChess('chess_char_1_02_a'), charId: 'char_x_demo_op' }, data), 'chess_char_1_02_a');
+});
+
 // =====================================================================================================================
 // items
 
@@ -553,6 +616,28 @@ test('auto_chess_change_map: Touch\'s map characters have a battle part and coun
   }
 });
 
+/**
+ * The band ids code keys behaviour by on every data (bands/meta.js band_cathy / DUCK_BAND, bands/battle.js AMEDIC_BAND,
+ * server/match/gamedata.js band_bldsk / band_cannot). Bond ids are all keyed by id too (bonds/core.js INSTALLERS,
+ * memberOf(…, 'yanShip'), addon …): DESIGN §36.4 relies on a version reusing them only for the same band or bond.
+ */
+const CODE_KEYED_BANDS = Object.freeze(['band_cathy', 'band_ducklord', 'band_amedic', 'band_bldsk', 'band_cannot']);
+for (const dir of DIRS.filter((d) => !isDefault(d))) {
+  test(`bands and bonds of ${label(dir)}: each code-keyed band id and every shared bond id keeps the default's name and effectId`, () => {
+    const def = dataOf(DEFAULT_DIR);
+    const data = dataOf(dir);
+    for (const id of CODE_KEYED_BANDS) {
+      const b = data.bands?.[id];
+      if (!b) continue;
+      assert.deepEqual([b.name, b.effectId], [def.bands[id].name, def.bands[id].effectId], `${label(dir)} ${id}`);
+    }
+    for (const [id, b] of Object.entries(data.bonds || {})) {
+      if (!def.bonds[id]) continue;
+      assert.deepEqual([b.name, b.effectId], [def.bonds[id].name, def.bonds[id].effectId], `${label(dir)} ${id}`);
+    }
+  });
+}
+
 // =====================================================================================================================
 // AI
 
@@ -567,3 +652,39 @@ test('AI: another version\'s data gets no community evidence and no default-id i
   assert.ok(en.operators.every((p) => p.name === p.nameZh), 'Chinese names');
   assert.ok(knowledgePack(data, { modeId: 'mode_single_normal', language: 'en' }).operators.some((p) => p.name !== p.nameZh));
 });
+
+/** A store fetch over `dir`'s files, with the language folder's overlays (data/i18n) at /data/i18n/. */
+function dirFetch(dir) {
+  return async (url) => {
+    const rel = url.replace(/^\/data\//, '');
+    const abs = rel.startsWith('i18n/') ? path.join(DEFAULT_DIR, rel) : path.join(dir, rel);
+    if (!existsSync(abs)) return { ok: false, status: 404, json: async () => null };
+    const text = readFileSync(abs, 'utf8');
+    return { ok: true, status: 200, json: async () => JSON.parse(text) };
+  };
+}
+const TEXT_FILES = ['chess', 'bonds', 'items', 'bands', 'enemies', 'tokens', 'choices', 'config', 'backups'];
+
+for (const dir of DIRS) {
+  test(`client (public/js/data.js): ${label(dir)} ${isDefault(dir) ? 'takes' : 'never takes'} the language folder's data/i18n overlay; a content set's own texts apply`, async () => {
+    const files = TEXT_FILES.filter((n) => existsSync(path.join(dir, DATA_FILES[n])));
+    const d = createDataStore({ fetch: dirFetch(dir), retryDelays: [] });
+    await d.loadAll(files);
+    assert.equal(await d.setLocale('en'), 'en');
+    const changed = () => files.filter((n) => d.get(n) !== d.getRaw(n));
+    if (isDefault(dir)) { assert.ok(changed().includes('items'), 'the default data is localized'); return; }
+    // 上半 reuses default ids for other records (chess_item_2_03_e_b, eff_acarm054, garrison_69_b …): nothing applied
+    assert.deepEqual(changed(), [], 'served version files');
+    assert.equal(d.lookup('items', 'chess_item_2_03_e_b').desc, d.lookupRaw('items', 'chess_item_2_03_e_b').desc);
+    const en = JSON.parse(readFileSync(path.join(DEFAULT_DIR, 'i18n/en.json'), 'utf8'));
+    const values = Object.fromEntries(files.map((n) => [n, d.getRaw(n)]));
+    // a version content set without texts of its own: none
+    d.setContent({ id: 'cs-version', values });
+    await d.setLocale('en');
+    assert.deepEqual(changed(), [], 'a version content set without its own texts');
+    // with its own (here: the default overlay standing in for a per-version one, M3): applied
+    d.setContent({ id: 'cs-version-own', values, overlay: async () => en, langs: ['en'] });
+    await d.setLocale('en');
+    assert.ok(changed().length > 0, 'the set\'s own texts apply');
+  });
+}

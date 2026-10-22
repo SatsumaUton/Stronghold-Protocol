@@ -158,7 +158,14 @@ keyed build tables, the hidden inputs and the warning classes.
 - **Carried over for 上半 [ASSUMED].** The bounty cards' `draft` / `draftPool` classification is not one of the four
   tables: `HIDDEN_BOUNTY_IDS` and the effect-id shapes of `bountyDraftPool`, read from 下半's PRTS table and screenshots,
   still sort 上半's 93 cards (excluded perfect 20, unseen 14, hidden 4; drafted boss 19, initial 18, hunter 18), and the
-  match honours them. M2's research decides 上半's own pools.
+  match honours them. M2's research decides 上半's own pools. Two more build rules sourced only from 下半's PRTS record
+  (「卫戍协议：盟约 下半/PRTS盟约记录」) apply to 上半 outside `buildConfig` and the four tables:
+  - `DIY_EXTRA_PROTOTYPES` (`tools/build-data.mjs`): the tier-5 自选 slots also offer the six 4★ prototypes (先锋 and 特种
+    left out), so both 上半 builds' `backups.json` `diy.prototypes` has 15 at tier 5 and 9 at tier 6, as the default.
+    PRTS's 上半 page 卫戍协议：盟约 does not mention 4★ prototypes in 自选; M2 checks the rule against 上半.
+  - `BAND_SWAP_LPR` 1: 鸭爵's swapped-in enemies cost 1 LP at the protection point (下半's record, §策略 鸭爵 备注). V1_2's
+    `band_ducklord` carries the same `round_start_all_player_change_enemy_2` enemylist, so its `enemies.json`
+    `enemy_2001_duckmi_2` / `enemy_2002_bearmi_2` get `lpr` 1 (V1_1 has no 鸭爵 band).
 - **Config.** `hiddenCore` 300 / 1000 comes from PRTS 卫戍协议：盟约, and `tuning.json` is the same for every version
   [ASSUMED]. The 上半 rule switches are inert in M0: `deployOrder: 'rowBottomUp'`, `soloTimed`, no bench equipment, no
   full-bench swap and no shared boss. 上半's constData has no `singleReconnectTime` (`12e0a020` added it), so both 上半
@@ -185,9 +192,18 @@ keyed build tables, the hidden inputs and the warning classes.
 
 上半 reuses the default data's ids for other things. 50 of its 100 shop chess ids name another operator than 下半:
 `chess_char_1_02_a` is 讯使, not 角峰. 72 item ids carry another effect and 6 are absent in 下半. On a version's build
-(`config.version`, support `isVersionData`) everything hand-written that was found by id is found by what the record
-*is*. Data without `config.version` — the default and the plugin content sets on it — resolves exactly as before
-(§36.2, §36.3).
+(`config.version`, support `isVersionData`) the hand-written behaviour of the id-reused tables, chess (kits, traits,
+tokens) and items, is found by what the record *is*. Data without `config.version` — the default and the plugin content
+sets on it — resolves exactly as before (§36.2, §36.3).
+
+Band and bond ids still key behaviour by id on every data: `bands/meta.js` (`band_cathy`, `DUCK_BAND` `band_ducklord`),
+`bands/battle.js AMEDIC_BAND`, `server/match/gamedata.js` (`band_bldsk`, `band_cannot`), `bonds/core.js INSTALLERS`
+(`kjeragShip: installKjerag` …) and `memberOf(…, 'yanShip')` in `items/battle.js`. That is correct while a version
+reuses those ids only for the same band or bond: 上半 does (checked: the 29 V1_2 / 19 V1_1 shared band ids keep the
+default's name and effectId, and the 18 shared bond ids their name and effectId; only `emptyShip`'s activeCount and 炎's
+thresholds differ, both documented). `test/versions-keying.test.js` pins it per directory for the code-keyed band ids
+and every shared bond id, so a later build (`SP_VERSION_DATA_DIRS`, 第一期) that reuses one of them for another entity
+fails there.
 
 - **Kits** (SIM.md §7.2).
   - `KIT_CHAR_IDS` names the charId each tier kit was written for. The first line of every kit file names the same one.
@@ -197,7 +213,8 @@ keyed build tables, the hidden inputs and the warning classes.
   - Test fixtures and plugin `chess_x_` records keep the by-id lookup, and so do stand-ins and 自选 pieces
     (`KITS[charId]`).
   - A chess whose own kit was written for its operator but failed to load stays generic, as on the default data; it
-    never takes the operator's other tier kit.
+    never takes the operator's other tier kit. A `char_x_` charId on an official id keeps the by-id kit. Both rules are
+    tested through `officialKitKey`'s injectable registries (`{ kits, kitCharIds, tierKeys }`, tests only).
 - **Items** (SIM.md §7.2, META.md §2.1).
   - `items/battle.js BY_EFFECT`, 蒸汽之心 (`eff_acarm079`) and its hammers, the `items/meta.js` overrides and 凯瑟琳's
     one-cell allowance (`eff_acarm072`, official normal records only; counted at the prep's pick and in her later offers) all
@@ -213,8 +230,15 @@ keyed build tables, the hidden inputs and the warning classes.
 - **`bonds/core.js reached()`.** On a version's build a threshold the record lacks counts as not reached. Before this
   change, 上半's 炎, which has no 9-member tier, would have summoned two 炎佑 at 6 members. Data without
   `config.version` keeps the old rule (reached), so a plugin or Forge core bond without the threshold plays as before.
-- **AI.** The community overlay and the fixed `data/i18n` overlay are keyed by default ids, so they apply only to data
-  without `config.version` (AI-STRATEGY.md §2).
+- **AI and game texts.** The community overlay and the fixed `data/i18n` overlay are keyed by default ids, so they
+  apply only to data without `config.version` (AI-STRATEGY.md §2). The client uses the same gate
+  (`public/js/data.js versionFiles`): files whose config carries `version` take only their content set's own game texts
+  (`setContent` `overlay`; a per-version overlay is M3), never the language folder's `data/i18n/<lang>.json`. The
+  per-text staleness hash (`shared/i18nData.js textHash2`, 2 base-36 characters) cannot stand in for that gate: applied
+  to 上半's files the default overlay changes 7 leaves on V1_2 and 6 on V1_1 in each of en, ja, ko and zh-TW (下半's
+  战栗维式重锤 text on `chess_item_2_03_e_b`, `eff_acarm054`'s +40% HP, `garrison_69_b` without 上半's "若同一行有至少3名干员",
+  `band_dusk` / `aceffect_band_45` with 下半's 【墨色真颜】 clause, `allybuff_select_2_2`'s name). `localeName` still maps
+  Chinese names, which mean the same operator in both versions.
 
 **Kit resolution on 上半** (96 normal shop records; V1_2 and V1_1 resolve identically):
 
@@ -309,7 +333,8 @@ Besides those:
   `enemyAttackAnim` reads, holds only 下半's models. They get no `attackAnim`, so the sim uses `ATTACK_PAUSE` instead of
   the clip timing (`attackStand` / `attackWindup`); 墨浪, 军术师 and 圆号手 are ranged (range 2 / 2.5 / 1.5). This changes
   sim behaviour, so it is M2 work, not M3's visual asset union. Adding their models edits `data/assets.json`, a default
-  data file hashed by G1, and needs the G1 refresh. A non-default build warns once per enemy whose model the manifest
+  data file and a hidden input of every version build: rebuild every version directory (§36.6), and refresh G1 if it
+  still exists (it is deleted when M1 starts, §36.2). A non-default build warns once per enemy whose model the manifest
   lacks, so the list stays visible in `.cache/build-data-report.<slug>.json`.
 - **Version-only keys** (the same 14 in both builds; each is an M2 item):
   - four 上半 traits with no handler: 煌's `SERVER_GAIN_CHAR` (`garrison_52_a` / `_b`, 售出时 she becomes 烛煌, who counts
@@ -356,6 +381,11 @@ version-only keys with their records on every version directory.
     taken, never the default id; V1_1 has no 凯瑟琳 band); the official-record rules of 夕, 远牙 and 凯瑟琳 (a plugin record never counts);
   - the default data matches the baseline, and a plugin patch of an official `charId` / `effectId` on it keeps the old
     lookups;
+  - the same patch keeps 凯瑟琳's cell (`isMutationCell` / `mutationCellIds`), 蒸汽之心's hammers, 远牙's granted trait and
+    夕's dragon by id; `officialKitKey`'s failed-load and `char_x_` rules;
+  - each code-keyed band id and every shared bond id keeps the default's name and effectId;
+  - the client store (`public/js/data.js`) applies no `data/i18n` overlay to a version directory, served or as a content
+    set without its own texts, and does apply a set's own texts;
   - 炎, 远牙, 夕 and the AI overlays (each of these fails on the code before M0).
 - `test/versions-bb-audit.test.js`.
 - `test/docs-consistency.test.js` §21.29: the charId-keyed `TRIGGER_DEVIATIONS`.
@@ -381,6 +411,8 @@ The per-version rebuild tests need the pinned caches `.cache/gamedata@<sha>/` an
 - Official records only for 夕 / 远牙 / 凯瑟琳.
 - A missing threshold is not reached for every core bond, on a version's build.
 - The 下半 bounty draft classification and research texts (`spec`, `implFormula`, `howToPlay`) carried into 上半.
+- 下半's tier-5 4★ prototype extension of 自选 (`DIY_EXTRA_PROTOTYPES`) and 鸭爵's swapped enemies costing 1 LP
+  (`BAND_SWAP_LPR`), both from 下半's PRTS record, carried into 上半 (§36.3).
 - `config.version` marks non-default data.
 - The audit's name matching.
 

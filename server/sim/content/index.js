@@ -95,10 +95,10 @@ const isPluginChess = (id) => String(id ?? '').startsWith(`${RECORD_MAPS.chess[0
  * The official kit of operator `charId`: its tier kit of `tier`, else its first tier kit, else a kit registered under
  * the charId itself (a 自选 op-* or stand-in kit), else null.
  */
-function kitKeyForChar(charId, tier) {
-  const keys = TIER_KIT_KEYS_BY_CHAR[charId];
+function kitKeyForChar(charId, tier, kits = KITS, tierKeys = TIER_KIT_KEYS_BY_CHAR) {
+  const keys = tierKeys[charId];
   if (keys?.length) return keys.find((k) => tierOfKitKey(k) === tier) ?? keys[0];
-  return Object.hasOwn(KITS, charId) ? charId : null;
+  return Object.hasOwn(kits, charId) ? charId : null;
 }
 
 /**
@@ -110,19 +110,20 @@ function kitKeyForChar(charId, tier) {
  * operator but failed to load stays generic, as on the default data. Only an official record with a real charId takes
  * that path: test fixtures (charId defaults to the chess id) and plugin chess (chess_x_ ids; forgeImport leaves `kitRef`
  * out on purpose to keep the generic kit) keep the by-id lookup. The default data and the plugin content sets built on
- * it keep the by-id lookup of before versions M0 (test/versions-keying.test.js).
+ * it keep the by-id lookup of before versions M0 (test/versions-keying.test.js). `registries` replaces the official
+ * registries (KITS, KIT_CHAR_IDS, TIER_KIT_KEYS_BY_CHAR) for tests only, e.g. to model a kit file that failed to load.
  */
-export function officialKitKey(def, data) {
+export function officialKitKey(def, data, { kits = KITS, kitCharIds = KIT_CHAR_IDS, tierKeys = TIER_KIT_KEYS_BY_CHAR } = {}) {
   if (!def) return null;
-  if (isOtherBody(def)) return Object.hasOwn(KITS, def.charId) ? def.charId : null;
+  if (isOtherBody(def)) return Object.hasOwn(kits, def.charId) ? def.charId : null;
   const bare = String(def.baseId ?? def.id ?? '').replace(/_[ab]$/, '');
-  const byId = [def.baseId, def.id, bare].find((k) => k != null && Object.hasOwn(KITS, k) && KITS[k]) ?? null;
+  const byId = [def.baseId, def.id, bare].find((k) => k != null && Object.hasOwn(kits, k) && kits[k]) ?? null;
   if (!isVersionData(data)) return byId;
   const real = typeof def.charId === 'string' && def.charId.startsWith('char_') && !def.charId.startsWith('char_x_') ? def.charId : null;
   if (!real || isPluginChess(def.baseId ?? def.id)) return byId;
-  if (byId && (KIT_CHAR_IDS[byId] ?? real) === real) return byId;
-  if (!byId && KIT_CHAR_IDS[`${bare}_a`] === real) return null;
-  return kitKeyForChar(real, def.tier);
+  if (byId && (kitCharIds[byId] ?? real) === real) return byId;
+  if (!byId && kitCharIds[`${bare}_a`] === real) return null;
+  return kitKeyForChar(real, def.tier, kits, tierKeys);
 }
 
 /**

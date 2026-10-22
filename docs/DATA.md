@@ -130,7 +130,7 @@ Top level: `{ season, seasonName, modes, economy, lpCapPerRound, bossOvertimeAft
 | `dp` | `{"init":10,"perSec":1,"max":99}` | |
 | `unite` | `{"maxHelpers":2,"helperOrder":"unitsOnField>activeBond>undownedUnits; pair: unitsOnField>activeBond>activeLayers>undownedUnits, first = right field (PRTS 帮助)","layerGainsEnabled":false,"templates":{"1":"act1autochess_escaped_single","2":"act1autochess_escaped_multi"},…}` | 联防; `helperOrder` documents the rule `server/match/unite.js helperOrder` implements (research 08 §5; ties → seat) |
 | `finalAssault` | `{"pairing":"seatOrderPairs","oddPlayerAlone":true,"movableBossPerAlivePlayerSide":true,"layerGainsEnabled":false}` | |
-| `timers` | `{"infoCheck":25,"infoCheckHint":5,"bandDraft":50,"bandDraftHint":15,"bandTurn":30,"battleCheck":3,"spFirst":30,"spTurn":16,"soloPrepTimeData":300,"soloSpTimeData":150,"chatCd":1,"chatBubble":3,"broadcastDelay":1,"enterSteps":[…]}` | seconds |
+| `timers` | `{"infoCheck":25,"infoCheckHint":5,"bandDraft":50,"bandDraftHint":15,"bandTurn":50,"battleCheck":3,"spFirst":30,"spTurn":16,"soloPrepTimeData":300,"soloSpTimeData":150,"chatCd":1,"chatBubble":3,"broadcastDelay":1,"enterSteps":[…]}` | seconds |
 | `bans[difficulty]` | `{"core":3,"addon":4}` (FUNNY `{0,1}`) + `rule` | per-match disabled-bond draw (research 01 A2) |
 | `bandDraft` | `{"skipsPerPlayer":1,"order":"random","duplicatesAllowed":true,"timeoutBandId":"band_bldsk"}` | |
 | `titles[]` | `{"id":"comment_1","picId":"comment_icon_1","name":"卫戍之星","stat":"bossDamage","rule":"max","onlyOnWin":true,"text":"…"}` | 评语 + [ASSUMED] criteria; `titleRule` explains assignment |
@@ -577,7 +577,8 @@ Glyph legend (`rows`):
 16. Research-only fields (null without `docs/research`): stage `name`, item `category/kind/family/implFormula/
     requiresBondId/rangeGrid/flavor`, bond `spec`, E2 art availability (falls back to "char has an E2 phase").
 17. [ASSUMED] content (flagged in data): 机变 family schedule and server pools, title criteria, income cap 12, per-turn
-    band-draft timer 30 s (`timers.bandTurn`, the step's only countdown — user playtest #4), the shop-only item list
+    band-draft timer 50 s (`timers.bandTurn`, the step's only countdown — user playtest #4; 50 from the owner's
+    official-play report of 2026-10-10), the shop-only item list
     (`SHOP_EXCLUDED_ITEMS`, from play), the alive / 4 proportion of the fixed pool's optional alive scaling
     (`bossHpScale.aliveAssumed`; `aliveScaling` off). The special-enemy generator, the leader table (`bloodPoint`, one
     pool for every field) and the 联防 timing are official; the pool's × players alive is the owner's decision of
@@ -861,8 +862,15 @@ every file system and URL).
   effect-id shapes of `bountyDraftPool` (`enemyeffect_b_*` / `enemyeffect_5_1` → boss, `enemyeffect_1[0-5]_[78]` /
   `16_*` → hunter, every other kill card → `unseen`, never drafted) come from 下半's PRTS table and screenshots, and the
   match honours them (`server/match/choices.js`). 上半's 93 bounty cards: excluded perfect 20, unseen 14, hidden 4;
-  drafted boss 19, initial 18, hunter 18. M2's research decides 上半's own pools. Some ids also change meaning (`enemyeffect_12_7` and
-  `15_7` are tier II in 下半, I in 上半; the tier is read from the name, so it comes out right).
+  drafted boss 19, initial 18, hunter 18. M2's research decides 上半's own pools. Four drafted ids also change meaning in both 上半 builds:
+  `enemyeffect_12_7` and `15_7` are tier II in 下半, I in 上半 (the tier is read from the name, so it comes out right);
+  悬赏·频次III `enemyeffect_11_6` (initial pool) targets 沉沙 `enemy_1207_sfji` in 上半, `enemy_1209_sfden` in 下半; and
+  “鼠王”·悬赏 `enemyeffect_b_11` (boss pool) is tier 3 / 3 coins in 上半, 2 / 2 in 下半.
+  Two more build rules come only from 下半's PRTS record 「卫戍协议：盟约 下半/PRTS盟约记录」 and are carried into 上半
+  [ASSUMED] (DESIGN §36.3; M2 checks both against 上半): `DIY_EXTRA_PROTOTYPES`, the tier-5 自选 slots' six extra 4★
+  prototypes (先锋 / 特种 left out: `backups.json` `diy.prototypes` 15 at tier 5, 9 at tier 6, as the default; PRTS's 上半
+  page says nothing of 4★ prototypes in 自选), and `BAND_SWAP_LPR` 1, 鸭爵's swapped-in enemies costing 1 LP
+  (§策略 鸭爵 备注: V1_2's `enemy_2001_duckmi_2` / `enemy_2002_bearmi_2` `lpr` 1; V1_1 has no 鸭爵).
 - **`config`**: `hiddenCore` single / multi (下半 350 / 1200; 上半 300 / 1000, PRTS 卫戍协议：盟约); `rules` — 上半:
   `deployOrder 'rowBottomUp'`, `soloTimed true`, `benchEquip false`, `benchFullSwap false`, `bossMirrorShare false`, all
   inert until M2 and [ASSUMED] (PRTS 卫戍协议/帮助; news 5114 lists the last three as 下半 additions).
@@ -932,7 +940,8 @@ node --test test/data-versions.test.js test/versions-default-guard.test.js
 and names the missing `.cache/gamedata@<sha>/`. **Hidden inputs**: a version build also reads the committed
 `data/assets.json` (the enemies' attack clips: a manifest of 下半's models, so the 6 上半-only enemies above have no
 `attackAnim` and the sim keeps `ATTACK_PAUSE` for them — 墨浪, 萨卡兹王庭军术师 and 巫王乐团圆号手 are ranged, so their
-attack timing is off — until M2 adds their models; that is a default data file change and needs the G1 refresh),
+attack timing is off — until M2 adds their models; `data/assets.json` is a default data file, so that change rebuilds
+every version directory and refreshes G1 if it still exists, DESIGN §36.2 deleting G1 when M1 starts),
 `data/tuning.json` (its byte copy; `test/data-versions.test.js` fails
 while a copy differs) and, while it has no research copy, `docs/research/*.json` — a default-side change to those makes
 the version directories stale with no version-related cause. Rebuild every version then
