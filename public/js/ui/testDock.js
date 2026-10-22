@@ -44,15 +44,14 @@ export const DOCK_REM = Object.freeze({
 });
 
 /**
- * Layout root in CSS px. Same clamp as css/theme.css, times 界面大小 (`ui`, --sp-ui; 1 = 100 %). A caller that can read the
- * real root (getComputedStyle(<html>).fontSize: --sp-ui and the 异形屏适配 box included) passes it as `size.rem` instead.
+ * Layout root in CSS px at 界面大小 100 %. Same clamp as css/theme.css. A caller that can read the real root
+ * (getComputedStyle(<html>).fontSize: --sp-ui and the 异形屏适配 box included) passes it as `size.rem` instead.
  */
-export function remOf(width, height, ui = 1) {
+export function remOf(width, height) {
   const w = Number(width);
   const h = Number(height);
-  const k = Number(ui) > 0 ? Number(ui) : 1;
-  if (!(w > 0) || !(h > 0)) return 40 * k;
-  return Math.min(240, Math.max(40, Math.min(w / 19.2, h / 10.8))) * k;
+  if (!(w > 0) || !(h > 0)) return 40;
+  return Math.min(240, Math.max(40, Math.min(w / 19.2, h / 10.8)));
 }
 /** `size.rem` when the caller measured it, else remOf(width, height). */
 const rootOf = (size, w, h) => (Number(size?.rem) > 0 ? Number(size.rem) : remOf(w, h));

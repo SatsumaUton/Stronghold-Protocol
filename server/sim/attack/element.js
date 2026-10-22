@@ -31,8 +31,9 @@
 // other) cannot re-burst the unit recursively. The unit's shown gauge (the fullest, "当前损伤元素") and its cooldown
 // travel in b.snap `elem` (elementView).
 // 元素伤害 (HP damage of an element) is the DamageInfo type 'elemental' (+ optional `element` for display): no DEF/RES
-// (元素抗性 instead), no dodge, × source dmgDealtMul × target elementalTakenMul (元素脆弱) only — the target's
-// dmgTakenMul (脆弱 and the other "受到的伤害±" effects) does not scale it: ba.fragile is "受到的物理、法术、真实伤害提升"
+// (元素抗性 instead), no probability dodge (dodgePhys / dodgeArts are phys / arts only), but an injury dodge that
+// names every HP type (圣约送葬人 S2) can cancel it, × source dmgDealtMul × target elementalTakenMul (元素脆弱) only —
+// the target's dmgTakenMul (脆弱 and the other "受到的伤害±" effects) does not scale it: ba.fragile is "受到的物理、法术、真实伤害提升"
 // (gamedata_const termDescriptionDict), 元素伤害 has its own ba.elementfragile [ASSUMED for the damage_resistance-type
 // cuts, which share the multiplier]. An element fill on a target with no HP left (hasHp: a lethal hit's `damaged` hook
 // runs before battle.kill, while the target is still `alive` at 0 HP) is refused, so nothing bursts on a corpse.

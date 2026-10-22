@@ -100,15 +100,19 @@ const LO = sliderOf(FIT_MIN), HI = sliderOf(FIT_MAX);
 export function ScreenFitSection() {
   const f = useStore((s) => s, Object.is, fitStore);
   const textSize = useStore((s) => s.textSize, Object.is, settingsStore);
+  // a drag's reading ({ v, from }: the value and the stored size it was taken from). The release applies it; Chrome
+  // fires no `change` when a drag ends where it began, and a touch drag can turn into a scroll, so the reading is
+  // also dropped on pointercancel / blur and by −, + and 重置, and ignored once the stored size is another one.
   const [preview, setPreview] = useState(null);
   const ui = sanitizeUi(f.ui);
   const allowed = uiAllowed(textSize);
-  const shown = allowed ? sanitizeUi(preview ?? ui) : 100;
+  const shown = allowed ? sanitizeUi(preview && preview.from === ui ? preview.v : ui) : 100;
+  const setUi = (v) => { setPreview(null); updateFit({ ui: Number(v) }); };
   const any = FIT_SIDES.some((k) => f[k] !== 0) || ui !== 100;
   return html`<section class="set-fit" aria-labelledby="set-fit-title" data-testid="screen-fit">
     <div class="set-keys__head">
       <span class="set-row__label" id="set-fit-title">${t('异形屏适配')}<${MicroLabel}>SCREEN FIT<//></span>
-      <${Button} variant="ghost" size="sm" icon="refresh" class="set-fit__reset" disabled=${!any} onClick=${() => updateFit(NONE)}>${t('重置')}<//>
+      <${Button} variant="ghost" size="sm" icon="refresh" class="set-fit__reset" disabled=${!any} onClick=${() => { setPreview(null); updateFit(NONE); }}>${t('重置')}<//>
     </div>
     <p class="set-hint">${t('全屏后界面被挖孔、刘海或曲面边缘挡住，或比例、位置不对时使用：50 为不调整，往右拉该边往里收，往左拉该边往外扩。界面会立即移动，可边看边调，只保存在这台设备上。')}</p>
     ${FIT_SIDES.map((k) => {
@@ -124,12 +128,13 @@ export function ScreenFitSection() {
     })}
     <div class=${`set-row set-fit__row${allowed ? '' : ' is-disabled'}`} data-testid="ui-size">
       <span class="set-row__label">${t('界面大小')}<${MicroLabel}>UI SIZE<//></span>
-      <button type="button" class="set-fit__step" aria-label=${t('减少')} disabled=${!allowed || ui <= UI_MIN} onClick=${() => updateFit({ ui: ui - UI_STEP })}>−</button>
+      <button type="button" class="set-fit__step" aria-label=${t('减少')} disabled=${!allowed || ui <= UI_MIN} onClick=${() => setUi(ui - UI_STEP)}>−</button>
       <input class="set-range" type="range" min=${UI_MIN} max=${UI_MAX} step=${UI_STEP} value=${shown} disabled=${!allowed}
         style=${`--pct:${((shown - UI_MIN) / (UI_MAX - UI_MIN)) * 100}%`} aria-label=${t('界面大小')} data-testid="ui-size-range"
-        onInput=${(e) => setPreview(Number(e.currentTarget.value))}
-        onChange=${(e) => { setPreview(null); updateFit({ ui: Number(e.currentTarget.value) }); }} />
-      <button type="button" class="set-fit__step" aria-label=${t('增加')} disabled=${!allowed || ui >= UI_MAX} onClick=${() => updateFit({ ui: ui + UI_STEP })}>+</button>
+        onInput=${(e) => setPreview({ v: Number(e.currentTarget.value), from: ui })}
+        onPointerUp=${(e) => setUi(e.currentTarget.value)} onChange=${(e) => setUi(e.currentTarget.value)}
+        onPointerCancel=${() => setPreview(null)} onBlur=${() => setPreview(null)} />
+      <button type="button" class="set-fit__step" aria-label=${t('增加')} disabled=${!allowed || ui >= UI_MAX} onClick=${() => setUi(ui + UI_STEP)}>+</button>
       <span class="set-row__val num" data-testid="ui-size-pct">${shown}%</span>
     </div>
     <p class="set-hint">${t('界面大小：缩小按钮、面板、商店条和文字，给棋盘多留空间（100% 为原尺寸）；按钮保持可点的大小。')}</p>

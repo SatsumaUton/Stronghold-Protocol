@@ -204,7 +204,7 @@ test('same-named flat reduction takes the strongest value separately for each HP
   assert.equal(b.dealDamage({ target: t, amount: 100, type: 'phys' }), 70, 'weaker surviving source resumes');
 });
 
-// PRTS 伤害减免: reductions of different names stack; the name is `reductionGroup`, else the buff key (DESIGN §35.32).
+// PRTS 伤害减免: reductions of different names stack; the name is `reductionGroup`, else the buff key (DESIGN §35.44).
 test('differently named flat reductions stack, one name keeps its strongest', () => {
   const { b, t } = fixture();
   b.addBuff(t, { key: 'a', damageReduction: { phys: 30 } });
@@ -212,6 +212,11 @@ test('differently named flat reductions stack, one name keeps its strongest', ()
   assert.equal(b.dealDamage({ target: t, amount: 100, type: 'phys' }), 50, 'two names: both subtract');
   b.addBuff(t, { key: 'c', reductionGroup: 'a', damageReduction: { phys: 40 } });
   assert.equal(b.dealDamage({ target: t, amount: 100, type: 'phys' }), 40, "'c' joins 'a': 40 replaces 30");
+  // a group that names no key (per-unit keys sharing one name, as 浊心斯卡蒂's aura does)
+  const fresh = fixture();
+  fresh.b.addBuff(fresh.t, { key: 'aura:1', reductionGroup: 'aura', damageReduction: { phys: 25 } });
+  fresh.b.addBuff(fresh.t, { key: 'aura:2', reductionGroup: 'aura', damageReduction: { phys: 35 } });
+  assert.equal(fresh.b.dealDamage({ target: fresh.t, amount: 100, type: 'phys' }), 65, 'two keys of one group: the strongest alone');
 });
 
 test('flat reduction follows its buff priority/acquisition position and can remove the mitigation floor', () => {

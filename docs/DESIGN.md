@@ -39,7 +39,8 @@ consumers that depend on it in [§35.32](history/0.3.2.md#3532-ordered-settlemen
 the contract and the series' verification in [§35.35](history/0.3.2.md#3535-settlement-contract-and-the-series-verification-pr-856-siornya).
 Current contracts: [design/engine.md](design/engine.md) §5.5 and [SIM.md](SIM.md) §4. The batch's merge review
 (burst damage dodgeable, fixed reductions by name, #848's manifest, 界面大小 at 小 only) is
-[§35.44](history/0.3.2.md#3544-merge-review-of-the-pr-batch-2026-10-23).
+[§35.44](history/0.3.2.md#3544-merge-review-of-the-pr-batch-2026-10-23); its second review (the injury fields in SIM §3,
+the 界面大小 reading) is [§35.45](history/0.3.2.md#3545-second-review-of-the-pr-batch-2026-10-23).
 
 Picture-only outfits become wearable under the maintainer's 2026-10-18 option A in
 [§35.4](history/0.3.2.md#354-picture-only-outfits-b6): per-seat pictures with default battle models;

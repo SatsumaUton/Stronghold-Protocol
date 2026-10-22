@@ -193,4 +193,48 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
     assert.deepEqual(problems, []);
     await page.close();
   });
+
+  test('界面大小: a real drag that ends where it began leaves no stale reading (Chrome fires no change); − and 重置 show the new size', async () => {
+    const { page, problems } = await open('phase=PREP&variant=settings', { width: 1280, height: 720 }, { l: 0, r: 0, t: 0, b: 0, ui: 85 });
+    await page.waitForSelector('[data-testid="ui-size-range"]', { timeout: 10000 });
+    const row = () => page.evaluate(() => ({
+      pct: document.querySelector('[data-testid="ui-size-pct"]').textContent,
+      value: document.querySelector('[data-testid="ui-size-range"]').value,
+      k: document.documentElement.style.getPropertyValue('--sp-ui'),
+    }));
+    // the range's box, measured again after each size change (the whole interface scales with it)
+    let box;
+    const measure = async () => {
+      box = await page.evaluate(() => {
+        const r = document.querySelector('[data-testid="ui-size-range"]');
+        r.scrollIntoView({ block: 'center' });
+        const b = r.getBoundingClientRect();
+        return { x: b.left, y: b.top + b.height / 2, w: b.width };
+      });
+    };
+    await measure();
+    const xAt = (v) => box.x + ((v - 75) / 25) * box.w;
+    await page.mouse.move(xAt(85), box.y);
+    await page.mouse.down();
+    for (const v of [80, 75, 80, 85]) { await page.mouse.move(xAt(v), box.y, { steps: 3 }); await sleep(30); }
+    await page.mouse.up();
+    await sleep(200);
+    assert.deepEqual(await row(), { pct: '85%', value: '85', k: '0.85' });
+    await page.evaluate(() => document.querySelector('[data-testid="ui-size"] .set-fit__step').click());
+    await sleep(200);
+    assert.deepEqual(await row(), { pct: '80%', value: '80', k: '0.8' }, '− moves the reading with the size');
+    // a drag to another value applies on release
+    await measure();
+    await page.mouse.move(xAt(80), box.y);
+    await page.mouse.down();
+    await page.mouse.move(xAt(90), box.y, { steps: 5 });
+    await page.mouse.up();
+    await sleep(200);
+    assert.deepEqual(await row(), { pct: '90%', value: '90', k: '0.9' });
+    await page.click('.set-fit__reset');
+    await sleep(200);
+    assert.deepEqual(await row(), { pct: '100%', value: '100', k: '' }, '重置 shows 100 %');
+    assert.deepEqual(problems, []);
+    await page.close();
+  });
 });

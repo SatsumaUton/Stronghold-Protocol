@@ -655,7 +655,8 @@ per source — DoTs and slows do that on purpose; a damage-taken / DEF / RES mod
 ## 3. Buffs, mods, statuses
 
 `battle.addBuff(unit, { key, duration=Infinity, refresh='replace'|'extend'|'stack'|'independent'|'keep', stacks, maxStacks,
-mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, shieldHits, shieldType, persist, visible, data, allowDead })`
+mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, shieldHits, shieldType, keepEmptyShield,
+damageReduction, reductionGroup, injury(event), observeInjury(event), injuryPriority, persist, visible, data, allowDead })`
 - `replace`: new instance replaces the old; `extend`: keep the longer remaining time, take the new mods; `stack`: +stacks
   up to maxStacks, timer reset; `independent`: separate timers, at most `maxStacks` alive (oldest dropped); `keep`: ignore.
 - Additive mods scale with stacks (`value × stacks`), `*Mul` mods multiply (`value ^ stacks`).
@@ -664,6 +665,19 @@ mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, 
   `shieldType` ('phys' | 'arts' | 'true' | 'elemental') = a 屏障 that absorbs that damage type only (夜莺 S2 法术护盾 "能吸收…
   法术伤害"), or a list of them = those types only (机械师's 屏障 `['phys', 'arts']`: BlockDamage PHYSICAL_AND_MAGICAL — true
   damage passes); none = every type (PRTS 术语释义 屏障 "若无特殊说明，屏障可吸收全种类伤害"). Shields are spent oldest first.
+- The injury fields (伤判效果, `attack/effects.js injuryEffects`; DESIGN §35.32, design/engine.md §5.5) run on the
+  target after 限伤, in `injuryPriority` order (higher first, default 0; 斥罪's barrier −1000), then acquisition order:
+  - `damageReduction` = `{ phys, arts, true, elemental }`: a fixed amount subtracted from that HP type (PRTS 伤害减免).
+    Reductions of one name keep only the strongest per HP type; differently named ones stack. The name is
+    `reductionGroup`, else the buff key — so a per-unit key (`key:${unit.id}`, §2 above) stacks per source unless the
+    buffs share a `reductionGroup` (浊心斯卡蒂's aura: `'skadi2:reduction'`; DESIGN §35.44).
+  - `injury(event)`: `{ amount, type, dodge(p), block(p), defer(fn), source, target, buff, … }` — it may lower or raise
+    `event.amount`, call `dodge(p)` / `block(p)` to cancel the hit with probability `p` (omitted = always), and `defer`
+    a cleanup that runs after the settlement even when a later effect cancels it.
+  - `observeInjury(event)`: `{ amount, type, cancelled, outcome, … }`, a read-only snapshot; it keeps its place in the
+    order and still runs after a cancellation.
+  - `keepEmptyShield: true`: an emptied `shield` / `shieldHits` buff is not removed — it keeps its acquisition position
+    and may refill later (斥罪's barrier, 碎铳之簧's shared barrier).
 - `visible: true` emits `['status', id, key, 1/0]` client events. `battle.removeBuff(unit, key|buff)`.
 - `removeBuff` fixes the matching instances in reverse order, then locates each in the current buff list before
   removing it. Synchronous `onRemove` may remove other buffs: an absent candidate is skipped, its callback is not
@@ -673,9 +687,10 @@ mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, 
   another call. [ASSUMED] Extension API traversal policy, not an official gameplay rule (DESIGN §35.5).
 
 **Mod keys** — additive: `atkFlat atkPct atkFinal defFlat defPct hpFlat hpPct resFlat aspd batPct blockCnt rangeExtend
-defIgnoreFlat defIgnorePct resIgnoreFlat resIgnorePct dodgePhys dodgeArts spRecoveryFlat maxTargets taunt hpRegen
+artsAttackAddition defIgnoreFlat defIgnorePct resIgnoreFlat resIgnorePct dodgePhys dodgeArts spRecoveryFlat maxTargets taunt hpRegen
 hpRegenRatio spCostFlat moveFlat massFlat blockRadiusScale` (重量 levels: 失重 = `massFlat: −1`; never edit `base.massLevel`;
-`blockRadiusScale` = 阻挡半径倍率 − 1, the air-block radius of §1.2);
+`blockRadiusScale` = 阻挡半径倍率 − 1, the air-block radius of §1.2; `artsAttackAddition` = 法术攻击加算, added to an arts
+hit's attack at the target's calculation, design/engine.md §5.5);
 multiplicative: `atkMul defMul hpMul resMul moveMul dmgDealtMul dmgTakenMul physTakenMul artsTakenMul trueTakenMul
 elemTakenMul elementalTakenMul healingDealtMul healingTakenMul spRecoveryMul redeployMul atkScaleMul physDealtMul artsDealtMul`.
 A `rangeExtend` on a `persist` never-expiring buff is **permanent**: it also widens the initial range (§7.1). It widens

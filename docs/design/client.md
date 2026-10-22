@@ -432,7 +432,9 @@ target ≥ 32 px stays ≥ 32 px, one of 32 px or less stays `max(<rem>, Npx)` (
 line-height and letter-spacing floors stay px. The size applies at 文字大小 小 only (`effectiveUi`): 中 / 大 / 特大 keep
 their 64 / 76 / 88 px `--t` floors and the interface at 100 % (the row is disabled with a note; the stored size returns at
 小), since those floors outgrew boxes that shrank; 小's `--t` (1rem, no floor) follows the layout. A drag moves only the
-reading; the size applies on release (`change`). `test/ui/ui-size.test.js` guards every floor. At 100 % no property is
+reading; the size applies on release (`pointerup` or `change`). The reading is dropped on `pointercancel` / blur and by
+−, + and 重置, and ignored once the stored size changes (Chrome fires no `change` when a drag ends on its start value;
+§35.45). `test/ui/ui-size.test.js` guards every floor. At 100 % no property is
 set: the page is the design itself.
 Overrides are local listening preferences, absent from room loadouts and their exports.
 
