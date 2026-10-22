@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { makeBattle, chessRec, checkInvariants } from '../helpers/battleHarness.js';
+import { grantHitShield } from '../../server/sim/content/enemies/helpers.js';
 import * as enemiesMod from '../../server/sim/content/enemies.js';
 import * as bossesMod from '../../server/sim/content/bosses.js';
 import { spawnYanyou } from '../../server/sim/content/tokens.js';
@@ -350,7 +351,7 @@ for (const key of ['enemy_1200_msfjin', 'enemy_1204_msfhu', 'enemy_1288_duskls']
   });
 }
 
-test('茶器 (hitCountArts): physical instances remove nothing, true / elemental remove 1 each; element fills do not count', () => {
+test('茶器 (hitCountArts): only arts/true lower HP; physical/elemental and gauge fills do not count', () => {
   const h = arena({ units: [{ chessId: 't_gun', row: 12, col: 3 }] });
   h.step();
   const e = put(h, 'enemy_1204_msfhu', [10, 7]);
@@ -361,7 +362,9 @@ test('茶器 (hitCountArts): physical instances remove nothing, true / elemental
   h.b.dealDamage(g, e, { type: 'element', element: 'burn', amount: 100 });
   assert.equal(e.hp, n);
   h.b.dealDamage(g, e, { amount: 1, type: 'true' });
-  h.b.dealDamage(g, e, { amount: 1, type: 'elemental' });
+  assert.equal(h.b.dealDamage(g, e, { amount: 1, type: 'elemental' }), 0);
+  assert.equal(e.hp, n - 1);
+  h.b.dealDamage(g, e, { amount: 1, type: 'arts' });
   assert.equal(e.hp, n - 2);
   checkInvariants(h.b);
 });
@@ -3278,4 +3281,68 @@ test(`${nm('enemy_10122_uacann_2')}: its 燃烧区域 (不可对空) spares a fl
   assert.ok(burns.some((c) => c.target === w), 'the wall burns');
   assert.ok(!burns.some((c) => c.target === y), 'the dragon does not');
   assert.ok(!h.hooksOf('damaged').some((c) => c.source === e && c.target === y), 'nor is it shot or splashed');
+});
+
+// PRTS 伤判效果: enemy-class barriers and fragile have ordinary priority and use acquisition order.
+test('enemy arts barriers consume actual damage at their own position relative to fragile', () => {
+  for (const fragileFirst of [false, true]) {
+    const h = arena();
+    h.step();
+    const e = put(h, 'enemy_1509_mousek', [10, 7]);
+    const bar = e.mem.ab.list[0];
+    h.b.addBuff(e, { key: 'probe:fragile', mods: { dmgTakenMul: 2 } });
+    if (fragileFirst) bar.refresh(h.b, e, bar);
+    const before = bar.left;
+    const base = 1000 * (1 - e.s.res / 100);
+    assert.equal(h.b.dealDamage({ target: e, amount: 1000, type: 'arts' }), 0);
+    approx(before - bar.left, base * (fragileFirst ? 2 : 1), 1e-9);
+  }
+});
+
+
+for (const earlier of ['dodge', 'block', 'barrier']) {
+  test(`native enemy hit shield retains its charge after earlier ${earlier} and still allows later observers`, () => {
+    const h = arena();
+    h.step();
+    const b = h.b, e = put(h, 'enemy_1249_lysdb_2', [10, 7]);
+    const shield = e.findBuff('ab:hitShield');
+    assert.equal(shield.shieldHits, 1);
+    b.addBuff(e, { key: 'earlier', injuryPriority: 1000,
+      ...(earlier === 'dodge' ? { mods: { dodgeArts: 1 } } : earlier === 'block' ? { injury(c) { c.block(); } } : { shield: 100000 }) });
+    let observed = 0, successes = 0;
+    b.addBuff(e, { key: 'observer', injuryPriority: -1000, observeInjury() { observed++; } });
+    b.on('damageApplied', c => { if (c.target === e) successes++; });
+    b.rng = () => 0;
+    assert.equal(b.dealDamage({ target: e, amount: 100, type: 'arts' }), 0);
+    assert.equal(shield.shieldHits, 1);
+    assert.equal(observed, 1);
+    assert.equal(successes, 0);
+    b.removeBuff(e, 'earlier');
+    assert.equal(b.dealDamage({ target: e, amount: 100, type: 'arts' }), 0);
+    assert.equal(e.findBuff('ab:hitShield'), null);
+    assert.equal(observed, 2, 'full shield absorption still passes injury observation');
+    assert.equal(successes, 0);
+    checkInvariants(b);
+  });
+}
+
+test('enemy hit shield uses phys/arts filters and continuous acquisition order on stronger regrant', () => {
+  const h = arena();
+  h.step();
+  const b = h.b, e = put(h, 'enemy_1249_lysdb_2', [10, 7]);
+  const shield = e.findBuff('ab:hitShield');
+  for (const type of ['true', 'elemental']) assert.ok(b.dealDamage({ target: e, amount: 10, type }) > 0);
+  b.dealHPLose({ target: e, amount: 1 });
+  b.dealElementDamage({ target: e, amount: 1, element: 'burn' });
+  assert.equal(shield.shieldHits, 1);
+  b.addBuff(e, { key: 'later-dodge', mods: { dodgePhys: 1 } });
+  assert.equal(grantHitShield(b, e, 5), shield);
+  assert.equal(grantHitShield(b, e, 1), shield);
+  assert.equal(shield.shieldHits, 5);
+  let draws = 0;
+  b.rng = () => { draws++; return 0; };
+  b.dealDamage({ target: e, amount: 100, type: 'phys' });
+  assert.equal(shield.shieldHits, 4);
+  assert.equal(draws, 0, 'the older shield absorbs before the later ordinary dodge');
+  checkInvariants(b);
 });
