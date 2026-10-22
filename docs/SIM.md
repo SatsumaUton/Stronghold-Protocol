@@ -962,11 +962,14 @@ registration order. `battle.off(handle)` / `battle.off(name, fn)` / `battle.offO
 "bonus damage on hit") must not react to its own output or to other reactive damage, or two such effects ping-pong
 until the nesting guard trips (the guard then skips *every* nested handler, including `kill`/`death` bookkeeping of
 content). Respond only to `dmg.isAttack` (normal attacks), tag your damage (`tags: ['counter']`) and skip tagged damage,
-or guard with a per-unit flag while dealing it. The "受到攻击时" counters take the second way: the official ones fire on
-every damage instance from an enemy (ON_TAKE_DAMAGE — its attack, a skill hit, 深溟巢涌者's pulse; never a 流失), so they
-answer `kits/shared/tier1.js byEnemyAttack` (星熊 S2, 泡泡, 刺玫 S2, 余 S1, 玛恩纳 无动于衷, 年 S2, 斩业星熊; 菲莱 S2 any
-instance) and skip `'counter'` / `'reflect'` damage. When the guard trips, the logged error names the open frames
-(`chain: hit(enemy_x→chess_y) > damaged(chess_y) > …`).
+or guard with a per-unit flag while dealing it. The "受到攻击时" counters are held injury observers since 0.3.2 (§4,
+DESIGN §35.32): the official ones fire on every damage instance from an enemy source (ON_TAKE_DAMAGE — its attack, a
+skill hit, 深溟巢涌者's pulse; never a 流失 or a 无来源 hit), so they answer `kits/shared/tier1.js byEnemyDamage`
+(`byEnemyAttack` is its deprecated alias; 星熊 S2, 泡泡, 刺玫 S2, 余 S1, 玛恩纳 无动于衷, 年 S2, 斩业星熊, 斥罪; 菲莱 S2 any
+instance). A descriptive `'counter'` / `'reflect'` tag no longer excludes an enemy source — the official templates filter
+by source side, attack type and route, not by such tags (no ally counter answers ally damage; an enemy counter with a
+source can set one off, and the nesting guard ends such an exchange). When the guard trips, the logged error names the
+open frames (`chain: hit(enemy_x→chess_y) > damaged(chess_y) > …`).
 
 ---
 

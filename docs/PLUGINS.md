@@ -1176,6 +1176,18 @@ are unrestricted and never labelled sandboxable; their sim/meta entries still us
 Geometry helpers read no battle state and incur no engine-action charge; their caller still uses the callback budget.
 `sortEnemyTargets` remains unavailable: it mutates its candidate array, uses live Unit references and calls Battle.remainingDistance.
 
+**SDK hit and damage helpers (0.3.2 settlement, DESIGN §35.32).** `kit.onHitBy(battle, unit, fn)` (damage `unit` deals to
+an enemy) and `kit.onHitOn(battle, unit, fn)` (damage dealt to `unit`) listen on `hit`: once per HP-damage instance, before
+the calculation, output and injury stages — `ctx.dmg.amount` is the instance's input, no DEF / RES, barrier, shield or
+dodge has acted yet, and a handler may still set `ctx.dmg.cancel`. A 流失 (`dealHPLose`) and a gauge fill (`'element'`)
+never reach `hit`. `kit.onDamagedOn(battle, unit, fn)` listens on `damaged`, after the HP step: `ctx.amount` is the damage
+dealt (on a special-HP target the computed damage, while its HP drops by one point); a hit a barrier absorbs whole reports
+0; a dodged one reports nothing; a 流失 and a gauge fill report too (`isHpLoss(ctx.dmg)`, `ctx.type === 'element'`); a
+无来源 instance has `source: null` and names its `credit`. `kit.byEnemyAttack(ctx)` (= tier1 `byEnemyDamage`) is true for
+damage from an enemy source, never a 流失, a gauge fill or a 无来源 instance; since 0.3.2 a `'counter'` / `'reflect'`
+tag no longer excludes it (the official counters filter by source, type and route), so a counter written with it must
+guard its own output (SIM §5 re-entrancy rule). `test/plugins/sdk-hooks-settlement.test.js` pins this.
+
 **Budget.** Script callbacks and engine actions use the same per-battle/per-plugin counter as DSL (default 8000).
 Setup installs, hooks, timer callbacks and skill callbacks count. Engine actions (damage, buffs, spawning, DP, etc.)
 count too; exhaustion unwinds that callback, cancels the plugin's timers and removes its tagged buffs, records one
