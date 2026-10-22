@@ -51,7 +51,7 @@ node tools/golden.mjs --twice                   # determinism: the corpus twice 
   changed files together with the change, saying in the commit message which scenarios moved and why. Until the
   official versions' M1 starts, `test/versions-default-guard.test.js` (G1) also pins the sha256 of these files and of
   the default `data/*.json`: refresh it in the same commit with
-  `SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js` (DESIGN §36.2).
+  `SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js` (DESIGN §35.22.2).
 - **Reviewing the diff:** every scenario is a block of its own and every unit / enemy / round is one line, so a diff
   shows which scenarios moved and which values changed. A change confined to the scenarios that contain the touched
   operator, enemy or rule is expected; a change everywhere (every `rngDraws`, every `snaps`) means something global

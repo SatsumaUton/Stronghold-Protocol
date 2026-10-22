@@ -1117,8 +1117,8 @@ Kit = {
 ```
 Keys: the data `baseId` (`chess_char_1_01_a`, also used for the elite `_b`), the exact chess id, or the suffix-less id of the
 DESIGN §5.6 example (`chess_char_1_01`) — all three are looked up.
-The operator is checked too (official versions M0, after 0.3.2): another official version reuses chess ids for other
-operators — in 盟约·上半 (`act1autochess`) 50 of the 100 shop chess ids name another operator than today, e.g.
+The operator is checked too (official versions M0, 0.3.2, DESIGN §35.22): another official version reuses chess ids for
+other operators — in 第一期 (盟约·上半, `act1autochess`) 50 of the 100 shop chess ids name another operator than today, e.g.
 `chess_char_1_02_a` is 讯使 (`char_198_blackd`), not 角峰. `kits/index.js` `KIT_CHAR_IDS` names the charId each tier kit was
 written for (the first line of every kit file names the same one). On a version's build (data whose `config.json` carries
 `version`, support `isVersionData`) `content/index.js officialKitKey` uses the by-id kit only when it was written for the
@@ -1127,15 +1127,17 @@ record's tier when the operator has several: 锡人, 耶拉, 华法琳 …), els
 `op-*` kit), else none — the generic kit. Only official records with a real charId take that path: test fixtures (whose
 charId defaults to the chess id) and plugin chess (`chess_x_` ids; Forge imports leave out `kitRef` on purpose to keep
 the generic kit) keep the by-id lookup, and stand-ins / 自选 pieces keep theirs (`KITS[def.charId]`). 上半's owned
-自选 pool holds 24 operators that 下半 sells as shop chess (星熊, 莫斯提马, 夕, 玛恩纳 …): their kit is a tier kit only, so
-they are listed in `kits/index.js` `PENDING_DIY_KIT_CHARS`, stay out of `KITTED_CHARS` and are left out of 上半's 自选 by
-the kitted gate [ASSUMED] until M2 reviews the tier kit as a 自选 kit or writes one. The default data
+自选 pool holds 24 operators that 下半 sells as shop chess (星熊, 莫斯提马, 夕, 玛恩纳 …), 第二期上半's (V2_1) 4 that V2_2 made
+shop chess (银灰, 空弦, 卡涅利安, 伺夜): their kit is a tier kit only, so they are listed in `kits/index.js`
+`PENDING_DIY_KIT_CHARS`, stay out of `KITTED_CHARS` and are left out of those versions' 自选 by the kitted gate [ASSUMED]
+until M2 reviews the tier kit as a 自选 kit or writes one. The default data
 and the plugin content sets built on it carry no `config.version` and keep the by-id lookup of before M0, so nothing
-changes there, not even for a plugin that patches an official record's `charId` (DESIGN §36.3). On the 上半 data (measured on a dry build of
+changes there, not even for a plugin that patches an official record's `charId` (DESIGN §35.22.3). On the 上半 data (measured on a dry build of
 `@21b1f240`, 96 normal shop records): 46 keep their id with the same operator, 19 resolve to a tier kit by charId, 12 to a
 自选 `op-*` kit (菲亚梅塔, 森蚺, 煌, 左乐, 涤火杰西卡, 林, 提丰, 娜仁图亚, 澄闪, 死芒, 伊芙利特, 淬羽赫默 — written for 自选, to be
 reviewed as shop chess), and 19 have no kit yet: 讯使, 梅, 远山, 狮蝎, 暴行, 布丁, 万顷, 暴雨, 锡兰, 芳汀, 极光, 槐琥, 海蒂, 蜜莓, 安哲拉,
-伊桑, 星源, 桑葚, 亚叶 (`kits/index.js` `PENDING_KIT_CHARS`). `test/versions-keying.test.js` checks every data directory
+伊桑, 星源, 桑葚, 亚叶 (`kits/index.js` `PENDING_KIT_CHARS`). V2_1 reuses no id for another operator: its 116 normal shop
+records all keep their own kit. `test/versions-keying.test.js` checks every data directory
 (`data/`, each `data/versions/*/`, and `SP_VERSION_DATA_DIRS`): each chess resolves to a kit of its own charId or is
 pending, each 自选 pick and 补位 stand-in to its charId's kit or is a 预备干员 (generic) or a pending 自选 pick that the
 kitted gate drops, each directory matches its pinned resolution counts, and the default data keeps exactly the old lookup. The same
@@ -1149,13 +1151,15 @@ read with 10 in `bonds/addon/battle.js`), the buff keys the code names that the 
 the engine does not implement (上半's 斩业星熊 S3: `AUTO_STOP`), and the keys the version carries that the default data
 lacks and no code under `server/` or `shared/` names (buff keys and `bbStr.key` of bands, bonds, items and effects;
 garrison `effectType` / `effectKey` / `battleRuneKey` / `bbStr.key`), each with its records. Those mechanics are
-silently inert until M2 (DESIGN §36.5): in 上半, the traits of 煌 (`SERVER_GAIN_CHAR`, 售出时 → 烛煌, both 炎 and 维多利亚),
+silently inert until M2 (DESIGN §35.22.5): in 上半, the traits of 煌 (`SERVER_GAIN_CHAR`, 售出时 → 烛煌, both 炎 and 维多利亚),
 蜜莓 (`SERVER_ADD_BOND_ACTIVATED_RANDOM`), 伊芙利特 (`SERVER_ADD_BOND_FRONT_ALL_LAYER`) and 极光
 (`act1autochess_gar_event_recoverhp_enemy_abflag_inrange`); 华法琳 / 寒芒克洛丝's grant to the operator in front (上半
 spells the field `give_garrion_id`; `garrisons/battle.js` reads `give_garrison_id`); the 标准模拟 band clause
 `act1autochess_band31_buff` on four bandIds 下半 also has; 灵巧's 20-layer award `bond_layer_refresh_shop_award_equip`
 and 远见's 100-layer discount; and six 上半 equipment keys (商业包装方案, 信标, 寻呼模块, `act1autochess_equip_acarm055` /
-`078` / `102_global_buff`). No class reports 上半's 森蚺 (`band_zumama`): it carries Touch's key `auto_chess_change_map`, which the default data has (same key, different meaning: the M2 audit), with device aliases
+`078` / `102_global_buff`); in V2_1, 远见's discounts (上半's two keys, not V2_2's
+`bond_multi_layer_char_goods_price_bond_discount`). No class sees a changed text under the same keys: V2_1's 陈 以己之长
+reaches 高台 operators only, `bands/battle.js` every operator as in V2_2 (DESIGN §35.22.5). Nor does any class report 上半's 森蚺 (`band_zumama`): it carries Touch's key `auto_chess_change_map`, which the default data has (same key, different meaning: the M2 audit), with device aliases
 (`trap_1104_aclasert#1`…`#4`, one 双眼皮 on every field). `bands/battle.js isMapCharBuff` accepts only Touch's
 map-character shape, so 森蚺 has no battle part (nor the AI's team-support class) until M2 builds its device switch. The
 shape check is not gated on `config.version`: it applies to every data set, so a plugin band on the default data

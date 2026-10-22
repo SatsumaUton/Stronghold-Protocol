@@ -22,10 +22,11 @@ id), else the generic kit built from the skill blackboard (`content/generic.js`,
 and a 自选 piece's kit is `KITS[def.charId]` and nothing else (`content/index.js kitOf`): it keeps the chess's (the DIY
 slot's) ids, which name the replaced operator's kit (a slot has none).
 On another official version's build the by-id kit is used only when `KIT_CHAR_IDS` names the record's charId (official
-versions M0, after 0.3.2): that version gives some chess ids to other operators, whose kit is then found by charId
-(`content/index.js officialKitKey`, docs/SIM.md §7.2). The default data keeps the by-id lookup. A 自选 piece keeps
-`KITS[def.charId]` there too: 上半's owned 自选 pool holds 24 operators whose kit is a tier kit only
-(`PENDING_DIY_KIT_CHARS`), which `KITTED_CHARS` therefore leaves out of that version's 自选 [ASSUMED] until M2.
+versions M0, 0.3.2, DESIGN §35.22): that version may give chess ids to other operators (第一期, 盟约·上半, does), whose kit
+is then found by charId (`content/index.js officialKitKey`, docs/SIM.md §7.2). The default data keeps the by-id lookup.
+A 自选 piece keeps `KITS[def.charId]` there too: the owned 自选 pools hold operators whose kit is a tier kit only (24 in
+上半, 4 in 第二期上半: `PENDING_DIY_KIT_CHARS`), which `KITTED_CHARS` therefore leaves out of that version's 自选
+[ASSUMED] until M2.
 
 ## Naming
 

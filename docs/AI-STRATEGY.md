@@ -65,9 +65,9 @@ The maintainer also suggests 罗素 with cheap elites and three 坚守 as the te
 teams have poor early enemy matchups but strong late potential, or 芬 supplying their missing key operators with
 信标. These are **[ASSUMED] strategies based on community testimony**, not guarantees of carrying a team.
 
-The overlay applies to the default data (盟约·下半) only (official versions M0, after 0.3.2). Its evidence names
-default-data ids, and another official version gives those ids to other operators and items (in 盟约·上半,
-`chess_char_1_02_a` is 讯使, not 角峰). `server/ai/playbook.js` therefore gives data that carries `config.version` (a
+The overlay applies to the default data (第二期下半, 盟约·下半 V2_2) only (official versions M0, 0.3.2, DESIGN §35.22).
+Its evidence names default-data ids, and another official version gives those ids to other operators and items (in
+第一期, 盟约·上半, `chess_char_1_02_a` is 讯使, not 角峰; 第二期上半 lacks 13 of today's shop entries and 4 strategies). `server/ai/playbook.js` therefore gives data that carries `config.version` (a
 non-default version's build) an empty community overlay, and `server/ai/knowledge.js` keeps its Chinese names instead
 of loading the fixed `data/i18n/<lang>.json` overlay, which is keyed by default ids. A version gets its own overlay
 through §7.

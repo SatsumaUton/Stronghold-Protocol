@@ -39,7 +39,7 @@
 // server's files back (the entries the set replaced, kept meanwhile — nothing is downloaded again) and its overlays. The
 // subscribers of every file that changed hands are told. One content set at a time: the next one replaces it.
 //
-// Versions (DESIGN §36.4): files whose config carries `version` (another official version's, e.g. 上半 as a content set)
+// Versions (DESIGN §35.22.4): files whose config carries `version` (another official version's, e.g. 上半 as a content set)
 // take only their content set's own game texts, never the language folder's data/i18n overlays, which are keyed by the
 // default data's record ids (versionFiles). `localeName` still maps Chinese names.
 
@@ -275,7 +275,7 @@ export function createDataStore(opts = {}) {
   }
 
   /**
-   * Whether the files in effect are another official version's (their config carries `version`, DESIGN §36.4). The
+   * Whether the files in effect are another official version's (their config carries `version`, DESIGN §35.22.4). The
    * language folder's overlays are keyed by the default data's record ids, which a version reuses for other records
    * (上半's chess_item_2_03_e_b is not 下半's hammer), and the per-text hash cannot tell them apart: such files take
    * only their content set's own texts (setContent `overlay`; a per-version overlay is M3), the same gate as the

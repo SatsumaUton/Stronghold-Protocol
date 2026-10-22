@@ -10,7 +10,7 @@
 //   On another official version's build (support isVersionData: config.version) an official kit is checked against the
 //   operator it was written for (officialKitKey, kits/index.js KIT_CHAR_IDS): that version gives some chess ids to
 //   other operators, whose kit is then found by charId (the tier kit of the record's tier, else a 自选 op-* kit), or
-//   none (generic). The default data and the plugin content sets built on it keep the by-id lookup (DESIGN §36.3).
+//   none (generic). The default data and the plugin content sets built on it keep the by-id lookup (DESIGN §35.22.3).
 //   补位 stand-ins (isStandInDef: the def of simdata getStandIn — the chess's ids, another character's body): the kit is
 //   kits[def.charId] (the stand-in's own, kits/ops/standin-<codename>.js), never the chess id's — that is the replaced
 //   operator's kit; without one, the generic kit plus the talents it can apply exactly (generic.js genericTalents).

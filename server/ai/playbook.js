@@ -73,7 +73,7 @@ function bandProfile(id, band, data, gd) {
       'Useful against uneven DEF/RES; does not remove the leader hit limit.');
     if (/coin|price_change/.test(b.key)) classes.push('economy');
     if (/copy_max/.test(b.key)) classes.push('elite-merge');
-    // Touch's map characters only: 上半's 森蚺 names a device (trap_1104_aclasert#n) under the same key (DESIGN §36.5)
+    // Touch's map characters only: 上半's 森蚺 names a device (trap_1104_aclasert#n) under the same key (DESIGN §35.22.5)
     const mapChars = b.key === 'auto_chess_change_map' && Object.keys(b.bb || {}).some(k => k.startsWith('char_') && k.includes('#'));
     if (mapChars || b.key === 'round_start_all_player_change_enemy_2') classes.push('team-support');
     if (b.key === 'round_start_all_player_change_enemy_2') add('team-enemies', 'team-support', p,

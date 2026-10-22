@@ -62,7 +62,7 @@ export const isGoldenId = (id) => /_b$/.test(String(id ?? ''));
 
 /**
  * Whether `data` (default: the loaded data) is another official version's build (config.version, data/versions/*;
- * DESIGN §36.3). Only such data finds hand-written behaviour by charId / effectId: the default data and the plugin
+ * DESIGN §35.22.3). Only such data finds hand-written behaviour by charId / effectId: the default data and the plugin
  * content sets built on it carry no config.version and keep the by-id lookups of before versions M0, so a plugin that
  * patches an official record's charId or effectId changes that record, not which kit or item behaviour runs.
  */

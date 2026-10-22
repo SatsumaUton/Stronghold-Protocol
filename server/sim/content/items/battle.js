@@ -889,7 +889,7 @@ export function addShieldLayer(battle, target, key, cap = 1) {
 /**
  * The default data's item key of each BY_EFFECT behaviour. Data without config.version (support isVersionData: the
  * default data and the plugin content sets built on it) dispatches by item key (itemKeyOf, which follows a plugin
- * record's effectRef), as before versions M0 (DESIGN §36.3): a plugin that patches an official item's effectId does
+ * record's effectRef), as before versions M0 (DESIGN §35.22.3): a plugin that patches an official item's effectId does
  * not change its behaviour there.
  */
 export const DEFAULT_ITEM_KEYS = Object.freeze({
