@@ -19,8 +19,10 @@
 // carries its tag (ui/pluginTag.js VersionTag). Re-viewing a settlement needs that version's data on the page: outside a
 // room the row offers 切换到「X」查看 (the page shows that version while the replay is open — the store's `replayVersion`,
 // versions.js shownVersion — and the settlement opens once its data is checked; closing the replay or 统计数据 clears it,
-// the lobby preference is never touched); in a room it says the room's version decides the data. 成就统计 counts the
-// season of the version shown.
+// the lobby preference is never touched); in a room it says the room's version decides the data; a version this server
+// does not offer (welcome.versions, e.g. a default server) is not offered as a switch. The replay's wait always keeps
+// 返回统计 (a failed version set offers 重试; a room left while its version's replay is open keeps that version shown).
+// 成就统计 counts the season of the version shown.
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
@@ -43,8 +45,8 @@ import {
 import { t, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { VersionTag } from '../ui/pluginTag.js';
-import { contentSet } from '../content.js';
-import { DEFAULT_VERSION, shownVersion, seasonOf, versionLabel } from '../versions.js';
+import { contentSet, retryContentSet } from '../content.js';
+import { DEFAULT_VERSION, shownVersion, seasonOf, versionLabel, welcomeVersion } from '../versions.js';
 import { VERSIONS } from '../../../shared/versions.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -64,7 +66,10 @@ export function openStats() {
   statsStore.set({ open: true, tab: 'overview' });
 }
 export const closeStats = () => statsStore.set({ open: false });
-/** Whether 统计数据 is open (the lobby's 成就统计 card reads the records again when it closes). */
+/**
+ * Whether 统计数据 is open (the lobby's 成就统计 card reads the records again when it closes; main.js floats the room's
+ * version vote above it, ui/versionVote.js CoveredVersionVote).
+ */
 export const useStatsOpen = () => useStore((s) => s.open, Object.is, statsStore);
 
 const TABS = [
@@ -480,6 +485,13 @@ function VersionFilter({ records, value, shown }) {
   </div>`;
 }
 
+/**
+ * Can this page show `version`'s data outside a room? 第二期下半 always (its own /data/ files); another version only when
+ * this server offers it (welcome.versions: content.js loads a version set from there).
+ * @param {any} s the app store's state @param {string} version
+ */
+const versionOffered = (s, version) => version === DEFAULT_VERSION || !!welcomeVersion(s, version);
+
 /** One 对局记录 row: what it was, who won, whether it counted and whether the settlement can be re-viewed. */
 function HistoryRow({ rec, gd, onOpen }) {
   const self = selfRowOf(rec);
@@ -493,11 +505,14 @@ function HistoryRow({ rec, gd, onOpen }) {
   const version = recordVersion(rec);
   const shown = useStore(shownVersion);
   const inRoom = useStore((s) => !!s.room);
+  const offered = useStore((s) => versionOffered(s, version));
   const other = version !== shown;
-  const view = !quit && !rec.compact && !(other && inRoom); // a quit has nothing settled; a compacted record no rows left
+  // a quit has nothing settled; a compacted record no rows left; another version needs the lobby and this server's offer
+  const view = !quit && !rec.compact && !(other && (inRoom || !offered));
   const open = () => onOpen(rec);
   return html`<tr class=${cx(quit ? 'is-quit' : won ? 'is-win' : 'is-lose', !counted && 'is-excluded', view && 'is-clickable')} data-version=${version}
-      title=${!quit && !rec.compact && other ? (inRoom ? t('同盟中的数据由房间的版本决定，离开同盟后才能回看「{version}」的结算', { version: versionLabel(version) }) : t('切换到「{version}」查看', { version: versionLabel(version) }))
+      title=${!quit && !rec.compact && other ? (inRoom ? t('同盟中的数据由房间的版本决定，离开同盟后才能回看「{version}」的结算', { version: versionLabel(version) })
+        : !offered ? t('这台服务器没有提供「{version}」，不能回看该局结算', { version: versionLabel(version) }) : t('切换到「{version}」查看', { version: versionLabel(version) }))
         : view ? t('点击查看该局结算') : !counted ? t('没有清完第一个回合就退出，不计入统计') : quit ? t('中途退出的对局没有结算可看') : t('较早的对局只保留汇总，不能回看结算')}
       tabIndex=${view ? 0 : undefined}
       onClick=${view ? open : undefined} onKeyDown=${view ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } : undefined}>
@@ -531,15 +546,37 @@ function History({ records, gd, onOpen }) {
 
 /**
  * A stored match re-viewed as its settlement screen: the full game data is loaded now (the lobby alone never loads it)
- * — of the record's version, which the page loads first when it shows another (see the header).
+ * — of the record's version, which the page loads first when it shows another (see the header). Until it can be drawn
+ * the wait keeps 返回统计: the version may be one this server does not offer, the room may now play another, or the
+ * version set may fail its check (重试). A room left while its version's replay is open (kick, room closed) would move
+ * the page to the lobby's version: the record's stays shown (`replayVersion`).
  */
 function Replay({ rec, onBack }) {
   const gd = useGameData();
   const res = useMemo(() => recordToResult(rec), [rec]);
   const version = recordVersion(rec);
   const versionReady = useStore((c) => (version === DEFAULT_VERSION ? c.kind !== 'version' : c.kind === 'version' && c.version === version && c.status === 'ready'), Object.is, contentSet);
+  const failed = useStore((c) => version !== DEFAULT_VERSION && c.kind === 'version' && c.version === version && c.status === 'failed', Object.is, contentSet);
   const shown = useStore(shownVersion);
-  if (!gd.ready || !versionReady || shown !== version) return html`<div class="st-loading"><${Spinner} size="md" /><p class="t-lo">${version !== DEFAULT_VERSION ? t('正在载入「{version}」的数据…', { version: versionLabel(version) }) : ''}</p></div>`;
+  const inRoom = useStore((s) => !!s.room);
+  const offered = useStore((s) => versionOffered(s, version));
+  useEffect(() => {
+    if (!inRoom && offered && shown !== version && store.get().replayVersion !== version) store.set({ replayVersion: version });
+  }, [inRoom, offered, shown, version]);
+  if (!gd.ready || !versionReady || shown !== version) {
+    const label = versionLabel(version);
+    const why = inRoom && shown !== version ? t('同盟中的数据由房间的版本决定，离开同盟后才能回看「{version}」的结算', { version: label })
+      : !offered ? t('这台服务器没有提供「{version}」，不能回看该局结算', { version: label })
+        : failed ? t('版本数据校验失败') : null;
+    return html`<div class="st-loading st-replay-wait" data-testid="stats-replay-wait">
+      ${why ? html`<p class=${cx('t-lo', failed && 'is-warn')}>${why}</p>`
+        : html`<${Spinner} size="md" /><p class="t-lo">${version !== DEFAULT_VERSION ? t('正在载入「{version}」的数据…', { version: label }) : ''}</p>`}
+      <div class="st-replay-wait__acts">
+        ${failed && !inRoom ? html`<${Button} variant="primary" size="sm" data-testid="stats-replay-retry" onClick=${retryContentSet}>${t('重试')}<//>` : null}
+        <${Button} variant="secondary" size="sm" icon="chevronLeft" data-testid="stats-replay-back" onClick=${onBack}>${t('返回统计')}<//>
+      </div>
+    </div>`;
+  }
   return html`<${ResultView} res=${res} pub=${null} myId=${rec.selfId} backLabel=${t('返回统计')} onBack=${onBack} quiet=${true}
     content=${rec.content ? { cs: rec.content.cs, vanilla: false, plugins: rec.content.plugins } : null} version=${rec.version ?? null} />`;
 }
@@ -590,7 +627,7 @@ function StatsScreen({ tab }) {
   // the replay waits for its data
   const openRecord = (rec) => {
     const v = recordVersion(rec);
-    if (v !== shownVersion(store.get()) && store.get().room) return;
+    if (v !== shownVersion(store.get()) && (store.get().room || !versionOffered(store.get(), v))) return;
     if (!store.get().room && store.get().replayVersion !== v) store.set({ replayVersion: v });
     setReplay(rec);
   };

@@ -15,6 +15,8 @@
 // API (the lobby, the static server, the match hosts, /healthz):
 //   ids / defaultId / nonDefault           enabled ids in registry order, the server's default, the enabled others
 //   isEnabled(id), entry(id)               the registry entry of an enabled id, else null
+//   available(id)                          enabled and playable: another version's data loads (loaded on first use; a
+//                                          failed load is remembered — create / proposeVersion refuse it, welcome omits it)
 //   csOf(id), idOfCs(cs)                   a version's cs (the vanilla cs for the default) and back
 //   content(id)                            the room content base: frozen { cs, vanilla: true, version, plugins: [] }
 //                                          (the default: { cs, vanilla: true, plugins: [] }, no `version`)
@@ -144,6 +146,8 @@ export function createVersionSets({ enabled, defaultId = DEFAULT_VERSION, dataDi
     nonDefault: Object.freeze(ids.filter((id) => id !== DEFAULT_VERSION)),
     /** @param {unknown} id */
     isEnabled: (id) => typeof id === 'string' && ids.includes(id),
+    /** Enabled, and (another version) its data loads — a failed load stays failed (see `load`). @param {unknown} id */
+    available: (id) => typeof id === 'string' && ids.includes(id) && (id === DEFAULT_VERSION || load(id) != null),
     /** @param {unknown} id */
     entry: (id) => (typeof id === 'string' && ids.includes(id) ? versionById(id) : null),
     /** @param {string} id */
@@ -180,10 +184,14 @@ export function createVersionSets({ enabled, defaultId = DEFAULT_VERSION, dataDi
       const modes = id === DEFAULT_VERSION ? defaultModes() : /** @type {any} */ (others.get(id)).modes;
       return DIFFICULTIES.filter((d) => modes.has(modeIdFor(roomMode, d)));
     },
-    /** welcome.versions, or null when the server offers act2autochess alone (a default server's welcome is unchanged). */
+    /**
+     * welcome.versions, or null when the server offers act2autochess alone (a default server's welcome is unchanged). A
+     * version whose data failed to load is left out (no page could load it; known once a room or its manifest tried).
+     */
     welcome() {
-      if (ids.length === 1 && ids[0] === DEFAULT_VERSION) return null;
-      return ids.map((id) => {
+      const live = ids.filter((id) => !others.get(id)?.failed);
+      if (live.length === 1 && live[0] === DEFAULT_VERSION) return null;
+      return live.map((id) => {
         const entry = /** @type {import('../shared/versions.js').OfficialVersion} */ (versionById(id));
         return { id, cs: id === DEFAULT_VERSION ? vanilla.cs : /** @type {any} */ (others.get(id)).content.cs, family: entry.family,
           label: entry.label, roomModes: [...entry.roomModes], ...(id === def ? { default: true } : {}) };

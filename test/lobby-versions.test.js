@@ -209,6 +209,18 @@ test('the host cancels (told to the others); a stale or foreign vote id is BAD_T
   h.lobby.shutdown();
 });
 
+test('a version whose data failed to load is refused by room.create and room.proposeVersion (VERSION_UNSUPPORTED)', () => {
+  const stub = versionStub({ enabled: ['act2autochess', 'act1autochess'] });
+  stub.available = (id) => id === DEFAULT_VERSION; // server/versions.js available after act1autochess's load failed
+  const h = harness({ versions: stub });
+  refused(h.lobby.create(h.player('Solo'), { mode: 'solo', version: 'act1autochess' }), ERR.VERSION_UNSUPPORTED, 'the data of this version is not available');
+  const { people: [a], room } = coop(h, 2);
+  refused(h.lobby.proposeVersion(a, { version: 'act1autochess' }), ERR.VERSION_UNSUPPORTED, 'the data of this version is not available');
+  assert.equal(room.versionVote, null, 'no vote opened');
+  assert.equal(room.version, DEFAULT_VERSION);
+  h.lobby.shutdown();
+});
+
 test('refusals of room.proposeVersion, in their order', () => {
   const h = harness({ versions: versionStub({ enabled: ['act2autochess', 'act1autochess', 'act2autochess@V2_1'], roomModes: { 'act2autochess@V2_1': ['solo'] } }) });
   const outsider = h.player('Out');
@@ -235,7 +247,7 @@ test('refusals of room.proposeVersion, in their order', () => {
 
 test('what voids a vote (toast to every member): a join, a spectator sitting down, a leave, a kick, the host leaving (its freed seat), a voter dropping', () => {
   const cases = {
-    join: (h, { room }) => ok(h.lobby.join(h.player('Late'), { code: room.code })),
+    join: (h, ctx) => { ctx.late = h.player('Late'); ok(h.lobby.join(ctx.late, { code: ctx.room.code })); },
     sit: (h, { room, spy }) => ok(h.lobby.join(spy, { code: room.code })),
     leave: (h, { people }) => ok(h.lobby.leave(people[2])),
     kick: (h, { people, room }) => ok(h.lobby.kick(people[0], { seat: room.seatOf(people[2].playerId).seat, playerId: people[2].playerId })),
@@ -257,6 +269,9 @@ test('what voids a vote (toast to every member): a join, a spectator sitting dow
     const watcher = name === 'sit' ? ctx.people[1] : ctx.spy;
     assert.equal(h.toasts(watcher).at(-1)?.msgid, '同盟成员有变动，切换版本投票已取消', name);
     assert.equal(h.last(watcher).versionVote, undefined, name);
+    // the joiner never saw the vote: no toast about it; a spectator sitting down did see it
+    if (name === 'join') assert.deepEqual(h.toasts(ctx.late), [], 'no toast for the joiner');
+    if (name === 'sit') assert.equal(h.toasts(ctx.spy).at(-1)?.msgid, '同盟成员有变动，切换版本投票已取消', 'the spectator who sat down saw the vote');
     h.lobby.shutdown();
   }
 });

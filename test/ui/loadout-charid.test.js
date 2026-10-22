@@ -20,6 +20,7 @@ globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), se
 const readJson = (rel) => JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 const DEF = readJson('data/chess.json');
 const V1 = readJson('data/versions/act1autochess/chess.json');
+const V21 = readJson('data/versions/act2autochess-v2_1/chess.json');
 const listOf = (c) => Object.values(c);
 
 const M = await import('../../public/js/ui/loadoutModel.js');
@@ -114,6 +115,14 @@ test('the app\'s views follow the data on screen; a write-back on a stale view i
   assert.deepEqual(JSON.parse(mem.get('sp.pref.ownership')), { v: 2, notOwnedChars: [BLACKD], notOwned: [] }, '讯使 has no chess in 第二期下半: an older build sees everyone owned');
   // a v1 import (第二期下半's chess ids) as entries of the view on screen is importedEntries' job; a v2 one maps directly
   assert.deepEqual(S.importedEntries({ byChar: { [YAK]: { skill: 1 } } }), { chess_char_2_03_a: { skill: 1 } });
+  assert.deepEqual(S.importedEntries({ entries: { chess_char_1_02_a: { skill: 1 } } }, 'act1autochess'), { chess_char_2_03_a: { skill: 1 } }, 'a v1 entry: by its operator');
+  // a v1 import with entries on both of an operator's 第二期下半 chess — the visible chess_char_4_23_a and the hidden
+  // droppable chess_char_5_18_a (see the migration) — files the visible chess's choice under the operator, whatever the
+  // key order (importedEntries' ownChessOf: the slot's entry first); in 第二期上半 that operator (char_1026_gvial2) is
+  // chess_char_5_18_a itself, visible
+  show(V21, 'v21');
+  assert.deepEqual(S.importedEntries({ entries: { chess_char_5_18_a: { skill: 1 }, chess_char_4_23_a: { skill: 0 } } }, 'act2autochess@V2_1'),
+    { chess_char_5_18_a: { skill: 0 } }, 'the visible chess\'s choice, not the hidden chess\'s');
   show(DEF, 'def');
   refreshViews();
   assert.deepEqual(loadoutStore.get().entries, { chess_char_1_02_a: { skill: 2 } });

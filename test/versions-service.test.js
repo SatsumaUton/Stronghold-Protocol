@@ -167,6 +167,11 @@ test('a version whose data passed the boot checks but fails to load is remembere
     assert.equal(v.file(csUrlPart(v.csOf('act1autochess')), 'bounds/official.json'), null);
     assert.equal(errors.filter((m) => /act1autochess data failed to load/.test(m)).length, 1, 'logged once');
     assert.equal(v.stats().loaded, 0);
+    // no longer offered: the lobby's gates refuse it (available) and later pages do not see it (welcome)
+    assert.equal(v.isEnabled('act1autochess'), true);
+    assert.equal(v.available('act1autochess'), false);
+    assert.equal(v.available(DEFAULT_VERSION), true);
+    assert.equal(v.welcome(), null, 'only 第二期下半 left: the default welcome');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

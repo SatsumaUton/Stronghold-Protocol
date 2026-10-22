@@ -2327,6 +2327,7 @@
   "全部版本": "All versions",
   "同盟中的数据由房间的版本决定，离开同盟后才能回看「{version}」的结算": "In a co-op the room's version decides the data; leave it to review a settlement of “{version}”",
   "切换到「{version}」查看": "Switch to “{version}” to view",
+  "这台服务器没有提供「{version}」，不能回看该局结算": "This server does not offer “{version}”: the settlement cannot be reviewed",
   "正在载入「{version}」的数据…": "Loading the data of “{version}”…",
   "这个版本还没有记录。": "No records for this version yet.",
   "玩法说明的图片来自第二期下半，「{version}」中部分规则不同": "The How to Play pictures are from Season 2 · Part 2; some rules differ in “{version}”",

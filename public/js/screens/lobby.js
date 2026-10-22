@@ -61,7 +61,7 @@ import { t, tc, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { NoticesButton } from '../ui/notices.js';
 import { VersionSwitch } from '../ui/versionPicker.js';
-import { contentSet } from '../content.js';
+import { contentSet, retryContentSet } from '../content.js';
 import { DEFAULT_VERSION, lobbyVersion, offeredDifficulties, fallbackDifficulty, seasonOf, versionLabel } from '../versions.js';
 
 /** Official mode texts (activity_table act2autochess.modeDataDict), fallback when config.json is absent. */
@@ -505,7 +505,7 @@ function BackPlate({ onClick, class: cls = '' }) {
  * button (the other doctors: the host chooses).
  */
 export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, onCreate, busy, online, testMode, asTest, onTest, action = null, hint = null, readOnly = false,
-  difficulties = DIFFICULTIES, loading = false }) {
+  difficulties = DIFFICULTIES, loading = false, failed = false }) {
   const card = MODE_CARDS.find((c) => c.id === roomMode) || MODE_CARDS[0];
   const info = difficultyInfo(roomMode, difficulty);
   const label = action || (roomMode === 'solo' ? t('开始独立模拟') : t('创建同盟'));
@@ -535,7 +535,9 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
         </section>
         <section class="proto-side">
           <div class="proto-list" role="group" aria-label=${t('模拟难度')} aria-busy=${loading ? 'true' : 'false'}>
-            ${loading ? html`<p class="proto-list__wait" data-testid="proto-loading"><${Spinner} size="sm" />${t('正在载入版本数据…')}</p>` : null}
+            ${failed ? html`<p class="proto-list__wait is-failed" data-testid="proto-failed"><${Icon} name="warn" />${t('版本数据校验失败')}
+                <${Button} size="sm" variant="secondary" data-testid="proto-retry" onClick=${retryContentSet}>${t('重试')}<//></p>`
+              : loading ? html`<p class="proto-list__wait" data-testid="proto-loading"><${Spinner} size="sm" />${t('正在载入版本数据…')}</p>` : null}
             ${difficulties.map((d) => html`<${DifficultyCard} key=${d} roomMode=${roomMode} difficulty=${d} selected=${difficulty === d} onSelect=${onDifficulty} disabled=${readOnly || loading} />`)}
           </div>
           ${readOnly ? html`<div class="proto-foot proto-foot--ro">
@@ -664,6 +666,8 @@ export function LobbyScreen() {
   const versions = useStore((s) => s.versions);
   const version = useStore(lobbyVersion);
   const versionLoading = useStore((c) => version !== DEFAULT_VERSION && (c.kind !== 'version' || c.version !== version || c.status !== 'ready'), Object.is, contentSet);
+  // its set failed to load or its check (the chip's 重试 sits under the modal): 选择模拟协议 says so and offers 重试 too
+  const versionFailed = useStore((c) => version !== DEFAULT_VERSION && c.kind === 'version' && c.version === version && c.status === 'failed', Object.is, contentSet);
   const cfg = getConfig();
   const solo = offeredDifficulties(versionLoading ? null : cfg, 'solo');
   const coop = offeredDifficulties(versionLoading ? null : cfg, 'coop');
@@ -763,7 +767,7 @@ export function LobbyScreen() {
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} short=${shortScreen} />` : null}
     ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
-      testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} />` : null}
+      testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed} />` : null}
     ${sweepOpen ? html`<${SweepReport} onClose=${() => setSweepOpen(false)} />` : null}
     ${achOpen ? html`<${AchievementDialog} onClose=${() => setAchOpen(false)} />` : null}
   </div>`;

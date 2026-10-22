@@ -636,7 +636,8 @@ export function buildQuitRecord(state, ctx = {}) {
     selfId: myId,
     vs: vsOf(state.room?.content?.vs),
     content: contentOf(state.room?.content),
-    version: state.room ? state.room.version ?? null : str(pub.version) ?? state.matchVersion ?? null,
+    // the room's version, else the frames' (m.public `version`; absent = 第二期下半, as versions.js matchFrameVersion)
+    version: state.room ? state.room.version ?? null : str(pub.version) ?? null,
     players: [{
       playerId: myId, seat: row.seat, name: row.name, isBot: false, left: true, alive, victory: false, roundsPassed,
       eliminatedRound: alive ? null : live.aliveRound, lp: row.lp, bandId: row.bandId,

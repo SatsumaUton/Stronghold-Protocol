@@ -200,18 +200,20 @@ constant: a message or a record without a version means it, whatever the server'
 
 - S→C `welcome.versions?` = `[{ id, cs, family, label, roomModes, default?: true }]` in registry order (`label`: the
   registry msgid; `default` on the server's default only) — present only when more than one version is enabled or the only
-  one is not `act2autochess`;
+  one is not `act2autochess`; a version whose data failed to load at run time is left out of later welcomes;
 - C→S `room.create { mode, difficulty?, test?, version? }` — `version` omitted: the server's default. Refused
-  `VERSION_UNKNOWN` (not enabled), `VERSION_UNSUPPORTED` (not one of its `roomModes`; or the server owner's fixed plugins —
-  plugins/config.json `rooms: fixed` — cannot play it). A difficulty the version lacks is lowered: the highest it offers
+  `VERSION_UNKNOWN` (not enabled), `VERSION_UNSUPPORTED` (not one of its `roomModes`; its data failed to load — 'the data
+  of this version is not available'; or the server owner's fixed plugins — plugins/config.json `rooms: fixed` — cannot
+  play it). A difficulty the version lacks is lowered: the highest it offers
   below, else its lowest (终极 → 绝境);
 - `room.setDifficulty` / `room.setMode`: a difficulty or official mode the room's version lacks → `BAD_TARGET` 'not a mode
   of this version'; `room.setMode` during an open vote → `VERSION_VOTE` (`room.setDifficulty` is allowed);
 - C→S `room.proposeVersion { version }` (the host, before the match). Refused, in this order: `NOT_IN_ROOM`, `SPECTATOR`,
   `NOT_HOST`, `ROOM_STARTED`, `VERSION_UNKNOWN`, `VERSION_UNSUPPORTED` (the room mode; gameplay plugins on and the target
   not `act2autochess`), `ALREADY` (the room's own version), `VERSION_VOTE` (a vote is open), `RATE` (300 ms since the last
-  proposal, or 5 s after a declined or expired vote [ASSUMED]), `NOT_READY` (a seated human offline), and
-  `VERSION_UNSUPPORTED` again when the room's cosmetic plugins do not resolve on the target. With exactly one active human
+  proposal, or 5 s after a declined or expired vote [ASSUMED]), `NOT_READY` (a seated human offline), `VERSION_UNSUPPORTED`
+  when the target's data failed to load, and `VERSION_UNSUPPORTED` again when the room's cosmetic plugins do not resolve
+  on the target. With exactly one active human
   the room switches at once; otherwise a vote opens — voters: the seated, non-departed humans then, in seat order (AI seats
   and spectators never vote); the host counts as agreed; 60 s to answer [ASSUMED];
 - C→S `room.versionVote { voteId, agree }` (a voter): `NOT_IN_ROOM`, `SPECTATOR`, `WRONG_PHASE` (no vote), `BAD_TARGET`

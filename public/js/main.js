@@ -60,10 +60,11 @@ import { GuideHost } from './ui/guide.js';
 import { installDeviceSupport } from './ui/device.js';
 import { registerImportedAssetWorker } from './assetCache.js';
 import { LoadoutHost } from './screens/loadout.js';
-import { StatsHost } from './screens/stats.js';
+import { StatsHost, useStatsOpen } from './screens/stats.js';
+import { CoveredVersionVote } from './ui/versionVote.js';
 import { installRehearsal } from './battle/rehearsal.js';
 import { recordResult, installStatsRecorder } from './ui/stats.js';
-import { installLoadoutSync, installOwnershipSync, installDiySync, installSkinsSync, installCardSync, installSettingsViews } from './ui/loadoutSync.js';
+import { installLoadoutSync, installOwnershipSync, installDiySync, installSkinsSync, installCardSync, installSettingsViews, loadoutStore } from './ui/loadoutSync.js';
 import { startBuildGuard } from './ui/buildGuard.js';
 import { initLang, useLang, tickerText } from './ui/lang.js';
 import { t, N_, translateWire } from '../../shared/i18n.js';
@@ -223,7 +224,7 @@ function onRoomState(msg) {
   // The room switched its version (DESIGN §35.23): a result still on screen (a settlement, a spectator's view) names the old
   // version's chess ids, and the server dropped the room's replay — it closes, back to the room.
   else if (prevRoom && prevRoom.code === room.code && !room.inMatch && roomVersion(prevRoom) !== roomVersion(room) && store.get().match.public) store.set({ match: emptyMatch() });
-  store.set({ room, matchVersion: roomVersion(room) });
+  store.set({ room });
   identity.rememberMatch(room.inMatch && seats.some((seat) => seat?.playerId === myId)
     ? { name: store.get().me.name, code: room.code || '' } : null);
   if (room.mode === 'coop' && typeof room.code === 'string') rememberRoom(room.code, room.test === true);
@@ -363,7 +364,15 @@ function App() {
     <${GuideHost} />
     <${LoadoutHost} />
     <${StatsHost} />
+    <${VoteOverOverlays} />
   </div>`;
+}
+
+/** The room's version vote above 干员调配 / 统计数据 while one covers the room (ui/versionVote.js CoveredVersionVote). */
+function VoteOverOverlays() {
+  const lo = useStore((s) => !!s.open, Object.is, loadoutStore);
+  const st = useStatsOpen();
+  return html`<${CoveredVersionVote} covered=${lo || st} />`;
 }
 
 // ---- boot -----------------------------------------------------------------------------------------

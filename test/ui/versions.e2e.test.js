@@ -6,6 +6,8 @@
 //   * the host proposes 第二期上半 → the strip on both pages, the guest agrees → both pages switch; a proposal the guest
 //     declines → the host's toast; a solo room switches at once; leaving restores the guest's lobby version;
 //   * a stats record of another version (an imported fixture) carries its tag in 统计数据;
+//   * a vote opened while a voter has 干员调配 open floats above it; a replay open when the room goes away (a kick) keeps
+//     its version shown; a default server does not offer another version's record for re-viewing;
 //   * phones (667×375): the chip, the picker, the room pill, the strip and the banner fit the width;
 //   * no console error on any page.
 // Game texts of another version stay Chinese in other languages until M3 (data.js versionFiles) — not checked here.
@@ -184,6 +186,107 @@ describe('official versions (real server, SP_VERSIONS=all)', { skip: !ENABLED &&
     } finally {
       await host.close();
       await guest.close();
+      await srv.stop();
+    }
+  });
+
+  test('the vote over 干员调配; a replay outlives a kick (1280×720)', { timeout: 4 * 60 * 1000 }, async () => {
+    const srv = await startRealServer({ env: { SP_VERSIONS: 'all' } });
+    const P = (await import('puppeteer-core')).default;
+    const host = new Client(P, srv.base, 'cover-host', { prefix: 'versions-cover', w: 1280, h: 720 });
+    const guest = new Client(P, srv.base, 'cover-guest', { prefix: 'versions-cover', w: 1280, h: 720 });
+    try {
+      await host.open();
+      await host.enter('凯尔希');
+      const room = await host.createCoop();
+      // the guest's lobby shows 第一期下半; it joins the host's 第二期下半 room
+      await guest.open();
+      await guest.enter('阿米娅');
+      await openWith(guest, '[data-testid="version-switch"]', null, '[data-testid="version-picker"]');
+      await pickVersion(guest, 'act1autochess');
+      await waitState(guest, (s) => s.version === 'act1autochess' && s.status === 'ready', 'the guest\'s lobby on 第一期下半');
+      await guest.page.evaluate((code) => globalThis.__SP__.net.request('room.join', { code }), room.code);
+      await waitState(guest, (s) => s.room === 'act2autochess' && s.kind === null, 'the guest in the 第二期下半 room');
+      // 干员调配 open (a guest edits the loadout before readying): a vote opened now floats above it
+      await openWith(guest, '.rs-loadout', null, '.lo-count');
+      await host.page.evaluate(() => globalThis.__SP__.net.request('room.proposeVersion', { version: 'act1autochess' }));
+      await guest.page.waitForSelector('.vervote--covered [data-testid="version-decline"]', { visible: true, timeout: 10000 });
+      const top = await guest.page.$eval('.vervote--covered [data-testid="version-decline"]', (b) => {
+        const r = b.getBoundingClientRect();
+        return !!document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest('.vervote--covered');
+      });
+      assert.equal(top, true, 'the strip is on top of 干员调配');
+      assert.equal(await host.page.$('.vervote--covered'), null, 'the host\'s room is not covered: its strip is the room\'s');
+      await guest.shot('vote-over-loadout');
+      await guest.click('.vervote--covered [data-testid="version-decline"]');
+      await host.page.waitForFunction(() => [...document.querySelectorAll('.toast__text')].some((e) => e.textContent.includes('阿米娅拒绝了切换版本')), { timeout: 10000 });
+      await guest.page.waitForSelector('.vervote--covered', { hidden: true });
+      await guest.page.keyboard.press('Escape');
+      await guest.page.waitForFunction(() => !document.querySelector('.lo-count'), { timeout: 10000 });
+
+      // 统计数据 in the room: the 第二期下半 record re-viewed (the room's version), then the host kicks the guest — the
+      // replay keeps 第二期下半 shown (replayVersion) instead of spinning on the lobby's 第一期下半
+      await openWith(guest, '.stats-entry', null, '.st');
+      const input = await guest.page.$('.st input[type=file]');
+      await input.uploadFile(FIXTURE);
+      await guest.page.waitForFunction(() => [...document.querySelectorAll('.toast__text')].some((e) => /已导入 2 条记录/.test(e.textContent)), { timeout: 10000 });
+      await guest.click('.st-tab[data-tab="history"]');
+      await guest.click('.st-table--history tr[data-version="act2autochess"]');
+      await guest.page.waitForSelector('.st--replay', { visible: true });
+      await guest.page.waitForFunction(() => !document.querySelector('.st--replay .st-loading'), { timeout: 20000 });
+      const seat = await host.page.evaluate(() => globalThis.__SP__.store.get().room.seats.find((x) => x && x.name === '阿米娅'));
+      await host.page.evaluate(({ seat: n, playerId }) => globalThis.__SP__.net.request('room.kick', { seat: n, playerId }), { seat: seat.seat, playerId: seat.playerId });
+      await waitState(guest, (s) => s.room === null, 'the guest kicked');
+      assert.equal(await guest.page.evaluate(() => globalThis.__SP__.store.get().replayVersion), 'act2autochess');
+      await sleep(800);
+      assert.equal((await stateOf(guest)).kind, null, 'still 第二期下半');
+      assert.equal(await guest.page.$('.st--replay .st-loading'), null, 'the settlement stays drawn');
+      await guest.page.keyboard.press('Escape');
+      await waitState(guest, (s) => s.kind === 'version' && s.version === 'act1autochess' && s.status === 'ready', 'closing the replay: the lobby\'s 第一期下半');
+      assert.deepEqual(problemsOf([host, guest]), []);
+    } catch (err) {
+      console.log('guest:', await toastText(guest).catch(() => ''), JSON.stringify(await stateOf(guest).catch(() => null)), problemsOf([host, guest]).join('\n'));
+      await host.shot('fail-host').catch(() => {});
+      await guest.shot('fail-guest').catch(() => {});
+      throw err;
+    } finally {
+      await host.close();
+      await guest.close();
+      await srv.stop();
+    }
+  });
+
+  test('a default server: a record of another version is not offered for re-viewing (1280×720)', { timeout: 3 * 60 * 1000 }, async () => {
+    const srv = await startRealServer({ env: {} });
+    const P = (await import('puppeteer-core')).default;
+    const c = new Client(P, srv.base, 'default', { prefix: 'versions-default', w: 1280, h: 720 });
+    try {
+      await c.open();
+      await c.enter('凯尔希');
+      await openWith(c, '.hub-ach', null, '.achv__more');
+      await sleep(400);
+      await c.click('.achv__more');
+      await c.page.waitForSelector('.st', { visible: true });
+      const input = await c.page.$('.st input[type=file]');
+      await input.uploadFile(FIXTURE);
+      await c.page.waitForFunction(() => [...document.querySelectorAll('.toast__text')].some((e) => /已导入 2 条记录/.test(e.textContent)), { timeout: 10000 });
+      await c.click('.st-tab[data-tab="history"]');
+      await c.click('[data-testid="stats-version"] [data-version="all"]');
+      await c.page.waitForSelector('.st-table--history tr[data-version="act1autochess"]', { visible: true });
+      const row = await c.page.$eval('.st-table--history tr[data-version="act1autochess"]', (r) => ({ cls: r.className, title: r.title }));
+      assert.doesNotMatch(row.cls, /is-clickable/);
+      assert.match(row.title, /这台服务器没有提供「第一期下半」/);
+      await c.click('.st-table--history tr[data-version="act1autochess"] td');
+      await sleep(600);
+      assert.equal(await c.page.$('.st--replay'), null, 'no replay opened');
+      assert.equal(await c.page.evaluate(() => globalThis.__SP__.store.get().replayVersion ?? null), null);
+      await c.shot('row');
+      assert.deepEqual(problemsOf([c]), []);
+    } catch (err) {
+      await c.shot('fail').catch(() => {});
+      throw err;
+    } finally {
+      await c.close();
       await srv.stop();
     }
   });

@@ -40,7 +40,7 @@ import { data, buildIndex } from '../data.js';
 import { contentSet as appContentSet, pageVersion } from '../content.js';
 import { LOADOUT_PREF, parseStored, parseStoredOps, parseStoredByChar, toStored, toStoredV1, sanitizeEntries, sanitizeOps, charKeyMap, entriesToChar,
   entriesView, rebaseByChar } from './loadoutModel.js';
-import { cultivationCharIds, charPotentialChanges, loadoutOptions } from '../../../shared/protocol.js';
+import { cultivationCharIds, charPotentialChanges, loadoutOptions, operatorCharIds } from '../../../shared/protocol.js';
 import { PHASE } from '../../../shared/constants.js';
 import { POTENTIAL_DEFAULT, CULTIVATE_DEFAULT } from '../../../shared/potential.js';
 import { ruleOption } from '../../../shared/plugins/rules.js';
@@ -272,13 +272,14 @@ export function setOpsMap(ops) {
  * through the shown data's map, a v1 payload's `entries` (第二期下半's chess ids) through 第二期下半's map — loaded by
  * openLoadout; until then (and on the server's own files, where the ids are the same) as they are.
  * @param {{ entries?: Record<string, any>, byChar?: Record<string, any> }} parsed ui/loadoutModel.js parseImport's result
+ * @param {string} [version] the version on screen (content.js pageVersion; tests give it)
  */
-export function importedEntries(parsed) {
+export function importedEntries(parsed, version = pageVersion()) {
   const map = shownCharMap();
   if (parsed?.byChar) return map ? entriesView(parsed.byChar, map) : {};
   const entries = parsed?.entries || {};
   const def = defaultCharMap();
-  if (!map || !def || pageVersion() === DEFAULT_VERSION) return entries;
+  if (!map || !def || version === DEFAULT_VERSION) return entries;
   return entriesView(entriesToChar(entries, (id) => def.toChar.get(id), ownChessOf(def)), map);
 }
 
@@ -429,8 +430,10 @@ export function canSendSettings({ store: app = store, content = appContentSet, c
  * is the message body), `prepare()` → the payload to send (may await data; null = the data is missing: nothing is sent,
  * state 'error'), `lockedText` = what a refused edit tells the player. `seatBound` (default true): the server keeps the
  * setting per room data — it checks it against the room's content and drops it on a version switch —, so a content
- * change sends it again; false (skins, the card: kept on the session whatever the room plays) sends it on a content change
- * only when the payload changed (a version switch or a room's arrival then spends no heavy-message budget on them).
+ * change sends it again; false (skins, the card: their payload follows the data on screen — the skins filtered to its
+ * operators, the card '' when it lacks the operator — so it changes whenever what the server keeps would) sends it on a
+ * content change only when the payload changed (a version switch or a room's arrival then spends no heavy-message budget
+ * on them).
  */
 function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, field, prepare, lockedText, tag, content = appContentSet, gate = null, app = store, seatBound = true }) {
   const T = timers || { setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms), clearTimeout: (id) => globalThis.clearTimeout(id) };
@@ -633,14 +636,29 @@ export function installOwnershipSync({ net, timers, target = loadoutStore, notif
  * unknown id can only fail to resolve in `spineEntry()` and draw the default model. During a match the server takes it
  * at once (`Match.setSkins`, any phase: a skin is cosmetic and public) instead of storing it for the next one, so the
  * one refusal that can still arrive is 'locked' — a build whose server predates the message.
+ *
+ * The server keeps only the operators of the data the room plays (server/lobby.js skins: operatorCharIds), on the
+ * session too, so the map goes filtered to the operators of the data on screen (the same set): a content change that
+ * changes the kept set (a 第一期-only operator's skin on joining or switching to a 第一期 room, a plugin operator's)
+ * changes the payload and is sent; one that does not spends no heavy-message budget (`seatBound: false`). Without the data
+ * (it failed to load) the map goes whole and the server filters it.
  * @param {{ net: any, timers?: { setTimeout: Function, clearTimeout: Function }, target?: ReturnType<typeof createStore>,
- *   notify?: (text: string) => void }} deps
+ *   notify?: (text: string) => void, operatorsReady?: () => Promise<Set<string>|null> }} deps
  */
-export function installSkinsSync({ net, timers, target = skinsStore, notify, content = appContentSet, app = store, gate = null } = {}) {
+export function installSkinsSync({ net, timers, target = skinsStore, notify, content = appContentSet, app = store, gate = null, operatorsReady } = {}) {
+  const operators = operatorsReady || (async () => {
+    const [chess, backups] = await Promise.all([data.load('chess'), data.load('backups')]);
+    return chess == null || backups == null ? null : operatorCharIds({ chess: data.getRaw('chess'), backups: data.getRaw('backups') });
+  });
   return installPrefSync({
     net, timers, target, notify, content, app, gate, seatBound: false, key: SKINS_KEY, stateKey: SKINS_SYNC_KEY, msgType: 'room.skins', field: 'skins', tag: 'skins',
     lockedText: N_('这台服务器不接受皮肤选择，只有本机保存'),
-    prepare: async () => parseStoredSkins(target.get()[SKINS_KEY]),
+    async prepare() {
+      const all = parseStoredSkins(target.get()[SKINS_KEY]);
+      if (!Object.keys(all).length) return all; // nothing to filter: no data download for it
+      const ids = await operators();
+      return ids ? Object.fromEntries(Object.entries(all).filter(([id]) => ids.has(id))) : all;
+    },
   });
 }
 

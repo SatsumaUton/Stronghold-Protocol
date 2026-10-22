@@ -183,8 +183,9 @@
 //     a player seat (the seat is kept and given back on resume).
 //   * Official versions (DESIGN §35.23, M1; shared/versions.js, server/versions.js): a room plays one official version,
 //     `room.version` — room.create { version? } (omitted: the server's default version; refused VERSION_UNKNOWN when this
-//     server does not enable it, VERSION_UNSUPPORTED when it does not offer the room mode or the server owner's fixed
-//     plugins (plugins/config.json rooms: fixed) cannot play it; a difficulty the version lacks is lowered — the highest it
+//     server does not enable it, VERSION_UNSUPPORTED when it does not offer the room mode, its data failed to load
+//     (server/versions.js available; welcome then omits it) or the server owner's fixed plugins (plugins/config.json
+//     rooms: fixed) cannot play it; a difficulty the version lacks is lowered — the highest it
 //     offers below, else its lowest: 终极 → 绝境). A room of 第二期下半 (act2autochess, the code constant DEFAULT_VERSION)
 //     is exactly the room of before: no new key in its room.state, its match in this process. Another version's room:
 //     room.state.version, its content `{ cs: <the version's cs>, vanilla: true, version, plugins }` (official — never
@@ -198,8 +199,8 @@
 //     (room.proposeVersion { version }: refused NOT_IN_ROOM, SPECTATOR, NOT_HOST, ROOM_STARTED, VERSION_UNKNOWN,
 //     VERSION_UNSUPPORTED — the room mode, or gameplay plugins on and the target not 第二期下半 —, ALREADY, VERSION_VOTE,
 //     RATE — `versionProposeGapMs` (300 ms) since the last proposal, `versionRetryMs` (5 s) after a declined or expired
-//     vote [ASSUMED] —, NOT_READY — a seated human offline —, and VERSION_UNSUPPORTED again when the room's cosmetic
-//     plugins do not resolve on the target, checked last);
+//     vote [ASSUMED] —, NOT_READY — a seated human offline —, VERSION_UNSUPPORTED when the target's data failed to load,
+//     and VERSION_UNSUPPORTED again when the room's cosmetic plugins do not resolve on the target, checked last);
 //     ▸ a lone active human switches at once; otherwise a vote opens: voters = the seated humans then (seat order; AI and
 //     spectators never vote), the host counted as agreed, `versionVoteMs` (60 s [ASSUMED]: a room has no clock to pause,
 //     unlike 重刷) to answer. room.versionVote { voteId, agree }: a decline cancels (toast to every member), the last
@@ -873,6 +874,7 @@ export class Lobby {
     const version = askedVersion ?? this.defaultVersion();
     if (!this.versionEnabled(version)) return fail(ERR.VERSION_UNKNOWN);
     if (!this.offered(version, mode).length) return fail(ERR.VERSION_UNSUPPORTED, `${version} has no ${mode} rooms`);
+    if (!this.versionAvailable(version)) return fail(ERR.VERSION_UNSUPPORTED, 'the data of this version is not available');
     // left out: the default (header); the protocol refuses any other value that is not a difficulty; one the version
     // lacks is lowered (终极 → 绝境)
     const difficulty = this.fallbackDifficulty(version, mode, DIFFICULTIES.includes(asked) ? asked : DEFAULT_DIFFICULTY);
@@ -933,14 +935,15 @@ export class Lobby {
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
     const idx = room.freeSeat();
     if (idx < 0) return fail(ERR.ROOM_FULL);
+    // a human takes a player seat: the version vote is void (header "Official versions") — before the seat is taken, so
+    // its toast reaches the members who saw the vote (a spectator sitting down too), never a joiner who did not
+    if (room.versionVote) this.voidVersionVote(room, 'members');
     if (cur) this.removeMember(cur, session.playerId);
     room.seats[idx] = this.humanSeat(idx, session, room);
     session.roomCode = room.code;
     session.notice = null;
     session.pendingResult = null;
     if (!room.hostId) room.hostId = session.playerId;
-    // a human took a player seat: the version vote is void (header "Official versions")
-    if (room.versionVote) this.voidVersionVote(room, 'members');
     this.broadcastState(room);
     return OK;
   }
@@ -1238,6 +1241,13 @@ export class Lobby {
   /** Does this server offer the version `id`? @param {unknown} id */
   versionEnabled(id) { return this.versions ? this.versions.isEnabled(id) : id === DEFAULT_VERSION; }
 
+  /**
+   * Can a room play the enabled version `id` now? Another version's data loads on first use (a room of it loads it
+   * anyway); a failed load is remembered (server/versions.js available), and such a version is never offered again.
+   * @param {string} id
+   */
+  versionAvailable(id) { return id === DEFAULT_VERSION || typeof this.versions?.available !== 'function' || this.versions.available(id); }
+
   /** A room's content base for a version: the vanilla content for 第二期下半, else the version's own. @param {string} v */
   baseContent(v) {
     if (v === DEFAULT_VERSION || !this.versions) return this.vanilla;
@@ -1283,6 +1293,7 @@ export class Lobby {
     if (now - room.versionProposeAt < this.opts.versionProposeGapMs || now < room.versionRetryAt) return fail(ERR.RATE);
     const humans = room.activeHumans();
     if (humans.some((s) => !s.connected)) return fail(ERR.NOT_READY);
+    if (!this.versionAvailable(version)) return fail(ERR.VERSION_UNSUPPORTED, 'the data of this version is not available');
     room.versionProposeAt = now;
     // the room's cosmetic plugins must resolve on the target (the server owner's policy, a plugin refused there)
     const ids = (room.content?.plugins || []).filter((p) => !p.auto).map((p) => p.id);

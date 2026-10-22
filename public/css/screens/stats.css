@@ -75,6 +75,11 @@
 }
 .st-body > * { max-width: max(12.4rem, 760px); margin-left: auto; margin-right: auto; }
 .st-loading { flex: 1; display: grid; place-items: center; min-height: 2rem; }
+/* the replay's wait: its line and 返回统计 (重试) stay together in the middle */
+.st-replay-wait { align-content: center; gap: .14rem; padding: .3rem 16px; text-align: center; }
+.st-replay-wait > p { margin: 0; max-width: 32em; }
+.st-replay-wait > p.is-warn { color: var(--amber); }
+.st-replay-wait__acts { display: flex; flex-wrap: wrap; justify-content: center; gap: .12rem; }
 .st-empty { margin: .6rem auto; text-align: center; font-size: max(.2rem, 13px); color: var(--text-lo); letter-spacing: .06em; }
 
 .st-sec__h { display: flex; align-items: baseline; gap: .12rem; margin: 0 0 .1rem; font-size: max(.22rem, 14px); font-weight: 800; letter-spacing: .1em; color: var(--text-hi); }

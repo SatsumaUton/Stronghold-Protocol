@@ -639,7 +639,7 @@ Simplified Chinese that its game texts are Chinese for now). The title shows a n
 选择模拟协议 lists `offeredDifficulties(config, roomMode)` of the version shown (its config's modes) and selects
 `fallbackDifficulty` (the server's rule: the highest offered below, else the lowest) when the remembered difficulty is
 not offered — `sp.pref.lobby.difficulty` changes only on a pick; the cards wait (spinner, disabled) while the version
-loads. `room.create` carries `version` only when welcome.versions exists. The 成就统计 card counts the season of the
+loads, and when its set failed it says 版本数据校验失败 with 重试 (`retryContentSet`; the chip's 重试 is under the modal). `room.create` carries `version` only when welcome.versions exists. The 成就统计 card counts the season of the
 version shown.
 
 **Room.** `roomFacts.needsContent` (gameplay plugins or another version) gates ready, start, the seat tags and the
@@ -653,7 +653,9 @@ heavy-message budget — is tried once more after 1.2 s [ASSUMED]); off during a
 strip between the 观战席 and the footer — title with agreed / voters, a countdown anchored at receipt from
 `remainingMs`, the voters' chips, 同意切换 / 拒绝切换 for a voter who has not agreed, 取消投票 for the host, one request at a
 time; on a short screen it floats over the seats. The settlement screen shows the same strip (`vervote--float`), so a
-doctor still reading the result can vote. A change of `room.version` toasts 「同盟已切换到「{version}」」 (never on entering
+doctor still reading the result can vote. While 干员调配 or 统计数据 covers the room (fixed overlays at z 55), a voter or the
+host sees the strip floating above it (`CoveredVersionVote`, `vervote--covered` z 56, mounted by main.js after the
+overlays), so a vote never runs out unseen. A change of `room.version` toasts 「同盟已切换到「{version}」」 (never on entering
 a room) and closes a result of the old version still on screen (`main.js onRoomState`). When the room's version is not
 the lobby's, a banner says leaving restores it (a short screen gives the line up: the pill's tooltip says it). The plugin
 panel disables the gameplay switches in a version room (「改变玩法的插件只能在第二期下半使用」) and shows only a
@@ -685,8 +687,10 @@ on a server whose `SP_VERSION_DEFAULT` names another version that version's chec
 lobby could not send them sends them then (not at every room entry: the server keeps the session's copy, and five sends
 at once would spend the server's heavy-message budget an edit needs). A content change (a version switch, a room's set)
 sends the seat-bound settings again (loadout, 干员持有, 自选: the server checks them against the room's data and drops them
-on a switch); skins and the card are kept on the session, so they go out then only when their payload changed
-(`installPrefSync` `seatBound: false`). The wire keys of `room.loadout` / `room.ownership`
+on a switch); skins and the card go out then only when their payload changed (`installPrefSync` `seatBound: false`),
+and their payload follows the data on screen: the skins map is filtered to its operators (`operatorCharIds`, the set
+the server keeps, on the session too — a 第一期-only operator's skin goes out once a 第一期 room's data is on the page),
+the card is '' when that data lacks the operator. The wire keys of `room.loadout` / `room.ownership`
 stay the chess ids of the room's data.
 
 **Statistics.** Records of another version carry `version` (a registry id, never 第二期下半; not part of the record id;
@@ -694,7 +698,11 @@ stay the chess ids of the room's data.
 (the version shown by default, every version with records, 全部版本: `recordsOfVersion`) narrowing every tab; history rows
 carry the VersionTag. Re-viewing another version's settlement needs that version's data: outside a room the row offers
 「切换到「X」查看」 (the page shows that version while the replay is open, `replayVersion`; the settlement opens once its data
-is checked), in a room it is disabled with a hint.
+is checked), in a room it is disabled with a hint, and a version this server does not offer (not in welcome.versions —
+a default server offers none) is not clickable (「这台服务器没有提供「X」，不能回看该局结算」). The replay's wait always keeps
+返回统计: with 版本数据校验失败 + 重试 when the set failed, with the room's line when the room now plays another version; a
+room left while its version's replay is open (a kick, the room closed) sets `replayVersion` to the record's version, so
+the page does not move to the lobby's under it.
 The levels (`settle.js levelProgress` `season`), the lobby card and 成就统计 count one season (`recordsOfSeason`:
 第一期 = both act1autochess versions, 第二期 = both act2autochess).
 

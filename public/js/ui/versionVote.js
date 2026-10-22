@@ -4,7 +4,9 @@
 // it, the host may cancel it (room.cancelVersionVote), it runs out after 60 s and any seat change voids it (the server
 // says why: an m.toast). Spectators and AI teammates do not vote. The countdown is anchored when each room.state
 // arrives (`remainingMs` is a duration at send time — clocks differ). The room shows the strip between the 观战席 and
-// the footer; the settlement screen shows it too (a doctor still reading the result can vote, screens/game.js).
+// the footer; the settlement screen shows it too (a doctor still reading the result can vote, screens/game.js). While
+// 干员调配 or 统计数据 covers the room (fixed overlays, z 55 — a guest edits the loadout there before readying), a voter or
+// the host sees the strip floating above them (<CoveredVersionVote/>, main.js), so a vote never runs out unseen.
 // Texts go through t() (docs/I18N.md).
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
@@ -77,6 +79,20 @@ export function VersionVoteView({ facts, seconds, busy = false, online = true, c
       ${facts.host ? html`<${Button} size="sm" disabled=${busy || !online} data-testid="version-cancel" onClick=${onCancel}>${t('取消投票')}<//>` : null}
     </div>
   </section>`;
+}
+
+/**
+ * The strip above 干员调配 / 统计数据 (see the header; review fix): `covered` — one of them is open. Shown only to a page
+ * that can act on the vote (a voter, or the host who may cancel it); spectators keep the room's own strip.
+ * @param {{ covered: boolean }} props
+ */
+export function CoveredVersionVote({ covered }) {
+  const room = useStore((s) => (s.room && s.room.versionVote ? s.room : null));
+  const myId = useStore((s) => s.me.playerId);
+  if (!covered || !room) return null;
+  const facts = versionVoteFacts(room, myId);
+  if (!facts || !(facts.voter || facts.host)) return null;
+  return html`<${VersionVote} room=${room} class="vervote--float vervote--covered" />`;
 }
 
 /** The strip (see the header): nothing while no vote is open. One request at a time (like 重刷本局's). */

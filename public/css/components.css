@@ -1212,6 +1212,8 @@
 .vervote__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .1rem; flex-shrink: 0; }
 /* on the settlement screen: over the page's bottom edge (the vote must stay in view) */
 .vervote--float { position: fixed; left: 50%; bottom: max(.2rem, env(safe-area-inset-bottom)); z-index: 40; width: min(9rem, calc(100vw - 32px)); margin: 0; transform: translateX(-50%); }
+/* above 干员调配 / 统计数据 (.lo / .st, 55), below the connection banner (75), modals and toasts */
+.vervote--covered { z-index: 56; box-shadow: 0 .06rem .3rem rgba(0, 0, 0, .55); }
 @media (max-width: 900px), (max-height: 520px) {
   .vervote { margin-inline: .2rem; padding: .08rem .12rem; }
   .vervote__actions .btn { min-height: 40px; padding-inline: .12rem; }
