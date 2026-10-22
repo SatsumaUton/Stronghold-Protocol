@@ -544,6 +544,16 @@
 .rs-opts__diff:disabled { cursor: default; opacity: .6; }
 .room-bar__right { display: flex; align-items: center; justify-content: flex-end; gap: .14rem; min-width: 0; }
 .rs-go.proto-start { width: min(4.6rem, 40vw); }
+/* the label (§35.18 review: it shared 选择模拟协议's wrapping label by accident, and on a phone a fixed 46 px button then cut
+   every line): like the dialog's, it wraps onto a second line and the button grows (`.proto-start` min-height) rather than
+   cutting it — on one line English 开始模拟 ran off the right at 中 and above at every desktop size, Japanese and Korean
+   at 特大 (Korean from 中 in a 960–1024 px window) —, stopping at .46rem (大's size); the mark's rook at .4rem and its
+   STRONGHOLD PROTOCOL at .1rem (the design's .08rem at 小:
+   at 特大 its 88 px floor made it 54 px wide in a 960 px window, which left 「Simulation」 no line of its own); on a short
+   screen below. [ASSUMED] the caps */
+.rs-go .proto-start__label { flex: 1 1 auto; padding-right: 8%; font-size: min(calc(.4 * var(--t)), .46rem); white-space: normal; line-height: 1.1; }
+.rs-go .proto-start__rook { font-size: min(calc(.36 * var(--t)), .4rem); }
+.rs-go .proto-start__mark small { font-size: min(calc(.08 * var(--t)), .1rem); }
 .rs-go__box { flex: none; display: grid; place-items: center; width: max(.5rem, 28px); height: max(.5rem, 28px); border: 3px solid currentColor; border-radius: 6px; }
 .rs-go__box .icon { width: 80%; height: 80%; }
 .rs-go.is-ready { background: linear-gradient(180deg, #7ff3d4, #4fe0bf); }
@@ -610,9 +620,11 @@
   .rs-clock__ping, .rs-ready { font-size: calc(.22 * var(--t)); }
   .rs-key__code { font-size: calc(.36 * var(--t)); }
   .rs-key__copy { font-size: calc(.26 * var(--t)); }
-  .rs-go.proto-start { height: 46px; }
+  /* the button at least 46 px, taller for a second line; the label 18–20 px (as 选择模拟协议's here: it was .46 × --t, 40 px
+     at 特大, which cut 开始模拟 in English, Japanese and Korean, and at 特大 in Chinese once it wrapped). [ASSUMED] the cap */
+  .rs-go.proto-start { height: auto; min-height: 46px; }
   .rs-go .proto-start__mark { display: none; }
-  .rs-go .proto-start__label { font-size: calc(.46 * var(--t)); }
+  .rs-go .proto-start__label { font-size: min(calc(.46 * var(--t)), 20px); }
   .rs .rs-loadout .btn__label { display: none; }
   .rs-tools, .rs-key__k { display: none; }
 }

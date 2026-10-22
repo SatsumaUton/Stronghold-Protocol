@@ -134,7 +134,9 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   const block = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
   const sizes = [...block.matchAll(/font-size:\s*([^;}]+)[;}]/g)].map((m) => m[1].trim());
   assert.ok(sizes.length >= 30, sizes.join(' | '));
-  for (const v of sizes) assert.match(v, /^calc\(\.\d+ \* var\(--t\)\)$/, v);
+  // (the room's big button caps its label and mark: it still follows 文字大小 below the cap — §35.18 review)
+  for (const v of sizes) assert.match(v, /^(calc\(\.\d+ \* var\(--t\)\)|min\(calc\(\.\d+ \* var\(--t\)\), (\.\d+rem|\d+px)\))$/, v);
+  assert.equal(sizes.filter((v) => v.startsWith('min(')).length, 4, 'the caps: the GoButton\'s label, rook and mark, and its label on a short screen');
   assert.ok(!/!important/.test(block) && !/:has\(/.test(block));
   assert.match(block, /\.rseat__art img \{[^}]*object-fit: cover/);
   assert.match(block, /\.cardpick__grid[\s\S]*overflow-y: auto/);

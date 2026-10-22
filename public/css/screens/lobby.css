@@ -507,7 +507,11 @@
 .proto-title__mode .icon { width: 1.1em; height: 1.1em; }
 .proto-title__mode i { font-style: normal; font-family: var(--font-display); font-size: calc(.13 * var(--t)); letter-spacing: .16em; color: #8b8f8e; }
 
-.proto-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) min(5.6rem, 46vw); gap: .3rem; padding: 0 .34rem .26rem .22rem; }
+/* the cards' column 5.6rem, at least 300 px (§35.18 review: in a window whose 1rem is under 54 px — 960×540, 1100×530,
+   800×600 — the px floors of the glyph and the 文字大小 made 5.6rem too narrow for English 「Standard Simulation」 /
+   「Ultimate Simulation」 on one line, and the unselected cards' names ended in an ellipsis), never past 46vw. [ASSUMED] the
+   floor */
+.proto-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) min(max(5.6rem, 300px), 46vw); gap: .3rem; padding: 0 .34rem .26rem .22rem; }
 .proto-stage { position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; }
 
 /* the official picture of the selected difficulty, with its brief at the bottom left */
@@ -697,15 +701,18 @@
 .proto-start:focus-visible { outline: 2px solid #eef0ef; outline-offset: 2px; }
 .proto-start:disabled { filter: grayscale(.8) brightness(.6); cursor: default; }
 .proto-start__mark { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; }
-.proto-start__rook { display: inline-flex; align-items: center; gap: 2px; font-size: min(calc(.36 * var(--t)), .4rem); font-weight: 300; line-height: 1; }
+.proto-start__rook { display: inline-flex; align-items: center; gap: 2px; font-size: calc(.36 * var(--t)); font-weight: 300; line-height: 1; }
 .proto-start__rook i { font-style: normal; }
 .proto-start__rook .icon { width: max(.34rem, 19px); height: max(.34rem, 19px); }
 .proto-start__mark small { font-family: var(--font-display); font-size: calc(.08 * var(--t)); font-weight: 800; letter-spacing: .06em; line-height: 1.1; text-align: center; }
-/* the label wraps onto a second line (the button grows) rather than being cut, and stops at .46rem — 大's size — on a
-   screen taller than 520 px (§35.18's leftover: English 开始独立模拟 was cut at every desktop size, even at 小 at 1440x900;
-   the short-screen block has its own cap). [ASSUMED] the cap */
-.proto-start__label { position: relative; flex: 1 1 auto; display: inline-flex; align-items: center; gap: .1rem; min-width: 0; padding-right: 8%;
-  font-size: min(calc(.4 * var(--t)), .46rem); font-weight: 900; letter-spacing: .08em; white-space: normal; line-height: 1.1; }
+.proto-start__label { position: relative; display: inline-flex; align-items: center; gap: .1rem; min-width: 0; font-size: calc(.4 * var(--t)); font-weight: 900; letter-spacing: .08em; white-space: nowrap; }
+/* 选择模拟协议's own button (.proto-foot; the room's GoButton shares the rules above and makes its own choice in
+   css/screens/room.css — §35.18 review: these rules once reached it too): the label wraps onto a second line (the button
+   grows: min-height above) rather than being cut, and stops at .46rem — 大's size — on a screen taller than 520 px, the
+   mark's rook at .4rem (§35.18's leftover: English 开始独立模拟 was cut at every desktop size, even at 小 at 1440x900;
+   the short-screen block has its own caps). [ASSUMED] the label's caps */
+.proto-foot .proto-start__label { flex: 1 1 auto; padding-right: 8%; font-size: min(calc(.4 * var(--t)), .46rem); white-space: normal; line-height: 1.1; }
+.proto-foot .proto-start__rook { font-size: min(calc(.36 * var(--t)), .4rem); }
 .proto-start__deco {
   position: absolute;
   right: 0;
@@ -934,8 +941,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .ally-side { padding-left: 0; }
   /* the cards and the button span the width here: the caps for the landscape column (a 5.6rem column) give way */
   .pcard__name { font-size: calc(.28 * var(--t)); }
-  .proto-start__label { font-size: calc(.4 * var(--t)); }
-  .proto-start__rook { font-size: calc(.36 * var(--t)); }
+  .proto-foot .proto-start__label { font-size: calc(.4 * var(--t)); }
+  .proto-foot .proto-start__rook { font-size: calc(.36 * var(--t)); }
 }
 
 /* ---- short landscape phones (≤ 520 CSS px tall) ---------------------------------------------------------- */
@@ -986,7 +993,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .proto-foot { padding-left: 22px; }
   .proto-hint { display: none; }
   .proto-start { height: auto; min-height: 44px; gap: 10px; padding: 3px 0 3px 10px; }
-  .proto-start__label { flex: 1 1 auto; padding-right: 8%; letter-spacing: .02em; white-space: normal; line-height: 1.1; }
+  .proto-start__label { letter-spacing: .02em; }
   /* a column still taller than its space (a long language, the recent keys, the test-room box) scrolls rather than being
      cut off; the 4 px pad on the three other sides keeps the focus ring and the shadows inside the clip */
   .ally-side { gap: 8px; margin: -4px -4px -4px 0; padding: 4px 4px 4px 10px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
@@ -1011,9 +1018,9 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .proto-brief__code { font-size: min(calc(.22 * var(--t)), 14px); }
   .proto-brief__name { font-size: min(calc(.34 * var(--t)), 20px); }
   .pcard__name { font-size: clamp(16px, calc(.4 * var(--t)), 20px); }
-  .proto-start__label { font-size: min(calc(.5 * var(--t)), 20px); }
-  .proto-start__rook { font-size: min(calc(.36 * var(--t)), 16px); }
-  .proto-start__mark small { font-size: min(calc(.08 * var(--t)), 6px); }
+  .proto-foot .proto-start__label { font-size: min(calc(.5 * var(--t)), 20px); }
+  .proto-foot .proto-start__rook { font-size: min(calc(.36 * var(--t)), 16px); }
+  .proto-foot .proto-start__mark small { font-size: min(calc(.08 * var(--t)), 6px); }
   /* the bars' names 16–26 px here ([ASSUMED] the cap: en 「Create Alliance」 on its row at 特大, the column on the screen) */
   .ally-card__bar { font-size: clamp(16px, calc(.3 * var(--t)), 26px); }
   /* 创建同盟 keeps its difficulty line (§35.18's leftover: it was hidden here): two columns, the icon and the name on the

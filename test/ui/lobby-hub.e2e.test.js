@@ -15,6 +15,10 @@
 // 选择模拟协议 on phones 640×360 / 667×375 / 740×360 / 844×390 in all five languages at all four 文字大小 (§35.18's
 // leftover: at 中 and above the cards ran under 开始独立模拟): the four cards whole above the button without scrolling,
 // the button and its label whole, the names whole (the chosen card's in the brief), the description in the brief.
+// 选择模拟协议 in small desktop windows (960×540, 1024×600, 1100×530, 800×600), every language and 文字大小: the names of
+// the cards not chosen whole (§35.18 review). The room's big button (开始模拟 / 准备就绪) on the four phones in every
+// language and 文字大小, and on desktops in English / Japanese / Korean: each line of its label inside the button (§35.18
+// review: it had taken 选择模拟协议's wrapping label, cut in its fixed 46 px).
 // The other doctors' read-only view: test/ui/room-settings.e2e.test.js.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/lobby-hub-*.png
 
@@ -470,7 +474,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
     const box = (el) => el.getBoundingClientRect();
     const list = document.querySelector('.proto-list'), l = box(list);
     const cards = [...list.querySelectorAll('.diff-card')];
-    const start = document.querySelector('.proto-start'), s = box(start);
+    const start = document.querySelector('.modal__box.proto .proto-start'), s = box(start);
     const label = start.querySelector('.proto-start__label');
     const range = document.createRange();
     range.selectNodeContents(label);
@@ -535,7 +539,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
     const body = document.querySelector('.proto__body'), level = body.dataset.fit;
     const list = document.querySelector('.proto-list'), l = box(list);
     const cards = [...list.querySelectorAll('.diff-card')];
-    const start = document.querySelector('.proto-start'), s = box(start);
+    const start = document.querySelector('.modal__box.proto .proto-start'), s = box(start);
     const label = start.querySelector('.proto-start__label'), lb = box(label);
     const range = document.createRange();
     range.selectNodeContents(label);
@@ -597,6 +601,163 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
           assert.deepEqual(problems, []);
         } finally { await ctx.close(); }
       }
+    }
+  });
+
+  // §35.18 review: in a window whose 1rem is under 54 px (960×540, 1100×530, 800×600) English 「Standard Simulation」 and
+  // 「Ultimate Simulation」 ended in an ellipsis on cards that were not chosen once the cards went compact; the column now
+  // has a 300 px floor. Every language and 文字大小, the first card, the second and the last chosen in turn.
+  test('desktop: 选择模拟协议 in small windows (960×540, 1024×600, 1100×530, 800×600) keeps the unselected names whole in every language at every 文字大小', { timeout: 600000 }, async () => {
+    const levels = {};
+    for (const lang of ['zh', 'zh-TW', 'en', 'ja', 'ko']) {
+      for (const textSize of ['sm', 'md', 'lg', 'xl']) {
+        const { ctx, page, problems } = await open({ w: 960, h: 540, lang: lang === 'zh' ? null : lang, textSize });
+        try {
+          await press(page, '.mode-card[data-mode="solo"]');
+          await page.waitForSelector('.modal__box.proto', { visible: true });
+          await page.evaluate(() => document.fonts.ready);
+          const fontsIn = async () => { await sleep(150); await page.evaluate(() => document.fonts.ready); await sleep(150); };
+          for (const [w, h] of [[960, 540], [1024, 600], [1100, 530], [800, 600]]) {
+            await page.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
+            await fontsIn();
+            for (const i of [1, 3, 0]) {
+              await page.$$eval('.modal__box.proto .diff-card', (els, i) => { els.forEach((el) => el.removeAttribute('data-test-pick')); els[i].setAttribute('data-test-pick', '1'); }, i);
+              await page.click('.diff-card[data-test-pick]');
+              await page.waitForFunction((i) => document.querySelectorAll('.modal__box.proto .diff-card')[i]?.classList.contains('is-on'), {}, i);
+              await fontsIn();
+              assert.deepEqual(await fit(page), { out: [], scrolls: false }, `${lang} ${textSize} ${w}×${h} card ${i}: 选择模拟协议 fits`);
+              const d = await protoDesk(page);
+              levels[d.level] = (levels[d.level] || 0) + 1;
+              assert.ok(deskOk(d), `${lang} ${textSize} ${w}×${h} card ${i}: ${JSON.stringify(d)}`);
+            }
+            if (lang === 'en' && w === 960 && textSize === 'md') await page.screenshot({ path: path.join(OUT, 'lobby-hub-desktop-960-protocol-en-md.png') });
+          }
+          assert.deepEqual(problems, []);
+        } finally { await ctx.close(); }
+      }
+    }
+    assert.ok(levels.brief > 0 && levels.names > 0, `the compact levels are reached: ${JSON.stringify(levels)}`);
+  });
+
+  /**
+   * The room's big button (screens/room.js GoButton, the host's 开始模拟 / another doctor's 准备就绪): every line of its
+   * label inside the button's padding box (a line's box: its glyph box's middle ± half the line height — the font's ascent
+   * and descent reach past a 1.1 line on purpose), the label not wider than itself, the button on the screen, the page not
+   * scrolling, at most two lines.
+   */
+  const goFit = (page) => page.evaluate(() => {
+    const b = document.querySelector('.rs-go'), s = b.getBoundingClientRect(), cs = getComputedStyle(b);
+    const bx = parseFloat(cs.borderLeftWidth), by = parseFloat(cs.borderTopWidth);
+    const label = b.querySelector('.proto-start__label'), lh = parseFloat(getComputedStyle(label).lineHeight);
+    const rects = [...label.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim()).flatMap((n) => {
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      return [...range.getClientRects()].filter((r) => r.width > 0);
+    });
+    return {
+      text: label.textContent.trim(), h: Math.round(s.height), px: parseFloat(getComputedStyle(label).fontSize),
+      lines: new Set(rects.map((r) => Math.round(r.top))).size,
+      inside: rects.length > 0 && rects.every((r) => {
+        const mid = (r.top + r.bottom) / 2;
+        return r.left >= s.left + bx - 1 && r.right <= s.right - bx + 1 && mid - lh / 2 >= s.top + by - 1 && mid + lh / 2 <= s.bottom - by + 1;
+      }),
+      whole: label.scrollWidth <= label.clientWidth + 1,
+      onScreen: s.left >= 0 && s.top >= 0 && s.right <= innerWidth + 0.5 && s.bottom <= innerHeight + 0.5,
+      pageScrolls: document.documentElement.scrollHeight > innerHeight + 1 || document.documentElement.scrollWidth > innerWidth + 1,
+    };
+  });
+  const goOk = (d) => d.inside && d.whole && d.onScreen && !d.pageScrolls && d.lines >= 1 && d.lines <= 2;
+  /** Waits out the room's entrance (rs-*: the bottom bar rises from below the screen) and the 转场. */
+  const roomSettled = (page) => page.waitForFunction(() => !document.getAnimations()
+    .some((a) => /^(rs|tr)-/.test(String(a.animationName)) && a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity));
+
+  // §35.18 review: the room's button took 选择模拟协议's wrapping label by accident; in its fixed 46 px on a short screen
+  // the label (.46 × --t, 40 px at 特大) wrapped to 2–4 lines and every line was cut. Now at least 46 px, taller for a second
+  // line, the label 18–20 px. The host's 开始模拟 and a guest's 准备就绪, every language and 文字大小 (set in the page, as 设置
+  // does), four phones.
+  test('phones: the room\'s 开始模拟 / 准备就绪 label sits inside its button in every language at every 文字大小 (640×360 – 844×390)', { timeout: 420000 }, async () => {
+    const phone = (w, h) => ({ width: w, height: h, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
+    for (const lang of ['zh', 'zh-TW', 'en', 'ja', 'ko']) {
+      const host = await open({ w: 640, h: 360, touch: true, lang: lang === 'zh' ? null : lang });
+      let guest = null;
+      try {
+        await press(host.page, '.mode-card[data-mode="coop"]', true);
+        await host.page.waitForSelector('.modal__box.ally', { visible: true });
+        await settle(host.page);
+        await press(host.page, '[data-testid="alliance-create"]', true);
+        await host.page.waitForSelector('.room-screen .rs-go', { visible: true, timeout: 15000 });
+        await roomSettled(host.page);
+        const code = await host.page.evaluate(() => globalThis.__SP__.store.get().room.code);
+        guest = await open({ w: 640, h: 360, touch: true, lang: lang === 'zh' ? null : lang });
+        assert.equal(await guest.page.evaluate(async (code) => {
+          const { net } = await import('/js/net.js');
+          return net.request('room.join', { code }).then(() => 'ok', (e) => e?.code || 'error');
+        }, code), 'ok');
+        await guest.page.waitForSelector('.room-screen .rs-go', { visible: true, timeout: 15000 });
+        await roomSettled(guest.page);
+        const labels = await Promise.all([host, guest].map((c) => c.page.$eval('.rs-go .proto-start__label', (el) => el.textContent.trim())));
+        for (const textSize of ['sm', 'md', 'lg', 'xl']) {
+          for (const c of [host, guest]) await c.page.evaluate(async (ts) => (await import('/js/ui/settings.js')).updateSettings({ textSize: ts }), textSize);
+          for (const [w, h] of [[640, 360], [667, 375], [740, 360], [844, 390]]) {
+            for (const c of [host, guest]) await c.page.setViewport(phone(w, h));
+            await sleep(200);
+            for (const [who, c] of [['host', host], ['guest', guest]]) {
+              await c.page.evaluate(() => document.fonts.ready);
+              const d = await goFit(c.page);
+              assert.ok(goOk(d), `${lang} ${textSize} ${w}×${h} ${who}: ${JSON.stringify(d)}`);
+              assert.ok(d.h >= 46, `${lang} ${textSize} ${w}×${h} ${who}: at least 46 px (${d.h})`);
+            }
+            if (['zh', 'en', 'ja'].includes(lang) && textSize === 'xl' && w === 667) await host.page.screenshot({ path: path.join(OUT, `lobby-hub-phone-667-room-go-${lang}-xl.png`) });
+          }
+        }
+        assert.ok(labels[0].length > 0 && labels[1].length > 0, JSON.stringify(labels));
+        assert.deepEqual(host.problems, []);
+        assert.deepEqual(guest.problems, []);
+      } finally { await host.ctx.close(); await guest?.ctx.close(); }
+    }
+  });
+
+  // the same button on a desktop: like 选择模拟协议's it wraps onto a second line (the button grows) rather than being cut
+  // (English 开始模拟 at 中 and above, Japanese and Korean at 特大 ran off the right), the room's 选择模拟协议 in a 960×540
+  // window keeps the unselected names whole (English at 特大 cut them)
+  test('desktop: the room\'s 开始模拟 label sits inside its button (800×600 – 1920×1080, English / Japanese / Korean at 小 / 特大); its 选择模拟协议 keeps the names whole at 960×540', { timeout: 300000 }, async () => {
+    for (const lang of ['en', 'ja', 'ko']) {
+      const { ctx, page, problems } = await open({ w: 1920, h: 1080, lang });
+      try {
+        await press(page, '.mode-card[data-mode="coop"]');
+        await page.waitForSelector('.modal__box.ally', { visible: true });
+        await settle(page);
+        await press(page, '[data-testid="alliance-create"]');
+        await page.waitForSelector('.room-screen .rs-go', { visible: true, timeout: 15000 });
+        await roomSettled(page);
+        for (const textSize of ['sm', 'xl']) {
+          await page.evaluate(async (ts) => (await import('/js/ui/settings.js')).updateSettings({ textSize: ts }), textSize);
+          for (const [w, h] of [[1920, 1080], [1440, 900], [1280, 720], [1100, 530], [1024, 600], [960, 540], [800, 600]]) {
+            await page.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
+            await sleep(150); await page.evaluate(() => document.fonts.ready); await sleep(100);
+            const d = await goFit(page);
+            assert.ok(goOk(d), `${lang} ${textSize} ${w}×${h}: ${JSON.stringify(d)}`);
+            if (lang === 'en' && textSize === 'xl' && w === 1440) await page.screenshot({ path: path.join(OUT, 'lobby-hub-desktop-1440-room-go-en-xl.png') });
+          }
+        }
+        if (lang === 'en') {
+          await page.setViewport({ width: 960, height: 540, deviceScaleFactor: 1 });
+          await press(page, '.rs-pill__diff');
+          await page.waitForSelector('.modal__box.proto', { visible: true });
+          await page.evaluate(() => document.fonts.ready);
+          await page.$$eval('.modal__box.proto .diff-card', (els) => els[1].setAttribute('data-test-pick', '1'));
+          await page.click('.diff-card[data-test-pick]');
+          await page.waitForFunction(() => document.querySelectorAll('.modal__box.proto .diff-card')[1]?.classList.contains('is-on'));
+          for (const textSize of ['lg', 'xl']) {
+            await page.evaluate(async (ts) => (await import('/js/ui/settings.js')).updateSettings({ textSize: ts }), textSize);
+            await sleep(150); await page.evaluate(() => document.fonts.ready); await sleep(150);
+            assert.deepEqual(await fit(page), { out: [], scrolls: false }, `${textSize}: the room's 选择模拟协议 fits`);
+            const d = await protoDesk(page);
+            assert.ok(deskOk(d), `${textSize} the room's 选择模拟协议: ${JSON.stringify(d)}`);
+          }
+        }
+        assert.deepEqual(problems, []);
+      } finally { await ctx.close(); }
     }
   });
 });

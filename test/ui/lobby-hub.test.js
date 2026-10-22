@@ -200,6 +200,7 @@ test('选择同盟方式: a recent key fills the field (it never joins by itself
 
 const lobbySrc = readFileSync(path.join(ROOT, 'public/js/screens/lobby.js'), 'utf8');
 const lobbyCss = readFileSync(path.join(ROOT, 'public/css/screens/lobby.css'), 'utf8');
+const roomCss = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
 
 test('the key: a pasted invite link of any length, a 5th character or a dash are normalised to the 4-letter key', () => {
   const link = 'https://crops-flexible-wedding-trademarks.trycloudflare.com/?room=QWER';
@@ -325,11 +326,11 @@ test('选择模拟协议 on a short screen (§35.18 leftover: at 文字大小 �
   assert.match(short, /\.pcard__name \{ font-size: clamp\(16px, calc\(\.4 \* var\(--t\)\), 20px\); \}/);
   assert.match(short, /\.proto-title \.modal__title \{ font-size: min\(calc\(\.46 \* var\(--t\)\), 24px\); white-space: nowrap; \}/);
   assert.match(short, /\.proto-title__mode, \.proto-title__mode i \{ font-size: min\(calc\(\.24 \* var\(--t\)\), 16px\); \}/);
-  // the button grows for a second line of its label instead of cutting it
+  // the button grows for a second line of its label instead of cutting it (the wrap: the dialog's base rule)
   assert.match(short, /\.proto-start \{ height: auto; min-height: 44px;/);
-  assert.match(short, /\.proto-start__label \{[^}]*white-space: normal; line-height: 1\.1; \}/);
-  assert.match(short, /\.proto-start__label \{ font-size: min\(calc\(\.5 \* var\(--t\)\), 20px\); \}/);
-  assert.match(short, /\.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), 16px\); \}/);
+  assert.match(short, /\.proto-foot \.proto-start__label \{ font-size: min\(calc\(\.5 \* var\(--t\)\), 20px\); \}/);
+  assert.match(short, /\.proto-foot \.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), 16px\); \}/);
+  assert.match(short, /\.proto-foot \.proto-start__mark small \{ font-size: min\(calc\(\.08 \* var\(--t\)\), 6px\); \}/);
   // the list still scrolls should a pack's names not fit (its base rule)
   assert.match(lobbyCss, /\.proto-list \{[^}]*overflow-y: auto;/);
   // the markup the rules rely on: the description on each card and in the brief, the name in its own element
@@ -389,16 +390,30 @@ test('选择模拟协议 above 520 px tall (§35.18 leftover: the label cut, the
   assert.equal(pickCardFit(() => true), 'names');
   const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
   const base = css.slice(0, css.indexOf('@media (max-aspect-ratio: 1/1) {'));
-  // the label: wraps (the button grows from its old height) and stops at 大's size; the rook too; the names at .36rem
+  // the label: wraps (the button grows from its old height) and stops at 大's size; the rook too; the names at .36rem —
+  // the dialog's own button only (.proto-foot): the shared rule keeps the old one-line label for the room's GoButton,
+  // which makes its own choice in room.css (the review: these rules had reached it, and its fixed 46 px on a phone cut
+  // every line)
   assert.match(base, /\n\.proto-start \{[^}]*\n {2}min-height: max\(1\.04rem, 54px\);/);
   assert.doesNotMatch(base.match(/\n\.proto-start \{[^}]*\}/)[0], /\n {2}height:/, 'no fixed height');
-  assert.match(base, /\n\.proto-start__label \{[^}]*flex: 1 1 auto;[^}]*font-size: min\(calc\(\.4 \* var\(--t\)\), \.46rem\);[^}]*white-space: normal; line-height: 1\.1; \}/);
-  assert.match(base, /\n\.proto-start__rook \{[^}]*font-size: min\(calc\(\.36 \* var\(--t\)\), \.4rem\);/);
+  assert.match(base, /\n\.proto-start__label \{[^}]*font-size: calc\(\.4 \* var\(--t\)\);[^}]*white-space: nowrap; \}/);
+  assert.match(base, /\n\.proto-foot \.proto-start__label \{ flex: 1 1 auto; padding-right: 8%; font-size: min\(calc\(\.4 \* var\(--t\)\), \.46rem\); white-space: normal; line-height: 1\.1; \}/);
+  assert.match(base, /\n\.proto-start__rook \{[^}]*font-size: calc\(\.36 \* var\(--t\)\);/);
+  assert.match(base, /\n\.proto-foot \.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), \.4rem\); \}/);
   assert.match(base, /\n\.pcard__name \{ font-size: min\(calc\(\.28 \* var\(--t\)\), \.36rem\);/);
+  // no rule of lobby.css outside the dialog wraps the label (the room's button shares the class)
+  for (const [, sel, body] of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+    if (/\.proto-start__label/.test(sel) && /white-space: normal|flex: 1 1 auto|padding-right/.test(body)) {
+      assert.ok(sel.split(',').every((x) => !/\.proto-start__label/.test(x) || /\.proto-foot \.proto-start__label/.test(x)), `scoped to the dialog: ${sel.trim()}`);
+    }
+  }
+  // the cards' column: 5.6rem with a 300 px floor (the review: in a 960×540 / 1100×530 / 800×600 window English names
+  // ended in an ellipsis on cards not chosen), never past 46vw
+  assert.match(base, /\n\.proto-body \{[^}]*grid-template-columns: minmax\(0, 1fr\) min\(max\(5\.6rem, 300px\), 46vw\);/);
   // the portrait layout's cards and button span the width: the caps give way there
   const narrow = mediaBlock('(max-aspect-ratio: 1/1)');
   assert.match(narrow, /\.pcard__name \{ font-size: calc\(\.28 \* var\(--t\)\); \}/);
-  assert.match(narrow, /\.proto-start__label \{ font-size: calc\(\.4 \* var\(--t\)\); \}/);
+  assert.match(narrow, /\.proto-foot \.proto-start__label \{ font-size: calc\(\.4 \* var\(--t\)\); \}/);
   // the levels, above 520 px only (the short-screen block has its own one-line cards)
   const tall = mediaBlock('(min-height: 521px)');
   assert.match(tall, /\.proto__body\[data-fit="brief"\] \.pcard__desc,\s*\.proto__body\[data-fit="names"\] \.pcard__desc, \.proto__body\[data-fit="names"\] \.pcard__effects, \.proto__body\[data-fit="names"\] \.pcard__meta \{ display: none; \}/);
@@ -422,8 +437,35 @@ test('选择模拟协议 above 520 px tall (§35.18 leftover: the label cut, the
   assert.match(lobbySrc, /fonts\?\.addEventListener\?\.\('loadingdone', refit\);/);
   assert.match(lobbySrc, /fonts\?\.removeEventListener\?\.\('loadingdone', refit\);/);
   assert.match(lobbyCss, /\[ASSUMED\] the levels and the sizes/);
-  assert.match(lobbyCss, /\[ASSUMED\] the cap \*\//);
+  assert.match(lobbyCss, /\[ASSUMED\] the label's caps \*\//);
   assert.match(lobbyCss, /\[ASSUMED\] the spacing \*\//);
+  assert.match(lobbyCss, /\[ASSUMED\] the\n {3}floor \*\//);
+});
+
+test('the room\'s 开始模拟 / 准备就绪 (screens/room.js GoButton, `.proto-start rs-go`) chooses its own label (§35.18 review: 选择模拟协议\'s wrapping label reached it, and its fixed 46 px on a phone cut every line)', () => {
+  const css = roomCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const at = css.indexOf('@media (max-height: 520px) {');
+  const base = css.slice(0, at);
+  // like the dialog's: wraps onto a second line (the button grows from .proto-start's min-height), .46rem at most; the
+  // mark's rook and its STRONGHOLD PROTOCOL capped so 「Simulation」 has a line of its own in a 960 px window at 特大
+  assert.match(base, /\n\.rs-go \.proto-start__label \{ flex: 1 1 auto; padding-right: 8%; font-size: min\(calc\(\.4 \* var\(--t\)\), \.46rem\); white-space: normal; line-height: 1\.1; \}/);
+  assert.match(base, /\n\.rs-go \.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), \.4rem\); \}/);
+  assert.match(base, /\n\.rs-go \.proto-start__mark small \{ font-size: min\(calc\(\.08 \* var\(--t\)\), \.1rem\); \}/);
+  // on a short screen: at least 46 px and taller for the second line (it was a fixed 46 px), the label 18–20 px (it was
+  // .46 × --t, 40 px at 特大)
+  let end = css.indexOf('{', at) + 1;
+  for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
+  const short = css.slice(at, end);
+  assert.match(short, /\.rs-go\.proto-start \{ height: auto; min-height: 46px; \}/);
+  assert.doesNotMatch(short, /\.rs-go\.proto-start \{ height: 46px; \}/);
+  assert.match(short, /\.rs-go \.proto-start__label \{ font-size: min\(calc\(\.46 \* var\(--t\)\), 20px\); \}/);
+  assert.match(short, /\.rs-go \.proto-start__mark \{ display: none; \}/);
+  // the markup the rules rely on
+  const room = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
+  assert.match(room, /class=\$\{`proto-start rs-go\$\{ready \? ' is-ready' : ''\}`\}/);
+  assert.match(room, /<span class="proto-start__label">/);
+  assert.match(roomCss, /\[ASSUMED\] the caps \*\//);
+  assert.match(roomCss, /\[ASSUMED\] the cap \*\//);
 });
 
 test('选择同盟方式 on a short screen (§35.18 leftover: the key field\'s placeholder ran under 观战 at 特大): the field\'s name as the placeholder, capped sizes', async () => {
