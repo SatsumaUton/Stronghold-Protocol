@@ -147,7 +147,7 @@ test('the sync waits for the data the server checks against (canSendSettings)', 
   assert.equal(S.canSendSettings({ store: app(plain), content: content({}), contentId: () => null }), true);
 });
 
-test('the sync engine: no send while the gate is shut; the content\'s arrival and entering a room send again', async () => {
+test('the sync engine: no send while the gate is shut; the content\'s arrival, and entering a room after a shut gate, send it', async () => {
   const sent = [];
   const listeners = new Map();
   const net = { status: 'online', on: (t, fn) => { listeners.set(t, fn); return () => listeners.delete(t); }, request: async (t, f) => { sent.push({ t, ...f }); return { t: 'ok' }; } };
@@ -167,8 +167,19 @@ test('the sync engine: no send while the gate is shut; the content\'s arrival an
   assert.equal(sent.length, 1, 'the content arrived');
   app.set({ room: { code: 'ROOM' } });
   await flush();
-  assert.equal(sent.length, 2, 'entering a room sends it again (its version may check it against other data)');
-  app.set({ room: { code: 'ROOM', seats: [] } });
+  assert.equal(sent.length, 1, 'sent already: entering a room sends nothing more (the server keeps the session\'s copy)');
+  // the lobby could not send (another version on screen): entering a room sends it
+  app.set({ room: null });
+  open = false;
+  target.set({ notOwned: ['chess_char_3_02_a'] });
+  await flush();
+  assert.equal(sent.length, 1, 'the gate is shut');
+  open = true;
+  app.set({ room: { code: 'ROOM2' } });
+  await flush();
+  assert.equal(sent.length, 2, 'entering a room after a shut gate sends it');
+  assert.deepEqual(sent[1].notOwned, ['chess_char_3_02_a']);
+  app.set({ room: { code: 'ROOM2', seats: [] } });
   await flush();
   assert.equal(sent.length, 2, 'not on every push of the same room');
   sync.dispose();

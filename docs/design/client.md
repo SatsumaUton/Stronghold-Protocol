@@ -671,8 +671,10 @@ picks are per version (`diyModel.diyPrefKey`: `sp.pref.diy` for 第二期下半,
 through 第二期下半's chess, `importedEntries` / `importedNotOwned`) and v2. Every sync (loadout, 干员持有, 自选, skins, card)
 waits for the data the server checks against (`canSendSettings`): never while the page's content loads; in a room once
 the room's content is on the page; outside a room only while the page shows the server's own files (the server checks
-outside-room settings against 第二期下半, the code constant, whatever its default version) — and entering a room sends
-them again. The wire keys of `room.loadout` / `room.ownership` stay the chess ids of the room's data.
+outside-room settings against 第二期下半, the code constant, whatever its default version) — and a room entered after the
+lobby could not send them sends them then (not at every room entry: the server keeps the session's copy, and five sends
+at once would spend the server's heavy-message budget an edit needs). The wire keys of `room.loadout` / `room.ownership`
+stay the chess ids of the room's data.
 
 **Statistics.** Records of another version carry `version` (a registry id, never 第二期下半; not part of the record id;
 `STATS_VERSION` 3, `MIGRATIONS[2]` rewrites nothing — a record without one played 第二期下半). 统计数据 has a version filter

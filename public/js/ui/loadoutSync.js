@@ -31,7 +31,8 @@
 // through 第二期下半's chess.json (migrateSettings; nothing is sent before). The 自选 picks are the version's own
 // (diyModel.js diyPrefKey). Every sync waits for the data the server checks against (canSendSettings): never while the
 // page's content loads, in a room once the room's content is on the page, outside a room only on 第二期下半's own files;
-// entering a room sends them again.
+// a room entered after the lobby could not send them sends them then (not at every room entry: the server keeps the
+// session's copy, and the heavy-message budget is an edit's too).
 
 import { createStore, loadPref, savePref, store } from '../store.js';
 import { data, buildIndex } from '../data.js';
@@ -405,6 +406,7 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
   let lastSent = null;    // JSON of the last payload the server accepted (on this session)
   let edited = false;     // an edit is waiting to be sent (a lock refusal is then worth telling the player)
   let disposed = false;
+  let gated = false;      // the last send waited for the data the server checks against (canSendSettings)
 
   const setState = (sync) => { if (target.get()[stateKey] !== sync) target.set({ [stateKey]: sync }); };
 
@@ -422,7 +424,8 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
     if (disposed) return;
     if (net.status !== 'online') { setState('idle'); return; } // the next welcome resends
     // the data the server checks against is not on the page (yet): the content's arrival sends it (DESIGN §35.23)
-    if (!(gate || canSendSettings)({ store: app, content })) { setState('idle'); return; }
+    if (!(gate || canSendSettings)({ store: app, content })) { gated = true; setState('idle'); return; }
+    gated = false;
     const preparing = revision;
     try {
       const payload = await prepare();
@@ -475,14 +478,15 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
   });
   // a match leaving INFO_CHECK locks the loadout; a new match (the room back in LOBBY / a new INFO_CHECK) accepts it again
   const offRoom = net.on('room.state', (msg) => { if (msg && !msg.inMatch && target.get()[stateKey] === 'locked') { lastSent = null; schedule(); } });
-  // entering a room (DESIGN §35.23): sent again — a room of another version checks them against its own data, and the
-  // lobby may not have sent them at all (another version on screen there)
+  // entering a room (DESIGN §35.23) after the lobby could not send them (another version on screen there): sent now.
+  // (A room of another version sends them once its content arrives — below —; otherwise the server keeps the session's
+  // copy, and five settings sent at every room entry would spend the server's heavy-message budget an edit needs.)
   let roomCode = app?.get?.()?.room?.code ?? null;
   const offApp = app?.subscribe ? app.subscribe((s) => {
     const code = s?.room?.code ?? null;
     if (code === roomCode) return;
     roomCode = code;
-    if (code) { revision++; lastSent = null; schedule(50); }
+    if (code && gated) { revision++; lastSent = null; schedule(50); }
   }) : null;
   // the room's content set arrived or went (DESIGN §32.6): sent again, checked against the data the room plays now
   let contentKey = content ? `${content.get().cs}|${content.get().status}` : '';
