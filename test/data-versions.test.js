@@ -206,7 +206,11 @@ for (const v of OTHERS) {
 
 // 第二期上半's records that keep today's id but differ from today's data (DESIGN §35.22.5 lists each). Today's data is V2_2
 // with the 04-14 level and text fixes (86da4cfa) and the modules added after 03-14, so the list is not only V2_2's. A
-// rebuild that changes a set fails here, and the hand-written list is reviewed with the new set.
+// rebuild that changes one of the compared fields fails here, and the hand-written list is reviewed with the new set.
+// Compared: every field of bands, effects, enemies and tokens; the waves' routes; the chess records' modules and their
+// skill / talent texts; the 自选 operators' powers and bonds and the 自选 forms' modules (backups.json). Not compared: the
+// chess fields the shop changes rewrite (visible, bonds, garrisons, identifier), the waves' usedBy (终极 dropped) and the
+// 自选 forms' texts.
 test('data/versions/act2autochess-v2_1: the same-id records that differ from today\'s are the listed ones', () => {
   const read = (dir, name) => readJson(join(ROOT, 'data', dir), name);
   const changed = (name, pick = (x) => x) => {
@@ -229,7 +233,23 @@ test('data/versions/act2autochess-v2_1: the same-id records that differ from tod
   assert.deepEqual(changed('chess', (c) => (c.modules || []).map((m) => m.uniEquipId)), ['chess_char_3_18_b', 'chess_char_4_01_b', 'chess_char_4_16_b',
     'chess_char_5_03_b', 'chess_char_5_05_b', 'chess_char_5_07_b', 'chess_char_5_13_b', 'chess_char_5_18_b', 'chess_char_6_04_b', 'chess_char_6_08_b',
     'chess_char_6_10_b', 'chess_char_6_15_b', 'chess_char_6_19_b']);
+  // the skill or talent texts of 菲莱, 忍冬, 阿罗玛, 乌尔比安, 圣聆初雪 and 焰影苇草 (term markup, 攻击力 30%, （+2） / （+2%）)
+  assert.deepEqual(changed('chess', (c) => [c.skill, c.skills, c.talents, c.talentsBase]), ['chess_char_3_06_a', 'chess_char_3_06_b',
+    'chess_char_3_18_a', 'chess_char_3_18_b', 'chess_char_4_10_a', 'chess_char_4_10_b', 'chess_char_5_05_a', 'chess_char_5_05_b',
+    'chess_char_6_02_a', 'chess_char_6_02_b', 'chess_char_6_08_a', 'chess_char_6_08_b']);
   assert.deepEqual(changed('tokens'), ['token_10017_skadi2_dedant', 'token_10039_ulpia_block']);
+  // backups.json: the 自选 operators' powers and bonds from the 03-14 character_table (鸿雪 and 真言 emptyShip, not
+  // sargonShip; seven with one power fewer), and the 自选 forms without a module added after 03-14
+  const today = read('', 'backups');
+  const v21b = read('versions/act2autochess-v2_1', 'backups');
+  const changedIn = (sub, pick) => Object.keys(sub(v21b)).filter((id) => Object.hasOwn(sub(today), id)
+    && JSON.stringify(pick(sub(today)[id])) !== JSON.stringify(pick(sub(v21b)[id]))).sort();
+  const diyOps = (b) => b.diy.operators;
+  assert.deepEqual(changedIn(diyOps, (o) => o.bonds), ['char_4055_bgsnow', 'char_4204_mantra']);
+  assert.deepEqual(changedIn(diyOps, (o) => o.powers), ['char_003_kalts', 'char_1044_hsgma2', 'char_1050_chen3', 'char_1502_crosly',
+    'char_4055_bgsnow', 'char_4132_ascln', 'char_4133_logos', 'char_4195_radian', 'char_4204_mantra']);
+  assert.deepEqual(changedIn((b) => b.units, (u) => Object.values(u.forms || {}).map((f) => (f.modules || []).map((m) => m.uniEquipId))),
+    ['char_2012_typhon', 'char_2025_shu', 'char_300_phenxi', 'char_4138_narant']);
   const v21 = read('versions/act2autochess-v2_1', 'enemies');
   assert.deepEqual([v21.enemy_2085_skzjxd.rank, v21.enemy_10040_cnvbln.notCountInTotal], ['NORMAL', true]);
 });

@@ -1127,7 +1127,7 @@ record's tier when the operator has several: 锡人, 耶拉, 华法琳 …), els
 `op-*` kit), else none — the generic kit. Only official records with a real charId take that path: test fixtures (whose
 charId defaults to the chess id) and plugin chess (`chess_x_` ids; Forge imports leave out `kitRef` on purpose to keep
 the generic kit) keep the by-id lookup, and stand-ins / 自选 pieces keep theirs (`KITS[def.charId]`). 第一期's owned
-自选 pool holds 24 operators that 第二期 sells as shop chess (星熊, 莫斯提马, 夕, 玛恩纳 …), 第二期上半's (V2_1) 4 that V2_2 made
+自选 pool holds 24 operators that 第二期下半 (today's data) sells as shop chess (星熊, 莫斯提马, 夕, 玛恩纳 …), 第二期上半's (V2_1) 4 that V2_2 made
 shop chess (银灰, 空弦, 卡涅利安, 伺夜): their kit is a tier kit only, so they are listed in `kits/index.js`
 `PENDING_DIY_KIT_CHARS`, stay out of `KITTED_CHARS` and are left out of those versions' 自选 by the kitted gate [ASSUMED]
 until M2 reviews the tier kit as a 自选 kit or writes one. The default data

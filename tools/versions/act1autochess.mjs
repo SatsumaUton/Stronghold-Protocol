@@ -8,6 +8,9 @@
 //           range_table of dcc057f6, 2025-09-04) and the level files (levels/activities/act1autochess/* equal those of
 //           23c99d5d, the V1_2 update)
 //   enemy   ee2cabff (2025-12-05 17:15): enemy_handbook_table and enemy_database, the last change inside the season
+// V1_2 opened on 11-25 with 23c99d5d; the 12-05 commit added 莎草's module, 娜斯提 to the owned 自选 pool, the ray / Mon3tr
+// 自选 modules and 10 bond texts (DATA.md pins row), and changed three battle templates the build does not read. A split
+// at 12-05 is open for the maintainer (DESIGN §35.22).
 // [ASSUMED] every field the data does not hold falls back to 下半: the rules (inert in M0, read in M2), the research
 // (docs/research/ until docs/research/versions/act1autochess/ exists) and the 下半-measured tables, which are left out.
 
