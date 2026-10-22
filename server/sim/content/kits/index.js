@@ -309,9 +309,9 @@ export const KIT_CHAR_IDS = Object.freeze({
 });
 
 /**
- * Operators of another official version that have no kit yet (上半: docs/SIM.md §7.2): their chess fight with the generic
- * kit. test/versions-keying.test.js accepts a chess without a kit only when its charId is listed here, and fails once a
- * listed operator gets a kit (it then leaves the list).
+ * Operators of another official version that have no kit yet (上半: DESIGN §36.4, docs/SIM.md §7.2): their chess fight
+ * with the generic kit. test/versions-keying.test.js accepts a chess without a kit only when its charId is listed here,
+ * and fails once a listed operator gets a kit (it then leaves the list).
  */
 export const PENDING_KIT_CHARS = Object.freeze([
   'char_198_blackd', // 讯使

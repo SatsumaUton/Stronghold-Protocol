@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // tools/bb-audit.mjs — blackboard audit of another official version's data against the default (versions M0,
-// docs/SIM.md §7.2).
+// DESIGN §36.5, docs/SIM.md §7.2).
 //
 // The hand-written content reads blackboard fields with a default for a missing one (`num(bb.no_attack_duration, 10)`).
 // When another version's record lacks a field the default data has, that default — the 下半 meaning — silently applies

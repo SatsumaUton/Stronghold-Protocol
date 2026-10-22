@@ -1,8 +1,9 @@
 // test/versions-default-guard.test.js — the default version (盟约·下半, act2autochess) stays exactly as it was before
-// the official version switch (docs/DATA.md "Official versions (M0)"). The fixture test/fixtures/versions-default-guard.json
-// pins:
+// the official version switch (DESIGN §36.2, docs/DATA.md "Official versions (M0)"). The fixture
+// test/fixtures/versions-default-guard.json pins:
 //   G1  the sha256 of every tracked default data file (top-level data/*.json and data/i18n/*.json, never data/versions/)
-//   G2  the sha256 of the golden corpus test/golden/*.json
+//       and of the golden corpus test/golden/*.json
+//   G2  the default config.json has no `version`, and cs reads exactly the top-level gameplay files
 //   G3  the cs formula (known-answer vectors of shared/plugins/identity.js), not the vanilla cs itself, which changes with
 //       any code change (server/plugins/identity.js)
 //   G4  a fresh co-op/NORMAL room's room.state (code, ids, name and content.cs normalised) and a welcome without

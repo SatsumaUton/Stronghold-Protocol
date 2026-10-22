@@ -1,5 +1,5 @@
-// shared/versions.js — the official versions this remake can play (docs/DATA.md "Official versions (M0)"). Pure ESM,
-// no Node APIs: the server, the browser and the tools read the same table.
+// shared/versions.js — the official versions this remake can play (DESIGN §36.1, docs/DATA.md "Official versions
+// (M0)"). Pure ESM, no Node APIs: the server, the browser and the tools read the same table.
 //
 //   id         the official activity id (activity_table AUTOCHESS_SEASON key), plus `@<versionInfoDict id>` for a
 //              sub-version (autoChessData.versionInfoDict: V1_1 from 2025-11-14 16:00, V1_2 from 2025-11-25 16:00)
