@@ -9,14 +9,14 @@ import {
 import { holdProtect, byEnemyDamage } from '../shared/tier1.js';
 
 /**
-* "传送至自身位置": a ground enemy that can reach `unit`'s tile on the ground grid is moved onto it (unblocked, its
-* route re-planned from there — the engine then blocks it on that tile when capacity allows). Flyers stay, and so does a
-* 自缚 unit (flag `selfBound`: 守墓石像's 转换模式, the 7 huge leaders, the 胄 parts' anchor): PRTS 余 S2 备注 "处于消失状态的/
-* 持有自缚的单位不视为可达目标" (束缚 alone does not exempt it, so not `noMove`). Being a leader is no exemption: PRTS gives
-* 卢西恩 and 假想敌：铳 (both sections) 传送抗性 无 — they are teleported like any ground enemy and walk on from his tile (a
-* patrol keeps looping: content/bosses.js patrolLoop). 静态刚体 forbids physical movement, not a teleport (the 备注 names
-* only 消失 / 自缚 / 免疫传送); every 静态刚体 of the mode flies or is 自缚 anyway.
-*/
+ * "传送至自身位置": a ground enemy that can reach `unit`'s tile on the ground grid is moved onto it (unblocked, its
+ * route re-planned from there — the engine then blocks it on that tile when capacity allows). Flyers stay, and so does a
+ * 自缚 unit (flag `selfBound`: 守墓石像's 转换模式, the 7 huge leaders, the 胄 parts' anchor): PRTS 余 S2 备注 "处于消失状态的/
+ * 持有自缚的单位不视为可达目标" (束缚 alone does not exempt it, so not `noMove`). Being a leader is no exemption: PRTS gives
+ * 卢西恩 and 假想敌：铳 (both sections) 传送抗性 无 — they are teleported like any ground enemy and walk on from his tile (a
+ * patrol keeps looping: content/bosses.js patrolLoop). 静态刚体 forbids physical movement, not a teleport (the 备注 names
+ * only 消失 / 自缚 / 免疫传送); every 静态刚体 of the mode flies or is 自缚 anyway.
+ */
 function teleportEnemy(battle, unit, e) {
   if (!e || !e.alive || e.isFlying || e.s.flags.selfBound) return false;
   const r = unit.tileR, c = unit.tileC;
@@ -82,7 +82,6 @@ function yu(bb, chess, def) {
       if (sid !== 'skchr_yu_1') return;
       // 被动效果：自身更容易受到敌人攻击 (while this skill is carried)
       battle.addBuff(unit, { key: 'yu:host', mods: { taunt: num(bb.taunt_level, 1) }, persist: true, allowDead: true });
-
     },
     skill: {
       kind: 'duration',
@@ -153,7 +152,6 @@ function yu(bb, chess, def) {
           ctx.cancel = true;
           battle.fx('firewallBlock', { x: p.x, y: p.y, id: unit.id });
         }, { owner: unit });
-
       } },
       { install(battle, unit) { // elite: module element ×1.15 while blocking; 闲云隐市 arts ×1.14 vs burning targets (≥4 ops)
         const epScale = num(tb.ep_damage_scale, 1), cnt = num(mod.cnt, Infinity), ds = num(mod.damage_scale, 1);
