@@ -498,7 +498,9 @@ export const C2S = {
   ping: { c: (v) => typeof v === 'number' && Number.isFinite(v) },
   // test: only the literal true (DESIGN §34.8). Omit it for a normal room — `false` is a bad field, so a
   // string cannot sneak in as "not a test". The server still refuses it unless SP_TEST_MODE is on.
-  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, $optional: ['test'] },
+  // difficulty: may be left out — the room starts at the server's default (server/lobby.js DEFAULT_DIFFICULTY) and the
+  // host changes it in the room (room.setDifficulty), as in the event's 联合模拟; a value given must be a difficulty.
+  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, $optional: ['test', 'difficulty'] },
   'room.join': { $optional: ['testAck'], testAck: (v) => v === true, code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'room.leave': {},
   'room.ready': { ready: isBool },
@@ -520,6 +522,9 @@ export const C2S = {
   // 干员皮肤 (docs/SKINS.md): the appearances the player wears, keyed by operator charId; PUBLIC, so it is accepted in
   // any room phase (the loadout locks at INFO_CHECK because it changes what a unit does; a skin changes only the model)
   'room.skins': { skins: isSkinSelection },
+  // 名片干员 (PR #643 split 6): the operator whose portrait fills the player's seat card in the waiting room — an
+  // operator charId ('' for none; the server keeps only a visible charId of the room's chess.json); cosmetic, any room phase
+  'room.card': { charId: (v) => v === '' || isCharId(v) },
   // operator ownership (干员持有, 0.2.0 补位): stored per session / seat; a match takes the list its seat had when it
   // started (an out-of-match setting — during a match it is stored for the next one: ROOM_STARTED)
   'room.ownership': { notOwned: isNotOwnedList },

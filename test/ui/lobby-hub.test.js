@@ -1,0 +1,489 @@
+// test/ui/lobby-hub.test.js — the hub lobby (PR #643 split 6, PR #812): the two entries (独立模拟 / 同盟模拟) open their
+// dialogs, 选择模拟协议 (the project's Modal, full screen: four difficulty cards with the 已选定 stamp, the selected one's
+// scene — its official picture on the drawn grid, ui/protocolScene.js — 开始独立模拟, the test-room box only in test mode;
+// the room's 确认 and read-only uses) and 选择同盟方式 (the project's Modal, full screen: 创建同盟 creating the room at once
+// at the remembered difficulty — the event's 联合模拟, the maintainer's decision of 2026-10-21 —, the key field (the
+// project's TextField) with 观战, 加入同盟, recent keys that only fill it); the 成就统计 card is the lobby's only statistics
+// entry; the official art keys the hub asks for exist in data/assets.json; the css follows 文字大小 without !important; no
+// account / matchmaking / federation code came along. Hook-free views drawn as vnode trees. (The browser side:
+// test/ui/lobby-hub.e2e.test.js, test/ui/room-settings.e2e.test.js.)
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+globalThis.fetch = async (url) => {
+  const name = String(url).split('/').pop();
+  try { const body = readFileSync(path.join(ROOT, 'data', name), 'utf8'); return { ok: true, status: 200, json: async () => JSON.parse(body) }; } catch { return { ok: false, status: 404, json: async () => ({}) }; }
+};
+const mem = new Map();
+globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
+const { HubEntry, ProtocolSelect, AllianceSelect, normalizeCode, codeArg } = await import('../../public/js/screens/lobby.js');
+const { Modal, TextField } = await import('../../public/js/ui/components.js');
+const { DIFFICULTIES } = await import('../../shared/constants.js');
+
+function* walk(v) {
+  if (Array.isArray(v)) { for (const x of v) yield* walk(x); return; }
+  if (!v || typeof v !== 'object') return;
+  yield v;
+  if (typeof v.type === 'function' && ['DifficultyCard', 'BackPlate'].includes(v.type.name)) { yield* walk(v.type(v.props)); return; }
+  yield* walk(v.props?.children);
+}
+const hasClass = (v, c) => typeof v?.props?.class === 'string' && v.props.class.split(/\s+/).includes(c);
+const find = (tree, pred) => [...walk(tree)].filter(pred);
+const byClass = (tree, c) => find(tree, (v) => hasClass(v, c));
+const textOf = (v) => (v == null || typeof v === 'boolean' ? '' : typeof v !== 'object' ? String(v) : Array.isArray(v) ? v.map(textOf).join('') : textOf(v.props?.children));
+const buttons = (tree) => find(tree, (v) => v.type === 'button');
+const buttonText = (tree, text) => buttons(tree).find((b) => textOf(b).includes(text));
+const titleOf = (tree) => textOf(byClass(tree, 'modal__title')[0]);
+
+const MODES = {
+  solo: { id: 'solo', name: '独立模拟', en: 'SOLO SIMULATION', icon: 'user', desc: '独自', points: ['1 名博士'] },
+  coop: { id: 'coop', name: '同盟模拟', en: 'ALLIANCE SIMULATION', icon: 'users', desc: '同盟', points: ['联防'] },
+};
+
+test('the entries: 独立模拟 / 同盟模拟 keep the .mode-card hook and open their own dialog', () => {
+  for (const id of ['solo', 'coop']) {
+    const opened = [];
+    const wrap = HubEntry({ card: MODES[id], onOpen: (m) => opened.push(m) });
+    assert.ok(textOf(byClass(wrap, 'hub-entry__group')[0]).includes(MODES[id].points[0]), 'its line above it');
+    const v = buttons(wrap)[0];
+    assert.ok(hasClass(v, 'mode-card') && hasClass(v, 'hub-entry'));
+    assert.equal(v.props['data-mode'], id);
+    assert.ok(textOf(v).includes(MODES[id].name));
+    v.props.onClick();
+    assert.deepEqual(opened, [id]);
+  }
+});
+
+const proto = (props) => ProtocolSelect({
+  roomMode: 'solo', difficulty: 'FUNNY', onDifficulty: () => {}, onClose: () => {}, onCreate: () => {}, busy: null, online: true,
+  testMode: false, asTest: false, onTest: () => {}, ...props,
+});
+
+test('选择模拟协议: the project Modal, four difficulty cards, the official picture of the selected one', () => {
+  const picked = [];
+  const v = proto({ difficulty: 'HARD', onDifficulty: (d) => picked.push(d) });
+  assert.equal(v.type, Modal, 'a Modal (focus trap, Esc, focus restored)');
+  assert.equal(titleOf(v), '选择模拟协议');
+  assert.ok(hasClass(v, 'proto'));
+  assert.equal(byClass(v, 'proto-back').length, 1, 'the back plate');
+  assert.equal(typeof v.props.onClose, 'function');
+  const cards = byClass(v, 'diff-card');
+  assert.equal(cards.length, DIFFICULTIES.length);
+  assert.deepEqual(cards.map((c) => hasClass(c, 'is-selected')), DIFFICULTIES.map((d) => d === 'HARD'));
+  assert.deepEqual(cards.map((c) => hasClass(c, 'is-on') && byClass(c, 'pcard__stamp').length === 1), DIFFICULTIES.map((d) => d === 'HARD'));
+  cards[0].props.onClick();
+  assert.deepEqual(picked, ['FUNNY']);
+  const art = find(v, (x) => x.type?.name === 'ProtocolArt');
+  assert.deepEqual(art.map((x) => x.props.difficulty), ['HARD'], 'the selected difficulty’s scene');
+  const body = byClass(v, 'proto__body')[0];
+  assert.equal(body.props['data-difficulty'], 'HARD');
+  assert.match(body.props.style, /--d-color:/);
+});
+
+test('选择模拟协议: 开始独立模拟, offline and busy states, the test-room box only in test mode; the room’s 确认', () => {
+  const made = [];
+  const solo = proto({ onCreate: () => made.push('solo') });
+  const start = buttonText(solo, '开始独立模拟');
+  assert.ok(start && hasClass(start, 'proto-start') && !start.props.disabled);
+  assert.equal(byClass(solo, 'create-box').length, 1, 'the .create-box hook of the older tests');
+  start.props.onClick();
+  assert.deepEqual(made, ['solo']);
+  assert.equal(find(solo, (x) => x.props?.['data-testid'] === 'create-test').length, 0);
+
+  // the room's change of difficulty (screens/room.js, the host): 确认 with the server rules as the hint, busy while sent
+  const room = proto({ roomMode: 'coop', busy: 'create', action: '确认', hint: '更改难度后，其他博士需要重新准备就绪' });
+  assert.equal(buttonText(room, '确认').props['aria-busy'], 'true');
+  assert.ok(buttonText(room, '确认').props.disabled, 'no second click while it is sent');
+  assert.ok(textOf(room).includes('更改难度后，其他博士需要重新准备就绪'));
+  assert.equal(buttonText(room, '创建同盟'), undefined, 'no 创建同盟 button inside a room');
+  assert.ok(buttonText(proto({ online: false }), '开始独立模拟').props.disabled, 'offline: no create');
+
+  const ticked = [];
+  const test = proto({ testMode: true, asTest: true, onTest: (on) => ticked.push(on) });
+  const box = find(test, (x) => x.props?.['data-testid'] === 'create-test');
+  assert.equal(box.length, 1);
+  const input = find(box[0], (x) => x.type === 'input')[0];
+  assert.equal(input.props.checked, true);
+  input.props.onChange({ target: { checked: false } });
+  assert.deepEqual(ticked, [false]);
+});
+
+test('选择模拟协议 read-only (a room’s other doctors): the cards shown, not chosen, no button, 由创建者选择', () => {
+  const v = proto({ roomMode: 'coop', difficulty: 'ABYSS', readOnly: true, onCreate: () => assert.fail('sent') });
+  const cards = byClass(v, 'diff-card');
+  assert.equal(cards.length, DIFFICULTIES.length);
+  assert.ok(cards.every((c) => c.props.disabled === true), 'no card can be chosen');
+  assert.deepEqual(cards.map((c) => hasClass(c, 'is-selected')), DIFFICULTIES.map((d) => d === 'ABYSS'), 'the room’s difficulty');
+  assert.equal(byClass(v, 'proto-start').length, 0, 'no 确认 / 创建同盟 button');
+  assert.equal(find(v, (x) => x.props?.['data-testid'] === 'create-test').length, 0);
+  assert.ok(textOf(byClass(v, 'proto-hint--ro')[0]).includes('由创建者选择'));
+  assert.ok(proto({}).props && byClass(proto({}), 'diff-card').every((c) => !c.props.disabled), 'the host’s and the lobby’s cards stay live');
+});
+
+const ally = (props) => AllianceSelect({
+  onClose: () => {}, onCreate: () => {}, code: '', onCode: () => {}, codeOk: false, online: true, busy: null,
+  onJoin: () => {}, onSpectate: () => {}, recent: [], marks: [], focusKey: true, ...props,
+});
+
+test('选择同盟方式: 创建同盟 creates the room at once at the remembered difficulty (changed in the room); the test-room box in test mode', () => {
+  const calls = [];
+  const v = ally({ onCreate: (...a) => calls.push(['create', ...a]), difficulty: 'HARD' });
+  assert.equal(v.type, Modal);
+  assert.ok(hasClass(v, 'ally') && !hasClass(v, 'proto'), 'its own class: .modal__box.proto is 选择模拟协议 only');
+  assert.equal(titleOf(v), '选择同盟方式');
+  const create = find(v, (x) => x.props?.['data-testid'] === 'alliance-create')[0];
+  assert.equal(create.type, 'button');
+  assert.equal(create.props['data-difficulty'], 'HARD');
+  assert.ok(textOf(create).includes('难度：绝境模拟（可在同盟内更改）'), textOf(create));
+  assert.ok(!create.props.disabled);
+  create.props.onClick({ type: 'click' });
+  assert.deepEqual(calls, [['create']], 'no click event handed on, no difficulty step in between');
+  const busy = find(ally({ busy: 'create' }), (x) => x.props?.['data-testid'] === 'alliance-create')[0];
+  assert.ok(busy.props.disabled && busy.props['aria-busy'] === 'true', 'no second room while it is made');
+  assert.ok(find(ally({ online: false }), (x) => x.props?.['data-testid'] === 'alliance-create')[0].props.disabled, 'offline');
+  assert.equal(find(v, (x) => x.props?.['data-testid'] === 'create-test').length, 0, 'no test-room box outside test mode');
+  const ticked = [];
+  const test = ally({ testMode: true, asTest: true, onTest: (on) => ticked.push(on) });
+  const box = find(test, (x) => x.props?.['data-testid'] === 'create-test');
+  assert.equal(box.length, 1);
+  const input = find(box[0], (x) => x.type === 'input')[0];
+  assert.equal(input.props.checked, true);
+  input.props.onChange({ target: { checked: false } });
+  assert.deepEqual(ticked, [false]);
+});
+
+test('选择同盟方式: the key field is the project TextField (IME-safe Enter, normalised write-back, no length cap); join or watch once the key is whole', () => {
+  const calls = [];
+  const v = ally({ onCreate: () => calls.push('create') });
+  const row = byClass(v, 'join-row');
+  assert.equal(row.length, 1);
+  assert.equal(find(row[0], (x) => x.type === 'input').length, 0, 'no raw <input>: TextField guards the IME composition');
+  const field = find(row[0], (x) => x.type === TextField)[0];
+  assert.ok(field, 'the key field');
+  assert.equal(field.props.transform, normalizeCode, 'the normalised key is written back into the field');
+  assert.equal(field.props.maxLength, undefined, 'no cap before normalizeCode: a long pasted invite link must reach it whole');
+  assert.equal(field.props.modalFocus, true, 'the Modal focuses it');
+  assert.equal(field.props.ariaLabel, '同盟密钥');
+  assert.equal(find(ally({ focusKey: false }), (x) => x.type === TextField)[0].props.modalFocus, false, 'not on a touch screen');
+  const enter = [];
+  find(ally({ onJoin: (...a) => enter.push(a) }), (x) => x.type === TextField)[0].props.onEnter({ key: 'Enter' });
+  assert.deepEqual(enter, [[]], 'Enter joins with the field’s key (no event handed on as a key)');
+  assert.ok(buttonText(v, '加入同盟').props.disabled, 'no key yet');
+  assert.ok(buttonText(v, '观战').props.disabled);
+
+  const ready = ally({ code: 'ABCD', codeOk: true, onJoin: () => calls.push('join'), onSpectate: () => calls.push('spectate') });
+  const join = buttonText(ready, '加入同盟');
+  const watch = buttonText(ready, '观战');
+  assert.ok(!join.props.disabled && !watch.props.disabled);
+  assert.ok(hasClass(watch, 'join-spectate'));
+  join.props.onClick();
+  watch.props.onClick();
+  assert.deepEqual(calls, ['join', 'spectate']);
+  assert.ok(buttonText(ally({ code: 'ABCD', codeOk: true, online: false }), '加入同盟').props.disabled, 'offline');
+});
+
+test('选择同盟方式: a recent key fills the field (it never joins by itself); a test room keeps its mark', () => {
+  const filled = [];
+  const v = ally({ recent: ['ABCD', 'WXYZ'], marks: ['WXYZ'], onCode: (c) => filled.push(c), onJoin: () => assert.fail('joined') });
+  const chips = byClass(v, 'code-chip');
+  assert.deepEqual(chips.map((c) => textOf(c).trim()), ['ABCD', 'WXYZ']);
+  assert.equal(find(chips[0], (x) => x.type?.name === 'TestMark').length, 0);
+  assert.equal(find(chips[1], (x) => x.type?.name === 'TestMark').length, 1);
+  chips[1].props.onClick();
+  assert.deepEqual(filled, ['WXYZ']);
+  assert.ok(textOf(ally({})).includes('向同伴索取'), 'no recent key: the hint');
+});
+
+const lobbySrc = readFileSync(path.join(ROOT, 'public/js/screens/lobby.js'), 'utf8');
+const lobbyCss = readFileSync(path.join(ROOT, 'public/css/screens/lobby.css'), 'utf8');
+const roomCss = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
+
+test('the key: a pasted invite link of any length, a 5th character or a dash are normalised to the 4-letter key', () => {
+  const link = 'https://crops-flexible-wedding-trademarks.trycloudflare.com/?room=QWER';
+  assert.ok(link.length > 64);
+  assert.equal(normalizeCode(link), 'QWER', 'the whole link reaches normalizeCode (the old maxlength 64 made it "HTTP")');
+  assert.equal(normalizeCode(`${link} 凯尔希邀请你加入卫戍协议：盟约【标准模拟】`), 'QWER', 'the copied invitation line too');
+  assert.equal(normalizeCode('abcde'), 'ABCD');
+  assert.equal(normalizeCode('ab-'), 'AB');
+  assert.equal(codeArg({ type: 'click' }, 'abcd'), 'ABCD', 'a click event falls back to the field');
+});
+
+test('official art only: every key the hub and 选择模拟协议 ask for is in data/assets.json', () => {
+  const ui = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).ui;
+  const keys = [...lobbySrc.matchAll(/\sk="([^"$]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(keys.sort(), ['entry/entry_bkg_01', 'entry/entry_bkg_02', 'entry/season_logo']);
+  for (const k of keys) assert.ok(ui[k], k);
+  for (const d of ['funny', 'normal', 'hard', 'abyss']) assert.ok(ui[`modeChoice/${d}_rhodes_island`], d);
+});
+
+test('成就统计 card: the lobby’s only statistics entry (no top-bar 统计数据 chip); this browser’s records read without writing, the official trophy medals', () => {
+  assert.match(lobbySrc, /<\$\{AchievementCard\} onOpen=\$\{\(\) => setAchOpen\(true\)\} \/>/);
+  assert.match(lobbySrc, /achOpen \? html`<\$\{AchievementDialog\} onClose=/);
+  assert.doesNotMatch(lobbySrc, /openStats/, 'the 统计数据 page opens from the window’s 查看完整统计 only');
+  assert.doesNotMatch(lobbySrc, /stats-entry|me-chip/, 'the top-bar chip is gone');
+  assert.match(lobbySrc, /const records = peekStatsRecords\(\);\s*return \{ prog: levelProgress\(records/);
+  assert.match(lobbySrc, /trophies: aggregateStats\(records\)\.trophies/, 'the same trophy count as the window’s 获得奖杯');
+  assert.match(lobbySrc, /\[cfg, statsOpen\]/, 'read again when 统计数据 closes (an import or 清空 there)');
+  assert.doesNotMatch(lobbySrc, /loadStats\(/, 'loadStats moves a damaged value away: the 统计数据 page must still find it');
+  const ui = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).ui;
+  const medals = JSON.parse(readFileSync(path.join(ROOT, 'data/config.json'), 'utf8')).trophies.medals;
+  for (const m of medals) assert.ok(ui[`medalIcon/${m.iconId}`], m.iconId);
+});
+
+test('选择模拟协议 scene: the official picture as an <image> of the drawn scene, the drawn hull when it fails to load', () => {
+  assert.match(lobbySrc, /<\$\{ProtocolScene\} difficulty=\$\{difficulty\} art=\$\{uiUrl\(data\.get\('assets'\), `modeChoice\/\$\{PROTOCOL_ART\[difficulty\]\}_rhodes_island`\)\} \/>/);
+  const scene = readFileSync(path.join(ROOT, 'public/js/ui/protocolScene.js'), 'utf8');
+  assert.match(scene, /<image href=\$\{pic\}[^>]*onError=\$\{\(\) => setBad\(art\)\}/);
+  const ui = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).ui;
+  for (const k of ['funny', 'normal', 'hard', 'abyss']) assert.ok(ui[`modeChoice/${k}_rhodes_island`], k);
+});
+
+test('成就统计 window (screens/stats.js AchievementDialog): the project Modal, this browser’s records only, 查看完整统计 opens 统计数据', () => {
+  const stats = readFileSync(path.join(ROOT, 'public/js/screens/stats.js'), 'utf8');
+  const dlg = stats.slice(stats.indexOf('export function AchievementDialog'));
+  assert.match(dlg, /<\$\{Modal\}/);
+  assert.match(dlg, /peekStatsRecords\(\)/);
+  assert.match(dlg, /openStats\(/);
+  assert.doesNotMatch(dlg, /loadStats\(/);
+  // the lineup's portraits, 自选 units and gear: nothing on the lobby path loads chess / items / backups
+  assert.match(dlg, /useData\('config', 'bands', 'bonds', 'assets', 'chess', 'items', 'backups'\)/);
+  // no gameplay-plugin match in the peak or the strategy marks (checklist §二.6), like the tallies (aggregateStats)
+  assert.match(dlg, /achievementRecords\(records\)/);
+  assert.match(dlg, /highestBondRecord\(official\)/);
+  assert.match(dlg, /<\$\{StrategyRecords\}[^>]*records=\$\{official\}/);
+  // an alphabetic title gets ': ', as on the hub and the title screen
+  assert.match(dlg, /scriptOf\(t\('卫戍协议'\)\) === 'alphabetic' \? ': ' : '：'/);
+});
+
+test('选择同盟方式 creates the room itself: the lobby never stacks 选择模拟协议 for a 同盟', () => {
+  assert.match(lobbySrc, /onCreate=\$\{\(\) => create\('coop'\)\} difficulty=\$\{difficulty\}/);
+  assert.match(lobbySrc, /onCreate=\$\{\(\) => create\('solo'\)\}/);
+  assert.doesNotMatch(lobbySrc, /setProtocol\('coop'\)/);
+  assert.match(lobbySrc, /<\$\{ProtocolSelect\} roomMode="solo"/, '选择模拟协议 stays before 独立模拟');
+});
+
+test('no server-only features: accounts, friends, federation, matchmaking, 无限火力, Android', () => {
+  for (const re of [/accounts\.js/, /friends\.js/, /federation/, /matchmaking/i, /match\.queue/, /randomMode/, /AndroidNative/, /__onRoomFound/, /room\.list/]) {
+    assert.doesNotMatch(lobbySrc, re, String(re));
+  }
+});
+
+test('lobby.css: text follows 文字大小 (var(--t)), no !important, no :has()', () => {
+  const sizes = [...lobbyCss.matchAll(/font-size:\s*([^;}]+)/g)].map((m) => m[1].trim());
+  assert.ok(sizes.length >= 25, `${sizes.length} font sizes`);
+  // (a plain px value is a touch floor of the 0.3.x test-room box, never a rem that would ignore 文字大小)
+  for (const s of sizes) assert.ok(/var\(--t\)/.test(s) || /^\d+px$/.test(s), s);
+  assert.doesNotMatch(lobbyCss, /!important/);
+  assert.doesNotMatch(lobbyCss, /:has\(/);
+});
+
+test('选择同盟方式 on a short screen (≤ 520 px tall): 创建同盟 keeps its difficulty line under the name, the column fits or scrolls (§35.18)', () => {
+  // the name is an element of its own, so the icon and the name stay on the first row (a bare text node became a
+  // flex item that wrapped under the icon in English at 大 — the 2026-10-22 review)
+  const bar = byClass(find(ally({ difficulty: 'HARD' }), (x) => x.props?.['data-testid'] === 'alliance-create')[0], 'ally-card__bar')[0];
+  const kids = [bar.props.children].flat(Infinity).filter((x) => x && typeof x === 'object');
+  assert.deepEqual(kids.map((x) => x.props?.class ?? x.type), ['ally-card__icon', 'ally-card__name', 'small']);
+  assert.equal(textOf(kids[1]), '创建同盟');
+  const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  // the column centres with auto margins (they give way when it is too tall; justify-content: center spilled it past both ends)
+  assert.match(css, /\n\.ally-side \{(?![^}]*justify-content)[^}]*\}\n\.ally-side > :first-child \{ margin-top: auto; \}\n\.ally-side > :last-child \{ margin-bottom: auto; \}/);
+  // the @media block, up to its own closing brace
+  const at = css.indexOf('@media (max-height: 520px) {');
+  let end = css.indexOf('{', at) + 1;
+  for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
+  const short = css.slice(at, end);
+  assert.ok(short.includes('.ally-card__bar {'), 'the short-screen block');
+  assert.doesNotMatch(short, /\.ally-card__bar small \{ display: none; \}/, 'no longer hidden');
+  assert.match(short, /\.ally-card__bar \{ font-size: clamp\(16px, calc\(\.3 \* var\(--t\)\), 26px\); \}/, 'the names a step smaller, capped');
+  assert.match(short, /\.ally-card--create \.ally-card__bar \{[^}]*display: grid; grid-template-columns: auto minmax\(0, 1fr\);[^}]*height: auto;/);
+  assert.match(short, /\.ally-card--create \.ally-card__name \{[^}]*min-width: 0;[^}]*text-overflow: ellipsis;/);
+  assert.match(short, /\.ally-card--create \.ally-card__bar small \{[^}]*grid-column: 2;[^}]*white-space: normal;[^}]*font-size: clamp\(11px, calc\(\.28 \* var\(--t\)\), 14px\);/);
+  assert.match(short, /\.ally-recent \{ font-size: min\(calc\(\.24 \* var\(--t\)\), 14px\);/);
+  assert.match(short, /\.proto-title__mode \{[^}]*flex-wrap: wrap;[^}]*white-space: nowrap; \}/, 'the mode line breaks between its parts, never inside one');
+  assert.match(short, /\.ally-side \{[^}]*overflow-x: hidden; overflow-y: auto;/, 'a column still too tall scrolls');
+});
+
+/** The short-screen @media block of lobby.css (comments dropped), up to its own closing brace. */
+function shortBlock() {
+  const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const at = css.indexOf('@media (max-height: 520px) {');
+  let end = css.indexOf('{', at) + 1;
+  for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
+  return css.slice(at, end);
+}
+
+test('选择模拟协议 on a short screen (§35.18 leftover: at 文字大小 中+ the cards ran under 开始独立模拟): one-line cards, the description in the brief, capped header and label', () => {
+  const short = shortBlock();
+  assert.match(short, /\.proto-body \{ grid-template-columns: minmax\(0, 1fr\) min\(7\.4rem, 50vw\);/, 'the column as wide as 选择同盟方式\'s');
+  assert.match(short, /\.pcard__desc, \.pcard__effects, \.pcard__meta \{ display: none; \}/, 'the cards keep only their names');
+  assert.doesNotMatch(short, /\.proto-brief p \{ display: none; \}/, 'the brief keeps its description');
+  assert.match(short, /\.proto-brief p \{[^}]*font-size: clamp\(11px, calc\(\.26 \* var\(--t\)\), 13px\);/);
+  assert.match(short, /\.pcard__name \{ min-width: 0; overflow: hidden; text-overflow: ellipsis;/);
+  assert.match(short, /\.pcard__name \{ font-size: clamp\(16px, calc\(\.4 \* var\(--t\)\), 20px\); \}/);
+  assert.match(short, /\.proto-title \.modal__title \{ font-size: min\(calc\(\.46 \* var\(--t\)\), 24px\); white-space: nowrap; \}/);
+  assert.match(short, /\.proto-title__mode, \.proto-title__mode i \{ font-size: min\(calc\(\.24 \* var\(--t\)\), 16px\); \}/);
+  // the button grows for a second line of its label instead of cutting it (the wrap: the dialog's base rule)
+  assert.match(short, /\.proto-start \{ height: auto; min-height: 44px;/);
+  assert.match(short, /\.proto-foot \.proto-start__label \{ font-size: min\(calc\(\.5 \* var\(--t\)\), 20px\); \}/);
+  assert.match(short, /\.proto-foot \.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), 16px\); \}/);
+  assert.match(short, /\.proto-foot \.proto-start__mark small \{ font-size: min\(calc\(\.08 \* var\(--t\)\), 6px\); \}/);
+  // the list still scrolls should a pack's names not fit (its base rule)
+  assert.match(lobbyCss, /\.proto-list \{[^}]*overflow-y: auto;/);
+  // the markup the rules rely on: the description on each card and in the brief, the name in its own element
+  const v = ProtocolSelect({ roomMode: 'solo', difficulty: 'ABYSS', onDifficulty: () => {}, onClose: () => {}, onCreate: () => {}, online: true });
+  assert.equal(byClass(v, 'pcard__name').length, 4);
+  assert.equal(byClass(byClass(v, 'proto-brief')[0], 'proto-brief__name').length, 1);
+  assert.ok(textOf(find(byClass(v, 'proto-brief')[0], (x) => x.type === 'p')[0]).length > 0, 'the brief\'s description');
+  assert.match(lobbyCss, /\[ASSUMED\] every cap/);
+});
+
+test('TextField placeholderShort: placeholderFits measures the text in the ::placeholder font (letter spacing included) against the inner width', async () => {
+  const { placeholderFits } = await import('../../public/js/ui/components.js');
+  const saved = { gcs: globalThis.getComputedStyle, doc: globalThis.document };
+  try {
+    // 10 px a character in the canvas, + 1 px letter spacing; the input 200 px wide with 10 px padding each side → 180 px
+    const ph = { fontStyle: 'normal', fontWeight: '500', fontSize: '20px', fontFamily: 'x', letterSpacing: '1px' };
+    const own = { fontStyle: 'normal', fontWeight: '700', fontSize: '20px', fontFamily: 'x', letterSpacing: '2px', paddingLeft: '10px', paddingRight: '10px' };
+    let font = '';
+    globalThis.document = { createElement: () => ({ getContext: () => ({ set font(f) { font = f; }, measureText: (s) => ({ width: s.length * 10 }) }) }) };
+    globalThis.getComputedStyle = (el, pseudo) => (pseudo === '::placeholder' ? ph : own);
+    const input = { clientWidth: 200 };
+    assert.equal(placeholderFits(input, 'x'.repeat(16)), true, '16 × 11 = 176 ≤ 180');
+    assert.equal(placeholderFits(input, 'x'.repeat(17)), false, '17 × 11 = 187 > 180');
+    assert.equal(font, 'normal 500 20px x', 'the placeholder\'s own font');
+    // no ::placeholder style (an older engine): the input's own font and spacing stand in
+    globalThis.getComputedStyle = (el, pseudo) => (pseudo ? {} : own);
+    assert.equal(placeholderFits(input, 'x'.repeat(15)), true, '15 × 12 = 180');
+    assert.equal(placeholderFits(input, 'x'.repeat(16)), false);
+    // nothing to measure with: the whole placeholder stays
+    globalThis.getComputedStyle = () => { throw new Error('no layout'); };
+    assert.equal(placeholderFits(input, 'x'.repeat(99)), true);
+  } finally { globalThis.getComputedStyle = saved.gcs; globalThis.document = saved.doc; }
+  const comp = readFileSync(path.join(ROOT, 'public/js/ui/components.js'), 'utf8');
+  assert.match(comp, /const check = \(\) => \{ if \(live\) setPhShort\(!placeholderFits\(el, placeholder\)\); \};/);
+  assert.match(comp, /ro\?\.observe\(el\);\n\s+const fonts = globalThis\.document\?\.fonts;\n\s+fonts\?\.addEventListener\?\.\('loadingdone', check\);/);
+  assert.match(comp, /placeholder=\$\{phShort && placeholderShort \? placeholderShort : placeholder\}/);
+});
+
+/** A top-level @media block of lobby.css (comments dropped), up to its own closing brace. */
+function mediaBlock(query) {
+  const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const at = css.indexOf(`@media ${query} {`);
+  assert.ok(at >= 0, query);
+  let end = css.indexOf('{', at) + 1;
+  for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
+  return css.slice(at, end);
+}
+
+test('选择模拟协议 above 520 px tall (§35.18 leftover: the label cut, the cards under the button at 大 / 特大): the label wraps and stops at .46rem, the cards fit by levels', async () => {
+  const { pickCardFit, CARD_FIT_LEVELS } = await import('../../public/js/screens/lobby.js');
+  // the first level whose cards do not spill; the last when none fits (the list then scrolls)
+  assert.deepEqual(CARD_FIT_LEVELS, ['full', 'brief', 'names']);
+  const tried = [];
+  assert.equal(pickCardFit((lv) => { tried.push(lv); return lv !== 'brief'; }), 'brief');
+  assert.deepEqual(tried, ['full', 'brief'], 'stops at the first that fits');
+  assert.equal(pickCardFit(() => false), 'full');
+  assert.equal(pickCardFit(() => true), 'names');
+  const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const base = css.slice(0, css.indexOf('@media (max-aspect-ratio: 1/1) {'));
+  // the label: wraps (the button grows from its old height) and stops at 大's size; the rook too; the names at .36rem —
+  // the dialog's own button only (.proto-foot): the shared rule keeps the old one-line label for the room's GoButton,
+  // which makes its own choice in room.css (the review: these rules had reached it, and its fixed 46 px on a phone cut
+  // every line)
+  assert.match(base, /\n\.proto-start \{[^}]*\n {2}min-height: max\(1\.04rem, 54px\);/);
+  assert.doesNotMatch(base.match(/\n\.proto-start \{[^}]*\}/)[0], /\n {2}height:/, 'no fixed height');
+  assert.match(base, /\n\.proto-start__label \{[^}]*font-size: calc\(\.4 \* var\(--t\)\);[^}]*white-space: nowrap; \}/);
+  assert.match(base, /\n\.proto-foot \.proto-start__label \{ flex: 1 1 auto; padding-right: 8%; font-size: min\(calc\(\.4 \* var\(--t\)\), \.46rem\); white-space: normal; line-height: 1\.1; \}/);
+  assert.match(base, /\n\.proto-start__rook \{[^}]*font-size: calc\(\.36 \* var\(--t\)\);/);
+  assert.match(base, /\n\.proto-foot \.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), \.4rem\); \}/);
+  assert.match(base, /\n\.pcard__name \{ font-size: min\(calc\(\.28 \* var\(--t\)\), \.36rem\);/);
+  // no rule of lobby.css outside the dialog wraps the label (the room's button shares the class)
+  for (const [, sel, body] of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+    if (/\.proto-start__label/.test(sel) && /white-space: normal|flex: 1 1 auto|padding-right/.test(body)) {
+      assert.ok(sel.split(',').every((x) => !/\.proto-start__label/.test(x) || /\.proto-foot \.proto-start__label/.test(x)), `scoped to the dialog: ${sel.trim()}`);
+    }
+  }
+  // the cards' column: 5.6rem with a 300 px floor (the review: in a 960×540 / 1100×530 / 800×600 window English names
+  // ended in an ellipsis on cards not chosen), never past 46vw
+  assert.match(base, /\n\.proto-body \{[^}]*grid-template-columns: minmax\(0, 1fr\) min\(max\(5\.6rem, 300px\), 46vw\);/);
+  // the portrait layout's cards and button span the width: the caps give way there
+  const narrow = mediaBlock('(max-aspect-ratio: 1/1)');
+  assert.match(narrow, /\.pcard__name \{ font-size: calc\(\.28 \* var\(--t\)\); \}/);
+  assert.match(narrow, /\.proto-foot \.proto-start__label \{ font-size: calc\(\.4 \* var\(--t\)\); \}/);
+  // the levels, above 520 px only (the short-screen block has its own one-line cards)
+  const tall = mediaBlock('(min-height: 521px)');
+  assert.match(tall, /\.proto__body\[data-fit="brief"\] \.pcard__desc,\s*\.proto__body\[data-fit="names"\] \.pcard__desc, \.proto__body\[data-fit="names"\] \.pcard__effects, \.proto__body\[data-fit="names"\] \.pcard__meta \{ display: none; \}/);
+  assert.match(tall, /\.proto__body\[data-fit="brief"\] \.pcard__name, \.proto__body\[data-fit="names"\] \.pcard__name \{ min-width: 0; overflow: hidden; text-overflow: ellipsis;/);
+  assert.match(tall, /\.proto__body\[data-fit="names"\] \.proto-brief__more \{ display: flex;/);
+  assert.match(base, /\n\.proto-brief__more \{ display: none; \}/, 'the brief\'s extra lines only at names');
+  assert.doesNotMatch(tall, /\.proto-list \{|\.proto-body \{|\.proto-side \{/, 'a level never changes the list\'s box (no measuring loop)');
+  // the markup: the fit element inside the body, the brief's effects and rounds, the list's tighter rhythm
+  const v = ProtocolSelect({ roomMode: 'solo', difficulty: 'HARD', onDifficulty: () => {}, onClose: () => {}, onCreate: () => {}, online: true });
+  const body = byClass(v, 'proto__body')[0];
+  assert.equal(find(body, (x) => typeof x.type === 'function' && x.type.name === 'ProtoFit').length, 1);
+  const more = byClass(v, 'proto-brief__more')[0];
+  assert.ok(byClass(more, 'proto-brief__effects')[0].props.children.length > 0, 'the chosen difficulty\'s effects');
+  assert.equal(byClass(more, 'proto-brief__meta').length, 1);
+  assert.match(base, /\n\.proto-list \{[^}]*gap: \.1rem;\n {2}padding: \.07rem \.06rem \.07rem \.5rem;/);
+  assert.match(base, /\n\.pcard \{[^}]*padding: \.08rem \.26rem \.09rem;/);
+  // re-fitted at every render, on the list's resize and on every font load (late web fonts make the lines taller)
+  assert.match(lobbySrc, /body\.dataset\.fit = pickCardFit\(\(level\) => \{ body\.dataset\.fit = level; return list\.scrollHeight > list\.clientHeight \+ 1; \}\);/);
+  assert.match(lobbySrc, /useLayoutEffect\(fit\);/);
+  assert.match(lobbySrc, /ro\?\.observe\(list\);/);
+  assert.match(lobbySrc, /fonts\?\.addEventListener\?\.\('loadingdone', refit\);/);
+  assert.match(lobbySrc, /fonts\?\.removeEventListener\?\.\('loadingdone', refit\);/);
+  assert.match(lobbyCss, /\[ASSUMED\] the levels and the sizes/);
+  assert.match(lobbyCss, /\[ASSUMED\] the label's caps \*\//);
+  assert.match(lobbyCss, /\[ASSUMED\] the spacing \*\//);
+  assert.match(lobbyCss, /\[ASSUMED\] the\n {3}floor \*\//);
+});
+
+test('the room\'s 开始模拟 / 准备就绪 (screens/room.js GoButton, `.proto-start rs-go`) chooses its own label (§35.18 review: 选择模拟协议\'s wrapping label reached it, and its fixed 46 px on a phone cut every line)', () => {
+  const css = roomCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const at = css.indexOf('@media (max-height: 520px) {');
+  const base = css.slice(0, at);
+  // like the dialog's: wraps onto a second line (the button grows from .proto-start's min-height), .46rem at most; the
+  // mark's rook and its STRONGHOLD PROTOCOL capped so 「Simulation」 has a line of its own in a 960 px window at 特大
+  assert.match(base, /\n\.rs-go \.proto-start__label \{ flex: 1 1 auto; padding-right: 8%; font-size: min\(calc\(\.4 \* var\(--t\)\), \.46rem\); white-space: normal; line-height: 1\.1; \}/);
+  assert.match(base, /\n\.rs-go \.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), \.4rem\); \}/);
+  assert.match(base, /\n\.rs-go \.proto-start__mark small \{ font-size: min\(calc\(\.08 \* var\(--t\)\), \.1rem\); \}/);
+  // on a short screen: at least 46 px and taller for the second line (it was a fixed 46 px), the label 18–20 px (it was
+  // .46 × --t, 40 px at 特大)
+  let end = css.indexOf('{', at) + 1;
+  for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
+  const short = css.slice(at, end);
+  assert.match(short, /\.rs-go\.proto-start \{ height: auto; min-height: 46px; \}/);
+  assert.doesNotMatch(short, /\.rs-go\.proto-start \{ height: 46px; \}/);
+  assert.match(short, /\.rs-go \.proto-start__label \{ font-size: min\(calc\(\.46 \* var\(--t\)\), 20px\); \}/);
+  assert.match(short, /\.rs-go \.proto-start__mark \{ display: none; \}/);
+  // the markup the rules rely on
+  const room = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
+  assert.match(room, /class=\$\{`proto-start rs-go\$\{ready \? ' is-ready' : ''\}`\}/);
+  assert.match(room, /<span class="proto-start__label">/);
+  assert.match(roomCss, /\[ASSUMED\] the caps \*\//);
+  assert.match(roomCss, /\[ASSUMED\] the cap \*\//);
+});
+
+test('选择同盟方式 on a short screen (§35.18 leftover: the key field\'s placeholder ran under 观战 at 特大): the field\'s name as the placeholder, capped sizes', async () => {
+  const field = (props) => find(ally(props), (x) => x.type === TextField)[0];
+  assert.equal(field({}).props.placeholder, '输入同盟密钥 / 粘贴邀请链接', 'the whole sentence on a taller screen');
+  assert.equal(field({}).props.placeholderShort, '同盟密钥', '… the field\'s name where it does not fit the field (TextField, by its width)');
+  assert.equal(field({ short: true }).props.placeholder, '同盟密钥', 'the field\'s name on a short one');
+  assert.equal(field({ short: true }).props.ariaLabel, '同盟密钥');
+  const short = shortBlock();
+  assert.match(short, /\.ally-key input::placeholder \{ font-size: clamp\(11px, calc\(\.26 \* var\(--t\)\), 13px\); \}/);
+  assert.match(short, /\.ally-key__spec \{ font-size: min\(calc\(\.26 \* var\(--t\)\), 14px\); \}/, '观战 capped');
+  assert.match(lobbyCss, /\.ally-key input \{[^}]*text-overflow: ellipsis;/, 'an ellipsis, never a cut, should a pack\'s name still be longer');
+  // the lobby asks the same query as the stylesheet's block, kept current (a rotation)
+  const dev = await import('../../public/js/ui/device.js');
+  assert.equal(dev.SHORT_SCREEN_QUERY, '(max-height: 520px)');
+  assert.ok(lobbyCss.includes(`@media ${dev.SHORT_SCREEN_QUERY} {`));
+  assert.equal(typeof dev.useMediaQuery, 'function');
+  assert.match(lobbySrc, /const shortScreen = useMediaQuery\(SHORT_SCREEN_QUERY\);/);
+  assert.match(lobbySrc.match(/<\$\{AllianceSelect\}[\s\S]*? \/>/)[0], /short=\$\{shortScreen\} \/>$/);
+  assert.match(readFileSync(path.join(ROOT, 'public/js/ui/device.js'), 'utf8'), /m\.addEventListener\('change', sync\); return \(\) => m\.removeEventListener\('change', sync\);/);
+});

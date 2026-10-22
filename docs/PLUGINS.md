@@ -331,13 +331,13 @@ also takes away that entry's local-client model (`spineLocal`, which the client 
 that model: a model write the browser leaves out, or whose file fails to load, leaves the local model too. The split
 battle music `audio.bgm.combatAlts` (the mode's own 开战 tracks, 骑士之日 / 无畏者, fixed per round) is not something a
 plugin changes: the client plays it instead of `combat` in the rounds it covers, so a plugin's `combat` is heard only
-where no such track plays. Writing an
-entry the installation has needs the permission `assets.override`, a new entry `assets.add`. `theme` is the allowlisted variables of §9.1, applied on this player's page only.
+where no such track plays. A player's own lobby music (大厅背景与音乐, `ui/lobbyMedia.js`) outranks a plugin's
+`audio.bgm.lobby` in that player's browser while it is switched on. Writing an
 entry the installation has needs the permission `assets.override`, a new entry `assets.add` — the decision the permission
 is: a write to a path whose entry the installation's manifest already has is an override, whatever it writes there, so an
 operator the manifest has counts as one even when the write only adds a skin under `chars[<charId>].skins` or a field the
-record did not have (`illust`); a new operator is an `assets.add`. `theme` is not applied yet
-(a warning).
+record did not have (`illust`); a new operator is an `assets.add`. `theme` is the allowlisted variables of §9.1, applied
+on this player's page only.
 
 **立绘 and the skins of one operator.** `illust` is the full illustration (立绘), the picture a detail view shows. The
 committed `data/assets.json` of this version carries no `illust` and no `skins` yet, so a plugin that writes one adds that field to the
@@ -389,7 +389,8 @@ server-side install route at all (upstream #652 closed the one that let any clie
 rewrite the shared `data/assets.json`). What a player then picks is a `{ [charId]: skinKey }` map, keyed by the
 **operator** — the container the key is written under — sent as `room.skins` (accepted in any phase: an appearance
 changes nothing a battle does, so it never enters `cs`) and published to teammates in `Match.publicView().players[]`,
-which is how a co-op partner's piece draws your skin. `public/js/assets.js` resolves it (`spineEntry`, `avatarUrl`,
+which is how a co-op partner's piece draws your skin, and, while the room waits, in `room.state.seats[].skins` (the
+名片干员 seat cards; SKINS.md). `public/js/assets.js` resolves it (`spineEntry`, `avatarUrl`,
 `portraitUrl`, `illustUrl` take `opts.skin`) and falls back to the operator's own model and pictures for a skin (or a
 skin's layer) that is not there, so a plugin that replaces only a model still draws a face. 设置「显示其他玩家的皮肤」
 (default on) is a pure client preference: off, this browser draws every OTHER seat's piece on the operator's own model and pictures

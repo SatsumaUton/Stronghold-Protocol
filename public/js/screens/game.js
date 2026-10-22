@@ -119,7 +119,7 @@ import {
   terrainInfo, deviceInfo, deviceTipAt, noteDeviceUnits, deviceUnitsForEntry,
   countdownState, shopBlockReason, stageOverrides, effectiveStage, watchTarget, dropFailureReason,
   previewEnemyKey, prepCamera, prepCameraFor, deployFoldsShop, deployZoomStep, deployZoomRemember, prepDeployCamera, deployFieldOf, fieldTile, panelSide, panelSlots, bondPopupPlace, unitLoadout, deployedRecord,
-  mergeTarget, modeOffBonds, readyFundsPrompt, readyShopFold, ownerBandId, ownDiyRecord, ownStandIn, roundStartReplay,
+  mergeTarget, modeOffBonds, readyFundsPrompt, readyShopFold, ownerBandId, ownDiyRecord, ownStandIn, roundStartReplay, heldDraftPub,
 } from '../ui/gameLogic.js';
 import { toast } from '../ui/toasts.js';
 import { LoadoutButton } from './loadout.js';
@@ -136,7 +136,7 @@ import { screenStrip, playerBonds, playerLayer, detailBondOwner, toggleBond, pop
 import { data, getMode } from '../data.js';
 import { audio, resultSpeaker, resultVoiceSlot } from '../audio.js';
 import { useDocClass, FullscreenButton, reducedMotion } from '../ui/device.js';
-import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady } from '../ui/turnPopup.js';
+import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady, TURN_CUE_WAIT_MS, TURN_CUE_PLATE_WAIT_MS } from '../ui/turnPopup.js';
 // MatchEnded, PausedOverlay, the highlight styles and keepEarly live in ./game/*.js.
 import { HUD_HZ_MS, MERGE_HL, SEL_RANGE, cx } from './game/marks.js';
 import { keepEarly, audioEarly } from './game/early.js';
@@ -153,6 +153,20 @@ if (battleRunner) {
   settingsStore.subscribe(applyCombatMetrics);
 }
 
+/**
+ * The pre-game's end inside the official BATTLE_CHECK (activity_table autoChessData.enterStepList: BATTLE_CHECK, 协议启动,
+ * time 3 → data/config.json timers.battleCheck 3; the maintainer's decision of 2026-10-21): once the draft is over the
+ * draft screen stays DRAFT_HOLD_MS on 已选定策略 / 策略选择完成 · 正在进入模拟…, then 协议启动！ shows at least
+ * BOOT_MIN_MS — together the 3 s the server spends in BATTLE_CHECK, so 协议启动！ starts to leave as 回合开始 begins and
+ * the round-1 plate plays inside 回合开始's 2 s. BOOT_MIN_MS is its own animation (ui/protocolBoot.js, css/screens/
+ * protocol-boot.css: 正在连接… is in by 2.1 s) and a beat to read it. [ASSUMED] the split (PR #643 holds 1.6 s on the
+ * draft and 3 s on 协议启动！, read off the footage, where the event's client presumably also loads the battle behind 协议启动！ —
+ * 7:43–7:51 — which this client does not need; that overran the 3 s by ~2 s). The overrun left: 协议启动！'s 350 ms fade
+ * (BOOT_LEAVE_MS) runs over the start of 回合开始, while the round-1 plate comes in under it.
+ */
+export const DRAFT_HOLD_MS = 700;
+export const BOOT_MIN_MS = 2300;
+
 /** Router for the in-match screens. */
 export function GameScreen() {
   const pub = useStore((s) => s.match.public);
@@ -163,6 +177,25 @@ export function GameScreen() {
   const gd = useGameData();
   // 协议启动！'s official sprites (ui/protocolBoot.js), fetched while the briefing and the band draft run
   useEffect(() => { if (gd.ready) preloadBootArt(); }, [gd.ready]);
+  // 已选定策略 (PR #643, the event's draft end, video 7:36–7:44): once the draft is over the screen stays DRAFT_HOLD_MS on
+  // 策略选择完成 · 正在进入模拟… with the pick, from the last draft snapshot (m.public.draft is gone after BAND_DRAFT),
+  // then 协议启动！ — both inside BATTLE_CHECK's official 3 s (see DRAFT_HOLD_MS). Decided while rendering, so the match
+  // screen mounts once; none with reduced motion or into a result.
+  const liveMode = pub ? phaseMode(pub.phase) : null;
+  const lastDraft = useRef(null);
+  const hold = useRef(null);                             // { until, pub } while the draft screen is held
+  const [, endHold] = useState(0);
+  if (liveMode === 'draft' && pub?.draft) { lastDraft.current = pub; hold.current = null; }
+  else if (lastDraft.current && pub) {
+    if (liveMode !== 'result' && !reducedMotion()) hold.current = { until: Date.now() + DRAFT_HOLD_MS, pub: heldDraftPub(lastDraft.current, pub) };
+    lastDraft.current = null;
+  }
+  const held = hold.current && hold.current.until > Date.now() && liveMode !== 'result' ? hold.current.pub : null;
+  useEffect(() => {
+    if (!held) return undefined;
+    const id = setTimeout(() => { hold.current = null; endHold((n) => n + 1); }, Math.max(0, hold.current.until - Date.now()));
+    return () => clearTimeout(id);
+  }, [held]);
   if (!pub || !gd.ready) {
     return html`<div class="screen gload">
       <${Spinner} size="lg" label=${pub ? 'LOADING DATA' : 'ENTERING SIMULATION'} />
@@ -173,7 +206,7 @@ export function GameScreen() {
   let body;
   if (hasResult || mode === 'result') body = html`<${ResultScreen} />`;
   else if (mode === 'briefing') body = html`<${BriefingScreen} />`;
-  else if (mode === 'draft') body = html`<${BandDraftScreen} />`;
+  else if (mode === 'draft' || held) body = html`<${BandDraftScreen} held=${held} />`;
   else body = html`<${MatchScreen} />`;
   return html`${body}
     ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
@@ -248,7 +281,9 @@ function MatchScreen() {
   const [hud, setHud] = useState(null);
   const [banner, setBanner] = useState(null);            // a phase's banner (PhaseBanner) or plate (ui/matchPopups.js PhasePopup: `plate`)
   const [roundPop, setRoundPop] = useState(null);        // the round-start plate (RoundPopup)
-  const [boot, setBoot] = useState(null);                // 协议启动！ (ui/protocolBoot.js): { key } while it shows
+  // 协议启动！ (ui/protocolBoot.js): { key, at } while it shows — from the first frame when the screen opens in BATTLE_CHECK
+  // (after the held draft screen), so the board never shows before it
+  const [boot, setBoot] = useState(() => (pub?.phase === PHASE.BATTLE_CHECK && bootArtReady() ? { key: `${pub.phase}:${pub.round}`, at: Date.now() } : null));
   const [resultBox, setResultBox] = useState(null);      // the round's result box (ResultDialog), shown at SETTLE
   const [bossPlate, setBossPlate] = useState(null);      // ui/bossPlates.js: { kind: 'final'|'core'|'end', … , key }
   const [readyBusy, setReadyBusy] = useState(false);
@@ -817,7 +852,7 @@ function MatchScreen() {
     // (ui/matchPopups.js); the other phases keep the banner. The screen and the plates replace a banner still on screen
     // from a phase shorter than it (everyone ready at once; the dev mock opening at PREP)
     const plate = phasePopupOf(phase, b);
-    if (phase === PHASE.BATTLE_CHECK && bootArtReady()) { setBanner(null); setBoot({ key: phaseKey }); }
+    if (phase === PHASE.BATTLE_CHECK && bootArtReady()) { setBanner(null); setBoot((b) => (b && b.key === phaseKey ? b : { key: phaseKey, at: Date.now() })); }
     else if (phase === PHASE.FINAL_ASSAULT && bossPlateArtReady()) { setBanner(null); setBossPlate({ kind: 'final', ...finalPlateRows(pub), key: phaseKey }); }
     else if (phase === PHASE.HIDDEN_CORE && bossPlateArtReady()) { setBanner(null); setBossPlate({ kind: 'core', key: phaseKey }); }
     else if (phase === PHASE.ROUND_START && b && pub?.round > 0) {
@@ -863,13 +898,44 @@ function MatchScreen() {
     if (phase !== PHASE.PREP) setRewardMin(false);
     setSpBusy(null);
   }, [phaseKey]);
-  // 协议启动！ fades once BATTLE_CHECK is over (ProtocolBoot `leaving`), then goes
+  // 协议启动！ fades once BATTLE_CHECK is over (ProtocolBoot `leaving`) — not before BOOT_MIN_MS, so its animation plays
+  // whole after the held draft screen (normally both end together, see DRAFT_HOLD_MS) — then goes; the round plate
+  // comes in as it starts to leave, with the HUD's entry (hudIn, below) — over a top bar already coming in —, inside
+  // 回合开始's 2 s
   const bootDone = !!boot && phase !== PHASE.BATTLE_CHECK;
+  const [bootLeaving, setBootLeaving] = useState(false);
   useEffect(() => {
     if (!bootDone) return undefined;
-    const id = setTimeout(() => setBoot(null), BOOT_LEAVE_MS);
-    return () => clearTimeout(id);
+    let out = 0;
+    const id = setTimeout(() => {
+      setBootLeaving(true);
+      out = setTimeout(() => { setBoot(null); setBootLeaving(false); }, BOOT_LEAVE_MS);
+    }, Math.max(0, (boot.at || 0) + BOOT_MIN_MS - Date.now()));
+    return () => { clearTimeout(id); clearTimeout(out); };
   }, [bootDone]);
+  // 进场 (PR #827; the maintainer's decision of 2026-10-21): the HUD waits hidden only while 协议启动！ is on screen and
+  // comes in as soon as it starts to leave (ProtocolBoot `leaving`), so the first round's 回合开始 kettles and plate play
+  // over a visible top bar — the event's top bar is up from the end of 协议启动 (video 7:51) through the round-1 kettles
+  // (7:55–7:58) and plate (7:57–8:01). It waits for 协议启动！ alone, never for the plate. A plugin window over
+  // BATTLE_CHECK hides 协议启动！ (`boot && !hasOffers` below), so the HUD is not held behind that veil either. Without
+  // the art pack (no `boot`) or with reduced motion the HUD is simply there. [ASSUMED] the entry motion itself — its
+  // order and its ~1.2 s (css/screens/game.css 进场) — read off the footage by the PR's author, and starting it as the
+  // fade starts rather than when it ends. The HUD comes in once per 协议启动！ (`hudCame`, its boot.key): when a plugin
+  // window over BATTLE_CHECK closes, 协议启动！ shows again for its fade, and the HUD that came in behind the window
+  // stays (l2 review nit: it used to hide and play the whole entry a second time).
+  const bootShown = !!boot && !hasOffers && !bootLeaving;
+  const hudCame = useRef(null);
+  const [hudIn, setHudIn] = useState(() => (bootShown && !reducedMotion() ? 'wait' : null)); // null | 'wait' | 'enter'
+  useEffect(() => {
+    if (bootShown) { if (!reducedMotion() && hudCame.current !== boot.key) setHudIn('wait'); return; }
+    if (boot) hudCame.current = boot.key;
+    setHudIn((s) => (s === 'wait' ? 'enter' : s));
+  }, [bootShown]);
+  useEffect(() => {
+    if (hudIn !== 'enter') return undefined;
+    const id = setTimeout(() => setHudIn(null), 1200);
+    return () => clearTimeout(id);
+  }, [hudIn]);
 
   // what the round start paid (the round plate's 获得 +N): the funds this round's ROUND_START shows against the funds the
   // phase before it opened with — nothing is bought in SETTLE / BATTLE_CHECK, so that is the balance before the income,
@@ -933,15 +999,31 @@ function MatchScreen() {
     if ((busyPrep || myPick) && cd.remain > 0) audio.sfx('timer', { volume: 0.6 });
   });
 
-  // your turn cue in the 机变 draft, and the official 轮到你选 disc over the cards (ui/turnPopup.js) once its art is in
-  const spMine = !!sp && !solo && sp.turnPid === myId && !sp.pickOf.has(myId);
+  // your turn cue in the 机变 draft, and the official 轮到你选 disc over the cards (ui/turnPopup.js) once its art is in —
+  // a shared draft's turn, and a solo draft as it opens (the maintainer's decision of 2026-10-22, decision 7 extended: as
+  // the strategy draft's 请选择策略 band, screens/bandDraft.js). The cue comes due with the turn and plays once no phase
+  // banner or plate is on screen (the 机变阶段 banner that opens the draft hid the disc's words: §35.18's leftover); a pick
+  // (or the turn moving on) before then drops it. The wait runs per overlay (overlayKey): the round plate still up from
+  // ROUND_START holds the banner back (the server's ROUND_START is 2 s, the plate 1.98 s: a plate mounted late, or a slow
+  // phone, has the turn come under it), so the plate gets at most TURN_CUE_PLATE_WAIT_MS, then the banner as it mounts
+  // its own TURN_CUE_WAIT_MS — never timed from the turn alone. [ASSUMED] the order and the bounds
+  const spMine = !!sp && (solo || sp.turnPid === myId) && !sp.pickOf.has(myId);
   const [turnPop, setTurnPop] = useState(0);
+  const [turnDue, setTurnDue] = useState(0);             // > 0: the cue is waiting to play (re-counted per turn)
   useEffect(() => { preloadTurnPopupArt(); }, []);
+  useEffect(() => { if (spMine) setTurnDue((n) => n + 1); else setTurnDue(0); }, [spMine]);
+  const overlayKey = hasOffers ? '' : roundPop ? `r:${roundPop.key}` : banner ? `b:${banner.key}` : '';
   useEffect(() => {
-    if (!spMine) return;
-    audio.sfx('yourTurn');
-    if (turnPopupArtReady() && !reducedMotion()) setTurnPop((n) => n + 1);
-  }, [spMine]);
+    if (!turnDue) return undefined;
+    const play = () => {
+      setTurnDue(0);
+      audio.sfx('yourTurn');
+      if (turnPopupArtReady() && !reducedMotion()) setTurnPop((n) => n + 1);
+    };
+    if (!overlayKey) { play(); return undefined; }
+    const id = setTimeout(play, overlayKey.startsWith('r:') ? TURN_CUE_PLATE_WAIT_MS : TURN_CUE_WAIT_MS);
+    return () => clearTimeout(id);
+  }, [turnDue, overlayKey]);
 
   // promotion (merge reward offered) and bond activation cues; a special refresh's offer (凯瑟琳 定向投放 …) plays the
   // shop's refresh sound instead of the promotion cue
@@ -1697,14 +1779,15 @@ function MatchScreen() {
       ready=${phase === PHASE.PREP && !!priv?.ready} />` : null}
     ${showPrep && view && viewKind !== 'loading' && priv && !pen ? html`<${StandInTags} view=${view} priv=${priv} getChess=${gd.chess} backups=${gd.backups} diyData=${{ chess: data.get('chess'), backups: data.get('backups') }} />` : null}
 
-    <div class="gm__hud" ref=${hudElRef}>
+    <div class=${cx('gm__hud', hudIn && `is-${hudIn}`)} ref=${hudElRef}>
       <${TopBar} pub=${pub} priv=${priv} conn=${conn} hud=${hud} total=${total} drawer=${drawer}
         onExit=${() => setExitOpen(true)} onDrawer=${(t) => setDrawer((d) => (d ? null : t))} onReady=${toggleReady}
         readyBusy=${readyBusy} readyCount=${readyCount} playerCount=${solo ? 1 : aliveCount}
         pen=${pen} penAvail=${penAvail} onPen=${togglePen} config=${gd.config} frozenAt=${frozenAt}
         pause=${canPause || paused ? { show: canPause, paused, busy: pauseBusy, onToggle: () => togglePause(!paused) } : null}
         live=${liveLpNow} spectator=${spectator}
-        spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom} />
+        spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom}
+        held=${hudIn === 'wait'} />
 
       <div class="gm__bonds">
         <button type="button" class="bonds-toggle" aria-expanded=${!bondsCollapsed} aria-controls="match-bond-strip"
@@ -1811,8 +1894,8 @@ function MatchScreen() {
       }} />` : null}
     ${!hasOffers && turnPop ? html`<${TurnPopup} key=${turnPop} onDone=${() => setTurnPop(0)} />` : null}
 
-    ${boot && !hasOffers ? html`<${ProtocolBoot} key=${boot.key} players=${players} myId=${myId} leaving=${phase !== PHASE.BATTLE_CHECK} />` : null}
-    ${roundPop && !hasOffers ? html`<${RoundPopup} key=${roundPop.key} round=${roundPop.round} gain=${roundGain} left=${roundPop.left} sub=${roundPop.sub}
+    ${boot && !hasOffers ? html`<${ProtocolBoot} key=${boot.key} players=${players} myId=${myId} leaving=${bootLeaving} />` : null}
+    ${roundPop && !hasOffers && (!boot || bootLeaving) && hudIn !== 'wait' ? html`<${RoundPopup} key=${roundPop.key} round=${roundPop.round} gain=${roundGain} left=${roundPop.left} sub=${roundPop.sub}
       watching=${roundPop.watching} onDone=${() => setRoundPop(null)} />` : null}
     ${!hasOffers && banner?.plate && !roundPop ? html`<${PhasePopup} key=${banner.key} tone=${banner.tone} faces=${banner.faces} title=${banner.title} sub=${banner.sub}
       chev=${banner.chev} duration=${banner.duration} onDone=${() => setBanner(null)} />` : null}

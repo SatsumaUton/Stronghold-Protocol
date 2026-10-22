@@ -87,6 +87,18 @@ export function contentOf(c) {
 }
 /** Did the record's match play gameplay plugins (unofficial)? @param {any} rec */
 export const isModdedRecord = (rec) => !!(isObj(rec) && rec.content);
+/**
+ * The records the achievement blocks read — 卫戍成就's peak alliance (highestBondRecord) and 策略记录's special marks
+ * (strategyBadgeIds), on 统计数据 and in the lobby's 成就统计 window: a match with gameplay plugins is unofficial and stays
+ * out (#643 checklist §二.6 「不计插件对局」, DESIGN §32.6) unless `withModded` (统计数据's 「含插件对局」) takes it in.
+ * A filter for the callers, not inside the two helpers: the storage budget (fitToBudget) keeps the peak of every record.
+ * @param {any[]} records
+ * @param {boolean} [withModded]
+ */
+export function achievementRecords(records, withModded = false) {
+  const all = Array.isArray(records) ? records : [];
+  return withModded ? all : all.filter((r) => !isModdedRecord(r));
+}
 const int = (v, d) => (Number.isFinite(v) ? Math.round(v) : d);
 const num = (v) => (Number.isFinite(v) ? v : null);
 const bool = (v, d = false) => (typeof v === 'boolean' ? v : d);
@@ -328,6 +340,21 @@ export function loadStats() {
   const { stats, changed, newer, dropped } = migrateStats(parsed);
   if (!newer && changed) saveStats(stats);
   return { ...stats, newer, dropped, damaged: false };
+}
+
+/**
+ * The stored records for a glance (the lobby's 成就统计 card): read and migrated in memory only — nothing is written back
+ * and an unreadable or newer value reads as no records, so the 统计数据 page still finds it and says so.
+ * @returns {any[]}
+ */
+export function peekStatsRecords() {
+  const raw = readRaw();
+  if (raw == null) return [];
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { return []; }
+  if (!isObj(parsed) || !Array.isArray(parsed.records)) return [];
+  const { stats, newer } = migrateStats(parsed);
+  return newer ? [] : stats.records;
 }
 
 // ---- compaction + the storage budget ---------------------------------------------------------------------------

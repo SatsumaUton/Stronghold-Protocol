@@ -65,8 +65,9 @@ const NOT_SCALED = [
   /\.dhp\b/,
   // the 机变 card: its grid fits 7 lines of the effect text (game-panels.css), so a bigger font would clamp text away
   /\.spcard/,
-  // decorative wordmarks and boot/rotate overlays whose size is the composition
-  /\.title-cn/, /\.title-en/, /\.title-bg__target/, /\.brief-boss__q/, /\.boot__/, /\.rotate-hint/,
+  // decorative wordmarks and boot/rotate overlays whose size is the composition (the top bar's deco type: the text
+  // stand-in of the official hudPanel/frame_deco_txt* sprites, at their size)
+  /\.title-cn/, /\.title-en/, /\.title-bg__target/, /\.brief-boss__q/, /\.boot__/, /\.rotate-hint/, /\.gtop__deco/,
   // the join code's letter-spaced field, the px-floored 本局信息 dialog, the 16 px diagnostics box (iOS zoom guard)
   /\.field--code/, /\.minfo-dlg/, /\.set-diag__text/,
   // the keyboard hints of the 快捷键 list (a shared rule with the HUD's .toolbtn kbd)
@@ -214,7 +215,7 @@ describe('文字大小: the CSS text root', () => {
       ['screens/game.css', /\.set-row__label \{[^}]*font-size: calc\(\.18 \* var\(--t\)\)/s],
       ['screens/game-panels.css', /\.dtext \{ font-size: calc\(\.15 \* var\(--t\)\); line-height: 1\.65;/],
       ['screens/guide.css', /\.guide__tips li \{ font-size: calc\(\.18 \* var\(--t\)\)/],
-      ['screens/lobby.css', /\.mode-card__desc/, ],
+      ['screens/lobby.css', /\.pcard__desc \{[^}]*font-size: calc\(\.16 \* var\(--t\)\)/],
     ];
     for (const [file, re] of samples) assert.match(byRel.get(`${CSS}/${file}`), re, file);
   });
