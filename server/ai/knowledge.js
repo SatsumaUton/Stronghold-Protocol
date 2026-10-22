@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { applyFileOverlay } from '../../shared/i18nData.js';
+import { DEFAULT_VERSION, versionOfData } from '../../shared/versions.js';
 import { deepFreeze } from '../data.js';
 import { GameData } from '../match/gamedata.js';
 import { buildPlaybook } from './playbook.js';
@@ -82,8 +83,12 @@ export function knowledgePack(data, { language = 'zh-CN', modeId, rules = {}, of
     return { id, name: r.name || id, nameZh: raw.name || id, ...fn(r, id) };
   });
   const copies = gd.visibleChess.map(id => ({ tier: gd.tierOf(id), count: gd.poolCopies(id) }));
+  const gameVersion = versionOfData(data);
   const payload = {
-    schema: 'sp-knowledge/1', language, modeId, contentId, sources: ['docs/PLAYING.md §1–§7', 'docs/DATA.md', 'excel/activity_table.json autoChessData',
+    schema: 'sp-knowledge/1', language, modeId, contentId,
+    // another official version's data (DESIGN §35.23): its registry id; the default pack (and its hash) has no key
+    ...(gameVersion !== DEFAULT_VERSION ? { gameVersion } : {}),
+    sources: ['docs/PLAYING.md §1–§7', 'docs/DATA.md', 'excel/activity_table.json autoChessData',
       'excel/character_table.json', 'excel/skill_table.json', 'excel/enemy_handbook_table.json'], playingHash: hash(source),
     rulesSummary: summaries[language] || summaries.en,
     // Retain the source economy table as Chinese reference, alongside localized prose and numeric rules.

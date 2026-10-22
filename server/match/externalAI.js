@@ -28,6 +28,8 @@ export function aiObservation(m, ps, { id, kind, deadline, remaining }, results)
     digest: aiDigest(m, ps, kind, pub, own, pack),
     ...(pack ? { knowledgeVersion: pack.version } : {}),
     context: { kind, phase: m.phase, round: m.round, deadline, remaining, legalActions: AI_ACTIONS[kind],
+      // a non-default official version's match (DESIGN §35.23): its registry id; the default's observation is unchanged
+      ...(m.version ? { gameVersion: m.version } : {}),
       ...(m.externalAI?.config.mode === 'plan' ? { matchId: m.externalAI.matchId } : {}) }, results });
 }
 

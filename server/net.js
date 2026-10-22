@@ -72,9 +72,10 @@ export const NET_DEFAULTS = Object.freeze({
  * room.setPlugins (a new visual set: every member downloads its art manifest — server/plugins/visualSet.js).
  * room.skins (docs/SKINS.md) is a small `{ [charId]: skinId }` map, sent on every edit of the appearance; a changed map
  * re-broadcasts room.state to a waiting room (its seat cards wear it: room.state seats[].skins). room.card (名片干员, PR
- * #643 split 6): every accepted change re-broadcasts room.state to the room.
+ * #643 split 6): every accepted change re-broadcasts room.state to the room. room.proposeVersion (DESIGN §35.23): an
+ * accepted proposal by a lone human switches the room's version — every page then downloads that version's data.
  */
-export const HEAVY_TYPES = new Set(['g.watch', 'room.loadout', 'room.ownership', 'room.diy', 'room.spectate', 'room.setPlugins', 'room.skins', 'room.card']);
+export const HEAVY_TYPES = new Set(['g.watch', 'room.loadout', 'room.ownership', 'room.diy', 'room.spectate', 'room.setPlugins', 'room.skins', 'room.card', 'room.proposeVersion']);
 
 /** Close codes (see header). */
 export const CLOSE = Object.freeze({ REPLACED: 4001, HELLO_TIMEOUT: 4002, POLICY: 1008, SHUTDOWN: 1001 });
