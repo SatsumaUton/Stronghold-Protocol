@@ -776,7 +776,9 @@ See PLUGINS.md for namespaces, limits and the local-table version recorded by Fo
 The data side of the official version switch: besides today's 盟约·下半, the build can produce 盟约·上半 in its final state
 and at launch. **M0 is invisible**: nothing at run time reads a non-default version yet (the lobby switch, room versions
 and the 上半 rules come later). The default version is unchanged — `data/*.json`, `data/i18n/`, the golden corpus, the
-`cs` formula and a default room's `room.state` are pinned by `test/versions-default-guard.test.js`.
+`cs` formula and a default room's `room.state` are pinned by `test/versions-default-guard.test.js`. Its file hashes (G1)
+are the M0 merge check and are deleted when M1 starts (DESIGN §36.2); until then a rebuild that changes a default data
+file also refreshes the fixture: `SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js`.
 
 **Registry** (`shared/versions.js`, pure, browser-safe). `DEFAULT_VERSION = 'act2autochess'` is a code constant, never a
 server setting: data, rooms and logs without a version mean 下半.
@@ -812,10 +814,13 @@ every file system and URL).
   | `act1autochess@V1_1` | `8303c922` (2025-11-14, launch) | none: `enemy_database` changed again at `23c99d5d`, so V1_2's `ee2cabff` would leak V1_2 enemies | [ASSUMED] the launch day, before the 11-18 hotfix `ea164ef7` (see below) |
 
   **The V1_1 hotfix [ASSUMED]**: `versionInfoDict` counts the 11-18 hotfix (`ea164ef70736ca2d1a356b3bf7b1cd7540960dc1`) as
-  V1_1, and about 7 of V1_1's 11 days (11-18 → 11-25 16:00) ran on it. It changed only `activity_table`: leader HP ×0.75
-  (Funny / Normal pools; −5…−12.5% Hard), `modeFactorInfo.SINGLE` 1.0 → 1.25, `borrowCount` 8 → 20, the enemy effects
-  攻坚装备II / III, battlefield and special-enemy weights. The profile follows the maintainer's default (launch day,
-  `8303c922`); adding `activity: 'ea164ef7…'` to its pins builds the hotfixed V1_1.
+  V1_1, and about 7 of V1_1's 11 days (11-18 → 11-25 16:00) ran on it. The only build input it changed is
+  `activity_table`, among its changes: leader HP ×0.75 (Funny / Normal pools; −5…−12.5% Hard), `modeFactorInfo.SINGLE`
+  1.0 → 1.25, `borrowCount` 8 → 20, the enemy effects 攻坚装备II / III, battlefield and special-enemy weights, and 10 more
+  enemies inactive in the Normal modes. The commit also changed `skill_table.json` — only the text
+  of 拟态物质 (`sktok_acarm069_1` / `_2`: "获得1名该干员" became "该初始干员…同盟约初始干员", a note for its M2 handler) — and
+  added a client Lua fix of a drag state; neither is a build input. The profile follows the maintainer's default (launch
+  day, `8303c922`); adding `activity: 'ea164ef7…'` to its pins builds the hotfixed V1_1.
 - **Cache**: a pinned file is cached in `.cache/gamedata@<sha>/<repo path>` and downloaded from
   `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/<sha>/zh_CN/gamedata/<path>` (about 50–60 MB per commit:
   the 8 tables and the 43 `act1autochess` level files). `--offline` / `--refresh` keep their per-file meaning; `--cache
@@ -832,12 +837,21 @@ every file system and URL).
     override level) need no adapter.
 - **`research`**: the version's research directory (`docs/research/versions/<slug>/`, absent in M0). A file missing
   there falls back to `docs/research/<name>` with a warning — every 上半 field from research is a 下半 value [ASSUMED]
-  until M2 (enemy multipliers, timers, rewards). For V1_1 this is wrong in one more way: the solo 70% / co-op 80% enemy
+  until M2 (enemy multipliers, timers, rewards). That includes the descriptive overlays keyed by bondId or trapId:
+  `bonds.json` `spec` (上半's 炎 gets 下半's third tier and "hits up to 3 targets", which 上半 has not), and the items'
+  `implFormula` / `howToPlay` texts. The sim reads none of them, but an M1 screen (S.W.E.E.P., the guide) must not show
+  them as 上半 rules. For V1_1 this is wrong in one more way: the solo 70% / co-op 80% enemy
   multipliers of 上半 date from the 11-18 hotfix (PRTS 卫戍协议：盟约), so pre-hotfix V1_1 had neither.
 - **`tables`**: `'default'` runs the 下半-measured tables of the build; `null` leaves one out [ASSUMED] for M2 —
   `stock` (`economy.poolCopiesOverrides` / `itemPoolCopiesOverrides` become `{}`), `shopDraft`, `tacticDraft` and
   `bountyDrafts` (the `choices.json` key is omitted, and with `bountyDrafts` the boss-card gating and the draft-set
   checks are skipped). The match already draws uniformly when a key is absent. Both 上半 profiles leave all four out.
+  The bounty cards' own `draft` / `draftPool` classification still runs for 上半 [ASSUMED]: `HIDDEN_BOUNTY_IDS` and the
+  effect-id shapes of `bountyDraftPool` (`enemyeffect_b_*` / `enemyeffect_5_1` → boss, `enemyeffect_1[0-5]_[78]` /
+  `16_*` → hunter, every other kill card → `unseen`, never drafted) come from 下半's PRTS table and screenshots, and the
+  match honours them (`server/match/choices.js`). 上半's 93 bounty cards: excluded perfect 20, unseen 14, hidden 4;
+  drafted boss 19, initial 18, hunter 18. M2's research decides 上半's own pools. Some ids also change meaning (`enemyeffect_12_7` and
+  `15_7` are tier II in 下半, I in 上半; the tier is read from the name, so it comes out right).
 - **`config`**: `hiddenCore` single / multi (下半 350 / 1200; 上半 300 / 1000, PRTS 卫戍协议：盟约); `rules` — 上半:
   `deployOrder 'rowBottomUp'`, `soloTimed true`, `benchEquip false`, `benchFullSwap false`, `bossMirrorShare false`, all
   inert until M2 and [ASSUMED] (PRTS 卫戍协议/帮助; news 5114 lists the last three as 下半 additions).
@@ -885,8 +899,9 @@ node --test test/data-versions.test.js test/versions-default-guard.test.js
 
 `test/data-versions.test.js` rebuilds each version offline and compares all 16 files; without the pinned caches it skips
 and names the missing `.cache/gamedata@<sha>/`. **Hidden inputs**: a version build also reads the committed
-`data/assets.json` (the enemies' attack clips) and, while it has no research copy, `docs/research/*.json` — a default-side
-change to those makes the version directories stale with no version-related cause. Rebuild every version then
+`data/assets.json` (the enemies' attack clips), `data/tuning.json` (its byte copy; `test/data-versions.test.js` fails
+while a copy differs) and, while it has no research copy, `docs/research/*.json` — a default-side change to those makes
+the version directories stale with no version-related cause. Rebuild every version then
 (`--version` for each id). `server/data.js`: `versionDataDir(id)`, `getVersionData(id)` (the default returns `getData()`;
 another version loads its directory once, frozen, with `VERSION_DATA_FILES`, never filling the official-bounds cache),
 `resetVersionData()`; `loadData(DATA_DIR)` reads the top level only.

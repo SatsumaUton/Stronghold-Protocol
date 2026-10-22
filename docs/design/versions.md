@@ -72,17 +72,25 @@ other M0 change, in `test/versions-default-guard.test.js` and `test/fixtures/ver
 
 - **G1**: the sha256 of the 22 tracked default data files (top-level `data/*.json` and `data/i18n/*.json`, never
   `data/versions/`) and of the golden corpus `test/golden/*.json`. Hand checks with `git diff` must use the pathspec
-  `':(glob)data/*.json'`. A plain `'data/*.json'` also matches below `data/` and lists every version file.
+  `':(glob)data/*.json'`. A plain `'data/*.json'` also matches below `data/` and lists every version file. G1 is the
+  M0 merge check: it proves that the M0 commits moved neither, and it is **deleted when M1 starts**. After that
+  `test/golden.test.js` and the rebuild check of `test/data.test.js` guard both, as before M0. Until then an intended
+  golden update or default data rebuild refreshes the fixture in the same commit
+  (`SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js`, named in `test/golden/README.md` and DATA.md).
 - **G2**: the default `config.json` has no `version`. The gameplay file lists and the vanilla content cover exactly the 16
   top-level files, nothing under `data/versions/`.
 - **G3**: the cs formula, through known-answer vectors of `shared/plugins/identity.js`, and `CONTENT_HASH_VERSION` 1.
 - **G4**: a fresh co-op / NORMAL `room.state` deep-equals the fixture. The code, ids, name and `content.cs` are
   normalised; `content.cs` must equal the welcome's vanilla hash. The welcome has no `versions`.
 
+G2–G4 stay after M1.
+
 `node tools/golden.mjs` reports every scenario unchanged: roster 49, bonds 46, fields 22, matches 21, standins 10 and diy
 140. `test/versions-keying.test.js` checks the default data against `test/fixtures/versions-keying-baseline.json`. That
-baseline was generated before the keying change and covers the item handler of every item, the battle-effect list, the
-meta wraps and the default meta registry's 305 keys and hooks.
+baseline was frozen on `db8e226d` before the keying change. It covers only what M0 changed: the item handler key of
+every item, the battle-effect list, the meta wraps and the 18 `item:` entries of the default meta registry with their
+hooks. It is never regenerated: an intended change of an item handler or item override edits its entry by hand. The
+tests pin which handler key an item reaches, not the handler's body; a swapped body is caught by `test/golden.test.js`.
 
 ### 36.3 Build profiles and the 上半 data
 
@@ -109,14 +117,18 @@ keyed build tables, the hidden inputs and the warning classes.
 - **Pins.** V1_2 reads `21b1f240`, with enemies at `ee2cabff`. V1_1 reads `8303c922` for everything and has no enemy
   pin, so no V1_2 enemy record leaks in.
 - **V1_1 is launch day, before the 11-18 hotfix [ASSUMED].** `ea164ef7` is still V1_1 by `versionInfoDict`: about 4 of
-  its 11 days ran before the hotfix and about 7 on it. The hotfix changed only activity_table:
+  its 11 days ran before the hotfix and about 7 on it. The only build input the hotfix changed is activity_table. Among
+  its changes:
   - leader HP ×0.75 on Funny / Normal and −5…−12.5% on Hard;
   - `modeFactorInfo.SINGLE` 1.0 → 1.25;
   - `borrowCount` 8 → 20;
   - the enemy effects 攻坚装备II / III;
-  - the m06 / m07 battlefield weights and two special-enemy weights.
+  - the m06 / m07 battlefield weights and two special-enemy weights;
+  - 10 more enemies inactive in the Normal modes.
 
-  One added pin (`activity: ea164ef7…`) builds the hotfixed state instead.
+  The commit also clarified 拟态物质's skill text in skill_table (`sktok_acarm069_1` / `_2`: the operator gained is the
+  初始干员, of the same bond) and added a client drag fix. Neither is a build input; the 初始干员 wording is a note for
+  拟态物质's M2 handler. One added pin (`activity: ea164ef7…`) builds the hotfixed state instead.
 - **Adapters.** `bondActiveType` converts 上半's bond activation (ALL with the deck → BOARD_AND_DECK; MANI → BOARD with
   `['1']`, as 下半's maniShip) [ASSUMED]. `selfBackupPreset` makes 盟约·辅助干员 a PRESET backup with its default skill
   and module, as 下半 writes it [ASSUMED].
@@ -129,19 +141,31 @@ keyed build tables, the hidden inputs and the warning classes.
 - **Left out for 上半.** The four tables measured on 下半 (the stock overrides, the shop draft, the tactic draft and the
   bounty drafts) do not apply, so those draws are uniform [ASSUMED]. Every research-derived 上半 field keeps its 下半
   value until a per-version research folder exists [ASSUMED]. For V1_1 that is wrong in one more way: PRTS dates the
-  solo 70% / co-op 80% enemy multipliers from 11-18.
+  solo 70% / co-op 80% enemy multipliers from 11-18. The research overlays keyed by bondId and trapId also write 下半's
+  descriptive texts into 上半: `bonds.json` `spec` (上半's 炎 gets 下半's third tier and "hits up to 3 targets") and the
+  items' `implFormula` / `howToPlay`. The sim reads none of them; M1's screens (S.W.E.E.P., the guide) must not show
+  them as 上半 rules.
+- **Carried over for 上半 [ASSUMED].** The bounty cards' `draft` / `draftPool` classification is not one of the four
+  tables: `HIDDEN_BOUNTY_IDS` and the effect-id shapes of `bountyDraftPool`, read from 下半's PRTS table and screenshots,
+  still sort 上半's 93 cards (excluded perfect 20, unseen 14, hidden 4; drafted boss 19, initial 18, hunter 18), and the
+  match honours them. M2's research decides 上半's own pools.
 - **Config.** `hiddenCore` 300 / 1000 comes from PRTS 卫戍协议：盟约, and `tuning.json` is the same for every version
   [ASSUMED]. The 上半 rule switches are inert in M0: `deployOrder: 'rowBottomUp'`, `soloTimed`, no bench equipment, no
   full-bench swap and no shared boss.
 - **Loader.** `server/data.js` provides `versionDataDir`, `getVersionData` (lazy, cached and frozen) and
   `resetVersionData`. Nothing at run time calls them in M0. `loadData(DATA_DIR)` reads the top level only.
+- **`config.version` is the gate.** Data that carries it (a version's build) finds hand-written behaviour by charId and
+  effectId (§36.4). The default data and the plugin content sets built on it carry none and keep every by-id lookup of
+  before M0: a plugin `data.patch` that sets an official chess record's `charId` (a reskin, say) keeps that chess id's
+  kit, and one that sets an official item's `effectId` keeps the item key's behaviour. The AI overlays use the same gate.
 
 ### 36.4 Behaviour keyed by charId and effectId
 
 上半 reuses the default data's ids for other things. 50 of its 100 shop chess ids name another operator than 下半:
-`chess_char_1_02_a` is 讯使, not 角峰. 72 item ids carry another effect and 6 are absent in 下半. Everything
-hand-written that was found by id is now found by what the record *is*. On the default data every lookup resolves
-exactly as before (§36.2).
+`chess_char_1_02_a` is 讯使, not 角峰. 72 item ids carry another effect and 6 are absent in 下半. On a version's build
+(`config.version`, support `isVersionData`) everything hand-written that was found by id is found by what the record
+*is*. Data without `config.version` — the default and the plugin content sets on it — resolves exactly as before
+(§36.2, §36.3).
 
 - **Kits** (SIM.md §7.2).
   - `KIT_CHAR_IDS` names the charId each tier kit was written for. The first line of every kit file names the same one.
@@ -149,15 +173,23 @@ exactly as before (§36.2).
     operator's tier kit (the one at the record's tier when the operator has two: 锡人 → `2_19`, 耶拉 → `3_20`, 华法琳 →
     `4_26`), then a 自选 `op-*` kit registered under the charId, then none (the generic kit).
   - Test fixtures and plugin `chess_x_` records keep the by-id lookup, and so do stand-ins and 自选 pieces.
+  - A chess whose own kit was written for its operator but failed to load stays generic, as on the default data; it
+    never takes the operator's other tier kit.
 - **Items** (SIM.md §7.2, META.md §2.1).
-  - `items/battle.js BY_EFFECT`, 蒸汽之心 (`eff_acarm079`), the `items/meta.js` overrides (bound by effectId to the
-    loaded data's item keys) and 凯瑟琳's one-cell allowance (`eff_acarm072`, official normal records only) all go
-    through the normal record's effectId.
+  - `items/battle.js BY_EFFECT`, 蒸汽之心 (`eff_acarm079`) and its hammers, the `items/meta.js` overrides and 凯瑟琳's
+    one-cell allowance (`eff_acarm072`, official normal records only; counted at the prep's pick and in her offers) all
+    go through the normal record's effectId. On the default data they keep the item key (`DEFAULT_ITEM_KEYS`,
+    `MUTATION_CELL_ID`, each override's default key).
+  - A meta override is bound by its effectId **and** the buff key it reads (`items/meta.js OVERRIDES`): the same
+    effectId can carry another mechanic. 上半's 寻呼模块 (`eff_acarm075`) is one special refresh showing operators of one
+    bond (`use_equip_add_goods_rule_with_refresh_shop`), not 下半's pick of one of three same-bond operators, so it binds
+    nothing until M2 writes its mechanic. The battle handlers already return when their buff is missing.
   - Item keys stay the identity of combo partners, buff keys and fx labels, which the golden digests hash.
 - **Traits and tokens.** 远牙's dollSwap trait is the one his own traits grant, found by `char_430_fartth`. 夕's
   generic-kit dragon follows `char_2015_dusk` on official chess.
-- **`bonds/core.js reached()`.** A threshold the record lacks counts as not reached. Before this change, 上半's 炎, which
-  has no 9-member tier, would have summoned two 炎佑 at 6 members.
+- **`bonds/core.js reached()`.** On a version's build a threshold the record lacks counts as not reached. Before this
+  change, 上半's 炎, which has no 9-member tier, would have summoned two 炎佑 at 6 members. Data without
+  `config.version` keeps the old rule (reached), so a plugin or Forge core bond without the threshold plays as before.
 - **AI.** The community overlay and the fixed `data/i18n` overlay are keyed by default ids, so they apply only to data
   without `config.version` (AI-STRATEGY.md §2).
 
@@ -174,10 +206,12 @@ The tier kits were written at their 下半 tier, and the `op-*` kits for 自选.
 until M2 reviews each one at its 上半 tier [ASSUMED].
 
 **Items on 上半.** 44 records dispatch to 22 battle handlers, each the handler of its own effectId. The meta overrides
-bind 寻呼模块 `chess_item_5_03_e`, 天师古鼎 `6_02_e`, 教鞭, “神秘顾客” and 画卷. 紧急调度券 (`eff_acarm115`) does not exist
-in 上半 and binds nothing.
+bind 天师古鼎 `chess_item_6_02_e`, 教鞭, “神秘顾客” (both of its overrides) and 画卷. 紧急调度券 (`eff_acarm115`) does not exist
+in 上半, and 寻呼模块 `chess_item_5_03_e` carries another buff: neither binds anything. 蒸汽之心 is `chess_item_6_04_e`, and
+its hammers are `chess_item_2_03_e`–`2_06_e`. `test/versions-keying.test.js` pins these counts, the kit split above and
+the bound keys for each directory (`EXPECT`); a directory without an entry fails.
 
-**The `reached()` proof.** The change cannot alter the default data:
+**The `reached()` proof.** The change cannot alter the default data (and, gated on `config.version`, no data without it):
 
 - Statically: every core bond's main buff carries `power_bond_char_cnt` (5 or 6), and 炎's `ex_bond_char_cnt` is 9.
 - Dynamically: a temporary counter on the unchanged `reached()` saw 1349 calls over the 288 golden scenarios and 211
@@ -185,19 +219,21 @@ in 上半 and binds nothing.
 
 ### 36.5 The blackboard audit (the M2 work list)
 
-`node tools/bb-audit.mjs --data <dir>…` (with `--json` and `--strict`) reports two kinds of gap for each version
+`node tools/bb-audit.mjs --data <dir>…` (with `--json` and `--strict`) reports three kinds of gap for each version
 directory, compared with the default data:
 
 - the blackboard fields the version lacks that the code reads with a default, flagged when the default is not neutral;
-- the buff keys the code names that the version lacks.
+- the buff keys the code names that the version lacks;
+- the skill trigger rules of its chess, backups and tokens that the engine does not implement
+  (`shared/plugins/skillSpec.js TRIGGER_RULES`).
 
 `kits/` is skipped, because kits read skill blackboards. Fields are matched by name across tables, so the audit
 over-reports (for example `atk`) [ASSUMED]. The default data audited against itself has no finding.
 
-| | field gaps (non-neutral default) | absent code-named buff keys |
-|---|---|---|
-| 盟约·上半 V1_2 | 32 (9) | 39 |
-| 盟约·上半 V1_1 | 36 (9) | 41 |
+| | field gaps (non-neutral default) | absent code-named buff keys | unknown trigger rules |
+|---|---|---|---|
+| 盟约·上半 V1_2 | 32 (9) | 39 | 1 |
+| 盟约·上半 V1_1 | 36 (9) | 41 | 1 |
 
 The non-neutral gaps are listed below. Each would silently apply the 下半 meaning and is an M2 item:
 
@@ -213,23 +249,31 @@ Besides those:
   keys and the `act2autochess_equip_acarm*` keys, three of which make these items inert in 上半 until M2: 伪装服, 海沟实验体
   and 耶拉冈德之泪.
 - Several 下半 prep keys are also absent. Among them is the key 寻呼模块's override reads; 上半 names its own,
-  `use_equip_add_goods_rule_with_refresh_shop`.
+  `use_equip_add_goods_rule_with_refresh_shop`, and the override binds nothing there (§36.4). M2 writes that mechanic.
+- **`AUTO_STOP`.** 上半's 斩业星熊 (`char_1044_hsgma2`, a 自选 operator) S3 `skchr_hsgma2_3` triggers on `AUTO_STOP`, one
+  of the 15 rows of 上半's skillTriggerDataList. The engine does not implement it (`server/sim/skills.js`), and
+  `validateAll` accepts it. M2 builds it; until then 上半's 自选 must not offer 斩业星熊 (round-50 design §2.9).
 
-`test/versions-bb-audit.test.js` pins the 突袭 and 炎 findings on every version directory.
+`test/versions-bb-audit.test.js` pins the 突袭 and 炎 findings and the unknown trigger rules (exactly `AUTO_STOP`) on
+every version directory.
 
 ### 36.6 Tests and what stays open
 
 **Tests:**
 
-- `test/versions-default-guard.test.js`: G1–G4.
+- `test/versions-default-guard.test.js`: G1 (until M1) and G2–G4.
 - `test/data-versions.test.js`:
   - the registry, the profiles and the `--version` CLI;
   - the committed directories and their offline rebuild;
   - the adapters, the keyed pools and the loader.
 - `test/versions-keying.test.js`, on `data/`, every `data/versions/*/` and `SP_VERSION_DATA_DIRS`. It checks:
   - every chess resolves to its own charId's kit or is pending;
-  - every item runs its own effectId's handler;
-  - the default data matches the baseline;
+  - every item runs its own effectId's handler, and each meta override binds only keys carrying its effectId and buff;
+  - each directory's pinned counts: kit split, dispatched items and handlers, battle-effect items, 蒸汽之心's hammers
+    (the version directory after the default exercises the hammer cache reset), bound meta keys and 突变细胞;
+  - 凯瑟琳's cell at the prep's pick;
+  - the default data matches the baseline, and a plugin patch of an official `charId` / `effectId` on it keeps the old
+    lookups;
   - 炎, 远牙, 夕 and the AI overlays (each of these fails on the code before M0).
 - `test/versions-bb-audit.test.js`.
 - `test/docs-consistency.test.js` §21.29: the charId-keyed `TRIGGER_DEVIATIONS`.
@@ -249,9 +293,21 @@ The per-version rebuild tests need the pinned caches `.cache/gamedata@<sha>/` an
 - The first tier kit in `KIT_FILES` order when none matches the record's tier.
 - The borrowed kits.
 - Official records only for 夕 / 远牙 / 凯瑟琳.
-- A missing threshold is not reached for every core bond.
+- A missing threshold is not reached for every core bond, on a version's build.
+- The 下半 bounty draft classification and research texts (`spec`, `implFormula`, `howToPlay`) carried into 上半.
 - `config.version` marks non-default data.
 - The audit's name matching.
 
-A version build also reads two default-side inputs: the committed `data/assets.json` and `docs/research/*.json`, the
-fallback. A change to either needs every version rebuilt. The rebuild test's failure message says so.
+A version build also reads default-side inputs: the committed `data/assets.json`, `data/tuning.json` (byte-copied) and
+`docs/research/*.json`, the fallback. A change to any of them needs every version rebuilt. The rebuild test's failure
+message says so; outside a machine with the pinned caches only the `tuning.json` copy is checked.
+
+**Open (for the maintainer):**
+
+- **Which release M0 belongs to.** The docs say "after 0.3.2" (AI-STRATEGY.md, META.md, SIM.md, `kits/README.md`), as the
+  round-50 plan does, while its CHANGELOG line sits under 0.3.2 (工具) because no later section exists yet. Once the
+  release is named, one wording goes into all five places.
+- **Packaging and static serving.** `data/versions/**` (about 9.6 MB, 32 files) ships today in the full package, the
+  update zips and Docker (`tools/package.mjs RUNTIME_DIRS` includes `data/`), and `server/http/static.js` serves
+  `/data/versions/*` publicly, although nothing reads it before M1. Either exclude it from the packages until M1 (and
+  test the exclusion) or ship it and say so in the CHANGELOG.

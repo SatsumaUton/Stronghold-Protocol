@@ -21,9 +21,9 @@ operators, the self-select 6★ operators, contributions from GitHub issue #136 
 id), else the generic kit built from the skill blackboard (`content/generic.js`, docs/SIM.md §7.4). A 补位 stand-in's
 and a 自选 piece's kit is `KITS[def.charId]` and nothing else (`content/index.js kitOf`): it keeps the chess's (the DIY
 slot's) ids, which name the replaced operator's kit (a slot has none).
-The by-id kit is used only when `KIT_CHAR_IDS` names the record's charId (official versions M0, after 0.3.2): another
-official version gives some chess ids to other operators, whose kit is then found by charId (`content/index.js
-officialKitKey`, docs/SIM.md §7.2).
+On another official version's build the by-id kit is used only when `KIT_CHAR_IDS` names the record's charId (official
+versions M0, after 0.3.2): that version gives some chess ids to other operators, whose kit is then found by charId
+(`content/index.js officialKitKey`, docs/SIM.md §7.2). The default data keeps the by-id lookup.
 
 ## Naming
 

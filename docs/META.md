@@ -420,11 +420,14 @@ the engine built-ins, so content always wins). Sugar: `registry.band(id, h)`, `.
 `itemKey` = item id without `_a`/`_b` (`chess_item_1_03_e`); Arts have no suffix (`chess_item_6_02_m`).
 Normal and golden share the key: read `ctx.gd.item(ctx.source.piece.id).params` (or `ev.item`) for the numbers.
 The official item handlers of the content (`server/sim/content/items/meta.js`; official versions M0, after 0.3.2) are
-declared by the normal record's `effectId` (`eff_acarm075` 寻呼模块, `eff_acchal` 教鞭 …) and bound when the registry is
-built to the item keys of the loaded data that carry that effect, because another official version gives these ids to
-other items (in 盟约·上半, `chess_item_4_01_e` is 催泪瓦斯 and 寻呼模块 is `chess_item_5_03_e`). The registry keys stay
-`item:<itemKey>` of the loaded data, so the dispatcher, the built-ins and the bots see no difference; an effect the data
-does not have binds nothing. The battle side does the same (`items/battle.js` `BY_EFFECT`, docs/SIM.md §7.2).
+declared in its `OVERRIDES` table by the normal record's `effectId` (`eff_acarm075` 寻呼模块, `eff_acchal` 教鞭 …), the buff
+key each one reads and the item's default key. The default data and the plugin content sets built on it bind the default
+key, as before. Another official version gives these ids to other items (in 盟约·上半, `chess_item_4_01_e` is 催泪瓦斯 and
+寻呼模块 is `chess_item_5_03_e`): on its build (`config.version`) an override binds the item keys whose normal record
+carries its effectId and its buff, so an effect the data does not have, or has with another mechanic (上半's 寻呼模块 reads
+`use_equip_add_goods_rule_with_refresh_shop`), binds nothing. The registry keys stay `item:<itemKey>` of the loaded data,
+so the dispatcher, the built-ins and the bots see no difference. The battle side does the same (`items/battle.js`
+`BY_EFFECT`, docs/SIM.md §7.2).
 
 ### 2.2 Hooks and events
 Every handler method is `(ctx, ev)`; `ev` is shared by all handlers of one dispatch and may be mutated where noted.
