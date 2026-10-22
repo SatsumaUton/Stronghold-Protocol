@@ -165,7 +165,9 @@ public/assets/ ─────────▶ public/js/render/, public/js/audio
 - **Game data.** `tools/build-data.mjs` downloads the official zh_CN tables into `.cache/gamedata/` (or reads them
   there with `--offline`), joins them with the research JSON and writes `data/*.json` deterministically; DATA.md
   documents every field. A data fix goes into the builder: rebuild with `node tools/build-data.mjs --offline` and
-  compare the JSON to see that only the intended data changed.
+  compare the JSON to see that only the intended data changed. The official versions (`shared/versions.js`; build
+  profiles in `tools/versions/`) build other seasons into `data/versions/` with `--version <id>` (DATA.md "Official
+  versions (M0)").
 - **On the server**, `server/data.js` loads the files once; the match reads them through `server/match/gamedata.js`,
   the sim through `server/sim/simdata.js`, which turns every record into a frozen engine def.
 - **In the browser**, `public/js/data.js` fetches the same files once per page for the UI, and the battle runner loads
