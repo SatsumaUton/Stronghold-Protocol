@@ -4,10 +4,12 @@
 // character / skill / module / range tables, the enemy tables (enemy_database changed again at 23c99d5d, so there is no
 // separate enemy pin: V1_2's ee2cabff would leak V1_2 enemies) and the 43 level files.
 // [ASSUMED] the launch day, BEFORE the 11-18 hotfix ea164ef70736ca2d1a356b3bf7b1cd7540960dc1. versionInfoDict still
-// counts that hotfix as V1_1 (V1_2 starts 2025-11-25 16:00), and about 7 of V1_1's 11 days ran on it. It changed only
-// activity_table: leader HP ×0.75 (Funny / Normal pools, −5…−12.5% Hard), modeFactorInfo.SINGLE 1.0 → 1.25, borrowCount
-// 8 → 20, the enemy effects 攻坚装备II / III, battlefield and special-enemy weights. To build the hotfixed V1_1 instead,
-// add `activity: 'ea164ef70736ca2d1a356b3bf7b1cd7540960dc1'` to the pins below and rebuild.
+// counts that hotfix as V1_1 (V1_2 starts 2025-11-25 16:00), and about 7 of V1_1's 11 days ran on it. The only build
+// input it changed is activity_table, among its changes: leader HP ×0.75 (Funny / Normal pools, −5…−12.5% Hard),
+// modeFactorInfo.SINGLE 1.0 → 1.25, borrowCount 8 → 20, the enemy effects 攻坚装备II / III, battlefield and
+// special-enemy weights, 10 more enemies inactive in the Normal modes. It also clarified 拟态物质's skill text to 初始干员
+// (skill_table) and added a client drag fix, neither a build input. To build the hotfixed V1_1 instead, add
+// `activity: 'ea164ef70736ca2d1a356b3bf7b1cd7540960dc1'` to the pins below and rebuild.
 // The rest is as tools/versions/act1autochess.mjs.
 
 export default Object.freeze({

@@ -26,7 +26,15 @@ const BUILT = ['backups', 'bands', 'bonds', 'bosses', 'chess', 'choices', 'confi
   'items', 'stages', 'tokens', 'waves'];
 const OTHERS = VERSIONS.filter((v) => v.id !== DEFAULT_VERSION);
 const REBUILD_ALL = `rebuild every version: ${VERSIONS.map((v) => `node tools/build-data.mjs --version ${v.id}`).join('; ')} `
-  + '(a version also reads data/assets.json and docs/research/*.json, so a default-side change to those can make it stale)';
+  + '(a version also reads data/assets.json, data/tuning.json and docs/research/*.json, so a default-side change to those can make it stale)';
+/**
+ * The expected counts of each non-default build, written out (DESIGN §36.3), independent of the
+ * profile's `expect` / `config` that the build and validateAll read: a typo in a profile fails here.
+ */
+const PINNED = Object.freeze({
+  act1autochess: { bonds: 18, bands: 30, visibleNonDiy: 95, chess: 200, items: 89, effects: 281, hiddenCore: [300, 1000] },
+  'act1autochess@V1_1': { bonds: 18, bands: 20, visibleNonDiy: 95, chess: 200, items: 89, effects: 279, hiddenCore: [300, 1000] },
+});
 
 const readJson = (dir, name) => JSON.parse(readFileSync(join(dir, `${name}.json`), 'utf8'));
 const runBuild = (args, timeout = 180_000) => spawnSync(process.execPath, [BUILD, ...args], { encoding: 'utf8', timeout });
@@ -113,6 +121,13 @@ for (const v of OTHERS) {
     assert.equal(Object.keys(f.bonds).length, profile.expect.bonds);
     assert.equal(Object.keys(f.bands).length, profile.expect.bands);
     assert.equal(Object.values(f.chess).filter((c) => !c.isGolden && c.visible).length, profile.expect.visibleNonDiy);
+    const pin = PINNED[v.id];
+    assert.ok(pin, `${v.id}: pin its counts in PINNED`);
+    assert.deepEqual({
+      bonds: Object.keys(f.bonds).length, bands: Object.keys(f.bands).length,
+      visibleNonDiy: Object.values(f.chess).filter((c) => !c.isGolden && c.visible).length, chess: Object.keys(f.chess).length,
+      items: Object.keys(f.items).length, effects: Object.keys(f.effects).length, hiddenCore: [f.config.hiddenCore.single, f.config.hiddenCore.multi],
+    }, pin, `${v.id}: the pinned counts`);
     for (const [file, recs] of [['items', f.items], ['bands', f.bands]]) {
       for (const r of Object.values(recs)) assert.ok(!Object.hasOwn(r, 'effectRef'), `${file} ${r.id ?? r.bandId}: no effectRef (it would name a default-version id)`);
     }
