@@ -20,6 +20,11 @@
 //     shared/ names (kits included) — a mechanic that is silently inert there (garrisons/meta.js runs H[effectType] and
 //     garrisons/battle.js INSTALLERS[key] only when a handler exists). The by-id comparisons above never see these: 上半's
 //     煌 SERVER_GAIN_CHAR, the 标准模拟 clause act1autochess_band31_buff on bands 下半 also has.
+//   * version-only fields: a field the version carries and the base lacks, for the same behaviour key and buff (the
+//     gaps the other way round), with the code's reads of that name. A neutral default for a field the version lacks is
+//     harmless only when the version lacks the mechanic: 上半's 维多利亚 6-member clause carries power_atk where 下半 has
+//     atk_normal_equip / atk_golden_equip (read with default 0), so the gap looks neutral and the clause is inert. Not
+//     filtered by the reads: a field name the code reads elsewhere (silence, power_atk) is no proof its handler reads it.
 // Not seen by any class: a record whose text changed under the same keys and blackboard fields (下半 V2_1's 陈
 // 以己之长 reaches 高台 operators only, the code every operator as in V2_2); DESIGN §35.22.5 lists those by hand.
 // Code reads: server/sim/content/**/*.js (but the operator kits, which read skill blackboards) and server/match/**/*.js
@@ -31,9 +36,9 @@
 //   --base    the reference data directory (default: data/)
 //   --data    a version's data directory (repeatable)
 //   --json    machine-readable report on stdout: [{ dir, findings: [...], missingBuffKeys: [...], unknownTriggerRules: [...],
-//             versionOnlyKeys: [...] }]
-//   --strict  exit code 1 when any finding, missing buff key, unknown trigger rule or version-only key is listed (M2:
-//             every one reviewed)
+//             versionOnlyKeys: [...], versionOnlyFields: [...] }]
+//   --strict  exit code 1 when any finding, missing buff key, unknown trigger rule, version-only key or version-only
+//             field is listed (M2: every one reviewed)
 // Unknown options are errors (exit code 2).
 
 import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -274,6 +279,14 @@ export function versionOnlyKeys(base, version, named) {
   return out.sort((x, y) => x.key.localeCompare(y.key));
 }
 
+/**
+ * Fields the version carries and the base lacks, for the same behaviour key and buff (gaps the other way round), each
+ * with the code's reads of that field name (`reads`, possibly none): [{ table, key, buff, field, reads }] (sorted).
+ */
+export function versionOnlyFields(base, version, reads = codeReads()) {
+  return gaps(version, base).map((g) => ({ ...g, reads: reads.get(g.field) ?? [] }));
+}
+
 /** The data files whose records carry skills with a `trigger` (chess, backup forms, tokens). */
 const SKILL_TABLES = Object.freeze(['chess', 'backups', 'tokens']);
 
@@ -313,7 +326,8 @@ export function unknownTriggerRules(data, known = TRIGGER_RULES) {
  * nonNeutral }]), `missingBuffKeys` = the code-named buff keys of the base the version lacks ([{ key, refs }]),
  * `unknownTriggerRules` = the version's trigger rules the engine does not implement (unknownTriggerRules),
  * `versionOnlyKeys` = the version's keys the base lacks and no code names (versionOnlyKeys; only with `names`, the
- * codeBuffKeys of NAME_DIRS).
+ * codeBuffKeys of NAME_DIRS), `versionOnlyFields` = the version's fields the base lacks under a shared key and buff
+ * (versionOnlyFields).
  */
 export function audit(base, version, { reads = codeReads(), keys = null, names = null } = {}) {
   const findings = [];
@@ -332,6 +346,7 @@ export function audit(base, version, { reads = codeReads(), keys = null, names =
   return {
     findings, missingBuffKeys, unknownTriggerRules: unknownTriggerRules(version),
     versionOnlyKeys: names ? versionOnlyKeys(base, version, names) : [],
+    versionOnlyFields: versionOnlyFields(base, version, reads),
   };
 }
 
@@ -367,7 +382,7 @@ function main(argv) {
   else {
     for (const r of reports) {
       const flagged = r.findings.filter((f) => f.nonNeutral).length;
-      console.log(`${r.dir}: ${r.findings.length} field gap(s) the code reads (${flagged} with a non-neutral default), ${r.missingBuffKeys.length} code-named buff key(s) absent, ${r.unknownTriggerRules.length} unknown trigger rule(s), ${r.versionOnlyKeys.length} version-only key(s) no code names`);
+      console.log(`${r.dir}: ${r.findings.length} field gap(s) the code reads (${flagged} with a non-neutral default), ${r.missingBuffKeys.length} code-named buff key(s) absent, ${r.unknownTriggerRules.length} unknown trigger rule(s), ${r.versionOnlyKeys.length} version-only key(s) no code names, ${r.versionOnlyFields.length} version-only field(s)`);
       for (const f of r.findings) {
         console.log(`  ${f.nonNeutral ? '!' : ' '} ${f.table} ${f.key} ${f.buff} .${f.field}: ${f.reads.slice(0, 4).map(fmtRead).join(', ')}${f.reads.length > 4 ? ` … +${f.reads.length - 4}` : ''}`);
       }
@@ -378,9 +393,12 @@ function main(argv) {
       for (const v of r.versionOnlyKeys) {
         console.log(`  + key ${v.key} (no code): ${v.records.slice(0, 4).map((x) => `${x.table} ${x.id}`).join(', ')}${v.records.length > 4 ? ` … +${v.records.length - 4}` : ''}`);
       }
+      for (const f of r.versionOnlyFields) {
+        console.log(`  * ${f.table} ${f.key} ${f.buff} .${f.field} (version only): ${f.reads.length ? `${f.reads.slice(0, 3).map(fmtRead).join(', ')}${f.reads.length > 3 ? ` … +${f.reads.length - 3}` : ''}` : 'no read of that name'}`);
+      }
     }
   }
-  const any = reports.some((r) => r.findings.length || r.missingBuffKeys.length || r.unknownTriggerRules.length || r.versionOnlyKeys.length);
+  const any = reports.some((r) => r.findings.length || r.missingBuffKeys.length || r.unknownTriggerRules.length || r.versionOnlyKeys.length || r.versionOnlyFields.length);
   return o.strict && any ? 1 : 0;
 }
 

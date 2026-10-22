@@ -1,6 +1,7 @@
 // tools/bb-audit.mjs (versions M0, docs/SIM.md §7.2): blackboard fields the code reads that another official version's
-// data lacks, the buff keys the code names that it lacks, its skill trigger rules the engine does not implement, and the
-// keys it carries that the default data lacks and no code names.
+// data lacks, the buff keys the code names that it lacks, its skill trigger rules the engine does not implement, the
+// keys it carries that the default data lacks and no code names, and the fields it carries under a key and buff the
+// default data also has.
 // Real version directories: every data/versions/*/ with a
 // chess.json and the directories of SP_VERSION_DATA_DIRS (path.delimiter-separated, e.g. a dry build); none → skipped.
 import { test } from 'node:test';
@@ -10,7 +11,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadData, getData } from '../server/data.js';
 import {
-  audit, codeReads, codeBuffKeys, gaps, isNeutral, parseDefault, repoSources, unknownTriggerRules, versionOnlyKeys, NAME_DIRS,
+  audit, codeReads, codeBuffKeys, gaps, isNeutral, parseDefault, repoSources, unknownTriggerRules, versionOnlyKeys, versionOnlyFields,
+  NAME_DIRS,
 } from '../tools/bb-audit.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -58,7 +60,7 @@ test('the base against itself has no finding; a code-named buff key the version 
   const data = getData({ log: QUIET });
   const reads = codeReads();
   const keys = codeBuffKeys();
-  assert.deepEqual(audit(data, data, { reads, keys, names: NAMES }), { findings: [], missingBuffKeys: [], unknownTriggerRules: [], versionOnlyKeys: [] });
+  assert.deepEqual(audit(data, data, { reads, keys, names: NAMES }), { findings: [], missingBuffKeys: [], unknownTriggerRules: [], versionOnlyKeys: [], versionOnlyFields: [] });
   assert.ok(reads.get('no_attack_duration')?.some((r) => r.default === 10 && r.file === 'server/sim/content/bonds/addon/battle.js'));
   assert.ok(keys.has('act2autochess_equip_acarm055_global_buff'), 'items/battle.js names it');
   const items = Object.fromEntries(Object.entries(data.items).filter(([, r]) => r.effectId !== 'eff_acarm055' && r.effectId !== 'eff_acgarm055'));
@@ -103,6 +105,17 @@ test('version-only keys: a buff key / bbStr.key or garrison key the base lacks a
   assert.deepEqual(audit(base, version, { reads: new Map() }).versionOnlyKeys, [], 'only with names');
 });
 
+test('version-only fields: a field the version carries under a key and buff the base also has is listed with the reads of its name', () => {
+  const base = { bonds: { victoriaShip: { buffs: [{ key: 'env_gbuff_new', bb: { atk_normal_equip: 0.3 }, bbStr: { key: 'k_vict' } }] } } };
+  const version = { bonds: { victoriaShip: { buffs: [{ key: 'env_gbuff_new', bb: { power_atk: 0.8 }, bbStr: { key: 'k_vict' } }] } } };
+  const reads = codeReads([{ file: 'v.js', text: 'const a = num(bb.atk_normal_equip, 0);' }]);
+  // the base's field is a gap with a neutral default (not flagged), the version's own field a version-only field
+  assert.equal(audit(base, version, { reads }).findings[0].nonNeutral, false);
+  assert.deepEqual(versionOnlyFields(base, version, reads), [{ table: 'bonds', key: 'victoriaShip', buff: 'k_vict', field: 'power_atk', reads: [] }]);
+  // a buff or record the base lacks entirely is no field (versionOnlyKeys covers new keys)
+  assert.deepEqual(versionOnlyFields({ bonds: {} }, version, reads), []);
+});
+
 // 上半's 斩业星熊 S3 (skchr_hsgma2_3, 自选) triggers on AUTO_STOP, which the engine does not implement: M2 builds it or
 // keeps 斩业星熊 out of 上半's 自选 (DESIGN §35.22.5). A version adding another unknown rule fails here.
 const UNKNOWN_RULES_SHANG = Object.freeze([{ rule: 'AUTO_STOP', table: 'backups', skillId: 'skchr_hsgma2_3', owners: ['char_1044_hsgma2'] }]);
@@ -135,6 +148,29 @@ const VERSION_ONLY_V21 = Object.freeze(Object.entries({
   bond_layer_char_goods_price_bond_discount: 'bonds: visiShip | effects: bondeffect_visi',
   bond_layer_char_goods_price_discount: 'bonds: visiShip | effects: bondeffect_visi',
 }).map(([key, spec]) => ({ key, records: rec(spec) })));
+// 上半's fields under keys and buffs 下半 also has (versionOnlyFields), each checked against the code:
+//   inert until M2 (DESIGN §35.22.5) — 维多利亚's 6-member power_atk 0.8 (the code reads 下半's atk_normal_equip /
+//     atk_golden_equip), 精准's 3-member 失能 silence 2 s (bonds/addon/battle.js applies only the penetration), 突袭's
+//     30-layer power_respawn_time / power_cost_scale (the code reads 下半's power_attack_speed); the bond records and
+//     their effect mirrors; and 坚守 garrison_69's row gate check_count 3 under SERVER_ADD_BOND (garrisons/meta.js runs
+//     rowCondition for SERVER_POOL_CHAR / SERVER_MOST_BOND only, so the +3 fires without 3 in a row)
+//   read — garrison_44's check_count / conditionkey character_same_row (garrisons/battle.js conditionMet) and
+//     garrison_88's conditionkey character_target_inboard under SERVER_ONCE_GOLD (match/effectsMeta.js, every garrison)
+const fld = (table, key, buff, fields) => fields.split(' ').map((field) => ({ table, key, buff, field }));
+const VERSION_ONLY_FIELDS_SHANG = Object.freeze([
+  ...fld('bonds', 'preciShip', 'act1autochess_bond_eff_preci', 'silence'),
+  ...fld('bonds', 'raidShip', 'act1autochess_bond_eff_raid', 'power_cost_scale power_respawn_time'),
+  ...fld('bonds', 'victoriaShip', 'act1autochess_bond_eff_victoria', 'power_atk'),
+  ...fld('effects', 'bondeffect_preci', 'act1autochess_bond_eff_preci', 'silence'),
+  ...fld('effects', 'bondeffect_raid', 'act1autochess_bond_eff_raid', 'power_cost_scale power_respawn_time'),
+  ...fld('effects', 'bondeffect_victoria', 'act1autochess_bond_eff_victoria', 'power_atk'),
+  ...fld('garrisons', 'act1autochess_gar_event_useskill|act1autochess_gar_event_useskill', 'env_gbuff_new_with_verify', 'check_count conditionkey'),
+  ...fld('garrisons', 'SERVER_ADD_BOND|', 'SERVER_ADD_BOND', 'check_count'),
+  ...fld('garrisons', 'SERVER_ONCE_GOLD|', 'SERVER_ONCE_GOLD', 'conditionkey'),
+]);
+const VERSION_ONLY_FIELDS = Object.freeze({
+  'data/versions/act1autochess': VERSION_ONLY_FIELDS_SHANG, 'data/versions/act1autochess-v1_1': VERSION_ONLY_FIELDS_SHANG,
+});
 const VERSION_ONLY = Object.freeze({
   'data/versions/act1autochess': VERSION_ONLY_SHANG, 'data/versions/act1autochess-v1_1': VERSION_ONLY_SHANG, 'data/versions/act2autochess-v2_1': VERSION_ONLY_V21,
 });
@@ -175,5 +211,11 @@ for (const dir of VERSION_DIRS) {
     const got = versionOnlyKeys(getData({ log: QUIET }), loadData(dir, { log: QUIET }), NAMES);
     if (want) assert.deepEqual(got, want);
     else assert.deepEqual(got, [], `${rel}: version-only keys ${got.map((v) => v.key).join(', ')} (list them for M2)`);
+  });
+
+  test(`${path.relative(ROOT, dir) || dir}: its fields under keys the default data also has are exactly the known ones`, () => {
+    const rel = path.relative(ROOT, dir).split(path.sep).join('/');
+    const got = versionOnlyFields(getData({ log: QUIET }), loadData(dir, { log: QUIET }), new Map()).map(({ reads, ...f }) => f);
+    assert.deepEqual(got, VERSION_ONLY_FIELDS[rel] ?? [], `${rel}: version-only fields (list them for M2)`);
   });
 }

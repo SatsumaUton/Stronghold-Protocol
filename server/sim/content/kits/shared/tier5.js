@@ -49,7 +49,9 @@ const HALF_HP = 0.5;
  * docs/research/03-operators.json): 幽灵鲨, 斯卡蒂, 歌蕾蒂娅, 乌尔比安, 归溟幽灵鲨, the list of before versions M0, which data
  * without config.version (the default data and the plugin content sets on it) keeps. On another version's build (support
  * isVersionData) also 安哲拉, shop chess in 第一期 (DESIGN §35.22.4). 浊心斯卡蒂 (char_1012_skadi2) has groupId null in the
- * official data — she is NOT an Abyssal Hunter for these talents.
+ * official data — she is NOT an Abyssal Hunter for these talents. The one list of the tier-5 kits, 歌蕾蒂娅 and 浊心斯卡蒂
+ * (abyssalOf); 斯卡蒂's own list (../ops/chess_char_3_05-skadi.js ABYSSAL) stays separate: it named 安哲拉 before M0, on
+ * every data set.
  */
 const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
 const ABYSSAL_VERSION = new Set([...ABYSSAL, 'char_218_cuttle']);

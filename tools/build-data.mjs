@@ -2706,6 +2706,8 @@ function buildChoices(ctx, effects, items, chess) {
   // an entry this version does not have: null in the default version (validation fails, as it always did); dropped with
   // a warning in another version [ASSUMED] (the pool may end up empty)
   const poolItems = (pool, ids) => (IS_DEFAULT ? ids : ids.filter((id) => id !== null || (warn(`pool ${pool}: an entry this version does not have is dropped [ASSUMED]`), false)));
+  // the operators a chess pool names by charId, in the profile's `pools` where the version's trait text names others
+  const poolChars = (pool, chars) => PROFILE.pools?.[pool] ?? chars;
   const poolWeighted = (pool, pairs) => (IS_DEFAULT ? pairs : pairs.filter(([id]) => id !== null || (warn(`pool ${pool}: an entry this version does not have is dropped [ASSUMED]`), false)));
 
   // Per-mode schedule of families (research 01 A4).
@@ -2826,7 +2828,7 @@ function buildChoices(ctx, effects, items, chess) {
       // 路标月报#2 BV1eLXXBqEgF, card-pool rule 6: measured subset weights. The four special hammers are still
       // exclusive to this and Victoria's pools, but are not the whole of Rockrock's pool.
       pool_equip_rockr: { kind: 'equip', weighted: poolWeighted('pool_equip_rockr', [['eff_acarm041', 10], ['eff_acarm045', 2], ['eff_acarm043', 2], ['eff_acarm044', 2], ['eff_acarm042', 2], ['eff_acarm052', 1], ['eff_acarm061', 4], ['eff_acarm053', 4]].map(([e, w]) => [itemByEffect(e), w])), assumed: true }, // 维式重锤, 战栗 / 坚固 / 加速 / 灼燃维式重锤, 有限加速器, 护盾无人机, 激光发射器
-      pool_chess_glady: { kind: 'chess', items: poolItems('pool_chess_glady', ['char_263_skadi', 'char_143_ghost', 'char_4137_udflow'].map(chessByChar)), assumed: true }, // 斯卡蒂, 幽灵鲨, 深巡
+      pool_chess_glady: { kind: 'chess', items: poolItems('pool_chess_glady', poolChars('pool_chess_glady', ['char_263_skadi', 'char_143_ghost', 'char_4137_udflow']).map(chessByChar)), assumed: true }, // 斯卡蒂, 幽灵鲨, 深巡 (歌蕾蒂娅's garrison_39)
       pool_char_pinus: { kind: 'chess', weighted: poolWeighted('pool_char_pinus', [['char_496_wildmn', 10], ['char_431_ashlok', 10], ['char_430_fartth', 3]].map(([c, w]) => [chessByChar(c), w])), assumed: true }, // 野鬃, 灰毫, 远牙
       pool_char_later: { kind: 'chess', bond: 'lateranoShip', minTier: 4, golden: true, rule: 'shopEligible', assumed: true },
       ...Object.fromEntries([1, 2, 3, 4, 5, 6].map((t) => [`pool_chess_shop_${t}_reward`, { kind: 'chess', tier: t, rule: 'shopEligible', assumed: true }])),

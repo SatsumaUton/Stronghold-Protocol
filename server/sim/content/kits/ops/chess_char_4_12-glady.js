@@ -7,18 +7,10 @@ import {
   pullToFront, withDefaults,
 } from '../shared/tier4.js';
 import { hypot } from '../../../detmath.js';
-import { isVersionData } from '../../tokens.js';
+import { abyssalOf } from '../shared/tier5.js';
 
-/**
- * 深海猎人 (character_table groupId "abyssal"), the list of before versions M0: data without config.version (the default
- * data and the plugin content sets on it) keeps it. On another version's build (support isVersionData) also 安哲拉, shop
- * chess in 第一期 (DESIGN §35.22.4).
- */
-const ABYSSAL = new Set(['char_143_ghost', 'char_263_skadi', 'char_474_glady', 'char_4145_ulpia', 'char_1023_ghost2']);
-const ABYSSAL_VERSION = new Set([...ABYSSAL, 'char_218_cuttle']);
-/** The 深海猎人 list of `data` (default: the loaded data). */
-export const abyssalOf = (data) => (isVersionData(data) ? ABYSSAL_VERSION : ABYSSAL);
-const isAbyssal = (u) => u?.def?.raw?.groupId === 'abyssal' || abyssalOf().has(u?.def?.charId ?? u?.def?.raw?.charId);
+/** 深海猎人 (character_table groupId "abyssal"): the list of the loaded data (../shared/tier5.js abyssalOf). */
+export const isAbyssal = (u) => u?.def?.raw?.groupId === 'abyssal' || abyssalOf().has(u?.def?.charId ?? u?.def?.raw?.charId);
 
 export default withDefaults({
   // ===== 歌蕾蒂娅 (hookmaster) S3 缺水的碎漩狂舞 — bind a far target, tornado (r 1.5): slow, 85 % arts pulses + pull,

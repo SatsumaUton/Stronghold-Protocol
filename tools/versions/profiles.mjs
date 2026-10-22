@@ -1,6 +1,6 @@
 // tools/versions/profiles.mjs — load the build profile of an official version (shared/versions.js; docs/DATA.md "Official
 // versions (M0)"). A profile is tools/versions/<slug>.mjs:
-//   { id, season, pins, adapters, research, tables, config: { hiddenCore: { single, multi }, rules? },
+//   { id, season, pins, adapters, research, tables, pools?, config: { hiddenCore: { single, multi }, rules? },
 //     expect: { bonds, bands, visibleNonDiy, triggerDeviations } }
 //   pins      null (master, .cache/gamedata/) or { default: <sha>, <group>: <sha> … } — the commit of each file group
 //             (pinGroupOf), cached in .cache/gamedata@<sha>/
@@ -8,6 +8,8 @@
 //   research  the version's research directory (falls back to docs/research/, with a warning) or null = docs/research/
 //   tables    'default' (the 下半-measured tables of tools/build-data.mjs) or { stock, shopDraft, tacticDraft,
 //             bountyDrafts } with null = left out
+//   pools     { <pool id>: [charId…] } replaces the operators tools/build-data.mjs writes for a hand-written chess pool,
+//             where the version's trait text names others (omitted = the default's)
 //   config    hiddenCore thresholds; `rules` the rule switches a non-default build writes into config.version =
 //             { id, family, rules } ({} = the default's rules)
 //   expect    the counts validateAll checks; triggerDeviations 'default' (every deliberate deviation meets its official

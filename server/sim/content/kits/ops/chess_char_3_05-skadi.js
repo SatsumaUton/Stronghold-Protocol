@@ -3,7 +3,10 @@
 
 import { num, defOf, talentBb, traitBb, altSkills, statSkill, fx } from '../shared/tier3.js';
 
-/** Abyssal Hunters (character_table groupId `abyssal`, not in data/chess.json): 深海掠食者 targets. */
+/**
+ * Abyssal Hunters (character_table groupId `abyssal`, not in data/chess.json): 深海掠食者 targets. It named 安哲拉 before
+ * versions M0, so it applies on every data set and is not ../shared/tier5.js abyssalOf (default data: without 安哲拉).
+ */
 export const ABYSSAL = new Set(['char_263_skadi', 'char_143_ghost', 'char_218_cuttle', 'char_474_glady', 'char_1023_ghost2', 'char_4145_ulpia']);
 
 export default {

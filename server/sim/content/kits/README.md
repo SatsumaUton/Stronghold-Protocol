@@ -27,6 +27,12 @@ is then found by charId (`content/index.js officialKitKey`, docs/SIM.md §7.2). 
 A 自选 piece keeps `KITS[def.charId]` there too: the owned 自选 pools hold operators whose kit is a tier kit only (24 in
 第一期, 4 in 第二期上半: `PENDING_DIY_KIT_CHARS`), which `KITTED_CHARS` therefore leaves out of that version's 自选
 [ASSUMED] until M2.
+A kit that lists the members of a character_table group by charId (no built record carries `groupId` or `teamId`:
+深海猎人, 莱茵生命, `STUDENTS`, `SUI`) keeps the default list on data without `config.version`. A member that only another
+official version brings in is added behind `isVersionData` (from `../../tokens.js`), as `shared/tier5.js abyssalOf` and
+the 缪尔赛思 kit's `rhineOf` do; a kit shares an existing list rather than copying it. `test/versions-keying.test.js`
+`GROUPS` pins the 深海猎人 and 莱茵生命 members each data directory sees (`STUDENTS` and `SUI` are complete on every build;
+docs/SIM.md §7.2, DESIGN §35.22.4).
 
 ## Naming
 

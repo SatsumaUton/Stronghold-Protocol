@@ -1138,8 +1138,8 @@ those content sets: 蒸汽之心's hammers per data object and the map-character
 `@21b1f240`, 96 normal shop records): 46 keep their id with the same operator, 19 resolve to a tier kit by charId, 12 to a
 自选 `op-*` kit (菲亚梅塔, 森蚺, 煌, 左乐, 涤火杰西卡, 林, 提丰, 娜仁图亚, 澄闪, 死芒, 伊芙利特, 淬羽赫默 — written for 自选, to be
 reviewed as shop chess), and 19 have no kit yet: 讯使, 梅, 远山, 狮蝎, 暴行, 布丁, 万顷, 暴雨, 锡兰, 芳汀, 极光, 槐琥, 海蒂, 蜜莓, 安哲拉,
-伊桑, 星源, 桑葚, 亚叶 (`kits/index.js` `PENDING_KIT_CHARS`). V2_1 reuses no id for another operator: its 116 normal shop
-records all keep their own kit. `test/versions-keying.test.js` checks every data directory
+伊桑, 星源, 桑葚, 亚叶 (`kits/index.js` `PENDING_KIT_CHARS`). V2_1 reuses no id for another operator: its 116 normal
+records (the 115 shop chess and 盟约·辅助干员) all keep their own kit. `test/versions-keying.test.js` checks every data directory
 (`data/`, each `data/versions/*/`, and `SP_VERSION_DATA_DIRS`): each chess resolves to a kit of its own charId or is
 pending, each 自选 pick and 补位 stand-in to its charId's kit or is a 预备干员 (generic) or a pending 自选 pick that the
 kitted gate drops, each directory matches its pinned resolution counts, and the default data keeps exactly the old lookup. The same
@@ -1152,7 +1152,11 @@ the blackboard fields a version lacks that the code reads with a default (e.g. �
 read with 10 in `bonds/addon/battle.js`), the buff keys the code names that the version lacks, the skill trigger rules
 the engine does not implement (上半's 斩业星熊 S3: `AUTO_STOP`), and the keys the version carries that the default data
 lacks and no code under `server/` or `shared/` names (buff keys and `bbStr.key` of bands, bonds, items and effects;
-garrison `effectType` / `effectKey` / `battleRuneKey` / `bbStr.key`), each with its records. Those mechanics are
+garrison `effectType` / `effectKey` / `battleRuneKey` / `bbStr.key`), each with its records, and the fields a version
+carries under a key and buff the default data also has (a neutral default for a missing field is harmless only when the
+version lacks the mechanic: 第一期's 维多利亚 6-member `power_atk`, 精准's 3-member `silence` and 突袭's 30-layer
+`power_respawn_time` / `power_cost_scale` sit beside 下半 fields the code reads, so the three clauses are inert, as is
+坚守 `garrison_69`'s row gate `check_count` under `SERVER_ADD_BOND`, which `garrisons/meta.js` does not check). Those mechanics are
 silently inert until M2 (DESIGN §35.22.5): in 上半, the traits of 煌 (`SERVER_GAIN_CHAR`, 售出时 → 烛煌, both 炎 and 维多利亚),
 蜜莓 (`SERVER_ADD_BOND_ACTIVATED_RANDOM`), 伊芙利特 (`SERVER_ADD_BOND_FRONT_ALL_LAYER`) and 极光
 (`act1autochess_gar_event_recoverhp_enemy_abflag_inrange`); 华法琳 / 寒芒克洛丝's grant to the operator in front (上半
@@ -1174,8 +1178,9 @@ group lists are hand-written (no built record carries character_table's `groupId
 lists of 斯卡蒂, 歌蕾蒂娅, 浊心斯卡蒂 and `shared/tier5.js` (归溟幽灵鲨, 乌尔比安) name all six members, 安哲拉 included (shop
 chess in 第一期), and 缪尔赛思's 莱茵生命 list names the shop members (today's five and 第一期's 星源); data without
 `config.version` keeps the lists of before M0 (斯卡蒂's already named 安哲拉), so a Forge pack or plugin official operator
-fielding 安哲拉 or 星源 on the default data counts as before (`abyssalOf` / `rhineOf`). 缪尔赛思's list leaves out
-伊芙利特 and 淬羽赫默, shop chess in 第一期 and 自选 picks today, nor today's other 自选 members, while 淬羽赫默's own list (`op-slent2.js`) counts every member; whether 自选
+fielding 安哲拉 or 星源 on the default data counts as before (`abyssalOf` in `shared/tier5.js`, the one list of 歌蕾蒂娅,
+浊心斯卡蒂 and the tier-5 kits; `rhineOf`; the test asserts the predicate each kit calls). 缪尔赛思's list leaves out
+伊芙利特 and 淬羽赫默 (shop chess in 第一期, 自选 picks today) and today's other 自选 members (麦哲伦, 多萝西, 娜斯提), while 淬羽赫默's own list (`op-slent2.js`) counts every member; whether 自选
 members count for 缪尔赛思 is an M2 question. `test/versions-keying.test.js` pins, per data directory, the members each
 list sees.
 Plugin dispatch (DESIGN §32.5, C2): extension registry → `def.raw.dsl` → `def.raw.skillSpec` → `def.raw.kitRef` → official registry → generic; explicit Battle test kits still take precedence. The extension registry stays empty for vanilla; P3a script compositions register SDK kits, enemy installs and battle modules (PLUGINS §13). `kitOf` calls `compileDsl` when the record carries `dsl`. The content-set builder stamps `pluginId`. A bad spec is refused at build. If compilation still throws (`PLUGIN_DSL_*`, or any throw while `raw.dsl` is set), the battle ends `forced` with `content:dsl` and does not field an empty or generic kit (DESIGN §32.7). Any other kit throw still falls back to generic. A one-skill DSL kit binds that default spec for a 自选 piece and a 补位 stand-in. The JSON SkillSpec allowlist is §7.3 without functions (validated by `shared/plugins/skillSpec.js`); `talentMods` adds permanent numeric mods. `kitRef` accepts an official key or file stem, never an import path.

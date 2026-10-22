@@ -3,7 +3,8 @@
 // the maintainer's decisions of 2026-10-22, DESIGN §35.22). Pinned to Kengxxiao/ArknightsGameData:
 //   default   8303c922 (the launch, data version 25-11-12-14-06-12): the range table, the enemy tables (enemy_database
 //             changed again at 23c99d5d, so there is no separate enemy pin: V1_2's ee2cabff would leak V1_2 enemies) and
-//             the 43 level files (the hotfix changed none)
+//             the 43 level files (the hotfix changed none; V1_2's 23c99d5d changed the three solo hidden-core levels
+//             h08_0X_s, whose routes end at the 传送 entrance (1,3) instead of the protection point (2,2))
 //   activity  ea164ef7 (the 11-18 hotfix, 25-11-17-12-07-19): activity_table with the first 20 strategies.
 //             versionInfoDict counts the hotfix as V1_1 (V1_2 starts 2025-11-25 16:00) and 7 of V1_1's 11 days ran on
 //             it. Its changes: leader HP ×0.75 (Funny / Normal pools, −5…−12.5% Hard), modeFactorInfo.SINGLE
@@ -30,6 +31,7 @@ export default Object.freeze({
   adapters: Object.freeze(['bondActiveType', 'selfBackupPreset', 'launchMilestones']),
   research: 'docs/research/versions/act1autochess-v1_1/',
   tables: Object.freeze({ stock: null, shopDraft: null, tacticDraft: null, bountyDrafts: null }),
+  pools: Object.freeze({ pool_chess_glady: Object.freeze(['char_263_skadi', 'char_143_ghost', 'char_218_cuttle']) }),
   config: Object.freeze({
     hiddenCore: Object.freeze({ single: 300, multi: 1000 }),
     rules: Object.freeze({ deployOrder: 'rowBottomUp', soloTimed: true, benchEquip: false, benchFullSwap: false, bossMirrorShare: false }),

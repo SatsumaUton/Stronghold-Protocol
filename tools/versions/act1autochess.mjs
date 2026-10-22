@@ -27,6 +27,8 @@ export default Object.freeze({
   research: 'docs/research/versions/act1autochess/',
   // the 下半-measured tables (shop stock overrides, the measured draft weights) are left out: uniform draws [ASSUMED]
   tables: Object.freeze({ stock: null, shopDraft: null, tacticDraft: null, bountyDrafts: null }),
+  // 歌蕾蒂娅's garrison_39 names 斯卡蒂、幽灵鲨或安哲拉 here (下半: 深巡); 安哲拉 is shop chess chess_char_3_10
+  pools: Object.freeze({ pool_chess_glady: Object.freeze(['char_263_skadi', 'char_143_ghost', 'char_218_cuttle']) }),
   config: Object.freeze({
     hiddenCore: Object.freeze({ single: 300, multi: 1000 }), // PRTS 卫戍协议：盟约: >300 / >1000 layers
     // [ASSUMED] inert in M0 (nothing reads them before M2): deploy order row by row from the bottom (PRTS 卫戍协议/帮助,

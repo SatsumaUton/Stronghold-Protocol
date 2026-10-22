@@ -391,8 +391,8 @@ const registryOf = (m) => (m && m.default && typeof m.default === 'object' ? m.d
 export const TIER_KITS = Object.freeze(MODULES.map((group) => Object.assign({}, ...group.map(registryOf))));
 
 /**
- * charId → the tier kit keys written for it whose file loaded, in KIT_FILES order (锡人, 耶拉 and 华法琳 have one kit per
- * tier they appear at).
+ * charId → the tier kit keys written for it whose file loaded, in KIT_FILES order (the 8 operators V2_2 re-tiered — 锡人,
+ * 耶拉, 录武官, 白面鸮, 百炼嘉维尔, 魔王, 华法琳, 妮芙; DESIGN §35.22.4 — have one kit per tier they appear at).
  */
 export const TIER_KIT_KEYS_BY_CHAR = (() => {
   const out = {};
