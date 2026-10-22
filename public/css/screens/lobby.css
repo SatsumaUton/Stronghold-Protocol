@@ -16,13 +16,18 @@
 /* Japanese never starts a line with a small kana, ー or a closing mark (§35.18 review: the tips' 「オペレ|ーター」 at 中 / 特大
    in a 1024×600 window; line-break: normal allows a break before them), as in the room */
 .lobby-hub:lang(ja) .hub-stage { line-break: strict; }
-/* a last line of one character: the hub's tips, the protocol dialog's paragraphs and the big button's label wrap `pretty`
+/* a last line of one character: the hub's tips, the protocol dialog's paragraphs and its big button's label wrap `pretty`
    (§35.18 review of the text-fit fixes: 「比較的所要時間が短いシミュレーショ|ン」 on a phone at 特大, 「単独演算を開|始」,
    Korean 「독립 시뮬레이션 시|작」 on desktops). Scoped as in the room (room.css): WebKit's `pretty` adds lines to short
-   labels, and the lobby's other dialogs were not measured with it. The big button grows with its label and kept its lines
-   in Safari with `pretty` (56 measured room cases); `balance` broke it inside a word (「シミュレー|ション開始」 at 小,
-   「독립 시뮬|레이션 시작」) */
-.tips__text, .proto-brief p, .proto-hint, .proto-start__label { text-wrap: pretty; }
+   labels, and the lobby's other dialogs were not measured with it. The dialog's button only (`.proto-foot`): the room's
+   big button shares the label's class and wraps plainly — in Safari `pretty` broke its Japanese 「シミュレーション|開始」
+   inside the word, 「シミュレー|ション開始」, at 小 on the phones (review of 6f34f380), as `balance` had. `pretty`:
+   Chrome 117+, Safari 26+; Firefox wraps as before */
+.tips__text, .proto-brief p, .proto-hint, .proto-foot .proto-start__label { text-wrap: pretty; }
+/* 选择同盟方式's note breaks Japanese between phrases in Chrome 119+ (BudouX; review of 6f34f380: 「…教えてもらう|か、招待リンク…」
+   at 特大 on the phones, now 「…教えて|もらうか、招待リンクを|直接開いてください」); Safari and Firefox ignore it and wrap as
+   before */
+.ally-recent:lang(ja) { word-break: auto-phrase; }
 /* the top bar's ping pill grows with its text at 大 / 特大, as in the room (§35.18 review: its fixed .32rem cut it) */
 .lobby-hub > .topbar .ping { height: auto; min-height: .32rem; padding-top: 1px; padding-bottom: 1px; }
 .hub-bg {

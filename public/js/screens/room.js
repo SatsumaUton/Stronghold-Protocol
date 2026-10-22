@@ -234,6 +234,9 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
   const lit = state === 'ready' || state === 'host';
   const art = seat.isBot ? null : seatArtSrc([portrait, portraitDefault], badArt);
   const canPick = isMe && !seat.isBot && !!onPickCard;
+  // an AI teammate's name without its 「AI·」 prefix on a phone (room.css): the avatar's badge and the card's AI 队友 tag say
+  // it, and at 特大 the prefix left one character of the name (「AI·华…」). Kept when only a number follows (`AI·2`)
+  const botPrefix = seat.isBot ? /^(AI\s*·\s*)(\D.*)$/su.exec(seat.name || '') : null;
   return html`<article class=${`seat rseat${isMe ? ' is-me' : ''}${isHostSeat ? ' is-host' : ''}${seat.isBot ? ' is-bot' : ''}${art ? ' has-art' : ''}${lit ? ' is-lit' : ''}${flash ? ' is-flash' : ''} is-${state}`}
       style=${`--i:${index}`}>
     <span class="rseat__clip" aria-hidden="true"></span>
@@ -268,7 +271,7 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
     <div class="rseat__plate">
       ${isMe ? html`<span class="rseat__me" role="img" aria-label=${t('你')} title=${t('你')}><${Icon} name="info" /></span>` : null}
       <${AvatarFrame} size="sm" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} />
-      <span class="rseat__who"><b class="seat__name">${seat.name || t('博士')}</b>${isMe ? html`<span class="seat__you" aria-hidden="true">${t('你')}</span>` : null}</span>
+      <span class="rseat__who"><b class="seat__name">${botPrefix ? html`<span class="seat__name-pre">${botPrefix[1]}</span>${botPrefix[2]}` : seat.name || t('博士')}</b>${isMe ? html`<span class="seat__you" aria-hidden="true">${t('你')}</span>` : null}</span>
       <small class="rseat__doc">${seat.isBot ? 'AUTONOMOUS UNIT' : `DOCTOR #${doctorNo(seat.playerId)}`}</small>
     </div>
   </article>`;

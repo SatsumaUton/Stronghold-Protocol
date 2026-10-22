@@ -824,7 +824,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
   // each case checked one random tip — a tip-specific overflow, such as a Japanese line starting with ー where only two
   // tips wrap there, made the test flaky rather than red): the pager steps through them, each checked with its entry
   // animation finished; a step the 5 s turn lands in is checked again. A problem the case already shows is not repeated
-  const tipProblems = async (page, known) => {
+  const tipProblems = async (page, known, h) => {
     const now = () => page.evaluate(() => {
       const p = document.querySelector('.lobby-hub .tips__text');
       if (!p?.checkVisibility()) return null;
@@ -837,8 +837,9 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
     let total = 0;
     for (let k = 0; k < 80; k++) {
       const a = await now();
-      if (!a || seen.size >= a.n) break;
+      if (!a) break;
       total = a.n;
+      if (!(a.n > 0) || seen.size >= a.n) break;
       const probs = await page.evaluate(textProblems, '.lobby-screen');
       if ((await now())?.i === a.i && !seen.has(a.i)) {
         seen.add(a.i);
@@ -849,6 +850,9 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
     }
     // a pager that stopped advancing, or clicks that kept racing the 5 s turn, must not pass with tips unchecked
     if (total && seen.size < total) out.push(`only ${seen.size}/${total} tips checked`);
+    // nor a tips panel that is not shown, or an index that no longer reads n/21, in a window over 520 px tall (lobby.css
+    // hides the panel only below that)
+    if (h > 520 && !(total > 0)) out.push(`no tip checked (index ${total})`);
     return out;
   };
   test('phones and desktops: every label of the hub inside its box in every language at every 文字大小', { timeout: 1500000 }, async () => {
@@ -866,7 +870,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
               await sleep(150); await settle(page); await page.evaluate(() => document.fonts.ready);
               const plain = await page.evaluate(textProblems, '.lobby-screen');
               for (const p of plain) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
-              for (const p of await tipProblems(page, new Set(plain))) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
+              for (const p of await tipProblems(page, new Set(plain), h)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               for (const p of await page.evaluate(hubShapes)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               for (const p of await forcedShapes(page)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               if (lang === 'en' && textSize === 'xl' && (w === 667 || w === 1280)) await page.screenshot({ path: path.join(OUT, `lobby-hub-fit-${w}-en-xl.png`) });

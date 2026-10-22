@@ -507,11 +507,21 @@ test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simul
   // Korean breaks between words (review: 「독립 시뮬레이|션」)
   assert.match(css, /\.lobby-hub:lang\(ko\) \.hub-stage \{ word-break: keep-all; overflow-wrap: break-word; \}/);
   assert.match(css, /\.lobby-hub:lang\(ja\) \.hub-stage \{ line-break: strict; \}/, 'no line starts with a small kana or ー');
-  // a last line not a single character: `pretty` on the tips, the protocol dialog's paragraphs and the big button's label;
+  // a last line not a single character: `pretty` on the tips, the protocol dialog's paragraphs and its big button's label;
   // not on the whole lobby nor every dialog (WebKit's `pretty` adds lines to short labels; the other
-  // dialogs not measured); the dialogs' Japanese strict as the room's and the hub's (§35.18 review of the review)
-  assert.match(css, /\.tips__text, \.proto-brief p, \.proto-hint, \.proto-start__label \{ text-wrap: pretty; \}/);
+  // dialogs not measured); the dialogs' Japanese strict as the room's and the hub's (§35.18 review of the review). The
+  // room's big button shares the label's class and wraps plainly: in Safari `pretty` broke its 「シミュレー|ション開始」
+  // at 小 on the phones (review of 6f34f380)
+  assert.match(css, /\.tips__text, \.proto-brief p, \.proto-hint, \.proto-foot \.proto-start__label \{ text-wrap: pretty; \}/);
   assert.doesNotMatch(css, /\.proto-start__label[^{]*\{[^}]*text-wrap: balance/, 'balance broke 「シミュレー|ション開始」');
+  for (const [, sel, body] of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\})\s*([^{}@]+)\{([^}]*)\}/g)) {
+    if (!/text-wrap/.test(body)) continue;
+    for (const x of sel.split(',')) assert.ok(!/\.proto-start__label/.test(x) || /\.proto-foot \.proto-start__label/.test(x), `the room's button wraps plainly: ${x.trim()}`);
+  }
+  const roomCss = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
+  assert.doesNotMatch(roomCss, /\.proto-start__label[^{]*\{[^}]*text-wrap/, 'no text-wrap on the room\'s button');
+  // 选择同盟方式's Japanese note breaks between phrases (Chrome; 「…教えてもらう|か、招待リンク…」 at 特大)
+  assert.match(css, /\.ally-recent:lang\(ja\) \{ word-break: auto-phrase; \}/);
   assert.doesNotMatch(css, /\.lobby-screen \{ text-wrap/);
   const comp = readFileSync(path.join(ROOT, 'public/css/components.css'), 'utf8');
   assert.doesNotMatch(comp, /\.modal__box \{ text-wrap/);

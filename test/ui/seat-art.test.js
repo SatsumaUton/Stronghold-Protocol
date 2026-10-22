@@ -184,6 +184,8 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   assert.match(plain, /\.rs-hint, \.rs-brief p, \.rs-brief li \{ text-wrap: pretty; \}/);
   assert.match(plain, /\.rseat__add, \.rseat__wait small \{ text-wrap: balance; \}/);
   assert.match(plain, /\.cardpick__name \{ text-wrap: balance; \}/);
+  // review of 6f34f380: `balance` broke Japanese 「AI同盟|者を追加」 inside the word at 特大 on the phones — phrase breaks
+  assert.match(plain, /\.rseat__add:lang\(ja\) \{ word-break: auto-phrase; \}/);
   assert.match(plain, /\.rseat__state \{[^}]*margin: 0 -\.08rem;/);
   // 2 of the art's 3 px on a phone beside a 16 px box and a 3 px gap (all 3 px put the box and 「by」 against the card's
   // border on a 640×360 phone)

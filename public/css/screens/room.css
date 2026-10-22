@@ -12,14 +12,18 @@
    button, 「ドクタ|ーの画面」 in a spectator's status line, 「シークレ|ットコア」 in 独立模拟's briefing — line-break: normal
    allows a break before a small kana and ー) */
 .rs:lang(ja) { line-break: strict; }
-/* a last line of one character (§35.18 review of the text-fit fixes: 「…各位博|士」 in a spectator's status line, 「ドクターの
+/* a last line of one character (§35.18 review of the text-fit fixes: 「…各位博|士」 in the room's status line, 「ドクターの
    参加待|ち」, 「添加AI队|友」 at 特大). The paragraphs wrap `pretty` (Chrome never adds a line for it); the short labels
    `balance` (the line count stays): WebKit's `pretty` adds lines to short labels (review of that review: 「AI同盟者を追加」
-   took 4 lines in Safari on a 640×360 phone at 特大 and was cut, 2 with `balance`). Chrome 114+ / Safari 17.5+ — elsewhere
-   they wrap as before. The big button's label (`pretty`) and the protocol dialog's paragraphs in lobby.css, the picker's
-   names below */
+   took 4 lines in Safari on a 640×360 phone at 特大 and was cut, 2 with `balance`). `balance`: Chrome 114+, Safari 17.5+,
+   Firefox 121+; `pretty`: Chrome 117+, Safari 26+, Firefox wraps as before. The big button's label wraps plainly (in
+   Safari `pretty` and `balance` broke 「シミュレー|ション開始」 inside the word at 小 on the phones; 选择模拟协议's own button
+   keeps `pretty`, lobby.css); the picker's names below */
 .rs-hint, .rs-brief p, .rs-brief li { text-wrap: pretty; }
 .rseat__add, .rseat__wait small { text-wrap: balance; }
+/* `balance` broke Japanese 「AI同盟|者を追加」 inside the word at 特大 on the phones (review of 6f34f380; 「AI同盟者を|追加」
+   with `pretty`): phrase breaks (BudouX) in Chrome 119+; Safari and Firefox ignore it */
+.rseat__add:lang(ja) { word-break: auto-phrase; }
 .rs__bg {
   position: absolute;
   inset: 0;
@@ -688,6 +692,9 @@
      it, and the name gets the tag's ~35 px back (§35.18 review of the text-fit fixes: 「Kal'…」, 「ケ…」 at 特大 in a card
      about 120 px wide). [ASSUMED] */
   .rseat__who .seat__you { display: none; }
+  /* an AI teammate's name without its 「AI·」 prefix (room.js): the avatar's AI badge and the card's AI 队友 tag already say
+     it, and at 特大 on the 640 / 667 px phones it left 「AI·华…」 (review of 6f34f380). [ASSUMED] */
+  .seat__name-pre { display: none; }
   .rseat__pick { min-height: 22px; font-size: min(calc(.22 * var(--t)), calc(16px + var(--t-step) / 2)); }
   .rseat__pick span { display: none; }
   /* the badge and 更换立绘 share a row, the tags wrap under them; the 连接中断 band gives way to the state, which says the
@@ -733,6 +740,9 @@
   .rs-pill__diff { font-size: min(calc(.28 * var(--t)), calc(20px + var(--t-step))); }
   .rs-key__code { font-size: calc(.36 * var(--t)); }
   .rs-key__copy { font-size: min(calc(.26 * var(--t)), calc(18px + var(--t-step))); }
+  /* English 「Copy」 sat low (its descenders 0.1 px above the button's bottom at 特大, 5 px free above; the CJK labels are
+     centred): set 2 px higher. [ASSUMED] */
+  .rs-key__copy:lang(en) { padding-bottom: 4px; }
   /* the button at least 46 px, taller for a second line; the label 18–20 px at 小 / 中, a pixel more a step above (as
      选择模拟协议's here: it was .46 × --t, 40 px at 特大, which cut 开始模拟 in English, Japanese and Korean, and at 特大 in
      Chinese once it wrapped). [ASSUMED] the cap */
