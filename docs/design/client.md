@@ -421,6 +421,15 @@ non-zero, `<html data-fit>` with `--fit-l/r/t/b` makes `.app-root` and the full-
 the inset box and computes the layout rem from it (css/devices.css §5); dialogs and toasts keep the whole screen. The
 board is sized from its host, and `fieldHost.js hudBands` measures the HUD from the host's top. All zero leaves no
 attribute: the page is exactly the unmoved one.
+The same preference holds 界面大小 (`ui`, 0.3.2, §35.43; reworked from PR #838): a percentage 75–100 in 5 % steps, 100
+by default, set by hand only (no automatic factor, nothing reads visualViewport). Under 100 % `<html>` gets
+`--sp-ui` (the fraction); theme.css and devices.css multiply both layout roots by it, so every rem and the HUD bands the
+prep cameras keep clear follow. Every `max(<rem>, <N>px)` floor in public/css carries it: a size floor (width, height,
+min-*, flex, grid tracks, custom properties) as `max(<rem>, min(N, 32)px, calc(Npx * var(--sp-ui, 1)))`, so a touch
+target ≥ 32 px stays ≥ 32 px and a smaller one never shrinks; the others as `calc(Npx * var(--sp-ui, 1))`. The
+readability floors are the exemptions: font-size, line-height and letter-spacing floors stay px, and 中 / 大 / 特大 keep
+their 64 / 76 / 88 px `--t` floors; 小's `--t` (1rem, no floor) follows the layout.
+`test/ui/ui-size.test.js` guards every floor. At 100 % no property is set: the page is the design itself.
 Overrides are local listening preferences, absent from room loadouts and their exports.
 
 干员调配's 卡片视图 (`screens/loadout.js` DeckView / DeckCard / TierMark / DeckBar, optional; PR #811, §35.18) persists

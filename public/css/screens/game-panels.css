@@ -312,7 +312,7 @@ button.bpop__harmony { cursor: pointer; }
 button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .bpop__harmony b { flex: none; color: var(--gold-2); font-weight: 700; white-space: nowrap; }
 .bpop__harmony span { min-width: 0; }
-.bpop__harmony .bglyph { width: max(.24rem, 14px); height: max(.24rem, 14px); }
+.bpop__harmony .bglyph { width: max(.24rem, 14px, calc(14px * var(--sp-ui, 1))); height: max(.24rem, 14px, calc(14px * var(--sp-ui, 1))); }
 .bpop__harmony .bglyph img { filter: brightness(0) invert(.78) sepia(1) saturate(3) hue-rotate(5deg); }
 
 /* ---- enemy / info drawer ---- */

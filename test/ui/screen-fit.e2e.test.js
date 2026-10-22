@@ -85,19 +85,72 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
     const { page, problems } = await open('phase=PREP&variant=settings', { width: 1280, height: 720 }, { l: 0, r: 0, t: 0, b: 0 });
     await page.waitForSelector('[data-testid="screen-fit"]', { timeout: 10000 });
     const vals = () => page.$$eval('.set-fit__row .set-row__val', (els) => els.map((e) => e.textContent));
-    assert.deepEqual(await vals(), ['50', '50', '50', '50']);
+    assert.deepEqual(await vals(), ['50', '50', '50', '50', '100%'], 'the four edges, then 界面大小');
     assert.equal(await page.$eval('.set-fit__reset', (b) => b.disabled), true);
     // 顶部 +1 step = 2 px in
     await page.evaluate(() => document.querySelectorAll('.set-fit__row')[2].querySelectorAll('.set-fit__step')[1].click());
     await sleep(200);
     let b = await boxes(page);
     assert.deepEqual([b.fit, b.app?.[1]], [true, 2]);
-    assert.deepEqual(await vals(), ['50', '50', '51', '50']);
+    assert.deepEqual(await vals(), ['50', '50', '51', '50', '100%']);
     await page.click('.set-fit__reset');
     await sleep(200);
     b = await boxes(page);
     assert.deepEqual([b.fit, b.app], [false, [0, 0, 1280, 720]]);
-    assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('sp.pref.screenFit'))), { l: 0, r: 0, t: 0, b: 0 });
+    assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('sp.pref.screenFit'))), { l: 0, r: 0, t: 0, b: 0, ui: 100 });
+    assert.deepEqual(problems, []);
+    await page.close();
+  });
+
+  /** The layout root, the text root --t in px, the ready button's height and --sp-ui on <html>. */
+  const sizes = (page) => page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.fontSize = 'var(--t)';
+    document.body.append(probe);
+    const t = parseFloat(getComputedStyle(probe).fontSize);
+    probe.remove();
+    const ready = document.querySelector('.readybtn')?.getBoundingClientRect();
+    return { rem: parseFloat(getComputedStyle(document.documentElement).fontSize), t, ready: ready ? Math.round(ready.height) : null,
+      k: document.documentElement.style.getPropertyValue('--sp-ui') };
+  });
+
+  test('界面大小: a stored 75 % shrinks the layout root and 小\'s text with it, keeps 中\'s 64 px text floor and the 32 px touch floor; the board fills its host', async () => {
+    const phone = await open('phase=PREP', { width: 844, height: 390, hasTouch: true, isMobile: true }, { l: 0, r: 0, t: 0, b: 0, ui: 75 });
+    await phone.page.waitForSelector('.gm__field canvas', { timeout: 60000 });
+    await sleep(500);
+    const p = await sizes(phone.page);
+    assert.equal(p.k, '0.75');
+    assert.equal(p.rem, 30, 'the 40 px clamp × 0.75');
+    assert.equal(p.t, 30, '小\'s text root follows the layout');
+    assert.ok(p.ready >= 32, `the ready button keeps a 32 px touch target (${p.ready})`);
+    await phone.page.evaluate(async () => (await import('/js/ui/settings.js')).updateSettings({ textSize: 'md' }));
+    await sleep(200);
+    assert.equal((await sizes(phone.page)).t, 64, '中 keeps its 64 px floor');
+    const b = await boxes(phone.page);
+    assert.deepEqual(b.field, b.app, 'the board\'s host fills the screen box');
+    assert.deepEqual(b.canvas, b.app);
+    assert.deepEqual(phone.problems, []);
+    await phone.page.close();
+  });
+
+  test('界面大小: − steps 5 % live (--sp-ui on <html>), 重置 returns the design size with no property', async () => {
+    const { page, problems } = await open('phase=PREP&variant=settings', { width: 1280, height: 720 }, { l: 0, r: 0, t: 0, b: 0 });
+    await page.waitForSelector('[data-testid="ui-size"]', { timeout: 10000 });
+    const before = await sizes(page);
+    assert.equal(before.k, '');
+    assert.ok(Math.abs(before.rem - 1280 / 19.2) < 0.01);
+    assert.equal(await page.$eval('[data-testid="ui-size"] .set-fit__step:last-of-type', (b) => b.disabled), true, '+ stops at 100 %');
+    await page.evaluate(() => document.querySelector('[data-testid="ui-size"] .set-fit__step').click());
+    await sleep(200);
+    const less = await sizes(page);
+    assert.equal(less.k, '0.95');
+    assert.ok(Math.abs(less.rem - (1280 / 19.2) * 0.95) < 0.01, `the root follows (${less.rem})`);
+    assert.equal(await page.$eval('[data-testid="ui-size-pct"]', (e) => e.textContent), '95%');
+    await page.click('.set-fit__reset');
+    await sleep(200);
+    const back = await sizes(page);
+    assert.equal(back.k, '');
+    assert.ok(Math.abs(back.rem - 1280 / 19.2) < 0.01);
     assert.deepEqual(problems, []);
     await page.close();
   });

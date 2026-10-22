@@ -482,7 +482,7 @@
 .proto-back {
   display: inline-flex;
   align-items: center;
-  height: max(.62rem, 36px);
+  height: max(.62rem, 32px, calc(36px * var(--sp-ui, 1)));
   padding: 0;
   font: inherit;
   color: #f2f4f3;
@@ -490,16 +490,16 @@
   border: 1px solid rgba(255, 255, 255, .1);
   box-shadow: 0 .04rem .14rem rgba(0, 0, 0, .5);
 }
-.proto-back > .icon { width: max(.4rem, 22px); height: max(.4rem, 22px); margin: 0 .3rem 0 .14rem; }
+.proto-back > .icon { width: max(.4rem, 22px, calc(22px * var(--sp-ui, 1))); height: max(.4rem, 22px, calc(22px * var(--sp-ui, 1))); margin: 0 .3rem 0 .14rem; }
 .proto-back__home {
   display: grid;
   place-items: center;
   align-self: stretch;
-  width: max(2rem, 96px);
+  width: max(2rem, 32px, calc(96px * var(--sp-ui, 1)));
   border-left: 2px solid #0d0e0e;
   background: radial-gradient(circle, rgba(255, 255, 255, .22) 1px, transparent 1.6px) 0 0 / .14rem .14rem, linear-gradient(90deg, #2f3132, #3d3f40 50%, #2f3132);
 }
-.proto-back__home .icon { width: max(.32rem, 18px); height: max(.32rem, 18px); }
+.proto-back__home .icon { width: max(.32rem, 18px, calc(18px * var(--sp-ui, 1))); height: max(.32rem, 18px, calc(18px * var(--sp-ui, 1))); }
 .proto-back:hover, .proto-back:focus-visible { border-color: rgba(255, 255, 255, .35); }
 .proto-title { display: flex; flex-direction: column; align-items: flex-end; gap: .02rem; min-width: 0; padding-top: .06rem; text-align: right; }
 .proto-title .modal__title { margin: 0; font-size: calc(.36 * var(--t)); font-weight: 900; letter-spacing: .06em; color: #eef0ef; }
@@ -511,7 +511,7 @@
    800×600 — the px floors of the glyph and the 文字大小 made 5.6rem too narrow for English 「Standard Simulation」 /
    「Ultimate Simulation」 on one line, and the unselected cards' names ended in an ellipsis), never past 46vw. [ASSUMED] the
    floor */
-.proto-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) min(max(5.6rem, 300px), 46vw); gap: .3rem; padding: 0 .34rem .26rem .22rem; }
+.proto-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) min(max(5.6rem, 32px, calc(300px * var(--sp-ui, 1))), 46vw); gap: .3rem; padding: 0 .34rem .26rem .22rem; }
 .proto-stage { position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; }
 
 /* the official picture of the selected difficulty, with its brief at the bottom left */
@@ -632,9 +632,9 @@
 }
 .pcard.is-on .pcard__glow { opacity: 1; }
 .pcard__head, .pcard__desc, .pcard__effects, .pcard__meta { position: relative; }
-.pcard.is-on .pcard__head, .pcard.is-on .pcard__desc, .pcard.is-on .pcard__effects, .pcard.is-on .pcard__meta { padding-right: max(1.3rem, 70px); }
+.pcard.is-on .pcard__head, .pcard.is-on .pcard__desc, .pcard.is-on .pcard__effects, .pcard.is-on .pcard__meta { padding-right: max(1.3rem, calc(70px * var(--sp-ui, 1))); }
 .pcard__head { display: flex; align-items: center; gap: .08rem; }
-.pcard__glyph { width: max(.3rem, 18px); height: max(.3rem, 18px); color: var(--d-color); }
+.pcard__glyph { width: max(.3rem, 18px, calc(18px * var(--sp-ui, 1))); height: max(.3rem, 18px, calc(18px * var(--sp-ui, 1))); color: var(--d-color); }
 .pcard__name { font-size: min(calc(.28 * var(--t)), .36rem); font-weight: 900; letter-spacing: .04em; color: var(--d-color); text-shadow: 0 0 .1rem rgba(0, 0, 0, .6); white-space: nowrap; }
 .pcard__desc { padding-bottom: .05rem; font-size: calc(.16 * var(--t)); color: #9a9f9d; border-bottom: 1px solid rgba(255, 255, 255, .18); }
 .pcard__effects { display: flex; flex-direction: column; padding-top: .04rem; font-size: calc(.17 * var(--t)); line-height: 1.4; }
@@ -652,15 +652,15 @@
   align-items: center;
   justify-content: center;
   gap: .04rem;
-  width: max(1.3rem, 70px);
-  height: max(1.1rem, 60px);
+  width: max(1.3rem, 32px, calc(70px * var(--sp-ui, 1)));
+  height: max(1.1rem, 32px, calc(60px * var(--sp-ui, 1)));
   transform: translateY(-50%) rotate(-6deg);
 }
 .pcard.is-on .pcard__stamp { display: flex; animation: proto-stamp 260ms var(--ease-out) backwards; }
 @keyframes proto-stamp { from { opacity: 0; transform: translateY(-50%) rotate(-6deg) scale(1.4); } }
 .pcard__ring { position: absolute; inset: -.1rem -.14rem; width: calc(100% + .28rem); height: calc(100% + .2rem); }
 .pcard__ring path { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; opacity: .9; }
-.pcard__tick { display: grid; place-items: center; width: max(.46rem, 26px); height: max(.46rem, 26px); color: #2a1712; background: #f5f5f5; border-radius: .06rem; box-shadow: 0 .02rem .08rem rgba(0, 0, 0, .5); }
+.pcard__tick { display: grid; place-items: center; width: max(.46rem, 26px, calc(26px * var(--sp-ui, 1))); height: max(.46rem, 26px, calc(26px * var(--sp-ui, 1))); color: #2a1712; background: #f5f5f5; border-radius: .06rem; box-shadow: 0 .02rem .08rem rgba(0, 0, 0, .5); }
 .pcard__tick .icon { width: 78%; height: 78%; color: var(--d-color); filter: brightness(.7); }
 .pcard__ok { font-size: calc(.18 * var(--t)); font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); white-space: nowrap; }
 
@@ -679,14 +679,14 @@
 }
 .proto-hint { display: flex; align-items: center; gap: .08rem; min-height: .24rem; margin: 0; font-size: calc(.14 * var(--t)); color: #858b89; }
 .proto-hint .icon { flex: none; width: 1.1em; height: 1.1em; }
-.proto-hint--ro { min-height: max(.64rem, 38px); font-size: calc(.18 * var(--t)); color: #b9bfbd; }
+.proto-hint--ro { min-height: max(.64rem, 32px, calc(38px * var(--sp-ui, 1))); font-size: calc(.18 * var(--t)); color: #b9bfbd; }
 .proto-start {
   position: relative;
   display: flex;
   align-items: center;
   gap: .26rem;
   width: 100%;
-  min-height: max(1.04rem, 54px);
+  min-height: max(1.04rem, 32px, calc(54px * var(--sp-ui, 1)));
   padding: .03rem 0 .03rem .26rem;
   overflow: hidden;
   font: inherit;
@@ -703,7 +703,7 @@
 .proto-start__mark { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; }
 .proto-start__rook { display: inline-flex; align-items: center; gap: 2px; font-size: calc(.36 * var(--t)); font-weight: 300; line-height: 1; }
 .proto-start__rook i { font-style: normal; }
-.proto-start__rook .icon { width: max(.34rem, 19px); height: max(.34rem, 19px); }
+.proto-start__rook .icon { width: max(.34rem, 19px, calc(19px * var(--sp-ui, 1))); height: max(.34rem, 19px, calc(19px * var(--sp-ui, 1))); }
 .proto-start__mark small { font-family: var(--font-display); font-size: calc(.08 * var(--t)); font-weight: 800; letter-spacing: .06em; line-height: 1.1; text-align: center; }
 .proto-start__label { position: relative; display: inline-flex; align-items: center; gap: .1rem; min-width: 0; font-size: calc(.4 * var(--t)); font-weight: 900; letter-spacing: .08em; white-space: nowrap; }
 /* 选择模拟协议's own button (.proto-foot; the room's GoButton shares the rules above and makes its own choice in
@@ -759,7 +759,7 @@
   display: inline-flex;
   align-items: center;
   gap: .14rem;
-  height: max(.64rem, 38px);
+  height: max(.64rem, 32px, calc(38px * var(--sp-ui, 1)));
   padding: 0 .3rem 0 .1rem;
   font: inherit;
   font-size: calc(.22 * var(--t));
@@ -770,7 +770,7 @@
   box-shadow: 0 .04rem .14rem rgba(0, 0, 0, .5);
 }
 .ally-guide:hover, .ally-guide:focus-visible { filter: brightness(1.06); }
-.ally-guide__icon { display: grid; place-items: center; width: max(.46rem, 28px); height: max(.4rem, 24px); color: #e9edeb; background: #2a2f2d; }
+.ally-guide__icon { display: grid; place-items: center; width: max(.46rem, 28px, calc(28px * var(--sp-ui, 1))); height: max(.4rem, 24px, calc(24px * var(--sp-ui, 1))); color: #e9edeb; background: #2a2f2d; }
 .ally-guide__icon .icon { width: 64%; height: 64%; }
 /* centred safely: the auto margins give way when the column is taller than its space (justify-content: center would
    push it past both ends), so a short screen's scroll (below) starts at 创建同盟 */
@@ -818,7 +818,7 @@ button.ally-card:hover, button.ally-card:focus-visible { border-color: rgba(93, 
   display: flex;
   align-items: center;
   gap: .14rem;
-  height: max(.74rem, 42px);
+  height: max(.74rem, 32px, calc(42px * var(--sp-ui, 1)));
   padding: 0 .2rem;
   font-family: inherit;
   font-size: calc(.3 * var(--t));
@@ -838,7 +838,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .ally-card__bar--join { width: 100%; color: #2a1404; background: linear-gradient(180deg, #ffb24f, #f08a26); }
 .ally-card__bar--join:disabled { filter: grayscale(.6) brightness(.75); cursor: default; }
 .ally-card__bar--join:hover:not(:disabled), .ally-card__bar--join:focus-visible { filter: brightness(1.06); }
-.ally-card__icon { flex: none; display: grid; place-items: center; width: max(.36rem, 22px); height: max(.36rem, 22px); color: currentColor; background: rgba(0, 0, 0, .14); border: 2px solid currentColor; border-radius: 4px; }
+.ally-card__icon { flex: none; display: grid; place-items: center; width: max(.36rem, 22px, calc(22px * var(--sp-ui, 1))); height: max(.36rem, 22px, calc(22px * var(--sp-ui, 1))); color: currentColor; background: rgba(0, 0, 0, .14); border: 2px solid currentColor; border-radius: 4px; }
 .ally-card__icon .icon { width: 74%; height: 74%; }
 /* the key field: the project's TextField (.field / .field__box / .field__input) restyled as the event's grey bar, with
    观战 beside it inside the same bar */
@@ -846,7 +846,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   display: flex;
   align-items: center;
   gap: .1rem;
-  height: max(.56rem, 34px);
+  height: max(.56rem, 32px, calc(34px * var(--sp-ui, 1)));
   margin: .06rem .2rem .08rem;
   padding: 0 .06rem 0 .12rem;
   background: #262929;
@@ -857,7 +857,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .ally-key .field { flex: 1 1 auto; height: 100%; gap: 0; }
 .ally-key .field__box { height: 100%; padding: 0; gap: .1rem; background: none; border: 0; box-shadow: none; }
 .ally-key .field__box::after { display: none; }
-.ally-key .field__icon { flex: none; width: max(.24rem, 15px); height: max(.24rem, 15px); color: #c9cecc; }
+.ally-key .field__icon { flex: none; width: max(.24rem, 15px, calc(15px * var(--sp-ui, 1))); height: max(.24rem, 15px, calc(15px * var(--sp-ui, 1))); color: #c9cecc; }
 .ally-key .field__box:focus-within .field__icon { color: #ff9a3c; }
 .ally-key input {
   flex: 1 1 auto;
@@ -921,9 +921,9 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .proto__body[data-fit="brief"] .pcard__head, .proto__body[data-fit="names"] .pcard__head { min-width: 0; }
   .proto__body[data-fit="brief"] .pcard__glyph, .proto__body[data-fit="names"] .pcard__glyph { flex: none; }
   .proto__body[data-fit="brief"] .pcard__name, .proto__body[data-fit="names"] .pcard__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
-  .proto__body[data-fit="names"] .pcard.is-on .pcard__head { padding-right: max(.9rem, 46px); }
-  .proto__body[data-fit="names"] .pcard.is-on .pcard__stamp { right: .1rem; width: max(.8rem, 40px); height: max(.64rem, 34px); }
-  .proto__body[data-fit="names"] .pcard.is-on .pcard__tick { width: max(.4rem, 22px); height: max(.4rem, 22px); }
+  .proto__body[data-fit="names"] .pcard.is-on .pcard__head { padding-right: max(.9rem, calc(46px * var(--sp-ui, 1))); }
+  .proto__body[data-fit="names"] .pcard.is-on .pcard__stamp { right: .1rem; width: max(.8rem, 32px, calc(40px * var(--sp-ui, 1))); height: max(.64rem, 32px, calc(34px * var(--sp-ui, 1))); }
+  .proto__body[data-fit="names"] .pcard.is-on .pcard__tick { width: max(.4rem, 22px, calc(22px * var(--sp-ui, 1))); height: max(.4rem, 22px, calc(22px * var(--sp-ui, 1))); }
   .proto__body[data-fit="names"] .pcard__ok { display: none; }
   .proto__body[data-fit="names"] .proto-brief__more { display: flex; flex-direction: column; gap: .04rem; margin-top: .06rem; padding-top: .06rem; border-top: 1px solid rgba(255, 255, 255, .18); }
   .proto-brief__effects { display: flex; flex-direction: column; font-size: calc(.16 * var(--t)); line-height: 1.4; color: #e9eceb; }
@@ -963,9 +963,9 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .hub-center__mark .emblem__svg { width: .9rem; height: 1rem; }
   .hub-center__title { font-size: calc(.46 * var(--t)); }
   .hub-right { padding-top: .1rem; }
-  .lobby-hub .hub-plate { height: max(.7rem, 40px); }
+  .lobby-hub .hub-plate { height: max(.7rem, 32px, calc(40px * var(--sp-ui, 1))); }
   .lobby-hub .hub-plate--ach { display: flex; }
-  .hub-entry { height: max(1.1rem, 64px); padding: .1rem .14rem; }
+  .hub-entry { height: max(1.1rem, 32px, calc(64px * var(--sp-ui, 1))); padding: .1rem .14rem; }
 
   .proto-top { padding-top: 8px; }
   /* 选择模拟协议 (§35.18's leftover: at 文字大小 中 and above the four cards ran under 开始独立模拟 — 终极模拟 out of sight,
@@ -1026,7 +1026,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   /* 创建同盟 keeps its difficulty line (§35.18's leftover: it was hidden here): two columns, the icon and the name on the
      first row, the line under the name on the second, wrapping rather than cut short; 11–14 px, [ASSUMED] the cap */
   .ally-card--create .ally-card__bar { display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: center; row-gap: 1px; height: auto;
-    min-height: max(.74rem, 42px); padding-top: 5px; padding-bottom: 5px; }
+    min-height: max(.74rem, 32px, calc(42px * var(--sp-ui, 1))); padding-top: 5px; padding-bottom: 5px; }
   .ally-card--create .ally-card__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
   .ally-card--create .ally-card__bar small { grid-column: 2; margin-left: 0; overflow: visible; white-space: normal; font-size: clamp(11px, calc(.28 * var(--t)), 14px); line-height: 1.3; }
   .ally-key input { font-size: calc(.32 * var(--t)); }

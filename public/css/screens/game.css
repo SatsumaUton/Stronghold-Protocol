@@ -467,7 +467,7 @@
 
 /* ---- bond strip ---------------------------------------------------------------------------------------- */
 .gm__bonds { position: absolute; left: 1.56rem; top: 1.36rem; right: 5.2rem; pointer-events: none;
-  display: flex; align-items: flex-start; gap: max(.1rem, 8px); }
+  display: flex; align-items: flex-start; gap: max(.1rem, calc(8px * var(--sp-ui, 1))); }
 /* Only the bond discs (and the +N chip) take the pointer: the strip's box spans the width under the top bar, where the
    top board row's units stand (row 12 at 16:9 / 21:9 / 720p / phones, the boss field's row 5 in a boss prep) — it used
    to swallow the taps and drags on them (review of user playtest #2 item 8: every own unit reachable). */
@@ -480,7 +480,7 @@
 .gm__bonds .bonds-toggle { pointer-events: auto; flex: none; display: inline-flex; align-items: center; justify-content: center;
   min-width: 44px; min-height: 44px; padding: 0; color: var(--text-hi); background: transparent; border: 0; cursor: pointer;
   opacity: .55; transition: opacity var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out); line-height: 1; }
-.bonds-toggle .icon { width: max(.22rem, 18px); height: max(.22rem, 18px); filter: drop-shadow(0 0 2px rgba(0, 0, 0, .85)); }
+.bonds-toggle .icon { width: max(.22rem, 18px, calc(18px * var(--sp-ui, 1))); height: max(.22rem, 18px, calc(18px * var(--sp-ui, 1))); filter: drop-shadow(0 0 2px rgba(0, 0, 0, .85)); }
 .bonds-toggle[aria-expanded="false"] { opacity: .8; }
 .bonds-toggle:hover, .bonds-toggle:focus-visible { opacity: 1; color: var(--mint-500); }
 .bonds-toggle:focus-visible { outline: 2px solid var(--mint-500); outline-offset: -4px; }
@@ -490,12 +490,12 @@
 /* a watched teammate's bonds (DESIGN §20.15): an amber "👁 name" pill in front of the discs, amber rings. Horizontal at
    every width with a pixel floor (a vertical .12rem name was ~6-8 px per glyph on desktop / tablet, ~5 px on phones
    where 1rem is clamped at 40 px); centred on the discs, clear of the team panel below */
-.bstrip__owner { align-self: center; flex: none; display: inline-flex; flex-direction: row; align-items: center; gap: max(.04rem, 3px);
-  padding: max(.03rem, 2px) max(.06rem, 4px); border: 1px solid rgba(246, 163, 41, .5); background: rgba(40, 26, 6, .7); }
-.bstrip__owner .micro { color: var(--amber); font-size: max(.15rem, 10px); letter-spacing: .04em; max-width: max(1.3rem, 72px);
+.bstrip__owner { align-self: center; flex: none; display: inline-flex; flex-direction: row; align-items: center; gap: max(.04rem, calc(3px * var(--sp-ui, 1)));
+  padding: max(.03rem, calc(2px * var(--sp-ui, 1))) max(.06rem, calc(4px * var(--sp-ui, 1))); border: 1px solid rgba(246, 163, 41, .5); background: rgba(40, 26, 6, .7); }
+.bstrip__owner .micro { color: var(--amber); font-size: max(.15rem, 10px); letter-spacing: .04em; max-width: max(1.3rem, calc(72px * var(--sp-ui, 1)));
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .bstrip__eye { color: var(--amber); font-size: max(.17rem, 11px); flex: none; }
-.bstrip--empty .bstrip__owner .micro { max-width: max(1.6rem, 80px); }
+.bstrip--empty .bstrip__owner .micro { max-width: max(1.6rem, calc(80px * var(--sp-ui, 1))); }
 .bstrip--empty.is-other { border-color: rgba(246, 163, 41, .5); }
 @media (max-width: 767px) {
   .bstrip__owner .micro { font-size: max(.12rem, 9px); }
@@ -602,7 +602,7 @@
 .gm__effects { position: absolute; right: .3rem; top: 2.4rem; }
 /* 准备就绪 refused (the temp row holds pieces): its reason shows under the button and pushes the ready count down —
    the effects column follows, or the count runs into it on phones */
-.gm.has-readywhy .gm__effects { top: calc(2.4rem + max(.3rem, 16px)); }
+.gm.has-readywhy .gm__effects { top: calc(2.4rem + max(.3rem, calc(16px * var(--sp-ui, 1)))); }
 .effects { display: flex; flex-direction: column; align-items: flex-end; gap: .08rem; }
 .effect {
   position: relative; width: .5rem; height: .5rem; display: grid; place-items: center;
@@ -632,32 +632,32 @@
 /* Local combat meter, docked above the corner's actual height (including mobile wrapped rows). */
 .combat-metrics {
   --bk-c: var(--mint-500);
-  position: absolute; left: 0; bottom: calc(100% + max(.1rem, 8px)); z-index: 12;
-  width: min(max(5.2rem, 340px), calc(100vw - var(--sa-l, 0px) - var(--sa-r, 0px) - .48rem));
-  max-height: min(max(6.6rem, 280px), calc(100vh - var(--combat-corner-height, 110px) - max(.9rem, 48px) - .34rem - var(--sa-t, 0px) - var(--sa-b, 0px)));
-  max-height: min(max(6.6rem, 280px), calc(100dvh - var(--combat-corner-height, 110px) - max(.9rem, 48px) - .34rem - var(--sa-t, 0px) - var(--sa-b, 0px)));
+  position: absolute; left: 0; bottom: calc(100% + max(.1rem, calc(8px * var(--sp-ui, 1)))); z-index: 12;
+  width: min(max(5.2rem, 32px, calc(340px * var(--sp-ui, 1))), calc(100vw - var(--sa-l, 0px) - var(--sa-r, 0px) - .48rem));
+  max-height: min(max(6.6rem, calc(280px * var(--sp-ui, 1))), calc(100vh - var(--combat-corner-height, 110px) - max(.9rem, calc(48px * var(--sp-ui, 1))) - .34rem - var(--sa-t, 0px) - var(--sa-b, 0px)));
+  max-height: min(max(6.6rem, calc(280px * var(--sp-ui, 1))), calc(100dvh - var(--combat-corner-height, 110px) - max(.9rem, calc(48px * var(--sp-ui, 1))) - .34rem - var(--sa-t, 0px) - var(--sa-b, 0px)));
   display: flex; flex-direction: column; overflow: hidden;
   background: linear-gradient(180deg, rgba(28, 35, 32, .98), rgba(17, 21, 19, .98));
   border: 1px solid var(--line-2); border-top: 2px solid var(--mint-700);
   box-shadow: 0 .12rem .4rem rgba(0, 0, 0, .6); color: var(--text-md);
   font-size: max(calc(.14 * var(--t)), 12px); line-height: 1.35; text-align: left;
 }
-.combat-metrics__head { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 8px; padding: max(.1rem, 8px) max(.14rem, 10px) 0; }
+.combat-metrics__head { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 8px; padding: max(.1rem, calc(8px * var(--sp-ui, 1))) max(.14rem, calc(10px * var(--sp-ui, 1))) 0; }
 .combat-metrics__micro { font-family: var(--font-display); font-size: max(calc(.1 * var(--t)), 10px); letter-spacing: .12em; color: var(--mint-500); }
 .combat-metrics__head h2 { margin: 0; font-size: max(calc(.2 * var(--t)), 16px); color: var(--text-hi); }
 .combat-metrics__body { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; overflow: hidden; }
-.combat-metrics__close { display: grid; place-items: center; flex: none; width: max(.36rem, 32px); height: max(.36rem, 32px); color: var(--text-md); border: 1px solid var(--line-2); background: var(--bg-1); }
-.combat-metrics__close .icon { width: max(.18rem, 16px); height: max(.18rem, 16px); }
-.combat-metrics__tools { display: flex; flex: none; gap: 8px; padding: 8px max(.14rem, 10px); }
+.combat-metrics__close { display: grid; place-items: center; flex: none; width: max(.36rem, 32px, calc(32px * var(--sp-ui, 1))); height: max(.36rem, 32px, calc(32px * var(--sp-ui, 1))); color: var(--text-md); border: 1px solid var(--line-2); background: var(--bg-1); }
+.combat-metrics__close .icon { width: max(.18rem, 16px, calc(16px * var(--sp-ui, 1))); height: max(.18rem, 16px, calc(16px * var(--sp-ui, 1))); }
+.combat-metrics__tools { display: flex; flex: none; gap: 8px; padding: 8px max(.14rem, calc(10px * var(--sp-ui, 1))); }
 .combat-metrics__head > .combat-metrics__tools { flex-basis: 100%; padding-left: 0; padding-right: 0; }
 .combat-metrics__scopes { display: flex; flex: 1; min-width: 0; }
 .combat-metrics__scopes button { flex: 1; min-width: 0; padding: 4px 6px; min-height: 32px; color: var(--text-lo); background: var(--bg-1); border: 1px solid var(--line-2); white-space: nowrap; font-size: inherit; }
 .combat-metrics__scopes button[aria-pressed="true"] { background: var(--mint-900); color: var(--mint-400); border-color: var(--mint-700); }
-.combat-metrics__totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: none; gap: 8px; padding: 0 max(.14rem, 10px) 8px; }
+.combat-metrics__totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: none; gap: 8px; padding: 0 max(.14rem, calc(10px * var(--sp-ui, 1))) 8px; }
 .combat-metrics__totals span { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px; color: var(--text-lo); }
 .combat-metrics__totals b { font-family: var(--font-num); color: var(--text-hi); font-size: max(calc(.18 * var(--t)), 14px); overflow-wrap: anywhere; }
 .combat-metrics__totals span:last-child b { color: var(--mint-400); }
-.combat-metrics__legend { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 0 max(.14rem, 10px) 8px; font-size: max(calc(.12 * var(--t)), 11px); }
+.combat-metrics__legend { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 0 max(.14rem, calc(10px * var(--sp-ui, 1))) 8px; font-size: max(calc(.12 * var(--t)), 11px); }
 .combat-metrics__type { display: inline-flex; align-items: center; gap: 4px; }
 .combat-metrics__type::before { content: ''; width: 10px; height: 4px; background: var(--damage-color); }
 .combat-metrics__type--phys, .combat-metrics__segment--phys { --damage-color: #f6a329; }
@@ -665,14 +665,14 @@
 .combat-metrics__type--true, .combat-metrics__segment--true { --damage-color: #ff7272; }
 .combat-metrics__type--elemental, .combat-metrics__segment--elemental { --damage-color: #cf9fff; }
 .combat-metrics__sort { margin-left: auto; color: var(--text-lo); }
-.combat-metrics__list { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0 max(.14rem, 10px); list-style: none; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
-.combat-metrics__row { display: grid; grid-template-columns: max(.2rem, 18px) max(.42rem, 30px) minmax(0, 1fr); gap: max(.08rem, 6px); align-items: center; padding: max(.09rem, 7px) 0; border-top: 1px solid var(--line); }
+.combat-metrics__list { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0 max(.14rem, calc(10px * var(--sp-ui, 1))); list-style: none; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.combat-metrics__row { display: grid; grid-template-columns: max(.2rem, 18px, calc(18px * var(--sp-ui, 1))) max(.42rem, 30px, calc(30px * var(--sp-ui, 1))) minmax(0, 1fr); gap: max(.08rem, calc(6px * var(--sp-ui, 1))); align-items: center; padding: max(.09rem, calc(7px * var(--sp-ui, 1))) 0; border-top: 1px solid var(--line); }
 .combat-metrics__rank { align-self: start; color: var(--text-lo); font-family: var(--font-num); padding-top: 2px; }
-.combat-metrics__row > .uthumb { width: max(.42rem, 30px); height: max(.42rem, 30px); }
+.combat-metrics__row > .uthumb { width: max(.42rem, 30px, calc(30px * var(--sp-ui, 1))); height: max(.42rem, 30px, calc(30px * var(--sp-ui, 1))); }
 .combat-metrics__unit { min-width: 0; }
 .combat-metrics__name { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
 .combat-metrics__name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-hi); }
-.combat-metrics__bar { display: flex; width: 100%; height: max(.05rem, 5px); margin: 5px 0; background: var(--bg-4); overflow: hidden; }
+.combat-metrics__bar { display: flex; width: 100%; height: max(.05rem, 5px, calc(5px * var(--sp-ui, 1))); margin: 5px 0; background: var(--bg-4); overflow: hidden; }
 .combat-metrics__segment { flex: none; height: 100%; background: var(--damage-color); }
 .combat-metrics__values { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 .combat-metrics__values span { min-width: 0; display: flex; flex-direction: column; }
@@ -681,7 +681,7 @@
 .combat-metrics__values .combat-metrics__heal b { color: var(--mint-400); }
 .combat-metrics__empty { padding: 20px 8px; color: var(--text-md); text-align: center; }
 .combat-metrics__empty small { display: inline-block; margin-top: 6px; color: var(--text-lo); }
-.combat-metrics__note { flex: none; margin: 0; padding: 8px max(.14rem, 10px); border-top: 1px solid var(--line); color: var(--text-lo); font-size: max(calc(.1 * var(--t)), 10px); }
+.combat-metrics__note { flex: none; margin: 0; padding: 8px max(.14rem, calc(10px * var(--sp-ui, 1))); border-top: 1px solid var(--line); color: var(--text-lo); font-size: max(calc(.1 * var(--t)), 10px); }
 .combat-metrics button:hover { color: var(--mint-400); border-color: var(--mint-700); }
 .combat-metrics button:focus-visible { outline: 2px solid var(--mint-400); outline-offset: -2px; }
 @media (pointer: coarse), (any-pointer: coarse) {
@@ -704,30 +704,30 @@
    36 px touch rows, 300 px wide (文字大小 still lifts every size through --t). Desktop/tablet keep the original sizes. */
 @media (max-height: 600px) and (pointer: coarse), (max-height: 600px) and (any-pointer: coarse) {
   .combat-metrics {
-    width: min(max(5rem, 300px), calc(100vw - var(--sa-l, 0px) - var(--sa-r, 0px) - .48rem));
+    width: min(max(5rem, 32px, calc(300px * var(--sp-ui, 1))), calc(100vw - var(--sa-l, 0px) - var(--sa-r, 0px) - .48rem));
     font-size: max(calc(.2 * var(--t)), 9px);
     line-height: 1.3;
   }
-  .combat-metrics__head { padding: max(.06rem, 6px) max(.12rem, 8px) 0; gap: 0 6px; }
+  .combat-metrics__head { padding: max(.06rem, calc(6px * var(--sp-ui, 1))) max(.12rem, calc(8px * var(--sp-ui, 1))) 0; gap: 0 6px; }
   .combat-metrics__micro { font-size: max(calc(.12 * var(--t)), 8px); }
   .combat-metrics__head h2 { font-size: max(calc(.3 * var(--t)), 12px); }
-  .combat-metrics__close { width: max(.3rem, 36px); height: max(.3rem, 36px); min-width: 36px; min-height: 36px; }
-  .combat-metrics__close .icon { width: max(.16rem, 15px); height: max(.16rem, 15px); }
-  .combat-metrics__tools { padding: max(.06rem, 6px) max(.12rem, 8px); gap: 6px; }
+  .combat-metrics__close { width: max(.3rem, 32px, calc(36px * var(--sp-ui, 1))); height: max(.3rem, 32px, calc(36px * var(--sp-ui, 1))); min-width: 36px; min-height: 36px; }
+  .combat-metrics__close .icon { width: max(.16rem, 15px, calc(15px * var(--sp-ui, 1))); height: max(.16rem, 15px, calc(15px * var(--sp-ui, 1))); }
+  .combat-metrics__tools { padding: max(.06rem, calc(6px * var(--sp-ui, 1))) max(.12rem, calc(8px * var(--sp-ui, 1))); gap: 6px; }
   .combat-metrics__scopes button { min-height: 36px; padding: 2px 5px; }
-  .combat-metrics__totals { gap: 6px; padding: 0 max(.12rem, 8px) max(.06rem, 6px); }
+  .combat-metrics__totals { gap: 6px; padding: 0 max(.12rem, calc(8px * var(--sp-ui, 1))) max(.06rem, calc(6px * var(--sp-ui, 1))); }
   .combat-metrics__totals b { font-size: max(calc(.26 * var(--t)), 11px); }
-  .combat-metrics__legend { gap: 4px 10px; padding: 0 max(.12rem, 8px) max(.06rem, 6px); font-size: max(calc(.16 * var(--t)), 8px); }
+  .combat-metrics__legend { gap: 4px 10px; padding: 0 max(.12rem, calc(8px * var(--sp-ui, 1))) max(.06rem, calc(6px * var(--sp-ui, 1))); font-size: max(calc(.16 * var(--t)), 8px); }
   .combat-metrics__type::before { width: 8px; height: 3px; }
-  .combat-metrics__list { padding: 0 max(.12rem, 8px); }
-  .combat-metrics__row { grid-template-columns: max(.24rem, 14px) max(.5rem, 24px) minmax(0, 1fr); gap: 5px; padding: max(.05rem, 4px) 0; }
-  .combat-metrics__row > .uthumb { width: max(.5rem, 24px); height: max(.5rem, 24px); }
+  .combat-metrics__list { padding: 0 max(.12rem, calc(8px * var(--sp-ui, 1))); }
+  .combat-metrics__row { grid-template-columns: max(.24rem, 14px, calc(14px * var(--sp-ui, 1))) max(.5rem, 24px, calc(24px * var(--sp-ui, 1))) minmax(0, 1fr); gap: 5px; padding: max(.05rem, calc(4px * var(--sp-ui, 1))) 0; }
+  .combat-metrics__row > .uthumb { width: max(.5rem, 24px, calc(24px * var(--sp-ui, 1))); height: max(.5rem, 24px, calc(24px * var(--sp-ui, 1))); }
   .combat-metrics__rank { padding-top: 1px; }
-  .combat-metrics__bar { height: max(.04rem, 4px); margin: 3px 0; }
+  .combat-metrics__bar { height: max(.04rem, 4px, calc(4px * var(--sp-ui, 1))); margin: 3px 0; }
   .combat-metrics__values { gap: 4px; }
   .combat-metrics__values small { font-size: max(calc(.14 * var(--t)), 8px); }
   .combat-metrics__values b { font-size: max(calc(.18 * var(--t)), 9px); }
-  .combat-metrics__note { padding: max(.06rem, 6px) max(.12rem, 8px); font-size: max(calc(.14 * var(--t)), 8px); }
+  .combat-metrics__note { padding: max(.06rem, calc(6px * var(--sp-ui, 1))) max(.12rem, calc(8px * var(--sp-ui, 1))); font-size: max(calc(.14 * var(--t)), 8px); }
 }
 
 .ewheel { position: relative; }
@@ -945,8 +945,8 @@
 .set-diag__url { min-width: 0; font-size: calc(.13 * var(--t)); color: var(--text-dim); overflow-wrap: anywhere; -webkit-user-select: all; user-select: all; }
 .set-diag__battle-hint { margin-top: -.06rem; }
 .set-diag__text {
-  box-sizing: border-box; width: 100%; height: max(2rem, 140px); min-height: 120px; resize: vertical;
-  padding: max(.1rem, 8px) max(.12rem, 10px);
+  box-sizing: border-box; width: 100%; height: max(2rem, 32px, calc(140px * var(--sp-ui, 1))); min-height: 120px; resize: vertical;
+  padding: max(.1rem, calc(8px * var(--sp-ui, 1))) max(.12rem, calc(10px * var(--sp-ui, 1)));
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: max(.13rem, 11px); line-height: 1.5;
   color: var(--text-hi); background: rgba(4, 10, 8, .55); border: 1px solid var(--line-2); border-radius: 2px; outline: none;
   white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto;
@@ -956,8 +956,8 @@
 .sp-coarse .set-diag__text { font-size: 16px; }
 @media (max-width: 767px) { .set-keys__list { grid-template-columns: minmax(0, 1fr); } }
 @media (max-height: 600px) and (pointer: coarse), (max-height: 600px) and (any-pointer: coarse) {
-  .set-key { height: max(.38rem, 30px); }
-  .set-keys__more > summary { padding: max(.06rem, 8px) 0; }
+  .set-key { height: max(.38rem, 30px, calc(30px * var(--sp-ui, 1))); }
+  .set-keys__more > summary { padding: max(.06rem, calc(8px * var(--sp-ui, 1))) 0; }
 }
 
 /* ---- exit / away ------------------------------------------------------------------------------------------------------ */

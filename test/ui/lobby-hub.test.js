@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { unscaled } from '../helpers/uiSize.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 globalThis.fetch = async (url) => {
@@ -199,8 +200,8 @@ test('选择同盟方式: a recent key fills the field (it never joins by itself
 });
 
 const lobbySrc = readFileSync(path.join(ROOT, 'public/js/screens/lobby.js'), 'utf8');
-const lobbyCss = readFileSync(path.join(ROOT, 'public/css/screens/lobby.css'), 'utf8');
-const roomCss = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
+const lobbyCss = unscaled(readFileSync(path.join(ROOT, 'public/css/screens/lobby.css'), 'utf8'));
+const roomCss = unscaled(readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8'));
 
 test('the key: a pasted invite link of any length, a 5th character or a dash are normalised to the 4-letter key', () => {
   const link = 'https://crops-flexible-wedding-trademarks.trycloudflare.com/?room=QWER';

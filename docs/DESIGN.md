@@ -29,6 +29,10 @@ Q / X prefer the selected operator, otherwise the hovered operator (PR #859, the
 [§35.31](history/0.3.2.md#3531-q--x-prefer-the-selected-operator-otherwise-use-hover-pr-859).
 Current interaction contract: [design/client.md](design/client.md).
 
+设置 → 异形屏适配 →「界面大小」 (75–100 %, manual, default 100 %) scales the layout root and every px floor while the
+text and touch floors stay: [§35.43](history/0.3.2.md#3543-界面大小-in-异形屏适配-837-pr-838-reworked-zasx77771); contract:
+[design/client.md](design/client.md).
+
 The damage settlement follows PRTS 伤判效果 / 伤害分类 since 0.3.2 (@Siornya's series): fixed before percentage
 penetration in [§35.30](history/0.3.2.md#3530-settlement-penetration-order-pr-798-siornya), the ordered pipeline and the
 consumers that depend on it in [§35.32](history/0.3.2.md#3532-ordered-settlement-pipeline-and-dependent-consumers-pr-802-siornya)–§35.34,

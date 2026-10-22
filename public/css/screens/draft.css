@@ -152,7 +152,7 @@
   border: 1px dashed rgba(255, 255, 255, .32); white-space: nowrap; pointer-events: none; }
 .draft-detail__off { display: flex; align-items: flex-start; gap: .06rem; margin: .04rem 0 .06rem; padding: .06rem .1rem;
   font-size: max(calc(.15 * var(--t)), 9px); line-height: 1.5; color: var(--text-lo); background: rgba(0, 0, 0, .25); border-left: 2px solid rgba(255, 255, 255, .28); }
-.draft-detail__off .icon { width: max(.16rem, 10px); height: max(.16rem, 10px); flex: none; margin-top: .02rem; }
+.draft-detail__off .icon { width: max(.16rem, 10px, calc(10px * var(--sp-ui, 1))); height: max(.16rem, 10px, calc(10px * var(--sp-ui, 1))); flex: none; margin-top: .02rem; }
 .draft-detail__offname { color: var(--text-dim); text-decoration: line-through; text-decoration-color: rgba(255, 84, 84, .6); }
 
 /* ---- the detail pane (slides in from the right on a tap) ---- */
@@ -248,45 +248,45 @@
    stays at ≥ 9–15 px and the dialog's body scrolls inside the screen (756×366, 844×390) while the header and the
    footer (the turn's countdown, 关闭) stay in view. */
 .modal__box.minfo-dlg {
-  width: min(max(17rem, 900px), calc(100vw - .6rem - var(--sa-l, 0px) - var(--sa-r, 0px)));
+  width: min(max(17rem, 32px, calc(900px * var(--sp-ui, 1))), calc(100vw - .6rem - var(--sa-l, 0px) - var(--sa-r, 0px)));
   max-height: calc(100vh - .6rem);
   max-height: calc(100svh - .6rem);
 }
 .minfo-dlg .modal__head { padding: .16rem .3rem .02rem; }
 .minfo-dlg .modal__head .micro { font-size: max(.11rem, 8px); }
 .minfo-dlg .modal__title { font-size: max(.26rem, 15px); }
-.minfo-dlg .modal__body { display: flex; flex-direction: column; gap: max(.16rem, 6px); padding: .1rem .3rem .2rem; }
+.minfo-dlg .modal__body { display: flex; flex-direction: column; gap: max(.16rem, calc(6px * var(--sp-ui, 1))); padding: .1rem .3rem .2rem; }
 .minfo-dlg__content { flex: none; min-width: 0; }
-.minfo-dlg__content.has-enemies { display: grid; grid-template-columns: minmax(0, 6.2rem) minmax(0, 1fr); gap: max(.2rem, 10px); }
-.minfo-dlg__enemies, .minfo-dlg__bonds { display: flex; flex-direction: column; gap: max(.16rem, 6px); min-width: 0; }
+.minfo-dlg__content.has-enemies { display: grid; grid-template-columns: minmax(0, 6.2rem) minmax(0, 1fr); gap: max(.2rem, calc(10px * var(--sp-ui, 1))); }
+.minfo-dlg__enemies, .minfo-dlg__bonds { display: flex; flex-direction: column; gap: max(.16rem, calc(6px * var(--sp-ui, 1))); min-width: 0; }
 .minfo-dlg__enemies > *, .minfo-dlg__bonds > * { flex-shrink: 0; }
 /* the shared 本局遭遇敌方 block (ui/matchEnemies.js; its briefing layout is scoped under .brief) stacked into the
    dialog's column: portrait + 敌方领袖 | name, round, abilities, battlefield; the special enemies as rows under them */
-.minfo-dlg .brief-enemies { padding: max(.16rem, 6px) max(.2rem, 8px) max(.2rem, 8px); background: rgba(12, 15, 14, .8); border: 1px solid var(--line); }
-.minfo-dlg .brief-enemy { display: grid; grid-template-columns: max(1.4rem, 70px) minmax(0, 1fr); align-items: start; gap: max(.16rem, 8px); }
-.minfo-dlg .brief-boss { display: flex; flex-direction: column; align-items: center; gap: max(.04rem, 2px); }
+.minfo-dlg .brief-enemies { padding: max(.16rem, calc(6px * var(--sp-ui, 1))) max(.2rem, calc(8px * var(--sp-ui, 1))) max(.2rem, calc(8px * var(--sp-ui, 1))); background: rgba(12, 15, 14, .8); border: 1px solid var(--line); }
+.minfo-dlg .brief-enemy { display: grid; grid-template-columns: max(1.4rem, 32px, calc(70px * var(--sp-ui, 1))) minmax(0, 1fr); align-items: start; gap: max(.16rem, calc(8px * var(--sp-ui, 1))); }
+.minfo-dlg .brief-boss { display: flex; flex-direction: column; align-items: center; gap: max(.04rem, calc(2px * var(--sp-ui, 1))); }
 .minfo-dlg .brief-boss__art {
-  position: relative; width: max(1.4rem, 70px); height: max(1.4rem, 70px); display: grid; place-items: center; overflow: hidden;
+  position: relative; width: max(1.4rem, 32px, calc(70px * var(--sp-ui, 1))); height: max(1.4rem, 32px, calc(70px * var(--sp-ui, 1))); display: grid; place-items: center; overflow: hidden;
   background: radial-gradient(circle at 50% 40%, #6b3420, #2a120b 75%); box-shadow: 0 0 0 2px #4a4e50, 0 0 0 3px #1a1c1d;
 }
 .minfo-dlg .brief-boss__img { width: 100%; height: 100%; object-fit: cover; }
 .minfo-dlg .brief-boss__q { font-size: max(.6rem, 28px); font-weight: 900; color: rgba(255, 140, 70, .6); }
-.minfo-dlg .brief-boss__tag { width: 100%; padding: max(.02rem, 1px) 0; text-align: center; font-size: max(.13rem, 9px); font-weight: 700; letter-spacing: .1em;
+.minfo-dlg .brief-boss__tag { width: 100%; padding: max(.02rem, calc(1px * var(--sp-ui, 1))) 0; text-align: center; font-size: max(.13rem, 9px); font-weight: 700; letter-spacing: .1em;
   color: #ffcf4a; background: linear-gradient(180deg, #5a4210, #3a2a08); box-shadow: inset 0 0 0 1px rgba(255, 207, 74, .25); }
-.minfo-dlg .brief-boss__text { display: flex; flex-direction: column; gap: max(.06rem, 3px); min-width: 0; overflow-wrap: anywhere; }
+.minfo-dlg .brief-boss__text { display: flex; flex-direction: column; gap: max(.06rem, calc(3px * var(--sp-ui, 1))); min-width: 0; overflow-wrap: anywhere; }
 .minfo-dlg .brief-boss__name { margin: 0; font-size: max(calc(.34 * var(--t)), 16px); font-weight: 900; letter-spacing: .04em; line-height: 1.25; }
 .minfo-dlg .brief-boss__when { font-size: max(calc(.15 * var(--t)), 10px); color: var(--orange-hi); }
-.minfo-dlg .brief-boss__abil { margin: 0; padding-left: max(.18rem, 12px); display: flex; flex-direction: column; gap: .04rem; font-size: max(calc(.14 * var(--t)), 10px); line-height: 1.6; color: var(--text-md); }
-.minfo-dlg .brief-stage { display: flex; flex-wrap: wrap; align-items: center; gap: max(.08rem, 4px); color: var(--text-lo); }
-.minfo-dlg .brief-stage .icon { width: max(.2rem, 12px); height: max(.2rem, 12px); color: var(--mint-500); }
+.minfo-dlg .brief-boss__abil { margin: 0; padding-left: max(.18rem, calc(12px * var(--sp-ui, 1))); display: flex; flex-direction: column; gap: .04rem; font-size: max(calc(.14 * var(--t)), 10px); line-height: 1.6; color: var(--text-md); }
+.minfo-dlg .brief-stage { display: flex; flex-wrap: wrap; align-items: center; gap: max(.08rem, calc(4px * var(--sp-ui, 1))); color: var(--text-lo); }
+.minfo-dlg .brief-stage .icon { width: max(.2rem, 12px, calc(12px * var(--sp-ui, 1))); height: max(.2rem, 12px, calc(12px * var(--sp-ui, 1))); color: var(--mint-500); }
 .minfo-dlg .brief-stage__pool { font-size: max(calc(.14 * var(--t)), 10px); }
 .minfo-dlg .brief-stage__name { font-size: max(calc(.19 * var(--t)), 12px); color: var(--text-hi); }
-.minfo-dlg .brief-factions { grid-column: 1 / -1; display: flex; flex-direction: column; gap: max(.08rem, 4px); min-width: 0; }
+.minfo-dlg .brief-factions { grid-column: 1 / -1; display: flex; flex-direction: column; gap: max(.08rem, calc(4px * var(--sp-ui, 1))); min-width: 0; }
 .minfo-dlg .brief-faction__tt { min-width: 0; }
-.minfo-dlg .brief-faction { flex: 1; min-width: 0; display: flex; align-items: center; gap: max(.14rem, 6px); padding: max(.1rem, 5px) max(.14rem, 6px);
+.minfo-dlg .brief-faction { flex: 1; min-width: 0; display: flex; align-items: center; gap: max(.14rem, calc(6px * var(--sp-ui, 1))); padding: max(.1rem, calc(5px * var(--sp-ui, 1))) max(.14rem, calc(6px * var(--sp-ui, 1)));
   background: rgba(255, 255, 255, .03); border-left: 3px solid var(--amber); cursor: help; }
 .minfo-dlg .brief-faction__icon {
-  flex: none; width: max(.72rem, 32px); height: max(.72rem, 32px); display: grid; place-items: center; border-radius: 50%; outline: none;
+  flex: none; width: max(.72rem, 32px, calc(32px * var(--sp-ui, 1))); height: max(.72rem, 32px, calc(32px * var(--sp-ui, 1))); display: grid; place-items: center; border-radius: 50%; outline: none;
   background: radial-gradient(circle at 50% 45%, #2a3a38, #121817 70%);
 }
 .minfo-dlg .brief-faction__icon:focus-visible { box-shadow: 0 0 0 2px var(--mint-400); }
@@ -295,33 +295,33 @@
 .minfo-dlg .brief-faction__text { display: flex; flex-direction: column; gap: .03rem; min-width: 0; overflow-wrap: anywhere; }
 .minfo-dlg .brief-faction__text b { font-size: max(calc(.2 * var(--t)), 12px); color: var(--amber); }
 .minfo-dlg .modal__actions { align-items: center; padding: .12rem .3rem; }
-.minfo-dlg .modal__actions .btn { height: max(.5rem, 30px); font-size: max(.18rem, 12px); }
+.minfo-dlg .modal__actions .btn { height: max(.5rem, 30px, calc(30px * var(--sp-ui, 1))); font-size: max(.18rem, 12px); }
 .minfo-dlg__status { margin-right: auto; min-width: 0; }
 .minfo-dlg__turn { display: inline-flex; align-items: center; gap: .06rem; font-size: max(.17rem, 11px); font-weight: 700; color: var(--gold); white-space: nowrap; }
-.minfo-dlg__turn .icon { width: max(.18rem, 12px); height: max(.18rem, 12px); }
+.minfo-dlg__turn .icon { width: max(.18rem, 12px, calc(12px * var(--sp-ui, 1))); height: max(.18rem, 12px, calc(12px * var(--sp-ui, 1))); }
 .minfo-dlg__turn b { margin-left: .04rem; font-size: max(.22rem, 14px); }
 .minfo-dlg__turn.is-warn { color: var(--orange-hi); }
 .minfo-dlg__turn.is-mint { color: var(--mint-400); }
 .minfo-dlg__turn.is-dim { color: var(--text-lo); }
-.minfo-dlg .brief-bonds, .minfo-dlg .brief-banned { padding: max(.16rem, 6px) max(.2rem, 8px) max(.2rem, 8px); }
-.minfo-dlg .brief-h { font-size: max(.21rem, 12px); margin-bottom: max(.12rem, 5px); }
-.minfo-dlg .brief-h::before { width: max(.06rem, 3px); height: max(.2rem, 11px); }
-.minfo-dlg .brief-bonds__row { gap: max(.16rem, 6px) max(.1rem, 4px); }
-.minfo-dlg .brief-bond { width: max(1rem, 50px); }
-.minfo-dlg .brief-bond .bond { --disc: max(.66rem, 32px); }
+.minfo-dlg .brief-bonds, .minfo-dlg .brief-banned { padding: max(.16rem, calc(6px * var(--sp-ui, 1))) max(.2rem, calc(8px * var(--sp-ui, 1))) max(.2rem, calc(8px * var(--sp-ui, 1))); }
+.minfo-dlg .brief-h { font-size: max(.21rem, 12px); margin-bottom: max(.12rem, calc(5px * var(--sp-ui, 1))); }
+.minfo-dlg .brief-h::before { width: max(.06rem, 3px, calc(3px * var(--sp-ui, 1))); height: max(.2rem, 11px, calc(11px * var(--sp-ui, 1))); }
+.minfo-dlg .brief-bonds__row { gap: max(.16rem, calc(6px * var(--sp-ui, 1))) max(.1rem, calc(4px * var(--sp-ui, 1))); }
+.minfo-dlg .brief-bond { width: max(1rem, 32px, calc(50px * var(--sp-ui, 1))); }
+.minfo-dlg .brief-bond .bond { --disc: max(.66rem, 32px, calc(32px * var(--sp-ui, 1))); }
 .minfo-dlg .brief-bond .bond__name { font-size: max(.16rem, 10px); }
-.minfo-dlg .brief-bond__ban { font-size: max(.12rem, 9px); padding: 0 max(.05rem, 2px); }
-.minfo-dlg .brief-bond__ban .icon { width: max(.12rem, 9px); height: max(.12rem, 9px); }
+.minfo-dlg .brief-bond__ban { font-size: max(.12rem, 9px); padding: 0 max(.05rem, calc(2px * var(--sp-ui, 1))); }
+.minfo-dlg .brief-bond__ban .icon { width: max(.12rem, 9px, calc(9px * var(--sp-ui, 1))); height: max(.12rem, 9px, calc(9px * var(--sp-ui, 1))); }
 .minfo-dlg .brief-legend { margin-top: 0; font-size: max(.14rem, 10px); }
-.minfo-dlg .brief-legend__off { width: max(.16rem, 9px); height: max(.16rem, 9px); }
-.minfo-dlg .brief-legend__ban { width: max(.2rem, 12px); height: max(.18rem, 11px); }
-.minfo-dlg .brief-legend__ban .icon { width: max(.12rem, 8px); height: max(.12rem, 8px); }
+.minfo-dlg .brief-legend__off { width: max(.16rem, 9px, calc(9px * var(--sp-ui, 1))); height: max(.16rem, 9px, calc(9px * var(--sp-ui, 1))); }
+.minfo-dlg .brief-legend__ban { width: max(.2rem, 12px, calc(12px * var(--sp-ui, 1))); height: max(.18rem, 11px, calc(11px * var(--sp-ui, 1))); }
+.minfo-dlg .brief-legend__ban .icon { width: max(.12rem, 8px, calc(8px * var(--sp-ui, 1))); height: max(.12rem, 8px, calc(8px * var(--sp-ui, 1))); }
 .minfo-dlg .brief-banned__n { font-size: max(.22rem, 13px); }
-.minfo-dlg .brief-banned__grid { grid-template-columns: repeat(auto-fill, minmax(max(.6rem, 34px), 1fr)); gap: max(.08rem, 3px); }
-.minfo-dlg .brief-banned__grid .uthumb { --ut: max(.6rem, 34px); }
+.minfo-dlg .brief-banned__grid { grid-template-columns: repeat(auto-fill, minmax(max(.6rem, 32px, calc(34px * var(--sp-ui, 1))), 1fr)); gap: max(.08rem, calc(3px * var(--sp-ui, 1))); }
+.minfo-dlg .brief-banned__grid .uthumb { --ut: max(.6rem, 32px, calc(34px * var(--sp-ui, 1))); }
 .minfo-dlg .brief-banned__diy { font-size: max(.14rem, 12px); }
 .minfo-dlg .t-dim { font-size: max(.16rem, 10px); }
 @media (max-width: 1000px) {
-  .modal__box.minfo-dlg { width: min(max(12rem, 600px), calc(100vw - .6rem - var(--sa-l, 0px) - var(--sa-r, 0px))); }
+  .modal__box.minfo-dlg { width: min(max(12rem, 32px, calc(600px * var(--sp-ui, 1))), calc(100vw - .6rem - var(--sa-l, 0px) - var(--sa-r, 0px))); }
   .minfo-dlg__content.has-enemies { grid-template-columns: minmax(0, 1fr); }
 }

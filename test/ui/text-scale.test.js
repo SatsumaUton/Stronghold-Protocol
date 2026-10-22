@@ -178,6 +178,7 @@ describe('文字大小: the CSS text root', () => {
   const theme = sheets.find((s) => s.rel === `${CSS}/theme.css`).src;
 
   test('theme.css defines --t for 小 and every step, and nothing else defines it', () => {
+    // 小 = the design's own sizes; the 64 / 76 / 88 px floors never shrink with 界面大小 (DESIGN §35.43, ui-size.test.js)
     assert.match(theme, /:root \{ --t: 1rem; \}/, '小 = the design\'s own sizes');
     for (const [attr, value] of [['md', /--t: max\(1rem, 64px\)/], ['lg', /--t: max\(calc\(1rem \* 1\.15\), 76px\)/], ['xl', /--t: max\(calc\(1rem \* 1\.3\), 88px\)/]]) {
       assert.match(theme, new RegExp(`:root\\[data-text="${attr}"\\] \\{ ${value.source}; \\}`), `the ${attr} step`);
@@ -188,10 +189,10 @@ describe('文字大小: the CSS text root', () => {
     }
   });
 
-  test('the layout root 1rem is untouched — the five rem→px readers must not move', () => {
-    assert.match(theme, /html \{\n {2}font-size: clamp\(40px, min\(calc\(100vw \/ 19\.2\), calc\(100vh \/ 10\.8\)\), 240px\);/,
+  test('the layout root 1rem is untouched by 文字大小 — the five rem→px readers must not move (only 界面大小 scales it)', () => {
+    assert.match(theme, /html \{\n {2}font-size: calc\(clamp\(40px, min\(calc\(100vw \/ 19\.2\), calc\(100vh \/ 10\.8\)\), 240px\) \* var\(--sp-ui, 1\)\);/,
       'the desktop clamp');
-    assert.match(theme, /font-size: clamp\(40px, min\(calc\(100vw \/ 19\.2\), calc\(100svh \/ 10\.8\)\), 240px\);/,
+    assert.match(theme, /font-size: calc\(clamp\(40px, min\(calc\(100vw \/ 19\.2\), calc\(100svh \/ 10\.8\)\), 240px\) \* var\(--sp-ui, 1\)\);/,
       'the svh clamp (mobile toolbars)');
     assert.doesNotMatch(theme, /font-size: clamp\([^)]*var\(--t\)/, 'the root scale never reads the text root');
     // and the modules that convert it keep their own floor: a text step must not reach them
