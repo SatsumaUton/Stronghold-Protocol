@@ -58,12 +58,15 @@ function garrisonIdsOf(u) {
 const FAR_TOOTH_CHAR = 'char_430_fartth';
 let FAR_TOOTH = null;
 let FAR_TOOTH_DATA = null;
+const FAR_TOOTH_DEFAULT = Object.freeze(new Set(['garrison_108_a', 'garrison_108_b']));
 /**
- * The garrison ids 远牙's own traits grant (bbStr.give_garrison_id) in the loaded data — default: garrison_148_a/b →
- * garrison_108_a/b. Found by charId over the official chess records: garrison and chess ids are season-local.
+ * The garrison ids 远牙's own traits grant (bbStr.give_garrison_id): garrison_108_a/b (granted by garrison_148_a/b), or
+ * on another version's build (S.isVersionData) the grants found by charId over its official chess records — garrison
+ * and chess ids are season-local.
  */
 function farToothGrants() {
   const d = S.gameData();
+  if (!S.isVersionData(d)) return FAR_TOOTH_DEFAULT;
   if (FAR_TOOTH_DATA !== d) {
     FAR_TOOTH_DATA = d;
     FAR_TOOTH = new Set();

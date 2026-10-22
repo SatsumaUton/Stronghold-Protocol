@@ -7,9 +7,10 @@
 //   a faulty content module is logged and skipped, never crashing the battle.
 // setupUnitKit(battle, unit, mode) — resolves a unit's Kit: kits[baseChessId]?.(bb, chess, def) ?? generic.
 //   Battle opts.kits ({ [baseChessId]: kitFn }) take precedence (tests / sandboxes).
-//   An official kit is checked against the operator it was written for (officialKitKey, kits/index.js KIT_CHAR_IDS):
-//   another official version gives some chess ids to other operators, whose kit is then found by charId (the tier kit
-//   of the record's tier, else a 自选 op-* kit), or none (generic). The default data maps every chess to its own kit.
+//   On another official version's build (support isVersionData: config.version) an official kit is checked against the
+//   operator it was written for (officialKitKey, kits/index.js KIT_CHAR_IDS): that version gives some chess ids to
+//   other operators, whose kit is then found by charId (the tier kit of the record's tier, else a 自选 op-* kit), or
+//   none (generic). The default data and the plugin content sets built on it keep the by-id lookup (DESIGN §36.3).
 //   补位 stand-ins (isStandInDef: the def of simdata getStandIn — the chess's ids, another character's body): the kit is
 //   kits[def.charId] (the stand-in's own, kits/ops/standin-<codename>.js), never the chess id's — that is the replaced
 //   operator's kit; without one, the generic kit plus the talents it can apply exactly (generic.js genericTalents).
@@ -36,6 +37,7 @@ import { validateSkillSpec, matchesSchema, MODS_SCHEMA } from '../../../shared/p
 import { withUnitLoadouts } from '../simdata.js';
 import { isPotential } from '../../../shared/potential.js';
 import { RECORD_MAPS } from '../../../shared/plugins/dataUtils.js';
+import { isVersionData } from './support/index.js';
 
 // Content files are loaded with guarded dynamic imports: a module that fails to load (syntax error, throwing
 // top-level code, missing file) is logged and replaced by an empty module instead of breaking the server.
@@ -101,20 +103,24 @@ function kitKeyForChar(charId, tier) {
 
 /**
  * The key of `def`'s kit in KITS, or null (generic). A stand-in's and a 自选 piece's: its charId (isOtherBody). Any
- * other def: the kit of its id (baseId, the exact id, or the suffix-less id) when that kit was written for the def's
- * charId (KIT_CHAR_IDS), else the kit found by its charId (kitKeyForChar). Only an official record with a real charId
- * takes that second path: test fixtures (charId defaults to the chess id) and plugin chess (chess_x_ ids; forgeImport
- * leaves `kitRef` out on purpose to keep the generic kit) keep the by-id lookup. Under the default data every chess
- * resolves to its own id's kit (test/versions-keying.test.js).
+ * other def: the kit of its id (baseId, the exact id, or the suffix-less id). On another version's build (`data`
+ * carries config.version; default: the loaded data) that kit counts only when it was written for the def's charId
+ * (KIT_CHAR_IDS), else the kit is found by its charId (kitKeyForChar); a chess whose own kit was written for its
+ * operator but failed to load stays generic, as on the default data. Only an official record with a real charId takes
+ * that path: test fixtures (charId defaults to the chess id) and plugin chess (chess_x_ ids; forgeImport leaves `kitRef`
+ * out on purpose to keep the generic kit) keep the by-id lookup. The default data and the plugin content sets built on
+ * it keep the by-id lookup of before versions M0 (test/versions-keying.test.js).
  */
-export function officialKitKey(def) {
+export function officialKitKey(def, data) {
   if (!def) return null;
   if (isOtherBody(def)) return Object.hasOwn(KITS, def.charId) ? def.charId : null;
   const bare = String(def.baseId ?? def.id ?? '').replace(/_[ab]$/, '');
   const byId = [def.baseId, def.id, bare].find((k) => k != null && Object.hasOwn(KITS, k) && KITS[k]) ?? null;
+  if (!isVersionData(data)) return byId;
   const real = typeof def.charId === 'string' && def.charId.startsWith('char_') && !def.charId.startsWith('char_x_') ? def.charId : null;
   if (!real || isPluginChess(def.baseId ?? def.id)) return byId;
   if (byId && (KIT_CHAR_IDS[byId] ?? real) === real) return byId;
+  if (!byId && KIT_CHAR_IDS[`${bare}_a`] === real) return null;
   return kitKeyForChar(real, def.tier);
 }
 

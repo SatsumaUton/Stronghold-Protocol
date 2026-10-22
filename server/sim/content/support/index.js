@@ -61,6 +61,14 @@ export const itemKeyOf = (id) => String(itemRecord(id)?.effectRef ?? id ?? '').r
 export const isGoldenId = (id) => /_b$/.test(String(id ?? ''));
 
 /**
+ * Whether `data` (default: the loaded data) is another official version's build (config.version, data/versions/*;
+ * DESIGN §36.3). Only such data finds hand-written behaviour by charId / effectId: the default data and the plugin
+ * content sets built on it carry no config.version and keep the by-id lookups of before versions M0, so a plugin that
+ * patches an official record's charId or effectId changes that record, not which kit or item behaviour runs.
+ */
+export const isVersionData = (data = gameData()) => !!(data && typeof data === 'object' && data.config?.version);
+
+/**
  * Whether `id` names an official record of data file `file` (`chess`, `items` …), not a plugin's namespaced one
  * (shared/plugins/dataUtils.js RECORD_MAPS: chess_x_ / item_x_ …).
  */
@@ -71,6 +79,7 @@ export const isOfficialId = (file, id) => !String(id ?? '').startsWith(`${RECORD
  * version reuses item ids for other effects, while an effectId keeps its meaning. A golden record (effectId
  * eff_acgarmNNN) counts as its normal one (baseId); a plugin record follows its effectRef; a plugin record without one
  * (item_x_) has no official behaviour (null). itemKeyOf stays the item's identity (combo partners, buff keys, labels).
+ * The dispatchers use it on another version's build only (isVersionData); the default data keeps the item key.
  */
 export function itemEffectKey(id) {
   let rec = itemRecord(id);
@@ -110,8 +119,20 @@ export function itemIdsWithEffect(effectId, { normalOnly = false } = {}) {
 
 /** 突变细胞's effect: 凯瑟琳's one-cell allowance (bands/meta.js, server/match/player/prep.js) counts its normal records. */
 export const MUTATION_CELL_EFFECT = 'eff_acarm072';
-/** Whether item record `rec` is an official normal 突变细胞 (not golden, not a plugin record). */
-export const isMutationCell = (rec) => !!rec && rec.effectRef == null && isOfficialId('items', rec.id) && rec.effectId === MUTATION_CELL_EFFECT;
+/** 突变细胞's normal record in the default data: data without config.version (isVersionData) counts it by this id. */
+export const MUTATION_CELL_ID = 'chess_item_5_08_e_a';
+/**
+ * The 突变细胞 ids 凯瑟琳's one-cell allowance counts in `data`: MUTATION_CELL_ID, or on another version's build the
+ * official normal records of MUTATION_CELL_EFFECT (上半: chess_item_6_08_e_a).
+ */
+export const mutationCellIds = (data = gameData()) => (isVersionData(data)
+  ? officialItemIdsWithEffect(data.items, MUTATION_CELL_EFFECT, { normalOnly: true }) : [MUTATION_CELL_ID]);
+/** Whether item `id` is a 突变细胞 the allowance counts (mutationCellIds). */
+export function isMutationCell(id, data = gameData()) {
+  if (!isVersionData(data)) return id === MUTATION_CELL_ID;
+  const rec = own(data.items, id);
+  return !!rec && rec.effectRef == null && isOfficialId('items', id) && rec.effectId === MUTATION_CELL_EFFECT;
+}
 
 /**
  * Buffs of a data record (bond / item / band / effect / garrison-like) as `{ key, bbKey, p }` where `key` is the

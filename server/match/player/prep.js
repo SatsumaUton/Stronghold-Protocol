@@ -50,7 +50,7 @@ export class PlayerPrep {
       const gained = this.acquireItem(slot.id, { source: 'reward', displayed: true });
       // #677: maintainer decision 2026-10-17 (official play memory): one Cathy cell per player/match.
       // [ASSUMED] Only a successful pick from this source counts; Quintus's grant is independent.
-      if (gained && offer.source === 'band:band_cathy' && isMutationCell(this.gd.item(slot.id))) {
+      if (gained && offer.source === 'band:band_cathy' && isMutationCell(slot.id, this.gd.raw)) {
         this.counters['band:cathy:cellTaken'] = 1;
         // [ASSUMED] Remove the cell from queued Cathy offers too, retaining their other choices without rerolling.
         for (const pending of this.offers) if (pending.source === 'band:band_cathy') {

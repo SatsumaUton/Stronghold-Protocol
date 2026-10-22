@@ -100,7 +100,7 @@ import { SKILL_SUMMON_START_DEPLOY } from '../../../shared/constants.js';
 import { hypot } from '../detmath.js';
 import { atPotential } from '../../../shared/potential.js';
 import { textFinite } from '../../../shared/plugins/textNumber.js';
-import { isOfficialId } from './support/index.js';
+import { isOfficialId, isVersionData } from './support/index.js';
 
 const num = (v, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : (typeof v === 'string' && v.trim() !== '' && Number.isFinite(+v) ? +v : d));
 const GRID_3X3 = Object.freeze([[1, -1], [1, 0], [1, 1], [0, -1], [0, 0], [0, 1], [-1, -1], [-1, 0], [-1, 1]]);
@@ -1793,9 +1793,10 @@ export function install(battle) {
       }
     }
     if (!kitGeneric) continue;
-    // 夕 by charId (another official version gives chess_char_5_12 to 林); an official chess only, as before (a plugin
-    // chess_x_ record keeps its own kit's behaviour)
-    if (toks.includes(TOKEN_IDS.duskDragon) && owner.def?.charId === DUSK_CHAR && isOfficialId('chess', base)) {
+    // 夕: chess_char_5_12, or on another version's build by charId (上半 gives chess_char_5_12 to 林) and an official
+    // chess only (a plugin chess_x_ record keeps its own kit's behaviour)
+    const isDusk = isVersionData() ? owner.def?.charId === DUSK_CHAR && isOfficialId('chess', base) : base === 'chess_char_5_12';
+    if (toks.includes(TOKEN_IDS.duskDragon) && isDusk) {
       const life = num(owner.def?.talents?.find((t) => t.tokenKey === TOKEN_IDS.duskDragon)?.bb?.['attack@tokenduration'], 0);
       battle.on('deploy', (ctx) => { if (ctx.unit === owner) owner.mem.duskPending = true; }, { owner });
       battle.on('attack', (ctx) => {

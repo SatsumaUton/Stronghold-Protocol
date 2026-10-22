@@ -43,8 +43,8 @@
 // undying duration ×m, ASPD ×m, tremble chance ×m. Granted hammers without an own copy use 蒸汽之心's blackboard.
 
 import {
-  num, itemRecord, itemKeyOf, itemEffectKey, itemIdsWithEffect, gameData, buffsOf, isOp, onField, unitBonds, isMember,
-  bondActive, isGroundOp, frontTile, alliesAround, passiveBuff, fxOn, battleStore, contentInfo, itemsOf, directMods,
+  num, itemRecord, itemKeyOf, itemEffectKey, itemIdsWithEffect, isVersionData, gameData, buffsOf, isOp, onField, unitBonds,
+  isMember, bondActive, isGroundOp, frontTile, alliesAround, passiveBuff, fxOn, battleStore, contentInfo, itemsOf, directMods,
 } from '../support/index.js';
 import { mitigate, hasHp, periodicDamage, isHpLoss } from '../../damage.js';
 import { hypot } from '../../detmath.js';
@@ -101,7 +101,8 @@ function statMods(p) {
 }
 
 // ---- hammers (蒸汽之心) — derived from data: hammer records carry bbStr.big_hammer on their special buff. 蒸汽之心 is
-// found by its effectId (another official version gives chess_item_6_05_e to 耶拉冈德之泪).
+// chess_item_6_05_e, on another version's build the record of its effectId (上半 gives chess_item_6_05_e to 耶拉冈德之泪).
+const STEAM_KEY = 'chess_item_6_05_e';
 const STEAM_EFFECT = 'eff_acarm079';
 const STEAM_BUFF = 'act1autochess_equip_acarm079_global_buff';
 function hammerTypeOf(p) {
@@ -118,7 +119,7 @@ let HAMMERS_DATA = null;
 function hammerInfo(key) {
   if (HAMMERS_DATA !== gameData()) { HAMMERS = new Map(); HAMMERS_DATA = gameData(); }
   if (!HAMMERS.size) {
-    const steamId = itemIdsWithEffect(STEAM_EFFECT, { normalOnly: true })[0];
+    const steamId = isVersionData() ? itemIdsWithEffect(STEAM_EFFECT, { normalOnly: true })[0] : `${STEAM_KEY}_a`;
     const steam = steamId ? itemRecord(steamId) : null;
     const sp = steam ? bp(steam, STEAM_BUFF) : null;
     const keys = sp ? Object.keys(sp).filter((k) => /^hammer_\d+$/.test(k)).map((k) => itemKeyOf(sp[k])) : [];
@@ -472,8 +473,8 @@ const BY_BUFF = {
 
 /**
  * Item behaviours by the normal record's effectId (support itemEffectKey; versions M0, docs/SIM.md §7.2: another
- * official version reuses item ids for other effects). Each entry names the item and its default-data key; the buff
- * and fx labels inside keep that key (golden digests hash them).
+ * official version reuses item ids for other effects). Each entry names the item and its default-data key
+ * (DEFAULT_ITEM_KEYS); the buff and fx labels inside keep that key (golden digests hash them).
  */
 const BY_EFFECT = {
   // 精准狙击镜 (chess_item_3_02_e): damage ×damage_scale against targets ≥ radius tiles away
@@ -885,16 +886,42 @@ export function addShieldLayer(battle, target, key, cap = 1) {
   return true;
 }
 
-/** The BY_EFFECT behaviour of item `itemId` (by its effectId, support itemEffectKey), or null. */
+/**
+ * The default data's item key of each BY_EFFECT behaviour. Data without config.version (support isVersionData: the
+ * default data and the plugin content sets built on it) dispatches by item key (itemKeyOf, which follows a plugin
+ * record's effectRef), as before versions M0 (DESIGN §36.3): a plugin that patches an official item's effectId does
+ * not change its behaviour there.
+ */
+export const DEFAULT_ITEM_KEYS = Object.freeze({
+  eff_acarm063: 'chess_item_3_02_e', eff_acarm040: 'chess_item_3_04_e', eff_acarm051: 'chess_item_3_05_e',
+  eff_acarm049: 'chess_item_3_06_e', eff_acarm064: 'chess_item_3_11_e', eff_acarm052: 'chess_item_4_03_e',
+  eff_acarm055: 'chess_item_4_04_e', eff_acarm060: 'chess_item_4_05_e', eff_acarm065: 'chess_item_4_06_e',
+  eff_acarm119: 'chess_item_4_07_e', eff_acarm057: 'chess_item_4_08_e', eff_acarm059: 'chess_item_4_10_e',
+  eff_acarm061: 'chess_item_4_11_e', eff_acarm068: 'chess_item_4_12_e', eff_acarm058: 'chess_item_5_01_e',
+  eff_acarm062: 'chess_item_5_02_e', eff_acarm067: 'chess_item_5_03_e', eff_acarm118: 'chess_item_5_09_e',
+  eff_acarm117: 'chess_item_6_01_e', eff_acarm076: 'chess_item_6_02_e', eff_acarm077: 'chess_item_6_03_e',
+  eff_acarm078: 'chess_item_6_04_e', eff_acarm079: 'chess_item_6_05_e', eff_acarm102: 'chess_item_6_06_e',
+  eff_acarm103: 'chess_item_6_07_e', eff_acarm120: 'chess_item_6_10_e', eff_acarm122: 'chess_item_6_11_e',
+});
+const EFFECT_OF_DEFAULT_KEY = new Map(Object.entries(DEFAULT_ITEM_KEYS).map(([eff, key]) => [key, eff]));
+
+/** The BY_EFFECT key of item `itemId`: its effectId on another version's build (itemEffectKey), else by its item key. */
+function behaviourKey(itemId) {
+  const eff = isVersionData() ? itemEffectKey(itemId) : EFFECT_OF_DEFAULT_KEY.get(itemKeyOf(itemId));
+  return eff != null && Object.hasOwn(BY_EFFECT, eff) ? eff : null;
+}
+/** The BY_EFFECT behaviour of item `itemId` (behaviourKey), or null. */
 function effectBehaviour(itemId) {
-  const eff = itemEffectKey(itemId);
-  return eff != null && Object.hasOwn(BY_EFFECT, eff) ? BY_EFFECT[eff] : null;
+  const eff = behaviourKey(itemId);
+  return eff == null ? null : BY_EFFECT[eff];
 }
 
 /** The effectIds with a hand-written battle behaviour (BY_EFFECT; tests). */
 export const BATTLE_EFFECT_IDS = Object.freeze(Object.keys(BY_EFFECT));
 /** The BY_EFFECT key item `itemId` dispatches to, or null (tests: test/versions-keying.test.js). */
-export const battleEffectOf = (itemId) => (effectBehaviour(itemId) ? itemEffectKey(itemId) : null);
+export const battleEffectOf = (itemId) => behaviourKey(itemId);
+/** The hammer item keys of the loaded data (蒸汽之心's hammer_N; tests). */
+export const hammerKeys = () => { hammerInfo(''); return [...HAMMERS.keys()].filter((k) => k !== '__none__'); };
 
 /** Does this record have a battle part? (stat buffs, known buff behaviours, hammer specials, item behaviours) */
 export function hasBattleEffect(rec) {
