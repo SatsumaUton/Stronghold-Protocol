@@ -262,6 +262,10 @@ test('a 无来源 burst still passes on through content that shares damage: 圣�
   g.profile.noAttack = true;
   assert.ok(g.bossPool, '铳 on the shared pool');
   const sp = hb.spawn('enemy_9020_actrpc', { pos: [3, 4], routeIndex: 0, mods: { speedMul: 0 }, tag: 'part' });
+  // The native count shield blocks elemental HP damage too. Exercise sharing after spending its charges.
+  const count = sp.findBuff('boss:springShield').shieldHits;
+  for (let i = 0; i < count; i++) hb.b.dealDamage({ target: sp, amount: 1, type: 'true' });
+  assert.equal(sp.findBuff('boss:springShield'), null);
   const pool0 = hb.b.sharedBoss.hp, sp0 = sp.hp;
   hb.b.dealDamage(hb.unit('t_wall'), sp, { type: 'element', element: 'burn', amount: sp.gaugeMax });
   assert.ok(sp0 - sp.hp > 0, 'the spring takes the burst');

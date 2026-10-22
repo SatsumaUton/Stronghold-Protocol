@@ -387,6 +387,7 @@ Sources: [伤判效果](https://prts.wiki/w/伤判效果), [伤害分类](https:
 | [棘刺](https://prts.wiki/w/棘刺) | Fixed BUFF poison is precomputed and ordinarily dodgeable; S2 filters native type and counters after 0.5 s; Delta derives gauge intake from source output. |
 | [仇白](https://prts.wiki/w/仇白) | Check control after the authored 0.1 s delay, then issue precomputed ADDITION; first-hit marks are deployment-local. |
 | Weakness selection | Compare only attack input/scales, target input addition, penetration and DEF/RES, without dispatching speculative events. Source: [下半盟约记录](https://prts.wiki/w/卫戍协议：盟约_下半/PRTS盟约记录). |
+| [“碎铳之簧”](https://prts.wiki/w/“碎铳之簧”) | Ordered barriers/count shields; permanently unblockable, including after shield loss. The arts variant's physical counter filters NORMAL and issues source-less ADDITION. Each variant uses its modifier-application/injury filter; ordinary healing and elemental modifiers may qualify, HP loss/regen/restoration do not. Select the highest-hatred gun; apply erosion only after successful counter damage. Templates: `actrpa/b/c_t_1`, `actrpa/b/c_passive`. |
 
 [ASSUMED] Mode hit-limit placement, Stead/barrier order and mixed parallel sharing, initial acquisition/reapplication
 ties, some inherited cancellation masks, literal-zero dispatch, exact 30 Hz deadlines and projectile sampling remain
