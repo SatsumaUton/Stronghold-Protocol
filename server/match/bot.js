@@ -104,6 +104,12 @@ export function runSteps(gen) {
   return r.value;
 }
 
+/**
+ * [ASSUMED] §35.24: share of an advisor plan's unit weight (aiPlan planUnitWeight, up to +48) in a piece's lineup and
+ * bench value. Unit power runs 10-25 and computeBonds already scores the plan's bonds exactly, so the full weight
+ * benched tier 5/6 carries for tier 1-2 plan members (27 of 38 LLM preps from R10).
+ */
+const PLAN_UNIT_SHARE = 0.25;
 /** Lineup value of each deployed member of the focus bond (up to its top threshold). */
 const FOCUS_MEMBER = 4;
 /**
@@ -114,6 +120,22 @@ const FOCUS_MEMBER = 4;
 const CORE_TOP_TIER = 30;
 /** [ASSUMED] §35.23: bench members of a core bond with at least this many distinct owned members are not sold as junk. */
 const CORE_KEEP_OWNED = 4;
+/**
+ * [ASSUMED] §35.24 commitment to a 6-member core: last round's focus keeps CORE_LOCK (was 6) once 3 members are owned, a
+ * new focus member is worth CORE_MEMBER more on the way to the top threshold, and a refresh that may show one is worth
+ * CORE_HIT × P(shown) (coreGap).
+ */
+const CORE_LOCK = 16;
+const CORE_MEMBER = 10;
+const CORE_HIT = 20;
+/**
+ * [ASSUMED] §35.24 sustain floor: from HEAL_FROM the lineup values its first healer at HEAL_FIRST and a second one from R9
+ * at HEAL_SECOND (buyScore: the first healer +14, a second from R8 +4). Bots fielded 0.1–0.5 healers in R4–R13 and died
+ * to DOT / ELEMENT / SPECIAL rounds; 终极 co-op seats alive at the Final Assault rose with it.
+ */
+const HEAL_FROM = 5;
+const HEAL_FIRST = 16;
+const HEAL_SECOND = 6;
 /** Value per unit of armour fit (the share of a dealer's damage the round's DEF / RES lets through, armorFit). */
 const ARMOR_WEIGHT = 10;
 /** Least buy score of a purchase once the board is full (below it the bot refreshes instead). */
@@ -131,8 +153,12 @@ const MAX_PAIRS = 4;
 const MAX_REFRESHES = 16;
 /** Spare bench units kept beyond the lineup at the prep start (pairs first). */
 const BENCH_BUDGET = 6;
-/** Shop level the bot aims for at the start of round r (index = round). */
-const LEVEL_TARGET = [1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 6, 6];
+/**
+ * Shop level the bot aims for at the start of round r (index = round). §35.24: L5 at R9 and L6 at R11 (were R10 / R12),
+ * the community rhythm 3-5-7-9 (BV19UXZBJExQ reply; handoff/round51 RESEARCH §3.2) plus one step: 终极 solo boards
+ * reached the Final Assault short of leader damage, and bots on this curve dealt about 40 % more of it.
+ */
+const LEVEL_TARGET = [1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 6, 6, 6];
 /**
  * AI 托管 of a human with 自选 picks (0.2.0; bots field none): the buy score of one of the player's own slotted pieces —
  * the operator the player chose to field (follow-up #13: under AI 托管 they were rarely bought) — and the 调度中心 is
@@ -401,7 +427,7 @@ export function bondPlan(m, ps, owned = ownedBonds(m, ps)) {
     const k = owned.counts.get(id) || 0;
     if (!k) continue;
     const s = k * 10 + Math.min(4, pool.reach.get(id) || 0) + Math.min(6, (ps.layers[id] || 0) / 10)
-      + (id === prev ? 6 : 0) - (mates.has(id) ? 6 : 0) + Math.min(0.9, (pool.supply.get(id) || 0) / 100);
+      + (id === prev ? (k >= 3 ? CORE_LOCK : 6) : 0) - (mates.has(id) ? 6 : 0) + Math.min(0.9, (pool.supply.get(id) || 0) / 100);
     if (s > bestS) { bestS = s; focus = id; }
   }
   if (planMain) focus = planMain;
@@ -422,8 +448,65 @@ export function bondPlan(m, ps, owned = ownedBonds(m, ps)) {
   return ps._botFocus;
 }
 
+/**
+ * §35.24 layer trade: buy an operator whose 获得时 trait adds layers to every bond it has (SERVER_GAIN
+ * SERVER_ADD_BOND_CHESS_ALL: 野鬃 / 角峰 / 艾丝黛尔 / 深靛 +2, 雪猎 / 灵知 +5, 忍冬 +6, 星熊 / 锏 +8) when it carries the focus or
+ * an active bond, and sell it again unless it starts a pair, fills the board or makes the lineup. The community stacks this way: 「买卖
+ * 灵知／野鬃／忍冬／角峰／雪猎」 doubles their stacking under 投资人 (BV1qkDsBtEER pinned; cv47352364; handoff/round51
+ * RESEARCH §3.3). [ASSUMED] From R4, outside banking bands, and only when layers per net fund (price − the 1 refund) ×
+ * the bonds it reaches is at least TRADE_MIN. Measured on 终极 with the other §35.24 rules (seeds 1–100): see history.
+ */
+const TRADE_MIN = 3;
+const TRADE_FROM = 4;
+function gainLayers(gd, c) {
+  let n = 0;
+  for (const gid of c.garrisonIds || []) {
+    const g = gd.garrison(gid);
+    if (g && g.eventType === 'SERVER_GAIN' && g.effectKey === 'SERVER_ADD_BOND_CHESS_ALL') n += Number(g.bb?.count) || 0;
+  }
+  return n;
+}
+function tradeOnce(m, ps, ctx) {
+  if (m.round < TRADE_FROM || m.gd.leftoverKeptBands.includes(ps.bandId) || freeSlot(ps.hand) < 0) return false;
+  const gd = ps.gd || m.gd;
+  const active = new Set(Object.entries(ps.bonds).filter(([, b]) => b && b.active).map(([id]) => id));
+  if (ctx.focus) active.add(ctx.focus);
+  let best = -1;
+  let bestV = 0;
+  ps.shop.slots.forEach((sl, i) => {
+    if (!sl || sl.sold || sl.kind !== 'chess') return;
+    const price = ps.priceOf(sl);
+    const c = price <= ps.funds ? gd.chess(sl.id) : null;
+    const layers = c ? gainLayers(gd, c) : 0;
+    const n = layers ? (c.bonds || []).filter((b) => active.has(b)).length : 0;
+    const v = (layers * n) / Math.max(1, price - 1);
+    if (n && v > bestV) { bestV = v; best = i; }
+  });
+  if (best < 0 || bestV < TRADE_MIN) return false;
+  const before = new Set(ps.allChess().map((p) => p.uid));
+  const keep = (ctx.copies.get(gd.baseIdOf(ps.shop.slots[best].id)) || 0) >= 1 || ps.allChess().length < ps.deployCap;
+  if (!buyOffer(m, ps, best)) return false;
+  const fresh = keep ? null : ps.allChess().find((p) => !before.has(p.uid));
+  // a unit the lineup takes stays (the buy loop would have bought it anyway)
+  if (fresh && !gd.isGolden(fresh.id) && !chooseLineup(m, ps, context(m, ps)).set.includes(fresh)) tryDo(() => ps.sell(fresh.uid));
+  return true;
+}
+
+/**
+ * §35.24: the focus core bond (bondPlan) between 2 owned members and its top threshold (6; 阿戈尔 5), when buys and
+ * refreshes still build toward it (null otherwise). Measured on 终极 bots: boards owning 6 members of one core at R11
+ * went from 2/18 to 11/19, co-op seats alive at the Final Assault rose (handoff/round51 cycle 3, EXP_CORE).
+ */
+function coreGap(m, focus, owned) {
+  const bond = focus ? m.gd.bond(focus) : null;
+  const th = bond && bond.isCore && Array.isArray(bond.thresholds) && bond.thresholds.length ? bond.thresholds : null;
+  const k = owned.counts.get(focus) || 0;
+  return th && k >= 2 && k < th[th.length - 1] ? { k, top: th[th.length - 1] } : null;
+}
+
 /** Copies a merge takes (3; 风丸 2). */
 const mergeNeed = (m, base) => m.gd.mergeCount(base) || 3;
+
 
 /**
  * Bases worth merging ("keepers"): the deployed operators, the owned members of the focus / second bond, and owned
@@ -475,7 +558,7 @@ function bondValue(m, c, owned, focus, second = null) {
     if (hits) v += 10 * w;
     else if (th.some((t) => t > n + 1 && t - (n + 1) <= 1)) v += 3 * w;
     if (bond.thresholdTemplate === 'count_threshold_downward') v -= n > 0 ? 12 : 0; // 独行 breaks with a second member
-    if (b === focus) v += 10;
+    if (b === focus) v += 10 + (bond.isCore && n >= 2 && n < th[th.length - 1] ? CORE_MEMBER : 0);
     else if (b === second) v += 4;
     else if (committed && bond.isCore && !hits) v -= 4;
   }
@@ -516,7 +599,7 @@ function traitsOf(m, c) {
 function unitBase(m, piece, ctx) {
   const c = chessRec(m, piece.id, ctx.ps);
   if (!c) return 0;
-  let v = power(c) + (piece.items ? piece.items.length * 5 : 0) + planUnitWeight(m, ctx.ps, piece.id);
+  let v = power(c) + (piece.items ? piece.items.length * 5 : 0) + PLAN_UNIT_SHARE * planUnitWeight(m, ctx.ps, piece.id);
   if (m.round <= 11) v += traitsOf(m, c).recurring * 4;
   if (c.attackKind === 'none' && !isHealer(c)) v -= 6;
   if (ctx.fly > 0 && hitsFly(c)) v += 2;
@@ -565,6 +648,7 @@ function lineupScore(m, ps, set, ctx, handSlots = countFree(ps.hand)) {
   v -= Math.max(0, Math.min(2, ctx.roles.blockers) - blockers) * 15;
   if (ctx.fly > 0 && ctx.roles.antiAir > 0 && air === 0) v -= 12;
   v -= Math.max(0, healers - 2) * 10;
+  if (m.round >= HEAL_FROM) v += Math.min(healers, 1) * HEAL_FIRST + (healers >= 2 && m.round >= 9 ? HEAL_SECOND : 0);
   return v;
 }
 
@@ -661,7 +745,7 @@ function buyScore(m, ps, id, ctx) {
   // role needs
   if (isBlocker(c) && ctx.roles.blockers < 2) s += 10;
   if (hitsFly(c) && ctx.fly > 0 && ctx.roles.antiAir < 2) s += 8;
-  if (isHealer(c)) s += ctx.roles.healers === 0 && m.round >= 3 ? 6 : ctx.roles.healers >= 2 ? -14 : -3;
+  if (isHealer(c)) s += ctx.roles.healers === 0 && m.round >= 3 ? 14 : ctx.roles.healers >= 2 ? -14 : ctx.roles.healers === 1 && m.round >= 8 ? 4 : -3;
   if (c.attackKind === 'none' && !isHealer(c)) s -= 4;
   if (ctx.model && !isHealer(c)) s += ARMOR_WEIGHT * 0.6 * (armorFit(ctx.model, c) - 0.6);
   // the player's own 自选 piece (a slotted slot: its composed record carries diyFor) — AI 托管 of a human with picks
@@ -1361,6 +1445,16 @@ function refreshValue(m, ps, ctx) {
     if (k + 1 >= mergeNeed(m, b)) v += pShop * MERGE_HIT;
     else if (ctx.keep.has(b)) v += pShop * PAIR_HIT;
   }
+  // §35.24: a refresh may also show a missing member of the focus core bond on its way to the top threshold
+  if (coreGap(m, ctx.focus, ctx.owned)) {
+    let miss = 1;
+    for (const [id, e] of m.pool.entries) {
+      if (!(e.left > 0) || e.tier > L || ctx.owned.bases.has(id)) continue;
+      const c = m.gd.chess(id);
+      if (c && (c.bonds || []).includes(ctx.focus)) miss *= (1 - e.left / total) ** slots;
+    }
+    v += (1 - miss) * CORE_HIT;
+  }
   return v;
 }
 
@@ -1373,7 +1467,8 @@ function refreshValue(m, ps, ctx) {
  * piece value).
  */
 export function sellWeakestHand(m, ps, { keepPairs = true, below = Infinity, handOnly = false, keepFresh = false } = {}) {
-  if (economyPlan(m, ps)) {
+  const advisor = !!economyPlan(m, ps);
+  if (advisor) {
     if (advisorRoomStep(m, ps, { handOnly, below, keepFresh, keepPairs })) return true;
     // [ASSUMED] Never sell protected pieces pre-emptively for a speculative purchase.
     if (freeSlot(ps.hand) >= 0) return false;
@@ -1386,7 +1481,11 @@ export function sellWeakestHand(m, ps, { keepPairs = true, below = Infinity, han
     const base = m.gd.baseIdOf(p.id);
     if (keepPairs && !m.gd.isGolden(p.id) && (ctx.copies.get(base) || 0) >= 2) continue;
     if (keepFresh && (p.boughtRound === m.round || unseen(ps, p))) continue;
-    const v = pieceValue(m, ps, p, ctx);
+    // §35.24: an advisor's full hand of protected pieces may still give up a tier <= 4 one (legal room), never an
+    // elite, a tier 5/6 carry or a merge piece (cycle 2: 11 tier 5/6 sales for 1 fund each, 荒芜拉普兰德 for a tier-1 copy)
+    const guarded = advisor && advisorProtected(m, ps, p);
+    if (guarded && (m.gd.isGolden(p.id) || m.gd.tierOf(p.id) >= 5 || ps.completesChessMerge(p.id))) continue;
+    const v = pieceValue(m, ps, p, ctx) + (guarded ? 50 : 0);
     if (v < worstV) { worstV = v; worst = p; }
   }
   if (!worst || worstV >= below) return false;
@@ -1508,6 +1607,7 @@ export function* botPrepBeginSteps(m, ps, { delegate = false } = {}) {
   takeOffers(m, ps);
   levelUp(m, ps, { spare: true });
   yield* advisorSpendSteps(m, ps);
+  spendDown(m, ps);
   maybeFreeze(m, ps);
   yield;
   // 3. placement, 4. items, placement again (item carriers gain value; rehearsed when the match allows it)
@@ -1691,6 +1791,23 @@ function fundsReserve(m, ps) {
   return Number.isFinite(cap) && cap > 0 ? cap : 5;
 }
 
+/**
+ * §35.24: funds left after the buy loop (it keeps 2 for a purchase after each refresh) expire at the prep end
+ * (PlayerState.endPrep): spend them on refreshes that may show a copy completing a held pair, which maybeFreeze then
+ * keeps for the next round. Never refreshes away such a copy or a frozen shop; banking bands keep their funds. [ASSUMED]
+ * At most 4 refreshes. Measured: funds lost per prep 0.78 → 0.25 (终极 solo, seeds 1–100, with the other §35.24 rules).
+ */
+function spendDown(m, ps) {
+  if (economyPlan(m, ps) || m.gd.leftoverKeptBands.includes(ps.bandId)) return;
+  const gd = ps.gd || m.gd;
+  for (let guard = 0; guard < 4; guard++) {
+    if (ps.shop.frozen || ps.shop.slots.some((s) => s && !s.sold && s.kind === 'chess' && ps.completesChessMerge(s.id))) return;
+    const cost = ps.shop.freeRefreshes > 0 ? 0 : gd.refreshPrice;
+    if (ps.funds < cost || (cost === 0 && guard > 0) || !tryDo(() => ps.refresh())) return;
+    takeOffers(m, ps);
+  }
+}
+
 /** Buying / rerolling toward the lineup; a step generator (yields after each purchase or reroll). */
 export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}) {
   const gd = ps?.gd || m.gd;
@@ -1705,6 +1822,7 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}
   let memo = null;
   for (let guard = 0; guard < 40; guard++) {
     if (guard > 0) yield;
+    if (!fillOnly && tradeOnce(m, ps, context(m, ps))) continue;
     // Do not cash a bank for a non-merge during the initial merge-only pass: the intervening level-up
     // could consume its refund before this pass is allowed to buy the target.
     // §35.14: complete merges first, then the affordable floor, before any fill-only single can spend it.
@@ -1751,7 +1869,11 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}
         const base = gd.baseIdOf(s.id);
         if (boardFull && !merges && ps.funds - price < reserve) return; // banked (坎诺特)
         sc = buyScore(m, ps, s.id, ctx) - price;
-        if (boardFull && !merges && !advisorWanted(m, ps, s.id)) {
+        // §35.24: a missing member of the focus core bond is bought even when one swap does not raise the lineup yet,
+        // while the bench keeps room for it and the members a later swap withdraws (3 free hand slots)
+        const coreStep = !ctx.owned.bases.has(base) && countFree(ps.hand) >= 3 && (chessRec(m, s.id, ps)?.bonds || []).includes(ctx.focus)
+          && !!coreGap(m, ctx.focus, ctx.owned);
+        if (boardFull && !merges && !advisorWanted(m, ps, s.id) && !coreStep) {
           if (!ctx.copies.get(base)) {
             // with a full board a new operator must improve the lineup
             if (!cur) {
@@ -1858,7 +1980,7 @@ export function* advisorSpendSteps(m, ps) {
     eligible.push(...(ps.diyRollEntries() || []).map(([id]) => id));
     const minPrice = Math.min(...eligible.map(id => ps.priceOf({ kind: 'chess', id, basePrice: gd.chessPrice(id) })), Infinity);
     const refreshPrice = ps.shop.freeRefreshes > 0 ? 0 : gd.refreshPrice;
-    if (!preserve && ((!carry && countFree(ps.hand) > 1 && ps.funds >= refreshPrice + minPrice)
+    if (!preserve && ((!carry && countFree(ps.hand) >= 1 && ps.funds >= refreshPrice + minPrice)
       || canFreezeSearch(m, ps, eligible))) {
       if (!tryDo(() => ps.refresh())) return;
       continue;

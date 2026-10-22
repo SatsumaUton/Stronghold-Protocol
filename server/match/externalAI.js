@@ -26,9 +26,10 @@ export function carryPlan(plan) {
   if (!plan) return null;
   const { choice, placements, economy, ...rest } = clone(plan);
   void choice; void placements;
+  // §35.24: only the funds direction carries over. A carried maxRefreshes 0 / level / refreshAbove met a new round's
+  // shop with last round's limits (failed preps lost 1.19 funds each against 0.37 for accepted ones).
   if (economy) {
-    const { holdLevel, why, ...kept } = economy;
-    void holdLevel; void why;
+    const kept = Object.fromEntries(Object.entries(economy).filter(([k]) => ['saveForInterest', 'reserve'].includes(k)));
     if (Object.keys(kept).length) rest.economy = kept;
   }
   return rest;

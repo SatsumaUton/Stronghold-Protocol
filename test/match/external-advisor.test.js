@@ -167,7 +167,8 @@ test('§35.23 plan mode: a late prep keeps the last accepted direction; only pro
   const state = m.externalAI.states.get(ps.playerId);
   const nextPrep = (round = m.round) => h.run(() => pending(m)?.kind === 'prep' && m.round > round);
   assert.ok(nextPrep());
-  const carried = { buy: [id], bonds: [{ id: bond, priority: 4 }], economy: { level: 1, reserve: 3 } };
+  // §35.24: of the economy only the funds direction (saveForInterest, reserve) carries over.
+  const carried = { buy: [id], bonds: [{ id: bond, priority: 4 }], economy: { reserve: 3 } };
   assert.deepEqual(m.externalAI.planFor(ps), carried, 'no placements, choice or one-prep hold carry over');
   m.externalReply(pending(m).id, null, 'timeout');
   assert.equal(state.failures, 0);
