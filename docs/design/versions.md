@@ -123,7 +123,9 @@ keyed build tables, the hidden inputs and the warning classes.
   - `modeFactorInfo.SINGLE` 1.0 → 1.25;
   - `borrowCount` 8 → 20;
   - the enemy effects 攻坚装备II / III;
-  - the m06 / m07 battlefield weights and two special-enemy weights;
+  - 战场 m06 weight 40 → 60; m07 weight 40 → 5 and Hard modes only (taken out of both Normal modes, whose stage pool
+    drops from 6 to 5, as in V1_2);
+  - 墨浪 / 枯朽萃聚使徒 special-enemy weight 10 → 0;
   - the leader weight of `boss_2` (假想敌：铳) 5 → 2;
   - 9 more enemies inactive in the Normal modes (one of them, 沉沙 `enemy_1207_sfji`, also in the Funny modes);
   - 拟态物质's `effectDesc` (`eff_acarm069` and the golden `eff_acgarm069`): the operator gained is the 初始干员, of the
@@ -132,7 +134,10 @@ keyed build tables, the hidden inputs and the warning classes.
 
   The commit made the same wording change in skill_table, in the two `sktok_acarm069_1` / `_2` descriptions. The table
   is a pinned build input, but the build does not read those rows. It also added a client drag fix, which is not a build
-  input. One added pin (`activity: ea164ef7…`) builds the hotfixed state instead.
+  input. One added pin (`activity: ea164ef7…`) builds the hotfixed state instead. That switch also updates the V1_1 row of
+  `test/data-versions.test.js` (`PINNED` effects 279 → 281, as `aceffect_enemy_4` / `_5` come in, and the assertion that
+  V1_1's pins hold only `default`) and the V1_1 row of the table above (effects 281, 4 756 757 bytes). The bb-audit
+  and keying expectations do not change.
 - **Adapters.** `bondActiveType` converts 上半's bond activation (ALL with the deck → BOARD_AND_DECK; MANI → BOARD with
   `['1']`, as 下半's maniShip) [ASSUMED]. `selfBackupPreset` makes 盟约·辅助干员 a PRESET backup with its default skill
   and module, as 下半 writes it [ASSUMED].
@@ -158,6 +163,11 @@ keyed build tables, the hidden inputs and the warning classes.
   full-bench swap and no shared boss. 上半's constData has no `singleReconnectTime` (`12e0a020` added it), so both 上半
   builds write `constants.singleReconnectTime: null` instead of the 下半 value. The lobby's own fallback then keeps a
   dropped solo run resumable for 24 h [ASSUMED] until 上半's solo exit rule is decided, together with the timed solo.
+- **Config carried over unreviewed [ASSUMED].** `tools/build-data.mjs` writes several rule constants as literals, and
+  both 上半 builds copy them as measured on 下半: `bans` (NORMAL / HARD 3 core + 4 addon; 下半 has 8 core bonds, 上半 6,
+  so the same draw bans half of 上半's), the `hiddenCore` extras (`minTeamLpExclusive`, `checkedAfterRound`, and
+  `difficulties`, which names ABYSS although 上半 has no ABYSS mode), `trophies`, the boss overtime and HP scale,
+  `unite`, `finalAssault` and `bandDraft`. They equal the default, so the blackboard audit cannot list them (§36.5).
 - **Loader.** `server/data.js` provides `versionDataDir`, `getVersionData` (lazy, cached and frozen) and
   `resetVersionData`. Nothing at run time calls them in M0. `loadData(DATA_DIR)` reads the top level only.
 - **`config.version` is the gate.** Data that carries it (a version's build) finds hand-written behaviour by charId and
@@ -184,7 +194,7 @@ keyed build tables, the hidden inputs and the warning classes.
     never takes the operator's other tier kit.
 - **Items** (SIM.md §7.2, META.md §2.1).
   - `items/battle.js BY_EFFECT`, 蒸汽之心 (`eff_acarm079`) and its hammers, the `items/meta.js` overrides and 凯瑟琳's
-    one-cell allowance (`eff_acarm072`, official normal records only; counted at the prep's pick and in her offers) all
+    one-cell allowance (`eff_acarm072`, official normal records only; counted at the prep's pick and in her later offers) all
     go through the normal record's effectId. On the default data they keep the item key (`DEFAULT_ITEM_KEYS`,
     `MUTATION_CELL_ID`, each override's default key).
   - A meta override is bound by its effectId **and** the buff key it reads (`items/meta.js OVERRIDES`): the same
@@ -248,7 +258,7 @@ directory, compared with the default data:
   Such a mechanic is silently inert: `garrisons/meta.js` runs `H[effectType]` and `garrisons/battle.js`
   `INSTALLERS[key]` only when a handler exists, without a warning.
 
-`kits/` is skipped for the first three, because kits read skill blackboards. Fields are matched by name across tables, so the audit
+`kits/` is skipped for the field and buff-key classes, because kits read skill blackboards. Fields are matched by name across tables, so the audit
 over-reports (for example `atk`) [ASSUMED]. The default data audited against itself has no finding.
 
 | | field gaps (non-neutral default) | absent code-named buff keys | unknown trigger rules | version-only keys no code names |
@@ -271,7 +281,8 @@ Besides those:
   and 耶拉冈德之泪.
 - Several 下半 prep keys are also absent. Among them is the key 寻呼模块's override reads; 上半 names its own,
   `use_equip_add_goods_rule_with_refresh_shop`, and the override binds nothing there (§36.4). M2 writes that mechanic.
-- **森蚺's `auto_chess_change_map`.** The audit compares bands by bandId, so a band only the version has is not audited.
+- **森蚺's `auto_chess_change_map`.** Its key is Touch's, which the default data has, so no class reports it (same key,
+  different meaning: the M2 audit).
   上半's 森蚺 (`band_zumama`, `aceffect_band_43`, both builds) carries Touch's key with device aliases
   (`trap_1104_aclasert#1`…`#4`: one 双眼皮 on every field, the alias format of 机变 cards). It is a device switch, not a
   map character. `bands/battle.js isMapCharBuff` accepts only Touch's map-character shape, so 森蚺 reports no battle part
@@ -292,6 +303,8 @@ Besides those:
   - six 上半 equipment keys: `sell_char_count_gain_equip_owner_original` (商业包装方案, `eff_acarm074`),
     `use_equip_give_char_to_player_most_bond` (信标, `eff_acarm109`), `use_equip_add_goods_rule_with_refresh_shop`
     (寻呼模块, above) and `act1autochess_equip_acarm055` / `078` / `102_global_buff`.
+- **`bans`.** The per-match bond ban draws 3 of 上半's 6 core bonds, a 下半 count (§36.3, config carried over); very
+  likely not 上半's rule.
 - **`AUTO_STOP`.** 上半's 斩业星熊 (`char_1044_hsgma2`, a 自选 operator) S3 `skchr_hsgma2_3` triggers on `AUTO_STOP`, one
   of the 15 rows of 上半's skillTriggerDataList. The engine does not implement it (`server/sim/skills.js`), and
   `validateAll` accepts it. M2 builds it; until then 上半's 自选 must not offer 斩业星熊 (round-50 design §2.9).
@@ -316,7 +329,8 @@ version-only keys with their records on every version directory.
   - every item runs its own effectId's handler, and each meta override binds only keys carrying its effectId and buff;
   - each directory's pinned counts: kit split, dispatched items and handlers, battle-effect items, 蒸汽之心's hammers
     (the version directory after the default exercises the hammer cache reset), bound meta keys and 突变细胞;
-  - 凯瑟琳's cell at the prep's pick;
+  - 凯瑟琳's cell at the prep's pick and in her later offers (the band's offer leaves out that directory's cell once
+    taken, never the default id; V1_1 has no 凯瑟琳 band); the official-record rules of 夕, 远牙 and 凯瑟琳 (a plugin record never counts);
   - the default data matches the baseline, and a plugin patch of an official `charId` / `effectId` on it keeps the old
     lookups;
   - 炎, 远牙, 夕 and the AI overlays (each of these fails on the code before M0).
@@ -329,6 +343,7 @@ The per-version rebuild tests need the pinned caches `.cache/gamedata@<sha>/` an
 
 - V1_1 without the 11-18 hotfix, and its enemy multipliers.
 - The labels.
+- The 下半 rule constants of `config.json` (`bans` and the rest, §36.3).
 - The two adapters.
 - The left-out 下半 tables and the research fallback.
 - Pool entries dropped.

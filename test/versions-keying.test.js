@@ -29,7 +29,7 @@ import {
 } from '../server/sim/content/kits/index.js';
 import { diyPool, diySlot, diySlotIds, isPrototypePick } from '../shared/diy.js';
 import { checkDiyPicks } from '../shared/protocol.js';
-import { setGameData, itemEffectKey, itemIdsWithEffect, isMutationCell, mutationCellIds } from '../server/sim/content/support/index.js';
+import { setGameData, itemEffectKey, itemIdsWithEffect, officialItemIdsWithEffect, isMutationCell, mutationCellIds } from '../server/sim/content/support/index.js';
 import { BATTLE_EFFECT_IDS, DEFAULT_ITEM_KEYS, battleEffectOf, hasBattleEffect, hammerKeys } from '../server/sim/content/items/battle.js';
 import { PlayerPrep } from '../server/match/player/prep.js';
 import { applyPatches } from '../shared/plugins/patch.js';
@@ -41,6 +41,7 @@ import { makeBattle, chessRec, enemyRec, checkInvariants } from './helpers/battl
 import { buildPlaybook } from '../server/ai/playbook.js';
 import { knowledgePack } from '../server/ai/knowledge.js';
 import { hasBattlePart as bandHasBattlePart } from '../server/sim/content/bands/battle.js';
+import { bandMetaHandler } from '../server/sim/content/bands/meta.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const QUIET = Object.freeze({ warn() {}, error() {}, info() {} });
@@ -406,6 +407,17 @@ test('itemEffectKey: golden → normal effect; plugin records follow effectRef, 
   assert.equal(isMutationCell('chess_item_5_08_e_a', v), true);
   assert.equal(isMutationCell('chess_item_5_08_e_b', v), false);
   assert.equal(isMutationCell('item_x_t_c', v), false);
+  // official records only: a plugin record without an effectRef is no cell even with the cell's effectId, and an
+  // official-id record that carries an effectRef (a copy of its base) is not an official record of that effect
+  const w = versioned({ ...base, items: { ...base.items,
+    item_x_t_d: { id: 'item_x_t_d', effectId: 'eff_acarm072' },
+    chess_item_9_98_e_a: { id: 'chess_item_9_98_e_a', effectRef: 'chess_item_5_08_e_a', effectId: 'eff_acarm072' },
+  } });
+  assert.equal(isMutationCell('item_x_t_d', w), false);
+  assert.equal(isMutationCell('chess_item_9_98_e_a', w), false);
+  assert.deepEqual(mutationCellIds(w), ['chess_item_5_08_e_a']);
+  assert.deepEqual(officialItemIdsWithEffect(w.items, 'eff_acarm072', { normalOnly: true }), ['chess_item_5_08_e_a']);
+  assert.deepEqual(officialItemIdsWithEffect(w.items, 'eff_acarm072'), ['chess_item_5_08_e_a', 'chess_item_5_08_e_b']);
 });
 
 test('凯瑟琳: picking the cell of the match\'s data from her offer uses the allowance (server/match/player/prep.js)', () => {
@@ -427,6 +439,35 @@ test('凯瑟琳: picking the cell of the match\'s data from her offer uses the a
     if (data.items.chess_item_5_08_e_a) assert.equal(pick(data, 'chess_item_5_08_e_a'), false, `${label(dir)}: the default id is another item`);
   }
 });
+
+for (const dir of DIRS) {
+  test(`凯瑟琳 on ${label(dir)}: once the cell is taken her later offers leave out that data's cell, never another id (bands/meta.js)`, (t) => {
+    const data = useDir(t, dir);
+    const cells = mutationCellIds(data);
+    assert.deepEqual(cells, EXPECT[label(dir)]?.cells ?? cells);
+    // V1_1 (20 strategies) has no 凯瑟琳 band
+    if (!data.bands?.band_cathy) { assert.ok(!isDefault(dir), 'the default data has band_cathy'); return; }
+    const h = bandMetaHandler('band_cathy');
+    assert.equal(typeof h?.onLevelUp, 'function', 'band_cathy offers on level-up');
+    // a stub pool: the first id not excluded; it holds the data's cell, the default cell id (another item, or none, in a
+    // version) and enough filler for a full offer
+    const pool = [...cells, ...(isDefault(dir) ? [] : ['chess_item_5_08_e_a']), 'filler_1', 'filler_2', 'filler_3'];
+    const offer = (taken) => {
+      const out = [];
+      h.onLevelUp({
+        data, counter: (k) => (k === 'band:cathy:cellTaken' ? taken : 0),
+        rollPool: (_id, { exclude = [] } = {}) => { const id = pool.find((x) => !exclude.includes(x)); return id ? { kind: 'item', id } : null; },
+        offerItems: (ids) => out.push(...ids),
+      });
+      return out;
+    };
+    assert.ok(cells.every((c) => offer(0).includes(c)), 'before the cell is taken it can be offered');
+    const after = offer(1);
+    assert.equal(after.length, 3, 'a full offer');
+    for (const c of cells) assert.ok(!after.includes(c), `${c} left out once taken`);
+    if (!isDefault(dir)) assert.ok(after.includes('chess_item_5_08_e_a'), 'the default cell id is not left out on another version');
+  });
+}
 
 // =====================================================================================================================
 // bonds, traits, tokens
@@ -451,11 +492,12 @@ test('reached(): on a version\'s build 9 炎 whose record lacks ex_bond_char_cnt
   }
 });
 
-test('远牙: on a version\'s build the trait its own traits grant gains on dollSwap under other chess and garrison ids', (t) => {
+for (const [farId, swapGains] of [['chess_char_4_99_a', 8], ['chess_x_test_far_a', 4]]) test(`远牙: on a version\'s build the trait its own traits grant gains on dollSwap under other chess and garrison ids (${farId}: ${swapGains === 8 ? 'official, gains' : 'a plugin chess, no grant'})`, (t) => {
   const data = versioned(clone(getData({ log: QUIET })));
-  // another version's ids: 远牙 at chess_char_4_99, its trait garrison_901_a granting garrison_902_a (a copy of 108)
-  const far = { ...data.chess.chess_char_4_20_a, chessId: 'chess_char_4_99_a', baseId: 'chess_char_4_99_a', goldenId: null, garrisonIds: ['garrison_901_a'] };
-  data.chess.chess_char_4_99_a = far;
+  // another version's ids: 远牙 at chess_char_4_99, its trait garrison_901_a granting garrison_902_a (a copy of 108);
+  // a plugin chess_x_ record with his charId adds no grant (official records only)
+  const far = { ...data.chess.chess_char_4_20_a, chessId: farId, baseId: farId, goldenId: null, garrisonIds: ['garrison_901_a'] };
+  data.chess[farId] = far;
   data.garrisons.garrison_901_a = { ...data.garrisons.garrison_148_a, garrisonId: 'garrison_901_a', bbStr: { give_garrison_id: 'garrison_902_a' } };
   data.garrisons.garrison_902_a = { ...data.garrisons.garrison_108_a, garrisonId: 'garrison_902_a' };
   setGameData(data);
@@ -463,7 +505,7 @@ test('远牙: on a version\'s build the trait its own traits grant gains on doll
   const bond = { count: 3, active: true, tier: 1, layers: 0 };
   const h = makeBattle({
     data: new DataSource(data, null),
-    units: [{ chessId: 'chess_char_4_99_a', row: 10, col: 3 }, { chessId: 'chess_char_2_11_a', row: 10, col: 8 }],
+    units: [{ chessId: farId, row: 10, col: 3 }, { chessId: 'chess_char_2_11_a', row: 10, col: 8 }],
     bonds: { kazimierzShip: bond, preciShip: bond }, autoFinish: false, timeLimit: 300,
   });
   h.step();
@@ -472,7 +514,7 @@ test('远牙: on a version\'s build the trait its own traits grant gains on doll
   assert.deepEqual(gains(), { kazimierzShip: 4, preciShip: 4 }, 'initial deployment');
   h.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
   assert.ok(u.alive && u.trait.doll, 'the lethal hit switches to a substitute');
-  assert.deepEqual(gains(), { kazimierzShip: 8, preciShip: 8 }, 'the switch gains');
+  assert.deepEqual(gains(), { kazimierzShip: swapGains, preciShip: swapGains }, 'the switch gains (official 远牙 only)');
   checkInvariants(h.b);
 });
 

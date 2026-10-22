@@ -816,14 +816,18 @@ every file system and URL).
   **The V1_1 hotfix [ASSUMED]**: `versionInfoDict` counts the 11-18 hotfix (`ea164ef70736ca2d1a356b3bf7b1cd7540960dc1`) as
   V1_1, and about 7 of V1_1's 11 days (11-18 → 11-25 16:00) ran on it. Every change the build reads is in
   `activity_table`, among them: leader HP ×0.75 (Funny / Normal pools; −5…−12.5% Hard), `modeFactorInfo.SINGLE`
-  1.0 → 1.25, `borrowCount` 8 → 20, the enemy effects 攻坚装备II / III, battlefield and special-enemy weights, the leader
-  weight of `boss_2` (假想敌：铳) 5 → 2, 9 more enemies inactive in the Normal modes (one of them, 沉沙 `enemy_1207_sfji`,
+  1.0 → 1.25, `borrowCount` 8 → 20, the enemy effects 攻坚装备II / III, 战场 m06 weight 40 → 60, m07 weight 40 → 5 and Hard
+  modes only (taken out of both Normal modes: their stage pool drops from 6 to 5, as in V1_2), 墨浪 / 枯朽萃聚使徒
+  special-enemy weight 10 → 0, the leader weight of `boss_2` (假想敌：铳) 5 → 2, 9 more enemies inactive in the Normal modes (one of them, 沉沙 `enemy_1207_sfji`,
   also in the Funny modes), and 拟态物质's `effectDesc` (`eff_acarm069` and the golden `eff_acgarm069`:
   "若已拥有至少2名该干员，则再获得1名该干员" became "该初始干员…同盟约初始干员"), so the hotfixed build's `effects.json` and item descriptions change too; the
   初始干员 wording is a note for 拟态物质's M2 handler. The commit made the same wording change in `skill_table.json`, in
   the two `sktok_acarm069_1` / `_2` descriptions, rows the build does not read (the table itself is a pinned input of
   the `character` group), and added a client Lua fix of a drag state, not a build input. The profile follows the
-  maintainer's default (launch day, `8303c922`); adding `activity: 'ea164ef7…'` to its pins builds the hotfixed V1_1.
+  maintainer's default (launch day, `8303c922`); adding `activity: 'ea164ef7…'` to its pins builds the hotfixed V1_1. That switch also updates the V1_1 row of
+  `test/data-versions.test.js` (`PINNED` effects 279 → 281, as `aceffect_enemy_4` / `_5` come in, and the assertion that
+  V1_1's pins hold only `default`) and the V1_1 row of DESIGN §36.3's counts table (effects 281, 4 756 757 bytes); the
+  bb-audit and keying expectations stay as they are.
 - **Cache**: a pinned file is cached in `.cache/gamedata@<sha>/<repo path>` and downloaded from
   `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/<sha>/zh_CN/gamedata/<path>` (about 50–60 MB per commit:
   the 8 tables and the 43 `act1autochess` level files). `--offline` / `--refresh` keep their per-file meaning; `--cache
@@ -862,6 +866,12 @@ every file system and URL).
   rewrite `12e0a020` added it), so the build writes no 下半 value as official data. The lobby's own fallback then keeps a
   dropped solo run resumable for 24 h (`server/lobby.js SOLO_RECONNECT_FALLBACK_SEC`) [ASSUMED] until 上半's solo exit
   rule is decided (M1 / M2, with the timed 上半 solo).
+  **Carried over unreviewed [ASSUMED]**: the rule constants `tools/build-data.mjs` writes as literals go into 上半's
+  `config.json` as measured on 下半 — `bans` (NORMAL / HARD 3 core + 4 addon: 下半 has 8 core bonds, 上半 6, so the same
+  draw bans half of 上半's), the `hiddenCore` extras (`minTeamLpExclusive`, `checkedAfterRound`, and `difficulties`,
+  which names ABYSS although 上半 has no ABYSS mode), `trophies`, `bossOvertimeAfter` / `bossOvertimeDrainPerSec` /
+  `bossHpScale`, `unite`, `finalAssault` and `bandDraft`. They equal the default, so `tools/bb-audit.mjs` cannot list
+  them; `bans` is an M2 item (DESIGN §36.5).
 - **`config.version`**: a non-default build appends `version: { id, family, rules }` as the last key of `config.json`;
   `data/config.json` never has it. A non-default directory also carries `tuning.json`, a byte copy of the hand-maintained
   `data/tuning.json` (a gameplay file `loadData` and the content hash read) [ASSUMED] the same tuning.
@@ -869,7 +879,8 @@ every file system and URL).
   deviation; `'none'` asserts that no chess skill and no backups form has a `TAKE_DAMAGE` row (上半 has no TANK row).
 
 **Tables keyed by stable ids** (so a version that reuses an id for something else is never matched by it: 50 of 上半's
-100 chess ids and 78 of its 89 item records name another operator or effect in 下半):
+100 chess ids name another operator in 下半; 72 of its 89 item records carry another effect in 下半 and 6 do not exist
+there):
 
 - `SHOP_EXCLUDED_ITEMS` and `ITEM_RULES` by the NORMAL item's `effectId` (`eff_acarm042`–`045` the four special 维式重锤,
   `eff_acarm072` 突变细胞; 上半's `chess_item_2_03_e_a` is 灼燃, not 战栗). The default version needs exactly one normal

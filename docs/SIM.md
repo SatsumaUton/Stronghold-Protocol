@@ -1142,7 +1142,7 @@ kitted gate drops, each directory matches its pinned resolution counts, and the 
 gate and test cover the other id-keyed behaviour, which a version's build finds by what the record is: equipment by the
 normal record's `effectId` (`items/battle.js` `BY_EFFECT`, `items/meta.js` — each override also needs the buff it reads,
 so 上半's 寻呼模块, the same effectId with another buff, binds nothing —, 蒸汽之心 and its hammers, 凯瑟琳's cell at the prep's
-pick), 远牙's granted trait (the traits 远牙's own traits grant, by charId), 夕's generic-kit dragon (by charId), and
+pick and in her later offers), 远牙's granted trait (the traits 远牙's own traits grant, by charId), 夕's generic-kit dragon (by charId), and
 `bonds/core.js reached()` (a threshold the record lacks is not reached: 上半's 炎 has no 9-member tier). `node tools/bb-audit.mjs --data <dir>` lists
 the blackboard fields a version lacks that the code reads with a default (e.g. 上半's 突袭 has no `no_attack_duration`,
 read with 10 in `bonds/addon/battle.js`), the buff keys the code names that the version lacks, the skill trigger rules
@@ -1155,7 +1155,7 @@ silently inert until M2 (DESIGN §36.5): in 上半, the traits of 煌 (`SERVER_G
 spells the field `give_garrion_id`; `garrisons/battle.js` reads `give_garrison_id`); the 标准模拟 band clause
 `act1autochess_band31_buff` on four bandIds 下半 also has; 灵巧's 20-layer award `bond_layer_refresh_shop_award_equip`
 and 远见's 100-layer discount; and six 上半 equipment keys (商业包装方案, 信标, 寻呼模块, `act1autochess_equip_acarm055` /
-`078` / `102_global_buff`). The field gaps compare bands by bandId, so a band only the version has is not audited: 上半's 森蚺 (`band_zumama`) carries Touch's key `auto_chess_change_map` with device aliases
+`078` / `102_global_buff`). No class reports 上半's 森蚺 (`band_zumama`): it carries Touch's key `auto_chess_change_map`, which the default data has (same key, different meaning: the M2 audit), with device aliases
 (`trap_1104_aclasert#1`…`#4`, one 双眼皮 on every field). `bands/battle.js isMapCharBuff` accepts only Touch's
 map-character shape, so 森蚺 has no battle part (nor the AI's team-support class) until M2 builds its device switch.
 Plugin dispatch (DESIGN §32.5, C2): extension registry → `def.raw.dsl` → `def.raw.skillSpec` → `def.raw.kitRef` → official registry → generic; explicit Battle test kits still take precedence. The extension registry stays empty for vanilla; P3a script compositions register SDK kits, enemy installs and battle modules (PLUGINS §13). `kitOf` calls `compileDsl` when the record carries `dsl`. The content-set builder stamps `pluginId`. A bad spec is refused at build. If compilation still throws (`PLUGIN_DSL_*`, or any throw while `raw.dsl` is set), the battle ends `forced` with `content:dsl` and does not field an empty or generic kit (DESIGN §32.7). Any other kit throw still falls back to generic. A one-skill DSL kit binds that default spec for a 自选 piece and a 补位 stand-in. The JSON SkillSpec allowlist is §7.3 without functions (validated by `shared/plugins/skillSpec.js`); `talentMods` adds permanent numeric mods. `kitRef` accepts an official key or file stem, never an import path.
