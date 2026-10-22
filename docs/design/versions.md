@@ -124,9 +124,11 @@ keyed build tables, the hidden inputs and the warning classes.
   - `borrowCount` 8 → 20;
   - the enemy effects 攻坚装备II / III;
   - the m06 / m07 battlefield weights and two special-enemy weights;
-  - 10 more enemies inactive in the Normal modes;
-  - 拟态物质's `effectDesc` (`eff_acarm069`): the operator gained is the 初始干员, of the same bond. The hotfixed build's
-    `effects.json` and item descriptions change with it; the wording is a note for 拟态物质's M2 handler.
+  - the leader weight of `boss_2` (假想敌：铳) 5 → 2;
+  - 9 more enemies inactive in the Normal modes (one of them, 沉沙 `enemy_1207_sfji`, also in the Funny modes);
+  - 拟态物质's `effectDesc` (`eff_acarm069` and the golden `eff_acgarm069`): the operator gained is the 初始干员, of the
+    same bond. The hotfixed build's `effects.json` and item descriptions change with it; the wording is a note for
+    拟态物质's M2 handler.
 
   The commit made the same wording change in skill_table, in the two `sktok_acarm069_1` / `_2` descriptions. The table
   is a pinned build input, but the build does not read those rows. It also added a client drag fix, which is not a build

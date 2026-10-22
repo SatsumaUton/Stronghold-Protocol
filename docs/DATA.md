@@ -816,9 +816,10 @@ every file system and URL).
   **The V1_1 hotfix [ASSUMED]**: `versionInfoDict` counts the 11-18 hotfix (`ea164ef70736ca2d1a356b3bf7b1cd7540960dc1`) as
   V1_1, and about 7 of V1_1's 11 days (11-18 → 11-25 16:00) ran on it. Every change the build reads is in
   `activity_table`, among them: leader HP ×0.75 (Funny / Normal pools; −5…−12.5% Hard), `modeFactorInfo.SINGLE`
-  1.0 → 1.25, `borrowCount` 8 → 20, the enemy effects 攻坚装备II / III, battlefield and special-enemy weights, 10 more
-  enemies inactive in the Normal modes, and 拟态物质's `effectDesc` (`eff_acarm069`: "若已拥有至少2名该干员，则再获得1名该干员"
-  became "该初始干员…同盟约初始干员"), so the hotfixed build's `effects.json` and item descriptions change too; the
+  1.0 → 1.25, `borrowCount` 8 → 20, the enemy effects 攻坚装备II / III, battlefield and special-enemy weights, the leader
+  weight of `boss_2` (假想敌：铳) 5 → 2, 9 more enemies inactive in the Normal modes (one of them, 沉沙 `enemy_1207_sfji`,
+  also in the Funny modes), and 拟态物质's `effectDesc` (`eff_acarm069` and the golden `eff_acgarm069`:
+  "若已拥有至少2名该干员，则再获得1名该干员" became "该初始干员…同盟约初始干员"), so the hotfixed build's `effects.json` and item descriptions change too; the
   初始干员 wording is a note for 拟态物质's M2 handler. The commit made the same wording change in `skill_table.json`, in
   the two `sktok_acarm069_1` / `_2` descriptions, rows the build does not read (the table itself is a pinned input of
   the `character` group), and added a client Lua fix of a drag state, not a build input. The profile follows the

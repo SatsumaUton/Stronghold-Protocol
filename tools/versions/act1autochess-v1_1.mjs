@@ -7,10 +7,11 @@
 // counts that hotfix as V1_1 (V1_2 starts 2025-11-25 16:00), and about 7 of V1_1's 11 days ran on it. Every change
 // the build reads is in activity_table, among them: leader HP ×0.75 (Funny / Normal pools, −5…−12.5% Hard),
 // modeFactorInfo.SINGLE 1.0 → 1.25, borrowCount 8 → 20, the enemy effects 攻坚装备II / III, battlefield and
-// special-enemy weights, 10 more enemies inactive in the Normal modes, and 拟态物质's effectDesc (eff_acarm069: 初始干员;
-// effects.json and the item descriptions change with it). The same wording changed in skill_table's two
-// sktok_acarm069 descriptions, rows the build does not read; the client drag fix is not a build input. To build the
-// hotfixed V1_1 instead, add
+// special-enemy weights, the leader weight of boss_2 (假想敌：铳) 5 → 2, 9 more enemies inactive in the Normal modes
+// (one of them, 沉沙 enemy_1207_sfji, also in the Funny modes), and 拟态物质's effectDesc (eff_acarm069 and the golden
+// eff_acgarm069: 初始干员; effects.json and the item descriptions change with it). The same wording changed in
+// skill_table's two sktok_acarm069 descriptions, rows the build does not read; the client drag fix is not a build
+// input. To build the hotfixed V1_1 instead, add
 // `activity: 'ea164ef70736ca2d1a356b3bf7b1cd7540960dc1'` to the pins below and rebuild.
 // The rest is as tools/versions/act1autochess.mjs.
 
