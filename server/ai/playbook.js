@@ -136,7 +136,13 @@ function recommendedSchedule(gd, operators) {
   });
 }
 
-export function buildPlaybook(data, { modeId, community = COMMUNITY } = {}) {
+/**
+ * The community evidence (strategy-community.js) lists default-data (下半) ids, which another official version gives to
+ * other operators and items: a non-default version's data (config.version) gets none until it has its own (M3).
+ */
+const NO_COMMUNITY = Object.freeze({ revision: null, mains: [], pairs: [], builds: [], roles: [] });
+
+export function buildPlaybook(data, { modeId, community = data?.config?.version ? NO_COMMUNITY : COMMUNITY } = {}) {
   const gd = new GameData(data, modeId);
   const operators = sorted(gd.visibleChess.map(id => {
     const c = gd.chess(id);
