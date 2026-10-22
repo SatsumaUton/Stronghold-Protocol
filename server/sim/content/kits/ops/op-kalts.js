@@ -22,7 +22,7 @@
 // - Trait (医师) "恢复友方单位生命": the profession default (one heal per attack on an injured ally of her 3-10 range), with T1's
 //   order: when she, her Mon3tr or — with no module — an operator Mon3tr (char_4179_monstr) is injured, the one of them with
 //   the lowest HP ratio (ties: herself); else the lowest HP ratio. Her heals reach her Mon3tr through its 禁疗, and her heal
-//   selection takes it (profile `healThrough`, damage.js heal / Battle.injuredAlliesInKeys); other 禁疗 units stay out.
+//   selection takes it (profile `healThrough`, attack/heal.js heal / Battle.injuredAlliesInKeys); other 禁疗 units stay out.
 // - Module PHY-X Mon2tr: ×heal_scale (1.15) on a heal whose target is at or below hp_ratio (50 %) before it
 //   (heal_scale_up[hpratio][LE]); stage 3 changes T2 (below). PHY-Y 医者: ×heal_scale on a heal whose target stands on a 地面
 //   tile (heal_scale_up[lowland]); stage 3 changes T1 (below). ISW-A 凯尔希特限证章: only its attributes act — its trait

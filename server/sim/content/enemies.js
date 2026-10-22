@@ -356,7 +356,7 @@ function chaliceShare(b, c) {
     if (!a || !(a.share > 0) || hypot(o.x - t.x, o.y - t.y) > a.r) continue;
     const part = c.dmg.amount * a.share;
     c.dmg.amount -= part;
-    // a 无来源 burst's share stays 无来源, credited like the burst (damage.js)
+    // a 无来源 burst's share stays 无来源, credited like the burst (attack/element.js)
     b.dealDamage(c.dmg.sourceless ? c.credit : c.source, o, { amount: part, type: c.dmg.type, canDodge: false, sourceless: c.dmg.sourceless, tags: [...(c.dmg.tags || []), 'chalice'] });
     break;
   }

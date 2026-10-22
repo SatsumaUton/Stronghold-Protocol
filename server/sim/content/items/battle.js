@@ -556,7 +556,7 @@ const BY_EFFECT = {
       S.buff(u, { key, mods, refresh: 'stack', stacks: 1, maxStacks: cap, persist: true, allowDead: true });
     });
   },
-  // 伪装服 (chess_item_4_04_e): first damage taken in the battle ⇒ 隐匿 `duration` s (a 流失 is not 受到伤害: damage.js isHpLoss)
+  // 伪装服 (chess_item_4_04_e): first damage taken in the battle ⇒ 隐匿 `duration` s (a 流失 is not 受到伤害: attack.js isHpLoss)
   eff_acarm055(battle, u, rec, S) {
     const p = bp(rec, 'act2autochess_equip_acarm055_global_buff');
     const d = p ? num(p.duration) : 0;
@@ -862,7 +862,7 @@ const SHIELD_KEY = 'item:shield_drone';
 
 /**
  * 弱点伤害 (双模机械臂, band 陈 以己之长): a physical or arts DamageInfo from `source` becomes whichever of the two types
- * `target` resists less (same mitigation formula as damage.js, incl. the source's ignore stats). Mutates `dmg.type`.
+ * `target` resists less (the mitigation formula of attack.js mitigate, incl. the source's ignore stats). Mutates `dmg.type`.
  */
 export function weaknessRetype(dmg, source, target) {
   if (!dmg || !target || !target.s || (dmg.type !== 'phys' && dmg.type !== 'arts')) return;

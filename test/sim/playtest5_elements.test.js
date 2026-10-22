@@ -1,7 +1,7 @@
 // test/sim/playtest5_elements.test.js — user playtest #5 report 3 (enemy side): "海嗣敌人元素损伤效率有点低 — check every
 // enemy's element damage and element gauge against the official game". Encodes the official numbers (enemy_database /
 // PRTS 元素 / 游戏数据基础 / the enemies' PRTS pages / gamedata_const termDescriptionDict) for the gauge pipeline
-// (server/sim/damage.js) and the enemies' element abilities (content/enemies.js):
+// (server/sim/attack/element.js) and the enemies' element abilities (content/enemies.js):
 //   · 海嗣 enemies take element damage at the full rate (损伤抵抗 0, 1000 / leader 2000) and deal ATK × ratio per hit;
 //   · 元素损伤倍率 (elemTakenMul) scales the gauge, 元素脆弱 (elementalTakenMul) the 元素伤害 — never each other;
 //   · 损伤抵抗 (epResistance) reduces the gauge, 元素抗性 (epDamageResistance) the 元素伤害 (both with the 5 % floor);

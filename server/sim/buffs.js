@@ -35,7 +35,7 @@ export const MUL_KEYS = Object.freeze([
  * Boolean flag keys (OR). `taunt` is also accepted as a numeric mod. `liftoff` = 起飞 of an ally (蒂比's skills): blocks
  * no ground enemy (Battle._blockerFor), 对地规避 against ground enemies (targeting.js evadesGround); it stays a ground
  * unit on its tile (`unit.ground` unchanged). `noHeal` = no heal from another unit (and no heal pick of one); `healFree`
- * = 禁疗 that also stops the unit's own heals (damage.js heal: only an HP-regen attribute and a heal that "无视禁疗" pass —
+ * = 禁疗 that also stops the unit's own heals (attack/heal.js heal: only an HP-regen attribute and a heal that "无视禁疗" pass —
  * 史尔特尔's 余烬, which sets both). `stealthOff` = an enemy 隐匿 source switched off after a block (Battle._stealthSwitch).
  */
 export const FLAG_KEYS = Object.freeze([
@@ -77,7 +77,7 @@ export const STATUS = Object.freeze({
   artsFragile: { mods: (v) => ({ artsTakenMul: 1 + (v ?? 0.3) }), valued: 0.3 },
   physFragile: { mods: (v) => ({ physTakenMul: 1 + (v ?? 0.3) }), valued: 0.3 },
   // 元素脆弱 (ba.elementfragile "受到的元素伤害提升相应比例（同名效果取最高）"): 元素伤害 (the 'elemental' HP damage) only —
-  // never the element gauge (元素损伤 has its own multiplier, `elemTakenMul`; damage.js)
+  // never the element gauge (元素损伤 has its own multiplier, `elemTakenMul`; attack/element.js)
   elemFragile: { mods: (v) => ({ elementalTakenMul: 1 + (v ?? 0.2) }), valued: 0.2 },
   silence: { flags: { silence: true }, immune: 'silence' },
   // 恐惧: 无法被阻挡并四散逃跑 (no attacks, unblockable; leaves its route and runs to random tiles of the fan away from the
@@ -174,7 +174,7 @@ export function makeBuff(b) {
     keepEmptyShield: !!b.keepEmptyShield,
     // Explicit original-game injury priority; ordinary effects use zero.
     injuryPriority: Number.isFinite(b.injuryPriority) ? b.injuryPriority : 0,
-    // a 屏障 that absorbs one damage type only (damage.js absorbShields): 'phys' | 'arts' | 'true' | 'elemental', or a list
+    // a 屏障 that absorbs one damage type only (attack/effects.js injuryEffects): 'phys' | 'arts' | 'true' | 'elemental', or a list
     // of them (机械师's 屏障: ['phys', 'arts']); null = every type (PRTS 术语释义 屏障 "若无特殊说明，屏障可吸收全种类伤害") —
     // 夜莺 S2 法术护盾 "能吸收…法术伤害"
     shieldType: b.shieldType ?? null,

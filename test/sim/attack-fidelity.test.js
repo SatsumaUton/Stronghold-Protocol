@@ -1,7 +1,6 @@
-// Intentional differences: compare the frozen original implementation where applicable, then assert sourced rules.
+// Intentional differences from the v0.3.1 settlement (DESIGN §35.32 records its outcomes): assert the sourced rules.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as old from '../../server/sim/damage.js';
 import { mitigate } from '../../server/sim/attack.js';
 import { makeBattle, chessRec, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
 
@@ -170,11 +169,9 @@ test('physical/arts element-burst damage uses normal dodge while burst status an
 });
 
 // PRTS 游戏数据基础 + 数值范围: fixed penetration is subtracted before percentage penetration.
-test('fixed/percentage penetration order: preserve baseline observations and assert the PRTS formula', () => {
+test('fixed/percentage penetration order: the PRTS formula (v0.3.1 gave 900 for both first cases)', () => {
   const target = { def: 300, res: 40 };
-  assert.equal(old.mitigate(1000, 'phys', target, { defIgnoreFlat: 50, defIgnorePct: 0.5 }), 900);
   assert.equal(mitigate(1000, 'phys', target, { defIgnoreFlat: 50, defIgnorePct: 0.5 }), 875);
-  assert.equal(old.mitigate(1000, 'arts', target, { resIgnoreFlat: 10, resIgnorePct: 0.5 }), 900);
   assert.equal(mitigate(1000, 'arts', target, { resIgnoreFlat: 10, resIgnorePct: 0.5 }), 850);
   assert.equal(mitigate(1000, 'phys', target, { defIgnoreFlat: 999, defIgnorePct: 0.5 }), 1000);
   assert.equal(mitigate(1000, 'phys', target, { defIgnorePct: 2 }), 1000);
@@ -239,22 +236,17 @@ test('overlapping Skadi S1 uses the strongest value and transfers each instance 
 
 // PRTS 元素: character-class allies and enemy-class entities have different burst rules.
 test('enemy-class allies retain enemy element bursts and leader gauge capacity, independently of their team', () => {
-  for (const original of [false, true]) {
-    const h = makeBattle({ defs: { enemies: { enemy_probe: enemyRec({ key: 'enemy_probe', hp: 100000, speed: 0, def: 0, res: 0 }) } },
-      units: [], content: 'none', autoFinish: false });
-    h.step();
-    const target = h.spawn('enemy_probe', { pos: [10, 9] });
-    target.side = 'ally';
-    const before = target.hp;
-    if (original) {
-      // The legacy burst internally calls Battle; bind that call to the independent baseline too.
-      h.b.dealDamage = (source, t, dmg) => old.dealDamage(h.b, source, t, dmg);
-      old.dealDamage(h.b, null, target, { amount: 1000, type: 'element', element: 'burn' });
-    } else h.b.dealElementDamage({ source: null, target, amount: 1000, element: 'burn' });
-    assert.equal(before - target.hp, original ? 1200 : 7000);
-    target.isBoss = true;
-    assert.equal(target.gaugeMax, 2000);
-  }
+  const h = makeBattle({ defs: { enemies: { enemy_probe: enemyRec({ key: 'enemy_probe', hp: 100000, speed: 0, def: 0, res: 0 }) } },
+    units: [], content: 'none', autoFinish: false });
+  h.step();
+  const target = h.spawn('enemy_probe', { pos: [10, 9] });
+  target.side = 'ally';
+  const before = target.hp;
+  h.b.dealElementDamage({ source: null, target, amount: 1000, element: 'burn' });
+  // the enemy burst (7000 元素伤害); v0.3.1 chose by the current side and dealt the operators' 1200 arts
+  assert.equal(before - target.hp, 7000);
+  target.isBoss = true;
+  assert.equal(target.gaugeMax, 2000);
 });
 
 function skadiModuleArena(two = false) {

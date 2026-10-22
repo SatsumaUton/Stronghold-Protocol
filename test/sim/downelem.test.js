@@ -1,5 +1,5 @@
 // test/sim/downelem.test.js — user playtest #4 items 8 and 9, sim side (server/sim/Battle.js snapshot / fieldMeta,
-// damage.js elementView): b.snap `down` lists the knocked-out operators waiting to redeploy on the tile they lie on (the
+// attack/element.js elementView): b.snap `down` lists the knocked-out operators waiting to redeploy on the tile they lie on (the
 // client keeps them there knocked down with a redeploy countdown) and `elem` the element gauge each unit shows
 // (PRTS 元素: the fullest gauge, its 爆发冷却) — entries, states, and what is left out. User playtest #5 item 2: an
 // operator entering a battle knocked out (联防 carryState `down`, constants.js FORCED_EXIT) is down the same way.

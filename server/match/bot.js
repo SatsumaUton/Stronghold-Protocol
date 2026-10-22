@@ -837,7 +837,7 @@ function dpsOf(rec) {
   return rec.attackKind === 'none' ? d * 0.4 : d;
 }
 
-/** Damage per second of a record against one enemy's DEF / RES (one hit mitigated like the sim, damage.js mitigate). */
+/** Damage per second of a record against one enemy's DEF / RES (one hit mitigated like the sim, attack.js mitigate). */
 function dpsVs(rec, def, res) {
   const st = rec && rec.stats;
   if (!st || isHealer(rec)) return 0;

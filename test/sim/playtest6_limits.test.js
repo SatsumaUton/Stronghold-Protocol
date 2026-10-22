@@ -5,7 +5,7 @@
 // (AutoChessBattleConst.MAX_BATTLE_DAMAGE) is cancelled: 0 damage, nothing credited to the shared pool.
 //
 // This file: the switches (shared/constants.js), the in-battle layer copy (Battle.addLayers / support.gainLayers) and
-// the hit limit in the damage pipeline (server/sim/damage.js leaderHitCancelled: dealDamage, Battle.loseHp).
+// the hit limit in the damage pipeline (server/sim/attack/health.js leaderHitCancelled: Battle.dealDamage, Battle.dealHPLose).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +19,7 @@ import { buildBossWave, setupMatchWaves } from '../../server/match/waves.js';
 import { createRng } from '../../server/sim/rng.js';
 import { GEO } from '../../shared/constants.js';
 import { getData } from '../../server/data.js';
-import { leaderHitCancelled } from '../../server/sim/damage.js';
+import { leaderHitCancelled } from '../../server/sim/attack/health.js';
 import { grantHitShield } from '../../server/sim/content/enemies/helpers.js';
 
 const DATA = getData({ log: { warn() {}, error() {}, info() {} } });

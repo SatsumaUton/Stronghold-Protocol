@@ -2,7 +2,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeBattle, chessRec } from '../helpers/battleHarness.js';
-import * as baseline from '../../server/sim/damage.js';
 
 function fixture() {
   const h = makeBattle({ defs: { chess: { probe: chessRec({ id: 'probe', stats: { maxHp: 1000, def: 0 }, skill: null }) } },
@@ -69,15 +68,6 @@ for (const first of ['shield', 'dodge']) {
     assert.equal(rolls(), first === 'shield' ? 0 : 1);
   });
 }
-
-test('baseline counterexample: shield acquired before dodge was ignored by the old dodge-first branch', () => {
-  const { b, t, rolls } = fixture();
-  b.addBuff(t, { key: 'shield', shieldHits: 1 });
-  b.addBuff(t, { key: 'dodge', mods: { dodgePhys: 1 } });
-  baseline.dealDamage(b, null, t, { amount: 100, type: 'phys' });
-  assert.equal(t.findBuff('shield').shieldHits, 1);
-  assert.equal(rolls(), 1);
-});
 
 test('priority overrides acquisition order; independent dodge effects stop after successful cancellation', () => {
   const { b, t, rolls } = fixture();

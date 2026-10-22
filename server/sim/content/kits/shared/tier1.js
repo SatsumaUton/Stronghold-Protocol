@@ -76,7 +76,7 @@ export const byEnemyDamage = (ctx) => {
 /** @deprecated Use byEnemyDamage: these injury effects do not require an attack action. */
 export const byEnemyAttack = byEnemyDamage;
 /**
- * `damaged` ctx of a damage that removed HP and can give 受击回复 SP — the engine's rule (damage.js applyHpLoss: not a 流失
+ * `damaged` ctx of a damage that removed HP and can give 受击回复 SP — the engine's rule (attack/health.js applyHpDecrease: not a 流失
  * (`noSp`, Battle.loseHp), not an element 损伤), whatever its source: an attack, a zone, the 无来源 源石溶剂 tick.
  */
 export const hurtSpDamage = (ctx) => !!ctx.dmg && !ctx.dmg.noSp && ctx.type !== 'element' && ctx.amount > 0;

@@ -188,7 +188,7 @@ export function elem(b, src, tgt, el, amount, { ignoreSelect = false, tags = [] 
 /**
  * Skill / ability damage (no dodge unless asked). `ignoreSelect` = no selection the target's 无法选择 effects stop
  * (abilities that "无视无法选择", direct picks, a flying unit's blast credited to a ground leader): it also reaches an
- * airborne 起飞 ally, which a ground enemy's damage otherwise skips (damage.js, targeting.js evadesGround).
+ * airborne 起飞 ally, which a ground enemy's damage otherwise skips (attack/helpers.js liftoffEvades, targeting.js evadesGround).
  */
 export function hurt(b, src, tgt, amount, type = 'phys', { canDodge = false, tags = [], isSkill = true, ignoreSelect = false } = {}) {
   if (!tgt || !tgt.alive || !(amount > 0)) return 0;
@@ -414,7 +414,7 @@ export {
 // Transitional support for the unconverted Spring boss; removed in group 05.
 /**
  * Final HP damage the pipeline would deal for a phys/arts/true/elemental `dmg` before shields (mitigation is linear in
- * the amount) — the same terms as damage.js dealDamage (元素伤害: 元素抗性 + elementalTakenMul, no dmgTakenMul).
+ * the amount) — the terms of the v0.3.1 settlement (元素伤害: 元素抗性 + elementalTakenMul, no dmgTakenMul).
  */
 export function expectedFinal(src, tgt, dmg) {
   const ts = tgt.s, ss = src && src.s && !dmg.sourceless ? src.s : null, ty = dmg.type; // 无来源 (bursts): no source stats
@@ -423,7 +423,7 @@ export function expectedFinal(src, tgt, dmg) {
     resIgnorePct: (dmg.resIgnorePct || 0) + (ss ? ss.resIgnorePct : 0), resIgnoreFlat: (dmg.resIgnoreFlat || 0) + (ss ? ss.resIgnoreFlat : 0),
     elementalRes: ty === 'elemental' ? (tgt.def?.epDamageResistance ?? 0) : 0,
   });
-  let mul = (dmg.mul ?? 1) * (ty === 'elemental' ? 1 : ts.dmgTakenMul); // 脆弱 skips 元素伤害 (damage.js)
+  let mul = (dmg.mul ?? 1) * (ty === 'elemental' ? 1 : ts.dmgTakenMul); // 脆弱 skips 元素伤害
   if (ss) mul *= ss.dmgDealtMul * (ty === 'phys' ? ss.physDealtMul : ty === 'arts' ? ss.artsDealtMul : 1);
   mul *= ty === 'phys' ? ts.physTakenMul : ty === 'arts' ? ts.artsTakenMul : ty === 'elemental' ? ts.elementalTakenMul : ts.trueTakenMul;
   const f = v * mul;

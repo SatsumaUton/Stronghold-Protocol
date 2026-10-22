@@ -28,7 +28,7 @@
 //   canAttack(battle, unit) → bool             afterAttack(battle, unit, targets)
 //   skipEnemy(enemy) → bool (an enemy the unit never selects — targeting.js canTargetEnemy; 嵯峨 "不攻击重伤单位")
 //   healThrough(healer, ally) → bool (a healer that selects and heals that ally through its 禁疗 — Battle
-//                             injuredAlliesInKeys, damage.js heal; 凯尔希 on her Mon3tr)
+//                             injuredAlliesInKeys, attack/heal.js heal; 凯尔希 on her Mon3tr)
 //   hitsFn(battle, unit, info) → n (info: the hit's { isSkill, index, attackId, energy })
 //   hitDmgMul n (伤害倍率 of each of the `hits` instances on the main target: DamageInfo `mul`, applied after DEF / RES
 //                and the damage multipliers, not 攻击倍率 — a 频次 enemy still loses 1 per instance; the instances after
@@ -240,7 +240,7 @@ const installDollkeeper = (battle, unit) => {
     };
     battle.addBuff(unit, {
       key: 'trait:dollSwitching', duration: DOLL_SWITCH, onExpire: ended, onRemove: done,
-      // noHeal refuses another unit's heal; healFree is 禁疗 (damage.js: a self-heal is 0 too, regen excepted). The
+      // noHeal refuses another unit's heal; healFree is 禁疗 (attack/heal.js: a self-heal is 0 too, regen excepted). The
       // window still ends at full HP — onExpire writes it, it does not heal.
       flags: { invulnerable: true, noSp: true, noHeal: true, healFree: true, isolated: true, disarm: true },
     });
@@ -436,7 +436,7 @@ export const BARD_REGEN_DUR = 0.5;
  * 来增加受益者的“生命回复速度”属性" — an hpRegen buff of `value` (the bard's ATK × ratio) on `ally`, one per bard (two bards
  * add up), which the caller refreshes before it lapses (`duration`, default BARD_REGEN_DUR). No heal: 禁疗 and 无法被友方
  * 治疗 (收割者 / 不屈者 / 武者 noHeal) do not stop it — PRTS 异常效果 禁疗 "增减生命回复速度…的效果不会被识别为治疗类能力"; the
- * regeneration tick is the ally's own (damage.js heal `regen`, no 治疗加成). The `bardRegen` hook { unit (the bard),
+ * regeneration tick is the ally's own (attack/heal.js heal `regen`, no 治疗加成). The `bardRegen` hook { unit (the bard),
  * target, value } may scale one ally's share (魔王's 微尘: "使该干员受到魔王特性效果提升至1.5倍"). Also the 海嗣 range of
  * 浊心斯卡蒂 (content/tokens.js, kits/ops/chess_char_6_04-skadi2.js).
  */

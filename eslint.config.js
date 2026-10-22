@@ -89,10 +89,6 @@ export default [
     // leaves these Math functions (and **) implementation-approximated: engines differ in the last bits.
     files: ['server/sim/**/*.js'],
     rules: {
-    'no-restricted-imports': ['warn', { patterns: [{
-      regex: '(^|/)damage\\.js$',
-      message: 'Legacy damage.js: use the public attack.js entry for new code.',
-    }] }],
       'no-restricted-properties': ['error', ...APPROXIMATED_MATH.map((property) => ({
         object: 'Math', property, message: 'implementation-approximated (engines differ in the last bits): use server/sim/detmath.js',
       }))],
@@ -103,13 +99,13 @@ export default [
     },
   },
   {
-    // Content callers use one public entry; the facade, implementation and legacy bridge own deep imports.
+    // Content callers use one public entry (server/sim/attack.js); the facade, its implementation and the Battle methods
+    // (battle/combat.js) own the deep imports. Tests may import the implementation directly.
     files: ['server/**/*.js', 'public/js/**/*.js'],
     ignores: ['server/sim/attack.js', 'server/sim/attack/**', 'server/sim/battle/combat.js'],
     rules: {
-      'no-restricted-imports': ['warn', { patterns: [
+      'no-restricted-imports': ['error', { patterns: [
         { regex: '(^|/)attack/', message: 'Use public exports from attack.js; attack/ is private implementation.' },
-        { regex: '(^|/)damage\\.js$', message: 'Legacy damage.js: use the public attack.js entry for new code.' },
       ] }],
     },
   },

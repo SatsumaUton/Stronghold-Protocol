@@ -1452,7 +1452,7 @@ function definedFields(over) {
 /**
  * enemy_database attribute → enemies.json stat. The two element resistances (PRTS 元素 / 游戏数据基础 / enemy pages):
  * `epResistance` (EP_RESISTANCE) = 损伤抵抗, % off element gauge fills → `elementRes`; `epDamageResistance` = 元素抗性,
- * % off 元素伤害 (element HP damage) → `elementDmgRes` (sim: server/sim/damage.js).
+ * % off 元素伤害 (element HP damage) → `elementDmgRes` (sim: server/sim/attack/calculation.js mitigate).
  */
 const ENEMY_STAT_FIELDS = {
   maxHp: 'maxHp', atk: 'atk', def: 'def', magicResistance: 'res', moveSpeed: 'moveSpeed',

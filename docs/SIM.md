@@ -26,7 +26,6 @@ server/sim/
   buffs.js         Buff model, mod keys, status catalogue
   attack.js        public settlement operations and helpers
   attack/          damage calculation, ordered injury effects, HP, gauges and healing
-  damage.js        independent deprecated comparison implementation
   targeting.js     range grids (rotated by the unit direction), target filters, priorities
   body.js          where a unit can be hit: huge units' hit rectangles — the helper of every range test on enemies
   dir.js           the 4 deploy directions: vectors, rotation, mirror (shared with server/match and browsers)

@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as api from '../../server/sim/attack.js';
-import * as legacy from '../../server/sim/damage.js';
 import { makeBattle, chessRec, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
 
 function arena() {
@@ -23,7 +22,6 @@ test('attack API exposes five operations and public helpers while keeping pipeli
     'hasHp', 'isHpLoss', 'makeDamageInfo', 'periodicDamage', 'damageAttackType', 'damageApplyWay',
     'damageDodgeMode', 'cancelDamage', 'mitigate', 'attackInput', 'burstLocked', 'elementView', 'palsyBuff', 'reserveTransfer',
   ].sort());
-  for (const name of ['dealDamage', 'heal', 'makeDamageInfo', 'mitigate', 'reduceElement']) assert.equal(typeof legacy[name], 'function');
 });
 
 test('sourced and sourceless entries share target mitigation, shields and hooks; credit grants no attacker multiplier', () => {
@@ -240,16 +238,13 @@ for (const mode of ['heal', 'regen', 'restore']) test(`${mode} reports HP change
   assert.deepEqual(b.errors, []);
 });
 
-test('new source-less gauge semantics explicitly differ from the old overloaded element source', () => {
-  for (const old of [true, false]) {
-    const { b, u, e } = arena();
-    let source;
-    b.on('elementHit', c => { source = c.source; });
-    if (old) legacy.dealDamage(b, u, e, { amount: 10, type: 'element', element: 'burn', sourceless: true });
-    else api.dealElementDamage(b, { source: null, credit: u, target: e, amount: 10, element: 'burn' });
-    assert.equal(source, old ? u : null);
-    assert.equal(u.stats.elem, 10);
-  }
+test('a source-less gauge fill keeps no source while its credit counts it (v0.3.1 showed the filler as the source)', () => {
+  const { b, u, e } = arena();
+  let source;
+  b.on('elementHit', c => { source = c.source; });
+  api.dealElementDamage(b, { source: null, credit: u, target: e, amount: 10, element: 'burn' });
+  assert.equal(source, null);
+  assert.equal(u.stats.elem, 10);
 });
 
 test('credit controls the shared-pool player tally while the source remains independent', () => {

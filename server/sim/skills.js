@@ -328,7 +328,7 @@ export class SkillRuntime {
   gainSp(amount, reason = 'time', silent = false, { ignoreLock = false } = {}) {
     if (this.noSkill || this.kind === 'passive' || !(amount > 0)) return 0;
     if (this.active && this.isTimed && reason !== 'init' && !ignoreLock) return 0;
-    // 阻回 (the operators' 凋亡 burst, damage.js): "停止并阻止任意形式的技力回复" — no SP of any kind (time, attack, hurt, gifts)
+    // 阻回 (the operators' 凋亡 burst, attack/element.js): "停止并阻止任意形式的技力回复" — no SP of any kind (time, attack, hurt, gifts)
     if (reason !== 'init' && !ignoreLock && this.unit.s.flags.noSp) return 0;
     let cost = this.spCost;
     if (this.charges >= this.maxCharges && this.sp >= cost) return 0;

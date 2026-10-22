@@ -3,7 +3,7 @@
 // dmg tuple that already fires; a dodge of such a hit sets num:'m' on the dodge fx that already fires. No new event.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { officialDamageMark } from '../../server/sim/damage.js';
+import { officialDamageMark } from '../../server/sim/attack/hit.js';
 import { makeBattle, chessRec, enemyRec } from '../helpers/battleHarness.js';
 
 const approx = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) <= eps, `${a} ≈ ${b}`);
