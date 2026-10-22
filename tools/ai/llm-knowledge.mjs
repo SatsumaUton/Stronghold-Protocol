@@ -23,7 +23,7 @@ function slimView(pack) {
   return {
     schema: pack.schema, version: pack.version, language: pack.language, modeId: pack.modeId,
     rulesSummary: pack.rulesSummary, economy: pack.economy,
-    bonds: (pack.bonds || []).map(b => ({ id: b.id, name: b.name, thresholds: b.thresholds, countMode: b.countMode,
+    bonds: (pack.bonds || []).map(b => ({ id: b.id, name: b.name, kind: b.core ? 'core' : 'class', thresholds: b.thresholds, countMode: b.countMode,
       countsGoldenOnly: b.countsGoldenOnly, effect: b.effect })),
     operators: (pack.operators || []).map(o => ({ id: o.id, name: o.name, tier: o.tier, cost: o.cost, class: o.class,
       bonds: o.bonds || [], caps: capsOf(o, byId), trait: trait(o), skill: o.skill?.name || '' })),

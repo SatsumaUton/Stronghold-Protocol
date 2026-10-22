@@ -1,7 +1,7 @@
 // §35.12. [ASSUMED] Reproducible candidate policy, not an optimizer or official build prescription.
 // Only a static playbook and the existing seat-visible digest enter this module. No Match/GameData/live pool.
 import { cycleCandidates } from './cycle-candidates.js';
-import { communityCandidates, survivalScore } from './community-candidates.js';
+import { communityCandidates, survivalScore, finalAssaultScore } from './community-candidates.js';
 const unique = xs => [...new Set(xs)];
 const rank = (a, b) => b.score - a.score || a.id.localeCompare(b.id);
 const cheap = (a, b) => a.tier - b.tier || a.cost - b.cost || a.id.localeCompare(b.id);
@@ -85,6 +85,10 @@ export function strategyCandidates(playbook, digest, previousPlan = null) {
       const communityRole = playbook.community.roles.find(r => r.band === band.id);
       const role = communityRole?.role === 'supplier' && !teammates.length ? 'carry'
         : communityRole?.role || (band.roleClasses.includes('economy') && !band.bondIds.length ? 'economy' : 'carry');
+      // §35.24 [ASSUMED]: a carry's main is a core faction bond (thresholds 3/6). A class bond (迅捷 2, 精准 2/3 …) has
+      // nothing past its first threshold to build toward: in cycle 2 every 迅捷 / 精准 / 坚守 main dealt 2-6 % of the
+      // leader pool. A band engine tied to a class bond and the safety-net / supplier / economy roles keep theirs.
+      if (role === 'carry' && main.core === false && !band.bondIds.includes(main.id)) continue;
       const preferred = playbook.community.pairs.find(p => p.main === main.id)?.subs || [];
       const options = legal.filter(b => b.id !== main.id).map(b => {
         const edge = playbook.graph.find(e => e.bonds.includes(main.id) && e.bonds.includes(b.id));
@@ -105,6 +109,7 @@ export function strategyCandidates(playbook, digest, previousPlan = null) {
           community: band.communityMain?.main === main.id ? 8 : 0,
           earlyAccess: Math.min(early.length, 5) * 2,
           timing: -(main.thresholds[0]?.estimatedRound ?? 16),
+          finalAssault: finalAssaultScore(playbook, main, members, preferred, profile),
           progress: progress * 5, continuity: previousMain === main.id ? 14 : 0,
           contention: -24 * contested(main.id) - members.filter(c => taken(c.id)).length * 2,
           coverage: (profile.needs.length - missing.length) * 4 - missing.length * 9 - earlyMissing.length * 3,

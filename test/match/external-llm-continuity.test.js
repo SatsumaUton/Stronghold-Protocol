@@ -18,7 +18,8 @@ test('example repair preserves reasoned level holds and drops an unexplained hol
 });
 
 test('§35.23 repair drops level holds below the slow curve unless a candidate holds that level; item buys move', () => {
-  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 13].map(holdFloor), [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
+  // §35.24: L2 by R4 (not R3) and L6 by R11.
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13].map(holdFloor), [1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]);
   const economy = { level: 2, holdLevel: true, why: 'Price drops next round.' };
   const late = { ...fixture.digest, round: 5, economy: { ...fixture.digest.economy, level: 2 } };
   const dropped = repairPlan({ economy }, pack, late, []);

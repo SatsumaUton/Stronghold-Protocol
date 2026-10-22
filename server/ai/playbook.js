@@ -174,7 +174,7 @@ export function buildPlaybook(data, { modeId, community = data?.config?.version 
       return { count, estimatedRound: r ? r.round : null,
         basis: count > capacity ? 'needs capacity/count modifiers' : elite ? 'expected merge encounters; not owned elites' : 'expected distinct sightings and budget' };
     });
-    return { id, name: b.name, countMode: b.countMode, eliteOnly: !!elite, noStack: !!b.noStack,
+    return { id, name: b.name, core: !!b.isCore, countMode: b.countMode, eliteOnly: !!elite, noStack: !!b.noStack,
       membersByTier: Object.fromEntries(uniq(members.map(c => c.tier)).sort((a, b) => a - b).map(t => [t, members.filter(c => c.tier === t).map(c => c.id)])),
       thresholds, coverage: Object.fromEntries(['air', 'reveal', 'elementRecovery', 'elementDamage', 'block', 'sustain']
         .map(k => [k, members.filter(c => c.capabilities[k]).map(c => c.id)])),
@@ -228,7 +228,8 @@ export function buildPlaybook(data, { modeId, community = data?.config?.version 
         meanLevel: (gd.modeId === 'mode_single_hard' ? [2, 3.6667, 5, 6] : [2, 3.9167, 5, 6])[i] })),
       caveat: 'Small vanilla sample, surviving seats only. Re-run botbench for changed content; explain falling behind, never treat it as a hard cap.',
     } : null,
-    community: { revision: community.revision, pairs, builds, roles: community.roles || [] }, warnings,
+    community: { revision: community.revision, pairs, builds, roles: community.roles || [],
+      ...(community.bossCounters ? { bossCounters: community.bossCounters.filter(e => e.bonds.every(validBond)) } : {}) }, warnings,
     enemies: sorted(Object.entries(data.enemies || {}).map(([id, e]) => ({ id, types: e.acTypes || [], fly: !!e.isFlyEnemy,
       def: e.stats?.def || 0, res: e.stats?.res || 0, inactiveIn: e.inactiveIn || [] }))),
     factions: Object.values(data.factions?.types || {}).map(f => ({ id: f.type, enemies: f.pool })),
