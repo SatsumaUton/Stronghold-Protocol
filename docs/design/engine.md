@@ -386,7 +386,7 @@ Sources: [伤判效果](https://prts.wiki/w/伤判效果), [伤害分类](https:
 | Lord additions | Use each operator's template inputs and eligibility; precomputed ADDITION skips the source calculation event, retains target calculation and DEF/RES, and remains distinct from attack behavior. No profession-wide guess replaces per-template filters. |
 | [棘刺](https://prts.wiki/w/棘刺) | Fixed BUFF poison is precomputed and ordinarily dodgeable; S2 filters native type and counters after 0.5 s; Delta derives gauge intake from source output. |
 | [仇白](https://prts.wiki/w/仇白) | Check control after the authored 0.1 s delay, then issue precomputed ADDITION; first-hit marks are deployment-local. |
-| Weakness selection | Compare only attack input/scales, target input addition, penetration and DEF/RES, without dispatching speculative events. Source: [下半盟约记录](https://prts.wiki/w/卫戍协议：盟约_下半/PRTS盟约记录). |
+| Weakness selection | The 混乱 trait (`garrisons/battle.js weaknessType`): at each source calculation of phys / arts damage (not precomputed or source-less damage), compare the theoretical phys and arts damage from attack input/scales, the target's arts input addition, penetration and DEF/RES only — no damage multiplier or injury effect, no speculative event; near-equal keeps the type. 双模机械臂, 以己之长 and 赤刃明霄陈 still decide in `hit` with the mitigation-only comparison (`items/battle.js weaknessRetype`). Sources: [术语释义 弱点伤害](https://prts.wiki/w/术语释义), [下半盟约记录](https://prts.wiki/w/卫戍协议：盟约_下半/PRTS盟约记录) (混乱 备注). |
 
 [ASSUMED] Mode hit-limit placement, Stead/barrier order and mixed parallel sharing, initial acquisition/reapplication
 ties, some inherited cancellation masks, literal-zero dispatch, exact 30 Hz deadlines and projectile sampling remain
