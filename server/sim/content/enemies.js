@@ -237,19 +237,31 @@ function onBeforeAttack(b, c) {
  * attack-clip stand after it (昆图斯 is 自缚).
  */
 function attackSlotSkill(b, e, c) {
+  if (!attackTurnSkill(b, e)) return false;
+  c.targets = [];
+  e.atkCd = e.s.interval;
+  return true;
+}
+
+/**
+ * The attack's turn of enemy `e` has come: cast its ready attack-class skill (`atk`) — the highest priority (`a.pr`, else
+ * the data's `sk.pr`), equal ones at random (`b.rng`) — and return true, or return false (the turn goes to the attack).
+ * The engine's swing calls it at the damage frame (attackSlotSkill); a kit whose leader attacks through its own loop
+ * (假想敌：管 / 弦's strikes on 余音, “萨米的意志”'s 【冰凌】: bosses.js) calls it when that loop's attack is due and has a
+ * target, and skips the attack when it returns true (DESIGN §35.29).
+ */
+export function attackTurnSkill(b, e) {
   const ab = e.mem.ab;
+  if (!ab) return false;
   let ready = null, top = -Infinity;
   for (const a of ab.list) {
-    if (!a.atk || !a.fire || a.cd == null || a.left > 1e-9) continue;
+    if (!a || !a.atk || !a.fire || a.cd == null || a.left > 1e-9) continue;
     if (!canCast(e, a.sil, b) || (a.cond && !safe(b, e, () => a.cond(b, e, a)))) continue;
-    const pr = (a.sk && a.sk.pr) || 0;
+    const pr = a.pr ?? ((a.sk && a.sk.pr) || 0);
     if (pr > top) { top = pr; ready = [a]; } else if (pr === top) ready.push(a);
   }
   if (!ready) return false;
-  const pick = ready.length > 1 ? b.rng.pick(ready) : ready[0];
-  c.targets = [];
-  e.atkCd = e.s.interval;
-  castNow(b, e, pick);
+  castNow(b, e, ready.length > 1 ? b.rng.pick(ready) : ready[0]);
   return true;
 }
 

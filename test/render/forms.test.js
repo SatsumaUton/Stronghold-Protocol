@@ -638,3 +638,13 @@ test('镜膜: first silence switches all clips to the stopped B form, including 
     } finally { v.destroy(); }
   }
 });
+
+describe('second forms leave their skill slot\'s clip to the cast (DESIGN §35.29)', () => {
+  test('杰斯顿·威廉姆斯 / 锏 form2: no `skill` role, so C2_Skill / B_Skill2 (anims.skills) play the casts', () => {
+    for (const key of ['enemy_1516_jakill', 'enemy_1525_blkswb']) {
+      const roles = FORMS[key].form2.roles;
+      assert.ok(!Object.hasOwn(roles, 'skill'), `${key}: no form skill role`);
+      assert.ok(roles.attack && roles.idle, `${key}: its own attack and idle clips stay`);
+    }
+  });
+});
