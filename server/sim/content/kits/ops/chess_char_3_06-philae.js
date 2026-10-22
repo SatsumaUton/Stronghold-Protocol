@@ -2,7 +2,7 @@
 // Conventions of the tier-3 kits: ../shared/tier3.js; kit contract and rules: ../README.md.
 
 import { num, defOf, talentBb, traitBb, selectedId, altSkills, fx, NINE, giveSp } from '../shared/tier3.js';
-import { isHpLoss } from '../../../damage.js';
+import { isHpLoss } from '../../../attack.js';
 
 export default {
   // ---- 3_06 菲莱 · 本源铁卫 — S2 冥河诅咒: stops attacking, HP +; "受到攻击时" — any damage instance she takes (official

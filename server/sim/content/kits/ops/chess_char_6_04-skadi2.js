@@ -2,7 +2,7 @@
 // Conventions of the tier-6 kits: ../shared/tier6.js; kit contract and rules: ../README.md.
 
 import { aggregateMods } from '../../../buffs.js';
-import { applyRedirectCut, redirectShare } from '../../../damage.js';
+import { applyRedirectCut, redirectShare } from '../../../attack.js';
 import { COLS } from '../../../constants.js';
 import { bardRegen } from '../../../professions.js';
 import { startCountdown } from '../../tokens.js';

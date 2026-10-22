@@ -45,7 +45,7 @@
 
 import { num, talentBb, moduleBb, traitBb, skillRec, up, giveSp, once } from '../shared/tier1.js';
 import { isElite, elementDmg } from '../shared/tier6.js';
-import { hasHp } from '../../../damage.js';
+import { hasHp } from '../../../attack.js';
 import { COLS, ROWS } from '../../../constants.js';
 
 const S1 = 'skchr_logos_1';

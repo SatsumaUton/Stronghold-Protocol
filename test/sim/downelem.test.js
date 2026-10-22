@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeBattle, chessRec, enemyRec } from '../helpers/battleHarness.js';
 import { DOWN_STATE, ELEMENT, ELEMENT_ORDER, FORCED_EXIT } from '../../server/sim/constants.js';
-import { elementView } from '../../server/sim/damage.js';
+import { elementView } from '../../server/sim/attack.js';
 import { unitStatsEntry } from '../../shared/protocol.js';
 
 const approx = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) <= eps, `${a} ≈ ${b}`);

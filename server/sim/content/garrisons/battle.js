@@ -41,7 +41,7 @@
 // multipliers). install() registers nothing when no operator carries an IN_BATTLE garrison.
 
 import * as S from '../support/index.js';
-import { mitigate } from '../../damage.js';
+import { mitigate } from '../../attack.js';
 import { frontOf } from '../../dir.js';
 
 const ids = (s) => String(s ?? '').split(',').map((x) => x.trim()).filter(Boolean);

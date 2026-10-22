@@ -48,7 +48,7 @@
 import { num, talentBb, moduleBb, traitBb, skillRec, up, batMod } from '../shared/tier1.js';
 import { canTargetEnemy } from '../../../targeting.js';
 import { bodyInRange } from '../../../body.js';
-import { hasHp } from '../../../damage.js';
+import { hasHp } from '../../../attack.js';
 
 const S1 = 'skchr_ascln_1';
 const S2 = 'skchr_ascln_2';

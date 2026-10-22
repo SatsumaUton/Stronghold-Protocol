@@ -4,7 +4,7 @@
 
 import { bondTimerView } from '../content/bonds/timers.js';
 import { EVENT_BUFFER_CAP } from '../constants.js';
-import { elementView } from '../damage.js';
+import { elementView } from '../attack.js';
 import { unitInfo, snapshotUnits, ammoView, wolfView, negView, coinView, mysticView, layerView, chargeView } from '../snapshot.js';
 
 export class BattleEvents {

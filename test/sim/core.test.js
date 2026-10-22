@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../server/sim/rng.js';
 import { Grid } from '../../server/sim/grid.js';
-import { mitigate } from '../../server/sim/damage.js';
+import { mitigate } from '../../server/sim/attack.js';
 import { Unit } from '../../server/sim/units.js';
 import { getDefaultSource, hasGeneratedData } from '../../server/sim/simdata.js';
 import { makeBattle, flatStage, chessRec, enemyRec } from '../helpers/battleHarness.js';

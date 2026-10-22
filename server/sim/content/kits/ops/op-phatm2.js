@@ -66,7 +66,7 @@ import { isElite, onElementHit, elementDmg } from '../shared/tier6.js';
 import { releaseSkillSummon, startCountdown } from '../../tokens.js';
 import { absoluteRangeKeys } from '../../../targeting.js';
 import { bodyInRange } from '../../../body.js';
-import { hasHp, burstLocked } from '../../../damage.js';
+import { hasHp, burstLocked } from '../../../attack.js';
 import { MIN_DAMAGE_RATIO } from '../../../constants.js';
 import { hypot } from '../../../detmath.js';
 

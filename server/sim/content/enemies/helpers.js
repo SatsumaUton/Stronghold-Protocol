@@ -5,7 +5,7 @@
 
 import { ELEMENT } from '../../constants.js';
 import { canTargetAlly, sortAllyTargets, areaSelectable, auraSelectable } from '../../targeting.js';
-import { mitigate } from '../../damage.js';
+import { mitigate } from '../../attack.js';
 import { hypot } from '../../detmath.js';
 
 // ---------------------------------------------------------------------------------------------------------------

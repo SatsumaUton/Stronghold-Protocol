@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeBattle, enemyRec, chessRec, checkInvariants } from '../helpers/battleHarness.js';
 import { getDefaultSource } from '../../server/sim/simdata.js';
-import { hasHp } from '../../server/sim/damage.js';
+import { hasHp } from '../../server/sim/attack.js';
 
 const SRC = getDefaultSource();
 const raw = (id) => SRC.rawChess(id);
