@@ -783,9 +783,9 @@ A bare 上半 / 下半 here and in code comments keeps the official activity sen
 **M0 is invisible**: nothing at run time reads a non-default version yet (the lobby switch, room versions and the earlier
 versions' rules come later). `data/versions/` is tracked, so the release zips and Docker carry it (48 files, 15.0 MB on
 disk, about 1.3 MB zipped), but `server/http/static.js` does not serve it until M1 (404 under `/data/versions/`). The default version is unchanged — `data/*.json`, `data/i18n/`, the golden corpus, the
-`cs` formula and a default room's `room.state` are pinned by `test/versions-default-guard.test.js`. Its file hashes (G1)
-are the M0 merge check and are deleted when M1 starts (DESIGN §35.22.2); until then a rebuild that changes a default data
-file also refreshes the fixture: `SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js`.
+`cs` formula and a default room's `room.state` are pinned: `test/data.test.js` and `test/golden.test.js` guard the data
+and the goldens, `test/versions-default-guard.test.js` (G2–G4) the `cs` inputs, the formula and the default room. Its
+file hashes (G1) were the M0 merge check and were deleted when M1 started (DESIGN §35.22.2, §35.23).
 
 **Registry** (`shared/versions.js`, pure, browser-safe). `DEFAULT_VERSION = 'act2autochess'` is a code constant, never a
 server setting: data, rooms and logs without a version mean 第二期下半 (`act2autochess` V2_2).
@@ -996,7 +996,7 @@ and names the missing `.cache/gamedata@<sha>/`. **Hidden inputs**: a version bui
 `data/assets.json` (the enemies' attack clips: a manifest of 下半's models, so the 6 上半-only enemies above have no
 `attackAnim` and the sim keeps `ATTACK_PAUSE` for them — 墨浪, 萨卡兹王庭军术师 and 巫王乐团圆号手 are ranged, so their
 attack timing is off — until M2 adds their models; `data/assets.json` is a default data file, so that change rebuilds
-every version directory and refreshes G1 if it still exists, DESIGN §35.22.2 deleting G1 when M1 starts),
+every version directory; G1, which also pinned it, was deleted when M1 started, DESIGN §35.22.2),
 `data/tuning.json` (its byte copy; `test/data-versions.test.js` fails
 while a copy differs) and `docs/research/*.json` (the default's research, which V2_1 reads by id and 上半 uses as its fallback) — a default-side change to those makes
 the version directories stale with no version-related cause. Rebuild every version then
