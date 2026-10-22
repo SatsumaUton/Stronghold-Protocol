@@ -1130,7 +1130,7 @@ function LoadoutScreen({ st }) {
   </div>
   ${help ? html`<${DeckHelp} onClose=${() => setHelp(false)} />` : null}
   ${io ? html`<${Modal} open=${true} onClose=${() => setIo(null)}
-      title=${ioDiy ? t(io.mode === 'export' ? '导出自选编队' : '导入自选编队')
+      title=${ioDiy ? (io.mode === 'export' ? t('导出自选编队') : t('导入自选编队'))
         : io.mode === 'export' ? (ioOwn ? t('导出干员持有') : t('导出干员调配')) : (ioOwn ? t('导入干员持有') : t('导入干员调配'))}
       micro=${ioOwn ? 'OPERATOR ROSTER' : ioDiy ? 'SELF-SELECT SQUAD' : 'OPERATOR LOADOUT'}
       actions=${io.mode === 'export'
