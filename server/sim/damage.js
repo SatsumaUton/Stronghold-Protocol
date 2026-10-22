@@ -11,8 +11,8 @@
 //   → 'damaged' hook → SP-on-hurt / TAKE_DAMAGE trigger → fatal/kill.
 // Damage-dealt stats (the source's `stats.dmg`, the player's `damageDealt`) count only HP removed from the other side:
 // self and friendly damage (a 源石溶剂 drain, an operator's own 流失) is the target's `taken` and keeps the kill credit.
-// Phys: max(A − max(0, D×(1−defIgnorePct) − defIgnoreFlat), 5 %·A); Arts: max(A×(1 − R′/100), 5 %·A) with
-// R′ = max(0, R×(1−resIgnorePct) − resIgnoreFlat); True: A; Elemental (元素伤害): max(A×(1 − 元素抗性/100), 5 %·A)
+// Phys: max(A − max(0, (D−defIgnoreFlat)×(1−defIgnorePct)), 5 %·A); Arts: max(A×(1 − R′/100), 5 %·A) with
+// R′ = max(0, (R−resIgnoreFlat)×(1−resIgnorePct)); True: A; Elemental (元素伤害): max(A×(1 − 元素抗性/100), 5 %·A)
 // (PRTS 游戏数据基础 DMG_e; 元素抗性 = the target's data `epDamageResistance`: 0 on every enemy in data/enemies.json).
 // Element damage ('element' type + element, 元素损伤) fills a gauge instead of HP (1000; enemy leaders 2000):
 //   gain = amount × dmg.mul × target elemTakenMul (元素损伤倍率: "受到的元素损伤提高/降低…") × max(5 %, 1 − 损伤抵抗/100)
@@ -183,18 +183,19 @@ function liftoffEvades(target, source, dmg) {
 }
 
 /**
+ * Fixed penetration precedes percentage penetration (PRTS 游戏数据基础).
  * Pure mitigation formula (exported for tests). `target` = the target's stats; `ign.elementalRes` = its 元素抗性
  * (epDamageResistance) for 'elemental' damage.
  */
 export function mitigate(amount, type, target, ign = {}) {
   if (type === 'phys') {
     const D = target.def ?? 0;
-    const eff = Math.max(0, D * (1 - clamp01(ign.defIgnorePct ?? 0)) - (ign.defIgnoreFlat ?? 0));
+    const eff = Math.max(0, D - (ign.defIgnoreFlat ?? 0)) * (1 - clamp01(ign.defIgnorePct ?? 0));
     return Math.max(amount - eff, MIN_DAMAGE_RATIO * amount);
   }
   if (type === 'arts') {
     const R = target.res ?? 0;
-    const eff = Math.max(0, R * (1 - clamp01(ign.resIgnorePct ?? 0)) - (ign.resIgnoreFlat ?? 0));
+    const eff = Math.max(0, R - (ign.resIgnoreFlat ?? 0)) * (1 - clamp01(ign.resIgnorePct ?? 0));
     return Math.max(amount * (1 - Math.min(100, eff) / 100), MIN_DAMAGE_RATIO * amount);
   }
   if (type === 'elemental') {
