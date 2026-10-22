@@ -867,7 +867,7 @@ Object healing defaults to `mode: 'heal'`; `regen` bypasses healing modifiers an
 `restore` bypasses healing modifiers, heal events, healing statistics and overheal conversion. Prefer HP-regeneration
 buffs for regeneration attributes. Healing emits `hpChanged` only for actual HP restoration; ordinary healing
 also emits `modifierApplied` with both modifier amount and `hpRestored`. Gauge healing directly changes gauges.
-The following positional-healing details remain available through compatibility calls.
+The following healing options and legacy positional form remain supported.
 
 `battle.heal(source, target, amount, { overheal=false, self, silent, regen, ignoreHealFree })`: no-op on `noHeal` targets
 (unless self — 禁疗 / 孤立 summons carry the flag, §3) and on `healFree` ones, self included (史尔特尔's 余烬), unless `regen`
