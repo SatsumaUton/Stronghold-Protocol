@@ -88,6 +88,22 @@ describe('selected operator shortcuts', { skip: !ENABLED && 'set SP_E2E=1 and CH
       await removed(first.uid);
       assert.equal((await sent()).at(-1)[1].uid, first.uid, 'X sells the hovered bench operator with no selection');
 
+      // Right-click (or long-press) on another own operator while one is selected: the press on the field clears the
+      // selection, as any press there does, and the release only opens that operator's card (no underframe). Q / X then
+      // follow the hover as with no selection — the PR's behaviour, accepted by the maintainer on 2026-10-23 (§35.31).
+      await select(selected.uid);
+      const otherPoint = await hover(other.uid);
+      const card = () => page.evaluate(() => document.querySelector('.dpanel--chess')?.textContent ?? null);
+      const selectedCard = await card();
+      await page.mouse.click(otherPoint.x, otherPoint.y, { button: 'right' });
+      await page.waitForFunction((was) => {
+        const text = document.querySelector('.dpanel--chess')?.textContent;
+        return !!text && text !== was && !document.querySelector('.uframe');
+      }, {}, selectedCard);
+      await page.mouse.move(5, 5);
+      await inert('after the right-click nothing is selected: with no hovered operator Q / X do nothing (the old selection is not sold)');
+      await page.keyboard.press('Escape');
+
       await select(selected.uid);
       await hover(other.uid);
       // Two keydowns in one task, before Preact can update: only one sale may be in flight.
