@@ -14,6 +14,11 @@
 // JSON file, merged by record id on the way in) moves it between devices; 清空 resets it after a confirm dialog.
 // The host renders nothing until opened and the game data files the replay needs load only then (the lobby alone never
 // downloads them): the statistics tabs read config / bands / bonds / assets only.
+// Official versions (DESIGN §35.23, M1): a version filter above the tabs — the version the page shows by default, every
+// version that has records, and 全部版本 — narrows every tab (ui/stats.js recordsOfVersion); a row of another version
+// carries its tag (ui/pluginTag.js VersionTag). Re-viewing a settlement needs that version's data on the page: outside a
+// room the row offers 切换到「X」查看 (the lobby switches to it, the settlement opens once its data is checked); in a room
+// it says the room's version decides the data. 成就统计 counts the season of the version shown.
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
@@ -31,17 +36,22 @@ import { toast, toastError } from '../ui/toasts.js';
 import {
   loadStats, peekStatsRecords, saveStats, emptyStats, importStats, exportStats, aggregateStats, countsTowardStats, selfRowOf, roundsOf, isModdedRecord,
   recordToResult, MAX_RECORDS, FULL_KEEP, IMPORT_MAX_CHARS,
-  trophyMedalOf, strategyBadgeIds, bondMemberChess, highestBondRecord, achievementRecords,
+  trophyMedalOf, strategyBadgeIds, bondMemberChess, highestBondRecord, achievementRecords, recordVersion, recordsOfVersion, recordsOfSeason,
 } from '../ui/stats.js';
 import { t, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
+import { VersionTag } from '../ui/pluginTag.js';
+import { contentSet } from '../content.js';
+import { DEFAULT_VERSION, setLobbyVersion, shownVersion, seasonOf, versionLabel } from '../versions.js';
+import { VERSIONS } from '../../../shared/versions.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
 /** Rows of 对局记录 shown at first and added by each 显示更多. */
 export const HISTORY_PAGE = 50;
 
-const statsStore = createStore({ open: false, tab: 'overview', withModded: false });
+// `version`: the version filter (null: the version the page shows; 'all': every record — DESIGN §35.23)
+const statsStore = createStore({ open: false, tab: 'overview', withModded: false, version: null });
 
 /** Open the stats viewer (title screen / lobby / room entry points). */
 export function openStats() {
@@ -451,6 +461,23 @@ function CombatSums({ agg }) {
   <//>`;
 }
 
+/**
+ * The version filter (see the header): the version shown, every version with records, 全部版本 — only once records of
+ * another version exist or the server enables versions.
+ */
+function VersionFilter({ records, value, shown }) {
+  const enabled = useStore((s) => Array.isArray(s.versions));
+  const have = new Set((records || []).map(recordVersion));
+  have.add(shown);
+  if (!enabled && have.size < 2) return null;
+  const options = [...VERSIONS.filter((v) => have.has(v.id)).map((v) => ({ id: v.id, name: versionLabel(v.id) })), { id: 'all', name: t('全部版本') }];
+  return html`<div class="st-verfilter" role="radiogroup" aria-label=${t('版本')} data-testid="stats-version">
+    <span class="st-verfilter__k">${t('版本')}</span>
+    ${options.map((o) => html`<button key=${o.id} type="button" role="radio" aria-checked=${value === o.id ? 'true' : 'false'} data-version=${o.id}
+      class=${cx('dpick__opt', value === o.id && 'is-active')} onClick=${() => statsStore.set({ version: o.id === shown ? null : o.id })}>${o.name}</button>`)}
+  </div>`;
+}
+
 /** One 对局记录 row: what it was, who won, whether it counted and whether the settlement can be re-viewed. */
 function HistoryRow({ rec, gd, onOpen }) {
   const self = selfRowOf(rec);
@@ -460,10 +487,16 @@ function HistoryRow({ rec, gd, onOpen }) {
   const band = self?.bandId ? gd.band(self.bandId) : null;
   const rounds = roundsOf(rec);
   const known = Number.isFinite(self?.roundsPassed) || Number.isFinite(rec.roundsPassed);
-  const view = !quit && !rec.compact; // a quit has nothing settled; a compacted record no rows left
+  // another version's settlement needs its data on the page (see the header): offered as a switch outside a room
+  const version = recordVersion(rec);
+  const shown = useStore(shownVersion);
+  const inRoom = useStore((s) => !!s.room);
+  const other = version !== shown;
+  const view = !quit && !rec.compact && !(other && inRoom); // a quit has nothing settled; a compacted record no rows left
   const open = () => onOpen(rec);
-  return html`<tr class=${cx(quit ? 'is-quit' : won ? 'is-win' : 'is-lose', !counted && 'is-excluded', view && 'is-clickable')}
-      title=${view ? t('点击查看该局结算') : !counted ? t('没有清完第一个回合就退出，不计入统计') : quit ? t('中途退出的对局没有结算可看') : t('较早的对局只保留汇总，不能回看结算')}
+  return html`<tr class=${cx(quit ? 'is-quit' : won ? 'is-win' : 'is-lose', !counted && 'is-excluded', view && 'is-clickable')} data-version=${version}
+      title=${!quit && !rec.compact && other ? (inRoom ? t('同盟中的数据由房间的版本决定，离开同盟后才能回看「{version}」的结算', { version: versionLabel(version) }) : t('切换到「{version}」查看', { version: versionLabel(version) }))
+        : view ? t('点击查看该局结算') : !counted ? t('没有清完第一个回合就退出，不计入统计') : quit ? t('中途退出的对局没有结算可看') : t('较早的对局只保留汇总，不能回看结算')}
       tabIndex=${view ? 0 : undefined}
       onClick=${view ? open : undefined} onKeyDown=${view ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } : undefined}>
     <td class="st-t">${dateTime(rec.t)}</td>
@@ -472,7 +505,8 @@ function HistoryRow({ rec, gd, onOpen }) {
     <td><span class="st-band">${band ? html`<${BandIcon} bandId=${band.bandId} size="xs" />${band.name}` : self?.bandId || '—'}</span></td>
     <td class="st-res">${quit ? html`<span class="t-quit">${t('中途退出')}</span>` : html`<span class=${won ? 't-win' : 't-lose'}>${won ? t('胜') : t('负')}</span>`}
       ${!counted ? html`<em class="st-chip">${t('不计入统计')}</em>` : null}
-      ${isModdedRecord(rec) ? html`<em class="st-chip is-modded" title=${(rec.content.plugins || []).join(', ')}>${t('非官方')}</em>` : null}</td>
+      ${isModdedRecord(rec) ? html`<em class="st-chip is-modded" title=${(rec.content.plugins || []).join(', ')}>${t('非官方')}</em>` : null}
+      <${VersionTag} version=${rec.version ?? null} compact=${true} class="st-chip" /></td>
     <td class="num">${known ? fmtNum(rounds) : '—'}</td>
     <td class="st-go" aria-hidden="true">${view ? html`<${Icon} name="chevronRight" />` : null}</td>
   </tr>`;
@@ -493,13 +527,19 @@ function History({ records, gd, onOpen }) {
   <//>`;
 }
 
-/** A stored match re-viewed as its settlement screen: the full game data is loaded now (the lobby alone never loads it). */
+/**
+ * A stored match re-viewed as its settlement screen: the full game data is loaded now (the lobby alone never loads it)
+ * — of the record's version, which the page loads first when it shows another (see the header).
+ */
 function Replay({ rec, onBack }) {
   const gd = useGameData();
   const res = useMemo(() => recordToResult(rec), [rec]);
-  if (!gd.ready) return html`<div class="st-loading"><${Spinner} size="md" /></div>`;
+  const version = recordVersion(rec);
+  const versionReady = useStore((c) => (version === DEFAULT_VERSION ? c.kind !== 'version' : c.kind === 'version' && c.version === version && c.status === 'ready'), Object.is, contentSet);
+  const shown = useStore(shownVersion);
+  if (!gd.ready || !versionReady || shown !== version) return html`<div class="st-loading"><${Spinner} size="md" /><p class="t-lo">${version !== DEFAULT_VERSION ? t('正在载入「{version}」的数据…', { version: versionLabel(version) }) : ''}</p></div>`;
   return html`<${ResultView} res=${res} pub=${null} myId=${rec.selfId} backLabel=${t('返回统计')} onBack=${onBack} quiet=${true}
-    content=${rec.content ? { cs: rec.content.cs, vanilla: false, plugins: rec.content.plugins } : null} />`;
+    content=${rec.content ? { cs: rec.content.cs, vanilla: false, plugins: rec.content.plugins } : null} version=${rec.version ?? null} />`;
 }
 
 /** The overlay, rendered while open (its data hooks run only then). */
@@ -530,9 +570,23 @@ function StatsScreen({ tab }) {
   }, []);
 
   const withModded = useStore((s) => s.withModded, Object.is, statsStore);
-  const agg = useMemo(() => aggregateStats(stats.records, { modded: withModded }), [stats, withModded]);
+  // the version filter (see the header): the version shown unless another (or 全部版本) is picked
+  const shown = useStore(shownVersion);
+  const picked = useStore((s) => s.version, Object.is, statsStore);
+  const versionPick = picked || shown;
+  const recs = useMemo(() => recordsOfVersion(stats.records, versionPick), [stats, versionPick]);
+  const agg = useMemo(() => aggregateStats(recs, { modded: withModded }), [recs, withModded]);
   // 卫戍成就's peak and the strategy marks follow the same 「含插件对局」 switch as the tallies (the history lists them all)
-  const achRecords = useMemo(() => achievementRecords(stats.records, withModded), [stats, withModded]);
+  const achRecords = useMemo(() => achievementRecords(recs, withModded), [recs, withModded]);
+  // a row of another version (outside a room): the lobby switches to it, the replay waits for its data
+  const openRecord = (rec) => {
+    const v = recordVersion(rec);
+    if (v !== shownVersion(store.get())) {
+      if (store.get().room) return;
+      setLobbyVersion(v);
+    }
+    setReplay(rec);
+  };
   const reload = () => setStats(loadStats());
 
   const doExport = () => {
@@ -604,14 +658,16 @@ function StatsScreen({ tab }) {
     <p class="st-note"><${Icon} name="info" />${t('本机数据：只保存在这个浏览器里，不会上传到服务器；同盟对局里队友的代号也会存在本机（导出文件里也有）。')}</p>
     ${stats.damaged ? html`<p class="st-note is-warn"><${Icon} name="warn" />${t('本机保存的统计数据无法读取，已另存为备份，从现在起重新记录。')}</p>` : null}
     ${stats.dropped ? html`<p class="st-note is-warn"><${Icon} name="warn" />${t('有 {n} 条记录已损坏，已忽略。', { n: stats.dropped })}</p>` : null}
+    <${VersionFilter} records=${stats.records} value=${versionPick} shown=${shown} />
     <div class="ui-slot" data-ui-slot="stats.tab" aria-label=${t('界面插件')} dangerouslySetInnerHTML=${{ __html: '' }}></div>
     <main class="st-body" data-tab=${tab}>
       ${!ready ? html`<div class="st-loading"><${Spinner} size="md" /></div>`
         : stats.newer ? html`<p class="st-empty">${t('检测到更新版本的统计数据，请先升级客户端再查看，以免覆盖数据。')}</p>`
           : empty ? html`<p class="st-empty">${t('还没有记录 —— 完成一局对局后，这里会开始积累。')}</p>`
+            : !recs.length ? html`<p class="st-empty" data-testid="stats-version-empty">${t('这个版本还没有记录。')}</p>`
             : tab === 'bands' ? html`<${Bands} agg=${agg} gd=${gd} records=${achRecords} />`
               : tab === 'totals' ? html`<${CombatSums} agg=${agg} />`
-                : tab === 'history' ? html`<${History} records=${stats.records} gd=${gd} onOpen=${setReplay} />`
+                : tab === 'history' ? html`<${History} records=${recs} gd=${gd} onOpen=${openRecord} />`
                   : html`<${Overview} agg=${agg} gd=${gd} nickname=${nickname} records=${achRecords} />`}
     </main>
   </div>`;
@@ -630,7 +686,9 @@ function StatsScreen({ tab }) {
 export function AchievementDialog({ onClose }) {
   const ready = useData('config', 'bands', 'bonds', 'assets', 'chess', 'items', 'backups');
   const gd = useMemo(() => makeLookups(ready), [ready, data.locale()]);
-  const records = useMemo(() => peekStatsRecords(), []);
+  // the season of the version shown (DESIGN §35.23), like the lobby's card
+  const season = useStore((s) => seasonOf(shownVersion(s)));
+  const records = useMemo(() => recordsOfSeason(peekStatsRecords(), season), [season]);
   const agg = useMemo(() => aggregateStats(records), [records]);
   const official = useMemo(() => achievementRecords(records), [records]);
   // a title in an alphabetic script (English …): ": " between its halves, as on the hub and the title screen
