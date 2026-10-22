@@ -368,6 +368,7 @@ test('鸭爵 “神秘顾客”: from R5, 0–2 ground enemies in the last 40 % 
   const counts = {};
   for (let k = 0; k < 30; k++) {
     m.round = 5;
+    m.seed = 4 + k; // one draw per round from the match seed (GitHub #839): another seed, another draw
     const ev = { input: p0.battleInput({ side: 'L', colOffset: 0 }), kind: 'normal', round: 5, spawns: wave() };
     m.dispatch(p0, 'onBattleStart', ev);
     const dk = ev.spawns.filter((sp) => ducks.includes(sp.enemyKey));
