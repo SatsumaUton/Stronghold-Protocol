@@ -175,11 +175,25 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   // the review of the review: the briefing's difficulty code on one line (「AC-」 / 「2」); a paragraph's last line not a
   // single character; the state as wide as before it went in flow (「Standing / by」 in 独立模拟's 108 px card on phones);
   // on a phone your plate without its 你 tag (the corner mark says it)
-  assert.match(plain, /\.rs-brief h2 \{ text-wrap: wrap; \}\n\.rs-brief h2 \.num \{ white-space: nowrap; \}/);
-  assert.match(plain, /\.rs \{ text-wrap: pretty; \}/);
+  assert.match(plain, /\.rs-brief h2 \.num \{ white-space: nowrap; \}/);
+  assert.doesNotMatch(plain, /\.rs-brief h2[^{]*\{[^}]*text-wrap/,
+    'the briefing title wraps plainly (with pretty and the nowrap code Chrome broke 「…Simulation / AC-2」 where it fits)');
+  // review of that review: `pretty` on the paragraphs only, `balance` on the short labels and the picker's names — WebKit's
+  // `pretty` adds lines to short labels (「AI同盟者を追加」 cut at 特大 on a 640×360 phone) and kept 「アンジェリー|ナ」
+  assert.doesNotMatch(plain, /^\.rs \{ text-wrap/m, 'no text-wrap on the whole room');
+  assert.match(plain, /\.rs-hint, \.rs-brief p, \.rs-brief li \{ text-wrap: pretty; \}/);
+  assert.match(plain, /\.rseat__add, \.rseat__wait small \{ text-wrap: balance; \}/);
+  assert.match(plain, /\.cardpick__name \{ text-wrap: balance; \}/);
   assert.match(plain, /\.rseat__state \{[^}]*margin: 0 -\.08rem;/);
-  assert.match(short, /\.rseat__state \{[^}]*margin-inline: -3px;/);
+  // 2 of the art's 3 px on a phone beside a 16 px box and a 3 px gap (all 3 px put the box and 「by」 against the card's
+  // border on a 640×360 phone)
+  assert.match(short, /\.rseat__state \{ gap: 3px; margin-inline: -2px;/);
+  assert.match(short, /\.rseat__box \{ width: 16px; height: 16px; \}/);
   assert.match(short, /\.rseat__who \.seat__you \{ display: none; \}/);
+  // the corner mark is what screen readers hear as 你 (the tag, hidden on a phone, is aria-hidden everywhere)
+  const roomJs = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
+  assert.match(roomJs, /<span class="rseat__me" role="img" aria-label=\$\{t\('你'\)\}/);
+  assert.match(roomJs, /<span class="rseat__who"><b class="seat__name">[^\n]*<span class="seat__you" aria-hidden="true">/);
   assert.match(readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8'), /\} <span class="num t-dim">\$\{info\.code\}<\/span><\/h2>/,
     'the space before the code outside its nowrap span, so the title can still break there');
   // the ping pill grows in the room only (§35.18 review: a global min-height outgrew title.css's own height)

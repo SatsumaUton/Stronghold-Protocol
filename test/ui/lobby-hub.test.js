@@ -507,11 +507,14 @@ test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simul
   // Korean breaks between words (review: 「독립 시뮬레이|션」)
   assert.match(css, /\.lobby-hub:lang\(ko\) \.hub-stage \{ word-break: keep-all; overflow-wrap: break-word; \}/);
   assert.match(css, /\.lobby-hub:lang\(ja\) \.hub-stage \{ line-break: strict; \}/, 'no line starts with a small kana or ー');
-  // a paragraph's last line not a single character on the hub and in the lobby's dialogs (the picker's 「アンジェリー|ナ」),
-  // the dialogs' Japanese strict as the room's and the hub's (§35.18 review of the review of the text-fit fixes)
-  assert.match(css, /\.lobby-screen \{ text-wrap: pretty; \}/);
+  // a last line not a single character: `pretty` on the tips, the protocol dialog's paragraphs and the big button's label;
+  // not on the whole lobby nor every dialog (WebKit's `pretty` adds lines to short labels; the other
+  // dialogs not measured); the dialogs' Japanese strict as the room's and the hub's (§35.18 review of the review)
+  assert.match(css, /\.tips__text, \.proto-brief p, \.proto-hint, \.proto-start__label \{ text-wrap: pretty; \}/);
+  assert.doesNotMatch(css, /\.proto-start__label[^{]*\{[^}]*text-wrap: balance/, 'balance broke 「シミュレー|ション開始」');
+  assert.doesNotMatch(css, /\.lobby-screen \{ text-wrap/);
   const comp = readFileSync(path.join(ROOT, 'public/css/components.css'), 'utf8');
-  assert.match(comp, /\.modal__box \{ text-wrap: pretty; \}/);
+  assert.doesNotMatch(comp, /\.modal__box \{ text-wrap/);
   assert.match(comp, /\.modal__box:lang\(ja\) \{ line-break: strict; \}/);
   assert.match(rule('.lobby-hub .hub-plate'), /min-height: \.7rem;/, 'a plate grows for a second line');
   const label = rule('.hub-plate__label, .lobby-hub .hub-plate .btn__label');

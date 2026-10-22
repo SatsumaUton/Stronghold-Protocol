@@ -834,9 +834,11 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
     });
     const out = [];
     const seen = new Set();
+    let total = 0;
     for (let k = 0; k < 80; k++) {
       const a = await now();
       if (!a || seen.size >= a.n) break;
+      total = a.n;
       const probs = await page.evaluate(textProblems, '.lobby-screen');
       if ((await now())?.i === a.i && !seen.has(a.i)) {
         seen.add(a.i);
@@ -845,6 +847,8 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
       if (seen.size >= a.n) break;
       await page.$eval('.lobby-hub .tips__nav:last-child', (b) => b.click());
     }
+    // a pager that stopped advancing, or clicks that kept racing the 5 s turn, must not pass with tips unchecked
+    if (total && seen.size < total) out.push(`only ${seen.size}/${total} tips checked`);
     return out;
   };
   test('phones and desktops: every label of the hub inside its box in every language at every 文字大小', { timeout: 1500000 }, async () => {
