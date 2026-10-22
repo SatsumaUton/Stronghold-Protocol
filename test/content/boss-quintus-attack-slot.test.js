@@ -26,14 +26,17 @@ const TPL = 'act1autochess_h07_04';
 const WALL = (id, def) => chessRec({ id, profession: 'TANK', stats: { atk: 0, maxHp: 1e9, def, res: 0, blockCnt: 3 }, rangeGrid: [[0, 0]], skill: null });
 const NOATK = () => ({ trait: { noAttack: true } });
 
-/** A pair boss field of 昆图斯 with the level's overrides, `units` walls on the board; the leader at [3, 10]. */
-function quintus(units, { seed = 7, tpl = TPL } = {}) {
+/**
+ * A boss field of 昆图斯, `units` walls on the board; the leader at [3, 10]. By default the pair template with its level
+ * overrides; `overrides: false` = the enemy_database values (the solo template `_s` has no override).
+ */
+function quintus(units, { seed = 7, tpl = TPL, overrides = true } = {}) {
   const chess = { t_wall: WALL('t_wall', 300), t_wall2: WALL('t_wall2', 200), t_wall3: WALL('t_wall3', 0) };
   const h = makeBattle({
     content: 'generic', extraContent: [enemiesMod, bossesMod], seed, autoFinish: false, timeLimit: 600, kind: 'boss',
     sharedBoss: { hp: 1e6, maxHp: 1e6, damage(pid, a) { this.hp = Math.max(0, this.hp - a); } },
     defs: { chess }, kits: { t_wall: NOATK, t_wall2: NOATK, t_wall3: NOATK }, enemies: [], units,
-    setup(b) { if (tpl) b.opts.templateId = tpl; b.enemyOverrides = JSON.parse(JSON.stringify(W[TPL].overrides)); },
+    setup(b) { if (tpl) b.opts.templateId = tpl; if (overrides) b.enemyOverrides = JSON.parse(JSON.stringify(W[TPL].overrides)); },
   });
   h.step();
   const e = h.spawn(KEY, { pos: [3, 10], routeIndex: 0, mods: { speedMul: 0 }, tag: 'boss' });
@@ -141,8 +144,7 @@ test('昆图斯 third form at attack interval 2.0 (attack speed +75): a tide eve
   const log = actions(h, e, 70);
   const tides = tideRule(log);
   assert.ok(tides.length >= 8, `${tides.length} tides`);
-  // 3.5 + 1.667 s from the cast: not ready at the 2nd turn (4 s), ready at the 3rd (6 s) — "previous slot waits one"
-  // gave 4 s here
+  // 3.5 + 1.667 s from the cast: not ready at the 2nd turn (4 s), ready at the 3rd (6 s)
   const plain = tides.filter((x, i) => i > 0 && !log.some((a) => /^Rockfall/.test(a.what) && a.t > tides[i - 1].t && a.t < x.t));
   assert.ok(plain.length >= 5, `${plain.length} tide gaps without 崩坍`);
   for (const x of plain) { const prev = tides[tides.indexOf(x) - 1]; assert.ok(Math.abs(x.t - prev.t - 3 * iv) < 0.06, `gap ${(x.t - prev.t).toFixed(3)} at ${x.t.toFixed(3)}`); }
@@ -253,4 +255,44 @@ test('昆图斯 skill clips: QUINTUS_CLIP = the length of the official clip of e
     assert.ok(clip, `slot ${slot} ${s.prefabKey}: a clip`);
     assert.equal(sp.animations[clip], QUINTUS_CLIP[kind], `${s.prefabKey}: ${clip}`);
   });
+});
+
+test('昆图斯 solo template: 【物种爆发】 at its initial cooldown after the third form starts, then its cooldown plus its 4.467 s clip apart', () => {
+  // the solo template has no override (enemy_database: Doom cooldown 100, initial cooldown 200); the pair level's
+  // 999 / 999 never lets it come. Its own timer (not attack-class), the cooldown counted from the clip's end (castNow)
+  assert.equal((W[`${TPL}_s`].overrides || {})[KEY], undefined, 'the solo template: no 昆图斯 override');
+  const doom = E[KEY].skills.find((s) => s.prefabKey === 'Doom');
+  assert.deepEqual([doom.cooldown, doom.initCooldown], [100, 200]);
+  const { h, e } = quintus(TWO(), { tpl: `${TPL}_s`, overrides: false });
+  thirdForm(h);
+  const from = h.b.time;
+  const log = actions(h, e, 420).filter((a) => a.what === 'Doom');
+  assert.equal(log.length, 3, `casts at ${log.map((a) => a.t.toFixed(3)).join(', ')}`);
+  // the form starts within the 1 s of thirdForm (0.25 s ability tick): the first cast 200 s on
+  assert.ok(log[0].t - from > doom.initCooldown - 1 && log[0].t - from <= doom.initCooldown + 0.3, `first at ${log[0].t.toFixed(3)} (form ${from.toFixed(3)} − 1 s)`);
+  for (let i = 1; i < log.length; i++) assert.ok(Math.abs(log[i].t - log[i - 1].t - (doom.cooldown + QUINTUS_CLIP.Doom)) < 0.06, `gap ${(log[i].t - log[i - 1].t).toFixed(3)}`);
+});
+
+test('an attack-class skill its leader cannot cast (here: silenced, the skill made silenceable) leaves the turn to the normal strike', () => {
+  // attackSlotSkill checks canCast like the own-timer path: 昆图斯 is immune to silence and stun and its skills are not
+  // silenceable (no `sil`), so both are forced here — the case of a later attack-class skill on another leader. A stun
+  // stops the swing itself (no turn at all).
+  const { h, e } = quintus(TWO());
+  thirdForm(h);
+  const ab = e.mem.ab;
+  const tide = ab.list.find((a) => a.sk === ab.sk.TidewaterG2), rock = ab.list.find((a) => a.sk === ab.sk.RockfallG2);
+  tide.sil = true; rock.sil = true;
+  h.b.addBuff(e, { key: 'test:silence', persist: true, flags: { silence: true } });
+  h.run(0.25);
+  assert.ok(e.s.flags.silence, 'silenced');
+  const mute = actions(h, e, 25).filter((a) => a.what === 'ATTACK' || /^(Tidewater|Rockfall)/.test(a.what));
+  assert.ok(mute.length >= 6, `${mute.length} turns`);
+  assert.deepEqual(mute.filter((a) => a.what !== 'ATTACK'), [], 'no attack-class skill while silenced');
+  assert.ok(tide.left <= 1e-9, 'the tide stays ready');
+  h.b.removeBuff(e, 'test:silence');
+  const back = actions(h, e, 10).filter((a) => a.what === 'ATTACK' || /^(Tidewater|Rockfall)/.test(a.what));
+  assert.match(back[0].what, /^(TidewaterG2|RockfallG2)$/, `first turn after the silence: ${back[0].what}`);
+  h.b.addBuff(e, { key: 'test:stun', persist: true, flags: { stun: true } });
+  h.run(0.25);
+  assert.deepEqual(actions(h, e, 15).filter((a) => a.what === 'ATTACK' || /^(Tidewater|Rockfall)/.test(a.what)), [], 'stunned: no turn');
 });
