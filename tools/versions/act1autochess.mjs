@@ -1,5 +1,6 @@
-// tools/versions/act1autochess.mjs — build profile of 盟约·上半 in its final state V1_2 (2025-11-25 → 2025-12-12; docs/DATA.md
-// "Official versions (M0)"). The master activity_table holds no pure 上半 any more: commit 12e0a020 (2026-03-10) migrated
+// tools/versions/act1autochess.mjs — build profile of 第一期下半: 盟约·上半 (act1autochess) in its final state V1_2
+// (2025-11-25 → 2025-12-12; docs/DATA.md "Official versions (M0)", DESIGN §35.22). The master activity_table holds no pure
+// 上半 any more: commit 12e0a020 (2026-03-10) migrated
 // act1autochess to the 下半 schema and replaced the shared autoChessData, so every table is pinned to a commit of the
 // season (Kengxxiao/ArknightsGameData, zh_CN/gamedata; cached in .cache/gamedata@<sha>/).
 //   default 21b1f240 (2025-12-05, 上半 final): activity_table — its autochess sections are byte-identical to fdf34ff5 and

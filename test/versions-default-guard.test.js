@@ -1,9 +1,9 @@
-// test/versions-default-guard.test.js — the default version (盟约·下半, act2autochess) stays exactly as it was before
-// the official version switch (DESIGN §36.2, docs/DATA.md "Official versions (M0)"). The fixture
+// test/versions-default-guard.test.js — the default version (第二期下半, act2autochess) stays exactly as it was before
+// the official version switch (DESIGN §35.22.2, docs/DATA.md "Official versions (M0)"). The fixture
 // test/fixtures/versions-default-guard.json pins:
 //   G1  the sha256 of every tracked default data file (top-level data/*.json and data/i18n/*.json, never data/versions/)
 //       and of the golden corpus test/golden/*.json — the M0 merge check: it proves the M0 commits moved neither, and
-//       is deleted when M1 starts (DESIGN §36.2; afterwards test/golden.test.js and test/data.test.js guard them). Until
+//       is deleted when M1 starts (DESIGN §35.22.2; afterwards test/golden.test.js and test/data.test.js guard them). Until
 //       then an intended golden update or data rebuild also refreshes the fixture (test/golden/README.md)
 //   G2  the default config.json has no `version`, and cs reads exactly the top-level gameplay files
 //   G3  the cs formula (known-answer vectors of shared/plugins/identity.js), not the vanilla cs itself, which changes with
