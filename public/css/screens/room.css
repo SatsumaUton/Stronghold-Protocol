@@ -660,7 +660,13 @@
   background: rgba(120, 196, 255, .08); border: 1px solid rgba(120, 196, 255, .35);
 }
 .rs-verbanner .icon { flex: none; width: 1.1em; height: 1.1em; color: #9fd3ff; }
+/* a short screen (a phone in landscape): the seats and the footer keep the height — the strip floats over the seats while
+   the vote runs (it wraps and scrolls inside), the banner gives its line up (the pill's tooltip says it) */
 @media (max-height: 520px) {
   .rs-pill__ver { max-width: 1.9rem; font-size: calc(.24 * var(--t)); }
-  .rs-verbanner { margin: 0 .2rem 4px; padding: 2px 8px; font-size: calc(.22 * var(--t)); }
+  .rs-verbanner { display: none; }
+  .rs .vervote {
+    position: fixed; left: 50%; top: 50%; z-index: 30; width: min(calc(100vw - 24px), 9rem); max-height: 70svh; margin: 0; overflow-y: auto;
+    transform: translate(-50%, -50%); box-shadow: 0 .1rem .5rem rgba(0, 0, 0, .8);
+  }
 }

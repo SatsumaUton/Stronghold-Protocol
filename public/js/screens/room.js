@@ -374,6 +374,9 @@ function GoButton({ label, onClick, disabled, loading = false, ready = null, ico
   </button>`;
 }
 
+/** How long a version proposal refused as too frequent (RATE) waits before it is sent once more [ASSUMED]. */
+const PROPOSE_RETRY_MS = 1200;
+
 /** Room screen component. */
 export function RoomScreen() {
   const room = useStore((s) => s.room);
@@ -549,13 +552,27 @@ export function RoomScreen() {
     : facts.modded ? t('请先关闭改变玩法的插件')
     : !Array.isArray(versions) || versions.length < 2 ? t('本服务器只启用了这一个版本') : null;
   const versionEditable = facts.isHost && !facts.spectating && !room.inMatch;
+  // the room's version is not this browser's lobby choice: the banner says leaving restores it (on a short screen, where
+  // the banner gives its room to the seats, the pill's tooltip says it)
+  const bannerText = curVersion !== myLobby && Array.isArray(versions) ? t('本房间为「{room}」，离开后恢复你的大厅版本「{mine}」', { room: versionLabel(curVersion), mine: versionLabel(myLobby) }) : null;
   const versionCtl = showVersion ? {
-    id: curVersion, editable: versionEditable, why: versionEditable ? versionWhy : t('由创建者发起'),
+    id: curVersion, editable: versionEditable, why: [versionEditable ? versionWhy : t('由创建者发起'), bannerText].filter(Boolean).join(' · ') || null,
     disabled: versionEditable ? !!versionWhy || !!busy : !Array.isArray(versions),
     onOpen: () => { setOpts(false); setVersionOpen(true); },
   } : null;
+  // (a switch makes every page send its settings again, which share the server's budget of heavy messages with
+  // room.proposeVersion: a RATE right after one is tried once more a moment later; the server's own 5 s pause after a
+  // declined or expired vote answers RATE again and is told)
   const proposeVersion = async (version) => {
-    if (await run('version', () => net.request('room.proposeVersion', { version }))) { if (alive.current) setVersionOpen(false); }
+    const send = () => net.request('room.proposeVersion', { version });
+    const sent = await run('version', async () => {
+      try { await send(); } catch (err) {
+        if (err?.code !== 'RATE') throw err;
+        await new Promise((r) => setTimeout(r, PROPOSE_RETRY_MS));
+        await send();
+      }
+    });
+    if (sent && alive.current) setVersionOpen(false);
   };
 
   return html`<div class=${`screen room-screen rs${coop ? '' : ' rs--solo'}`} style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}; --n:${facts.seats.length}`}>
@@ -612,7 +629,7 @@ export function RoomScreen() {
     </main>
     <${SpectatorBar} facts=${facts} myId=${me.playerId} busy=${busy} onRemove=${removeSpectator} onSit=${sit} />
     <${VersionVote} room=${room} />
-    ${curVersion !== myLobby && Array.isArray(versions) ? html`<p class="rs-verbanner" data-testid="version-banner"><${Icon} name="info" />${t('本房间为「{room}」，离开后恢复你的大厅版本「{mine}」', { room: versionLabel(curVersion), mine: versionLabel(myLobby) })}</p>` : null}
+    ${bannerText ? html`<p class="rs-verbanner" data-testid="version-banner"><${Icon} name="info" />${bannerText}</p>` : null}
 
     <footer class="room-bar rs-foot">
       <div class="rs-foot__left" aria-hidden="true"></div>

@@ -1216,3 +1216,17 @@
   .vervote { margin-inline: .2rem; padding: .08rem .12rem; }
   .vervote__actions .btn { min-height: 40px; padding-inline: .12rem; }
 }
+/* short landscape phones (1rem is ~40 px: the text gets its own sizes, like the room's — css/screens/room.css) */
+@media (max-height: 520px) {
+  .vervote__text { font-size: calc(.22 * var(--t)); }
+  .vervote__text strong { font-size: calc(.26 * var(--t)); }
+  .vertag { max-width: 2.4rem; height: auto; padding: 1px 5px; font-size: calc(.2 * var(--t)); }
+  .verchip { max-width: 2.8rem; font-size: calc(.22 * var(--t)); }
+  .verchip__state, .verchip__retry { font-size: calc(.2 * var(--t)); }
+  .verpick__lead, .verpick__hint { font-size: calc(.22 * var(--t)); }
+  .verpick__list { max-height: 60svh; }
+  .verpick__pick { padding: 6px 10px; }
+  .verpick__name { font-size: calc(.28 * var(--t)); }
+  .verpick__badge { font-size: calc(.2 * var(--t)); }
+  .verpick__period, .verpick__note { font-size: calc(.21 * var(--t)); }
+}
