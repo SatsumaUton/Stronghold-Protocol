@@ -739,7 +739,9 @@
   background: rgba(255, 255, 255, .06); border: 1px solid var(--line-2); cursor: pointer; }
 .lo-info:hover { border-color: var(--mint-500); color: var(--mint-400); }
 .lo-info .icon { width: 56%; height: 56%; }
-.lo-top__note { margin: 0; max-width: 8.4rem; font-size: max(calc(.15 * var(--t)), 10px); color: var(--text-lo); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* never wider than the centre column (§35.27: centred in it at its own width, it ran under ⓘ and 已同步 at 1280–1440 px in
+   English and Japanese) */
+.lo-top__note { margin: 0; max-width: min(8.4rem, 100%); font-size: max(calc(.15 * var(--t)), 10px); color: var(--text-lo); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lo-tbtn { position: relative; display: inline-flex; align-items: center; gap: .06rem; height: max(.4rem, 28px); padding: 0 max(.14rem, 8px);
   font: inherit; font-size: max(calc(.15 * var(--t)), 11px); font-weight: 700; color: var(--text-md); background: rgba(255, 255, 255, .04);
   border: 1px solid var(--line-2); cursor: pointer; white-space: nowrap; }
@@ -889,7 +891,9 @@
 /* ---- bottom bar ---- */
 .lo-bbar { flex: none; display: flex; align-items: center; gap: .3rem; height: max(.8rem, 46px); padding: 0 .36rem;
   background: linear-gradient(180deg, rgba(10, 12, 11, .7), rgba(6, 8, 7, .96)); border-top: 1px solid var(--line); }
-.lo-bbar__tiers { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: .04rem; overflow-x: auto; scrollbar-width: none; padding-top: .14rem; }
+/* the room above the tiers holds their 自选 badge (.lo-bbar__diy, max(-.2rem, -14px) above a tier: §35.27, its top was cut by
+   this scroller's edge at .14rem) */
+.lo-bbar__tiers { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: .04rem; overflow-x: auto; scrollbar-width: none; padding-top: max(.24rem, 17px); }
 .lo-bbar__tier { position: relative; flex: none; display: inline-flex; align-items: center; gap: .05rem; height: max(.42rem, 28px); padding: 0 max(.16rem, 8px); font: inherit;
   font-size: max(calc(.15 * var(--t)), 11px); color: var(--text-lo); background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
 .lo-bbar__tier + .lo-bbar__tier::before { content: ""; position: absolute; left: 0; top: 25%; bottom: 25%; width: 1px; background: var(--line); }
@@ -918,7 +922,7 @@
 
 @media (max-width: 1100px) {
   .lo-top--deck .lo-count, .lo-top--deck .lo-sync { display: none; }
-  .lo-top__note { max-width: 4.6rem; }
+  .lo-top__note { max-width: min(4.6rem, 100%); }
 }
 @media (max-width: 900px) {
   .lo-top--deck .lo-tbtn__l, .lo-quickbtn__txt small, .lo-assist__k { display: none; }
@@ -929,6 +933,11 @@
 @media (max-height: 520px) {
   .lo-deck { padding-top: .12rem; padding-bottom: .1rem; gap: .2rem; }
   .lo-tgrid { gap: .1rem; }
+  /* 甄选干员's frame smaller and its count capped (its size at 中, a pixel more a step above), so its 0/2 stays on the card
+     (§35.27: cut 8–16 px on a 640×360 phone, at 特大 also on a 667×375 one) [ASSUMED] the sizes */
+  .lo-diy__frame { width: 46%; }
+  .lo-diy__n { font-size: min(max(calc(.3 * var(--t)), 16px), max(16px, calc(16px + var(--t-step)))); }
+  .lo-diy__n b { font-size: min(max(calc(.4 * var(--t)), 20px), max(20px, calc(20px + var(--t-step)))); }
 }
 @media (prefers-reduced-motion: reduce) { .lo-drawer, .lo-op__quick, .lo-pop { animation: none; } .lo-op__card { transition: none; } }
 

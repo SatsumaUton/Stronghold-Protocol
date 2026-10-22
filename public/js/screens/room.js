@@ -502,6 +502,8 @@ export function RoomScreen() {
     if (d === room.difficulty && !pluginMode) { closeProto(); return; }
     if (!(await setDifficulty(d))) return;
     savePref('lobby.difficulty', d);
+    // the plugin mode is gone: said, as a same-difficulty 确认 changes nothing else the host sees (§35.27; §35.18's nit)
+    if (pluginMode) toast(t('已退出插件模式「{name}」', { name: pluginMode }), 'info');
     if (alive.current) closeProto();
   };
   const protoHint = pluginMode

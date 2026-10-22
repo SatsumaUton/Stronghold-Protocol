@@ -182,7 +182,7 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   // `pretty` adds lines to short labels (「AI同盟者を追加」 cut at 特大 on a 640×360 phone) and kept 「アンジェリー|ナ」
   assert.doesNotMatch(plain, /^\.rs \{ text-wrap/m, 'no text-wrap on the whole room');
   assert.match(plain, /\.rs-hint, \.rs-brief p, \.rs-brief li \{ text-wrap: pretty; \}/);
-  assert.match(plain, /\.rseat__add, \.rseat__wait small \{ text-wrap: balance; \}/);
+  assert.match(plain, /\.rseat__add, \.rseat__wait small, \.rseat__invite small \{ text-wrap: balance; \}/);
   assert.match(plain, /\.cardpick__name \{ text-wrap: balance; \}/);
   // review of 6f34f380: `balance` broke Japanese 「AI同盟|者を追加」 inside the word at 特大 on the phones — phrase breaks
   assert.match(plain, /\.rseat__add:lang\(ja\) \{ word-break: auto-phrase; \}/);
@@ -192,6 +192,10 @@ test('room.css: the seat cards and the picker follow 文字大小, no !important
   assert.match(short, /\.rseat__state \{ gap: 3px; margin-inline: -2px;/);
   assert.match(short, /\.rseat__box \{ width: 16px; height: 16px; \}/);
   assert.match(short, /\.rseat__who \.seat__you \{ display: none; \}/);
+  // §35.27: on a phone at least 370 px tall a long name takes two lines (then its ellipsis), every plate two lines tall
+  assert.match(plain, /@media \(max-height: 520px\) and \(min-height: 370px\) \{\n  \.rseat__plate/);
+  assert.match(short, /\.rseat__who \.seat__name \{ white-space: normal;[^}]*-webkit-line-clamp: 2;/);
+  assert.match(short, /\.rseat__plate \{ min-height: max\(36px, calc\(2\.2 \* min\(calc\(\.28 \* var\(--t\)\), calc\(18px \+ var\(--t-step\) \/ 2\)\) \+ 8px\)\); \}/);
   // the corner mark is what screen readers hear as 你 (the tag, hidden on a phone, is aria-hidden everywhere)
   const roomJs = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
   assert.match(roomJs, /<span class="rseat__me" role="img" aria-label=\$\{t\('你'\)\}/);
