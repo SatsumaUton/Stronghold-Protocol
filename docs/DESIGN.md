@@ -29,6 +29,12 @@ Q / X prefer the selected operator, otherwise the hovered operator, per the main
 [§35.31](history/0.3.2.md#3531-q--x-prefer-the-selected-operator-otherwise-use-hover-pr-859).
 Current interaction contract: [design/client.md](design/client.md).
 
+The damage settlement follows PRTS 伤判效果 / 伤害分类 since 0.3.2 (@Siornya's series): fixed before percentage
+penetration in [§35.30](history/0.3.2.md#3530-settlement-penetration-order-pr-798-siornya), the ordered pipeline and the
+consumers that depend on it in [§35.32](history/0.3.2.md#3532-ordered-settlement-pipeline-and-dependent-consumers-pr-802-siornya)–§35.34,
+the contract and the series' verification in [§35.35](history/0.3.2.md#3535-settlement-contract-and-the-series-verification-pr-856-siornya).
+Current contracts: [design/engine.md](design/engine.md) §5.5 and [SIM.md](SIM.md) §4.
+
 Picture-only outfits become wearable under the maintainer's 2026-10-18 option A in
 [§35.4](history/0.3.2.md#354-picture-only-outfits-b6): per-seat pictures with default battle models;
 current rendering rules are in [design/client.md](design/client.md) and [SKINS.md](SKINS.md).
