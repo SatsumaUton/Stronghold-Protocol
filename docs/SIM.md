@@ -1126,8 +1126,8 @@ record's charId; otherwise it takes that operator's tier kit (the one of the
 record's tier when the operator has several: 锡人, 耶拉, 华法琳 …), else a kit registered under the charId (a 自选
 `op-*` kit), else none — the generic kit. Only official records with a real charId take that path: test fixtures (whose
 charId defaults to the chess id) and plugin chess (`chess_x_` ids; Forge imports leave out `kitRef` on purpose to keep
-the generic kit) keep the by-id lookup, and stand-ins / 自选 pieces keep theirs (`KITS[def.charId]`). 上半's owned
-自选 pool holds 24 operators that 下半 sells as shop chess (星熊, 莫斯提马, 夕, 玛恩纳 …), 第二期上半's (V2_1) 4 that V2_2 made
+the generic kit) keep the by-id lookup, and stand-ins / 自选 pieces keep theirs (`KITS[def.charId]`). 第一期's owned
+自选 pool holds 24 operators that 第二期 sells as shop chess (星熊, 莫斯提马, 夕, 玛恩纳 …), 第二期上半's (V2_1) 4 that V2_2 made
 shop chess (银灰, 空弦, 卡涅利安, 伺夜): their kit is a tier kit only, so they are listed in `kits/index.js`
 `PENDING_DIY_KIT_CHARS`, stay out of `KITTED_CHARS` and are left out of those versions' 自选 by the kitted gate [ASSUMED]
 until M2 reviews the tier kit as a 自选 kit or writes one. The default data
@@ -1157,8 +1157,9 @@ silently inert until M2 (DESIGN §35.22.5): in 上半, the traits of 煌 (`SERVE
 spells the field `give_garrion_id`; `garrisons/battle.js` reads `give_garrison_id`); the 标准模拟 band clause
 `act1autochess_band31_buff` on four bandIds 下半 also has; 灵巧's 20-layer award `bond_layer_refresh_shop_award_equip`
 and 远见's 100-layer discount; and six 上半 equipment keys (商业包装方案, 信标, 寻呼模块, `act1autochess_equip_acarm055` /
-`078` / `102_global_buff`); in V2_1, 远见's discounts (上半's two keys, not V2_2's
-`bond_multi_layer_char_goods_price_bond_discount`). No class sees a changed text under the same keys: V2_1's 陈 以己之长
+`078` / `102_global_buff`); in V2_1, 远见's two discount keys, which the code does not read: `bond_layer_char_goods_price_bond_discount` (V2_1 only)
+and `bond_layer_char_goods_price_discount` (also 上半's 100-layer key), not V2_2's
+`bond_multi_layer_char_goods_price_bond_discount`. No class sees a changed text under the same keys: V2_1's 陈 以己之长
 reaches 高台 operators only, `bands/battle.js` every operator as in V2_2 (DESIGN §35.22.5). Nor does any class report 上半's 森蚺 (`band_zumama`): it carries Touch's key `auto_chess_change_map`, which the default data has (same key, different meaning: the M2 audit), with device aliases
 (`trap_1104_aclasert#1`…`#4`, one 双眼皮 on every field). `bands/battle.js isMapCharBuff` accepts only Touch's
 map-character shape, so 森蚺 has no battle part (nor the AI's team-support class) until M2 builds its device switch. The

@@ -128,8 +128,9 @@ const VERSION_ONLY_SHANG = Object.freeze(Object.entries({
   use_equip_add_goods_rule_with_refresh_shop: 'effects: eff_acarm075 eff_acgarm075 | items: chess_item_5_03_e_a chess_item_5_03_e_b',
   use_equip_give_char_to_player_most_bond: 'effects: eff_acarm109 eff_acgarm109 | items: chess_item_5_04_e_a chess_item_5_04_e_b',
 }).map(([key, spec]) => ({ key, records: rec(spec) })));
-// 下半 V2_1's 远见 (visiShip) reads 上半's two discount keys, not V2_2's bond_multi_layer_char_goods_price_bond_discount:
-// its 80 / 150-layer discounts are inert there until M2 (DESIGN §35.22.5).
+// 第二期上半 V2_1's 远见 (visiShip) carries two discount keys no code reads, bond_layer_char_goods_price_bond_discount
+// (V2_1 only) and bond_layer_char_goods_price_discount (also 上半's 100-layer key), not V2_2's
+// bond_multi_layer_char_goods_price_bond_discount: its 80 / 150-layer discounts are inert there until M2 (DESIGN §35.22.5).
 const VERSION_ONLY_V21 = Object.freeze(Object.entries({
   bond_layer_char_goods_price_bond_discount: 'bonds: visiShip | effects: bondeffect_visi',
   bond_layer_char_goods_price_discount: 'bonds: visiShip | effects: bondeffect_visi',
@@ -137,7 +138,7 @@ const VERSION_ONLY_V21 = Object.freeze(Object.entries({
 const VERSION_ONLY = Object.freeze({
   'data/versions/act1autochess': VERSION_ONLY_SHANG, 'data/versions/act1autochess-v1_1': VERSION_ONLY_SHANG, 'data/versions/act2autochess-v2_1': VERSION_ONLY_V21,
 });
-// 下半 V2_1's code-named keys it lacks: 远见's V2_2 discount (above), the trait type SERVER_ADD_MULTIPLE_BOND (V2_2's new
+// 第二期上半 V2_1's code-named keys it lacks: 远见's V2_2 discount (above), the trait type SERVER_ADD_MULTIPLE_BOND (V2_2's new
 // traits) and 奥术法阵's 失能 (silence_attachment, added on 2026-03-27: V2_1's 奥术法阵 does not silence, as the data says)
 const MISSING_KEYS = Object.freeze({
   'data/versions/act2autochess-v2_1': ['bond_multi_layer_char_goods_price_bond_discount', 'SERVER_ADD_MULTIPLE_BOND', 'silence_attachment'],

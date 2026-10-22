@@ -5,7 +5,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -13,10 +14,10 @@ import { fileURLToPath } from 'node:url';
 
 import { DEFAULT_VERSION, VERSIONS, versionById, versionSlug, versionOfData } from '../shared/versions.js';
 import { loadProfile, pinGroupOf, pinnedShaOf } from '../tools/versions/profiles.mjs';
-import { bondActiveType, selfBackupPreset, launchModes, applyAdapters } from '../tools/versions/adapters.mjs';
+import { bondActiveType, selfBackupPreset, launchModes, launchMilestones, applyAdapters } from '../tools/versions/adapters.mjs';
 import { validateReferences } from '../shared/plugins/validate.js';
 import { DATA_DIR, VERSION_DATA_FILES, getData, getVersionData, loadData, resetVersionData, versionDataDir } from '../server/data.js';
-import { startServer } from '../server/index.js';
+import { createStaticHandler, startServer } from '../server/index.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BUILD = join(ROOT, 'tools', 'build-data.mjs');
@@ -31,12 +32,13 @@ const REBUILD_ALL = `rebuild every version: ${VERSIONS.map((v) => `node tools/bu
 /**
  * The expected counts of each non-default build, written out (DESIGN §35.22.3), independent of the
  * profile's `expect` / `config` that the build and validateAll read: a typo in a profile fails here. V2_1: 36 strategies,
- * 120 chess (119 visible with the 4 DIY slots), no 终极 mode (it opened with V2_2): activity_table @1457587e.
+ * 120 chess (119 visible with the 4 DIY slots), no 终极 mode (it opened with V2_2): activity_table @1457587e. The 功勋
+ * levels: 35 at a launch (levels 36–60 open with the second sub-version, adapter launchMilestones), 60 in V1_2.
  */
 const PINNED = Object.freeze({
-  'act2autochess@V2_1': { bonds: 23, bands: 36, visibleNonDiy: 115, chess: 240, items: 115, effects: 361, hiddenCore: [350, 1200] },
-  act1autochess: { bonds: 18, bands: 30, visibleNonDiy: 95, chess: 200, items: 89, effects: 281, hiddenCore: [300, 1000] },
-  'act1autochess@V1_1': { bonds: 18, bands: 20, visibleNonDiy: 95, chess: 200, items: 89, effects: 281, hiddenCore: [300, 1000] },
+  'act2autochess@V2_1': { bonds: 23, bands: 36, visibleNonDiy: 115, chess: 240, items: 115, effects: 361, hiddenCore: [350, 1200], milestones: 35 },
+  act1autochess: { bonds: 18, bands: 30, visibleNonDiy: 95, chess: 200, items: 89, effects: 281, hiddenCore: [300, 1000], milestones: 60 },
+  'act1autochess@V1_1': { bonds: 18, bands: 20, visibleNonDiy: 95, chess: 200, items: 89, effects: 281, hiddenCore: [300, 1000], milestones: 35 },
 });
 
 const readJson = (dir, name) => JSON.parse(readFileSync(join(dir, `${name}.json`), 'utf8'));
@@ -95,7 +97,7 @@ test('profiles: the default is today\'s build; pins pick a commit per file group
   assert.equal(pinnedShaOf(v12, 'levels/enemydata/enemy_database.json'), 'ee2cabffd45de01548cc6dceb23129ce93ac7926');
   assert.equal(pinnedShaOf(v12, 'excel/enemy_handbook_table.json'), 'ee2cabffd45de01548cc6dceb23129ce93ac7926');
   const { profile: v11 } = await loadProfile('act1autochess@V1_1');
-  // V1_1 with the 11-18 hotfix (the maintainer, 2026-10-22): activity_table and skill_table at ea164ef7, the rest at the
+  // V1_1 with the 11-18 hotfix (the maintainer, 2026-10-22): activity_table and the character group at ea164ef7, the rest at the
   // launch; no enemy pin: V1_2's ee2cabff would leak V1_2 enemies
   assert.deepEqual(Object.keys(v11.pins), ['default', 'activity', 'character']);
   for (const rel of ['excel/activity_table.json', 'excel/skill_table.json', 'excel/character_table.json']) {
@@ -110,7 +112,9 @@ test('profiles: the default is today\'s build; pins pick a commit per file group
     'levels/activities/act1autochess/level_autochess_enemy_data.json', 'levels/activities/act2autochess/level_act2autochess_m01.json']) {
     assert.equal(pinnedShaOf(v21, rel), '1457587e48fe65361f523821d24e6d14c3b91713', rel);
   }
-  assert.deepEqual(v21.adapters, ['launchModes']);
+  assert.deepEqual(v21.adapters, ['launchModes', 'launchMilestones']);
+  assert.deepEqual(v11.adapters, ['bondActiveType', 'selfBackupPreset', 'launchMilestones']);
+  assert.deepEqual(v12.adapters, ['bondActiveType', 'selfBackupPreset'], 'V1_2 is the final state: all 60 功勋 levels');
   assert.equal(v21.research, 'docs/research/', 'the 下半 research applies by id');
   assert.equal(v21.tables, 'default', 'the 下半-measured tables apply by id / name');
   assert.deepEqual(v21.config.rules, {}, 'the default\'s rules');
@@ -126,7 +130,7 @@ test('profiles: the default is today\'s build; pins pick a commit per file group
 // ---------------------------------------------------------------------------------------------------
 
 for (const v of OTHERS) {
-  test(`data/${v.dir}: the 16 files, under 6 MB, config.version, the profile's counts, no effectRef, no TAKE_DAMAGE row, references resolve`, async () => {
+  test(`data/${v.dir}: the 16 files, under 6 MB, config.version, the profile's counts, no effectRef, the trigger deviations of its profile, references resolve`, async () => {
     const { profile } = await loadProfile(v.id);
     const dir = join(ROOT, 'data', v.dir);
     const names = readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
@@ -157,7 +161,9 @@ for (const v of OTHERS) {
       bonds: Object.keys(f.bonds).length, bands: Object.keys(f.bands).length,
       visibleNonDiy: Object.values(f.chess).filter((c) => !c.isGolden && c.visible).length, chess: Object.keys(f.chess).length,
       items: Object.keys(f.items).length, effects: Object.keys(f.effects).length, hiddenCore: [f.config.hiddenCore.single, f.config.hiddenCore.multi],
+      milestones: f.config.rewards.milestones.length,
     }, pin, `${v.id}: the pinned counts`);
+    assert.deepEqual(f.config.rewards.milestones.map((m) => m.level), Array.from({ length: pin.milestones }, (_, i) => i + 1), `${v.id}: the 功勋 levels 1…n`);
     for (const [file, recs] of [['items', f.items], ['bands', f.bands]]) {
       for (const r of Object.values(recs)) assert.ok(!Object.hasOwn(r, 'effectRef'), `${file} ${r.id ?? r.bandId}: no effectRef (it would name a default-version id)`);
     }
@@ -197,6 +203,36 @@ for (const v of OTHERS) {
     }
   });
 }
+
+// 第二期上半's records that keep today's id but differ from today's data (DESIGN §35.22.5 lists each). Today's data is V2_2
+// with the 04-14 level and text fixes (86da4cfa) and the modules added after 03-14, so the list is not only V2_2's. A
+// rebuild that changes a set fails here, and the hand-written list is reviewed with the new set.
+test('data/versions/act2autochess-v2_1: the same-id records that differ from today\'s are the listed ones', () => {
+  const read = (dir, name) => readJson(join(ROOT, 'data', dir), name);
+  const changed = (name, pick = (x) => x) => {
+    const today = read('', name);
+    const v21 = read('versions/act2autochess-v2_1', name);
+    return Object.keys(v21).filter((id) => Object.hasOwn(today, id) && JSON.stringify(pick(today[id])) !== JSON.stringify(pick(v21[id]))).sort();
+  };
+  // 余's HP, 商业包装 every 7 sold, 陈 以己之长's 高台 clause (all V2_2)
+  assert.deepEqual(changed('bands'), ['band_chen', 'band_malkie', 'band_yu']);
+  // the bands' and bonds' effects above, 奥术法阵 without 失能 and 商业包装方案 (V2_2), 阿戈尔's swallow order and
+  // 悬赏·折射II's 卫队 / 卫士 (04-14)
+  assert.deepEqual(changed('effects'), ['aceffect_band_27', 'aceffect_band_39', 'bondeffect_egir', 'bondeffect_invest', 'bondeffect_mira',
+    'bondeffect_visi', 'eff_acarm048', 'eff_acarm074', 'eff_acgarm048', 'eff_acgarm074', 'enemyeffect_15_7']);
+  // 圆仔 NORMAL and 节日气球 uncounted (level_autochess_enemy_data, 04-14); the rest term markup or an ability's format only
+  assert.deepEqual(changed('enemies'), ['enemy_10028_vtswd', 'enemy_10029_vtshld', 'enemy_10030_vtwand', 'enemy_10034_cnvsax', 'enemy_10040_cnvbln',
+    'enemy_10144_xdelk_2', 'enemy_2008_flking', 'enemy_2085_skzjxd', 'enemy_2085_skzjxd_2', 'enemy_9011_acrefr']);
+  // h07_05's patrol loop (04-14)
+  assert.deepEqual(changed('waves', (w) => [w.routes, w.extraRoutes]), ['act2autochess_h07_05', 'act2autochess_h07_05_s']);
+  // the modules added after 03-14: 13 elite records offer one fewer, and two summons lose their byModule entry
+  assert.deepEqual(changed('chess', (c) => (c.modules || []).map((m) => m.uniEquipId)), ['chess_char_3_18_b', 'chess_char_4_01_b', 'chess_char_4_16_b',
+    'chess_char_5_03_b', 'chess_char_5_05_b', 'chess_char_5_07_b', 'chess_char_5_13_b', 'chess_char_5_18_b', 'chess_char_6_04_b', 'chess_char_6_08_b',
+    'chess_char_6_10_b', 'chess_char_6_15_b', 'chess_char_6_19_b']);
+  assert.deepEqual(changed('tokens'), ['token_10017_skadi2_dedant', 'token_10039_ulpia_block']);
+  const v21 = read('versions/act2autochess-v2_1', 'enemies');
+  assert.deepEqual([v21.enemy_2085_skzjxd.rank, v21.enemy_10040_cnvbln.notCountInTotal], ['NORMAL', true]);
+});
 
 test('--version act2autochess --offline reproduces data/*.json (the default profile is today\'s build)', { skip: (!existsSync(join(CACHE, 'excel', 'activity_table.json')) && 'no .cache/gamedata') || (process.env.DATA_DIR && 'DATA_DIR set') }, (t) => {
   const out = mkdtempSync(join(tmpdir(), 'sp-version-'));
@@ -258,6 +294,14 @@ test('HTTP: data/versions/ is not served until M1 (any spelling); the default da
   try {
     const get = (p) => fetch(srv.url + p, { redirect: 'manual' });
     assert.equal((await get('/data/chess.json')).status, 200);
+    // the nested default data stays served: the client store loads its game-text overlays from /data/i18n/ (public/js/data.js)
+    const langs = readdirSync(join(ROOT, 'data', 'i18n')).filter((f) => f.endsWith('.json'));
+    assert.ok(langs.length >= 4, 'data/i18n/<lang>.json');
+    for (const name of langs) {
+      const r = await get(`/data/i18n/${name}`);
+      assert.equal(r.status, 200, `/data/i18n/${name}`);
+      assert.ok((await r.arrayBuffer()).byteLength > 0);
+    }
     for (const v of OTHERS) {
       for (const p of [`/data/${v.dir}chess.json`, `/data/${v.dir}config.json`, `/data/${v.dir}`, `/data/${v.dir.toUpperCase()}CHESS.JSON`,
         `/data/${v.dir.replace('versions/', 'Versions/')}chess.json`, `/data/./${v.dir}chess.json`, `/data/i18n/../${v.dir}chess.json`]) {
@@ -268,6 +312,29 @@ test('HTTP: data/versions/ is not served until M1 (any spelling); the default da
     }
   } finally {
     await srv.close();
+  }
+});
+
+test('HTTP: only the versions/ folder itself is refused — a sibling whose name starts with "versions" is served', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sp-versions-static-'));
+  for (const sub of ['versions/act1autochess', 'versions-old', 'versionsX', 'i18n']) mkdirSync(join(dir, sub), { recursive: true });
+  for (const rel of ['config.json', 'versions/act1autochess/chess.json', 'versions-old/chess.json', 'versionsX/chess.json', 'versions.json', 'i18n/en.json']) {
+    writeFileSync(join(dir, rel), '{}');
+  }
+  const handler = createStaticHandler({ publicDir: join(ROOT, 'public'), dataDir: dir, sharedDir: join(ROOT, 'shared') });
+  const srv = createServer((req, res) => { const [p, q] = req.url.split('?'); handler(req, res, p, q || ''); });
+  await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
+  try {
+    const get = async (p) => {
+      const r = await fetch(`http://127.0.0.1:${srv.address().port}${p}`, { redirect: 'manual' });
+      await r.arrayBuffer();
+      return r.status;
+    };
+    for (const p of ['/data/versions-old/chess.json', '/data/versionsX/chess.json', '/data/versions.json', '/data/i18n/en.json']) assert.equal(await get(p), 200, p);
+    assert.equal(await get('/data/versions/act1autochess/chess.json'), 404);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
@@ -324,6 +391,21 @@ test('adapter launchModes: modes opening after the earliest one leave modeDataDi
   launchModes(same);
   assert.deepEqual(Object.keys(same.modeDataDict), ['a', 'b'], 'one launch time: nothing dropped');
   assert.throws(() => launchModes({ modeDataDict: { a: {} }, battleDataDict: {}, stageDatasDict: {} }), /no startTime/);
+});
+
+test('adapter launchMilestones: 功勋 levels opening after the earliest one leave milestoneList', () => {
+  const lv = (n, t) => ({ milestoneId: `m${n}`, milestoneLvl: n, tokenNum: n * 100, availableTime: t });
+  const act = { milestoneList: [lv(1, 100), lv(2, 100), lv(3, 200), lv(4, 200)] };
+  launchMilestones(act);
+  assert.deepEqual(act.milestoneList.map((m) => m.milestoneLvl), [1, 2]);
+  const dict = { milestoneList: { a: lv(1, 100), b: lv(2, 300) } };
+  launchMilestones(dict);
+  assert.deepEqual(Object.keys(dict.milestoneList), ['a'], 'a keyed list too');
+  const same = { milestoneList: [lv(1, 5), lv(2, 5)] };
+  launchMilestones(same);
+  assert.equal(same.milestoneList.length, 2, 'one opening time: nothing dropped');
+  assert.throws(() => launchMilestones({ milestoneList: [{ milestoneLvl: 1 }] }), /no availableTime/);
+  assert.throws(() => launchMilestones({ milestoneList: [] }), /no levels/);
 });
 
 // ---------------------------------------------------------------------------------------------------

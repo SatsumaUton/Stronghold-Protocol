@@ -39,7 +39,7 @@ direction-dependent classification. Current contract: [design/engine.md](design/
 
 The official version switch starts in 0.3.2 with M0, recorded in
 [§35.22](history/0.3.2.md#3522-official-versions-groundwork-m0): four versions named by period, as the maintainer named
-them on 2026-10-22 — 第一期 is the official `act1autochess` (「卫戍协议:盟约」 上半期活动), 第二期 `act2autochess` (下半期活动),
+them on 2026-10-22 — 第一期 is the official `act1autochess` (「卫戍协议：盟约」 上半期活动), 第二期 `act2autochess` (下半期活动),
 and each period's 上半 / 下半 its sub-versions V1_1 / V1_2 and V2_1 / V2_2; 第二期下半, today's game, stays the default
 byte for byte. Nothing at run time reads another version before M1. Current contract: [DATA.md](DATA.md) "Official
 versions (M0)" (registry, profiles, builds) and [SIM.md](SIM.md) §7.2 (behaviour keyed by charId / effectId).

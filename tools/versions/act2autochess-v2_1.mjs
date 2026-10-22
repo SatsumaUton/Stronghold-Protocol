@@ -9,12 +9,14 @@
 //
 // What carries over from the default build (same season, measured on V2_2) and what does not:
 //   adapters  launchModes: the 1457587e table already lists the 终极 modes (startTime 2026-03-27 16:00); they open with
-//             V2_2 and are left out. The bond and shop schemas are 下半's, so the 上半 adapters do not apply.
+//             V2_2 and are left out. launchMilestones: so do 功勋 levels 36–60 (availableTime 2026-03-27 16:00), so V2_1
+//             has 35. The bond and shop schemas are 下半's, so the 上半 adapters do not apply.
 //   research  docs/research/ by id [ASSUMED]: the bond specs (02, by bondId), the item kinds (04, by trapId), the enemy
 //             and stage notes (05, by id), the asset notes (07) and the core numbers (01: the enemy stat multipliers per
 //             mode and round, PRTS 下半, and the trophies), all written on V2_2; the build warns of none missing.
-//   tables    'default' [ASSUMED]: the 机变 events (effectChoiceInfoDict), the bounty cards and the shop rows
-//             (trapShopChessDatas) are byte-identical at 1457587e and today; the measured stock (BV1eLXXBqEgF, 2026-03-29)
+//   tables    'default' [ASSUMED]: the 机变 events (effectChoiceInfoDict) and the shop rows (trapShopChessDatas) are
+//             byte-identical at 1457587e and today, the bounty cards keep their ids and draft data (one text, 悬赏·折射II,
+//             changed on 04-14); the measured stock (BV1eLXXBqEgF, 2026-03-29)
 //             and the 22 matches of test/fixtures/official-bounty-drafts.json (dated to the end of March 2026, so V2_1 or
 //             V2_2) name only operators and items V2_1 has (stockByName / itemByName throw otherwise).
 //   config    hiddenCore 350 / 1200 [ASSUMED] (PRTS 卫戍协议：盟约 下半; its 3-27 notes do not change them); rules {}:
@@ -29,7 +31,7 @@ export default Object.freeze({
   pins: Object.freeze({
     default: '1457587e48fe65361f523821d24e6d14c3b91713',
   }),
-  adapters: Object.freeze(['launchModes']),
+  adapters: Object.freeze(['launchModes', 'launchMilestones']),
   research: 'docs/research/',
   tables: 'default',
   config: Object.freeze({

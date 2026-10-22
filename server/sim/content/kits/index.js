@@ -336,11 +336,12 @@ export const PENDING_KIT_CHARS = Object.freeze([
 ]);
 
 /**
- * 自选 picks of another official version without a 自选 kit (上半 and 下半 V2_1: DESIGN §35.22.4, docs/SIM.md §7.2).
- * Their owned 自选 pools hold these operators, which today's data sells as shop chess: their hand-written kit is a tier
- * kit under a chess id, never one under the charId (V2_1: 银灰, 空弦, 卡涅利安 and 伺夜, shop chess since V2_2). A 自选 piece keeps the by-charId lookup, so they are not in KITTED_CHARS and the kitted gate
- * (shared/protocol.js checkDiyPicks, shared/diy.js diyPool) leaves them out of that version's 自选 [ASSUMED: until M2
- * either reviews the tier kit as a borrowed 自选 kit or writes one]. test/versions-keying.test.js accepts a 自选 pick
+ * 自选 picks of another official version without a 自选 kit (第一期 and 第二期上半 V2_1: DESIGN §35.22.4, docs/SIM.md
+ * §7.2). Their owned 自选 pools hold these operators, which today's data sells as shop chess: their hand-written kit is a
+ * tier kit under a chess id, never one under the charId (V2_1: 银灰, 空弦, 卡涅利安 and 伺夜, shop chess since V2_2). A 自选
+ * piece keeps the by-charId lookup, so they are not in KITTED_CHARS and the kitted gate (shared/protocol.js
+ * checkDiyPicks, shared/diy.js diyPool) leaves them out of that version's 自选 [ASSUMED: until M2 either reviews the tier
+ * kit as a borrowed 自选 kit or writes one]. test/versions-keying.test.js accepts a 自选 pick
  * without a kit only when its charId is a 预备干员 (GENERIC_KIT_CHARS) or listed here, and fails once a listed operator
  * gets a 自选 kit or loses its tier kit.
  */

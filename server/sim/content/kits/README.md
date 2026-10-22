@@ -25,7 +25,7 @@ On another official version's build the by-id kit is used only when `KIT_CHAR_ID
 versions M0, 0.3.2, DESIGN §35.22): that version may give chess ids to other operators (第一期, 盟约·上半, does), whose kit
 is then found by charId (`content/index.js officialKitKey`, docs/SIM.md §7.2). The default data keeps the by-id lookup.
 A 自选 piece keeps `KITS[def.charId]` there too: the owned 自选 pools hold operators whose kit is a tier kit only (24 in
-上半, 4 in 第二期上半: `PENDING_DIY_KIT_CHARS`), which `KITTED_CHARS` therefore leaves out of that version's 自选
+第一期, 4 in 第二期上半: `PENDING_DIY_KIT_CHARS`), which `KITTED_CHARS` therefore leaves out of that version's 自选
 [ASSUMED] until M2.
 
 ## Naming

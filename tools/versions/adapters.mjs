@@ -18,6 +18,12 @@
 //                     start of V2_2 in autoChessData.versionInfoDict; PRTS 卫戍协议：盟约 下半, 3-27: 终极模拟开放). Every mode
 //                     whose startTime is later than the earliest mode's leaves modeDataDict and battleDataDict, and the
 //                     stages' mode lists. A mode without a numeric startTime throws.
+//   launchMilestones  the 功勋 levels open at the season's launch: milestoneList lists all 60 levels in both seasons'
+//                     launch tables, and levels 36–60 carry the availableTime of the second sub-version (1764057600 =
+//                     2025-11-25 16:00 at 8303c922 / ea164ef7, V1_2; 1774598400 = 2026-03-27 16:00 at 1457587e, V2_2).
+//                     Every level whose availableTime is later than the earliest level's leaves milestoneList, so the
+//                     settlement's LV strip (config.rewards.milestones) stops at 35. A level without a numeric
+//                     availableTime throws.
 
 /** activeType (+ isActiveInDeck) → 下半's activeCondition. */
 const ACTIVE_CONDITION = Object.freeze({ 'ALL+deck': 'BOARD_AND_DECK', BATTLE: 'BOARD', MANI: 'BOARD' });
@@ -70,8 +76,20 @@ export function launchModes(act) {
   for (const sd of Object.values(act.stageDatasDict || {})) if (Array.isArray(sd?.mode)) sd.mode = sd.mode.filter((id) => !later.has(id));
 }
 
+/**
+ * @param {{ milestoneList: any[] | Record<string, any> }} act
+ */
+export function launchMilestones(act) {
+  const list = Array.isArray(act.milestoneList) ? act.milestoneList : Object.values(act.milestoneList || {});
+  for (const m of list) if (!Number.isFinite(m?.availableTime)) throw new Error(`adapter launchMilestones: level ${m?.milestoneLvl} has no availableTime`);
+  if (!list.length) throw new Error('adapter launchMilestones: no levels');
+  const launch = Math.min(...list.map((m) => m.availableTime));
+  if (Array.isArray(act.milestoneList)) act.milestoneList = list.filter((m) => m.availableTime <= launch);
+  else for (const [k, m] of Object.entries(act.milestoneList)) if (m.availableTime > launch) delete act.milestoneList[k];
+}
+
 /** Every adapter by the name a profile lists. */
-export const ADAPTERS = Object.freeze({ bondActiveType, selfBackupPreset, launchModes });
+export const ADAPTERS = Object.freeze({ bondActiveType, selfBackupPreset, launchModes, launchMilestones });
 
 /**
  * Apply a profile's adapters, in order, to the season section.

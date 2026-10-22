@@ -15,6 +15,8 @@
 //   character ea164ef7: the hotfix also reworded skill_table's two sktok_acarm069 descriptions the same way, rows the
 //             build does not read (the output is byte-identical with the character tables of 8303c922); character /
 //             uniequip / battle_equip are the same at both commits. The client drag fix is not a build input.
+// adapters: the two 上半 schema adapters, and launchMilestones: the table lists all 60 功勋 levels, and levels 36–60 open
+// with V1_2 (availableTime 2025-11-25 16:00), so V1_1 has 35.
 // The rest is as tools/versions/act1autochess.mjs.
 
 export default Object.freeze({
@@ -25,7 +27,7 @@ export default Object.freeze({
     activity: 'ea164ef70736ca2d1a356b3bf7b1cd7540960dc1',
     character: 'ea164ef70736ca2d1a356b3bf7b1cd7540960dc1',
   }),
-  adapters: Object.freeze(['bondActiveType', 'selfBackupPreset']),
+  adapters: Object.freeze(['bondActiveType', 'selfBackupPreset', 'launchMilestones']),
   research: 'docs/research/versions/act1autochess-v1_1/',
   tables: Object.freeze({ stock: null, shopDraft: null, tacticDraft: null, bountyDrafts: null }),
   config: Object.freeze({
