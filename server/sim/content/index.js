@@ -102,7 +102,8 @@ function kitKeyForChar(charId, tier) {
 }
 
 /**
- * The key of `def`'s kit in KITS, or null (generic). A stand-in's and a 自选 piece's: its charId (isOtherBody). Any
+ * The key of `def`'s kit in KITS, or null (generic). A stand-in's and a 自选 piece's: its charId (isOtherBody), on every
+ * data (a version's 自选 pick whose only kit is a tier kit has none: kits/index.js PENDING_DIY_KIT_CHARS). Any
  * other def: the kit of its id (baseId, the exact id, or the suffix-less id). On another version's build (`data`
  * carries config.version; default: the loaded data) that kit counts only when it was written for the def's charId
  * (KIT_CHAR_IDS), else the kit is found by its charId (kitKeyForChar); a chess whose own kit was written for its

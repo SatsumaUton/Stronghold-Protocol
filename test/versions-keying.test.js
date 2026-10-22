@@ -5,6 +5,9 @@
 // checked here — data/, every data/versions/*/ with a chess.json, and the directories of SP_VERSION_DATA_DIRS
 // (path.delimiter-separated, e.g. a dry build) — must:
 //   * resolve every chess to a kit written for its own charId, or list its charId in PENDING_KIT_CHARS (generic kit);
+//   * resolve every 自选 pick (owned pool and prototypes, each slot) and every 补位 stand-in to the kit of its charId, or
+//     be a 预备干员 (GENERIC_KIT_CHARS, generic by design) or a version's 自选 pick listed in PENDING_DIY_KIT_CHARS, which
+//     the kitted gate (KITTED_CHARS) then drops;
 //   * dispatch every item to the handler of its own effectId, and bind each meta override only to item keys whose
 //     record carries its effectId and the buff it reads;
 //   * match its pinned resolution counts (EXPECT; a directory without an entry fails until it gets one).
@@ -21,7 +24,11 @@ import { fileURLToPath } from 'node:url';
 import { loadData, getData, setData, resetData } from '../server/data.js';
 import { DataSource } from '../server/sim/simdata.js';
 import { KITS, officialKitKey } from '../server/sim/content/index.js';
-import { KIT_CHAR_IDS, KIT_FILES, TIER_KITS, TIER_KIT_KEYS_BY_CHAR, PENDING_KIT_CHARS } from '../server/sim/content/kits/index.js';
+import {
+  KIT_CHAR_IDS, KIT_FILES, TIER_KITS, TIER_KIT_KEYS_BY_CHAR, PENDING_KIT_CHARS, PENDING_DIY_KIT_CHARS, GENERIC_KIT_CHARS, KITTED_CHARS,
+} from '../server/sim/content/kits/index.js';
+import { diyPool, diySlot, diySlotIds, isPrototypePick } from '../shared/diy.js';
+import { checkDiyPicks } from '../shared/protocol.js';
 import { setGameData, itemEffectKey, itemIdsWithEffect, isMutationCell, mutationCellIds } from '../server/sim/content/support/index.js';
 import { BATTLE_EFFECT_IDS, DEFAULT_ITEM_KEYS, battleEffectOf, hasBattleEffect, hammerKeys } from '../server/sim/content/items/battle.js';
 import { PlayerPrep } from '../server/match/player/prep.js';
@@ -33,6 +40,7 @@ import { TOKEN_IDS } from '../server/sim/content/tokens.js';
 import { makeBattle, chessRec, enemyRec, checkInvariants } from './helpers/battleHarness.js';
 import { buildPlaybook } from '../server/ai/playbook.js';
 import { knowledgePack } from '../server/ai/knowledge.js';
+import { hasBattlePart as bandHasBattlePart } from '../server/sim/content/bands/battle.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const QUIET = Object.freeze({ warn() {}, error() {}, info() {} });
@@ -68,7 +76,9 @@ const versioned = (data) => ({ ...data, config: { ...data.config, version: SHANG
 
 /**
  * The pinned resolution of each directory: kits over the normal official chess records (own = its id's kit, tier = an
- * operator's tier kit under another id, op = a 自选 op-* kit, pending = distinct charIds without a kit), items with a
+ * operator's tier kit under another id, op = a 自选 op-* kit, pending = distinct charIds without a kit), the 自选 picks
+ * (distinct charIds over every slot's pool: kitted, generic = 预备干员, pending = PENDING_DIY_KIT_CHARS) and the 补位
+ * stand-in records (kitted, generic = 预备干员), items with a
  * BY_EFFECT handler (records, golden included) and the distinct handlers, 蒸汽之心's hammer keys, the item records with
  * a battle part, and the item keys each meta override binds (items/meta.js OVERRIDES).
  */
@@ -77,7 +87,9 @@ const DEFAULT_META = Object.freeze({
   scroll: ['chess_item_6_02_m'], customerDestroy: ['chess_item_6_01_m'], cauldron: ['chess_item_6_03_e'],
 });
 const SHANG = Object.freeze({
-  kits: { own: 46, tier: 19, op: 12, pending: 19 }, items: 44, handlers: 22, battleEffect: 68,
+  // 自选: 24 owned picks whose only kit is a 下半 tier kit (PENDING_DIY_KIT_CHARS); V1_1's owned pool has one operator less
+  kits: { own: 46, tier: 19, op: 12, pending: 19 }, diy: { kitted: 57, generic: 6, pending: 24 }, standIns: { kitted: 64, generic: 68 },
+  items: 44, handlers: 22, battleEffect: 68,
   hammers: ['chess_item_2_03_e', 'chess_item_2_04_e', 'chess_item_2_05_e', 'chess_item_2_06_e'],
   // 上半 has no 紧急调度券, and its 寻呼模块 (eff_acarm075) reads use_equip_add_goods_rule_with_refresh_shop: unbound (M2)
   meta: { dispatchTicket: [], pager: [], pointer: ['chess_item_6_03_m'], customerBounty: ['chess_item_6_01_m'], scroll: ['chess_item_6_02_m'],
@@ -86,12 +98,13 @@ const SHANG = Object.freeze({
 });
 const EXPECT = Object.freeze({
   data: {
-    kits: { own: 129, tier: 0, op: 0, pending: 0 }, items: 54, handlers: 27, battleEffect: 82,
+    kits: { own: 129, tier: 0, op: 0, pending: 0 }, diy: { kitted: 81, generic: 6, pending: 0 }, standIns: { kitted: 82, generic: 28 },
+    items: 54, handlers: 27, battleEffect: 82,
     hammers: ['chess_item_4_09_e', 'chess_item_3_09_e', 'chess_item_3_10_e', 'chess_item_2_03_e'], meta: DEFAULT_META,
     cells: ['chess_item_5_08_e_a'],
   },
   'data/versions/act1autochess': SHANG,
-  'data/versions/act1autochess-v1_1': SHANG,
+  'data/versions/act1autochess-v1_1': { ...SHANG, diy: { kitted: 56, generic: 6, pending: 24 } },
 });
 
 /** The behaviour of each default item key (C in the plan): BY_ITEM key → effectId. */
@@ -199,6 +212,62 @@ for (const dir of DIRS) {
     const want = EXPECT[label(dir)];
     assert.ok(want, `${label(dir)} has no EXPECT entry: pin its counts`);
     assert.deepEqual({ ...split, pending: split.pending.size }, want.kits);
+  });
+}
+
+test('PENDING_DIY_KIT_CHARS: operators with a tier kit only, never a 自选 kit (one that gets a 自选 kit leaves the list)', () => {
+  assert.equal(new Set(PENDING_DIY_KIT_CHARS).size, PENDING_DIY_KIT_CHARS.length);
+  for (const c of PENDING_DIY_KIT_CHARS) {
+    assert.ok(TIER_KIT_KEYS_BY_CHAR[c]?.length, `${c} has no tier kit`);
+    assert.ok(!Object.hasOwn(KITS, c) && !KITTED_CHARS.includes(c), `${c} has a 自选 kit now: remove it from PENDING_DIY_KIT_CHARS`);
+    assert.ok(!PENDING_KIT_CHARS.includes(c) && !GENERIC_KIT_CHARS.includes(c), c);
+  }
+});
+
+for (const dir of DIRS) {
+  test(`自选 and 补位 of ${label(dir)}: every pick and stand-in has its charId's kit, is a 预备干员 or a pending 自选 pick; the kitted gate agrees; the pinned split`, (t) => {
+    const data = dataOf(dir);
+    setGameData(data);
+    t.after(() => setGameData(null));
+    const ds = new DataSource(data, null);
+    const kitted = new Set(KITTED_CHARS);
+    const diy = { kitted: new Set(), generic: new Set(), pending: new Set() };
+    const slots = diySlotIds(data);
+    assert.ok(slots.length > 0);
+    for (const slotId of slots) {
+      const { tier } = diySlot(slotId, data);
+      for (const charId of diyPool(tier, { data })) {
+        const pick = isPrototypePick(data, tier, charId) ? { charId } : { charId, skillIndex: 0, uniEquipId: null };
+        const def = ds.getChess(slotId, { diy: pick });
+        assert.ok(def, `${slotId} ${charId}: a legal pick`);
+        const key = officialKitKey(def);
+        const kept = Object.keys(checkDiyPicks({ [slotId]: pick }, { data, kitted: KITTED_CHARS }).picks).length === 1;
+        if (key) {
+          assert.equal(KIT_CHAR_IDS[key] ?? key, charId, `${slotId} ${charId} → ${key}`);
+          assert.ok(kitted.has(charId) && kept, `${slotId} ${charId}: kitted, kept by the gate`);
+          diy.kitted.add(charId);
+        } else if (GENERIC_KIT_CHARS.includes(charId)) {
+          assert.ok(kept, `${slotId} ${charId}: a 预备干员 is kept by the gate`);
+          diy.generic.add(charId);
+        } else {
+          assert.ok(!isDefault(dir) && PENDING_DIY_KIT_CHARS.includes(charId), `${slotId} ${charId} has no 自选 kit and is not in PENDING_DIY_KIT_CHARS`);
+          assert.ok(!kept && !diyPool(tier, { data, kitted: KITTED_CHARS }).includes(charId), `${slotId} ${charId}: the gate drops a pending pick`);
+          diy.pending.add(charId);
+        }
+      }
+    }
+    const standIns = { kitted: 0, generic: 0 };
+    for (const id of Object.keys(data.chess || {})) {
+      const def = ds.getStandIn(id);
+      if (!def) continue;
+      const key = officialKitKey(def);
+      if (key) { assert.equal(KIT_CHAR_IDS[key] ?? key, def.charId, `${id} stand-in ${def.charId} → ${key}`); standIns.kitted++; }
+      else { assert.ok(GENERIC_KIT_CHARS.includes(def.charId), `${id}: stand-in ${def.charId} has no kit and is no 预备干员`); standIns.generic++; }
+    }
+    const want = EXPECT[label(dir)];
+    assert.ok(want, `${label(dir)} has no EXPECT entry: pin its counts`);
+    assert.deepEqual({ kitted: diy.kitted.size, generic: diy.generic.size, pending: diy.pending.size }, want.diy);
+    assert.deepEqual(standIns, want.standIns);
   });
 }
 
@@ -419,6 +488,26 @@ test('夕: on a version\'s build her generic-kit dragon follows her charId (any 
     });
     assert.equal(h.runUntil(() => h.b.allyUnits.some((u) => u.defId === TOKEN_IDS.duskDragon), 10), want, id);
     checkInvariants(h.b);
+  }
+});
+
+// =====================================================================================================================
+// bands
+
+test('auto_chess_change_map: Touch\'s map characters have a battle part and count as team support; 上半\'s 森蚺 device switch has neither (M2)', (t) => {
+  t.after(() => setGameData(null));
+  // the bands carrying the key in each directory → whether it is Touch's map-character shape
+  const want = { band_amedic: true, band_zumama: false };
+  for (const dir of DIRS) {
+    const data = dataOf(dir);
+    setGameData(data);
+    const holders = Object.keys(data.bands || {}).filter((id) => (data.bands[id].buffs || []).some((b) => b.key === 'auto_chess_change_map'));
+    assert.deepEqual(holders, isDefault(dir) ? ['band_amedic'] : ['band_zumama'], label(dir));
+    const roles = new Map(buildPlaybook(data, { modeId: 'mode_single_normal' }).bands.map((b) => [b.id, b.roleClasses]));
+    for (const id of holders) {
+      assert.equal(bandHasBattlePart(id), want[id], `${label(dir)} ${id}: battle part`);
+      assert.equal(roles.get(id)?.includes('team-support'), want[id], `${label(dir)} ${id}: team support`);
+    }
   }
 });
 

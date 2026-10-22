@@ -259,9 +259,18 @@ function installMapChars(battle) {
 /** Band buff keys with a battle part (tests / tooling). */
 export const BATTLE_BUFF_KEYS = Object.freeze([...Object.keys(BY_KEY), 'auto_chess_change_map']);
 
+/**
+ * Whether band buff `b` (buffsOf) is Touch's map-character grant: `auto_chess_change_map` naming map characters
+ * (`char_605_cmedic#1` …). 上半's 森蚺 (band_zumama) carries the same key with device aliases (`trap_1104_aclasert#1` …,
+ * one 双眼皮 on every field, the format of choices.js mapAliases): another mechanic, not built yet (DESIGN §36.5, M2).
+ */
+export function isMapCharBuff(b) {
+  return b.key === 'auto_chess_change_map' && Object.keys(b.p || {}).some((k) => k.startsWith('char_') && k.includes('#'));
+}
+
 /** Does this band have a battle part? */
 export function hasBattlePart(bandId) {
-  return buffsOf(bandRecord(bandId)).some((b) => (b.bbKey && BY_KEY[b.bbKey]) || b.key === 'auto_chess_change_map');
+  return buffsOf(bandRecord(bandId)).some((b) => (b.bbKey && BY_KEY[b.bbKey]) || isMapCharBuff(b));
 }
 
 export function install(battle) {

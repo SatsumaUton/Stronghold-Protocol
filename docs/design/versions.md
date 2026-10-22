@@ -24,7 +24,7 @@ auto-chess family with its own data, and the mechanics that differ become rule s
 |---|---|---|
 | **M0** (§36.1–§36.6) | registry, per-version build profiles and the two 上半 data builds; behaviour keyed by charId / effectId instead of the default data's ids; the default pinned by tests | nothing |
 | M1 | one match process per version, the room's version and its vote, the lobby switch, per-version settings and logs | the switch, behind a server option (default off) |
-| M2 | 上半 fidelity: the rule switches, the same-key-different-meaning audit, the 19 missing kits and the review of the 31 borrowed ones, the blackboard gaps of §36.5, 上半 research data, golden and bot runs | 上半 playable |
+| M2 | 上半 fidelity: the rule switches, the same-key-different-meaning audit, the 19 missing kits and the review of the 31 borrowed ones, the 24 自选 picks with a tier kit only (§36.4), the blackboard gaps of §36.5, 上半 research data, golden and bot runs | 上半 playable |
 | M3 | translations, the asset union, a version-differences page, optional sub-versions | polish |
 
 M0–M2 together make 上半 releasable. This section records M0. The later milestones get their own subsections when they
@@ -109,26 +109,28 @@ keyed build tables, the hidden inputs and the warning classes.
 | | chess | visible non-DIY | bonds | bands | items | effects | garrisons | enemies | bytes (15 built files) |
 |---|---|---|---|---|---|---|---|---|---|
 | 盟约·下半 (`data/`) | 266 | 112 | 23 | 40 | 115 | 361 | 249 | 249 | 5 810 393 |
-| 盟约·上半 V1_2 | 200 | 95 | 18 | 30 | 89 | 281 | 174 | 197 | 4 852 026 |
-| 盟约·上半 V1_1 | 200 | 95 | 18 | 20 | 89 | 279 | 170 | 197 | 4 754 560 |
+| 盟约·上半 V1_2 | 200 | 95 | 18 | 30 | 89 | 281 | 174 | 197 | 4 852 025 |
+| 盟约·上半 V1_1 | 200 | 95 | 18 | 20 | 89 | 279 | 170 | 197 | 4 754 559 |
 
 - Both 上半 builds pass validation with 0 errors. Each version directory holds 16 files: the 15 built ones and a byte
   copy of `tuning.json`. Offline rebuilds are byte-identical (`test/data-versions.test.js`).
 - **Pins.** V1_2 reads `21b1f240`, with enemies at `ee2cabff`. V1_1 reads `8303c922` for everything and has no enemy
   pin, so no V1_2 enemy record leaks in.
 - **V1_1 is launch day, before the 11-18 hotfix [ASSUMED].** `ea164ef7` is still V1_1 by `versionInfoDict`: about 4 of
-  its 11 days ran before the hotfix and about 7 on it. The only build input the hotfix changed is activity_table. Among
+  its 11 days ran before the hotfix and about 7 on it. Every change the build reads is in activity_table. Among
   its changes:
   - leader HP ×0.75 on Funny / Normal and −5…−12.5% on Hard;
   - `modeFactorInfo.SINGLE` 1.0 → 1.25;
   - `borrowCount` 8 → 20;
   - the enemy effects 攻坚装备II / III;
   - the m06 / m07 battlefield weights and two special-enemy weights;
-  - 10 more enemies inactive in the Normal modes.
+  - 10 more enemies inactive in the Normal modes;
+  - 拟态物质's `effectDesc` (`eff_acarm069`): the operator gained is the 初始干员, of the same bond. The hotfixed build's
+    `effects.json` and item descriptions change with it; the wording is a note for 拟态物质's M2 handler.
 
-  The commit also clarified 拟态物质's skill text in skill_table (`sktok_acarm069_1` / `_2`: the operator gained is the
-  初始干员, of the same bond) and added a client drag fix. Neither is a build input; the 初始干员 wording is a note for
-  拟态物质's M2 handler. One added pin (`activity: ea164ef7…`) builds the hotfixed state instead.
+  The commit made the same wording change in skill_table, in the two `sktok_acarm069_1` / `_2` descriptions. The table
+  is a pinned build input, but the build does not read those rows. It also added a client drag fix, which is not a build
+  input. One added pin (`activity: ea164ef7…`) builds the hotfixed state instead.
 - **Adapters.** `bondActiveType` converts 上半's bond activation (ALL with the deck → BOARD_AND_DECK; MANI → BOARD with
   `['1']`, as 下半's maniShip) [ASSUMED]. `selfBackupPreset` makes 盟约·辅助干员 a PRESET backup with its default skill
   and module, as 下半 writes it [ASSUMED].
@@ -151,7 +153,9 @@ keyed build tables, the hidden inputs and the warning classes.
   match honours them. M2's research decides 上半's own pools.
 - **Config.** `hiddenCore` 300 / 1000 comes from PRTS 卫戍协议：盟约, and `tuning.json` is the same for every version
   [ASSUMED]. The 上半 rule switches are inert in M0: `deployOrder: 'rowBottomUp'`, `soloTimed`, no bench equipment, no
-  full-bench swap and no shared boss.
+  full-bench swap and no shared boss. 上半's constData has no `singleReconnectTime` (`12e0a020` added it), so both 上半
+  builds write `constants.singleReconnectTime: null` instead of the 下半 value. The lobby's own fallback then keeps a
+  dropped solo run resumable for 24 h [ASSUMED] until 上半's solo exit rule is decided, together with the timed solo.
 - **Loader.** `server/data.js` provides `versionDataDir`, `getVersionData` (lazy, cached and frozen) and
   `resetVersionData`. Nothing at run time calls them in M0. `loadData(DATA_DIR)` reads the top level only.
 - **`config.version` is the gate.** Data that carries it (a version's build) finds hand-written behaviour by charId and
@@ -172,7 +176,8 @@ keyed build tables, the hidden inputs and the warning classes.
   - `officialKitKey` uses the by-id kit only when it was written for the record's charId. Otherwise it takes that
     operator's tier kit (the one at the record's tier when the operator has two: 锡人 → `2_19`, 耶拉 → `3_20`, 华法琳 →
     `4_26`), then a 自选 `op-*` kit registered under the charId, then none (the generic kit).
-  - Test fixtures and plugin `chess_x_` records keep the by-id lookup, and so do stand-ins and 自选 pieces.
+  - Test fixtures and plugin `chess_x_` records keep the by-id lookup, and so do stand-ins and 自选 pieces
+    (`KITS[charId]`).
   - A chess whose own kit was written for its operator but failed to load stays generic, as on the default data; it
     never takes the operator's other tier kit.
 - **Items** (SIM.md §7.2, META.md §2.1).
@@ -204,6 +209,15 @@ keyed build tables, the hidden inputs and the warning classes.
 
 The tier kits were written at their 下半 tier, and the `op-*` kits for 自选. The 31 borrowed kits are used as they are
 until M2 reviews each one at its 上半 tier [ASSUMED].
+
+**自选 and 补位 on 上半.** Every 补位 stand-in resolves as on the default data: a stand-in kit, or a 预备干员 with the
+generic kit. 上半's owned 自选 pool (72 operators in V1_2, 71 in V1_1) holds 24 that 下半 sells as shop chess: 星熊, 莫斯提马,
+塑心, 安洁莉娜, 空弦, 迷迭香, 焰尾, 瑕光, 卡涅利安, 伺夜, 远牙, 耀骑士临光, 焰影苇草, 百炼嘉维尔, 荒芜拉普兰德, 凛御银灰, 圣聆初雪,
+溯光星源, 夕, 隐德来希, 号角, 玛恩纳, 仇白 and 妮芙. Their only kit is a tier kit under a chess id. A 自选 piece keeps the
+by-charId lookup, so they have no 自选 kit, are listed in `kits/index.js PENDING_DIY_KIT_CHARS` and stay out of
+`KITTED_CHARS`. The kitted gate (`diyPool`, `checkDiyPicks`) therefore leaves them out of 上半's 自选 [ASSUMED]: M2 either
+reviews each tier kit as a borrowed 自选 kit or writes one. Making the kitted list follow the data would touch the
+lobby's and the match's 自选 paths (and the welcome's `diyKitted`), which M1 reorganises per version.
 
 **Items on 上半.** 44 records dispatch to 22 battle handlers, each the handler of its own effectId. The meta overrides
 bind 天师古鼎 `chess_item_6_02_e`, 教鞭, “神秘顾客” (both of its overrides) and 画卷. 紧急调度券 (`eff_acarm115`) does not exist
@@ -250,6 +264,12 @@ Besides those:
   and 耶拉冈德之泪.
 - Several 下半 prep keys are also absent. Among them is the key 寻呼模块's override reads; 上半 names its own,
   `use_equip_add_goods_rule_with_refresh_shop`, and the override binds nothing there (§36.4). M2 writes that mechanic.
+- **森蚺's `auto_chess_change_map`.** The audit compares bands by bandId, so a band only the version has is not audited.
+  上半's 森蚺 (`band_zumama`, `aceffect_band_43`, both builds) carries Touch's key with device aliases
+  (`trap_1104_aclasert#1`…`#4`: one 双眼皮 on every field, the alias format of 机变 cards). It is a device switch, not a
+  map character. `bands/battle.js isMapCharBuff` accepts only Touch's map-character shape, so 森蚺 reports no battle part
+  and the AI playbook does not class it as team support. M2 builds the device switch (`server/sim/content/devices.js`
+  already implements the 双眼皮).
 - **`AUTO_STOP`.** 上半's 斩业星熊 (`char_1044_hsgma2`, a 自选 operator) S3 `skchr_hsgma2_3` triggers on `AUTO_STOP`, one
   of the 15 rows of 上半's skillTriggerDataList. The engine does not implement it (`server/sim/skills.js`), and
   `validateAll` accepts it. M2 builds it; until then 上半's 自选 must not offer 斩业星熊 (round-50 design §2.9).
@@ -268,6 +288,9 @@ every version directory.
   - the adapters, the keyed pools and the loader.
 - `test/versions-keying.test.js`, on `data/`, every `data/versions/*/` and `SP_VERSION_DATA_DIRS`. It checks:
   - every chess resolves to its own charId's kit or is pending;
+  - every 自选 pick (owned pool and prototypes, each slot) and 补位 stand-in resolves to its charId's kit, or is a 预备干员
+    (generic) or a pending 自选 pick that the kitted gate drops;
+  - `auto_chess_change_map`: Touch has a battle part and is team support, 上半's 森蚺 neither;
   - every item runs its own effectId's handler, and each meta override binds only keys carrying its effectId and buff;
   - each directory's pinned counts: kit split, dispatched items and handlers, battle-effect items, 蒸汽之心's hammers
     (the version directory after the default exercises the hammer cache reset), bound meta keys and 突变细胞;
@@ -292,6 +315,8 @@ The per-version rebuild tests need the pinned caches `.cache/gamedata@<sha>/` an
 - hiddenCore 300 / 1000.
 - The first tier kit in `KIT_FILES` order when none matches the record's tier.
 - The borrowed kits.
+- The 24 自选 picks with a tier kit only left out of 上半's 自选.
+- `constants.singleReconnectTime` null for 上半, with the lobby's 24 h fallback.
 - Official records only for 夕 / 远牙 / 凯瑟琳.
 - A missing threshold is not reached for every core bond, on a version's build.
 - The 下半 bounty draft classification and research texts (`spec`, `implFormula`, `howToPlay`) carried into 上半.

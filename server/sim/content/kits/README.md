@@ -9,7 +9,7 @@ operators, the self-select 6★ operators, contributions from GitHub issue #136 
 
 | path | what |
 |---|---|
-| `index.js` | the registry: `KIT_FILES` lists every kit file, grouped by tier, `STANDIN_KIT_FILES` the 补位 stand-in kits and `OPERATOR_KIT_FILES` the 自选 operator kits; `KITS` (base chess id → kit builder, then stand-in charId → kit builder, then operator charId → kit builder), `TIER_KITS` (one registry per tier group), `STANDIN_KITS`, `OPERATOR_KITS` and `KITTED_CHARS` (who a 自选 slot may field) are built from them; `KIT_CHAR_IDS` names the charId each tier kit was written for (`TIER_KIT_KEYS_BY_CHAR` is its reverse), `PENDING_KIT_CHARS` the operators of another official version that have no kit yet |
+| `index.js` | the registry: `KIT_FILES` lists every kit file, grouped by tier, `STANDIN_KIT_FILES` the 补位 stand-in kits and `OPERATOR_KIT_FILES` the 自选 operator kits; `KITS` (base chess id → kit builder, then stand-in charId → kit builder, then operator charId → kit builder), `TIER_KITS` (one registry per tier group), `STANDIN_KITS`, `OPERATOR_KITS` and `KITTED_CHARS` (who a 自选 slot may field) are built from them; `KIT_CHAR_IDS` names the charId each tier kit was written for (`TIER_KIT_KEYS_BY_CHAR` is its reverse), `PENDING_KIT_CHARS` the operators of another official version that have no kit yet, `PENDING_DIY_KIT_CHARS` the 自选 picks of another official version whose only kit is a tier kit (left out of its 自选) |
 | `ops/<chessId>-<codename>.js` | one kit per file, with the helpers and constants only that kit uses |
 | `ops/standin-<codename>.js` | one 补位 stand-in kit per file (below: "Stand-in kits") |
 | `ops/op-<codename>.js` | one 自选 operator kit per file (below: "How to add an operator (自选)") |
@@ -23,7 +23,9 @@ and a 自选 piece's kit is `KITS[def.charId]` and nothing else (`content/index.
 slot's) ids, which name the replaced operator's kit (a slot has none).
 On another official version's build the by-id kit is used only when `KIT_CHAR_IDS` names the record's charId (official
 versions M0, after 0.3.2): that version gives some chess ids to other operators, whose kit is then found by charId
-(`content/index.js officialKitKey`, docs/SIM.md §7.2). The default data keeps the by-id lookup.
+(`content/index.js officialKitKey`, docs/SIM.md §7.2). The default data keeps the by-id lookup. A 自选 piece keeps
+`KITS[def.charId]` there too: 上半's owned 自选 pool holds 24 operators whose kit is a tier kit only
+(`PENDING_DIY_KIT_CHARS`), which `KITTED_CHARS` therefore leaves out of that version's 自选 [ASSUMED] until M2.
 
 ## Naming
 
@@ -179,7 +181,8 @@ const b = JSON.parse(readFileSync('data/backups.json', 'utf8')); for (const id o
    `char_112_siege`); the Chinese name in the first line.
 2. The default export has exactly one key, the charId: `export default { char_112_siege: (bb, chess, def) => Kit }`.
 3. Append the file name to `OPERATOR_KIT_FILES` in `index.js`. The operator becomes a legal pick (`KITTED_CHARS`;
-   `shared/diy.js diyPool` / `validateDiyPicks` with `kitted`) — never register it under a chess or slot id.
+   `shared/diy.js diyPool` / `validateDiyPicks` with `kitted`) — never register it under a chess or slot id. An operator
+   listed in `PENDING_DIY_KIT_CHARS` leaves that list (`node --test test/versions-keying.test.js` checks it).
 4. `node --test test/content/kits_layout.test.js` checks the name, the key (an owned pick), the registry and that every
    skill of every form is authored under `skills`.
 

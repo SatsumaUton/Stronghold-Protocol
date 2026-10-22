@@ -1126,7 +1126,10 @@ record's charId; otherwise it takes that operator's tier kit (the one of the
 record's tier when the operator has several: 锡人, 耶拉, 华法琳 …), else a kit registered under the charId (a 自选
 `op-*` kit), else none — the generic kit. Only official records with a real charId take that path: test fixtures (whose
 charId defaults to the chess id) and plugin chess (`chess_x_` ids; Forge imports leave out `kitRef` on purpose to keep
-the generic kit) keep the by-id lookup, and stand-ins / 自选 pieces keep theirs (`KITS[def.charId]`). The default data
+the generic kit) keep the by-id lookup, and stand-ins / 自选 pieces keep theirs (`KITS[def.charId]`). 上半's owned
+自选 pool holds 24 operators that 下半 sells as shop chess (星熊, 莫斯提马, 夕, 玛恩纳 …): their kit is a tier kit only, so
+they are listed in `kits/index.js` `PENDING_DIY_KIT_CHARS`, stay out of `KITTED_CHARS` and are left out of 上半's 自选 by
+the kitted gate [ASSUMED] until M2 reviews the tier kit as a 自选 kit or writes one. The default data
 and the plugin content sets built on it carry no `config.version` and keep the by-id lookup of before M0, so nothing
 changes there, not even for a plugin that patches an official record's `charId` (DESIGN §36.3). On the 上半 data (measured on a dry build of
 `@21b1f240`, 96 normal shop records): 46 keep their id with the same operator, 19 resolve to a tier kit by charId, 12 to a
@@ -1134,7 +1137,8 @@ changes there, not even for a plugin that patches an official record's `charId` 
 reviewed as shop chess), and 19 have no kit yet: 讯使, 梅, 远山, 狮蝎, 暴行, 布丁, 万顷, 暴雨, 锡兰, 芳汀, 极光, 槐琥, 海蒂, 蜜莓, 安哲拉,
 伊桑, 星源, 桑葚, 亚叶 (`kits/index.js` `PENDING_KIT_CHARS`). `test/versions-keying.test.js` checks every data directory
 (`data/`, each `data/versions/*/`, and `SP_VERSION_DATA_DIRS`): each chess resolves to a kit of its own charId or is
-pending, each directory matches its pinned resolution counts, and the default data keeps exactly the old lookup. The same
+pending, each 自选 pick and 补位 stand-in to its charId's kit or is a 预备干员 (generic) or a pending 自选 pick that the
+kitted gate drops, each directory matches its pinned resolution counts, and the default data keeps exactly the old lookup. The same
 gate and test cover the other id-keyed behaviour, which a version's build finds by what the record is: equipment by the
 normal record's `effectId` (`items/battle.js` `BY_EFFECT`, `items/meta.js` — each override also needs the buff it reads,
 so 上半's 寻呼模块, the same effectId with another buff, binds nothing —, 蒸汽之心 and its hammers, 凯瑟琳's cell at the prep's
@@ -1142,7 +1146,10 @@ pick), 远牙's granted trait (the traits 远牙's own traits grant, by charId),
 `bonds/core.js reached()` (a threshold the record lacks is not reached: 上半's 炎 has no 9-member tier). `node tools/bb-audit.mjs --data <dir>` lists
 the blackboard fields a version lacks that the code reads with a default (e.g. 上半's 突袭 has no `no_attack_duration`,
 read with 10 in `bonds/addon/battle.js`), the buff keys the code names that the version lacks, and the skill trigger rules
-the engine does not implement (上半's 斩业星熊 S3: `AUTO_STOP`).
+the engine does not implement (上半's 斩业星熊 S3: `AUTO_STOP`). It compares bands by bandId, so a band only the version
+has is not audited: 上半's 森蚺 (`band_zumama`) carries Touch's key `auto_chess_change_map` with device aliases
+(`trap_1104_aclasert#1`…`#4`, one 双眼皮 on every field). `bands/battle.js isMapCharBuff` accepts only Touch's
+map-character shape, so 森蚺 has no battle part (nor the AI's team-support class) until M2 builds its device switch.
 Plugin dispatch (DESIGN §32.5, C2): extension registry → `def.raw.dsl` → `def.raw.skillSpec` → `def.raw.kitRef` → official registry → generic; explicit Battle test kits still take precedence. The extension registry stays empty for vanilla; P3a script compositions register SDK kits, enemy installs and battle modules (PLUGINS §13). `kitOf` calls `compileDsl` when the record carries `dsl`. The content-set builder stamps `pluginId`. A bad spec is refused at build. If compilation still throws (`PLUGIN_DSL_*`, or any throw while `raw.dsl` is set), the battle ends `forced` with `content:dsl` and does not field an empty or generic kit (DESIGN §32.7). Any other kit throw still falls back to generic. A one-skill DSL kit binds that default spec for a 自选 piece and a 补位 stand-in. The JSON SkillSpec allowlist is §7.3 without functions (validated by `shared/plugins/skillSpec.js`); `talentMods` adds permanent numeric mods. `kitRef` accepts an official key or file stem, never an import path.
 
 Missing kit ⇒ `content/generic.js` builds one from the blackboard (§7.4), so every chess always fights.

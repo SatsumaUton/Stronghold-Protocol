@@ -3091,7 +3091,9 @@ function buildConfig(ctx, waves, stages, bands, chess, items) {
     },
     constants: {
       maxLevelCnt: ac.constData?.maxLevelCnt ?? 15, bossTrailerStartRound: ac.constData?.bossTrailerStartRound ?? 3,
-      singleReconnectTime: ac.constData?.singleReconnectTime ?? 86400, trainingModeId: act.constData.trainingModeId || null,
+      // 下半's constData has it (24 h); 上半's has none (12e0a020 added it): another version keeps null rather than the
+      // 下半 value, and the lobby's own fallback applies (server/lobby.js SOLO_RECONNECT_FALLBACK_SEC; DESIGN §36.3)
+      singleReconnectTime: ac.constData?.singleReconnectTime ?? (IS_DEFAULT ? 86400 : null), trainingModeId: act.constData.trainingModeId || null,
       discountColor: ac.constData?.discountColor || '#59f4ca', premiumColor: ac.constData?.premiumColor || '#ff5454', normalColor: ac.constData?.normalColor || '#ffc600',
       pingConds: (ac.constData?.pingConds || []).map((p) => ({ minMs: p.cond, textRaw: p.txt })),
     },

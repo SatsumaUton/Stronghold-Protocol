@@ -118,6 +118,8 @@ for (const v of OTHERS) {
     assert.equal(f.config.season, v.season);
     assert.equal(f.config.hiddenCore.single, profile.config.hiddenCore.single);
     assert.equal(f.config.hiddenCore.multi, profile.config.hiddenCore.multi);
+    // 上半's constData has no singleReconnectTime (12e0a020 added it): null, never the 下半 value (server/lobby.js falls back)
+    if (v.season === 'act1autochess') assert.equal(f.config.constants.singleReconnectTime, null, 'no 下半 constant as official data');
     assert.equal(Object.keys(f.bonds).length, profile.expect.bonds);
     assert.equal(Object.keys(f.bands).length, profile.expect.bands);
     assert.equal(Object.values(f.chess).filter((c) => !c.isGolden && c.visible).length, profile.expect.visibleNonDiy);

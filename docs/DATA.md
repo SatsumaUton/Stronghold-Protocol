@@ -139,7 +139,7 @@ Top level: `{ season, seasonName, modes, economy, lpCapPerRound, bossOvertimeAft
 | `trophies` | `{"byRoundsPassed":[{"maxRound":4,"FUNNY":0,…},…],"hiddenCore":{…},"multiOnly":true,"medals":[{"count":0,"iconId":"trophy_level1_icon"},…]}` | |
 | `roundScores[]` | `{"round":4,"score":50}` | |
 | `rewards` | `{"itemId":"act2autochess_token_chess","baseByRoundsPassed":[{"round":1,"count":10,"dailyPoint":10},…],"formula":"…","difficultyFactor":{…},"modeFactor":{…},"milestones":[{"level":1,"tokens":100},…],"daily":{"name":"每日防卫目标","need":200,"bonus":300,"resetHour":4,"rule":"…"}}` | 卫戍认证; `milestones`: the 60 levels of the settlement's LV (milestoneList, cumulative tokens); `daily`: 每日防卫目标 (constData dailyMission*; the bonus and the reset hour read from its rule text) |
-| `constants` | `{"maxLevelCnt":15,"bossTrailerStartRound":3,"singleReconnectTime":86400,…,"pingConds":[…]}` | misc official constData; `singleReconnectTime` (s) = how long a dropped **solo** run stays resumable (server/lobby.js; co-op keeps the 10-minute window) |
+| `constants` | `{"maxLevelCnt":15,"bossTrailerStartRound":3,"singleReconnectTime":86400,…,"pingConds":[…]}` | misc official constData; `singleReconnectTime` (s) = how long a dropped **solo** run stays resumable (server/lobby.js; co-op keeps the 10-minute window; `null` in a version whose constData lacks it, "Official versions (M0)") |
 
 ---
 
@@ -814,13 +814,15 @@ every file system and URL).
   | `act1autochess@V1_1` | `8303c922` (2025-11-14, launch) | none: `enemy_database` changed again at `23c99d5d`, so V1_2's `ee2cabff` would leak V1_2 enemies | [ASSUMED] the launch day, before the 11-18 hotfix `ea164ef7` (see below) |
 
   **The V1_1 hotfix [ASSUMED]**: `versionInfoDict` counts the 11-18 hotfix (`ea164ef70736ca2d1a356b3bf7b1cd7540960dc1`) as
-  V1_1, and about 7 of V1_1's 11 days (11-18 → 11-25 16:00) ran on it. The only build input it changed is
-  `activity_table`, among its changes: leader HP ×0.75 (Funny / Normal pools; −5…−12.5% Hard), `modeFactorInfo.SINGLE`
-  1.0 → 1.25, `borrowCount` 8 → 20, the enemy effects 攻坚装备II / III, battlefield and special-enemy weights, and 10 more
-  enemies inactive in the Normal modes. The commit also changed `skill_table.json` — only the text
-  of 拟态物质 (`sktok_acarm069_1` / `_2`: "获得1名该干员" became "该初始干员…同盟约初始干员", a note for its M2 handler) — and
-  added a client Lua fix of a drag state; neither is a build input. The profile follows the maintainer's default (launch
-  day, `8303c922`); adding `activity: 'ea164ef7…'` to its pins builds the hotfixed V1_1.
+  V1_1, and about 7 of V1_1's 11 days (11-18 → 11-25 16:00) ran on it. Every change the build reads is in
+  `activity_table`, among them: leader HP ×0.75 (Funny / Normal pools; −5…−12.5% Hard), `modeFactorInfo.SINGLE`
+  1.0 → 1.25, `borrowCount` 8 → 20, the enemy effects 攻坚装备II / III, battlefield and special-enemy weights, 10 more
+  enemies inactive in the Normal modes, and 拟态物质's `effectDesc` (`eff_acarm069`: "若已拥有至少2名该干员，则再获得1名该干员"
+  became "该初始干员…同盟约初始干员"), so the hotfixed build's `effects.json` and item descriptions change too; the
+  初始干员 wording is a note for 拟态物质's M2 handler. The commit made the same wording change in `skill_table.json`, in
+  the two `sktok_acarm069_1` / `_2` descriptions, rows the build does not read (the table itself is a pinned input of
+  the `character` group), and added a client Lua fix of a drag state, not a build input. The profile follows the
+  maintainer's default (launch day, `8303c922`); adding `activity: 'ea164ef7…'` to its pins builds the hotfixed V1_1.
 - **Cache**: a pinned file is cached in `.cache/gamedata@<sha>/<repo path>` and downloaded from
   `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/<sha>/zh_CN/gamedata/<path>` (about 50–60 MB per commit:
   the 8 tables and the 43 `act1autochess` level files). `--offline` / `--refresh` keep their per-file meaning; `--cache
@@ -855,6 +857,10 @@ every file system and URL).
 - **`config`**: `hiddenCore` single / multi (下半 350 / 1200; 上半 300 / 1000, PRTS 卫戍协议：盟约); `rules` — 上半:
   `deployOrder 'rowBottomUp'`, `soloTimed true`, `benchEquip false`, `benchFullSwap false`, `bossMirrorShare false`, all
   inert until M2 and [ASSUMED] (PRTS 卫戍协议/帮助; news 5114 lists the last three as 下半 additions).
+  `constants.singleReconnectTime` is `null` in a version whose constData lacks it: 上半's has none (the 2026-03-10
+  rewrite `12e0a020` added it), so the build writes no 下半 value as official data. The lobby's own fallback then keeps a
+  dropped solo run resumable for 24 h (`server/lobby.js SOLO_RECONNECT_FALLBACK_SEC`) [ASSUMED] until 上半's solo exit
+  rule is decided (M1 / M2, with the timed 上半 solo).
 - **`config.version`**: a non-default build appends `version: { id, family, rules }` as the last key of `config.json`;
   `data/config.json` never has it. A non-default directory also carries `tuning.json`, a byte copy of the hand-maintained
   `data/tuning.json` (a gameplay file `loadData` and the content hash read) [ASSUMED] the same tuning.

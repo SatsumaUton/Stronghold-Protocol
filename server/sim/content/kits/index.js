@@ -335,6 +335,42 @@ export const PENDING_KIT_CHARS = Object.freeze([
   'char_345_folnic', // 亚叶
 ]);
 
+/**
+ * 自选 picks of another official version without a 自选 kit (上半: DESIGN §36.4, docs/SIM.md §7.2). 上半's owned 自选
+ * pool holds these operators, which 下半 sells as shop chess: their hand-written kit is a tier kit under a chess id, never
+ * one under the charId. A 自选 piece keeps the by-charId lookup, so they are not in KITTED_CHARS and the kitted gate
+ * (shared/protocol.js checkDiyPicks, shared/diy.js diyPool) leaves them out of that version's 自选 [ASSUMED: until M2
+ * either reviews the tier kit as a borrowed 自选 kit or writes one]. test/versions-keying.test.js accepts a 自选 pick
+ * without a kit only when its charId is a 预备干员 (GENERIC_KIT_CHARS) or listed here, and fails once a listed operator
+ * gets a 自选 kit or loses its tier kit.
+ */
+export const PENDING_DIY_KIT_CHARS = Object.freeze([
+  'char_136_hsguma', // 星熊
+  'char_213_mostma', // 莫斯提马
+  'char_245_cello', // 塑心
+  'char_291_aglina', // 安洁莉娜
+  'char_332_archet', // 空弦
+  'char_391_rosmon', // 迷迭香
+  'char_420_flamtl', // 焰尾
+  'char_423_blemsh', // 瑕光
+  'char_426_billro', // 卡涅利安
+  'char_427_vigil', // 伺夜
+  'char_430_fartth', // 远牙
+  'char_1014_nearl2', // 耀骑士临光
+  'char_1020_reed2', // 焰影苇草
+  'char_1026_gvial2', // 百炼嘉维尔
+  'char_1038_whitw2', // 荒芜拉普兰德
+  'char_1045_svash2', // 凛御银灰
+  'char_1046_sbell2', // 圣聆初雪
+  'char_1047_halo2', // 溯光星源
+  'char_2015_dusk', // 夕
+  'char_4010_etlchi', // 隐德来希
+  'char_4039_horn', // 号角
+  'char_4064_mlynar', // 玛恩纳
+  'char_4082_qiubai', // 仇白
+  'char_4146_nymph', // 妮芙
+]);
+
 async function loadKitFile(file) {
   try {
     return await import(`./ops/${file}`);
