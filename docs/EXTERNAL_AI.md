@@ -160,7 +160,8 @@ match and log the switch once; a completed decision resets the streak. Other sea
 In plan mode (§35.23) only protocol and transport errors count: a decision whose budget ran out, or a reply
 `{plan: null}` from an agent that could not plan in time, falls back the same way without touching the streak.
 A plan seat whose prep call fails or is still waiting keeps the last accepted plan's bonds, buy / keep / sell,
-items and economy preferences (not `choice`, `placements` or a one-prep `holdLevel`).
+items and the funds direction of its economy (`saveForInterest`, `reserve`; since §35.24 not `level`, `maxRefreshes`,
+`refreshAbove` or `freezeSearch`, and never `choice`, `placements` or a one-prep `holdLevel`).
 
 ## Journals, security and tests
 
@@ -367,14 +368,14 @@ SP_LLM_API_KEY="$YOUR_KEY" npm start
 
 `SP_LLM_BASE_URL`, `SP_LLM_MODEL`, `SP_LLM_API_KEY` are required environment values; none are logged or
 journaled. `SP_LLM_TIMEOUT_MS` defaults to 20000 (1..300000). The adapter has no default provider or model.
-`SP_LLM_MAX_TOKENS` caps one reply (default 6000, 256–32000; reasoning models spend completion tokens before the plan, so a small cap returns an empty reply); `SP_LLM_REASONING_EFFORT` (minimal / low / medium / high) is sent as `reasoning_effort` when set; `SP_LLM_DEBUG_FILE` appends one line per request with the failing stage, the reply head and the accepted plan, never the key or request headers.
+`SP_LLM_MAX_TOKENS` caps one reply (default 16000, 256–32000; reasoning models spend completion tokens before the plan, so a small cap returns an empty reply); a reply cut off by that cap before any JSON is asked once more with a short "decide now, JSON only" turn while half of `SP_LLM_TIMEOUT_MS` remains (the limit covers both requests; history §35.24); `SP_LLM_REASONING_EFFORT` (minimal / low / medium / high) is sent as `reasoning_effort` when set, `SP_LLM_RETRY_EFFORT` (same values) only on that retry; 机变 / offer / reward calls get a choice-only task and may echo `choiceName`, which corrects a mismatched choice ID when it names exactly one other card; `SP_LLM_DEBUG_FILE` appends one line per request with the failing stage, the reply head and the accepted plan, never the key or request headers.
 It keeps eight knowledge versions in memory as stable system prompts, with an original general-principles
 strategy prompt, and sends only compact digest/choices/continuity per decision. Provider prompt caching can reuse that prefix;
 it is provider-dependent and still requires sending the prefix with the compatible stateless chat API.
 It POSTs `/chat/completions`, uses `response_format:{type:'json_object'}`, validates the parsed plan locally,
 rejects truncation/redirects/oversized output, and forwards numeric usage only. JSON mode does not guarantee
 schema adherence ([official OpenAI documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat)).
-[ASSUMED] Example limits: 6000 output tokens (`SP_LLM_MAX_TOKENS`, 256–32000), 256 KiB provider replies, 2 MiB input frames and 16 concurrent
+[ASSUMED] Example limits: 16000 output tokens (`SP_LLM_MAX_TOKENS`, 256–32000), 256 KiB provider replies, 2 MiB input frames and 16 concurrent
 requests (four seats plus requests the host abandoned that are still finishing). Debug lines carry the provider's
 usage, so abandoned replies still show their tokens. Catalogue effect summaries retain at most 500 characters each. Tests use a loopback mock; no real API
 is used for repository validation.

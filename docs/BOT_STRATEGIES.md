@@ -131,6 +131,10 @@ HARD from getting worse (`--configs solo:FUNNY,solo:NORMAL,solo:HARD,coop4:FUNNY
 A win is clearing the round-14 Final Assault (`victory`); round 15 is the optional Hidden Core. An `external` seat in
 plan mode runs the legacy executor with the plan's weights, so a legacy change moves plan seats too: since §35.23 the
 plan's primary core bond is legacy's focus, and legacy lineups can field a 6-member core bond.
+Since §35.24 legacy also levels to L5 at R9 and L6 at R11, trades 获得时 layer units (`tradeOnce`), commits to a
+6-member core (`coreGap`), values a healer from R5 and spends expiring funds on refreshes (`spendDown`); 终极 needs 100
+seeds per mode to separate such rules from noise (seeds 1–40 to develop, the rest to check), and a per-match "share of
+the leader pool" (0 before the Final Assault, 1 for a win) moves long before the win count does.
 
 The match harness accepts `botStrategy` objects, so an implementation can be tested before registration. See
 [`bot-strategies.test.js`](../test/match/bot-strategies.test.js) for real draft, sliced prep, personal-choice and
