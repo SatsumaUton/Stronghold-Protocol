@@ -10,12 +10,17 @@
 //     with a warning when the server starts, and an explicit startServer() option still wins over the environment;
 //   * SP_ASSET_INDEX=0 (or the `assetIndex: false` option) → no content-hash index: plain asset URLs, size-mtime ETags
 //     (assetIndex.js); the index of the default public/ persists in .cache/asset-hashes.json;
+//   * SP_VERSIONS ('all' or a comma list of shared/versions.js ids), SP_VERSION_DEFAULT and SP_MAX_VERSION_HOSTS (or the
+//     `versions: { enabled, default, maxHosts }` option, which wins) → the official versions this server offers
+//     (DESIGN §35.23, M1; versionsFrom): only act2autochess unless one of them says otherwise;
 //   * the served directories (public/, data/, shared/, the content packs' packs/ and the plugins' plugins/ of this
 //     repository unless the options name others), and which startServer() options are handed on to net.js Network and
 //     lobby.js Lobby.
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { DEFAULT_VERSION, VERSIONS, versionById } from '../../shared/versions.js';
 
 /** Repository root. */
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -151,6 +156,57 @@ function applyEnvLimits(target, table, log) {
     const v = parseEnvLimit(process.env[envName], null, envName, log);
     if (v != null) target[key] = v;
   }
+}
+
+/**
+ * The official versions this server offers (DESIGN §35.23, M1): the `versions` option, else SP_VERSIONS ('all' or a comma
+ * list of registry ids), SP_VERSION_DEFAULT and SP_MAX_VERSION_HOSTS. An unknown id is warned about and dropped; nothing
+ * left keeps act2autochess alone (the switch off, also the default when nothing is set); a default that is not enabled
+ * is warned about and replaced by the first enabled id in registry order. `enabled` comes out in registry order.
+ * `maxHosts` caps the version match hosts (server/match/host, kind 'version'): by default one per enabled non-default
+ * version, and at least 1 whenever there is one.
+ * @param {{ versions?: { enabled?: 'all' | string[], default?: string, maxHosts?: number } }} opts
+ * @param {{ warn?: (m: string) => void } | null} [log]
+ * @returns {{ enabled: string[], default: string, maxHosts: number }}
+ */
+export function versionsFrom(opts, log = null) {
+  const o = opts.versions && typeof opts.versions === 'object' ? opts.versions : {};
+  const envList = String(process.env.SP_VERSIONS ?? '').trim();
+  /** @type {unknown} */
+  let wanted = o.enabled ?? (envList === '' ? null : (envList.toLowerCase() === 'all' ? 'all' : envList.split(',')));
+  if (wanted == null) wanted = [DEFAULT_VERSION];
+  let ids;
+  if (wanted === 'all') ids = VERSIONS.map((v) => v.id);
+  else {
+    const list = Array.isArray(wanted) ? wanted : [wanted];
+    ids = [];
+    for (const raw of list) {
+      const id = String(raw ?? '').trim();
+      if (id === '') continue;
+      if (!versionById(id)) log?.warn?.(`[versions] unknown version "${id}" ignored (shared/versions.js lists ${VERSIONS.map((v) => v.id).join(', ')})`);
+      else if (!ids.includes(id)) ids.push(id);
+    }
+  }
+  if (!ids.length) {
+    log?.warn?.(`[versions] no known version enabled, keeping ${DEFAULT_VERSION}`);
+    ids = [DEFAULT_VERSION];
+  }
+  const enabled = VERSIONS.map((v) => v.id).filter((id) => ids.includes(id));
+  const envDefault = String(process.env.SP_VERSION_DEFAULT ?? '').trim();
+  const want = o.default != null ? String(o.default).trim() : (envDefault || null);
+  let def = want ?? (enabled.includes(DEFAULT_VERSION) ? DEFAULT_VERSION : enabled[0]);
+  if (!enabled.includes(def)) {
+    log?.warn?.(`[versions] default version "${def}" is not enabled, using ${enabled[0]}`);
+    def = enabled[0];
+  }
+  const nonDefault = enabled.filter((id) => id !== DEFAULT_VERSION).length;
+  let maxHosts = Number.isSafeInteger(o.maxHosts) && /** @type {number} */ (o.maxHosts) >= 0 ? /** @type {number} */ (o.maxHosts)
+    : parseEnvLimit(process.env.SP_MAX_VERSION_HOSTS, nonDefault, 'SP_MAX_VERSION_HOSTS', log) ?? nonDefault;
+  if (nonDefault > 0 && maxHosts < 1) {
+    log?.warn?.(`[versions] maxHosts ${maxHosts} raised to 1: ${nonDefault} non-default version(s) need a match host`);
+    maxHosts = 1;
+  }
+  return { enabled, default: def, maxHosts };
 }
 
 /** TRUST_PROXY env → net.js trustProxy ('auto' unless explicitly on/off). @param {string | undefined} v */
