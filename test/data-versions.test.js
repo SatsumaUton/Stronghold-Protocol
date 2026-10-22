@@ -16,6 +16,7 @@ import { loadProfile, pinGroupOf, pinnedShaOf } from '../tools/versions/profiles
 import { bondActiveType, selfBackupPreset, launchModes, applyAdapters } from '../tools/versions/adapters.mjs';
 import { validateReferences } from '../shared/plugins/validate.js';
 import { DATA_DIR, VERSION_DATA_FILES, getData, getVersionData, loadData, resetVersionData, versionDataDir } from '../server/data.js';
+import { startServer } from '../server/index.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BUILD = join(ROOT, 'tools', 'build-data.mjs');
@@ -250,6 +251,24 @@ test('server/data.js: versionDataDir and getVersionData; loadData(DATA_DIR) neve
   resetVersionData();
   assert.notEqual(getVersionData('act1autochess', { log: quiet }), a, 'reloaded after resetVersionData');
   resetVersionData();
+});
+
+test('HTTP: data/versions/ is not served until M1 (any spelling); the default data is', async () => {
+  const srv = await startServer({ port: 0, host: '127.0.0.1', quiet: true });
+  try {
+    const get = (p) => fetch(srv.url + p, { redirect: 'manual' });
+    assert.equal((await get('/data/chess.json')).status, 200);
+    for (const v of OTHERS) {
+      for (const p of [`/data/${v.dir}chess.json`, `/data/${v.dir}config.json`, `/data/${v.dir}`, `/data/${v.dir.toUpperCase()}CHESS.JSON`,
+        `/data/${v.dir.replace('versions/', 'Versions/')}chess.json`, `/data/./${v.dir}chess.json`, `/data/i18n/../${v.dir}chess.json`]) {
+        const r = await get(p);
+        assert.ok([400, 403, 404].includes(r.status), `${p} → ${r.status}`);
+        await r.arrayBuffer();
+      }
+    }
+  } finally {
+    await srv.close();
+  }
 });
 
 // ---------------------------------------------------------------------------------------------------

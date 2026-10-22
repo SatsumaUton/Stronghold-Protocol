@@ -143,6 +143,16 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
     if (studioReal === undefined) studioReal = await fsp.realpath(path.join(path.resolve(publicDir), 'studio')).catch(() => null);
     return studioReal;
   };
+  // another official version's data (data/versions/<slug>/, DESIGN §35.22): the release carries it, but nothing reads it
+  // at run time until the version switch (M1), so it is not served; the on-disk path decides (case-insensitive disks,
+  // Windows short names), as for the studio below
+  let versionsReal = null;
+  const isVersionData = async (abs) => {
+    versionsReal ||= await fsp.realpath(path.join(path.resolve(dataDir), 'versions')).catch(() => null);
+    if (!versionsReal) return false;
+    const real = await fsp.realpath(abs).catch(() => null);
+    return !!real && real.startsWith(versionsReal + path.sep);
+  };
   const shimBody = Buffer.from(DATA_SHIM_JS);
   const shimTag = `"shim-${shimBody.length.toString(16)}"`;
   const gzipCache = new CompressCache(); // brotli and gzip bodies (files.js)
@@ -298,6 +308,9 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
         // the on-disk name decides (case-insensitive file systems, Windows 8.3 short names like NODEDA~1.JS)
         const real = await fsp.realpath(absPath);
         if (mount.deny.has(path.basename(real).toLowerCase())) throw Object.assign(new Error('private'), { code: 'ENOENT' });
+      }
+      if (mount.name === 'data' && segments.length > 1 && await isVersionData(absPath)) {
+        throw Object.assign(new Error('version data'), { code: 'ENOENT' });
       }
     } catch (e) {
       if (e && e.code === 'ENOENT' && mount.name === 'data' && segments.length === 1 && LOCAL_ART_MANIFESTS.has(segments[0])) {
