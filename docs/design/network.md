@@ -192,6 +192,68 @@ for byte what they were; everything below appears only in a room whose host swit
   `/cs/<cs16>/`;
 - errors (`shared/constants.js` ERR, text in ERR_TEXT): `PLUGIN_INCOMPATIBLE`, `PLUGIN_BUSY`, `CONTENT_NOT_READY`.
 
+### 8.5 Official version messages (M1, §35.23)
+
+A server offers the official versions its owner enables (docs/DATA.md "Serving the versions (M1)"; default: 第二期下半,
+`act2autochess`, alone — then nothing below appears on the wire). A room plays one version; `act2autochess` is a code
+constant: a message or a record without a version means it, whatever the server's default.
+
+- S→C `welcome.versions?` = `[{ id, cs, family, label, roomModes, default?: true }]` in registry order (`label`: the
+  registry msgid; `default` on the server's default only) — present only when more than one version is enabled or the only
+  one is not `act2autochess`;
+- C→S `room.create { mode, difficulty?, test?, version? }` — `version` omitted: the server's default. Refused
+  `VERSION_UNKNOWN` (not enabled), `VERSION_UNSUPPORTED` (not one of its `roomModes`; or the server owner's fixed plugins —
+  plugins/config.json `rooms: fixed` — cannot play it). A difficulty the version lacks is lowered: the highest it offers
+  below, else its lowest (终极 → 绝境);
+- `room.setDifficulty` / `room.setMode`: a difficulty or official mode the room's version lacks → `BAD_TARGET` 'not a mode
+  of this version'; `room.setMode` during an open vote → `VERSION_VOTE` (`room.setDifficulty` is allowed);
+- C→S `room.proposeVersion { version }` (the host, before the match). Refused, in this order: `NOT_IN_ROOM`, `SPECTATOR`,
+  `NOT_HOST`, `ROOM_STARTED`, `VERSION_UNKNOWN`, `VERSION_UNSUPPORTED` (the room mode; gameplay plugins on and the target
+  not `act2autochess`), `ALREADY` (the room's own version), `VERSION_VOTE` (a vote is open), `RATE` (300 ms since the last
+  proposal, or 5 s after a declined or expired vote [ASSUMED]), `NOT_READY` (a seated human offline), and
+  `VERSION_UNSUPPORTED` again when the room's cosmetic plugins do not resolve on the target. With exactly one active human
+  the room switches at once; otherwise a vote opens — voters: the seated, non-departed humans then, in seat order (AI seats
+  and spectators never vote); the host counts as agreed; 60 s to answer [ASSUMED];
+- C→S `room.versionVote { voteId, agree }` (a voter): `NOT_IN_ROOM`, `SPECTATOR`, `WRONG_PHASE` (no vote), `BAD_TARGET`
+  ('vote changed', 'not a voter'). `agree: false` cancels the vote; the last agreement switches;
+- C→S `room.cancelVersionVote { voteId }` (the host): `NOT_IN_ROOM`, `SPECTATOR`, `NOT_HOST`, `WRONG_PHASE`, `BAD_TARGET`;
+- the vote is void when a human takes a player seat (a join, a spectator sitting down), a player seat is freed (leave, kick,
+  grace timeout, expiry), the host changes, a voter's socket drops, or a match starts — not when spectators come or go or
+  AI seats are added or removed. While it is open `room.start`, `room.setPlugins` and `room.setMode` → `VERSION_VOTE`;
+- a switch: `room.version`; the difficulty lowered as at create; the content the version's base with the room's cosmetic
+  plugins applied again (dropped when they no longer resolve); every human seat and spectator back to content `'loading'`;
+  the other humans un-readied; the whole result replay dropped; every human seat's loadout / 潜能 / 干员持有 / 自选 cleared
+  (the pages send them again) and a seat card the version lacks dropped;
+- S→C `room.state` (a default room is byte-identical): `version?` (only when not `act2autochess`); `versionVote?: { id,
+  proposerId, version, voters, agreed, remainingMs }` while a vote is open (`id` 1, 2, … per room; `remainingMs` a duration
+  at send time by the lobby's clock, never a wall clock); a version room's `content` = `{ cs: <the version's cs>, vanilla:
+  true, version, plugins: [...cosmetic], vs?, warnings?, bytes? }` — never `vanilla: false`, so never unofficial;
+  `seats[].content` / `spectators[].content` ('loading' | 'ready' | 'failed') appear whenever the room needs its pages to
+  load content (gameplay plugins, or a version other than `act2autochess`);
+- existing messages in a version room: `room.ready { true }` and `room.start` wait for every player's `content: 'ready'`
+  (`CONTENT_NOT_READY`); `room.contentReady { cs, ok? }` names the version's cs; `room.setPlugins` with a content / script /
+  trusted plugin → `VERSION_UNSUPPORTED` (cosmetic plugins work); `room.loadout` / `room.ownership` / `room.diy` /
+  `room.card` / `room.skins` are checked against the version's data — a setting a page sends before it reported the
+  room's content ready is kept unverified (chess ids name other operators across versions) and a version room's match
+  drops it; outside a room the server's default version's data and `cs` apply;
+- S→C `m.toast { t, kind, text, msgid, params }` to the room: `{name}拒绝了切换版本` `{ name }` (warn, every member),
+  `切换版本投票已超时，房间版本未改变` (warn, every member), `同盟成员有变动，切换版本投票已取消` (warn, every member),
+  `创建者取消了切换版本投票` (info, everyone but the host). The page toasts a successful switch itself, on a change of
+  `room.version`. When a version's match host stops: `本局模拟长时间无响应，已结束` · `该版本的模拟无法启动` ·
+  `本局模拟出错，已结束` (`summary.reason` 'version-hang' / 'version-start' / 'version-crash');
+- `GET /cs/<cs16>/index.json` of a version (immutable): `{ v: 1, cs, app, vanilla: true, version, sim, simFiles, data: {
+  <name>: { url: '/data/versions/<slug>/<name>.json?v=<sha8>', sha256, bytes } }, plugins: [], settings: {}, bounds: {
+  official: { url: '/cs/<cs16>/bounds/official.json', sha256, bytes } } }` with `cs === contentHashOf({ app, sim, data: {
+  <name>: sha256 } })`; the page accepts it only when `cs` and `version` are the expected ones, `vanilla` is true, plugins
+  and settings are empty, every data URL lies under `/data/versions/<slug>/` without `..`, the bounds URL under
+  `/cs/<cs16>/`, and every file's bytes and sha256 match;
+- errors: `VERSION_UNKNOWN`, `VERSION_UNSUPPORTED`, `VERSION_VOTE` (ERR_TEXT: 本服务器没有启用该版本 ·
+  该版本不能用于当前房间（例如房间开着改变玩法的插件） · 切换版本投票进行中，请等投票结束).
+- tools: Match opts `version` (non-default only, forwarded by the match host's wireOptions), the test journal's
+  `init.options.version`, the external AI observation's `context.gameVersion` and the knowledge pack's `gameVersion`
+  (non-default only), `/healthz` `versions` (only when a non-default version is enabled). BattleSpec is unchanged (`cs`
+  already names the content).
+
 ---
 
 ## 14. Client-side combat (v2 architecture — supersedes the combat-streaming parts of §4, §8.2, §9)
@@ -200,7 +262,7 @@ for byte what they were; everything below appears only in a room whose host swit
 
 **Modes.** `Match` option `clientCombat` (default **on**; env `SP_COMBAT=server` → the legacy server-run + streaming mode, kept as a fallback). `m.public.combatMode` = `'client' | 'server'` tells the UI which one runs.
 
-**Shared deterministic sim.** `server/sim/**` is pure ESM runnable in both Node and browsers. Node-only code (reading `data/*.json` from disk, research fallbacks) lives in `server/sim/nodeData.js`, imported dynamically by `simdata.js` under Node only; the browser injects its own frozen copies of `/data/{chess,enemies,tokens,stages,waves,bonds,items,garrisons,bands,effects}.json` via `setSimData(data)` (`getSimData()` serves them). The HTTP server serves `server/sim/**` read-only at `/sim/` (`.js` only, no listings, `nodeData.js` excluded under any spelling — the on-disk name decides, for case-insensitive hosts) and a generated `/data.js` stand-in of `server/data.js` (the content support module imports `../../../data.js`; in the browser it returns `getSimData()`). Until M1, `/data/versions/` (another official version's data, §35.22) answers 404 under any spelling, decided by the on-disk path, and the build tag (`server/http/buildTag.js`) leaves it out, so a version-only rebuild is no new build. A battle is fully described by a JSON **BattleSpec** (`server/sim/spec.js buildBattleSpec`: `{ v, battleId, fieldId, kind, seed, modeId, round, stageId, rect, timeLimit|null, players:[PlayerBattleInput], spawns, routes, flags, enemyOverrides, waveId, bossId, content, boss?: { poolHp, poolMax }, cs? }` — the JSON round trip of the Battle options; ±Infinity → ±1e308, spawns at time Infinity dropped; `cs` (0.3.0, §8.4): the room's content hash, kept when well-formed, never read by the sim) and constructed with `createBattleFromSpec(spec, dataSource, { sharedBoss? })` identically on both sides; **the server builds its own battles from the spec too**, so both run exactly the same input. No wall-clock or `Math.random` inside the sim. Verified: spec-built battles give identical result digests (`resultDigest`) in any construction order; whole client-combat matches are outcome-identical to server-run matches (same seed).
+**Shared deterministic sim.** `server/sim/**` is pure ESM runnable in both Node and browsers. Node-only code (reading `data/*.json` from disk, research fallbacks) lives in `server/sim/nodeData.js`, imported dynamically by `simdata.js` under Node only; the browser injects its own frozen copies of `/data/{chess,enemies,tokens,stages,waves,bonds,items,garrisons,bands,effects}.json` via `setSimData(data)` (`getSimData()` serves them). The HTTP server serves `server/sim/**` read-only at `/sim/` (`.js` only, no listings, `nodeData.js` excluded under any spelling — the on-disk name decides, for case-insensitive hosts) and a generated `/data.js` stand-in of `server/data.js` (the content support module imports `../../../data.js`; in the browser it returns `getSimData()`). `/data/versions/<slug>/` (another official version's data, §35.22) is served only for a version the server enables (M1, §35.23; §8.5) and answers 404 otherwise under any spelling, decided by the on-disk path; the build tag (`server/http/buildTag.js`) counts only the served version directories, so rebuilding a version the server does not offer is no new build. A battle is fully described by a JSON **BattleSpec** (`server/sim/spec.js buildBattleSpec`: `{ v, battleId, fieldId, kind, seed, modeId, round, stageId, rect, timeLimit|null, players:[PlayerBattleInput], spawns, routes, flags, enemyOverrides, waveId, bossId, content, boss?: { poolHp, poolMax }, cs? }` — the JSON round trip of the Battle options; ±Infinity → ±1e308, spawns at time Infinity dropped; `cs` (0.3.0, §8.4): the room's content hash, kept when well-formed, never read by the sim) and constructed with `createBattleFromSpec(spec, dataSource, { sharedBoss? })` identically on both sides; **the server builds its own battles from the spec too**, so both run exactly the same input. No wall-clock or `Math.random` inside the sim. Verified: spec-built battles give identical result digests (`resultDigest`) in any construction order; whole client-combat matches are outcome-identical to server-run matches (same seed).
 
 **Authority per field.**
 - Normal field: the owning human's client is **authoritative** (if connected).

@@ -30,6 +30,8 @@ const isMap = (v, max, key, val) => {
 };
 const isList = (v, max, item) => Array.isArray(v) && v.length <= max && v.every(item);
 const isScalar = (v) => isStr(v, 64) || isNum(v) || isBool(v);
+/** An official version id (shared/versions.js: the activity id, `@<sub-version>` for a sub-version) — structural only; the lobby answers VERSION_UNKNOWN for one this server does not enable (DESIGN §35.23). */
+export const isVersionId = (v) => typeof v === 'string' && v.length <= 40 && /^[a-z0-9]{1,32}(?:@[A-Za-z0-9_]{1,16})?$/.test(v);
 
 // ---- client-side combat (DESIGN §14): b.progress / b.result payloads -------------------------------------------
 
@@ -500,7 +502,7 @@ export const C2S = {
   // string cannot sneak in as "not a test". The server still refuses it unless SP_TEST_MODE is on.
   // difficulty: may be left out — the room starts at the server's default (server/lobby.js DEFAULT_DIFFICULTY) and the
   // host changes it in the room (room.setDifficulty), as in the event's 联合模拟; a value given must be a difficulty.
-  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, $optional: ['test', 'difficulty'] },
+  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, version: isVersionId, $optional: ['test', 'difficulty', 'version'] },
   'room.join': { $optional: ['testAck'], testAck: (v) => v === true, code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'room.leave': {},
   'room.ready': { ready: isBool },
@@ -516,6 +518,11 @@ export const C2S = {
   'room.start': {},
   'room.rerollSetup': { setupRevision: (v) => isInt(v, 0, 2 ** 31) },
   'room.cancelReroll': { voteId: (v) => isInt(v, 1, 2 ** 31) },
+  // official versions (DESIGN §35.23, M1; before the match): the host proposes the room's version; the seated humans vote
+  // like 重刷 (unanimous, a decline cancels, a lone human switches at once); room.state.version / versionVote
+  'room.proposeVersion': { version: isVersionId },
+  'room.versionVote': { voteId: (v) => isInt(v, 1, 2 ** 31), agree: isBool },
+  'room.cancelVersionVote': { voteId: (v) => isInt(v, 1, 2 ** 31) },
   // operator loadout (DESIGN §16): stored per session/seat; accepted until the match leaves INFO_CHECK — `ops` (0.2.2):
   // the per-operator 潜能 / 练度 (absent = none set: every operator at 潜能 6, 精英2 Lv.60)
   'room.loadout': { entries: isLoadoutEntries, ops: isLoadoutOps, $optional: ['ops'] },

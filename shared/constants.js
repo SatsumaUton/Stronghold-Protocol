@@ -184,6 +184,12 @@ export const ERR = Object.freeze({
   TEST_CONFIRM: 'TEST_CONFIRM',
   TEST_DISABLED: 'TEST_DISABLED',
   TEST_FORBIDDEN: 'TEST_FORBIDDEN',
+  // official versions (DESIGN §35.23, M1): a version this server does not enable (room.create, room.proposeVersion); a
+  // version that cannot serve the room (its roomModes, or the room's gameplay plugins — they play 第二期下半 only); a room
+  // action refused while the room's version vote is open (room.start, room.setPlugins, room.setMode, room.proposeVersion)
+  VERSION_UNKNOWN: 'VERSION_UNKNOWN',
+  VERSION_UNSUPPORTED: 'VERSION_UNSUPPORTED',
+  VERSION_VOTE: 'VERSION_VOTE',
   INTERNAL: 'INTERNAL',
 });
 
@@ -210,6 +216,9 @@ export const ERR_TEXT = {
   TEST_CONFIRM: N_('这是测试房间，不计入任何记录。确认加入？'),
   TEST_DISABLED: N_('测试模式未开启'),
   TEST_FORBIDDEN: N_('这不是测试房间'),
+  VERSION_UNKNOWN: N_('本服务器没有启用该版本'),
+  VERSION_UNSUPPORTED: N_('该版本不能用于当前房间（例如房间开着改变玩法的插件）'),
+  VERSION_VOTE: N_('切换版本投票进行中，请等投票结束'),
 };
 
 // ---- Emotes (交流, research 09 §4) -----------------------------------------------------------------------------
