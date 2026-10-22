@@ -7,10 +7,10 @@
 //   prep_finish_char_bond_add_layer {layer}            华法琳   prep end: per distinct board tier, 1 random op → its bonds +layer (无需激活)
 //   band_first_self_refresh_present_char {count,bond}  杜遥夜   first 2 manual refreshes/round: ≥count <bond> chess (tier ≤ shop level)
 //   band_shop_refresh_copy_max_lv_char {count}         梓兰     every manual refresh: highest-tier shop chess copied into another slot, copy frozen
-//   preparation_start_gain_chess_from_round {round}    梓兰/小贾斯汀/昆图斯/马克维茨/变形者集群/Pith/夕/杰西卡/缪尔赛思/芬  round start of `round`: bbStr.chess
-//   preparation_start_gain_chess_every_n_round {round} 杜宾     every `round` rounds (round % n = 0): bbStr.chess
+//   preparation_start_gain_chess_from_round {round}    梓兰/小贾斯汀/昆图斯/马克维茨/变形者集群/Pith/夕/杰西卡/缪尔赛思/芬  prep start of `round`: bbStr.chess
+//   preparation_start_gain_chess_every_n_round {round} 杜宾     prep start, every `round` rounds (round % n = 0): bbStr.chess
 //   give_coin_in_round {round,coin}                    老鲤     income of round `round` = coin (R1/R2 0, R3 15)
-//   prep_start_gain_chess_from_pool_in_round {round}   老鲤     round start of `round`: 1 chess of pool
+//   prep_start_gain_chess_from_pool_in_round {round}   老鲤     prep start of `round`: 1 chess of pool
 //   band_coin_cost_gain_random_char_by_shop_level      绮良     every coin_cnt funds spent → count random chess ≤ shop level
 //   up_shop_next_refresh_must_present_bond_char        佩佩     level-up to a level of lvlist → the next manual refresh (its usual
 //                                                               price) prefers <bond>
@@ -27,11 +27,17 @@
 //                                                                pair field): 0–2 ground enemies → enemylist
 //   round_start_activate_char_chess_effect_in_board    铃兰     round start: 获得时 traits of the right-most (then bottom-most) board op with one
 //   first_sell_char_chess_exchange_char_chess_in_shop  巫恋     first sale of a normal op per round: swapped with a random shop chess (no funds)
-//   round_start_gain_char_chess_in_shop_every_n_round  松桐     round % n = 0: a random shop chess for free (its slot empties)
+//   round_start_gain_char_chess_in_shop_every_n_round  松桐     prep start, round % n = 0: a random shop chess for free (its slot empties)
 //   round_start_gain_coin_by_bond_char_chess_buy       玛恩纳   each <bond> chess bought → +count funds next round (≤ max_count / round)
 //   refresh_shop_count_gain_coin_bond_char_chess       贾维     every refresh_count manual refreshes (match total) → <bond> chess ≤ shop level (≤ max_count / round)
-//   preparation_start_add_special_goods_every_n_round  娜仁图亚 round % n = 0: pick choice_cnt of refresh_cnt items of pool (free)
-// "进入休整期时" / "回合开始时" = onRoundStart (research 01 §5 step 6).
+//   preparation_start_add_special_goods_every_n_round  娜仁图亚 prep start, round % n = 0: pick choice_cnt of refresh_cnt items of pool (free)
+// "进入休整期时" / "休整期开始时" = onPrepStart: after the round's 机变 phase (research 01 §4.1: the 机变 choice is step 4, the
+// 「进入休整期时」 effects step 6; official 「进入此阶段时，触发<进入休整期时>的效果」 of the 休整期). The five keys above whose text or key
+// says so (老鲤 「第3回合进入休整期时」, 松桐 「偶数回合的休整期开始时」, 娜仁图亚 / 小贾斯汀 / 杰西卡 「进入休整期时」, the
+// preparation_start_* keys of the rest) run there — GitHub #851: 老鲤's R3 operators showed before the R3 draft. The whole key
+// moves, so 缪尔赛思's 「在第1回合开始时」 and the texts with no time (「第3回合获得」, 「每5回合获得」) follow their key [ASSUMED]. A
+// 机变 round (config spRounds) meets 老鲤 / 昆图斯 at R3 and the even-round ones (杜宾, 松桐, 娜仁图亚) at R6 of NORMAL; elsewhere
+// only the order around the round start changes. "回合开始时" (余, 铃兰) and 哈洛德's gain_bond_char_per_round stay onRoundStart.
 
 import { GEO } from '../../../../shared/constants.js';
 import { bbCap } from '../../../../shared/plugins/officialBounds.js';
@@ -146,7 +152,7 @@ K.band_shop_refresh_copy_max_lv_char = () => ({
 });
 
 K.preparation_start_gain_chess_from_round = (ps) => ({
-  onRoundStart(ctx) {
+  onPrepStart(ctx) {
     for (const p of ps) {
       const id = p.chess ?? p.chess_id;
       if (ctx.round !== int(p.round, -1) || !id) continue;
@@ -156,7 +162,7 @@ K.preparation_start_gain_chess_from_round = (ps) => ({
 });
 
 K.preparation_start_gain_chess_every_n_round = (ps) => ({
-  onRoundStart(ctx) {
+  onPrepStart(ctx) {
     for (const p of ps) {
       const n = int(p.round, 0);
       const id = p.chess ?? p.chess_id;
@@ -173,7 +179,7 @@ K.give_coin_in_round = (ps) => ({
 });
 
 K.prep_start_gain_chess_from_pool_in_round = (ps) => ({
-  onRoundStart(ctx) {
+  onPrepStart(ctx) {
     for (const p of ps) {
       if (ctx.round !== int(p.round, -1)) continue;
       for (let k = 0; k < timesOf(p.count, 1); k++) {
@@ -339,7 +345,7 @@ K.first_sell_char_chess_exchange_char_chess_in_shop = (ps) => ({
 });
 
 K.round_start_gain_char_chess_in_shop_every_n_round = (ps) => ({
-  onRoundStart(ctx) {
+  onPrepStart(ctx) {
     const p = ps[0];
     const n = int(p.round, 0);
     if (n <= 0 || ctx.round % n !== 0) return;
@@ -378,7 +384,7 @@ K.refresh_shop_count_gain_coin_bond_char_chess = (ps) => ({
 });
 
 K.preparation_start_add_special_goods_every_n_round = (ps) => ({
-  onRoundStart(ctx) {
+  onPrepStart(ctx) {
     const p = ps[0];
     const n = int(p.round, 0);
     if (n <= 0 || ctx.round % n !== 0) return;
