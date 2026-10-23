@@ -62,7 +62,7 @@ import { scriptOf } from '../../../shared/i18nPacks.js';
 import { NoticesButton } from '../ui/notices.js';
 import { VersionSwitch } from '../ui/versionPicker.js';
 import { contentSet, retryContentSet } from '../content.js';
-import { DEFAULT_VERSION, lobbyVersion, offeredDifficulties, fallbackDifficulty, seasonOf, versionLabel } from '../versions.js';
+import { DEFAULT_VERSION, lobbyVersion, offeredDifficulties, fallbackDifficulty, seasonOf, soloTimedOf, soloTimeMsgid, versionLabel } from '../versions.js';
 
 /** Official mode texts (activity_table act2autochess.modeDataDict), fallback when config.json is absent. */
 export const MODE_TEXT = {
@@ -344,12 +344,20 @@ function ProtoFit() {
   return html`<i ref=${ref} class="proto__fit" hidden></i>`;
 }
 
-/** One of the two entries at the bottom right of the hub (独立模拟 / 同盟模拟), with its line above it: opens its dialog. */
-export function HubEntry({ card, onOpen }) {
-  return html`<div class="hub-entry-wrap">
-    <span class="hub-entry__group"><${Icon} name=${card.icon} />${card.pointShort
+/**
+ * One of the two entries at the bottom right of the hub (独立模拟 / 同盟模拟), with its line above it: opens its dialog.
+ * `timePoint` (the solo card only): the version's time rule after 「1 名博士」. Absent, the markup is today's — the
+ * co-op card's long/short pair, or the solo card's single line. `timeShort` replaces the phone line; absent, the phone
+ * keeps points[0] (「1 名博士」).
+ */
+export function HubEntry({ card, onOpen, timePoint = null, timeShort = null }) {
+  const line = timePoint
+    ? html`<span class="hub-entry__long">${t(card.points[0], card.pointParams)} · ${t(timePoint)}</span><span class="hub-entry__short">${timeShort ? t(timeShort) : t(card.points[0], card.pointParams)}</span>`
+    : card.pointShort
       ? html`<span class="hub-entry__long">${t(card.points[0], card.pointParams)}</span><span class="hub-entry__short">${t(card.pointShort, card.pointParams)}</span>`
-      : t(card.points[0], card.pointParams)}</span>
+      : t(card.points[0], card.pointParams);
+  return html`<div class="hub-entry-wrap">
+    <span class="hub-entry__group"><${Icon} name=${card.icon} />${line}</span>
     <button type="button" class=${`mode-card hub-entry hub-entry--${card.id}`} data-mode=${card.id} onClick=${() => onOpen(card.id)}
         title=${t(card.desc, card.params)}>
       <span class="hub-entry__icon" aria-hidden="true"><${Icon} name=${card.icon} /></span>
@@ -511,7 +519,7 @@ function BackPlate({ onClick, class: cls = '' }) {
  * button (the other doctors: the host chooses).
  */
 export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, onCreate, busy, online, testMode, asTest, onTest, action = null, hint = null, readOnly = false,
-  difficulties = DIFFICULTIES, loading = false, failed = false }) {
+  difficulties = DIFFICULTIES, loading = false, failed = false, soloTime = null }) {
   const card = MODE_CARDS.find((c) => c.id === roomMode) || MODE_CARDS[0];
   const info = difficultyInfo(roomMode, difficulty);
   const label = action || (roomMode === 'solo' ? t('开始独立模拟') : t('创建同盟'));
@@ -549,6 +557,11 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
           ${readOnly ? html`<div class="proto-foot proto-foot--ro">
             <p class="proto-hint proto-hint--ro"><${Icon} name="info" />${hint || t('由创建者选择')}</p>
           </div>` : html`<div class="proto-foot create-box">
+            ${soloTime && !readOnly ? html`<label class="create-box__test" data-testid="solo-unlimited">
+              <input type="checkbox" role="switch" checked=${soloTime.on} onChange=${(e) => soloTime.onToggle(e.target.checked)} />
+              <span>${t('不限时')}</span>
+              <em class="t-dim">${t('关闭本局休整与机变的计时。官方为休整期每轮 300 秒、机变 150 秒。')}</em>
+            </label>` : null}
             ${testMode ? html`<label class="create-box__test" data-testid="create-test">
               <input type="checkbox" checked=${asTest} onChange=${(e) => onTest(e.target.checked)} />
               <span>${t('测试房间')}</span>
@@ -648,6 +661,9 @@ export function LobbyScreen() {
     const d = loadPref('lobby.difficulty', 'FUNNY');
     return DIFFICULTIES.includes(d) ? d : 'FUNNY';
   });
+  // 「不限时」 for the next timed solo (DESIGN §35.23.10; default off). The room's 模拟设置 is the authority once the
+  // room exists; this pref is what the lobby card and the create message say before that.
+  const [soloFree, setSoloFree] = useState(() => loadPref('lobby.soloUnlimited', false) === true);
   // the open dialogs: 选择同盟方式 (同盟模拟 / 密钥加入) and 选择模拟协议 (独立模拟)
   const [allyOpen, setAllyOpen] = useState(false);
   const [soloOpen, setSoloOpen] = useState(false);
@@ -675,6 +691,8 @@ export function LobbyScreen() {
   // its set failed to load or its check (the chip's 重试 sits under the modal): 选择模拟协议 says so and offers 重试 too
   const versionFailed = useStore((c) => version !== DEFAULT_VERSION && c.kind === 'version' && c.version === version && c.status === 'failed', Object.is, contentSet);
   const cfg = getConfig();
+  // null while that version's data is not on screen: the card states no time rule and the dialog hides the switch
+  const soloTimed = soloTimedOf(versionLoading ? null : cfg, version);
   const solo = offeredDifficulties(versionLoading ? null : cfg, 'solo');
   const coop = offeredDifficulties(versionLoading ? null : cfg, 'coop');
   const shownSolo = fallbackDifficulty(solo, difficulty);
@@ -682,6 +700,7 @@ export function LobbyScreen() {
 
   const openMode = (m) => { if (m === 'solo') setSoloOpen(true); else setAllyOpen(true); };
   const pickDifficulty = (d) => { setDifficulty(d); savePref('lobby.difficulty', d); };
+  const setSoloFreePref = (on) => { const next = on === true; setSoloFree(next); savePref('lobby.soloUnlimited', next); };
 
   const run = async (kind, fn) => {
     if (inFlight.current) return;
@@ -697,6 +716,7 @@ export function LobbyScreen() {
   // (`version`: the lobby's, only on a server that enables versions — protocol §4; a default server's message is unchanged)
   const create = (mode) => run('create', () => net.request('room.create', {
     mode, difficulty: mode === 'solo' ? shownSolo : shownCoop, ...(testMode && asTest ? { test: true } : {}), ...(versions ? { version } : {}),
+    ...(mode === 'solo' && soloFree && soloTimed === true ? { soloUnlimited: true } : {}),
   }));
   const join = (c = code) => {
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
@@ -763,7 +783,12 @@ export function LobbyScreen() {
         <${AchievementPlate} onOpen=${() => setAchOpen(true)} />
       </aside>
       <section class="hub-entries" aria-label=${t('模拟方式')}>
-        ${MODE_CARDS.map((c) => html`<${HubEntry} key=${c.id} card=${c} onOpen=${openMode} />`)}
+        ${MODE_CARDS.map((c) => {
+          const timedCard = c.id === 'solo';
+          const timePoint = timedCard ? soloTimeMsgid('card', { timed: soloTimed, unlimited: soloFree }) : '';
+          const timeShort = timedCard ? soloTimeMsgid('short', { timed: soloTimed, unlimited: soloFree }) : '';
+          return html`<${HubEntry} key=${c.id} card=${c} onOpen=${openMode} timePoint=${timePoint || null} timeShort=${timeShort || null} />`;
+        })}
       </section>
     </main>
 
@@ -773,7 +798,8 @@ export function LobbyScreen() {
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} short=${shortScreen} />` : null}
     ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
-      testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed} />` : null}
+      testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed}
+      soloTime=${soloTimed === true ? { on: soloFree, onToggle: setSoloFreePref } : null} />` : null}
     ${sweepOpen ? html`<${SweepReport} onClose=${() => setSweepOpen(false)} />` : null}
     ${achOpen ? html`<${AchievementDialog} onClose=${() => setAchOpen(false)} />` : null}
   </div>`;

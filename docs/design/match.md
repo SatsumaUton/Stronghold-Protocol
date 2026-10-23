@@ -39,6 +39,12 @@ LOBBY(room) → INFO_CHECK (co-op 25 s; solo and any single-human match untimed 
 ```
 Solo FUNNY has 9 rounds (boss at R9); everything is read from `data/config.json → modes[modeId]`.
 
+A first-season solo (`config.version.rules.soloTimed`, DESIGN §35.22.7) is not `soloUntimed` unless the room's
+「不限时」 is on (`room.setSoloUnlimited`, default off; `room.state` omits `soloUnlimited` unless true; the match is built
+with `opts.soloUnlimited`, DESIGN §35.23.10). While it is off, INFO_CHECK, the strategy draft, 机变 and preparation use
+their clocks (preparation 300 s, 机变 150 s; the other two use the co-op lengths, because they read `soloUntimed`). A
+co-op match with one human stays untimed. A second-season solo stays untimed.
+
 P1b plugin modes inherit an official mode and may override economy and other global configuration field by field in `GameData` (DESIGN §32.5). Original modes retain the same values and behavior; room mode selection belongs to P1c.
 
 ### 6.2 Player state (PlayerState.js) — authoritative per player

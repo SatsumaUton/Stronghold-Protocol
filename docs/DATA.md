@@ -906,12 +906,13 @@ every file system and URL).
   (`garrison_39`: 「斯卡蒂、幽灵鲨或安哲拉」; 下半: 深巡); V2_1 and the default have none.
 - **`config`**: `hiddenCore` single / multi (下半 350 / 1200, V2_1 too; 上半 300 / 1000, PRTS 卫戍协议：盟约); `rules` — V2_1:
   `{}`, the default's (every 下半 switch dates from 2026-03-14); 上半:
-  `deployOrder 'rowBottomUp'`, `soloTimed true`, `benchEquip false`, `benchFullSwap false`, `bossMirrorShare false`, all
-  inert until M2 and [ASSUMED] (PRTS 卫戍协议/帮助; news 5114 lists the last three as 下半 additions).
+  `deployOrder 'rowBottomUp'`, `soloTimed true`, `benchEquip false`, `benchFullSwap false`, `bossMirrorShare false`
+  (PRTS 卫戍协议/帮助; news 5114 lists the last three as 下半 additions). M2 reads `rules` (§35.22.7): a first-season
+  solo is timed unless the room opts into `soloUnlimited` (§35.23.10).
   `constants.singleReconnectTime` is `null` in a version whose constData lacks it: 上半's has none (the 2026-03-10
   rewrite `12e0a020` added it), so the build writes no 下半 value as official data. The lobby's own fallback then keeps a
-  dropped solo run resumable for 24 h (`server/lobby.js SOLO_RECONNECT_FALLBACK_SEC`) [ASSUMED] until 上半's solo exit
-  rule is decided (M1 / M2, with the timed 上半 solo).
+  dropped solo run resumable for 24 h (`server/lobby.js SOLO_RECONNECT_FALLBACK_SEC`). That 24 h window is a carried-over
+  convenience [ASSUMED], not official 第一期 data: M2 did not add the constant, and the code path is unchanged (§35.23.10).
   **Carried over unreviewed [ASSUMED]**: the rule constants `tools/build-data.mjs` writes as literals (its `buildConfig`
   return block is the full set; a script comparing `data/config.json` with both 上半 configs finds them equal) go into
   上半's `config.json` as measured on 下半. Among them: `bans` (NORMAL / HARD 3 core + 4 addon: 下半 has 8 core bonds, 上半 6, so the same

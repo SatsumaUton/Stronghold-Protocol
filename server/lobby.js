@@ -12,8 +12,14 @@
 //     host changes it in the room — the event's 联合模拟 creates the room first (research 06 §3.2), the starting
 //     difficulty is not recorded [ASSUMED: 标准, the first one unlocked; the event room research 06 §3.2 describes shows
 //     ♜ 标准模拟 in its footer pill]. The game's own lobby always sends the remembered one.
-//   * Host-only: room.setDifficulty, room.setAiPicksLast, room.addBot, room.removeBot, room.kick, room.start.
+//   * Host-only: room.setDifficulty, room.setAiPicksLast, room.setSoloUnlimited, room.addBot, room.removeBot, room.kick,
+//     room.start.
 //     ▸ Changing the difficulty or the AI-picks-last option (co-op only) un-readies the other humans.
+//     ▸ 「不限时」 (room.setSoloUnlimited { on }, DESIGN §35.23.10): a solo room of a version whose rules.soloTimed is
+//       true, off by default. On, the match is built with opts.soloUnlimited (preparation and 机变 untimed — the existing
+//       Match opt-out). room.state carries `soloUnlimited: true` only while it is on, so a default room.state stays
+//       identical. A switch to a version whose solo is not timed clears it. A create that sends the key on a co-op room
+//       or an untimed version is ignored.
 //     ▸ room.start requires every other human to be connected and ready; the host's start counts as the host's
 //     ready (the host may still toggle room.ready for display).
 //   * room.kick {seat, playerId} (community report #17, owner approved): before the match only, the host removes another
@@ -32,8 +38,10 @@
 //     the lobby then broadcasts room.state and, in a match, calls match.onReconnect(playerId).
 //     Solo runs (下半: "休整期及机变阶段没有时间限制…24小时内随时返回", research 01 §1 / 06 §17): a session that drops
 //     while its solo room's match runs stays resumable for the official `config.constants.singleReconnectTime`
-//     (86400 s; option `soloReconnectWindowMs` overrides it) instead of the 10-minute window — the untimed solo match
-//     simply waits (net.js session.resumeWindowMs, set at every disconnect). Only after that does expiry turn into
+//     (86400 s; option `soloReconnectWindowMs` overrides it) instead of the 10-minute window (net.js
+//     session.resumeWindowMs, set at every disconnect). 第一期's constData has no singleReconnectTime, so that solo
+//     uses the same 24 h figure as a carried-over convenience [ASSUMED] — not because the run is untimed (a 第一期 solo
+//     is timed unless the room's 「不限时」 is on, §35.23.10). Only after that does expiry turn into
 //     match.onLeave ('abandoned'). The extension outlives the match, so a run that ended meanwhile (e.g. a server-run
 //     Final Assault) still shows its result on the player's return.
 //     A repeated hello on a live connection is a full resync: room.state goes to the requester only
@@ -383,6 +391,11 @@ export class Room {
      * put every human seat before every AI seat (Match opts.aiPicksLast). Kept across the room's matches.
      */
     this.aiPicksLast = false;
+    /**
+     * 「不限时」 (room.setSoloUnlimited, DESIGN §35.23.10; a timed solo only, off by default): the match is built with
+     * opts.soloUnlimited. room.state omits the key unless this is true.
+     */
+    this.soloUnlimited = false;
     /** @type {string | null} */
     this.hostId = null;
     /** @type {(Seat | null)[]} */
@@ -482,6 +495,8 @@ export class Room {
         remainingMs: Math.max(0, Math.round(this.versionVote.expiresAt - now)) } } : {}),
       // omitted when false so a normal room.state stays identical
       ...(this.test ? { test: true } : {}),
+      // 「不限时」 (header): omitted unless on, so a default room.state stays identical
+      ...(this.soloUnlimited === true ? { soloUnlimited: true } : {}),
     };
   }
 }
@@ -778,6 +793,7 @@ export class Lobby {
       case 'room.ready': return this.ready(session, msg);
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
+      case 'room.setSoloUnlimited': return this.setSoloUnlimited(session, msg);
       case 'room.addBot': return this.addBot(session);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
@@ -868,7 +884,7 @@ export class Lobby {
   // room.* handlers
   // ---------------------------------------------------------------------------------------------------
 
-  create(session, { mode, difficulty: asked, test, version: askedVersion } = {}) {
+  create(session, { mode, difficulty: asked, test, version: askedVersion, soloUnlimited } = {}) {
     // A test room exists only when the process switch allowed it. The check runs before the room is built.
     if (test === true && this.testEnabled !== true) return fail(ERR.TEST_DISABLED);
     // the official version (header "Official versions"): left out, the server's default
@@ -911,6 +927,9 @@ export class Lobby {
     if (cur) this.removeMember(cur, session.playerId);
     const room = new Room(code, mode, difficulty, this.now(), version);
     room.test = test === true;
+    // 「不限时」 only on a solo room of a version whose solo is timed (header). Anywhere else the key is ignored, so a
+    // stray true cannot change a default or co-op create.
+    if (mode === 'solo' && soloUnlimited === true && this.versionSoloTimed(version)) room.soloUnlimited = true;
     room.content = initial;
     if (initial !== this.baseContent(version)) this.holdContent(initial);
     room.ownerKey = key;
@@ -1049,6 +1068,26 @@ export class Lobby {
     if (room.aiPicksLast !== on) {
       room.aiPicksLast = on;
       for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
+  /**
+   * 「不限时」 (DESIGN §35.23.10): host-only, before the match, a solo room of a version whose solo is timed. `on: false`
+   * clears the flag and drops the room.state key. A co-op room or a version whose solo is already untimed is BAD_TARGET.
+   */
+  setSoloUnlimited(session, { on }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.spectatorOf(session.playerId)) return fail(ERR.SPECTATOR);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.mode !== 'solo' || !this.versionSoloTimed(room.version)) return fail(ERR.BAD_TARGET, 'this version\'s solo is not timed');
+    this.dropReplay(room, session.playerId);
+    const next = on === true;
+    if (room.soloUnlimited !== next) {
+      room.soloUnlimited = next;
       this.broadcastState(room);
     }
     return OK;
@@ -1279,6 +1318,22 @@ export class Lobby {
   }
 
   /**
+   * Does this version's solo use the official per-round timers (`config.version.rules.soloTimed`)? 第二期下半, a server
+   * without the versions service, and a version whose data cannot be read: no.
+   * @param {string} id
+   */
+  versionSoloTimed(id) {
+    if (!id || id === DEFAULT_VERSION || !this.versions) return false;
+    try {
+      const data = this.versions.data(id);
+      return data?.config?.version?.rules?.soloTimed === true;
+    } catch (e) {
+      this.log.error(`[lobby] the solo timer of ${id} failed`, e);
+      return false;
+    }
+  }
+
+  /**
    * `d`, or the difficulty the version offers instead: the highest below it, else its lowest (终极 → 绝境).
    * @param {string} v @param {string} mode @param {string} d
    */
@@ -1411,6 +1466,9 @@ export class Lobby {
     if (room.versionVote) { clearTimeout(room.versionVote.timer); room.versionVote = null; }
     const before = room.content;
     room.version = version;
+    // 「不限时」 belongs to a timed solo only (header): a co-op room, or a version whose solo is not timed, drops it.
+    // Switching between the two 第一期 versions keeps it.
+    if (room.mode !== 'solo' || !this.versionSoloTimed(version)) room.soloUnlimited = false;
     room.difficulty = this.fallbackDifficulty(version, room.mode, room.difficulty);
     let next = this.baseContent(version);
     const ids = (before?.plugins || []).filter((p) => !p.auto).map((p) => p.id);
@@ -1890,6 +1948,8 @@ export class Lobby {
         ...(modded || versioned ? { requireCs: true } : {}),
         // another official version (header "Official versions"): its registry id; a default room's opts keep their keys
         ...(versioned ? { version: room.version } : {}),
+        // 「不限时」 (header): only while the room's flag is on, so a default match's opts keep their keys
+        ...(room.mode === 'solo' && room.soloUnlimited === true ? { soloUnlimited: true } : {}),
         // The list the lobby just checked the picks with (kittedFor). Vanilla rooms omit it: setDiy stays on
         // KITTED_CHARS, and the worker payload / test journal of a normal match do not grow a key.
         ...(modded ? { kitted: this.kittedFor(room) } : {}),
@@ -2157,7 +2217,10 @@ export class Lobby {
 
   /**
    * How long a dropped solo run stays resumable (ms): the option, else data singleReconnectTime — the room's version's
-   * (header "Official versions": 第一期 has none, so 24 h [ASSUMED until M2's rule switches]) —, else 24 h.
+   * (header "Official versions": 第一期 has none, so the 24 h figure below) —, else 24 h. The 24 h fallback is a
+   * carried-over convenience [ASSUMED]: 第一期's constData never gained singleReconnectTime, and M2 did not add it.
+   * The code path is unchanged (§35.23.10). It is not official 第一期 data, and it is not "because the solo is untimed"
+   * — a 第一期 solo is timed unless the room's 「不限时」 is on.
    * @param {Room | null} [room]
    */
   soloResumeWindowMs(room = null) {

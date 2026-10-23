@@ -6,8 +6,9 @@
 //     loads or checks its data, how far it is (载入中 n%) or that it failed (校验失败 · 重试). A server that enables one
 //     version only, not 第二期下半, shows it as a plain tag (nothing to choose). A tap opens the picker.
 //   * VersionPicker — the project's Modal: one row per version the server enables (its name, the official period it
-//     replicates, the badges 当前 / 服务器默认, and 预览 on every version but 第二期下半 with the line that some rules still
-//     follow 第二期下半 [ASSUMED]; in a language other than Simplified Chinese also that its game texts are in Chinese
+//     replicates, the badges 当前 / 服务器默认, and 预览 on every version but 第二期下半 with what is still an estimate after
+//     M2 [ASSUMED]: bounty draws, some numbers, and six enemies' attack wind-ups. In a language other than Simplified
+//     Chinese also that its game texts are in Chinese
 //     until they are translated — a version's data carries no translations yet). In the lobby a pick is this browser's
 //     choice at once (setLobbyVersion); in a room the host's pick proposes the switch (room.proposeVersion — the seated
 //     doctors vote, ui/versionVote.js), everybody else reads it (由创建者发起).
@@ -56,7 +57,7 @@ export function VersionPicker({ mode, versions, current, serverDefault, roomMode
               ${preview ? html`<span class="verpick__badge is-preview">${t('预览')}</span>` : null}
             </span>
             <span class="verpick__period t-lo">${periodLine(v.id)}</span>
-            ${preview ? html`<span class="verpick__note t-dim">${t('部分规则仍按第二期下半，正在逐步复刻')}${chineseTexts ? html`<br />${t('该版本的游戏文本暂时只有中文')}` : null}</span>` : null}
+            ${preview ? html`<span class="verpick__note t-dim">${t('核心规则已按该版本。悬赏抽取、部分数值和六名敌人的攻击前摇仍是推算')}${chineseTexts ? html`<br />${t('该版本的游戏文本暂时只有中文')}` : null}</span>` : null}
             ${usable ? null : html`<span class="verpick__note is-warn">${t('该版本不支持当前的模拟方式')}</span>`}
           </button>
         </li>`;

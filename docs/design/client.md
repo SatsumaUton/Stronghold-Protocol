@@ -677,19 +677,26 @@ adds ` version=<id>`.
 
 **Lobby.** `ui/versionPicker.js`: VersionSwitch (the chip before 恢复本机对局; a single non-default entry is a plain tag;
 载入中 n% / 校验失败 + 重试) and VersionPicker (the project's Modal: one row per enabled version — its name, the official
-period line, 当前 / 服务器默认 / 预览 with 「部分规则仍按第二期下半，正在逐步复刻」 [ASSUMED], and in a language other than
+period line, 当前 / 服务器默认 / 预览 with 「核心规则已按该版本。悬赏抽取、部分数值和六名敌人的攻击前摇仍是推算」 [ASSUMED], and in a language other than
 Simplified Chinese that its game texts are Chinese for now). The title shows a non-default version under 盟约.
 选择模拟协议 lists `offeredDifficulties(config, roomMode)` of the version shown (its config's modes) and selects
 `fallbackDifficulty` (the server's rule: the highest offered below, else the lowest) when the remembered difficulty is
 not offered — `sp.pref.lobby.difficulty` changes only on a pick; the cards wait (spinner, disabled) while the version
-loads, and when its set failed it says 版本数据校验失败 with 重试 (`retryContentSet`; the chip's 重试 is under the modal). `room.create` carries `version` only when welcome.versions exists. The 成就统计 card counts the season of the
+loads, and when its set failed it says 版本数据校验失败 with 重试 (`retryContentSet`; the chip's 重试 is under the modal). `room.create` carries `version` only when welcome.versions exists, and `soloUnlimited: true` only when the
+version's solo is timed and this browser's 「不限时」 pref (`sp.pref.lobby.soloUnlimited`, default off) is on. For that
+version the dialog shows the switch, and the 独立模拟 card states the 300 s / 150 s rule or 不限时 (while the version's
+data is not on screen the card states no time rule). A version whose solo is already untimed keeps 「休整期与机变阶段不限时」
+on the long line and 「1 名博士」 on a phone. The 成就统计 card counts the season of the
 version shown.
 
 **Room.** `roomFacts.needsContent` (gameplay plugins or another version) gates ready, start, the seat tags and the
 status line; `modded` stays the 非官方 mark. A version room's words: 版本数据载入中 / 就绪 / 校验失败, 「等待所有博士载入
 「{version}」的数据」, the two GoButton tooltips, the invite 「…盟约·{version}【…】」. `ui/pluginTag.js VersionTag` (nothing for
 第二期下半) sits beside the mode in the top bar and beside UnofficialMark in the briefing, the settlement and the result
-[ASSUMED placement]. The version pill beside the difficulty and ⚙'s 版本 row open the picker in room mode: the host's pick
+[ASSUMED placement]. A timed solo (第一期) shows ⚙ 模拟设置 with the 「不限时」 switch (the host toggles `room.setSoloUnlimited`; everybody else reads
+it). The solo briefing states the 300 s / 150 s rule, or the untimed line when the switch is on or the version's solo is
+not timed; while that version's data is not on screen the briefing omits the time line and the gear stays hidden. The
+version pill beside the difficulty and ⚙'s 版本 row open the picker in room mode: the host's pick
 sends `room.proposeVersion` (a RATE right after a switch — every page resends its settings, which share the server's
 heavy-message budget — is tried once more after 1.2 s [ASSUMED]); off during a vote, with gameplay plugins (「请先关闭改变
 玩法的插件」) and offline; read-only for everybody else. `ui/versionVote.js` (modelled on `ui/setupReroll.js`): the

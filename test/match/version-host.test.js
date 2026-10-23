@@ -228,8 +228,8 @@ test('(f) no official blackboard value of a version is over the cap of its own s
 
 test('a test room of a version plays in its host: test commands through the proxy against that version\'s data', { timeout: 120_000 }, async () => {
   // 第一期 solo preparation is the official 300 s (DESIGN §35.22.7). Under virtual time that prep ends during the
-  // first round trip and the next g.test is WRONG_PHASE. soloUnlimited holds the quiet phase for this item check;
-  // the room still has no 「不限时」 control, so a real 第一期 room does not pass it.
+  // first round trip and the next g.test is WRONG_PHASE. soloUnlimited holds the quiet phase for this item check.
+  // The room's 「不限时」 defaults off (§35.23.10), so this test still forces it through matchOptions.
   const versionHosts = createMatchHosts({ contents: versions, log: quiet, options: { kind: 'version', virtualTime: true, matchOptions: { botRehearsal: 0, soloUnlimited: true } } });
   const registry = new SessionRegistry();
   const lobby = new Lobby({ registry, log: quiet, content: { cs: vanilla.cs }, getData, versions, versionHosts, options: { testMode: '1', testHost: '127.0.0.1' } });

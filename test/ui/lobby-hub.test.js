@@ -604,7 +604,7 @@ test('official versions (DESIGN §35.23): the cards of the version shown, the wa
   assert.equal(byId(failed, 'proto-loading').length, 0, 'no spinner');
   assert.ok(byClass(failed, 'diff-card').every((c) => c.props.disabled === true));
   // the lobby: the version only on a server that enables versions; the shown difficulty (the fallback) is the one sent
-  assert.match(lobbySrc, /mode, difficulty: mode === 'solo' \? shownSolo : shownCoop, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\), \.\.\.\(versions \? \{ version \} : \{\}\),/);
+  assert.match(lobbySrc, /mode, difficulty: mode === 'solo' \? shownSolo : shownCoop, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\), \.\.\.\(versions \? \{ version \} : \{\}\),\n {4}\.\.\.\(mode === 'solo' && soloFree && soloTimed === true \? \{ soloUnlimited: true \} : \{\}\),/);
   assert.match(lobbySrc, /const shownSolo = fallbackDifficulty\(solo, difficulty\);/);
   assert.match(lobbySrc, /const pickDifficulty = \(d\) => \{ setDifficulty\(d\); savePref\('lobby\.difficulty', d\); \};/, 'the pref changes only on a pick');
   assert.match(lobbySrc, /<\$\{VersionSwitch\} \/>\s*<\$\{ResumeMatchButton\} \/>/, 'the chip before 恢复本机对局');
