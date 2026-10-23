@@ -237,3 +237,13 @@ test('node tools/ci.mjs --list and a bad option run without npm (exit 0 / 2)', (
   assert.equal(bad.status, 2);
   assert.match(bad.stderr, /unknown step "nope"/);
 });
+
+
+test('local CI clears residual shard and JUnit settings before invoking the full test runner', () => {
+  const base = { PATH: 'p', SHARD: '2', JUNIT: 'unexpected.xml' };
+  const env = stepEnv(STEPS.find(s => s.id === 'test'), base);
+  assert.equal(Object.hasOwn(env, 'SHARD'), false);
+  assert.equal(Object.hasOwn(env, 'JUNIT'), false);
+  assert.equal(env.PATH, 'p');
+  assert.equal(base.SHARD, '2', 'the caller environment is unchanged');
+});

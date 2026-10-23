@@ -41,7 +41,7 @@ node tools/test-timings.mjs report.xml
 node tools/ci-shards.mjs --write --timings report.xml
 ```
 
-解析器只接受 `<testcase file="…" time="…">`，没有 `file` 的报告拒绝计权，不从用例名猜路径。部分 Node 版本的 JUnit 不提供 `file`；应先取得带文件信息的报告，且路径要对应当前 checkout。未出现的文件保留原权重。每次改表后重新检查最慢任务墙钟，再决定超时；20 分钟保留 runner 机型差异和负载余量。
+解析器只接受 `<testcase file="…" time="…">`，没有 `file` 的报告拒绝计权，不从用例名猜路径。部分 Node 版本的 JUnit 不提供 `file`；应先取得带文件信息的报告，路径按 test/ 或 plugins/ 归一到仓库。多个报告取每个文件的下中位数；未出现的文件保留原权重。每次改表后重新检查最慢任务墙钟，再决定超时；20 分钟保留 runner 机型差异和负载余量。
 
 ## 改工作流
 

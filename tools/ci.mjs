@@ -21,7 +21,7 @@
 //
 // Not mirrored: actions/checkout and actions/setup-node (GitHub runner setup) and `npm ci` (the install — run it
 // yourself; replacing node_modules is not a check). The OS × Node matrix is whatever this machine has.
-// The independent `golden` job is run locally with `npm run golden`, separately from these six steps.
+// The independent `golden` job is run locally with `npm run golden`, separately from these seven steps.
 // Every child is `process.execPath` with a script path (eslint and tsc from node_modules/<pkg>/package.json `bin`),
 // never npm or a shell, so the run does not depend on PATH or on the shell npm uses for scripts.
 // test/ci.test.js keeps this list and ci.yml in step: a ci.yml step this file does not know fails it.
@@ -40,7 +40,7 @@ export const CI_TEST_ENV = { SP_E2E: '0', SP_REAL_E2E: '0', RENDER_E2E: '0', NO_
 /**
  * What ci.yml's job `test` adds on top of CI_TEST_ENV: the shard of the matrix this job runs. tools/test-run.mjs turns
  * SHARD into that shard's test files (unset means the whole suite, which is what this machine runs — tools/ci.mjs sets
- * nothing, so `npm run ci` still runs everything). The matrix is node 22 only: one CI job per shard, eight together.
+ * no shard and clears inherited SHARD/JUNIT, so `npm run ci` still runs everything). The matrix is node 22 only: one CI job per shard, eight together.
  */
 export const CI_SHARD_ENV = {
   SHARD: '${{ matrix.shard }}',
@@ -269,6 +269,8 @@ export function selectSteps(only) {
 /** A child's env: `base` plus ci.yml's job env for the keys `base` does not set. */
 export function stepEnv(step, base = process.env) {
   const env = { ...base };
+  // Local CI always runs the full suite, irrespective of an earlier shard/report command in this shell.
+  if (step.id === 'test') { delete env.SHARD; delete env.JUNIT; }
   if (step.ci.job === 'test') for (const [k, v] of Object.entries(CI_TEST_ENV)) if (env[k] === undefined) env[k] = v;
   return env;
 }

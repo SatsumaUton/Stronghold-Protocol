@@ -16,9 +16,8 @@ jobs:
   test:
     name: test (${{ matrix.os }}, node ${{ matrix.node }}, shard ${{ matrix.shard }})
     runs-on: ${{ matrix.os }}
-    # One shard is a quarter of the suite (ci-shards.json balances them by measured time): in run 39612686697 the
-    # slowest job took 701 s of wall clock (windows, shard 1), the full run it replaces took 22.4 min (run 38777566530).
-    # 20 minutes keeps a margin and still fails a hung job.
+    # Weights: author-reported run 39617468541 (not independently remeasured here), fullmatch-coop median 235132 ms,
+    # Windows shard 0 wall clock 397 s. docs/CI.md records provenance; 20 min leaves runner variance/hang margin.
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -97,7 +96,7 @@ jobs:
       - name: CI guard tests (sharding and workflow wiring)
         run: npm run test:guards
 
-  # Separate from the test matrix so lint / types / import boundaries run once, not four times.
+  # Separate from the test matrix so lint / types / import boundaries run once, outside the eight test jobs.
   # Lint warnings do not fail the job (npm run lint does not pass --max-warnings=0).
   tooling:
     name: tooling (lint, imports, typecheck)
