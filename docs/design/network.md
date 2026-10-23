@@ -428,7 +428,7 @@ Test-room admission requires `testAck:true` for both join and spectate; otherwis
 
 Attack pacing (PR #729): UnitInfo carries the actual attack interval in game seconds. A `rate` event after the ally
 phase and before projectiles carries changes; its baseline is seeded by birth info. The renderer looks ahead through
-the attack tick, including a rate later in that tick, without borrowing a later tick’s value. Its 0.2–6 second display
+the queued timestamp, including a rate later in that batch, without borrowing a later timestamp’s value. A b.ev batch may contain several simulation ticks; [ASSUMED] its latest interval per unit paces that timestamp, including batches without an attack (§35.101). Its 0.2–6 second display
 window is [ASSUMED]; damage, attack timing and targeting are unchanged.
 
 Server rehearsal offload (§35.86) is opt-in via SP_WORKERS; plugin and historical-version match hosts retain their own

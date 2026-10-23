@@ -3,14 +3,14 @@
 // record (`bat × 100 / aspd`) while the battle had already buffed it (宴: 1.20 s guessed vs 0.74 s real = a 62 % slow
 // clip), and only the measured gap between attacks pulled it right. The snapshot's own interval now starts the view, the
 // measured gap is followed directly (a real change is taken on the next swing), and the sim pushes a changed interval as a
-// ['rate', ...] event (EV.RATE) — see test/attackRateEvents.test.js.
-// `node --test test/attackRate.test.js`
+// ['rate', ...] event (EV.RATE) — see test/render/attack-rate.test.js.
+// `node --test test/render/attack-rate.test.js`
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
   clampAtkInterval, startAtkInterval, nextAtkInterval, ATK_DEFAULT_S, ATK_MAX_S, ATK_MIN_S,
-  ATK_JUMP_TOLERANCE, ATK_DRIFT_SHARE,
+  ATK_JUMP_TOLERANCE, ATK_DRIFT_SHARE, attackRateEvents,
 } from '../../public/js/render/attackRate.js';
 
 test('the snapshot interval wins over the base-record guess', () => {
@@ -59,3 +59,18 @@ test('a stall is not a rhythm', () => {
     assert.equal(r.interval, 1.1);
   }
 });
+
+
+for (const attack of [false, true]) {
+  test(`batched interval changes retain the last value when an attack is ${attack ? 'present' : 'absent'}`, () => {
+    const spawn = ['spawn', { id: 1 }], skill = ['skill', 1, 1];
+    const first = ['rate', 1, 1.1], last = ['rate', 1, 0.6], other = ['rate', 2, 2];
+    const atk = ['atk', 1, 3, 'none'];
+    const input = [spawn, first, skill, ...(attack ? [atk] : []), other, last];
+    const output = attackRateEvents(input);
+    assert.deepEqual(output.filter(e => e[0] === 'rate'), [last, other]);
+    assert.deepEqual(output.filter(e => e[0] !== 'rate'), [spawn, skill, ...(attack ? [atk] : [])]);
+    if (attack) assert.ok(output.indexOf(last) < output.indexOf(atk));
+    assert.equal(input[1], first, 'the received batch is not mutated');
+  });
+}

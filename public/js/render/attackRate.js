@@ -75,7 +75,8 @@ export function nextAtkInterval(prev, measured, hasMeasured, opts = {}) {
   return { interval: jump ? target : clampAtkInterval(base + (target - base) * ATK_DRIFT_SHARE), measured: true };
 }
 
-/** A tick sends rate after atk; deliver that value before its attack, retaining every other event's order. */
+/** A b.ev batch shares one timestamp. [ASSUMED] Pace it with the last interval recorded for each unit;
+ * send that value before its first attack and retain every other event's order. */
 export function attackRateEvents(events) {
   const rates = new Map();
   for (const e of events) if (Array.isArray(e) && e[0] === 'rate') rates.set(e[1], e);
@@ -89,6 +90,8 @@ export function attackRateEvents(events) {
     if (e?.[0] === 'rate') {
       if (sent.has(e[1])) continue;
       sent.add(e[1]);
+      out.push(rates.get(e[1]) || e);
+      continue;
     }
     out.push(e);
   }
