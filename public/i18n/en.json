@@ -2376,5 +2376,14 @@
   "官方「盟约·上半」{sub}（{from} – {to}）": "Official “Alliance” first half, {sub} ({from} – {to})",
   "官方「盟约·下半」{sub}（{from} – {to}）": "Official “Alliance” second half, {sub} ({from} – {to})",
   "向左滚动盟约": "Scroll bonds left",
-  "向右滚动盟约": "Scroll bonds right"
+  "向右滚动盟约": "Scroll bonds right",
+  "AI 协作": "AI teamwork",
+  "申请接替": "Request seat",
+  "暂无投票": "No pending votes",
+  "同意": "Agree",
+  "不同意": "Reject",
+  "观战者申请接替AI，同房间在线且未托管的真人过半同意后在休整期加入；无合格队友时由在线房主决定。": "Spectators may request an AI seat. A majority of online human teammates in this room who are not on autoplay approves during preparation; the online host decides if there are no eligible teammates.",
+  "你已接管AI席位，资金、阵容与席位已保留": "You have taken over the AI seat; funds, lineup and seat are preserved",
+  "第 {round} 回合接替 AI；含此前席位数据，不计入个人统计或奖励。": "Took over AI in round {round}; includes earlier seat data and does not count toward personal statistics or rewards.",
+  "申请在退出、断线、投票资格或阶段变化时取消。接替后的席位数据含 AI 此前表现，不计入你的个人统计或奖励。": "Requests are cancelled on leaving, disconnection, voter eligibility changes or phase changes. Inherited seat data includes earlier AI performance and does not count toward your personal statistics or rewards."
 }

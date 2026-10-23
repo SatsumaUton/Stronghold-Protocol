@@ -1,3 +1,4 @@
+import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.js';
 // server/lobby.js — rooms, seats, host, AI seats, ready/start, reconnect, and room → Match wiring
 // (DESIGN §2, §6.1 LOBBY, §8.1). Implements the handler interface consumed by server/net.js.
 //
@@ -470,6 +471,7 @@ export class Room {
   toState(now = Date.now()) {
     return {
       t: 'room.state',
+      aiTakeoverVotes: this.aiTakeoverVotes || [],
       code: this.code,
       hostId: this.hostId,
       mode: this.mode,
@@ -809,6 +811,8 @@ export class Lobby {
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
       case 'room.setSoloUnlimited': return this.setSoloUnlimited(session, msg);
+      case 'room.aiRequest':
+      case 'room.aiVote': return aiTakeover(this, session, msg);
       case 'room.addBot': return this.addBot(session);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
@@ -2014,7 +2018,10 @@ export class Lobby {
       match.start();
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match failed to start`, e);
-      if (room.matchCtx === ctx) { room.match = null; room.matchCtx = null; room.matchKey = null; }
+      if (room.matchCtx === ctx) {
+        resetAiTakeover(room);
+        room.match = null; room.matchCtx = null; room.matchKey = null;
+      }
       this.disposeMatchCtx(ctx);
       this.broadcastState(room);
       // the match hosts refuse one content set more than they run (PLUGIN_BUSY: server/match/host/index.js)
@@ -2028,6 +2035,7 @@ export class Lobby {
     if (ctx.ended || !ctx.live || room.matchCtx !== ctx || room.disposed) return;
     ctx.ended = true;
     room.lastSummary = summary ?? null;
+    resetAiTakeover(room);
     room.match = null;
     room.matchCtx = null;
     room.matchKey = null;
@@ -2066,6 +2074,7 @@ export class Lobby {
 
   /** Match broadcast; the latest m.public and a broadcast m.result are also kept for the replay. */
   matchBroadcast(room, ctx, msg, encoded = null) {
+    if (msg.t === 'm.public' && reconcileAiTakeover(this, room)) this.broadcastState(room);
     const data = this.broadcastRoom(room, msg, encoded);
     if (data == null) return;
     if (msg.t === 'm.public') ctx.lastPublic = data;
@@ -2206,6 +2215,7 @@ export class Lobby {
     let res;
     try {
       res = room.match.handle(session.playerId, msg);
+      if (reconcileAiTakeover(this, room)) this.broadcastState(room);
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match.handle(${msg.t}) threw`, e);
       return fail(ERR.INTERNAL);
@@ -2401,6 +2411,7 @@ export class Lobby {
     // an open version vote ends with the room (its timer)
     if (room.versionVote) { clearTimeout(room.versionVote.timer); room.versionVote = null; }
     const ctx = room.matchCtx;
+    resetAiTakeover(room);
     room.match = null;
     room.matchCtx = null;
     room.matchKey = null;
@@ -2457,6 +2468,7 @@ export class Lobby {
 
   broadcastState(room) {
     if (room.disposed) return;
+    reconcileAiTakeover(this, room);
     if (this.trustedRuntime) {
       const state = room.toState(this.now()), prev = room.trustedPrevious;
       const event = (name,extra={}) => this.trustedRuntime.event(name,{room:state,...extra});

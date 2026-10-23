@@ -79,6 +79,8 @@ export function createSessionStack(opts, { data, log, content = null, plugins = 
   log.info(`[http] limits: rooms ${lobby.opts.maxRooms} (${perNetwork(lobby.opts.maxRoomsPerAddr)}/network), `
     + `matches ${perNetwork(lobby.opts.maxMatchesPerAddr)}/network, `
     + `sockets ${network.opts.maxConnections} (${perNetwork(network.opts.maxConnectionsPerAddr)}/network)`);
+
+  lobby.network = network;
   return { registry, lobby, network };
 }
 
