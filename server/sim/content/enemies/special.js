@@ -340,7 +340,7 @@ export const SPECIAL_KITS = Object.freeze({
     }, { cond: (b, e) => inRange(b, e).length > 0, turn: attackSkillOf('enemy_1273_stmgun_2', 'Cannon') })];   // the attack's turn (DESIGN §35.52)
   },
   // 萨卡兹骸骨拷打者 · heals + ATK stack when a unit within Attack.range_radius is knocked out; leaves 2 血珀 on death — they
-  // stay where it fell and wait for a 唤血祭坛 that this mode has none of (inert, not counted)
+  // stay where it fell, uncounted, and bleed out (enemy_1367_dseed). This mode has no 唤血祭坛 to pulse them.
   enemy_1364_spnaxe_2: (ab) => [{
     death(c, b, e) {
       const key = ab.tS['Summon.enemy_key'], n = T(ab, 'Summon.cnt') ?? 0;
@@ -356,6 +356,20 @@ export const SPECIAL_KITS = Object.freeze({
       b.addBuff(e, { key: 'ab:torture', refresh: 'stack', stacks: 1, maxStacks: T(ab, 'Attack.max_stack_cnt') ?? 1, persist: true, mods: { atkPct: T(ab, 'Attack.atk') ?? 0 } });
     },
     hitOut(c, b, e) { if (c.dmg.isAttack && c.target !== e.blockedBy) c.dmg.amount *= T(ab, 'Attack.attack@ranged_atk_scale') ?? 1; },
+  }],
+  // 血珀 · PRTS 天赋: 自缚, 失衡免疫, 不攻击, 无法被阻挡. With no 唤血祭坛 / 沥血王座 on the field, lose Passive.hp_ratio of
+  // max HP per second (true 流失, can kill). The handbook line is the altar rebirth ("在祭坛处重生为新生血裔"); this mode
+  // has no altar, so that pulse is not modelled. Passive.damage_resistance is 0 (0% 庇护) and applies nothing.
+  enemy_1367_dseed: (ab) => [{
+    spawn(b, e) {
+      e.profile.noAttack = true;
+      b.addBuff(e, { key: 'ab:dseed', persist: true, flags: { selfBound: true, noMove: true, unblockable: true, noDisplace: true } });
+    },
+    iv: 1,
+    tick(b, e) {
+      const r = T(ab, 'Passive.hp_ratio') ?? 0;
+      if (r > 0) b.loseHp(e, e.s.maxHp * r);
+    },
   }],
   enemy_1501_demonk: () => [maxTargets(2)],                          // 萨卡兹百夫长 · attacks 2 targets
   enemy_10018_sgrobh: () => [maxTargets(2)],                         // “独轮车玩具” · attacks 2 targets

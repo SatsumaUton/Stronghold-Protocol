@@ -1696,7 +1696,7 @@ test(`${nm('enemy_2010_csdcr')}: neural on hit; after ${tb('enemy_2010_csdcr', '
   assert.equal(o.s.aspd, 100 + tb('enemy_2010_csdcr', 'AttackSpeedUp.attack_speed'));
 });
 
-test(`${nm('enemy_1364_spnaxe_2')}: heals and stacks ATK when a unit within ${tb('enemy_1364_spnaxe_2', 'Attack.range_radius')} tile is knocked out; leaves 2 inert 血珀 in place`, () => {
+test(`${nm('enemy_1364_spnaxe_2')}: heals and stacks ATK when a unit within ${tb('enemy_1364_spnaxe_2', 'Attack.range_radius')} tile is knocked out; leaves 2 uncounted 血珀 that bleed out in place`, () => {
   const h = arena();
   h.step();
   const e = put(h, 'enemy_1364_spnaxe_2', [10, 7]);
@@ -1715,8 +1715,41 @@ test(`${nm('enemy_1364_spnaxe_2')}: heals and stacks ATK when a unit within ${tb
   const seeds = alive(h, 'enemy_1367_dseed');
   assert.equal(seeds.length, tb('enemy_1364_spnaxe_2', 'Summon.cnt'));
   assert.equal(h.b.total, total, '血珀 are not counted (no altar in this mode)');
+  for (const d of seeds) assert.ok(Math.hypot(d.x - x, d.y - y) < 0.5, 'left where it fell');
+  const killedN = h.b.killed;
+  const spots = seeds.map((d) => [d.x, d.y]);
   h.run(20);
-  for (const d of seeds) { assert.ok(d.alive); assert.ok(Math.hypot(d.x - x, d.y - y) < 0.5, 'stays where it fell'); }
+  assert.equal(h.b.total, total, 'a 血珀 dying still does not count');
+  assert.equal(h.b.killed, killedN, 'an uncounted 血珀 is not a kill');
+  seeds.forEach((d, i) => {
+    assert.equal(d.alive, false, '血珀 bleeds out');
+    assert.ok(Math.hypot(d.x - spots[i][0], d.y - spots[i][1]) < 0.05, 'it did not move before it died');
+  });
+  checkInvariants(h.b);
+});
+
+test(`#720 ${nm('enemy_1367_dseed')}: loses ${tb('enemy_1367_dseed', 'Passive.hp_ratio')} of max HP per second and can die; self-bound, no attack, a push does nothing`, () => {
+  const h = arena({ units: [{ chessId: 't_wall', row: 10, col: 7 }] });
+  h.step();
+  const ratio = tb('enemy_1367_dseed', 'Passive.hp_ratio');
+  const e = put(h, 'enemy_1367_dseed', [10, 7], { move: true });
+  assert.equal(e.profile.noAttack, true);
+  assert.equal(e.stats.attacks, 0);
+  assert.ok(e.s.flags.selfBound && e.s.flags.noMove && e.s.flags.unblockable && e.s.flags.noDisplace);
+  assert.equal(e.blockedBy, null, '无法被阻挡 even on a blocker');
+  const x = e.x, y = e.y, max = e.s.maxHp;
+  h.run(0.5);
+  assert.equal(e.hp, max, 'the first loss is at 1 s');
+  h.run(0.5);
+  approx(e.hp, max * (1 - ratio), 1e-6, 'one second');
+  h.b.push(e, e.s.massLevel, { from: { x: e.x - 1, y: e.y } });
+  assert.equal(e.x, x);
+  assert.equal(e.y, y);
+  h.run(9);
+  assert.equal(e.alive, false, '10% per second kills at 10 s');
+  assert.equal(e.x, x);
+  assert.equal(e.y, y);
+  assert.equal(e.stats.attacks, 0);
   checkInvariants(h.b);
 });
 
