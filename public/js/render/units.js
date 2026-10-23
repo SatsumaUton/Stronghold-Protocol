@@ -1207,6 +1207,8 @@ export class UnitView {
       }
     }
     if (this.isEnemy && !this.slide?.keepFacing && Math.abs(s.vx) > 0.08) this.visFacing = s.vx < 0 ? -1 : 1;
+    // a scripted sign (心虚设计师, b.snap face) wins while the unit stands: a block freezes vx, so velocity never turns it
+    if (this.isEnemy && (s.face === -1 || s.face === 1) && !this.slide) this.visFacing = s.face;
     if ((prevFlags ^ this.flags) & UF.SKILL) this.setSkill(!!(this.flags & UF.SKILL));
     if (this.anim === ANIM.DIE && this.alive) this.die();
     if (this.actor && this.alive) this.actor.setBase(this._baseFromAnim());

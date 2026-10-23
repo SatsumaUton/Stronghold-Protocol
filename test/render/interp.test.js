@@ -48,6 +48,17 @@ describe('normalizeSnapshot', () => {
   });
 });
 
+test('face keeps ±1 for listed units and sample uses the older snapshot', () => {
+  const s = normalizeSnapshot({ t: 1, units: [U(1, 2, 3), U(2, 4, 5)], face: [[1, 1], [2, -1], [9, 1], [1, 0], [2, 2]] });
+  assert.deepEqual([...s.face], [[1, 1], [2, -1]]);
+  assert.equal(normalizeSnapshot({ t: 1, units: [U(1, 0, 0)] }).face, null);
+  const b = new SnapshotBuffer();
+  b.push({ t: 0, units: [U(1, 0, 0)], face: [[1, 1]] });
+  b.push({ t: 1, units: [U(1, 1, 0)] });
+  assert.equal(b.sample(0).get(1).face, 1);
+  assert.equal(b.sample(1).get(1).face, null);
+});
+
 describe('SnapshotBuffer', () => {
   test('render clock trails the newest snapshot by delay × rate', () => {
     const b = new SnapshotBuffer({ delay: 0.1, rate: 2 });

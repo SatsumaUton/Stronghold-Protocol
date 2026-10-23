@@ -46,6 +46,8 @@
 //     snapshot without it interpolates linearly;
 //   * `standCut` [[id, at]] — the latest time that enemy's recovery was cut or ignored: an interval with a cut inside
 //     it stays linear.
+//   * `face` [[id, ±1]] — a scripted horizontal sign (心虚设计师): sample() hands it out from the older snapshot like
+//     flags. The model applies it only while it is not sliding. Absent or malformed entries leave the velocity rule.
 // Game times in all of them (`cooldownEnd`, `respawnAt`, `until`, `at`) are on the snapshots' clock, so a view compares
 // them with renderT.
 
@@ -96,7 +98,7 @@ export function frameTime(msg) {
 /**
  * Validate & normalise a b.snap payload. Returns `{ t, units: Map<id, tuple>, down: [[id, respawnAt, respawnTime,
  * state, row?, col?]] | null, ammo, wolves: Map id → [left, max] | null, neg: Map id → fill | null, stand: Map<id, until> | null,
- * standCut: Map<id, at> | null, raw }` or null when unusable. Tuples with a non-finite id/x/y are skipped; other numbers
+ * standCut: Map<id, at> | null, face: Map<id, ±1> | null, raw }` or null when unusable. Tuples with a non-finite id/x/y are skipped; other numbers
  * default to 0; a unit's `elem` entry (see header) is appended to its tuple; malformed `elem` / `down` / `ammo` / `wolves` /
  * `neg` entries are dropped. `stand` keeps finite end times after `t` of units in the snapshot; `standCut` keeps finite
  * times in [0, t] of units in it.
@@ -169,7 +171,14 @@ export function normalizeSnapshot(snap) {
       (standCut || (standCut = new Map())).set(e[0], e[1]);
     }
   }
-  return { t, units, down, ammo, wolves, coins, energy, charges, layers, neg, motes, stand, standCut, raw: snap };
+  let face = null;
+  if (Array.isArray(snap.face)) {
+    for (const e of snap.face) {
+      if (!Array.isArray(e) || !units.has(e[0]) || (e[1] !== -1 && e[1] !== 1)) continue;
+      (face || (face = new Map())).set(e[0], e[1]);
+    }
+  }
+  return { t, units, down, ammo, wolves, coins, energy, charges, layers, neg, motes, stand, standCut, face, raw: snap };
 }
 
 /**
@@ -400,7 +409,7 @@ export class SnapshotBuffer {
     const stamp = A.t;
     for (const [id, a] of A.units) {
       let o = out.get(id);
-      if (!o) { o = { id, x: 0, y: 0, hp: 0, maxHp: 0, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0, seen: 0, el: null, elFill: 0, elUntil: 0, elDur: 0, ammo: null, wolves: null, neg: 0, motes: null }; out.set(id, o); }
+      if (!o) { o = { id, x: 0, y: 0, hp: 0, maxHp: 0, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0, seen: 0, el: null, elFill: 0, elUntil: 0, elDur: 0, ammo: null, wolves: null, neg: 0, motes: null, face: null }; out.set(id, o); }
       const b = B ? B.units.get(id) : null;
       if (b) {
         const dx = b[1] - a[1], dy = b[2] - a[2];
@@ -455,6 +464,7 @@ export class SnapshotBuffer {
       o.layers = A.layers?.get(id) ?? 0;
       o.neg = A.neg ? A.neg.get(id) || 0 : 0;
       o.motes = A.motes ? A.motes.get(id) || null : null;
+      o.face = A.face ? A.face.get(id) ?? null : null;
       o.seen = stamp;
     }
     for (const id of out.keys()) if (!A.units.has(id)) out.delete(id);

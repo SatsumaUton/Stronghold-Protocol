@@ -1615,7 +1615,7 @@ Unknown subprofessions fall back to the profession default (test `professions.te
 
 ## 9. Wire format (snapshot.js, DESIGN §8.2)
 
-- `snapshot()` → `{ fieldId, t, units: [[id, x, y, hp, maxHp, sp, spMax, flags, anim]], dp, killed, total, resolved, dps?, boss?, down?, elem?, ammo?, coins?, energy?, wolves?, neg?, layers?, charges?, stand?, standCut? }`.
+- `snapshot()` → `{ fieldId, t, units: [[id, x, y, hp, maxHp, sp, spMax, flags, anim]], dp, killed, total, resolved, dps?, boss?, down?, elem?, ammo?, coins?, energy?, wolves?, neg?, layers?, charges?, stand?, standCut?, face? }`.
   `killed` counts every `counted` knock-out (§1.3) and `total` only the enemies this field scheduled (`inTotal`), so it may
   exceed it; `resolved = min(total, killedInTotal + leakedInTotal)` is the HUD capsule's numerator (DESIGN §14 顶栏胶囊).
   `sp/spMax` show remaining duration/ammo as a draining bar while a timed skill is active (ammo: `ammoLeft / ammoMax`, the
@@ -1652,6 +1652,8 @@ Unknown subprofessions fall back to the profession default (test `professions.te
   `units` (the 0.8 s death window included), never a hidden or unlisted one. The newest snapshot showing a death, a stun
   (freeze, sleep, 浮空 included) or a block is not extrapolated until a later snapshot shows it moving again; the
   extrapolated velocity uses the same moving span as the interpolation (the stand is not in its denominator).
+  `face: [[id, ±1]]` (only when non-empty; display only, not in the golden tuple, #869) is the horizontal sign
+  心虚设计师 publishes (`mem.publishFacing`): the model applies the older snapshot's sign while it is not sliding.
 - `drainEvents()` tuples: `['spawn', UnitInfo]` (first appearance), `['deploy', id]` (every (re)deploy and 【移动】 — the
   client plays the deploy and its interpolation snaps instead of sliding), `['atk', src, tgt, projKind]`
   (`none|arrow|bolt|bomb|lob|orb|drone|enemy|boomerang|droneBomb|chain|chainHeal`; a boomerang's way back has no event —

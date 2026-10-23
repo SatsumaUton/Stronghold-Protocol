@@ -2155,6 +2155,53 @@ test(`${nm('enemy_10097_crshd')} / ${nm('enemy_2085_skzjxd')}: physical / arts d
   approx(h.b.dealDamage(back, y, { amount: 1000, type: 'true' }), 1000, 1e-6, 'true damage is never reduced');
 });
 
+test(`#869 ${nm('enemy_10097_crshd')}: while blocked, front 80% follows the blocker (phys 110 / arts 140; the back is 550 / 700); the model uses that sign`, () => {
+  assert.equal(tb('enemy_10097_crshd', 'weakness.damage_resistance'), 0.8);
+  const walk = arena({ units: [{ chessId: 't_gun', row: 10, col: 3 }, { chessId: 't_blade', row: 11, col: 9 }], kits: { t_gun: NOATK, t_blade: NOATK } });
+  walk.step();
+  const moving = put(walk, 'enemy_10097_crshd', [11, 6], { move: true, route: { motion: 'WALK', start: [11, 6], end: [11, 3], checkpoints: [] } });
+  moving.base.def = 450;
+  moving.base.res = 30;
+  moving.markDirty();
+  walk.run(0.5);
+  assert.ok(moving.x < 6, 'walked left');
+  assert.equal(moving.blockedBy, null);
+  assert.equal(moving.facing, -1, 'unblocked facing follows the walk');
+  assert.equal(moving.dir, 'LEFT', 'the model uses the walk sign');
+  approx(walk.b.dealDamage(walk.unit('t_gun'), moving, { amount: 1000, type: 'phys' }), 110, 1e-6, 'left is the front');
+  approx(walk.b.dealDamage(walk.unit('t_blade'), moving, { amount: 1000, type: 'phys' }), 550, 1e-6, 'right is the back');
+
+  const h = arena({
+    units: [{ chessId: 't_wall', row: 11, col: 6 }, { chessId: 't_gun', row: 11, col: 3 }, { chessId: 't_blade', row: 11, col: 9 }],
+    kits: { t_wall: NOATK, t_gun: NOATK, t_blade: NOATK },
+  });
+  h.step();
+  const wall = h.unit('t_wall');
+  const e = put(h, 'enemy_10097_crshd', [11, 5.5], { move: true, route: { motion: 'WALK', start: [11, 5.5], end: [11, 2], checkpoints: [] } });
+  e.base.def = 450;
+  e.base.res = 30;
+  e.markDirty();
+  h.runUntil(() => e.blockedBy === wall, 3);
+  h.step();
+  assert.equal(e.blockedBy, wall, 'blocked by the operator behind a leftward walk');
+  assert.ok(e.x < wall.x - 1e-6, `blocker is to the right (enemy x ${e.x})`);
+  assert.equal(e.facing, 1, 'faces the blocker');
+  assert.equal(e.dir, 'RIGHT');
+  const published = (h.b.snapshot().face || []).find((row) => row[0] === e.id);
+  assert.deepEqual(published, [e.id, 1], 'the snapshot carries the same sign for the model');
+  approx(h.b.dealDamage(h.unit('t_blade'), e, { amount: 1000, type: 'phys' }), 110, 1e-6, 'right side is now the front');
+  approx(h.b.dealDamage(h.unit('t_blade'), e, { amount: 1000, type: 'arts' }), 140, 1e-6, 'arts from the front');
+  approx(h.b.dealDamage(h.unit('t_gun'), e, { amount: 1000, type: 'phys' }), 550, 1e-6, 'left side is the back');
+  approx(h.b.dealDamage(h.unit('t_gun'), e, { amount: 1000, type: 'arts' }), 700, 1e-6, 'arts from the back');
+  const x = e.x;
+  e.x = wall.x;
+  h.step();
+  assert.equal(e.blockedBy, wall);
+  assert.equal(e.facing, 1, 'a blocker on the same column keeps the last facing');
+  e.x = x;
+  checkInvariants(h.b);
+});
+
 for (const key of ['enemy_2085_skzjxd', 'enemy_2085_skzjxd_2']) {
   test(`${nm(key)}: 无法攻击/被阻挡 (PRTS 天赋) — walks through a blocker, never attacks`, () => {
     const h = arena({ units: [{ chessId: 't_wall', row: 10, col: 5 }], hooks: ['blocked'] });

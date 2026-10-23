@@ -10,7 +10,7 @@ import {
 } from './helpers.js';
 import {
   unblockable, runWhenHit, blockWeight, taunt, maxTargets, ep, nthAttackPower, lowHpBuff, deathBoom, setFloat, float,
-  reborn, frontGuard, faceMove, unbalanced, skill, kitEp, kitPrisoner, kitStun3,
+  reborn, frontGuard, unbalanced, skill, kitEp, kitPrisoner, kitStun3,
 } from './archetypes.js';
 import { hypot } from '../../detmath.js';
 import { passengerBus } from './passengers.js';
@@ -281,6 +281,27 @@ function catapultVolley(ab, b, e, aim) {
 // ---------------------------------------------------------------------------------------------------------------
 // this family's part of KITS (content/enemies.js spreads the parts in this order)
 
+/**
+ * 心虚设计师: while a living blocker stands off the same column, the front is that side; otherwise the walk
+ * (faceMove). The unit's `dir` and the display-only snapshot `face` use the same sign, so the model turns with the
+ * cut. A blocker on the same column keeps the last sign [ASSUMED: PRTS names the front, not a same-column tie].
+ */
+function faceCrshd(b, e, a) {
+  const blk = e.blockedBy;
+  let sign = null;
+  if (blk && blk.alive) {
+    const dx = blk.x - e.x;
+    if (Math.abs(dx) > 1e-6) sign = dx > 0 ? 1 : -1;
+  } else {
+    const dx = e.x - a.px;
+    if (Math.abs(dx) > 1e-6) sign = dx > 0 ? 1 : -1;
+  }
+  if (sign != null) a.facing = sign;
+  e.facing = a.facing;
+  e.mem.publishFacing = true;
+  a.px = e.x;
+}
+
 export const SPECIAL_KITS = Object.freeze({
   // --- SPECIAL 特异 / others
   enemy_1045_hammer: kitStun3,                                       // 粉碎攻坚手 · every 3rd attack stuns
@@ -455,9 +476,9 @@ export const SPECIAL_KITS = Object.freeze({
     },
   }],
   enemy_10094_crstf: kitEp('neural', 'ep.ep_damage_ratio'),          // 临时收音师 · neural on hit (filming zones n/a → always)
-  enemy_10097_crshd: (ab) => [                                       // 心虚设计师 · neural to its blocker every s; front damage −80 % (faces its walk)
+  enemy_10097_crshd: (ab) => [                                       // 心虚设计师 · neural to its blocker every s; front damage −80 % (faces the blocker, else the walk)
     { iv: 1, tick(b, e) { if (e.blockedBy) elem(b, e, e.blockedBy, 'neural', e.s.atk * (T(ab, 'block.ep_damage_ratio') ?? 0)); } },
-    frontGuard(T(ab, 'weakness.damage_resistance') ?? 0, faceMove),  // 减少来自正面的物理/法术伤害 (cameras absent: it never turns)
+    frontGuard(T(ab, 'weakness.damage_resistance') ?? 0, faceCrshd), // 减少来自正面的物理/法术伤害 (#869)
   ],
   enemy_10098_crhro: (ab) => [ep('neural', T(ab, 'inside.attack@ep_damage_ratio') ?? 0), // 主角阵营角色 · neural on hit; 重生 once (reborn.duration s, full HP)
     reborn({ dur: T(ab, 'reborn.duration') ?? 0, invincible: T(ab, 'reborn.invincible') ?? 0 })],

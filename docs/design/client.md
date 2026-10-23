@@ -435,6 +435,8 @@ are verified, and cleans up / restores focus on both success and failure. Failur
 Push/pull slides preserve the target's pre-hit facing through the waiting and moving phases (`keepFacing`, §28.9).
 Explicit false and unmarked raw displacements face the travel direction. Normal snapshot facing resumes on landing.
 [ASSUMED] unrecorded push sources and reverse-facing hook pulls use the same display rule as the cited examples.
+心虚设计师 publishes `b.snap` `face` (±1) while it stands (#869, §35.108). The model uses that sign when it is not
+sliding, so a block — which freezes velocity — still turns it with the front cut. The nine-field tuple is unchanged.
 
 ### Local preferences and recovery (§28.14, §28.18–20)
 
