@@ -230,7 +230,7 @@
 import { randomBytes, randomInt } from 'node:crypto';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
-import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
+import { encode, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
 import { Match as DefaultMatch } from './match/Match.js';
 import { KITTED_CHARS } from './sim/content/kits/index.js';
@@ -819,6 +819,10 @@ export class Lobby {
       case 'room.proposeVersion': return this.proposeVersion(session, msg);
       case 'room.versionVote': return this.versionVote(session, msg);
       case 'room.cancelVersionVote': return this.cancelVersionVote(session, msg);
+      // A client that missed a state-delta frame asks for a full one (shared/stateDelta.js StateReceiver; server/net.js
+      // throttles it like the other resend-heavy intents). This is the same heavy resync a repeated hello runs, so it
+      // draws from the same per-session budget: the match resends its full state, or the lobby its room state.
+      case 'state.resync': return this.resync(session, true) ?? { ok: true };
       default:
         if (typeof msg.t === 'string' && msg.t.startsWith('g.')) return this.routeGameNow(session, msg);
         return fail(ERR.BAD_MSG, `unhandled type ${String(msg.t).slice(0, 32)}`);
@@ -1965,8 +1969,8 @@ export class Lobby {
         // the server's own simulation pool (server/workers/roomPool.js) for bot rehearsals, when the operator started
         // one: null keeps every rehearsal on this thread, exactly as before (Match.simPool / MatchRehearsal.poolRehearsal)
         ...(!modded && !versioned && this.simPool ? { simPool: this.simPool } : {}),
-        send: (playerId, msg) => (ctx.live ? this.matchSend(room, ctx, playerId, msg) : false),
-        broadcast: (msg) => { if (ctx.live) this.matchBroadcast(room, ctx, msg); },
+        send: (playerId, msg, encoded) => (ctx.live ? this.matchSend(room, ctx, playerId, msg, encoded) : false),
+        broadcast: (msg, encoded) => { if (ctx.live) this.matchBroadcast(room, ctx, msg, encoded); },
         onEnd: (summary) => this.onMatchEnd(room, ctx, summary),
       };
       // a room with gameplay plugins plays in its content set's match host, a room of another official version in that
@@ -2027,17 +2031,17 @@ export class Lobby {
   }
 
   /** Match unicast; m.result frames are also kept for the replay. */
-  matchSend(room, ctx, playerId, msg) {
+  matchSend(room, ctx, playerId, msg, encoded = null) {
     if (msg && msg.t === 'm.result') {
-      const data = encode(msg);
+      const data = encoded ?? encode(msg);
       if (data != null) ctx.results.set(playerId, data);
     }
-    return this.sendToPlayer(room, playerId, msg);
+    return this.sendToPlayer(room, playerId, msg, encoded);
   }
 
   /** Match broadcast; the latest m.public and a broadcast m.result are also kept for the replay. */
-  matchBroadcast(room, ctx, msg) {
-    const data = this.broadcastRoom(room, msg);
+  matchBroadcast(room, ctx, msg, encoded = null) {
+    const data = this.broadcastRoom(room, msg, encoded);
     if (data == null) return;
     if (msg.t === 'm.public') ctx.lastPublic = data;
     else if (msg.t === 'm.result') ctx.sharedResult = data;
@@ -2445,22 +2449,23 @@ export class Lobby {
   }
 
   /** Match broadcast: encode once, send to every connected member. @returns {string | null} the encoded frame */
-  broadcastRoom(room, msg) {
+  broadcastRoom(room, msg, encoded = null) {
     if (room.disposed) return null;
-    const data = encode(msg);
+    const data = encoded ?? encode(msg);
     if (data == null) { this.log.error(`[lobby] ${room.code} unserializable broadcast ${msg && msg.t}`); return null; }
-    const droppable = isDroppable(msg);
-    for (const session of this.memberSessions(room)) sendRaw(session.ws, data, { droppable });
+    // per connection: sendSession runs the state transport, which owns each socket's delta baseline (and the
+    // droppable/backpressure rules) - one shared byte string in, one frame per member out
+    for (const session of this.memberSessions(room)) sendSession(session, msg, data);
     return data;
   }
 
   /** Match unicast. @returns {boolean} */
-  sendToPlayer(room, playerId, msg) {
+  sendToPlayer(room, playerId, msg, encoded = null) {
     if (room.disposed) return false;
     const seat = room.seatOf(playerId) || room.spectatorOf(playerId);
     if (!seat || seat.isBot || seat.left) return false;
     const session = this.registry.byId(playerId);
     if (!session || session.roomCode !== room.code) return false;
-    return sendSession(session, msg);
+    return sendSession(session, msg, encoded);
   }
 }
