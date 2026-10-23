@@ -2,13 +2,13 @@
 //
 // Why it exists: when the hall stalls, the operator has to tell whether the stall is the rehearsal / battle slice running
 // on the main thread or something else. A thread pool cannot answer that — and the pool is off by default anyway — so
-// this sampler reads the main thread's own loop, needs no pool, is ON by default, and writes a *local* line only.
+// this sampler reads the main thread's own loop, needs no pool, is off by default, and writes a *local* line only.
 //
 // It deliberately does NOT extend /healthz: the maintainer asked for a bounded local log, not a public endpoint. Every
 // line is one window: the loop delay percentiles, the CPU and memory the process used over that window, and the room /
 // player / spectator counts with the phase the hall was in. At most LOOP_LOG_MAX lines are kept in memory.
 //
-// SP_LOOP_SAMPLE=0 (or off / false / no) turns it off; SP_LOOP_WINDOW_MS sets the window (100 ms .. 1 h).
+// SP_LOOP_SAMPLE=1 turns it on; SP_LOOP_WINDOW_MS sets the window (100 ms .. 1 h).
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 
 /** Where the sampler's window defaults to, and the bounds SP_LOOP_WINDOW_MS is held to. */
@@ -19,17 +19,17 @@ const MAX_WINDOW_MS = 3600000;
 export const LOOP_LOG_MAX = 120;
 
 /**
- * The sampler's configuration. Unlike the worker pool this is ON by default: an operator who never sets anything still
+ * The sampler's configuration. Unlike the worker pool this is off by default: an operator who never sets anything still
  * gets the numbers that decide whether phase 3 is worth reviewing.
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {{ enabled: boolean, windowMs: number }}
  */
 export function eventLoopSettings(env = process.env) {
   const raw = env.SP_LOOP_SAMPLE;
-  const off = raw != null && ['0', 'off', 'false', 'no'].includes(String(raw).trim().toLowerCase());
+  const enabled = String(raw || '').trim() === '1';
   const n = Number(env.SP_LOOP_WINDOW_MS);
   const windowMs = Number.isInteger(n) && n >= MIN_WINDOW_MS && n <= MAX_WINDOW_MS ? n : LOOP_WINDOW_MS;
-  return { enabled: !off, windowMs };
+  return { enabled, windowMs };
 }
 
 const ms = (ns) => Math.round((ns / 1e6) * 10) / 10;
@@ -53,7 +53,6 @@ export function createEventLoopSampler({ log = console, windowMs, keep = LOOP_LO
   const recent = [];
   let timer = null;
   let baseline = null;
-  let lastSample = null;
 
   /** @param {object} [extra] counts for this window (rooms / humans / matches / spectators / phase) */
   function snapshot(extra = null) {
@@ -87,13 +86,12 @@ export function createEventLoopSampler({ log = console, windowMs, keep = LOOP_LO
     const countsNow = counts ? counts() : null;
     const { cpu, mem } = usage();
     const record = { ...snapshot(), ...(countsNow && typeof countsNow === 'object' ? countsNow : {}), ...(extra ?? {}), cpu, mem };
-    lastSample = record;
     recent.push(record);
     if (recent.length > maxLines) recent.splice(0, recent.length - maxLines);
     log.info?.(`[loop] p50=${record.p50}ms p95=${record.p95}ms p99=${record.p99}ms max=${record.max}ms ` +
       `samples=${record.samples} cpu=${record.cpu}% mem=${record.mem}MB ` +
       `rooms=${record.rooms ?? 0} matches=${record.matches ?? 0} humans=${record.humans ?? 0} ` +
-      `spectators=${record.spectators ?? 0} phase=${record.phase ?? 'idle'}`);
+      `spectators=${record.spectators ?? 0} phase=${record.phase ?? 'idle'} rehearsals=${record.rehearsals ?? 0}`);
     return record;
   }
 
@@ -111,7 +109,7 @@ export function createEventLoopSampler({ log = console, windowMs, keep = LOOP_LO
       hist.enable();
       // Seed the CPU baseline so the first window reports the window's own usage, not the process's lifetime.
       baseline = (() => { const c = process.cpuUsage(); return { at: Date.now(), user: c.user, system: c.system }; })();
-      timer = setInterval(() => { report(lastSample ? null : { phase: 'boot' }); }, window);
+      timer = setInterval(() => { report(); }, window);
       timer.unref?.();
     },
     stop() {
@@ -125,8 +123,7 @@ export function createEventLoopSampler({ log = console, windowMs, keep = LOOP_LO
 }
 
 /**
- * The sampler a server runs with, or null when it is switched off. On by default (this is the opposite of the worker pool:
- * the sampler is what tells the operator whether the pool is ever needed).
+ * The sampler a server runs with, or null unless SP_LOOP_SAMPLE=1.
  * @param {{ log?: object, env?: NodeJS.ProcessEnv, counts?: () => object, windowMs?: number }} [opts]
  */
 export function createEventLoopMonitor({ log = console, env = process.env, counts = null, windowMs } = {}) {

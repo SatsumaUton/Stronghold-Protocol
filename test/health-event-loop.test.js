@@ -2,7 +2,7 @@
 //
 // The sampler answers one operational question the maintainer asked before phase 3: when a hall stalls, is it the
 // rehearsal/battle slice on the main thread, or something else? It therefore has to work with NO thread pool at all, be
-// on by default, and stay a *local* log — it never touches /healthz.
+// off by default, and stay a *local* log — it never touches /healthz.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,11 +22,12 @@ function fakeHistogram(samples) {
   return h;
 }
 
-test('the sampler is on by default and off only when explicitly asked', () => {
-  assert.equal(eventLoopSettings({}).enabled, true, 'no configuration still samples');
+test('the sampler is off by default and only SP_LOOP_SAMPLE=1 enables it', () => {
+  assert.equal(eventLoopSettings({}).enabled, false, 'no configuration creates no sampler');
+  assert.equal(eventLoopSettings({ SP_LOOP_SAMPLE: '1' }).enabled, true);
   assert.equal(eventLoopSettings({ SP_LOOP_SAMPLE: '0' }).enabled, false);
   assert.equal(eventLoopSettings({ SP_LOOP_SAMPLE: 'off' }).enabled, false);
-  assert.equal(eventLoopSettings({ SP_LOOP_SAMPLE: 'junk' }).enabled, true, 'junk keeps the default');
+  assert.equal(eventLoopSettings({ SP_LOOP_SAMPLE: 'junk' }).enabled, false, 'junk keeps the default');
   assert.equal(eventLoopSettings({ SP_LOOP_WINDOW_MS: '1000' }).windowMs, 1000);
   assert.equal(eventLoopSettings({ SP_LOOP_WINDOW_MS: '10' }).windowMs, LOOP_WINDOW_MS, 'out of bounds keeps the default');
 });
