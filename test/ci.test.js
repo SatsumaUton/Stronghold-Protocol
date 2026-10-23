@@ -7,9 +7,10 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  CI_TEST_ENV, ROOT, SKIPPED_CI_STEPS, SMOKE_PATHS, STEPS, TEST_FILES, binPath, formatDuration, formatSummary,
-  isSkippedCiStep, parseArgs, parseWorkflow, selectSteps, stepEnv,
+  CI_SHARD_ENV, CI_TEST_ENV, ROOT, SKIPPED_CI_STEPS, SMOKE_PATHS, STEPS, TEST_FILES, binPath, formatDuration,
+  formatSummary, isSkippedCiStep, parseArgs, parseMatrix, parseWorkflow, selectSteps, stepEnv,
 } from '../tools/ci.mjs';
+import { SHARD_COUNT } from '../tools/ci-shards.mjs';
 
 const workflowText = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n?/g, '\n');
 const workflow = parseWorkflow(workflowText);
@@ -63,9 +64,10 @@ test('the commands match ci.yml: the run lines, the npm scripts ci.yml calls, th
   // here, so that smoke() in tools/ci.mjs is looked at and this copy updated with it.
   const normalized = smokeRun.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
   assert.deepEqual(normalized, SMOKE_CI_RUN, "ci.yml's smoke step changed: update smoke() in tools/ci.mjs and SMOKE_CI_RUN");
-  // job env: ci.yml's job test env is CI_TEST_ENV; any other job has none (stepEnv gives the tooling steps nothing)
+  // job env: ci.yml's job test env is CI_TEST_ENV plus the matrix's shard; any other job has none (stepEnv gives the
+  // tooling steps nothing)
   for (const [job, j] of Object.entries(workflow.jobs)) {
-    assert.deepEqual(j.env, job === 'test' ? CI_TEST_ENV : {}, `env of job ${job}`);
+    assert.deepEqual(j.env, job === 'test' ? { ...CI_TEST_ENV, ...CI_SHARD_ENV } : {}, `env of job ${job}`);
   }
   // per-step config (env, if, continue-on-error, working-directory, with, …) on a mirrored step is not mirrored
   for (const l of STEPS) {
@@ -95,7 +97,7 @@ test('the full Golden check runs independently once on Ubuntu / Node 22 and cann
   assert.match(jobText, /^          cache: npm$/m);
   assert.doesNotMatch(jobText, /^\s*(strategy|needs|if|continue-on-error|defaults|env):/m);
   assert.equal(pkg.scripts.golden, 'node tools/golden.mjs');
-  assert.deepEqual(STEPS.map((s) => s.id), ['setup', 'test', 'smoke', 'lint', 'imports', 'typecheck']);
+  assert.deepEqual(STEPS.map((s) => s.id), ['setup', 'test', 'smoke', 'guards', 'lint', 'imports', 'typecheck']);
 });
 
 test('the separate Golden skip is scoped to its job, step name and unfiltered comparison command', () => {
@@ -111,8 +113,10 @@ test('the separate Golden skip is scoped to its job, step name and unfiltered co
 });
 
 test('npm test runs every test file and nothing else under test/: no helper, no child-process entry, no Forge fixture', () => {
-  // the test step's command line is package.json's (checked above) and runs node --test over TEST_FILES
-  assert.equal(STEPS.find((s) => s.id === 'test').describe, `node --test ${TEST_FILES.map((g) => `"${g}"`).join(' ')}`);
+  // `npm test` is tools/test-run.mjs, which runs node --test over TEST_FILES (test/test-run.test.js checks that side:
+  // SHARD unset is the whole suite, SHARD=n is one shard of it)
+  assert.equal(pkg.scripts.test, 'node tools/test-run.mjs');
+  assert.equal(STEPS.find((s) => s.id === 'test').describe, 'node tools/test-run.mjs');
   // what Node's test runner expands them to (the same glob, node_modules left out the way --test leaves it out)
   const picked = fs.globSync(TEST_FILES, { cwd: ROOT, exclude: (p) => path.basename(String(p?.name ?? p)) === 'node_modules' })
     .map((f) => f.split(path.sep).join('/')).sort();
@@ -127,6 +131,38 @@ test('npm test runs every test file and nothing else under test/: no helper, no 
   for (const f of underTest.filter((x) => /\.[cm]?js$/.test(x) && !picked.includes(x))) {
     assert.doesNotMatch(fs.readFileSync(path.join(ROOT, f), 'utf8'), /['"]node:test['"]/, `${f} uses node:test but npm test does not run it`);
   }
+});
+
+test('the test matrix runs every shard exactly once, on both systems, for node 22', () => {
+  const matrix = parseMatrix(workflowText);
+  assert.deepEqual(Object.keys(matrix), ['test'], 'only the test job is a matrix');
+  const m = matrix.test;
+  // The shard numbers, not the count: a matrix that listed [0, 1, 3] would run three quarters of the suite and stay
+  // green — the table's own guard (test/ci-shards.test.js) only proves the partition inside ci-shards.json.
+  assert.deepEqual((m.shard ?? []).map(Number), [...Array(SHARD_COUNT).keys()], 'matrix.shard must list 0..SHARD_COUNT-1 once each');
+  assert.deepEqual(m.os, ['ubuntu-latest', 'windows-latest']);
+  assert.deepEqual((m.node ?? []).map(Number), [22], 'the full suite runs on node 22; node 24 has its own lane');
+  // the job hands its shard to tools/test-run.mjs, which is what turns the number into files
+  assert.equal(workflow.jobs.test.env.SHARD, '${{ matrix.shard }}');
+  // the node 24 lane is a job of its own, with the guards and without the suite
+  assert.ok(workflow.jobs.node24, 'ci.yml has the node 24 lane');
+  assert.deepEqual(workflow.jobs.node24.env, {}, 'the node 24 lane needs no job env');
+  assert.ok(workflow.jobs.node24.steps.some((s) => s.run === 'npm run test:guards'), 'the node 24 lane runs the guards');
+  assert.ok(!workflow.jobs.node24.steps.some((s) => s.run === 'npm run test'), 'the node 24 lane does not run the suite');
+});
+
+test('the matrix reader: flow lists, block lists, include/exclude left out, other jobs ignored', () => {
+  const yml = [
+    'name: X', 'jobs:', '  a:', '    runs-on: x', '    strategy:', '      fail-fast: false', '      matrix:',
+    '        os: [ubuntu-latest, windows-latest]', '        node: [22]', "        shard: ['0', 1]", '        extra:',
+    '          - one', '          - "two"', '        include:', '          - os: z', '    steps:', '      - run: x',
+    '  b:', '    steps:', '      - run: y',
+  ].join('\r\n');
+  assert.deepEqual(parseMatrix(yml), {
+    a: { os: ['ubuntu-latest', 'windows-latest'], node: ['22'], shard: ['0', '1'], extra: ['one', 'two'] },
+  });
+  assert.deepEqual(parseMatrix('name: no jobs\n'), {});
+  assert.deepEqual(parseMatrix('jobs:\n  a:\n    steps:\n      - run: x\n'), {}, 'a job without a matrix is left out');
 });
 
 test('the workflow reader: jobs, flat env, named and uses steps, run blocks; comments and nested blocks skipped, other step keys named', () => {

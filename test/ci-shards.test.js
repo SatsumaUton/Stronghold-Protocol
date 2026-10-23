@@ -10,7 +10,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { ROOT, TEST_FILES } from '../tools/ci.mjs';
 import { MAX_IMBALANCE, SHARD_COUNT, TABLE, assignShards, loadTable, shardsOf, testFileList } from '../tools/ci-shards.mjs';
-import { perFileMs } from '../tools/test-timings.mjs';
+import { perFileMs, perFileMsOf } from '../tools/test-timings.mjs';
 
 const files = testFileList();
 const table = loadTable();
@@ -62,16 +62,28 @@ test('assignShards: the heaviest files spread over the shards, the lightest fill
   assert.ok(s.imbalance <= MAX_IMBALANCE);
 });
 
-test('perFileMs: a file sums its cases, other checkouts are dropped, paths are relative and whole milliseconds', () => {
+test('perFileMs: a file sums its cases, another checkout\'s prefix is cut to the path inside the repo, whole milliseconds', () => {
   const xml = [
     '<?xml version="1.0" encoding="utf-8"?>', '<testsuites>',
     `<testcase name="one" time="0.5" classname="test" file="${ROOT}/test/a.test.js"/>`,
     `<testcase name="two" time="0.25" classname="test" file="${ROOT}/test/a.test.js"/>`,
-    '<testcase name="three" time="1.5" classname="test" file="/elsewhere/test/b.test.js"/>',
+    // CI checks out to /home/runner/work/… and D:\a\…: the same file by the path that starts at the suite root
+    '<testcase name="three" time="0.4" classname="test" file="/home/runner/work/Stronghold-Protocol/Stronghold-Protocol/test/b.test.js"/>',
+    '<testcase name="four" time="0.6" classname="test" file="D:\\a\\Stronghold-Protocol\\Stronghold-Protocol\\test\\b.test.js"/>',
+    '<testcase name="five" time="1.5" classname="test" file="/elsewhere/src/c.test.js"/>',
     '<testcase name="suite" time="9" classname="test"/>',
     '</testsuites>',
   ].join('\n');
-  assert.deepEqual(perFileMs(xml), { 'test/a.test.js': 750 });
+  assert.deepEqual(perFileMs(xml), { 'test/a.test.js': 750, 'test/b.test.js': 1000 });
+});
+
+test('perFileMsOf: one value per file, the median of the reports that ran it', () => {
+  const one = (file, time) => `<testcase name="x" time="${time}" classname="test" file="${ROOT}/${file}"/>`;
+  const slow = `<testsuites>${one('test/a.test.js', '9')}${one('test/b.test.js', '1')}</testsuites>`;
+  const fast = `<testsuites>${one('test/a.test.js', '1')}</testsuites>`;
+  const mid = `<testsuites>${one('test/a.test.js', '3')}</testsuites>`;
+  // a: 1s, 3s, 9s → 3s; b ran in one report only and keeps that value
+  assert.deepEqual(perFileMsOf([slow, fast, mid]), { 'test/a.test.js': 3000, 'test/b.test.js': 1000 });
 });
 
 test('the command line: --print <n> is that shard\'s list, a shard number outside the matrix is an error', () => {

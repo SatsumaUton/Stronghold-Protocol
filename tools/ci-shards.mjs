@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TEST_FILES } from './ci.mjs';
-import { perFileMs } from './test-timings.mjs';
+import { perFileMsOf } from './test-timings.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -90,7 +90,8 @@ const usage = `usage: node tools/ci-shards.mjs <command>
   --print <n>                the files of shard n, one per line
   --run <n>                  node --test over the files of shard n
   --list                     one line per shard: its load and its files
-  --write --timings <file>   re-weigh ${TABLE} from a JUnit report (node --test --test-reporter=junit)`;
+  --write --timings <file…>  re-weigh ${TABLE} from JUnit reports (node --test --test-reporter=junit), one per job:
+                             a file's weight is the median of the jobs that ran it`;
 
 const fmt = (ms) => `${(ms / 1000).toFixed(1)}s`;
 
@@ -118,15 +119,16 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     for (let i = 0; i < SHARD_COUNT; i++) console.log(`shard ${i}  ${fmt(shards.load[i])}  ${shards.files[i].join(' ')}`);
   } else if (cmd === '--write') {
     const at = process.argv.indexOf('--timings');
-    const report = at >= 0 && process.argv[at + 1];
-    if (!report) {
+    // every JUnit report given: one per CI job, which is how the table is re-weighed from the runners' own times
+    const reports = at >= 0 ? process.argv.slice(at + 1).filter((a) => !a.startsWith('--')) : [];
+    if (!reports.length) {
       console.error(usage);
       process.exit(2);
     }
     const old = loadTable();
-    const fresh = perFileMs(fs.readFileSync(report, 'utf8'), ROOT);
+    const fresh = perFileMsOf(reports.map((r) => fs.readFileSync(r, 'utf8')), ROOT);
     if (!Object.keys(fresh).length) {
-      console.error(`${report}: no usable <testcase file="…"> timings; table unchanged`);
+      console.error(`${reports.join(', ')}: no usable <testcase file="…"> timings; table unchanged`);
       process.exit(1);
     }
     const known = new Set(testFileList());

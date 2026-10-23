@@ -20,6 +20,30 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 /** One attribute of a tag, or undefined. @param {string} attrs @param {string} name */
 const attr = (attrs, name) => new RegExp(`(?:^|\\s)${name}="([^"]*)"`).exec(attrs)?.[1];
 
+/** The repository folders a report's `file` can name a test file from: the suite's two roots. */
+const TEST_ROOTS = ['test/', 'plugins/'];
+
+/**
+ * A report's `file` as a path inside the repository. A report made by another machine (CI checks out to
+ * /home/runner/work/… and D:\a\…) is still ours: its path inside the repository is taken from the suite root on, and
+ * only a file that names none of them is dropped.
+ * @param {string} file @param {string} root
+ */
+function relOf(file, root) {
+  const norm = file.split('\\').join('/');
+  const absolute = norm.startsWith('/') || /^[A-Za-z]:\//.test(norm);
+  // a relative path: the report was made in this checkout
+  if (!absolute) return path.posix.normalize(norm);
+  // an absolute path: this checkout, or another machine's — the file is still ours by the path inside the repository
+  const here = root.split('\\').join('/').replace(/\/*$/, '/');
+  if (norm.toLowerCase().startsWith(here.toLowerCase())) return norm.slice(here.length);
+  for (const k of TEST_ROOTS) {
+    const at = norm.lastIndexOf(`/${k}`);
+    if (at >= 0) return norm.slice(at + 1);
+  }
+  return ''; // an absolute path with no suite root in it: not one of ours
+}
+
 /**
  * The time each test file took, in milliseconds, from a JUnit report (`--test-reporter=junit`).
  * @param {string} xml
@@ -33,29 +57,65 @@ export function perFileMs(xml, root = ROOT) {
     const file = attr(m[1], 'file');
     const time = Number(attr(m[1], 'time'));
     if (!file || !Number.isFinite(time)) continue;
-    const rel = path.relative(root, path.resolve(root, file)).split(path.sep).join('/');
-    if (rel.startsWith('..')) continue; // another checkout's file: not one of ours
+    const rel = relOf(file, root);
+    if (!rel || rel.startsWith('..')) continue; // not a test file of this repository
     out[rel] = (out[rel] || 0) + time * 1000;
   }
   for (const k of Object.keys(out)) out[k] = Math.round(out[k]);
   return out;
 }
 
+/**
+ * The time each test file took, in milliseconds, from several JUnit reports: one value per file, the median of the
+ * reports that mention it. A file is measured once per CI job that ran it (ubuntu and windows, node 22 and 24), so the
+ * median is what one runner takes without trusting a single slow or fast job — and a file a report does not mention
+ * (a shard that did not run, a report cut short) keeps the others' value instead of vanishing.
+ * @param {string[]} xmls
+ * @param {string} [root]
+ * @returns {Record<string, number>}
+ */
+export function perFileMsOf(xmls, root = ROOT) {
+  const per = xmls.map((x) => perFileMs(x, root));
+  const files = [...new Set(per.flatMap((m) => Object.keys(m)))].sort();
+  /** @type {Record<string, number>} */
+  const out = {};
+  for (const f of files) {
+    const seen = per.map((m) => m[f]).filter((v) => v !== undefined).sort((a, b) => a - b);
+    out[f] = seen[(seen.length - 1) >> 1];
+  }
+  return out;
+}
+
 // The command line: a report, and where the JSON goes (stdout by default).
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  const file = args.find((a) => !a.startsWith('-'));
-  const outAt = args.indexOf('--out');
-  if (!file) {
-    console.error('usage: node tools/test-timings.mjs <report.xml> [--out <file.json>]');
+  const reports = [];
+  let out = '';
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--out') out = args[++i] ?? '';
+    else reports.push(args[i]);
+  }
+  if (!reports.length) {
+    console.error('usage: node tools/test-timings.mjs <report.xml…> [--out <file.json>]');
     process.exit(2);
   }
-  const ms = perFileMs(fs.readFileSync(file, 'utf8'));
+  const texts = reports.map((f) => fs.readFileSync(f, 'utf8'));
+  // A JUnit report without `file` weighs nothing: `<testcase name time>` alone does not say which file a case ran in.
+  // Node 22's reporter writes no file attribute (22.22.0 measured), node 24's does, so a report from a node 22 run can
+  // only ever add nothing — say so instead of quietly returning an empty or half-filled table.
+  for (let i = 0; i < texts.length; i++) {
+    const cases = (texts[i].match(/<testcase\b/g) ?? []).length;
+    const withFile = (texts[i].match(/<testcase\b[^>]*\bfile="/g) ?? []).length;
+    if (cases && !withFile) {
+      console.error(`${reports[i]}: ${cases} <testcase> and none with file="…" — this Node.js version's JUnit reporter does not write the file attribute (node 22 does not, node 24 does), so this report weighs nothing`);
+    }
+  }
+  const ms = perFileMsOf(texts);
   const json = `${JSON.stringify(ms, null, 2)}\n`;
-  if (outAt >= 0) fs.writeFileSync(args[outAt + 1], json);
+  if (out) fs.writeFileSync(out, json);
   else process.stdout.write(json);
   if (!Object.keys(ms).length) {
-    console.error(`${file}: no <testcase file="…"> found — was the report made with --test-reporter=junit?`);
+    console.error(`${reports.join(', ')}: no <testcase file="…"> found — was the report made with --test-reporter=junit?`);
     process.exit(1);
   }
 }

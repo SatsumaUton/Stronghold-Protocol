@@ -31,8 +31,8 @@ npm run golden:update                                            # 有意改变�
 npm run lint && npm run check:imports && npm run typecheck       # 代码检查、导入边界、类型
 ```
 
-提交 PR 前可以一条命令跑一遍 GitHub CI（`.github/workflows/ci.yml`）的 test 和 tooling 检查：`npm run ci`（或 `node tools/ci.mjs`）。
-依次是 setup 检查、`npm test`、服务器冒烟测试（在空闲端口启动、请求 `/healthz` 和首页、运行 doctor，然后关掉）、lint、导入边界、
+提交 PR 前可以一条命令跑一遍 GitHub CI（`.github/workflows/ci.yml`）的 test、node24 守卫和 tooling 检查：`npm run ci`（或 `node tools/ci.mjs`）。
+依次是 setup 检查、`npm test`、服务器冒烟测试（在空闲端口启动、请求 `/healthz` 和首页、运行 doctor，然后关掉）、CI 守卫、lint、导入边界、
 类型；第一步失败就停下并打印每步结果和耗时。`--keep-going` 失败后继续，`--only lint,test` 只跑指定步骤，`--list` 列出步骤。
 不包含 `npm ci`（依赖请自己装），也不跑 Node 版本 × 系统的矩阵。
 全量 Golden 在独立的 Ubuntu / Node 22 job 中运行，本地另跑 `npm run golden`。发现差异直接失败并列出场景和字段，CI 不更新期望结果。
@@ -44,6 +44,8 @@ npm run lint && npm run check:imports && npm run typecheck       # 代码检查�
 一个文件明显变慢之后用 `node tools/ci-shards.mjs --write --timings report.xml` 重新计权（report 由
 `node --test --test-reporter=junit --test-reporter-destination=report.xml …` 生成）。`test/ci-shards.test.js` 守着
 「每个文件恰好一片」和「偏差不超过 1.3×」。权重来源、超时口径与测量上的坑见 [docs/CI.md](docs/CI.md)。
+
+CI 测试矩阵为 Ubuntu/Windows × Node 22 × 四片（8 个任务），Node 24 只跑 `test:guards`。本地 `npm run ci` 的测试步骤清掉继承的 `SHARD`/`JUNIT`，仍跑全量；`SHARD=2 npm test` 可手动复现一片。
 
 浏览器测试默认不跑，需要本机 Chrome（路径不标准时设置 `CHROME_PATH`），用环境变量打开：
 
