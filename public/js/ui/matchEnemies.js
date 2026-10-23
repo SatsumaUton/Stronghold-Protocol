@@ -30,6 +30,10 @@ export const factionDescId = (scope, type) => `${scope}-fdesc-${String(type).rep
 /** What a 特训敌人 tooltip keeps clear of: the leader block — the portrait with its tag, and each line of its text. */
 export const leaderBlockOf = (el) => el.closest('.brief-enemy')?.querySelectorAll('.brief-boss, .brief-boss__text > *') || [];
 
+/** A faction's name with a break opportunity after each '/' (「特训敌人/飞行」: English 「Tactical Training/Flying」 broke
+ * inside 「Flying」, a slash between letters giving none — §35.33 review); its text and accessible name unchanged. */
+const slashBreaks = (s) => String(s).split('/').flatMap((part, i) => (i ? [html`/<wbr />`, part] : [part]));
+
 /**
  * One 特训敌人 type: the round icon (focusable, named by the type, described by its text) and the name; the description
  * in the Tooltip (hover, keyboard focus, a long press on touch — anywhere on the cell; the box points at the icon, inside
@@ -37,10 +41,6 @@ export const leaderBlockOf = (el) => el.closest('.brief-enemy')?.querySelectorAl
  * component), so the markup sits in MatchEnemies' own tree.
  * @param {{ type: string, info: any, m: any, scope: string }} o
  */
-/** A faction's name with a break opportunity after each '/' (「特训敌人/飞行」: English 「Tactical Training/Flying」 broke
- * inside 「Flying」, a slash between letters giving none — §35.33 review); its text and accessible name unchanged. */
-const slashBreaks = (s) => String(s).split('/').flatMap((part, i) => (i ? [html`/<wbr />`, part] : [part]));
-
 function factionCell({ type, info, m, scope }) {
   const name = info?.name || type;
   const desc = info?.desc || '';

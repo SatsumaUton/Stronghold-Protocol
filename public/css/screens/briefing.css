@@ -202,7 +202,10 @@
 .brief-reroll {
   position: relative; z-index: 2; flex: none;
   display: flex; align-items: center; justify-content: space-between; gap: .2rem;
-  margin: .1rem .5rem 1.6rem; padding: .14rem .2rem;
+  /* the foot's height grows with 文字大小 (about .73rem + .56 × --t above its content): the bottom margin keeps 已就绪 x/N
+     clear at 中 – 特大 on phones and short windows too (§35.38: the note ran over 2/2 at 大 / 特大 in English, Japanese
+     and Korean) */
+  margin: .1rem .5rem max(1.6rem, calc(.76rem + .58 * var(--t))); padding: .14rem .2rem;
   background: rgba(12, 15, 14, .9); border: 1px solid var(--mint-700);
 }
 .brief-reroll__text { display: flex; flex-direction: column; gap: .05rem; min-width: 0; font-size: calc(.16 * var(--t)); }
@@ -223,6 +226,13 @@
 @media (max-height: 520px) {
   .stephead__micro { display: none; }
   .stephead__guide .btn__label { display: none; }
+  /* 确认本局信息's step name takes two lines before it runs under 玩法说明 and COUNTDOWN (§35.38: English 「Confirm Match
+     Info」 and Korean 「이번 시뮬레이션 정보 확인」 at 大 / 特大 on 640–740 px phones); the header grows with it */
+  .brief .stephead { height: auto; min-height: 1.3rem; }
+  .brief .stephead__left, .brief .stephead__title { min-width: 0; }
+  .brief .stephead__name { min-width: 0; white-space: normal; text-wrap: balance; line-height: 1.1; }
+  .brief .stephead__name:lang(ko) { word-break: keep-all; overflow-wrap: break-word; }
+  .brief .stephead__name:lang(ja) { line-break: strict; }
 }
 /* … and in a short desktop window (≤ 640 px tall: 1024×600) at 大 / 特大 (§35.33 review: the micro cut and over 玩法说明 there) */
 @media (max-height: 640px) {

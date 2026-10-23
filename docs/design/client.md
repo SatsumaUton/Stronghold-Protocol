@@ -89,6 +89,12 @@ the 'atk' of that tick plays the slot's clip in place of the attack clip (`UnitV
 wind-up look-ahead `app.js onUpcoming` passes a cast of the attack's tick to `windUp`; `SpineActor.castStrike`), the next
 plain attack its attack clip again. A form's clip set without a `skill` role (锏's second form) keeps the slot clips.
 
+The pre-game text fit (§35.38): while a strategy status shows, the draft's step name gives way at 大 / 特大 at any
+width, and at heights ≤ 640 px; 小 / 中 retain it in taller windows. The guide button keeps its width. On short screens
+(≤ 520 px tall), the briefing's step name may wrap, its header grows, and the 机变 timing line sits below its title.
+Korean card text wraps between words; Japanese follows strict line breaking. [ASSUMED] font caps and the briefing
+reroll banner's bottom margin follow the measured header / footer geometry (history §35.38).
+
 Picture-only outfits (B6, §35.4): per the maintainer's 2026-10-18 option A, a `skins` record with pictures and no
 Spine is wearable, labelled 「仅更换头像与立绘」. Owner-specific cards / panels / results read that seat's choice;
 missing pictures and the battle model use the effective operator's defaults. #686's visibility switch and

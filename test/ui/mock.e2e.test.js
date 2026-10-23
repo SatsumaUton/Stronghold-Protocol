@@ -969,6 +969,63 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
     assert.deepEqual(bad, []);
   });
 
+  // §35.38: the pre-game headers at wide windows and on phones, the 机变 overlay's head on phones. One page per case, the
+  // text-fit checker's overlap findings plus the header's own boxes
+  async function mockScreen(query, root, lang, textSize, [w, h]) {
+    const page = await browser.newPage();
+    const touch = h <= 520;
+    await page.setViewport(touch ? { width: w, height: h, hasTouch: true, isMobile: true, deviceScaleFactor: 1 } : { width: w, height: h, deviceScaleFactor: 1 });
+    await page.evaluateOnNewDocument((l, ts) => {
+      localStorage.setItem('sp.pref.lang', JSON.stringify(l));
+      localStorage.setItem('sp.pref.settings', JSON.stringify({ textSize: ts }));
+    }, lang, textSize);
+    await page.goto(`${base}/dev/game-mock.html?shot=1&render=fallback&${query}`, { waitUntil: 'networkidle0' });
+    await page.waitForFunction((r) => !!document.querySelector(r), { timeout: 15000 }, root);
+    await page.evaluate(async () => { const m = await import('/js/ui/lang.js'); await m.initLang(); globalThis.__MOCK__.mutate(() => {}); });
+    await sleep(1300);
+    await page.evaluate(() => document.fonts.ready);
+    return page;
+  }
+
+  test('选择策略 in wide windows: at 大 / 特大 nothing over 2/2 or the step\'s name and 「How to Play」 inside its button; at 中 the name shown (§35.38)', { timeout: 300000 }, async () => {
+    const bad = [];
+    for (const variant of ['', '&variant=solo']) for (const textSize of ['lg', 'xl']) for (const win of [[1600, 900], [1920, 1080]]) {
+      const page = await mockScreen(`phase=BAND_DRAFT${variant}`, '.screen.draft', 'en', textSize, win);
+      const found = (await page.evaluate(textProblems, '.draft')).filter((p) => /^over: .*(stephead|b\.num|span\.num)|^x past button\.btn: span\.btn__label/.test(p));
+      for (const p of found) bad.push(`${variant ? 'solo' : 'team'} ${textSize} ${win.join('×')}: ${p}`);
+      await page.close();
+    }
+    for (const win of [[1280, 720], [1920, 1080]]) {
+      const page = await mockScreen('phase=BAND_DRAFT', '.screen.draft', 'en', 'md', win);
+      if (!(await page.$eval('.stephead__name', (el) => el.checkVisibility()))) bad.push(`md ${win.join('×')}: the step's name hidden`);
+      await page.close();
+    }
+    assert.deepEqual(bad, []);
+  });
+
+  test('确认本局信息 and the 机变 overlay on phones: the header\'s name, the reroll note and the timing line clear; Korean card texts by words (§35.38)', { timeout: 300000 }, async () => {
+    const bad = [];
+    for (const lang of ['en', 'ko']) for (const textSize of ['lg', 'xl']) for (const win of [[640, 360], [667, 375]]) {
+      const page = await mockScreen('phase=INFO_CHECK', '.brief', lang, textSize, win);
+      const found = (await page.evaluate(textProblems, '.brief')).filter((p) => /^over: /.test(p));
+      const heads = await page.evaluate(() => {
+        const R = (s) => document.querySelector(s)?.getBoundingClientRect();
+        const t = R('.stephead__title'), g = R('.stephead__guide'), c = R('.countdown');
+        const ov = (a, b) => a && b && Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
+        return [ov(t, g) && 'title × 玩法说明', ov(t, c) && 'title × COUNTDOWN'].filter(Boolean);
+      });
+      for (const p of [...found, ...heads]) bad.push(`brief ${lang} ${textSize} ${win.join('×')}: ${p}`);
+      await page.close();
+    }
+    for (const variant of ['supply', 'tactic']) for (const [lang, textSize] of [['en', 'md'], ['en', 'xl'], ['ko', 'md'], ['ko', 'xl']]) for (const win of [[640, 360], [844, 390]]) {
+      const page = await mockScreen(`phase=SP_DRAFT&variant=${variant}`, '.spov', lang, textSize, win);
+      const found = (await page.evaluate(textProblems, '.spov')).filter((p) => /^over: .*spov__turntxt/.test(p) || (lang === 'ko' && /inside a word/.test(p)));
+      for (const p of found) bad.push(`${variant} ${lang} ${textSize} ${win.join('×')}: ${p}`);
+      await page.close();
+    }
+    assert.deepEqual(bad, []);
+  });
+
   test('session replacement: recovery action stays clickable above the AI away overlay', async () => {
     const { page, problems } = await open('phase=PREP', { render: 'fallback' });
     await page.click('.gtop__exit');

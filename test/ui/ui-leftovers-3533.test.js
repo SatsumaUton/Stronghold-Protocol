@@ -95,6 +95,16 @@ test('the other event screens at a big 文字大小: 成就统计\'s banner, the
   assert.match(draftAll, /\.draft \.stephead__right \{ flex: 1 1 0;/);
   assert.match(draftAll, /\.draft \.dturn__go b \{ white-space: normal; text-wrap: balance;/);
   assert.match(draftAll, /\.draft \.draft-skip \{ height: auto;/, 'above the base rule (`.draft`)');
+  // §35.38: the step's name gives way by text size (大 / 特大) and on short screens, not by window width; 玩法说明 keeps its box
+  assert.doesNotMatch(draftAll, /@media \(max-width: 1440px\)/);
+  assert.match(draftAll, /:root\[data-text="lg"\] \.draft\.has-status \.stephead__name, :root\[data-text="xl"\] \.draft\.has-status \.stephead__name \{ display: none; \}/);
+  assert.match(block(draftAll, '@media (max-height: 640px) {'), /\.draft\.has-status \.stephead__name \{ display: none; \}/);
+  assert.match(draftAll, /\.draft \.stephead__guide \{ flex: none; \}/);
+  assert.match(brief, /margin: \.1rem \.5rem max\(1\.6rem, calc\(\.76rem \+ \.58 \* var\(--t\)\)\);/);
+  assert.match(briefShort, /\.brief \.stephead__name \{ min-width: 0; white-space: normal; text-wrap: balance;/);
+  const panels = css('public/css/screens/game-panels.css');
+  assert.match(panels, /\.spov \.rt:lang\(ko\), \.spov \.rt-note:lang\(ko\), \.spov \.rt-vup:lang\(ko\) \{ word-break: keep-all; overflow-wrap: break-word; \}/);
+  assert.match(block(panels, '@media (max-height: 520px) {\n  .spov__titles'), /\.spov__sub \{ grid-row: 3; grid-column: 1 \/ -1;/);
   assert.match(readFileSync(path.join(ROOT, 'public/js/screens/bandDraft.js'), 'utf8'), /held && 'is-held', head && 'has-status'\)/);
   assert.match(css('public/css/screens/game.css'), /\.gtop__net \.ping \{ height: auto; min-height: \.32rem; padding-top: 1px; padding-bottom: 1px; \}/);
   const lo = css('public/css/screens/loadout.css');

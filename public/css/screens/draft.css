@@ -280,11 +280,17 @@
 .draft .stephead { height: auto; min-height: 1.3rem; }
 .draft .draft-skip { height: auto; min-height: .44rem; padding-top: 2px; padding-bottom: 2px; line-height: 1.25; }
 .dturn:lang(ko), .draft-order__tip:lang(ko) { word-break: keep-all; overflow-wrap: break-word; }
-/* … and while the status shows, the step's name gives way to it in windows up to 1440 px wide or 640 px tall, as on short
-   screens (the 2/2 stays) */
-@media (max-width: 1440px), (max-height: 640px) {
+/* … and while the status shows, the step's name gives way to it in windows up to 640 px tall (1024×600), as on short
+   screens, and at 大 / 特大 in any window (the 2/2 stays). §35.38: chosen by window width (up to 1440 px) it was hidden
+   for nothing at 小 / 中 in laptop windows — the layout scales with the window — and still ran under the status at 大 /
+   特大 in wider ones (English 「Choose Your Strategy」 over 「Choose Strategy」 at 1600×900 and 1920×1080) */
+@media (max-height: 640px) {
   .draft.has-status .stephead__name { display: none; }
 }
+:root[data-text="lg"] .draft.has-status .stephead__name, :root[data-text="xl"] .draft.has-status .stephead__name { display: none; }
+/* 玩法说明 keeps its label inside its button: the button does not shrink (English 「How to Play」 ran past it into the
+   countdown at 大 / 特大 in 1600–1920 px windows) */
+.draft .stephead__guide { flex: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .draft-order, .dorder, .dorder.is-cur::before, .dorder.is-flash .dorder__box, .dorder.is-flash .dorder__check, .dband, .dband.is-sel::before, .dband__taken,
