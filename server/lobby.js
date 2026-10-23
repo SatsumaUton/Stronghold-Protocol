@@ -530,7 +530,7 @@ export class Lobby {
    *   the other versions (server/match/host/index.js, kind 'version')
    */
   constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, content = null, plugins = null, hosts = null,
-    versions = null, versionHosts = null, options = {} }) {
+    versions = null, versionHosts = null, simPool = null, options = {} }) {
     this.registry = registry;
     /** the vanilla content set every room plays (header "Content identity"), or null */
     this.vanilla = content && isContentHash(content.cs) ? Object.freeze({ cs: content.cs, vanilla: true, plugins: Object.freeze([]) }) : null;
@@ -541,6 +541,11 @@ export class Lobby {
     /** the official versions this server offers and their match hosts (header "Official versions"), or null */
     this.versions = versions;
     this.versionHosts = versionHosts;
+    /**
+     * The server's own simulation pool for bot rehearsals (server/workers/roomPool.js), or null when the operator
+     * started none — then every rehearsal stays on this thread, exactly as before.
+     */
+    this.simPool = simPool;
     this.log = log;
     this.MatchClass = MatchClass;
     this.getData = getData;
@@ -1957,6 +1962,9 @@ export class Lobby {
         data,
         log: this.log,
         now: this.now,
+        // the server's own simulation pool (server/workers/roomPool.js) for bot rehearsals, when the operator started
+        // one: null keeps every rehearsal on this thread, exactly as before (Match.simPool / MatchRehearsal.poolRehearsal)
+        ...(this.simPool ? { simPool: this.simPool } : {}),
         send: (playerId, msg) => (ctx.live ? this.matchSend(room, ctx, playerId, msg) : false),
         broadcast: (msg) => { if (ctx.live) this.matchBroadcast(room, ctx, msg); },
         onEnd: (summary) => this.onMatchEnd(room, ctx, summary),

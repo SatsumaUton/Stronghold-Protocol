@@ -106,7 +106,7 @@ export class MatchPrep {
     const begin = () => {
       if (!valid()) return;
       let gen;
-      try { gen = this.bot.prepBegin(this, ps, { delegate: this.botRehearsalDelegate }); }
+      try { gen = this.bot.prepBegin(this, ps, { delegate: this.botRehearsalDelegate, pooled: !!this.simPool }); }
       catch (e) { this.reportError(`bot ${ps.playerId}`, e); end(null); return; }
       drive(gen, '', (job) => {
         if (!job) { end(null); return; }

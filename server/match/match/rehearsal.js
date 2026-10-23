@@ -77,6 +77,70 @@ export class MatchRehearsal {
     return job;
   }
 
+  /**
+   * Offer one bot prep's layout rehearsal to the server's own simulation pool (server/workers/roomPool.js) instead of
+   * simulating it in this thread. This is the same job and the same candidates as the local run: the pool only decides
+   * where the CPU is spent, never what is compared — the worker builds each candidate Battle from the very options
+   * `candidateOpts` produced, runs the same `RehearsalRun` (server/workers/simulation.js) and returns the winning index.
+   *
+   * The pool is optional and may be busy: an unset SP_WORKERS means no pool at all, and an overloaded one answers
+   * POOL_FULL rather than starting another thread. Every such answer — a refusal, a failed task, or a pool that went
+   * away — makes the server run the candidates itself (`job.takeOver()`, exactly the delegated path's fallback), so the
+   * prep costs latency when the pool is busy, never a different layout.
+   * @param {{ ps: import('../PlayerState.js').PlayerState, chosen: any[], plans: Array<Map<number, string>>,
+   *   inputs: object[] }} o
+   * @returns {null | ReturnType<typeof createDelegatedRehearsalJob>} the job to drive, or null when the pool cannot take
+   *   it and the caller should rehearse locally
+   */
+  poolRehearsal({ ps, chosen, plans, inputs }) {
+    const pool = this.simPool;
+    if (!pool || this.disposed || this.ended) return null;
+    if (!Array.isArray(inputs) || inputs.length < 2) return null;
+    // a gameplay-plugin room's content set does not reach a worker thread: the worker builds its Battle from the
+    // official data pack, so the candidates must be built on this thread's own DataSource (same rule as delegation)
+    if (this.requireCs) return null;
+    const job = createDelegatedRehearsalJob(this, ps, chosen, plans, inputs);
+    const task = {
+      id: `${this.battlePrefix}.${this.round}.${ps.seat}.${++this._rehearsalSeq}`,
+      job, executor: null, timer: null, cancel: null, kind: 'pool',
+    };
+    // the candidates as the worker takes them: the same battle options the local run would build from, with the room's
+    // content and rule options, so the pool and this thread simulate the same battles
+    const options = inputs.map((o) => ({ ...o, content: this.battleContent, ...morphBattleOpt(this.rules) }));
+    let handle;
+    try {
+      handle = pool.submit('rehearsal', { options, playerId: ps.playerId, cap: job.cap });
+    } catch {
+      return null; // a pool that cannot even accept the task: local run, as if it did not exist
+    }
+    if (!handle || !handle.promise) return null;
+    task.cancel = () => { try { handle.cancel(); } catch { /* already settled */ } };
+    this._rehearsalTasks.set(task.id, task);
+    this.rehearsalPoolStats.pooled++;
+    const settle = (wanted) => {
+      if (this._rehearsalTasks.get(task.id) !== task) return; // cancelled with the prep: nothing to apply
+      this._dropRehearsalTask(task);
+      if (!job.pending) return;
+      const index = wanted();
+      if (Number.isInteger(index) && index >= 0 && index < plans.length) {
+        job.accept(index);
+        this.rehearsalPoolStats.accepted++;
+      } else {
+        // a refusal or a failed task is the server's turn: the very same candidates run here (never a second
+        // simulation of what the pool already ran — a failed task produced no pick to keep)
+        this.rehearsalPoolStats.fallbacks++;
+        job.takeOver();
+        this.log.info?.(`[match ${this.roomCode}] bot ${ps.playerId} rehearsal ← server (pool unavailable)`);
+      }
+      if (job.onSettled) job.onSettled();
+    };
+    handle.promise.then(
+      (value) => settle(() => (value && value.bestIndex)),
+      () => settle(() => null),
+    );
+    return job;
+  }
+
   /** The host answered (C2S b.rehearsalResult): its pick, a task it cannot run, or something to ignore. */
   _onRehearsalResult(ps, msg) {
     const task = this._rehearsalTasks.get(msg.taskId);
@@ -106,6 +170,7 @@ export class MatchRehearsal {
    */
   _rehearsalHostChanged() {
     for (const task of [...this._rehearsalTasks.values()]) {
+      if (task.kind === 'pool') continue; // no executor to follow: the pool is the server's own, not a host's
       const host = this.players.get(task.executor);
       if (task.executor === this.hostId && host && !host.left && host.connected) continue;
       this._takeOverRehearsal(task, task.executor === this.hostId ? 'host gone' : 'host changed');
@@ -118,7 +183,11 @@ export class MatchRehearsal {
    * match on screen is over (public/js/battle/rehearsal.js clear, wired in main.js).
    */
   _cancelRehearsal() {
-    for (const task of [...this._rehearsalTasks.values()]) this._dropRehearsalTask(task, !this.disposed);
+    for (const task of [...this._rehearsalTasks.values()]) {
+      // A pool task is cancelled locally even in a disposed match: no frame is involved (the host is not told
+      // anything there), and its thread must stop stepping once no match is waiting for the pick.
+      this._dropRehearsalTask(task, !this.disposed || task.kind === 'pool');
+    }
   }
 
   /** Run a delegated rehearsal on the server instead: the job resumes locally, the task is dead (its answers ignored). */
@@ -140,6 +209,11 @@ export class MatchRehearsal {
     if (this._rehearsalTasks.get(task.id) !== task) return;
     this._rehearsalTasks.delete(task.id);
     if (task.timer) { this.cancel(task.timer); task.timer = null; }
+    // a pool task is cancelled at the pool (its thread is told to stop stepping), a delegated one on its host
+    if (task.kind === 'pool') {
+      if (task.cancel) { try { task.cancel(); } catch { /* the pool already settled it */ } task.cancel = null; }
+      return;
+    }
     if (cancel) this.sendTo(task.executor, { t: 'b.rehearsalCancel', taskId: task.id });
   }
 
