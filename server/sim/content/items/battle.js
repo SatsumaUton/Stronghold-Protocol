@@ -44,7 +44,7 @@
 
 import {
   num, itemRecord, itemKeyOf, itemEffectKey, itemIdsWithEffect, isVersionData, gameData, buffsOf, isOp, onField, unitBonds,
-  isMember, bondActive, isGroundOp, frontTile, alliesAround, passiveBuff, fxOn, battleStore, contentInfo, itemsOf, directMods,
+  isMember, bondActive, isGroundOp, frontTile, alliesAround, passiveBuff, fxOn, battleStore, contentInfo, itemsOf, directMods, bodyInRadius,
 } from '../support/index.js';
 import { mitigate, hasHp, periodicDamage, isHpLoss, damageAttackType } from '../../attack.js';
 import { hypot } from '../../detmath.js';
@@ -558,6 +558,11 @@ const BY_EFFECT = {
   },
   // 伪装服 (chess_item_4_04_e): first damage taken in the battle ⇒ 隐匿 `duration` s (a 流失 is not 受到伤害: attack.js isHpLoss)
   eff_acarm055(battle, u, rec, S) {
+    const old = bp(rec, 'act1autochess_equip_acarm055_global_buff');
+    if (old) {
+      S.on('deploy', (c) => { if (c.unit === u) battle.applyStatus(u, 'camou', { duration: num(old.camouflage_duration), source: u }); });
+      return;
+    }
     const p = bp(rec, 'act2autochess_equip_acarm055_global_buff');
     const d = p ? num(p.duration) : 0;
     if (!(d > 0)) return;
@@ -606,7 +611,7 @@ const BY_EFFECT = {
   eff_acarm057(battle, u, rec, S) {
     const p = bp(rec, 'act1autochess_equip_acarm057_global_buff');
     if (!p) return;
-    const cap = Math.floor(num(p.max_trigger_cnt, 3));
+    const cap = Math.floor(num(p.max_trigger_cnt, isVersionData() ? Infinity : 3));
     let seq = -1, n = 0;
     S.on('ammoUsed', (c) => {
       if (c.unit !== u || c.left !== 1 || !c.skill) return;
@@ -741,6 +746,19 @@ const BY_EFFECT = {
   },
   // 耶拉冈德之泪 (chess_item_6_06_e, 谢拉格): every interval s, cold/frozen enemies in range take atk_scale (+不融冰: atk_scale_ex) × ATK arts
   eff_acarm102(battle, u, rec, S) {
+    const old = bp(rec, 'act1autochess_equip_acarm102_global_buff');
+    if (old) {
+      const partner = partnerOf(old);
+      S.on('kill', ({ killer, victim }) => {
+        if (killer !== u || victim?.side !== 'enemy' || !memberOf(battle, u, 'kjeragShip')) return;
+        const count = partner && carries(battle, u, partner) ? 2 : 1;
+        for (const e of battle.enemies) {
+          if (!e.alive || !bodyInRadius(e, victim.x, victim.y, num(old.range_radius))) continue;
+          for (let i = 0; i < count; i++) battle.applyStatus(e, 'cold', { duration: num(old.duration), source: u });
+        }
+      });
+      return;
+    }
     const p = bp(rec, 'act2autochess_equip_acarm102_ability');
     if (!p) return;
     const partner = partnerOf(p);

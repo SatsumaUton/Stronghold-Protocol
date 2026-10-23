@@ -6,6 +6,7 @@
 //   node tools/botbench.mjs [--configs solo:FUNNY,solo:HARD,coop4:FUNNY,coop4:HARD] [--seeds N] [--seed S]
 //                           [--rehearsal N] [--bot ID] [--json out.json] [--quiet]
 //   node tools/botbench.mjs --compare old.json new.json      A/B tables (markdown) of two --json runs
+//   --version   official version id (default: act2autochess); workers and JSON records carry it
 //   --configs   comma list of <solo|coopN>:<FUNNY|NORMAL|HARD|ABYSS> (coopN = N bot seats, 1–4)
 //   --seeds N   matches per config (seeds S..S+N−1, default 10)
 //   --rehearsal layouts each bot rehearses per prep (default: the Match default)
@@ -29,6 +30,8 @@
 // the SP_DRAFT callback in which a bot's pick landed. Wall-clock numbers depend on the host load: compare runs made
 // back to back with --jobs 1.
 
+import { toolVersion } from './versions/runtime.mjs';
+import { DEFAULT_VERSION } from '../shared/versions.js';
 import { performance } from 'node:perf_hooks';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
@@ -86,6 +89,7 @@ async function runOne(cfg, seed) {
   // Test-only band forcing overrides the selected picker, preserving real band metadata for custom strategies.
   if (opt.band && cfg.mode === 'solo') m.bot = defineBotStrategy({ id: m.bot.id, base: m.bot, pickBand: () => String(opt.band) });
   const rec = { config: cfg.name, botStrategy: m.bot.id, seed, stageId: m.stageId, bossId: m.bossId, preps: [], economy: [], picks: [], rounds: [], bounties: [] };
+  if (toolVersion !== DEFAULT_VERSION) rec.version = toolVersion;
   // rehearsal stepping time (Battle.step of the rehearsal fields)
   let rehMs = 0;
   const newBattle = m.newBattle.bind(m);

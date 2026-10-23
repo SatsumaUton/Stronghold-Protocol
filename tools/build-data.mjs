@@ -2746,7 +2746,8 @@ function buildChoices(ctx, effects, items, chess) {
           shop: eventsOf('shop', (e) => e.solo === solo),
           tactic: eventsOf('tactic', (e) => e.solo === solo && (/^hardbuff/.test(e.id) ? diff === 'HARD' || diff === 'ABYSS' : true)),
         },
-        assumed: !(diff === 'HARD' || diff === 'ABYSS') || r === 11,
+        // [ASSUMED] First-season candidate shapes/schedules carry over; measured second-season groups/weights do not.
+        assumed: !useTable('bountyDrafts') || !(diff === 'HARD' || diff === 'ABYSS') || r === 11,
       };
     }
     schedule[modeId] = { spRounds: sp, rounds: m };
@@ -2948,7 +2949,7 @@ function buildConfig(ctx, waves, stages, bands, chess, items) {
         template, bossTemplates: isBoss ? bossTemplates : null,
         combatTimeLimit: isBoss ? null : (waves[template]?.maxPlayTime ?? null),
         levelMaxPlayTime: waves[tplId]?.maxPlayTime ?? null,
-        prepTime: multi || type === 'LOCAL' ? turn.normalPhaseTime ?? null : null,
+        prepTime: multi || type === 'LOCAL' || PROFILE.config.rules?.soloTimed ? turn.normalPhaseTime ?? null : null,
         prepTimeData: turn.normalPhaseTime ?? null,
         isSpPrepare: entries.some((e) => e.isSpPrepare), isBoss, isHidden,
         bossOvertimeAfter: isBoss ? turn.bossTurnHpReduceTime || 150 : null,

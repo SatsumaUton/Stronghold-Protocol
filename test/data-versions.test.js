@@ -115,7 +115,7 @@ test('profiles: the default is today\'s build; pins pick a commit per file group
   assert.deepEqual(v21.adapters, ['launchModes', 'launchMilestones']);
   assert.deepEqual(v11.adapters, ['bondActiveType', 'selfBackupPreset', 'launchMilestones']);
   assert.deepEqual(v12.adapters, ['bondActiveType', 'selfBackupPreset'], 'V1_2 is the final state: all 60 功勋 levels');
-  assert.equal(v21.research, 'docs/research/', 'the 下半 research applies by id');
+  assert.equal(v21.research, 'docs/research/versions/act2autochess-v2_1/', 'V2_1 uses its own evidence');
   assert.equal(v21.tables, 'default', 'the 下半-measured tables apply by id / name');
   assert.deepEqual(v21.config.rules, {}, 'the default\'s rules');
   assert.equal(v21.expect.triggerDeviations, 'present');

@@ -188,6 +188,7 @@ export class Unit {
       spRecovery: Math.max(0, fin((b.spRecovery + a('spRecoveryFlat')) * m('spRecoveryMul'), 0)),
       spCostFlat: a('spCostFlat'),
       redeployMul: m('redeployMul'),
+      costMul: m('costMul'),
       hpRegen: fin(b.hpRecoveryPerSec + a('hpRegen') + a('hpRegenRatio') * maxHp, 0),
       shield,
       flags: flags || EMPTY,

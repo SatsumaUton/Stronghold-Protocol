@@ -68,6 +68,9 @@ export const isGoldenId = (id) => /_b$/.test(String(id ?? ''));
  */
 export const isVersionData = (data = gameData()) => !!(data && typeof data === 'object' && data.config?.version);
 
+/** Historical season-one semantics; absent version metadata always means today's rules. */
+export const isFirstPeriod = (data = gameData()) => isVersionData(data) && data.config.season === 'act1autochess';
+
 /**
  * Whether `id` names an official record of data file `file` (`chess`, `items` …), not a plugin's namespaced one
  * (shared/plugins/dataUtils.js RECORD_MAPS: chess_x_ / item_x_ …).

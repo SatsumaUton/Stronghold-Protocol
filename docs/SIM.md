@@ -1159,6 +1159,26 @@ flag alters movement or 失衡.
   maxCharges, active, timeLeft, ammoLeft, ammoMax, activations, kind, rule, bb` (`ammoMax`: the most bullets the running ammo skill
   has held — set at activation, raised by skillStart additions and `addAmmo` above it; 0 when inactive).
 
+### Historical version execution (M2)
+
+`DataSource.raw.config.version.rules` selects historical deployment ordering and boss mirror behavior. A non-default
+`BattleSpec` carries `version`; an explicit version must match the supplied data. Default specs omit it to preserve
+existing replay/digest bytes. One official data set belongs to one process/worker; the tools bootstrap it before
+importing content. First-season `AUTO_STOP` manually closes after half duration with an in-range enemy, subject to
+operation cooldown and silence. `costMul` multiplies paid deployment costs (neutral 1).
+
+```bash
+node tools/golden.mjs --version act1autochess --update --twice
+node tools/golden.mjs --version act2autochess@V2_1
+node tools/botbench.mjs --version act1autochess@V1_1 --seeds 1 --rehearsal 1
+node tools/bb-audit.mjs --strict
+```
+
+Goldens are stored in `test/golden/<slug>/`. The audit still reports intentional differences; every surviving entry
+has a reason in [blackboard-review.json](research/versions/blackboard-review.json), enforced by a test. Unknown rules
+and unhandled version-only keys must be empty. The earlier M0 inventory below is superseded by
+[history §35.22.7–8](history/0.3.2.md#35227-historical-core-rules-m2); operator kits remain a separate workstream.
+
 ### 7.2 Kits
 
 ```js
@@ -1187,18 +1207,18 @@ record's tier when the operator has several: 锡人, 耶拉, 华法琳 …), els
 `op-*` kit), else none — the generic kit. Only official records with a real charId take that path: test fixtures (whose
 charId defaults to the chess id) and plugin chess (`chess_x_` ids; Forge imports leave out `kitRef` on purpose to keep
 the generic kit) keep the by-id lookup, and stand-ins / 自选 pieces keep theirs (`KITS[def.charId]`). 第一期's owned
-自选 pool holds 24 operators that 第二期下半 (today's data) sells as shop chess (星熊, 莫斯提马, 夕, 玛恩纳 …), 第二期上半's (V2_1) 4 that V2_2 made
-shop chess (银灰, 空弦, 卡涅利安, 伺夜): their kit is a tier kit only, so they are listed in `kits/index.js`
-`PENDING_DIY_KIT_CHARS`, stay out of `KITTED_CHARS` and are left out of those versions' 自选 by the kitted gate [ASSUMED]
-until M2 reviews the tier kit as a 自选 kit or writes one. The default data
+自选 pool holds 24 operators that 第二期下半 (today's data) sells as shop chess (星熊, 莫斯提马, 夕, 玛恩纳 …), and 第二期上半's (V2_1) holds 4 that V2_2 made
+shop chess (银灰, 空弦, 卡涅利安, 伺夜). 银灰 is not in 第一期's pool. Those 25 borrow the tier kit under the charId
+(`kits/ops/ver-diy.js`, DESIGN §35.22.9), are in `KITTED_CHARS` and are not keys of `OPERATOR_KITS`. `PENDING_DIY_KIT_CHARS`
+is empty. A shop chess of the same operator still takes the tier key. The default data
 and the plugin content sets built on it carry no `config.version` and keep the by-id lookup of before M0, so the kit
 lookup does not change there, not even for a plugin that patches an official record's `charId`. Two M0 fixes do reach
 those content sets: 蒸汽之心's hammers per data object and the map-character shape check of `auto_chess_change_map`
 (below; DESIGN §35.22.3). On the 上半 data (measured on a dry build of
 `@21b1f240`, 96 normal shop records): 46 keep their id with the same operator, 19 resolve to a tier kit by charId, 12 to a
-自选 `op-*` kit (菲亚梅塔, 森蚺, 煌, 左乐, 涤火杰西卡, 林, 提丰, 娜仁图亚, 澄闪, 死芒, 伊芙利特, 淬羽赫默 — written for 自选, to be
-reviewed as shop chess), and 19 have no kit yet: 讯使, 梅, 远山, 狮蝎, 暴行, 布丁, 万顷, 暴雨, 锡兰, 芳汀, 极光, 槐琥, 海蒂, 蜜莓, 安哲拉,
-伊桑, 星源, 桑葚, 亚叶 (`kits/index.js` `PENDING_KIT_CHARS`). V2_1 reuses no id for another operator: its 116 normal
+自选 `op-*` kit (菲亚梅塔, 森蚺, 煌, 左乐, 涤火杰西卡, 林, 提丰, 娜仁图亚, 澄闪, 死芒, 伊芙利特, 淬羽赫默 — written for 自选 and
+reviewed as shop chess in §35.22.9), and 19 have a charId kit (`ops/ver-*.js`): 讯使, 梅, 远山, 狮蝎, 暴行, 布丁, 万顷, 暴雨, 锡兰, 芳汀, 极光, 槐琥, 海蒂, 蜜莓, 安哲拉,
+伊桑, 星源, 桑葚, 亚叶. `PENDING_KIT_CHARS` is empty. The pinned split counts those 31 charId kits as `op` (own 46, tier 19, op 31, pending 0). V2_1 reuses no id for another operator: its 116 normal
 records (the 115 shop chess and 盟约·辅助干员) all keep their own kit. `test/versions-keying.test.js` checks every data directory
 (`data/`, each `data/versions/*/`, and `SP_VERSION_DATA_DIRS`): each chess resolves to a kit of its own charId or is
 pending, each 自选 pick and 补位 stand-in to its charId's kit or is a 预备干员 (generic) or a pending 自选 pick that the

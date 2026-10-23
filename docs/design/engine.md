@@ -17,6 +17,12 @@ Prepared 外勤医疗 map characters (§30.22) keep an earlier aggro order than 
 can open their detail card and board-space range. Their `deploySeq` is still the later runtime spawn. The retained
 team grant (§30.14) is unchanged.
 
+Historical core (0.3.2 M2, history §35.22.7): `config.version.rules` is authoritative for deployment order and boss
+mirror branches. First-season deployments order rows bottom to top, then columns left to right (mirrored halves use
+local column order). Explicit BattleSpec version identity must match its DataSource. Historical AUTO_STOP closes
+manually after half duration when the running range contains an enemy. Paid deployments compose `costMul` (default 1).
+Historical content uses its own blackboards/text; gaps and assumptions are enumerated in the version audit review.
+
 ### 5.1 Battle API (implemented by the sim-core owner; consumed by match & content)
 
 ```js

@@ -16,7 +16,7 @@
 //
 // The default is a code constant, never a server setting: data, rooms and logs without a version mean act2autochess.
 // tools/versions/<slug>.mjs holds each version's build profile (pins, adapters, expected counts). M0 builds the data
-// only; nothing at run time reads a non-default version yet.
+// originally; M2 tools now bootstrap a selected version per process/worker. Lobby hosts are M1 work.
 
 import { N_ } from './i18n.js';
 

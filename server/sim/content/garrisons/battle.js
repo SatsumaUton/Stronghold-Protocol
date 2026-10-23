@@ -112,8 +112,8 @@ export function install(battle) {
 
   const grants = [];
   for (const it of all.slice()) {
-    if (it.key !== 'ADD_BOND') continue;
-    const g2 = S.garrisonRecord(it.bbStr.give_garrison_id);
+    if (it.key !== 'ADD_BOND' && it.g.battleRuneKey !== 'give_garrion_to_front') continue;
+    const g2 = S.garrisonRecord(it.bbStr.give_garrison_id ?? it.bbStr.give_garrion_id);
     if (!g2 || g2.eventType !== 'IN_BATTLE') continue;
     for (const t of grantTargets(battle, it)) {
       const got = add(t, g2, it);
@@ -268,6 +268,18 @@ function ammoScope(it, u) {
 }
 
 const INSTALLERS = {
+  act1autochess_gar_event_recoverhp_enemy_abflag_inrange(battle, list) {
+    battle.on('statusApplied', ({ target, status, entered }) => {
+      if (!entered || target?.side !== 'enemy') return;
+      for (const it of list) {
+        if (status !== (AB_FLAG_STATUS[S.num(it.bb.check_ab_flag, 16)] ?? 'freeze') || !S.onField(it.unit) || !S.inRange(it.unit, target)) continue;
+        // [ASSUMED] The text only says "数次". One pulse immediately, then two at one-second intervals.
+        for (let i = 0; i < 3; i++) battle.after(i, () => {
+          if (S.onField(it.unit)) battle.heal({ source: it.unit, target: it.unit, amount: it.unit.s.maxHp * S.num(it.bb.hp_ratio) });
+        });
+      }
+    });
+  },
   act1autochess_gar_event_useskill(battle, list) {
     const m = byUnit(list);
     battle.on('skillStart', ({ unit }) => {

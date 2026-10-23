@@ -780,12 +780,19 @@ the three earlier versions, named by period as the maintainer named them (2026-1
 sub-versions V1_1 / V1_2 and V2_1 / V2_2. (PRTS's 「第一期」 is the 2024 卫戍协议, `act1vautochess`, which is not done.)
 A bare 上半 / 下半 here and in code comments keeps the official activity sense (上半 = 第一期 / `act1autochess`, 下半 =
 第二期 / `act2autochess`); a period's halves are always written with the period (第一期上半 …) or as V1_1 … V2_2.
-**M0 is invisible**: nothing at run time reads a non-default version yet (the lobby switch, room versions and the earlier
-versions' rules come later). `data/versions/` is tracked, so the release zips and Docker carry it (48 files, 15.0 MB on
+**M2 core is available to tools**: golden/botbench can load the historical data in isolated workers. The lobby switch
+and room version hosts remain M1 work. `data/versions/` is tracked, so the release zips and Docker carry it (48 files, 15.0 MB on
 disk, about 1.3 MB zipped), but `server/http/static.js` does not serve it until M1 (404 under `/data/versions/`). The default version is unchanged — `data/*.json`, `data/i18n/`, the golden corpus, the
 `cs` formula and a default room's `room.state` are pinned by `test/versions-default-guard.test.js`. Its file hashes (G1)
 are the M0 merge check and are deleted when M1 starts (DESIGN §35.22.2); until then a rebuild that changes a default data
 file also refreshes the fixture: `SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js`.
+
+**M2 research and rules:** `docs/research/versions/<slug>/02-bonds.json` and `04-items.json` use each snapshot's own
+text. First-season `01-core-data.json` supplies the 11-18 blackboard multipliers and preserves 300-second solo prep;
+`config.version.rules` is read by the engine/match. Other absent research files still fall back with warnings and are
+[ASSUMED], including unmeasured ban/stock/schedule values. See [history §35.22.7](history/0.3.2.md#35227-historical-core-rules-m2)
+for the complete list and [the exhaustive blackboard review](research/versions/blackboard-review.json). The following
+profile notes describe M0's original fallbacks; the M2 overrides take precedence.
 
 **Registry** (`shared/versions.js`, pure, browser-safe). `DEFAULT_VERSION = 'act2autochess'` is a code constant, never a
 server setting: data, rooms and logs without a version mean 第二期下半 (`act2autochess` V2_2).

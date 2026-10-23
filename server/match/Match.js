@@ -284,6 +284,9 @@ export class Match {
     this.broadcastFn = opts.broadcast;
     this.onEndFn = opts.onEnd;
     this.data = opts.data && typeof opts.data === 'object' ? opts.data : {};
+    if (this.data.config?.version && !Object.hasOwn(this.data.config.modes || {}, this.modeId)) {
+      throw new RangeError(`Match: mode ${this.modeId} is unavailable in ${this.data.config.version.id}`);
+    }
     /** the room's content hash (opts.cs, DESIGN §32): every BattleSpec carries it */
     this.cs = isContentHash(opts.cs) ? opts.cs : null;
     /** the room's visual set (opts.vs, DESIGN §32.6): every BattleSpec names it */

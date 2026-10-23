@@ -332,6 +332,7 @@ function patrolLoop() {
 }
 
 function mirror(b, e, tpl) {
+  if (b.data.raw?.config?.version?.rules?.bossMirrorShare === false) return;
   const st = stOf(b);
   const br = tpl && tpl.branches && tpl.branches.boss_battle_multi_player;
   if (!Array.isArray(br) || !br.length || st.mirrored.has(e.defId) || (b.opts && b.opts.bossMirror === false)) return;
