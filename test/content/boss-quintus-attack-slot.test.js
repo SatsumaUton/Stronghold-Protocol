@@ -9,7 +9,8 @@
 // ready at the next turn, and the boss alternates: arknights.wiki.gg (Sal Viento Bishop Quintus) — it never uses Great
 // Tide twice in a row. Until this fix the tide ran on its own 3.5 s timer next to the normal attack: a tide every 3.5 s
 // **and** an attack every 3.5 s, tides back to back, and a tide with no operator to attack. 【断裂生殖】
-// 「仅仍有未执行的小队动作指令时可触发」: no cast after the level branch's 7 phases.
+// 「仅仍有未执行的小队动作指令时可触发」: no cast after the level branch's 7 phases. 【断裂生殖】 / 【物种爆发】 take the attack's
+// turn too, with a trigger of their own (DESIGN §35.37; until then on their own timers).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -67,6 +68,10 @@ function actions(h, e, secs) {
 }
 
 const sk = (p) => W[TPL].overrides[KEY].skills.find((x) => x.prefabKey === p);
+/** The actions that take an attack's turn: the normal attack and every 昆图斯 skill (DESIGN §35.19 / §35.37). */
+const TURN = /^(ATTACK|Tidewater|Rockfall|SummonTentac|Doom)/;
+/** The tides after a gap with no other skill in it (崩坍, 断裂生殖, 物种爆发 move the tide by a turn). */
+const plainTides = (log, tides) => tides.filter((x, i) => i > 0 && !log.some((a) => /^(Rockfall|SummonTentac|Doom)/.test(a.what) && a.t > tides[i - 1].t && a.t < x.t));
 const TWO = () => [{ chessId: 't_wall', row: 10, col: 9 }, { chessId: 't_wall2', row: 11, col: 9 }];
 
 /**
@@ -94,29 +99,33 @@ test('昆图斯 third form: 【大潮】 takes an attack slot — never twice in
   const log = actions(h, e, 70);
   const tides = log.filter((a) => a.what === 'TidewaterG2');
   const attacks = log.filter((a) => a.what === 'ATTACK');
-  assert.ok(tides.length >= 8 && attacks.length >= 8, `tides ${tides.length}, attacks ${attacks.length}`);
+  assert.ok(tides.length >= 8 && attacks.length >= 4, `tides ${tides.length}, attacks ${attacks.length}`);
   // never two tides in a row: an attack or another skill between every two
   for (let i = 1; i < log.length; i++) assert.ok(!(log[i].what === 'TidewaterG2' && log[i - 1].what === 'TidewaterG2'), `two tides in a row at ${log[i].t.toFixed(3)}`);
   // so a tide every other attack slot at most: ≥ 2 attack intervals apart (until the fix: every 3.5 s)
   for (let i = 1; i < tides.length; i++) assert.ok(tides[i].t - tides[i - 1].t >= 2 * iv - 1e-6, `tide gap ${(tides[i].t - tides[i - 1].t).toFixed(3)} at ${tides[i].t.toFixed(3)}`);
   tideRule(log);
   // with nothing else in the way: exactly every other turn (3.5 + 1.667 s ready, the turn after at 2 × 3.5 = 7 s)
-  const plain = tides.filter((x, i) => i > 0 && !log.some((a) => /^Rockfall/.test(a.what) && a.t > tides[i - 1].t && a.t < x.t));
-  assert.ok(plain.length >= 5, `${plain.length} tide gaps without 崩坍`);
+  const plain = plainTides(log, tides);
+  assert.ok(plain.length >= 4, `${plain.length} tide gaps without another skill`);
   for (const x of plain) { const prev = tides[tides.indexOf(x) - 1]; assert.ok(Math.abs(x.t - prev.t - 2 * iv) < 0.06, `gap ${(x.t - prev.t).toFixed(3)} at ${x.t.toFixed(3)}`); }
-  // one action per slot: the tide, 崩坍 and the normal attack share the attack's turn (断裂生殖 / 物种爆发 keep their own timers)
-  const slot = log.filter((a) => a.what === 'ATTACK' || /^(Tidewater|Rockfall)/.test(a.what));
+  // one action per slot: the tide, 崩坍, 断裂生殖 and the normal attack share the attack's turn (DESIGN §35.37)
+  const slot = log.filter((a) => TURN.test(a.what));
+  assert.ok(slot.some((a) => /^SummonTentac/.test(a.what)), '断裂生殖 among the turns');
   for (let i = 1; i < slot.length; i++) assert.ok(slot[i].t - slot[i - 1].t >= iv - 1e-6, `${slot[i - 1].what} then ${slot[i].what} ${(slot[i].t - slot[i - 1].t).toFixed(3)} s apart`);
   // the tide still hits the whole field (the operator outside the attack's two targets too)
   assert.ok(h.unit('t_wall3').stats.taken > 0, 'global tide');
 });
 
-test('昆图斯: no attack target, no 【大潮】 (PRTS 「触发索敌和普通攻击相同」)', () => {
+test('昆图斯: no attack target, no 【大潮】 (PRTS 「触发索敌和普通攻击相同」); 【断裂生殖】 still comes (its own trigger, `_allowNoTarget` 1)', () => {
   const { h, e } = quintus([]);
   thirdForm(h);
-  const log = actions(h, e, 20);
+  const log = actions(h, e, 40);
   assert.equal(log.filter((a) => a.what === 'ATTACK').length, 0);
   assert.deepEqual(log.filter((a) => /^(Tidewater|Rockfall)/.test(a.what)), [], 'no attack-class skill without a target');
+  const tent = log.filter((a) => /^SummonTentac/.test(a.what));
+  assert.ok(tent.length >= 1, '断裂生殖 with nobody in range');
+  for (let i = 1; i < tent.length; i++) assert.ok(tent[i].t - tent[i - 1].t >= sk('SummonTentacG2').cooldown + QUINTUS_CLIP.SummonTentac - 1e-6);
 });
 
 test('昆图斯 first form: 崩坍 and 大潮 come at the first attack slot after their initial cooldown', () => {
@@ -124,14 +133,14 @@ test('昆图斯 first form: 崩坍 and 大潮 come at the first attack slot afte
   const log = actions(h, e, 60);
   const iv = e.s.interval;
   const at = (p) => (log.find((a) => a.what === p) || {}).t;
-  for (const p of ['Rockfall', 'Tidewater']) {
+  // 断裂生殖 (AnimatedActionToOwnerAbility) takes a turn too, since §35.37 (until then its own timer)
+  for (const p of ['Rockfall', 'Tidewater', 'SummonTentac']) {
     const t = at(p);
     assert.ok(t != null, `${p} cast`);
     assert.ok(t >= sk(p).initCooldown - 1e-6 && t <= sk(p).initCooldown + iv + 1e-6, `${p} at ${t} (initial cooldown ${sk(p).initCooldown})`);
   }
-  // 断裂生殖 is not attack-class (AnimatedActionToOwnerAbility; PRTS 「仅仍有未执行的小队动作指令时可触发」): its own timer
-  const tent = at('SummonTentac');
-  assert.ok(tent != null && Math.abs(tent - sk('SummonTentac').initCooldown) <= 0.3, `SummonTentac at ${tent}`);
+  const slot = log.filter((a) => TURN.test(a.what));
+  for (let i = 1; i < slot.length; i++) assert.ok(slot[i].t - slot[i - 1].t >= iv - 1e-6, `${slot[i - 1].what} then ${slot[i].what}`);
 });
 
 test('昆图斯 third form at attack interval 2.0 (attack speed +75): a tide every 3 turns, as the PRTS rule gives', () => {
@@ -145,8 +154,8 @@ test('昆图斯 third form at attack interval 2.0 (attack speed +75): a tide eve
   const tides = tideRule(log);
   assert.ok(tides.length >= 8, `${tides.length} tides`);
   // 3.5 + 1.667 s from the cast: not ready at the 2nd turn (4 s), ready at the 3rd (6 s)
-  const plain = tides.filter((x, i) => i > 0 && !log.some((a) => /^Rockfall/.test(a.what) && a.t > tides[i - 1].t && a.t < x.t));
-  assert.ok(plain.length >= 5, `${plain.length} tide gaps without 崩坍`);
+  const plain = plainTides(log, tides);
+  assert.ok(plain.length >= 5, `${plain.length} tide gaps without another skill`);
   for (const x of plain) { const prev = tides[tides.indexOf(x) - 1]; assert.ok(Math.abs(x.t - prev.t - 3 * iv) < 0.06, `gap ${(x.t - prev.t).toFixed(3)} at ${x.t.toFixed(3)}`); }
 });
 
@@ -164,9 +173,9 @@ test('昆图斯 third form under 寒冷 (interval 5.0): still alternating; 寒�
   assert.ok(Math.abs(e.s.interval - 5) < 1e-6 && e.s.interval < ready, `寒冷: interval ${e.s.interval} (ready ${ready.toFixed(3)})`);
   const cold = actions(h, e, 70);
   const coldTides = tideRule(cold);
-  assert.ok(cold.filter((a) => a.what === 'ATTACK').length >= 4, 'normal attacks between the tides');
-  const plain = coldTides.filter((x, i) => i > 0 && !cold.some((a) => /^Rockfall/.test(a.what) && a.t > coldTides[i - 1].t && a.t < x.t));
-  assert.ok(plain.length >= 3, `${plain.length} tide gaps without 崩坍`);
+  assert.ok(cold.filter((a) => a.what === 'ATTACK').length >= 2, 'normal attacks between the tides');
+  const plain = plainTides(cold, coldTides);
+  assert.ok(plain.length >= 3, `${plain.length} tide gaps without another skill`);
   for (const x of plain) { const prev = coldTides[coldTides.indexOf(x) - 1]; assert.ok(Math.abs(x.t - prev.t - 2 * e.s.interval) < 0.06, `寒冷: gap ${(x.t - prev.t).toFixed(3)} at ${x.t.toFixed(3)}`); }
   h.b.addBuff(e, { key: 'test:vision', persist: true, mods: { aspd: -5 } });
   h.run(2 * e.s.interval);
@@ -176,7 +185,7 @@ test('昆图斯 third form under 寒冷 (interval 5.0): still alternating; 寒�
   const slowTides = tideRule(slow);
   assert.equal(slow.filter((a) => a.what === 'ATTACK').length, 0, 'every turn goes to a skill');
   assert.ok(slowTides.length >= 10, `${slowTides.length} tides`);
-  const turns = slow.filter((a) => /^(Tidewater|Rockfall)/.test(a.what));
+  const turns = slow.filter((a) => TURN.test(a.what));
   for (let i = 1; i < turns.length; i++) assert.ok(Math.abs(turns[i].t - turns[i - 1].t - iv) < 0.06, `turn gap ${(turns[i].t - turns[i - 1].t).toFixed(3)} at ${turns[i].t.toFixed(3)}`);
 });
 
@@ -236,8 +245,10 @@ test('昆图斯 【断裂生殖】: no cast once the 7 squad actions of the leve
   thirdForm(h);
   const log = actions(h, e, 240).filter((a) => /^SummonTentac/.test(a.what));
   assert.equal(log.length, 7, `casts at ${log.map((a) => a.t.toFixed(1)).join(', ')}`);
-  // its own timer, the cooldown counted from the end of its 2 s clip: 18 + 2 s apart
-  for (let i = 1; i < log.length; i++) assert.ok(Math.abs(log[i].t - log[i - 1].t - (sk('SummonTentacG2').cooldown + QUINTUS_CLIP.SummonTentac)) < 0.06, `gap ${(log[i].t - log[i - 1].t).toFixed(3)}`);
+  // the cooldown counted from the end of its 2 s clip (18 + 2 s), then the next attack's turn — one more when a tide
+  // ready on the same turn wins the draw (DESIGN §35.37)
+  const ready = sk('SummonTentacG2').cooldown + QUINTUS_CLIP.SummonTentac, iv = e.s.interval;
+  for (let i = 1; i < log.length; i++) { const g = log[i].t - log[i - 1].t; assert.ok(g >= ready - 1e-6 && g <= ready + 2 * iv + 0.06, `gap ${g.toFixed(3)}`); }
   assert.equal(h.eventsOf('fx').filter((f) => f[1] === 'tentacle').length, br.reduce((n, p) => n + p.length, 0), 'every phase once: 1+1+1+1+2+2+4 tentacles');
   // a field without the template's branch: the random-target fallback, no limit
   const free = quintus(TWO(), { tpl: null });
@@ -259,18 +270,26 @@ test('昆图斯 skill clips: QUINTUS_CLIP = the length of the official clip of e
 
 test('昆图斯 solo template: 【物种爆发】 at its initial cooldown after the third form starts, then its cooldown plus its 4.467 s clip apart', () => {
   // the solo template has no override (enemy_database: Doom cooldown 100, initial cooldown 200); the pair level's
-  // 999 / 999 never lets it come. Its own timer (not attack-class), the cooldown counted from the clip's end (castNow)
+  // 999 / 999 never lets it come. It takes the attack's turn (DESIGN §35.37), the cooldown counted from the clip's end
+  // (castNow); its 4.467 s clip holds the next attack (enemies.js attackCdAfter, DESIGN §35.36)
   assert.equal((W[`${TPL}_s`].overrides || {})[KEY], undefined, 'the solo template: no 昆图斯 override');
   const doom = E[KEY].skills.find((s) => s.prefabKey === 'Doom');
   assert.deepEqual([doom.cooldown, doom.initCooldown], [100, 200]);
   const { h, e } = quintus(TWO(), { tpl: `${TPL}_s`, overrides: false });
   thirdForm(h);
   const from = h.b.time;
-  const log = actions(h, e, 420).filter((a) => a.what === 'Doom');
+  const full = actions(h, e, 420);
+  const log = full.filter((a) => a.what === 'Doom');
   assert.equal(log.length, 3, `casts at ${log.map((a) => a.t.toFixed(3)).join(', ')}`);
   // the form starts within the 1 s of thirdForm (0.25 s ability tick): the first cast 200 s on
-  assert.ok(log[0].t - from > doom.initCooldown - 1 && log[0].t - from <= doom.initCooldown + 0.3, `first at ${log[0].t.toFixed(3)} (form ${from.toFixed(3)} − 1 s)`);
-  for (let i = 1; i < log.length; i++) assert.ok(Math.abs(log[i].t - log[i - 1].t - (doom.cooldown + QUINTUS_CLIP.Doom)) < 0.06, `gap ${(log[i].t - log[i - 1].t).toFixed(3)}`);
+  const iv = e.s.interval;
+  assert.ok(log[0].t - from > doom.initCooldown - 1 && log[0].t - from <= doom.initCooldown + 2 * iv + 0.06, `first at ${log[0].t.toFixed(3)} (form ${from.toFixed(3)} − 1 s)`);
+  for (let i = 1; i < log.length; i++) { const g = log[i].t - log[i - 1].t; assert.ok(g >= doom.cooldown + QUINTUS_CLIP.Doom - 1e-6 && g <= doom.cooldown + QUINTUS_CLIP.Doom + 2 * iv + 0.06, `gap ${g.toFixed(3)}`); }
+  // nothing else in its clip: the next turn comes 4.467 s after it at the earliest
+  for (const d of log) {
+    const next = full.find((a) => a.t > d.t + 1e-9 && TURN.test(a.what));
+    if (next) assert.ok(next.t - d.t >= QUINTUS_CLIP.Doom - 1e-6, `${next.what} ${(next.t - d.t).toFixed(3)} s after 物种爆发`);
+  }
 });
 
 test('an attack-class skill its leader cannot cast (here: silenced, the skill made silenceable) leaves the turn to the normal strike', () => {

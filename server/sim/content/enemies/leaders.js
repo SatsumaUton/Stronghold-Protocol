@@ -489,9 +489,10 @@ function kitXi(ab) {
       if (s2) s2.left = s2.icd;
     },
   });
-  // the three skills take the attack's turn (DESIGN §35.34)
-  const s1 = skill(sb, burst(sb), { cond: () => !P.form2, turn: attackSkillOf('enemy_1517_xi', 'ShieldBurst') });
-  const s2 = skill(sb2, sb2 ? burst(sb2) : null, { cond: () => P.form2, turn: attackSkillOf('enemy_1517_xi', 'ShieldBurstReborn') });
+  // the three skills take the attack's turn (DESIGN §35.34); 破桎而出 (MeleeAttack, its `cond` only the form) has no
+  // selector of its own: it waits for a swing at the attack's target (`own` false; PRTS 「触发索敌和普通攻击相同」, §35.36)
+  const s1 = skill(sb, burst(sb), { cond: () => !P.form2, turn: attackSkillOf('enemy_1517_xi', 'ShieldBurst', false) });
+  const s2 = skill(sb2, sb2 ? burst(sb2) : null, { cond: () => P.form2, turn: attackSkillOf('enemy_1517_xi', 'ShieldBurstReborn', false) });
   return [re, s1, s2, doubleHit(() => P.form2),                   // 普通攻击进行两次
     skill(cross, (b, e) => {
       const l = byDist(b, e);

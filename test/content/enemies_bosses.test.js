@@ -2243,24 +2243,35 @@ test(`${nm('enemy_1517_xi')}: 纬地经天 cross on the nearest unit; 破桎而�
   approx(h.unit('t_wall').stats.taken, e.s.atk * cr.bb.atk_scale, 1e-6, 'nearest');
   approx(h.unit('t_wall2').stats.taken, e.s.atk * cr.bb.atk_scale, 1e-6, 'same column, 2 rows away: inside the cross');
   assert.equal(h.unit('t_wall3').stats.taken, 0, 'outside the cross');
-  h.run(sb.initCooldown - h.b.time + 0.1);
+  // 破桎而出 has no selector of its own: it waits for a swing at the attack's target (DESIGN §35.36), so 自在 attacks now
+  e.profile.noAttack = false;
+  h.runUntil(() => e.s.shield > 0, sb.initCooldown - h.b.time + 2 * e.s.interval);
+  assert.ok(h.b.time >= sb.initCooldown - 1e-6, 'not before its initial cooldown');
   approx(e.s.shield, sb.bb.dynamic);
-  const w0 = h.unit('t_wall').stats.taken, c0 = casts(e, 'CrossAttack');
-  h.run(sb.bb.duration);
-  assert.ok(h.eventsOf('fx').some((f) => f[1] === 'explode' && f[4].kind === 'breakFree'));
-  // the burst and the crosses share the attack's turns (DESIGN §35.34): the crosses cast meanwhile, at most one a turn
-  const nc = casts(e, 'CrossAttack') - c0;
-  assert.ok(nc <= Math.ceil(sb.bb.duration / e.s.interval));
-  approx(h.unit('t_wall').stats.taken - w0, e.s.atk * (sb.bb.atk_scale + nc * cr.bb.atk_scale), 1e-6, 'barrier held ⇒ blast (+ the crosses meanwhile)');
+  const breakFree = (hh) => hh.eventsOf('fx').some((f) => f[1] === 'explode' && f[4].kind === 'breakFree');
+  const t0 = h.b.time, c0 = casts(e, 'CrossAttack'), a0 = e.stats.attacks;
+  let w0 = h.unit('t_wall').stats.taken;
+  while (!breakFree(h) && h.b.time < t0 + sb.bb.duration + 0.5) { w0 = h.unit('t_wall').stats.taken; h.step(); }
+  assert.ok(breakFree(h));
+  approx(h.unit('t_wall').stats.taken - w0, e.s.atk * sb.bb.atk_scale, 1e-6, 'barrier held ⇒ blast');
+  // the burst, the crosses and the strikes share the attack's turns (DESIGN §35.34): at most one a turn
+  assert.ok(casts(e, 'CrossAttack') - c0 + e.stats.attacks - a0 <= Math.ceil(sb.bb.duration / e.s.interval));
   // a broken barrier never blasts
   const h3 = arena({ units: [{ chessId: 't_wall', row: 10, col: 6 }] });
   h3.step();
   const x3 = put(h3, 'enemy_1517_xi', [10, 8]);
-  x3.profile.noAttack = true;
-  h3.run(sb.initCooldown + 0.1);
+  h3.runUntil(() => x3.s.shield > 0, sb.initCooldown + 2 * x3.s.interval);
   h3.b.dealDamage(null, x3, { amount: 1e5, type: 'true' });
   h3.run(sb.bb.duration);
-  assert.ok(!h3.eventsOf('fx').some((f) => f[1] === 'explode' && f[4].kind === 'breakFree'));
+  assert.ok(!breakFree(h3));
+  // nobody in its attack range: no swing, so no barrier — though the attack is ready (§35.36)
+  const h4 = arena({ units: [{ chessId: 't_wall', row: 10, col: 1 }] });
+  h4.step();
+  const x4 = put(h4, 'enemy_1517_xi', [10, 8]);
+  h4.run(sb.initCooldown + 3 * x4.s.interval);
+  assert.equal(x4.stats.attacks, 0, 'nothing in its attack range');
+  assert.equal(casts(x4, 'ShieldBurst'), 0);
+  assert.equal(x4.s.shield || 0, 0);
   killed(h, e, null);
   h.run(tb('enemy_1517_xi', 'reborn.duration') + 0.1);
   assert.ok(e.s.flags.invulnerable, 'reborn invincibility');
@@ -2968,7 +2979,8 @@ test('盐风主教昆图斯: 2 highest-DEF targets + neural; 崩坍 / 大潮 / �
   assert.ok(h.eventsOf('fx').some((f) => f[1] === 'rockfall'));
   h.run(skb('enemy_1521_dslily', 'Tidewater').initCooldown - h.b.time + e.s.interval + 0.2);
   assert.ok(h.eventsOf('fx').some((f) => f[1] === 'tide') && h.unit('t_wall3').stats.taken > 0, 'global tide');
-  h.run(skb('enemy_1521_dslily', 'SummonTentac').initCooldown - h.b.time + 0.2);
+  // 断裂生殖 takes a turn too (§35.37): the first turn after its initial cooldown
+  h.run(skb('enemy_1521_dslily', 'SummonTentac').initCooldown - h.b.time + e.s.interval + 0.2);
   assert.ok(h.eventsOf('fx').some((f) => f[1] === 'tentacle'));
   const atk0 = e.s.atk;
   h.b.sharedBoss.hp = h.b.sharedBoss.maxHp * 0.6;
@@ -2977,7 +2989,7 @@ test('盐风主教昆图斯: 2 highest-DEF targets + neural; 崩坍 / 大潮 / �
   h.b.sharedBoss.hp = h.b.sharedBoss.maxHp * 0.3;
   h.run(0.5);
   approx(e.s.atk, atk0 * (1 + tb('enemy_1521_dslily', 'atkup2.atk')));
-  h.run(6);
+  h.run(6 + e.s.interval);
   assert.equal(h.hooksOf('lpLoss')[0].amount, 100);
   assert.equal(h.result().lpLoss ?? h.b.result().lpLoss ?? 100, 100);
 });

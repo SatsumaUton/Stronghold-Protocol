@@ -147,6 +147,10 @@ test('假想敌：管 / 弦: 【裂管之奏】 / 【断弦之奏】 take a stri
   const casts = log.filter((a) => a.what === '1');
   assert.ok(casts.length >= 1, '裂管之奏 cast');
   oneActionPerTurn(log, pipe.s.interval, '管');
+  for (const c of casts) {
+    const next = log.find((a) => a.t > c.t + 1e-9);
+    if (next) assert.ok(next.t - c.t >= ATTACK_SKILL_CLIP[pipe.defId][1] - 1e-6, 'no strike inside 裂管之奏\'s longer clip');
+  }
   assert.ok((abilityOf(str, '1').casts ?? 0) >= 1, '断弦之奏 cast');
   // 弦 alone with a gold echo: its 断弦之奏 in its own strike turn
   const q = field([{ chessId: 't_wall', row: 10, col: 6 }], { tpl: 'act1autochess_h08_03' });
@@ -208,4 +212,18 @@ test('“萨米的意志”: 【自然涌动】 takes a 冰凌 turn', () => {
   assert.ok(lassos.length >= 2, `${lassos.length} lassos`);
   assert.ok(lassos[0].t >= sk(key, 'Lasso').initCooldown - 1e-6 && lassos[0].t <= sk(key, 'Lasso').initCooldown + e.s.interval + 0.05);
   oneActionPerTurn(log, e.s.interval, '萨米');
+});
+
+test('“萨米的意志”: a shortened attack interval still waits for Doom\'s clip in its own attack loop', () => {
+  const h = field([{ chessId: 't_wall', row: 9, col: 6 }]);
+  const e = put(h, 'enemy_9033_acdeer', [3, 10]);
+  h.b.addBuff(e, { key: 'test:haste', persist: true, mods: { aspd: 300 } });
+  const doom = abilityOf(e, 'Doom');
+  doom.left = 0;
+  assert.ok(e.s.interval < doom.clip);
+  const log = actions(h, e, 12, ['Lasso', 'Doom']);
+  const cast = log.find((a) => a.what === 'Doom');
+  assert.ok(cast, 'Doom cast');
+  const next = log.find((a) => a.t > cast.t + 1e-9);
+  assert.ok(next && next.t - cast.t >= doom.clip - 1e-6, 'no action inside the clip');
 });

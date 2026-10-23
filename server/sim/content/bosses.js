@@ -855,7 +855,7 @@ function kitEcho(ab, e) {
 function pipeCore(ab, e, b, tpl, { form, prefix }) {
   const hi = T(ab, `1.${prefix}_t_1[high_hp].interval`) ?? 40, lo = T(ab, `1.${prefix}_t_1[low_hp].interval`) ?? hi, thr = T(ab, '1.hp_ratio') ?? 0;
   const key = ab.tS['1.enemy_key'] ?? ECHO_KEY;
-  const P = { acc: 0, atk: Infinity };   // first strike as soon as an echo of its form exists (engine attack rule)
+  const P = { acc: 0, atk: Infinity, heldUntil: 0 };   // first strike as soon as an echo of its form exists (engine attack rule)
   const summon = (b2, e2) => {
     const got = branchSpawn(b2, tpl, 'summon_enemy', 0, { mods: summonMods(b2), at: { x: e2.x, y: e2.y }, fallback: () => [b2.spawnEnemy(key, { pos: [e2.y, e2.x], route: toGoal(b2, e2.x, e2.y), mods: summonMods(b2) })].filter(Boolean) });
     for (const u of got) if (u.defId === ECHO_KEY && form === 'gold') setEchoForm(b2, u, 'gold');
@@ -868,11 +868,16 @@ function pipeCore(ab, e, b, tpl, { form, prefix }) {
       if (P.acc >= (e2.hpRatio < thr ? lo : hi)) { P.acc = 0; summon(b2, e2); }
       if (!canCast(e2, false, b2)) return;
       P.atk += dt;
-      if (P.atk < e2.s.interval) return;
+      if (P.atk < e2.s.interval || b2.time < P.heldUntil) return;
       const t = b2.rng.pick(echoesOf(b2, form));                 // 优先攻击…形态余音
       if (!t) return;
       P.atk = 0;
-      if (attackTurnSkill(b2, e2)) return;                       // 裂管之奏 / 断弦之奏 take this attack's turn (DESIGN §35.29)
+      const cast = attackTurnSkill(b2, e2);                       // 裂管之奏 / 断弦之奏 take this attack's turn (DESIGN §35.29)
+      if (cast) {
+        // [ASSUMED] a longer clip holds this custom attack loop too (管: 4.167 s clip, 3 s interval; DESIGN §35.36).
+        P.heldUntil = b2.time + (cast.clip || 0);
+        return;
+      }
       e2.lastAttackAt = b2.time;
       e2.stats.attacks++;
       b2.fx('beam', { x: e2.x, y: e2.y, from: e2.id, to: t.id, kind: `${prefix}Strike` });
@@ -934,9 +939,10 @@ function kitQuintus(ab, e, b, tpl) {
   // attack's turn (enemies.js attackSlotSkill; PRTS 「大多数技能自动触发会占用攻击间隔」), equal priorities at random. Every
   // skill's cooldown counts from the end of its clip (QUINTUS_CLIP; PRTS 「同一技能的冷却时间于该技能结束时开始计时」): the
   // third-form tide (3.5 + 1.667 s) alternates with the attack instead of coming on top of it every 3.5 s (DESIGN §35.19).
-  // 断裂生殖 / 物种爆发 (AnimatedActionToOwnerAbility) keep their own timers, so they can come during or in the tick of a
-  // tide, 崩坍 or attack [ASSUMED: a deviation kept to limit scope — PRTS's default has most skills take the attack's
-  // turn, and arknights.wiki.gg has one action between two tides; DESIGN §35.19]. 断裂生殖 「仅仍有未执行的小队动作指令时
+  // 断裂生殖 / 物种爆发 (AnimatedActionToOwnerAbility) take the attack's turn too — PRTS's default (most skills; no
+  // exception noted for them) and arknights.wiki.gg's one action ("attacking once or using another ability") between two
+  // tides —, with a trigger of their own (`own`: the abilities' `_allowNoTarget` 1), so they also come with the attack
+  // ready and nothing in range (enemies.js onTick; DESIGN §35.37; until then on their own timers). 断裂生殖 「仅仍有未执行的小队动作指令时
   // 可触发」: its level branch (blackboard branch_id; prefab MoveNextLevelBranch, not looping) is shared by the three forms
   // and used up after its last phase (7 in act1autochess_h07_04 / _s); a template without the branch keeps the
   // random-target fallback with no limit.
@@ -950,7 +956,7 @@ function kitQuintus(ab, e, b, tpl) {
     const kind = name.replace(/G\d$/, '');
     const phases = kind === 'SummonTentac' ? tentLeft(s) : Infinity;
     const a = {
-      cd: s.cd, icd: s.icd, sk: s, stage, atk: QUINTUS_ATTACK_SKILLS.has(kind), clip: QUINTUS_CLIP[kind] ?? 0,
+      cd: s.cd, icd: s.icd, sk: s, stage, atk: true, own: !QUINTUS_ATTACK_SKILLS.has(kind), clip: QUINTUS_CLIP[kind] ?? 0,
       cond: () => P.stage === stage && P.tent < phases, fire: (b2, e2) => QUINTUS[kind](b2, e2, s, P, tpl),
     };
     skills.push(a);
@@ -983,6 +989,7 @@ function kitQuintus(ab, e, b, tpl) {
   return list;
 }
 
+/** 昆图斯's skills whose trigger is the attack's (「触发索敌和普通攻击相同」: MeleeAttack); 断裂生殖 / 物种爆发 trigger on their own. */
 const QUINTUS_ATTACK_SKILLS = new Set(['Tidewater', 'Rockfall']);
 /**
  * The clip of each 昆图斯 skill, in s: its official ability's animKey (prefab battle/enm_pfb_18.ab — fx/index.json units.
@@ -1182,7 +1189,7 @@ function kitDeer(ab, e) {
   const dr = T(ab, 'Madness.damage_resistance') ?? 0;
   const atkN = T(ab, 'Madness.enemy_smdeer_mad[attack].max_cnt') ?? 1, skN = T(ab, 'Madness.enemy_smdeer_mad[skill].max_target') ?? 1;
   const lasso = ab.sk.Lasso, doom = ab.sk.Doom;
-  const P = { low: false, acc: Infinity };   // like engine attacks, the first 冰凌 comes as soon as it has a target
+  const P = { low: false, acc: Infinity, heldUntil: 0 };   // like engine attacks, the first 冰凌 comes as soon as it has a target
   return [
     {
       spawn(b, e2) { e2.profile.noAttack = true; },
@@ -1194,11 +1201,16 @@ function kitDeer(ab, e) {
         }
         if (!canCast(e2, false, b)) return;
         P.acc += dt;
-        if (P.acc < e2.s.interval) return;
+        if (P.acc < e2.s.interval || b.time < P.heldUntil) return;
         const cands = fairOrder(b, e2, allTargets(b, e2), P);
         if (!cands.length) return;
         P.acc = 0;
-        if (attackTurnSkill(b, e2)) return;                        // 自然涌动 / Doom take this attack's turn (DESIGN §35.29)
+        const cast = attackTurnSkill(b, e2);                        // 自然涌动 / Doom take this attack's turn (DESIGN §35.29)
+        if (cast) {
+          // [ASSUMED] no 冰凌 inside its skill clip even with a shortened interval (DESIGN §35.36).
+          P.heldUntil = b.time + (cast.clip || 0);
+          return;
+        }
         const cols = [];
         for (const t of cands) { if (!cols.includes(t.tileC)) cols.push(t.tileC); if (cols.length >= (P.low ? atkN : 1)) break; }
         for (const c of cols) { // 【冰凌】 its normal attack: the whole column (an area selection: no unblocking 隐匿 operator)

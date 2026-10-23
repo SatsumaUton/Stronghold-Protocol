@@ -366,7 +366,11 @@ drops when its blocker is gone; 0.2.0 — until then it walked on at once). Ever
 leaders' and normal enemies' attack-class skills, `enemies/helpers.js ENEMY_ATTACK_SKILL_CLIP`) ready at the frame (not checked at the swing's start [ASSUMED]) is cast instead of the strike and the cooldown restarts as after one — several ready: the highest data priority, equal ones at random (`b.rng`); a skill whose kit gives its clip (`clip`) is ready again its cooldown after the clip's end, the clip kept at its length under an attack-speed cut like the attack clip [ASSUMED] (so 昆图斯's third-form tide takes every turn once the interval passes 5.167 s: 寒冷 plus any further cut) (PRTS 「大多数技能自动触发会占用攻击间隔」, 「同一技能的冷却时间于该技能结束时开始计时」; `content/enemies.js attackSlotSkill` / `castNow`, DESIGN §35.19); a skill with a trigger selector of its own (`own`: 卢西恩 /
 不祥幻影's radius-2 aoe, most of §35.34's) also takes the turn of an attack that is ready with no swing started — no attack
 target, e.g. an unblocked melee enemy — the effect at once and the cooldown restarting as after a strike (`enemies.js`
-onTick, DESIGN §35.29 / §35.34); `fear`/`disarm` stop attacks; `dmgType 'none'` enemies
+onTick, DESIGN §35.29 / §35.34). Since §35.36, both paths restart the attack cooldown at
+max(attack interval, skill clip), so the next strike cannot land inside a longer clip [ASSUMED: the clip occupies the
+unit]; 管 / 弦 and “萨米的意志”'s custom attack loops keep the same clip deadline. “自在”'s two 破桎而出 need a swing (no selector of their own). Since §35.37 昆图斯's 断裂生殖 / 物种爆发 also take
+the attack's turn, with `own` (`_allowNoTarget` 1), and compete with its other skills by priority. `attackTurnSkill`
+returns the cast ability, or null. `fear`/`disarm` stop attacks; `dmgType 'none'` enemies
 never attack — unless content arms them through `enemy.profile` (`noAttack: false`, `melee`, `dmgType`, `maxTargets`:
 转译基底·α's 寻仇者 / 特战术师 forms, which then attack like any enemy); `dmgType 'heal'` enemies heal the lowest-HP% enemy in their radius instead. A `noMove` enemy stands (not `moving`, drawn idle). Content can take over an
 enemy's attack: `enemy.profile.deferHit` = the engine makes the attack (target, timing, the `'atk'` event) but deals no
