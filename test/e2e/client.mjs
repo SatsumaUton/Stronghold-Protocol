@@ -328,6 +328,8 @@ export class Client {
       for (const el of document.querySelectorAll(sel)) {
         if (text && !(el.textContent || '').includes(text)) continue;
         if (!any && (el.disabled || el.getAttribute('aria-disabled') === 'true')) continue;
+        // The loadout overlay hides the underlying screen until its closing effect restores it.
+        if (getComputedStyle(el).visibility === 'hidden') continue;
         const r = el.getBoundingClientRect();
         if (r.width < 2 || r.height < 2) continue;
         const x = r.left + r.width / 2; const y = r.top + r.height / 2;
