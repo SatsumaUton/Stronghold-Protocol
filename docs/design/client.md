@@ -986,3 +986,7 @@ Attack pacing (PR #729): UnitInfo carries the actual attack interval in game sec
 phase and before projectiles carries changes; its baseline is seeded by birth info. The renderer looks ahead through
 the attack tick, including a rate later in that tick, without borrowing a later tick’s value. Its 0.2–6 second display
 window is [ASSUMED]; damage, attack timing and targeting are unchanged.
+
+Skill model fallback (#786, §35.90): when facing up, a skill with an authored Front clip and only an attack fallback
+on Back uses Front through the skill clip and ending. Back-authored skills keep Back. [ASSUMED] This model choice
+is presentation inferred from the available animation roles; simulation facing and targeting do not change.

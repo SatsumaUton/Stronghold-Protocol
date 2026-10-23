@@ -1,4 +1,4 @@
-// test/render/skill-front-face.test.js — 开技能转正面（本地补丁，未上游）。官方在【背面骨架没有自己的技能动作】时把正面
+// test/render/skill-front-face.test.js — 开技能转正面。[ASSUMED] 在【背面骨架没有自己的技能动作】时把正面
 // 模型转过来播技能：德克萨斯 S2 剑雨、缄默德克萨斯这类干员的背面骨架根本没有 Skill clip，导出器只能把 skill 记成
 // via:'attack'（tools/assets/anim-roles.mjs:31），于是背面开技能只是挥一下普攻。反过来，灰烬的背面骨架只有
 // Skill_Loop_Up / Skill_Idle_Up、excu 的背面有 Skill_Up_*，官方给「朝上」编了专属技能动作 —— 所以这条只对「背面演不出
@@ -133,7 +133,6 @@ describe('开技能转正面', () => {
     frames(v, 1);
     await settle();
     assert.equal(v.actor.entry, front(TEXAS));
-    assert.equal(s.acquired === undefined ? 0 : 0, 0);
     v.destroy();
     await settle();
   });
@@ -188,4 +187,21 @@ describe('开技能转正面', () => {
     v.destroy();
     await settle();
   });
+});
+
+
+test('pausing animation time preserves the front-only skill window', async () => {
+  const v = await op(TEXAS, 'UP');
+  cast(v, true);
+  frames(v, 1);
+  await settle();
+  cast(v, false);
+  const hold = v._faceHold;
+  assert.ok(hold > 0);
+  v.ctx.animRate = () => 0;
+  frames(v, 180);
+  assert.equal(v._faceHold, hold);
+  assert.equal(v._wantsBack(), false);
+  v.destroy();
+  await settle();
 });

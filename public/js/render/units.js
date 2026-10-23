@@ -1797,7 +1797,7 @@ export class UnitView {
     const P = this.P;
     // the cast's clip still on screen: once it played out and the skill is off, the Back model comes back (_skillFacesFront)
     if (this._faceHold > 0) {
-      this._faceHold = Math.max(0, this._faceHold - dt * (this.ctx.animRate?.() || 1));
+      this._faceHold = Math.max(0, this._faceHold - dt * (this.ctx.animRate?.() ?? 1));
       if (!this._faceHold && !(this.flags & UF.SKILL)) this._modelDirty = true;
     }
     // the model for the state the frame's events and snapshot left (Front ⇄ Back when it went down / stood up: die, revive)
