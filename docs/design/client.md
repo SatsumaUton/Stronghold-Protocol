@@ -306,6 +306,7 @@ again after closing; the modal interaction is unchanged.
 Settlement layout (§35.1, #745): preserve #698's official art and positions. Both translated outcome headings fit
 inside bounded boxes; button backgrounds/inset decoration are missing-or-failed-sprite fallbacks only (keyboard
 focus remains visible). Each of the two equipment slots constrains its icon with `object-fit: contain`.
+The 下一步 button maps the face of its 297×86 art (rows 1–68, columns 1–268) onto its box; label and icon use layout rem, with the label registered as a text-size exception (§35.94).
 [ASSUMED] Browser title budgets and uniform shrinking accommodate translation and text-size expansion; they are
 not measurements of the official client.
 
