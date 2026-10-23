@@ -27,10 +27,10 @@ Configuration is validated before server startup; an invalid configuration fails
 | `SP_EXTERNAL_AI_TOKEN` | Optional HTTP bearer token; environment only |
 | `SP_EXTERNAL_AI_COMMAND` | Required for stdio: JSON argv array, no shell; 1–64 nonempty strings, each ≤4096 characters |
 | `SP_EXTERNAL_AI_SEATS` | Optional comma-separated seat indices, 0–3; omitted means all bot-controlled seats |
-| `SP_EXTERNAL_AI_TIMEOUT_MS` | 1000; integer 1–30000, both request timeout and total decision budget |
+| `SP_EXTERNAL_AI_TIMEOUT_MS` | 1000; integer 1–300000, both request timeout and total decision budget |
 | `SP_EXTERNAL_AI_MAX_INTENTS` | 64; integer 1–256, cumulative across replies in one decision |
 | `SP_EXTERNAL_AI_MAX_BYTES` | 65536; integer 1–1048576, raw response bytes / stdio line, excluding newline |
-| `SP_EXTERNAL_AI_FAILURES` | 3; integer 1–20 consecutive failed decisions before match-long fallback |
+| `SP_EXTERNAL_AI_FAILURES` | 3; integer 1–20 consecutive failed decisions before match-long fallback (plan mode: protocol/transport errors only) |
 | `SP_EXTERNAL_AI_BACKOFF_MS` | 1000; integer 1–60000 before the next demand can restart a failed stdio child |
 
 Seat selection applies to AI teammates, opponent seats in modes that use them, and humans under AI takeover.
@@ -139,8 +139,10 @@ credentials are never forwarded. The raw response has the configured size cap an
 
 Stdio launches argv directly, without a shell, with one long-lived child per match. Each observation and reply
 occupies one UTF-8 JSON line. Several seats/windows may be in flight; echo IDs to correlate replies. Stdout is
-protocol-only. Stderr is discarded to avoid leaking secrets through server logs. A crash, bad/oversized line,
-unknown reply ID, cancellation or timeout kills the child and fails outstanding requests. A subsequent demand
+protocol-only. Stderr is discarded to avoid leaking secrets through server logs. A crash, bad/oversized line or a
+reply ID that was never sent kills the child and fails outstanding requests. A cancellation (the host dropped that
+decision) or a timeout ends only that request; its late reply is ignored by ID (history §35.62). A timeout kills the
+child only when the child wrote no line at all since that request was sent. A subsequent demand after a kill
 restarts it only after `backoffMs`; requests during backoff fail immediately. Shutdown uses SIGKILL to bound
 cleanup, including programs that ignore SIGTERM. The operator remains responsible for any grandchildren its
 own program starts. Match end and disposal terminate the child and cancel pending HTTP requests.
@@ -156,6 +158,11 @@ shopping/placement, the existing rehearsal/delegation path, cleanup and Ready. A
 stay applied, so legacy continues from the current seat state. Offer fallback retains the existing window default.
 Three consecutive failed decisions (configurable) disable external decisions for that seat for the rest of the
 match and log the switch once; a completed decision resets the streak. Other seats keep their own counters.
+In plan mode (§35.62) only protocol and transport errors count: a decision whose budget ran out, or a reply
+`{plan: null}` from an agent that could not plan in time, falls back the same way without touching the streak.
+A plan seat whose prep call fails or is still waiting keeps the last accepted plan's bonds, buy / keep / sell,
+items and the funds direction of its economy (`saveForInterest`, `reserve`; since §35.63 not `level`, `maxRefreshes`,
+`refreshAbove` or `freezeSearch`, and never `choice`, `placements` or a one-prep `holdLevel`).
 
 ## Journals, security and tests
 
@@ -369,16 +376,17 @@ SP_LLM_API_KEY="$YOUR_KEY" npm start
 ```
 
 `SP_LLM_BASE_URL`, `SP_LLM_MODEL`, `SP_LLM_API_KEY` are required environment values; none are logged or
-journaled. `SP_LLM_TIMEOUT_MS` defaults to 20000 (1..30000). The adapter has no default provider or model.
-`SP_LLM_MAX_TOKENS` caps one reply (default 6000, 256–32000; reasoning models spend completion tokens before the plan, so a small cap returns an empty reply); `SP_LLM_REASONING_EFFORT` (minimal / low / medium / high) is sent as `reasoning_effort` when set; `SP_LLM_DEBUG_FILE` appends one line per request with the failing stage, the reply head and the accepted plan, never the key or request headers.
+journaled. `SP_LLM_TIMEOUT_MS` defaults to 20000 (1..300000). The adapter has no default provider or model.
+`SP_LLM_MAX_TOKENS` caps one reply (default 16000, 256–32000; reasoning models spend completion tokens before the plan, so a small cap returns an empty reply); a reply cut off by that cap before any JSON is asked once more with a short "decide now, JSON only" turn while half of `SP_LLM_TIMEOUT_MS` remains (the limit covers both requests; history §35.63); `SP_LLM_REASONING_EFFORT` (minimal / low / medium / high) is sent as `reasoning_effort` when set, `SP_LLM_RETRY_EFFORT` (same values) only on that retry; 机变 / offer / reward calls get a choice-only task and may echo `choiceName`, which corrects a mismatched choice ID when it names exactly one other card; `SP_LLM_DEBUG_FILE` appends one line per request with the failing stage, the reply head and the accepted plan, never the key or request headers.
 It keeps eight knowledge versions in memory as stable system prompts, with an original general-principles
 strategy prompt, and sends only compact digest/choices/continuity per decision. Provider prompt caching can reuse that prefix;
 it is provider-dependent and still requires sending the prefix with the compatible stateless chat API.
 It POSTs `/chat/completions`, uses `response_format:{type:'json_object'}`, validates the parsed plan locally,
 rejects truncation/redirects/oversized output, and forwards numeric usage only. JSON mode does not guarantee
 schema adherence ([official OpenAI documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat)).
-[ASSUMED] Example limits: 6000 output tokens (`SP_LLM_MAX_TOKENS`, 256–32000), 256 KiB provider replies, 2 MiB input frames and four concurrent
-requests. Catalogue effect summaries retain at most 500 characters each. Tests use a loopback mock; no real API
+[ASSUMED] Example limits: 16000 output tokens (`SP_LLM_MAX_TOKENS`, 256–32000), 256 KiB provider replies, 2 MiB input frames and 16 concurrent
+requests (four seats plus requests the host abandoned that are still finishing). Debug lines carry the provider's
+usage, so abandoned replies still show their tokens. Catalogue effect summaries retain at most 500 characters each. Tests use a loopback mock; no real API
 is used for repository validation.
 
 ### Committed round plans and private reasoning (§35.11)

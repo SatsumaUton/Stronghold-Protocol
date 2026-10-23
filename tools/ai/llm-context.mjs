@@ -17,11 +17,34 @@ export function compactChoices(d) {
   });
 }
 
+// §35.63 [ASSUMED]: the seat's own copy counts and the shop arithmetic, computed here so the model does not have to
+// (cycle 2: plans skipped third copies, and holds were justified by miscounted prices).
+const baseOf = p => p.baseId || String(p.id).replace(/_b$/, '_a');
+export function levelOptions(economy, mergeCosts) {
+  const gold = economy?.gold, price = economy?.upgradePrice, level = economy?.level;
+  if (!Number.isInteger(gold) || !Number.isInteger(price) || !Number.isInteger(level)) return undefined;
+  const merges = mergeCosts.slice().sort((a, b) => a - b);
+  const affordable = funds => { let n = 0, left = funds; for (const c of merges) if (c <= left) { left -= c; n++; } return n; };
+  return [{ action: 'hold', fundsAfter: gold, mergesAffordable: affordable(gold), nextRoundPrice: Math.max(0, price - 1) },
+    ...(gold >= price && level < 6 ? [{ action: 'level', toLevel: level + 1, fundsAfter: gold - price, mergesAffordable: affordable(gold - price) }] : [])];
+}
+
 export function compactDigest(d, pack) {
   const board = (d.board || []).map(unit), bench = (d.bench || []).map(unit), overflow = (d.overflow || []).map(unit);
   const offers = (d.shop || []).filter(s => s && !s.sold);
-  const shop = offers.map(s => ({ ...pick(s, ['id', 'name', 'kind', 'slot', 'bonds', 'frozen', 'class', 'caps']), cost: s.price, tier: s.tier }));
   const held = [...(d.board || []), ...(d.bench || [])].filter(p => p.kind === 'chess');
+  const copies = new Map(), elites = new Set();
+  for (const p of [...held, ...(d.overflow || []).filter(p => p.kind === 'chess')]) {
+    if (p.stars === 2) elites.add(baseOf(p)); else copies.set(baseOf(p), (copies.get(baseOf(p)) || 0) + 1);
+  }
+  const mergeCopies = new Map((pack.operators || []).map(o => [o.id, o.mergeCopies || 3]));
+  const shop = offers.map(s => {
+    const row = { ...pick(s, ['id', 'name', 'kind', 'slot', 'bonds', 'frozen', 'class', 'caps']), cost: s.price, tier: s.tier };
+    if (s.kind !== 'chess' || s.stars === 2) return row;
+    const n = copies.get(baseOf(s)) || 0;
+    return { ...row, copiesHeld: n, ...(elites.has(baseOf(s)) ? { eliteHeld: true } : {}),
+      completesMerge: !elites.has(baseOf(s)) && n + 1 >= (mergeCopies.get(s.id) || mergeCopies.get(baseOf(s)) || 3) };
+  });
   const disabled = new Set(d.availability?.disabledBonds || []);
   const banned = new Set([...(d.availability?.bannedChess || []), ...(d.availability?.diyBanned || [])]);
   const pool = pack.operators.filter(p => p.poolEligible && !p.elite && p.tier <= d.economy?.level
@@ -42,18 +65,27 @@ export function compactDigest(d, pack) {
     const capacity = b.countMode === 'BOARD_AND_DECK' ? potential : Math.min(potential, d.deployCap || 0);
     const reachable = !!current?.active || (nextThreshold !== null && Math.max(count, capacity) >= nextThreshold);
     // Preserve actual accumulated investment when assessing pivots; never infer layers from member counts.
-    return { id: b.id, count, nextThreshold, ...(current?.layers ? { layers: current.layers } : {}),
+    return { id: b.id, kind: b.core ? 'core' : 'class', count, nextThreshold, ...(current?.layers ? { layers: current.layers } : {}),
       ...(current?.tier ? { tier: current.tier } : {}), held: members.length,
       shopOptions: new Set(shown.map(p => p.baseId || p.id)).size, poolOptions: eligible.length,
       candidate: members.length > 0 && reachable };
   }).filter(b => b.count || b.held || b.shopOptions);
+  // Official mode data (config enemyScale): the catalogue rows above are unscaled, co-op R7-R10 enemies have 3.6-4.3x HP.
+  const scale = (pack.difficulties || []).find(x => x.id === pack.modeId)?.enemyScale?.[d.round];
+  const options = levelOptions(d.economy, shop.filter(s => s.completesMerge).map(s => s.cost));
+  const coreIds = new Set((pack.bonds || []).filter(b => b.core).map(b => b.id));
   return { ...pick(d, ['round', 'phase', 'lp', 'deployCap', 'factions']), band: d.band?.id,
-    economy: pick(d.economy, ['gold', 'interest', 'level', 'upgradePrice', 'refreshPrice', 'expiringFunds', 'frozenSlots', 'bankOperators']),
+    economy: { ...pick(d.economy, ['gold', 'interest', 'level', 'upgradePrice', 'refreshPrice', 'expiringFunds', 'frozenSlots', 'bankOperators']),
+      ...(options ? { levelOptions: options } : {}) },
+    ...(scale ? { enemyScale: pick(scale, ['atk', 'hp']) } : {}),
     board, bench, overflow, shop, bonds,
     upcoming: (d.upcoming || []).map(e => pick(e, ['enemyKey', 'name', 'count', 'gate', 't', 'fly', 'elite', 'boss', 'source', 'mods'])),
     boss: pick(d.boss, ['id', 'name', 'round']),
-    teammates: (d.opponents || []).map(p => ({ playerId: p.playerId, lp: p.lp, bandId: p.bandId,
-      bonds: (p.bonds || []).filter(b => b.active).map(b => ({ id: b.bondId, count: b.count })) })) };
+    teammates: (d.opponents || []).map(p => {
+      const main = (p.bonds || []).filter(b => coreIds.has(b.bondId) && b.count >= 2).sort((a, b) => b.count - a.count || a.bondId.localeCompare(b.bondId))[0];
+      return { playerId: p.playerId, lp: p.lp, bandId: p.bandId, ...(main ? { main: main.bondId } : {}),
+        bonds: (p.bonds || []).filter(b => b.active).map(b => ({ id: b.bondId, count: b.count })) };
+    }) };
 }
 
 export function continuity(d, previous) {
@@ -74,10 +106,13 @@ export function continuity(d, previous) {
       lp: { before: confirmed?.digest.lp ?? null, after: d.lp ?? null }, lastBattle: feedback?.lastBattle || null } };
 }
 
-export function focusPlan(plan, meta, digest, previousPlan, repairs) {
+// §35.62 [ASSUMED]: the band draft sets a direction before any member is owned (玛恩纳 → 卡西米尔 waited until R6 for a
+// first copy). `intent` lists the mains of the current strategy candidates: those bonds may lead the plan without a
+// held member. A primary change still needs pivot:true and a reason.
+export function focusPlan(plan, meta, digest, previousPlan, repairs, intent = []) {
   // §35.9's explicit empty-plan delegation remains unweighted, even when an earlier plan had targets.
   if (!Object.keys(plan).length) return { pivot: false, pivotReason: '' };
-  const candidates = new Set(digest.bonds.filter(b => b.candidate).map(b => b.id));
+  const candidates = new Set([...digest.bonds.filter(b => b.candidate).map(b => b.id), ...intent]);
   const select = bonds => (bonds || []).filter(b => candidates.has(b.id)).sort((a, b) => b.priority - a.priority).slice(0, 3);
   const proposed = select(plan.bonds);
   for (const b of plan.bonds || []) if (!proposed.includes(b)) repairs.push({ path: 'bonds', id: b.id, reason: 'no held/reachable progress or three-bond cap' });

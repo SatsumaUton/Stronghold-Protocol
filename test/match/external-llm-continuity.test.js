@@ -5,9 +5,9 @@ import { once } from 'node:events';
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createLLMAgent } from '../../tools/ai/llm-agent.mjs';
+import { createLLMAgent, modelStrategy, parseReply } from '../../tools/ai/llm-agent.mjs';
 import { compactDigest, compactChoices, continuity, focusPlan } from '../../tools/ai/llm-context.mjs';
-import { repairPlan } from '../../tools/ai/llm-plan.mjs';
+import { repairPlan, holdFloor } from '../../tools/ai/llm-plan.mjs';
 
 test('example repair preserves reasoned level holds and drops an unexplained hold', () => {
   const economy = { level: 2, holdLevel: true, why: 'Farm low-tier elites.' };
@@ -15,6 +15,43 @@ test('example repair preserves reasoned level holds and drops an unexplained hol
   const repaired = repairPlan({ economy: { level: 2, holdLevel: true } }, pack, fixture.digest, []);
   assert.equal(repaired.plan.economy.holdLevel, undefined);
   assert.ok(repaired.repairs.some(r => r.path === 'economy.holdLevel'));
+});
+
+test('§35.62 repair drops level holds below the slow curve unless a candidate holds that level; item buys move', () => {
+  // §35.63: L2 by R4 (not R3) and L6 by R11.
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13].map(holdFloor), [1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]);
+  const economy = { level: 2, holdLevel: true, why: 'Price drops next round.' };
+  const late = { ...fixture.digest, round: 5, economy: { ...fixture.digest.economy, level: 2 } };
+  const dropped = repairPlan({ economy }, pack, late, []);
+  assert.equal(dropped.plan.economy.holdLevel, undefined);
+  assert.ok(dropped.repairs.some(r => r.path === 'economy.holdLevel' && /floor L3/.test(r.reason)));
+  assert.equal(repairPlan({ economy }, pack, late, [], { holds: [2] }).plan.economy.holdLevel, true);
+  assert.equal(repairPlan({ economy }, pack, { ...late, round: 4 }, []).plan.economy.holdLevel, true);
+  // Levelling to the floor first and holding there is at the curve, not below it.
+  assert.equal(repairPlan({ economy: { ...economy, level: 3 } }, pack, late, []).plan.economy.holdLevel, true);
+  const moved = repairPlan({ buy: ['lead', 'item'], items: { buy: [] } }, pack, fixture.digest, []);
+  assert.deepEqual(moved.plan.buy, ['lead']);
+  assert.deepEqual(moved.plan.items.buy, ['item']);
+  assert.deepEqual(repairPlan({ buy: ['item'] }, pack, fixture.digest, []).plan, { buy: [], items: { buy: ['item'] } });
+});
+
+test('§35.62 a strategy candidate main may lead the plan before a member is held; the model sees two prep candidates', () => {
+  const digest = { ...compactDigest(fixture.digest, pack), bonds: [] };
+  const plan = { bonds: [{ id: 'a', priority: 5 }] }, repairs = [];
+  focusPlan(plan, { pivot: false }, digest, null, repairs, ['a']);
+  assert.deepEqual(plan.bonds, [{ id: 'a', priority: 5 }]);
+  const without = { bonds: [{ id: 'a', priority: 5 }] };
+  focusPlan(without, { pivot: false }, digest, null, [], []);
+  assert.deepEqual(without.bonds, []);
+  const curve = [4, 7].map(round => ({ round, level: 2, basis: 'same sentence' }));
+  const strategy = { candidates: [1, 2, 3, 4].map(i => ({ id: `c${i}`, main: 'a', levelCurve: curve })) };
+  const prep = modelStrategy(strategy, 'prep');
+  assert.equal(prep.candidates.length, 2);
+  assert.equal(prep.levelCurveBasis, 'same sentence');
+  assert.ok(prep.candidates.every(c => c.levelCurve.every(r => !('basis' in r) && r.round)));
+  assert.equal(modelStrategy(strategy, 'band').candidates.length, 4);
+  assert.deepEqual(parseReply('```json\n{"plan":{}}\n```'), { plan: {} });
+  assert.throws(() => parseReply('no json'));
 });
 import { validPlan } from '../../server/match/aiPlan.js';
 import { aiObservation } from '../../server/match/externalAI.js';

@@ -19,6 +19,21 @@ export const AI_ACTIONS = Object.freeze({
   prep: ['g.buy', 'g.sell', 'g.move', 'g.refresh', 'g.freeze', 'g.levelUp', 'g.equip', 'g.unequip', 'g.art', 'g.destroy', 'g.reward', 'g.choice', 'g.ready', 'g.offer', 'g.offerRefresh'],
 });
 const clone = value => JSON.parse(JSON.stringify(value));
+// §35.62 [ASSUMED]: a failed or late prep call keeps the last accepted direction (bonds, buy/keep/sell, items,
+// economy preferences) instead of leaving legacy with no weights. Observation-local choice IDs, placements and a
+// one-prep level hold never carry over.
+export function carryPlan(plan) {
+  if (!plan) return null;
+  const { choice, placements, economy, ...rest } = clone(plan);
+  void choice; void placements;
+  // §35.63: only the funds direction carries over. A carried maxRefreshes 0 / level / refreshAbove met a new round's
+  // shop with last round's limits (failed preps lost 1.19 funds each against 0.37 for accepted ones).
+  if (economy) {
+    const kept = Object.fromEntries(Object.entries(economy).filter(([k]) => ['saveForInterest', 'reserve'].includes(k)));
+    if (Object.keys(kept).length) rest.economy = kept;
+  }
+  return rest;
+}
 
 export function aiObservation(m, ps, { id, kind, deadline, remaining }, results) {
   // Exactly the existing wire views: no PlayerState spread, data tables, RNG, seeds or other private views.
@@ -84,10 +99,10 @@ export class ExternalAI {
     // [ASSUMED] Reserve half the remaining phase for legacy; untimed phases still have the adapter's own cap.
     const budget = Math.max(0, Math.min(this.config.timeoutMs, phaseDeadline > 0 ? (phaseDeadline - now) / 2 : Infinity));
     if (budget <= 0) return false;
-    if (this.config.mode === 'plan' && decision.kind === 'prep') { state.prepRound = m.round; state.plan = null; }
+    if (this.config.mode === 'plan' && decision.kind === 'prep') { state.prepRound = m.round; state.plan = carryPlan(state.acceptedPlan?.plan); }
     const job = { ...decision, key, ps, state, used: 0, deadline: now + budget, id: null, controller: null, timer: null };
-    job.timer = m.later(budget, () => this.fail(job));
-    if (!this.replay) job.wallTimer = setTimeout(() => this.m.externalReply(job.id, null, true), budget);
+    job.timer = m.later(budget, () => this.fail(job, 'timeout'));
+    if (!this.replay) job.wallTimer = setTimeout(() => this.m.externalReply(job.id, null, 'timeout'), budget);
     this.request(job);
     return true;
   }
@@ -185,14 +200,17 @@ export class ExternalAI {
     if (!job) return;
     if (!this.active(job)) { this.drop(job); return; }
     if (job.started != null) { this.metric(job, 'latencyMs', performance.now() - job.started); job.started = null; }
-    if (failed || this.m.sched.now() >= job.deadline) { this.fail(job); return; }
+    if (failed || this.m.sched.now() >= job.deadline) { this.fail(job, failed === true ? 'error' : 'timeout'); return; }
     if (validUsage(reply?.usage) && reply?.usage) {
       this.metric(job, 'usageReports');
       for (const key of ['inputTokens', 'outputTokens', 'cachedTokens']) this.metric(job, key, reply.usage[key] || 0);
     }
     if (this.config.mode === 'plan') {
       if (!reply || !Object.keys(reply).every(k => ['v', 'id', 'plan', 'usage'].includes(k))
-        || reply.v !== AI_VERSION || reply.id !== id || !validPlan(reply.plan) || !validUsage(reply.usage)) { this.fail(job); return; }
+        || reply.v !== AI_VERSION || reply.id !== id || !validUsage(reply.usage)) { this.fail(job, 'error'); return; }
+      // An agent that answers {plan: null} could not produce a plan in time (its own model timeout or refusal).
+      if (reply.plan === null) { this.fail(job, 'timeout'); return; }
+      if (!validPlan(reply.plan)) { this.fail(job, 'error'); return; }
       if (job.kind === 'prep') {
         job.state.plan = clone(reply.plan);
         job.state.acceptedPlan = { id, round: this.m.round, plan: clone(reply.plan) };
@@ -232,14 +250,18 @@ export class ExternalAI {
     }
   }
 
-  fail(job) {
+  fail(job, reason = 'error') {
     if (this.jobs.get(job.id) !== job) return;
     const active = this.active(job);
     this.drop(job);
     if (!active) return;
-    job.state.plan = null;
     this.metric(job, 'fallbacks');
-    if (++job.state.failures >= this.config.failureLimit && !job.state.disabled) {
+    // §35.62 [ASSUMED]: in plan mode legacy always continues the decision, so a slow reply (budget elapsed or the
+    // agent's {plan: null}) is not a broken adapter: only protocol/transport errors count toward failureLimit, and
+    // the carried plan stays. Direct mode keeps §35.8's rule (every failure counts, the plan is cleared).
+    const soft = this.config.mode === 'plan' && reason === 'timeout';
+    if (this.config.mode !== 'plan') job.state.plan = null;
+    if (!soft && ++job.state.failures >= this.config.failureLimit && !job.state.disabled) {
       job.state.disabled = true;
       this.m.log.warn?.(`[match ${this.m.roomCode}] external AI seat ${job.ps.seat} switched to legacy for this match`);
       for (const other of [...this.jobs.values()]) if (other.state === job.state) {

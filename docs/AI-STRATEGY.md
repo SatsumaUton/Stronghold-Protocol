@@ -590,3 +590,81 @@ item ids), `economy.freezeSearch`, a one-round `holdLevel` with `economy.why`, e
 id is the elite), and `buy` only to finish a merge or add a distinct member; `repairPlan` keeps them after
 checking the ids. Activated layers on every bond count; do not bench a stronger unit only to chase a
 6-threshold. Each prep, compare `digest.upcoming` fly and elite counts with `caps.air`.
+
+## 终极 (ABYSS) push (§35.62)
+
+Goal (maintainer, 2026-10-23): LLM-played seats clear the 终极 Final Assault close to always, solo and 4-player
+co-op, and the lessons go back into the bots. Everything below reads seat-visible state only.
+
+Official facts the prompt now states: starting LP is `bands.json totalHp`; from 150 real seconds of a Final Assault
+the team loses 1 LP per real second and LP 0 loses; no in-battle layer gains in the Final Assault; a leader hit of
+300000 or more is voided. So LP is both the R5–R13 leak budget and the Final Assault clock, and in-battle stackers
+add nothing in the boss round.
+
+Candidate changes:
+
+- Bands carry `lp`. Every candidate (generic, community build, cycle) has `scoreParts.survival = (lp − 26) × 1.5`
+  [ASSUMED]. Measured before the change: the model followed the ranking to 23–24 LP bands in 6/6 solo matches and
+  died before the Final Assault on three of them, where legacy's 25–45 LP picks arrived.
+- The band draft keeps one of its eight slots for the best direction of a band without a community main [ASSUMED].
+  Every community band starts with 23–29 LP; without the slot no 45 LP opening (歌利亚) was ever listed.
+- The model sees two prep candidates, not four, and one copy of the level-curve basis sentence. Latency, not input
+  size, was the limit: the user text grew only from 18.7k to 29.5k characters over a match, while successful replies
+  averaged about 2000 output tokens and from R5 every solo prep hit the 28 s HTTP limit.
+- Level holds: waiting a round saves exactly 1 fund and costs a round of higher-tier rolls. `repairPlan` drops a hold
+  below the slow community rhythm 3-5-7-9 (L2 by R3, L3 by R5, L4 by R7, L5 by R9; BV19UXZBJExQ reply) unless one of the
+  seat's candidates holds that level (二本叙 holds L2: BV1AdXKB9Ebt pinned).
+- A candidate's main may lead the plan before any member is owned, so 玛恩纳 can name 卡西米尔 from its first prep.
+  An accepted plan's primary core bond becomes legacy's focus (`bondPlan`).
+- A prep that fails or is late keeps the last accepted direction (`carryPlan`), and only protocol errors count toward
+  the seat's `failureLimit` (history §35.62).
+
+Bot changes from the same diagnosis: legacy lineups now reach a 6-member (阿戈尔 5) core bond when the members are
+owned (a climb seeded from the full threshold, +30 for a core bond's second tier) and keep bench members of a core
+bond with 4+ distinct owned members. Measured, seeds 1–20: solo ABYSS mean leader damage 504k → 515k, co-op 108k →
+128k per seat, still 0/20 both; FUNNY / NORMAL / HARD wins unchanged or better (solo NORMAL 6 → 7 of 10).
+
+Not yet solved: the bots bank about 230 layers by R13 and deal 6–39 % of a solo leader pool; the community boards hold
+several hundred (「400层保底」, BV1ohDNBPEcx comment; 999 谢拉格, BV1xVdBBWEuu). Measured against a ×K scaling of the
+bot's own layers, wins start around 4–6× (handoff/round51, local). Layer engines, a Final Assault lineup and the
+co-op cover seat are the next levers (cycle 2 below).
+
+### Cycle 2 (§35.63)
+
+What the LLM seats got wrong on their own (cycle 2 bench, deepseek-flash, plan mode), and the rule each now follows:
+
+- **The main bond is a core faction bond.** Class bonds (迅捷 2, 精准 2/3, 坚守 2/3 …) have nothing to build past their
+  first threshold; in cycle 2 the 迅捷 / 精准 / 坚守 mains dealt 2–6 % of the leader pool and the two 卡西米尔 boards 87.5 %
+  and 28.7 %. Generic carry candidates now lead with a core bond (`kind: "core"` in the digest), and every candidate
+  scores `finalAssault`: top threshold reachable (+6), a 灵巧 / 奥术 / 精准 multiplier among its community pairs (+3), a
+  community counter to the announced leader (+8; 卢西恩: 叙拉古's fear — Bahamut 12316 6F, BV118QcBGEmZ; 铳: true damage
+  from 卡西米尔 / 叙拉古 — BV1YTX5BbEGW reply, BV1W5XMB8Exj, BV1eBSdBBEig reply). [ASSUMED] weights.
+- **Merges before thresholds before new members.** The model skipped third copies for a "distinct count"; shop rows
+  now say `copiesHeld` and `completesMerge`.
+- **The hold floor is not a levelling order.** L2 by R4 (legacy levels at R4, when the price is 2), L3 by R5, L4 by R7,
+  L5 by R9, L6 by R11. `economy.levelOptions` gives the hold / level arithmetic.
+- **Scaled enemies.** `digest.enemyScale` is the round's official multiplier (co-op 终极 R7–R10 HP ×3.58–4.30).
+- **Choice calls only choose.** 机变 / offer / reward calls get `CHOICE_TASK`; the model's `choiceName` corrects a
+  mismatched ID. A reply cut off by the output limit is retried once ("decide now").
+
+What carries over to the bots (and to plan seats, which run the same executor), measured on 终极 seeds 1–100 (1–40
+development, 41–100 check):
+
+| rule | why | source |
+|---|---|---|
+| L5 at R9, L6 at R11 | solo boards reach the Final Assault short of damage | community 3-5-7-9 (BV19UXZBJExQ reply) plus one step |
+| layer trade: buy a 获得时 layer unit of the focus / active bonds, sell it unless it is used | layers are the damage lever (+100 layers at the boss prep took solo seeds from 9 / 24 / 44 % to 65 / 36 / 67 % of the pool) | 「买卖灵知／野鬃／忍冬／角峰／雪猎」 (BV1qkDsBtEER pinned; cv47352364) |
+| commit to a 6-member core (`coreGap`) | boards owned 3.9 members of their best core at R9–R13 | the guides' 6-member main (RESEARCH §2) |
+| a healer from R5 | 0.1–0.5 healers fielded; deaths decided the Final Assault (r = −0.78) | measured; 坚守 / sustain advice (RESEARCH §1.2) |
+| spend expiring funds on refreshes, freeze a completing copy | 0.78 funds lost per prep | 「出锤子冻结」 (BV1nyDKB5Eoj comment) |
+
+Result: solo 0 → 2 wins of 100, reached the Final Assault 56 → 64, half the leader pool or more 2 → 12; co-op 0 → 4
+wins, 30 → 35 teams at the Final Assault; FUNNY / NORMAL / HARD wins equal or higher. Plan-seat executor fixes (no
+tier 5/6 or elite sales for 1 fund, a crowded bench frees keep-listed low tiers, the carried plan keeps only its
+funds direction, a quarter of the plan's unit weight in the lineup) are history §35.63.
+
+Still open: winning 终极 near always. Layout and the boss lineup swing one seed's damage from 0.2 to 50 % of the pool.
+The independent-seed rehearsal is §35.64 (counted leaks first; leader damage breaks a leak tie, #315). A few hundred
+more layers on the main remain open. RESEARCH §10 Q1 (co-op leader HP 4× too low) does not hold for the current pools:
+they match `activity_table.json` `bossInfoDict` (§35.64).
+

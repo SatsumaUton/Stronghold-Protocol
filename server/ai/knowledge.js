@@ -114,7 +114,7 @@ export function knowledgePack(data, { language = 'zh-CN', modeId, rules = {}, of
       // PRTS help / pool.js: there is no fixed tier-odds table. Never reveal the live shared stock here.
       shopOdds: 'P(id) = remaining eligible copies of id / sum of remaining eligible copies; tier <= shop level. Item tier shares follow this pool, then eligible item stock. No fixed odds.',
     },
-    bonds: rows('bonds', r => ({ thresholds: r.thresholds, countMode: r.countMode, countsGoldenOnly: r.countsGoldenOnly,
+    bonds: rows('bonds', r => ({ core: !!r.isCore, thresholds: r.thresholds, countMode: r.countMode, countsGoldenOnly: r.countsGoldenOnly,
       thresholdTemplate: r.thresholdTemplate, effect: short(r.desc), layers: r.bb })),
     operators: rows('chess', (r, id) => ({ tier: r.tier, cost: gd.chessPrice(id), sellValue: gd.sellPrice(id), elite: !!r.isGolden,
       baseId: gd.baseIdOf(id), poolEligible: gd.visibleChess.includes(id),
