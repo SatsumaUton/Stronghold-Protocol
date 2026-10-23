@@ -43,7 +43,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { getData, loadData } from './data.js';
 import { getBotStrategy } from './match/botStrategies.js';
-import { externalConfig } from './match/externalConfig.js';
+import { noteLlmIgnored, releaseIgnoresExternalAi, validateExternalConfig } from './match/llmGate.js';
 import { ROOT, listenAddress, bindCandidates, serveDirs, makeLogger, parseTrustProxy, assetIndexOptionsFrom, versionsFrom } from './http/config.js';
 import { WS_MAX_PAYLOAD, createSessionStack, attachWebSocket } from './http/websocket.js';
 import { siteCsp } from './http/csp.js';
@@ -108,15 +108,17 @@ export {
  *                     close: () => Promise<void> }>}
  */
 export async function startServer(opts = {}) {
-  // Reject a server-wide typo before loading data, creating timers or accepting rooms.
+  // A release ignores external-AI settings (one log line) and keeps the built-in bot (§35.66).
+  // An unknown strategy id still fails here, before data is loaded or the port is opened.
+  const log = opts.log || makeLogger(!!opts.quiet);
+  if (releaseIgnoresExternalAi()) noteLlmIgnored(log);
   try {
     const strategy = getBotStrategy(process.env.SP_BOT_STRATEGY);
-    if (strategy.id === 'external') externalConfig();
+    if (strategy.id === 'external') validateExternalConfig();
   } catch (cause) {
     throw new Error(`Invalid SP_BOT_STRATEGY: ${cause.message}. Unset SP_BOT_STRATEGY to use the original bot (legacy).`, { cause });
   }
   const { port, host } = listenAddress(opts);
-  const log = opts.log || makeLogger(!!opts.quiet);
   const { publicDir, dataDir, sharedDir, packsDir, pluginsDir } = serveDirs(opts);
   const simDir = path.join(ROOT, 'server', 'sim');
 

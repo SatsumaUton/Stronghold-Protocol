@@ -1,5 +1,9 @@
 # External AI API (`sp-ai/1`)
 
+**Development only for now (maintainer 2026-10-23, §35.66).** This API is not in a release package, an update
+package or the Docker image. A packaged server ignores `SP_BOT_STRATEGY=external` and the `SP_EXTERNAL_AI_*` /
+`SP_LLM_*` settings, logs one line, and uses the built-in bot. The pages below describe a development checkout.
+
 This implements the maintainer's **2026-10-17 decision**, requested on 2026-10-19: “observation → intents,
 validated like a human, timeout → built-in bot, runs on the host or a third-party service”, as a strategy of
 PR #673 by **@HankDUMPLINGZhong**. `legacy` remains the default. Nothing connects or spawns unless the server

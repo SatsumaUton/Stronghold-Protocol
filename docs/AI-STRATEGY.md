@@ -1,5 +1,8 @@
 # Regenerating the example advisor's strategy playbook
 
+**Development only for now (maintainer 2026-10-23, §35.66).** This playbook and the example advisor are not in a
+release package. A packaged server has no external host.
+
 This is an English strategy method with Chinese game names, for the opt-in example language-model advisor
 ([API](EXTERNAL_AI.md), [中文指南](EXTERNAL_AI_ZH.md)). It changes advice, not game rules or the legacy AI.
 The model receives reproducible candidate evidence and returns a brief justification and a validated plan.

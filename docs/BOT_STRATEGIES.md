@@ -4,7 +4,9 @@ The strategy interface selects trusted server-side AI code per match. It keeps t
 [`bot.js`](../server/match/bot.js) as the default, named `legacy`; registering another strategy does not change
 legacy's weights, RNG consumption, economy, placement or rehearsal. The framework is PR #673 by
 @HankDUMPLINGZhong. The optional `external` adapter is documented in [External AI API](EXTERNAL_AI.md)
-and the [Chinese server-owner guide](EXTERNAL_AI_ZH.md).
+and the [Chinese server-owner guide](EXTERNAL_AI_ZH.md). Until LLM-played seats clear 终极, that adapter is
+development-only and is not in a release package (maintainer 2026-10-23, §35.66). A packaged server keeps
+`legacy` and ignores `SP_BOT_STRATEGY=external`.
 
 The contract lives in [`botStrategyContract.js`](../server/match/botStrategyContract.js); the built-in registry is
 [`botStrategies.js`](../server/match/botStrategies.js). Implementations import the contract, not the registry, to
@@ -96,8 +98,9 @@ connections. An unknown ID prevents startup with an error naming `SP_BOT_STRATEG
 IDs, plus a reminder to unset the variable to use the original bot. Match construction also validates its selection.
 One match's selection does not change another match. The same strategy also handles humans under AI takeover.
 Strategy selection does not grant an AI seat priority in the band draft: the existing seat order and the room's
-existing AI-last option still apply. `legacy` and operator-enabled `external` are registered; the latter inherits
-all legacy hooks for fallback and requires transport configuration before startup.
+existing AI-last option still apply. `legacy` is always registered. On a development checkout, operator-enabled
+`external` is registered too; it inherits all legacy hooks for fallback and requires transport configuration before
+startup. A release package does not register it (§35.66).
 
 Test input journals record the resolved strategy ID as `init.options.botStrategy`, rather than serializing hooks.
 Replay uses that ID, or `legacy` for older journals without it, regardless of the replay host's environment.

@@ -223,8 +223,8 @@ test('a whole update: base zip v9.9.8 → --update v9.9.9 ships only what change
     const listed = JSON.parse(m);
     assert.equal(listed.app, '9.9.9');
     assert.deepEqual(Object.keys(listed.files).sort(), ['README.md', 'data/chess.json', 'package-lock.json', 'package.json', 'public/index.html',
-      'scripts/launch.mjs', 'server/index.js', 'server/new.js', 'server/sim/rng.js', 'shared/constants.js', 'tools/doctor.mjs',
-      'tools/fetch-assets.mjs', 'tools/setup.mjs', 'tools/vendor.mjs'], 'no art, no data/assets.json');
+      'scripts/launch.mjs', 'server/index.js', 'server/new.js', 'server/release-without-llm', 'server/sim/rng.js', 'shared/constants.js',
+      'tools/doctor.mjs', 'tools/fetch-assets.mjs', 'tools/setup.mjs', 'tools/vendor.mjs'], 'no art, no data/assets.json');
     assert.deepEqual(listed.files['server/new.js'], dg('export const n = 1;\n'));
 
     // the player: the base extracted, a pack of their own, the update extracted over it, the server started

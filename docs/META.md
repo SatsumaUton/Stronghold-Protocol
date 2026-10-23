@@ -375,6 +375,8 @@ plugin offers keep their phase timers. Legacy finishes incomplete/failed decisio
 1000 ms restart backoff; at most half the remaining phase time is spent on external decisions. Journals record
 replies and failures, replay without transport IO, and omit endpoint/command/credentials. See
 [External AI API](EXTERNAL_AI.md) and the [Chinese server-owner guide](EXTERNAL_AI_ZH.md).
+A release package omits this host (maintainer 2026-10-23, §35.66): the zip, the update package and the Docker image
+leave the files out, and a packaged server ignores external-AI settings and plays the built-in bot.
 
 The maintainer's 2026-10-19 advisor extension (§35.9) adds `mode: 'plan'`: once per prep round the external
 agent returns bounded preferences and legacy executes its procurement and rehearsal. Band/card/offer replies

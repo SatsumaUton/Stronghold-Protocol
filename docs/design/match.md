@@ -163,6 +163,8 @@ reserved for fallback, 64 intents, 64 KiB response, 3 consecutive failures to ma
 1000 ms child restart backoff; limits configurable. One stdio child per match, no HTTP redirects, no client-set
 endpoint/command, gameplay actions only. Test journals record replies/failures; offline replay performs no IO.
 The complete policy and scope are in [External AI API](../EXTERNAL_AI.md).
+Maintainer decision 2026-10-23 (§35.66): a release package does not include this strategy. The zip, the update
+package and the Docker image omit the host, and a packaged server ignores external-AI settings.
 
 Maintainer request 2026-10-19 (§35.12): the example advisor's static knowledge includes a regenerable playbook
 from the active data and a sourced community overlay. [ASSUMED] Per-seat scoring uses only announced
