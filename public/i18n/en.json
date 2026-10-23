@@ -189,6 +189,7 @@
   "你不在房间中": "You are not in a room",
   "未找到该同盟密钥对应的房间": "No room found for this Alliance Key",
   "房间已满": "Room is full",
+  "服务器已满": "The server is full",
   "模拟已开始": "Simulation already started",
   "只有房主可以操作": "Only the host can do that",
   "仍有玩家未就绪": "Some players are not ready",
