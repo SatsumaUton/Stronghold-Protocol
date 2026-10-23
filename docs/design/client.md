@@ -708,6 +708,11 @@ a default server offers none) is not clickable (「这台服务器没有提供�
 Opening a row sets `replayVersion` in a room too (the room's version comes first, so nothing changes while seated): a
 room left while the replay is open (a kick, the room closed) never moves the page to the lobby's version, so the
 settlement stays mounted.
+The peak alliance in 总览 and 成就统计 keeps its alliance and layers across version filters, but draws its lineup and
+gear only when the loaded config names the record's version, including while a newly requested version downloads.
+Otherwise it shows 「切换到「X」查看」: reused chess and item ids refer
+to different operators and equipment. A record trimmed of its lineup needs no version switch. Alliance and strategy
+ids keep their meaning; names absent from the shown version's data fall back to their ids.
 The levels (`settle.js levelProgress` `season`), the lobby card and 成就统计 count one season (`recordsOfSeason`:
 第一期 = both act1autochess versions, 第二期 = both act2autochess).
 

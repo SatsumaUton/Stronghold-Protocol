@@ -185,6 +185,8 @@
 .st-achievement-unit.is-empty .st-achievement-unit__slot { background-color: rgba(33,33,33,.5); }
 .st-achievement-unit.is-empty .st-achievement-unit__slot::before, .st-achievement-unit.is-empty .st-achievement-unit__slot::after { content: none; }
 .st-achievement-unit.is-empty .st-achievement-unit__slot > i { width: .0125rem; height: 80.9%; background-color: rgba(255,255,255,.4); }
+/* a peak of another version: its line over the empty slots (screens/stats.js BondAchievement) */
+.st-achievement__other { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: .06rem .1rem; color: var(--text-md); font-size: calc(.14 * var(--t)); overflow-wrap: anywhere; }
 .st-achievement__bonds { display: grid; grid-template-columns: repeat(2, minmax(0, .875rem)); align-content: start; margin: 0; padding: 0; list-style: none; max-height: 2.95rem; overflow-y: auto; }
 .st-achievement__bonds > li { position: relative; display: flex; justify-content: center; align-items: center; min-width: 0; aspect-ratio: 1; background-position: center; background-size: contain; background-repeat: no-repeat; }
 .st-achievement__bonds .bglyph { position: absolute; top: 50%; left: 50%; width: 48%; height: 48%; transform: translate(-50%, -50%); }

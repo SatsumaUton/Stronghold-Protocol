@@ -22,7 +22,7 @@ const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
 const { HubEntry, ProtocolSelect, AllianceSelect, normalizeCode, codeArg } = await import('../../public/js/screens/lobby.js');
 const { Modal, TextField } = await import('../../public/js/ui/components.js');
-const { ReplayWait } = await import('../../public/js/screens/stats.js');
+const { ReplayWait, BondAchievement } = await import('../../public/js/screens/stats.js');
 const { DIFFICULTIES } = await import('../../shared/constants.js');
 
 function* walk(v) {
@@ -537,4 +537,34 @@ test('统计数据 replay wait (screens/stats.js ReplayWait): 返回统计 alway
   const room = ReplayWait({ ...base, otherInRoom: true, inRoom: true });
   assert.ok(textOf(room).includes('同盟中的数据由房间的版本决定，离开同盟后才能回看「第一期下半」的结算'));
   assert.equal(byId(room, 'stats-replay-back').length, 1);
+});
+
+test('卫戍成就 (screens/stats.js BondAchievement): a peak of another version shows its alliance, never its lineup drawn with the data on screen', () => {
+  // 第一期下半's chess_char_1_02_a is 讯使; on 第二期下半's data the same id is 角峰 (and its items are other items)
+  const peak = {
+    record: { id: 'r1', version: 'act1autochess' },
+    player: { lineup: [{ id: 'chess_char_1_02_a', tier: 1, items: ['chess_item_1_02_e_a'] }], bonds: [{ bondId: 'yanShip', active: true, layers: 12 }] },
+    bond: { bondId: 'yanShip', layers: 12 },
+  };
+  const looked = [];
+  const gd = { m: null, bond: () => null, chess: (id) => { looked.push(id); return null; }, item: (id) => { looked.push(id); return null; } };
+  const ops = (tree) => find(tree, (x) => x.type?.name === 'AchievementOperator');
+  const other = BondAchievement({ peak, gd });
+  assert.equal(ops(other).length, 0, 'no operator of the lineup is drawn');
+  const line = find(other, (x) => x.props?.['data-testid'] === 'achievement-other-version');
+  assert.equal(line.length, 1);
+  assert.ok(textOf(line).includes('切换到「第一期下半」查看'), textOf(line));
+  assert.ok(find(other, (x) => x.type?.name === 'BondGlyph' && x.props.bondId === 'yanShip').length >= 1, 'the alliance stays');
+  // the same version: the lineup is drawn (and nothing of another version's line)
+  const firstData = { ...gd, config: { version: { id: 'act1autochess' } } };
+  const same = BondAchievement({ peak, gd: firstData });
+  assert.equal(ops(same).length, 1);
+  assert.equal(find(same, (x) => x.props?.['data-testid'] === 'achievement-other-version').length, 0);
+  // a record without a version is 第二期下半's
+  const def = BondAchievement({ peak: { ...peak, record: { id: 'r2' } }, gd });
+  assert.equal(ops(def).length, 1);
+  const trimmed = BondAchievement({ peak: { ...peak, player: { ...peak.player, lineup: null } }, gd: firstData });
+  assert.equal(ops(trimmed).length, 0);
+  assert.equal(find(trimmed, (x) => x.props?.['data-testid'] === 'achievement-other-version').length, 0, 'a trimmed same-version record needs no switch');
+  assert.deepEqual(looked, [], 'drawn as vnodes only: nothing looked up here');
 });

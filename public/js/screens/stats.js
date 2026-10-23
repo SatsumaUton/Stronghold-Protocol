@@ -23,7 +23,10 @@
 // does not offer (welcome.versions, e.g. a default server) is not offered as a switch. The replay's wait always keeps
 // 返回统计 (a failed version set offers 重试). A replay opened in a room sets `replayVersion` too (the room's version comes
 // first, so nothing changes while seated): a room left under the open replay keeps that version shown.
-// 成就统计 counts the season of the version shown.
+// 成就统计 counts the season of the version shown. 卫戍成就's peak lineup (chess and item ids) is drawn only with the data
+// of its own version: a peak of another version (the filter on another version or 全部版本, or 成就统计's other half of
+// the season) shows its alliance and layers, and 切换到「X」查看 in place of the operators and gear — chess and item ids
+// are reused across versions for other operators and items (第一期下半: 100 chess ids, 72 item ids; review fix).
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
@@ -273,9 +276,17 @@ function AchievementOperator({ unit, gd }) {
   </li>`;
 }
 
-function BondAchievement({ peak, gd }) {
+/**
+ * 卫戍成就's peak (ui/stats.js highestBondRecord). The loaded config names the data the lookups read, even while the
+ * page waits for a newly requested version. A peak of another version keeps its alliances but not its lineup.
+ * @param {{ peak: ReturnType<typeof highestBondRecord>, gd: any }} props
+ */
+export function BondAchievement({ peak, gd }) {
   if (!peak) return html`<p class="st-hint">${t('暂无可用的盟约最高叠加战绩')}</p>`;
   const bonds = (peak.player.bonds || []).filter((b) => b.active).sort((a, b) => b.layers - a.layers);
+  const own = recordVersion(peak.record);
+  const sameVersion = own === (gd.config?.version?.id ?? DEFAULT_VERSION);
+  const lineup = sameVersion ? peak.player.lineup : null;
   return html`<div class="st-achievement">
     <div class="st-achievement__peak">
       <span class="st-achievement__caption">${t('战果纪录')}</span>
@@ -283,8 +294,9 @@ function BondAchievement({ peak, gd }) {
       <span>${t('盟约最高叠加')}</span><b class="num">${fmtNum(peak.bond.layers)}</b>
     </div>
     <div class="st-achievement__detail" style=${`background-image:url(${uiUrl(gd.m, 'statistics/achievementBg')})`}>
-      <ul class="st-achievement__lineup">${Array.from({ length: 10 }, (_, i) => peak.player.lineup?.[i]
-        ? html`<${AchievementOperator} key=${i} unit=${peak.player.lineup[i]} gd=${gd} />`
+      <ul class="st-achievement__lineup">${sameVersion ? null : html`<li class="st-achievement__other" data-testid="achievement-other-version">
+        <${VersionTag} version=${own} compact=${true} />${t('切换到「{version}」查看', { version: versionLabel(own) })}</li>`}${Array.from({ length: 10 }, (_, i) => lineup?.[i]
+        ? html`<${AchievementOperator} key=${i} unit=${lineup[i]} gd=${gd} />`
         : html`<li key=${i} class="st-achievement-unit is-empty" aria-hidden="true"><i></i><span>${t('NO INFO')}</span>
           <div class="st-achievement-unit__items"><div class="st-achievement-unit__slot"><i></i></div><div class="st-achievement-unit__slot"><i></i></div></div>
         </li>`)}</ul>
