@@ -19,6 +19,7 @@ export function createWindUpLookahead({ views, woundUp, castStart }) {
   // A cast in the attack's turn (['cast', id, slot, dur, clip]: no 'atk' with it) winds up its own clip, so the clip's
   // strike frame lands with the cast (UnitView.windUpCast, DESIGN §35.57)
   const upCast = new Map();
+  const rates = new Map();
   function onUpcoming(e, t) {
     if (e[0] === 'skill') { upSkill.set(e[1], !!e[2]); return; }
     if (e[0] === 'cast') {
@@ -33,7 +34,12 @@ export function createWindUpLookahead({ views, woundUp, castStart }) {
     const v = views.get(e[1]);
     if (!v || !v.windUp) return;
     const cast = upCast.get(e[1]);
-    if (v.windUp(t - upcomingT, e[3], cast && cast.t === t ? cast.slot : null)) {
+    let interval;
+    for (const rate of rates.get(e[1]) || []) {
+      if (rate.t > t) break;
+      interval = rate.value;
+    }
+    if (v.windUp(t - upcomingT, e[3], cast && cast.t === t ? cast.slot : null, interval)) {
       woundUp.add(e);
       const a = v.actor;
       const skillOn = upSkill.has(e[1]) ? upSkill.get(e[1]) : undefined;
@@ -45,6 +51,13 @@ export function createWindUpLookahead({ views, woundUp, castStart }) {
       upcomingT = renderT;
       upSkill.clear();
       upCast.clear();
+      rates.clear();
+      // Rates are emitted after ally attacks, so inspect the entire tick before winding up its attack.
+      interp.forEachUpcoming(renderT, renderT + 1.5, (e, t) => {
+        if (e[0] !== 'rate') return;
+        if (!rates.has(e[1])) rates.set(e[1], []);
+        rates.get(e[1]).push({ t, value: e[2] });
+      });
       interp.forEachUpcoming(renderT, renderT + 1.5, onUpcoming);
     },
   };

@@ -981,3 +981,8 @@ the hidden five-star orbit is unchanged (PR #576).
 
 The active-bond strip shows every entry in a horizontal scroller, with keyboard focus, touch panning and translated
 arrow controls. Watched owners, harmony counts, morph members and disabled bonds retain their existing behavior (PR #678).
+
+Attack pacing (PR #729): UnitInfo carries the actual attack interval in game seconds. A `rate` event after the ally
+phase and before projectiles carries changes; its baseline is seeded by birth info. The renderer looks ahead through
+the attack tick, including a rate later in that tick, without borrowing a later tick’s value. Its 0.2–6 second display
+window is [ASSUMED]; damage, attack timing and targeting are unchanged.

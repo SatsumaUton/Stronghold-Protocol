@@ -45,9 +45,7 @@ export class BattleEvents {
       const iv = Number(u.s && u.s.interval);
       if (!(iv > 0)) continue;
       const r = Math.round(iv * 1000) / 1000;
-      // The spawn snapshot already carried this value (unitInfo.atkInterval), so the first computation is not a
-      // change: only a LATER difference is worth an event (this keeps one redundant tuple per unit out).
-      if (u._rateSent === undefined) { u._rateSent = r; continue; }
+      // unitInfo seeds the birth value; the first changed value must reach the client too.
       if (u._rateSent === r) continue;
       u._rateSent = r;
       this._ev(['rate', u.id, r]);

@@ -27,6 +27,10 @@ const r1 = (v) => Math.round(v * 10) / 10;
 /** Static per-unit info sent on spawn / in m.field. */
 export function unitInfo(u) {
   const d = u.def || {};
+  const interval = u.s?.interval;
+  const atkInterval = Number.isFinite(interval) && interval > 0 ? Math.round(interval * 1000) / 1000 : undefined;
+  // Seed from the first published value, before a later buff can change the interval.
+  if (u._rateSent === undefined) u._rateSent = atkInterval;
   return {
     id: u.id,
     kind: u.kind,
@@ -39,7 +43,7 @@ export function unitInfo(u) {
     // The unit's OWN attack interval in game seconds (units.js `s.interval`: bat × batPct × 100 / aspd, i.e. with the buffs
     // this record carries). The renderer stretches the attack clip over it (render/attackRate.js): without it a view started
     // from the operator's base-record guess and swung in slow motion until two attacks had been measured.
-    atkInterval: Number.isFinite(u.s?.interval) && u.s.interval > 0 ? r2(u.s.interval) : undefined,
+    atkInterval,
     spine: d.spine ?? d.charId ?? u.defId,
     // 皮肤 (docs/SKINS.md): the owning player's chosen skinId. `undefined` (not null) on purpose — JSON.stringify drops
     // it, so an install with no skins produces the exact same wire format as before and the §8.2 contract holds; the key

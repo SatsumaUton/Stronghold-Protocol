@@ -9,9 +9,9 @@
 // happens in the battle; the numbers below only bound what this renderer is willing to show, so a broken value (a 0, a
 // NaN, a gap across a hidden tab) cannot freeze or explode a clip. `clampAtkInterval` IS applied to every value the view
 // takes — snapshot, 'rate' event and measured gap alike — and it is the ATK_MIN_S..ATK_MAX_S window that does it, hence the
-// clip of a unit attacking faster than 6 / s or slower than one per 6 s plays at the window edge. [ASSUMED - the window
+// clip of a unit attacking faster than 5 / s or slower than one per 6 s plays at the window edge. [ASSUMED - the window
 // itself has no official counterpart; the official client was not measured]
-export const ATK_MIN_S = 0.2;      // [ASSUMED] display lower bound (6 attacks / s)
+export const ATK_MIN_S = 0.2;      // [ASSUMED] display lower bound (5 attacks / s)
 export const ATK_MAX_S = 6;        // [ASSUMED] display upper bound (1 attack / 6 s)
 export const ATK_DEFAULT_S = 1.2;  // [ASSUMED] nothing known at all
 export const ATK_SANE_S = [0.05, 6]; // [ASSUMED] a measured gap outside this is a stall (a hidden tab, a reconnect), not a rhythm
@@ -73,4 +73,24 @@ export function nextAtkInterval(prev, measured, hasMeasured, opts = {}) {
   }
   const jump = !hasMeasured || Math.abs(target - base) > base * ATK_JUMP_TOLERANCE;
   return { interval: jump ? target : clampAtkInterval(base + (target - base) * ATK_DRIFT_SHARE), measured: true };
+}
+
+/** A tick sends rate after atk; deliver that value before its attack, retaining every other event's order. */
+export function attackRateEvents(events) {
+  const rates = new Map();
+  for (const e of events) if (Array.isArray(e) && e[0] === 'rate') rates.set(e[1], e);
+  if (!rates.size) return events;
+  const sent = new Set(), out = [];
+  for (const e of events) {
+    if (e?.[0] === 'atk' && rates.has(e[1]) && !sent.has(e[1])) {
+      out.push(rates.get(e[1]));
+      sent.add(e[1]);
+    }
+    if (e?.[0] === 'rate') {
+      if (sent.has(e[1])) continue;
+      sent.add(e[1]);
+    }
+    out.push(e);
+  }
+  return out;
 }

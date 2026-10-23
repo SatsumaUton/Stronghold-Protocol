@@ -94,9 +94,9 @@ describe('a skill / buff change', () => {
 
   test('the sim emits rate only when the interval changed', () => {
     const evs = [];
-    // The first computation only SEEDS the sent value: the spawn snapshot already carried this interval
-    // (unitInfo.atkInterval), so an event for it would be redundant.
+    // Publishing the birth info seeds the sent value before the first tick.
     const u7 = { id: 7, alive: true, deployed: true, s: { interval: 0.5 }, _rateDirty: true };
+    unitInfo(u7);
     const battle = { recordEvents: true, units: [u7], _ev: (t) => evs.push(t) };
     BattleEvents.prototype._emitRateChanges.call(battle);
     assert.deepEqual(evs, [], 'no event for the value the spawn already carried');
@@ -247,4 +247,31 @@ describe('the intervals the renderer must not mistake for a rhythm', () => {
     const v = await view(unit({ bat: 0, aspd: 0 }));
     assert.equal(v.atkInterval, ATK_DEFAULT_S);
   });
+});
+
+test('the first changed interval is emitted after the birth value was published', () => {
+  const u = { id: 7, alive: true, deployed: true, s: { interval: 1, maxHp: 100, flags: {} } };
+  assert.equal(unitInfo(u).atkInterval, 1);
+  u.s.interval = 0.5;
+  u._rateDirty = true;
+  const events = new BattleEvents();
+  Object.assign(events, { recordEvents: true, _evq: [], units: [u] });
+  events._emitRateChanges();
+  assert.deepEqual(events._evq, [['rate', 7, 0.5]]);
+});
+
+test('lookahead uses the rate at the attack tick without applying a later tick early', async () => {
+  const { createWindUpLookahead } = await import('../../public/js/render/app/windup.js');
+  const calls = [];
+  const view = { windUp: (...args) => { calls.push(args); return true; } };
+  const events = [[['atk', 1, 2, 'none'], 1], [['rate', 1, 0.5], 1], [['rate', 1, 2], 1.2]];
+  const look = createWindUpLookahead({ views: new Map([[1, view]]), woundUp: new WeakSet(), castStart() {} });
+  look.run({ forEachUpcoming: (from, to, fn) => events.forEach(([e, t]) => fn(e, t)) }, 0);
+  assert.equal(calls[0][3], 0.5);
+});
+
+test('delivery places a rate before its attack while preserving spawn and skill order', async () => {
+  const { attackRateEvents } = await import('../../public/js/render/attackRate.js');
+  const spawn = ['spawn', { id: 1 }], skill = ['skill', 1, 1], attack = ['atk', 1, 2, 'none'], rate = ['rate', 1, 0.5];
+  assert.deepEqual(attackRateEvents([spawn, skill, attack, rate]), [spawn, skill, rate, attack]);
 });
