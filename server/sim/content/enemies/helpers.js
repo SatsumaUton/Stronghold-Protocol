@@ -5,7 +5,6 @@
 
 import { ELEMENT } from '../../constants.js';
 import { canTargetAlly, sortAllyTargets, areaSelectable, auraSelectable } from '../../targeting.js';
-import { mitigate } from '../../damage.js';
 import { hypot } from '../../detmath.js';
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -97,8 +96,24 @@ export function abOf(b, e) {
     const at = base.findIndex((x) => x && x.prefabKey === s.prefabKey);
     sk[s.prefabKey] = { cd: num(s.cooldown, 0), icd: num(s.initCooldown, 0), sp: num(s.spCost, 0), pr: num(s.priority, 0), bb: s.bb || {}, bs: s.bbStr || {}, slot: at >= 0 ? at : i };
   });
-  e.mem.ab = { key, t, tS, sk, list: [], times: null, hitShield: 0, atkType: null, immune: null, origMaxHp: e.base.maxHp };
+  e.mem.ab = { key, t, tS, sk, list: [], times: null, atkType: null, immune: null, origMaxHp: e.base.maxHp };
   return e.mem.ab;
+}
+
+/** Native ordinary-priority phys/arts count shield; repeated grants keep the held instance and stronger count. */
+export function grantHitShield(battle, enemy, count) {
+  if (!Number.isFinite(count) || !(count > 0)) return null;
+  const key = 'ab:hitShield';
+  const held = enemy.findBuff(key);
+  if (held) {
+    held.shieldHits = Math.max(held.shieldHits, count);
+    enemy.markDirty();
+    return held;
+  }
+  return battle.addBuff(enemy, { key, shieldHits: count, shieldType: ['phys', 'arts'],
+    onRemove({ buff }) {
+      if (!(buff.shieldHits > 0)) battle.fx('shieldBreak', { x: enemy.x, y: enemy.y, id: enemy.id });
+    } });
 }
 
 /**
@@ -172,7 +187,7 @@ export function elem(b, src, tgt, el, amount, { ignoreSelect = false, tags = [] 
 /**
  * Skill / ability damage (no dodge unless asked). `ignoreSelect` = no selection the target's 无法选择 effects stop
  * (abilities that "无视无法选择", direct picks, a flying unit's blast credited to a ground leader): it also reaches an
- * airborne 起飞 ally, which a ground enemy's damage otherwise skips (damage.js, targeting.js evadesGround).
+ * airborne 起飞 ally, which a ground enemy's damage otherwise skips (attack/helpers.js liftoffEvades, targeting.js evadesGround).
  */
 export function hurt(b, src, tgt, amount, type = 'phys', { canDodge = false, tags = [], isSkill = true, ignoreSelect = false } = {}) {
   if (!tgt || !tgt.alive || !(amount > 0)) return 0;
@@ -340,7 +355,7 @@ export function setHits(e, n) {
 
 const HIT_COUNT_KEY = 'ab:hitCount';
 
-/** 频次 on/off: every damage instance removes exactly 1 HP (engine flag; `artsOnly` = 茶器, physical instances remove 0). */
+/** 频次 on/off: every damage instance removes exactly 1 HP (engine flag; `artsOnly` = 茶器: only arts and true instances remove 1, phys and 元素伤害 remove 0 — DESIGN §35.32, PRTS 青瓷茶器). */
 export function hitCount(b, e, on, artsOnly = false) {
   if (!on) { b.removeBuff(e, HIT_COUNT_KEY); return; }
   b.addBuff(e, { key: HIT_COUNT_KEY, persist: true, flags: artsOnly ? { hitCountArts: true } : { hitCount: true } });
@@ -375,38 +390,6 @@ export function expose(b, u, dur, scale) {
   if (!u || !u.alive || !(dur > 0)) return;
   b.addBuff(u, { key: 'ab:exposed', duration: dur, refresh: 'extend', mods: { dmgTakenMul: scale }, visible: true });
   b.fx('expose', { x: u.x, y: u.y, id: u.id });
-}
-
-/**
- * Final HP damage the pipeline would deal for a phys/arts/true/elemental `dmg` before shields (mitigation is linear in
- * the amount) — the same terms as damage.js dealDamage (元素伤害: 元素抗性 + elementalTakenMul, no dmgTakenMul).
- */
-export function expectedFinal(src, tgt, dmg) {
-  const ts = tgt.s, ss = src && src.s && !dmg.sourceless ? src.s : null, ty = dmg.type; // 无来源 (bursts): no source stats
-  const v = mitigate(dmg.amount, ty, ts, {
-    defIgnorePct: (dmg.defIgnorePct || 0) + (ss ? ss.defIgnorePct : 0), defIgnoreFlat: (dmg.defIgnoreFlat || 0) + (ss ? ss.defIgnoreFlat : 0),
-    resIgnorePct: (dmg.resIgnorePct || 0) + (ss ? ss.resIgnorePct : 0), resIgnoreFlat: (dmg.resIgnoreFlat || 0) + (ss ? ss.resIgnoreFlat : 0),
-    elementalRes: ty === 'elemental' ? (tgt.def?.epDamageResistance ?? 0) : 0,
-  });
-  let mul = (dmg.mul ?? 1) * (ty === 'elemental' ? 1 : ts.dmgTakenMul); // 脆弱 skips 元素伤害 (damage.js)
-  if (ss) mul *= ss.dmgDealtMul * (ty === 'phys' ? ss.physDealtMul : ty === 'arts' ? ss.artsDealtMul : 1);
-  mul *= ty === 'phys' ? ts.physTakenMul : ty === 'arts' ? ts.artsTakenMul : ty === 'elemental' ? ts.elementalTakenMul : ts.trueTakenMul;
-  const f = v * mul;
-  return Number.isFinite(f) && f > 0 ? f : 0;
-}
-
-/**
- * "吸收法术伤害的屏障": absorb up to `left` of an arts instance in a `hit` handler (after RES, like a shield) by scaling
- * the instance down (cancelled when fully absorbed). Returns the amount absorbed.
- */
-export function absorbArts(c, left) {
-  if (!c || c.dmg.type !== 'arts' || !(left > 0) || c.dmg.cancel) return 0;
-  const f = expectedFinal(c.source, c.target, c.dmg);
-  if (!(f > 0)) return 0;
-  const take = Math.min(left, f);
-  if (take >= f - 1e-9) c.dmg.cancel = true;
-  else c.dmg.amount *= (f - take) / f;
-  return take;
 }
 
 /** Timed buff on each unit (same key never stacks: aura semantics). */

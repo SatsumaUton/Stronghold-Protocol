@@ -409,7 +409,8 @@ export function createDataStore(opts = {}) {
     load,
     /** A content set's files instead of the server's, or the server's again (null) — see the header. */
     setContent,
-    /** The id of the content set the files come from (its cs), or null. */
+    /** The id of the content set the files come from (its cs), or null. The open roster memos key on it
+     *  (loadout.js, ownership.js; PR #852): a room version switch (versions M1) must change it or join their deps. */
     contentId: () => content?.id ?? null,
     /** Load several files; resolves when all settled. */
     loadAll: (...names) => Promise.all(names.flat().map(load)),

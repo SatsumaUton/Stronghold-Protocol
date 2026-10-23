@@ -9,9 +9,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { unscaled } from '../helpers/uiSize.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const CSS = readFileSync(path.join(ROOT, 'public/css/screens/game.css'), 'utf8');
+const CSS = unscaled(readFileSync(path.join(ROOT, 'public/css/screens/game.css'), 'utf8'));
 
 const PHONE = '@media (max-height: 600px) and (pointer: coarse), (max-height: 600px) and (any-pointer: coarse) {';
 

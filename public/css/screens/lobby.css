@@ -535,7 +535,7 @@
 .proto-back {
   display: inline-flex;
   align-items: center;
-  height: max(.62rem, 36px);
+  height: max(.62rem, 32px, calc(36px * var(--sp-ui, 1)));
   padding: 0;
   font: inherit;
   color: #f2f4f3;
@@ -548,7 +548,7 @@
   display: grid;
   place-items: center;
   align-self: stretch;
-  width: max(2rem, 96px);
+  width: max(2rem, 32px, calc(96px * var(--sp-ui, 1)));
   border-left: 2px solid #0d0e0e;
   background: radial-gradient(circle, rgba(255, 255, 255, .22) 1px, transparent 1.6px) 0 0 / .14rem .14rem, linear-gradient(90deg, #2f3132, #3d3f40 50%, #2f3132);
 }
@@ -564,7 +564,7 @@
    800×600 — the px floors of the glyph and the 文字大小 made 5.6rem too narrow for English 「Standard Simulation」 /
    「Ultimate Simulation」 on one line, and the unselected cards' names ended in an ellipsis), never past 46vw. [ASSUMED] the
    floor */
-.proto-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) min(max(5.6rem, 300px), 46vw); gap: .3rem; padding: 0 .34rem .26rem .22rem; }
+.proto-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) min(max(5.6rem, 32px, calc(300px * var(--sp-ui, 1))), 46vw); gap: .3rem; padding: 0 .34rem .26rem .22rem; }
 .proto-stage { position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; }
 
 /* the official picture of the selected difficulty, with its brief at the bottom left */
@@ -685,7 +685,7 @@
 }
 .pcard.is-on .pcard__glow { opacity: 1; }
 .pcard__head, .pcard__desc, .pcard__effects, .pcard__meta { position: relative; }
-.pcard.is-on .pcard__head, .pcard.is-on .pcard__desc, .pcard.is-on .pcard__effects, .pcard.is-on .pcard__meta { padding-right: max(1.3rem, 70px); }
+.pcard.is-on .pcard__head, .pcard.is-on .pcard__desc, .pcard.is-on .pcard__effects, .pcard.is-on .pcard__meta { padding-right: max(1.3rem, 32px, calc(70px * var(--sp-ui, 1))); }
 .pcard__head { display: flex; align-items: center; gap: .08rem; }
 .pcard__glyph { width: max(.3rem, 18px); height: max(.3rem, 18px); color: var(--d-color); }
 .pcard__name { font-size: min(calc(.28 * var(--t)), .36rem); font-weight: 900; letter-spacing: .04em; color: var(--d-color); text-shadow: 0 0 .1rem rgba(0, 0, 0, .6); white-space: nowrap; }
@@ -705,8 +705,8 @@
   align-items: center;
   justify-content: center;
   gap: .04rem;
-  width: max(1.3rem, 70px);
-  height: max(1.1rem, 60px);
+  width: max(1.3rem, 32px, calc(70px * var(--sp-ui, 1)));
+  height: max(1.1rem, 32px, calc(60px * var(--sp-ui, 1)));
   transform: translateY(-50%) rotate(-6deg);
 }
 .pcard.is-on .pcard__stamp { display: flex; animation: proto-stamp 260ms var(--ease-out) backwards; }
@@ -732,14 +732,14 @@
 }
 .proto-hint { display: flex; align-items: center; gap: .08rem; min-height: .24rem; margin: 0; font-size: calc(.14 * var(--t)); color: #858b89; }
 .proto-hint .icon { flex: none; width: 1.1em; height: 1.1em; }
-.proto-hint--ro { min-height: max(.64rem, 38px); font-size: calc(.18 * var(--t)); color: #b9bfbd; }
+.proto-hint--ro { min-height: max(.64rem, 32px, calc(38px * var(--sp-ui, 1))); font-size: calc(.18 * var(--t)); color: #b9bfbd; }
 .proto-start {
   position: relative;
   display: flex;
   align-items: center;
   gap: .26rem;
   width: 100%;
-  min-height: max(1.04rem, 54px);
+  min-height: max(1.04rem, 32px, calc(54px * var(--sp-ui, 1)));
   padding: .03rem 0 .03rem .26rem;
   overflow: hidden;
   font: inherit;
@@ -812,7 +812,7 @@
   display: inline-flex;
   align-items: center;
   gap: .14rem;
-  height: max(.64rem, 38px);
+  height: max(.64rem, 32px, calc(38px * var(--sp-ui, 1)));
   padding: 0 .3rem 0 .1rem;
   font: inherit;
   font-size: calc(.22 * var(--t));
@@ -871,7 +871,7 @@ button.ally-card:hover, button.ally-card:focus-visible { border-color: rgba(93, 
   display: flex;
   align-items: center;
   gap: .14rem;
-  height: max(.74rem, 42px);
+  height: max(.74rem, 32px, calc(42px * var(--sp-ui, 1)));
   padding: 0 .2rem;
   font-family: inherit;
   font-size: calc(.3 * var(--t));
@@ -899,7 +899,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   display: flex;
   align-items: center;
   gap: .1rem;
-  height: max(.56rem, 34px);
+  height: max(.56rem, 32px, calc(34px * var(--sp-ui, 1)));
   margin: .06rem .2rem .08rem;
   padding: 0 .06rem 0 .12rem;
   background: #262929;
@@ -974,8 +974,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .proto__body[data-fit="brief"] .pcard__head, .proto__body[data-fit="names"] .pcard__head { min-width: 0; }
   .proto__body[data-fit="brief"] .pcard__glyph, .proto__body[data-fit="names"] .pcard__glyph { flex: none; }
   .proto__body[data-fit="brief"] .pcard__name, .proto__body[data-fit="names"] .pcard__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
-  .proto__body[data-fit="names"] .pcard.is-on .pcard__head { padding-right: max(.9rem, 46px); }
-  .proto__body[data-fit="names"] .pcard.is-on .pcard__stamp { right: .1rem; width: max(.8rem, 40px); height: max(.64rem, 34px); }
+  .proto__body[data-fit="names"] .pcard.is-on .pcard__head { padding-right: max(.9rem, calc(46px * var(--sp-ui, 1))); }
+  .proto__body[data-fit="names"] .pcard.is-on .pcard__stamp { right: .1rem; width: max(.8rem, 32px, calc(40px * var(--sp-ui, 1))); height: max(.64rem, 32px, calc(34px * var(--sp-ui, 1))); }
   .proto__body[data-fit="names"] .pcard.is-on .pcard__tick { width: max(.4rem, 22px); height: max(.4rem, 22px); }
   .proto__body[data-fit="names"] .pcard__ok { display: none; }
   .proto__body[data-fit="names"] .proto-brief__more { display: flex; flex-direction: column; gap: .04rem; margin-top: .06rem; padding-top: .06rem; border-top: 1px solid rgba(255, 255, 255, .18); }
@@ -1004,7 +1004,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 @media (max-height: 520px) {
   /* the entries span the screen's width here: at least 128 px each, so a wrapped English name has a line of its own
      (at 2.1rem, 84 px, 「Simulation」 was 95 px at 小). [ASSUMED] the width */
-  .lobby-hub { --hub-entry-w: max(2.1rem, 128px); }
+  .lobby-hub { --hub-entry-w: max(2.1rem, 32px, calc(128px * var(--sp-ui, 1))); }
   .hub-stage {
     grid-template-columns: minmax(0, 1fr) minmax(0, calc(var(--hub-entry-w) * 2 + var(--hub-gap)));
     grid-template-areas: "center right" "entries entries";
@@ -1018,12 +1018,12 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .hub-center__mark .emblem__svg { width: .9rem; height: 1rem; }
   .hub-center__title { max-width: none; font-size: calc(.46 * var(--t)); }
   .hub-right { padding-top: .1rem; }
-  .lobby-hub .hub-plate { min-height: max(.7rem, 40px); }
+  .lobby-hub .hub-plate { min-height: max(.7rem, 32px, calc(40px * var(--sp-ui, 1))); }
   .lobby-hub .hub-plate--ach { display: flex; }
   /* (here the hub's height is the limit: a top padding for the icon made the English and Korean cards so tall at 大 /
      特大 that the line above them ran into the title on a 640 / 740 px phone. The decorative line keeps clear of the icon
      beside it instead, .44rem — at 小 it stays on one line there in every language) */
-  .hub-entry { min-height: max(1.1rem, 64px); padding: .1rem .14rem; }
+  .hub-entry { min-height: max(1.1rem, 32px, calc(64px * var(--sp-ui, 1))); padding: .1rem .14rem; }
   .hub-entry__icon .icon { width: .42rem; height: .42rem; }
 
   .proto-top { padding-top: 8px; }
@@ -1033,10 +1033,13 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
      chosen difficulty's description in the brief at the left (11–13 px, the event's own place for it, as on a desktop),
      the header and the label capped (below) and the label wrapping onto a second line rather than being cut. The list
      still scrolls should a pack's names not fit. [ASSUMED] every cap */
-  .proto-body { grid-template-columns: minmax(0, 1fr) min(7.4rem, 50vw); gap: 10px; padding-bottom: 10px; }
-  .ally-body { grid-template-columns: minmax(0, 1fr) min(7.4rem, 54vw); }
+  /* the column and the brief keep their unscaled widths under 界面大小 (÷ --sp-ui): the names' 16 px floor, the brief's
+     11 px floor and the px paddings and stamp space do not shrink, so at 75 % a 222 px column cut 'Perilous Simulation'
+     in English and the brief broke a Korean word (DESIGN §35.47) */
+  .proto-body { grid-template-columns: minmax(0, 1fr) min(calc(7.4rem / var(--sp-ui, 1)), 50vw); gap: 10px; padding-bottom: 10px; }
+  .ally-body { grid-template-columns: minmax(0, 1fr) min(calc(7.4rem / var(--sp-ui, 1)), 54vw); }
   .proto__pic { inset: 0 0 1.6rem; }
-  .proto-brief { max-width: min(6.4rem, 100%); padding: 6px 10px 7px; }
+  .proto-brief { max-width: min(calc(6.4rem / var(--sp-ui, 1)), 100%); padding: 6px 10px 7px; }
   .proto-brief p { margin-top: 2px; font-size: clamp(11px, calc(.26 * var(--t)), 13px); line-height: 1.35; }
   .proto-list { gap: 6px; padding-left: 22px; justify-content: flex-start; }
   .pcard { padding: 6px 10px; gap: 2px; border-radius: 10px; }
@@ -1090,7 +1093,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   /* 创建同盟 keeps its difficulty line (§35.18's leftover: it was hidden here): two columns, the icon and the name on the
      first row, the line under the name on the second, wrapping rather than cut short; 11–14 px, [ASSUMED] the cap */
   .ally-card--create .ally-card__bar { display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: center; row-gap: 1px; height: auto;
-    min-height: max(.74rem, 42px); padding-top: 5px; padding-bottom: 5px; }
+    min-height: max(.74rem, 32px, calc(42px * var(--sp-ui, 1))); padding-top: 5px; padding-bottom: 5px; }
   .ally-card--create .ally-card__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
   .ally-card--create .ally-card__bar small { grid-column: 2; margin-left: 0; overflow: visible; white-space: normal; font-size: clamp(11px, calc(.28 * var(--t)), 14px); line-height: 1.3; }
   .ally-key input { font-size: calc(.32 * var(--t)); }

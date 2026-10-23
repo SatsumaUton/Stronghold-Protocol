@@ -8,7 +8,7 @@
 // [ASSUMED] or sourced from the official term table (gamedata_const termDescriptionDict) / PRTS.
 //
 // Runtime model: `enemy.mem.ab = { key, t (talent bb), tS (talent bbStr), sk {prefabKey → {cd, icd, sp, pr (priority), bb, bs}},
-//   list [abilities], times, hitShield, atkType, immune, … }`. An ability is a plain object with optional methods
+//   list [abilities], times, atkType, immune, … }`. An ability is a plain object with optional methods
 //   spawn(b,e,a,ab) · dealt(c,…) ('damaged' by one of e's ATTACKS on an ally, non-element) · taken(c,…) ('damaged' on e,
 //   non-element) · hitIn(c,…) ('hit' on e, late: after every other hit handler) · hitOut(c,…) ('hit' from e, early) ·
 //   (`c.source` is null for 无来源 damage — element bursts; target-side reactions that must still fire, e.g. damage
@@ -61,7 +61,8 @@
 // Special types (factions.json):
 //   FLY        — engine (FLY motion, ranged-only targeting). Flyer kits in enemies/fly.js (御4, 护障, 寒霜, 萨科塔之翼/眼, 黑云 …).
 //   TIMES 频次 — "需要N次伤害击倒": maxHp := N hits; engine buff flag hitCount — every damage instance (any type, element
-//                bursts included) removes exactly 1 on its own DamageInfo (茶器 hitCountArts: phys removes 0); HP loss
+//                bursts included) removes exactly 1 on its own DamageInfo (茶器 hitCountArts: only arts and true
+//                instances remove 1, phys and 元素伤害 remove 0 — DESIGN §35.32, PRTS 青瓷茶器); HP loss
 //                (loseHp) bypasses the rule. The faction's enemies
 //                create those units (death spawns, embers, blades, 再生).
 //   ELEMENT    — element damage on hit = ATK × ep_damage_ratio into the ally's gauge. 侵蚀 (erosion) is an engine
@@ -101,7 +102,7 @@
 // dispatchers, builds KITS from the kit families and lists STATS_ONLY; the rest lives in server/sim/content/enemies/ —
 //   helpers.js      constants several families use, per-battle state, ability bookkeeping (abOf / attach / dispatch, T,
 //                   canCast …), selection and damage helpers (elem, hurt, areaAllies & friends, zone, spawnChildren,
-//                   setForm, lpLoss, expose, absorbArts …)
+//                   setForm, lpLoss, expose …)
 //   archetypes.js   ability building blocks (stealth, splashAttack, deathBoom, refraction, float, reborn, husk, statue,
 //                   artsBarrier, bleed, pollution, dmgZone, skill(), blinkForward …) and the archetype kits reused by
 //                   several keys (kitEp, kitStealth, kitTimes, kitRefraction, kitPrisoner, kitDeathSpawn, kitStun3 …)
@@ -127,7 +128,7 @@ export {
   EROSION, EROSION_BURST, HUSK_REBIRTH, nthOf, abOf, attach, T, silenced, canCast, unbalancedNow, elem, hurt, alliesInTiles,
   targetsNear, allTargets, areaAllies, areaAlliesInTiles, fieldAllies, auraAllies, targetAndArea, byPriority, zone,
   remainingRoute, stayRoute, spawnChildren, stepToward, setHits, hitCount, isHitCount, setForm, lpLoss, expose,
-  expectedFinal, absorbArts, castSlot,
+  castSlot,
 } from './enemies/helpers.js';
 export { TRANSLATOR_CHANGE } from './enemies/leaders.js';
 export { BOMBD_RELEASE, BOMBD_POST_DELAY } from './enemies/fly.js';
@@ -193,16 +194,7 @@ function onHitOut(b, c) {
 function onHitIn(b, c) {
   const t = c.target;
   if (!t || t.side !== 'enemy' || !t.mem.ab || c.dmg.cancel) return;
-  const ab = t.mem.ab;
   dispatch(b, t, 'hitIn', c);
-  if (c.dmg.cancel) return;
-  const ty = c.dmg.type;
-  if (ab.hitShield > 0 && (ty === 'phys' || ty === 'arts')) {
-    // "可以抵挡一次物理或法术伤害" / 再生's aura shield: the whole instance is negated
-    c.dmg.cancel = true;
-    ab.hitShield--;
-    if (ab.hitShield <= 0) b.fx('shieldBreak', { x: t.x, y: t.y, id: t.id });
-  }
 }
 
 function onDamaged(b, c) {
@@ -365,7 +357,7 @@ function chaliceShare(b, c) {
     if (!a || !(a.share > 0) || hypot(o.x - t.x, o.y - t.y) > a.r) continue;
     const part = c.dmg.amount * a.share;
     c.dmg.amount -= part;
-    // a 无来源 burst's share stays 无来源, credited like the burst (damage.js)
+    // a 无来源 burst's share stays 无来源, credited like the burst (attack/element.js)
     b.dealDamage(c.dmg.sourceless ? c.credit : c.source, o, { amount: part, type: c.dmg.type, canDodge: false, sourceless: c.dmg.sourceless, tags: [...(c.dmg.tags || []), 'chalice'] });
     break;
   }

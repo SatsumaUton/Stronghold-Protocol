@@ -46,7 +46,7 @@ import {
   num, itemRecord, itemKeyOf, itemEffectKey, itemIdsWithEffect, isVersionData, gameData, buffsOf, isOp, onField, unitBonds,
   isMember, bondActive, isGroundOp, frontTile, alliesAround, passiveBuff, fxOn, battleStore, contentInfo, itemsOf, directMods,
 } from '../support/index.js';
-import { mitigate, hasHp, periodicDamage, isHpLoss } from '../../damage.js';
+import { mitigate, hasHp, periodicDamage, isHpLoss, damageAttackType } from '../../attack.js';
 import { hypot } from '../../detmath.js';
 
 // =====================================================================================================================
@@ -374,7 +374,7 @@ function hammerRelease(battle, rt, u, hs) {
 // =====================================================================================================================
 // item behaviours: key → (battle, u, rec, S, ctx) — register through S (disposed with the grant)
 
-/** Damage mitigation estimate for flat DR / weakness damage (same formula as damage.js). */
+/** Mitigation-only estimate for weakness damage; actual flat reductions use ordered injury effects. */
 function mitigated(amount, type, target, source, dmg) {
   const ss = source && source.s ? source.s : null;
   return mitigate(amount, type, target.s, {
@@ -394,7 +394,10 @@ function onAttackEnemies(S, u, fn) {
   });
 }
 
-/** Actual carrier damage to enemies, including DoT/skill/splash. Element gauge fill and HP loss are not damage. */
+/**
+ * Actual carrier damage to enemies, including DoT/skill/splash. Gauges and HP loss are not damage.
+ * [ASSUMED] Preserve legacy notification order until native item timing is established (research 12 S59).
+ */
 function onDamageEnemies(S, u, fn) {
   S.on('damaged', (c) => {
     if (c.source !== u || c.type === 'element' || isHpLoss(c.dmg) || !(c.amount > 0)
@@ -447,14 +450,7 @@ const BY_BUFF = {
   halfidle_block_fixed_damage(battle, u, p, S) {
     const v = num(p.value);
     if (!(v > 0)) return;
-    S.on('hit', (c) => {
-      if (c.target !== u) return;
-      const d = c.dmg;
-      if (d.type === 'element') return;
-      const base = mitigated(d.amount * d.mul, d.type, u, c.source, d);
-      if (!(base > 0)) return;
-      d.mul *= Math.max(0, base - v) / base;
-    }, -10);
+    S.buff(u, { key: S.key('fixedReduction'), persist: true, allowDead: true, injury(c) { c.amount = Math.max(0, c.amount - v); } });
   },
   // 叙拉古正装: allies on the two tiles beside the carrier ("左右两格", perpendicular to its direction: the facing-RIGHT
   // offsets (±1, 0) rotated by its dir) get ASPD +attack_speed
@@ -560,7 +556,7 @@ const BY_EFFECT = {
       S.buff(u, { key, mods, refresh: 'stack', stacks: 1, maxStacks: cap, persist: true, allowDead: true });
     });
   },
-  // 伪装服 (chess_item_4_04_e): first damage taken in the battle ⇒ 隐匿 `duration` s (a 流失 is not 受到伤害: damage.js isHpLoss)
+  // 伪装服 (chess_item_4_04_e): first damage taken in the battle ⇒ 隐匿 `duration` s (a 流失 is not 受到伤害: attack.js isHpLoss)
   eff_acarm055(battle, u, rec, S) {
     const p = bp(rec, 'act2autochess_equip_acarm055_global_buff');
     const d = p ? num(p.duration) : 0;
@@ -680,16 +676,19 @@ const BY_EFFECT = {
     if (!partner || !(r > 0)) return;
     S.stat('set', null, { interval: 1, onTick: ({ unit }) => { if (unit.deployed && carries(battle, unit, partner)) battle.heal(unit, unit, unit.s.maxHp * r, { self: true }); } });
   },
-  // 天马之枪 (chess_item_6_01_e): with 天马之盔 ⇒ every damage instance also deals atk_scale × ATK true damage
+  // 天马之枪 (chess_item_6_01_e): with 天马之盔 ⇒ every damage instance also deals a source-less ADDITION true damage of
+  // atk_scale × the parent's scaled input, before the parent's injury / HP (credited to the carrier)
   eff_acarm117(battle, u, rec, S) {
     const p = bp(rec, 'act2autochess_equip_acarm117_global_buff');
     const partner = partnerOf(p);
-    const sc = p ? num(p.atk_scale) : 0;
-    if (!partner || !(sc > 0)) return;
-    S.on('damaged', (c) => {
-      if (c.source !== u || isProc(c.dmg) || c.type === 'element' || !c.target || c.target.side !== 'enemy' || !c.target.alive) return;
+    const scale = p ? num(p.atk_scale) : 0;
+    if (!partner || !(scale > 0)) return;
+    S.on('damageBeforeApply', c => {
+      if (c.source !== u || damageAttackType(c.dmg) === 'ADDITION' || c.target.side !== 'enemy' || !hasHp(c.target)) return;
       if (!carries(battle, u, partner)) return;
-      battle.dealDamage(u, c.target, { amount: u.s.atk * sc, type: 'true', canDodge: false, tags: procTags('pegasus') });
+      // [ASSUMED] A resolved request's supplied amount is its only available origin input.
+      battle.dealDamage({ source: null, credit: u, target: c.target, amount: c.dmg.amount * scale,
+        type: 'true', attackType: 'ADDITION', applyWay: 'NONE', calculation: 'precomputed', origin: c.dmg, tags: procTags('pegasus') });
     });
   },
   // 铳骑之威 (chess_item_6_02_e, 拉特兰): on attack 35 % ⇒ extra bullet at 1 enemy in range, atk_scale_1 (with 拉特兰桥夹 atk_scale_2) × ATK phys
@@ -863,7 +862,7 @@ const SHIELD_KEY = 'item:shield_drone';
 
 /**
  * 弱点伤害 (双模机械臂, band 陈 以己之长): a physical or arts DamageInfo from `source` becomes whichever of the two types
- * `target` resists less (same mitigation formula as damage.js, incl. the source's ignore stats). Mutates `dmg.type`.
+ * `target` resists less (the mitigation formula of attack.js mitigate, incl. the source's ignore stats). Mutates `dmg.type`.
  */
 export function weaknessRetype(dmg, source, target) {
   if (!dmg || !target || !target.s || (dmg.type !== 'phys' && dmg.type !== 'arts')) return;

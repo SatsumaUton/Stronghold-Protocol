@@ -24,7 +24,8 @@ server/sim/
   grid.js          stage grid, tile semantics, 8-dir A* (no corner cutting), obstacles
   units.js         Unit model + stat aggregation
   buffs.js         Buff model, mod keys, status catalogue
-  damage.js        damage / heal pipeline, shields, dodge, element gauges
+  attack.js        public settlement operations and helpers
+  attack/          damage calculation, ordered injury effects, HP, gauges and healing
   targeting.js     range grids (rotated by the unit direction), target filters, priorities
   body.js          where a unit can be hit: huge units' hit rectangles — the helper of every range test on enemies
   dir.js           the 4 deploy directions: vectors, rotation, mirror (shared with server/match and browsers)
@@ -503,7 +504,7 @@ recorded for the player whose half contains the goal it reached, with `sourcePla
   its starting layers; `bossDamage` / `damageDealt` never include a leader hit cancelled by 限伤 (§4).
 - `damageDealt` and `unitStats[].dmg` count only HP removed from the other side: a unit's own drain or 流失 (源石溶剂,
   史尔特尔 S3 …) and friendly damage (the drain on 炎佑) count as the target's `taken`, never as damage dealt; the kill
-  credit is unchanged (`damage.js applyHpLoss`).
+  credit is unchanged (`attack/health.js applyHpDecrease`).
 
 ### 1.4 Robustness
 
@@ -654,7 +655,8 @@ per source — DoTs and slows do that on purpose; a damage-taken / DEF / RES mod
 ## 3. Buffs, mods, statuses
 
 `battle.addBuff(unit, { key, duration=Infinity, refresh='replace'|'extend'|'stack'|'independent'|'keep', stacks, maxStacks,
-mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, shieldHits, shieldType, persist, visible, data, allowDead })`
+mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, shieldHits, shieldType, keepEmptyShield,
+damageReduction, reductionGroup, injury(event), observeInjury(event), injuryPriority, persist, visible, data, allowDead })`
 - `replace`: new instance replaces the old; `extend`: keep the longer remaining time, take the new mods; `stack`: +stacks
   up to maxStacks, timer reset; `independent`: separate timers, at most `maxStacks` alive (oldest dropped); `keep`: ignore.
 - Additive mods scale with stacks (`value × stacks`), `*Mul` mods multiply (`value ^ stacks`).
@@ -663,6 +665,24 @@ mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, 
   `shieldType` ('phys' | 'arts' | 'true' | 'elemental') = a 屏障 that absorbs that damage type only (夜莺 S2 法术护盾 "能吸收…
   法术伤害"), or a list of them = those types only (机械师's 屏障 `['phys', 'arts']`: BlockDamage PHYSICAL_AND_MAGICAL — true
   damage passes); none = every type (PRTS 术语释义 屏障 "若无特殊说明，屏障可吸收全种类伤害"). Shields are spent oldest first.
+- The injury fields (伤判效果, `attack/effects.js injuryEffects`; DESIGN §35.32, design/engine.md §5.5) run on the
+  target after 限伤, in `injuryPriority` order (higher first, default 0; 斥罪's barrier −1000), then acquisition order:
+  - `damageReduction` = `{ phys, arts, true, elemental }`: a fixed amount subtracted from that HP type (PRTS 伤害减免).
+    Reductions of one name keep only the strongest per HP type; differently named ones stack. The name is
+    `reductionGroup`, else the buff key — so a per-unit key (`key:${unit.id}`, §2 above) stacks per source unless the
+    buffs share a `reductionGroup` (浊心斯卡蒂's aura: `'skadi2:reduction'`; DESIGN §35.44).
+  - `injury(event)`: `{ amount, type, dodge(p), block(p), defer(fn), source, target, buff, … }` — it may lower or raise
+    `event.amount`, call `dodge(p)` / `block(p)` to cancel the hit with probability `p` (omitted = always), and `defer`
+    a cleanup that runs after the settlement even when a later effect cancels it. Both return true when the attempt
+    succeeds, which is not always a cancellation: `dodge()` is skipped (returns false) on an instance that cannot be
+    dodged (`dodgeMode: 'ignore'`, i.e. `canDodge: false`), and under a cancellation mask (`dodgeMode: 'uncancellable'` or
+    `ignoreCancelReasons` naming `'dodge'` for `dodge()`, `ignoreCancelReasons` naming `'block'` for `block()`) it
+    returns true without cancelling. Whether the hit was cancelled shows in `observeInjury`'s `cancelled` /
+    `outcome` (or the dodge / block hook's `ctx.cancelled`).
+  - `observeInjury(event)`: `{ amount, type, cancelled, outcome, … }`, a read-only snapshot; it keeps its place in the
+    order and still runs after a cancellation.
+  - `keepEmptyShield: true`: an emptied `shield` / `shieldHits` buff is not removed — it keeps its acquisition position
+    and may refill later (斥罪's barrier, 碎铳之簧's shared barrier).
 - `visible: true` emits `['status', id, key, 1/0]` client events. `battle.removeBuff(unit, key|buff)`.
 - `removeBuff` fixes the matching instances in reverse order, then locates each in the current buff list before
   removing it. Synchronous `onRemove` may remove other buffs: an absent candidate is skipped, its callback is not
@@ -672,9 +692,10 @@ mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, 
   another call. [ASSUMED] Extension API traversal policy, not an official gameplay rule (DESIGN §35.5).
 
 **Mod keys** — additive: `atkFlat atkPct atkFinal defFlat defPct hpFlat hpPct resFlat aspd batPct blockCnt rangeExtend
-defIgnoreFlat defIgnorePct resIgnoreFlat resIgnorePct dodgePhys dodgeArts spRecoveryFlat maxTargets taunt hpRegen
+artsAttackAddition defIgnoreFlat defIgnorePct resIgnoreFlat resIgnorePct dodgePhys dodgeArts spRecoveryFlat maxTargets taunt hpRegen
 hpRegenRatio spCostFlat moveFlat massFlat blockRadiusScale` (重量 levels: 失重 = `massFlat: −1`; never edit `base.massLevel`;
-`blockRadiusScale` = 阻挡半径倍率 − 1, the air-block radius of §1.2);
+`blockRadiusScale` = 阻挡半径倍率 − 1, the air-block radius of §1.2; `artsAttackAddition` = 法术攻击加算, added to an arts
+hit's attack at the target's calculation, design/engine.md §5.5);
 multiplicative: `atkMul defMul hpMul resMul moveMul dmgDealtMul dmgTakenMul physTakenMul artsTakenMul trueTakenMul
 elemTakenMul elementalTakenMul healingDealtMul healingTakenMul spRecoveryMul redeployMul atkScaleMul physDealtMul artsDealtMul`.
 A `rangeExtend` on a `persist` never-expiring buff is **permanent**: it also widens the initial range (§7.1). It widens
@@ -758,7 +779,7 @@ of coverage per 3 s), kept because the current wording no longer says so (feedba
 | `defDown` / `resDown` | defMul 1 − value / RES −value (*strongest*) | 0.3 / 20 |
 
 瑕光's 仁慈 (`character_table char_423_blemsh talents[1]`) supplies `profile.hitSleep`: the engine's
-`canTargetEnemy` search admits a lone sleeper, and `damage.js sleepBlocks` lets only that profile through sleep.
+`canTargetEnemy` search admits a lone sleeper, and `attack/helpers.js sleepBlocks` lets only that profile through sleep.
 Sleep uses its own flag, not `untargetable` or `invulnerable`; separate such flags still apply. S2 does not stop her
 attacks; `beforeAttack` prioritizes sleepers and the hit hook applies the form's `atk_scale`. The ordinary `atk`
 replay events drive the client's attacks. During S2 only, sleepers in x-1 add extra attack tiles [ASSUMED, §32.14.8];
@@ -776,7 +797,7 @@ leaders (rank BOSS / boss units) 2000): deal `{ type:'element', element, amount 
 gain is amount × `dmg.mul` × `elemTakenMul` (元素损伤倍率: "受到的元素损伤提高/降低…") × max(5 %, 1 − 损伤抵抗 / 100),
 损伤抵抗 = the target's data `epResistance` — PRTS 元素 "受到的元素损伤 = 损伤值 × (1 − 损伤抵抗 × 0.01)，
 后续可应用元素损伤倍率", with the 5 % floor of DMG_e (PRTS 游戏数据基础 "目标受到元素损伤时也可以使用该公式计算，只需要将 D 值
-改为目标的损伤抵抗即可"); `elementIntake(unit)` in damage.js returns that factor, applied after `elementHit`). 元素脆弱 never
+改为目标的损伤抵抗即可"); `elementIntake(unit)` in attack/element.js returns that factor, applied after `elementHit`). 元素脆弱 never
 scales it, no gauge decays (EP_RECOVERY_PER_SEC 0), and every enemy in data/enemies.json has 损伤抵抗 0 except 转译基底·α
 (10); operators have none.
 Enemies deal ATK × their talent's `ep_damage_ratio` per hit (content/enemies/archetypes.js `ep`). A full gauge bursts with the
@@ -798,9 +819,9 @@ the source's side):
 The lock (`<el>Burst` buff, flag `burstLock`) is the official **爆发冷却**: while it runs NO element of the unit fills or
 can be recovered (`battle.reduceElement(unit, amount, el?)` removes nothing) and the bursting gauge shows full; when it
 ends EVERY gauge of the unit resets to 0. A burst that is still resolving counts as locked too (`unit.burstPending[el]`,
-`burstLocked(unit)` in damage.js — it takes no element): the `elementBurst` hook fires before the lock buff exists, so
+`burstLocked(unit)` in attack.js — it takes no element): the `elementBurst` hook fires before the lock buff exists, so
 fills of that unit are refused until the burst has resolved — an `elementBurst` handler that spreads the element to
-neighbours (淤困 parasite) cannot bounce it back into a second burst. `elementView(u, now)` (damage.js) is the one gauge
+neighbours (淤困 parasite) cannot bounce it back into a second burst. `elementView(u, now)` (attack.js) is the one gauge
 a unit shows (b.snap `elem`, §9): the fullest one, ties by the official element id (`constants.js ELEMENT_ORDER`: 神经,
 侵蚀, 灼燃, 凋亡, then the legacy `necrosis`), with its fill rounded DOWN to 1 % and kept within 0.01–0.99 — the remainder
 the client draws (the white bar, 1 − fill) is never less than what is left (except that a first chip of less than 1 %
@@ -811,7 +832,7 @@ client colour): no DEF/RES/dodge — 元素抗性 instead (the target's data `ep
 PRTS 游戏数据基础 DMG_e; 0 on every enemy in data/enemies.json) —, × source `dmgDealtMul` × target `elementalTakenMul`
 (元素脆弱) only — the target's `dmgTakenMul` (脆弱, ba.fragile "受到的物理、法术、真实伤害提升", and the other "受到的伤害±"
 effects [ASSUMED: they share that multiplier]) does not scale it —, shields absorb it. An element fill on a target with no
-HP left is refused (damage.js `hasHp`: a lethal hit's `damaged` hook runs before `battle.kill`, while the target is still
+HP left is refused (attack.js `hasHp`: a lethal hit's `damaged` hook runs before `battle.kill`, while the target is still
 `alive` at 0 HP — no burst on the corpse). **Element healing** (`battle.reduceElement(unit, amount, el?)`) lowers element
 `el`, or every element type, each by `amount` on its own (PRTS 菲莱 备注: 清除元素损伤 = "一次等同于自身最大元素值的全类型元素
 损伤治疗").
@@ -820,41 +841,58 @@ HP left is refused (damage.js `hasHp`: a lethal hit's `damaged` hook runs before
 
 ## 4. Damage & heal pipeline
 
-`battle.dealDamage(source, target, dmg)` → HP removed. `DamageInfo = { amount, type:'phys'|'arts'|'true'|'elemental'|'element',
-element?, defIgnoreFlat, defIgnorePct, resIgnoreFlat, resIgnorePct, mul=1, canDodge (phys/arts), isSkill, isSplash,
-isAttack, isProjectile, attackId, ignoreSleep, ignoreSelect, sourceless, tags[], cancel }` (`isProjectile`: 远程途径 — an
-enemy normal attack that flew as a projectile (ai.js enemyAttack; PRTS 作战机制 "有弹道的攻击固定为10，无弹道的攻击固定为01")
-and 怒潮凛冬's 高台 splash (PRTS "被视为远程途径伤害"); every other hit is 近战途径 — what only melee-path damage triggers
-reads it: 薇薇安娜's 散华 护盾, kits/ops/op-vvana.js; `ignoreSelect`: no selection 无法选择
-effects stop — an ability "无视无法选择", a direct pick such as a counter on the attacker, a flying unit's blast credited to
-a ground leader, the tick of a debuff already on the unit — it reaches an airborne 起飞 ally whatever its source;
-`sourceless`: 无来源 damage — the source's stats add nothing and the hooks get `source: null` plus `credit` = the source,
-which keeps the stats and the kill; a `loseHp` whose `from` is 无来源 is 无来源 too; element bursts, leader-part transfers and 坚守 thorns use it — content damage that has a
-responsible unit should pass it as `source` with `sourceless: true` rather than `source: null`, which credits nobody)
-(`battle.makeDamage(d)` normalises). `attackId` is the same for every
-damage instance of one normal attack (all targets, splash, chain, projectile impacts; 0 for non-attack damage) — use it
-for "本次攻击" procs that must roll once per attack. **Dodge** from several buffs rolls independently: the unit's
-`s.dodgePhys` = 1 − Π(1 − pᵢ) (a single source keeps its exact value).
-Order: invulnerable / asleep / 对地规避? (a ground enemy's damage or element fill on an airborne 起飞 ally — flag `liftoff`,
-`targeting.js evadesGround` — is refused unless `ignoreSelect` or 无来源: it cannot select her, so its splash and area
-abilities skip her and a shot in flight when she took off lands on nothing [ASSUMED: PRTS 伤害流程 7 "取消掉隐匿/无敌状态
-下的攻击" read for 对地规避]; the ticks of a debuff already on her select nobody and land (content passes `ignoreSelect`;
-PRTS 异常效果: 无法选择 effects "仅在选择时生效"); checked before `hit` only — 蒂比 S2 takes off inside the
-`hit` of the attack that set it off, which resolves as usual) → **`hit`** (mutate `dmg`, set `dmg.cancel`) → dodge
-(`rng()`) → mitigation (phys
-`max(A − max(0, D×(1−defIgnorePct) − defIgnoreFlat), 5 %A)`, arts `max(A×(1 − R′/100), 5 %A)`, elemental
-`max(A×(1 − 元素抗性/100), 5 %A)`, true = A; source ignore mods are added) → × source `dmgDealtMul` (× phys/artsDealtMul)
-× target `dmgTakenMul` (not for elemental) × type-taken mul × `dmg.mul` (a `sourceless` hit skips every source term) →
-**限伤** (`leaderHitCancelled`: on a leader — `isBoss`, the tag-'boss' units: data/bosses.json `enemyKey`, the official
-`IsBossEnemy` list, and their mirrored copies; never parts, escorts, drones — in a `'boss'` / `'hidden'` battle, a hit
-with `ceil(final) ≥ BOSS_HIT_LIMIT` (300000, shared/constants.js) is cancelled whole: returns 0 before shields (阿利斯泰尔's
-`boss:vest` barrier stays untouched; a `hit`-step block such as 假想敌：再生's aura acts earlier) [ASSUMED order], no HP /
-pool loss, no credit or stats, no `dmg` event, no `damaged` / `fatal` / kill; an fx `hitCap` `{ id, n }` marks it and
-draws nothing; research 11) → shields (a typed one — buff `shieldType` — only for its damage type) → **`hpDamage`** (what
-passed the shields; a handler may only lower `amount` — the 伤判效果 that act after a barrier: 煌's 紧急除颤 HP floor, PRTS
-备注 "该伤害减少(伤害值-煌当前生命值+煌最大生命值×50%)点"; 左乐's 庇护 re-applied after his 行险 barrier; never for a 流失) → HP loss
-(boss units: routed to `sharedBoss.damage(playerId, amount)`; a pool left under 1 HP is emptied) → if HP ≤ 0: **`fatal`** (`ctx.prevented = true` keeps the
-unit at ≥ 1 HP) → **`damaged`** → SP-on-hurt / TAKE_DAMAGE → `kill` + `death`.
+Use the object-request operations on `battle`; public helper imports come from `attack.js`.
+[Short examples](../server/sim/AGENTS.md) and [request types](../types/attack.js) describe the author-facing API.
+
+| Operation | Input meaning | Return value |
+|---|---|---|
+| `dealDamage({source, credit?, target, amount, type, ...})` | HP damage, `phys/arts/true/elemental` | HP actually removed |
+| `dealElementDamage({source, credit?, target, amount, element, ...})` | Element gauge intake | Accepted gauge intake |
+| `dealHPLose({source, credit?, target, amount, type?, ...})` | HP loss; defaults to true, physical/arts input is before mitigation | HP actually removed |
+| `heal({source, target, amount, mode?, ...})` | Ordinary heal, regeneration or restoration | HP actually restored |
+| `healElement({target, amount, element?})` | Recovery of one gauge or each gauge independently | Sum actually recovered |
+
+`source` is the actual source used by modifiers/events; `credit` defaults to it and independently owns statistics
+and kills. `source: null, credit: owner` expresses attributed source-less damage. `type: 'elemental'` removes HP;
+`dealElementDamage` changes a gauge. True damage still undergoes ordinary injury processing, unlike HP loss.
+Legacy positional calls remain supported, including the old `sourceless` descriptor convention and `loseHp` /
+`reduceElement` aliases. Both HP-loss forms share one path (`attack/health.js loseHp`): `type` 'phys' / 'arts' is first
+reduced by DEF / RES, 'true' — the default, and what a positional `dealHPLose(target, amount, opts)` / `loseHp` without
+`opts.type` passes — is an already processed amount. A refused request (an unknown type, route, mode …) is reported as an
+internal error and returns 0 on every Battle entry point.
+
+`attackType` describes native class (`NONE/NORMAL/SPLASH/BUFF/ADDITION`, default NORMAL in object requests),
+`applyWay` describes the instance route, and `isAttack` independently describes attack behavior. Tags do not set
+native class in object requests. `attackId` groups instances belonging to one attack; use `forceAttack` when the
+mechanism requires an entire attack, with attack hooks, ammunition and attack SP.
+
+Amounts include the caller's authored attack scale. `calculation: 'base'` (default) runs source and target
+calculation; `precomputed` skips source calculation but retains target calculation and DEF/RES; `resolved` skips
+calculation events and DEF/RES. Precomputed does not mean source-less, undodgeable or immune to target effects.
+Fixed DEF/RES penetration is subtracted and clamped at zero before percentage penetration.
+
+HP damage follows guards (including sleep/selectability), legacy `hit`, permitted calculation events, numerical
+calculation, `damageOutput`, `damageBeforeApply`, `damageApplying`, the mode hit-limit check, ordered injury
+processing, `hpDamage`/transfer reservations, then final HP bookkeeping. The hit-limit position is [ASSUMED].
+A `hit` listener may still cancel or mutate the descriptor; an early cancellation does not enter later injury.
+Within injury processing, priority precedes actual Buff acquisition order. Cancellation stops later defense
+resource consumption but qualifying `observeInjury` callbacks can still run. HP loss bypasses ordinary damage
+stages; gauge intake has its own pipeline.
+
+Final HP handling includes special-HP mapping, `fatal` prevention, statistics, `hpChanged` for nonzero HP loss,
+`modifierApplied`/`damageApplied` for positive ordinary damage, legacy `damaged`, hurt-SP and death handling.
+`amount` and `hpRemoved` are different quantities: a positive damage instance can remove zero HP under special
+HP rules. The client's damage number shows `amount`, and its red mark compares that final damage — after barriers,
+fixed reductions and `hpDamage` — with the expected damage (`attack/hit.js officialDamageMark`; PRTS 作战机制 「伤害红字」:
+the expected damage leaves out 屏障吸收 and the other 后置增益, the number is the final damage, which can differ from the
+HP change); a yellow MISS uses the amount left at the dodging effect's position. `onApplied` runs after successful settlement and fatal/kill processing; a fully absorbed/cancelled hit
+does not call it. Legacy `damaged` also includes zero values and HP loss, so it is not a universal success event.
+
+Object healing defaults to `mode: 'heal'`; `regen` bypasses healing modifiers and retains regen notifications;
+`restore` bypasses healing modifiers, heal events, healing statistics and overheal conversion. Prefer HP-regeneration
+buffs for regeneration attributes. Healing emits `hpChanged` only for actual HP restoration; ordinary healing
+also emits `modifierApplied` with both modifier amount and `hpRestored`. Gauge healing directly changes gauges.
+The following healing options and legacy positional form remain supported.
 
 `battle.heal(source, target, amount, { overheal=false, self, silent, regen, ignoreHealFree })`: no-op on `noHeal` targets
 (unless self — 禁疗 / 孤立 summons carry the flag, §3) and on `healFree` ones, self included (史尔特尔's 余烬), unless `regen`
@@ -873,7 +911,7 @@ turns the excess into an `overheal` shield. `battle.loseHp(target, amount, { sou
 loss ignoring DEF/RES/shields/dodge (流失); `sourceless: true` makes it 无来源 ("受到等量的无来源生命流失": hooks see no source,
 `source` keeps the credit — stats and the per-player shared-pool tally), as does a 无来源 `from`. A 流失 skips the damage
 events (PRTS 作战机制 "生命流失不会触发反伤、受击回复等受到攻击触发的时点"): no `hit`, no 受击回复 SP, no TAKE_DAMAGE; its
-`damaged` ctx carries the tag `'hpLoss'` (and `noSp`; `damage.js isHpLoss`), and "受到伤害时" content skips it (信仰搅拌机 S3
+`damaged` ctx carries the tag `'hpLoss'` (and `noSp`; `attack.js isHpLoss`), and "受到伤害时" content skips it (信仰搅拌机 S3
 counters, 雷蛇 战术防御, 乌尔比安 本性的坚守, 录武官's guard, 远牙's 未受伤害 timer, 伪装服, 坚守 thorn chances, 机变 自愈) —
 while it counts every real damage instance, 无来源 ones included (a zone tick, the 源石溶剂 drain; 蒂比 S2 "受到伤害前
 触发"). Use it only for what the official calls 流失 — operator skill / trait 流失 (华法琳, 史尔特尔, 瑰盐 …), 阿戈尔's 物理流失,
@@ -881,7 +919,7 @@ a leader part's 传递 and the 胄 drone link ("无来源生命流失") — and,
 and 扎罗's 溶血骇惧; "受到N真实伤害" over time is damage (PRTS 伤害分类: BUFF damage, "自残类型" included) — the official
 `periodic_damage` template (源石溶剂: PRTS 盟约记录 修正 "并非流失", "造成无来源真实持续环境伤害"; 狂暴宿主 "自身每秒受到N无来源
 真实伤害"), 码头水手's drowning ("每秒受到1000点无来源真实伤害"), 弧光锋卫's 失衡 bleed (修正 "失衡移动时持续受到真实伤害") and
-孽罪奇美拉's aura are `dealDamage(credit, target, damage.js periodicDamage(n))`: 无来源 true, `canDodge: false`, tags
+孽罪奇美拉's aura are `dealDamage(credit, target, attack.js periodicDamage(n))`: 无来源 true, `canDodge: false`, tags
 `'dot'` / `'periodic'` (player report D1). Terrain ticks (`content/devices.js`): 深水区's 【水蚀】 is the same kind (PRTS 涨潮控制
 深水 "无来源真实持续伤害（不属于环境伤害，不会触发受击回复）": `noSp`, tags `'dot'` / `'periodic'` / `'deepsea'`); 活性源石's is
 无来源 true damage tagged `'terrain'` — 环境伤害 (PRTS 自然环境), what "受到来自自然环境的伤害" content (纠缠藤蔓) reads — and
@@ -897,6 +935,8 @@ removes no HP and never does.
 
 ---
 
+Content-specific rules, references and remaining assumptions: [DESIGN §5](design/engine.md#settlement-consumers-and-evidence).
+
 ## 5. Hook bus
 
 `battle.on(name, fn(ctx, battle), { priority=0, owner, once })` → handle; handlers run in descending priority, then
@@ -911,6 +951,14 @@ registration order. `battle.off(handle)` / `battle.off(name, fn)` / `battle.offO
 | `beforeAttack` | `{ attacker, targets, isSkill, profile }` | allies **and** enemies; replace/filter `ctx.targets` |
 | `enemyAttackStart` | `{ enemy, targets }` | an enemy starts a normal attack (it has targets), **before** 麻痹 may interrupt it (ai.js enemyAttack; the client's ON_BEFORE_ABILITY_SPELL_ON): a burst a handler causes interrupts that very attack (酒神 堕梦, PRTS 备注 "触发的元素爆发可打断当次普攻"); a handler that kills or stuns the enemy ends it |
 | `attack` | `{ attacker, targets, isSkill, targetDeployments? }` | an attack/heal was performed (projectiles may still be in flight). Normal enemy attacks provide a `Map<Unit, deploySeq>` captured before their damage; post-attack control effects must not cross a target redeployment. |
+| `damageCalculate` | `{ source, credit, target, dmg }` | source calculation; omitted for precomputed/resolved damage |
+| `damageCalculateTarget` | `{ source, credit, target, dmg }` | target calculation; omitted for resolved damage |
+| `damageOutput` | `{ source, credit, target, dmg, amount }` | after calculation, before target injury; not proof of HP loss |
+| `damageBeforeApply` | `{ source, credit, target, dmg, amount }` | sourced instance before target application |
+| `damageApplying` | `{ source, credit, target, dmg, amount }` | target application before injury, including source-less damage |
+| `modifierApplied` | `{ source, credit, target, kind, amount, ... }` | ordinary damage/heal/gauge modifier application; amount can differ from HP/gauge delta |
+| `damageApplied` | `{ source, credit, target, dmg, kind, amount, hpRemoved }` | positive ordinary HP damage; not called for loss or fully cancelled damage |
+| `hpChanged` | `{ source, credit, target, kind, amount, delta, ... }` | actual nonzero HP change; full-HP healing emits none |
 | `hit` | `{ source, target, dmg, credit }` | before mitigation; mutate `dmg` (not fired for gauge fills — see `elementHit`). `source` may be null (terrain; 无来源 `dmg.sourceless` bursts, whose `credit` names the unit credited) |
 | `elementHit` | `{ source, target, dmg }` | before a gauge fill (`dmg.type === 'element'`); mutate `dmg.amount`/`dmg.mul`, set `dmg.cancel` |
 | `damaged` | `{ source, target, amount, type, dmg, credit }` | after application (`amount` may be 0 when shielded); element fills too (with their source); 无来源: `source` null, `credit` set |
@@ -940,11 +988,15 @@ registration order. `battle.off(handle)` / `battle.off(name, fn)` / `battle.offO
 "bonus damage on hit") must not react to its own output or to other reactive damage, or two such effects ping-pong
 until the nesting guard trips (the guard then skips *every* nested handler, including `kill`/`death` bookkeeping of
 content). Respond only to `dmg.isAttack` (normal attacks), tag your damage (`tags: ['counter']`) and skip tagged damage,
-or guard with a per-unit flag while dealing it. The "受到攻击时" counters take the second way: the official ones fire on
-every damage instance from an enemy (ON_TAKE_DAMAGE — its attack, a skill hit, 深溟巢涌者's pulse; never a 流失), so they
-answer `kits/shared/tier1.js byEnemyAttack` (星熊 S2, 泡泡, 刺玫 S2, 余 S1, 玛恩纳 无动于衷, 年 S2, 斩业星熊; 菲莱 S2 any
-instance) and skip `'counter'` / `'reflect'` damage. When the guard trips, the logged error names the open frames
-(`chain: hit(enemy_x→chess_y) > damaged(chess_y) > …`).
+or guard with a per-unit flag while dealing it. The "受到攻击时" counters are held injury observers since 0.3.2 (§4,
+DESIGN §35.32): the official ones fire on every damage instance from an enemy source (ON_TAKE_DAMAGE — its attack, a
+skill hit, 深溟巢涌者's pulse; never a 流失 or a 无来源 hit), so they answer `kits/shared/tier1.js byEnemyDamage`
+(`byEnemyAttack` is its deprecated alias; 星熊 S2, 泡泡, 刺玫 S2, 余 S1, 玛恩纳 无动于衷, 年 S2, 斩业星熊, 斥罪; 菲莱 S2 any
+instance). A descriptive `'counter'` / `'reflect'` tag no longer excludes an enemy source — the official templates filter
+by source side, attack type and route, not by such tags: no ally counter answers ally damage, and the enemy counters
+of this mode are 无来源 (碎铳之簧's physical ADDITION, §4 / DESIGN §35.34), which no enemy-source filter answers; an enemy
+counter that kept a source could set one off, and the nesting guard would end the exchange. When the guard trips, the
+logged error names the open frames (`chain: hit(enemy_x→chess_y) > damaged(chess_y) > …`).
 
 ---
 
@@ -1237,7 +1289,7 @@ Element conventions of the kits (user playtest #5 #3; official term dictionary: 
   "损伤屏障于伤害计算前、第一天赋后处理"); the enemy-side amplifier 塑心 精神逆构 (×1.2 凋亡 in her range) has no ordering
   constraint (priority 0 — enemies carry no 损伤屏障).
 - **Element attached to a damage** (a `damaged` hook: 迭代元素, 灼燃维式重锤, 炎佑, 妮芙 S2, 余 S3 火墙): the hook runs before
-  `battle.kill`, so a killing blow still sees the target `alive` at 0 HP — these riders check HP left (damage.js `hasHp`,
+  `battle.kill`, so a killing blow still sees the target `alive` at 0 HP — these riders check HP left (attack.js `hasHp`,
   boss: pool HP; kits/shared/tier6.js `elementDmg`) and applyElement itself refuses such a target, so nothing bursts on the corpse.
   塑心 S2 (安魂的弥撒) is the exception: PRTS "…凋亡损伤生效于当次触发的伤害之前，该造成的凋亡损伤的来源始终为塑心" — a late
   `hit` handler (priority −1000, after any cancel), so its 凋亡 lands (and may burst) before the damage; a hit dodged or
@@ -1497,13 +1549,13 @@ header of professions.js).
 | chainhealer | the heal jumps on to 3 units in all (−25 % per jump, bb chain.*), each jump inside the 3×3 of tiles around the last one healed (range x-4), never twice to one unit, the lowest HP ratio first — a full-HP ally too (healed for nothing, the chain goes on from it) — then the latest deployed; no 禁疗 / 孤立 unit (a healer's `healThrough` summon excepted) — PRTS 分支特性信息 链愈师 (`ai.js chainHealNext`, shared with Mon3tr's kit; until 0.2.0: the most injured ally within 2.5 tiles) |
 | healer (流明) | heal ×0.8 (bb heal_scale) beyond 2 tiles |
 | wandermedic | heal + reduce element gauges by 50 % ATK (bb ep_heal_ratio); also targets uninjured allies with gauge |
-| incantationmedic | arts attack; EVERY damage the unit deals heals the lowest ally in range for 50 % (bb scale) of it — the official trait buff (`vendla_tr` / `reed2_tr` / `titi_tr`) is ON_AFTER_OUTPUT_DAMAGE, so skill and DoT damage heals too (缇缇's 凝固的时光 ticks, 焰影苇草's S2 fireballs while she is disarmed); a skill that triggers it for one named ally says so ("仅对该角色触发…特性") and the damage instance carries that ally (`DamageInfo.traitAlly`) |
+| incantationmedic | arts attack; every successful ordinary HP damage instance heals the lowest ally in range for 50 % (bb scale) of its damage amount; HP loss and gauge intake are excluded — the official trait buff (`vendla_tr` / `reed2_tr` / `titi_tr`) is ON_AFTER_OUTPUT_DAMAGE, so skill and DoT damage heals too (缇缇's 凝固的时光 ticks, 焰影苇草's S2 fireballs while she is disarmed); a skill that triggers it for one named ally says so ("仅对该角色触发…特性") and the damage instance carries that ally (`DamageInfo.traitAlly`) |
 | slower | sluggish 0.8 s on hit (bb sluggish) |
 | bard | no attack; allies in range get 生命回复速度 +10 % ATK (bb atk_to_hp_recovery_ratio) — an hpRegen buff refreshed every 0.25 s (`bardRegen`), no heal |
 | craftsman | melee phys (support devices via kit) |
 | shotprotector | ranged phys, can hit FLY, blocks 3 |
 | fortress | melee single target while blocking, ranged 1.0 splash otherwise, ground only (never hits FLY) |
-| unyield / musha / reaper | cannot be healed by others. musha: one heal of 50 (bb value) per damage instance it deals to an enemy (PRTS 分支特性信息 武者 "特性治疗于干员每次输出伤害时触发（不局限于攻击）"; the official `utage_trait` / `helage_trait` / `zuole_trait` ON_OUTPUT_DAMAGE): every hit of a normal attack — a double strike heals twice, a dodged hit not at all — and every skill / item / bond damage instance; not a 流失, an element 损伤 or a talent / DoT damage. reaper: 50 × min(enemies hit, block) per normal attack and 50 per other damage instance it outputs that no buff produced (the official trait's ON_OUTPUT_DAMAGE, which is why 隐德来希's S2 血镰 cuts heal her while she is disarmed), capped at the block count per instant. Both trait heals ignore 禁疗 (PRTS 分支特性信息 武者 / 收割者 "通过自身特性/天赋/技能产生的作用于自身的治疗效果会无视自身的禁疗") |
+| unyield / musha / reaper | cannot be healed by others. musha: one heal of 50 (bb value) per damage instance it deals to an enemy (PRTS 分支特性信息 武者 "特性治疗于干员每次输出伤害时触发（不局限于攻击）"; the official `utage_trait` / `helage_trait` / `zuole_trait` ON_OUTPUT_DAMAGE): every hit of a normal attack — a double strike heals twice, including hits later dodged or absorbed — and every skill / item / bond damage instance; not HP loss or element-gauge intake; source-less credit alone does not qualify. reaper: source output admits at most the block count of damage instances per 0.05 s window, with individual heals delivered 0.12 s apart. The profession accepts BUFF damage unless a kit filters it (隐德来希 does); HP loss, gauge intake and source-less credit do not qualify. Exact first delivery on the 30 Hz scheduler is [ASSUMED]. Both trait heals ignore 禁疗 (PRTS 分支特性信息 武者 / 收割者 "通过自身特性/天赋/技能产生的作用于自身的治疗效果会无视自身的禁疗") |
 | centurion / crusher / pusher | "同时攻击阻挡的所有敌人" (`hitAllBlocked`): each attack takes up to the block count of targets (never fewer than 1) from the range and the enemies it blocks, the blocked ones first — PRTS 分支特性信息 "普通攻击最大目标数等于阻挡数（不会低于1）", PRTS 作战机制 §AOE伤害判定 (强攻手: a 锁定人数 AoE taking the targets of its range up to its cap); the client's selector flag `_limitedMaxTargetNumToBlockedCnt`, carried by every skill worded so too (忍冬 S3, 左乐 S2, Mon3tr S3, 凯尔希's Mon3tr under S2 … — kits set `attack.hitAllBlocked`). Until 0.2.0 it struck the blocked enemies only |
 | hammer | 50 % splash (bb atk_scale_2) to others within 1 tile |
 | instructor | ×1.2 (bb atk_scale) vs enemies it doesn't block |
@@ -1777,7 +1829,7 @@ server's digests (DESIGN §32.14.16). The match adds phase credits into its sing
 - Optional snapshot `coins: [[id, balance, cap]]` comes from `snapshot.js coinView`: a live allied Swire skill's nonnegative integer balance and blackboard cap, including zero. Invalid/missing entries are omitted; interpolation clears absent values.
 - Optional snapshot `energy: [[id, stored, cap]]` comes from `snapshot.js mysticView` (GitHub #633): a 秘术师's stored attack energies — the trait's `trait.stored` against its `profile.storeMax` (3 by default, 4 with 深靛's MSC-X module) — including zero. Invalid/missing entries are omitted; interpolation clears absent values. A kit whose store is its own (维伊's 转置能量, 黑键's elite energies) keeps no `trait.stored` and reports no row.
 - Raid's one reselect after a revive orders by taunt, then remaining route distance, then id, and jumps while the operator is not blocking (contact on the current tile is refreshed first). Ordinary polls keep remaining-distance order and the empty-range prerequisite.
-- Healing skill activation includes elemental-only injury when the operator's heal profile can cure it. Pinecone S2 growth is deployment-local. Skadi S1 and Stead preserve redirect ancestry and take both shares from the pre-redirect hit, so the total damage is conserved.
+- Healing skill activation includes elemental-only injury when the operator's heal profile can cure it. Pinecone S2 growth is deployment-local. Skadi S1 and Stead preserve redirect ancestry and reserve shares from one post-barrier amount. Skadi receives HP loss; Stead recipients receive resolved true damage. The mixed sharing and Stead/barrier order are [ASSUMED] (DESIGN §35.32).
 
 `champagneHold` includes the internal `isolated` ally-selection flag (§29.11): device-type champagne bombs are excluded from ordinary allied auras/inspiration in both creation paths. Other unhealable summons retain their own selection behavior.
 
@@ -1800,4 +1852,4 @@ SDK-owned return records are immutable copies; live Battle/Unit callback objects
 
 ### Declarative operator traits (0.3.1, #671)
 
-The optional `public/js/battle/operatorTraits.js` loader adapter attaches operator-owned DSL after unit setup, using existing trigger/action helpers and the existing `damage.js` elementBurst event. Its fingerprint is pinned only in participating content sets; vanilla sim/shared bytes are unchanged. Server match hosts, studio trials and the browser loader install it; direct harness battles must call `installServerOperatorTraits(data)` from `server/plugins/operatorTraits.js` first and restore with vanilla data afterward. [ASSUMED] Layer caps are per holder/action/bond across redeploy, reset per battle. See [PLUGIN-DSL §10](PLUGIN-DSL.md#10-干员特质031671) for the fixed element vocabulary and filters.
+The optional `public/js/battle/operatorTraits.js` loader adapter attaches operator-owned DSL after unit setup, using existing trigger/action helpers and the existing `elementBurst` event. Its fingerprint is pinned only in participating content sets; vanilla sim/shared bytes are unchanged. Server match hosts, studio trials and the browser loader install it; direct harness battles must call `installServerOperatorTraits(data)` from `server/plugins/operatorTraits.js` first and restore with vanilla data afterward. [ASSUMED] Layer caps are per holder/action/bond across redeploy, reset per battle. See [PLUGIN-DSL §10](PLUGIN-DSL.md#10-干员特质031671) for the fixed element vocabulary and filters.

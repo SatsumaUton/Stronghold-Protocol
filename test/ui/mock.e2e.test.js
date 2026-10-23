@@ -295,14 +295,14 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
     } finally { await page.close(); }
   });
 
-  // Q / X act on the HOVERED operator (PR #629, DESIGN §32.14.22): no click needed, a selection alone does nothing
-  test('prep: Q retreats and X sells only the hovered operator', async () => {
+  // Q / X prefer the underframe's selection, otherwise use hover (DESIGN §35.31).
+  test('prep: Q/X use selection before hover', async () => {
     const { page, problems } = await open('phase=PREP', { render: 'fallback' });
     const initial = await mockState(page);
     await page.mouse.move(5, 5);
     await page.keyboard.press('KeyQ');
     await page.keyboard.press('KeyX');
-    assert.deepEqual(await mockState(page), initial, 'nothing hovered means no action');
+    assert.deepEqual(await mockState(page), initial, 'no selection or hover means no action');
     const unit = initial.board.find((piece) => piece.kind === 'chess' && !piece.golden);
     // as test/ui/hover-hotkeys.e2e.test.js: the piece's current screen rect, then wait for the live hit test to see it
     const hover = async (uid) => {
@@ -327,19 +327,27 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
     assert.deepEqual(await mockState(page), initial, 'typing must not retreat or sell');
     await page.evaluate(() => document.getElementById('shortcut-test-input').remove());
     await hover(unit.uid);
+    await page.click(`.ff-piece[data-uid="${unit.uid}"]`);
+    await page.waitForSelector('.uframe__btn--retreat');
+    await page.mouse.move(5, 5);
     await page.keyboard.press('KeyQ');
     await page.waitForFunction((uid) => globalThis.__MOCK__.S().priv.hand.some((piece) => piece?.uid === uid), {}, unit.uid);
     const retreated = await mockState(page);
     assert.ok(!retreated.board.some((piece) => piece.uid === unit.uid));
     assert.equal(retreated.funds, initial.funds, 'retreat does not sell');
     await hover(unit.uid);
+    await page.click(`.ff-piece[data-uid="${unit.uid}"]`);
+    await page.waitForSelector('.uframe__btn--sell');
+    await page.mouse.move(5, 5);
     await page.keyboard.press('KeyQ');
     assert.deepEqual(await mockState(page), retreated, 'Q on the bench does nothing');
     await page.keyboard.press('KeyX');
     await page.waitForFunction((uid) => !globalThis.__MOCK__.S().priv.hand.some((piece) => piece?.uid === uid), {}, unit.uid);
-    assert.ok((await mockState(page)).funds > retreated.funds, 'X sells the hovered operator');
+    assert.ok((await mockState(page)).funds > retreated.funds, 'X sells the selected operator over blank space');
     const item = (await mockState(page)).hand.find((piece) => piece?.kind === 'item');
     await hover(item.uid);
+    await page.click(`.ff-piece[data-uid="${item.uid}"]`);
+    await page.waitForSelector('.uframe__btn--destroy');
     await page.keyboard.press('KeyX');
     assert.ok((await mockState(page)).hand.some((piece) => piece?.uid === item.uid), 'X must not destroy an item');
     assert.equal(await page.$('.modal'), null, 'no destroy confirmation');

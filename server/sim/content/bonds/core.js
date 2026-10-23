@@ -25,7 +25,7 @@
 //   卡西米尔 kazimierzShip every deployment of one of the player's operators (initial ones included): members ATK
 //                        +atk_when_born, total ≤ base_max_atk_when_born + max_atk_when_born_per_stack·L; 6: blocking
 //                        members pulse damage_atk_scale×ATK true damage + stun around them every damage_interval s,
-//                        non-blocking members' attacks add pure_atk_scale×ATK true damage
+//                        non-blocking members' NORMAL damage carries source-less true ADDITION damage
 //
 // Numbers: data/bonds.json buffs (support.buffParams by bbStr.key); 炎佑's 30 % is parsed from the effect text.
 // Tiers: a bond's upper tier is reached when count ≥ the blackboard threshold (power_bond_char_cnt / ex_bond_char_cnt)
@@ -38,11 +38,11 @@
 // death 10; every `fatal` saver runs before any death hook), layerGain −100 (after 魔王-style modifiers).
 
 import * as S from '../support/index.js';
-import { mitigate } from '../../damage.js';
 import { spawnYanyou } from '../tokens.js';
 import { kjeragColdWind } from '../devices.js';
 import * as items from '../items.js';
 import { FORCED_EXIT } from '../../constants.js';
+import { damageAttackType, isHpLoss } from '../../attack.js';
 import { msg } from '../../../../shared/i18n.js';
 import { bbCap } from '../../../../shared/plugins/officialBounds.js';
 import { textFinite } from '../../../../shared/plugins/textNumber.js';
@@ -467,7 +467,8 @@ function devour(battle, pid, bb, members) {
     // opening HP loss (or trigger deaths/revives) to an operator restored from the previous field. Battle.start
     // applies its exact HP ratio and SP after the opening hooks. Fresh units and all other battle kinds still pay.
     const restored = battle.kind === 'unite' && Number.isFinite(t.carry?.hpPct) && t.carry.hpPct > 0;
-    if (amount > 0 && !restored) battle.loseHp(t, mitigate(amount, 'phys', t.s), { source: m, tags: ['bond:egir:devour'] });
+  // PRTS: devour is physical HP loss sourced by its victim; the mark's owner receives the kill credit.
+  if (amount > 0 && !restored) battle.dealHPLose({ source: t, credit: m, target: t, amount, type: 'phys', tags: ['bond:egir:devour'] });
     if (!layered.has(t)) {
       layered.add(t);
       S.gainLayers(battle, { playerId: pid, bonds: 'egirShip', n: S.tierOf(t), source: m, reason: 'bond' });
@@ -641,7 +642,8 @@ function installKazimierz(battle, pid, bb, members) {
         const amount = scale * m.s.atk;
         for (const e of hits) {
           if (!e.alive) continue;
-          battle.dealDamage(m, e, { amount, type: 'true', canDodge: false, isSplash: true, tags: ['bond:kazimierz'] });
+          battle.dealDamage({ source: m, target: e, amount, type: 'true', attackType: 'NORMAL',
+            applyWay: 'NONE', dodgeMode: 'ignore', isSplash: true, tags: ['bond:kazimierz'] });
           if (e.alive && stun > 0) battle.applyStatus(e, 'stun', { duration: stun, source: m });
         }
         S.fxOn(battle, 'aoe', m, 'bond:kazimierzShip', 'pulse', { radius, dmgType: 'true', n: hits.length });
@@ -652,9 +654,13 @@ function installKazimierz(battle, pid, bb, members) {
   if (!(pure > 0)) return;
   const onDmg = (ctx) => {
     const u = ctx.source, t = ctx.target, dmg = ctx.dmg;
-    if (!dmg || !dmg.isAttack || !isEnemyTarget(t) || ownTag(dmg, 'bond:kazimierz')) return;
+    if (!dmg || isHpLoss(dmg) || damageAttackType(dmg) !== 'NORMAL' || dmg.type === 'element'
+      || !isEnemyTarget(t) || ownTag(dmg, 'bond:kazimierz')) return;
     if (u.blocking && u.blocking.length) return;
-    battle.dealDamage(u, t, { amount: pure * u.s.atk, type: 'true', canDodge: false, tags: ['bond:kazimierz'] });
+    // [ASSUMED] Retain the legacy damaged-listener timing; PRTS settles class/source, not this relative phase.
+    battle.dealDamage({ source: null, credit: u, target: t, amount: pure * u.s.atk, type: 'true',
+      attackType: 'ADDITION', applyWay: 'NONE', calculation: 'precomputed', dodgeMode: 'ignore',
+      origin: dmg, tags: ['bond:kazimierz'] });
   };
   for (const u of members) onUnitDamaged(battle, u, onDmg);
 }

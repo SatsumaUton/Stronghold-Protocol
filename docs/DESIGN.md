@@ -25,6 +25,27 @@ The 0.3.1 sim investigation and rule correction are [§34.32](history/0.3.1.md#3
 瑕光 S2 retains sleeper targeting and attack replay events; 琳琅诗怀雅 S3 keeps double attacks and coins at the cap,
 following the official mode's no-auto-close rule. Current contracts: [design/engine.md](design/engine.md).
 
+Q / X prefer the selected operator, otherwise the hovered operator (PR #859, the maintainer's decision of 2026-10-23) in
+[§35.31](history/0.3.2.md#3531-q--x-prefer-the-selected-operator-otherwise-use-hover-pr-859-felixsion28).
+Current interaction contract: [design/client.md](design/client.md).
+
+设置 → 异形屏适配 →「界面大小」 (75–100 %, manual, default 100 %, at 文字大小 小 only) scales the layout root and every
+px floor while the touch floor stays: [§35.43](history/0.3.2.md#3543-界面大小-in-异形屏适配-837-pr-838-reworked-zasx77771); contract:
+[design/client.md](design/client.md).
+
+The damage settlement follows PRTS 伤判效果 / 伤害分类 since 0.3.2 (@Siornya's series): the public entry
+server/sim/attack.js and fixed before percentage penetration in
+[§35.30](history/0.3.2.md#3530-settlement-penetration-order-prs-796-and-798-siornya), the ordered pipeline and the
+consumers that depend on it in [§35.32](history/0.3.2.md#3532-ordered-settlement-pipeline-and-dependent-consumers-pr-802-siornya)–§35.34,
+the contract and the series' verification in [§35.35](history/0.3.2.md#3535-settlement-contract-and-the-series-verification-pr-856-siornya).
+Current contracts: [design/engine.md](design/engine.md) §5.5 and [SIM.md](SIM.md) §4. The batch's merge review
+(burst damage dodgeable, fixed reductions by name, #848's manifest, 界面大小 at 小 only) is
+[§35.44](history/0.3.2.md#3544-merge-review-of-the-pr-batch-2026-10-23); its second review (the injury fields in SIM §3,
+the 界面大小 reading) is [§35.45](history/0.3.2.md#3545-second-review-of-the-pr-batch-2026-10-23), the third
+[§35.46](history/0.3.2.md#3546-third-review-of-the-pr-batch-2026-10-23), the fourth (界面大小's disabled row and the lobby
+dialogs at 75 %, #796's credit, one dodge notice per masked hit, the single-human reroll throttle)
+[§35.47](history/0.3.2.md#3547-fourth-review-of-the-pr-batch-2026-10-23).
+
 Picture-only outfits become wearable under the maintainer's 2026-10-18 option A in
 [§35.4](history/0.3.2.md#354-picture-only-outfits-b6): per-seat pictures with default battle models;
 current rendering rules are in [design/client.md](design/client.md) and [SKINS.md](SKINS.md).

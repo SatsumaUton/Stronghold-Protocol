@@ -251,15 +251,21 @@ bot reply. Settlement uses that round's results (kills then damage, stable seat 
 chess merge reacts once and resets at settlement. Gifts are classified by trusted source playerId, never display name.
 These hooks consume no gameplay RNG and schedule no game actions.
 
-[ASSUMED] During INFO_CHECK the host may request an opening reroll; all connected human participants must explicitly
-agree, including autoplay humans. Bots and spectators do not vote; one human refreshes immediately. A vote pauses the
-confirmation timer and blocks Ready. Rejection, host cancellation, disconnect or leaving cancels it and restores the
-remaining time / prior Ready state. Success preserves the room, seats, settings and connections, redraws the complete
-opening, resets Ready, and starts the full original timer (single-human matches remain untimed). Fixed stage/bans
-remain fixed and random results can repeat. A separate seed-derived stream leaves shop/draft RNG untouched; requests
-have a 300 ms anti-burst guard, revision and vote identities. All new setup data and player DIY stocks are prepared
-before mutation; data preparation failure leaves the old opening intact. This is a remake convenience, not an official
-mode rule. Unrelated result-screen changes from PR #408 are not included.
+[ASSUMED] During INFO_CHECK any seated human participant may request an opening reroll; all connected human
+participants must explicitly agree, including autoplay humans. Bots and spectators do not vote; one human refreshes
+immediately. A vote pauses the confirmation timer and blocks Ready. Rejection, cancellation by any seated participant,
+disconnect or leaving cancels it and restores the remaining time / prior Ready state. Success preserves the room,
+seats, settings and connections, redraws the complete opening, resets Ready, and starts the full original timer
+(single-human matches remain untimed). Fixed stage/bans remain fixed and random results can repeat. A separate
+seed-derived stream leaves shop/draft RNG untouched; each seat may start one vote per 30 s (a completed reroll opens a
+fresh window, a cancelled or rejected vote does not give the cooldown back; the refusal is RATE with the detail `setup
+reroll cooldown`, which the client shows as 「每人 30 秒内只能发起一次重刷投票」), and stale revisions or vote identities
+are refused. With one human (solo, or co-op with bots) every start completes at once and so clears the cooldown; there
+`room.rerollSetup` is throttled by the connection's heavy bucket (server/net.js `HEAVY_TYPES`, 2 per second after a
+burst of 6; plain RATE), since each reroll rebuilds the opening and resends `m.public` (§35.47).
+All new setup data and player DIY stocks are prepared before mutation; data preparation failure leaves the old opening
+intact. This is a remake convenience, not an official mode rule. Unrelated result-screen changes from PR #408 are not
+included.
 
 The shared DIY detail preview (stats, range, trait, talents, potential, cultivation and matching normal/elite skill descriptions) follows roster loadout resolution. Jessica shield placement is limited to her four orthogonal neighbors. The two Ptilopsis prep-gift copy exceptions are defined in §29.3 and META; no generic change to all copied conditions is implied.
 

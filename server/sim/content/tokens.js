@@ -91,7 +91,7 @@
 import { COLS, ROWS, MOVE_SCALE, FORCED_EXIT } from '../constants.js';
 import { absoluteRangeKeys, sortEnemyTargets, canTargetEnemy } from '../targeting.js';
 import { bodyOnTile, bodyInRange } from '../body.js';
-import { hasHp } from '../damage.js';
+import { hasHp } from '../attack.js';
 import { textCount } from '../../../shared/plugins/textNumber.js';
 import { genericKit } from './generic.js';
 import { bardRegen } from '../professions.js';
@@ -1226,7 +1226,7 @@ function yanyouFallbackDef(battle) {
  *   * every damage it deals adds burn = ATK × 2.ep_damage_ratio (20 %: "自身造成伤害时，附加攻击力20%的灼燃损伤"; the
  *     official 下半 notice: "祛恶之焰附带的灼燃损伤调整为基于炎佑的攻击力") — normal attacks AND flame ticks;
  *   * 元素脆弱 aura: enemies within YANYOU_FRAGILE_RADIUS (1.5, PRTS "自身<固定半径>半径1.5范围内") take 元素伤害 (burst
- *     damage) × 2.damage_scale (1.2) — not the gauge fill (damage.js);
+ *     damage) × 2.damage_scale (1.2) — not the gauge fill (attack/element.js);
  *   * immune to element damage ("即将受到元素损伤前取消此元素损伤");
  *   * 祛恶之焰 [模式乙] (the 炎 bond's mode, Skill_2; cooldown / initCooldown 15, atk_scale 0.6, hit_duration 20,
  *     range_radius 1.0): "触发索敌和普通攻击相同：锁定1个目标持续施法，最多持续20秒，每秒对目标周围半径1.0范围内的所有
