@@ -624,6 +624,9 @@ export function useData(...names) {
     let alive = true;
     const unsub = data.subscribe((n) => { if (alive && names.includes(n)) force(); });
     for (const n of names) data.load(n);
+    // A warm-up can settle between render and this effect's subscription (e.g. a resumed match).
+    // Read the statuses again even when those loads already finished and will send no more notifications.
+    force();
     return () => { alive = false; unsub(); };
   }, [key]);
   return names.every((n) => {

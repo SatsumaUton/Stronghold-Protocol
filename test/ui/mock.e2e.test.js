@@ -58,6 +58,37 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
     await srv?.close();
   });
 
+  test('data that settles before the hook subscribes leaves the loading screen', async () => {
+    const { page, problems } = await open('phase=PREP');
+    try {
+      const states = await page.evaluate(async () => {
+        const { h, render } = await import('/vendor/preact.module.js');
+        const { data, useData } = await import('/js/data.js');
+        const host = document.createElement('div');
+        document.body.append(host);
+        const seen = [];
+        function Probe() {
+          const ready = useData('hookrace');
+          seen.push(ready);
+          return h('output', null, ready ? 'ready' : 'loading');
+        }
+        try {
+          render(h(Probe), host);
+          // Same task: the first render sees idle, but the file settles before useEffect can subscribe.
+          data.setContent({ id: 'hook-race', values: { hookrace: {} } });
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          return { first: seen[0], last: host.textContent, status: data.status('hookrace') };
+        } finally {
+          render(null, host);
+          host.remove();
+          data.setContent(null);
+        }
+      });
+      assert.deepEqual(states, { first: false, last: 'ready', status: 'ready' });
+      assert.deepEqual(problems, []);
+    } finally { await page.close(); }
+  });
+
   async function open(query, { w = 1920, h = 1080, render = RENDER, touch = false } = {}) {
     const page = await browser.newPage();
     await page.setViewport(touch ? { width: w, height: h, hasTouch: true, isMobile: true, deviceScaleFactor: 1 } : { width: w, height: h });
