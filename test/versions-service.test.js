@@ -192,3 +192,19 @@ test('a configured default (not 第二期下半) whose data fails to load: the w
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('a configured default whose data fails to load, 第二期下半 not enabled: the welcome marks the first version that loads the default', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-versions-'));
+  try {
+    for (const id of ['act1autochess', 'act2autochess@V2_1']) fs.cpSync(versionDataDir(id), versionDataDir(id, tmp), { recursive: true });
+    const v = createVersionSets({ enabled: ['act1autochess', 'act2autochess@V2_1'], defaultId: 'act1autochess', dataDir: tmp, vanilla,
+      defaultData: getData(), log: quiet });
+    assert.equal(v.welcome().find((e) => e.default)?.id, 'act1autochess');
+    fs.writeFileSync(path.join(versionDataDir('act1autochess', tmp), 'chess.json'), '{ not json');
+    assert.equal(v.available('act1autochess'), false);
+    // (the lobby's defaultVersion() agrees: lobby-versions)
+    assert.deepEqual(v.welcome().map((e) => [e.id, !!e.default]), [['act2autochess@V2_1', true]]);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

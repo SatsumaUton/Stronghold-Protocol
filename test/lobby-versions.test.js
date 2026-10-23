@@ -8,12 +8,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 
 import { Lobby } from '../server/lobby.js';
 import { SessionRegistry } from '../server/net.js';
 import { DATA_DIR, ROOT, getData, getVersionData, lookup } from '../server/data.js';
 import { createVersionSets } from '../server/versions.js';
 import { createRoomSets } from '../server/plugins/roomSets.js';
+import { createContentSets } from '../server/plugins/contentSets.js';
+import { createPluginRegistry } from '../server/plugins/registry.js';
+import { createPluginPolicy } from '../server/plugins/policy.js';
+import { writePlugin } from './helpers/pluginFixtures.js';
 import { computeVanillaContent } from '../server/plugins/identity.js';
 import { DATA_SHIM_JS } from '../server/http/static.js';
 import { DIFFICULTIES, ERR, modeIdFor } from '../shared/constants.js';
@@ -84,6 +90,39 @@ const refused = (r, code, detail) => {
   assert.equal(r?.error, code, JSON.stringify(r));
   if (detail) assert.equal(r.detail, detail);
 };
+
+test('room.create frees the sole-held old room set for default plugins at maxSets (without a socket)', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-version-content-limit-'));
+  let contents;
+  let h;
+  try {
+    const pluginsDir = path.join(tmp, 'plugins');
+    for (const id of ['one', 'two']) writePlugin(path.join(pluginsDir, id), {
+      manifest: 2, version: '1.0.0', app: '*', api: 1, class: 'content', scope: ['room'], permissions: ['data.patch'], data: ['p.json'],
+    }, { 'p.json': { patch: 1, ops: [] } });
+    fs.writeFileSync(path.join(pluginsDir, 'config.json'), JSON.stringify({ limits: { maxSets: 1 }, default: ['one'] }));
+    const registry = createPluginRegistry({ publicDir: path.join(ROOT, 'public'), dataDir: DATA_DIR, packsDir: tmp, pluginsDir }, { log: quiet });
+    registry.refresh(true);
+    const policy = createPluginPolicy({ pluginsDir, log: quiet, env: {} });
+    contents = createContentSets({ registry, vanillaData: getData(), log: quiet, maxSets: () => policy.get().maxSets });
+    const plugins = createRoomSets({ registry, visual: null, contents, policy });
+    h = harness({ plugins });
+    const p = h.player('Host');
+    ok(h.lobby.create(p, { mode: 'solo' }));
+    ok(h.lobby.setPlugins(p, { plugins: [{ id: 'two' }] }));
+    const oldCode = p.roomCode;
+    assert.equal(contents.inUse(), 1);
+    ok(h.lobby.create(p, { mode: 'solo' }));
+    assert.equal(h.lobby.getRoom(oldCode), null);
+    assert.deepEqual(h.last(p).content.plugins.map((x) => x.id), ['one']);
+    assert.equal(h.last(p).content.vanilla, false);
+    assert.equal(contents.inUse(), 1);
+  } finally {
+    h?.lobby.shutdown();
+    contents?.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
 
 /** A co-op room with `n` humans (the first one the host). */
 function coop(h, n, extra = {}) {

@@ -883,10 +883,10 @@ export class Lobby {
     if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
     if (this.rooms.size >= this.opts.maxRooms) return fail(ERR.INTERNAL, 'too many rooms');
     const key = session.limitKey || null;
+    // The room being left disappears with this create when the creator is its only human (a spectator is none).
+    const leaving = !!cur && cur.activeHumans().length === 1 && !cur.spectatorOf(session.playerId);
     if (key && this.opts.maxRoomsPerAddr > 0) {
-      // The room being left disappears with this create when the creator is its only human (a spectator is none).
-      const leaving = cur && cur.ownerKey === key && cur.activeHumans().length === 1 && !cur.spectatorOf(session.playerId) ? 1 : 0;
-      if (this.countRooms((r) => r.ownerKey === key) - leaving >= this.opts.maxRoomsPerAddr) {
+      if (this.countRooms((r) => r.ownerKey === key) - (leaving && cur.ownerKey === key ? 1 : 0) >= this.opts.maxRoomsPerAddr) {
         this.limitWarn(`room limit (${this.opts.maxRoomsPerAddr}) reached for ${session.addr}`);
         return fail(ERR.RATE, 'too many rooms from your network');
       }
@@ -895,11 +895,13 @@ export class Lobby {
     if (!code) return fail(ERR.INTERNAL, 'no room code available');
     // the server owner's default plugins (plugins/config.json `default`; header "Gameplay plugins"): none — the original
     // game. On another official version (header "Official versions") gameplay plugins are refused: a server whose rooms
-    // must play them (rooms: fixed) cannot make that version's room; otherwise the room starts without them
+    // must play them (rooms: fixed) cannot make that version's room; otherwise the room starts without them. Resolved
+    // before the creator leaves the old room (a refusal keeps them there), so a set that room alone holds counts as freed
+    // (limits.maxSets), as when the room went first before M1
     let initial = this.baseContent(version);
     const defaults = this.plugins?.defaults?.() || [];
     if (defaults.length) {
-      const r = this.resolveContent(null, defaults, {}, version);
+      const r = this.resolveContent(null, defaults, {}, version, leaving ? cur.content : null);
       if ('error' in r) {
         const fixed = (() => { try { return this.plugins?.fixed?.() || null; } catch { return null; } })();
         if (fixed && fixed.length && version !== DEFAULT_VERSION) return fail(ERR.VERSION_UNSUPPORTED, `this server fixes every room's plugins (plugins/config.json rooms: fixed): ${r.error}`);
@@ -1101,9 +1103,11 @@ export class Lobby {
    * (VERSION_UNSUPPORTED).
    * @param {Room | null} room @param {string[]} ids @param {Record<string, Record<string, unknown>>} [settings]
    * @param {string} [version] the version the content is for (default: the room's)
+   * @param {Room['content'] | null} [replacing] the content this change frees (default: the room's — room.create passes
+   *   the creator's old room's when it goes away with the create: its set counts as freed against limits.maxSets)
    * @returns {{ content: Room['content'] } | { error: string, detail?: string }}
    */
-  resolveContent(room, ids, settings = {}, version = room ? room.version : DEFAULT_VERSION) {
+  resolveContent(room, ids, settings = {}, version = room ? room.version : DEFAULT_VERSION, replacing = room?.content ?? null) {
     const base = this.baseContent(version);
     if (!ids.length) {
       // the server owner may fix every room's plugins (plugins/config.json rooms: fixed): the original game is not one
@@ -1114,7 +1118,7 @@ export class Lobby {
     if (!this.vanilla || !this.plugins || !base) return fail(ERR.PLUGIN_UNKNOWN, 'this server applies no plugins');
     const gameplay = version === DEFAULT_VERSION;
     let r;
-    try { r = this.plugins.resolve(ids, { scope: 'room', settings, replacing: room?.content ?? null, gameplay }); } catch (e) {
+    try { r = this.plugins.resolve(ids, { scope: 'room', settings, replacing, gameplay }); } catch (e) {
       this.log.error(`[lobby] ${room?.code ?? '----'} plugin set failed`, e);
       return fail(ERR.INTERNAL);
     }
