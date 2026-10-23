@@ -2368,5 +2368,7 @@
   "同意切换": "Agree to switch",
   "拒绝切换": "Reject the switch",
   "官方「盟约·上半」{sub}（{from} – {to}）": "Official “Alliance” first half, {sub} ({from} – {to})",
-  "官方「盟约·下半」{sub}（{from} – {to}）": "Official “Alliance” second half, {sub} ({from} – {to})"
+  "官方「盟约·下半」{sub}（{from} – {to}）": "Official “Alliance” second half, {sub} ({from} – {to})",
+  "向左滚动盟约": "Scroll bonds left",
+  "向右滚动盟约": "Scroll bonds right"
 }
