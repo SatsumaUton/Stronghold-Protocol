@@ -200,7 +200,9 @@ constant: a message or a record without a version means it, whatever the server'
 
 - S→C `welcome.versions?` = `[{ id, cs, family, label, roomModes, default?: true }]` in registry order (`label`: the
   registry msgid; `default` on the server's default only) — present only when more than one version is enabled or the only
-  one is not `act2autochess`; a version whose data failed to load at run time is left out of later welcomes;
+  one is not `act2autochess`; a version whose data failed to load at run time is left out of later welcomes (when it
+  was the server's default, `default` moves to `act2autochess`, else to the first version left — the version a
+  `room.create` without `version` then gets);
 - C→S `room.create { mode, difficulty?, test?, version? }` — `version` omitted: the server's default. Refused
   `VERSION_UNKNOWN` (not enabled), `VERSION_UNSUPPORTED` (not one of its `roomModes`; its data failed to load — 'the data
   of this version is not available'; or the server owner's fixed plugins — plugins/config.json `rooms: fixed` — cannot
@@ -236,8 +238,10 @@ constant: a message or a record without a version means it, whatever the server'
   (`CONTENT_NOT_READY`); `room.contentReady { cs, ok? }` names the version's cs; `room.setPlugins` with a content / script /
   trusted plugin → `VERSION_UNSUPPORTED` (cosmetic plugins work); `room.loadout` / `room.ownership` / `room.diy` /
   `room.card` / `room.skins` are checked against the version's data — a setting a page sends before it reported the
-  room's content ready is kept unverified (chess ids name other operators across versions) and a version room's match
-  drops it; outside a room the server's default version's data and `cs` apply;
+  room's content ready is kept unverified (chess ids name other operators across versions): a version room's match drops
+  that loadout's skill / module choices and that 干员持有 list whole, while its 潜能 / 练度 (`ops`) and 自选 picks, keyed
+  by charId, are checked again against the version's data and the legal ones kept (`server/lobby.js seatSettings`);
+  outside a room the server's default version's data and `cs` apply;
 - S→C `m.toast { t, kind, text, msgid, params }` to the room: `{name}拒绝了切换版本` `{ name }` (warn, every member),
   `切换版本投票已超时，房间版本未改变` (warn, every member), `同盟成员有变动，切换版本投票已取消` (warn, every member),
   `创建者取消了切换版本投票` (info, everyone but the host). The page toasts a successful switch itself, on a change of

@@ -3,14 +3,22 @@
 // A journal of an official version's match (init.options.version, DESIGN §35.23) replays in a process whose data
 // singleton is that version's (server/data.js setData(getVersionData(id)) before this module is imported — the kits,
 // builtinMeta and the official-bounds cache read the singleton, as in the version's match host), with that data passed in.
+// Both are checked, as the version host checks its own (host/entry.js): another version's data would re-simulate on other
+// kits and items without an error.
 import { Match } from './Match.js';
 import { TEST_INPUT_METHODS } from './testTrace.js';
+import { getData } from '../data.js';
+import { DEFAULT_VERSION, versionOfData } from '../../shared/versions.js';
 
 export function replayTestMatch(data, entries, { send = () => {}, broadcast = () => {}, onEnd = () => {}, registry, BattleClass } = {}) {
   entries = decodeTestTrace(entries);
   if (entries.some((e) => e && e.kind === 'capped')) throw new TypeError('journal is not replayable');
   const init = entries[0];
   if (!init || init.version !== 1 || init.kind !== 'init' || init.options?.test !== true) throw new TypeError('invalid test journal');
+  const want = init.options?.version ?? DEFAULT_VERSION;
+  if (want !== versionOfData(data) || want !== versionOfData(getData())) {
+    throw new TypeError(`journal of ${want} needs that version's data (see test/helpers/versionReplay.mjs)`);
+  }
   let now = init.at;
   let seq = 0;
   const timers = new Map();

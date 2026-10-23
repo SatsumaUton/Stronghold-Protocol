@@ -215,8 +215,9 @@
 //     every human seat's loadout / 潜能 / 干员持有 / 自选 cleared (the pages send them again) and a seat card the version
 //     lacks dropped. ▸ A setting sent in such a room before its page reported the room's content ready is kept unverified
 //     (the version's chess ids are reused with other operators: chess_char_1_02 is 角峰 in 第二期, 讯使 in 第一期) — a
-//     version room's match then drops it; a setting checked for another content keeps only the ids whose operator
-//     (charId) is the same in both data sets.
+//     version room's match then drops that loadout's skill / module choices and that 干员持有 list whole, while 潜能 /
+//     练度 and 自选 (keyed by charId) are checked again against the version's data (seatSettings); a setting checked for
+//     another content keeps only the ids whose operator (charId) is the same in both data sets.
 
 import { randomBytes, randomInt } from 'node:crypto';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
@@ -1235,8 +1236,18 @@ export class Lobby {
   // Official versions (header "Official versions")
   // ---------------------------------------------------------------------------------------------------
 
-  /** The server's default version (a room created without one). */
-  defaultVersion() { return this.versions?.defaultId ?? DEFAULT_VERSION; }
+  /**
+   * The server's default version (a room created without one, the settings outside a room). When the configured one's
+   * data failed to load: 第二期下半 if enabled, else the first enabled version that loads (server/versions.js welcome
+   * marks the same one the default).
+   */
+  defaultVersion() {
+    const v = this.versions;
+    const id = v?.defaultId ?? DEFAULT_VERSION;
+    if (!v || this.versionAvailable(id)) return id;
+    if (v.isEnabled(DEFAULT_VERSION)) return DEFAULT_VERSION;
+    return v.ids.find((x) => this.versionAvailable(x)) ?? id;
+  }
 
   /** Does this server offer the version `id`? @param {unknown} id */
   versionEnabled(id) { return this.versions ? this.versions.isEnabled(id) : id === DEFAULT_VERSION; }

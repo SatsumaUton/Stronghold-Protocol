@@ -1024,8 +1024,12 @@ the sha256 of its directory's gameplay files (`server/plugins/identity.js` versi
 manifest; bytes only, no JSON parse) — and its `config.json` modes (the difficulties it offers: 第一期 and 第二期上半 have
 no 终极). A version whose directory is missing a file or unreadable is warned about and stays disabled. Its data
 (`loadData` of its directory, deep-frozen), its official-bounds snapshot (`shared/plugins/officialBounds.js`
-officialBoundsOf: its own maxima — the main process's cache keeps 第二期下半's) and its manifest load on first use. The
-default version is the vanilla content and the server's data.
+officialBoundsOf: its own maxima — the main process's cache keeps 第二期下半's) and its manifest load on first use. A
+load that fails at run time is logged once and remembered until the server restarts: the version is then unavailable
+(`available(id)` false — `room.create` / `room.proposeVersion` answer `VERSION_UNSUPPORTED`, later welcomes leave it out,
+and when it is the configured default, rooms created without a version and the settings outside a room use 第二期下半,
+else the first enabled version that loads, which the welcome marks the default), while `/healthz` `versions` still lists
+it under `enabled` and keeps the configured `default`. The default version is the vanilla content and the server's data.
 
 **HTTP** (`server/http/static.js`):
 

@@ -186,15 +186,18 @@ export function createVersionSets({ enabled, defaultId = DEFAULT_VERSION, dataDi
     },
     /**
      * welcome.versions, or null when the server offers act2autochess alone (a default server's welcome is unchanged). A
-     * version whose data failed to load is left out (no page could load it; known once a room or its manifest tried).
+     * version whose data failed to load is left out (no page could load it; known once a room or its manifest tried);
+     * when that is the configured default, 第二期下半 (if enabled, else the first one left) is marked the default
+     * instead, as the lobby's defaultVersion picks it.
      */
     welcome() {
       const live = ids.filter((id) => !others.get(id)?.failed);
       if (live.length === 1 && live[0] === DEFAULT_VERSION) return null;
+      const shownDef = live.includes(def) ? def : live.includes(DEFAULT_VERSION) ? DEFAULT_VERSION : live[0];
       return live.map((id) => {
         const entry = /** @type {import('../shared/versions.js').OfficialVersion} */ (versionById(id));
         return { id, cs: id === DEFAULT_VERSION ? vanilla.cs : /** @type {any} */ (others.get(id)).content.cs, family: entry.family,
-          label: entry.label, roomModes: [...entry.roomModes], ...(id === def ? { default: true } : {}) };
+          label: entry.label, roomModes: [...entry.roomModes], ...(id === shownDef ? { default: true } : {}) };
       });
     },
     /**

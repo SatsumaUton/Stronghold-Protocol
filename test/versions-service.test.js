@@ -176,3 +176,19 @@ test('a version whose data passed the boot checks but fails to load is remembere
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('a configured default (not 第二期下半) whose data fails to load: the welcome marks 第二期下半 the default', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-versions-'));
+  try {
+    for (const id of ['act1autochess', 'act2autochess@V2_1']) fs.cpSync(versionDataDir(id), versionDataDir(id, tmp), { recursive: true });
+    const v = createVersionSets({ enabled: ['act2autochess', 'act1autochess', 'act2autochess@V2_1'], defaultId: 'act1autochess', dataDir: tmp, vanilla,
+      defaultData: getData(), log: quiet });
+    assert.equal(v.welcome().find((e) => e.default)?.id, 'act1autochess');
+    fs.writeFileSync(path.join(versionDataDir('act1autochess', tmp), 'chess.json'), '{ not json');
+    assert.equal(v.available('act1autochess'), false);
+    assert.deepEqual(v.welcome().map((e) => [e.id, !!e.default]), [['act2autochess', true], ['act2autochess@V2_1', false]]);
+    assert.equal(v.defaultId, 'act1autochess', 'the configuration is unchanged (the lobby falls back: lobby-versions)');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

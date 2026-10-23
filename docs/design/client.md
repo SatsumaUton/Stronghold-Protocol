@@ -607,8 +607,9 @@ The page shows one official version's data at a time (`public/js/versions.js`): 
 (`room.state.version`, absent = 第二期下半); a result shown after its room is gone (a kick, a grace timeout, a settlement
 left open — also on a reloaded page that never saw the room) keeps the version its frames name (`m.result` / `m.public`
 `version`, non-default only: `versions.js matchFrameVersion`; absent = 第二期下半, never the lobby's), and main.js records
-it under that version; 统计数据's replay of a stored match of another version shows that version while it is open (the
-store's `replayVersion`, cleared when the replay or 统计数据 closes — the lobby preference is never changed). Without
+it under that version; 统计数据's replay of a stored match shows its version while it is open (the store's
+`replayVersion`, set when the row opens — in a room it equals the room's — and cleared when the replay or 统计数据 closes;
+the lobby preference is never changed). Without
 welcome.versions (a default server, G4) the switch does not exist and nothing below runs.
 
 **Data.** `content.js installContentSet` follows the version shown: 第二期下半 → the server's own files
@@ -655,7 +656,10 @@ strip between the 观战席 and the footer — title with agreed / voters, a cou
 time; on a short screen it floats over the seats. The settlement screen shows the same strip (`vervote--float`), so a
 doctor still reading the result can vote. While 干员调配 or 统计数据 covers the room (fixed overlays at z 55), a voter or the
 host sees the strip floating above it (`CoveredVersionVote`, `vervote--covered` z 56, mounted by main.js after the
-overlays), so a vote never runs out unseen. A change of `room.version` toasts 「同盟已切换到「{version}」」 (never on entering
+overlays), so a vote never runs out unseen; it is its own `role="alertdialog"` (the overlays are aria-modal) and the
+strip it covers is `aria-hidden` + `inert` meanwhile. A floating strip never grows past the screen: on a short screen its
+text scrolls above the buttons. Screens that memoise rows or lookups of the data (干员调配, 干员持有, `useGameData`,
+统计数据) key them by `data.contentId()` as well as the language, so an open one follows a version switch. A change of `room.version` toasts 「同盟已切换到「{version}」」 (never on entering
 a room) and closes a result of the old version still on screen (`main.js onRoomState`). When the room's version is not
 the lobby's, a banner says leaving restores it (a short screen gives the line up: the pill's tooltip says it). The plugin
 panel disables the gameplay switches in a version room (「改变玩法的插件只能在第二期下半使用」) and shows only a
@@ -700,9 +704,10 @@ carry the VersionTag. Re-viewing another version's settlement needs that version
 「切换到「X」查看」 (the page shows that version while the replay is open, `replayVersion`; the settlement opens once its data
 is checked), in a room it is disabled with a hint, and a version this server does not offer (not in welcome.versions —
 a default server offers none) is not clickable (「这台服务器没有提供「X」，不能回看该局结算」). The replay's wait always keeps
-返回统计: with 版本数据校验失败 + 重试 when the set failed, with the room's line when the room now plays another version; a
-room left while its version's replay is open (a kick, the room closed) sets `replayVersion` to the record's version, so
-the page does not move to the lobby's under it.
+返回统计: with 版本数据校验失败 + 重试 when the set failed, with the room's line when the room now plays another version.
+Opening a row sets `replayVersion` in a room too (the room's version comes first, so nothing changes while seated): a
+room left while the replay is open (a kick, the room closed) never moves the page to the lobby's version, so the
+settlement stays mounted.
 The levels (`settle.js levelProgress` `season`), the lobby card and 成就统计 count one season (`recordsOfSeason`:
 第一期 = both act1autochess versions, 第二期 = both act2autochess).
 

@@ -28,7 +28,7 @@ import { computeVanillaContent } from '../../server/plugins/identity.js';
 import { DATA_DIR, ROOT, getData, getVersionData } from '../../server/data.js';
 import { DATA_SHIM_JS } from '../../server/http/static.js';
 import { Lobby } from '../../server/lobby.js';
-import { decodeTestTrace } from '../../server/match/testReplay.js';
+import { decodeTestTrace, replayTestMatch } from '../../server/match/testReplay.js';
 import { SessionRegistry } from '../../server/net.js';
 import { ERR } from '../../shared/constants.js';
 import { DEFAULT_VERSION, VERSIONS } from '../../shared/versions.js';
@@ -181,6 +181,10 @@ test('(d) a test match\'s journal from the host log carries its version and repl
   const replay = JSON.parse(r.stdout);
   assert.equal(replay.version, 'act1autochess');
   assert.deepEqual(replay.summary, summary, 'the same final m.result');
+  // this process's singleton is 第二期下半's: the journal is refused with either data, never re-simulated on other kits
+  for (const d of [getData(), getVersionData('act1autochess', { log: quiet })]) {
+    assert.throws(() => replayTestMatch(d, j.entries), /journal of act1autochess needs that version's data/);
+  }
 });
 
 test('(e) every version\'s bounds snapshot leaves this process\'s official bounds (第二期下半) as they were', () => {

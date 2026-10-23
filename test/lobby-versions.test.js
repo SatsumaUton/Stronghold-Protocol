@@ -221,6 +221,25 @@ test('a version whose data failed to load is refused by room.create and room.pro
   h.lobby.shutdown();
 });
 
+test('a configured default whose data failed to load: rooms and settings fall back (第二期下半, else the first that loads)', () => {
+  const stub = versionStub({ enabled: ['act2autochess', 'act1autochess'], defaultId: 'act1autochess' });
+  stub.available = (id) => id === DEFAULT_VERSION;
+  const h = harness({ versions: stub });
+  const solo = h.player('Solo');
+  ok(h.lobby.create(solo, { mode: 'solo' }));
+  assert.equal(h.lobby.roomOf(solo).version, DEFAULT_VERSION, 'not VERSION_UNSUPPORTED for a room created without a version');
+  assert.equal(h.lobby.csOf(null), VANILLA);
+  assert.equal(h.lobby.dataFor(null), getData());
+  h.lobby.shutdown();
+  const other = versionStub({ enabled: ['act1autochess', 'act2autochess@V2_1'], defaultId: 'act1autochess' });
+  other.available = (id) => id === 'act2autochess@V2_1';
+  const h2 = harness({ versions: other });
+  const p = h2.player('Solo');
+  ok(h2.lobby.create(p, { mode: 'solo' }));
+  assert.equal(h2.lobby.roomOf(p).version, 'act2autochess@V2_1');
+  h2.lobby.shutdown();
+});
+
 test('refusals of room.proposeVersion, in their order', () => {
   const h = harness({ versions: versionStub({ enabled: ['act2autochess', 'act1autochess', 'act2autochess@V2_1'], roomModes: { 'act2autochess@V2_1': ['solo'] } }) });
   const outsider = h.player('Out');

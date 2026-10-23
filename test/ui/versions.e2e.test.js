@@ -6,8 +6,10 @@
 //   * the host proposes 第二期上半 → the strip on both pages, the guest agrees → both pages switch; a proposal the guest
 //     declines → the host's toast; a solo room switches at once; leaving restores the guest's lobby version;
 //   * a stats record of another version (an imported fixture) carries its tag in 统计数据;
-//   * a vote opened while a voter has 干员调配 open floats above it; a replay open when the room goes away (a kick) keeps
-//     its version shown; a default server does not offer another version's record for re-viewing;
+//   * a vote opened while a voter has 干员调配 open floats above it (an alertdialog; the room's strip under it aria-hidden),
+//     and agreeing there switches the open 干员调配 to the new version's operators (95, then 112 back); a replay open when
+//     the room goes away (a kick) keeps its version shown and is never replaced by the wait; a default server does not
+//     offer another version's record for re-viewing;
 //   * phones (667×375): the chip, the picker, the room pill, the strip and the banner fit the width;
 //   * no console error on any page.
 // Game texts of another version stay Chinese in other languages until M3 (data.js versionFiles) — not checked here.
@@ -217,10 +219,30 @@ describe('official versions (real server, SP_VERSIONS=all)', { skip: !ENABLED &&
       });
       assert.equal(top, true, 'the strip is on top of 干员调配');
       assert.equal(await host.page.$('.vervote--covered'), null, 'the host\'s room is not covered: its strip is the room\'s');
+      assert.deepEqual(await guest.page.evaluate(() => [...document.querySelectorAll('[data-testid="version-vote"]')]
+        .map((e) => [e.classList.contains('vervote--covered'), e.getAttribute('role'), e.getAttribute('aria-hidden'), e.hasAttribute('aria-live')])),
+      [[false, null, 'true', false], [true, 'alertdialog', null, true]], 'one live region: the floating alertdialog; the room\'s strip hidden');
       await guest.shot('vote-over-loadout');
       await guest.click('.vervote--covered [data-testid="version-decline"]');
       await host.page.waitForFunction(() => [...document.querySelectorAll('.toast__text')].some((e) => e.textContent.includes('阿米娅拒绝了切换版本')), { timeout: 10000 });
       await guest.page.waitForSelector('.vervote--covered', { hidden: true });
+      assert.match(await guest.page.$eval('.lo-count', (e) => e.textContent), /\/112\b/, '第二期下半: 112 operators');
+      // agreed from the floating strip: the open 干员调配 follows the switch (its roster is keyed by the content set)
+      for (const [id, n] of [['act1autochess', 95], ['act2autochess', 112]]) {
+        // (RATE: no proposal for 5 s after a declined vote — server/lobby.js versionRetryMs)
+        await host.page.evaluate(async (version) => {
+          for (let i = 0; ; i++) {
+            try { return await globalThis.__SP__.net.request('room.proposeVersion', { version }); } catch (err) {
+              if (err?.code !== 'RATE' || i > 40) throw err;
+              await new Promise((r) => setTimeout(r, 250));
+            }
+          }
+        }, id);
+        await guest.page.waitForSelector('.vervote--covered [data-testid="version-agree"]', { visible: true, timeout: 10000 });
+        await guest.click('.vervote--covered [data-testid="version-agree"]');
+        await waitState(guest, (s) => s.room === id && !s.vote && s.config === id, `the room on ${id}`);
+        await guest.page.waitForFunction((k) => new RegExp(`/${k}\\b`).test(document.querySelector('.lo-count')?.textContent || ''), { timeout: 20000 }, n);
+      }
       await guest.page.keyboard.press('Escape');
       await guest.page.waitForFunction(() => !document.querySelector('.lo-count'), { timeout: 10000 });
 
@@ -234,6 +256,12 @@ describe('official versions (real server, SP_VERSIONS=all)', { skip: !ENABLED &&
       await guest.click('.st-table--history tr[data-version="act2autochess"]');
       await guest.page.waitForSelector('.st--replay', { visible: true });
       await guest.page.waitForFunction(() => !document.querySelector('.st--replay .st-loading'), { timeout: 20000 });
+      // from here on the wait must never replace the settlement (no flip to the lobby's version and back)
+      await guest.page.evaluate(() => {
+        globalThis.__waitSeen = false;
+        new MutationObserver(() => { if (document.querySelector('.st--replay .st-loading')) globalThis.__waitSeen = true; })
+          .observe(document.body, { childList: true, subtree: true });
+      });
       const seat = await host.page.evaluate(() => globalThis.__SP__.store.get().room.seats.find((x) => x && x.name === '阿米娅'));
       await host.page.evaluate(({ seat: n, playerId }) => globalThis.__SP__.net.request('room.kick', { seat: n, playerId }), { seat: seat.seat, playerId: seat.playerId });
       await waitState(guest, (s) => s.room === null, 'the guest kicked');
@@ -241,6 +269,7 @@ describe('official versions (real server, SP_VERSIONS=all)', { skip: !ENABLED &&
       await sleep(800);
       assert.equal((await stateOf(guest)).kind, null, 'still 第二期下半');
       assert.equal(await guest.page.$('.st--replay .st-loading'), null, 'the settlement stays drawn');
+      assert.equal(await guest.page.evaluate(() => globalThis.__waitSeen), false, 'the wait never showed after the kick');
       await guest.page.keyboard.press('Escape');
       await waitState(guest, (s) => s.kind === 'version' && s.version === 'act1autochess' && s.status === 'ready', 'closing the replay: the lobby\'s 第一期下半');
       assert.deepEqual(problemsOf([host, guest]), []);

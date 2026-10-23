@@ -6,18 +6,22 @@
 // arrives (`remainingMs` is a duration at send time — clocks differ). The room shows the strip between the 观战席 and
 // the footer; the settlement screen shows it too (a doctor still reading the result can vote, screens/game.js). While
 // 干员调配 or 统计数据 covers the room (fixed overlays, z 55 — a guest edits the loadout there before readying), a voter or
-// the host sees the strip floating above them (<CoveredVersionVote/>, main.js), so a vote never runs out unseen.
+// the host sees the strip floating above them (<CoveredVersionVote/>, main.js), so a vote never runs out unseen. Both
+// overlays are aria-modal dialogs, so the floating strip is its own alertdialog (announced when it appears), and the
+// strip it covers is aria-hidden + inert meanwhile: one live region speaks for the vote.
 // Texts go through t() (docs/I18N.md).
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Icon } from './components.js';
 import { net } from '../net.js';
-import { useStore } from '../store.js';
+import { useStore, createStore } from '../store.js';
 import { toastError } from './toasts.js';
 import { versionLabel } from '../versions.js';
 import { t } from '../../../shared/i18n.js';
 
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+/** Whether the floating strip is up (<CoveredVersionVote/> sets it): the covered strips step back for assistive tech. */
+const coverStore = createStore({ floating: false });
 
 /**
  * The room's open version vote (room.state.versionVote) as the strip reads it, or null: its id, the version, the voters
@@ -60,13 +64,15 @@ export const secondsLeft = (deadline, now) => Math.max(0, Math.ceil((deadline - 
 /**
  * The strip's markup (hook-free: the tests draw it): the title with the count, the countdown, the voters' chips, 同意切换 /
  * 拒绝切换 for a voter who has not agreed, 取消投票 for the host.
+ * `floating`: the strip above an overlay (an alertdialog of its own); `covered`: a strip under it (aria-hidden, inert).
  * @param {{ facts: ReturnType<typeof versionVoteFacts>, seconds: number, busy?: boolean, online?: boolean, class?: string,
- *   onAgree: () => void, onDecline: () => void, onCancel: () => void }} props
+ *   floating?: boolean, covered?: boolean, onAgree: () => void, onDecline: () => void, onCancel: () => void }} props
  */
-export function VersionVoteView({ facts, seconds, busy = false, online = true, class: cls = '', onAgree, onDecline, onCancel }) {
+export function VersionVoteView({ facts, seconds, busy = false, online = true, class: cls = '', floating = false, covered = false, onAgree, onDecline, onCancel }) {
   if (!facts) return null;
   const { vote: v } = facts;
-  return html`<section class=${`vervote ${cls}`} aria-label=${t('切换版本投票')} aria-live="polite" data-testid="version-vote">
+  return html`<section class=${`vervote ${cls}`} role=${floating ? 'alertdialog' : undefined} aria-label=${t('切换版本投票')}
+      aria-live=${covered ? undefined : 'polite'} aria-hidden=${covered ? 'true' : undefined} inert=${covered || undefined} data-testid="version-vote">
     <div class="vervote__text">
       <strong>${t('切换到「{version}」投票：{agreed}/{total}', { version: versionLabel(v.version), agreed: facts.yes, total: facts.total })}</strong>
       <span class="vervote__time"><${Icon} name="hourglass" /><b class="num">${seconds}</b>s</span>
@@ -89,15 +95,20 @@ export function VersionVoteView({ facts, seconds, busy = false, online = true, c
 export function CoveredVersionVote({ covered }) {
   const room = useStore((s) => (s.room && s.room.versionVote ? s.room : null));
   const myId = useStore((s) => s.me.playerId);
-  if (!covered || !room) return null;
-  const facts = versionVoteFacts(room, myId);
-  if (!facts || !(facts.voter || facts.host)) return null;
-  return html`<${VersionVote} room=${room} class="vervote--float vervote--covered" />`;
+  const facts = covered && room ? versionVoteFacts(room, myId) : null;
+  const shown = !!facts && (facts.voter || facts.host);
+  useEffect(() => {
+    coverStore.set({ floating: shown });
+    return () => coverStore.set({ floating: false });
+  }, [shown]);
+  if (!shown) return null;
+  return html`<${VersionVote} room=${room} floating class="vervote--float vervote--covered" />`;
 }
 
 /** The strip (see the header): nothing while no vote is open. One request at a time (like 重刷本局's). */
-export function VersionVote({ room, class: cls = '' }) {
+export function VersionVote({ room, floating = false, class: cls = '' }) {
   const myId = useStore((s) => s.me.playerId);
+  const covered = useStore((s) => s.floating, Object.is, coverStore) && !floating;
   const online = useStore((s) => s.connection.status === 'online');
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -121,6 +132,7 @@ export function VersionVote({ room, class: cls = '' }) {
   };
   const id = facts.vote.id;
   return html`<${VersionVoteView} facts=${facts} seconds=${secondsLeft(deadline, now)} busy=${busy} online=${online} class=${cls}
+    floating=${floating} covered=${covered}
     onAgree=${() => send(() => net.request('room.versionVote', { voteId: id, agree: true }))}
     onDecline=${() => send(() => net.request('room.versionVote', { voteId: id, agree: false }))}
     onCancel=${() => send(() => net.request('room.cancelVersionVote', { voteId: id }))} />`;

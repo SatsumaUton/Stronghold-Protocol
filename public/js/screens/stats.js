@@ -21,7 +21,8 @@
 // versions.js shownVersion — and the settlement opens once its data is checked; closing the replay or 统计数据 clears it,
 // the lobby preference is never touched); in a room it says the room's version decides the data; a version this server
 // does not offer (welcome.versions, e.g. a default server) is not offered as a switch. The replay's wait always keeps
-// 返回统计 (a failed version set offers 重试; a room left while its version's replay is open keeps that version shown).
+// 返回统计 (a failed version set offers 重试). A replay opened in a room sets `replayVersion` too (the room's version comes
+// first, so nothing changes while seated): a room left under the open replay keeps that version shown.
 // 成就统计 counts the season of the version shown.
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
@@ -545,11 +546,33 @@ function History({ records, gd, onOpen }) {
 }
 
 /**
+ * The replay's wait (hook-free: the tests draw it): why it cannot be drawn — the room plays another version
+ * (`otherInRoom`), this server does not offer it, its set failed the check — else a spinner; 重试 for a failed set
+ * outside a room; 返回统计 always.
+ * @param {{ version: string, otherInRoom: boolean, offered: boolean, failed: boolean, inRoom: boolean, onBack: () => void }} props
+ */
+export function ReplayWait({ version, otherInRoom, offered, failed, inRoom, onBack }) {
+  const label = versionLabel(version);
+  const why = otherInRoom ? t('同盟中的数据由房间的版本决定，离开同盟后才能回看「{version}」的结算', { version: label })
+    : !offered ? t('这台服务器没有提供「{version}」，不能回看该局结算', { version: label })
+      : failed ? t('版本数据校验失败') : null;
+  return html`<div class="st-loading st-replay-wait" data-testid="stats-replay-wait">
+    ${why ? html`<p class=${cx('t-lo', failed && 'is-warn')}>${why}</p>`
+      : html`<${Spinner} size="md" /><p class="t-lo">${version !== DEFAULT_VERSION ? t('正在载入「{version}」的数据…', { version: label }) : ''}</p>`}
+    <div class="st-replay-wait__acts">
+      ${failed && !inRoom ? html`<${Button} variant="primary" size="sm" data-testid="stats-replay-retry" onClick=${retryContentSet}>${t('重试')}<//>` : null}
+      <${Button} variant="secondary" size="sm" icon="chevronLeft" data-testid="stats-replay-back" onClick=${onBack}>${t('返回统计')}<//>
+    </div>
+  </div>`;
+}
+
+/**
  * A stored match re-viewed as its settlement screen: the full game data is loaded now (the lobby alone never loads it)
  * — of the record's version, which the page loads first when it shows another (see the header). Until it can be drawn
  * the wait keeps 返回统计: the version may be one this server does not offer, the room may now play another, or the
- * version set may fail its check (重试). A room left while its version's replay is open (kick, room closed) would move
- * the page to the lobby's version: the record's stays shown (`replayVersion`).
+ * version set may fail its check (重试). The record's version is the store's `replayVersion` from the moment the row is
+ * opened, also in a room (where the room's version comes first, versions.js shownVersion): a room left while the replay is
+ * open (kick, room closed) never moves the page to the lobby's version, so the settlement stays drawn.
  */
 function Replay({ rec, onBack }) {
   const gd = useGameData();
@@ -560,22 +583,8 @@ function Replay({ rec, onBack }) {
   const shown = useStore(shownVersion);
   const inRoom = useStore((s) => !!s.room);
   const offered = useStore((s) => versionOffered(s, version));
-  useEffect(() => {
-    if (!inRoom && offered && shown !== version && store.get().replayVersion !== version) store.set({ replayVersion: version });
-  }, [inRoom, offered, shown, version]);
   if (!gd.ready || !versionReady || shown !== version) {
-    const label = versionLabel(version);
-    const why = inRoom && shown !== version ? t('同盟中的数据由房间的版本决定，离开同盟后才能回看「{version}」的结算', { version: label })
-      : !offered ? t('这台服务器没有提供「{version}」，不能回看该局结算', { version: label })
-        : failed ? t('版本数据校验失败') : null;
-    return html`<div class="st-loading st-replay-wait" data-testid="stats-replay-wait">
-      ${why ? html`<p class=${cx('t-lo', failed && 'is-warn')}>${why}</p>`
-        : html`<${Spinner} size="md" /><p class="t-lo">${version !== DEFAULT_VERSION ? t('正在载入「{version}」的数据…', { version: label }) : ''}</p>`}
-      <div class="st-replay-wait__acts">
-        ${failed && !inRoom ? html`<${Button} variant="primary" size="sm" data-testid="stats-replay-retry" onClick=${retryContentSet}>${t('重试')}<//>` : null}
-        <${Button} variant="secondary" size="sm" icon="chevronLeft" data-testid="stats-replay-back" onClick=${onBack}>${t('返回统计')}<//>
-      </div>
-    </div>`;
+    return html`<${ReplayWait} version=${version} otherInRoom=${inRoom && shown !== version} offered=${offered} failed=${failed} inRoom=${inRoom} onBack=${onBack} />`;
   }
   return html`<${ResultView} res=${res} pub=${null} myId=${rec.selfId} backLabel=${t('返回统计')} onBack=${onBack} quiet=${true}
     content=${rec.content ? { cs: rec.content.cs, vanilla: false, plugins: rec.content.plugins } : null} version=${rec.version ?? null} />`;
@@ -589,7 +598,7 @@ function clearReplayVersion() {
 /** The overlay, rendered while open (its data hooks run only then). */
 function StatsScreen({ tab }) {
   const ready = useData('config', 'bands', 'bonds', 'assets');
-  const gd = useMemo(() => makeLookups(ready), [ready, data.locale()]);
+  const gd = useMemo(() => makeLookups(ready), [ready, data.locale(), data.contentId()]);
   const [stats, setStats] = useState(() => loadStats());
   const [replay, setReplay] = useState(null);
   const boxRef = useRef(null);
@@ -622,13 +631,14 @@ function StatsScreen({ tab }) {
   const agg = useMemo(() => aggregateStats(recs, { modded: withModded }), [recs, withModded]);
   // 卫戍成就's peak and the strategy marks follow the same 「含插件对局」 switch as the tallies (the history lists them all)
   const achRecords = useMemo(() => achievementRecords(recs, withModded), [recs, withModded]);
-  // a row of another version (outside a room): the page shows it while the replay is open (`replayVersion`, a transient
-  // override — the lobby preference stays), set before the replay mounts so its data hooks load that version's files;
-  // the replay waits for its data
+  // the row's version is shown while the replay is open (`replayVersion`, a transient override — the lobby preference
+  // stays), set before the replay mounts so its data hooks load that version's files (the replay waits for its data).
+  // Set in a room too, where it changes nothing (the room's version comes first) but keeps the version when the room goes
+  // away under the open replay: no flip to the lobby's version and back (review fix)
   const openRecord = (rec) => {
     const v = recordVersion(rec);
     if (v !== shownVersion(store.get()) && (store.get().room || !versionOffered(store.get(), v))) return;
-    if (!store.get().room && store.get().replayVersion !== v) store.set({ replayVersion: v });
+    if (store.get().replayVersion !== v) store.set({ replayVersion: v });
     setReplay(rec);
   };
   const closeReplay = () => { setReplay(null); clearReplayVersion(); };
@@ -731,7 +741,7 @@ function StatsScreen({ tab }) {
  */
 export function AchievementDialog({ onClose }) {
   const ready = useData('config', 'bands', 'bonds', 'assets', 'chess', 'items', 'backups');
-  const gd = useMemo(() => makeLookups(ready), [ready, data.locale()]);
+  const gd = useMemo(() => makeLookups(ready), [ready, data.locale(), data.contentId()]);
   // the season of the version shown (DESIGN §35.23), like the lobby's card
   const season = useStore((s) => seasonOf(shownVersion(s)));
   const records = useMemo(() => recordsOfSeason(peekStatsRecords(), season), [season]);

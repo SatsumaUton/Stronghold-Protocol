@@ -2,11 +2,14 @@
 // four phones 640×360 / 667×375 / 740×360 / 844×390, in all five languages at all four 文字大小, and on desktops
 // 1920×1080 / 1280×720:
 //   * the lobby's version chip inside the top bar and the screen, the version picker inside the screen with every name
-//     whole and every period line inside its row;
+//     whole and every period line inside its row; 选择模拟协议's 版本数据校验失败 + 重试 row (a failed version set's look,
+//     laid over content.js contentSet) inside the dialog;
 //   * a version room seen by a doctor whose lobby is 第二期下半: the pill (the name may end in an ellipsis) inside the
 //     footer, the vote strip inside the screen with its texts wrapping (never cut sideways) and its buttons inside it, the
 //     banner inside the screen, the seat tags (版本数据就绪 …) inside their cards, the tag beside the mode in the top bar;
-//   * the settlement's team page and its detail of a version match: the version tag inside the screen.
+//   * the vote strip floating above 干员调配 (a voter's) inside the screen with its title and buttons in view;
+//   * the settlement's team page and its detail of a version match: the version tag inside the screen, and the vote strip
+//     floating over the settlement (the host's) inside the screen.
 // The vote is drawn from a room.state with `versionVote` laid over the page's store (its look only; the vote itself:
 // test/ui/versions.e2e.test.js); the settlement from an imported record's payload (test/ui/fixtures/stats-versions.json).
 // The game texts of another version stay Chinese in other languages until M3 (data.js versionFiles) — the interface's own
@@ -102,6 +105,33 @@ describe('official versions: text fit (real server, SP_VERSIONS=all)', { skip: !
           await c.page.waitForSelector('[data-testid="version-picker"]', { hidden: true });
         }
       }
+      // 选择模拟协议 of a version whose set failed its check: the look of content.js contentSet 'failed' (the data stays)
+      const setStatus = (status) => c.page.evaluate(async (status) => { (await import('/js/content.js')).contentSet.set({ status }); }, status);
+      await setStatus('failed');
+      await setLook(c, 'zh', 'md');
+      await viewport(c, 667, 375);
+      await c.click('.mode-card[data-mode="solo"]');
+      await c.page.waitForSelector('[data-testid="proto-failed"]', { visible: true });
+      await sleep(500); // the dialog's 转场
+      const protoBad = [];
+      for (const lang of LANGS) {
+        for (const size of SIZES) {
+          await setLook(c, lang, size);
+          for (const [w, h] of [...PHONES, ...DESKTOPS]) {
+            await viewport(c, w, h);
+            await sleep(120);
+            const bad = await misfits(c, [
+              { sel: '[data-testid="proto-failed"]', within: '.modal__box.proto', wrap: true, x: true },
+              { sel: '[data-testid="proto-retry"]', within: '.modal__box.proto', x: true },
+            ]);
+            if (bad.length) protoBad.push(`选择模拟协议 ${lang} ${size} ${w}×${h}: ${bad.join('; ')}`);
+          }
+          if (size === 'xl' && lang === 'ja') { await viewport(c, 667, 375); await c.shot('proto-failed-ja-xl'); }
+        }
+      }
+      assert.deepEqual(protoBad, []);
+      await c.page.keyboard.press('Escape');
+      await setStatus('ready');
       assert.deepEqual(problemsOf([c]), []);
     } finally { await c.close(); }
   });
@@ -154,6 +184,33 @@ describe('official versions: text fit (real server, SP_VERSIONS=all)', { skip: !
       }
       assert.deepEqual(roomBad, []);
 
+      // the strip floating above 干员调配 (the guest is a voter): inside the screen, its title and buttons in view
+      await setLook(guest, 'zh', 'md');
+      await viewport(guest, 1280, 720);
+      await guest.click('.rs-loadout');
+      await guest.page.waitForSelector('.lo-count', { visible: true });
+      await guest.page.waitForSelector('.vervote--covered [data-testid="version-agree"]', { visible: true });
+      const coverBad = [];
+      for (const lang of LANGS) {
+        for (const size of SIZES) {
+          await setLook(guest, lang, size);
+          for (const [w, h] of [...PHONES, ...DESKTOPS]) {
+            await viewport(guest, w, h);
+            await sleep(150);
+            const bad = await misfits(guest, [
+              { sel: '.vervote--covered' },
+              { sel: '.vervote--covered .vervote__text strong', wrap: true },
+              { sel: '.vervote--covered .vervote__actions .btn', within: '.vervote--covered' },
+            ]);
+            if (bad.length) coverBad.push(`over 干员调配 ${lang} ${size} ${w}×${h}: ${bad.join('; ')}`);
+          }
+          if (size === 'xl' && lang === 'en') { await viewport(guest, 640, 360); await guest.shot('covered-en-xl'); }
+        }
+      }
+      assert.deepEqual(coverBad, []);
+      await guest.page.keyboard.press('Escape');
+      await guest.page.waitForSelector('.lo-count', { hidden: true });
+
       // a settlement of a version match (an imported record's payload on the host's screen, inside its version room)
       const fixture = JSON.parse(readFileSync(path.join(ROOT, 'test/ui/fixtures/stats-versions.json'), 'utf8'));
       await host.page.evaluate(async (rec) => {
@@ -162,16 +219,33 @@ describe('official versions: text fit (real server, SP_VERSIONS=all)', { skip: !
         store.set({ match: { public: { phase: 'RESULT', round: 14, players: [] }, private: null, field: null, battle: null, result: recordToResult(rec) } });
       }, fixture.records[0]);
       await host.page.waitForSelector('[data-testid="settle"] [data-testid="version-tag"]', { visible: true, timeout: 20000 });
+      // the vote over the settlement: the host's strip (取消投票), laid over its store like the guest's
+      await host.page.evaluate(() => {
+        const { store } = globalThis.__SP__;
+        const r = store.get().room;
+        const voters = r.seats.filter((s) => s && !s.isBot).map((s) => s.playerId);
+        store.set({ room: { ...r, versionVote: { id: 1, proposerId: r.hostId, version: 'act2autochess@V2_1', voters, agreed: [r.hostId], remainingMs: 59000 } } });
+      });
+      await host.page.waitForSelector('.vervote--float [data-testid="version-cancel"]', { visible: true });
+      const settleBad = [];
       for (const lang of LANGS) {
         for (const size of SIZES) {
           await setLook(host, lang, size);
           for (const [w, h] of [...PHONES, ...DESKTOPS]) {
             await viewport(host, w, h);
             await sleep(150);
-            assert.deepEqual(await misfits(host, [{ sel: '[data-testid="settle"] [data-testid="version-tag"]' }]), [], `settlement ${lang} ${size} ${w}×${h}`);
+            const bad = await misfits(host, [
+              { sel: '[data-testid="settle"] [data-testid="version-tag"]' },
+              { sel: '.vervote--float' },
+              { sel: '.vervote--float .vervote__text strong', wrap: true },
+              { sel: '.vervote--float .vervote__actions .btn', within: '.vervote--float' },
+            ]);
+            if (bad.length) settleBad.push(`settlement ${lang} ${size} ${w}×${h}: ${bad.join('; ')}`);
           }
+          if (size === 'xl' && lang === 'en') { await viewport(host, 640, 360); await host.shot('settle-vote-en-xl'); }
         }
       }
+      assert.deepEqual(settleBad, []);
       await viewport(host, 667, 375);
       await host.shot('settle');
       assert.deepEqual(problemsOf([host, guest]), []);

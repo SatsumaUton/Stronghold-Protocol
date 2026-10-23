@@ -10,8 +10,9 @@
 //     also to a freshly loaded page; a settlement screen left open) keeps the version of the match it came from: the
 //     frames say it (m.public / m.result `version`, a non-default match only), so its operators are read from the data
 //     they played.
-//   * 统计数据's replay of a stored match of another version (outside a room): the store's `replayVersion` while it is
-//     open (screens/stats.js) — the lobby preference is not touched.
+//   * 统计数据's replay of a stored match: the store's `replayVersion` while it is open (screens/stats.js) — another
+//     version outside a room; in a room it is the room's version (which comes first anyway), kept if the room goes away
+//     under the replay. The lobby preference is not touched.
 // The difficulties a version offers (its config's modes) and the fallback for one it does not offer follow the server's
 // rule (the highest offered one below it, else the lowest offered: ABYSS → HARD), re-implemented here because the page
 // imports no server code. content.js loads and checks the version's data (loadVersionSet); every screen reads it through

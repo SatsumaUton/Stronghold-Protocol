@@ -150,8 +150,9 @@ export async function startServer(opts = {}) {
   // when one beyond 第二期下半 is enabled — the match hosts their rooms play in (counted apart from the plugin hosts)
   const versionCfg = versionsFrom(opts, log);
   const versions = createVersionSets({ enabled: versionCfg.enabled, defaultId: versionCfg.default, dataDir, vanilla: content, defaultData: data, log });
+  // (the test options of matchHost apply to both pools, but never the version pool's kind or its own SP_MAX_VERSION_HOSTS)
   const versionHosts = versions.nonDefault.length
-    ? createMatchHosts({ contents: versions, log, options: { transport, kind: 'version', maxWorkers: Math.max(1, versionCfg.maxHosts), ...(opts.matchHost || {}) } })
+    ? createMatchHosts({ contents: versions, log, options: { transport, ...(opts.matchHost || {}), kind: 'version', maxWorkers: Math.max(1, versionCfg.maxHosts) } })
     : null;
   log.info(`[versions] enabled: ${versions.ids.map((id) => `${id} (${t(/** @type {any} */ (versionById(id)).label)}${id === versions.defaultId ? ', default' : ''})`).join(', ')}`);
   const { registry, lobby, network } = createSessionStack(opts, { data, log, content, plugins: roomSets, hosts, versions, versionHosts });
