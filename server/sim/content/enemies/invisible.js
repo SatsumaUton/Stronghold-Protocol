@@ -86,7 +86,7 @@ function kitJazz(ab, e) {
     // is gone, makes no normal attacks meanwhile and is never re-cast over itself — the 10 s cooldown (enemy_database
     // skill 'fire') runs out mid-channel, the next cast waits for its end [ASSUMED "持续施法", as 死亡之眼].
     // the attack's turn (RangedAttack: DESIGN §35.34) — while revealed, its trigger the targets in its radius (`own`)
-    sil: true, cd: s.cd, icd: s.icd, ...attackSkillOf('enemy_10034_cnvsax', 'fire'),
+    sil: true, cd: s.cd, icd: s.icd, sk: s, ...attackSkillOf('enemy_10034_cnvsax', 'fire'),
     cond: (b, e2) => revealed(e2) && !(e2.mem.jazzChannel && !e2.mem.jazzChannel.cancelled) && targetsNear(b, e2, r).length > 0,
     fire(b, e2) {
       const dur = s.bb['enemy_cnvsax[cd].duration'] ?? 0, iv = s.bb.hit_interval ?? 0.5;

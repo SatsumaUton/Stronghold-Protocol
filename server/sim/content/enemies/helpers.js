@@ -104,13 +104,17 @@ export function abOf(b, e) {
 /**
  * A display-only client event: enemy `e` uses its skill `s` (an `ab.sk` entry) — ['cast', id, slot] with the slot of
  * its data record's skills[] (`s.slot`) and, when the skill's blackboard has one, its `duration` (render/app.js: the
- * slot's skill clip, render/vfx/skillfx.js: that skill's official effects for the window). No gameplay effect: no state,
- * no random draw (DESIGN §8.2; golden counts the event, nothing else moves).
+ * slot's skill clip, render/vfx/skillfx.js: that skill's official effects for the window). `turnClip` (s, ≥ 0): an
+ * attack-class skill cast in the attack's turn (enemies.js attackTurnSkill) — ['cast', id, slot, dur, clip], the
+ * length of its official clip, 0 when its ability names none: the client plays that clip (or the attack clip) in
+ * place of the attack (render/units.js UnitView.onCast; DESIGN §35.39). No gameplay effect: no state, no random draw
+ * (DESIGN §8.2; golden counts the event, nothing else moves).
  */
-export function castSlot(b, e, s) {
+export function castSlot(b, e, s, turnClip = null) {
   if (!b || !e || !s || !Number.isInteger(s.slot)) return;
   const d = s.bb && typeof s.bb.duration === 'number' && s.bb.duration > 0 ? Math.round(s.bb.duration * 100) / 100 : 0;
-  b._ev(d > 0 ? ['cast', e.id, s.slot, d] : ['cast', e.id, s.slot]);
+  if (turnClip != null) b._ev(['cast', e.id, s.slot, d, Math.round(Math.max(0, turnClip) * 1000) / 1000]);
+  else b._ev(d > 0 ? ['cast', e.id, s.slot, d] : ['cast', e.id, s.slot]);
 }
 
 /**

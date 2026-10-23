@@ -85,8 +85,9 @@ test('each listed skill is built as an attack-class ability with its clip; è…è´
     const h = field([]);
     const e = put(h, key, [9, 8]);
     for (const [p, len] of Object.entries(skills)) {
-      const a = abilityOf(e, p) || (key === 'enemy_10034_cnvsax' ? e.mem.ab.list.find((x) => x && x.fire && x.cd != null) : null);
+      const a = abilityOf(e, p);
       assert.ok(a, `${key} ${p}: an ability`);
+      assert.equal(a.sk, e.mem.ab.sk[p], `${key} ${p}: skill slot available for the cast clip`);
       assert.equal(a.atk, true, `${key} ${p}: atk`);
       assert.equal(a.clip, len, `${key} ${p}: clip`);
       assert.equal(a.own, !SWING_ONLY.has(`${key} ${p}`), `${key} ${p}: own trigger`);

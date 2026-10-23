@@ -1425,8 +1425,50 @@ export class UnitView {
    * 杰斯顿·威廉姆斯, “碎铳之簧”) is the attack of the same tick, so the next attack (onAttack, within STRIKE_WINDOW) plays that
    * clip in place of the attack clip. Any other slot changes nothing here.
    */
-  onCast(index, now) {
+  onCast(index, now, turnClip = null) {
     this._cast = this._strikeClip(index) ? { index, t: now } : null;
+    if (turnClip != null) this._turnCast(index, turnClip);
+  }
+
+  /**
+   * The clip of an attack-class skill cast in the attack's turn (the sim's ['cast', id, slot, dur, clip]; enemies.js
+   * attackTurnSkill — no 'atk' comes with it): the slot's clip (`anims.skills[slot]`, else the primary `anims.skill`) when
+   * its official ability names one (`clip` > 0: the §35.29 / §35.34 tables, 昆图斯's), else null — the attack clip
+   * [ASSUMED: an attack-class ability with an empty `_animKey` shows the unit's attack; DESIGN §35.39].
+   */
+  _turnClip(index, clip) {
+    if (!(clip > 0) || !this.actor) return null;
+    const an = this.actor.entry?.anims || {};
+    const c = an.skills?.[String(index)] || an.skill;
+    return c && this.actor.has?.(c.loop) ? c : null;
+  }
+
+  /**
+   * An attack-turn cast is rendered now (onCast): its clip plays once at its own speed in place of the attack — from
+   * its strike frame unless the look-ahead wound it up (windUpCast) —, or the attack clip in the attack's rhythm when
+   * the ability names none (DESIGN §35.39). Until then the swing it replaced showed nothing (the model stood idle).
+   */
+  _turnCast(index, clip) {
+    if (!this.alive || !this.actor) return;
+    this._pendingDeployElapsed = null;
+    const c = this._turnClip(index, clip);
+    this.actor.castStrike?.(c);
+    this.actor.attack(this.atkInterval, !!c);
+    if (this.imp) this.imp.dirty = true;
+  }
+
+  /**
+   * An attack-turn cast is `lead` game s ahead in the snapshot buffer (render/app/windup.js): wind its clip up so the
+   * strike frame lands with the cast, as windUp does for an attack. True once started.
+   */
+  windUpCast(lead, index, clip) {
+    if (!this.alive || !this.actor || !this.spineReady) return false;
+    const c = this._turnClip(index, clip);
+    this.actor.castStrike?.(c);
+    const ok = this.actor.windUp(this.atkInterval, lead, !!c);
+    if (!ok) this.actor.castStrike?.(null);
+    if (ok && this.imp) this.imp.dirty = true;
+    return ok;
   }
 
   /** The `strike` clip of skill slot `index` in this unit's model (`anims.skills`), else null. */

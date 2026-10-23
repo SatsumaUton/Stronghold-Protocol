@@ -15,11 +15,20 @@ export function createWindUpLookahead({ views, woundUp, castStart }) {
   // attack and 0 in one tick) — the official cast effects of the wind-up are the skill's own then
   const upSkill = new Map();
   // … and its casts: a ['cast', id, slot] in the tick of an 'atk' of that enemy — an attack-class skill cast in the
-  // attack's `before` hook; a `strike` slot winds that attack up on the slot's clip (UnitView.onCast, DESIGN §35.30)
+  // attack's `before` hook; a `strike` slot winds that attack up on the slot's clip (UnitView.onCast, DESIGN §35.30).
+  // A cast in the attack's turn (['cast', id, slot, dur, clip]: no 'atk' with it) winds up its own clip, so the clip's
+  // strike frame lands with the cast (UnitView.windUpCast, DESIGN §35.39)
   const upCast = new Map();
   function onUpcoming(e, t) {
     if (e[0] === 'skill') { upSkill.set(e[1], !!e[2]); return; }
-    if (e[0] === 'cast') { upCast.set(e[1], { slot: e[2] | 0, t }); return; }
+    if (e[0] === 'cast') {
+      upCast.set(e[1], { slot: e[2] | 0, t });
+      if (e.length > 4 && !woundUp.has(e)) {
+        const v = views.get(e[1]);
+        if (v && v.windUpCast && v.windUpCast(t - upcomingT, e[2] | 0, Number(e[4]) || 0)) woundUp.add(e);
+      }
+      return;
+    }
     if (e[0] !== 'atk' || woundUp.has(e) || CHAIN_KINDS.has(e[3])) return;
     const v = views.get(e[1]);
     if (!v || !v.windUp) return;

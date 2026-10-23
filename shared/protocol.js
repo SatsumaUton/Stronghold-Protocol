@@ -673,9 +673,10 @@ export function validateC2S(msg) {
   return null;
 }
 
-// Event tuple kinds inside `b.ev` (DESIGN §8.2). 'cast' ['cast', id, slot, dur?] is display only: an enemy uses the skill
-// of that slot of its data record's skills[] (server/sim/content/enemies/helpers.js castSlot; the client's skill clip
-// and official skill effects — render/app.js).
+// Event tuple kinds inside `b.ev` (DESIGN §8.2). 'cast' ['cast', id, slot, dur?, clip?] is display only: an enemy uses the
+// skill of that slot of its data record's skills[] (server/sim/content/enemies/helpers.js castSlot; the client's skill
+// clip and official skill effects — render/app.js); `clip` (s) when it is an attack-class skill cast in the attack's
+// turn: the clip played in place of the attack, 0 = the attack clip (DESIGN §35.39).
 export const EV = Object.freeze({
   SPAWN: 'spawn', ATK: 'atk', DMG: 'dmg', HEAL: 'heal', SKILL: 'skill', ENGAGE: 'engage', DIE: 'die', LEAK: 'leak',
   STATUS: 'status', FX: 'fx', LAYER: 'layer', BOUNTY: 'bounty', DEPLOY: 'deploy', CAST: 'cast',

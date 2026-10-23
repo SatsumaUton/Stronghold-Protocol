@@ -89,6 +89,13 @@ the 'atk' of that tick plays the slot's clip in place of the attack clip (`UnitV
 wind-up look-ahead `app.js onUpcoming` passes a cast of the attack's tick to `windUp`; `SpineActor.castStrike`), the next
 plain attack its attack clip again. A form's clip set without a `skill` role (锏's second form) keeps the slot clips.
 
+An attack-turn cast (§35.39) instead sends `['cast', id, slot, dur, clip]`, with no accompanying 'atk'. `clip` is the
+official ability's clip length in seconds; `UnitView.onCast` plays `anims.skills[slot]` (else `anims.skill`) once at its
+own speed through `SpineActor.castStrike` / `attack`. When `clip` is 0 the ability names no animation and the model
+plays its attack clip [ASSUMED]. `app/windup.js` / `UnitView.windUpCast` start the clip ahead of the cast so its strike
+frame aligns with the event; rendering consumes that wind-up without restarting it. Subsequent plain attacks keep
+their attack clip.
+
 The pre-game text fit (§35.38): while a strategy status shows, the draft's step name gives way at 大 / 特大 at any
 width, and at heights ≤ 640 px; 小 / 中 retain it in taller windows. The guide button keeps its width. On short screens
 (≤ 520 px tall), the briefing's step name may wrap, its header grows, and the 机变 timing line sits below its title.

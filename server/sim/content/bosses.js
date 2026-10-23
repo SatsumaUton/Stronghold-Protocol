@@ -1102,7 +1102,7 @@ function kitLion(ab, e, b) {
     const sk = P.adv && eqA ? eqA : eq;
     const t = b2.rng.pick(targetsNear(b2, e2, range()));
     if (!t) return false;
-    castSlot(b2, e2, sk);   // 【王权号令】: equip / equipA (display only)
+    castSlot(b2, e2, sk, ATTACK_SKILL_CLIP[e2.defId]?.equip ?? 0);   // 【王权号令】: equip / equipA, an attack-turn clip (§35.39)
     const r0 = t.tileR, c0 = t.tileC;
     const tiles = [[r0, c0], [r0 + 1, c0], [r0 - 1, c0], [r0, c0 + 1], [r0, c0 - 1]];
     b2.fx('telegraph', { x: c0, y: r0, r: 1, kind: 'royalDecree', tiles: 'plus', id: e2.id });

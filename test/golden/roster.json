@@ -641,7 +641,7 @@
         "enemy_2034_sythef_2": [1,0,1,0,0]
       },
       "hooks": [1,131,5100,526,526,1364,1329,605,70,118,22,23,0,8686,413,14,102,50,1,200,3,0,14],
-      "events": {"atk":627,"bounty":2,"cast":13,"deploy":26,"die":68,"dmg":1241,"engage":12,"fx":207,"heal":7,"layer":3,"leak":50,"skill":46,"spawn":119,"status":342},
+      "events": {"atk":627,"bounty":2,"cast":14,"deploy":26,"die":68,"dmg":1241,"engage":12,"fx":207,"heal":7,"layer":3,"leak":50,"skill":46,"spawn":119,"status":342},
       "fx": {"beam":1,"block":22,"catShield":2,"charge":1,"dilemma":1,"displace":3,"dodge":14,"explode":22,"explosion":2,"featherArrow":1,"flame":1,"frostNova":4,"garrison":3,"garrisonGrant":1,"overclock":1,"pull":1,"riposte":2,"rockslide":3,"shieldBreak":5,"slippery":1,"summon":11,"swordRain":44,"swordStorm":6,"telegraph":2,"thorns":41,"tornado":1,"tornadoPulse":5,"undying":6},
       "snaps": "238fab8a bd4f76e2 c7f4b9f6 0645958e 47ba9a71 d987866c 26148471 a2475fc3 f009d5b4 c77880c5 2483d2ee 19042f0f 2638ed49 69e4eab7 950c7d7e 618700a7 418e9bdc"
     },
@@ -1490,7 +1490,7 @@
         "enemy_2048_smgrd": [1,0,0,10181,5853]
       },
       "hooks": [1,51,3300,321,319,825,923,2937,34,34,21,19,0,11050,50,35,35,0,1,34,0,1,0],
-      "events": {"atk":531,"bounty":2,"cast":6,"deploy":13,"die":34,"dmg":855,"engage":8,"fx":60,"heal":102,"skill":40,"spawn":50,"status":169},
+      "events": {"atk":531,"bounty":2,"cast":9,"deploy":13,"die":34,"dmg":855,"engage":8,"fx":60,"heal":102,"skill":40,"spawn":50,"status":169},
       "fx": {"beam":48,"buff":3,"burst":1,"explode":1,"takeoff":1,"telegraph":6},
       "snaps": "e50a8c52 83fdbe45 1c029c64 b6bb2d6a 083d526f 6935b366 a0638298 5816f5a8 dab3f001 ec47a0b9 dcb1db60"
     },

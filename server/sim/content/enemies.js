@@ -284,7 +284,8 @@ function castNow(b, e, a) {
   a.left = Math.max(TICK, a.cd + (a.clip > 0 ? a.clip : 0));
   a.casts = (a.casts ?? 0) + 1;
   e.skillAnimUntil = b.time + 0.5;
-  if (a.sk) castSlot(b, e, a.sk);   // display only: the skill slot it uses (render/app.js 'cast')
+  // display only: the skill slot it uses (render/app.js 'cast'); an attack-class one with its clip (DESIGN §35.39)
+  if (a.sk) castSlot(b, e, a.sk, a.atk ? (a.clip > 0 ? a.clip : 0) : null);
   safe(b, e, () => a.fire(b, e, a));
 }
 
