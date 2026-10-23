@@ -422,6 +422,12 @@
 .hub-entry__group .icon { flex: none; width: .16rem; height: .16rem; color: var(--mint-400); }
 .hub-entry__long { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .hub-entry__short { display: none; }
+/* Narrow desktop windows keep the full descriptions (phones have their own short labels below).
+   [ASSUMED] A shared two-line minimum keeps both cards level when only one description wraps. */
+@media (max-width: 900px) and (min-height: 521px) {
+  .hub-entry__group { min-height: 3em; white-space: normal; overflow: visible; text-overflow: clip; }
+  .hub-entry__long { white-space: normal; overflow: visible; text-overflow: clip; }
+}
 .hub-entry {
   position: relative;
   display: flex;

@@ -873,7 +873,7 @@ describe('hub lobby (real server, headless Chrome)', { skip: !ENABLED && 'set SP
               for (const p of await tipProblems(page, new Set(plain), h)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               for (const p of await page.evaluate(hubShapes)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
               for (const p of await forcedShapes(page)) bad.push(`${lang} ${textSize} ${w}×${h}: ${p}`);
-              if (lang === 'en' && textSize === 'xl' && (w === 667 || w === 1280)) await page.screenshot({ path: path.join(OUT, `lobby-hub-fit-${w}-en-xl.png`) });
+              if (lang === 'en' && textSize === 'xl' && (w === 667 || w === 800 || w === 1280)) await page.screenshot({ path: path.join(OUT, `lobby-hub-fit-${w}-en-xl.png`) });
             }
           }
           assert.deepEqual(problems, [], `${lang}`);
