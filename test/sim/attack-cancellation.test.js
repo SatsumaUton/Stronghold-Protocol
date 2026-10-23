@@ -74,6 +74,24 @@ for (const skip of [false, true]) {
   });
 }
 
+for (const mask of ['dodgeMode', 'ignoreCancelReasons']) {
+  test(`a held dodge with several stacks notifies once per instance under a dodge cancellation mask (${mask})`, () => {
+    const { b, t, e } = fixture();
+    b.addBuff(t, { key: 'dodge', refresh: 'stack', stacks: 3, mods: { dodgePhys: 1 } });
+    assert.equal(t.findBuff('dodge').stacks, 3);
+    let rolls = 0;
+    const dodges = [], fx = [], fxOf = b.fx.bind(b);
+    b.rng = () => { rolls++; return 0; };
+    b.fx = (kind, data) => { if (kind === 'dodge') fx.push(data); return fxOf(kind, data); };
+    b.on('dodge', c => { dodges.push(c.cancelled); });
+    assert.equal(b.dealDamage({ source: e, target: t, amount: 100, type: 'phys',
+      ...(mask === 'dodgeMode' ? { dodgeMode: 'uncancellable' } : { ignoreCancelReasons: ['dodge'] }) }), 100);
+    assert.equal(rolls, 1, 'the stacks stop rolling at the first success');
+    assert.deepEqual(dodges, [false]);
+    assert.equal(fx.length, 1, 'one MISS for one hit');
+  });
+}
+
 for (const uncancellable of [false, true]) {
   test(`actual miss remains recorded when its cancellation is ${uncancellable ? 'rejected' : 'accepted'}`, () => {
     const { b, t, e } = fixture();

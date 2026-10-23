@@ -319,7 +319,11 @@ function shortBlock() {
 
 test('选择模拟协议 on a short screen (§35.18 leftover: at 文字大小 中+ the cards ran under 开始独立模拟): one-line cards, the description in the brief, capped header and label', () => {
   const short = shortBlock();
-  assert.match(short, /\.proto-body \{ grid-template-columns: minmax\(0, 1fr\) min\(7\.4rem, 50vw\);/, 'the column as wide as 选择同盟方式\'s');
+  // ÷ --sp-ui: under 界面大小 the column and the brief keep their unscaled widths (the 16 / 11 px text floors and the px
+  // paddings do not shrink; DESIGN §35.47, the browser case in screen-fit.e2e)
+  assert.match(short, /\.proto-body \{ grid-template-columns: minmax\(0, 1fr\) min\(calc\(7\.4rem \/ var\(--sp-ui, 1\)\), 50vw\);/, 'the column as wide as 选择同盟方式\'s');
+  assert.match(short, /\.ally-body \{ grid-template-columns: minmax\(0, 1fr\) min\(calc\(7\.4rem \/ var\(--sp-ui, 1\)\), 54vw\); \}/);
+  assert.match(short, /\.proto-brief \{ max-width: min\(calc\(6\.4rem \/ var\(--sp-ui, 1\)\), 100%\);/);
   assert.match(short, /\.pcard__desc, \.pcard__effects, \.pcard__meta \{ display: none; \}/, 'the cards keep only their names');
   assert.doesNotMatch(short, /\.proto-brief p \{ display: none; \}/, 'the brief keeps its description');
   assert.match(short, /\.proto-brief p \{[^}]*font-size: clamp\(11px, calc\(\.26 \* var\(--t\)\), 13px\);/);

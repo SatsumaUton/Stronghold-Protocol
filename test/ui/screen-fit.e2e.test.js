@@ -139,6 +139,44 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
     await phone.page.close();
   });
 
+  // DESIGN §35.47: on a short phone 选择同盟方式's and 选择模拟协议's right column and the protocol brief keep their unscaled
+  // widths (÷ --sp-ui) — the names' 16 px and the brief's 11 px floors and the px paddings do not shrink, and at 75 % a
+  // 222 px column cut the English difficulty names ('Perilous Simulation…') and the brief broke a Korean word
+  for (const lang of ['en', 'ko']) {
+    test(`界面大小 75 % on a 640×360 phone (${lang}): 选择同盟方式 and 选择模拟协议 keep their columns; no difficulty name is cut`, async () => {
+      const ctx = await browser.createBrowserContext(); // its own storage: a fresh player, not the other language's room
+      const page = await ctx.newPage();
+      await page.setViewport({ width: 640, height: 360, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
+      const problems = [];
+      page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
+      page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
+      await page.evaluateOnNewDocument((l) => {
+        localStorage.setItem('sp.name', '界面测试'); sessionStorage.setItem('sp.entered', '1');
+        localStorage.setItem('sp.pref.lang', JSON.stringify(l));
+        localStorage.setItem('sp.pref.screenFit', JSON.stringify({ l: 0, r: 0, t: 0, b: 0, ui: 75 }));
+      }, lang);
+      await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => globalThis.__SP__?.store.get().connection.status === 'online' && !!document.querySelector('.lobby-screen .hub-entries'), { timeout: 30000 });
+      const track = (sel) => page.$eval(sel, (el) => parseFloat(getComputedStyle(el).gridTemplateColumns.split(' ').pop()));
+      await page.click('.mode-card[data-mode="coop"]');
+      await page.waitForSelector('.modal__box.ally .ally-body', { visible: true });
+      assert.equal(await page.evaluate(() => document.documentElement.style.getPropertyValue('--sp-ui')), '0.75');
+      assert.ok(Math.abs(await track('.modal__box.ally .ally-body') - 296) < 1, '选择同盟方式: 7.4 × the unscaled 40 px root');
+      await page.click('[data-testid="alliance-create"]');
+      await page.waitForSelector('.room-screen', { timeout: 15000 });
+      await page.click('.rs-pill__diff');
+      await page.waitForSelector('.modal__box.proto .pcard__name', { visible: true });
+      await page.evaluate(() => document.fonts.ready);
+      await sleep(600);
+      assert.ok(Math.abs(await track('.modal__box.proto .proto-body') - 296) < 1, '选择模拟协议: the same column');
+      assert.equal(await page.$eval('.modal__box.proto .proto-brief', (el) => getComputedStyle(el).maxWidth), 'min(256px, 100%)', 'the brief: 6.4 × 40 px');
+      const cut = await page.$$eval('.modal__box.proto .pcard:not(.is-on) .pcard__name', (els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
+      assert.deepEqual(cut, [], 'no unselected difficulty name ends in an ellipsis');
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    });
+  }
+
   test('界面大小: − steps 5 % live (--sp-ui on <html>), 重置 returns the design size with no property', async () => {
     const { page, problems } = await open('phase=PREP&variant=settings', { width: 1280, height: 720 }, { l: 0, r: 0, t: 0, b: 0 });
     await page.waitForSelector('[data-testid="ui-size"]', { timeout: 10000 });
@@ -161,7 +199,7 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
     await page.close();
   });
 
-  test('界面大小 at 文字大小 中: the row is disabled at 100 % with its note; a drag shows the reading and applies on release', async () => {
+  test('界面大小 at 文字大小 中: the row is disabled at 100 % with its note and a click on it saves nothing; a drag shows the reading and applies on release', async () => {
     const { page, problems } = await open('phase=PREP&variant=settings', { width: 1280, height: 720 }, { l: 0, r: 0, t: 0, b: 0, ui: 85 });
     await page.waitForSelector('[data-testid="ui-size"]', { timeout: 10000 });
     assert.equal((await sizes(page)).k, '0.85');
@@ -176,6 +214,17 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
     }));
     assert.deepEqual(await row(), { range: true, steps: [true, true], pct: '100%', note: true, k: '' });
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('sp.pref.screenFit')).ui), 85, 'the stored size is kept');
+    // a real click on the disabled range: Chrome still sends it pointerdown / pointerup, whose value is the shown 100
+    const off = await page.evaluate(() => {
+      const r = document.querySelector('[data-testid="ui-size-range"]');
+      r.scrollIntoView({ block: 'center' });
+      const b = r.getBoundingClientRect();
+      return { x: b.left + b.width * 0.3, y: b.top + b.height / 2 };
+    });
+    await page.mouse.click(off.x, off.y);
+    await sleep(200);
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('sp.pref.screenFit')).ui), 85, 'a click on the disabled row saves nothing');
+    assert.deepEqual(await row(), { range: true, steps: [true, true], pct: '100%', note: true, k: '' });
     await page.evaluate(async () => (await import('/js/ui/settings.js')).updateSettings({ textSize: 'sm' }));
     await sleep(200);
     assert.deepEqual(await row(), { range: false, steps: [false, false], pct: '85%', note: false, k: '0.85' });
@@ -238,7 +287,7 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
     await page.close();
   });
 
-  test('界面大小: each way out of a drag — pointerup alone applies, pointercancel drops the reading, a size changed elsewhere replaces it', async () => {
+  test('界面大小: each way out of a drag — pointerup alone applies, pointercancel and blur drop the reading, a size changed elsewhere replaces it', async () => {
     const { page, problems } = await open('phase=PREP&variant=settings', { width: 1280, height: 720 }, { l: 0, r: 0, t: 0, b: 0, ui: 85 });
     await page.waitForSelector('[data-testid="ui-size-range"]', { timeout: 10000 });
     const row = () => page.evaluate(() => ({
@@ -269,6 +318,13 @@ describe('异形屏适配 (headless Chrome)', { skip: !ENABLED && 'set SP_E2E=1 
     await fire('pointercancel');
     await sleep(200);
     assert.deepEqual(await row(), { pct: '90%', k: '0.9', stored: 90 }, 'pointercancel drops the reading');
+    // focus leaves the range mid-drag (no pointerup / change): blur drops the reading too
+    await drag(80);
+    await sleep(150);
+    assert.equal((await row()).pct, '80%');
+    await page.evaluate(() => document.querySelector('[data-testid="ui-size-range"]').dispatchEvent(new FocusEvent('blur')));
+    await sleep(200);
+    assert.deepEqual(await row(), { pct: '90%', k: '0.9', stored: 90 }, 'blur drops the reading');
     // a reading left behind (no release event at all) yields to a size stored by anything else
     await drag(80);
     await sleep(150);

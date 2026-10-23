@@ -974,10 +974,13 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
      chosen difficulty's description in the brief at the left (11–13 px, the event's own place for it, as on a desktop),
      the header and the label capped (below) and the label wrapping onto a second line rather than being cut. The list
      still scrolls should a pack's names not fit. [ASSUMED] every cap */
-  .proto-body { grid-template-columns: minmax(0, 1fr) min(7.4rem, 50vw); gap: 10px; padding-bottom: 10px; }
-  .ally-body { grid-template-columns: minmax(0, 1fr) min(7.4rem, 54vw); }
+  /* the column and the brief keep their unscaled widths under 界面大小 (÷ --sp-ui): the names' 16 px floor, the brief's
+     11 px floor and the px paddings and stamp space do not shrink, so at 75 % a 222 px column cut 'Perilous Simulation'
+     in English and the brief broke a Korean word (DESIGN §35.47) */
+  .proto-body { grid-template-columns: minmax(0, 1fr) min(calc(7.4rem / var(--sp-ui, 1)), 50vw); gap: 10px; padding-bottom: 10px; }
+  .ally-body { grid-template-columns: minmax(0, 1fr) min(calc(7.4rem / var(--sp-ui, 1)), 54vw); }
   .proto__pic { inset: 0 0 1.6rem; }
-  .proto-brief { max-width: min(6.4rem, 100%); padding: 6px 10px 7px; }
+  .proto-brief { max-width: min(calc(6.4rem / var(--sp-ui, 1)), 100%); padding: 6px 10px 7px; }
   .proto-brief p { margin-top: 2px; font-size: clamp(11px, calc(.26 * var(--t)), 13px); line-height: 1.35; }
   .proto-list { gap: 6px; padding-left: 22px; justify-content: flex-start; }
   .pcard { padding: 6px 10px; gap: 2px; border-radius: 10px; }

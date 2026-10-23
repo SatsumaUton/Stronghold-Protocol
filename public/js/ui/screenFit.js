@@ -110,8 +110,10 @@ export function ScreenFitSection() {
   const allowed = uiAllowed(textSize);
   const shown = allowed ? sanitizeUi(preview && preview.from === ui ? preview.v : ui) : 100;
   // applies only a new size: a plain click on the thumb, or the `change` after a `pointerup` that already applied it,
-  // stores nothing and re-measures nothing (applyFit sends a window resize)
-  const setUi = (v) => { setPreview(null); if (sanitizeUi(v) !== ui) updateFit({ ui: Number(v) }); };
+  // stores nothing and re-measures nothing (applyFit sends a window resize). Nothing at all while the row is disabled:
+  // Chrome still sends pointerup to a disabled range, whose value is the shown 100, and the stored size must survive
+  // 中 and above (DESIGN §35.47).
+  const setUi = (v) => { setPreview(null); if (allowed && sanitizeUi(v) !== ui) updateFit({ ui: Number(v) }); };
   const any = FIT_SIDES.some((k) => f[k] !== 0) || ui !== 100;
   return html`<section class="set-fit" aria-labelledby="set-fit-title" data-testid="screen-fit">
     <div class="set-keys__head">

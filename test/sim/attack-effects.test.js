@@ -212,11 +212,14 @@ test('differently named flat reductions stack, one name keeps its strongest', ()
   assert.equal(b.dealDamage({ target: t, amount: 100, type: 'phys' }), 50, 'two names: both subtract');
   b.addBuff(t, { key: 'c', reductionGroup: 'a', damageReduction: { phys: 40 } });
   assert.equal(b.dealDamage({ target: t, amount: 100, type: 'phys' }), 40, "'c' joins 'a': 40 replaces 30");
-  // a group that names no key (per-unit keys sharing one name, as 浊心斯卡蒂's aura does)
-  const fresh = fixture();
-  fresh.b.addBuff(fresh.t, { key: 'aura:1', reductionGroup: 'aura', damageReduction: { phys: 25 } });
-  fresh.b.addBuff(fresh.t, { key: 'aura:2', reductionGroup: 'aura', damageReduction: { phys: 35 } });
-  assert.equal(fresh.b.dealDamage({ target: fresh.t, amount: 100, type: 'phys' }), 65, 'two keys of one group: the strongest alone');
+});
+
+// its own test so it reports on its own when the assertions above change (DESIGN §35.47)
+test('a reduction group that names no key keeps its strongest (per-unit keys, as 浊心斯卡蒂\'s aura)', () => {
+  const { b, t } = fixture();
+  b.addBuff(t, { key: 'aura:1', reductionGroup: 'aura', damageReduction: { phys: 25 } });
+  b.addBuff(t, { key: 'aura:2', reductionGroup: 'aura', damageReduction: { phys: 35 } });
+  assert.equal(b.dealDamage({ target: t, amount: 100, type: 'phys' }), 65, 'two keys of one group: the strongest alone');
 });
 
 test('flat reduction follows its buff priority/acquisition position and can remove the mitigation floor', () => {

@@ -434,8 +434,10 @@ their 64 / 76 / 88 px `--t` floors and the interface at 100 % (the row is disabl
 小), since those floors outgrew boxes that shrank; 小's `--t` (1rem, no floor) follows the layout. A drag moves only the
 reading; the size applies on release (`pointerup` or `change`). The reading is dropped on `pointercancel` / blur and by
 −, + and 重置, and ignored once the stored size changes (Chrome fires no `change` when a drag ends on its start value;
-§35.45). `test/ui/ui-size.test.js` guards every floor. At 100 % no property is
-set: the page is the design itself.
+§35.45). A disabled row stores nothing, even on the `pointerup` Chrome still sends it (§35.47). On short screens
+(≤ 520 px) the lobby's 选择同盟方式 / 选择模拟协议 column and the protocol brief divide their rem width by --sp-ui and keep
+their unscaled size, since the text floors and px paddings inside do not shrink (§35.47). `test/ui/ui-size.test.js`
+guards every floor. At 100 % no property is set: the page is the design itself.
 Overrides are local listening preferences, absent from room loadouts and their exports.
 
 干员调配's 卡片视图 (`screens/loadout.js` DeckView / DeckCard / TierMark / DeckBar, optional; PR #811, §35.18) persists

@@ -260,7 +260,9 @@ seats, settings and connections, redraws the complete opening, resets Ready, and
 seed-derived stream leaves shop/draft RNG untouched; each seat may start one vote per 30 s (a completed reroll opens a
 fresh window, a cancelled or rejected vote does not give the cooldown back; the refusal is RATE with the detail `setup
 reroll cooldown`, which the client shows as 「每人 30 秒内只能发起一次重刷投票」), and stale revisions or vote identities
-are refused.
+are refused. With one human (solo, or co-op with bots) every start completes at once and so clears the cooldown; there
+`room.rerollSetup` is throttled by the connection's heavy bucket (server/net.js `HEAVY_TYPES`, 2 per second after a
+burst of 6; plain RATE), since each reroll rebuilds the opening and resends `m.public` (§35.47).
 All new setup data and player DIY stocks are prepared before mutation; data preparation failure leaves the old opening
 intact. This is a remake convenience, not an official mode rule. Unrelated result-screen changes from PR #408 are not
 included.

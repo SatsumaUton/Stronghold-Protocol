@@ -2,7 +2,7 @@
 // [ASSUMED] Remake convenience, not official mode rules (DESIGN §28.21): the unanimous human vote, the INFO_CHECK
 // timer paused during the vote and resumed with its remaining time, the independent reroll stream; and (PR #860) any
 // seated player may open or cancel the vote, each seat may open one every 30 s, a completed reroll opens a fresh window
-// (a cancelled or rejected vote does not give the cooldown back).
+// (a cancelled or rejected vote does not give the cooldown back); a connection's starts also draw from its heavy bucket.
 // Installed on Match.prototype like the other method containers. The lobby only refuses spectators and absent seats.
 import { PHASE, ERR, SETUP_REROLL_COOLDOWN_MS as REROLL_COOLDOWN_MS } from '../../../shared/constants.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
@@ -12,7 +12,9 @@ import { OK, fail } from './common.js';
 
 // One start per seat per cooldown: the vote freezes the INFO_CHECK countdown, so an endless restart loop would stall
 // the opening. A completed reroll starts a new opening and therefore a new window. (SETUP_REROLL_COOLDOWN_MS, 30 s, lives
-// in shared/constants.js so the client's refusal toast names the same value.)
+// in shared/constants.js so the client's refusal toast names the same value.) With one human every start completes at
+// once and clears the seat cooldown, so the throttle there is the connection's heavy bucket: room.rerollSetup is in
+// server/net.js HEAVY_TYPES (2 per second, burst 6), as each reroll rebuilds the opening and resends m.public (DESIGN §35.47).
 
 export class MatchSetupVote {
   requestSetupReroll(playerId, revision) {

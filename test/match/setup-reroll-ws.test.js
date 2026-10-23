@@ -147,3 +147,26 @@ test('real sockets: reject/cancel/disconnect keep the setup and resume the count
     await err(starter, { t: 'room.rerollSetup', setupRevision: 0 }, finish === 'disconnect' ? ERR.NOT_READY : ERR.RATE);
   }
 });
+
+test('real socket, one human: completed rerolls clear the seat cooldown, so the connection heavy bucket throttles them', { timeout: 15000 }, async (t) => {
+  const errors = [];
+  const srv = await startServer({ port: 0, host: '127.0.0.1', seedFn: () => 123,
+    log: { info() {}, warn() {}, debug() {}, error: (...args) => errors.push(args.map(String).join(' ')) } });
+  const c = await TestClient.connect(`ws://127.0.0.1:${srv.port}/ws`);
+  t.after(async () => {
+    await c.terminate();
+    await srv.close();
+    assert.deepEqual(errors, []);
+  });
+  await c.hello('Solo');
+  await ok(c, { t: 'room.create', mode: 'solo', difficulty: 'HARD' });
+  await ok(c, { t: 'room.start' });
+  await c.waitFor('m.public', (p) => p.phase === 'INFO_CHECK');
+  const m = [...srv.lobby.rooms.values()][0].match;
+  let revision = 0;
+  for (let i = 0; i < 6; i++) await ok(c, { t: 'room.rerollSetup', setupRevision: revision++ }); // the burst (heavyBurst 6)
+  assert.equal(m.setupRevision, 6);
+  const r = await c.request({ t: 'room.rerollSetup', setupRevision: revision });
+  assert.equal(r.code, ERR.RATE, JSON.stringify(r));
+  assert.equal(m.setupRevision, 6, 'the refused start rebuilds nothing');
+});

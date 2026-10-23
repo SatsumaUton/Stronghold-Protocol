@@ -90,8 +90,10 @@ export function injuryEffects(battle, target, amount, type, { dodgeMode = 'ignor
         rest = cancelled ? 0 : Number.isFinite(event.amount) ? Math.max(0, event.amount) : 0;
       }
       const probability = type === 'phys' ? buff.mods?.dodgePhys : type === 'arts' ? buff.mods?.dodgeArts : 0;
+      // one roll per stack until one succeeds: a success under a cancellation mask cancels nothing, and a second one
+      // would only repeat onDodge (another MISS, another 'dodge' hook) for the same hit (DESIGN §35.47)
       if (rest > 0 && !cancelled && probability > 0) for (let i = 0; i < buff.stacks; i++) {
-        if (dodge(probability) && cancelled) break;
+        if (dodge(probability)) break;
       }
       if (!(rest > 0) && outcome == null) outcome = 'zero';
     }
