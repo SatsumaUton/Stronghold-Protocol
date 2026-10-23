@@ -199,6 +199,9 @@ export class Unit {
       flags: flags || EMPTY,
     };
     s.flags.stun = !!(flags.stun || flags.freeze || flags.sleep || flags.levitate);
+    // the renderer's pacing hint (server/sim/battle/events.js _emitRateChanges): this unit's own attack interval moved,
+    // so a 'rate' event has to go out — set here instead of comparing every unit's stats on every tick
+    if (!this._s || Math.abs(this._s.interval - s.interval) > 1e-9) this._rateDirty = true;
     this._s = s;
     this._flyS = null; // drop the cached answer's reference to the previous stats object
     this._dirty = false;
