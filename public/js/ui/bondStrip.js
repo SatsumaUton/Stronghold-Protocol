@@ -1,5 +1,3 @@
-import { cloneElement } from '../../vendor/preact.module.js';
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 // Bond strip (active-bond discs under the top bar) and the bond detail popup: the key facts first (user playtest #2
 // item 9: name, members in play / next threshold, layers, reached tier and its threshold row, the current effect with
 // layer-resolved numbers), then the full description and the member list with owned / on-board state — operators that
@@ -32,6 +30,8 @@ import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 // pick goes with onMember: never the empty 甄选干员 slot's card). A 自选 piece that is a member through 变形同构体 shows its
 // operator too, with the 「同构」 tag (#846: it showed the empty slot's 「甄」).
 
+import { cloneElement } from '../../vendor/preact.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, BondDisc, Icon, MicroLabel, Tooltip } from './components.js';
 import { RichText, UnitThumb, BondGlyph, GIcon } from './gameComponents.js';
 import { sortBonds, bondMembers, nextThreshold, bondTier, harmonyMembers, HARMONY_BOND, memberHeadCount, briefingBondTip, diyGetter, diyRecordFor, memberStandIn, standInForText } from './gameLogic.js';

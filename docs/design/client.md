@@ -978,3 +978,6 @@ The field view receives an explicit completion signal (`finishBattle`): the loca
 The four-star Theresa mote ring follows the game clock (including pause and speed), converts its y-up offsets to
 Spine display coordinates, and is recreated on model swaps. Its S2 radius of 2 tiles is [ASSUMED] from outside_radius;
 the hidden five-star orbit is unchanged (PR #576).
+
+The active-bond strip shows every entry in a horizontal scroller, with keyboard focus, touch panning and translated
+arrow controls. Watched owners, harmony counts, morph members and disabled bonds retain their existing behavior (PR #678).
