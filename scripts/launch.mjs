@@ -158,7 +158,7 @@ async function main() {
     console.log(`${mark.ok} 服务器已经在运行（端口 ${o.port}），直接打开浏览器。`);
     if (o.scripts !== undefined) console.log(c.warn(`  --scripts ${o.scripts} 不会改变正在运行的服务器：先停止它（关掉它的窗口），再重新启动。`));
     if (o.testMode !== undefined) console.log(c.warn(`  --test-mode ${o.testMode} 不会改变正在运行的服务器：先停止它（关掉它的窗口），再重新启动。`));
-    if (o.roomCode !== undefined) console.log(c.warn(`  --room-code ${String(o.roomCode).trim().toUpperCase()} 不会改变正在运行的服务器：先停止它（关掉它的窗口），再重新启动。`));
+    if (o.roomCode !== undefined) console.log(c.warn(`  --room-code 不会改变正在运行的服务器：先停止它（关掉它的窗口），再重新启动。`));
     if (fs.existsSync(path.join(ROOT, UPDATE_FILE))) {
       console.log(c.warn(`  解压过的更新包还没有应用：正在运行的仍是旧版本。先停止它（关掉它的窗口；开机自启用 install-service-windows.ps1 -Restart），再重新启动即可。`));
     }

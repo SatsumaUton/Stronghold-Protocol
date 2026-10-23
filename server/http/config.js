@@ -129,7 +129,7 @@ export function parseRoomCode(v) {
   if (!s) return null;
   const code = s.toUpperCase();
   if (code.length !== ROOM_CODE_LEN || !/^[A-Z0-9]+$/.test(code)) {
-    throw new RangeError(`invalid fixed alliance key "${s}": use ${ROOM_CODE_LEN} letters or digits (A-Z, 0-9)`);
+    throw new RangeError(`invalid fixed alliance key: use ${ROOM_CODE_LEN} letters or digits (A-Z, 0-9)`);
   }
   return code;
 }

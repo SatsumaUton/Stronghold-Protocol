@@ -90,3 +90,47 @@ test('room.create: the fixed key stays refused while another human is in the cal
   assert.equal(session.roomCode, 'ARK1');
   assert.equal(room.seats[0].playerId, 'p_me');
 });
+
+test('fixed codes stay out of lifecycle logs, occupied errors and invalid-value errors', () => {
+  const lines = [];
+  const log = Object.fromEntries(['info', 'warn', 'error', 'debug'].map(level => [level, (...args) => lines.push(args)]));
+  const lobby = new Lobby({ registry: { byId: () => null }, getData: () => ({}), options: { roomCode: 'ZZ99' }, log });
+  const owner = newSession('owner');
+  assert.deepEqual(lobby.create(owner, { mode: 'coop', difficulty: 'FUNNY' }), { ok: true });
+  const refused = lobby.create(newSession('stranger'), { mode: 'coop', difficulty: 'FUNNY' });
+  assert.equal(refused.error, 'ROOM_CODE_TAKEN');
+  assert.doesNotMatch(JSON.stringify(refused), /ZZ99/);
+  lobby.shutdown();
+  assert.ok(lines.length > 0, 'the lifecycle is still logged');
+  assert.doesNotMatch(JSON.stringify(lines), /ZZ99/);
+  assert.throws(() => parseRoomCode('secret-too-long'), e => e instanceof RangeError && !e.message.includes('secret-too-long'));
+});
+
+test('a late fixed-plugin/version refusal preserves the sole-human room before a fixed-code replacement', () => {
+  const lobby = newLobby('ARK1'), session = newSession('owner');
+  lobby.create(session, { mode: 'coop', difficulty: 'FUNNY' });
+  const old = lobby.rooms.get('ARK1');
+  lobby.versions = { isEnabled: () => true, offered: () => ['FUNNY'], content: () => null };
+  lobby.plugins = { defaults: () => ['required'], fixed: () => ['required'] };
+  lobby.resolveContent = () => ({ error: 'VERSION_UNSUPPORTED' });
+  let considered = false;
+  const gen = lobby.genCode.bind(lobby);
+  lobby.genCode = room => { considered = room === old; return gen(room); };
+  const result = lobby.create(session, { mode: 'coop', difficulty: 'FUNNY', version: 'act1autochess' });
+  assert.equal(considered, true, 'code generation temporarily considers the old room releasable');
+  assert.equal(result.error, 'VERSION_UNSUPPORTED');
+  assert.equal(lobby.rooms.get('ARK1'), old);
+  assert.equal(old.disposed, false);
+  assert.equal(old.seats[0].playerId, session.playerId);
+  assert.equal(session.roomCode, 'ARK1');
+  lobby.shutdown();
+});
+
+test('launcher drops inherited SP_ROOM_CODE and keeps the explicit argument out of setup', async () => {
+  const { parseArgs, serverEnv } = await import('../scripts/launch.mjs');
+  const options = parseArgs(['--room-code=ark1', '--no-setup']);
+  assert.equal(options.roomCode, 'ark1');
+  assert.deepEqual(options.setupArgs, []);
+  assert.equal(Object.hasOwn(serverEnv(options, { SP_ROOM_CODE: 'ZZ99' }), 'SP_ROOM_CODE'), false);
+  assert.equal(Object.hasOwn(serverEnv(parseArgs([]), { SP_ROOM_CODE: 'ZZ99' }), 'SP_ROOM_CODE'), false);
+});
