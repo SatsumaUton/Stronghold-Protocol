@@ -1394,6 +1394,45 @@ function MatchScreen() {
     return () => host.removeEventListener('pointerdown', onDown, true);
   }, []);
 
+  // Close the bond popup on an outside press. Bond-strip discs and detail-card chips open/toggle
+  // it themselves, so leave those interactions to openBond.
+  useEffect(() => {
+    const screen = hudElRef.current?.parentElement;
+    if (!screen) return undefined;
+    const onDown = (e) => {
+      if (!live.current.bondOpen || e.target?.closest?.('.bpop, .bslot, .dbond')) return;
+      setBondOpen(null);
+    };
+    screen.addEventListener('pointerdown', onDown, true);
+    return () => screen.removeEventListener('pointerdown', onDown, true);
+  }, []);
+
+  // Detail cards can also be opened from the shop, reward, or bond popup, so field-only
+  // dismissal misses those cards when the next press lands elsewhere in the HUD.
+  useEffect(() => {
+    const screen = hudElRef.current?.parentElement;
+    if (!screen) return undefined;
+    const onDown = (e) => {
+      if (!live.current.detail || e.target?.closest?.('.dpanel')) return;
+      setDetail(null);
+    };
+    screen.addEventListener('pointerdown', onDown, true);
+    return () => screen.removeEventListener('pointerdown', onDown, true);
+  }, []);
+
+  // The underframe belongs to the selected field piece. Keep it while using its own actions or
+  // tapping the field (which handles selection separately), but dismiss it on other HUD content.
+  useEffect(() => {
+    const screen = hudElRef.current?.parentElement;
+    if (!screen) return undefined;
+    const onDown = (e) => {
+      if (!live.current.sel || e.target?.closest?.('.uframe, .gm__field')) return;
+      setSel(null);
+    };
+    screen.addEventListener('pointerdown', onDown, true);
+    return () => screen.removeEventListener('pointerdown', onDown, true);
+  }, []);
+
   // ---- direction step (research 09 §1.2) and the selected piece's underframe ------------------------------------
   const heldRef = useRef(new Map());                     // uid → { row, col, t } committed placements awaiting m.private
   const releaseHold = useCallback((uid) => {
