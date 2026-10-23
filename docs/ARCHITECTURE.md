@@ -266,26 +266,25 @@ threads; work is submitted as a task (a function name plus its arguments) and co
   than its timeout is terminated and replaced, so a worker stuck on bad input cannot quietly wedge the pool.
 - **Thread reuse.** A worker is returned to the idle list after each task instead of being respawned, which matters on
   Windows where thread start-up costs tens of milliseconds.
-- **One pool, no lanes.** `server/workers/roomPool.js` adds the office a match needs — a room registers a key while it
+- **One pool, no lanes.** `server/workers/roomPool.js` provides the submission method a match needs — a room registers a key while it
   holds work, and `stats()` counts those rooms — over that one pool. It deliberately does not pin rooms to lanes: a pool
   per room (or per lane) would multiply the thread count, and the pool is the server's, not a room's.
 - **What runs in it today.** Bot layout rehearsals: `MatchRehearsal.poolRehearsal` (`server/match/match/rehearsal.js`)
   submits the same candidates the local run would simulate to `server/workers/simulation.js`, which builds each
-  candidate Battle from the very options the match produced and returns the winning index. The pool decides where the
+  candidate Battle lazily from a serialized BattleSpec with the original cap and adaptive limits and returns the winning index. The pool decides where the
   CPU is spent, never what is compared. A room's simulation tick, snapshot encoding and the state writes are *not* in
   the pool yet — they arrive as separate changes.
-- **Every refusal is a fallback, not an error.** An absent, busy or broken pool, `POOL_FULL`, a failed task or a prep
-  that ends mid-flight all resume the same candidates on the main thread; a busy pool costs latency, never a different
-  layout. A gameplay-plugin room's content set does not reach a worker thread, so its rehearsals stay local.
+- **Every refusal is a fallback, not an error.** An absent, busy or broken pool, `POOL_FULL` or a failed task resumes the same candidates on the main thread; ending a prep cancels pending work; a busy pool costs latency, never a different
+  layout. Gameplay-plugin and non-default-version rooms never receive this default-data pool; their own match host rehearses locally.
 - **A dead thread is replaced, not isolated.** A worker that exits abnormally or overruns its timeout is terminated
   and replaced, and the task it was running is rejected (`WORKER_FAILED` / `TASK_TIMEOUT`), so the caller sees an error
   instead of a hang; while it is stopping it still counts against the pool size — and it keeps its place in the queue
   budget too, so a `terminate()` that never resolves cannot make repeated submissions overrun the bound. This is not a
   safety boundary: a worker is a thread of the same process, so an out-of-memory kill or a native crash there can still
-  take the whole server down — the reason a whole match never runs on a single worker thread.
+  take the whole server down — why this pool only receives rehearsal jobs; plugin/version match hosts have separate transport settings.
 - **Measuring it.** `server/health/eventLoop.js` samples main-thread event-loop delay (`monitorEventLoopDelay`) per
   window with no pool involved and writes one local log line — `[loop] p50=… p95=… p99=… max=… samples=… cpu=… mem=…
-  rooms=… matches=… humans=… spectators=… phase=…`. On by default, `SP_LOOP_SAMPLE=0` turns it off, `SP_LOOP_WINDOW_MS`
+  rooms=… matches=… humans=… spectators=… phase=… rehearsals=…`. Off by default, `SP_LOOP_SAMPLE=1` turns it on, `SP_LOOP_WINDOW_MS`
   sets the window; the last lines stay in memory for a report. It is deliberately *not* part of `/healthz`: the operator
   reads it to tell a rehearsal stall from a battle slice, which is what decides whether more work should move into the
   pool at all. `stats()` on the pool reports the live threads, the queue depth and the tasks finished; the tests read it.
