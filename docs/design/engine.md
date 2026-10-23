@@ -321,8 +321,7 @@ the existing per-tick behavior. The optional flag defaults to false for compatib
 silence and control checks apply. [ASSUMED] The activation area is that grid plus permanent attack-range extension,
 not every tile the roaming wave might eventually reach.
 
-凛御银灰 S3 变革已至 does the same for its skill grid (§34.35): PRTS 备注 「此技能的攻击（包括自身与赋予的攻击效果）无视
-目标的隐匿效果，可对空」 and 「技能期间，自身在可攻击时（可对空）不直接攻击，而是请【丹增】进行攻击」 — the attacks are the
+凛御银灰 S3 变革已至 does the same for its skill grid (§35.84): PRTS 备注：技能期间由丹增进行攻击判定，允许空中目标 — the attacks are the
 eagle's. The same content range on his attack grid with an air profile, and `targeting.canHitFly` so those attacks and the
 enemies they add on the target's line reach flyers. [ASSUMED] The same activation area — the grid plus permanent range
 extension.

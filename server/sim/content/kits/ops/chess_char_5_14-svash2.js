@@ -164,8 +164,7 @@ export default {
         const tok = battle.tokenDef(eyeId, unit); // the owner's skill variant (DESIGN §16)
         unit.mem.eyeCost = num(tok?.stats?.cost, 14);
         if (selectedId(chess, def) === 'skchr_svash2_3') {
-          // PRTS 备注 (S3): 「此技能的攻击（包括自身与赋予的攻击效果）无视目标的隐匿效果，可对空」 and 「技能期间，自身在可攻击时
-          // （可对空）不直接攻击，而是请【丹增】进行攻击」 — the attacks are the eagle's, not his melee PIONEER ones. The data's
+          // PRTS S3 notes: while active, Danzeng attacks and can select airborne targets; these are not his melee attacks. The data's
           // ACTIVE_RANGE condition asks the UNIT's profile (canHitFly false), so a wave of flyers alone left the ready
           // skill closed forever (reported playtest; the same hole 赤刃明霄陈 S3 had, op-chen3.js). Add those selectable
           // targets to the existing ACTIVE_RANGE automation through a content trigger range, exactly as she does:
