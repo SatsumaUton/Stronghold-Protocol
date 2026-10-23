@@ -23,6 +23,12 @@
 // KITTED_CHARS = every character a 自选 pick may field with a faithful kit; an operator outside it is not offered
 // (shared/diy.js diyPool / validateDiyPicks `kitted`).
 //
+// Version kits (第一期 shop operators with no tier file, DESIGN §35.22.7): VERSION_KIT_FILES lists `ops/ver-<codename>.js`,
+// one charId each, merged into KITS after the 自选 operators and NOT added to KITTED_CHARS (they are shop chess). The 25
+// 自选 picks whose hand-written kit is a tier kit (24 in 第一期, plus 银灰, who is only in V2_1's pool) live in one file,
+// `ops/ver-diy.js` (DIY_BORROW_KIT_FILES): those charIds are in KITTED_CHARS (DIY_BORROW_CHARS, the ones whose file loaded)
+// and are not keys of OPERATOR_KITS. PENDING_KIT_CHARS and PENDING_DIY_KIT_CHARS are empty after that work.
+//
 // KIT_CHAR_IDS names the operator (charId) each tier kit was written for. Another official version (docs/SIM.md §7.2)
 // reuses chess ids for other operators (上半's chess_char_1_02_a is 讯使, not 角峰), so content/index.js officialKitKey
 // checks a record's charId against it and otherwise finds the kit by charId (TIER_KIT_KEYS_BY_CHAR). A new tier kit
@@ -309,45 +315,44 @@ export const KIT_CHAR_IDS = Object.freeze({
 });
 
 /**
- * Operators of another official version that have no kit yet (上半: DESIGN §35.22.4, docs/SIM.md §7.2): their chess fight
- * with the generic kit. test/versions-keying.test.js accepts a chess without a kit only when its charId is listed here,
- * and fails once a listed operator gets a kit (it then leaves the list).
+ * 第一期 shop operators whose kit is keyed by charId (`ops/ver-<codename>.js`, DESIGN §35.22.7). Order is the old
+ * pending order. Not shop-chess files: those chess ids belong to other operators today.
  */
-export const PENDING_KIT_CHARS = Object.freeze([
-  'char_198_blackd', // 讯使
-  'char_133_mm', // 梅
-  'char_109_fmout', // 远山
-  'char_215_mantic', // 狮蝎
-  'char_230_savage', // 暴行
-  'char_4004_pudd', // 布丁
-  'char_4119_wanqin', // 万顷
-  'char_304_zebra', // 暴雨
-  'char_348_ceylon', // 锡兰
-  'char_271_spikes', // 芳汀
-  'char_422_aurora', // 极光
-  'char_243_waaifu', // 槐琥
-  'char_4045_heidi', // 海蒂
-  'char_449_glider', // 蜜莓
-  'char_218_cuttle', // 安哲拉
-  'char_355_ethan', // 伊桑
-  'char_135_halo', // 星源
-  'char_473_mberry', // 桑葚
-  'char_345_folnic', // 亚叶
+export const VERSION_KIT_FILES = Object.freeze([
+  'ver-blackd.js', // 讯使
+  'ver-mm.js', // 梅
+  'ver-fmout.js', // 远山
+  'ver-mantic.js', // 狮蝎
+  'ver-savage.js', // 暴行
+  'ver-pudd.js', // 布丁
+  'ver-wanqin.js', // 万顷
+  'ver-zebra.js', // 暴雨
+  'ver-ceylon.js', // 锡兰
+  'ver-spikes.js', // 芳汀
+  'ver-aurora.js', // 极光
+  'ver-waaifu.js', // 槐琥
+  'ver-heidi.js', // 海蒂
+  'ver-glider.js', // 蜜莓
+  'ver-cuttle.js', // 安哲拉
+  'ver-ethan.js', // 伊桑
+  'ver-halo.js', // 星源
+  'ver-mberry.js', // 桑葚
+  'ver-folnic.js', // 亚叶
 ]);
 
 /**
- * 自选 picks of another official version without a 自选 kit (第一期 and 第二期上半 V2_1: DESIGN §35.22.4, docs/SIM.md
- * §7.2). Their owned 自选 pools hold these operators, which today's data sells as shop chess: their hand-written kit is a
- * tier kit under a chess id, never one under the charId (V2_1: 银灰, 空弦, 卡涅利安 and 伺夜, shop chess since V2_2). A 自选
- * piece keeps the by-charId lookup, so they are not in KITTED_CHARS and the kitted gate (shared/protocol.js
- * checkDiyPicks, shared/diy.js diyPool) leaves them out of that version's 自选 [ASSUMED: until M2 either reviews the tier
- * kit as a borrowed 自选 kit or writes one]. test/versions-keying.test.js accepts a 自选 pick
- * without a kit only when its charId is a 预备干员 (GENERIC_KIT_CHARS) or listed here, and fails once a listed operator
- * gets a 自选 kit or loses its tier kit.
+ * The one file of borrowed 自选 kits (`ops/ver-diy.js`): a charId → a tier-kit builder (shared/borrow.js). These are
+ * shop chess today, so they are not `op-*` files and not keys of OPERATOR_KITS.
  */
-export const PENDING_DIY_KIT_CHARS = Object.freeze([
+export const DIY_BORROW_KIT_FILES = Object.freeze(['ver-diy.js']);
+
+/**
+ * charIds `ver-diy.js` exports, in that order. The ones whose file loaded join KITTED_CHARS. A 自选 piece looks its kit
+ * up by charId, so this is what lets 第一期 and V2_1 field them. Shop chess of the same operator still take the tier key.
+ */
+export const DIY_BORROW_CHARS = Object.freeze([
   'char_136_hsguma', // 星熊
-  'char_172_svrash', // 银灰 (V2_1)
+  'char_172_svrash', // 银灰
   'char_213_mostma', // 莫斯提马
   'char_245_cello', // 塑心
   'char_291_aglina', // 安洁莉娜
@@ -373,6 +378,20 @@ export const PENDING_DIY_KIT_CHARS = Object.freeze([
   'char_4146_nymph', // 妮芙
 ]);
 
+/**
+ * Operators of another official version that have no kit yet. Empty after §35.22.7 (the 19 第一期 operators are
+ * VERSION_KIT_FILES). test/versions-keying.test.js accepts a chess without a kit only when its charId is listed here,
+ * and fails once a listed operator gets a kit (it then leaves the list).
+ */
+export const PENDING_KIT_CHARS = Object.freeze([]);
+
+/**
+ * 自选 picks of another official version that still have no charId kit. Empty after §35.22.7 (the 25 of
+ * DIY_BORROW_CHARS: 24 in 第一期, plus 银灰 who is only in V2_1's pool). test/versions-keying.test.js accepts a 自选 pick without a kit only when its charId is a 预备干员
+ * (GENERIC_KIT_CHARS) or listed here, and fails once a listed operator gets a 自选 kit or loses its tier kit.
+ */
+export const PENDING_DIY_KIT_CHARS = Object.freeze([]);
+
 async function loadKitFile(file) {
   try {
     return await import(`./ops/${file}`);
@@ -385,6 +404,8 @@ async function loadKitFile(file) {
 const MODULES = await Promise.all(KIT_FILES.map((group) => Promise.all(group.map(loadKitFile))));
 const STANDIN_MODULES = await Promise.all(STANDIN_KIT_FILES.map(loadKitFile));
 const OPERATOR_MODULES = await Promise.all(OPERATOR_KIT_FILES.map(loadKitFile));
+const VERSION_MODULES = await Promise.all(VERSION_KIT_FILES.map(loadKitFile));
+const DIY_MODULES = await Promise.all(DIY_BORROW_KIT_FILES.map(loadKitFile));
 const registryOf = (m) => (m && m.default && typeof m.default === 'object' ? m.default : {});
 
 /** The registry of each tier group (index 0 = tier 1): baseChessId → kit builder, in KIT_FILES order. */
@@ -410,15 +431,25 @@ export const STANDIN_KITS = Object.freeze(Object.assign({}, ...STANDIN_MODULES.m
 /** The 自选 operator kits: owned-6★ charId → kit builder, in OPERATOR_KIT_FILES order. */
 export const OPERATOR_KITS = Object.freeze(Object.assign({}, ...OPERATOR_MODULES.map(registryOf)));
 
+/** 第一期 charId kits (`ops/ver-*.js` except ver-diy), in VERSION_KIT_FILES order. Not part of KITTED_CHARS. */
+export const VERSION_KITS = Object.freeze(Object.assign({}, ...VERSION_MODULES.map(registryOf)));
+
+/** Borrowed 自选 kits (`ops/ver-diy.js`): charId → builder, in DIY_BORROW_CHARS order. */
+export const DIY_BORROW_KITS = Object.freeze(Object.assign({}, ...DIY_MODULES.map(registryOf)));
+
 /**
  * The merged kit registry: baseChessId → (bb, chess, def) => Kit, tier 1 … tier 6, then the stand-ins' charIds, then
- * the 自选 operators' charIds.
+ * the 自选 operators' charIds, then the version charId kits, then the borrowed 自选 charIds.
  */
-export const KITS = Object.freeze(Object.assign({}, ...TIER_KITS, STANDIN_KITS, OPERATOR_KITS));
+export const KITS = Object.freeze(Object.assign({}, ...TIER_KITS, STANDIN_KITS, OPERATOR_KITS, VERSION_KITS, DIY_BORROW_KITS));
 
 /**
  * Every character a 自选 pick may field with a faithful kit: the 预备干员 (GENERIC_KIT_CHARS), the stand-ins with a kit
- * file and the operators of OPERATOR_KIT_FILES whose file loaded. The `kitted` option of shared/diy.js diyPool /
+ * file, the operators of OPERATOR_KIT_FILES whose file loaded, and the borrowed 自选 charIds whose file loaded
+ * (DIY_BORROW_CHARS). The 19 version shop kits are not here. The `kitted` option of shared/diy.js diyPool /
  * validateDiyPicks.
  */
-export const KITTED_CHARS = Object.freeze([...new Set([...GENERIC_KIT_CHARS, ...Object.keys(STANDIN_KITS), ...Object.keys(OPERATOR_KITS)])]);
+export const KITTED_CHARS = Object.freeze([...new Set([
+  ...GENERIC_KIT_CHARS, ...Object.keys(STANDIN_KITS), ...Object.keys(OPERATOR_KITS),
+  ...DIY_BORROW_CHARS.filter((c) => Object.hasOwn(DIY_BORROW_KITS, c)),
+])]);

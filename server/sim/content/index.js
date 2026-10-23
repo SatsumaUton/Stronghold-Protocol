@@ -103,7 +103,7 @@ function kitKeyForChar(charId, tier, kits = KITS, tierKeys = TIER_KIT_KEYS_BY_CH
 
 /**
  * The key of `def`'s kit in KITS, or null (generic). A stand-in's and a 自选 piece's: its charId (isOtherBody), on every
- * data (a version's 自选 pick whose only kit is a tier kit has none: kits/index.js PENDING_DIY_KIT_CHARS). Any
+ * data (a version's 自选 pick borrows its tier kit under the charId: kits/index.js DIY_BORROW_CHARS). Any
  * other def: the kit of its id (baseId, the exact id, or the suffix-less id). On another version's build (`data`
  * carries config.version; default: the loaded data) that kit counts only when it was written for the def's charId
  * (KIT_CHAR_IDS), else the kit is found by its charId (kitKeyForChar); a chess whose own kit was written for its
@@ -147,12 +147,14 @@ function registeredKit(def, reg) {
 /** Official kit key or file stem; no path supplied by a plugin is ever imported. */
 export function officialKit(ref) {
   if (Object.hasOwn(KITS, ref)) return KITS[ref];
-  const file = Object.values(KIT_REGISTRY.KIT_FILES || {}).flat().concat(KIT_REGISTRY.STANDIN_KIT_FILES || [], KIT_REGISTRY.OPERATOR_KIT_FILES || [])
-    .find(f => f.replace(/\.js$/, '') === ref);
+  const file = Object.values(KIT_REGISTRY.KIT_FILES || {}).flat().concat(
+    KIT_REGISTRY.STANDIN_KIT_FILES || [], KIT_REGISTRY.OPERATOR_KIT_FILES || [],
+    KIT_REGISTRY.VERSION_KIT_FILES || [], KIT_REGISTRY.DIY_BORROW_KIT_FILES || [],
+  ).find(f => f.replace(/\.js$/, '') === ref);
   if (!file) return undefined;
   const stem = file.replace(/\.js$/, '');
   if (stem.startsWith('chess_')) return KITS[stem.split('-')[0] + '_a'];
-  const code = stem.replace(/^(op|standin)-/, '');
+  const code = stem.replace(/^(op|standin|ver)-/, '');
   return Object.entries(KITS).find(([k]) => k.startsWith('char_') && k.endsWith('_' + code))?.[1];
 }
 
