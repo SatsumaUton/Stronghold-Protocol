@@ -98,6 +98,8 @@
 
 ### 开服
 
+- 关停超时可由 SP_SHUTDOWN_TIMEOUT_MS 设置，默认仍为 5 秒；超时以失败状态退出（PR #775，感谢 @kanomahoro，§35.70）。
+
 - 新增 `SP_VERSIONS`（`all` 或逗号分隔的版本 id）、`SP_VERSION_DEFAULT`、`SP_MAX_VERSION_HOSTS`：启用第二期上半、第一期下半、第一期上半并指定默认版本，默认只开第二期下半，房间、消息和数据与以前逐字节相同；启用后 `/data/versions/` 只提供已启用的版本，`/healthz` 增加 `versions`，启动日志列出启用的版本（DEPLOY.md §11，DESIGN §35.23）。
 
 ### 开发中（未随版本发布）
