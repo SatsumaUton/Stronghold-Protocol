@@ -291,4 +291,3 @@ threads; work is submitted as a task (a function name plus its arguments) and co
 
 The rule of thumb for new work: if it is pure CPU over data the worker can be given (a simulation step, an encode, a
 snapshot), it belongs in a task; if it touches sockets, timers or the lobby, it stays on the main thread.
-

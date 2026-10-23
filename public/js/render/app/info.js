@@ -64,4 +64,3 @@ export function renderInfo(u) {
     skin: typeof u.skin === 'string' && u.skin ? u.skin : null,
   };
 }
-
