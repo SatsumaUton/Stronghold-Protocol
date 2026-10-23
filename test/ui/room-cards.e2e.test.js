@@ -160,6 +160,9 @@ describe('名片干员 seat cards (real server)', { skip: !ENABLED && 'set SP_E2
       assert.equal((await seatNamed(host, '凯尔希')).op, '浊心斯卡蒂');
       await waitOp(guest, '凯尔希', '浊心斯卡蒂', 'the teammate sees the pick');
       assert.equal(await host.page.evaluate(() => localStorage.getItem('sp.pref.room.card')), JSON.stringify(PICK));
+      // The default portrait can already be PICK; its image alone does not prove room.card reached the teammate.
+      await guest.page.waitForFunction((id) => globalThis.__SP__.store.get().room.seats.find((s) => s?.name === '凯尔希')?.card === id,
+        { timeout: 10000 }, PICK);
       assert.equal(await guest.page.evaluate(() => globalThis.__SP__.store.get().room.seats.find((s) => s?.name === '凯尔希')?.card), PICK);
       await guest.shot('room-picked');
 
@@ -226,6 +229,8 @@ describe('名片干员 seat cards (real server)', { skip: !ENABLED && 'set SP_E2
       await host.click('.cardpick__op[data-char=""]');
       const before = hv.find((s) => s.name === '凯尔希').op;
       await waitOp(guest, '凯尔希', before, 'default again');
+      await guest.page.waitForFunction(() => !('card' in globalThis.__SP__.store.get().room.seats.find((s) => s?.name === '凯尔希')),
+        { timeout: 10000 });
       assert.equal(await guest.page.evaluate(() => 'card' in globalThis.__SP__.store.get().room.seats.find((s) => s?.name === '凯尔希')), false);
 
       // a phone in landscape: the picker fits, its grid scrolls inside it, no input takes the focus
