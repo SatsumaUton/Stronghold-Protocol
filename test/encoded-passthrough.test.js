@@ -90,3 +90,19 @@ test('a connection that never negotiated still gets the bytes it was handed, val
   assert.equal(send(ws, { t: 'm.public', funds: 1 }, 'not json'), true);
   assert.equal(ws.frames[0], 'not json', 'nothing is re-encoded for a connection that did not negotiate');
 });
+
+
+test('the same socket changing rooms starts a full baseline without rewinding its sequence', () => {
+  const ws = socket(), session = { connected: true, ws, roomCode: 'AAAA' };
+  negotiateStateDelta(ws, 1);
+  const pub = (funds) => ({ t: 'm.public', funds, padding: 'x'.repeat(500) });
+  sendSession(session, pub(10));
+  sendSession(session, pub(11));
+  const last = JSON.parse(ws.frames.at(-1));
+  assert.ok(last.patch);
+  session.roomCode = 'BBBB';
+  sendSession(session, pub(12));
+  const next = JSON.parse(ws.frames.at(-1));
+  assert.ok(next.full);
+  assert.ok(next.seq > last.seq);
+});

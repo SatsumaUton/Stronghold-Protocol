@@ -31,6 +31,14 @@ export function negotiateStateDelta(ws, version) {
 /** Forget the baselines (a new negotiation, or a client that asked for a full resync). The counter never rewinds. */
 export function resetStateDelta(ws) { connections.get(ws)?.kinds.clear(); }
 
+/** Keep negotiation and sequence, but never carry a previous room's state into a new room. */
+export function setStateDeltaRoom(ws, roomCode) {
+  const connection = connections.get(ws);
+  if (!connection || connection.roomCode === roomCode) return;
+  connection.roomCode = roomCode;
+  connection.kinds.clear();
+}
+
 /** Return an encoded state and commit its baseline ONLY after the caller successfully queues the reliable frame.
  * `usable: false` means the given bytes cannot be a baseline (they are not a JSON object) and the caller should send a
  * full frame it encoded itself; this connection keeps the baseline it already had. */

@@ -170,6 +170,7 @@ export class Net {
     // hello named STATE_DELTA_VERSION. A missed frame blocks that channel, and one resync request per RESYNC_GAP_MS
     // asks for a full one — the server answers it like a repeated hello (and throttles it the same way).
     this._receiver = new StateReceiver();
+    this._stateRoom = null;
     this._resyncAt = 0;        // epoch ms of the last resync request we sent
   }
 
@@ -363,6 +364,7 @@ export class Net {
     // A new socket is a new negotiation (server/net.js onHelloMsg re-baselines per connection): the sequences the old
     // one used mean nothing here, so a stale baseline must never make the first full frame of the new one look old.
     this._receiver?.reset();
+    this._stateRoom = null;
     this._resyncAt = 0;
   }
 
@@ -569,6 +571,11 @@ export class Net {
     // frames. They are decoded here and continue as the ordinary m.public / m.private messages every listener already
     // handles, so nothing above this line notices the difference. A frame that cannot be applied (a gap, a lost or
     // reordered delta, an older full frame) is dropped and one rate-limited `state.resync` asks for a full one.
+    if (msg.t === 'room.closed' || (msg.t === 'room.state' && msg.code !== this._stateRoom)) {
+      this._stateRoom = msg.t === 'room.state' ? msg.code : null;
+      this._receiver.reset();
+      this._resyncAt = 0;
+    }
     if (msg.t === 'm.state') {
       const { message, resync } = this._receiver.receive(msg);
       if (resync) this.requestResync();

@@ -433,3 +433,9 @@ window is [ASSUMED]; damage, attack timing and targeting are unchanged.
 
 Server rehearsal offload (§35.86) is opt-in via SP_WORKERS; plugin and historical-version match hosts retain their own
 data and execution. No socket or authoritative combat operation moves to this pool.
+
+Public-state deltas (#772, §35.89): hello.delta opts a socket into m.state for m.public only. Unnegotiated clients
+keep full messages; private views retain their current encoding. Commit a baseline only after a successful reliable
+send; malformed pre-encoded JSON falls back to ordinary m.public and advances no baseline. state.resync is rate
+limited and sends a full baseline. Clear both endpoints on room change, retain same-room repeated-hello baselines,
+and keep full replay records. Version negotiation/votes and hello identity ownership remain unchanged.

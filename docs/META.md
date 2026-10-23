@@ -1191,3 +1191,7 @@ Optional server rehearsal pool (#756, §35.86): only default-version vanilla mat
 SP_WORKERS is unset by default. Host/process options never contain the pool object. Jobs carry BattleSpecs, the
 Final Assault cap and optional adaptive limits; failure resumes those same local candidates. Prep ending cancels
 pending work. The normal combat loop and authoritative results retain their existing execution path.
+
+State transport (§35.89): negotiated m.state frames reconstruct ordinary m.public before UI listeners run.
+Room changes reset both endpoints; a sequence gap requests one rate-limited state.resync. Plain clients, m.private
+and replay records keep full frames.

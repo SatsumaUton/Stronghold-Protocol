@@ -40,7 +40,7 @@
 //   onDisconnect(session)                  the session's socket closed (session kept for the reconnect window)
 //   onExpire(session)                      the session was purged (disconnected longer than the window)
 
-import { prepareStateFrame, negotiateStateDelta, resetStateDelta } from './stateTransport.js';
+import { prepareStateFrame, negotiateStateDelta, resetStateDelta, setStateDeltaRoom } from './stateTransport.js';
 import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
 import { C2S, validateC2S } from '../shared/protocol.js';
@@ -339,6 +339,7 @@ export function send(ws, msg, encoded = null) {
  */
 export function sendSession(session, msg, encoded = null) {
   if (!session || !session.connected) return false;
+  setStateDeltaRoom(session.ws, session.roomCode ?? null);
   return send(session.ws, msg, encoded);
 }
 

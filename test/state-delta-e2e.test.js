@@ -132,3 +132,38 @@ test('a client that never names the version is never sent a frame it cannot pars
   await legacy.waitFor('m.public', () => true, 5000);
   assert.equal(legacy.log.filter(isState).length, 0, 'an unnegotiated connection never sees m.state');
 });
+
+
+test('a same-socket move to a new room sends a full initial match view', async (t) => {
+  const { url } = await boot(t);
+  const client = await TestClient.connect(url);
+  t.after(() => client.close());
+  await client.hello('Mover', undefined, { delta: STATE_DELTA_VERSION });
+  await client.request({ t: 'room.create', mode: 'solo', difficulty: 'NORMAL' });
+  await client.request({ t: 'room.start' });
+  const previous = await client.waitFor('m.state', () => true, 5000);
+  assert.equal((await client.request({ t: 'room.leave' })).t, 'ok');
+  client.clearInbox();
+  assert.equal((await client.request({ t: 'room.create', mode: 'solo', difficulty: 'NORMAL' })).t, 'ok');
+  assert.equal((await client.request({ t: 'room.start' })).t, 'ok');
+  const next = await client.waitFor('m.state', () => true, 5000);
+  assert.ok(next.full);
+  assert.ok(next.seq > previous.seq);
+});
+
+test('the browser Net clears its receiver on room change and closure, retaining repeated room updates', async () => {
+  const { Net } = await import('../public/js/net.js');
+  const net = new Net(), received = [];
+  net.on('m.public', (m) => received.push(m));
+  const message = (m) => net._onMessage(JSON.stringify(m));
+  message({ t: 'room.state', code: 'AAAA' });
+  message({ t: 'm.state', kind: 'm.public', seq: 1, full: { t: 'm.public', funds: 1 } });
+  message({ t: 'room.state', code: 'AAAA' });
+  assert.equal(net._receiver.states.size, 1);
+  message({ t: 'room.state', code: 'BBBB' });
+  assert.equal(net._receiver.states.size, 0);
+  message({ t: 'm.state', kind: 'm.public', seq: 2, full: { t: 'm.public', funds: 2 } });
+  message({ t: 'room.closed', reason: 'kicked' });
+  assert.equal(net._receiver.states.size, 0);
+  assert.deepEqual(received.map((m) => m.funds), [1, 2]);
+});
