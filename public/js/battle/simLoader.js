@@ -31,7 +31,7 @@ export async function loadBrowserSim({ base = '/sim/', dataBase = '/data/', fetc
   // The page's store holds the original content only while `reuseOwner()` returns null: a room's content set may
   // already be in it when a vanilla simulation starts, or be adopted while this load is in flight (content.js).
   // `original()` is checked around every retrieval, so either case falls back to fetching — the behaviour before reuse.
-  const original = reuse && reuseOwner ? () => reuseOwner() === null : null;
+  const original = typeof reuse === 'function' && typeof reuseOwner === 'function' ? () => reuseOwner() === null : null;
   const [spec, simdata, support] = await Promise.all([
     import(`${base}spec.js`), import(`${base}simdata.js`), import(`${base}content/support/index.js`),
   ]);
@@ -50,7 +50,7 @@ export async function loadBrowserSim({ base = '/sim/', dataBase = '/data/', fetc
     : await Promise.all(SIM_DATA_FILES.map(async (n) => {
       // Checked before and after the retrieval: the store can change hands while the load is in flight, or during the
       // retrieval itself — an object from a content set is thrown away and the file fetched instead.
-      let local = reuse && (!original || original()) ? reuse(n) : null;
+      let local = original && original() ? reuse(n) : null;
       if (local && original && !original()) local = null;
       if (local && typeof local === 'object') return local;
       return (await fetchOnce(n)) ?? fetchOnce(n);

@@ -244,3 +244,6 @@ public/assets/ ─────────▶ public/js/render/, public/js/audio
 Before changing a rule, read the DESIGN section that owns it (module headers cite their sections; the table in
 DESIGN.md names the file that holds each) and the official source; a rule no source settles is marked `[ASSUMED]`
 ([CONTRIBUTING.md](../CONTRIBUTING.md) §3).
+
+Browser sim reuse requires both a data getter and an explicit ownership getter returning null before and after retrieval.
+Without either hook it fetches normally; plugin and historical-version data keep their structured clones (PR #722).

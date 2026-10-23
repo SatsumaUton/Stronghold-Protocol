@@ -35,7 +35,7 @@ function recorder() {
 test('a file the page already parsed is adopted, not fetched again', async () => {
   const have = pageFiles();
   const { fetched, fetchFn } = recorder();
-  const sim = await loadBrowserSim({ base, fetchFn, reuse: (n) => have[n] ?? null });
+  const sim = await loadBrowserSim({ base, fetchFn, reuse: (n) => have[n] ?? null, reuseOwner: () => null });
   assert.deepEqual(fetched, ['waves'], 'only the file the page does not hold is downloaded');
   assert.equal(sim.raw.chess, have.chess, 'the simulation runs on the page copy, not a second graph');
   assert.ok(Object.isFrozen(have.chess), 'the adopted copy is frozen like a downloaded one');
@@ -86,7 +86,7 @@ test('a set that is switched back to the original before the load starts is reus
 test('the adopted copy stays localizable: a language overlay does not write into the frozen tree', async () => {
   const have = pageFiles();
   const { fetchFn } = recorder();
-  await loadBrowserSim({ base, fetchFn, reuse: (n) => have[n] ?? null });
+  await loadBrowserSim({ base, fetchFn, reuse: (n) => have[n] ?? null, reuseOwner: () => null });
   assert.ok(Object.isFrozen(have.chess));
   const first = Object.keys(have.chess)[0];
   const zh = have.chess[first].name;
@@ -110,7 +110,7 @@ test('a missing file still goes through the retry of the fetch path', async () =
     if (name === 'waves' && ++wavesCalls === 1) return { ok: false, json: async () => null }; // first try fails
     return { ok: true, json: async () => read(name) };
   };
-  const sim = await loadBrowserSim({ base, fetchFn, reuse: (n) => have[n] ?? null });
+  const sim = await loadBrowserSim({ base, fetchFn, reuse: (n) => have[n] ?? null, reuseOwner: () => null });
   assert.equal(wavesCalls, 2, 'the second attempt fetched it again');
   assert.deepEqual(sim.raw.waves, read('waves'), 'and the retry produced the data');
   assert.deepEqual(asked.filter((n) => n !== 'waves'), [], 'nothing the page held was requested');
@@ -128,4 +128,12 @@ test('an explicit content set uses its own files and never the reuse hook', asyn
   assert.deepEqual(fetched, [], 'and nothing was fetched');
   assert.notEqual(sim.raw.chess, set.chess, 'the set’s files are copied, not adopted');
   assert.deepEqual(sim.raw.chess, { marker: 'chess' });
+});
+
+test('a reuse hook without an ownership check is ignored', async () => {
+  const have = pageFiles();
+  const { fetched, fetchFn } = recorder();
+  const sim = await loadBrowserSim({ base, fetchFn, reuse: () => { throw new Error('unowned reuse'); } });
+  assert.deepEqual([...fetched].sort(), [...SIM_DATA_FILES].sort());
+  assert.notEqual(sim.raw.chess, have.chess);
 });
