@@ -157,7 +157,9 @@ describe('统计数据 page (real server, headless Chrome)', { skip: !ENABLED &&
     const c = await open({ stored: JSON.stringify(env) });
     await c.page.waitForSelector('.lobby-screen');
     await openStats(c);
-    // 总览: 24 settled + the quit after 6 rounds count, the first-round one does not
+    // 总览: 24 settled + the quit after 6 rounds count, the first-round one does not (the tabs show before the page's data
+    // is loaded: wait for the cards)
+    await c.page.waitForSelector('.st-sec > .st-cards .st-card__num', { timeout: 15000 });
     const cards = await texts(c, '.st-sec > .st-cards .st-card__num');
     assert.equal(cards[0], '25', 'games');
     assert.match(await c.page.$$eval('.st-rule', (els) => els.map((e) => e.textContent).join(' ')), /另有 1 局未计入统计/);

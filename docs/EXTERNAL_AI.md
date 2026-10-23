@@ -80,7 +80,8 @@ Each request is a complete JSON observation:
     phase: 'PREP', round: 1,
     deadline: 1234567890000,          // absolute server clock ms: decision expires here
     remaining: 64,                    // remaining intent budget for this decision
-    legalActions: ['g.buy', /* ... */ 'g.ready']
+    legalActions: ['g.buy', /* ... */ 'g.ready'],
+    // gameVersion: 'act1autochess' — only in a room of another official version than 第二期下半 (act2autochess)
   },
   results: [
     { intent: { t: 'g.freeze' }, ok: true },
@@ -293,6 +294,14 @@ no EXP; base upgrade costs from the selected mode, −1 per round; normally fund
 fixed tier table: per-level eligibility/slot counts and pristine-catalogue tier shares are given, explicitly
 before random bans, purchases and DIY stock. The formula is included; hidden live pool counts are never sent.
 These game rules are unchanged. Plugin descriptions/rules may differ from the vanilla summary.
+
+**Official versions (0.3.2, DESIGN §35.23).** A server may offer earlier official versions (docs/DEPLOY.md §11). A match
+of a room that plays one carries `context.gameVersion` (its registry id: `act2autochess@V2_1`, `act1autochess`,
+`act1autochess@V1_1`) and its knowledge pack a top-level `gameVersion` with that version's own tables (its bonds,
+strategies, operators and modes — 第一期 has 18 bonds and no 终极); a match of 第二期下半 (`act2autochess`, the default)
+carries neither key, so its observations and its pack's hash are unchanged. Do not reuse a cached pack across versions:
+the hash differs, and chess ids name other operators in other versions (`chess_char_1_02` is 角峰 in 第二期, 讯使 in
+第一期). Names in such a pack stay Chinese until the version has its own translations.
 
 Before its first decision, the connection sends:
 

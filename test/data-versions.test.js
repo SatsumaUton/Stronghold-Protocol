@@ -1,7 +1,8 @@
 // test/data-versions.test.js — the official versions' data (docs/DATA.md "Official versions (M0)"): the registry
 // shared/versions.js, the build profiles tools/versions/<slug>.mjs, the committed data/versions/<slug>/ directories, the
-// build CLI's --version, the field adapters, and server/data.js's per-version loader. The default version's bytes are
-// guarded by test/versions-default-guard.test.js.
+// build CLI's --version, the field adapters, server/data.js's per-version loader, and (M1, DESIGN §35.23) how a server
+// serves an enabled version's data. The default version's bytes are guarded by test/data.test.js and test/golden.test.js,
+// its cs inputs and default room by test/versions-default-guard.test.js.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -329,11 +330,13 @@ test('server/data.js: versionDataDir and getVersionData; loadData(DATA_DIR) neve
   resetVersionData();
 });
 
-test('HTTP: data/versions/ is not served until M1 (any spelling); the default data is', async () => {
+test('HTTP: a default server (only 第二期下半 enabled) never serves data/versions/ (any spelling); the default data is', async () => {
   const srv = await startServer({ port: 0, host: '127.0.0.1', quiet: true });
   try {
     const get = (p) => fetch(srv.url + p, { redirect: 'manual' });
     assert.equal((await get('/data/chess.json')).status, 200);
+    assert.equal(Object.hasOwn(await (await get('/healthz')).json(), 'versions'), false, '/healthz says nothing of versions');
+    assert.equal(srv.versionHosts, null, 'no version match host');
     // the nested default data stays served: the client store loads its game-text overlays from /data/i18n/ (public/js/data.js)
     const langs = readdirSync(join(ROOT, 'data', 'i18n')).filter((f) => f.endsWith('.json'));
     assert.ok(langs.length >= 4, 'data/i18n/<lang>.json');
@@ -350,6 +353,60 @@ test('HTTP: data/versions/ is not served until M1 (any spelling); the default da
         await r.arrayBuffer();
       }
     }
+  } finally {
+    await srv.close();
+  }
+});
+
+test('HTTP (M1, DESIGN §35.23): an enabled version\'s data is served (immutable with ?v=), a disabled one\'s is 404; its /cs/ manifest and bounds', async () => {
+  const srv = await startServer({ port: 0, host: '127.0.0.1', quiet: true, assetIndex: false, studio: false,
+    versions: { enabled: ['act2autochess', 'act1autochess', 'act2autochess@V2_1'] } });
+  try {
+    const get = (p) => fetch(srv.url + p, { redirect: 'manual' });
+    for (const id of ['act1autochess', 'act2autochess@V2_1']) {
+      const v = versionById(id);
+      const r = await get(`/data/${v.dir}chess.json?v=12345678`);
+      assert.equal(r.status, 200, id);
+      assert.equal(r.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+      assert.deepEqual(JSON.parse(Buffer.from(await r.arrayBuffer()).toString('utf8')), JSON.parse(readFileSync(join(ROOT, 'data', v.dir, 'chess.json'), 'utf8')));
+      // its manifest and bounds under /cs/<cs16>/
+      const cs = srv.versions.csOf(id);
+      const ir = await get(`/cs/${cs.slice(0, 16)}/index.json`);
+      assert.equal(ir.status, 200);
+      assert.equal(ir.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+      const index = await ir.json();
+      assert.equal(index.cs, cs);
+      assert.equal(index.version, id);
+      assert.equal(index.vanilla, true);
+      for (const d of Object.values(index.data)) assert.ok(d.url.startsWith(`/data/${v.dir}`), d.url);
+      const br = await get(index.bounds.official.url);
+      assert.equal(br.status, 200);
+      assert.equal(Buffer.from(await br.arrayBuffer()).length, index.bounds.official.bytes);
+      for (const d of Object.values(index.data).slice(0, 3)) {
+        const dr = await get(d.url);
+        assert.equal(dr.status, 200, d.url);
+        assert.equal(Buffer.from(await dr.arrayBuffer()).length, d.bytes);
+      }
+    }
+    const off = versionById('act1autochess@V1_1');
+    for (const p of [`/data/${off.dir}chess.json`, `/data/${off.dir.toUpperCase()}CHESS.JSON`, `/data/./${off.dir}chess.json`, `/data/i18n/../${off.dir}chess.json`, `/data/${off.dir}`]) {
+      const r = await get(p);
+      assert.ok([400, 403, 404].includes(r.status), `${p} → ${r.status}`);
+      await r.arrayBuffer();
+    }
+    assert.equal((await get('/data/versions/')).status, 404);
+    // the vanilla manifest is unchanged: no version, its data under /data/
+    const vr = await get(`/cs/${srv.content.cs.slice(0, 16)}/index.json`);
+    const vanilla = await vr.json();
+    assert.equal(Object.hasOwn(vanilla, 'version'), false);
+    assert.equal(Object.hasOwn(vanilla, 'bounds'), false);
+    assert.ok(Object.values(vanilla.data).every((d) => /^\/data\/[a-z]+\.json\?v=[0-9a-f]{8}$/.test(d.url)));
+    assert.deepEqual(vanilla, srv.content.index);
+    assert.equal((await get(`/cs/${srv.versions.csOf('act1autochess').slice(0, 16)}/data/chess.json`)).status, 404);
+    // /healthz names them and their match hosts
+    const health = await (await get('/healthz')).json();
+    assert.deepEqual(health.versions, { enabled: ['act2autochess', 'act2autochess@V2_1', 'act1autochess'], default: 'act2autochess',
+      hosts: { workers: 0, matches: 0, transport: 'process' } });
   } finally {
     await srv.close();
   }

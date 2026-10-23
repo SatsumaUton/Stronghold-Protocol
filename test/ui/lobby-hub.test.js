@@ -23,6 +23,7 @@ const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
 const { HubEntry, ProtocolSelect, AllianceSelect, normalizeCode, codeArg } = await import('../../public/js/screens/lobby.js');
 const { Modal, TextField } = await import('../../public/js/ui/components.js');
+const { ReplayWait, BondAchievement } = await import('../../public/js/screens/stats.js');
 const { DIFFICULTIES } = await import('../../shared/constants.js');
 
 function* walk(v) {
@@ -241,9 +242,10 @@ test('成就统计 card: the lobby’s only statistics entry (no top-bar 统计�
   assert.match(lobbySrc, /achOpen \? html`<\$\{AchievementDialog\} onClose=/);
   assert.doesNotMatch(lobbySrc, /openStats/, 'the 统计数据 page opens from the window’s 查看完整统计 only');
   assert.doesNotMatch(lobbySrc, /stats-entry|me-chip/, 'the top-bar chip is gone');
-  assert.match(lobbySrc, /const records = peekStatsRecords\(\);\s*return \{ prog: levelProgress\(records/);
+  // (the season of the version shown: DESIGN §35.23 — every record on a server without versions)
+  assert.match(lobbySrc, /const records = recordsOfSeason\(peekStatsRecords\(\), season\);\s*return \{ prog: levelProgress\(records/);
   assert.match(lobbySrc, /trophies: aggregateStats\(records\)\.trophies/, 'the same trophy count as the window’s 获得奖杯');
-  assert.match(lobbySrc, /\[cfg, statsOpen\]/, 'read again when 统计数据 closes (an import or 清空 there)');
+  assert.match(lobbySrc, /\[cfg, statsOpen, season\]/, 'read again when 统计数据 closes (an import or 清空 there) or the version changes');
   assert.doesNotMatch(lobbySrc, /loadStats\(/, 'loadStats moves a damaged value away: the 统计数据 page must still find it');
   const ui = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).ui;
   const medals = JSON.parse(readFileSync(path.join(ROOT, 'data/config.json'), 'utf8')).trophies.medals;
@@ -276,7 +278,8 @@ test('成就统计 window (screens/stats.js AchievementDialog): the project Moda
 });
 
 test('选择同盟方式 creates the room itself: the lobby never stacks 选择模拟协议 for a 同盟', () => {
-  assert.match(lobbySrc, /onCreate=\$\{\(\) => create\('coop'\)\} difficulty=\$\{difficulty\}/);
+  // (the remembered difficulty, or the server's fallback when the lobby's version lacks it: DESIGN §35.23)
+  assert.match(lobbySrc, /onCreate=\$\{\(\) => create\('coop'\)\} difficulty=\$\{shownCoop\}/);
   assert.match(lobbySrc, /onCreate=\$\{\(\) => create\('solo'\)\}/);
   assert.doesNotMatch(lobbySrc, /setProtocol\('coop'\)/);
   assert.match(lobbySrc, /<\$\{ProtocolSelect\} roomMode="solo"/, '选择模拟协议 stays before 独立模拟');
@@ -581,4 +584,82 @@ test('the hub keeps its text whole (§35.18 review: English 「Solo / Team Simul
   assert.match(short, /\.hub-entry__en \{ padding-right: \.44rem; font-size: min\(calc\(\.16 \* var\(--t\)\), calc\(10px \+ var\(--t-step\)\)\);/);
   assert.match(short, /\.hub-entry__name \{ font-size: min\(calc\(\.42 \* var\(--t\)\), calc\(18px \+ var\(--t-step\)\)\); \}/);
   assert.match(readFileSync(path.join(ROOT, 'public/css/theme.css'), 'utf8'), /:root \{ --t-step: calc\(\(var\(--t\) - 64px\) \/ 12\); \}/);
+});
+
+test('official versions (DESIGN §35.23): the cards of the version shown, the wait while it loads, room.create names the version', () => {
+  // 第一期 / 第二期上半 offer three difficulties: the cards follow (versions.js offeredDifficulties)
+  const three = proto({ difficulty: 'HARD', difficulties: ['FUNNY', 'NORMAL', 'HARD'] });
+  assert.deepEqual(byClass(three, 'diff-card').map((c) => c.props.style.match(/--d-color:(#\w+)/)[1]).length, 3);
+  assert.equal(byClass(three, 'diff-card').filter((c) => hasClass(c, 'is-selected')).length, 1);
+  const waiting = proto({ difficulty: 'FUNNY', loading: true });
+  assert.ok(find(waiting, (x) => x.props?.['data-testid'] === 'proto-loading').length, 'a spinner while the version loads');
+  assert.ok(byClass(waiting, 'diff-card').every((c) => c.props.disabled === true), 'the cards wait');
+  assert.equal(buttons(waiting).find((b) => hasClass(b, 'proto-start')).props.disabled, true, 'so does 开始独立模拟');
+  // the version set failed its check: 版本数据校验失败 + 重试 instead of the spinner, the cards still wait
+  const failed = proto({ difficulty: 'FUNNY', loading: true, failed: true });
+  const byId = (tree, id) => find(tree, (x) => x.props?.['data-testid'] === id);
+  assert.equal(byId(failed, 'proto-failed').length, 1);
+  assert.ok(textOf(byId(failed, 'proto-failed')[0]).includes('版本数据校验失败'));
+  assert.equal(byId(failed, 'proto-retry').length, 1, '重试');
+  assert.equal(byId(failed, 'proto-loading').length, 0, 'no spinner');
+  assert.ok(byClass(failed, 'diff-card').every((c) => c.props.disabled === true));
+  // the lobby: the version only on a server that enables versions; the shown difficulty (the fallback) is the one sent
+  assert.match(lobbySrc, /mode, difficulty: mode === 'solo' \? shownSolo : shownCoop, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\), \.\.\.\(versions \? \{ version \} : \{\}\),/);
+  assert.match(lobbySrc, /const shownSolo = fallbackDifficulty\(solo, difficulty\);/);
+  assert.match(lobbySrc, /const pickDifficulty = \(d\) => \{ setDifficulty\(d\); savePref\('lobby\.difficulty', d\); \};/, 'the pref changes only on a pick');
+  assert.match(lobbySrc, /<\$\{VersionSwitch\} \/>\s*<\$\{ResumeMatchButton\} \/>/, 'the chip before 恢复本机对局');
+  assert.match(lobbySrc, /data-testid="hub-version"/);
+});
+
+test('统计数据 replay wait (screens/stats.js ReplayWait): 返回统计 always, 重试 for a failed set outside a room, the line of each case', () => {
+  const byId = (tree, id) => find(tree, (x) => x.props?.['data-testid'] === id);
+  const back = [];
+  const base = { version: 'act1autochess', otherInRoom: false, offered: true, failed: false, inRoom: false, onBack: () => back.push(1) };
+  const loading = ReplayWait(base);
+  assert.equal(find(loading, (x) => x.type?.name === 'Spinner').length, 1, 'a spinner while the version loads');
+  assert.ok(textOf(loading).includes('正在载入「第一期下半」的数据…'), textOf(loading));
+  assert.equal(byId(loading, 'stats-replay-retry').length, 0);
+  byId(loading, 'stats-replay-back')[0].props.onClick();
+  assert.deepEqual(back, [1], '返回统计');
+  const unoffered = ReplayWait({ ...base, offered: false });
+  assert.ok(textOf(unoffered).includes('这台服务器没有提供「第一期下半」，不能回看该局结算'));
+  assert.equal(find(unoffered, (x) => x.type?.name === 'Spinner').length, 0);
+  assert.equal(byId(unoffered, 'stats-replay-back').length, 1);
+  const failed = ReplayWait({ ...base, failed: true });
+  assert.ok(textOf(failed).includes('版本数据校验失败'));
+  assert.equal(byId(failed, 'stats-replay-retry').length, 1, '重试 outside a room');
+  assert.equal(byId(ReplayWait({ ...base, failed: true, inRoom: true }), 'stats-replay-retry').length, 0, 'no 重试 in a room (the room decides)');
+  const room = ReplayWait({ ...base, otherInRoom: true, inRoom: true });
+  assert.ok(textOf(room).includes('同盟中的数据由房间的版本决定，离开同盟后才能回看「第一期下半」的结算'));
+  assert.equal(byId(room, 'stats-replay-back').length, 1);
+});
+
+test('卫戍成就 (screens/stats.js BondAchievement): a peak of another version shows its alliance, never its lineup drawn with the data on screen', () => {
+  // 第一期下半's chess_char_1_02_a is 讯使; on 第二期下半's data the same id is 角峰 (and its items are other items)
+  const peak = {
+    record: { id: 'r1', version: 'act1autochess' },
+    player: { lineup: [{ id: 'chess_char_1_02_a', tier: 1, items: ['chess_item_1_02_e_a'] }], bonds: [{ bondId: 'yanShip', active: true, layers: 12 }] },
+    bond: { bondId: 'yanShip', layers: 12 },
+  };
+  const looked = [];
+  const gd = { m: null, bond: () => null, chess: (id) => { looked.push(id); return null; }, item: (id) => { looked.push(id); return null; } };
+  const ops = (tree) => find(tree, (x) => x.type?.name === 'AchievementOperator');
+  const other = BondAchievement({ peak, gd });
+  assert.equal(ops(other).length, 0, 'no operator of the lineup is drawn');
+  const line = find(other, (x) => x.props?.['data-testid'] === 'achievement-other-version');
+  assert.equal(line.length, 1);
+  assert.ok(textOf(line).includes('切换到「第一期下半」查看'), textOf(line));
+  assert.ok(find(other, (x) => x.type?.name === 'BondGlyph' && x.props.bondId === 'yanShip').length >= 1, 'the alliance stays');
+  // the same version: the lineup is drawn (and nothing of another version's line)
+  const firstData = { ...gd, config: { version: { id: 'act1autochess' } } };
+  const same = BondAchievement({ peak, gd: firstData });
+  assert.equal(ops(same).length, 1);
+  assert.equal(find(same, (x) => x.props?.['data-testid'] === 'achievement-other-version').length, 0);
+  // a record without a version is 第二期下半's
+  const def = BondAchievement({ peak: { ...peak, record: { id: 'r2' } }, gd });
+  assert.equal(ops(def).length, 1);
+  const trimmed = BondAchievement({ peak: { ...peak, player: { ...peak.player, lineup: null } }, gd: firstData });
+  assert.equal(ops(trimmed).length, 0);
+  assert.equal(find(trimmed, (x) => x.props?.['data-testid'] === 'achievement-other-version').length, 0, 'a trimmed same-version record needs no switch');
+  assert.deepEqual(looked, [], 'drawn as vnodes only: nothing looked up here');
 });

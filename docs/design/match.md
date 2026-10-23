@@ -209,6 +209,29 @@ and before Ready. The prep's deadline — and the scheduler's fallback when a st
 
 Deterministic-ish heuristic player used for (a) AI teammates, (b) auto-play for disconnected humans (only auto-ready + auto-picks, not shopping, unless "AI 托管" is toggled), (c) tests. Strategy (§21.6): pick a band (weighted by starting LP; never one built around a bond the mode switches off — `gd.bandBondIds`, §21.26); each prep: take offers, sell dead bench weight, fill the board, complete affordable merges, level on the curve, then buy only merge progress / lineup upgrades worth more than the refreshes their price would buy (shop odds of completing held pairs), freeze for an unaffordable third copy (坎诺特 keeps 5 funds back); build around a committed focus core bond (a teammate's main bond on its strip counts against it; bonds the mode switches off never) + a second bond; value dealers by DPS vs the round's DEF / RES (an attack on every enemy in range counts double — 阵法术师 / 轰击术师), with the range the unit is deployed with; place by the exposure model + rehearsal on the server's deploy map (no 深水区; a blocker whose range is its own tile only — range 0-1 — takes a free tile of the enemy road first; a tactician's 援军 within `PlayerState.summonRange`; a melee chess whose trait reads 「可以放置于远程位」 (钩索师 / 推击手) on a 高台 whose range covers the enemy road, else on the ground, counted as a blocker in the lineup either way — §3; `g.move` judges legality); items by effect (META §1.5: 突变细胞 on the least valuable normal single below 6阶, a cell left in temp gets a hand slot made for it, the operator its transformation gains is deployed by the next prep's lineup step like any owned unit — AI 托管 too; the buy loop's bench shed never sells a piece gained since the bot's last prep, §21.1); 机变 bounties by expected payout − expected LP loss over the offered cards; resolve temp — on a human seat under AI 托管 never by destroying an item while a bench operator can be sold for the slot —; ready. A bot's whole prep — shop decisions and layout planning (`botPrepBeginSteps`, 25–70 ms late in a 4-bot match), the layout rehearsal and `botPrepEndSteps` — runs in wall-clock slices of `botSliceMs` (8 ms) per scheduler callback on a real host (step generators that yield between whole actions, never with a transient board; the same actions in the same order, so decisions are unchanged; at once in virtual time). Under AI 托管 a human's own 自选 pieces score `DIY_PIECE_BONUS` (12) more in the shop / reward choice and the 调度中心 is levelled one round earlier for the step that opens a slotted tier (`levelUp`, `diyOpensAt`; 0.2.0 — bots field no 自选 piece).
 
+### 6.7 Where a match runs: match hosts (§32.6, §35.23)
+
+A room of 第二期下半 (`act2autochess`) without gameplay plugins runs its `Match` in the server process, as always. Two kinds
+of rooms run it in a match host (`server/match/host/`: a child process by default, `SP_MATCH_HOST=worker` a worker
+thread), whose module table holds that room's data — `server/data.js setData` before the match code is imported, so every
+singleton (the kits, builtinMeta, the meta registry, the official-bounds cache) reads it:
+
+- **plugin hosts** (`kind: 'plugins'`, §32.6): one per content set of gameplay plugins, at most `limits.maxSets` (4);
+  stop reasons 'plugin-crash' / 'plugin-hang' / 'plugin-start';
+- **version hosts** (`kind: 'version'`, §35.23, M1): one per enabled official version other than 第二期下半 (its `cs`,
+  `server/versions.js`), at most `maxHosts` (default: one per such version; `SP_MAX_VERSION_HOSTS`), counted apart from
+  the plugin hosts; log lines `[versions]` with the version's id as the host label; stop reasons 'version-crash' /
+  'version-hang' / 'version-start' (the room is told `本局模拟出错，已结束` / `本局模拟长时间无响应，已结束` /
+  `该版本的模拟无法启动`); a full pool refuses the start with `INTERNAL` 'version hosts busy'. The host installs the
+  version's own official-bounds snapshot, and refuses (`failed` → 'version-start') a match whose `opts.version` (absent:
+  `act2autochess`) is not its data's (`shared/versions.js versionOfData`). The lobby passes `opts.version` and
+  `opts.requireCs: true` (a client b.result must name the version's `cs`; the bot layout rehearsal is never delegated to
+  a browser, `match/rehearsal.js`), never `kitted`. A version room without a version host refuses to start (`INTERNAL`):
+  the server process's singletons hold 第二期下半's data. `Match.version` is the registry id (null for the default); the
+  test journal's `init.options.version`, `m.public` / `m.result` `version` (`views.js` / `results.js`: the page reads a
+  replayed result with it), the external AI's `context.gameVersion` and the knowledge pack's `gameVersion` carry it (all
+  non-default only). Both kinds: heartbeat watchdog 10 s, idle stop after 10 minutes, `diag()` (tests) reports `version` too.
+
 ---
 
 ## 16. Operator loadout: skill & module selection (v2.1, user playtest #1)

@@ -780,12 +780,7 @@ the three earlier versions, named by period as the maintainer named them (2026-1
 sub-versions V1_1 / V1_2 and V2_1 / V2_2. (PRTS's 「第一期」 is the 2024 卫戍协议, `act1vautochess`, which is not done.)
 A bare 上半 / 下半 here and in code comments keeps the official activity sense (上半 = 第一期 / `act1autochess`, 下半 =
 第二期 / `act2autochess`); a period's halves are always written with the period (第一期上半 …) or as V1_1 … V2_2.
-**M2 core is available to tools**: golden/botbench can load the historical data in isolated workers. The lobby switch
-and room version hosts remain M1 work. `data/versions/` is tracked, so the release zips and Docker carry it (48 files, 15.0 MB on
-disk, about 1.3 MB zipped), but `server/http/static.js` does not serve it until M1 (404 under `/data/versions/`). The default version is unchanged — `data/*.json`, `data/i18n/`, the golden corpus, the
-`cs` formula and a default room's `room.state` are pinned by `test/versions-default-guard.test.js`. Its file hashes (G1)
-are the M0 merge check and are deleted when M1 starts (DESIGN §35.22.2); until then a rebuild that changes a default data
-file also refreshes the fixture: `SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js`.
+**M2 core and kits are in** (DESIGN §35.22.7–§35.22.9): golden and botbench load a selected version, and a version room plays that version's rules and kits. **M1 serves enabled versions** (DESIGN §35.23; "Serving the versions (M1)" below): `server/http/static.js` serves `data/versions/<slug>/` only when the server enables that version, and a default server still answers 404. `data/versions/` is tracked, so the release zips and Docker carry it (48 files, 15.0 MB on disk, about 1.3 MB zipped). The default version is unchanged — `data/*.json`, `data/i18n/`, the golden corpus, the `cs` formula and a default room's `room.state` are pinned: `test/data.test.js` and `test/golden.test.js` guard the data and the goldens, `test/versions-default-guard.test.js` (G2–G4) the `cs` inputs, the formula and the default room. Its file hashes (G1) were the M0 merge check and were deleted when M1 started (DESIGN §35.22.2, §35.23).
 
 **M2 research and rules:** `docs/research/versions/<slug>/02-bonds.json` and `04-items.json` use each snapshot's own
 text. First-season `01-core-data.json` supplies the 11-18 blackboard multipliers and preserves 300-second solo prep;
@@ -1003,10 +998,55 @@ and names the missing `.cache/gamedata@<sha>/`. **Hidden inputs**: a version bui
 `data/assets.json` (the enemies' attack clips: a manifest of 下半's models, so the 6 上半-only enemies above have no
 `attackAnim` and the sim keeps `ATTACK_PAUSE` for them — 墨浪, 萨卡兹王庭军术师 and 巫王乐团圆号手 are ranged, so their
 attack timing is off — until M2 adds their models; `data/assets.json` is a default data file, so that change rebuilds
-every version directory and refreshes G1 if it still exists, DESIGN §35.22.2 deleting G1 when M1 starts),
+every version directory; G1, which also pinned it, was deleted when M1 started, DESIGN §35.22.2),
 `data/tuning.json` (its byte copy; `test/data-versions.test.js` fails
 while a copy differs) and `docs/research/*.json` (the default's research, which V2_1 reads by id and 上半 uses as its fallback) — a default-side change to those makes
 the version directories stale with no version-related cause. Rebuild every version then
 (`--version` for each id). `server/data.js`: `versionDataDir(id)`, `getVersionData(id)` (the default returns `getData()`;
 another version loads its directory once, frozen, with `VERSION_DATA_FILES`, never filling the official-bounds cache),
 `resetVersionData()`; `loadData(DATA_DIR)` reads the top level only.
+
+### Serving the versions (M1)
+
+DESIGN §35.23. A server offers the versions its owner enables; rooms play one of them (server/lobby.js header "Official
+versions"), and their matches run in a match host whose data singleton is that version's.
+
+**Configuration** (`server/http/config.js` versionsFrom): the startServer option `versions: { enabled, default, maxHosts }`
+wins over the environment — `SP_VERSIONS` (`all` or a comma list of registry ids), `SP_VERSION_DEFAULT`,
+`SP_MAX_VERSION_HOSTS`. Nothing set: `act2autochess` alone (the switch off: every room, page and welcome as before M1). An
+unknown id is warned about and dropped (none left: `act2autochess`); a default that is not enabled is warned about and
+replaced by the first enabled id in registry order; `maxHosts` defaults to the number of enabled non-default versions (at
+least 1 when there is one). The boot log prints one line, e.g.
+`[versions] enabled: act2autochess (第二期下半, default), act1autochess (第一期下半)`.
+
+**The service** (`server/versions.js` createVersionSets): at boot, each enabled non-default version's `cs` —
+`contentHashOf({ app, sim, data })` over the vanilla code (`app`, `sim`, the same served `/sim/` and `/shared/` files) and
+the sha256 of its directory's gameplay files (`server/plugins/identity.js` versionContentOf; the 16 tables, no art
+manifest; bytes only, no JSON parse) — and its `config.json` modes (the difficulties it offers: 第一期 and 第二期上半 have
+no 终极). A version whose directory is missing a file or unreadable is warned about and stays disabled. Its data
+(`loadData` of its directory, deep-frozen), its official-bounds snapshot (`shared/plugins/officialBounds.js`
+officialBoundsOf: its own maxima — the main process's cache keeps 第二期下半's) and its manifest load on first use. A
+load that fails at run time is logged once and remembered until the server restarts: the version is then unavailable
+(`available(id)` false — `room.create` / `room.proposeVersion` answer `VERSION_UNSUPPORTED`, later welcomes leave it out,
+and when it is the configured default, rooms created without a version and the settings outside a room use 第二期下半,
+else the first enabled version that loads, which the welcome marks the default), while `/healthz` `versions` still lists
+it under `enabled` and keeps the configured `default`. The default version is the vanilla content and the server's data.
+
+**HTTP** (`server/http/static.js`):
+
+| path | answer |
+|---|---|
+| `/data/versions/<slug>/<file>.json` | an enabled version's file; `?v=<sha8>` immutable like `/data/`. Any other path under `data/versions/` (a disabled version, the folder itself, another spelling of one) is a 404: the real path must lie inside an enabled version's real directory |
+| `/cs/<cs16>/index.json` | an enabled version's manifest: `{ v: 1, cs, app, vanilla: true, version, sim, simFiles, data: { <name>: { url: '/data/versions/<slug>/<name>.json?v=<sha8>', sha256, bytes } }, plugins: [], settings: {}, bounds: { official: { url, sha256, bytes } } }`, immutable |
+| `/cs/<cs16>/bounds/official.json` | its official-bounds snapshot, canonical JSON `{ v: 1, bb, fields, bbMin, fieldMin, text }` |
+
+The vanilla `/cs/<cs16>/index.json` is byte-identical (no `version`, no `bounds`, URLs under `/data/`). The build tag
+(`server/http/buildTag.js`) counts the served version directories only, so rebuilding a version the server does not offer
+is no new build. `/healthz` adds `versions: { enabled, default, hosts: { workers, matches, transport } }` only when a
+non-default version is enabled.
+
+**Match hosts**: the rooms of a non-default version start their matches in `server/match/host/` with `kind: 'version'` —
+one child process per version `cs`, at most `maxHosts`, counted apart from the plugin hosts (docs/design/match.md). The
+host checks every data file's sha256 against the version's hash input, installs the data with `setData` and the version's
+bounds snapshot, and refuses a match whose `opts.version` is not its data's version. A test journal of such a match carries
+`init.options.version` and replays in a process whose data singleton is that version's (`server/match/testReplay.js`).

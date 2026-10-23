@@ -6,6 +6,7 @@ import { GameData } from '../../server/match/gamedata.js';
 import { aiObservation } from '../../server/match/externalAI.js';
 import { validateC2S } from '../../shared/protocol.js';
 import { buildRecordOverlay } from '../../shared/i18nData.js';
+import { getVersionData } from '../../server/data.js';
 
 const opts = { modeId: 'mode_single_normal' };
 test('knowledge is immutable, cached, content-addressed, language-aware and independent of match state', () => {
@@ -32,6 +33,15 @@ test('knowledge is immutable, cached, content-addressed, language-aware and inde
   assert.notEqual(knowledgePack(DATA, { ...opts, contentId: 'plugin-script-version' }).version, a.version);
   assert.ok(a.playingEconomy.includes('|'));
   assert.notEqual(knowledgePack(DATA, { ...opts, rules: { unequip: 'allow' } }).version, a.version);
+});
+
+test('another official version\'s data names it (gameVersion, DESIGN §35.23); the default pack has no such key', () => {
+  const a = knowledgePack(DATA, opts);
+  assert.equal(Object.hasOwn(a, 'gameVersion'), false);
+  const v = knowledgePack(getVersionData('act1autochess'), opts);
+  assert.equal(v.gameVersion, 'act1autochess');
+  assert.notEqual(v.version, a.version);
+  assert.ok(v.bonds.length === 18, '第一期\'s 18 bonds');
 });
 
 test('active plugin records and offer cards are included; stale translations cannot mask plugin edits', () => {

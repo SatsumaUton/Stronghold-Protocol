@@ -75,6 +75,11 @@
 }
 .st-body > * { max-width: max(12.4rem, calc(760px * var(--sp-ui, 1))); margin-left: auto; margin-right: auto; }
 .st-loading { flex: 1; display: grid; place-items: center; min-height: 2rem; }
+/* the replay's wait: its line and 返回统计 (重试) stay together in the middle */
+.st-replay-wait { align-content: center; gap: .14rem; padding: .3rem 16px; text-align: center; }
+.st-replay-wait > p { margin: 0; max-width: 32em; }
+.st-replay-wait > p.is-warn { color: var(--amber); }
+.st-replay-wait__acts { display: flex; flex-wrap: wrap; justify-content: center; gap: .12rem; }
 .st-empty { margin: .6rem auto; text-align: center; font-size: max(.2rem, 13px); color: var(--text-lo); letter-spacing: .06em; }
 
 .st-sec__h { display: flex; align-items: baseline; gap: .12rem; margin: 0 0 .1rem; font-size: max(.22rem, 14px); font-weight: 800; letter-spacing: .1em; color: var(--text-hi); }
@@ -180,6 +185,8 @@
 .st-achievement-unit.is-empty .st-achievement-unit__slot { background-color: rgba(33,33,33,.5); }
 .st-achievement-unit.is-empty .st-achievement-unit__slot::before, .st-achievement-unit.is-empty .st-achievement-unit__slot::after { content: none; }
 .st-achievement-unit.is-empty .st-achievement-unit__slot > i { width: .0125rem; height: 80.9%; background-color: rgba(255,255,255,.4); }
+/* a peak of another version: its line over the empty slots (screens/stats.js BondAchievement) */
+.st-achievement__other { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: .06rem .1rem; color: var(--text-md); font-size: calc(.14 * var(--t)); overflow-wrap: anywhere; }
 .st-achievement__bonds { display: grid; grid-template-columns: repeat(2, minmax(0, .875rem)); align-content: start; margin: 0; padding: 0; list-style: none; max-height: 2.95rem; overflow-y: auto; }
 .st-achievement__bonds > li { position: relative; display: flex; justify-content: center; align-items: center; min-width: 0; aspect-ratio: 1; background-position: center; background-size: contain; background-repeat: no-repeat; }
 .st-achievement__bonds .bglyph { position: absolute; top: 50%; left: 50%; width: 48%; height: 48%; transform: translate(-50%, -50%); }
@@ -415,3 +422,10 @@
 @media (prefers-reduced-motion: reduce) {
   .modal__box.achv, .achv__scroll > * { animation: none; }
 }
+
+/* official versions (DESIGN §35.23): the version filter under the note lines */
+.st-verfilter { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: .06rem; padding: .08rem .36rem; font-size: calc(.14 * var(--t)); }
+.st-verfilter__k { color: var(--text-lo); margin-right: .06rem; }
+.st-verfilter .dpick__opt { --d-color: #9fd3ff; height: .4rem; padding: 0 .14rem; border: 1px solid var(--line-2); font-size: calc(.14 * var(--t)); letter-spacing: .02em; }
+@media (max-width: 760px) { .st-verfilter { padding-inline: .16rem; } }
+.sp-coarse .st-verfilter .dpick__opt { min-height: 36px; }

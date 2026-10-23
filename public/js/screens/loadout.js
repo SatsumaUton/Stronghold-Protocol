@@ -50,7 +50,7 @@ import {
   changedCount, skillLabel, moduleBadge, attrRows, skillTags, quickSkillTags, traitLines, serializeExport, parseImport, LOADOUT_IMPORT_MAX_BYTES,
   opsOf, setOps, resetOps, moduleRecord,
 } from '../ui/loadoutModel.js';
-import { loadoutStore, openLoadout, closeLoadout, setEntries, setOpsMap, applyLoadoutEntries, setNotOwned, applyOwnershipImport, setDiyPicks, applyDiyImport } from '../ui/loadoutSync.js';
+import { loadoutStore, openLoadout, closeLoadout, setEntries, setOpsMap, applyLoadoutEntries, setNotOwned, applyOwnershipImport, setDiyPicks, applyDiyImport, importedEntries, importedNotOwned } from '../ui/loadoutSync.js';
 import { OperatorVoice } from '../ui/operatorVoice.js';
 // 皮肤 (docs/SKINS.md): a self-contained section — everything it does lives in ui/skinPicker.js, so this screen keeps
 // one import and one line in its detail body
@@ -744,7 +744,7 @@ function LoadoutScreen({ st }) {
   const m = data.get('assets');
   const getChess = (id) => data.lookup('chess', id);
   const getBond = (id) => data.lookup('bonds', id);
-  const roster = useMemo(() => rosterOf(data.list('chess')), [ready, data.locale(), data.contentId()]); // names and slots follow the room's content
+  const roster = useMemo(() => rosterOf(data.list('chess')), [ready, data.locale(), data.contentId()]); // names follow a language switch; the list follows the room's content and a version switch (§35.36, §35.23)
   const bonds = useMemo(() => {
     const used = new Set(roster.flatMap((c) => c.bonds || []));
     return (data.list('bonds') || []).filter((b) => b && used.has(b.bondId))
@@ -796,7 +796,7 @@ function LoadoutScreen({ st }) {
     if (ok) setDiyPicks({});
   };
   const setTab = (t) => loadoutStore.set({ tab: t });
-  const toggleOwned = (id, owned) => setNotOwned(setOwned(loadoutStore.get().notOwned, id, owned));
+  const toggleOwned = (id, owned) => setNotOwned(setOwned(st.notOwned, id, owned), { base: st.notOwned });
   const ownAll = async () => {
     if (!nNotOwned) return;
     const ok = await confirmDialog({ title: t('全部持有'), text: t('将 {nNotOwned} 名未持有的干员恢复为持有（由本人上场）？', { nNotOwned }), okText: t('全部持有') });
@@ -810,18 +810,21 @@ function LoadoutScreen({ st }) {
     if (view === 'deck') setDrawer(true); else setNarrowDetail(true);
   };
   // a row's quick choice (PR #301): the same setChoice / setEntries path; the row becomes the selection, a phone stays on the list
+  // (the edit is made on the view this render drew, with this render's records: written back through that view's map —
+  // a click that lands while another version's data replaces it is re-based, never filed under another operator,
+  // DESIGN §35.23)
   const quickChange = (id, patch) => {
     const recs = recordsOf(id, getChess);
-    setEntries(setChoice(loadoutStore.get().entries, recs.base, recs.golden, patch));
+    setEntries(setChoice(st.entries, recs.base, recs.golden, patch), { base: st.entries });
     loadoutStore.set({ sel: id });
   };
-  const change = (patch) => { if (base) setEntries(setChoice(loadoutStore.get().entries, base, golden, patch)); };
+  const change = (patch) => { if (base) setEntries(setChoice(st.entries, base, golden, patch), { base: st.entries }); };
   // 0.2.2: an operator's 潜能 / 练度 (by charId: its normal, elite and 自选 forms share them)
   const setOpsOf = (charId, patch) => setOpsMap(setOps(loadoutStore.get().ops, charId, patch));
   const resetOne = () => {
     if (!base) return;
     setOpsMap(resetOps(loadoutStore.get().ops, base.charId));
-    setEntries(resetChoice(loadoutStore.get().entries, base.chessId));
+    setEntries(resetChoice(st.entries, base.chessId), { base: st.entries });
   };
   const resetAll = async () => {
     if (!nChanged) return;
@@ -841,9 +844,10 @@ function LoadoutScreen({ st }) {
   const ioOwn = io?.kind === 'ownership';
   const ioDiy = io?.kind === 'diy';
   const openExport = () => setIo(tab === 'ownership'
-    ? { mode: 'export', kind: 'ownership', text: serializeOwnership(loadoutStore.get().notOwned) }
-    : tab === 'diy' ? { mode: 'export', kind: 'diy', text: serializeDiy(loadoutStore.get().diy) }
-      : { mode: 'export', kind: 'loadout', text: serializeExport(loadoutStore.get().entries, { ops: loadoutStore.get().ops }) });
+    // (by operator, every version's — DESIGN §35.23; a v1 store still migrating exports what it has)
+    ? { mode: 'export', kind: 'ownership', text: serializeOwnership(loadoutStore.get().notOwnedChars || []) }
+    : tab === 'diy' ? { mode: 'export', kind: 'diy', text: serializeDiy(loadoutStore.get().diy, { version: loadoutStore.get().diyVersion }) }
+      : { mode: 'export', kind: 'loadout', text: serializeExport(loadoutStore.get().byChar || {}, { ops: loadoutStore.get().ops }) });
   const openImport = () => setIo({ mode: 'import', kind: tab, text: '' });
   const ioCopy = async () => {
     const ok = await copyText(ioText);
@@ -876,7 +880,7 @@ function LoadoutScreen({ st }) {
     if (ioOwn) {
       const r = parseOwnershipImport(ioText);
       if (!r.ok) { toast(t('导入失败：{error}', { error: r.error }), 'error'); return; }
-      const { applied, dropped } = applyOwnershipImport(r.notOwned, getChess);
+      const { applied, dropped } = applyOwnershipImport(importedNotOwned(r), getChess);
       setIo(null);
       toast(applied ? (dropped ? t('已导入：{applied} 名干员未持有（另有 {dropped} 项无效，未导入）', { applied, dropped }) : t('已导入：{applied} 名干员未持有', { applied }))
         : t('已导入：全部持有'), dropped ? 'warn' : 'success');
@@ -890,7 +894,8 @@ function LoadoutScreen({ st }) {
     if (opsRefused) { toast(opsRefused.text, opsRefused.tone); return; }
     // 0.2.2: a payload with `ops` replaces the 潜能 / 练度 too (an older export leaves them alone)
     const opIds = res.ops ? cultivationCharIds(data.get('chess'), data.get('backups')) : null;
-    const r = applyLoadoutEntries(res.entries, getChess, res.ops ? { ops: res.ops, isOperator: (id) => opIds.has(id) } : {});
+    // (v2 by operator, v1 by 第二期下半's chess ids: as entries of the data on screen — DESIGN §35.23)
+    const r = applyLoadoutEntries(importedEntries(res), getChess, res.ops ? { ops: res.ops, isOperator: (id) => opIds.has(id) } : {});
     const { applied, dropped } = r;
     const nOps = r.ops ?? 0;
     // nothing survived sanitising (unknown chess, or every choice already the default): keep the current loadout

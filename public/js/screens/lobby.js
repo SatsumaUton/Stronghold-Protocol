@@ -25,6 +25,12 @@
 // screen is complete before data is generated. Rounds: solo 标准 = 9, everything else 14 (+R15
 // hidden core on 险境+), per research 00-INDEX §2. Battlefield pool (`modes[].stages`): 标准 always
 // plays 战场#01, 险境 draws one of 8, 绝境 / 终极 one of 7 (m01 excluded).
+// Official versions (DESIGN §35.23, M1; versions.js): with welcome.versions the top bar shows the version chip (ui/
+// versionPicker.js VersionSwitch — this browser's choice, its data loaded and checked by content.js), the title names a
+// version other than 第二期下半, 选择模拟协议 offers the difficulties of the version shown (its config's modes: 第一期 and
+// 第二期上半 have no 终极; the remembered difficulty, when it is not offered, shows as the server's fallback — the highest
+// offered below it — and stays remembered until the player picks one; the cards wait while the version loads), 创建同盟 /
+// 独立模拟 create the room in that version (room.create `version`), and the 成就统计 card counts the records of its season.
 // Texts go through t() (docs/I18N.md); the module-level tables hold msgids (N_) translated where they are shown, the
 // config.json mode texts come localized from data.js.
 
@@ -35,7 +41,7 @@ import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_S
 import { html, confirmDialog, Button, Icon, MicroLabel, Modal, PingPill, Spinner, DifficultyIcon, TextField } from '../ui/components.js';
 import { Sprite, Img } from '../ui/gameComponents.js';
 import { uiUrl } from '../ui/assetUrls.js';
-import { peekStatsRecords, trophyMedalOf, aggregateStats } from '../ui/stats.js';
+import { peekStatsRecords, trophyMedalOf, aggregateStats, recordsOfSeason } from '../ui/stats.js';
 import { levelProgress, levelOf } from './settle.js';
 import { OwnBackdrop, LobbyScene, LobbyMediaButton } from '../ui/lobbyMedia.js';
 import { toast, toastError } from '../ui/toasts.js';
@@ -54,6 +60,9 @@ import { data, getConfig, getMode, getStage, useData } from '../data.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { NoticesButton } from '../ui/notices.js';
+import { VersionSwitch } from '../ui/versionPicker.js';
+import { contentSet, retryContentSet } from '../content.js';
+import { DEFAULT_VERSION, lobbyVersion, offeredDifficulties, fallbackDifficulty, seasonOf, versionLabel } from '../versions.js';
 
 /** Official mode texts (activity_table act2autochess.modeDataDict), fallback when config.json is absent. */
 export const MODE_TEXT = {
@@ -363,10 +372,12 @@ function AchievementCard({ onOpen }) {
   useData('config'); useData('assets');
   const cfg = data.get('config');
   const statsOpen = useStatsOpen();
+  // the LV of the season shown (DESIGN §35.23: 第一期's records count toward 第一期's levels)
+  const season = useStore((s) => seasonOf(lobbyVersion(s)));
   const { prog, trophies } = useMemo(() => {
-    const records = peekStatsRecords();
+    const records = recordsOfSeason(peekStatsRecords(), season);
     return { prog: levelProgress(records, { counted: false, rewards: cfg?.rewards }), trophies: aggregateStats(records).trophies };
-  }, [cfg, statsOpen]);
+  }, [cfg, statsOpen, season]);
   const lv = levelOf(prog.before, cfg?.rewards?.milestones);
   const medal = trophyMedalOf(trophies, cfg?.trophies?.medals);
   return html`<button type="button" class="hub-ach" onClick=${onOpen} title=${t('成就统计（本机记录）')}>
@@ -464,10 +475,13 @@ function HubRadar() {
 function HubTitle() {
   // a title in an alphabetic script (English …) is set like the title screen's: no wordmark above it, ": " between
   const alphabetic = scriptOf(t('卫戍协议')) === 'alphabetic';
+  // another official version (DESIGN §35.23): its name under the title
+  const version = useStore(lobbyVersion);
   return html`<div class="hub-center">
     <div class="hub-center__mark"><${HubRadar} /><${Sprite} k="entry/season_logo" class="hub-center__logo" fallback=${html`<${Emblem} />`} /></div>
     ${alphabetic ? null : html`<div class="hub-center__en">STRONGHOLD PROTOCOL <b>ALLIANCE</b></div>`}
     <h1 class=${`hub-center__title${alphabetic ? ' hub-center__title--latin' : ''}`}>${t('卫戍协议')}<span>${alphabetic ? ': ' : '：'}</span><em>${t('盟约')}</em></h1>
+    ${version !== DEFAULT_VERSION ? html`<div class="hub-center__ver" data-testid="hub-version">· ${versionLabel(version)}</div>` : null}
   </div>`;
 }
 
@@ -496,7 +510,8 @@ function BackPlate({ onClick, class: cls = '' }) {
  * replacing the button's label and the hint (the host's 确认), or `readOnly` — the cards shown, not chosen, and no
  * button (the other doctors: the host chooses).
  */
-export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, onCreate, busy, online, testMode, asTest, onTest, action = null, hint = null, readOnly = false }) {
+export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, onCreate, busy, online, testMode, asTest, onTest, action = null, hint = null, readOnly = false,
+  difficulties = DIFFICULTIES, loading = false, failed = false }) {
   const card = MODE_CARDS.find((c) => c.id === roomMode) || MODE_CARDS[0];
   const info = difficultyInfo(roomMode, difficulty);
   const label = action || (roomMode === 'solo' ? t('开始独立模拟') : t('创建同盟'));
@@ -525,8 +540,11 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
           </div>
         </section>
         <section class="proto-side">
-          <div class="proto-list" role="group" aria-label=${t('模拟难度')}>
-            ${DIFFICULTIES.map((d) => html`<${DifficultyCard} key=${d} roomMode=${roomMode} difficulty=${d} selected=${difficulty === d} onSelect=${onDifficulty} disabled=${readOnly} />`)}
+          <div class="proto-list" role="group" aria-label=${t('模拟难度')} aria-busy=${loading ? 'true' : 'false'}>
+            ${failed ? html`<p class="proto-list__wait is-failed" data-testid="proto-failed"><${Icon} name="warn" />${t('版本数据校验失败')}
+                <${Button} size="sm" variant="secondary" data-testid="proto-retry" onClick=${retryContentSet}>${t('重试')}<//></p>`
+              : loading ? html`<p class="proto-list__wait" data-testid="proto-loading"><${Spinner} size="sm" />${t('正在载入版本数据…')}</p>` : null}
+            ${difficulties.map((d) => html`<${DifficultyCard} key=${d} roomMode=${roomMode} difficulty=${d} selected=${difficulty === d} onSelect=${onDifficulty} disabled=${readOnly || loading} />`)}
           </div>
           ${readOnly ? html`<div class="proto-foot proto-foot--ro">
             <p class="proto-hint proto-hint--ro"><${Icon} name="info" />${hint || t('由创建者选择')}</p>
@@ -541,7 +559,7 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
                 ? hint ?? (roomMode === 'solo' ? t('创建后即可开始模拟') : t('创建后可邀请好友或添加 AI 队友'))
                 : html`<${Spinner} size="sm" label="CONNECTING" /> ${t('正在连接服务器…')}`}
             </p>
-            <button type="button" class="proto-start" disabled=${!online || busy === 'create'} aria-busy=${busy === 'create' ? 'true' : 'false'} onClick=${onCreate}>
+            <button type="button" class="proto-start" disabled=${!online || busy === 'create' || loading} aria-busy=${busy === 'create' ? 'true' : 'false'} onClick=${onCreate}>
               <span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>STRONGHOLD<br />PROTOCOL</small></span>
               <span class="proto-start__label">${busy === 'create' ? html`<${Spinner} size="sm" />` : null}${label}</span>
               <span class="proto-start__deco" aria-hidden="true"></span>
@@ -649,6 +667,18 @@ export function LobbyScreen() {
 
   const online = conn.status === 'online';
   const codeOk = CODE_RE.test(code);
+  // official versions (DESIGN §35.23): the lobby's version, the difficulties it offers and the one shown — the remembered
+  // one, or the server's fallback when the version lacks it (the pref is only overwritten when the player picks)
+  const versions = useStore((s) => s.versions);
+  const version = useStore(lobbyVersion);
+  const versionLoading = useStore((c) => version !== DEFAULT_VERSION && (c.kind !== 'version' || c.version !== version || c.status !== 'ready'), Object.is, contentSet);
+  // its set failed to load or its check (the chip's 重试 sits under the modal): 选择模拟协议 says so and offers 重试 too
+  const versionFailed = useStore((c) => version !== DEFAULT_VERSION && c.kind === 'version' && c.version === version && c.status === 'failed', Object.is, contentSet);
+  const cfg = getConfig();
+  const solo = offeredDifficulties(versionLoading ? null : cfg, 'solo');
+  const coop = offeredDifficulties(versionLoading ? null : cfg, 'coop');
+  const shownSolo = fallbackDifficulty(solo, difficulty);
+  const shownCoop = fallbackDifficulty(coop, difficulty);
 
   const openMode = (m) => { if (m === 'solo') setSoloOpen(true); else setAllyOpen(true); };
   const pickDifficulty = (d) => { setDifficulty(d); savePref('lobby.difficulty', d); };
@@ -664,8 +694,9 @@ export function LobbyScreen() {
     }
   };
   // 独立模拟: at the difficulty picked on 选择模拟协议; 创建同盟: at the remembered one, changed in the room by the host
+  // (`version`: the lobby's, only on a server that enables versions — protocol §4; a default server's message is unchanged)
   const create = (mode) => run('create', () => net.request('room.create', {
-    mode, difficulty, ...(testMode && asTest ? { test: true } : {}),
+    mode, difficulty: mode === 'solo' ? shownSolo : shownCoop, ...(testMode && asTest ? { test: true } : {}), ...(versions ? { version } : {}),
   }));
   const join = (c = code) => {
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
@@ -714,6 +745,7 @@ export function LobbyScreen() {
         </div>
       </div>
       <div class="topbar__right">
+        <${VersionSwitch} />
         <${ResumeMatchButton} />
       </div>
     </header>
@@ -735,13 +767,13 @@ export function LobbyScreen() {
       </section>
     </main>
 
-    ${allyOpen ? html`<${AllianceSelect} onClose=${() => setAllyOpen(false)} onCreate=${() => create('coop')} difficulty=${difficulty}
+    ${allyOpen ? html`<${AllianceSelect} onClose=${() => setAllyOpen(false)} onCreate=${() => create('coop')} difficulty=${shownCoop}
       code=${code} onCode=${(v) => setCode(normalizeCode(v))} codeOk=${codeOk} online=${online} busy=${busy}
       onJoin=${join} onSpectate=${spectate} recent=${recent} marks=${marks} focusKey=${!coarse}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} short=${shortScreen} />` : null}
-    ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${difficulty} onDifficulty=${pickDifficulty}
+    ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
-      testMode=${testMode} asTest=${asTest} onTest=${setAsTest} />` : null}
+      testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed} />` : null}
     ${sweepOpen ? html`<${SweepReport} onClose=${() => setSweepOpen(false)} />` : null}
     ${achOpen ? html`<${AchievementDialog} onClose=${() => setAchOpen(false)} />` : null}
   </div>`;

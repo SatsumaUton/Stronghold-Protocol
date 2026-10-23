@@ -1178,3 +1178,9 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .pcard.is-on .pcard__ring path { stroke-dashoffset: 0; }
   .proto__body::after, .ally__body::after { display: none; }
 }
+
+/* official versions (DESIGN §35.23): the version under the title, the cards' wait while a version's data loads */
+.hub-center__ver { position: relative; margin-top: .04rem; font-size: calc(.22 * var(--t)); font-weight: 700; letter-spacing: .08em; color: #9fd3ff; text-shadow: 0 1px .08rem rgba(0, 0, 0, .85); overflow-wrap: anywhere; }
+.proto-list__wait { display: flex; align-items: center; gap: .08rem; margin: 0; color: var(--text-lo); font-size: calc(.15 * var(--t)); }
+.proto-list__wait.is-failed { flex-wrap: wrap; color: var(--amber); }
+.proto-list__wait.is-failed .icon { flex: none; width: 1.1em; height: 1.1em; }

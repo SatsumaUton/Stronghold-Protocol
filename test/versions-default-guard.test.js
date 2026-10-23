@@ -1,29 +1,20 @@
 // test/versions-default-guard.test.js — the default version (第二期下半, act2autochess) stays exactly as it was before
 // the official version switch (DESIGN §35.22.2, docs/DATA.md "Official versions (M0)"). The fixture
 // test/fixtures/versions-default-guard.json pins:
-//   G1  the sha256 of every tracked default data file (top-level data/*.json and data/i18n/*.json, never data/versions/)
-//       and of the golden corpus test/golden/*.json — the M0 merge check: it proves the M0 commits moved neither, and
-//       is deleted when M1 starts (DESIGN §35.22.2; afterwards test/golden.test.js and test/data.test.js guard them). Until
-//       then an intended golden update or data rebuild also refreshes the fixture (test/golden/README.md). The hashes are
-//       db8e226d's: when the base M0 merges into has moved a pinned file since (the 0.3.2 integration branch's §35.19
-//       assets and goldens), G1 fails on the merged tree. Then, with <m0> the M0 branch tip, (1) check that
-//       git diff $(git merge-base <base> <m0>) <m0> -- ':(glob)data/*.json' ':(glob)data/i18n/*.json' ':(glob)test/golden/*.json'
-//       (exactly the files G1 pins) is empty, (2) run node tools/golden.mjs on the merged tree, and only then (3)
-//       regenerate with SP_UPDATE_GUARD=1 in the merge commit, naming the base's changes (DESIGN §35.22.2)
 //   G2  the default config.json has no `version`, and cs reads exactly the top-level gameplay files
 //   G3  the cs formula (known-answer vectors of shared/plugins/identity.js), not the vanilla cs itself, which changes with
 //       any code change (server/plugins/identity.js)
 //   G4  a fresh co-op/NORMAL room's room.state (code, ids, name and content.cs normalised) and a welcome without
 //       `versions`
-// G2–G4 stay. An intended change of the default must regenerate the fixture on purpose and say why in the commit:
+// G1 (the sha256 of every tracked default data file and of the golden corpus) was the M0 merge check; it was deleted when
+// M1 started (DESIGN §35.22.2, §35.23): test/golden.test.js and test/data.test.js guard the data and the goldens now.
+// An intended change of the default must regenerate the fixture on purpose and say why in the commit:
 //   SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { CONTENT_HASH_VERSION, contentHashOf, simHashOf } from '../shared/plugins/identity.js';
@@ -41,23 +32,6 @@ const HOW = 'an intended change of the default version must regenerate test/fixt
 /** The gameplay data files of the default version (gameplayDataFiles: data/*.json without the presentation files). */
 const GAMEPLAY = ['backups', 'bands', 'bonds', 'bosses', 'chess', 'choices', 'config', 'effects', 'enemies', 'factions',
   'garrisons', 'items', 'stages', 'tokens', 'tuning', 'waves'];
-
-const sha = (abs) => createHash('sha256').update(fs.readFileSync(abs)).digest('hex');
-const isDefaultData = (rel) => /^data\/[^/]+\.json$/.test(rel) || /^data\/i18n\/[^/]+\.json$/.test(rel);
-
-/**
- * The tracked default data files: `git ls-files data` filtered to data/*.json and data/i18n/*.json (never data/versions/,
- * never the per-machine local-assets.json / local-fx.json, which are not tracked). Null without git (a release or Docker
- * checkout): the fixture's list is used instead.
- */
-function trackedDataFiles() {
-  const r = spawnSync('git', ['ls-files', 'data'], { cwd: ROOT, encoding: 'utf8' });
-  if (r.status !== 0 || !r.stdout.trim()) return null;
-  return r.stdout.split('\n').map((s) => s.trim()).filter(isDefaultData).sort();
-}
-
-const goldenFiles = () => fs.readdirSync(path.join(ROOT, 'test', 'golden')).filter((f) => f.endsWith('.json')).sort()
-  .map((f) => `test/golden/${f}`);
 
 /** A fresh co-op/NORMAL room's room.state and the host's welcome, on the default data. */
 async function freshRoom() {
@@ -100,13 +74,9 @@ const KAT = {
 
 if (UPDATE) {
   test('regenerate the default-version guard fixture', async () => {
-    const files = trackedDataFiles();
-    assert.ok(files, 'git is needed to regenerate the fixture');
     const { welcome, state } = await freshRoom();
     const fixture = {
       _: `Default-version guard (test/versions-default-guard.test.js); ${HOW}.`,
-      data: Object.fromEntries(files.map((f) => [f, sha(path.join(ROOT, f))])),
-      golden: Object.fromEntries(goldenFiles().map((f) => [f, sha(path.join(ROOT, f))])),
       kat: { cs: KAT.cs, sim: KAT.sim, contentHashVersion: CONTENT_HASH_VERSION },
       roomState: normaliseState(state, welcome),
     };
@@ -114,19 +84,6 @@ if (UPDATE) {
   });
 } else {
   const fixture = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
-
-  test('G1 (until M1): the tracked default data files are byte-identical', () => {
-    const tracked = trackedDataFiles();
-    const names = Object.keys(fixture.data).sort();
-    assert.ok(names.length > 0, 'the fixture pins the default data files');
-    if (tracked) assert.deepEqual(tracked, names, `the tracked default data files changed; ${HOW}`);
-    for (const f of names) assert.equal(sha(path.join(ROOT, f)), fixture.data[f], `${f} changed; ${HOW}`);
-  });
-
-  test('G1 (until M1): the golden corpus is unchanged', () => {
-    assert.deepEqual(goldenFiles(), Object.keys(fixture.golden).sort(), `the golden files changed; ${HOW}`);
-    for (const [f, h] of Object.entries(fixture.golden)) assert.equal(sha(path.join(ROOT, f)), h, `${f} changed; ${HOW}`);
-  });
 
   test('G2: the default config has no version and cs reads exactly the gameplay files', () => {
     const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'config.json'), 'utf8'));
