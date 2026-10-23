@@ -125,6 +125,19 @@ skips the original picker's RNG draw). Regenerate both comparison runs with this
 Keep seeds, difficulty and rehearsal counts
 identical in comparisons; use `--jobs 1` for timing, since parallel load inflates the timings.
 
+终极 (ABYSS) is the hard target for both kinds of seat (history §35.62): compare with
+`node tools/botbench.mjs --configs solo:ABYSS,coop4:ABYSS --seeds 20 --seed 1 --json …`, and keep FUNNY / NORMAL /
+HARD from getting worse (`--configs solo:FUNNY,solo:NORMAL,solo:HARD,coop4:FUNNY,coop4:NORMAL,coop4:HARD --seeds 10`).
+A win is clearing the round-14 Final Assault (`victory`); round 15 is the optional Hidden Core. An `external` seat in
+plan mode runs the legacy executor with the plan's weights, so a legacy change moves plan seats too: since §35.62 the
+plan's primary core bond is legacy's focus, and legacy lineups can field a 6-member core bond.
+Since §35.63 legacy also levels to L5 at R9 and L6 at R11, trades 获得时 layer units (`tradeOnce`), commits to a
+6-member core (`coreGap`), values a healer from R5 and spends expiring funds on refreshes (`spendDown`). Since §35.64
+a boss round rehearses the same layout variants against the already-planned wave, on `deriveSeed(0xA11CE, fa:round:seat)`,
+for the visible countdown (`faRehearsalTicks`); counted leaks still rank first. 终极 needs 100
+seeds per mode to separate such rules from noise (seeds 1–40 to develop, the rest to check), and a per-match "share of
+the leader pool" (0 before the Final Assault, 1 for a win) moves long before the win count does.
+
 The match harness accepts `botStrategy` objects, so an implementation can be tested before registration. See
 [`bot-strategies.test.js`](../test/match/bot-strategies.test.js) for real draft, sliced prep, personal-choice and
 failure-cleanup tests; the existing delegated-rehearsal tests exercise the unchanged default path. Test legal actions

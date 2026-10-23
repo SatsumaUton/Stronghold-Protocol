@@ -305,7 +305,12 @@ prefer allied estimated DPS not already covered by another placed medic, then ti
 **Rehearsal:** with `opts.botRehearsal = N` (default 3) the bot simulates the N best
 distinct layout variants once each with the real `Battle` and `Match._normalOpts`, including `onBattleStart`, enemy
 replacements, teammate effects and in-battle layer gains. [ASSUMED] Every candidate uses the normal field seed (#315)
-and its own clone of the current meta RNG. `previewPlayer` builds a detached candidate board/hand/bonds view without
+and its own clone of the current meta RNG. A boss round (`m.wave` null, `bossGroupOf` already planned) rehearses the
+same variants on that wave: seed `deriveSeed(0xA11CE, fa:${round}:${seat})` — not the match seed and not the live
+fight's seed — a fresh `bossPoolHp` pool per candidate, the teammate's current board, preview dispatch only, and a
+cap of the visible countdown on the combat clock (`faRehearsalTicks`: `bossLevelTime` × `combatTimeScale` game
+seconds; history §35.64). Counted leaks still rank first; `perPlayer.bossDamage` breaks a leak tie.
+`previewPlayer` builds a detached candidate board/hand/bonds view without
 calling live `recompute`; the original pieces, directions, hand/temp and dirty flags never change, even at a yield.
 The preview dispatcher supplies copied read results, no-op state writers, isolated teammate/player contexts and a
 local script budget; errors stay out of match diagnostics, and preview results never reach settlement. Actual starts

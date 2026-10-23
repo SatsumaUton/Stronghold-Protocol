@@ -41,7 +41,7 @@ export class MatchRehearsal {
    * @returns {null | ReturnType<typeof createDelegatedRehearsalJob>} the job to drive, or null when the server should
    *   rehearse the candidates itself (delegation off, no host to ask, or the frame could not be sent)
    */
-  delegateRehearsal({ ps, chosen, plans, inputs }) {
+  delegateRehearsal({ ps, chosen, plans, inputs, cap = null }) {
     if (!this.botRehearsalDelegate || this.disposed || this.ended) return null;
     // A gameplay-plugin room (requireCs) runs in a match host on that room's content set. The host browser only has
     // the official data pack and must not load the room's scripts or spend a different script budget, so the server
@@ -54,7 +54,7 @@ export class MatchRehearsal {
     if (!ps.isBot) return null;
     const host = this.hostId ? this.players.get(this.hostId) : null;
     if (!host || host.isBot || host.left || !host.connected) return null;
-    const job = createDelegatedRehearsalJob(this, ps, chosen, plans, inputs);
+    const job = createDelegatedRehearsalJob(this, ps, chosen, plans, inputs, cap);
     const task = {
       // protocol ids are ≤ 64 chars (shared/protocol.js isId): prefix, round, seat and a per-match counter
       id: `${this.battlePrefix}.${this.round}.${ps.seat}.${++this._rehearsalSeq}`,

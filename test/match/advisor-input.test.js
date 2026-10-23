@@ -68,7 +68,13 @@ test('band draft returns at most eight uncontended community directions; prep co
   const draft = strategyCandidates(book, open).candidates;
   assert.equal(draft.length, 8);
   assert.equal(new Set(draft.map(c => c.band)).size, draft.length);
-  for (const id of ['band_pepe', 'band_paganini', 'band_clementia', 'band_harold']) assert.ok(draft.some(c => c.band === id), id);
+  for (const id of ['band_pepe', 'band_clementia', 'band_mlynar']) assert.ok(draft.some(c => c.band === id), id);
+  // §35.62: one slot keeps the best direction of a band without a community main (the sturdiest opening, 45 LP).
+  const community = new Set(book.bands.filter(b => b.communityMain).map(b => b.id));
+  const sturdy = draft.filter(c => !community.has(c.band));
+  assert.equal(sturdy.length, 1);
+  assert.equal(book.bands.find(b => b.id === sturdy[0].band).lp, Math.max(...book.bands.map(b => b.lp)));
+  assert.ok(draft.every(c => Number.isFinite(c.scoreParts.survival)));
   const contended = strategyCandidates(book, { ...open, opponents: [{ playerId: 'other', bandId: 'band_duyaoy', bonds: [], board: [] }] }).candidates;
   assert.ok(contended.every(c => c.main !== 'yanShip'));
   const prep = strategyCandidates(book, { playerId: 'self', round: 4, band: { id: 'band_duyaoy' }, availability: {},

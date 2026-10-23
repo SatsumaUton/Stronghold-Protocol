@@ -193,7 +193,8 @@ These placement assumptions are tracked in [issue #315](https://github.com/sgang
 then any legal fallback when neither exists (#577). The supported-road test is the same as the guard repair above:
 every incoming ground route needs an ally covering both the medic's tile and its preceding contact tile; different
 routes may use different allies, and healing never counts as fire support. Within each preference group the existing
-exposure score chooses the tile. On boss rounds (no rehearsal), wider healing ranges are placed first; equal exposure
+exposure score chooses the tile. On boss rounds the planner still places wider healing ranges first; the last
+arrangement of the prep rehearses those layout variants against the already-planned boss wave (§35.64). Equal exposure
 scores prefer estimated allied DPS **not already covered by a previously placed medic**, before the tile-noise tie-break.
 
 [ASSUMED] Purchase scores within `1e-9` tie in favour of the cheaper offer; genuine score advantages still win.
@@ -202,7 +203,11 @@ BOARD_AND_DECK members withdrawn from the board only while hand slots remain, in
 (withdrawals before deployments). A purchase reserves its own hand slot first; members forced to be sold do not count.
 
 [ASSUMED] Layout rehearsals use normal battle inputs and the normal field seed, including battle-start effects,
-enemy replacements, teammate effects and in-battle layer gains. Each candidate uses an independent copy of the current
+enemy replacements, teammate effects and in-battle layer gains. A Final Assault / Hidden Core rehearsal uses the wave
+`startRound` already planned, an independent seed `deriveSeed(0xA11CE, fa:round:seat)` (not the match seed and not the
+live fight's seed), a fresh boss pool per candidate, the teammate's currently deployed board, and the visible
+countdown on the combat clock (`bossLevelTime` real seconds × `combatTimeScale`, 240 game seconds when the data
+says 120; §35.64). Counted leaks still rank first; leader damage breaks a leak tie (#315). Each candidate uses an independent copy of the current
 meta RNG. Candidate boards and events are detached; preview contexts expose copied reads and no-op state writers,
 including contexts reached through teammates/player. A separate dispatcher owns the preview script budget and drops
 preview errors; no live script quota, diagnostics or settlement is affected. Actual starts retain the original RNG

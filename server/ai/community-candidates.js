@@ -2,6 +2,21 @@
 // Official mechanics and the maintainer-supplied sources/disagreements stay in the versioned playbook.
 const unique = xs => [...new Set(xs)];
 const cheap = (a, b) => a.tier - b.tier || a.cost - b.cost || a.id.localeCompare(b.id);
+// §35.62 [ASSUMED]: 26 LP is the median band; each LP above it is one more leaked enemy (R5–R13) or one more second of
+// Final Assault overtime. Measured on ABYSS: 23–24 LP picks died before the FA where legacy's 25–45 LP picks arrived (seeds 4–6).
+export const survivalScore = band => Number.isFinite(band?.lp) ? +((band.lp - 26) * 1.5).toFixed(2) : 0;
+
+// §35.63 [ASSUMED]: what the main brings to the round-14 leader fight: a core bond that can field its top threshold
+// (6 distinct members at L5-L6), a damage multiplier sub (灵巧 / 奥术 / 精准, RESEARCH §1.6) among its community pairs,
+// and a community counter to the announced boss (strategy-community.js bossCounters, from R3 the boss is public).
+const MULTIPLIERS = ['skillfulShip', 'arcaneShip', 'preciShip'];
+export function finalAssaultScore(playbook, main, members, preferred, profile) {
+  if (!main.core) return 0;
+  const top = main.thresholds[main.thresholds.length - 1]?.count ?? 0;
+  const bossKey = playbook.bosses.find(b => b.id === profile.boss)?.enemyKey;
+  const counter = (playbook.community.bossCounters || []).some(e => e.bonds.includes(main.id) && bossKey && bossKey.startsWith(e.enemyKey));
+  return (top >= 5 && members.length >= top ? 6 : 0) + (preferred.some(id => MULTIPLIERS.includes(id)) ? 3 : 0) + (counter ? 8 : 0);
+}
 
 export function communityCandidates(book, digest, { operators, disabled, held, teammates, bands, profile, previousMain }) {
   const all = [], draft = (digest.actions || []).filter(a => a.intent.t === 'g.band');
@@ -34,8 +49,9 @@ export function communityCandidates(book, digest, { operators, disabled, held, t
       if (book.community.roles.some(r => r.band === band.id)) continue; // Preserve the explicit safety-net/supplier policy.
       // [ASSUMED] Specific actionable recipes compete with generic variants, but lose priority to public
       // contention and missing counters. These weights are not measured win-rate or official balance claims.
-      const scoreParts = { recipe: 22, engine: band.bondIds.includes(main) ? 16 : 0,
+      const scoreParts = { recipe: 22, survival: survivalScore(band), engine: band.bondIds.includes(main) ? 16 : 0,
         community: band.communityMain?.main === main ? 8 : 0,
+        finalAssault: finalAssaultScore(book, bond, operators.filter(c => c.bonds.includes(main)), build.subs, profile),
         progress: Math.min(5, members.filter(m => held.has(m.id)).length) * 5,
         continuity: previousMain === main ? 14 : 0,
         access: -2 * Math.max(0, minimumShopLevel - (digest.economy?.level || 1)),
