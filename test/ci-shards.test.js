@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { ROOT, TEST_FILES } from '../tools/ci.mjs';
 import { MAX_IMBALANCE, SHARD_COUNT, TABLE, assignShards, loadTable, shardsOf, testFileList } from '../tools/ci-shards.mjs';
 import { perFileMs } from '../tools/test-timings.mjs';
@@ -80,4 +81,18 @@ test('the command line: --print <n> is that shard\'s list, a shard number outsid
   const bad = spawnSync(process.execPath, ['tools/ci-shards.mjs', '--run', '9'], { cwd: ROOT, encoding: 'utf8' });
   assert.equal(bad.status, 2);
   assert.match(bad.stderr, /shard number 0\.\.3/);
+});
+
+
+test('reweighing refuses a report without file attribution and leaves the table untouched', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-shard-report-'));
+  const before = fs.readFileSync(path.join(ROOT, TABLE));
+  try {
+    const report = path.join(dir, 'report.xml');
+    fs.writeFileSync(report, '<testsuites><testcase name="unattributed" time="3"/></testsuites>');
+    const result = spawnSync(process.execPath, ['tools/ci-shards.mjs', '--write', '--timings', report], { cwd: ROOT, encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /no usable/);
+    assert.deepEqual(fs.readFileSync(path.join(ROOT, TABLE)), before);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

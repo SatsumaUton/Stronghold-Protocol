@@ -125,6 +125,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     }
     const old = loadTable();
     const fresh = perFileMs(fs.readFileSync(report, 'utf8'), ROOT);
+    if (!Object.keys(fresh).length) {
+      console.error(`${report}: no usable <testcase file="…"> timings; table unchanged`);
+      process.exit(1);
+    }
     const known = new Set(testFileList());
     // a file the report does not mention keeps its old weight: a partial report must not silently re-weigh the rest
     const measured = Object.fromEntries([...known].sort().map((f) => [f, fresh[f] ?? old.measured[f] ?? old.defaultMs]));
