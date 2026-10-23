@@ -21,6 +21,7 @@
 // cancels whatever is left (Match._cancelRehearsal), and the deadline stays the phase's own.
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
+import { DEFAULT_VERSION } from '../../../shared/versions.js';
 import { buildBattleSpec } from '../../sim/spec.js';
 import { createDelegatedRehearsalJob } from '../bot.js';
 import { morphBattleOpt } from '../../../shared/plugins/rules.js';
@@ -92,37 +93,38 @@ export class MatchRehearsal {
    * @returns {null | ReturnType<typeof createDelegatedRehearsalJob>} the job to drive, or null when the pool cannot take
    *   it and the caller should rehearse locally
    */
-  poolRehearsal({ ps, chosen, plans, inputs }) {
+  poolRehearsal({ ps, chosen, plans, inputs, cap = null, limits = null }) {
     const pool = this.simPool;
     if (!pool || this.disposed || this.ended) return null;
     if (!Array.isArray(inputs) || inputs.length < 2) return null;
     // a gameplay-plugin room's content set does not reach a worker thread: the worker builds its Battle from the
     // official data pack, so the candidates must be built on this thread's own DataSource (same rule as delegation)
-    if (this.requireCs) return null;
-    const job = createDelegatedRehearsalJob(this, ps, chosen, plans, inputs);
+    if (this.requireCs || (this.version && this.version !== DEFAULT_VERSION)) return null;
+    const job = createDelegatedRehearsalJob(this, ps, chosen, plans, inputs, cap, limits);
     const task = {
       id: `${this.battlePrefix}.${this.round}.${ps.seat}.${++this._rehearsalSeq}`,
       job, executor: null, timer: null, cancel: null, kind: 'pool',
     };
     // the candidates as the worker takes them: the same battle options the local run would build from, with the room's
     // content and rule options, so the pool and this thread simulate the same battles
-    const options = inputs.map((o) => ({ ...o, content: this.battleContent, ...morphBattleOpt(this.rules) }));
     let handle;
     try {
-      handle = pool.submit('rehearsal', { options, playerId: ps.playerId, cap: job.cap });
+      const specs = inputs.map((o) => buildBattleSpec({ ...o, content: this.battleContent, ...morphBattleOpt(this.rules) }));
+      handle = pool.submit('rehearsal', { specs, playerId: ps.playerId, cap: job.cap, ...(limits ? { limits } : {}) });
     } catch {
       return null; // a pool that cannot even accept the task: local run, as if it did not exist
     }
     if (!handle || !handle.promise) return null;
     task.cancel = () => { try { handle.cancel(); } catch { /* already settled */ } };
     this._rehearsalTasks.set(task.id, task);
+    pool.assign?.(this.roomCode);
     this.rehearsalPoolStats.pooled++;
     const settle = (wanted) => {
       if (this._rehearsalTasks.get(task.id) !== task) return; // cancelled with the prep: nothing to apply
       this._dropRehearsalTask(task);
       if (!job.pending) return;
       const index = wanted();
-      if (Number.isInteger(index) && index >= 0 && index < plans.length) {
+      if (Number.isInteger(index) && index >= 0 && index < inputs.length) {
         job.accept(index);
         this.rehearsalPoolStats.accepted++;
       } else {
@@ -135,7 +137,7 @@ export class MatchRehearsal {
       if (job.onSettled) job.onSettled();
     };
     handle.promise.then(
-      (value) => settle(() => (value && value.bestIndex)),
+      (value) => settle(() => { job.stats = value?.stats || null; return value?.bestIndex; }),
       () => settle(() => null),
     );
     return job;
@@ -211,6 +213,7 @@ export class MatchRehearsal {
     if (task.timer) { this.cancel(task.timer); task.timer = null; }
     // a pool task is cancelled at the pool (its thread is told to stop stepping), a delegated one on its host
     if (task.kind === 'pool') {
+      if (![...this._rehearsalTasks.values()].some((other) => other.kind === 'pool')) this.simPool?.release?.(this.roomCode);
       if (task.cancel) { try { task.cancel(); } catch { /* the pool already settled it */ } task.cancel = null; }
       return;
     }

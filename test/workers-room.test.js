@@ -124,8 +124,8 @@ test('the pool picks exactly the candidate the main thread picks, from the same 
   const prep = capturedPrep();
   const pool = new RoomWorkerPool({ data: DATA, totalWorkers: 2, maxQueue: 8 });
   t.after(() => pool.close());
-  const value = await pool.assign('room:A').submit('rehearsal', {
-    options: prep.inputs, playerId: prep.playerId, cap: prep.cap,
+  const value = await pool.submit('rehearsal', {
+    specs: prep.inputs.map((o) => buildBattleSpec(o)), playerId: prep.playerId, cap: prep.cap,
   }).promise;
   assert.equal(typeof value.bestIndex, 'number');
   assert.equal(value.bestIndex, prep.pick, `the pool must pick ${prep.pick}, picked ${value.bestIndex}`);
@@ -167,4 +167,36 @@ test('the simulation worker loads with the real module graph (a wrong export nam
   } finally {
     await worker.terminate();
   }
+});
+
+
+test('boss specs cross the real pool, preserve the cap and obey adaptive tick limits', async (t) => {
+  const pool = new RoomWorkerPool({ data: DATA, totalWorkers: 1 });
+  t.after(() => pool.close());
+  const { SharedBossPool } = await import('../server/match/finalAssault.js');
+  const sharedBoss = new SharedBossPool(1000000);
+  const spec = buildBattleSpec({ kind: 'boss', seed: 42, modeId: 'mode_single_normal', round: 14,
+    timeLimit: Infinity, players: [{ playerId: 'p_0', side: 'L', colOffset: 0 }], spawns: [], routes: [],
+    sharedBoss, boss: { poolHp: sharedBoss.hp, poolMax: sharedBoss.maxHp }, flags: {} });
+  assert.equal(spec.sharedBoss, undefined);
+  assert.ok(spec.boss.poolHp > 0);
+  for (const limits of [null, { stage: 3, tickBudget: 2 }]) {
+    const cap = 7, specs = [spec, spec];
+    const local = new RehearsalRun(specs.map((s) => () => createBattleFromSpec(s, new DataSource(DATA, null))), 'p_0', cap, limits || {});
+    local.run();
+    const got = await pool.submit('rehearsal', { specs, playerId: 'p_0', cap, limits }).promise;
+    assert.equal(got.bestIndex, local.score.index);
+    assert.equal(got.stats.totalTicks, local.totalTicks);
+    assert.ok(local.totalTicks > 0, 'the boss actually steps under the supplied limits');
+    assert.equal(got.stats.completed, local.completed);
+    assert.ok(got.stats.totalTicks <= (limits?.tickBudget || 2 * cap));
+  }
+  const threadId = pool.stats().memory[0].threadId;
+  const pending = pool.submit('rehearsal', { specs: [spec], playerId: 'p_0', cap: 1e9 });
+  const rejected = assert.rejects(pending.promise, { code: 'TASK_CANCELLED' });
+  await delay(20);
+  pending.cancel();
+  await rejected;
+  await pool.submit('rehearsal', { specs: [spec], playerId: 'p_0', cap: 1 }).promise;
+  assert.equal(pool.stats().memory[0].threadId, threadId, 'cooperative cancellation reuses the worker');
 });

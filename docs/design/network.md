@@ -430,3 +430,6 @@ Attack pacing (PR #729): UnitInfo carries the actual attack interval in game sec
 phase and before projectiles carries changes; its baseline is seeded by birth info. The renderer looks ahead through
 the attack tick, including a rate later in that tick, without borrowing a later tick’s value. Its 0.2–6 second display
 window is [ASSUMED]; damage, attack timing and targeting are unchanged.
+
+Server rehearsal offload (§35.86) is opt-in via SP_WORKERS; plugin and historical-version match hosts retain their own
+data and execution. No socket or authoritative combat operation moves to this pool.

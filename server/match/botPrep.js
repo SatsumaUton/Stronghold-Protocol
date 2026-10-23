@@ -12,7 +12,7 @@ export function createPrepSteps(actions, { maxRefreshes, arrangeBeforeLevel = fa
   for (const key of Object.keys(actions)) if (!REQUIRED.includes(key)) throw new TypeError(`Unknown prep action: ${key}`);
   const ops = Object.freeze({ ...actions });
   return Object.freeze({
-    *prepBegin(m, ps, { delegate = false } = {}) {
+    *prepBegin(m, ps, { delegate = false, pooled = false } = {}) {
       if (!ps.alive || ps.ready) return null;
       m.autoPickPersonalChoice(ps, 'bot');
       ops.takeOffers(m, ps);
@@ -35,7 +35,7 @@ export function createPrepSteps(actions, { maxRefreshes, arrangeBeforeLevel = fa
       yield* ops.arrangeSteps(m, ps);
       ops.equipItems(m, ps);
       yield;
-      return yield* ops.arrangeSteps(m, ps, { final: true, defer: true, delegate });
+      return yield* ops.arrangeSteps(m, ps, { final: true, defer: true, delegate, pooled });
     },
     *prepEnd(m, ps, job = null) {
       if (!ps.alive || ps.ready) return;

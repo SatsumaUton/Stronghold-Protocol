@@ -45,7 +45,7 @@ test('prep keeps legacy action order, yield boundaries and delegated job identit
     ['buyLoopSteps', { fillOnly: true, maxRefreshes: 0 }], ['takeOffers', undefined], ['levelUp', undefined],
     ['buyLoopSteps', { fillOnly: false, maxRefreshes: 16 }], ['takeOffers', undefined], ['levelUp', { spare: true }],
     ['advisorSpendSteps'], ['spendDown', undefined], ['maybeFreeze', undefined], ['arrangeSteps'], ['equipItems', undefined],
-    ['arrangeSteps', { final: true, defer: true, delegate: true }],
+    ['arrangeSteps', { final: true, defer: true, delegate: true, pooled: false }],
   ]);
 });
 

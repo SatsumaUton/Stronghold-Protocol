@@ -1186,3 +1186,8 @@ map-independent formation candidates; `ioleta-adaptive` pairs that placement wit
 Match strategy handles AI and autoplay players. The fixed-three contact prefix extends to at most eight candidates
 when completed results still leak, under six strict tick caps. Full policy and inherited lifecycle:
 [BOT_STRATEGIES](BOT_STRATEGIES.md). Production LP and unite rules are unchanged.
+
+Optional server rehearsal pool (#756, §35.86): only default-version vanilla matches receive the pool.
+SP_WORKERS is unset by default. Host/process options never contain the pool object. Jobs carry BattleSpecs, the
+Final Assault cap and optional adaptive limits; failure resumes those same local candidates. Prep ending cancels
+pending work. The normal combat loop and authoritative results retain their existing execution path.

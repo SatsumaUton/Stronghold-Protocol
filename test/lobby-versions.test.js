@@ -640,8 +640,9 @@ test('seatSettings: a setting checked for another version keeps only the chess i
 
 test('startMatch: a version room plays in its version host (version + requireCs); a default room keeps today\'s opts', () => {
   const hosted = [];
-  const versionHosts = { create(cs, opts) { hosted.push([cs, opts]); return { hosted: true, start() {}, dispose() {} }; } };
+  const versionHosts = { create(cs, opts) { assert.equal(opts.simPool, undefined, "a live pool must not cross the match-host boundary"); hosted.push([cs, opts]); return { hosted: true, start() {}, dispose() {} }; } };
   const h = harness({ versionHosts, MatchClass: Rec });
+  h.lobby.simPool = { submit() { throw new Error("must not reach hosted versions"); } };
   const p = h.player('A');
   ok(h.lobby.create(p, { mode: 'solo', difficulty: 'NORMAL', version: 'act2autochess@V2_1' }));
   ok(h.lobby.contentReady(p, { cs: CS['act2autochess@V2_1'] }));
@@ -653,6 +654,7 @@ test('startMatch: a version room plays in its version host (version + requireCs)
   assert.equal(opts.cs, cs);
   assert.equal(Object.hasOwn(opts, 'kitted'), false, 'kitted only with gameplay plugins');
   assert.equal(opts.data, getVersionData('act2autochess@V2_1'));
+  h.lobby.simPool = null;
   const q = h.player('B');
   Rec.last = null;
   ok(h.lobby.create(q, { mode: 'solo', difficulty: 'NORMAL' }));

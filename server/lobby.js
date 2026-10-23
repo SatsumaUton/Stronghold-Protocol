@@ -1964,7 +1964,7 @@ export class Lobby {
         now: this.now,
         // the server's own simulation pool (server/workers/roomPool.js) for bot rehearsals, when the operator started
         // one: null keeps every rehearsal on this thread, exactly as before (Match.simPool / MatchRehearsal.poolRehearsal)
-        ...(this.simPool ? { simPool: this.simPool } : {}),
+        ...(!modded && !versioned && this.simPool ? { simPool: this.simPool } : {}),
         send: (playerId, msg) => (ctx.live ? this.matchSend(room, ctx, playerId, msg) : false),
         broadcast: (msg) => { if (ctx.live) this.matchBroadcast(room, ctx, msg); },
         onEnd: (summary) => this.onMatchEnd(room, ctx, summary),

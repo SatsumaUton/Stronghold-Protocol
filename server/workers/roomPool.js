@@ -29,6 +29,9 @@ export class RoomWorkerPool {
     return this.pool;
   }
 
+  /** Submit through the same object startServer passes to Match. */
+  submit(type, payload, options) { return this.pool.submit(type, payload, options); }
+
   /** How many keys a room's tasks can be told apart by: the pool itself does not. */
   has(key) { return this.rooms.has(String(key || '')); }
 

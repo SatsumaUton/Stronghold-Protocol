@@ -19,6 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PHASE } from '../../shared/constants.js';
+import { createBattleFromSpec } from '../../server/sim/spec.js';
 import { RehearsalRun } from '../../server/sim/rehearsal.js';
 import { makeMatch, checkInvariants } from './harness.js';
 
@@ -95,7 +96,7 @@ test('a prep rehearsal is submitted to the pool and its pick reaches the board',
   const h = play();
   const pool = stubPool(h, (payload) => {
     const run = new RehearsalRun(
-      payload.options.map((o) => () => h.m.newBattle(o, { preview: true })), payload.playerId, payload.cap,
+      payload.specs.map((spec) => () => createBattleFromSpec(spec, h.m.ds)), payload.playerId, payload.cap,
     );
     run.run();
     reference = run.score.index;
@@ -106,7 +107,7 @@ test('a prep rehearsal is submitted to the pool and its pick reaches the board',
 
   assert.ok(pool.submits.length > 0, 'the pool was handed the bot rehearsals');
   assert.equal(pool.submits[0].type, 'rehearsal');
-  assert.ok(Array.isArray(pool.submits[0].payload.options) && pool.submits[0].payload.options.length >= 2);
+  assert.ok(Array.isArray(pool.submits[0].payload.specs) && pool.submits[0].payload.specs.length >= 2);
   assert.ok(Number.isInteger(pool.submits[0].payload.cap) && pool.submits[0].payload.cap > 0);
   assert.equal(pool.received, pool.submits.length, 'every submitted task was answered');
   const stats = h.m.rehearsalPoolStats;
@@ -184,5 +185,21 @@ test('without a pool nothing is submitted anywhere and every rehearsal stays on 
   assert.deepEqual(h.m.rehearsalPoolStats, { pooled: 0, accepted: 0, fallbacks: 0 });
   assert.deepEqual(h.m.rehearsalStats, { delegated: 0, answered: 0, takeovers: 0 });
   assert.equal(h.m.errorCount, 0, h.logs.error.join('\n'));
+  h.m.dispose();
+});
+
+
+test('plugin and historical matches reject the default-data pool before building specs', () => {
+  const h = play();
+  let submitted = 0;
+  h.m.simPool = { submit() { submitted++; } };
+  const inputs = [{ get players() { throw new Error('must not serialize'); } }, {}];
+  const args = { ps: h.m.order[0], chosen: [], plans: [new Map(), new Map()], inputs };
+  h.m.requireCs = true;
+  assert.equal(h.m.poolRehearsal(args), null);
+  h.m.requireCs = false;
+  h.m.version = 'act1autochess';
+  assert.equal(h.m.poolRehearsal(args), null);
+  assert.equal(submitted, 0);
   h.m.dispose();
 });

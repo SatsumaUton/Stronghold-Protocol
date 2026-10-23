@@ -2164,7 +2164,7 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
     plans = yield* candidatePlans(m, ps, chosen, plans);
   }
   if ((defer || adaptive) && plans.length > 1) {
-    const limits = adaptive ? { stage: 3, tickBudget: 6 * rehearsalCap(m.wave?.timeLimit) } : null;
+    const limits = adaptive ? { stage: 3, tickBudget: 6 * (!m.wave && bossWaveOf(m, ps) ? faRehearsalTicks(m) : rehearsalCap(m.wave?.timeLimit)) } : null;
     const job = yield* createRehearsalSteps(m, ps, chosen, plans,
       { delegate, pooled, limits, candidateLimit: adaptive ? 8 : m.botRehearsal });
     if (!defer && job) job.run();
