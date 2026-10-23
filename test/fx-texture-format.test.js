@@ -95,6 +95,8 @@ from unittest.mock import patch
 import contextlib, extract
 with tempfile.TemporaryDirectory() as tmp:
     root = pathlib.Path(tmp)
+    # --game resolves recognizable client roots; bundle reads below remain mocked.
+    (root / 'ui' / 'autochess').mkdir(parents=True)
     images = {key: Image.new('RGBA', (128, 64), color) for key, color in
               (('spark', (60, 100, 180, 120)), ('glow', (180, 80, 60, 80)))}
     class Env:
