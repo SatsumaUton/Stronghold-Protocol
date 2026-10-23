@@ -82,6 +82,8 @@
 
 import { advisorPlan, planContains, planUnitWeight, planPlacementWeight, planBuyTarget, ownsElite } from './aiPlan.js';
 import { economyPlan, advisorWanted, advisorBanks, fundAdvisorPurchase, advisorFreezeTarget, advisorProtected, advisorSaleRank } from './aiEconomy.js';
+import { createPrepSteps } from './botPrep.js';
+import { refineFormationSteps } from './botFormationCandidates.js';
 import { ASPD_MIN } from '../sim/constants.js';
 import { rehearsalCap, RehearsalRun } from '../sim/rehearsal.js';
 import { deriveSeed } from '../sim/rng.js';
@@ -725,8 +727,8 @@ function climbLineup(m, ps, ctx, set0, bench0) {
 }
 
 /** buyScore with a fresh context (tests). */
-export function buyScoreOf(m, ps, id) {
-  return buyScore(m, ps, id, context(m, ps));
+export function buyScoreOf(m, ps, id, policy = null) {
+  return buyScore(m, ps, id, context(m, ps, policy));
 }
 
 /** Shop / reward score of acquiring one copy of chess `id` (0 = not worth it). */
@@ -762,7 +764,7 @@ function buyScore(m, ps, id, ctx) {
   // Humans and bots count equally; a single soft penalty still allows valuable own merges.
   if (c.tier >= 5 && !c.isGolden && !c.diyFor && m.pool.has(base) && m.alivePlayers().some((mate) =>
     mate !== ps && gd.bandBondIds(mate.bandId).some((b) => !gd.modeInactiveBonds.has(b) && c.bonds.includes(b)))) s -= 18;
-  return s;
+  return s + (ctx.policy?.buyBonus(m, ps, id, ctx) || 0);
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -1385,7 +1387,7 @@ function candidateOpts(m, ps, byUid, plan) {
  * `run(budgetMs)` steps until every candidate is done (false: still running); `done` is only true then, and `best`
  * is the winner — the default plan (`plans[0]`) while no candidate beat it.
  */
-export function createRehearsalJob(m, ps, chosen, plans, inputs, prebuilt = null, cap = null) {
+export function createRehearsalJob(m, ps, chosen, plans, inputs, prebuilt = null, cap = null, limits = null) {
   const ticks = Number.isFinite(cap) ? cap : rehearsalCap(m.wave && m.wave.timeLimit);
   let run = null;
   const held = prebuilt ? prebuilt.slice() : null;
@@ -1393,10 +1395,10 @@ export function createRehearsalJob(m, ps, chosen, plans, inputs, prebuilt = null
     ? held.map((_, i) => () => { const battle = held[i]; held[i] = null; return battle; })
     : inputs.map((o) => () => m.newBattle(o, { preview: true }));
   const job = {
-    chosen, plans, inputs, cap: ticks, best: plans[0], done: false, pending: false,
+    chosen, plans, inputs, cap: ticks, limits, stats: null, best: plans[0], done: false, pending: false,
     run(budgetMs = Infinity, control = null) {
       if (job.done) return true;
-      if (!run) run = new RehearsalRun(factories, ps.playerId, ticks);
+      if (!run) run = new RehearsalRun(factories, ps.playerId, ticks, limits || {});
       // A test replay (`control.replaying`) stops on the journalled step count, not the wall clock.
       const replaying = !!(control && control.replaying);
       const timed = !replaying && Number.isFinite(budgetMs);
@@ -1404,6 +1406,8 @@ export function createRehearsalJob(m, ps, chosen, plans, inputs, prebuilt = null
       const over = () => (replaying ? control.stop() : performance.now() - t0 >= budgetMs);
       job.done = run.run(timed || replaying ? over : null, control);
       job.best = job.plans[run.score.index] || job.best;
+      job.stats = { totalTicks: run.totalTicks, completed: run.completed, considered: run.index,
+        stopReason: run.stopReason, choice: run.score.index, candidates: factories.length };
       return job.done;
     },
   };
@@ -1417,8 +1421,8 @@ export function createRehearsalJob(m, ps, chosen, plans, inputs, prebuilt = null
  * (`takeOver`, `done` still false) runs the very same candidates here instead. A synchronous `run` (the one-shot
  * botPrep, tools, tests) takes a delegated job over at once: no browser can answer within one call.
  */
-export function createDelegatedRehearsalJob(m, ps, chosen, plans, inputs, cap = null) {
-  const job = createRehearsalJob(m, ps, chosen, plans, inputs, null, cap);
+export function createDelegatedRehearsalJob(m, ps, chosen, plans, inputs, cap = null, limits = null) {
+  const job = createRehearsalJob(m, ps, chosen, plans, inputs, null, cap, limits);
   const step = job.run;
   job.pending = true;
   /** The host's pick (MatchRehearsal checked the sender, the task and the index). */
@@ -1453,13 +1457,13 @@ export function createRehearsal(m, ps, chosen, plans) {
  * browser (Match.delegateRehearsal — an AI teammate's prep only, and never a gameplay-plugin room). Nothing is built
  * here in that case; a synchronous caller leaves it off and simulates on the server.
  */
-export function* createRehearsalSteps(m, ps, chosen, plans, { delegate = false } = {}) {
+export function* createRehearsalSteps(m, ps, chosen, plans, { delegate = false, limits = null, candidateLimit = m.botRehearsal } = {}) {
   const boss = !m.wave && bossWaveOf(m, ps);
   const distinct = distinctPlans(plans);
   if ((!m.wave && !boss) || distinct.length < 2 || !(m.botRehearsal > 0)) return null;
   // [ASSUMED] #315: a boss field has no time limit. Cap the rehearsal; do not use the live fight's seed.
   const cap = boss ? faRehearsalTicks(m) : null;
-  const cands = distinct.slice(0, m.botRehearsal);
+  const cands = distinct.slice(0, Math.min(8, candidateLimit));
   const byUid = new Map(chosen.map((p) => [p.uid, p]));
   const inputs = [];
   const battles = [];
@@ -1470,18 +1474,19 @@ export function* createRehearsalSteps(m, ps, chosen, plans, { delegate = false }
       inputs.push(opts);
       // The default path builds now, in this generator step, as 0.3.0 did. Delegation builds nothing: the host
       // simulates the specs, and a takeover builds these same inputs later.
-      if (!delegate) battles.push(m.newBattle(opts, { preview: true }));
+      if (!delegate && !limits) battles.push(m.newBattle(opts, { preview: true }));
     } catch {
       // A failed estimate cannot affect the match's error log or displace its default plan.
       break;
     }
     yield;
   }
+  if (limits) cands.length = inputs.length;
   if (delegate && typeof m.delegateRehearsal === 'function') {
-    const job = m.delegateRehearsal({ ps, chosen, plans: cands, inputs, cap });
+    const job = m.delegateRehearsal({ ps, chosen, plans: cands, inputs, cap, limits });
     if (job) return job;
   }
-  return createRehearsalJob(m, ps, chosen, cands, inputs, delegate ? null : battles, cap);
+  return createRehearsalJob(m, ps, chosen, cands, inputs, delegate || limits ? null : battles, cap, limits);
 }
 
 /**
@@ -1511,14 +1516,16 @@ function canUseItem(m, ps, item) {
   return true;
 }
 
-function context(m, ps) {
+function context(m, ps, policy = null) {
   const owned = ownedBonds(m, ps);
   const model = fieldModel(m, ps);
   const plan = bondPlan(m, ps, owned);
   const copies = copyCounts(m, ps);
   let pairs = 0;
   for (const [b, k] of copies) if (k + 1 >= mergeNeed(m, b)) pairs++;
-  return { ps, owned, focus: plan.focus, second: plan.second, keep: keeperBases(m, ps, plan), copies, pairs, roles: roles(m, ps), fly: model.flyTotal, model };
+  const keep = keeperBases(m, ps, plan);
+  if (policy) for (const p of ps.allChess()) if (policy.core(m, ps, p.id)) keep.add(m.gd.baseIdOf(p.id));
+  return { ps, policy, owned, focus: plan.focus, second: plan.second, keep, copies, pairs, roles: roles(m, ps), fly: model.flyTotal, model };
 }
 
 /** Normal copies owned per base (board, hand, temp). */
@@ -1626,8 +1633,8 @@ function lineupGain(m, ps, id, ctx, cur) {
  * Prep start: sell bench chess that neither make the lineup nor build toward something (a pair that can still
  * merge, the focus bond, an elite) — they only block merges; the refund buys more. Keeps a few spare bench units.
  */
-export function sellJunk(m, ps) {
-  const ctx = context(m, ps);
+export function sellJunk(m, ps, policy = null) {
+  const ctx = context(m, ps, policy);
   const { bench } = chooseLineup(m, ps, ctx);
   const keep = [];
   const junk = [];
@@ -1658,11 +1665,11 @@ export function sellJunk(m, ps) {
 }
 
 /** Take the queued pick-one offers (merge rewards, special refreshes — free; they last until picked, the bot takes them at once). */
-function takeOffers(m, ps) {
+function takeOffers(m, ps, policy = null) {
   const gd = ps?.gd || m.gd;
   for (let guard = 0; guard < 4 && ps.offers.length; guard++) {
     const offer = ps.offers[0];
-    const ctx = context(m, ps);
+    const ctx = context(m, ps, policy);
     let best = -1;
     let bestS = -Infinity;
     offer.slots.forEach((s, i) => {
@@ -1695,32 +1702,8 @@ export function botPrepBegin(m, ps) {
  * otherwise). `delegate` (the async driver): offer the final rehearsal to the current host's browser.
  * Returns the rehearsal job (or null).
  */
-export function* botPrepBeginSteps(m, ps, { delegate = false } = {}) {
-  if (!ps.alive || ps.ready) return null;
-  m.autoPickPersonalChoice(ps, 'bot');
-  // 1. reward offers (free)
-  takeOffers(m, ps);
-  yield;
-  // 2. economy: dead bench weight back to funds, units toward a full board, the level curve, then everything else;
-  //    merges completed while buying queue reward offers — take them right away
-  sellJunk(m, ps);
-  yield;
-  yield* buyLoopSteps(m, ps, { fillOnly: true, maxRefreshes: 0 });
-  takeOffers(m, ps);
-  levelUp(m, ps);
-  yield;
-  yield* buyLoopSteps(m, ps, { fillOnly: false, maxRefreshes: MAX_REFRESHES });
-  takeOffers(m, ps);
-  levelUp(m, ps, { spare: true });
-  yield* advisorSpendSteps(m, ps);
-  spendDown(m, ps);
-  maybeFreeze(m, ps);
-  yield;
-  // 3. placement, 4. items, placement again (item carriers gain value; rehearsed when the match allows it)
-  yield* arrangeSteps(m, ps);
-  equipItems(m, ps);
-  yield;
-  return yield* arrangeSteps(m, ps, { final: true, defer: true, delegate });
+export function* botPrepBeginSteps(m, ps, options = {}) {
+  return yield* LEGACY_PREP.prepBegin(m, ps, options);
 }
 
 /** Prep routine, end: the rehearsed layout (when it beat the default plan), temp, a free hand slot, Ready. */
@@ -1730,27 +1713,7 @@ export function botPrepEnd(m, ps, job = null) {
 
 /** botPrepEnd as a step generator (see botPrepBeginSteps). */
 export function* botPrepEndSteps(m, ps, job = null) {
-  if (!ps.alive || ps.ready) return;
-  if (job && job.done && job.best !== job.plans[0]) yield* applyPlanSteps(m, ps, job.chosen, job.best);
-  // 5. temp → hand / sell / destroy; keep one hand slot free for next round's merges
-  resolveTemp(m, ps);
-  if (freeSlot(ps.hand) < 0) freeHandSlot(m, ps);
-  // Sales/consumables during final placement can leave new expiring funds. Recheck before Ready.
-  if (economyPlan(m, ps)) {
-    const before = ps.allChess().map(p => p.uid).join();
-    yield* advisorSpendSteps(m, ps);
-    if (before !== ps.allChess().map(p => p.uid).join()) {
-      takeOffers(m, ps);
-      yield* arrangeSteps(m, ps);
-      equipItems(m, ps);
-      resolveTemp(m, ps);
-    }
-    maybeFreeze(m, ps);
-  }
-  // what the next prep's bench shed may judge by value: what is owned now (later gains wait for a placement step)
-  rememberOwned(ps);
-  m.autoPickPersonalChoice(ps, 'bot');
-  tryDo(() => ps.setReady(true));
+  return yield* LEGACY_PREP.prepEnd(m, ps, job);
 }
 
 /**
@@ -1778,10 +1741,11 @@ export function botPrep(m, ps) {
  * Freeze the shop (free) when it shows a copy that would complete a held pair and the bot cannot afford it: the unsold
  * slots are kept at the next round start (PlayerState.startRound rollShop keepFrozen), the rest rerolled.
  */
-function maybeFreeze(m, ps) {
+function maybeFreeze(m, ps, policy = null) {
   if (ps.shop.frozen) return;
   if (ps.shop.slots.some((s) => s && !s.sold && s.kind === 'chess' && ps.priceOf(s) > ps.funds
-    && (economyPlan(m, ps) ? advisorFreezeTarget(m, ps, s.id) : ps.completesChessMerge(s.id)))) tryDo(() => ps.freeze());
+    && (economyPlan(m, ps) ? advisorFreezeTarget(m, ps, s.id) : ps.completesChessMerge(s.id))
+    && (!policy || policy.core(m, ps, s.id) || buyScoreOf(m, ps, s.id, policy) >= 60))) tryDo(() => ps.freeze());
 }
 
 /** §35.14, maintainer 2026-10-20. [ASSUMED] Sell unprotected clutter before destroying cheap hand items.
@@ -1850,16 +1814,22 @@ export function diyOpensAt(ps, lv) {
 }
 
 /** The 调度中心 level-ups of a bot's prep (exported for tests). */
-export function levelUp(m, ps, { spare = false } = {}) {
+export function levelUp(m, ps, { spare = false, policy = null } = {}) {
   const gd = ps?.gd || m.gd;
+  if (policy) {
+    if (!policy.canLevel(m, ps) || ps.offers.length) return;
+    if (ps.shop.slots.some(s => s && !s.sold && s.kind === 'chess' && ps.priceOf(s) <= ps.funds
+      && ps.completesChessMerge(s.id) && policy.core(m, ps, s.id))) return;
+    return tryDo(() => ps.levelUp());
+  }
   for (let guard = 0; guard < 6; guard++) {
     if (ps.shop.level >= gd.maxShopLevel) return;
     const price = Math.max(0, ps.shop.upgradePrice);
     if (ps.funds < price) return;
-    const policy = advisorPlan(m, ps)?.economy;
-    if (policy?.holdLevel && ps.shop.level >= policy.level) return;
-    if (policy?.level != null) {
-      if (ps.shop.level < policy.level) {
+    const advisorEconomy = advisorPlan(m, ps)?.economy;
+    if (advisorEconomy?.holdLevel && ps.shop.level >= advisorEconomy.level) return;
+    if (advisorEconomy?.level != null) {
+      if (ps.shop.level < advisorEconomy.level) {
         if (ps.funds - price < fundsReserve(m, ps) || !tryDo(() => ps.levelUp())) return;
         continue;
       }
@@ -1914,30 +1884,45 @@ function spendDown(m, ps) {
   }
 }
 
+// [ASSUMED] Delay optional merges only for a concrete affordable upgrade.
+function deferPolicyMerge(m, ps, purchasePrice = 0, policy = null) {
+  if (!policy || ps.shop.level >= 4 || ps.lp <= 10 || ps.deployCount < ps.deployCap) return false;
+  if (!policy.canLevel(m, ps) || ps.funds < Math.max(0, ps.shop.upgradePrice) + purchasePrice) return false;
+  const previous = m.lastResults.get(ps.playerId);
+  return !!previous && !(previous.leaked || []).some(l => l.counted !== false);
+}
+
 /** Buying / rerolling toward the lineup; a step generator (yields after each purchase or reroll). */
-export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}) {
+export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, policy = null } = {}) {
   const gd = ps?.gd || m.gd;
-  const policy = advisorPlan(m, ps)?.economy;
+  const advisorEconomy = advisorPlan(m, ps)?.economy;
   const advisor = economyPlan(m, ps);
   if (advisor) advisorPrepState(m, ps);
-  if (policy?.maxRefreshes != null) maxRefreshes = Math.min(maxRefreshes, policy.maxRefreshes);
+  if (advisorEconomy?.maxRefreshes != null) maxRefreshes = Math.min(maxRefreshes, advisorEconomy.maxRefreshes);
   let refreshes = 0;
   const minPrice = 2;
   const reserve = fundsReserve(m, ps);
+  const customPolicy = !!policy;
   // the best lineup is reused while the owned chess stay the same (a refresh changes only the shop)
   let memo = null;
   for (let guard = 0; guard < 40; guard++) {
     if (guard > 0) yield;
-    if (!fillOnly && tradeOnce(m, ps, () => context(m, ps))) continue;
+    if (!policy && !fillOnly && tradeOnce(m, ps, () => context(m, ps))) continue;
+    if (policy) takeOffers(m, ps, policy); // a merge reward can enable another merge before upgrading
+    if (customPolicy && !fillOnly && policy.canLevel(m, ps)) {
+      const oldLevel = ps.shop.level;
+      levelUp(m, ps, { policy });
+      if (ps.shop.level !== oldLevel) { memo = null; continue; }
+    }
     // Do not cash a bank for a non-merge during the initial merge-only pass: the intervening level-up
     // could consume its refund before this pass is allowed to buy the target.
     // §35.14: complete merges first, then the affordable floor, before any fill-only single can spend it.
-    const floorPending = advisor && policy?.level > ps.shop.level && ps.funds >= Math.max(0, ps.shop.upgradePrice);
+    const floorPending = advisor && advisorEconomy?.level > ps.shop.level && ps.funds >= Math.max(0, ps.shop.upgradePrice);
     if (advisor) for (const slot of ps.shop.slots) {
       if (!fillOnly || (!floorPending && ps.allChess().length < ps.deployCap) || (slot?.kind === 'chess' && ps.completesChessMerge(slot.id)))
         fundAdvisorPurchase(m, ps, slot);
     }
-    const ctx = context(m, ps);
+    const ctx = context(m, ps, policy);
     const ownedN = ps.allChess().length;
     const ownKey = `${ps.allChess().map((p) => `${p.uid}:${p.id}:${(p.items || []).length}`).join()}|${ctx.focus}|${ctx.second}`;
     const boardFull = ownedN >= ps.deployCap;
@@ -1958,6 +1943,9 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}
       && (ps.completesChessMerge(s.id) || (advisor && !mergesOnly && planBuyTarget(m, ps, s.id))))) {
       sellWeakestHand(m, ps, { handOnly: true, keepFresh: true });
     }
+    // Reserve for searching only when this loop can actually refresh and buy.
+    const refreshCost = ps.shop.freeRefreshes > 0 ? 0 : gd.refreshPrice;
+    const canRefresh = refreshes < maxRefreshes && ps.funds - refreshCost >= (advisorEconomy?.refreshAbove ?? 0) && ps.funds >= refreshCost + (refreshCost > 0 ? Math.max(minPrice, reserve) : minPrice);
     let best = -1;
     let bestS = 0;
     let bestPrice = Infinity;
@@ -1973,6 +1961,18 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}
         const merges = ps.completesChessMerge(s.id);
         if (freeSlot(ps.hand) < 0 || (mergesOnly && !merges)) return;
         const base = gd.baseIdOf(s.id);
+        const core = customPolicy && policy.core(m, ps, s.id);
+        if (customPolicy) {
+          if (fillOnly && !merges && policy.canLevel(m, ps)) return;
+          const target = policy.target(m, ps, s.id);
+          const hasElite = ps.allChess().some(p => gd.baseIdOf(p.id) === base && gd.isGolden(p.id));
+          if (!gd.isGolden(s.id) && (hasElite || (target?.copies === 1 && ctx.owned.bases.has(base)))) return;
+          // [ASSUMED] Delay a healthy optional merge only for a concrete, affordable upgrade.
+          // A planned upgrade is performed above before the third copy is purchased.
+          if (merges && !core && deferPolicyMerge(m, ps, price, policy)) return;
+          if (fillOnly && !core && policy.canLevel(m, ps)
+            && (!merges || ps.funds >= Math.max(0, ps.shop.upgradePrice) + price)) return;
+        }
         if (boardFull && !merges && ps.funds - price < reserve) return; // banked (坎诺特)
         sc = buyScore(m, ps, s.id, ctx) - price;
         // §35.63: a missing member of the focus core bond is bought even when one swap does not raise the lineup yet,
@@ -1987,7 +1987,7 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}
               cur = memo.cur;
             }
             const gain = lineupGain(m, ps, s.id, ctx, cur);
-            if (gain <= 2) return;
+            if (gain <= 2 && !core) return;
             sc += Math.min(15, gain * 0.5);
           } else if (gd.isGolden(s.id) || (!ctx.keep.has(base) && !(ctx.pairs < MAX_PAIRS && (chessRec(m, s.id, ps)?.tier ?? 6) <= 3 && countFree(ps.hand) >= 3))) {
             // a second copy of a non-keeper with no bench room for another pair is clutter, sold later at a loss
@@ -1998,6 +1998,9 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}
       } else {
         if (fillOnly) return;
         if (!advisorItemAllowed(m, ps, s)) return;
+        if (customPolicy && (policy.canLevel(m, ps) || (canRefresh && freeSlot(ps.hand) >= 0
+          && policy.searchTargets(m, ps).some(t => ps.funds >= refreshCost
+            + ps.priceOf({ kind: 'chess', id: t.base, basePrice: gd.chessPrice(t.base) }))))) return;
         if (!canUseItem(m, ps, { id: s.id })) return;
         if (freeSlot(ps.hand) < 0) return;
         if (ps.funds - price < reserve && !ps.completesItemMerge(s.id)) return;
@@ -2006,17 +2009,14 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}
         if (!carriers && !requested) return;
         sc = 6 + (gd.tierOf(s.id) || 1) * 3 - price + (ps.completesItemMerge(s.id) ? 10 : 0) + (requested ? 24 : 0);
       }
-      // [ASSUMED] Prefer the cheaper purchase when scores tie, including floating-point cancellation noise.
-      // Product-policy tracking: https://github.com/sganggs/Stronghold-Protocol/issues/315
-      if (sc > bestS + 1e-9 || (best >= 0 && Math.abs(sc - bestS) <= 1e-9 && price < bestPrice)) {
-        bestS = sc; best = i; bestPrice = price;
-        bestMerges = s.kind === 'chess' && ps.completesChessMerge(s.id);
-      }
+      const merges = s.kind === 'chess' && ps.completesChessMerge(s.id)
+        && (!customPolicy || policy.core(m, ps, s.id));
+      const mergeFirst = !!policy && merges !== bestMerges;
+      const betterScore = sc > bestS + 1e-9 || (best >= 0 && Math.abs(sc - bestS) <= 1e-9 && price < bestPrice);
+      if (mergeFirst ? merges : betterScore) { bestS = sc; best = i; bestMerges = merges; bestPrice = price; }
     });
     // leftover funds are lost at prep end: reroll while a purchase stays affordable (a band that keeps them: down to its
     // reserve — a free refresh is always taken)
-    const refreshCost = ps.shop.freeRefreshes > 0 ? 0 : gd.refreshPrice;
-    const canRefresh = refreshes < maxRefreshes && ps.funds - refreshCost >= (policy?.refreshAbove ?? 0) && ps.funds >= refreshCost + (refreshCost > 0 ? Math.max(minPrice, reserve) : minPrice);
     // a full board buys only what improves it (merge progress, a lineup upgrade), and only when it is worth more than
     // the refreshes its price would pay for (each may show the third copy of a held pair, refreshValue)
     let buy = best >= 0 && bestS >= (boardFull ? BUY_FULL_MIN : 3);
@@ -2116,7 +2116,7 @@ export function arrange(m, ps, opts = {}) {
 }
 
 /** arrange as a step generator (yields inside the layout planning, see planLayoutSteps). */
-export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = false } = {}) {
+export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = false, candidatePlans = null, adaptive = false } = {}) {
   const ctx = context(m, ps);
   let chosen = chooseLineup(m, ps, ctx).set;
   let chosenSet = new Set(chosen.map((p) => p.uid));
@@ -2140,20 +2140,79 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
     else tryDo(() => ps.sell(p.uid));
   }
   yield;
-  const plans = [];
+  let plans = [];
   // A boss round has no `m.wave`. The already-planned boss group is rehearsed the same way, on its own seed.
   if (final && (m.wave || bossWaveOf(m, ps)) && m.botRehearsal > 0) {
     for (const v of REHEARSAL_VARIANTS) plans.push(yield* planLayoutSteps(m, ps, chosen, { ...LAYOUT_PARAMS, ...v }));
   } else {
     plans.push(yield* planLayoutSteps(m, ps, chosen));
   }
-  if (defer && plans.length > 1) {
-    const job = yield* createRehearsalSteps(m, ps, chosen, plans, { delegate });
-    yield* applyPlanSteps(m, ps, chosen, plans[0]);
+  if (candidatePlans && final && m.wave && m.botRehearsal > 1) {
+    plans = yield* candidatePlans(m, ps, chosen, plans);
+  }
+  if ((defer || adaptive) && plans.length > 1) {
+    const limits = adaptive ? { stage: 3, tickBudget: 6 * rehearsalCap(m.wave?.timeLimit) } : null;
+    const job = yield* createRehearsalSteps(m, ps, chosen, plans,
+      { delegate, limits, candidateLimit: adaptive ? 8 : m.botRehearsal });
+    if (!defer && job) job.run();
+    yield* applyPlanSteps(m, ps, chosen, !defer && job ? job.best : plans[0]);
     return job;
   }
   yield* applyPlanSteps(m, ps, chosen, plans.length > 1 ? rehearse(m, ps, chosen, plans) : plans[0]);
   return null;
+}
+
+/**
+ * [ASSUMED] Opt-in, map-independent contact candidate. Preserve the default and the earlier variants, allocating
+ * the last available rehearsal slot to a distinct repair. This keeps the existing configured budget (at most 8).
+ * With the default budget of 3, merely appending to all 5 legacy plans would never rehearse the extra candidate.
+ */
+export function* contactCandidatePlansSteps(m, ps, chosen, plans, { budget = Math.min(8, Math.floor(m.botRehearsal)) } = {}) {
+  if (!(budget > 1) || !m.wave || !Number.isInteger(m.round) || m.round < 1
+    || m.round === m.gd.bossRound || m.round === m.gd.hiddenRound || !plans.length) return plans;
+  const model = fieldModel(m, ps);
+  if (!model.routes.length) return plans;
+  const base = plans[0], pgd = ps.gd || m.gd, deployMap = ps.deployMap();
+  const units = [];
+  for (const piece of chosen) {
+    const key = base.get(piece.uid), rec = rangeRec(ps, pgd.chess(piece.id));
+    if (piece.kind !== 'chess' || !key || !rec) return plans;
+    const [r, c] = parseKey(key);
+    units.push({ ...unitOf(rec, key, r, c, planDir(base, piece.uid), model), uid: piece.uid, kind: piece.kind,
+      placementClass: placeClass(ps, pgd.chess(piece.id)) });
+  }
+  const repaired = yield* refineFormationSteps(model, units, function* (unit) {
+    for (const [r, c] of legalTiles(deployMap, unit.placementClass)) {
+      const key = tileKey(r, c);
+      for (const dir of PLAN_DIRS) yield { ...unit, ...unitOf(unit.rec, key, r, c, dir, model) };
+    }
+  });
+  if (repaired === units) return plans;
+  const candidate = new LayoutPlan(base);
+  for (const unit of repaired) { candidate.set(unit.uid, unit.key); candidate.dirs.set(unit.uid, unit.dir); }
+  const distinct = distinctPlans(plans);
+  if (distinctPlans([...distinct, candidate]).length === distinct.length) return plans;
+  return [...distinct.slice(0, budget - 1), candidate];
+}
+
+/** [ASSUMED] Fixed-three prefix, remaining legacy variants, then contact repairs of those variants; max eight.
+ * Reuses map-independent planners, without RNG draws or mutations of Match configuration. */
+export function* adaptiveCandidatePlansSteps(m, ps, chosen, plans) {
+  const fixed = (yield* contactCandidatePlansSteps(m, ps, chosen, plans, { budget: 3 })).slice(0, 3);
+  let pool = distinctPlans([...fixed, ...plans]);
+  for (const base of plans.slice(1)) {
+    if (pool.length >= 8) break;
+    const repaired = yield* contactCandidatePlansSteps(m, ps, chosen, [base], { budget: 2 });
+    pool = distinctPlans([...pool, ...repaired]);
+  }
+  return pool.slice(0, 8);
+}
+
+/** Trusted strategy hook pair; selecting it is explicit and leaves the legacy adapter untouched. */
+export function createContactPrepSteps() {
+  return createBotPrepSteps({
+    arrangeSteps: (m, ps, options = {}) => arrangeSteps(m, ps, { ...options, candidatePlans: contactCandidatePlansSteps }),
+  });
 }
 
 /**
@@ -2514,3 +2573,26 @@ export function resolveTemp(m, ps) {
   }
   if (!ps.tempEmpty) ps.resolveTemp();
 }
+
+// Explicit operation references keep the default policy and RNG consumption unchanged.
+const LEGACY_PREP_ACTIONS = Object.freeze({
+  takeOffers, sellJunk, buyLoopSteps, levelUp, advisorSpendSteps, economyPlan, maybeFreeze, arrangeSteps, equipItems,
+  applyPlanSteps, resolveTemp, freeHandSlot, rememberOwned,
+  hasHandRoom: (ps) => freeSlot(ps.hand) >= 0,
+  ready: (ps) => tryDo(() => ps.setReady(true)),
+});
+
+/** Reuse prep scheduling with explicit operation overrides; definitions hold no per-seat state. */
+export function createBotPrepSteps(actions = {}, policy = null) {
+  const economic = policy ? {
+    takeOffers: (m, ps) => takeOffers(m, ps, policy),
+    sellJunk: (m, ps) => sellJunk(m, ps, policy),
+    buyLoopSteps: (m, ps, opts) => buyLoopSteps(m, ps, { ...opts, policy }),
+    levelUp: (m, ps, opts) => levelUp(m, ps, { ...opts, policy }),
+    maybeFreeze: (m, ps) => maybeFreeze(m, ps, policy),
+  } : {};
+  return createPrepSteps({ ...LEGACY_PREP_ACTIONS, ...economic, ...actions },
+    { maxRefreshes: MAX_REFRESHES, arrangeBeforeLevel: !!policy });
+}
+
+const LEGACY_PREP = createBotPrepSteps();

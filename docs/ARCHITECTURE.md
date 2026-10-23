@@ -13,6 +13,9 @@ making one, in Chinese). The [settlement usage guide](../server/sim/AGENTS.md) g
 
 ## 1. What runs where
 
+AI strategy selection is documented in [BOT_STRATEGIES](BOT_STRATEGIES.md): `botStrategyContract.js` defines
+the five hooks, `botStrategies.js` registers legacy/external/ioleta/adaptive/ioleta-adaptive, and `botIoletaPolicy.js` holds opt-in procurement heuristics.
+
 ```
  browser (public/)                               one Node process (server/index.js, Node ≥ 22)
  ┌──────────────────────────────────────┐        ┌─────────────────────────────────────────────────────┐
@@ -104,7 +107,7 @@ so old imports keep working: `public/js/ui/gameLogic.js` (`public/js/ui/gameLogi
 | `server/ai/transport.js` | Operator-enabled external AI HTTP(S) / stdio IO; match policy and seat observations live in `server/match/externalAI.js` ([API](EXTERNAL_AI.md)). Development-only; omitted from release packages (§35.66) |
 | `server/match/Match.js` | one match: the phase machine, timers, the round loop, co-op, the views; its methods are in `server/match/match/` (`phases.js`, `prep.js`, `combat.js`, `clientCombat.js`, `rehearsal.js`, `reports.js`, `unitePhase.js`, `bossRounds.js`, `settle.js`, `views.js`, `intents.js` …) |
 | `server/match/PlayerState.js` | one player's shop, hand, board, items, bonds and LP, and every prep intent; its methods are in `server/match/player/` (`economy.js`, `acquire.js`, `placement.js`, `items.js`, `pieces.js`, `prep.js`, `round.js`, `diy.js`, `views.js` …) |
-| `server/match/` (the rest) | `pool.js` (the shared chess pool), `board.js` (placement), `bondsMeta.js`, `effectsMeta.js` and `builtinMeta.js` (prep-phase effects), `choices.js` (机变), `waves.js`, `unite.js` (联防), `finalAssault.js`, `results.js`, `bot.js` (AI players and AI 托管), `fields.js` (the battles of a combat phase), `scheduler.js`, `gamedata.js` |
+| `server/match/` (the rest) | `pool.js` (the shared chess pool), `board.js` (placement), `bondsMeta.js`, `effectsMeta.js` and `builtinMeta.js` (prep-phase effects), `choices.js` (机变), `waves.js`, `unite.js` (联防), `finalAssault.js`, `results.js`, `bot.js` (AI players and AI 托管), `botPrep.js` (shared synchronous prep sequencing), `botFormationCandidates.js` (opt-in contact geometry), `fields.js` (the battles of a combat phase), `scheduler.js`, `gamedata.js` |
 | `server/sim/Battle.js` | one battle field; its methods are in `server/sim/battle/` (`lifecycle.js`, `spawns.js`, `deploy.js`, `blocking.js`, `combat.js`, `status.js`, `summons.js`, `displacement.js`, `events.js` …) |
 | `server/sim/` (the rest) | `skills.js`, `ai.js`, `attack.js` (the explicit settlement API), `attack/` (hit, ordered injury effects, transfers, health, element, heal and helpers), `buffs.js`, `targeting.js`, `grid.js` (pathing), `units.js`, `professions.js`, `snapshot.js`, `spec.js` (the BattleSpec), `rehearsal.js` (tests AI layouts and picks the best, shared with the browser), `simdata.js` (data records → engine defs), `nodeData.js` (the Node-only data loader, never served) |
 | `server/sim/content/` | everything game-specific, installed into a battle by `server/sim/content/index.js` |
@@ -229,7 +232,7 @@ public/assets/ ─────────▶ public/js/render/, public/js/audio
 | a bond, 特质, item or strategy | `server/sim/content/bonds/`, `server/sim/content/garrisons/`, `server/sim/content/items/`, `server/sim/content/bands/` (the battle side and the prep side apart) | META.md §2 |
 | the shop, economy, hand or placement | `server/match/player/`, `server/match/pool.js`, `server/match/board.js` | `test/match/` |
 | phases, timers, 联防, the Final Assault | `server/match/match/phases.js`, `server/match/match/unitePhase.js`, `server/match/match/bossRounds.js`, `server/match/unite.js`, `server/match/finalAssault.js` | META.md §1, §4 |
-| the bots | `server/match/bot.js` (unchanged legacy), `server/match/botStrategyContract.js` (definitions), `server/match/botStrategies.js` (registry) | `docs/BOT_STRATEGIES.md`, `tools/botbench.mjs` |
+| the bots | `server/match/bot.js` (unchanged legacy), `server/match/botStrategyContract.js` (definitions), `server/match/botStrategies.js` (registry), `server/match/botIoleta.js` / `botAdaptive.js` (opt-in strategies) | `docs/BOT_STRATEGIES.md`, `tools/botbench.mjs` |
 | a new client message | `shared/protocol.js` (`C2S`), then `server/match/match/intents.js` (or `server/lobby.js` for `room.*`) | DESIGN §8 |
 | data from the official tables | `tools/build-data.mjs` | rebuild `--offline`, JSON compare, DATA.md, golden |
 | a screen or a HUD panel | `public/js/screens/`, `public/js/ui/`; pure logic in `public/js/ui/gameLogic/` | `test/ui/` |

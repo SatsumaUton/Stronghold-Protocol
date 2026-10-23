@@ -33,6 +33,7 @@ server/match/
   fields.js        FieldRunner: battle pacing (2×), snapshots, per-field error isolation
   results.js       m.result rows, titles, trophies, rewards
   bot.js           AI player (AI teammates, departed humans, "AI 托管")
+  botStrategies.js registered trusted AI hooks (default legacy; opt-in external, ioleta, adaptive, ioleta-adaptive), see BOT_STRATEGIES.md
   scheduler.js     RealScheduler / VirtualScheduler
   StubMatch.js     the old platform stub (platform tests only)
 ```
@@ -237,6 +238,26 @@ The rest of this section is the legacy server-run mode
 另一组队友的战场情况" → `BAD_TARGET 'other group hidden'`); eliminated / departed players spectate any field.
 
 ### 1.5 AI player (bot.js)
+
+The synchronous prep orchestrator lives in `server/match/botPrep.js`. `bot.js` binds its existing actions through
+`createBotPrepSteps(actions)`; trusted strategies can override an operation while keeping reward, economy,
+placement and cleanup sequencing. Overrides are synchronous functions or synchronous iterators according to the
+operation they replace. Each iterator yields only between complete actions. Per-seat state belongs to the player
+or match, never the shared action definition. The default adapter retains the original action references, refresh
+limit, yield boundaries, delegated job and Ready path. Purchase scoring remains inside the bound economy actions.
+With an advisor plan (`economyPlan`), prep begin spends expiring funds after the spare level-up and prep end rechecks
+them before Ready (§35.13–35.14); without one these steps do nothing.
+
+An opt-in `createContactPrepSteps()` adapter uses `contactCandidatePlansSteps` for final ordinary-round layouts.
+It derives contacts from current routes and resolved ranges, retaining existing damage activity, air exposure,
+healing and held routes. Pure medics and tokens remain fixed during search; normal deployment still handles summons.
+[ASSUMED] Contact weighting and the two-pass local search are AI heuristics. The adapter keeps the default candidate
+and earlier variants, using the final configured rehearsal slot for one distinct repair (maximum eight candidates).
+With a budget of three, the first two original candidates precede the repair. Disabled/single-candidate rehearsal,
+Boss/hidden rounds, missing geometry and duplicate repairs retain the original candidates. The normal Match path
+still uses the legacy prep adapter; a trusted strategy must explicitly select these hooks.
+
+
 **Strategy** (`botPickBand`): weighted by starting LP among the offered bands (alone, 老鲤's withheld first-round funds
 × 0.02); a band whose mechanic rides on a bond the mode switches off weighs 0 — `GameData.bandBondIds` (bands.json
 `bondIds`, built by shared/bandBonds.js: the bond names in <…> of its text, the bond ids / bond pools of its blackboards)
@@ -974,6 +995,13 @@ round was over. The official 1 s `broadcastBeginDelay` is not modelled.
 
 ## 6. Testing & tools
 
+`opts.botStrategy` / `SP_BOT_STRATEGY` select the registered AI per match, default `legacy`.
+`ioleta` supplies Russell procurement through the shared prep pipeline; its state is
+`player.botStrategyState.ioleta.plan`. The HTTP server rejects unknown environment IDs at startup.
+Journal replay persists the registered ID and reconstructs the plan through deterministic prep inputs.
+`matchrun` and `botbench` accept `--bot`; botbench's solo `--band` replaces the picker while retaining band metadata.
+See [BOT_STRATEGIES](BOT_STRATEGIES.md) for composition and lifecycle details.
+
 * `test/match/lobby-integration.test.js` 的联机轮选使用固定种子 `69`，覆盖 AI 先选走默认策略的情况（GitHub #144）。模拟玩家从当前公开选牌结果中选择未被占用的策略，并断言请求成功；不依赖拒绝后的超时分配。单人和联机用例均通过 `b.start` 确认战斗开始，避免瞬间结束的模拟战斗被公开状态节流而漏掉 `COMBAT` 阶段。
 
 * `test/match/fakeBattle.js` — scriptable DESIGN §5.1 Battle (`FakeBattle.script = (battle) => plan`); inject with
@@ -1150,3 +1178,11 @@ blocking `battleCheck` window. Failed grants leave the seat unpicked; auto/bot f
 and skips when none grants [ASSUMED]. Native `g.offer`/`g.offerRefresh` use plugin id, local window id, sequence and slot; `m.public.offers` is a
 reconnectable, spectator-readable snapshot. Bots resolve immediately. Sources, bounds and [ASSUMED] defaults are
 [PLUGINS §10b](PLUGINS.md#10b-offers--interaction-windows); test journals carry declarations and intents.
+
+### Optional adaptive AI search
+
+`adaptive` registers the same five hooks as legacy/ioleta with legacy band picking and procurement, and adds
+map-independent formation candidates; `ioleta-adaptive` pairs that placement with Russell procurement. The same
+Match strategy handles AI and autoplay players. The fixed-three contact prefix extends to at most eight candidates
+when completed results still leak, under six strict tick caps. Full policy and inherited lifecycle:
+[BOT_STRATEGIES](BOT_STRATEGIES.md). Production LP and unite rules are unchanged.

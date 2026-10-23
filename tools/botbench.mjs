@@ -11,6 +11,7 @@
 //   --seeds N   matches per config (seeds S..S+N−1, default 10)
 //   --rehearsal layouts each bot rehearses per prep (default: the Match default)
 //   --json F    write the raw per-match records to F (the input of --compare)
+//   --bot ID    registered strategy ID (docs/BOT_STRATEGIES.md); default legacy (SP_BOT_STRATEGY is not read)
 //   --jobs N    run the matches in N worker threads (outcomes are identical; the timings are then inflated by the
 //               parallel load — measure decision time with --jobs 1)
 //   --band ID   solo configs only: force the opening pickBand hook (e.g. band_cannot); keep gd.bandIds() and

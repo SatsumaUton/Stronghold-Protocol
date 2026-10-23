@@ -92,11 +92,19 @@ export class RehearsalRun {
    *   never scored, never picked
    * @param {string} playerId whose leaks and kills the candidates are compared by
    * @param {number} cap ticks per candidate ({@link rehearsalCap})
-   * @param {{ onError?: (e: Error, index: number) => void }} [opts] a factory that throws is reported and skipped
+   * @param {{ onError?: (e: Error, index: number) => void, stage?: number, tickBudget?: number }} [opts] a factory that throws is reported and skipped
    */
-  constructor(candidates, playerId, cap, { onError = null } = {}) {
+  constructor(candidates, playerId, cap, { onError = null, stage = 0, tickBudget = 0 } = {}) {
     this.candidates = candidates;
     this.cap = cap;
+    if (!Number.isInteger(stage) || stage < 0 || stage > 8
+      || !Number.isSafeInteger(tickBudget) || tickBudget < 0) throw new RangeError('Invalid rehearsal limits');
+    this.stage = stage;
+    this.tickBudget = tickBudget;
+    this.totalTicks = 0;
+    this.completed = 0;
+    this.zeroComplete = false;
+    this.stopReason = null;
     this.score = new RehearsalScore(playerId);
     this.onError = onError;
     this.index = 0;
@@ -122,11 +130,18 @@ export class RehearsalRun {
     // candidate that never ticks (it was already finished, it could not be built, its construction threw) cannot run
     // the whole candidate list past the caller's budget either
     let worked = false;
-    const note = () => { n++; if (control) control.note(1); this.spent = n; };
+    const note = () => { n++; this.totalTicks++; if (control) control.note(1); this.spent = n; };
     while (this.index < this.candidates.length) { // loop-cap: the candidate list
       // a candidate that ended mid-slice (finished, cap, or beaten at a 64-tick check that skipped the budget test):
       // check the budget before building and stepping the next one
       if (outOfBudget && worked && outOfBudget()) { this.spent = n; return false; }
+      if (!this.current && ((this.stage && this.index >= this.stage && this.zeroComplete)
+        || (this.tickBudget && this.totalTicks >= this.tickBudget))) {
+        this.stopReason = this.zeroComplete && this.index >= this.stage ? 'zero' : 'budget';
+        this.candidates.fill(null, this.index);
+        this.spent = n;
+        return true;
+      }
       try {
         // the candidate of this turn, built when the first slice reaches it: its construction is part of the sliced
         // work, and the battle stays in `this.current` for the slices that continue it
@@ -138,7 +153,7 @@ export class RehearsalRun {
         const battle = this.current;
         if (battle) {
           let beaten = false;
-          while (this.ticks < this.cap && !battle.finished) { // loop-cap: the tick cap
+          while (this.ticks < this.cap && !battle.finished && (!this.tickBudget || this.totalTicks < this.tickBudget)) { // loop-cap: the tick cap
             battle.step();
             this.ticks++;
             note();
@@ -146,8 +161,18 @@ export class RehearsalRun {
             if (outOfBudget && (n & 3) === 0 && outOfBudget()) { this.spent = n; return false; }
           }
           if (!beaten) {
-            if (!battle.finished) battle.forceEnd('timeout');
-            this.score.note(battle, this.index);
+            const complete = battle.finished;
+            if (!complete) battle.forceEnd('timeout');
+            // Adaptive candidates interrupted by a cap cannot displace a completed result.
+            const result = complete ? battle.result() : null;
+            if (!this.stage || (complete && !result?.errors)) this.score.note(battle, this.index);
+            if (complete) {
+              this.completed++;
+              if (result?.reason === 'cleared' && !result.synthetic && !result.errors
+                && result.perPlayer?.[this.score.playerId] && rehearsalLeaks(battle, this.score.playerId) === 0) {
+                this.zeroComplete = true;
+              }
+            }
           }
         }
       } catch (e) {
@@ -158,6 +183,7 @@ export class RehearsalRun {
       this.index++;
       this.ticks = 0;
     }
+    this.stopReason ||= 'exhausted';
     this.spent = n;
     return true;
   }

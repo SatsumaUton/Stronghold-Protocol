@@ -16,6 +16,7 @@
 //   --content   sim content mode (default full)
 //   --rehearsal N  layouts each bot rehearses per prep with the real sim (default: the Match default, 3; 0 = off,
 //               faster sweeps with the heuristic placement only)
+//   --bot ID    registered strategy ID (docs/BOT_STRATEGIES.md); default legacy (SP_BOT_STRATEGY is not read)
 //   --check     audit every match: engine invariants at every phase change + rule checks (server/match/audit.js:
 //               income, upgrade price, freeze, shop odds/bans, temp overflow lifetime (no piece outlives the prep it is
 //               due at), drafts, 联防 helpers, settle LP, final assault pairing/pool, hidden core, titles, deadlines).

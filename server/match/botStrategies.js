@@ -3,8 +3,12 @@
 import { createBotRegistry, defineBotStrategy } from './botStrategyContract.js';
 import { EXTERNAL_BOT, llmIntegrationEnabledNow } from './llmGate.js';
 
-// Registration does not enable external IO: the operator must select and configure it.
-export const BOT_STRATEGIES = createBotRegistry(llmIntegrationEnabledNow && EXTERNAL_BOT ? [EXTERNAL_BOT] : []);
+import { ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT } from './botAdaptive.js';
+import { IOLETA_BOT } from './botIoleta.js';
+
+// Registration does not enable external IO or select an opt-in strategy.
+export const BOT_STRATEGIES = createBotRegistry([...(llmIntegrationEnabledNow && EXTERNAL_BOT ? [EXTERNAL_BOT] : []),
+  IOLETA_BOT, ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT]);
 
 /** @param {string | import('./botStrategyContract.js').BotStrategyDefinition} [selection] */
 export function getBotStrategy(selection = 'legacy', registry = BOT_STRATEGIES) {

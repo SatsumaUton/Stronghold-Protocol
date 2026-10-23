@@ -1890,3 +1890,11 @@ Attack pacing (PR #729): UnitInfo carries the actual attack interval in game sec
 phase and before projectiles carries changes; its baseline is seeded by birth info. The renderer looks ahead through
 the attack tick, including a rate later in that tick, without borrowing a later tick’s value. Its 0.2–6 second display
 window is [ASSUMED]; damage, attack timing and targeting are unchanged.
+
+### Adaptive rehearsal limits
+
+The opt-in adaptive strategy passes `{ stage: 3, tickBudget: 6 * cap }` into RehearsalRun. Total ticks are
+separate from per-call `spent` replay counts; Node and Worker apply identical strict tick limits. Initial candidates
+retain order, followed by extension up to eight. Zero-leak stopping requires a completed, error-free `cleared`
+result for the evaluated player. Truncated candidates never certify zero or displace completed candidates.
+Default runs have no adaptive limits. See [BOT_STRATEGIES](BOT_STRATEGIES.md) for candidate and takeover details.
