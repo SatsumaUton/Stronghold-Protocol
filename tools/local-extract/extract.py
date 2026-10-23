@@ -241,28 +241,25 @@ def job_parts(job):
     return rel, sub, kinds, keep
 
 
+def only_prefix(prefix):
+    """Only the two documented Spine categories have short aliases."""
+    prefix = prefix.rstrip('/')
+    return {'enemy': 'spine/enemy', 'token': 'spine/token'}.get(prefix, prefix)
+
+
 def names_sub(only, sub):
-    """Whether one --only prefix names output subdir `sub` itself rather than something below it: the prefix IS `sub`, a
-    child of it, or the short form the lists are documented by (`enemy` for `spine/enemy`, `token` for `spine/token`) —
-    the last two are compared the same way, `select_jobs`' `j[1] == p` included, so one rule answers the question
-    everywhere and `--only enemy` selects exactly what the prefix `spine/enemy` does."""
-    return any(sub == p.rstrip('/') or sub.rsplit('/', 1)[-1] == p.rstrip('/')
-               or sub.startswith(p.rstrip('/') + '/') for p in only)
+    """A prefix names this output directory or one of its parents."""
+    return any(sub == only_prefix(p) or sub.startswith(only_prefix(p) + '/') for p in only)
 
 
 def wants_sub(only, sub):
-    """Whether output subdir `sub` runs under --only: no prefixes, or one prefix is `sub`, a parent of it or below it."""
-    if not only:
-        return True
-    return names_sub(only, sub) or any(p.rstrip('/').startswith(sub + '/') for p in only)
+    """Include parent jobs when selecting an individual model below them."""
+    return not only or names_sub(only, sub) or any(only_prefix(p).startswith(sub + '/') for p in only)
 
 
 def select_jobs(only):
-    """The jobs whose output subdir `sub` is named by one of the `only` prefixes (all jobs when `only` is empty): the
-    same `names_sub` rule the Spine and scene lists use, so one prefix selects the same way wherever it is read."""
-    if not only:
-        return list(JOBS)
-    return [j for j in JOBS if names_sub(only, j[1])]
+    """Select explicit directories and the two documented Spine aliases."""
+    return [j for j in JOBS if wants_sub(only, j[1])]
 
 
 def enemy_spine_id(container, wanted):
