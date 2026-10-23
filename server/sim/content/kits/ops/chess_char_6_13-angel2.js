@@ -148,8 +148,11 @@ function angel2(bb, chess, def) {
         // PRTS 备注: one round per consumption (the bullets one action spends: the engine's 1st and a kit's further ones
         // in the same tick); each bullet heals and rolls the chance, and each success adds a bombing to the round; the
         // target is chosen once per round, by her (her default targeting, 「始终使用默认索敌逻辑」) among the enemies of the
-        // consumer's range (its own grid, 「不受对方的攻击距离增减」: no 攻击距离 change counts, a permanent one — talents,
-        // modules, bonds, baseRangeKeys' extension — neither [ASSUMED: the note names no exception]); the bombings land BOMB_GAP apart,
+        // consumer's range (its own grid, 「不受对方的攻击距离增减」: no 攻击距离 change counts, nor the permanent 攻击距离 +N
+        // extension of talents, modules and bonds — `s.baseRangeExtend`, baseRangeKeys' [ASSUMED: the note names no
+        // exception]; a grid the unit's module or kit replaces, `u.rangeGrid` — tier4 applyModuleRange, op-aphris's path
+        // —, is its own grid and counts; tier5 moduleRangeUp's no-grid fallback is a rangeExtend buff and is excluded);
+        // the bombings land BOMB_GAP apart,
         // radius BOMB_RADIUS around the target (附着型弹道: it follows the target), with the damage computed when the round
         // is made (「预计算的物理普通伤害」). Until 0.3.2 every success chose its own target with the consumer's sort and hit
         // radius 1 at once (DESIGN §35.28).

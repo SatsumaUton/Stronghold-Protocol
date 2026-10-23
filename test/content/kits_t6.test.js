@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeBattle, enemyRec, chessRec, checkInvariants } from '../helpers/battleHarness.js';
+import { applyModuleRange } from '../../server/sim/content/kits/shared/tier4.js';
 
 const dummy = (o = {}) => enemyRec({ key: 'enemy_dummy', hp: 1e7, speed: 0, ...o });
 const DEFS = {
@@ -645,6 +646,34 @@ test('新约能天使 火力电台: the target among the enemies of the consumer
   h.b.rng = rng;
   h.run(0.3);
   assert.equal(h.dmg.filter((x) => x.src === u.id && x.tags.includes('airstrike') && x.t >= t0 - 1e-9).length, 0, 'no target in the consumer\'s own grid: no bombing');
+});
+
+test('新约能天使 火力电台: a module that replaces the consumer\'s grid defines its own range', () => {
+  const h = battle({
+    units: [{ chessId: 'chess_char_6_13_a', row: 10, col: 1 }, { chessId: 'test_short_a', row: 10, col: 3 }],
+    enemies: [{ key: 'enemy_dummy', pos: [10, 5] }],
+  });
+  const u = h.unit('chess_char_6_13_a'), sh = h.unit('test_short_a');
+  h.step();
+  const d = enemyAt(h, 'enemy_dummy');
+  assert.ok(!h.b.enemiesInKeys(sh.rangeKeys, u).includes(d), 'outside the original grid');
+  // The production module helper replaces rangeGrid, unlike a rangeExtend buff. No current ammo consumer has such
+  // a module, so the fixture supplies one to exercise that distinction (DESIGN §35.28 review).
+  const grid = [[0, 0], [0, 1], [0, 2]];
+  applyModuleRange(h.b, sh, { raw: {
+    module: { active: true, id: 'test:module' },
+    modules: [{ uniEquipId: 'test:module', talentChanges: [{ rangeGrid: grid }] }],
+  } });
+  assert.deepEqual(sh.rangeGrid, grid);
+  assert.ok(h.b.enemiesInKeys(sh.rangeKeys, u).includes(d), 'inside the module grid');
+  const rng = h.b.rng;
+  h.b.rng = Object.assign(() => 0, rng);
+  const t0 = h.b.time;
+  h.b.emit('ammoUsed', { unit: sh, left: 4, skill: sh.skill });
+  h.b.rng = rng;
+  h.run(0.3);
+  assert.equal(h.dmg.filter((x) => x.src === u.id && x.tgt === d.id && x.tags.includes('airstrike') && x.t >= t0 - 1e-9).length, 1);
+  checkInvariants(h.b);
 });
 
 test('新约能天使: S2 steals 70 ASPD from an ally in range, shields both, 35+5 ammo; 火力电台 heals per ammo', () => {
