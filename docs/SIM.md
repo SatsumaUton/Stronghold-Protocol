@@ -1899,3 +1899,6 @@ separate from per-call `spent` replay counts; Node and Worker apply identical st
 retain order, followed by extension up to eight. Zero-leak stopping requires a completed, error-free `cleared`
 result for the evaluated player. Truncated candidates never certify zero or displace completed candidates.
 Default runs have no adaptive limits. See [BOT_STRATEGIES](BOT_STRATEGIES.md) for candidate and takeover details.
+
+Blemishine S3 (§35.91): kit trigger DEFAULT overrides the guardian class condition, while rawRule retains TAKE_DAMAGE.
+No damage/heal settlement or other guardian trigger changes.

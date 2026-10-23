@@ -875,8 +875,8 @@
           "title": {"id":"comment_3","name":"坚若磐石","picId":"comment_icon_3","text":"目标生命值损失最少"},
           "trophies": 4,
           "reward": 400,
-          "stats": {"activatedLayers":200,"bossDamage":441844,"dmgDealt":3867540,"gold":144,"itemsEquipped":14,"kills":291,"leaks":7,"lpLost":7,"merges":5,"perfectRounds":12,"refreshes":27},
-          "lineup": ["6_08_a@12,3[1_02_e_b+4_08_e_a]","2_18_a@11,6[1_01_e_a]","4_20_b@11,7[4_09_e_a+3_08_e_a]","3_17_a@10,3","6_17_a@10,8[4_06_e_b]","3_12_a@9,4","4_14_a@9,8","1_19_a@9,9"],
+          "stats": {"activatedLayers":200,"bossDamage":483109,"dmgDealt":3907198,"gold":144,"itemsEquipped":14,"kills":291,"leaks":7,"lpLost":7,"merges":5,"perfectRounds":12,"refreshes":27},
+          "lineup": ["6_08_a@12,3[1_02_e_b+4_08_e_a]","4_14_a@11,3","2_18_a@11,6[1_01_e_a]","4_20_b@11,7[4_09_e_a+3_08_e_a]","3_17_a@10,3","6_17_a@10,8[4_06_e_b]","3_12_a@9,4","1_19_a@9,9"],
           "bonds": ["deputShip 0/44","indomShip 0/16","kazimierzShip 2/78","kjeragShip 0/8","miraShip 0/10","preciShip 2/32","raidShip 1/19","soloShip 1/59","steadShip 0/43","suntShip 0/16","swiftShip 1/12","victoriaShip 0/25","visiShip 0/26","yanShip 0/5"]
         },
         "ai_1": {
@@ -889,7 +889,7 @@
           "title": {"id":"comment_1","name":"卫戍之星","picId":"comment_icon_1","text":"对敌方领袖造成伤害最高（仅胜利时）"},
           "trophies": 4,
           "reward": 400,
-          "stats": {"activatedLayers":271,"bossDamage":908156,"dmgDealt":4052548,"gold":151,"itemsEquipped":21,"kills":251,"leaks":26,"lpLost":10,"merges":4,"perfectRounds":11,"refreshes":35},
+          "stats": {"activatedLayers":271,"bossDamage":866891,"dmgDealt":4012852,"gold":151,"itemsEquipped":21,"kills":251,"leaks":26,"lpLost":10,"merges":4,"perfectRounds":11,"refreshes":35},
           "lineup": ["5_09_a@12,3","3_15_a@11,3[2_03_e_a+3_10_e_a]","6_08_a@11,6","1_06_b@11,7[5_02_e_a+3_11_e_b]","3_18_a@11,8","5_10_a@10,3[1_05_e_b+1_01_e_b]","6_07_a@10,7[1_05_e_b+3_08_e_a]","6_19_b@10,8[5_01_e_a+3_08_e_b]"],
           "bonds": ["deputShip 1/49","emptyShip 1/8","indomShip 0/16","kazimierzShip 0/32","kjeragShip 0/77","miraShip 1/18","siracusaShip 1/48","soloShip 0/20","steadShip 0/28","suntShip 1/36","swiftShip 1/62","victoriaShip 1/50","visiShip 0/16","yanShip 0/6"]
         }

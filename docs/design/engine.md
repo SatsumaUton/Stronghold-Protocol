@@ -419,3 +419,7 @@ from the cast, so a longer clip holds the next strike [ASSUMED: the ability occu
 need an attack target (`own: false`); skills with their own selectors may take a ready turn without a swing, subject
 to the normal attack's 恐惧 / 缴械 / blocked 战栗 refusals. 管 / 弦 and “萨米的意志”'s custom attack loops hold
 until the cast clip ends too. `attackTurnSkill` returns the selected ability or null.
+
+瑕光 S3 先贤化身 is a sourced guardian exception (§35.91, #789): DEFAULT activates with an attackable enemy in her
+attack range, even at full HP. The official TAKE_DAMAGE row remains rawRule for provenance. The maintainer accepted
+the author video BV1UdAHzNEVj and their recall on 2026-10-24; other guardian skills keep their class rule.

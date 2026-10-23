@@ -1,6 +1,6 @@
 // test/sim/blemsh-s3-trigger.test.js — 瑕光 (chess_char_3_12) S3 先贤化身 开启条件.
 //
-// The owner's decision of 2026-10-18: S3 opens with an attackable target in range — the basic strategy, DEFAULT — at full
+// Author video BV1UdAHzNEVj and maintainer confirmation of 2026-10-24: S3 opens with an attackable target in range — the basic strategy, DEFAULT — at full
 // HP too ("能攻击到人时就会开技能"), not only after a hit. The data's 重装 skill strategy is TAKE_DAMAGE ("不受技能范围影响，
 // 受到伤害时释放技能"), which made a full-HP 瑕光 hold S3 with its SP ready until something damaged her; the kit's spec
 // overrides the rule for this skill (server/sim/content/kits/ops/chess_char_3_12-blemsh.js, `trigger: 'DEFAULT'`). The
@@ -46,6 +46,7 @@ test('3_12 瑕光 S3: full HP + a target in range + SP ready ⇒ opens (DEFAULT)
   h.step(); // the target is in range and her attack is due: the same tick, no extra frame
   assert.equal(u.skill.activations, 1, 'S3 opened with a target at full HP (before the fix it waited for a hit)');
   assert.equal(u.skill.rule, 'DEFAULT', 'the kit overrides the 重装 TAKE_DAMAGE row for S3');
+  assert.equal(ds.rawChess(ID).skills.find((s) => s.skillId === SKILL).trigger.rawRule, 'TAKE_DAMAGE', 'the source table rule remains available');
   assert.equal(seen.length, 1);
   assert.equal(seen[0].reason, 'DEFAULT');
   assert.equal(seen[0].t, t0, 'the same tick the target appeared — no extra frame');
