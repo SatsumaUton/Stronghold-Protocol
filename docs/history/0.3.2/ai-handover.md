@@ -1,7 +1,6 @@
-# Proposed AI handover revision for 0.3.2 — PR #691
+# AI handover revision for 0.3.2 — PR #691 (§35.100)
 
-This is a pending cooperation proposal, not part of the maintainer's 0.3.2 release scope.
-Source: maintainer review of 2026-10-21 on PR #691. No official combat/data rule changes.
+Accepted by the maintainer on 2026-10-24 with a host room toggle defaulting to off. The host can change it before play; disabled rooms omit the option and votes from their state and refuse takeover requests. Five interface languages include the setting and help. No official combat/data rule changes.
 
 - The original server is one room of at most four players. All online, non-autoplay human room teammates vote;
   the downstream fork's multi-group wording does not apply. If no eligible teammates remain, the online host decides.
@@ -13,9 +12,8 @@ Source: maintainer review of 2026-10-21 on PR #691. No official combat/data rule
   The result and reconnect snapshots carry `aiTakeoverRound`. A takeover is not a fresh game under another name.
 - [ASSUMED] Preserve inherited matches as marked local history, including earlier AI performance, but exclude the
   inheritor's record from personal aggregates, peak layers and strategy achievements. Award no personal title,
-  trophies or reward for that inherited seat; other players are unaffected. This conservative attribution policy
-  needs maintainer approval. The request panel and result details explain it; metadata survives history export/import.
-- Vanilla original-content rooms only; isolated gameplay-plugin rooms remain explicitly unsupported. Test-room
+  trophies or reward for that inherited seat; other players are unaffected. This conservative attribution policy is part of the accepted remake-only option. The request panel and result details explain it; metadata survives history export/import.
+- Default-version vanilla co-op rooms only; isolated gameplay-plugin and historical-version matches remain unsupported. Test-room
   acknowledgement and host-only test powers remain unchanged.
 
 Verification: lifecycle WebSocket tests, result/history attribution, token/socket binding, result replay and reconnect;

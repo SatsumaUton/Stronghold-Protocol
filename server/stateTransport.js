@@ -28,6 +28,9 @@ export function negotiateStateDelta(ws, version) {
   connections.delete(ws);
 }
 
+/** The already negotiated capability, for an internal identity handover on the same socket. */
+export function stateDeltaVersion(ws) { return connections.has(ws) ? STATE_DELTA_VERSION : undefined; }
+
 /** Forget the baselines (a new negotiation, or a client that asked for a full resync). The counter never rewinds. */
 export function resetStateDelta(ws) { connections.get(ws)?.kinds.clear(); }
 

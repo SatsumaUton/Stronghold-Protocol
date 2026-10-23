@@ -1195,3 +1195,7 @@ pending work. The normal combat loop and authoritative results retain their exis
 State transport (§35.89): negotiated m.state frames reconstruct ordinary m.public before UI listeners run.
 Room changes reset both endpoints; a sequence gap requests one rate-limited state.resync. Plain clients, m.private
 and replay records keep full frames.
+
+### Optional spectator AI handover (§35.100, PR #691)
+
+The host’s pre-match `room.setAiTakeover {on}` opts a co-op room in; default off. Only default-version vanilla PREP supports requests. Online, non-autoplay humans throughout the room vote by strict majority; if none qualify, the online host decides. The 30-second request is bound to match/round/electorate and is cancelled on membership/eligibility/phase changes. A successful handover preserves the AI seat’s resources and rebinds the spectator token, cancels that seat’s old rehearsal, and resynchronizes its unchanged delta capability. Inherited records retain `aiTakeoverRound` and previous AI metrics but grant no personal aggregates, titles, trophies or reward. These are maintainer-approved remake-only rules [ASSUMED]; see [network](design/network.md) and [handover revision](history/0.3.2/ai-handover.md).

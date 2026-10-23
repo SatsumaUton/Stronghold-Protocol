@@ -440,19 +440,22 @@ send; malformed pre-encoded JSON falls back to ordinary m.public and advances no
 limited and sends a full baseline. Clear both endpoints on room change, retain same-room repeated-hello baselines,
 and keep full replay records. Version negotiation/votes and hello identity ownership remain unchanged.
 
-### Proposed spectator AI handover (PR #691, [ASSUMED])
+### Spectator AI handover (PR #691, §35.100, [ASSUMED])
 
-In an original-content co-op room during PREP, a spectator may send `room.aiRequest {botId}`.
+The host may opt in before the match with `room.setAiTakeover {on}` (default off, co-op only); changing it clears human ready flags. Off, both option/vote keys are omitted from room.state, the client hides the panel, and requests/votes/transfers are refused.
+In an enabled original-content default-version co-op room during PREP, a spectator may send `room.aiRequest {botId}`.
 `room.aiVote {voteId, approve}` records one replaceable vote per online, non-autoplay human teammate.
 Strict majority accepts/rejects; an online host decides if there are no eligible human teammates.
 Requests expire after 30 seconds and cannot transfer a seat during combat or after match disposal.
 `room.state.aiTakeoverVotes` exposes the applicant, AI seat, eligible IDs, yes/no votes and expiry.
 Successful transfer retains the AI player ID, funds and inventory, rebinds the applicant's existing session token,
 and sends `welcome.takeoverFrom` followed by ordinary room/match resynchronization. Test-room admission still
-requires the existing acknowledgement before spectating. Isolated gameplay-plugin rooms are unsupported.
-These are proposed remake-only cooperation rules, not official combat rules; battle goldens are unaffected.
+requires the existing acknowledgement before spectating. Isolated gameplay-plugin and historical-version matches are unsupported.
+These remake-only cooperation rules were accepted by the maintainer on 2026-10-24 with the default-off host toggle; ordinary battle goldens are unaffected.
 
-The [pending 0.3.2 AI handover revision](../history/0.3.2/ai-handover.md) binds requests to a match, round and
+The [0.3.2 AI handover revision](../history/0.3.2/ai-handover.md) binds requests to a match, round and
 unchanged electorate; disconnect/leave, autoplay eligibility, target elimination, phase changes and expiry cancel
 and clear timers. No shrinking-electorate auto-approval. `aiTakeoverRound` is optional in public/private and result
 player rows; local history retains it. [ASSUMED] inherited seat totals do not grant personal awards or aggregates.
+
+The internal welcome preserves the socket’s negotiated delta version and clears its public baseline for a full resync. The inherited seat’s pending pool/delegated rehearsal is cancelled; other seats continue.

@@ -59,7 +59,7 @@ export class MatchRehearsal {
     const task = {
       // protocol ids are ≤ 64 chars (shared/protocol.js isId): prefix, round, seat and a per-match counter
       id: `${this.battlePrefix}.${this.round}.${ps.seat}.${++this._rehearsalSeq}`,
-      job, executor: host.playerId, timer: null,
+      playerId: ps.playerId, job, executor: host.playerId, timer: null,
     };
     // the candidates as the JSON the browser simulates — the same preview inputs the server would build, so both
     // sides compare the same battles. No `cs`: a missing hash means the official data. A spec that names a content
@@ -103,7 +103,7 @@ export class MatchRehearsal {
     const job = createDelegatedRehearsalJob(this, ps, chosen, plans, inputs, cap, limits);
     const task = {
       id: `${this.battlePrefix}.${this.round}.${ps.seat}.${++this._rehearsalSeq}`,
-      job, executor: null, timer: null, cancel: null, kind: 'pool',
+      playerId: ps.playerId, job, executor: null, timer: null, cancel: null, kind: 'pool',
     };
     // the candidates as the worker takes them: the same battle options the local run would build from, with the room's
     // content and rule options, so the pool and this thread simulate the same battles
@@ -184,6 +184,13 @@ export class MatchRehearsal {
    * disposed — a disposed match sends nothing at all (MatchMessaging.sendTo), and the page drops its own tasks when the
    * match on screen is over (public/js/battle/rehearsal.js clear, wired in main.js).
    */
+  /** Stop only the seat that a spectator inherited; its former bot must not apply a late layout. */
+  cancelSeatRehearsal(playerId) {
+    for (const task of [...this._rehearsalTasks.values()]) {
+      if (task.playerId === playerId) this._dropRehearsalTask(task, true);
+    }
+  }
+
   _cancelRehearsal() {
     for (const task of [...this._rehearsalTasks.values()]) {
       // A pool task is cancelled locally even in a disposed match: no frame is involved (the host is not told
