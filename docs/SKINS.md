@@ -133,8 +133,9 @@ choice, not a rule established by the official tables.
 
 In 干员调配 (`screens/loadout.js Detail`) and in the 自选编队 picker's detail (`screens/diy.js DiyPickerView`), the 皮肤
 section sits under the operator's name. 潜能与练度 immediately follows 皮肤 wherever cultivation is offered.
-The preserved 0.3.1 order is 皮肤 → 潜能与练度 → 特质 → 技能 → 局内数值 → 模组 in 干员调配, and
-皮肤 → 潜能与练度 → 局内数值 → 技能 → 模组 in 自选编队 (prototype picks omit cultivation).
+The order is 皮肤 → 潜能与练度 → 特质 → 技能 → 局内数值 → 模组 in 干员调配, and 皮肤 → 潜能与练度 → 技能 →
+局内数值 → 模组 in 自选编队: the picker draws the roster's own sections in the roster's order (a prototype pick omits
+cultivation, so 皮肤 is followed by its locked 技能 and 模组).
 [ASSUMED] This is the existing remake panel order; official tables do not prescribe a skin picker layout.
 
 1. **The section is GLOBAL: every operator shows it, or none does.** The one question `SkinSection` asks is
