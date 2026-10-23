@@ -120,7 +120,10 @@ test('the client renders no research texts of the data (spec / implFormula / how
       // `spec` is the battle runner's BattleSpec (b.start), never a data record's research text
       if (m[1] === 'spec' && /\b(e|entry|msg|cur|battle|b|s|x|loading|pending|task|t|current)\.spec\b|spec\.(cs|seed|fieldId)|\.spec\b\s*\?\?|\bspec\b\s*[,)]/.test(text)) continue;
       if (/^\s*(\/\/|\*)/.test(text)) continue;
-      hits.push(`${path.relative(ROOT, f)}:${line}: ${text.trim().slice(0, 100)}`);
+      // path.relative uses the platform separator; the allow-list below is a POSIX path (Windows CI
+      // reported public\js\ui\detailPanel.js, and this line names item.note twice)
+      const rel = path.relative(ROOT, f).split(path.sep).join('/');
+      hits.push(`${rel}:${line}: ${text.trim().slice(0, 100)}`);
     }
   }
   // the one allowed: 突变细胞's rule line (data/items.json `note`, tools/build-data.mjs ITEM_RULES — a corrected Chinese rule,
