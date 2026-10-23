@@ -100,13 +100,15 @@ function fuzzOne(seed, { fake, rules }, context = {}) {
   return intents;
 }
 
-function runFuzz(t, seed, fake) {
-  const context = { seed, fake };
+function runFuzz(t, seed, fake, rules) {
+  const context = { seed, fake, ...(rules ? { rules } : {}) };
   try {
-    return fuzzOne(seed, { fake }, context);
+    return fuzzOne(seed, { fake, rules }, context);
   } catch (error) {
     t.diagnostic(`Fuzz failure: ${JSON.stringify(context)}`);
-    const pattern = `^fuzz with ${fake ? 'FakeBattle' : 'the real simulation'}:`;
+    const pattern = rules
+      ? `^fuzz with all four rules enabled: ${fake ? 'FakeBattle' : 'real simulation'}$`
+      : `^fuzz with ${fake ? 'FakeBattle' : 'the real simulation'}:`;
     t.diagnostic(`Reproduce: MATCH_FUZZ_SEED=${seed} node --test --test-name-pattern="${pattern}" test/match/fuzz.test.js`);
     throw error;
   }
@@ -135,8 +137,9 @@ test('every generated game intent has a valid protocol shape, including unequip'
   }
 });
 
-test('fuzz with all four rules enabled: 12 fake and 4 real matches', () => {
-  const rules = { shopBias: 'bondBias', prepLoadout: 'prep', morphPairing: 'plus', unequip: 'allow' };
-  for (let seed = 201; seed <= 212; seed++) fuzzOne(seed, { fake: true, rules });
-  for (let seed = 301; seed <= 304; seed++) fuzzOne(seed, { fake: false, rules });
-});
+for (const [fake, first, last] of [[true, 201, 212], [false, 301, 304]]) {
+  test(`fuzz with all four rules enabled: ${fake ? 'FakeBattle' : 'real simulation'}`, (t) => {
+    const rules = { shopBias: 'bondBias', prepLoadout: 'prep', morphPairing: 'plus', unequip: 'allow' };
+    for (let seed = ONLY_SEED ?? first; seed <= (ONLY_SEED ?? last); seed++) runFuzz(t, seed, fake, rules);
+  });
+}

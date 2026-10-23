@@ -43,7 +43,7 @@ function run(pattern, env) {
   return { status: result.status, output: result.stdout + result.stderr };
 }
 
-for (const [fake, seed, pattern] of [[true, 7, '^fuzz with FakeBattle:'], [false, 103, '^fuzz with the real simulation:']]) {
+for (const [fake, seed, pattern] of [[true, 7, '^fuzz with FakeBattle:'], [false, 103, '^fuzz with the real simulation:'], [true, 201, '^fuzz with all four rules enabled: FakeBattle$'], [false, 301, '^fuzz with all four rules enabled: real simulation$']]) {
   test(`fuzz ${fake ? 'FakeBattle' : 'real simulation'} failure prints a command that replays only seed ${seed}`, (t) => {
     const env = fixture(t, seed);
     const failed = run(pattern, env);
