@@ -102,6 +102,8 @@
 - 官方数值边界扫描复用正则读取器，模拟初始化时这一步从约 88 ms 降到约 14 ms（PR #823，@hesperine）。
 ### 工具
 
+- `setup --game` 接受安装目录（含启动器的「Arknights Game」）或资源根目录，解析到 `Arknights_Data/StreamingAssets/AB/Windows`（PlayCover 则到 `Documents/Bundles`）；成功提取后记住该路径，下次未指定 `--game` 时优先用它。自动查找补上「Arknights Game」。`extract.py` 与 setup 共用同一份候选列表（#572，感谢反馈，§35.104）。
+
 - CI 接入八个 Node 22 分片，Node 24 跑守卫，本地 CI 始终全量（PR #836，感谢 @zasx77771，§35.98）。
 
 - 增加确定性测试分片工具，采用 #836 的计权表并校正 CI 文档（PR #835，感谢 @zasx77771，§35.97）。

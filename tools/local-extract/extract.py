@@ -49,7 +49,7 @@ aklz4.py registers a decoder for it. This script pulls the art the web sources l
 
 Usage:
   python3 -m venv .venv && .venv/bin/pip install -r tools/local-extract/requirements.txt
-  .venv/bin/python tools/local-extract/extract.py [--game <AB root>] [--out public/assets/local] [--only <subdir prefix>]
+  .venv/bin/python tools/local-extract/extract.py [--game <install dir or AB root>] [--out public/assets/local] [--only <subdir prefix>]
   python3 tools/local-extract/extract.py --print-jobs     (the job table as JSON, including expectedGroups; needs no dependencies)
   python3 tools/local-extract/extract.py --webp           (only the WebP copies of the board textures and the guide
                                                           pages, from the PNGs already extracted — e.g. the local art
@@ -78,13 +78,155 @@ import operators  # noqa: E402 (installed plugin operators' optional official ar
 
 ROOT = Path(__file__).resolve().parents[2]
 HOME = Path.home()
-CANDIDATES = [
-    HOME / 'Library/Application Support/CrossOver/Bottles/Arknights/drive_c/Program Files/Hypergryph Launcher/games/Arknights/Arknights_Data/StreamingAssets/AB/Windows',
-    HOME / 'Library/Containers/com.hypergryph.arknights/Data/Documents/Bundles',
-    # native Windows installs of the official launcher (default and x86 locations)
-    Path('C:/Program Files/Hypergryph Launcher/games/Arknights/Arknights_Data/StreamingAssets/AB/Windows'),
-    Path('C:/Program Files (x86)/Hypergryph Launcher/games/Arknights/Arknights_Data/StreamingAssets/AB/Windows'),
-]
+# The same list tools/setup.mjs reads (client-candidates.json). Do not keep a second copy here.
+SPEC = json.loads((Path(__file__).resolve().parent / 'client-candidates.json').read_text('utf-8'))
+
+
+def _abs(raw):
+    return Path(os.path.abspath(os.path.expanduser(str(raw))))
+
+
+def _is_ab_root(p):
+    return (p / 'ui' / 'autochess').exists() or (p / 'arts' / 'maps' / 'map_autochess').exists()
+
+
+def _ends_with_ab_tail(p):
+    norm = str(p).replace('\\', '/').rstrip('/')
+    return norm.endswith('/'.join(SPEC['abTail']))
+
+
+def _has_install_marker(p):
+    return (p / 'Arknights.exe').exists() or (p / 'Arknights_Data').exists()
+
+
+def _named_install(directory):
+    for game in SPEC['gameFolders']:
+        child = directory / game
+        if _has_install_marker(child):
+            return child
+    return None
+
+
+def _find_install_root(start):
+    """[ASSUMED] One level of children, then at most 8 ancestors. See tools/setup.mjs findInstallRoot."""
+    if _has_install_marker(start):
+        return start
+    named = _named_install(start)
+    if named is not None:
+        return named
+    try:
+        children = list(start.iterdir()) if start.is_dir() else []
+    except OSError:
+        children = []
+    for child in children:
+        if child.name in SPEC['gameFolders']:
+            continue
+        if _has_install_marker(child):
+            return child
+    cur = start
+    for _ in range(8):
+        parent = cur.parent
+        if parent == cur:
+            break
+        cur = parent
+        if _has_install_marker(cur):
+            return cur
+    return None
+
+
+def _playcover_bundles(directory):
+    text = str(directory)
+    sep = os.sep
+    playcover = (sep + 'com.hypergryph.arknights' + sep) in text or text.endswith(sep + 'com.hypergryph.arknights')
+    for rel in SPEC['playcoverBundleRels']:
+        bundles = directory.joinpath(*rel)
+        if _is_ab_root(bundles):
+            return bundles
+        if playcover and bundles.exists():
+            return bundles
+    return None
+
+
+def resolve_game_dir(raw):
+    """AB root for --game. Install directory, AB root, or PlayCover container. None if it is not a client."""
+    if not raw:
+        return None
+    abs_path = _abs(raw)
+    if not abs_path.exists():
+        return None
+    if _is_ab_root(abs_path) or _ends_with_ab_tail(abs_path):
+        return abs_path
+    bundles = _playcover_bundles(abs_path)
+    if bundles is not None:
+        return bundles
+    install = _find_install_root(abs_path)
+    if install is None:
+        return None
+    return install.joinpath(*SPEC['abTail'])
+
+
+def windows_candidate_suffixes():
+    out = []
+    for base in SPEC['windowsBases']:
+        for game in SPEC['gameFolders']:
+            out.append('/'.join(list(base) + [game] + list(SPEC['abTail'])))
+    return out
+
+
+def build_candidates(home=None, win=None):
+    home = Path(home) if home else HOME
+    if win is None:
+        win = os.name == 'nt'
+    out = []
+    seen = set()
+
+    def add(p):
+        key = str(p)
+        if key not in seen:
+            seen.add(key)
+            out.append(Path(p))
+
+    bottle = SPEC['defaultCrossoverBottle']
+    bottles_root = home.joinpath(*SPEC['crossoverBottles'])
+    names = []
+    if bottles_root.is_dir():
+        try:
+            names = sorted((p.name for p in bottles_root.iterdir() if p.is_dir()), key=lambda n: (n != bottle, n))
+        except OSError:
+            names = []
+    if bottle not in names:
+        names.insert(0, bottle)
+    ab = SPEC['abTail']
+    for n in names:
+        for pf in SPEC['crossoverProgramFiles']:
+            for game in SPEC['gameFolders']:
+                add(bottles_root / n / 'drive_c' / pf / Path(*SPEC['crossoverGameTail']) / game / Path(*ab))
+    add(home.joinpath(*SPEC['playcoverTail']))
+    if not win:
+        for prefix in SPEC['winePrefixes']:
+            for game in SPEC['gameFolders']:
+                add(home / prefix / 'drive_c' / 'Program Files' / Path(*SPEC['crossoverGameTail']) / game / Path(*ab))
+    for drive in SPEC['windowsDrives']:
+        for base in SPEC['windowsBases']:
+            for game in SPEC['gameFolders']:
+                add(Path(drive + ':/').joinpath(*(list(base) + [game] + list(ab))))
+    return out
+
+
+def locate_client(explicit=None):
+    """Resolved --game path, else the first candidate that holds the mode, else the first that exists."""
+    if explicit:
+        return resolve_game_dir(explicit)
+    for p in CANDIDATES:
+        if _is_ab_root(p):
+            return p
+    for p in CANDIDATES:
+        if p.exists():
+            return p
+    return None
+
+
+CANDIDATES = build_candidates()
 
 # In-match emote themes (display_meta_table emoticonData, scene AUTOCHESS_BATTLE), in the order of
 # activity_table autoChessData.enabledEmoticonThemeIdList: (themeId, output dir under emoticon/). The dirs are the
@@ -920,7 +1062,7 @@ def export_token_spines(ab_root, out_root, manifest, log, ids=None):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--game', help='AssetBundle root (…/StreamingAssets/AB/Windows or …/Documents/Bundles)')
+    ap.add_argument('--game', help='install directory or AssetBundle root (…/AB/Windows or PlayCover …/Documents/Bundles)')
     ap.add_argument('--out', default=str(ROOT / 'public/assets/local'))
     ap.add_argument('--manifest', default=str(ROOT / 'data/local-assets.json'))
     ap.add_argument('--plugin-root', default=str(ROOT), help='installation whose plugin JSON and roster are scanned')
@@ -971,9 +1113,9 @@ def main():
     if args.webp:
         return webp_only(Path(args.out), Path(args.manifest), print)
 
-    ab_root = Path(args.game) if args.game else next((p for p in CANDIDATES if p.exists()), None)
+    ab_root = locate_client(args.game)
     if not ab_root or not ab_root.exists():
-        print('No Arknights install found. Pass --game <AssetBundle root>.', file=sys.stderr)
+        print('No Arknights install found. Pass --game <install directory or AssetBundle root>.', file=sys.stderr)
         return 2
     jobs = select_jobs(args.only)
     enemy_ids = spine_ids(args.only, ENEMY_SPINE_SUB, ENEMY_SPINES)

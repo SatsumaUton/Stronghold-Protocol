@@ -291,7 +291,7 @@ containing the plugin JSON and roster; `--only plugin-art/<charId>` narrows the 
   --manifest /tmp/operator-check/local-assets.json
 ```
 
-`--game <AB root>` selects a local game explicitly; otherwise the existing local-install detection applies.
+`--game <install dir or AB root>` selects a local game explicitly; otherwise the existing local-install detection applies.
 
 ### Re-extracting scenes after an update
 
@@ -318,7 +318,7 @@ For inspection without replacing installed assets, the local extractor already s
   --manifest /tmp/grok-r48-p2/scene-extract/local-assets.json
 ```
 
-Use the project's existing extractor venv (on Windows, `.venv-extract/Scripts/python.exe`). `--game <AB root>`
+Use the project's existing extractor venv (on Windows, `.venv-extract/Scripts/python.exe`). `--game <install dir or AB root>`
 overrides the local-install discovery (including the configured CrossOver Arknights bottle); `--scenes <AB root>`
 overrides the archived scene-bundle search before `.cache/official-scenes/*`. **Both** `--out` and `--manifest`
 must point into scratch: `--out` alone still writes the default `data/local-assets.json`. Each scene logs its
