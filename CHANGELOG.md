@@ -74,6 +74,8 @@
 - 官方数值边界扫描复用正则读取器，模拟初始化时这一步从约 88 ms 降到约 14 ms（PR #823，@hesperine）。
 ### 工具
 
+- CI 增加独立的 Ubuntu / Node 22 全量 golden 校验任务（PR #586，感谢 @Xinglan233，§35.68）。
+
 - golden 文档改为通过 --list 查询场景数量，避免手写数量过期（PR #581，感谢 @Xinglan233，§35.67）。
 
 - 修复 dev `23b484c2` 的两处 CI 失败：Windows 上研究文本扫描按 POSIX 路径比对 `path.relative` 的反斜杠，漏放突变细胞的规则行；`golden --list` 在 POSIX 管道上 `process.exit` 会丢掉尚未写完的输出，Ubuntu 的 Node 22 因此把第二期上半的场景名单停在 diy-103。名单改为同步写完再退出，测试把子进程输出接到文件上，并拒绝写到一半的输出和加载失败的 kit。语料与默认版本 golden 不变（§35.65）。
