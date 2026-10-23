@@ -108,7 +108,7 @@ npm start          # 启动服务器：http://localhost:3000
 
 ### 端口与配置
 
-默认监听 **TCP 3000**。换端口：启动脚本加 `--port 3001`，或设置环境变量 `PORT`。
+默认监听 **TCP 3000**。换端口：启动脚本加 `--port 3001`，或设置环境变量 `PORT`。固定私服的同盟密钥：启动脚本加 `--room-code ARK1`（或 `npm start -- --room-code ARK1`），只对本次启动的服务器实例生效；下次不带参数就恢复随机。
 
 | 环境变量 | 默认 | 说明 |
 |---|---|---|
@@ -124,6 +124,8 @@ npm start          # 启动服务器：http://localhost:3000
 | `SP_ASSET_INDEX` | 空 | 素材地址带内容哈希、浏览器长期缓存（0.2.6 起默认开启，哈希存在 `.cache/asset-hashes.json`）；设为 `0` 时关闭，素材清单原样下发 |
 | `SP_VERSIONS` | 不设（只开第二期下半） | 启用官方的其他版本：`all` 或逗号分隔的版本 id（如 `act1autochess,act2autochess@V2_1`）；启用后大厅出现「版本」按钮，房间可投票切换版本。`SP_VERSION_DEFAULT` 指定默认版本，`SP_MAX_VERSION_HOSTS` 限制版本模拟进程数，详见 [DEPLOY.md](docs/DEPLOY.md) §11 |
 | `SP_BOT_STRATEGY` / `SP_EXTERNAL_AI_*` / `SP_LLM_*` | 不设（内置 AI） | 外部 AI 与顾问模式目前只在开发分支上。发布包和 Docker 镜像会忽略这些变量，仍用内置 AI，并打一行日志。详见 [DEPLOY.md](docs/DEPLOY.md) |
+
+`--room-code` 只接受 4 位字母或数字，不是环境变量，也不会跨重启保留；同一时间只能有一个使用该密钥的房间。固定密钥更容易被猜到，建议只在私服 / 局域网使用。
 
 设置方式：macOS / Linux `PORT=8080 npm start`；PowerShell `$env:PORT=8080; npm start`；cmd `set "PORT=8080" && npm start`。健康检查：`GET /healthz`。
 
