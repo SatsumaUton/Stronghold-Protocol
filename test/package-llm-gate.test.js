@@ -82,7 +82,7 @@ test('the marker wins over a present host, and a dev checkout still registers ex
   assert.equal(BOT_STRATEGIES.external?.id, 'external');
   assert.equal(getBotStrategy('external').id, 'external');
   assert.equal(getBotStrategy('external').decide, EXTERNAL_BOT.decide);
-  assert.deepEqual(Object.keys(BOT_STRATEGIES), ['legacy', 'external']);
+  assert.deepEqual(Object.keys(BOT_STRATEGIES), ['legacy', 'external', 'ioleta', 'adaptive', 'ioleta-adaptive']);
 });
 
 test('a packaged server boots and plays a bot match while ignoring external-AI settings', { timeout: 120_000 }, async () => {

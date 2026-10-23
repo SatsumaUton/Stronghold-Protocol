@@ -1,7 +1,7 @@
 // Shared prep orchestration. Actions own policy and validated PlayerState mutations;
 // this module owns their order and yield boundaries. No match state lives in the factory.
 
-const REQUIRED = Object.freeze(['takeOffers', 'sellJunk', 'buyLoopSteps', 'levelUp', 'advisorSpendSteps', 'economyPlan',
+const REQUIRED = Object.freeze(['takeOffers', 'sellJunk', 'buyLoopSteps', 'levelUp', 'advisorSpendSteps', 'spendDown', 'economyPlan',
   'maybeFreeze', 'arrangeSteps', 'equipItems', 'applyPlanSteps', 'resolveTemp', 'hasHandRoom', 'freeHandSlot',
   'rememberOwned', 'ready']);
 
@@ -29,6 +29,7 @@ export function createPrepSteps(actions, { maxRefreshes, arrangeBeforeLevel = fa
       if (arrangeBeforeLevel) yield* ops.arrangeSteps(m, ps);
       ops.levelUp(m, ps, { spare: true });
       yield* ops.advisorSpendSteps(m, ps);
+      ops.spendDown(m, ps);
       ops.maybeFreeze(m, ps);
       yield;
       yield* ops.arrangeSteps(m, ps);

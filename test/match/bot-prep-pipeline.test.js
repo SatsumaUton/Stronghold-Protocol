@@ -8,7 +8,7 @@ function fixture() {
   const ps = { alive: true, ready: false, room: false, advisor: false, chess: [], allChess() { return this.chess; } };
   const m = { autoPickPersonalChoice(player, source) { assert.equal(player, ps); calls.push(['personal', source]); } };
   const actions = {};
-  for (const name of ['takeOffers', 'sellJunk', 'levelUp', 'maybeFreeze', 'equipItems', 'resolveTemp', 'freeHandSlot']) {
+  for (const name of ['takeOffers', 'sellJunk', 'levelUp', 'spendDown', 'maybeFreeze', 'equipItems', 'resolveTemp', 'freeHandSlot']) {
     actions[name] = (match, player, options) => {
       assert.equal(match, m); assert.equal(player, ps); calls.push([name, options]);
     };
@@ -44,7 +44,7 @@ test('prep keeps legacy action order, yield boundaries and delegated job identit
     ['personal', 'bot'], ['takeOffers', undefined], ['sellJunk', undefined],
     ['buyLoopSteps', { fillOnly: true, maxRefreshes: 0 }], ['takeOffers', undefined], ['levelUp', undefined],
     ['buyLoopSteps', { fillOnly: false, maxRefreshes: 16 }], ['takeOffers', undefined], ['levelUp', { spare: true }],
-    ['advisorSpendSteps'], ['maybeFreeze', undefined], ['arrangeSteps'], ['equipItems', undefined],
+    ['advisorSpendSteps'], ['spendDown', undefined], ['maybeFreeze', undefined], ['arrangeSteps'], ['equipItems', undefined],
     ['arrangeSteps', { final: true, defer: true, delegate: true }],
   ]);
 });

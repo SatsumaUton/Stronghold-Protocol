@@ -258,3 +258,6 @@ end under the engine audit (联防 helpers, shared pool and equipment stock, AI 
 through a gameplay-plugin room, whose rehearsal stays on the server. Measured strength and compute cost, with the
 configuration, seeds, version and commands to reproduce them, are in the
 [strategy summary](research/bot-strategies-summary.md).
+
+Legacy and adaptive prep retain §35.63 `spendDown` between advisor spending and freezing, without another yield.
+[ASSUMED] Ioleta procurement owns its refresh budget and omits that legacy sweep. Framework by @HankDUMPLINGZhong; strategies by @Lidong1793.

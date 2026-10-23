@@ -2576,7 +2576,7 @@ export function resolveTemp(m, ps) {
 
 // Explicit operation references keep the default policy and RNG consumption unchanged.
 const LEGACY_PREP_ACTIONS = Object.freeze({
-  takeOffers, sellJunk, buyLoopSteps, levelUp, advisorSpendSteps, economyPlan, maybeFreeze, arrangeSteps, equipItems,
+  takeOffers, sellJunk, buyLoopSteps, levelUp, advisorSpendSteps, spendDown, economyPlan, maybeFreeze, arrangeSteps, equipItems,
   applyPlanSteps, resolveTemp, freeHandSlot, rememberOwned,
   hasHandRoom: (ps) => freeSlot(ps.hand) >= 0,
   ready: (ps) => tryDo(() => ps.setReady(true)),
@@ -2585,6 +2585,8 @@ const LEGACY_PREP_ACTIONS = Object.freeze({
 /** Reuse prep scheduling with explicit operation overrides; definitions hold no per-seat state. */
 export function createBotPrepSteps(actions = {}, policy = null) {
   const economic = policy ? {
+    // [ASSUMED] Ioleta owns its refresh budget; legacy/adaptive retain the expiring-fund sweep.
+    spendDown: () => {},
     takeOffers: (m, ps) => takeOffers(m, ps, policy),
     sellJunk: (m, ps) => sellJunk(m, ps, policy),
     buyLoopSteps: (m, ps, opts) => buyLoopSteps(m, ps, { ...opts, policy }),

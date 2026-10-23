@@ -156,7 +156,7 @@ See [the strategy guide](../BOT_STRATEGIES.md) for the contract, registration an
 
 The opt-in `ioleta` strategy applies [ASSUMED] staged Russell procurement to Russell seats and legacy prep to other
 bands. Its seat-local plan, core-merge/reward ordering and affordable search rules are recorded in
-[§35.18](../history/0.3.2.md#3518-opt-in-russell-procurement-and-adaptive-placement-742). Placement candidates remain independently selectable.
+[§35.83](../history/0.3.2.md#3583-optional-bot-strategies-pr-742-lidong1793). Placement candidates remain independently selectable.
 
 Maintainer decision 2026-10-17, requested 2026-10-19 (§35.8): `external`, a strategy of @HankDUMPLINGZhong's
 #673 framework (§35.7), sends the seat's existing public/private views to operator-configured HTTP(S) or stdio,
