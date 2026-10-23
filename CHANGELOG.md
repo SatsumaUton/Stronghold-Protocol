@@ -104,6 +104,8 @@
 - 官方数值边界扫描复用正则读取器，模拟初始化时这一步从约 88 ms 降到约 14 ms（PR #823，@hesperine）。
 ### 工具
 
+- 信仰搅拌机默认三技能「退休前布道」的两侧攻击范围进入摆阵评分和朝向；精锐模组 SPT-Y 的攻击距离 +1 不加在这格上。部署预览、详情和召唤范围仍是未开技能的直线。技能是弹药、并非全程开启，整场仍按技能范围摆，这一点是 [ASSUMED]（#31，感谢反馈，§35.106）。
+
 - `setup --game` 接受安装目录（含启动器的「Arknights Game」）或资源根目录，解析到 `Arknights_Data/StreamingAssets/AB/Windows`（PlayCover 则到 `Documents/Bundles`）；成功提取后记住该路径，下次未指定 `--game` 时优先用它。自动查找补上「Arknights Game」。`extract.py` 与 setup 共用同一份候选列表（#572，感谢反馈，§35.104）。
 
 - CI 接入八个 Node 22 分片，Node 24 跑守卫，本地 CI 始终全量（PR #836，感谢 @zasx77771，§35.98）。

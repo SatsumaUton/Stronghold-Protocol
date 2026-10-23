@@ -195,6 +195,12 @@ ground route. Different routes may have different supporting allies. The exposur
 regardless of seat count. Supported guards and guards without such an alternative keep their positions.
 These placement assumptions are tracked in [issue #315](https://github.com/sganggs/Stronghold-Protocol/issues/315).
 
+信仰搅拌机's selected 退休前布道 (`skchr_rmixer_3`, the default) is scored and faced on that skill's own grid (both sides
+and one tile farther; the record's `skills[].rangeGrid`). `attackRangeGrid` — the deploy overlay, the card and
+`summonRange` — stays on the base line: the skill text is 「攻击范围扩大」 without 「被动效果：」. SPT-Y's 攻击距离 +1 does not
+grow this planned grid (PRTS 备注: the skill range ignores 攻击距离). S1 and S2 keep `attackRangeGrid`. [ASSUMED] The
+skill is ammo and is not up for the whole fight; the plan still uses the skill-on grid (#31, §35.106).
+
 [ASSUMED] Blocking medics prefer legal tiles outside the enemy road, then road tiles supported by allied damage,
 then any legal fallback when neither exists (#577). The supported-road test is the same as the guard repair above:
 every incoming ground route needs an ally covering both the medic's tile and its preceding contact tile; different

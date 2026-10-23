@@ -307,7 +307,8 @@ they act on (a 盟誓 / 驰援 card on its bonds, 升华, …). Placement uses t
 over the own board (ground: the stage's device-aware ground paths; flyers: through their checkpoints) and weighted by
 its enemies; an exposure model (time on each tile × DPS against the round's armour of the units covering it — each
 unit's cover is the range it is deployed with under the player's loadout, `rangeRec` = `attackRangeGrid`, the grid the
-server's `summonRange` and the card use —, blocker hold time, anti-air only on flying routes) is maximized greedily
+server's `summonRange` and the card use — except 信仰搅拌机 S3, which is planned on that skill's own two-side grid,
+and which SPT-Y does not grow (#31) —, blocker hold time, anti-air only on flying routes) is maximized greedily
 (blockers, then damage dealers, then healers) over the server's deploy map (no 深水区, PlayerState.deployMap); a
 blocker whose range is its own tile only (range 0-1, the one grid (0,0): 角峰, 古米, 泡泡, 折桠, 菲莱, 蛇屠箱, 塞雷娅, 余) takes a free
 tile of the enemy road first — it blocks and hits nothing off it — and only when the road has none free any legal tile (0.2.2, PR #339 by

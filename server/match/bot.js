@@ -39,7 +39,7 @@
 //      (owner 2026-10-04 for the 高台 preference, 2026-10-05 for who may use one). It stays a blocker in the lineup
 //      (basePositionClass). A blocker whose range grid is its own tile only (range 0-1: 角峰, 古米, 泡泡, 折桠, 菲莱, 蛇屠箱,
 //      塞雷娅, 余) is planned on a free tile of the enemy road first: off it nothing is blocked or hit. Each unit's range grid — the one it is
-//      deployed with, rangeRec (loadoutRecord attackRangeGrid) — is rotated per direction (DESIGN §3; RIGHT is tried first
+//      deployed with, rangeRec (loadoutRecord attackRangeGrid; 信仰搅拌机 S3 uses that skill's grid as-is, #31) — is rotated per direction (DESIGN §3; RIGHT is tried first
 //      and kept on ties, so symmetric ranges and melee units whose front adds nothing stay facing the gates), so
 //      ranged units turn toward the enemy path tiles they cover best and blockers toward the road; on 气流 tiles
 //      (act2 m01 blowers) the DPS is scaled by the blower ATK bonus of that direction (with / against / across). The last
@@ -985,20 +985,27 @@ function dpsVs(rec, def, res) {
 /**
  * The record a chess fights with for range purposes: its range grid replaced by the one it is deployed with under the
  * player's loadout — a passive 攻击范围扩大 skill, a module's range or 攻击距离 (shared/loadoutRecord.js attackRangeGrid:
- * what the server's summonRange, the deploy wheel and the card use since 0.1.1) — else the record itself. Cached per
- * player and loadout.
+ * what the server's summonRange, the deploy wheel and the card use since 0.1.1) — else the record itself. 信仰搅拌机 S3
+ * is the exception: the planner uses that skill's own grid and does not grow it (§35.106). Cached per player and loadout.
  */
 export function rangeRec(ps, rec) {
   if (!rec || !rec.chessId || typeof ps.loadoutFor !== 'function') return rec;
   const lo = ps.loadoutFor(rec);
-  const key = `${rec.chessId}|${lo ? `${lo.skill ?? ''}:${lo.module ?? ''}` : ''}`;
+  const key = `${rec.chessId}|${lo ? `${lo.skillIndex ?? lo.skill ?? ''}:${lo.moduleId ?? lo.module ?? ''}` : ''}`;
   const cache = ps._botRangeRecs || (ps._botRangeRecs = new Map());
   if (cache.has(key)) return cache.get(key);
   let out = rec;
   try {
     // 0.2.0 补位: a human's not-owned chess (AI 托管) is deployed as its stand-in — that body's range
     const body = typeof ps.fieldRecord === 'function' ? ps.fieldRecord(rec) || rec : rec;
-    const g = attackRangeGrid(loadoutRecord(body, resolveRecordLoadout(body, lo)));
+    const resolved = loadoutRecord(body, resolveRecordLoadout(body, lo));
+    let g = attackRangeGrid(resolved);
+    // 信仰搅拌机 S3 退休前布道 (skchr_rmixer_3). The skill text is 「攻击范围扩大」 without 「被动效果：」, so attackRangeGrid
+    // (the deploy overlay, the card and summonRange) keeps the base line. PRTS 备注: 此技能的攻击范围不受「攻击距离」属性影响
+    // — SPT-Y's +1 does not grow it (the kit's targeting.noRangeExtend). [ASSUMED] The skill is ammo and is not up for
+    // the whole fight; scoring and facing still use this grid for the deployment (#31).
+    const sk = resolved && resolved.skill;
+    if (sk && sk.skillId === 'skchr_rmixer_3' && Array.isArray(sk.rangeGrid) && sk.rangeGrid.length) g = sk.rangeGrid;
     if (Array.isArray(g) && g.length && JSON.stringify(g) !== JSON.stringify(rec.rangeGrid)) out = Object.freeze({ ...rec, rangeGrid: g });
   } catch { out = rec; }
   cache.set(key, out);
