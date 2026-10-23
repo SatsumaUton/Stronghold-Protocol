@@ -489,6 +489,17 @@ flow, the bottom bar, the 快速配置 columns, the 转场 timings, and ONE comb
 data lists two DIY slots (`charChessDiySlotIdList`). Both views read and write the same loadout store, so the room and
 the server see nothing new.
 
+Automatic combat screen wake lock restores the official mobile client's screen-awake experience. App requests it
+for players and spectators when `isCombatPhase(phase)` holds for a valid ongoing match; an ended/absent room or an
+existing result does not qualify. 设置 →「全屏时保持屏幕常亮」 (`fullscreenWakeLock`, default false) is an additional
+opt-in for fullscreen on any app screen, persisted in `sp.pref.settings`. One App-level hook owns both reasons, so
+overlapping combat and fullscreen keep the same lock. When neither reason holds, on hiding the page or unmounting,
+release the lock and cancel a pending gesture retry; returning visible while active requests again. A failed normal
+request retries once on the next pointer/touch gesture, and a failed retry stays silent. Late results are released.
+The short fullscreen hint links to a tooltip describing HTTPS or a trustworthy local address, Screen Wake Lock API
+support, foreground visibility, and possible system restrictions. Hover, keyboard focus, or a tap opens it; outside
+input or Escape closes it. Only iOS/iPadOS shows the Low Power Mode caveat; device detection affects this text only.
+
 The title and lobby offer explicit recovery of a previously saved local match seat. `sp.matches` stores bounded name /
 room-code metadata indexed by token hash; the existing four-entry `sp.tokens` ring remains the authority. Recovery
 rechecks BroadcastChannel claims before selecting the token in memory and reconnecting in the same document.

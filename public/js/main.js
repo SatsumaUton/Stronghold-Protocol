@@ -57,7 +57,8 @@ import { audio, installAudio } from './audio.js';
 import { installLobbyMedia } from './ui/lobbyMedia.js';
 import { settingsStore } from './ui/settings.js';
 import { GuideHost } from './ui/guide.js';
-import { installDeviceSupport } from './ui/device.js';
+import { installDeviceSupport, useFullscreen, useScreenWakeLock } from './ui/device.js';
+import { isCombatPhase } from './ui/gameLogic/phases.js';
 import { registerImportedAssetWorker } from './assetCache.js';
 import { LoadoutHost } from './screens/loadout.js';
 import { StatsHost, useStatsOpen } from './screens/stats.js';
@@ -351,6 +352,11 @@ function ScreenCrashed({ error, reset }) {
 
 function App() {
   const route = useStore(selectRoute);
+  const combatActive = useStore((s) => selectRoute(s) === 'game' && s.room?.inMatch === true
+    && !s.match?.result && isCombatPhase(s.match?.public?.phase));
+  const fullscreenWakeLock = useStore((s) => s.fullscreenWakeLock, Object.is, settingsStore);
+  const fullscreenActive = useFullscreen();
+  useScreenWakeLock(combatActive || (fullscreenWakeLock && fullscreenActive));
   useLang(); // a language switch re-renders the whole tree in place
   const [error, resetError] = useErrorBoundary((err) => console.error('[ui] screen crashed', err));
   const Screen = SCREENS[route] || LobbyScreen;

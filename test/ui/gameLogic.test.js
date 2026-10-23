@@ -740,7 +740,7 @@ describe('keyboard & settings', () => {
   test('sanitizeSettings', () => {
     assert.deepEqual(sanitizeSettings(null), { ...DEFAULT_SETTINGS });
     assert.deepEqual(sanitizeSettings({ bgm: 3, sfx: -1, voice: 2, muted: 'yes', damageNumbers: false, quality: 'ultra' }),
-      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, bondTimers: false, combatMetrics: false, prepDeployFold: true, quality: 'high', officialFx: 'auto', otherSkins: true, textSize: 'sm', keys: { ...DEFAULT_SETTINGS.keys } },
+      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, fullscreenWakeLock: false, bondTimers: false, combatMetrics: false, prepDeployFold: true, quality: 'high', officialFx: 'auto', otherSkins: true, textSize: 'sm', keys: { ...DEFAULT_SETTINGS.keys } },
       'a saved profile without `keys` (before 0.2.0) gets the default key map (test/ui/feedback5-hotkeys.test.js)');
     // 显示其他玩家的皮肤 (docs/SKINS.md): on by default, and off only when the profile says so
     assert.equal(DEFAULT_SETTINGS.otherSkins, true);
@@ -769,6 +769,27 @@ describe('keyboard & settings', () => {
     for (const bad of ['native', 'JP', 'ja', 1, null]) assert.equal(sanitizeSettings({ voiceLang: bad }).voiceLang, 'cn', String(bad));
     assert.equal(sanitizeSettings({ bgm: 0.333 }).bgm, 0.33);
     assert.equal(sanitizeSettings({ quality: 'low' }).quality, 'low');
+  });
+  test('fullscreen wake lock is opt-in and accepts only boolean saved values', () => {
+    assert.equal(DEFAULT_SETTINGS.fullscreenWakeLock, false);
+    for (const profile of [null, undefined, {}, { bgm: 0.5 }, { fullscreenWakeLock: undefined }]) {
+      assert.equal(sanitizeSettings(profile).fullscreenWakeLock, false);
+    }
+    for (const value of [true, false]) assert.equal(sanitizeSettings({ fullscreenWakeLock: value }).fullscreenWakeLock, value);
+    for (const value of ['true', 1, null, {}, []]) assert.equal(sanitizeSettings({ fullscreenWakeLock: value }).fullscreenWakeLock, false);
+  });
+  test('the old combat wake lock preference never enables fullscreen wake lock', () => {
+    assert.equal(Object.hasOwn(DEFAULT_SETTINGS, 'screenWakeLock'), false);
+    for (const screenWakeLock of [true, false]) {
+      const migrated = sanitizeSettings({ screenWakeLock });
+      assert.equal(migrated.fullscreenWakeLock, false);
+      assert.equal(Object.hasOwn(migrated, 'screenWakeLock'), false);
+      for (const fullscreenWakeLock of [true, false, undefined, null, 'true', 1]) {
+        const settings = sanitizeSettings({ screenWakeLock, fullscreenWakeLock });
+        assert.equal(settings.fullscreenWakeLock, fullscreenWakeLock === true);
+        assert.equal(Object.hasOwn(settings, 'screenWakeLock'), false);
+      }
+    }
   });
 });
 
