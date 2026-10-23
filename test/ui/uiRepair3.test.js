@@ -78,7 +78,7 @@ describe('detail card vs a press on the field', () => {
     const end = src.indexOf("screen.addEventListener('pointerdown', onDown, true)", start);
     const h = src.slice(start, end);
     assert.ok(h.length > 0);
-    assert.match(h, /if \(!live\.current\.detail \|\| e\.target\?\.closest\?\.\('\.dpanel'\)\) return;\s+setDetail\(null\)/);
+    assert.match(h, /if \(!live\.current\.detail \|\| e\.target\?\.closest\?\.\('\.dpanel, \.bpop, \.bslot, \.dbond'\)\) return;\s+if \(e\.target\?\.closest\?\.\('\.gm__field'\) && !closesOnFieldPress\(live\.current\.detail\)\) return;\s+setDetail\(null\)/);
     assert.ok(end > start, 'the handler listens on the whole game screen, including the HUD');
     assert.match(src.slice(end, end + 100), /screen\.addEventListener\('pointerdown', onDown, true\)/);
   });

@@ -1413,7 +1413,8 @@ function MatchScreen() {
     const screen = hudElRef.current?.parentElement;
     if (!screen) return undefined;
     const onDown = (e) => {
-      if (!live.current.detail || e.target?.closest?.('.dpanel')) return;
+      if (!live.current.detail || e.target?.closest?.('.dpanel, .bpop, .bslot, .dbond')) return;
+      if (e.target?.closest?.('.gm__field') && !closesOnFieldPress(live.current.detail)) return;
       setDetail(null);
     };
     screen.addEventListener('pointerdown', onDown, true);
