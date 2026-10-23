@@ -92,6 +92,8 @@
 - 统计页新增版本筛选（默认当前版本，可选「全部版本」），其他版本的对局带版本标签；卫戍认证等级与成就统计按期分开计算；在大厅回看其他版本的结算时临时载入该版本，关闭后恢复，不改大厅版本；服务器没有提供的版本不能回看，载入时随时可「返回统计」，校验失败可重试；盟约最高叠加若来自其他版本的对局，只显示盟约与层数，阵容和装备需切换到该版本查看（各版本的棋子与装备编号会指向不同的干员和装备）；断线后才收到的结算也按那局的版本记录（DESIGN §35.23）。
 ### 插件／稳定性
 
+- 内容插件房间复用同一个模拟 Worker：一份内容只 `load` 一次，之后每回合只 `start` 新的战斗。换内容、离开房间、Worker 失败或关掉页面才停。回合之间的 `clear` 不再关掉还能用的 Worker，也留着还没送到服务器的本页结算（#864，感谢 @1nsaneeee，§35.105）。
+
 - 插件与内容的结算入口统一为 `server/sim/attack.js`：结算辅助函数都从这里导入，不再引用内部文件，本身不改变任何行为（PR #796，感谢 @Siornya，§35.30）；其后的对象写法 `dealDamage` / `dealHPLose` / `heal` / `dealElementDamage` / `healElement` 见 SIM.md §4（PR #802，§35.32），结算约定写入 design/engine.md 与 SIM.md（PR #856，感谢 @Siornya，§35.35）。
 - 插件 SDK：`kit.onHitBy` / `onHitOn` 在伤害计算与伤判之前触发，`kit.onDamagedOn` 在扣血之后触发（被屏障完全吸收时为 0，被闪避时不触发）；`kit.byEnemyAttack` 不再排除带 counter / reflect 标签的敌方伤害；`battle.dealHPLose(目标, 数值, { type })` 与对象写法一样按 type 计算防御 / 法抗，结算入口收到无效请求时记录错误并返回 0（PLUGINS.md「SDK hit and damage helpers」，PR #802 合入时的修订，§35.32）。
 - 插件文档：SIM.md §3 的 `addBuff` 补全伤判字段（`damageReduction`、`reductionGroup`、`injury`、`observeInjury`、`injuryPriority`、`keepEmptyShield`）与加算属性 `artsAttackAddition`；固定减伤 `damageReduction` 同名取最高、不同名叠加（名称为 `reductionGroup`，否则为增益的 key），按单位生成 key 的减伤需共用 `reductionGroup` 才不叠加（§35.44–§35.46）。

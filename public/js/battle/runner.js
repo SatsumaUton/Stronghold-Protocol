@@ -77,6 +77,8 @@
 // simulation's; a vanilla room's sends none, as before). An official version's set (DESIGN §35.23: content.js
 // loadVersionSet, `version` on simContent) is a content set like any other here, except that it runs on this page's own
 // Battle (its data only, no script) instead of the plugin Worker, so 作战统计 works as on the original content.
+// A plugin set keeps one Worker for that content: `load` once, then `start` each round. `clear` parks it. It stops
+// when the content set changes, the page leaves the room, the Worker fails, or the runner is disposed.
 //
 // createBattleRunner(deps) builds an instance with injectable net / store / clock / frame scheduler / sim loader
 // (test/match/runner.test.js and test/match/runner-pending.test.js drive it under Node).
@@ -233,6 +235,29 @@ export function createBattleRunner(deps) {
   }
   /** @type {Map<string, any>} battleId → entry of a b.start still being prepared (prepare(); `battle` null until built) */
   const pending = new Map();
+  /** One idle remote host for the content set it loaded. In-page hosts are not parked. */
+  let parked = null;
+  /** Entries clear() removed that still hold a pending or undelivered b.result. */
+  const retained = [];
+  function releaseParked() {
+    if (!parked) return;
+    const host = parked.host;
+    parked = null;
+    try { host.stop(); } catch { /* already stopped */ }
+  }
+  function takeParked(cs) {
+    if (!parked) return null;
+    if (parked.cs !== cs || parked.host.stopped) { releaseParked(); return null; }
+    const host = parked.host;
+    parked = null;
+    return host;
+  }
+  /** Park one healthy remote host. A second idle host for the same set is stopped (two live fields already have their own). */
+  function parkHost(host, cs) {
+    if (!host?.remote || host.stopped || !cs) { try { host?.stop(); } catch { /* ignore */ } return; }
+    if (parked && parked.host !== host) releaseParked();
+    parked = { host, cs };
+  }
   let cur = null;              // entry on screen
   let simP = null;
   /** the content set simP was loaded for (null: the original content) */
@@ -279,6 +304,7 @@ export function createBattleRunner(deps) {
   function ensureSim(cs = null) {
     const vanilla = vanillaCs();
     const want = typeof cs === 'string' && vanilla != null && cs !== vanilla ? cs : null;
+    if (parked && parked.cs !== want) releaseParked();
     if (simP && simCs === want) return simP;
     simCs = want;
     const p = (want ? contentFor(want).then((content) => {
@@ -566,7 +592,7 @@ export function createBattleRunner(deps) {
     const send = (tries) => {
       let req;
       try { req = net.request('b.result', msg, { timeout: 15000 }); } catch (err) { req = Promise.reject(err); }
-      return Promise.resolve(req).then(() => { e.delivery = 'delivered'; }, (err) => {
+      return Promise.resolve(req).then(() => { e.delivery = 'delivered'; dropRetained(e); }, (err) => {
         const code = err && err.code;
         if (code === 'TIMEOUT' && tries > 0) return send(tries - 1);
         if (LOST_RESULT_CODES.includes(code)) {
@@ -574,6 +600,7 @@ export function createBattleRunner(deps) {
           console.warn(`[runner] b.result not delivered (${code}) — sent again when the session resumes`);
         } else {
           e.delivery = 'delivered';
+          dropRetained(e);
           console.warn('[runner] b.result refused', code);
           recordError('runner', code, 'b.result refused');
         }
@@ -583,9 +610,15 @@ export function createBattleRunner(deps) {
     send(1);
   }
 
-  /** The session is back: every result lost with the socket goes out again. */
+  function dropRetained(e) {
+    const i = retained.indexOf(e);
+    if (i >= 0) retained.splice(i, 1);
+  }
+
+  /** The session is back: every result lost with the socket goes out again, including one clear() already dropped. */
   function redeliver() {
     for (const e of entries.values()) if (e.delivery === 'undelivered') deliver(e);
+    for (const e of [...retained]) if (e.delivery === 'undelivered') deliver(e);
   }
 
   /** Solo pause (m.public.paused): freeze / resume every local battle clock. */
@@ -636,6 +669,7 @@ export function createBattleRunner(deps) {
     const authority = e.authoritative;
     e.failed = true; e.authoritative = false; e.done = true;
     e.host?.stop();
+    if (parked && parked.host === e.host) parked = null;
     stats.errors++;
     recordError('runner', err, 'plugin worker stopped');
     const text = t('插件卡死，本场由服务器接管');
@@ -802,12 +836,20 @@ export function createBattleRunner(deps) {
       if (!csAccepted(e.spec.cs)) e.authoritative = false;
       let battle;
       try {
-        e.host = deps.createHost ? deps.createHost(sim, err => failWorker(e, err)) : sim.remote
-          ? new WorkerSimHost({ onFailure: err => failWorker(e, err), timeoutMs: deps.workerTimeoutMs })
-          : new InPageSimHost();
+        const reused = sim.remote ? takeParked(sim.cs) : null;
+        if (reused) {
+          reused.onFailure = (err) => failWorker(e, err);
+          e.host = reused;
+        } else {
+          e.host = deps.createHost ? deps.createHost(sim, err => failWorker(e, err)) : sim.remote
+            ? new WorkerSimHost({ onFailure: err => failWorker(e, err), timeoutMs: deps.workerTimeoutMs })
+            : new InPageSimHost();
+        }
         if (e.host.remote) {
-          await e.host.load(sim.cs, sim.content);
-          if (!wanted()) return;
+          if (!reused) {
+            await e.host.load(sim.cs, sim.content);
+            if (!wanted()) return;
+          }
           await e.host.start(e.spec);
         } else { e.host.sim = sim; e.host.start(e.spec, { logger }); }
         battle = e.host.battle;
@@ -850,7 +892,8 @@ export function createBattleRunner(deps) {
     } catch (err) {
       if (e.host?.remote) failWorker(e, err); else throw err;
     } finally {
-      if (entries.get(e.battleId) !== e) e.host?.stop();
+      // A host parked by clear() is still the next round's worker. Anything else this prepare no longer owns stops.
+      if (entries.get(e.battleId) !== e && parked?.host !== e.host) e.host?.stop();
       if (pending.get(e.battleId) === e) pending.delete(e.battleId);
       if (loading === e) { loading = null; publishState(); }
     }
@@ -900,20 +943,38 @@ export function createBattleRunner(deps) {
   /**
    * Drop every battle (a new round's prep, the match ended, the player left). Each dropped battle keeps its last
    * combat snapshot in combatHistory for the panel's match totals; `keepMetrics` false (a new match) starts over.
+   * A healthy plugin Worker stays parked for the next round of the same content set. Results not yet delivered stay
+   * in `retained` so a later resume can send them.
    */
   function clear({ keepMetrics = false } = {}) {
     ++startSeq;
     loading = null;
     for (const e of entries.values()) {
       // never drop an unreported authoritative result (the round already moved on: the server has its own).
-      // A Worker battle is ended by stopping its host below, not by forceEnd on the page-side stub.
+      // An in-page battle forceEnds here. A Worker battle is not forceEnded: the server takes an unfinished one,
+      // and a finished one's result is retained below.
       if (!e.host?.remote && e.authoritative && !e.resultSent && e.battle && !e.battle.finished) { try { e.battle.forceEnd('forced'); } catch { /* ignore */ } }
       rememberCombat(e);
     }
     // a battle still being prepared too: its preparation finds itself gone and stops (prepare). Snapshot first:
     // host.stop() drops the in-page Battle the meter reads.
     for (const e of pending.values()) rememberCombat(e);
-    for (const e of [...entries.values(), ...pending.values()]) e.host?.stop();
+    const dropped = [...entries.values(), ...pending.values()];
+    for (const e of dropped) {
+      if (e.result && (e.delivery === 'pending' || e.delivery === 'undelivered')) retained.push(e);
+    }
+    let keep = null;
+    for (const e of dropped) {
+      const host = e.host;
+      if (!host) continue;
+      // Only a host that already started a battle is reusable. One still inside load stays with prepare's finally.
+      if (host.remote && !host.stopped && !e.failed && e.battle && (e.sim?.cs || host.cs) && keep == null) {
+        keep = e;
+        continue;
+      }
+      try { host.stop(); } catch { /* already stopped */ }
+    }
+    if (keep) parkHost(keep.host, keep.sim?.cs || keep.host.cs);
     pending.clear();
     entries.clear();
     if (!keepMetrics) forgetCombat();
@@ -952,6 +1013,8 @@ export function createBattleRunner(deps) {
       if (!phase || ['PREP', 'ROUND_START', 'SP_DRAFT', 'RESULT', 'LOBBY', 'INFO_CHECK', 'BAND_DRAFT', 'BATTLE_CHECK'].includes(phase)) {
         if (entries.size || pending.size) clear({ keepMetrics: !resetMetrics });
       }
+      // Leaving the room drops the parked Worker even when RESULT already cleared the entries.
+      if (!pub || phase === 'LOBBY') releaseParked();
       // warm the simulation up as soon as a match runs (the first b.start then starts at once) — on the room's content set
       // when it plays one (DESIGN §32.6), or its official version's (§35.23)
       const roomCs = s && s.room && s.room.content && (s.room.content.vanilla === false || typeof s.room.version === 'string') ? s.room.content.cs : null;
@@ -1071,7 +1134,11 @@ export function createBattleRunner(deps) {
     _frame: frame,
     _pump: pump,
     onStart, onPool, onEnd, clear, ensureSim, redeliver, setPaused,
-    dispose() { clear(); for (const off of offs) { try { off?.(); } catch { /* ignore */ } } },
+    dispose() {
+      clear();
+      releaseParked();
+      for (const off of offs) { try { off?.(); } catch { /* ignore */ } }
+    },
   };
 }
 
