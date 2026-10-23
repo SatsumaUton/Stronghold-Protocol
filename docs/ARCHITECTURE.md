@@ -171,8 +171,18 @@ public/assets/ ─────────▶ public/js/render/, public/js/audio
   "Official versions (M0)"; DESIGN §35.22).
 - **On the server**, `server/data.js` loads the files once; the match reads them through `server/match/gamedata.js`,
   the sim through `server/sim/simdata.js`, which turns every record into a frozen engine def.
-- **In the browser**, `public/js/data.js` fetches the same files once per page for the UI, and the battle runner loads
-  its own frozen copies for the sim (`loadBrowserSim` → `setSimData`), so both sides simulate from the same data.
+- **In the browser**, `public/js/data.js` fetches the same files once per page for the UI, and the battle runner hands
+  the sim those parsed files (`loadBrowserSim` `reuse`, adopting them as they are and freezing them there → `setSimData`;
+  only `waves` — which the UI never loads — is downloaded for the sim), so both sides simulate from the same data and
+  the page holds one object graph instead of two. The freeze happens when the sim loads, not when the page does: the
+  sim's guarantee (a content bug that writes into a record fails on both sides) starts at the first battle, and the
+  main thread's frozen objects are what the rehearsal Worker receives as its own structured-clone copy. `reuse` is only
+  for the original content: a room's content set passes its own files (`data`), and the loader adopts files only while
+  the page's owner (`reuseOwner` → `data.contentId`) is the original — checked around every retrieval — so a set that is
+  already in the store, or adopted while the load is in flight, is never handed to the original simulation. Measured with the loader called directly (Node 22.22.2, Apple M1, a fresh process
+  per run, heapUsed after GC): the loader's own allocation drops from 34.3 MiB to 26.0 MiB — the ten adopted files are
+  5.19 MB of JSON and are not parsed again. In a browser the absolute numbers differ; the saving is the same second copy
+  that no longer exists.
 - **Languages.** Chinese is the source language; every other language is a pack — `public/i18n/<code>.json` (UI
   strings) and optionally `data/i18n/<code>.json` (game texts), listed by the server at `/packs/index.json`
   (`server/packs.js`; PACKS.md). The English game texts come from the official EN client (`tools/build-i18n.mjs` →
