@@ -6,7 +6,7 @@
 // chess.json and the directories of SP_VERSION_DATA_DIRS (path.delimiter-separated, e.g. a dry build); none → skipped.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadData, getData } from '../server/data.js';
@@ -61,7 +61,7 @@ test('the base against itself has no finding; a code-named buff key the version 
   const reads = codeReads();
   const keys = codeBuffKeys();
   assert.deepEqual(audit(data, data, { reads, keys, names: NAMES }), { findings: [], missingBuffKeys: [], unknownTriggerRules: [], versionOnlyKeys: [], versionOnlyFields: [] });
-  assert.ok(reads.get('no_attack_duration')?.some((r) => r.default === 10 && r.file === 'server/sim/content/bonds/addon/battle.js'));
+  assert.ok(reads.get('no_attack_duration')?.some((r) => r.file === 'server/sim/content/bonds/addon/battle.js'));
   assert.ok(keys.has('act2autochess_equip_acarm055_global_buff'), 'items/battle.js names it');
   const items = Object.fromEntries(Object.entries(data.items).filter(([, r]) => r.effectId !== 'eff_acarm055' && r.effectId !== 'eff_acgarm055'));
   const effects = Object.fromEntries(Object.entries(data.effects).filter(([id]) => id !== 'eff_acarm055' && id !== 'eff_acgarm055'));
@@ -72,13 +72,13 @@ test('the base against itself has no finding; a code-named buff key the version 
 test('unknown trigger rules: a rule outside TRIGGER_RULES is listed once per rule, table and skill, with its owners', () => {
   const skill = (rule) => ({ skillId: 'sk_t', trigger: { rule, rawRule: rule } });
   const data = {
-    chess: { c1_a: { skills: [skill('DEFAULT'), skill('AUTO_STOP')] }, c2_a: { skill: skill('AUTO_STOP') } },
-    backups: { units: { char_t: { forms: { '2/1/4/0': { skills: [skill('AUTO_STOP')] } } } } },
+    chess: { c1_a: { skills: [skill('DEFAULT'), skill('UNKNOWN_RULE')] }, c2_a: { skill: skill('UNKNOWN_RULE') } },
+    backups: { units: { char_t: { forms: { '2/1/4/0': { skills: [skill('UNKNOWN_RULE')] } } } } },
     tokens: { t1: { skill: skill('SP_FULL') } },
   };
   assert.deepEqual(unknownTriggerRules(data), [
-    { rule: 'AUTO_STOP', table: 'backups', skillId: 'sk_t', owners: ['char_t'] },
-    { rule: 'AUTO_STOP', table: 'chess', skillId: 'sk_t', owners: ['c1_a', 'c2_a'] },
+    { rule: 'UNKNOWN_RULE', table: 'backups', skillId: 'sk_t', owners: ['char_t'] },
+    { rule: 'UNKNOWN_RULE', table: 'chess', skillId: 'sk_t', owners: ['c1_a', 'c2_a'] },
   ]);
   assert.deepEqual(unknownTriggerRules(getData({ log: QUIET })), [], 'the default data uses only implemented rules');
 });
@@ -116,14 +116,7 @@ test('version-only fields: a field the version carries under a key and buff the 
   assert.deepEqual(versionOnlyFields({ bonds: {} }, version, reads), []);
 });
 
-// 上半's 斩业星熊 S3 (skchr_hsgma2_3, 自选) triggers on AUTO_STOP, which the engine does not implement: M2 builds it or
-// keeps 斩业星熊 out of 上半's 自选 (DESIGN §35.22.5). A version adding another unknown rule fails here.
-const UNKNOWN_RULES_SHANG = Object.freeze([{ rule: 'AUTO_STOP', table: 'backups', skillId: 'skchr_hsgma2_3', owners: ['char_1044_hsgma2'] }]);
-const UNKNOWN_RULES = Object.freeze({ 'data/versions/act1autochess': UNKNOWN_RULES_SHANG, 'data/versions/act1autochess-v1_1': UNKNOWN_RULES_SHANG });
-
-// 上半's keys that 下半 lacks and no code names: each is an inert mechanic there until M2 (DESIGN §35.22.5) — 煌 / 蜜莓 /
-// 伊芙利特 / 极光's traits, 华法琳 / 寒芒克洛丝's grant (上半 spells its field give_garrion_id, garrisons/battle.js reads
-// give_garrison_id), the 标准模拟 band clause, 灵巧 / 远见's layer awards and six 上半 equipment keys. A new one fails here.
+// M0's inventory: all historical keys now have handlers; new unknown keys must fail.
 const rec = (spec) => spec.split(' | ').flatMap((part) => { const [table, ids] = part.split(': '); return ids.split(' ').map((id) => ({ table, id })); });
 const VERSION_ONLY_SHANG = Object.freeze(Object.entries({
   act1autochess_band31_buff: 'bands: band_amiya band_bldsk band_duyaoy band_sarkazb | effects: aceffect_band_21 aceffect_band_22 aceffect_band_28 aceffect_band_44',
@@ -181,7 +174,7 @@ const MISSING_KEYS = Object.freeze({
 });
 
 for (const dir of VERSION_DIRS) {
-  test(`${path.relative(ROOT, dir) || dir}: the field gaps — 上半: 突袭's no_attack_duration (default 10) and 炎's 9-member fields; 下半 V2_1: none`, () => {
+  test(`${path.relative(ROOT, dir) || dir}: historical field gaps stay visible, without the modern raid idle trigger`, () => {
     const data = loadData(dir, { log: QUIET });
     const { findings, missingBuffKeys } = audit(getData({ log: QUIET }), data, { reads: codeReads(), keys: codeBuffKeys() });
     const rel = path.relative(ROOT, dir).split(path.sep).join('/');
@@ -192,25 +185,22 @@ for (const dir of VERSION_DIRS) {
     }
     const has = (key, field) => findings.find((f) => f.table === 'bonds' && f.key === key && f.field === field);
     const idle = has('raidShip', 'no_attack_duration');
-    assert.ok(idle?.nonNeutral, 'raidShip.no_attack_duration');
-    assert.ok(idle.reads.some((r) => r.default === 10 && r.file === 'server/sim/content/bonds/addon/battle.js'));
+    assert.ok(idle && !idle.nonNeutral, 'historical raid does not inherit a 10-second trigger');
+    assert.ok(idle.reads.some((r) => r.file === 'server/sim/content/bonds/addon/battle.js'));
     assert.ok(has('yanShip', 'ex_bond_char_cnt'), 'yanShip.ex_bond_char_cnt');
   });
 
   test(`${path.relative(ROOT, dir) || dir}: its trigger rules the engine does not implement are exactly the known ones`, () => {
     const rel = path.relative(ROOT, dir).split(path.sep).join('/');
-    const want = UNKNOWN_RULES[rel];
-    const got = unknownTriggerRules(loadData(dir, { log: QUIET }));
-    if (want) assert.deepEqual(got, want);
-    else assert.deepEqual(got, [], `${rel}: unknown trigger rules ${got.map((u) => u.rule).join(', ')} (list them for M2)`);
+    assert.deepEqual(unknownTriggerRules(loadData(dir, { log: QUIET })), [], `${rel}: unknown trigger rules`);
   });
 
   test(`${path.relative(ROOT, dir) || dir}: its keys the default data lacks and no code names are exactly the known ones`, () => {
     const rel = path.relative(ROOT, dir).split(path.sep).join('/');
     const want = VERSION_ONLY[rel];
     const got = versionOnlyKeys(getData({ log: QUIET }), loadData(dir, { log: QUIET }), NAMES);
-    if (want) assert.deepEqual(got, want);
-    else assert.deepEqual(got, [], `${rel}: version-only keys ${got.map((v) => v.key).join(', ')} (list them for M2)`);
+    for (const { key } of want || []) assert.ok(NAMES.has(key), `${rel}: ${key} needs a handler`);
+    assert.deepEqual(got, [], `${rel}: unknown historical keys`);
   });
 
   test(`${path.relative(ROOT, dir) || dir}: its fields under keys the default data also has are exactly the known ones`, () => {
@@ -219,3 +209,17 @@ for (const dir of VERSION_DIRS) {
     assert.deepEqual(got, VERSION_ONLY_FIELDS[rel] ?? [], `${rel}: version-only fields (list them for M2)`);
   });
 }
+
+// M2 deliberately preserves strict diagnostics: every surviving entry must have a reviewed reason.
+test('all remaining historical audit entries are documented, without suppressing diagnostics', () => {
+  const review = JSON.parse(readFileSync(new URL('../docs/research/versions/blackboard-review.json', import.meta.url), 'utf8'));
+  const reads = codeReads(), keys = codeBuffKeys();
+  for (const report of review.reports) {
+    const actual = audit(getData({ log: QUIET }), loadData(path.join(ROOT, report.dir), { log: QUIET }), { reads, keys, names: NAMES });
+    for (const kind of Object.keys(actual)) {
+      const identity = ({ reads, refs, nonNeutral, reason, ...entry }) => entry;
+      assert.deepEqual(actual[kind].map(identity), report[kind].map(identity), `${report.dir} ${kind}`);
+      for (const entry of report[kind]) assert.ok(entry.reason?.length > 20, `${report.dir} ${kind}: missing reason`);
+    }
+  }
+});

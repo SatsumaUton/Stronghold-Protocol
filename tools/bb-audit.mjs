@@ -34,7 +34,7 @@
 //
 // Usage: node tools/bb-audit.mjs [--base data] --data <dir> [--data <dir>…] [--json] [--strict]
 //   --base    the reference data directory (default: data/)
-//   --data    a version's data directory (repeatable)
+//   --data    a version's data directory (repeatable; omitted: all historical versions)
 //   --json    machine-readable report on stdout: [{ dir, findings: [...], missingBuffKeys: [...], unknownTriggerRules: [...],
 //             versionOnlyKeys: [...], versionOnlyFields: [...] }]
 //   --strict  exit code 1 when any finding, missing buff key, unknown trigger rule, version-only key or version-only
@@ -45,6 +45,7 @@ import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadData } from '../server/data.js';
+import { VERSIONS } from '../shared/versions.js';
 import { TRIGGER_RULES } from '../shared/plugins/skillSpec.js';
 import { maskComments } from './check-imports.mjs';
 
@@ -360,7 +361,7 @@ function parseArgs(argv) {
     else if (a === '--strict') o.strict = true;
     else return { error: `unknown option ${a}` };
   }
-  if (!o.data.length) return { error: 'at least one --data <dir> is required' };
+  if (!o.data.length) o.data = VERSIONS.filter((v) => v.dir).map((v) => path.join(ROOT, 'data', v.dir));
   return o;
 }
 

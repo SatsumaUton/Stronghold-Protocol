@@ -66,3 +66,8 @@ node tools/golden.mjs --twice                   # determinism: the corpus twice 
 The original stand-in / DIY seeds remain as outcome regressions even when they field no such operator. The
 `coop2-NORMAL-1-unowned-roster` scenario supplies no owned NORMAL operators, so stand-in coverage does not depend on
 the bot choosing one of a small set of missing operators. `coop2-NORMAL-5-coverage-diy` covers the DIY path.
+
+Historical versions (0.3.2 M2): pass `--version <official-id>` to use the snapshot in an isolated process/worker.
+The six corpora live under `<versionSlug>/`; root JSON files remain the default. Generate a historical corpus with
+`node tools/golden.mjs --version act1autochess --update --twice`; the second pass reverses scenario order.
+`test/versions-golden.test.js` checks corpus identity, engine errors and representative worker execution.

@@ -1151,6 +1151,26 @@ flag alters movement or 失衡.
   maxCharges, active, timeLeft, ammoLeft, ammoMax, activations, kind, rule, bb` (`ammoMax`: the most bullets the running ammo skill
   has held — set at activation, raised by skillStart additions and `addAmmo` above it; 0 when inactive).
 
+### Historical version execution (M2)
+
+`DataSource.raw.config.version.rules` selects historical deployment ordering and boss mirror behavior. A non-default
+`BattleSpec` carries `version`; an explicit version must match the supplied data. Default specs omit it to preserve
+existing replay/digest bytes. One official data set belongs to one process/worker; the tools bootstrap it before
+importing content. First-season `AUTO_STOP` manually closes after half duration with an in-range enemy, subject to
+operation cooldown and silence. `costMul` multiplies paid deployment costs (neutral 1).
+
+```bash
+node tools/golden.mjs --version act1autochess --update --twice
+node tools/golden.mjs --version act2autochess@V2_1
+node tools/botbench.mjs --version act1autochess@V1_1 --seeds 1 --rehearsal 1
+node tools/bb-audit.mjs --strict
+```
+
+Goldens are stored in `test/golden/<slug>/`. The audit still reports intentional differences; every surviving entry
+has a reason in [blackboard-review.json](research/versions/blackboard-review.json), enforced by a test. Unknown rules
+and unhandled version-only keys must be empty. The earlier M0 inventory below is superseded by
+[history §35.22.7–8](history/0.3.2.md#35227-historical-core-rules-m2); operator kits remain a separate workstream.
+
 ### 7.2 Kits
 
 ```js

@@ -79,7 +79,7 @@ import { BOSS_ROW_OFFSET } from '../../../constants.js';
 import { GEO } from '../../../../../shared/constants.js';
 import {
   num, bondRecord, buffParams, bondTier, bondLayers, isMember, isElite, isGroundOp, onField, playerOps, passiveBuff,
-  fxOn, N4, N8, directMods, COLS,
+  fxOn, N4, N8, directMods, COLS, isFirstPeriod,
 } from '../../support/index.js';
 
 export const ID = Object.freeze({
@@ -139,7 +139,7 @@ function applyPassives(battle, st) {
     const mods = directMods({ atk: num(bb.base_atk) + num(bb.atk_per_stack) * L(battle, st, ID.preci) });
     if (wide) { mods.defIgnorePct = num(bb.power_def_penetrate); mods.resIgnorePct = num(bb.power_magic_resist_penetrate); }
     for (const u of st.ops) {
-      if (st.members[ID.preci].has(u) || (wide && u.def?.position === 'RANGED')) passiveBuff(battle, u, KEY.preci, mods);
+      if (isFirstPeriod() ? u.def?.position === 'RANGED' : st.members[ID.preci].has(u) || (wide && u.def?.position === 'RANGED')) passiveBuff(battle, u, KEY.preci, mods);
     }
   }
   if (t[ID.stead]) {
@@ -158,6 +158,8 @@ function applyPassives(battle, st) {
     const milestone = num(bb.power_bond_stack_cnt, Infinity);
     if (lv >= milestone) {
       const mods = { aspd: num(bb.power_attack_speed) };
+      if (bb.power_cost_scale != null) mods.costMul = num(bb.power_cost_scale, 1);
+      if (bb.power_respawn_time != null) mods.redeployMul = num(bb.power_respawn_time, 1);
       for (const u of st.ops) passiveBuff(battle, u, KEY.raidAspd, mods);
       if (!st.raidMilestone) { st.raidMilestone = true; for (const u of st.members[ID.raid]) if (onField(u)) { fxOn(battle, 'bondMilestone', u, KEY.raid, 'aspd'); break; } }
     }
@@ -178,7 +180,7 @@ function applyPassives(battle, st) {
     const lv = L(battle, st, ID.skillful);
     const v = num(bb.base_attack_speed) + num(bb.attack_speed_per_stack) * lv;
     if (!st.auraMods || st.auraMods.aspd !== v) st.auraMods = { aspd: v };
-    st.auraWide = lv >= num(bb.power_bond_stack_cnt, Infinity);
+    st.auraWide = isFirstPeriod() || lv >= num(bb.power_bond_stack_cnt, Infinity);
   }
 }
 
@@ -200,7 +202,7 @@ function applyStatic(battle, st) {
     const taken = Math.max(0, 1 - num(bb.damage_resistance));
     for (const u of st.ops) {
       passiveBuff(battle, u, KEY.empty, { physTakenMul: taken, artsTakenMul: taken });
-      if (st.members[ID.empty].has(u)) {
+      if (isFirstPeriod() || st.members[ID.empty].has(u)) {
         passiveBuff(battle, u, KEY.emptyDmg, { dmgDealtMul: num(isElite(u) ? bb.damage_scale_extra : bb.damage_scale_normal, 1) });
       }
     }
@@ -407,7 +409,7 @@ function raidRefreshContact(battle, u) {
 
 function raidPoll(battle, st) {
   const bb = st.bb[ID.raid];
-  const idle = num(bb.no_attack_duration, 10);
+  const idle = num(bb.no_attack_duration, isFirstPeriod() ? Infinity : 10);
   // Ordinary and post-revive orders stay separate: one poll can hold a member of each.
   let plain = null, taunted = null;
   for (const u of st.members[ID.raid]) {
@@ -487,6 +489,15 @@ export function install(battle) {
   const byPid = Object.create(null);
   for (const st of states) { byPid[st.pid] = st; applyPassives(battle, st); applyStatic(battle, st); }
   const has = (id, tier = 1) => states.some((st) => (st.tiers[id] ?? 0) >= tier);
+
+  if (states.some((st) => st.tiers[ID.preci] >= 2 && num(st.bb[ID.preci]?.silence) > 0)) {
+    battle.on('attack', ({ attacker, targets }) => {
+      const st = attacker && byPid[attacker.ownerId];
+      if (!st || st.tiers[ID.preci] < 2 || attacker.def?.position !== 'RANGED') return;
+      const duration = num(st.bb[ID.preci]?.silence);
+      if (duration > 0) for (const target of targets) if (target?.side === 'enemy' && target.alive) battle.applyStatus(target, 'silence', { duration, source: attacker });
+    });
+  }
 
   // live layers
   if (states.some((st) => Object.keys(st.tiers).some((id) => LAYERED.has(id)))) {
@@ -630,6 +641,8 @@ export function install(battle) {
         // "可被无来源伤害消耗反伤机会")
         if (dmg.tags?.includes('bond:stead:share') || dmg.steadThorn || c.type === 'element' || isHpLoss(dmg) || !st.members[ID.stead].has(t)) return;
         const bb = st.bb[ID.stead];
+        // Season one has damage sharing, without a retaliation clause: emit no zero-damage hit either.
+        if (bb.base_damage_value == null && bb.damage_value_per_stack == null) return;
         const last = t.mem[STEAD_CD] ?? -Infinity;
         if (battle.time - last < num(bb.cd_duration) - 1e-9) return;
         t.mem[STEAD_CD] = battle.time;
@@ -641,7 +654,7 @@ export function install(battle) {
         const d = battle.makeDamage({ amount: num(bb.base_damage_value) + num(bb.damage_value_per_stack) * L(battle, st, ID.stead), type: 'arts', canDodge: false, sourceless: true });
         d.steadThorn = true;
         battle.dealDamage(t, src, d);
-        if (src.alive) battle.applyStatus(src, 'fragile', { duration: num(bb['weak[limit]'], 5), value: num(bb.damage_scale, 1) - 1, source: t });
+        if (src.alive && bb.damage_scale != null) battle.applyStatus(src, 'fragile', { duration: num(bb['weak[limit]'], 5), value: num(bb.damage_scale, 1) - 1, source: t });
         return;
       }
       if (!arcane || c.type !== 'arts' || t.side !== 'enemy' || !t.alive) return;

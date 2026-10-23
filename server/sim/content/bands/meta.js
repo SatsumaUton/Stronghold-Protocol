@@ -537,4 +537,14 @@ export function registerMeta(registry) {
     if (h) registry.band(id, h);
   }
   registry.global('bands_ducklord', duckGlobal);
+  registry.global('bands_devices', {
+    onRoundStart(ctx) {
+      for (const holder of [ctx, ...ctx.teammates()]) {
+        for (const b of buffsOf(bandRecord(holder.bandId()))) {
+          if (b.key !== 'auto_chess_change_map') continue;
+          for (const [alias, on] of Object.entries(b.p)) if (alias.startsWith('trap_') && alias.includes('#')) ctx.setDeviceActive(alias, !!on);
+        }
+      }
+    },
+  });
 }

@@ -686,10 +686,10 @@ test('夕: on a version\'s build her generic-kit dragon follows her charId (any 
 // =====================================================================================================================
 // bands
 
-test('auto_chess_change_map: Touch\'s map characters have a battle part and count as team support; 上半\'s 森蚺 device switch has neither (M2)', (t) => {
+test('auto_chess_change_map: Touch\'s map characters have a battle part and count as team support; 第一期\'s 森蚺 device switch also supports the team', (t) => {
   t.after(() => setGameData(null));
   // the bands carrying the key in each directory → whether it is Touch's map-character shape
-  const want = { band_amedic: true, band_zumama: false };
+  const want = { band_amedic: true, band_zumama: true };
   for (const dir of DIRS) {
     const data = dataOf(dir);
     setGameData(data);

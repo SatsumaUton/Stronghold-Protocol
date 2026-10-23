@@ -288,8 +288,8 @@ function installVictoria(battle, pid, bb, members) {
   for (const u of members) {
     const ids = S.itemsOf(u);
     if (!ids.length) continue;
-    let add = 0;
-    for (const id of ids) add += S.isGoldenId(id) ? golden : normal;
+    let add = num(bb.power_atk, 0);
+    if (bb.power_atk == null) for (const id of ids) add += S.isGoldenId(id) ? golden : normal;
     if (add > 0) S.passiveBuff(battle, u, 'bond:victoria:atk', S.directMods({ atk: add }));
   }
 }
@@ -413,11 +413,12 @@ function devour(battle, pid, bb, members) {
   // nothing — it is forced out, so it is never knocked out again, revived or devoured. Per players' reports (community
   // report #3, GitHub #33 item 3), owner's decision 2026-10-04; until 0.1.2 the forced exit came first and the chain broke.
   const downAtStart = (u) => egirDownAtStart(battle, u);
-  const order = members.filter((u) => S.onField(u) || downAtStart(u)).sort(egirOrder);
+  // Historical text says bottom then left; [ASSUMED] season one's unspecified order follows its deployment.
+  const order = members.filter((u) => S.onField(u) || downAtStart(u)).sort(S.isVersionData()
+    ? (a, b) => a.tileR - b.tileR || boardCol(a) - boardCol(b) || a.id - b.id : egirOrder);
   // the operator in front, whoever owns it (until 0.1.3 only the player's own): a living one, else one lying there since
   // the 联防 start (carry.down, forced out) — a teammate's included
-  const opAt = (u) => {
-    const [r, c] = S.frontTile(u);
+  const opAtTile = (r, c) => {
     const a = S.allyAt(battle, r, c);
     if (a) return S.isOp(a) && a.alive ? a : null;
     const d = battle.downOn(r, c);
@@ -426,24 +427,32 @@ function devour(battle, pid, bb, members) {
   const markedBy = new Map(); // marker → [targets]
   const marks = [];
   for (const m of order) {
+    const trench = S.itemsOf(m).map((id) => S.buffParams(S.itemRecord(id), 'act1autochess_equip_acarm078_global_buff')).find(Boolean);
+    const targets = (u) => S.itemsOf(u).some((id) => S.buffParams(S.itemRecord(id), 'act1autochess_equip_acarm078_global_buff'))
+      ? S.N4.map(([dr, dc]) => opAtTile(u.tileR + dr, u.tileC + dc)).filter(Boolean) : [opAtTile(...S.frontTile(u))].filter(Boolean);
     const mine = [];
     const seen = new Set([m]);
     const queue = [m];
     for (let guard = 0; queue.length && guard < 64; guard++) {
       const x = queue.shift();
-      const t = opAt(x);
-      if (!t || seen.has(t)) continue;
-      if ((markedBy.get(t) ?? []).includes(m)) continue;
-      seen.add(t);
-      mine.push(t);
-      // through a marked 阿戈尔 (for the player's own operators: exactly its members; a teammate's by its own bonds)
-      if (S.isMember(battle, t, 'egirShip')) queue.push(t);
+      for (const t of targets(x)) {
+        if (seen.has(t)) continue;
+        if ((markedBy.get(t) ?? []).includes(m)) continue;
+        seen.add(t);
+        mine.push(t);
+        // through a marked 阿戈尔 (for the player's own operators: exactly its members; a teammate's by its own bonds)
+        if (S.isMember(battle, t, 'egirShip')) queue.push(t);
+      }
     }
     markedBy.set(m, mine);
     if (!mine.length) continue;
     let atk = 0, block = 0;
     for (const t of mine) { atk += num(t.base.atk, 0); block += num(t.base.blockCnt, 0); marks.push([m, t]); }
     const mods = {};
+    if (trench && S.itemsOf(m).some((id) => id.replace(/_[ab]$/, '') === trench.equip_chess_id)) {
+      // [ASSUMED] "等量生命值" uses the victims' base max HP, matching the devour's base ATK/block inheritance.
+      mods.hpFlat = mine.reduce((n, t) => n + num(t.base.maxHp), 0);
+    }
     if (atk > 0) mods.atkFinal = atk; // 最终加算 (units.js _recalc)
     if (block > 0) mods.blockCnt = block;
     if (Object.keys(mods).length) S.passiveBuff(battle, m, 'bond:egir:devour', mods);

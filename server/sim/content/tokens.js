@@ -1261,7 +1261,8 @@ function yanyouKit(bb, raw) {
   const sk = skills.find((s) => s.prefabKey === 'Skill_2') ?? skills.find((s) => s.prefabKey === 'Skill') ?? skills[0] ?? {};
   const maxTargets = Math.max(1, Math.floor(num(tal['1.attack@max_target'], 1)));
   const epRatio = num(tal['2.ep_damage_ratio'], 0);
-  const fragMul = num(tal['2.damage_scale'], 1);
+  // V1_1 text promises 15% 元素脆弱; [ASSUMED] the older ep_damage_scale names the same HP-damage multiplier.
+  const fragMul = num(tal['2.damage_scale'] ?? tal['2.ep_damage_scale'], 1);
   const radius = num(raw?.stats?.rangeRadius, 0) > 0 ? num(raw.stats.rangeRadius, 0) : 2;
   const moveSpeed = num(raw?.stats?.moveSpeed, 1);
   const cd = num(sk.cooldown, 0);

@@ -11,8 +11,8 @@
 // V1_2 opened on 11-25 with 23c99d5d; the 12-05 commit added 莎草's module, 娜斯提 to the owned 自选 pool, the ray / Mon3tr
 // 自选 modules and 10 bond texts (DATA.md pins row), and changed three battle templates the build does not read. A split
 // at 12-05 is open for the maintainer (DESIGN §35.22).
-// [ASSUMED] every field the data does not hold falls back to 下半: the rules (inert in M0, read in M2), the research
-// (docs/research/ until docs/research/versions/act1autochess/ exists) and the 下半-measured tables, which are left out.
+// M2 reads these rules and the per-version research. Other missing research still falls back to 第二期 [ASSUMED];
+// the later measured draft/stock tables remain excluded. See docs/history/0.3.2.md §35.22.7.
 
 export default Object.freeze({
   id: 'act1autochess',
@@ -31,7 +31,7 @@ export default Object.freeze({
   pools: Object.freeze({ pool_chess_glady: Object.freeze(['char_263_skadi', 'char_143_ghost', 'char_218_cuttle']) }),
   config: Object.freeze({
     hiddenCore: Object.freeze({ single: 300, multi: 1000 }), // PRTS 卫戍协议：盟约: >300 / >1000 layers
-    // [ASSUMED] inert in M0 (nothing reads them before M2): deploy order row by row from the bottom (PRTS 卫戍协议/帮助,
+    // Deploy order row by row from the bottom (PRTS 卫戍协议/帮助,
     // changed on 2026-03-14), a timed solo prep (300 s), no bench equipment, no full-bench swap, no boss shared by both
     // sides (news 5114 lists the last three as 下半 additions)
     rules: Object.freeze({ deployOrder: 'rowBottomUp', soloTimed: true, benchEquip: false, benchFullSwap: false, bossMirrorShare: false }),

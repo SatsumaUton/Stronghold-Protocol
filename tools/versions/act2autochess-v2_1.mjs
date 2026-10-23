@@ -34,7 +34,7 @@ export default Object.freeze({
     default: '1457587e48fe65361f523821d24e6d14c3b91713',
   }),
   adapters: Object.freeze(['launchModes', 'launchMilestones']),
-  research: 'docs/research/',
+  research: 'docs/research/versions/act2autochess-v2_1/',
   tables: 'default',
   config: Object.freeze({
     hiddenCore: Object.freeze({ single: 350, multi: 1200 }),
