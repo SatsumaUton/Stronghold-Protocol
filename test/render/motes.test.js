@@ -41,6 +41,7 @@ describe('微尘的几何（render/motes.js）', () => {
     const ring = new MoteRing({ PIXI: P, getTexture: () => null });
     try {
       ring.setState(1, 0);
+      assert.equal(ring.sprites[0].position.y, -MOTE_ART.y);
       const a = [ring.sprites[0].position.x, ring.sprites[0].position.y];
       ring.update(1);
       const b = [ring.sprites[0].position.x, ring.sprites[0].position.y];
@@ -87,7 +88,7 @@ describe('微尘的几何（render/motes.js）', () => {
       for (const s of ring.sprites) {
         assert.equal(s.width, MOTE_ART.w);
         assert.equal(s.height, MOTE_ART.h);
-        assert.equal(Math.round(Math.hypot(s.position.x, s.position.y - MOTE_ART.y)), MOTE_ORBIT.normal);
+        assert.equal(Math.round(Math.hypot(s.position.x, s.position.y + MOTE_ART.y)), MOTE_ORBIT.normal);
       }
       // 半圈之后第 0 枚跑到对面
       const before0 = [ring.sprites[0].position.x, ring.sprites[0].position.y];
@@ -99,7 +100,7 @@ describe('微尘的几何（render/motes.js）', () => {
       // S2：六枚 + 更大半径
       ring.setState(6, 1);
       assert.equal(ring.sprites.length, 6);
-      for (const s of ring.sprites) assert.equal(Math.round(Math.hypot(s.position.x, s.position.y - MOTE_ART.y)), MOTE_ORBIT.wide);
+      for (const s of ring.sprites) assert.equal(Math.round(Math.hypot(s.position.x, s.position.y + MOTE_ART.y)), MOTE_ORBIT.wide);
 
       // 撞掉两枚 → 少两个亮点
       ring.setState(4, 1);
@@ -175,11 +176,16 @@ describe('微尘的接线（interp + units）', () => {
       // 每帧都驱动：在一张没有模型的普通视图上证明 update() 会调 _syncMotes（不牵扯整套 actor 更新）
       const plain = new UnitView(fakeViewCtx(fake.P, { cam }), { id: 9, side: 'ally', kind: 'op', defId: 'char_x', tier: 3, x: 5, y: 10, maxHp: 1000, dir: 'RIGHT' });
       try {
-        let driven = 0;
+        let driven = 0, elapsed = 0;
+        plain.ctx.animRate = () => 2;
         const orig = plain._syncMotes.bind(plain);
-        plain._syncMotes = (dt) => { driven++; return orig(dt); };
+        plain._syncMotes = (dt) => { driven++; elapsed += dt; return orig(dt); };
         plain.update(0.02, cam(), 1);
         assert.equal(driven, 1, 'update() 每帧调 _syncMotes');
+        assert.equal(elapsed, 0.04, 'orbit follows the game clock at double speed');
+        plain.ctx.animRate = () => 0;
+        plain.update(0.02, cam(), 2);
+        assert.equal(elapsed, 0.04, 'paused clock does not advance the orbit');
       } finally { plain.destroy(); }
       // 装上模型（spine + 官方区域都就位）
       const spine = new fake.P.Container();

@@ -79,9 +79,9 @@
 //
 // Picking is by tile (render/pick.js, user playtest #4 item 1): views carry no hit shapes; `bounds()` is the drawn body's
 // screen rect for tooltips and overlays (view.pieceScreenRect). A dragged (lifted) item plate is drawn centred on its
-import { MoteRing } from './motes.js';
 // ground point, i.e. on the pointer (render/app.js).
 
+import { MoteRing } from './motes.js';
 import { UF, ANIM } from '../../../shared/constants.js';
 import { SpineActor } from './spine.js';
 import { skillAttackMode } from './skillAttack.js';
@@ -1370,6 +1370,7 @@ export class UnitView {
 
   /** Destroy the current Spine actor (and its impostor) and release its asset entry (model swap / destroy). */
   _dropActor() {
+    if (this.moteRing) { this.moteRing.destroy(); this.moteRing = null; }
     if (this.imp) {
       try { if (this.imp.slot) this.ctx.impostors?.free(this.imp.slot); this.imp.sprite.destroy(); if (this.imp.rt) this.imp.rt.destroy(true); } catch { /* ignore */ }
       this.imp = null;
@@ -1645,7 +1646,7 @@ export class UnitView {
   /** @param {number} dt real seconds @param {any} cam camera @param {number} t real clock */
   update(dt, cam, t) {
     if (this.destroyed) return;
-    this._syncMotes(dt);
+    this._syncMotes(dt * (this.ctx.animRate?.() ?? 1));
     if (this._pendingDeployElapsed != null) this._pendingDeployElapsed += dt * (this.ctx.animRate?.() || 1);
     // a displacement's slide (slideTo): held where it stood until the snapshot with the destination is shown, then
     // eased into the sampled position (sync keeps `lx, ly` current) under a constant deceleration

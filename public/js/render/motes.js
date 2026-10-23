@@ -130,7 +130,7 @@ export class MoteRing {
     for (let i = 0; i < this.n; i++) {
       const s = this.sprites[i];
       if (!s) continue;
-      s.position.set(pts[i][0], pts[i][1] + MOTE_ART.y);
+      s.position.set(pts[i][0], -(pts[i][1] + MOTE_ART.y)); // Spine display coordinates have y down.
       s.rotation = 0;                    // the motes stay upright while the ring turns
       s.alpha = 1;
     }
