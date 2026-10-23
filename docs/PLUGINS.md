@@ -1139,7 +1139,9 @@ export default function setup(sp) {
 by battle, never in a module variable. Child hosts and browsers run setup in the composition's
 resolved load order. While composing a set, a disposable child probes each plugin's registrations (5 s default ceiling per
 uncached plugin (`SP_SCRIPT_PROBE_MS`) [ASSUMED]). The parent combines the registration reports in load order and rejects conflicts.
-The probe uses SIGKILL on timeout; spawnSync waits for the child to exit before composition returns a failure.
+The probe uses SIGKILL on timeout; spawnSync waits for the child to exit before composition returns a failure, whose
+message names the ceiling and the variable (`script setup exceeded 5000 ms; child terminated (SIGKILL); a slow or busy
+server can raise SP_SCRIPT_PROBE_MS`, GitHub #847).
 Results, including failures, are cached per registry by plugin id + lock hash + actual descriptor hash + normalized
 settings (256 recent results [ASSUMED]); changing settings or executable bytes requires another probe. This also
 prevents a stale or missing lock in an explicit CLI test from reusing another source's result.

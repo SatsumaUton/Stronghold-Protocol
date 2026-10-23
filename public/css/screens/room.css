@@ -20,7 +20,8 @@
    Safari `pretty` and `balance` broke 「シミュレー|ション開始」 inside the word at 小 on the phones; 选择模拟协议's own button
    keeps `pretty`, lobby.css); the picker's names below */
 .rs-hint, .rs-brief p, .rs-brief li { text-wrap: pretty; }
-.rseat__add, .rseat__wait small { text-wrap: balance; }
+/* (§35.51: the empty seat's invite hint too — 「…仲間を招|待」 at 大 in a 1024×600 window) */
+.rseat__add, .rseat__wait small, .rseat__invite small { text-wrap: balance; }
 /* `balance` broke Japanese 「AI同盟|者を追加」 inside the word at 特大 on the phones (review of 6f34f380; 「AI同盟者を|追加」
    with `pretty`): phrase breaks (BudouX) in Chrome 119+; Safari and Firefox ignore it */
 .rseat__add:lang(ja) { word-break: auto-phrase; }
@@ -752,6 +753,18 @@
   .rs-go .proto-start__label { font-size: min(calc(.46 * var(--t)), calc(20px + var(--t-step))); }
   .rs .rs-loadout .btn__label { display: none; }
   .rs-tools, .rs-key__k { display: none; }
+}
+
+/* A long name takes a second line on the phones at least 370 px tall, then ends in an ellipsis (§35.51: one line kept 3–5
+   characters of a long name at 特大 — 「罗德岛…」, 「ロドス…」 — and 1–3 on your own plate before its tag went). The plate's
+   second row is free there (.rseat__doc hidden) and every plate is two lines tall, so the cards' art stays one height
+   whatever the names; the art gives up that height. On the 360 px tall phones the art has none to give at 大 / 特大
+   (「Standing by」, the AI frame's tag and 添加 AI 队友 ran past it with a modded room's tags), so the name keeps its one
+   line there. [ASSUMED] two lines, the 370 px */
+@media (max-height: 520px) and (min-height: 370px) {
+  .rseat__plate { min-height: max(32px, calc(36px * var(--sp-ui, 1)), calc(2.2 * min(calc(.28 * var(--t)), calc(18px + var(--t-step) / 2)) + 8px)); }
+  .rseat__who { grid-row: 1 / 3; align-self: center; }
+  .rseat__who .seat__name { white-space: normal; overflow-wrap: anywhere; line-height: 1.1; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 }
 @media (max-width: 900px) {
   /* the centre column takes what the button leaves (it keeps its width); the status line and the pill sit at its start, as

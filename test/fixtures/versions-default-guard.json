@@ -1,7 +1,7 @@
 {
   "_": "Default-version guard (test/versions-default-guard.test.js); an intended change of the default version must regenerate test/fixtures/versions-default-guard.json with SP_UPDATE_GUARD=1 node --test test/versions-default-guard.test.js and give the reason in the commit.",
   "data": {
-    "data/assets.json": "2399ba7da0bc99be9a0f0a0066d4e249be1aeb03275d3e63e5129e512b9ae55f",
+    "data/assets.json": "3d16f0574f85225809e5ae91c0831a081547b9ccd56d97eba12a125513fa8268",
     "data/backups.json": "3df06b7d5bfacba9d3d5a7afafb98adb799a32b0fadf7dd1ddea435144195854",
     "data/bands.json": "8f18abc99eb50639a1f2fc679a84015d6d8cc8aa3ff7c7d22ad6db5dc347053b",
     "data/bonds.json": "53a22f4724771b6ff40041635e907c0af39790731f661b0439fc593f5a91c94c",
@@ -25,12 +25,12 @@
     "data/waves.json": "80cb535958f22a1bf4ea71b26155c6f92ee1b49dd24b88acf4b2bcdf73d80e68"
   },
   "golden": {
-    "test/golden/bonds.json": "2fd7f7cd3f8dbe0cecd4940ed60030dc2679514c577b56e7fecdbbafd2215328",
-    "test/golden/diy.json": "66b28fbfee27ee592e899e78b104ca2d3f110966935c7823ac891baff6826286",
-    "test/golden/fields.json": "874a416977d61ad72b231529a0e01743651bfe610ea9e2963966b3856d55fe43",
-    "test/golden/matches.json": "3e79affcdc5fc098fca844ab59fe07ce53db09a2b283c1241833298197f08a47",
-    "test/golden/roster.json": "8b27e579dd7d05b9823d30e13aa735a60eb78079baa51a77e7ef62c71f2ee228",
-    "test/golden/standins.json": "ea4a83318a3c105b4325d9ff670bb7950d54f9a1fa6ea3e84b809e75bc1c5c09"
+    "test/golden/bonds.json": "10f440714066385fbc701e987ddb1ca35b676fbbf963263f9df7e80eb28f5294",
+    "test/golden/diy.json": "07e056d341d9ffdcb5eb3dc77e03461db1e0a93435e9b5e898729e611b19dbe6",
+    "test/golden/fields.json": "c703957ed32a7bfe4f9995acba8bda276f1e15c444a584c35f85cf64eaa2e2d8",
+    "test/golden/matches.json": "1a1b156bfec038a92a88e059500da640ed6da658ee2b5bd6020e416d1107a72d",
+    "test/golden/roster.json": "2bbc39b359830ea44feca3685dc5769c7abdbdf6ae521992d5935b48907b482e",
+    "test/golden/standins.json": "31f8d980454b230a3688e13284085b8fffc918825cd33e45fc2617a2529343bc"
   },
   "kat": {
     "cs": "7d6565abd4c1ec7ceaf979a2d82f90a04f5fe3a11a03d822c6775b2a6c632309",

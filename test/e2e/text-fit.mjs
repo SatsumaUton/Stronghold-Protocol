@@ -5,12 +5,12 @@
  * In the page: the text problems under `rootSel`. Each visible text node's line boxes (a glyph box's middle ± half the line
  * height) against every ancestor up to the root that clips (overflow) or draws a box (background, border, a button) —
  * 2 px of slack for hairlines —, an ancestor that scrolls on that axis ending the climb; the viewport; the other labels'
- * text as it shows (clipped by its clipping ancestors); a line break inside a word (not at a space, a hyphen — unless a digit follows it — or between
+ * text as it shows (clipped by its clipping ancestors); a line break inside a word (but in a player's name) (not at a space, a hyphen — unless a digit follows it — or between
  * CJK / kana; Korean puts spaces between its words, so a break between two Hangul syllables — or a syllable and a latin
  * letter or digit — is inside a word too, keep-all or not: under word-break: keep-all such a break is the overflow-wrap
  * fallback of a word too long for its box); a line that starts with a small kana, ー, an iteration mark or a closing
  * mark (Japanese line-breaking rules, 禁則; also Chinese for the closing marks — line-break: normal lets Chrome break
- * before a small kana and ー); an ellipsis anywhere but a player's name (.seat__name, .specbar__who) or a
+ * before a small kana and ー); an ellipsis (one line's, or a line clamp's) anywhere but a player's name (.seat__name, .specbar__who) or a
  * plugin mode's own name (.room-mode, cut by design like a name); the page scrolling.
  */
 export function textProblems(rootSel) {
@@ -45,12 +45,15 @@ export function textProblems(rootSel) {
       const lh = cs.lineHeight === 'normal' ? parseFloat(cs.fontSize) * 1.2 : parseFloat(cs.lineHeight);
       const label = `${name(el)} "${txt.slice(0, 30)}"`;
       let boxes = rects.map((r) => { const m = (r.top + r.bottom) / 2, hh = Math.min(r.height, lh) / 2; return { l: r.left, r: r.right, t: m - hh, b: m + hh }; });
-      // an ellipsis: allowed for a player's name only; what shows is the element's box
-      const cut = [el, el.parentElement].find((a) => a && getComputedStyle(a).textOverflow === 'ellipsis' && a.scrollWidth > a.clientWidth + 1);
+      // an ellipsis — on one line, or the last of a line clamp (a long name's two lines on a phone, §35.51): allowed for a
+      // player's name only; what shows is the element's box (a clamp's lines past it are hidden)
+      const clamped = (a) => { const v = getComputedStyle(a).webkitLineClamp; return !!v && v !== 'none' && a.scrollHeight > a.clientHeight + 1; };
+      const cut = [el, el.parentElement].find((a) => a && ((getComputedStyle(a).textOverflow === 'ellipsis' && a.scrollWidth > a.clientWidth + 1) || clamped(a)));
       if (cut) {
         if (!cut.matches('.seat__name, .specbar__who, .room-mode')) out.push(`ellipsis ${label}`);
         const ar = cut.getBoundingClientRect();
         boxes = boxes.map((b) => ({ ...b, l: Math.max(b.l, ar.left), r: Math.min(b.r, ar.right) }));
+        if (clamped(cut)) boxes = boxes.filter((b) => (b.t + b.b) / 2 < ar.bottom);
       }
       let pastX = false, pastY = false;
       for (let a = el; a && a !== root.parentElement && !(pastX && pastY); a = a.parentElement) {
@@ -92,7 +95,8 @@ export function textProblems(rootSel) {
           const p = n.textContent[i - 1] || ' ';
           if (prevTop != null && rr.top > prevTop + rr.height / 2) {
             const at = `${n.textContent.slice(Math.max(0, i - 6), i)}|${n.textContent.slice(i, i + 6)}`;
-            if (!breakOk(p, c)) { out.push(`broken inside a word (${at}): ${label}`); break; }
+            // (a player's name is any string: on a phone its second line may start inside a long word — §35.51)
+            if (!breakOk(p, c) && !el.closest('.seat__name')) { out.push(`broken inside a word (${at}): ${label}`); break; }
             if (noStart.test(c)) { out.push(`a line starts with ${c} (${at}): ${label}`); break; }
           }
           prevTop = rr.top;

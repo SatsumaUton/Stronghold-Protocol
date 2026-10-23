@@ -50,8 +50,8 @@ describe('0.2.0 补位 — a not-owned operator fights as its stand-in (real ser
       await c.page.waitForFunction(() => !document.querySelector('.lo'), { timeout: 3000 });
 
       // 2) a solo 标准 match: the briefing's m.private carries the list
+      // 独立模拟 → 选择模拟协议 (标准 preselected in a fresh browser) → 开始独立模拟 (§35.51: the old lobby's difficulty cards)
       await c.click('.mode-card', '独立模拟');
-      await c.click('.diff-card', '标准模拟');
       await c.click('.create-box button', '开始独立模拟');
       await c.waitFor((s) => !!s.room, 'solo room');
       if (!(await c.st()).phase) await c.click('.room-bar__right button', '开始模拟', { timeout: 20000 });

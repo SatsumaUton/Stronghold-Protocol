@@ -114,6 +114,8 @@ const MODE_CARDS = [
     id: 'coop', name: N_('同盟模拟'), en: 'ALLIANCE SIMULATION', icon: 'users',
     desc: N_('与至多 {n} 名博士组成同盟，共享干员池，联防协作抵御敌潮。'), params: { n: MAX_SEATS - 1 },
     points: [N_('1–{n} 名博士 · 可由 AI 队友补位'), N_('联防阶段 · 最终攻势合并生命值')], pointParams: { n: MAX_SEATS },
+    // the hub's line above the entry on a short screen, where the whole line is wider than the entry (§35.51)
+    pointShort: N_('1–{n} 名博士'),
   },
 ];
 
@@ -336,7 +338,9 @@ function ProtoFit() {
 /** One of the two entries at the bottom right of the hub (独立模拟 / 同盟模拟), with its line above it: opens its dialog. */
 export function HubEntry({ card, onOpen }) {
   return html`<div class="hub-entry-wrap">
-    <span class="hub-entry__group"><${Icon} name=${card.icon} />${t(card.points[0], card.pointParams)}</span>
+    <span class="hub-entry__group"><${Icon} name=${card.icon} />${card.pointShort
+      ? html`<span class="hub-entry__long">${t(card.points[0], card.pointParams)}</span><span class="hub-entry__short">${t(card.pointShort, card.pointParams)}</span>`
+      : t(card.points[0], card.pointParams)}</span>
     <button type="button" class=${`mode-card hub-entry hub-entry--${card.id}`} data-mode=${card.id} onClick=${() => onOpen(card.id)}
         title=${t(card.desc, card.params)}>
       <span class="hub-entry__icon" aria-hidden="true"><${Icon} name=${card.icon} /></span>

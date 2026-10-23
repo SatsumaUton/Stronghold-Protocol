@@ -150,12 +150,44 @@ const HELM_SKILLS = slotClips(['Skill_1', 'Skill_3', 'Revive']);
 const QUINTUS_SKILLS = slotClips(['Skill_02', 'Skill_01', 'Skill_03', 'Skill_02', 'Skill_01', 'Skill_03', 'Skill_02', 'Skill_01', 'Skill_03', 'Skill_04']);
 // 阿利斯泰尔 (enm_pfb_29.ab): equip / equipA Skill_1, store / storeA Skill_2, Suicide Skill_3
 const LION_SKILLS = slotClips(['Skill_1', 'Skill_2', 'Skill_2', 'Skill_1', 'Skill_3']);
+/** One skill slot's clip: a clip name or `{ begin, loop, end }`; `extra` adds `via` / `strike`. */
+const slotClip = (index, c, extra = null) => Object.freeze({ ...(typeof c === 'string' ? { begin: null, loop: c, end: null } : c), index, idle: null, ...extra });
+const slotMap = (list) => Object.freeze(Object.fromEntries(list.map((c) => [c.index, c])));
+// 泥岩 (Skills/RefreshShield, Skills/Occupy, AnimatedActionToTargetAbility): RefreshShield Skill_2, occupy Skill_1 — the
+// names run the other way round (until 0.3.2 the 屏障 refresh played the 1.5 s Skill_1 for its 1.333 s Skill_2)
+const MDROCK_SKILLS = slotMap([slotClip(0, 'Skill_2'), slotClip(1, 'Skill_1')]);
+// “自在”: CrossAttack (纬地经天, RangedAttackWithExtraActions, both modes) Skill_01_02 — not Skill_01 —; ShieldBurst /
+// ShieldBurstReborn (破桎而出, MeleeAttack) have an empty _animKey: the skeleton's one Skill_02 set for both [ASSUMED: by the
+// clip names; until 0.3.2 the second form's ShieldBurstReborn, slot 2, had no clip and played the cross's Skill_01]; the
+// two CrossAttackMark* slots are buffs the sim never casts
+const XI_BURST = Object.freeze({ begin: 'Skill_02_Begin', loop: 'Skill_02_Loop', end: 'Skill_02_End' });
+const XI_SKILLS = slotMap([slotClip(0, 'Skill_01_02'), slotClip(1, XI_BURST), slotClip(2, XI_BURST)]);
+// “斩胄之剑” / “破胄之锤” (enm_pfb_28.ab, EmptyAnimatedAbility): skill "1" (掷剑 / 掷锤) Launch_Begin, "2" Back_End — not the
+// name-resolved Skill clip
+const HAND_SKILLS = slotMap([slotClip(0, 'Launch_Begin'), slotClip(1, 'Back_End')]);
+// 锏 (Modes/Default CircleAttack A_Skill2, Modes/Reborn CircleAttack2 B_Skill2): 肆虐风雪 in each form — until 0.3.2 no clip
+// (the attack role); Blink / Blink2 (速杀, ActiveBuffAbility) name no clip and keep that attack role (via 'attack': none)
+const MACE_SKILLS = slotMap([slotClip(0, 'A_Skill2'), slotClip(1, 'A_Attack', { via: 'attack' }), slotClip(2, 'B_Skill2'), slotClip(3, 'B_Attack', { via: 'attack' })]);
+// Attack-class skills the sim casts as one of the enemy's attacks (castSlot in a `before` hook: no skill window) — `strike`:
+// that attack plays the slot's clip in place of the attack clip (render/units.js UnitView.onCast, render/spine.js
+// castStrike). 杰斯顿·威廉姆斯: ironsandstorm (RangedAttack, Modes/Default) C1_Skill, armorpiercing (MultiMeleeAttack,
+// Modes/R) C2_Skill; “碎铳之簧” 元素护盾 / 频次护盾: skill "1" (RangedAttack Skill_b / MultiRangedAttack Skill_c). Until 0.3.2
+// every one of them swung its attack clip.
+const WARDEN_SKILLS = slotMap([slotClip(0, 'C1_Skill', { strike: true }), slotClip(1, 'C2_Skill', { strike: true })]);
 export const PREFAB_SPINE_ROLES = Object.freeze({
   enemy_1116_liprr: PRISONER_GREY_3,
   enemy_1116_liprr_2: PRISONER_GREY_3,
   enemy_9013_acstmk: { skills: HELM_SKILLS },
   enemy_1521_dslily: { skill: QUINTUS_SKILLS[0], skills: QUINTUS_SKILLS },
   enemy_9032_aclionk: { skills: LION_SKILLS },
+  enemy_1511_mdrock: { skill: MDROCK_SKILLS[0], skills: MDROCK_SKILLS },
+  enemy_1517_xi: { skill: XI_SKILLS[0], skills: XI_SKILLS },
+  enemy_9014_acstma: { skill: HAND_SKILLS[0], skills: HAND_SKILLS },
+  enemy_9015_acstmb: { skill: HAND_SKILLS[0], skills: HAND_SKILLS },
+  enemy_1525_blkswb: { skills: MACE_SKILLS },
+  enemy_1516_jakill: { skills: WARDEN_SKILLS },
+  enemy_9019_actrpb: { skills: slotMap([slotClip(0, 'Skill_b', { strike: true })]) },
+  enemy_9020_actrpc: { skills: slotMap([slotClip(0, 'Skill_c', { strike: true })]) },
   // operators by character id: both the front and the back model
   char_337_utage: { skill: UTAGE_S2, skills: { 0: UTAGE_S1, 1: UTAGE_S2 } },
 });

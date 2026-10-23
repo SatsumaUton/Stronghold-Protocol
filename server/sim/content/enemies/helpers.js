@@ -119,13 +119,59 @@ export function grantHitShield(battle, enemy, count) {
 /**
  * A display-only client event: enemy `e` uses its skill `s` (an `ab.sk` entry) — ['cast', id, slot] with the slot of
  * its data record's skills[] (`s.slot`) and, when the skill's blackboard has one, its `duration` (render/app.js: the
- * slot's skill clip, render/vfx/skillfx.js: that skill's official effects for the window). No gameplay effect: no state,
- * no random draw (DESIGN §8.2; golden counts the event, nothing else moves).
+ * slot's skill clip, render/vfx/skillfx.js: that skill's official effects for the window). `turnClip` (s, ≥ 0): an
+ * attack-class skill cast in the attack's turn (enemies.js attackTurnSkill) — ['cast', id, slot, dur, clip], the
+ * length of its official clip, 0 when its ability names none: the client plays that clip (or the attack clip) in
+ * place of the attack (render/units.js UnitView.onCast; DESIGN §35.57). No gameplay effect: no state, no random draw
+ * (DESIGN §8.2; golden counts the event, nothing else moves).
  */
-export function castSlot(b, e, s) {
+export function castSlot(b, e, s, turnClip = null) {
   if (!b || !e || !s || !Number.isInteger(s.slot)) return;
   const d = s.bb && typeof s.bb.duration === 'number' && s.bb.duration > 0 ? Math.round(s.bb.duration * 100) / 100 : 0;
-  b._ev(d > 0 ? ['cast', e.id, s.slot, d] : ['cast', e.id, s.slot]);
+  if (turnClip != null) b._ev(['cast', e.id, s.slot, d, Math.round(Math.max(0, turnClip) * 1000) / 1000]);
+  else b._ev(d > 0 ? ['cast', e.id, s.slot, d] : ['cast', e.id, s.slot]);
+}
+
+/**
+ * The attack-class skills of the non-leader enemies and bounty leaders that run on a cooldown (the boss records' leaders
+ * and parts: bosses.js ATTACK_SKILL_CLIP; DESIGN §35.29 / §35.52): enemy key → skill prefabKey → the length in s of the
+ * clip its official ability plays (fx/index.json units.<key>.skills.<prefabKey>.abilities[].animKey → data/assets.json
+ * enemies.<key>.spine.animations), 0 when the ability names no clip. The class of each official ability (from the
+ * client's `battle/enm_pfb_*.ab`): 重弩突袭者 `CrossAttack` RangedAttack; 萨卡兹王庭军精锐术师 `DeathEye` an AbilitySequenceGroup
+ * of two RangedAttacks [ASSUMED: a group of attacks counts as one]; 假想敌：黑云 `FireWeapon` an AbilitySequenceGroup with
+ * a MultiRangedAttack (Skill_2); 高准度伦蒂尼姆城防自行炮 `Cannon`, W `C4`, 凋零骑士 `TripleAttack`, 迷路的巨像 `StunAttack`,
+ * 陷落雪祀 `ChainBuff` RangedAttack (Skill); 鼠王 `DriftSand` / `SandStorm` RangedAttack (Skill_1 / Skill_2); 腐败骑士
+ * `ChargeAttack`, “自在” `ShieldBurst` / `ShieldBurstReborn`, 扎罗 `FearCage` MeleeAttack (no clip); “自在” `CrossAttack`
+ * RangedAttackWithExtraActions (Skill_01_02); 锏 `CircleAttack` MeleeAttack (A_Skill2) / `CircleAttack2` MultiMeleeAttack
+ * (B_Skill2); 节日爵士乐手 `fire` RangedAttack (no clip). Each one takes the attack's turn (enemies.js attackTurnSkill —
+ * PRTS 「大多数技能自动触发会占用攻击间隔」) and its cooldown counts from its clip's end. Not here: 暴鸰's `boomb` (its one
+ * bomb is its attack: no normal attack to share a turn with) and the SP attacks (粉碎攻坚手, 澪, 杰斯顿 …: the attack itself).
+ */
+export const ENEMY_ATTACK_SKILL_CLIP = Object.freeze({
+  enemy_1404_msnip: { CrossAttack: 0 },
+  enemy_1275_dwlock_2: { DeathEye: 0 },
+  enemy_9009_acfort: { FireWeapon: 2 },
+  enemy_1273_stmgun_2: { Cannon: 10 },
+  enemy_1504_cqbw: { C4: 4.8 },
+  enemy_1509_mousek: { DriftSand: 2.333, SandStorm: 1.333 },
+  enemy_1513_dekght: { ChargeAttack: 0 },
+  enemy_1513_dekght_2: { TripleAttack: 1.667 },
+  enemy_2003_rockman: { StunAttack: 2.333 },
+  enemy_2050_smsha: { ChainBuff: 1.667 },
+  enemy_1517_xi: { CrossAttack: 1.333, ShieldBurst: 0, ShieldBurstReborn: 0 },
+  enemy_1525_blkswb: { CircleAttack: 2.067, CircleAttack2: 2.067 },
+  enemy_1535_wlfmster: { FearCage: 0 },
+  enemy_10034_cnvsax: { fire: 0 },
+});
+
+/**
+ * The attack-turn fields (`atk`, `clip`, `own`) of skill `prefabKey` of enemy key `key` (ENEMY_ATTACK_SKILL_CLIP), {} when
+ * it is no attack-class skill. `own` (default true): its trigger is a selector of its own (`cond`), so it also takes a
+ * ready attack's turn with no swing (enemies.js onTick); false when the trigger is the attack's target (its blocker).
+ */
+export function attackSkillOf(key, prefabKey, own = true) {
+  const clip = ENEMY_ATTACK_SKILL_CLIP[key]?.[prefabKey];
+  return clip == null ? {} : { atk: true, clip, own };
 }
 
 /** Attach abilities to an enemy (calls their spawn()). */
@@ -134,6 +180,7 @@ export function attach(b, e, list) {
   for (const a of list) {
     if (!a) continue;
     if (a.cd != null) a.left = num(a.left, num(a.icd, 0));
+    if (a.atk && a.own) ab.ownTurn = true;   // enemies.js onTick: a turn without a swing (attackTurnSkill ownOnly)
     ab.list.push(a);
     if (a.spawn) safe(b, e, () => a.spawn(b, e, a, ab));
   }

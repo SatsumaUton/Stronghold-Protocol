@@ -420,6 +420,8 @@
 .hub-entry-wrap:nth-child(2) { animation-delay: 60ms; }
 .hub-entry__group { display: flex; align-items: center; gap: .06rem; min-height: .22rem; padding-left: .04rem; font-size: calc(.13 * var(--t)); color: rgba(223, 230, 226, .7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hub-entry__group .icon { flex: none; width: .16rem; height: .16rem; color: var(--mint-400); }
+.hub-entry__long { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.hub-entry__short { display: none; }
 .hub-entry {
   position: relative;
   display: flex;
@@ -883,7 +885,17 @@ button.ally-card:hover, button.ally-card:focus-visible { border-color: rgba(93, 
   background: linear-gradient(180deg, #4fe8c0, #2fcf9f);
   border: 0;
 }
-.ally-card__bar small { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: calc(.14 * var(--t)); font-weight: 700; letter-spacing: 0; color: rgba(8, 34, 27, .75); }
+/* the difficulty line wraps at the bar's right rather than ending in an ellipsis (§35.51: English 「Difficulty: Standard
+   Simulat…」 at 1280–1440 px, Japanese at 1024×600 特大). It keeps a column of at least 10em beside the name, else it
+   takes a row of its own under the name and the bar grows (§35.51 review: squeezed into the 96 px the name left in
+   English at 特大 on 1024×600, six lines ran out of the 42 px bar); Korean breaks between words only (the review:
+   「시뮬레이|션」 once balanced), Japanese by its line-breaking rules */
+.ally-card--create .ally-card__bar { flex-wrap: wrap; align-content: center; row-gap: 1px; height: auto; min-height: max(.74rem, 32px, calc(42px * var(--sp-ui, 1)));
+  padding-top: 4px; padding-bottom: 4px; }
+.ally-card__bar small { flex: 0 1 auto; margin-left: auto; min-width: min(100%, 10em); white-space: normal; text-align: right; text-wrap: balance;
+  line-height: 1.2; font-size: calc(.14 * var(--t)); font-weight: 700; letter-spacing: 0; color: rgba(8, 34, 27, .75); }
+.ally-card__bar small:lang(ko) { word-break: keep-all; overflow-wrap: break-word; }
+.ally-card__bar small:lang(ja) { line-break: strict; }
 button.ally-card:disabled { cursor: default; }
 button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8); }
 /* the test-room box under 创建同盟 (test mode only) */
@@ -990,7 +1002,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .proto-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, .7fr) minmax(0, 1.3fr); }
   .ally-body { grid-template-rows: minmax(0, .5fr) minmax(0, 1.5fr); }
   .proto__pic { inset: 0 0 .9rem; }
-  .proto-list, .proto-foot { padding-left: .1rem; }
+  /* the list keeps the .5rem the chosen card slides into (§35.51: at .1rem its -.44rem ran past the screen's left edge) */
+  .proto-foot { padding-left: .1rem; }
   .ally-side { padding-left: 0; }
   /* the cards and the button span the width here: the caps for the landscape column (a 5.6rem column) give way */
   .pcard__name { font-size: calc(.28 * var(--t)); }
@@ -1072,6 +1085,10 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .lobby-hub .hub-plate { font-size: min(calc(.3 * var(--t)), calc(18px + var(--t-step))); }
   .hub-plate__tag { display: none; }
   .hub-entry__group { height: auto; font-size: calc(.22 * var(--t)); }
+  /* 同盟模拟's line keeps only 「1–4 名博士」 here (§35.51: the whole line, nowrap, ran 81–320 px past its entry at 特大 —
+     two to four lines if it wrapped; the AI teammates are the room's to show) */
+  .hub-entry__long { display: none; }
+  .hub-entry__short { display: inline; }
   .hub-entry { width: calc(var(--hub-entry-w) + 7 * max(0px, var(--t-step))); }
   .hub-entry__en { padding-right: .44rem; font-size: min(calc(.16 * var(--t)), calc(10px + var(--t-step))); letter-spacing: .12em; }
   .hub-entry__name { font-size: min(calc(.42 * var(--t)), calc(18px + var(--t-step))); }
@@ -1095,12 +1112,15 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .ally-card--create .ally-card__bar { display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: center; row-gap: 1px; height: auto;
     min-height: max(.74rem, 32px, calc(42px * var(--sp-ui, 1))); padding-top: 5px; padding-bottom: 5px; }
   .ally-card--create .ally-card__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
-  .ally-card--create .ally-card__bar small { grid-column: 2; margin-left: 0; overflow: visible; white-space: normal; font-size: clamp(11px, calc(.28 * var(--t)), 14px); line-height: 1.3; }
+  .ally-card--create .ally-card__bar small { grid-column: 2; margin-left: 0; overflow: visible; white-space: normal; text-align: left; font-size: clamp(11px, calc(.28 * var(--t)), 14px); line-height: 1.3; }
   .ally-key input { font-size: calc(.32 * var(--t)); }
   /* the key field's placeholder fits beside 观战 (§35.18's leftover: clipped at 特大 in English and Japanese): the short
      text (screens/lobby.js AllianceSelect `short`), 11–13 px, and 观战 at most 14 px; an ellipsis should a pack's
      name still be longer. [ASSUMED] the caps */
   .ally-key input::placeholder { font-size: clamp(11px, calc(.26 * var(--t)), 13px); }
+  /* the empty field takes the placeholder's size, so the placeholder sits in the middle like the key will (§35.51: on the
+     28 px key's baseline it sat 6–9 px below the key icon and 观战 at 特大) */
+  .ally-key input:placeholder-shown { font-size: clamp(11px, calc(.26 * var(--t)), 13px); }
   .ally-key__spec { font-size: min(calc(.26 * var(--t)), 14px); }
   .ally-recent { font-size: min(calc(.24 * var(--t)), 14px); line-height: 1.35; } /* [ASSUMED] the cap, like the difficulty line's */
   .code-chip { font-size: calc(.28 * var(--t)); }

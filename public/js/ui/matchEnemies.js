@@ -30,6 +30,10 @@ export const factionDescId = (scope, type) => `${scope}-fdesc-${String(type).rep
 /** What a 特训敌人 tooltip keeps clear of: the leader block — the portrait with its tag, and each line of its text. */
 export const leaderBlockOf = (el) => el.closest('.brief-enemy')?.querySelectorAll('.brief-boss, .brief-boss__text > *') || [];
 
+/** A faction's name with a break opportunity after each '/' (「特训敌人/飞行」: English 「Tactical Training/Flying」 broke
+ * inside 「Flying」, a slash between letters giving none — §35.51 review); its text and accessible name unchanged. */
+const slashBreaks = (s) => String(s).split('/').flatMap((part, i) => (i ? [html`/<wbr />`, part] : [part]));
+
 /**
  * One 特训敌人 type: the round icon (focusable, named by the type, described by its text) and the name; the description
  * in the Tooltip (hover, keyboard focus, a long press on touch — anywhere on the cell; the box points at the icon, inside
@@ -45,7 +49,7 @@ function factionCell({ type, info, m, scope }) {
       anchor=".brief-faction__icon" within=".modal__box" avoid=${leaderBlockOf}>
     <div class="brief-faction" data-faction=${type}>
       <span class="brief-faction__icon" tabindex="0" role="img" aria-label=${name} aria-describedby=${descId}><${Img} src=${factionIconUrl(m, info?.icon)} /></span>
-      <span class="brief-faction__text"><b>${name}</b></span>
+      <span class="brief-faction__text"><b>${slashBreaks(name)}</b></span>
       ${desc ? html`<span id=${descId} class="brief-faction__desc sr-only">${desc}</span>` : null}
     </div>
   <//>`;
