@@ -5,7 +5,7 @@
 import { bondTimerView } from '../content/bonds/timers.js';
 import { EVENT_BUFFER_CAP } from '../constants.js';
 import { elementView } from '../attack.js';
-import { unitInfo, snapshotUnits, ammoView, wolfView, negView, coinView, mysticView, layerView, chargeView } from '../snapshot.js';
+import { unitInfo, snapshotUnits, ammoView, wolfView, negView, moteView, coinView, mysticView, layerView, chargeView } from '../snapshot.js';
 
 export class BattleEvents {
   fx(kind, params = {}) {
@@ -60,12 +60,14 @@ export class BattleEvents {
    *         official sand armour of her charges;
    *   bondTimers: [[id, [{ id: effectId, count, remaining }]]] — selected-unit timed bond readouts (#746);
    *         count + next expiry in simulation seconds; omitted when no declared effect is active.
+   *   motes: [[id, count, wide]] — the orbiting 「微尘」 of a unit (snapshot.js moteView; 魔王's T1 过往尘埃): how many
+   *         still circle her and whether S2's wider radius is up (display only: render/motes.js draws them);
    *   stand: [[id, until]] — when each enemy's attack recovery ends (atkStandUntil; alive, deployed, visible, not
    *         feared or stunned) — display metadata (render/interp.js holds the position until then);
    *   standCut: [[id, at]] — the latest time each listed enemy's recovery was cut or ignored (_cutAttackStand), the
    *         dying ones in their death window included.
-   * ammo / wolves / neg / energy / layers / charges / stand / standCut are display only: no sim state reads them, and the
-   * nine-field unit tuples are unchanged. bondTimers is also display only (golden canon excludes it).
+   * ammo / wolves / neg / motes / energy / layers / charges / stand / standCut are display only: no sim state reads
+   * them, and the nine-field unit tuples are unchanged. bondTimers is also display only (golden canon excludes it).
    */
   snapshot() {
     const snap = {
@@ -91,7 +93,7 @@ export class BattleEvents {
       (down || (down = [])).push([u.id, r2(u.respawnAt), r2(Math.max(0, u.respawnAt - u.deathAt)), this._downState(u), ...this.restTile(u)]);
     }
     if (down) snap.down = down;
-    let elem = null, ammo = null, wolves = null, neg = null, energy = null, stand = null, standCut = null;
+    let elem = null, ammo = null, wolves = null, neg = null, motes = null, energy = null, stand = null, standCut = null;
     let listed = null;   // the ids in snap.units, built for the first enemy with a cut to report
     for (const u of this.units) {
       if (u.side === 'enemy' && u.atkStandCutAt >= 0) {
@@ -113,6 +115,8 @@ export class BattleEvents {
       if (wv) (wolves || (wolves = [])).push([u.id, wv[0], wv[1]]);
       const ng = negView(u);
       if (ng) (neg || (neg = [])).push([u.id, ng]);
+      const mo = moteView(u);
+      if (mo) (motes || (motes = [])).push([u.id, mo[0], mo[1]]);
       const purse = coinView(u);
       if (purse) (snap.coins || (snap.coins = [])).push([u.id, ...purse]);
       const en = mysticView(u);
@@ -120,6 +124,7 @@ export class BattleEvents {
       const ly = layerView(u);
       if (ly) (snap.layers || (snap.layers = [])).push([u.id, ly]);
       const ch = chargeView(u);
+    if (motes) snap.motes = motes;
       if (ch) (snap.charges || (snap.charges = [])).push([u.id, ch[0], ch[1]]);
     }
     if (elem) snap.elem = elem;
