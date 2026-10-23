@@ -212,6 +212,7 @@ describe('official versions (real server, SP_VERSIONS=all)', { skip: !ENABLED &&
       await waitState(guest, (s) => s.room === 'act2autochess' && s.kind === null, 'the guest in the 第二期下半 room');
       // 干员调配 open (a guest edits the loadout before readying): a vote opened now floats above it
       await openWith(guest, '.rs-loadout', null, '.lo-count');
+      await guest.page.waitForSelector('.lo-search input', { visible: true });
       await guest.page.focus('.lo-search input');
       await host.page.evaluate(() => globalThis.__SP__.net.request('room.proposeVersion', { version: 'act1autochess' }));
       await guest.page.waitForSelector('.vervote--covered [data-testid="version-decline"]', { visible: true, timeout: 10000 });
