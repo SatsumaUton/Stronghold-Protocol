@@ -610,7 +610,7 @@ different bundles share one file (`star_02` alone exists ~50 times in the client
 (written as RGB). Textures are straight (not premultiplied) alpha; the half-size copy is resized premultiplied (no dark
 fringes). `srgb` is informational: render in gamma space (§33.2). Built-in textures appear as `builtin:<path id>`.
 
-WebP quality 90, method 4 is the extraction default, with the existing Pillow options, image bytes and
+Optional PNG textures are documented in history §35.96 (PR #806). WebP quality 90, method 4 is the extraction default, with the existing Pillow options, image bytes and
 metadata. `extract.py --only fx --fx-texture-format png` selects lossless PNG when WebP's RGB artefacts matter.
 Both full and half files use the selected encoding; dimensions, keys, sampler settings and effect descriptors stay
 the same. `format` keeps the original texture's GPU encoding. PNG output adds `encoding: 'png'` to this metadata
