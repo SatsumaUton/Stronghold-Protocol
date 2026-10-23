@@ -50,6 +50,11 @@ test('a voter who has not agreed: 同意切换 / 拒绝切换, the count, the ch
   assert.ok(byTestId(tree, 'version-agree') && byTestId(tree, 'version-decline'));
   assert.equal(byTestId(tree, 'version-cancel'), null, 'not the host');
   assert.equal(tree.props['aria-live'], 'polite');
+  const countdown = [...walk(tree)].find((n) => n.props?.class === 'vervote__time');
+  assert.equal(countdown.props['aria-hidden'], 'true', 'the live region never announces countdown ticks');
+  const floating = draw(room(VOTE), 'p2', { floating: true });
+  assert.equal(floating.props.role, 'alertdialog');
+  assert.equal(floating.props.tabindex, '-1', 'the dialog can receive focus without focusing a vote button');
 });
 
 test('the host (counted as agreed): only 取消投票; a spectator only reads it; offline disables the buttons', () => {

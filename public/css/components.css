@@ -1159,6 +1159,8 @@
   font-size: calc(.13 * var(--t)); font-weight: 700; letter-spacing: .04em; white-space: nowrap; text-overflow: ellipsis;
   vertical-align: middle;
 }
+/* (the label is its own box: a bare text in an inline-flex box is cut without the ellipsis) */
+.vertag__label { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .vertag--compact { height: .2rem; padding: 0 .06rem; font-size: calc(.11 * var(--t)); }
 .verchip-wrap { display: inline-flex; align-items: center; gap: .06rem; min-width: 0; }
 .verchip {
@@ -1216,6 +1218,8 @@
   position: fixed; left: 50%; bottom: max(.2rem, env(safe-area-inset-bottom)); z-index: 40; width: min(9rem, calc(100vw - 32px)); margin: 0;
   max-height: calc(100svh - .2rem - max(.2rem, env(safe-area-inset-bottom))); overflow-y: auto; transform: translateX(-50%);
 }
+/* (it takes the focus as an alertdialog — ui/versionVote.js —: the strip's own border marks it) */
+.vervote--float:focus { outline: none; }
 /* above 干员调配 / 统计数据 (.lo / .st, 55), below the connection banner (75), modals and toasts */
 .vervote--covered { z-index: 56; box-shadow: 0 .06rem .3rem rgba(0, 0, 0, .55); }
 @media (max-width: 900px), (max-height: 520px) {
@@ -1230,7 +1234,9 @@
   .vervote--float { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
   .vervote--float .vervote__text { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
   .vervote--float .vervote__actions { flex: none; }
-  .vertag { max-width: 2.4rem; height: auto; padding: 1px 5px; font-size: calc(.2 * var(--t)); }
+  /* the whole name, on two lines if it must (English 'Season 1 · Part 2' at 特大): the part is what tells two halves apart */
+  .vertag { max-width: 3.4rem; height: auto; padding: 1px 5px; font-size: calc(.2 * var(--t)); line-height: 1.2; white-space: normal; }
+  .vertag__label { white-space: normal; }
   /* the label is what tells the versions apart: the 版本 key word gives its room (the hourglass and the title say it) */
   .verchip { max-width: 3.4rem; font-size: calc(.22 * var(--t)); }
   .verchip__k { display: none; }

@@ -5,8 +5,9 @@
 //     whole and every period line inside its row; 选择模拟协议's 版本数据校验失败 + 重试 row (a failed version set's look,
 //     laid over content.js contentSet) inside the dialog;
 //   * a version room seen by a doctor whose lobby is 第二期下半: the pill (the name may end in an ellipsis) inside the
-//     footer, the vote strip inside the screen with its texts wrapping (never cut sideways) and its buttons inside it, the
-//     banner inside the screen, the seat tags (版本数据就绪 …) inside their cards, the tag beside the mode in the top bar;
+//     footer, the vote strip inside the screen with its texts wrapping (never cut sideways) and its buttons inside it (in
+//     view, a tap on each reaches it), the banner inside the screen, the seat tags (版本数据就绪 …) inside their cards, the
+//     tag beside the mode in the top bar with its whole name;
 //   * the vote strip floating above 干员调配 (a voter's) inside the screen with its title and buttons in view;
 //   * the settlement's team page and its detail of a version match: the version tag inside the screen, and the vote strip
 //     floating over the settlement (the host's) inside the screen.
@@ -17,6 +18,7 @@
 //
 //   SP_E2E=1 node --test test/ui/versions-fit.e2e.test.js
 //
+// The history row and briefing tags also keep their whole label throughout the same matrix.
 // Screenshots: test/e2e/out/versions-fit-*.png.
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,11 +43,14 @@ const setLook = (c, lang, size) => c.page.evaluate(async (lang, size) => {
 // (no touch emulation: a change of it reloads the page — ui/device.js —, and the sizes follow the screen's height alone)
 const viewport = (c, w, h) => c.page.setViewport({ width: w, height: h, hasTouch: false, isMobile: false, deviceScaleFactor: 1 });
 
-/** Elements of `sel` that leave the screen sideways or up/down, or whose own text is cut sideways. */
+/**
+ * Elements of `sel` that leave the screen sideways or up/down, or whose own text is cut sideways (`wrap`); `inView`: also
+ * up/down inside `within` (not scrolled out of it) and hit by a tap on its centre.
+ */
 const misfits = (c, checks) => c.page.evaluate((checks) => {
   const out = [];
   const box = (el) => el.getBoundingClientRect();
-  for (const { sel, within = null, wrap = false, optional = false, x = false } of checks) {
+  for (const { sel, within = null, wrap = false, optional = false, x = false, inView = false } of checks) {
     const els = [...document.querySelectorAll(sel)].filter((el) => { const r = box(el); return r.width > 0 && r.height > 0; });
     if (!els.length && !optional) { out.push(`${sel}: missing`); continue; }
     for (const el of els) {
@@ -54,6 +59,11 @@ const misfits = (c, checks) => c.page.evaluate((checks) => {
       if (within) {
         const p = el.closest(within);
         if (p) { const q = box(p); if (r.left < q.left - 1 || r.right > q.right + 1) out.push(`${sel}: outside ${within}`); }
+        if (p && inView) {
+          const q = box(p);
+          if (r.top < q.top - 1 || r.bottom > q.bottom + 1) out.push(`${sel}: scrolled out of ${within}`);
+          else if (!el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2))) out.push(`${sel}: a tap on its centre misses it`);
+        }
       }
       if (wrap && el.scrollWidth > el.clientWidth + 1) out.push(`${sel}: cut sideways (${el.scrollWidth} > ${el.clientWidth})`);
     }
@@ -171,11 +181,13 @@ describe('official versions: text fit (real server, SP_VERSIONS=all)', { skip: !
               { sel: '[data-testid="version-vote"]' },
               { sel: '.vervote__text strong', wrap: true },
               { sel: '.vervote__hint', wrap: true },
-              { sel: '.vervote__actions .btn', within: '[data-testid="version-vote"]' },
+              { sel: '.vervote__actions .btn', within: '[data-testid="version-vote"]', inView: true },
               // (a short screen gives the banner's line to the seats: then it is not shown at all)
               { sel: '[data-testid="version-banner"]', wrap: true, optional: h <= 520 },
               { sel: '.seat__content', within: '.rseat' },
-              { sel: '.rs-clock [data-testid="version-tag"]' },
+              // the whole name (the part tells two halves apart): two lines on a short screen, never an ellipsis
+              { sel: '.rs-clock [data-testid="version-tag"]', wrap: true },
+              { sel: '.rs-clock [data-testid="version-tag"] .vertag__label', wrap: true },
             ]);
             if (bad.length) roomBad.push(`room ${lang} ${size} ${w}×${h}: ${bad.join('; ')}`);
           }
@@ -200,7 +212,7 @@ describe('official versions: text fit (real server, SP_VERSIONS=all)', { skip: !
             const bad = await misfits(guest, [
               { sel: '.vervote--covered' },
               { sel: '.vervote--covered .vervote__text strong', wrap: true },
-              { sel: '.vervote--covered .vervote__actions .btn', within: '.vervote--covered' },
+              { sel: '.vervote--covered .vervote__actions .btn', within: '.vervote--covered', inView: true },
             ]);
             if (bad.length) coverBad.push(`over 干员调配 ${lang} ${size} ${w}×${h}: ${bad.join('; ')}`);
           }
@@ -213,6 +225,45 @@ describe('official versions: text fit (real server, SP_VERSIONS=all)', { skip: !
 
       // a settlement of a version match (an imported record's payload on the host's screen, inside its version room)
       const fixture = JSON.parse(readFileSync(path.join(ROOT, 'test/ui/fixtures/stats-versions.json'), 'utf8'));
+      // History and briefing share VersionTag, with their own layout / chip classes. Measure the label itself too:
+      // the outer inline-flex box can fit while its child clips the half out of the name.
+      await host.page.evaluate(async (fixture) => {
+        const { importStats, saveStats } = await import('/js/ui/stats.js');
+        saveStats(importStats(fixture).stats);
+        (await import('/js/screens/stats.js')).openStats();
+      }, fixture);
+      await host.page.waitForSelector('[data-testid="stats-version"]', { visible: true });
+      await host.click('[data-testid="stats-version"] [data-version="all"]');
+      await host.click('.st-tab[data-tab="history"]');
+      await host.page.waitForSelector('.st-table--history [data-testid="version-tag"]', { visible: true });
+      const tagsFit = async (selector, sidewaysOnly = false) => {
+        const bad = [];
+        for (const lang of LANGS) for (const size of SIZES) {
+          await setLook(host, lang, size);
+          for (const [w, h] of [...PHONES, ...DESKTOPS]) {
+            await viewport(host, w, h);
+            await sleep(150);
+            const found = await misfits(host, [
+              { sel: selector, wrap: true, x: sidewaysOnly },
+              { sel: `${selector} .vertag__label`, wrap: true, x: sidewaysOnly },
+            ]);
+            if (found.length) bad.push(`${selector} ${lang} ${size} ${w}×${h}: ${found.join('; ')}`);
+          }
+        }
+        assert.deepEqual(bad, []);
+      };
+      await tagsFit('.st-table--history [data-testid="version-tag"]', true);
+      await host.page.evaluate(async () => { (await import('/js/screens/stats.js')).closeStats(); });
+      await host.page.waitForSelector('.st', { hidden: true });
+      await host.page.evaluate(async () => {
+        const { modeIdFor } = await import('/shared/constants.js');
+        const { store } = globalThis.__SP__;
+        const r = store.get().room;
+        store.set({ match: { public: { phase: 'INFO_CHECK', round: 1, modeId: modeIdFor(r.mode, r.difficulty),
+          players: r.seats.filter(Boolean).map((s) => ({ ...s, ready: false, lp: 100 })) }, private: null, field: null, battle: null, result: null } });
+      });
+      await host.page.waitForSelector('.brief__vertag', { visible: true });
+      await tagsFit('.brief__vertag');
       await host.page.evaluate(async (rec) => {
         const { recordToResult } = await import('/js/ui/stats.js');
         const { store } = globalThis.__SP__;
@@ -235,10 +286,11 @@ describe('official versions: text fit (real server, SP_VERSIONS=all)', { skip: !
             await viewport(host, w, h);
             await sleep(150);
             const bad = await misfits(host, [
-              { sel: '[data-testid="settle"] [data-testid="version-tag"]' },
+              { sel: '[data-testid="settle"] [data-testid="version-tag"]', wrap: true },
+              { sel: '[data-testid="settle"] [data-testid="version-tag"] .vertag__label', wrap: true },
               { sel: '.vervote--float' },
               { sel: '.vervote--float .vervote__text strong', wrap: true },
-              { sel: '.vervote--float .vervote__actions .btn', within: '.vervote--float' },
+              { sel: '.vervote--float .vervote__actions .btn', within: '.vervote--float', inView: true },
             ]);
             if (bad.length) settleBad.push(`settlement ${lang} ${size} ${w}×${h}: ${bad.join('; ')}`);
           }

@@ -6,7 +6,8 @@
 //   * the host proposes 第二期上半 → the strip on both pages, the guest agrees → both pages switch; a proposal the guest
 //     declines → the host's toast; a solo room switches at once; leaving restores the guest's lobby version;
 //   * a stats record of another version (an imported fixture) carries its tag in 统计数据;
-//   * a vote opened while a voter has 干员调配 open floats above it (an alertdialog; the room's strip under it aria-hidden),
+//   * a vote opened while a voter has 干员调配 open floats above it (an alertdialog that takes the focus, its countdown not
+//     announced; the room's strip under it aria-hidden),
 //     and agreeing there switches the open 干员调配 to the new version's operators (95, then 112 back); a replay open when
 //     the room goes away (a kick) keeps its version shown and is never replaced by the wait; a default server does not
 //     offer another version's record for re-viewing;
@@ -211,6 +212,7 @@ describe('official versions (real server, SP_VERSIONS=all)', { skip: !ENABLED &&
       await waitState(guest, (s) => s.room === 'act2autochess' && s.kind === null, 'the guest in the 第二期下半 room');
       // 干员调配 open (a guest edits the loadout before readying): a vote opened now floats above it
       await openWith(guest, '.rs-loadout', null, '.lo-count');
+      await guest.page.focus('.lo-search input');
       await host.page.evaluate(() => globalThis.__SP__.net.request('room.proposeVersion', { version: 'act1autochess' }));
       await guest.page.waitForSelector('.vervote--covered [data-testid="version-decline"]', { visible: true, timeout: 10000 });
       const top = await guest.page.$eval('.vervote--covered [data-testid="version-decline"]', (b) => {
@@ -220,12 +222,15 @@ describe('official versions (real server, SP_VERSIONS=all)', { skip: !ENABLED &&
       assert.equal(top, true, 'the strip is on top of 干员调配');
       assert.equal(await host.page.$('.vervote--covered'), null, 'the host\'s room is not covered: its strip is the room\'s');
       assert.deepEqual(await guest.page.evaluate(() => [...document.querySelectorAll('[data-testid="version-vote"]')]
-        .map((e) => [e.classList.contains('vervote--covered'), e.getAttribute('role'), e.getAttribute('aria-hidden'), e.hasAttribute('aria-live')])),
-      [[false, null, 'true', false], [true, 'alertdialog', null, true]], 'one live region: the floating alertdialog; the room\'s strip hidden');
+        .map((e) => [e.classList.contains('vervote--covered'), e.getAttribute('role'), e.getAttribute('aria-hidden'), e.hasAttribute('aria-live'),
+          e.querySelector('.vervote__time')?.getAttribute('aria-hidden')])),
+      [[false, null, 'true', false, 'true'], [true, 'alertdialog', null, true, 'true']], 'one live region: the floating alertdialog (the ticking countdown left out); the room\'s strip hidden');
+      await guest.page.waitForFunction(() => document.activeElement?.matches('.vervote--covered'), { timeout: 5000 });
       await guest.shot('vote-over-loadout');
       await guest.click('.vervote--covered [data-testid="version-decline"]');
       await host.page.waitForFunction(() => [...document.querySelectorAll('.toast__text')].some((e) => e.textContent.includes('阿米娅拒绝了切换版本')), { timeout: 10000 });
       await guest.page.waitForSelector('.vervote--covered', { hidden: true });
+      await guest.page.waitForFunction(() => document.activeElement?.matches('.lo-search input'), { timeout: 5000 });
       assert.match(await guest.page.$eval('.lo-count', (e) => e.textContent), /\/112\b/, '第二期下半: 112 operators');
       // agreed from the floating strip: the open 干员调配 follows the switch (its roster is keyed by the content set)
       for (const [id, n] of [['act1autochess', 95], ['act2autochess', 112]]) {

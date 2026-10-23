@@ -114,5 +114,5 @@ export function VersionTag({ version = null, room = null, compact = false, class
   if (!v) return null;
   const name = t(v.label);
   return html`<span class=${cx('vertag', compact && 'vertag--compact', cls)} data-testid="version-tag" data-version=${v.id}
-      title=${t('游戏版本：{name}', { name })} aria-label=${t('游戏版本：{name}', { name })}>${name}</span>`;
+      title=${t('游戏版本：{name}', { name })} aria-label=${t('游戏版本：{name}', { name })}><span class="vertag__label">${name}</span></span>`;
 }

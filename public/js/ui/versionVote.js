@@ -7,8 +7,10 @@
 // the footer; the settlement screen shows it too (a doctor still reading the result can vote, screens/game.js). While
 // 干员调配 or 统计数据 covers the room (fixed overlays, z 55 — a guest edits the loadout there before readying), a voter or
 // the host sees the strip floating above them (<CoveredVersionVote/>, main.js), so a vote never runs out unseen. Both
-// overlays are aria-modal dialogs, so the floating strip is its own alertdialog (announced when it appears), and the
-// strip it covers is aria-hidden + inert meanwhile: one live region speaks for the vote.
+// overlays are aria-modal dialogs, so the floating strip is its own alertdialog (it takes the focus when it appears —
+// the strip itself, not a button: a key pressed in the roster's search field never votes —, and gives it back when it
+// goes), and the strip it covers is aria-hidden + inert meanwhile: one live region speaks for the vote. The countdown
+// ticks every second and stays out of what is announced (aria-hidden; 重刷本局's live region has no ticking text either).
 // Texts go through t() (docs/I18N.md).
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
@@ -64,18 +66,19 @@ export const secondsLeft = (deadline, now) => Math.max(0, Math.ceil((deadline - 
 /**
  * The strip's markup (hook-free: the tests draw it): the title with the count, the countdown, the voters' chips, 同意切换 /
  * 拒绝切换 for a voter who has not agreed, 取消投票 for the host.
- * `floating`: the strip above an overlay (an alertdialog of its own); `covered`: a strip under it (aria-hidden, inert).
+ * `floating`: the strip above an overlay (an alertdialog of its own, focusable: `boxRef`); `covered`: a strip under it
+ * (aria-hidden, inert).
  * @param {{ facts: ReturnType<typeof versionVoteFacts>, seconds: number, busy?: boolean, online?: boolean, class?: string,
- *   floating?: boolean, covered?: boolean, onAgree: () => void, onDecline: () => void, onCancel: () => void }} props
+ *   floating?: boolean, covered?: boolean, boxRef?: any, onAgree: () => void, onDecline: () => void, onCancel: () => void }} props
  */
-export function VersionVoteView({ facts, seconds, busy = false, online = true, class: cls = '', floating = false, covered = false, onAgree, onDecline, onCancel }) {
+export function VersionVoteView({ facts, seconds, busy = false, online = true, class: cls = '', floating = false, covered = false, boxRef = undefined, onAgree, onDecline, onCancel }) {
   if (!facts) return null;
   const { vote: v } = facts;
-  return html`<section class=${`vervote ${cls}`} role=${floating ? 'alertdialog' : undefined} aria-label=${t('切换版本投票')}
-      aria-live=${covered ? undefined : 'polite'} aria-hidden=${covered ? 'true' : undefined} inert=${covered || undefined} data-testid="version-vote">
+  return html`<section ref=${boxRef} class=${`vervote ${cls}`} role=${floating ? 'alertdialog' : undefined} tabindex=${floating ? '-1' : undefined}
+      aria-label=${t('切换版本投票')} aria-live=${covered ? undefined : 'polite'} aria-hidden=${covered ? 'true' : undefined} inert=${covered || undefined} data-testid="version-vote">
     <div class="vervote__text">
       <strong>${t('切换到「{version}」投票：{agreed}/{total}', { version: versionLabel(v.version), agreed: facts.yes, total: facts.total })}</strong>
-      <span class="vervote__time"><${Icon} name="hourglass" /><b class="num">${seconds}</b>s</span>
+      <span class="vervote__time" aria-hidden="true"><${Icon} name="hourglass" /><b class="num">${seconds}</b>s</span>
       <span class="vervote__hint t-lo">${t('全员同意后切换；切换后需要重新准备，本同盟上一局的结算回放会清除。')}</span>
       <div class="vervote__players">${facts.chips.map((c) => html`<span key=${c.id} class=${c.agreed ? 'is-agreed' : ''}>${c.name} · ${c.agreed ? t('已同意') : t('待同意')}</span>`)}</div>
     </div>
@@ -123,6 +126,21 @@ export function VersionVote({ room, floating = false, class: cls = '' }) {
     const id = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(id);
   }, [vote ? facts?.vote.id : null]);
+  // the floating alertdialog takes the focus when it appears (a vote opens, or an overlay opens over a running vote) and
+  // gives it back to where it was when it goes, if the focus is still inside it
+  const box = useRef(null);
+  const shownId = floating && facts ? facts.vote.id : null;
+  useEffect(() => {
+    const el = box.current;
+    if (shownId == null || !el) return undefined;
+    const prev = document.activeElement;
+    el.focus({ preventScroll: true });
+    return () => {
+      // (the strip may be gone already: then the focus fell back to the body)
+      const a = document.activeElement;
+      if ((!a || a === document.body || el.contains(a)) && prev && prev !== document.body && prev.isConnected) prev.focus?.({ preventScroll: true });
+    };
+  }, [shownId]);
   if (!facts) return null;
   const send = async (fn) => {
     if (pending.current) return;
@@ -132,7 +150,7 @@ export function VersionVote({ room, floating = false, class: cls = '' }) {
   };
   const id = facts.vote.id;
   return html`<${VersionVoteView} facts=${facts} seconds=${secondsLeft(deadline, now)} busy=${busy} online=${online} class=${cls}
-    floating=${floating} covered=${covered}
+    floating=${floating} covered=${covered} boxRef=${floating ? box : undefined}
     onAgree=${() => send(() => net.request('room.versionVote', { voteId: id, agree: true }))}
     onDecline=${() => send(() => net.request('room.versionVote', { voteId: id, agree: false }))}
     onCancel=${() => send(() => net.request('room.cancelVersionVote', { voteId: id }))} />`;

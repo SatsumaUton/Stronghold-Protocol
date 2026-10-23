@@ -668,5 +668,9 @@
   .rs .vervote {
     position: fixed; left: 50%; top: 50%; z-index: 30; width: min(calc(100vw - 24px), 9rem); max-height: 70svh; margin: 0; overflow-y: auto;
     transform: translate(-50%, -50%); box-shadow: 0 .1rem .5rem rgba(0, 0, 0, .8);
+    /* too tall for the screen: the text scrolls, the buttons stay in view below it (like the floating strip's) */
+    flex-direction: column; flex-wrap: nowrap; align-items: stretch;
   }
+  .rs .vervote .vervote__text { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+  .rs .vervote .vervote__actions { flex: none; }
 }

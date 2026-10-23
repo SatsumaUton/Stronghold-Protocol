@@ -1049,4 +1049,3 @@ one child process per version `cs`, at most `maxHosts`, counted apart from the p
 host checks every data file's sha256 against the version's hash input, installs the data with `setData` and the version's
 bounds snapshot, and refuses a match whose `opts.version` is not its data's version. A test journal of such a match carries
 `init.options.version` and replays in a process whose data singleton is that version's (`server/match/testReplay.js`).
-

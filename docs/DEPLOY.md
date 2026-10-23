@@ -539,4 +539,3 @@ Node 22 的 `--permission` **不限制网络**（TCP/UDP/DNS/监听均可能可�
 - 玩家第一次进入某个版本时，浏览器要下载该版本的数据（约 5 MB，之后缓存）。
 - `http://localhost:3000/healthz` 在启用了非默认版本时多一项 `versions`：启用的版本、默认版本和版本子进程的数量。
 - 也可以在 `startServer({ versions: { enabled, default, maxHosts } })` 里设置（优先于环境变量）。
-

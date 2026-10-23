@@ -657,8 +657,11 @@ time; on a short screen it floats over the seats. The settlement screen shows th
 doctor still reading the result can vote. While 干员调配 or 统计数据 covers the room (fixed overlays at z 55), a voter or the
 host sees the strip floating above it (`CoveredVersionVote`, `vervote--covered` z 56, mounted by main.js after the
 overlays), so a vote never runs out unseen; it is its own `role="alertdialog"` (the overlays are aria-modal) and the
-strip it covers is `aria-hidden` + `inert` meanwhile. A floating strip never grows past the screen: on a short screen its
-text scrolls above the buttons. Screens that memoise rows or lookups of the data (干员调配, 干员持有, `useGameData`,
+strip it covers is `aria-hidden` + `inert` meanwhile. The floating dialog takes focus on its section when it appears and
+returns it when dismissed; the countdown is `aria-hidden`, so the live region never announces its ticks. A floating
+strip never grows past the screen: on a short screen its text scrolls above the buttons, as does the room's own fixed
+strip. Version tags wrap their whole name on short screens, keeping the part visible. Screens that memoise rows or
+lookups of the data (干员调配, 干员持有, `useGameData`,
 统计数据) key them by `data.contentId()` as well as the language, so an open one follows a version switch. A change of `room.version` toasts 「同盟已切换到「{version}」」 (never on entering
 a room) and closes a result of the old version still on screen (`main.js onRoomState`). When the room's version is not
 the lobby's, a banner says leaving restores it (a short screen gives the line up: the pill's tooltip says it). The plugin
