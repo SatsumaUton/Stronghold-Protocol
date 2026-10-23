@@ -4,10 +4,11 @@
 // and the plugin content sets built on it (no config.version) keep the by-id lookups of before M0. Every data directory
 // checked here — data/, every data/versions/*/ with a chess.json, and the directories of SP_VERSION_DATA_DIRS
 // (path.delimiter-separated, e.g. a dry build) — must:
-//   * resolve every chess to a kit written for its own charId, or list its charId in PENDING_KIT_CHARS (generic kit);
+//   * resolve every chess to a kit written for its own charId, or list its charId in PENDING_KIT_CHARS (generic kit;
+//     empty after the 第一期 charId kits, §35.22.7);
 //   * resolve every 自选 pick (owned pool and prototypes, each slot) and every 补位 stand-in to the kit of its charId, or
-//     be a 预备干员 (GENERIC_KIT_CHARS, generic by design) or a version's 自选 pick listed in PENDING_DIY_KIT_CHARS, which
-//     the kitted gate (KITTED_CHARS) then drops;
+//     be a 预备干员 (GENERIC_KIT_CHARS, generic by design) or a version's 自选 pick listed in PENDING_DIY_KIT_CHARS
+//     (empty after the borrowed tier kits), which the kitted gate (KITTED_CHARS) then drops;
 //   * dispatch every item to the handler of its own effectId, and bind each meta override only to item keys whose
 //     record carries its effectId and the buff it reads;
 //   * match its pinned resolution counts (EXPECT; a directory without an entry fails until it gets one);
@@ -97,8 +98,8 @@ const DEFAULT_META = Object.freeze({
   scroll: ['chess_item_6_02_m'], customerDestroy: ['chess_item_6_01_m'], cauldron: ['chess_item_6_03_e'],
 });
 const SHANG = Object.freeze({
-  // 自选: 24 owned picks whose only kit is a 下半 tier kit (PENDING_DIY_KIT_CHARS); V1_1's owned pool has one operator less
-  kits: { own: 46, tier: 19, op: 12, pending: 19 }, diy: { kitted: 57, generic: 6, pending: 24 }, standIns: { kitted: 64, generic: 68 },
+  // 自选: the 24 borrowed charId kits (§35.22.7) are kitted; V1_1's owned pool has one operator less (娜斯提)
+  kits: { own: 46, tier: 19, op: 31, pending: 0 }, diy: { kitted: 81, generic: 6, pending: 0 }, standIns: { kitted: 64, generic: 68 },
   items: 44, handlers: 22, battleEffect: 68,
   hammers: ['chess_item_2_03_e', 'chess_item_2_04_e', 'chess_item_2_05_e', 'chess_item_2_06_e'],
   // 上半 has no 紧急调度券, and its 寻呼模块 (eff_acarm075) reads use_equip_add_goods_rule_with_refresh_shop: unbound (M2)
@@ -114,11 +115,11 @@ const EXPECT = Object.freeze({
     cells: ['chess_item_5_08_e_a'],
   },
   'data/versions/act1autochess': SHANG,
-  'data/versions/act1autochess-v1_1': { ...SHANG, diy: { kitted: 56, generic: 6, pending: 24 } },
+  'data/versions/act1autochess-v1_1': { ...SHANG, diy: { kitted: 80, generic: 6, pending: 0 } },
   // 下半 V2_1: the chess and item ids of today's data, 13 chess entries fewer (V2_2's 5 new operators and 8 re-tiered
-  // entries); 4 owned 自选 picks whose only kit is the shop chess kit V2_2 added (银灰, 空弦, 卡涅利安, 伺夜)
+  // entries); 4 owned 自选 picks borrow the shop kit (银灰, 空弦, 卡涅利安, 伺夜)
   'data/versions/act2autochess-v2_1': {
-    kits: { own: 116, tier: 0, op: 0, pending: 0 }, diy: { kitted: 72, generic: 6, pending: 4 }, standIns: { kitted: 74, generic: 26 },
+    kits: { own: 116, tier: 0, op: 0, pending: 0 }, diy: { kitted: 76, generic: 6, pending: 0 }, standIns: { kitted: 74, generic: 26 },
     items: 54, handlers: 27, battleEffect: 82,
     hammers: ['chess_item_4_09_e', 'chess_item_3_09_e', 'chess_item_3_10_e', 'chess_item_2_03_e'], meta: DEFAULT_META,
     cells: ['chess_item_5_08_e_a'],
@@ -368,8 +369,8 @@ test('kits: on a version\'s build a chess id given to another operator takes tha
   t.after(() => setGameData(null));
   const ds = new DataSource(dataOf(DEFAULT_DIR), null);
   const yak = ds.getChess('chess_char_1_02_a');
-  // 上半's chess_char_1_02_a is 讯使 (pending), its chess_char_5_12_a 林 (an op-* kit)
-  assert.equal(officialKitKey({ ...yak, charId: 'char_198_blackd' }), null);
+  // 上半's chess_char_1_02_a is 讯使 (a charId kit, §35.22.7), its chess_char_5_12_a 林 (an op-* kit)
+  assert.equal(officialKitKey({ ...yak, charId: 'char_198_blackd' }), 'char_198_blackd');
   assert.equal(officialKitKey({ ...ds.getChess('chess_char_5_12_a'), charId: 'char_4080_lin' }), 'char_4080_lin');
   // 锡人 at tier 2 under another id → chess_char_2_19_a; at an unknown tier → the first one
   assert.equal(officialKitKey({ ...yak, charId: 'char_4151_tinman', tier: 2 }), 'chess_char_2_19_a');
@@ -402,7 +403,7 @@ test('kits and items: a plugin content set on the default data that patches an o
   // the same patches on a version's build follow the patched values
   setGameData(versioned(data));
   assert.equal(officialKitKey(ds.getChess('chess_char_1_02_a')), 'chess_char_1_16_a');
-  assert.equal(officialKitKey(ds.getChess('chess_char_1_03_a')), null);
+  assert.equal(officialKitKey(ds.getChess('chess_char_1_03_a')), 'char_198_blackd');
   assert.equal(battleEffectOf('chess_item_3_02_e_a'), 'eff_acarm040');
   assert.deepEqual(itemMetaBindings().find((b) => b.name === 'pager').keys, []);
 });
