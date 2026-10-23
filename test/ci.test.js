@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   CI_SHARD_ENV, CI_TEST_ENV, ROOT, SKIPPED_CI_STEPS, SMOKE_PATHS, STEPS, TEST_FILES, binPath, formatDuration,
-  formatSummary, isSkippedCiStep, parseArgs, parseMatrix, parseWorkflow, selectSteps, stepEnv,
+  formatSummary, isSkippedCiStep, parseArgs, parseMatrix, parseWorkflow, selectSteps, stepEnv, runStep,
 } from '../tools/ci.mjs';
 import { SHARD_COUNT } from '../tools/ci-shards.mjs';
 
@@ -246,4 +246,20 @@ test('local CI clears residual shard and JUnit settings before invoking the full
   assert.equal(Object.hasOwn(env, 'JUNIT'), false);
   assert.equal(env.PATH, 'p');
   assert.equal(base.SHARD, '2', 'the caller environment is unchanged');
+});
+
+
+test('the local CI dispatcher executes its declared guard and full-test commands', async () => {
+  for (const id of ['guards', 'test']) {
+    const step = STEPS.find(s => s.id === id), env = { NO_COLOR: '1' };
+    let invoked = false;
+    const result = await runStep(step, env, async (args, childEnv) => {
+      invoked = true;
+      assert.deepEqual(args, step.describe.slice('node '.length).split(' '));
+      assert.equal(childEnv, env);
+      return 0;
+    });
+    assert.equal(invoked, true, id);
+    assert.equal(result, 0);
+  }
 });

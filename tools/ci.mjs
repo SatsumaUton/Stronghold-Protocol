@@ -400,14 +400,15 @@ async function smoke(env) {
 }
 
 /** @param {Step} step @param {Record<string, string | undefined>} env */
-function runStep(step, env) {
+export function runStep(step, env, runNode = node) {
   switch (step.id) {
-    case 'setup': return node(['tools/setup.mjs', '--check', '--no-local'], env);
-    case 'test': return node(['--test', ...TEST_FILES], env);
+    case 'setup': return runNode(['tools/setup.mjs', '--check', '--no-local'], env);
+    case 'test': return runNode(['tools/test-run.mjs'], env);
+    case 'guards': return runNode(['--test', 'test/ci.test.js', 'test/ci-shards.test.js', 'test/test-run.test.js'], env);
     case 'smoke': return smoke(env);
-    case 'lint': return node([binPath('eslint', 'eslint'), '.'], env);
-    case 'imports': return node(['tools/check-imports.mjs'], env);
-    case 'typecheck': return node([binPath('typescript', 'tsc'), '--noEmit', '--checkJs', '-p', 'jsconfig.json'], env);
+    case 'lint': return runNode([binPath('eslint', 'eslint'), '.'], env);
+    case 'imports': return runNode(['tools/check-imports.mjs'], env);
+    case 'typecheck': return runNode([binPath('typescript', 'tsc'), '--noEmit', '--checkJs', '-p', 'jsconfig.json'], env);
     default: throw new Error(`no runner for step ${step.id}`);
   }
 }
