@@ -1014,6 +1014,15 @@ the hidden five-star orbit is unchanged (PR #576).
 
 The active-bond strip shows every entry in a horizontal scroller, with keyboard focus, touch panning and translated
 arrow controls. Watched owners, harmony counts, morph members and disabled bonds retain their existing behavior (PR #678).
+The strip's .08rem clip padding has matching negative margins to preserve the discs' and names' original height.
+Prep and Final Assault prep reserve the arrows' 44 px floor and any taller measured bounds (including native scrollbars),
+relative to the field host and safe-area insets. The minimum band remains while collapsed; desktop keeps the official
+camera and original 2.16rem band when the strip already fits (§35.110).
+
+Outside presses dismiss match detail cards, bond popups and the selected-piece underframe (PR #792, §35.93).
+The detail card and bond popup retain selection while used, so pointerdown cannot move a card before its click.
+Other HUD controls, including Settings, still dismiss them; after closing Settings the player selects a unit again.
+Field presses retain the existing origin rule: field-unit cards close, while shop/reward/bond-member cards stay (§35.110).
 
 Attack pacing (PR #729): UnitInfo carries the actual attack interval in game seconds. A `rate` event after the ally
 phase and before projectiles carries changes; its baseline is seeded by birth info. The renderer looks ahead through
