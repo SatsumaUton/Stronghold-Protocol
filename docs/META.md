@@ -736,8 +736,10 @@ Any `choice:` handler whose EffectRef reuses its own key must guard like this (o
   the boss field (board coordinates unchanged). `onMerge` carries `area` ('board' | 'hand' | 'temp').
 * **Board**: rows 9–12 × cols 2–10, legality from `stages[id].tiles` + devices (board.js); deploy cap 8 (+effects);
   summons don't use slots; legal chess board↔hand swaps in either direction reuse the occupied slots, even with a full
-  hand and at the deploy cap. This applies to all four official versions (round53 maintainer correction, §36.2;
-  first-period historical fidelity is not independently re-measured [ASSUMED]). Other phase/ready, terrain, summon,
+  hand and at the deploy cap. This applies to all four official versions. **INTENTIONAL DEVIATION (有意偏差):**
+  after reviewing [official news 5114](https://ak.hypergryph.com/news/5114), the maintainer decided on 2026-10-25
+  that 第一期上／下半 also allow this swap; the official first period did not, and the second period added it
+  ([§36.2](history/0.3.3.md)). Other phase/ready, terrain, summon,
   purchase, reward and actual-addition limits still apply. The legend's `buildable` is the effective deploy type: the
   深水区 (`tile_deepsea`, 战场#08's pool — level buildableType ALL) refuses deployment (PRTS 深水区 地形信息
   "拒绝部署（待补充）"; a 特制水上平台 device makes its tile deployable for any unit; player report #3 after 0.1.0). A

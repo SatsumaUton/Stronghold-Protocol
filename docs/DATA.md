@@ -918,8 +918,10 @@ every file system and URL).
   `{}`, the default's (every 下半 switch dates from 2026-03-14); 上半:
   `deployOrder 'rowBottomUp'`, `soloTimed true`, `benchEquip false`, `bossMirrorShare false`
   (PRTS 卫戍协议/帮助; news 5114 describes the later equipment / boss changes). The former `benchFullSwap false`
-  restriction is removed by the maintainer's round53 instruction: a swap reuses occupied slots in all versions
-  (§36.2; first-period historical fidelity not independently re-measured [ASSUMED]). M2 reads `rules` (§35.22.7): a first-season
+  restriction is removed as an **INTENTIONAL DEVIATION (有意偏差)**: after reviewing
+  [official news 5114](https://ak.hypergryph.com/news/5114), the maintainer decided on 2026-10-25 to allow the swap
+  in 第一期上／下半 too. The official first period did not allow it; the second period added it. This convenience
+  applies to all four versions ([§36.2](history/0.3.3.md)). M2 reads `rules` (§35.22.7): a first-season
   solo is timed unless the room opts into `soloUnlimited` (§35.23.10).
   `constants.singleReconnectTime` is `null` in a version whose constData lacks it: 上半's has none (the 2026-03-10
   rewrite `12e0a020` added it), so the build writes no 下半 value as official data. The lobby's own fallback then keeps a

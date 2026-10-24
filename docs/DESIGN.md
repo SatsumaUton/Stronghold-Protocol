@@ -78,6 +78,12 @@ version; the earlier versions still play with 第二期下半's rules where they
 [design/network.md](design/network.md) §8.5 (the messages), [design/client.md](design/client.md) "Official versions"
 and [SIM.md](SIM.md) §7.2 (behaviour keyed by charId / effectId).
 
+Versions' intentional deviations / 有意偏差: the remake's deliberate conveniences carry across versions
+(§35.22). Since 0.3.3, full-bench swaps are also allowed in 第一期上／下半 by the maintainer's 2026-10-25 decision,
+after reviewing [official news 5114](https://ak.hypergryph.com/news/5114): the official first period did not allow
+this swap; the second period added it. This is an **INTENTIONAL DEVIATION**, recorded in
+[§36.2](history/0.3.3.md), [design/match.md](design/match.md), [META.md](META.md) and [DATA.md](DATA.md).
+
 ## Where each section lives
 
 0.3.3 未发布的第一期商店装备核查与空栏显示修正见 [§36.1](history/0.3.3.md)，满休整区互换修正见同文件 §36.2。
