@@ -196,9 +196,11 @@ for byte what they were; everything below appears only in a room whose host swit
 
 ### 8.5 Official version messages (M1, §35.23)
 
-A server offers the official versions its owner enables (docs/DATA.md "Serving the versions (M1)"; default: 第二期下半,
-`act2autochess`, alone — then nothing below appears on the wire). A room plays one version; `act2autochess` is a code
-constant: a message or a record without a version means it, whatever the server's default.
+A server offers the official versions its owner enables (docs/DATA.md "Serving the versions (M1)"). Nothing set enables
+all four, so `welcome.versions` lists them and the default version stays 第二期下半 / `act2autochess` (§35.23.11).
+`welcome.versions` is omitted only when the live list is exactly that one version (`SP_VERSIONS=act2autochess`). A room
+plays one version; `act2autochess` is a code constant: a message or a record without a version means it, whatever the
+server's default.
 
 - S→C `welcome.versions?` = `[{ id, cs, family, label, roomModes, default?: true }]` in registry order (`label`: the
   registry msgid; `default` on the server's default only) — present only when more than one version is enabled or the only

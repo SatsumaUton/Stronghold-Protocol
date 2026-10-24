@@ -243,7 +243,9 @@ singleton (the kits, builtinMeta, the meta registry, the official-bounds cache) 
   stop reasons 'plugin-crash' / 'plugin-hang' / 'plugin-start';
 - **version hosts** (`kind: 'version'`, §35.23, M1): one per enabled official version other than 第二期下半 (its `cs`,
   `server/versions.js`), at most `maxHosts` (default: one per such version; `SP_MAX_VERSION_HOSTS`), counted apart from
-  the plugin hosts; log lines `[versions]` with the version's id as the host label; stop reasons 'version-crash' /
+  the plugin hosts. Nothing set enables all four, so that cap is three (§35.23.11). A host is forked on the first match
+  of that version, never at boot; an idle server has zero version workers. Log lines `[versions]` with the version's id
+  as the host label; stop reasons 'version-crash' /
   'version-hang' / 'version-start' (the room is told `本局模拟出错，已结束` / `本局模拟长时间无响应，已结束` /
   `该版本的模拟无法启动`); a full pool refuses the start with `INTERNAL` 'version hosts busy'. The host installs the
   version's own official-bounds snapshot, and refuses (`failed` → 'version-start') a match whose `opts.version` (absent:

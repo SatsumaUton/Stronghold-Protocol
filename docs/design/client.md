@@ -679,7 +679,7 @@ left open — also on a reloaded page that never saw the room) keeps the version
 it under that version; 统计数据's replay of a stored match shows its version while it is open (the store's
 `replayVersion`, set when the row opens — in a room it equals the room's — and cleared when the replay or 统计数据 closes;
 the lobby preference is never changed). Without
-welcome.versions (a default server, G4) the switch does not exist and nothing below runs.
+welcome.versions (a server that offers only 第二期下半) the switch does not exist and nothing below runs. A default server lists every version (G4, §35.23.11).
 
 **Data.** `content.js installContentSet` follows the version shown: 第二期下半 → the server's own files
 (`data.setContent(null)`); another version → `loadVersionSet(cs, id)`: the version's `/cs/<cs16>/index.json` (it must
@@ -782,7 +782,7 @@ stay the chess ids of the room's data.
 carry the VersionTag. Re-viewing another version's settlement needs that version's data: outside a room the row offers
 「切换到「X」查看」 (the page shows that version while the replay is open, `replayVersion`; the settlement opens once its data
 is checked), in a room it is disabled with a hint, and a version this server does not offer (not in welcome.versions —
-a default server offers none) is not clickable (「这台服务器没有提供「X」，不能回看该局结算」). The replay's wait always keeps
+a server narrowed to 第二期下半 offers none) is not clickable (「这台服务器没有提供「X」，不能回看该局结算」). The replay's wait always keeps
 返回统计: with 版本数据校验失败 + 重试 when the set failed, with the room's line when the room now plays another version.
 Opening a row sets `replayVersion` in a room too (the room's version comes first, so nothing changes while seated): a
 room left while the replay is open (a kick, the room closed) never moves the page to the lobby's version, so the

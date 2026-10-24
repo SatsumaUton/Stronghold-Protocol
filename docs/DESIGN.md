@@ -71,7 +71,7 @@ The official version switch starts in 0.3.2 with M0, recorded in
 them on 2026-10-22 — 第一期 is the official `act1autochess` (「卫戍协议：盟约」 上半期活动), 第二期 `act2autochess` (下半期活动),
 and each period's 上半 / 下半 its sub-versions V1_1 / V1_2 and V2_1 / V2_2; 第二期下半, today's game, stays the default
 byte for byte. M1, recorded in [§35.23](history/0.3.2.md#3523-official-versions-the-version-switch-m1), makes them
-playable on a server that enables them (`SP_VERSIONS`, off by default): each player's lobby switch, the room's version
+playable by default (all four; `SP_VERSIONS` narrows the list, [§35.23.11](history/0.3.2.md#352311-every-official-version-is-enabled-unless-the-list-is-narrowed)): each player's lobby switch, the room's version
 switched before the match by a unanimous vote of the seated humans (the host proposes, as in 重刷), one match process per
 version; the earlier versions still play with 第二期下半's rules where they differ (M2). Current contract:
 [DATA.md](DATA.md) "Official versions (M0)" (registry, profiles, builds) and "Serving the versions (M1)",

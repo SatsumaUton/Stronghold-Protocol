@@ -330,8 +330,24 @@ test('server/data.js: versionDataDir and getVersionData; loadData(DATA_DIR) neve
   resetVersionData();
 });
 
-test('HTTP: a default server (only 第二期下半 enabled) never serves data/versions/ (any spelling); the default data is', async () => {
-  const srv = await startServer({ port: 0, host: '127.0.0.1', quiet: true });
+const VERSION_ENV = ['SP_VERSIONS', 'SP_VERSION_DEFAULT', 'SP_MAX_VERSION_HOSTS'];
+
+/** Start a server with the version environment unset, then restore it. `extra` still wins (the `versions` option). */
+async function startVersionsServer(extra = {}) {
+  const saved = VERSION_ENV.map((k) => [k, process.env[k]]);
+  for (const [k] of saved) delete process.env[k];
+  try {
+    return await startServer({ port: 0, host: '127.0.0.1', quiet: true, ...extra });
+  } finally {
+    for (const [k, v] of saved) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+}
+
+test('HTTP: a server narrowed to 第二期下半 never serves data/versions/ (any spelling); the default data is', async () => {
+  const srv = await startVersionsServer({ versions: { enabled: ['act2autochess'] } });
   try {
     const get = (p) => fetch(srv.url + p, { redirect: 'manual' });
     assert.equal((await get('/data/chess.json')).status, 200);
@@ -352,6 +368,30 @@ test('HTTP: a default server (only 第二期下半 enabled) never serves data/ve
         assert.ok([400, 403, 404].includes(r.status), `${p} → ${r.status}`);
         await r.arrayBuffer();
       }
+    }
+  } finally {
+    await srv.close();
+  }
+});
+
+test('HTTP: nothing set enables every version, serves their data, and forks no version host while idle', async () => {
+  const srv = await startVersionsServer();
+  try {
+    const get = (p) => fetch(srv.url + p, { redirect: 'manual' });
+    assert.deepEqual(srv.versions.ids, VERSIONS.map((v) => v.id));
+    assert.equal(srv.versions.defaultId, DEFAULT_VERSION);
+    assert.equal(srv.versionHosts.stats().workers, 0, 'the pool exists; no child until the first match of a version');
+    assert.equal(srv.versionHosts.stats().matches, 0);
+    const health = await (await get('/healthz')).json();
+    assert.deepEqual(health.versions, {
+      enabled: VERSIONS.map((v) => v.id), default: DEFAULT_VERSION,
+      hosts: { workers: 0, matches: 0, transport: 'process' },
+    });
+    assert.equal((await get('/data/chess.json')).status, 200);
+    for (const v of OTHERS) {
+      const r = await get(`/data/${v.dir}chess.json`);
+      assert.equal(r.status, 200, v.id);
+      await r.arrayBuffer();
     }
   } finally {
     await srv.close();

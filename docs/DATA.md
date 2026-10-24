@@ -780,7 +780,7 @@ the three earlier versions, named by period as the maintainer named them (2026-1
 sub-versions V1_1 / V1_2 and V2_1 / V2_2. (PRTS's 「第一期」 is the 2024 卫戍协议, `act1vautochess`, which is not done.)
 A bare 上半 / 下半 here and in code comments keeps the official activity sense (上半 = 第一期 / `act1autochess`, 下半 =
 第二期 / `act2autochess`); a period's halves are always written with the period (第一期上半 …) or as V1_1 … V2_2.
-**M2 core and kits are in** (DESIGN §35.22.7–§35.22.9): golden and botbench load a selected version, and a version room plays that version's rules and kits. **M1 serves enabled versions** (DESIGN §35.23; "Serving the versions (M1)" below): `server/http/static.js` serves `data/versions/<slug>/` only when the server enables that version, and a default server still answers 404. `data/versions/` is tracked, so the release zips and Docker carry it (48 files, 15.0 MB on disk, about 1.3 MB zipped). The default version is unchanged — `data/*.json`, `data/i18n/`, the golden corpus, the `cs` formula and a default room's `room.state` are pinned: `test/data.test.js` and `test/golden.test.js` guard the data and the goldens, `test/versions-default-guard.test.js` (G2–G4) the `cs` inputs, the formula and the default room. Its file hashes (G1) were the M0 merge check and were deleted when M1 started (DESIGN §35.22.2, §35.23).
+**M2 core and kits are in** (DESIGN §35.22.7–§35.22.9): golden and botbench load a selected version, and a version room plays that version's rules and kits. **M1 serves enabled versions** (DESIGN §35.23; "Serving the versions (M1)" below): `server/http/static.js` serves `data/versions/<slug>/` only when the server enables that version. Nothing set enables all four, so those files are served (§35.23.11); a version the server does not enable, and a server narrowed to 第二期下半 alone, still answer 404. `data/versions/` is tracked, so the release zips and Docker carry it (48 files, 15.0 MB on disk, about 1.3 MB zipped). The default version is unchanged — `data/*.json`, `data/i18n/`, the golden corpus, the `cs` formula and a default room's `room.state` are pinned: `test/data.test.js` and `test/golden.test.js` guard the data and the goldens, `test/versions-default-guard.test.js` (G2–G4) the `cs` inputs, the formula, the default room and the welcome's versions list. Its file hashes (G1) were the M0 merge check and were deleted when M1 started (DESIGN §35.22.2, §35.23).
 
 **M2 research and rules:** `docs/research/versions/<slug>/02-bonds.json` and `04-items.json` use each snapshot's own
 text. First-season `01-core-data.json` supplies the 11-18 blackboard multipliers and preserves 300-second solo prep;
@@ -1014,10 +1014,12 @@ versions"), and their matches run in a match host whose data singleton is that v
 
 **Configuration** (`server/http/config.js` versionsFrom): the startServer option `versions: { enabled, default, maxHosts }`
 wins over the environment — `SP_VERSIONS` (`all` or a comma list of registry ids), `SP_VERSION_DEFAULT`,
-`SP_MAX_VERSION_HOSTS`. Nothing set: `act2autochess` alone (the switch off: every room, page and welcome as before M1). An
-unknown id is warned about and dropped (none left: `act2autochess`); a default that is not enabled is warned about and
-replaced by the first enabled id in registry order; `maxHosts` defaults to the number of enabled non-default versions (at
-least 1 when there is one). The boot log prints one line, e.g.
+`SP_MAX_VERSION_HOSTS`. Nothing set enables every registry id (the lobby switch on; the default version stays
+`act2autochess`, §35.23.11). `SP_VERSIONS=act2autochess`, or `versions.enabled` of that one id, is 第二期下半 alone (the
+switch off). An unknown id is warned about and dropped (none left: `act2autochess`); a default that is not enabled is
+warned about and replaced by the first enabled id in registry order; `maxHosts` defaults to the number of enabled
+non-default versions (at least 1 when there is one). Version match hosts are forked on the first match of a version,
+never at boot. The boot log prints one line, e.g.
 `[versions] enabled: act2autochess (第二期下半, default), act1autochess (第一期下半)`.
 
 **The service** (`server/versions.js` createVersionSets): at boot, each enabled non-default version's `cs` —
