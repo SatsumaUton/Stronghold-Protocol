@@ -80,6 +80,9 @@ and [SIM.md](SIM.md) §7.2 (behaviour keyed by charId / effectId).
 
 ## Where each section lives
 
+0.3.3 跨版本装备贴图与渲染查表缓存修正见 [§36.3](history/0.3.3.md)；当前缓存身份约定见
+[design/client.md](design/client.md)「Official versions」与 [ASSETS.md](ASSETS.md)「Id scope」。
+
 0.3.3 未发布的第一期商店装备核查与空栏显示修正见 [§36.1](history/0.3.3.md)。
 当前规则见 [design/match.md](design/match.md)，空栏布局字段见 [design/network.md](design/network.md)。
 
