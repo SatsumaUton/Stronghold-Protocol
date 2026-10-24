@@ -495,7 +495,11 @@ the remake's own tips (the official tutorial chapter keeps the name 调度手册
 nothing. [ASSUMED], with no screenshot or video of the event screen offline: the card frame and colours, the two-row
 flow, the bottom bar, the 快速配置 columns, the 转场 timings, and ONE combined 甄选干员 card per tier where the official
 data lists two DIY slots (`charChessDiySlotIdList`). Both views read and write the same loadout store, so the room and
-the server see nothing new.
+the server see nothing new. Normal / elite level indicators read each form's `status.phase` and `status.level`:
+`PromotionIcon` uses the official `elite/elite_0..2` sprites (missing art: `E0` / `E1` / `E2`), never a fixed two-bar
+glyph or a phase inferred from shop tier. The tier badge reserves the full square image height above these indicators,
+including at every text size and UI scale. Settlement uses the same icon and the resolved chess / stand-in / DIY
+record's status; absent records have no phase icon and show `—` for level (§35.18 card-icon review).
 
 Automatic combat screen wake lock restores the official mobile client's screen-awake experience. App requests it
 for players and spectators when `isCombatPhase(phase)` holds for a valid ongoing match; an ended/absent room or an
