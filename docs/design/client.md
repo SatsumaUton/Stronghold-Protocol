@@ -681,6 +681,11 @@ it under that version; 统计数据's replay of a stored match shows its version
 the lobby preference is never changed). Without
 welcome.versions (a server that offers only 第二期下半) the switch does not exist and nothing below runs. A default server lists every version (G4, §35.23.11).
 
+The lobby switch keeps the full season and part visible as 文字大小 grows: its width follows its label rather than a
+fixed rem cap, and the top bar reserves that width beside its tools ([ASSUMED] presentation policy, §35.23.12). The hub
+checks include all five languages, all four text sizes, and 界面大小 75 % at 小, with the switch inside the bar and its
+hit target clear of the other controls.
+
 **Data.** `content.js installContentSet` follows the version shown: 第二期下半 → the server's own files
 (`data.setContent(null)`); another version → `loadVersionSet(cs, id)`: the version's `/cs/<cs16>/index.json` (it must
 be `vanilla: true`, name the version expected, carry no plugins and no settings, and its composition must hash to the
@@ -723,7 +728,10 @@ status line; `modded` stays the 非官方 mark. A version room's words: 版本�
 [ASSUMED placement]. A timed solo (第一期) shows ⚙ 模拟设置 with the 「不限时」 switch (the host toggles `room.setSoloUnlimited`; everybody else reads
 it). The solo briefing states the 300 s / 150 s rule, or the untimed line when the switch is on or the version's solo is
 not timed; while that version's data is not on screen the briefing omits the time line and the gear stays hidden. The
-version pill beside the difficulty and ⚙'s 版本 row open the picker in room mode: the host's pick
+version pill beside the difficulty and ⚙'s 版本 row open the picker in room mode. The compact pill may abbreviate its
+visible name with an ellipsis (the existing `versions-fit` policy, now covered on default servers too, §35.23.12);
+its accessible name and the picker's version names stay complete, and its control stays inside the footer and reachable.
+The host's pick
 sends `room.proposeVersion` (a RATE right after a switch — every page resends its settings, which share the server's
 heavy-message budget — is tried once more after 1.2 s [ASSUMED]); off during a vote, with gameplay plugins (「请先关闭改变
 玩法的插件」) and offline; read-only for everybody else. `ui/versionVote.js` (modelled on `ui/setupReroll.js`): the
