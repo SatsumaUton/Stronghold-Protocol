@@ -39,6 +39,14 @@ LOBBY(room) → INFO_CHECK (co-op 25 s; solo and any single-human match untimed 
 ```
 Solo FUNNY has 9 rounds (boss at R9); everything is read from `data/config.json → modes[modeId]`.
 
+Shop layouts are version-specific (`config.modes[modeId].shopSlots`, official
+`activity.AUTOCHESS_SEASON[season].shopLevelDataDict[modeId][level].charChessCount` / `itemCount`). Both 第一期
+builds have no equipment slot at levels 1–4 and one at 5–6; 第二期上半 and the default have one at 1–6 in every
+lobby mode. Training, which the lobby does not offer, has one only at 5–6 in every version. An upgrade opens
+new slots empty; refresh / the next round fills them. The private shop view includes its actual `{ chess, item }`
+layout so an empty equipment slot stays in the equipment column. A mode with zero equipment slots shows no sold
+equipment placeholder. Verification and sources: [§36.1](../history/0.3.3.md).
+
 A first-season solo (`config.version.rules.soloTimed`, DESIGN §35.22.7) is not `soloUntimed` unless the room's
 「不限时」 is on (`room.setSoloUnlimited`, default off; `room.state` omits `soloUnlimited` unless true; the match is built
 with `opts.soloUnlimited`, DESIGN §35.23.10). While it is off, INFO_CHECK, the strategy draft, 机变 and preparation use
