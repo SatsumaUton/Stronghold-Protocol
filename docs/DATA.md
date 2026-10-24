@@ -774,6 +774,11 @@ See PLUGINS.md for namespaces, limits and the local-table version recorded by Fo
 
 ## Official versions (M0)
 
+Presentation is shared across the official builds: `tools/assets/versions.mjs` reads their rosters by charId,
+enemyKey and iconId, including backups/DIY, rather than merging reused chess ids. `fetch-assets` plans the union;
+`local-extract` fills missing official art and effects. See [ASSETS.md](ASSETS.md#id-scope) and §35.109. Gameplay
+data and the default version's existing presentation entries remain unchanged by this asset expansion.
+
 The data side of the official version switch (0.3.2, DESIGN §35.22): besides today's game, 第二期下半, the build produces
 the three earlier versions, named by period as the maintainer named them (2026-10-22): 第一期 is the official
 `act1autochess` (「卫戍协议：盟约」 上半期活动), 第二期 `act2autochess` (下半期活动), and each period's 上半 / 下半 are its

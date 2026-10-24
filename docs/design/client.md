@@ -670,6 +670,12 @@ simplified board uses the same mark with a fixed slot. The title footer links th
 
 ### Official versions (DESIGN §35.23, M1)
 
+Presentation assets cover the union of the installed official builds by operator/enemy/icon identity, including
+backups and summons; chess ids reused by another season never replace an operator's art. The shared manifest
+contains each version's base/E2 pictures, skill and strategy icons and models; optional local models/effects use
+the same local manifests and package pipeline. Adding earlier-version art preserves existing default-version
+entries. Full illustrations/outfits remain cosmetic-plugin layers for all versions (§35.109, ASSETS.md "Id scope").
+
 The page shows one official version's data at a time (`public/js/versions.js`): in the lobby this browser's choice
 (`sp.pref.lobby.version`, a registry id of `shared/versions.js`) when welcome lists it, else the server's default
 (welcome.versions' `default`), else 第二期下半 (`DEFAULT_VERSION`, a code constant); in a room the room's version
