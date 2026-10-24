@@ -301,6 +301,14 @@ specified above.
 **Data readiness.** `data.js useData` subscribes and starts its loads, then schedules a render to re-read their
 statuses: a warm-up that settles between the initial render and the subscription must not leave a resumed match on
 正在载入模拟数据… (§35.59). Later settlements notify the same subscription.
+S.W.E.E.P. also waits for the selected official version to match the checked set on the page: settled files can still
+belong to the previous version while the new set downloads. During that interval it shows 正在读取报告…; a failed
+version check shows 版本数据校验失败 and 重试 (§35.112).
+
+The room footer's version and difficulty pills share their height, padding, font size and radius, including the
+short-screen text rules. The version's Tooltip wrapper carries the footer height so the child's percentage height
+resolves correctly. [ASSUMED] The existing book glyph denotes the archived event period, also in the lobby switch
+and room settings; the lobby retains its own top-bar sizing (§35.111).
 
 Strategy-draft match information (§35.6): the read-only modal reuses the briefing's announced leader,
 battlefield and special enemy blocks alongside the existing bonds and banned operators. Its body scrolls within
