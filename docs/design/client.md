@@ -305,6 +305,13 @@ S.W.E.E.P. also waits for the selected official version to match the checked set
 belong to the previous version while the new set downloads. During that interval it shows 正在读取报告…; a failed
 version check shows 版本数据校验失败 and 重试 (§35.112).
 
+**S.W.E.E.P. animation independence (§35.113).** The report, enemy codex, their detail panels and their Modal veils
+show content immediately, with no opacity entry animation. Paused or disabled animations must leave the report,
+its loading/error state, all tiles and newly selected details visible. Ready-data notifications keep the mounted
+report and detail nodes; an ordinary update must not restart entry effects. The decorative mist may drift without
+affecting content visibility; reduced motion stops it and the tile hover transitions. Other screens' entry effects
+are inventoried in §35.113; this fix changes only S.W.E.E.P.
+
 The room footer's version and difficulty pills share their height, padding, font size and radius, including the
 short-screen text rules. The version's Tooltip wrapper carries the footer height so the child's percentage height
 resolves correctly. [ASSUMED] The existing book glyph denotes the archived event period, also in the lobby switch

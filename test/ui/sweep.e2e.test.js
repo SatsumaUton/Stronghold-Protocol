@@ -43,7 +43,6 @@ async function report(c, version, capture = false) {
     for (const tile of [tiles[0], tiles.at(-1)]) {
       await tile.evaluate((e) => e.scrollIntoView({ block: 'center' }));
       await tile.click();
-      await sleep(180); // the detail's 160 ms fade
       const visible = await tile.evaluate((e) => {
         const r = e.getBoundingClientRect();
         return r.width > 16 && r.height > 16 && e.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
@@ -142,5 +141,127 @@ test('S.W.E.E.P.: pending version never presents the previous report; 64 opens w
     if (held) await held.continue().catch(() => {});
     if (shots) writeFileSync(path.join(shots, 'sweep-network.json'), JSON.stringify({ network, warnings, problems: problemsOf([c, host]) }, null, 2) + '\n');
     await c.close(); await host.close(); await srv.stop();
+  }
+});
+
+// DOM presence and hit testing alone accept opacity:0. Check the whole ancestor chain as well.
+async function assertPainted(c, selector) {
+  const bad = await c.page.$$eval(selector, (els) => {
+    if (!els.length) return ['missing elements'];
+    return els.flatMap((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) return [`${el.className}: empty box`];
+      for (let e = el; e; e = e.parentElement) {
+        const s = getComputedStyle(e);
+        if (Number(s.opacity) < .99 || s.visibility !== 'visible' || s.display === 'none') {
+          return [`${el.className}: ${e.className} opacity=${s.opacity} visibility=${s.visibility}`];
+        }
+      }
+      return [];
+    });
+  });
+  assert.deepEqual(bad, [], `${selector} stays painted without advancing the animation clock`);
+}
+
+test('S.W.E.E.P.: paused entry animations keep the report, selections and codex visible', {
+  skip: !enabled, timeout: 120000,
+}, async (t) => {
+  const srv = await startRealServer();
+  const P = (await import('puppeteer-core')).default;
+  const c = new Client(P, srv.base, 'sweep-paused');
+  try {
+    await c.open(); await c.enter('暂停动画验收');
+    // Finish the lobby's unrelated entry before freezing newly opened report/codex animations.
+    await c.page.waitForFunction(() => !document.getAnimations().some((a) =>
+      a.effect.getTiming().iterations !== Infinity && a.playState === 'running'));
+    const cdp = await c.page.createCDPSession();
+    await cdp.send('Animation.enable');
+    for (const mode of ['cdp', 'web-animations', 'disabled', 'reduced-motion']) {
+      await t.test(mode, async () => {
+        let style;
+        const freeze = async () => {
+          if (mode !== 'web-animations') return;
+          await c.page.evaluate(() => {
+            for (const a of document.getAnimations()) {
+              const modal = a.effect.target?.closest('.modal');
+              if (modal?.querySelector('.sw, .sw-codex')) { a.pause(); a.currentTime = 0; }
+            }
+          });
+        };
+        try {
+          if (mode === 'cdp') await cdp.send('Animation.setPlaybackRate', { playbackRate: 0 });
+          if (mode === 'disabled') style = await c.page.addStyleTag({ content: '* { animation: none !important; transition: none !important; }' });
+          if (mode === 'reduced-motion') await c.page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+          await c.click('.lobby-sweep');
+          for (const [tab, label] of [['bands', '策略'], ['bonds', '盟约'], ['enemies', '敌方']]) {
+            await c.click('.sw-tab', label);
+            await c.page.waitForFunction((tab) => document.querySelector('.sw-body')?.dataset.tab === tab
+              && !!document.querySelector('.sw-detail'), {}, tab);
+            await freeze();
+            await shot(c, `animation-${mode}-${tab}`);
+            await assertPainted(c, '.sw-top, .sw-hero__name, .sw-text, .sw-sec__head, .sw-tile');
+            const tiles = await c.page.$$('.sw-tile');
+            for (const tile of [tiles.at(-1), tiles[0]]) {
+              const title = await tile.evaluate((el) => el.title);
+              await tile.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+              await tile.click();
+              await c.page.waitForFunction((title) => document.querySelector('.sw-hero__name')?.textContent === title, {}, title);
+              await freeze();
+              await assertPainted(c, '.sw-hero__name, .sw-text, .sw-tile.is-on');
+              assert.ok(await tile.evaluate((el) => {
+                const r = el.getBoundingClientRect();
+                return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+              }), 'selected tile remains hit-testable');
+            }
+            // Publish ready-data notifications while the entry clock is frozen. Use a locale with no
+            // overlays (Chinese fallback), so this checks rerenders without introducing network timing.
+            const retained = await c.page.evaluate(async () => {
+              const box = document.querySelector('.sw'), detail = document.querySelector('.sw-detail');
+              const animations = box.getAnimations({ subtree: true });
+              const { data } = await import('/js/data.js');
+              await data.setLocale(data.locale() === 'zh' ? 'en' : 'zh', []);
+              await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+              const now = box.getAnimations({ subtree: true });
+              return box === document.querySelector('.sw') && detail === document.querySelector('.sw-detail')
+                && animations.every((a) => now.includes(a));
+            });
+            assert.ok(retained, 'data updates retain the report, detail and running animations');
+            await freeze();
+            await assertPainted(c, '.sw-hero__name, .sw-tile');
+          }
+          await c.page.$eval('.sw-allcodex', (el) => el.scrollIntoView({ block: 'center' }));
+          await c.click('.sw-allcodex');
+          await c.page.waitForSelector('.sw-cd__name');
+          await freeze();
+          await shot(c, `animation-${mode}-codex`);
+          await assertPainted(c, '.sw-codex__title, .sw-cd__name, .sw-stat, .sw-codex__list .sw-eth');
+          const enemies = await c.page.$$('.sw-codex__list .sw-eth');
+          const lastEnemy = await enemies.at(-1).evaluate((el) => el.title);
+          await enemies.at(-1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+          await enemies.at(-1).click();
+          await c.page.waitForFunction((name) => document.querySelector('.sw-cd__name')?.textContent.includes(name), {}, lastEnemy);
+          await freeze();
+          await assertPainted(c, '.sw-cd__name, .sw-stat');
+          if (mode === 'reduced-motion' || mode === 'disabled') {
+            assert.equal(await c.page.$eval('.sw', (el) => el.getAnimations({ subtree: true }).length), 0);
+          }
+          await c.page.keyboard.press('Escape');
+          await c.page.waitForSelector('.sw-codex', { hidden: true });
+          await assertPainted(c, '.sw-hero__name, .sw-tile');
+        } finally {
+          await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 });
+          await c.page.emulateMediaFeatures([]);
+          if (style) await style.evaluate((el) => el.remove());
+          if (await c.page.$('.sw-codex')) {
+            await c.page.keyboard.press('Escape');
+            await c.page.waitForSelector('.sw-codex', { hidden: true });
+          }
+          if (await c.page.$('.sw')) await close(c);
+        }
+      });
+    }
+    assert.deepEqual(problemsOf([c]), []);
+  } finally {
+    await c.close(); await srv.stop();
   }
 });

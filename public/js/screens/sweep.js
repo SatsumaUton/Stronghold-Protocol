@@ -359,7 +359,7 @@ function EnemyCodex({ open, m, onClose }) {
     && (!needle || String(e.name || '').toLowerCase().includes(needle) || String(e.handbookIndex || '').toLowerCase().includes(needle)));
   const cur = list.find((e) => e.key === sel) || list[0] || null;
   const counts = Object.fromEntries(RANK_TABS.map(([k]) => [k, pool.filter((e) => k === 'all' || e.rank === k).length]));
-  return html`<${Modal} open=${true} onClose=${onClose} class="sw-codex" closeOnBackdrop=${false}>
+  return html`<${Modal} open=${true} onClose=${onClose} class="sw-codex" veilClass="sw-veil" closeOnBackdrop=${false}>
     <div class="sw-codex__top">
       <button type="button" class="sw-back" onClick=${onClose} aria-label=${t('返回')} title=${t('返回 (Esc)')}><${Icon} name="chevronLeft" /></button>
       <span class="sw-codex__title">${t('敌方图鉴')}</span>
@@ -441,7 +441,7 @@ export function SweepReport({ onClose }) {
 
   // the codex is the report's sibling, not its child: the report's body lifts its children over the backdrop
   // (position: relative), which would pull a nested Modal out of its fixed layer
-  return html`<${Modal} open=${true} onClose=${onClose} class="sw" closeOnBackdrop=${false}>
+  return html`<${Modal} open=${true} onClose=${onClose} class="sw" veilClass="sw-veil" closeOnBackdrop=${false}>
     <div class="sw__bg" aria-hidden="true"><i class="sw__mist"></i><i class="sw__lines"></i></div>
     <header class="sw-top">
       <div class="sw-top__left">
