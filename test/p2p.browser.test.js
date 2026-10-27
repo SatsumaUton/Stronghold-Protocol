@@ -1,14 +1,75 @@
 // Real local WebRTC + WebSocket integration. No game assets or external ICE service are needed.
 // PowerShell: $env:SP_P2P_E2E='1'; node --test test/p2p.browser.test.js
+// POSIX:      SP_P2P_E2E=1 node --test test/p2p.browser.test.js
+// The browser is auto-detected (Edge / Chrome / Chromium); override it with CHROME_PATH.
 /* global p2pTest */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import { homedir, platform } from 'node:os';
+import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const browserPath = process.env.CHROME_PATH || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const CHROMIUM_NAMES = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser', 'microsoft-edge', 'msedge'];
+
+function fromPath() {
+  const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  const found = [];
+  for (const dir of dirs) {
+    for (const name of CHROMIUM_NAMES) {
+      const candidate = path.join(dir, name);
+      if (existsSync(candidate)) found.push(candidate);
+    }
+  }
+  return found;
+}
+
+// A desktop run finds a browser in the usual place; CI and Linux images usually only have one on PATH.
+function browserCandidates() {
+  const override = process.env.CHROME_PATH || process.env.EDGE_PATH;
+  if (override) return [override];
+  const sys = platform();
+  const home = homedir();
+  if (sys === 'win32') {
+    return [
+      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      path.join(home, 'AppData\\Local\\Microsoft\\Edge\\Application\\msedge.exe'),
+    ];
+  }
+  if (sys === 'darwin') {
+    return [
+      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      path.join(home, 'Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'),
+      path.join(home, 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
+    ];
+  }
+  return ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium', ...fromPath()];
+}
+
+const candidates = browserCandidates();
+const browserPath = candidates.find((candidate) => existsSync(candidate));
 const skip = process.env.SP_P2P_E2E !== '1' ? 'set SP_P2P_E2E=1 to run real WebRTC integration'
-  : !existsSync(browserPath) ? 'set CHROME_PATH to an installed Chromium browser' : false;
+  : !browserPath ? `no Chromium browser found; set CHROME_PATH (looked at: ${candidates.join(', ')})`
+    : false;
+
+// Three of these keep an ICE-server-free, host-candidate-only connection working outside a desktop:
+// - Chrome replaces local IPs with unresolvable `.local` names unless mDNS hiding is off (no mDNS responder in
+//   most Linux images / containers), which leaves ICE connecting forever;
+// - loopback candidates are dropped unless explicitly allowed;
+// - /dev/shm is tiny in containers and makes headless Chromium stall or crash.
+const LAUNCH_ARGS = [
+  '--no-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-features=WebRtcHideLocalIpsWithMdns',
+  '--allow-loopback-in-peer-connection',
+  '--disable-background-networking',
+  '--disable-component-update',
+  '--disable-default-apps',
+];
 
 async function eventually(predicate, message, timeout = 10000) {
   const deadline = Date.now() + timeout;
@@ -18,16 +79,35 @@ async function eventually(predicate, message, timeout = 10000) {
   }
 }
 
-test('three real RTC clients receive signed public state with one WS copy and recover after channel loss', { skip, timeout: 90000 }, async (t) => {
+// "It timed out" is useless on its own: report what each link actually reached, so a machine that cannot do
+// local WebRTC is distinguishable from a regression in the relay itself.
+async function linkDiagnostics(page) {
+  return page.evaluate(() => p2pTest.clients.map((net, i) => ({
+    client: i,
+    playerId: net.playerId ?? null,
+    relayId: net.peers.config?.relayId ?? null,
+    configured: net.peers.config?.peers.length ?? 0,
+    links: [...net.peers.links.values()].map((link) => ({
+      to: link.id,
+      closed: !!link.closed,
+      channel: link.channel?.readyState ?? null,
+      connection: link.pc?.connectionState ?? null,
+      ice: link.pc?.iceConnectionState ?? null,
+      gathering: link.pc?.iceGatheringState ?? null,
+    })),
+  })));
+}
+
+test('three real RTC clients receive signed public state with one WS copy and recover after channel loss', { skip, timeout: 120000 }, async (t) => {
   const { startServer } = await import('../server/index.js');
   const puppeteer = (await import('puppeteer-core')).default;
   const srv = await startServer({ port: 0, host: '127.0.0.1', quiet: true });
   t.after(() => srv.close());
   srv.lobby.peerRelay.enabled = true;
   srv.lobby.peerRelay.iceServers = [];
+  // Fail on a wedged browser instead of idling until the test timeout: a protocol error names the step.
   const browser = await puppeteer.launch({
-    executablePath: browserPath, headless: true,
-    args: ['--no-sandbox', '--disable-background-networking', '--disable-component-update', '--disable-default-apps'],
+    executablePath: browserPath, headless: true, args: LAUNCH_ARGS, timeout: 30000, protocolTimeout: 60000,
   });
   t.after(() => browser.close());
   const page = await browser.newPage();
@@ -70,9 +150,12 @@ test('three real RTC clients receive signed public state with one WS copy and re
       };
       net.on('m.public', (msg) => p2pTest.snapshots[i].push(msg));
       net.on('room.state', (msg) => { net.roomCode = msg.code; });
+      // A missing `welcome` (dead socket, rejected hello) must reject, not hang inside page.evaluate.
       await new Promise((resolve, reject) => {
-        net.on('welcome', resolve);
-        net.on('helloError', reject);
+        const timer = setTimeout(() => reject(new Error(`client ${i}: no welcome within 15 s`)), 15000);
+        const done = (fn) => (value) => { clearTimeout(timer); fn(value); };
+        net.on('welcome', done(resolve));
+        net.on('helloError', done((error) => reject(new Error(`client ${i}: ${error?.message ?? error}`))));
         net.setName(`P2P ${i}`);
       });
     }
@@ -81,9 +164,16 @@ test('three real RTC clients receive signed public state with one WS copy and re
     await p2pTest.clients[1].request('room.join', { code });
     await p2pTest.clients[2].request('room.join', { code });
   });
-  await page.waitForFunction(() => p2pTest.clients.every((net) => net.peers.config?.peers.length === 3
-    && net.peers.links.size === (net.playerId === net.peers.config.relayId ? 2 : 1)
-    && [...net.peers.links.values()].every((link) => link.channel?.readyState === 'open')), { timeout: 15000 });
+  try {
+    await page.waitForFunction(() => p2pTest.clients.every((net) => net.peers.config?.peers.length === 3
+      && net.peers.links.size === (net.playerId === net.peers.config.relayId ? 2 : 1)
+      && [...net.peers.links.values()].every((link) => link.channel?.readyState === 'open')), { timeout: 30000, polling: 100 });
+  } catch (error) {
+    const state = await linkDiagnostics(page).catch(() => null);
+    error.message = `${error.message}\nRTC links never opened: ${JSON.stringify(state)}\n`
+      + 'This machine may not allow local WebRTC (no usable host candidates, mDNS .local names unresolvable, UDP blocked) — see the launch flags above.';
+    throw error;
+  }
   const room = [...srv.lobby.rooms.values()][0];
   await eventually(() => srv.lobby.peerRelay.rooms.get(room)?.peers.every((peer) => peer.ready), 'all WebRTC readiness leases reach the server');
   const identities = await page.evaluate(() => p2pTest.clients.map((net) => ({ id: net.playerId, relay: net.peers.config.relayId })));
