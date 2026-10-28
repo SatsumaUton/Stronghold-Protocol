@@ -110,6 +110,10 @@ export class BattleLifecycle {
           } catch (err) { this._internalError('updateAlly', err); }
         }
       });
+      // Emitted AFTER the skill tick and the allies' attacks: a skill that starts (or ends) this tick has already changed
+      // `s.interval`, so the value the client gets is the one the current swing runs on. (The snapshot carries the same
+      // number, and the view adopts that too - see render/units.js sync - so the event is a fast path, not the only one.)
+      this._phase('rate', () => this._emitRateChanges());
       this._phase('projectiles', () => this.projectiles.update(dt));
       this._phase('redeploy', () => this._checkRedeploys());
       this._phase('boss', () => this._bossSync());
@@ -158,7 +162,7 @@ export class BattleLifecycle {
     // §5.5) — never merely because it emptied: the h07_04 pair leader (official route: no wait) can walk into the
     // objective, and the field then idles while another field may still empty the pool or the overtime drain ends it.
     const poolHolds = !!this.sharedBoss && (this.kind === 'boss' || this.kind === 'hidden');
-    if (this.autoFinish && !poolHolds && !this._pending.length && !this.enemies.some((e) => e.alive) && this.started) {
+    if (this.autoFinish && !poolHolds && !this._pending.length && this.started && !this._anyEnemyAlive()) {
       if (!this._hasPendingEnemySchedules()) { this._finish('cleared'); return; }
     }
     if (this.time >= this.timeLimit - 1e-9) { this._timeout(); return; }
@@ -167,6 +171,13 @@ export class BattleLifecycle {
 
   _hasPendingEnemySchedules() {
     for (const s of this._sched) if (!s.cancelled && s.holdsBattle) return true;
+    return false;
+  }
+
+  /** Is any enemy still alive? (Checked every tick; a plain loop instead of a per-tick `some` closure.) */
+  _anyEnemyAlive() {
+    const list = this.enemies;
+    for (let i = 0; i < list.length; i++) if (list[i].alive) return true;
     return false;
   }
 

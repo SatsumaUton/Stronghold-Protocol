@@ -80,12 +80,24 @@ print(json.dumps({
     'dyn/battle/prefabs/skins/character/token_10002_kalts_mon3tr/token_10002_kalts_mon3tr_boc#6.prefab',
     'dyn/battle/prefabs/[uc]tokens/token_10000_silent_healrb.prefab', None]],
   'only': [e.spine_ids(o, 'spine/token', ids) for o in ([], ['spine'], ['spine/token'], ['spine/token/token_b'], ['spine/enemy'], ['map'])],
+  'jobs': {p: [j[1] for j in e.select_jobs([p])] for p in ['enemy', 'token', 'fx', 'common', 'spine/enemy', 'spine/token', 'ui/outer/some_sprite']},
+  'short': [e.spine_ids(o, 'spine/token', ids) for o in (['enemy'], ['token'], ['nope'])],
+  'shortEnemy': [e.spine_ids(o, 'spine/enemy', ['enemy_a']) for o in (['enemy'], ['spine/enemy'])],
   'pick': [e.pick_spine_node(nodes)[0], e.pick_spine_node([('Spine', True, {}), ('X', True, {})])[0],
            e.pick_spine_node([('Front', False, {}), ('Other', True, {})])[0], e.pick_spine_node([('A', False, {})])[0], e.pick_spine_node([])],
   'pages': e.atlas_pages('\\ntoken_x.png\\nsize: 64,64\\nformat: RGBA8888\\nC_Body\\n  rotate: false\\n  xy: 2, 2\\n\\ntoken_x2.png\\nsize: 32,32\\nC_Leg\\n  xy: 0, 0\\n'),
 }))`);
     assert.deepEqual(out.ids, ['token_10009_weedy_cannon', 'token_10002_kalts_mon3tr', null, null, null]);
     assert.deepEqual(out.only, [['token_a', 'token_b'], ['token_a', 'token_b'], ['token_a', 'token_b'], ['token_b'], [], []]);
+    // the short form the usage line documents: `--only enemy` selects the enemy list and `--only token` this one, not
+    // an empty selection (a prefix naming nothing stays empty: neither list nor job)
+    assert.deepEqual(out.short, [[], ['token_a', 'token_b'], []]);
+    assert.deepEqual(out.jobs.enemy, out.jobs['spine/enemy']);
+    assert.deepEqual(out.jobs.token, out.jobs['spine/token']);
+    assert.ok(out.jobs['ui/outer/some_sprite'].includes('ui/outer'));
+    assert.ok(!out.jobs.fx.includes('map/fx'));
+    assert.ok(!out.jobs.common.includes('ui/common') && !out.jobs.common.includes('map/common'));
+    assert.deepEqual(out.shortEnemy, [['enemy_a'], ['enemy_a']]);
     assert.deepEqual(out.pick, ['Front', 'Spine', 'Other', 'A', null]);
     assert.deepEqual(out.pages, ['token_x.png', 'token_x2.png']);
   });

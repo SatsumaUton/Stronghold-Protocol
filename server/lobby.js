@@ -227,13 +227,15 @@
 //     练度 and 自选 (keyed by charId) are checked again against the version's data (seatSettings); a setting checked for
 //     another content keeps only the ids whose operator (charId) is the same in both data sets.
 
+import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.js';
 import { randomBytes, randomInt } from 'node:crypto';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
-import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
+import { encode, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
 import { Match as DefaultMatch } from './match/Match.js';
 import { KITTED_CHARS } from './sim/content/kits/index.js';
+import { PeerRelay } from './peerRelay.js';
 
 const VANILLA_KITTED = new Set(KITTED_CHARS);
 import { isContentHash } from '../shared/plugins/identity.js';
@@ -256,6 +258,7 @@ export const LOBBY_DEFAULTS = Object.freeze({
   versionVoteMs: 60_000,  // an open version vote is cancelled after this long (header "Official versions") [ASSUMED]
   versionRetryMs: 5_000,  // no new version proposal this long after a declined or expired vote [ASSUMED]
   versionProposeGapMs: 300, // nor this soon after the last proposal (重刷's debounce)
+  roomCode: null,         // --room-code / roomCode: a fixed alliance key for every new room (null = random per room)
 });
 
 /** The stamp of a setting a version room's page sent before it reported the room's content ready (header). */
@@ -391,6 +394,8 @@ export class Room {
      * put every human seat before every AI seat (Match opts.aiPicksLast). Kept across the room's matches.
      */
     this.aiPicksLast = false;
+    // [ASSUMED] Remake cooperation option, approved 2026-10-24; host opt-in before the match.
+    this.aiTakeoverEnabled = false;
     /**
      * 「不限时」 (room.setSoloUnlimited, DESIGN §35.23.10; a timed solo only, off by default): the match is built with
      * opts.soloUnlimited. room.state omits the key unless this is true.
@@ -469,6 +474,7 @@ export class Room {
   toState(now = Date.now()) {
     return {
       t: 'room.state',
+      ...(this.aiTakeoverEnabled ? { aiTakeoverEnabled: true, aiTakeoverVotes: this.aiTakeoverVotes || [] } : {}),
       code: this.code,
       hostId: this.hostId,
       mode: this.mode,
@@ -530,7 +536,7 @@ export class Lobby {
    *   the other versions (server/match/host/index.js, kind 'version')
    */
   constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, content = null, plugins = null, hosts = null,
-    versions = null, versionHosts = null, options = {} }) {
+    versions = null, versionHosts = null, simPool = null, options = {} }) {
     this.registry = registry;
     /** the vanilla content set every room plays (header "Content identity"), or null */
     this.vanilla = content && isContentHash(content.cs) ? Object.freeze({ cs: content.cs, vanilla: true, plugins: Object.freeze([]) }) : null;
@@ -541,6 +547,11 @@ export class Lobby {
     /** the official versions this server offers and their match hosts (header "Official versions"), or null */
     this.versions = versions;
     this.versionHosts = versionHosts;
+    /**
+     * The server's own simulation pool for bot rehearsals (server/workers/roomPool.js), or null when the operator
+     * started none — then every rehearsal stays on this thread, exactly as before.
+     */
+    this.simPool = simPool;
     this.log = log;
     this.MatchClass = MatchClass;
     this.getData = getData;
@@ -554,6 +565,15 @@ export class Lobby {
       delete options.testHost;
     }
     this.opts = { ...LOBBY_DEFAULTS, ...options };
+    // A fixed alliance key (--room-code / roomCode): every room this process creates uses it. server/index.js parses
+    // the argument once at startup; a test passes it directly. Nothing is read from the environment or persisted.
+    if (this.opts.roomCode) {
+      // The fixed key is an admission secret: ordinary room lifecycle logs must not expose it either.
+      const key = this.opts.roomCode;
+      this.log = Object.fromEntries(['info', 'warn', 'error', 'debug'].map(level => [level,
+        (...args) => log[level]?.(...args.map(value => typeof value === 'string' ? value.split(key).join('[fixed room]') : value)),
+      ]));
+    }
     // Test rooms stay off until the bound address is known (setTestHost). An empty host fails closed, so a
     // server that is about to bind 0.0.0.0 does not briefly accept test rooms on the default. [ASSUMED] the
     // env words are parsed in server/testMode.js.
@@ -572,6 +592,8 @@ export class Lobby {
     this.resyncTimers = new Map();
     /** per-network limit warnings: at most one log line per 10 s (the rest are counted) */
     this.limitLog = { at: -Infinity, suppressed: 0 };
+    this.peerRelay = new PeerRelay({ now, log });
+    this.publicDeliveries = new WeakMap();
     /** log lines said once (warnOnce) */
     this.told = new Set();
     /** a held visual set whose plugins changed on disk: its rooms' hosts are told (header "The room's plugins") */
@@ -723,6 +745,9 @@ export class Lobby {
    * @returns {{ ok: true } | { error: string, detail?: string } | Promise<{ ok: true } | { error: string, detail?: string }>}
    */
   onMessage(session, msg) {
+    // Transport handshakes/leases belong to the live socket, independently of a plugin match's IPC queue.
+    // In particular, an old queued enable must never opt a replacement socket into peer delivery.
+    if (msg?.t === 'p2p.enable' || msg?.t === 'p2p.signal' || msg?.t === 'p2p.ready') return this.handleMessage(session, msg);
     const room = this.queuedRoom(session);
     if (!room) return this.handleMessage(session, msg);
     // a queued room.contentReady speaks for the page that sent it: the seat and its generation now — a disconnect in
@@ -794,6 +819,9 @@ export class Lobby {
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
       case 'room.setSoloUnlimited': return this.setSoloUnlimited(session, msg);
+      case 'room.setAiTakeover': return this.setAiTakeover(session, msg);
+      case 'room.aiRequest':
+      case 'room.aiVote': return aiTakeover(this, session, msg);
       case 'room.addBot': return this.addBot(session);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
@@ -814,6 +842,24 @@ export class Lobby {
       case 'room.proposeVersion': return this.proposeVersion(session, msg);
       case 'room.versionVote': return this.versionVote(session, msg);
       case 'room.cancelVersionVote': return this.cancelVersionVote(session, msg);
+      // A client that missed a state-delta frame asks for a full one (shared/stateDelta.js StateReceiver; server/net.js
+      // throttles it like the other resend-heavy intents). This is the same heavy resync a repeated hello runs, so it
+      // draws from the same per-session budget: the match resends its full state, or the lobby its room state.
+      case 'state.resync': return this.resync(session, true) ?? { ok: true };
+      case 'p2p.enable': {
+        this.peerRelay.enable(session, msg.enabled);
+        const room = this.roomOf(session);
+        if (room) this.peerRelay.sync(room, [...this.memberSessions(room)], session);
+        else sendSession(session, { t: 'p2p.config', enabled: false });
+        return OK;
+      }
+      case 'p2p.signal':
+      case 'p2p.ready': {
+        const room = this.roomOf(session);
+        if (!room) return fail(ERR.NOT_IN_ROOM);
+        this.peerRelay.sync(room, [...this.memberSessions(room)]);
+        return msg.t === 'p2p.signal' ? this.peerRelay.signal(room, session, msg) : this.peerRelay.ready(room, session, msg);
+      }
       default:
         if (typeof msg.t === 'string' && msg.t.startsWith('g.')) return this.routeGameNow(session, msg);
         return fail(ERR.BAD_MSG, `unhandled type ${String(msg.t).slice(0, 32)}`);
@@ -822,6 +868,7 @@ export class Lobby {
 
   /** The session's socket closed. @param {import('./net.js').Session} session */
   onDisconnect(session) {
+    this.peerRelay.disconnect(session);
     this.clearResync(session.playerId); // the next resume resyncs immediately
     const room = this.roomOf(session);
     // a solo run may be resumed within singleReconnectTime (24 h); everything else keeps the registry's window
@@ -878,6 +925,7 @@ export class Lobby {
     this.graceTimers.clear();
     for (const t of this.resyncTimers.values()) clearTimeout(t);
     this.resyncTimers.clear();
+    this.peerRelay.dispose();
   }
 
   // ---------------------------------------------------------------------------------------------------
@@ -907,8 +955,23 @@ export class Lobby {
         return fail(ERR.RATE, 'too many rooms from your network');
       }
     }
-    const code = this.genCode();
-    if (!code) return fail(ERR.INTERNAL, 'no room code available');
+    // A fixed key (--room-code) can only belong to one room. This player's own room may hold it and can be left
+    // below (then the key is free again); any other room — or a room this session only watches as a spectator —
+    // keeps it, and the create is refused before anything is removed.
+    const fixed = this.opts.roomCode || null;
+    const fixedIsMine = !!fixed && !!cur && this.rooms.get(fixed) === cur;
+    if (fixed) {
+      const taken = this.rooms.get(fixed);
+      const mine = cur && cur.seatOf(session.playerId);
+      const onlyMe = mine && cur.activeHumans().length === 1;
+      if (taken && !(taken === cur && onlyMe)) {
+        return fail(ERR.ROOM_CODE_TAKEN, 'the fixed alliance key is in use');
+      }
+    }
+    // Treat this sole-human room as yielding its key, but keep membership until all content/version checks pass.
+    const code = this.genCode(fixedIsMine ? cur : null);
+    if (!code) return fixed ? fail(ERR.ROOM_CODE_TAKEN, 'the fixed alliance key is in use')
+      : fail(ERR.INTERNAL, 'no room code available');
     // the server owner's default plugins (plugins/config.json `default`; header "Gameplay plugins"): none — the original
     // game. On another official version (header "Official versions") gameplay plugins are refused: a server whose rooms
     // must play them (rooms: fixed) cannot make that version's room; otherwise the room starts without them. Resolved
@@ -1058,6 +1121,23 @@ export class Lobby {
   }
 
   /** 「AI 队友最后选择」 (GitHub #338): host-only, before the match, co-op rooms only (a solo room has no AI seat). */
+  /** Host-only opt-in, fixed before play; inherited seat metrics never become personal rewards (§35.100). */
+  setAiTakeover(session, { on }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.mode === 'solo' || (on && (room.modded || room.version !== DEFAULT_VERSION))) return fail(ERR.BAD_TARGET);
+    if (room.aiTakeoverEnabled !== on) {
+      this.dropReplay(room, session.playerId);
+      room.aiTakeoverEnabled = on;
+      resetAiTakeover(room);
+      for (const seat of room.seats) if (seat && !seat.isBot && seat.playerId !== room.hostId) seat.ready = false;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
   setAiPicksLast(session, { on }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -1871,7 +1951,7 @@ export class Lobby {
       if (this.plugins?.hasNotices?.()) info.content.notices = true;
     }
     // the official versions (header "Official versions"): only when the server offers more than 第二期下半, so a
-    // welcome from a default server stays identical
+    // welcome from a server narrowed to that version alone stays without `versions`
     let versions = null;
     try { versions = this.versions?.welcome?.() || null; } catch (e) { this.log.error('[lobby] the versions list failed', e); }
     if (versions) info.versions = versions;
@@ -1957,8 +2037,11 @@ export class Lobby {
         data,
         log: this.log,
         now: this.now,
-        send: (playerId, msg) => (ctx.live ? this.matchSend(room, ctx, playerId, msg) : false),
-        broadcast: (msg) => { if (ctx.live) this.matchBroadcast(room, ctx, msg); },
+        // the server's own simulation pool (server/workers/roomPool.js) for bot rehearsals, when the operator started
+        // one: null keeps every rehearsal on this thread, exactly as before (Match.simPool / MatchRehearsal.poolRehearsal)
+        ...(!modded && !versioned && this.simPool ? { simPool: this.simPool } : {}),
+        send: (playerId, msg, encoded) => (ctx.live ? this.matchSend(room, ctx, playerId, msg, encoded) : false),
+        broadcast: (msg, encoded) => { if (ctx.live) this.matchBroadcast(room, ctx, msg, encoded); },
         onEnd: (summary) => this.onMatchEnd(room, ctx, summary),
       };
       // a room with gameplay plugins plays in its content set's match host, a room of another official version in that
@@ -1977,7 +2060,10 @@ export class Lobby {
       match.start();
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match failed to start`, e);
-      if (room.matchCtx === ctx) { room.match = null; room.matchCtx = null; room.matchKey = null; }
+      if (room.matchCtx === ctx) {
+        resetAiTakeover(room);
+        room.match = null; room.matchCtx = null; room.matchKey = null;
+      }
       this.disposeMatchCtx(ctx);
       this.broadcastState(room);
       // the match hosts refuse one content set more than they run (PLUGIN_BUSY: server/match/host/index.js)
@@ -1991,6 +2077,7 @@ export class Lobby {
     if (ctx.ended || !ctx.live || room.matchCtx !== ctx || room.disposed) return;
     ctx.ended = true;
     room.lastSummary = summary ?? null;
+    resetAiTakeover(room);
     room.match = null;
     room.matchCtx = null;
     room.matchKey = null;
@@ -2019,17 +2106,18 @@ export class Lobby {
   }
 
   /** Match unicast; m.result frames are also kept for the replay. */
-  matchSend(room, ctx, playerId, msg) {
+  matchSend(room, ctx, playerId, msg, encoded = null) {
     if (msg && msg.t === 'm.result') {
-      const data = encode(msg);
+      const data = encoded ?? encode(msg);
       if (data != null) ctx.results.set(playerId, data);
     }
-    return this.sendToPlayer(room, playerId, msg);
+    return this.sendToPlayer(room, playerId, msg, encoded);
   }
 
   /** Match broadcast; the latest m.public and a broadcast m.result are also kept for the replay. */
-  matchBroadcast(room, ctx, msg) {
-    const data = this.broadcastRoom(room, msg);
+  matchBroadcast(room, ctx, msg, encoded = null) {
+    if (msg.t === 'm.public' && reconcileAiTakeover(this, room)) this.broadcastState(room);
+    const data = this.broadcastRoom(room, msg, encoded);
     if (data == null) return;
     if (msg.t === 'm.public') ctx.lastPublic = data;
     else if (msg.t === 'm.result') ctx.sharedResult = data;
@@ -2169,6 +2257,7 @@ export class Lobby {
     let res;
     try {
       res = room.match.handle(session.playerId, msg);
+      if (reconcileAiTakeover(this, room)) this.broadcastState(room);
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match.handle(${msg.t}) threw`, e);
       return fail(ERR.INTERNAL);
@@ -2359,11 +2448,13 @@ export class Lobby {
    */
   disposeRoom(room, reason) {
     if (room.disposed) return;
+    this.peerRelay.clear(room);
     room.disposed = true;
     if (this.rooms.get(room.code) === room) { this.trustedRuntime?.event('roomClosed',{room:room.toState(this.now())}); this.rooms.delete(room.code); }
     // an open version vote ends with the room (its timer)
     if (room.versionVote) { clearTimeout(room.versionVote.timer); room.versionVote = null; }
     const ctx = room.matchCtx;
+    resetAiTakeover(room);
     room.match = null;
     room.matchCtx = null;
     room.matchKey = null;
@@ -2393,7 +2484,10 @@ export class Lobby {
     this.log.info(`[lobby] ${room.code} disposed (${reason})`);
   }
 
-  genCode() {
+  genCode(yieldingRoom = null) {
+    // create() may reuse its caller's sole-human room only after validation; no membership changes here.
+    const fixed = this.opts.roomCode || null;
+    if (fixed) return this.rooms.has(fixed) && this.rooms.get(fixed) !== yieldingRoom ? null : fixed;
     for (let attempt = 0; attempt < 1000; attempt++) {
       let code = '';
       for (let i = 0; i < ROOM_CODE_LEN; i++) code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
@@ -2417,6 +2511,7 @@ export class Lobby {
 
   broadcastState(room) {
     if (room.disposed) return;
+    reconcileAiTakeover(this, room);
     if (this.trustedRuntime) {
       const state = room.toState(this.now()), prev = room.trustedPrevious;
       const event = (name,extra={}) => this.trustedRuntime.event(name,{room:state,...extra});
@@ -2428,31 +2523,88 @@ export class Lobby {
       if (state.inMatch && !prev?.inMatch) event('matchStarted');
       room.trustedPrevious = state;
     }
+    this.peerRelay.sync(room, [...this.memberSessions(room)]);
     const data = encode(room.toState(this.now()));
     for (const session of this.memberSessions(room)) sendRaw(session.ws, data);
   }
 
   sendState(room, session) {
+    this.peerRelay.sync(room, [...this.memberSessions(room)], session);
     sendSession(session, room.toState(this.now()));
   }
 
+  /** The room's delivery stream: one order shared by the WebSocket and the peer path. */
+  publicStream(room) {
+    let stream = this.publicDeliveries.get(room);
+    if (!stream) {
+      stream = { epoch: randomBytes(16).toString('hex'), seq: 0 };
+      this.publicDeliveries.set(room, stream);
+    }
+    return stream;
+  }
+
+  /**
+   * Append the room's delivery stamps to bytes a caller already produced (a lane Worker's m.public). Splicing them
+   * into the finished JSON keeps the pass-through: the public view is still serialized exactly once per broadcast.
+   * Bytes that are not a JSON object come back unchanged — that frame carries no cross-transport order to honour.
+   * @param {string} bytes @param {string} epoch @param {number} seq
+   * @returns {string}
+   */
+  stampPublicBytes(bytes, epoch, seq) {
+    const end = bytes.lastIndexOf('}');
+    if (end < 0) return bytes;
+    let view;
+    try { view = JSON.parse(bytes); } catch { return bytes; }
+    if (!view || typeof view !== 'object' || Array.isArray(view)) return bytes;
+    return `${bytes.slice(0, end)},"deliveryEpoch":${JSON.stringify(epoch)},"deliverySeq":${seq}}`;
+  }
+
+  /**
+   * A public view joins the room's delivery stream: the peer route signs and forwards these stamped bytes, so a
+   * delayed copy from either transport can never overwrite newer state. Inert while `SP_P2P` is not enabled, which
+   * leaves the wire byte-identical with the merged state-delta transport (it owns its own per-connection baseline).
+   * @param {object} room @param {object} msg @param {string | null} [encoded] bytes a caller already produced
+   * @returns {{ msg: object, bytes: string }}
+   */
+  stampPublic(room, msg, encoded = null) {
+    if (!this.peerRelay.enabled || msg?.t !== 'm.public') return { msg, bytes: encoded ?? encode(msg) };
+    const stream = this.publicStream(room);
+    const deliverySeq = ++stream.seq;
+    const bytes = this.stampPublicBytes(encoded ?? encode(msg), stream.epoch, deliverySeq);
+    return { msg: { ...msg, deliveryEpoch: stream.epoch, deliverySeq }, bytes };
+  }
+
   /** Match broadcast: encode once, send to every connected member. @returns {string | null} the encoded frame */
-  broadcastRoom(room, msg) {
+  broadcastRoom(room, msg, encoded = null) {
     if (room.disposed) return null;
-    const data = encode(msg);
+    let data = encoded ?? encode(msg);
     if (data == null) { this.log.error(`[lobby] ${room.code} unserializable broadcast ${msg && msg.t}`); return null; }
-    const droppable = isDroppable(msg);
-    for (const session of this.memberSessions(room)) sendRaw(session.ws, data, { droppable });
+    const stamped = this.stampPublic(room, msg, data);
+    msg = stamped.msg;
+    data = stamped.bytes;
+    const members = [...this.memberSessions(room)];
+    // Peer delivery (server/peerRelay.js) takes the relay and its ready receivers out of the loop below: the relay
+    // gets the signed frame over its own socket (never compressed into a delta — it forwards these exact bytes) and
+    // each ready receiver is served by the channel, with the lobby's watchdog re-sending over WebSocket on timeout.
+    const routed = this.peerRelay.enabled && msg.t === 'm.public' ? this.peerRelay.broadcast(room, members, data) : null;
+    // per connection: sendSession runs the state transport, which owns each socket's delta baseline (and the
+    // droppable/backpressure rules) - one shared byte string in, one frame per member out
+    for (const session of members) {
+      if (routed?.has(session)) continue;
+      sendSession(session, msg, data);
+    }
     return data;
   }
 
   /** Match unicast. @returns {boolean} */
-  sendToPlayer(room, playerId, msg) {
+  sendToPlayer(room, playerId, msg, encoded = null) {
     if (room.disposed) return false;
     const seat = room.seatOf(playerId) || room.spectatorOf(playerId);
     if (!seat || seat.isBot || seat.left) return false;
     const session = this.registry.byId(playerId);
     if (!session || session.roomCode !== room.code) return false;
-    return sendSession(session, msg);
+    // A unicast m.public joins the room's delivery stream too (its stamps order it against peer frames).
+    const stamped = this.stampPublic(room, msg, encoded ?? encode(msg));
+    return sendSession(session, stamped.msg, stamped.bytes);
   }
 }

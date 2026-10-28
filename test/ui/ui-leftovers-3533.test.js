@@ -58,10 +58,12 @@ test('short screens: the empty key field takes the placeholder\'s size; 同盟�
   }
 });
 
-test('text-fit: a player\'s name may end in a line clamp\'s ellipsis and break inside a word, nothing else may', () => {
+test('text-fit: ellipsis exceptions stay scoped; only player names may break inside a word', () => {
   const src = readFileSync(path.join(ROOT, 'test/e2e/text-fit.mjs'), 'utf8');
   assert.match(src, /webkitLineClamp/);
-  assert.match(src, /if \(!cut\.matches\('\.seat__name, \.specbar__who, \.room-mode'\)\) out\.push\(`ellipsis \$\{label\}`\);/);
+  // §35.23.12: callers may allow the compact version pill while checking its accessible name and bounds.
+  assert.ok(src.includes("export function textProblems(rootSel, extraEllipsis = '')"));
+  assert.ok(src.includes("if (!cut.matches(`.seat__name, .specbar__who, .room-mode${extraEllipsis ? `, ${extraEllipsis}` : ''}`)) out.push(`ellipsis ${label}`);"));
   assert.match(src, /!breakOk\(p, c\) && !el\.closest\('\.seat__name'\)/);
 });
 
@@ -120,5 +122,6 @@ test('the other event screens at a big 文字大小: 成就统计\'s banner, the
 test('the draft\'s name cards fall back to the default picture when an outfit\'s fails, as the seat cards do', () => {
   const js = readFileSync(path.join(ROOT, 'public/js/screens/bandDraft.js'), 'utf8');
   assert.match(js, /const art = seatArtSrc\(arts, badArt\);/);
-  assert.match(css('public/css/screens/draft.css'), /\.dorder__art \{[^}]*object-fit: cover; object-position: 50% 16%;/);
+  // #886: the browser portrait regression checks that this crop keeps eyes through chin visible.
+  assert.match(css('public/css/screens/draft.css'), /\.dorder__art \{[^}]*object-fit: cover; object-position: 50% 40%;/);
 });

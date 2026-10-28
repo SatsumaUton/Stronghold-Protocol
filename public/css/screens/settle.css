@@ -272,14 +272,20 @@ img.sbonds__none { width: .64rem; height: .12rem; }
 .slv__gain--daily small { margin-left: .06rem; font-size: calc(.18 * var(--t)); color: #8a9592; }
 .slv__gain--off { color: #ff8a5c; }
 
-.settle__next { position: absolute; left: 14.77rem; top: 9.42rem; width: 4.43rem; height: 1rem; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: .24rem;
-  padding: 0; border: 0; cursor: pointer; color: #062a20; background: transparent; font-size: calc(.4 * var(--t)); font-weight: 700; letter-spacing: .06em;
+.settle__next { position: absolute; left: 14.77rem; top: 9.42rem; width: 4rem; height: 1rem; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: .28rem;
+  padding: 0; border: 0; cursor: pointer; color: #062a20; background: transparent; font-size: .4rem; font-weight: 700; letter-spacing: .06em;
   animation: snext-in 460ms var(--ease-out) 1400ms both; }
+/* btn_next_bg.png is 297×86; the face (white frame + green) is rows 1–68, columns 1–268, with the machine at the
+   right and the shadow below. Fit only the official image to that face; the art-less fallback keeps the CSS button. */
+.settle__next img.settle__btnbg { inset: auto; left: -.3745%; top: -1.4706%; width: 111.236%; height: 126.4706%; }
+/* The official label is heavier than the installed CJK 700 face (800/900 resolve to the same on Windows); a thin
+   text-colour stroke adds the difference. */
+.settle__nextlabel { -webkit-text-stroke: .03em currentColor; }
 .settle__next:hover, .settle__next:focus-visible { filter: brightness(1.12); outline: none; }
 .settle__next:focus-visible { box-shadow: 0 0 0 3px #fff inset; }
-.settle__nexticon { width: .4rem; height: .4rem; }
+.settle__nexticon { width: .45rem; height: .45rem; }
 span.settle__nexticon { display: grid; place-items: center; border-radius: .08rem; background: #0b2d25; color: #44e6b8; }
-span.settle__nexticon .icon { width: .3rem; height: .3rem; }
+span.settle__nexticon .icon { width: .34rem; height: .34rem; }
 @keyframes snext-in { from { opacity: 0; transform: translateX(.6rem); } }
 
 /* ---- 同盟 ---- */

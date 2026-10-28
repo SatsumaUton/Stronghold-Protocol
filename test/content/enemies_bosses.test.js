@@ -683,6 +683,29 @@ test(`${nm('enemy_9007_acelem')}: harder to target (taunt −1); parasitises its
   assert.ok(!w.findBuff('ab:parasite'));
 });
 
+test(`${nm('enemy_9007_acelem')}: attaching from contact blinks to the blocker's tile centre`, () => {
+  const h = arena({ units: [{ chessId: 't_wall', row: 9, col: 5 }] });
+  h.step();
+  const e = put(h, 'enemy_9007_acelem', [9, 7], {
+    move: true, route: { motion: 'WALK', start: [9, 7], end: [9, 2], checkpoints: [] },
+  });
+  const host = h.unit('t_wall');
+  assert.ok(h.runUntil(() => !!host.findBuff('ab:parasite'), 15), 'the approaching enemy attaches');
+  assert.equal(e.blockedBy, host);
+  assert.equal(e.x, host.tileC, 'enemy moves to the host tile centre on attachment');
+  assert.equal(e.y, host.tileR);
+  assert.ok(e.s.flags.selfBound && e.s.flags.noMove, 'attachment holds 自缚');
+  const blink = h.eventsOf('fx').find((fx) => fx[1] === 'teleport' && fx[4].id === e.id);
+  assert.ok(blink && blink[4].fromX > host.tileC, 'the blink starts at the contact point');
+  assert.equal(blink[4].kind, 'parasite', 'only this attachment effect marks a short position cut');
+  assert.deepEqual(blink.slice(2, 4), [host.tileC, host.tileR]);
+  h.b.retreat(host, { reason: 'test' });
+  h.run(0.3);
+  assert.ok(!e.s.flags.selfBound && !e.s.flags.noMove, 'attachment state ends after the block is released');
+  assert.ok(e.x < host.tileC, 'the enemy resumes its route from the host tile');
+  checkInvariants(h.b);
+});
+
 test(`${nm('enemy_10067_ftsjc')} + ${nm('enemy_10065_ftzlc')}: ATK ramps until the first attack (AoE arts + burn); ignites 卷心籽, whose ignited death blasts`, () => {
   const h = arena({ units: [{ chessId: 't_wall', row: 9, col: 5 }, { chessId: 't_wall2', row: 10, col: 5 }] });
   h.step();
@@ -1673,7 +1696,7 @@ test(`${nm('enemy_2010_csdcr')}: neural on hit; after ${tb('enemy_2010_csdcr', '
   assert.equal(o.s.aspd, 100 + tb('enemy_2010_csdcr', 'AttackSpeedUp.attack_speed'));
 });
 
-test(`${nm('enemy_1364_spnaxe_2')}: heals and stacks ATK when a unit within ${tb('enemy_1364_spnaxe_2', 'Attack.range_radius')} tile is knocked out; leaves 2 inert 血珀 in place`, () => {
+test(`${nm('enemy_1364_spnaxe_2')}: heals and stacks ATK when a unit within ${tb('enemy_1364_spnaxe_2', 'Attack.range_radius')} tile is knocked out; leaves 2 uncounted 血珀 that bleed out in place`, () => {
   const h = arena();
   h.step();
   const e = put(h, 'enemy_1364_spnaxe_2', [10, 7]);
@@ -1692,8 +1715,41 @@ test(`${nm('enemy_1364_spnaxe_2')}: heals and stacks ATK when a unit within ${tb
   const seeds = alive(h, 'enemy_1367_dseed');
   assert.equal(seeds.length, tb('enemy_1364_spnaxe_2', 'Summon.cnt'));
   assert.equal(h.b.total, total, '血珀 are not counted (no altar in this mode)');
+  for (const d of seeds) assert.ok(Math.hypot(d.x - x, d.y - y) < 0.5, 'left where it fell');
+  const killedN = h.b.killed;
+  const spots = seeds.map((d) => [d.x, d.y]);
   h.run(20);
-  for (const d of seeds) { assert.ok(d.alive); assert.ok(Math.hypot(d.x - x, d.y - y) < 0.5, 'stays where it fell'); }
+  assert.equal(h.b.total, total, 'a 血珀 dying still does not count');
+  assert.equal(h.b.killed, killedN, 'an uncounted 血珀 is not a kill');
+  seeds.forEach((d, i) => {
+    assert.equal(d.alive, false, '血珀 bleeds out');
+    assert.ok(Math.hypot(d.x - spots[i][0], d.y - spots[i][1]) < 0.05, 'it did not move before it died');
+  });
+  checkInvariants(h.b);
+});
+
+test(`#720 ${nm('enemy_1367_dseed')}: loses ${tb('enemy_1367_dseed', 'Passive.hp_ratio')} of max HP per second and can die; self-bound, no attack, a push does nothing`, () => {
+  const h = arena({ units: [{ chessId: 't_wall', row: 10, col: 7 }] });
+  h.step();
+  const ratio = tb('enemy_1367_dseed', 'Passive.hp_ratio');
+  const e = put(h, 'enemy_1367_dseed', [10, 7], { move: true });
+  assert.equal(e.profile.noAttack, true);
+  assert.equal(e.stats.attacks, 0);
+  assert.ok(e.s.flags.selfBound && e.s.flags.noMove && e.s.flags.unblockable && e.s.flags.noDisplace);
+  assert.equal(e.blockedBy, null, '无法被阻挡 even on a blocker');
+  const x = e.x, y = e.y, max = e.s.maxHp;
+  h.run(0.5);
+  assert.equal(e.hp, max, 'the first loss is at 1 s');
+  h.run(0.5);
+  approx(e.hp, max * (1 - ratio), 1e-6, 'one second');
+  h.b.push(e, e.s.massLevel, { from: { x: e.x - 1, y: e.y } });
+  assert.equal(e.x, x);
+  assert.equal(e.y, y);
+  h.run(9);
+  assert.equal(e.alive, false, '10% per second kills at 10 s');
+  assert.equal(e.x, x);
+  assert.equal(e.y, y);
+  assert.equal(e.stats.attacks, 0);
   checkInvariants(h.b);
 });
 
@@ -2097,6 +2153,53 @@ test(`${nm('enemy_10097_crshd')} / ${nm('enemy_2085_skzjxd')}: physical / arts d
   approx(h.b.dealDamage(back, d, { amount: 1000, type: 'phys' }), 1000 - d.s.def, 1e-6, 'from behind');
   approx(h.b.dealDamage(front, y, { amount: 1000, type: 'arts' }), 1000 * (1 - y.s.res / 100) * (1 - tb('enemy_2085_skzjxd', 'Weakness.damage_resistance')), 1e-6, '圆仔 faces the two operators on the left');
   approx(h.b.dealDamage(back, y, { amount: 1000, type: 'true' }), 1000, 1e-6, 'true damage is never reduced');
+});
+
+test(`#869 ${nm('enemy_10097_crshd')}: while blocked, front 80% follows the blocker (phys 110 / arts 140; the back is 550 / 700); the model uses that sign`, () => {
+  assert.equal(tb('enemy_10097_crshd', 'weakness.damage_resistance'), 0.8);
+  const walk = arena({ units: [{ chessId: 't_gun', row: 10, col: 3 }, { chessId: 't_blade', row: 11, col: 9 }], kits: { t_gun: NOATK, t_blade: NOATK } });
+  walk.step();
+  const moving = put(walk, 'enemy_10097_crshd', [11, 6], { move: true, route: { motion: 'WALK', start: [11, 6], end: [11, 3], checkpoints: [] } });
+  moving.base.def = 450;
+  moving.base.res = 30;
+  moving.markDirty();
+  walk.run(0.5);
+  assert.ok(moving.x < 6, 'walked left');
+  assert.equal(moving.blockedBy, null);
+  assert.equal(moving.facing, -1, 'unblocked facing follows the walk');
+  assert.equal(moving.dir, 'LEFT', 'the model uses the walk sign');
+  approx(walk.b.dealDamage(walk.unit('t_gun'), moving, { amount: 1000, type: 'phys' }), 110, 1e-6, 'left is the front');
+  approx(walk.b.dealDamage(walk.unit('t_blade'), moving, { amount: 1000, type: 'phys' }), 550, 1e-6, 'right is the back');
+
+  const h = arena({
+    units: [{ chessId: 't_wall', row: 11, col: 6 }, { chessId: 't_gun', row: 11, col: 3 }, { chessId: 't_blade', row: 11, col: 9 }],
+    kits: { t_wall: NOATK, t_gun: NOATK, t_blade: NOATK },
+  });
+  h.step();
+  const wall = h.unit('t_wall');
+  const e = put(h, 'enemy_10097_crshd', [11, 5.5], { move: true, route: { motion: 'WALK', start: [11, 5.5], end: [11, 2], checkpoints: [] } });
+  e.base.def = 450;
+  e.base.res = 30;
+  e.markDirty();
+  h.runUntil(() => e.blockedBy === wall, 3);
+  h.step();
+  assert.equal(e.blockedBy, wall, 'blocked by the operator behind a leftward walk');
+  assert.ok(e.x < wall.x - 1e-6, `blocker is to the right (enemy x ${e.x})`);
+  assert.equal(e.facing, 1, 'faces the blocker');
+  assert.equal(e.dir, 'RIGHT');
+  const published = (h.b.snapshot().face || []).find((row) => row[0] === e.id);
+  assert.deepEqual(published, [e.id, 1], 'the snapshot carries the same sign for the model');
+  approx(h.b.dealDamage(h.unit('t_blade'), e, { amount: 1000, type: 'phys' }), 110, 1e-6, 'right side is now the front');
+  approx(h.b.dealDamage(h.unit('t_blade'), e, { amount: 1000, type: 'arts' }), 140, 1e-6, 'arts from the front');
+  approx(h.b.dealDamage(h.unit('t_gun'), e, { amount: 1000, type: 'phys' }), 550, 1e-6, 'left side is the back');
+  approx(h.b.dealDamage(h.unit('t_gun'), e, { amount: 1000, type: 'arts' }), 700, 1e-6, 'arts from the back');
+  const x = e.x;
+  e.x = wall.x;
+  h.step();
+  assert.equal(e.blockedBy, wall);
+  assert.equal(e.facing, 1, 'a blocker on the same column keeps the last facing');
+  e.x = x;
+  checkInvariants(h.b);
 });
 
 for (const key of ['enemy_2085_skzjxd', 'enemy_2085_skzjxd_2']) {

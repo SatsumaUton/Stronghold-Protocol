@@ -4,7 +4,7 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
 
 ## 8. Network protocol (shared/protocol.js is normative)
 
-Transport: one WebSocket per tab at `/ws`, JSON text frames `{ t: '<type>', ...payload }`. Client requests may carry `rid` (request id); the server's direct reply echoes `rid` (`ok` or `error`). Server pushes have no `rid`. Max frame 64 KB inbound (a compressed frame counts its inflated size); rate limit 40 msgs/s per connection (excess dropped with `error RATE`). Frames from 1 KB up are compressed with permessage-deflate (RFC 7692; `server/http/websocket.js WS_DEFLATE`: no server context takeover, a 2 KB server window, zlib memLevel 7 — about 72 KB of zlib state per connection); smaller frames go out plain, and a client that offers no compression, or caps the server window below 2 KB, gets plain frames. A measured solo session (rounds 3–5, `/healthz?traffic=1`): 173 KB of server frames → 60 KB on the wire.
+Transport: one WebSocket per tab at `/ws`, JSON text frames `{ t: '<type>', ...payload }`. Client requests may carry `rid` (request id); the server's direct reply echoes `rid` (`ok` or `error`). Server pushes have no `rid`. Max frame 64 KB inbound (a compressed frame counts its inflated size); rate limit 40 msgs/s per connection (excess dropped with `error RATE`). Frames from 1 KB up are compressed with permessage-deflate (RFC 7692; `server/http/websocket.js WS_DEFLATE`: server context takeover — the deflate window is kept from one frame to the next —, an 8 KB server window (windowBits 13), zlib memLevel 7, about 105 KB of zlib state per connection); smaller frames go out plain — decided at the send site on the frame's UTF-8 length, because ws applies its own `threshold` only when the extension negotiated `*_no_context_takeover` — and a client that offers no compression, or caps the server window below 8 KB, gets plain frames. A measured 4-player match (one client's stream, a real ws round trip: 3,339 KiB of frames in 1,127 messages, the median of three runs): 284 KiB on the wire, against 809 KiB with per-message deflate and a 2 KB window (windowBits 15 would reach about 160 KiB at about 140 KiB more state per connection).
 
 ### 8.1 Session & lobby
 C→S: `hello {name, token?, version}` · `room.create {mode:'solo'|'coop', difficulty?, test?:true}` (no difficulty: the room starts at 标准, server/lobby.js `DEFAULT_DIFFICULTY` [ASSUMED: the event's 联合模拟 creates the room first and its starting difficulty is not recorded; the event room of research 06 §3.2 shows ♜ 标准模拟 in its footer pill], and the host changes it in the room; the game's lobby sends the remembered one) · `room.join {code, testAck?:true}` · `room.leave` · `room.ready {ready}` · `room.setDifficulty {difficulty}` (host) · `room.setPlugins {plugins:[{id, settings?}]}` (host, before the match — the room's cosmetic and gameplay plugins, §8.4; un-readies the other humans like a difficulty change) · `room.setMode {modeId}` (host, before the match: an official mode of the room's type sets the difficulty, a mode the room's content set adds becomes its mode, §8.4) · `room.contentReady {cs, ok?}` (a member's page loaded and checked the room's content set — or not, `ok: false`; §8.4) · `room.setAiPicksLast {on}` (host, co-op, before the match — `ROOM_STARTED` during it, `BAD_TARGET` in a solo room; un-readies the other humans like a difficulty change; the match takes it as `opts.aiPicksLast`: humans draft before AI seats, off by default, no extra random draw) · `room.setSoloUnlimited {on}` (host, before the match, a solo room of a version whose solo is timed — otherwise `BAD_TARGET`; `SPECTATOR`, `NOT_HOST`, `ROOM_STARTED` as the other host settings; off by default; `room.state` omits `soloUnlimited` unless it is true; the match takes `true` as `opts.soloUnlimited`) · `room.addBot` / `room.removeBot {seat}` (host) · `room.kick {seat, playerId}` (host, before the match: another human leaves the room and gets `room.closed {reason:'kicked'}`; may join again; `playerId` = the player the host confirmed, a seat that changed hands meanwhile → `BAD_TARGET`) · `room.start` (host) · `room.loadout {entries, ops?}` (§16: any time in the lobby / room and during INFO_CHECK, then `WRONG_PHASE`; heavy rate-limit bucket; the match exposes it as `m.private.loadout`; `ops` — 0.2.2 — the per-operator 潜能 / 练度 `{ [charId]: { potential?: 1–6, cultivate?: 0–3 } }` of the 干员调配 roster and the 自选 owned pool, ≤ 256, checked strictly with the entries, `m.private.ops`; absent = none set: every operator 潜能 6, 精英2 Lv.60) · `room.ownership {notOwned}` (0.2.0 补位, the 干员持有 tab: the base chess ids marked as not owned — ≤ 160 ids, kept leniently: anything but a droppable NORMAL chess is dropped; stored on the session and the seat, a match takes the seat's list when it starts and never changes it — during a match `ROOM_STARTED` 'stored for the next match'; heavy bucket; the match exposes it as `m.private.standIns`) · `room.diy {picks}` (0.2.0 自选编队: `{ [slotBaseId]: { charId, skillIndex?, uniEquipId? } | null }` for the four DIY slots — ≤ 8 entries, kept leniently: shared/protocol.js `checkDiyPicks` drops an illegal pick (an operator without a kit, another tier's prototype, a prototype off its locked skill, a module of another game mode (集成战略 / 生息演算), an owned operator's second slot, the same operator twice in a tier, an unknown slot), only malformed picks are `BAD_MSG`; stored on the session and the seat like the not-owned list, a match takes the seat's picks when it starts — during a match `ROOM_STARTED` 'stored for the next match'; heavy bucket; the match exposes them as `m.private.diy`) · `room.card {charId}` (名片干员: the operator whose portrait fills the player's seat card in the waiting room — a visible, non-自选 charId of the room's chess.json (the picker's list), anything else `BAD_MSG` 'unknown operator'; `''` clears it; stored on the session and the seat, so it follows the player into the next room — checked again when the player takes a seat: a card the room's content does not have is left off that seat, the session keeps it; cosmetic, any phase; heavy bucket; shown to every member as `room.state.seats[].card`; the client sends it through `ui/loadoutSync.js installCardSync`, which retries RATE / TIMEOUT / OFFLINE) · `room.skins {skins}` (docs/SKINS.md: `{ [charId]: skinId }`, the outfit each operator wears — public, any phase, heavy bucket; a match takes it as `m.public.players[].skins`, a waiting room shows a changed map as `room.state.seats[].skins`) · `ping {c}`
@@ -30,14 +30,16 @@ S→C:
 - NOTE: game time in `b.snap`/`b.ev` is carried as **`gt`** (the frame's `t` is the message type).
 - Active finite zero-SP timed skills display `sp=timeLeft`, `spMax=duration` and `UF.SKILL`; after end they display
   `0/0`. Snapshot display capacity does not change runtime SP/cost.
-- `b.snap` — `{ fieldId, gt, units: [[id, x, y, hp, maxHp, sp, spMax, flags, anim]] , dp, killed, total, resolved, down?, elem?, ammo?, coins?, energy?, wolves?, neg?, layers?, charges?, stand?, standCut? }` 20 Hz (a countdown summon's `hp` is maxHp × the share of its life left, §25.16.5). Optional, only when non-empty (§18.3): `down: [[id, respawnAt (game s), respawnTime (s), state, row, col]]` — knocked-out operators waiting to redeploy, `state` 0 counting | 1 timer done, waiting for DP | 2 timer done, its tile taken — a safeguard, no ally deploys there (sim/constants.js `DOWN_STATE`); `row, col` = the tile it lies on and comes back on (§21.24); `elem: [[id, element, fill, cooldownEnd (game s), cooldown (s)]]` — the one gauge a unit shows: the fullest (ties by the official element id 神经 < 侵蚀 < 灼燃 < 凋亡), fill with 2 decimals rounded DOWN and kept at 0.01–0.99 outside a burst (§20.8); during a 爆发冷却 the bursting element with fill 1 and the cooldown numbers (else 0, 0); the three HP-bar readouts (0.2.2, GitHub PR #303 / #378 / #383, display only — no sim state reads them, the nine-field tuples and the SP fraction an ammo skill still puts in them are unchanged; `render/interp.js` keeps them per snapshot and `sample()` hands them out from the older snapshot like `flags`, so they step with the skill flag; a malformed entry or an id the snapshot does not list is dropped, a snapshot without the list clears the readout): `ammo: [[id, rounds left, rounds in the magazine]]` — an ally's running ammo skill, whole rounds, the magazine being the activation's real total (extra bullets and refills included; 隐现's S2 holds 14, skill_table `attack@trigger_time`) — the client draws yellow cells in place of the SP bar (the count, not a pixel copy of the official magazine widget — its art is in no game data we have), and UnitInfo `ammoSkill: true` (an ally whose skill is an ammo magazine, known from its first appearance) tells it to draw no standing skill aura; `wolves: [[id, 狼影 left, the talent's maximum]]` — 伺夜's 狼群 (`mem.shadows` / `mem.wolfCapacity`, both the placed and the automatic pack), one diamond per slot under the HP bar (plain diamonds: no official counter art is known, the portrait of PR #378 was not taken), nothing in the 战术点形态; `neg: [[id, fill]]` — the share (0.01–1) of its cap a negative-HP pool holds (斩业星熊's 我执, `unit.negFill`), drawn as the red bar over her drained HP bar; two the official effects read (0.3.0 round 46, display only, kept and sampled the same way): `layers: [[id, n]]` — the hit-negating 护盾 layers a unit holds (the sum of its buffs' `shieldHits`: 泥岩's; DESIGN §33.16 per-layer loops) and `charges: [[id, stored, maximum]]` — the charges an ally's charge skill stores (maxCharges > 1: 卡涅利安's sand armour, §33.16 `[eff_cond]`). These show only for a living, deployed, visible unit and only when it has one
+- `b.snap` — `{ fieldId, gt, units: [[id, x, y, hp, maxHp, sp, spMax, flags, anim]] , dp, killed, total, resolved, down?, elem?, ammo?, coins?, energy?, wolves?, neg?, layers?, charges?, motes?, stand?, standCut?, face? }` 20 Hz (a countdown summon's `hp` is maxHp × the share of its life left, §25.16.5). Optional, only when non-empty (§18.3): `down: [[id, respawnAt (game s), respawnTime (s), state, row, col]]` — knocked-out operators waiting to redeploy, `state` 0 counting | 1 timer done, waiting for DP | 2 timer done, its tile taken — a safeguard, no ally deploys there (sim/constants.js `DOWN_STATE`); `row, col` = the tile it lies on and comes back on (§21.24); `elem: [[id, element, fill, cooldownEnd (game s), cooldown (s)]]` — the one gauge a unit shows: the fullest (ties by the official element id 神经 < 侵蚀 < 灼燃 < 凋亡), fill with 2 decimals rounded DOWN and kept at 0.01–0.99 outside a burst (§20.8); during a 爆发冷却 the bursting element with fill 1 and the cooldown numbers (else 0, 0); the three HP-bar readouts (0.2.2, GitHub PR #303 / #378 / #383, display only — no sim state reads them, the nine-field tuples and the SP fraction an ammo skill still puts in them are unchanged; `render/interp.js` keeps them per snapshot and `sample()` hands them out from the older snapshot like `flags`, so they step with the skill flag; a malformed entry or an id the snapshot does not list is dropped, a snapshot without the list clears the readout): `ammo: [[id, rounds left, rounds in the magazine]]` — an ally's running ammo skill, whole rounds, the magazine being the activation's real total (extra bullets and refills included; 隐现's S2 holds 14, skill_table `attack@trigger_time`) — the client draws yellow cells in place of the SP bar (the count, not a pixel copy of the official magazine widget — its art is in no game data we have), and UnitInfo `ammoSkill: true` (an ally whose skill is an ammo magazine, known from its first appearance) tells it to draw no standing skill aura; `wolves: [[id, 狼影 left, the talent's maximum]]` — 伺夜's 狼群 (`mem.shadows` / `mem.wolfCapacity`, both the placed and the automatic pack), one diamond per slot under the HP bar (plain diamonds: no official counter art is known, the portrait of PR #378 was not taken), nothing in the 战术点形态; `neg: [[id, fill]]` — the share (0.01–1) of its cap a negative-HP pool holds (斩业星熊's 我执, `unit.negFill`), drawn as the red bar over her drained HP bar; `motes: [[id, count, wide]]` — 魔王's T1 过往尘埃 (`unit.moteRing`): how many 「微尘」 circle her right now and whether S2's 旋转半径扩大 is up, drawn by `render/motes.js` as that many sprites of her model's own `C_Eff_Moire_B` region (the official slots `C_Eff_Moire_B` / `B2` / `B3` are attached at runtime in the real client and every animation leaves them empty), the count dropping as motes touch an operator and coming back after the cooldown; two the official effects read (0.3.0 round 46, display only, kept and sampled the same way): `layers: [[id, n]]` — the hit-negating 护盾 layers a unit holds (the sum of its buffs' `shieldHits`: 泥岩's; DESIGN §33.16 per-layer loops) and `charges: [[id, stored, maximum]]` — the charges an ally's charge skill stores (maxCharges > 1: 卡涅利安's sand armour, §33.16 `[eff_cond]`). These show only for a living, deployed, visible unit and only when it has one
   Optional, only when non-empty (PR #381; display metadata, SIM §9): `stand: [[id, until]]` — the game time an enemy's
   attack recovery ends (`atkStandUntil`; enemies alive, deployed, visible, neither feared nor stunned): when it falls
   between two snapshots the renderer holds the position until then and interpolates the rest (HP / SP unchanged), and
   extrapolates nothing while the newest snapshot still holds a stand; `standCut: [[id, at]]` — the latest time each
   listed enemy's recovery was cut or ignored (失衡, fear, stun, hiding, leaving): an interval with a cut inside it stays
   linear. A newest snapshot showing a death, a stun or a block is not extrapolated. Old snapshots without them
-  interpolate linearly; nothing is inferred from the attack animation.
+  interpolate linearly; nothing is inferred from the attack animation. `face: [[id, ±1]]` (only when non-empty; display
+  only, not in the golden tuple, #869) is the horizontal sign 心虚设计师 uses for its front cut: `sample()` hands it
+  out from the older snapshot, and the model applies it only while it is not sliding.
 - `b.ev` — `{ fieldId, ev: [ ... ] }` event tuples: `['spawn', UnitInfo]`, `['atk', srcId, tgtId, projKind]`, `['dmg', tgtId, amount, type]`, `['heal', tgtId, amount]`, `['skill', id, on:0|1]`, `['die', id, reason]` (reason `'killed'`, `'retreat'`, `'expired'` …; only `'killed'` plays an operator's knock-down sound), `['status', id, key, on]`, `['fx', kind, x, y, extra]` (`'hitCap' {id, n}` = a cancelled 限伤 hit, drawn as nothing, §20.12; `extra.form` = the unit's model form from then on (an enemy's mode, a 傀儡师's 替身 §22.11) — `shared/protocol.js fxForm`, state like a spawn: never dropped by the client, §21.4), `['layer', playerId, bondId, n]`, `['bounty', playerId, coins]`, `['deploy', id]`, `['cast', id, slot, dur?, clip?]` (display only: an enemy's skill by the slot of its data record's `skills[]`, `dur` its blackboard duration; an attack-turn cast appends `clip` in seconds, 0 for an ability with no named clip, so the client plays the skill clip or attack clip in place of the attack (§35.57) — SIM.md; a cosmetic event the client may drop when stale, `render/interp.js COSMETIC_EVENTS`)
 - `m.toast {kind, text}` · `m.ticker {text, id, type, priority, playerId}` (the strip plays the highest priority first, §21.10) · `m.emote {playerId, id}` · `m.result {...}`
 - A test match (DESIGN §34.8) adds `m.public.test: true`, `testActions` (successful `g.test` commands), `testTimers`, and `testLog` (the last 12 audit rows: seq, playerId, cmd, args, at, ok, code?). `m.result` adds `test: true` and `testActions`. `room.state` adds `test: true`. All of these keys are omitted on a normal room, so an old client ignores them and a normal snapshot does not grow. `g.test` is an input: re-sim applies the recorded platform calls and timer order (`server/match/testReplay.js`). It cannot name another player, another room, a file, or a plugin script.
@@ -60,6 +62,7 @@ bump; clients without these controls keep their existing messages.
 { playerId, seat, alive, lp, funds, bandId, ready, canReady /* false while a personal choice or temp overflow is pending */,
   personalChoice: null | { id, round, sourceItemId, cards: [ { kind: 'bounty', id, name, desc, descRaw, ... } ] }, // recipient only, including reconnect; absent from public / scout views
   shop: { level, maxLevel: 6, upgradePrice, refreshPrice /* effective (0 when a free refresh is available) */, freeRefreshes,
+          layout: { chess, item }, // actual slot counts, including empty slots; old saved frames may omit this (§36.1)
           frozen, slots: [ { kind: 'chess'|'item', id, price, basePrice, sold, frozen } | null ],  // slot.frozen: the 冻结 toggle copies onto every unsold slot, and 梓兰's 猎头顾问 freezes ONE card of an active refresh with the toggle off — every card draws its own flag (GitHub #354)
           rewardOffer: null | { tier, source: 'merge'|'special', label, queued, slots: [ { kind: 'chess'|'item', id, price: 0, sold } ] } },  // §21.2
   hand:  [ Piece | null ],   // length 10, index = hand slot
@@ -67,7 +70,7 @@ bump; clients without these controls keep their existing messages.
   board: [ Piece & { row, col, dir } ],   // dir ∈ UP|RIGHT|DOWN|LEFT (§3; bench pieces carry none)
   deployCap, deployCount,
   bonds: [ { bondId, count, active, tier, layers, harmony? /* 调和's +1 is in count, §21.26 */, thresholds, countsHand } ],   // sorted: active first, then layers desc; an `off` entry (a bond the mode never activates, with members: count only, never active — the strip's grey 本局禁用 disc, bondsMeta.offBondCounts) comes last
-  effects: [ { id, name, desc, iconKind: 'band'|'choice'|'team'|'item'|'garrison', iconId, counter?, counterText? /* a bounty: 还剩 N 场作战, §20.6 */ } ],
+  effects: [ { id, name, desc, iconKind: 'band'|'choice'|'team'|'item'|'garrison', iconId, counter?, counterText?, progress?: {current,total}, roundProgress?: {current,total} /* read-only preparation counters; a bounty's counterText: 还剩 N 场作战, §20.6 */ } ],
   nextEnemies: [ { enemyKey, count, tag, start? } ],   // preview of the upcoming round's wave (after waves.js generation); `start` = a leader's spawn tile [row, col] on the boss field (the boss-field prep shows it standing there, community report #12)
   loadout: { [baseChessId]: { skill, module } },   // §16: the effective loadout (chess not listed: defaults)
   standIns: [ baseChessId ],   // 0.2.0 补位: the chess this player fields as their stand-ins in this match (sorted; [] = everything owned)
@@ -194,9 +197,11 @@ for byte what they were; everything below appears only in a room whose host swit
 
 ### 8.5 Official version messages (M1, §35.23)
 
-A server offers the official versions its owner enables (docs/DATA.md "Serving the versions (M1)"; default: 第二期下半,
-`act2autochess`, alone — then nothing below appears on the wire). A room plays one version; `act2autochess` is a code
-constant: a message or a record without a version means it, whatever the server's default.
+A server offers the official versions its owner enables (docs/DATA.md "Serving the versions (M1)"). Nothing set enables
+all four, so `welcome.versions` lists them and the default version stays 第二期下半 / `act2autochess` (§35.23.11).
+`welcome.versions` is omitted only when the live list is exactly that one version (`SP_VERSIONS=act2autochess`). A room
+plays one version; `act2autochess` is a code constant: a message or a record without a version means it, whatever the
+server's default.
 
 - S→C `welcome.versions?` = `[{ id, cs, family, label, roomModes, default?: true }]` in registry order (`label`: the
   registry msgid; `default` on the server's default only) — present only when more than one version is enabled or the only
@@ -268,6 +273,49 @@ constant: a message or a record without a version means it, whatever the server'
   `version` too) and the knowledge pack's `gameVersion` (non-default only), `/healthz` `versions` (only when a non-default version is enabled). BattleSpec is unchanged (`cs`
   already names the content).
 
+
+### 8.6 The optional peer relay path (§8.1 `p2p.*`)
+
+**Opt-in, off by default.** `server/peerRelay.js` (server) and `public/js/p2p.js` (browser) add ONE optional path
+for co-op `m.public` broadcasts; every other frame keeps using the WebSocket. The lobby only builds a peer plan
+for a room when `SP_P2P` is explicitly `1` / `true` and at least two members' browsers have both opted in
+(`p2p.enable { enabled: true }` after their `welcome`) — otherwise the lobby's own fanout serves every member,
+exactly as before. A browser that opts in while the switch is off is answered `p2p.config { enabled: false }`.
+
+**The path.** One member's browser is picked as the relay. On each broadcast the server signs the already-encoded
+`m.public` bytes once (ECDSA P-256 / SHA-256, 64-byte IEEE P1363, Base64, over UTF-8
+`JSON.stringify([epoch, seq, payload])`) and sends `p2p.frame { epoch, seq, payload, signature }` to the relay over
+its own authenticated WebSocket — deliberately bypassing the state-delta transport, because the relay forwards these
+exact bytes to each ready receiver over a reliable, ordered `public-state` data channel. Signalling (`p2p.signal`) stays on
+the WebSocket: the server authenticates the sender, keeps it to current room members and star edges, applies the network and
+signalling limits, and forwards with a server-selected `from`. No peer payload is ever a game command, a private view or a
+reply.
+
+**Coexistence with the state-delta transport.** A member the peer route does not serve (not ready, solo room, no
+WebRTC / WebCrypto, opted out) keeps receiving `m.state` frames over its own socket
+(`server/stateTransport.js`, `shared/stateDelta.js`), and its per-connection baseline is never advanced by snapshot
+bytes it did not receive: while peer delivery serves a receiver, the server sends that socket no `m.state` frame at all, so
+when the route is abandoned the stream simply resumes from the baseline it already had (an exact patch, or a full frame
+after a reset). The room-wide `deliveryEpoch` / `deliverySeq` stamps ride inside every `m.public` — peer and WebSocket
+alike — so a delayed copy from either transport can never overwrite newer state, even where two snapshots share a
+`serverNow`.
+
+**Readiness and the fallback gap.** A receiver renews a 3 s lease with `p2p.ready { epoch, ready, seq }` once a second;
+`seq` is the watermark of the snapshot it APPLIED (or that the state it already holds supersedes), never the last frame it
+merely received. The server keeps only the newest pending snapshot per receiver behind a 2.5 s watchdog
+(`P2P_ACK_MS`) that a newer snapshot cannot postpone and an acknowledgement cannot cancel: a self-reported
+sequence is a hint, not proof. On timeout the server re-sends those signed bytes over the receiver's own WebSocket, and
+— only if that receiver confirmed nothing at all since the snapshot was armed — marks the frame `fallback`, blocks the
+route and closes that receiver's channel. A relay whose channel stays open but silently stops forwarding therefore costs
+at most one 2.5 s window of stale state. A channel close reports `ready: false` immediately.
+
+**What the path exposes.** Direct peer connections exchange ICE candidates, and host candidates are the machine's own
+addresses on its networks — typically private ranges such as `192.168.x.x` / `10.x.x.x`. They go to the other members of
+that room that are negotiating, which is the same as telling them your LAN address. The default `[]` adds no external
+STUN / TURN service; where the operator configures one, its credentials reach the browsers and are never logged. Use
+it the way you would share your network with friends, and leave `SP_P2P` unset where you would not.
+Deployment details: [DEPLOY.md](../../DEPLOY.md#26-p2p-公共状态转发).
+
 ---
 
 ## 14. Client-side combat (v2 architecture — supersedes the combat-streaming parts of §4, §8.2, §9)
@@ -316,8 +364,10 @@ removed. It also clears tasks when leaving the match or losing its connection.
 - C→S `b.progress { battleId, gt, killed, total, resolved?, leaks?, left?, bossDmg?, by?, leaksBy?, done? }` — authoritative clients, ~1 Hz (boss fields 4 Hz). `resolved` = the HUD capsule's numerator of this field (below; omitted by a client that cannot count it — the teammate UI then falls back to `killed`); `killed` / `total` are the field's own counters: `killed` counts every `counted` knock-out (a runtime split / summon included) and may exceed `total`, which counts only the enemies the round scheduled. Normal/联防: `leaks` = counted leaks so far; 联防: `left` = per leaker its enemies still standing (`spec.js uniteLeft`, clamped by the server to what the escaped wave sent (`fields.js uniteBillBounds`, `keySourceCounts`); §20.6). Boss: `bossDmg` = cumulative damage of this field to the shared pool, `by` = the same per player, `leaks` = the field's cumulative LP cost (leaks × `lpr` + leader "扣除目标生命" effects; `spec.js attachLpMeter`), `leaksBy` = its split per player (the LP the enemies that reached that player's goal cost: every leak entry the result will show × its `lpr`; `leaks` minus its sum is the leader's effects; `spec.js battleProgress`) — the server keeps the highest value per player and, before a perfect-payout bounty pays in a client-reported field, requires the result's leaked list of that player to show at least that much and the LP asked for to have been split at all (`Match._bossLeaksAgree`, the boss path does not re-simulate). The server applies deltas (never twice). Stale reports (unknown battle, not the authority, after the match ended) are ignored, never answered with an error; the platform never answers a rid-less `b.progress` with an error frame (it would surface as a toast).
 - C→S `b.result { battleId, result, cs? }` — authoritative client at battle end (`cs`: §8.4); `result` = `compactResult(BattleResult)` (the fields the match consumes; ≤ 4 players, ≤ 400 leaks, ≤ 64 unitsEnd, ≤ 160 unitStats, ≤ 40 layer gains; `fitResult` keeps the frame ≤ 60 KB: unit statistics, then leak mods, then — boss only — leak entries go first). Structural checks in `isBattleResult`; `server/net.js` routes `b.*` frames to the match (lobby `routeGame`).
 - S→C `b.pool { hp, max, teamLp, acked: { [fieldId]: cumulative damage counted } }` (boss rounds, ≤ 4 Hz; exact numbers, never rounded) — clients reconcile their `LocalBossPool`: displayed pool = server hp − (local cumulative damage − acked). Pools never hold less than 1 HP (`BOSS_POOL_MIN_HP`: `SharedBossPool` and `LocalBossPool`; a browser pool reads any finite rest below 1 as 0 — §20.5); the 'cleared'-result dust rule (a boss field whose client result is `'cleared'` while < 1 HP is left on the server empties the pool) only catches noise at that boundary.
-- S→C `b.rehearsal { taskId, playerId, cap, specs }` — ask the host to test AI teammate `playerId`'s layouts when
-  host rehearsal is enabled. `specs` contains one BattleSpec per candidate; `cap` is the simulation tick limit.
+- S→C `b.rehearsal { taskId, playerId, cap, specs, limits? }` — ask the host to test AI teammate `playerId`'s layouts when
+  host rehearsal is enabled. `specs` contains one BattleSpec per candidate; `cap` is the per-candidate simulation tick limit.
+  Optional `limits: { stage, tickBudget }` selects adaptive stopping and a strict total tick budget shared by server
+  and Worker. Omission preserves legacy behavior. See [BOT_STRATEGIES](../BOT_STRATEGIES.md).
   `taskId` is `<prefix>.<round>.<seat>.<seq>` and identifies this prep task.
 - C→S `b.rehearsalResult { taskId, choice?, error? }` — return the chosen candidate's index, or `error: true` if the
   task failed. Only a valid index for the current host's live task is accepted. No answer within the configured
@@ -423,3 +473,44 @@ are entirely native and require consent [ASSUMED]; trusted classes cannot load i
 same-origin native script responses before import; all gameplay battle simulations run in Workers.
 
 Test-room admission requires `testAck:true` for both join and spectate; otherwise `TEST_CONFIRM` precedes any membership/state delivery. `g.test bond` accepts `{id,layers,count?}` (count is 0–99 extra members). All host attempts consume their per-command rate bucket, including malformed args. `[test-input ROOM]` init/call/timer JSON lines and `[test-audit ROOM]` results use the server logger. Test results have null titles and zero trophies/rewards and never enter browser records.
+
+Attack pacing (PR #729): UnitInfo carries the actual attack interval in game seconds. A `rate` event after the ally
+phase and before projectiles carries changes; its baseline is seeded by birth info. The renderer looks ahead through
+the queued timestamp, including a rate later in that batch, without borrowing a later timestamp’s value. A b.ev batch may contain several simulation ticks; [ASSUMED] its latest interval per unit paces that timestamp, including batches without an attack (§35.101). Its 0.2–6 second display
+window is [ASSUMED]; damage, attack timing and targeting are unchanged.
+
+Server rehearsal offload (§35.86) is opt-in via SP_WORKERS; plugin and historical-version match hosts retain their own
+data and execution. No socket or authoritative combat operation moves to this pool.
+
+Public-state deltas (#772, §35.89): hello.delta opts a socket into m.state for m.public only. Unnegotiated clients
+keep full messages; private views retain their current encoding. Commit a baseline only after a successful reliable
+send; malformed pre-encoded JSON falls back to ordinary m.public and advances no baseline. state.resync is rate
+limited and sends a full baseline. Clear both endpoints on room change, retain same-room repeated-hello baselines,
+and keep full replay records. Version negotiation/votes and hello identity ownership remain unchanged.
+
+### Spectator AI handover (PR #691, §35.100, [ASSUMED])
+
+The host may opt in before the match with `room.setAiTakeover {on}` (default off, co-op only); changing it clears human ready flags. Off, both option/vote keys are omitted from room.state, the client hides the panel, and requests/votes/transfers are refused.
+In an enabled original-content default-version co-op room during PREP, a spectator may send `room.aiRequest {botId}`.
+`room.aiVote {voteId, approve}` records one replaceable vote per online, non-autoplay human teammate.
+Strict majority accepts/rejects; an online host decides if there are no eligible human teammates.
+Requests expire after 30 seconds and cannot transfer a seat during combat or after match disposal.
+`room.state.aiTakeoverVotes` exposes the applicant, AI seat, eligible IDs, yes/no votes and expiry.
+Successful transfer retains the AI player ID, funds and inventory, rebinds the applicant's existing session token,
+and sends `welcome.takeoverFrom` followed by ordinary room/match resynchronization. Test-room admission still
+requires the existing acknowledgement before spectating. Isolated gameplay-plugin and historical-version matches are unsupported.
+These remake-only cooperation rules were accepted by the maintainer on 2026-10-24 with the default-off host toggle; ordinary battle goldens are unaffected.
+
+The [0.3.2 AI handover revision](../history/0.3.2/ai-handover.md) binds requests to a match, round and
+unchanged electorate; disconnect/leave, autoplay eligibility, target elimination, phase changes and expiry cancel
+and clear timers. No shrinking-electorate auto-approval. `aiTakeoverRound` is optional in public/private and result
+player rows; local history retains it. [ASSUMED] inherited seat totals do not grant personal awards or aggregates.
+
+The internal welcome preserves the socket’s negotiated delta version and clears its public baseline for a full resync. The inherited seat’s pending pool/delegated rehearsal is cancelled; other seats continue.
+
+### Resource-number display events (#657)
+
+Live display hosts opt into Battle `resourceNumbers`; optional `b.ev` tuples are
+`['resource', unitId, 'cost'|'sp', actualSignedDelta, reason]`. They carry post-settlement receipts, never mutable
+SP requests or bar differences sampled by the renderer. These cosmetic events may be dropped when stale; they
+change no gameplay state and are absent from headless/golden observation. See [§37.3](../history/0.3.4.md).

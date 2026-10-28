@@ -41,25 +41,27 @@ aklz4.py registers a decoder for it. This script pulls the art the web sources l
     only while the season runs: they are read from the client when it has them, else from --scenes <dir> (default
     .cache/official-scenes/*, filled by tools/local-extract/fetch_scenes.py)
   - the official battle effects (特效) of the mode's operators, enemies and tokens (fx.py, DESIGN §33)
-    → fx/index.json, fx/textures.json, fx/prefabs/*.json, fx/tex/**.webp, fx/mesh/*.json, listed in their own
+    → fx/index.json, fx/textures.json, fx/prefabs/*.json, fx/tex/**.webp (or .png), fx/mesh/*.json, listed in their own
     data/local-fx.json (next to --manifest; data/local-assets.json has no fx group);
     only with an explicit --only fx (a plain run leaves them out): the Phase 1a sample by default, --fx-set used for
-    every effect the units reference, --fx-keys <k1,k2> for named prefabs
+    every effect the units reference, --fx-keys <k1,k2> for named prefabs; textures are WebP quality 90 by default,
+    --fx-texture-format png selects lossless PNG
 
 Usage:
   python3 -m venv .venv && .venv/bin/pip install -r tools/local-extract/requirements.txt
-  .venv/bin/python tools/local-extract/extract.py [--game <AB root>] [--out public/assets/local] [--only <subdir prefix>]
+  .venv/bin/python tools/local-extract/extract.py [--game <install dir or AB root>] [--out public/assets/local] [--only <subdir prefix>]
   python3 tools/local-extract/extract.py --print-jobs     (the job table as JSON, including expectedGroups; needs no dependencies)
   python3 tools/local-extract/extract.py --webp           (only the WebP copies of the board textures and the guide
                                                           pages, from the PNGs already extracted — e.g. the local art
                                                           copied from a release bundle; needs Pillow)
   .venv/bin/python tools/local-extract/extract.py --only scene [--scenes <dir of in-season bundles>]
   .venv/bin/python tools/local-extract/extract.py --only fx [--fx-set sample|used] [--fx-keys k1,k2] [--fx-jobs N]
+                                                        [--fx-texture-format webp|png]
   .venv/bin/python tools/local-extract/extract.py --only plugin-art [--plugin-root <installation>]
 
 Writes <out>/**.png|.webp|.skel|.atlas and data/local-assets.json (manifest of what was extracted). With --only, just
-the jobs whose output subdir starts with one of the prefixes run, and their groups replace those of the existing
-manifest (every other group is kept as is).
+the jobs whose output subdir one of the prefixes names run (`enemy` selects `spine/enemy` as `spine/enemy` does), and
+their groups replace those of the existing manifest (every other group is kept as is).
 Everything is (c) Hypergryph; for private, non-commercial fan use only.
 """
 import argparse
@@ -73,16 +75,159 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import scenes  # noqa: E402  (the battlefield scene table and exporter; imports UnityPy only when it runs)
 import fx  # noqa: E402  (the official battle effects, DESIGN §33; imports UnityPy only when it runs)
 import operators  # noqa: E402 (installed plugin operators' optional official art, §34.28)
+import versions  # noqa: E402 (the official-version roster's missing presentation art)
 
 ROOT = Path(__file__).resolve().parents[2]
 HOME = Path.home()
-CANDIDATES = [
-    HOME / 'Library/Application Support/CrossOver/Bottles/Arknights/drive_c/Program Files/Hypergryph Launcher/games/Arknights/Arknights_Data/StreamingAssets/AB/Windows',
-    HOME / 'Library/Containers/com.hypergryph.arknights/Data/Documents/Bundles',
-    # native Windows installs of the official launcher (default and x86 locations)
-    Path('C:/Program Files/Hypergryph Launcher/games/Arknights/Arknights_Data/StreamingAssets/AB/Windows'),
-    Path('C:/Program Files (x86)/Hypergryph Launcher/games/Arknights/Arknights_Data/StreamingAssets/AB/Windows'),
-]
+# The same list tools/setup.mjs reads (client-candidates.json). Do not keep a second copy here.
+SPEC = json.loads((Path(__file__).resolve().parent / 'client-candidates.json').read_text('utf-8'))
+
+
+def _abs(raw):
+    return Path(os.path.abspath(os.path.expanduser(str(raw))))
+
+
+def _is_ab_root(p):
+    return (p / 'ui' / 'autochess').exists() or (p / 'arts' / 'maps' / 'map_autochess').exists()
+
+
+def _ends_with_ab_tail(p):
+    norm = str(p).replace('\\', '/').rstrip('/')
+    return norm.endswith('/'.join(SPEC['abTail']))
+
+
+def _has_install_marker(p):
+    return (p / 'Arknights.exe').exists() or (p / 'Arknights_Data').exists()
+
+
+def _named_install(directory):
+    for game in SPEC['gameFolders']:
+        child = directory / game
+        if _has_install_marker(child):
+            return child
+    return None
+
+
+def _find_install_root(start):
+    """[ASSUMED] One level of children, then at most 8 ancestors. See tools/setup.mjs findInstallRoot."""
+    if _has_install_marker(start):
+        return start
+    named = _named_install(start)
+    if named is not None:
+        return named
+    try:
+        children = list(start.iterdir()) if start.is_dir() else []
+    except OSError:
+        children = []
+    for child in children:
+        if child.name in SPEC['gameFolders']:
+            continue
+        if _has_install_marker(child):
+            return child
+    cur = start
+    for _ in range(8):
+        parent = cur.parent
+        if parent == cur:
+            break
+        cur = parent
+        if _has_install_marker(cur):
+            return cur
+    return None
+
+
+def _playcover_bundles(directory):
+    text = str(directory)
+    sep = os.sep
+    playcover = (sep + 'com.hypergryph.arknights' + sep) in text or text.endswith(sep + 'com.hypergryph.arknights')
+    for rel in SPEC['playcoverBundleRels']:
+        bundles = directory.joinpath(*rel)
+        if _is_ab_root(bundles):
+            return bundles
+        if playcover and bundles.exists():
+            return bundles
+    return None
+
+
+def resolve_game_dir(raw):
+    """AB root for --game. Install directory, AB root, or PlayCover container. None if it is not a client."""
+    if not raw:
+        return None
+    abs_path = _abs(raw)
+    if not abs_path.exists():
+        return None
+    if _is_ab_root(abs_path) or _ends_with_ab_tail(abs_path):
+        return abs_path
+    bundles = _playcover_bundles(abs_path)
+    if bundles is not None:
+        return bundles
+    install = _find_install_root(abs_path)
+    if install is None:
+        return None
+    return install.joinpath(*SPEC['abTail'])
+
+
+def windows_candidate_suffixes():
+    out = []
+    for base in SPEC['windowsBases']:
+        for game in SPEC['gameFolders']:
+            out.append('/'.join(list(base) + [game] + list(SPEC['abTail'])))
+    return out
+
+
+def build_candidates(home=None, win=None):
+    home = Path(home) if home else HOME
+    if win is None:
+        win = os.name == 'nt'
+    out = []
+    seen = set()
+
+    def add(p):
+        key = str(p)
+        if key not in seen:
+            seen.add(key)
+            out.append(Path(p))
+
+    bottle = SPEC['defaultCrossoverBottle']
+    bottles_root = home.joinpath(*SPEC['crossoverBottles'])
+    names = []
+    if bottles_root.is_dir():
+        try:
+            names = sorted((p.name for p in bottles_root.iterdir() if p.is_dir()), key=lambda n: (n != bottle, n))
+        except OSError:
+            names = []
+    if bottle not in names:
+        names.insert(0, bottle)
+    ab = SPEC['abTail']
+    for n in names:
+        for pf in SPEC['crossoverProgramFiles']:
+            for game in SPEC['gameFolders']:
+                add(bottles_root / n / 'drive_c' / pf / Path(*SPEC['crossoverGameTail']) / game / Path(*ab))
+    add(home.joinpath(*SPEC['playcoverTail']))
+    if not win:
+        for prefix in SPEC['winePrefixes']:
+            for game in SPEC['gameFolders']:
+                add(home / prefix / 'drive_c' / 'Program Files' / Path(*SPEC['crossoverGameTail']) / game / Path(*ab))
+    for drive in SPEC['windowsDrives']:
+        for base in SPEC['windowsBases']:
+            for game in SPEC['gameFolders']:
+                add(Path(drive + ':/').joinpath(*(list(base) + [game] + list(ab))))
+    return out
+
+
+def locate_client(explicit=None):
+    """Resolved --game path, else the first candidate that holds the mode, else the first that exists."""
+    if explicit:
+        return resolve_game_dir(explicit)
+    for p in CANDIDATES:
+        if _is_ab_root(p):
+            return p
+    for p in CANDIDATES:
+        if p.exists():
+            return p
+    return None
+
+
+CANDIDATES = build_candidates()
 
 # In-match emote themes (display_meta_table emoticonData, scene AUTOCHESS_BATTLE), in the order of
 # activity_table autoChessData.enabledEmoticonThemeIdList: (themeId, output dir under emoticon/). The dirs are the
@@ -128,7 +273,8 @@ JOBS = [
     ('arts/maps/effect.ab', 'map/water', {'Texture2D'}, r'water_normal|Caustics|WaterNoise|noise_clouds|Water_Foam|SmoothWaves'),
 ]
 
-# Enemy battle Spine models that no community dump carries (isHarryh/Ark-Models lists them with an empty assetList, so
+# Local enemy battle Spine models: six earlier-season enemies, plus two no community dump carries
+# (isHarryh/Ark-Models lists them with an empty assetList, so
 # tools/fetch-assets.mjs aliases them to another enemy's skeleton — the web model): every enemy of data/enemies.json whose
 # official battle prefab draws a skeleton of its own that is missing upstream (audited against the client's prefabs, user
 # feedback after 0.1.0 report D3: 灼热源石虫 / 炽焰源石虫 — the ELEMENT faction's slugs — were drawn as the plain 源石虫).
@@ -137,7 +283,8 @@ JOBS = [
 # _AlphaTex merged in as A). Output: spine/enemy/<id>/ (manifest group spine/enemy/<id>); the client draws the model
 # when the group lists every file of data/assets.json enemies[id].spineLocal (whose metadata
 # tools/assets/local-enemy-spines.json keeps: `node tools/fetch-assets.mjs --local-spines` after a game update).
-ENEMY_SPINES = ['enemy_1305_mhslim', 'enemy_1305_mhslim_2']
+ENEMY_SPINES = ['enemy_1201_sfzhi', 'enemy_1249_lysdb', 'enemy_1254_lypa', 'enemy_1275_dwlock',
+                'enemy_1305_mhslim', 'enemy_1305_mhslim_2', 'enemy_1373_ltnhor_2', 'enemy_1376_ltndru']
 ENEMY_ART = 'refs/arts/enm_art_*.ab'
 ENEMY_SPINE_SUB = 'spine/enemy'
 
@@ -241,19 +388,25 @@ def job_parts(job):
     return rel, sub, kinds, keep
 
 
+def only_prefix(prefix):
+    """Only the two documented Spine categories have short aliases."""
+    prefix = prefix.rstrip('/')
+    return {'enemy': 'spine/enemy', 'token': 'spine/token'}.get(prefix, prefix)
+
+
+def names_sub(only, sub):
+    """A prefix names this output directory or one of its parents."""
+    return any(sub == only_prefix(p) or sub.startswith(only_prefix(p) + '/') for p in only)
+
+
 def wants_sub(only, sub):
-    """Whether output subdir `sub` runs under --only: no prefixes, or one prefix is `sub`, a parent of it or below it."""
-    if not only:
-        return True
-    return any(sub == p.rstrip('/') or sub.startswith(p.rstrip('/') + '/') or p.rstrip('/').startswith(sub + '/')
-               for p in only)
+    """Include parent jobs when selecting an individual model below them."""
+    return not only or names_sub(only, sub) or any(only_prefix(p).startswith(sub + '/') for p in only)
 
 
 def select_jobs(only):
-    """The jobs whose output subdir starts with one of the `only` prefixes (all jobs when `only` is empty)."""
-    if not only:
-        return list(JOBS)
-    return [j for j in JOBS if any(j[1] == p.rstrip('/') or j[1].startswith(p.rstrip('/') + '/') for p in only)]
+    """Select explicit directories and the two documented Spine aliases."""
+    return [j for j in JOBS if wants_sub(only, j[1])]
 
 
 def enemy_spine_id(container, wanted):
@@ -272,10 +425,11 @@ def token_prefab_id(container, wanted):
 
 def spine_ids(only, sub, ids):
     """The ids of a Spine model list (ENEMY_SPINES / TOKEN_SPINES, written to `<sub>/<id>`) that run under --only: all of
-    them with no prefix, `sub` or a parent of it; else those whose output dir is a prefix or below one."""
+    them with no prefix, `sub` or the short form of it (`enemy` / `token`) or a parent of it; else those whose output dir
+    is a prefix or below one."""
     if not wants_sub(only, sub):
         return []
-    if not only or any(sub == p.rstrip('/') or sub.startswith(p.rstrip('/') + '/') for p in only):
+    if not only or names_sub(only, sub):
         return list(ids)
     return [i for i in ids if any(f'{sub}/{i}' == p.rstrip('/') or f'{sub}/{i}'.startswith(p.rstrip('/') + '/')
                                   for p in only)]
@@ -911,13 +1065,14 @@ def export_token_spines(ab_root, out_root, manifest, log, ids=None):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--game', help='AssetBundle root (…/StreamingAssets/AB/Windows or …/Documents/Bundles)')
+    ap.add_argument('--game', help='install directory or AssetBundle root (…/AB/Windows or PlayCover …/Documents/Bundles)')
     ap.add_argument('--out', default=str(ROOT / 'public/assets/local'))
     ap.add_argument('--manifest', default=str(ROOT / 'data/local-assets.json'))
     ap.add_argument('--plugin-root', default=str(ROOT), help='installation whose plugin JSON and roster are scanned')
     ap.add_argument('--plugin-art', action='store_true', help='explicitly include referenced official operator art in a full run')
     ap.add_argument('--only', action='append', default=[], metavar='SUBDIR',
-                    help='only run the jobs whose output subdir starts with this prefix (repeatable), e.g. emoticon')
+                    help='only run the jobs whose output subdir this prefix names (repeatable), e.g. emoticon, enemy or '
+                         'spine/token')
     ap.add_argument('--scenes', action='append', default=[], metavar='DIR',
                     help='an AB root holding the battlefield scene bundles of an in-season version (repeatable; '
                          'searched after --game and before .cache/official-scenes/*)')
@@ -927,6 +1082,10 @@ def main():
     ap.add_argument('--fx-keys', default='', metavar='K1,K2',
                     help='with --only fx: export only these effect prefabs (comma-separated keys)')
     ap.add_argument('--fx-jobs', type=int, default=0, metavar='N', help='with --only fx: worker processes (default up to 8)')
+    ap.add_argument('--fx-add-only', action='store_true',
+                    help='extract only units/prefabs missing from the current fx index; preserve the existing set')
+    ap.add_argument('--fx-texture-format', choices=('webp', 'png'), default='webp',
+                    help='with --only fx: WebP quality 90 textures (default) or lossless PNG')
     ap.add_argument('--webp', action='store_true',
                     help='only write the WebP copies of the board textures and the guide pages from the PNGs already '
                          'under --out and list them in the manifest (needs Pillow, not the client)')
@@ -947,6 +1106,7 @@ def main():
                           'fx': {'sub': fx.FX_SUB, 'groups': list(fx.FX_GROUPS), 'version': fx.FORMAT_VERSION,
                                  'indexVersion': fx.INDEX_VERSION, 'meshVersion': fx.MESH_VERSION,
                                  'manifestVersion': fx.MANIFEST_VERSION, 'optIn': True,
+                                 'textureFormat': args.fx_texture_format, 'textureFormats': ['webp', 'png'],
                                  'sample': {'keys': fx.FX_SAMPLE_KEYS, 'units': fx.FX_SAMPLE_UNITS,
                                             'coverage': fx.FX_COVERAGE_KEYS}},
                           'scenes': {'sub': scenes.SCENE_SUB, 'tex': scenes.TEX_SUB,
@@ -958,9 +1118,9 @@ def main():
     if args.webp:
         return webp_only(Path(args.out), Path(args.manifest), print)
 
-    ab_root = Path(args.game) if args.game else next((p for p in CANDIDATES if p.exists()), None)
+    ab_root = locate_client(args.game)
     if not ab_root or not ab_root.exists():
-        print('No Arknights install found. Pass --game <AssetBundle root>.', file=sys.stderr)
+        print('No Arknights install found. Pass --game <install directory or AssetBundle root>.', file=sys.stderr)
         return 2
     jobs = select_jobs(args.only)
     enemy_ids = spine_ids(args.only, ENEMY_SPINE_SUB, ENEMY_SPINES)
@@ -970,13 +1130,16 @@ def main():
     # §34.28: a normal full run is not consent for optional plugin art. --only plugin-art is explicit too.
     art_on = wants_sub(args.only, operators.SUB) and (bool(args.only) or args.plugin_art)
     art_ids = spine_ids(args.only, operators.SUB, operators.references(Path(args.plugin_root))) if art_on else []
-    if not jobs and not enemy_ids and not token_ids and not stage_ids and not fx_on and not art_on:
+    versions_on = not args.only or 'versions' in args.only
+    if not jobs and not enemy_ids and not token_ids and not stage_ids and not fx_on and not art_on and not versions_on:
         print(f'--only {args.only}: no job matches', file=sys.stderr)
         return 2
     out_root = Path(args.out)
     out_root.mkdir(parents=True, exist_ok=True)
     manifest, total = {}, 0
     chars = {}
+    if versions_on:
+        total += versions.export(ab_root, out_root, manifest, print, ROOT)
     if art_ids:
         chars, n = operators.export(ab_root, out_root, manifest, print, art_ids)
         total += n
@@ -991,7 +1154,8 @@ def main():
         keys = [k.strip().lower() for k in args.fx_keys.split(',') if k.strip()]
         total += fx.export_fx(ab_root, out_root, manifest, print, selection=args.fx_set, keys=keys or None,
                               jobs=args.fx_jobs or None, root=ROOT,
-                              fx_manifest=Path(args.manifest).with_name(fx.FX_MANIFEST))
+                              fx_manifest=Path(args.manifest).with_name(fx.FX_MANIFEST), texture_format=args.fx_texture_format,
+                              add_only=args.fx_add_only)
     if stage_ids:
         total += export_scenes(ab_root, out_root, manifest, print, stage_ids, scene_roots(ab_root, args.scenes))
     old, old_chars = {}, {}

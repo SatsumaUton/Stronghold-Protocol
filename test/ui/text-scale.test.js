@@ -10,7 +10,7 @@
 // What this file guards: the default is the design's own sizes; a bad or missing value falls back to 小; the step lands
 // on <html data-text>; the layout root's clamp is untouched; and every font-size that stayed on a plain `rem` is one of
 // the deliberate exclusions (the in-match HUD's fixed boxes, the board-pinned DOM text, geometry-derived sizes, the
-// ≥16 px iOS-zoom guards) — a new readable size that forgets `--t` fails here, the way `tools/i18n.mjs extract 0` fails
+// ≥16 px iOS-zoom guards, the official-art settlement button's label) — a new readable size that forgets `--t` fails here, the way `tools/i18n.mjs extract 0` fails
 // on an unwrapped string. Browser counterpart: test/ui/text-scale.e2e.test.js (SP_E2E=1).
 
 import { describe, test } from 'node:test';
@@ -68,6 +68,8 @@ const NOT_SCALED = [
   // decorative wordmarks and boot/rotate overlays whose size is the composition (the top bar's deco type: the text
   // stand-in of the official hudPanel/frame_deco_txt* sprites, at their size)
   /\.title-cn/, /\.title-en/, /\.title-bg__target/, /\.brief-boss__q/, /\.boot__/, /\.rotate-hint/, /\.gtop__deco/,
+  // The cropped official next-button face uses layout rem for its label (§35.94).
+  /\.settle__next/,
   // the join code's letter-spaced field, the px-floored 本局信息 dialog, the 16 px diagnostics box (iOS zoom guard)
   /\.field--code/, /\.minfo-dlg/, /\.set-diag__text/,
   // the keyboard hints of the 快捷键 list (a shared rule with the HUD's .toolbtn kbd)

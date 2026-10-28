@@ -138,6 +138,7 @@
   "enemy_1355_mrfly": {},
   "enemy_1355_mrfly_2": {},
   "enemy_1364_spnaxe_2": {},
+  "enemy_1367_dseed": {},
   "enemy_1389_winbab_2": {},
   "enemy_1402_tgshd_2": {},
   "enemy_1404_msnip": {"crossattack":{"root":"RangedAttack","attack":true,"animKey":null}},

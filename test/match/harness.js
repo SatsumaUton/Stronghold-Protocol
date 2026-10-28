@@ -80,6 +80,7 @@ export function makeMatch(o = {}) {
     // simulation work of full-match suites; test/match/bot.test.js covers it
     botRehearsal: o.botRehearsal ?? 0,
     botStrategy: o.botStrategy,
+    botStrategySeats: o.botStrategySeats,
     externalAI: o.externalAI,
     externalReplay: o.externalReplay,
     botSliceMs: o.botSliceMs,
@@ -93,6 +94,9 @@ export function makeMatch(o = {}) {
     test: o.test === true,
     botRehearsalDelegate: o.botRehearsalDelegate,
     botRehearsalDelegateMs: o.botRehearsalDelegateMs,
+    // the server's own simulation pool for those rehearsals (server/workers/roomPool.js); absent unless a test passes
+    // one, so a harness match keeps every rehearsal on this thread (test/workers-room.test.js covers the pooled path)
+    ...(o.simPool !== undefined ? { simPool: o.simPool } : {}),
     // a gameplay-plugin room (DESIGN §32.6): host rehearsal stays off there (match/rehearsal.js requireCs)
     cs: o.cs,
     vs: o.vs,

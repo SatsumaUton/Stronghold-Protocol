@@ -12,13 +12,15 @@
 //     (assetIndex.js); the index of the default public/ persists in .cache/asset-hashes.json;
 //   * SP_VERSIONS ('all' or a comma list of shared/versions.js ids), SP_VERSION_DEFAULT and SP_MAX_VERSION_HOSTS (or the
 //     `versions: { enabled, default, maxHosts }` option, which wins) → the official versions this server offers
-//     (DESIGN §35.23, M1; versionsFrom): only act2autochess unless one of them says otherwise;
+//     (DESIGN §35.23, versionsFrom): every registry id unless one of them narrows the list (SP_VERSIONS=act2autochess
+//     is 第二期下半 alone, the switch off);
 //   * the served directories (public/, data/, shared/, the content packs' packs/ and the plugins' plugins/ of this
 //     repository unless the options name others), and which startServer() options are handed on to net.js Network and
 //     lobby.js Lobby.
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ROOM_CODE_LEN } from '../../shared/constants.js';
 
 import { DEFAULT_VERSION, VERSIONS, versionById } from '../../shared/versions.js';
 
@@ -28,7 +30,7 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 export const noopLog = { info() {}, warn() {}, error() {}, debug() {} };
 
 /** startServer() options handed on to net.js Network / lobby.js Lobby (an absent one keeps that module's default). */
-const NET_OPTION_KEYS = ['reconnectWindowMs', 'heartbeatMs', 'helloTimeoutMs', 'ratePerSec', 'rateBurst', 'maxConnections', 'abuseDropsPerSec',
+const NET_OPTION_KEYS = ['reconnectWindowMs', 'heartbeatMs', 'helloTimeoutMs', 'ratePerSec', 'rateBurst', 'maxConnections', 'maxOnline', 'abuseDropsPerSec',
   'maxConnectionsPerAddr', 'heavyPerSec', 'heavyBurst', 'trustProxy'];
 const LOBBY_OPTION_KEYS = ['lobbyGraceMs', 'maxRooms', 'maxRoomsPerAddr', 'maxMatchesPerAddr', 'resyncMinGapMs', 'soloReconnectWindowMs', 'versionVoteMs', 'versionRetryMs'];
 
@@ -114,6 +116,26 @@ export function netOptionsFrom(opts, log = null) {
 }
 
 /**
+ * A fixed alliance key passed to one server instance: four letters or digits, upper-cased, or null for the random
+ * code every room gets. `--room-code` (server/index.js) and startServer({ roomCode }) share this parser; a blank value
+ * means random. Anything else is refused at boot instead of silently falling back to random — a private server that
+ * expects the same key should not start with a different one. There is no environment variable: the value lives only
+ * in the process that was started with it, so stopping the server ends it.
+ * @param {unknown} v
+ * @returns {string | null}
+ * @throws {RangeError} a value that is neither blank nor ROOM_CODE_LEN letters or digits
+ */
+export function parseRoomCode(v) {
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+  const code = s.toUpperCase();
+  if (code.length !== ROOM_CODE_LEN || !/^[A-Z0-9]+$/.test(code)) {
+    throw new RangeError(`invalid fixed alliance key: use ${ROOM_CODE_LEN} letters or digits (A-Z, 0-9)`);
+  }
+  return code;
+}
+
+/**
  * lobby.js Lobby options out of the startServer() options.
  * @param {Record<string, any>} opts @param {{ warn?: (m: string) => void } | null} [log] the server logger, for a junk SP_MAX_*
  */
@@ -123,11 +145,15 @@ export function lobbyOptionsFrom(opts, log = null) {
     if (opts[k] != null) lobbyOptions[k] = opts[k];
   }
   applyEnvLimits(lobbyOptions, LOBBY_LIMIT_ENV, log);
+  // Per instance only: startServer({ roomCode }) or the --room-code argument parsed by server/index.js. No environment
+  // variable is read here, so a stop / restart without the argument is random again.
+  const roomCode = parseRoomCode(opts.roomCode);
+  if (roomCode) lobbyOptions.roomCode = roomCode;
   return lobbyOptions;
 }
 
 /** Socket caps that SP_MAX_CONNECTIONS / SP_MAX_CONNECTIONS_PER_ADDR may override (net.js). */
-const NET_LIMIT_ENV = [['maxConnections', 'SP_MAX_CONNECTIONS'], ['maxConnectionsPerAddr', 'SP_MAX_CONNECTIONS_PER_ADDR']];
+const NET_LIMIT_ENV = [['maxConnections', 'SP_MAX_CONNECTIONS'], ['maxConnectionsPerAddr', 'SP_MAX_CONNECTIONS_PER_ADDR'], ['maxOnline', 'SP_MAX_ONLINE']];
 /** Room / match caps that SP_MAX_ROOMS / SP_MAX_ROOMS_PER_ADDR / SP_MAX_MATCHES_PER_ADDR may override (lobby.js). */
 const LOBBY_LIMIT_ENV = [['maxRooms', 'SP_MAX_ROOMS'], ['maxRoomsPerAddr', 'SP_MAX_ROOMS_PER_ADDR'], ['maxMatchesPerAddr', 'SP_MAX_MATCHES_PER_ADDR']];
 
@@ -159,11 +185,13 @@ function applyEnvLimits(target, table, log) {
 }
 
 /**
- * The official versions this server offers (DESIGN §35.23, M1): the `versions` option, else SP_VERSIONS ('all' or a comma
- * list of registry ids), SP_VERSION_DEFAULT and SP_MAX_VERSION_HOSTS. An unknown id is warned about and dropped; nothing
- * left keeps act2autochess alone (the switch off, also the default when nothing is set); a default that is not enabled
- * is warned about and replaced by the first enabled id in registry order. `enabled` comes out in registry order.
- * `maxHosts` caps the version match hosts (server/match/host, kind 'version'): by default one per enabled non-default
+ * The official versions this server offers (DESIGN §35.23): the `versions` option, else SP_VERSIONS ('all' or a comma
+ * list of registry ids), SP_VERSION_DEFAULT and SP_MAX_VERSION_HOSTS. Nothing set enables every registry id (the lobby
+ * switch on; the default version stays act2autochess). SP_VERSIONS or `versions.enabled` narrows that list —
+ * SP_VERSIONS=act2autochess is 第二期下半 alone, the switch off. An unknown id is warned about and dropped; nothing left
+ * keeps act2autochess alone; a default that is not enabled is warned about and replaced by the first enabled id in
+ * registry order. `enabled` comes out in registry order. `maxHosts` caps the version match hosts (server/match/host,
+ * kind 'version' — forked on the first match of a version, never at boot): by default one per enabled non-default
  * version, and at least 1 whenever there is one.
  * @param {{ versions?: { enabled?: 'all' | string[], default?: string, maxHosts?: number } }} opts
  * @param {{ warn?: (m: string) => void } | null} [log]
@@ -174,7 +202,8 @@ export function versionsFrom(opts, log = null) {
   const envList = String(process.env.SP_VERSIONS ?? '').trim();
   /** @type {unknown} */
   let wanted = o.enabled ?? (envList === '' ? null : (envList.toLowerCase() === 'all' ? 'all' : envList.split(',')));
-  if (wanted == null) wanted = [DEFAULT_VERSION];
+  // Nothing set: every official version (registry order). A set list, including one id, narrows it.
+  if (wanted == null) wanted = 'all';
   let ids;
   if (wanted === 'all') ids = VERSIONS.map((v) => v.id);
   else {
