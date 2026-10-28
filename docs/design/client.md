@@ -442,6 +442,14 @@ modal. The normal roster detail and chosen DIY cards expose each operator's voic
 charId's forms, listing only the dubs this server has and offering a preview. An absent override follows the global
 preference, then the own-language dub when the switch is on and the operator has one, then Chinese. A missing line
 falls back to the Chinese file of the same name. Changing the global language does not clear per-operator choices.
+The title screen's 下载资源管理 → 干员语音 section manages a separate download selection (`sp.pref.voiceDownloads`),
+independent of playback and interface language: one row per operator, multiple language checkboxes and preview.
+Language checkboxes outside the table select/clear that language for all voiced operators, regardless of search;
+partially selected languages show an indeterminate state. Chinese is selected initially; users may select one
+or several available dubs per voiced operator. Individual and bulk deselection retain the last available selected
+dub. Bulk clear removes a language only where another is selected; the global checkbox becomes indeterminate
+when some operators must retain it. Older empty or stale selections resolve to Chinese, else the first available dub. Predownload fetches exactly these selections, without implicit Chinese fallback.
+Starting/resuming after a download selection change rebuilds the queue; existing cached files are retained.
 
 异形屏适配 (`ui/screenFit.js`) persists `sp.pref.screenFit` — four whole pixel offsets `{ l, r, t, b }` in ±100 (inward
 positive; the settings show each as a 0–100 slider, 50 = 0, 2 px a step) — on this device only. While any offset is
@@ -970,3 +978,14 @@ Art/audio templates ship original CC0 sample media; the studio fills the target'
 ### Finished battle presentation
 
 The field view receives an explicit completion signal (`finishBattle`): the local runner's `done`, or the server's public field `live: false`. Missing snapshots and solo pause never imply completion. After rendering the final buffered snapshot/events, surviving units return to idle with temporary crowd-control and skill pose flags cleared for presentation only, retaining flight, stealth-driven forms and other persistent flags; knocked-out/dead poses remain. Official and plugin persistent effects stop, while one-shot effects advance on the presentation clock and are removed after at most two presentation seconds [ASSUMED]. Studio playback continues to use its external clock, including zero-time paused frames. This does not tick the simulation, delay results, or change golden outcomes.
+
+The centralized voice picker shows one operator per table row: name, independent checkboxes for available dubs, and a preview button. Column headers remain visible while scrolling; narrow screens can scroll horizontally.
+
+下载资源管理 is the single title-screen entry for voice download selection (first and initially active), download, local import and completeness checking. Opening the manager or a section starts no transfer; downloading needs its explicit action. Switching sections unmounts the old panel and pauses downloads or cancels imports without deleting stored bytes. The common dialog owns closing and focus trapping.
+
+检查资源 requires all non-voice manifest resources and one complete manifest-listed dub per voiced charId,
+regardless of download selections. Unvoiced operators are exempt. It reads actual import-cache responses and
+HTTP-cache-only responses, never fetching missing art; a partial dub or an unverifiable file cannot satisfy a
+requirement. Only manifests may use the network. Results include missing files and operators; cancellation or
+invalid manifests cannot report completeness. `public/js/resourceCheck.js` exposes the checker and pure planning/
+summary functions for downstream deployments. 下载素材 uses the multi-language selections from 干员语音.
