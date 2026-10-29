@@ -801,3 +801,9 @@ kept injecting their least valuable 1–2阶 piece; injecting the highest tier o
 estimate (the best of three 战术特训 cards pays 1–3 funds only on a perfect battle), yet never using it, or using it only
 when that estimate is positive, cost wins; 夕's same-name pairs and not valuing worn recruit items moved nothing. The
 contributed ioleta strategy (opt-in) is 30 points below legacy on forced 伊奥莱塔.
+
+The sweep also says which bands the bots should take. Until now only the starting LP chose (cubed on 终极), so bands the
+bots play badly (杜宾, 梓兰, 马克维茨) were drawn as often as good ones. Multiplying the LP weight by the measured strength
+(80 forced games per band, shrunk toward the mean, to the 6th power; §37.46, the owner's choice among three options)
+lifts solo pool completion by about 3.5 points over three seed sets (wins 65 → 77) and leaves co-op about even: the table
+measures solo play. 歌利亚 keeps the lead on its LP (57 % of solo picks).

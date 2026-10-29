@@ -72,7 +72,8 @@
 //   6. resolve the temp slots (a 突变细胞 left there — it comes back after every transformation — gets a hand slot made
 //      for it, makeHandRoom, instead of being destroyed), keep one hand slot free (freeHandSlot: a kept bounty Art goes
 //      before a chess on a bot's own seat, never on a human's seat under AI 托管), then Ready.
-// Strategy (botPickBand): weighted by starting LP among the offered bands; never one whose mechanic rides on a bond the
+// Strategy (botPickBand): weighted by starting LP among the offered bands, on 终极 also by the bots' measured strength with
+// each band (bandStrength, §37.46); never one whose mechanic rides on a bond the
 // mode switches off (gd.bandBondIds = bands.json bondIds: the bond its text names in <…> or its blackboards name — 标准's
 // 潘格尼尼, 克莱门莎, 玛恩纳; DESIGN §21.26); alone, 老鲤's withheld first-round funds only rarely (× 0.02).
 // 机变 (botPickCard): a bounty by its expected payout minus the expected LP lost — bountyKillChance runs the exposure
@@ -210,11 +211,46 @@ const DEFAULT_MELEE_RANGE = [[0, 0], [0, 1]];
  * reservation ends when that teammate is eliminated (alivePlayers). #121 [ASSUMED]: a band whose mechanic also changes
  * the teammates' enemies (鸭爵 「神秘顾客」: from R5 some enemies of the player AND the teammates become 鸭爵 / 高普尼克 /
  * 流泪小子 / 圆仔, which break through boards built for the normal wave) burdens the whole team, so it keeps a tenth of its
- * weight while a teammate lives (MATE_BURDEN); alone it only touches the own field. With every band excluded, the
- * default band. One rng draw per call (deterministic per seed); a solo match has no teammate to reserve against.
+ * weight while a teammate lives (MATE_BURDEN); alone it only touches the own field. §37.46 (the maintainer's choice of
+ * 2026-10-30): on 终极 the weight is also multiplied by how well the bots play each band (bandStrength). With every band
+ * excluded, the default band. One rng draw per call (deterministic per seed); a solo match has no teammate to reserve
+ * against.
  */
 const SOFT_BAND_RESERVE = 0.25;
 const MATE_BURDEN = 0.1;
+/**
+ * §37.46: the bots' own strength with each band of the default version — 终极 solo pool completion (%) of 80 forced games
+ * per band (seeds 1–80, botbench --band) at dev 17a075f1 (handoff/round57). Forced 40 games already ranked them far apart:
+ * the passive combat buffs on top (阿米娅 +40 % ATK / HP with 5 active bonds, 华法琳's layers by distinct tiers), the
+ * effects the bots barely use at the bottom; 歌利亚's 45 LP lands mid-table. Re-measure after a bot change that moves a
+ * band (handoff/round57/sweep.sh).
+ */
+const BAND_STRENGTH = Object.freeze({
+  band_amiya: 51.8, band_bldsk: 51.2, band_sciurus: 48.1, band_quintus: 47.7, band_ermengard: 47.2, band_qalaisa: 47.2,
+  band_sarkazb: 47.1, band_mlyss: 46.5, band_cannot: 45.1, band_amedic: 44.6, band_ioleta: 43.0, band_harold: 42.9,
+  band_chen: 42.3, band_makiri: 42.2, band_emperor: 41.6, band_dusk: 40.5, band_ducklord: 40.2, band_kirara: 39.9,
+  band_yu: 39.9, band_jesica: 39.3, band_doberm: 39.2, band_orchid: 39.2, band_cathy: 38.8, band_chiave: 38.2,
+  band_duyaoy: 35.8, band_mberry: 35.6, band_damaztic: 34.2, band_paganini: 33.8, band_humus: 32.0, band_malkie: 31.9,
+  band_fang: 31.4, band_narant: 31.4, band_lisa: 31.3, band_pepe: 30.6, band_vodfox: 29.5, band_lmlee: 29.2,
+  band_pith: 28.5, band_justin: 28.3, band_mlynar: 25.1, band_clementia: 18.6,
+});
+const BAND_STRENGTH_MEAN = Object.values(BAND_STRENGTH).reduce((s, v) => s + v, 0) / Object.keys(BAND_STRENGTH).length;
+/** Pulled toward the mean by the 80-seed noise (SE ≈ 4 points against a spread of ≈ 7). */
+const BAND_STRENGTH_SHRINK = 0.7;
+const BAND_STRENGTH_POWER = 6;
+/**
+ * §37.46 [ASSUMED]: the 终极 pick multiplier of band `id` — (shrunk strength / 50)^6; against 歌利亚's: 阿米娅 ×1.5,
+ * 杜宾 / 梓兰 ×0.45, 克莱门莎 ×0.03. 歌利亚 still leads on its LP (57 % of solo picks instead of 44 %). Pool completion
+ * against the LP weight alone: solo 1–320 +1.9 ± 1.5, fresh seeds 481–640 +4.9 ± 2.2 (321–480 with a 40-game table:
+ * +5.8 ± 2.1), wins 65 → 77 over the three; co-op 1–320 −0.6 ± 2.9, fresh 401–480 +8.0 ± 6.2 (321–400: +5.0 ± 5.1), wins
+ * 113 → 111 — the table measures solo play, co-op about even. 1 off 终极 (only the default version has 终极: the other
+ * versions' modes stop at 绝境); a band missing from the table (plugin data) counts as the mean.
+ */
+export function bandStrength(m, id) {
+  if (m.difficulty !== 'ABYSS') return 1;
+  const s = Object.hasOwn(BAND_STRENGTH, id) ? BAND_STRENGTH[id] : BAND_STRENGTH_MEAN;
+  return ((BAND_STRENGTH_MEAN + BAND_STRENGTH_SHRINK * (s - BAND_STRENGTH_MEAN)) / 50) ** BAND_STRENGTH_POWER;
+}
 export function botPickBand(m, ps) {
   const gd = ps?.gd || m.gd;
   const ids = gd.bandIds();
@@ -227,7 +263,7 @@ export function botPickBand(m, ps) {
   const pairs = ids.map((id) => {
     if (inactive(id)) return [id, 0];
     const w = Math.max(1, (gd.startLp(id) - 18) ** (m.difficulty === 'ABYSS' ? 3 : 2)) * (m.isSolo && lateFunds(id) ? 0.02 : 1)
-      * (mates.length && burdensMates(id) ? MATE_BURDEN : 1);
+      * (mates.length && burdensMates(id) ? MATE_BURDEN : 1) * bandStrength(m, id);
     return [id, gd.bandBondIds(id).some((b) => reserved.has(b)) ? w * SOFT_BAND_RESERVE : w];
   });
   let total = 0;
