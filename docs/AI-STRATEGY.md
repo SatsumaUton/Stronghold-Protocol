@@ -807,3 +807,8 @@ bots play badly (杜宾, 梓兰, 马克维茨) were drawn as often as good ones.
 (80 forced games per band, shrunk toward the mean, to the 6th power; §37.46, the owner's choice among three options)
 lifts solo pool completion by about 3.5 points over three seed sets (wins 65 → 77) and leaves co-op about even: the table
 measures solo play. 歌利亚 keeps the lead on its LP (57 % of solo picks).
+
+Rehearsing every distinct layout instead of the first three (§37.47) was the cheapest general gain of the round: the
+winner sat past the third candidate in one rehearsal of six, and the leaks it saves in rounds 1–13 carry into the Final
+Assault (320 seeds: solo +2.2 ± 0.9, co-op +5.6 ± 1.7 with wins 73 → 92); more layouts in the Final Assault alone changed
+nothing. With §37.46 the round lifts 终极 solo from 46.4 to 50.4 % and co-op from 46.5 to 51.5 %.

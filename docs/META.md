@@ -327,7 +327,7 @@ After placing the whole formation, the planner checks isolated self-range guards
 dealer covering both the tile and the preceding contact, with different allies allowed per route. Within each group,
 the exposure model ranks positions. Boss rounds place wider healing ranges first; on equal exposure scores, medics
 prefer allied estimated DPS not already covered by another placed medic, then tile noise (#315).
-**Rehearsal:** with `opts.botRehearsal = N` (default 3) the bot simulates the N best
+**Rehearsal:** with `opts.botRehearsal = N` (default 6, §37.47; 3 before) the bot simulates the N best
 distinct layout variants once each with the real `Battle` and `Match._normalOpts`, including `onBattleStart`, enemy
 replacements, teammate effects and in-battle layer gains. [ASSUMED] Every candidate uses the normal field seed (#315)
 and its own clone of the current meta RNG. A boss round (`m.wave` null, `bossGroupOf` already planned) rehearses the
