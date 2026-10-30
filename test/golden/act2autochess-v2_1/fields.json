@@ -615,7 +615,7 @@
         ["p1",4,"op","chess_char_5_05_b",2,"uniequip_002_ulpia",7592.75,1,24,1,52594,6465,1320,9,2],
         ["p1",5,"op","chess_char_5_06_b",2,"uniequip_002_etlchi",3989.37,1,9,0,87652,665,641,66,3],
         ["p1",6,"op","chess_char_5_07_b",2,"uniequip_002_surtr",2948,1,28,0,29806,20359,0,16,1],
-        ["p1",7,"op","chess_char_6_20_b",2,"uniequip_002_agoat2",1828.31,1,4,0,0,0,15581,31,2],
+        ["p1",7,"op","chess_char_6_20_b",2,"uniequip_002_agoat2",1828.31,1,4,0,0,0,15581,29,2],
         ["p1",8,"op","chess_char_5_02_b",2,"uniequip_002_titi",1741.19,1,7,3,104020,1399,15733,82,3],
         ["p1",9,"op","chess_char_5_03_b",2,"uniequip_002_blaze2",520.75,1,5,3,124648,5698,0,152,6],
         ["p1",10,"op","chess_char_5_04_b",0,"uniequip_002_bldsk",1674.2,1,8,0,0,3533,3093,10,0],
@@ -628,10 +628,10 @@
         "enemy_2016_csphtm": [1,0,0,15867,329691],
         "enemy_2017_csphts": [8,6,0,1313,121363]
       },
-      "hooks": [1,30,6000,497,485,755,1248,363,14,16,20,19,110,15012,8,17,14,0,1,61,0,0,58],
-      "events": {"atk":620,"cast":29,"deploy":16,"die":16,"dmg":838,"engage":6,"fx":219,"heal":217,"rate":34,"skill":39,"spawn":25,"status":28},
+      "hooks": [1,30,6000,495,483,755,1248,361,14,16,20,19,110,15012,8,17,14,0,1,61,0,0,58],
+      "events": {"atk":618,"cast":29,"deploy":16,"die":16,"dmg":838,"engage":6,"fx":219,"heal":217,"rate":34,"skill":39,"spawn":25,"status":28},
       "fx": {"anchor":2,"aoe":1,"blink":8,"bloodBattle":1,"dodge":58,"ember":1,"explode":21,"overload":3,"shieldBreak":2,"splash":109,"summon":8,"telegraph":1,"teleport":2,"wake":2},
-      "snaps": "b6b8c1d0 e3d0d51f 6220e4fa 2e0d2f78 03450ca8 d875debf 9ef85eae 24f22d44 e786b1f3 caa5e7eb 681c476e bf725a1a 6ad68444 6d8d72c4 ddc039b0 6d5753dc db977082 82eb504a cb1430aa 267ec8e2"
+      "snaps": "b6b8c1d0 e3d0d51f 6220e4fa 2e0d2f78 03450ca8 d875debf 9ef85eae 24f22d44 d45922d0 05d7dd44 cfedcf05 2df21949 b3248b33 8fd726d3 bdd799db 465e29db d4e13211 1956e861 ec847fe9 dadb7855"
     },
     "boss-boss_6-pair": {
       "about": "阿利斯泰尔，帝国余晖 pair pool 3980000: chess_char_5_11_b chess_char_5_18_b chess_char_5_13_b chess_char_5_14_b chess_char_5_17_b chess_char_5_09_b chess_char_5_10_b chess_char_5_12_b chess_char_5_15_b chess_char_5_16_b | chess_char_5_19_b chess_char_4_01_b chess_char_4_04_b chess_char_4_07_b chess_char_5_20_b chess_char_5_21_b chess_char_4_02_b chess_char_4_03_b chess_char_4_05_b chess_char_4_06_b",
@@ -1124,7 +1124,7 @@
       "hooks": [1,32,6000,769,769,3675,7534,787,10,13,34,29,140,21814,313,5,15,0,1,5,0,2,0],
       "events": {"atk":1447,"cast":17,"deploy":17,"die":13,"dmg":7315,"engage":11,"fx":1255,"heal":555,"rate":87,"skill":63,"spawn":30,"status":223},
       "fx": {"anchor":5,"beam":22,"burst":2,"candle":8,"charge":7,"dash":12,"displace":18,"drone":333,"droneLock":14,"drones":3,"extraAttack":23,"finale":4,"garrisonGrant":1,"healAoe":2,"link":597,"palsy":4,"phase":12,"radiantSword":4,"shieldBreak":10,"slash":44,"splash":105,"summon":4,"talent":3,"teleport":5,"wake":13},
-      "snaps": "90f4098c 81803438 56461e33 0524f8f7 73d251a1 a2b5212a 409320f3 101c3e57 d723cdc0 45754170 5a9d4c92 c5c4f9da fbd13d7f 1077febc cbce3626 89573339 ce8abd07 cce37c64 fe76e036 00a53dc7"
+      "snaps": "90f4098c 81803438 56461e33 0524f8f7 73d251a1 a2b5212a 409320f3 101c3e57 d723cdc0 45754170 5a9d4c92 c5c4f9da fbd13d7f 1077febc cbce3626 89573339 ce8abd07 cce37c64 0fba5658 443c9b89"
     },
     "hidden-boss_10-pair": {
       "about": "假想敌：管 pair pool 7600000: chess_char_5_08_b chess_char_5_11_b chess_char_5_13_b chess_char_5_14_b chess_char_5_07_b chess_char_5_09_b chess_char_5_10_b chess_char_5_12_b chess_char_5_15_b chess_char_5_16_b | chess_char_5_18_b chess_char_5_19_b chess_char_4_01_b chess_char_5_17_b chess_char_4_04_b chess_char_5_20_b chess_char_5_21_b chess_char_4_02_b chess_char_4_03_b chess_char_4_05_b",
