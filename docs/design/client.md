@@ -107,6 +107,10 @@ plays its attack clip [ASSUMED]. `app/windup.js` / `UnitView.windUpCast` start t
 frame aligns with the event; rendering consumes that wind-up without restarting it. Subsequent plain attacks keep
 their attack clip.
 
+A normal attack's wind-up (`UnitView.windUp`, started by `app/windup.js` ahead of the 'atk') turns an enemy toward
+that attack's target with the same rule as `onAttack` (|dx| > 0.1) the moment the clip starts (#869, DESIGN §37.54).
+Operators keep their deploy direction. The clip's start time is unchanged.
+
 The pre-game text fit (§35.56): while a strategy status shows, the draft's step name gives way at 大 / 特大 at any
 width, and at heights ≤ 640 px; 小 / 中 retain it in taller windows. The guide button keeps its width. On short screens
 (≤ 520 px tall), the briefing's step name may wrap, its header grows, and the 机变 timing line sits below its title.
