@@ -470,7 +470,7 @@ export function RoomScreen() {
   const backups = data.get('backups');
   // the room version's chess records and 自选编队 pool (ui/seatArt.js cardOperators — the server's cardCharIds)
   const cardList = useMemo(() => cardOperators(data.list('chess'), backups), [chess, backups]);
-  const cards = useMemo(() => cardContext(cardList), [cardList]);
+  const cards = useMemo(() => cardContext(cardList, { pending: !backups }), [cardList, backups]);
   const myCard = useStore((s) => s[CARD_KEY], Object.is, cardStore);
   const localSkins = useStore((s) => s[SKINS_KEY], Object.is, skinsStore);
   const otherSkins = useStore((s) => s.otherSkins !== false, Object.is, settingsStore);

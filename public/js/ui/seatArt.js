@@ -76,8 +76,11 @@ export function cardOperators(chessList, backups = null) {
  * client orders it the same).
  * @param {any[]} list cardOperators()
  */
-export function cardContext(list) {
+export function cardContext(list, { pending = false } = {}) {
   return {
+    // PR #894 follow-up: true while the room version's 自选 pool (backups) is still loading — a pick that is not in the
+    // list yet waits for it instead of drawing a default pool operator for a moment
+    pending,
     byChar: new Map(list.map((c) => [c.charId, c])),
     pool: list.filter((c) => (c.rarity ?? 0) >= 5).sort((a, b) => (a.charId < b.charId ? -1 : a.charId > b.charId ? 1 : 0)),
   };
@@ -88,15 +91,16 @@ export function cardContext(list) {
  * seats[].card), else one of the pool chosen by the player id [ASSUMED, see the header]. null for an empty seat, a bot,
  * or before the data loads.
  * @param {any} seat room.state seat
- * @param {{ byChar: Map<string, any>, pool: any[] }} ctx cardContext()
+ * @param {{ byChar: Map<string, any>, pool: any[], pending?: boolean }} ctx cardContext()
  * @param {{ myId?: any, myCard?: string }} [own]
  * @returns {{ chess: any, picked: boolean } | null}
  */
-export function seatOperator(seat, { byChar, pool }, { myId, myCard } = {}) {
+export function seatOperator(seat, { byChar, pool, pending = false }, { myId, myCard } = {}) {
   if (!seat || seat.playerId == null || seat.isBot) return null;
   const pick = (seat.playerId === myId ? myCard : seat.card) || '';
   const rec = pick && byChar ? byChar.get(pick) : null;
   if (rec) return { chess: rec, picked: true };
+  if (pick && pending) return null;
   if (!Array.isArray(pool) || !pool.length) return null;
   return { chess: pool[hash32(seat.playerId) % pool.length], picked: false };
 }

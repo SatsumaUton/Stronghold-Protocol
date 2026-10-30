@@ -107,6 +107,18 @@ test('the operator a seat shows: own pick at once, a teammate\'s seats[].card, e
   assert.equal(CARD_PREF, 'room.card');
 });
 
+// PR #894 follow-up: while the 自选 pool (backups) loads, a pick missing from the list draws nothing rather than a default
+// operator that would swap to the real pick a moment later; a seat without a pick keeps its default at once
+test('a pick not yet in the list waits while the 自选 pool loads; no pick keeps the default (PR #894 follow-up)', () => {
+  const loading = cardContext(cardOperators(CHESS), { pending: true });
+  const mate = { playerId: 'p_mate', name: 'Mate', isBot: false, card: 'char_003_kalts' };
+  assert.equal(seatOperator(mate, loading), null, 'a pool-only pick waits');
+  assert.equal(seatOperator({ ...mate, card: 'char_498_inside' }, loading).picked, true, 'a chess pick shows at once');
+  assert.equal(seatOperator({ ...mate, card: undefined }, loading).picked, false, 'no pick: the default at once');
+  // once loaded, an id that is still missing falls back to the default as before
+  assert.equal(seatOperator(mate, cardContext(cardOperators(CHESS))).picked, false);
+});
+
 test('the outfit a seat card wears (decision 4 of 2026-10-21): one\'s own choice at once, another doctor\'s published map, the switch, the fallback', () => {
   const OP = 'char_1012_skadi2';
   const SKIN = `${OP}@test#1`;
