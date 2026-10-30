@@ -812,3 +812,12 @@ Rehearsing every distinct layout instead of the first three (§37.47) was the ch
 winner sat past the third candidate in one rehearsal of six, and the leaks it saves in rounds 1–13 carry into the Final
 Assault (320 seeds: solo +2.2 ± 0.9, co-op +5.6 ± 1.7 with wins 73 → 92); more layouts in the Final Assault alone changed
 nothing. With §37.46 the round lifts 终极 solo from 46.4 to 50.4 % and co-op from 46.5 to 51.5 %.
+
+### Cycle 16: rehearsals that know the summons, the solo trade bar (§37.60, round58)
+
+Every rehearsal misprediction came from a round whose real board differed from the rehearsed one — mostly 伺夜's wolf
+pack, placed after the layout and planned on an empty field. Putting the pack into the rehearsal made the predictions
+right and the results worse (−1.8 solo): the pack-less rehearsal was the harder test and picked layouts with margin,
+while the obvious margin tie-breaks (fewer own knock-downs, more HP left) lost to the layer-gain one. Re-tuning the layer
+trade bar after §37.47 found the clear gain of the round: alone, a trade or a layer refresh now has to pay 4 layers per
+fund instead of 3 (solo +2.2 over three seed sets, wins 63 → 75); co-op keeps 3.

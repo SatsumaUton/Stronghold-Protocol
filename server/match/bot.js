@@ -571,6 +571,13 @@ export function bondPlan(m, ps, owned = ownedBonds(m, ps)) {
  * the prep (gainCountLayers) — with both out, any cheap operator is a trade. Measured on 终极: see history §35.63, §37.35.
  */
 const TRADE_MIN = 3;
+/**
+ * §37.60 [ASSUMED]: alone the bar is 4 layers per fund — the funds a 3-per-fund trade or refresh spends buy more in the
+ * shop (终极 solo 1–320 +1.75 ± 1.04, fresh seeds 481–640 +3.15 ± 1.33, wins 63 → 75; 5 and 6 less). In co-op it stays 3:
+ * 4 there was −1.49 ± 1.83 on 1–320.
+ */
+const SOLO_TRADE_MIN = 4;
+export const tradeMin = (m) => (m.isSolo ? SOLO_TRADE_MIN : TRADE_MIN);
 const TRADE_FROM = 4;
 const bondList = (s) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean);
 
@@ -651,7 +658,7 @@ export function refreshLayers(m, ps) {
 function layerRefresh(m, ps) {
   const gd = ps.gd || m.gd;
   const cost = ps.shop.freeRefreshes > 0 ? 0 : gd.refreshPrice;
-  if (ps.funds < cost + 2 || ps.shop.frozen || refreshLayers(m, ps) < TRADE_MIN * Math.max(1, cost)) return false;
+  if (ps.funds < cost + 2 || ps.shop.frozen || refreshLayers(m, ps) < tradeMin(m) * Math.max(1, cost)) return false;
   const ctx = context(m, ps);
   if (ps.shop.slots.some((s) => s && !s.sold && s.kind === 'chess' && ps.priceOf(s) <= ps.funds && (ps.completesChessMerge(s.id)
     || (ctx.focus && !ctx.owned.bases.has(gd.baseIdOf(s.id)) && (chessRec(m, s.id, ps)?.bonds || []).includes(ctx.focus))))) return false;
@@ -680,7 +687,7 @@ function tradeOnce(m, ps, ctxOf) {
     const v = layers / Math.max(1, price - 1);
     if (layers > 0 && v > bestV) { bestV = v; best = i; }
   });
-  if (best < 0 || bestV < TRADE_MIN) return false;
+  if (best < 0 || bestV < tradeMin(m)) return false;
   const before = new Set(ps.allChess().map((p) => p.uid));
   const keep = (ctx.copies.get(gd.baseIdOf(ps.shop.slots[best].id)) || 0) >= 1 || ps.allChess().length < ps.deployCap;
   if (!buyOffer(m, ps, best)) return false;
