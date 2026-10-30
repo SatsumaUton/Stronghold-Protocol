@@ -29,31 +29,38 @@ function browserCandidates() {
   const override = process.env.CHROME_PATH || process.env.EDGE_PATH;
   if (override) return [override];
   const sys = platform();
-  const home = homedir();
+  // the per-user installs; a missing HOME only drops those candidates (the file still loads and skips cleanly)
+  let home = null;
+  try { home = homedir(); } catch { /* no HOME */ }
+  const inHome = (rel) => (home ? [path.join(home, rel)] : []);
   if (sys === 'win32') {
     return [
       'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
       'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
       'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-      path.join(home, 'AppData\\Local\\Microsoft\\Edge\\Application\\msedge.exe'),
+      ...inHome('AppData\\Local\\Microsoft\\Edge\\Application\\msedge.exe'),
     ];
   }
   if (sys === 'darwin') {
     return [
       '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
       '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-      path.join(home, 'Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'),
-      path.join(home, 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      ...inHome('Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'),
+      ...inHome('Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
+      ...fromPath(),
     ];
   }
   return ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium', ...fromPath()];
 }
 
+const homedirPrefix = (c) => { try { return c.startsWith(homedir()); } catch { return false; } };
 const candidates = browserCandidates();
 const browserPath = candidates.find((candidate) => existsSync(candidate));
 const skip = process.env.SP_P2P_E2E !== '1' ? 'set SP_P2P_E2E=1 to run real WebRTC integration'
-  : !browserPath ? `no Chromium browser found; set CHROME_PATH (looked at: ${candidates.join(', ')})`
+  // the per-user candidates stay out of the message (they would print the account's home folder)
+  : !browserPath ? `no Chromium browser found; set CHROME_PATH (looked at: ${candidates.filter((c) => !homedirPrefix(c)).join(', ')} and the per-user installs)`
     : false;
 
 // Three of these keep an ICE-server-free, host-candidate-only connection working outside a desktop:
