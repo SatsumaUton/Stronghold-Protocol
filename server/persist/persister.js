@@ -290,20 +290,32 @@ export class LobbyPersister {
     this.counts.restoredRooms += result.rooms;
     let matches = 0;
     for (const { room, ref, departed } of result.matches) {
-      if (!this.cluster) {
-        // A process restart must not silently resume a match: keep the alliance room, but
-        // return it to its waiting state so clients show 返回同盟 instead of continuing.
-        this.abortRestoredMatch(room);
-        this.counts.droppedMatches++;
-        continue;
-      }
+      // ★ 2026-11-02：本地模式也要**真的恢复**对局（断点续玩）。
+      //
+      //   以前这里是无条件 abortRestoredMatch(room)，注释理由是「A process restart must not
+      //   silently resume a match」—— 于是每个节点一重启，正在打的对局就被丢掉，玩家只看到
+      //   「服务器重启导致对局中断，同盟已返回等待室」，点按钮回同盟，没法继续。
+      //   而 restoreLocal() 早就写好了（下面这个方法），却**从来没有被调用过**：
+      //   它按 startMatch(room, key, keys, { restore }) 调用，而 lobby.startMatch 当时只收
+      //   2 个参数 —— 是死代码。两边一起修好之后才真正能续玩。
+      //
+      //   恢复失败（检查点缺失/版本不符/跨房间）仍然退回 abortRestoredMatch，
+      //   所以行为是「能恢复就恢复，不能恢复就照旧回同盟」，不会卡住。
       let ok = false;
-      try { ok = this.lobby.restoreRemoteMatch(room, ref, departed); }
-      catch (e) { this.log.warn?.(`[persist] ${room.code}: match not restored (${e.message})`); }
-      if (ok) matches++;
-      else {
-        this.counts.droppedMatches++;
+      try {
+        ok = this.cluster ? this.lobby.restoreRemoteMatch(room, ref, departed)
+          : await this.restoreLocal(room, ref, departed);
+      } catch (e) {
+        this.log.warn?.(`[persist] ${room.code}: match not restored (${e.message})`);
+        ok = false;
+      }
+      if (ok) { matches++; continue; }
+      // 恢复不了：保留同盟房间、退回等待状态（客户端显示 返回同盟），和以前一样
+      this.counts.droppedMatches++;
+      if (this.cluster) {
         if (!room.disposed) this.lobby.disposeRoom(room, 'node-restarted');
+      } else {
+        this.abortRestoredMatch(room);
       }
     }
     if (!this.cluster) this.counts.restoredMatches += matches;
