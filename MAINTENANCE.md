@@ -5822,67 +5822,62 @@ git fetch $url refs/heads/custom/production:refs/remotes/origin/custom/productio
 
 **另：本机直连 `github.com` 不可用**。2026-11-02 02:03 实测
 `ls-remote https://github.com/...` → `Failed to connect to github.com:443 after 21103 ms`。
-`api.github.com` 同样不通。所以「改直连」这条在本机**走不通**，只能走代理。
+所以**拉取/推送**只能走代理。
 
-##### ★ 真正管用的解法：**URL 去掉 `.git` 后缀**（2026-11-02 02:12 实测）
+> ⚠ 2026-11-02 05:1x 复测：**`api.github.com` 是通的**
+> （`Invoke-WebRequest https://api.github.com/rate_limit` → HTTP 200）。
+> 只有 `github.com:443` 直连不通，API 域名不受影响 —— 下面那条 API 解法就靠它，
+> 别因为「直连不通」这句话放弃这条路。
 
-上面「删跟踪 ref」只成功过一次，第二次就失效了。稳定的复现规律是：
+##### ★ 真正管用的解法：**用 GitHub API 直接改 ref**（2026-11-02 05:1x 实测）
 
-**报错的 `expected` 值，永远恰好是远端真实值的父提交**（真实 `8a731f14` → 期望 `b8728e11`；
-之前真实 `b8728e11` → 期望 `67fbde34`）。换 `--force`、`--force-with-lease`、
-`http.version=HTTP/1.1`、删远端分支，**全部报同一个错**（连 `git push :refs/heads/xxx` 删除都被挡住）。
+先说结论：**`.git` 后缀和本地跟踪 ref 都不是原因，别在这上面浪费时间。**
+下面是一轮完整的实测记录，四条否定 + 一条肯定：
 
-判定：`ghfast.top` 按 **URL 字符串**做缓存，`.git` 后缀那条路径的 ref 状态卡在旧版本。
+| 实验 | 结果 |
+|---|---|
+| `git ls-remote`（带 `.git`） | `f4fb4e8f` ✅ 正确 |
+| `git ls-remote`（**不带** `.git`） | `f4fb4e8f` ✅ **同样正确** → 「URL 缓存」说被推翻 |
+| `git update-ref -d` 删掉本地跟踪 ref 再推 | ❌ 仍报 `expected b1ba57aa` |
+| `--force` / `--force-with-lease=<ref>:<正确SHA>` | ❌ 前者同样报错，后者报 `stale info` |
+| `git push origin --delete <分支>` | ❌ 报 `reference already exists`（删除请求被代理当成创建） |
+| **推到全新分支名** `tmp-verify-1102` | ✅ **成功** → 代码、提交、令牌都没问题 |
+| **`PATCH /repos/{owner}/{repo}/git/refs/heads/<branch>`** | ✅ **成功**，远端立刻变成目标 SHA |
 
-**曾经以为的解法：推送时把 URL 末尾的 `.git` 去掉**：
+三个关键判据：
+1. `ls-remote` 读到的是**对的**，但 push 报的 `expected` 是**旧值** —— 说明错的是
+   push 那条链路上的状态，不是仓库。
+2. `expected` 的值**不是父提交**（那次真实 `f4fb4e8f`，期望却是 `b1ba57aa`，
+   差了 2 次推送 / 6 代），所以以前记的「永远是父提交」也不准。
+3. 新分支名能推、旧分支名推不动 —— 卡的是**「目标分支名」这层状态**，
+   跟 URL 形态无关。（`ghfast.top` 是会话代理，它对已推送过的 ref 名留了旧 `old_oid`。）
+
+**解法 A（推荐，最省事）：用 API 改 ref**
 
 ```powershell
-# 卡住的写法（当时以为缓存键命中旧状态）
-$u = "https://x-access-token:$tok@ghfast.top/https://github.com/SatsumaUton/Stronghold-Protocol.git"
-
-# 换成不带 .git —— 当时一次就成功了
-$u = "https://x-access-token:$tok@ghfast.top/https://github.com/SatsumaUton/Stronghold-Protocol"
-git push $u refs/heads/custom/production:refs/heads/custom/production
+$tok = (Get-Content '<部署根>\.secrets\github-token.txt' -Raw).Trim()
+$sha = (git rev-parse HEAD).Trim()
+$h = @{ Authorization = "Bearer $tok"; Accept = 'application/vnd.github+json'
+        'X-GitHub-Api-Version' = '2022-11-28' }
+Invoke-RestMethod -Method Patch `
+  -Uri 'https://api.github.com/repos/SatsumaUton/Stronghold-Protocol/git/refs/heads/custom/production' `
+  -Headers $h -Body (@{ sha = $sha; force = $false } | ConvertTo-Json) -ContentType 'application/json'
 ```
 
-> #### ⚠ 2026-11-02 05:0x 更正：`.git` 后缀**不是**原因，别照上面那条改
->
-> 同一天稍后再推，用**带 `.git` 的原始 origin**直接成功：
->
-> ```
-> $ git push origin custom/production
-> To https://ghfast.top/https://github.com/SatsumaUton/Stronghold-Protocol.git
->    b1ba57aa..f4fb4e8f  custom/production -> custom/production      ← 退出码 0
-> ```
->
-> 推完三方一致：`ls-remote` = `HEAD` = `origin/custom/production` = `f4fb4e8f`，
-> `rev-list --left-right --count origin/custom/production...HEAD` 得 `0 0`。
-> 所以「去掉 `.git`」那次成功是**巧合**（当时本地跟踪 ref 恰好被前面的
-> `update-ref -d` 清过），不是换缓存键的功劳。
->
-> **真正的原因还是「本地跟踪 ref 陈旧」**：那次之所以看着像卡住，是因为
-> 本地 `origin/custom/production` 停在 `bea2b0c0`（父提交），而远端早已是
-> `b1ba57aa`。git 拿这个过期值去做 `--force-with-lease` 式的 ref 校验，
-> 于是报 `cannot lock ref ... is at X but expected Y`，而且 `--force` 也挡不住
-> （它挡的是**非快进**，不是**期望值不符**）。
->
-> **下次遇到就按这个顺序做，别先怀疑代理/URL**：
->
-> ```powershell
-> git ls-remote --heads origin custom/production   # ① 远端真实值
-> git rev-parse HEAD                              # ② 本地 HEAD
-> # 若 ① == ②：其实已经推上去了，只是本地跟踪 ref 没更新 —— 直接修 ref，不用再推
-> git fetch origin custom/production --force      # 让跟踪 ref 跟上
-> # 若 ① != ② 且 ① 是 ② 的祖先：正常 push 即可
-> # 若仍报 expected 不符：先 update-ref -d 删掉跟踪 ref 再推（见上一节）
-> ```
->
-> 判据一句话：**先比 `ls-remote` 和 `HEAD`。相等就是「早就推成功了」，问题在本地 ref**，
-> 跟 `.git` 后缀、代理、代码、历史都无关。
+之后把本地跟踪 ref 拉正、确认差距：
 
-**交叉验证手段**：把同一个 commit 推到**新分支名**。若新分支名能推成功，
-说明代码和提交都没问题，卡住的一定是那个 ref 名的状态 —— 这时先按上面的
-三部曲查本地跟踪 ref，不要去改代码或强推历史。
+```powershell
+git fetch origin custom/production --force
+git rev-list --left-right --count origin/custom/production...HEAD   # 必须是 0 0
+```
+
+**解法 B（兜底）：换个分支名走 PR**
+推到 `tmp-verify-<日期>` 一定能成（实测），然后在 GitHub 上开 PR 合进
+`custom/production`。**注意**：本仓 `custom/production` 是长期分支，PR 合并要确认
+是快进或普通合并，不要制造假合并（见 `patcher/REPO-SYNC.md` 硬规则 12）。
+
+**临时分支记得删**（API DELETE 同一个 ref 路径，或 `git push origin --delete` 成功后确认）。
+
 
 #### 本地备份文件不入库
 
