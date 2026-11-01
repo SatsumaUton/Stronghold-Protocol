@@ -581,16 +581,6 @@ node tools\_set-open-nodes.mjs <已重启的节点号，逗号分隔>
 | `admin` | 2 | 查看账号、封禁/解封、重置密码、改昵称、看详情、看审计（只读） |
 | `owner` | 3 | 全部权限：改权限、删除/恢复账号、节点状态与重启、服务器设置、数据占用、审计导出 |
 
-> **术语（2026-10-31 维护者定）：界面上 `owner` 一律叫「服主」，不再叫「最高管理员」。**
-> `admin` 叫「管理员」，`player` 叫「普通玩家」。
->
-> 改动落在 `matchmaker/public/admin.html`（该文件被 `.gitignore` 排除，只改本机）：
-> 角色名映射 `RN`、权限说明文字、各功能行的「服主可用」、
-> 以及「删除失败（仅服主）」「恢复失败（仅服主）」「保存失败（仅服主）」这些提示。
->
-> 代码注释里仍可能写「最高管理员」—— 那只是描述 `owner` 这个角色，**不影响界面**。
-> 以后新增文案请统一用「服主」。
-
 规则：只能操作**严格低于**自己的账号；不能把自己的等级授出。
 
 **页签与功能**
@@ -718,6 +708,78 @@ curl --resolve stronghold.luobomiao.love:443:127.0.0.1 -o NUL -s -w "%{http_code
 
 ## 七、故障排查速查
 
+### 7.0 铁律：先看日志，再动代码（2026-10-30 立的规矩）
+
+> **任何排查，第一步永远是「找到这次的日志并读它」，不是「往代码里插探针」，更不是「凭现象猜原因」。**
+
+这条是被反复违反后才写下来的。典型的错误顺序是：
+看到「刷新后掉回大厅」→ 开始推理 `onWelcome` 里的 `prevId !== msg.playerId` → 改代码 → 重启节点 →
+没有解决 → 再推理 → 再改 …… 每一轮都消耗真实的线上重启和玩家的等待，
+而**日志里早就写明了答案**（`resumed=false`、token 前 8 位、已知会话数）。
+
+正确的顺序：
+
+| 步 | 做什么 | 具体命令 |
+|---|---|---|
+| 1 | **读这次的日志** | `pm2 logs node-N --lines 200` 或直接读 `logs/node-N.out-N.log` |
+| 2 | 日志不够 → **先确认日志级别/开关** | 是否需要 `SP_LOG_LEVEL`；`[persist]` / `[net]` / `[mm-debug]` 等前缀 |
+| 3 | 还是不够 → **加最少量的日志**（不是探针） | 一行 `this.log.warn('[x] ...')`，带**能定位问题的字段** |
+| 4 | 重启/刷新一次，**再读日志** | |
+| 5 | 拿到事实后**才**改逻辑 | |
+
+**为什么不能先猜**：
+- 猜错一次就要多一次线上重启；重启会踢掉所有 WebSocket（`WSRecv failed 10054` 见 §9.9），玩家在打对局会被打断。
+- 猜出来的「修复」没有日志佐证，**无法证明修好了**，只能靠玩家再试一次 —— 等于把验证成本转嫁给用户。
+- 同一个现象往往有 3~5 个可能原因，只有日志能一次排除掉其中 4 个。
+
+#### 7.0.1 数据已经给出方向时，**立刻停止猜测**（2026-10-30 再次违反后的追加）
+
+同一天我违反了两次，第二次和第一次不是同一个错：
+
+| 第几次 | 我错在哪 |
+|---|---|
+| 第一次 | **根本没去看日志**，直接推理 `onWelcome`，改代码、重启节点 |
+| 第二次 | **看到了数据却没读懂**，数据已经排除了一条路，我还在按自己的假设往下推 |
+
+第二次的具体经过（必须记住，这是最容易重犯的）：
+
+- 实测 `warm-cache.mjs` 预热的是 `/assets-cdn/`，而前端 `assets.js` 早就改成统一用 `/assets/`。
+  **预热对象和实际链路不是同一条** —— 这时候就该停下来说「预热对当前链路无效」，
+  而不是继续推「是不是资源站需要预热」。
+- 更严重的一次：测出 `可见 <img> 1117 张，空白 598 张，失败请求 0 个`。
+  **「空白 962 张 + 请求 0 个」的唯一含义就是「请求根本没发出去」**，
+  这条数据已经把「文件缺失」「加载慢」「404」全部排除掉了。
+  我却继续去查 `skin_avatar` 目录、去查 manifest、去查 `assetOrigin` —— 全是无效动作。
+
+**判据（照这个做，不要临场发挥）**：
+
+| 数据形态 | 含义 | 下一步 |
+|---|---|---|
+| 空白图很多 + **失败请求 0** | 请求没发出（懒加载 / 元素不可见 / `naturalWidth` 探测方式错） | 查**为什么没发**，不要查文件 |
+| 空白图很多 + 失败请求也很多 | 真的 404 / 5xx | 查文件是否存在、路径是否对 |
+| 空白图很少 + 少量慢请求 | 网络/链路 | 查耗时构成（等待 vs 下载） |
+
+**一条硬规则**：当一条数据已经把某个假设否掉了，**必须在回复里明确写出「这条数据否掉了什么」**，
+写完再决定下一步。不允许跳过这一步直接进入下一个假设 —— 那等于把数据当摆设。
+
+**日志文件在哪**（本机，2026-10-30 实测）：
+
+| 文件 | 内容 |
+|---|---|
+| `logs/node-N.out-N.log` | 该节点当前 stdout（`[diag-*]`、`[persist]`、`[net]` 等） |
+| `logs/node-N.error-N.log` | 该节点 stderr（未捕获异常、崩溃栈） |
+| `logs/node-N.out-N__YYYY-MM-DD_00-00-00.log` | 同上的按天归档 |
+| `C:\Users\<用户>\AppData\Roaming\pm2\logs\` | pm2 自己保留的副本（`pm2 logs` 读这里） |
+| `logs/restart-watch.log` | 自动重启巡检记录（「玩家说一直在重启」先看它） |
+| `logs\pm2-resurrect.log` | `_start-pm2.ps1` 的日志 |
+
+**读日志的两个注意点**：
+1. `pm2 jlist` 输出的 JSON 里**同名但大小写不同的键**会让 PowerShell 的 `ConvertFrom-Json` 直接失败。
+   先用正则把全大写键改名（`"USERNAME"` → `"username_uc"`）再解析。
+2. `out` 和 `error` 是两个文件，别只读一个。Node 的未捕获异常在 `error` 里。
+
+---
+
 | 现象 | 先查什么 | 处理 |
 |---|---|---|
 | 站点 502 | `pm2 list` 节点是否全在线；nginx 是否启动 | 启动节点/nginx；`pm2 start ecosystem.config.cjs` |
@@ -753,20 +815,10 @@ curl --resolve stronghold.luobomiao.love:443:127.0.0.1 -o NUL -s -w "%{http_code
 | `node-N/server/match/*` | 对局逻辑、快照、结算 |
 | `node-N/public/js/*` | 前端：大厅、房间、对局、皮肤、商店 |
 | `node-N/public/js/boot.js` | 启动诊断 + 脚本加载自动重试 |
+| `docs-plan/开场动画与登录前置-预案.md` | **未实施的设计**：登录注册前置 + 点击进入 + 开场动画（2026-10-30 记录） |
 | `nginx/conf/nginx.conf` | 反代、注入、缓存、HTTP/2 |
 | `ecosystem.config.cjs` | PM2 30 节点配置 |
 | `.secrets/secrets.json` | 数据库密码、邮箱授权码（**绝不外传**） |
-
-### 已规划、尚未实现的功能（不要当成现有功能）
-
-| 文档 | 内容 | 状态 |
-|---|---|---|
-| `../docs-plan/开场动画与登录前置-预案.md` | 登录注册单独成屏 → 点击进入 → 开场动画 → 原标题页（代号框留在原位）→ 大厅。含参考实现 PR #878 的完整代码拆解 | **等待上游 PR #878 合并后接入**；维护者 2026-10-30 明确「不需要你现在接入」 |
-| `../docs-plan/login-design/` | **第一屏（登录 / 注册）的设计稿**：`login-screen.css` + `login-screen.html`（**三状态**：登录 / 注册 / 横屏手机，双击可开）+ `phone-preview.html` + `README.md`（视觉参数表、接入步骤、待确认项）。**「已登录」不在设计范围内** —— 它本来就存在于 `account-title.js` 的 `render()` 里，按作者原样保留 | **设计稿完成，未接入任何代码**；2026-10-30 维护者叫停「先暂停吧。我晚点再跟你做」，并明确「再让你加的登录注册界面中也不要出现这个界面」 |
-
-> ⚠ 当前代码里**没有**「点击进入」屏，也没有开场动画（`allianceScene.js` / `entryFilm.js` 都还不存在）。
-> 搜 `点击进入` 在 `public/` 下零命中。`public/js/ui/protocolBoot.js` 是**对局内**的「协议启动！」，
-> 与启动流程无关，别搞混。
 
 ---
 
@@ -1350,36 +1402,993 @@ pm2.cmd restart dashboard --update-env     # 注意是 pm2.cmd，不是 pm2.ps1
 `dashboard/` 在仓库里也是**独立一份**（不是 junction），漏同步就会「线上改了、仓库没改」。
 dashboard 重启不影响任何对局（它只读 `pm2 jlist` 和各节点 `/healthz`）。
 
-> ⚠ **方向别搞反**：pm2 拉起的是**部署目录**的 `D:\Stronghold-Protocol\dashboard\server.js`，
-> 不是 `repo-sync\dashboard\`。所以在仓库里改完不复制过去，线上**一点变化都没有**，
-> 而 `pm2 restart dashboard` 也救不回来（它重启的仍是部署目录那份）。
-> 2026-10-31 加「自动同步状态」时就先踩了这一步：改了 `repo-sync` 的文件、刷新控制台没反应。
-> 判据：`Get-FileHash` 比一下两边的 MD5，或者直接 `curl http://127.0.0.1:3080/app.js`
-> 看里面有没有你刚加的函数名。
+#### ⚠ 踩过的坑：pm2 的 ecosystem 路径必须写绝对路径
 
-#### 自动同步状态行（「部分节点关掉后还能用」的监控）
-
-运维面板「更新 nginx 开放列表」下面那行灰色小字，是**计划任务 `SP-Open-Nodes` 上一次实际执行的结果**：
+整合当天，面板点「重启空闲节点」后显示：
 
 ```
-自动同步：2 分钟前　在线 30　配置无变化　上次结果：配置无变化，不 reload
+已重启 1 个: 8
+[PM2][ERROR] File ecosystem.config.cjs not found
 ```
 
-- 数据来自 `logs/open-nodes.log` 最后一块，由 `dashboard/server.js` 的 `readOpenSync()` 解析，
-  挂在 `GET /api/ops/state` 的 `openSync` 字段上；
-- 上面那行「当前开放 N 个；已跑新代码 M 个」是**按 nginx 当前配置算出来的期望值**，
-  这一行是**自动任务实际做了什么**——两者不一致就说明定时任务停了；
-- **超过 15 分钟没跑**会标红（任务每 5 分钟一次），告诉你去看计划任务；
-- `dead > 0` 也会标红并列出挂掉的节点编号。
+**一行字两个错**：
 
-这条链路就是「保证在部分节点关闭的状态下也能用」所依赖的东西：节点挂了 → 5 分钟内
-`open-nodes.conf` 被重写（把死节点从 `split_clients` 和 `map $cookie_sp_route` 里摘掉）→
-nginx reload 后新访客不会分到死节点，而已经分到过的浏览器也会被判为 cookie 无效、重新随机。
-所以**这一行变红 = 玩家正在被往死节点上分**，要当事故处理，见 §9.34。
+1. **`ecosystem.config.cjs` 是相对路径** —— pm2 相对**调用进程的 cwd** 找文件。
+   dashboard 被 pm2 从别的目录拉起，cwd 不是部署根，于是根本找不到。
+   后果是 `startOrReload` 什么都没做，**节点重启失败**。
+2. **失败却报「已重启」** —— 结果里 `notify` 那行是硬编码的成功文案，
+   没看 pm2 的退出码/输出。维护者以为自己点成功了，实际一个节点都没动。
+
+正确写法（`dashboard/server.js` 与 `deploy/ops-menu.ps1` 都已改）：
+
+```js
+const eco = path.join(BASE, 'ecosystem.config.cjs');          // 绝对路径
+execFile(process.execPath, [PM2_JS, 'startOrReload', eco, '--only', names, '--update-env'],
+  { cwd: BASE }, (err, out, errOut) => {
+    if (err || /\[PM2\]\[ERROR\]/.test(out)) { /* 报失败，且【不要】pm2 save */ }
+  });
+```
+
+**三条通用规则**（以后再写运维脚本都适用）：
+
+- 调 pm2 一律：**绝对路径的 ecosystem + 显式 `cwd` + 检查退出码/`[PM2][ERROR]`**；
+- **失败时不要 `pm2 save`** —— 那会把一个可能不对的进程表固化下来；
+- 重启后要**复查**：节点响应了吗？`fresh` 变 true 了吗？没起来就必须报出来，
+  不能只说「已重启」。
+
+> 当天实测：点出这个错误的是一次针对 node-8 的误点，但 node-8 **实际没有重启**
+> （`uptime` 仍是 8000+ 秒、`matches` 也没断），所以没有玩家受影响 —— 因为
+> `startOrReload` 在报错前就退出了。这也说明「报错时绝不能显示成功」有多重要。
+
+### 9.12 玩家反馈「一直在重启」——2026-10-28 连环事故
+
+> 维护者原话：「玩家反馈一直在重启，你看看你改了什么」
+
+当天下午连续修了三轮，每一轮都以为找到根因了，下一轮又冒出来。
+**根因是一条链：两个服务抢同一个端口 → 一个无限崩溃循环 → 看门狗读不到状态就全量重启。**
+
+#### 症状与定位方法（下次照着走）
+
+| 要确认的事 | 怎么看 | 判据 |
+|---|---|---|
+| 服务端到底有没有重启 | `healthz` 的 `uptimeSec`；或 `logs\restart-watch.log` | 运行时长**变小** = 重启过 |
+| pm2 有没有重启过某个应用 | `pm2 jlist` 的 `restart_time` | 计数字段只增不减，看它有没有涨 |
+| PM2 里有没有崩溃循环的应用 | `pm2 jlist` 里 `status` 不是 `online` 的 | `errbackoff`/`waiting restart` = 崩溃循环 |
+| 谁在动进程 | `logs\pm2-resurrect.log`、`logs\stack-watchdog.log` | 出现 `start node-XX` / `resurrect` 就是它 |
+
+**最有用的一条**：`restart_time` 几百上千次 = 有个应用在崩溃循环，别去别处找。
+
+#### 第 1 环：`nginx-gateway` 崩溃循环 4321 次
+
+为了满足「nginx 不能挂在用户会话下」，2026-10-27 把 nginx 改成由计划任务
+`SP-Nginx-Start` 以 SYSTEM 身份启动，**但没有停掉 pm2 里的 `nginx-gateway`**
+（它本是原作者设计用来托管 nginx 的 wrapper，跑 `nginx\run-nginx.mjs`）。
+
+结果两个都想占 443：
+
+```
+SP-Nginx-Start (SYSTEM) → 占用 443 ✅
+nginx-gateway (pm2)     → bind 失败 → autorestart 重试 → 失败 → …
+                          实测崩溃 4321 次
+```
+
+**修法**：`pm2 delete nginx-gateway`，并从 `ecosystem.config.cjs` 删掉定义
+（只停进程不够 —— `resurrect` 会把它拉回来）。代码里留了注释说明**不要加回去**。
+
+#### 第 2 环：看门狗读不到 pm2 状态 → `resurrect` 全量重启
+
+`deploy\_stack-watchdog.ps1` 原来的逻辑：
+
+```powershell
+cmd /c "pm2 jlist > tmp 2>nul"     # 失败静默返回空
+$online = @($r.out -split ',')     # 空
+$missing = $expected 里不在 $online 的  # → 全部 32 个都"缺失"
+pm2 resurrect                       # ← 重启整张进程表
+```
+
+`pm2 jlist` 在 pm2 忙时会**间歇性失败**。一次读取抖动 → 判定「所有应用都丢了」→
+`resurrect` → 全服重启。日志里 `ALERT cannot read PM2 status` 从 11:52 刷到 13:40
+就是这个过程。**实测一次这样的误判中断了 10 局对局。**
+
+`_start-pm2.ps1` 有同样的形状（`$online` 空 → 全部缺失 → 逐个 `start --only`），
+只是没那么狠。
+
+**修法（两条脚本都改了）**：
+
+1. 读不到 / 明显过短 → **这一轮什么都不做**，只记日志
+2. `_stack-watchdog` **连读两次且必须一致**才采信（正在变动时不猜）
+3. 缺失过半 → 认定是读数问题，不动进程
+4. **永不 `resurrect`** 去补缺失的应用，只对确实缺的逐个 `--only` 启动
+   （`resurrect` 只保留给「pm2 守护进程整个挂了」，那时所有应用本来就都没了）
+
+#### 第 3 环：我自己那次 `pm2 delete` 也触发了全量重启
+
+13:12 执行 `pm2 delete nginx-gateway` 时，30 个节点在 2 分钟内挨个重启，中断 10 局。
+
+**教训**：`pm2 delete` 会重排进程表。要摘掉一个应用，**低峰期做**，
+并且事前先用 `restart-watch` 或手动采样确认在线的对局数。
+
+#### 这次的深层教训
+
+| 教训 | 说明 |
+|---|---|
+| **改启动方式 ≠ 只改启动方式** | 把 nginx 从 pm2 挪到计划任务，只做了一半（改了新的，没停旧的）。凡涉及「谁托管这个进程」，必须**先停旧的再起新的**，或两者互斥 |
+| **看门狗的「读不到」绝不能被当成「都没有了」** | 这是本事故最危险的一条。任何「检测 → 修复」型脚本，第一件事都是**区分「真的坏了」和「我读不到」** |
+| **`resurrect` 是高危操作** | 它按保存的进程表重启**全部**应用。只应在「整栈都没了」时用，绝不能当作「补几个缺失应用」的手段 |
+| **修复要能自证** | 每轮改完都要用运行时长/`restart_time` 验证，而不是看日志里没有报错就收工 |
+
+#### 现在的状态（2026-10-28 14:00）
+
+- nginx：计划任务 `SP-Nginx-Start` 启动，3 进程全部 Session 0
+- pm2：32 个应用，`nginx-gateway` 已移除
+- 崩溃恢复：`_stack-watchdog.ps1` 每 2 分钟，只补确实缺的；nginx 没了会经计划任务拉起
+- **巡检**：计划任务 `SP-Restart-Watch` 每 10 分钟跑 `deploy\restart-watch.ps1`，
+  比对运行时长，发现变小就写 `logs\restart-watch.log` 的 `RESTART DETECTED`
+  （后续再排查直接看这个日志，不必靠人盯着）
+
+```powershell
+# 手动看一眼巡检结果
+Get-Content D:\Stronghold-Protocol\logs\restart-watch.log -Tail 20
+# 正常是连续的 ok，形如：
+# 2026-10-28 13:57:58 ok alive=30/30 avg_uptime=784s
+```
+
+### 9.21 「恢复对局」按钮只在大厅、且挨着「公告」（2026-10-29 修正）
+
+玩家反馈：恢复对局按钮的位置不对，希望它在大厅「公告」按钮旁边；
+维护者进一步明确：**其他界面均不要出现恢复对局按钮**。
+
+#### 原来的位置没写错，但按钮会跑到别处去
+
+代码里的插入是 `insertBefore(btn, anchor)`，锚点就是「公告」按钮 ——
+所以**只要锚点找得到，位置本来就在公告左边**（维护者 2026-10-29 确认要左边）。
+
+问题出在**锚点找不到时的降级链**：
+
+```js
+const anchor = notice
+  || document.querySelector('.verchip-wrap, button.verchip[data-testid="version-switch"]')
+  || [...document.querySelectorAll('button')].find((b) => /S\.W\.E\.E\.P/i.test(...));
+if (!anchor || !anchor.parentElement) {
+  // 造一个 position:fixed 的按钮挂在 body 上
+}
+```
+
+三种情况会把按钮放到不是「公告旁边」的地方：
+
+| 情况 | 结果 |
+|---|---|
+| 大厅里公告按钮还没渲染出来 | 退到**版本按钮**旁边（位置变了） |
+| 版本按钮也没有 | 退到 **S.W.E.E.P. 文字按钮**旁边 |
+| 三个都没有 | **右下角浮动按钮**，任何界面都挂着 |
+
+第三条最糟：玩家在对局中、结算页、设置页都能看到右下角冒出来一个「恢复对局」，
+而那根本不是大厅。
+
+#### 修复：只认公告按钮，拿不到就不显示
+
+```js
+/** 大厅的「公告」按钮此刻是否真的可见 */
+const lobbyNotice = () => {
+  const n = document.getElementById('mm-notice-btn');
+  if (!n || !n.isConnected) return null;
+  if (n.style.display === 'none') return null;                       // 非大厅被 ensureTopButton 隐藏
+  if (n.getClientRects().length === 0) return null;                  // 不可见（display/尺寸为 0）
+  return n;
+};
+
+if (!lobbyNotice()) { removeBtn(); return; }        // 不在大厅 → 直接没有任何按钮
+const anchor = lobbyNotice();                        // 锚点只认公告
+```
+
+**为什么用「公告按钮是否可见」当作「是否在大厅」的判据**：
+`ensureTopButton`（公告按钮的维护函数）在非大厅界面会把它 `display:none` 并返回 null，
+所以不管界面怎么改版、路由怎么变，**只要玩家不在大厅，公告按钮就不在**，
+恢复对局自然也不会冒出来。这比判断屏幕类名/路由更抗改版。
+
+同时**删掉了整段浮动按钮降级**（`mm-resume-fallback`）—— 它正是「其他界面也出现
+恢复对局」的源头。
+
+#### 生效方式
+
+`client.js` 由 nginx 的 `sub_filter` 注入，**改完必须改版本号**：
+
+```
+client.js?v=20261029-1  →  client.js?v=20261029-2
+```
+
+**需重启 nginx**（`node tools/restart-nginx.mjs --apply`）。
+
+#### 补丁副本怎么改的（吸取上次教训）
+
+两个补丁（`client-announcement` / `matching-party`）的 `client.js` 内容各不相同，
+**不能整份覆盖** —— 上次整份覆盖就把 `server/lobby.js` 误写进了前端文件（§9.19 末尾）。
+这次用脚本按**精确字符串**分三段替换，替换后逐段校验命中数（3/3）：
+
+1. 抽出 `lobbyNotice()` / `recentlyLeft()` 两个辅助函数
+2. 删掉浮动按钮降级段
+3. 锚点链改成只认公告按钮
+
+### 9.36 改 `client.js` 的铁律：精确替换 + 校验命中数，**禁止整份覆盖**（2026-10-31 事故）
+
+> 这一条是 2026-10-31 凌晨踩出来的，代价是**一个已经修好的 bug 又被放回去了**。
+> 把它放在 §9.21 旁边不是巧合 —— 被冲掉的正是 §9.21 的修复。
+
+#### 事故经过
+
+§9.21（2026-10-29）修过「恢复对局按钮跑到大厅以外的地方」，方案是：
+
+1. 加 `lobbyNotice()` 辅助函数（用「公告按钮是否可见」判断「是否在大厅」）
+2. **删掉浮动按钮降级段（`mm-resume-fallback`）**——它是一切「其他界面也出现恢复对局」的源头
+3. 锚点链只认公告按钮
+
+2026-10-31 检查线上 `client.js` 发现：`lobbyNotice` **不存在**、`mm-resume-fallback` **还在**。
+也就是说第 1、2 步的成果已经没了 —— 而当天为了修游戏内管理员工具，**整份 `Copy-Item` 覆盖过 `client.js`**。
+重做时又用 `indexOf` 找「结束标记」删段，匹配到了后面更远的位置，**一次砍掉 58844 字节**
+（本该只少约 1.5 KB）。幸好删前做了备份才救回来。
+
+#### 为什么 `client.js` 特别危险
+
+| 特性 | 后果 |
+|---|---|
+| **四份副本**：`mm/client.js`、`matchmaker/public/client.js`、`patcher/features/*/files/` 下两份 | 覆盖任意一份都会让副本间不一致，下次升级时「谁才是对的」无从判断 |
+| 近 **20 万字节**单文件 | 肉眼 diff 不可行，出错也看不出来 |
+| 由 nginx `sub_filter` 注入到每个页面 | 改坏了是**全站**，不只是某个界面 |
+| 多人在不同时间往里加功能（Q群、公告、恢复对局、节点状态、管理员工具…） | 每段都「看起来可以独立整份覆盖」，实际一覆盖就冲掉别人 |
+
+#### 铁律
+
+1. **禁止整份覆盖**。永远不要用 `Copy-Item` / `cp` 把某个副本整体盖到另一个副本上。
+2. **用精确字符串替换**，一次改一段，每段改完打印**命中数**，命中数不等于 1 立刻中止，不写盘。
+3. **删代码段时不要用 `indexOf` 找结尾**。改用下面的方式之一：
+   - 按**行号**删除（先打印那几行确认内容，再按行删）；
+   - 用**包含独特标记的完整字符串**（把整段代码原文写进脚本，`split().length - 1 === 1` 才替换）。
+4. **写完必须做三件事**，缺一不可：
+   - `node --check <文件>` 语法通过；
+   - **字节数变化合理**（删 27 行大约 -1.5 KB；如果少了 5 万字节，说明找错了范围）；
+   - 用关键标记**双向验证**（该没的没了：搜 `mm-resume-fallback` 为空；该有的有了：搜 `lobbyNotice` 命中）。
+5. **改前先备份**：`Copy-Item client.js "$env:TEMP\client.bak.js"`。今天就是靠它救回来的。
+6. **四份副本逐一同步并校验哈希**，不要假设「改一份就够了」。
+
+#### 生效方式
+
+`client.js` 由 nginx `sub_filter` 注入，**改完必须改版本号**（`nginx.conf` 里 `client.js?v=YYYYMMDD-N`），
+并重启 nginx：`node tools/restart-nginx.mjs --apply`。只改文件不改版本号，浏览器会继续用缓存。
+
+#### 顺带一提：线上 `/mm/client.js` 究竟是哪一份
+
+`nginx.conf` 里有：
+
+```
+location = /mm/client.js { proxy_pass http://127.0.0.1:3090/client.js; }
+```
+
+所以**线上真正的 `/mm/client.js` 来自 `matchmaker/public/client.js`**，不是 `mm/client.js`。
+改完要确认改的是这一份（本机实测：`Invoke-WebRequest http://127.0.0.1:3090/client.js`）。
+
+### 9.37 游戏内管理员工具：两道门 + 一次性验证码 + 退出授权（2026-10-31 新增）
+
+对局中点击左上角「节点状态」胶囊（`📊 汐斯塔 · 正常` 那个）打开的面板，
+可以刷干员 / 装备 / 盟约 / 策略 / 数值 / 阶段 / 商店 / 机变 / 召唤物。
+
+#### 两道门，缺一不可
+
+| 门 | 服务端字段 | 判据 | 不过会怎样 |
+|---|---|---|---|
+| ① 身份门 | `session.adminId` | 账号 `role in (owner, admin)` | 面板提示「本账号不是管理员」 |
+| ② 验码门 | `session.adminTool` | 手里有**未过期**的验码令牌（`typ='admin'`） | 只显示取码框，功能一律不渲染 |
+| 放行 | `session.admin` | `adminId && adminTool` | — |
+
+服务端在 `net.js` 每次 hello 时重算这三个字段，并通过 `welcome` 下发
+`adminId` / `adminCode` / `adminTools` 三个键；前端 `store.js` 存它们，**不靠 localStorage 猜**。
+
+#### 验证码是一次性的
+
+```
+后台「生成验证码」→ POST /api/admin2/tool-code
+  → 服务端存 { h: sha256(email:code), exp: now+10min }，只存哈希不存明文
+  → 后台每 3 秒轮询 /api/admin2/tool-code-status，用掉/过期立刻显示「已使用」并停止轮询
+
+游戏内输码 → POST /api/admintool/exchange
+  → 校验哈希 + 过期 + 账号角色（**再查一次库**，防止权限被吊销后旧码还能用）
+  → DELETE 这条记录（一次性，用掉即失效）
+  → 签发 4 小时的 adminToken：{ v:1, typ:'admin', uid, role, iat, exp }
+```
+
+#### ★ 令牌类型必须区分（这是修过的一个安全漏洞）
+
+`adminToken` 与登录身份令牌 `accountToken` **同一把密钥、同样的 payload 结构**。
+如果验证时不看类型，owner 的 `accountToken`（`role=owner`、有效期 7 天）可以直接冒充验码令牌，
+**「必须有验证码」这道门就形同虚设**。所以：
+
+| 令牌 | `typ` | 能否当验码令牌 |
+|---|---|---|
+| 登录身份 `accountToken`（`userTokenFor`） | `'user'` | ❌ |
+| 后台下发 `adminTokenFor` / 兑换得到的 | `'admin'` | ✅ |
+
+`server/adminAuth.js` 的 `readAdminToken()` **必须**检查 `data.typ === 'admin'`；
+`readUserToken()` 反过来拒绝 `typ === 'admin'`。
+
+#### 退出授权 = 服务端吊销（前端删不干净）
+
+验码令牌是**无状态 HMAC**，服务端无法单独作废某一枚。所以用「吊销时间点」：
+
+```
+点「退出授权」→ POST /api/admintool/revoke
+  → matchmaker 写时间戳：数据库 admin_settings['tool_revoke_at'] + 文件 .secrets/admin-revoke-at
+  → 节点 verifyAdminToken() 比对：token.iat < 吊销点 → 令牌作废
+```
+
+`adminAuth.js` 读 `.secrets/admin-revoke-at`（按 mtime 缓存，文件变了才重读）。
+**文件不存在时返回 0 = 不吊销**（fail-open，保证缺文件不会锁死管理员）。
+
+#### ★ 普通玩家连「界面」都不该看到（2026-10-31 维护者要求）
+
+第一版在 `adminTools.js` 里给非管理员渲染了一个「本账号不是管理员」的提示面板。
+**这属于信息泄露** —— 等于告诉普通玩家「这里有个管理员工具」，
+按 F12 一看就知道有 `admin-tools` 这个 testid 和 `/js/ui/adminTools.js` 这个文件。
+
+现在三层防线全部用 **`adminId`（身份门）** 判断，非管理员**什么都不渲染**：
+
+| 层 | 位置 | 判定 |
+|---|---|---|
+| ① | `mm/client.js` 点击胶囊 | `st.adminId === true` 才派发 `sp-open-admin-tools` |
+| ② | `hud.js` 创建组件 | `adminId && adminOpen` 才创建 `<AdminTools />` |
+| ③ | `adminTools.js` 内部 | `if (!adminId) return null`（**不渲染任何东西**） |
+
+实测（headless Edge 真实 render，注入 store）：
+
+```
+A 普通玩家     → DOM 长度 0        ← 完全看不到
+B 管理员未授权 → 678 字节（取码框）
+C 管理员已授权 → 14485 字节（16 个页签）
+D 退出授权后   → 678 字节（取码框）
+```
+
+#### ★ 为什么「能用 adminId」而「不能用 adminTools」判面板
+
+- `adminTools` = 身份门 **&&** 验码门。用它判「能不能打开面板」→ **退出授权后打不开 → 死锁**
+- `adminId` = 只有身份门。用它判「能不能打开面板」→ 普通玩家仍被挡住，管理员退权后还能进去输码
+
+**一句话：`adminId` 管「能不能看界面」，`adminTools` 管「能不能用功能」。**
+#### ★ 死锁教训：判「能不能开面板」要用 `adminId`，不是 `adminTools`
+
+第一版 `mm/client.js` 用 `store.adminTools === true` 决定点胶囊要不要开面板。
+退出授权后 `adminTools` 变 `false` → **面板打不开 → 没有地方重新输码 → 永远进不去**。
+
+正确做法：
+
+```js
+// 能不能「打开面板」→ 看身份门 adminId（普通玩家也是 false，权限没放宽）
+if (st && st.adminId === true) { /* 派发 sp-open-admin-tools 事件 */ }
+// 能不能「使用功能」→ 由 adminTools.js 内部两道门把关
+```
+
+#### 管理员与普通玩家看到的必须完全一致
+
+维护者要求：**有没有这个面板，节点状态胶囊的位置、图标、外观都不能有任何差别。**
+
+- 延迟胶囊（`16 ms`）上**不能**挂 `role` / `tabindex` / `title` / `onClick` —— 那是管理员专属特征，普通玩家按 F12 就能看出来
+- 节点胶囊**不设** `title`、**不变色**，两边只差一个 `cursor: pointer`（只有管理员自己看得见）
+- 两个胶囊盒子高度统一到同一个 `.32rem`（`game.css` 里 `.gtop .gtop__net > .ping` 与 `> #mm-nodes > .chip` 共用），否则带鱼屏上差几十像素
+
+#### 相关文件
+
+| 文件 | 作用 |
+|---|---|
+| `server/net.js` | 重算 `adminId` / `adminTool` / `admin`；下发三个 welcome 键 |
+| `server/adminAuth.js` | 令牌验签 + `typ` 检查 + 吊销时间点比对 |
+| `server/lobby.js` | `g.test` 对 `session.admin` 放行；`startMatch` 用**会话**重算座位 admin |
+| `server/match/match/testCommands.js` | `ps.admin` 放行 |
+| `server/persist/lobbyState.js` | `fallbackRoom` 补回 `admin` / `accountId` / `tag` / `guest` |
+| `matchmaker/account.cjs` | 生成码 / 兑换 / 状态查询 / 吊销四个接口；`tools.game` 权限 |
+| `matchmaker/public/admin.html` | 生成按钮 + 轮询 + 权限面板（快捷预设 / 高风险红框） |
+| `public/js/ui/adminTools.js` | 面板本体、两道门、二次确认、退出授权 |
+| `public/js/store.js` / `main.js` | `adminTools` / `adminId` / `adminCode` 三个字段 |
+| `mm/client.js` | 节点胶囊点击 → 派发 `sp-open-admin-tools`（判据 `adminId`） |
+| `public/js/ui/hud.js` | 监听事件、渲染面板 |
+| `public/css/screens/game.css` | `.admintools*` 样式、两胶囊等高 |
+
+#### 生效方式
+
+| 改动 | 生效 |
+|---|---|
+| `server/**` | **重启节点** |
+| `matchmaker/account.cjs` | **重启 matchmaker** |
+| `public/js`、`public/css` | 玩家刷新页面 |
+| `mm/client.js` | 刷新（nginx `sub_filter` 注入，**改完要改版本号**，见 §9.36） |
+
+#### 实测记录（2026-10-31，node-20）
+
+```
+业务闭环 12/12：身份识别 → 授权 → 退出授权 → 重新授权 → 玩家隔离
+令牌安全  8/8 ：含「owner accountToken 不能冒充验码令牌」「吊销后旧令牌失效」
+接口鉴权  4/4 ：四个接口未登录一律 401
+```
+
+2026-10-31 自测脚本（可复跑，不碰玩家房间）：
+
+```js
+// 用真实 WebSocket 连节点，带不同令牌发 hello，读 welcome 的 adminId/adminCode/adminTools
+```
+
+
+### 已规划、尚未实现的功能（不要当成现有功能）
+
+| 文档 | 内容 | 状态 |
+|---|---|---|
+| `../docs-plan/开场动画与登录前置-预案.md` | 登录注册单独成屏 → 点击进入 → 开场动画 → 原标题页（代号框留在原位）→ 大厅。含参考实现 PR #878 的完整代码拆解 | **等待上游 PR #878 合并后接入**；维护者 2026-10-30 明确「不需要你现在接入」 |
+| `../docs-plan/login-design/` | **第一屏（登录 / 注册）的设计稿**：`login-screen.css` + `login-screen.html`（**三状态**：登录 / 注册 / 横屏手机，双击可开）+ `phone-preview.html` + `README.md`（视觉参数表、接入步骤、待确认项）。**「已登录」不在设计范围内** —— 它本来就存在于 `account-title.js` 的 `render()` 里，按作者原样保留 | **设计稿完成，未接入任何代码**；2026-10-30 维护者叫停「先暂停吧。我晚点再跟你做」，并明确「再让你加的登录注册界面中也不要出现这个界面」 |
+
+> ⚠ 当前代码里**没有**「点击进入」屏，也没有开场动画（`allianceScene.js` / `entryFilm.js` 都还不存在）。
+> 搜 `点击进入` 在 `public/` 下零命中。`public/js/ui/protocolBoot.js` 是**对局内**的「协议启动！」，
+> 与启动流程无关，别搞混。
 
 ---
 
-### 9.34 开放列表的口径：**谁活着谁就开放**，绝不能「谁代码新就开放」（2026-10-31）
+## 九、更新 GitHub 前必查（每次提交/推送都要走一遍）
+
+> 这个仓库是**公开**的，同时是**生产代码库**。下面每一条都是踩过的坑。
+
+
+
+### 9.35 含中文的 `.ps1` 必须带 UTF-8 BOM（2026-10-31 踩到）
+
+PowerShell 5.1 **无 BOM 时按 GBK 解析脚本**，含中文的脚本会直接解析失败：
+
+```
+Missing closing '}' in statement block or type definition.
+Unexpected token ')' in expression or statement.
+└─ 提示的行号还指向别的地方，看不出来是编码问题
+```
+
+当天 `tools/sync-open-nodes.ps1` 在给输出加注释后变成无 BOM，**每 5 分钟的自动同步整条挂掉**，
+而且计划任务只报 `Last Result: 1`，不看脚本输出根本不知道原因。
+
+写入时显式带 BOM：
+
+```powershell
+$enc = New-Object System.Text.UTF8Encoding($true)   # $true = 带 BOM
+[System.IO.File]::WriteAllText($path, $content, $enc)
+```
+
+检查：
+
+```powershell
+$b = [System.IO.File]::ReadAllBytes($path)[0..2]
+if ($b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) { '✓ 有 BOM' } else { '✗ 无 BOM' }
+```
+
+> 用 `Out-File -Encoding UTF8` / `Set-Content -Encoding UTF8` 在 **PowerShell 7** 下**不加** BOM，
+> 在 5.1 下会加。两种都可能踩到，所以不要依赖 cmdlet 的默认行为，一律显式写字节。
+
+#### 连带问题：被 dashboard 调用时中文变乱码
+
+`powershell.exe` 作为子进程时 stdout 是管道，默认按控制台代码页（中文系统 = GBK/936）输出，
+而 `dashboard/server.js` 按 UTF-8 读 → 面板上显示成 `ڵ�̽��: ��� 30`。
+
+修法是在脚本开头强制管道输出用 UTF-8（已加进 `sync-open-nodes.ps1`）：
+
+```powershell
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+```
+
+注意日志文件本身一直是正确的 UTF-8——**只有管道那段错了**，
+所以别因为面板显示乱码就去改 `Out-File -Encoding UTF8`。
+
+
+#### ⚠ 踩过的坑：pm2 的 ecosystem 路径必须写绝对路径
+
+整合当天，面板点「重启空闲节点」后显示：
+
+```
+已重启 1 个: 8
+[PM2][ERROR] File ecosystem.config.cjs not found
+```
+
+**一行字两个错**：
+
+1. **`ecosystem.config.cjs` 是相对路径** —— pm2 相对**调用进程的 cwd** 找文件。
+   dashboard 被 pm2 从别的目录拉起，cwd 不是部署根，于是根本找不到。
+   后果是 `startOrReload` 什么都没做，**节点重启失败**。
+2. **失败却报「已重启」** —— 结果里 `notify` 那行是硬编码的成功文案，
+   没看 pm2 的退出码/输出。维护者以为自己点成功了，实际一个节点都没动。
+
+正确写法（`dashboard/server.js` 与 `deploy/ops-menu.ps1` 都已改）：
+
+```js
+const eco = path.join(BASE, 'ecosystem.config.cjs');          // 绝对路径
+execFile(process.execPath, [PM2_JS, 'startOrReload', eco, '--only', names, '--update-env'],
+  { cwd: BASE }, (err, out, errOut) => {
+    if (err || /\[PM2\]\[ERROR\]/.test(out)) { /* 报失败，且【不要】pm2 save */ }
+  });
+```
+
+**三条通用规则**（以后再写运维脚本都适用）：
+
+- 调 pm2 一律：**绝对路径的 ecosystem + 显式 `cwd` + 检查退出码/`[PM2][ERROR]`**；
+- **失败时不要 `pm2 save`** —— 那会把一个可能不对的进程表固化下来；
+- 重启后要**复查**：节点响应了吗？`fresh` 变 true 了吗？没起来就必须报出来，
+  不能只说「已重启」。
+
+> 当天实测：点出这个错误的是一次针对 node-8 的误点，但 node-8 **实际没有重启**
+> （`uptime` 仍是 8000+ 秒、`matches` 也没断），所以没有玩家受影响 —— 因为
+> `startOrReload` 在报错前就退出了。这也说明「报错时绝不能显示成功」有多重要。
+
+
+### 9.20 观战「席位已满（2/2）」——前端写死了 2（2026-10-29 修复）
+
+玩家反馈：**房间 PCPJ 观战进不来，提示「观战席位已满（2/2）」**。
+
+#### 服务端没问题，是前端把上限写死了
+
+服务端的观战上限是 `server/lobby.js` 的 `spectatorLimit()`：
+
+```js
+spectatorLimit() {
+  if (this.mode !== 'coop') return 0;
+  return Math.max(MAX_SPECTATORS, Math.ceil(this.activeHumans().length / 2));
+}
+```
+
+**取 `max(2, 玩家数 / 2)`**，“2”只是下限：
+
+| 玩家数 | 观战上限 |
+|---|---|
+| 1–4 | 2 |
+| 5–6 | 3 |
+| 8 | 4 |
+| **14（PCPJ）** | **7** |
+| 20 | 10 |
+
+但 `matchmaker/public/client.js` 的大厅跳转预检把上限**写死成 2**：
+
+```js
+if (spec && Number(d.spectators) >= 2) { showStyledToast('观战席位已满（2/2），请稍后再试'); return; }
+```
+
+于是**任何房间第 3 个想观战的人都会被前端拦下**，根本不会走到服务端。
+
+#### 实测对照（PCPJ，2026-10-29）
+
+```
+find-room 返回: node=8 humans=11 spectators=2 maxSpectators=6 started=False
+旧逻辑 (>=2 就拦):            拦下 ✗   ← 玩家看到的就是这个
+新逻辑 (>=maxSpectators 才拦): 放行 ✓
+```
+
+另外直接用测试账号 `room.spectate PCPJ` 实测，**第 3 个观战者成功进入**：
+
+```
+room.state: spec=["逸天","记念","观战测试"]  maxSpectators=7
+```
+
+#### 修复
+
+`find-room` 早就已经把权威的 `maxSpectators` 带回来了（`matchmaker/server.js` 的
+`roomInfo()`，算法与服务端一致），前端直接用它：
+
+```js
+if (spec) {
+  const cap = Number.isInteger(d.maxSpectators) ? d.maxSpectators
+    : (d.mode === 'coop' ? Math.max(2, Math.ceil((Number(d.humans) || 0) / 2)) : 0);
+  const used = Number(d.spectators) || 0;
+  if (used >= cap) { showStyledToast(`观战席位已满（${used}/${cap}），请稍后再试`); return; }
+}
+```
+
+提示里的数字也改成实际值（`已用/上限`），不再永远显示 `2/2`。
+
+#### ⚠ 改 `client.js` 必须同时改 nginx 的版本号
+
+`client.js` 是通过 nginx 的 `sub_filter` 注入的，带版本号：
+
+```nginx
+sub_filter '</body>' '<script src="/mm/client.js?v=20261026-107" defer></script>…';
+```
+
+**不改这个 `?v=`，浏览器会继续用缓存的旧文件** —— 改了等于没改（§9.x 踩过同样的坑，
+当时 `account-title.js` 就是版本号没动导致修复不生效）。
+
+本次已由 `20261026-107` 改为 **`20261029-1`**。
+
+#### ✅ 已生效（2026-10-29 20:51，维护者亲自重启 nginx）
+
+重启过程**零中断**（细节见「重启 nginx」一节 §9 的 2026-10-29 实测）：
+
+```
+20:51:26  进程=3  HTTP=200  版本=20261026-107
+20:51:29  进程=5  HTTP=200  版本=20261029-1   ← 切换
+```
+
+生效后验证：
+
+| 检查 | 结果 |
+|---|---|
+| 首页注入的版本号 | `client.js?v=20261029-1` ✓ |
+| `/mm/client.js?v=20261029-1` | HTTP 200，**含 `d.maxSpectators` 新逻辑** ✓ |
+| 残留 `>= 2` 硬编码 | 只剩第 924 行的**注释**（说明改了什么都），代码里已无 ✓ |
+| nginx 进程 | 3 个 ✓ |
+| 对局 | 重启前 24 场 → 重启后 **26 场**，一场没断 ✓ |
+
+**玩家侧**：刷新页面即可（版本号变了会强制重新下载 `client.js`）。
+若玩家仍看到「2/2」，让他 `Ctrl + F5` 一次。
+
+
+#### 教训
+
+**同一个规则在服务端和前端各写一遍，迟早会不一致。** 遇到「明明没满却提示已满」，
+先看前端有没有自己算一遍 —— 这个例子里服务端完全正确，是前端把它盖掉了。
+
+### 9.19 「结束对局」按钮 —— 只结束这一局，房间留着（2026-10-29 新增）
+
+维护者要求：房间表能**单独结束某一局**，但**不销毁房间**。
+
+#### 和「关闭房间」的区别（两个按钮并存，别搞混）
+
+| 按钮 | 走的方法 | 结果 |
+|---|---|---|
+| **关闭**（原有） | `disposeRoom(room, 'admin-closed')` | 房间整个没了，所有座位/观战者收到 `room.closed`，玩家被移出同盟、回到大厅 |
+| **结束对局**（新增） | `abortMatch(room)` | 只这一局结束，**房间、座位、玩家都留着**，可以立刻重新开局 |
+
+两个按钮都只在**房间表里那间房正在对局时**才显示「结束对局」（没有对局时这个按钮没有意义）。
+
+#### 实现要点
+
+`abortMatch` 走的是和对局**自然结束完全一样**的收尾路径 `onMatchEnd`：
+
+```js
+abortMatch(room, { reason = 'admin-aborted' } = {}) {
+  const ctx = room.matchCtx;
+  if (!ctx || !room.match) return { ok: false, reason: 'no_match' };  // 没对局：如实说，不算失败
+  this.onMatchEnd(room, ctx, { reason, detail: 'admin', adminAborted: true });
+  if (!room.disposed) this.broadcastState(room);
+  return { ok: true, code: room.code, wasRunning: true };
+}
+```
+
+**为什么必须走 `onMatchEnd` 而不是自己清字段**：它会一并处理这些收尾 ——
+房间退回大厅（`match/matchCtx/matchKey` 置空）、座位 `ready` 重置、房主迁移、
+以及**把「15 分钟未开始对局就解散」的计时推到现在**（`lastMatchEndAt`）。
+少做任何一步，都可能出现「结束对局后房间立刻被解散」这类问题（§9.x 踩过一次）。
+
+没有对局时返回 `409 no_match`，前端的文案是「这个房间当前没有进行中的对局」
+—— 是**如实说明**，不是报错。
+
+#### 三处改动
+
+| 位置 | 内容 |
+|---|---|
+| `server/lobby.js` | 新增 `abortMatch(room)` |
+| `server/http/routes.js` | 新增 `POST /admin/room/abort`（鉴权与 `/admin/room/close` 完全一致：loopback/内网 + HMAC + 60 秒时限） |
+| `dashboard/server.js` | 新增 `POST /api/rooms/abort`；`closeRoom` 与 `abortMatch` 合并到 `adminRoomAction(action, ...)`，只差路径、失败话术、成功字段 |
+| `dashboard/public/app.js` | 房间表加「结束对局」按钮 + `abortMatch()` + 确认框 |
+| `matchmaker/account.cjs` | 新增 `POST /api/admin2/rooms/abort`（权限复用 `rooms.close`，审计动作 `abort-match`） |
+| `matchmaker/public/admin.html` | 房间表加「结束对局」按钮 + 事件委托处理 |
+
+> ⚠ `admin.html` 被 `.gitignore` 排除（仓库不公开管理后台），这是**既定设计**。
+> 所以它只改本机，不进仓库；`repo-sync/matchmaker/public/admin.html` 那份只是本地副本。
+
+#### 生效方式
+
+- **`server/` 改动必须重启节点** —— 该节点上没重启就用，「结束对局」会返回 405
+  （控制台会翻译成「node-N 还没重启到最新代码」）
+- `dashboard` / `matchmaker` 重启即生效
+- `admin.html` 刷新页面即生效
+
+#### 端到端验证（2026-10-29 实测，node-9）
+
+用测试账号在**空闲节点**上自建房跑一局，然后调接口（不碰玩家房间）：
+
+```
+abort 接口: 200 {"ok":true,"code":"EABB","humans":1,"roomKept":true}
+房间还在: 是 ✓
+已退回大厅: 是 ✓        （room.state.inMatch 由 true 变 false）
+座位保留: 是 ✓
+```
+
+**注意**：`/admin/room/abort` 第一次测返回 **405**，原因是那台节点还没重启到新代码 ——
+这正是 §9.13 那个坑的同类表现，不是接口本身的问题。
+
+### 9.22 房间玩家标签两个后台各写一份，改一边忘一边（2026-10-29 重构）
+
+**现象**：同一批玩家，「管理员」标签在节点控制台和 matchmaker 管理后台长得不一样。
+维护者反馈后改了**三轮**才对上，每次都只改到一处：
+
+1. 后台是紫色药丸（`#d9c2ff` / `rgba(160,120,255,…)`），控制台是红色。
+2. 换成琥珀色 —— 但维护者要的是**照抄控制台**，不该自己配色。
+3. 把内层徽章改对红色后，**外框还是红的**：因为后台多了一条
+   `.room-player.is-admin{border-color:rgba(217,83,79,.42)}`，而控制台
+   **从来没有这条规则**（管理员只由内层 `.room-kind.is-admin` 着红，外框保持基础灰）。
+4. 最后发现尺寸也不一样（后台 11px / `3px 6px` / `gap:3px` / `line-height:1.4`，
+   控制台 12px / `3px 7px` / `gap:4px` / `line-height:1.5`）。
+
+**根因**：同一样式在两处各维护一份。这两处后台（`dashboard/`、`matchmaker/public/admin.html`）
+都是本机自写的代码，不是上游产物，所以没有「按作者设计保存」的约束 —— 不一致纯属疏漏。
+
+**修法（单一来源）**：
+
+```
+shared/admin-ui/room-tags.css     ← 唯一权威定义（数值就是控制台原值）
+```
+
+两个服务各自把该目录映射成 `/__admin-ui/*` 挂出去（因为两边各有自己的 `public/`，
+互相读不到对方目录）：
+
+- `dashboard/server.js` → `serveStatic()` 里 `pathname.startsWith('/__admin-ui/')`
+- `matchmaker/server.js` → 同样处理，基准目录用 `SP_ROOT` 或 `../`
+
+页面里都是 `<link rel="stylesheet" href="/__admin-ui/room-tags.css">`。
+**本地只保留容器特有的约束**（控制台 `max-width:360px`、后台 `max-height:4.6rem` 滚动区），
+玩家/观战者标签本身一行都不留。
+
+**以后要改玩家标签样式，只改 `shared/admin-ui/room-tags.css` 一处，两个后台同时生效。**
+
+**验证方法**（两条都必须做）：
+
+```
+# 1. 两个服务都能吐出同一个文件
+curl http://127.0.0.1:3080/__admin-ui/room-tags.css   → 200, text/css
+curl http://127.0.0.1:3090/__admin-ui/room-tags.css   → 200, text/css（字节数相同）
+
+# 2. 本地不再残留重复规则（应为 0）
+grep -c '#rooms-bar \.room-kind\.'  dashboard/public/index.html   → 0
+grep -c '#roomBody \.room-kind\.'   matchmaker/public/admin.html  → 0
+```
+
+路径穿越防护已测：`/__admin-ui/../server.js` → 404，`/__admin-ui/` → 403。
+
+**教训**：
+
+- 用户说「跟 X 一样」就是**字面一致**，不要自作主张换配色（「暖色更顺眼」不是理由）。
+- 抄样式时**先确认目标有没有那条规则**。控制台没有 `.room-player.is-admin`，
+  后台就不该有 —— 多写一条就是多一处漂移点。
+- 两处都自写的 UI，出现不一致时优先**合并成一份**，而不是反复对齐数值。
+
+**后续事故（2026-10-29，同一天发现）**：合并成共享文件后，**管理后台的玩家标签一度完全没有样式**
+（玩家名变成纯文字、没有胶囊边框）。原因是：
+
+- Node 服务侧已经能吐 `/__admin-ui/room-tags.css`（本机 `:3090` 直连 → 200 ✓）
+- 但 **nginx 里没有加转发规则**，经域名访问 `/__admin-ui/room-tags.css` 被 `location /`
+  打到游戏节点上 → **404**
+
+维护者是通过 `https://stronghold.luobomiao.love/mm/admin.html` 访问后台的，
+所以 CSS 拿不到，标签退化成纯文字。节点控制台那边是本地访问，因此看起来正常 ——
+这种「一边正常一边不正常」最容易误判成样式写错。
+
+**已在 nginx 补上**：
+
+```nginx
+location ^~ /__admin-ui/ {
+  proxy_pass http://127.0.0.1:3090;    # 原样转发，matchmaker 的 serveStatic 认 /__admin-ui/
+  proxy_hide_header Cache-Control;
+  add_header Cache-Control "no-store" always;
+}
+```
+
+**验证（必须两边都测，只测本机会漏掉这类问题）**：
+
+```
+直连: :3090/__admin-ui/room-tags.css                      → 200, 3302 B
+域名: https://stronghold.luobomiao.love/__admin-ui/room-tags.css → 200, 3302 B
+```
+
+**教训**：新增一个静态资源路径时，**Node 服务能返回 ≠ 浏览器能拿到**。
+只要页面实际是通过 nginx 域名访问的，就必须同时在 `nginx.conf` 里加对应的
+`location` 转发。以前 `/mm/*`、`/css/`、`/js/` 都是这么处理的，这次漏了。
+
+**排查这类「样式突然没了」的最快顺序**：
+
+1. 浏览器 F12 → Network，看那个 CSS 是不是 404（本例就是）
+2. 直连 Node 端口试同一个路径（200 说明服务端没问题，问题在 nginx）
+3. 搜 `nginx.conf` 有没有对应的 `location`
+
+
+### 9.23b 脚本正常工作时的副作用：玩家会看到「连接已中断」一闪（2026-10-31）
+
+**现象**：维护者反馈「为什么我这里还是会有出现网络连接中断的提示呢？但是很快就好了」。
+
+**不是网络问题。** 是 `rolling-restart.ps1` 在**正常履职**：每 10 分钟重启一批「空闲 + 旧代码」的节点。
+
+当天因为 `server/` 被改了五六次（管理员判据、徽章、挂机检测…），每改一次 30 个节点全变成「旧代码」，
+脚本就一直追着重启。日志实测：
+
+```
+23:02:15  restarted 2/2 (12,26)
+23:42:14  restarted 1/1 (1)
+```
+
+**60 分钟内有 21 个节点被重启过。** 玩家连的那个节点一旦被重启，就会看到
+「与服务器的连接已中断，正在重连」，1–3 秒后自动恢复 —— 这正是「一闪就好」的来源。
+
+#### 关键结论：**脚本不会被动触发，只有 `server/` 内容变了才会重启**
+
+```powershell
+# 内容指纹：server/ 树内容没变就把 codeAt 压回部署时刻，避免无意义重启
+$newest = Get-ChildItem $serverDir -Recurse -File -Filter '*.js' | Measure-Object LastWriteTime -Maximum
+```
+
+指纹**只覆盖 `node-1\server` 下的 `.js`**。所以：
+
+| 改了什么 | 会触发重启吗 |
+|---|---|
+| `server/**/*.js` | ✅ 会（这是设计意图） |
+| `public/js`、`public/css` | ❌ 不会（刷新页面即可） |
+| `MAINTENANCE.md`、`deploy/*.ps1`、`nginx/conf` | ❌ 不会 |
+| `matchmaker/**` | ❌ 不会（那是 `pm2 restart matchmaker` 的事） |
+
+> **推论：改完 `server/` 之后的一两小时内，玩家可能会感觉到几次闪断。**
+> 这是「让所有人尽快拿到修复」的代价，不是故障。要避免就在人少的时候改 `server/`。
+
+#### 观察与操作
+
+```powershell
+# 还有多少节点在跑旧代码（build 不一致即旧代码）
+# 打开任意一页看左上角节点号 → /healthz 的 build 对比多数派
+
+# 最近的重启记录
+Get-Content D:\Stronghold-Protocol\logs\rolling-restart.log -Tail 20
+
+# 计划任务是否存在 / 是否在跑
+schtasks /Query /TN "SP-Rolling-Restart" /FO LIST
+```
+
+**要不要临时停掉？** 一般**不用**：
+
+- 它只动完全空闲的节点（`matches=0 && rooms=0`），不会打断对局；
+- 代码稳定后它自然就闲下来了（内容指纹没变 → 不重启任何东西）；
+- 停掉反而会让剩下的旧代码节点一直跑旧版本。
+
+只有当「故意让某台机器停在旧代码做对比测试」时，才需要临时禁用。
+
+#### 当天收尾时的状态（供对照）
+
+```
+db206a112ca2 → 28 个节点 ✅
+606fdcd17256 →  1 个（node-17，有对局）
+bb91f23812e1 →  1 个（node-13，有对局）
+```
+
+剩下 2 个等它们空下来会被自动处理。**不需要人工干预。**
+
+- 判断「代码是否更新」用**内容指纹**，永远不要用 mtime。
+
+
+### 9.34 「刷新掉回大厅」的真正根因：nginx 的开放节点名单（2026-10-31）
+
+**现象**：玩家在房间里按 F5（普通刷新），画面直接变大厅，**什么都不弹**；
+必须手动点「恢复对局」才回得去。服务端日志里只有一条
+`server takeover from ... (disconnect)`，**没有任何新连接**。
+
+**根因**：`nginx/conf/nginx.conf` 里两个 map 各硬编码了一份「开放节点」名单：
+
+```nginx
+split_clients "$request_id" $sp_rand_node {
+  ... 只有 2,5,6,8,12,14,17,21,26,28,29 这 11 个
+}
+map $cookie_sp_route $sp_cookie_open {
+  default 0;
+  2 1; 5 1; 6 1; 8 1; 12 1; 14 1; 17 1; 21 1; 26 1; 28 1; 29 1;   ← 同样 11 个
+}
+```
+
+这两份名单是 2026-10-26「只有已重启的节点对外开放」时手动维护的，**早就没人更新**
+（上面那行注释写的 `1, 11, 14, 15, 16, 17, 18, 22, 24, 25` 和实际列表完全对不上）。
+
+后果链条：
+
+```
+玩家在 node-1 打对局（PSTM 房）
+  → 浏览器带 cookie sp_route=1
+  → map 判 node-1「不在开放名单」→ $sp_cookie_open = 0
+  → location / 里的 `if ($sp_cookie_open = 0) { set $sp_node $sp_rand_node; }` 把他改派走
+  → 新连接落到别的节点，那台机器没有他的会话
+  → 前端 main.js onRoomState 判定「座位里没有我」→ 清空房间回大厅（这条路径**不弹 toast**）
+  → 只能手动点「恢复对局」
+```
+
+**为什么这么难查**：所有环节看起来都正常 —— 会话没丢、服务端记录还在、token 也对，
+只是**连接落到了另一台机器**。日志里连错误都没有。
+
+#### 修法：名单不再硬编码，改成自动生成
+
+1. 新增 `nginx/conf/open-nodes.conf`，里面**同时**放 `split_clients` 和
+   `map $cookie_sp_route $sp_cookie_open` 两份定义；主配置用 `include open-nodes.conf;` 引入。
+2. 新增 `tools/sync-open-nodes.ps1`：探测 30 个节点的 `/healthz`，把**存活的**写成上面那个文件，
+   `nginx -t` 验证通过才 reload。**挂掉的节点自动摘掉，回来的自动加回。**
+3. 计划任务 `SP-Open-Nodes`（SYSTEM，**每 5 分钟**）跑它。
+
+```powershell
+powershell -NoProfile -File tools\sync-open-nodes.ps1            # 只报告
+powershell -NoProfile -File tools\sync-open-nodes.ps1 -Apply     # 写文件 + reload
+```
+
+#### 实测验证（2026-10-31，停掉 node-7 模拟节点关闭）
+
+```
+停 node-7 → 脚本摘除 → 开放节点变成 29 个
+  cookie=sp_route=7  → 改派到 node-19     ← 关闭的节点不再粘
+  cookie=sp_route=1  → 粘住
+  cookie=sp_route=8  → 粘住
+  30 次随机请求，落到 node-7 的次数: 0     ← 新玩家不会被分到关闭节点
+恢复 node-7 → 脚本自动加回 → 开放节点回到 30 个
+```
+
+#### ★ 已知副作用：不在对局的玩家也会被 cookie 粘回旧代码节点（2026-10-31 观察）
+
+`map $cookie_sp_route $sp_cookie_open` 故意写成「**全部存活节点**」，理由见上面
+（旧代码节点上正在对局的玩家刷新必须能回去）。
+
+**但 cookie 是 30 天有效**（`Set-Cookie: sp_route=...; Max-Age=2592000`），
+于是出现了一个没预料到的情况：
+
+```
+玩家昨晚在 node-6 玩过（那时 6 还在开放名单）
+  → 浏览器存下 sp_route=6，30 天有效
+  → 今早再打开游戏
+  → split_clients 确实不含 6（新访客不会来）
+  → 但 map 判「6 存活」→ 允许粘住 → 又回到旧代码的 node-6
+```
+
+2026-10-31 11:20 实测：node-6 上 5 个房间（10:09~11:15 陆续创建）全是这样进来的，
+**他们并不在对局中**，只是 cookie 指向旧节点。
+
+**这不是 bug，是当时为了「刷新不掉线」做的取舍的必要代价。** 维护者当天决定
+**按 A 处理：等这些局打完**。玩家打完会看到结算页的提示（`nodeCodeHint.js`）：
+
+> 这台服务器还在使用旧版本。本局已结束，刷新页面即可换到新版本（不会影响你的账号和对局记录）。
+
+那行提示依赖 `X-SP-Accepts-New: 0`，实测正常（带 `sp_route=6` 的请求确实返回 `0`）。
+
+> ⚠ **提示只在结算页出现**（`nodeCodeHint.js` 注释：只在结算页出现，这时对局已经结束，
+> 刷新不会打断任何人）。**对局进行中不会有任何提示**，别指望中途看到。
+
+**如果这个副作用变得难以接受**，可行的改法是给 `map` 加一个条件：
+只有「该节点上确实有你的房间」时才允许 cookie 粘住。需要 nginx 能判断房间归属
+（房间码 cookie + 节点房间表），实现复杂度明显上升，当时没有做。
+
+#### ★ 踩坑：普通 shell 不能 reload nginx
+
+
+```
+nginx: [error] OpenEvent("Global\ngx_reload_<pid>") failed (5: Access is denied)
+```
+
+nginx 主进程是 SYSTEM，普通用户发 reload 信号会被拒。**但脚本不会报错**，
+于是「配置改了却没生效」，而且容易误报成功（这次就误报过一次）。
+
+正确做法：新增 `tools/nginx-reload.ps1` + 计划任务 **`SP-Nginx-Reload`**（SYSTEM），
+`sync-open-nodes.ps1` 里用 `schtasks /Run /TN "SP-Nginx-Reload"` 触发，再读
+`logs/nginx-reload.log` 校验 `HTTPS 首页: 200` 才算成功。
+
+`nginx-reload.ps1` 里 `Invoke-WebRequest` 必须带 **`-UseBasicParsing`**：
+SYSTEM 环境下没有 IE 引擎，否则报「Internet Explorer 引擎不可用」。
+
+#### 与「重启纪律」的关系
+
+- `sync-open-nodes.ps1` **只读 `/healthz`，绝不重启任何节点**
+- reload 会踢掉所有 WebSocket（玩家断线重连 5–20 秒），但**不重启进程**，
+  比 `restart-nginx.mjs`（quit + 重新拉起，全站约 25 秒不可用）温和得多
+- 因此每 5 分钟跑一次是安全的；但如果节点列表长期不变，脚本不会 reload
+  （文件内容一致时直接退出）
+
+#### 关掉一个节点的正确姿势
+
+```powershell
+pm2 stop node-7
+# 最多等 5 分钟（或立刻手动跑一次），SP-Open-Nodes 会把它从名单里摘掉并 reload
+powershell -NoProfile -File tools\sync-open-nodes.ps1 -Apply
+```
+
+**注意**：摘掉只是「不再往这台分新玩家」。已经在这台节点上的玩家不受影响，
+他们的 `sp_route` cookie 仍指向它（map 里没了它 → `$sp_cookie_open=0` → 会被改派，
+但那是下次刷新才发生）。要让全部人平滑离开，还要等他们自己离开或打完后重启节点。
+
+---
+
+
+### 9.34a 开放列表的口径：**谁活着谁就开放**，绝不能「谁代码新就开放」（2026-10-31）
 
 #### 结论（先记住这一条）
 
@@ -2300,621 +3309,355 @@ node -e "const d=require('D:/Stronghold-Protocol/shared/assets/local/fx/index.js
 最省事的做法是**整份采用补丁包的 index.json**，而不是手工合并。
 
 
-### 9.35 含中文的 `.ps1` 必须带 UTF-8 BOM（2026-10-31 踩到）
 
-PowerShell 5.1 **无 BOM 时按 GBK 解析脚本**，含中文的脚本会直接解析失败：
+### 9.33 每小时节点巡检（`SP-Node-Check`，2026-10-30 新增）
 
-```
-Missing closing '}' in statement block or type definition.
-Unexpected token ')' in expression or statement.
-└─ 提示的行号还指向别的地方，看不出来是编码问题
-```
+**为什么有它**：游戏节点的 `server/` 代码改了必须重启进程才生效，而**重启会踢掉该节点上
+所有玩家的 WebSocket**，正在打的对局会中断。所以「改完代码 → 什么时候重启 30 个节点」
+一直是个反复要判断的事：既要确认哪些节点落后，又要确认哪些节点此刻是空的。
 
-当天 `tools/sync-open-nodes.ps1` 在给输出加注释后变成无 BOM，**每 5 分钟的自动同步整条挂掉**，
-而且计划任务只报 `Last Result: 1`，不看脚本输出根本不知道原因。
+**它做什么**（`tools/check-nodes.ps1`，计划任务每小时跑一次，SYSTEM 身份）：
 
-写入时显式带 BOM：
+1. 拉 30 个节点的 `/healthz`，收集 `rooms` / `matches` / `sockets` / `humans`
+2. **逐个节点检查服务端源码里有没有每一项修复的标志串**（见下面「按修复内容判断」）
+3. 列出缺修复的节点，并逐个标出**能不能安全重启**
+4. 结果同时打到控制台和 `logs/node-check.log`（追加、带时间戳，可回看趋势）
 
-```powershell
-$enc = New-Object System.Text.UTF8Encoding($true)   # $true = 带 BOM
-[System.IO.File]::WriteAllText($path, $content, $enc)
-```
+**它不做什么**：**绝不重启任何东西**。`★ 可以重启` 只是一个建议，真正重启由人拍板。
 
-检查：
+#### ★ 判据一：按「缺哪个修复」判断，**不要按 build 哈希判断**（2026-10-31 改）
 
-```powershell
-$b = [System.IO.File]::ReadAllBytes($path)[0..2]
-if ($b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) { '✓ 有 BOM' } else { '✗ 无 BOM' }
-```
+第一版脚本是按 `/healthz` 的 `build` 值判断的，**方向错了**。
 
-> 用 `Out-File -Encoding UTF8` / `Set-Content -Encoding UTF8` 在 **PowerShell 7** 下**不加** BOM，
-> 在 5.1 下会加。两种都可能踩到，所以不要依赖 cmdlet 的默认行为，一律显式写字节。
+`build` 是节点启动时对 `BUILD_INPUTS`（`public/index.html`、`public/js`、`public/css`、
+`server/sim`、`shared`、`data`）整棵树求的哈希，**进程里只算一次**（`buildTag.js` 的
+`buildCache`）。所以只要 `public/js` 改过一个字节，不同时间重启的节点就各自拿到不同的
+`build` —— 哪怕它们跑的功能代码**完全一样**。
 
-#### 连带问题：被 dashboard 调用时中文变乱码
-
-`powershell.exe` 作为子进程时 stdout 是管道，默认按控制台代码页（中文系统 = GBK/936）输出，
-而 `dashboard/server.js` 按 UTF-8 读 → 面板上显示成 `ڵ�̽��: ��� 30`。
-
-修法是在脚本开头强制管道输出用 UTF-8（已加进 `sync-open-nodes.ps1`）：
-
-```powershell
-[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
-$OutputEncoding = New-Object System.Text.UTF8Encoding($false)
-```
-
-注意日志文件本身一直是正确的 UTF-8——**只有管道那段错了**，
-所以别因为面板显示乱码就去改 `Out-File -Encoding UTF8`。
-
-
-#### ⚠ 踩过的坑：pm2 的 ecosystem 路径必须写绝对路径
-
-整合当天，面板点「重启空闲节点」后显示：
+2026-10-30 实测到的假警报：30 个节点出现 **6 种** `build`，被报成「23 个节点跑旧代码」。
+逐个核对后：
 
 ```
-已重启 1 个: 8
-[PM2][ERROR] File ecosystem.config.cjs not found
+所有节点的 server/lobby.js         哈希完全相同  F7AEDA9D6BC7
+所有节点的 ui/gameComponents.js    哈希完全相同  0D70C52C
+data、server/sim                   文件数与总字节完全相同，mtime 也相同
+真正缺修复的只有 3 个节点
 ```
 
-**一行字两个错**：
+**也就是说按 build 判，20 个是噪音**，还会误导人去重启本来不需要重启的节点。
 
-1. **`ecosystem.config.cjs` 是相对路径** —— pm2 相对**调用进程的 cwd** 找文件。
-   dashboard 被 pm2 从别的目录拉起，cwd 不是部署根，于是根本找不到。
-   后果是 `startOrReload` 什么都没做，**节点重启失败**。
-2. **失败却报「已重启」** —— 结果里 `notify` 那行是硬编码的成功文案，
-   没看 pm2 的退出码/输出。维护者以为自己点成功了，实际一个节点都没动。
+正确的做法是区分两类改动：
 
-正确写法（`dashboard/server.js` 与 `deploy/ops-menu.ps1` 都已改）：
-
-```js
-const eco = path.join(BASE, 'ecosystem.config.cjs');          // 绝对路径
-execFile(process.execPath, [PM2_JS, 'startOrReload', eco, '--only', names, '--update-env'],
-  { cwd: BASE }, (err, out, errOut) => {
-    if (err || /\[PM2\]\[ERROR\]/.test(out)) { /* 报失败，且【不要】pm2 save */ }
-  });
-```
-
-**三条通用规则**（以后再写运维脚本都适用）：
-
-- 调 pm2 一律：**绝对路径的 ecosystem + 显式 `cwd` + 检查退出码/`[PM2][ERROR]`**；
-- **失败时不要 `pm2 save`** —— 那会把一个可能不对的进程表固化下来；
-- 重启后要**复查**：节点响应了吗？`fresh` 变 true 了吗？没起来就必须报出来，
-  不能只说「已重启」。
-
-> 当天实测：点出这个错误的是一次针对 node-8 的误点，但 node-8 **实际没有重启**
-> （`uptime` 仍是 8000+ 秒、`matches` 也没断），所以没有玩家受影响 —— 因为
-> `startOrReload` 在报错前就退出了。这也说明「报错时绝不能显示成功」有多重要。
-
-### 9.12 玩家反馈「一直在重启」——2026-10-28 连环事故
-
-> 维护者原话：「玩家反馈一直在重启，你看看你改了什么」
-
-当天下午连续修了三轮，每一轮都以为找到根因了，下一轮又冒出来。
-**根因是一条链：两个服务抢同一个端口 → 一个无限崩溃循环 → 看门狗读不到状态就全量重启。**
-
-#### 症状与定位方法（下次照着走）
-
-| 要确认的事 | 怎么看 | 判据 |
+| 改动位置 | 生效方式 | 巡检要不要管 |
 |---|---|---|
-| 服务端到底有没有重启 | `healthz` 的 `uptimeSec`；或 `logs\restart-watch.log` | 运行时长**变小** = 重启过 |
-| pm2 有没有重启过某个应用 | `pm2 jlist` 的 `restart_time` | 计数字段只增不减，看它有没有涨 |
-| PM2 里有没有崩溃循环的应用 | `pm2 jlist` 里 `status` 不是 `online` 的 | `errbackoff`/`waiting restart` = 崩溃循环 |
-| 谁在动进程 | `logs\pm2-resurrect.log`、`logs\stack-watchdog.log` | 出现 `start node-XX` / `resurrect` 就是它 |
+| `public/js`、`public/css`、`shared/`、`data/` | 静态文件，**玩家刷新即生效** | ❌ 不用管 |
+| `server/**`（`lobby.js`、`net.js` …） | 进程内代码，**必须重启** | ✅ 只查这些 |
 
-**最有用的一条**：`restart_time` 几百上千次 = 有个应用在崩溃循环，别去别处找。
-
-#### 第 1 环：`nginx-gateway` 崩溃循环 4321 次
-
-为了满足「nginx 不能挂在用户会话下」，2026-10-27 把 nginx 改成由计划任务
-`SP-Nginx-Start` 以 SYSTEM 身份启动，**但没有停掉 pm2 里的 `nginx-gateway`**
-（它本是原作者设计用来托管 nginx 的 wrapper，跑 `nginx\run-nginx.mjs`）。
-
-结果两个都想占 443：
-
-```
-SP-Nginx-Start (SYSTEM) → 占用 443 ✅
-nginx-gateway (pm2)     → bind 失败 → autorestart 重试 → 失败 → …
-                          实测崩溃 4321 次
-```
-
-**修法**：`pm2 delete nginx-gateway`，并从 `ecosystem.config.cjs` 删掉定义
-（只停进程不够 —— `resurrect` 会把它拉回来）。代码里留了注释说明**不要加回去**。
-
-#### 第 2 环：看门狗读不到 pm2 状态 → `resurrect` 全量重启
-
-`deploy\_stack-watchdog.ps1` 原来的逻辑：
+所以脚本里维护了一张 `$SERVER_FIXES` 表，每项是一个「必须重启才生效」的修复，
+用**源码里的标志串**判定节点是否已含它。加新修复时往表里加一行即可：
 
 ```powershell
-cmd /c "pm2 jlist > tmp 2>nul"     # 失败静默返回空
-$online = @($r.out -split ',')     # 空
-$missing = $expected 里不在 $online 的  # → 全部 32 个都"缺失"
-pm2 resurrect                       # ← 重启整张进程表
+@{ Id='onDisconnect-watcher'; Name='…'; Date='2026-10-30 21:37';
+   File='server/lobby.js'; Pattern='const seat = player \|\| room\.watcherOf\(session\.playerId\);' }
 ```
 
-`pm2 jlist` 在 pm2 忙时会**间歇性失败**。一次读取抖动 → 判定「所有应用都丢了」→
-`resurrect` → 全服重启。日志里 `ALERT cannot read PM2 status` 从 11:52 刷到 13:40
-就是这个过程。**实测一次这样的误判中断了 10 局对局。**
+⚠ `Pattern` 必须选「**只有修复后才会出现**」的字符串，且不能太泛，否则永远为真、
+巡检就失去意义。**改完表一定要验证它真的能报错**（见下面「自检」）。
 
-`_start-pm2.ps1` 有同样的形状（`$online` 空 → 全部缺失 → 逐个 `start --only`），
-只是没那么狠。
+#### ★ 判据二：「能重启」= `matches=0` **且** `rooms=0` **且** `sockets=0`
 
-**修法（两条脚本都改了）**：
+只看 `matches` 不够：`sockets` 有残留（玩家还连着大厅、或断线后没清干净）时重启
+同样会踢人；`rooms>0` 时房间会被销毁。三个都为 0 才算真空。
 
-1. 读不到 / 明显过短 → **这一轮什么都不做**，只记日志
-2. `_stack-watchdog` **连读两次且必须一致**才采信（正在变动时不猜）
-3. 缺失过半 → 认定是读数问题，不动进程
-4. **永不 `resurrect`** 去补缺失的应用，只对确实缺的逐个 `--only` 启动
-   （`resurrect` 只保留给「pm2 守护进程整个挂了」，那时所有应用本来就都没了）
+#### ★ 判据三：Redis 房间文档里有没有 `connected` 字段
 
-#### 第 3 环：我自己那次 `pm2 delete` 也触发了全量重启
+巡检最后一段会跑 `tools/check-redis-connected.cjs`，报告「多少节点的房间文档已带
+`connected`」。它回答一个具体问题：**现在能不能把 matchmaker 的在线判断改成严格模式。**
 
-13:12 执行 `pm2 delete nginx-gateway` 时，30 个节点在 2 分钟内挨个重启，中断 10 局。
+背景（2026-10-31）：控制台的「观战席」永远显示在线，哪怕玩家在游戏界面里已是灰的
+（那里读 `room.state` 的真实值）。根因是 `lobbyState.js` 序列化时**没存 `connected`**：
 
-**教训**：`pm2 delete` 会重排进程表。要摘掉一个应用，**低峰期做**，
-并且事前先用 `restart-watch` 或手动采样确认在线的对局数。
+```js
+spectators: room.spectators.map((s) => ({ playerId: s.playerId, name: s.name, ... }))
+```
 
-#### 这次的深层教训
+而 matchmaker 用 `s.connected !== false` 判在线 —— `undefined !== false` 恒为 true。
 
-| 教训 | 说明 |
-|---|---|
-| **改启动方式 ≠ 只改启动方式** | 把 nginx 从 pm2 挪到计划任务，只做了一半（改了新的，没停旧的）。凡涉及「谁托管这个进程」，必须**先停旧的再起新的**，或两者互斥 |
-| **看门狗的「读不到」绝不能被当成「都没有了」** | 这是本事故最危险的一条。任何「检测 → 修复」型脚本，第一件事都是**区分「真的坏了」和「我读不到」** |
-| **`resurrect` 是高危操作** | 它按保存的进程表重启**全部**应用。只应在「整栈都没了」时用，绝不能当作「补几个缺失应用」的手段 |
-| **修复要能自证** | 每轮改完都要用运行时长/`restart_time` 验证，而不是看日志里没有报错就收工 |
+**修法分两半，且必须按顺序**：
 
-#### 现在的状态（2026-10-28 14:00）
+1. **让节点写出这个字段**：`SEAT_FIELDS` 加 `'connected'`、观战席序列化加 `connected: s.connected !== false`。
+   已分发到 30 个节点，但**只有重启过的节点才会真正写**——Redis 里已有的旧文档不会自己补。
+2. **改 matchmaker 的判断**：把 `!== false` 改成 `=== true`。
 
-- nginx：计划任务 `SP-Nginx-Start` 启动，3 进程全部 Session 0
-- pm2：32 个应用，`nginx-gateway` 已移除
-- 崩溃恢复：`_stack-watchdog.ps1` 每 2 分钟，只补确实缺的；nginx 没了会经计划任务拉起
-- **巡检**：计划任务 `SP-Restart-Watch` 每 10 分钟跑 `deploy\restart-watch.ps1`，
-  比对运行时长，发现变小就写 `logs\restart-watch.log` 的 `RESTART DETECTED`
-  （后续再排查直接看这个日志，不必靠人盯着）
+⚠ **第 2 步不能急**。2026-10-31 实测：在节点还没重启时就改了，结果
+**83 个座位全部显示离线**（缺字段 = 全部判成 false），比原来「全部显示在线」
+更误导，**当场回滚**。
+
+所以顺序是：先重启节点 → 确认本脚本报「30/30 已带 connected」→ 才改 matchmaker。
+巡检每小时的这一段就是在等这个信号。
 
 ```powershell
-# 手动看一眼巡检结果
-Get-Content D:\Stronghold-Protocol\logs\restart-watch.log -Tail 20
-# 正常是连续的 ok，形如：
-# 2026-10-28 13:57:58 ok alive=30/30 avg_uptime=784s
+node tools/check-redis-connected.cjs --sample 2
+#   已带 connected 字段的节点: 26 / 30 ✓
+#   待重启: 1,3,4,...
+#   无房间（未验证）: 2,5,6,...
+#   ★ 可以把 matchmaker 的 !== false 改成 === true 了
 ```
 
-### 9.21 「恢复对局」按钮只在大厅、且挨着「公告」（2026-10-29 修正）
+用 Node 而不是 PowerShell：房间文档动辄几十 MB，PowerShell 的 TCP 读取 + JSON 解析
+实测会卡到几分钟超时，Node 处理同样的数据是秒级。
 
-玩家反馈：恢复对局按钮的位置不对，希望它在大厅「公告」按钮旁边；
-维护者进一步明确：**其他界面均不要出现恢复对局按钮**。
+#### 巡检脚本的自检方法（重要）
 
-#### 原来的位置没写错，但按钮会跑到别处去
+一个「永远报全通过」的巡检等于没有巡检。**每次改 `$SERVER_FIXES` 或判定逻辑后，
+演练一次反例**：
 
-代码里的插入是 `insertBefore(btn, anchor)`，锚点就是「公告」按钮 ——
-所以**只要锚点找得到，位置本来就在公告左边**（维护者 2026-10-29 确认要左边）。
+```powershell
+# 临时把某个节点的修复标志改回旧写法
+$f = 'node-30\server\lobby.js'; Copy-Item $f "$f.bak" -Force
+$c = [IO.File]::ReadAllText($f); $c = $c.Replace('watcherOf(session.playerId)', 'spectatorOf(session.playerId)')
+[IO.File]::WriteAllText($f, $c)
+# 跑巡检 → 必须报「缺 1，节点 30，★ 可以重启」
+# 然后把 .bak 覆盖回去
+```
 
-问题出在**锚点找不到时的降级链**：
+2026-10-31 这样演练过一次，确认脚本能准确报出缺失节点。
+
+#### 历史：SYSTEM 计划任务找不到 pm2（按 build 判断时期的问题，已随判据一失效）
+
+原脚本需要 pm2 的 `pm_uptime` 推算「最新 build」。但**计划任务以 SYSTEM 运行**：
+
+```
+APPDATA     = C:\WINDOWS\system32\config\systemprofile\AppData\Roaming   ← 这里没有 pm2
+PATH has npm = False
+```
+
+所以既不能写 `pm2`，也不能按 `$env:APPDATA` 拼路径。最终做法是
+**从正在运行的 pm2 守护进程反推**：
+
+```powershell
+$daemon = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Where-Object { $_.CommandLine -match 'pm2\\lib\\Daemon\.js' } | Select-Object -First 1
+```
+
+⚠️ 这里还有个坑：命令行形状是 `<node.exe 完整路径> <Daemon.js 完整路径>`，
+两段之间**只有空格、没有引号**。用 `([A-Za-z]:\\[^"]*?Daemon\.js)` 会连 node.exe
+的路径一起吞进去，`npmDir` 变成 `D:\nodejs\node.exe C:\Users\...\npm`，永远找不到。
+必须用 `[regex]::Matches(...)` 取**最后一个**盘符路径：
+
+```powershell
+$ms = [regex]::Matches($daemon.CommandLine, '[A-Za-z]:\\[^\s"]*?Daemon\.js')
+$daemonJs = $ms[$ms.Count - 1].Value
+```
+
+**排查这类「SYSTEM 下脚本行为不对」的通用方法**：不要在普通 shell 里试（那总是好的），
+写一个临时脚本由 SYSTEM 计划任务执行、把诊断写到文件里，再读那个文件。
+本次就是这样一眼看出 `npmDir` 拼错的（`tools/check-nodes.ps1` 里也保留了这个说明）。
+
+---
+
+### 9.32 素材改写正则取太早 → 大量图片走外站（2026-10-30，**根因已定位**）
+
+**现象**：立绘/头像/技能图标大量不出来（维护者原话「基本上每个都有，不只是助力」），
+资源加载慢、商店池立绘出不来、悬赏决策要等。
+
+**根因**：`public/js/ui/gameComponents.js` 第 28 行
 
 ```js
-const anchor = notice
-  || document.querySelector('.verchip-wrap, button.verchip[data-testid="version-switch"]')
-  || [...document.querySelectorAll('button')].find((b) => /S\.W\.E\.E\.P/i.test(...));
-if (!anchor || !anchor.parentElement) {
-  // 造一个 position:fixed 的按钮挂在 body 上
-}
+const REMOTE_ASSET_RE = __spRemoteAssetRe();   // ← 模块级常量，加载时算一次
 ```
 
-三种情况会把按钮放到不是「公告旁边」的地方：
-
-| 情况 | 结果 |
-|---|---|
-| 大厅里公告按钮还没渲染出来 | 退到**版本按钮**旁边（位置变了） |
-| 版本按钮也没有 | 退到 **S.W.E.E.P. 文字按钮**旁边 |
-| 三个都没有 | **右下角浮动按钮**，任何界面都挂着 |
-
-第三条最糟：玩家在对局中、结算页、设置页都能看到右下角冒出来一个「恢复对局」，
-而那根本不是大厅。
-
-#### 修复：只认公告按钮，拿不到就不显示
-
-```js
-/** 大厅的「公告」按钮此刻是否真的可见 */
-const lobbyNotice = () => {
-  const n = document.getElementById('mm-notice-btn');
-  if (!n || !n.isConnected) return null;
-  if (n.style.display === 'none') return null;                       // 非大厅被 ensureTopButton 隐藏
-  if (n.getClientRects().length === 0) return null;                  // 不可见（display/尺寸为 0）
-  return n;
-};
-
-if (!lobbyNotice()) { removeBtn(); return; }        // 不在大厅 → 直接没有任何按钮
-const anchor = lobbyNotice();                        // 锚点只认公告
-```
-
-**为什么用「公告按钮是否可见」当作「是否在大厅」的判据**：
-`ensureTopButton`（公告按钮的维护函数）在非大厅界面会把它 `display:none` 并返回 null，
-所以不管界面怎么改版、路由怎么变，**只要玩家不在大厅，公告按钮就不在**，
-恢复对局自然也不会冒出来。这比判断屏幕类名/路由更抗改版。
-
-同时**删掉了整段浮动按钮降级**（`mm-resume-fallback`）—— 它正是「其他界面也出现
-恢复对局」的源头。
-
-#### 生效方式
-
-`client.js` 由 nginx 的 `sub_filter` 注入，**改完必须改版本号**：
+`__spRemoteAssetRe()` 靠 `window.__SP__.data.get('config').assetOrigin` 拼正则。实测时序：
 
 ```
-client.js?v=20261029-1  →  client.js?v=20261029-2
+t= 224ms  DOMContentLoaded   SP=n data=n origin=(空)
+t= 388ms  data 才就绪        SP=Y data=Y origin=https://assets.luobomiao.love
 ```
 
-**需重启 nginx**（`node tools/restart-nginx.mjs --apply`）。
+**模块在 data 就绪之前就被求值了**，于是 `host` 为空，正则变成
+`^https?:\/\/\/assets\/` —— 永远匹配不上任何真实 URL，`localAssetSrc()` 原样返回外站地址。
 
-#### 补丁副本怎么改的（吸取上次教训）
-
-两个补丁（`client-announcement` / `matching-party`）的 `client.js` 内容各不相同，
-**不能整份覆盖** —— 上次整份覆盖就把 `server/lobby.js` 误写进了前端文件（§9.19 末尾）。
-这次用脚本按**精确字符串**分三段替换，替换后逐段校验命中数（3/3）：
-
-1. 抽出 `lobbyNotice()` / `recentlyLeft()` 两个辅助函数
-2. 删掉浮动按钮降级段
-3. 锚点链改成只认公告按钮
-
-### 9.20 观战「席位已满（2/2）」——前端写死了 2（2026-10-29 修复）
-
-玩家反馈：**房间 PCPJ 观战进不来，提示「观战席位已满（2/2）」**。
-
-#### 服务端没问题，是前端把上限写死了
-
-服务端的观战上限是 `server/lobby.js` 的 `spectatorLimit()`：
-
-```js
-spectatorLimit() {
-  if (this.mode !== 'coop') return 0;
-  return Math.max(MAX_SPECTATORS, Math.ceil(this.activeHumans().length / 2));
-}
-```
-
-**取 `max(2, 玩家数 / 2)`**，“2”只是下限：
-
-| 玩家数 | 观战上限 |
-|---|---|
-| 1–4 | 2 |
-| 5–6 | 3 |
-| 8 | 4 |
-| **14（PCPJ）** | **7** |
-| 20 | 10 |
-
-但 `matchmaker/public/client.js` 的大厅跳转预检把上限**写死成 2**：
-
-```js
-if (spec && Number(d.spectators) >= 2) { showStyledToast('观战席位已满（2/2），请稍后再试'); return; }
-```
-
-于是**任何房间第 3 个想观战的人都会被前端拦下**，根本不会走到服务端。
-
-#### 实测对照（PCPJ，2026-10-29）
+**实测证据（同一文件被请求两次）**：
 
 ```
-find-room 返回: node=8 humans=11 spectators=2 maxSpectators=6 started=False
-旧逻辑 (>=2 就拦):            拦下 ✗   ← 玩家看到的就是这个
-新逻辑 (>=maxSpectators 才拦): 放行 ✓
+图片请求总数: 5   本机域名: 3   资源站: 2
+  https://assets.luobomiao.love/assets/~d4a90301d39bf6da/ui/entry/bkg_01.png   ← 没改写
+  https://stronghold.luobomiao.love/assets/~d4a90301d39bf6da/ui/entry/bkg_01.png ← 改写成功
 ```
 
-另外直接用测试账号 `room.spectate PCPJ` 实测，**第 3 个观战者成功进入**：
+同一个文件，`assets.js` 改写成功了（它用的是能延迟求值的写法），
+`gameComponents.js` 没改写 —— **说明问题就出在那个模块级常量上**。
 
-```
-room.state: spec=["逸天","记念","观战测试"]  maxSpectators=7
-```
+**为什么之前一直没定位到**：这条链路不会产生 404、也不会报错，只是走外站，
+所以日志里看不到任何异常；而外站单个文件可达 3.4 秒（`assets.js` 注释实测）。
+表现成「慢」，不表现成「坏」。
 
-#### 修复
+**这条也是 7.0.1 的教训来源**：数据早就说了「空白 962 张 + 失败请求 0」，
+即「请求根本没发出去」，我却一路去查 `skin_avatar` 目录、manifest、`assetOrigin` 配置，
+全是无效动作，浪费了维护者好几轮时间。
 
-`find-room` 早就已经把权威的 `maxSpectators` 带回来了（`matchmaker/server.js` 的
-`roomInfo()`，算法与服务端一致），前端直接用它：
+---
 
-```js
-if (spec) {
-  const cap = Number.isInteger(d.maxSpectators) ? d.maxSpectators
-    : (d.mode === 'coop' ? Math.max(2, Math.ceil((Number(d.humans) || 0) / 2)) : 0);
-  const used = Number(d.spectators) || 0;
-  if (used >= cap) { showStyledToast(`观战席位已满（${used}/${cap}），请稍后再试`); return; }
-}
-```
+### 9.31 nginx 性能调优 + 日志轮转（2026-10-30）
 
-提示里的数字也改成实际值（`已用/上限`），不再永远显示 `2/2`。
+**由头**：维护者反馈「加载资源很卡顿，商店池立绘出来很慢，悬赏决策立绘也要加载一会」。
 
-#### ⚠ 改 `client.js` 必须同时改 nginx 的版本号
+#### 先做的诊断（结论很重要，别重复走一遍）
 
-`client.js` 是通过 nginx 的 `sub_filter` 注入的，带版本号：
+| 查什么 | 实测 | 结论 |
+|---|---|---|
+| CPU / 内存 | 1% / 24 GB 可用 | 空闲 |
+| 磁盘队列 | 0，读 0.004 s | 非瓶颈 |
+| 上传带宽 | 22–47 Mbps 波动 | **未跑满** |
+| 素材请求量 | ~5900 次/分钟（峰值 195/秒），~1 GB/分钟 | 偏高但服务端扛得住 |
+| nginx 缓存 | 11.4 万文件 / 4.7 GB，命中正常 | 无问题 |
+| 回源 | **0 次**（全部 `src=-` 本地直读） | 无问题 |
+| Node 处理 `/media` | **3 ms**（连续 20 次平均，最慢 25 ms） | **Node 不慢** |
+| 单次 404 往返 | 99 ms | 正常 |
+
+**唯一异常**：`nginx/logs/assets.log` 里有一批 **`0KB` 传输 + 整整 60 秒**的请求，且**成批出现**
+（22:22:50 有 9 条 `char`、22:23:13 有 8 条 `spine` + 8 条 `local`）。60 秒是**客户端超时**的
+典型值 —— 服务器一个字节都没返回，浏览器放弃。特征：`char`（立绘）平均 778 ms / 最慢 60 s，
+`avatar`（头像）平均 862 ms / **最慢 82 s**，而同样走 nginx 的 `band`（盟约图标）只要 **0.5 ms**。
+
+**这批慢请求的成因没有最终定位**：服务器本机测不出任何瓶颈，怀疑是「服务器 → 玩家」那段链路或
+玩家本地带宽。**不要**因此去改 nginx 架构（见下面「评估过但没做」）。
+
+#### 做了什么（两项，均已验证）
+
+**1. `worker_processes` 2 → 4**
 
 ```nginx
-sub_filter '</body>' '<script src="/mm/client.js?v=20261026-107" defer></script>…';
+# 本机是 1 物理核 / 32 逻辑处理器；nginx 大部分时间在等 I/O，不是算力瓶颈。
+# 2 个 worker 扛 ~125 请求/秒 偏少，一个 worker 一忙整批请求就排队。
+# 不用 `auto`：那会按 32 个逻辑处理器起 32 个 worker，对 1 物理核只会增加
+# 上下文切换，并把缓存键分散到 32 份。
+worker_processes  4;
 ```
 
-**不改这个 `?v=`，浏览器会继续用缓存的旧文件** —— 改了等于没改（§9.x 踩过同样的坑，
-当时 `account-title.js` 就是版本号没动导致修复不生效）。
+应用方式：`node repo-sync/tools/restart-nginx.mjs --apply`
+（**普通用户 shell 发 `nginx -s reload` 会被拒**：`OpenEvent("Global\ngx_reload_<pid>") failed
+(5: Access is denied)` —— nginx 主进程是 SYSTEM，必须走 SYSTEM 计划任务。
+`restart-nginx.mjs` 内部 `schtasks /Run /TN "SP-Nginx-Start"` 就是干这个的。）
 
-本次已由 `20261026-107` 改为 **`20261029-1`**。
+⚠ **应用前后对比**：进程数从 3（1 master + 2 worker）变成 5（1 + 4），
+**脚本自己的「进程数 ≤ 3」校验会误报 ✗**，看到这个不用管，只要 `Get-CimInstance Win32_Process`
+里是 1 个 parent + 4 个 child 就对了。同理它启动后立刻检查 HTTPS 会报 `HTTPS 首页: FAIL`，
+因为进程还没就绪 —— 等 30 秒再手动访问一次确认 200 即可。
 
-#### ✅ 已生效（2026-10-29 20:51，维护者亲自重启 nginx）
+**2. 日志轮转（`SP-Nginx-LogRotate`，每日 04:00，SYSTEM）**
 
-重启过程**零中断**（细节见「重启 nginx」一节 §9 的 2026-10-29 实测）：
+脚本：`tools/rotate-nginx-logs.ps1`（**必须带 UTF-8 BOM**，否则 PowerShell 5.1 按 GBK 解析，
+中文注释会报 `The string is missing the terminator`）。
 
-```
-20:51:26  进程=3  HTTP=200  版本=20261026-107
-20:51:29  进程=5  HTTP=200  版本=20261029-1   ← 切换
-```
+做三件事：改名 → `nginx -s reopen` → 各保留 7 份归档。
+**轮转和 reopen 必须在同一个 SYSTEM 进程里**，因为普通用户发 reopen 会 `Access is denied`，
+结果就是「文件改名了、nginx 还在往改名后的旧文件写、新 access.log 永远是空的」。
 
-生效后验证：
+首次执行效果：`access.log` **9.67 GB** + `assets.log` 580 MB + `error.log` 5.3 MB → 全部归档，
+新建的 `access.log` 从 0 开始。
 
-| 检查 | 结果 |
-|---|---|
-| 首页注入的版本号 | `client.js?v=20261029-1` ✓ |
-| `/mm/client.js?v=20261029-1` | HTTP 200，**含 `d.maxSpectators` 新逻辑** ✓ |
-| 残留 `>= 2` 硬编码 | 只剩第 924 行的**注释**（说明改了什么都），代码里已无 ✓ |
-| nginx 进程 | 3 个 ✓ |
-| 对局 | 重启前 24 场 → 重启后 **26 场**，一场没断 ✓ |
+#### 评估过但**没做**（重要，别重新想一遍）
 
-**玩家侧**：刷新页面即可（版本号变了会强制重新下载 `client.js`）。
-若玩家仍看到「2/2」，让他 `Ctrl + F5` 一次。
+- **给 `/media` 加独立 nginx location 直读磁盘**：不可行。
+  `/media/bgm/act1` 这类 URL **没有扩展名**，`server/http/media.js` 要按
+  `['.mp3','.m4a','.aac','.ogg','.oga','.opus','.wav']` 的**顺序逐个 `fsp.stat`** 才能找到文件
+  （`shared/media.js` 的 `AUDIO_EXTS`）。nginx 里要穷举 7 个 `try_files` 分支，行为容易和 Node 不一致。
+  **而且收益被高估了**：`/media` 请求数是多（~125 请求/秒里的大头），但**每个只花 3 ms**，
+  流量也只有 113 MB；真正的大头是 `/assets` 的 Spine 立绘（~1 GB/分钟）。
+- **关掉 `assets.log`**：不需要。它现在只有 ~17 请求/秒，量很小，而且是排查素材问题的唯一入口。
 
+#### 改完之后的验证（**以后改 nginx 都要走一遍**）
 
-#### 教训
-
-**同一个规则在服务端和前端各写一遍，迟早会不一致。** 遇到「明明没满却提示已满」，
-先看前端有没有自己算一遍 —— 这个例子里服务端完全正确，是前端把它盖掉了。
-
-### 9.19 「结束对局」按钮 —— 只结束这一局，房间留着（2026-10-29 新增）
-
-维护者要求：房间表能**单独结束某一局**，但**不销毁房间**。
-
-#### 和「关闭房间」的区别（两个按钮并存，别搞混）
-
-| 按钮 | 走的方法 | 结果 |
+| 验证项 | 命令 | 结果 |
 |---|---|---|
-| **关闭**（原有） | `disposeRoom(room, 'admin-closed')` | 房间整个没了，所有座位/观战者收到 `room.closed`，玩家被移出同盟、回到大厅 |
-| **结束对局**（新增） | `abortMatch(room)` | 只这一局结束，**房间、座位、玩家都留着**，可以立刻重新开局 |
+| HTTPS 首页 | `Invoke-WebRequest https://stronghold.luobomiao.love/` | 200 |
+| 关键接口 | `/healthz`、`/maintenance.json`、`/data/assets.json` | 200 / 200 / 200 |
+| `/mm/api/account/room` 未登录 | 同上 | 401（预期） |
+| 玩家回得来 | 合计 30 个节点的 `healthz.humans` | 129 → 129（一个不少） |
+| 同盟模拟全流程 | `SP_E2E_NODE=5 SP_E2E_ACCOUNT=3 node repo-sync/tools/e2e-full-play.mjs` | 全通过 |
+| 独立模拟刷新 | `SP_E2E_NODE=9 SP_E2E_ACCOUNT=2 node repo-sync/tools/e2e-solo-play.mjs` | 全通过 |
+| 恢复对局 UI | `node repo-sync/tools/e2e-resume-hint.mjs` | 全通过 |
+| 可恢复的对局数 | `/api/status` 里有 `accountId` 的 started 房间 | 115 位 |
 
-两个按钮都只在**房间表里那间房正在对局时**才显示「结束对局」（没有对局时这个按钮没有意义）。
+**教训**：`restart-nginx.mjs` 报 ✗ 不等于操作失败，要自己核对进程结构和端口。
+反过来，它报 ✓ 也不等于玩家没事 —— 必须查 `healthz.humans` 有没有回来。
 
-#### 实现要点
+---
 
-`abortMatch` 走的是和对局**自然结束完全一样**的收尾路径 `onMatchEnd`：
+### 9.30 `onDisconnect` 漏查隐身观战席位 → 抛异常 → **刷新掉出房间**（2026-10-30 修复）
+
+**现象**：玩家在同盟模拟 / 独立模拟房间里刷新，掉回大厅；观战者刷新后也回不到自己的位置。
+
+**根因**（`server/lobby.js` `onDisconnect`，**上游原版就有这个 bug**）：
 
 ```js
-abortMatch(room, { reason = 'admin-aborted' } = {}) {
-  const ctx = room.matchCtx;
-  if (!ctx || !room.match) return { ok: false, reason: 'no_match' };  // 没对局：如实说，不算失败
-  this.onMatchEnd(room, ctx, { reason, detail: 'admin', adminAborted: true });
-  if (!room.disposed) this.broadcastState(room);
-  return { ok: true, code: room.code, wasRunning: true };
-}
+const room = this.roomOf(session);            // roomOf 认三种身份：座位 / 普通观战 / 隐身观战
+if (!room) return;
+const player = room.seatOf(session.playerId);
+const seat = player || room.spectatorOf(session.playerId);   // ← 漏了 hiddenSpectatorOf
+seat.connected = false;                                      // ← seat 为 null → TypeError
 ```
 
-**为什么必须走 `onMatchEnd` 而不是自己清字段**：它会一并处理这些收尾 ——
-房间退回大厅（`match/matchCtx/matchKey` 置空）、座位 `ready` 重置、房主迁移、
-以及**把「15 分钟未开始对局就解散」的计时推到现在**（`lastMatchEndAt`）。
-少做任何一步，都可能出现「结束对局后房间立刻被解散」这类问题（§9.x 踩过一次）。
+`roomOf()` 第 2950 行明确把**隐身观战**（`hiddenSpectators`，`g.watch` / `adminWatch`）也认成
+「在这个房间里」，但取 `seat` 只查了 `seatOf` 和 `spectatorOf`。于是隐身观战的 socket 一断：
 
-没有对局时返回 `409 no_match`，前端的文案是「这个房间当前没有进行中的对局」
-—— 是**如实说明**，不是报错。
+1. `net.js` 里 `session.connected = false` **已经执行**
+2. `onDisconnect` 余下的 `startGrace` / `broadcastState` / `lastHumanLeftAt` /
+   `callMatch('onDisconnect')` **全部没跑**
 
-#### 三处改动
+房间状态与真实情况脱节 —— 座位上的 `connected` 还是 `true`、宽限计时没启动、
+房间不会因为人走光而回收。玩家刷新回来时看到的是一致性被破坏的房间，
+表现就是「回不到自己的座位 / 掉回大厅」。
 
-| 位置 | 内容 |
-|---|---|
-| `server/lobby.js` | 新增 `abortMatch(room)` |
-| `server/http/routes.js` | 新增 `POST /admin/room/abort`（鉴权与 `/admin/room/close` 完全一致：loopback/内网 + HMAC + 60 秒时限） |
-| `dashboard/server.js` | 新增 `POST /api/rooms/abort`；`closeRoom` 与 `abortMatch` 合并到 `adminRoomAction(action, ...)`，只差路径、失败话术、成功字段 |
-| `dashboard/public/app.js` | 房间表加「结束对局」按钮 + `abortMatch()` + 确认框 |
-| `matchmaker/account.cjs` | 新增 `POST /api/admin2/rooms/abort`（权限复用 `rooms.close`，审计动作 `abort-match`） |
-| `matchmaker/public/admin.html` | 房间表加「结束对局」按钮 + 事件委托处理 |
-
-> ⚠ `admin.html` 被 `.gitignore` 排除（仓库不公开管理后台），这是**既定设计**。
-> 所以它只改本机，不进仓库；`repo-sync/matchmaker/public/admin.html` 那份只是本地副本。
-
-#### 生效方式
-
-- **`server/` 改动必须重启节点** —— 该节点上没重启就用，「结束对局」会返回 405
-  （控制台会翻译成「node-N 还没重启到最新代码」）
-- `dashboard` / `matchmaker` 重启即生效
-- `admin.html` 刷新页面即生效
-
-#### 端到端验证（2026-10-29 实测，node-9）
-
-用测试账号在**空闲节点**上自建房跑一局，然后调接口（不碰玩家房间）：
+**证据（这次是日志给出的答案，不是推理）**：
 
 ```
-abort 接口: 200 {"ok":true,"code":"EABB","humans":1,"roomKept":true}
-房间还在: 是 ✓
-已退回大厅: 是 ✓        （room.state.inMatch 由 true 变 false）
-座位保留: 是 ✓
+$ Select-String -Path logs\*.log -Pattern 'onDisconnect crashed'
+node-1.error-35__2026-10-27_00-00-00.log:5:  2026-10-26T15:05:47: [net] onDisconnect crashed TypeError: Cannot set properties of null (setting 'connected')
+...
+合计 12 个节点、31 次，时间跨度 2026-10-26 ~ 2026-10-30
 ```
 
-**注意**：`/admin/room/abort` 第一次测返回 **405**，原因是那台节点还没重启到新代码 ——
-这正是 §9.13 那个坑的同类表现，不是接口本身的问题。
-
-### 9.22 房间玩家标签两个后台各写一份，改一边忘一边（2026-10-29 重构）
-
-**现象**：同一批玩家，「管理员」标签在节点控制台和 matchmaker 管理后台长得不一样。
-维护者反馈后改了**三轮**才对上，每次都只改到一处：
-
-1. 后台是紫色药丸（`#d9c2ff` / `rgba(160,120,255,…)`），控制台是红色。
-2. 换成琥珀色 —— 但维护者要的是**照抄控制台**，不该自己配色。
-3. 把内层徽章改对红色后，**外框还是红的**：因为后台多了一条
-   `.room-player.is-admin{border-color:rgba(217,83,79,.42)}`，而控制台
-   **从来没有这条规则**（管理员只由内层 `.room-kind.is-admin` 着红，外框保持基础灰）。
-4. 最后发现尺寸也不一样（后台 11px / `3px 6px` / `gap:3px` / `line-height:1.4`，
-   控制台 12px / `3px 7px` / `gap:4px` / `line-height:1.5`）。
-
-**根因**：同一样式在两处各维护一份。这两处后台（`dashboard/`、`matchmaker/public/admin.html`）
-都是本机自写的代码，不是上游产物，所以没有「按作者设计保存」的约束 —— 不一致纯属疏漏。
-
-**修法（单一来源）**：
-
-```
-shared/admin-ui/room-tags.css     ← 唯一权威定义（数值就是控制台原值）
-```
-
-两个服务各自把该目录映射成 `/__admin-ui/*` 挂出去（因为两边各有自己的 `public/`，
-互相读不到对方目录）：
-
-- `dashboard/server.js` → `serveStatic()` 里 `pathname.startsWith('/__admin-ui/')`
-- `matchmaker/server.js` → 同样处理，基准目录用 `SP_ROOT` 或 `../`
-
-页面里都是 `<link rel="stylesheet" href="/__admin-ui/room-tags.css">`。
-**本地只保留容器特有的约束**（控制台 `max-width:360px`、后台 `max-height:4.6rem` 滚动区），
-玩家/观战者标签本身一行都不留。
-
-**以后要改玩家标签样式，只改 `shared/admin-ui/room-tags.css` 一处，两个后台同时生效。**
-
-**验证方法**（两条都必须做）：
-
-```
-# 1. 两个服务都能吐出同一个文件
-curl http://127.0.0.1:3080/__admin-ui/room-tags.css   → 200, text/css
-curl http://127.0.0.1:3090/__admin-ui/room-tags.css   → 200, text/css（字节数相同）
-
-# 2. 本地不再残留重复规则（应为 0）
-grep -c '#rooms-bar \.room-kind\.'  dashboard/public/index.html   → 0
-grep -c '#roomBody \.room-kind\.'   matchmaker/public/admin.html  → 0
-```
-
-路径穿越防护已测：`/__admin-ui/../server.js` → 404，`/__admin-ui/` → 403。
-
-**教训**：
-
-- 用户说「跟 X 一样」就是**字面一致**，不要自作主张换配色（「暖色更顺眼」不是理由）。
-- 抄样式时**先确认目标有没有那条规则**。控制台没有 `.room-player.is-admin`，
-  后台就不该有 —— 多写一条就是多一处漂移点。
-- 两处都自写的 UI，出现不一致时优先**合并成一份**，而不是反复对齐数值。
-
-#### ★★ 2026-10-31：同一个坑又踩了一次（改东西前先读这一节）
-
-维护者报「我明明是管理员，管理后台还是显示玩家」。我去修的时候**没读这一节**，
-于是又走了同样的弯路，而且叠加了另一个错误：
-
-1. **先修错了页面。** 一直以为是 `dashboard`（运维后台 `:3080`），
-   查了数据、接口、还真开了无头浏览器验证 —— 全都是好的。
-   实际维护者截的是 **`matchmaker/public/admin.html`**（管理后台 `:3090`，特征是有「隐身观战」按钮）。
-   → **两个后台是两套独立页面**，问「后台」时要先确认是哪一个。
-2. **`admin.html` 压根没引共享样式。** 它有自己那份 `.room-kind` / `.room-player` 本地副本，
-   而且**没有 `<link rel="stylesheet" href="/__admin-ui/room-tags.css">`**。
-   所以它连「管理员」这个标签都渲染不出来 —— 判据里只读 `p.guest`，写的是
-   `(p.guest ? '游客' : '玩家')`，**从来没读过 `p.admin`**。
-3. **我又自己写了一份配色。** 补 `is-admin` 时手写了一条蓝紫色的本地规则 ——
-   正是本节开头说的「不要再本地复制」。维护者立刻发现颜色和节点控制台不一样。
-
-**这次的完整修法**（`matchmaker/public/admin.html`，该文件被 `.gitignore` 排除，只改本机）：
-
-| 改动 | 说明 |
-|---|---|
-| 渲染逻辑 | 由 `(p.guest ? '游客' : '玩家')` 改为 `p.admin ? 管理员 : p.guest ? 游客 : 玩家`（顺序与 dashboard 一致） |
-| 加上 `<link>` | `<link rel="stylesheet" href="/__admin-ui/room-tags.css">`，排在本地 `<style>` **之前** |
-| 删掉本地重复规则 | `.room-kind`（player/guest/admin）、`.room-player`、`.room-player.is-host`、`em`、`i`、`.room-spectator`、`.room-spectators` 全部删除 |
-| 只保留容器样式 | `.room-players` 的 `max-height:4.6rem` + 滚动条（共享文件里没有） |
-
-改完按本节的验证方法实测：
-
-```
-:3080/__admin-ui/room-tags.css → 200, 3302 字节, text/css
-:3090/__admin-ui/room-tags.css → 200, 3302 字节, text/css   ← 字节数相同
-grep '#rooms-bar \.room-kind\.'  dashboard/public/index.html  → 0
-grep '#roomBody \.room-kind\.'   matchmaker/public/admin.html → 0
-```
-
-**新增教训（写给下一个改这里的人，包括未来的我）**：
-
-- **动任何两处都有的 UI 之前，先读本节。** 这里已经因为「两处各写一份」改过
-  三轮 + 一次事后事故，再写一份本地副本就是第四次。
-- **维护者说「后台」时，先问是 `:3080`（运维）还是 `/mm/admin.html`（管理后台）。**
-  两者的特征：管理后台有「隐身观战 / 结束对局」按钮，运维后台有节点/进程/nginx 面板。
-- 改 `admin.html` 不需要重启服务：`matchmaker/server.js` 的 `serveStatic` 是
-  `fs.readFile` 每次读盘 + `cache-control: no-store`，刷新页面即生效。
-
-**后续事故（2026-10-29，同一天发现）**：合并成共享文件后，**管理后台的玩家标签一度完全没有样式**
-（玩家名变成纯文字、没有胶囊边框）。原因是：
-
-- Node 服务侧已经能吐 `/__admin-ui/room-tags.css`（本机 `:3090` 直连 → 200 ✓）
-- 但 **nginx 里没有加转发规则**，经域名访问 `/__admin-ui/room-tags.css` 被 `location /`
-  打到游戏节点上 → **404**
-
-维护者是通过 `https://stronghold.luobomiao.love/mm/admin.html` 访问后台的，
-所以 CSS 拿不到，标签退化成纯文字。节点控制台那边是本地访问，因此看起来正常 ——
-这种「一边正常一边不正常」最容易误判成样式写错。
-
-**已在 nginx 补上**：
-
-```nginx
-location ^~ /__admin-ui/ {
-  proxy_pass http://127.0.0.1:3090;    # 原样转发，matchmaker 的 serveStatic 认 /__admin-ui/
-  proxy_hide_header Cache-Control;
-  add_header Cache-Control "no-store" always;
-}
-```
-
-**验证（必须两边都测，只测本机会漏掉这类问题）**：
-
-```
-直连: :3090/__admin-ui/room-tags.css                      → 200, 3302 B
-域名: https://stronghold.luobomiao.love/__admin-ui/room-tags.css → 200, 3302 B
-```
-
-**教训**：新增一个静态资源路径时，**Node 服务能返回 ≠ 浏览器能拿到**。
-只要页面实际是通过 nginx 域名访问的，就必须同时在 `nginx.conf` 里加对应的
-`location` 转发。以前 `/mm/*`、`/css/`、`/js/` 都是这么处理的，这次漏了。
-
-**排查这类「样式突然没了」的最快顺序**：
-
-1. 浏览器 F12 → Network，看那个 CSS 是不是 404（本例就是）
-2. 直连 Node 端口试同一个路径（200 说明服务端没问题，问题在 nginx）
-3. 搜 `nginx.conf` 有没有对应的 `location`
-
-### 9.28 部署静态文件：先写 `node-1`，`shared` 里的走 junction（2026-10-30）
-
-**分发脚本的源是 `node-1`，不是 `repo-sync`。** `deploy/sync-nodes.cjs` 第 33 行：
+**修复**（`server/lobby.js` `onDisconnect`）：
 
 ```js
-for (const d of DIRS) ref[d] = walk(path.join(ROOT, 'node-1', d));
+const player = room.seatOf(session.playerId);
+// roomOf() 认三种身份（座位 / 普通观战 / 隐身观战），这里必须同样认全。
+// watcherOf = spectatorOf || hiddenSpectatorOf
+const seat = player || room.watcherOf(session.playerId);
+if (!seat) return;   // 已不在这个房间（被踢/已移除），没有要标记的席位
+seat.connected = false;
 ```
 
-所以「改仓库 → 跑 `--apply`」**什么都不发生**（会输出「完成：共复制 0 个文件」），
-因为 `node-1` 自己还是旧版，30 个节点跟它一致。正确顺序是：
+注意 `watcherOf` **只查观战者，不查座位**，所以必须写成 `seatOf(id) || watcherOf(id)`，
+不能单独用 `watcherOf`。
 
-```
-repo-sync/<file>  →  node-1/<file>  →  node-2…30
-                       ↑ 先手动覆盖这一份
-```
+**回归测试**：`test/match/on-disconnect-seat.test.js`（4 个用例，含「旧表达式返回 null」
+这一条直接锁死崩溃点）。
 
-**这一条以前没写清楚，2026-10-30 踩到过一次。**
+**教训 —— 先看日志**：
 
-#### 哪些目录是 junction（写了就等于写 30 个节点）
+这个 bug 在 `.error` 日志里躺了 5 天、31 条记录，而我一开始**没有去读日志**，
+先猜是 `onWelcome` 里 `prevId !== msg.playerId` 导致 `backToLobby()`，往 `net.js` 插了一堆
+`[diag-*]` 探针、重启节点做实验——全部白费。**一条 `Select-String 'crashed'` 就找到了。**
+见第七节 §7.0 的铁律。
 
-| 路径 | 类型 | 指向 |
+**同类隐患（都查过一遍，结论如下）**：凡是「先判定在房间里，再自己取席位」的地方，都要 `seatOf || watcherOf`。
+`Select-String -Path server\lobby.js -Pattern 'spectatorOf\('` 一共 20 处，逐个看过：
+
+| 位置 | 是否要改 | 理由 |
 |---|---|---|
-| `node-N/public/i18n` | **Junction** | `shared/public/i18n` |
-| `shared/` 其余部分 | Junction | 由部署脚本建立 |
-| `node-N/public/js/` | **真实目录**（逐节点副本） | — |
-| `node-N/server/` | **真实目录**（逐节点副本） | — |
+| `onDisconnect`（1133） | ✅ 已改 | 会崩，本节的 bug |
+| `startGrace` 定时器（3349） | ✅ 已改 | 不崩，但 `if (!s \|\| s.connected) return` 让**隐身观战者过期后永不移除**，席位永久残留 |
+| `seatGen`（1022） | ❌ 不用改 | 有 `seat ?` 判空；观战者本来就没有 contentGen 语义 |
+| `settingsCs`（2433） | ❌ 不用改 | 有 `seat &&` 判空；隐身观战者不改设置 |
+| 其余 `if (room.spectatorOf(...)) return fail(ERR.SPECTATOR)` | ❌ 不用改 | 是**权限判断**：隐身观战者本来就不该走玩家操作路径，判不到反而是对的 |
 
-推论：
+`seatGen` / `settingsCs` 这两处保留 `spectatorOf` 是**故意的**：它们要的是「普通观战席」，
+不是「任何观战者」。不要为了统一而全部换成 `watcherOf`。
 
-- **改 i18n 文案**：写一次 `shared/public/i18n/`（或经 `node-1/public/i18n/`，
-  它指向同一个地方），30 个节点**立刻全部生效**，`sync-nodes` 会报「0 处差异」——
-  **这是正常的，不是没同步**。
-- **改 `public/js/`、`server/`**：必须走上面的「先 node-1 再分发」两步。
-
-#### 生效条件
-
-| 改动 | 生效方式 |
-|---|---|
-| `public/js/**`、`public/i18n/**`、`public/css/**` | **玩家刷新即可**，不需要重启节点 |
-| `server/**` | 必须重启节点（按重启纪律，只动 `matches=0` 的） |
-
-`/js/**` 线上返回 `Cache-Control: no-cache`，所以刷新一定能拿到新版，不会卡在旧缓存。
-
-#### 验证命令
-
-```powershell
-# 1. 一致性（必须 0 处差异）
-$env:SP_ROOT='D:\Stronghold-Protocol'; node repo-sync\deploy\sync-nodes.cjs
-
-# 2. 线上真的返回新内容（挑几个节点直连 port，再走一次 nginx）
-(Invoke-WebRequest "http://127.0.0.1:3001/js/screens/<file>.js" -UseBasicParsing).Content.Contains('<新代码里的唯一字符串>')
-```
+---
 
 ### 9.27 `SP_REDIS_URL` 断点持久化 —— **0.3.1 遗留代码，官方已移除（重要）**
 
@@ -3042,53 +3785,60 @@ Get-NetTCPConnection -State Listen -LocalPort 6379
 #   node 直连：SCAN 0 COUNT 500，看 sp:n*:cp:* 的 savedAt
 ```
 
-### 9.26b 维护者说「设计稿」时，不要碰生产（2026-10-30，重复犯错）
 
-**事故**：维护者在讨论 `docs-plan/login-design/` 里的登录界面设计稿，几次要求微调
-（改示例邮箱、改提示文案、调手机上的疏密）。我**两次**把改动直接落到生产环境：
+### 9.28 部署静态文件：先写 `node-1`，`shared` 里的走 junction（2026-10-30）
 
-1. 改了 `matchmaker/public/account-title.js` 的占位符 + 升 nginx `sub_filter` 的 `?v=`
-   + 重启 nginx；
-2. 第二次同样改了 `account-title.js` 并升版本号，**改完还没及时回滚**，被追问才撤回。
+**分发脚本的源是 `node-1`，不是 `repo-sync`。** `deploy/sync-nodes.cjs` 第 33 行：
 
-维护者原话：「你给我看的新界面。没让你改现在线上的版本」「我是说设计稿的。
-不要跟我扯到线上版本」。
+```js
+for (const d of DIRS) ref[d] = walk(path.join(ROOT, 'node-1', d));
+```
 
-#### 根因
+所以「改仓库 → 跑 `--apply`」**什么都不发生**（会输出「完成：共复制 0 个文件」），
+因为 `node-1` 自己还是旧版，30 个节点跟它一致。正确顺序是：
 
-设计稿里出现过的字符串（`123456@qq.com`、`QQ 邮箱（如 …）`）**和线上代码里的完全一样**
-—— 因为设计稿本来就是仿照线上界面画的。于是「改设计稿里的这句」和「改线上那句」
-指的东西看起来是同一个，我按线上的位置去找，就改到生产上了。
+```
+repo-sync/<file>  →  node-1/<file>  →  node-2…30
+                       ↑ 先手动覆盖这一份
+```
 
-#### 规则
+**这一条以前没写清楚，2026-10-30 踩到过一次。**
 
-| 维护者说的是 | 只许动 | 绝对不动 |
+#### 哪些目录是 junction（写了就等于写 30 个节点）
+
+| 路径 | 类型 | 指向 |
 |---|---|---|
-| **「设计稿」/「预案」/指向 `docs-plan/`** | `docs-plan/` 下的文件 | `matchmaker/`、`nginx/`、`node-*/`、`dashboard/`、`shared/` |
-| 「线上」「现在玩家看到的」 | 生产环境 | 先走重启纪律，并说明会碰哪些进程 |
+| `node-N/public/i18n` | **Junction** | `shared/public/i18n` |
+| `shared/` 其余部分 | Junction | 由部署脚本建立 |
+| `node-N/public/js/` | **真实目录**（逐节点副本） | — |
+| `node-N/server/` | **真实目录**（逐节点副本） | — |
 
-**判断方法**：先看维护者这句话的上下文里有没有 `docs-plan/` 的路径、或者引用的是
-「设计稿」这个词本身。有 → 只改文档目录。
+推论：
 
-**要碰生产时，先一句话问清楚**，不要顺手改。改错了要**立刻**回滚并说明，
-不要等到被追问。
+- **改 i18n 文案**：写一次 `shared/public/i18n/`（或经 `node-1/public/i18n/`，
+  它指向同一个地方），30 个节点**立刻全部生效**，`sync-nodes` 会报「0 处差异」——
+  **这是正常的，不是没同步**。
+- **改 `public/js/`、`server/`**：必须走上面的「先 node-1 再分发」两步。
 
-#### 同类错误（同一模式：一句话做了三件事）
+#### 生效条件
 
-| 维护者说 | 我做的 | 该做的 |
-|---|---|---|
-| 改 `(如 123456@qq.com)` | 改线上代码 + 升 nginx 版本 + 重启 nginx | 只改设计稿那一处 |
-| 「不是让你这么写」 | 把整行说明都删了 | 只改括号里的数字 |
-| 设计稿的登录界面 | 改 `account-title.js` | 改 `docs-plan/login-design/` |
+| 改动 | 生效方式 |
+|---|---|
+| `public/js/**`、`public/i18n/**`、`public/css/**` | **玩家刷新即可**，不需要重启节点 |
+| `server/**` | 必须重启节点（按重启纪律，只动 `matches=0` 的） |
 
-**一句话原则：按最小改动做；不确定就先用一句话问，不要顺手「优化」别的。**
+`/js/**` 线上返回 `Cache-Control: no-cache`，所以刷新一定能拿到新版，不会卡在旧缓存。
 
-#### 顺带发现（与本节相关）
+#### 验证命令
 
-`matchmaker/public/account-title.js` 里有一段 **9 行生产环境本地改动从未提交进 git**
-（2026-10-28 的「只在标题页拦截开始按钮」修复，`if (!titleScreen()) return;`）。
-`repo-sync` 里的那份有这 9 行，`git show HEAD:` 里没有 —— 即生产上有一个游离于版本库
-之外的补丁。**重新部署 `repo-sync` 版本会把它覆盖掉。** 尚未提交，需要维护者决定。
+```powershell
+# 1. 一致性（必须 0 处差异）
+$env:SP_ROOT='D:\Stronghold-Protocol'; node repo-sync\deploy\sync-nodes.cjs
+
+# 2. 线上真的返回新内容（挑几个节点直连 port，再走一次 nginx）
+(Invoke-WebRequest "http://127.0.0.1:3001/js/screens/<file>.js" -UseBasicParsing).Content.Contains('<新代码里的唯一字符串>')
+```
+
 
 ### 9.26 「节点重启保住对局」做不到 —— 实验记录与结论（2026-10-30）
 
@@ -3235,6 +3985,56 @@ startMatch(room, key = null) {    // ← 只接受 2 个参数
 - 备份保留在 `backups/persist-local-restore-20261030-011619/`
 - node-5 的 3 个测试检查点已从 Redis 清理
 - 房间 / 会话 / 断线重连的持久化**不受影响，正常运行**
+
+
+### 9.26b 维护者说「设计稿」时，不要碰生产（2026-10-30，重复犯错）
+
+**事故**：维护者在讨论 `docs-plan/login-design/` 里的登录界面设计稿，几次要求微调
+（改示例邮箱、改提示文案、调手机上的疏密）。我**两次**把改动直接落到生产环境：
+
+1. 改了 `matchmaker/public/account-title.js` 的占位符 + 升 nginx `sub_filter` 的 `?v=`
+   + 重启 nginx；
+2. 第二次同样改了 `account-title.js` 并升版本号，**改完还没及时回滚**，被追问才撤回。
+
+维护者原话：「你给我看的新界面。没让你改现在线上的版本」「我是说设计稿的。
+不要跟我扯到线上版本」。
+
+#### 根因
+
+设计稿里出现过的字符串（`123456@qq.com`、`QQ 邮箱（如 …）`）**和线上代码里的完全一样**
+—— 因为设计稿本来就是仿照线上界面画的。于是「改设计稿里的这句」和「改线上那句」
+指的东西看起来是同一个，我按线上的位置去找，就改到生产上了。
+
+#### 规则
+
+| 维护者说的是 | 只许动 | 绝对不动 |
+|---|---|---|
+| **「设计稿」/「预案」/指向 `docs-plan/`** | `docs-plan/` 下的文件 | `matchmaker/`、`nginx/`、`node-*/`、`dashboard/`、`shared/` |
+| 「线上」「现在玩家看到的」 | 生产环境 | 先走重启纪律，并说明会碰哪些进程 |
+
+**判断方法**：先看维护者这句话的上下文里有没有 `docs-plan/` 的路径、或者引用的是
+「设计稿」这个词本身。有 → 只改文档目录。
+
+**要碰生产时，先一句话问清楚**，不要顺手改。改错了要**立刻**回滚并说明，
+不要等到被追问。
+
+#### 同类错误（同一模式：一句话做了三件事）
+
+| 维护者说 | 我做的 | 该做的 |
+|---|---|---|
+| 改 `(如 123456@qq.com)` | 改线上代码 + 升 nginx 版本 + 重启 nginx | 只改设计稿那一处 |
+| 「不是让你这么写」 | 把整行说明都删了 | 只改括号里的数字 |
+| 设计稿的登录界面 | 改 `account-title.js` | 改 `docs-plan/login-design/` |
+
+**一句话原则：按最小改动做；不确定就先用一句话问，不要顺手「优化」别的。**
+
+#### 顺带发现（与本节相关）
+
+`matchmaker/public/account-title.js` 里有一段 **9 行生产环境本地改动从未提交进 git**
+（2026-10-28 的「只在标题页拦截开始按钮」修复，`if (!titleScreen()) return;`）。
+`repo-sync` 里的那份有这 9 行，`git show HEAD:` 里没有 —— 即生产上有一个游离于版本库
+之外的补丁。**重新部署 `repo-sync` 版本会把它覆盖掉。** 尚未提交，需要维护者决定。
+
 
 ### 9.25 救援提示「本轮合格联防队友的生命值都不足 11」与实际不符（2026-10-29）
 
@@ -3445,76 +4245,6 @@ cmd /c 'powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -F
 - 定时任务里的 PowerShell 脚本**必须带 BOM**，否则中文会毁掉整个文件。
 - `$ErrorActionPreference = 'SilentlyContinue'` 在运维脚本里是双刃剑：
   它能避免噪音，但也会让「脚本根本没跑起来」伪装成「没有可做的事」。
-
----
-
-### 9.23b 脚本正常工作时的副作用：玩家会看到「连接已中断」一闪（2026-10-31）
-
-**现象**：维护者反馈「为什么我这里还是会有出现网络连接中断的提示呢？但是很快就好了」。
-
-**不是网络问题。** 是 `rolling-restart.ps1` 在**正常履职**：每 10 分钟重启一批「空闲 + 旧代码」的节点。
-
-当天因为 `server/` 被改了五六次（管理员判据、徽章、挂机检测…），每改一次 30 个节点全变成「旧代码」，
-脚本就一直追着重启。日志实测：
-
-```
-23:02:15  restarted 2/2 (12,26)
-23:42:14  restarted 1/1 (1)
-```
-
-**60 分钟内有 21 个节点被重启过。** 玩家连的那个节点一旦被重启，就会看到
-「与服务器的连接已中断，正在重连」，1–3 秒后自动恢复 —— 这正是「一闪就好」的来源。
-
-#### 关键结论：**脚本不会被动触发，只有 `server/` 内容变了才会重启**
-
-```powershell
-# 内容指纹：server/ 树内容没变就把 codeAt 压回部署时刻，避免无意义重启
-$newest = Get-ChildItem $serverDir -Recurse -File -Filter '*.js' | Measure-Object LastWriteTime -Maximum
-```
-
-指纹**只覆盖 `node-1\server` 下的 `.js`**。所以：
-
-| 改了什么 | 会触发重启吗 |
-|---|---|
-| `server/**/*.js` | ✅ 会（这是设计意图） |
-| `public/js`、`public/css` | ❌ 不会（刷新页面即可） |
-| `MAINTENANCE.md`、`deploy/*.ps1`、`nginx/conf` | ❌ 不会 |
-| `matchmaker/**` | ❌ 不会（那是 `pm2 restart matchmaker` 的事） |
-
-> **推论：改完 `server/` 之后的一两小时内，玩家可能会感觉到几次闪断。**
-> 这是「让所有人尽快拿到修复」的代价，不是故障。要避免就在人少的时候改 `server/`。
-
-#### 观察与操作
-
-```powershell
-# 还有多少节点在跑旧代码（build 不一致即旧代码）
-# 打开任意一页看左上角节点号 → /healthz 的 build 对比多数派
-
-# 最近的重启记录
-Get-Content D:\Stronghold-Protocol\logs\rolling-restart.log -Tail 20
-
-# 计划任务是否存在 / 是否在跑
-schtasks /Query /TN "SP-Rolling-Restart" /FO LIST
-```
-
-**要不要临时停掉？** 一般**不用**：
-
-- 它只动完全空闲的节点（`matches=0 && rooms=0`），不会打断对局；
-- 代码稳定后它自然就闲下来了（内容指纹没变 → 不重启任何东西）；
-- 停掉反而会让剩下的旧代码节点一直跑旧版本。
-
-只有当「故意让某台机器停在旧代码做对比测试」时，才需要临时禁用。
-
-#### 当天收尾时的状态（供对照）
-
-```
-db206a112ca2 → 28 个节点 ✅
-606fdcd17256 →  1 个（node-17，有对局）
-bb91f23812e1 →  1 个（node-13，有对局）
-```
-
-剩下 2 个等它们空下来会被自动处理。**不需要人工干预。**
-
 - 判断「代码是否更新」用**内容指纹**，永远不要用 mtime。
 
 ### 9.18 HTTPS 证书续期一直失败（2026-10-29 修复）
@@ -3948,6 +4678,751 @@ node tools\verify-revive.mjs 9 <userToken>
 `matches > 0` 的节点**绝对不能重启**，交给计划任务 `SP-Rolling-Restart`（每 10 分钟）
 在对局结束、节点空闲时自己补上。
 
+### 9.40 皮肤模型不生效：`assets.json` 缺 `anims` → `validSpine()` 回退本体（2026-11-01 修复）
+
+> **排查绕了很多弯路，先把结论放前面。**
+> 皮肤模型不显示**不是** CDN 的问题，**不是** nginx 的问题，**也不是**代码问题。
+> 是 `assets.json` 里那条皮肤记录**少了一个 `anims` 字段**，导致 `validSpine()` 返回 `false`，
+> `spineEntry()` 走了兜底分支，画了干员本体。
+
+#### 故障表现
+
+给「凛御银灰」（`char_1045_svash2`）戴上「雪覆伦城」（`char_1045_svash2_sale_20`）后：
+
+- **立绘变了**（说明皮肤选择、`room.skins` 推送都正常）
+- **战场上的 Q 版小人还是本体**
+
+#### 根因
+
+`public/js/assets.js:320`：
+
+```js
+export function validSpine(sp) {
+  return isObj(sp) && typeof sp.skel === 'string' && /\.skel$/.test(sp.skel)
+      && typeof sp.atlas === 'string'
+      && isObj(sp.anims);        // ← 必须有 anims
+}
+```
+
+`spineEntry()`（`assets.js:229`）拿到皮肤后先过 `validSpine`：
+
+```js
+if (skinHasModel(skin)) {
+  const sp = ...skin.spine.front;
+  if (validSpine(sp)) return sp;    // ← anims 缺失 → 这里失败
+}
+// 兜底：干员本体
+if (isObj(ch.spine)) return ch.spine.front;
+```
+
+手工加「雪覆伦城」那次只写了 `skel` / `atlas` / `textures` / `pma`，**漏了 `anims`**。
+
+#### 怎么一眼看出是这个问题
+
+```js
+// Console
+fetch('/data/assets.json').then(r => r.json()).then(m => {
+  const s = m.chars['char_1045_svash2'].skins['char_1045_svash2_sale_20'].spine.front;
+  console.log('keys:', Object.keys(s));      // 缺 anims 时这里只有 skel,atlas,textures,pma
+  console.log('anims:', s.anims);            // undefined
+});
+```
+
+或直接查全服：
+
+```powershell
+node -e "const a=require('./shared/data/assets.json');let bad=[];for(const[c,ch]of Object.entries(a.chars))for(const[s,v]of Object.entries(ch.skins||{})){const f=v.spine&&v.spine.front;if(f&&!(f.anims&&typeof f.anims==='object'))bad.push(c+'/'+s)}console.log('缺 anims:',bad.length,bad.slice(0,10))"
+```
+
+#### 修法
+
+从**干员本体**复制 `anims`（连同 `animations` / `events` / `hits` / `bounds`）。
+皮肤和本体是同一套骨骼，动画名一致，安全。先验证：
+
+```powershell
+node -e "const fs=require('fs');const t=fs.readFileSync('./shared/assets/spine/op/<干员>/<皮肤>/front/<皮肤>.skel').toString('latin1');for(const n of ['Idle','Attack_A','Skill_2','Die']){process.stdout.write(n+':'+(t.includes(n)?'Y':'N')+' ')}"
+```
+
+4 个以上命中即可复制。
+
+#### 血的教训：**浏览器缓存让「改好了但看不到」**
+
+修好 `assets.json` 后**反复刷新仍是本体**，因为 `/data/assets.json` 被 nginx 设成
+`Cache-Control: public, max-age=86400`（24 小时）——**浏览器在 24 小时内根本不发请求**。
+只有 `Ctrl+F5` 能绕过。见 §9.42。
+
+#### 排查中被推翻的几个错误结论（记下来，别再犯）
+
+| 当时的判断 | 实际情况 |
+|---|---|
+| 「资源站 404 导致模型回退」 | ❌ nginx `try_files $uri @assets_origin` **磁盘优先**，本地有就直接给，实测 200 + 字节数完全一致 |
+| 「王冠是雪覆伦城的特征，所以已经是皮肤」 | ❌ 用**贴图颜色分布**才是硬证据：本体蓝色 26.8% / 白色 22.9% / 金色 0.2%；雪覆伦城蓝色 5.5% / 白色 36.5% / 金色 1.9% |
+| 「列全部部件，独有部件多就是皮肤」 | ❌ 论证方式无效，部件表不能证明画的是哪套 |
+
+**判断「画的到底是哪套模型」，最快的办法是比贴图颜色分布：**
+
+```python
+from PIL import Image
+for label,p in [("BODY",body_png),("SKIN",skin_png)]:
+    img = Image.open(p).convert("RGBA")
+    px = [q for q in img.getdata() if q[3] > 200]
+    n = len(px)
+    blue  = sum(1 for r,g,b,a in px if b > r+30 and b > g+10)
+    white = sum(1 for r,g,b,a in px if r>200 and g>200 and b>200)
+    gold  = sum(1 for r,g,b,a in px if r>150 and g>110 and b<110 and r>b+60)
+    print(f"{label}: 蓝{blue/n*100:.1f}% 白{white/n*100:.1f}% 金{gold/n*100:.1f}%")
+```
+
+---
+
+### 9.41 26 套皮肤立绘：只在 `skin-upload/` 中转，**没进生产目录也没登记**（2026-11-01 补齐）
+
+#### 故障表现
+
+26 套皮肤的**立绘和头像不显示**（模型正常）。affected: 远山「未知的旅行」、梅「夏卉 FA054」、
+星源「所愿」、讯使「无言狂响」「新航线」、狮蝎「面纱之下」「无形悼挽」、安哲拉「暗矢」、
+暴行「地底三百米」「家传秘方」「又一年秋季」、诗怀雅「街道狂花」、芳汀「危险邀约」「随性」、
+暴雨「幽苔」、亚叶「残葛」、锡兰「悠然假日 HD49」、伊桑「渗透」、布丁「火树灵」、
+海蒂「书信零落」、万顷「万顷阳光」、极光「极昼捕手」、蜜莓「荒野之后」「洇灵雨」、
+桑葚「植药」「照冰轮」。
+
+#### 根因：三个地方都缺
+
+| 位置 | 修前 | 修后 |
+|---|---|---|
+| `skin-upload/batch2/skin/`（中转） | ✅ 26 | ✅ 26 |
+| **`shared/assets/char/skin/`（生产）** | ❌ **0** | ✅ **295**（269+26） |
+| **`shared/assets/char/skin_avatar/`（生产）** | ❌ **0** | ✅ **295** |
+| `assets.json` 的 `portrait` / `avatar` | ❌ **26/26 未登记** | ✅ 26/26 |
+| 资源站 | ❌ 404 | ✅ 26/26（维护者同步） |
+
+> **踩坑**：曾一度以为“本地有、只是 CDN 缺”，因为只查了中转目录 `skin-upload/batch2/`。
+> **必须查生产目录** `shared/assets/char/skin/`。
+
+#### 修法
+
+```powershell
+# 1) 备份
+Copy-Item shared\data\assets.json "shared\data\assets.json.bak-before-26-skins-$(Get-Date -Format yyyyMMdd-HHmmss)"
+
+# 2) 复制到生产目录（junction，30 节点即时可见）
+$src = 'D:\Stronghold-Protocol\skin-upload\batch2'
+$dst = 'D:\Stronghold-Protocol\shared\assets\char'
+Copy-Item "$src\skin\*.png"        "$dst\skin\"        -Force
+Copy-Item "$src\skin_avatar\*.png" "$dst\skin_avatar\" -Force
+
+# 3) 补 assets.json（portrait / avatar），字段顺序对齐已生效的皮肤：
+#    name, portrait, avatar, type, spine
+```
+
+`portrait` = `https://assets.luobomiao.love/assets/char/skin/<skinId>.png`
+`avatar`   = `https://assets.luobomiao.love/assets/char/skin_avatar/<skinId>.png`
+
+#### 验证
+
+```powershell
+# A. 全服皮肤字段完整性（应为 532/532 全有）
+node -e "const a=require('./shared/data/assets.json');let t=0,p=0,v=0,s=0;for(const ch of Object.values(a.chars))for(const r of Object.values(ch.skins||{})){t++;if(r.portrait)p++;if(r.avatar)v++;const f=r.spine&&r.spine.front;if(f&&f.anims)s++}console.log('皮肤',t,'portrait',p,'avatar',v,'spine',s)"
+
+# B. 经 nginx（磁盘优先）
+curl.exe -sI https://127.0.0.1/assets/char/skin/char_109_fmout_epoque_2.png
+```
+
+#### 立绘尺寸规范
+
+| 类型 | 尺寸 |
+|---|---|
+| `char/skin/*.png`（立绘） | **180×360** |
+| `char/skin_avatar/*.png`（头像） | **180×180** |
+
+#### 资源站同步后为什么“字节不同但没问题”
+
+资源站 52 个文件与本地**字节数都不同**（如 129108 B → 64013 B），但：
+
+- IHDR 完全一致（180×360、8-bit RGBA、无隔行）
+- **解码后像素 52/52 完全一致**
+
+资源站只是用了更高的 PNG 压缩（本地 16 个 IDAT 块 → 资源站 1 个）。
+**这是正常的，别当成“传错了”。** 想确认就跑一次 PIL 逐像素比对。
+
+---
+
+### 9.42 nginx 缓存策略：`max-age=86400` 是「改完看不到」的元凶（2026-11-01 修复）
+
+> 这条是 §9.40 排查时**真正的绊脚石**：修好了，但玩家看不到。
+
+#### 修前的实际行为（实测）
+
+| 请求 | 上游节点返回 | nginx 覆盖成 |
+|---|---|---|
+| `/data/assets.json` | `no-cache`（带 ETag） | **`public, max-age=86400`** |
+| `/data/local-assets.json` | `no-cache` | **`public, max-age=86400`** |
+| `/data/local-fx.json` | `no-cache` | `no-cache`（没覆盖） |
+| `/js/main.js`（无参数） | `no-cache` | 透传 → `no-cache` ✅ |
+| **`/js/main.js?v=1`** | **`public, max-age=31536000, immutable`** | **透传 → 缓存 30 天** ❌ |
+| `/css/*.css` | — | `no-cache, must-revalidate` ✅ |
+
+两个问题：
+
+1. **清单 24 小时不校验** → 改完 `assets.json`，玩家当天看不到（只有 `Ctrl+F5` 能绕过）
+2. **`/js/` 规则漏了 `proxy_hide_header`** → 一旦有人用 `/js/x.js?v=版本` 引用脚本，
+   浏览器就把它缓存 **30 天**，部署后刷新也拿不到新代码（`/css/` 早就处理了，`/js/` 漏了）
+
+#### 修法（`nginx/conf/nginx.conf`）
+
+**1）`/js/` 对齐 `/css/`**（原 L325 附近）：
+
+```nginx
+location ~* ^/js/.*\.js$ {
+  proxy_pass http://127.0.0.1:$sp_port;
+  proxy_http_version 1.1;
+  proxy_set_header Connection "";
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_hide_header Cache-Control;                                   # ← 新增
+  add_header Cache-Control "no-cache, must-revalidate" always;       # ← 新增
+}
+```
+
+**2）三个清单 `86400` → `1800`**（30 分钟）：
+
+```nginx
+location = /data/assets.json {
+  ...
+  proxy_hide_header Cache-Control;
+  add_header Cache-Control "public, max-age=1800" always;
+}
+location = /data/local-assets.json {  ...  同上 ... }
+location = /data/local-fx.json {
+  ...
+  proxy_hide_header Cache-Control;                             # ← 新增（原先没写）
+  add_header Cache-Control "public, max-age=1800" always;      # ← 新增
+}
+```
+
+#### 为什么是 1800 秒
+
+| 值 | 改完多久全员看到 | 每天校验次数（100 玩家） | 评价 |
+|---|---|---|---|
+| `86400`（原） | **24 小时** | 0 | 盲区太大，排查时被绕死 |
+| **`1800`（现）** | **30 分钟** | ~4,800 次 304 ≈ 几 MB | **均衡，清单不常改** |
+| `300` | 5 分钟 | ~28,800 次 ≈ 十几 MB | 太勤，没必要 |
+
+**关键点**：浏览器到时带 `If-None-Match` 来问，**内容没变只回 304（几百字节）**，
+不是重新拉 3.9 MB。所以缩短 `max-age` 的代价很小。
+
+#### 验证（重启 nginx 后）
+
+```powershell
+foreach ($p in '/data/assets.json','/data/local-assets.json','/data/local-fx.json','/js/main.js?v=1') {
+  $r = Invoke-WebRequest "https://127.0.0.1$p" -Method Head -SkipCertificateCheck -UseBasicParsing
+  "$p  ->  $($r.Headers['Cache-Control'])"
+}
+# 期望：
+#   /data/assets.json         ->  public, max-age=1800
+#   /data/local-assets.json   ->  public, max-age=1800
+#   /data/local-fx.json       ->  public, max-age=1800
+#   /js/main.js?v=1           ->  no-cache, must-revalidate
+```
+
+#### 不影响资源包玩家
+
+资源包走**完全独立**的通道，全部 `no-store`，跟 `/data/*.json` 无关：
+
+```nginx
+location = /__bundle/current/assets.tar.gz   { add_header Cache-Control "no-store"; }
+location = /__bundle/current/manifest.json   { add_header Cache-Control "no-store"; }
+location = /__bundle/current/version         { add_header Cache-Control "no-store"; }
+```
+
+改 `max-age` 对下载资源包的人**零影响**。
+
+#### 状态
+
+**已重启并验证生效（2026-11-02 00:38）。** 备份：
+`nginx/conf/nginx.conf.bak-before-js-cachehdr-20261101-234326`。
+
+实测响应头（`https://127.0.0.1`，HEAD）：
+
+| 请求 | 实测 Cache-Control | 判定 |
+|---|---|---|
+| `/data/assets.json` | `public, max-age=1800` | ✅ 原 86400 |
+| `/data/local-assets.json` | `public, max-age=1800` | ✅ 原 86400 |
+| `/data/local-fx.json` | `public, max-age=1800` | ✅ 原无覆盖 |
+| `/js/main.js?v=1` | `no-cache, must-revalidate` | ✅ 原 31536000 immutable |
+| `/js/render/units.js?v=1` | `no-cache, must-revalidate` | ✅ 子目录同样覆盖 |
+| `/js/main.js`（无参数） | `no-cache, must-revalidate` | ✅ 未被改坏 |
+| `/css/theme.css` | `no-cache, must-revalidate` | ✅ 未受影响 |
+
+**两个验证坑**：
+
+1. `/js/main.js?v=1` 实际返回的字符串顺序是 **`must-revalidate, no-cache`**，和本文档
+   上面期望值写的 `no-cache, must-revalidate` **字面不同、语义相同** —— nginx 会重排
+   `add_header` 的值。**按字符串相等比对会误判成失败**，应按指令集合比对。
+2. `proxy_hide_header` 生效的标志是「只有一条」：若漏了 hid，`add_header` 会与上游的
+   值**叠加成两行**。实测只有一条，说明 `proxy_hide_header` 确实起作用了。
+
+---
+
+### 9.43 nginx 重启脚本会**误报「中止」**：它把 `worker_processes` 读成 2，实际是 4（2026-11-01）
+
+> 看到「✗ 仍有 1 个 nginx 进程无法结束，已中止」**先别慌**，很可能服务是好的。
+
+#### 现象
+
+`node tools/restart-nginx.mjs --apply` 输出：
+
+```
+=== 当前 nginx 状态 ===
+  pid=... 共 5 个进程（配置 worker_processes 2，正常应为 master + 2 worker = 3）
+  ⚠ 有 2 个残留 worker —— 这正是素材加载变慢的原因
+...
+✗ 仍有 1 个 nginx 进程无法结束，**已中止**，没有启动新的
+Command failed: ...
+```
+
+#### 实际情况
+
+`nginx.conf` 里写的是 **`worker_processes 4;`**，正常结构就是 **1 master + 4 worker = 5 个**。
+
+脚本读错了配置（以为是 2），于是：
+
+1. 把 3 个**正常 worker** 当成「残留」
+2. 等归零永远等不到 → 强杀
+3. 强杀后检查 → 进程句柄还没被 Windows 完全回收 → **误报「还有 1 个无法结束」**
+4. 报「中止」，但服务其实已经起来了
+
+#### 怎么确认服务到底好不好
+
+```powershell
+# 1) 端口与 HTTP
+Test-NetConnection 127.0.0.1 -Port 443 -InformationLevel Quiet     # True
+Invoke-WebRequest https://127.0.0.1/ -SkipCertificateCheck -UseBasicParsing | % StatusCode   # 200
+
+# 2) 进程结构（关键：看 ppid）
+Get-CimInstance Win32_Process -Filter "Name='nginx.exe'" |
+  Select-Object ProcessId,ParentProcessId,CommandLine
+```
+
+**判据：**
+- 有 **1 个 master**：它的 `ParentProcessId` **不是** nginx 自己（是 shell / 计划任务）
+- 其余 **4 个 worker**：`ParentProcessId` **都指向那个 master**
+- 全部 `StartTime` 是同一时刻 → 干净
+
+```powershell
+# 3) pid 文件指向 master
+Get-Content D:\Stronghold-Protocol\nginx\logs\nginx.pid
+```
+
+#### 结论
+
+**脚本的「中止」是误报，不代表重启失败。** 每次重启后都按上面三条自己确认一遍，
+不要只看脚本退出码。
+
+#### ✅ 已修复（2026-11-02 01:10）
+
+脚本不再写死数字，改成**从 `nginx.conf` 现读 `worker_processes`**：
+
+```javascript
+import { readFileSync } from 'node:fs';
+
+function readWorkerProcesses() {
+  try {
+    const conf = readFileSync(NGX_DIR + '\\conf\\nginx.conf', 'utf8');
+    // 只认行首指令；被 # 注释掉的会先被排除
+    const m = conf.match(/^\s*worker_processes\s+([^;]+);/m);
+    if (!m) return null;
+    const v = m[1].trim();
+    return /^\d+$/.test(v) ? Number(v) : null;   // auto 等算不出来 → null
+  } catch { return null; }
+}
+const WORKERS = readWorkerProcesses();
+/** master + worker；读不到配置时 null = 不做上限判断（避免用错数字误杀） */
+const EXPECTED_MAX = WORKERS == null ? null : WORKERS + 1;
+```
+
+三处输出同步改成读变量，`null` 时不做上限判断（不误报）：
+第 0 步的「正常应为 master + N worker」、残留 worker 告警、第 5 步的「进程数 ≤ N」。
+
+**改动文件（两份，内容必须一致）：**
+`D:\Stronghold-Protocol\tools\restart-nginx.mjs` 与 `D:\Stronghold-Protocol\repo-sync\tools\restart-nginx.mjs`
+
+**验证（2026-11-02 01:13 实测）：**
+
+| 场景 | 输出 | 判定 |
+|---|---|---|
+| `worker_processes 4;`（当前） | `共 5 个进程（配置 worker_processes 4，正常应为 master + 4 worker = 5）` | ✅ 不再报残留 |
+| `worker_processes 2;` | `…master + 2 worker = 3` | ✅ 跟随配置 |
+| `worker_processes 8;` | `…master + 8 worker = 9` | ✅ 跟随配置 |
+| 该行被 `#` 注释 | `读不出数字（可能是 auto），不做上限判断` | ✅ 不误报 |
+| `worker_processes auto;` | 同上 | ✅ 不误报 |
+
+两份文件 `SHA256` 一致（`A0CDED54CF4D7827…`），`node --check` 均通过，`nginx -t` 仍 successful。
+**本次只改文件、未重启 nginx**，服务全程 HTTP 200、33 个 pm2 在线。
+
+备份：`tools/restart-nginx.mjs.bak-before-expectedmax-20261102-011038`（repo-sync 同款）。
+
+#### 仍需注意
+
+上面「真正的判据」那条**依然有效**——脚本现在数字对了，但重启后仍应按
+账户 / `SessionId` / 父进程断链自查，不要只看脚本退出码。
+
+---
+
+#### ⚠ 这个 ✗ 是**必然**的，不是偶发（2026-11-02 补）
+
+`nginx.conf` 第 6 行是 **`worker_processes  4;`**，所以正常结构**恒为 1 master + 4 worker = 5 个**。
+而 `tools/restart-nginx.mjs` 里硬编码的是「正常应为 master + 2 worker = 3」，第 7 步校验写的是
+**「进程数 ≤ 3」**。
+
+**只要脚本不改，每次重启都必然打印这套 ✗：**
+
+```
+  共 5 个进程（配置 worker_processes 2，正常应为 master + 2 worker = 3）
+  ⚠ 有 2 个残留 worker —— 这正是素材加载变慢的原因
+...
+  进程数: 5  ✗ 期望 ≤ 3（还有残留）
+⚠ 未达预期，请按上面的 ✗ 逐项检查
+```
+
+**看到这段不必再排查「是不是真有残留」，直接按下面三条判据自查。**
+`5 个进程` 在 `worker_processes 4` 下就是**正确值**。
+
+#### 真正的判据：账户 + `SessionId` + 父进程断链（不是进程数）
+
+2026-11-02 00:38 那次重启的实测：
+
+| 项 | 值 | 判定 |
+|---|---|---|
+| master（35700） | `NT AUTHORITY\SYSTEM` / Session **0** | ✓ |
+| 4 个 worker | `NT AUTHORITY\SYSTEM` / Session **0** | ✓ |
+| master 的 `ParentProcessId` = 37412 | 该进程**已退出**（`schtasks.exe` 退场后孤儿化） | ✓ 手册第 498–509 行规定的**正常态** |
+| 我的 shell | `LUOBOMIAO\Administrator` / Session **2** | 与 nginx 无交集 ✓ |
+
+**一个真实踩过的误判**：看到 `ParentProcessId` 指向的进程已消失，就以为「master 脱离了
+监督、是定时炸弹」—— **这是错的**。手册第 504–505 行早就写明：
+
+> 正常情况下 master 的父进程「已退出」—— 它是孤儿进程，由内核接管。
+
+判断「有没有挂在你的会话上」，看的是 **`SessionId` 是不是 0**，不是父进程在不在。
+父进程断链 **+** 全部 `session=0` 才算达标；只有断链、`session` 还是 2 不算达标。
+
+---
+
+### 9.44 `assets.js` 的「资源站失败回落本地」改动 —— **已还原，不要重加**（2026-11-01）
+
+#### 背景
+
+曾经有一个会话基于**错误的前提**（“资源站是主、本地只是图片兜底”）给
+`public/js/assets.js` 加了一层 `assetFetch()`：资源站地址失败时回落到同路径的本地 `/assets/`。
+
+#### 为什么前提是错的
+
+| 事实 | 证据 |
+|---|---|
+| **本地优先，资源站兜底** | `nginx.conf` `location ^~ /assets/ { root D:/Stronghold-Protocol/shared; try_files $uri @assets_origin; }` |
+| 客户端本来就把 URL 改成本地 | `assets.js localizeOne()` 把 `https://assets.luobomiao.love/assets/X` 改写成 `/assets/X` |
+| 实测 | 取雪覆伦城 skel：本地 200、`Content-Length` 与磁盘完全一致、**无 `X-Cache-Status`**（没走回源） |
+
+#### 处理
+
+**已还原**到 `repo-sync/public/js/assets.js`（30 个节点哈希一致）。
+备份在 `node-N/public/js/assets.js.bak-before-revert-*`。
+
+#### 如果将来真要加
+
+必须先归档：写进 `repo-sync`、进 `patcher/`、在本文档记录。
+**否则下次上游升级会被静默冲掉，且没人知道曾经加过。**
+
+---
+
+### 9.45 官方音效缺失：51 个文件 / 21 干员 + 4 敌人（2026-11-01 已补齐）
+
+#### 正确的审计口径
+
+唯一权威来源是 `shared/data/assets.json` → `audio.sfx.pools[*].sounds` 的**键**：
+
+```js
+const a = require('./shared/data/assets.json');
+const ROOT = 'D:/Stronghold-Protocol/shared/assets/audio/sfx/';
+const refs = new Set();
+for (const pv of Object.values(a.audio.sfx.pools || {}))
+  for (const k of Object.keys(pv.sounds || {})) refs.add(k);
+console.log('引用', refs.size, '缺失', [...refs].filter(r => !fs.existsSync(ROOT + r)).length);
+```
+
+**注意**：`pools` 里的键**不带** `sfx/` 前缀，形如 `player/p_atk/p_atk_berryheal_n.mp3`。
+
+> **踩坑**：早期审计只查了 `audio.sfx.units[<id>].attack` 一条，报「17 个 / 14 干员」，
+> **漏了 34 个**（`_2`/`_3` 变体、`metalshield`、`magclose`、`yoyo` 等）。
+> 正确口径下是 **51 个 / 21 干员 + 4 敌人**。
+
+#### 官方音效从哪下
+
+- 仓库 <https://github.com/ArknightsAssets/ArknightsAssets2>，分支 **`voice`**
+- 前缀 `assets/dyn/audio/sound_beta_2/`
+- **唯一稳定镜像：`ghfast.top`**
+
+```
+https://ghfast.top/https://raw.githubusercontent.com/ArknightsAssets/ArknightsAssets2/voice/assets/dyn/audio/sound_beta_2/<相对路径>
+```
+
+镜像可用性（2026-11-01 实测）：
+
+| 镜像 | 状态 |
+|---|---|
+| **ghfast.top** | ✅ 唯一稳定（51/51） |
+| ghproxy.net | ⚠️ 15 s 超时 |
+| jsDelivr `cdn.jsdelivr.net/gh/...@voice/...` | ⚠️ 大仓库部分 404 |
+| gitmirror 系列 | ❌ DNS 不解析 |
+| `raw.githubusercontent.com` 直连 | ❌ 国内连不上 |
+| **`api.github.com`（列目录）** | ❌ 经代理 **403** |
+
+列目录**不要用 GitHub API**，用：
+
+```powershell
+git ls-remote --heads https://ghfast.top/https://github.com/ArknightsAssets/ArknightsAssets2.git
+git clone --filter=blob:none --no-checkout --depth 1 --branch voice `
+  https://ghfast.top/https://github.com/ArknightsAssets/ArknightsAssets2.git .cache/aa2-probe
+git -C .cache/aa2-probe ls-tree -r --name-only HEAD
+```
+
+#### 安装位置与验证
+
+装到 `shared/assets/audio/sfx/{player,enemy}/...`（junction，**30 节点即时可见，不需要同步/重启**）。
+
+```powershell
+# 验证：应为 0 缺失
+node -e "const a=require('./shared/data/assets.json'),fs=require('fs');const R='D:/Stronghold-Protocol/shared/assets/audio/sfx/';const r=new Set();for(const pv of Object.values(a.audio.sfx.pools||{}))for(const k of Object.keys(pv.sounds||{}))r.add(k);console.log('引用',r.size,'缺失',[...r].filter(x=>!fs.existsSync(R+x)).length)"
+```
+
+**音频不经过 assetIndex**：`localizeOne()` 只改写 URL、**不注入 `~hash`**，nginx 直接命中磁盘。
+
+#### 现状
+
+51 个已装（`player/p_atk` +30、`player/p_imp` +16、`player/p_aoe` +1、`enemy/e_atk` +4），
+**838 个引用 0 缺失**。安装包与说明见 `skin-upload/audio-all/`、`skin-upload/official-audio-51.zip`。
+
+---
+
+### 9.46 皮肤是否会改变技能特效？**不会**（2026-11-01 结论）
+
+#### 结论
+
+**官方从头到尾没做过「换皮肤换技能特效」。** 皮肤只影响两件事：
+
+1. **挂点坐标** —— `idx.skins[skinId]` 里每个皮肤一套 `HitPoint` / `MuzzlePoint`，绑到对应骨骼
+2. **模型资源** —— `assets.json` 里每个皮肤的 `spine`
+
+#### 证据
+
+| 检查 | 结果 |
+|---|---|
+| 特效 prefab 名带皮肤季后缀（`_sale` / `_summer` / `_snow`） | **0 个** |
+| `skin_table.json` 里 `effect` / `particle` 字段 | **0 次** |
+| `battleSkin.overwritePrefab` | **2410 条全是 `false`** |
+| `battleSkin.skinOrPrefabId` 指向的 | **`charpack` 战斗模型**，不是特效（我们已全部实现） |
+| 渲染器 `render/vfx/*.js` 里 `replace_skin` / `skinVariant` | **0 处** |
+
+唯一名字带 skin 的 prefab `common_hit_01_replace_skin_effect`：
+与普通版 `common_hit_01` **去掉 key/名字后参数完全相同（差异 0 处）**，是官方包里的空壳。
+
+#### 别被误导的东西
+
+prefab 里那些 `xingdian` / `andi` / `baoshan` / `huoguangyun` / `lizi` 子节点，
+是**美术给特效层起的中文小名**（星点/暗地/爆闪/火光云/粒子），**不是皮肤代号**。
+
+#### 如果真要做（工作量参考）
+
+- **引擎侧**：改动点集中在 `wiring.js:516`（`_variant` 分支），约 50–150 行，半天到一天
+- **内容侧**：**277 套 outfit 皮肤 × 平均 2–3 技能**，需要为每个点指定/制作特效
+- **但官方没有现成的皮肤版特效资源可复用**，等于从零造美术
+
+**结论：不是"改几行代码"，是要建一条特效制作流水线。** 建议先做 1 个干员的技术验证再决定。
+
+---
+
+### 9.47 资源包（`ArknightsResource-main.zip`）里到底有什么、我们还缺什么（2026-11-01 审计）
+
+#### 包内容（18 GB / 61260 条目）
+
+| 目录 | 数量 | 是特效吗 |
+|---|---|---|
+| `spine/` | 14854 | 战斗模型骨架 |
+| `gamedata/` | 14667 | 游戏数据表 / Lua / 剧情 |
+| `avgs/` | 12150 | 剧情背景图 |
+| `mapreview/` | 3196 | 地图预览图 |
+| `avatar/` `charpack/` `enemy/` `skills/` … | ~10000 | 头像 / 战斗模型 / 敌人图 / 技能图标 |
+| **`fx` / `prefab` / `effect` / `bundle`** | **0** | **没有** |
+
+**特效资源（`.ab` 粒子包）完全不在这个包里。**
+
+#### 我们的完整性（实测）
+
+| 项 | 结果 |
+|---|---|
+| `assets.json` 全部 21790 个 URL → 磁盘 | **0 缺失** |
+| 干员本体模型（front+back） | 454 齐全 / **0 缺失** |
+| 皮肤模型（1031 组） | **1031 / 0 缺失** |
+| 敌人模型 | 251 / **0 缺失** |
+| 召唤物模型 | 13 / **0 缺失** |
+
+#### 一个容易踩的坑
+
+`spine/` 在 zip 里是 `spine/<owner>/build_<组名>/Spine/<文件>`，
+而我们的皮肤模型放在 `assets/skins/<skinId>/front/`。
+**目录不同、文件名对得上** —— 用目录结构对比会误报 459 个"缺失"，改用
+`assets.json` 里的真实路径逐个查才是 **0**。
+
+---
+
+### 9.48 `assets.json` / `node-N/data` / `public/assets` 的同步关系（常被误解）
+
+| 路径 | 类型 | 改了要做什么 |
+|---|---|---|
+| `node-N/data` | **Junction → `shared/data`** | 改 `shared/data/*.json` **立即全节点生效**，不用同步、不用重启 |
+| `node-N/public/assets` | **Junction → `shared/assets`** | 同上 |
+| `node-N/public/{css,i18n,icons,vendor,fonts}` | Junction → `shared/public/*` | 同上 |
+| **`node-N/public/js`** | **实体副本（每节点一份）** | ⚠️ **必须逐节点同步** |
+| **`node-N/server`** | **实体副本** | ⚠️ **必须同步 + 重启节点** |
+
+**所以：**
+
+- 加立绘/音效/改 `assets.json` → **只改 `shared/`，立刻生效**
+- 改 `public/js/**` → **30 份都要改**（`deploy/sync-nodes.cjs` 或逐节点 `Copy-Item`）
+- 改 `server/**` → 同步后**还要重启对应节点**
+
+---
+
+### 9.49 本轮（2026-11-01 夜）改动清单与待办
+
+#### 已完成并生效
+
+| 事项 | 位置 | 状态 |
+|---|---|---|
+| 雪覆伦城补 `anims` 等字段 | `shared/data/assets.json` | ✅ 全服 532/532 皮肤 `validSpine` 通过 |
+| 26 套皮肤立绘 + 头像进生产目录 | `shared/assets/char/{skin,skin_avatar}/` | ✅ 269 → 295 |
+| 26 套 `portrait`/`avatar` 登记 | `shared/data/assets.json` | ✅ 26/26 |
+| 26 套资源站同步 | `assets.luobomiao.love` | ✅ 26/26，像素一致 |
+| 51 个官方音效 | `shared/assets/audio/sfx/` | ✅ 838 引用 0 缺失 |
+| `assets.js` fetch 回落改动 | `node-N/public/js/assets.js` | ✅ 已还原（30 节点哈希一致） |
+| 诊断代码清理 | `node-N/public/js/render/units.js` | ✅ 已删，与 `repo-sync` 一致 |
+| 5–20 人优化（`MAX_PARALLEL=4` / `PRELOAD_UNITS_MAX=8`） | `render/vfx/library.js` / `render/app.js` | ✅ 30/30 节点都在 |
+| 观战席位修复 | `mm/client.js?v=20261101-1` | ✅ nginx 已重启，生效 |
+| `/js/` 加 `proxy_hide_header` + `no-cache`（§9.42） | `nginx/conf/nginx.conf` | ✅ 2026-11-02 00:38 重启后生效 |
+| 三个清单 `86400` → `1800`（§9.42） | 同上 | ✅ 2026-11-02 00:38 重启后生效 |
+
+#### 2026-11-02 00:38 重启：原「已改好但未生效」两项已生效
+
+上一版这里挂着两行「等重启」。已于 **2026-11-02 00:38** 通过
+`node tools\restart-nginx.mjs --apply` 重启并验证完毕，两行**全部生效**：
+
+| 事项 | 备份 | 验证结果 |
+|---|---|---|
+| `/js/` 加 `proxy_hide_header` + `no-cache`（§9.42） | `nginx.conf.bak-before-js-cachehdr-20261101-234326` | ✅ `/js/main.js?v=1`、`/js/render/units.js?v=1` 均为 `no-cache, must-revalidate`，且未与上游值叠加 |
+| 三个清单 `86400` → `1800`（§9.42） | 同上 | ✅ `assets.json` / `local-assets.json` / `local-fx.json` 均为 `public, max-age=1800` |
+
+**本次重启的过程数据（留作基线，下次重启拿来对比）：**
+
+| 项 | 实测 |
+|---|---|
+| 停止方式 | `restart-nginx.mjs --apply`：`-s quit` 被拒（SYSTEM 权限）→ 强制结束 → 确认 443 释放 |
+| 进程结构 | 1 master + 4 worker，全部 `SYSTEM` / Session 0，父进程断链（符合 §9.43） |
+| 用户可见空窗 | **00:38:08 → 00:38:15，约 9 秒**（`access.log` 该段无任何请求） |
+| 空窗内 5xx / 499 | **0 / 0** |
+| 恢复后 | 00:38:16 起 `388 req/s`（约 40 名玩家自动重连），首条为 `/healthz 200` |
+| `error.log` | 00:37:52 之后**无任何记录**（那两条是本次 `quit` 被拒，属预期） |
+| `assets.log` | 窗口内 6795 条，**全部 200/304**，无失败 |
+| 脚本自身结论 | 退出码 1、报 ✗ —— **已知必然误报，见 §9.43** |
+
+**两条结论：**
+
+1. **这个脚本路径必然有约 10 秒空窗**（先 `quit` 再 `start`，中间真没有 worker 在听）。
+   实测 9 秒，落在手册「5–20 秒」的预期内，**不是故障**。
+2. **要做到玩家无感，不能走这个脚本**，要走控制台/维护者的新旧 worker 重叠重启
+   （5 个进程是正常的重叠态，5 分钟后回落到 3 个才算完）—— 见上一章
+   「✅ 2026-10-29 实测：正常重启是『零中断』的」。
+
+
+#### 仍未做
+
+| 事项 | 说明 |
+|---|---|
+| ~~蒂比 / 多萝西的技能特效绑定~~ | **已核实：不是缺陷（2026-11-02），见 §9.50** |
+| 皮肤专属技能特效 | 见 §9.46，工作量是「建流水线」级别 |
+
+---
+
+### 9.50 「蒂比 / 多萝西技能特效未绑定」是**误判** —— 特效绑在 mode/token 层（2026-11-02 核实）
+
+> 这条是 §9.49「仍未做」里挂着的待办。核实后**不成立，不要再去补 `index.json`**。
+
+#### 误判是怎么来的
+
+只查了 `units.<干员>.skills.<技能>.effects` 一层，看到是 `[]` 就判定「未绑定」。
+**但 `fx/index.json` 的特效分三层挂载，技能层为空是常态。**
+
+#### 三层挂载（全库 541 个 unit 实测）
+
+| 层级 | 字段 | unit 数 |
+|---|---|---|
+| 技能层 | `units.<k>.skills.<sk>.effects` / `.uses` | 303 |
+| **仅 mode 层** | `units.<k>.modes[].attack.cast[].effects` | **57** |
+| **仅 refs/token 层** | `units.<k>.refs[]`，或特效在 token 的 `skills` 上 | **173** |
+
+**230 / 541 的干员技能层为空，但特效是有的** —— 只查一层必然大面积误判。
+
+#### 两个干员的实际绑定位置
+
+**蒂比 `char_4191_tippi`** —— 绑在技能 `mode` 指向的 mode 里：
+
+| 技能 | `mode` | mode 名 | `attack.cast[].effects` |
+|---|---|---|---|
+| `skchr_tippi_1` | 2 | S1 | `tippi_skill_01_attack_01_start` |
+| `skchr_tippi_2` | 5 | S2 | `tippi_skill_02_attack_01_start` |
+
+（`modes` 索引核对过：`[2]=S1`、`[5]=S2`，映射正确。）
+
+**多萝西 `char_4048_doroth`** —— 3 个技能 `mode: null`，特效在 **token** 上：
+`token_10025_doroth_recttp` → `skills.sktok_doroth_1/2/3`，`effects` 齐全
+（`doroth_bomb_01_activited`、`doroth_skill_01_debuff` 等），`uses` 也有完整 role/keys。
+
+#### 顺带纠正的数字
+
+原记录「prefab 在磁盘上，分别 13 / 2 个」**与磁盘不符**：
+
+| | 原记录 | 实测 |
+|---|---|---|
+| tippi | 13 | **22** 个 `tippi_*.json` |
+| doroth | 2 | **24** 个 `doroth_*.json` |
+
+且这些 prefab **都已在 `index.json` 的 `prefabs` 表登记**（4671 条中 tippi 22 / doroth 24），
+`refs` 也列了对应键。资源侧没有缺失。
+
+#### 判据（以后查「特效有没有绑」）
+
+**不要只看 `skills[].effects`**，按顺序查三层：
+
+```js
+const u = require('./shared/assets/local/fx/index.json').units;
+const k = 'char_4191_tippi';
+const v = u[k];
+const skill = Object.values(v.skills || {}).some(s => (s.effects || []).length);
+const mode  = (v.modes || []).some(m => ((m.attack && m.attack.cast) || []).some(c => (c.effects || []).length));
+const refs  = (v.refs || []).length;
+console.log({ skill, mode, refs });   // 任一为真即「有特效」
+```
+
+token 类干员（多萝西、召唤物）还要再看 token 的 `skills`。
+
+#### 教训
+
+**「某字段为空」不等于「功能缺失」** —— 先确认这个字段是不是唯一的承载点。
+和 §7.0.1 同一条：数据已经把「未绑定」否掉了（581/905 条 `attack.hit` 为空是普遍现象），
+就该换口径，而不是继续按原假设找补。
+
+---
+
 ### 9.8 提交前最终检查
 
 ```powershell
@@ -3961,76 +5436,52 @@ git status --short                                                  # 无意外�
 
 ```powershell
 $tok = (Get-Content D:\Stronghold-Protocol\.secrets\github-token.txt -Raw).Trim()
-$url = "https://x-access-token:$tok@github.com/SatsumaUton/Stronghold-Protocol.git"
-# 直连 + HTTP/1.1，见下面「镜像全挂时怎么办」
-git -c http.version=HTTP/1.1 -c credential.helper= -c http.postBuffer=524288000 `
-    push  $url refs/heads/custom/production:refs/heads/custom/production
-git -c http.version=HTTP/1.1 -c credential.helper= `
-    fetch $url refs/heads/custom/production:refs/remotes/origin/custom/production --force
+$url = "https://x-access-token:$tok@ghfast.top/https://github.com/SatsumaUton/Stronghold-Protocol.git"
+git push   $url refs/heads/custom/production:refs/heads/custom/production --force
+git fetch  $url refs/heads/custom/production:refs/remotes/origin/custom/production --force
 git rev-list --left-right --count origin/custom/production...HEAD   # 再确认一次 0  0
 ```
 
-#### 镜像全挂时怎么办（2026-10-31 实测）
+#### 仓库地址已改（2026-11-02）
 
-那天 `ghfast.top` 连续十几次超时（21 秒后 `Failed to connect`），直连也报
-`Recv failure: Connection was reset`，一度以为推不上去。逐个试出来的结论：
+原 `Jackcharled/Stronghold-Protocol` → **`SatsumaUton/Stronghold-Protocol`**。旧地址会重定向，
+推送时会打一行 `remote: This repository moved. Please use the new location:`。`repo-sync` 的
+`origin` 已更新到新地址，**文档和脚本里新写的地址一律用 `SatsumaUton`**。
 
-| 通道 | 结果 |
-|---|---|
-| `ghfast.top` | 连接超时，全程不可用 |
-| `gh-proxy.com` | **读可以、写不行**：`remote: No anonymous write access.` |
-| `gitclone.com` | 只读镜像，不认 token |
-| `hk.gh-proxy.com` | HTTP 超时 20s |
-| **直连 `github.com` + HTTP/1.1** | ✅ 成功（`ls-remote` 1.8s，30 个提交直接推完） |
+#### ⚠ `ghfast.top` 推送会误报 `fetch first`——改直连（2026-11-02 实测）
 
-关键有两条：
-
-1. **`-c http.version=HTTP/1.1`** —— 这道改动让直连从「21 秒超时」变成「1.8 秒通」。
-   默认协商的 HTTP/2 在这条链路上会被卡住。
-2. **token 必须拼在 URL 里**（`https://x-access-token:$tok@github.com/...`），
-   用 `http.extraHeader="Authorization: Bearer ..."` 反而会走到凭据提示，
-   报 `could not read Username`。
-
-> ⚠ **千万别加 `-c http.postBuffer=...`**（2026-10-31 又踩一次）。
-> 同一个时刻，`ls-remote` 2.2 秒就通、说明网络是好的，但带 `postBuffer=524288000`
-> 的 `push` 依然 `Failed to connect after 21020 ms`；去掉这个参数、只留
-> `-c http.version=HTTP/1.1 -c credential.helper=` 后**立刻推成功**。
-> 那个参数本来是给「大提交卡住」准备的，在这条链路上反而让连接建不起来。
-> 最小可用的推送命令行就是：
->
-> ```powershell
-> git -c http.version=HTTP/1.1 -c credential.helper= push $url HEAD:custom/production
-> ```
-
-> 判断「连不连得上」不要用 `Test-NetConnection`：它只测 TCP 握手，
-> 那天它对 `ghfast.top:443` 报 `True`，但 TLS/HTTP 层根本走不通。
-> 真判据是 `git ls-remote <url> HEAD` 能不能在几秒内返回。
-
-#### ⚠ 判断「推送成功没有」不要看 `origin/custom/production`
-
-本仓库 `remote.origin.fetch` 只配了 `master`：
+**症状**：明明可以快进，经代理推送却一直失败：
 
 ```
-+refs/heads/master:refs/remotes/origin/master
+ ! [rejected]          HEAD -> custom/production (fetch first)
+error: failed to push some refs
+hint: Updates were rejected because the remote contains work that you do
+hint: not have locally. ...
 ```
 
-所以 `origin/custom/production` 这个本地跟踪引用**从来不会自动更新**——`git push` 明明成功了
-（输出里能看到 `a6d15a79..9f54921b  custom/production -> custom/production`），
-`git fetch origin custom/production` 也成功了，但 `git rev-parse origin/custom/production`
-仍然停在很久以前的旧提交。**拿它判推送结果是假警报**，2026-10-31 就被它误导过一次。
-
-唯一可信的判据是直接问远端：
+**先确认是不是真的落后**（不依赖本地过期引用）：
 
 ```powershell
-git ls-remote origin refs/heads/custom/production   # 输出必须等于 git rev-parse HEAD
+git -c http.version=HTTP/1.1 ls-remote $url refs/heads/custom/production   # 远程真实 SHA
+git rev-parse HEAD                                                        # 本地 SHA
+git merge-base --is-ancestor <远程SHA> HEAD; echo $LASTEXITCODE            # 0 = 可快进
 ```
 
-`git rev-parse FETCH_HEAD` 只在刚 fetch 完的那一刻有效，也可靠，但不直观。
-想一劳永逸就把 refspec 补上（可选）：
+若 `merge-base` 返回 `0`（远程确实是本地 HEAD 的祖先），**这就是代理的问题，不是冲突**。
+换成**直连**再推一次即可：
 
 ```powershell
-git config --add remote.origin.fetch '+refs/heads/custom/production:refs/remotes/origin/custom/production'
+$urlDirect = "https://x-access-token:$tok@github.com/SatsumaUton/Stronghold-Protocol.git"
+git -c http.version=HTTP/1.1 -c credential.helper= push $urlDirect HEAD:custom/production
 ```
+
+2026-11-02 实测：经 `ghfast.top` 连拒两次，改直连一次成功（`17562391..2230cebb`）。
+**fetch 用代理没问题，只有 push 受影响。** 不要在没确认祖先关系前就 `--force` 覆盖远程。
+
+#### 本地备份文件不入库
+
+`.gitignore` 已加 `*.bak` 和 `*.bak-*`。改文件时随手留在仓库里的
+`xxx.js.bak-before-<时间戳>` 不会再出现在 `git status` 里。
 
 ## 十、安全与红线
 
