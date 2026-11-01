@@ -29,6 +29,7 @@ function gameGate() {
 let updateFile = null;
 try { updateFile = require('../guard/update-file.cjs'); } catch { /* 可选模块 */ }
 const account = require('./account.cjs');
+const feedback = require('./feedback.cjs');
 
 const PORT = Number(process.env.MM_PORT || 3090);
 const HOST = process.env.MM_HOST || '127.0.0.1';
@@ -558,6 +559,18 @@ function clientBuildTag() {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const pathname = decodeURIComponent(url.pathname);
+
+  // ---- 玩家反馈板（/api/feedback/*）：读公开、写要登录、管理要 admin/owner ----
+  if (pathname.startsWith('/api/feedback')) {
+    try {
+      if (await feedback.handle(req, res, pathname)) return;
+      return json(res, 404, { error: 'NOT_FOUND' });
+    } catch (e) {
+      try { json(res, 500, { error: 'INTERNAL' }); } catch { /* 已发送 */ }
+      console.error('[feedback] unhandled', e && e.message);
+      return;
+    }
+  }
 
   // ---- 账号与用户偏好（/api/auth/*、/api/prefs*）----
   if (pathname.startsWith('/api/auth') || pathname.startsWith('/api/prefs') || pathname.startsWith('/api/account') || pathname.startsWith('/api/admin')) {

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>玩家反馈板 · Stronghold Protocol</title>
+<meta name="referrer" content="same-origin">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1518'/%3E%3Cpath d='M16 18h32v20H30l-8 8v-8h-6z' fill='none' stroke='%234ed8af' stroke-width='4' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="feedback.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <div class="head__main">
+      <h1>玩家反馈板<span class="micro">FEEDBACK</span></h1>
+      <p>提交 Bug、玩法建议与界面问题；服主会在这里回复并更新状态。</p>
+    </div>
+    <div class="head__side">
+      <span class="who" id="who">读取登录状态…</span>
+      <button type="button" class="btn btn--primary" id="compose">发帖</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <div class="tabs" id="tabs" role="tablist" aria-label="状态筛选">
+      <button type="button" class="tab" role="tab" data-status="all" aria-selected="true">全部<span class="n" data-count="all">0</span></button>
+      <button type="button" class="tab" role="tab" data-status="unassigned" aria-selected="false">未分配<span class="n" data-count="unassigned">0</span></button>
+      <button type="button" class="tab" role="tab" data-status="unplanned" aria-selected="false">无计划<span class="n" data-count="unplanned">0</span></button>
+      <button type="button" class="tab" role="tab" data-status="planned" aria-selected="false">已计划<span class="n" data-count="planned">0</span></button>
+      <button type="button" class="tab" role="tab" data-status="updated" aria-selected="false">已更新<span class="n" data-count="updated">0</span></button>
+    </div>
+    <select id="category" aria-label="分类筛选">
+      <option value="all">全部分类</option>
+      <option value="bug">Bug 反馈</option>
+      <option value="gameplay">玩法建议</option>
+      <option value="ui">界面与体验</option>
+      <option value="other">其他</option>
+    </select>
+    <input type="search" id="search" placeholder="搜索标题 / 正文 / 回复…" aria-label="搜索" maxlength="64">
+  </div>
+
+  <div class="list" id="list" aria-live="polite">
+    <div class="state"><b>加载中…</b></div>
+  </div>
+
+  <div class="more" id="more" hidden>
+    <button type="button" class="btn btn--ghost" id="loadMore">加载更多</button>
+  </div>
+
+</div>
+
+<!-- 发帖弹窗 -->
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel">
+    <h2 id="modalTitle">提交反馈</h2>
+    <p class="modal__hint">发帖需要登录账号；署名取你的博士代号。标题 2–80 字，正文 5–4000 字。</p>
+    <form id="form" novalidate>
+      <div class="field">
+        <label for="f-category">分类<span class="req">*</span></label>
+        <select id="f-category" required>
+          <option value="bug">Bug 反馈</option>
+          <option value="gameplay">玩法建议</option>
+          <option value="ui">界面与体验</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-title">标题<span class="req">*</span></label>
+        <input id="f-title" type="text" maxlength="80" required autocomplete="off">
+        <div class="counter" id="c-title">0 / 80</div>
+      </div>
+      <div class="field">
+        <label for="f-body">正文<span class="req">*</span></label>
+        <textarea id="f-body" maxlength="4000" required></textarea>
+        <div class="counter" id="c-body">0 / 4000</div>
+      </div>
+      <div class="modal__foot">
+        <span class="modal__err" id="formErr"></span>
+        <button type="button" class="btn btn--ghost" data-close>取消</button>
+        <button type="submit" class="btn btn--primary" id="submit">提交</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="feedback.js"></script>
+</body>
+</html>
