@@ -1497,7 +1497,87 @@ node --test test/ui/bot-band-protocol.test.js    # 3 条：协议放行 / 非法
   （10 分钟 3 条，存在 `feedback.cjs` 的**内存 Map** 里，测试清不掉），
   于是后面发帖只拿到 `RATE_LIMITED`。→ 发帖改用 `TEST_POSTER = 990003`。
 
-### 9.2 不能提交的内容
+### 9.11i 挂机（消极游戏）判定：参考版那套更好，已经换掉（2026-11-02 移植）
+
+维护者问「有没有把参考版更好的挂机检测移植过来」。答案：**参考版确实有，而且确实更好，现在已移植**。
+
+#### 我们原来的做法，以及它的问题
+
+原来只有 `server/match/match/intents.js` 的 `_trackActivity`，两条规则：
+
+- 连续 2 回合「花钱了（买/刷新/升级）但一次都没部署干员」→ 踢
+- 连续 2 回合「既没买也没部署」→ 踢
+
+而且它挂在 `_handle` 里，**每收到一条 `g.*` 消息**才判一次，第 4 回合以后不再判。
+
+**最要命的缺陷：没有「掉线」这个维度。**
+掉线的玩家发不出任何指令，两条规则都会把「什么都没做」算成消极游戏 ——
+他其实只是网断了，回来座位已经没了。这不是理论风险，是这条规则的必然结果。
+
+#### 参考版的做法（`_ref/.../server/match/match/platform.js` 的 `_checkIdle`）
+
+1. **按回合判，不按消息判**：每回合**备战结束**时数一次（`prep.js` 的 `endPrep`）。
+2. **判据是「有没有实质操作」**：`common.js` 的 `AFK_ACTIONS` 白名单 13 条
+   （买/卖/移动/刷新/升级/冻结/装备/销毁/选择/领奖/复活/选盟约/跳过盟约）。
+   点准备、发表情、观战都**不算**。
+3. **三条豁免，任一命中就归零**：
+   - `!ps.connected` —— **掉线不算挂机**（这是关键修复）
+   - `ps.botControlled` —— AI 托管中是主动交出去的，不算消极
+   - `ps.afkActed` —— 这回合动过
+4. **移出前一回合先警告一次**（`toast` + 私有视图），不是突然踢人。
+5. `afkRemoveRounds` 可配，`0` = 关闭，默认 2。
+
+#### 这次怎么接的
+
+| 位置 | 改动 |
+|---|---|
+| `server/match/match/common.js` | 新增 `AFK_ACTIONS`（13 条）与 `AFK_REMOVE_ROUNDS = 2` |
+| `server/match/PlayerState.js` | 新增 `afkActed` / `afkRounds`（两个字段 `snapshot.js` 本来就列了，只是从来没人写） |
+| `server/match/Match.js` | 新增 `this.afkRemoveRounds`（`opts` 覆盖，非整数回落默认，上限 100） |
+| `server/match/match/platform.js` | 新增 `_checkIdle()` / `_removeIdle()` |
+| `server/match/match/prep.js` | `endPrep()` 在 `_checkpoint('prep-end')` **之后**调 `_checkIdle()` |
+| `server/match/match/intents.js` | `_trackActivity` 置位 `afkActed`；**`!ps.connected` 直接 return** |
+
+**两套规则并存**：参考版抓「什么都没干」，我们原来那两条抓「只花钱不部署」——
+后者参考版抓不到（`g.buy` 本身就在白名单里）。两条旧规则保留，只是都加了掉线豁免。
+
+`_checkpoint` 必须排在 `_checkIdle` **前面**：断点续玩恢复的是「备战已完成」那一刻，
+恢复时如果再过一遍 `_checkIdle`，同一个人会被判两次。
+
+#### 与参考版的一处有意差别
+
+参考版自己发 `m.removed`（给本人）+ `m.notice {kind:'afkRemoved'}`（给其他人），
+再调 `opts.onRemove` 让平台摘座位。我们**没有那两条消息的客户端实现**，
+而 `onIdleKick → lobby.kickIdle → removeMember` 这条路已经在用
+（提示 + `room.closed` + 踢出记录，被踢的人不能自己加回来）。
+所以这里复用它，客户端不需要新消息类型。
+
+#### 测试
+
+```powershell
+node --test test/match/afk.test.js      # 10 条
+```
+
+关键那条是 **「掉线中不算挂机」**：断言掉线的 `p_0` 连数 3 回合 `afkRounds` 恒为 0 且不被移出，
+而同时在线的 `p_1` 什么都不做就被移出。这一条就是这次移植要修的东西。
+
+其余覆盖：默认值/关闭/非法值回落、有操作归零、AI 托管归零、
+单人局（<2 真人）根本不判定、中途退到只剩一人不再判定、移出前一回合先警告、幂等不重复踢。
+
+⚠ `test/match/harness.js` 里 `afkRemoveRounds` **默认传 0（关）**。
+原因是它按回合计时，而绝大多数测试根本不发备战指令 ——
+默认开着会把 `humans: 2` 的测试里的玩家在两回合后移出，与它们要测的东西无关。
+要测这条规则就显式传值。
+
+#### 什么时候它不会踢人（避免误判投诉）
+
+- 单人局（含「一个真人 + 三个 AI」）→ 完全不判定
+- 开局 2 人、中途退了一个 → 实时数真人（`_humanCount()`），只剩 1 个就不再判
+- 掉线、AI 托管 → 归零
+- `afkRemoveRounds = 0` → 整体关闭
+
+
+
 
 | 禁止 | 原因 |
 |---|---|
