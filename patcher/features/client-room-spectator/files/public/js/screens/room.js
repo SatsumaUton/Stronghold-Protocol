@@ -294,16 +294,26 @@ function BotBandChip({ seat, gd, editable, busy, onOpen }) {
 /**
  * 房主给某个 AI 座位指定策略的选择框：第一项是「自动选择」，后面是这个模式开放的全部盟约。
  * 已经指定给**别的** AI 座位的策略会置灰并标出是哪个 AI 拿了（服务端也会拒绝重复指定）。
+ *
+ * ★ 2026-11-02：扩容房开了「允许重复选择策略」(allowRepeat) 时**不置灰也不标占用** ——
+ *   那时两个 AI 拿同一个盟约是合法的（服务端 roomAllowsRepeatBands 同口径，
+ *   Match 的 bandTaken() 在 allowRepeat 下也恒为 false）。
  */
 function BotBandPicker({ seat, room, gd, busy, onClose, onPick }) {
   const seats = roomFacts(room, null).seats;
   // 扩容房开了「禁用鸭爵策略」时这个盟约要从列表里去掉（与服务端同一套规则）
   const bands = allowedBands(gd.list('bands'), 'MULTI', seats.length > MAX_SEATS && room.experimental?.disableDuckLord === true);
+  // 与 server/lobby.js roomAllowsRepeatBands 同口径：扩容房 + 实验项打开
+  const allowRepeat = seats.length > MAX_SEATS && room.experimental?.allowRepeat === true;
   const usedBy = new Map();
-  for (const s of seats) if (s && s.isBot && s.seat !== seat.seat && typeof s.band === 'string') usedBy.set(s.band, s.name);
+  if (!allowRepeat) {
+    for (const s of seats) if (s && s.isBot && s.seat !== seat.seat && typeof s.band === 'string') usedBy.set(s.band, s.name);
+  }
   return html`<${Modal} open=${true} onClose=${onClose} title=${t('指定 AI 策略：{name}', { name: seat.name })} micro="AI STRATEGY"
       class="botband-dlg" actions=${html`<${Button} variant="secondary" data-autofocus onClick=${onClose}>${t('关闭')}<//>`}>
-    <p class="botband-dlg__tip t-dim">${t('开局选择策略时，该 AI 队友会直接选择指定的策略，其他博士不能再选它。')}</p>
+    <p class="botband-dlg__tip t-dim">${allowRepeat
+      ? t('开局选择策略时，该 AI 队友会直接选择指定的策略。本房允许重复选择策略，多个 AI 可以选同一个。')
+      : t('开局选择策略时，该 AI 队友会直接选择指定的策略，其他博士不能再选它。')}</p>
     <div class="botband-dlg__grid" role="listbox" aria-label=${t('策略')}>
       <button type="button" role="option" aria-selected=${seat.band == null ? 'true' : 'false'} disabled=${busy}
           class=${`botband ${seat.band == null ? 'is-sel' : ''}`} onClick=${() => onPick(null)}>

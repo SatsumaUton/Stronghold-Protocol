@@ -1912,6 +1912,16 @@ export class Lobby {
    * 改完把其他真人的「准备」清掉 —— 和 setAiPicksLast / setDifficulty 一样，
    * 避免有人已经点了准备却被房主改掉规则就开局。
    */
+  /**
+   * 这个房间是否允许两个 AI 座位被指定同一个策略（实验项「允许重复选择策略」）。
+   * 判据与 Match.js:342-345 逐字一致，否则 lobby 的校验会和 Match 的 bandTaken() 打架。
+   */
+  roomAllowsRepeatBands(room) {
+    if (!room || room.mode === 'solo') return false;
+    if (!(Number(room.capacity) > MAX_SEATS)) return false;      // 非扩容房：没有这个实验项
+    return room.experimental?.allowRepeat === true;
+  }
+
   setBotBand(session, { seat, bandId = null }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -1932,7 +1942,14 @@ export class Lobby {
         return fail(ERR.BAD_TARGET, 'strategy disabled in this room');
       }
       if (!data.bandAllowed(bandId)) return fail(ERR.BAD_TARGET, 'strategy not offered in this mode');
-      if (room.seats.some((s) => s && s !== target && s.isBot && s.band === bandId)) {
+      // ★ 2026-11-02：扩容房开了「允许重复选择策略」(allowRepeat) 时，两个 AI 可以拿同一个盟约。
+      //   判据必须与 Match 完全一致（Match.js:342-345）：
+      //     capacityExperiment = !isSolo && playerCapacity > 4
+      //     allowRepeat       = capacityExperiment && experimental.allowRepeat === true
+      //   否则会与 phases.js 的 bandTaken()（allowRepeat 下恒为 false）打架：
+      //   房间允许重复，但房主给第二个 AI 选同一个盟约却被拒 —— 玩家看到的就是「允许重复了还不让我选」。
+      if (!this.roomAllowsRepeatBands(room)
+        && room.seats.some((s) => s && s !== target && s.isBot && s.band === bandId)) {
         return fail(ERR.BAD_TARGET, 'strategy designated to another AI');
       }
     }
@@ -2826,7 +2843,17 @@ export class Lobby {
   // ---------------------------------------------------------------------------------------------------
 
   /** @param {Room} room @param {string | null} [key] per-network limit key of the starter */
-  startMatch(room, key = null) {
+  /**
+   * 开一局。
+   *
+   * `restore`（server/persist/persister.js 的 restoreLocal）—— 从检查点**恢复**的一局：
+   * 用它自己存下来的座位、seed 和局号，并用 `apply(match)` 代替 `start()`。
+   *
+   * ★ 2026-11-02：这个参数以前**不存在**，于是 persister 里写好的 restoreLocal 是死代码
+   *   （它按 4 个参数调用，而这里只收 2 个），进程重启后对局一律被 abortRestoredMatch 丢掉 ——
+   *   玩家看到的就是「服务器重启导致对局中断，同盟已返回等待室」，点按钮回同盟，没法继续打。
+   */
+  startMatch(room, key = null, keys = null, { restore = null } = {}) {
     if (room.matchmaking) {
       room.matchmaking = false;
       room.matchmakingAt = 0;
@@ -2847,7 +2874,9 @@ export class Lobby {
     if (host) host.ready = true;
     // the room's data: its content set's in a room with gameplay plugins (header "Gameplay plugins")
     const data = this.dataFor(room);
-    const seats = room.seats.filter(Boolean).map((s) => {
+    // ★ 恢复时座位取自检查点（restore.seats），不重新从房间算 —— 那局的座位/卡池/练度
+    //   必须和存档一致，否则恢复出来的局面和玩家的记忆对不上。
+    const seats = restore ? restore.seats : room.seats.filter(Boolean).map((s) => {
       // a setting checked for another content is filtered to this room's data (header "Gameplay plugins")
       const own = s.isBot ? null : this.seatSettings(room, s, data);
       return {
@@ -2882,7 +2911,8 @@ export class Lobby {
     // lastPublic / results: the latest m.public broadcast and the m.result frames (encoded), kept for the replay.
     const ctx = { live: true, ended: false, disposed: false, match: null, lastPublic: null, sharedResult: null, results: new Map() };
     let seed = 0;
-    try { seed = this.seedFn() >>> 0; } catch { seed = randomInt(2 ** 32); }
+    // ★ 恢复时用存档里的 seed —— 整局的 RNG 都从它派生，换一个 seed 就不是同一局了。
+    try { seed = restore ? restore.seed >>> 0 : this.seedFn() >>> 0; } catch { seed = randomInt(2 ** 32); }
     const modded = room.modded;
     try {
       const opts = {
@@ -2906,7 +2936,8 @@ export class Lobby {
         ...(room.test === true ? { test: true } : {}),
         seed,
         // the room's match number: with the seed it keeps battleIds unique across the room's matches (DESIGN §14)
-        matchNo: room.matchCount + 1,
+        // ★ 恢复时沿用存档里的局号（restore.matchNo），否则 battleId 会重号。
+        matchNo: restore ? restore.matchNo : room.matchCount + 1,
         // the room's content hash (header "Content identity"): copied into every BattleSpec; its visual set too (a
         // replay names the art), and with gameplay plugins a b.result must name the room's cs (header "Gameplay plugins")
         ...(room.content ? { cs: room.content.cs } : {}),
@@ -2957,11 +2988,14 @@ export class Lobby {
       room.match = match;
       room.matchCtx = ctx;
       room.matchKey = key;
+      room.matchKeys = keys;
       room.replay = null;
-      room.matchCount++;
-      this.log.info(`[lobby] ${room.code} match #${room.matchCount} starting (${room.mode}/${room.difficulty}, ${seats.length} seats, seed ${seed}${room.test ? ', test' : ''}${modded ? `, content ${room.content.cs.slice(0, 8)}${match.hosted ? ' in its match host' : ''}` : ''}${versioned ? `, version ${room.version}${match.hosted ? ' in its match host' : ''}` : ''})`);
+      // ★ 恢复时局号沿用存档，不 ++（否则这一局会被记成「下一局」，battleId 重号、回放对不上）
+      room.matchCount = restore ? restore.matchNo : room.matchCount + 1;
+      this.log.info(`[lobby] ${room.code} match #${room.matchCount} ${restore ? 'restored' : 'starting'} (${room.mode}/${room.difficulty}, ${seats.length} seats, seed ${seed}${room.test ? ', test' : ''}${modded ? `, content ${room.content.cs.slice(0, 8)}${match.hosted ? ' in its match host' : ''}` : ''}${versioned ? `, version ${room.version}${match.hosted ? ' in its match host' : ''}` : ''})`);
       this.broadcastState(room);
-      match.start();
+      // ★ 恢复走 apply(match)（把存档灌回 Match），正常开局走 match.start()
+      if (restore) restore.apply(match); else match.start();
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match failed to start`, e);
       if (room.matchCtx === ctx) {
