@@ -467,8 +467,13 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
     if (!(gate || canSendSettings)({ store: app, content })) { gated = true; setState('idle'); return; }
     gated = false;
     const preparing = revision;
+    // ★ 本服 2026-11-01：这一次推送是不是玩家自己改出来的。`edited` 只在 store **真的变了**时置 true
+    // （下面 subscribe 的 `s[k] !== prev[k]`）——welcome 重新握手、内容集变化、RATE 重试这些重发都不是编辑。
+    // 用它把「玩家主动取消掉最后一个皮肤」和「本地被清空、一个都没有」区分开：前者要推（否则云端清不掉），
+    // 后者不推（否则清一次浏览器数据就把云端覆盖成空，2026-11-01 的 skins 事故）。
+    const fromEdit = edited;
     try {
-      const payload = await prepare();
+      const payload = await prepare(fromEdit);
       // a newer edit or welcome happened while prepare awaited chess/backups: do not send, and do not touch the
       // sync state that newer flush owns (an older skill must not overwrite a restore-defaults)
       if (disposed || preparing !== revision) return;
@@ -653,9 +658,18 @@ export function installSkinsSync({ net, timers, target = skinsStore, notify, con
   return installPrefSync({
     net, timers, target, notify, content, app, gate, seatBound: false, key: SKINS_KEY, stateKey: SKINS_SYNC_KEY, msgType: 'room.skins', field: 'skins', tag: 'skins',
     lockedText: N_('这台服务器不接受皮肤选择，只有本机保存'),
-    async prepare() {
+    async prepare(fromEdit) {
       const all = parseStoredSkins(target.get()[SKINS_KEY]);
-      if (!Object.keys(all).length) return all; // nothing to filter: no data download for it
+      // ★ 本服 2026-11-01：一个皮肤选择都没有时，**只有玩家自己刚改出来的**（`fromEdit`，见 installPrefSync
+      // flush 里的 `edited`）才推出去；否则这一次不发（`null`，installPrefSync 记成 'error' 并跳过，不写任何东西）。
+      //
+      // 为什么：以前这里无条件 `return all`（空对象），于是 `welcome` 一来就把 `{}` 推给服务端。玩家清一次
+      // 浏览器数据（localStorage 里的 sp.pref.skins 没了）→ 本地空 → 一登录就把云端的皮肤选择覆盖成空，
+      // 2026-11-01 就是这样丢了 111 个干员的皮肤选择。
+      //
+      // 而 `fromEdit` 为真时的空 map 是另一回事：玩家把最后一个皮肤改回默认（clearSkin），那是主动取消，
+      // 必须推到服务端，否则云端那份永远删不掉、下次 pullPrefs 又把它拉回本地，玩家会以为"改不回来"。
+      if (!Object.keys(all).length) return fromEdit ? all : null;
       const ids = await operators();
       return ids ? Object.fromEntries(Object.entries(all).filter(([id]) => ids.has(id))) : all;
     },

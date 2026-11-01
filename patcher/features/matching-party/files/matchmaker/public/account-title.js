@@ -286,6 +286,9 @@
       state.user = null; state.guest = false; syncReady = false;
     window.__SP_ADMIN_TOKEN = null;
     window.__SP_ACCOUNT_TOKEN = null;
+      // 登出要连兑换令牌一起清（否则换账号登录还带着上一个人的授权）
+      try { sessionStorage.removeItem('sp.adminToken'); } catch { /* ignore */ }
+      try { localStorage.removeItem('sp.adminCodeExp'); } catch { /* ignore */ }
       clearAccountCache();
       // 清掉输入框里的账号代号，避免游客模式继承
       const cs = findCallsign();
@@ -469,7 +472,10 @@
       }
       state.user = r.body.user;
       state.guest = false;
-      window.__SP_ADMIN_TOKEN = r.body.adminToken || null;
+      // ★ 2026-10-31：服务端已不再下发 adminToken（要用验证码换）。
+      //   这里必须**保留手头那枚**（可能正是刚兑换来的），不能写成 `|| null` ——
+      //   那样每次登录都会把兑换到的授权清掉，表现为「输码成功、一刷新又要求输码」。
+      window.__SP_ADMIN_TOKEN = r.body.adminToken || window.__SP_ADMIN_TOKEN || null;
       window.__SP_ACCOUNT_TOKEN = r.body.userToken || null;
       try { window.dispatchEvent(new Event('sp-account-token')); } catch { /* ignore */ }
       try { if (r.body.token) localStorage.setItem('mm.sid', r.body.token); } catch { /* 忽略 */ }
@@ -488,6 +494,9 @@
     window.__SP_ACCOUNT_USER = state.user ? state.user.name : null;
     window.__SP_ACCOUNT_TAG = state.user && state.user.tag ? String(state.user.tag) : null;
     window.__SP_ACCOUNT_ROLE = state.user && state.user.role ? String(state.user.role) : null;
+    // 本服：游戏内管理员工具兑换验证码时要用邮箱（/api/admintool/exchange）。
+    // 只暴露给本页脚本，不写进任何 DOM / URL。
+    window.__SP_ACCOUNT_EMAIL = state.user && state.user.email ? String(state.user.email) : null;
     // 角色是判定「管理员 / 服主」的唯一前端依据（房间免销毁、维护开关放行都用它）。
     // 它可能比 sp-account-token 更晚写入，所以单独派发一次，让游戏侧重握手补身份。
     // render() 会被反复调用，只在角色真的变化时派发，避免触发无意义的重复握手。
@@ -711,6 +720,15 @@
       if (raw == null) return;
       let payload;
       try { payload = JSON.parse(raw); } catch { /* 非 JSON */ return; }
+      // ★ 本服 2026-11-01：空载荷**默认不推**，别让「清浏览器数据」变成「删云端记录」。
+      // 以前只挡 raw == null，`{}` / `[]` 照样 PUT 上去，于是玩家清一次缓存 → 本地空 → 一登录
+      // 就把云端的 111 个干员皮肤选择覆盖成 {}（2026-11-01 实测事故）。
+      //
+      // 但有两种空是**玩家主动清出来的**，必须放行，否则云端那份永远删不掉、下次 pullPrefs 又拉回本地：
+      //   ownership（notOwned 全空）、diy（自选全空）—— 玩家确实可以把它们清到一个不剩。
+      // skins 的主动清空由 ui/loadoutSync.js 的 `prepare(fromEdit)` 自己放行（那条走 WebSocket），这里不重复。
+      // 真要一次清空全部云端数据，用账号面板的「重置云端数据」（/api/prefs/reset，有确认框）。
+      if (isEmptyPref(payload) && domain !== 'ownership' && domain !== 'diy') return;
       try {
         setSyncState('syncing');
         const r = await api('/api/prefs/' + domain, {
@@ -794,7 +812,10 @@
       const r = await api('/api/auth/me');
       if (r.status === 200 && r.body && r.body.user) {
         state.user = r.body.user;
-        window.__SP_ADMIN_TOKEN = r.body.adminToken || null;
+        // ★ 2026-10-31：**这一行每次刷新都会跑**，写 `|| null` 会把
+        //   ui/adminTools.js 从 sessionStorage 恢复出来的兑换令牌清掉 ——
+        //   表现为「验证成功 -> 刷新 -> 又要输码」。必须保留已有值。
+        window.__SP_ADMIN_TOKEN = r.body.adminToken || window.__SP_ADMIN_TOKEN || null;
         window.__SP_ACCOUNT_TOKEN = r.body.userToken || null;
         try { window.dispatchEvent(new Event('sp-account-token')); } catch { /* ignore */ }
         pullPrefs();

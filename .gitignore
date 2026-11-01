@@ -118,3 +118,7 @@ patcher/features/*/**/*.bat
 
 # patcher/merge-features.py 的合并输出（每次重新生成，不入库）
 staging/
+
+# 本地备份文件（*.bak-<时间戳>、*.bak-before-* 等）：都是临时快照，不入库
+*.bak
+*.bak-*

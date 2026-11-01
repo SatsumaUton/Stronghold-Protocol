@@ -720,6 +720,15 @@
       if (raw == null) return;
       let payload;
       try { payload = JSON.parse(raw); } catch { /* 非 JSON */ return; }
+      // ★ 本服 2026-11-01：空载荷**默认不推**，别让「清浏览器数据」变成「删云端记录」。
+      // 以前只挡 raw == null，`{}` / `[]` 照样 PUT 上去，于是玩家清一次缓存 → 本地空 → 一登录
+      // 就把云端的 111 个干员皮肤选择覆盖成 {}（2026-11-01 实测事故）。
+      //
+      // 但有两种空是**玩家主动清出来的**，必须放行，否则云端那份永远删不掉、下次 pullPrefs 又拉回本地：
+      //   ownership（notOwned 全空）、diy（自选全空）—— 玩家确实可以把它们清到一个不剩。
+      // skins 的主动清空由 ui/loadoutSync.js 的 `prepare(fromEdit)` 自己放行（那条走 WebSocket），这里不重复。
+      // 真要一次清空全部云端数据，用账号面板的「重置云端数据」（/api/prefs/reset，有确认框）。
+      if (isEmptyPref(payload) && domain !== 'ownership' && domain !== 'diy') return;
       try {
         setSyncState('syncing');
         const r = await api('/api/prefs/' + domain, {

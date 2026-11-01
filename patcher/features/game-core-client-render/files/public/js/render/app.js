@@ -176,6 +176,12 @@ export { ensurePixi } from './app/pixi.js';
 
 /** fx.damage / fx.heal option: the official effect drew the hit (no procedural spark, slash or glow; numbers stay). */
 const NO_SPARK = Object.freeze({ noSpark: true });
+
+// ★ 本服 2026-11-01：进战斗时一次性预加载特效的**单位数上限**（见下面 wiring.begin 那段注释）。
+// 4 人房（59 个 prefab）照旧全预加载；5–20 人房只预加载前 8 个，其余上场时由 wiring.more() 按需补。
+// 8 是经验值：8 个干员约 118 个 prefab，加上同批要下的 skel / 贴图 / 语音，正好吃满浏览器的 6 个连接
+// 而不至于把别的资源饿死。要调大先看 nginx/logs/assets.log 里 >1s 的请求比例。
+const PRELOAD_UNITS_MAX = 8;
 export { PEN_CAMERA_MS, LEADER_HIT_STYLE, DRAG_HOLD_TILES, DEPLOY_REPLAY_MS } from './app/tune.js';
 export { viewKind, boardArea, bandFor, fieldRows, penShown, showsPen, leaderShown, restView, flightView, boardPreference, switchableBox } from './app/view.js';
 export { FORCED_EXIT, showsDeathFx, renderInfo } from './app/info.js';
@@ -1608,7 +1614,16 @@ export async function createFieldView(host, options = {}) {
     // depth-tested materials
     if (ofx.active && !battleMeta.prep) {
       ofx.setGround(heightAt, stageRec?.id ?? null);
-      wiring.begin([...infos.values()].map((info) => ({ id: info.id, info }))).catch(() => {});
+      // ★ 本服 2026-11-01：单位多时不再一次性预加载全场特效。
+      // 每个干员约 15 个 prefab（wiring.begin → keysFor），4 人房约 59 个，
+      // 5–20 人房一路涨到 20 人约 294 个 —— 浏览器每域名只开 6 个连接，
+      // 这一整批会把连接占满，同一时刻要下的 .skel（单个可达 540 KB）、贴图、语音只能排队，
+      // 玩家看到的就是进战斗后「资源加载变慢」（2026-11-01 的 assets.log：同一秒内 5 个 prefab
+      // 一起等 2.2–3.7 s，而服务器读同样的文件只要 0.15 ms）。
+      // 超过 PRELOAD_UNITS_MAX 只预加载前这么多个（准备阶段的己方 / 首屏），
+      // 其余单位上场时由 spawn 分支调 wiring.more() 按需补（app.js 下面的 spawn 处理，已经存在）。
+      const all = [...infos.values()].map((info) => ({ id: info.id, info }));
+      wiring.begin(all.length > PRELOAD_UNITS_MAX ? all.slice(0, PRELOAD_UNITS_MAX) : all).catch(() => {});
     }
     return true;
   }

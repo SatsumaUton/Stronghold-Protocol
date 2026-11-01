@@ -95,8 +95,16 @@ export function ConnectionBanner() {
   const replaced = conn.status === 'closed' && conn.lastError?.code === 'REPLACED';
   const rejected = conn.status === 'connected' && !!conn.lastError; // hello refused (version, server full…)
   const versionMismatch = rejected && conn.lastError.text === CLIENT_ERR_TEXT.VERSION;
-  // Short transitional states (a rename re-sends hello on the live socket) only show if they linger.
-  const transient = conn.status === 'connecting' || conn.status === 'handshaking' || (conn.status === 'connected' && !rejected);
+  // Short transitional states only show if they linger.
+  // ★ 2026-11-01（维护者：「为什么我这里还是有网络中断的提示」）：
+  //   节点被滚动重启时，玩家那条 WebSocket 会断 1–3 秒，前端自动重连就好。
+  //   但 `reconnecting` **原本不在这里**，于是一断就立刻弹横幅 —— 看到的就是「闪一下」。
+  //   维护者要的是「节点追新代码时用户无感」，所以把重连也纳入「短状态」：
+  //   用 conn-banner--soft（CSS 里 delay .6s 才出现），2 秒内连回来就什么都不显示。
+  //   ⚠ 真的连不上（超过 2 秒）时横幅照样出现，而且 `retryNow` 按钮仍在 —— 不掩盖真故障。
+  const flapping = conn.status === 'reconnecting';
+  const transient = conn.status === 'connecting' || conn.status === 'handshaking'
+    || flapping || (conn.status === 'connected' && !rejected);
   const text = conn.status === 'reconnecting'
     ? t('与服务器的连接已中断，正在重连')
     : replaced ? t('该身份已在其他页面登录')
@@ -106,7 +114,9 @@ export function ConnectionBanner() {
     : conn.status === 'closed' ? { label: replaced ? t('在此页面继续') : t('重新连接'), run: () => net.connect() }
       : versionMismatch ? { label: t('刷新页面'), run: () => location.reload() }
         : rejected ? { label: t('重试'), run: () => net.reconnectNow() } : null;
-  return html`<div class=${`conn-banner${transient ? ' conn-banner--soft' : ''}`} role="alert">
+  // flap（断线重连）用 2 秒宽限；其他短状态沿用 .6 秒
+  const bannerCls = `conn-banner${flapping ? ' conn-banner--flap' : transient ? ' conn-banner--soft' : ''}`;
+  return html`<div class=${bannerCls} role="alert">
     <${Icon} name="wifiOff" />
     <span>${text}</span>
     ${conn.status === 'reconnecting' ? html`<span class="conn-banner__sub">${t('第 {attempt} 次 · {secs}s', { attempt: conn.attempt, secs })}</span>` : null}

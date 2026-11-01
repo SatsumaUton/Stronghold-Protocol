@@ -383,7 +383,13 @@ export function AdminTools({ open, onClose, anchor = null }) {
   };
   const shown = (() => {
     const all = list();
-    const f = q ? all.filter(([k, rec]) => (k + ' ' + nameOf(rec, k)).toLowerCase().includes(q.toLowerCase())) : all;
+    // ★ 本服 2026-11-01：**空搜索时不截断**，列出全部条目。
+    // 以前是无条件 `f.slice(0, 80)`，于是干员（data/chess.json 266 条）只看得到前 80 条，
+    // 后 83 个干员（断崖、斯卡蒂、瑕光、初雪、风笛…）在搜索框空着时根本不出现在列表里 ——
+    // 维护者以为「下拉框显示不全」，实际是被砍掉的。列表本来就带滚动条，266 个按钮渲染没有压力。
+    // 搜索时仍保留 80 条上限：输入一个宽泛的关键字（比如「char」）也能出上百条，那时截断是为了不让面板卡。
+    if (!q) return all;
+    const f = all.filter(([k, rec]) => (k + ' ' + nameOf(rec, k)).toLowerCase().includes(q.toLowerCase()));
     return f.slice(0, 80);
   })();
 

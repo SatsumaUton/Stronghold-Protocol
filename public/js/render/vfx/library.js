@@ -18,7 +18,16 @@ import { compileEffect } from './effect.js';
 import { FX_LIST_URL, loadFxList } from './available.js';
 import { setIndexVersion } from './mounts.js';
 import { mergePluginFx } from './pluginLibrary.js';
-const MAX_PARALLEL = 8;
+// ★ 本服 2026-11-01：特效文件（prefab / mesh / texture）同时下载的上限，8 → 4。
+// 浏览器对同一域名只开 6 个 HTTP 连接，而这个库在进战斗时会一次性排一整场的特效
+// （wiring.begin：每个干员约 15 个 prefab，20 人房约 294 个文件）。并发设成 8 时，
+// 这 294 个请求会把 6 个连接全部占满，同一时刻要下的 .skel（单个可达 540 KB）、
+// 干员贴图和语音只能排在后面 —— 玩家看到的就是「资源加载突然变慢」，5–20 人房尤其明显
+// （2026-11-01 用 nginx 的 assets.log 定位：同一秒内 5 个 prefab 一起等 2.2–3.7 s，
+// 而服务器磁盘读同样的文件只要 0.15 ms，src 全是本机直读）。
+// 降到 4 之后特效自己慢一点（本来就不阻塞渲染，app.js 的 begin 没有 await），
+// 但给模型/贴图/音频留出 2 个连接，整体体感更好。改大之前先想清楚这一点。
+const MAX_PARALLEL = 4;
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
