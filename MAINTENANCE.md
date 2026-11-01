@@ -1019,6 +1019,11 @@ concurrentDraft() { return !!this.capacityExperiment && !this.isSolo && this.all
 
 **2026-11-02 实测断点续玩本身是好的**，不是坏在半路：
 
+> ⚠ **这句话后来被证明只对了一半，已在下节 §9.11c-2 更正**：
+> 下面测的是**检查点（存档）机制**，而「重启后真的把对局恢复回来」那条路当时根本没接线
+> （`persister.restore()` 在本地模式下无条件 `abortRestoredMatch`，`restoreLocal()` 是死代码）。
+> 看这张表之前请先读 §9.11c-2。
+
 | 证据 | 数值 |
 |---|---|
 | `node --test test/match/snapshot.test.js test/match/feedback1-dispatch-snapshot.test.js` | **16 / 16 通过** |
@@ -1035,6 +1040,139 @@ concurrentDraft() { return !!this.capacityExperiment && !this.isSolo && this.all
 & D:\Redis\redis-cli.exe STRLEN <那个键>     # 0 字节 = 存了个空的，不正常
 & D:\Redis\redis-cli.exe TTL <那个键>        # 应该是 8 万多秒；-2 = 键没了，-1 = 没设过期
 ```
+
+### 9.11c-2 断点续玩曾经**根本没接线**（2026-11-02 修复，必读）
+
+上一节写着「断点续玩本身是好的」—— 那句话只对了一半，必须更正：
+
+> **检查点（存档）机制是好的；但「重启后把对局恢复回来」这条路从来没接通。**
+> 上面那张表的 16/16 测的是 `server/match/snapshot.js` 的编解码与 `restoreMatch()`，
+> **没有一个测试覆盖 persister 的恢复分支**，所以这个洞一直没被发现。
+
+#### 现象（维护者实测，node-1）
+
+重启节点后，正在打的玩家看到的不是「继续玩」，而是：
+
+```
+本局模拟已结束
+服务器重启导致对局中断，同盟已返回等待室
+[ 返回同盟 ]
+```
+
+点那个按钮只会 `store.set({ match: emptyMatch() })` —— 对局被**丢掉**，检查点白存。
+
+#### 两层根因（缺一不可，只修一层都没用）
+
+**第一层 —— `server/persist/persister.js` 的 `restore()` 在本地模式下无条件丢弃对局：**
+
+```js
+// 修之前
+for (const { room, ref, departed } of result.matches) {
+  if (!this.cluster) {
+    // A process restart must not silently resume a match: keep the alliance room, but
+    // return it to its waiting state so clients show 返回同盟 instead of continuing.
+    this.abortRestoredMatch(room);
+    this.counts.droppedMatches++;
+    continue;                       // ← 根本没尝试恢复
+  }
+  ...
+}
+```
+
+注意：**参考版没有这段**。参考版 `persister.js:289` 是
+
+```js
+ok = this.cluster ? this.lobby.restoreRemoteMatch(room, ref, departed)
+                  : await this.restoreLocal(room, ref, departed);
+```
+
+—— 本地模式**总是**走 `restoreLocal`，压根没有 `abortRestoredMatch` 这个方法。
+`git log -S 'must not silently resume'` 只能追到一次「同步 node-1 游戏本体」的批量提交，
+没有留下任何决策记录，所以这不是维护者的有意设计，是移植时被改坏/漏合并的。
+
+**第二层 —— `restoreLocal()` 是死代码：**
+
+它按 **4 个参数**调用 `this.lobby.startMatch(room, room.matchKey, room.matchKeys, { restore: {...} })`，
+而我们的 `startMatch` 当时签名是 `startMatch(room, key = null)` —— 只收 2 个。
+即使第一层放行，`restore` 也传不进去，恢复必然失败。
+
+`restoreLocal` 本身与参考版**逐字一致**（`ref.kind`/`cp.room`/`cp.seed`/`cp.matchNo` 四道校验、
+`restoreMatch()` 灌档、`departed` 座位补 `onLeave`），所以**不要重写它**，只要把它接通。
+
+#### 修法（两处，必须一起）
+
+**1. `server/lobby.js` 的 `startMatch` 支持 `restore`：**
+
+```js
+startMatch(room, key = null, keys = null, { restore = null } = {}) {
+  ...
+  const seats = restore ? restore.seats : room.seats.filter(Boolean).map((s) => { ... });
+  try { seed = restore ? restore.seed >>> 0 : this.seedFn() >>> 0; } catch { ... }
+  const opts = { ..., matchNo: restore ? restore.matchNo : room.matchCount + 1, ... };
+  ...
+  room.matchKeys = keys;
+  room.matchCount = restore ? restore.matchNo : room.matchCount + 1;
+  this.broadcastState(room);
+  if (restore) restore.apply(match); else match.start();
+}
+```
+
+四个字段都不能省，每个都有具体后果：
+
+| 字段 | 不这么写会怎样 |
+|---|---|
+| `seats` | 用房间当前座位重算 → 卡池/练度/皮肤和玩家记忆对不上 |
+| `seed` | 换 seed → 整局 RNG 变了，**不是同一局**（`checkSnapshot` 直接拒） |
+| `matchNo` | `battlePrefix` 由它派生，错了 `checkSnapshot` 报 `refused (seed)`，battleId 还会重号 |
+| `matchCount` | 写成 `++` 的话这一局被记成「下一局」，回放/战报全错 |
+| `apply` 而非 `start` | 走 `start()` 会重新发钱、重跑回合开始钩子 —— 存档里那些已经跑过了 |
+
+**2. `server/persist/persister.js` 的 `restore()` 先恢复、失败才回退：**
+
+```js
+let ok = false;
+try {
+  ok = this.cluster ? this.lobby.restoreRemoteMatch(room, ref, departed)
+    : await this.restoreLocal(room, ref, departed);
+} catch (e) { this.log.warn?.(`[persist] ${room.code}: match not restored (${e.message})`); ok = false; }
+if (ok) { matches++; continue; }
+this.counts.droppedMatches++;
+if (this.cluster) { if (!room.disposed) this.lobby.disposeRoom(room, 'node-restarted'); }
+else { this.abortRestoredMatch(room); }        // 房间保留、退回等待室（= 旧的「返回同盟」）
+```
+
+和参考版有一处**有意的差别**：恢复失败时参考版直接 `disposeRoom()`（房间连同座位全没），
+我们保留房间并退回等待室 —— 玩家还能在同盟里重开，不至于被踢出。这也保持了原有
+`droppedMatches` 统计口径和客户端「返回同盟」那条兜底路径。
+
+#### 怎么验证真的修好了
+
+看运行时的 `droppedMatches` / `restoredMatches`（`/healthz` 的 `persistence` 段）：
+
+```powershell
+(Invoke-RestMethod 'http://127.0.0.1:3001/healthz').persistence
+```
+
+- 修之前重启一次：`"restoredMatches":0,"droppedMatches":1`
+- 修之后重启一次：应该是 `"restoredMatches":1,"droppedMatches":0`
+
+回归测试（新增，4 条）：
+
+```powershell
+node --test test/persist/resume-match.test.js
+```
+
+其中「恢复成功」那条是**真 Match + 真检查点**的完整链路：
+`lobby.startMatch → snapshotMatch → 新进程 restore() → restoreLocal → restoreMatch`，
+断言 `res.matches === 1`、`back.match` 存在、`back.match.seed` 与 `back.matchCount` 都与存档一致。
+
+#### 排查这类问题时的顺序
+
+1. 先看 `healthz` 的 `restoredMatches` / `droppedMatches` —— 一眼看出是「没找到」还是「找到了又丢」。
+2. `droppedMatches>0` 且 `restoredMatches==0` → 恢复分支在丢，查 `persister.restore()`。
+3. 日志里出现 `[snapshot] <房间>: checkpoint refused (seed)` → **不是** seed 真的不对，
+   八成是 `matchNo` 没从存档带过来（`battlePrefix` 由它派生）。
+4. 日志里出现 `checkpoint missing or foreign` → `ref.id` 与检查点键不一致，或检查点已过期（TTL 25 h）。
 
 ### 9.11d 选策略阶段的「战场小地图」（2026-11-02 移植自参考版 #65）
 
@@ -1250,6 +1388,102 @@ test.after(async () => {
 ```
 
 修完从「>120 秒不退出」变成「**1.5 秒退出码 0**」。
+
+### 9.11h 「指定 AI 策略」点下去报「无效的请求」（2026-11-02 修复）
+
+#### 现象
+
+房主在房间里点某个 AI 队友的「策略」按钮、在弹出的框里选一个盟约 →
+界面直接弹 **「无效的请求」**，策略没变。
+
+#### 根因：协议表里**没有这条消息**（不是服务端拒绝）
+
+服务端 `lobby.setBotBand()` 一直都在，写得也对。问题是客户端**根本没把消息发出去**：
+
+```js
+// public/js/net.js 的 request()
+const bad = validateC2S(msg);
+if (bad) { console.warn(`[net] refusing invalid ${t}: ${bad}`); reject(new NetError('BAD_MSG', bad)); return; }
+```
+
+`shared/protocol.js` 的 C2S 表里从来没有 `room.setBotBand` 这一条，
+于是 `validateC2S` 返回 `bad field` → 客户端抛 `BAD_MSG` = 「无效的请求」（`shared/constants.js:228`）。
+**请求连 socket 都没上**，服务端日志里也不会留下任何痕迹 —— 这就是为什么按「服务端为什么拒」去查会一无所获。
+
+修法（`shared/protocol.js`，紧挨 `room.removeBot`）：
+
+```js
+'room.setBotBand': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1), bandId: nullable(isId) },
+```
+
+`bandId` 必须用 `nullable(isId)` —— `null` 是「自动选择」这个合法取值，用 `isId` 会把「自动选择」也拒掉。
+
+> **教训（这条适用于所有移植功能）**：加一条 C2S 消息 = **三处**都要动：
+> ① `shared/protocol.js` 的 C2S 表；② 服务端 `lobby.js` 的 `switch (msg.t)` 分支；
+> ③ 客户端调用。只做 ②③ 会得到「无效的请求」，而且客户端和服务端**都不会报错日志**。
+> 排查时先在浏览器 console 找 `[net] refusing invalid …`，那是唯一的线索。
+
+#### 第二件事：`allowRepeat` 没作用到「指定 AI 策略」
+
+维护者同时要求确认「允许重复选择策略」时，两个 AI 能拿同一个盟约。
+原来**不行**，客户端和服务端各有一道无条件的重复拦截：
+
+```js
+// 服务端 lobby.setBotBand —— 无条件拒绝
+if (room.seats.some((s) => s && s !== target && s.isBot && s.band === bandId)) return fail(...);
+// 客户端 BotBandPicker —— 无条件置灰
+for (const s of seats) if (s && s.isBot && s.seat !== seat.seat && typeof s.band === 'string') usedBy.set(s.band, s.name);
+//   ... disabled=${busy || !!other}
+```
+
+这与 `Match` 的判据**打架**：`server/match/match/phases.js:223` 的 `bandTaken()` 在
+`allowRepeat` 下**恒为 false**，`views.js:180` 在 `allowRepeat` 下**不再下发 `reserved`**。
+即「房间说允许重复，房主却被拒」。
+
+修法：两边都改成同一个判据，且**与 `Match.js:342-345` 逐字一致**（这点很重要，否则又会不一致）：
+
+```js
+// server/lobby.js —— 新增
+roomAllowsRepeatBands(room) {
+  if (!room || room.mode === 'solo') return false;
+  if (!(Number(room.capacity) > MAX_SEATS)) return false;      // 非扩容房没有这个实验项
+  return room.experimental?.allowRepeat === true;
+}
+// 对应 Match.js：
+//   this.capacityExperiment = !this.isSolo && this.playerCapacity > 4;
+//   this.allowRepeat       = this.capacityExperiment && this.experimental.allowRepeat === true;
+```
+
+客户端 `BotBandPicker` 同口径（`seats.length > MAX_SEATS && room.experimental?.allowRepeat === true`），
+允许重复时**既不置灰也不标占用**，提示文案也换成「本房允许重复选择策略，多个 AI 可以选同一个」。
+
+AI 自己挑策略那一侧**不用改** —— `server/match/bot.js:197-201` 早就处理了：
+
+```js
+// 5–20 人房的「允许重复选择策略」(allowRepeat) 同样作用于 AI：
+const reserve = m.allowRepeat === true ? 1 : SOFT_BAND_RESERVE;
+```
+
+#### 顺手补的 i18n
+
+移植 AI 指定策略时，整块文案**一个都没进语言包**（en/ja/ko/zh-TW 全缺 9 条），
+于是英文/日文/韩文/繁中界面会直接回落成简体中文。这次一起补了这 9 条：
+
+`指定 AI 策略：{name}`、`指定该 AI 队友选择的策略`、`已指定给 {name}`、`自动选择`、
+`禁用鸭爵策略`、`允许重复选择策略`、`鸭爵策略可叠加`、以及两条 botband 提示。
+
+> 补 i18n 的做法：msgid 就是中文原串，直接在 `public/i18n/<lang>.json` 里加键。
+> 用 `node tools/i18n.mjs check --all` 复查；`missing` 行是既有缺口（当前 zh-TW 还缺 159 条，
+> 与本次无关，别以为是新加的）。
+
+#### 回归测试
+
+```powershell
+node --test test/ui/bot-band-protocol.test.js    # 3 条：协议放行 / 非法参数仍拒 / allowRepeat 判据
+```
+
+第二条特意测「非法参数仍然被拒」，防止把校验写成永远放行。
+
 
 > 注意：这个测试**在 `repo-sync` 里跑不了** —— 仓库不提交 `node_modules`，
 > `require('nodemailer')` 会 `MODULE_NOT_FOUND`。要在运行目录跑，或先 `npm ci`。
