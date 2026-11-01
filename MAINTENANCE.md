@@ -5673,6 +5673,42 @@ git -c http.version=HTTP/1.1 -c credential.helper= push $urlDirect HEAD:custom/p
 2026-11-02 实测：经 `ghfast.top` 连拒两次，改直连一次成功（`17562391..2230cebb`）。
 **fetch 用代理没问题，只有 push 受影响。** 不要在没确认祖先关系前就 `--force` 覆盖远程。
 
+##### 补充实测（2026-11-02 02:03）：真正的原因常常是**本地跟踪 ref 残留**，不是代理
+
+同一晚再推时，报错换了形状：
+
+```
+! [remote rejected] custom/production -> custom/production
+  (cannot lock ref 'refs/heads/custom/production':
+   is at b8728e11... but expected 67fbde34...)
+```
+
+`b8728e11` 是远端**真实**值，`67fbde34` 是它的**父提交** —— git 拿着一个过期的期望值去锁 ref。
+
+关键判据：**`ls-remote` 读到的值是对的，但 push 用的不是它**。
+
+```powershell
+git ls-remote --heads $url custom/production        # 远端真实值（正确）
+git rev-parse origin/custom/production              # 本地跟踪 ref
+git log --oneline -1 <期望值>                        # 期望值是不是远端真实值的祖先？
+```
+
+这次 `ls-remote` 和 `origin/custom/production` **都显示 `b8728e11`**，但 push 仍报
+`expected 67fbde34` —— 说明是 git 内部缓存的陈旧信息，**改 `remote.origin.fetch`
+refspec、加 `--force-with-lease=<ref>:<正确SHA>` 都没用**（后者会报 `stale info`）。
+
+**有效解法：删掉跟踪 ref，让 git 重新协商**：
+
+```powershell
+git update-ref -d refs/remotes/origin/custom/production
+git push $url refs/heads/custom/production:refs/heads/custom/production   # 成功
+git fetch $url refs/heads/custom/production:refs/remotes/origin/custom/production --force  # 重建
+```
+
+**另：本机直连 `github.com` 不可用**。2026-11-02 02:03 实测
+`ls-remote https://github.com/...` → `Failed to connect to github.com:443 after 21103 ms`。
+所以「改直连」这条在本机**走不通**，只能走代理 + 上面清 ref 的办法。
+
 #### 本地备份文件不入库
 
 `.gitignore` 已加 `*.bak` 和 `*.bak-*`。改文件时随手留在仓库里的
