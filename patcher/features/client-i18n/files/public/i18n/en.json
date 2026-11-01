@@ -2411,5 +2411,14 @@
   "通过账号恢复当前对局": "Resume the current match via account",
   "这个页面对应的节点上没有你的对局，它在另一个节点（房间 {code}）。点下面的按钮过去继续。": "Your match is not on this page's node — it is on another one (room {code}). Click the button below to go there and continue.",
   "前往该房间继续对局": "Go to that room and continue",
-  "这台服务器还在使用旧版本。本局已结束，刷新页面即可换到新版本（不会影响你的账号和对局记录）。": "This server is still running an older version. The match is over — reload the page to move to the new version (your account and match history are not affected)."
+  "这台服务器还在使用旧版本。本局已结束，刷新页面即可换到新版本（不会影响你的账号和对局记录）。": "This server is still running an older version. The match is over — reload the page to move to the new version (your account and match history are not affected).",
+  "指定 AI 策略：{name}": "Designate a strategy for {name}",
+  "指定该 AI 队友选择的策略": "Designate the strategy this AI teammate picks",
+  "开局选择策略时，该 AI 队友会直接选择指定的策略，其他博士不能再选它。": "When the strategy draft starts, this AI teammate takes the designated strategy at once; other Doctors can no longer pick it.",
+  "开局选择策略时，该 AI 队友会直接选择指定的策略。本房允许重复选择策略，多个 AI 可以选同一个。": "When the strategy draft starts, this AI teammate takes the designated strategy at once. This room allows repeated strategies, so several AIs may share one.",
+  "已指定给 {name}": "Designated to {name}",
+  "自动选择": "Automatic",
+  "禁用鸭爵策略": "Disable the Duck Lord strategy",
+  "允许重复选择策略": "Allow repeated strategies",
+  "鸭爵策略可叠加": "Duck Lord strategies stack"
 }
