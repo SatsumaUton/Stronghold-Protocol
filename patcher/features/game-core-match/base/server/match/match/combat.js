@@ -3,7 +3,8 @@
 // (server-run streaming, client-side combat), the per-field results and the sim-error log, then 联防 or SETTLE.
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
-import { PHASE, GEO } from '../../../shared/constants.js';
+import { PHASE, GEO, layerGainRoom } from '../../../shared/constants.js';
+import { WorkerFieldRunner } from '../combat/runner.js';
 import { deriveSeed } from '../../sim/rng.js';
 import { withBounties } from '../waves.js';
 import { planUnite } from '../unite.js';
@@ -51,10 +52,7 @@ export class MatchCombat {
     const input = ps.battleInput({ side: 'L', colOffset: 0 });
     // the client's list: bounty units inserted among their host action's own units, which are re-timed around them
     const spawns = withBounties(this.gd, this.round, wave, ps.bounties, ps.playerId).map((s) => ({ ...s, ownerPlayerId: ps.playerId }));
-    // `waveSpawns`: the round's own wave before this player's bounties (a copy), so a draw every player shares picks the
-    // same units (鸭爵, GitHub #839)
-    const waveSpawns = (wave.spawns || []).map((s) => ({ ...s, mods: s.mods ? { ...s.mods } : undefined }));
-    const ev = { input, kind: 'normal', round: this.round, spawns, waveSpawns, ...(preview ? { preview: true } : {}) };
+    const ev = { input, kind: 'normal', round: this.round, spawns, ...(preview ? { preview: true } : {}) };
     // Preview construction failures go to the rehearsal's discard path, never Match.dispatch's live error sink.
     if (preview) this.dispatcher.dispatch(ps, 'onBattleStart', ev);
     else this.dispatch(ps, 'onBattleStart', ev);
@@ -82,12 +80,21 @@ export class MatchCombat {
     this.phase = PHASE.COMBAT;
     const alive = this.alivePlayers();
     this.lastResults = new Map();
-    this.fields = alive.map((ps) => ({ fieldId: `n:${ps.playerId}`, kind: 'normal', players: [ps.playerId], battle: this._normalBattle(ps), live: true }));
+    this._normalAliveCount = alive.length;
+    this._uniteRelay = null;
+    if (this.capacityExperiment) this._uniteBudget = null;
+    this.fields = alive.map((ps) => this.combatPool ? this._remoteField(this._normalOpts(ps), [ps.playerId])
+      : { fieldId: `n:${ps.playerId}`, kind: 'normal', players: [ps.playerId], battle: this._normalBattle(ps), live: true });
+    this._beginDamage('normal');
     const limit = this.wave ? this.wave.timeLimit : 60;
     this.deadline = this.sched.instant ? 0 : this.sched.now() + Math.round((limit / this.gameSpeed) * 1000);
+    const Runner = this.combatPool ? WorkerFieldRunner : FieldRunner;
+    this.runner = new Runner(this, this.fields, {
+      onTick: (runner) => { if (!runner.remote) this._sampleDamage(); },
+      onDone: (runner) => this.combatDone(runner),
+    });
     this._defaultWatch();
     this.markPublic();
-    this.runner = new FieldRunner(this, this.fields, { onDone: (runner) => this.combatDone(runner) });
     this.runner.start();
   }
 
@@ -95,11 +102,16 @@ export class MatchCombat {
     this.phase = PHASE.COMBAT;
     const alive = this.alivePlayers();
     this.lastResults = new Map();
+    this._normalAliveCount = alive.length;
+    this._uniteRelay = null;
+    if (this.capacityExperiment) this._uniteBudget = null;
     this.watchers.clear();
     const fields = alive.map((ps) => this._ccField({ fieldId: `n:${ps.playerId}`, kind: 'normal', players: [ps.playerId], opts: this._normalOpts(ps) }));
     const limit = this.wave ? this.wave.timeLimit : 60;
     this.deadline = this.sched.instant ? 0 : this.sched.now() + Math.round((limit / this.gameSpeed) * 1000);
     this._launch(fields);
+    this._beginDamage('normal');
+    this._flushDamage(true);
     // every fighting human runs its own field; eliminated humans (and spectator seats) keep watching (research 09 §3.1
     // "Keep-watching auto-observes the first available field", switching freely with 前往查看): a replica of the field
     // of the player they follow — the one they last watched, else the first player still in (item 56) — else the first
@@ -139,22 +151,67 @@ export class MatchCombat {
     }
   }
 
+  /** Consume a normal battle's cumulative gains once; settlement may supply a missing final delta. */
+  _applyBattleLayerGains(ps, gains) {
+    if (!ps || !ps.alive || ps.left || !gains || typeof gains !== 'object') return false;
+    let changed = false;
+    for (const [bondId, n] of Object.entries(gains)) {
+      if (!this.gd.bond(bondId) || !Number.isFinite(n) || !(n > 0)) continue;
+      const total = Math.floor(n);
+      const credited = ps.battleLayerGains[bondId] || 0;
+      if (total <= credited) continue;
+      // Advance the watermark before dispatch: rewards can cause nested onGain/onLayers hooks.
+      ps.battleLayerGains[bondId] = total;
+      const before = ps.layers[bondId] || 0;
+      const add = layerGainRoom(before, total - credited);
+      if (!(add > 0)) continue;
+      ps.layers[bondId] = before + add;
+      this.dispatch(ps, 'onLayers', { bondId, from: before, to: ps.layers[bondId], reason: 'battle' });
+      changed = true;
+    }
+    if (changed) ps.dirty();
+    return changed;
+  }
+
+  /** Authority updates are independent of who watches; old fields and disabled phases cannot award layers. */
+  _syncNormalLayers(field, gains) {
+    if (this.disposed || this.ended || this.phase !== PHASE.COMBAT || field.kind !== 'normal'
+      || !this.fields.includes(field) || field.spec?.flags?.layerGainsEnabled === false
+      || field.battle?.flags?.layerGainsEnabled === false) return;
+    for (const pid of field.players) {
+      const ps = this.players.get(pid);
+      if (this._applyBattleLayerGains(ps, gains?.[pid])) ps.recompute();
+    }
+  }
+
   combatDone(runner) { this._finishCombat((f) => runner.resultOf(f)); }
 
   /** Every normal field has its result: record them, then 联防 or SETTLE. */
   _finishCombat(resultOf) {
     if (this.phase !== PHASE.COMBAT) return;
+    this._sampleDamage(true, true); // save normal totals before the unite phase replaces these Battle objects
+    this._flushDamage(true);
     this._stopClientCombat();
     for (const f of this.fields) {
       const res = resultOf(f);
+      if (!res.synthetic) this._syncNormalLayers(f, Object.fromEntries(
+        Object.entries(res.perPlayer || {}).map(([pid, pp]) => [pid, pp.layerGains || {}])));
       this._collectSimErrors(f, res);
       for (const pid of f.players) {
         const pp = res.perPlayer && res.perPlayer[pid];
-        this.lastResults.set(pid, pp || { killed: 0, total: 0, leaked: [], perfect: true, layerGains: {}, coins: 0, damageDealt: 0, unitsEnd: [], unitStats: [] });
-        // the views show the layers the battle reached until settle() makes them persistent (DESIGN §20.15)
+        const normalResult = pp || { killed: 0, total: 0, leaked: [], perfect: true, layerGains: {}, coins: 0, damageDealt: 0, unitsEnd: [], unitStats: [] };
+        // Keep the full field's provenance: a synthetic fallback must never qualify a rescue donor.
+        this.lastResults.set(pid, res.synthetic || !pp ? { ...normalResult, synthetic: true } : normalResult);
+        // Keep only a legacy/reference result's uncredited remainder as an overlay; live gains must not show twice.
         const ps = this.players.get(pid);
         const gains = pp && pp.layerGains && typeof pp.layerGains === 'object' ? pp.layerGains : null;
-        if (ps && gains && Object.keys(gains).length) { ps.pendingLayerGains = { ...gains }; ps.dirty(); }
+        if (ps && gains) {
+          const pending = Object.fromEntries(Object.entries(gains)
+            .filter(([bondId, n]) => Number.isFinite(n) && Math.floor(n) > (ps.battleLayerGains[bondId] || 0))
+            .map(([bondId, n]) => [bondId, Math.floor(n) - (ps.battleLayerGains[bondId] || 0)]));
+          ps.pendingLayerGains = Object.keys(pending).length ? pending : null;
+          ps.dirty();
+        }
       }
     }
     for (const f of this.fields) f.live = false;

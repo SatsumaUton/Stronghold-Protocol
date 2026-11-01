@@ -39,6 +39,7 @@
 
 import { ATTACK_PAUSE, ALLY_COLLIDER_RADIUS, MOVE_SCALE, PROJECTILE_SPEEDS, PROJECTILE_SPEED, BOOMERANG_RETURN_SPEED, COLS, CHAIN_RADIUS } from './constants.js';
 import { sortEnemyTargets, sortAllyTargets, canTargetEnemy, canTargetAlly, tileKeyOf } from './targeting.js';
+import { reduceElement } from './damage.js';
 import { straightClear } from './grid.js';
 import { moveFeared, endFear } from './fear.js';
 import { hypot, powi } from './detmath.js';
@@ -54,7 +55,7 @@ export function effectiveProfile(u) {
   const ov = sk ? sk.attackOverride() : null;
   const tg = sk ? sk.targetingOverride() : null;
   if (!ov && !tg) return base;
-  const p = Object.assign({}, base);
+  const p = { ...base };   // (spread: the same own enumerable copy as Object.assign({}, base), on V8's object-clone fast path)
   p.isSkill = true;
   if (ov) {
     for (const k in ov) {
@@ -160,7 +161,6 @@ export function noteAttackCommit(b, dt) {
   const allies = b.allyUnits;
   if (!allies || !allies.length) return;
   let map = null;
-  const meleeState = { fortressMelee: false };
   for (let i = 0; i < allies.length; i++) {
     const u = allies[i];
     if (!u.alive || !u.deployed || !u.canAct || !u.profile) continue;
@@ -174,10 +174,8 @@ export function noteAttackCommit(b, dt) {
     if (prof.heal && prof.dmgType === 'heal') continue;
     if (prof.allInRange || prof.rangeAoe) continue;
     if (prof.canAttack && !prof.canAttack(b, u)) continue;
-    // The fortress melee/ranged switch is a per-search answer, not profile state: `acquireTargets` reports it in this
-    // scratch object instead of writing `_fortressMelee` on the live profile (a hook that runs during the search must
-    // never see it). Reused across calls — one object per battle, no copy per ally per tick.
-    const targets = acquireTargets(b, u, prof, meleeState);
+    // acquireTargets writes `_fortressMelee` on the profile it is given; keep that off the live profile
+    const targets = acquireTargets(b, u, Object.assign({}, prof));
     if (!targets.length) continue;
     (map ??= new Map()).set(u.id, targets.filter((t) => t && t.alive));
   }
@@ -194,16 +192,8 @@ function committedAttackTargets(b, u, prof) {
   return out;
 }
 
-/** Write the fortress switch where the caller expects it: a scratch object when one was given, else the profile. */
-function setFortressMelee(prof, state, v) {
-  if (state) state.fortressMelee = v; else prof._fortressMelee = v;
-}
-
-/**
- * Collect targets for an ally with profile `prof`. `state` (optional) receives the fortress switch instead of it being
- * written on `prof`: `{fortressMelee}` — a caller that must not touch the live profile passes a scratch object.
- */
-export function acquireTargets(b, u, prof, state = null) {
+/** Collect targets for an ally with profile `prof`. */
+export function acquireTargets(b, u, prof) {
   // a heal attack (医师 / 群愈师 / 疗养师 / 链愈师 / 行医, a skill attack turned into a heal) selects injured allies only,
   // never the enemies its unit blocks — a blocking healer keeps healing: PRTS 卫戍协议/帮助 "对于医疗干员（咒愈师分支除外），
   // 攻击目标为需要治疗的单位" (the blocked-first rule below is for attackers of enemies; community feedback after 0.1.0, E2)
@@ -220,10 +210,10 @@ export function acquireTargets(b, u, prof, state = null) {
   if (prof.fortress) {
     if (u.blocking.length) {
       const t = u.blocking.filter((e) => canTargetEnemy(u, e, { canHitFly: false }));
-      setFortressMelee(prof, state, true);
+      prof._fortressMelee = true;
       return t.slice(0, 1);
     }
-    setFortressMelee(prof, state, false);
+    prof._fortressMelee = false;
   }
   const cands = b.enemiesInKeys(u.rangeKeys, u, prof);
   // "可以选择且优先选择阻挡单位" (PRTS 选择器): the enemies a unit blocks are always selectable by it — the block radius
@@ -238,7 +228,7 @@ export function acquireTargets(b, u, prof, state = null) {
     const here = [u.tileR * COLS + u.tileC];
     const near = b.enemiesInKeys(here, u, prof);
     if (!near.length && b._allyTargets?.size) near.push(...b.allyTargetsInKeys(here, u));
-    setFortressMelee(prof, state, near.length > 0);
+    prof._fortressMelee = near.length > 0;
     sortEnemyTargets(b, u, near, prof.priority);
     return near.slice(0, 1);
   }
@@ -488,7 +478,7 @@ function doHeal(b, u, prof, t) {
   const h = prof.heal || { mode: 'single' };
   let amount = atk * scale;
   if (h.farMul && Math.max(Math.abs(t.tileR - u.tileR), Math.abs(t.tileC - u.tileC)) > (h.nearDist ?? 2)) amount *= h.farMul;
-  if (h.elementHealRatio) b.healElement({ target: t, amount: atk * h.elementHealRatio });
+  if (h.elementHealRatio) reduceElement(t, atk * h.elementHealRatio);
   b.heal(u, t, amount);
   if (h.mode === 'chain') {
     const seen = new Set([t.id]);

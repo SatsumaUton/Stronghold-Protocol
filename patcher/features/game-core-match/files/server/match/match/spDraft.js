@@ -31,6 +31,8 @@ export class MatchSpDraft {
     this.setDeadline(0);
     this.startSpTurn();
     this.markPublic();
+    // 断点续玩：选秀开始是一个安全点
+    this._checkpoint('sp-draft');
   }
 
   spTurn() {

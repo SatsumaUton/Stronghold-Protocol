@@ -14,16 +14,20 @@
 // Enter work the same way). While the pick is in flight the card shows a "选择中" strip with a sweeping bar (never a
 // spinner over its text — user playtest #3 item 9), dropped as soon as the pick shows in m.public (spBusy itself resets
 // when the request settles, ≤ 8 s, or the phase moves on). Untimed drafts (solo, a single-human match: sp.untimed) show
-// no countdown and say so. The selected card's frame and its ☑ 确认选择 strip are white, as in the event's video (10:16).
+// no countdown and say so. When the pick order comes round to the player, screens/game.js drops the official 轮到你选
+// disc over the cards (ui/turnPopup.js); the selected card's frame and its ☑ 确认选择 strip are white, as in the event's
+// video (10:16).
 
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Icon, TierChip, Countdown, Button } from './components.js';
+import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady } from './turnPopup.js';
+import { reducedMotion } from './device.js';
 import { Img, RichText, PlayerAvatar, GIcon } from './gameComponents.js';
 import { itemIconUrl, enemyIconUrl, uiUrl } from './assetUrls.js';
 import { richTextPlain } from './richText.js';
-import { sortedPlayers } from './gameLogic.js';
+import { sortedPlayers, draftMyTurn } from './gameLogic.js';
 import { data } from '../data.js';
-import { t, tName } from '../../../shared/i18n.js';
+import { t, tc, tName } from '../../../shared/i18n.js';
 import { sentText } from './lang.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -82,11 +86,12 @@ export function resolveSpCard(card, family) {
 
 /**
  * Whether a card shows the in-flight pick (g.choice sent, no answer yet): only until the pick lands in m.public — the
- * player's pick is known or the card is taken — so it can never outlive the request's effect.
+ * player's pick is known (or an exclusive card is taken) — so it can never outlive the request's effect.
  * @param {number|null} busyIdx @param {{ idx: number, takenBy?: string|null }} card @param {number|null|undefined} mine
+ * @param {boolean} [allowRepeat] strict server flag; another player's pick does not finish my pending request
  */
-export function pickBusy(busyIdx, card, mine) {
-  return busyIdx != null && !!card && busyIdx === card.idx && mine == null && !card.takenBy;
+export function pickBusy(busyIdx, card, mine, allowRepeat = false) {
+  return busyIdx != null && !!card && busyIdx === card.idx && mine == null && (allowRepeat === true || !card.takenBy);
 }
 
 /**
@@ -96,8 +101,8 @@ export function pickBusy(busyIdx, card, mine) {
  */
 export function cardPickable(sp, card, { myId, solo, busyIdx = null }) {
   if (!sp || !card) return false;
-  const myTurn = solo || sp.turnPid === myId;
-  return myTurn && sp.pickOf.get(myId) == null && !card.takenBy && !card.soldOut && busyIdx == null;
+  const myTurn = draftMyTurn(sp, myId, solo);
+  return myTurn && sp.pickOf.get(myId) == null && (sp.allowRepeat === true || !card.takenBy) && !card.soldOut && busyIdx == null;
 }
 
 /**
@@ -130,9 +135,13 @@ export function armedCard(armed, sp, o) {
  * @param {{ pub:any, sp:any, myId:string, solo:boolean, personal?:boolean, onPick:(idx:number)=>void, busyIdx?:number|null, total?:number|null }} props
  */
 export function ChoiceOverlay(props) {
-  const { sp, myId, solo, busyIdx = null, onPick } = props;
+  const { sp, myId, solo, personal = false, busyIdx = null, onPick } = props;
   const [sel, setSel] = useState(null);
+  const orderRef = useRef(null);
   const armed = armedCard(sel, sp, { myId, solo, busyIdx });
+  useEffect(() => {
+    orderRef.current?.querySelector('.is-cur')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [sp?.turnPid]);
   // a selection whose card cannot be picked any more (taken, the turn moved on, a pick in flight) is dropped
   useEffect(() => { if (sel != null && armed == null) setSel(null); }, [sel, armed]);
   useEffect(() => {
@@ -141,6 +150,17 @@ export function ChoiceOverlay(props) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [armed]);
+  // 轮到你选 (the event's video 10:08): the official disc (ui/turnPopup.js) drops in each time the pick order comes round
+  // to the player — also in a concurrent draft (draftMyTurn) — once its art is in; nothing without it
+  const [turnPop, setTurnPop] = useState(0);
+  const turnNow = turnPopupDue(sp, { myId, solo, personal });
+  const turnSeen = useRef(false);
+  useEffect(() => { preloadTurnPopupArt(); }, []);
+  useEffect(() => {
+    const due = turnNow && !turnSeen.current;
+    turnSeen.current = turnNow;
+    if (due && turnPopupArtReady() && !reducedMotion()) setTurnPop((k) => k + 1);
+  }, [turnNow]);
   if (!sp) return null;
   const tap = (idx) => {
     const card = sp.cards.find((c) => c && c.idx === idx);
@@ -148,8 +168,18 @@ export function ChoiceOverlay(props) {
     setSel(r.armed);
     if (r.pick != null) onPick(r.pick);
   };
-  return html`<${ChoiceView} ...${props} armed=${armed} onTap=${tap}
-    onConfirm=${() => { if (armed != null) tap(armed); }} onDisarm=${() => setSel(null)} />`;
+  return html`<${ChoiceView} ...${props} orderRef=${orderRef} armed=${armed} onTap=${tap}
+    onConfirm=${() => { if (armed != null) tap(armed); }} onDisarm=${() => setSel(null)} />
+    ${turnPop ? html`<${TurnPopup} key=${turnPop} onDone=${() => setTurnPop(0)} />` : null}`;
+}
+
+/**
+ * Whether the 轮到你选 popup is due: a shared draft (not solo, not a personal 教鞭 pick) whose turn is the player's and
+ * the player has not picked yet.
+ * @param {any} sp normalizeSp(...) @param {{ myId: string, solo: boolean, personal?: boolean }} o
+ */
+export function turnPopupDue(sp, { myId, solo, personal = false }) {
+  return !!sp && !solo && !personal && draftMyTurn(sp, myId) && sp.pickOf.get(myId) == null;
 }
 
 /**
@@ -163,7 +193,7 @@ export function spMarks(sp, { solo }) {
   if (!sp || solo || !Array.isArray(sp.order)) return out;
   for (const pid of sp.order) {
     if (sp.pickOf.has(pid)) out.set(pid, 'done');
-    else if (sp.turnPid === pid) out.set(pid, 'turn');
+    else if (sp.concurrent === true || sp.turnPid === pid) out.set(pid, 'turn');
   }
   return out;
 }
@@ -173,18 +203,19 @@ export function spMarks(sp, { solo }) {
  * @param {{ pub:any, sp:any, myId:string, solo:boolean, personal?:boolean, busyIdx?:number|null, total?:number|null, armed?:number|null,
  *   onTap?:(idx:number)=>void, onConfirm?:()=>void, onDisarm?:()=>void }} props
  */
-export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = null, total = null, armed = null, onTap = () => {}, onConfirm = () => {}, onDisarm = () => {} }) {
+export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = null, total = null, armed = null, onTap = () => {}, onConfirm = () => {}, onDisarm = () => {}, orderRef = null }) {
   if (!sp) return null;
   const fam = data.get('choices')?.families?.[sp.family] || null;
   const rawFam = data.getRaw('choices')?.families?.[sp.family] || null;
   const players = new Map(sortedPlayers(pub).map((p) => [p.playerId, p]));
-  const myTurn = solo || sp.turnPid === myId;
+  const myTurn = draftMyTurn(sp, myId, solo);
   const mine = sp.pickOf.get(myId);
   const turnName = players.get(sp.turnPid)?.name || t('队友');
   const special = /_s$/.test(String(sp.family || ''));
   const timed = personal ? pub?.deadline > 0 : !solo && !sp.untimed;
   const armedCardRec = armed != null ? sp.cards.find((c) => c && c.idx === armed) : null;
   const armedName = armedCardRec ? resolveSpCard(armedCardRec, sp.family).name : null;
+  const order = personal || solo ? [] : sp.order;
   // a press anywhere but a card or the confirm button drops the selection
   const onDown = (e) => {
     if (armed == null) return;
@@ -194,8 +225,9 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
   };
   // the official header (the event's 悬赏决策, video 9:59): 「悬赏决策 |」 with the description and the timing line stacked
   // beside the bar; on the right the player deciding (name over 正在决策…, an hourglass) or 当前轮到你决策, then the
-  // countdown. The pick order lives on the team panel (✓ / ••• on the portraits, ui/teamPanel.js spMarks).
-  return html`<div class=${cx('spov', armed != null && 'has-armed', personal && 'spov--personal')} role="dialog" aria-label=${personal ? t('教鞭选择') : t('机变阶段')} onPointerDown=${onDown}>
+  // countdown. The pick order also shows on the team panel (✓ / ••• on the portraits, ui/teamPanel.js spMarks); the
+  // strip below keeps each teammate's pick (the fork's, 2026-10)
+  return html`<div class=${cx('spov', armed != null && 'has-armed', personal && 'spov--personal', (sp.cards.length > 6 || order.length > 4) && 'spov--expanded')} data-allow-repeat=${sp.allowRepeat === true ? 'true' : undefined} role="dialog" aria-label=${personal ? t('教鞭选择') : t('机变阶段')} onPointerDown=${onDown}>
     <div class="spov__veil" aria-hidden="true"></div>
     <div class="spov__inner">
       <header class="spov__head">
@@ -203,26 +235,49 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
           <i class="spov__deco" aria-hidden="true"></i>
           <h2 class=${cx('spov__title', special && 'is-special')}><span class="spov__name">${sentText(sp.name, rawFam?.name, fam?.name) || fam?.name || t('机变')}</span><span class="spov__bar">|</span><span class="spov__desc"><${RichText} text=${sentText(sp.desc, rawFam?.desc, fam?.desc) || fam?.desc || t('选择一项')} /></span></h2>
           <p class="spov__sub">${timed ? (personal ? t('休整期结束时未选择将自动选定') : t('倒计时结束后仍未选定将自动分配')) : t('选择一项（无时间限制）')}${mine == null && myTurn ? t(' · 点击卡牌选中，再次点击确认') : ''}</p>
+          ${sp.allowRepeat === true ? html`<p class="spov__repeat" data-testid="sp-repeat">${sp.concurrent === true ? t('所有博士同时选择，可重复选择，每人只能选择一次') : t('可重复选择，每人只能选择一次')}</p>` : null}
         </div>
         <div class="spov__turn">
           ${personal ? html`<span class="spov__turntxt is-mine">${t('从候选中选择一项战术特训')}</span>`
             : mine != null ? html`<span class="spov__turntxt is-done"><${Icon} name="check" />${t('已完成选择')}</span>`
-            : myTurn ? html`<span class="spov__turntxt is-mine">${t('当前轮到你决策')}</span>`
+            : myTurn ? html`<span class="spov__turntxt is-mine">${sp.concurrent === true ? t('选择一项') : t('当前轮到你决策')}</span>`
+            : sp.concurrent === true ? html`<span class="spov__turntxt is-other"><span class="spov__tw"><small>${t('其他博士正在决策…')}</small></span><${Icon} name="hourglass" /></span>`
             : html`<span class="spov__turntxt is-other"><span class="spov__tw"><b>${turnName}</b><small>${t('正在决策…')}</small></span><${Icon} name="hourglass" /></span>`}
           ${armed != null ? html`<${Button} variant="primary" size="lg" icon="check" class="spov__confirm" data-testid="sp-confirm"
               title=${armedName ? t('确认选择「{armedName}」（再次点击卡牌亦可）', { armedName }) : t('确认选择')} onClick=${onConfirm}>${t('确认选择')}<//>` : null}
           ${timed ? html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />` : null}
         </div>
       </header>
+      ${order.length ? html`<div class="spov__order" ref=${orderRef} aria-label=${t('决策顺序')}>
+        ${order.map((pid, i) => {
+          const p = players.get(pid);
+          const pick = sp.cards.find((c) => c.idx === sp.pickOf.get(pid));
+          const picked = !!pick;
+          const pickName = pick ? resolveSpCard(pick, sp.family).name : null;
+          const cur = (sp.concurrent === true || sp.turnPid === pid) && !picked;
+          const left = p?.status === 'left';
+          return html`<div key=${pid} class=${cx('spov__who', cur && 'is-cur', picked && 'is-done', pid === myId && 'is-self')}>
+            <span class="spov__idx num">${i + 1}</span>
+            <${PlayerAvatar} player=${p || { name: '?' }} size="sm" self=${pid === myId} />
+            <span class="spov__wtext"><span class="spov__wname">${p?.name || t('博士')}</span>
+              ${pickName ? html`<span class="spov__wpick" data-picked-idx=${pick.idx} title=${pickName}>${pickName}</span>` : null}
+            </span>
+            <span class="spov__wstate">${left ? html`<${Icon} name="exit" />` : picked ? html`<${Icon} name="check" />` : cur ? html`<${Icon} name="hourglass" />` : html`<${Icon} name="dots" />`}</span>
+          </div>`;
+        })}
+      </div>` : null}
       <div class=${cx('spov__grid', sp.cards.length <= 3 && 'spov__grid--3')}>
         ${sp.cards.map((card) => {
           const r = resolveSpCard(card, sp.family);
-          const taker = card.takenBy ? players.get(card.takenBy) : null;
+          const taken = sp.allowRepeat !== true && !!card.takenBy;
+          const taker = taken ? players.get(card.takenBy) : null;
+          const isMine = sp.allowRepeat === true ? mine === card.idx : card.takenBy === myId;
           const can = cardPickable(sp, card, { myId, solo, busyIdx });
-          const busy = pickBusy(busyIdx, card, mine);
+          const busy = pickBusy(busyIdx, card, mine, sp.allowRepeat);
           const isArmed = can && armed === card.idx;
-          const takerName = taker ? (card.takenBy === myId ? t('你') : taker.name) : null;
-          return html`<button key=${card.idx} type="button" class=${cx('spcard', `spcard--${r.kind}`, (card.takenBy || card.soldOut) && 'is-taken', card.takenBy === myId && 'is-mine', can && 'is-pickable', isArmed && 'is-armed', busy && 'is-busy')}
+          const pickers = sp.allowRepeat === true ? order.filter((pid) => sp.pickOf.get(pid) === card.idx && players.has(pid)).map((pid) => players.get(pid)) : [];
+          const takerName = taker ? (card.takenBy === myId ? t('你') : taker.name) : pickers.length ? pickers.map((p) => p.name).join(tc('list', '、')) : null;
+          return html`<button key=${card.idx} type="button" data-card-idx=${card.idx} class=${cx('spcard', `spcard--${r.kind}`, (taken || card.soldOut) && 'is-taken', isMine && 'is-mine', can && 'is-pickable', isArmed && 'is-armed', busy && 'is-busy')}
               aria-busy=${busy ? 'true' : undefined} aria-pressed=${can ? String(isArmed) : undefined} disabled=${!can} onClick=${() => can && onTap(card.idx)}
               aria-label=${isArmed ? t('{name}，已选中，再次点击确认', { name: r.name }) : takerName ? t('{name}，{takerName}已选择', { name: r.name, takerName }) : r.name} title=${`${r.name}\n${richTextPlain(r.desc)}`}>
             <span class="spcard__glow" aria-hidden="true"></span>
@@ -237,10 +292,11 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
               </span>
             </span>
             <${RichText} text=${r.desc} class="spcard__desc" />
-            ${card.soldOut && !taker ? html`<span class="spcard__busy" role="status">${t('库存不足')}</span>` : null}
+            ${card.soldOut && !taker ? html`<span class="spcard__busy" role="status">${t('全队库存已用完')}</span>` : null}
             ${r.tier ? html`<${TierChip} tier=${r.tier} size="md" class="spcard__tier" />` : null}
             ${taker ? html`<span class="spcard__taker" title=${t('{name} 已选择', { name: taker.name })}><${PlayerAvatar} player=${taker} size="sm" /></span>` : null}
-            ${isArmed ? html`<span class="spcard__confirm" role="status"><span class="spcard__cbox"><${Icon} name="check" /></span><b>${t('确认选择')}</b><small>${t('再次点击')}</small></span>` : null}
+            ${pickers.length ? html`<span class="spcard__pickers" data-picked-count=${pickers.length} title=${t('{name} 已选择', { name: takerName })}><${Icon} name="check" />${t('{name} 已选择', { name: takerName })}</span>` : null}
+            ${isArmed ? html`<span class="spcard__confirm" role="status"><span class="spcard__cbox" aria-hidden="true"><${Icon} name="check" /></span><b>${t('确认选择')}</b><small>${t('再次点击')}</small></span>` : null}
             ${busy ? html`<span class="spcard__busy" role="status">${t('选择中')}</span>` : null}
           </button>`;
         })}

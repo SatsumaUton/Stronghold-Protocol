@@ -34,6 +34,10 @@ import { SharedPool, createItemPools, createPoolGroups } from './pool.js';
 /**
  * Checkpoint layout version. A document of another version is refused (the match is dropped, server/persist/).
  * Raise it whenever a saved field is added, removed or changes its meaning, or the restore rules below change.
+ *
+ * 例外：**纯追加**的 saved 字段不用抬版本。restoreMatch 用 `Object.hasOwn(doc.match, k)` 逐字段拷贝，
+ * 旧存档缺这一项就保留构造函数给的默认值 —— 例如 bossPairsRound 是 2026-11-02 追加的，旧文档缺它
+ * 时仍是 null，恢复出来的对局和加这个字段之前一模一样。抬版本反而会把线上正在跑的对局全部丢掉。
  */
 export const SNAPSHOT_VERSION = 1;
 
@@ -68,46 +72,63 @@ export const MATCH_FIELDS = Object.freeze({
     'stageId', 'factions', 'bossId', 'hiddenBossId', 'disabledBonds', 'staticInactiveBonds', 'bannedChess',
     'setupRevision', '_setupVoteSeq', 'loneHuman', 'uidSeq', 'pausedMs', 'verifyStats', 'rehearsalStats', '_rehearsalSeq',
     'errors', 'errorCount', 'simErrors', 'simErrorLog', 'localStats', 'watchPref', 'lastResults', '_revival',
-    'draft', 'sp', 'wave', 'bossWaves', 'bossPairs', 'hiddenLayerSum', 'finalAliveCount', 'hiddenReached', 'outcome',
+    'draft', 'sp', 'wave', 'bossWaves', 'bossPairs', 'bossPairsRound', 'hiddenLayerSum', 'finalAliveCount', 'hiddenReached', 'outcome',
     '_botEmotesSettledRound',
     // plugin interaction windows (0.3.1, match/offers.js): the id counter only — no checkpoint is taken while one is open
     'offerSeq',
   ]),
   special: Object.freeze([
-    'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'damageBoard', 'poolGroups', 'playerItemPools',
+    'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'poolGroups', 'playerItemPools',
     ...RNG_NAMES,
   ]),
   derived: Object.freeze([
     'opts', 'roomCode', 'mode', 'difficulty', 'modeId', 'seed', 'log', 'sendFn', 'broadcastFn', 'onEndFn', 'data', 'cs', 'vs',
     'requireCs', 'gd', 'isSolo', 'aiPicksLast', 'afkRemoveRounds', 'ownsScheduler', 'sched', 'registry', 'dispatcher',
-    'BattleClass', 'battleContent', 'timerScale', 'gameSpeed', 'snapshotHz', 'localReplica', 'botRehearsal', 'botSliceMs',
+    'BattleClass', 'battleContent', 'timerScale', 'baseGameSpeed', 'snapshotHz', 'localReplica', 'botRehearsal', 'botSliceMs',
     'botRehearsalDelegate', 'botRehearsalDelegateMs', 'hostId', 'ds', 'clientCombat', 'verifyMode', 'combatPool', 'trialPool',
     'headlessSliceMs', 'battlePrefix', 'experimental', 'revivalEnabled', 'disableSharedPool', 'playerCapacity',
-    'capacityExperiment', 'twentyPlayerMode', 'disableDuckLord', 'allowRepeat', 'stackDuckLord', 'players', 'order', 'spectators', 'botBands', 'stage', 'pool',
+    'capacityExperiment', 'twentyPlayerMode', 'disableDuckLord', 'allowRepeat', 'stackDuckLord', 'disableLayerCap', 'disableHitLimit', 'enemyHpMul', 'enemyAtkMul', 'players', 'order', 'spectators', 'botBands', 'stage', 'pool',
     'playerPools', 'itemPool', 'ended', 'disposed',
+    // 本服：联合作战的战斗 id（unitePhase.js 由 battlePrefix + round + _battleSeq 拼出）。
+    // 它的三个来源要么是 saved/special，要么在恢复时被 RESTORE_SEQ_GAP 顶开，所以不存，重建即可。
+    'battleId',
+    'hiddenSpectators',
     // 0.3.1: the content set's declared windows and the room's 测试 flag (both from the match options)
     'offers', 'test',
+    // 0.3.2: the official version (a hosted match: never checkpointed), the bot strategy, the room's simulation pool, the external AI
+    'version', 'bot', 'simPool', 'externalAI',
   ]),
   transient: Object.freeze([
-    '_rehearsalTasks', 'paused', '_pausedAt', '_bossPubTimer', '_bossPubAt', '_bossClockOn', '_damageDirty', '_damageTimer',
-    '_damageAt', '_damageSampleAt', '_damageSent', '_progressTimer', '_bossClock', '_lastPoolAt', '_poolTimer', '_lastPoolKey',
+    '_rehearsalTasks', 'paused', '_pausedAt', '_bossPubTimer', '_bossPubAt', '_bossClockOn',
+    '_progressTimer', '_bossClock', '_lastPoolAt', '_poolTimer', '_lastPoolKey',
     'pacer', 'overtimeAt', '_timers', '_phaseTimer', '_infoAdvanceTimer', 'setupVote', '_lastSetupVoteAt', '_turnTimer',
     '_pubDirty', '_pubTimer', '_lastPubAt', '_lastPubJson', '_privDirty', '_prepEndQueued', 'fields', 'runner', 'watchers',
-    'localViews', 'unitePlan', '_normalAliveCount', '_uniteRelay', 'uniteResultView', '_uniteLeftKey', '_uniteBounds',
+    'unitePlan', '_normalAliveCount', '_uniteRelay', 'uniteResultView', '_uniteLeftKey', '_uniteBounds',
     'teamLp', 'bossPool', '_turnToken', '_botPath', '_botTraits', '_workerBotPrepOwner', '_botEmotesMerges', 'overtimeApplied',
-    'bossOvertimeStartReal', '_finalEnding', '_bossStartAt', 'lastResultMsg', '_uniteBudget', 'onCheckpoint', 'replayRound',
+    'bossOvertimeStartReal', '_finalEnding', '_bossStartAt', 'lastResultMsg', 'onCheckpoint', 'replayRound',
     // the reroll proposal marks and the kick vote (setupVote.js, kickVote.js): a restore drops them
     '_setupProposals', 'kickVote', '_kickVoteSeq', '_kickFailed', '_kickVoteAt',
+    // 刷新（setup reroll）的每人限流时间戳：纯缓存，恢复后重新计时
+    '_rerollStartAt',
+    // 战斗 2 倍速 (speedVote.js): the votes and the speed they set go with the run; a restore is back on the base speed
+    '_speedVotes', '_speedVoteAt', '_speedUp', 'gameSpeed',
     // an open plugin window and its continuation (match/offers.js): checkpoints wait for it to close (canSnapshot)
     'offerWin', '_offerTimers', '_offerResume', '_offerResumeTimer',
+    // how the bot rehearsals offered to simPool ended
+    'rehearsalPoolStats',
   ]),
 });
 
 /** Every own property of a PlayerState (the same four kinds as MATCH_FIELDS). */
 export const PLAYER_FIELDS = Object.freeze({
   saved: Object.freeze([
-    'left', 'revived', 'pendingDeath', 'revivalUnavailableReason', 'autoplay', 'afkActed', 'afkRounds', 'offlineRounds',
-    'offlineAutoplay', 'alive', 'lp', 'bandId', 'funds', 'pendingFunds', 'infoReady', 'lastEmoteAt', 'bondPlan',
+    'left', 'revived', 'pendingDeath', 'revivalUnavailableReason', 'autoplay', 'afkActed', 'afkRounds',
+    // 本服：管理员标记（三道门全过才为 true，lobby 写入，客户端改不了）。它必须跟着存档走 ——
+    // 否则重启续玩后 ps.admin 变回 false，管理员在这局里再也用不了 g.test
+    // （server/persist/lobbyState.js 的「restored by fallback」注释记过这个坑）。
+    // 存档只在 Redis 里，matchSeats() 的输出不发给客户端，所以带上是安全的。
+    'admin',
+    'alive', 'lp', 'bandId', 'funds', 'pendingFunds', 'infoReady', 'lastEmoteAt', 'bondPlan',
     'shop', 'offers', 'hand', 'temp', 'prepsEnded', '_tempDue', 'board', 'layers', 'battleLayerGains', 'pendingLayerGains',
     'bondCountBonus', 'effects', 'bounties', 'personalChoice', 'counters', 'round', 'deployCapBonus', 'deployCapMin',
     'deviceOverrides', 'tileOverrides', 'stats', 'eliminatedRound', 'creditedKills', 'lpAtFinal', 'lastResult',
@@ -303,7 +324,6 @@ function buildSnapshot(m) {
     ...(m.disableSharedPool ? { soloPool: Object.fromEntries([...m.pool.entries].map(([id, e]) => [id, e.left])) } : {}),
     itemDebt: m.poolGroups.map((g) => [...(m.playerItemPools.get(g.playerIds[0])?.debt || new Map())]),
     rng: Object.fromEntries(RNG_NAMES.map((n) => [n, m[n].state() >>> 0])),
-    damageBoard: encodeValue({ ...m.damageBoard }),
   };
   // a vote in INFO_CHECK is dropped on restore: keep its paused confirmation budget instead of a zero deadline
   if (m.setupVote && m.phase === PHASE.INFO_CHECK) doc.deadlineRemainingMs = Math.max(0, Number(m.setupVote.remainingMs) || 0);
@@ -367,7 +387,6 @@ export function restoreMatch(m, doc, { createRngFromState, log = null, replay = 
     const state = doc.rng[name];
     if (Number.isInteger(state)) m[name] = createRngFromState(state >>> 0);
   }
-  if (doc.damageBoard && typeof doc.damageBoard === 'object') Object.assign(m.damageBoard, decodeValue(doc.damageBoard));
   m.stage = m.stageId ? m.gd.stage(m.stageId) : null;
   // the game data a release ships may have dropped what the checkpoint holds: such a match does not come back
   if ((m.stageId && !m.stage) || (m.bossId && !m.gd.boss(m.bossId))) { log?.warn?.(`[snapshot] ${m.roomCode}: checkpoint refused (data)`); return false; }
@@ -375,8 +394,9 @@ export function restoreMatch(m, doc, { createRngFromState, log = null, replay = 
   // the pools of the saved setup (a setup reroll may have changed the bans since the constructor drew them), then the
   // saved copies left and equipment debt — exactly as MatchSetupVote.completeSetupReroll rebuilds them
   const bans = m.bannedChess || [];
+  // a six-seat match saved before the 3 + 3 rule goes on with the one enlarged pool it started with
   const poolGroups = createPoolGroups(m.gd, m.order, { banned: bans, experimental: m.capacityExperiment,
-    independent: m.disableSharedPool, fixedChunks: m.twentyPlayerMode });
+    independent: m.disableSharedPool, fixedChunks: m.twentyPlayerMode, legacySix: doc.pools.length === 1 });
   if (poolGroups.length !== doc.pools.length) { log?.warn?.(`[snapshot] ${m.roomCode}: checkpoint refused (pool groups)`); return false; }
   const applyLeft = (pool, saved) => {
     for (const [id, left] of Object.entries(saved || {})) {
@@ -406,9 +426,12 @@ export function restoreMatch(m, doc, { createRngFromState, log = null, replay = 
     _turnTimer: null, _pubTimer: null, _pubDirty: false, _lastPubAt: -Infinity, _lastPubJson: '', _prepEndQueued: false,
     _turnToken: 0, _progressTimer: null, _bossPubTimer: null, _bossClock: null, _bossClockOn: false, _poolTimer: null,
     pacer: null, runner: null, fields: [], unitePlan: null, teamLp: null, bossPool: null, _botPath: null, lastResultMsg: null,
+    // 战斗 2 倍速: a restore drops the votes and goes back to the base speed
+    gameSpeed: m.baseGameSpeed, _speedUp: false,
   });
+  m._speedVotes.clear();
+  m._speedVoteAt.clear();
   m.watchers.clear();
-  m.localViews.clear();
   m._privDirty.clear();
 
   const off = new Set([...(m.disabledBonds || []), ...(m.staticInactiveBonds || [])]);

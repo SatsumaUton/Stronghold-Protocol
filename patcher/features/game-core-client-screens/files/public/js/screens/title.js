@@ -84,7 +84,7 @@ export function findUiAsset(assets, names) {
   // 本服：清单里的资源是资源站的绝对地址。统一改写到 /assets-cdn/ 代理，
   // 与游戏内其它美术保持一致（同源、可缓存、不受 CSP 影响）。
   const REMOTE = __spRemoteAssetRe();
-  const toProxy = (u) => (typeof u === 'string' && REMOTE.test(u) ? '/assets-cdn/' + u.replace(REMOTE, '') : u);
+  const toProxy = (u) => (typeof u === 'string' && REMOTE.test(u) ? '/assets/' + u.replace(REMOTE, '') : u);
   const asUrl = (v) => {
     if (typeof v === 'string') return toProxy(v);
     if (v && typeof v === 'object') return toProxy(v.url || v.path || v.src || null);
@@ -187,6 +187,40 @@ export function TitleScreen() {
     if (currentName) setName((draft) => draft || currentName);
   }, [currentName]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 「你有进行中的对局」：维护者要求，切换标题页 / 换设备登录时要主动告诉玩家，
+  // 并把他引到大厅的「恢复对局」按钮，而不是让他以为对局丢了。
+  //
+  // 两路来源：
+  //   sp.resumeAvailable —— 本标签页刚被另一台接管过（ui/accountObserver.js 写入，最确定）
+  //   /mm/api/account/room —— 账号名下确实有房间（换设备后第一次打开标题页时走这条）
+  // 只读不写，不会触发任何自动跳转（「恢复对局只能玩家自己点」的规则不变）。
+  const [resumePending, setResumePending] = useState(() => {
+    try { return sessionStorage.getItem('sp.resumeAvailable') === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      let urgent = false;
+      try { urgent = sessionStorage.getItem('sp.resumeAvailable') === '1'; } catch { /* ignore */ }
+      if (urgent) { if (alive) setResumePending(true); return; }
+      if (!window.__SP_ACCOUNT_USER) { if (alive) setResumePending(false); return; }
+      try {
+        const r = await fetch('/mm/api/account/room', { credentials: 'same-origin', cache: 'no-store' });
+        const j = r.ok ? await r.json() : null;
+        if (alive) setResumePending(!!j?.room?.code);
+      } catch { if (alive) setResumePending(false); }
+    };
+    check();
+    const timer = setInterval(check, 5000);
+    window.addEventListener('sp-resume-available', check);
+    window.addEventListener('sp-account-token', check);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      window.removeEventListener('sp-resume-available', check);
+      window.removeEventListener('sp-account-token', check);
+    };
+  }, []);
   // the list of the server's plugins once loaded (ui/pluginPanel.js — a component in state: set through an updater)
   const [Installed, setInstalled] = useState(null);
   const openPlugins = () => {
@@ -264,6 +298,11 @@ export function TitleScreen() {
       <p class="title-tag">${t('调配资金与干员，与同伴协同布防，抵御多波次进攻，直至击败敌方领袖。')}</p>
 
       <div class="title-login">
+        ${resumePending ? html`<div class="title-invite title-resume" data-testid="title-resume-hint">
+          <${Icon} name="refresh" />
+          <span>${t('你有进行中的对局')}</span>
+          <span class="t-lo">${t('· 点下方「恢复对局」切回来')}</span>
+        </div>` : null}
         ${pendingJoin ? html`<div class="title-invite">
           <${Icon} name="key" />
           <span>${t('收到同盟邀请')}</span><b class="num">${pendingJoin}</b><span class="t-lo">${t('· 输入代号后将自动加入')}</span>

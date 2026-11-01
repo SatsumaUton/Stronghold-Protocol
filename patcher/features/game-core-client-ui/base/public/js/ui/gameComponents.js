@@ -6,9 +6,9 @@ import { html, Icon, TierChip, Tooltip } from './components.js';
 import { data, useData, localAsset } from '../data.js';
 import { parseRichText, rtClassName } from './richText.js';
 import { t as tr } from '../../../shared/i18n.js';
-import { useStore } from '../store.js';
-import { skinsStore, ownerSkin } from './skins.js';
-import { settingsStore } from './settingsStore.js';
+import { appearanceRecord } from './skinAssets.js';
+import { MaterialImage } from './materialImage.js';
+import { useCardAvatar } from './playerCard.js';
 import {
   uiUrl, chessAvatarUrl, chessPortraitUrl, itemIconUrl, tokenAvatarUrl, enemyIconUrl, bondIconUrl, bandIconUrl,
 } from './assetUrls.js';
@@ -27,9 +27,8 @@ export const GAME_FILES = ['config', 'assets', 'chess', 'bonds', 'items', 'bands
  */
 export function useGameData() {
   const ready = useData(...GAME_FILES);
-  // (config / factions / choices are read once per memo: a language switch reads them again in the new locale, a
-  // content switch — a version or a plugin set — from the new files)
-  return useMemo(() => makeLookups(ready), [ready, data.locale(), data.contentId()]);
+  // (config / factions / choices are read once per memo: a language switch reads them again in the new locale)
+  return useMemo(() => makeLookups(ready), [ready, data.locale()]);
 }
 
 /** A 自选 operator's summon record (data/backups.json `tokens`, 0.2.0), or null. */
@@ -66,39 +65,16 @@ export function makeLookups(ready = true) {
  * <img> that swaps to a fallback node when the URL is missing or fails.
  * @param {{ src?: string|null, class?: string, alt?: string, fallback?: any, style?: string }} props
  */
-export function Img({ src, class: cls, alt = '', fallback = null, style }) {
+export function Img({ src, class: cls, alt = '', fallback = null, fallbackSrc = null, style }) {
   const [bad, setBad] = useState(null);
-  if (!src || bad === src) return fallback;
-  return html`<img class=${cls} src=${src} alt=${alt} draggable=${false} loading="lazy" style=${style} onError=${() => setBad(src)} />`;
-}
-
-/** Owner-aware operator pictures, with live selection / settings updates even on an already open card.
- * `ownerId` omitted = local picker; null = unowned catalogue art. Callers resolve stand-ins / DIY first.
- * B6, maintainer option A (2026-10-18); docs/SKINS.md and §35.4. Model outfits retain their models.
- */
-export function OperatorImage({ m, chess, ownerId, skin = null, portrait = false, avatarFallback = false,
-  portraitClass, avatarClass, ...props }) {
-  useData('assets');
-  m = data.get('assets') || m;
-  const localSkins = useStore((s) => s.skins, Object.is, skinsStore);
-  const otherSkins = useStore((s) => s.otherSkins, Object.is, settingsStore);
-  const selected = useStore((s) => ownerSkin(chess?.charId, { ownerId, skin, myId: s.me.playerId,
-    players: s.match.public?.players || [], localSkins, otherSkins }));
-  const art = portrait ? chessPortraitUrl(m, chess, { skin: selected }) : null;
-  const src = art || (!portrait || avatarFallback ? chessAvatarUrl(m, chess, { skin: selected }) : null);
-  return html`<${Img} ...${props} src=${src} class=${art ? portraitClass ?? props.class : avatarClass ?? props.class} />`;
+  if (!src || bad === src) return fallbackSrc && fallbackSrc !== src
+    ? html`<${Img} src=${fallbackSrc} class=${cls} alt=${alt} fallback=${fallback} style=${style} />` : fallback;
+  return html`<${MaterialImage} class=${cls} src=${src} alt=${alt} draggable=${false} loading="lazy" style=${style} onError=${() => setBad(src)} />`;
 }
 
 /** Official UI sprite by 'group/key' with a fallback. */
 export function Sprite({ k, class: cls, fallback = null }) {
   return html`<${Img} src=${uiUrl(data.get('assets'), k)} class=${cx('sprite', cls)} fallback=${fallback} />`;
-}
-
-/** Official promotion phase from the resolved record's status (not its shop tier or normal / golden form). */
-export function PromotionIcon({ m, phase, class: cls }) {
-  if (!Number.isInteger(phase) || phase < 0 || phase > 2) return null;
-  return html`<${Img} src=${uiUrl(m, `elite/elite_${phase}`)} class=${cls}
-    fallback=${html`<small class=${cls}>E${phase}</small>`} />`;
 }
 
 /**
@@ -130,19 +106,23 @@ export const isGoldenPiece = (piece, chess) => !!(piece?.golden || chess?.isGold
 /**
  * Square unit thumbnail for a piece / chess / item / token / enemy: art + tier chip + elite frame.
  * @param {{ kind?: 'chess'|'item'|'token'|'enemy', id: string, golden?: boolean, size?: 'xs'|'sm'|'md'|'lg', tier?: number,
- *   showTier?: boolean, class?: string, dim?: boolean, badge?: any, title?: string, rec?: any, ownerId?: string|null, skin?: string|null }} props
+ *   showTier?: boolean, class?: string, dim?: boolean, badge?: any, title?: string, rec?: any }} props
  *   `rec`: the chess record to draw instead of the data's (a 自选 piece's composed record — 0.2.0, gameLogic/diy.js; a
  *   补位 stand-in's — gameLogic/standIn.js: drawn with a small 「替补」 mark in the corner)
  */
-export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showTier = true, class: cls, dim = false, badge = null, title, rec = null, ownerId, skin = null }) {
+export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showTier = true, class: cls, dim = false, badge = null, title, rec = null, skinId = null }) {
   const m = data.get('assets');
   let src = null;
+  let fallbackSrc = null;
   let name = '';
   let t = tier;
   let si = null;
   if (kind === 'chess') {
-    const c = rec || data.lookup('chess', id);
+    const c0 = rec || data.lookup('chess', id);
+    const c = appearanceRecord(c0, skinId || c0?.skinId);
     si = rec && typeof rec.standInFor === 'string' && rec.standInFor ? rec : null;
+    src = chessAvatarUrl(m, c);
+    fallbackSrc = c?.skinId ? chessAvatarUrl(m, { ...c, skinId: null }) : null;
     name = c?.name || '';
     t = t ?? c?.tier;
     golden = golden ?? !!c?.isGolden;
@@ -165,9 +145,7 @@ export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showT
   return html`<span class=${cx('uthumb', `uthumb--${size}`, `uthumb--${kind}`, golden && 'is-golden', dim && 'is-dim', t && `uthumb--t${Math.max(1, Math.min(6, t | 0))}`, cls)}
       title=${title ?? name}>
     <span class="uthumb__art">
-      ${kind === 'chess'
-        ? html`<${OperatorImage} m=${m} chess=${rec || data.lookup('chess', id)} ownerId=${ownerId} skin=${skin} fallback=${html`<span class="uthumb__glyph">${glyph}</span>`} />`
-        : html`<${Img} src=${src} fallback=${html`<span class="uthumb__glyph">${glyph}</span>`} />`}
+      <${Img} src=${src} fallbackSrc=${fallbackSrc} fallback=${html`<span class="uthumb__glyph">${glyph}</span>`} />
     </span>
     ${showTier && t && kind !== 'enemy' && kind !== 'token' ? html`<${TierChip} tier=${t} golden=${golden} size="sm" class="uthumb__tier" />` : null}
     ${kind === 'token' ? html`<span class="uthumb__tag">${tr('召唤')}</span>` : null}
@@ -180,7 +158,7 @@ export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showT
 export function PieceThumb({ piece, size = 'md', class: cls, badge }) {
   if (!piece) return null;
   return html`<${UnitThumb} kind=${piece.kind === 'item' ? 'item' : piece.kind === 'token' ? 'token' : 'chess'} id=${piece.id}
-    golden=${!!piece.golden} tier=${piece.tier} size=${size} class=${cls} badge=${badge} />`;
+    golden=${!!piece.golden} tier=${piece.tier} skinId=${piece.skinId} size=${size} class=${cls} badge=${badge} />`;
 }
 
 /**
@@ -281,21 +259,31 @@ export function RichTip({ text, children, placement = 'top' }) {
   return html`<${Tooltip} text=${text ? html`<${RichText} text=${text} />` : null} placement=${placement}>${children}<//>`;
 }
 
+/** A human player's picked 头像 (room.card avatar, ui/playerCard.js) — or `then` when none — over the fallback. */
+function PickedFace({ playerId, then, fallback }) {
+  const face = useCardAvatar(playerId);
+  return html`<${Img} src=${face || then} fallbackSrc=${face ? then : null} fallback=${fallback} />`;
+}
+
 /**
- * Seat-coloured player avatar: band icon when a band is picked, else glyph/robot.
- * @param {{ player: any, size?: 'sm'|'md', self?: boolean, class?: string }} props
+ * Seat-coloured player avatar: band icon when a band is picked, else the player's picked 头像, else glyph/robot;
+ * `prefer="avatar"` puts the picked 头像 first (a player's own cards: the draft rows, 协议启动, the settlement).
+ * @param {{ player: any, size?: 'sm'|'md', self?: boolean, prefer?: 'band'|'avatar', class?: string }} props
  */
-export function PlayerAvatar({ player, size = 'md', self = false, class: cls }) {
+export function PlayerAvatar({ player, size = 'md', self = false, prefer = 'band', class: cls }) {
   const src = player?.bandId ? bandIconUrl(data.get('assets'), player.bandId) : null;
   const glyph = [...(player?.name || '').trim()][0] || '?';
-  const dead = player?.alive === false || player?.status === 'dead';
+  const pending = player?.pendingDeath === true;
+  const dead = !pending && (player?.alive === false || player?.status === 'dead');
   const left = player?.status === 'left';
   const hue = [162, 196, 38, 280][((player?.seat | 0) % 4 + 4) % 4];
+  const fallback = player?.isBot ? html`<${Icon} name="robot" class="pavatar__bot" />` : html`<span class="pavatar__glyph">${glyph}</span>`;
+  const face = player?.isBot || player?.playerId == null || (src && prefer !== 'avatar') ? html`<${Img} src=${src} fallback=${fallback} />`
+    : html`<${PickedFace} playerId=${player.playerId} then=${src} fallback=${fallback} />`;
   return html`<span class=${cx('pavatar', `pavatar--${size}`, self && 'is-self', dead && 'is-dead', left && 'is-left', player?.isBot && 'is-bot',
       player?.connected === false && !player?.isBot && 'is-offline', cls)} style=${`--seat-hue:${hue}`}>
-    <span class="pavatar__img">
-      <${Img} src=${src} fallback=${player?.isBot ? html`<${Icon} name="robot" class="pavatar__bot" />` : html`<span class="pavatar__glyph">${glyph}</span>`} />
-    </span>
+    <span class="pavatar__img">${face}</span>
+    ${pending ? html`<span class="pavatar__rescue" aria-label=${tr('等待救援')}><${Icon} name="hourglass" /></span>` : null}
     ${dead ? html`<span class="pavatar__x" aria-label=${tr('已淘汰')}><${Icon} name="close" /></span>` : null}
     ${left ? html`<span class="pavatar__door" aria-label=${tr('已离开')}><${Icon} name="exit" /></span>` : null}
   </span>`;

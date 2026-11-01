@@ -29,3 +29,29 @@ export const DELAYS = Object.freeze({
  * the remake's (50 s per turn per the owner's 2026-10-10 official-play report). It is also the step's only countdown (m.public.deadline = draft.turnDeadline). × timerScale.
  */
 export const BAND_TURN_SECONDS = 50;
+
+/**
+ * 挂机移出 (the owner's rule; Match opts.afkRemoveRounds, 0 = off): the rounds in a row without a substantive intent after
+ * which a human seat of a match that started with ≥ 2 humans is removed like a g.leave (MatchPlatform._checkIdle).
+ */
+export const AFK_REMOVE_ROUNDS = 2;
+/**
+ * 掉线由 AI 接管 (the owner's rule of 2026-10-14): the prep ends in a row a human seat spends offline before the AI plays
+ * it (AI 托管) — from the next phase on; the player takes the seat back by reconnecting (MatchPlatform._checkOffline,
+ * onReconnect).
+ */
+export const OFFLINE_TAKEOVER_ROUNDS = 2;
+/**
+ * The intents that count as playing for that rule — accepted ones only. g.ready, g.infoReady, g.emote, g.watch,
+ * g.unitStats, g.pause, g.art, g.bandFocus, g.autoplay, g.rerollVote, g.kickVote, g.kickBallot, the battle reports and
+ * anything else do not.
+ */
+export const AFK_ACTIONS = new Set(['g.buy', 'g.sell', 'g.move', 'g.refresh', 'g.levelUp', 'g.freeze', 'g.equip', 'g.destroy',
+  'g.choice', 'g.reward', 'g.revive', 'g.band', 'g.bandSkip']);
+
+export const REVIVAL_COST = 10;
+export const REVIVAL_MIN_DONOR_LP = 11;
+export const REVIVAL_WINDOW_SECONDS = 15;
+export const REVIVAL_UNAVAILABLE_REASONS = Object.freeze([
+  'disabled', 'no-helper', 'donor-lp', 'window-expired', 'window-closed', 'already-used', 'left', 'match-ended',
+]);

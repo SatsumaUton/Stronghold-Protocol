@@ -6,7 +6,7 @@
 // below it (classes instead of CSS :has(), which Firefox ESR / Safari < 15.4 lack).
 
 import { html, Button, Icon, useTicker } from './components.js';
-import { net, CLIENT_ERR_TEXT } from '../net.js';
+import { net, CLIENT_ERR_TEXT, serverFull } from '../net.js';
 import { useStore, shallowEqual } from '../store.js';
 import { useDocClass } from './device.js';
 import { t } from '../../../shared/i18n.js';
@@ -47,11 +47,15 @@ export function ConnectionBanner() {
   const versionMismatch = rejected && conn.lastError.text === CLIENT_ERR_TEXT.VERSION;
   // Short transitional states (a rename re-sends hello on the live socket) only show if they linger.
   const transient = conn.status === 'connecting' || conn.status === 'handshaking' || (conn.status === 'connected' && !rejected);
-  const text = conn.status === 'reconnecting'
-    ? t('与服务器的连接已中断，正在重连')
+  // the online cap refused a new session: the client retries on its own (public/js/net.js serverFull)
+  const full = conn.status === 'reconnecting' && conn.lastError?.code === 'SERVER_FULL' ? serverFull(conn.lastError.detail) : null;
+  const text = full
+    ? (full.online != null && full.limit != null ? t('服务器在线人数已满（{online}/{limit}），稍后自动重试', { online: full.online, limit: full.limit }) : t('服务器在线人数已满，稍后自动重试'))
+    : conn.status === 'reconnecting'
+    ? t('连接中断，重连中')
     : replaced ? t('该身份已在其他页面登录')
       : conn.status === 'closed' ? t('连接已关闭')
-        : rejected ? t(conn.lastError.text) : t('正在连接服务器');
+        : rejected ? t(conn.lastError.text) : t('连接中');
   const action = conn.status === 'reconnecting' ? { label: t('立即重连'), run: () => net.retryNow() }
     : conn.status === 'closed' ? { label: replaced ? t('在此页面继续') : t('重新连接'), run: () => net.connect() }
       : versionMismatch ? { label: t('刷新页面'), run: () => location.reload() }
@@ -59,7 +63,8 @@ export function ConnectionBanner() {
   return html`<div class=${`conn-banner${transient ? ' conn-banner--soft' : ''}`} role="alert">
     <${Icon} name="wifiOff" />
     <span>${text}</span>
-    ${conn.status === 'reconnecting' ? html`<span class="conn-banner__sub">${t('第 {attempt} 次 · {secs}s', { attempt: conn.attempt, secs })}</span>` : null}
+    ${full ? html`<span class="conn-banner__sub num">${secs}s</span>`
+      : conn.status === 'reconnecting' ? html`<span class="conn-banner__sub">${t('第 {attempt} 次 · {secs}s', { attempt: conn.attempt, secs })}</span>` : null}
     ${action ? html`<${Button} size="sm" variant="secondary" icon="refresh" onClick=${action.run}>${action.label}<//>` : null}
   </div>`;
 }

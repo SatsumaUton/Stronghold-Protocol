@@ -7,7 +7,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 180311
+        "customBytes": 232356
       },
       {
         "path": "server/http/config.js",
@@ -24,7 +24,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 180311
+        "customBytes": 232356
       },
       {
         "path": "server/match/aiDigest.js",
@@ -44,7 +44,7 @@
       {
         "path": "server/match/audit.js",
         "baseExists": true,
-        "customBytes": 31669
+        "customBytes": 31690
       },
       {
         "path": "server/match/board.js",
@@ -54,12 +54,12 @@
       {
         "path": "server/match/bondsMeta.js",
         "baseExists": true,
-        "customBytes": 12635
+        "customBytes": 12758
       },
       {
         "path": "server/match/bot.js",
         "baseExists": true,
-        "customBytes": 144451
+        "customBytes": 144992
       },
       {
         "path": "server/match/botAdaptive.js",
@@ -134,22 +134,22 @@
       {
         "path": "server/match/fields.js",
         "baseExists": true,
-        "customBytes": 51323
+        "customBytes": 51487
       },
       {
         "path": "server/match/finalAssault.js",
         "baseExists": true,
-        "customBytes": 10569
+        "customBytes": 10761
       },
       {
         "path": "server/match/gamedata.js",
         "baseExists": true,
-        "customBytes": 32497
+        "customBytes": 32880
       },
       {
         "path": "server/match/invariants.js",
         "baseExists": true,
-        "customBytes": 16245
+        "customBytes": 16431
       },
       {
         "path": "server/match/llmGate.js",
@@ -164,7 +164,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 50097
+        "customBytes": 54969
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -174,12 +174,12 @@
       {
         "path": "server/match/PlayerState.js",
         "baseExists": true,
-        "customBytes": 21399
+        "customBytes": 21749
       },
       {
         "path": "server/match/pool.js",
         "baseExists": true,
-        "customBytes": 14094
+        "customBytes": 14708
       },
       {
         "path": "server/match/preview.js",
@@ -199,7 +199,7 @@
       {
         "path": "server/match/snapshot.js",
         "baseExists": true,
-        "customBytes": 30450
+        "customBytes": 32200
       },
       {
         "path": "server/match/StubMatch.js",
@@ -219,7 +219,7 @@
       {
         "path": "server/match/unite.js",
         "baseExists": true,
-        "customBytes": 15188
+        "customBytes": 16114
       },
       {
         "path": "server/match/waves.js",
@@ -236,7 +236,12 @@
       {
         "path": "matchmaker/account.cjs",
         "baseExists": false,
-        "customBytes": 83429
+        "customBytes": 121536
+      },
+      {
+        "path": "matchmaker/feedback.cjs",
+        "baseExists": false,
+        "customBytes": 21461
       },
       {
         "path": "matchmaker/package-lock.json",
@@ -251,17 +256,32 @@
       {
         "path": "matchmaker/public/account-title.js",
         "baseExists": false,
-        "customBytes": 41975
+        "customBytes": 47150
       },
       {
         "path": "matchmaker/public/admin.html",
         "baseExists": false,
-        "customBytes": 65009
+        "customBytes": 81516
       },
       {
         "path": "matchmaker/public/client.js",
         "baseExists": false,
-        "customBytes": 183568
+        "customBytes": 237547
+      },
+      {
+        "path": "matchmaker/public/feedback.css",
+        "baseExists": false,
+        "customBytes": 11512
+      },
+      {
+        "path": "matchmaker/public/feedback.html",
+        "baseExists": false,
+        "customBytes": 4280
+      },
+      {
+        "path": "matchmaker/public/feedback.js",
+        "baseExists": false,
+        "customBytes": 17987
       },
       {
         "path": "matchmaker/public/index.html",
@@ -291,17 +311,22 @@
       {
         "path": "matchmaker/server.js",
         "baseExists": false,
-        "customBytes": 41190
+        "customBytes": 48226
+      },
+      {
+        "path": "matchmaker/test/feedback.test.cjs",
+        "baseExists": false,
+        "customBytes": 9726
       },
       {
         "path": "mm/client.js",
         "baseExists": false,
-        "customBytes": 134780
+        "customBytes": 227100
       },
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 180311
+        "customBytes": 232356
       }
     ]
   },
@@ -313,7 +338,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 180311
+        "customBytes": 232356
       },
       {
         "path": "shared/playerCapacity.js",
@@ -323,22 +348,22 @@
       {
         "path": "shared/experimental.js",
         "baseExists": true,
-        "customBytes": 3006
+        "customBytes": 5860
       },
       {
         "path": "shared/protocol.js",
         "baseExists": true,
-        "customBytes": 51821
+        "customBytes": 52571
       },
       {
         "path": "public/css/screens/room.css",
         "baseExists": true,
-        "customBytes": 56609
+        "customBytes": 67377
       },
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 66942
+        "customBytes": 77692
       }
     ]
   },
@@ -350,12 +375,12 @@
       {
         "path": "matchmaker/public/client.js",
         "baseExists": false,
-        "customBytes": 183568
+        "customBytes": 237547
       },
       {
         "path": "mm/client.js",
         "baseExists": false,
-        "customBytes": 134780
+        "customBytes": 227100
       }
     ]
   },
@@ -367,12 +392,12 @@
       {
         "path": "public/js/main.js",
         "baseExists": true,
-        "customBytes": 34948
+        "customBytes": 41347
       },
       {
         "path": "public/js/ui/buildGuard.js",
         "baseExists": true,
-        "customBytes": 7855
+        "customBytes": 14009
       }
     ]
   },
@@ -384,12 +409,12 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": true,
-        "customBytes": 55762
+        "customBytes": 59627
       },
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 180311
+        "customBytes": 232356
       }
     ]
   },
@@ -401,17 +426,17 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 66942
+        "customBytes": 77692
       },
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 136703
+        "customBytes": 136779
       },
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 180311
+        "customBytes": 232356
       }
     ]
   },
@@ -438,7 +463,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 136703
+        "customBytes": 136779
       }
     ]
   },
@@ -455,7 +480,7 @@
       {
         "path": "public/js/assetPack.js",
         "baseExists": true,
-        "customBytes": 33745
+        "customBytes": 34576
       },
       {
         "path": "public/js/ui/assetImport.js",
@@ -497,7 +522,7 @@
       {
         "path": "public/js/render/units.js",
         "baseExists": true,
-        "customBytes": 166908
+        "customBytes": 168380
       }
     ]
   },
@@ -509,7 +534,7 @@
       {
         "path": "matchmaker/account.cjs",
         "baseExists": false,
-        "customBytes": 83429
+        "customBytes": 121536
       },
       {
         "path": "dashboard/announce.png",
@@ -669,17 +694,17 @@
       {
         "path": "dashboard/public/app.js",
         "baseExists": false,
-        "customBytes": 37092
+        "customBytes": 54353
       },
       {
         "path": "dashboard/public/index.html",
         "baseExists": false,
-        "customBytes": 22051
+        "customBytes": 24863
       },
       {
         "path": "dashboard/public/style.css",
         "baseExists": false,
-        "customBytes": 6278
+        "customBytes": 7135
       },
       {
         "path": "dashboard/resume-test.json",
@@ -714,7 +739,7 @@
       {
         "path": "dashboard/server.js",
         "baseExists": false,
-        "customBytes": 24451
+        "customBytes": 60812
       },
       {
         "path": "dashboard/title-pill.png",
@@ -734,7 +759,7 @@
       {
         "path": "public/js/ui/accountObserver.js",
         "baseExists": false,
-        "customBytes": 15387
+        "customBytes": 19923
       }
     ]
   },
@@ -771,12 +796,12 @@
       {
         "path": "nginx/conf/nginx.conf",
         "baseExists": false,
-        "customBytes": 14655
+        "customBytes": 41920
       },
       {
-        "path": "nginx/conf/nginx.conf.bak-before-node4-test",
+        "path": "nginx/conf/open-nodes.conf",
         "baseExists": false,
-        "customBytes": 8483
+        "customBytes": 2536
       },
       {
         "path": "nginx/conf/scgi_params",
@@ -926,12 +951,12 @@
       {
         "path": "nginx/run-nginx.mjs",
         "baseExists": false,
-        "customBytes": 542
+        "customBytes": 710
       },
       {
         "path": "ecosystem.config.cjs",
         "baseExists": false,
-        "customBytes": 5229
+        "customBytes": 9119
       },
       {
         "path": "start-all.bat",
@@ -946,7 +971,7 @@
       {
         "path": "deploy/server-watchdog.ps1",
         "baseExists": false,
-        "customBytes": 3057
+        "customBytes": 3496
       }
     ]
   },
@@ -964,6 +989,5470 @@
         "path": "public/js/screens/loadout.js",
         "baseExists": true,
         "customBytes": 85945
+      }
+    ]
+  },
+  {
+    "id": "game-core-match",
+    "name": "对局核心（5–20 人大厅、并发草稿、悬赏/盟约、跳过、联防分段、视图下发）",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "server/match/aiDigest.js",
+        "baseExists": false,
+        "customBytes": 9456
+      },
+      {
+        "path": "server/match/aiEconomy.js",
+        "baseExists": false,
+        "customBytes": 4180
+      },
+      {
+        "path": "server/match/aiPlan.js",
+        "baseExists": false,
+        "customBytes": 4977
+      },
+      {
+        "path": "server/match/audit.js",
+        "baseExists": true,
+        "customBytes": 31690
+      },
+      {
+        "path": "server/match/board.js",
+        "baseExists": true,
+        "customBytes": 14518
+      },
+      {
+        "path": "server/match/bondsMeta.js",
+        "baseExists": true,
+        "customBytes": 12758
+      },
+      {
+        "path": "server/match/bot.js",
+        "baseExists": true,
+        "customBytes": 144992
+      },
+      {
+        "path": "server/match/botAdaptive.js",
+        "baseExists": false,
+        "customBytes": 1025
+      },
+      {
+        "path": "server/match/botEmotes.js",
+        "baseExists": true,
+        "customBytes": 3450
+      },
+      {
+        "path": "server/match/botFormationCandidates.js",
+        "baseExists": false,
+        "customBytes": 4580
+      },
+      {
+        "path": "server/match/botIoleta.js",
+        "baseExists": false,
+        "customBytes": 1710
+      },
+      {
+        "path": "server/match/botIoletaPolicy.js",
+        "baseExists": false,
+        "customBytes": 13143
+      },
+      {
+        "path": "server/match/botPrep.js",
+        "baseExists": false,
+        "customBytes": 2909
+      },
+      {
+        "path": "server/match/botStrategies.js",
+        "baseExists": false,
+        "customBytes": 1660
+      },
+      {
+        "path": "server/match/botStrategyContract.js",
+        "baseExists": false,
+        "customBytes": 3083
+      },
+      {
+        "path": "server/match/builtinMeta.js",
+        "baseExists": true,
+        "customBytes": 21667
+      },
+      {
+        "path": "server/match/choices.js",
+        "baseExists": true,
+        "customBytes": 30755
+      },
+      {
+        "path": "server/match/dslMeta.js",
+        "baseExists": true,
+        "customBytes": 7347
+      },
+      {
+        "path": "server/match/effectsMeta.js",
+        "baseExists": true,
+        "customBytes": 43033
+      },
+      {
+        "path": "server/match/externalAI.js",
+        "baseExists": false,
+        "customBytes": 14758
+      },
+      {
+        "path": "server/match/externalConfig.js",
+        "baseExists": false,
+        "customBytes": 3359
+      },
+      {
+        "path": "server/match/fields.js",
+        "baseExists": true,
+        "customBytes": 51487
+      },
+      {
+        "path": "server/match/finalAssault.js",
+        "baseExists": true,
+        "customBytes": 10761
+      },
+      {
+        "path": "server/match/gamedata.js",
+        "baseExists": true,
+        "customBytes": 32880
+      },
+      {
+        "path": "server/match/host/childHost.js",
+        "baseExists": true,
+        "customBytes": 1702
+      },
+      {
+        "path": "server/match/host/entry.js",
+        "baseExists": true,
+        "customBytes": 16804
+      },
+      {
+        "path": "server/match/host/index.js",
+        "baseExists": true,
+        "customBytes": 15912
+      },
+      {
+        "path": "server/match/host/ipc.js",
+        "baseExists": true,
+        "customBytes": 3251
+      },
+      {
+        "path": "server/match/host/proxy.js",
+        "baseExists": true,
+        "customBytes": 12867
+      },
+      {
+        "path": "server/match/invariants.js",
+        "baseExists": true,
+        "customBytes": 16431
+      },
+      {
+        "path": "server/match/llmGate.js",
+        "baseExists": false,
+        "customBytes": 3498
+      },
+      {
+        "path": "server/match/llmRelease.js",
+        "baseExists": false,
+        "customBytes": 2975
+      },
+      {
+        "path": "server/match/match/bossRounds.js",
+        "baseExists": true,
+        "customBytes": 30142
+      },
+      {
+        "path": "server/match/match/clientCombat.js",
+        "baseExists": true,
+        "customBytes": 13375
+      },
+      {
+        "path": "server/match/match/combat.js",
+        "baseExists": true,
+        "customBytes": 9734
+      },
+      {
+        "path": "server/match/match/common.js",
+        "baseExists": true,
+        "customBytes": 2007
+      },
+      {
+        "path": "server/match/match/infra.js",
+        "baseExists": true,
+        "customBytes": 8355
+      },
+      {
+        "path": "server/match/match/intents.js",
+        "baseExists": true,
+        "customBytes": 13065
+      },
+      {
+        "path": "server/match/match/messaging.js",
+        "baseExists": true,
+        "customBytes": 5263
+      },
+      {
+        "path": "server/match/match/offers.js",
+        "baseExists": true,
+        "customBytes": 8825
+      },
+      {
+        "path": "server/match/match/pause.js",
+        "baseExists": true,
+        "customBytes": 3566
+      },
+      {
+        "path": "server/match/match/phases.js",
+        "baseExists": true,
+        "customBytes": 23252
+      },
+      {
+        "path": "server/match/match/platform.js",
+        "baseExists": true,
+        "customBytes": 13438
+      },
+      {
+        "path": "server/match/match/prep.js",
+        "baseExists": true,
+        "customBytes": 9805
+      },
+      {
+        "path": "server/match/match/rehearsal.js",
+        "baseExists": true,
+        "customBytes": 15237
+      },
+      {
+        "path": "server/match/match/reports.js",
+        "baseExists": true,
+        "customBytes": 10631
+      },
+      {
+        "path": "server/match/match/settle.js",
+        "baseExists": true,
+        "customBytes": 10761
+      },
+      {
+        "path": "server/match/match/setupVote.js",
+        "baseExists": true,
+        "customBytes": 7445
+      },
+      {
+        "path": "server/match/match/spDraft.js",
+        "baseExists": true,
+        "customBytes": 19879
+      },
+      {
+        "path": "server/match/match/speedVote.js",
+        "baseExists": false,
+        "customBytes": 3748
+      },
+      {
+        "path": "server/match/match/testCommands.js",
+        "baseExists": true,
+        "customBytes": 20344
+      },
+      {
+        "path": "server/match/match/unitePhase.js",
+        "baseExists": true,
+        "customBytes": 11702
+      },
+      {
+        "path": "server/match/match/views.js",
+        "baseExists": true,
+        "customBytes": 29408
+      },
+      {
+        "path": "server/match/match/watch.js",
+        "baseExists": true,
+        "customBytes": 13506
+      },
+      {
+        "path": "server/match/Match.js",
+        "baseExists": true,
+        "customBytes": 54969
+      },
+      {
+        "path": "server/match/operatorTraits.js",
+        "baseExists": true,
+        "customBytes": 4231
+      },
+      {
+        "path": "server/match/player/acquire.js",
+        "baseExists": true,
+        "customBytes": 20602
+      },
+      {
+        "path": "server/match/player/basics.js",
+        "baseExists": true,
+        "customBytes": 16508
+      },
+      {
+        "path": "server/match/player/common.js",
+        "baseExists": true,
+        "customBytes": 537
+      },
+      {
+        "path": "server/match/player/diy.js",
+        "baseExists": true,
+        "customBytes": 14783
+      },
+      {
+        "path": "server/match/player/economy.js",
+        "baseExists": true,
+        "customBytes": 13717
+      },
+      {
+        "path": "server/match/player/items.js",
+        "baseExists": true,
+        "customBytes": 11339
+      },
+      {
+        "path": "server/match/player/pieces.js",
+        "baseExists": true,
+        "customBytes": 12848
+      },
+      {
+        "path": "server/match/player/placement.js",
+        "baseExists": true,
+        "customBytes": 18020
+      },
+      {
+        "path": "server/match/player/prep.js",
+        "baseExists": true,
+        "customBytes": 5321
+      },
+      {
+        "path": "server/match/player/round.js",
+        "baseExists": true,
+        "customBytes": 10411
+      },
+      {
+        "path": "server/match/player/views.js",
+        "baseExists": true,
+        "customBytes": 8289
+      },
+      {
+        "path": "server/match/PlayerState.js",
+        "baseExists": true,
+        "customBytes": 21749
+      },
+      {
+        "path": "server/match/pool.js",
+        "baseExists": true,
+        "customBytes": 14708
+      },
+      {
+        "path": "server/match/preview.js",
+        "baseExists": true,
+        "customBytes": 3302
+      },
+      {
+        "path": "server/match/results.js",
+        "baseExists": true,
+        "customBytes": 8773
+      },
+      {
+        "path": "server/match/scheduler.js",
+        "baseExists": true,
+        "customBytes": 7300
+      },
+      {
+        "path": "server/match/snapshot.js",
+        "baseExists": true,
+        "customBytes": 32200
+      },
+      {
+        "path": "server/match/StubMatch.js",
+        "baseExists": true,
+        "customBytes": 13536
+      },
+      {
+        "path": "server/match/testReplay.js",
+        "baseExists": true,
+        "customBytes": 4191
+      },
+      {
+        "path": "server/match/testTrace.js",
+        "baseExists": true,
+        "customBytes": 6316
+      },
+      {
+        "path": "server/match/unite.js",
+        "baseExists": true,
+        "customBytes": 16114
+      },
+      {
+        "path": "server/match/waves.js",
+        "baseExists": true,
+        "customBytes": 37877
+      }
+    ]
+  },
+  {
+    "id": "game-core-server",
+    "name": "服务端本体（连接/会话、重连窗口、持久化、HTTP 路由、模拟数据）",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "server/adminAuth.js",
+        "baseExists": false,
+        "customBytes": 4344
+      },
+      {
+        "path": "server/ai/community-candidates.js",
+        "baseExists": false,
+        "customBytes": 6542
+      },
+      {
+        "path": "server/ai/cycle-candidates.js",
+        "baseExists": false,
+        "customBytes": 9102
+      },
+      {
+        "path": "server/ai/cycles.js",
+        "baseExists": false,
+        "customBytes": 9101
+      },
+      {
+        "path": "server/ai/knowledge.js",
+        "baseExists": false,
+        "customBytes": 12973
+      },
+      {
+        "path": "server/ai/playbook.js",
+        "baseExists": false,
+        "customBytes": 18585
+      },
+      {
+        "path": "server/ai/strategy-community.js",
+        "baseExists": false,
+        "customBytes": 16128
+      },
+      {
+        "path": "server/ai/strategy.js",
+        "baseExists": false,
+        "customBytes": 15699
+      },
+      {
+        "path": "server/ai/transport.js",
+        "baseExists": false,
+        "customBytes": 5480
+      },
+      {
+        "path": "server/aiTakeover.js",
+        "baseExists": false,
+        "customBytes": 6566
+      },
+      {
+        "path": "server/data.js",
+        "baseExists": true,
+        "customBytes": 11563
+      },
+      {
+        "path": "server/health/eventLoop.js",
+        "baseExists": false,
+        "customBytes": 6252
+      },
+      {
+        "path": "server/http/assetIndex.js",
+        "baseExists": true,
+        "customBytes": 15741
+      },
+      {
+        "path": "server/http/assetViews.js",
+        "baseExists": true,
+        "customBytes": 10382
+      },
+      {
+        "path": "server/http/boot.js",
+        "baseExists": true,
+        "customBytes": 7457
+      },
+      {
+        "path": "server/http/buildTag.js",
+        "baseExists": true,
+        "customBytes": 6753
+      },
+      {
+        "path": "server/http/common.js",
+        "baseExists": true,
+        "customBytes": 3350
+      },
+      {
+        "path": "server/http/config.js",
+        "baseExists": true,
+        "customBytes": 14232
+      },
+      {
+        "path": "server/http/csp.js",
+        "baseExists": true,
+        "customBytes": 2396
+      },
+      {
+        "path": "server/http/files.js",
+        "baseExists": true,
+        "customBytes": 16670
+      },
+      {
+        "path": "server/http/media.js",
+        "baseExists": true,
+        "customBytes": 3969
+      },
+      {
+        "path": "server/http/routes.js",
+        "baseExists": true,
+        "customBytes": 16640
+      },
+      {
+        "path": "server/http/static.js",
+        "baseExists": true,
+        "customBytes": 27416
+      },
+      {
+        "path": "server/http/traffic.js",
+        "baseExists": true,
+        "customBytes": 5001
+      },
+      {
+        "path": "server/http/websocket.js",
+        "baseExists": true,
+        "customBytes": 9200
+      },
+      {
+        "path": "server/index.js",
+        "baseExists": true,
+        "customBytes": 21801
+      },
+      {
+        "path": "server/lobby.js",
+        "baseExists": true,
+        "customBytes": 232356
+      },
+      {
+        "path": "server/match/aiDigest.js",
+        "baseExists": false,
+        "customBytes": 9456
+      },
+      {
+        "path": "server/match/aiEconomy.js",
+        "baseExists": false,
+        "customBytes": 4180
+      },
+      {
+        "path": "server/match/aiPlan.js",
+        "baseExists": false,
+        "customBytes": 4977
+      },
+      {
+        "path": "server/match/audit.js",
+        "baseExists": true,
+        "customBytes": 31690
+      },
+      {
+        "path": "server/match/board.js",
+        "baseExists": true,
+        "customBytes": 14518
+      },
+      {
+        "path": "server/match/bondsMeta.js",
+        "baseExists": true,
+        "customBytes": 12758
+      },
+      {
+        "path": "server/match/bot.js",
+        "baseExists": true,
+        "customBytes": 144992
+      },
+      {
+        "path": "server/match/botAdaptive.js",
+        "baseExists": false,
+        "customBytes": 1025
+      },
+      {
+        "path": "server/match/botEmotes.js",
+        "baseExists": true,
+        "customBytes": 3450
+      },
+      {
+        "path": "server/match/botFormationCandidates.js",
+        "baseExists": false,
+        "customBytes": 4580
+      },
+      {
+        "path": "server/match/botIoleta.js",
+        "baseExists": false,
+        "customBytes": 1710
+      },
+      {
+        "path": "server/match/botIoletaPolicy.js",
+        "baseExists": false,
+        "customBytes": 13143
+      },
+      {
+        "path": "server/match/botPrep.js",
+        "baseExists": false,
+        "customBytes": 2909
+      },
+      {
+        "path": "server/match/botStrategies.js",
+        "baseExists": false,
+        "customBytes": 1660
+      },
+      {
+        "path": "server/match/botStrategyContract.js",
+        "baseExists": false,
+        "customBytes": 3083
+      },
+      {
+        "path": "server/match/builtinMeta.js",
+        "baseExists": true,
+        "customBytes": 21667
+      },
+      {
+        "path": "server/match/choices.js",
+        "baseExists": true,
+        "customBytes": 30755
+      },
+      {
+        "path": "server/match/dslMeta.js",
+        "baseExists": true,
+        "customBytes": 7347
+      },
+      {
+        "path": "server/match/effectsMeta.js",
+        "baseExists": true,
+        "customBytes": 43033
+      },
+      {
+        "path": "server/match/externalAI.js",
+        "baseExists": false,
+        "customBytes": 14758
+      },
+      {
+        "path": "server/match/externalConfig.js",
+        "baseExists": false,
+        "customBytes": 3359
+      },
+      {
+        "path": "server/match/fields.js",
+        "baseExists": true,
+        "customBytes": 51487
+      },
+      {
+        "path": "server/match/finalAssault.js",
+        "baseExists": true,
+        "customBytes": 10761
+      },
+      {
+        "path": "server/match/gamedata.js",
+        "baseExists": true,
+        "customBytes": 32880
+      },
+      {
+        "path": "server/match/host/childHost.js",
+        "baseExists": true,
+        "customBytes": 1702
+      },
+      {
+        "path": "server/match/host/entry.js",
+        "baseExists": true,
+        "customBytes": 16804
+      },
+      {
+        "path": "server/match/host/index.js",
+        "baseExists": true,
+        "customBytes": 15912
+      },
+      {
+        "path": "server/match/host/ipc.js",
+        "baseExists": true,
+        "customBytes": 3251
+      },
+      {
+        "path": "server/match/host/proxy.js",
+        "baseExists": true,
+        "customBytes": 12867
+      },
+      {
+        "path": "server/match/invariants.js",
+        "baseExists": true,
+        "customBytes": 16431
+      },
+      {
+        "path": "server/match/llmGate.js",
+        "baseExists": false,
+        "customBytes": 3498
+      },
+      {
+        "path": "server/match/llmRelease.js",
+        "baseExists": false,
+        "customBytes": 2975
+      },
+      {
+        "path": "server/match/match/bossRounds.js",
+        "baseExists": true,
+        "customBytes": 30142
+      },
+      {
+        "path": "server/match/match/clientCombat.js",
+        "baseExists": true,
+        "customBytes": 13375
+      },
+      {
+        "path": "server/match/match/combat.js",
+        "baseExists": true,
+        "customBytes": 9734
+      },
+      {
+        "path": "server/match/match/common.js",
+        "baseExists": true,
+        "customBytes": 2007
+      },
+      {
+        "path": "server/match/match/infra.js",
+        "baseExists": true,
+        "customBytes": 8355
+      },
+      {
+        "path": "server/match/match/intents.js",
+        "baseExists": true,
+        "customBytes": 13065
+      },
+      {
+        "path": "server/match/match/messaging.js",
+        "baseExists": true,
+        "customBytes": 5263
+      },
+      {
+        "path": "server/match/match/offers.js",
+        "baseExists": true,
+        "customBytes": 8825
+      },
+      {
+        "path": "server/match/match/pause.js",
+        "baseExists": true,
+        "customBytes": 3566
+      },
+      {
+        "path": "server/match/match/phases.js",
+        "baseExists": true,
+        "customBytes": 23252
+      },
+      {
+        "path": "server/match/match/platform.js",
+        "baseExists": true,
+        "customBytes": 13438
+      },
+      {
+        "path": "server/match/match/prep.js",
+        "baseExists": true,
+        "customBytes": 9805
+      },
+      {
+        "path": "server/match/match/rehearsal.js",
+        "baseExists": true,
+        "customBytes": 15237
+      },
+      {
+        "path": "server/match/match/reports.js",
+        "baseExists": true,
+        "customBytes": 10631
+      },
+      {
+        "path": "server/match/match/settle.js",
+        "baseExists": true,
+        "customBytes": 10761
+      },
+      {
+        "path": "server/match/match/setupVote.js",
+        "baseExists": true,
+        "customBytes": 7445
+      },
+      {
+        "path": "server/match/match/spDraft.js",
+        "baseExists": true,
+        "customBytes": 19879
+      },
+      {
+        "path": "server/match/match/speedVote.js",
+        "baseExists": false,
+        "customBytes": 3748
+      },
+      {
+        "path": "server/match/match/testCommands.js",
+        "baseExists": true,
+        "customBytes": 20344
+      },
+      {
+        "path": "server/match/match/unitePhase.js",
+        "baseExists": true,
+        "customBytes": 11702
+      },
+      {
+        "path": "server/match/match/views.js",
+        "baseExists": true,
+        "customBytes": 29408
+      },
+      {
+        "path": "server/match/match/watch.js",
+        "baseExists": true,
+        "customBytes": 13506
+      },
+      {
+        "path": "server/match/Match.js",
+        "baseExists": true,
+        "customBytes": 54969
+      },
+      {
+        "path": "server/match/operatorTraits.js",
+        "baseExists": true,
+        "customBytes": 4231
+      },
+      {
+        "path": "server/match/player/acquire.js",
+        "baseExists": true,
+        "customBytes": 20602
+      },
+      {
+        "path": "server/match/player/basics.js",
+        "baseExists": true,
+        "customBytes": 16508
+      },
+      {
+        "path": "server/match/player/common.js",
+        "baseExists": true,
+        "customBytes": 537
+      },
+      {
+        "path": "server/match/player/diy.js",
+        "baseExists": true,
+        "customBytes": 14783
+      },
+      {
+        "path": "server/match/player/economy.js",
+        "baseExists": true,
+        "customBytes": 13717
+      },
+      {
+        "path": "server/match/player/items.js",
+        "baseExists": true,
+        "customBytes": 11339
+      },
+      {
+        "path": "server/match/player/pieces.js",
+        "baseExists": true,
+        "customBytes": 12848
+      },
+      {
+        "path": "server/match/player/placement.js",
+        "baseExists": true,
+        "customBytes": 18020
+      },
+      {
+        "path": "server/match/player/prep.js",
+        "baseExists": true,
+        "customBytes": 5321
+      },
+      {
+        "path": "server/match/player/round.js",
+        "baseExists": true,
+        "customBytes": 10411
+      },
+      {
+        "path": "server/match/player/views.js",
+        "baseExists": true,
+        "customBytes": 8289
+      },
+      {
+        "path": "server/match/PlayerState.js",
+        "baseExists": true,
+        "customBytes": 21749
+      },
+      {
+        "path": "server/match/pool.js",
+        "baseExists": true,
+        "customBytes": 14708
+      },
+      {
+        "path": "server/match/preview.js",
+        "baseExists": true,
+        "customBytes": 3302
+      },
+      {
+        "path": "server/match/results.js",
+        "baseExists": true,
+        "customBytes": 8773
+      },
+      {
+        "path": "server/match/scheduler.js",
+        "baseExists": true,
+        "customBytes": 7300
+      },
+      {
+        "path": "server/match/snapshot.js",
+        "baseExists": true,
+        "customBytes": 32200
+      },
+      {
+        "path": "server/match/StubMatch.js",
+        "baseExists": true,
+        "customBytes": 13536
+      },
+      {
+        "path": "server/match/testReplay.js",
+        "baseExists": true,
+        "customBytes": 4191
+      },
+      {
+        "path": "server/match/testTrace.js",
+        "baseExists": true,
+        "customBytes": 6316
+      },
+      {
+        "path": "server/match/unite.js",
+        "baseExists": true,
+        "customBytes": 16114
+      },
+      {
+        "path": "server/match/waves.js",
+        "baseExists": true,
+        "customBytes": 37877
+      },
+      {
+        "path": "server/net.js",
+        "baseExists": true,
+        "customBytes": 50768
+      },
+      {
+        "path": "server/packs.js",
+        "baseExists": true,
+        "customBytes": 1027
+      },
+      {
+        "path": "server/persist/index.js",
+        "baseExists": true,
+        "customBytes": 2749
+      },
+      {
+        "path": "server/persist/lobbyState.js",
+        "baseExists": true,
+        "customBytes": 17542
+      },
+      {
+        "path": "server/persist/node.js",
+        "baseExists": true,
+        "customBytes": 8002
+      },
+      {
+        "path": "server/persist/persister.js",
+        "baseExists": true,
+        "customBytes": 20771
+      },
+      {
+        "path": "server/persist/store.js",
+        "baseExists": true,
+        "customBytes": 9472
+      },
+      {
+        "path": "server/persist/valkey.js",
+        "baseExists": true,
+        "customBytes": 13705
+      },
+      {
+        "path": "server/plugins/artReferences.js",
+        "baseExists": true,
+        "customBytes": 4978
+      },
+      {
+        "path": "server/plugins/contentData.js",
+        "baseExists": true,
+        "customBytes": 5544
+      },
+      {
+        "path": "server/plugins/contentSet.js",
+        "baseExists": true,
+        "customBytes": 25123
+      },
+      {
+        "path": "server/plugins/contentSets.js",
+        "baseExists": true,
+        "customBytes": 17879
+      },
+      {
+        "path": "server/plugins/forgeImport.js",
+        "baseExists": true,
+        "customBytes": 214083
+      },
+      {
+        "path": "server/plugins/forgeKits.js",
+        "baseExists": true,
+        "customBytes": 21553
+      },
+      {
+        "path": "server/plugins/forgePanels.js",
+        "baseExists": true,
+        "customBytes": 25082
+      },
+      {
+        "path": "server/plugins/forgeRecords.js",
+        "baseExists": true,
+        "customBytes": 8317
+      },
+      {
+        "path": "server/plugins/fxAssets.js",
+        "baseExists": true,
+        "customBytes": 7145
+      },
+      {
+        "path": "server/plugins/fxRecords.js",
+        "baseExists": true,
+        "customBytes": 2990
+      },
+      {
+        "path": "server/plugins/fxReferences.js",
+        "baseExists": true,
+        "customBytes": 3093
+      },
+      {
+        "path": "server/plugins/gameplayRecords.js",
+        "baseExists": true,
+        "customBytes": 11106
+      },
+      {
+        "path": "server/plugins/identity.js",
+        "baseExists": true,
+        "customBytes": 10421
+      },
+      {
+        "path": "server/plugins/install.js",
+        "baseExists": true,
+        "customBytes": 36475
+      },
+      {
+        "path": "server/plugins/offerData.js",
+        "baseExists": true,
+        "customBytes": 2342
+      },
+      {
+        "path": "server/plugins/officialUnitBuilder.js",
+        "baseExists": true,
+        "customBytes": 48907
+      },
+      {
+        "path": "server/plugins/officialUnits.js",
+        "baseExists": true,
+        "customBytes": 1958
+      },
+      {
+        "path": "server/plugins/operatorTraits.js",
+        "baseExists": true,
+        "customBytes": 13107
+      },
+      {
+        "path": "server/plugins/pack.js",
+        "baseExists": true,
+        "customBytes": 20398
+      },
+      {
+        "path": "server/plugins/policy.js",
+        "baseExists": true,
+        "customBytes": 7493
+      },
+      {
+        "path": "server/plugins/registry.js",
+        "baseExists": true,
+        "customBytes": 61550
+      },
+      {
+        "path": "server/plugins/roomSets.js",
+        "baseExists": true,
+        "customBytes": 10350
+      },
+      {
+        "path": "server/plugins/scriptPreflight.js",
+        "baseExists": true,
+        "customBytes": 3693
+      },
+      {
+        "path": "server/plugins/scriptProbe.js",
+        "baseExists": true,
+        "customBytes": 998
+      },
+      {
+        "path": "server/plugins/scriptTestSetup.js",
+        "baseExists": true,
+        "customBytes": 507
+      },
+      {
+        "path": "server/plugins/stageWarnings.js",
+        "baseExists": true,
+        "customBytes": 4017
+      },
+      {
+        "path": "server/plugins/traitSchema.js",
+        "baseExists": true,
+        "customBytes": 4450
+      },
+      {
+        "path": "server/plugins/trusted.js",
+        "baseExists": true,
+        "customBytes": 4310
+      },
+      {
+        "path": "server/plugins/trustedApi.js",
+        "baseExists": true,
+        "customBytes": 695
+      },
+      {
+        "path": "server/plugins/trustedEntry.js",
+        "baseExists": true,
+        "customBytes": 2224
+      },
+      {
+        "path": "server/plugins/trustedRuntime.js",
+        "baseExists": true,
+        "customBytes": 4230
+      },
+      {
+        "path": "server/plugins/visualSet.js",
+        "baseExists": true,
+        "customBytes": 14306
+      },
+      {
+        "path": "server/plugins/zip.js",
+        "baseExists": true,
+        "customBytes": 14746
+      },
+      {
+        "path": "server/release-without-llm",
+        "baseExists": false,
+        "customBytes": 65
+      },
+      {
+        "path": "server/sim/AGENTS.md",
+        "baseExists": false,
+        "customBytes": 976
+      },
+      {
+        "path": "server/sim/ai.js",
+        "baseExists": true,
+        "customBytes": 63551
+      },
+      {
+        "path": "server/sim/attack/calculation.js",
+        "baseExists": false,
+        "customBytes": 3966
+      },
+      {
+        "path": "server/sim/attack/effects.js",
+        "baseExists": false,
+        "customBytes": 6448
+      },
+      {
+        "path": "server/sim/attack/element.js",
+        "baseExists": false,
+        "customBytes": 16308
+      },
+      {
+        "path": "server/sim/attack/heal.js",
+        "baseExists": false,
+        "customBytes": 3857
+      },
+      {
+        "path": "server/sim/attack/health.js",
+        "baseExists": false,
+        "customBytes": 7093
+      },
+      {
+        "path": "server/sim/attack/helpers.js",
+        "baseExists": false,
+        "customBytes": 6972
+      },
+      {
+        "path": "server/sim/attack/hit.js",
+        "baseExists": false,
+        "customBytes": 6709
+      },
+      {
+        "path": "server/sim/attack/legacy.js",
+        "baseExists": false,
+        "customBytes": 1775
+      },
+      {
+        "path": "server/sim/attack/transfer.js",
+        "baseExists": false,
+        "customBytes": 1212
+      },
+      {
+        "path": "server/sim/attack.js",
+        "baseExists": false,
+        "customBytes": 4835
+      },
+      {
+        "path": "server/sim/battle/blocking.js",
+        "baseExists": true,
+        "customBytes": 8559
+      },
+      {
+        "path": "server/sim/battle/combat.js",
+        "baseExists": true,
+        "customBytes": 4583
+      },
+      {
+        "path": "server/sim/battle/deploy.js",
+        "baseExists": true,
+        "customBytes": 15177
+      },
+      {
+        "path": "server/sim/battle/displacement.js",
+        "baseExists": true,
+        "customBytes": 14292
+      },
+      {
+        "path": "server/sim/battle/economy.js",
+        "baseExists": true,
+        "customBytes": 4582
+      },
+      {
+        "path": "server/sim/battle/events.js",
+        "baseExists": true,
+        "customBytes": 9583
+      },
+      {
+        "path": "server/sim/battle/hooks.js",
+        "baseExists": true,
+        "customBytes": 9623
+      },
+      {
+        "path": "server/sim/battle/lifecycle.js",
+        "baseExists": true,
+        "customBytes": 16044
+      },
+      {
+        "path": "server/sim/battle/players.js",
+        "baseExists": true,
+        "customBytes": 13914
+      },
+      {
+        "path": "server/sim/battle/queries.js",
+        "baseExists": true,
+        "customBytes": 19468
+      },
+      {
+        "path": "server/sim/battle/spawns.js",
+        "baseExists": true,
+        "customBytes": 13224
+      },
+      {
+        "path": "server/sim/battle/status.js",
+        "baseExists": true,
+        "customBytes": 21105
+      },
+      {
+        "path": "server/sim/battle/summons.js",
+        "baseExists": true,
+        "customBytes": 8378
+      },
+      {
+        "path": "server/sim/battle/tiles.js",
+        "baseExists": true,
+        "customBytes": 13441
+      },
+      {
+        "path": "server/sim/battle/util.js",
+        "baseExists": true,
+        "customBytes": 567
+      },
+      {
+        "path": "server/sim/Battle.js",
+        "baseExists": true,
+        "customBytes": 14221
+      },
+      {
+        "path": "server/sim/body.js",
+        "baseExists": true,
+        "customBytes": 9819
+      },
+      {
+        "path": "server/sim/buffs.js",
+        "baseExists": true,
+        "customBytes": 15045
+      },
+      {
+        "path": "server/sim/constants.js",
+        "baseExists": true,
+        "customBytes": 19676
+      },
+      {
+        "path": "server/sim/content/bands/battle.js",
+        "baseExists": true,
+        "customBytes": 15932
+      },
+      {
+        "path": "server/sim/content/bands/meta.js",
+        "baseExists": true,
+        "customBytes": 37740
+      },
+      {
+        "path": "server/sim/content/bands.js",
+        "baseExists": true,
+        "customBytes": 1307
+      },
+      {
+        "path": "server/sim/content/bonds/addon/battle.js",
+        "baseExists": true,
+        "customBytes": 41865
+      },
+      {
+        "path": "server/sim/content/bonds/addon/meta.js",
+        "baseExists": true,
+        "customBytes": 8160
+      },
+      {
+        "path": "server/sim/content/bonds/addon.js",
+        "baseExists": true,
+        "customBytes": 823
+      },
+      {
+        "path": "server/sim/content/bonds/core.js",
+        "baseExists": true,
+        "customBytes": 44650
+      },
+      {
+        "path": "server/sim/content/bonds/timers.js",
+        "baseExists": false,
+        "customBytes": 1507
+      },
+      {
+        "path": "server/sim/content/bonds.js",
+        "baseExists": true,
+        "customBytes": 2015
+      },
+      {
+        "path": "server/sim/content/bosses.js",
+        "baseExists": true,
+        "customBytes": 83629
+      },
+      {
+        "path": "server/sim/content/choices.js",
+        "baseExists": true,
+        "customBytes": 27432
+      },
+      {
+        "path": "server/sim/content/devices.js",
+        "baseExists": true,
+        "customBytes": 31068
+      },
+      {
+        "path": "server/sim/content/dsl/bounds.js",
+        "baseExists": true,
+        "customBytes": 4979
+      },
+      {
+        "path": "server/sim/content/dsl/budget.js",
+        "baseExists": true,
+        "customBytes": 3448
+      },
+      {
+        "path": "server/sim/content/dsl/compile.js",
+        "baseExists": true,
+        "customBytes": 8136
+      },
+      {
+        "path": "server/sim/content/dsl/validate.js",
+        "baseExists": true,
+        "customBytes": 26912
+      },
+      {
+        "path": "server/sim/content/dsl/vocab.js",
+        "baseExists": true,
+        "customBytes": 26332
+      },
+      {
+        "path": "server/sim/content/enemies/archetypes.js",
+        "baseExists": true,
+        "customBytes": 40839
+      },
+      {
+        "path": "server/sim/content/enemies/dot.js",
+        "baseExists": true,
+        "customBytes": 10278
+      },
+      {
+        "path": "server/sim/content/enemies/element.js",
+        "baseExists": true,
+        "customBytes": 13221
+      },
+      {
+        "path": "server/sim/content/enemies/fly.js",
+        "baseExists": true,
+        "customBytes": 19922
+      },
+      {
+        "path": "server/sim/content/enemies/helpers.js",
+        "baseExists": true,
+        "customBytes": 24740
+      },
+      {
+        "path": "server/sim/content/enemies/invisible.js",
+        "baseExists": true,
+        "customBytes": 11938
+      },
+      {
+        "path": "server/sim/content/enemies/leaders.js",
+        "baseExists": true,
+        "customBytes": 59134
+      },
+      {
+        "path": "server/sim/content/enemies/passengers.js",
+        "baseExists": true,
+        "customBytes": 6399
+      },
+      {
+        "path": "server/sim/content/enemies/reflection.js",
+        "baseExists": true,
+        "customBytes": 3600
+      },
+      {
+        "path": "server/sim/content/enemies/special.js",
+        "baseExists": true,
+        "customBytes": 34972
+      },
+      {
+        "path": "server/sim/content/enemies/times.js",
+        "baseExists": true,
+        "customBytes": 10419
+      },
+      {
+        "path": "server/sim/content/enemies.js",
+        "baseExists": true,
+        "customBytes": 28743
+      },
+      {
+        "path": "server/sim/content/extensions.js",
+        "baseExists": true,
+        "customBytes": 7793
+      },
+      {
+        "path": "server/sim/content/garrisons/battle.js",
+        "baseExists": true,
+        "customBytes": 26197
+      },
+      {
+        "path": "server/sim/content/garrisons/meta.js",
+        "baseExists": true,
+        "customBytes": 22403
+      },
+      {
+        "path": "server/sim/content/garrisons.js",
+        "baseExists": true,
+        "customBytes": 551
+      },
+      {
+        "path": "server/sim/content/generic.js",
+        "baseExists": true,
+        "customBytes": 27781
+      },
+      {
+        "path": "server/sim/content/index.js",
+        "baseExists": true,
+        "customBytes": 23209
+      },
+      {
+        "path": "server/sim/content/items/battle.js",
+        "baseExists": true,
+        "customBytes": 56766
+      },
+      {
+        "path": "server/sim/content/items/meta.js",
+        "baseExists": true,
+        "customBytes": 15360
+      },
+      {
+        "path": "server/sim/content/items.js",
+        "baseExists": true,
+        "customBytes": 662
+      },
+      {
+        "path": "server/sim/content/kits/index.js",
+        "baseExists": true,
+        "customBytes": 23645
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_01-inside.js",
+        "baseExists": true,
+        "customBytes": 3549
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_02-yak.js",
+        "baseExists": true,
+        "customBytes": 1259
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_03-leizi.js",
+        "baseExists": true,
+        "customBytes": 1733
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_04-udflow.js",
+        "baseExists": true,
+        "customBytes": 3244
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_05-vigna.js",
+        "baseExists": true,
+        "customBytes": 1867
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_06-vendla.js",
+        "baseExists": true,
+        "customBytes": 4716
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_07-prove.js",
+        "baseExists": true,
+        "customBytes": 3744
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_08-texas.js",
+        "baseExists": true,
+        "customBytes": 2397
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_09-caper.js",
+        "baseExists": true,
+        "customBytes": 1975
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_10-sunbr.js",
+        "baseExists": true,
+        "customBytes": 5359
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_11-skgoat.js",
+        "baseExists": true,
+        "customBytes": 844
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_12-estell.js",
+        "baseExists": true,
+        "customBytes": 1970
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_13-podego.js",
+        "baseExists": true,
+        "customBytes": 3563
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_14-greyy.js",
+        "baseExists": true,
+        "customBytes": 1233
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_15-pithst.js",
+        "baseExists": true,
+        "customBytes": 3364
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_16-tinman.js",
+        "baseExists": true,
+        "customBytes": 5824
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_17-indigo.js",
+        "baseExists": true,
+        "customBytes": 4620
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_18-utage.js",
+        "baseExists": true,
+        "customBytes": 3527
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_19-wildmn.js",
+        "baseExists": true,
+        "customBytes": 4279
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_1_20-liskam.js",
+        "baseExists": true,
+        "customBytes": 4526
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_01-excu.js",
+        "baseExists": true,
+        "customBytes": 1407
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_02-silent.js",
+        "baseExists": true,
+        "customBytes": 3471
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_03-slchan.js",
+        "baseExists": true,
+        "customBytes": 2273
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_04-grabds.js",
+        "baseExists": true,
+        "customBytes": 2627
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_05-harold.js",
+        "baseExists": true,
+        "customBytes": 3396
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_06-papyrs.js",
+        "baseExists": true,
+        "customBytes": 5182
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_07-ghost.js",
+        "baseExists": true,
+        "customBytes": 1970
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_08-bubble.js",
+        "baseExists": true,
+        "customBytes": 2755
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_09-humus.js",
+        "baseExists": true,
+        "customBytes": 2898
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_10-rockr.js",
+        "baseExists": true,
+        "customBytes": 6007
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_11-kazema.js",
+        "baseExists": true,
+        "customBytes": 4516
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_12-gravel.js",
+        "baseExists": true,
+        "customBytes": 4364
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_13-tippi.js",
+        "baseExists": true,
+        "customBytes": 6163
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_14-flower.js",
+        "baseExists": true,
+        "customBytes": 2017
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_15-akkord.js",
+        "baseExists": true,
+        "customBytes": 2294
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_16-whitew.js",
+        "baseExists": true,
+        "customBytes": 1514
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_17-branch.js",
+        "baseExists": true,
+        "customBytes": 2631
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_18-ashlok.js",
+        "baseExists": true,
+        "customBytes": 2157
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_2_19-tinman.js",
+        "baseExists": true,
+        "customBytes": 3022
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_01-angel.js",
+        "baseExists": true,
+        "customBytes": 2957
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_02-ayer.js",
+        "baseExists": true,
+        "customBytes": 3438
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_03-swire.js",
+        "baseExists": true,
+        "customBytes": 1781
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_04-swire2.js",
+        "baseExists": true,
+        "customBytes": 15784
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_05-skadi.js",
+        "baseExists": true,
+        "customBytes": 3539
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_06-philae.js",
+        "baseExists": true,
+        "customBytes": 7428
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_07-forcer.js",
+        "baseExists": true,
+        "customBytes": 4272
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_08-mint.js",
+        "baseExists": true,
+        "customBytes": 4688
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_09-haini.js",
+        "baseExists": true,
+        "customBytes": 2782
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_10-pinecn.js",
+        "baseExists": true,
+        "customBytes": 3053
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_11-snhunt.js",
+        "baseExists": true,
+        "customBytes": 4042
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_12-blemsh.js",
+        "baseExists": true,
+        "customBytes": 11030
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_13-malist.js",
+        "baseExists": true,
+        "customBytes": 1393
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_14-slbell.js",
+        "baseExists": true,
+        "customBytes": 2498
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_15-vodfox.js",
+        "baseExists": true,
+        "customBytes": 1553
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_16-snakek.js",
+        "baseExists": true,
+        "customBytes": 1356
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_17-shotst.js",
+        "baseExists": true,
+        "customBytes": 2230
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_18-vulpis.js",
+        "baseExists": true,
+        "customBytes": 8064
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_19-vigil.js",
+        "baseExists": true,
+        "customBytes": 19898
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_20-kjera.js",
+        "baseExists": true,
+        "customBytes": 6989
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_3_21-archet.js",
+        "baseExists": true,
+        "customBytes": 6231
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_01-rmixer.js",
+        "baseExists": true,
+        "customBytes": 9662
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_02-mostma.js",
+        "baseExists": true,
+        "customBytes": 3883
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_03-kjera.js",
+        "baseExists": true,
+        "customBytes": 1516
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_04-ines.js",
+        "baseExists": true,
+        "customBytes": 10379
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_05-beewax.js",
+        "baseExists": true,
+        "customBytes": 4016
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_06-kroos2.js",
+        "baseExists": true,
+        "customBytes": 2493
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_07-bpipe.js",
+        "baseExists": true,
+        "customBytes": 3283
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_08-rosesa.js",
+        "baseExists": true,
+        "customBytes": 2750
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_09-mizuki.js",
+        "baseExists": true,
+        "customBytes": 3816
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_10-aroma.js",
+        "baseExists": true,
+        "customBytes": 4665
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_11-cathy.js",
+        "baseExists": true,
+        "customBytes": 2088
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_12-glady.js",
+        "baseExists": true,
+        "customBytes": 6532
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_13-gnosis.js",
+        "baseExists": true,
+        "customBytes": 6898
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_14-lionhd.js",
+        "baseExists": true,
+        "customBytes": 2052
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_15-reckpr.js",
+        "baseExists": true,
+        "customBytes": 2318
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_16-texas2.js",
+        "baseExists": true,
+        "customBytes": 8657
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_17-hsguma.js",
+        "baseExists": true,
+        "customBytes": 2987
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_18-mudrok.js",
+        "baseExists": true,
+        "customBytes": 6458
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_19-flamtl.js",
+        "baseExists": true,
+        "customBytes": 6262
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_20-fartth.js",
+        "baseExists": true,
+        "customBytes": 6122
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_21-plosis.js",
+        "baseExists": true,
+        "customBytes": 1253
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_22-svrash.js",
+        "baseExists": true,
+        "customBytes": 3740
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_23-gvial2.js",
+        "baseExists": true,
+        "customBytes": 4525
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_24-billro.js",
+        "baseExists": true,
+        "customBytes": 10055
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_25-cetsyr.js",
+        "baseExists": true,
+        "customBytes": 9807
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_4_26-bldsk.js",
+        "baseExists": true,
+        "customBytes": 3931
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_01-excu2.js",
+        "baseExists": true,
+        "customBytes": 7147
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_02-titi.js",
+        "baseExists": true,
+        "customBytes": 11362
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_03-blaze2.js",
+        "baseExists": true,
+        "customBytes": 10694
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_04-bldsk.js",
+        "baseExists": true,
+        "customBytes": 3341
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_05-ulpia.js",
+        "baseExists": true,
+        "customBytes": 13179
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_06-etlchi.js",
+        "baseExists": true,
+        "customBytes": 11946
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_07-surtr.js",
+        "baseExists": true,
+        "customBytes": 6987
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_08-horn.js",
+        "baseExists": true,
+        "customBytes": 8859
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_09-cetsyr.js",
+        "baseExists": true,
+        "customBytes": 7353
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_10-lisa.js",
+        "baseExists": true,
+        "customBytes": 4578
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_11-demkni.js",
+        "baseExists": true,
+        "customBytes": 6431
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_12-dusk.js",
+        "baseExists": true,
+        "customBytes": 6708
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_13-ghost2.js",
+        "baseExists": true,
+        "customBytes": 6688
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_14-svash2.js",
+        "baseExists": true,
+        "customBytes": 13149
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_15-thorn2.js",
+        "baseExists": true,
+        "customBytes": 15183
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_16-plosis.js",
+        "baseExists": true,
+        "customBytes": 1129
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_17-f12yin.js",
+        "baseExists": true,
+        "customBytes": 4330
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_18-gvial2.js",
+        "baseExists": true,
+        "customBytes": 2537
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_19-mlynar.js",
+        "baseExists": true,
+        "customBytes": 10052
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_20-aglina.js",
+        "baseExists": true,
+        "customBytes": 4962
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_21-sntlla.js",
+        "baseExists": true,
+        "customBytes": 4816
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_22-nymph.js",
+        "baseExists": true,
+        "customBytes": 6278
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_5_23-reckpr.js",
+        "baseExists": true,
+        "customBytes": 2783
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_01-lemuen.js",
+        "baseExists": true,
+        "customBytes": 15486
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_02-sbell2.js",
+        "baseExists": true,
+        "customBytes": 12516
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_03-yu.js",
+        "baseExists": true,
+        "customBytes": 10650
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_04-skadi2.js",
+        "baseExists": true,
+        "customBytes": 12242
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_05-pasngr.js",
+        "baseExists": true,
+        "customBytes": 6945
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_06-pepe.js",
+        "baseExists": true,
+        "customBytes": 6175
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_07-siege2.js",
+        "baseExists": true,
+        "customBytes": 7540
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_08-reed2.js",
+        "baseExists": true,
+        "customBytes": 7368
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_09-cello.js",
+        "baseExists": true,
+        "customBytes": 8585
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_10-nymph.js",
+        "baseExists": true,
+        "customBytes": 3802
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_11-mlyss.js",
+        "baseExists": true,
+        "customBytes": 20439
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_12-rosmon.js",
+        "baseExists": true,
+        "customBytes": 5403
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_13-angel2.js",
+        "baseExists": true,
+        "customBytes": 12786
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_14-lumen.js",
+        "baseExists": true,
+        "customBytes": 6793
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_15-qiubai.js",
+        "baseExists": true,
+        "customBytes": 7012
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_16-halo2.js",
+        "baseExists": true,
+        "customBytes": 8065
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_17-nearl2.js",
+        "baseExists": true,
+        "customBytes": 8220
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_18-whitw2.js",
+        "baseExists": true,
+        "customBytes": 19649
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_19-blkkgt.js",
+        "baseExists": true,
+        "customBytes": 8015
+      },
+      {
+        "path": "server/sim/content/kits/ops/chess_char_6_20-agoat2.js",
+        "baseExists": true,
+        "customBytes": 8301
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-aglna2.js",
+        "baseExists": true,
+        "customBytes": 24882
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-amgoat.js",
+        "baseExists": true,
+        "customBytes": 13624
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-aphris.js",
+        "baseExists": true,
+        "customBytes": 20822
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-ascln.js",
+        "baseExists": true,
+        "customBytes": 16323
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-bgsnow.js",
+        "baseExists": true,
+        "customBytes": 14339
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-cerber.js",
+        "baseExists": true,
+        "customBytes": 12077
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-cgbird.js",
+        "baseExists": true,
+        "customBytes": 11153
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-chen.js",
+        "baseExists": true,
+        "customBytes": 14164
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-chen2.js",
+        "baseExists": true,
+        "customBytes": 17578
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-chen3.js",
+        "baseExists": true,
+        "customBytes": 22538
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-chyue.js",
+        "baseExists": true,
+        "customBytes": 14384
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-clemnt.js",
+        "baseExists": true,
+        "customBytes": 13713
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-closur.js",
+        "baseExists": true,
+        "customBytes": 25588
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-cqbw.js",
+        "baseExists": true,
+        "customBytes": 22097
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-crosly.js",
+        "baseExists": true,
+        "customBytes": 16379
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-demetr.js",
+        "baseExists": true,
+        "customBytes": 21744
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-doroth.js",
+        "baseExists": true,
+        "customBytes": 20469
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-ebnhlz.js",
+        "baseExists": true,
+        "customBytes": 21733
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-gdglow.js",
+        "baseExists": true,
+        "customBytes": 11215
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-haak.js",
+        "baseExists": true,
+        "customBytes": 13261
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-haruka.js",
+        "baseExists": true,
+        "customBytes": 16779
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-headb2.js",
+        "baseExists": true,
+        "customBytes": 19833
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-helage.js",
+        "baseExists": true,
+        "customBytes": 8146
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-heyak.js",
+        "baseExists": true,
+        "customBytes": 17957
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-hodrer.js",
+        "baseExists": true,
+        "customBytes": 12849
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-hsgma2.js",
+        "baseExists": true,
+        "customBytes": 22405
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-huang.js",
+        "baseExists": true,
+        "customBytes": 15354
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-ifrit.js",
+        "baseExists": true,
+        "customBytes": 15399
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-irene.js",
+        "baseExists": true,
+        "customBytes": 14432
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-ironmn.js",
+        "baseExists": true,
+        "customBytes": 27452
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-jesca2.js",
+        "baseExists": true,
+        "customBytes": 21197
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-judge.js",
+        "baseExists": true,
+        "customBytes": 13521
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-kalts.js",
+        "baseExists": true,
+        "customBytes": 18279
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-kalts2.js",
+        "baseExists": true,
+        "customBytes": 23895
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-leizi2.js",
+        "baseExists": true,
+        "customBytes": 23412
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-lessng.js",
+        "baseExists": true,
+        "customBytes": 11718
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-lin.js",
+        "baseExists": true,
+        "customBytes": 16107
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-ling.js",
+        "baseExists": true,
+        "customBytes": 17257
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-lmlee.js",
+        "baseExists": true,
+        "customBytes": 15071
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-logos.js",
+        "baseExists": true,
+        "customBytes": 17902
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-mantra.js",
+        "baseExists": true,
+        "customBytes": 19472
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-mcnist.js",
+        "baseExists": true,
+        "customBytes": 25376
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-mgllan.js",
+        "baseExists": true,
+        "customBytes": 14890
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-monstr.js",
+        "baseExists": true,
+        "customBytes": 22540
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-narant.js",
+        "baseExists": true,
+        "customBytes": 17820
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-nasti.js",
+        "baseExists": true,
+        "customBytes": 29034
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-necras.js",
+        "baseExists": true,
+        "customBytes": 27523
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-nian.js",
+        "baseExists": true,
+        "customBytes": 12093
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-pallas.js",
+        "baseExists": true,
+        "customBytes": 11691
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-phatm2.js",
+        "baseExists": true,
+        "customBytes": 26362
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-phatom.js",
+        "baseExists": true,
+        "customBytes": 17294
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-phenxi.js",
+        "baseExists": true,
+        "customBytes": 16467
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-poca.js",
+        "baseExists": true,
+        "customBytes": 11702
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-radian.js",
+        "baseExists": true,
+        "customBytes": 20046
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-ray.js",
+        "baseExists": true,
+        "customBytes": 21454
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-saga.js",
+        "baseExists": true,
+        "customBytes": 16221
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-shining.js",
+        "baseExists": true,
+        "customBytes": 10110
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-shu.js",
+        "baseExists": true,
+        "customBytes": 21397
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-shwaz.js",
+        "baseExists": true,
+        "customBytes": 10495
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-siege.js",
+        "baseExists": true,
+        "customBytes": 8204
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-sleach.js",
+        "baseExists": true,
+        "customBytes": 23171
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-slent2.js",
+        "baseExists": true,
+        "customBytes": 20368
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-thorns.js",
+        "baseExists": true,
+        "customBytes": 16707
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-thumpy.js",
+        "baseExists": true,
+        "customBytes": 21283
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-typhon.js",
+        "baseExists": true,
+        "customBytes": 14080
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-veen.js",
+        "baseExists": true,
+        "customBytes": 15864
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-vvana.js",
+        "baseExists": true,
+        "customBytes": 20008
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-wang.js",
+        "baseExists": true,
+        "customBytes": 28264
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-weedy.js",
+        "baseExists": true,
+        "customBytes": 19527
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-wisdel.js",
+        "baseExists": true,
+        "customBytes": 20439
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-zumama.js",
+        "baseExists": true,
+        "customBytes": 9706
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-zuole.js",
+        "baseExists": true,
+        "customBytes": 16281
+      },
+      {
+        "path": "server/sim/content/kits/ops/standin-accast.js",
+        "baseExists": true,
+        "customBytes": 6071
+      },
+      {
+        "path": "server/sim/content/kits/ops/standin-acfend.js",
+        "baseExists": true,
+        "customBytes": 6745
+      },
+      {
+        "path": "server/sim/content/kits/ops/standin-acguad.js",
+        "baseExists": true,
+        "customBytes": 5144
+      },
+      {
+        "path": "server/sim/content/kits/ops/standin-acmedc.js",
+        "baseExists": true,
+        "customBytes": 5412
+      },
+      {
+        "path": "server/sim/content/kits/ops/standin-acnipe.js",
+        "baseExists": true,
+        "customBytes": 6320
+      },
+      {
+        "path": "server/sim/content/kits/ops/standin-acpion.js",
+        "baseExists": true,
+        "customBytes": 8576
+      },
+      {
+        "path": "server/sim/content/kits/ops/standin-acspec.js",
+        "baseExists": true,
+        "customBytes": 7431
+      },
+      {
+        "path": "server/sim/content/kits/ops/standin-acsupo.js",
+        "baseExists": true,
+        "customBytes": 9967
+      },
+      {
+        "path": "server/sim/content/kits/ops/standin-sharp2.js",
+        "baseExists": true,
+        "customBytes": 3813
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-aurora.js",
+        "baseExists": false,
+        "customBytes": 3333
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-blackd.js",
+        "baseExists": false,
+        "customBytes": 1921
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-ceylon.js",
+        "baseExists": false,
+        "customBytes": 2424
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-cuttle.js",
+        "baseExists": false,
+        "customBytes": 2460
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-diy.js",
+        "baseExists": false,
+        "customBytes": 4627
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-ethan.js",
+        "baseExists": false,
+        "customBytes": 2278
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-fmout.js",
+        "baseExists": false,
+        "customBytes": 2073
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-folnic.js",
+        "baseExists": false,
+        "customBytes": 2775
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-glider.js",
+        "baseExists": false,
+        "customBytes": 3011
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-halo.js",
+        "baseExists": false,
+        "customBytes": 2180
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-heidi.js",
+        "baseExists": false,
+        "customBytes": 2976
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-mantic.js",
+        "baseExists": false,
+        "customBytes": 3115
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-mberry.js",
+        "baseExists": false,
+        "customBytes": 2851
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-mm.js",
+        "baseExists": false,
+        "customBytes": 1718
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-pudd.js",
+        "baseExists": false,
+        "customBytes": 1050
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-savage.js",
+        "baseExists": false,
+        "customBytes": 1712
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-spikes.js",
+        "baseExists": false,
+        "customBytes": 2161
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-waaifu.js",
+        "baseExists": false,
+        "customBytes": 2627
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-wanqin.js",
+        "baseExists": false,
+        "customBytes": 3790
+      },
+      {
+        "path": "server/sim/content/kits/ops/ver-zebra.js",
+        "baseExists": false,
+        "customBytes": 2463
+      },
+      {
+        "path": "server/sim/content/kits/README.md",
+        "baseExists": true,
+        "customBytes": 33920
+      },
+      {
+        "path": "server/sim/content/kits/shared/borrow.js",
+        "baseExists": false,
+        "customBytes": 4596
+      },
+      {
+        "path": "server/sim/content/kits/shared/injury.js",
+        "baseExists": false,
+        "customBytes": 908
+      },
+      {
+        "path": "server/sim/content/kits/shared/lord.js",
+        "baseExists": false,
+        "customBytes": 771
+      },
+      {
+        "path": "server/sim/content/kits/shared/summoner.js",
+        "baseExists": true,
+        "customBytes": 10314
+      },
+      {
+        "path": "server/sim/content/kits/shared/tier1.js",
+        "baseExists": true,
+        "customBytes": 16167
+      },
+      {
+        "path": "server/sim/content/kits/shared/tier2.js",
+        "baseExists": true,
+        "customBytes": 1801
+      },
+      {
+        "path": "server/sim/content/kits/shared/tier3.js",
+        "baseExists": true,
+        "customBytes": 13890
+      },
+      {
+        "path": "server/sim/content/kits/shared/tier4.js",
+        "baseExists": true,
+        "customBytes": 11668
+      },
+      {
+        "path": "server/sim/content/kits/shared/tier5.js",
+        "baseExists": true,
+        "customBytes": 14656
+      },
+      {
+        "path": "server/sim/content/kits/shared/tier6.js",
+        "baseExists": true,
+        "customBytes": 20751
+      },
+      {
+        "path": "server/sim/content/kits/shared/version.js",
+        "baseExists": false,
+        "customBytes": 6913
+      },
+      {
+        "path": "server/sim/content/support/index.js",
+        "baseExists": true,
+        "customBytes": 23507
+      },
+      {
+        "path": "server/sim/content/support/meta.js",
+        "baseExists": true,
+        "customBytes": 4739
+      },
+      {
+        "path": "server/sim/content/tokens.js",
+        "baseExists": true,
+        "customBytes": 108648
+      },
+      {
+        "path": "server/sim/content/traitMods.js",
+        "baseExists": true,
+        "customBytes": 14836
+      },
+      {
+        "path": "server/sim/damage.js",
+        "baseExists": true,
+        "customBytes": 40814
+      },
+      {
+        "path": "server/sim/detmath.js",
+        "baseExists": true,
+        "customBytes": 12491
+      },
+      {
+        "path": "server/sim/dir.js",
+        "baseExists": true,
+        "customBytes": 4788
+      },
+      {
+        "path": "server/sim/fear.js",
+        "baseExists": true,
+        "customBytes": 11378
+      },
+      {
+        "path": "server/sim/grid.js",
+        "baseExists": true,
+        "customBytes": 31452
+      },
+      {
+        "path": "server/sim/groundPaths.js",
+        "baseExists": true,
+        "customBytes": 2753
+      },
+      {
+        "path": "server/sim/nodeData.js",
+        "baseExists": true,
+        "customBytes": 2563
+      },
+      {
+        "path": "server/sim/professions.js",
+        "baseExists": true,
+        "customBytes": 45189
+      },
+      {
+        "path": "server/sim/projectiles.js",
+        "baseExists": true,
+        "customBytes": 3501
+      },
+      {
+        "path": "server/sim/rehearsal.js",
+        "baseExists": true,
+        "customBytes": 10270
+      },
+      {
+        "path": "server/sim/rng.js",
+        "baseExists": true,
+        "customBytes": 2298
+      },
+      {
+        "path": "server/sim/simdata.js",
+        "baseExists": true,
+        "customBytes": 46722
+      },
+      {
+        "path": "server/sim/skills.js",
+        "baseExists": true,
+        "customBytes": 40634
+      },
+      {
+        "path": "server/sim/snapshot.js",
+        "baseExists": true,
+        "customBytes": 14906
+      },
+      {
+        "path": "server/sim/spec.js",
+        "baseExists": true,
+        "customBytes": 28302
+      },
+      {
+        "path": "server/sim/targeting.js",
+        "baseExists": true,
+        "customBytes": 17933
+      },
+      {
+        "path": "server/sim/units.js",
+        "baseExists": true,
+        "customBytes": 16459
+      },
+      {
+        "path": "server/stateTransport.js",
+        "baseExists": true,
+        "customBytes": 4627
+      },
+      {
+        "path": "server/studio/authoring.js",
+        "baseExists": true,
+        "customBytes": 16424
+      },
+      {
+        "path": "server/studio/authorMerge.js",
+        "baseExists": true,
+        "customBytes": 5324
+      },
+      {
+        "path": "server/studio/authorOptions.js",
+        "baseExists": true,
+        "customBytes": 4353
+      },
+      {
+        "path": "server/studio/candidate.js",
+        "baseExists": true,
+        "customBytes": 5787
+      },
+      {
+        "path": "server/studio/check.js",
+        "baseExists": true,
+        "customBytes": 1678
+      },
+      {
+        "path": "server/studio/checkChild.js",
+        "baseExists": true,
+        "customBytes": 2765
+      },
+      {
+        "path": "server/studio/console.js",
+        "baseExists": true,
+        "customBytes": 12824
+      },
+      {
+        "path": "server/studio/dslExamples.js",
+        "baseExists": true,
+        "customBytes": 2853
+      },
+      {
+        "path": "server/studio/edit.js",
+        "baseExists": true,
+        "customBytes": 12687
+      },
+      {
+        "path": "server/studio/files.js",
+        "baseExists": true,
+        "customBytes": 15021
+      },
+      {
+        "path": "server/studio/fxReplay.js",
+        "baseExists": true,
+        "customBytes": 2332
+      },
+      {
+        "path": "server/studio/gameData.js",
+        "baseExists": true,
+        "customBytes": 3995
+      },
+      {
+        "path": "server/studio/gameplayCheck.js",
+        "baseExists": true,
+        "customBytes": 6365
+      },
+      {
+        "path": "server/studio/gameplayTrial.js",
+        "baseExists": true,
+        "customBytes": 5572
+      },
+      {
+        "path": "server/studio/gate.js",
+        "baseExists": true,
+        "customBytes": 7363
+      },
+      {
+        "path": "server/studio/index.js",
+        "baseExists": true,
+        "customBytes": 69796
+      },
+      {
+        "path": "server/studio/key.js",
+        "baseExists": true,
+        "customBytes": 2850
+      },
+      {
+        "path": "server/studio/mediaDraft.js",
+        "baseExists": true,
+        "customBytes": 3635
+      },
+      {
+        "path": "server/studio/mediaValidation.js",
+        "baseExists": true,
+        "customBytes": 5100
+      },
+      {
+        "path": "server/studio/paths.js",
+        "baseExists": true,
+        "customBytes": 1207
+      },
+      {
+        "path": "server/studio/presentationData.js",
+        "baseExists": true,
+        "customBytes": 869
+      },
+      {
+        "path": "server/studio/preview.js",
+        "baseExists": true,
+        "customBytes": 7205
+      },
+      {
+        "path": "server/studio/rulesTrial.js",
+        "baseExists": true,
+        "customBytes": 2888
+      },
+      {
+        "path": "server/studio/targets.js",
+        "baseExists": true,
+        "customBytes": 11066
+      },
+      {
+        "path": "server/studio/templates/art.js",
+        "baseExists": true,
+        "customBytes": 2126
+      },
+      {
+        "path": "server/studio/templates/audio.js",
+        "baseExists": true,
+        "customBytes": 1770
+      },
+      {
+        "path": "server/studio/templates/bond.js",
+        "baseExists": true,
+        "customBytes": 2907
+      },
+      {
+        "path": "server/studio/templates/dsl.js",
+        "baseExists": true,
+        "customBytes": 3013
+      },
+      {
+        "path": "server/studio/templates/fx.js",
+        "baseExists": true,
+        "customBytes": 3254
+      },
+      {
+        "path": "server/studio/templates/index.js",
+        "baseExists": true,
+        "customBytes": 9168
+      },
+      {
+        "path": "server/studio/templates/item.js",
+        "baseExists": true,
+        "customBytes": 3340
+      },
+      {
+        "path": "server/studio/templates/meta.js",
+        "baseExists": true,
+        "customBytes": 433
+      },
+      {
+        "path": "server/studio/templates/mode.js",
+        "baseExists": true,
+        "customBytes": 1092
+      },
+      {
+        "path": "server/studio/templates/notices.js",
+        "baseExists": true,
+        "customBytes": 333
+      },
+      {
+        "path": "server/studio/templates/numbers.js",
+        "baseExists": true,
+        "customBytes": 1720
+      },
+      {
+        "path": "server/studio/templates/offers.js",
+        "baseExists": true,
+        "customBytes": 674
+      },
+      {
+        "path": "server/studio/templates/operator.js",
+        "baseExists": true,
+        "customBytes": 2607
+      },
+      {
+        "path": "server/studio/templates/readme.js",
+        "baseExists": true,
+        "customBytes": 3702
+      },
+      {
+        "path": "server/studio/templates/rules.js",
+        "baseExists": true,
+        "customBytes": 659
+      },
+      {
+        "path": "server/studio/templates/script.js",
+        "baseExists": true,
+        "customBytes": 857
+      },
+      {
+        "path": "server/studio/templates/skins.js",
+        "baseExists": true,
+        "customBytes": 603
+      },
+      {
+        "path": "server/studio/templates/spine.js",
+        "baseExists": true,
+        "customBytes": 1344
+      },
+      {
+        "path": "server/studio/templates/theme.js",
+        "baseExists": true,
+        "customBytes": 850
+      },
+      {
+        "path": "server/studio/templates/trait.js",
+        "baseExists": true,
+        "customBytes": 1234
+      },
+      {
+        "path": "server/studio/templates/ui.js",
+        "baseExists": true,
+        "customBytes": 1016
+      },
+      {
+        "path": "server/studio/templates/voice.js",
+        "baseExists": true,
+        "customBytes": 1460
+      },
+      {
+        "path": "server/studio/trial.js",
+        "baseExists": true,
+        "customBytes": 4203
+      },
+      {
+        "path": "server/studio/trialChild.js",
+        "baseExists": true,
+        "customBytes": 7354
+      },
+      {
+        "path": "server/studio/trialDraft.js",
+        "baseExists": true,
+        "customBytes": 865
+      },
+      {
+        "path": "server/studio/trialOptions.js",
+        "baseExists": true,
+        "customBytes": 1146
+      },
+      {
+        "path": "server/studio/trialRunner.js",
+        "baseExists": true,
+        "customBytes": 5477
+      },
+      {
+        "path": "server/studio/trialScenario.js",
+        "baseExists": true,
+        "customBytes": 3802
+      },
+      {
+        "path": "server/studio/watch.js",
+        "baseExists": true,
+        "customBytes": 6786
+      },
+      {
+        "path": "server/testMode.js",
+        "baseExists": true,
+        "customBytes": 5491
+      },
+      {
+        "path": "server/update.js",
+        "baseExists": true,
+        "customBytes": 20221
+      },
+      {
+        "path": "server/versions.js",
+        "baseExists": false,
+        "customBytes": 14163
+      },
+      {
+        "path": "server/workers/memory.js",
+        "baseExists": false,
+        "customBytes": 300
+      },
+      {
+        "path": "server/workers/pool.js",
+        "baseExists": false,
+        "customBytes": 10298
+      },
+      {
+        "path": "server/workers/roomPool.js",
+        "baseExists": false,
+        "customBytes": 2993
+      },
+      {
+        "path": "server/workers/simulation.js",
+        "baseExists": false,
+        "customBytes": 2550
+      }
+    ]
+  },
+  {
+    "id": "game-core-shared",
+    "name": "前后端共享常量与规则",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "shared/assetPaths.js",
+        "baseExists": true,
+        "customBytes": 5033
+      },
+      {
+        "path": "shared/bandBonds.js",
+        "baseExists": true,
+        "customBytes": 2863
+      },
+      {
+        "path": "shared/bondTimers.js",
+        "baseExists": false,
+        "customBytes": 1030
+      },
+      {
+        "path": "shared/constants.js",
+        "baseExists": true,
+        "customBytes": 23235
+      },
+      {
+        "path": "shared/diy.js",
+        "baseExists": true,
+        "customBytes": 17264
+      },
+      {
+        "path": "shared/experimental.js",
+        "baseExists": true,
+        "customBytes": 5860
+      },
+      {
+        "path": "shared/highGround.js",
+        "baseExists": true,
+        "customBytes": 2885
+      },
+      {
+        "path": "shared/i18n.js",
+        "baseExists": true,
+        "customBytes": 25349
+      },
+      {
+        "path": "shared/i18nData.js",
+        "baseExists": true,
+        "customBytes": 8564
+      },
+      {
+        "path": "shared/i18nPacks.js",
+        "baseExists": true,
+        "customBytes": 8935
+      },
+      {
+        "path": "shared/loadoutRecord.js",
+        "baseExists": true,
+        "customBytes": 13458
+      },
+      {
+        "path": "shared/media.js",
+        "baseExists": true,
+        "customBytes": 1572
+      },
+      {
+        "path": "shared/packs.js",
+        "baseExists": true,
+        "customBytes": 9196
+      },
+      {
+        "path": "shared/playerCapacity.js",
+        "baseExists": true,
+        "customBytes": 877
+      },
+      {
+        "path": "shared/plugins/catalog.js",
+        "baseExists": true,
+        "customBytes": 12582
+      },
+      {
+        "path": "shared/plugins/dataUtils.js",
+        "baseExists": true,
+        "customBytes": 3886
+      },
+      {
+        "path": "shared/plugins/errors.js",
+        "baseExists": true,
+        "customBytes": 103970
+      },
+      {
+        "path": "shared/plugins/forgePanel.js",
+        "baseExists": true,
+        "customBytes": 14794
+      },
+      {
+        "path": "shared/plugins/identity.js",
+        "baseExists": true,
+        "customBytes": 7276
+      },
+      {
+        "path": "shared/plugins/limits.js",
+        "baseExists": true,
+        "customBytes": 3842
+      },
+      {
+        "path": "shared/plugins/manifest.js",
+        "baseExists": true,
+        "customBytes": 63982
+      },
+      {
+        "path": "shared/plugins/notices.js",
+        "baseExists": true,
+        "customBytes": 14446
+      },
+      {
+        "path": "shared/plugins/offers.js",
+        "baseExists": true,
+        "customBytes": 16680
+      },
+      {
+        "path": "shared/plugins/officialBounds.js",
+        "baseExists": true,
+        "customBytes": 15549
+      },
+      {
+        "path": "shared/plugins/order.js",
+        "baseExists": true,
+        "customBytes": 5023
+      },
+      {
+        "path": "shared/plugins/patch.js",
+        "baseExists": true,
+        "customBytes": 6985
+      },
+      {
+        "path": "shared/plugins/records.js",
+        "baseExists": true,
+        "customBytes": 18327
+      },
+      {
+        "path": "shared/plugins/recordsSchema.js",
+        "baseExists": true,
+        "customBytes": 4179
+      },
+      {
+        "path": "shared/plugins/rules.js",
+        "baseExists": true,
+        "customBytes": 13505
+      },
+      {
+        "path": "shared/plugins/sandbox.js",
+        "baseExists": true,
+        "customBytes": 12548
+      },
+      {
+        "path": "shared/plugins/scriptCheck.js",
+        "baseExists": true,
+        "customBytes": 3314
+      },
+      {
+        "path": "shared/plugins/scriptLoad.js",
+        "baseExists": true,
+        "customBytes": 6104
+      },
+      {
+        "path": "shared/plugins/sdk.js",
+        "baseExists": true,
+        "customBytes": 4641
+      },
+      {
+        "path": "shared/plugins/skillSpec.js",
+        "baseExists": true,
+        "customBytes": 5374
+      },
+      {
+        "path": "shared/plugins/steps.js",
+        "baseExists": true,
+        "customBytes": 2168
+      },
+      {
+        "path": "shared/plugins/surface.js",
+        "baseExists": true,
+        "customBytes": 11747
+      },
+      {
+        "path": "shared/plugins/textNumber.js",
+        "baseExists": true,
+        "customBytes": 3152
+      },
+      {
+        "path": "shared/plugins/textPatterns.js",
+        "baseExists": true,
+        "customBytes": 1185
+      },
+      {
+        "path": "shared/plugins/theme.js",
+        "baseExists": true,
+        "customBytes": 11775
+      },
+      {
+        "path": "shared/plugins/ui.js",
+        "baseExists": true,
+        "customBytes": 32816
+      },
+      {
+        "path": "shared/plugins/validate.js",
+        "baseExists": true,
+        "customBytes": 24966
+      },
+      {
+        "path": "shared/plugins/visual.js",
+        "baseExists": true,
+        "customBytes": 60522
+      },
+      {
+        "path": "shared/potential.js",
+        "baseExists": true,
+        "customBytes": 11897
+      },
+      {
+        "path": "shared/protocol.js",
+        "baseExists": true,
+        "customBytes": 52571
+      },
+      {
+        "path": "shared/sha256.js",
+        "baseExists": true,
+        "customBytes": 7930
+      },
+      {
+        "path": "shared/standIn.js",
+        "baseExists": true,
+        "customBytes": 9764
+      },
+      {
+        "path": "shared/stateDelta.js",
+        "baseExists": true,
+        "customBytes": 4958
+      },
+      {
+        "path": "shared/studio/scenario.js",
+        "baseExists": true,
+        "customBytes": 9138
+      },
+      {
+        "path": "shared/summonPlacement.js",
+        "baseExists": true,
+        "customBytes": 685
+      },
+      {
+        "path": "shared/testMode.js",
+        "baseExists": true,
+        "customBytes": 9361
+      },
+      {
+        "path": "shared/versions.js",
+        "baseExists": false,
+        "customBytes": 4132
+      }
+    ]
+  },
+  {
+    "id": "admin-ui-shared",
+    "name": "管理后台共享样式（房间标签）",
+    "status": "custom-outside-upstream",
+    "files": [
+      {
+        "path": "shared/admin-ui/room-tags.css",
+        "baseExists": false,
+        "customBytes": 3302
+      }
+    ]
+  },
+  {
+    "id": "client-result-node-hint",
+    "name": "结算页显示所在节点（方便玩家报障）",
+    "status": "custom-outside-upstream",
+    "files": [
+      {
+        "path": "public/css/screens/result.css",
+        "baseExists": true,
+        "customBytes": 8520
+      },
+      {
+        "path": "public/js/ui/nodeCodeHint.js",
+        "baseExists": false,
+        "customBytes": 5516
+      }
+    ]
+  },
+  {
+    "id": "client-i18n",
+    "name": "界面多语言包与 PWA 清单",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "public/i18n/en.json",
+        "baseExists": true,
+        "customBytes": 176956
+      },
+      {
+        "path": "public/i18n/ja.json",
+        "baseExists": true,
+        "customBytes": 206575
+      },
+      {
+        "path": "public/i18n/ko.json",
+        "baseExists": true,
+        "customBytes": 197822
+      },
+      {
+        "path": "public/i18n/zh-TW.json",
+        "baseExists": true,
+        "customBytes": 168854
+      },
+      {
+        "path": "public/manifest.json",
+        "baseExists": true,
+        "customBytes": 776
+      }
+    ]
+  },
+  {
+    "id": "game-core-client-core",
+    "name": "客户端核心（启动、连接、资源、音频、状态存储）",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "public/js/assetCache.js",
+        "baseExists": true,
+        "customBytes": 12330
+      },
+      {
+        "path": "public/js/assetDownload.js",
+        "baseExists": true,
+        "customBytes": 17691
+      },
+      {
+        "path": "public/js/assetPack.js",
+        "baseExists": true,
+        "customBytes": 34576
+      },
+      {
+        "path": "public/js/assets.js",
+        "baseExists": true,
+        "customBytes": 62946
+      },
+      {
+        "path": "public/js/audio.js",
+        "baseExists": true,
+        "customBytes": 100284
+      },
+      {
+        "path": "public/js/boot.js",
+        "baseExists": true,
+        "customBytes": 4913
+      },
+      {
+        "path": "public/js/bootLegacy.js",
+        "baseExists": true,
+        "customBytes": 51
+      },
+      {
+        "path": "public/js/content.js",
+        "baseExists": true,
+        "customBytes": 50584
+      },
+      {
+        "path": "public/js/cosmetics.js",
+        "baseExists": true,
+        "customBytes": 9637
+      },
+      {
+        "path": "public/js/data.js",
+        "baseExists": true,
+        "customBytes": 32427
+      },
+      {
+        "path": "public/js/diag.js",
+        "baseExists": true,
+        "customBytes": 22167
+      },
+      {
+        "path": "public/js/main.js",
+        "baseExists": true,
+        "customBytes": 41347
+      },
+      {
+        "path": "public/js/media.js",
+        "baseExists": true,
+        "customBytes": 4291
+      },
+      {
+        "path": "public/js/net.js",
+        "baseExists": true,
+        "customBytes": 47543
+      },
+      {
+        "path": "public/js/pwa.js",
+        "baseExists": true,
+        "customBytes": 1874
+      },
+      {
+        "path": "public/js/store.js",
+        "baseExists": true,
+        "customBytes": 10776
+      },
+      {
+        "path": "public/js/themeVars.js",
+        "baseExists": true,
+        "customBytes": 1457
+      },
+      {
+        "path": "public/js/versions.js",
+        "baseExists": false,
+        "customBytes": 11697
+      },
+      {
+        "path": "public/js/voicePrefs.js",
+        "baseExists": true,
+        "customBytes": 2757
+      },
+      {
+        "path": "public/js/webFonts.js",
+        "baseExists": true,
+        "customBytes": 279
+      }
+    ]
+  },
+  {
+    "id": "game-core-client-ui",
+    "name": "客户端 UI 组件（选策略头部、HUD、选择弹层、皮肤、设置等）",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "public/js/ui/abilityLines.js",
+        "baseExists": true,
+        "customBytes": 789
+      },
+      {
+        "path": "public/js/ui/accountObserver.js",
+        "baseExists": false,
+        "customBytes": 19923
+      },
+      {
+        "path": "public/js/ui/adminGate.js",
+        "baseExists": false,
+        "customBytes": 2422
+      },
+      {
+        "path": "public/js/ui/adminTools.js",
+        "baseExists": false,
+        "customBytes": 32202
+      },
+      {
+        "path": "public/js/ui/aiTakeover.js",
+        "baseExists": false,
+        "customBytes": 2828
+      },
+      {
+        "path": "public/js/ui/allyArt.js",
+        "baseExists": false,
+        "customBytes": 4720
+      },
+      {
+        "path": "public/js/ui/assetDownload.js",
+        "baseExists": true,
+        "customBytes": 8184
+      },
+      {
+        "path": "public/js/ui/assetImport.js",
+        "baseExists": true,
+        "customBytes": 11796
+      },
+      {
+        "path": "public/js/ui/assetUrls.js",
+        "baseExists": true,
+        "customBytes": 9868
+      },
+      {
+        "path": "public/js/ui/bondStrip.js",
+        "baseExists": true,
+        "customBytes": 18358
+      },
+      {
+        "path": "public/js/ui/bondTimers.js",
+        "baseExists": false,
+        "customBytes": 1458
+      },
+      {
+        "path": "public/js/ui/bossPlates.js",
+        "baseExists": true,
+        "customBytes": 14899
+      },
+      {
+        "path": "public/js/ui/buildGuard.js",
+        "baseExists": true,
+        "customBytes": 14009
+      },
+      {
+        "path": "public/js/ui/choiceOverlay.js",
+        "baseExists": true,
+        "customBytes": 19150
+      },
+      {
+        "path": "public/js/ui/clipboard.js",
+        "baseExists": true,
+        "customBytes": 1432
+      },
+      {
+        "path": "public/js/ui/combatHud.js",
+        "baseExists": true,
+        "customBytes": 6837
+      },
+      {
+        "path": "public/js/ui/combatMetrics.js",
+        "baseExists": true,
+        "customBytes": 6915
+      },
+      {
+        "path": "public/js/ui/combatMetricsLayout.js",
+        "baseExists": true,
+        "customBytes": 837
+      },
+      {
+        "path": "public/js/ui/compat.js",
+        "baseExists": true,
+        "customBytes": 4252
+      },
+      {
+        "path": "public/js/ui/components.js",
+        "baseExists": true,
+        "customBytes": 57190
+      },
+      {
+        "path": "public/js/ui/connBanner.js",
+        "baseExists": true,
+        "customBytes": 8602
+      },
+      {
+        "path": "public/js/ui/danmaku.js",
+        "baseExists": true,
+        "customBytes": 7040
+      },
+      {
+        "path": "public/js/ui/detailPanel.js",
+        "baseExists": true,
+        "customBytes": 68991
+      },
+      {
+        "path": "public/js/ui/device.js",
+        "baseExists": true,
+        "customBytes": 18889
+      },
+      {
+        "path": "public/js/ui/diyModel.js",
+        "baseExists": true,
+        "customBytes": 11773
+      },
+      {
+        "path": "public/js/ui/downedPlate.js",
+        "baseExists": true,
+        "customBytes": 5812
+      },
+      {
+        "path": "public/js/ui/effectsList.js",
+        "baseExists": true,
+        "customBytes": 3151
+      },
+      {
+        "path": "public/js/ui/emotes.js",
+        "baseExists": true,
+        "customBytes": 17480
+      },
+      {
+        "path": "public/js/ui/enemyDrawer.js",
+        "baseExists": true,
+        "customBytes": 7990
+      },
+      {
+        "path": "public/js/ui/equipReplace.js",
+        "baseExists": true,
+        "customBytes": 9722
+      },
+      {
+        "path": "public/js/ui/facing.js",
+        "baseExists": true,
+        "customBytes": 12627
+      },
+      {
+        "path": "public/js/ui/facingWheel.js",
+        "baseExists": true,
+        "customBytes": 20860
+      },
+      {
+        "path": "public/js/ui/fallbackField.js",
+        "baseExists": true,
+        "customBytes": 32291
+      },
+      {
+        "path": "public/js/ui/fieldHost.js",
+        "baseExists": true,
+        "customBytes": 20179
+      },
+      {
+        "path": "public/js/ui/gameActions.js",
+        "baseExists": true,
+        "customBytes": 6181
+      },
+      {
+        "path": "public/js/ui/gameComponents.js",
+        "baseExists": true,
+        "customBytes": 19090
+      },
+      {
+        "path": "public/js/ui/gameLogic/bonds.js",
+        "baseExists": true,
+        "customBytes": 21949
+      },
+      {
+        "path": "public/js/ui/gameLogic/camera.js",
+        "baseExists": true,
+        "customBytes": 12009
+      },
+      {
+        "path": "public/js/ui/gameLogic/diy.js",
+        "baseExists": true,
+        "customBytes": 6666
+      },
+      {
+        "path": "public/js/ui/gameLogic/draft.js",
+        "baseExists": true,
+        "customBytes": 6115
+      },
+      {
+        "path": "public/js/ui/gameLogic/enemies.js",
+        "baseExists": true,
+        "customBytes": 5252
+      },
+      {
+        "path": "public/js/ui/gameLogic/format.js",
+        "baseExists": true,
+        "customBytes": 5248
+      },
+      {
+        "path": "public/js/ui/gameLogic/loadout.js",
+        "baseExists": true,
+        "customBytes": 7570
+      },
+      {
+        "path": "public/js/ui/gameLogic/panel.js",
+        "baseExists": true,
+        "customBytes": 4968
+      },
+      {
+        "path": "public/js/ui/gameLogic/phases.js",
+        "baseExists": true,
+        "customBytes": 17090
+      },
+      {
+        "path": "public/js/ui/gameLogic/placement.js",
+        "baseExists": true,
+        "customBytes": 29873
+      },
+      {
+        "path": "public/js/ui/gameLogic/result.js",
+        "baseExists": true,
+        "customBytes": 3340
+      },
+      {
+        "path": "public/js/ui/gameLogic/settings.js",
+        "baseExists": true,
+        "customBytes": 6871
+      },
+      {
+        "path": "public/js/ui/gameLogic/shared.js",
+        "baseExists": true,
+        "customBytes": 728
+      },
+      {
+        "path": "public/js/ui/gameLogic/shop.js",
+        "baseExists": true,
+        "customBytes": 12078
+      },
+      {
+        "path": "public/js/ui/gameLogic/shortcuts.js",
+        "baseExists": true,
+        "customBytes": 12617
+      },
+      {
+        "path": "public/js/ui/gameLogic/standIn.js",
+        "baseExists": true,
+        "customBytes": 8517
+      },
+      {
+        "path": "public/js/ui/gameLogic/terrain.js",
+        "baseExists": true,
+        "customBytes": 19958
+      },
+      {
+        "path": "public/js/ui/gameLogic/watch.js",
+        "baseExists": true,
+        "customBytes": 5255
+      },
+      {
+        "path": "public/js/ui/gameLogic.js",
+        "baseExists": true,
+        "customBytes": 5570
+      },
+      {
+        "path": "public/js/ui/guide.js",
+        "baseExists": true,
+        "customBytes": 11854
+      },
+      {
+        "path": "public/js/ui/hubScene.js",
+        "baseExists": false,
+        "customBytes": 7725
+      },
+      {
+        "path": "public/js/ui/hud.js",
+        "baseExists": true,
+        "customBytes": 45852
+      },
+      {
+        "path": "public/js/ui/lang.js",
+        "baseExists": true,
+        "customBytes": 17815
+      },
+      {
+        "path": "public/js/ui/loadoutModel.js",
+        "baseExists": true,
+        "customBytes": 33447
+      },
+      {
+        "path": "public/js/ui/loadoutStats.js",
+        "baseExists": true,
+        "customBytes": 4809
+      },
+      {
+        "path": "public/js/ui/loadoutSync.js",
+        "baseExists": true,
+        "customBytes": 45551
+      },
+      {
+        "path": "public/js/ui/lobbyMedia.js",
+        "baseExists": false,
+        "customBytes": 28506
+      },
+      {
+        "path": "public/js/ui/matchChrome.js",
+        "baseExists": true,
+        "customBytes": 12296
+      },
+      {
+        "path": "public/js/ui/matchEnemies.js",
+        "baseExists": false,
+        "customBytes": 6794
+      },
+      {
+        "path": "public/js/ui/matchInfo.js",
+        "baseExists": true,
+        "customBytes": 10855
+      },
+      {
+        "path": "public/js/ui/matchPopups.js",
+        "baseExists": true,
+        "customBytes": 11101
+      },
+      {
+        "path": "public/js/ui/matchStatus.js",
+        "baseExists": true,
+        "customBytes": 7404
+      },
+      {
+        "path": "public/js/ui/nodeCodeHint.js",
+        "baseExists": false,
+        "customBytes": 5516
+      },
+      {
+        "path": "public/js/ui/notices.js",
+        "baseExists": true,
+        "customBytes": 2301
+      },
+      {
+        "path": "public/js/ui/numberInput.js",
+        "baseExists": true,
+        "customBytes": 1353
+      },
+      {
+        "path": "public/js/ui/offerOverlay.js",
+        "baseExists": true,
+        "customBytes": 6827
+      },
+      {
+        "path": "public/js/ui/operatorVoice.js",
+        "baseExists": true,
+        "customBytes": 3799
+      },
+      {
+        "path": "public/js/ui/ownershipModel.js",
+        "baseExists": true,
+        "customBytes": 11009
+      },
+      {
+        "path": "public/js/ui/playerName.js",
+        "baseExists": true,
+        "customBytes": 1820
+      },
+      {
+        "path": "public/js/ui/pluginFrame.js",
+        "baseExists": true,
+        "customBytes": 25750
+      },
+      {
+        "path": "public/js/ui/pluginPanel.js",
+        "baseExists": true,
+        "customBytes": 20896
+      },
+      {
+        "path": "public/js/ui/pluginSettings.js",
+        "baseExists": true,
+        "customBytes": 4250
+      },
+      {
+        "path": "public/js/ui/pluginTag.js",
+        "baseExists": true,
+        "customBytes": 7375
+      },
+      {
+        "path": "public/js/ui/protocolBoot.js",
+        "baseExists": true,
+        "customBytes": 7784
+      },
+      {
+        "path": "public/js/ui/protocolScene.js",
+        "baseExists": true,
+        "customBytes": 8947
+      },
+      {
+        "path": "public/js/ui/resumeMatch.js",
+        "baseExists": true,
+        "customBytes": 10231
+      },
+      {
+        "path": "public/js/ui/revival.js",
+        "baseExists": true,
+        "customBytes": 5200
+      },
+      {
+        "path": "public/js/ui/rewardOverlay.js",
+        "baseExists": true,
+        "customBytes": 1435
+      },
+      {
+        "path": "public/js/ui/richText.js",
+        "baseExists": true,
+        "customBytes": 6718
+      },
+      {
+        "path": "public/js/ui/screenFit.js",
+        "baseExists": true,
+        "customBytes": 10961
+      },
+      {
+        "path": "public/js/ui/seatArt.js",
+        "baseExists": true,
+        "customBytes": 6652
+      },
+      {
+        "path": "public/js/ui/settings.js",
+        "baseExists": true,
+        "customBytes": 41035
+      },
+      {
+        "path": "public/js/ui/settingsStore.js",
+        "baseExists": false,
+        "customBytes": 638
+      },
+      {
+        "path": "public/js/ui/setupReroll.js",
+        "baseExists": true,
+        "customBytes": 3141
+      },
+      {
+        "path": "public/js/ui/shopBar.js",
+        "baseExists": true,
+        "customBytes": 30757
+      },
+      {
+        "path": "public/js/ui/skinIO.js",
+        "baseExists": false,
+        "customBytes": 4878
+      },
+      {
+        "path": "public/js/ui/skinPicker.js",
+        "baseExists": true,
+        "customBytes": 9167
+      },
+      {
+        "path": "public/js/ui/skins.js",
+        "baseExists": true,
+        "customBytes": 14881
+      },
+      {
+        "path": "public/js/ui/stats.js",
+        "baseExists": true,
+        "customBytes": 48512
+      },
+      {
+        "path": "public/js/ui/stickyNode.js",
+        "baseExists": false,
+        "customBytes": 5140
+      },
+      {
+        "path": "public/js/ui/teamLayout.js",
+        "baseExists": true,
+        "customBytes": 3881
+      },
+      {
+        "path": "public/js/ui/teamPanel.js",
+        "baseExists": true,
+        "customBytes": 16991
+      },
+      {
+        "path": "public/js/ui/testAudit.js",
+        "baseExists": true,
+        "customBytes": 2782
+      },
+      {
+        "path": "public/js/ui/testConsole.js",
+        "baseExists": true,
+        "customBytes": 17400
+      },
+      {
+        "path": "public/js/ui/testDock.js",
+        "baseExists": true,
+        "customBytes": 8215
+      },
+      {
+        "path": "public/js/ui/ticker.js",
+        "baseExists": true,
+        "customBytes": 6925
+      },
+      {
+        "path": "public/js/ui/titleHexagon.js",
+        "baseExists": true,
+        "customBytes": 681
+      },
+      {
+        "path": "public/js/ui/toasts.js",
+        "baseExists": true,
+        "customBytes": 7248
+      },
+      {
+        "path": "public/js/ui/transitions.js",
+        "baseExists": true,
+        "customBytes": 1468
+      },
+      {
+        "path": "public/js/ui/turnBanner.js",
+        "baseExists": true,
+        "customBytes": 4110
+      },
+      {
+        "path": "public/js/ui/turnPopup.js",
+        "baseExists": true,
+        "customBytes": 4793
+      },
+      {
+        "path": "public/js/ui/uiPlugins.js",
+        "baseExists": true,
+        "customBytes": 4518
+      },
+      {
+        "path": "public/js/ui/underframe.js",
+        "baseExists": true,
+        "customBytes": 12162
+      },
+      {
+        "path": "public/js/ui/versionPicker.js",
+        "baseExists": false,
+        "customBytes": 7455
+      },
+      {
+        "path": "public/js/ui/versionVote.js",
+        "baseExists": false,
+        "customBytes": 9774
+      },
+      {
+        "path": "public/js/ui/watchBonds.js",
+        "baseExists": true,
+        "customBytes": 17667
+      }
+    ]
+  },
+  {
+    "id": "game-core-client-screens",
+    "name": "客户端界面（标题、选策略、对局、结算、培养）",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "public/js/screens/bandDraft.js",
+        "baseExists": true,
+        "customBytes": 39203
+      },
+      {
+        "path": "public/js/screens/briefing.js",
+        "baseExists": true,
+        "customBytes": 5563
+      },
+      {
+        "path": "public/js/screens/cultivation.js",
+        "baseExists": true,
+        "customBytes": 8486
+      },
+      {
+        "path": "public/js/screens/diy.js",
+        "baseExists": true,
+        "customBytes": 32687
+      },
+      {
+        "path": "public/js/screens/game/early.js",
+        "baseExists": true,
+        "customBytes": 1270
+      },
+      {
+        "path": "public/js/screens/game/marks.js",
+        "baseExists": true,
+        "customBytes": 672
+      },
+      {
+        "path": "public/js/screens/game/overlays.js",
+        "baseExists": true,
+        "customBytes": 1942
+      },
+      {
+        "path": "public/js/screens/game/range.js",
+        "baseExists": true,
+        "customBytes": 2593
+      },
+      {
+        "path": "public/js/screens/game/standInTags.js",
+        "baseExists": true,
+        "customBytes": 4935
+      },
+      {
+        "path": "public/js/screens/game.js",
+        "baseExists": true,
+        "customBytes": 136779
+      },
+      {
+        "path": "public/js/screens/loadout.js",
+        "baseExists": true,
+        "customBytes": 85945
+      },
+      {
+        "path": "public/js/screens/loadoutSections.js",
+        "baseExists": false,
+        "customBytes": 14916
+      },
+      {
+        "path": "public/js/screens/lobby.js",
+        "baseExists": true,
+        "customBytes": 59627
+      },
+      {
+        "path": "public/js/screens/ownership.js",
+        "baseExists": true,
+        "customBytes": 5832
+      },
+      {
+        "path": "public/js/screens/result.js",
+        "baseExists": true,
+        "customBytes": 13968
+      },
+      {
+        "path": "public/js/screens/room.js",
+        "baseExists": true,
+        "customBytes": 77692
+      },
+      {
+        "path": "public/js/screens/settle.js",
+        "baseExists": true,
+        "customBytes": 42429
+      },
+      {
+        "path": "public/js/screens/stats.js",
+        "baseExists": true,
+        "customBytes": 51310
+      },
+      {
+        "path": "public/js/screens/sweep.js",
+        "baseExists": true,
+        "customBytes": 28997
+      },
+      {
+        "path": "public/js/screens/title.js",
+        "baseExists": false,
+        "customBytes": 18167
+      }
+    ]
+  },
+  {
+    "id": "game-core-client-render",
+    "name": "客户端渲染（棋盘、特效、投影、3D 场景）",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "public/js/render/app/host.js",
+        "baseExists": true,
+        "customBytes": 5532
+      },
+      {
+        "path": "public/js/render/app/info.js",
+        "baseExists": true,
+        "customBytes": 5596
+      },
+      {
+        "path": "public/js/render/app/pick.js",
+        "baseExists": true,
+        "customBytes": 1778
+      },
+      {
+        "path": "public/js/render/app/pixi.js",
+        "baseExists": true,
+        "customBytes": 1237
+      },
+      {
+        "path": "public/js/render/app/pixiNoEval.js",
+        "baseExists": true,
+        "customBytes": 7188
+      },
+      {
+        "path": "public/js/render/app/playback.js",
+        "baseExists": true,
+        "customBytes": 351
+      },
+      {
+        "path": "public/js/render/app/tune.js",
+        "baseExists": true,
+        "customBytes": 2629
+      },
+      {
+        "path": "public/js/render/app/view.js",
+        "baseExists": true,
+        "customBytes": 8225
+      },
+      {
+        "path": "public/js/render/app/windup.js",
+        "baseExists": false,
+        "customBytes": 3121
+      },
+      {
+        "path": "public/js/render/app.js",
+        "baseExists": true,
+        "customBytes": 140143
+      },
+      {
+        "path": "public/js/render/attackRate.js",
+        "baseExists": false,
+        "customBytes": 5862
+      },
+      {
+        "path": "public/js/render/battlePresentation.js",
+        "baseExists": false,
+        "customBytes": 890
+      },
+      {
+        "path": "public/js/render/board3d/atlas.js",
+        "baseExists": true,
+        "customBytes": 6980
+      },
+      {
+        "path": "public/js/render/board3d/layout.js",
+        "baseExists": true,
+        "customBytes": 34010
+      },
+      {
+        "path": "public/js/render/board3d/load.js",
+        "baseExists": true,
+        "customBytes": 18747
+      },
+      {
+        "path": "public/js/render/board3d/materials.js",
+        "baseExists": true,
+        "customBytes": 48411
+      },
+      {
+        "path": "public/js/render/board3d/obj.js",
+        "baseExists": true,
+        "customBytes": 4619
+      },
+      {
+        "path": "public/js/render/board3d/scene.js",
+        "baseExists": true,
+        "customBytes": 44660
+      },
+      {
+        "path": "public/js/render/boardArt.js",
+        "baseExists": true,
+        "customBytes": 3561
+      },
+      {
+        "path": "public/js/render/drag.js",
+        "baseExists": true,
+        "customBytes": 14177
+      },
+      {
+        "path": "public/js/render/fx/arrivals.js",
+        "baseExists": true,
+        "customBytes": 5880
+      },
+      {
+        "path": "public/js/render/fx/beams.js",
+        "baseExists": true,
+        "customBytes": 8868
+      },
+      {
+        "path": "public/js/render/fx/camera.js",
+        "baseExists": true,
+        "customBytes": 1661
+      },
+      {
+        "path": "public/js/render/fx/fonts.js",
+        "baseExists": true,
+        "customBytes": 1005
+      },
+      {
+        "path": "public/js/render/fx/kinds.js",
+        "baseExists": true,
+        "customBytes": 12878
+      },
+      {
+        "path": "public/js/render/fx/limits.js",
+        "baseExists": true,
+        "customBytes": 395
+      },
+      {
+        "path": "public/js/render/fx/locks.js",
+        "baseExists": true,
+        "customBytes": 4867
+      },
+      {
+        "path": "public/js/render/fx/numbers.js",
+        "baseExists": true,
+        "customBytes": 19519
+      },
+      {
+        "path": "public/js/render/fx/particles.js",
+        "baseExists": true,
+        "customBytes": 6391
+      },
+      {
+        "path": "public/js/render/fx/projectiles.js",
+        "baseExists": true,
+        "customBytes": 22438
+      },
+      {
+        "path": "public/js/render/fx/rings.js",
+        "baseExists": true,
+        "customBytes": 6294
+      },
+      {
+        "path": "public/js/render/fx/simfx.js",
+        "baseExists": true,
+        "customBytes": 20119
+      },
+      {
+        "path": "public/js/render/fx/speeds.js",
+        "baseExists": true,
+        "customBytes": 1963
+      },
+      {
+        "path": "public/js/render/fx/system.js",
+        "baseExists": true,
+        "customBytes": 8541
+      },
+      {
+        "path": "public/js/render/fx/zones.js",
+        "baseExists": true,
+        "customBytes": 12654
+      },
+      {
+        "path": "public/js/render/fx.js",
+        "baseExists": true,
+        "customBytes": 4386
+      },
+      {
+        "path": "public/js/render/impostor.js",
+        "baseExists": true,
+        "customBytes": 10140
+      },
+      {
+        "path": "public/js/render/interp.js",
+        "baseExists": true,
+        "customBytes": 27052
+      },
+      {
+        "path": "public/js/render/manifold.js",
+        "baseExists": true,
+        "customBytes": 999
+      },
+      {
+        "path": "public/js/render/motes.js",
+        "baseExists": false,
+        "customBytes": 7265
+      },
+      {
+        "path": "public/js/render/pen.js",
+        "baseExists": true,
+        "customBytes": 11634
+      },
+      {
+        "path": "public/js/render/pick.js",
+        "baseExists": true,
+        "customBytes": 8751
+      },
+      {
+        "path": "public/js/render/prepfield.js",
+        "baseExists": true,
+        "customBytes": 5487
+      },
+      {
+        "path": "public/js/render/projection.js",
+        "baseExists": true,
+        "customBytes": 28496
+      },
+      {
+        "path": "public/js/render/promote.js",
+        "baseExists": true,
+        "customBytes": 2119
+      },
+      {
+        "path": "public/js/render/skillAttack.js",
+        "baseExists": true,
+        "customBytes": 4449
+      },
+      {
+        "path": "public/js/render/spine.js",
+        "baseExists": true,
+        "customBytes": 64029
+      },
+      {
+        "path": "public/js/render/style.js",
+        "baseExists": true,
+        "customBytes": 12353
+      },
+      {
+        "path": "public/js/render/textures.js",
+        "baseExists": true,
+        "customBytes": 78457
+      },
+      {
+        "path": "public/js/render/tiles.js",
+        "baseExists": true,
+        "customBytes": 53686
+      },
+      {
+        "path": "public/js/render/units.js",
+        "baseExists": true,
+        "customBytes": 168380
+      },
+      {
+        "path": "public/js/render/vfx/available.js",
+        "baseExists": true,
+        "customBytes": 1725
+      },
+      {
+        "path": "public/js/render/vfx/clips.js",
+        "baseExists": true,
+        "customBytes": 6391
+      },
+      {
+        "path": "public/js/render/vfx/curves.js",
+        "baseExists": true,
+        "customBytes": 11107
+      },
+      {
+        "path": "public/js/render/vfx/effect.js",
+        "baseExists": true,
+        "customBytes": 56266
+      },
+      {
+        "path": "public/js/render/vfx/flight.js",
+        "baseExists": true,
+        "customBytes": 7872
+      },
+      {
+        "path": "public/js/render/vfx/funnelfx.js",
+        "baseExists": true,
+        "customBytes": 38120
+      },
+      {
+        "path": "public/js/render/vfx/funnels.js",
+        "baseExists": true,
+        "customBytes": 16359
+      },
+      {
+        "path": "public/js/render/vfx/geom.js",
+        "baseExists": true,
+        "customBytes": 35493
+      },
+      {
+        "path": "public/js/render/vfx/gl.js",
+        "baseExists": true,
+        "customBytes": 23698
+      },
+      {
+        "path": "public/js/render/vfx/glsl.js",
+        "baseExists": true,
+        "customBytes": 21721
+      },
+      {
+        "path": "public/js/render/vfx/library.js",
+        "baseExists": true,
+        "customBytes": 17597
+      },
+      {
+        "path": "public/js/render/vfx/materials.js",
+        "baseExists": true,
+        "customBytes": 10064
+      },
+      {
+        "path": "public/js/render/vfx/math.js",
+        "baseExists": true,
+        "customBytes": 9025
+      },
+      {
+        "path": "public/js/render/vfx/mounts.js",
+        "baseExists": true,
+        "customBytes": 14569
+      },
+      {
+        "path": "public/js/render/vfx/pluginFormat.js",
+        "baseExists": true,
+        "customBytes": 4710
+      },
+      {
+        "path": "public/js/render/vfx/pluginLibrary.js",
+        "baseExists": true,
+        "customBytes": 4816
+      },
+      {
+        "path": "public/js/render/vfx/pluginPlayer.js",
+        "baseExists": true,
+        "customBytes": 7168
+      },
+      {
+        "path": "public/js/render/vfx/pluginValidate.js",
+        "baseExists": true,
+        "customBytes": 8929
+      },
+      {
+        "path": "public/js/render/vfx/psys.js",
+        "baseExists": true,
+        "customBytes": 46267
+      },
+      {
+        "path": "public/js/render/vfx/rng.js",
+        "baseExists": true,
+        "customBytes": 2026
+      },
+      {
+        "path": "public/js/render/vfx/shapes.js",
+        "baseExists": true,
+        "customBytes": 14509
+      },
+      {
+        "path": "public/js/render/vfx/skillfx.js",
+        "baseExists": true,
+        "customBytes": 79978
+      },
+      {
+        "path": "public/js/render/vfx/skills.js",
+        "baseExists": true,
+        "customBytes": 117040
+      },
+      {
+        "path": "public/js/render/vfx/system.js",
+        "baseExists": true,
+        "customBytes": 22799
+      },
+      {
+        "path": "public/js/render/vfx/talentfx.js",
+        "baseExists": true,
+        "customBytes": 19980
+      },
+      {
+        "path": "public/js/render/vfx/talents.js",
+        "baseExists": true,
+        "customBytes": 15921
+      },
+      {
+        "path": "public/js/render/vfx/tier.js",
+        "baseExists": true,
+        "customBytes": 1053
+      },
+      {
+        "path": "public/js/render/vfx/wiring.js",
+        "baseExists": true,
+        "customBytes": 92636
+      },
+      {
+        "path": "public/js/render/vfx/yuwall.js",
+        "baseExists": true,
+        "customBytes": 4920
+      }
+    ]
+  },
+  {
+    "id": "game-core-client-style",
+    "name": "客户端样式",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "public/css/components.css",
+        "baseExists": true,
+        "customBytes": 65365
+      },
+      {
+        "path": "public/css/devices.css",
+        "baseExists": true,
+        "customBytes": 14796
+      },
+      {
+        "path": "public/css/emotes.css",
+        "baseExists": true,
+        "customBytes": 10107
+      },
+      {
+        "path": "public/css/screens/boss-plates.css",
+        "baseExists": true,
+        "customBytes": 14456
+      },
+      {
+        "path": "public/css/screens/briefing.css",
+        "baseExists": true,
+        "customBytes": 24107
+      },
+      {
+        "path": "public/css/screens/draft.css",
+        "baseExists": true,
+        "customBytes": 39127
+      },
+      {
+        "path": "public/css/screens/game-panels.css",
+        "baseExists": true,
+        "customBytes": 72660
+      },
+      {
+        "path": "public/css/screens/game-shop.css",
+        "baseExists": true,
+        "customBytes": 21447
+      },
+      {
+        "path": "public/css/screens/game.css",
+        "baseExists": true,
+        "customBytes": 120394
+      },
+      {
+        "path": "public/css/screens/guide.css",
+        "baseExists": true,
+        "customBytes": 6938
+      },
+      {
+        "path": "public/css/screens/loadout.css",
+        "baseExists": true,
+        "customBytes": 85986
+      },
+      {
+        "path": "public/css/screens/lobby.css",
+        "baseExists": true,
+        "customBytes": 78730
+      },
+      {
+        "path": "public/css/screens/match-popups.css",
+        "baseExists": true,
+        "customBytes": 12897
+      },
+      {
+        "path": "public/css/screens/protocol-boot.css",
+        "baseExists": true,
+        "customBytes": 14789
+      },
+      {
+        "path": "public/css/screens/result.css",
+        "baseExists": true,
+        "customBytes": 8520
+      },
+      {
+        "path": "public/css/screens/room.css",
+        "baseExists": true,
+        "customBytes": 67377
+      },
+      {
+        "path": "public/css/screens/settle.css",
+        "baseExists": true,
+        "customBytes": 40811
+      },
+      {
+        "path": "public/css/screens/stats.css",
+        "baseExists": true,
+        "customBytes": 38915
+      },
+      {
+        "path": "public/css/screens/sweep.css",
+        "baseExists": true,
+        "customBytes": 27360
+      },
+      {
+        "path": "public/css/screens/title.css",
+        "baseExists": false,
+        "customBytes": 16713
+      },
+      {
+        "path": "public/css/theme.css",
+        "baseExists": true,
+        "customBytes": 16145
+      }
+    ]
+  },
+  {
+    "id": "game-core-data",
+    "name": "本服数据与开关（建房限制、房间 TTL、本地特效）",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "data/assets.json",
+        "baseExists": true,
+        "customBytes": 3676754
+      },
+      {
+        "path": "data/backups.json",
+        "baseExists": true,
+        "customBytes": 2056578
+      },
+      {
+        "path": "data/bands.json",
+        "baseExists": true,
+        "customBytes": 35918
+      },
+      {
+        "path": "data/bonds.json",
+        "baseExists": true,
+        "customBytes": 85693
+      },
+      {
+        "path": "data/bosses.json",
+        "baseExists": true,
+        "customBytes": 18057
+      },
+      {
+        "path": "data/chess.json",
+        "baseExists": true,
+        "customBytes": 1876337
+      },
+      {
+        "path": "data/choices.json",
+        "baseExists": true,
+        "customBytes": 124495
+      },
+      {
+        "path": "data/config.json",
+        "baseExists": true,
+        "customBytes": 113163
+      },
+      {
+        "path": "data/create-room.json",
+        "baseExists": false,
+        "customBytes": 16
+      },
+      {
+        "path": "data/effects.json",
+        "baseExists": true,
+        "customBytes": 253427
+      },
+      {
+        "path": "data/emotes.json",
+        "baseExists": true,
+        "customBytes": 9746
+      },
+      {
+        "path": "data/enemies.json",
+        "baseExists": true,
+        "customBytes": 407255
+      },
+      {
+        "path": "data/factions.json",
+        "baseExists": true,
+        "customBytes": 23739
+      },
+      {
+        "path": "data/garrisons.json",
+        "baseExists": true,
+        "customBytes": 150039
+      },
+      {
+        "path": "data/i18n/en.json",
+        "baseExists": true,
+        "customBytes": 2494535
+      },
+      {
+        "path": "data/i18n/ja.json",
+        "baseExists": true,
+        "customBytes": 2857606
+      },
+      {
+        "path": "data/i18n/ko.json",
+        "baseExists": true,
+        "customBytes": 2666126
+      },
+      {
+        "path": "data/i18n/zh-TW.json",
+        "baseExists": true,
+        "customBytes": 2244930
+      },
+      {
+        "path": "data/items.json",
+        "baseExists": true,
+        "customBytes": 170806
+      },
+      {
+        "path": "data/local-assets.json",
+        "baseExists": false,
+        "customBytes": 328434
+      },
+      {
+        "path": "data/local-fx.json",
+        "baseExists": false,
+        "customBytes": 1251238
+      },
+      {
+        "path": "data/room-ttl.json",
+        "baseExists": false,
+        "customBytes": 40
+      },
+      {
+        "path": "data/stages.json",
+        "baseExists": true,
+        "customBytes": 266095
+      },
+      {
+        "path": "data/sync-incremental.ps1.txt",
+        "baseExists": false,
+        "customBytes": 7590
+      },
+      {
+        "path": "data/sync-manifest.json",
+        "baseExists": false,
+        "customBytes": 2411136
+      },
+      {
+        "path": "data/tokens.json",
+        "baseExists": true,
+        "customBytes": 138571
+      },
+      {
+        "path": "data/tuning.json",
+        "baseExists": true,
+        "customBytes": 621
+      },
+      {
+        "path": "data/versions/act1autochess/backups.json",
+        "baseExists": false,
+        "customBytes": 2074498
+      },
+      {
+        "path": "data/versions/act1autochess/bands.json",
+        "baseExists": false,
+        "customBytes": 25655
+      },
+      {
+        "path": "data/versions/act1autochess/bonds.json",
+        "baseExists": false,
+        "customBytes": 49639
+      },
+      {
+        "path": "data/versions/act1autochess/bosses.json",
+        "baseExists": false,
+        "customBytes": 14631
+      },
+      {
+        "path": "data/versions/act1autochess/chess.json",
+        "baseExists": false,
+        "customBytes": 1380633
+      },
+      {
+        "path": "data/versions/act1autochess/choices.json",
+        "baseExists": false,
+        "customBytes": 89717
+      },
+      {
+        "path": "data/versions/act1autochess/config.json",
+        "baseExists": false,
+        "customBytes": 53329
+      },
+      {
+        "path": "data/versions/act1autochess/effects.json",
+        "baseExists": false,
+        "customBytes": 188490
+      },
+      {
+        "path": "data/versions/act1autochess/enemies.json",
+        "baseExists": false,
+        "customBytes": 322563
+      },
+      {
+        "path": "data/versions/act1autochess/factions.json",
+        "baseExists": false,
+        "customBytes": 22015
+      },
+      {
+        "path": "data/versions/act1autochess/garrisons.json",
+        "baseExists": false,
+        "customBytes": 100782
+      },
+      {
+        "path": "data/versions/act1autochess/items.json",
+        "baseExists": false,
+        "customBytes": 129183
+      },
+      {
+        "path": "data/versions/act1autochess/stages.json",
+        "baseExists": false,
+        "customBytes": 191942
+      },
+      {
+        "path": "data/versions/act1autochess/tokens.json",
+        "baseExists": false,
+        "customBytes": 71398
+      },
+      {
+        "path": "data/versions/act1autochess/tuning.json",
+        "baseExists": false,
+        "customBytes": 621
+      },
+      {
+        "path": "data/versions/act1autochess/waves.json",
+        "baseExists": false,
+        "customBytes": 125705
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/backups.json",
+        "baseExists": false,
+        "customBytes": 1991913
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/bands.json",
+        "baseExists": false,
+        "customBytes": 17673
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/bonds.json",
+        "baseExists": false,
+        "customBytes": 48624
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/bosses.json",
+        "baseExists": false,
+        "customBytes": 14631
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/chess.json",
+        "baseExists": false,
+        "customBytes": 1379569
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/choices.json",
+        "baseExists": false,
+        "customBytes": 89717
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/config.json",
+        "baseExists": false,
+        "customBytes": 52651
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/effects.json",
+        "baseExists": false,
+        "customBytes": 188319
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/enemies.json",
+        "baseExists": false,
+        "customBytes": 322684
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/factions.json",
+        "baseExists": false,
+        "customBytes": 22015
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/garrisons.json",
+        "baseExists": false,
+        "customBytes": 98203
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/items.json",
+        "baseExists": false,
+        "customBytes": 129183
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/stages.json",
+        "baseExists": false,
+        "customBytes": 191942
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/tokens.json",
+        "baseExists": false,
+        "customBytes": 71401
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/tuning.json",
+        "baseExists": false,
+        "customBytes": 621
+      },
+      {
+        "path": "data/versions/act1autochess-v1_1/waves.json",
+        "baseExists": false,
+        "customBytes": 125705
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/backups.json",
+        "baseExists": false,
+        "customBytes": 1910561
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/bands.json",
+        "baseExists": false,
+        "customBytes": 31460
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/bonds.json",
+        "baseExists": false,
+        "customBytes": 68634
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/bosses.json",
+        "baseExists": false,
+        "customBytes": 16707
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/chess.json",
+        "baseExists": false,
+        "customBytes": 1674075
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/choices.json",
+        "baseExists": false,
+        "customBytes": 119659
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/config.json",
+        "baseExists": false,
+        "customBytes": 52578
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/effects.json",
+        "baseExists": false,
+        "customBytes": 253018
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/enemies.json",
+        "baseExists": false,
+        "customBytes": 407131
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/factions.json",
+        "baseExists": false,
+        "customBytes": 23739
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/garrisons.json",
+        "baseExists": false,
+        "customBytes": 135949
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/items.json",
+        "baseExists": false,
+        "customBytes": 174310
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/stages.json",
+        "baseExists": false,
+        "customBytes": 265822
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/tokens.json",
+        "baseExists": false,
+        "customBytes": 124772
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/tuning.json",
+        "baseExists": false,
+        "customBytes": 621
+      },
+      {
+        "path": "data/versions/act2autochess-v2_1/waves.json",
+        "baseExists": false,
+        "customBytes": 133659
+      },
+      {
+        "path": "data/waves.json",
+        "baseExists": true,
+        "customBytes": 137772
+      },
+      {
+        "path": "content/announcements.json",
+        "baseExists": false,
+        "customBytes": 11591
+      },
+      {
+        "path": "content/ascii-test.png",
+        "baseExists": false,
+        "customBytes": 264432
+      },
+      {
+        "path": "content/chk.png",
+        "baseExists": false,
+        "customBytes": 325319
+      },
+      {
+        "path": "content/doubleclick-test.png",
+        "baseExists": false,
+        "customBytes": 356900
+      },
+      {
+        "path": "content/game-gate.json",
+        "baseExists": false,
+        "customBytes": 82
+      },
+      {
+        "path": "content/hint-back.png",
+        "baseExists": false,
+        "customBytes": 395859
+      },
+      {
+        "path": "content/hint-final.png",
+        "baseExists": false,
+        "customBytes": 369515
+      },
+      {
+        "path": "content/hint-fix.png",
+        "baseExists": false,
+        "customBytes": 296482
+      },
+      {
+        "path": "content/hint-fix2.png",
+        "baseExists": false,
+        "customBytes": 297660
+      },
+      {
+        "path": "content/hint-reg.png",
+        "baseExists": false,
+        "customBytes": 744914
+      },
+      {
+        "path": "content/icp-final.png",
+        "baseExists": false,
+        "customBytes": 371780
+      },
+      {
+        "path": "content/icp-ok.png",
+        "baseExists": false,
+        "customBytes": 371512
+      },
+      {
+        "path": "content/icp.png",
+        "baseExists": false,
+        "customBytes": 320983
+      },
+      {
+        "path": "content/icp2.png",
+        "baseExists": false,
+        "customBytes": 320983
+      },
+      {
+        "path": "content/icp3.png",
+        "baseExists": false,
+        "customBytes": 325306
+      },
+      {
+        "path": "content/icp4.png",
+        "baseExists": false,
+        "customBytes": 325314
+      },
+      {
+        "path": "content/login-after.png",
+        "baseExists": false,
+        "customBytes": 863169
+      },
+      {
+        "path": "content/login-design.png",
+        "baseExists": false,
+        "customBytes": 958029
+      },
+      {
+        "path": "content/login-design2.png",
+        "baseExists": false,
+        "customBytes": 1244801
+      },
+      {
+        "path": "content/login-fixed.png",
+        "baseExists": false,
+        "customBytes": 286901
+      },
+      {
+        "path": "content/login-phone.png",
+        "baseExists": false,
+        "customBytes": 97447
+      },
+      {
+        "path": "content/lp-1180x820.png",
+        "baseExists": false,
+        "customBytes": 375857
+      },
+      {
+        "path": "content/lp-390-e.png",
+        "baseExists": false,
+        "customBytes": 123179
+      },
+      {
+        "path": "content/lp-390x844-b.png",
+        "baseExists": false,
+        "customBytes": 123179
+      },
+      {
+        "path": "content/lp-390x844-c.png",
+        "baseExists": false,
+        "customBytes": 123179
+      },
+      {
+        "path": "content/lp-390x844-d.png",
+        "baseExists": false,
+        "customBytes": 123179
+      },
+      {
+        "path": "content/lp-390x844.png",
+        "baseExists": false,
+        "customBytes": 123125
+      },
+      {
+        "path": "content/lp-740x400.png",
+        "baseExists": false,
+        "customBytes": 93329
+      },
+      {
+        "path": "content/lp-viewport.png",
+        "baseExists": false,
+        "customBytes": 122874
+      },
+      {
+        "path": "content/mob-203413.png",
+        "baseExists": false,
+        "customBytes": 115831
+      },
+      {
+        "path": "content/mob2-203451.png",
+        "baseExists": false,
+        "customBytes": 115785
+      },
+      {
+        "path": "content/mob3-203530.png",
+        "baseExists": false,
+        "customBytes": 115961
+      },
+      {
+        "path": "content/mp2.png",
+        "baseExists": false,
+        "customBytes": 48701
+      },
+      {
+        "path": "content/mprobe.png",
+        "baseExists": false,
+        "customBytes": 52361
+      },
+      {
+        "path": "content/ph-194437.png",
+        "baseExists": false,
+        "customBytes": 118776
+      },
+      {
+        "path": "content/ph-700x360.png",
+        "baseExists": false,
+        "customBytes": 53141
+      },
+      {
+        "path": "content/ph-740x400.png",
+        "baseExists": false,
+        "customBytes": 96627
+      },
+      {
+        "path": "content/ph-real.png",
+        "baseExists": false,
+        "customBytes": 127140
+      },
+      {
+        "path": "content/ph5-194507.png",
+        "baseExists": false,
+        "customBytes": 117267
+      },
+      {
+        "path": "content/ph6-194528.png",
+        "baseExists": false,
+        "customBytes": 117267
+      },
+      {
+        "path": "content/ph7-194604.png",
+        "baseExists": false,
+        "customBytes": 117298
+      },
+      {
+        "path": "content/phone-final.png",
+        "baseExists": false,
+        "customBytes": 128399
+      },
+      {
+        "path": "content/phone-fix.png",
+        "baseExists": false,
+        "customBytes": 405918
+      },
+      {
+        "path": "content/phone-fix2.png",
+        "baseExists": false,
+        "customBytes": 638748
+      },
+      {
+        "path": "content/phone-measure.png",
+        "baseExists": false,
+        "customBytes": 92751
+      },
+      {
+        "path": "content/phone-now.png",
+        "baseExists": false,
+        "customBytes": 139994
+      },
+      {
+        "path": "content/phone-v2.png",
+        "baseExists": false,
+        "customBytes": 118776
+      },
+      {
+        "path": "content/phone-v3.png",
+        "baseExists": false,
+        "customBytes": 118776
+      },
+      {
+        "path": "content/phone-v3b.png",
+        "baseExists": false,
+        "customBytes": 118776
+      },
+      {
+        "path": "content/phone-v4.png",
+        "baseExists": false,
+        "customBytes": 118776
+      },
+      {
+        "path": "content/pk.png",
+        "baseExists": false,
+        "customBytes": 40248
+      },
+      {
+        "path": "content/pk2-194445.png",
+        "baseExists": false,
+        "customBytes": 45670
+      },
+      {
+        "path": "content/pr878-files.json",
+        "baseExists": false,
+        "customBytes": 149134
+      },
+      {
+        "path": "content/pr878.json",
+        "baseExists": false,
+        "customBytes": 22557
+      },
+      {
+        "path": "content/probe-cap.png",
+        "baseExists": false,
+        "customBytes": 6486
+      },
+      {
+        "path": "content/probe-cap2.png",
+        "baseExists": false,
+        "customBytes": 6629
+      },
+      {
+        "path": "content/probe-cap3.png",
+        "baseExists": false,
+        "customBytes": 7292
+      },
+      {
+        "path": "content/probe-cap4.png",
+        "baseExists": false,
+        "customBytes": 6828
+      },
+      {
+        "path": "content/probe.png",
+        "baseExists": false,
+        "customBytes": 36332
+      },
+      {
+        "path": "content/probe2.png",
+        "baseExists": false,
+        "customBytes": 39745
+      },
+      {
+        "path": "content/probe3.png",
+        "baseExists": false,
+        "customBytes": 28142
+      },
+      {
+        "path": "content/probe4.png",
+        "baseExists": false,
+        "customBytes": 22766
+      },
+      {
+        "path": "content/qq-pwa.png",
+        "baseExists": false,
+        "customBytes": 320983
+      },
+      {
+        "path": "content/reg-fixed.png",
+        "baseExists": false,
+        "customBytes": 395833
+      },
+      {
+        "path": "content/reg-narrow.png",
+        "baseExists": false,
+        "customBytes": 226624
+      },
+      {
+        "path": "content/reg-page.png",
+        "baseExists": false,
+        "customBytes": 370230
+      },
+      {
+        "path": "content/reg-probe.png",
+        "baseExists": false,
+        "customBytes": 8100
+      },
+      {
+        "path": "content/restart-targets.txt",
+        "baseExists": false,
+        "customBytes": 28
+      },
+      {
+        "path": "content/update.md",
+        "baseExists": false,
+        "customBytes": 67
       }
     ]
   }

@@ -121,7 +121,7 @@ export function AwayOverlay({ onBack = () => {} }) {
 }
 
 /**
- * Pre-game step header (PR #643, the event's pre-game, video 6:29–7:51): exit over the ping | the difficulty, with
+ * Pre-game step header (2026-10-13, the event's pre-game, video 6:29–7:51): exit over the ping | the difficulty, with
  * `extra` beside it in one capsule (the draft's 本局信息) | "1/2 确认本局信息" ……… `status` (the draft's turn: 请选择策略 /
  * X 正在选择策略… / 策略选择完成) | 玩法说明 and the countdown.
  * @param {{ step: number, of: number, title: string, micro: string, pub: any, total?: number|null, onExit: Function,
@@ -134,10 +134,10 @@ export function StepHeader({ step, of, title, micro, pub, total, onExit, extra =
       <div class="stephead__exit">
         <${Button} variant="danger" size="lg" square=${true} icon="exit" onClick=${onExit} aria-label=${t('离开')} title=${t('离开')} />
         <${PingPill} ms=${conn.ping} online=${conn.status === 'online'} />
+        ${pub?.test ? html`<${TestMark} />` : null}
       </div>
       <div class=${`stephead__mode${extra ? ' has-extra' : ''}`}>
         ${pub?.difficulty ? html`<${DifficultyTag} difficulty=${pub.difficulty} />` : null}
-        ${pub?.test ? html`<${TestMark} />` : null}
         ${extra}
       </div>
       <i class="stephead__sep" aria-hidden="true"></i>
@@ -151,3 +151,4 @@ export function StepHeader({ step, of, title, micro, pub, total, onExit, extra =
     </div>
   </header>`;
 }
+

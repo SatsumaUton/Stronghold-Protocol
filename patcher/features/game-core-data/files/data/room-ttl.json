@@ -1,1 +1,4 @@
-{"minutes":15}
+{
+  "enabled": false,
+  "minutes": 15
+}

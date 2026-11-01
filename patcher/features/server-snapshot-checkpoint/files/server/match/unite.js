@@ -80,10 +80,23 @@ export function planUnite(m, results) {
     }
   }
   const plan = { helpers, leakers, leaked, notReentered };
-  // Expanded rooms with at least eight alive players may need a second relay field.
-  if (m.capacityExperiment && m._normalAliveCount >= 8 && alive.length >= 8) {
-    plan.uniteRound = 1;
-    plan.relayCandidates = perfects.filter((ps) => !helpers.includes(ps) && !results.get(ps.playerId)?.synthetic);
+  // 5–20 人大厅：完美玩家够「打满第一波 + 至少还有 1 个人能接力」就分两轮。
+  //
+  // 一轮联防最多上 2 名 helper（config.unite.maxHelpers）。第二轮不要求凑满 2 人 ——
+  // 第一波用掉 2 个后**还剩至少 1 个**就能再打一波，所以门槛是 maxHelpers + 1 = 3。
+  // 维护者 2026-10-26 的决定：3 个完美玩家也要分两轮（原来要求凑够 4 个才分，
+  // 3 个人只能一轮打完，第二段的预算白白留给了一个不存在的第二轮）。
+  //
+  // 以前卡的是「存活 ≥ 8 人」这个和实际需求无关的门槛：7 人房明明有 4 个以上完美玩家可接力，
+  // 却被挡掉只打一轮（玩家反馈「左边这么多人可以帮联防，但只有一轮」）。
+  const eligible = perfects.filter((ps) => !results.get(ps.playerId)?.synthetic);
+  if (m.capacityExperiment && eligible.length >= m.gd.unite.maxHelpers + 1) {
+    const spare = eligible.filter((ps) => !helpers.includes(ps));
+    // 第二波要有人顶上：第一波用掉 maxHelpers 个后，剩下的至少要够 1 个
+    if (spare.length > 0) {
+      plan.uniteRound = 1;
+      plan.relayCandidates = spare;
+    }
   }
   return plan;
 }
@@ -156,7 +169,7 @@ export function helperStats(m, ps, results) {
     active = true;
     const stored = Number(ps.layers && ps.layers[id]) || Number(b.layers) || 0;
     const gain = pending && Number(pending[id]);
-    const add = Number.isFinite(gain) && gain > 0 ? layerGainRoom(stored, Math.floor(gain)) : 0;
+    const add = Number.isFinite(gain) && gain > 0 ? layerGainRoom(stored, Math.floor(gain), m?.disableLayerCap) : 0;
     layers += stored + add;
   }
   const r = results && typeof results.get === 'function' ? results.get(ps.playerId) : null;

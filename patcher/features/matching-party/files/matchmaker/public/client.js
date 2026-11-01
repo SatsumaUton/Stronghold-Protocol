@@ -313,15 +313,30 @@ const JOIN_COOKIE = (() => {
 /* 延迟胶囊（.ping）的宽度随毫秒数位数变化，会把右侧工具组整体推动，表现为 2~3px 的漂移。
    给固定最小宽度并让内容居中，布局就稳定了。 */
 .lobby-screen .topbar__left > .ping{min-width:84px!important;justify-content:center!important}
-/* 弹窗（同盟模拟 / 独立模拟）里的节点状态：与大按钮同高、垂直居中 */
-.mm-proto-meter{display:flex!important;align-items:center!important;gap:10px!important;flex:none!important;align-self:center!important}
-.mm-proto-meter > #mm-nodes{display:inline-flex!important;align-items:center!important;height:42px!important;max-height:42px!important;line-height:1!important;flex:none!important;margin:0!important;align-self:center!important}
-.mm-proto-meter > #mm-nodes > .chip{display:inline-flex!important;align-items:center!important;justify-content:center!important;height:42px!important;min-height:42px!important;max-height:42px!important;box-sizing:border-box!important;padding:0 16px!important;line-height:1!important;margin:0!important}
-.mm-proto-meter > #mm-nodes > .chip > *{line-height:1!important;display:inline-flex!important;align-items:center!important}
+/* ★ 2026-11-01 删除：原来这里有 4 条 .mm-proto-meter 规则（把弹窗里的节点状态写成 42px 死值）。
+   那个容器 .mm-proto-meter **从来没有被任何代码创建过** —— 全仓库只有这 4 行 CSS
+   和一处防御性清理（querySelector 后 if 判断再 remove，元素不存在什么也不做）。
+   房间里的节点状态实际挂在 .rs-clock__ping 里，走全局规则
+   #mm-nodes:not(.topbar) .chip（clamp(26px,2.2vw,32px)），和延迟胶囊等高。
+   删掉这 4 行对渲染零影响（它们本来就没命中任何元素），只是免得以后有人照着
+   42px 这个死值去改，又造出「这个胶囊比旁边大一圈」的问题。 */
 
-/* 节点状态 chip：位于大厅顶栏左侧（延迟之后、分隔线之前），与右侧按钮同一中心线 */
-.lobby-screen .topbar__left > #mm-nodes{display:inline-flex!important;align-items:center!important;height:42px!important;line-height:1!important;flex:none!important;align-self:center!important}
-.lobby-screen .topbar__left > #mm-nodes > .chip{display:inline-flex!important;align-items:center!important;justify-content:center!important;height:42px!important;min-height:42px!important;box-sizing:border-box!important;padding:0 16px!important;line-height:1!important;margin:0!important}
+/* 节点状态 chip：位于大厅顶栏左侧（延迟之后、分隔线之前），与右侧按钮同一中心线
+   ★ 2026-11-01（维护者：「节点状态胶囊不会根据页面尺寸变大变小吗」）：
+     原来这里写死 42px!important —— 而**整个 UI 的尺寸都由 rem 驱动**：
+       html{font-size:calc(clamp(40px, min(100vw/19.2, 100vh/10.8), 240px) * var(--sp-ui,1))}
+     右侧方形按钮也是 ".46rem"（随屏幕缩放），于是只有这个胶囊钉死在 42px：
+     小屏上偏大、大屏上偏小，而且**不再跟按钮同高**。
+     改成 rem 与邻居同源：既跟着屏幕缩放，又永远等高。
+
+   ★ 2026-11-01 第二次修正（维护者：「你不觉得他变得太大了吗」）：
+     第一次改成了 ".46rem"（对齐**右侧方形按钮**）—— 这在视觉上是错的：
+     顶栏最左那一段是 [返回][延迟胶囊][节点状态]，**节点状态的邻居是延迟胶囊**，
+     不是右侧那排按钮。延迟胶囊 .ping 是 .32rem，节点状态却做成 .46rem，
+     两个紧挨着的胶囊差一大圈，看起来就是「这一个特别大」。
+     → 改成 .32rem，和 .ping 完全一致（同高、同圆角量级），跟邻居齐平。 */
+.lobby-screen .topbar__left > #mm-nodes{display:inline-flex!important;align-items:center!important;height:.32rem!important;line-height:1!important;flex:none!important;align-self:center!important}
+.lobby-screen .topbar__left > #mm-nodes > .chip{display:inline-flex!important;align-items:center!important;justify-content:center!important;height:.32rem!important;min-height:.32rem!important;box-sizing:border-box!important;padding:0 .17rem 0 .14rem!important;line-height:1!important;margin:0!important;border-radius:99px!important}
 .lobby-screen .topbar__left > #mm-nodes > .chip > *{line-height:1!important;display:inline-flex!important;align-items:center!important}
 .lobby-screen .topbar__tools > #mm-qq-lobby{margin-left:0!important;margin-right:0!important}
 /* 节点状态的宽度：原先用 min-width:230px + justify-content:flex-end 锁宽度防止抖动，
@@ -634,6 +649,7 @@ const JOIN_COOKIE = (() => {
   installBackToAlliance();
   installAutoRejoin();
   installRoomCountdown();
+  installFeedbackEntry();
 
   hideLatencyLabel();
   fixCenterButtons();
@@ -919,13 +935,21 @@ const JOIN_COOKIE = (() => {
         .then((d) => {
           if (d && d.node) {
             if (d.mode === 'solo') { showStyledToast(spec ? '独立模拟房间不支持观战（观战只对同盟房间开放）' : '独立模拟房间无法加入'); return; }
+            // ★ 本服 2026-11-01 修复（第二次）：观战席上限不是固定 2。
+            // 服务端按 max(2, ceil(玩家数/2)) 算（server/lobby.js spectatorLimit），20 人房就有 10 个席位；
+            // find-room 早就把权威的 maxSpectators 带回来了（matchmaker/server.js roomInfo），直接用。
+            // 这里原来写死 `Number(d.spectators) >= 2`，任何房间第 3 个想观战的人都会被前端拦下，
+            // 还弹出「观战席位已满（2/2）」，而服务端其实放得下（维护者 2026-11-01 截图：后台显示 2/9）。
+            // 2026-10-29 修过一次（71b2958b），2026-10-31 被 b50d6d77 覆盖回去（那次拿旧版文件改的管理员工具
+            // 两道门）。这次连同 nginx 的注入版本号一起改，防止浏览器继续用缓存的旧 client.js。
             if (spec) {
-              // 观战上限由服务端算：max(2, 玩家数/2)。find-room 已带回权威的 maxSpectators。
-              // ⚠ 2026-10-29 修：原来写死 `>= 2`，第 3 个人想观战就被拦下（玩家反馈「只能进 2 个」）。
               const cap = Number.isInteger(d.maxSpectators) ? d.maxSpectators
                 : (d.mode === 'coop' ? Math.max(2, Math.ceil((Number(d.humans) || 0) / 2)) : 0);
               const used = Number(d.spectators) || 0;
-              if (used >= cap) { showStyledToast(`观战席位已满（${used}/${cap}），请稍后再试`); return; }
+              if (used >= cap) {
+                showStyledToast(`观战席位已满（${used}/${cap}），请稍后再试`);
+                return;
+              }
             }
             if (!spec && d.started) { showStyledToast('该同盟已开始对局，无法加入；可以点「观战」进入'); return; }
             if (!spec && d.full) { showStyledToast('该同盟人数已满，无法加入；可以点「观战」进入'); return; }
@@ -1591,6 +1615,72 @@ const JOIN_COOKIE = (() => {
 
 
 
+  // ---------------------------------------------------------------- 大厅左下角：反馈板入口
+
+  /* 反馈板（/mm/feedback.html，matchmaker/feedback.cjs）的入口按钮。
+     维护者指定位置：大厅界面左下角。
+     只在「大厅」显示 —— 标题页、对局中、房间内都不画（那里各有自己的底栏，
+     角落再叠一个按钮只会挡住东西）。判据与 cleanTopExtras 一致：.lobby-screen 存在，
+     且没有 .title-screen / .room-screen。
+     用 <a> 而不是 button：新标签页打开，玩家的座位不会被顶掉，中键/右键也能用。 */
+  function installFeedbackEntry() {
+    if (window.__mmFeedbackInstalled) return;
+    window.__mmFeedbackInstalled = true;
+    const HREF = '/mm/feedback.html';
+    const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+      + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/>'
+      + '</svg>';
+
+    const ensure = () => {
+      const onTitle = !!document.querySelector('.title-screen');
+      const inRoom = !!document.querySelector('.room-screen');
+      const inLobby = !!document.querySelector('.lobby-screen');
+      const existing = document.getElementById('mm-feedback');
+      // 不在大厅：收起来（保留节点，避免反复建删导致闪动）
+      if (onTitle || inRoom || !inLobby) {
+        if (existing) existing.style.display = 'none';
+        return;
+      }
+      if (!document.getElementById('mm-feedback-css')) {
+        const st = document.createElement('style');
+        st.id = 'mm-feedback-css';
+        st.textContent = `
+          #mm-feedback{position:fixed;left:max(18px,env(safe-area-inset-left,0px));
+            bottom:calc(max(18px,env(safe-area-inset-bottom,0px)) + 4px);z-index:2147481900;
+            display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;
+            height:32px;padding:0 14px;border:1px solid var(--line-2,rgba(255,255,255,.14));
+            border-left:2px solid var(--mint-500,#5ee0b9);border-radius:0;
+            background:rgba(8,20,17,.82);color:var(--text-md,#c3cbc7);
+            font:600 13px/1 "Noto Sans SC",system-ui,sans-serif;letter-spacing:.04em;
+            text-decoration:none;cursor:pointer;white-space:nowrap;
+            backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+            transition:color .15s,border-color .15s,background .15s}
+          #mm-feedback:hover,#mm-feedback:focus-visible{color:var(--mint-400,#59f4ca);
+            border-color:var(--mint-500,#5ee0b9);background:rgba(12,30,25,.92);outline:none}
+          #mm-feedback svg{width:15px;height:15px;flex:none;display:block}
+          @media (max-width:640px){#mm-feedback{height:28px;padding:0 10px;font-size:12px}
+            #mm-feedback svg{width:13px;height:13px}}
+          @media (prefers-reduced-motion:reduce){#mm-feedback{transition:none}}
+        `;
+        (document.head || document.documentElement).appendChild(st);
+      }
+      if (existing) { existing.style.display = ''; return; }
+      const a = document.createElement('a');
+      a.id = 'mm-feedback';
+      a.href = HREF;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.title = '反馈板：提交问题、查看回复';
+      a.setAttribute('aria-label', '打开反馈板');
+      a.innerHTML = ICON + '<span>反馈板</span>';
+      document.body.appendChild(a);
+    };
+
+    ensure();
+    setInterval(ensure, 900);
+  }
+
   // ---------------------------------------------------------------- 房间右上角：15 分钟开始倒计时
 
   function installRoomCountdown() {
@@ -1599,9 +1689,13 @@ const JOIN_COOKIE = (() => {
     const sp = window.__SP__;
     if (!sp || !sp.store || !sp.store.subscribe) return;
     let LIMIT = 15 * 60 * 1000;
+    // 自动解散总开关（shared/data/room-ttl.json 的 enabled）。关掉时整块浮层都不画：
+    // 房间根本不会到期消失，画一个倒计时只会误导玩家。
+    let TTL_OFF = false;
     // 同盟解散时间由后台配置（分钟）。数据来自合并轮询 /mm/api/pulse（见 refreshPulse），
     // 不再自己每 5 秒打一次 /mm/api/room-ttl —— 那三个端点曾占全部请求的一半以上。
     const applyTtl = (j) => {
+      TTL_OFF = !!(j && j.enabled === false);
       const m = Number(j && j.minutes);
       if (Number.isFinite(m) && m >= 1 && m <= 1440) { LIMIT = Math.round(m * 60000); window.__mmTtlMs = LIMIT; }
     };
@@ -1628,6 +1722,12 @@ const JOIN_COOKIE = (() => {
     const tick = () => {
       const s = sp.store.get();
       const room = s.room;
+      // 自动解散已被关掉（后台/节点控制台）：房间不会到期消失，这里什么都不画。
+      if (TTL_OFF) {
+        const dead = document.getElementById('mm-room-timer');
+        if (dead) dead.remove();
+        return;
+      }
       // 只在「真的坐在同盟房间里、还没开始模拟」时显示倒计时。
       // 这个浮层表达的是「同盟/独立模拟的等待室多久后自动销毁」，所以：
       //   * 没进大厅（标题页）→ 不显示
@@ -2960,39 +3060,17 @@ const JOIN_COOKIE = (() => {
     let lastCode = null;
     let lastCheck = 0;
 
-    /** 大厅的「公告」按钮此刻是否真的可见（见 probe 里的说明）。 */
-    const lobbyNotice = () => {
-      // 标题页也有公告按钮（ensureTopButton allowLobby），而它不是一个合法的锚点：
-      // 恢复对局属于大厅。这里显式排掉，避免标题页靠这条判据混过去。
-      if (document.querySelector('.title-screen')) return null;
-      const n = document.getElementById('mm-notice-btn');
-      if (!n || !n.isConnected) return null;
-      if (n.style.display === 'none') return null;
-      if (typeof n.getClientRects === 'function' && n.getClientRects().length === 0) return null;
-      if (typeof n.closest === 'function' && n.closest('.title-screen')) return null;
-      return n;
-    };
-    /** 玩家刚主动退出对局（2 分钟内）：这段时间不提醒恢复。 */
-    const recentlyLeft = () => {
-      try {
-        const now = Date.now();
-        const a = Number(sessionStorage.getItem('sp.matchExitAt') || 0);
-        const b2 = Number(localStorage.getItem('sp.matchExitAtShared') || 0);
-        return !!((a && now - a < 120000) || (b2 && now - b2 < 120000));
-      } catch { return false; }
-    };
-
     const probe = async () => {
       const role = window.__SP_ACCOUNT_ROLE || '';
       if (!window.__SP_ACCOUNT_TOKEN || !role || role === 'guest') { removeBtn(); return; }
       if (inRoom() || autoBusy()) { removeBtn(); return; }
-      // ★ 第一道：标题界面一律不显示。必须在最前面判 —— 标题页也有公告按钮
-      // （ensureTopButton allowLobby，且它在 .title-screen 里即使找不到 stat 也会保留按钮），
-      // 只靠下面的公告按钮判断会漏掉标题页。
-      if (document.querySelector('.title-screen')) { removeBtn(); return; }
-      // ★ 第二道：只在大厅显示（「其他界面均不要出现恢复对局按钮」）。
-      if (!lobbyNotice()) { removeBtn(); return; }
-      if (recentlyLeft()) { removeBtn(); return; }
+      // 主动退出对局后的一段时间内不显示（与自动恢复同一套闸）
+      try {
+        const now = Date.now();
+        const a = Number(sessionStorage.getItem('sp.matchExitAt') || 0);
+        const b2 = Number(localStorage.getItem('sp.matchExitAtShared') || 0);
+        if ((a && now - a < 120000) || (b2 && now - b2 < 120000)) { removeBtn(); return; }
+      } catch { /* ignore */ }
       if (Date.now() - lastCheck < 15000 && (lastCode || !existing())) return;   // 15 秒最多查一次
       lastCheck = Date.now();
       let code = null;
@@ -3009,14 +3087,18 @@ const JOIN_COOKIE = (() => {
       // 锚点：**只在联厅显示**（维护者明确要求：标题界面不要「恢复对局」）。
       //   1) 大厅：公告按钮（恢复对局排在它左边）
       //   2) 大厅：版本按钮 / SWEEP 文字按钮
-      // 只认「公告」按钮（恢复对局排在它左边）。降级锚点会让按钮在大厅之外冒出来。
-      const anchor = lobbyNotice();
+      const notice = document.getElementById('mm-notice-btn');
       // ★ 标题界面一律不显示「恢复对局」（维护者 2026-10-26 明确要求）。
-      // 判定用「当前是否停在标题屏」，而不是「有没有公告按钮」—— 标题页上也可能存在
-      // 公告按钮，用锚点判断会漏。标题页只需展示账号/开始游戏，恢复入口属于联厅。
       if (document.querySelector('.title-screen')) { removeBtn(); return; }
-      // ★ 不再退化成右下角浮动按钮（维护者 2026-10-29：「其他界面均不要出现恢复对局按钮」）。
-      // 只在大厅、且能挨着「公告」按钮时显示；拿不到就不显示。
+      // ★ MAINTENANCE.md §9.21 + §9.36：只认大厅「公告」按钮当锚点，拿不到就**不显示**。
+      //   §9.21 删掉过下面这段浮动按钮降级（mm-resume-fallback），它正是
+      //   「房间页 / 对局中 / 结算页也冒出恢复对局」的源头；那次修复后来被整份覆盖冲掉了，
+      //   2026-10-31 按 §9.36 的规矩（精确替换 + 校验命中数 + 字节差合理）重做。
+      //   判据用「公告按钮是否可见」：非大厅界面它会被 display:none 或移除，
+      //   比判断屏幕类名 / 路由更抗改版。
+      if (!notice || !notice.isConnected || notice.style.display === 'none') { removeBtn(); return; }
+      if (notice.getClientRects().length === 0) { removeBtn(); return; }
+      const anchor = notice;   // 锚点只认公告按钮，恢复对局永远排在它左边
       const btn = (notice || anchor).cloneNode(true);
       btn.id = ID;
       btn.type = 'button';
@@ -3271,8 +3353,19 @@ const JOIN_COOKIE = (() => {
       #mm-nodes .chip i{width:7px;height:7px;border-radius:50%;background:#4ed8af;box-shadow:0 0 6px #4ed8af}
       #mm-nodes[data-state=busy] .chip i{background:#e8b25a;box-shadow:0 0 6px #e8b25a}
       #mm-nodes[data-state=down] .chip i{background:#d9534f;box-shadow:0 0 6px #d9534f}
+
       #mm-nodes .chip b{font-weight:700;color:#e6fff7}
       #mm-nodes.match .chip i{background:#e8b25a;box-shadow:0 0 6px #e8b25a}
+      /* 对局中：管理员与普通玩家必须逐像素一致。
+         锁定盒高与内边距，图标固定 14px、圆点固定 7px 全部隐藏 ——
+         这样无论 topbar 分支有没有给它插过柱状图图标，最终盒子都一样大、位置一样。 */
+      #mm-nodes.match .chip{box-sizing:border-box;
+        height:var(--gtop-pill-h, calc(.32rem + 2px));min-height:var(--gtop-pill-h, calc(.32rem + 2px));max-height:var(--gtop-pill-h, calc(.32rem + 2px));
+        padding:0 .14rem 0 .11rem;gap:.05rem;display:inline-flex;align-items:center;line-height:1}
+      #mm-nodes.match .chip i{display:none!important;width:0!important;height:0!important;margin:0!important}
+      #mm-nodes.match .chip svg{display:block;flex:none;width:14px;height:14px;margin-right:6px}
+      #mm-nodes.match .chip svg.mm-chip-icon{margin-right:6px}
+      #mm-nodes.match #mm-nodes-text{display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       /* 手机（1rem 被钳到 40px）上 .16 × --t 只有 6px，字几乎看不见；
          高度 .32rem 也只有 12.8px，和旁边动辄 30px 的按钮不成比例。
          这里给字号和高度都加一个像素下限：小屏上反而要略微变小、但不能小到看不清。
@@ -3528,6 +3621,38 @@ const JOIN_COOKIE = (() => {
               dot.style.removeProperty('height');
               dot.style.removeProperty('margin-right');
               dot.style.removeProperty('border-radius');
+              // ★ 对局中一律显示柱状图图标、隐藏圆点，与普通玩家看到的完全一致。
+              //   （维护者确认：有柱状图图标的才是标准外观；圆点是另一套，必须消掉。）
+              dot.style.setProperty('display', 'none', 'important');
+            }
+            // 确保图标存在：普通玩家的胶囊里是柱状图 svg，管理员也必须有**同一个**。
+            // 直接从 topbar 分支用的同一个来源（公告/统计按钮的 svg）克隆，避免手画走样。
+            if (chipEl && !chipEl.querySelector('svg.mm-chip-icon')) {
+              const src = document.querySelector('#mm-notice-btn svg')
+                || document.querySelector('button.title-stats svg')
+                || [...document.querySelectorAll('button svg')].find((s) => {
+                  const b = s.closest('button');
+                  return b && /公告|统计/.test((b.textContent || '').trim());
+                });
+              let svg = null;
+              if (src) {
+                svg = src.cloneNode(true);
+                svg.classList.add('mm-chip-icon');
+                svg.style.marginRight = '6px';
+              } else {
+                // 找不到来源时才退到内置柱状图，保证至少有图标且宽度一致
+                const NS = 'http://www.w3.org/2000/svg';
+                svg = document.createElementNS(NS, 'svg');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                svg.setAttribute('width', '14'); svg.setAttribute('height', '14');
+                svg.classList.add('mm-chip-icon');
+                svg.style.cssText = 'margin-right:6px;flex:none';
+                const p1 = document.createElementNS(NS, 'path');
+                p1.setAttribute('fill', 'currentColor');
+                p1.setAttribute('d', 'M4 20h4V10H4v10zm6 0h4V4h-4v16zm6 0h4v-7h-4v7z');
+                svg.appendChild(p1);
+              }
+              chipEl.insertBefore(svg, chipEl.firstChild);
             }
           }
         }
@@ -3545,8 +3670,16 @@ const JOIN_COOKIE = (() => {
       setIf2('right', 'auto');
       setIf2('top', 'auto');
       setIf2('transform', 'none');
-      setIf2('margin', '0 0 0 10px');
+      // ★ 间距只由一处负责，避免叠加导致的 2px 跳动：
+      //   如果容器（下面算出的 host）用的是 flex + gap，就把节点状态的 margin-left 清零，
+      //   间距交给 gap；否则保留 10px margin（老界面不是 flex 时 gap 不生效）。
+      //   2026-10-31 实测：margin-left:10px 叠加 gap:10px 之后，
+      //   观战胶囊插进来/撤走会让 left 在 165 与 167 之间跳 2px，肉眼可见。
       setIf2('display', 'inline-flex');
+      // 位置稳定性：节点状态胶囊不参与 flex 伸缩，宽度固定由内容决定。
+      // 前面（延迟胶囊）宽度会变（数字位数），后面（观战胶囊）可能消失 ——
+      // 都不应该让它左右跑。
+      setIf2('flex', '0 0 auto');
       if (el.classList.contains('topbar')) el.classList.remove('topbar');
       // 把“延迟 + 角标”强制排成一行（与选择模拟协议界面一致）
       let host = ping.parentElement;
@@ -3559,17 +3692,44 @@ const JOIN_COOKIE = (() => {
           host.style.alignItems = 'center';
           host.style.gap = '10px';
         }
-        // 期望顺序：ping → 本节点状态（大厅里 Q群在右侧工具组，不参与这里）
+        // 容器已经是 flex+gap 了，节点状态自己不再加外边距（否则 10+10，且会随兄弟变化）。
+        setIf2('margin', '0');
+        // ★ 2026-10-31 修「有观战按钮时节点状态胶囊会位移」（维护者反馈）。
+        //
+        //   现象：房间里出现观战者时，左上角多出「👁 1」胶囊，节点状态胶囊被推右 34px
+        //        （实测 left 199 → 233）；观战数归零它又弹回来。
+        //
+        //   原因：游戏本体的观战胶囊（React 的 SpectatorPill）渲染在「延迟胶囊」后面，
+        //        我们也把节点状态插在延迟后面，谁后插谁就往后站 —— 两者互相挤。
+        //
+        //   修法：**观战胶囊永远排在节点状态之后**。
+        //        每次 place() 时，如果发现延迟胶囊后面紧跟着观战胶囊（.specpill），
+        //        就把它挪到节点状态之后。这样节点状态的位置只由「延迟胶囊宽度」决定，
+        //        与观战者数量无关。
+        //        DOM 只在顺序不对时才动，避免周期性重排（那会表现为「一跳一跳」）。
+        const specPill = () => {
+          const p = ping.parentElement;
+          if (!p) return null;
+          return p.querySelector(':scope > .specpill');
+        };
         const qq = document.getElementById('mm-qq-lobby');
         const inTools = qq && qq.parentElement && qq.parentElement.classList.contains('topbar__tools');
         const wantPrev = inTools ? ping : ((qq && qq.parentElement === host && qq.isConnected) ? qq : ping);
-        // 只有「位置确实不对」时才动 DOM，且只动一次，避免周期性重排造成的跳动
         if (el.parentElement !== host) host.appendChild(el);
         if (el.previousElementSibling !== wantPrev) {
           wantPrev.insertAdjacentElement('afterend', el);
         }
-      } else if (ping.nextElementSibling !== el && ping.parentElement) {
-        ping.insertAdjacentElement('afterend', el);
+        // 把观战胶囊挪到节点状态之后（只在不正确时动）。
+        const sp = specPill();
+        if (sp && sp !== el.nextElementSibling && sp.previousElementSibling === el.previousElementSibling) {
+          el.insertAdjacentElement('afterend', sp);
+        }
+      } else {
+        // 没有可用的 flex 容器（老界面）：退回自己留 10px 间距，避免贴死在延迟胶囊上。
+        setIf2('margin', '0 0 0 10px');
+        if (ping.nextElementSibling !== el && ping.parentElement) {
+          ping.insertAdjacentElement('afterend', el);
+        }
       }
     };
     const attach = () => {
@@ -3620,9 +3780,55 @@ const JOIN_COOKIE = (() => {
       document.body.appendChild(veil);
     };
 
+    // 能不能打开「游戏内管理员工具」——2026-10-31 维护者定的规则：
+    //   **只有在自己参与的对局里才能打开**；观战、隐身观战一律不能。
+    //
+    // 判据本体在 /js/ui/adminGate.js（ui/hud.js 监听事件时也调它），这里只做一层
+    // 「注入脚本够不到 React 状态」的适配。★ 此处是**同步**判断：需要立刻知道结果，
+    // 所以用同步的 XMLHttpRequest 拉一次源文件是不行的 —— 改为把同样的规则再写一遍，
+    // 并靠 test/ui/adminGate.test.js 保证两边语义一致（见该测试的注释）。
+    //   · 必须已经是管理员（adminId）
+    //   · 必须已经在自己的对局里（match.public 存在）
+    //   · 不能是观战者：room.spectators 里有我（普通观战 + 隐身观战都在这里）
+    //   · 必须自己坐在 seats 里（没席位 = 在看别人打）
+    function canOpenAdminTools(st) {
+      if (!st || st.adminId !== true) return false;
+      // ①b 权限门（2026-10-31 维护者要求）：没被授予 tools.game 的管理员，
+      //    连「输入授权码的界面」都不该出现。这个值由服务端判定后随 welcome 下发。
+      if (st.gameTool !== true) return false;
+      const s = window.__SP__ && window.__SP__.store ? window.__SP__.store.get() : null;
+      if (!s || !s.match || !s.match.public) return false;
+      const room = s.room;
+      const myId = s.me && s.me.playerId;
+      if (!room || myId == null) return false;
+      if ((room.spectators || []).some((x) => x && x.playerId === myId)) return false;
+      return (room.seats || []).some((x) => x && x.playerId === myId);
+    }
+
     chip.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (el.classList.contains('match') || !data) return;
+      // 对局中：这颗胶囊是「游戏内管理员工具」的入口。
+      // 只对「正在自己参与的对局里」的管理员有效（见 canOpenAdminTools）。
+      // 普通玩家、观战者、隐身观战者点它仍然什么都不发生（下面原有的 return 保持不变）。
+      if (el.classList.contains('match')) {
+        const st = window.__SP__ && window.__SP__.store && window.__SP__.store.get();
+        // ★ 判据用 adminId（身份门）而不是 adminTools（两道门都过）。
+        //   退出授权后 adminTools 会变 false，若继续用它判断，管理员连面板都打不开，
+        //   也就没有地方重新输码了 —— 2026-10-31 实测出来的死锁。
+        //   普通玩家 adminId 也是 false，所以权限没有放宽。
+        if (canOpenAdminTools(st)) {
+          try {
+            // 把胶囊的屏幕位置一并传出：面板要开在它**正下方**，
+            // 而不是固定在屏幕角落（维护者要求「就地打开，不用去别处找」）。
+            const r = el.getBoundingClientRect();
+            window.dispatchEvent(new CustomEvent('sp-open-admin-tools', {
+              detail: { left: r.left, top: r.bottom + 8, width: r.width },
+            }));
+          } catch { /* ignore */ }
+        }
+        return;
+      }
+      if (!data) return;
       // 标题页只显示在线人数，不提供节点状态面板
       if (document.querySelector('.title-screen')) return;
       openStatusModal();
@@ -3668,6 +3874,16 @@ const JOIN_COOKIE = (() => {
       const setHtml = (node, html) => { if (node.innerHTML !== html) node.innerHTML = html; };
       if (inMatch) {
         if (!el.classList.contains('match')) el.classList.add('match');
+        // 管理员：这颗胶囊可以点开工具面板。外观保持不变（维护者要求），
+        // 只加 cursor:pointer 与 title 作为「可点」的唯一提示。
+        // 管理员：这颗胶囊可以点开工具面板。
+        // ★ 不设 title、不加任何可见标记 —— 维护者要求「管理员和普通玩家看到的完全一致」。
+        //   普通玩家点它没有任何反应（下面 click 里会判 adminTools），
+        //   但不能靠悬停提示、光标、颜色等任何东西暴露「这是管理入口」。
+        const isAdmin = !!(s && s.adminId === true);
+        if (isAdmin) { chip.style.cursor = 'pointer'; }
+        else { chip.style.removeProperty('cursor'); }
+        chip.removeAttribute('title');
         const n = nodeOf();
         const node = data && data.nodes.find((x) => x.n === n);
         const label = node ? node.name + ' · ' + (node.ok ? '正常' : '离线') : '当前节点';

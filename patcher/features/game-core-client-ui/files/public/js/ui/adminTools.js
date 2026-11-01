@@ -28,7 +28,10 @@ const ERR_HINT = {
   TEST_FORBIDDEN: t('没有使用权限。请确认本局你的座位带管理员身份（重新登录游戏账号后进房）；或到管理后台生成验证码。'),
   TEST_DISABLED: t('这个节点没有开启测试指令开关。换一个节点（例如 node-1）再试。'),
   SPECTATOR: t('观战席只能观看，不能执行管理指令。'),
-  NOT_HOST: t('只有房主能执行这条指令。'),
+  // ★ 2026-10-31：服务端已放行管理员（不再要求房主），所以这条现在只在两种情况下出现：
+  //   ① 座位上的 admin 标记没同步上（例如刚兑换完验证码、还没重连）；
+  //   ② 测试模式房间里由非房主、非管理员的人下命令。
+  NOT_HOST: t('这条指令需要管理员身份或房主身份。若你刚兑换了验证码，刷新一次页面再试。'),
   WRONG_PHASE: t('当前阶段不允许这条操作（例如战斗中不能改经济或棋子）。'),
   NOT_IN_ROOM: t('你不在房间里。'),
   RATE: t('操作太频繁，稍等一下再点。'),
@@ -380,7 +383,13 @@ export function AdminTools({ open, onClose, anchor = null }) {
   };
   const shown = (() => {
     const all = list();
-    const f = q ? all.filter(([k, rec]) => (k + ' ' + nameOf(rec, k)).toLowerCase().includes(q.toLowerCase())) : all;
+    // ★ 本服 2026-11-01：**空搜索时不截断**，列出全部条目。
+    // 以前是无条件 `f.slice(0, 80)`，于是干员（data/chess.json 266 条）只看得到前 80 条，
+    // 后 83 个干员（断崖、斯卡蒂、瑕光、初雪、风笛…）在搜索框空着时根本不出现在列表里 ——
+    // 维护者以为「下拉框显示不全」，实际是被砍掉的。列表本来就带滚动条，266 个按钮渲染没有压力。
+    // 搜索时仍保留 80 条上限：输入一个宽泛的关键字（比如「char」）也能出上百条，那时截断是为了不让面板卡。
+    if (!q) return all;
+    const f = all.filter(([k, rec]) => (k + ' ' + nameOf(rec, k)).toLowerCase().includes(q.toLowerCase()));
     return f.slice(0, 80);
   })();
 

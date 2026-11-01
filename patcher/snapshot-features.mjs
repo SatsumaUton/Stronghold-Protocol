@@ -27,6 +27,18 @@ const OUT = `${REPO}/patcher/features`;
 const skipDir = new Set(['node_modules', 'logs', 'state', '.cache', 'bundles', '.git']);
 const skipRel = /^(public\/assets|data\/runtime)\//;
 
+// 运行目录里存在、但**不属于要保住的功能**的东西：临时脚本、一次性补丁草稿、调试产物、
+// 运行状态与令牌。这些如果被 content/** 之类的 glob 扫进补丁，check-coverage.mjs 会报
+// 「补丁里有 N 个文件在仓库中已不存在（补丁过期）」—— 因为仓库里根本没有它们。
+// 2026-11-02 实测踩到：content/pr878/*、content/q2.cjs、content/qadm.cjs 全被扫进去了。
+const skipFile = [
+  /^content\/pr\d+\//,                 // PR 补丁草稿
+  /^content\/[^/]+\.(cjs|mjs|ps1)$/,   // 临时脚本（q2.cjs / qadm.cjs / probe.ps1）
+  /^content\/_testtoken\.txt$/,        // 令牌，绝不入库
+  /^content\/(rooms|metrics-history|ops-code-stamp|rolling-code-stamp)\.json$/, // 运行状态
+  /\.bak$/, /\.bak-/, /\.orig$/, /~$/,
+];
+
 function expand(pattern) {
   const clean = pattern.replace(/\\/g, '/');
   if (!clean.includes('*')) return [clean];
@@ -80,6 +92,7 @@ for (const feature of features) {
   for (const pattern of feature.files || []) {
     for (const rel of expand(pattern)) {
       if (skipRel.test(rel) || rel.endsWith('.log')) continue;
+      if (skipFile.some((re) => re.test(rel))) continue;
       const src = fs.existsSync(path.join(SRC, rel)) ? path.join(SRC, rel) : path.join(ROOT, rel);
       const base = path.join(BASE, rel);
       if (!fs.existsSync(src)) continue;

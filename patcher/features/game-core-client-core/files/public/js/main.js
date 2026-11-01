@@ -1,0 +1,725 @@
+// Client entry: boot (fonts, identity, socket), net → store wiring, router, global overlays.
+//
+// Router (derived from the store, no URL routes):
+//   not entered            → Title
+//   m.public.phase ≠ LOBBY → Game (screens/game.js: briefing / band draft / match / result by phase)
+//   room.inMatch           → Game (match starting, m.public on its way)
+//   in a room              → Room
+//   otherwise              → Lobby
+// Deep link `?room=CODE`: remembered at boot, auto-joined once the player has entered and the
+// session is online (after a short grace period in case the server restores a room on resume).
+// Reloading a tab that already passed the title re-enters automatically (sessionStorage flag) and
+// resumes the server session with the saved token; stale room/match state is dropped if the
+// server does not re-push it within RESTORE_GRACE_MS after `welcome`. Boot waits for
+// `identity.init()` (which token this tab may use without stealing another live tab's session)
+// before the first connect; a page restored from the back/forward cache reloads.
+// A `welcome` with a NEW playerId (the server restarted / the session expired) while a room or match was on screen:
+// toast 「服务器会话已重置，上一局模拟已结束」 (store.js sessionResetNotice) and return to the lobby with nothing stale.
+//
+// Shared modules are imported relatively ('../../shared/…' resolves to /shared/… in the browser).
+// Multi-device support (ui/device.js + css/devices.css): feature classes on <html>, no page zoom, safe areas, rotation
+// re-layout; ui/compat.js polyfills are imported before anything else.
+// 干员调配 (DESIGN §16): an overlay over any route (<LoadoutHost/>, opened from lobby / room / briefing); its loadout is
+// kept in sync with the server by installLoadoutSync (room.loadout after every welcome and edit), its 干员持有 tab's
+// not-owned list (0.2.0 补位) by installOwnershipSync (room.ownership, likewise), the 自选编队 picks (0.2.0 DIY) by
+// installDiySync (room.diy, likewise; it also keeps welcome.diyKitted for the picker).
+// Game data: every text of the game is static data (/data/*.json) downloaded once per page; the in-match files are
+// warmed in the background as soon as the player is in a room (warmGameData), before the match needs them.
+// Language (ui/lang.js, docs/I18N.md): chosen before the first render (initLang); App re-renders on a switch (useLang).
+// Server texts are translated on arrival: m.toast / m.ticker frames (msgid + params, or the text as a msgid; a
+// config.broadcasts line from its id + args), error codes (ui/toasts.js describeError) and room.closed reasons.
+// Cosmetic plugins (DESIGN §32 P1a): installContent (content.js) lays the room's visual set and the player's personal
+// plugins over the art manifest every screen reads. Gameplay plugins (§32.6): installContentSet (content.js) downloads and
+// checks a room's content set and makes it the data every screen and the battle runner read.
+// Official versions (DESIGN §35.23, versions.js): welcome.versions turns the lobby's version switch on; installContentSet
+// also loads and checks the version the page shows (the lobby's choice, a room's version). A room whose version changes
+// while a result is on screen drops that result (the server dropped the room's replay: its chess ids are the old
+// version's), and a result that arrives after the room is gone keeps the version its frames name (m.result / m.public
+// `version`, versions.js matchFrameVersion), also on a freshly loaded page that never saw the room.
+
+// Polyfills first (older Safari / Firefox ESR): every module evaluated after this one sees them.
+import './ui/compat.js';
+import { render } from '../vendor/preact.module.js';
+import { useErrorBoundary } from '../vendor/hooks.module.js';
+import { html, UiHosts, Button, MicroLabel, closeAllDialogs } from './ui/components.js';
+import { ConnectionBanner } from './ui/connBanner.js';
+import { ToastHost, toast, toastError, describeError } from './ui/toasts.js';
+import { net, identity, NetError } from './net.js';
+import { store, useStore, emptyMatch, selectRoute, sessionResetNotice, isSpectating } from './store.js';
+import { data } from './data.js';
+import { GAME_FILES } from './ui/gameComponents.js';
+import { TitleScreen, sanitizeName } from './screens/title.js';
+import { LobbyScreen, rememberRoom, parseRoomParam, joinKnown } from './screens/lobby.js';
+import { RoomScreen, TrustedNotice } from './screens/room.js';
+import { GameScreen } from './screens/game.js';
+import { preloadBootArt } from './ui/protocolBoot.js';
+import { audio, installAudio } from './audio.js';
+import { installLobbyMedia } from './ui/lobbyMedia.js';
+import { settingsStore } from './ui/settings.js';
+import { GuideHost } from './ui/guide.js';
+import { installDeviceSupport, useFullscreen, useScreenWakeLock } from './ui/device.js';
+import { isCombatPhase } from './ui/gameLogic/phases.js';
+import { registerImportedAssetWorker } from './assetCache.js';
+import { LoadoutHost } from './screens/loadout.js';
+import { StatsHost, useStatsOpen } from './screens/stats.js';
+import { CoveredVersionVote } from './ui/versionVote.js';
+import { installRehearsal } from './battle/rehearsal.js';
+import { recordResult, installStatsRecorder } from './ui/stats.js';
+import { installLoadoutSync, installOwnershipSync, installDiySync, installSkinsSync, installCardSync, installSettingsViews, loadoutStore } from './ui/loadoutSync.js';
+import { startBuildGuard } from './ui/buildGuard.js';
+import { startStickyNode } from './ui/stickyNode.js';
+import { installAccountObserver } from './ui/accountObserver.js';
+import { initLang, useLang, tickerText } from './ui/lang.js';
+import { t, N_, translateWire } from '../../shared/i18n.js';
+import { recordError, installTrafficMeter } from './diag.js';
+import { installContent, installContentSet } from './content.js';
+import { cosmetics } from './cosmetics.js';
+import { sanitizeVersions, roomVersion, isDefaultVersion, matchFrameVersion } from './versions.js';
+
+const RESTORE_GRACE_MS = 1500;
+const JOIN_DELAY_MS = 350;
+const TICKER_KEEP = 20;
+const EMOTE_KEEP = 20;
+
+const SCREENS = { title: TitleScreen, lobby: LobbyScreen, room: RoomScreen, game: GameScreen };
+
+/** Copy of a server message without transport fields. */
+function payload(msg) {
+  const { t, rid, ...rest } = msg; // eslint-disable-line no-unused-vars
+  return rest;
+}
+
+function clearRoomParam() {
+  try {
+    const url = new URL(location.href);
+    let changed = false;
+    if (url.searchParams.has('room')) { url.searchParams.delete('room'); changed = true; }
+    // An invite short link must not survive a closed/kicked room.
+    let path = url.pathname;
+    if (/^\/r\/[A-Za-z0-9]{4,6}\/?$/i.test(path)) { path = '/'; changed = true; }
+    if (changed) history.replaceState(history.state, '', path + (url.search || '') + url.hash);
+  } catch { /* ignore */ }
+}
+
+// ---- net → store wiring ---------------------------------------------------------------------------
+
+let seq = 0;
+let welcomeAt = 0;
+let roomStateAt = 0;
+let matchAt = 0;
+let restoreTimer = null;
+let joinTimer = null;
+let joinInFlight = false;
+/** The rehearsal installer (battle/rehearsal.js): its tasks follow the match on screen (see wireNet's store hook). */
+let rehearsal = null;
+
+function clearPendingJoin() {
+  store.patch('ui', { pendingJoin: null, pendingSpectate: false });
+  clearRoomParam();
+  try { sessionStorage.removeItem('mm.pendingRoom'); } catch { /* ignore */ }
+}
+
+/** The account observer has already read this flag; keep the address bar clean even when it skipped. */
+function stripAccountResumeParam() {
+  try {
+    const url = new URL(location.href);
+    if (!url.searchParams.has('accountResume')) return;
+    url.searchParams.delete('accountResume');
+    history.replaceState(history.state, '', url.pathname + (url.search || '') + url.hash);
+  } catch { /* ignore */ }
+}
+
+/** A stale /r/CODE or ?room=CODE must not advertise a room that has already closed. */
+function validatePendingInvite(code) {
+  if (!code) return;
+  fetch('/mm/api/find-room?code=' + encodeURIComponent(code), { credentials: 'same-origin', cache: 'no-store' })
+    .then((r) => r.ok ? r.json() : null)
+    .then((j) => {
+      if (!j) return;
+      const cur = store.get().ui.pendingJoin;
+      if (cur && cur.toUpperCase() === String(code).toUpperCase() && !j.node) clearPendingJoin();
+    })
+    .catch(() => {});
+}
+
+/** Auto-join the deep-linked room once entered + online (idempotent). */
+function schedulePendingJoin() {
+  // Hidden admin watch is a spectator session, not a player deep-link.
+  try {
+    const qs = new URLSearchParams(location.search);
+    if (qs.get('adminWatch') === '1' || qs.get('watchGuest') === '1' || qs.get('watchToken')
+      || sessionStorage.getItem('sp_admin_watch_code') || localStorage.getItem('sp_admin_watch_code')) return;
+    const closedAt = Number(localStorage.getItem('sp_admin_watch_closed_at') || 0);
+    if (closedAt > 0 && Date.now() - closedAt < 60_000) {
+      clearPendingJoin();
+      return;
+    }
+  } catch { /* ignore */ }
+  clearTimeout(joinTimer);
+  joinTimer = setTimeout(async () => {
+    if (window.__SP_ACCOUNT_RESUME_PENDING) return;
+    const s = store.get();
+    const code = s.ui.pendingJoin;
+    if (!code || joinInFlight || !s.session.entered || net.status !== 'online') return;
+    if (s.room) {
+      if (s.room.code !== code) toast(t('你已在其他同盟中，请先离开当前同盟'), 'warn');
+      clearPendingJoin();
+      return;
+    }
+    joinInFlight = true;
+    try {
+      await joinKnown(s.ui.pendingSpectate ? 'room.spectate' : 'room.join', code);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      joinInFlight = false;
+      clearPendingJoin();
+    }
+  }, JOIN_DELAY_MS);
+}
+
+/** End the post-resume "syncing" state early once the server re-pushed what we were showing. */
+function maybeFinishRestore() {
+  const s = store.get();
+  if (!s.ui.restoring) return;
+  const roomOk = !s.room || roomStateAt >= welcomeAt;
+  const matchOk = !s.match.public || matchAt >= welcomeAt || !s.room?.inMatch;
+  if (roomOk && matchOk) {
+    clearTimeout(restoreTimer);
+    store.patch('ui', { restoring: false });
+  }
+}
+
+/**
+ * Leave whatever room / match was on screen for the lobby with nothing stale left behind: open imperative dialogs,
+ * the post-resume restore timer, ticker lines and emote bubbles of the old match (the battle runner and the 暂离 flag
+ * follow the store themselves).
+ */
+function backToLobby() {
+  identity.rememberMatch(null);
+  clearTimeout(restoreTimer);
+  clearPendingJoin();
+  const s = store.get();
+  if (s.room || s.match.public) closeAllDialogs();
+  store.set({ room: null, match: emptyMatch(), ticker: [], emotes: [] });
+  store.patch('ui', { restoring: false, buildStale: false });
+}
+
+/** The unofficial plugins a server counts in welcome / /healthz `content.plugins` (absent: none — DESIGN §32 P1a). */
+const pluginCount = (content) => (content && Number.isInteger(content.plugins) && content.plugins > 0 ? content.plugins : 0);
+
+function onWelcome(msg) {
+  identity.saveToken(msg.token);
+  identity.rememberMatch(null);
+  const prev = store.get();
+  const prevId = prev.me.playerId;
+  const name = typeof msg.name === 'string' && msg.name ? msg.name : prev.me.name;
+  identity.saveName(name);
+  store.set({
+    me: { playerId: msg.playerId ?? null, name, tag: typeof msg.tag === 'string' && /^[0-9]{4}$/.test(msg.tag) ? msg.tag : null, token: typeof msg.token === 'string' ? msg.token : null },
+    // the server's content identity (DESIGN §32): the diagnostics name it (diag.js contentLine)
+    content: msg.content && typeof msg.content.vanilla === 'string' ? { vanilla: msg.content.vanilla } : null,
+    // how many unofficial plugins it has (P1a — absent: none; content.js fetches the catalogue only when there are some)
+    installedPlugins: pluginCount(msg.content),
+    installedNotices: msg.content?.notices === true,
+    testMode: msg.testMode === true,
+    // 本服：管理员工具入口开关（服务端 net.js 验签后下发；普通玩家永远拿不到这个键）
+    adminTools: msg.adminTools === true,
+    adminId: msg.adminId === true,
+    gameTool: msg.gameTool === true,   // 权限门：有没有 tools.game 权限
+    adminCode: msg.adminCode === true,
+    // the official versions the server enables (protocol §2; absent: the switch is off — versions.js)
+    versions: sanitizeVersions(msg.versions),
+  });
+  welcomeAt = Date.now();
+
+  if (msg.takeoverFrom === prevId && prevId != null) {
+    toast(t('你已接管AI席位，资金、阵容与席位已保留'), 'info');
+  } else if (prevId != null && prevId !== msg.playerId) {
+    // A brand-new server session (the server restarted — crashed / killed, so no room.closed arrived — or this session
+    // expired on it): whatever we showed before is gone — back to the lobby cleanly and say why.
+    // Hidden watch has no player seat; a reconnect with a fresh guest id must keep watching the same room.
+    const adminWatch = (() => {
+      try {
+        const qs = new URLSearchParams(location.search);
+        return qs.get('adminWatch') === '1' || qs.get('watchGuest') === '1' || !!qs.get('watchToken')
+          || !!sessionStorage.getItem('sp_admin_watch_code') || !!localStorage.getItem('sp_admin_watch_code');
+      } catch { return false; }
+    })();
+    if (!adminWatch) {
+      const notice = sessionResetNotice(prev, msg.playerId);
+      backToLobby();
+      if (notice) toast(t(notice), 'warn', { ttl: 7000 });
+    }
+  } else if (prev.room || prev.match.public) {
+    // Resumed session: the server re-pushes room/match state; drop whatever it doesn't.
+    store.patch('ui', { restoring: true });
+    clearTimeout(restoreTimer);
+    restoreTimer = setTimeout(() => {
+      const s = store.get();
+      const patch = {};
+      if (s.room && roomStateAt < welcomeAt) patch.room = null;
+      if (s.match.public && matchAt < welcomeAt) patch.match = emptyMatch();
+      store.set(patch);
+      store.patch('ui', { restoring: false });
+    }, RESTORE_GRACE_MS);
+  }
+  schedulePendingJoin();
+}
+
+function onRoomState(msg) {
+  const room = payload(msg);
+  roomStateAt = Date.now();
+  const myId = store.get().me.playerId;
+  const seats = Array.isArray(room.seats) ? room.seats : [];
+  const adminWatch = (() => {
+    try {
+      return /(?:^|[?&])adminWatch=1(?:&|$)/.test(location.search) || !!sessionStorage.getItem('sp_admin_watch_code');
+    } catch { return false; }
+  })();
+  // ★ 服务端可能在 welcome 之前就推 room.state（同账号接管座位时，
+  //   lobby.js 的 join 分支先 broadcastState 再回 OK）。那一刻本页的 me.playerId
+  //   还是**上一个会话**的 id，而房间里的座位已经换成新会话的 playerId ——
+  //   下面「座位里没有我」的判断会误判成「已被踢出」，把刚接管的房间和 match 一起清空，
+  //   界面就永远停在「正在进入模拟…」（玩家实测的正是这个画面）。
+  //   所以先认出「本页是刚换过身份、新 welcome 还在路上」的情况，此时不清房间。
+  const identityPending = net.playerIdPending === true;
+  if (!adminWatch && !identityPending && myId != null && seats.length
+    && !seats.some((s) => s && s.playerId === myId) && !isSpectating(room, myId)) {
+    // We are no longer seated (kicked / left elsewhere) — neither in a player seat nor a spectator seat.
+    if (store.get().room) toast(t('你已不在该同盟中'), 'warn');
+    store.set({ room: null, match: emptyMatch() });
+    return;
+  }
+  const prevRoom = store.get().room;
+  // A (new) match starts: forget the previous match's state so stale results never show.
+  if (room.inMatch && !(prevRoom && prevRoom.inMatch && prevRoom.code === room.code)) store.set({ match: emptyMatch() });
+  // The room switched its version (DESIGN §35.23): a result still on screen (a settlement, a spectator's view) names the old
+  // version's chess ids, and the server dropped the room's replay — it closes, back to the room.
+  else if (prevRoom && prevRoom.code === room.code && !room.inMatch && roomVersion(prevRoom) !== roomVersion(room) && store.get().match.public) store.set({ match: emptyMatch() });
+  store.set({ room });
+  identity.rememberMatch(room.inMatch && seats.some((seat) => seat?.playerId === myId)
+    ? { name: store.get().me.name, code: room.code || '' } : null);
+  if (room.mode === 'coop' && typeof room.code === 'string') rememberRoom(room.code, room.test === true);
+  maybeFinishRestore();
+}
+
+// 房间关闭的提示文案。每条都可以给 `solo` / `coop` 两个说法：
+// 独立模拟（solo）里没有「同盟」这个概念，说「同盟已解散」会很怪。
+// 只写一个字符串的条目（ended / shutdown）两种模式通用。
+// 2026-10-28 维护者要求：「独立模拟和同盟模拟的关闭信息」要分开。
+const CLOSE_REASON = {
+  // 'timeout' = this player was removed after staying disconnected past the lobby grace (server/lobby.js)
+  host_left: { solo: N_('创建者已离开，模拟已结束'), coop: N_('创建者已离开，同盟已解散') },
+  timeout: { solo: N_('由于长时间断开连接，你已离开模拟'), coop: N_('由于长时间断开连接，你已离开同盟') },
+  empty: { solo: N_('模拟已结束'), coop: N_('同盟已解散') },
+  kicked: { solo: N_('你已被移出模拟'), coop: N_('你已被移出同盟') },
+  ended: N_('模拟已结束'),
+  expired: { solo: N_('模拟已过期'), coop: N_('同盟已过期') },
+  shutdown: N_('服务器维护中，模拟已关闭'),
+  'stuck-preparing': { solo: N_('模拟超时未开始，已自动结束'), coop: N_('同盟超时未开始，已自动解散') },
+  // 管理员从控制台 / 管理后台手动关闭（服务器 /admin/room/close）
+  'admin-closed': { solo: N_('该模拟已被管理员关闭'), coop: N_('该同盟已被管理员关闭') },
+};
+
+/**
+ * 一条关闭原因在当前模式下的文案键。
+ * @param {string | Record<string, string>} entry CLOSE_REASON 的值
+ * @param {string | null} mode 关闭前的房间模式：'solo' | 'coop' | null
+ * @returns {string}
+ */
+function closeText(entry, mode) {
+  if (typeof entry === 'string') return t(entry);
+  // 单人房就是 solo；其余（含模式未知）按同盟的说法，保持改动前的行为
+  return t(mode === 'solo' ? entry.solo : entry.coop);
+}
+
+function wireNet() {
+  net.on('status', (snap) => {
+    const cur = store.get().connection;
+    store.set({
+      connection: {
+        status: snap.status, ping: snap.ping, attempt: snap.attempt, retryAt: snap.retryAt,
+        lastError: snap.lastError, everOnline: cur.everOnline || snap.status === 'online',
+      },
+    });
+  });
+  net.on('clock', (c) => store.set({ clock: { offset: c.offset, rtt: c.rtt, synced: c.synced } }));
+  net.on('welcome', onWelcome);
+  net.on('helloError', (err) => {
+    if (err.code === 'SESSION_IN_USE') identity.rejectToken();
+    toastError(err);
+  });
+  // 同一账号在另一个标签页/浏览器登录时，服务端会关闭本页的 socket（4001），
+  // 并让新的那个接管座位。本页从此不会自动重连（net.js _onClose 的注释：不要跟新页面抢）。
+  //
+  // 以前这里只弹一条 toast，界面什么都不做 —— 于是被接管的那一页会**永远停在原画面**：
+  // 实测「两个标签页登同一账号」时，旧页卡在「正在进入模拟…」不动，玩家以为是加载失败。
+  // 服务端那局其实还在（由新页接着打），所以刷新本页也没用，看起来像"闪退后恢复不了"。
+  //
+  // 现在：提示保留，同时把页面清理到可理解的状态 ——
+  // 清掉对局/房间的内存状态（让它回到大厅）、收掉残留的过渡遮罩与倒计时浮层。
+  net.on('replaced', () => {
+    toast(t('该身份已在其他页面登录，本页已断开。要继续在这页玩，请刷新页面。'), 'warn', { ttl: 8000 });
+    try {
+      // 交还座位：本页不再持有这一局，让 UI 回到大厅而不是钉在旧画面上。
+      // 只清 room / match，外加 ui.pendingJoin（那是"/r/CODE 待加入"的占位，
+      // 不清的话本页会继续尝试自己加入一个已经由新页面接管的对局）。
+      store.set({ room: null, match: null });
+      store.patch('ui', { pendingJoin: null, restoring: false });
+    } catch { /* ignore */ }
+    try {
+      for (const id of ['mm-overlay', 'mm-back']) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+      }
+      const timer = document.getElementById('mm-room-timer');
+      if (timer) timer.remove();
+    } catch { /* ignore */ }
+  });
+  // 这些错误码由具体流程自己处理并给出更具体的提示（例如 mm/client.js 的 joinFlow 会显示
+  // 「加入失败：未找到该同盟密钥对应的房间」）。若这里再弹一次，玩家会同时看到两条几乎相同的红条。
+  const QUIET_CODES = new Set(['ROOM_NOT_FOUND', 'ROOM_STARTED', 'ROOM_FULL', 'NOT_IN_ROOM']);
+  net.on('unhandledError', (err) => {
+    if (err && QUIET_CODES.has(err.code)) return;   // 流程内已提示，避免重复弹窗
+    toastError(err);
+  });
+  net.on('room.state', onRoomState);
+  net.on('room.closed', (msg) => {
+    // 房间关闭提示要按模式说人话：独立模拟（solo）里没有「同盟」这个概念。
+    // backToLobby() 会把 store.room 清空，所以模式必须在它之前抓（2026-10-28）。
+    const mode = store.get().room?.mode ?? null;
+    clearPendingJoin();
+    backToLobby();
+    const known = Object.hasOwn(CLOSE_REASON, String(msg.reason)) ? CLOSE_REASON[msg.reason] : null;
+    const text = known ? closeText(known, mode) : typeof msg.reason === 'string' && msg.reason.length < 60
+      ? t('同盟已关闭：{reason}', { reason: msg.reason }) : t('同盟已关闭');
+    toast(text, 'warn');
+  });
+  net.on('m.public', (msg) => { matchAt = Date.now(); store.patch('match', { public: payload(msg) }); maybeFinishRestore(); });
+  net.on('m.private', (msg) => { matchAt = Date.now(); store.patch('match', { private: payload(msg) }); });
+  net.on('m.layer', (msg) => {
+    const s = store.get();
+    if (selectRoute(s) === 'game' && msg.playerId === s.me?.playerId) audio.layerGain(msg.bondId, msg.add);
+  });
+  net.on('m.field', (msg) => store.patch('match', { field: payload(msg) }));
+  net.on('m.result', (msg) => {
+    const res = payload(msg);
+    store.patch('match', { result: res });
+    // 本机统计 (PR #323): every arrival, including the lobby's result replay after a reconnect / reload —
+    // replays dedupe by content id inside recordResult (spectator seats' copies build no record at all)
+    // (`vs`: the room's cosmetic plugins, recorded — such a match still counts as the original game: ui/stats.js)
+    // (`content`: the room's content set when it played gameplay plugins — such a match is unofficial: ui/stats.js)
+    // (`version`: the official version the match played, DESIGN §35.23 — the room's, or the result's own `version` when
+    // it arrives after the room is gone, also to a freshly loaded page; only a non-default one is written)
+    const s = store.get();
+    const version = s.room ? roomVersion(s.room) : matchFrameVersion({ result: res, public: s.match.public });
+    if (s.room?.test !== true && s.match.public?.test !== true) recordResult(res, { myId: s.me.playerId, roomMode: s.room?.mode ?? null, vs: s.room?.content?.vs ?? null, content: s.room?.content ?? null, version: isDefaultVersion(version) ? null : version, now: Date.now() });
+  });
+  net.on('m.toast', (msg) => {
+    const kind = ['info', 'success', 'warn', 'error'].includes(msg.kind) ? msg.kind : 'info';
+    // msgid + params (server ≥ 0.2.0) or the text itself as a msgid, in the current language
+    toast(translateWire(msg), kind);
+  });
+  net.on('m.ticker', (msg) => {
+    if (typeof msg.text !== 'string') return;
+    const text = tickerText(msg);
+    // type, player + the round it came in: a BOSS_HIT line is dropped once its boss round is over and superseded by the
+    // same player's next one (ui/ticker.js tickerLineLive / tickerSupersedes)
+    const type = typeof msg.type === 'string' ? msg.type : null;
+    const playerId = typeof msg.playerId === 'string' ? msg.playerId : null;
+    // its broadcast priority: the strip plays the highest first (ui/ticker.js enqueueTickerLines)
+    const priority = Number.isFinite(msg.priority) ? msg.priority : 0;
+    store.set((s) => ({ ticker: [...s.ticker.slice(-(TICKER_KEEP - 1)), { id: ++seq, text, at: Date.now(), type, playerId, round: s.match?.public?.round ?? null, priority }] }));
+  });
+  net.on('m.emote', (msg) => {
+    try { globalThis.__SP_LAST_EMOTE = { id: msg.id, at: Date.now() }; } catch { /* ignore */ }
+    store.set((s) => ({ emotes: [...s.emotes.slice(-(EMOTE_KEEP - 1)), { seq: ++seq, playerId: msg.playerId, id: msg.id, at: Date.now() }] }));
+  });
+
+  // Entering (title → lobby) while already online also needs the deep-link join.
+  store.subscribe((s, prev) => {
+    if (s.session.entered && !prev.session.entered) schedulePendingJoin();
+    // in a room (co-op or solo, also a resumed one) a match is near: its data starts downloading
+    if (s.room && !prev.room) warmGameData();
+    // the match on screen is over (left, closed, kicked, a new session): a rehearsal task of it is dead, and the frame
+    // that cancels it may never arrive (a disposed match sends nothing) — the page stops what it is running itself
+    if (selectRoute(prev) === 'game' && selectRoute(s) !== 'game') rehearsal?.clear();
+  });
+}
+
+/**
+ * Download every data file of the match UI (gameComponents GAME_FILES: operators, skills, bonds, items, enemies, 特质 …)
+ * and the pre-game sprites in the background once the player is in a room — a match is near (the lobby alone never
+ * downloads them). The game's
+ * texts are static data loaded once per page — never fetched during a match — and the match screen waits for these
+ * files, so with them warmed it opens at once and no text ever appears late (user playtest #3 item 9). Idempotent (the
+ * data store shares each file's promise).
+ */
+function warmGameData() {
+  // a room with gameplay plugins: content.js downloads its content set's files instead (DESIGN §32.6). With the art list
+  // in, the pre-game sprites (协议启动！ and the 请选择策略 band, ui/protocolBoot.js) start too: a solo player who starts
+  // at once and skips through the briefing meets the band draft's first turn with them at hand (§35.18's leftover)
+  // Another official version's room (DESIGN §35.23): its version set brings those files (content.js) — the server's
+  // default ones would race it; only the art list the sprites need is fetched.
+  const go = () => {
+    const room = store.get().room;
+    if (room?.content?.vanilla === false) return;
+    if (typeof room?.version === 'string') { data.load('assets').then(() => preloadBootArt(), () => {}); return; }
+    data.loadAll(GAME_FILES).then(() => preloadBootArt(), () => {});
+  };
+  if (typeof globalThis.requestIdleCallback === 'function') globalThis.requestIdleCallback(go, { timeout: 2500 });
+  else setTimeout(go, 600);
+}
+
+// ---- UI chrome (the connection banner lives in ui/connBanner.js) -----------------------------------
+
+function ScreenCrashed({ error, reset }) {
+  return html`<div class="screen crash">
+    <div class="crash__box brackets">
+      <${MicroLabel} tone="mint">SYSTEM FAULT<//>
+      <h2>${t('界面发生错误')}</h2>
+      <p class="t-lo">${String(error?.message || error).slice(0, 200)}</p>
+      <${Button} variant="primary" icon="refresh" onClick=${reset}>${t('重新加载界面')}<//>
+    </div>
+  </div>`;
+}
+
+function App() {
+  const route = useStore(selectRoute);
+  const combatActive = useStore((s) => selectRoute(s) === 'game' && s.room?.inMatch === true
+    && !s.match?.result && isCombatPhase(s.match?.public?.phase));
+  const fullscreenWakeLock = useStore((s) => s.fullscreenWakeLock, Object.is, settingsStore);
+  const fullscreenActive = useFullscreen();
+  useScreenWakeLock(combatActive || (fullscreenWakeLock && fullscreenActive));
+  useLang(); // a language switch re-renders the whole tree in place
+  const [error, resetError] = useErrorBoundary((err) => console.error('[ui] screen crashed', err));
+  const Screen = SCREENS[route] || LobbyScreen;
+  return html`<div class="app-root">
+    <div class="app-bg" aria-hidden="true"></div>
+    ${error ? html`<${ScreenCrashed} error=${error} reset=${resetError} />` : html`<${Screen} key=${route} />`}
+    <${TrustedNotice} />
+    <${ConnectionBanner} />
+    <${ToastHost} />
+    <${UiHosts} />
+    <${GuideHost} />
+    <${LoadoutHost} />
+    <${StatsHost} />
+    <${VoteOverOverlays} />
+  </div>`;
+}
+
+/** The room's version vote above 干员调配 / 统计数据 while one covers the room (ui/versionVote.js CoveredVersionVote). */
+function VoteOverOverlays() {
+  const lo = useStore((s) => !!s.open, Object.is, loadoutStore);
+  const st = useStatsOpen();
+  return html`<${CoveredVersionVote} covered=${lo || st} />`;
+}
+
+// ---- boot -----------------------------------------------------------------------------------------
+
+async function waitForFonts(ms) {
+  const fonts = document.fonts;
+  if (!fonts || typeof fonts.load !== 'function') return;
+  const loads = [
+    fonts.load('900 1em "Noto Sans SC"', '卫戍协议盟约'), // i18n-ignore (font sample)
+    fonts.load('700 1em "Noto Sans SC"', '开始'), // i18n-ignore (font sample)
+    fonts.load('700 1em Bender', '0123456789'),
+    fonts.load('700 1em Rajdhani', '0123456789'),
+  ].map((p) => p.catch(() => null));
+  await Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, ms))]);
+}
+
+function installGlobalErrorHandlers() {
+  window.addEventListener('unhandledrejection', (ev) => {
+    const err = ev.reason;
+    // Media autoplay/abort rejections (audio.play() before a user gesture, interrupted loads) are
+    // expected browser behaviour, not app errors: log quietly, never toast.
+    if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) { console.warn('[app] ignored rejection', err.name); return; }
+    console.error('[app] unhandled rejection', err);
+    recordError('rejection', err);
+    if (err instanceof NetError) toastError(err);
+    else toast(t('发生意外错误：{error}', { error: describeError(err) }).slice(0, 120), 'error');
+  });
+  window.addEventListener('error', (ev) => {
+    if (!(ev instanceof ErrorEvent)) return; // resource load errors are not script errors
+    console.error('[app] uncaught error', ev.error || ev.message);
+    recordError('error', ev.error || ev.message, ev.error ? null : `${ev.filename || '?'}:${ev.lineno || 0}:${ev.colno || 0}`);
+  });
+}
+
+async function boot() {
+  installGlobalErrorHandlers();
+  // what this page downloads, by category, for the 问题反馈 report's traffic line (diag.js; nothing is sent anywhere)
+  installTrafficMeter();
+  // touch / hover / fullscreen classes, zoom-gesture blocking, rotation re-layout (ui/device.js, css/devices.css)
+  installDeviceSupport();
+  // Hashed art a player imported. HTTPS or localhost only; a failure here must not stop boot.
+  void registerImportedAssetWorker();
+  // A page restored from the back/forward cache has a dead socket and a stale token choice: start over.
+  window.addEventListener('pageshow', (ev) => { if (ev.persisted) location.reload(); });
+  // Pick this tab's reconnect token (asks other live tabs; ≤150 ms) while fonts load.
+  const identityReady = identity.init();
+
+  const pendingJoin = parseRoomParam(location.search);
+  const pendingSpectate = /(?:^|[?&])spectate=1(?:&|$)/.test(location.search);
+  // Consume a closed-watch cleanup request exactly once on a normal game page.
+  try {
+    const qs = new URLSearchParams(location.search);
+    const watchUrl = qs.get('adminWatch') === '1' || qs.get('watchGuest') === '1' || !!qs.get('watchToken');
+    if (!watchUrl && localStorage.getItem('sp_admin_watch_cleanup') === '1') {
+      localStorage.removeItem('sp_admin_watch_cleanup');
+      for (const k of ['sp_watch_token', 'sp_admin_watch_code', 'sp_admin_watch_node', 'sp_admin_watch_name']) {
+        localStorage.removeItem(k);
+      }
+      sessionStorage.removeItem('sp_admin_watch_code');
+      sessionStorage.removeItem('sp_admin_watch_token');
+    }
+  } catch { /* ignore */ }
+  const savedName = sanitizeName(identity.loadName());
+  const entered = identity.wasEntered() && !!savedName;
+  store.set((s) => ({
+    me: { ...s.me, name: savedName },
+    session: { entered },
+    ui: { ...s.ui, pendingJoin, pendingSpectate },
+  }));
+  const bootAdminWatch = (() => {
+    try {
+      const qs = new URLSearchParams(location.search);
+      return qs.get('adminWatch') === '1' || qs.get('watchGuest') === '1' || !!qs.get('watchToken')
+        || !!sessionStorage.getItem('sp_admin_watch_code') || !!localStorage.getItem('sp_admin_watch_code');
+    } catch { return false; }
+  })();
+  if (!bootAdminWatch && typeof validatePendingInvite === 'function') validatePendingInvite(pendingJoin);
+
+  wireNet();
+  stripAccountResumeParam();
+  installAccountObserver();
+  installStatsRecorder(store); // follows the match on screen, so a 放弃模拟 can be recorded (ui/stats.js)
+  // the loadout / 干员持有 / 自选 settings by operator, shown for the data on screen (DESIGN §35.23; a v1 store migrates)
+  installSettingsViews();
+  installLoadoutSync({ net });
+  installOwnershipSync({ net });
+  installDiySync({ net });
+  // 干员皮肤 (docs/SKINS.md): keeps the server's copy of this browser's chosen appearances current (room.skins), from
+  // ui/skins.js' own store — its 皮肤 section is rendered by screens/loadout.js.
+  installSkinsSync({ net });
+  // 名片干员 (PR #643 split 6): the operator on this browser's seat card (room.card, ui/seatArt.js cardStore) — after every
+  // welcome, pick and content change, with the engine's retries (the room screen only reads and sets the pick)
+  installCardSync({ net });
+  // the room's cosmetic plugins and the player's own over the art manifest (content.js; nothing is fetched without them)
+  installContent({ toast });
+  // a room with gameplay plugins: its content set downloaded, checked and shown (content.js — DESIGN §32.6)
+  installContentSet({ toast });
+  // A bot prep's layout rehearsal the server offers this host's browser (DESIGN §14, SP_BOT_REHEARSAL=host on the
+  // server): a same-origin module Worker simulates the candidates off the main thread and answers with its pick; a
+  // browser that cannot run one answers `error` and the server rehearses itself. Nothing happens while the server
+  // does not delegate. A gameplay-plugin room is never offered (the server keeps that rehearsal).
+  rehearsal = installRehearsal({ net });
+  net.attachBrowserHooks();
+  // Audio: unlock on first gesture, BGM follows the route / match phase (js/audio.js).
+  // a cosmetic plugin's sound that will not load falls back like its art (content.js, DESIGN §32 P1a)
+  installAudio({ getManifest: () => data.get('assets'), subscribe: store.subscribe, getState: store.get, selectRoute, settings: settingsStore.get(),
+    onFailed: (url) => cosmetics.fail(url) });
+  // …and the music follows the art: the screen's track again when the cosmetic layers change its URLs
+  cosmetics.subscribe(() => audio.refreshBgm());
+  // 自定义大厅背景与音乐 (ui/lobbyMedia.js): the player's own files of this browser, the music from the title on
+  installLobbyMedia();
+  data.load('assets').catch(() => {});
+  // Warm the data cache in the background (missing files are tolerated).
+  data.loadAll('config').catch(() => {});
+  // Optional local-client art manifest (emotes, tutorial pages, official UI sprites; DESIGN §13).
+  data.load('local').catch(() => {});
+
+  const connectWhenReady = identityReady.then(() => {
+    if (entered) net.setName(savedName);
+    else net.connect();
+  });
+  // the language (and its UI translations) before the first render: no Chinese flash for an English player
+  const langReady = initLang().catch((err) => console.warn('[app] language setup failed', err));
+  await Promise.all([waitForFonts(1200), connectWhenReady, langReady]);
+  const root = document.getElementById('app');
+  render(html`<${App} />`, root);
+
+  const splash = document.getElementById('boot');
+  if (splash) {
+    splash.classList.add('is-done');
+    setTimeout(() => splash.remove(), 300);
+  }
+  // 启动成功：通知 boot.js 清掉「首屏加载失败重试计数」。
+  // 那个计数只该在连续失败时累加，成功一次就该归零，否则玩家网络抖过一次后，
+  // 之后每次刷新都会被直接判到错误页（表现为「一直刷新都不能好」）。
+  try { document.dispatchEvent(new Event('sp-boot-ok')); } catch { /* ignore */ }
+  try { sessionStorage.removeItem('sp_boot_retry'); } catch { /* ignore */ }
+  globalThis.__SP__ = { store, net, data, version: 1 };
+  // A page keeps the modules it imported at load time for its whole lifetime, so a deploy cannot reach an open tab
+  // (ui/buildGuard.js): watch `/healthz.build`. Never reload on our own: show the banner and let the player press
+  // 刷新页面, so leaving a room or visiting the lobby is not turned into an unexplained refresh.
+  const adminWatchPage = (() => {
+    try {
+      const qs = new URLSearchParams(location.search);
+      return qs.get('adminWatch') === '1' || qs.get('watchGuest') === '1' || !!qs.get('watchToken')
+        || !!sessionStorage.getItem('sp_admin_watch_code') || !!localStorage.getItem('sp_admin_watch_code');
+    } catch { return false; }
+  })();
+  const recentlyLeftWatch = (() => {
+    try {
+      const at = Number(localStorage.getItem('sp_admin_watch_closed_at') || 0);
+      return at > 0 && Date.now() - at < 10 * 60_000;
+    } catch { return false; }
+  })();
+  try {
+    let buildGuard = null;
+    // 「正开着对局」时把当前节点写进 sp_sticky cookie，离开时删掉。
+    // nginx 靠它决定「cookie 指向旧代码节点时还要不要粘住这个人」（见 ui/stickyNode.js）。
+    // admin 观战页不写：观战者本来就没在对局里，写了反而会把观战页钉在旧节点上。
+    if (!adminWatchPage) startStickyNode(store, { selectRoute });
+    if (!adminWatchPage && !recentlyLeftWatch) buildGuard = startBuildGuard({
+      inMatch: () => selectRoute(store.get()) === 'game',
+      // never reload the page on our own
+      reload: () => { store.patch('ui', { buildStale: true }); },
+      onStale: () => { store.patch('ui', { buildStale: true }); },
+      // the same /healthz names how many plugins the server has: the title screen shows it before any hello
+      onHealth: (h) => {
+        const n = pluginCount(h.content), notices = h.content?.notices === true;
+        if (n !== store.get().installedPlugins || notices !== store.get().installedNotices) store.set({ installedPlugins: n, installedNotices: notices });
+      },
+    });
+    if (buildGuard) {
+      // 离开房间 / 对局结束时，只清掉「刚才那局留下的」刷新提示，**不要停掉监控**。
+      //
+      // ★ 2026-10-31 修正（维护者要求：大厅、房间等待中也要提示更新）：
+      //   以前这里是 buildGuard.stop() —— 一离开房间就再也不检查版本了，
+      //   于是「在大厅/房间里等更新」的人永远收不到提示，只有正在打对局的人才会被拦。
+      //   现在改成：停一次即时检查的标记清空，然后**继续监控**（重新开始比对 build）。
+      //   这样人回到大厅后，服务器一换版，横幅照样会出现在大厅里。
+      window.addEventListener('sp-room-left', () => {
+        try {
+          // ★ 2026-10-31 第二次修正（维护者要求：对局中不弹，大厅/房间/结算才弹）。
+          //   这里**不要再清 stale**。以前是 reset()（清 stale），但：
+          //     · 现在对局中本来就不显示这条提示，所以「上一局留下的提示」不存在了；
+          //     · 清了反而会抹掉「离开房间后大厅里该出现的提示」，
+          //       而 known 还是旧 build，要再攒 2 次确认（约 2 分钟）才能重新触发，
+          //       中间这段时间玩家在大厅/结算页什么也看不到。
+          //   所以改成 resume()：只确保监控没停，**保留「服务器已更新」这个结论**。
+          buildGuard.resume?.();
+        } catch { /* ignore */ }
+      });
+      // A normal tab already open while the admin watches must also stop its build guard
+      // when the watch closes (the marker is written by the watch tab).
+      window.addEventListener('storage', (ev) => {
+        if (ev.key !== 'sp_admin_watch_closed_at' || !ev.newValue) return;
+        try { buildGuard.stop(); } catch { /* ignore */ }
+        store.patch('ui', { buildStale: false });
+      });
+    }
+  } catch (err) {
+    console.warn('[app] build guard failed to start', err);
+  }
+}
+
+boot().catch((err) => {
+  console.error('[app] boot failed', err);
+  const el = document.getElementById('boot-err');
+  if (el) el.textContent = t('启动失败，请刷新页面重试');
+});

@@ -7,7 +7,7 @@
 import { h } from '../../vendor/preact.module.js';
 import { useEffect, useReducer } from '../../vendor/hooks.module.js';
 import htm from '../../vendor/htm.module.js';
-import { ERR_TEXT, SETUP_REROLL_COOLDOWN_MS } from '../../../shared/constants.js';
+import { ERR_TEXT } from '../../../shared/constants.js';
 import { t, N_ } from '../../../shared/i18n.js';
 import { recordError } from '../diag.js';
 import { catalog, pluginName } from '../content.js';
@@ -89,6 +89,13 @@ export function dismissToast(id) {
   }, 200));
 }
 
+/** Server failure details with their own text (the match's votes: server/match/match/setupVote.js, kickVote.js). */
+const DETAIL_TEXT = {
+  'reroll-proposed': N_('本次开局信息你已发起过一次重刷投票'),
+  'reroll-limit': N_('本局的重刷次数已用完'),
+  'kick-failed-this-round': N_('本回合对该玩家的移出投票未通过，请下回合再试'),
+};
+
 /**
  * Text for an error-ish value: NetError / {code,msg} / Error / string — in the current language (the Chinese texts are
  * msgids: ERR_TEXT, net.js CLIENT_ERR_TEXT, a server `msg`; anything else is shown as it is).
@@ -98,6 +105,9 @@ export function dismissToast(id) {
 export function describeError(err) {
   if (!err) return t('发生未知错误');
   if (typeof err === 'string') return t(Object.hasOwn(ERR_TEXT, err) ? ERR_TEXT[err] : err);
+  // a nickname reserved for the server's owner: the NetError's own text (net.js NAME_RESERVED_TEXT)
+  if (err.code === 'NAME_REJECTED' && err.detail === 'reserved' && typeof err.message === 'string' && err.message) return t(err.message);
+  if (typeof err.detail === 'string' && Object.hasOwn(DETAIL_TEXT, err.detail)) return t(DETAIL_TEXT[err.detail]);
   if (err.code === 'PLUGIN_RULE_CONFLICT') {
     // Existing wire detail is bounded to 120 characters. The ids precede the longer developer explanation.
     const match = typeof err.detail === 'string' && /^PLUGIN_RULE_CONFLICT (\w+): ([a-z0-9-]{2,32}) and ([a-z0-9-]{2,32}) set /.exec(err.detail);
@@ -107,8 +117,6 @@ export function describeError(err) {
       return t('「{a}」和「{b}」的规则开关「{rule}」选项冲突', { a: name(match[2]), b: name(match[3]), rule: t(labels[match[1]]) });
     }
   }
-  // the per-seat 重刷本局 cooldown (PR #860, DESIGN §28.21): say which limit it is, not the generic RATE text
-  if (err.code === 'RATE' && err.detail === 'setup reroll cooldown') return t('每人 {s} 秒内只能发起一次重刷投票', { s: SETUP_REROLL_COOLDOWN_MS / 1000 });
   if (err.code && Object.hasOwn(ERR_TEXT, err.code)) return t(ERR_TEXT[err.code]);
   if (typeof err.message === 'string' && err.message) return t(err.message);
   if (typeof err.msg === 'string' && err.msg) return t(err.msg);

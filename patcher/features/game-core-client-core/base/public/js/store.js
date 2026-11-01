@@ -15,10 +15,6 @@
 //   ticker      – recent `m.ticker` lines, emotes – recent `m.emote` events
 //   clock       – { offset, rtt } server clock correction: serverNow ≈ Date.now() + offset
 //   ui          – small bits of local UI state shared between screens
-//   versions    – welcome.versions (the official versions the server enables, versions.js sanitizeVersions) or null: the
-//                 lobby's version switch is off; lobbyVersion – this browser's choice (`sp.pref.lobby.version`, an id);
-//                 replayVersion – the version of the stored match
-//                 统计数据 replays while it is open (screens/stats.js; null otherwise) — versions.js
 //
 // The store is framework-agnostic (get/set/subscribe); `useStore(selector)` binds it to Preact.
 // Updates are immutable at the top level: `set` shallow-merges a patch object, `patch(key, obj)`
@@ -76,50 +72,44 @@ export function createStore(initial) {
 }
 
 /** Fresh (empty) match slice. */
-export const emptyMatch = () => ({ public: null, private: null, field: null, result: null, battle: null });
+export const emptyMatch = () => ({ public: null, private: null, field: null, result: null, battle: null, damage: null });
 
 /** Initial app state (exported for tests and resets). */
 export const initialState = Object.freeze({
-  connection: { status: 'idle', ping: null, attempt: 0, retryAt: 0, lastError: null, everOnline: false },
+  connection: { status: 'idle', ping: null, loadState: 'unknown', loadDetails: null, clusterLoad: null, attempt: 0, retryAt: 0, lastError: null, everOnline: false },
   me: { playerId: null, name: '', token: null },
   content: null,
   // how many unofficial plugins the server has (DESIGN §32 P1a: /healthz or welcome `content.plugins`; content.js)
   installedPlugins: 0,
   // A language-only installation may have announcements without an unofficial plugin count.
   installedNotices: false,
-  session: { entered: false },
+  session: { entered: false }, // false only before boot and after a NAME_REJECTED hello (ui/nickname.js)
   room: null,
+  presence: null,
+  queue: { state: 'idle', ticketId: null },
   // welcome.testMode (DESIGN §34.8). The server omits the key when the switch is off; the client cannot set it.
   testMode: false,
   match: emptyMatch(),
   ticker: [],
   emotes: [],
   clock: { offset: 0, rtt: null, synced: false },
-  ui: { pendingJoin: null, restoring: false, buildStale: false },
-  // official versions (DESIGN §35.23, versions.js): welcome.versions (null: the switch is off), this browser's lobby choice
-  // (the pref as stored — versions.js lobbyVersion checks it against the list) and the version of the stored match
-  // 统计数据 replays (null when none: the lobby preference is never changed to show one). A match's version is its frames'
-  // (versions.js matchFrameVersion; absent = 第二期下半), never remembered from the last room.
-  versions: null,
-  lobbyVersion: (() => { const v = loadPref('lobby.version', null); return typeof v === 'string' && v.length <= 40 ? v : null; })(),
-  replayVersion: null,
+  ui: { pendingJoin: null, restoring: false, resumed: false, buildStale: false, nameDialog: false },
 });
 
 /** The app-wide store singleton. */
 export const store = createStore(initialState);
 
 /**
- * Which screen the router shows for a given app state:
- * not entered → title; m.public.phase ≠ LOBBY or room.inMatch → game; in a room → room; else lobby.
+ * Which screen the router shows for a given app state (there is no title screen: ui/nickname.js):
+ * m.public.phase ≠ LOBBY or room.inMatch → game; in a room → room; else lobby.
  * @param {any} s store state
- * @returns {'title'|'lobby'|'room'|'game'}
+ * @returns {'lobby'|'room'|'game'}
  */
 export function selectRoute(s) {
-  if (!s?.session?.entered) return 'title';
-  const phase = s.match?.public?.phase;
+  const phase = s?.match?.public?.phase;
   if (phase && phase !== PHASE.LOBBY) return 'game';
-  if (s.room?.inMatch) return 'game'; // match starting: m.public is on its way
-  if (s.room) return 'room';
+  if (s?.room?.inMatch) return 'game'; // match starting: m.public is on its way
+  if (s?.room) return 'room';
   return 'lobby';
 }
 

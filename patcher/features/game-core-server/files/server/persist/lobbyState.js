@@ -35,7 +35,7 @@ const plain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const clone = (v) => (v == null ? null : structuredClone(v));
 /** A session's settings (the lobby replaces these frozen values, never mutates them: a reference compare finds a change). */
 export const SESSION_FIELDS = Object.freeze(['loadout', 'ops', 'notOwned', 'diy', 'card', 'loadoutCs', 'notOwnedCs', 'diyCs']);
-const SEAT_FIELDS = ['seat', 'playerId', 'name', 'isBot', 'ready', 'left', 'loadout', 'revivalVote', 'ops', 'notOwned', 'diy', 'card',
+const SEAT_FIELDS = ['seat', 'playerId', 'name', 'isBot', 'ready', 'left', 'connected', 'loadout', 'revivalVote', 'ops', 'notOwned', 'diy', 'card',
   'owner', 'loadoutCs', 'notOwnedCs', 'diyCs', 'band', 'accountId',
   // 管理员/服主标记：控制台房间列表据此把「玩家」显示成「管理员」。
   // 必须一起存进 Redis，否则 matchmaker 从 Redis 读房间时看不到这个字段。
@@ -265,6 +265,13 @@ function fallbackRoom(r, lobby, now) {
         ready: false,
         left: false,
         skins: {},
+        // 本服：兜底重建也必须带上管理员标记，否则房间一旦走 fallback 恢复
+        // （日志「restored by fallback」），座位上的 admin 就丢了，开局后 ps.admin=false，
+        // 每个 g.test 都回 TEST_FORBIDDEN —— 2026-10-31 实测复现。
+        ...(s.admin === true ? { admin: true } : {}),
+        ...(typeof s.accountId === 'string' && s.accountId ? { accountId: s.accountId } : {}),
+        ...(typeof s.tag === 'string' && s.tag ? { tag: s.tag } : {}),
+        ...(s.guest === true ? { guest: true } : {}),
       };
     });
     const humans = typeof room.activeHumans === 'function' ? room.activeHumans() : [];

@@ -116,12 +116,20 @@ const CHECKS = [
       ['server/lobby.js', /room\.activeHumans\(\)\.some\(\(s\) => s && s\.connected\)\) continue;/, '★ 有真人在线就绝不回收'],
       ['server/lobby.js', /room\.lastHumanLeftAt = this\.now\(\)/, '★ 记录最后一人断线时刻'],
       ['server/lobby.js', /if \(room\.lastHumanLeftAt\) room\.lastHumanLeftAt = 0;/, '★ 有人回来就作废回收计时'],
-      // 管理员房：人在才永久保留，人走了也要回收
-      ['server/lobby.js', /return !!\(session && session\.admin === true && session\.connected === true\);/, '★ noExpire 只在管理员在线时生效'],
+      // 管理员房：人在才永久保留，人走了也要回收。
+      // ★ 2026-11-02 修正锚点：2026-10-31 起判据改成只看身份 session.adminId（不看验证码），
+      //   这里一直写着旧的 session.admin，于是这条检查长期误报 FAIL。
+      ['server/lobby.js', /return !!\(session && session\.adminId === true && session\.connected === true\);/, '★ noExpire 只在管理员在线时生效'],
       // 光有 adminOwnerOnline() 不够，必须真的被 sweepOldRooms 用来决定 forever
       ['server/lobby.js', /const forever = room\.noExpire === true && this\.adminOwnerOnline\(room\);/, '★ 过期判定必须调用 adminOwnerOnline（不能只看 noExpire 标志）'],
       ['server/lobby.js', /room\.adminLeftAt = this\.now\(\)/, '★ 记录管理员离线时刻'],
       ['server/lobby.js', /Number\(room\.adminLeftAt\)/, '★ 管理员房从离线时刻起计时'],
+      // ---- 2026-11-02：改用参考版的事件驱动机制（refreshMatchWindows + matchHeld），
+      //      sweepOldRooms 降级为兜底。这三条保证「移植被改回去」时能被发现。----
+      ['server/lobby.js', /refreshMatchWindows\(room\) \{/, '★ refreshMatchWindows 主体还在'],
+      ['server/net.js', /this\.matchHeld = false;/, '★ Session.matchHeld 字段还在'],
+      ['server/lobby.js', /const hasSession = humans\.some\(\(s\) => this\.registry\?\.byId\?\.\(s\.playerId\)\);/, '★ 兜底只回收「一个 session 都没有」的对局房'],
+      ['server/lobby.js', /room\.match\).*?if \(forever\) continue;[\s\S]{0,400}?hasSession/s, '★ 对局房兜底不受 room-ttl 开关影响'],
     ],
   },
   {

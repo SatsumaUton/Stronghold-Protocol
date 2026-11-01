@@ -1,6 +1,7 @@
 // ui/gameLogic/draft.js — 机变 and band-draft normalisation. Re-exported from ../gameLogic.js.
 
 import { isObj } from './shared.js';
+import { MAX_DRAFT_CARDS } from '../../../../shared/playerCapacity.js';
 import { PHASE } from '../../../../shared/constants.js';
 import { t } from '../../../../shared/i18n.js';
 
@@ -12,7 +13,8 @@ import { t } from '../../../../shared/i18n.js';
  * object/array picks.
  * @param {any} draft
  * @param {any[]} [players]
- * @returns {{ order: string[], turnPid: string|null, picks: Map<string,string>, skipsLeft: Map<string, number>, done: boolean }}
+ * @returns {{ order: string[], turnPid: string|null, picks: Map<string,string>, skipsLeft: Map<string, number>, done: boolean,
+ *   allowRepeat?: true, concurrent?: true }}
  */
 export function normalizeDraft(draft, players = []) {
   const ids = (Array.isArray(players) ? players : []).filter(isObj).map((p) => p.playerId);
@@ -34,49 +36,54 @@ export function normalizeDraft(draft, players = []) {
   const sk = draft?.skipsLeft ?? draft?.skips;
   if (isObj(sk)) for (const [k, v] of Object.entries(sk)) if (Number.isFinite(v)) skipsLeft.set(k, v);
   const done = order.length > 0 && order.every((pid) => picks.has(pid));
-  return { order, turnPid, picks, skipsLeft, done };
+  return { order, turnPid, picks, skipsLeft, done, ...(draft?.allowRepeat === true ? { allowRepeat: true } : {}),
+    // every seat picks at once (server MatchPhases.concurrentDraft): no turn, no skip
+    ...(draft?.concurrent === true ? { concurrent: true } : {}) };
 }
 
 /**
- * The draft as it ended, for the draft screen screens/game.js keeps on 已选定策略 a moment after BAND_DRAFT (PR #643):
- * the last BAND_DRAFT snapshot with every pick filled in from the players' `bandId` (the pick that ended the draft
- * arrives with the next phase, when m.public.draft is gone) and no turn or countdown left.
- * @param {any} last the last public state of BAND_DRAFT
- * @param {any} pub the public state now
+ * Whether it is `myId`'s turn to pick in a normalised draft (normalizeDraft / normalizeSp): solo — always; a concurrent
+ * draft (everybody at once) — while I am in its order and have not picked; else when the turn is mine.
+ * @param {any} d @param {string|null} myId @param {boolean} [solo]
  */
-export function heldDraftPub(last, pub) {
-  const players = Array.isArray(pub?.players) ? pub.players : last.players;
-  const picks = { ...(last.draft?.picks || {}) };
-  for (const p of Array.isArray(players) ? players : []) if (p && p.bandId && !picks[p.playerId]) picks[p.playerId] = p.bandId;
-  return { ...last, players, deadline: 0, draft: { ...last.draft, picks, turn: null, turnDeadline: 0 } };
+export function draftMyTurn(d, myId, solo = false) {
+  if (!d) return false;
+  if (solo) return true;
+  if (d.concurrent === true) return !!myId && d.order.includes(myId) && !(d.picks || d.pickOf).has(myId);
+  return d.turnPid === myId;
 }
 
 /**
  * Normalise m.public.sp ({family, cards, turn, picks, order?}).
  * Cards: string ids or objects; picks: {playerId: cardIdx} | [{playerId, idx}] | card.takenBy.
+ * `blocked` (m.private spBlocked of a concurrent draft): the cards my own equipment stock cannot give — soldOut for me.
  * @param {any} sp
  * @param {any[]} [players]
+ * @param {number[]|null} [blocked]
  */
-export function normalizeSp(sp, players = []) {
+export function normalizeSp(sp, players = [], blocked = null) {
   if (!isObj(sp)) return null;
+  const allowRepeat = sp.allowRepeat === true;
   const ids = (Array.isArray(players) ? players : []).filter(isObj).map((p) => p.playerId);
   const order = Array.isArray(sp.order) && sp.order.length ? sp.order.filter((x) => typeof x === 'string') : ids;
-  const cards = (Array.isArray(sp.cards) ? sp.cards : []).slice(0, 6).map((c, idx) => {
+  const cards = (Array.isArray(sp.cards) ? sp.cards : []).slice(0, MAX_DRAFT_CARDS).map((c, idx) => {
     const card = typeof c === 'string' ? { id: c } : isObj(c) ? { ...c } : {};
-    return { ...card, idx, takenBy: typeof card.takenBy === 'string' ? card.takenBy : null };
+    return { ...card, idx, takenBy: typeof card.takenBy === 'string' ? card.takenBy : null,
+      ...(Array.isArray(blocked) && blocked.includes(idx) ? { soldOut: true } : {}) };
   });
   const takenBy = new Map(); // idx → playerId
   const pickOf = new Map(); // playerId → idx
   const src = sp.picks;
-  const add = (pid, idx) => {
+  const add = (pid, idx, compatibility = false) => {
     if (typeof pid !== 'string' || !Number.isInteger(idx) || idx < 0 || idx >= cards.length) return;
-    takenBy.set(idx, pid);
+    if (allowRepeat && compatibility && pickOf.has(pid)) return;
+    if (!allowRepeat || !takenBy.has(idx)) takenBy.set(idx, pid);
     pickOf.set(pid, idx);
   };
   if (Array.isArray(src)) src.forEach((v, i) => { if (isObj(v)) add(v.playerId, v.idx); else if (Number.isInteger(v) && order[i]) add(order[i], v); });
   else if (isObj(src)) for (const [k, v] of Object.entries(src)) add(k, v);
-  if (isObj(sp.taken)) for (const [k, v] of Object.entries(sp.taken)) add(v, Number(k));
-  for (const c of cards) if (c.takenBy) add(c.takenBy, c.idx);
+  if (isObj(sp.taken)) for (const [k, v] of Object.entries(sp.taken)) add(v, Number(k), true);
+  for (const c of cards) if (c.takenBy) add(c.takenBy, c.idx, true);
   for (const c of cards) c.takenBy = takenBy.get(c.idx) ?? null;
   let turnPid = null;
   if (typeof sp.turn === 'string') turnPid = sp.turn;
@@ -86,7 +93,8 @@ export function normalizeSp(sp, players = []) {
     name: typeof sp.name === 'string' && sp.name ? sp.name : null,
     desc: typeof sp.desc === 'string' && sp.desc ? sp.desc : null,
     untimed: !!sp.untimed,
-    cards, order, turnPid, pickOf, takenBy, pickedCount: pickOf.size,
+    cards, order, turnPid, pickOf, takenBy, pickedCount: pickOf.size, ...(allowRepeat ? { allowRepeat: true } : {}),
+    ...(sp.concurrent === true ? { concurrent: true } : {}),
   };
 }
 
