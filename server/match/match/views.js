@@ -94,6 +94,8 @@ export class MatchViews {
         voters: this.setupVote.voters.slice(),
         agreed: [...this.setupVote.agreed],
       } : null,
+      // 战斗 2 倍速 (speedVote.js): { agreed, voters, need, next, on, speed }
+      speedVote: this.speedVoteView(),
       factions: this.factions.slice(),
       disabledBonds: [...new Set([...this.disabledBonds, ...this.staticInactiveBonds])].sort(),
       drawnDisabledBonds: this.disabledBonds.slice(),
@@ -108,6 +110,9 @@ export class MatchViews {
       combatMode: this.clientCombat ? 'client' : 'server',
       // solo pause (g.pause, DESIGN §14): the battle, its field clock and every deadline are frozen while true
       paused: !!this.paused,
+      // 断点续玩：这一局是从「本回合备战结束」的存档恢复回来的，本回合的战斗要重打一遍
+      // （server/match/snapshot.js restoreMatch({ replay: true })）。客户端据此提示玩家。
+      ...(this.replayRound && this.phase === PHASE.PREP && this.round === this.replayRound ? { replayRound: this.replayRound } : {}),
       // experimental rescue: the client shows the window and each donor/target predicate; the server rechecks all
       revival: this.revivalEnabled ? {
         enabled: true,
@@ -170,6 +175,9 @@ export class MatchViews {
         turnSeconds: d.untimed ? 0 : this.bandTurnMs() / 1000, untimed: !!d.untimed,
         ...(this.allowRepeat ? { allowRepeat: true } : {}),
         ...(d.concurrent ? { concurrent: true } : {}),
+        // room.setBotBand：已指定给某个 AI 座位、且还没被它选走的策略（bandId → playerId）。
+        // 只在真有指定、且不允许重复时下发，客户端据此把这些策略标成「已预留给 AI」。
+        ...(this.botBands?.size && !this.allowRepeat ? { reserved: this.reservedBands() } : {}),
       };
     }
     if (this.phase === PHASE.SP_DRAFT && this.sp) {
@@ -185,8 +193,7 @@ export class MatchViews {
     }
     if (this.phase === PHASE.UNITE && this.unitePlan) v.unite = { helpers: this.unitePlan.helpers.map((p) => p.playerId), leakers: this.unitePlan.leakers.map((p) => p.playerId),
       ...(this.capacityExperiment ? { round: this.unitePlan.uniteRound || 1, timeLimit: this.unitePlan.timeLimit || 0,
-        gameSpeed: this.unitePlan.gameSpeed || 1,
-        totalBudget: this.unitePlan.totalBudget || 0, remainingBudget: this.unitePlan.remainingBudget || 0 } : {}) };
+        gameSpeed: this.unitePlan.gameSpeed || 1 } : {}) };
     // SETTLE after a 联防: its outcome as data (settle.js uniteResultView; GitHub #235, PR #112) — { through, helpers,
     // leakers, losses: { playerId: the LP settlement charged this round } } — the client's result box reads the viewer's
     // own charge from it; absent when no 联防 resolved (the client then shows the round's own battle result)

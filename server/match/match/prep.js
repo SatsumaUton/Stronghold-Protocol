@@ -172,6 +172,9 @@ export class MatchPrep {
 
   endPrep() {
     if (this.phase !== PHASE.PREP) return;
+    // 断点续玩：本回合的存档点 —— 存的是「备战已完成、结束逻辑还没改动任何东西」这一刻。
+    // 本回合战斗期间掉线，恢复回来就落在这里，不用重打一遍备战。
+    this._checkpoint('prep-end');
     // rehearsals still waiting for a host's answer die with the prep: their bots place the default layout, a late answer
     // is ignored (Match._takeOverRehearsal / MatchRehearsal) and nothing of them runs after the phase ended
     this._cancelRehearsal();

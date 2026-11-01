@@ -228,7 +228,7 @@ import { PlayerState } from './PlayerState.js';
 import { EffectDispatcher, getDefaultRegistry } from './effectsMeta.js';
 import { setupMatchWaves } from './waves.js';
 import { getBotStrategy } from './botStrategies.js';
-import { GAME_SPEED, HEADLESS_SLICE_MS } from './fields.js';
+import { GAME_SPEED, MAX_GAME_SPEED, HEADLESS_SLICE_MS } from './fields.js';
 import { MatchPlatform } from './match/platform.js';
 import { MatchInfra } from './match/infra.js';
 import { MatchMessaging } from './match/messaging.js';
@@ -238,6 +238,7 @@ import { MatchIntents } from './match/intents.js';
 import { MatchPause } from './match/pause.js';
 import { MatchPhases } from './match/phases.js';
 import { MatchSetupVote } from './match/setupVote.js';
+import { MatchSpeedVote } from './match/speedVote.js';
 import { MatchSpDraft } from './match/spDraft.js';
 import { MatchPrep } from './match/prep.js';
 import { MatchCombat } from './match/combat.js';
@@ -342,6 +343,14 @@ export class Match {
     this.twentyPlayerMode = this.capacityExperiment && this.playerCapacity === 20;
     this.disableDuckLord = this.capacityExperiment && this.experimental.disableDuckLord === true;
     this.allowRepeat = this.capacityExperiment && this.experimental.allowRepeat === true;
+    // 实验性战斗规则（任意模式、任意容量都可用，与人数无关）：
+    //   * disableLayerCap  —— 盟约层数上限 999 抬到 BOND_LAYER_SAFE_MAX（1e9），等于「不设上限」；
+    //   * disableHitLimit  —— 不取消对敌方领袖的单次 ≥ BOSS_HIT_LIMIT(300000) 伤害；
+    //   * enemyHpMul / enemyAtkMul —— 敌人生命 / 攻击倍率，对敌方领袖的共享生命值同样生效。
+    this.disableLayerCap = this.experimental.disableLayerCap === true;
+    this.disableHitLimit = this.experimental.disableHitLimit === true;
+    this.enemyHpMul = this.experimental.enemyHpMul ?? 1;
+    this.enemyAtkMul = this.experimental.enemyAtkMul ?? 1;
     // 鸭爵叠加（本服新增）：两个前置条件缺一不可。
     //   - allowRepeat：去重时一支队伍最多一个鸭爵，叠不叠加都是 1 份，开关无从谈起。
     //   - 不能同时禁用鸭爵：鸭爵都被禁了，"鸭爵可叠加"是自相矛盾的组合。
@@ -361,7 +370,13 @@ export class Match {
     this.BattleClass = typeof opts.BattleClass === 'function' ? opts.BattleClass : Battle;
     this.battleContent = opts.battleContent || 'full';
     this.timerScale = Number.isFinite(opts.timerScale) && opts.timerScale >= 0 ? opts.timerScale : 1;
-    this.gameSpeed = Number.isFinite(opts.combatSpeed) && opts.combatSpeed > 0 ? Math.min(opts.combatSpeed, 200) : GAME_SPEED;
+    /** the battles' normal game speed; `gameSpeed` is the current battle's (speedVote.js sets it when a battle starts) */
+    this.baseGameSpeed = Number.isFinite(opts.combatSpeed) && opts.combatSpeed > 0 ? Math.min(opts.combatSpeed, MAX_GAME_SPEED) : GAME_SPEED;
+    this.gameSpeed = this.baseGameSpeed;
+    // 战斗 2 倍速 (speedVote.js): the seats that agree, playerId → last change ms
+    this._speedVotes = new Set();
+    this._speedUp = false;
+    this._speedVoteAt = new Map();
     /** layouts a bot rehearses per prep with the real simulation (bot.js; 0 = heuristic placement only) */
     this.botRehearsal = Number.isInteger(opts.botRehearsal) && opts.botRehearsal >= 0 ? Math.min(opts.botRehearsal, 8) : BOT_REHEARSAL_DEFAULT;
     this.bot = getBotStrategy(opts.botStrategy ?? env('SP_BOT_STRATEGY'));
@@ -475,6 +490,30 @@ export class Match {
      * @type {Map<string, { playerId: string, isBot: false, left: false, alive: false, connected: true, spectator: true }>}
      */
     this.spectators = new Map();
+    /**
+     * 房主给 AI 座位指定的策略（opts.seats[].band，room.setBotBand）：AI playerId → bandId，按座位序。
+     * 只在同盟房生效、一个策略只能给一个 AI 座位、且必须是当前模式开放的策略。
+     * 空表 = 行为和没有这个功能时完全一致（AI 自己挑）。
+     *
+     * 注意：这个字段**必须永远存在**（哪怕空表）——
+     * server/match/snapshot.js 的 matchSeats() 会读 m.botBands.has(...)，字段不存在时
+     * snapshotMatch() 会抛异常并被吞成 null，导致**任何带 AI 座位的对局都存不了档**（断点续玩对它们失效）。
+     * @type {Map<string, string>}
+     */
+    this.botBands = new Map();
+    if (!this.isSolo) {
+      const wanted = new Map();
+      for (const s of Array.isArray(opts.seats) ? opts.seats : []) {
+        if (s && typeof s.band === 'string' && !wanted.has(s.playerId)) wanted.set(s.playerId, s.band);
+      }
+      const held = new Set();
+      for (const ps of this.order) {
+        const band = wanted.get(ps.playerId);
+        if (!ps.isBot || !band || held.has(band) || !this.gd.bandAllowed(band)) continue;
+        held.add(band);
+        this.botBands.set(ps.playerId, band);
+      }
+    }
     /** @type {Set<string>} invisible admin watchers: watched like spectators, never listed or counted */
     this.hiddenSpectators = new Set(Array.isArray(opts.hiddenSpectators) ? opts.hiddenSpectators : []);
     for (const id of Array.isArray(opts.spectators) ? opts.spectators : []) this._spectator(id);
@@ -572,7 +611,6 @@ export class Match {
     this._uniteBounds = null;
     /** expanded-room 联防 relay: { rounds: [], eligible: Set } across the two fields */
     this._uniteRelay = null;
-    this._uniteBudget = null;
     this._normalAliveCount = 0;
     this.teamLp = null;
     this.bossPool = null;
@@ -735,7 +773,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpeedVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);
