@@ -175,6 +175,11 @@ export class MatchPrep {
     // 断点续玩：本回合的存档点 —— 存的是「备战已完成、结束逻辑还没改动任何东西」这一刻。
     // 本回合战斗期间掉线，恢复回来就落在这里，不用重打一遍备战。
     this._checkpoint('prep-end');
+    // 挂机移出（消极游戏）：在本回合战斗开始前判定，移出可能直接结束整局。
+    // 放在 checkpoint 之后 —— 断点续玩恢复的是「备战已完成」那一刻，
+    // 恢复时不该重复判定一遍（否则同一个人会被判两次）。
+    this._checkIdle();
+    if (this.ended || this.disposed || this.phase !== PHASE.PREP) return;
     // rehearsals still waiting for a host's answer die with the prep: their bots place the default layout, a late answer
     // is ignored (Match._takeOverRehearsal / MatchRehearsal) and nothing of them runs after the phase ended
     this._cancelRehearsal();

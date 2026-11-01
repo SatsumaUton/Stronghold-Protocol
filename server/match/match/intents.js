@@ -7,7 +7,7 @@
 import { unitStatsEntry } from '../../../shared/protocol.js';
 import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO } from '../../../shared/constants.js';
 import { deriveSeed } from '../../sim/rng.js';
-import { OK, fail } from './common.js';
+import { OK, fail, AFK_ACTIONS } from './common.js';
 import { onHumanEmote } from '../botEmotes.js';
 
 export class MatchIntents {
@@ -31,6 +31,17 @@ export class MatchIntents {
   /** 消极游戏检测：连续 2 回合花钱（买/刷新/升级）但一次都没部署干员 → 踢出。 */
   _trackActivity(ps, msg) {
     if (!ps || ps.isBot) return;
+    const t = msg && msg.t;
+    // 挂机移出用的「有实质操作」标记（common.js AFK_ACTIONS）：与下面两条规则**并存**，
+    // 由 prep.js endPrep → platform.js _checkIdle 每回合结算一次。
+    // 放在最前面，且不受下面那些闸门（回合数、单人局）影响 ——
+    // 它只是记「这个人动过」，不是判定。
+    if (AFK_ACTIONS.has(t)) ps.afkActed = true;
+    // ★ 2026-11-02：**掉线的人不算消极游戏**。
+    //   掉线的玩家发不出任何指令，若不豁免，两条规则都会把「什么都没做」判成挂机，
+    //   把人踢掉 —— 而他只是网断了，回来座位已经没了。参考版也是这么处理的
+    //   （platform.js 的 _checkIdle 用 !ps.connected 归零）。这一层必须在规则之前。
+    if (!ps.connected) return;
     // ★ 2026-10-31 维护者要求：**单人（只有一个真人）不判定消极游戏**。
     //   理由很直接：消极游戏伤害的是「同局的其他真人」—— 一个人自己打单机，
     //   挂机也好、不部署也好，没有别人受影响，踢掉他只会平白打断他。
@@ -79,7 +90,6 @@ export class MatchIntents {
       }
       st = ps._act = { round, spend: 0, place: 0, strikes: st ? (st.strikes || 0) : 0, idleStrikes: (st && st.idleStrikes) || 0 };
     }
-    const t = msg && msg.t;
     if (t === 'g.buy' || t === 'g.refresh' || t === 'g.levelUp') st.spend++;
     if (t === 'g.place' || t === 'g.move' || t === 'g.deploy' || t === 'g.swap') st.place++;
   }
@@ -94,6 +104,8 @@ export class MatchIntents {
         if (!ps.infoReady) { ps.infoReady = true; this.markPublic(); this.maybeEndInfo(); }
         return OK;
       case 'g.rerollVote': return this.voteSetupReroll(ps, msg.voteId, msg.agree);
+      // 战斗 2 倍速: the seat's standing vote (speedVote.js)
+      case 'g.speedVote': return this.setSpeedVote(ps, msg.agree === true);
       case 'g.band': return this.pickBand(ps, msg.bandId);
       case 'g.bandSkip': return this.skipBand(ps);
       // the strategy highlighted in the draft screen (what a timed-out turn takes, timeoutBand)
@@ -204,7 +216,7 @@ export class MatchIntents {
     const b = this.newBattle({
       seed: deriveSeed(this.seed, `preview:${this.round}:${ps.seat}`), kind: 'normal', modeId: this.modeId, round: this.round,
       stageId: this.stageId, rect: { ...GEO.NORMAL_RECT }, timeLimit: 60, players, spawns: [], routes: this.wave ? this.wave.routes : [],
-      sharedBoss: null, flags: { layerGainsEnabled: !bossRound, ...this.gd.dp }, fieldId: `n:${ps.playerId}`, recordEvents: false,
+      sharedBoss: null, flags: { layerGainsEnabled: !bossRound, ...this.gd.dp, ...this._ruleFlags() }, fieldId: `n:${ps.playerId}`, recordEvents: false,
     });
     try {
       if (typeof b.start === 'function') b.start();
