@@ -7,21 +7,24 @@
 //   * any method but GET / HEAD → 405 with `Allow: GET, HEAD`;
 //   * GET /healthz → JSON status (protocol `version`, release `app`, uptime, the served `build`, the vanilla content
 //     hash `content.vanilla`, the modded content sets in use `content.sets` and — only when there are some — how many
-//     unofficial plugins the server has, `content.plugins` (the title screen's count before any hello) — DESIGN §32 —,
-//     sockets, sessions,
-//     rooms, matches; `versions: { enabled, default, hosts }` only when the server enables another official version than
-//     第二期下半 — DESIGN §35.23), never cached; `?traffic=1` adds the traffic counters (traffic.js: bytes by category since the
-//     start, WebSocket wire and payload bytes) for a loopback or private-network client only — the maintainer's
-//     decision of 2026-10-12: the figures are the host's, so any other client, also one a tunnel or proxy on this
-//     machine forwards, gets the plain report (net.js clientAddress, honouring TRUST_PROXY like the WebSocket limits);
+//     unofficial plugins the server has, `content.plugins` — DESIGN §32 —, sockets, sessions,
+//     rooms, matches, the room / AI caps in force with the largest per-network use and the refusals (`limits`,
+//     lobby.js limitStats), the hello outcomes and match-seat departures since start (`reconnect`), the cached
+//     `performance` sample — a cluster coordinator adds `performance.phases`,
+//     server/phaseMetrics.js), never cached; `?traffic=1` adds the traffic counters (traffic.js: bytes by category
+//     since the start, WebSocket wire and payload bytes) for a loopback or private-network client only — the
+//     maintainer's decision of 2026-10-12: the figures are the host's, so any other client, also one a tunnel or proxy
+//     on this machine forwards, gets the plain report (net.js clientAddress, honouring TRUST_PROXY like the WebSocket
+//     limits);
 //   * everything else → the static files (static.js).
 // Every response's body bytes count in the traffic counters (traffic.js meter). A route that throws is logged and
 // answers 500.
 
 import { PROTOCOL_VERSION, APP_VERSION } from '../../shared/constants.js';
-import { buildTag } from './buildTag.js';
+import { PERFORMANCE_UNAVAILABLE } from '../healthMetrics.js';
 import { setSecurityHeaders, sendError, sendJson, splitUrl } from './common.js';
-import { clientAddress, isLocalIp } from '../net.js';
+import { clientAddress, isLocalIp, netCounters } from '../net.js';
+import { stateDeltaStats } from '../stateTransport.js';
 
 const MAX_URL_LENGTH = 4096;
 
@@ -45,31 +48,34 @@ function contentSets(lobby) {
  *           lobby: import('../lobby.js').Lobby, content?: { cs: string } | null,
  *           traffic?: ReturnType<typeof import('./traffic.js').createTrafficCounter>,
  *           assetIndex?: ReturnType<typeof import('./assetIndex.js').createAssetIndex> | null,
- *           views?: ReturnType<typeof import('./assetViews.js').createManifestViews> | null, trusted?: any,
- *           versions?: ReturnType<typeof import('../versions.js').createVersionSets> | null,
- *           versionHosts?: { stats: () => object } | null }} health
- *   content: the server's vanilla content (server/plugins/identity.js); versions / versionHosts: the official versions
- *   and their match hosts (DESIGN §35.23)
+ *           views?: ReturnType<typeof import('./assetViews.js').createManifestViews> | null }} health
+ *   content: the server's vanilla content (server/plugins/identity.js)
  * @param {boolean} [withTraffic]
  */
-export function healthReport({ startedAt, network, registry, lobby, content = null, traffic, assetIndex, views, trusted, versions = null, versionHosts = null }, withTraffic = false) {
+export function healthReport({ startedAt, network, registry, lobby, content = null, browserBuild, combatPool, trialPool, trialStartupFailed, getHealthMetrics,
+  traffic, assetIndex, views, trusted, persistence = null }, withTraffic = false) {
+  const combat = combatPool ? { backend: 'workers', scope: 'server-streaming', ...combatPool.stats() } : { backend: 'inline', workers: 0 };
+  const ok = !combatPool || (combat.status === 'ready' && combat.ready > 0);
+  const trial = trialPool ? { backend: 'workers', scope: 'bot-rehearsal', ...trialPool.stats() }
+    : { backend: 'inline', scope: 'bot-rehearsal', workers: 0, status: trialStartupFailed ? 'degraded' : 'disabled' };
   const report = {
-    ok: true, version: PROTOCOL_VERSION, app: APP_VERSION, uptimeSec: Math.round((Date.now() - startedAt) / 1000),
-    // the runtime the server is serving right now (public/js/ui/buildGuard.js): a page whose own build is
-    // older than this reloads itself, so a deploy reaches clients that never reload
-    build: buildTag(),
+    ok, version: PROTOCOL_VERSION, app: APP_VERSION, uptimeSec: Math.round((Date.now() - startedAt) / 1000),
+    build: browserBuild,
     // what its rooms play (DESIGN §32): the vanilla content hash, and how many content sets with gameplay plugins rooms
     // hold now (P1c, §32.6 — a room's cosmetic plugins leave its cs the vanilla one, §32.3); how many unofficial plugins
     // it has, when it has some (a page's title screen says so; P1a)
     ...(content ? { content: { vanilla: content.cs, sets: contentSets(lobby), ...pluginCount(lobby) } } : {}),
     sockets: network.connectionCount, sessions: registry.size, ...lobby.stats(),
+    maxRooms: lobby.opts?.maxRooms, limits: lobby.limitStats?.() ?? null, combat, trial,
+    // since start: hello outcomes (net.js helloStats) and the human seats that left a running match (lobby.js departureStats)
+    reconnect: { hello: network.helloStats?.() ?? null, matchSeats: lobby.departureStats?.() ?? null },
+    performance: getHealthMetrics?.()?.snapshot() ?? PERFORMANCE_UNAVAILABLE,
+    // since start: backpressure (net.js netCounters) and the m.state transport (stateTransport.js)
+    net: { ...netCounters, stateDelta: { ...stateDeltaStats } },
   };
   if (trusted && Object.keys(trusted).length) report.plugins = trusted;
-  // the official versions (DESIGN §35.23): only when another one than 第二期下半 is enabled
-  if (versions && versions.nonDefault.length) {
-    report.versions = { enabled: [...versions.ids], default: versions.defaultId,
-      hosts: versionHosts ? versionHosts.stats() : { workers: 0, matches: 0, transport: 'process' } };
-  }
+  // checkpoints (SP_REDIS_URL, server/persist/): writes, failures, restores since start — absent when off
+  if (persistence) { try { report.persistence = persistence(); } catch { report.persistence = null; } }
   if (withTraffic && traffic) report.traffic = traffic.snapshot();
   // content-hashed asset URLs (assetIndex.js / assetViews.js): off, building, or ready with how many files and URLs
   if (withTraffic) report.assetHashes = assetIndex ? { ...assetIndex.stats(), views: views ? views.stats() : null } : null;
@@ -105,7 +111,12 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
     }
     if (parts.rawPath === '/healthz') {
       const withTraffic = wantsTraffic(parts.query) && isLocalIp(clientAddress(req, trustProxy).ip);
-      sendJson(req, res, 200, healthReport(health, withTraffic));
+      const report = healthReport(health, withTraffic);
+      sendJson(req, res, report.ok ? 200 : 503, report);
+      return;
+    }
+    if (parts.rawPath === '/client-build') {
+      sendJson(req, res, 200, { build: health.browserBuild });
       return;
     }
     await serveStatic(req, res, parts.rawPath, parts.query);

@@ -12,7 +12,8 @@ import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../
 export class PlayerRound {
   startRound(r) {
     this.round = { refreshes: 0, buys: 0, sells: 0, spent: 0, gainedChess: 0, arts: 0 };
-    this.pendingLayerGains = null; // settled (or lapsed) at the last SETTLE
+    this.pendingLayerGains = null; // only unsynchronized result gains may remain until SETTLE
+    this.battleLayerGains = {};
     if (r > 1) this.shop.upgradePrice = Math.max(0, this.shop.upgradePrice - 1);
     // onIncome handlers may rewrite ev.income / ev.pending (e.g. 老鲤 withholds R1–R2 income until R3)
     const ev = { round: r, income: this.gd.income(r), pending: this.pendingFunds };
@@ -52,6 +53,7 @@ export class PlayerRound {
   // `effects` are kept: a 信标 gift still pending is delivered to the teammate at the next round start (builtin_gift is
   // flagged afterElimination — GitHub #86); nothing else of an eliminated player is dispatched.
   eliminate(round) {
+    this.pendingDeath = false;
     this.alive = false;
     this.ready = false;
     this.eliminatedRound = round;
@@ -116,9 +118,8 @@ export class PlayerRound {
   activatedLayers() { return activatedLayers(this.bonds); }
 
   /**
-   * The bond states the views show (m.private bonds, m.public players[].bonds): the computed states plus the pending
-   * in-battle gains of this round's finished normal battle (bondsMeta.bondsWithGains). The 联防 field fights with them too
-   * (battleInput `reached`); no other rule reads them.
+   * The bond states the views show (m.private bonds, m.public players[].bonds): live persistent states plus only a
+   * legacy/reference result's uncredited remainder. The 联防 field uses the same reached count, never double gains.
    */
   bondsView() { return bondsWithGains(this.bonds, this.pendingLayerGains); }
 
@@ -150,15 +151,12 @@ export class PlayerRound {
           u.skillIndex = lo.skillIndex;
           u.moduleId = lo.moduleId;
         }
+        const skinId = this.skinIdFor(this.gd.chess(piece.id));
+        if (skinId) u.skinId = skinId;
         // 0.2.2: the potential / 练度 of an operator the player owns (the chess as itself, an owned 自选 pick — the player's
         // 干员调配 settings, 潜能 6 / 精英2 Lv.60 by default and for bots; never a stand-in's nor a prototype pick's)
         const cv = u.standIn ? null : this.cultivationFor(this.gd.chess(piece.id));
         if (cv) { u.potential = cv.potential; u.cultivate = cv.cultivate; }
-        // 皮肤 (docs/SKINS.md): the appearance this player wears for the operator the piece fields, carried into the sim
-        // so it reaches Unit.skin and the snapshot every client draws from. A 自选 slot's own record has no charId (its
-        // appearance is the PICK's operator), so the pick's operator decides the key first.
-        const skinId = this.skinFor(this.gd.chess(piece.id), pick ? pick.charId : null);
-        if (skinId) u.skin = skinId;
         if (carry && carry.has(piece.uid)) u.carryState = carry.get(piece.uid);
         units.push(u);
       } else if (piece.kind === 'token') {

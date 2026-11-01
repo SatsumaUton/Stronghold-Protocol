@@ -1,0 +1,201 @@
+﻿<#
+  增量同步：只下载与清单相比发生变化的文件
+  用法：
+    # 第一次（或换机器）先用全量包同步，然后建立基线：
+    powershell -NoProfile -ExecutionPolicy Bypass -File C:\caddy\sync\sync-incremental.ps1 -Bootstrap
+    # 之后每次：
+    powershell -NoProfile -ExecutionPolicy Bypass -File C:\caddy\sync\sync-incremental.ps1
+    # 强制重建：
+    powershell -NoProfile -ExecutionPolicy Bypass -File C:\caddy\sync\sync-incremental.ps1 -Force
+#>
+param(
+  [string]$Base = 'https://stronghold.luobomiao.love',
+  [string]$Root = 'C:\Users\Administrator\Desktop\assets',
+  [string]$State = 'C:\caddy\sync\state-incremental.json',
+  [string]$Oxipng = 'C:\tools\oxipng\oxipng-9.1.5-x86_64-pc-windows-msvc\oxipng.exe',
+  [string]$Log = 'C:\caddy\sync\logs\sync.log',
+  [switch]$Bootstrap,
+  [switch]$Force,
+  [switch]$SkipOptimize
+)
+
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+
+function Log([string]$msg) {
+  $line = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss') + '  ' + $msg
+  Write-Host $line
+  if ($Log) { Add-Content -Path $Log -Value $line -Encoding UTF8 }
+}
+
+function Get-Sig([string]$path) {
+  $st = Get-Item -LiteralPath $path
+  $h = (Get-FileHash -LiteralPath $path -Algorithm SHA1).Hash.ToLower().Substring(0, 16)
+  return ($h + '-' + $st.Length)
+}
+
+New-Item -ItemType Directory -Force -Path (Split-Path $State) | Out-Null
+New-Item -ItemType Directory -Force -Path (Split-Path $Log) | Out-Null
+
+# [本地补丁] 日志轮转：超过 20MB 滚动一份，最多保留 5 份历史
+if ((Test-Path -LiteralPath $Log) -and ((Get-Item -LiteralPath $Log).Length -gt 20MB)) {
+  $logStamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+  Move-Item -LiteralPath $Log -Destination ($Log + '.' + $logStamp) -Force
+  Get-ChildItem ($Log + '.*') -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -Skip 5 |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+}
+
+# [本地补丁] 单实例锁：创建前先清理超过 6 小时的残留锁
+$lock = 'C:\caddy\sync\sync.lock'
+if (Test-Path -LiteralPath $lock) {
+  $lockAge = (Get-Date) - (Get-Item -LiteralPath $lock).LastWriteTime
+  if ($lockAge.TotalHours -ge 6) {
+    Remove-Item -LiteralPath $lock -Force -ErrorAction SilentlyContinue
+  } else {
+    Log ('已有一实例在运行（锁已存在 {0:N0} 分钟），退出' -f $lockAge.TotalMinutes)
+    exit 3
+  }
+}
+New-Item -ItemType File -Path $lock -Force | Out-Null
+
+try {
+
+if (-not (Test-Path $Root)) { Log "素材目录不存在：$Root"; exit 1 }
+
+Log "拉取清单 $Base/data/sync-manifest.json"
+try {
+  $manifest = Invoke-RestMethod -Uri "$Base/data/sync-manifest.json" -UseBasicParsing -Headers @{ 'Cache-Control' = 'no-cache' }
+} catch {
+  Log ("清单下载失败：" + $_.Exception.Message); exit 1
+}
+$version = [string]$manifest.v
+$count = [int]$manifest.count
+Log "远端版本 $version，文件数 $count"
+
+# [本地补丁] 清单完整性保护：清单异常时宁可不同步，也不能按残缺清单删本地文件
+$manifestEntries = ($manifest.files.PSObject.Properties | Measure-Object).Count
+if (-not $version -or $count -lt 30000 -or $manifestEntries -ne $count) {
+  Log "清单异常（v=$version count=$count entries=$manifestEntries），已中止，未改动任何文件"
+  exit 4
+}
+
+$prev = $null
+if (Test-Path $State) { try { $prev = Get-Content $State -Raw | ConvertFrom-Json } catch { $prev = $null } }
+if (-not $Force -and -not $Bootstrap -and $prev -and ([string]$prev.v -eq $version)) {
+  Log "版本未变化（$version），无需同步"; exit 0
+}
+
+$prevFiles = @{}
+if ($prev -and $prev.files) { foreach ($p in $prev.files.PSObject.Properties) { $prevFiles[$p.Name] = [string]$p.Value } }
+
+$newFiles = @{}
+$changed = New-Object System.Collections.ArrayList
+$same = 0
+
+if ($Bootstrap) {
+  $missing = 0
+  foreach ($p in $manifest.files.PSObject.Properties) {
+    $rel = $p.Name
+    $sig = [string]$p.Value
+    $target = Join-Path $Root ($rel -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $target)) { $missing++; continue }
+    $localSig = Get-Sig $target
+    if ($localSig -ne $sig) { $missing++; continue }
+    $newFiles[$rel] = $sig
+    $same++
+  }
+  if ($missing -gt 0) {
+    Log "基线建立失败：有 $missing 个文件与清单不一致，请先执行一次全量同步（sync-assets.ps1）后重跑 -Bootstrap"
+    exit 2
+  }
+  $out = [ordered]@{
+    v          = $version
+    count      = $count
+    updatedAt  = (Get-Date).ToString('o')
+    bootstrapped = $true
+    files      = $newFiles
+  }
+  $out | ConvertTo-Json -Compress | Set-Content -Path $State -Encoding UTF8
+  Log "基线已建立：$same 个文件，版本 $version"
+  exit 0
+}
+
+foreach ($p in $manifest.files.PSObject.Properties) {
+  $rel = $p.Name
+  $sig = [string]$p.Value
+  $newFiles[$rel] = $sig
+  $target = Join-Path $Root ($rel -replace '/', '\')
+  if (Test-Path -LiteralPath $target) {
+    if ($prevFiles.ContainsKey($rel) -and $prevFiles[$rel] -eq $sig) { $same++; continue }
+    $wantSize = [long]($sig.Split('-')[-1])
+    if ((Get-Item -LiteralPath $target).Length -eq $wantSize) {
+      if ((Get-Sig $target) -eq $sig) { $same++; continue }
+    }
+  }
+  [void]$changed.Add($rel)
+}
+
+Log "需要更新 $($changed.Count) 个文件，已是最新 $same 个"
+
+$ok = 0; $fail = 0; $bytes = 0
+$optimized = 0; $saved = 0
+$tmp = Join-Path $env:TEMP ('sp-sync-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+
+foreach ($rel in $changed) {
+  $sig = $newFiles[$rel]
+  $target = Join-Path $Root ($rel -replace '/', '\')
+  $url = "$Base/assets/$rel"
+  $tmpFile = Join-Path $tmp ([guid]::NewGuid().ToString('N'))
+  try {
+    Invoke-WebRequest -Uri $url -OutFile $tmpFile -UseBasicParsing -TimeoutSec 120 -Headers @{ 'Cache-Control' = 'no-cache' }
+    $got = Get-Sig $tmpFile
+    if ($got -ne $sig) { throw "校验不符（期望 $sig 实得 $got）" }
+    New-Item -ItemType Directory -Force -Path (Split-Path $target) | Out-Null
+    Move-Item -LiteralPath $tmpFile -Destination $target -Force
+    $bytes += (Get-Item -LiteralPath $target).Length
+    $ok++
+    if (-not $SkipOptimize -and $target -match '\.png$' -and (Test-Path $Oxipng)) {
+      $before = (Get-Item -LiteralPath $target).Length
+      & $Oxipng -o 4 --strip safe $target *> $null
+      if ($LASTEXITCODE -eq 0) {
+        $after = (Get-Item -LiteralPath $target).Length
+        if ($after -lt $before) { $optimized++; $saved += ($before - $after) }
+      }
+    }
+  } catch {
+    $fail++
+    Log ("失败：$rel -> " + $_.Exception.Message)
+    if (Test-Path $tmpFile) { Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue }
+  }
+}
+Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+
+$removed = 0
+foreach ($k in $prevFiles.Keys) {
+  if (-not $newFiles.ContainsKey($k)) {
+    $t = Join-Path $Root ($k -replace '/', '\')
+    if (Test-Path -LiteralPath $t) { Remove-Item -LiteralPath $t -Force; $removed++ }
+  }
+}
+
+Log ("增量完成：更新 $ok，失败 $fail，删除 $removed，下载 {0:N1} MB，优化 $optimized 个（省 {1:N1} MB）" -f ($bytes / 1MB), ($saved / 1MB))
+
+if ($fail -gt 0) { exit 1 }
+
+$out = [ordered]@{
+  v         = $version
+  count     = $count
+  updatedAt = (Get-Date).ToString('o')
+  files     = $newFiles
+}
+$out | ConvertTo-Json -Compress | Set-Content -Path $State -Encoding UTF8
+Log "同步成功：版本 $version，文件数 $count"
+exit 0
+
+} finally {
+  # [本地补丁] 无论正常退出、异常退出还是 exit N，都释放锁
+  Remove-Item -LiteralPath $lock -Force -ErrorAction SilentlyContinue
+}

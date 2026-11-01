@@ -45,7 +45,7 @@ export class PlayerEconomy {
     if (!this.gd.bond(bondId) || !Number.isFinite(n) || n <= 0) return 0;
     if (requireActive && !(this.bonds[bondId] && this.bonds[bondId].active)) return 0;
     const before = this.layers[bondId] || 0;
-    const add = layerGainRoom(before, Math.floor(n));
+    const add = layerGainRoom(before, Math.floor(n), this.m.disableLayerCap);
     if (add <= 0) return 0;
     this.layers[bondId] = before + add;
     this.recompute();

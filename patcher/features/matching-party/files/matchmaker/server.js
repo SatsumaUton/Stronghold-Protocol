@@ -29,6 +29,7 @@ function gameGate() {
 let updateFile = null;
 try { updateFile = require('../guard/update-file.cjs'); } catch { /* 可选模块 */ }
 const account = require('./account.cjs');
+const feedback = require('./feedback.cjs');
 
 const PORT = Number(process.env.MM_PORT || 3090);
 const HOST = process.env.MM_HOST || '127.0.0.1';
@@ -446,6 +447,10 @@ async function roomInfo(code, node) {
         accountId: s.accountId ? String(s.accountId) : null,
         seat: Number.isInteger(s.seat) ? s.seat + 1 : i + 1,
         ready: !!s.ready,
+        // 2026-10-31：这里**保持** `!== false`（缺字段=在线）。
+        //   试过改成 `=== true`，结果是节点未重启前 Redis 里没有 connected 字段，
+        //   83 个座位**全部显示离线**，比原来「全部显示在线」更误导 —— 立刻回滚。
+        //   等所有节点都重启过（lobbyState 会写真实值）之后，再统一改成 `=== true`。
         connected: s.connected !== false,
         host: !!doc.hostId && doc.hostId === s.playerId,
         guest: !s.accountId,
@@ -454,11 +459,10 @@ async function roomInfo(code, node) {
       }));
     const spectatorPlayers = (Array.isArray(doc.spectators) ? doc.spectators : [])
       .filter((s) => s && typeof s === 'object')
-      // ★ 2026-10-31：以前这里是 `s.connected !== false`，把「字段不存在」（undefined）也算成在线。
-      //   而老版本的 lobbyState 序列化根本不存 `connected`（已修），于是**所有观战者在控制台里
-      //   都显示在线**，哪怕他在游戏界面里已是灰的（那里读 room.state 的真实值）。
-      //   现在只有明确的 true 才算在线：缺字段 = 未知 = 按离线显示，宁可显示保守也别报假在线。
-      .map((s) => ({ name: String(s.name || ''), connected: s.connected === true }));
+      // 2026-10-31：**保持** `!== false`（缺字段=在线），理由同上面座位那段。
+      //   真正修的是 lobbyState 现在会存 connected（已分发到 30 个节点）；
+      //   等节点陆续重启、Redis 里都有真实值之后，这里和座位一起改成 `=== true` 才有意义。
+      .map((s) => ({ name: String(s.name || ''), connected: s.connected !== false }));
     const round = doc.matchLive ? (Number(doc.liveRound) || 0) : (doc.match && Number.isFinite(Number(doc.match.round)) ? Number(doc.match.round) : null);
     const maxSpectators = Number.isInteger(doc.maxSpectators) ? doc.maxSpectators
       : (mode === 'coop' ? Math.max(2, Math.ceil(humans / 2)) : 0);
@@ -555,6 +559,18 @@ function clientBuildTag() {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const pathname = decodeURIComponent(url.pathname);
+
+  // ---- 玩家反馈板（/api/feedback/*）：读公开、写要登录、管理要 admin/owner ----
+  if (pathname.startsWith('/api/feedback')) {
+    try {
+      if (await feedback.handle(req, res, pathname)) return;
+      return json(res, 404, { error: 'NOT_FOUND' });
+    } catch (e) {
+      try { json(res, 500, { error: 'INTERNAL' }); } catch { /* 已发送 */ }
+      console.error('[feedback] unhandled', e && e.message);
+      return;
+    }
+  }
 
   // ---- 账号与用户偏好（/api/auth/*、/api/prefs*）----
   if (pathname.startsWith('/api/auth') || pathname.startsWith('/api/prefs') || pathname.startsWith('/api/account') || pathname.startsWith('/api/admin')) {

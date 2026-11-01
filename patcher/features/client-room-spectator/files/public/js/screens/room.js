@@ -54,6 +54,8 @@ import {
   TextField,
 } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
+import { useGameData, BandIcon } from '../ui/gameComponents.js';
+import { allowedBands } from './bandDraft.js';
 import { TestMark } from '../ui/testConsole.js';
 import { copyText } from '../ui/clipboard.js';
 import { GuideButton } from '../ui/guide.js';
@@ -75,6 +77,8 @@ import { settingsStore } from '../ui/settingsStore.js';
 import { difficultyInfo, ProtocolSelect } from './lobby.js';
 import { useRise } from '../ui/transitions.js';
 import { t, tc } from '../../../shared/i18n.js';
+// 实验性战斗规则的可选倍率（shared/experimental.js 是唯一来源，服务端校验同一份）
+import { ENEMY_MULTIPLIERS, isEnemyMultiplier } from '../../../shared/experimental.js';
 
 /**
  * Seats padded to the room's capacity (co-op 4, solo 1), each null or a seat record.
@@ -275,7 +279,50 @@ function seatNo(seat) {
  * host of a co-op room, 添加 AI 队友. `portrait` is the outfit's picture, `portraitDefault` the operator's default one
  * (given when an outfit is worn): a picture that fails to load gives way to the next, the last to the avatar frame.
  */
-function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onKick, onInvite, portrait = null, portraitDefault = null, operator = null, onPickCard = null, fresh = false }) {
+/** An AI seat's strategy (自动选择 when none is set); the host's is a button opening the picker. */
+function BotBandChip({ seat, gd, editable, busy, onOpen }) {
+  const band = typeof seat.band === 'string' ? gd.band(seat.band) : null;
+  const body = html`${band ? html`<${BandIcon} bandId=${band.bandId} size="sm" />` : html`<${Icon} name="robot" />`}
+    <span class="seat__band-name">${band ? band.name : typeof seat.band === 'string' ? seat.band : t('自动选择')}</span>`;
+  return editable
+    ? html`<button type="button" class="seat__band rseat__band is-editable" disabled=${busy} onClick=${onOpen}
+        title=${t('指定该 AI 队友选择的策略')} aria-label=${t('指定该 AI 队友选择的策略')}>
+        <span class="seat__band-k">${t('策略')}</span>${body}<${Icon} name="edit" /></button>`
+    : html`<span class="seat__band rseat__band"><span class="seat__band-k">${t('策略')}</span>${body}</span>`;
+}
+
+/**
+ * 房主给某个 AI 座位指定策略的选择框：第一项是「自动选择」，后面是这个模式开放的全部盟约。
+ * 已经指定给**别的** AI 座位的策略会置灰并标出是哪个 AI 拿了（服务端也会拒绝重复指定）。
+ */
+function BotBandPicker({ seat, room, gd, busy, onClose, onPick }) {
+  const seats = roomFacts(room, null).seats;
+  // 扩容房开了「禁用鸭爵策略」时这个盟约要从列表里去掉（与服务端同一套规则）
+  const bands = allowedBands(gd.list('bands'), 'MULTI', seats.length > MAX_SEATS && room.experimental?.disableDuckLord === true);
+  const usedBy = new Map();
+  for (const s of seats) if (s && s.isBot && s.seat !== seat.seat && typeof s.band === 'string') usedBy.set(s.band, s.name);
+  return html`<${Modal} open=${true} onClose=${onClose} title=${t('指定 AI 策略：{name}', { name: seat.name })} micro="AI STRATEGY"
+      class="botband-dlg" actions=${html`<${Button} variant="secondary" data-autofocus onClick=${onClose}>${t('关闭')}<//>`}>
+    <p class="botband-dlg__tip t-dim">${t('开局选择策略时，该 AI 队友会直接选择指定的策略，其他博士不能再选它。')}</p>
+    <div class="botband-dlg__grid" role="listbox" aria-label=${t('策略')}>
+      <button type="button" role="option" aria-selected=${seat.band == null ? 'true' : 'false'} disabled=${busy}
+          class=${`botband ${seat.band == null ? 'is-sel' : ''}`} onClick=${() => onPick(null)}>
+        <span class="botband__auto"><${Icon} name="robot" /></span><span class="botband__name">${t('自动选择')}</span>
+      </button>
+      ${bands.map((b) => {
+        const other = usedBy.get(b.bandId);
+        return html`<button key=${b.bandId} type="button" role="option" aria-selected=${seat.band === b.bandId ? 'true' : 'false'}
+            disabled=${busy || !!other} title=${other ? t('已指定给 {name}', { name: other }) : b.effectName || b.name}
+            class=${`botband ${seat.band === b.bandId ? 'is-sel' : ''} ${other ? 'is-used' : ''}`} onClick=${() => onPick(b.bandId)}>
+          <${BandIcon} bandId=${b.bandId} size="md" /><span class="botband__name">${b.name}</span>
+          ${other ? html`<span class="botband__used">${other}</span>` : b.effectName ? html`<span class="botband__eff">${b.effectName}</span>` : null}
+        </button>`;
+      })}
+    </div>
+  <//>`;
+}
+
+function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onKick, onInvite, portrait = null, portraitDefault = null, operator = null, onPickCard = null, fresh = false, gd = null, onBotBand = null }) {
   const [badArt, setBadArt] = useState([]);
   const coop = room.mode !== 'solo';
   // the 转场 flash: a seat that turns ready (or becomes the host's), and an AI teammate added while the room is open
@@ -330,6 +377,10 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
         </span>` : null}
       </div>
       ${offline ? html`<span class="rseat__lost"><${Icon} name="wifiOff" />${t('连接中断')}</span>` : null}
+      ${seat.isBot && coop && gd && onBotBand
+        ? html`<${BotBandChip} seat=${seat} gd=${gd} editable=${facts.isHost && !room.matchmaking} busy=${busy === `band${index}`}
+            onOpen=${() => onBotBand(index)} />`
+        : null}
       <div class="rseat__low">
         ${art ? html`<span class="seat__op">${operator?.name || ''}</span>` : null}
         <span class=${`rseat__state seat__state--${state}`}>
@@ -424,6 +475,11 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
   const [repeat, setRepeat] = useState(false);
   // 鸭爵叠加（本服新增）：只在「允许重复选择策略」打开时出现，见下方 showDuckStack。
   const [stackDuck, setStackDuck] = useState(false);
+  // 实验性战斗规则（任意模式、任意容量都能开，与人数无关）
+  const [layerCapOff, setLayerCapOff] = useState(false);
+  const [hitLimitOff, setHitLimitOff] = useState(false);
+  const [enemyHp, setEnemyHp] = useState(1);
+  const [enemyAtk, setEnemyAtk] = useState(1);
   const wrapRef = useRef(null);
   // 实验性弹窗是挂在 .rs-opts 里的 position: fixed 整屏遮罩，而 .rs-opts 带 translateX(-50%)，
   // 会成为固定后代的包含块：弹窗于是相对那个小面板定位，被推到屏幕外，「应用」点不到。
@@ -459,6 +515,10 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       setNoDuck(exp.disableDuckLord === true);
       setRepeat(exp.allowRepeat === true);
       setStackDuck(exp.stackDuckLord === true);
+      setLayerCapOff(exp.disableLayerCap === true);
+      setHitLimitOff(exp.disableHitLimit === true);
+      setEnemyHp(isEnemyMultiplier(exp.enemyHpMul) ? exp.enemyHpMul : 1);
+      setEnemyAtk(isEnemyMultiplier(exp.enemyAtkMul) ? exp.enemyAtkMul : 1);
     }
   };
   const apply = () => {
@@ -470,6 +530,11 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       ...(capacity > 4 && noDuck ? { disableDuckLord: true } : {}),
       ...(capacity > 4 && repeat ? { allowRepeat: true } : {}),
       ...(capacity > 4 && repeat && stackDuck ? { stackDuckLord: true } : {}),
+      // 实验性战斗规则：关闭时一个键都不写（房间指纹与旧房间保持一致）
+      ...(layerCapOff ? { disableLayerCap: true } : {}),
+      ...(hitLimitOff ? { disableHitLimit: true } : {}),
+      ...(enemyHp !== 1 ? { enemyHpMul: enemyHp } : {}),
+      ...(enemyAtk !== 1 ? { enemyAtkMul: enemyAtk } : {}),
     };
     setOpen(false);
     setCapOpen(false);
@@ -477,7 +542,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
   };
   return html`<div class="exp-wrap" ref=${wrapRef}>
     <${Tooltip} text=${t('调整同盟人数与特殊规则：队友复活、独立卡池、禁用鸭爵策略、允许重复选择策略')}>
-      <button type="button" class=${`dpick__opt exp-btn${open ? ' is-active' : ''}`} disabled=${!!busy} onClick=${toggle}
+      <button type="button" class=${`dpick__opt ailast__opt exp-btn${open ? ' is-active' : ''}`} disabled=${!!busy} onClick=${toggle}
         title=${t('实验性选项')} aria-haspopup="dialog" aria-expanded=${open ? 'true' : 'false'}>
         <${Icon} name="gear" class=${open ? 'is-on' : ''} />${t('实验性功能')}
       </button>
@@ -539,6 +604,42 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
           <${Icon} name="check" class=${stackDuck ? 'is-on' : ''} />${t('鸭爵策略可叠加')}
         </button>
       <//>` : null}
+      <${Tooltip} text=${t('盟约层数不再停在 999，可以一直叠加（上限 1e9）')}>
+        <button type="button" role="switch" aria-checked=${layerCapOff ? 'true' : 'false'} data-testid="exp-layer-cap"
+            class=${`dpick__opt ailast__opt${layerCapOff ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
+            onClick=${() => { setCapOpen(false); canEdit && setLayerCapOff(!layerCapOff); }}>
+          <${Icon} name="check" class=${layerCapOff ? 'is-on' : ''} />${t('禁用层数上限')}
+        </button>
+      <//>
+      <${Tooltip} text=${t('对敌方领袖的单次 30 万以上伤害不再被取消')}>
+        <button type="button" role="switch" aria-checked=${hitLimitOff ? 'true' : 'false'} data-testid="exp-hit-limit"
+            class=${`dpick__opt ailast__opt${hitLimitOff ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
+            onClick=${() => { setCapOpen(false); canEdit && setHitLimitOff(!hitLimitOff); }}>
+          <${Icon} name="check" class=${hitLimitOff ? 'is-on' : ''} />${t('禁用单次伤害上限')}
+        </button>
+      <//>
+      </div>
+      <div class="exp-modal__muls">
+        <div class="exp-mul">
+          <span class="exp-mul__k">${t('敌人生命')}</span>
+          <div class="exp-mul__opts" role="group" aria-label=${t('敌人生命倍率')}>
+            ${ENEMY_MULTIPLIERS.map((m) => html`<button key=${m} type="button"
+                class=${`dpick__opt ailast__opt exp-mul__opt${enemyHp === m ? ' is-active' : ''}`}
+                aria-pressed=${enemyHp === m ? 'true' : 'false'} data-testid=${`exp-enemy-hp-${m}`}
+                disabled=${!!busy || !canEdit}
+                onClick=${() => { setCapOpen(false); canEdit && setEnemyHp(m); }}>×${m}</button>`)}
+          </div>
+        </div>
+        <div class="exp-mul">
+          <span class="exp-mul__k">${t('敌人攻击')}</span>
+          <div class="exp-mul__opts" role="group" aria-label=${t('敌人攻击倍率')}>
+            ${ENEMY_MULTIPLIERS.map((m) => html`<button key=${m} type="button"
+                class=${`dpick__opt ailast__opt exp-mul__opt${enemyAtk === m ? ' is-active' : ''}`}
+                aria-pressed=${enemyAtk === m ? 'true' : 'false'} data-testid=${`exp-enemy-atk-${m}`}
+                disabled=${!!busy || !canEdit}
+                onClick=${() => { setCapOpen(false); canEdit && setEnemyAtk(m); }}>×${m}</button>`)}
+          </div>
+        </div>
       </div>
       </div>
       ${canEdit ? html`<div class="exp-pop__foot">
@@ -675,6 +776,12 @@ export function RoomScreen() {
   // every pick, welcome and content change and retries a RATE / TIMEOUT / OFFLINE refusal (review of PR #813)
   const pickCard = (charId) => { setCard(charId); setPicking(false); };
 
+  // 「AI 指定策略」选择框当前针对哪个座位（null = 关着）。
+  // 用座位号而不是 playerId：AI 座位被移掉再加回来 playerId 会变，座位号才是稳定的。
+  const [bandSeat, setBandSeat] = useState(null);
+  // 策略名/图标要查 game data（band.name、BandIcon 的图），这里取一次给座位卡和选择框共用
+  const gd = useGameData();
+
   // 后台维护开关：'开始游戏' 关闭时，房主的开始按钮也要置灰，并用上游同款 Tooltip 说明原因
   // （上游 GoButton 的禁用原因走 .tooltip，不用浏览器原生 title）。
   // 管理员/服主无视维护开关，维护期间可自测。
@@ -740,6 +847,11 @@ export function RoomScreen() {
   const setDifficulty = (difficulty) => run('diff', () => net.request('room.setDifficulty', { difficulty }));
   const setAiTakeover = (on) => run('aihandover', () => net.request('room.setAiTakeover', { on }));
   const setAiLast = (on) => run('ailast', () => net.request('room.setAiPicksLast', { on }));
+  // 给 AI 座位指定策略（bandId = null 表示「自动选择」，即取消指定）
+  const setBotBand = (seat, bandId) => run(`band${seat}`, async () => {
+    await net.request('room.setBotBand', { seat, bandId });
+    setBandSeat(null);
+  });
   const setExperimental = (experimental) => run('experimental', () => net.request('room.setExperimental', { experimental }));
   // the room is the authority; the lobby card reads the same pref the next time this browser creates a solo room
   const setSoloUnlimited = async (on) => {
@@ -897,7 +1009,7 @@ export function RoomScreen() {
           myId=${me.playerId} busy=${busy} onAddBot=${addBot} onRemoveBot=${removeBot} onKick=${kick} onInvite=${() => copy('code')}
           portrait=${op ? chessPortraitUrl(data.get('assets'), op.chess, { skin }) : null}
           portraitDefault=${op && skin ? chessPortraitUrl(data.get('assets'), op.chess) : null} operator=${op?.chess} onPickCard=${() => setPicking(true)}
-          fresh=${shownRoom.current === room.code} />`;
+          fresh=${shownRoom.current === room.code} gd=${gd} onBotBand=${setBandSeat} />`;
       })}
       ${coop ? null : html`<aside class="solo-brief rs-brief brackets">
         <${MicroLabel} tone="mint">BRIEFING<//>
@@ -942,6 +1054,10 @@ export function RoomScreen() {
             <//>`}
       </div>
     </footer>
+    ${bandSeat != null && facts.isHost && facts.seats[bandSeat]?.isBot
+      ? html`<${BotBandPicker} seat=${facts.seats[bandSeat]} room=${room} gd=${gd}
+          busy=${busy === `band${bandSeat}`} onClose=${() => setBandSeat(null)} onPick=${(bandId) => setBotBand(bandSeat, bandId)} />`
+      : null}
     ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${data.get('assets')} localSkins=${localSkins} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
     ${protoOpen ? facts.isHost
       ? html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${protoPick || room.difficulty} onDifficulty=${setProtoPick} onClose=${closeProto}

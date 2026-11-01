@@ -74,7 +74,7 @@ function contentSets(lobby) {
  *   and their match hosts (DESIGN §35.23)
  * @param {boolean} [withTraffic]
  */
-export function healthReport({ startedAt, network, registry, lobby, content = null, traffic, assetIndex, views, trusted, versions = null, versionHosts = null }, withTraffic = false) {
+export function healthReport({ startedAt, network, registry, lobby, content = null, traffic, assetIndex, views, trusted, persistence = null, versions = null, versionHosts = null }, withTraffic = false) {
   const report = {
     ok: true, version: PROTOCOL_VERSION, app: APP_VERSION, uptimeSec: Math.round((Date.now() - startedAt) / 1000),
     // the runtime the server is serving right now (public/js/ui/buildGuard.js): a page whose own build is
@@ -87,6 +87,9 @@ export function healthReport({ startedAt, network, registry, lobby, content = nu
     sockets: network.connectionCount, sessions: registry.size, ...lobby.stats(),
   };
   if (trusted && Object.keys(trusted).length) report.plugins = trusted;
+  // 断点续玩（SP_REDIS_URL，server/persist/）：自启动以来的存档次数、失败数、恢复数 —— 没开就没有这一项。
+  // store.snapshot() 只含统计与连接状态，不含地址或凭据，可以放在这个公开端点上。
+  if (persistence) { try { report.persistence = persistence(); } catch { report.persistence = null; } }
   // the official versions (DESIGN §35.23): only when another one than 第二期下半 is enabled
   if (versions && versions.nonDefault.length) {
     report.versions = { enabled: [...versions.ids], default: versions.defaultId,

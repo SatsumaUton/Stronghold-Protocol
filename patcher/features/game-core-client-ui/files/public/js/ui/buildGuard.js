@@ -1,0 +1,234 @@
+// public/js/ui/buildGuard.js — the "this page is running an outdated build" guard.
+//
+// WHY: every module a page imports lives in its module map for the whole page lifetime, so a deploy can never reach an
+// already-open tab — not even a client-only one, which is served `Cache-Control: no-cache` and would be picked up by a
+// reload. A client-only battle fix shipped exactly that way and stayed invisible on the reporting player's page: the
+// nginx log shows the page loaded the PRE-fix module blob and made no module request at all for the rest of the session.
+//
+// HOW: the server stamps a short hash of the runtime it serves into `/healthz.build` (server/http/buildTag.js).
+// The first successful check of a page records that tag as "the build this page runs" — IN MEMORY, because one page is
+// one set of loaded modules: nothing must survive a reload, and a duplicated tab must not inherit the first tab's tag.
+// A later check reporting a DIFFERENT tag means the server changed under this page:
+//   * outside a match the page reloads itself, once;
+//   * during a match the guard never throws the player's game away — `onStale` fires (the connection banner offers
+//     刷新页面) and the reload happens by itself as soon as the match, settlement screen included, is over.
+// A check that cannot read a build (`/healthz` down or restarting, no `build` field, no answer in time) is 'unknown' and
+// NEVER reloads: a restarting server must not turn a playing page into the browser's error page. A new tag is acted on
+// only after two checks in a row report the SAME one, so a deploy that is still copying files cannot ping-pong a page.
+//
+// The same `/healthz` body carries what else a page reads of the server before it says hello: `onHealth(body)` is told
+// every body a check reads (main.js: how many plugins the server has, for the title screen — DESIGN §32 P1a).
+//
+// Kept dependency-free and injectable (fetch / reload / inMatch / timers) so test/ui/buildGuard.test.js can drive it.
+
+import { PHASE } from '../../../shared/constants.js';
+
+/** How often a page re-asks the server for its build tag. */
+export const BUILD_CHECK_MS = 60_000;
+/** Give up on a `/healthz` that does not answer: a request left hanging must not stop the guard from ever checking again. */
+export const BUILD_FETCH_TIMEOUT_MS = 5_000;
+/** How many checks in a row must report the same NEW build before the page acts on it. */
+export const BUILD_CONFIRMATIONS = 2;
+
+/**
+ * 哪些界面允许出现「服务器已更新，请刷新页面」。
+ *
+ * 维护者要求（2026-10-31）：**对局中一律不弹**，只在
+ *   大厅、房间准备阶段、结算界面 这三个地方提示。
+ *
+ * 理由：对局中刷新会把当前这局丢掉（或者至少打断），而当下的规则是
+ * 「对局中不刷新、等结算」—— 既然不会刷新，中途弹一个「请刷新」只会让人分心。
+ * 之前对局中也弹，所以维护者看到的就是「打一半跳出来一条刷新提示」。
+ *
+ * ⚠ 与「什么时候真的刷新」是两件事，别混：
+ *   * `inMatch`（main.js 传给 startBuildGuard）只决定**要不要自动刷新**：
+ *     对局中是 true → 绝不刷新；结算变成 RESULT 后 `selectRoute` 不再是 'game'，
+ *     于是回到「不等待」的状态，会自动刷新一次。这个自动刷新**与横幅无关**，
+ *     本次改动不影响它（维护者要的是「别在中途弹提示」，不是「别在中途换版本」）。
+ *   * 这里决定的是**要不要把横幅画出来**。
+ *
+ * @param {'title'|'lobby'|'room'|'game'} route selectRoute 的返回值
+ * @param {string|undefined|null} phase 对局阶段（m.public.phase）
+ * @returns {boolean}
+ */
+export function updateHintAllowed(route, phase) {
+  // 对局中（含 INFO_CHECK / 选点 / 备战 / 战斗 / 休整 / SETTLE…）一律不提示；
+  // 只有 RESULT 才是「结算界面」，那时 route 仍是 'game'，所以必须先判断 phase。
+  if (route !== 'game') return true;          // 大厅 / 房间准备阶段 / 标题页
+  return phase === PHASE.RESULT;              // 结算界面
+}
+
+/**
+ * Fetch `/healthz` and return its `build` tag (null when unavailable, not reported, or too slow). Never throws.
+ * @param {Function} fetchFn
+ * @param {{ timeoutMs?: number, setTimeout?: Function, clearTimeout?: Function, onHealth?: (body: any) => void }} [o]
+ *   onHealth: told the body it read (see the header)
+ * @returns {Promise<string|null>}
+ */
+export async function fetchBuild(fetchFn, o = {}) {
+  const timeoutMs = Number.isFinite(o.timeoutMs) && o.timeoutMs > 0 ? o.timeoutMs : BUILD_FETCH_TIMEOUT_MS;
+  const setT = o.setTimeout || ((fn, ms) => globalThis.setTimeout(fn, ms));
+  const clearT = o.clearTimeout || ((h) => globalThis.clearTimeout(h));
+  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+  let timer = null;
+  const tooSlow = new Promise((_, reject) => {
+    timer = setT(() => { try { ctrl?.abort(); } catch { /* ignore */ } reject(new Error('timeout')); }, timeoutMs);
+  });
+  try {
+    const res = await Promise.race([fetchFn('/healthz', { cache: 'no-store', signal: ctrl ? ctrl.signal : undefined }), tooSlow]);
+    if (!res || !res.ok) return null;
+    const body = await res.json();
+    try { if (body && typeof body === 'object') o.onHealth?.(body); } catch { /* the listener's own trouble */ }
+    return body && typeof body.build === 'string' && body.build ? body.build : null;
+  } catch {
+    return null;
+  } finally {
+    if (timer != null) clearT(timer);
+  }
+}
+
+/**
+ * One check, against the build this page already knows.
+ * @param {{ fetchFn?: Function, known?: string|null, timeoutMs?: number, setTimeout?: Function, clearTimeout?: Function,
+ *   onHealth?: (body: any) => void }} [o]
+ * @returns {Promise<{ status: 'first'|'current'|'new'|'unknown', build: string|null }>}
+ */
+export async function checkBuildOnce(o = {}) {
+  const fetchFn = o.fetchFn || ((url, init) => globalThis.fetch(url, init));
+  const build = await fetchBuild(fetchFn, o);
+  if (!build) return { status: 'unknown', build: null };            // unreachable / not reported: never a reload
+  if (!o.known) return { status: 'first', build };
+  return { status: o.known === build ? 'current' : 'new', build };
+}
+
+/**
+ * Watch for a new build.
+ * @param {{ fetchFn?: Function, reload?: Function, inMatch?: () => boolean, intervalMs?: number, timeoutMs?: number,
+ *           setInterval?: Function, clearInterval?: Function, setTimeout?: Function, clearTimeout?: Function,
+ *           onStale?: (info: { build: string, known: string|null, waiting: boolean }) => void,
+ *           onHealth?: (body: any) => void }} [o]  onHealth: every /healthz body a check reads (see the header)
+ * @returns {{ stop: () => void, check: () => Promise<object>, stale: () => boolean, known: () => string|null }}
+ */
+export function startBuildGuard(o = {}) {
+  const fetchFn = o.fetchFn || ((url, init) => globalThis.fetch(url, init));
+  const reload = o.reload || (() => globalThis.location.reload());
+  const inMatch = typeof o.inMatch === 'function' ? o.inMatch : () => false;
+  const setIv = o.setInterval || ((fn, ms) => globalThis.setInterval(fn, ms));
+  const clearIv = o.clearInterval || ((h) => globalThis.clearInterval(h));
+  const intervalMs = Number.isFinite(o.intervalMs) && o.intervalMs > 0 ? o.intervalMs : BUILD_CHECK_MS;
+  let known = null;      // the build this page runs — memory only (one page == one set of loaded modules)
+  let candidate = null;  // the last new build seen; needs BUILD_CONFIRMATIONS checks in a row to be acted on
+  let seen = 0;          // consecutive checks that reported `candidate`
+  let stale = false;     // a new build is confirmed → reload as soon as no match is on screen
+  let pending = false;
+  let timer = null;
+  let stopped = false;
+  let lastNode = null;   // 上次检查时所在的节点（sp_node cookie）；变了说明玩家跨节点了
+
+  const stopTimer = () => { if (timer != null) { clearIv(timer); timer = null; } };
+  const reloadNow = () => { stopped = true; stopTimer(); reload(); };
+
+  const check = async () => {
+    if (stopped) return { status: 'stopped', build: null };
+    if (pending) return { status: 'pending', build: null };
+    // 跨节点时不要误判为「服务器更新了」：本服有 30 个节点，各节点进程启动时间不同，
+    // buildTag 又是进程启动时缓存的，于是同一个页面从 node-A 跳到 node-B 会看到不同的
+    // build，被当成「有新版」并自动 reload —— 玩家看到的就是「离开房间/跳节点突然刷新」。
+    // 节点变了就忽略「与旧基准不同」这件事，把新节点这次的 build 直接当作基准。
+    let nodeChanged = false;
+    try {
+      const nodeNow = (typeof document !== 'undefined' && document.cookie.match(/sp_node=(\d+)/) || [])[1] || '';
+      if (nodeNow && nodeNow !== lastNode) {
+        nodeChanged = true;
+        lastNode = nodeNow;
+        candidate = null;
+        seen = 0;
+      }
+    } catch { /* ignore */ }
+    pending = true;
+    let r;
+    try { r = await checkBuildOnce({ fetchFn, known, timeoutMs: o.timeoutMs, setTimeout: o.setTimeout, clearTimeout: o.clearTimeout, onHealth: o.onHealth }); }
+    finally { pending = false; }
+    if (stopped) return { status: 'stopped', build: null };
+    if (r.status === 'unknown') { candidate = null; seen = 0; return r; }   // review: a failed check never reloads
+    // 节点刚变：把这一轮的 build 直接当作基准，等同于「首次见到」。
+    // 不同节点进程启动时间不同，buildTag 必然不同，那不是「有新版本」。
+    if (nodeChanged) {
+      if (r.build) { known = r.build; candidate = null; seen = 0; return { status: 'first', build: r.build }; }
+    }
+    if (r.status === 'first') { known = r.build; return r; }
+    if (r.status === 'current') { candidate = null; seen = 0; return r; }
+    // a different build: only BUILD_CONFIRMATIONS checks in a row with the SAME tag count (a deploy that is still
+    // copying files exposes a tag that keeps moving, and must not ping-pong the page)
+    if (candidate !== r.build) { candidate = r.build; seen = 1; } else { seen++; }
+    if (seen < BUILD_CONFIRMATIONS) return { status: 'new', build: r.build };
+    const first = !stale;
+    stale = true;
+    const waiting = inMatch();
+    if (first) { try { o.onStale?.({ build: r.build, known, waiting }); } catch { /* ignore */ } }
+    if (!waiting) reloadNow();
+    return { status: 'stale', build: r.build, known };
+  };
+
+  const tick = () => { check().catch(() => {}); };
+  check().catch(() => {});
+  timer = setIv(tick, intervalMs);
+  return {
+    stop: () => { stopped = true; stopTimer(); },
+    /**
+     * 复位「已判定为旧版本」的状态，但**继续监控**（2026-10-31）。
+     *
+     * 用在「离开房间/对局」这类事件上：那一刻的提示属于刚结束的那一局，应该清掉；
+     * 但人还在大厅里，服务器随时可能换版，所以不能停表 —— 以前 main.js 在这里调 stop()，
+     * 结果「在大厅/房间里等着的人」永远收不到更新提示。
+     *
+     * 复位后下一轮检查会把当前 build 当成新的基准重新比对：
+     * 如果服务器确实已经换了版本，几秒内会重新判定为 stale 并再次触发 onStale。
+     */
+    reset: () => {
+      // ★ 2026-10-31 踩到：这里原本有一句 `if (stopped) return;`，于是 reset 什么都不做。
+      //   因为 check() 判定 stale 后会走 reloadNow() → `stopped = true`；
+      //   而 main.js 的 reload 回调被改成「只设 buildStale、不真的刷新」，
+      //   所以「已经 stale 的 guard」其实已经 stopped 了 —— reset 被第一行挡掉，
+      //   stale 永远是 true。实测：reset 后立刻读仍是 true。
+      //
+      // ★ 另一个坑：不能把 known 清成 null。known 是「这一页跑的是哪个 build」，
+      //   它没有变（页面没刷新）。清掉之后下一轮会当 first 直接把服务器当前 build
+      //   记成基准，于是「服务器确实换了版本」这件事就再也发现不了了（实测）。
+      //   只清「判定过程中的中间状态」，保留 known。
+      //
+      // ★★★ 2026-10-31 修正（维护者：「对局中不要弹，结算/房间/大厅才弹」）：
+      //   这里**不能再把 stale 清掉当常态**。以前 main.js 在 sp-room-left 时 reset()，
+      //   本意是「清掉上一局留下的提示」—— 但现在提示本来就只在大厅/房间/结算出现，
+      //   对局中已经不显示了，清它反而会**把大厅里刚该出现的提示一起抹掉**：
+      //   判定 stale 之后如果玩家正好离开房间，reset 把 stale 清成 false，
+      //   而 known 还停在旧 build，下一轮要再攒 2 次确认才重新触发 ——
+      //   中间那段大厅/结算的时间窗口里，提示是看不见的。
+      //   所以：sp-room-left 现在走 resume()（只恢复监控，**不动 stale**），
+      //   reset() 留给「真的想清掉这条提示」的场合。
+      stale = false;
+      candidate = null;
+      seen = 0;
+      if (stopped) {
+        stopped = false;
+        if (timer == null) timer = setIv(tick, intervalMs);
+      }
+    },
+    /**
+     * 只恢复监控，**不动「已判定为旧版本」这个结论**（2026-10-31）。
+     *
+     * 用在 sp-room-left：对局结束的那一刻，如果服务器确实换过版，
+     * 大厅/房间/结算**本来就应该**继续显示刷新提示（维护者要的就是这三个地方提示）。
+     * 这里只保证表没停，别的都不碰。
+     */
+    resume: () => {
+      if (stopped) {
+        stopped = false;
+        if (timer == null) timer = setIv(tick, intervalMs);
+      }
+    },
+    check,
+    stale: () => stale,
+    known: () => known,
+  };
+}

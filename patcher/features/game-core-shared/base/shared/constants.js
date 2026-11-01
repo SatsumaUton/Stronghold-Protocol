@@ -3,10 +3,12 @@
 import { N_ } from './i18n.js';
 
 export const PROTOCOL_VERSION = 1;
-/** Release version shown to players (title screen, server banner, /healthz). Kept equal to package.json "version"
+/** Public matchmaking capability/data contract; bump when queued clients cannot share a match. */
+export const MATCHMAKING_VERSION = 'alliance-2';
+/** Release version shown to players (the lobby's footer, server banner, /healthz). Kept equal to package.json "version"
  * (test/version.test.js); PROTOCOL_VERSION above is the separate wire-format number. */
-export const APP_VERSION = '0.3.3';
-/** A development build (the public `dev` branch): the title screen, the boot banner and the README say so, and
+export const APP_VERSION = '0.3.1';
+/** A development build (the public `dev` branch): the lobby's footer, the boot banner and the README say so, and
  * tools/package.mjs refuses to build a release zip from it without --allow-dev. */
 export const DEV_BUILD = /-dev$/.test(APP_VERSION);
 /**
@@ -25,12 +27,7 @@ export const MAX_SEATS = 4;
  * A spectator never counts as a player, may not act, and watches like an eliminated player (server/lobby.js spectate,
  * server/match/match/watch.js addSpectator).
  */
-export const MAX_SPECTATORS = 2;
-/**
- * 重刷本局 (PR #860, DESIGN §28.21 [ASSUMED]): each seat may open one setup-reroll vote per this many ms. Shared so the
- * client's refusal toast (ui/toasts.js) names the server's value (server/match/match/setupVote.js).
- */
-export const SETUP_REROLL_COOLDOWN_MS = 30_000;
+export const MAX_SPECTATORS = 0; // 0 = unlimited observers; MAX_SEATS still caps players at four.
 export const ROOM_CODE_LEN = 4;
 export const NAME_MAX_LEN = 12;
 
@@ -125,8 +122,7 @@ export function layerGainRoom(before, n) {
  * = data/bosses.json `enemyKey`; in the sim the tag-'boss' units: those leaders and their mirrored copies, never parts,
  * escorts or drones) whose `ceil(final damage)` ≥ this is CANCELLED: 0 damage, nothing credited to the shared pool
  * (`AutoChessStepModeManager._OnBossEnemyTakeDamage` → `modifier.Cancel()`). It is not a clamp: a hit of 299999 lands.
- * Checked in server/sim/attack/hit.js (resolveDamage: after the calculation and output stages and the target's damage-taken
- * multipliers, before the ordered injury effects — barriers, shields, dodges) and server/sim/attack.js (dealHPLose — not
+ * Checked in server/sim/damage.js (dealDamage after DEF / RES and every multiplier, before shields; Battle.loseHp — not
  * the 胄 drone link's pool share, `noHitLimit`, DESIGN §25.13.4). Minions, normal rounds and 联防 are unaffected.
  * 0 / Infinity = off.
  */
@@ -141,15 +137,15 @@ export const ANIM = Object.freeze({ IDLE: 0, MOVE: 1, ATTACK: 2, SKILL: 3, DIE: 
 
 export const ERR = Object.freeze({
   BAD_MSG: 'BAD_MSG',             // malformed / unknown message
+  NAME_REJECTED: 'NAME_REJECTED', // displayed nickname/callsign failed moderation
   SESSION_IN_USE: 'SESSION_IN_USE', // a local recovery candidate cannot replace the connected holder
+  SERVER_FULL: 'SERVER_FULL',     // the online cap is reached (server/onlineLimit.js); a resumed session is never refused
   RATE: 'RATE',                   // rate limited
+  LIMIT: 'LIMIT',                 // a room / match / AI seat cap (server/lobby.js Lobby.cap: per network or for all)
   NOT_IN_ROOM: 'NOT_IN_ROOM',
   ROOM_NOT_FOUND: 'ROOM_NOT_FOUND',
   ROOM_FULL: 'ROOM_FULL',
-  SERVER_FULL: 'SERVER_FULL',     // the online cap (SP_MAX_ONLINE) has no seat for a new player
   ROOM_STARTED: 'ROOM_STARTED',
-  // a fixed alliance key (--room-code): one room at a time can hold it
-  ROOM_CODE_TAKEN: 'ROOM_CODE_TAKEN',
   NOT_HOST: 'NOT_HOST',
   NOT_READY: 'NOT_READY',
   WRONG_PHASE: 'WRONG_PHASE',
@@ -164,7 +160,10 @@ export const ERR = Object.freeze({
   ALREADY: 'ALREADY',
   TEMP_NOT_EMPTY: 'TEMP_NOT_EMPTY',
   ELIMINATED: 'ELIMINATED',
+  QUEUED: 'QUEUED',               // leave matchmaking before creating/joining a private room
   SPECTATOR: 'SPECTATOR',         // a spectator seat only watches (MAX_SPECTATORS)
+  START_RETRY: 'START_RETRY',     // cluster start: a player's game channel was not ready in time (server/cluster/lobby.js)
+  MAINTENANCE: 'MAINTENANCE',     // the limits file's maintenance switch is on (server/onlineLimit.js): no new room / start / matchmaking
   // room.setPlugins (DESIGN §32): a plugin this server has not installed; one a room cannot switch on in this version
   // (not a cosmetic or content plugin it loads, not of the room's scope, or not allowed by the server owner's
   // plugins/config.json); a requirement missing or out of range, or a load-order cycle; two plugins in conflict; a set
@@ -193,24 +192,22 @@ export const ERR = Object.freeze({
   TEST_CONFIRM: 'TEST_CONFIRM',
   TEST_DISABLED: 'TEST_DISABLED',
   TEST_FORBIDDEN: 'TEST_FORBIDDEN',
-  // official versions (DESIGN §35.23, M1): a version this server does not enable (room.create, room.proposeVersion); a
-  // version that cannot serve the room (its roomModes, or the room's gameplay plugins — they play 第二期下半 only); a room
-  // action refused while the room's version vote is open (room.start, room.setPlugins, room.setMode, room.proposeVersion)
-  VERSION_UNKNOWN: 'VERSION_UNKNOWN',
-  VERSION_UNSUPPORTED: 'VERSION_UNSUPPORTED',
-  VERSION_VOTE: 'VERSION_VOTE',
   INTERNAL: 'INTERNAL',
 });
 
 export const ERR_TEXT = {
   SESSION_IN_USE: N_('此对局仍在其他窗口中，或当前浏览器无法安全恢复。请关闭原窗口后重试。'),
+  SERVER_FULL: N_('服务器在线人数已满，稍后自动重试'),
   BAD_MSG: N_('无效的请求'), RATE: N_('操作过于频繁'), NOT_IN_ROOM: N_('你不在房间中'), ROOM_NOT_FOUND: N_('未找到该同盟密钥对应的房间'),
-  ROOM_FULL: N_('房间已满'), SERVER_FULL: N_('服务器已满'), ROOM_STARTED: N_('模拟已开始'), NOT_HOST: N_('只有房主可以操作'), NOT_READY: N_('仍有玩家未就绪'),
-  ROOM_CODE_TAKEN: N_('固定同盟密钥已被另一个房间占用，请先关闭那个房间'),
+  ROOM_FULL: N_('房间已满'), ROOM_STARTED: N_('模拟已开始'), NOT_HOST: N_('只有房主可以操作'), NOT_READY: N_('仍有玩家未就绪'),
   WRONG_PHASE: N_('当前阶段无法进行该操作'), NO_FUNDS: N_('资金不足'), HAND_FULL: N_('整备区已满'), BOARD_FULL: N_('已达到部署上限'),
   BAD_TILE: N_('无法部署在该位置'), BAD_TARGET: N_('无效的目标'), SOLD_OUT: N_('已售出'), MAX_LEVEL: N_('调度中心已达最高等级'),
   NOT_YOUR_TURN: N_('尚未轮到你'), ALREADY: N_('已完成该操作'), TEMP_NOT_EMPTY: N_('临时整备区不为空'), ELIMINATED: N_('你已被淘汰'),
-  SPECTATOR: N_('观战中无法进行该操作'), INTERNAL: N_('服务器内部错误'),
+  SPECTATOR: N_('观战中无法进行该操作'), START_RETRY: N_('有玩家连接未就绪，请重试'), INTERNAL: N_('服务器内部错误'),
+  NAME_REJECTED: N_('代号含有不适宜内容或格式无效，请换一个昵称。'),
+  QUEUED: N_('正在匹配中，请先取消匹配'),
+  LIMIT: N_('房间、对局或 AI 队友数量已达上限，请先退出其他房间或稍后再试'),
+  MAINTENANCE: N_('服务器即将维护，暂停开启新的模拟'),
   PLUGIN_UNKNOWN: N_('本服务器没有安装该插件'), PLUGIN_BLOCKED: N_('该插件不能在房间中启用'), PLUGIN_DEPENDENCY: N_('缺少该插件需要的其他插件'),
   PLUGIN_CONFLICT: N_('所选插件互相冲突'), PLUGIN_LIMIT: N_('所选插件的素材总量超出本服务器的上限'),
   PLUGIN_RULE_CONFLICT: N_('两个插件把同一个规则开关设成了不同的选项'),
@@ -226,9 +223,6 @@ export const ERR_TEXT = {
   TEST_CONFIRM: N_('这是测试房间，不计入任何记录。确认加入？'),
   TEST_DISABLED: N_('测试模式未开启'),
   TEST_FORBIDDEN: N_('这不是测试房间'),
-  VERSION_UNKNOWN: N_('本服务器没有启用该版本'),
-  VERSION_UNSUPPORTED: N_('该版本不能用于当前房间（例如房间开着改变玩法的插件）'),
-  VERSION_VOTE: N_('切换版本投票进行中，请等投票结束'),
 };
 
 // ---- Emotes (交流, research 09 §4) -----------------------------------------------------------------------------

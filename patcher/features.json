@@ -276,6 +276,37 @@
       "tests": ["协议版本", "玩家容量", "实验选项", "道具/潜能/高地等共享规则"]
     },
     {
+      "id": "admin-ui-shared",
+      "name": "管理后台共享样式（房间标签）",
+      "status": "custom-outside-upstream",
+      "files": ["shared/admin-ui/room-tags.css"],
+      "tests": ["后台房间列表的标签样式不丢"]
+    },
+    {
+      "id": "client-result-node-hint",
+      "name": "结算页显示所在节点（方便玩家报障）",
+      "status": "custom-outside-upstream",
+      "files": [
+        "public/css/screens/result.css",
+        "public/js/ui/nodeCodeHint.js"
+      ],
+      "tests": ["结算页能看到节点编号"]
+    },
+    {
+      "id": "client-i18n",
+      "name": "界面多语言包与 PWA 清单",
+      "status": "ported-main",
+      "files": [
+        "public/i18n/**",
+        "public/manifest.json"
+      ],
+      "tests": [
+        "中文串即 msgid，英文包 public/i18n/en.json 查不到就回落中文",
+        "node tools/i18n.mjs check en <改动文件> 只报 missing、不报错",
+        "新增中文文案要在 en/ja/ko/zh-TW 四包各补一条"
+      ]
+    },
+    {
       "id": "game-core-client-core",
       "name": "客户端核心（启动、连接、资源、音频、状态存储）",
       "status": "ported-main",

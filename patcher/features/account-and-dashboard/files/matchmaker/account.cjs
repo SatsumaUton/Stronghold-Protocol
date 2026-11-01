@@ -29,23 +29,62 @@ function watchSecret() {
 // 短时管理员能力令牌：游戏节点用同一 watch-secret 验签，无需读取账号数据库。
 function adminTokenFor(u) {
   if (!u || (u.role !== 'owner' && u.role !== 'admin')) return null;
-  const payload = Buffer.from(JSON.stringify({ v: 1, uid: u.id, role: u.role, exp: Date.now() + 12 * 3600_000 })).toString('base64url');
+  // typ 区分令牌用途：只有 typ='admin' 的才算验码令牌，accountToken（typ='user'）不能冒充
+  //
+  // ★ 2026-10-31：必须带 iat。
+  //   server/adminAuth.js 的 verifyAdminToken 拿 iat 和「退出授权」记下的吊销时刻比：
+  //   没有 iat 的令牌在吊销发生后一律作废（那边写得很明确：宁可重新换码也不留后门）。
+  //   这条令牌以前没有 iat，于是管理员点过一次「退出授权」之后，
+  //   账号登录带来的令牌**永远**是坏的 —— 游戏里怎么看都显示「需要验证码」，
+  //   刷新也没用（维护者 2026-10-31 实测撞到）。
+  //   加上 iat 之后语义才对：「我这次登录是在那次吊销之后，所以我是新授权」。
+  const payload = Buffer.from(JSON.stringify({ v: 1, typ: 'admin', uid: u.id, role: u.role, iat: Date.now(), exp: Date.now() + 12 * 3600_000 })).toString('base64url');
   const sig = crypto.createHmac('sha256', watchSecret()).update(payload).digest('base64url');
   return payload + '.' + sig;
 }
 
+// 验码令牌的有效期。默认 4 小时。
+// ★ 环境变量 SP_ADMIN_TOOL_TTL_MS 只用于测试「到期后自动退回取码界面」：
+//   调成 60000（1 分钟）重启 matchmaker，兑换后等 1 分钟，看面板是否自动退回。
+//   生产环境不要设它。
+function adminToolTtlMs() {
+  const v = Number(process.env.SP_ADMIN_TOOL_TTL_MS);
+  if (Number.isFinite(v) && v >= 10_000 && v <= 24 * 3600_000) return v;
+  return 4 * 3600_000;
+}
+
 // 登录账号的短期签名身份：游戏节点验签后只信 uid/tag，不再依赖可伪造的四位 tag。
-function userTokenFor(u) {
+//
+// ★ 2026-10-31：新增 perms 字段（只带和「游戏内管理员工具」相关的那一个：tools.game）。
+//   为什么要把权限塞进令牌：游戏节点（server/net.js）只验签、不查库，
+//   它没法知道这个 admin 到底有没有 tools.game。前端要据此决定
+//   「连取码界面都不给看」——没有权限的 admin 打开工具界面本身就是越权展示。
+//   只带一个布尔量（gameTool: true/false），不把整张权限表塞进令牌。
+//   owner 恒为 true（最高管理员不受权限表限制，和 adminHasPerm 的口径一致）。
+function userTokenFor(u, perms) {
   if (!u || !u.id) return null;
+  const isOwner = u.role === 'owner';
+  const gameTool = isOwner ? true : !!(perms && perms.toolsGame === true);
   const payload = Buffer.from(JSON.stringify({
     v: 1,
+    // typ='user'：登录身份令牌，不是验码令牌。verifyAdminToken 会拒绝它。
+    typ: 'user',
     uid: u.id,
     role: u.role || 'player',
     tag: u.tag || null,
+    gameTool,
     exp: Date.now() + 7 * 24 * 3600_000,
   })).toString('base64url');
   const sig = crypto.createHmac('sha256', watchSecret()).update(payload).digest('base64url');
   return payload + '.' + sig;
+}
+
+// 这个账号能不能用「游戏内管理员工具」。owner 恒可真；普通 admin 看权限表。
+async function gameToolAllowed(u) {
+  if (!u) return false;
+  if (u.role === 'owner') return true;
+  if (u.role !== 'admin') return false;
+  try { return await adminHasPerm(u.id, 'tools.game'); } catch { return false; }
 }
 
 // 数据库连接只从环境变量 / .secrets/secrets.json 读取；代码里不写死账号、口令、库名
@@ -87,10 +126,68 @@ const ADMIN_PERMISSIONS = [
   { key: 'nodes.view', label: '查看节点状态', desc: '30 节点在线 / 人数 / 对局 / 趋势', def: false },
   { key: 'nodes.restart', label: '重启游戏节点', desc: '从后台重启单个节点（高风险）', def: false },
   { key: 'storage.view', label: '查看数据占用', desc: '账号云端数据大小排行', def: false },
-  { key: 'rooms.view', label: '查看所有房间号', desc: '各节点当前房间码', def: false },
+  { key: 'rooms.view', label: '查看所有房间号', desc: '各节点当前房间码、房间名单', def: false },
+  // 2026-10-29 拆细：原来「看房间」和「动房间」是同一个 rooms.view，
+  // 于是想看房间列表的人必然也能关房间。现在分成三个：
+  //   rooms.view   只看
+  //   rooms.abort  结束这一局（房间保留，玩家留在房里）
+  //   rooms.close  关闭整个房间（玩家被移出同盟）
+  { key: 'rooms.abort', label: '结束对局', desc: '结束房间当前这一局，房间与座位保留', def: false },
+  { key: 'rooms.close', label: '关闭房间', desc: '手动关闭任意房间（玩家会被移出同盟）', def: false },
+  { key: 'rooms.watch', label: '隐身观战', desc: '不占观战席地进入任意房间观战', def: false },
   { key: 'rooms.maintenance', label: '维护开关', desc: '创建房间 / 开始游戏 / 匹配队友的维护开关', def: false },
-  { key: 'dash.settings', label: '服务器设置', desc: '公告板、房间时长、服务器状态等', def: false },
+  // ⚠ 权限按【管理后台的页签】分组，一个页签一项（维护者 2026-10-29 定的规则）：
+  //     玩家账号 → accounts.*    审计日志 → audit.*     已删除账号 → accounts.delete
+  //     节点状态 → nodes.*       当前房间 → rooms.*     维护开关 → rooms.maintenance
+  //     数据占用 → storage.view  服务器设置 → dash.settings（本项）
+  //     权限设置 → 仅最高管理员（isOwner，不在本表里）
+  // 所以「服务器设置」页签里的公告板、房间时长、nginx、日志等，仍然共用这一项，
+  // 不再往下拆 —— 拆了就和页签对不上了。
+  { key: 'dash.settings', label: '服务器设置', desc: '公告板、房间时长、维护开关、服务器状态、日志等', def: false },
+  // 2026-10-31 新增：游戏内管理员工具（刷干员 / 装备 / 盟约 / 数值 / 阶段）。
+  // 默认关闭 —— 它能让持有者在**正常对局**里直接改对局状态，属于高风险能力，
+  // 必须由最高管理员在「权限设置」里手动勾上。勾上后：
+  //   · 后台「游戏内管理员工具」卡片会显示，能生成 6 位验证码；
+  //   · 游戏内点延迟胶囊 → 输码 → 面板可用 4 小时。
+  // 没勾这项的 admin 即使在游戏里输了码，兑换接口也会返回 not_admin。
+  { key: 'tools.game', label: '游戏内管理员工具', desc: '在正常对局里刷干员 / 装备 / 盟约 / 数值（高风险）', def: false },
 ];
+
+/**
+ * 权限预设模板（2026-10-29 新增）。
+ *
+ * 19 项权限逐个勾太麻烦，新加一个管理员经常漏掉关键项（尤其新增条目默认是关的）。
+ * 这里给几个常见角色的一键组合；点一下套用，之后仍可手改任意项。
+ * 与下方 DANGEROUS_PERMS 配合：任何预设都不含「删除账号 / 修改权限」。
+ */
+const PERM_PRESETS = [
+  { id: 'readonly', label: '只能看，不能改', desc: '看账号、日志、节点、房间、数据占用，但不能做任何改动',
+    keys: ['accounts.view', 'audit.view', 'nodes.view', 'storage.view', 'rooms.view', 'dash.settings'] },
+  { id: 'support', label: '管玩家（封禁/改名/改密码）', desc: '处理玩家问题：看账号、封禁、改名、重置密码、隐身观战；不能动节点和房间',
+    keys: ['accounts.view', 'accounts.ban', 'accounts.rename', 'accounts.resetpw',
+      'audit.view', 'rooms.view', 'rooms.watch', 'dash.settings'] },
+  { id: 'ops', label: '管房间（可关房/结束对局）', desc: '结束对局、关闭房间、隐身观战、维护开关、看日志和节点状态；不能重启节点、不能封禁或改账号',
+    keys: ['accounts.view', 'audit.view', 'nodes.view', 'storage.view',
+      'rooms.view', 'rooms.abort', 'rooms.close', 'rooms.watch', 'rooms.maintenance', 'dash.settings'] },
+  { id: 'all', label: '全部（除三项高风险）', desc: '上面全部；「删除账号」「修改权限」「重启节点」属高风险，任何预设都不含，必须手动勾', keys: null },
+];
+/**
+ * 危险权限：面板上标红，且**任何预设都不包含** —— 必须手动勾。
+ *
+ * 2026-10-29 维护者要求把「重启游戏节点」也算进来：重启一台节点会让上面的玩家
+ * 断线重连（对局数据不丢，但会卡一下），和删账号、改权限同属「一按就影响很多人」。
+ */
+const DANGEROUS_PERMS = Object.freeze(['accounts.delete', 'accounts.role', 'nodes.restart']);
+
+/** 把一个预设展开成实际的权限 key 列表（只保留本案里真实存在的项，去掉危险项）。 */
+function expandPreset(preset) {
+  const known = new Set(ADMIN_PERMISSIONS.map((p) => p.key));
+  const base = preset && preset.keys
+    ? preset.keys
+    : ADMIN_PERMISSIONS.map((p) => p.key);   // 「全部」：所有非危险项
+  return base.filter((k) => known.has(k) && !DANGEROUS_PERMS.includes(k));
+}
+
 const DEFAULT_ADMIN_PERMS = ADMIN_PERMISSIONS.filter((p) => p.def).map((p) => p.key);
 let adminPermsCache = { at: 0, list: null };
 async function getAdminPerms() {
@@ -109,6 +206,16 @@ async function getAdminPerms() {
   adminPermsCache = { at: Date.now(), list: DEFAULT_ADMIN_PERMS };
   return DEFAULT_ADMIN_PERMS;
 }
+/** 某个 admin 账号是否被授予了某权限。
+ *  权限表是全局的（所有 admin 共用 admin_perms 这一份），所以这里只查全局列表；
+ *  只有 admin 角色会被限制，owner（最高管理员）在调用处直接放行。
+ *  @param {number} _adminId 预留：以后若要按账号细分权限，改这里即可
+ *  @param {string} key @returns {Promise<boolean>} */
+async function adminHasPerm(_adminId, key) {
+  const list = await getAdminPerms();
+  return list.includes(key);
+}
+
 async function setAdminPerms(list) {
   const valid = [...new Set((Array.isArray(list) ? list : []).filter((k) => ADMIN_PERMISSIONS.some((p) => p.key === k)))];
   await db().query("INSERT INTO admin_settings (k, v) VALUES ('admin_perms', ?) ON DUPLICATE KEY UPDATE v = VALUES(v)", [JSON.stringify(valid)]);
@@ -437,8 +544,14 @@ async function ensureSchema() {
       ua VARCHAR(255) NULL,
       ip VARCHAR(45) NULL,
       first_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_ip VARCHAR(45) NULL,
+      last_seen TIMESTAMP NULL,
       PRIMARY KEY (account_id, device)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    // 异地登录提醒（游戏账号侧，2026-10-31）：老库补两列，记录该设备上次登录的 IP / 时间。
+    // 只在管理员账号（role owner/admin）上用；普通玩家不写这张表，也就不会触发邮件。
+    try { await c.query('ALTER TABLE admin_devices ADD COLUMN last_ip VARCHAR(45) NULL'); } catch { /* 已有 */ }
+    try { await c.query('ALTER TABLE admin_devices ADD COLUMN last_seen TIMESTAMP NULL'); } catch { /* 已有 */ }
     // 老库遗留：name 必填 + 唯一键，会阻止「注册后再设代号」的流程
     try { await c.query('ALTER TABLE accounts MODIFY COLUMN name VARCHAR(40) NULL DEFAULT NULL'); } catch { /* 已可空 */ }
     try { await c.query('ALTER TABLE accounts DROP INDEX uk_name'); } catch { /* 无该索引 */ }
@@ -528,7 +641,17 @@ async function handle(req, res, pathname) {
 
   if (method === 'GET' && pathname === '/api/auth/me') {
     const u = await currentUser(req);
-    return u ? sendJson(res, 200, { ok: true, user: u, userToken: userTokenFor(u), adminToken: adminTokenFor(u) }) : sendJson(res, 401, { ok: false, error: 'unauthorized' });
+    // ★ 2026-10-31：这里**不再下发 adminToken**（维护者要求）。
+    //   以前 /api/auth/me 和登录都顺手给一枚 adminToken，于是「登录了管理员账号」
+    //   等于「游戏内管理员工具直接可用」—— 验码门形同虚设。
+    //   维护者定的规则是：第一次打开必须先输授权码，4 小时后过期要重新输。
+    //   所以 adminToken 只能由 /api/admintool/exchange 发（那边签 4 小时）。
+    //   身份仍照常下发（user.role），前端靠它决定"要不要显示取码框"。
+    if (!u) return sendJson(res, 401, { ok: false, error: 'unauthorized' });
+    // gameTool 一并下发：前端据此决定「要不要显示管理员工具入口 / 取码界面」。
+    // 没有 tools.game 权限的 admin 连界面都不该看到（维护者 2026-10-31 要求）。
+    const gameTool = await gameToolAllowed(u);
+    return sendJson(res, 200, { ok: true, user: u, gameTool, userToken: userTokenFor(u, { toolsGame: gameTool }) });
   }
 
   // 跨节点恢复：只告诉当前登录账号它自己所在的房间，不暴露全服房间目录。
@@ -570,6 +693,51 @@ async function handle(req, res, pathname) {
     return sendJson(res, 200, { ok: true, room: null });
   }
 
+  // 内部接口（只给 nginx 用，仅本机可访问）：这个登录账号在 node=N 上有没有房间？
+  //
+  // 背景：nginx 的 map $cookie_sp_route 原本让「所有存活节点」都能粘住 cookie，
+  // 于是 30 天有效的老 cookie 会把玩家带回旧代码节点 —— 哪怕他根本不在对局中。
+  // nginx 查不了数据库，所以在这里提供一个只回 204/404 的极简接口，配 auth_request 用。
+  //
+  // 鉴权：只看 nginx 转发来的 X-Real-IP 是否本机（公网访问直接 403），
+  // 且必须带登录 session（否则视为「没有房间」→ 不粘 → 走随机新节点，安全侧）。
+  if (method === 'GET' && pathname === '/api/account/room-on-node') {
+    const ip = ipOf(req) || '';
+    if (!(ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1')) {
+      res.writeHead(403, { 'cache-control': 'no-store' });
+      return res.end();
+    }
+    const u = await currentUser(req);
+    if (!u) { res.writeHead(404, { 'cache-control': 'no-store' }); return res.end(); }
+    const wantNode = Number(new URL(req.url, 'http://x').searchParams.get('node'));
+    if (!Number.isInteger(wantNode) || wantNode < 1 || wantNode > 30) {
+      res.writeHead(400, { 'cache-control': 'no-store' });
+      return res.end();
+    }
+    const uid = u.id != null ? String(u.id) : null;
+    let has = false;
+    try {
+      const r = await fetch('http://127.0.0.1:3080/api/status', { cache: 'no-store' });
+      if (r.ok) {
+        const j = await r.json();
+        for (const n of j?.rooms?.nodes || []) {
+          if (Number(n.n) !== wantNode) continue;
+          for (const room of n.rooms || []) {
+            // 只认「已开局的对局」：大厅里等人不算（那种情况刷新不会掉线）。
+            if (room.started !== true) continue;
+            const players = (room.players || []).filter(Boolean);
+            if (uid && players.some((x) => x && x.accountId != null && String(x.accountId) === uid)) { has = true; break; }
+          }
+          if (has) break;
+        }
+      }
+    } catch { /* 查不到 = 没有房间 */ }
+    res.writeHead(has ? 204 : 404, {
+      'cache-control': 'no-store',
+      ...(has ? { 'X-SP-Room-On-Node': String(wantNode) } : {}),
+    });
+    return res.end();
+  }
   if (method === 'POST' && pathname === '/api/auth/send-code') {
     const ip = ipOf(req) || '?';
     if (limited('code-ip:' + ip, 20, 60 * 60 * 1000)) return sendJson(res, 429, { ok: false, error: 'too_many_requests', retryAfter: 60 });
@@ -659,7 +827,8 @@ async function handle(req, res, pathname) {
       await db().query('DELETE FROM email_codes WHERE email = ?', [email]);
       const sid = await createSession(r.insertId, req, res);
       const created = { id: r.insertId, email, nickname: null, tag, role: 'player', name: null, displayName: null };
-      return sendJson(res, 200, { ok: true, token: sid, userToken: userTokenFor(created), user: created });
+      // 新注册一律是 player，不可能有 tools.game —— 不必查库。
+      return sendJson(res, 200, { ok: true, token: sid, userToken: userTokenFor(created, { toolsGame: false }), user: created });
     } catch (e) {
       if (e && e.code === 'ER_DUP_ENTRY') return sendJson(res, 409, { ok: false, error: 'email_taken' });
       return sendJson(res, 500, { ok: false, error: 'server_error' });
@@ -711,7 +880,10 @@ async function handle(req, res, pathname) {
     await db().query('UPDATE accounts SET nickname = ?, name = ?, tag = ? WHERE id = ?', [nickname, nickname + '#' + tag, tag, u.id]);
     const display = nickname + '#' + tag;
     const next = { ...u, nickname, tag, name: display, displayName: display, titleName: display };
-    return sendJson(res, 200, { ok: true, userToken: userTokenFor(next), adminToken: adminTokenFor(next), user: next });
+    // ★ 2026-10-31：改名也不再补发 adminToken（原样保留手头那枚 4 小时的兑换令牌即可）。
+    //   但 userToken 要重签（tag 变了），权限也要一并带上。
+    const gameToolN = await gameToolAllowed(next);
+    return sendJson(res, 200, { ok: true, gameTool: gameToolN, userToken: userTokenFor(next, { toolsGame: gameToolN }), user: next });
   }
   // （这里原有一段重复的 /api/auth/set-name 分支，永远不可达——上面的同名路由已先行 return。
   //   它写的是 name = nickname（不带 #代码），与实际生效的逻辑相反，容易误导，已删除。）
@@ -728,9 +900,55 @@ async function handle(req, res, pathname) {
       return sendJson(res, 401, { ok: false, error: 'bad_credentials' });
     }
     await db().query('UPDATE accounts SET last_login_at = NOW() WHERE id = ?', [u.id]);
+    // 异地登录提醒（游戏账号侧，2026-10-31）。
+    // 背景：管理员工具（游戏内 F9 面板）靠「登录游戏账号时下发的 adminToken」授权，
+    // 所以游戏账号登录也成了拿到管理权限的途径 —— 必须能在异常登录时通知服主。
+    //
+    // 只在管理员账号上做（role owner/admin）：普通玩家一个邮件都不发，避免骚扰。
+    // 发信条件（维护者定稿）：**新设备 或 IP 和这台设备上次登录的 IP 不同**。
+    //   同一台设备 + 同一 IP 反复登录 → 不发；
+    //   常用设备换了网络 → 发（异地）；
+    //   新设备（同网络也算）→ 发（新设备）。
+    // device = sha256(ua + '|' + accept-language)，和后台登录用的是同一种指纹。
+    if (u.role === 'owner' || u.role === 'admin') {
+      try {
+        const ua = String(req.headers['user-agent'] || '').slice(0, 255);
+        const lang = String(req.headers['accept-language'] || '');
+        const dev = crypto.createHash('sha256').update(ua + '|' + lang).digest('hex');
+        const [known] = await db().query('SELECT last_ip FROM admin_devices WHERE account_id = ? AND device = ?', [u.id, dev]);
+        const prevIp = known[0] ? (known[0].last_ip || null) : null;
+        const isNewDevice = !known[0];
+        const ipChanged = !isNewDevice && prevIp != null && prevIp !== ip;
+        if (isNewDevice || ipChanged) {
+          const [owners] = await db().query("SELECT email FROM accounts WHERE role = 'owner' AND email IS NOT NULL AND deleted_at IS NULL");
+          const what = isNewDevice ? '在新设备登录' : '在异地登录（IP 变了）';
+          const subject = '【萝卜喵公益服】管理员账号' + what;
+          const text = '管理员账号 ' + (u.email || '') + '（' + (u.nickname || '') + '#' + (u.tag || '') + '）' + what + '。\n'
+            + 'IP: ' + ip + (ipChanged ? '（上次 ' + prevIp + '）' : '') + '\n'
+            + 'UA: ' + ua + '\n'
+            + (u.role === 'owner' ? '' : '')
+            + '如非本人操作，请立即到后台重置密码或收回权限。\n\n—— 萝卜喵公益服 · 卫戍协议：盟约';
+          for (const o of owners) {
+            if (!o.email) continue;
+            try { await mail().sendMail({ from: `"萝卜喵公益服" <${MAIL.user}>`, to: o.email, subject, text }); } catch { /* 忽略 */ }
+          }
+          await audit({ id: u.id, email: u.email }, isNewDevice ? 'game-new-device' : 'game-ip-changed', u.id, ip, ip);
+        }
+        // 每次登录都刷新该设备的最后 IP / 时间（新设备也顺手插一条）
+        await db().query(
+          'INSERT INTO admin_devices (account_id, device, ua, ip, last_ip, last_seen) VALUES (?,?,?,?,?,NOW()) '
+          + 'ON DUPLICATE KEY UPDATE last_ip = VALUES(last_ip), last_seen = NOW(), ua = VALUES(ua)',
+          [u.id, dev, ua, ip, ip],
+        );
+      } catch { /* 设备识别 / 发信失败都不影响登录 */ }
+    }
     const sid = await createSession(u.id, req, res);
     const display = displayOf(u);
-    return sendJson(res, 200, { ok: true, token: sid, userToken: userTokenFor(u), adminToken: adminTokenFor(u), user: { id: u.id, email: u.email, nickname: u.nickname, tag: u.tag, role: u.role || 'player', name: display, displayName: display, titleName: u.nickname ? u.nickname + '#' + u.tag : null } });
+    // ★ 2026-10-31：登录**不再下发 adminToken**，理由同 /api/auth/me（见那处注释）。
+    //   管理员要用游戏内工具，必须到后台生成验证码再兑换 —— 这是验码门存在的意义。
+    //   gameTool 照常下发（含进 userToken），前端据此决定「要不要显示入口」。
+    const gameToolL = await gameToolAllowed(u);
+    return sendJson(res, 200, { ok: true, token: sid, gameTool: gameToolL, userToken: userTokenFor(u, { toolsGame: gameToolL }), user: { id: u.id, email: u.email, nickname: u.nickname, tag: u.tag, role: u.role || 'player', name: display, displayName: display, titleName: u.nickname ? u.nickname + '#' + u.tag : null } });
   }
 
   if (method === 'POST' && pathname === '/api/auth/logout') {
@@ -963,6 +1181,129 @@ async function handle(req, res, pathname) {
     await audit({ id: u.id, email: u.email }, 'login-code', u.id, u.role, ipOf(req));
     return sendJson(res, 200, { ok: true, token, admin: { id: u.id, email: u.email, nickname: u.nickname, tag: u.tag, role: u.role } });
   }
+  // ---------------- 游戏内管理员工具：一次性授权码（本服，2026-10-31）----------------
+  // 设计目标：游戏内那个刷干员 / 刷装备的面板，**不能只靠"登录了管理员账号"就长期有效**。
+  // 维护者要求：几小时过期一次，过期后必须回管理后台取新的码才能继续用。
+  //
+  // 流程（码只能在后台生成，游戏页拿不到）：
+  //   1) 后台已登录 → POST /api/admin2/tool-code  → 拿到 6 位码（后台页面显示给你）
+  //   2) 游戏页 → POST /api/admintool/exchange { email, code }
+  //              → 验证码正确且账号 role 为 owner/admin → 下发 adminToken（4 小时）
+  //   3) 节点 net.js 验签该 token → session.admin → 放行 g.test
+  //
+  // 为什么码要有 TTL（10 分钟）而 token 是 4 小时：码是「一次授权动作」，token 是「这段工作时间内有效」。
+  // 码用过即删，避免被重复兑换。
+  if (method === 'POST' && pathname === '/api/admin2/tool-code') {
+    const u = await currentUser(req);
+    if (!u) return sendJson(res, 401, { ok: false, error: 'login_required' });
+    if (u.role !== 'owner' && u.role !== 'admin') return sendJson(res, 403, { ok: false, error: 'not_admin' });
+    // 最高管理员恒有；普通 admin 要在「权限设置」里勾了 tools.game 才行
+    if (u.role !== 'owner' && !(await adminHasPerm(u.id, 'tools.game'))) {
+      return sendJson(res, 403, { ok: false, error: 'no_perm' });
+    }
+    if (limited('toolcode:' + (ipOf(req) || '?'), 20, 3600_000)) return sendJson(res, 429, { ok: false, error: 'too_many_requests' });
+    const code = String(crypto.randomInt(100000, 1000000));
+    // ★ 码按「生成者自己的邮箱」存一条：key 里已经带了身份，
+    //   再加上 val.uid 做第二道保险（兑换时会比对）。同一个人重复生成会覆盖旧码
+    //   （ON DUPLICATE KEY UPDATE），所以每人同时只有一个有效码 —— 这符合
+    //   「每个管理员生成的码只对他自己有效」的语义。
+    const key = 'tool_code:' + String(u.email || '').toLowerCase();
+    const val = JSON.stringify({ h: hashCode(key, code), exp: Date.now() + 10 * 60_000, uid: u.id });
+    await db().query('INSERT INTO admin_settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)', [key, val]);
+    await audit({ id: u.id, email: u.email }, 'tool-code-issue', u.id, u.role, ipOf(req));
+    return sendJson(res, 200, { ok: true, code, minutes: 10, hours: 4, note: '在游戏内点左上角「节点状态」胶囊，输入这个码；只有你自己的账号能用' });
+  }
+  if (method === 'POST' && pathname === '/api/admintool/exchange') {
+    // ⚠ 路径不能挂在 /api/admin/ 下：那个前缀在本文件上方有「仅本机 IP」+「Bearer 鉴权」两道旧守卫，
+    //    游戏页从公网访问会被直接 403/401。
+    if (limited('toolex:' + (ipOf(req) || '?'), 30, 3600_000)) return sendJson(res, 429, { ok: false, error: 'too_many_requests' });
+    const body = await readBody(req, 8 * 1024);
+    const code = String(body.code || '').trim();
+    // ★★★ 2026-10-31 安全修复：身份**只能取自登录会话，绝不采信请求体里的 email** ★★★
+    //
+    //   以前这里用的是 `body.email`。那意味着：任何登录用户（哪怕普通玩家）
+    //   只要在请求里把 email 写成某个管理员的邮箱、并且知道那 6 位码，
+    //   就能兑换出那个管理员的令牌 —— 码和人的绑定形同虚设。
+    //   维护者的要求是「每个管理员生成的码只对这个管理员有效，其他人不能用」，
+    //   所以这里必须先有登录态，再用**会话里的账号**去查码。
+    const me = await currentUser(req);
+    if (!me) return sendJson(res, 401, { ok: false, error: 'login_required' });
+    const email = String(me.email || '').trim().toLowerCase();
+    if (!email || !/^[0-9]{6}$/.test(code)) return sendJson(res, 400, { ok: false, error: 'invalid' });
+    // 请求体里如果硬塞了别的 email，直接拒绝（帮助排查，也避免「静默忽略」带来的困惑）
+    const bodyEmail = String(body.email || '').trim().toLowerCase();
+    if (bodyEmail && bodyEmail !== email) {
+      return sendJson(res, 403, { ok: false, error: 'not_your_code' });
+    }
+    const key = 'tool_code:' + email;
+    const [rows] = await db().query('SELECT v FROM admin_settings WHERE k = ?', [key]);
+    const rec = rows[0] ? JSON.parse(rows[0].v) : null;
+    if (!rec || Number(rec.exp) < Date.now()) return sendJson(res, 400, { ok: false, error: 'code_expired' });
+    if (rec.h !== hashCode(key, code)) return sendJson(res, 400, { ok: false, error: 'code_wrong' });
+    // ★ 码的归属再核一次：生成时记了 uid，这里必须与当前登录账号一致。
+    //   key 已经是「tool_code:<本人的邮箱>」，uid 这层是第二道保险 ——
+    //   万一以后有人改了 key 的构造方式，也不会把码发给别人。
+    if (rec.uid != null && Number(rec.uid) !== Number(me.id)) {
+      return sendJson(res, 403, { ok: false, error: 'not_your_code' });
+    }
+    // 角色仍以账号表为准：验证码只证明「后台已登录并发过码」，不替代角色判定
+    const [acc] = await db().query('SELECT id, email, nickname, tag, role, disabled, deleted_at FROM accounts WHERE email = ?', [email]);
+    const a = acc[0];
+    if (!a || a.disabled || a.deleted_at || (a.role !== 'owner' && a.role !== 'admin')) {
+      return sendJson(res, 403, { ok: false, error: 'not_admin' });
+    }
+    // 权限吊销后即使手里还有旧码也不能用：最高管理员恒有，普通 admin 要 tools.game
+    if (a.role !== 'owner' && !(await adminHasPerm(a.id, 'tools.game'))) {
+      await db().query('DELETE FROM admin_settings WHERE k = ?', [key]);
+      return sendJson(res, 403, { ok: false, error: 'no_perm' });
+    }
+    await db().query('DELETE FROM admin_settings WHERE k = ?', [key]);   // 一次性
+    await audit({ id: a.id, email: a.email }, 'tool-code-redeem', a.id, a.role, ipOf(req));
+    // 验码令牌的有效期：默认 4 小时。
+    // ★ 2026-10-31：抽成常量 + 环境变量，方便把时间调短做「到期自动退回」的测试。
+    //   测试方法：SP_ADMIN_TOOL_TTL_MS=60000 重启 matchmaker → 1 分钟后自动失效，
+    //   验证完把环境变量去掉、重启回 4 小时。生产不要设这个变量。
+    const ttlMs = adminToolTtlMs();
+    // iat：签发时间。配合「吊销时间点」实现退出授权 —— 早于吊销点的令牌一律作废。
+    const payload = Buffer.from(JSON.stringify({ v: 1, typ: 'admin', uid: a.id, role: a.role, iat: Date.now(), exp: Date.now() + ttlMs })).toString('base64url');
+    const sig = crypto.createHmac('sha256', watchSecret()).update(payload).digest('base64url');
+    return sendJson(res, 200, { ok: true, adminToken: payload + '.' + sig, hours: ttlMs / 3600_000, ttlMs, role: a.role });
+  }
+  // 吊销验码令牌（游戏内「退出授权」按钮调用）。
+  // 令牌是无状态 HMAC，服务端无法单独作废某一枚，所以记一个「吊销时间点」：
+  // 早于这个时刻签发的 admin 令牌一律失效（节点侧 verifyAdminToken 会比对 iat）。
+  // 存在 admin_settings 表里，键固定为 tool_revoke_at，所有节点共用。
+  if (method === 'POST' && pathname === '/api/admintool/revoke') {
+    const u = await currentUser(req);
+    if (!u) return sendJson(res, 401, { ok: false, error: 'login_required' });
+    if (u.role !== 'owner' && u.role !== 'admin') return sendJson(res, 403, { ok: false, error: 'not_admin' });
+    const at = Date.now();
+    await db().query('INSERT INTO admin_settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)', ['tool_revoke_at', String(at)]);
+    // 同时写文件：节点只读 .secrets 下的文件，不查数据库（见 server/adminAuth.js）
+    try {
+      const fsp = require('node:fs');
+      const pth = require('node:path');
+      const root = process.env.SP_ROOT || pth.resolve(__dirname, '..');
+      fsp.writeFileSync(pth.join(root, '.secrets', 'admin-revoke-at'), String(at), 'utf8');
+    } catch (e) { console.error('[revoke] 写文件失败', e && e.message); }
+    await audit({ id: u.id, email: u.email }, 'tool-code-revoke', u.id, u.role, ipOf(req));
+    return sendJson(res, 200, { ok: true, revokedAt: at });
+  }
+  // 验证码状态查询：后台生成码之后轮询它，用掉就立刻显示「已使用」并禁用。
+  // 服务端在 exchange 里已经 DELETE 了记录，这里只读一次判断还在不在。
+  if (method === 'GET' && pathname === '/api/admin2/tool-code-status') {
+    const u = await currentUser(req);
+    if (!u) return sendJson(res, 401, { ok: false, error: 'login_required' });
+    if (u.role !== 'owner' && u.role !== 'admin') return sendJson(res, 403, { ok: false, error: 'not_admin' });
+    const key = 'tool_code:' + String(u.email || '').toLowerCase();
+    const [rows] = await db().query('SELECT v FROM admin_settings WHERE k = ?', [key]);
+    if (!rows[0]) return sendJson(res, 200, { ok: true, used: true, remaining: 0 });
+    let rec = null;
+    try { rec = JSON.parse(rows[0].v); } catch { rec = null; }
+    const left = rec ? Math.max(0, Number(rec.exp) - Date.now()) : 0;
+    return sendJson(res, 200, { ok: true, used: false, remaining: left, expired: left <= 0 });
+  }
+
   if (method === 'POST' && pathname === '/api/admin2/login') {
     const body = await readBody(req, 8 * 1024);
     const email = String(body.email || '').trim().toLowerCase();
@@ -1019,7 +1360,9 @@ async function handle(req, res, pathname) {
     me2.perms = isOwner ? ['*'] : await getAdminPerms();
     if (method === 'GET' && pathname === '/api/admin2/me') return sendJson(res, 200, { ok: true, admin: { id: me2.admin_id, email: me2.email, nickname: me2.nickname, tag: me2.tag, role: me2.role }, perms: me2.perms });
     if (method === 'POST' && pathname === '/api/admin2/watch-token') {
-      if (!adminCan(me2, 'rooms.view')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
+      // 独立权限 rooms.watch：隐身观战能看到房间里的一切（包括玩家名字与会话），
+      // 但不占观战席、不算房间成员，属于「只读但范围最大」的能力，单独授权。
+      if (!adminCan(me2, 'rooms.watch')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
       let code = '';
       try { const b = earlyBody ? await earlyBody : null; code = String(b && b.code || '').toUpperCase(); } catch { /* bad body */ }
       if (!code) {
@@ -1092,7 +1435,15 @@ async function handle(req, res, pathname) {
     if (method === 'POST' && pathname === '/api/admin2/logout') { await db().query('DELETE FROM admin_sessions WHERE token = ?', [bm[1]]); return sendJson(res, 200, { ok: true }); }
     if (method === 'GET' && pathname === '/api/admin2/permissions') {
       if (!isOwner) return sendJson(res, 403, { ok: false, error: 'forbidden' });
-      return sendJson(res, 200, { ok: true, catalog: ADMIN_PERMISSIONS, current: await getAdminPerms() });
+      // presets / dangerous 一并给前端：权限页据此渲染「只读 / 客服 / 运维 / 全部」
+      // 一键模板，并把危险项标出来（任何预设都不含它们，必须手勾）。
+      return sendJson(res, 200, {
+        ok: true,
+        catalog: ADMIN_PERMISSIONS,
+        current: await getAdminPerms(),
+        presets: PERM_PRESETS.map((p) => ({ id: p.id, label: p.label, desc: p.desc, keys: expandPreset(p) })),
+        dangerous: DANGEROUS_PERMS,
+      });
     }
     if (method === 'POST' && pathname === '/api/admin2/permissions') {
       if (!isOwner) return sendJson(res, 403, { ok: false, error: 'forbidden' });
@@ -1248,6 +1599,107 @@ async function handle(req, res, pathname) {
         return sendJson(res, 200, { ok: true, at: Date.now(), nodes });
       }
     }
+    // 关闭任意房间（本服新增）：{ code, node? }
+    //
+    // 房间归某个节点所有，其它节点不认识这个房间号，所以必须直接打「房间所在的那台」。
+    // node 由前端从 /api/admin2/rooms 的列表里带上；没带就去 rooms.json 里找。
+    // 节点侧用 .secrets/watch-secret 的 HMAC 认人（server/http/routes.js /admin/room/close）。
+    if (method === 'POST' && pathname === '/api/admin2/rooms/close') {
+      if (!adminCan(me3, 'rooms.close')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
+      const body = await readBody(req, 4096).catch(() => ({}));
+      const code = String(body && body.code || '').trim().toUpperCase();
+      if (!/^[A-Z0-9]{4,6}$/.test(code)) return sendJson(res, 400, { ok: false, error: 'bad_code' });
+      let nodeN = Number(body && body.node);
+      if (!(nodeN >= 1 && nodeN <= 30)) {
+        // 没给节点号就从房间目录里找（同一房间号只会属于一台节点）
+        try {
+          const p = require('node:path').join(__dirname, '..', 'content', 'rooms.json');
+          const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+          for (const n of data.nodes || []) {
+            if ((n.rooms || []).some((r) => String(r && r.code).toUpperCase() === code)) { nodeN = Number(n.n); break; }
+          }
+        } catch { /* 目录缺了就只能靠前端传的 node */ }
+      }
+      if (!(nodeN >= 1 && nodeN <= 30)) return sendJson(res, 404, { ok: false, error: 'room_not_found' });
+      let secret = '';
+      try { secret = fs.readFileSync(require('node:path').join(__dirname, '..', '.secrets', 'watch-secret'), 'utf8').trim(); } catch { /* 下面会返回 503 */ }
+      if (!secret) return sendJson(res, 503, { ok: false, error: 'no_secret' });
+      const exp = Date.now() + 60_000;
+      const sig = require('node:crypto').createHmac('sha256', secret).update(`${code}.${exp}`).digest('base64url');
+      const payload = JSON.stringify({ code, exp });
+      const out = await new Promise((resolve) => {
+        const req2 = require('node:http').request({
+          host: '127.0.0.1', port: 3000 + nodeN, path: '/admin/room/close', method: 'POST',
+          headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload), 'x-sp-admin-sig': sig },
+          timeout: 8000,
+        }, (r2) => {
+          let b = '';
+          r2.on('data', (c) => { b += c; });
+          r2.on('end', () => { try { resolve({ status: r2.statusCode, body: JSON.parse(b) }); } catch { resolve({ status: r2.statusCode, body: { ok: false, error: 'bad_response' } }); } });
+        });
+        req2.on('error', (e) => resolve({ status: 0, body: { ok: false, error: String(e && e.code || e) } }));
+        req2.on('timeout', () => { req2.destroy(); resolve({ status: 0, body: { ok: false, error: 'timeout' } }); });
+        req2.write(payload);
+        req2.end();
+      });
+      if (out.body && out.body.ok) {
+        await audit({ id: me3.admin_id, email: me3.email }, 'close-room', code, 'node-' + nodeN, ipOf(req));
+        return sendJson(res, 200, { ok: true, code, node: nodeN, humans: out.body.humans, running: out.body.running });
+      }
+      const err = (out.body && out.body.error) || 'close_failed';
+      const status = err === 'no_room' ? 404 : out.status >= 400 ? out.status : 502;
+      return sendJson(res, status, { ok: false, error: err, node: nodeN });
+    }
+    // 结束房间里当前这一局，但**保留房间**（维护者 2026-10-29 要求）：
+    // 玩家不会被移出同盟，只是这一局没了，可以直接重新开局。
+    // 鉴权、找节点、签名与 close 完全一致，只是打 /admin/room/abort、审计动作不同。
+    if (method === 'POST' && pathname === '/api/admin2/rooms/abort') {
+      // 独立权限 rooms.abort：结束对局会作废玩家进度，但不销毁房间，
+      // 比「关闭房间」轻一档，允许单独授予。
+      if (!adminCan(me3, 'rooms.abort')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
+      const body = await readBody(req, 4096).catch(() => ({}));
+      const code = String(body && body.code || '').trim().toUpperCase();
+      if (!/^[A-Z0-9]{4,6}$/.test(code)) return sendJson(res, 400, { ok: false, error: 'bad_code' });
+      let nodeN = Number(body && body.node);
+      if (!(nodeN >= 1 && nodeN <= 30)) {
+        try {
+          const p = require('node:path').join(__dirname, '..', 'content', 'rooms.json');
+          const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+          for (const n of data.nodes || []) {
+            if ((n.rooms || []).some((r) => String(r && r.code).toUpperCase() === code)) { nodeN = Number(n.n); break; }
+          }
+        } catch { /* 目录缺了就只能靠前端传的 node */ }
+      }
+      if (!(nodeN >= 1 && nodeN <= 30)) return sendJson(res, 404, { ok: false, error: 'room_not_found' });
+      let secret = '';
+      try { secret = fs.readFileSync(require('node:path').join(__dirname, '..', '.secrets', 'watch-secret'), 'utf8').trim(); } catch { /* 下面会返回 503 */ }
+      if (!secret) return sendJson(res, 503, { ok: false, error: 'no_secret' });
+      const exp = Date.now() + 60_000;
+      const sig = require('node:crypto').createHmac('sha256', secret).update(`${code}.${exp}`).digest('base64url');
+      const payload = JSON.stringify({ code, exp });
+      const out = await new Promise((resolve) => {
+        const req2 = require('node:http').request({
+          host: '127.0.0.1', port: 3000 + nodeN, path: '/admin/room/abort', method: 'POST',
+          headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload), 'x-sp-admin-sig': sig },
+          timeout: 8000,
+        }, (r2) => {
+          let b = '';
+          r2.on('data', (c) => { b += c; });
+          r2.on('end', () => { try { resolve({ status: r2.statusCode, body: JSON.parse(b) }); } catch { resolve({ status: r2.statusCode, body: { ok: false, error: 'bad_response' } }); } });
+        });
+        req2.on('error', (e) => resolve({ status: 0, body: { ok: false, error: String(e && e.code || e) } }));
+        req2.on('timeout', () => { req2.destroy(); resolve({ status: 0, body: { ok: false, error: 'timeout' } }); });
+        req2.write(payload);
+        req2.end();
+      });
+      if (out.body && out.body.ok) {
+        await audit({ id: me3.admin_id, email: me3.email }, 'abort-match', code, 'node-' + nodeN, ipOf(req));
+        return sendJson(res, 200, { ok: true, code, node: nodeN, humans: out.body.humans, roomKept: true });
+      }
+      const err = (out.body && out.body.error) || 'abort_failed';
+      const status = err === 'no_room' ? 404 : err === 'no_match' ? 409 : out.status >= 400 ? out.status : 502;
+      return sendJson(res, status, { ok: false, error: err, node: nodeN });
+    }
     const mn = /^\/api\/admin2\/node\/([0-9]{1,2})\/restart$/.exec(pathname);
     if (mn && method === 'POST') {
       if (!adminCan(me3, 'nodes.restart')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
@@ -1255,13 +1707,49 @@ async function handle(req, res, pathname) {
       if (!(n >= 1 && n <= 30)) return sendJson(res, 400, { ok: false, error: 'bad_node' });
       try {
         const { execFile } = require('node:child_process');
-        await new Promise((resolve, reject) => execFile('pm2', ['restart', 'node-' + n, '--update-env'], { windowsHide: true }, (e) => e ? reject(e) : resolve()));
+        const fsx = require('node:fs');
+        const pathMod = require('node:path');
+        // pm2 不在 PATH 里时 execFile('pm2') 会 ENOENT —— 而 matchmaker 的 PATH 是空的
+        // （由 pm2 启动的进程没有继承用户 PATH），所以这里显式定位 pm2：
+        //   1) 「当前 node + pm2 的 bin 脚本」，完全不依赖 PATH；
+        //   2) 退回 %APPDATA%\npm\pm2.cmd；
+        //   3) 都找不到就把真实原因记进日志，绝不伪装成「没权限」。
+        const npmDirs = [
+          process.env.APPDATA && pathMod.join(process.env.APPDATA, 'npm'),
+        ].filter(Boolean);
+        const pm2BinJs = npmDirs
+          .map((d) => pathMod.join(d, 'node_modules', 'pm2', 'bin', 'pm2'))
+          .find((f) => { try { return fsx.existsSync(f); } catch { return false; } });
+        const pm2Cmd = npmDirs
+          .map((d) => pathMod.join(d, 'pm2.cmd'))
+          .find((f) => { try { return fsx.existsSync(f); } catch { return false; } });
+        let cmd, args;
+        if (pm2BinJs) {
+          cmd = process.execPath;
+          args = [pm2BinJs, 'restart', 'node-' + n, '--update-env'];
+        } else if (pm2Cmd) {
+          cmd = pm2Cmd;
+          args = ['restart', 'node-' + n, '--update-env'];
+        } else {
+          console.error('[admin2] restart-node: 找不到 pm2，PATH=' + String(process.env.PATH || ''));
+          return sendJson(res, 500, { ok: false, error: 'pm2_not_found' });
+        }
+        await new Promise((resolve, reject) => {
+          execFile(cmd, args, { windowsHide: true, env: { ...process.env, PM2_HOME: process.env.PM2_HOME || pathMod.join(process.env.APPDATA || '', 'pm2') } },
+            (e, so, se) => (e ? reject(Object.assign(e, { stderrOut: String(se || ''), cmdUsed: cmd })) : resolve()));
+        });
         await audit({ id: me3.admin_id, email: me3.email }, 'restart-node', n, 'node-' + n, ipOf(req));
         return sendJson(res, 200, { ok: true, node: n });
-      } catch (e) { return sendJson(res, 500, { ok: false, error: 'restart_failed' }); }
+      } catch (e) {
+        console.error('[admin2] restart-node failed:', e && ((e.cmdUsed || '') + ' ' + e.message + ' ' + (e.stderrOut || '')));
+        return sendJson(res, 500, { ok: false, error: 'restart_failed', detail: String((e && (e.stderrOut || (e.cmdUsed || '') + ' ' + e.message)) || '').slice(0, 300) });
+      }
     }
   }
-  // ---------------- 服务器设置代理（仅最高管理员，转发本机 3080）----------------
+  // ---------------- 服务器设置代理（转发本机 3080）----------------
+  //
+  // 权限按【管理后台的页签】划分，一个页签一项 —— 本路由整体属于「服务器设置」页签，
+  // 所以仍然只用 dash.settings 一项把关（不再按子路径拆，拆了就和页签对不上）。
   if (pathname.startsWith('/api/admin2/dash/') && (method === 'GET' || method === 'POST')) {
     const auth = String(req.headers.authorization || '');
     const bm = /^Bearer\s+([A-Za-z0-9_-]{20,64})$/.exec(auth);
@@ -1372,7 +1860,7 @@ async function handle(req, res, pathname) {
   return false;
 }
 
-module.exports = { handle, ensureSchema, currentUser, DOMAINS, codeMailHtml, adminGate, setRoomDirProvider };
+module.exports = { handle, ensureSchema, currentUser, db, DOMAINS, codeMailHtml, adminGate, setRoomDirProvider };
 
 /** 由 server.js 注入：返回 [{ n, codes, at }]，供后台 /api/admin2/rooms 展示。 */
 let roomDirProvider = null;

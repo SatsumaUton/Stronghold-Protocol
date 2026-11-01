@@ -7,10 +7,11 @@
 
 import { html, Button, Icon, useTicker } from './components.js';
 import { net, CLIENT_ERR_TEXT } from '../net.js';
-import { useStore, shallowEqual } from '../store.js';
+import { useStore, shallowEqual, selectRoute } from '../store.js';
 import { useDocClass } from './device.js';
 import { useState, useEffect } from '../../vendor/hooks.module.js';
 import { checkNodeAcceptsNew } from './nodeCodeHint.js';
+import { updateHintAllowed } from './buildGuard.js';
 import { t } from '../../../shared/i18n.js';
 
 /** Whether the banner shows for this connection state (mirrors the early returns below). */
@@ -26,6 +27,12 @@ export function ConnectionBanner() {
   const entered = useStore((s) => s.session.entered);
   const restoring = useStore((s) => s.ui.restoring);
   const buildStale = useStore((s) => !!s.ui.buildStale);
+  // ★ 2026-10-31（维护者要求）：**对局中不弹「服务器已更新」**，只在大厅 / 房间准备阶段 / 结算界面弹。
+  //   这两次订阅要分开写：selectRoute 只返回路由字符串，拿不到 phase，而结算界面（RESULT）
+  //   的路由仍然是 'game' —— 只看路由会把结算也当成「对局中」一并挡掉。
+  const route = useStore(selectRoute);
+  const phase = useStore((s) => s.match?.public?.phase);
+  const hintAllowed = updateHintAllowed(route, phase);
   // Hidden admin watch is not the player's page: a new build must not offer/force a 刷新状态 there.
   const adminWatch = (() => {
     try {
@@ -41,8 +48,9 @@ export function ConnectionBanner() {
   //                    也就是它还在跑旧代码，刷新能换到新节点上。
   //   维护者在 node-7（旧代码、build 一直没变）上等不到任何提示，就是缺了这一条：
   //   那台节点没重启过，buildGuard 永远不会说「有新版本」。
-  //   探测频率与 buildGuard 一致（60s），并且只在「不在对局里」时才提示刷新，
-  //   避免打断正在打的人（对局中的提示仍由 buildStale 负责，它知道等对局结束）。
+  //   探测频率与 buildGuard 一致（60s）。★ 2026-10-31 修正：原来这里注释说「只在不在对局里时才提示」，
+  //   但代码其实没做这个限制 —— 于是对局中也照样弹（buildStale 那条同样弹）。现在统一由
+  //   updateHintAllowed 把关：对局中一律不显示，只在大厅 / 房间准备阶段 / 结算界面显示。
   const [oldNode, setOldNode] = useState(false);
   useEffect(() => {
     if (adminWatch) return undefined;
@@ -61,15 +69,19 @@ export function ConnectionBanner() {
     const t = setInterval(probe, 60_000);
     return () => { alive = false; clearInterval(t); };
   }, [adminWatch]);
+  // ★ 2026-10-31：`stale` 只看「该不该提示刷新」这件事本身；**画不画**由 hintAllowed 决定。
+  //   注意 `html.sp-conn`（给 toast 让位的那个 class）跟着的是 bannerVisible —— 用 hintAllowed 参与判断，
+  //   否则横幅被藏起来、toast 却被无谓地压在下面。
   const stale = !adminWatch && (buildStale || oldNode);
+  const staleShown = stale && hintAllowed;
   useTicker(conn.status === 'reconnecting' ? 500 : 0);
-  useDocClass('sp-conn', bannerVisible(conn, entered, restoring, stale));
+  useDocClass('sp-conn', bannerVisible(conn, entered, restoring, staleShown));
   if (!entered) return null;
-  if (conn.status === 'online' && !restoring && !stale) return null;
+  if (conn.status === 'online' && !restoring && !staleShown) return null;
   if (conn.status === 'online' && restoring) {
     return html`<div class="conn-banner" role="status"><${Icon} name="refresh" /><span>${t('正在同步同盟状态…')}</span></div>`;
   }
-  if (conn.status === 'online' && stale) {
+  if (conn.status === 'online' && staleShown) {
     // the server has a newer build than this page: the guard reloads by itself once the match is over, the button is
     // for a player who would rather do it now
     return html`<div class="conn-banner" role="alert">
@@ -83,8 +95,16 @@ export function ConnectionBanner() {
   const replaced = conn.status === 'closed' && conn.lastError?.code === 'REPLACED';
   const rejected = conn.status === 'connected' && !!conn.lastError; // hello refused (version, server full…)
   const versionMismatch = rejected && conn.lastError.text === CLIENT_ERR_TEXT.VERSION;
-  // Short transitional states (a rename re-sends hello on the live socket) only show if they linger.
-  const transient = conn.status === 'connecting' || conn.status === 'handshaking' || (conn.status === 'connected' && !rejected);
+  // Short transitional states only show if they linger.
+  // ★ 2026-11-01（维护者：「为什么我这里还是有网络中断的提示」）：
+  //   节点被滚动重启时，玩家那条 WebSocket 会断 1–3 秒，前端自动重连就好。
+  //   但 `reconnecting` **原本不在这里**，于是一断就立刻弹横幅 —— 看到的就是「闪一下」。
+  //   维护者要的是「节点追新代码时用户无感」，所以把重连也纳入「短状态」：
+  //   用 conn-banner--soft（CSS 里 delay .6s 才出现），2 秒内连回来就什么都不显示。
+  //   ⚠ 真的连不上（超过 2 秒）时横幅照样出现，而且 `retryNow` 按钮仍在 —— 不掩盖真故障。
+  const flapping = conn.status === 'reconnecting';
+  const transient = conn.status === 'connecting' || conn.status === 'handshaking'
+    || flapping || (conn.status === 'connected' && !rejected);
   const text = conn.status === 'reconnecting'
     ? t('与服务器的连接已中断，正在重连')
     : replaced ? t('该身份已在其他页面登录')
@@ -94,7 +114,9 @@ export function ConnectionBanner() {
     : conn.status === 'closed' ? { label: replaced ? t('在此页面继续') : t('重新连接'), run: () => net.connect() }
       : versionMismatch ? { label: t('刷新页面'), run: () => location.reload() }
         : rejected ? { label: t('重试'), run: () => net.reconnectNow() } : null;
-  return html`<div class=${`conn-banner${transient ? ' conn-banner--soft' : ''}`} role="alert">
+  // flap（断线重连）用 2 秒宽限；其他短状态沿用 .6 秒
+  const bannerCls = `conn-banner${flapping ? ' conn-banner--flap' : transient ? ' conn-banner--soft' : ''}`;
+  return html`<div class=${bannerCls} role="alert">
     <${Icon} name="wifiOff" />
     <span>${text}</span>
     ${conn.status === 'reconnecting' ? html`<span class="conn-banner__sub">${t('第 {attempt} 次 · {secs}s', { attempt: conn.attempt, secs })}</span>` : null}

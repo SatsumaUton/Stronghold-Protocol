@@ -10,6 +10,9 @@ import { setupMatchWaves } from '../waves.js';
 import { drawDisabledBonds, SharedPool, createPoolGroups, createItemPools } from '../pool.js';
 import { OK, fail } from './common.js';
 
+/** Yes votes a vote needs of `n` voters: ceil(0.75 × n) — the 3/4 bar shared by 重刷本局 and 战斗 2 倍速. */
+export const rerollNeed = (n) => Math.ceil(0.75 * n);
+
 // One start per seat per cooldown: the vote freezes the INFO_CHECK countdown, so an endless restart loop would stall
 // the opening. A completed reroll starts a new opening and therefore a new window. (SETUP_REROLL_COOLDOWN_MS, 30 s, lives
 // in shared/constants.js so the client's refusal toast names the same value.) With one human every start completes at

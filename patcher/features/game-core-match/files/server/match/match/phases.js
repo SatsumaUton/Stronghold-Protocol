@@ -61,6 +61,8 @@ export class MatchPhases {
     this.setDeadline(0);
     this.startDraftTurn();
     this.markPublic();
+    // 断点续玩：选人开始是一个安全点（恢复回来从这个回合的第一手接着选）
+    this._checkpoint('band-draft');
   }
 
   /**
@@ -188,6 +190,10 @@ export class MatchPhases {
       const ps = d.concurrent ? target : this.players.get(this.draftTurn());
       if (!ps || !ps.botControlled) return;
       if (d.picks[ps.playerId]) return;
+      // 房主给这个 AI 座位指定了策略（room.setBotBand）：它直接拿那个，
+      // 而且该策略一直为它保留着（见 bandTaken / reservedBands），所以此刻仍然可选。
+      const own = this.designatedBand(ps);
+      if (own) { this._applyBand(ps, own, { dedupe: true }); return; }
       const fallback = () => {
         // a strategy a teammate already took is not selectable (队友已选): the bot re-draws, else the first free one.
         // 「允许重复选择策略」开着时 bandTaken 恒为 false，AI 就按自己的意愿挑（可能与人重复）—— 与本服原始设计一致。
@@ -217,7 +223,35 @@ export class MatchPhases {
     if (this.allowRepeat) return false;
     const picks = this.draft?.picks || {};
     for (const [pid, id] of Object.entries(picks)) if (pid !== playerId && id === bandId) return true;
+    // 房主给别的 AI 座位指定的策略（room.setBotBand）也算「已被占」，
+    // 直到那个座位真的选走它为止 —— 否则玩家能抢先选掉，指定就落空了。
+    for (const [pid, id] of this.botBands || []) if (pid !== playerId && id === bandId && !picks[pid]) return true;
     return false;
+  }
+
+  /**
+   * The designated strategies still held (room.setBotBand): bandId → the AI seat's playerId, for every AI seat that has
+   * not picked yet; {} when repeats are allowed (「允许重复选择策略」). m.public draft.reserved.
+   * 客户端用它把「已经指定给某个 AI」的策略标出来，不让玩家误以为可以选。
+   * @returns {Record<string, string>}
+   */
+  reservedBands() {
+    const out = {};
+    if (this.allowRepeat) return out;
+    const picks = this.draft?.picks || {};
+    for (const [pid, id] of this.botBands || []) if (!picks[pid]) out[id] = pid;
+    return out;
+  }
+
+  /**
+   * The strategy the host designated for this AI seat (room.setBotBand) while it can take it — allowed by the mode and
+   * held by nobody else —, else null (the seat picks as without the option).
+   * @param {any} ps
+   * @returns {string | null}
+   */
+  designatedBand(ps) {
+    const id = ps && this.botBands?.get(ps.playerId);
+    return id && this.gd.bandAllowed(id) && !this.bandTaken(id, ps.playerId) ? id : null;
   }
 
   /**

@@ -194,6 +194,11 @@ export function botPickBand(m, ps) {
   const ids = gd.bandIds();
   if (!ids.length) return gd.defaultBandId;
   const lateFunds = (id) => /暂存/.test(String(gd.band(id)?.desc || ''));
+  // 5–20 人房的「允许重复选择策略」(allowRepeat) 同样作用于 AI：
+  // 打开后 AI 不再软避让队友已选的盟约（SOFT_BAND_RESERVE 降到 1），
+  // 和玩家一样可以选到重复的策略 —— 这个开关控制的是整支队伍的选策略逻辑，不只是玩家。
+  // 关闭时保持原样（1/4 权重软预留，可被抽到但概率低）。
+  const reserve = m.allowRepeat === true ? 1 : SOFT_BAND_RESERVE;
   const reserved = new Set(ps && typeof m.alivePlayers === 'function'
     ? m.alivePlayers().filter((p) => p !== ps).flatMap((p) => gd.bandBondIds(p.bandId))
     : []);
@@ -201,7 +206,7 @@ export function botPickBand(m, ps) {
   const pairs = ids.map((id) => {
     if (inactive(id)) return [id, 0];
     const w = Math.max(1, (gd.startLp(id) - 18) ** 2) * (m.isSolo && lateFunds(id) ? 0.02 : 1);
-    return [id, gd.bandBondIds(id).some((b) => reserved.has(b)) ? w * SOFT_BAND_RESERVE : w];
+    return [id, gd.bandBondIds(id).some((b) => reserved.has(b)) ? w * reserve : w];
   });
   let total = 0;
   for (const [, w] of pairs) total += w;
@@ -254,7 +259,7 @@ export function bountyKillChance(m, ps, card) {
   if (!e || !e.stats) return 0.5;
   const model = fieldModel(m, ps);
   const sc = gd.enemyScale(m.round);
-  const hp = Math.max(1, (e.stats.maxHp || 1000) * sc.hpMul);
+  const hp = Math.max(1, (e.stats.maxHp || 1000) * sc.hpMul * (m.enemyHpMul ?? 1));
   const def = e.stats.def || 0;
   const res = e.stats.res || 0;
   const fly = isFlyKey(gd, card.enemyKey) || HOVER.has(card.enemyKey);
@@ -858,7 +863,7 @@ export function fieldModel(m, ps = null) {
         foes.set(k, (foes.get(k) || 0) + (isLeader ? LEADER_HP * LEADER_WEIGHT : (e.stats.maxHp || 1000) * n));
       }
       // the leader counts like LEADER_WEIGHT tough enemies: its huge pool makes damage on it worth a lot everywhere
-      const hp = isLeader ? LEADER_HP : ((e && e.stats && e.stats.maxHp) || 1000) * ((s.mods && s.mods.hpMul) || 1);
+      const hp = isLeader ? LEADER_HP : ((e && e.stats && e.stats.maxHp) || 1000) * ((s.mods && s.mods.hpMul) || 1) * (m.enemyHpMul ?? 1);
       const spd = ((e && e.stats && e.stats.moveSpeed) || 1) * ((s.mods && s.mods.speedMul) || 1);
       const air = HOVER.has(s.enemyKey);
       const key = `${s.routeIndex}|${isLeader ? 'boss' : ''}|${air ? 'air' : ''}`;
@@ -1330,7 +1335,7 @@ function bossCandidateOpts(m, ps, byUid, plan) {
     if (Array.isArray(ev.spawns)) spawns = ev.spawns;
     if (Array.isArray(ev.routes)) routes = ev.routes;
   }
-  const hp = bossPoolHp(m.gd, bossId, alive.length);
+  const hp = bossPoolHp(m.gd, bossId, alive.length, { hpMul: m.enemyHpMul ?? 1 });
   return {
     seed: faRehearsalSeed(m, ps),
     kind,
@@ -1345,7 +1350,7 @@ function bossCandidateOpts(m, ps, byUid, plan) {
     sharedBoss: new SharedBossPool(hp),
     // the spec the host's browser rebuilds the pool from (buildBattleSpec reads `boss`, not the live pool object)
     boss: { poolHp: hp, poolMax: hp },
-    flags: { layerGainsEnabled: false, ...m.gd.dp, enemyScale: m.gd.enemyScale(m.round) },
+    flags: { layerGainsEnabled: false, ...m.gd.dp, enemyScale: m.gd.enemyScale(m.round), ...m._ruleFlags?.() },
     fieldId: `rb:${ps.playerId}`,
     enemyOverrides: wave.overrides,
     waveId: wave.templateId,

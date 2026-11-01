@@ -35,10 +35,13 @@ import { data, localAsset } from '../data.js';
 import { uiUrl } from './assetUrls.js';
 import { reducedMotion } from './device.js';
 import { serverNow } from '../store.js';
+import { ServerStatusModal } from './serverStatus.js';
 import { isCombatPhase, isBossPhase, prepCapsuleLabel, bossFrac, bossPctText, fmtNum, shopBlockReason } from './gameLogic.js';
 import { overtimeState, overtimeDrainPerSec, remainAt } from './matchStatus.js';
+import { uniteBudgetInfo } from './gameLogic/phases.js';
 import { hotkeyLabelOf } from './settings.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
+import { uniteRelayRound } from '../battle/observe.js';
 import { UnofficialMark, ruleLine } from './pluginTag.js';
 import { TestMark } from './testConsole.js';
 
@@ -89,6 +92,7 @@ export function SpectatorPill({ spectators, myId, isHost, onRemove }) {
  */
 export function PhaseCapsule({ pub, hud, miss = null }) {
   const phase = pub?.phase;
+  const relayRound = uniteRelayRound(pub);
   if (isBossPhase(phase)) {
     // the battle on screen first: its snapshot carries the live pool (the local simulation's own damage on top of the
     // server's b.pool, or the server's 20 Hz stream); m.public.bossHp refreshes at ~1 Hz and lags the leader's death
@@ -96,7 +100,7 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
     const frac = bossFrac(boss);
     return html`<div class="capsule capsule--boss" role="status">
       <${Sprite} k="hudPanel/icon_boss" class="capsule__icon" fallback=${html`<${GIcon} name="skull" class="capsule__icon" />`} />
-      ${hud?.total != null ? html`<span class="capsule__kills num"><b>${hud.resolved ?? hud.killed ?? 0}</b>/${hud.total}</span>` : null}
+      ${hud?.total != null ? html`<span class="capsule__kills num"><b key=${hud.resolved ?? hud.killed ?? 0}>${hud.resolved ?? hud.killed ?? 0}</b>/${hud.total}</span>` : null}
       <div class="bossbar" title=${boss ? `${fmtNum(boss.hp)} / ${fmtNum(boss.max)}` : t('敌方领袖')}>
         <div class="bossbar__fill" style=${`width:${frac == null ? 100 : frac * 100}%`}></div>
         <span class="bossbar__txt num">${frac == null ? t('敌方领袖') : bossPctText(frac)}</span>
@@ -107,8 +111,8 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
     return html`<div class=${cx('capsule', 'capsule--combat', phase === PHASE.UNITE && 'capsule--unite')} role="status">
       <${Sprite} k=${phase === PHASE.UNITE ? 'hudPanel/icon_coop' : 'hudPanel/icon_battle'} class="capsule__icon"
         fallback=${html`<${Icon} name="sword" class="capsule__icon" />`} />
-      <span class="capsule__kills num"><b>${hud?.resolved ?? hud?.killed ?? 0}</b>/${hud?.total ?? '--'}</span>
-      ${phase === PHASE.UNITE ? html`<span class="capsule__tag">${t('联防')}</span>` : null}
+      <span class="capsule__kills num"><b key=${hud?.resolved ?? hud?.killed ?? 0}>${hud?.resolved ?? hud?.killed ?? 0}</b>/${hud?.total ?? '--'}</span>
+      ${phase === PHASE.UNITE ? html`<span class="capsule__tag">${relayRound === 2 ? t('联防 {round}/2', { round: relayRound }) : t('联防')}</span>` : null}
       ${phase === PHASE.UNITE && Number.isFinite(miss) ? html`<${MissTag} n=${miss} />` : null}
     </div>`;
   }
@@ -169,15 +173,13 @@ function preloadCapsuleArt() {
 /**
  * Which capsule scene to play: a new one at every phase (or round) change; nothing on the first render (a reload or a
  * late join lands mid-phase) or with reduced motion. `seq` re-keys the capsule so its CSS motion restarts.
- * `held`: the HUD is hidden under 协议启动！ (screens/game.js hudIn 'wait') — a change meanwhile waits and plays when the
- * HUD comes in, so the first round's 回合开始 kettles are seen even when 协议启动！ outlasts the start of 回合开始.
- * @param {string|undefined} phase @param {number|undefined} round @param {boolean} [held]
+ * @param {string|undefined} phase @param {number|undefined} round
  */
-function useCapsuleFx(phase, round, held = false) {
+function useCapsuleFx(phase, round) {
   const ref = useRef({ key: null, phase: null, kind: null, seq: 0 });
   const s = ref.current;
   const key = `${phase}:${round}`;
-  if (s.key !== key && !(held && s.key !== null)) {
+  if (s.key !== key) {
     const kind = s.key === null || reducedMotion() ? null : capsuleFxKind(phase, s.phase);
     s.kind = kind && kind !== 'enter' && capsuleArt !== true ? 'enter' : kind;
     s.key = key;
@@ -403,17 +405,6 @@ function CheckBtn({ sprite, cls, label, chev, on, disabled, onClick, testid }) {
 }
 
 /**
- * The top bar's faint deco type (official hudPanel/frame_deco_txt*; the same words as text without the art pack).
- * Decoration only: aria-hidden, so a screen reader never reads it.
- * @param {{ k: 'txt1'|'txt2'|'txt3', text: string, side: 'l'|'c'|'r' }} props
- */
-function DecoType({ k, text, side }) {
-  return html`<span class=${`gtop__deco gtop__deco--${side}`} aria-hidden="true" data-deco=${k}>
-    <${Sprite} k=${`hudPanel/frame_deco_${k}`} class=${`gtop__decoimg gtop__decoimg--${k}`} fallback=${html`<span class="gtop__decotxt">${text}</span>`} />
-  </span>`;
-}
-
-/**
  * The red overtime (DOT) warning of a boss round (pure view of ui/matchStatus.js overtimeState).
  * @param {{ ot: ReturnType<typeof overtimeState> }} props
  */
@@ -437,6 +428,19 @@ export function OvertimeWarning({ ot }) {
   </div>`;
 }
 
+/**
+ * 挂机移出 warning (server Match afkRemoveRounds; m.private afkWarn): the player made no substantive move last round, so
+ * one more idle prep removes them from the match. Shown through 机变 and 休整期 until any real action clears it.
+ */
+export function AfkWarning({ pub, priv }) {
+  if (!priv?.afkWarn || (pub?.phase !== PHASE.PREP && pub?.phase !== PHASE.SP_DRAFT)) return null;
+  return html`<div class="otwarn otwarn--afk" role="alert" data-state="afk">
+    <${Icon} name="warn" class="otwarn__icon" />
+    <span class="otwarn__tag">AFK</span>
+    <span class="otwarn__txt">${t('本回合仍无操作将被移出对局')}</span>
+  </div>`;
+}
+
 /** Two-bar pause glyph (the official battle pause button). */
 function PauseGlyph() {
   return html`<svg class="pausebtn__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4.5v16H6zm7.5 0H18v16h-4.5z" /></svg>`;
@@ -457,31 +461,38 @@ export function PauseButton({ paused, busy = false, onToggle }) {
   <//>`;
 }
 
+/** A frozen stage budget / round-start balance. The changing real-time countdown stays separate. */
+export function UniteBudgetNote({ pub }) {
+  const budget = uniteBudgetInfo(pub);
+  if (!budget) return null;
+  const total = Math.round(budget.total * 100) / 100, remaining = Math.round(budget.remaining * 100) / 100;
+  return html`<div class="gtop__budget" data-testid="unite-budget" data-total=${budget.total} data-remaining=${budget.remaining}>
+    <span>${t('联防总预算：{total} 游戏秒', { total })}</span>
+    <span>${t('本轮起始剩余：{remaining} 游戏秒', { remaining })}</span>
+  </div>`;
+}
+
 /**
- * Top bar. Its centre (PR #643 / #827, the event's top bar, video 8:01): [🔍] in a bracket frame · + · a long thin band
- * with 回合 N on the left half and the LP tower on the right half, the phase capsule as a bevelled plate in the middle
- * · + · [🔍▶▶] in a bracket frame (css/screens/game.css 顶部中栏), with the official deco type above it (hudPanel
- * frame_deco_txt1 / txt3 RHODES ISLAND TERMINAL SERVICE over the halves, frame_deco_txt2 STRONGHOLD PROTOCOL over the
- * plate — [ASSUMED] that placement: txt2 is as wide as the gap in the top edge of frame_mid_normal, the plate's frame;
- * the same words as text without the art pack, hidden from screen readers either way). It comes in as 协议启动！ leaves
- * (screens/game.js `hudIn`; `held` while it waits); the phase capsule plays a scene at each phase change (capsuleFxKind)
- * and the round number flips when it changes ([ASSUMED] the flip and the second + mark: #827's additions, #643 had neither).
+ * Top bar. Its centre (2026-10-13, the event's, video 8:01): [🔍] in a bracket frame · a long thin band with 回合 N on
+ * the left half and the LP tower on the right half · the phase capsule as a bevelled plate in the middle of it · [🔍▶▶]
+ * in a bracket frame (css/screens/game.css 顶部中栏). It drops in when the match screen opens; the capsule plays a scene
+ * at each phase change (capsuleFxKind), and the round number and the kills flip when they change.
  * @param {{ pub:any, priv:any, conn:any, hud:any, total:number|null, drawer:string|null, onExit:Function, onDrawer:(tab:string)=>void,
  *   onReady:(r:boolean)=>void, readyBusy?:boolean, readyCount?:number, playerCount?:number,
  *   pen?:boolean, penAvail?:boolean, onPen?:(on:boolean)=>void, config?: any, frozenAt?: number|null,
  *   pause?: { show: boolean, paused: boolean, busy?: boolean, onToggle: () => void } | null,
  *   live?: { pending: number, unite: boolean, left?: number|null } | null,
- *   spectators?: any[]|null, myId?: any, isHost?: boolean, onRemoveSpectator?: ((playerId: any) => any)|null, held?: boolean }} props
+ *   spectators?: any[]|null, myId?: any, isHost?: boolean, onRemoveSpectator?: ((playerId: any) => any)|null }} props
  *   spectators: the room's spectator seats (room.state) — the 观战席 capsule beside the latency (SpectatorPill; the host removes)
  *   room: room.state — a match with gameplay plugins shows the small MOD mark beside the difficulty (DESIGN §32.6)
  *   frozenAt: the server time every clock shows while the solo match is paused (null = live)
  *   live: the own battle's pending LP loss (liveLp): the tower keeps the settled lp and adds a red −N tick, 联防中 during 联防;
  *     `left` (a leaker in 联防): its enemies still standing — the capsule's ×N tag
- *   held: the HUD waits hidden under 协议启动！ — a phase change's capsule scene waits for it (useCapsuleFx)
  */
 export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, onReady, readyBusy, readyCount, playerCount, pen = false, penAvail = false, onPen = () => {},
   config = null, frozenAt = null, pause = null, live = null, spectator = false,
-  spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null, held = false }) {
+  spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null }) {
+  const [loadOpen, setLoadOpen] = useState(false);
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
   const lp = boss && Number.isFinite(pub?.teamLp) ? pub.teamLp : Number.isFinite(priv?.lp) ? priv.lp : null;
@@ -501,7 +512,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   const cap = Number(config?.lpCapPerRound) > 0 ? Number(config.lpCapPerRound) : 10;
   const frozenSecs = Number.isFinite(frozenAt) ? remainAt(pub?.deadline, frozenAt) : null;
   const btn = checkButtons({ pen, penAvail, infoOpen: !!drawer });
-  const fx = useCapsuleFx(phase, pub?.round, held);
+  const fx = useCapsuleFx(phase, pub?.round);
   useEffect(() => { preloadCapsuleArt(); }, []);
   const onLeft = () => (pen ? onPen(false) : onDrawer('info'));
   const onRight = () => (pen ? onPen(false) : penAvail ? onPen(true) : null);
@@ -510,9 +521,12 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
       <${Button} variant="danger" size="lg" square=${true} icon="exit" onClick=${onExit} aria-label=${t('离开')} title=${t('离开 / 暂离')} class="gtop__exit tapx" />
       <div class="gtop__meta">
         <div class="gtop__net">
-          <${PingPill} ms=${conn?.ping} online=${conn?.status === 'online'} />
+          <${PingPill} ms=${conn?.ping} online=${conn?.status === 'online'} status=${conn?.status} loadState=${conn?.loadState ?? 'unknown'}
+            loadDetails=${conn?.loadDetails} clusterLoad=${conn?.clusterLoad} scope="game" loadOpen=${loadOpen} onLoadClick=${() => setLoadOpen(true)} />
           <${SpectatorPill} spectators=${spectators} myId=${myId} isHost=${isHost} onRemove=${onRemoveSpectator} />
         </div>
+        <${ServerStatusModal} open=${loadOpen} online=${conn?.status === 'online'} state=${conn?.loadState}
+          details=${conn?.loadDetails} clusterLoad=${conn?.clusterLoad} scope="game" onClose=${() => setLoadOpen(false)} />
         ${pub?.difficulty ? html`<${DifficultyTag} difficulty=${pub.difficulty} size="sm" />` : null}
         ${pub?.test ? html`<${TestMark} class="gtop__test" />` : null}
         <${UnofficialMark} room=${room} compact=${true} class="gtop__mod" />
@@ -521,17 +535,14 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
     </div>
 
     <div class="gtop__center">
-      <span class="gtop__frame gtop__frame--l">
+      <span class="gtop__frame">
         <${Tooltip} text=${btn.left.tip} placement="bottom">
           <${CheckBtn} sprite=${btn.left.sprite} cls=${cx('gtop__iconbtn', btn.left.back && 'is-back')} label=${btn.left.label}
             chev=${btn.left.back ? '◀◀' : null} on=${!!drawer && !pen} onClick=${onLeft} testid="check-player" />
         <//>
       </span>
-      <i class="gtop__plus gtop__plus--l" aria-hidden="true"></i>
+      <i class="gtop__plus" aria-hidden="true"></i>
       <div class="gtop__band">
-        <${DecoType} k="txt1" text="RHODES ISLAND TERMINAL SERVICE" side="l" />
-        <${DecoType} k="txt2" text="STRONGHOLD PROTOCOL" side="c" />
-        <${DecoType} k="txt3" text="RHODES ISLAND TERMINAL SERVICE" side="r" />
         <div class="gtop__half gtop__half--l">
           <div class="roundbox">
             <span class="roundbox__label">${t('回合')}</span>
@@ -547,8 +558,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
             note=${pending > 0 && live?.unite ? t('联防中') : null} tip=${pendingTip(lp, pending, { unite: !!live?.unite, cap, left: live?.left ?? null })} />
         </div>
       </div>
-      <i class="gtop__plus gtop__plus--r" aria-hidden="true"></i>
-      <span class="gtop__frame gtop__frame--r">
+      <span class="gtop__frame">
         <${Tooltip} text=${btn.right.tip} placement="bottom">
           <${CheckBtn} sprite=${btn.right.sprite} cls=${cx('enemybtn', btn.right.grey && 'is-grey')} label=${btn.right.label}
             chev=${btn.right.grey ? null : '▶▶'} disabled=${btn.right.grey && !pen} onClick=${onRight} testid="check-enemy" />
@@ -564,8 +574,10 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
         ${pause && (pause.show || pause.paused) ? html`<${PauseButton} paused=${!!pause.paused} busy=${pause.busy} onToggle=${pause.onToggle} />` : null}
       </div>
       <${OvertimeWarning} ot=${ot} />
+      <${AfkWarning} pub=${pub} priv=${priv} />
       ${showReady ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} />` : null}
     </div>
+    <${UniteBudgetNote} pub=${pub} />
   </header>`;
 }
 

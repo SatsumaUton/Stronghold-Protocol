@@ -3,7 +3,8 @@
 // view carries) and RESULT (finish: m.result to every human still here, onEnd).
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
-import { PHASE, layerGainRoom } from '../../../shared/constants.js';
+import { PHASE } from '../../../shared/constants.js';
+import { REVIVAL_WINDOW_SECONDS } from './common.js';
 import { uniteSurvivors } from '../unite.js';
 import { buildResult } from '../results.js';
 import { FLOW_TICKER_PRIORITY, DELAYS } from './common.js';
@@ -13,15 +14,24 @@ import { creditedKillsOf } from '../../sim/spec.js';
 
 export class MatchSettle {
   settle(plan, uniteResult) {
+    if (this.disposed || this.ended || (this.phase !== PHASE.COMBAT && this.phase !== PHASE.UNITE)) return;
+    this._freezeDamage(); // before LP/death/board cleanup and fields clearing
+    const relay = this._uniteRelay?.rounds.at(-1)?.plan === plan ? this._uniteRelay : null;
+    const eligible = relay ? new Set(relay.eligible) : this._revivalHelpers(plan, uniteResult);
+    // Per-field results stay archived (including the earlier leaks). Helpers are unique, so merging their
+    // reward/stat entries cannot overwrite another round. LP below uses only the final field's survivors.
+    const combinedUnite = relay ? { ...uniteResult,
+      perPlayer: Object.assign({}, ...relay.rounds.map((r) => r.result?.perPlayer || {})) } : uniteResult;
     this.phase = PHASE.SETTLE;
     this.runner = null;
     this._stopClientCombat();
-    // the pending in-battle gains the views showed become persistent below (alive players) or lapse (DESIGN §20.15)
+    // Only legacy/final-result gains not yet synchronized may have a pending display overlay.
     for (const ps of this.order) if (ps.pendingLayerGains) { ps.pendingLayerGains = null; ps.dirty(); }
     const cap = this.gd.lpCapPerRound;
     // a 联防 battle that could not run at all (synthetic result) must not wipe the leakers' losses: charge their own leaks
-    const uniteRan = !!(plan && uniteResult && !uniteResult.synthetic);
-    const survivors = uniteRan ? uniteSurvivors(plan, uniteResult) : null;
+    const uniteRan = relay ? relay.rounds.some((r) => r.result && !r.result.synthetic)
+      : !!(plan && uniteResult && !uniteResult.synthetic);
+    const survivors = relay ? relay.rounds.at(-1).survivors : uniteRan ? uniteSurvivors(plan, uniteResult) : null;
     // The 联防's outcome as data for the SETTLE view (m.public.uniteResult, views.js; GitHub #235, PR #112 by @Convey123):
     // each client pops the official result box from it (ui/gameLogic/phases.js uniteResultBox) — `through` = the leakers'
     // enemies that still got through (uncapped; only decides whether 「全员无伤！」 is true), `losses` = every alive
@@ -30,9 +40,10 @@ export class MatchSettle {
     // itself. No ticker line: the official reports the outcome in the one dialog. null when no 联防 resolved.
     this.uniteResultView = uniteRan && plan.leakers.length ? {
       through: plan.leakers.reduce((n, lk) => n + Math.max(0, survivors.get(lk.playerId) || 0), 0),
-      helpers: plan.helpers.map((p) => p.playerId),
+      helpers: relay ? relay.rounds.flatMap((r) => r.view.helpers) : plan.helpers.map((p) => p.playerId),
       leakers: plan.leakers.map((p) => p.playerId),
       losses: {},
+      ...(relay ? { rounds: relay.rounds.map((r) => ({ ...r.view, helpers: r.view.helpers.slice() })) } : {}),
     } : null;
     const alive = this.alivePlayers();
     for (const ps of alive) {
@@ -49,11 +60,12 @@ export class MatchSettle {
       if (r.perfect !== false && counted === 0) ps.stats.perfectRounds++;
       // bounty coins (own battle + unite kills) are credited to the next prep
       let coins = Math.max(0, Math.trunc(Number(r.coins) || 0));
-      const up = uniteResult && uniteResult.perPlayer && uniteResult.perPlayer[ps.playerId];
+      const up = combinedUnite && combinedUnite.perPlayer && combinedUnite.perPlayer[ps.playerId];
       if (up) {
         coins += Math.max(0, Math.trunc(Number(up.coins) || 0));
         ps.stats.dmgDealt += Number(up.damageDealt) || 0;
         ps.stats.kills += Number(up.killed) || 0;
+        if (relay) ps.stats.healing += Number(up.healingDone) || 0;
       }
       ps.creditedKills += creditedKillsOf(r) + creditedKillsOf(up);
       // perfect-payout bounties (战术特训): own phase perfect
@@ -61,26 +73,28 @@ export class MatchSettle {
       if (coins > 0) { ps.pendingFunds += coins; ps.stats.fundsGained += coins; }
       for (const b of ps.bounties) b.roundsLeft--;
       ps.bounties = ps.bounties.filter((b) => b.roundsLeft > 0);
-      // IN_BATTLE layer gains (normal battles only), at most the room left under BOND_LAYER_CAP (999, as the battle's
-      // live copy: Battle.addLayers); a bond at the cap gains nothing and dispatches nothing
-      for (const [bondId, n] of Object.entries(r.layerGains || {})) {
-        if (!this.gd.bond(bondId) || !(n > 0)) continue;
-        const before = ps.layers[bondId] || 0;
-        const add = layerGainRoom(before, Math.floor(n));
-        if (!(add > 0)) continue;
-        ps.layers[bondId] = before + add;
-        this.dispatch(ps, 'onLayers', { bondId, from: before, to: ps.layers[bondId], reason: 'battle' });
-      }
+      // Ordinary server battles already retain gains live. Reconcile only an unsynchronized final delta;
+      // repeated results or a cap reached during combat must not award layers or milestone rewards again.
+      this._applyBattleLayerGains(ps, r.layerGains);
       this._charDamageTickers(ps, r);
-      this.dispatch(ps, 'onBattleResult', { result: r, lpLoss: loss, perfect: counted === 0 && r.perfect !== false, unite: uniteResult || null });
+      this.dispatch(ps, 'onBattleResult', { result: r, lpLoss: loss, perfect: counted === 0 && r.perfect !== false, unite: combinedUnite || null });
       ps.recompute();
     }
-    this.eliminateBroken();
+    this._revival = { round: this.round, eligible, windowOpen: false, deadline: 0 };
+    const canRescue = this.revivalEnabled && this.teamLp == null && this.order.some((ps) => this.revivalDonorEligible(ps));
+    for (const ps of alive) {
+      if (ps.lp <= 0) {
+        if (canRescue && ps.alive && !ps.revived && !ps.left) this._deferDeath(ps);
+        else this._finalizeDeath(ps);
+      }
+    }
     this.fields = [];
     this.watchers.clear();
+    const rescue = canRescue && this.order.some((ps) => this.revivalTargetEligible(ps));
+    this.setDeadline(rescue ? REVIVAL_WINDOW_SECONDS : DELAYS.SETTLE / 1000, () => this.afterSettle({ reason: 'window-expired' }), { silent: !rescue && this.soloUntimed });
+    if (rescue) { this._revival.windowOpen = true; this._revival.deadline = this.deadline; }
     this.markPublic();
     onSettle(this); // one emote per alive AI per round (enabled by default; SP_BOT_EMOTES=0 silences it)
-    this.setDeadline(DELAYS.SETTLE / 1000, () => this.afterSettle(), { silent: this.soloUntimed });
   }
 
   /**
@@ -107,22 +121,18 @@ export class MatchSettle {
   }
 
   /**
-   * Drop every alive player whose LP is already gone. Settlement calls this after the round's LP loss.
-   * An accepted test round jump calls the same helper before the next round starts, so LP 0 cannot be
+   * Drop every alive player whose LP is already gone, without the revival window (the fork's settlement above defers a
+   * rescuable death instead). An accepted test round jump calls this before the next round starts, so LP 0 cannot be
    * written back into a new prep. The LP command itself stays a raw write.
    */
   eliminateBroken() {
-    for (const ps of this.alivePlayers()) {
-      if (ps.lp <= 0) {
-        ps.lp = 0;
-        ps.eliminate(this.round);
-        this.toast(ps, 'error', '你的目标生命值耗尽，已被淘汰');
-        this.tickerText(msg('{name}博士的目标生命值已耗尽', { name: ps.name }), FLOW_TICKER_PRIORITY);
-      }
-    }
+    for (const ps of this.alivePlayers()) if (ps.lp <= 0) this._finalizeDeath(ps);
   }
 
-  afterSettle() {
+  afterSettle({ reason } = {}) {
+    // The scheduled timeout supplies its provenance: wall/monotonic clock rounding can differ by a millisecond.
+    // A forced transition without that provenance is classified from the original deadline instead.
+    this._finalizePendingDeaths({ reason });
     if (!this.alivePlayers().length) { this.finish({ victory: false, reason: 'eliminated' }); return; }
     resetRoundCounters(this); // AI bot merge-counter resets each round (server/match/botEmotes.js)
     this.startRound(this.round + 1);
@@ -132,9 +142,11 @@ export class MatchSettle {
     // A command that ends a test match must be audited/counted before publishing its result.
     if (this.test && this._testApplying) { this._testOutcome = { victory, hiddenCleared, reason }; return; }
     if (this.ended || this.disposed) return;
+    this._freezeDamage();
     this.offersDispose();
     this.ended = true;
-    this.externalAI?.close();
+    for (const ps of this.order) this._cancelBotPrep(ps);
+    this._finalizePendingDeaths();
     if (this.runner) { try { this.runner.stop(); } catch { /* ignore */ } this.runner = null; }
     this._stopClientCombat();
     this.cancel(this._phaseTimer);

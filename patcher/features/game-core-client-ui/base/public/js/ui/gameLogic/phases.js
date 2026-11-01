@@ -6,6 +6,7 @@ import { bossLevelSeconds } from '../matchStatus.js';
 import { clamp, int, isObj, sortedPlayers } from './shared.js';
 import { normalizeSp } from './draft.js';
 import { t } from '../../../../shared/i18n.js';
+import { uniteRelayRound } from '../../battle/observe.js';
 
 
 // ---- phases ----------------------------------------------------------------------------------------
@@ -62,7 +63,10 @@ export function phaseBanner(phase, pub, { alive = true, spectator = false } = {}
     case PHASE.UNITE: {
       const names = new Map(sortedPlayers(pub).map((p) => [p.playerId, p.name || t('博士')]));
       const helpers = Array.isArray(pub?.unite?.helpers) ? pub.unite.helpers.map((id) => names.get(id)).filter(Boolean) : [];
-      return { title: t('联防阶段'), micro: 'JOINT DEFENSE', tone: 'orange', sub: helpers.length ? t('联防：{names}', { names: helpers }) : t('完美作战的博士迎战突破防线的敌人') };
+      const relayRound = uniteRelayRound(pub);
+      return { title: relayRound === 2 ? t('接力联防 · 第 {round} 轮', { round: relayRound }) : t('联防阶段'),
+        micro: relayRound === 2 ? `JOINT DEFENSE ${relayRound}/2` : 'JOINT DEFENSE', tone: 'orange',
+        sub: helpers.length ? t('联防：{names}', { names: helpers }) : t('完美作战的博士迎战突破防线的敌人') };
     }
     case PHASE.FINAL_ASSAULT: return { title: t('最终攻势'), micro: 'FINAL ASSAULT', tone: 'red', sub: t('击败敌方领袖') };
     case PHASE.HIDDEN_CORE: return { title: t('隐秘核心'), micro: 'HIDDEN CORE', tone: 'red', sub: t('被源石侵蚀的假想敌') };
@@ -233,8 +237,17 @@ export function countdownState(deadline, now, total, warnAt = 10) {
   return { remain, warn: remain <= warnAt, bars, text: String(Math.min(999, remain)).padStart(2, '0'), frac };
 }
 
+/** The expanded-mode stage budget and its round-start balance, in game seconds (not a live countdown). */
+export function uniteBudgetInfo(pub) {
+  if (pub?.phase !== PHASE.UNITE) return null;
+  const total = pub.unite?.totalBudget, remaining = pub.unite?.remainingBudget;
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(remaining) || remaining < 0 || remaining > total) return null;
+  return { total, remaining };
+}
+
 /**
- * Nominal length (s) of the current timed phase from data/config.json, or null when unknown/untimed.
+ * Nominal real seconds of the current timed phase; expanded UNITE uses the authority's round limit / speed.
+ * Other phases use data/config.json, or null when unknown/untimed.
  * @param {any} pub m.public
  * @param {any} config data/config.json
  * @param {string|null} [myId]
@@ -251,12 +264,16 @@ export function phaseTotalSeconds(pub, config, myId = null) {
     case PHASE.BATTLE_CHECK: return num(timers.battleCheck) ?? 3;
     case PHASE.SP_DRAFT: {
       const sp = normalizeSp(pub.sp, pub.players);
-      const first = !sp || sp.pickedCount === 0;
+      // a concurrent draft (everybody at once) has one countdown, spFirst long
+      const first = !sp || sp.pickedCount === 0 || sp.concurrent === true;
       return first ? (num(timers.spFirst) ?? 30) : (num(timers.spTurn) ?? 16);
     }
     case PHASE.PREP: return num(mode?.rounds?.[String(pub.round)]?.prepTime);
-    case PHASE.COMBAT:
-    case PHASE.UNITE: return num(mode?.rounds?.[String(pub.round)]?.combatTimeLimit);
+    case PHASE.COMBAT: return num(mode?.rounds?.[String(pub.round)]?.combatTimeLimit);
+    case PHASE.UNITE: {
+      const limit = num(pub.unite?.timeLimit), speed = num(pub.unite?.gameSpeed);
+      return limit && speed ? limit / speed : num(mode?.rounds?.[String(pub.round)]?.combatTimeLimit);
+    }
     // 最终攻势 / 隐秘核心: m.public.deadline is the level's 120 s countdown (maxPlayTime; the battle goes on past it)
     case PHASE.FINAL_ASSAULT:
     case PHASE.HIDDEN_CORE: return bossLevelSeconds(pub, config);
