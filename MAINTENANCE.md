@@ -2189,6 +2189,117 @@ node deploy/sync-mtime.cjs --apply    # 执行
 ---
 
 
+---
+
+### 9.34f 官方特效的挂点数据：`skins` 段缺一条，特效就「贴在脚下」（2026-11-01 排查，**未修，等上游**）
+
+**现象**：维护者截图反馈「史尔特尔 S3 的技能特效位置不太对」——一个火焰大圆环套在
+身体下半截，位置明显偏低，不是原版挂在手/武器上的样子。
+
+**查下来是数据缺失，不是代码 bug，也不是本服改的。**
+
+#### 三个数据文件，各管一件事
+
+| 文件 | 客户端读它做什么 | 缓存 |
+|---|---|---|
+| `/data/local-fx.json` | **哪些特效文件存在**（prefabs / tex / mesh 清单） | `no-cache` |
+| `/assets/local/fx/index.json` | **哪个干员的哪个技能用哪些特效 + 挂点坐标** | 30 天 immutable（带内容 hash） |
+| `/assets/local/fx/textures.json` | 贴图尺寸表 | 同上 |
+
+`index.json` 有六段，**本服曾经比补丁包少四段里的条目**（2026-11-01 已用补丁包整份覆盖）：
+
+| 段 | 补丁包 | 本服（修前） | 差 |
+|---|---|---|---|
+| `units` | 541 | 541 | 0（内容逐条一致） |
+| **`skins`** | **535** | **510** | **-25** |
+| `skills` | 630 | 596 | -34 |
+| `projectiles` | 562 | 541 | -21 |
+| `prefabs` | 4671 | 4518 | -153 |
+| `generic` | 5 | 5 | 0 |
+
+**`skins` 段就是挂点坐标表。** 没有它，`mounts.js` 的 `skinPoint()` 返回 `null`，
+走 `unitPoint()` 的兜底：
+
+```js
+// mounts.js：no such point: a plausible fallback over the feet
+const h = kind === 'head' ? 0.75 : kind === 'muzzle' ? 0.4 : 0.3;
+out[1] += h * 0.866 * k;   // 向上约 0.26 格
+out[2] -= h * 0.5 * k;
+```
+
+**特效就落在「脚下往上 1/4 格」**，而不在挂点上 —— 这就是那个位置偏低的大圆环。
+
+史尔特尔 S3 的两个主打特效都用 `MP_SPECIAL_1`（`spawn=9`）：
+
+```
+surtr_skill_03_start   spawn=9 (MP_SPECIAL_1)  follow=6 (SPECIAL_0)
+surtr_skill_03_buff    spawn=9 (MP_SPECIAL_1)  follow=6 (SPECIAL_0)
+surtr_skill_03_range   spawn=5 (GROUND_CENTER)  ← 这个是格子坐标，本来就对
+```
+
+补上 `skins.char_350_surtr` 之后：
+
+```
+SpecialPoint1.front = { pos:[0.631634,0.473811,-0.389025], bone:"F_Rb_Weapon2", followRot:true }
+```
+
+**注意 `bone` 只是「跟随哪根骨骼」，实际位置由 `units.js boneOffset()` 实时从骨架读**，
+所以只要骨架里有 `F_Rb_Weapon2`，位置就是准的（默认和时装的骨架里都有）。
+
+#### ★ 仍然没解决的：穿皮肤时挂点一律失效（**上游行为，等作者修**）
+
+`wiring.js`：
+
+```js
+skinOf(u) { return u && u.skin && this.idx ? this.idx.skins[u.skin] || null : null; }
+```
+
+`u.skin` 是玩家**当前穿的**那套。而 `index.json` 的 `skins` 段**只有 `defaultskin` 一份**
+（`source: "chararts/char_350_surtr.ab defaultskin"`，补丁包 535 条全是这么来的）。所以：
+
+| 玩家选的 | `skinOf()` | 特效位置 |
+|---|---|---|
+| 默认 | 有数据 | ✅ 正确 |
+| **精英二**（`char_350_surtr_2`） | `null` | ❌ 兜底，偏低 |
+| **任何时装**（`char_350_surtr_it_1` …） | `null` | ❌ 兜底，偏低 |
+
+**这是上游设计，不是本服引入的**（补丁包里一条时装挂点都没有）。
+
+可能的修法（**2026-11-01 维护者决定先不做，避免和上游撞车**）：
+
+```js
+// 时装查不到时回退到干员本体的挂点
+skinOf(u) {
+  const s = u?.skin ? this.idx?.skins[u.skin] : null;
+  return s || (u?.charId ? this.idx?.skins[u.charId] : null) || null;
+}
+```
+
+改这里要动 `public/js/render/vfx/wiring.js`（上游文件），
+**必须归档进 `patcher/features/game-core-client-render/files/` 并在 `patcher/README.md` 登记**，
+否则上游升级会丢。先观察上游有没有修这个。
+
+#### 怎么复查（将来上游修了，或想自己动）
+
+```powershell
+# 1) 本服 index.json 的六段够不够
+node -e "const d=require('D:/Stronghold-Protocol/shared/assets/local/fx/index.json');for(const k of ['units','skins','skills','projectiles','prefabs'])console.log(k,Object.keys(d[k]).length)"
+
+# 2) 穿皮肤时挂点是否失效能直接看出来
+node -e "const d=require('D:/Stronghold-Protocol/shared/assets/local/fx/index.json');for(const s of ['char_350_surtr','char_350_surtr_2','char_350_surtr_it_1'])console.log(s,!!d.skins[s])"
+```
+
+第 2 条如果时装那一行是 `false`，说明这个坑还在。
+
+#### 教训
+
+**改 `index.json` 这类多段索引时，必须逐段比对，不能只看自己关心的那一段。**
+2026-11-01 第一次合并只看了 `units`（发现缺 25 个干员），
+**漏掉了 `skins` / `skills` / `projectiles` 三段各缺 20–34 条**，第二天才发现，
+白让人以为是代码 bug 查了一轮。补丁包本来就是超集（本服独有 0 条），
+最省事的做法是**整份采用补丁包的 index.json**，而不是手工合并。
+
+
 ### 9.35 含中文的 `.ps1` 必须带 UTF-8 BOM（2026-10-31 踩到）
 
 PowerShell 5.1 **无 BOM 时按 GBK 解析脚本**，含中文的脚本会直接解析失败：
