@@ -1007,6 +1007,262 @@ concurrentDraft() { return !!this.capacityExperiment && !this.isSolo && this.all
 4. 人全掉线但一直不消失 → 查 `refreshMatchWindows` 有没有被调用（3 个调用点在不在），
    以及该房间的 session 是否还在 registry（重启过就会没有，那时走机制二）。
 
+#### 和「断点续玩」会不会打架？——不会，两边都认 `restoredAt`
+
+这是被专门问过的点，记清楚：
+
+- 重启恢复房间时，`server/persist/lobbyState.js:182` 会写 `room.restoredAt = now`。
+- 上面机制二的兜底取 `since = max(lastHumanLeftAt, restoredAt, createdAt)`，
+  所以刚恢复的房间天然拿到「一整个 TTL」的宽限，不会被当成僵尸立刻收掉。
+- 等人中的房间那条分支另有 `if (restoredAt && now - restoredAt < ttl) continue;`（`lobby.js` L1068），
+  也是同一个意思。
+
+**2026-11-02 实测断点续玩本身是好的**，不是坏在半路：
+
+| 证据 | 数值 |
+|---|---|
+| `node --test test/match/snapshot.test.js test/match/feedback1-dispatch-snapshot.test.js` | **16 / 16 通过** |
+| Redis 里的活跃检查点键 | `sp:n7:cp:L.TFYK.1.122k7iw`、`sp:n2:cp:L.NSFY.1.1b36owc` 等共 **5 个** |
+| 单个检查点大小 | 3,659 B / 4,669 B（压缩过，不是明文 JSON） |
+| `TTL` | **89,993 s ≈ 25 h**，与 `STORE_TTL_MS` 一致 |
+| 每个节点的大厅键 | `sp:n<N>:lobby`、`sp:n<N>:lobby:rooms`、`sp:n<N>:lobby:sessions` |
+| `redis-server` 进程 | pid 5016，常驻约 35 MB |
+
+排查断点续玩时用这几条命令：
+
+```powershell
+& D:\Redis\redis-cli.exe KEYS 'sp:*'        # 有 sp:nN:cp:* 就说明有对局在存检查点
+& D:\Redis\redis-cli.exe STRLEN <那个键>     # 0 字节 = 存了个空的，不正常
+& D:\Redis\redis-cli.exe TTL <那个键>        # 应该是 8 万多秒；-2 = 键没了，-1 = 没设过期
+```
+
+### 9.11d 选策略阶段的「战场小地图」（2026-11-02 移植自参考版 #65）
+
+**是什么**：选策略（band draft）阶段，左栏最上面画一张本局战场的小地图，
+让玩家在选策略时就知道要打什么地形。不用任何美术资源 —— 直接拿 `data/stages.json`
+里关卡自己的 tile 现画。
+
+| 文件 | 作用 |
+|---|---|
+| `public/js/ui/stagePreview.js` | **新文件**。导出 `miniTile()` / `stagePreview()` / `StageMiniMap()` |
+| `public/js/ui/matchEnemies.js` | 新增 `stagePoolLine(mode)`：`战场随机（共N张）` / `战场固定` / 空 |
+| `public/js/screens/bandDraft.js` | 左栏 `.draft-order` 里渲染 `.draft-map`（取 `pub.stageId` → `gd.stage()`） |
+| `public/css/screens/draft.css` | `.draft-map*` 与 `.stagemap*`（在 `.draft-order__rows` 之后） |
+
+**取景范围**写死在 `stagePreview.js` 的 `RECT = { r0: 9, r1: 12, c0: 2, c1: 12 }`：
+只画 `GEO.FIELD` 的那 4 行、11 列，所以图是 11×4 的小块，不是整张战场。
+行号自下而上（`y = r1 - r`），敌人的门在上、保护点在下，跟棋盘方向一致。
+
+**格子颜色**由 `fallbackTileClass()`（`ui/fallbackField.js`）决定，语义与简化棋盘完全相同：
+
+| class | 含义 | 颜色 |
+|---|---|---|
+| `gate` | 敌人出怪的门 | 红 `#ff4a2e` |
+| `goal` | 要守的保护点 | 蓝 `#4ab0ff` |
+| `road` | 敌人能走的路 | 灰白 `#8e9e98` |
+| `fence` | 低地，走不了 | 深灰 `#38423e` |
+| `high` | 远程高台 | 薄荷 `#4fbf9f` |
+| `mire` / `smog` / `deep` / `infect` | 特殊地面 | 各自配色 |
+| `void` | 不可通行，**不画** | — |
+
+**验证方法**（不需要进对局，`node-1` 目录下直接跑）：
+
+```powershell
+node --input-type=module -e "const m=await import('./public/js/ui/stagePreview.js'); console.log(Object.keys(m))"
+```
+
+2026-11-02 实测：13 张关卡**全部**能画（`能画 13 / 不能画 0`），
+格子统计 `goal 13 / gate 26 / road 302 / fence 80 / high 10 / deep 23 / mire 3 / smog 2 / infect 2`。
+样例 `act1autochess_m01` 画出来是 11×4：
+
+```
+ #......S#.
+ #.###.. #.
+ #.###.. #.
+E..   ..S..
+```
+
+（`E` 保护点在左下、两个 `S` 是敌人门、`.` 通路、`#` 低地 —— 与参考版语义一致。）
+
+**注意**：`.stagemap` 的宽高是固定 `2.42rem × .88rem`（跟参考版一样），
+SVG 用 `viewBox="0 0 11 4"` 自适应，所以改 `RECT` 之后不用改 CSS。
+
+### 9.11e 反馈板入口：位置、样式、为什么在那儿（2026-11-02 调整）
+
+**入口不在游戏本体里**，是 `matchmaker/public/client.js` 的 `installFeedbackEntry()`
+用 JS 注入的一个 `<a id="mm-feedback">`。所以**改它不用重启任何节点**
+（matchmaker 以 `Cache-Control: no-store` 发这个文件，玩家刷新就生效）。
+
+**位置：大厅界面左下角**（维护者 2026-10-27 指定）。判据是「有 `.lobby-screen`，
+且没有 `.title-screen` / `.room-screen`」—— 也就是说**标题页、对局中、房间内都不显示**。
+这是有意的：那几个界面各有自己的底栏，角落再叠一个按钮只会挡东西。**不要"顺手"给它加回来。**
+
+用 `<a target="_blank">` 而不是 `<button>`：新标签页打开，玩家的座位不会被顶掉，中键也能用。
+
+**2026-11-02 样式调整**：维护者要求「做大一点、明显一点」→「样式要跟界面适配」→「绿色、抢眼一些」。
+中间被否过一版（薄荷实底 + 外发光 + 6px 圆角，像贴上去的外来物）。
+**最终版直接照抄游戏本体的主按钮 `.btn--primary`**（`shared/public/css/components.css` L98）：
+
+| 属性 | 调整前 | 最终版 | 对齐的是 |
+|---|---|---|---|
+| 高度 | 32px | **44px**（手机 40px） | 放大 |
+| 字号 / 字重 | 13px / 600 | **15px / 700** | `.btn` 的 700 |
+| 内边距 | 0 14px | **0 20px** | 放大 |
+| 图标 | 15px | **20px** | 放大 |
+| 圆角 | 0 | **0** | 界面全是直角 |
+| 底色 | `rgba(8,20,17,.82)` | **`--mint-500` #4ed8af（绿实底）** | `.btn--primary` |
+| 文字色 | `--text-md` #c3cbc7 | **`--text-on-mint` #06110d（深字）** | `.btn--primary` |
+| 边框 | `--line-2` + 左侧 2px 薄荷 | **1px `#6fe8c4`（四边）** | `.btn--primary` 的 `--btn-bd` |
+| 斜纹条 | 无 | **右侧 .34rem `repeating-linear-gradient(-55deg)`** | `.btn--primary` 的「准备就绪」质感 |
+| hover | 换底色 | **`--mint-400` + 边 `#9dffe2` + 光 `rgba(23,249,183,.45)`** | `.btn--primary` 的 `--btn-glow` |
+| 字距 | .04em | **.06em** | `.btn` 的 `letter-spacing` |
+
+关键点：**绿色抢眼在这个界面里不是"加戏"，是原生语言** —— 主按钮本来就是绿实底深字。
+所以想要醒目就直接用主按钮配方，不要再自创配色。
+
+浏览器实测（Edge headless，1280×800，`getComputedStyle`）：
+
+```
+静止 : w=113 h=44 font=15px weight=700 radius=0px
+       bg=rgb(78,216,175)=--mint-500   color=rgb(6,17,13)=--text-on-mint
+       border=rgb(111,232,196)=#6fe8c4  bgImage=有斜纹条  icon=20px
+       left=18  bottomGap=22
+hover: bg=rgb(89,244,202)=--mint-400  border=rgb(157,255,226)=#9dffe2
+       shadow=rgba(23,249,183,0.45) 0 0 14px = --btn-glow
+手机 390px: h=40 font=14px
+```
+
+**还没在真大厅里看过**：按钮只在 `.lobby-screen` 出现，而进大厅要登录（游客被
+`server/lobby.js` 的 guest gate 挡住），所以目前只做了「注入同样 CSS 后量计算值」这一层验证。
+**下次有人能进大厅时，请确认它没有压住左下角原有的东西**（高度多了 12px、宽度多了约 33px）。
+
+### 9.11f 反馈板「有新消息」怎么提醒服主/管理员（2026-11-02 新增）
+
+维护者要求：**新反馈要在服主和管理员上线后提示他，或者通过邮件提醒；普通玩家不需要。**
+所以做成两条腿：邮件（发帖时立刻发）+ 站内（上线后轮询未读）。
+
+#### 数据结构
+
+新增一张表（`feedback.cjs` 的 `ensureSchema()` 自动建，不用手动迁移）：
+
+```sql
+CREATE TABLE feedback_seen (
+  account_id   BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  last_seen_id BIGINT UNSIGNED NOT NULL DEFAULT 0,   -- 已经看到哪个 id 了
+  seen_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
+**为什么记 `last_seen_id` 而不是时间戳**：同一秒里进来两条，用时间戳会漏掉一条；
+用 id 水位线不会有这个问题。
+
+#### 接口
+
+| 方法 | 路径 | 谁能调 | 作用 |
+|---|---|---|---|
+| GET | `/mm/api/feedback/unread` | 只有 `role` 是 `owner`/`admin` | 返回 `{count, seen, latest:[{id,category,title,author,createdAt}]}` |
+| POST | `/mm/api/feedback/seen` | 同上 | 把 `last_seen_id` 推到当前最大 id |
+
+**普通玩家调这两个一律 403 `OWNER`**（`isAdmin()` 判据：`role === 'admin' || role === 'owner'`）。
+前端也先判角色（`client.js` 的 `currentRole()`），普通玩家根本不发这个请求。
+
+「未读」的完整判据（`unreadFor()`）：
+
+```sql
+WHERE hidden = 0 AND id > <last_seen_id> AND (account_id IS NULL OR account_id <> <自己>)
+```
+
+- `hidden = 0`：被服主隐藏的不算；
+- `account_id <> 自己`：**自己发的不提醒自己**。
+
+#### 邮件
+
+`notifyAdmins(item)`，在 `createItem()` 里 **fire-and-forget**（不 `await`）——
+邮件发不出去绝不能让玩家发帖失败，所以整个函数包在 try/catch 里，失败只记一行日志。
+
+收件人优先级：
+1. 环境变量 `SP_FEEDBACK_NOTIFY`（逗号分隔的邮箱列表）；
+2. 否则查 `accounts` 表里 `role IN ('owner','admin')` 且没停用、有邮箱的账号。
+
+复用 `account.cjs` 里已有的 nodemailer 配置（`MAIL` 常量 + `mail()`），
+为此把 `mail` 和 `MAIL` 加进了 `account.cjs` 的 `module.exports`。
+**改这两个文件（`account.cjs` / `feedback.cjs`）要重启 matchmaker 才生效。**
+
+#### 前端提示
+
+`matchmaker/public/client.js` 的 `installFeedbackNotify()`：
+
+- 60 秒轮询一次 `/mm/api/feedback/unread`；
+- 有未读 → 在左下角反馈板按钮上挂一个红点数字（`#mm-feedback-badge`，>99 显示 `99+`），
+  并弹一条可关闭的提示条（`#mm-feedback-toast`，列出最近 3 条的 id + 标题，12 秒自动消失）；
+- **只在数量「从少变多」时弹**（`lastCount`），否则每分钟都会重弹同一条；
+- 点按钮或提示条里的「去查看」→ POST `/seen` 并清掉红点；
+- 标题页不显示（判据与 `installFeedbackEntry` 一致）。
+
+> ⚠ **一个坑（2026-11-02 踩过）**：`escapeHtml` 必须定义在 `toast` **之前**。
+> 两者都是同一函数作用域里的 `const`，写在后面虽然在运行时能跑（`toast` 只被更晚的
+> `poll()` 调用），但属于 TDZ 边缘，改代码时容易踩。现在已按正确顺序排好。
+
+#### 怎么验证
+
+```powershell
+# 运行目录（有 node_modules，能连库）
+cd D:\Stronghold-Protocol\matchmaker
+$env:SP_FEEDBACK_NOTIFY = 'none@example.invalid'   # 测试时别真发邮件
+node --test test\feedback.test.cjs
+```
+
+**2026-11-02 实测：15 / 15 通过，1.5 秒正常退出。**
+（其中 3 个新用例专门测未读：别人发→算 1、自己发→不算、隐藏后→归零。）
+
+### 9.11g 两个顺手修掉的老 bug（2026-11-02）
+
+#### ① `cleanLine()` 把 tab / 换行删掉，而不是变成空格
+
+`feedback.cjs` 的 `stripControls(s, keep)` 会删掉所有 `< 0x20` 且不在 `keep` 里的字符。
+`cleanLine` 原来只传 `keep = ' '`，于是 `a\tb` 变成 `ab`（两个词粘一起），
+而测试 `test/feedback.test.cjs` 一直期望 `a b`。
+
+修法：把空白类都放进 `keep`，让下面那句 `\s+ → ' '` 统一压成一个空格：
+
+```js
+stripControls(String(v).normalize('NFC'), ' \t\n\r\f\v')
+  .replace(/[\s\u00a0\u3000]+/g, ' ')   // 空白统一压成一个空格
+  .trim();
+```
+
+**这个 bug 从测试写下的那天起就一直红着**（不是这次改坏的），只是没人跑这个文件。
+
+#### ② `node --test matchmaker/test/feedback.test.cjs` 跑完不退出
+
+所有用例都过了，进程却一直挂着，要人工超时强杀。原因是 `account.cjs` 的
+mysql2 连接池（`pool`）不关闭，事件循环一直有活句柄。
+
+修法：测试文件末尾加一个顶层 `test.after()`：
+
+```js
+test.after(async () => {
+  try {
+    const { db } = require(path.join(__dirname, '..', 'account.cjs'));
+    await db().end();
+  } catch { /* 池没建过 / 已经关了 */ }
+});
+```
+
+修完从「>120 秒不退出」变成「**1.5 秒退出码 0**」。
+
+> 注意：这个测试**在 `repo-sync` 里跑不了** —— 仓库不提交 `node_modules`，
+> `require('nodemailer')` 会 `MODULE_NOT_FOUND`。要在运行目录跑，或先 `npm ci`。
+> `matchmaker/node_modules/` 已在 `.gitignore` L82 里，不会被提交。
+
+#### ③ 测试用例自己写错的两处（记下来免得再犯）
+
+- **`admin` 和 `user` 用了同一个账号 id**（都是 990001）→ `unreadFor` 的
+  「排除自己发的」把发帖人也排除了，未读永远是 0。→ 改用独立的 `TEST_ADMIN = 990002`。
+- **未读用例复用被限流的账号发帖** → 前面「限流」用例故意把 990001 的配额用光
+  （10 分钟 3 条，存在 `feedback.cjs` 的**内存 Map** 里，测试清不掉），
+  于是后面发帖只拿到 `RATE_LIMITED`。→ 发帖改用 `TEST_POSTER = 990003`。
+
 ### 9.2 不能提交的内容
 
 | 禁止 | 原因 |
@@ -1102,6 +1358,24 @@ node deploy\sync-nodes.cjs           # 复检，必须输出「0 处差异」
    或内容哈希核对，不要只看时间戳。
 2. **`healthz.build` 不能证明服务端已更新**（见 9.4）。前端 `room.js` 之类的改动会立刻下发，
    但服务端逻辑要重启，两层要**分别验收**。
+
+**第三个坑（2026-11-02 修）：备份文件会被当成代码分发到 29 个节点。**
+
+`node-1` 里留着一个 `public/js/assets.js.bak-modified-22h29`（11-01 的备份），
+于是每个节点都报「1 处差异」，`--apply` 会把这个 `.bak` 复制到 29 个节点上去。
+现在 `_sync-nodes.cjs` 加了排除规则：
+
+```js
+const SKIP_REL = /(^|\/)\.|\.bak($|-)|\.bak-|\.orig$|\.swp$|~$|\.log$/i;
+// walk() 里：else if (e.isFile() && !SKIP_REL.test(rel)) out.set(rel, full);
+```
+
+排除：隐藏文件/目录（`.` 开头）、`*.bak`、`*.bak-*`、`*.orig`、`*.swp`、`*~`、`*.log`。
+加完差异从 406 处降到 377 处（正好是本轮真正改的 13 个文件 × 29）。
+
+> **`--apply` 只复制文件，不重启**（脚本注释里写着「复制 ≠ 生效」）。
+> 所以它可以在「不重启任何节点」的前提下安全执行 —— 新代码躺在磁盘上，
+> 等下次按重启纪律重启时才生效。
 
 ### 9.6 新增功能要登记（不要让功能"半丢"）
 
