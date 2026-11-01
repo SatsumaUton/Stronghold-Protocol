@@ -411,6 +411,17 @@
 .rseat__wait { display: flex; flex-direction: column; align-items: center; gap: .1rem; color: #b7bdbb; }
 .rseat__wait small { font-size: calc(.16 * var(--t)); text-align: center; }
 .rseat__noinfo { position: absolute; right: .12rem; bottom: .14rem; font-family: var(--font-display); font-size: calc(.12 * var(--t)); letter-spacing: .1em; color: rgba(255, 255, 255, .15); }
+/* AI 指定策略: the strategy chip across an AI seat's card (base look in .seat__band above; this is the card's layout).
+   本服把 .rseat 全部放在这个文件里（参考版拆在 screens/lobby.css），所以布局也写这儿。 */
+.rseat__band { display: flex; align-items: center; gap: .06rem; width: 100%; min-height: max(.42rem, 28px); margin-top: .06rem; padding: 0 .1rem; font: inherit;
+  max-width: 100%; font-size: max(calc(.14 * var(--t)), 11px); color: var(--text-hi); background: rgba(14, 20, 19, .92);
+  border: 1px solid rgba(255, 255, 255, .14); text-align: left; }
+.rseat__band.is-editable { cursor: pointer; border-color: rgba(79, 232, 192, .45); }
+.rseat__band.is-editable:hover:not(:disabled) { background: rgba(20, 48, 40, .92); }
+.rseat__band .seat__band-k { flex: none; padding: 0 .06rem; font-size: .9em; color: #08221b; background: #4fe8c0; }
+.rseat__band .seat__band-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rseat__band > .icon { flex: none; width: 1.1em; height: 1.1em; color: var(--text-lo); }
+.rseat__band .bandicon { width: max(.3rem, 18px); height: max(.3rem, 18px); flex: none; }
 
 /* 独立模拟: the briefing beside the single seat */
 .rs-brief { align-self: center; max-width: min(5rem, 46vw); max-height: 100%; overflow-y: auto; scrollbar-width: thin; padding: .24rem .3rem; background: rgba(10, 13, 12, .8); border: 1px solid var(--line); }
@@ -675,7 +686,32 @@
 .ailast__opt .icon { opacity: .25; }
 .ailast__opt .icon.is-on { opacity: 1; }
 
-
+/* AI 指定策略：AI 座位上的策略芯片（房主点它打开选择框）和选择框本身。
+   布局细节（.rseat__band 那一套）在 screens/lobby.css 里，因为座位卡是那边的样式。 */
+.seat__band { display: inline-flex; align-items: center; gap: .05rem; max-width: 100%; margin: .04rem auto 0; padding: .02rem .08rem;
+  border: 1px solid rgba(159, 212, 255, .3); background: rgba(159, 212, 255, .06); color: var(--text-md);
+  font-size: max(calc(.13 * var(--t)), 12px); }
+.seat__band .bandicon { --bi: .26rem; }
+.seat__band .icon { width: .14rem; height: .14rem; flex: none; }
+.seat__band-k { color: var(--ice); font-weight: 700; }
+.seat__band-name { max-width: 1.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-hi); }
+.seat__band.is-editable { cursor: pointer; }
+.seat__band.is-editable:hover { border-color: var(--ice); }
+.seat__band.is-editable:disabled { cursor: default; opacity: .7; }
+.botband-dlg__tip { margin: 0 0 .12rem; font-size: max(calc(.13 * var(--t)), 12px); }
+.botband-dlg__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(1.4rem, 1fr)); gap: .08rem; }
+.botband { display: flex; flex-direction: column; align-items: center; gap: .04rem; padding: .08rem .06rem; cursor: pointer;
+  background: rgba(12, 15, 14, .82); border: 1px solid var(--line); color: var(--text-md); }
+.botband:hover:not(:disabled) { border-color: var(--line-3); }
+.botband .bandicon { --bi: .7rem; border: 1px solid var(--line-2); }
+.botband__auto { display: grid; place-items: center; width: .7rem; height: .7rem; border: 1px dashed var(--line-3); color: var(--ice); }
+.botband__auto .icon { width: .36rem; height: .36rem; }
+.botband__name { font-size: max(calc(.14 * var(--t)), 12px); font-weight: 700; color: var(--text-hi); text-align: center; }
+.botband__eff, .botband__used { font-size: max(calc(.11 * var(--t)), 10px); color: var(--text-lo); text-align: center; }
+.botband__used { color: var(--gold, #f6a329); }
+.botband.is-sel { border-color: var(--mint-400); background: linear-gradient(180deg, rgba(78, 216, 175, .18), rgba(12, 15, 14, .85)); }
+.botband.is-used { cursor: not-allowed; }
+.botband.is-used .bandicon { filter: grayscale(.8) brightness(.62); }
 
 .trusted-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 90; padding: 5px 16px; background: #9b202b; color: #fff; display: flex; justify-content: space-between; gap: 12px; }
 .trusted-banner button { color: inherit; text-decoration: underline; }
@@ -862,9 +898,17 @@
    它不再居中，但弹窗自身是 position: fixed inset: 0 的整屏遮罩，不受影响；
    关闭后恢复原样，同盟设置面板的位置与之前一致。 */
 .rs-opts.has-exp-modal { transform: none; }
+/* 「实验性功能」入口按钮（房间设置的弹窗入口）。
+   它现在带 .ailast__opt，和上面那几个开关用同一套芯片语言
+   （高度 .36rem、字号 .15×t、深色底、四周 1px 描边）。
+   以前它只有 .dpick__opt，用的是选人界面工具栏按钮的尺寸（高 .54rem、字号 .18×t 粗体、
+   透明底、只有右边一条分隔线）—— 实测高 25.3px / 字 8.44px / 无底无框，
+   而旁边的「AI 队友最后选择」是 16.9px / 7.03px / 有深色底和四周描边，
+   摆在一起就像从别的界面掉进来的一块（维护者反馈「与界面不太搭」）。
+   所以下面的尺寸覆盖全部去掉，只保留薄荷色这个强调色；
+   打开状态也交给共用的 .dpick__opt.is-active（淡薄荷底 + 薄荷字 + 底边），
+   不再单独写一套背景/描边/文字色。 */
 .exp-wrap .exp-btn { --d-color: var(--mint-400); }
-.exp-wrap .exp-btn.is-active { border-color: var(--mint-500); background: rgba(78, 216, 175, .1); color: var(--mint-300); }
-.exp-wrap .exp-btn .icon { width: 1.1em; height: 1.1em; }
 /* 尺寸：宽度照旧；高度按内容自适应，但**给一个下限**，让弹窗看起来不局促。
    维护者 2026-10-27：「把显示的窗口整体拉大一点，不要出现滑动条」。
 
@@ -959,6 +1003,47 @@
 .exp-modal__switches > * { min-width: 0; }
 /* 开关保持贴合自身文字，不拉满整行（拉满会在选中时变成一条横贯的绿色色带） */
 .exp-modal__switches .ailast__opt { justify-self: start; max-width: 100%; }
+/* 实验性战斗规则的倍率（敌人生命 / 敌人攻击）。
+   这里原来用原生 <select>，实测在弹窗里很"怪"：原生下拉的字体/圆角/深色箭头跟旁边
+   那排芯片按钮完全不是一套语言，而且「标签在上、选择器在下」的竖排把弹窗撑高。
+   改成和开关同款的芯片按钮（复用 .ailast__opt + .is-active），一行一个倍率：
+   标签在左、6 个倍率芯片在右，视觉上和上面的开关阵一致。 */
+.exp-modal__muls {
+  display: flex;
+  flex-direction: column;
+  gap: .08rem;
+  width: 100%;
+  margin-top: .1rem;
+  padding-top: .1rem;
+  border-top: 1px solid rgba(255, 255, 255, .07);
+}
+.exp-mul { display: flex; align-items: center; gap: .1rem; min-width: 0; flex-wrap: wrap; }
+.exp-mul__k {
+  flex: none;
+  min-width: 1.04rem;
+  font-size: calc(.15 * var(--t));
+  color: var(--text-lo);
+  letter-spacing: .02em;
+}
+.exp-mul__opts { display: flex; align-items: center; gap: .06rem; flex-wrap: wrap; min-width: 0; }
+/* 等宽一点，6 个倍率排成整齐的一段（.ailast__opt 的左右内边距偏大，这里收窄）。
+   配色对齐弹窗里「同盟人数」那类数值按钮（.rs-opts__diff）：文字用 --text-md，
+   而不是芯片默认的 --text-lo —— 后者在这些小方块上发灰，和旁边控件不在一个层次。 */
+.exp-mul__opt {
+  min-width: .48rem; padding: .02rem .09rem; justify-content: center;
+  color: var(--text-md);
+}
+.exp-mul__opt:hover:not(:disabled) { color: var(--text-hi); border-color: var(--mint-400); }
+.exp-mul__opt:disabled { opacity: .55; }
+/* 选中态：淡薄荷底 + 薄荷描边 + 2px 底边。
+   .dpick__opt.is-active 那条 inset 0 -3px 是给 54px 高的工具栏按钮的，
+   压到 36px 的小芯片上显得又粗又闷，这里收细一档。 */
+.exp-mul__opt.is-active {
+  color: var(--mint-400);
+  background: color-mix(in srgb, var(--mint-400) 14%, rgba(0, 0, 0, .3));
+  border-color: color-mix(in srgb, var(--mint-400) 55%, var(--line-2));
+  box-shadow: inset 0 -2px 0 var(--mint-400);
+}
 .exp-cap { position: relative; display: inline-flex; }
 .exp-cap__btn { min-width: 1.5rem; justify-content: space-between; }
 .exp-cap__arrow { width: .14rem; height: .14rem; transform: rotate(90deg); transition: transform var(--t-fast); }

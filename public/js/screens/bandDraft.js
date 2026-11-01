@@ -120,6 +120,24 @@ export function teammateBands(picks, myId) {
 }
 
 /**
+ * 房主给 AI 队友预留的策略（m.public draft.reserved: bandId → 那个 AI 的 playerId），
+ * 只保留「那个 AI 还没拿走」的那些，且永远不包含预留给自己的。
+ * @param {any} rawDraft m.public draft
+ * @param {Map<string, string>} picks normalizeDraft(...).picks
+ * @param {string} myId
+ * @returns {Map<string, string>} bandId → playerId
+ */
+export function reservedBands(rawDraft, picks, myId) {
+  const out = new Map();
+  const r = rawDraft && typeof rawDraft.reserved === 'object' && rawDraft.reserved ? rawDraft.reserved : {};
+  for (const [bid, pid] of Object.entries(r)) {
+    if (typeof pid !== 'string' || pid === myId || (picks instanceof Map && picks.has(pid))) continue;
+    out.set(bid, pid);
+  }
+  return out;
+}
+
+/**
  * The band the detail pane shows (= the highlighted band a turn that runs out takes): the current one, else my pick,
  * else the band a timeout would give me (timeoutBand: 「华法琳」 while free, else the first free one). When it is my
  * turn and the shown band was taken meanwhile (队友已选), that default instead (confirm would be disabled).
@@ -304,8 +322,12 @@ export function BandDraftScreen({ held = null } = {}) {
   const canSkip = !solo && !draft.concurrent && myTurn && skipsLeft > 0 && draft.order.filter((pid) => !draft.picks.has(pid)).length > 1;
   // 并发 + 允许重复时，别人的选择不构成「队友已选」
   const taken = solo || (draft.concurrent && draft.allowRepeat) ? new Map() : teammateBands(draft.picks, myId);
+  // 房主给 AI 座位指定、而那个 AI 还没选走的策略：对玩家来说同样是「选不了」，
+  // 但要和「队友已选」区分开，所以单独记一份并进 taken。
+  const reserved = solo || draft.allowRepeat ? new Map() : reservedBands(pub?.draft, draft.picks, myId);
+  for (const [bid, pid] of reserved) if (!taken.has(bid)) taken.set(bid, [pid]);
   const pickers = new Map(); // bandId → players
-  for (const [pid, bid] of draft.picks) {
+  for (const [pid, bid] of [...draft.picks, ...[...reserved].map(([bid, pid]) => [pid, bid])]) {
     const p = players.find((x) => x.playerId === pid);
     if (!pickers.has(bid)) pickers.set(bid, []);
     pickers.get(bid).push(p || { playerId: pid, name: '?' });
@@ -469,11 +491,13 @@ export function BandDraftScreen({ held = null } = {}) {
         <section class="draft-grid" role="listbox" aria-label=${t('策略')}>
           ${bands.map((b, i) => {
             const isTaken = taken.has(b.bandId);
+            // 这个策略是「房主指定给某个 AI、而它还没选走」的（不是被队友选走的）
+            const isReserved = isTaken && reserved.has(b.bandId) && !draft.picks.has(reserved.get(b.bandId));
             const offNames = bandOffBonds(b, offBonds).map((id) => gd.bond(id)?.name || id); // 本局禁用 (still selectable)
             const on = view === 'detail' && !peek && sel === b.bandId;
             const badged = local.badges.has(b.bandId); // (the count is the detail pane's 已通过模拟 N 次)
             return html`<button key=${b.bandId} type="button" role="option" aria-selected=${on ? 'true' : 'false'} data-band=${b.bandId}
-                aria-disabled=${isTaken ? 'true' : 'false'} title=${isTaken ? t('已被选择') : offNames.length ? bandOffLine(offNames) : b.name}
+                aria-disabled=${isTaken ? 'true' : 'false'} title=${isReserved ? t('已指定给 AI 队友') : isTaken ? t('已被选择') : offNames.length ? bandOffLine(offNames) : b.name}
                 class=${cx('dband', on && 'is-sel', myPick === b.bandId && 'is-mine', isTaken && 'is-taken', offNames.length && 'is-off')} style=${`--n:${Math.min(i, 15)}`}
                 onClick=${() => pickTile(b.bandId)}>
               <span class="dband__frame"><${BandIcon} bandId=${b.bandId} size="lg" /></span>
@@ -481,7 +505,7 @@ export function BandDraftScreen({ held = null } = {}) {
               ${badged ? html`<span class="dband__badge" data-testid="band-badge" aria-hidden="true">
                 <${Sprite} k="statistics/strategyBadge" class="dband__badge-art" fallback=${html`<span class="dband__medal"><${Icon} name="rook" /></span>`} /></span>` : null}
               <${BandOffTag} names=${offNames} />
-              ${isTaken ? html`<span class="dband__taken">${t('已被选择')}</span>` : null}
+              ${isTaken ? html`<span class="dband__taken">${isReserved ? t('AI 已指定') : t('已被选择')}</span>` : null}
               ${on ? html`<span class="dband__selmark" aria-hidden="true">SELECTED</span>` : null}
             </button>`;
           })}
