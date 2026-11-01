@@ -5423,6 +5423,131 @@ token 类干员（多萝西、召唤物）还要再看 token 的 `skills`。
 
 ---
 
+### 9.51 节点每 10 分钟被重启一次：`rolling-restart` 的**重启死循环**（2026-11-02 修复）
+
+> 症状：`node-10/13/25` 反复断线，玩家看到「连接已中断」，但**节点根本没崩**。
+
+#### 误判的起点（别再走一遍）
+
+第一反应会去查崩溃，**但数据全部否掉了崩溃**：
+
+| 观察 | 结论 |
+|---|---|
+| `logs/node-25.error-25.log` = **0 字节** | 没有栈、没有异常 |
+| `logs/restart-watch.log` 全程 `ok alive=30/30` | 监控认为一切正常 |
+| `pm2` 显示 `online`、`unstable restarts 0` | 进程健康 |
+| `out-25.log` 每次都是**完整冷启动**（`[content]`/`[packs]`/`[listen]`） | 是「被重启」，不是「崩溃重启」 |
+
+**重启的源头在 `logs/rolling-restart.log`**：每 10 分钟一行 `stale node-N (build) -> startOrReload`。
+来源是计划任务 `SP-Rolling-Restart`（SYSTEM，每 10 分钟，跑 `deploy/rolling-restart.ps1`）。
+
+#### 根因：拿**陈旧缓存**当多数派
+
+`buildTag.js` 的 build 是**进程启动时算一次就缓存**的
+（注释原话：*files changing on disk do not advertise a new build before restart*）。
+而脚本用 `/healthz` 的 build 取众数当「多数派」：
+
+```
+26 个节点 24 小时前启动 → 缓存 db206a112ca2
+磁盘这 24 小时一直在改   → 当前实算 00c10f37d21e
+任何节点重启 → 用当前磁盘重算 → 得到 00c10f37d21e
+00c10f37d21e ≠ db206a112ca2（陈旧多数派）→ 下一轮又判 stale → 再重启
+```
+
+**越重启越偏离多数派，越偏离越被判旧** —— 自我维持的死循环。
+这个多数派永远追不上磁盘，除非把 26 个节点全部重启一遍。
+
+#### 修法：基准改用**磁盘实算**
+
+`rolling-restart.ps1` 不再取运行时众数，改为调用节点自己的 `computeBuildTag`
+算磁盘当前值（口径与 `/healthz` 逐字节一致）。基准描述「这批文件现在是什么版本」，
+与进程何时启动无关，**重启不会让节点偏离它**，循环自然终止。
+
+#### 四个必须记住的坑（都踩过）
+
+**① 必须传 `servedVersionDirs`**（`index.js:203` 就是这么调的）
+
+`buildTag.js:83` 只把「本进程实际服务的」`data/versions/<slug>/` 计入指纹。
+漏传会把三个版本目录**全排除**，算出一个**根本没有节点在跑**的值：
+
+| 调用方式 | 结果 | 有节点在跑吗 |
+|---|---|---|
+| `computeBuildTag(root)` | `e00a8dc6b16b` | ❌ 无人使用 |
+| `computeBuildTag(root, {servedVersionDirs})` | `00c10f37d21e` | ✅ 正确 |
+
+目录名映射（实测）：`act2autochess@V2_1` → `act2autochess-v2_1`（后缀小写）；
+**排除 default 版本**，因为 `servedDirs()` 取的是 `[...others.values()]`。
+
+**② 探测脚本在 `%TEMP%` 里，必须用绝对路径**
+
+相对路径 `./node-1/...` 会按 **TEMP** 解析 → `ERR_MODULE_NOT_FOUND`。
+`import` 和 root 都要绝对路径。
+
+**③ edit 工具会丢失 UTF-8 BOM，5.1 直接语法崩**
+
+改完脚本后计划任务返回 `Last Result = 1`，日志一行没写；5.1 报
+`Missing closing '}' ... at line 165 char:30`，而 165 行是**中文注释**。
+
+原因：原文件有 UTF-8 BOM，编辑写入后 BOM 没了，5.1 按 GBK 解析中文注释，
+引号/括号配对错乱（§2989 记过同一类坑）。**改完 .ps1 必须补 BOM 并用 5.1 复检**：
+
+```powershell
+$p = 'D:\Stronghold-Protocol\deploy\rolling-restart.ps1'
+$b = [System.IO.File]::ReadAllBytes($p)
+if (-not ($b[0] -eq 239 -and $b[1] -eq 187 -and $b[2] -eq 191)) {
+  $t = [System.IO.File]::ReadAllText($p, [System.Text.UTF8Encoding]::new($false))
+  [System.IO.File]::WriteAllText($p, $t, [System.Text.UTF8Encoding]::new($true))
+}
+```
+
+**必须用 5.1 复检**，7.x 的 parser 会放过 5.1 报错的写法（这次就是这么漏过去的）。
+
+**④ 单点异类：mtime 差 1 毫秒也会自成一种 build**
+
+`buildTag.js:107` 用 `Math.floor(mtimeMs)` 参与哈希，**差 1 毫秒就是两个 build**。
+`node-1` 是改动源头（保留 NTFS 亚毫秒精度 `...8237684`），其余 29 个是
+`Copy-Item` 分发的（取整为 `...8240000`），于是 node-1 单独算成 `620b1032bc3c`，
+重启多少次都收敛不了。
+
+**修法：只对齐 mtime，不动内容**（已核对 4 个文件 sha256 全部未变）：
+
+```powershell
+node -e "const fs=require('fs');const s=fs.statSync('node-6/'+f);fs.utimesSync('node-1/'+f,s.atime,s.mtime)"
+```
+
+对齐后 **30 个节点磁盘 build 全部 = `00c10f37d21e`**。
+
+#### 观察开关（上线新判据前先核对一轮）
+
+`data\rolling-restart-observe` 存在时**只判定不重启**，把「本会重启谁」写进日志：
+
+```
+OBSERVE ONLY (no restart): would restart 6/12 -> node-1,node-4,... [all candidates: ...]
+```
+
+比「把 6 改成 0」安全：日志会明确写出 observe 状态，不会静默失效。
+
+#### 实测收敛过程（2026-11-02）
+
+| 时刻 | 动作 | 新代码节点数 |
+|---|---|---|
+| 01:33 | 观察模式验证（零重启） | 3（10/13/25） |
+| 01:42 | 重启 1,6,8,9,11,12 | 8 |
+| 01:44 | 对齐 node-1 的 mtime | — |
+| 01:52 | 重启 1,2,4,23,24,26 | **14** |
+| 之后 | 按空闲窗口继续推进，**已重启的不再复现** | → 30 |
+
+**关键验证**：01:42 重启的 6/8/9/11/12 在 01:52 轮**全部未被再判**（uptime 655s 未变）
+—— 修复前它们会每轮被反复重启。
+
+#### 排查纪律
+
+看到「节点反复重启」**先读 `logs/rolling-restart.log`**，再看 `error.log`。
+前者有明确的重启理由（`stale node-N (build)`），后者是空的 ——
+**0 字节的 error.log 本身就是「不是崩溃」的证据**（§7.0.1：数据已否掉某假设就换方向）。
+
+---
+
 ### 9.8 提交前最终检查
 
 ```powershell
