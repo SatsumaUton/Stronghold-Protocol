@@ -40,10 +40,14 @@ function stripControls(s, keep) {
   return out;
 }
 
-/** 单行字段：NFC → 所有空白压成一个空格 → 去控制字符 → 去首尾空白。 */
+/** 单行字段：NFC → 去控制字符（空白保留）→ 所有空白压成一个空格 → 去首尾空白。 */
 function cleanLine(v) {
   if (typeof v !== 'string') return '';
-  return stripControls(String(v).normalize('NFC'), ' ')
+  // ★ 2026-11-02 修：原来 keep 只传 ' '，于是 tab / 换行（都是 <0x20 的控制字符）
+  //   被**直接删掉**而不是变成空格 —— `a\tb` 会粘成 `ab`。
+  //   单行字段的正确语义是「换行/制表符当空格」，所以把空白类都保留，
+  //   交给下面那句 \s+ 统一压成一个空格。（测试 test/feedback.test.cjs 一直是这么期望的）
+  return stripControls(String(v).normalize('NFC'), ' \t\n\r\f\v')
     .replace(/[\s\u00a0\u3000]+/g, ' ')
     .trim();
 }
@@ -205,6 +209,15 @@ function ensureSchema() {
       KEY idx_category (category),
       KEY idx_account (account_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    // ★ 2026-11-02 新增：服主/管理员的「已读到哪里」。
+    //   维护者要求「反馈板有新的消息，要在服主和管理员上线后提示他」，
+    //   所以按账号记一个 last_seen_id —— 比记时间戳稳（同一秒内多条也不会漏）。
+    //   普通玩家不写这张表，也不查（接口对他们直接 403）。
+    await db().query(`CREATE TABLE IF NOT EXISTS feedback_seen (
+      account_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+      last_seen_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+      seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   })().catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }
@@ -336,7 +349,97 @@ async function createItem(req, user) {
     [user.id, category, title, text, author, client]);
   recordHit(req, user.id, now);
   const [rows] = await db().query('SELECT * FROM feedback_items WHERE id = ?', [res.insertId]);
-  return { item: toItem(rows[0], { admin: isAdmin(user), viewerId: user.id }) };
+  const item = toItem(rows[0], { admin: isAdmin(user), viewerId: user.id });
+  // ★ 2026-11-02：新反馈 → 邮件通知服主/管理员（不 await，发帖不等邮件）
+  notifyAdmins(item);
+  return { item };
+}
+
+/** 该管理员上次看到的最大 id（没记录过就是 0）。 */
+async function lastSeenId(accountId) {
+  const [rows] = await db().query('SELECT last_seen_id FROM feedback_seen WHERE account_id = ?', [accountId]);
+  return Number(rows[0]?.last_seen_id) || 0;
+}
+
+/**
+ * 未读反馈（只给服主/管理员）。「未读」= id 大于该账号上次的 last_seen_id，
+ * 且没被隐藏、也不是自己发的。
+ * @param {any} user 已经过 isAdmin 校验
+ */
+async function unreadFor(user) {
+  const seen = await lastSeenId(user.id);
+  const [[cnt]] = await db().query(
+    `SELECT COUNT(*) AS n FROM feedback_items
+      WHERE hidden = 0 AND id > ? AND (account_id IS NULL OR account_id <> ?)`,
+    [seen, user.id]);
+  const count = Number(cnt?.n) || 0;
+  if (!count) return { count: 0, seen, latest: [] };
+  // 最近 5 条给提示条用（标题/分类/作者/时间），不返回正文
+  const [rows] = await db().query(
+    `SELECT id, category, title, author, created_at FROM feedback_items
+      WHERE hidden = 0 AND id > ? AND (account_id IS NULL OR account_id <> ?)
+      ORDER BY id DESC LIMIT 5`,
+    [seen, user.id]);
+  return {
+    count,
+    seen,
+    latest: rows.map((r) => ({
+      id: Number(r.id),
+      category: r.category,
+      title: r.title,
+      author: r.author,
+      createdAt: ms(r.created_at),
+    })),
+  };
+}
+
+/** 把「已读」推进到当前最大 id（含刚被隐藏的，避免永远清不掉）。 */
+async function markSeen(user) {
+  const [[mx]] = await db().query('SELECT COALESCE(MAX(id), 0) AS m FROM feedback_items');
+  const top = Number(mx?.m) || 0;
+  await db().query(
+    `INSERT INTO feedback_seen (account_id, last_seen_id) VALUES (?, ?)
+      ON DUPLICATE KEY UPDATE last_seen_id = GREATEST(last_seen_id, VALUES(last_seen_id))`,
+    [user.id, top]);
+  return { seen: top };
+}
+
+/**
+ * 新反馈 → 给服主/管理员发一封邮件（fire-and-forget，发不出去绝不影响发帖）。
+ * 收件人：环境变量 SP_FEEDBACK_NOTIFY（逗号分隔）优先，
+ * 否则取 accounts 表里 role 为 owner/admin 且没停用、有邮箱的账号。
+ */
+async function notifyAdmins(item, log = console) {
+  try {
+    const { mail, MAIL } = require('./account.cjs');
+    const fixed = String(process.env.SP_FEEDBACK_NOTIFY || '').split(',').map((s) => s.trim()).filter(Boolean);
+    let to = fixed;
+    if (!to.length) {
+      const [rows] = await db().query(
+        `SELECT email FROM accounts
+          WHERE role IN ('owner','admin') AND disabled = 0 AND deleted_at IS NULL
+            AND email IS NOT NULL AND email <> ''`);
+      to = rows.map((r) => r.email);
+    }
+    if (!to.length) return;
+    const body = [
+      `分类：${item.category}`,
+      `标题：${item.title}`,
+      `作者：${item.author || '（未署名）'}`,
+      `编号：#${item.id}`,
+      '',
+      '到「反馈板」查看并回复：/mm/feedback.html',
+    ].join('\n');
+    await mail().sendMail({
+      from: `"萝卜喵公益服" <${MAIL.user}>`,
+      to: to.join(','),
+      subject: `【萝卜喵公益服】新的玩家反馈 #${item.id}：${item.title}`.slice(0, 180),
+      text: body,
+    });
+  } catch (e) {
+    // 邮件失败不影响发帖；只记一行日志
+    log?.warn?.('[feedback] 新反馈邮件通知失败: ' + (e && e.message));
+  }
 }
 
 /** 服主操作：改状态 / 回复 / 隐藏。`reply: ''` 清除回复。 */
@@ -406,6 +509,23 @@ async function handle(req, res, pathname) {
       return sendJson(res, 200, out), true;
     }
 
+    // ★ 2026-11-02：服主/管理员的「新反馈」提醒。
+    //   普通玩家调这两个接口一律 403 —— 维护者要求「普通玩家可以不在反馈」。
+    if (rest === '/unread' && method === 'GET') {
+      const user = await currentUser(req).catch(() => null);
+      if (!isAdmin(user)) return fail(res, 403, 'OWNER'), true;
+      const out = await unreadFor(user);
+      return sendJson(res, 200, out), true;
+    }
+
+    if (rest === '/seen' && method === 'POST') {
+      if (!sameOrigin(req)) return fail(res, 403, 'ORIGIN'), true;
+      const user = await currentUser(req).catch(() => null);
+      if (!isAdmin(user)) return fail(res, 403, 'OWNER'), true;
+      const out = await markSeen(user);
+      return sendJson(res, 200, out), true;
+    }
+
     if (rest === '/items' && method === 'POST') {
       if (!sameOrigin(req)) return fail(res, 403, 'ORIGIN'), true;
       const user = await currentUser(req).catch(() => null);
@@ -463,4 +583,6 @@ async function handle(req, res, pathname) {
 module.exports = {
   handle, ensureSchema, createItem, adminUpdate, listItems, parseQuery,
   CATEGORIES, STATUSES, LIMITS, cleanLine, cleanBody, cps,
+  // ★ 2026-11-02：新反馈提醒（服主/管理员）。导出是为了让 test/feedback.test.cjs 能直接测。
+  unreadFor, markSeen, lastSeenId,
 };
