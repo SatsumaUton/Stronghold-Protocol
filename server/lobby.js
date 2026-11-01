@@ -1912,6 +1912,16 @@ export class Lobby {
    * 改完把其他真人的「准备」清掉 —— 和 setAiPicksLast / setDifficulty 一样，
    * 避免有人已经点了准备却被房主改掉规则就开局。
    */
+  /**
+   * 这个房间是否允许两个 AI 座位被指定同一个策略（实验项「允许重复选择策略」）。
+   * 判据与 Match.js:342-345 逐字一致，否则 lobby 的校验会和 Match 的 bandTaken() 打架。
+   */
+  roomAllowsRepeatBands(room) {
+    if (!room || room.mode === 'solo') return false;
+    if (!(Number(room.capacity) > MAX_SEATS)) return false;      // 非扩容房：没有这个实验项
+    return room.experimental?.allowRepeat === true;
+  }
+
   setBotBand(session, { seat, bandId = null }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -1932,7 +1942,14 @@ export class Lobby {
         return fail(ERR.BAD_TARGET, 'strategy disabled in this room');
       }
       if (!data.bandAllowed(bandId)) return fail(ERR.BAD_TARGET, 'strategy not offered in this mode');
-      if (room.seats.some((s) => s && s !== target && s.isBot && s.band === bandId)) {
+      // ★ 2026-11-02：扩容房开了「允许重复选择策略」(allowRepeat) 时，两个 AI 可以拿同一个盟约。
+      //   判据必须与 Match 完全一致（Match.js:342-345）：
+      //     capacityExperiment = !isSolo && playerCapacity > 4
+      //     allowRepeat       = capacityExperiment && experimental.allowRepeat === true
+      //   否则会与 phases.js 的 bandTaken()（allowRepeat 下恒为 false）打架：
+      //   房间允许重复，但房主给第二个 AI 选同一个盟约却被拒 —— 玩家看到的就是「允许重复了还不让我选」。
+      if (!this.roomAllowsRepeatBands(room)
+        && room.seats.some((s) => s && s !== target && s.isBot && s.band === bandId)) {
         return fail(ERR.BAD_TARGET, 'strategy designated to another AI');
       }
     }

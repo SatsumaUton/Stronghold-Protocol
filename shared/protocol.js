@@ -534,6 +534,12 @@ export const C2S = {
   'room.aiVote': { voteId: (v) => typeof v === 'string' && v.length <= 16, approve: isBool },
   'room.addBot': {},
   'room.removeBot': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1) },
+  // 本服：房主给某个 AI 座位预先指定策略（server/lobby.js setBotBand）。bandId = null 表示「自动选择」。
+  //
+  // ★ 2026-11-02 修：这条协议原来**根本没有登记**，于是 net.request 在客户端就被 validateC2S
+  //   挡下并抛 BAD_MSG —— 玩家点「指定 AI 策略」看到的就是「无效的请求」，请求连发都没发出去。
+  //   服务端 setBotBand 一直都在，只是永远收不到消息。
+  'room.setBotBand': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1), bandId: nullable(isId) },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the
   // host confirmed — a seat that changed hands meanwhile is refused
   'room.kick': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1), playerId: isId },
@@ -588,6 +594,8 @@ export const C2S = {
   // match
   'g.infoReady': { setupRevision: (v) => isInt(v, 0, 2 ** 31), $optional: ['setupRevision'] },
   'g.rerollVote': { voteId: (v) => isInt(v, 1, 2 ** 31), agree: isBool },
+  // 战斗 2 倍速 (server/match/match/speedVote.js): this seat's standing vote; m.public speedVote is the count
+  'g.speedVote': { agree: isBool },
   'g.band': { bandId: isId },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is
