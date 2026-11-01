@@ -2843,7 +2843,17 @@ export class Lobby {
   // ---------------------------------------------------------------------------------------------------
 
   /** @param {Room} room @param {string | null} [key] per-network limit key of the starter */
-  startMatch(room, key = null) {
+  /**
+   * 开一局。
+   *
+   * `restore`（server/persist/persister.js 的 restoreLocal）—— 从检查点**恢复**的一局：
+   * 用它自己存下来的座位、seed 和局号，并用 `apply(match)` 代替 `start()`。
+   *
+   * ★ 2026-11-02：这个参数以前**不存在**，于是 persister 里写好的 restoreLocal 是死代码
+   *   （它按 4 个参数调用，而这里只收 2 个），进程重启后对局一律被 abortRestoredMatch 丢掉 ——
+   *   玩家看到的就是「服务器重启导致对局中断，同盟已返回等待室」，点按钮回同盟，没法继续打。
+   */
+  startMatch(room, key = null, keys = null, { restore = null } = {}) {
     if (room.matchmaking) {
       room.matchmaking = false;
       room.matchmakingAt = 0;
@@ -2864,7 +2874,9 @@ export class Lobby {
     if (host) host.ready = true;
     // the room's data: its content set's in a room with gameplay plugins (header "Gameplay plugins")
     const data = this.dataFor(room);
-    const seats = room.seats.filter(Boolean).map((s) => {
+    // ★ 恢复时座位取自检查点（restore.seats），不重新从房间算 —— 那局的座位/卡池/练度
+    //   必须和存档一致，否则恢复出来的局面和玩家的记忆对不上。
+    const seats = restore ? restore.seats : room.seats.filter(Boolean).map((s) => {
       // a setting checked for another content is filtered to this room's data (header "Gameplay plugins")
       const own = s.isBot ? null : this.seatSettings(room, s, data);
       return {
@@ -2899,7 +2911,8 @@ export class Lobby {
     // lastPublic / results: the latest m.public broadcast and the m.result frames (encoded), kept for the replay.
     const ctx = { live: true, ended: false, disposed: false, match: null, lastPublic: null, sharedResult: null, results: new Map() };
     let seed = 0;
-    try { seed = this.seedFn() >>> 0; } catch { seed = randomInt(2 ** 32); }
+    // ★ 恢复时用存档里的 seed —— 整局的 RNG 都从它派生，换一个 seed 就不是同一局了。
+    try { seed = restore ? restore.seed >>> 0 : this.seedFn() >>> 0; } catch { seed = randomInt(2 ** 32); }
     const modded = room.modded;
     try {
       const opts = {
@@ -2923,7 +2936,8 @@ export class Lobby {
         ...(room.test === true ? { test: true } : {}),
         seed,
         // the room's match number: with the seed it keeps battleIds unique across the room's matches (DESIGN §14)
-        matchNo: room.matchCount + 1,
+        // ★ 恢复时沿用存档里的局号（restore.matchNo），否则 battleId 会重号。
+        matchNo: restore ? restore.matchNo : room.matchCount + 1,
         // the room's content hash (header "Content identity"): copied into every BattleSpec; its visual set too (a
         // replay names the art), and with gameplay plugins a b.result must name the room's cs (header "Gameplay plugins")
         ...(room.content ? { cs: room.content.cs } : {}),
@@ -2974,11 +2988,14 @@ export class Lobby {
       room.match = match;
       room.matchCtx = ctx;
       room.matchKey = key;
+      room.matchKeys = keys;
       room.replay = null;
-      room.matchCount++;
-      this.log.info(`[lobby] ${room.code} match #${room.matchCount} starting (${room.mode}/${room.difficulty}, ${seats.length} seats, seed ${seed}${room.test ? ', test' : ''}${modded ? `, content ${room.content.cs.slice(0, 8)}${match.hosted ? ' in its match host' : ''}` : ''}${versioned ? `, version ${room.version}${match.hosted ? ' in its match host' : ''}` : ''})`);
+      // ★ 恢复时局号沿用存档，不 ++（否则这一局会被记成「下一局」，battleId 重号、回放对不上）
+      room.matchCount = restore ? restore.matchNo : room.matchCount + 1;
+      this.log.info(`[lobby] ${room.code} match #${room.matchCount} ${restore ? 'restored' : 'starting'} (${room.mode}/${room.difficulty}, ${seats.length} seats, seed ${seed}${room.test ? ', test' : ''}${modded ? `, content ${room.content.cs.slice(0, 8)}${match.hosted ? ' in its match host' : ''}` : ''}${versioned ? `, version ${room.version}${match.hosted ? ' in its match host' : ''}` : ''})`);
       this.broadcastState(room);
-      match.start();
+      // ★ 恢复走 apply(match)（把存档灌回 Match），正常开局走 match.start()
+      if (restore) restore.apply(match); else match.start();
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match failed to start`, e);
       if (room.matchCtx === ctx) {
