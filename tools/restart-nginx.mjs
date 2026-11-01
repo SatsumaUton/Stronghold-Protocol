@@ -23,13 +23,41 @@
 //     5. 校验：进程数、全部 session 0、HTTPS 200、素材加载速度
 //   任何一步不达标就明确报失败，绝不说「已重启」。
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const APPLY = process.argv.includes('--apply');
 const NGX_DIR = 'D:\\Stronghold-Protocol\\nginx';
 const NGX = NGX_DIR + '\\nginx.exe';
 const TASK = 'SP-Nginx-Start';
-/** 配置 worker_processes 2 → master + 2 worker = 3；多出来的都是残留。 */
-const EXPECTED_MAX = 3;
+/**
+ * 进程数上限 = master + worker。worker 数从配置里现读，不要写死。
+ *
+ * ★ 2026-11-02：原来这里写死 `const EXPECTED_MAX = 3;`（注释说「配置 worker_processes 2」），
+ *   但 nginx.conf 实际是 `worker_processes 4;` → 正常明明有 5 个进程，脚本却按 3 判。
+ *   后果是每次重启都必然误报，而且会把 2 个**正常** worker 当成「残留」强杀：
+ *     第 0 步  「有 2 个残留 worker」
+ *     第 2 步  等它们退出 → 永远等不到 → 强杀
+ *     第 5 步  强杀后进程句柄还没被 Windows 回收 → 「✗ 仍有 1 个无法结束，已中止」
+ *   服务其实由计划任务 SP-Nginx-Start 拉起来了，是好的；脚本报的错是假的。
+ *   改成读配置后，以后调 worker_processes 也不会再对不上。
+ */
+function readWorkerProcesses() {
+  try {
+    const conf = readFileSync(NGX_DIR + '\\conf\\nginx.conf', 'utf8');
+    // 只认指令本身（行首，允许前导空白）；忽略被 # 注释掉的那些
+    const m = conf.match(/^\s*worker_processes\s+([^;]+);/m);
+    if (!m) return null;
+    const v = m[1].trim();
+    if (/^\d+$/.test(v)) return Number(v);
+    // `auto` 和其他表达式：算不出来，退回 null（不判残留，只报实际数）
+    return null;
+  } catch {
+    return null;
+  }
+}
+const WORKERS = readWorkerProcesses();
+/** master + worker；读不到配置时用 null 表示「不做上限判断」，避免用错误数字误杀。 */
+const EXPECTED_MAX = WORKERS == null ? null : WORKERS + 1;
 
 function run(exe, args) {
   try {
@@ -71,8 +99,13 @@ const before = nginxProcs();
 before.forEach((p) => {
   console.log(`  pid=${p.pid}  session=${p.sid}  ${p.created}${p.sid === '0' ? '' : '  ⚠ 不在 Session 0'}`);
 });
-console.log(`  共 ${before.length} 个进程（配置 worker_processes 2，正常应为 master + 2 worker = ${EXPECTED_MAX}）`);
-if (before.length > EXPECTED_MAX) console.log(`  ⚠ 有 ${before.length - EXPECTED_MAX} 个残留 worker —— 这正是素材加载变慢的原因`);
+const expectText = EXPECTED_MAX == null
+  ? '配置里的 worker_processes 读不出数字（可能是 auto），不做上限判断'
+  : `配置 worker_processes ${WORKERS}，正常应为 master + ${WORKERS} worker = ${EXPECTED_MAX}`;
+console.log(`  共 ${before.length} 个进程（${expectText}）`);
+if (EXPECTED_MAX != null && before.length > EXPECTED_MAX) {
+  console.log(`  ⚠ 有 ${before.length - EXPECTED_MAX} 个残留 worker —— 这正是素材加载变慢的原因`);
+}
 
 console.log('\n=== 当前对局 ===');
 const status = run('node', ['-e', `
@@ -176,9 +209,12 @@ after.forEach((p) => {
   console.log(`  pid=${p.pid}  session=${p.sid}${p.sid === '0' ? '  ✓' : '  ✗ 不在 Session 0！'}`);
 });
 const allZero = after.length > 0 && after.every((p) => p.sid === '0');
-const sizeOk = after.length > 0 && after.length <= EXPECTED_MAX;
+// 读不到 worker_processes 时不做上限判断（null → 视为通过），免得用错的数字判失败
+const sizeOk = after.length > 0 && (EXPECTED_MAX == null || after.length <= EXPECTED_MAX);
 code = httpsStatus();
-console.log(`\n  进程数: ${after.length}${sizeOk ? '  ✓' : `  ✗ 期望 ≤ ${EXPECTED_MAX}（还有残留）`}`);
+console.log(`\n  进程数: ${after.length}${sizeOk
+  ? (EXPECTED_MAX == null ? '  ✓（未判上限：读不到 worker_processes）' : '  ✓')
+  : `  ✗ 期望 ≤ ${EXPECTED_MAX}（还有残留）`}`);
 console.log(`  全部在 Session 0: ${allZero ? '✓' : '✗'}`);
 console.log(`  HTTPS 首页: ${code}`);
 

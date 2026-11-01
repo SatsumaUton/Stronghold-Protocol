@@ -86,6 +86,14 @@ test('skins sync: without the data the map goes whole (the server filters it); a
   t.after(e.dispose);
   e.show({ has: () => { asked++; return true; } });
   await e.flush();
-  assert.deepEqual(e.net.sent, [{ t: 'room.skins', skins: {} }]);
-  assert.equal(asked, 0);
+  // ★ 2026-11-01 改：空 map 且**不是玩家刚改出来的**（登录 / welcome 重发 / 内容集变化）一律不推。
+  //   否则清一次浏览器数据就会把云端那份皮肤选择覆盖成空（2026-11-01 事故：丢了 111 个干员的皮肤）。
+  assert.deepEqual(e.net.sent, [], 'an empty map on a fresh session goes nowhere');
+  assert.equal(asked, 0, 'and asks for no data');
+
+  // 玩家主动改出来的空 map 是另一回事：那是「把最后一个皮肤改回默认」，必须推，
+  // 否则云端那份永远删不掉、下次 pullPrefs 又把它拉回本地。
+  e.target.set({ [SKINS_KEY]: {} });
+  await e.flush();
+  assert.deepEqual(e.net.sent, [{ t: 'room.skins', skins: {} }], 'a player-cleared map does go out');
 });

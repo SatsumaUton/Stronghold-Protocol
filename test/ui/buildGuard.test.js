@@ -270,3 +270,26 @@ test('main.js: sp-room-left 走 resume，不再 reset + 清 buildStale', async (
   assert.doesNotMatch(block, /buildGuard\.reset/, '不能再用 reset（会把大厅里该出现的提示一起抹掉）');
   assert.doesNotMatch(block, /buildStale: false/, '不能清 buildStale（同上）');
 });
+
+// ---------------------------------------------------------------------------------------------------
+// 2026-11-01 维护者：「为什么我这里还是有网络中断的提示」——
+// 节点滚动重启会让 WebSocket 断 1–3 秒，前端自动重连就好，但横幅立刻弹出来。
+// 要求：短断线不显示横幅（用户无感），真断线（>2 秒）照常显示。
+// ---------------------------------------------------------------------------------------------------
+
+test('reconnecting 也有宽限期（conn-banner--flap，2 秒），短断线不弹横幅', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../../public/js/ui/connBanner.js', import.meta.url), 'utf8');
+  // reconnecting 必须被纳入「短状态」
+  assert.match(src, /const flapping = conn\.status === 'reconnecting'/, 'reconnecting 要单独识别');
+  assert.match(src, /flapping \|\| \(conn\.status === 'connected'/, 'reconnecting 要进 transient');
+  // 且用 2 秒的 flap 变体，而不是普通 soft
+  assert.match(src, /conn-banner--flap/, '断线重连用 conn-banner--flap');
+  assert.match(src, /conn-banner--soft/, '其他短状态仍用 soft');
+  // CSS 里要有 2 秒延迟 + backwards（动画开始前保持隐藏）
+  const css = fs.readFileSync(new URL('../../public/css/components.css', import.meta.url), 'utf8');
+  const rule = /\.conn-banner--flap\s*\{[^}]*\}/.exec(css)?.[0] || '';
+  assert.match(rule, /2s/, 'conn-banner--flap 要有 2 秒延迟');
+  assert.match(rule, /backwards/, 'backwards 填充：动画开始前保持 from 帧（隐藏）');
+  assert.match(rule, /conn-in-soft/, '复用 conn-in-soft 关键帧（from: opacity 0 / visibility hidden）');
+});

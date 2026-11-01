@@ -919,7 +919,18 @@ const JOIN_COOKIE = (() => {
         .then((d) => {
           if (d && d.node) {
             if (d.mode === 'solo') { showStyledToast(spec ? '独立模拟房间不支持观战（观战只对同盟房间开放）' : '独立模拟房间无法加入'); return; }
-            if (spec && Number(d.spectators) >= 2) { showStyledToast('观战席位已满（2/2），请稍后再试'); return; }
+            // ★ 本服 2026-11-01 修复（第二次）：观战席上限不是固定 2。
+            // 服务端按 max(2, ceil(玩家数/2)) 算（server/lobby.js spectatorLimit），find-room 带回权威 maxSpectators。
+            // 原写法 `Number(d.spectators) >= 2` 会把第 3 个观战者挡在门外（维护者截图：后台 2/9）。
+            if (spec) {
+              const cap = Number.isInteger(d.maxSpectators) ? d.maxSpectators
+                : (d.mode === 'coop' ? Math.max(2, Math.ceil((Number(d.humans) || 0) / 2)) : 0);
+              const used = Number(d.spectators) || 0;
+              if (used >= cap) {
+                showStyledToast(`观战席位已满（${used}/${cap}），请稍后再试`);
+                return;
+              }
+            }
             if (!spec && d.started) { showStyledToast('该同盟已开始对局，无法加入；可以点「观战」进入'); return; }
             if (!spec && d.full) { showStyledToast('该同盟人数已满，无法加入；可以点「观战」进入'); return; }
             const localGo = () => { if (btn) { bypass = true; btn.click(); setTimeout(() => { bypass = false; }, 500); } else clickLocal(spec); };

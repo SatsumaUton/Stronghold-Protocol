@@ -313,15 +313,30 @@ const JOIN_COOKIE = (() => {
 /* 延迟胶囊（.ping）的宽度随毫秒数位数变化，会把右侧工具组整体推动，表现为 2~3px 的漂移。
    给固定最小宽度并让内容居中，布局就稳定了。 */
 .lobby-screen .topbar__left > .ping{min-width:84px!important;justify-content:center!important}
-/* 弹窗（同盟模拟 / 独立模拟）里的节点状态：与大按钮同高、垂直居中 */
-.mm-proto-meter{display:flex!important;align-items:center!important;gap:10px!important;flex:none!important;align-self:center!important}
-.mm-proto-meter > #mm-nodes{display:inline-flex!important;align-items:center!important;height:42px!important;max-height:42px!important;line-height:1!important;flex:none!important;margin:0!important;align-self:center!important}
-.mm-proto-meter > #mm-nodes > .chip{display:inline-flex!important;align-items:center!important;justify-content:center!important;height:42px!important;min-height:42px!important;max-height:42px!important;box-sizing:border-box!important;padding:0 16px!important;line-height:1!important;margin:0!important}
-.mm-proto-meter > #mm-nodes > .chip > *{line-height:1!important;display:inline-flex!important;align-items:center!important}
+/* ★ 2026-11-01 删除：原来这里有 4 条 .mm-proto-meter 规则（把弹窗里的节点状态写成 42px 死值）。
+   那个容器 .mm-proto-meter **从来没有被任何代码创建过** —— 全仓库只有这 4 行 CSS
+   和一处防御性清理（querySelector 后 if 判断再 remove，元素不存在什么也不做）。
+   房间里的节点状态实际挂在 .rs-clock__ping 里，走全局规则
+   #mm-nodes:not(.topbar) .chip（clamp(26px,2.2vw,32px)），和延迟胶囊等高。
+   删掉这 4 行对渲染零影响（它们本来就没命中任何元素），只是免得以后有人照着
+   42px 这个死值去改，又造出「这个胶囊比旁边大一圈」的问题。 */
 
-/* 节点状态 chip：位于大厅顶栏左侧（延迟之后、分隔线之前），与右侧按钮同一中心线 */
-.lobby-screen .topbar__left > #mm-nodes{display:inline-flex!important;align-items:center!important;height:42px!important;line-height:1!important;flex:none!important;align-self:center!important}
-.lobby-screen .topbar__left > #mm-nodes > .chip{display:inline-flex!important;align-items:center!important;justify-content:center!important;height:42px!important;min-height:42px!important;box-sizing:border-box!important;padding:0 16px!important;line-height:1!important;margin:0!important}
+/* 节点状态 chip：位于大厅顶栏左侧（延迟之后、分隔线之前），与右侧按钮同一中心线
+   ★ 2026-11-01（维护者：「节点状态胶囊不会根据页面尺寸变大变小吗」）：
+     原来这里写死 42px!important —— 而**整个 UI 的尺寸都由 rem 驱动**：
+       html{font-size:calc(clamp(40px, min(100vw/19.2, 100vh/10.8), 240px) * var(--sp-ui,1))}
+     右侧方形按钮也是 ".46rem"（随屏幕缩放），于是只有这个胶囊钉死在 42px：
+     小屏上偏大、大屏上偏小，而且**不再跟按钮同高**。
+     改成 rem 与邻居同源：既跟着屏幕缩放，又永远等高。
+
+   ★ 2026-11-01 第二次修正（维护者：「你不觉得他变得太大了吗」）：
+     第一次改成了 ".46rem"（对齐**右侧方形按钮**）—— 这在视觉上是错的：
+     顶栏最左那一段是 [返回][延迟胶囊][节点状态]，**节点状态的邻居是延迟胶囊**，
+     不是右侧那排按钮。延迟胶囊 .ping 是 .32rem，节点状态却做成 .46rem，
+     两个紧挨着的胶囊差一大圈，看起来就是「这一个特别大」。
+     → 改成 .32rem，和 .ping 完全一致（同高、同圆角量级），跟邻居齐平。 */
+.lobby-screen .topbar__left > #mm-nodes{display:inline-flex!important;align-items:center!important;height:.32rem!important;line-height:1!important;flex:none!important;align-self:center!important}
+.lobby-screen .topbar__left > #mm-nodes > .chip{display:inline-flex!important;align-items:center!important;justify-content:center!important;height:.32rem!important;min-height:.32rem!important;box-sizing:border-box!important;padding:0 .17rem 0 .14rem!important;line-height:1!important;margin:0!important;border-radius:99px!important}
 .lobby-screen .topbar__left > #mm-nodes > .chip > *{line-height:1!important;display:inline-flex!important;align-items:center!important}
 .lobby-screen .topbar__tools > #mm-qq-lobby{margin-left:0!important;margin-right:0!important}
 /* 节点状态的宽度：原先用 min-width:230px + justify-content:flex-end 锁宽度防止抖动，
