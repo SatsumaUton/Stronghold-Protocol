@@ -5834,22 +5834,55 @@ git fetch $url refs/heads/custom/production:refs/remotes/origin/custom/productio
 
 判定：`ghfast.top` 按 **URL 字符串**做缓存，`.git` 后缀那条路径的 ref 状态卡在旧版本。
 
-**解法：推送时把 URL 末尾的 `.git` 去掉，缓存键就换了**：
+**曾经以为的解法：推送时把 URL 末尾的 `.git` 去掉**：
 
 ```powershell
-# 卡住的写法（缓存键命中旧状态）
+# 卡住的写法（当时以为缓存键命中旧状态）
 $u = "https://x-access-token:$tok@ghfast.top/https://github.com/SatsumaUton/Stronghold-Protocol.git"
 
-# 换成不带 .git —— 立刻成功
+# 换成不带 .git —— 当时一次就成功了
 $u = "https://x-access-token:$tok@ghfast.top/https://github.com/SatsumaUton/Stronghold-Protocol"
 git push $u refs/heads/custom/production:refs/heads/custom/production
 ```
 
-实测：带 `.git` 连拒 8 次（含 `--force`），去掉 `.git` **一次成功**（`8a731f14..bea2b0c0`）。
-同一 URL 变体也能正常删分支（`- [deleted] tmp-verify-...`）。
+> #### ⚠ 2026-11-02 05:0x 更正：`.git` 后缀**不是**原因，别照上面那条改
+>
+> 同一天稍后再推，用**带 `.git` 的原始 origin**直接成功：
+>
+> ```
+> $ git push origin custom/production
+> To https://ghfast.top/https://github.com/SatsumaUton/Stronghold-Protocol.git
+>    b1ba57aa..f4fb4e8f  custom/production -> custom/production      ← 退出码 0
+> ```
+>
+> 推完三方一致：`ls-remote` = `HEAD` = `origin/custom/production` = `f4fb4e8f`，
+> `rev-list --left-right --count origin/custom/production...HEAD` 得 `0 0`。
+> 所以「去掉 `.git`」那次成功是**巧合**（当时本地跟踪 ref 恰好被前面的
+> `update-ref -d` 清过），不是换缓存键的功劳。
+>
+> **真正的原因还是「本地跟踪 ref 陈旧」**：那次之所以看着像卡住，是因为
+> 本地 `origin/custom/production` 停在 `bea2b0c0`（父提交），而远端早已是
+> `b1ba57aa`。git 拿这个过期值去做 `--force-with-lease` 式的 ref 校验，
+> 于是报 `cannot lock ref ... is at X but expected Y`，而且 `--force` 也挡不住
+> （它挡的是**非快进**，不是**期望值不符**）。
+>
+> **下次遇到就按这个顺序做，别先怀疑代理/URL**：
+>
+> ```powershell
+> git ls-remote --heads origin custom/production   # ① 远端真实值
+> git rev-parse HEAD                              # ② 本地 HEAD
+> # 若 ① == ②：其实已经推上去了，只是本地跟踪 ref 没更新 —— 直接修 ref，不用再推
+> git fetch origin custom/production --force      # 让跟踪 ref 跟上
+> # 若 ① != ② 且 ① 是 ② 的祖先：正常 push 即可
+> # 若仍报 expected 不符：先 update-ref -d 删掉跟踪 ref 再推（见上一节）
+> ```
+>
+> 判据一句话：**先比 `ls-remote` 和 `HEAD`。相等就是「早就推成功了」，问题在本地 ref**，
+> 跟 `.git` 后缀、代理、代码、历史都无关。
 
 **交叉验证手段**：把同一个 commit 推到**新分支名**。若新分支名能推成功，
-说明代码和提交都没问题，纯粹是该 ref 名的缓存卡住 —— 这时换 URL 变体，不要去改代码或强推历史。
+说明代码和提交都没问题，卡住的一定是那个 ref 名的状态 —— 这时先按上面的
+三部曲查本地跟踪 ref，不要去改代码或强推历史。
 
 #### 本地备份文件不入库
 
