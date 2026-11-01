@@ -86,6 +86,18 @@ export class MatchInfra {
     return this.isSolo ? this.gd.config.version?.rules?.soloTimed !== true || this.opts.soloUnlimited === true : this.loneHuman;
   }
 
+  /**
+   * 断点续玩的安全点（server/match/snapshot.js）：opts.onCheckpoint(match, reason) 如果存在，
+   * 就在这里**同步**存一次档 —— 必须赶在别的东西改动状态之前。永远不会让对局失败。
+   * 调用点：phases.js（band-draft，选人开始）、spDraft.js（sp-draft，选秀开始）、
+   * prep.js（prep-end，备战结束时、结束逻辑改动任何东西之前）。
+   */
+  _checkpoint(reason) {
+    const fn = this.opts?.onCheckpoint;
+    if (typeof fn !== 'function' || this.disposed || this.ended) return;
+    try { fn(this, reason); } catch (e) { this.reportError('checkpoint', e); }
+  }
+
   nextUid() { return ++this.uidSeq; }
 
   alivePlayers() { return this.order.filter((p) => p.alive); }

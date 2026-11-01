@@ -401,18 +401,37 @@ function sameSkins(a, b) {
   return ka.length === kb.length && ka.every((k) => a[k] === b[k]);
 }
 
-/** 房间创建后多久未开始对局就解散；data/room-ttl.json 的 minutes，默认 15 分钟。 */
-let __roomTtlCache = { ms: 15 * 60 * 1000, at: 0 };
-function roomTtlMs() {
+/**
+ * 房间自动解散（同盟 / 独立模拟的等待室）配置：shared/data/room-ttl.json
+ *   { "enabled": true, "minutes": 15 }
+ *
+ * `enabled === false` 时**完全不解散**：房间一直保留到房主自己解散/离开，
+ * 玩家界面上也不再显示倒计时。管理后台与节点控制台都能改，5 秒缓存，改完即生效。
+ *
+ * 注意路径：本文件在 node-N/server/ 下，`../../shared/data/` 才指向仓库根的
+ * shared/data/room-ttl.json —— 也就是后台真正写入的那个文件。
+ * （旧版写的是 `../data/`，那是每个节点自己的 node-N/data/，后台根本改不到它，
+ *  于是这个开关一直形同虚设，所有节点都跑硬编码的 15 分钟。）
+ */
+let __roomTtlCache = { enabled: true, ms: 15 * 60 * 1000, at: 0 };
+function roomTtlConfig() {
   if (Date.now() - __roomTtlCache.at > 5000) {
+    let enabled = true;
+    let ms = 15 * 60 * 1000;
     try {
-      const j = JSON.parse(readFileSync(new URL('../../data/room-ttl.json', import.meta.url), 'utf8'));
-      const m = Number(j.minutes);
-      if (Number.isFinite(m) && m >= 1 && m <= 1440) __roomTtlCache = { ms: Math.round(m * 60000), at: Date.now() };
-    } catch { /* 配置缺失时用默认 15 分钟 */ }
+      const j = JSON.parse(readFileSync(new URL('../../shared/data/room-ttl.json', import.meta.url), 'utf8'));
+      if (j && j.enabled === false) enabled = false;
+      const m = Number(j && j.minutes);
+      if (Number.isFinite(m) && m >= 1 && m <= 1440) ms = Math.round(m * 60000);
+    } catch { /* 配置缺失：开启、15 分钟 */ }
+    __roomTtlCache = { enabled, ms, at: Date.now() };
   }
-  return __roomTtlCache.ms;
+  return __roomTtlCache;
 }
+/** 房间多久没开始对局就解散（毫秒）。 */
+function roomTtlMs() { return roomTtlConfig().ms; }
+/** 自动解散总开关：false 时 sweepOldRooms 不再因超时解散任何房间。 */
+function roomTtlEnabled() { return roomTtlConfig().enabled; }
 
 /**
  * 后台维护开关（管理后台「维护开关」页）：
@@ -602,10 +621,14 @@ export class Room {
       // 解散计时的基准：建房时间，或「上一局结束」的时间（取较晚者）。
       // 对局进行中不退出、不倒计时（sweepOldRooms 会跳过有 match 的房间），
       // 所以这里和 sweepOldRooms 用同一个 base，前端显示的剩余时间才不会与实际解散时机打架。
-      expiresInMs: this.noExpire ? null
+      // 自动解散关掉时（room-ttl.json 的 enabled=false）下发 null：前端据此不画倒计时浮层。
+      expiresInMs: this.noExpire || !roomTtlEnabled() ? null
         : Math.max(0, Math.max(Number(this.createdAt) || 0, Number(this.lastMatchEndAt) || 0)
           + (this.ttlMs || roomTtlMs()) - now),
-      ttlMs: this.noExpire ? null : (this.ttlMs || roomTtlMs()),
+      ttlMs: this.noExpire || !roomTtlEnabled() ? null : (this.ttlMs || roomTtlMs()),
+      // 房间**永不自动解散**（不是「管理员房」那种 ∞）。和 noExpire 分开：
+      // 后者的浮层文案是「管理员房 · 不自动销毁」，全局关掉时不该这么写。
+      autoExpire: roomTtlEnabled() && this.noExpire !== true,
       adminCreated: this.adminCreated === true,
       // 前端倒计时用它判断显示 ∞ 还是 mm:ss（mm/client.js installRoomCountdown）。
       // 之前只下发了 expiresInMs/ttlMs，唯独漏了 noExpire，导致管理员房
@@ -624,6 +647,9 @@ export class Room {
           ...(s.admin === true ? { admin: true } : {}),
           // a room with gameplay plugins (header "Gameplay plugins"): has this player's page loaded and checked its content?
           ...(this.needsContent && !s.isBot ? { content: s.content || 'loading' } : {}),
+          // AI 座位被房主指定的策略（room.setBotBand）：只有 AI 座位、且真的指定了才带这个键
+          // （null = AI 自己挑，不下发，保证没用到这个功能的房间 state 与以前逐字节一致）
+          ...(s.isBot && s.band ? { band: s.band } : {}),
           // 名片干员 (room.card): only a human seat with a card carries the key
           ...(!s.isBot && s.card ? { card: s.card } : {}),
           // 干员皮肤 (room.skins, PUBLIC like Match.publicView().players[].skins): the seat card's outfit (header);
@@ -955,6 +981,8 @@ export class Lobby {
     if (room.adminLeftAt && room.hostId === session.playerId) room.adminLeftAt = 0;
     if (!room.match && seat.name !== session.name) { seat.name = session.name; changed = true; }
     if (!room.hostId) { this.migrateHost(room); changed = true; }
+    // 有人回来了：还在打的对局里，其余掉线的人重新进入「AI 代打、等他们回来」的状态
+    if (changed && room.match && room.seatOf(session.playerId)) this.refreshMatchWindows(room);
     if (changed) this.broadcastState(room);
     else this.sendState(room, session);
     this.resync(session, !resumed);
@@ -968,9 +996,13 @@ export class Lobby {
    * @param {any} msg
    * @returns {{ ok: true } | { error: string, detail?: string } | Promise<{ ok: true } | { error: string, detail?: string }>}
    */
-  /** 每 20 秒扫描：创建后超过 15 分钟仍未开始对局的房间解散；匹配超过 2 分钟强制开局。 */
+  /** 每 20 秒扫描：超过 TTL 仍未开始对局的房间解散；匹配超过 2 分钟强制开局。 */
   sweepOldRooms() {
     const now = this.now();
+    // 自动解散总开关（shared/data/room-ttl.json 的 enabled，后台/控制台可改）。
+    // 关掉时**不因超时解散任何房间**：正在等人、卡死的对局都原样保留，由房主自己解散。
+    // 「匹配超时强制开局」不受影响 —— 那不是解散。
+    const ttlOff = !roomTtlEnabled();
     for (const room of [...this.rooms.values()]) {
       if (!room || room.disposed) continue;
       // 「永久保留」只在房主（管理员/服主）本人**在线**时才成立。
@@ -987,13 +1019,33 @@ export class Lobby {
       // 判据只有一条：房间里的真人都已经断线（没有在线玩家）。这时对局不可能再推进，
       // 保留它只会占着房间、挡住建房、让后台显示一个假「对局中」。
       // 只要还有任何一个真人连着，就照旧跳过 —— 不影响正常对局。
+      // 对局进行中的房间：正常回收由 refreshMatchWindows 负责 ——
+      //   还有真人在线 → 掉线队友的窗口拉到 24h（AI 代打）；
+      //   全员掉线   → 窗口退回普通重连窗口，从那一刻起算，到期 onExpire 释放座位、对局 'abandoned'。
+      // 这里只做**兜底**，而且只兜一种情况：重启后用存档恢复的房间可能**一个 session 都没有**
+      // （registry 是内存的），没有任何人能走完重连窗口 —— 那种僵尸房必须由这里回收。
+      //
+      // ★ 2026-11-02：这条兜底**不受 room-ttl.json 的开关影响**。
+      //   以前 `if (forever || ttlOff) continue;` 把对局房的回收一起关掉了，而开关当前就是
+      //   enabled:false —— 于是 node-1 上「全员掉线的对局」永远不回收（node-19 的 DTTW 卡 5.5 小时
+      //   就是这么来的）。开关的语义是「不因超时解散**等人中**的房间」，不该管僵尸对局。
       if (room.match) {
         if (forever) continue;
         if (room.activeHumans().some((s) => s && s.connected)) continue;
-        // 从「最后一个人断线」的时刻起算宽限期，避免对局刚开的瞬间被误判
-        const since = Math.max(Number(room.lastHumanLeftAt) || 0, Number(room.createdAt) || now);
+        const humans = room.activeHumans();
+        // 有 session 还在走重连窗口 → 交给 refreshMatchWindows，这里不抢（它的账算得更准）
+        const hasSession = humans.some((s) => this.registry?.byId?.(s.playerId));
+        if (hasSession) continue;
+        // 没有任何 session：给存档恢复留一个 TTL 的宽限，然后再回收。
+        // 注意不能写 `|| now` —— 那样 `now - since` 恒为 0，永远判不到过期（这个坑踩过一次）。
+        // 时间戳全缺失时按 0 处理，也就是「很老」，直接回收：真僵尸房没有别的出口。
+        const since = Math.max(
+          Number(room.lastHumanLeftAt) || 0,
+          Number(room.restoredAt) || 0,
+          Number(room.createdAt) || 0,
+        );
         if (now - since < (room.ttlMs || roomTtlMs())) continue;
-        this.log?.info?.(`[lobby] ${room.code} 对局已无人在线超过 ${Math.round((room.ttlMs || roomTtlMs()) / 60000)} 分钟，回收卡死房间`);
+        this.log?.info?.(`[lobby] ${room.code} 对局无任何在线 session 且已过 ${Math.round((room.ttlMs || roomTtlMs()) / 60000)} 分钟，回收僵尸房间`);
         try { this.disposeRoom(room, 'expired'); } catch { /* ignore */ }
         continue;
       }
@@ -1004,7 +1056,7 @@ export class Lobby {
         }
         continue;
       }
-      if (forever) continue;
+      if (forever || ttlOff) continue;
       // 普通房间：从建房 / 上一局结束算起。
       // 管理员房（noExpire 但人已离线）：从「管理员离线」算起 —— 他人在的时候房间一直保留，
       // 人一走才开始走 15 分钟倒计时，回来续上。
@@ -1020,6 +1072,41 @@ export class Lobby {
       if (now - base < ttl) continue;
       this.log?.info?.(`[lobby] ${room.code} expired (${room.noExpire === true ? '管理员离线，' : ''}15 min without a match)`);
       try { this.disposeRoom(room, 'expired'); } catch { /* ignore */ }
+    }
+  }
+
+  /**
+   * 掉线由 AI 接管（参考版 2026-10-14 的规则）：一局**非独立模拟**的对局只要还有一个真人在线，
+   * 掉线的人就一直保持可恢复（窗口拉到 solo 那档 24h，实际上没有对局撑得到），
+   * 期间他的座位由 AI 代打，人回来再交还。
+   *
+   * 一旦整局**没有任何真人在线**，每个掉线的人就退回普通的 10 分钟重连窗口，
+   * 并且从「现在」重新起算（`matchHeld` 保证只重算一次，之后的调用不会再往后推）。
+   * 窗口到期的 session 会被 registry 清掉 → onExpire → 座位释放、对局以 'abandoned' 结束。
+   *
+   * 这就是「无在线玩家的房间」的正确出口：房间活得和它的玩家能回来一样久，
+   * 不需要另一套独立 TTL 去猜（`sweepOldRooms` 现在只当重启后的兜底）。
+   *
+   * 调用时机：运行中的对局里有人掉线 / 回来 / 永久离开。
+   * @param {Room} room
+   */
+  refreshMatchWindows(room) {
+    if (!room?.match || room.disposed || room.mode === 'solo') return;
+    const humans = room.activeHumans();
+    const online = humans.some((s) => s && s.connected);
+    const now = this.now();
+    for (const s of humans) {
+      const session = s.connected ? null : this.registry?.byId ? this.registry.byId(s.playerId) : null;
+      if (!session || session.connected || session.roomCode !== room.code || session.disconnectedAt == null) continue;
+      if (online) {
+        session.resumeWindowMs = this.soloResumeWindowMs(room);
+        session.matchHeld = true;
+      } else if (session.matchHeld) {
+        // 从现在重新起算普通窗口 —— 不是把窗口「缩短」（net.js 只认更长的那个），
+        // 而是把起点挪到「最后一个人离开」的此刻，避免整局挂到 24h 之后。
+        session.resumeWindowMs = now - session.disconnectedAt + this.registry.reconnectWindowMs;
+        session.matchHeld = false;
+      }
     }
   }
 
@@ -1136,6 +1223,7 @@ export class Lobby {
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
       case 'room.setExperimental': return this.setExperimental(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
+      case 'room.setBotBand': return this.setBotBand(session, msg);
       case 'room.setSoloUnlimited': return this.setSoloUnlimited(session, msg);
       case 'room.setAiTakeover': return this.setAiTakeover(session, msg);
       case 'room.aiRequest':
@@ -1208,6 +1296,9 @@ export class Lobby {
         if (this.queuedRoom(session)) this.queueEvent(room, () => { if (!session.connected) this.callMatch(room, 'onDisconnect', session.playerId); });
         else this.callMatch(room, 'onDisconnect', session.playerId);
       }
+      // 还在打的对局：只要还有一个真人在线，掉线的人的恢复窗口就拉到 24h（AI 代打等它回来）；
+      // 全员掉线则退回普通窗口，从这里开始计时，最终让这局以 'abandoned' 结束。
+      this.refreshMatchWindows(room);
     } else this.startGrace(room, seat);
     this.broadcastState(room);
   }
@@ -1747,6 +1838,8 @@ export class Lobby {
       while (room.seats.length < capacity) room.seats.push(null);
       room.seats.length = capacity;
     }
+    // 扩容/缩容后，座位可能被裁掉，指定策略也可能是新规则不开放的 —— 一并退回自动
+    this.dropUnofferedBotBands(room);
     for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
     this.broadcastState(room);
     return OK;
@@ -1764,6 +1857,8 @@ export class Lobby {
     if (room.difficulty !== difficulty || room.content?.modeId) {
       room.difficulty = difficulty;
       if (room.content?.modeId) { const rest = { ...room.content }; delete rest.modeId; room.content = Object.freeze(rest); }
+      // 换难度后，新难度不开放的「指定策略」要退回自动（否则会留下一个选不出来的值）
+      this.dropUnofferedBotBands(room);
       for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
       this.broadcastState(room);
     }
@@ -1801,6 +1896,68 @@ export class Lobby {
       this.broadcastState(room);
     }
     return OK;
+  }
+
+  /**
+   * 房主给某个 AI 座位指定策略（「AI 可以指定策略」）。
+   * `bandId: null` = 取消指定，AI 恢复自己挑。
+   *
+   * 限制（与参考版一致）：
+   *   · 只有房主能改，且只能在对局开始前改；
+   *   · 单人房没有 AI 队友，直接拒；
+   *   · 目标座位必须坐着一个 AI；
+   *   · 策略必须是当前模式/版本开放的（`data.bandAllowed`）；
+   *   · 一个策略只能指定给一个 AI 座位（两个 AI 不能抢同一个盟约）。
+   *
+   * 改完把其他真人的「准备」清掉 —— 和 setAiPicksLast / setDifficulty 一样，
+   * 避免有人已经点了准备却被房主改掉规则就开局。
+   */
+  setBotBand(session, { seat, bandId = null }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.mode === 'solo') return fail(ERR.BAD_TARGET, 'solo rooms have no AI teammates');
+    const target = room.seats[seat];
+    if (!target || !target.isBot) return fail(ERR.BAD_TARGET, 'seat does not hold an AI');
+    if (bandId !== null) {
+      const data = this.dataFor(room);
+      // 注意两件事一起判：
+      //   · data.bandAllowed —— 这个版本/模式开放哪些盟约（只看 MULTI/SINGLE，与难度无关）；
+      //   · 房间实验项「禁用鸭爵策略」—— disableDuckLord 是 Match 在开局时写到它自己的 gd 上的
+      //     （Match.js: this.gd.disableDuckLord = ...），lobby 手里的这份 gd 并不知道。
+      //     只查 data.bandAllowed 会放行 band_ducklord，然后 Match 再静默丢掉它 —— 房主看到的就是
+      //     「指定了但没生效」。所以这里要显式补判。
+      if (bandId === 'band_ducklord' && room.experimental?.disableDuckLord === true) {
+        return fail(ERR.BAD_TARGET, 'strategy disabled in this room');
+      }
+      if (!data.bandAllowed(bandId)) return fail(ERR.BAD_TARGET, 'strategy not offered in this mode');
+      if (room.seats.some((s) => s && s !== target && s.isBot && s.band === bandId)) {
+        return fail(ERR.BAD_TARGET, 'strategy designated to another AI');
+      }
+    }
+    this.dropReplay(room, session.playerId);
+    if ((target.band ?? null) !== bandId) {
+      target.band = bandId;
+      for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
+  /**
+   * 换难度/改实验项之后：AI 座位被指定的策略如果新规则不再开放，就退回「自己挑」。
+   * 否则会留下一个选不出来的指定值，开局时 Match 会静默忽略它（看起来像「指定失效」）。
+   */
+  dropUnofferedBotBands(room) {
+    if (!room.seats.some((s) => s && s.isBot && s.band != null)) return;
+    const data = this.dataFor(room);
+    const duckOff = room.experimental?.disableDuckLord === true;
+    for (const s of room.seats) {
+      if (!s || !s.isBot || s.band == null) continue;
+      // 与 setBotBand 同一套判据（含 disableDuckLord，见那里的说明）
+      if ((duckOff && s.band === 'band_ducklord') || !data.bandAllowed(s.band)) s.band = null;
+    }
   }
 
   /**
@@ -2717,6 +2874,9 @@ export class Lobby {
           if (sess) return sess.admin === true;
           return s.admin === true;
         })(),
+        // 房主给这个 AI 座位指定的策略（room.setBotBand）：Match 用它填 this.botBands。
+        // null = 没指定（AI 自己挑），只有 AI 座位才可能有值。
+        band: s.isBot && s.band ? s.band : null,
       };
     });
     // lastPublic / results: the latest m.public broadcast and the m.result frames (encoded), kept for the replay.
@@ -2780,6 +2940,12 @@ export class Lobby {
         onIdleKick: (playerId, reason) => {
           try { this.kickIdle(room, playerId, this.registry.byId(playerId), { reason }); }
           catch (e) { this.log?.warn?.('[lobby] onIdleKick failed', e); }
+        },
+        // 断点续玩的安全点（server/match/snapshot.js，Match._checkpoint）：选人开始 / 备战结束 / 选秀开始
+        // 各存一次档 —— 只靠 10 秒定时存，掉线时可能正好卡在两回合之间，恢复回来要重打一整回合。
+        // ★ 与上面 onIdleKick 同一个坑：以前这里没有这个键，Match._checkpoint 就是空操作。
+        onCheckpoint: (match, reason) => {
+          if (ctx.live && room.matchCtx === ctx) this.onCheckpoint?.(room, ctx, match, reason);
         },
       };
       // a room with gameplay plugins plays in its content set's match host, a room of another official version in that
@@ -3430,6 +3596,8 @@ export class Lobby {
       if (room.versionVote) this.voidVersionVote(room, 'members');
     }
     if (room.disposed) return; // onLeave may have ended the match and emptied the room
+    // 最后一批在线的人离开了：其余掉线队友的恢复窗口从这里重新起算（见 refreshMatchWindows）
+    if (room.match) this.refreshMatchWindows(room);
     if (room.hostId === playerId) this.migrateHost(room);
     // 没有注册玩家了（空房，或只剩游客）：解散。
     // 只剩游客时必须解散 —— migrateHost 不再把房主给游客，
