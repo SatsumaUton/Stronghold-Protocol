@@ -6152,6 +6152,56 @@ git rev-list --left-right --count origin/custom/production...HEAD   # 必须是 
 
 **临时分支记得删**（API DELETE 同一个 ref 路径，或 `git push origin --delete` 成功后确认）。
 
+##### ★★ 补一条规律（2026-11-02 05:4x 再实测）：`expected` 是**冻结**的旧值，不会随推送更新
+
+上一节把原因归到「代理对已推送过的分支名留了旧 `old_oid`」，方向对，但还差一层：
+那个 `old_oid` **到底会不会更新**。连着推三次之后，答案很清楚了：**不会，它是冻结的。**
+
+完整时序（同一个会话内，远端依次是）：
+
+```
+起点                     远端 bfa9c499   （上一轮用 API PATCH 推上去的）
+第 1 次 push（3 条提交） → ✅ 成功       远端变成 bcb98feb
+第 2 次 push（1 条提交） → ❌ is at bcb98feb  but expected bfa9c499
+第 3 次 push（1 条提交） → ❌ is at f4eeb269  but expected bfa9c499   ← 还是 bfa9c499
+```
+
+关键在第 3 次：远端已经走了两格（`bcb98feb` → `f4eeb269`），`expected` **仍然是
+`bfa9c499`** —— 它一次都没跟着更新。
+
+> ⚠ **别被第 2 次误导**：那一次 `expected` 看起来「正好是上一次推送前的值」，
+> 很容易得出「落后一次」的结论。第 3 次就推翻了 —— 它只是**一直停在**
+> 上次刷新时的那个值上。第一次成功纯属巧合：当时远端真实值恰好等于这个冻结值。
+
+**所以正确的模型是**：代理把某个 ref 的 `old_oid` 缓存住之后就不再刷新，
+只有**换成它没见过的分支名**或**绕开代理**才会重新协商。
+
+于是有两个可以直接用的判据：
+
+| 报错里的字段 | 可信吗 | 含义 |
+|---|---|---|
+| `is at <X>` | ✅ 可信 | 远端**真实**当前值 |
+| `expected <Y>` | ❌ 不可信 | 代理**冻结**的旧值，可能落后任意多次 |
+
+**所以：不要在这上面调 `--force` / `--force-with-lease` / 删跟踪 ref，全是白费。**
+（`expected` 根本不受本地控制。）连续推多条时的标准姿势是——
+
+```powershell
+git push origin custom/production        # 第 1 次：远端真实值 == 冻结值时能成
+# 之后一律改用 API PATCH（见上面「解法 A」），别再浪费时间去试 git push
+```
+
+> **token 路径易错**：GitHub PAT 在 `.secrets/github-token.txt`（93 字节），
+> **不在** `.secrets/secrets.json` 里 —— 后者只有 `db*` / `mail*` 字段。
+> 用 `Authorization: token <pat>` 或 `Bearer <pat>` 都行（本轮两种都试过，均可用）。
+
+PATCH 成功后**必须 `git fetch`**，否则本地 `origin/custom/production` 还是旧的，
+`git rev-list --left-right --count` 会显示 `0 1` 让你误以为没推上去：
+
+```powershell
+git fetch origin custom/production        # 输出 bcb98feb..f4eeb269 才是对的
+git rev-list --left-right --count origin/custom/production...HEAD   # 0  0
+```
 
 #### 本地备份文件不入库
 
