@@ -87,10 +87,11 @@ export function makeMatch(o = {}) {
     verify: o.verify ?? 'off',
     headlessSliceMs: o.headlessSliceMs,
     aiPicksLast: o.aiPicksLast,
-    // 5–20 人大厅的实验选项（playerCapacity / allowRepeat / disableDuckLord …）。
-    // 不透传的话 roomCapacity 会退回 MAX_SEATS，构造超过 4 人的房间会直接抛
-    // 「seats exceed room capacity」，也就无法测试 capacityExperiment 相关的逻辑。
-    experimental: o.experimental,
+    // 挂机移出（消极游戏，server/match/match/platform.js _checkIdle）：**测试里默认关闭**（0）。
+    // 它是按「每回合备战结束」计时的，而绝大多数测试根本不发备战指令 ——
+    // 默认开着会把 `humans: 2` 的测试里的玩家在两回合后移出，与它们要测的东西无关。
+    // 要测这条规则就显式传 afkRemoveRounds（test/match/afk.test.js）。
+    afkRemoveRounds: o.afkRemoveRounds ?? 0,
     // a bot prep's layout rehearsal delegated to the room's host (DESIGN §14; test/match/rehearsal-delegate.test.js):
     // `hostId` is the executor a task is sent to, `botRehearsalDelegateMs` its answer window
     hostId: o.hostId !== undefined ? o.hostId : (o.test === true ? (seats.find((s) => s && !s.isBot)?.playerId ?? null) : undefined),
@@ -108,6 +109,9 @@ export function makeMatch(o = {}) {
     // still has no kitted key.
     ...(o.kitted !== undefined ? { kitted: o.kitted } : {}),
     ...(o.rules !== undefined ? { rules: o.rules } : {}),
+    // a room-owned experimental rule set (5–20 人扩容房: playerCapacity / disableDuckLord …). Omitted unless the test
+    // passes one, so an ordinary harness match keeps its two-flag default.
+    ...(o.experimental !== undefined ? { experimental: o.experimental } : {}),
   });
   const m = h.m;
   if (m.clientCombat && o.clients !== false) {
