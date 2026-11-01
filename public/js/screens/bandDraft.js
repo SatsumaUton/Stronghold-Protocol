@@ -39,7 +39,8 @@ import { html, Button, Icon, useTicker, secondsLeft } from '../ui/components.js'
 import { useGameData, BandIcon, RichText, PlayerAvatar, Sprite, Img } from '../ui/gameComponents.js';
 import { StepHeader, ExitModal } from '../ui/matchChrome.js';
 import { MatchInfoDialog, matchInfoModel } from '../ui/matchInfo.js';
-import { MatchEnemies } from '../ui/matchEnemies.js';
+import { MatchEnemies, stagePoolLine } from '../ui/matchEnemies.js';
+import { StageMiniMap } from '../ui/stagePreview.js';
 import { actions, act } from '../ui/gameActions.js';
 import { normalizeDraft, sortedPlayers, draftMyTurn } from '../ui/gameLogic.js';
 import { useStore } from '../store.js';
@@ -308,6 +309,9 @@ export function BandDraftScreen({ held = null } = {}) {
   // 「禁用鸭爵策略」：只在 5–20 人大厅房生效（服务端 gd.disableDuckLord 同一条件）
   const disableDuckLord = !solo && pub?.playerCapacity > 4 && pub?.experimental?.disableDuckLord === true;
   const bands = useMemo(() => allowedBands(gd.list('bands'), mode?.type || (solo ? 'SINGLE' : 'MULTI'), disableDuckLord), [gd.ready, mode?.type, solo, disableDuckLord, data.locale(), data.contentId()]);
+  // 本局的战场（左栏小地图，ui/stagePreview.js）与它的池说明
+  const stage = pub?.stageId ? gd.stage(pub.stageId) : null;
+  const stagePool = stagePoolLine(mode);
   const players = sortedPlayers(pub);
   const draft = normalizeDraft(pub?.draft, players);
   const myPick = draft.picks.get(myId) || priv?.bandId || null;
@@ -464,6 +468,14 @@ export function BandDraftScreen({ held = null } = {}) {
     <main class="draft__main">
       <aside class=${cx('draft-order', draft.concurrent && 'is-wide')}>
         <div class="draft-order__deco" aria-hidden="true"><i></i><i></i><span>STRONGHOLD PROTOCOL<br />${solo ? 'SINGLE OPERATOR' : 'COLLABORATIVE SYSTEM'}</span></div>
+        ${stage ? html`<div class="draft-map" data-testid="draft-map" title=${stage.name}>
+          <${StageMiniMap} stage=${stage} />
+          <div class="draft-map__text">
+            <span class="draft-tag">BATTLEFIELD</span>
+            <b>${stage.name}</b>
+            ${stagePool ? html`<small>${stagePool}</small>` : null}
+          </div>
+        </div>` : null}
         <div class="draft-order__rows">
           ${rows.map((p, i) => {
             const picked = draft.picks.get(p.playerId) || (p.playerId === myId ? myPick : p.bandId) || null;

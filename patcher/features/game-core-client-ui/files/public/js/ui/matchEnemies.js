@@ -30,6 +30,13 @@ export const factionDescId = (scope, type) => `${scope}-fdesc-${String(type).rep
 /** What a 特训敌人 tooltip keeps clear of: the leader block — the portrait with its tag, and each line of its text. */
 export const leaderBlockOf = (el) => el.closest('.brief-enemy')?.querySelectorAll('.brief-boss, .brief-boss__text > *') || [];
 
+/** 该模式的战场池（config.json modes[].stages）：标准永远是战场#01，险境+ 随机抽一张。
+ *  @param {any} mode */
+export function stagePoolLine(mode) {
+  const poolN = Array.isArray(mode?.stages) ? mode.stages.length : 0;
+  return poolN > 1 ? t('战场随机（共{poolN}张）', { poolN }) : poolN === 1 ? t('战场固定') : '';
+}
+
 /** A faction's name with a break opportunity after each '/' (「特训敌人/飞行」: English 「Tactical Training/Flying」 broke
  * inside 「Flying」, a slash between letters giving none — §35.51 review); its text and accessible name unchanged. */
 const slashBreaks = (s) => String(s).split('/').flatMap((part, i) => (i ? [html`/<wbr />`, part] : [part]));

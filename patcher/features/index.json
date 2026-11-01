@@ -236,12 +236,12 @@
       {
         "path": "matchmaker/account.cjs",
         "baseExists": false,
-        "customBytes": 121536
+        "customBytes": 121548
       },
       {
         "path": "matchmaker/feedback.cjs",
         "baseExists": false,
-        "customBytes": 21461
+        "customBytes": 26972
       },
       {
         "path": "matchmaker/package-lock.json",
@@ -266,7 +266,7 @@
       {
         "path": "matchmaker/public/client.js",
         "baseExists": false,
-        "customBytes": 237547
+        "customBytes": 245643
       },
       {
         "path": "matchmaker/public/feedback.css",
@@ -316,7 +316,7 @@
       {
         "path": "matchmaker/test/feedback.test.cjs",
         "baseExists": false,
-        "customBytes": 9726
+        "customBytes": 15021
       },
       {
         "path": "mm/client.js",
@@ -375,7 +375,7 @@
       {
         "path": "matchmaker/public/client.js",
         "baseExists": false,
-        "customBytes": 237547
+        "customBytes": 245643
       },
       {
         "path": "mm/client.js",
@@ -534,7 +534,7 @@
       {
         "path": "matchmaker/account.cjs",
         "baseExists": false,
-        "customBytes": 121536
+        "customBytes": 121548
       },
       {
         "path": "dashboard/announce.png",
@@ -801,7 +801,7 @@
       {
         "path": "nginx/conf/open-nodes.conf",
         "baseExists": false,
-        "customBytes": 2536
+        "customBytes": 2626
       },
       {
         "path": "nginx/conf/scgi_params",
@@ -4859,7 +4859,7 @@
       {
         "path": "public/js/ui/matchEnemies.js",
         "baseExists": false,
-        "customBytes": 6794
+        "customBytes": 7153
       },
       {
         "path": "public/js/ui/matchInfo.js",
@@ -5007,6 +5007,11 @@
         "customBytes": 14881
       },
       {
+        "path": "public/js/ui/stagePreview.js",
+        "baseExists": false,
+        "customBytes": 2435
+      },
+      {
         "path": "public/js/ui/stats.js",
         "baseExists": true,
         "customBytes": 48512
@@ -5106,7 +5111,7 @@
       {
         "path": "public/js/screens/bandDraft.js",
         "baseExists": true,
-        "customBytes": 39203
+        "customBytes": 39828
       },
       {
         "path": "public/js/screens/briefing.js",
@@ -5645,7 +5650,7 @@
       {
         "path": "public/css/screens/draft.css",
         "baseExists": true,
-        "customBytes": 39127
+        "customBytes": 40216
       },
       {
         "path": "public/css/screens/game-panels.css",
