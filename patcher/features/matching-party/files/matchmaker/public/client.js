@@ -650,6 +650,7 @@ const JOIN_COOKIE = (() => {
   installAutoRejoin();
   installRoomCountdown();
   installFeedbackEntry();
+  installFeedbackNotify();
 
   hideLatencyLabel();
   fixCenterButtons();
@@ -1645,22 +1646,39 @@ const JOIN_COOKIE = (() => {
       if (!document.getElementById('mm-feedback-css')) {
         const st = document.createElement('style');
         st.id = 'mm-feedback-css';
+        // 2026-11-02：维护者要求「按钮做大一点、明显一点」→ 再要求「绿色、抢眼一些」，
+        // 同时「样式要跟界面适配」。
+        // 解法：直接照抄游戏本体的**主按钮** .btn--primary（shared/public/css/components.css L98）——
+        //   薄荷绿实底(--mint-500) + 深色字(--text-on-mint) + 右侧 .34rem 斜纹条 + 顶部高光，
+        //   hover 换成 --mint-400 并加 --btn-glow 同款外发光。
+        // 也就是说：绿色抢眼是**这个界面本来就有的语言**，不是外挂上去的一块。
+        // 尺寸：高 32 → 44px（手机 40px）、字号 13 → 15px、内边距 14 → 20px、图标 15 → 20px。
+        // 位置不变，仍是左下角。
         st.textContent = `
           #mm-feedback{position:fixed;left:max(18px,env(safe-area-inset-left,0px));
             bottom:calc(max(18px,env(safe-area-inset-bottom,0px)) + 4px);z-index:2147481900;
-            display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;
-            height:32px;padding:0 14px;border:1px solid var(--line-2,rgba(255,255,255,.14));
-            border-left:2px solid var(--mint-500,#5ee0b9);border-radius:0;
-            background:rgba(8,20,17,.82);color:var(--text-md,#c3cbc7);
-            font:600 13px/1 "Noto Sans SC",system-ui,sans-serif;letter-spacing:.04em;
+            display:inline-flex;align-items:center;gap:.22em;box-sizing:border-box;
+            height:44px;padding:0 20px;border:1px solid #6fe8c4;border-radius:0;
+            background-color:var(--mint-500,#4ed8af);
+            background-image:
+              repeating-linear-gradient(-55deg,rgba(0,0,0,.16) 0 2px,transparent 2px 6px),
+              linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,0) 45%);
+            background-size:.34rem 100%,100% 100%;
+            background-position:right center,0 0;
+            background-repeat:no-repeat;
+            color:var(--text-on-mint,#06110d);
+            font:700 15px/1 "Noto Sans SC",system-ui,sans-serif;letter-spacing:.06em;
             text-decoration:none;cursor:pointer;white-space:nowrap;
-            backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-            transition:color .15s,border-color .15s,background .15s}
-          #mm-feedback:hover,#mm-feedback:focus-visible{color:var(--mint-400,#59f4ca);
-            border-color:var(--mint-500,#5ee0b9);background:rgba(12,30,25,.92);outline:none}
-          #mm-feedback svg{width:15px;height:15px;flex:none;display:block}
-          @media (max-width:640px){#mm-feedback{height:28px;padding:0 10px;font-size:12px}
-            #mm-feedback svg{width:13px;height:13px}}
+            text-shadow:none;
+            transition:background-color .15s,border-color .15s,box-shadow .15s,filter .15s}
+          #mm-feedback:hover,#mm-feedback:focus-visible{
+            background-color:var(--mint-400,#59f4ca);border-color:#9dffe2;
+            color:var(--text-on-mint,#06110d);
+            box-shadow:0 0 14px rgba(23,249,183,.45);outline:none}
+          #mm-feedback:active{filter:brightness(.94)}
+          #mm-feedback svg{width:20px;height:20px;flex:none;display:block}
+          @media (max-width:640px){#mm-feedback{height:40px;padding:0 14px;font-size:14px}
+            #mm-feedback svg{width:18px;height:18px}}
           @media (prefers-reduced-motion:reduce){#mm-feedback{transition:none}}
         `;
         (document.head || document.documentElement).appendChild(st);
@@ -1679,6 +1697,146 @@ const JOIN_COOKIE = (() => {
 
     ensure();
     setInterval(ensure, 900);
+  }
+
+  // ---------------------------------------------------------------- 新反馈提醒（只给服主/管理员）
+
+  /* ★ 2026-11-02 新增。维护者要求：「反馈板有新的消息，要在服主和管理员上线后提示他，
+     或者通过邮件提醒。普通玩家可以不在反馈。」
+     - 邮件那半在服务端（feedback.cjs 的 notifyAdmins，发帖时就发）。
+     - 这里做「上线后提示」：角色是 owner/admin 时轮询 /mm/api/feedback/unread，
+       有未读就在左下角那个反馈板按钮上加一个红点数字，并弹一条可点掉的提示条。
+       普通玩家（role === 'player'）完全不请求这个接口 —— 服务端也会给 403。
+     判据与 installAdminEntry 一致：标题页不显示（那里没有大厅底栏）。 */
+  function installFeedbackNotify() {
+    if (window.__mmFeedbackNotifyInstalled) return;
+    window.__mmFeedbackNotifyInstalled = true;
+
+    const UNREAD = '/mm/api/feedback/unread';
+    const SEEN = '/mm/api/feedback/seen';
+    const POLL_MS = 60_000;          // 一分钟一次，够用且不吵
+    const TOAST_MS = 12_000;         // 提示条自己消失的时间
+    let busy = false;
+    let lastCount = -1;              // 用来避免每次都重弹
+
+    // 与 feedback.js 的 api() 同样处理：Cookie 优先，被拦时退 Bearer
+    const authHeaders = () => {
+      const h = {};
+      try {
+        const sid = localStorage.getItem('mm.sid');
+        if (sid) h.authorization = 'Bearer ' + sid;
+      } catch { /* 隐私模式下 localStorage 会抛 */ }
+      return h;
+    };
+
+    const isAdminRole = () => {
+      const r = (typeof currentRole === 'function' ? currentRole() : '') || '';
+      return r === 'owner' || r === 'admin';
+    };
+
+    const badge = (n) => {
+      const a = document.getElementById('mm-feedback');
+      if (!a) return;
+      let b = document.getElementById('mm-feedback-badge');
+      if (!n) { if (b) b.remove(); return; }
+      if (!b) {
+        b = document.createElement('span');
+        b.id = 'mm-feedback-badge';
+        a.appendChild(b);
+        if (!document.getElementById('mm-feedback-badge-css')) {
+          const st = document.createElement('style');
+          st.id = 'mm-feedback-badge-css';
+          st.textContent = `
+            #mm-feedback{position:relative}
+            #mm-feedback-badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;
+              padding:0 5px;box-sizing:border-box;border-radius:9px;background:#e2483c;color:#fff;
+              font:700 11px/18px system-ui,sans-serif;text-align:center;letter-spacing:0;
+              box-shadow:0 0 0 2px rgba(20,24,22,.9)}
+          `;
+          (document.head || document.documentElement).appendChild(st);
+        }
+      }
+      b.textContent = n > 99 ? '99+' : String(n);
+    };
+
+    const escapeHtml = (s) => String(s == null ? '' : s)
+      .replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    const toast = (data) => {
+      const old = document.getElementById('mm-feedback-toast');
+      if (old) old.remove();
+      const box = document.createElement('div');
+      box.id = 'mm-feedback-toast';
+      const items = (data.latest || []).slice(0, 3)
+        .map((it) => `<li>#${it.id} ${escapeHtml(it.title)}</li>`).join('');
+      box.innerHTML = `<b>反馈板有 ${data.count} 条新消息</b>`
+        + (items ? `<ul>${items}</ul>` : '')
+        + `<a href="/mm/feedback.html" target="_blank" rel="noopener">去查看</a>`
+        + `<button type="button" aria-label="关闭">✕</button>`;
+      if (!document.getElementById('mm-feedback-toast-css')) {
+        const st = document.createElement('style');
+        st.id = 'mm-feedback-toast-css';
+        st.textContent = `
+          #mm-feedback-toast{position:fixed;left:max(18px,env(safe-area-inset-left,0px));
+            bottom:calc(max(18px,env(safe-area-inset-bottom,0px)) + 58px);z-index:2147481901;
+            max-width:min(340px,84vw);padding:12px 14px;box-sizing:border-box;
+            border:1px solid var(--mint-500,#4ed8af);border-radius:0;
+            background:rgba(20,24,22,.97);color:var(--text-hi,#f2f2f2);
+            font:400 13px/1.5 "Noto Sans SC",system-ui,sans-serif;
+            box-shadow:0 6px 24px rgba(0,0,0,.5)}
+          #mm-feedback-toast b{display:block;margin-bottom:6px;font-size:14px;
+            color:var(--mint-400,#59f4ca)}
+          #mm-feedback-toast ul{margin:0 0 8px;padding-left:16px;color:var(--text-md,#c3cbc7)}
+          #mm-feedback-toast li{margin:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+          #mm-feedback-toast a{color:var(--mint-400,#59f4ca);font-weight:700;text-decoration:none}
+          #mm-feedback-toast a:hover{text-decoration:underline}
+          #mm-feedback-toast button{position:absolute;top:4px;right:6px;border:0;background:none;
+            color:var(--text-lo,#8a948f);font:400 15px/1 system-ui;cursor:pointer;padding:2px 4px}
+          #mm-feedback-toast button:hover{color:var(--text-hi,#f2f2f2)}
+          @media (prefers-reduced-motion:reduce){#mm-feedback-toast{transition:none}}
+        `;
+        (document.head || document.documentElement).appendChild(st);
+      }
+      const close = () => box.remove();
+      box.querySelector('button')?.addEventListener('click', close);
+      box.querySelector('a')?.addEventListener('click', close);
+      document.body.appendChild(box);
+      setTimeout(() => { if (document.body.contains(box)) close(); }, TOAST_MS);
+    };
+
+    async function poll() {
+      if (busy) return;
+      if (document.querySelector('.title-screen')) { badge(0); return; }
+      if (!isAdminRole()) { badge(0); lastCount = -1; return; }
+      busy = true;
+      try {
+        const r = await fetch(UNREAD, {
+          credentials: 'same-origin', cache: 'no-store', headers: authHeaders(),
+        });
+        if (!r.ok) return;                       // 403/401 就当没有（普通玩家走这条）
+        const d = await r.json();
+        const n = Number(d && d.count) || 0;
+        badge(n);
+        // 只有「从少变多」才弹，避免每分钟重弹同一条
+        if (n > 0 && n !== lastCount) toast(d);
+        lastCount = n;
+      } catch { /* 网络抖动忽略 */ } finally { busy = false; }
+    }
+
+    // 点「去查看」就算已读：下次上线不再提示这些
+    document.addEventListener('click', (e) => {
+      const a = e.target && e.target.closest && e.target.closest('#mm-feedback, #mm-feedback-toast a');
+      if (!a) return;
+      if (!isAdminRole()) return;
+      try {
+        fetch(SEEN, { method: 'POST', credentials: 'same-origin', cache: 'no-store',
+          headers: { ...authHeaders(), 'content-type': 'application/json' }, body: '{}' });
+      } catch { /* 忽略 */ }
+      badge(0); lastCount = 0;
+    }, true);
+
+    poll();
+    setInterval(poll, POLL_MS);
   }
 
   // ---------------------------------------------------------------- 房间右上角：15 分钟开始倒计时

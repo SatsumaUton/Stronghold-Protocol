@@ -15,6 +15,14 @@ const path = require('node:path');
 const fb = require(path.join(__dirname, '..', 'feedback.cjs'));
 
 const TEST_ACCOUNT = 990001;
+// ★ 2026-11-02：未读用例需要一个**和发帖人不同**的管理员账号。
+//   一开始 admin 也用了 TEST_ACCOUNT，结果 unreadFor 的「排除自己发的」把
+//   发帖人自己也排除了，未读永远是 0 —— 那是测试写错，不是代码错。
+const TEST_ADMIN = 990002;
+// 发帖人也要另用一个：上面「限流」那个用例会故意把 TEST_ACCOUNT 的配额用光
+// （10 分钟 3 条，存在 feedback.cjs 的内存 Map 里，测试没法清），
+// 未读用例再用它发帖就只会拿到 RATE_LIMITED。
+const TEST_POSTER = 990003;
 
 /** 造一个假的 req：JSON 请求体 + 必要头。 */
 function fakeReq(body, { ip = '10.0.0.1', headers = {} } = {}) {
@@ -96,7 +104,11 @@ test('反馈板（数据库）', async (t) => {
   const { db } = require(path.join(__dirname, '..', 'account.cjs'));
   const user = { id: TEST_ACCOUNT, name: '测试博士', role: 'player' };
   const admin = { id: TEST_ACCOUNT, name: '测试服主', role: 'owner' };
-  const cleanup = () => db().query('DELETE FROM feedback_items WHERE account_id = ?', [TEST_ACCOUNT]);
+  // 未读用例专用：管理员必须与发帖人不是同一个账号，否则「排除自己发的」会把
+  // 发帖人也排除掉（见 TEST_ADMIN 的注释）
+  const boss = { id: TEST_ADMIN, name: '测试服主', role: 'owner' };
+  const poster = { id: TEST_POSTER, name: '测试路人', role: 'player' };
+  const cleanup = () => db().query('DELETE FROM feedback_items WHERE account_id IN (?,?,?)', [TEST_ACCOUNT, TEST_ADMIN, TEST_POSTER]);
   await cleanup();
   t.after(cleanup);
 
@@ -195,4 +207,78 @@ test('反馈板（数据库）', async (t) => {
     const limited = results.find((r) => r.error === 'RATE_LIMITED');
     assert.ok(limited.retryAfter > 0);
   });
+
+  // ── 新反馈提醒（2026-11-02）─────────────────────────────────────────────
+  // 维护者要求：新消息在服主/管理员上线后提示；普通玩家不提示。
+  // 这里测的是「未读怎么算」和「已读怎么推进」，邮件那半用 SP_FEEDBACK_NOTIFY 关掉。
+
+  await t.test('未读：服主看得到别人发的，看不到自己发的', async () => {
+    const dbh = db();
+    await dbh.query('DELETE FROM feedback_seen WHERE account_id IN (?,?,?)', [TEST_ACCOUNT, TEST_ADMIN, TEST_POSTER]);
+    // 从 0 开始：此刻库里所有未隐藏的反馈都算未读（除了自己的）
+    const before = await fb.unreadFor(boss);
+    assert.ok(before.count >= 0, JSON.stringify(before));
+    // 把已读推到底，归零
+    await fb.markSeen(boss);
+    const zero = await fb.unreadFor(boss);
+    assert.equal(zero.count, 0, '标记已读后应为 0');
+    assert.deepEqual(zero.latest, []);
+
+    // 普通玩家发一条 → 服主这边应当 +1
+    const made = await fb.createItem(fakeReq({ category: 'bug', title: '测试：新反馈提醒', body: '用来验证未读计数。' }), poster);
+    assert.ok(made.item, JSON.stringify(made));
+    const after = await fb.unreadFor(boss);
+    assert.equal(after.count, 1, JSON.stringify(after));
+    assert.equal(after.latest.length, 1);
+    assert.equal(after.latest[0].id, made.item.id);
+    assert.equal(after.latest[0].title, '测试：新反馈提醒');
+    assert.equal(after.latest[0].author, '测试路人');
+    // 提示条只要摘要，不要正文
+    assert.equal(after.latest[0].body, undefined);
+
+    // 服主自己再发一条 → 不该算进自己的未读
+    // 注意用 boss 而不是 admin：admin 的 id 就是 TEST_ACCOUNT，上面「限流」用例
+    // 已经把它的配额用光了。用 boss 发也正好是这条用例真正要验的语义
+    // ——「自己发的不会提醒自己」。
+    const own = await fb.createItem(fakeReq({ category: 'other', title: '测试：服主自己发的', body: '自己发的不该提醒自己。' }), boss);
+    assert.ok(own.item, JSON.stringify(own));
+    const still = await fb.unreadFor(boss);
+    assert.equal(still.count, 1, '自己发的不该进未读: ' + JSON.stringify(still));
+
+    // 推进已读后归零
+    await fb.markSeen(boss);
+    assert.equal((await fb.unreadFor(boss)).count, 0);
+  });
+
+  await t.test('未读：lastSeenId 只前进不后退', async () => {
+    const dbh = db();
+    await dbh.query('DELETE FROM feedback_seen WHERE account_id IN (?,?,?)', [TEST_ACCOUNT, TEST_ADMIN, TEST_POSTER]);
+    await fb.markSeen(boss);
+    const first = await fb.lastSeenId(TEST_ADMIN);
+    assert.ok(first > 0, 'markSeen 之后应当 > 0');
+    await fb.markSeen(boss);
+    const second = await fb.lastSeenId(TEST_ADMIN);
+    assert.ok(second >= first, 'last_seen_id 不能倒退');
+  });
+
+  await t.test('未读：隐藏的反馈不算未读', async () => {
+    await fb.markSeen(boss);
+    const made = await fb.createItem(fakeReq({ category: 'ui', title: '测试：待隐藏', body: '隐藏后不该出现在未读里。' }), poster);
+    assert.ok(made.item, JSON.stringify(made));
+    assert.equal((await fb.unreadFor(boss)).count, 1);
+    await fb.adminUpdate(made.item.id, fakeReq({ hidden: true }), admin);
+    assert.equal((await fb.unreadFor(boss)).count, 0, '隐藏后应为 0');
+  });
+
+  t.after(() => db().query('DELETE FROM feedback_seen WHERE account_id IN (?,?,?)', [TEST_ACCOUNT, TEST_ADMIN, TEST_POSTER]));
+});
+
+// ★ 2026-11-02：关掉 mysql2 连接池，否则 `node --test` 会一直挂着不退出
+//   （所有用例都跑完了，进程却卡在事件循环里，之前要人工超时强杀）。
+//   放在最后一个 after 里，等上面所有清理查询都跑完再关。
+test.after(async () => {
+  try {
+    const { db } = require(path.join(__dirname, '..', 'account.cjs'));
+    await db().end();
+  } catch { /* 池没建过 / 已经关了，都不用管 */ }
 });

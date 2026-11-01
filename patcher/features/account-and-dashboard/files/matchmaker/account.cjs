@@ -1860,7 +1860,7 @@ async function handle(req, res, pathname) {
   return false;
 }
 
-module.exports = { handle, ensureSchema, currentUser, db, DOMAINS, codeMailHtml, adminGate, setRoomDirProvider };
+module.exports = { handle, ensureSchema, currentUser, db, DOMAINS, codeMailHtml, adminGate, setRoomDirProvider, mail, MAIL };
 
 /** 由 server.js 注入：返回 [{ n, codes, at }]，供后台 /api/admin2/rooms 展示。 */
 let roomDirProvider = null;
