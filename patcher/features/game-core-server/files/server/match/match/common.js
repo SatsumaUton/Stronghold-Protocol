@@ -31,6 +31,26 @@ export const REVIVAL_UNAVAILABLE_REASONS = Object.freeze([
 ]);
 
 /**
+ * 挂机移出（消极游戏）默认判定的回合数：连续这么多回合**没有任何实质操作**就移出。0 = 关闭。
+ * `Match` 的 opts.afkRemoveRounds 覆盖它（server/match/match/platform.js 的 _checkIdle）。
+ */
+export const AFK_REMOVE_ROUNDS = 2;
+
+/**
+ * 算作「有操作」的意图（移植自参考版 common.js）。
+ *
+ * 判据是「有没有**实质**操作」，不是「有没有点过任何东西」：点准备、观战、发表情都不算。
+ * 这 13 条覆盖了备战期能做的事 —— 买/卖/移动/刷新/升级/冻结/装备/销毁/选择/领奖/复活/选盟约/跳过盟约。
+ *
+ * ⚠ 与旧的两条规则的关系：旧规则额外抓「只花钱不部署」和「什么都不做」，这条抓「什么都没干」。
+ *   两者并存（见 intents.js _trackActivity 的说明）。
+ */
+export const AFK_ACTIONS = new Set([
+  'g.buy', 'g.sell', 'g.move', 'g.refresh', 'g.levelUp', 'g.freeze', 'g.equip', 'g.destroy',
+  'g.choice', 'g.reward', 'g.revive', 'g.band', 'g.bandSkip',
+]);
+
+/**
  * Seconds of one turn of the co-op strategy draft (user playtest #4 item 4: the old 12 s per turn — research 06 §724,
  * itself [ASSUMED] — inside the 50 s step was far too little and counted apart from the header's 50 s). [ASSUMED]: the
  * official data only gives the whole BAND_CHECK step (autoChessData.enterStepList: 50 s, hint 15 s); the turn clock is

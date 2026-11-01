@@ -2420,5 +2420,9 @@
   "自动选择": "Automatic",
   "禁用鸭爵策略": "Disable the Duck Lord strategy",
   "允许重复选择策略": "Allow repeated strategies",
-  "鸭爵策略可叠加": "Duck Lord strategies stack"
+  "鸭爵策略可叠加": "Duck Lord strategies stack",
+  "你本回合没有任何操作，下回合备战仍无操作将被移出对局": "You made no move this round; make none next prep and you will be removed from the match",
+  "{name}博士长时间没有操作，已被移出对局": "Doctor {name} made no move for a long time and was removed from the match",
+  "检测到连续 2 回合购买/刷新但未部署干员，你已被移出同盟（消极游戏）": "No operator deployed for 2 rounds in a row (buying/refreshing only) — you were removed from the alliance (inactivity)",
+  "检测到连续 2 回合未购买、未部署干员，你已被移出同盟（消极游戏）": "Nothing bought, nothing deployed for 2 rounds in a row — you were removed from the alliance (inactivity)"
 }
