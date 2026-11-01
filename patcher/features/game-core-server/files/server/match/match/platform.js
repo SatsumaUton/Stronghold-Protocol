@@ -186,6 +186,64 @@ export class MatchPlatform {
     }
   }
 
+  /**
+   * 挂机移出 / 消极游戏（移植自参考版 platform.js 的 _checkIdle，维护者 2026-11-02 要求）。
+   *
+   * 判据与参考版一致：**每回合备战结束时**数一遍，看这个真人在这一回合有没有**实质操作**
+   * （common.js 的 AFK_ACTIONS，13 条：买/卖/移动/刷新/升级/冻结/装备/销毁/选择/领奖/复活/选盟约/跳过盟约）。
+   *
+   * ★ 三条关键口径（这是参考版比原来那两条规则好的地方）：
+   *   1. **掉线不算挂机**（`!ps.connected` 归零）。原来那版没有这个判断 ——
+   *      掉线的人发不了指令，会被当成「连续 2 回合什么都没做」踢掉，
+   *      而他其实只是网断了，回来发现座位没了。这是这次移植要修的主要问题。
+   *   2. **AI 托管中不算挂机**（`ps.botControlled` 归零）：托管是主动交出去的，不是消极。
+   *   3. **移出前一回合先警告**一次（toast + 私有视图），不是突然踢人。
+   *
+   * 单人局不判定（`_humanCount() < 2`）：一个人自己打单机，挂机不伤害别人。
+   * `afkRemoveRounds = 0` 可整体关闭。
+   */
+  _checkIdle() {
+    const limit = this.afkRemoveRounds;
+    if (!(limit > 0) || this.ended || this.disposed) return;
+    // 单人局：连计数都不必维护（开局 2 人、中途退了一个的情况用实时计数，见 _humanCount）
+    if (this._humanCount() < 2) return;
+    const humans = this.order.filter((p) => !p.isBot && !p.left && p.alive);
+    // 第一遍：结算本回合计数（有操作 / 托管 / 掉线 → 归零，否则 +1）
+    for (const ps of humans) {
+      ps.afkRounds = (ps.afkActed || ps.botControlled || !ps.connected) ? 0 : (ps.afkRounds | 0) + 1;
+      ps.afkActed = false;
+    }
+    // 第二遍：警告或移出（移出可能结束整局，所以每步都重新检查状态）
+    for (const ps of humans) {
+      if (this.ended || this.disposed) return;
+      if (ps.left) continue;
+      if (ps.afkRounds >= limit) this._removeIdle(ps);
+      else if (limit > 1 && ps.afkRounds === limit - 1) {
+        try { this.toast(ps, 'warn', '你本回合没有任何操作，下回合备战仍无操作将被移出对局'); } catch { /* ignore */ }
+        this.markPrivate(ps);
+      }
+    }
+  }
+
+  /**
+   * 把一个挂机的真人移出对局（`_checkIdle` 的唯一调用点）。
+   *
+   * 与参考版的一处有意差别：参考版自己发 `m.removed` 给本人、`m.notice {kind:'afkRemoved'}` 给其他人，
+   * 再调 opts.onRemove 让平台摘座位。我们没有那两条消息的客户端实现，
+   * 而 `onIdleKick → lobby.kickIdle → removeMember` 这条路已经在用（提示 + room.closed + 踢出记录），
+   * 所以这里直接复用它，客户端不需要新消息类型。
+   */
+  _removeIdle(ps) {
+    if (!ps || ps.isBot || ps.left) return;
+    if (ps._idleKicked) return;
+    ps._idleKicked = true;
+    try { this.log.info?.(`[match ${this.roomCode}] seat ${ps.seat} removed after ${ps.afkRounds} idle rounds (R${this.round})`); } catch { /* ignore */ }
+    try {
+      this.tickerText(msg('{name}博士长时间没有操作，已被移出对局', { name: ps.name }), FLOW_TICKER_PRIORITY);
+    } catch { /* ignore */ }
+    try { this.onIdleKick?.(ps.playerId, 'idle'); } catch (e) { this.reportError('onIdleKick', e); }
+  }
+
   onLeave(playerId) {
     const ps = this.players.get(playerId);
     if (!ps || ps.isBot || ps.left || this.disposed) return;

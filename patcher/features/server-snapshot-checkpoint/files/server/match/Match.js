@@ -213,7 +213,8 @@
 
 import { PHASE, ERR, modeIdFor } from '../../shared/constants.js';
 import { msg } from '../../shared/i18n.js';
-import { REVIVAL_COST, REVIVAL_MIN_DONOR_LP, REVIVAL_WINDOW_SECONDS, REVIVAL_UNAVAILABLE_REASONS } from './match/common.js';
+import { REVIVAL_COST, REVIVAL_MIN_DONOR_LP, REVIVAL_WINDOW_SECONDS, REVIVAL_UNAVAILABLE_REASONS,
+  AFK_REMOVE_ROUNDS } from './match/common.js';
 import { isContentHash } from '../../shared/plugins/identity.js';
 import { DEFAULT_VERSION, versionById } from '../../shared/versions.js';
 import { Battle } from '../sim/Battle.js';
@@ -363,6 +364,16 @@ export class Match {
     this._revival = null;
     /** 「AI 队友最后选择」 (opts.aiPicksLast, GitHub #338): humans draft before AI seats (MatchPhases.humansFirst) */
     this.aiPicksLast = !this.isSolo && opts.aiPicksLast === true;
+    /**
+     * 挂机移出（消极游戏，opts.afkRemoveRounds；默认 common.js 的 AFK_REMOVE_ROUNDS = 2，0 = 关闭）：
+     * 连续这么多回合没有任何实质操作（AFK_ACTIONS）就移出该真人座位。
+     *
+     * 只在**开局时至少 2 个真人**的对局里生效 —— 一个人自己打单机，挂机不伤害别人，不该踢他
+     * （维护者 2026-10-31 的要求，与 intents.js 的两条旧规则同一口径）。
+     * 判定在每回合备战结束时（prep.js endPrep → platform.js _checkIdle）。
+     */
+    this.afkRemoveRounds = Number.isInteger(opts.afkRemoveRounds) && opts.afkRemoveRounds >= 0
+      ? Math.min(opts.afkRemoveRounds, 100) : AFK_REMOVE_ROUNDS;
     this.ownsScheduler = !opts.scheduler;
     this.sched = opts.scheduler || new RealScheduler({ now: opts.now || Date.now, onError: (e) => this.reportError('timer', e) });
     this.registry = opts.registry || getDefaultRegistry();

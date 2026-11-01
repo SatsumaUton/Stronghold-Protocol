@@ -164,7 +164,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 54969
+        "customBytes": 55713
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -174,7 +174,7 @@
       {
         "path": "server/match/PlayerState.js",
         "baseExists": true,
-        "customBytes": 21749
+        "customBytes": 22365
       },
       {
         "path": "server/match/pool.js",
@@ -1175,7 +1175,7 @@
       {
         "path": "server/match/match/common.js",
         "baseExists": true,
-        "customBytes": 2007
+        "customBytes": 3057
       },
       {
         "path": "server/match/match/infra.js",
@@ -1185,7 +1185,7 @@
       {
         "path": "server/match/match/intents.js",
         "baseExists": true,
-        "customBytes": 13065
+        "customBytes": 13902
       },
       {
         "path": "server/match/match/messaging.js",
@@ -1210,12 +1210,12 @@
       {
         "path": "server/match/match/platform.js",
         "baseExists": true,
-        "customBytes": 13438
+        "customBytes": 16827
       },
       {
         "path": "server/match/match/prep.js",
         "baseExists": true,
-        "customBytes": 9805
+        "customBytes": 10192
       },
       {
         "path": "server/match/match/rehearsal.js",
@@ -1270,7 +1270,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 54969
+        "customBytes": 55713
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -1335,7 +1335,7 @@
       {
         "path": "server/match/PlayerState.js",
         "baseExists": true,
-        "customBytes": 21749
+        "customBytes": 22365
       },
       {
         "path": "server/match/pool.js",
@@ -1707,7 +1707,7 @@
       {
         "path": "server/match/match/common.js",
         "baseExists": true,
-        "customBytes": 2007
+        "customBytes": 3057
       },
       {
         "path": "server/match/match/infra.js",
@@ -1717,7 +1717,7 @@
       {
         "path": "server/match/match/intents.js",
         "baseExists": true,
-        "customBytes": 13065
+        "customBytes": 13902
       },
       {
         "path": "server/match/match/messaging.js",
@@ -1742,12 +1742,12 @@
       {
         "path": "server/match/match/platform.js",
         "baseExists": true,
-        "customBytes": 13438
+        "customBytes": 16827
       },
       {
         "path": "server/match/match/prep.js",
         "baseExists": true,
-        "customBytes": 9805
+        "customBytes": 10192
       },
       {
         "path": "server/match/match/rehearsal.js",
@@ -1802,7 +1802,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 54969
+        "customBytes": 55713
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -1867,7 +1867,7 @@
       {
         "path": "server/match/PlayerState.js",
         "baseExists": true,
-        "customBytes": 21749
+        "customBytes": 22365
       },
       {
         "path": "server/match/pool.js",
@@ -4400,22 +4400,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 180322
+        "customBytes": 181073
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 210031
+        "customBytes": 210849
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 201244
+        "customBytes": 202089
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 172146
+        "customBytes": 172834
       },
       {
         "path": "public/manifest.json",

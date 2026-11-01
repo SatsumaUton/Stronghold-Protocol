@@ -155,6 +155,14 @@ export class PlayerState {
     this.left = false;
     this.autoplay = false;
     this.alive = true;
+    // 挂机移出（消极游戏，server/match/match/platform.js 的 _checkIdle）：
+    //   afkActed  —— 自上次判定以来有没有**实质**操作（common.js AFK_ACTIONS 里任一条）。
+    //                每次判定后清回 false。
+    //   afkRounds —— 连续多少回合没有实质操作；掉线 / AI 托管 / 有操作都归零。
+    // 两个字段必须跟着存档走（snapshot.js 的 PLAYER_FIELDS.saved 已列出）——
+    // 否则断点续玩回来，挂机计数被清零，挂机的人可以靠重启洗掉记录。
+    this.afkActed = false;
+    this.afkRounds = 0;
     this.lp = 0;
     this.bandId = null;
     this.funds = 0;
