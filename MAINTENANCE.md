@@ -5707,7 +5707,34 @@ git fetch $url refs/heads/custom/production:refs/remotes/origin/custom/productio
 
 **另：本机直连 `github.com` 不可用**。2026-11-02 02:03 实测
 `ls-remote https://github.com/...` → `Failed to connect to github.com:443 after 21103 ms`。
-所以「改直连」这条在本机**走不通**，只能走代理 + 上面清 ref 的办法。
+`api.github.com` 同样不通。所以「改直连」这条在本机**走不通**，只能走代理。
+
+##### ★ 真正管用的解法：**URL 去掉 `.git` 后缀**（2026-11-02 02:12 实测）
+
+上面「删跟踪 ref」只成功过一次，第二次就失效了。稳定的复现规律是：
+
+**报错的 `expected` 值，永远恰好是远端真实值的父提交**（真实 `8a731f14` → 期望 `b8728e11`；
+之前真实 `b8728e11` → 期望 `67fbde34`）。换 `--force`、`--force-with-lease`、
+`http.version=HTTP/1.1`、删远端分支，**全部报同一个错**（连 `git push :refs/heads/xxx` 删除都被挡住）。
+
+判定：`ghfast.top` 按 **URL 字符串**做缓存，`.git` 后缀那条路径的 ref 状态卡在旧版本。
+
+**解法：推送时把 URL 末尾的 `.git` 去掉，缓存键就换了**：
+
+```powershell
+# 卡住的写法（缓存键命中旧状态）
+$u = "https://x-access-token:$tok@ghfast.top/https://github.com/SatsumaUton/Stronghold-Protocol.git"
+
+# 换成不带 .git —— 立刻成功
+$u = "https://x-access-token:$tok@ghfast.top/https://github.com/SatsumaUton/Stronghold-Protocol"
+git push $u refs/heads/custom/production:refs/heads/custom/production
+```
+
+实测：带 `.git` 连拒 8 次（含 `--force`），去掉 `.git` **一次成功**（`8a731f14..bea2b0c0`）。
+同一 URL 变体也能正常删分支（`- [deleted] tmp-verify-...`）。
+
+**交叉验证手段**：把同一个 commit 推到**新分支名**。若新分支名能推成功，
+说明代码和提交都没问题，纯粹是该 ref 名的缓存卡住 —— 这时换 URL 变体，不要去改代码或强推历史。
 
 #### 本地备份文件不入库
 
