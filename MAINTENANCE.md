@@ -5916,6 +5916,50 @@ OBSERVE ONLY (no restart): would restart 6/12 -> node-1,node-4,... [all candidat
 
 比「把 6 改成 0」安全：日志会明确写出 observe 状态，不会静默失效。
 
+#### 两个开关的区别（**别搞混**）
+
+| 标记文件 | 行为 | 日志 | 什么时候用 |
+|---|---|---|---|
+| `data\rolling-restart-observe` | **只判定不重启** | 每轮写 `OBSERVE ONLY …` | 刚改过判据，想先核对一轮「它会重启谁」 |
+| `data\rolling-restart-disabled` | **直接 exit 0，什么都不做** | **不写任何日志** | 维护者要求「先不重启，只改代码」时 |
+
+```powershell
+# 暂停（立即生效，下一次计划任务触发就跳过）
+Set-Content -Path 'D:\Stronghold-Protocol\data\rolling-restart-disabled' -Value 'paused' -Encoding UTF8
+
+# 恢复
+Remove-Item 'D:\Stronghold-Protocol\data\rolling-restart-disabled'
+```
+
+**验证暂停是否真的生效**（不要只看文件在不在）：
+
+```powershell
+$before = Get-Content 'D:\Stronghold-Protocol\logs\rolling-restart.log' -Tail 1
+& powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File 'D:\Stronghold-Protocol\deploy\rolling-restart.ps1'
+$after  = Get-Content 'D:\Stronghold-Protocol\logs\rolling-restart.log' -Tail 1
+$before -eq $after      # True = 脚本什么都没做（连日志都没写）
+```
+
+> ⚠ **`disabled` 是「静默」的**：它不写日志。所以排查「为什么节点一直不更新」时，
+> **第一件事就是看这个文件在不在** —— 否则会以为是判据坏了。
+
+#### ★ 一个容易踩的连带效应：**分发文件会触发一波重启**（2026-11-02 实测）
+
+`deploy\_sync-nodes.cjs --apply` 会把 `public/js`、`public/css`、`shared`、`data`
+也复制过去，而这几棵树**都在 build 指纹里**（`BUILD_INPUTS`）。于是：
+
+```
+分发 87 个文件 → 磁盘 build 变成 e8bb5edb498d
+             → rolling-restart 的基准（取磁盘实算）跟着变成 e8bb5edb498d
+             → 所有还在跑旧 build 的空闲节点被判 stale → 开始一波 6 个/10 分钟的重启
+```
+
+**所以「只分发不重启」这个说法只对了一半**：文件确实只是躺在磁盘上，
+但**滚动重启任务会自己去把它们重启**。真要「只改代码」，必须同时写 `disabled` 标记。
+
+反过来，想**让新代码上线**时，正确的做法就是「分发 + 什么都不做」——
+等它自己按空闲窗口铺开，不用手动重启任何节点。
+
 #### 实测收敛过程（2026-11-02）
 
 | 时刻 | 动作 | 新代码节点数 |
@@ -5928,6 +5972,29 @@ OBSERVE ONLY (no restart): would restart 6/12 -> node-1,node-4,... [all candidat
 
 **关键验证**：01:42 重启的 6/8/9/11/12 在 01:52 轮**全部未被再判**（uptime 655s 未变）
 —— 修复前它们会每轮被反复重启。
+
+#### ★ 2026-11-02 05:5x 现场：**已暂停在 6/30**（交接必读）
+
+维护者这轮要求「先不重启，只改代码」，但分发 87 个文件后滚动重启自己开始铺新 build。
+**发现后立即暂停，当前现场如下：**
+
+| build | 节点 | 说明 |
+|---|---|---|
+| `e8bb5edb498d` | 2,4,5,9,10,11（6 个） | **最新**（含本轮新功能：战场小地图、反馈板改动） |
+| `ad04693cc403` | 3,6,7,18…30（16 个） | 旧 |
+| `6e1eb8e6c1bf` | 12,13,14,15,16,17（6 个） | 旧 |
+| `5567df934f29` | 8 | 旧 |
+| `53af5aea539a` | 1 | 旧 |
+
+已做：写入 `data\rolling-restart-disabled` 并**实测验证**脚本不再动作（日志最后一行未变）。
+
+**恢复办法**（维护者确认窗口后）：删掉 `data\rolling-restart-disabled`，
+剩下的 24 个节点会按「每 10 分钟 6 个、只挑空闲」自己铺完，约 4 轮 / 40 分钟。
+**不需要手动重启任何节点**；有对局的 4 个节点（当时是 1/3/7/8）会被自动跳过，等空闲再切。
+
+**当时的安全性证据**：30 个节点 `error.log` 全部 0 字节无近期写入；
+10 个在线连接（node-1=2、node-3=3、node-6=1、node-7=2、node-8=2）未受影响；
+4 个有对局的节点全部被正确跳过。
 
 #### 排查纪律
 
