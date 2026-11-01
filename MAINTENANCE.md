@@ -892,6 +892,121 @@ node repo-sync\deploy\sync-nodes.cjs          # 复检，必须「0 处差异」
 2. 当场结算 →「同盟战报」（`screens/settle.js` `TeamPage`，横向滚动，自动定位到自己那张）
 3. 统计 → 对局记录 → 点一行回看（`recordToResult` → `ResultView`）
 
+### 9.11b 5–20 人房：选人是「同时」还是「轮流」——移植/改造前必读
+
+> 维护者 2026-11-02：「移植参考版任何跟扩容房有关的逻辑时都要先想清楚它假设的是哪一种。」
+> 本节就是那句话的展开版。**动 5–20 人房相关代码之前，先读完这一节。**
+
+#### 两种模式，由 `Match.concurrentDraft()` 决定
+
+```js
+// node-1/server/match/Match.js
+concurrentDraft() { return !!this.capacityExperiment && !this.isSolo && this.allowRepeat; }
+```
+
+| 返回值 | 选人流程 | 界面上有「跳过」按钮吗 |
+|---|---|---|
+| `true`（同时） | 所有座位**同一批**各选一个，倒计时同时走 | 没有 |
+| `false`（轮流） | 按座位顺序**一个人选完下一个**，继承「跳过」流程 | 有 |
+
+#### 本服与参考版的唯一分歧
+
+- **参考版**：`return !!this.capacityExperiment && !this.isSolo;` —— 只要房间扩容了就同时选。
+- **本服**：多一个 `&& this.allowRepeat` —— 扩容 **并且** 勾了「允许重复选择策略」才同时选；
+  否则仍是轮流选。这是维护者 2026-10-31 的决定，**不要为了迁就参考版的测试或代码把它删掉**。
+
+后果：同样一个 8 人房，参考版是「8 个人同时各选一个」，本服默认是「排队轮流选」。
+**两边对同一个房间的默认行为不一样。**
+
+#### 移植时的检查清单
+
+从参考版搬任何碰 5–20 人房的代码（选秀界面、备战倒计时、卡池编组、AI 策略、预约盟约、
+地图预览……），落地前逐条确认：
+
+1. **那段代码假设的是同时选还是轮流选？**
+   凡是「一次算完所有人的倒计时 / 一次性分配所有座位的选择 / 假设 `picks.length === seats`」
+   的写法，都是**同时选**的假设。本服轮流选时它会算错（倒计时按全员算完、进度条跳变、
+   `picks` 长度对不上）。
+2. **有没有依赖「跳过」按钮的存在或不存在？**
+   轮流选有「跳过」，同时选没有。参考版里找不到跳过流程，不要因此判定本服的跳过是死代码。
+3. **人数上限从哪读？** 一律走 `shared/playerCapacity.js`，不要写死 4/6/20。
+4. **测试怎么改？** 参考版的扩容房测试大概率只传 `{ capacity: 20 }`。本服要连同
+   `allowRepeat: true` 一起传，否则房间停在轮流选、测试驱动条件永远不满足
+   （`test/match/snapshot.test.js` 的 `twenty` 配置就是这么改的，改之前那个测试要跑 50 秒才超时失败）。
+5. **房人数不等于座位数。** `MAX_SEATS = 4` 是常规上限，`MAX_SEATS_HARD = 20` 是硬上限；
+   扩容房走的是实验开关，不是改常量。
+
+#### 相关代码位置
+
+| 文件 | 作用 |
+|---|---|
+| `server/match/Match.js` `concurrentDraft()` | 唯一的模式判定，改这里等于改全服行为 |
+| `server/match/match/spDraft.js` | 选人（SP）阶段的推进，两种模式都在这里分支 |
+| `shared/experimental.js` | 实验项校验（形如 `{ revivalEnabled, disableSharedPool, playerCapacity }`，传错会抛 `invalid experimental options`） |
+| `test/match/snapshot.test.js` `twenty` | 扩容房测试的配置样板 |
+
+### 9.11c 「无在线玩家的房间」怎么回收（2026-11-02 改造，维护前必读）
+
+**结论先说：房间的寿命由「玩家还能不能回来」决定，不再由另一套独立 TTL 猜。**
+
+#### 机制一（主）：`refreshMatchWindows` —— 参考版移植，事件驱动
+
+代码：`server/lobby.js` `refreshMatchWindows(room)`，字段 `Session.matchHeld`（`server/net.js`）。
+
+| 情形 | 行为 |
+|---|---|
+| 对局进行中，**还有真人在线** | 每个掉线的人的 `resumeWindowMs` 拉到 solo 那档（24h，实际没有对局撑得到），并打 `matchHeld=true`。座位由 AI 代打，人回来交还。 |
+| 对局进行中，**全员掉线** | 窗口退回普通重连窗口（10 min），从**此刻**重新起算，`matchHeld=false`。只重算一次，之后的调用不再往后推。 |
+| 窗口到期 | registry 清掉 session → `onExpire` → 座位释放、对局以 `'abandoned'` 结束。 |
+| solo 对局 | 完全不动（solo 有自己的 24h 规则）。 |
+| 没有对局的房间 | 不动（等人中的房间走 `lobbyGraceMs` 60s + 零真人即解散）。 |
+
+调用点只有 3 处（都是参考版的同一批位置）：
+`onDisconnect`（`if (room.match)` 分支内）、`onHello` 重连（`changed && room.match && seatOf`）、
+`removeMember`（`migrateHost` 之前）。
+
+> **为什么它比 TTL 好**：① 事件驱动，没有 20 秒轮询的延迟；② 与重连窗口**同源**，
+> 不会出现两套计时器互相打架；③ 没有任何全局开关能让它静默失效；
+> ④ 与「掉线由 AI 接管」天然配套 —— 有人在线时对局继续打，而不是把整局扔掉。
+
+#### 机制二（兜底）：`sweepOldRooms`
+
+每 20 秒扫一次。对**对局中**的房间，2026-11-02 之后只兜一种情况：
+
+- 没有真人在线 **且** registry 里**一个 session 都没有**（= 重启后从存档恢复的房间，
+  registry 是内存的，没人能走完重连窗口）；
+- 有 session 在走重连窗口 → **交给机制一，这里不抢**；
+- 有真人在线 → 绝不碰。
+
+**★ 这条兜底不受 `shared/data/room-ttl.json` 的 `enabled` 影响。**
+以前是 `if (forever || ttlOff) continue;`，把对局房的回收一起关掉了，
+而线上开关当前就是 `enabled:false` —— 于是「全员掉线的对局」永远不回收
+（node-19 的 DTTW 卡 5.5 小时就是这么来的）。开关的语义只是
+「不因超时解散**等人中**的房间」，不该管僵尸对局。
+
+**踩过的坑**：时间戳兜底不能写 `Number(room.createdAt) || now` ——
+那样 `now - since` 恒为 0，`now - since < ttl` 永远成立，房间永不回收。
+时间戳全缺失时按 0 处理（= 很老，直接回收）。
+
+#### 相关代码
+
+| 文件 | 作用 |
+|---|---|
+| `server/lobby.js` `refreshMatchWindows()` | 机制一，改这里等于改全服的掉线宽限策略 |
+| `server/net.js` `Session.matchHeld` | 「被对局持有」标记；只有它为 `true` 时退回窗口才会重算 |
+| `server/net.js` `resumeWindowMs` / `windowOf()` | 重连窗口**只能延长不能缩短**（`own > reconnectWindowMs ? own : reconnectWindowMs`）—— 机制一靠「改起点」而不是「缩短窗口」 |
+| `server/lobby.js` `sweepOldRooms()` | 机制二兜底 |
+| `server/lobby.js` `roomTtlEnabled()` / `roomTtlMs()` | 读 `shared/data/room-ttl.json`（缓存 5s），**只影响等人中的房间** |
+| `test/lobby-room-window.test.js` | 8 个用例覆盖两条机制；改完必须绿 |
+
+#### 排查「房间不消失」的顺序
+
+1. `curl /healthz?traffic=1` 看 `rooms` / `matches` —— 有 `matches` 就说明对局还挂着。
+2. 看日志有没有 `回收僵尸房间` / `expired`。
+3. 房间还有人连着就是**不该回收**（红线：不能因为计时器解散正在对局）。
+4. 人全掉线但一直不消失 → 查 `refreshMatchWindows` 有没有被调用（3 个调用点在不在），
+   以及该房间的 session 是否还在 registry（重启过就会没有，那时走机制二）。
+
 ### 9.2 不能提交的内容
 
 | 禁止 | 原因 |
