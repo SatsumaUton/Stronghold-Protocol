@@ -214,12 +214,14 @@
 
 <section class="ngx" id="ttl-bar" data-group="settings">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span class="dot"></span><b>同盟解散时间</b>
+      <span class="dot"></span><b>房间自动解散</b>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input id="ttl-enabled" type="checkbox" checked /> 到点自动解散</label>
       <input id="ttl-min" type="number" min="1" max="1440" step="1" style="width:90px;background:#0d1417;border:1px solid #27393b;color:#cfe;border-radius:8px;padding:6px 10px" />
-      <span class="muted" style="font-size:12px">分钟（1~1440；房间无新玩家加入时到期自动解散，保存后立即生效）</span>
+      <span class="muted" style="font-size:12px">分钟（1~1440；到期自动解散同盟 / 独立模拟的等待室，保存后立即生效）</span>
       <button id="ttl-save">保存</button>
       <span id="ttl-msg" class="muted" style="font-size:12px"></span>
     </div>
+    <div class="muted" style="font-size:12px;margin-top:6px">关闭「到点自动解散」后：房间不会因超时被解散，等待室也不显示倒计时；房间只在你手动解散时才消失。</div>
   </section>
 
 <section class="ngx" id="gate-bar" data-group="settings">
@@ -246,6 +248,24 @@
       </div>
       <textarea id="ann-text" rows="5" spellcheck="false" placeholder="例如：&#10;今晚 22:00 维护，预计 10 分钟&#10;新公告已发布，点右上角「公告」查看"
         style="width:100%;min-height:110px;background:#0d1417;border:1px solid #27393b;color:#cfe;border-radius:8px;padding:10px;font-size:13px;line-height:1.7;resize:vertical"></textarea>
+      <!-- 2026-11-02 临时公告的三项行为：自动消失、重要、到期时间 -->
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:12px;color:#9fb4b8">
+        <label style="display:flex;align-items:center;gap:6px" title="重要公告不会自己消失，也不给玩家「今日不再提醒」">
+          <input type="checkbox" id="ann-important" /> 重要公告（不自动消失、不可关掉当天提醒）
+        </label>
+        <label style="display:flex;align-items:center;gap:6px" title="0 = 不自动消失，玩家自己点 × 关掉">
+          <span>自动消失</span>
+          <input type="number" id="ann-autohide" min="0" max="600" step="1" value="15"
+            style="width:70px;background:#0d1417;border:1px solid #27393b;color:#cfe;border-radius:6px;padding:4px 6px" />
+          <span>秒后</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px" title="到这个时间以后整条不再显示；留空表示一直有效">
+          <span>到期时间</span>
+          <input type="datetime-local" id="ann-expires"
+            style="background:#0d1417;border:1px solid #27393b;color:#cfe;border-radius:6px;padding:4px 6px" />
+          <button type="button" id="ann-expires-clear" class="ghost" style="font-size:12px;padding:2px 8px">清除</button>
+        </label>
+      </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <button id="ann-save">保存并发布</button>
         <button id="ann-clear" class="danger">清空</button>

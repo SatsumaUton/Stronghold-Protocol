@@ -588,19 +588,50 @@ function annStats() {
   return lines;
 }
 
+/** ISO → <input type="datetime-local"> 需要的本地时间串（YYYY-MM-DDTHH:mm）。 */
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+/** <input type="datetime-local"> 的值 → ISO；留空返回 null（不过期）。 */
+function fromLocalInput(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isFinite(d.getTime()) ? d.toISOString() : null;
+}
+/** 三项行为设置，保存时统一带上。 */
+function annBehaviour() {
+  const important = !!$('ann-important')?.checked;
+  const raw = Number($('ann-autohide')?.value);
+  const autoHideSec = Number.isFinite(raw) ? Math.max(0, Math.min(600, Math.round(raw))) : 15;
+  const expiresAt = fromLocalInput($('ann-expires')?.value || '');
+  return { important, autoHideSec, expiresAt };
+}
+
 async function loadAnnouncement() {
   try {
     const j = await (await fetch('/api/announcement')).json();
     if (!annFilled) { $('ann-text').value = j.text || ''; annFilled = true; annStats(); }
     $('ann-on').checked = !!j.enabled;
+    // 三项行为每次都以服务端为准（它们和正文不同，改了就应该立刻反映）
+    const imp = $('ann-important'); if (imp) imp.checked = j.important === true;
+    const ah = $('ann-autohide'); if (ah) ah.value = String(Number.isFinite(Number(j.autoHideSec)) ? Number(j.autoHideSec) : 15);
+    const ex = $('ann-expires'); if (ex) ex.value = toLocalInput(j.expiresAt);
     const up = $('ann-updated');
-    if (up) up.textContent = j.updatedAt ? ('上次更新 ' + new Date(j.updatedAt).toLocaleString('zh-CN')) : '尚未发布';
+    if (up) {
+      let s = j.updatedAt ? ('上次更新 ' + new Date(j.updatedAt).toLocaleString('zh-CN')) : '尚未发布';
+      if (j.expiresAt) s += ' · 到期 ' + new Date(j.expiresAt).toLocaleString('zh-CN');
+      up.textContent = s;
+    }
   } catch { /* ignore */ }
 }
 async function saveAnnouncement(enabled, text) {
   const j = await (await fetch('/api/announcement', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ enabled, text }),
+    body: JSON.stringify({ enabled, text, ...annBehaviour() }),
   })).json();
   toast(j.ok ? '公告已保存' : '保存失败', j.ok ? 2000 : 4000);
   annFilled = true;
@@ -641,6 +672,21 @@ $('ann-clear').onclick = () => {
   $('ann-on').checked = false;
   saveAnnouncement(false, '');
 };
+// 到期时间「清除」：留空就是不过期
+const annExpClear = $('ann-expires-clear');
+if (annExpClear) annExpClear.onclick = () => { const ex = $('ann-expires'); if (ex) ex.value = ''; };
+// 勾了「重要公告」就不再自动消失 —— 把秒数输入框禁用，避免两个设置互相矛盾
+const annImp = $('ann-important');
+if (annImp) {
+  const sync = () => {
+    const ah = $('ann-autohide');
+    if (!ah) return;
+    ah.disabled = !!annImp.checked;
+    ah.title = annImp.checked ? '重要公告不自动消失' : '0 = 不自动消失，玩家自己点 × 关掉';
+  };
+  annImp.addEventListener('change', sync);
+  sync();
+}
 annStats();
 setTimeout(loadAnnouncement, 800);
 
@@ -882,24 +928,35 @@ async function loadRoomTtl() {
     const d = await res.json();
     const el = document.getElementById('ttl-min');
     if (el) el.value = d.minutes || 15;
+    const en = document.getElementById('ttl-enabled');
+    if (en) en.checked = d.enabled !== false;
+    syncTtlDisabled(d.enabled !== false);
   } catch { /* ignore */ }
+}
+/** 关掉自动解散时把分钟数灰掉 —— 它已经不起作用了。 */
+function syncTtlDisabled(on) {
+  const el = document.getElementById('ttl-min');
+  if (el) { el.disabled = !on; el.style.opacity = on ? '1' : '.45'; }
 }
 function bindRoomTtl() {
   const btn = document.getElementById('ttl-save');
+  const en = document.getElementById('ttl-enabled');
+  if (en) en.onchange = () => syncTtlDisabled(en.checked);
   if (!btn) return;
   btn.onclick = async () => {
     const msg = document.getElementById('ttl-msg');
     const m = Number(document.getElementById('ttl-min').value);
     if (!Number.isFinite(m) || m < 1 || m > 1440) { if (msg) msg.textContent = '请输入 1~1440'; return; }
+    const enabled = !en || en.checked;
     const r = await fetch('/api/room-ttl', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ minutes: m }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled, minutes: m }),
     });
     const d = await r.json().catch(() => ({}));
     if (msg) {
-      msg.textContent = d.ok ? ('已保存：' + d.minutes + ' 分钟') : ('失败：' + (d.error || '未知'));
+      msg.textContent = d.ok ? ('已保存：' + (d.enabled === false ? '不自动解散' : d.minutes + ' 分钟')) : ('失败：' + (d.error || '未知'));
       msg.style.color = d.ok ? '#7ff0cf' : '#ffb4a8';
     }
-    if (d.ok) toast('同盟解散时间已更新', 2000);
+    if (d.ok) { syncTtlDisabled(d.enabled !== false); toast('房间自动解散设置已更新', 2000); }
   };
 }
 loadRoomTtl();
