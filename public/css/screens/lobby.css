@@ -1330,7 +1330,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   max-height: min(52vh, calc(4.2 * var(--sp-ui, 1))); overflow-y: auto; overscroll-behavior: contain; }
 /* 一行一个同盟：左缘是难度色，底色跟大厅其它深色面板一样（半透明白 + 极淡描边），
    座位数用薄荷绿点出来 —— 一眼扫过去最先看到「还差几个人」。 */
-.rlist__row { display: grid; grid-template-columns: minmax(.84rem, auto) minmax(0, 1fr) auto auto auto;
+.rlist__row { display: grid; grid-template-columns: minmax(.84rem, auto) minmax(0, 1fr) auto auto;
   align-items: center; gap: .12rem; padding: .08rem .1rem;
   background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1);
   border-left: 3px solid var(--d-color, #8d9391); border-radius: .04rem; }
