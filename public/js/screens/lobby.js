@@ -808,15 +808,25 @@ function MatchRules() {
  * 所以这一屏通常只闪一下 —— 但网络慢或服务端在筛选时它是玩家看到的第一个反馈，
  * 所以照参考版把它做完整：搜寻中、已等秒数、这次的范围、取消。
  */
-function MatchQueue({ difficulty, scope, elapsed, online, onCancel }) {
+function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null }) {
   const info = difficultyInfo('coop', difficulty);
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const ss = String(elapsed % 60).padStart(2, '0');
+  // 排队信息（服务端 room.quickState 的答复）：还有几个人在等这个池、我排第几、还差几人。
+  const waiting = Number(queue?.waiting) || 0;
+  const need = Number(queue?.need) || 0;
+  const position = Number(queue?.position) || 0;
   return html`<div class="proto-side proto-side--search">
     <div class="mm-queue" data-testid="match-queue">
       <div class="mm-queue__radar" aria-hidden="true"><span></span><span></span><span></span></div>
       <b class="mm-queue__title">${t('搜寻中')}</b>
       <span class="mm-queue__clock num" data-testid="match-queue-clock">${mm}:${ss}</span>
+      ${waiting > 1 || need > 0 ? html`<p class="mm-queue__wait" data-testid="match-queue-wait">
+        <span>${t('队列 {n} 人', { n: waiting })}</span>
+        <span class="rs-matchwait__sep" aria-hidden="true">·</span>
+        <span>${need > 0 ? t('还差 {n} 人', { n: need }) : t('即将成形')}</span>
+        ${position > 0 ? html`<span class="rs-matchwait__sep" aria-hidden="true">·</span><span>${t('你排第 {n} 位', { n: position })}</span>` : null}
+      </p>` : null}
       <p class="mm-queue__line">
         <span class="mm-queue__diff">${t(DIFFICULTY_NAMES[difficulty])}</span>
         <span class="mm-queue__code num">${info.code}</span>
@@ -826,7 +836,7 @@ function MatchQueue({ difficulty, scope, elapsed, online, onCancel }) {
         ${scope.rules.map((r) => html`<span key=${r} class="mm-queue__chip">${r === 'standard' ? t('标准规则') : t('实验性规则')}</span>`)}
       </p>
       <p class="mm-queue__hint">
-        ${!online ? html`<${Spinner} size="sm" /> ${t('正在连接服务器…')}` : t('人满或等待超时后自动开局。')}
+        ${!online ? html`<${Spinner} size="sm" /> ${t('正在连接服务器…')}` : t('凑齐人数或等待超时后自动开局，成局后直接进入对局。')}
       </p>
       <button type="button" class="mm-queue__cancel" data-testid="match-cancel" onClick=${onCancel}>${t('取消匹配')}</button>
     </div>
@@ -856,16 +866,17 @@ function MatchQueue({ difficulty, scope, elapsed, online, onCancel }) {
  */
 export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, busy, online, createLocked = false,
   difficulties = DIFFICULTIES, scope = MATCH_SCOPE_DEFAULT, onScope = () => {},
-  searching = false, elapsed = 0, onCancel = () => {} }) {
+  searching = false, elapsed = 0, onCancel = () => {}, queue = null }) {
   const info = difficultyInfo('coop', difficulty);
   const working = busy === 'quick';
   // 已经按过「开始多人匹配」：照参考版把右列换成搜寻中（proto--searching），
   // 标题「同盟集结 / PUBLIC MATCHMAKING」不变，左边还是所选难度的画面。
   if (searching) {
     return html`<${Modal} open=${true} onClose=${onClose} class="proto proto--match proto--searching" veilClass="proto-veil">
-      <div class="proto__body" style=${`--d-color:${DIFFICULTY_COLORS[difficulty]}`} data-difficulty=${difficulty} data-mode="match">
+      <div class="proto__body" style=${`--d-color:${DIFFICULTY_COLORS[difficulty]}`} data-difficulty=${difficulty} data-mode="match" data-fit="full">
         <div class="proto__bg" aria-hidden="true"></div>
-        <${ProtoFit} />
+
+
         <header class="proto-top">
           <${BackPlate} onClick=${onClose} class="proto__back" />
           <div class="proto-title">
@@ -882,15 +893,16 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
               <p>${info.desc}</p>
             </div>
           </section>
-          <${MatchQueue} difficulty=${difficulty} scope=${scope} elapsed=${elapsed} online=${online} onCancel=${onCancel} />
+          <${MatchQueue} difficulty=${difficulty} scope=${scope} elapsed=${elapsed} online=${online} onCancel=${onCancel} queue=${queue} />
         </div>
       </div>
     <//>`;
   }
   return html`<${Modal} open=${true} onClose=${onClose} class="proto proto--match" veilClass="proto-veil">
-    <div class="proto__body" style=${`--d-color:${DIFFICULTY_COLORS[difficulty]}`} data-difficulty=${difficulty} data-mode="match">
+    <div class="proto__body" style=${`--d-color:${DIFFICULTY_COLORS[difficulty]}`} data-difficulty=${difficulty} data-mode="match" data-fit="full">
       <div class="proto__bg" aria-hidden="true"></div>
-      <${ProtoFit} />
+
+
       <header class="proto-top">
         <${BackPlate} onClick=${onClose} class="proto__back" />
         <div class="proto-title">
@@ -1205,11 +1217,15 @@ export function LobbyScreen() {
       try {
         // 服务端 net.js 把 reply 的字段平铺在 ok 帧顶层（{ ...res.reply, t:'ok', rid }），没有套一层 reply。
         const reply = (await net.request('room.quickMatch', { difficulty: d, seats, rules })) || {};
-        setMatchOpen(false);
-        setMatchSearch(null);
-        if (reply.joined) toast(t('已加入正在等人的同盟，人满或等待超时后自动开局'), 'success');
-        else if (reply.matchmaking === false) toast(t('已开好同盟，但匹配没能开启，请在大厅再点一次多人匹配'), 'warn');
-        else toast(t('已开好同盟并开始等人，人满或等待超时后自动开局'), 'success');
+        // 直接进了别人正在等人的房（服务端找到合适的公开房）：跳进去
+        if (reply.code && !reply.queued) { enterRoom(reply.code); return; }
+        // 没人可加入：**停在匹配界面排队等**（维护者 2026-11-02：不要给玩家开一间房让他等）
+        if (reply.queued && reply.ticket) {
+          setMatchSearch((cur) => ({ ...(cur || { difficulty: d, seats, rules }), ticket: reply.ticket, queue: reply.state }));
+          return;
+        }
+        if (reply.matchmaking === false) toast(t('已开好同盟，但匹配没能开启，请在大厅再点一次多人匹配'), 'warn');
+        else if (reply.code) enterRoom(reply.code);
       } catch (e) {
         // 失败就退回选择那一屏，让玩家改难度/范围再试
         setMatchSearch(null);
@@ -1217,6 +1233,29 @@ export function LobbyScreen() {
       }
     });
   };
+  // 取消匹配：先把服务端的票据撤掉（不然别人会跟一个已经走掉的人凑成一局），再关界面
+  const cancelMatch = () => {
+    const ticket = matchSearch?.ticket;
+    setMatchSearch(null);
+    if (ticket) net.request('room.quickLeave', { ticket }).catch(() => {});
+  };
+  // 排队中：每 2 秒问一次票据状态；成局了就进房（房间凑满会立刻开局，所以进房即进对局）
+  useEffect(() => {
+    const ticket = matchSearch?.ticket;
+    if (!ticket) return undefined;
+    let alive = true;
+    const ask = async () => {
+      try {
+        const st = (await net.request('room.quickState', { ticket })) || {};
+        if (!alive) return;
+        if (st.state === 'matched' && st.code) { enterRoom(st.code); return; }
+        setMatchSearch((cur) => (cur && cur.ticket === ticket
+          ? { ...cur, queue: { ...st, state: st.state || 'queued' } } : cur));
+      } catch { /* 下一轮再问；断线由 net 自己提示 */ }
+    };
+    const id = setInterval(ask, 2000);
+    return () => { alive = false; clearInterval(id); };
+  }, [matchSearch?.ticket]);
   // 搜寻中的秒数（只在那屏显示时走）
   useEffect(() => {
     if (!matchSearch) return undefined;
@@ -1352,7 +1391,7 @@ export function LobbyScreen() {
       onClose=${() => { setMatchOpen(false); setMatchSearch(null); }} onStart=${(req) => quickMatch(req)}
       busy=${busy} online=${online} createLocked=${!createOpen} difficulties=${coop}
       scope=${matchScopeState} onScope=${pickScope}
-      searching=${!!matchSearch} elapsed=${matchWait} onCancel=${() => setMatchSearch(null)} />` : null}
+      searching=${!!matchSearch} elapsed=${matchWait} queue=${matchSearch?.queue ?? null} onCancel=${cancelMatch} />` : null}
     ${/* 和参考版一致：同盟模拟还开着才画这个列表。它叠在上面（Modal 的 modalStack 让
          只有最上层响应 Esc / Tab / 焦点），所以关掉列表 = 回到同盟模拟，而不是回大厅。 */ null}
     ${browseOpen && allyOpen ? html`<${RoomListDialog} online=${online} busy=${busy}
