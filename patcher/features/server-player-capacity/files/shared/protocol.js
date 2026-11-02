@@ -528,6 +528,13 @@ export const C2S = {
   // preparation and 机变 stay untimed (Match opts.soloUnlimited). Off by default; room.state omits the key unless it is on.
   'room.setSoloUnlimited': { on: isBool },
 
+  // 同盟列表（公开同盟；房主，开局前）：把房间挂上「公开同盟」列表，或不挂。room.state.listed 只在挂上时出现。
+  // room.list 的答复：{ rooms: [{ code, host, humans, filled, capacity, difficulty, version?, experimental }] }，
+  // 最多 ROOM_LIST_MAX 个，空位最少的在前 —— host 是房主显示名，filled 是已占座位（含 AI），
+  // version 只在不是默认版本时出现。
+  'room.setListed': { listed: isBool },
+  'room.list': {},
+
   // Remake-only spectator handover: host opt-in before play, default off (§35.100).
   'room.setAiTakeover': { on: isBool },
   'room.aiRequest': { botId: isId },

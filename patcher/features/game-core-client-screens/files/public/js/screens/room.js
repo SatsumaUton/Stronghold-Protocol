@@ -83,6 +83,7 @@ import { ENEMY_MULTIPLIERS, isEnemyMultiplier } from '../../../shared/experiment
 // 实验性弹窗里只放一行摘要，真正排布在独立弹窗里（20 人也不会溢出，见 ui/poolEditor.js 顶部说明）
 import { PoolSummary, PoolEditorDialog } from '../ui/poolEditor.js';
 import { autoPoolPlan } from '../../../shared/poolPlan.js';
+import { ListPromptDialog, takeListPrompt, setListPromptSkipped } from '../ui/roomList.js';
 
 /**
  * Seats padded to the room's capacity (co-op 4, solo 1), each null or a seat record.
@@ -697,7 +698,8 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
 }
 
 
-function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null }) {
+function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null,
+  listed = false, onToggleListed = () => {} }) {
   const info = difficultyInfo(room.mode, room.difficulty);
   const title = soloOption ? t('模拟设置') : t('同盟设置');
   useEffect(() => {
@@ -729,6 +731,17 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
       ${version.editable ? null : html`<span class="t-dim">${t('由创建者发起')}</span>`}
     </div>` : null}
     <${AiTakeoverToggle} option=${takeoverOption} busy=${busy} onToggle=${onAiTakeover} />
+    ${/* 公开同盟（同盟列表）：挂了以后别的博士能在大厅「公开同盟」里看见这个房间、直接加入。
+           开局后服务端会拒（ROOM_STARTED），所以对局中这项显示成不可操作。 */ null}
+    ${soloOption ? null : html`<${Tooltip} text=${listed
+        ? t('其他博士可以在大厅的「公开同盟」里看到这个房间并直接加入')
+        : t('挂到大厅的「公开同盟」列表上，让其他博士能找到这个房间')}>
+      <button type="button" role="switch" aria-checked=${listed ? 'true' : 'false'} data-testid="room-opt-listed"
+          class=${`dpick__opt ailast__opt rs-opts__listed${listed ? ' is-active' : ''}`} disabled=${!!busy || !isHost || !!room.match}
+          onClick=${() => { if (isHost && !room.match) onToggleListed(!listed); }}>
+        <${Icon} name=${listed ? 'check' : 'users'} class=${listed ? 'is-on' : ''} />${listed ? t('公开同盟：已公开') : t('公开同盟：未公开')}
+      </button>
+    <//>`}
     ${soloOption
       ? html`<${SoloUnlimitedToggle} option=${soloOption} busy=${busy} onToggle=${onSoloUnlimited} />`
       : html`<${AiLastToggle} option=${option} busy=${busy} onToggle=${onAiLast} />`}
@@ -768,6 +781,10 @@ export function RoomScreen() {
   const me = useStore((s) => s.me, shallowEqual);
   const conn = useStore((s) => s.connection, shallowEqual);
   const [busy, setBusy] = useState(null);
+  // 建房后进房问一次「要不要公开到同盟列表」（大厅 create 时用 sessionStorage 留了标记）。
+  // 只问房主、只在合作房、且这局还没开始 —— 对局中改不了公开状态。
+  const [listAsk, setListAsk] = useState(() => takeListPrompt());
+  const [listAsking, setListAsking] = useState(false);
   const alive = useRef(true);
   const inFlight = useRef(false); // synchronous guard against double clicks (state updates are async)
   useEffect(() => () => { alive.current = false; }, []);
@@ -892,6 +909,8 @@ export function RoomScreen() {
   const setDifficulty = (difficulty) => run('diff', () => net.request('room.setDifficulty', { difficulty }));
   const setAiTakeover = (on) => run('aihandover', () => net.request('room.setAiTakeover', { on }));
   const setAiLast = (on) => run('ailast', () => net.request('room.setAiPicksLast', { on }));
+  // 公开同盟（同盟列表）：房主把房间挂上 / 摘下大厅的「公开同盟」列表
+  const setListed = (on) => run('listed', () => net.request('room.setListed', { listed: on }));
   // 给 AI 座位指定策略（bandId = null 表示「自动选择」，即取消指定）
   const setBotBand = (seat, bandId) => run(`band${seat}`, async () => {
     await net.request('room.setBotBand', { seat, bandId });
@@ -1083,7 +1102,8 @@ export function RoomScreen() {
           ${aiLast || soloOpt ? html`<button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${aiLast ? t('同盟设置') : t('模拟设置')} aria-label=${aiLast ? t('同盟设置') : t('模拟设置')}
             aria-expanded=${opts ? 'true' : 'false'}><${GearGlyph} /></button>` : null}
           ${opts && (aiLast || soloOpt) ? html`<${RoomOptions} takeoverOption=${aiTakeoverOption(room, me.playerId)} onAiTakeover=${setAiTakeover} option=${aiLast} soloOption=${soloOpt} room=${room} isHost=${facts.isHost} busy=${busy} onAiLast=${setAiLast}
-            onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onClose=${() => setOpts(false)} version=${versionCtl} />` : null}
+            onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onClose=${() => setOpts(false)} version=${versionCtl}
+              listed=${room.listed === true} onToggleListed=${setListed} />` : null}
         </div>
       </div>
       <div class="room-bar__right rs-foot__right">
@@ -1113,6 +1133,17 @@ export function RoomScreen() {
       serverDefault=${serverDefault} roomMode=${room.mode} editable=${versionEditable && !versionWhy} busy=${busy === 'version'}
       note=${versionEditable ? versionWhy || (facts.humans.length > 1 ? t('其他博士同意后才会切换；切换后需要重新准备。') : null) : t('由创建者发起')}
       onPick=${proposeVersion} onClose=${() => setVersionOpen(false)} />` : null}
+    ${/* 建房后的询问：要不要把这个同盟公开到大厅的「公开同盟」列表。
+         只在房主、合作房、还没开局时问一次（标记由大厅 create 写入，takeListPrompt 取走后自毁）。 */ null}
+    ${listAsk && facts.isHost && room.mode === 'coop' && !room.match ? html`<${ListPromptDialog}
+      busy=${listAsking}
+      onPublic=${async (skip) => {
+        setListAsk(false);
+        if (skip) setListPromptSkipped(true);
+        setListAsking(true);
+        try { await net.request('room.setListed', { listed: true }); } catch (err) { toastError(err); } finally { setListAsking(false); }
+      }}
+      onPrivate=${(skip) => { setListAsk(false); if (skip) setListPromptSkipped(true); }} />` : null}
   </div>`;
 }
 

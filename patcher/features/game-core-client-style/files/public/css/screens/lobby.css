@@ -1229,3 +1229,63 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .proto-list__wait { display: flex; align-items: center; gap: .08rem; margin: 0; color: var(--text-lo); font-size: calc(.15 * var(--t)); }
 .proto-list__wait.is-failed { flex-wrap: wrap; color: var(--amber); }
 .proto-list__wait.is-failed .icon { flex: none; width: 1.1em; height: 1.1em; }
+
+/* 公开同盟（同盟列表，room.list / room.setListed）
+   照参考版的做法：一排右对齐的胶囊按钮，夹在「创建同盟」和密钥卡之间。
+   深色渐变 + 999px 圆角 + 悬停亮边 —— 比整行大字卡片轻，也不抢「创建同盟」的主按钮位置。 */
+.ally-links { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .1rem; margin: -.04rem 0; }
+.ally-pill { display: inline-flex; align-items: center; gap: .08rem; height: max(.5rem, 30px); padding: 0 .2rem;
+  font: inherit; font-size: max(calc(.2 * var(--t)), 12px); font-weight: 700; white-space: nowrap;
+  color: #eef0ef; background: linear-gradient(180deg, #2c2f2f, #1b1d1d);
+  border: 1px solid rgba(255, 255, 255, .2); border-radius: 999px; cursor: pointer; }
+.ally-pill:hover:not(:disabled) { border-color: rgba(255, 255, 255, .45); }
+.ally-pill:disabled { opacity: .55; cursor: default; }
+.ally-pill .icon { width: max(.2rem, 13px); height: max(.2rem, 13px); }
+/* 未读数（多人匹配以后用得上，先留着） */
+.ally-pill b { min-width: max(.24rem, 16px); padding: 0 4px; font-size: .8em; text-align: center;
+  color: #2a1404; background: #ff9a3c; border-radius: 999px; }
+
+.rlist-dialog .modal__text { margin-bottom: .1rem; }
+.rlist { display: flex; flex-direction: column; gap: .06rem; margin: 0; padding: 0 .04rem 0 0; list-style: none;
+  max-height: min(52vh, calc(4.2 * var(--sp-ui, 1))); overflow-y: auto; overscroll-behavior: contain; }
+/* 一行一个同盟：左缘是难度色，底色跟大厅其它深色面板一样（半透明白 + 极淡描边），
+   座位数用薄荷绿点出来 —— 一眼扫过去最先看到「还差几个人」。 */
+.rlist__row { display: grid; grid-template-columns: minmax(.84rem, auto) minmax(0, 1fr) auto auto auto;
+  align-items: center; gap: .12rem; padding: .08rem .1rem;
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1);
+  border-left: 3px solid var(--d-color, #8d9391); border-radius: .04rem; }
+.rlist__diff { display: inline-flex; align-items: center; gap: .06rem; white-space: nowrap;
+  font-size: max(calc(.16 * var(--t)), 13px); color: var(--d-color, #8d9391); }
+.rlist__diff .icon, .rlist__diff svg { width: .16rem; height: .16rem; }
+.rlist__who { display: flex; flex-direction: column; min-width: 0; }
+.rlist__who b { overflow: hidden; font-size: max(calc(.17 * var(--t)), 14px); font-weight: 600;
+  text-overflow: ellipsis; white-space: nowrap; }
+.rlist__who small { overflow: hidden; font-size: max(calc(.13 * var(--t)), 11px); color: #858b89;
+  text-overflow: ellipsis; white-space: nowrap; }
+.rlist__ver { display: inline-flex; align-items: center; gap: .04rem; white-space: nowrap;
+  font-size: max(calc(.13 * var(--t)), 11px); color: var(--text-md); }
+.rlist__ver .icon { width: .13rem; height: .13rem; }
+.rlist__seats { font-size: max(calc(.2 * var(--t)), 15px); color: var(--mint-400, #59f4ca); white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.rlist__seats i { margin: 0 .01rem; font-style: normal; color: #858b89; }
+.rlist__join { min-height: .34rem; padding-inline: .1rem; white-space: nowrap;
+  font-size: max(calc(.15 * var(--t)), 13px); }
+.rlist__note { display: flex; align-items: center; justify-content: center; gap: .08rem; margin: .18rem 0;
+  font-size: max(calc(.16 * var(--t)), 13px); color: #858b89; }
+.rlist__note .icon { width: .15rem; height: .15rem; }
+.rlist__hint { color: #858b89; }
+@media (max-width: 900px) {
+  .rlist__row { grid-template-columns: minmax(0, 1fr) auto auto; gap: .04rem .1rem; }
+  .rlist__diff { grid-column: 1; grid-row: 1; }
+  .rlist__seats { grid-column: 2; grid-row: 1; }
+  .rlist__join { grid-column: 3; grid-row: 1; }
+  .rlist__who { grid-column: 1 / span 2; grid-row: 2; }
+  .rlist__ver { grid-column: 3; grid-row: 2; justify-self: end; }
+  .rlist__row > span:empty { display: none; }
+}
+
+/* 建房后询问里的「下次不再提醒」 */
+.listask__skip { display: flex; align-items: center; gap: .08rem; margin: .04rem 0 .02rem; cursor: pointer;
+  font-size: calc(.16 * var(--t)); color: var(--text); }
+.listask__skip input { width: calc(.16 * var(--t)); height: calc(.16 * var(--t)); accent-color: #4ed8af; cursor: pointer; flex: none; }
+.listask__skip span { line-height: 1.4; }

@@ -146,6 +146,31 @@
       ]
     },
     {
+      "id": "client-room-list",
+      "name": "公开同盟（同盟列表）",
+      "status": "ported-ui",
+      "files": [
+        "public/js/ui/roomList.js",
+        "public/js/screens/lobby.js",
+        "public/js/screens/room.js",
+        "public/css/screens/lobby.css",
+        "public/css/screens/room.css",
+        "server/lobby.js",
+        "server/net.js",
+        "shared/constants.js",
+        "shared/protocol.js",
+        "test/match/room-list.test.js"
+      ],
+      "tests": [
+        "房主点公开后别人能在列表里看到并直接加入",
+        "满员 / 开局 / 已排队 / 测试房 / 单人房不上列表",
+        "容量阈值是 MAX_SEATS（4），我们允许 4–20 任意人数",
+        "列表缓存 3 秒，房主关掉公开后不再出现",
+        "行里不带 playerId / 账号信息",
+        "建房后询问是否公开（可勾选不再提醒）"
+      ]
+    },
+    {
       "id": "client-emote-danmaku",
       "name": "表情弹幕（5–20 人房 / 手机 / 花名册折起时）",
       "status": "ported-ui",

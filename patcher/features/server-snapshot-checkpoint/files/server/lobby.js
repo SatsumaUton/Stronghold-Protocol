@@ -230,6 +230,9 @@
 /** 匹配队友最长搜索时间（默认 2 分钟；测试可用 SP_MATCHMAKING_TIMEOUT_MS 缩短）。 */
 const MATCHMAKING_TIMEOUT_MS = Math.max(1000, Number(process.env.SP_MATCHMAKING_TIMEOUT_MS) || 2 * 60 * 1000);
 
+/** 同盟列表（room.list）的一次扫描在这段时间内由所有提问者共用（毫秒）。 */
+const ROOM_LIST_CACHE_MS = 3000;
+
 function currentNodeNumber() {
   return Number((String(process.env.SP_NODE_DIR || '').match(/node-(\d+)/i) || [])[1])
     || (Number(process.env.PORT) > 3000 ? Number(process.env.PORT) - 3000 : 0);
@@ -250,7 +253,7 @@ function notifyPartyLeave(room) {
 import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.js';
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
+import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, ROOM_LIST_MAX, ROOM_LIST_MIN_CAPACITY, modeIdFor } from '../shared/constants.js';
 import { roomCapacity } from '../shared/playerCapacity.js';
 import { EXPERIMENTAL_DEFAULTS, isExperimental, experimentalOptions } from '../shared/experimental.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
@@ -586,6 +589,18 @@ export class Room {
     this.content = null;
     /** Test room (DESIGN §34.8). Set only at create, and only when the process switch is on. Never flipped later. */
     this.test = false;
+    /**
+     * 同盟列表 (room.setListed)：这个房间是否挂在「公开同盟」列表上，等陌生玩家进来。
+     * 只有房主在对局开始前能开关；满员 / 已开局 / 房主掉线 / 有排队任务时自动从列表消失
+     * （见 Lobby.roomOpen），不需要额外清理逻辑。默认 false = 不公开。
+     */
+    this.listed = false;
+    /**
+     * 房间的来源：'private' = 玩家自己建的（含同盟列表上的），'matchmaking' = 多人匹配配对成功后
+     * 由服务器替玩家建的。只有 private 房能挂到同盟列表上（见 Lobby.listable）——
+     * 否则匹配出来的房间会再被挂出去，玩家点进去会撞上已经配好的局。
+     */
+    this.source = 'private';
     /** the room's queue (header "Gameplay plugins": Lobby.serial): what is still waiting or running, and its tail */
     this.queue = { pending: 0, tail: Promise.resolve() };
   }
@@ -691,6 +706,8 @@ export class Room {
       ...(this.test ? { test: true } : {}),
       // 「不限时」 (header): omitted unless on, so a default room.state stays identical
       ...(this.soloUnlimited === true ? { soloUnlimited: true } : {}),
+      // 同盟列表 (room.setListed): omitted unless on, like the others
+      ...(this.listed ? { listed: true } : {}),
     };
   }
 }
@@ -824,6 +841,8 @@ export class Lobby {
     this.limitLog = { at: -Infinity, suppressed: 0 };
     /** log lines said once (warnOnce) */
     this.told = new Set();
+    /** 同盟列表（room.list）的扫描结果缓存：{ at, rooms } 或 null（改过 listed 就置空）。 */
+    this.roomListCache = null;
     /** a held visual set whose plugins changed on disk: its rooms' hosts are told (header "The room's plugins") */
     this.offStale = typeof plugins?.onStale === 'function' ? plugins.onStale((vs, ids) => this.pluginsChanged(vs, ids)) : null;
     /**
@@ -1243,6 +1262,8 @@ export class Lobby {
       case 'account.resume': return this.resumeAccount(session);
       case 'room.ready': return this.ready(session, msg);
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
+      case 'room.setListed': return this.setListed(session, msg);
+      case 'room.list': return this.roomList();
       case 'room.setExperimental': return this.setExperimental(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
       case 'room.setBotBand': return this.setBotBand(session, msg);
@@ -1862,9 +1883,90 @@ export class Lobby {
     }
     // 扩容/缩容后，座位可能被裁掉，指定策略也可能是新规则不开放的 —— 一并退回自动
     this.dropUnofferedBotBands(room);
+    // 容量变了可能已经不够「公开同盟」的门槛（ROOM_LIST_MIN_CAPACITY），这时直接把房间摘下来，
+    // 免得列表里留一条点不进去的死行。
+    if (room.listed && !this.listable(room)) {
+      room.listed = false;
+      this.roomListCache = null;
+    }
     for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
     this.broadcastState(room);
     return OK;
+  }
+
+  /**
+   * 这个房间能不能挂到同盟列表上：合作房、玩家自己建的（不是匹配器配出来的）、不是测试房、
+   * 容量够大（ROOM_LIST_MIN_CAPACITY = MAX_SEATS = 4，也就是本服**所有**合作房都能挂）、
+   * 没装玩法插件（插件房的内容和官方版本不一致，陌生人进来会一脸问号）。
+   */
+  listable(room) {
+    return room.mode === 'coop' && room.source === 'private' && !room.test
+      && room.capacity >= ROOM_LIST_MIN_CAPACITY && !room.modded;
+  }
+
+  /**
+   * 房间里还有没有排队中的任务（房间的串行队列，以及多人匹配队列里有没有它的玩家）。
+   * 有排队任务时房间不该出现在列表上 —— 它可能下一秒就被配对走 / 正在换规则。
+   */
+  roomQueued(room) {
+    if (room.queue && room.queue.pending > 0) return true;
+    // 多人匹配队列（server/matchmaking.js）存在时才查；没有这个子系统时只看房间队列。
+    if (this.queue && typeof this.queue.has === 'function') {
+      return room.activeHumans().some((seat) => this.queue.has(seat));
+    }
+    return false;
+  }
+
+  /** 挂在列表上的房间此刻是不是真的在等人：满员 / 已开局 / 房主掉线 / 有排队任务的自动消失。 */
+  roomOpen(room) {
+    return room.listed && !room.disposed && !room.match && this.listable(room)
+      && room.freeSeat() >= 0 && !this.roomQueued(room)
+      && room.seatOf(room.hostId)?.connected === true;
+  }
+
+  /**
+   * room.setListed { listed }（房主，开局前）：挂上「同盟列表」或摘下来。
+   * 这不是谁的规则，所以谁的就绪状态都不动。
+   */
+  setListed(session, { listed }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (this.roomQueued(room)) return fail(ERR.QUEUED);
+    if (listed && !this.listable(room)) return fail(ERR.BAD_TARGET, 'this room cannot be listed');
+    this.dropReplay(room, session.playerId);
+    if (room.listed !== listed) {
+      room.listed = listed;
+      this.roomListCache = null;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
+  /**
+   * room.list：同盟列表上还在等人的房间，空位最少的排前面（同样多则先建的在前），
+   * 一次最多 ROOM_LIST_MAX 个。只有列表界面开着时才问；ROOM_LIST_CACHE_MS 内多个
+   * 提问者共用一次扫描（net.js 也把它算进 heavy 桶）。
+   * 只回列表要显示的东西：没有 playerId、没有地址、没有座位明细。行过期了也不打紧 ——
+   * 点进去时 room.join 会再全部校验一遍。
+   */
+  roomList() {
+    const now = this.now();
+    if (!this.roomListCache || now - this.roomListCache.at >= ROOM_LIST_CACHE_MS) {
+      const rows = [];
+      for (const room of this.rooms.values()) {
+        if (!this.roomOpen(room)) continue;
+        const taken = room.seats.filter(Boolean);
+        rows.push({ code: room.code, host: room.seatOf(room.hostId).name, humans: room.activeHumans().length,
+          filled: taken.length, capacity: room.capacity, difficulty: room.difficulty,
+          ...(room.version !== DEFAULT_VERSION ? { version: room.version } : {}),
+          experimental: { ...room.experimental }, free: room.capacity - taken.length, at: room.createdAt });
+      }
+      rows.sort((a, b) => a.free - b.free || a.at - b.at);
+      this.roomListCache = { at: now, rooms: rows.slice(0, ROOM_LIST_MAX).map(({ free, at, ...row }) => row) };
+    }
+    return { ok: true, reply: { rooms: this.roomListCache.rooms } };
   }
 
   setDifficulty(session, { difficulty }) {

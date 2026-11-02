@@ -61,6 +61,7 @@ import { data, getConfig, getMode, getStage, useData } from '../data.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { NoticesButton } from '../ui/notices.js';
+import { RoomListDialog, markListPrompt } from '../ui/roomList.js';
 import { VersionSwitch } from '../ui/versionPicker.js';
 import { contentSet, retryContentSet } from '../content.js';
 import { DEFAULT_VERSION, lobbyVersion, offeredDifficulties, fallbackDifficulty, seasonOf, soloTimedOf, soloTimeMsgid, versionLabel } from '../versions.js';
@@ -663,7 +664,7 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
  */
 export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, onCode, codeOk, online, busy, onJoin, onSpectate, recent, marks, focusKey,
   testMode = false, asTest = false, onTest = () => {}, short = false, createLocked = false,
-  capacity = 4, onCapacity = null }) {
+  capacity = 4, onCapacity = null, onBrowse = null }) {
   const diffName = DIFFICULTY_NAMES[difficulty] ? t(DIFFICULTY_NAMES[difficulty]) : '';
   return html`<${Modal} open=${true} onClose=${onClose} class="ally" veilClass="proto-veil">
     <div class="ally__body">
@@ -694,6 +695,14 @@ export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, 
             <span>${t('测试房间')}</span>
             <em class="t-dim">${t('不计入战绩。房间会标明「测试」，只有房主能使用测试指令。')}</em>
           </label>` : null}
+          ${/* 公开同盟（同盟列表）：照参考版做成右对齐的胶囊按钮，夹在「创建同盟」和密钥卡之间。
+               多人匹配做完以后跟它并排放在这里（参考版就是这么摆的）。 */ null}
+          ${onBrowse ? html`<div class="ally-links">
+            <button type="button" class="ally-pill" data-testid="alliance-browse"
+                title=${t('看看有哪些同盟正在等博士，直接加入')} disabled=${!online} onClick=${() => onBrowse()}>
+              <${Icon} name="users" />${t('公开同盟')}
+            </button>
+          </div>` : null}
           <div class="ally-card ally-card--join ally-join join-row">
             <span class="ally-card__art"><${JoinArt} /></span>
             <div class="ally-key">
@@ -737,6 +746,8 @@ export function LobbyScreen() {
   // the open dialogs: 选择同盟方式 (同盟模拟 / 密钥加入) and 选择模拟协议 (独立模拟)
   const [allyOpen, setAllyOpen] = useState(false);
   const [soloOpen, setSoloOpen] = useState(false);
+  // 公开同盟（同盟列表）：从「选择同盟方式」里的入口打开
+  const [browseOpen, setBrowseOpen] = useState(false);
   const [code, setCode] = useState('');
   const [asTest, setAsTest] = useState(false);
   const testMode = useStore((s) => s.testMode === true);
@@ -855,11 +866,17 @@ export function LobbyScreen() {
       toast(mode === 'solo' ? t('游客不能开始独立模拟，请先登录') : t('游客不能创建同盟模拟房间，请先登录'), 'warn');
       return;
     }
-    return run('create', () => net.request('room.create', {
-      mode, difficulty: mode === 'solo' ? shownSolo : shownCoop, ...(testMode && asTest ? { test: true } : {}), ...(versions ? { version } : {}),
-      ...(mode === 'solo' && soloFree && soloTimed === true ? { soloUnlimited: true } : {}),
-      ...(() => { const experimental = experimentalForCreator(); return experimental ? { experimental } : {}; })(),
-    }));
+    return run('create', async () => {
+      const answer = await net.request('room.create', {
+        mode, difficulty: mode === 'solo' ? shownSolo : shownCoop, ...(testMode && asTest ? { test: true } : {}), ...(versions ? { version } : {}),
+        ...(mode === 'solo' && soloFree && soloTimed === true ? { soloUnlimited: true } : {}),
+        ...(() => { const experimental = experimentalForCreator(); return experimental ? { experimental } : {}; })(),
+      });
+      // 建好合作房以后，进房时问一次「要不要公开到同盟列表」（ui/roomList.js 的 ListPromptDialog）：
+      // 大厅到房间是一次跳转，用 sessionStorage 把这个问题带过去。
+      if (mode === 'coop') markListPrompt();
+      return answer;
+    });
   };
   const join = (c = code) => {
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
@@ -939,10 +956,13 @@ export function LobbyScreen() {
       code=${code} onCode=${(v) => setCode(normalizeCode(v))} codeOk=${codeOk} online=${online} busy=${busy}
       onJoin=${join} onSpectate=${spectate} recent=${recent} marks=${marks} focusKey=${!coarse}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} short=${shortScreen} createLocked=${!createOpen}
-      capacity=${coopCapacity} onCapacity=${pickCapacity} />` : null}    ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
+      capacity=${coopCapacity} onCapacity=${pickCapacity}
+      onBrowse=${() => { setAllyOpen(false); setBrowseOpen(true); }} />` : null}    ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed}
       soloTime=${soloTimed === true ? { on: soloFree, onToggle: setSoloFreePref } : null} createLocked=${!createOpen} />` : null}
+    ${browseOpen ? html`<${RoomListDialog} online=${online} busy=${busy}
+      onJoin=${(c) => { setBrowseOpen(false); join(c); }} onClose=${() => setBrowseOpen(false)} />` : null}
     ${sweepOpen ? html`<${SweepReport} onClose=${() => setSweepOpen(false)} />` : null}
     ${achOpen ? html`<${AchievementDialog} onClose=${() => setAchOpen(false)} />` : null}
   </div>`;

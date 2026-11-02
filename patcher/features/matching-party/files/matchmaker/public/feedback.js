@@ -213,7 +213,8 @@
     meta.appendChild(el('span', null, it.author ? it.author : '匿名'));
     var t = el('span', 'dot', fmtTime(it.createdAt));
     meta.appendChild(t);
-    if (it.client) meta.appendChild(el('span', 'dot', it.client));
+    // 2026-11-02：维护者要求不再显示玩家的设备信息（Windows / Mozilla/5.0… 那一串 UA）。
+    // 老数据里还有 client 字段，这里一律不画；新帖也不再采集（见下方发帖处）。
     if (it.mine) meta.appendChild(el('span', null, '· 我发的'));
     c.appendChild(meta);
 
@@ -392,13 +393,10 @@
     var body = $('f-body').value.trim();
     if (Array.from(title).length < 2) { formErr.textContent = '标题至少 2 个字'; return; }
     if (Array.from(body).length < 5) { formErr.textContent = '正文至少 5 个字'; return; }
-    var client = '';
-    try {
-      client = [navigator.userAgentData ? navigator.userAgentData.platform : navigator.platform,
-        navigator.userAgent].filter(Boolean).join(' / ').slice(0, 160);
-    } catch (err) { client = ''; }
+    // 不再采集 navigator.userAgent / platform：维护者说反馈板不需要显示玩家的设备信息。
+    // 服务端 client 字段仍然接受（老数据兼容），这里只是不再上报。
     submitBtn.disabled = true;
-    api('/api/feedback/items', { method: 'POST', body: { category: category, title: title, body: body, client: client } })
+    api('/api/feedback/items', { method: 'POST', body: { category: category, title: title, body: body } })
       .then(function (r) {
         submitBtn.disabled = false;
         if (r.status === 201) {
