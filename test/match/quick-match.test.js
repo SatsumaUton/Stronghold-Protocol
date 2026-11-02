@@ -8,9 +8,10 @@
 // 匹配的目的就是凑齐人，满员了还要房主再点一次「开始」是多余的；但只有 1 个真人时不算（AI 占座不算匹配到人）。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Lobby } from '../../server/lobby.js';
+import { Lobby, MULTI_SEAT_DEFAULT } from '../../server/lobby.js';
 import { SessionRegistry } from '../../server/net.js';
 import { ERR } from '../../shared/constants.js';
+import { experimentalRuleChanged } from '../../shared/experimental.js';
 
 // 仓库里的 data/create-room.json 存的是「关闭建房」（公开仓库不默认开放），
 // 这些用例只关心 quickMatch / 人满即开的逻辑，与运维开关无关，所以先忽略开关文件。
@@ -179,4 +180,83 @@ test('匹配中的房间不会被解散计时扫走', () => {
   room.createdAt = 0;
   lobby.sweepOldRooms();
   assert.equal(room.disposed, false, '匹配中的房间保留');
+});
+
+// ------------------------------------------------- 人数范围 / 规则（MatchScope 的两个维度）
+
+test('规则默认只找标准房：4 人房带 playerCapacity 不算「改过规则」', () => {
+  const lobby = makeLobby();
+  const { host, room } = coopRoom(lobby, 4);
+  assert.equal(experimentalRuleChanged(room.experimental), false, '4 人房只带 playerCapacity，规则没动');
+  lobby.setListed(host, { listed: true });
+  lobby.matchmaking(host, { on: true });
+  const res = lobby.quickMatch(player('Other'), { rules: 'standard' });
+  assert.equal(res.reply.joined, true, '标准规则能找到这间房');
+  assert.equal(res.reply.code, room.code);
+});
+
+test('规则要 experimental 时跳过标准房，自己开一间改过规则的', () => {
+  const lobby = makeLobby();
+  const { host, room } = coopRoom(lobby, 4);
+  lobby.setListed(host, { listed: true });
+  lobby.matchmaking(host, { on: true });
+  const other = player('Other');
+  const res = lobby.quickMatch(other, { rules: 'experimental' });
+  assert.equal(res.reply.joined, false, '没有改过规则的房，所以自己开');
+  assert.notEqual(res.reply.code, room.code, '不是那一间标准房');
+});
+
+test('改过规则的房会被 experimental 找到：revivalEnabled 就是改规则', () => {
+  const lobby = makeLobby();
+  const { host, room } = coopRoom(lobby, 4, { revivalEnabled: true });
+  assert.equal(experimentalRuleChanged(room.experimental), true);
+  lobby.setListed(host, { listed: true });
+  lobby.matchmaking(host, { on: true });
+  const res = lobby.quickMatch(player('Other'), { rules: 'experimental' });
+  assert.equal(res.reply.joined, true);
+  assert.equal(res.reply.code, room.code);
+});
+
+test('人数要 four 时不进 8 人房', () => {
+  const lobby = makeLobby();
+  const { host, room } = coopRoom(lobby, 8);
+  assert.equal(room.capacity, 8);
+  lobby.setListed(host, { listed: true });
+  lobby.matchmaking(host, { on: true });
+  const other = player('Other');
+  const res = lobby.quickMatch(other, { seats: 'four' });
+  assert.equal(res.reply.joined, false, '8 人房不算 4 人同盟');
+  assert.notEqual(res.reply.code, room.code);
+});
+
+test('人数要 multi 时进 8 人房，自己开时也开 8 人', () => {
+  const lobby = makeLobby();
+  const { host, room } = coopRoom(lobby, 8);
+  lobby.setListed(host, { listed: true });
+  lobby.matchmaking(host, { on: true });
+  const res = lobby.quickMatch(player('Other'), { seats: 'multi' });
+  assert.equal(res.reply.joined, true);
+  assert.equal(res.reply.code, room.code);
+
+  // 没有可加入的 8 人房时，自己开的那间也应该是 8 人
+  const lobby2 = makeLobby();
+  const solo = player('Solo2');
+  lobby2.quickMatch(solo, { seats: 'multi' });
+  assert.equal(lobby2.roomOf(solo).capacity, MULTI_SEAT_DEFAULT, '自己开的是多人同盟');
+});
+
+test('seats: both 两种房都能进，但优先人多的那间', () => {
+  const lobby = makeLobby();
+  const four = coopRoom(lobby, 4);
+  lobby.setListed(four.host, { listed: true });
+  lobby.matchmaking(four.host, { on: true });
+  const multi = coopRoom(lobby, 8);
+  lobby.setListed(multi.host, { listed: true });
+  lobby.matchmaking(multi.host, { on: true });
+  // 给 8 人房多塞一个人，让它人更多
+  lobby.join(player('MGuest'), { code: multi.room.code });
+
+  const res = lobby.quickMatch(player('Third'), { seats: 'both' });
+  assert.equal(res.reply.joined, true);
+  assert.equal(res.reply.code, multi.room.code, '人多的 8 人房优先');
 });

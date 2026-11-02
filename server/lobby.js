@@ -254,8 +254,8 @@ import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.j
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, ROOM_LIST_MAX, ROOM_LIST_MIN_CAPACITY, modeIdFor } from '../shared/constants.js';
-import { roomCapacity } from '../shared/playerCapacity.js';
-import { EXPERIMENTAL_DEFAULTS, isExperimental, experimentalOptions } from '../shared/experimental.js';
+import { roomCapacity, PLAYER_CAPACITIES } from '../shared/playerCapacity.js';
+import { EXPERIMENTAL_DEFAULTS, isExperimental, experimentalOptions, experimentalRuleChanged } from '../shared/experimental.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
 import { encode, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
@@ -271,6 +271,13 @@ import { parseTestModeEnv, testModeGate, unrecognizedTestMode } from './testMode
 
 /** Room code alphabet: uppercase letters without I and O (and no digits, so no 0/1). */
 export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+/**
+ * 多人匹配「多人同盟」那一档自己开房时用的人数：`PLAYER_CAPACITIES` 里第一个大于标准
+ * {MAX_SEATS} 人的档位（本服是 8）。参考版 ui/matchmaking.js 的 `SCOPE_SEATS.multi`
+ * 取的是 `PLAYER_CAPACITIES.filter((n) => n > MAX_SEATS)`，其最小值就是这里这个。
+ */
+export const MULTI_SEAT_DEFAULT = PLAYER_CAPACITIES.find((n) => n > MAX_SEATS) ?? MAX_SEATS + 1;
 
 /** Tunables. */
 export const LOBBY_DEFAULTS = Object.freeze({
@@ -2675,25 +2682,56 @@ export class Lobby {
    * 那是另一个量级的改动，见 MAINTENANCE.md「多人匹配」一节。
    *
    * 语义：已经在房间里就用 SESSION_IN_USE 拒绝（页面侧只在大厅显示这个按钮，正常不会撞上）。
+   *
+   * ★ 2026-11-02 维护者要求移植参考版「多人匹配」屏下方的设置项，所以这里多了两个维度
+   *   （参考版 ui/matchmaking.js 的 `matchScope`）：
+   *   - `seats`：'four'（只要标准 {MAX_SEATS} 人同盟，默认）/ 'multi'（只要 5–20 人的多人同盟）/
+   *     'both'（两种都行，人最多的优先）。
+   *   - `rules`：'standard'（只要没改过规则的，默认）/ 'experimental'（只要改过规则的）/
+   *     'both'。改过规则 = `room.experimental` 非空（复活、敌人倍率、人数上限那些）。
+   *   两个维度都用在**筛选候选**上；自己开房时按 `seats` 决定人数、按 `rules` 决定是否带实验性选项。
+   *   参考版还有服务端队列与 30 秒确认入场，我们这边没有（见上面那段说明），
+   *   所以这里只做「筛 + 自己开」，不做队列。
    */
-  quickMatch(session, { difficulty } = {}) {
+  quickMatch(session, { difficulty, seats, rules } = {}) {
     if (session.adminId !== true && !maintenanceGate().match) return fail(ERR.MATCH_DISABLED);
     if (this.roomOf(session)) return fail(ERR.SESSION_IN_USE, 'already in a room');
     const asked = DIFFICULTIES.includes(difficulty) ? difficulty : null;
+    // 人数范围：'multi' 只找多人同盟，'both' 两种都要，其余（含不传）按标准的 MAX_SEATS 人同盟
+    const wantMulti = seats === 'multi' || seats === 'both';
+    const wantFour = seats !== 'multi';
+    // 规则：'experimental' 只找改过规则的，'both' 都要，其余（含不传）只要标准规则的
+    const wantExperimental = rules === 'experimental' || rules === 'both';
+    const wantStandard = rules !== 'experimental';
+    const fitsSeats = (room) => (wantFour && room.capacity === MAX_SEATS) || (wantMulti && room.capacity > MAX_SEATS);
+    // 「改过规则」必须用 experimentalRuleChanged，不能只看 `!!room.experimental`：
+    // 容量 4 的房间也会带一个 experimental 对象（playerCapacity 恒在），
+    // 直接判断会把所有普通房都当成实验房，标准规则就永远匹配不到人。
+    const fitsRules = (room) => {
+      const custom = experimentalRuleChanged(room.experimental);
+      return (wantStandard && !custom) || (wantExperimental && custom);
+    };
     // 1) 找一间正在匹配、还缺人、且在公开列表上的房间：人最多的优先（更快凑满开局）
     let best = null;
     for (const room of this.rooms.values()) {
       if (!room.matchmaking || room.mode !== 'coop') continue;
       if (!this.roomOpen(room)) continue;
       if (asked && room.difficulty !== asked) continue;
+      if (!fitsSeats(room) || !fitsRules(room)) continue;
       if (!best || room.activeHumans().length > best.activeHumans().length) best = room;
     }
     if (best) {
       const res = this.join(session, { code: best.code });
       if (!res || !res.error) return { ok: true, reply: { code: best.code, joined: true } };
     }
-    // 2) 没有可加入的：自己开一间，挂到公开同盟上，直接开始等人
-    const made = this.create(session, { mode: 'coop', difficulty: asked ?? undefined });
+    // 2) 没有可加入的：自己开一间，挂到公开同盟上，直接开始等人。
+    //    只有「只要多人同盟」时才带上人数上限 —— 那样房间必然算「改过规则」，
+    //    与 `rules: 'standard'` 天然矛盾，所以这时候不额外加别的实验性选项。
+    const wantCapacity = wantMulti && !wantFour ? MULTI_SEAT_DEFAULT : null;
+    // 必须走 experimentalOptions() 规范化：isExperimental 要求至少两个键
+    // （EXPERIMENTAL_DEFAULTS 的两个布尔项恒在），只给 { playerCapacity } 会被 create 拒掉。
+    const experimental = wantCapacity ? experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, playerCapacity: wantCapacity }) : null;
+    const made = this.create(session, { mode: 'coop', difficulty: asked ?? undefined, experimental });
     if (made && made.error) return made;
     const room = this.roomOf(session);
     if (!room) return fail(ERR.INTERNAL, 'quick match created no room');
