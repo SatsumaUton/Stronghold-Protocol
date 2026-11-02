@@ -257,6 +257,54 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'
 
 > 当前进度与每次的节点清单记录在仓库根目录 `PENDING-RESTART.md`。
 
+### 房间只在节点内：公开同盟 / 多人匹配的跨节点边界（2026-11-02）
+
+**每个节点的 `Lobby` 是独立的。** 30 个进程各有自己的 `this.rooms`，房间码只在**本节点**有效。
+这一条决定了三个功能的实际行为，排障时必须先想到：
+
+| 能力 | 范围 | 怎么跨过去 |
+|---|---|---|
+| `room.join` / `room.spectate`（按房间码） | **仅本节点** | `?n=<节点>&room=<码>` 或 `/mm/api/find-room` 查到节点再跳 |
+| 公开同盟列表（`room.list`） | 本节点内存 | 叠加匹配服务 `/mm/api/rooms/open`（Redis 汇总，带 `node`） |
+| 多人匹配（`room.quickMatch`） | **仅本节点** | **不跨节点**：只配本节点上正在等人的房 |
+
+**多人匹配为什么不跨节点**：参考版那套是 `server/matchmaking.js`（641 行）+ `server/cluster/lobby.js`
+的共享队列，本服没有移植。真要跨节点配对，得先有共享队列（谁和谁配、配到哪台机器上开局），
+不是加一个按钮能解决的。目前两个人在**不同节点**上点「多人匹配」不会配到一起 ——
+要么等以后接共享队列，要么用「公开同盟」手动进同一间房。
+
+**公开同盟的跨节点怎么走的**（四段，缺一段都会退化成「只看得见本节点」）：
+
+1. `server/persist/lobbyState.js` 把 `listed` / `matchmaking` 写进 Redis 房间文档。
+   **这两个字段是为跨节点加的** —— 不写，匹配服务读到房间也不知道哪间是公开的。
+   为 false 时整条省掉，默认房间的存档与以前逐字节一致。
+2. 匹配服务 `GET /api/rooms/open`：按节点 `HGETALL sp:n<node>:lobby:rooms`，筛「公开 + 没开局 + 有空位」，
+   每条带 `node`，缓存 3 秒。筛选规则在 `matchmaker/openRooms.cjs`（纯函数，10 条单测）。
+3. 客户端 `RoomListDialog` 并发问 `room.list`（本节点，快）与 `/mm/api/rooms/open`（跨节点），
+   按房间码去重、本节点优先；跨节点的行显示节点号。
+4. 点「加入同盟」：本节点直接发 `room.join`；别的节点用 `?n=<node>&room=<code>` 换页，
+   落地后由既有 `?room=` 深链自动加入。
+
+**排查「看不到别人的公开房」按这个顺序**：
+
+```powershell
+# 1) 匹配服务汇总到几条（rooms 为空 = 真的没人挂，不是 bug）
+$open = Invoke-RestMethod http://127.0.0.1:3090/api/rooms/open
+"$($open.rooms.Count) 间"
+$open.rooms | Format-Table code, node, host, humans, filled, capacity, difficulty, matchmaking
+
+# 2) 某间房在哪个节点（同时验证 find-room 的 Redis 回退有没有生效）
+$r = Invoke-RestMethod 'http://127.0.0.1:3090/api/find-room?code=ABCD'
+"code=$($r.code) node=$($r.node) started=$($r.started) humans=$($r.humans)"
+```
+
+判断「这间房为什么不在列表里」：
+`node` 为 `null` → 房间不存在（或已解散）；`started=true` → 已开局；`full=true` → 满员；
+`node` 有值但 `/api/rooms/open` 里没有它 → **那台节点还没重启过**（没写 `listed` 字段）。
+
+**⚠ 没重启过的节点仍然只写旧字段**：`lobbyState.js` 是服务端代码，改动要重启节点才生效。
+所以「公开同盟跨节点」是**分批生效**的 —— 已重启的节点挂出来的房能被别的节点看见，
+没重启的不能。这跟其它服务端改动一样，按上面的「重启窗口期」流程走。
 #### ⚠ 「哪些节点已更新」不能只看 `lobby.js`（2026-10-27 踩过）
 
 `tools\_restart-when-idle.ps1` 判断「进程是否跑着新代码」用的是
