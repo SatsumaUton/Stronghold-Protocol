@@ -135,3 +135,18 @@ export function speedVoteState(pub, myId) {
   const status = running ? (v.next ? 'on' : 'ending') : v.next ? 'next' : 'idle';
   return { status, mine: agreed.includes(myId), count: agreed.length, need: Number(v.need) || 0 };
 }
+
+/**
+ * Whether the 2 倍速 switch shows its vote count (3/3, 1/3).
+ *
+ * 票已经过了、这一场就在 2 倍速上跑、而且下一场也确定了（status 'on'）时，那两个数字不再说明任何
+ * 事 —— 标签「本场 2 倍速」已经讲完了 —— 所以收起，只留标签。
+ *
+ * 'ending' 不算：那时这一场虽然也是 2 倍速，但**下一场**的票数不够，那个 1/3 正是在提示还差几票，
+ * 得留着。'next' / 'idle' 同理（还没到 2 倍速，票数就是进度）。
+ * @param {{ status: string } | null} v speedVoteState() 的结果
+ * @returns {boolean}
+ */
+export function speedVoteCountShown(v) {
+  return !!v && v.status !== 'on';
+}
