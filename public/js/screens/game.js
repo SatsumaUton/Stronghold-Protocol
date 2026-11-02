@@ -182,6 +182,9 @@ export function GameScreen() {
   const pub = useStore((s) => s.match.public);
   const hasResult = useStore((s) => !!s.match.result);
   const ended = useStore((s) => !!s.room && !s.room.inMatch && !!s.match.public);
+  // 上一局是怎么没的（server/lobby.js toState 的 endReason）：被打断的对局没有结算帧，
+  // 只能靠这个说对话 —— 管理员终止 ≠ 服务器重启。
+  const endReason = useStore((s) => (s.room && !s.room.inMatch ? s.room.endReason || null : null));
   const away = useStore((s) => s.away, Object.is, awayStore);
   const autoplay = useStore((s) => !!(Array.isArray(s.match.public?.players) && s.match.public.players.find((p) => p && p.playerId === s.me.playerId)?.autoplay));
   const gd = useGameData();
@@ -226,7 +229,7 @@ export function GameScreen() {
   return html`${body}
     ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} room=${voteRoom} class="vervote--float" />` : null}
     ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
-    ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} />` : null}
+    ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} reason=${endReason} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${TestConsole} />` : null}`;
 }
 

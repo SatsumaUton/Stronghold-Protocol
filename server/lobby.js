@@ -565,6 +565,17 @@ export class Room {
     /** @type {any} summary passed to onEnd by the last match */
     this.lastSummary = null;
     /**
+     * 上一局是**怎么**没的（'admin-aborted' / 'restart-aborted' / 'plugin-crash' / …）。
+     *
+     * 为什么需要它：对局被打断时客户端没有结算帧（m.result 根本没生成），只能靠房间状态判断
+     * 「这一局没了」—— 以前它没有原因可读，于是不管是被管理员终止、还是重启后恢复失败，
+     * 一律显示「服务器重启导致对局中断，同盟已返回等待室」（ui/game/overlays.js MatchEnded）。
+     * 管理员主动关的对局被说成服务器重启，玩家会以为是故障。
+     * 只有房间**没有在跑对局**时才下发（见 toState），所以正常情况下 room.state 不变。
+     * @type {string | null}
+     */
+    this.lastEndReason = null;
+    /**
      * Frames of the last match's end, replayed on resync to humans who have not moved on yet.
      * @type {{ publicFrame: string | null, frames: Map<string, string>, pending: Set<string> } | null}
      */
@@ -714,6 +725,9 @@ export class Room {
       // 标记**只发给本人**：broadcastState 在房间里有隐身观战者时逐会话编码，
       // 其余人拿到的 room.state 与以前逐字节一致。
       ...(viewerId && this.hiddenSpectatorOf(viewerId) ? { hiddenWatch: true } : {}),
+      // 上一局是怎么没的（'admin-aborted' / 'restart-aborted' / 'plugin-crash' / …）。
+      // 只在房间**没在跑对局**、且确实有原因时才下发，所以正常房间的 room.state 逐字节不变。
+      ...(!this.match && this.lastEndReason ? { endReason: this.lastEndReason } : {}),
     };
   }
 }
@@ -3147,6 +3161,10 @@ export class Lobby {
     if (ctx.ended || !ctx.live || room.matchCtx !== ctx || room.disposed) return;
     ctx.ended = true;
     room.lastSummary = summary ?? null;
+    // 这一局为什么没的：给客户端说对话用（管理员终止 ≠ 服务器重启）。自然打完的一局里
+    // summary.victory 是有值的（settle.js finish 把 m.result 原样传进来），客户端那时看结算
+    // 界面、不会读这个字段；被打断的只有 reason。
+    room.lastEndReason = summary && typeof summary.reason === 'string' ? summary.reason : null;
     resetAiTakeover(room);
     room.match = null;
     room.matchCtx = null;
@@ -3894,8 +3912,14 @@ export class Lobby {
    * 并把「15 分钟未开始对局就解散」的计时重新推到现在 —— 所以不会因为
    * 「房间创建时间太早」而在结束对局后立刻被解散。
    *
-   * 用 summary.reason = 'admin-aborted'：结算界面会据此显示「对局已被管理员终止」，
-   * 而不是伪装成一次正常打完的结算。
+   * 用 summary.reason = 'admin-aborted'：这个值会经 room.lastEndReason 下发给客户端
+   * （room.state.endReason），ui/game/overlays.js 的 MatchEnded 据它显示「管理员终止了这一局」，
+   * 而不是那句写死的服务器重启文案。
+   *
+   * ★ 2026-11-02：这里以前写的是「结算界面会据此显示『对局已被管理员终止』」—— 并不存在。
+   *   打断的对局没有结算帧（m.result 压根没生成），客户端也就没有结算界面可显示，
+   *   它看到的是 MatchEnded 那个浮层，而那个浮层把原因写死成了「服务器重启」。
+   *   现在原因真的下发了，两边才对得上。
    *
    * @param {Room} room @param {{ reason?: string }} [opts]
    * @returns {{ ok: true, code: string, wasRunning: boolean } | { ok: false, reason: string }}
