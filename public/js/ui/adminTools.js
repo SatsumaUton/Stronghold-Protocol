@@ -94,6 +94,8 @@ try {
 export function AdminTools({ open, onClose, anchor = null }) {
   const [tab, setTab] = useState('chess');
   const [q, setQ] = useState('');
+  // 盟约的层数（绝对值）。留空 = 老行为「加一层」；填了数字就按这个层数设置。
+  const [bondLayers, setBondLayers] = useState('');
   const [busy, setBusy] = useState('');
   const [log, setLog] = useState([]);
   // 数值类指令的三个输入（资金 / LP / 回合 / 商店位）
@@ -428,11 +430,15 @@ export function AdminTools({ open, onClose, anchor = null }) {
     ${
       // 干员 / 装备 / 盟约 / 策略 / 悬赏：从数据表里挑一条
       ['chess', 'item', 'bond', 'strategy', 'bounty'].includes(tab) ? html`
+        ${tab === 'bond' ? html`<label class="admintools__field">${t('层数')}
+          <input value=${bondLayers} onInput=${(e) => setBondLayers(e.target.value.replace(/[^0-9]/g, ''))}
+            inputmode="numeric" placeholder=${t('留空 = 加一层')} data-testid="bond-layers" />
+        </label>` : null}
         <input class="admintools__search" value=${q} onInput=${(e) => setQ(e.target.value)}
           placeholder=${t('搜索…')} aria-label=${t('搜索')} />
         <div class="admintools__list">
           ${shown.length ? shown.map(([key, rec]) => html`<button key=${key} type="button" class="admintools__row"
-            disabled=${!!busy} title=${key} onClick=${() => send(tab, { id: key }, nameOf(rec, key))}>
+            disabled=${!!busy} title=${key} onClick=${() => send(tab, tab === 'bond' && Number(bondLayers) > 0 ? { id: key, layers: Number(bondLayers) } : { id: key }, nameOf(rec, key))}>
             <span class="admintools__name">${nameOf(rec, key)}</span>
             ${rec && rec.tier ? html`<span class="admintools__tier">${rec.tier}</span>` : null}
           </button>`) : html`<div class="admintools__empty">${t('没有匹配的条目')}</div>`}

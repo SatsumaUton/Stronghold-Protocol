@@ -19,6 +19,10 @@ import { store, useStore } from '../store.js';
 import { data, useData } from '../data.js';
 import { net } from '../net.js';
 import { toast } from './toasts.js';
+// 服务端对 BAD_TARGET 之类的拒绝会带 detail（'no-such-bond'、'cap|{…}'、'add|{…}'…），
+// 只有 testAudit 的 explainTestDetail 认得这些格式。不接进来时这里只能显示一句
+// 「服务端拒绝：BAD_TARGET」，维护者看不出到底哪儿不对。
+import { explainTestDetail, testRefusalText } from './testAudit.js';
 import { t } from '../../../shared/i18n.js';
 
 /** 全部 16 条 g.test 指令（server/match/match/testCommands.js 的 _applyTest 一一对应）。 */
@@ -90,6 +94,8 @@ try {
 export function AdminTools({ open, onClose, anchor = null }) {
   const [tab, setTab] = useState('chess');
   const [q, setQ] = useState('');
+  // 盟约的层数（绝对值）。留空 = 老行为「加一层」；填了数字就按这个层数设置。
+  const [bondLayers, setBondLayers] = useState('');
   const [busy, setBusy] = useState('');
   const [log, setLog] = useState([]);
   // 数值类指令的三个输入（资金 / LP / 回合 / 商店位）
@@ -207,8 +213,11 @@ export function AdminTools({ open, onClose, anchor = null }) {
       const code = e?.code || String(e?.message || e);
       // 服务端会拒绝：WRONG_PHASE（战斗中不能改经济/棋子）、NOT_HOST、RATE、TEST_FORBIDDEN…
       // 原始错误码对使用者没有意义（"TEST_FORBIDDEN" 看不出该怎么办），所以翻成一句话再说。
-      // 未登记的新码仍然原样显示并标注来源，免得排查时找不到线索。
-      const why = ERR_HINT[code] || t('服务端拒绝：{code}', { code });
+      // 顺序：detail 里的具体原因 > 本面板的友好提示 > 错误码的通用文案。
+      // detail 优先是关键：盟约的 cap/add 会带上「现在几层、最多几层」，比任何固定文案都准。
+      const why = explainTestDetail(e?.detail)
+        || ERR_HINT[code]
+        || testRefusalText(e);
       push(false, `${note || cmd} — ${why}`);
       toast(why, 'error');
     } finally {
@@ -421,11 +430,15 @@ export function AdminTools({ open, onClose, anchor = null }) {
     ${
       // 干员 / 装备 / 盟约 / 策略 / 悬赏：从数据表里挑一条
       ['chess', 'item', 'bond', 'strategy', 'bounty'].includes(tab) ? html`
+        ${tab === 'bond' ? html`<label class="admintools__field">${t('层数')}
+          <input value=${bondLayers} onInput=${(e) => setBondLayers(e.target.value.replace(/[^0-9]/g, ''))}
+            inputmode="numeric" placeholder=${t('留空 = 加一层')} data-testid="bond-layers" />
+        </label>` : null}
         <input class="admintools__search" value=${q} onInput=${(e) => setQ(e.target.value)}
           placeholder=${t('搜索…')} aria-label=${t('搜索')} />
         <div class="admintools__list">
           ${shown.length ? shown.map(([key, rec]) => html`<button key=${key} type="button" class="admintools__row"
-            disabled=${!!busy} title=${key} onClick=${() => send(tab, { id: key }, nameOf(rec, key))}>
+            disabled=${!!busy} title=${key} onClick=${() => send(tab, tab === 'bond' && Number(bondLayers) > 0 ? { id: key, layers: Number(bondLayers) } : { id: key }, nameOf(rec, key))}>
             <span class="admintools__name">${nameOf(rec, key)}</span>
             ${rec && rec.tier ? html`<span class="admintools__tier">${rec.tier}</span>` : null}
           </button>`) : html`<div class="admintools__empty">${t('没有匹配的条目')}</div>`}
