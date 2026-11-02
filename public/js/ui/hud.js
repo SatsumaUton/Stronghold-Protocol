@@ -41,7 +41,7 @@ import { AdminTools } from './adminTools.js';
 import { canOpenAdminTools } from './adminGate.js';
 import { isCombatPhase, isBossPhase, prepCapsuleLabel, bossFrac, bossPctText, fmtNum, shopBlockReason } from './gameLogic.js';
 import { uniteBudgetInfo } from './gameLogic/phases.js';
-import { overtimeState, overtimeDrainPerSec, remainAt, speedVoteState, battleSpeedScale } from './matchStatus.js';
+import { overtimeState, overtimeDrainPerSec, remainAt, speedVoteState, speedVoteCountShown, battleSpeedScale } from './matchStatus.js';
 import { hotkeyLabelOf } from './settings.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 import { UnofficialMark, ruleLine } from './pluginTag.js';
@@ -472,6 +472,11 @@ export function SpeedVote({ pub, myId, spectator = false, onVote }) {
   if (!v || (spectator && v.status !== 'on' && v.status !== 'ending')) return null;
   const on = v.status === 'on' || v.status === 'ending';
   const label = on ? t('本场 2 倍速') : v.status === 'next' ? t('下一场起 2 倍速') : t('2 倍速');
+  // 票已经通过、这一场就在 2 倍速上跑，而且下一场也确定了（status 'on'）：票数（3/3、4/4）没有意义了，
+  // 只留「本场 2 倍速」。'ending' 不在此列 —— 那时这一场虽然是 2 倍速，但下一场的票数不够，
+  // 那个 1/3 是在提示还差几票，得留着（规则见 matchStatus.js speedVoteCountShown）。
+  const count = `${v.count}/${v.need}`;
+  const showCount = !spectator && speedVoteCountShown(v);
   const tip = v.status === 'ending' ? t('票数不足，下一场战斗恢复常速')
     : t('{need} 人同意后，下一场战斗起以 2 倍速进行', { need: v.need });
   const press = async () => {
@@ -481,10 +486,10 @@ export function SpeedVote({ pub, myId, spectator = false, onVote }) {
   };
   return html`<${Tooltip} text=${tip} placement="bottom">
     <button type="button" class=${cx('speedvote', 'tapx', on && 'is-on', v.mine && 'is-mine', v.count > 0 && 'is-called', busy && 'is-busy')}
-        aria-pressed=${v.mine ? 'true' : 'false'} aria-label=${`${label} ${v.count}/${v.need}`} disabled=${busy || spectator} data-testid="speed-vote" data-status=${v.status}
+        aria-pressed=${v.mine ? 'true' : 'false'} aria-label=${showCount ? `${label} ${count}` : label} disabled=${busy || spectator} data-testid="speed-vote" data-status=${v.status}
         onKeyDown=${(e) => { if (e.key === ' ') e.stopPropagation(); }} onClick=${press}>
       <i class="speedvote__glyph" aria-hidden="true">▶▶</i><span class="speedvote__label">${label}</span>
-      ${spectator ? null : html`<span class="speedvote__count num">${v.count}/${v.need}</span>`}
+      ${showCount ? html`<span class="speedvote__count num">${count}</span>` : null}
     </button>
   <//>`;
 }
