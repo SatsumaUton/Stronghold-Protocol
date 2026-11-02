@@ -1224,15 +1224,27 @@ export function LobbyScreen() {
           // 刷新后立刻点「开始多人匹配」时，accountToken 可能还没送到服务端，它会回
           // IDENTITY_PENDING（「还没收到账号身份」）。这不是游客，等身份到了重新握手再试一次，
           // 和 joinKnown 同一套做法。以前这里直接把这个码翻成「无效的请求」，玩家完全看不懂。
-          if (err?.code !== ERR.IDENTITY_PENDING) throw err;
+          //
+          // ★ 还要兼容旧节点：没有这次修复的节点不知道 IDENTITY_PENDING，它把「身份还没到」
+          //   直接压成 BAD_MSG + detail「游客不能参与多人匹配，请先登录」。我们手里明明有登录
+          //   凭证，就不该被当成游客打发 —— 同样等身份 + 重新握手 + 重试一次。
+          //   判据看 detail 而不是只看码：BAD_MSG 在别处另有含义，不能一律重试。
+          const identityRace = err?.code === ERR.IDENTITY_PENDING
+            || (err?.code === ERR.BAD_MSG && typeof err?.detail === 'string' && err.detail.includes('游客'));
+          if (!identityRace) throw err;
+          if (!window.__SP_ACCOUNT_TOKEN && !window.__SP_ACCOUNT_USER) throw err;   // 真游客：没法重试
           const got = await waitAccountToken();
           if (!got) {
             setMatchSearch(null);
             toast(t('还没读到你的账号信息，请稍等一秒再点一次；如果一直这样，请重新登录'), 'warn');
             return;
           }
-          try { net.close(); net.connect(); } catch { /* ignore */ }
-          await new Promise((r) => setTimeout(r, 800));
+          // 重新把账号令牌带给服务端：优先用 rehandshake（同一连接上重复 hello，服务端会重新同步身份），
+          // 它不可用或拒绝时再退回断开重连。实测：补发令牌后同一条连接立刻就能排队。
+          let sent = false;
+          try { sent = net.rehandshake?.() === true; } catch { sent = false; }
+          if (!sent) { try { net.close(); net.connect(); } catch { /* ignore */ } }
+          await new Promise((r) => setTimeout(r, 600));
           reply = (await ask()) || {};
         }
         // 直接进了别人正在等人的房（服务端找到合适的公开房）：跳进去
