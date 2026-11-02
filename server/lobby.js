@@ -466,6 +466,10 @@ function roomTtlEnabled() { return roomTtlConfig().enabled; }
  */
 let __gateCache = { at: 0, create: true, start: true, match: true };
 function maintenanceGate() {
+  // 测试 / 排障开关：置 1 时三个门全开，完全不读配置文件。
+  // 存在的理由：仓库里的 data/create-room.json 存的是「关闭」（公开仓库不该默认开放建房），
+  // 而单测跑的就是仓库那份 —— 不忽略开关的话，quickMatch / create 相关测试在仓库里永远是红的。
+  if (process.env.SP_GATE_IGNORE === '1') return { at: 0, create: true, start: true, match: true };
   if (Date.now() - __gateCache.at > 5000) {
     let create = true, start = true, match = true;
     try {
@@ -1112,8 +1116,11 @@ export class Lobby {
       }
       if (room.matchmaking) {
         const started = Number(room.matchmakingAt) || now;
-        if (now - started >= MATCHMAKING_TIMEOUT_MS) {
-          try { this.forceStartMatchmaking(room); } catch (e) { this.log?.warn?.('[lobby] 匹配超时开局失败 ' + (e && e.message)); }
+        // 人满即开：匹配的目的就是凑齐人，等满员了还让房主再点一次「开始」是多余的。
+        // 只有 1 个真人时不这么干（房间里可能有 AI 座位把座位占满，那不算「匹配到了」）。
+        const full = room.freeSeat() < 0 && room.activeHumans().length >= 2;
+        if (full || now - started >= MATCHMAKING_TIMEOUT_MS) {
+          try { this.forceStartMatchmaking(room); } catch (e) { this.log?.warn?.('[lobby] 匹配开局失败 ' + (e && e.message)); }
         }
         continue;
       }
@@ -1295,6 +1302,7 @@ export class Lobby {
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
       case 'room.matchmaking': return this.matchmaking(session, msg);
+    case 'room.quickMatch': return this.quickMatch(session, msg);
       case 'room.start': return this.start(session);
       case 'room.rerollSetup': return this.rerollSetup(session, msg);
       case 'room.cancelReroll': return this.rerollSetup(session, msg, true);
@@ -2656,6 +2664,49 @@ export class Lobby {
     this.broadcastState(room);
     return OK;
   }
+
+  /**
+   * room.quickMatch（大厅「多人匹配」）：一键参与匹配。
+   *
+   * 本服是 30 个独立节点进程，每个节点的 Lobby 只认识自己那批房间，所以这里**不做跨节点配对**：
+   * 候选来自本节点「公开同盟 + 匹配中 + 还缺人」的房间，凑不到就自己开一间并立刻进入匹配状态，
+   * 由既有的 matchmaking 超时（MATCHMAKING_TIMEOUT_MS）或「人满即开」负责开局。
+   * 跨节点配对需要一套共享队列（参考版的 server/matchmaking.js + cluster/lobby.js），
+   * 那是另一个量级的改动，见 MAINTENANCE.md「多人匹配」一节。
+   *
+   * 语义：已经在房间里就用 SESSION_IN_USE 拒绝（页面侧只在大厅显示这个按钮，正常不会撞上）。
+   */
+  quickMatch(session, { difficulty } = {}) {
+    if (session.adminId !== true && !maintenanceGate().match) return fail(ERR.MATCH_DISABLED);
+    if (this.roomOf(session)) return fail(ERR.SESSION_IN_USE, 'already in a room');
+    const asked = DIFFICULTIES.includes(difficulty) ? difficulty : null;
+    // 1) 找一间正在匹配、还缺人、且在公开列表上的房间：人最多的优先（更快凑满开局）
+    let best = null;
+    for (const room of this.rooms.values()) {
+      if (!room.matchmaking || room.mode !== 'coop') continue;
+      if (!this.roomOpen(room)) continue;
+      if (asked && room.difficulty !== asked) continue;
+      if (!best || room.activeHumans().length > best.activeHumans().length) best = room;
+    }
+    if (best) {
+      const res = this.join(session, { code: best.code });
+      if (!res || !res.error) return { ok: true, reply: { code: best.code, joined: true } };
+    }
+    // 2) 没有可加入的：自己开一间，挂到公开同盟上，直接开始等人
+    const made = this.create(session, { mode: 'coop', difficulty: asked ?? undefined });
+    if (made && made.error) return made;
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.INTERNAL, 'quick match created no room');
+    // 公开同盟列表由房主身份驱动（listable 会拒绝不该上架的房间），失败不影响匹配本身
+    try { if (this.listable(room)) this.setListed(session, { listed: true }); } catch { /* ignore */ }
+    const on = this.matchmaking(session, { on: true });
+    if (on && on.error) {
+      // 维护开关 / 未就绪之类：房间已经建好了，把失败原因交给前端提示即可
+      return { ok: true, reply: { code: room.code, joined: false, matchmaking: false, reason: on.error } };
+    }
+    return { ok: true, reply: { code: room.code, joined: false, matchmaking: true } };
+  }
+
   start(session) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);

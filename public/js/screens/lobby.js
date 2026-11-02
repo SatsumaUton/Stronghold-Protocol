@@ -62,6 +62,7 @@ import { t, tc, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { NoticesButton } from '../ui/notices.js';
 import { RoomListDialog, markListPrompt } from '../ui/roomList.js';
+import { currentNode } from '../ui/stickyNode.js';
 import { VersionSwitch } from '../ui/versionPicker.js';
 import { contentSet, retryContentSet } from '../content.js';
 import { DEFAULT_VERSION, lobbyVersion, offeredDifficulties, fallbackDifficulty, seasonOf, soloTimedOf, soloTimeMsgid, versionLabel } from '../versions.js';
@@ -253,6 +254,41 @@ function waitAccountToken(ms = 6000) {
   });
 }
 
+/**
+ * 房间不在本节点时，问匹配服务它在哪台节点上，然后跳过去。
+ *
+ * 30 个节点是独立进程，`room.join` 只认得本节点的房间：邀请链接 `?room=CODE`
+ * 或「公开同盟」里别的节点的房，在本节点直接加入只会拿到 ROOM_NOT_FOUND。
+ * 匹配服务有 `sp:n<节点>:lobby:rooms` 的全局目录，能答出节点号，我们再用 nginx 的
+ * `?n=<节点>&room=<码>` 换过去 —— 落到那台节点后 `?room=` 深链会自动加入。
+ *
+ * 防死循环：同一个房间码只在 sessionStorage 里允许跳一次。跳过去还是找不到
+ * （房刚解散），就不再跳，让它照常报「房间不存在」。
+ * @returns {Promise<boolean>} 真的跳走了就 true（调用方别再弹错）
+ */
+async function hopToRoomNode(code) {
+  const k = String(code || '').toUpperCase();
+  if (!k) return false;
+  const guardKey = 'sp.hopNode';
+  try {
+    if (sessionStorage.getItem(guardKey) === k) { sessionStorage.removeItem(guardKey); return false; }
+  } catch { /* ignore */ }
+  let node = 0;
+  try {
+    const r = await fetch('/mm/api/find-room?code=' + encodeURIComponent(k), { credentials: 'same-origin', cache: 'no-store' });
+    if (r.ok) { const j = await r.json(); node = Number(j?.node) || 0; }
+  } catch { return false; }
+  if (!(node >= 1 && node <= 30)) return false;
+  if (node === currentNode()) return false; // 已经在本节点上了，跳了也没用
+  try { sessionStorage.setItem(guardKey, k); } catch { /* ignore */ }
+  const u = new URL(location.href);
+  u.searchParams.set('n', String(node));
+  u.searchParams.set('room', k);
+  u.searchParams.delete('adminWatch');
+  location.assign(u.toString());
+  return true;
+}
+
 export async function joinKnown(type, key) {
   const attempt = (extra) => net.request(type, { code: key, ...(extra || {}) });
   try {
@@ -270,6 +306,11 @@ export async function joinKnown(type, key) {
       }
       // 等不到身份（未登录 / 网络慢）：退化成原来的「房间已满」，不再无限等
       throw Object.assign(new Error('房间已满'), { code: ERR.ROOM_FULL });
+    }
+    // 本节点没有这间房：可能是别的节点上的（邀请链接 / 公开同盟里的跨节点房）。
+    // 查得到节点就跳过去，跳成功了就别再弹「房间不存在」。
+    if (err?.code === ERR.ROOM_NOT_FOUND && type === 'room.join') {
+      if (await hopToRoomNode(key)) return { ok: true };
     }
     if (err?.code !== ERR.TEST_CONFIRM) throw err;
     const text = type === 'room.spectate'
@@ -664,7 +705,7 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
  */
 export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, onCode, codeOk, online, busy, onJoin, onSpectate, recent, marks, focusKey,
   testMode = false, asTest = false, onTest = () => {}, short = false, createLocked = false,
-  capacity = 4, onCapacity = null, onBrowse = null }) {
+  capacity = 4, onCapacity = null, onBrowse = null, onQuickMatch = null }) {
   const diffName = DIFFICULTY_NAMES[difficulty] ? t(DIFFICULTY_NAMES[difficulty]) : '';
   return html`<${Modal} open=${true} onClose=${onClose} class="ally" veilClass="proto-veil">
     <div class="ally__body">
@@ -697,11 +738,16 @@ export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, 
           </label>` : null}
           ${/* 公开同盟（同盟列表）：照参考版做成右对齐的胶囊按钮，夹在「创建同盟」和密钥卡之间。
                多人匹配做完以后跟它并排放在这里（参考版就是这么摆的）。 */ null}
-          ${onBrowse ? html`<div class="ally-links">
-            <button type="button" class="ally-pill" data-testid="alliance-browse"
+          ${onBrowse || onQuickMatch ? html`<div class="ally-links">
+            ${onBrowse ? html`<button type="button" class="ally-pill" data-testid="alliance-browse"
                 title=${t('看看有哪些同盟正在等博士，直接加入')} disabled=${!online} onClick=${() => onBrowse()}>
               <${Icon} name="users" />${t('公开同盟')}
-            </button>
+            </button>` : null}
+            ${onQuickMatch ? html`<button type="button" class="ally-pill" data-testid="alliance-quick"
+                title=${t('一键进一个还缺人的同盟；没有就自己开一间开始等人，人满或等待超时后自动开局')}
+                disabled=${!online || busy === 'create'} onClick=${() => onQuickMatch()}>
+              <${Icon} name="search" />${t('多人匹配')}
+            </button>` : null}
           </div>` : null}
           <div class="ally-card ally-card--join ally-join join-row">
             <span class="ally-card__art"><${JoinArt} /></span>
@@ -878,12 +924,49 @@ export function LobbyScreen() {
       return answer;
     });
   };
+  // 「多人匹配」：一键参与匹配。服务端（Lobby.quickMatch）先找本节点上正在匹配、还缺人的公开房间，
+  // 找不到就自己开一间并立刻进入匹配状态；进房后的状态由服务端广播过来，这里只负责关掉弹窗并给个提示。
+  const quickMatch = () => {
+    if (!createOpen) { toast(t('服务器暂时关闭了创建房间，请稍后再试'), 'warn'); return; }
+    if (guest) { toast(t('游客不能参与多人匹配，请先登录'), 'warn'); return; }
+    return run('quick', async () => {
+      // 服务端 net.js 把 reply 的字段平铺在 ok 帧顶层（{ ...res.reply, t:'ok', rid }），没有套一层 reply。
+      const reply = (await net.request('room.quickMatch', { difficulty: shownCoop })) || {};
+      setAllyOpen(false);
+      if (reply.joined) toast(t('已加入正在等人的同盟，人满或等待超时后自动开局'), 'success');
+      else if (reply.matchmaking === false) toast(t('已开好同盟，但匹配没能开启，请在同盟设置里手动打开'), 'warn');
+      else toast(t('已开好同盟并开始等人，人满或等待超时后自动开局'), 'success');
+    });
+  };
   const join = (c = code) => {
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
     // `undefined` — codeArg keeps an event target out of the key and falls back to the input field
     const k = codeArg(c, code);
     if (!k) { toast(t('同盟密钥为 {ROOM_CODE_LEN} 位字母或数字', { ROOM_CODE_LEN }), 'warn'); return; }
     run('join', () => joinKnown('room.join', k));
+  };
+  /**
+   * 从「公开同盟」列表进房：本节点直接发 room.join；
+   * 房间在**别的节点**上时，用 nginx 的 `?n=<节点>` 连过去 ——
+   * 页面落到那台节点后，`?room=` 深链会自动加入，玩家看到的就是「列表 → 房间」一步。
+   *
+   * 为什么要跳一下：30 个节点是各自独立的进程，每个 Lobby 只认识自己的房间，
+   * 在本节点发 room.join 只会拿到「房间不存在」。
+   */
+  const enterRoom = (c, node) => {
+    const k = codeArg(c, code);
+    if (!k) return;
+    const mine = currentNode();
+    if (node && node !== mine) {
+      // 直接换页到那台节点并带上房间码：不用先进大厅再点一次
+      const u = new URL(location.href);
+      u.searchParams.set('n', String(node));
+      u.searchParams.set('room', k);
+      u.searchParams.delete('adminWatch');
+      location.assign(u.toString());
+      return;
+    }
+    join(k);
   };
   // a spectator seat: no player seat taken, nothing to do but watch (also a match already running)
   const spectate = (c = code) => {
@@ -963,14 +1046,14 @@ export function LobbyScreen() {
       onJoin=${join} onSpectate=${spectate} recent=${recent} marks=${marks} focusKey=${!coarse}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} short=${shortScreen} createLocked=${!createOpen}
       capacity=${coopCapacity} onCapacity=${pickCapacity}
-      onBrowse=${() => setBrowseOpen(true)} />` : null}    ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
+      onBrowse=${() => setBrowseOpen(true)} onQuickMatch=${() => quickMatch()} />` : null}    ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed}
       soloTime=${soloTimed === true ? { on: soloFree, onToggle: setSoloFreePref } : null} createLocked=${!createOpen} />` : null}
     ${/* 和参考版一致：同盟模拟还开着才画这个列表。它叠在上面（Modal 的 modalStack 让
          只有最上层响应 Esc / Tab / 焦点），所以关掉列表 = 回到同盟模拟，而不是回大厅。 */ null}
     ${browseOpen && allyOpen ? html`<${RoomListDialog} online=${online} busy=${busy}
-      onJoin=${(c) => { setBrowseOpen(false); setAllyOpen(false); join(c); }} onClose=${() => setBrowseOpen(false)} />` : null}
+      onJoin=${(c, node) => { setBrowseOpen(false); setAllyOpen(false); enterRoom(c, node); }} onClose=${() => setBrowseOpen(false)} />` : null}
     ${sweepOpen ? html`<${SweepReport} onClose=${() => setSweepOpen(false)} />` : null}
     ${achOpen ? html`<${AchievementDialog} onClose=${() => setAchOpen(false)} />` : null}
   </div>`;

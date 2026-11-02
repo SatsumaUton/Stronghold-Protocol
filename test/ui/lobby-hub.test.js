@@ -285,10 +285,20 @@ test('选择同盟方式 creates the room itself: the lobby never stacks 选择�
   assert.match(lobbySrc, /<\$\{ProtocolSelect\} roomMode="solo"/, '选择模拟协议 stays before 独立模拟');
 });
 
-test('no server-only features: accounts, friends, federation, matchmaking, 无限火力, Android', () => {
-  for (const re of [/accounts\.js/, /friends\.js/, /federation/, /matchmaking/i, /match\.queue/, /randomMode/, /AndroidNative/, /__onRoomFound/, /room\.list/]) {
+test('no server-only features: accounts, friends, federation, 无限火力, Android — 以及上游那套退役的匹配机制', () => {
+  for (const re of [/accounts\.js/, /friends\.js/, /federation/, /match\.queue/, /randomMode/, /AndroidNative/, /__onRoomFound/, /room\.list/]) {
     assert.doesNotMatch(lobbySrc, re, String(re));
   }
+  // ★ 本服是有意的例外（2026-11-02 维护者要求「多人匹配按钮 + 界面」）：大厅里可以有一个「多人匹配」胶囊，
+  //   它只做两件事——发 room.quickMatch、读答复里的 matchmaking 标记。除此之外一概不许出现：
+  //   不 import 匹配子系统、不留上游的 match.queue / __onRoomFound / room.list 轮询。
+  assert.doesNotMatch(lobbySrc, /import[^\n]*matchmaking/i, '不许 import 匹配子系统');
+  for (const m of lobbySrc.matchAll(/matchmaking/gi)) {
+    const line = lobbySrc.slice(0, m.index).split('\n').length;
+    const text = lobbySrc.split('\n')[line - 1];
+    assert.match(text, /reply\.matchmaking/, `第 ${line} 行的 matchmaking 只允许读答复标记：${text.trim().slice(0, 80)}`);
+  }
+  assert.match(lobbySrc, /room\.quickMatch/, '本服的多人匹配入口就是 room.quickMatch 这一条');
 });
 
 test('lobby.css: text follows 文字大小 (var(--t)), no !important, no :has()', () => {

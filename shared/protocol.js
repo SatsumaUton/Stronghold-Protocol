@@ -553,6 +553,9 @@ export const C2S = {
   // 本服：匹配队友（server/lobby.js matchmaking）。0.3.3 上游拆掉了这条协议，但本服的
   // 「匹配队友」按钮与匹配服务器仍在用，必须放行，否则玩家点了只会拿到 unknown type。
   'room.matchmaking': { on: isBool },
+  // 本服：大厅「多人匹配」一键参与匹配（server/lobby.js quickMatch）。difficulty 可省：
+  // 省了就是「哪间匹配中的房间缺人就进哪间」。答复字段 { code, joined, matchmaking? }，由 net.js 平铺在 ok 帧顶层。
+  'room.quickMatch': { $optional: ['difficulty'], difficulty: (v) => DIFFICULTIES.includes(v) },
   'room.start': {},
   'room.rerollSetup': { setupRevision: (v) => isInt(v, 0, 2 ** 31) },
   'room.cancelReroll': { voteId: (v) => isInt(v, 1, 2 ** 31) },
