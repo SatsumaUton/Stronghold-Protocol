@@ -943,7 +943,7 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
             </p>
             <button type="button" class="proto-start" data-testid="match-start"
               disabled=${!online || working || createLocked} aria-busy=${working ? 'true' : 'false'}
-              onClick=${() => onStart({ difficulty, seats: scope.seats, rules: scope.rules })}>
+              onClick=${() => onStart({ difficulty, ...matchScopeRequest(scope) })}>
               <span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>STRONGHOLD<br />PROTOCOL</small></span>
               <span class="proto-start__label">${working ? html`<${Spinner} size="sm" />` : null}${t('开始多人匹配')}</span>
               <span class="proto-start__deco" aria-hidden="true"></span>
@@ -1206,8 +1206,18 @@ export function LobbyScreen() {
   // `req` = { difficulty, seats, rules }（MatchmakingSelect 的 onStart 直接把它传进来）。
   const quickMatch = (req) => {
     const d = req?.difficulty ?? shownCoop;
-    const seats = req?.seats ?? matchScopeRequest(matchScopeState).seats;
-    const rules = req?.rules ?? matchScopeRequest(matchScopeState).rules;
+    // ★ 服务端只认 'four' | 'multi' | 'both' 与 'standard' | 'experimental' | 'both' 这几个字符串；
+    //   界面传进来的却可能是数组（人数 / 规则都是多选）。以前这里原样把数组发出去，请求在
+    //   协议校验那一层就被拒，玩家每次点「开始多人匹配」都只看到一句「无效的请求」。
+    //   数组一律先过 matchScopeRequest 归一化，字符串原样放行。
+    const seatArg = Array.isArray(req?.seats)
+      ? matchScopeRequest({ seats: req.seats, rules: ['standard'] }).seats
+      : req?.seats;
+    const ruleArg = Array.isArray(req?.rules)
+      ? matchScopeRequest({ seats: ['four'], rules: req.rules }).rules
+      : req?.rules;
+    const seats = seatArg ?? matchScopeRequest(matchScopeState).seats;
+    const rules = ruleArg ?? matchScopeRequest(matchScopeState).rules;
     if (!createOpen) { toast(t('服务器暂时关闭了创建房间，请稍后再试'), 'warn'); return; }
     if (guest) { toast(t('游客不能参与多人匹配，请先登录'), 'warn'); return; }
     // ★ 别只看 `guest`：它是渲染时算的，可能已经过期。真正决定服务端怎么认人的是
@@ -1272,7 +1282,11 @@ export function LobbyScreen() {
           toast(t(e.detail), 'warn');
           return;
         }
-        throw e;
+        // 没有 detail 才是真正难查的情况：说明拒绝发生在协议校验那一层（那里不带原因）。
+        // 把错误码和原始错误一并打出来 —— 玩家截图就能定位，省掉一轮来回猜。
+        const code = e?.code || e?.message || '?';
+        try { console.warn('[quickMatch] 失败', e); } catch { /* ignore */ }
+        toast(t('匹配失败（{code}），请把这句发给服主', { code: String(code) }), 'error');
       }
     });
   };
