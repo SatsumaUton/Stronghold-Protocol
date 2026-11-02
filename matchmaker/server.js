@@ -992,6 +992,20 @@ const roomDir = new Map(); // node -> { codes: string[], at: number }
   // 公开同盟（跨节点）：所有节点上「挂到公开列表 + 还没开局 + 有空位」的房间。
   // 客户端在大厅点「公开同盟」时用它补齐本节点之外的房间，每条都带 node ——
   // 点进去时用 nginx 的 `?n=<node>` 直接落到那台节点，避免「在本节点找不到房间」。
+  // 提示语：给 /mm 那套「匹配队友」覆盖层用，和游戏内「多人匹配」界面同源
+  // （都读 shared/data/config.json 的 tips），免得两边轮换出来的句子不一样。
+  if (pathname === '/api/tips') {
+    try {
+      const raw = fs.readFileSync(path.join(ROOT_DIR, 'shared', 'data', 'config.json'), 'utf8');
+      const cfg = JSON.parse(raw);
+      const tips = Array.isArray(cfg?.tips)
+        ? cfg.tips.map((x) => (typeof x === 'string' ? x : x?.tip)).filter((x) => typeof x === 'string' && x)
+        : [];
+      return json(res, 200, { ok: true, tips });
+    } catch {
+      return json(res, 200, { ok: true, tips: [] });
+    }
+  }
   if (pathname === '/api/rooms/open') {
     try {
       const data = await openRooms();
