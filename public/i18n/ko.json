@@ -1,22 +1,5 @@
 {
   "离线导入（不下载官方数据表）": "오프라인으로 가져오기 (공식 데이터 테이블 다운로드 안 함)",
-  "_meta": {
-    "type": "lang",
-    "lang": "ko",
-    "name": "한국어",
-    "englishName": "Korean",
-    "version": "0.2.0",
-    "app": ">=0.2.0",
-    "authors": [
-      "the Stronghold Protocol contributors"
-    ],
-    "credits": "Game texts (data/i18n/ko.json): the official KR client data (© Hypergryph / Yostar) via ArknightsAssets/ArknightsGamedata. Interface strings machine-translated on 2026-10-07 using the official Korean game terms of the KR client; corrections are welcome on GitHub.",
-    "fallback": [
-      "en"
-    ],
-    "complete": true,
-    "machineTranslated": true
-  },
   "你已在其他同盟中，请先离开当前同盟": "이미 다른 동맹에 있습니다. 먼저 현재 동맹에서 나가 주세요.",
   "你已不在该同盟中": "더 이상 이 동맹에 속해 있지 않습니다.",
   "创建者已离开，同盟已解散": "방장이 나가 동맹이 해산되었습니다.",
@@ -2453,5 +2436,46 @@
   "{n} 池": "{n}개 풀",
   "每人独立": "각자 독립",
   "点一个座位，再点目标卡池即可移动；桌面端也可以直接拖。改动会随「应用」一起生效。": "자리를 누른 뒤 대상 풀을 누르면 이동합니다. PC에서는 드래그도 가능합니다. 변경은 「적용」과 함께 반영됩니다.",
-  "已由手动编组决定。": "수동 구성으로 결정됩니다."
+  "已由手动编组决定。": "수동 구성으로 결정됩니다.",
+  "公开同盟": "공개 동맹",
+  "看看有哪些同盟正在等博士，直接加入": "박사를 기다리는 동맹을 찾아 바로 참가할 수 있습니다",
+  "{n} 人及以上、由创建者公开且尚未开局的同盟显示在这里。": "생성자가 공개했고 아직 시작하지 않은 {n} 인 이상 동맹이 여기에 표시됩니다.",
+  "列表暂时无法更新，稍后自动重试": "목록을 갱신할 수 없습니다. 잠시 후 자동으로 다시 시도합니다",
+  "正在载入同盟列表…": "동맹 목록을 불러오는 중…",
+  "暂时没有等待博士的公开同盟": "지금 박사를 기다리는 공개 동맹이 없습니다",
+  "要公开这个同盟吗？": "이 동맹을 공개할까요?",
+  "先不公开": "지금은 공개하지 않기",
+  "公开以后，你创建的这个同盟会出现在大厅的「公开同盟」列表里，其他博士可以直接看到并加入。": "공개하면 이 동맹이 로비의 「公开同盟」 목록에 표시되어 다른 박사가 바로 보고 참가할 수 있습니다.",
+  "其他博士可以在大厅的「公开同盟」里看到这个房间并直接加入": "다른 박사가 로비의 「公开同盟」에서 이 방을 보고 바로 참가할 수 있습니다",
+  "挂到大厅的「公开同盟」列表上，让其他博士能找到这个房间": "로비의 「公开同盟」 목록에 올려 다른 박사가 이 방을 찾을 수 있게 합니다",
+  "公开同盟：已公开": "공개 동맹: 공개됨",
+  "公开同盟：未公开": "공개 동맹: 비공개",
+  "复活": "부활",
+  "禁用鸭爵": "덕로드 금지",
+  "关闭层数上限": "중첩 상한 없음",
+  "关闭命中上限": "타격 상한 없음",
+  "敌方生命 ×{n}": "적 HP ×{n}",
+  "敌方攻击 ×{n}": "적 공격 ×{n}",
+  "手动卡池": "수동 카드 풀",
+  "标准规则": "표준 규칙",
+  "{humans} 名博士，{bots} 名 AI": "박사 {humans} 명, AI {bots} 명",
+  "下次不再提醒": "다시 묻지 않기",
+  "勾选后建房不再询问。以后想公开时：进房后打开「同盟设置」，把里面的「公开同盟」打开即可；大厅「同盟模拟 → 公开同盟」里能看别人的同盟。": "체크하면 방 생성 시 더 이상 묻지 않습니다. 나중에 공개하려면 입장 후 「동맹 설정」을 열고 거기의 「公开同盟」을 켜면 됩니다. 로비의 「동맹 모의 → 公开同盟」에서는 다른 박사의 동맹을 볼 수 있습니다.",
+  "_meta": {
+    "type": "lang",
+    "lang": "ko",
+    "name": "한국어",
+    "englishName": "Korean",
+    "version": "0.2.0",
+    "app": ">=0.2.0",
+    "authors": [
+      "the Stronghold Protocol contributors"
+    ],
+    "credits": "Game texts (data/i18n/ko.json): the official KR client data (© Hypergryph / Yostar) via ArknightsAssets/ArknightsGamedata. Interface strings machine-translated on 2026-10-07 using the official Korean game terms of the KR client; corrections are welcome on GitHub.",
+    "fallback": [
+      "en"
+    ],
+    "complete": true,
+    "machineTranslated": true
+  }
 }

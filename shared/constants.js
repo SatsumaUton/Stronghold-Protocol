@@ -3,6 +3,10 @@
 import { N_ } from './i18n.js';
 
 export const PROTOCOL_VERSION = 1;
+/** 多人匹配（大厅「多人匹配」按钮，server/matchmaking.js）的能力与数据契约版本。
+ * 排队中的客户端只要版本不同就不能被配进同一局，所以改了排队/接受的语义就要 +1。
+ * 客户端在 hello 里带上它（net.js），旧页面不带 = 不能进公开匹配。 */
+export const MATCHMAKING_VERSION = 'alliance-2';
 /** Release version shown to players (title screen, server banner, /healthz). Kept equal to package.json "version"
  * (test/version.test.js); PROTOCOL_VERSION above is the separate wire-format number. */
 export const APP_VERSION = '0.3.3';
@@ -35,6 +39,16 @@ export const MAX_SPECTATORS = 2;
 export const SETUP_REROLL_COOLDOWN_MS = 30_000;
 export const ROOM_CODE_LEN = 4;
 export const NAME_MAX_LEN = 12;
+
+/**
+ * 同盟列表（room.list / room.setListed，公开同盟）：
+ * 本服**所有合作房都能挂**，所以门槛就是最小容量 MAX_SEATS（4）—— 参考版取 8 是因为它的容量
+ * 只有 [4,8,12,16,20] 五个档位，8 是「比默认 4 大的最小一档」；我们把 isPlayerCapacity 放宽成
+ * 任意 4–20 整数，5/6/7 人房都存在，用 8 会把它们白白挡在外面。
+ * 一次 room.list 最多回 ROOM_LIST_MAX 个房间。
+ */
+export const ROOM_LIST_MIN_CAPACITY = MAX_SEATS;
+export const ROOM_LIST_MAX = 50;
 
 export const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
 export const DIFFICULTY_NAMES = { FUNNY: N_('标准模拟'), NORMAL: N_('险境模拟'), HARD: N_('绝境模拟'), ABYSS: N_('终极模拟') };
@@ -170,6 +184,9 @@ export const ERR = Object.freeze({
   ROOM_CODE_TAKEN: 'ROOM_CODE_TAKEN',
   NOT_HOST: 'NOT_HOST',
   NOT_READY: 'NOT_READY',
+  // 房间里还有排队中的任务（房间串行队列，或多人匹配队列里还有它的玩家）：
+  // 这会儿改规则 / 挂同盟列表 / 开局都会和排队的那件事打架，先等它跑完。
+  QUEUED: 'QUEUED',
   WRONG_PHASE: 'WRONG_PHASE',
   NO_FUNDS: 'NO_FUNDS',
   HAND_FULL: 'HAND_FULL',

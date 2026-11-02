@@ -1229,3 +1229,42 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .proto-list__wait { display: flex; align-items: center; gap: .08rem; margin: 0; color: var(--text-lo); font-size: calc(.15 * var(--t)); }
 .proto-list__wait.is-failed { flex-wrap: wrap; color: var(--amber); }
 .proto-list__wait.is-failed .icon { flex: none; width: 1.1em; height: 1.1em; }
+
+/* 公开同盟（同盟列表，room.list / room.setListed）*/
+.ally-browse { display: flex; align-items: center; gap: .14rem; width: 100%; margin-top: .12rem; padding: .14rem .18rem;
+  border: 1px solid rgba(78, 216, 175, .34); border-radius: .1rem; background: linear-gradient(180deg, rgba(20, 44, 40, .92), rgba(12, 26, 24, .96));
+  color: #d8f6ec; text-align: left; cursor: pointer; }
+.ally-browse:hover:not(:disabled) { border-color: rgba(78, 216, 175, .62); background: linear-gradient(180deg, rgba(26, 58, 52, .96), rgba(14, 32, 29, .98)); }
+.ally-browse:disabled { opacity: .55; cursor: default; }
+.ally-browse__text { display: flex; flex-direction: column; gap: .02rem; min-width: 0; flex: 1; }
+.ally-browse__text b { font-size: calc(.2 * var(--t)); letter-spacing: .04em; }
+.ally-browse__text small { font-size: calc(.15 * var(--t)); color: var(--text-lo); overflow-wrap: anywhere; }
+.ally-browse__go { flex: none; display: flex; opacity: .7; }
+
+.rlist-dialog .modal__body { display: flex; flex-direction: column; gap: .12rem; }
+.rlist { display: flex; flex-direction: column; gap: .06rem; margin: 0; padding: 0; list-style: none;
+  max-height: min(52vh, calc(6.4 * var(--sp-ui, 1))); overflow-y: auto; overscroll-behavior: contain; }
+.rlist__row { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content max-content max-content;
+  align-items: center; gap: .12rem; padding: .1rem .12rem; border: 1px solid rgba(120, 160, 156, .22);
+  border-left: 3px solid var(--d-color, #78a09c); border-radius: .08rem; background: rgba(10, 20, 20, .72); }
+.rlist__diff { display: flex; align-items: center; gap: .06rem; font-size: calc(.16 * var(--t)); font-weight: 700; color: var(--d-color, #cfe); white-space: nowrap; }
+.rlist__who { display: flex; flex-direction: column; gap: .02rem; min-width: 0; }
+.rlist__who b { font-size: calc(.17 * var(--t)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rlist__who small { font-size: calc(.13 * var(--t)); color: var(--text-lo); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rlist__ver { display: flex; align-items: center; gap: .04rem; font-size: calc(.14 * var(--t)); color: #9fd3ff; white-space: nowrap; }
+.rlist__seats { font-size: calc(.17 * var(--t)); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rlist__seats i { font-style: normal; opacity: .45; margin: 0 .02rem; }
+.rlist__join { flex: none; }
+.rlist__note { display: flex; align-items: center; gap: .08rem; margin: 0; padding: .16rem 0; font-size: calc(.16 * var(--t)); color: var(--text-lo); }
+.rlist__hint { color: var(--text-lo); }
+@media (max-width: 700px) {
+  .rlist__row { grid-template-columns: max-content minmax(0, 1fr) max-content; grid-template-areas: 'd w s' 'j j j'; row-gap: .08rem; }
+  .rlist__diff { grid-area: d; } .rlist__who { grid-area: w; } .rlist__seats { grid-area: s; }
+  .rlist__ver { display: none; } .rlist__join { grid-area: j; width: 100%; }
+}
+
+/* 建房后询问里的「下次不再提醒」 */
+.listask__skip { display: flex; align-items: center; gap: .08rem; margin: .04rem 0 .02rem; cursor: pointer;
+  font-size: calc(.16 * var(--t)); color: var(--text); }
+.listask__skip input { width: calc(.16 * var(--t)); height: calc(.16 * var(--t)); accent-color: #4ed8af; cursor: pointer; flex: none; }
+.listask__skip span { line-height: 1.4; }

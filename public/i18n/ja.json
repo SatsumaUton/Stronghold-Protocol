@@ -1,26 +1,5 @@
 {
   "离线导入（不下载官方数据表）": "オフラインでインポート（公式データテーブルをダウンロードしない）",
-  "_meta": {
-    "type": "lang",
-    "lang": "ja",
-    "name": "日本語",
-    "englishName": "Japanese",
-    "version": "0.2.0",
-    "app": ">=0.2.0",
-    "authors": [
-      "the Stronghold Protocol contributors"
-    ],
-    "credits": "Game texts (data/i18n/ja.json): the official JP client data (© Hypergryph / Yostar) via ArknightsAssets/ArknightsGamedata. Interface strings machine-translated on 2026-10-07 using the official Japanese game terms of the JP client; corrections are welcome on GitHub.",
-    "fallback": [
-      "en"
-    ],
-    "numberUnits": [
-      "万",
-      "億"
-    ],
-    "complete": true,
-    "machineTranslated": true
-  },
   "你已在其他同盟中，请先离开当前同盟": "すでに他の同盟に参加しています。先に現在の同盟から退出してください",
   "你已不在该同盟中": "すでにこの同盟のメンバーではありません",
   "创建者已离开，同盟已解散": "ホストが退出したため、同盟は解散しました",
@@ -2457,5 +2436,50 @@
   "{n} 池": "{n} プール",
   "每人独立": "各自独立",
   "点一个座位，再点目标卡池即可移动；桌面端也可以直接拖。改动会随「应用」一起生效。": "席を選んでから移動先のプールをタップで移動。PC ではドラッグも可。「適用」で反映されます。",
-  "已由手动编组决定。": "手動編成で決まります。"
+  "已由手动编组决定。": "手動編成で決まります。",
+  "公开同盟": "公開同盟",
+  "看看有哪些同盟正在等博士，直接加入": "博士を待っている同盟を探して、そのまま参加できます",
+  "{n} 人及以上、由创建者公开且尚未开局的同盟显示在这里。": "作成者が公開し、まだ開始していない {n} 人以上の同盟がここに表示されます。",
+  "列表暂时无法更新，稍后自动重试": "リストを更新できませんでした。しばらくして自動で再試行します",
+  "正在载入同盟列表…": "同盟リストを読み込み中…",
+  "暂时没有等待博士的公开同盟": "博士を待っている公開同盟は今はありません",
+  "要公开这个同盟吗？": "この同盟を公開しますか？",
+  "先不公开": "今は公開しない",
+  "公开以后，你创建的这个同盟会出现在大厅的「公开同盟」列表里，其他博士可以直接看到并加入。": "公開すると、この同盟はロビーの「公開同盟」リストに表示され、他の博士が直接見て参加できます。",
+  "其他博士可以在大厅的「公开同盟」里看到这个房间并直接加入": "他の博士はロビーの「公開同盟」でこの部屋を見て、そのまま参加できます",
+  "挂到大厅的「公开同盟」列表上，让其他博士能找到这个房间": "ロビーの「公開同盟」リストに載せ、他の博士がこの部屋を見つけられるようにします",
+  "公开同盟：已公开": "公開同盟：公開中",
+  "公开同盟：未公开": "公開同盟：非公開",
+  "复活": "復活",
+  "禁用鸭爵": "ダックロード禁止",
+  "关闭层数上限": "レイヤー上限なし",
+  "关闭命中上限": "ヒット上限なし",
+  "敌方生命 ×{n}": "敵のHP ×{n}",
+  "敌方攻击 ×{n}": "敵の攻撃 ×{n}",
+  "手动卡池": "手動カードプール",
+  "标准规则": "標準ルール",
+  "{humans} 名博士，{bots} 名 AI": "博士 {humans} 名、AI {bots} 名",
+  "下次不再提醒": "次回から表示しない",
+  "勾选后建房不再询问。以后想公开时：进房后打开「同盟设置」，把里面的「公开同盟」打开即可；大厅「同盟模拟 → 公开同盟」里能看别人的同盟。": "チェックすると作成時に確認しなくなります。後で公開するには、入室後に「同盟設定」を開き、そこの「公開同盟」をオンにしてください。ロビーの「同盟模擬 → 公開同盟」では他の博士の同盟を見られます。",
+  "_meta": {
+    "type": "lang",
+    "lang": "ja",
+    "name": "日本語",
+    "englishName": "Japanese",
+    "version": "0.2.0",
+    "app": ">=0.2.0",
+    "authors": [
+      "the Stronghold Protocol contributors"
+    ],
+    "credits": "Game texts (data/i18n/ja.json): the official JP client data (© Hypergryph / Yostar) via ArknightsAssets/ArknightsGamedata. Interface strings machine-translated on 2026-10-07 using the official Japanese game terms of the JP client; corrections are welcome on GitHub.",
+    "fallback": [
+      "en"
+    ],
+    "numberUnits": [
+      "万",
+      "億"
+    ],
+    "complete": true,
+    "machineTranslated": true
+  }
 }
