@@ -695,6 +695,14 @@ export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, 
             <span>${t('测试房间')}</span>
             <em class="t-dim">${t('不计入战绩。房间会标明「测试」，只有房主能使用测试指令。')}</em>
           </label>` : null}
+          ${/* 公开同盟（同盟列表）：照参考版做成右对齐的胶囊按钮，夹在「创建同盟」和密钥卡之间。
+               多人匹配做完以后跟它并排放在这里（参考版就是这么摆的）。 */ null}
+          ${onBrowse ? html`<div class="ally-links">
+            <button type="button" class="ally-pill" data-testid="alliance-browse"
+                title=${t('看看有哪些同盟正在等博士，直接加入')} disabled=${!online} onClick=${() => onBrowse()}>
+              <${Icon} name="users" />${t('公开同盟')}
+            </button>
+          </div>` : null}
           <div class="ally-card ally-card--join ally-join join-row">
             <span class="ally-card__art"><${JoinArt} /></span>
             <div class="ally-key">
@@ -715,17 +723,6 @@ export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, 
               <span class="ally-card__icon"><${Icon} name="users" /></span>${t('加入同盟')}${busy === 'join' ? html`<${Spinner} size="sm" />` : null}
             </button>
           </div>
-          ${/* 公开同盟（同盟列表）：别的博士挂出来的、还在等人的同盟，点进去直接加入。
-               以前只能靠房主私发密钥，人凑不齐就散 —— 这个入口让他们自己找得到彼此。 */ null}
-          ${onBrowse ? html`<button type="button" class="ally-card ally-card--join ally-browse" data-testid="alliance-browse"
-              disabled=${!online} onClick=${() => onBrowse()}>
-            <span class="ally-card__icon"><${Icon} name="search" /></span>
-            <span class="ally-browse__text">
-              <b>${t('公开同盟')}</b>
-              <small>${t('看看有哪些同盟正在等博士，直接加入')}</small>
-            </span>
-            <span class="ally-browse__go"><${Icon} name="chevronRight" /></span>
-          </button>` : null}
         </section>
       </div>
     </div>
