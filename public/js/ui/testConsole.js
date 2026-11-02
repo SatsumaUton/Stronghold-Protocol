@@ -11,13 +11,14 @@
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html } from './components.js';
 import { useStore } from '../store.js';
-import { data, useData } from '../data.js';
+import { data, getMode, useData } from '../data.js';
 import { net } from '../net.js';
 import { toast } from './toasts.js';
 import { t } from '../../../shared/i18n.js';
 import { actionForKey } from './gameLogic/shortcuts.js';
 import { settingsStore } from './settings.js';
 import { formatAuditLine, newestFirst, testRefusalText } from './testAudit.js';
+import { modeOffBonds } from './gameLogic.js';
 import { clampDock, dockHome, dockMetricsFromStyle, DOCK_REM, readDockPos, writeDockPos } from './testDock.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -181,6 +182,16 @@ export function TestConsole() {
   const choices = tokenIds
     ? tokenIds.map((key) => [key, (data.get('tokens') || {})[key] || {}])
     : Object.entries(table ? data.get(table) || {} : {});
+  // 盟约：以前这里和干员/装备共用「自由文本 + datalist」，维护者要么留空、要么手打 id，
+  // 服务端 gd.bond(id) 查不到就回 BAD_TARGET —— 面板上只看到一句「无效的目标」，看不出是 id 没填。
+  // 现在换成真正的下拉：只列本模式**生效**的盟约（config.json modes[modeId].inactiveBondIds 之外的全部），
+  // 按 bondOrder 排，显示本地化名字 + id，选一个就一定是合法的 bond id。
+  const offBonds = cmd === 'bond' ? modeOffBonds(pub.modeId ? getMode(pub.modeId) : null) : null;
+  const bondChoices = cmd === 'bond'
+    ? Object.entries(data.get('bonds') || {})
+      .filter(([key]) => !offBonds.has(key))
+      .sort((a, b) => (Number(a[1].bondOrder) || 0) - (Number(b[1].bondOrder) || 0))
+    : [];
   const names = new Map((pub.players || []).map((p) => [p.playerId, p.name]));
   const log = newestFirst(pub.testLog);
   const send = (command, args) => {
@@ -210,7 +221,10 @@ export function TestConsole() {
     if (cmd === 'bond') {
       const n = num(layers);
       const extra = num(count);
-      if (!id.trim() || n == null || extra == null) return toast(t('无效的目标'), 'error');
+      // 分开报，别再用「无效的目标」这种通用话：漏填哪个就说哪个。
+      if (!id.trim()) return toast(t('先选一个盟约'), 'error');
+      if (n == null) return toast(t('层数要填一个数字'), 'error');
+      if (extra == null) return toast(t('额外盟约人数要填一个数字'), 'error');
       return go('bond', { id: id.trim(), layers: n, count: extra });
     }
     if (cmd === 'strategy') {
@@ -316,8 +330,14 @@ export function TestConsole() {
       ${cmd === 'funds' || cmd === 'lp' || cmd === 'hp' || cmd === 'teamLp' ? html`<label class="testconsole__field">${cmd === 'funds' ? t('资金') : cmd === 'lp' ? t('目标生命') : cmd === 'hp' ? t('领袖生命') : t('队伍生命')}
         <input value=${amount} onInput=${(e) => setAmount(e.target.value)} inputmode="numeric" />
       </label>` : null}
-      ${cmd === 'chess' || cmd === 'item' || cmd === 'bond' || cmd === 'strategy' || cmd === 'bounty' || cmd === 'token' ? html`<label class="testconsole__field">${cmd === 'item' ? t('装备') : cmd === 'bond' ? t('盟约') : cmd === 'strategy' ? t('策略') : cmd === 'bounty' ? t('悬赏目标') : cmd === 'token' ? t('召唤物') : t('干员')}
+      ${cmd === 'chess' || cmd === 'item' || cmd === 'strategy' || cmd === 'bounty' || cmd === 'token' ? html`<label class="testconsole__field">${cmd === 'item' ? t('装备') : cmd === 'strategy' ? t('策略') : cmd === 'bounty' ? t('悬赏目标') : cmd === 'token' ? t('召唤物') : t('干员')}
         <input list="test-content-ids" value=${id} onInput=${(e) => setId(e.target.value)} />
+      </label>` : null}
+      ${cmd === 'bond' ? html`<label class="testconsole__field">${t('盟约')}
+        <select value=${id} onChange=${(e) => setId(e.target.value)} data-testid="test-bond-id">
+          <option value="">${t('选一个盟约')}</option>
+          ${bondChoices.map(([key, rec]) => html`<option key=${key} value=${key}>${data.localeName(rec.name || key)}（${key}）</option>`)}
+        </select>
       </label>` : null}
       ${cmd === 'token' ? html`<label class="testconsole__field">${t('所属棋子 uid')}
         <input list="test-owner-uids" value=${ownerUid} onInput=${(e) => setOwnerUid(e.target.value)} inputmode="numeric" />
