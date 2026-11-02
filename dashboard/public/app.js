@@ -1071,8 +1071,11 @@ async function loadOps() {
         .map((k) => `${KIND_ZH[k]} ${new Date(kAt[k]).toLocaleString('zh-CN', { hour12: false })}`)
         .join(' · ')
     : '读不到代码时间';
+  // 排队人数单独列出来：这些人不在任何房间里，只看「房间 / 对局」是看不见的
+  const queuedTotal = Number(opsData.queued) || opsData.nodes.reduce((a, x) => a + (x.queued || 0), 0);
   $('ops-summary').textContent =
-    `节点响应 ${s.alive}/${NODES} · 房间 ${s.rooms} · 对局 ${s.matches} · 在线 ${s.players}`;
+    `节点响应 ${s.alive}/${NODES} · 房间 ${s.rooms} · 对局 ${s.matches} · 在线 ${s.players}`
+    + (queuedTotal ? ` · 多人匹配排队 ${queuedTotal}` : '');
 
   // 一键重启的实时计数：先说清「现在按下去会动几台」
   const allHint = $('ops-restart-all-hint');

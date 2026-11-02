@@ -977,7 +977,9 @@ export class Lobby {
       for (const s of r.seats) if (s && !s.left) (s.isBot ? bots++ : humans++);
       spectators += r.spectators.length;
     }
-    return { rooms: this.rooms.size, matches, humans, bots, spectators };
+    // queued：多人匹配**正在排队等**的人数。他们没有房间、没进对局，光看 rooms/matches 完全看不见，
+  // 所以控制台和后台要能读到 —— 否则「有人点了开始多人匹配但还没成局」在运维侧是隐形的。
+  return { rooms: this.rooms.size, matches, humans, bots, spectators, queued: this.quickQueue?.size || 0 };
   }
 
   // ---------------------------------------------------------------------------------------------------
