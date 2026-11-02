@@ -61,6 +61,16 @@ const isBackupName = (rel) => /(?:\.bak|\.old|\.orig)(?:$|[-.])/i.test(path.posi
 /** Whether a BUILD_INPUTS-relative path takes part in the build tag. */
 const isBuildInput = (rel) => !LOCAL_RUNTIME_FILES.has(rel) && !isBackupName(rel);
 
+/**
+ * 一个文件的内容指纹。**不看 mtime**：多节点部署下同一份代码在不同机器上的
+ * mtime 必然不同（复制、同步、重启都会改），用它当版本号会让「服务器已更新，
+ * 请刷新页面」在代码完全相同时反复误报 —— 2026-11-02 实测：node-1 与其余 29 台
+ * 文件逐字节相同，指纹却不同。
+ */
+function contentTag(abs) {
+  try { return createHash('sha1').update(fs.readFileSync(abs)).digest('hex').slice(0, 12); }
+  catch { return 'unreadable'; }
+}
 /** @type {{ tag: string|null }|null} */
 let buildCache = null;
 
@@ -71,7 +81,7 @@ let buildCache = null;
 function buildEntries(abs, rel, out, served) {
   let stat;
   try { stat = fs.statSync(abs); } catch { return; }
-  if (stat.isFile()) { if (isBuildInput(rel)) out.push([rel, stat.size, stat.mtimeMs]); return; }
+  if (stat.isFile()) { if (isBuildInput(rel)) out.push([rel, stat.size, contentTag(abs)]); return; }
   if (!stat.isDirectory()) return;
   let names;
   try { names = fs.readdirSync(abs, { withFileTypes: true }); } catch { return; }
@@ -85,7 +95,7 @@ function buildEntries(abs, rel, out, served) {
     }
     else if (d.isFile()) {
       if (!isBuildInput(childRel)) continue;
-      try { const s = fs.statSync(child); out.push([childRel, s.size, s.mtimeMs]); } catch { /* ignore */ }
+      try { const s = fs.statSync(child); out.push([childRel, s.size, contentTag(child)]); } catch { /* ignore */ }
     }
   }
 }
@@ -104,7 +114,7 @@ export function computeBuildTag(root = ROOT, { servedVersionDirs = [] } = {}) {
   if (!out.length) return null;
   out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   const h = createHash('sha1');
-  for (const [rel, size, mtime] of out) h.update(`${rel}\0${size}\0${Math.floor(mtime)}\n`);
+  for (const [rel, size, body] of out) h.update(`${rel}\0${size}\0${body}\n`);
   return h.digest('hex').slice(0, 12);
 }
 
