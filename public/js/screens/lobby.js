@@ -820,10 +820,13 @@ function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null
   const position = Number(queue?.position) || 0;
   const multi = multiSeats();
   const seatTags = scope.seats.map((s, i) => ({
-    key: `s${i}`,
+    key: `s${i}`, color: '#4ed8af',   // 人数：薄荷绿（照参考版第二颗标签）
     label: s === 'four' ? t('{n} 人同盟', { n: MAX_SEATS }) : t('多人同盟 {a}–{b} 人', { a: multi.a, b: multi.b }),
   }));
-  const ruleTags = scope.rules.map((r, i) => ({ key: `r${i}`, label: r === 'standard' ? t('标准规则') : t('实验性规则') }));
+  const ruleTags = scope.rules.map((r, i) => ({
+    key: `r${i}`, color: '#8d9391',    // 规则：灰
+    label: r === 'standard' ? t('标准规则') : t('实验性规则'),
+  }));
   const tags = [
     { key: 'difficulty', label: t(DIFFICULTY_NAMES[difficulty]), color: DIFFICULTY_COLORS[difficulty] },
     ...seatTags,
