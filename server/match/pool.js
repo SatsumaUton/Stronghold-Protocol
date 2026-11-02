@@ -1,6 +1,6 @@
 // server/match/pool.js — the SHARED chess pool (copies per base chess, across all players), per-match bans,
-import { MAX_SEATS } from '../../shared/constants.js';
 import { MAX_PLAYER_CAPACITY } from '../../shared/playerCapacity.js';
+import { poolScale } from '../../shared/poolPlan.js';
 // copy-weighted shop rolls (research 00-INDEX §3, §6; DESIGN §6.2).
 //
 // Model:
@@ -275,18 +275,41 @@ export class SharedItemPool {
 }
 
 
-export function createPoolGroups(gd, players, { banned = [], experimental = false, independent = false, fixedChunks = false } = {}) {
+export function createPoolGroups(gd, players, { banned = [], experimental = false, independent = false, fixedChunks = false, legacySix = false, plan = null } = {}) {
   if (!Array.isArray(players) || players.length < 1 || players.length > MAX_PLAYER_CAPACITY) throw new RangeError('pool groups require 1..20 players');
   const sorted = players.slice().sort((a, b) => a.seat - b.seat);
   const count = sorted.length;
-  const chunked = experimental && !independent && (fixedChunks || count > MAX_SEATS);
-  const groups = independent ? count : chunked ? Math.ceil(count / 4) : 1;
+  // 手动指定卡池编组（移植自参考版，反馈 #49）：房主自己排的座位分组说了算 ——
+  // `plan[seat]` 就是那个座位的卡池号（shared/poolPlan.js 的规范形式，按首次出现从 0 编号）。
+  // 一个池之所以存在，就是因为有座位在它里面，所以不需要存空池。
+  // 卡池大小按池里的座位数缩放（4 人以内 1 份完整池，更多按比例，同自动规则的 5 人 ×5/4）。
+  if (plan) {
+    const pools = new Map();
+    for (const p of sorted) {
+      if (!Number.isInteger(plan[p.seat])) throw new RangeError('pool plan has no such seat');
+      if (!pools.has(plan[p.seat])) pools.set(plan[p.seat], []);
+      pools.get(plan[p.seat]).push(p.playerId);
+    }
+    return [...pools.keys()].sort((a, b) => a - b).map((pool, i) => {
+      const playerIds = pools.get(pool), scale = poolScale(playerIds.length);
+      return { id: i + 1, playerIds, scale, pool: new SharedPool(gd, { banned, scale }) };
+    });
+  }
+  // 扩容房分组（反馈 #49）：
+  //   * `fixedChunks`（目标容量 20 的合作实验局）：开局按座位升序固定每四人一组，最后一组不足四人独立用完整池
+  //     —— 九人是 4＋4＋1，不是 3＋3＋3；
+  //   * 其余扩容房：5 人共享一份 ×5/4 卡池（一组，scale 1.25），6 人起每组一份完整普通卡池
+  //     —— 6 人是 3＋3、7 人是 4＋3、8 人是 4＋4、12 人是 4＋4＋4。
+  // `legacySix` 只为兼容旧房间保留（6 人回到「一份 ×1.5 大池」的旧行为），默认关闭。
+  const chunked = experimental && fixedChunks && !independent;
+  const enlarged = experimental && !independent && !chunked && (count === 5 || count === 6 && legacySix);
+  const groups = independent ? count : chunked || experimental && !enlarged && count >= 6 ? Math.ceil(count / 4) : 1;
   const size = Math.floor(count / groups), remainder = count % groups;
   let offset = 0;
   return Array.from({ length: groups }, (_, i) => {
     const n = chunked ? Math.min(4, count - offset) : size + (i < remainder ? 1 : 0);
     const playerIds = sorted.slice(offset, offset += n).map(p => p.playerId);
-    const scale = !independent && !chunked && experimental && count > 4 && count < 7 ? count / 4 : 1;
+    const scale = enlarged ? count / 4 : 1;
     return { id: i + 1, playerIds, scale, pool: new SharedPool(gd, { banned, scale }) };
   });
 }
