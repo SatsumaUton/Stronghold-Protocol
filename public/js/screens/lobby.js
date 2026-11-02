@@ -62,6 +62,8 @@ import { t, tc, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { NoticesButton } from '../ui/notices.js';
 import { RoomListDialog, markListPrompt } from '../ui/roomList.js';
+// 搜寻中面板：直接用同盟模拟里「匹配队友」那套界面（品牌行 + 像素侦察兵 + 轮换提示 + 停止搜寻）
+import { SearchPanel } from '../ui/matchFlow.js';
 import { currentNode } from '../ui/stickyNode.js';
 import { VersionSwitch } from '../ui/versionPicker.js';
 import { contentSet, retryContentSet } from '../content.js';
@@ -809,37 +811,30 @@ function MatchRules() {
  * 所以照参考版把它做完整：搜寻中、已等秒数、这次的范围、取消。
  */
 function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null }) {
-  const info = difficultyInfo('coop', difficulty);
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-  const ss = String(elapsed % 60).padStart(2, '0');
   // 排队信息（服务端 room.quickState 的答复）：还有几个人在等这个池、我排第几、还差几人。
   const waiting = Number(queue?.waiting) || 0;
   const need = Number(queue?.need) || 0;
   const position = Number(queue?.position) || 0;
+  const multi = multiSeats();
+  const seatTags = scope.seats.map((s, i) => ({
+    key: `s${i}`,
+    label: s === 'four' ? t('{n} 人同盟', { n: MAX_SEATS }) : t('多人同盟 {a}–{b} 人', { a: multi.a, b: multi.b }),
+  }));
+  const ruleTags = scope.rules.map((r, i) => ({ key: `r${i}`, label: r === 'standard' ? t('标准规则') : t('实验性规则') }));
+  const tags = [
+    { key: 'difficulty', label: t(DIFFICULTY_NAMES[difficulty]), color: DIFFICULTY_COLORS[difficulty] },
+    ...seatTags,
+    ...ruleTags,
+  ];
+  let note = null;
+  if (!online) note = t('正在连接服务器…');
+  else if (waiting > 0) {
+    note = position > 0
+      ? t('本难度等待队列 {n} 人 · 你排第 {p} 位 · 还差 {need} 人', { n: waiting, p: position, need })
+      : t('本难度等待队列 {n} 人', { n: waiting });
+  }
   return html`<div class="proto-side proto-side--search">
-    <div class="mm-queue" data-testid="match-queue">
-      <div class="mm-queue__radar" aria-hidden="true"><span></span><span></span><span></span></div>
-      <b class="mm-queue__title">${t('搜寻中')}</b>
-      <span class="mm-queue__clock num" data-testid="match-queue-clock">${mm}:${ss}</span>
-      ${waiting > 1 || need > 0 ? html`<p class="mm-queue__wait" data-testid="match-queue-wait">
-        <span>${t('队列 {n} 人', { n: waiting })}</span>
-        <span class="rs-matchwait__sep" aria-hidden="true">·</span>
-        <span>${need > 0 ? t('还差 {n} 人', { n: need }) : t('即将成形')}</span>
-        ${position > 0 ? html`<span class="rs-matchwait__sep" aria-hidden="true">·</span><span>${t('你排第 {n} 位', { n: position })}</span>` : null}
-      </p>` : null}
-      <p class="mm-queue__line">
-        <span class="mm-queue__diff">${t(DIFFICULTY_NAMES[difficulty])}</span>
-        <span class="mm-queue__code num">${info.code}</span>
-      </p>
-      <p class="mm-queue__scope">
-        ${scope.seats.map((s) => html`<span key=${s} class="mm-queue__chip">${s === 'four' ? t('{n} 人同盟', { n: MAX_SEATS }) : t('多人同盟')}</span>`)}
-        ${scope.rules.map((r) => html`<span key=${r} class="mm-queue__chip">${r === 'standard' ? t('标准规则') : t('实验性规则')}</span>`)}
-      </p>
-      <p class="mm-queue__hint">
-        ${!online ? html`<${Spinner} size="sm" /> ${t('正在连接服务器…')}` : t('凑齐人数或等待超时后自动开局，成局后直接进入对局。')}
-      </p>
-      <button type="button" class="mm-queue__cancel" data-testid="match-cancel" onClick=${onCancel}>${t('取消匹配')}</button>
-    </div>
+    <${SearchPanel} class="mm-search" elapsed=${elapsed} tags=${tags} note=${note} onStop=${onCancel} />
   </div>`;
 }
 
