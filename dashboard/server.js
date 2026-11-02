@@ -551,6 +551,8 @@ async function opsState() {
       startedAt,
       matches: Number(h.matches) || 0,
       rooms: Number(h.rooms) || 0,
+      // 多人匹配正在排队等的人数：他们不在任何房间里，只有这个字段能看见
+      queued: Number(h.queued) || 0,
       sockets: Number(h.sockets) || 0,
       players: (Number(h.humans) || 0) + (Number(h.bots) || 0),
       alive: pr.httpOk,
@@ -558,6 +560,7 @@ async function opsState() {
       restartable: !fresh && Number(h.matches) === 0 && pr.httpOk,
     };
   }));
+  const queued = nodes.reduce((a, x) => a + (x.queued || 0), 0);
   const restartable = nodes.filter((x) => x.restartable).map((x) => x.n);
   const stale = nodes.filter((x) => !x.fresh && x.alive).map((x) => x.n);
   const data = {
@@ -565,6 +568,7 @@ async function opsState() {
     codeAt,
     codeKindAt: codeInfo.byKind,
     nodes,
+    queued,
     restartable,
     stale,
     fresh: nodes.filter((x) => x.fresh).map((x) => x.n),
