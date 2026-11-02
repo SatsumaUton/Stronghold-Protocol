@@ -28,6 +28,7 @@ import { MissTag, uniteRemaining } from './hud.js';
 import { localAsset } from '../data.js';
 import { t } from '../../../shared/i18n.js';
 import { ReviveAction, RevivalNotice } from './revival.js';
+import { BondPlanTag } from './bondPlan.js';
 import { PHONE_QUERY, teamDensity, teamEmoteMode } from './teamLayout.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -215,6 +216,9 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
                   : html`<${GIcon} name=${meta.glyph} />`}
               </span>
             <//>
+            ${/* 预约盟约：进对局以后在队友行上也看得见（和 bandDraft 的选人顺序行同一个标记）。
+                 AI 不会预约，所以只有真人会带这个图标；compact 只出图标不出名字。 */ null}
+            ${p.bondPlan ? html`<${BondPlanTag} bondId=${p.bondPlan} compact=${true} class="team__plan" />` : null}
             ${watched && !self ? html`<span class="team__eye" title=${t('正在查看')}><${GIcon} name="eye" /></span>` : null}
           </div>
           ${open ? html`<button type="button" class="btn btn--primary btn--sm team__ob"
