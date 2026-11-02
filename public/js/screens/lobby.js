@@ -829,15 +829,11 @@ function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null
     ...seatTags,
     ...ruleTags,
   ];
-  let note = null;
-  if (!online) note = t('正在连接服务器…');
-  else if (waiting > 0) {
-    note = position > 0
-      ? t('本难度等待队列 {n} 人 · 你排第 {p} 位 · 还差 {need} 人', { n: waiting, p: position, need })
-      : t('本难度等待队列 {n} 人', { n: waiting });
-  }
+  // 面板只显示「本难度等待队列 N 人」（与匹配器一致）；位置/还差几人另起一行。
+  const waitCount = waiting > 0 ? waiting : (online ? 1 : 0);
   return html`<div class="proto-side proto-side--search">
-    <${SearchPanel} class="mm-search" elapsed=${elapsed} tags=${tags} note=${note} onStop=${onCancel} />
+    <${SearchPanel} elapsed=${elapsed} tags=${tags} waiting=${waitCount} onStop=${onCancel} />
+    ${position > 0 && need > 0 ? html`<p class="mm-ov__pop" style="margin-top:.06rem">${t('你排第 {p} 位 · 还差 {n} 人', { p: position, n: need })}</p>` : null}
   </div>`;
 }
 

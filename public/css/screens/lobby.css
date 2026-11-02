@@ -1412,3 +1412,42 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .mf-stop:hover:not(:disabled) { filter: brightness(1.15); }
 .mf-stop__x { display: grid; place-items: center; width: max(.34rem, 20px); height: max(.34rem, 20px); border: 2px solid currentColor; border-radius: 3px; }
 .mf-stop__x .icon { width: 80%; height: 80%; }
+
+/* ==== 搜寻中面板：从匹配器（matchmaker/public/client.js 的 mm-ov 覆盖层）原样搬过来 ==== */
+/* 那边是 fixed 全屏覆盖层；这里嵌在多人匹配整屏的右列里，所以把定位改回普通流。 */
+.mm-ov{position:static;inset:auto;z-index:auto;background:none;display:block}
+.mm-ov__panel{max-width:none;width:100%;padding:0}
+.mm-ov{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;
+  background:rgba(4,8,7,.86);backdrop-filter:blur(6px);font:15px/1.6 "Microsoft YaHei",system-ui,sans-serif;color:#eef0ef}
+.mm-ov__panel{display:flex;flex-direction:column;align-items:center;gap:12px;padding:26px 34px;text-align:center;
+  background:linear-gradient(180deg,rgba(16,24,21,.96),rgba(8,12,11,.98));border:1px solid #24312c;min-width:min(92vw,560px)}
+.mm-ov__brand{display:flex;gap:8px;align-items:center;font-size:12px;letter-spacing:.14em;color:#8d9391}
+.mm-ov__rook{color:#4ed8af}
+.mm-ov__title{display:flex;align-items:baseline;gap:10px;font-size:40px;font-weight:900;letter-spacing:.08em;text-shadow:0 0 24px rgba(255,255,255,.3)}
+.mm-ov__dots{display:inline-block;width:1.2em;text-align:left}
+.mm-ov__title small{font-size:.42em;font-weight:700;color:#c9cecc;font-family:Consolas,monospace}
+.mm-ov__tags{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.mm-ov__tag{padding:4px 16px;border-radius:999px;font-size:13px;font-weight:700;color:#eef0ef;
+  background:color-mix(in srgb,var(--c) 26%,#1b1d1d);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent)}
+.mm-ov__scene{position:relative;width:min(100%,420px);padding:10px 20px;overflow:hidden;contain:paint;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)}
+.mm-ov__scout{display:block;width:100%;height:auto;overflow:visible}
+.mm-ov__wave{fill:none;stroke:rgba(78,216,175,.35);stroke-width:6;filter:blur(2px);animation:mmWave 3s ease-in-out infinite alternate}
+@keyframes mmWave{to{transform:translateX(-12px)}}
+.mm-ov__sky{fill:#48e2b6;opacity:.9;animation:mmSky 4s linear infinite}
+@keyframes mmSky{from{transform:translateX(0)}to{transform:translateX(-120px)}}
+.mm-ov__bot rect{fill:#5df0c6}.mm-ov__bot{animation:mmHop .5s steps(2) infinite}
+@keyframes mmHop{50%{transform:translateY(-3px)}}
+.mm-ov__eye{fill:#0b2620!important;animation:mmBlink 3s steps(1) infinite}
+@keyframes mmBlink{0%,92%{opacity:1}94%,100%{opacity:0}}
+.mm-ov__leg{animation:mmLeg .3s steps(2) infinite}.mm-ov__leg--b{animation-direction:reverse}
+@keyframes mmLeg{50%{transform:translateY(-3px)}}
+.mm-ov__ground{stroke:rgba(93,240,198,.5);stroke-width:2;stroke-dasharray:6 4}
+.mm-ov__scout text{fill:#5df0c6;font:700 8px Consolas,monospace;letter-spacing:2px;opacity:.85}
+.mm-ov__pop{color:#8d9391;font-size:13px}.mm-ov__pop b{color:#4ed8af;font-size:24px;font-family:Consolas,monospace;margin:0 4px}
+.mm-ov__tip{margin:0;min-height:2.6em;max-width:520px;font-size:14px;color:#e6e9e8}
+.mm-ov__stop{display:inline-flex;align-items:center;gap:10px;height:44px;padding:0 24px 0 12px;cursor:pointer;font:inherit;
+  font-size:15px;font-weight:800;color:#ffd9d9;background:linear-gradient(90deg,rgba(120,24,34,.9),rgba(70,14,20,.9));
+  border:1px solid rgba(255,120,130,.55)}
+.mm-ov__stop:hover{filter:brightness(1.15)}
