@@ -165,6 +165,13 @@ export class PlayerState {
     this.afkRounds = 0;
     this.lp = 0;
     this.bandId = null;
+    /**
+     * 预约盟约（g.bondPlan，纯显示）：玩家声明这一局打算走哪个核心盟约。
+     * m.public 的 players[].bondPlan 下发，队友和观战者都看得见。
+     * ★ 没有任何规则、AI、计时或挂机判定读它 —— 它只是「说一声」。
+     * 必须跟着存档走（snapshot.js 的 PLAYER_FIELDS.saved），否则断点续玩回来预约就丢了。
+     */
+    this.bondPlan = null;
     this.funds = 0;
     this.pendingFunds = 0;
     this.ready = false;

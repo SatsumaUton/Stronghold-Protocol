@@ -601,6 +601,9 @@ export const C2S = {
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is
   // free (Match.timeoutBand); absent / null clears it
   'g.bandFocus': { bandId: nullable(isId), $optional: ['bandId'] },
+  // 预约盟约 (a remake feature, display only): the core bond this player announces it means to build — every teammate
+  // and spectator sees it as m.public players[].bondPlan; absent / null clears it (MatchIntents.planBond)
+  'g.bondPlan': { bondId: nullable(isId), $optional: ['bondId'] },
   'g.buy': { slot: (v) => isInt(v, 0, 15) },
   'g.refresh': {},
   'g.freeze': {},

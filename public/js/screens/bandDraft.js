@@ -41,6 +41,7 @@ import { StepHeader, ExitModal } from '../ui/matchChrome.js';
 import { MatchInfoDialog, matchInfoModel } from '../ui/matchInfo.js';
 import { MatchEnemies, stagePoolLine } from '../ui/matchEnemies.js';
 import { StageMiniMap } from '../ui/stagePreview.js';
+import { plannableBonds, bondPlanOpen, bondPlanHolders, BondPlanTag, BondPlanPicker } from '../ui/bondPlan.js';
 import { actions, act } from '../ui/gameActions.js';
 import { normalizeDraft, sortedPlayers, draftMyTurn } from '../ui/gameLogic.js';
 import { useStore } from '../store.js';
@@ -274,6 +275,7 @@ function OrderRow({ p, i, picked, cur, self, arts, medal, gd, onPeek }) {
         <b class="dorder__name">${medal ? html`<${Img} src=${medal} class="dorder__medal" />` : null}<span>${p.name || t('博士')}</span>${p.isBot ? html`<span class="dorder__ai">AI</span>` : null}</b>
         <span class="dorder__state">${picked ? html`<span class="t-mint">${pband?.name || t('已选择')}</span>`
           : cur ? html`<span class="t-gold">${t('决策中')}</span>` : html`<span class="t-dim">${t('等待中')}</span>`}</span>
+        ${typeof p.bondPlan === 'string' ? html`<${BondPlanTag} bondId=${p.bondPlan} gd=${gd} class="dorder__plan" />` : null}
       </div>
     </div>
     ${picked ? html`<button type="button" class="dorder__box is-band" onClick=${() => onPeek(picked)} title=${t('查看「{name}」', { name: pband?.name || '' })}>
@@ -302,6 +304,8 @@ export function BandDraftScreen({ held = null } = {}) {
   const [exit, setExit] = useState(false);
   const [skipped, setSkipped] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);   // 预约盟约选择框（ui/bondPlan.js）
+  const [planBusy, setPlanBusy] = useState(false);
 
   const mode = gd.config?.modes?.[pub?.modeId];
   const offBonds = modeOffBonds(mode); // the bonds this mode never activates (标准: 10 of 23)
@@ -316,6 +320,12 @@ export function BandDraftScreen({ held = null } = {}) {
   const draft = normalizeDraft(pub?.draft, players);
   const myPick = draft.picks.get(myId) || priv?.bandId || null;
   const inOrder = solo || draft.order.includes(myId);
+  // 预约盟约（ui/bondPlan.js）：我自己的预约、能不能改、以及**本版本**可预约的核心盟约。
+  // planBonds 必须从 gd 现算 —— gd 是按房间版本加载的，第一期 6 个、第二期 8 个。
+  const myPlan = players.find((p) => p.playerId === myId)?.bondPlan ?? null;
+  const canPlan = !solo && draft.order.includes(myId) && bondPlanOpen(pub);
+  const planBonds = useMemo(() => plannableBonds(gd.list('bonds')),
+    [gd.ready, data.locale(), data.contentId(), pub?.modeId]);
   // 轮到谁：并发草稿（5–20 人大厅 allowRepeat）里人人同时选、尚无选择就是「轮到我」，
   // 顺序草稿才看 turnPid。以前这里直接判 draft.turnPid === myId，
   // 并发时服务端 draftTurn() 返回 null，于是永远不「轮到我」、玩家根本选不了。
@@ -399,6 +409,14 @@ export function BandDraftScreen({ held = null } = {}) {
   };
   const pickTile = (id) => { setSel(id); setOpen(true); setPeek(null); audio.sfx('tab', { volume: 0.5 }); };
   const peekBand = (id) => { setPeek(id); setOpen(true); audio.sfx('tab', { volume: 0.5 }); };
+  // 预约盟约：服务端 g.bondPlan（intents.js planBond）。纯沟通，失败就不关框，让玩家重试。
+  const pickPlan = async (bondId) => {
+    if (planBusy) return;
+    setPlanBusy(true);
+    const ok = await act('g.bondPlan', { bondId }, { sfx: 'confirm' });
+    setPlanBusy(false);
+    if (ok) setPlanOpen(false);
+  };
   const turnName = players.find((p) => p.playerId === draft.turnPid)?.name;
   useTicker(clock ? 250 : 0);
   const turnSecs = clock ? secondsLeft(clock.deadline) : null;
@@ -485,6 +503,8 @@ export function BandDraftScreen({ held = null } = {}) {
               arts=${artOf(p)} medal=${p.playerId === myId ? myMedal : null} gd=${gd} onPeek=${peekBand} />`;
           })}
         </div>
+        ${canPlan ? html`<${Button} variant="secondary" icon="users" block=${true} class="draft-order__plan" data-testid="bond-plan-open"
+          aria-haspopup="dialog" onClick=${() => setPlanOpen(true)}>${myPlan ? t('预选盟约：{name}', { name: gd.bond(myPlan)?.name || myPlan }) : t('预选盟约')}<//>` : null}
         ${!solo ? html`<p class="draft-order__tip" data-testid="draft-tip">${draftTip({ timed, turnSeconds: turnLen, autoName: myPick ? null : autoName, selected: open && autoId === sel, concurrent: draft.concurrent })}</p>` : null}
       </aside>
       <i class="draft__link" aria-hidden="true"></i>
@@ -550,6 +570,8 @@ export function BandDraftScreen({ held = null } = {}) {
       status=${infoStatus ? html`<span class=${cx('minfo-dlg__turn', `is-${infoStatus.tone}`)}>
         <${Icon} name=${infoStatus.tone === 'mint' ? 'check' : 'hourglass'} />${infoStatus.text}${infoStatus.secs != null ? html`<b class="num">${infoStatus.secs}s</b>` : null}
       </span>` : null} />
+    <${BondPlanPicker} open=${planOpen && canPlan} onClose=${() => setPlanOpen(false)} bonds=${planBonds} value=${myPlan}
+      holders=${bondPlanHolders(players, myId)} off=${offBonds} busy=${planBusy} onPick=${pickPlan} />
     ${turnBanner ? html`<${TurnBanner} key=${turnBanner} onDone=${() => setTurnBanner(0)} />` : null}
   </div>`;
 }

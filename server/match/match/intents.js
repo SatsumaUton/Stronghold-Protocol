@@ -94,6 +94,40 @@ export class MatchIntents {
     if (t === 'g.place' || t === 'g.move' || t === 'g.deploy' || t === 'g.swap') st.place++;
   }
 
+  /**
+   * 预约盟约 g.bondPlan { bondId? }（移植自参考版，**纯显示**）：
+   * 玩家声明「这一局我打算走哪个核心盟约」，下发给 m.public 的 players[].bondPlan，
+   * 队友和观战者整局都看得见。
+   *
+   * 从 INFO_CHECK 到第 1 回合的战斗开始前都可以改（`bondPlanOpen()`）；
+   * `bondId` 必须是 `gd.plannableBondIds()` 之一（否则 BAD_TARGET），
+   * 省略 / null = 取消预约；重复预约同一个不产生任何变化（不 markPublic）。
+   *
+   * ★ 没有任何规则、AI、计时或挂机判定读这个字段 —— 它不影响对局。
+   * AI 座位和观战座位发不了（handle 在更早的地方就拒了），不需要额外判断。
+   * @param {any} ps @param {string|null} bondId
+   */
+  planBond(ps, bondId) {
+    if (!this.bondPlanOpen()) return fail(ERR.WRONG_PHASE);
+    if (bondId !== null && !this.gd.bondPlannable(bondId)) return fail(ERR.BAD_TARGET);
+    if (ps.bondPlan === bondId) return OK;
+    ps.bondPlan = bondId;
+    this.markPublic();
+    return OK;
+  }
+
+  /**
+   * 什么时候还能改预约盟约：INFO_CHECK、选策略、战前确认，以及第 1 回合开始后到它的战斗之前。
+   * 第 1 回合的战斗一开打就不能改了 —— 那时阵容已经定型，再改只会误导队友。
+   */
+  bondPlanOpen() {
+    switch (this.phase) {
+      case PHASE.INFO_CHECK: case PHASE.BAND_DRAFT: case PHASE.BATTLE_CHECK: return true;
+      case PHASE.ROUND_START: case PHASE.SP_DRAFT: case PHASE.PREP: return this.round <= 1;
+      default: return false;
+    }
+  }
+
   _handle(ps, msg) {
     try { this._trackActivity(ps, msg); } catch { /* ignore */ }
     switch (msg.t) {
@@ -108,6 +142,8 @@ export class MatchIntents {
       case 'g.speedVote': return this.setSpeedVote(ps, msg.agree === true);
       case 'g.band': return this.pickBand(ps, msg.bandId);
       case 'g.bandSkip': return this.skipBand(ps);
+      // 预约盟约（纯显示，移植自参考版）：声明这一局打算走哪个核心盟约
+      case 'g.bondPlan': return this.planBond(ps, msg.bondId ?? null);
       // the strategy highlighted in the draft screen (what a timed-out turn takes, timeoutBand)
       case 'g.bandFocus': return this.bandFocus(ps, msg.bandId ?? null);
       case 'g.buy': return ps.buy(msg.slot);
