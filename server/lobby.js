@@ -868,6 +868,11 @@ export class Lobby {
       try { this.sweepOldRooms(); } catch (e) { this.log.warn('[lobby] room sweep failed', e); }
     }, 20_000);
     this.roomTimer.unref?.();
+    /** 多人匹配排队：每秒扫一次（凑够人就成形；等满 MATCHMAKING_TIMEOUT_MS 也成形） */
+    this.quickTimer = setInterval(() => {
+      try { this.sweepQuickQueue(); } catch (e) { this.log.warn('[lobby] quick queue sweep failed', e); }
+    }, 1_000);
+    this.quickTimer.unref?.();
     /** per-network limit warnings: at most one log line per 10 s (the rest are counted) */
     this.limitLog = { at: -Infinity, suppressed: 0 };
     /** log lines said once (warnOnce) */
@@ -1310,6 +1315,8 @@ export class Lobby {
       case 'room.kick': return this.kick(session, msg);
       case 'room.matchmaking': return this.matchmaking(session, msg);
     case 'room.quickMatch': return this.quickMatch(session, msg);
+    case 'room.quickState': return this.quickState(session, msg);
+    case 'room.quickLeave': return this.quickLeave(session, msg);
       case 'room.start': return this.start(session);
       case 'room.rerollSetup': return this.rerollSetup(session, msg);
       case 'room.cancelReroll': return this.rerollSetup(session, msg, true);
@@ -2724,25 +2731,151 @@ export class Lobby {
       const res = this.join(session, { code: best.code });
       if (!res || !res.error) return { ok: true, reply: { code: best.code, joined: true } };
     }
-    // 2) 没有可加入的：自己开一间，挂到公开同盟上，直接开始等人。
-    //    只有「只要多人同盟」时才带上人数上限 —— 那样房间必然算「改过规则」，
-    //    与 `rules: 'standard'` 天然矛盾，所以这时候不额外加别的实验性选项。
-    const wantCapacity = wantMulti && !wantFour ? MULTI_SEAT_DEFAULT : null;
-    // 必须走 experimentalOptions() 规范化：isExperimental 要求至少两个键
-    // （EXPERIMENTAL_DEFAULTS 的两个布尔项恒在），只给 { playerCapacity } 会被 create 拒掉。
-    const experimental = wantCapacity ? experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, playerCapacity: wantCapacity }) : null;
-    const made = this.create(session, { mode: 'coop', difficulty: asked ?? undefined, experimental });
-    if (made && made.error) return made;
-    const room = this.roomOf(session);
-    if (!room) return fail(ERR.INTERNAL, 'quick match created no room');
-    // 公开同盟列表由房主身份驱动（listable 会拒绝不该上架的房间），失败不影响匹配本身
-    try { if (this.listable(room)) this.setListed(session, { listed: true }); } catch { /* ignore */ }
-    const on = this.matchmaking(session, { on: true });
-    if (on && on.error) {
-      // 维护开关 / 未就绪之类：房间已经建好了，把失败原因交给前端提示即可
-      return { ok: true, reply: { code: room.code, joined: false, matchmaking: false, reason: on.error } };
+    // 2) 没有可加入的房间：**排队等**，不替玩家建房。
+    //    维护者 2026-11-02 明确要求：没人匹配时玩家就停在多人匹配界面等人，
+    //    不要给他开一间房让他在房间里等 —— 那样看起来像「已经在房间里了」，
+    //    而且他会看不到自己在所有节点里排第几位。
+    const queued = this.quickEnqueue(session, { difficulty: asked, seats, rules, wantMulti, wantFour, wantExperimental });
+    // 排队失败（游客 / 维护开关）要原样返回，不能套进 reply，否则前端只看得到 ok:true
+    if (queued && queued.error) return queued;
+    return { ok: true, reply: queued };
+  }
+
+  /**
+   * 多人匹配的节点内排队（维护者 2026-11-02）：没人可加入时不建房，先把玩家放进队列，
+   * 前端停在「搜寻中」界面轮询 `room.quickState`。
+   *
+   * 成形条件（`sweepQuickQueue`）：同一个池（难度 + 人数 + 规则）里等够 `capacity` 个人；
+   * 或者最老的一个人已经等满 `MATCHMAKING_TIMEOUT_MS`（照既有超时语义：到点了就开局，
+   * 不能再让一个人无限等下去）。成形后由第一个人当房主建房，其余人加入，然后**立刻开局**
+   * （`forceStartMatchmaking`），这样玩家点完确认就直接进对局，不用再在房间里点开始。
+   */
+  quickEnqueue(session, { difficulty, seats, rules, wantMulti, wantFour, wantExperimental }) {
+    // 以前靠 create() 顺带拒绝游客；现在没人匹配时不再建房，所以这里要自己拦一道，
+    // 否则游客会排进队列、等 2 分钟超时才发现开不了局。
+    if (session.guest || !session.accountId) return fail(ERR.BAD_MSG, '游客不能参与多人匹配，请先登录');
+    if (!this.quickQueue) this.quickQueue = new Map();
+    const ticket = `q${(this.quickSeq = (this.quickSeq || 0) + 1)}${Math.random().toString(36).slice(2, 8)}`;
+    const capacity = wantMulti && !wantFour ? MULTI_SEAT_DEFAULT : MAX_SEATS;
+    const entry = {
+      ticket,
+      playerId: session.playerId,
+      session,
+      difficulty: difficulty ?? null,
+      seats: seats ?? null,
+      rules: rules ?? null,
+      // 池键：难度 + 人数 + 规则。'standard' / 'experimental' 不能混坐（规则不一样打不了）。
+      capacity,
+      standard: !wantExperimental,
+      createdAt: Date.now(),
+    };
+    this.quickQueue.set(ticket, entry);
+    this.log?.info?.(`[lobby] 多人匹配排队 ${session.name || session.playerId} 难度=${difficulty || '任意'} ${capacity}人`);
+    return { queued: true, ticket, state: this.quickQueueState(entry) };
+  }
+
+  /** 一条排队票据的对外状态：还在等（位置 / 队列人数 / 还差几人），或已成局（房间码）。 */
+  quickQueueState(entry) {
+    if (entry.room) {
+      return { state: 'matched', code: entry.room.code, difficulty: entry.room.difficulty, capacity: entry.room.capacity };
     }
-    return { ok: true, reply: { code: room.code, joined: false, matchmaking: true } };
+    const pool = [...(this.quickQueue?.values() || [])]
+      .filter((x) => !x.room && x.difficulty === entry.difficulty && x.capacity === entry.capacity && x.standard === entry.standard)
+      .sort((a, b) => a.createdAt - b.createdAt);
+    const waiting = pool.length;
+    const position = pool.findIndex((x) => x.ticket === entry.ticket) + 1;
+    return {
+      state: 'queued',
+      difficulty: entry.difficulty,
+      capacity: entry.capacity,
+      position: position || 1,
+      waiting,
+      need: Math.max(0, entry.capacity - waiting),
+      elapsedMs: Date.now() - entry.createdAt,
+    };
+  }
+
+  /** 前端轮询：还我这条票据的状态。票据不在队列里了（成局后已转成房间）就看分配结果。 */
+  quickState(session, { ticket } = {}) {
+    const entry = this.quickQueue?.get(ticket);
+    if (!entry) {
+      const done = this.quickDone?.get(ticket);
+      if (done) return { ok: true, reply: { state: 'matched', code: done.code, difficulty: done.difficulty, capacity: done.capacity } };
+      return fail(ERR.ROOM_NOT_FOUND, 'queue ticket unknown');
+    }
+    if (entry.playerId !== session.playerId) return fail(ERR.BAD_MSG, 'not your ticket');
+    return { ok: true, reply: this.quickQueueState(entry) };
+  }
+
+  /** 玩家点了「取消匹配」：把他从队列里拿掉。 */
+  quickLeave(session, { ticket } = {}) {
+    const entry = this.quickQueue?.get(ticket);
+    if (!entry) return { ok: true, reply: { state: 'left' } };
+    if (entry.playerId !== session.playerId) return fail(ERR.BAD_MSG, 'not your ticket');
+    this.quickQueue.delete(ticket);
+    this.log?.info?.(`[lobby] 多人匹配取消排队 ${session.name || session.playerId}`);
+    return { ok: true, reply: { state: 'left' } };
+  }
+
+  /** 每秒扫一次队列：够人就成形，等太久的也成形。 */
+  sweepQuickQueue() {
+    if (!this.quickQueue?.size) return;
+    const now = Date.now();
+    if (!this.quickDone) this.quickDone = new Map();
+    // 断线 / 已经进了别的房间的票据直接丢掉
+    for (const [ticket, entry] of this.quickQueue) {
+      const alive = entry.session?.connected !== false;
+      if (!alive || this.roomOf(entry.session)) this.quickQueue.delete(ticket);
+    }
+    const pools = new Map();
+    for (const entry of this.quickQueue.values()) {
+      const key = `${entry.difficulty || 'any'}|${entry.capacity}|${entry.standard ? 'std' : 'exp'}`;
+      if (!pools.has(key)) pools.set(key, []);
+      pools.get(key).push(entry);
+    }
+    for (const pool of pools.values()) {
+      pool.sort((a, b) => a.createdAt - b.createdAt);
+      const capacity = pool[0].capacity;
+      const oldest = now - pool[0].createdAt;
+      const full = pool.length >= capacity;
+      if (!full && oldest < MATCHMAKING_TIMEOUT_MS) continue;
+      const group = pool.slice(0, Math.max(1, Math.min(pool.length, capacity)));
+      this.formQuickMatch(group);
+    }
+    // 成局结果留着给前端取一次，5 分钟后清掉
+    for (const [ticket, done] of this.quickDone) {
+      if (now - done.at > 5 * 60_000) this.quickDone.delete(ticket);
+    }
+  }
+
+  /** 把一组排队玩家变成一间真正的房间，并立刻开局。 */
+  formQuickMatch(group) {
+    const host = group[0];
+    if (!host?.session?.connected) { this.quickQueue.delete(host?.ticket); return; }
+    // 建房要带人数（多人同盟）与规则（改过规则就带上，否则标准房）
+    const wantCapacity = host.capacity > MAX_SEATS ? host.capacity : null;
+    const experimental = wantCapacity
+      ? experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, playerCapacity: wantCapacity })
+      : (host.standard ? null : experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, revivalEnabled: true }));
+    const made = this.create(host.session, { mode: 'coop', difficulty: host.difficulty ?? undefined, experimental });
+    if (made && made.error) {
+      this.log?.warn?.(`[lobby] 多人匹配建房失败: ${made.error}`);
+      return;
+    }
+    const room = this.roomOf(host.session);
+    if (!room) return;
+    try { if (this.listable(room)) this.setListed(host.session, { listed: true }); } catch { /* ignore */ }
+    for (const entry of group.slice(1)) {
+      try { this.join(entry.session, { code: room.code }); } catch { /* ignore */ }
+    }
+    // 所有人都进房了：直接开局（凑满的意义就是马上能打），不等房主再点开始
+    this.quickQueue.delete(host.ticket);
+    for (const entry of group.slice(1)) this.quickQueue.delete(entry.ticket);
+    for (const entry of group) {
+      this.quickDone.set(entry.ticket, { code: room.code, difficulty: room.difficulty, capacity: room.capacity, at: Date.now() });
+    }
+    this.log?.info?.(`[lobby] 多人匹配成局 ${room.code}（${group.length} 人）`);
+    try { this.forceStartMatchmaking(room); } catch (e) { this.log?.warn?.('[lobby] 匹配开局失败 ' + (e && e.message)); }
   }
 
   start(session) {

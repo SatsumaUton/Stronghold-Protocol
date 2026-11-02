@@ -1,11 +1,13 @@
-// 多人匹配：room.quickMatch（大厅按钮）+「人满即开」。
+// 多人匹配：room.quickMatch 的**排队**语义 +「人满即开」。
 //
-// 本服是 30 个独立节点进程，每个 Lobby 只认识自己那批房间，所以 quickMatch **不做跨节点配对**：
+// 本服是 30 个独立节点进程，每个 Lobby 只认识自己那批房间，所以 quickMatch 不做跨节点配对：
 //   1. 先找本节点上「正在匹配 + 还缺人 + 在公开列表上」的合作房，人最多的优先（更快凑满）；
-//   2. 找不到就自己开一间、挂到公开同盟、立刻进入匹配状态；
+//   2. **找不到就排队等**（维护者 2026-11-02：不要替玩家开一间房让他在房间里等）——
+//      返回 { queued: true, ticket, state }，前端停在「搜寻中」界面轮询 room.quickState；
 //   3. 已经在一个房间里就拒绝（页面只在大厅显示这个按钮）。
-// 开局由既有机制负责：匹配超时（MATCHMAKING_TIMEOUT_MS）或「人满即开」——这一条是本功能新加的：
-// 匹配的目的就是凑齐人，满员了还要房主再点一次「开始」是多余的；但只有 1 个真人时不算（AI 占座不算匹配到人）。
+// 成形由 sweepQuickQueue 负责：池（难度 + 人数 + 规则）里等够 capacity 个人，或者最老的一个
+// 等满 MATCHMAKING_TIMEOUT_MS。成形后第一个人当房主建房、其余人加入，然后**立刻开局**
+// （forceStartMatchmaking），所以玩家不用再在房间里点开始。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Lobby, MULTI_SEAT_DEFAULT } from '../../server/lobby.js';
@@ -14,7 +16,7 @@ import { ERR } from '../../shared/constants.js';
 import { experimentalRuleChanged } from '../../shared/experimental.js';
 
 // 仓库里的 data/create-room.json 存的是「关闭建房」（公开仓库不默认开放），
-// 这些用例只关心 quickMatch / 人满即开的逻辑，与运维开关无关，所以先忽略开关文件。
+// 这些用例只关心 quickMatch / 排队的逻辑，与运维开关无关，所以先忽略开关文件。
 process.env.SP_GATE_IGNORE = '1';
 
 const silent = { info() {}, warn() {}, error() {}, debug() {} };
@@ -25,7 +27,9 @@ function player(name) {
   return { playerId: `p_${seq}`, accountId: `acc_${seq}`, name, connected: true, ws: null };
 }
 
-const makeLobby = () => new Lobby({ registry: new SessionRegistry(), log: silent });
+function makeLobby() {
+  return new Lobby({ registry: new SessionRegistry(), log: silent });
+}
 
 /** 一间合作房（capacity 默认 4，本服合作房的下限）。 */
 function coopRoom(lobby, capacity = 4, extra = {}) {
@@ -38,36 +42,55 @@ function coopRoom(lobby, capacity = 4, extra = {}) {
   return { host, room: lobby.roomOf(host) };
 }
 
-// ------------------------------------------------------------------ 没有可加入的房间
+// -------------------------------------------------- 没人可加入：排队，不开房
 
-test('没人匹配时：自己开一间、挂上公开同盟、直接进入匹配', () => {
+test('没人匹配时：进队列等着，不给玩家开房', () => {
   const lobby = makeLobby();
   const solo = player('Solo');
   const res = lobby.quickMatch(solo, {});
   assert.equal(res.ok, true, 'quickMatch 成功');
-  assert.deepEqual(
-    { joined: res.reply.joined, matchmaking: res.reply.matchmaking },
-    { joined: false, matchmaking: true },
-    '这是新建的房间，并且已经在匹配',
-  );
-  const room = lobby.roomOf(solo);
-  assert.equal(room.code, res.reply.code, '答复里的 code 就是我进的房间');
-  assert.equal(room.hostId, solo.playerId, '我是房主');
-  assert.equal(room.listed, true, '自动挂到公开同盟（否则别人点「公开同盟」看不见）');
-  assert.equal(room.matchmaking, true, '进入匹配状态');
-  assert.equal(room.toState().matchmaking, true, 'state 里也带着 matchmaking');
+  assert.equal(res.reply.queued, true, '是排队，不是建房');
+  assert.equal(typeof res.reply.ticket, 'string', '给了票据号');
+  assert.equal(res.reply.state.state, 'queued');
+  assert.equal(lobby.roomOf(solo), null, '★ 没有给玩家开房间');
+  assert.equal(lobby.rooms.size, 0, '★ 一间房都没建');
 });
 
-test('指定难度时按难度开房', () => {
+test('排队状态里有位置、等待人数、还差几人', () => {
   const lobby = makeLobby();
-  const solo = player('Solo');
-  lobby.quickMatch(solo, { difficulty: 'HARD' });
-  assert.equal(lobby.roomOf(solo).difficulty, 'HARD');
+  const a = player('A');
+  lobby.quickMatch(a, { difficulty: 'HARD' });
+  const res = lobby.quickMatch(player('B'), { difficulty: 'HARD' });
+  assert.equal(res.reply.state.waiting, 2, '两个人都在这个池里');
+  assert.equal(res.reply.state.position, 2, 'B 排第二');
+  assert.equal(res.reply.state.need, 2, '4 人房还差 2 人');
+  assert.equal(res.reply.state.difficulty, 'HARD');
 });
 
-// ------------------------------------------------------------------ 有可加入的房间
+test('指定难度时按难度排队', () => {
+  const lobby = makeLobby();
+  const res = lobby.quickMatch(player('Solo'), { difficulty: 'HARD' });
+  assert.equal(res.reply.state.difficulty, 'HARD');
+  assert.equal(lobby.rooms.size, 0);
+});
 
-test('有房间正在等人：直接塞进去，不另开一间', () => {
+test('已经有房间：拒绝（页面只在大厅显示这个按钮）', () => {
+  const lobby = makeLobby();
+  const { host } = coopRoom(lobby, 4);
+  const res = lobby.quickMatch(host, {});
+  assert.equal(res.error, ERR.SESSION_IN_USE, '已经在房间里');
+});
+
+test('游客：交给既有规则拒绝', () => {
+  const lobby = makeLobby();
+  const guest = { playerId: '', accountId: '', name: 'Guest', connected: true, ws: null };
+  const res = lobby.quickMatch(guest, {});
+  assert.equal(res.error, ERR.BAD_MSG, '游客不能排队');
+});
+
+// -------------------------------------------------- 有可加入的房间：直接进
+
+test('有房间正在等人：直接塞进去，不排队', () => {
   const lobby = makeLobby();
   const { host, room } = coopRoom(lobby, 4);
   assert.deepEqual(lobby.setListed(host, { listed: true }), { ok: true });
@@ -76,7 +99,7 @@ test('有房间正在等人：直接塞进去，不另开一间', () => {
   const before = lobby.rooms.size;
   const other = player('Other');
   const res = lobby.quickMatch(other, {});
-  assert.equal(res.reply.joined, true, '是加入，不是新建');
+  assert.equal(res.reply.joined, true, '是加入，不是排队');
   assert.equal(res.reply.code, room.code, '进的就是那间房');
   assert.equal(lobby.rooms.size, before, '没有多开房间');
   assert.equal(lobby.roomOf(other), room, '座位落在了那间房里');
@@ -92,7 +115,6 @@ test('匹配中的房间人最多者优先（更快凑满开局）', () => {
   const b = coopRoom(lobby, 4);
   lobby.setListed(b.host, { listed: true });
   lobby.matchmaking(b.host, { on: true });
-  // b 房再多一个人：两间都在等人，应该优先选 b（人多的那间）
   const bGuest = player('BGuest');
   assert.deepEqual(lobby.join(bGuest, { code: b.room.code }), { ok: true });
 
@@ -104,85 +126,80 @@ test('匹配中的房间人最多者优先（更快凑满开局）', () => {
 
 test('没有在匹配的房间时不会去挤一个普通房', () => {
   const lobby = makeLobby();
-  const { host, room } = coopRoom(lobby, 4);
-  lobby.setListed(host, { listed: true });          // 公开，但没开匹配
+  const { room } = coopRoom(lobby, 4);
+  const other = player('Other');
+  const res = lobby.quickMatch(other, {});
+  assert.equal(res.reply.joined, undefined, '没有进那间普通房');
+  assert.equal(res.reply.queued, true, '而是排队');
+  assert.equal(lobby.roomOf(other), null);
+  assert.equal(room.activeHumans().length, 1, '普通房里还是只有房主');
+});
+
+// -------------------------------------------------- 队列成形
+
+test('凑够人数就成形：建房 + 立刻开局，不用房主点开始', () => {
+  const lobby = makeLobby();
+  const players = [player('A'), player('B'), player('C'), player('D')];
+  for (const p of players) lobby.quickMatch(p, { difficulty: 'NORMAL' });
+  assert.equal(lobby.rooms.size, 0, '还没凑够之前一间房都没有');
+  lobby.sweepQuickQueue();
+  assert.equal(lobby.rooms.size, 1, '凑够 4 人后建了一间房');
+  for (const p of players) {
+    const room = lobby.roomOf(p);
+    assert.ok(room, '每个人都在同一间房里');
+    assert.equal(room.code, lobby.rooms.keys().next().value);
+  }
+  const room = lobby.roomOf(players[0]);
+  assert.ok(room.match, '★ 直接开局了，不需要房主再点开始');
+});
+
+test('票据在成形后能查到房间码（前端靠它跳进对局）', () => {
+  const lobby = makeLobby();
+  const players = [player('A'), player('B'), player('C'), player('D')];
+  const tickets = players.map((p) => lobby.quickMatch(p, { difficulty: 'NORMAL' }).reply.ticket);
+  lobby.sweepQuickQueue();
+  const room = lobby.roomOf(players[0]);
+  const st = lobby.quickState(players[0], { ticket: tickets[0] });
+  assert.equal(st.ok, true);
+  assert.equal(st.reply.state, 'matched');
+  assert.equal(st.reply.code, room.code, '拿到房间码');
+});
+
+test('等满超时也成形（只有 1 个人时也不会无限等）', () => {
+  const lobby = makeLobby();
+  const solo = player('Solo');
+  lobby.quickMatch(solo, { difficulty: 'NORMAL' });
+  // 把排队时间推到超时之前：还不该成形
+  lobby.sweepQuickQueue();
+  assert.equal(lobby.rooms.size, 0, '刚排队，不成形');
+  // 手动把 createdAt 推到很久以前
+  const entry = [...lobby.quickQueue.values()][0];
+  entry.createdAt = Date.now() - 3 * 60 * 1000;
+  lobby.sweepQuickQueue();
+  assert.equal(lobby.rooms.size, 1, '超时后成形');
+});
+
+test('取消匹配：票据从队列里拿掉', () => {
+  const lobby = makeLobby();
   const solo = player('Solo');
   const res = lobby.quickMatch(solo, {});
-  assert.equal(res.reply.joined, false, '普通房不该被「多人匹配」硬塞人');
-  assert.notEqual(lobby.roomOf(solo), room);
+  const ticket = res.reply.ticket;
+  assert.equal(lobby.quickLeave(solo, { ticket }).reply.state, 'left');
+  assert.equal(lobby.quickQueue.size, 0, '队列里没有他了');
+  lobby.sweepQuickQueue();
+  assert.equal(lobby.rooms.size, 0, '取消后不会给他建房');
 });
 
-test('已经在房间里：拒绝（页面只在大厅显示这个按钮）', () => {
+test('别人的票据查不到（不能拿别人的 ticket 偷状态）', () => {
   const lobby = makeLobby();
-  const { host } = coopRoom(lobby, 4);
-  const res = lobby.quickMatch(host, {});
-  assert.equal(res.error, ERR.SESSION_IN_USE);
+  const a = player('A');
+  const b = player('B');
+  const ticket = lobby.quickMatch(a, {}).reply.ticket;
+  assert.ok(lobby.quickState(b, { ticket }).error, '查不到别人的票据');
+  assert.ok(lobby.quickLeave(b, { ticket }).error, '撤不掉别人的票据');
 });
 
-test('游客：交给 create 的既有规则拒绝', () => {
-  const lobby = makeLobby();
-  const guest = { ...player('Guest'), guest: true, accountId: null };
-  const res = lobby.quickMatch(guest, {});
-  assert.equal(res.error, ERR.BAD_MSG);
-  assert.match(res.detail, /游客/);
-  assert.equal(lobby.rooms.size, 0, '没有留下半间房');
-});
-
-// ------------------------------------------------------------------ 人满即开
-
-/** 替换 startMatch，只记录「要不要开局」，不真的跑一局。 */
-function spyStart(lobby) {
-  const calls = [];
-  lobby.startMatch = (room, key) => { calls.push({ room, key }); };
-  return calls;
-}
-
-test('人满即开：四个真人坐满 4 人房，扫描时直接开局，不用房主再点开始', () => {
-  const lobby = makeLobby();
-  const { host, room } = coopRoom(lobby, 4);
-  assert.deepEqual(lobby.setListed(host, { listed: true }), { ok: true });
-  assert.deepEqual(lobby.matchmaking(host, { on: true }), { ok: true });
-
-  for (const n of ['G1', 'G2', 'G3']) {
-    assert.deepEqual(lobby.join(player(n), { code: room.code }), { ok: true });
-  }
-  assert.equal(room.activeHumans().length, 4);
-  assert.equal(room.freeSeat(), -1, '确实满了');
-
-  const calls = spyStart(lobby);
-  lobby.sweepOldRooms();
-  assert.equal(calls.length, 1, '扫描时开了一局');
-  assert.equal(calls[0].room, room);
-  assert.equal(room.matchmaking, false, '开局后匹配状态清掉');
-});
-
-test('人满但只有一个真人（AI 占座）不算匹配到：不开局，等超时', () => {
-  const lobby = makeLobby();
-  const { host, room } = coopRoom(lobby, 4);
-  lobby.setListed(host, { listed: true });
-  lobby.matchmaking(host, { on: true });
-  // 房主加满 AI，座位占满但只有 1 个真人
-  for (let i = 0; i < 3; i++) assert.deepEqual(lobby.addBot(host), { ok: true });
-  assert.equal(room.freeSeat(), -1, '座位满了，但只有 1 个真人');
-
-  const calls = spyStart(lobby);
-  lobby.sweepOldRooms();
-  assert.equal(calls.length, 0, '不该因为 AI 占座就开局');
-  assert.equal(room.matchmaking, true, '继续等');
-});
-
-test('匹配中的房间不会被解散计时扫走', () => {
-  const lobby = makeLobby();
-  const solo = player('Solo');
-  lobby.quickMatch(solo, {});
-  const room = lobby.roomOf(solo);
-  // 把人推到很久以前，正常情况下早该过期
-  room.createdAt = 0;
-  lobby.sweepOldRooms();
-  assert.equal(room.disposed, false, '匹配中的房间保留');
-});
-
-// ------------------------------------------------- 人数范围 / 规则（MatchScope 的两个维度）
+// -------------------------------------------------- 人数 / 规则范围
 
 test('规则默认只找标准房：4 人房带 playerCapacity 不算「改过规则」', () => {
   const lobby = makeLobby();
@@ -195,41 +212,19 @@ test('规则默认只找标准房：4 人房带 playerCapacity 不算「改过�
   assert.equal(res.reply.code, room.code);
 });
 
-test('规则要 experimental 时跳过标准房，自己开一间改过规则的', () => {
-  const lobby = makeLobby();
-  const { host, room } = coopRoom(lobby, 4);
-  lobby.setListed(host, { listed: true });
-  lobby.matchmaking(host, { on: true });
-  const other = player('Other');
-  const res = lobby.quickMatch(other, { rules: 'experimental' });
-  assert.equal(res.reply.joined, false, '没有改过规则的房，所以自己开');
-  assert.notEqual(res.reply.code, room.code, '不是那一间标准房');
-});
-
-test('改过规则的房会被 experimental 找到：revivalEnabled 就是改规则', () => {
-  const lobby = makeLobby();
-  const { host, room } = coopRoom(lobby, 4, { revivalEnabled: true });
-  assert.equal(experimentalRuleChanged(room.experimental), true);
-  lobby.setListed(host, { listed: true });
-  lobby.matchmaking(host, { on: true });
-  const res = lobby.quickMatch(player('Other'), { rules: 'experimental' });
-  assert.equal(res.reply.joined, true);
-  assert.equal(res.reply.code, room.code);
-});
-
 test('人数要 four 时不进 8 人房', () => {
   const lobby = makeLobby();
   const { host, room } = coopRoom(lobby, 8);
   assert.equal(room.capacity, 8);
   lobby.setListed(host, { listed: true });
   lobby.matchmaking(host, { on: true });
-  const other = player('Other');
-  const res = lobby.quickMatch(other, { seats: 'four' });
-  assert.equal(res.reply.joined, false, '8 人房不算 4 人同盟');
+  const res = lobby.quickMatch(player('Other'), { seats: 'four' });
+  assert.equal(res.reply.joined, undefined, '8 人房不算 4 人同盟');
+  assert.equal(res.reply.queued, true);
   assert.notEqual(res.reply.code, room.code);
 });
 
-test('人数要 multi 时进 8 人房，自己开时也开 8 人', () => {
+test('人数要 multi 时进 8 人房', () => {
   const lobby = makeLobby();
   const { host, room } = coopRoom(lobby, 8);
   lobby.setListed(host, { listed: true });
@@ -237,12 +232,12 @@ test('人数要 multi 时进 8 人房，自己开时也开 8 人', () => {
   const res = lobby.quickMatch(player('Other'), { seats: 'multi' });
   assert.equal(res.reply.joined, true);
   assert.equal(res.reply.code, room.code);
+});
 
-  // 没有可加入的 8 人房时，自己开的那间也应该是 8 人
-  const lobby2 = makeLobby();
-  const solo = player('Solo2');
-  lobby2.quickMatch(solo, { seats: 'multi' });
-  assert.equal(lobby2.roomOf(solo).capacity, MULTI_SEAT_DEFAULT, '自己开的是多人同盟');
+test('多人同盟排队时的容量是 MULTI_SEAT_DEFAULT', () => {
+  const lobby = makeLobby();
+  const res = lobby.quickMatch(player('Solo'), { seats: 'multi' });
+  assert.equal(res.reply.state.capacity, MULTI_SEAT_DEFAULT, '多人池按 MULTI_SEAT_DEFAULT 人算');
 });
 
 test('seats: both 两种房都能进，但优先人多的那间', () => {
@@ -253,10 +248,43 @@ test('seats: both 两种房都能进，但优先人多的那间', () => {
   const multi = coopRoom(lobby, 8);
   lobby.setListed(multi.host, { listed: true });
   lobby.matchmaking(multi.host, { on: true });
-  // 给 8 人房多塞一个人，让它人更多
   lobby.join(player('MGuest'), { code: multi.room.code });
 
   const res = lobby.quickMatch(player('Third'), { seats: 'both' });
   assert.equal(res.reply.joined, true);
   assert.equal(res.reply.code, multi.room.code, '人多的 8 人房优先');
+});
+
+// -------------------------------------------------- 人满即开（房间侧，与排队无关）
+
+test('人满即开：四个真人坐满 4 人房，扫描时直接开局', () => {
+  const lobby = makeLobby();
+  const { host, room } = coopRoom(lobby, 4);
+  lobby.setListed(host, { listed: true });
+  lobby.matchmaking(host, { on: true });
+  for (const name of ['B', 'C', 'D']) lobby.join(player(name), { code: room.code });
+  assert.equal(room.activeHumans().length, 4, '四个真人');
+  lobby.sweepOldRooms();
+  assert.ok(room.match, '满员即开局');
+});
+
+test('人满但只有一个真人（AI 占座）不算匹配到：不开局', () => {
+  const lobby = makeLobby();
+  const { host, room } = coopRoom(lobby, 4);
+  lobby.setListed(host, { listed: true });
+  lobby.matchmaking(host, { on: true });
+  for (let i = 0; i < 3; i += 1) lobby.addBot(host, {});
+  assert.equal(room.freeSeat(), -1, '座位被 AI 占满');
+  lobby.sweepOldRooms();
+  assert.equal(room.match, null, '只有一个真人，不算匹配到人');
+});
+
+test('匹配中的房间不会被解散计时扫走', () => {
+  const lobby = makeLobby();
+  const { host, room } = coopRoom(lobby, 4);
+  lobby.setListed(host, { listed: true });
+  lobby.matchmaking(host, { on: true });
+  room.createdAt = 0;
+  lobby.sweepOldRooms();
+  assert.equal(room.disposed, false, '匹配中的房间保留');
 });
