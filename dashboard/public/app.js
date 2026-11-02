@@ -1074,6 +1074,18 @@ async function loadOps() {
   $('ops-summary').textContent =
     `节点响应 ${s.alive}/${NODES} · 房间 ${s.rooms} · 对局 ${s.matches} · 在线 ${s.players}`;
 
+  // 一键重启的实时计数：先说清「现在按下去会动几台」
+  const allHint = $('ops-restart-all-hint');
+  if (allHint) {
+    const idleN = opsData.nodes.filter((x) => x.alive && x.matches === 0).length;
+    const busyN = opsData.nodes.filter((x) => x.alive && x.matches > 0).length;
+    const downN = opsData.nodes.filter((x) => !x.alive).length;
+    const incl = $('ops-include-busy') && $('ops-include-busy').checked;
+    allHint.textContent = `${NODES} 台：空闲 ${idleN} · 对局中 ${busyN}`
+      + (downN ? ` · 无响应 ${downN}` : '')
+      + (incl ? ' → 会重启全部，含对局中的' : ' → 只重启空闲的');
+  }
+
   // 可重启：绿；跑旧代码但有对局：黄（不能动）
   const can = opsData.restartable;
   const oldBusy = opsData.nodes.filter((x) => !x.fresh && x.alive && x.matches > 0);
@@ -1107,14 +1119,14 @@ async function loadOps() {
     : '读不到 nginx 配置';
 }
 
-async function opsPost(path, label, btn) {
+async function opsPost(path, label, btn, extra = {}) {
   const out = $('ops-out');
   if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = '执行中…'; }
   try {
     const r = await fetch(path, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ confirm: true }),
+      body: JSON.stringify({ confirm: true, ...extra }),
     });
     const j = await r.json();
     if (out) {
@@ -1138,6 +1150,58 @@ if (document.getElementById('ops-bar')) {
     if (!confirm(`将重启 ${n.length} 个空闲节点：\n${fmtList(n)}\n\n这些节点上的玩家会断线 1–2 秒，浏览器自动重连，对局数据不丢。\n另有 ${busy} 个节点正在对局，不会动。\n\n确认重启？`)) return;
     opsPost('/api/ops/restart-idle', '重启空闲节点', $('ops-restart'));
   };
+
+  // 一键重启全部节点：不看新旧代码，30 台全重启。
+  // 默认【只重启空闲的】；勾了「也重启正在对局的节点」才会碰有对局的，且要多确认一次。
+  //
+  // 先让服务端 dryRun 复查一遍再写确认框：本地 opsData 可能是几秒前的，中途有人开局就会漏报，
+  // 而「正在对局」恰恰是最不该漏的那一类。服务端真正动手前还会再审一次。
+  $('ops-restart-all').onclick = async () => {
+    const btn = $('ops-restart-all');
+    const includeBusy = !!($('ops-include-busy') && $('ops-include-busy').checked);
+    let plan;
+    if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = '复查中…'; }
+    try {
+      const r = await fetch('/api/ops/restart-all', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirm: true, dryRun: true, includeBusy }),
+      });
+      plan = await r.json();
+    } catch (e) {
+      toast('预览失败：' + e.message);
+      return;
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || btn.textContent; }
+    }
+    const would = plan.wouldRestart || [];
+    const busyList = (plan.skipped || []).map((x) => x.n);
+    const dead = plan.dead || [];
+    if (!would.length) return toast(plan.message || '没有可重启的节点');
+
+    if (includeBusy && busyList.length) {
+      const players = (opsData ? opsData.nodes : [])
+        .filter((x) => busyList.includes(x.n))
+        .reduce((a, x) => a + (x.players || 0), 0);
+      if (!confirm(`⚠ 这会中断正在进行的对局！\n\n`
+        + `${busyList.length} 个节点上有对局：${fmtList(busyList)}\n`
+        + `受影响玩家约 ${players} 人，本局会中断，需要重新开一局。\n\n确定连它们一起重启？`)) return;
+      if (!confirm(`再次确认：现在就重启这 ${would.length} 台？`)) return;
+    } else {
+      let msg = `将重启 ${would.length} 个空闲节点：\n${fmtList(would)}\n\n`
+        + '这些节点上的玩家会断线 1–2 秒，浏览器自动重连，对局数据不丢。';
+      if (busyList.length) msg += `\n\n跳过 ${busyList.length} 个正在对局的：${fmtList(busyList)}`;
+      if (dead.length) msg += `\n⚠ 另有 ${dead.length} 个无响应：${fmtList(dead)}`;
+      msg += '\n\n确认重启？';
+      if (!confirm(msg)) return;
+    }
+
+    opsPost('/api/ops/restart-all', '一键重启全部节点', btn, { includeBusy });
+  };
+  // 勾选状态一变就刷新那句计数提示（要重新算「按下去会动几台」）
+  const busyChk = $('ops-include-busy');
+  if (busyChk) busyChk.onchange = () => loadOps();
+
   $('ops-open').onclick = () => {
     // 语义：「探测存活节点 → 重写 open-nodes.conf → reload」。
     // 只读各节点 /healthz，不重启任何东西、不改代码。
