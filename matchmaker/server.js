@@ -123,10 +123,28 @@ function pickNodeFor(capacity) {
 }
 
 // ---------------------------------------------------------------- 匹配
+// ---------------------------------------------------------------- 匹配
+
+// 规则维度（移植参考版 Matchmaking 的 rules 池）：'standard' = 房间规则全是默认，
+// 'experimental' = 房主改过规则（复活、敌人倍率、人数…）。票据可以只要一种，也可以两种都要。
+const MATCH_RULES = ['standard', 'experimental'];
+const normRules = (value) => {
+  const list = Array.isArray(value) ? value : (value == null ? MATCH_RULES : [value]);
+  const clean = MATCH_RULES.filter((r) => list.includes(r));
+  return clean.length ? clean : [...MATCH_RULES];
+};
+/** 两张票据能不能坐进同一局：规则集合有交集。 */
+const rulesOverlap = (a, b) => a.some((r) => b.includes(r));
+/** 配对用的桶键：难度 + 人数 + 规则（只有一种规则时才分桶，两种都要的票据参与两个桶）。 */
+const poolRules = (ticket) => (ticket.rules.length === 1 ? [ticket.rules[0]] : MATCH_RULES);
+
+/** 确认入场窗口：匹配成功后所有人必须在这段时间内点「进入对局」，否则整局作废。 */
+const ACCEPT_MS = 30_000;
 
 function positionOf(ticket) {
   const waiting = [...tickets.values()]
-    .filter((t) => !t.matchId && t.difficulty === ticket.difficulty && t.capacity === ticket.capacity)
+    .filter((t) => !t.matchId && t.difficulty === ticket.difficulty && t.capacity === ticket.capacity
+      && rulesOverlap(poolRules(t), ticket.rules))
     .sort((a, b) => a.createdAt - b.createdAt);
   return { position: waiting.findIndex((t) => t.id === ticket.id) + 1, waiting: waiting.length };
 }
@@ -134,37 +152,49 @@ function positionOf(ticket) {
 function formMatches() {
   const now = Date.now();
   for (const difficulty of DIFFICULTIES) {
-    const capacities = [...new Set([...tickets.values()]
+    // 每个（难度, 人数, 规则）一个池子。规则两种都要的票据会同时出现在两个池里，
+    // 但一旦成局就带上 matchId，后面的池子自然排除它。
+    const caps = [...new Set([...tickets.values()]
       .filter((t) => !t.matchId && t.difficulty === difficulty && now - t.createdAt < TICKET_TTL_MS)
       .map((t) => t.capacity))]
       .filter(isSeatCount)
       .sort((a, b) => a - b);
-    for (const capacity of capacities) {
-      for (;;) {
-        const waiting = [...tickets.values()]
-          .filter((t) => !t.matchId && t.difficulty === difficulty && t.capacity === capacity && now - t.createdAt < TICKET_TTL_MS)
-          .sort((a, b) => a.createdAt - b.createdAt);
-        if (waiting.length < capacity) break;
-        const node = pickNodeFor(capacity);
-        if (!node) { console.warn('[mm] 没有可用节点，暂停组队'); break; }
-        const group = waiting.slice(0, capacity);
-        const match = {
-          id: rid(),
-          difficulty,
-          capacity,
-          node,
-          hostId: (group.find((t) => !t.guest) || group[0]).id,
-          memberIds: group.map((t) => t.id),
-          code: null,
-          createdAt: now,
-        };
-        matches.set(match.id, match);
-        for (const t of group) { t.matchId = match.id; t.node = node; }
-        console.log(`[mm] 组成对局 ${match.id.slice(0, 8)} 难度=${difficulty} 人数=${capacity} 节点=${node} 玩家=${group.map((t) => t.name).join(',')}`);
+    for (const capacity of caps) {
+      for (const rule of MATCH_RULES) {
+        for (;;) {
+          const waiting = [...tickets.values()]
+            .filter((t) => !t.matchId && t.difficulty === difficulty && t.capacity === capacity
+              && t.rules.includes(rule) && now - t.createdAt < TICKET_TTL_MS)
+            .sort((a, b) => a.createdAt - b.createdAt);
+          if (waiting.length < capacity) break;
+          const node = pickNodeFor(capacity);
+          if (!node) { console.warn('[mm] 没有可用节点，暂停组队'); break; }
+          const group = waiting.slice(0, capacity);
+          const match = {
+            id: rid(),
+            difficulty,
+            capacity,
+            rules: rule,
+            node,
+            hostId: (group.find((t) => !t.guest) || group[0]).id,
+            memberIds: group.map((t) => t.id),
+            code: null,
+            createdAt: now,
+            // 确认入场：所有人点过「进入对局」才算数，超时整局作废（参考版的 accept 步骤）
+            accepted: new Set(),
+            acceptDeadline: now + ACCEPT_MS,
+          };
+          matches.set(match.id, match);
+          for (const t of group) { t.matchId = match.id; t.node = node; }
+          console.log(`[mm] 组成对局 ${match.id.slice(0, 8)} 难度=${difficulty} 人数=${capacity} 规则=${rule} 节点=${node} 玩家=${group.map((t) => t.name).join(',')}`);
+        }
       }
     }
   }
 }
+
+/** 这一局是不是所有人都确认了；host 可以直接开始建房。 */
+const allAccepted = (m) => m.memberIds.every((id) => m.accepted.has(id));
 
 function sweep() {
   const now = Date.now();
@@ -179,7 +209,19 @@ function sweep() {
     if (t.matchId) {
       const m = matches.get(t.matchId);
       if (!m) { t.matchId = null; t.node = null; }
-      else if (now - m.createdAt > MATCH_TTL_MS) {
+      // 确认超时：还没全员确认就把整局作废，确认过的人退回队列重新等（参考版 breakOffer 的思路）。
+      else if (!allAccepted(m) && now > m.acceptDeadline) {
+        console.log(`[mm] 确认超时，作废对局 ${m.id.slice(0, 8)}`);
+        for (const mid of m.memberIds) {
+          const x = tickets.get(mid);
+          if (!x) continue;
+          if (m.accepted.has(mid)) { x.matchId = null; x.node = null; x.createdAt = now; }
+          else tickets.delete(mid);   // 没确认的视为放弃
+        }
+        matches.delete(m.id);
+      }
+      // 已确认但房主迟迟没建出房来：也给一个上限
+      else if (allAccepted(m) && now - m.createdAt > MATCH_TTL_MS) {
         if (m.code) { matches.delete(m.id); tickets.delete(t.id); }
         else { m.memberIds.forEach((mid) => { const x = tickets.get(mid); if (x) { x.matchId = null; x.node = null; } }); matches.delete(m.id); }
       }
@@ -191,19 +233,29 @@ function sweep() {
 function publicState(ticket) {
   if (!ticket.matchId) {
     const { position, waiting } = positionOf(ticket);
-    return { state: 'queued', difficulty: ticket.difficulty, capacity: ticket.capacity, position, waiting, need: ticket.capacity };
+    return { state: 'queued', difficulty: ticket.difficulty, capacity: ticket.capacity,
+      rules: ticket.rules, position, waiting, need: ticket.capacity };
   }
   const match = matches.get(ticket.matchId);
-  if (!match) return { state: 'queued', difficulty: ticket.difficulty, capacity: ticket.capacity, position: 1, waiting: 1, need: ticket.capacity };
+  if (!match) return { state: 'queued', difficulty: ticket.difficulty, capacity: ticket.capacity,
+    rules: ticket.rules, position: 1, waiting: 1, need: ticket.capacity };
   const role = match.hostId === ticket.id ? 'host' : 'guest';
+  const accepted = allAccepted(match);
   return {
-    state: 'matched',
+    // confirm = 匹配成功、正在等所有人点「进入对局」；matched = 全员确认，可以进局了
+    state: accepted ? 'matched' : 'confirm',
     difficulty: match.difficulty,
     capacity: match.capacity,
+    rules: match.rules,
     node: match.node,
     matchId: match.id,
     role,
     code: match.code,
+    accepted: match.accepted.has(ticket.id),
+    acceptedCount: match.accepted.size,
+    members: match.memberIds.length,
+    // 确认剩余毫秒（前端显示倒计时；超时整局作废）
+    acceptRemainMs: accepted ? 0 : Math.max(0, match.acceptDeadline - Date.now()),
     ready: Boolean(match.code) || role === 'host',
   };
 }
