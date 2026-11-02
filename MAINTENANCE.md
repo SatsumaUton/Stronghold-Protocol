@@ -257,6 +257,57 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'
 
 > 当前进度与每次的节点清单记录在仓库根目录 `PENDING-RESTART.md`。
 
+## 多人匹配：整屏、人数/规则范围、以及「无缝进对局」为什么是免费的（2026-11-02）
+
+维护者这一轮的要求（逐条对上了，别改回去）：
+
+1. 大厅点「多人匹配」、以及「同盟模拟」里的「多人匹配」胶囊，**进的是同一块整屏**；
+2. 那块屏**下方要有参考版那样的设置项**（人数 / 规则 / 匹配说明）；
+3. 多人匹配屏的**难度按钮要和独立模拟一样大**；
+4. 房间设置里**不要**「匹配队友」开关；
+5. 匹配成功要**弹窗确认**（超时自动取消），确认后**直接进对局**；
+6. 对局结束后玩家**仍在房间里**。
+
+### 3 是最容易改坏的一条
+
+两屏用的是**同一个** `DifficultyCard`、**同一个** `.proto-list` 容器，所以尺寸天然一致。
+CSS 里**故意没有**任何 `.proto--match` 的尺寸规则 —— 多人匹配屏只多了一个
+`.proto-foot--match`，它干的事是「小屏上把提示行藏起来，把高度让给难度卡」。
+以后谁想让卡片「稍微小一点」，先想想这条。
+
+### 5 和 6 不需要新代码，靠既有的「人满即开」
+
+`Lobby` 的扫描里有一条：匹配中的房间一旦 `freeSeat() < 0` 且真人 ≥ 2，就走
+`forceStartMatchmaking()`，而它会**把真人全部标成 ready 再 `startMatch()`** ——
+也就是说「凑满 → 开局」之间没有「等房主点开始」这一步。所以「确认后直接进对局」
+只需要让确认过的玩家进同一间房；房间一满，对局自己就开始了。
+
+对局结束后房间照旧存在（`startMatch` 不清房间），玩家仍在房间里 —— 这是既有行为，不用做。
+
+### 2 的语义坑：`!!room.experimental` 不能当「改过规则」
+
+4 人房也会带一个 `experimental` 对象（`playerCapacity: 4` 恒在）。按
+`!!room.experimental` 判断「实验房」，会让**所有普通房**都被算成改过规则，
+于是 `rules: 'standard'` 永远匹配不到人。必须用 `shared/experimental.js` 的
+`experimentalRuleChanged()`：它忽略 `playerCapacity`，只看真正动过的规则。
+`test/match/quick-match.test.js` 里「规则默认只找标准房」那条就是守这个的。
+
+### 自己开多人房要用 `experimentalOptions()` 规范化
+
+`isExperimental()` 要求**至少两个键**（`EXPERIMENTAL_DEFAULTS` 那两个布尔项恒在）。
+只给 `{ playerCapacity: 8 }` 会被 `create()` 拒掉，房间根本建不出来。
+正确写法：`experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, playerCapacity })`。
+
+### 还没做完的：跨节点配对
+
+`quickMatch` **仍然只在本节点匹配**。matchmaker 里那套票据队列（`/api/join` →
+`/api/state` → `queued` / `confirm` / `matched` 三态 → 30 秒确认 → host 建房上报房间码）
+已经按其要求改好（规则分池 + 确认入场），但**前端还没接**。
+接上以后才是真正的跨节点匹配；在那之前，两个人不在同一节点仍然配不到一起，
+只能靠「公开同盟」手动进同一间房。
+
+---
+
 ### 房间只在节点内：公开同盟 / 多人匹配的跨节点边界（2026-11-02）
 
 **每个节点的 `Lobby` 是独立的。** 30 个进程各有自己的 `this.rooms`，房间码只在**本节点**有效。
