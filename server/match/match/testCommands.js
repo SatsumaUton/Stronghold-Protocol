@@ -42,7 +42,7 @@
 //   * bond count sets the ordinary extra-member bonus (0..99), allowing activation without
 //     pieces. computeBonds still decides the tier; a mode-disabled bond is refused.
 
-import { ERR, PHASE, layerGainRoom } from '../../../shared/constants.js';
+import { ERR, PHASE, layerGainRoom, BOND_LAYER_CAP, BOND_LAYER_SAFE_MAX } from '../../../shared/constants.js';
 import { parseTestArgs, isTestCommand, TEST_LOG_CAP, TEST_RATE_COUNT, TEST_RATE_WINDOW_MS } from '../../../shared/testMode.js';
 import { OK, fail } from './common.js';
 
@@ -379,7 +379,10 @@ export class MatchTestCommands {
   _testBond(ps, id, layers, count) {
     const blocked = this._testQuiet();
     if (blocked) return blocked;
-    if (!this.gd.bond(id) || this.gd.modeInactiveBonds.has(id)) return fail(ERR.BAD_TARGET, 'bond');
+    // 每种拒绝都带 detail：不带 detail 的 BAD_TARGET 在控制台里只能显示成一句
+    // 通用话（更糟的情况是漏出原始 code），维护者看不出到底哪儿不对。
+    if (!this.gd.bond(id)) return fail(ERR.BAD_TARGET, 'no-such-bond');
+    if (this.gd.modeInactiveBonds.has(id)) return fail(ERR.BAD_TARGET, 'bond');
     const cur = ps.layers[id] || 0;
     if (layers < cur) return fail(ERR.BAD_TARGET, 'layers');
     // [ASSUMED] count is an absolute extra member count, applied by the ordinary bond calculator.
@@ -390,9 +393,12 @@ export class MatchTestCommands {
       return OK;
     }
     const delta = layers - cur;
-    if (layerGainRoom(cur, delta, this.disableLayerCap) !== delta) return fail(ERR.BAD_TARGET);
+    if (layerGainRoom(cur, delta, this.disableLayerCap) !== delta) {
+      const max = this.disableLayerCap ? BOND_LAYER_SAFE_MAX : BOND_LAYER_CAP;
+      return fail(ERR.BAD_TARGET, `cap|${JSON.stringify({ cur, want: layers, max })}`);
+    }
     const add = ps.addLayers(id, delta, { reason: 'test' });
-    if (add !== delta) return fail(ERR.BAD_TARGET);
+    if (add !== delta) return fail(ERR.BAD_TARGET, `add|${JSON.stringify({ cur, want: layers, got: cur + add })}`);
     return OK;
   }
 
