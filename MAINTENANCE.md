@@ -6632,6 +6632,49 @@ git fetch origin custom/production        # 输出 bcb98feb..f4eeb269 才是对�
 git rev-list --left-right --count origin/custom/production...HEAD   # 0  0
 ```
 
+#### ✅ 推送失败的正确姿势：记待办，别连着重试（2026-11-02 维护者定）
+
+**一次推送不上去，就记进部署根目录的 `PENDING-PUSH.md`，攒着一起推。不要连着试。**
+
+理由：上面那套分析说明 `expected` 是代理冻结的值，**重试不会让它刷新** ——
+连试 5 次和试 1 次的结果一样，只是白等。等一段时间（或代理缓存自然过期）再推一次就过了。
+
+`PENDING-PUSH.md` 的格式（部署根目录，**不在仓库里**）：
+
+```markdown
+# 待推送到 GitHub 的提交
+
+状态：**N 条待推送**
+
+## 待推送
+| 提交 | 说明 |
+|---|---|
+| `0ac14eef` | 一句话说明 |
+
+本地 `0ac14eef`，远端已知 `5bd898a7` —— 快进 N 条，无分叉。
+
+## 已推送成功的（不用重推）
+| 提交 | 说明 |
+```
+
+**做完一批活再推**，走这三步：
+
+```powershell
+cd D:\Stronghold-Protocol\repo-sync
+git rev-list --left-right --count origin/custom/production...HEAD   # 右列 = 待推条数
+git push origin HEAD:custom/production                              # 一次推完
+git fetch origin custom/production                                  # 成功后核对，必须 0  0
+```
+
+推成功后**删掉 `PENDING-PUSH.md`**（它是一次性的，不是长期账本）。
+
+> ⚠ 别换镜像：`gh-proxy.com` / `ghproxy.net` **不带凭据**，只会报
+> `No anonymous write access` / `Invalid username or token`。
+> 直连 `github.com` 在这个网络下通常 `Connection timed out`，也不用反复试。
+
+**这条同样适用于节点重启**：待重启的节点记在 `PENDING-RESTART.md`，
+等空闲了集中做，不要为了一台节点反复轮询。
+
 #### 本地备份文件不入库
 
 `.gitignore` 已加 `*.bak` 和 `*.bak-*`。改文件时随手留在仓库里的
