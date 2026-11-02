@@ -759,6 +759,81 @@
 }
 .proto-hint { display: flex; align-items: center; gap: .08rem; min-height: .24rem; margin: 0; font-size: calc(.14 * var(--t)); color: #858b89; }
 
+/* ---- 多人匹配：难度下面的人数 / 规则两组开关（参考版 MatchScope 的移植） ----
+   分组两列：左边是「人数」「规则」的小标题，右边两个等宽按钮。
+   选中态只描边 + 打勾，和 .pcard 的薄荷/难度色一致（用 --d-color）。 */
+.proto-scope { display: flex; flex-direction: column; gap: .06rem; }
+.proto-scope__row {
+  display: grid; grid-template-columns: max(.6rem, 30px) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center; gap: .08rem;
+}
+.proto-scope__k { font-size: max(calc(.14 * var(--t)), 11px); color: #858b89; white-space: nowrap; }
+.proto-scope__opt {
+  display: flex; align-items: center; gap: .06rem; min-width: 0; min-height: max(.42rem, 26px); padding: .03rem .12rem;
+  overflow: hidden; font: inherit; font-size: max(calc(.15 * var(--t)), 12px); color: #b9bfbd; cursor: pointer;
+  background: #16191a; border: 1px solid #3a3f40; border-radius: 3px;
+  transition: color var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.proto-scope__opt:hover:not(.is-on):not(:disabled) { border-color: #7b7f81; color: #e6eaE9; }
+.proto-scope__opt:disabled { cursor: default; opacity: .6; }
+.proto-scope__opt .icon { flex: none; width: max(.16rem, 11px); height: max(.16rem, 11px); opacity: 0; }
+.proto-scope__opt > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.proto-scope__opt small { margin-left: .06rem; font-size: .84em; color: #858b89; }
+.proto-scope__opt.is-on { color: #f0f3f2; border-color: var(--d-color, #8f9496); box-shadow: inset 0 0 0 1px var(--d-color, #8f9496); }
+.proto-scope__opt.is-on .icon { opacity: 1; color: var(--d-color, #8f9496); }
+
+/* 多人匹配的底部比创建同盟多两行开关，提示行在小屏上可以省掉，把高度让给难度卡。 */
+@media (max-height: 520px) {
+  .proto-foot--match .proto-hint { display: none; }
+  .proto-scope { gap: 3px; }
+  .proto-scope__row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px; }
+  .proto-scope__k, .proto-scope__opt small { display: none; }
+  .proto-scope__opt { min-height: 24px; padding: 0 5px; gap: 3px; font-size: 11px; }
+}
+
+/* ---- 多人匹配：按下「开始多人匹配」之后的搜寻中（右列整块替换难度列表） ----
+   我们自己的后端是「找一个正在等人的公开房，没有就自己开一间」，请求一回来就进房，
+   所以这块通常只闪一下；网络慢的时候它才是玩家唯一的反馈，所以要能说清在等什么。 */
+.proto-side--search { display: flex; align-items: center; justify-content: center; }
+.mm-queue {
+  display: flex; flex-direction: column; align-items: center; gap: .1rem;
+  width: 100%; padding: .3rem .2rem; text-align: center;
+  background: linear-gradient(180deg, rgba(20, 24, 24, .92), rgba(14, 17, 17, .96));
+  border: 1px solid #3a3f40; border-radius: 4px;
+}
+/* 雷达：三个同心圈 + 一圈缓慢旋转的高光，纯 CSS，不用额外资源。 */
+.mm-queue__radar { position: relative; width: max(1.5rem, 84px); aspect-ratio: 1; display: grid; place-items: center; }
+.mm-queue__radar span {
+  position: absolute; inset: 0; border: 1px solid color-mix(in srgb, var(--d-color, #8f9496) 55%, transparent);
+  border-radius: 50%; opacity: .55;
+}
+.mm-queue__radar span:nth-child(2) { inset: 22%; opacity: .7; }
+.mm-queue__radar span:nth-child(3) { inset: 44%; opacity: .9; }
+.mm-queue__radar::after {
+  content: ''; position: absolute; inset: 44%; border-radius: 50%;
+  border-top: 2px solid var(--d-color, #8f9496);
+  animation: mm-spin 1.6s linear infinite;
+}
+@keyframes mm-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .mm-queue__radar::after { animation: none; } }
+.mm-queue__title { font-size: max(calc(.26 * var(--t)), 16px); font-weight: 800; letter-spacing: .06em; color: #f0f3f2; }
+.mm-queue__clock { font-size: max(calc(.2 * var(--t)), 13px); color: var(--d-color, #8f9496); letter-spacing: .08em; }
+.mm-queue__line { display: flex; align-items: baseline; justify-content: center; gap: .1rem; margin: 0; }
+.mm-queue__diff { font-size: max(calc(.17 * var(--t)), 13px); color: #e6eae9; }
+.mm-queue__code { font-size: max(calc(.13 * var(--t)), 10px); color: #858b89; }
+.mm-queue__scope { display: flex; flex-wrap: wrap; justify-content: center; gap: .06rem; margin: 0; }
+.mm-queue__chip {
+  padding: .02rem .1rem; font-size: max(calc(.13 * var(--t)), 10px); color: #cfd4d2;
+  background: #1d2223; border: 1px solid #3a3f40; border-radius: 999px;
+}
+.mm-queue__hint { display: flex; align-items: center; justify-content: center; gap: .06rem; margin: 0; font-size: max(calc(.13 * var(--t)), 11px); color: #858b89; }
+.mm-queue__cancel {
+  margin-top: .06rem; padding: .05rem .28rem; font: inherit; font-size: max(calc(.15 * var(--t)), 12px);
+  color: #cfd4d2; cursor: pointer; background: #1d2223; border: 1px solid #4a4f50; border-radius: 3px;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.mm-queue__cancel:hover { color: #fff; border-color: #8f9496; }
+
 /* 同盟人数选择（4–20）：建 5–20 人房用，匹配池按人数分组 */
 .create-box__cap {
   display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: .04rem .1rem;

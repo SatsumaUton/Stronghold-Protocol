@@ -874,6 +874,24 @@
   background: rgba(120, 196, 255, .08); border: 1px solid rgba(120, 196, 255, .35);
 }
 .rs-verbanner .icon { flex: none; width: 1.1em; height: 1.1em; color: #9fd3ff; }
+
+/* 匹配等待中的提示条（维护者 2026-11-02）：房主在房间里打开「公开同盟」后，房间进入等待匹配状态。
+   以前这个状态没有任何显示，房主以为开关没生效、别人以为没人在等。薄荷色（和「公开同盟」开关一致），
+   比版本横幅稍亮一点，因为它代表「正在等人」而不是通知。 */
+.rs-matchwait {
+  position: relative; flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: .04rem .1rem; margin: 0 .6rem .1rem; padding: .06rem .16rem;
+  color: #d7f4ec; font-size: calc(.14 * var(--t)); text-align: center; overflow-wrap: anywhere;
+  background: rgba(79, 224, 191, .1); border: 1px solid rgba(79, 224, 191, .42);
+}
+.rs-matchwait .icon { flex: none; width: 1.1em; height: 1.1em; color: #4fe0bf; }
+.rs-matchwait b { font-weight: 700; color: #f0fffb; }
+.rs-matchwait__sep { color: rgba(79, 224, 191, .55); }
+.rs-matchwait em { font-style: normal; color: #9fb9b3; }
+/* 小屏：座位和底部按钮要留高度，这行让出来（状态在座位区已经看得到） */
+@media (max-height: 520px) {
+  .rs-matchwait { display: none; }
+}
 /* a short screen (a phone in landscape): the seats and the footer keep the height — the strip floats over the seats while
    the vote runs (it wraps and scrolls inside), the banner gives its line up (the pill's tooltip says it) */
 @media (max-height: 520px) {
