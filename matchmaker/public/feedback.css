@@ -163,6 +163,10 @@ a:hover { text-decoration: underline; }
 .state--err b { color: var(--red); }
 
 .more { display: flex; justify-content: center; margin-top: 18px; }
+/* hidden 属性默认是 display:none，但上面那条 display:flex 会把它盖掉 ——
+   以前「加载更多」在只有一页时也一直显示，点了不带 before 又只拉第一页，
+   于是同一条反馈被无限追加。这条必须留在 .more 之后。 */
+.more[hidden] { display: none; }
 
 /* ── 发帖弹窗 ─────────────────────────────────────────── */
 .modal { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; }

@@ -1637,9 +1637,12 @@ const JOIN_COOKIE = (() => {
       const onTitle = !!document.querySelector('.title-screen');
       const inRoom = !!document.querySelector('.room-screen');
       const inLobby = !!document.querySelector('.lobby-screen');
+      // 只在大厅：大厅上再开着自己的弹窗（选择同盟方式 / 独立模拟 / 成就统计…）时也收起来 ——
+      // 那些弹窗铺满屏幕，角落再压一个按钮就是挡 UI。
+      const dialogOpen = !!(inLobby && hasOverlayForFeedback());
       const existing = document.getElementById('mm-feedback');
       // 不在大厅：收起来（保留节点，避免反复建删导致闪动）
-      if (onTitle || inRoom || !inLobby) {
+      if (onTitle || inRoom || !inLobby || dialogOpen) {
         if (existing) existing.style.display = 'none';
         return;
       }
@@ -1677,6 +1680,12 @@ const JOIN_COOKIE = (() => {
             box-shadow:0 0 14px rgba(23,249,183,.45);outline:none}
           #mm-feedback:active{filter:brightness(.94)}
           #mm-feedback svg{width:20px;height:20px;flex:none;display:block}
+          /* 未读红点：定位相对的是这个 fixed 按钮本身，不能把 position 改成 relative
+             （否则按钮掉回文档流，位置跟着页面内容跑偏，玩家反馈「弹了提醒框按钮就歪了」）。 */
+          #mm-feedback-badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;
+            padding:0 5px;box-sizing:border-box;border-radius:9px;background:#e2483c;color:#fff;
+            font:700 11px/18px system-ui,sans-serif;text-align:center;letter-spacing:0;
+            box-shadow:0 0 0 2px rgba(20,24,22,.9)}
           @media (max-width:640px){#mm-feedback{height:40px;padding:0 14px;font-size:14px}
             #mm-feedback svg{width:18px;height:18px}}
           @media (prefers-reduced-motion:reduce){#mm-feedback{transition:none}}
@@ -1695,8 +1704,36 @@ const JOIN_COOKIE = (() => {
       document.body.appendChild(a);
     };
 
+    // 与顶部 ticker 判「有弹窗」的口径一致，但只看真正铺在页面上的遮罩/弹窗。
+    function hasOverlayForFeedback() {
+      const sel = '.modal, [role="dialog"][aria-modal="true"], .mm-ov, .announcement-board, .guide, .lo, .spov, .awayov, .pauseov, .exp-pop';
+      const nodes = document.querySelectorAll(sel);
+      for (const node of nodes) {
+        try {
+          const r = node.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) continue;
+          const cs = getComputedStyle(node);
+          if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
+          return true;
+        } catch { /* 单个节点炸了就当它不存在 */ }
+      }
+      return false;
+    }
+
     ensure();
-    setInterval(ensure, 900);
+    // 立刻跟随界面切换：以前靠 900ms 轮询，切页面时按钮会滞留一下才消失。
+    let raf = 0;
+    const kick = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; ensure(); });
+    };
+    try {
+      new MutationObserver(kick).observe(document.body, {
+        childList: true, subtree: true,
+        attributes: true, attributeFilter: ['class', 'hidden', 'style', 'aria-hidden'],
+      });
+    } catch { /* MutationObserver 不可用就退化成轮询 */ }
+    setInterval(ensure, 4000);   // 兜底：万一 observer 没触发（比如 canvas 内切换）
   }
 
   // ---------------------------------------------------------------- 新反馈提醒（只给服主/管理员）
@@ -1747,7 +1784,8 @@ const JOIN_COOKIE = (() => {
           const st = document.createElement('style');
           st.id = 'mm-feedback-badge-css';
           st.textContent = `
-            #mm-feedback{position:relative}
+            /* 红点相对固定的按钮绝对定位 —— 这里**不能**写 #mm-feedback{position:relative}：
+               那会把按钮从 fixed 拉回文档流，玩家反馈「弹了提醒框按钮位置就偏了，关掉也不回来」。 */
             #mm-feedback-badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;
               padding:0 5px;box-sizing:border-box;border-radius:9px;background:#e2483c;color:#fff;
               font:700 11px/18px system-ui,sans-serif;text-align:center;letter-spacing:0;
@@ -1804,6 +1842,15 @@ const JOIN_COOKIE = (() => {
       setTimeout(() => { if (document.body.contains(box)) close(); }, TOAST_MS);
     };
 
+    // 已经提示过的最新一条 id：刷新页面后不要为同一批再弹一次窗。
+    const TOASTED = 'mm.fbToasted';
+    const toastedUpTo = () => {
+      try { return Number(localStorage.getItem(TOASTED)) || 0; } catch { return 0; }
+    };
+    const setToasted = (id) => {
+      try { localStorage.setItem(TOASTED, String(id)); } catch { /* 隐私模式忽略 */ }
+    };
+
     async function poll() {
       if (busy) return;
       if (document.querySelector('.title-screen')) { badge(0); return; }
@@ -1817,8 +1864,13 @@ const JOIN_COOKIE = (() => {
         const d = await r.json();
         const n = Number(d && d.count) || 0;
         badge(n);
-        // 只有「从少变多」才弹，避免每分钟重弹同一条
-        if (n > 0 && n !== lastCount) toast(d);
+        // 只有「真有一条没提示过的」才弹：条数变化不足以判断（管理员处理掉一条、
+        // 又来一条新的，count 可能没变），刷新后也不该为同一批重弹。
+        const newest = (d.latest || []).reduce((m, it) => Math.max(m, Number(it.id) || 0), 0);
+        if (n > 0 && newest > toastedUpTo()) {
+          toast(d);
+          setToasted(newest);
+        }
         lastCount = n;
       } catch { /* 网络抖动忽略 */ } finally { busy = false; }
     }
