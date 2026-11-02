@@ -1150,3 +1150,56 @@
 /* 底部「应用」行的尺寸规则见上面 .exp-modal__body 之后那一份（不要在这里重复定义，
    重复的那条会把它覆盖回去 —— 2026-10-27 踩过）。 */
 .exp-pop__foot .btn { min-width: 1.2rem; }
+/* 手动指定卡池编组 (ui/poolEditor.js, 移植自参考版并在 2026-11-02 为 5–20 人改版)。
+   参考版把编辑器塞进实验性弹窗（内容区 464px），卡片/座位下限 290px/240px 放不下两列，
+   20 人时高 1053px，必然滚动。现在改成独立弹窗（宽 8.2rem ≈ 820px）：
+   卡片 3 列、卡内座位 2 列、宽卡（>4 人）整行 7 列 —— 20 人 5 池约 170px 高。
+   实测见 tools/_measure-pool-editor.cjs。 */
+.pooled { display: flex; flex-direction: column; gap: .1rem; min-height: max(2.2rem, calc(150px * var(--sp-ui, 1))); }
+.pooled__bar { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: .1rem; }
+.pooled__total { font-size: max(calc(.16 * var(--t)), calc(13px * var(--sp-ui, 1))); font-weight: 700; color: var(--text-hi); }
+.pooled__step { display: inline-flex; gap: 1px; }
+.pooled__bar .btn { height: max(.34rem, calc(26px * var(--sp-ui, 1))); min-width: max(.34rem, calc(26px * var(--sp-ui, 1))); font-size: max(calc(.15 * var(--t)), calc(12px * var(--sp-ui, 1))); }
+.pooled__bar .btn--square { --sq: max(.34rem, calc(26px * var(--sp-ui, 1))); }
+/* 快捷预设：20 人不用一个个拖，点「5 池」直接均分 */
+.pooled__presets { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: .07rem; padding-bottom: .04rem; }
+.pooled__presets-k { font-size: max(calc(.13 * var(--t)), calc(11px * var(--sp-ui, 1))); color: var(--text-lo); }
+.pooled__preset.is-active { border-color: var(--mint-a35); color: var(--text-hi); }
+.pooled__grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(max(2.2rem, calc(220px * var(--sp-ui, 1))), 1fr)); align-content: start; gap: .08rem; overflow: auto; padding-right: 2px; }
+.pooled__card { position: relative; display: flex; flex-direction: column; min-width: 0; background: rgba(255, 255, 255, .025); border: 1px solid var(--line-2); border-top: 2px solid var(--line-3);
+  transition: border-color var(--t-fast), background var(--t-fast); }
+.pooled__card.is-wide { grid-column: 1 / -1; }
+.pooled__card.is-mine { border-top-color: var(--mint-400); }
+.pooled__card.is-target { border-color: var(--mint-a35); border-style: dashed; background: rgba(79, 232, 192, .05); cursor: pointer; }
+.pooled__head { display: flex; align-items: center; gap: .08rem; min-height: max(.34rem, calc(24px * var(--sp-ui, 1))); padding: 0 .09rem; background: rgba(0, 0, 0, .24); }
+.pooled__head b { flex: none; font-size: max(calc(.15 * var(--t)), calc(12px * var(--sp-ui, 1))); color: var(--text-hi); }
+.pooled__head span { flex: 1; min-width: 0; overflow: hidden; font-size: max(calc(.13 * var(--t)), calc(11px * var(--sp-ui, 1))); color: var(--text-lo); text-overflow: ellipsis; white-space: nowrap; }
+.pooled__here { flex: none; min-height: max(.28rem, calc(20px * var(--sp-ui, 1))); padding: 0 .1rem; font: inherit; font-size: max(calc(.13 * var(--t)), calc(11px * var(--sp-ui, 1))); font-weight: 700; color: #08221b; background: var(--mint-400); border: 0; cursor: pointer; }
+.pooled__here:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+/* 座位：下限 96px，220px 的卡片里排 2 列；整行的宽卡里排 7 列（20 人一池也只要 3 行） */
+.pooled__seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(.98rem, calc(96px * var(--sp-ui, 1))), 1fr)); gap: 2px; padding: .05rem; }
+.pooled__seat { display: flex; align-items: center; gap: .06rem; min-width: 0; min-height: max(.32rem, calc(23px * var(--sp-ui, 1))); padding: 0 .07rem; font-size: max(calc(.14 * var(--t)), calc(12px * var(--sp-ui, 1)));
+  color: var(--text-md); background: rgba(0, 0, 0, .28); border: 1px solid transparent; }
+.pooled__seat.is-empty { color: var(--text-dim); background: none; border: 1px dashed var(--line-2); }
+.pooled__seat.is-editable { cursor: grab; }
+.pooled__seat.is-editable:hover { border-color: var(--mint-a35); color: var(--text-hi); }
+.pooled__seat:focus-visible { outline: 2px solid var(--mint-400); outline-offset: 1px; }
+.pooled__seat.is-me { color: var(--text-hi); border-color: var(--mint-a35); }
+.pooled__seat.is-picked { color: #08221b; background: var(--mint-400); border-color: var(--mint-400); }
+.pooled__no { flex: none; min-width: 1.8em; font-size: .86em; color: var(--text-lo); }
+.pooled__seat.is-empty .pooled__no { color: var(--text-dim); }
+.pooled__seat.is-picked .pooled__no, .pooled__seat.is-picked .pooled__me { color: #08221b; }
+.pooled__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pooled__mark { flex: none; width: 1em; height: 1em; opacity: .75; }
+.pooled__me { flex: none; font-size: .82em; font-style: normal; font-weight: 700; color: var(--mint-400); }
+.pooled__foot { flex: none; margin: 0; font-size: max(calc(.13 * var(--t)), calc(11px * var(--sp-ui, 1))); line-height: 1.5; color: var(--text-dim); }
+.sp-coarse .pooled__seat { min-height: 34px; }
+.sp-coarse .pooled__bar .btn { height: 34px; min-width: 34px; }
+.sp-coarse .pooled__bar .btn--square { --sq: 34px; }
+
+/* 实验性选项弹窗里的那一行摘要：卡池编组  4+4（2 个池）  [编辑…] */
+.poolsum { display: flex; align-items: center; gap: .1rem; width: 100%; margin-top: .12rem; padding-top: .1rem; border-top: 1px solid var(--line-2); }
+.poolsum__k { flex: none; font-size: max(calc(.15 * var(--t)), calc(12px * var(--sp-ui, 1))); color: var(--text-md); }
+.poolsum__v { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: .08rem; overflow: hidden; }
+.poolsum__v b { font-size: max(calc(.16 * var(--t)), calc(13px * var(--sp-ui, 1))); color: var(--text-hi); }
+.poolsum__v em { font-style: normal; font-size: max(calc(.13 * var(--t)), calc(11px * var(--sp-ui, 1))); color: var(--text-lo); }

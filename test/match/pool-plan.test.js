@@ -12,8 +12,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeMatch } from './harness.js';
 import {
-  autoPoolPlan, canonicalPoolPlan, evenPoolPlan, isPoolPlan, mergeLastPool, moveSeat,
-  poolCount, poolScale, poolSeats, splitPool,
+  autoPoolPlan, autoPoolSizes, canonicalPoolPlan, evenPoolPlan, isPoolPlan, mergeLastPool, moveSeat,
+  planLabel, poolCount, poolScale, poolSeats, splitPool,
 } from '../../shared/poolPlan.js';
 import { experimentalKey, experimentalOptions, isExperimental, sameExperimental } from '../../shared/experimental.js';
 
@@ -184,4 +184,97 @@ test('编组跟着存档走：续玩后分组不变', async () => {
   const doc = snapshotMatch(m, { reason: 'test', checkpointId: 'cp' });
   assert.deepEqual(doc.experimental.poolPlan, plan, '存档里带着编组');
   assert.equal(doc.pools.length, 3, '三个池都存了');
+});
+
+// ── 界面用的摘要（shared/poolPlan.js 的 planLabel）───────────────────────
+test('planLabel：各池人数从大到小，如 4+4 / 5 / 3+3+2', () => {
+  assert.equal(planLabel([0, 0, 0, 0, 1, 1, 1, 1]), '4+4');
+  assert.equal(planLabel([0, 0, 0, 0, 0]), '5');
+  assert.equal(planLabel([0, 0, 0, 1, 1, 1, 2, 2]), '3+3+2');
+  assert.equal(planLabel([0]), '1');
+  // 编号顺序不影响结果（先出现的池不一定最大）
+  assert.equal(planLabel([0, 1, 1, 1]), '3+1');
+  // 空/非法输入给空串，界面不会崩
+  assert.equal(planLabel(null), '');
+  assert.equal(planLabel([]), '');
+});
+
+// ── 5–20 人：快捷预设（均分成 n 个池）─────────────────────────────────────
+test('快捷预设：evenPoolPlan 把 20 人均分成 2–5 个池', () => {
+  for (const pools of [2, 3, 4, 5]) {
+    const plan = evenPoolPlan(20, pools);
+    assert.equal(plan.length, 20, `${pools} 池：座位数不变`);
+    assert.equal(poolCount(plan), pools, `${pools} 池：池数对`);
+    const sizes = poolSeats(plan).map((ids) => ids.length);
+    // 均衡：最大与最小相差不超过 1
+    assert.ok(Math.max(...sizes) - Math.min(...sizes) <= 1, `${pools} 池均衡（${sizes.join('+')}）`);
+  }
+  // 5 人房也能用
+  assert.equal(poolCount(evenPoolPlan(5, 2)), 2);
+  assert.deepEqual(poolSeats(evenPoolPlan(5, 2)).map((s) => s.length), [3, 2]);
+});
+
+test('5–20 人：autoPoolPlan 与自动规则一致，且每个容量都能用', () => {
+  for (const capacity of [5, 6, 7, 8, 12, 16, 20]) {
+    const plan = autoPoolPlan(capacity);
+    assert.equal(plan.length, capacity, `${capacity} 人：长度对`);
+    assert.ok(isPoolPlan(plan, capacity), `${capacity} 人：是合法编组`);
+    assert.equal(plan[0], 0, `${capacity} 人：池 0 含座位 0`);
+  }
+  // 20 人按四人一组（twentyPlayerMode 的 fixedChunks 口径）
+  assert.deepEqual(poolSeats(autoPoolPlan(20)).map((s) => s.length), [4, 4, 4, 4, 4]);
+});
+
+// ★ 这个盯的是一个真踩过的坑：初始编组要按**已坐的席位**撒，不是按满员容量。
+//   20 人房只坐了 6 个人时，按满员撒会变成 5 个池（4+4+4+4+4），房主一打开编辑器
+//   就看到一堆空池，和实际对局对不上。按已坐席位撒才是这 6 个人真正的分组。
+//   注意「池的大小」和「池里坐了人」是两回事：chunkedPlan 让空席跟随前一个席位，
+//   所以最后一个池会显得很大，但界面上显示的是**已坐人数**（poolStock 的 taken）。
+test('初始编组按已坐席位撒（参考版 takenSeats 口径），不是按满员容量', () => {
+  const seats6 = [0, 1, 2, 3, 4, 5];
+  // 分块意图（autoPoolSizes）才是参考版注释里说的「八人房坐六个打 3+3」
+  assert.deepEqual(autoPoolSizes(6, { experimental: true }).sizes, [3, 3], '8 人房坐 6 个：分块意图 3+3');
+  assert.deepEqual(autoPoolSizes(6, { experimental: true, fixedChunks: true }).sizes, [4, 2], '20 人房固定四人一组：4+2');
+  // 但最终编组里空席跟随前一个席位，所以末池会变大 —— 这是 chunkedPlan 的既定行为
+  assert.deepEqual(poolSeats(autoPoolPlan(8, { seats: seats6 })).map((s) => s.length), [3, 5], '8 人房坐 6 个：末池含空席 6、7');
+  assert.deepEqual(poolSeats(autoPoolPlan(20, { seats: seats6 })).map((s) => s.length), [4, 16], '20 人房坐 6 个：4+2 之后空席跟随');
+  // 满员容量直接撒才是 5 个池
+  assert.deepEqual(poolSeats(autoPoolPlan(20)).map((s) => s.length), [4, 4, 4, 4, 4], '满员才是 5 个池');
+  // 12 人房坐 8 个：4+4 分块，末池含空席 8..11
+  assert.deepEqual(poolSeats(autoPoolPlan(12, { seats: [0, 1, 2, 3, 4, 5, 6, 7] })).map((s) => s.length), [4, 8], '12 人房坐 8 个：4+4 分块');
+
+  // 只坐 4 个人时不超过 MAX_SEATS，退回「按容量」铺满（房间还在进人）
+  assert.deepEqual(poolSeats(autoPoolPlan(20, { seats: [0, 1, 2, 3] })).map((s) => s.length), [4, 4, 4, 4, 4], '4 人时仍按容量铺');
+  assert.deepEqual(poolSeats(autoPoolPlan(20, { seats: [] })).map((s) => s.length), [4, 4, 4, 4, 4], '空房按容量铺');
+
+  // ★ 关键差别：按已坐席位撒 vs 按满员撒，前 6 个人的**实际归属**不同
+  const byTaken = autoPoolPlan(20, { seats: seats6 });
+  const byCapacity = autoPoolPlan(20);
+  // 按已坐：座位 4、5 在第二个池；按满员：座位 4、5 在第二个池，但座位 6..19 全是新池
+  assert.equal(new Set(byTaken).size, 2, '按已坐撒：只有 2 个池');
+  assert.equal(new Set(byCapacity).size, 5, '按满员撒：5 个池');
+});
+
+// 界面上的「N 人」读的是**已坐人数**，不是格位数 —— 所以上面那个 4+16 的编组
+// 在 20 人房只坐 6 个人时，卡片上显示的是「4 人」和「2 人」，不会出现「16 人」。
+test('poolStock：卡片显示的是已坐人数，不是格位数', () => {
+  // poolStock 在浏览器模块（ui/poolEditor.js）里，Node 直接 import 不了（要 preact hooks）；
+  // 这里按它的定义重算一遍，口径和 ui/poolEditor.js 里逐字一致。
+  const stock = (seatIds, seats) => {
+    const taken = seatIds.filter((seat) => seats[seat]).length;
+    return { taken, scale: poolScale(taken || seatIds.length) };
+  };
+  const plan = autoPoolPlan(20, { seats: [0, 1, 2, 3, 4, 5] });
+  const groups = poolSeats(plan);
+  const seats = new Array(20).fill(null);
+  for (const i of [0, 1, 2, 3, 4, 5]) seats[i] = { playerId: 'p' + i, name: '博士' + i };
+  assert.equal(stock(groups[0], seats).taken, 4, '第一个池坐了 4 个人');
+  assert.equal(stock(groups[1], seats).taken, 2, '第二个池坐了 2 个人（不是 16）');
+  // 牌库倍率按已坐人数算：4 人 → 1，2 人 → 1
+  assert.equal(stock(groups[0], seats).scale, 1);
+  assert.equal(stock(groups[1], seats).scale, 1);
+  // 空池（还没人坐）按格位数算，这样房间还在进人时倍率不会乱跳
+  const emptySeats = new Array(20).fill(null);
+  assert.equal(stock(groups[1], emptySeats).taken, 0);
+  assert.equal(stock(groups[1], emptySeats).scale, poolScale(16), '空池按 16 个格位算倍率');
 });

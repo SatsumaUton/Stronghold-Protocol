@@ -80,7 +80,8 @@ import { t, tc } from '../../../shared/i18n.js';
 // 实验性战斗规则的可选倍率（shared/experimental.js 是唯一来源，服务端校验同一份）
 import { ENEMY_MULTIPLIERS, isEnemyMultiplier } from '../../../shared/experimental.js';
 // 手动指定卡池编组（移植自参考版，反馈 #49）：房主自己排「谁跟谁共用一个卡池」
-import { PoolEditor } from '../ui/poolEditor.js';
+// 实验性弹窗里只放一行摘要，真正排布在独立弹窗里（20 人也不会溢出，见 ui/poolEditor.js 顶部说明）
+import { PoolSummary, PoolEditorDialog } from '../ui/poolEditor.js';
 import { autoPoolPlan } from '../../../shared/poolPlan.js';
 
 /**
@@ -495,6 +496,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
   const [enemyAtk, setEnemyAtk] = useState(1);
   // 手动指定卡池编组（shared/poolPlan.js）：null = 用自动规则
   const [poolPlan, setPoolPlan] = useState(null);
+  const [poolOpen, setPoolOpen] = useState(false);
   const wrapRef = useRef(null);
   // 实验性弹窗是挂在 .rs-opts 里的 position: fixed 整屏遮罩，而 .rs-opts 带 translateX(-50%)，
   // 会成为固定后代的包含块：弹窗于是相对那个小面板定位，被推到屏幕外，「应用」点不到。
@@ -521,6 +523,13 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
     }
     return out;
   })();
+  // 已坐的席位号：初始编组按它来撒（参考版 takenSeats）。20 人房只坐了 6 个人时，
+  // 自动规则是 3+3 两个池，而不是按满员撒成 5 个池 —— 空席跟着前一个席位走。
+  const takenSeats = seatsForPools.flatMap((s, i) => (s ? [i] : []));
+  const autoPlan = autoPoolPlan(currentCap, { seats: takenSeats, independent: !!exp.disableSharedPool });
+  // 手动编组和「独立卡池」是同一件事的两种说法：编组由房主自己排时，独立卡池就没有意义了
+  // （参考版 poolRows 也是这样：手动编组开着就把「禁用共享卡池」那个开关禁用并注明）。
+  const manualPools = Array.isArray(poolPlan) && poolPlan.length === currentCap;
   /** 鸭爵叠加（本服新增）：没有「允许重复选择策略」就没有多个鸭爵可叠，所以跟着 repeat 一起显示/收起。 */
   /**
    * 鸭爵叠加（本服新增）的显示条件：
@@ -552,7 +561,8 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
     if (!canEdit) return;
     const experimental = {
       revivalEnabled: revival,
-      disableSharedPool: independent,
+      // 手动编组存在时不写 disableSharedPool（两者互斥，写了服务端也会被 poolPlan 顶掉）
+      ...(manualPools ? {} : { disableSharedPool: independent }),
       ...(capacity > 4 ? { playerCapacity: capacity } : {}),
       ...(capacity > 4 && noDuck ? { disableDuckLord: true } : {}),
       ...(capacity > 4 && repeat ? { allowRepeat: true } : {}),
@@ -563,7 +573,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       ...(enemyHp !== 1 ? { enemyHpMul: enemyHp } : {}),
       ...(enemyAtk !== 1 ? { enemyAtkMul: enemyAtk } : {}),
       // 手动指定卡池编组：长度必须等于人数，对不上就不发（服务端也会拒）
-      ...(capacity > 4 && Array.isArray(poolPlan) && poolPlan.length === capacity ? { poolPlan: poolPlan.slice() } : {}),
+      ...(manualPools ? { poolPlan: poolPlan.slice() } : {}),
     };
     setOpen(false);
     setCapOpen(false);
@@ -605,10 +615,10 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
           <${Icon} name="check" class=${revival ? 'is-on' : ''} />${t('队友复活')}
         </button>
       <//>
-      <${Tooltip} text=${t('每名博士使用自己的卡池，不与他人共享')}>
+      <${Tooltip} text=${manualPools ? t('已由手动编组决定。') : t('每名博士使用自己的卡池，不与他人共享')}>
         <button type="button" role="switch" aria-checked=${independent ? 'true' : 'false'} data-testid="exp-independent"
-            class=${`dpick__opt ailast__opt${independent ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
-            onClick=${() => { setCapOpen(false); canEdit && setIndependent(!independent); }}>
+            class=${`dpick__opt ailast__opt${independent ? ' is-active' : ''}`} disabled=${!!busy || !canEdit || manualPools}
+            onClick=${() => { setCapOpen(false); canEdit && !manualPools && setIndependent(!independent); }}>
           <${Icon} name="check" class=${independent ? 'is-on' : ''} />${t('独立卡池')}
         </button>
       <//>
@@ -670,16 +680,8 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
           </div>
         </div>
       </div>
-      ${capacity > 4 ? html`<div class="exp-modal__pools">
-        <div class="exp-modal__pools-head">
-          <span class="exp-mul__k">${t('手动指定卡池编组')}</span>
-          <${Button} variant="ghost" size="sm" disabled=${!!busy || !canEdit}
-            data-testid="pool-auto" onClick=${() => setPoolPlan(autoPoolPlan(capacity))}>${t('恢复自动')}<//>
-        </div>
-        <${PoolEditor} plan=${Array.isArray(poolPlan) && poolPlan.length === capacity ? poolPlan : autoPoolPlan(capacity)}
-          seats=${seatsForPools} hostId=${room?.hostId} myId=${myId} editable=${canEdit} busy=${!!busy}
-          onPlan=${setPoolPlan} />
-      </div>` : null}
+      ${capacity > 4 ? html`<${PoolSummary} plan=${Array.isArray(poolPlan) && poolPlan.length === capacity ? poolPlan : null}
+        capacity=${capacity} auto=${autoPlan} editable=${canEdit} busy=${!!busy} onEdit=${() => { setCapOpen(false); setPoolOpen(true); }} />` : null}
       </div>
       ${canEdit ? html`<div class="exp-pop__foot">
         <span class="t-dim">${t('开局后不可更改')}</span>
@@ -687,6 +689,10 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       </div>` : html`<div class="exp-pop__foot"><span class="t-dim">${t('由创建者设置')}</span></div>`}
       </div>
     </div>` : null}
+    ${capacity > 4 ? html`<${PoolEditorDialog} open=${poolOpen}
+      plan=${Array.isArray(poolPlan) && poolPlan.length === capacity ? poolPlan : autoPlan}
+      seats=${seatsForPools} hostId=${room?.hostId} myId=${myId} busy=${!!busy}
+      onClose=${() => setPoolOpen(false)} onPlan=${setPoolPlan} />` : null}
   </div>`;
 }
 

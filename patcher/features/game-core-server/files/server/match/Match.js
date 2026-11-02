@@ -344,6 +344,12 @@ export class Match {
     this.twentyPlayerMode = this.capacityExperiment && this.playerCapacity === 20;
     this.disableDuckLord = this.capacityExperiment && this.experimental.disableDuckLord === true;
     this.allowRepeat = this.capacityExperiment && this.experimental.allowRepeat === true;
+    /**
+     * 手动指定卡池编组（移植自参考版，反馈 #49）：房主排的座位分组，每个座位一个卡池号
+     * （shared/poolPlan.js 的规范形式），否则 null。单人局恒为 null —— 一个人没有分组可言。
+     * 开局（以及重摇设置）时交给 createPoolGroups 的 `plan`，它直接说了算，覆盖自动分组规则。
+     */
+    this.poolPlan = this.isSolo ? null : this.experimental.poolPlan ?? null;
     // 实验性战斗规则（任意模式、任意容量都可用，与人数无关）：
     //   * disableLayerCap  —— 盟约层数上限 999 抬到 BOND_LAYER_SAFE_MAX（1e9），等于「不设上限」；
     //   * disableHitLimit  —— 不取消对敌方领袖的单次 ≥ BOSS_HIT_LIMIT(300000) 伤害；
@@ -552,9 +558,10 @@ export class Match {
       experimental: this.capacityExperiment,
       independent: this.disableSharedPool,
       fixedChunks: this.twentyPlayerMode,
+      plan: this.poolPlan,
     });
     this.pool = this.disableSharedPool ? new SharedPool(this.gd, { banned: bans.banned }) : this.poolGroups[0].pool;
-    this.playerPools = this.disableSharedPool || this.capacityExperiment
+    this.playerPools = this.disableSharedPool || this.capacityExperiment || this.poolPlan
       ? new Map(this.poolGroups.flatMap((g) => g.playerIds.map((id) => [id, g.pool])))
       : null;
     this.playerItemPools = createItemPools(this.gd, this.poolGroups, (id) => this.players.get(id));

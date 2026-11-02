@@ -1,6 +1,7 @@
 // Room-owned experimental rules are snapshotted at launch, never player votes.
 import { MAX_SEATS } from './constants.js';
 import { isPlayerCapacity, roomCapacity } from './playerCapacity.js';
+import { canonicalPoolPlan, isPoolPlan } from './poolPlan.js';
 
 export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disableSharedPool: false });
 /**
@@ -20,8 +21,8 @@ export const isEnemyMultiplier = (value) => ENEMY_MULTIPLIERS.includes(value);
 const OPTIONAL_MULTIPLIERS = new Set(['enemyHpMul', 'enemyAtkMul']);
 const enemyMultiplier = (value) => (isEnemyMultiplier(value) ? value : 1);
 
-/** The most keys a valid set can carry: 2 defaults + playerCapacity + 5 optional flags + 2 multipliers. */
-const MAX_KEYS = 2 + 1 + OPTIONAL_FLAGS.size + OPTIONAL_MULTIPLIERS.size;
+/** The most keys a valid set can carry: 2 defaults + playerCapacity + 5 optional flags + 2 multipliers + poolPlan. */
+const MAX_KEYS = 2 + 1 + OPTIONAL_FLAGS.size + OPTIONAL_MULTIPLIERS.size + 1;
 
 export function isExperimental(value) {
   if (!value || typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype) return false;
@@ -36,6 +37,8 @@ export function isExperimental(value) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor?.enumerable !== true) return false;
     if (key === 'playerCapacity') return isPlayerCapacity(descriptor.value);
+    // 手动指定卡池编组：每个座位一个卡池号，长度必须等于房间容量
+    if (key === 'poolPlan') return isPoolPlan(descriptor.value, roomCapacity('coop', value));
     if (OPTIONAL_MULTIPLIERS.has(key)) return isEnemyMultiplier(descriptor.value);
     return OPTIONAL_FLAGS.has(key) && typeof descriptor.value === 'boolean';
   });
@@ -43,11 +46,13 @@ export function isExperimental(value) {
 
 /** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean,
  *   allowRepeat?: boolean, stackDuckLord?: boolean, disableLayerCap?: boolean, disableHitLimit?: boolean,
- *   enemyHpMul?: number, enemyAtkMul?: number }} [value] */
+ *   enemyHpMul?: number, enemyAtkMul?: number, poolPlan?: readonly number[] }} [value]
+ *   `poolPlan`: 手动指定卡池编组，每个座位一个卡池号（shared/poolPlan.js）。它已经把每个座位
+ *   分到哪个池说清楚了，所以**取代** `disableSharedPool`（后者只是「每人不共享」的粗粒度开关）。 */
 export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
   if (!isExperimental(value)) throw new TypeError('invalid experimental options');
   const capacity = roomCapacity('coop', value);
-  return Object.freeze({ revivalEnabled: value.revivalEnabled, disableSharedPool: value.disableSharedPool,
+  return Object.freeze({ revivalEnabled: value.revivalEnabled, disableSharedPool: value.disableSharedPool && !value.poolPlan,
     ...(capacity === MAX_SEATS ? {} : { playerCapacity: capacity }),
     // Optional and false by default: ordinary rooms and legacy DTOs keep their two-flag shape.
     ...(capacity > MAX_SEATS && value.disableDuckLord === true ? { disableDuckLord: true } : {}),
@@ -60,12 +65,16 @@ export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
     ...(value.disableLayerCap === true ? { disableLayerCap: true } : {}),
     ...(value.disableHitLimit === true ? { disableHitLimit: true } : {}),
     ...(enemyMultiplier(value.enemyHpMul) !== 1 ? { enemyHpMul: value.enemyHpMul } : {}),
-    ...(enemyMultiplier(value.enemyAtkMul) !== 1 ? { enemyAtkMul: value.enemyAtkMul } : {}) });
+    ...(enemyMultiplier(value.enemyAtkMul) !== 1 ? { enemyAtkMul: value.enemyAtkMul } : {}),
+    // 手动指定卡池编组：规范化后冻结（卡池按首次出现的顺序从 0 编号）
+    ...(value.poolPlan ? { poolPlan: Object.freeze(canonicalPoolPlan(value.poolPlan)) } : {}) });
 }
 
 const duckLordDisabled = (value) => roomCapacity('coop', value) > MAX_SEATS && value.disableDuckLord === true;
 const repeatAllowed = (value) => roomCapacity('coop', value) > MAX_SEATS && value.allowRepeat === true;
 const duckLordStacked = (value) => repeatAllowed(value) && value.stackDuckLord === true;
+/** 卡池编组的 key：同一套布局（不论编号）得到同一个字符串；没有编组时为空串。 */
+const planKey = (value) => (value.poolPlan ? canonicalPoolPlan(value.poolPlan).join() : '');
 export const experimentalKey = (value) => {
   const key = `${value.revivalEnabled ? 1 : 0}${value.disableSharedPool ? 1 : 0}`;
   const capacity = roomCapacity('coop', value);
@@ -73,7 +82,8 @@ export const experimentalKey = (value) => {
   const hp = enemyMultiplier(value.enemyHpMul), atk = enemyMultiplier(value.enemyAtkMul);
   return `${legacy}${duckLordDisabled(value) ? ':duck' : ''}${repeatAllowed(value) ? ':repeat' : ''}${duckLordStacked(value) ? ':stack' : ''}`
     + `${value.disableLayerCap === true ? ':layers' : ''}${value.disableHitLimit === true ? ':hits' : ''}`
-    + `${hp !== 1 ? `:hp${hp}` : ''}${atk !== 1 ? `:atk${atk}` : ''}`;
+    + `${hp !== 1 ? `:hp${hp}` : ''}${atk !== 1 ? `:atk${atk}` : ''}`
+    + `${value.poolPlan ? `:plan${planKey(value)}` : ''}`;
 };
 export const sameExperimental = (a, b) => !!a && !!b
   && a.revivalEnabled === b.revivalEnabled && a.disableSharedPool === b.disableSharedPool
@@ -84,4 +94,5 @@ export const sameExperimental = (a, b) => !!a && !!b
   && (a.disableLayerCap === true) === (b.disableLayerCap === true)
   && (a.disableHitLimit === true) === (b.disableHitLimit === true)
   && enemyMultiplier(a.enemyHpMul) === enemyMultiplier(b.enemyHpMul)
-  && enemyMultiplier(a.enemyAtkMul) === enemyMultiplier(b.enemyAtkMul);
+  && enemyMultiplier(a.enemyAtkMul) === enemyMultiplier(b.enemyAtkMul)
+  && planKey(a) === planKey(b);

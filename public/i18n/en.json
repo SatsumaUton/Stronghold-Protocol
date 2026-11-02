@@ -2442,5 +2442,14 @@
   "{n} 人": "{n} players",
   "完整牌库": "Full deck",
   "牌库 ×{n}": "Deck ×{n}",
-  "移到此处": "Move here"
+  "移到此处": "Move here",
+  "卡池编组": "Card pools",
+  "编辑…": "Edit…",
+  "手动指定卡池编组": "Card pool groups",
+  "恢复自动": "Back to automatic",
+  "快捷": "Quick",
+  "{n} 池": "{n} pools",
+  "每人独立": "One each",
+  "点一个座位，再点目标卡池即可移动；桌面端也可以直接拖。改动会随「应用」一起生效。": "Tap a seat, then the target pool to move it; desktop can drag it too. Changes apply with “Apply”.",
+  "已由手动编组决定。": "Decided by the manual groups."
 }
