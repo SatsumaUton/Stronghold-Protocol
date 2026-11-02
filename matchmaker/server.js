@@ -730,11 +730,15 @@ const server = http.createServer(async (req, res) => {
     if (!DIFFICULTIES.includes(difficulty)) return json(res, 400, { error: '难度不正确' });
     if (!isSeatCount(capacity)) return json(res, 400, { error: '匹配人数不正确' });
     const ip = clientIp(req);
+    // 规则维度（参考版 MatchScope 的移植）：'standard' = 房间规则全是默认，'experimental' = 房主改过规则。
+    // 票据可以只要一种，也可以两种都要（前端「两个都选」时传数组）。
+    const rules = normRules(body.rules);
     // 防刷：同一网络最多 3 个待匹配票据；全服最多 500 个
     const mine = [...tickets.values()].filter((x) => x.ip === ip && !x.matchId).length;
     if (mine >= 3) return json(res, 429, { error: '同一网络排队人数过多，请稍后再试' });
     if (tickets.size >= 500) return json(res, 429, { error: '匹配队列已满，请稍后再试' });
-    const t = { id: rid(), secret: rid(), name, difficulty, capacity, ip, createdAt: Date.now(), lastSeen: Date.now(), matchId: null, node: null };
+    const t = { id: rid(), secret: rid(), name, difficulty, capacity, rules, ip,
+      createdAt: Date.now(), lastSeen: Date.now(), matchId: null, node: null };
     tickets.set(t.id, t);
     console.log(`[mm] 排队 ${name} (${DIFF_NAMES[difficulty]}, ${capacity}人) 票据=${t.id.slice(0, 8)}`);
     return json(res, 200, { ok: true, id: t.id, secret: t.secret, state: publicState(t) });
@@ -754,6 +758,21 @@ const server = http.createServer(async (req, res) => {
     if (t.matchId) return json(res, 409, { error: '已匹配成功，不能取消' });
     tickets.delete(t.id);
     return json(res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/accept' && req.method === 'POST') {
+    const body = await readBody(req);
+    const t = tickets.get(body.id);
+    if (!auth(t, body.id, body.secret)) return json(res, 404, { error: 'ticket not found' });
+    t.lastSeen = Date.now();
+    if (!t.matchId) return json(res, 409, { error: '还没有匹配成功' });
+    const m = matches.get(t.matchId);
+    if (!m) return json(res, 404, { error: '对局已失效' });
+    // 超时之后再点就没意义了：那一局已经被 sweep 作废/回收
+    if (!allAccepted(m) && Date.now() > m.acceptDeadline) return json(res, 409, { error: '确认已超时' });
+    m.accepted.add(t.id);
+    console.log(`[mm] 确认入场 ${t.name} (${m.accepted.size}/${m.memberIds.length}) ${m.id.slice(0, 8)}`);
+    return json(res, 200, { ok: true, state: publicState(t) });
   }
 
   if (pathname === '/api/room' && req.method === 'POST') {
