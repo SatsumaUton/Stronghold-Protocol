@@ -2753,7 +2753,14 @@ export class Lobby {
   quickEnqueue(session, { difficulty, seats, rules, wantMulti, wantFour, wantExperimental }) {
     // 以前靠 create() 顺带拒绝游客；现在没人匹配时不再建房，所以这里要自己拦一道，
     // 否则游客会排进队列、等 2 分钟超时才发现开不了局。
-    if (session.guest || !session.accountId) return fail(ERR.BAD_MSG, '游客不能参与多人匹配，请先登录');
+    //
+    // ★ 但要把「真游客」和「身份还在路上」分开：刷新后立刻点「多人匹配」时，
+    //   accountToken 可能还没送到服务端（session.accountId 空）。那不是游客，
+    //   直接回 BAD_MSG 会让玩家只看到一句「无效的请求」（BAD_MSG 的通用文案），
+    //   完全看不出该怎么办。口径与 join() 一致：身份在途 → IDENTITY_PENDING，
+    //   客户端等 sp-account-token 到了重新握手再试一次。
+    if (session.guest) return fail(ERR.BAD_MSG, '游客不能参与多人匹配，请先登录');
+    if (!session.accountId) return fail(ERR.IDENTITY_PENDING, 'account identity not received yet');
     if (!this.quickQueue) this.quickQueue = new Map();
     const ticket = `q${(this.quickSeq = (this.quickSeq || 0) + 1)}${Math.random().toString(36).slice(2, 8)}`;
     const capacity = wantMulti && !wantFour ? MULTI_SEAT_DEFAULT : MAX_SEATS;
