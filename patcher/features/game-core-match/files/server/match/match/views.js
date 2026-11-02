@@ -148,6 +148,9 @@ export class MatchViews {
         fieldId: this.fieldOf(ps),
         status: this.statusOf(ps),
         autoplay: ps.autoplay,
+        // 预约盟约（g.bondPlan，纯显示）：队友和观战者都能看到这个人打算走哪个核心盟约。
+        // 只在预约了的时候下发，默认房间/对局的视图与以前逐字一致（少一个键）。
+        ...(ps.bondPlan ? { bondPlan: ps.bondPlan } : {}),
         // 干员皮肤 (docs/SKINS.md): PUBLIC on purpose — this is how a teammate sees your skin, and the reason the
         // renderer reads the skin off the unit rather than off the local player. Omitted when empty, which is the normal
         // case: the appearance comes from a cosmetic plugin each player switches on for themself, so most have none.

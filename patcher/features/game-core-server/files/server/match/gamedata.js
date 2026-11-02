@@ -144,6 +144,8 @@ export class GameData {
     this.tuning = this.raw.tuning && typeof this.raw.tuning === 'object' ? this.raw.tuning : {};
     /** standIn memo: chess id → composed 补位 record | null */
     this._standIns = new Map();
+    /** plannableBondIds memo (预约盟约, g.bondPlan) */
+    this._plannableBonds = null;
   }
 
   /**
@@ -202,6 +204,24 @@ export class GameData {
   chess(id) { return own(this._chess, id); }
   item(id) { return own(this._items, id); }
   bond(id) { return own(this._bonds, id); }
+
+  /**
+   * 预约盟约（移植自参考版）：可以「预约」的盟约 = 所有**核心盟约**（`isCore === true`）。
+   *
+   * 为什么只算核心盟约：预约是「这一局我打算走哪个核心」，而 精准 / 迅捷 那些特质盟约是
+   * 顺带叠出来的，不是可以「打算」的目标。数据顺序（identifier）排列并冻结，三次调用返回同一个数组。
+   * @returns {readonly string[]}
+   */
+  plannableBondIds() {
+    if (!this._plannableBonds) this._plannableBonds = Object.freeze(this.bondIds.filter((id) => this.bond(id)?.isCore === true));
+    return this._plannableBonds;
+  }
+
+  /** @param {unknown} bondId @returns {boolean} bondId 是不是 plannableBondIds() 之一（g.bondPlan 的校验） */
+  bondPlannable(bondId) {
+    return typeof bondId === 'string' && this.plannableBondIds().includes(bondId);
+  }
+
   band(id) { return own(this.raw.bands, id); }
   garrison(id) { return own(this.raw.garrisons, id); }
   effect(id) { return own(this.raw.effects, id); }

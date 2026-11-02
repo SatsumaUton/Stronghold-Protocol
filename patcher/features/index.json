@@ -144,7 +144,7 @@
       {
         "path": "server/match/gamedata.js",
         "baseExists": true,
-        "customBytes": 32880
+        "customBytes": 33847
       },
       {
         "path": "server/match/invariants.js",
@@ -174,7 +174,7 @@
       {
         "path": "server/match/PlayerState.js",
         "baseExists": true,
-        "customBytes": 22365
+        "customBytes": 22806
       },
       {
         "path": "server/match/pool.js",
@@ -353,7 +353,7 @@
       {
         "path": "shared/protocol.js",
         "baseExists": true,
-        "customBytes": 53139
+        "customBytes": 53438
       },
       {
         "path": "public/css/screens/room.css",
@@ -1115,7 +1115,7 @@
       {
         "path": "server/match/gamedata.js",
         "baseExists": true,
-        "customBytes": 32880
+        "customBytes": 33847
       },
       {
         "path": "server/match/host/childHost.js",
@@ -1185,7 +1185,7 @@
       {
         "path": "server/match/match/intents.js",
         "baseExists": true,
-        "customBytes": 13902
+        "customBytes": 15677
       },
       {
         "path": "server/match/match/messaging.js",
@@ -1260,7 +1260,7 @@
       {
         "path": "server/match/match/views.js",
         "baseExists": true,
-        "customBytes": 29408
+        "customBytes": 29706
       },
       {
         "path": "server/match/match/watch.js",
@@ -1335,7 +1335,7 @@
       {
         "path": "server/match/PlayerState.js",
         "baseExists": true,
-        "customBytes": 22365
+        "customBytes": 22806
       },
       {
         "path": "server/match/pool.js",
@@ -1647,7 +1647,7 @@
       {
         "path": "server/match/gamedata.js",
         "baseExists": true,
-        "customBytes": 32880
+        "customBytes": 33847
       },
       {
         "path": "server/match/host/childHost.js",
@@ -1717,7 +1717,7 @@
       {
         "path": "server/match/match/intents.js",
         "baseExists": true,
-        "customBytes": 13902
+        "customBytes": 15677
       },
       {
         "path": "server/match/match/messaging.js",
@@ -1792,7 +1792,7 @@
       {
         "path": "server/match/match/views.js",
         "baseExists": true,
-        "customBytes": 29408
+        "customBytes": 29706
       },
       {
         "path": "server/match/match/watch.js",
@@ -1867,7 +1867,7 @@
       {
         "path": "server/match/PlayerState.js",
         "baseExists": true,
-        "customBytes": 22365
+        "customBytes": 22806
       },
       {
         "path": "server/match/pool.js",
@@ -4324,7 +4324,7 @@
       {
         "path": "shared/protocol.js",
         "baseExists": true,
-        "customBytes": 53139
+        "customBytes": 53438
       },
       {
         "path": "shared/sha256.js",
@@ -4400,22 +4400,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 181073
+        "customBytes": 181397
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 210849
+        "customBytes": 211259
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 202089
+        "customBytes": 202459
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 172834
+        "customBytes": 173148
       },
       {
         "path": "public/manifest.json",
@@ -4580,6 +4580,11 @@
         "path": "public/js/ui/assetUrls.js",
         "baseExists": true,
         "customBytes": 9868
+      },
+      {
+        "path": "public/js/ui/bondPlan.js",
+        "baseExists": true,
+        "customBytes": 4898
       },
       {
         "path": "public/js/ui/bondStrip.js",
@@ -5111,7 +5116,7 @@
       {
         "path": "public/js/screens/bandDraft.js",
         "baseExists": true,
-        "customBytes": 39828
+        "customBytes": 41622
       },
       {
         "path": "public/js/screens/briefing.js",
@@ -5655,7 +5660,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": true,
-        "customBytes": 72660
+        "customBytes": 75095
       },
       {
         "path": "public/css/screens/game-shop.css",
