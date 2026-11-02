@@ -126,12 +126,23 @@ const MODE_CARDS = [
     id: 'coop', name: N_('同盟模拟'), en: 'ALLIANCE SIMULATION', icon: 'users',
     desc: N_('与至多 {n} 名博士组成同盟，共享干员池，联防协作抵御敌潮。'), params: { n: MAX_SEATS - 1 },
     points: [N_('1–{n} 名博士 · 可由 AI 队友补位'), N_('联防阶段 · 最终攻势合并生命值')], pointParams: { n: MAX_SEATS },
-    // 卡片上方的说明行（按重要性排：人数 → 人数可调 → 匹配队友）。
+    // 卡片上方的说明行（按重要性排：人数 → 人数可调）。
     // 以前「支持匹配队友」压在卡片内部的薄荷底上，和卡片标题挤在一起、还把卡片撑得很宽。
-    // 现在统一移到卡片上方，按「先讲人数、再讲人数可调、最后讲怎么凑人」的语序。
-    pointExtra: [N_('房间内可调整 5–20 人'), N_('支持「匹配队友」与等待中的博士组队')],
+    // 现在统一移到卡片上方，按「先讲人数、再讲人数可调」的语序。
+    // ★ 2026-11-02：凑人这件事改成**大厅独立的「多人匹配」入口**（参考版同款整屏），
+    //   同盟模拟里不再提「匹配队友」，房间设置里也没有那个开关了。
+    pointExtra: [N_('房间内可调整 5–20 人')],
     // the hub's line above the entry on a short screen, where the whole line is wider than the entry (§35.51)
     pointShort: N_('1–{n} 名博士'),
+  },
+  {
+    // 参考版的第三个入口：公开多人匹配。点它进的是**整屏**（MatchmakingSelect，参考版
+    // 「选择模拟协议 / 同盟集结」那一屏），不是原地开房 —— 先选难度，再按「开始多人匹配」。
+    id: 'match', name: N_('多人匹配'), en: 'PUBLIC MATCHMAKING', icon: 'search',
+    desc: N_('选一个难度开始等人：系统先找正在等人的同盟，没有就替你开一间，人满或等待超时后自动开局。'),
+    points: [N_('与陌生博士组队 · 不自动补 AI'), N_('人满即开 · 也可等待超时开局')],
+    pointExtra: [N_('公开同盟：等不到人就自己开一间')],
+    pointShort: N_('与陌生博士组队'),
   },
 ];
 
@@ -689,6 +700,248 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
     </div>
   <//>`;
 }
+/** 多人匹配可选的人数档：标准 4 人同盟，以及 PLAYER_CAPACITIES 里大于 4 的那几档。 */
+const MULTI_CAPACITIES = PLAYER_CAPACITIES.filter((n) => n > MAX_SEATS);
+
+/** 「多人同盟」那一档的区间文字参数：{a} 最小、{b} 最大。参考版 ui/matchmaking.js 的 multiSeats()。 */
+function multiSeats() { return { a: MULTI_CAPACITIES[0] ?? MAX_SEATS + 1, b: MULTI_CAPACITIES[MULTI_CAPACITIES.length - 1] ?? MAX_SEATS + 1 }; }
+
+/**
+ * 多人匹配的范围（参考版 ui/matchmaking.js 的 `matchScope`）：两组多选，每组至少留一个。
+ * `seats`：'four'（标准 4 人同盟）/ 'multi'（5–20 人的多人同盟）。
+ * `rules`：'standard'（没改过规则）/ 'experimental'（改过规则的，如复活、敌人倍率）。
+ * 默认 `MATCH_SCOPE_DEFAULT` = 只要标准 4 人 + 标准规则，也就是「怎么都能开起来」的那一档。
+ */
+export const MATCH_SCOPE_DEFAULT = Object.freeze({ seats: Object.freeze(['four']), rules: Object.freeze(['standard']) });
+
+const SCOPE_VALUES = { seats: ['four', 'multi'], rules: ['standard', 'experimental'] };
+
+/** 读回上次的选择；非法值退回默认（参考版 matchScope(saved)）。 */
+export function matchScope(saved) {
+  const clean = (axis) => {
+    const list = Array.isArray(saved?.[axis]) ? saved[axis].filter((v) => SCOPE_VALUES[axis].includes(v)) : [];
+    return list.length ? [...new Set(list)] : [...MATCH_SCOPE_DEFAULT[axis]];
+  };
+  return { seats: clean('seats'), rules: clean('rules') };
+}
+
+/** 点一下某组的某个值：取消要留最后一个（和参考版 toggleMatchScope 一致）。 */
+export function toggleMatchScope(scope, axis, value) {
+  const list = Array.isArray(scope?.[axis]) ? scope[axis] : [];
+  if (!SCOPE_VALUES[axis]?.includes(value)) return matchScope(scope);
+  if (list.includes(value)) {
+    if (list.length <= 1) return matchScope(scope);     // 每组至少留一个
+    return matchScope({ ...scope, [axis]: list.filter((v) => v !== value) });
+  }
+  return matchScope({ ...scope, [axis]: [...list, value] });
+}
+
+/** 发给服务端的形式：服务端只认 'four' | 'multi' | 'both' 与 'standard' | 'experimental' | 'both'。 */
+export function matchScopeRequest(scope) {
+  const one = (axis, a, b) => (scope[axis].length > 1 ? 'both' : scope[axis][0] === a ? a : b);
+  return { seats: one('seats', 'four', 'multi'), rules: one('rules', 'standard', 'experimental') };
+}
+
+/** 开始按钮上面那行：这次范围在等多少真人。 */
+function matchHint(scope) {
+  const { a, b } = multiSeats();
+  const multi = scope.seats.includes('multi');
+  return multi
+    ? t('{a}–{b} 名真人 · 不自动补 AI · 人满或等待超时后自动开局', { a: scope.seats.includes('four') ? MAX_SEATS : a, b })
+    : t('{n} 名真人 · 不自动补 AI · 人满或等待超时后自动开局', { n: MAX_SEATS });
+}
+
+/**
+ * 多人匹配下方的范围开关（参考版 `MatchScope`）：人数 / 规则两组，每组多选、至少留一个。
+ * 带 `data-testid="match-scope-<值>"`，测试直接按值点。
+ */
+function MatchScope({ scope, onToggle, disabled }) {
+  const row = (axis, label, options) => html`<div class="proto-scope__row" role="group" aria-label=${label}>
+    <span class="proto-scope__k">${label}</span>
+    ${options.map(({ id, name, note, why }) => {
+      const on = scope[axis].includes(id);
+      return html`<button key=${id} type="button" class=${`proto-scope__opt${on ? ' is-on' : ''}`} aria-pressed=${on ? 'true' : 'false'} disabled=${disabled}
+          title=${why} data-testid=${`match-scope-${id}`} onClick=${() => onToggle(axis, id)}>
+        <${Icon} name="check" /><span>${name}${note ? html`<small class="num">${note}</small>` : null}</span>
+      </button>`;
+    })}
+  </div>`;
+  return html`<div class="proto-scope" data-testid="match-scope">
+    ${row('seats', t('人数'), [
+      { id: 'four', name: t('{n} 人同盟', { n: MAX_SEATS }), why: t('标准的 {n} 人同盟', { n: MAX_SEATS }) },
+      { id: 'multi', name: t('多人同盟'), note: t('{a}–{b} 人', multiSeats()), why: t('{a}–{b} 人的同盟，最先集满的人数开局', multiSeats()) },
+    ])}
+    ${row('rules', t('规则'), [
+      { id: 'standard', name: t('标准规则'), why: t('所有规则保持原样的同盟') },
+      { id: 'experimental', name: t('实验性规则'), why: t('房主改过规则的同盟，如复活、敌人倍率；进房后可以在同盟设置里看到') },
+    ])}
+  </div>`;
+}
+
+/** 多人匹配规则说明（参考版 `MatchRules`）。 */
+function MatchRules() {
+  const [open, setOpen] = useState(false);
+  return html`<${Button} variant="ghost" size="sm" icon="info" class="matchmaking__help" data-testid="match-rules"
+      onClick=${() => setOpen(true)}>${t('匹配说明')}<//>
+    ${open ? html`<div class="modal hub-dialog" role="presentation" onMouseDown=${(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+      <div class="modal__box hub-dialog__box brackets" role="dialog" aria-modal="true" aria-label=${t('多人匹配规则')}>
+        <div class="modal__stripe" aria-hidden="true"></div>
+        <header class="hub-dialog__head"><${MicroLabel} tone="mint">MATCHMAKING RULES<//>
+          <div class="hub-dialog__title-row"><h2 class="modal__title">${t('多人匹配规则')}</h2>
+            <button type="button" class="mm-modal__close" onClick=${() => setOpen(false)} aria-label=${t('关闭')}><${Icon} name="close" /></button></div>
+        </header>
+        <div class="hub-dialog__body">
+          <p class="modal__text">${t('按所选的人数和规则匹配真人，不自动补 AI。')}</p>
+          <p class="modal__text">${t('先找正在等人的公开同盟；一个都没有就替你开一间并挂上公开同盟。人满或等待超时后自动开局。')}</p>
+          <p class="modal__text">${t('「多人同盟」是最先集满的那一档人数开局；「实验性规则」指房主改过规则的同盟，例如复活、敌人倍率。')}</p>
+          <p class="modal__text">${t('难度决定这一局的规则数值，进房后房主仍可在同盟设置里更改。')}</p>
+        </div>
+      </div>
+    </div>` : null}`;
+}
+
+/**
+ * 「开始多人匹配」之后的等待态（参考版 `QueueFlow` 的位置与写法）。
+ *
+ * 参考版这里是服务端队列（搜寻中 → 确认入场 → 搜寻成功），我们这边 `room.quickMatch`
+ * 是「找一个正在等人的公开房，没有就自己开一间」，请求一回来页面就进房，
+ * 所以这一屏通常只闪一下 —— 但网络慢或服务端在筛选时它是玩家看到的第一个反馈，
+ * 所以照参考版把它做完整：搜寻中、已等秒数、这次的范围、取消。
+ */
+function MatchQueue({ difficulty, scope, elapsed, online, onCancel }) {
+  const info = difficultyInfo('coop', difficulty);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  return html`<div class="proto-side proto-side--search">
+    <div class="mm-queue" data-testid="match-queue">
+      <div class="mm-queue__radar" aria-hidden="true"><span></span><span></span><span></span></div>
+      <b class="mm-queue__title">${t('搜寻中')}</b>
+      <span class="mm-queue__clock num" data-testid="match-queue-clock">${mm}:${ss}</span>
+      <p class="mm-queue__line">
+        <span class="mm-queue__diff">${t(DIFFICULTY_NAMES[difficulty])}</span>
+        <span class="mm-queue__code num">${info.code}</span>
+      </p>
+      <p class="mm-queue__scope">
+        ${scope.seats.map((s) => html`<span key=${s} class="mm-queue__chip">${s === 'four' ? t('{n} 人同盟', { n: MAX_SEATS }) : t('多人同盟')}</span>`)}
+        ${scope.rules.map((r) => html`<span key=${r} class="mm-queue__chip">${r === 'standard' ? t('标准规则') : t('实验性规则')}</span>`)}
+      </p>
+      <p class="mm-queue__hint">
+        ${!online ? html`<${Spinner} size="sm" /> ${t('正在连接服务器…')}` : t('人满或等待超时后自动开局。')}
+      </p>
+      <button type="button" class="mm-queue__cancel" data-testid="match-cancel" onClick=${onCancel}>${t('取消匹配')}</button>
+    </div>
+  </div>`;
+}
+
+/**
+ * 多人匹配（参考版「选择模拟协议 / 同盟集结」那一屏，`ProtocolSelect` 的 match 用途）。
+ *
+ * 为什么单独一屏而不是原地开房：参考版点「多人匹配」进的是整屏 —— 左边是所选难度的
+ * 画面（ProtocolArt），右边是难度卡和「开始多人匹配」。维护者 2026-11-02 要求同款：
+ * 大厅点「多人匹配」、以及同盟模拟里的「多人匹配」胶囊，都进这一屏。
+ *
+ * 难度卡**必须**和独立模拟那一屏一样大：两边用的是同一个 `DifficultyCard`、同一个
+ * `proto-list` 容器、同一套 CSS，这一屏不额外加任何压缩规则（维护者 2026-11-02 明确要求）。
+ *
+ * 下方的设置项照参考版移植（`MatchScope` + `MatchRules`）：人数（标准 4 人 / 多人同盟）
+ * 与规则（标准 / 实验性）两组开关，外加「匹配说明」。它们直接决定服务端筛选与开房参数
+ * （server/lobby.js `quickMatch` 的 seats / rules）。
+ *
+ * 和参考版的差别：参考版按下按钮后是**服务端队列**（排队 → 确认入场 → 分配节点），
+ * 我们这边 `room.quickMatch` 是「找一个正在等人的公开房，没有就替你开一间」，
+ * 按下即进房，所以这一屏只负责**选难度 + 选范围 + 说明将要发生什么**，
+ * 等待状态由房间里显示（`room-opt-listed`）。
+ *
+ * `busy` 用 `run()` 的 'quick' 键；`onStart` 收到 `{ difficulty, seats, rules }`。
+ */
+export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, busy, online, createLocked = false,
+  difficulties = DIFFICULTIES, scope = MATCH_SCOPE_DEFAULT, onScope = () => {},
+  searching = false, elapsed = 0, onCancel = () => {} }) {
+  const info = difficultyInfo('coop', difficulty);
+  const working = busy === 'quick';
+  // 已经按过「开始多人匹配」：照参考版把右列换成搜寻中（proto--searching），
+  // 标题「同盟集结 / PUBLIC MATCHMAKING」不变，左边还是所选难度的画面。
+  if (searching) {
+    return html`<${Modal} open=${true} onClose=${onClose} class="proto proto--match proto--searching" veilClass="proto-veil">
+      <div class="proto__body" style=${`--d-color:${DIFFICULTY_COLORS[difficulty]}`} data-difficulty=${difficulty} data-mode="match">
+        <div class="proto__bg" aria-hidden="true"></div>
+        <${ProtoFit} />
+        <header class="proto-top">
+          <${BackPlate} onClick=${onClose} class="proto__back" />
+          <div class="proto-title">
+            <h2 class="modal__title">${t('同盟集结')}</h2>
+            <span class="proto-title__mode"><${Icon} name="search" />${t('多人匹配')}<i>PUBLIC MATCHMAKING</i></span>
+          </div>
+        </header>
+        <div class="proto-body">
+          <section class="proto-stage">
+            <div key=${difficulty} class="proto__pic"><${ProtocolArt} difficulty=${difficulty} /></div>
+            <div class="proto-brief">
+              <span class="proto-brief__code num">${info.code}</span>
+              <b class="proto-brief__name">${t(DIFFICULTY_NAMES[difficulty])}</b>
+              <p>${info.desc}</p>
+            </div>
+          </section>
+          <${MatchQueue} difficulty=${difficulty} scope=${scope} elapsed=${elapsed} online=${online} onCancel=${onCancel} />
+        </div>
+      </div>
+    <//>`;
+  }
+  return html`<${Modal} open=${true} onClose=${onClose} class="proto proto--match" veilClass="proto-veil">
+    <div class="proto__body" style=${`--d-color:${DIFFICULTY_COLORS[difficulty]}`} data-difficulty=${difficulty} data-mode="match">
+      <div class="proto__bg" aria-hidden="true"></div>
+      <${ProtoFit} />
+      <header class="proto-top">
+        <${BackPlate} onClick=${onClose} class="proto__back" />
+        <div class="proto-title">
+          <h2 class="modal__title">${t('同盟集结')}</h2>
+          <span class="proto-title__mode"><${Icon} name="search" />${t('多人匹配')}<i>PUBLIC MATCHMAKING</i></span>
+        </div>
+      </header>
+      <div class="proto-body">
+        <section class="proto-stage">
+          <div key=${difficulty} class="proto__pic"><${ProtocolArt} difficulty=${difficulty} /></div>
+          <div class="proto-brief">
+            <span class="proto-brief__code num">${info.code}</span>
+            <b class="proto-brief__name">${t(DIFFICULTY_NAMES[difficulty])}</b>
+            <p>${info.desc}</p>
+            <div class="proto-brief__more" data-testid="proto-brief-more">
+              <span class="proto-brief__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}</span>
+              <span class="proto-brief__meta"><${DifficultyRounds} info=${info} /></span>
+            </div>
+          </div>
+        </section>
+        <section class="proto-side">
+          <div class="proto-list" role="radiogroup" aria-label=${t('模拟难度')}>
+            ${difficulties.map((d) => html`<${DifficultyCard} key=${d} roomMode="coop" difficulty=${d} selected=${difficulty === d}
+              onSelect=${onDifficulty} disabled=${working} />`)}
+          </div>
+          <div class="proto-foot proto-foot--match">
+            <${MatchScope} scope=${scope} onToggle=${onScope} disabled=${working} />
+            <div class="proto-opts">
+              <span class="proto-mode-chip"><${Icon} name="search" />${t('多人匹配')}</span>
+              <${MatchRules} />
+            </div>
+            <p class="proto-hint" data-testid="match-hint">
+              ${!online
+                ? html`<${Spinner} size="sm" label="CONNECTING" /> ${t('正在连接服务器…')}`
+                : createLocked
+                  ? t('服务器暂时关闭了创建房间，请稍后再试')
+                  : matchHint(scope)}
+            </p>
+            <button type="button" class="proto-start" data-testid="match-start"
+              disabled=${!online || working || createLocked} aria-busy=${working ? 'true' : 'false'}
+              onClick=${() => onStart({ difficulty, seats: scope.seats, rules: scope.rules })}>
+              <span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>STRONGHOLD<br />PROTOCOL</small></span>
+              <span class="proto-start__label">${working ? html`<${Spinner} size="sm" />` : null}${t('开始多人匹配')}</span>
+              <span class="proto-start__deco" aria-hidden="true"></span>
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  <//>`;
+}
 
 /**
  * 选择同盟方式 (laid out after the event's screen after 同盟模拟, research 06 §3.2): full screen — a radar at the left with
@@ -792,6 +1045,13 @@ export function LobbyScreen() {
   // the open dialogs: 选择同盟方式 (同盟模拟 / 密钥加入) and 选择模拟协议 (独立模拟)
   const [allyOpen, setAllyOpen] = useState(false);
   const [soloOpen, setSoloOpen] = useState(false);
+  // 多人匹配：整屏（参考版同款「同盟集结」）。大厅入口和同盟模拟里的胶囊都开这一屏。
+  const [matchOpen, setMatchOpen] = useState(false);
+  // 多人匹配的范围（人数 / 规则）：上次的选择记在本地，默认标准 4 人 + 标准规则
+  const [matchScopeState, setMatchScopeState] = useState(() => matchScope(loadPref('lobby.matchScope', null)));
+  // 已按下「开始多人匹配」：显示搜寻中那屏；null = 还在选难度
+  const [matchSearch, setMatchSearch] = useState(null);
+  const [matchWait, setMatchWait] = useState(0);
   // 公开同盟（同盟列表）：从「选择同盟方式」里的入口打开
   const [browseOpen, setBrowseOpen] = useState(false);
   const [code, setCode] = useState('');
@@ -867,7 +1127,11 @@ export function LobbyScreen() {
     return () => { stop = true; clearInterval(timer); };
   }, []);
   const createOpen = isAdminUser || createGateOpen;
-  const openMode = (m) => { if (m === 'solo') setSoloOpen(true); else setAllyOpen(true); };
+  const openMode = (m) => {
+    if (m === 'solo') setSoloOpen(true);
+    else if (m === 'match') setMatchOpen(true);
+    else setAllyOpen(true);
+  };
   const pickDifficulty = (d) => { setDifficulty(d); savePref('lobby.difficulty', d); };
   const setSoloFreePref = (on) => { const next = on === true; setSoloFree(next); savePref('lobby.soloUnlimited', next); };
 
@@ -924,19 +1188,46 @@ export function LobbyScreen() {
       return answer;
     });
   };
-  // 「多人匹配」：一键参与匹配。服务端（Lobby.quickMatch）先找本节点上正在匹配、还缺人的公开房间，
-  // 找不到就自己开一间并立刻进入匹配状态；进房后的状态由服务端广播过来，这里只负责关掉弹窗并给个提示。
-  const quickMatch = () => {
+  // 「多人匹配」：从整屏（MatchmakingSelect）按「开始多人匹配」进来的。
+  // 服务端（Lobby.quickMatch）先找本节点上正在匹配、还缺人的公开房间，找不到就自己开一间并立刻进入匹配状态。
+  // 进房后的等待状态由服务端广播过来，这里只负责关掉整屏并给个提示。
+  // `req` = { difficulty, seats, rules }（MatchmakingSelect 的 onStart 直接把它传进来）。
+  const quickMatch = (req) => {
+    const d = req?.difficulty ?? shownCoop;
+    const seats = req?.seats ?? matchScopeRequest(matchScopeState).seats;
+    const rules = req?.rules ?? matchScopeRequest(matchScopeState).rules;
     if (!createOpen) { toast(t('服务器暂时关闭了创建房间，请稍后再试'), 'warn'); return; }
     if (guest) { toast(t('游客不能参与多人匹配，请先登录'), 'warn'); return; }
+    // 先把右列换成「搜寻中」，再去请求：网络慢的时候玩家至少知道在等什么。
+    setMatchSearch({ difficulty: d, seats, rules });
+    setMatchWait(0);
     return run('quick', async () => {
-      // 服务端 net.js 把 reply 的字段平铺在 ok 帧顶层（{ ...res.reply, t:'ok', rid }），没有套一层 reply。
-      const reply = (await net.request('room.quickMatch', { difficulty: shownCoop })) || {};
-      setAllyOpen(false);
-      if (reply.joined) toast(t('已加入正在等人的同盟，人满或等待超时后自动开局'), 'success');
-      else if (reply.matchmaking === false) toast(t('已开好同盟，但匹配没能开启，请在同盟设置里手动打开'), 'warn');
-      else toast(t('已开好同盟并开始等人，人满或等待超时后自动开局'), 'success');
+      try {
+        // 服务端 net.js 把 reply 的字段平铺在 ok 帧顶层（{ ...res.reply, t:'ok', rid }），没有套一层 reply。
+        const reply = (await net.request('room.quickMatch', { difficulty: d, seats, rules })) || {};
+        setMatchOpen(false);
+        setMatchSearch(null);
+        if (reply.joined) toast(t('已加入正在等人的同盟，人满或等待超时后自动开局'), 'success');
+        else if (reply.matchmaking === false) toast(t('已开好同盟，但匹配没能开启，请在大厅再点一次多人匹配'), 'warn');
+        else toast(t('已开好同盟并开始等人，人满或等待超时后自动开局'), 'success');
+      } catch (e) {
+        // 失败就退回选择那一屏，让玩家改难度/范围再试
+        setMatchSearch(null);
+        throw e;
+      }
     });
+  };
+  // 搜寻中的秒数（只在那屏显示时走）
+  useEffect(() => {
+    if (!matchSearch) return undefined;
+    const id = setInterval(() => setMatchWait((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [matchSearch]);
+  // 范围改动落盘，下次进这一屏还是上次的选择
+  const pickScope = (axis, value) => {
+    const next = toggleMatchScope(matchScopeState, axis, value);
+    setMatchScopeState(next);
+    savePref('lobby.matchScope', next);
   };
   const join = (c = code) => {
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
@@ -1046,10 +1337,22 @@ export function LobbyScreen() {
       onJoin=${join} onSpectate=${spectate} recent=${recent} marks=${marks} focusKey=${!coarse}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} short=${shortScreen} createLocked=${!createOpen}
       capacity=${coopCapacity} onCapacity=${pickCapacity}
-      onBrowse=${() => setBrowseOpen(true)} onQuickMatch=${() => quickMatch()} />` : null}    ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
+      onBrowse=${() => setBrowseOpen(true)}
+      onQuickMatch=${() => { setAllyOpen(false); setBrowseOpen(false); setMatchOpen(true); }} />` : null}
+    ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed}
       soloTime=${soloTimed === true ? { on: soloFree, onToggle: setSoloFreePref } : null} createLocked=${!createOpen} />` : null}
+    ${/* 多人匹配：参考版同款整屏（「同盟集结」）。大厅的入口和同盟模拟里的胶囊都开这一屏，
+          按下「开始多人匹配」才真正发 room.quickMatch。 */ null}
+    ${/* 多人匹配整屏（「同盟集结」）：大厅的入口和同盟模拟里的胶囊都开这一屏。
+          按下「开始多人匹配」后同一屏的右列换成搜寻中（我们自己后端是按下即进房，
+          所以没有参考版那套 30 秒确认入场，这里也不假装有）。 */ null}
+    ${matchOpen ? html`<${MatchmakingSelect} difficulty=${shownCoop} onDifficulty=${pickDifficulty}
+      onClose=${() => { setMatchOpen(false); setMatchSearch(null); }} onStart=${(req) => quickMatch(req)}
+      busy=${busy} online=${online} createLocked=${!createOpen} difficulties=${coop}
+      scope=${matchScopeState} onScope=${pickScope}
+      searching=${!!matchSearch} elapsed=${matchWait} onCancel=${() => setMatchSearch(null)} />` : null}
     ${/* 和参考版一致：同盟模拟还开着才画这个列表。它叠在上面（Modal 的 modalStack 让
          只有最上层响应 Esc / Tab / 焦点），所以关掉列表 = 回到同盟模拟，而不是回大厅。 */ null}
     ${browseOpen && allyOpen ? html`<${RoomListDialog} online=${online} busy=${busy}
