@@ -30,6 +30,8 @@ let updateFile = null;
 try { updateFile = require('../guard/update-file.cjs'); } catch { /* 可选模块 */ }
 const account = require('./account.cjs');
 const feedback = require('./feedback.cjs');
+// 跨节点「公开同盟」的纯筛选逻辑（无 I/O，单测直接 require 它，不用起 HTTP 服务）
+const { collectOpenRooms } = require('./openRooms.cjs');
 
 const PORT = Number(process.env.MM_PORT || 3090);
 const HOST = process.env.MM_HOST || '127.0.0.1';
@@ -121,10 +123,28 @@ function pickNodeFor(capacity) {
 }
 
 // ---------------------------------------------------------------- 匹配
+// ---------------------------------------------------------------- 匹配
+
+// 规则维度（移植参考版 Matchmaking 的 rules 池）：'standard' = 房间规则全是默认，
+// 'experimental' = 房主改过规则（复活、敌人倍率、人数…）。票据可以只要一种，也可以两种都要。
+const MATCH_RULES = ['standard', 'experimental'];
+const normRules = (value) => {
+  const list = Array.isArray(value) ? value : (value == null ? MATCH_RULES : [value]);
+  const clean = MATCH_RULES.filter((r) => list.includes(r));
+  return clean.length ? clean : [...MATCH_RULES];
+};
+/** 两张票据能不能坐进同一局：规则集合有交集。 */
+const rulesOverlap = (a, b) => a.some((r) => b.includes(r));
+/** 配对用的桶键：难度 + 人数 + 规则（只有一种规则时才分桶，两种都要的票据参与两个桶）。 */
+const poolRules = (ticket) => (ticket.rules.length === 1 ? [ticket.rules[0]] : MATCH_RULES);
+
+/** 确认入场窗口：匹配成功后所有人必须在这段时间内点「进入对局」，否则整局作废。 */
+const ACCEPT_MS = 30_000;
 
 function positionOf(ticket) {
   const waiting = [...tickets.values()]
-    .filter((t) => !t.matchId && t.difficulty === ticket.difficulty && t.capacity === ticket.capacity)
+    .filter((t) => !t.matchId && t.difficulty === ticket.difficulty && t.capacity === ticket.capacity
+      && rulesOverlap(poolRules(t), ticket.rules))
     .sort((a, b) => a.createdAt - b.createdAt);
   return { position: waiting.findIndex((t) => t.id === ticket.id) + 1, waiting: waiting.length };
 }
@@ -132,37 +152,49 @@ function positionOf(ticket) {
 function formMatches() {
   const now = Date.now();
   for (const difficulty of DIFFICULTIES) {
-    const capacities = [...new Set([...tickets.values()]
+    // 每个（难度, 人数, 规则）一个池子。规则两种都要的票据会同时出现在两个池里，
+    // 但一旦成局就带上 matchId，后面的池子自然排除它。
+    const caps = [...new Set([...tickets.values()]
       .filter((t) => !t.matchId && t.difficulty === difficulty && now - t.createdAt < TICKET_TTL_MS)
       .map((t) => t.capacity))]
       .filter(isSeatCount)
       .sort((a, b) => a - b);
-    for (const capacity of capacities) {
-      for (;;) {
-        const waiting = [...tickets.values()]
-          .filter((t) => !t.matchId && t.difficulty === difficulty && t.capacity === capacity && now - t.createdAt < TICKET_TTL_MS)
-          .sort((a, b) => a.createdAt - b.createdAt);
-        if (waiting.length < capacity) break;
-        const node = pickNodeFor(capacity);
-        if (!node) { console.warn('[mm] 没有可用节点，暂停组队'); break; }
-        const group = waiting.slice(0, capacity);
-        const match = {
-          id: rid(),
-          difficulty,
-          capacity,
-          node,
-          hostId: (group.find((t) => !t.guest) || group[0]).id,
-          memberIds: group.map((t) => t.id),
-          code: null,
-          createdAt: now,
-        };
-        matches.set(match.id, match);
-        for (const t of group) { t.matchId = match.id; t.node = node; }
-        console.log(`[mm] 组成对局 ${match.id.slice(0, 8)} 难度=${difficulty} 人数=${capacity} 节点=${node} 玩家=${group.map((t) => t.name).join(',')}`);
+    for (const capacity of caps) {
+      for (const rule of MATCH_RULES) {
+        for (;;) {
+          const waiting = [...tickets.values()]
+            .filter((t) => !t.matchId && t.difficulty === difficulty && t.capacity === capacity
+              && t.rules.includes(rule) && now - t.createdAt < TICKET_TTL_MS)
+            .sort((a, b) => a.createdAt - b.createdAt);
+          if (waiting.length < capacity) break;
+          const node = pickNodeFor(capacity);
+          if (!node) { console.warn('[mm] 没有可用节点，暂停组队'); break; }
+          const group = waiting.slice(0, capacity);
+          const match = {
+            id: rid(),
+            difficulty,
+            capacity,
+            rules: rule,
+            node,
+            hostId: (group.find((t) => !t.guest) || group[0]).id,
+            memberIds: group.map((t) => t.id),
+            code: null,
+            createdAt: now,
+            // 确认入场：所有人点过「进入对局」才算数，超时整局作废（参考版的 accept 步骤）
+            accepted: new Set(),
+            acceptDeadline: now + ACCEPT_MS,
+          };
+          matches.set(match.id, match);
+          for (const t of group) { t.matchId = match.id; t.node = node; }
+          console.log(`[mm] 组成对局 ${match.id.slice(0, 8)} 难度=${difficulty} 人数=${capacity} 规则=${rule} 节点=${node} 玩家=${group.map((t) => t.name).join(',')}`);
+        }
       }
     }
   }
 }
+
+/** 这一局是不是所有人都确认了；host 可以直接开始建房。 */
+const allAccepted = (m) => m.memberIds.every((id) => m.accepted.has(id));
 
 function sweep() {
   const now = Date.now();
@@ -177,7 +209,19 @@ function sweep() {
     if (t.matchId) {
       const m = matches.get(t.matchId);
       if (!m) { t.matchId = null; t.node = null; }
-      else if (now - m.createdAt > MATCH_TTL_MS) {
+      // 确认超时：还没全员确认就把整局作废，确认过的人退回队列重新等（参考版 breakOffer 的思路）。
+      else if (!allAccepted(m) && now > m.acceptDeadline) {
+        console.log(`[mm] 确认超时，作废对局 ${m.id.slice(0, 8)}`);
+        for (const mid of m.memberIds) {
+          const x = tickets.get(mid);
+          if (!x) continue;
+          if (m.accepted.has(mid)) { x.matchId = null; x.node = null; x.createdAt = now; }
+          else tickets.delete(mid);   // 没确认的视为放弃
+        }
+        matches.delete(m.id);
+      }
+      // 已确认但房主迟迟没建出房来：也给一个上限
+      else if (allAccepted(m) && now - m.createdAt > MATCH_TTL_MS) {
         if (m.code) { matches.delete(m.id); tickets.delete(t.id); }
         else { m.memberIds.forEach((mid) => { const x = tickets.get(mid); if (x) { x.matchId = null; x.node = null; } }); matches.delete(m.id); }
       }
@@ -189,19 +233,29 @@ function sweep() {
 function publicState(ticket) {
   if (!ticket.matchId) {
     const { position, waiting } = positionOf(ticket);
-    return { state: 'queued', difficulty: ticket.difficulty, capacity: ticket.capacity, position, waiting, need: ticket.capacity };
+    return { state: 'queued', difficulty: ticket.difficulty, capacity: ticket.capacity,
+      rules: ticket.rules, position, waiting, need: ticket.capacity };
   }
   const match = matches.get(ticket.matchId);
-  if (!match) return { state: 'queued', difficulty: ticket.difficulty, capacity: ticket.capacity, position: 1, waiting: 1, need: ticket.capacity };
+  if (!match) return { state: 'queued', difficulty: ticket.difficulty, capacity: ticket.capacity,
+    rules: ticket.rules, position: 1, waiting: 1, need: ticket.capacity };
   const role = match.hostId === ticket.id ? 'host' : 'guest';
+  const accepted = allAccepted(match);
   return {
-    state: 'matched',
+    // confirm = 匹配成功、正在等所有人点「进入对局」；matched = 全员确认，可以进局了
+    state: accepted ? 'matched' : 'confirm',
     difficulty: match.difficulty,
     capacity: match.capacity,
+    rules: match.rules,
     node: match.node,
     matchId: match.id,
     role,
     code: match.code,
+    accepted: match.accepted.has(ticket.id),
+    acceptedCount: match.accepted.size,
+    members: match.memberIds.length,
+    // 确认剩余毫秒（前端显示倒计时；超时整局作废）
+    acceptRemainMs: accepted ? 0 : Math.max(0, match.acceptDeadline - Date.now()),
     ready: Boolean(match.code) || role === 'host',
   };
 }
@@ -479,6 +533,88 @@ async function roomInfo(code, node) {
   } catch { return null; }
 }
 
+/**
+ * 通用 RESP 调用：把一个命令发到 Redis，返回解析后的值（bulk string → string，nil → null，
+ * 数组 → array）。只用到 HGETALL / KEYS 这两种，超时 800 ms，失败就返回 null。
+ *
+ * 存在的理由：原来的 `redisHget` 只会发一条写死的 `HGET <prefix>lobby:rooms <code>`，
+ * 而「公开同盟跨节点列表」要把**每个节点**的整个房间哈希取回来，得按节点发 HGETALL。
+ */
+function redisCall(args, timeoutMs = 800) {
+  return new Promise((resolve) => {
+    let host = '127.0.0.1', port = 6379;
+    try { const u = new URL(process.env.SP_REDIS_URL || 'redis://127.0.0.1:6379'); host = u.hostname; port = Number(u.port) || 6379; } catch { /* defaults */ }
+    const sock = net.createConnection({ host, port });
+    let buf = Buffer.alloc(0);
+    let done = false;
+    const finish = (v) => { if (done) return; done = true; try { sock.destroy(); } catch { /* ignore */ } resolve(v ?? null); };
+    /** 解析一个 RESP2 值；返回 [value, nextPos]，数据不够时返回 null。 */
+    const parse = (b, p) => {
+      if (p >= b.length) return null;
+      const nl = b.indexOf('\r\n', p);
+      if (nl < 0) return null;
+      const line = b.slice(p + 1, nl).toString();
+      if (b[p] === 0x2b) return [line, nl + 2];                       // +simple
+      if (b[p] === 0x2d) return [null, nl + 2];                       // -error
+      if (b[p] === 0x24) {                                            // $bulk
+        const n = Number(line);
+        if (n < 0) return [null, nl + 2];
+        if (b.length < nl + 2 + n + 2) return null;
+        return [b.slice(nl + 2, nl + 2 + n).toString(), nl + 2 + n + 2];
+      }
+      if (b[p] === 0x2a) {                                            // *array
+        const n = Number(line);
+        if (n < 0) return [null, nl + 2];
+        const out = [];
+        let q = nl + 2;
+        for (let i = 0; i < n; i++) {
+          const got = parse(b, q);
+          if (!got) return null;
+          out.push(got[0]);
+          q = got[1];
+        }
+        return [out, q];
+      }
+      return [null, nl + 2];
+    };
+    sock.setTimeout(timeoutMs, () => finish(null));
+    sock.on('error', () => finish(null));
+    sock.on('connect', () => {
+      sock.write(`*${args.length}\r\n` + args.map((a) => `$${Buffer.byteLength(String(a))}\r\n${a}\r\n`).join(''));
+    });
+    sock.on('data', (d) => {
+      buf = Buffer.concat([buf, d]);
+      const got = parse(buf, 0);
+      if (got) finish(got[0]);
+    });
+    sock.on('end', () => finish(null));
+    sock.on('close', () => finish(null));
+  });
+}
+
+/**
+ * 所有节点上「公开同盟 + 还能进」的房间（跨节点列表的唯一数据源）。
+ *
+ * 每个节点的 Lobby 把房间写进 Redis 的 `sp:n<node>:lobby:rooms` 哈希（field = 房间码），
+ * `listed` / `matchmaking` 两个字段由 server/persist/lobbyState.js 写入。这里按节点 HGETALL，
+ * 再交给 `openRooms.cjs` 的 `collectOpenRooms` 筛（纯函数，单测覆盖），
+ * 每条都带**节点号** —— 客户端拿到 node 才能用 `?n=` 跳到那台节点。
+ *
+ * 结果缓存 3 秒：大厅列表每几秒刷一次，没必要每次都发 30 条 Redis 命令。
+ */
+const openRoomsCache = { at: 0, data: null };
+async function openRooms() {
+  if (openRoomsCache.data && Date.now() - openRoomsCache.at < 3000) return openRoomsCache.data;
+  const perNode = await Promise.all(NODE_NAMES.map(async (_name, i) => {
+    const n = i + 1;
+    return { node: n, flat: await redisCall(['HGETALL', `sp:n${n}:lobby:rooms`]) };
+  }));
+  const data = { at: Date.now(), rooms: collectOpenRooms(perNode) };
+  openRoomsCache.at = Date.now();
+  openRoomsCache.data = data;
+  return data;
+}
+
 function json(res, code, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -594,11 +730,15 @@ const server = http.createServer(async (req, res) => {
     if (!DIFFICULTIES.includes(difficulty)) return json(res, 400, { error: '难度不正确' });
     if (!isSeatCount(capacity)) return json(res, 400, { error: '匹配人数不正确' });
     const ip = clientIp(req);
+    // 规则维度（参考版 MatchScope 的移植）：'standard' = 房间规则全是默认，'experimental' = 房主改过规则。
+    // 票据可以只要一种，也可以两种都要（前端「两个都选」时传数组）。
+    const rules = normRules(body.rules);
     // 防刷：同一网络最多 3 个待匹配票据；全服最多 500 个
     const mine = [...tickets.values()].filter((x) => x.ip === ip && !x.matchId).length;
     if (mine >= 3) return json(res, 429, { error: '同一网络排队人数过多，请稍后再试' });
     if (tickets.size >= 500) return json(res, 429, { error: '匹配队列已满，请稍后再试' });
-    const t = { id: rid(), secret: rid(), name, difficulty, capacity, ip, createdAt: Date.now(), lastSeen: Date.now(), matchId: null, node: null };
+    const t = { id: rid(), secret: rid(), name, difficulty, capacity, rules, ip,
+      createdAt: Date.now(), lastSeen: Date.now(), matchId: null, node: null };
     tickets.set(t.id, t);
     console.log(`[mm] 排队 ${name} (${DIFF_NAMES[difficulty]}, ${capacity}人) 票据=${t.id.slice(0, 8)}`);
     return json(res, 200, { ok: true, id: t.id, secret: t.secret, state: publicState(t) });
@@ -618,6 +758,21 @@ const server = http.createServer(async (req, res) => {
     if (t.matchId) return json(res, 409, { error: '已匹配成功，不能取消' });
     tickets.delete(t.id);
     return json(res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/accept' && req.method === 'POST') {
+    const body = await readBody(req);
+    const t = tickets.get(body.id);
+    if (!auth(t, body.id, body.secret)) return json(res, 404, { error: 'ticket not found' });
+    t.lastSeen = Date.now();
+    if (!t.matchId) return json(res, 409, { error: '还没有匹配成功' });
+    const m = matches.get(t.matchId);
+    if (!m) return json(res, 404, { error: '对局已失效' });
+    // 超时之后再点就没意义了：那一局已经被 sweep 作废/回收
+    if (!allAccepted(m) && Date.now() > m.acceptDeadline) return json(res, 409, { error: '确认已超时' });
+    m.accepted.add(t.id);
+    console.log(`[mm] 确认入场 ${t.name} (${m.accepted.size}/${m.memberIds.length}) ${m.id.slice(0, 8)}`);
+    return json(res, 200, { ok: true, state: publicState(t) });
   }
 
   if (pathname === '/api/room' && req.method === 'POST') {
@@ -834,6 +989,34 @@ const roomDir = new Map(); // node -> { codes: string[], at: number }
     return;
   }
 
+  // 公开同盟（跨节点）：所有节点上「挂到公开列表 + 还没开局 + 有空位」的房间。
+  // 客户端在大厅点「公开同盟」时用它补齐本节点之外的房间，每条都带 node ——
+  // 点进去时用 nginx 的 `?n=<node>` 直接落到那台节点，避免「在本节点找不到房间」。
+  // 提示语：给 /mm 那套「匹配队友」覆盖层用，和游戏内「多人匹配」界面同源
+  // （都读 shared/data/config.json 的 tips），免得两边轮换出来的句子不一样。
+  if (pathname === '/api/tips') {
+    try {
+      const raw = fs.readFileSync(path.join(ROOT_DIR, 'shared', 'data', 'config.json'), 'utf8');
+      const cfg = JSON.parse(raw);
+      const tips = Array.isArray(cfg?.tips)
+        ? cfg.tips.map((x) => (typeof x === 'string' ? x : x?.tip)).filter((x) => typeof x === 'string' && x)
+        : [];
+      return json(res, 200, { ok: true, tips });
+    } catch {
+      return json(res, 200, { ok: true, tips: [] });
+    }
+  }
+  if (pathname === '/api/rooms/open') {
+    try {
+      const data = await openRooms();
+      return json(res, 200, { ok: true, at: data.at, rooms: data.rooms });
+    } catch {
+      return json(res, 200, { ok: true, at: Date.now(), rooms: [] });
+    }
+  }
+
+  // 按房间码找节点已经有了：`/api/find-room`（见下面，带 roomInfo）。
+
   if (pathname === '/api/resolve-room') {
     const code = String(url.searchParams.get('code') || '').toUpperCase();
     let found = null;
@@ -879,6 +1062,16 @@ const roomDir = new Map(); // node -> { codes: string[], at: number }
     for (const [node, v] of roomDirModule) {
       if (Date.now() - v.at > 45000) continue;
       if (v.codes.includes(code)) { found = node; break; }
+    }
+    // 节点每 10 秒才上报一次房间码：刚建好的房（尤其跨节点点「加入同盟」时）会查不到，
+    // 客户端据此判定「房间已关闭」并把待加入清掉 —— 玩家看到的就是「房间不存在」。
+    // 内存目录查不到时直接翻 Redis（每个节点的 lobby:rooms 哈希里就有）。
+    if (!found) {
+      const hits = await Promise.all(NODE_NAMES.map(async (_x, i) => {
+        const raw = parseRedisBulk(await redisHget(`sp:n${i + 1}:`, code));
+        return raw ? i + 1 : 0;
+      }));
+      found = hits.find((x) => x > 0) || null;
     }
     if (!found) return json(res, 200, { code, node: null });
     let info = null;
@@ -1012,9 +1205,5 @@ function readJsonBody(req, limit = 16 * 1024) {
 function sendAuthJson(res, code, obj) {
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(obj));
-}
-
-function clientIp(req) {
-  return String(req.headers['x-real-ip'] || (req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
 }
 

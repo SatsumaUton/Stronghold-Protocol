@@ -256,12 +256,18 @@ const JOIN_COOKIE = (() => {
   }
   const seatsOf = (room) => (room && Array.isArray(room.seats) ? room.seats.filter(Boolean).length : 0);
 
-  const TIPS = [
-    '联合模拟在选择策略时可以进行一次跳过',
-    '调度中心即使冻结，依然可以主动刷新',
-    '两件同名装备可以合成一件更强力的装备',
-    '只有达成完美作战的队友可以进行联防',
-  ];
+// 提示语：**和游戏内「多人匹配」界面同源** —— 都读 shared/data/config.json 的 tips（21 条）。
+// 以前这里硬编码 4 条，两边轮换出来的句子不一样（维护者当成 bug 报了）。取不到再退回内置几条。
+let TIPS = [
+  '联合模拟在选择策略时可以进行一次跳过',
+  '调度中心即使冻结，依然可以主动刷新',
+  '两件同名装备可以合成一件更强力的装备',
+  '只有达成完美作战的队友可以进行联防',
+];
+fetch('/mm/api/tips', { cache: 'no-store' })
+  .then((r) => (r.ok ? r.json() : null))
+  .then((j) => { if (Array.isArray(j?.tips) && j.tips.length) TIPS = j.tips.filter((x) => typeof x === "string" && x); })
+  .catch(() => { /* 用内置的 */ });
   const DIFF_NAMES = { FUNNY: '标准模拟', NORMAL: '险境模拟', HARD: '绝境模拟', ABYSS: '终极模拟' };
   const DIFF_COLORS = { FUNNY: '#f6a329', NORMAL: '#e85a1a', HARD: '#e73118', ABYSS: '#ff0024' };
 
@@ -1392,7 +1398,7 @@ const JOIN_COOKIE = (() => {
         tipId = setInterval(() => { tipIndex += 1; const t = document.getElementById('mm-ov-tip'); if (t) t.textContent = TIPS[tipIndex % TIPS.length]; }, 5000);
       }
       document.getElementById('mm-ov-tags').innerHTML =
-        `<span class="mm-ov__tag" style="--c:${color}">${d}</span><span class="mm-ov__tag" style="--c:#4ed8af">4 人 · 不补 AI</span>`;
+        `<span class="mm-ov__tag" style="--c:${color}">${d}</span><span class="mm-ov__tag" style="--c:#4ed8af">4 人同盟</span><span class="mm-ov__tag" style="--c:#8d9391">标准规则</span>`;
       document.getElementById('mm-ov-stop').style.display = canCancel ? '' : 'none';
       updateSearch(waiting);
     };
