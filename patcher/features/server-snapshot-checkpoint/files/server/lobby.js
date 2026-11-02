@@ -642,7 +642,7 @@ export class Room {
    * `room.state` frame (DESIGN §8.1) plus `inMatch`.
    * @param {number} [now] the lobby's clock (an open version vote's remainingMs)
    */
-  toState(now = Date.now()) {
+  toState(now = Date.now(), viewerId = null) {
     return {
       t: 'room.state',
       ...(this.aiTakeoverEnabled ? { aiTakeoverEnabled: true, aiTakeoverVotes: this.aiTakeoverVotes || [] } : {}),
@@ -708,6 +708,12 @@ export class Room {
       ...(this.soloUnlimited === true ? { soloUnlimited: true } : {}),
       // 同盟列表 (room.setListed): omitted unless on, like the others
       ...(this.listed ? { listed: true } : {}),
+      // 隐身观战（adminWatch，管理员功能）：这个会话既不在 seats 也不在 spectators，
+      // 所以前端以前分不清它和「普通玩家」，直接按玩家界面渲染 —— 管理员看到的就是
+      // 「跟我自己玩的时候一样，但点什么都不动」（服务端会拦掉隐身观战者的 g.*）。
+      // 标记**只发给本人**：broadcastState 在房间里有隐身观战者时逐会话编码，
+      // 其余人拿到的 room.state 与以前逐字节一致。
+      ...(viewerId && this.hiddenSpectatorOf(viewerId) ? { hiddenWatch: true } : {}),
     };
   }
 }
@@ -4001,12 +4007,22 @@ export class Lobby {
       if (state.inMatch && !prev?.inMatch) event('matchStarted');
       room.trustedPrevious = state;
     }
+    // 房间里有隐身观战者时不能一份广播给所有人：hiddenWatch 只该发给本人。
+    // 这种情况极少（只有管理员开隐身观战），所以照旧走快路径，只有需要时才逐会话编码。
+    const hiddenCount = Array.isArray(room.hiddenSpectators) ? room.hiddenSpectators.length : 0;
+    if (hiddenCount > 0) {
+      const now = this.now();
+      for (const session of this.memberSessions(room)) {
+        sendSession(session, room.toState(now, session.playerId));
+      }
+      return;
+    }
     const data = encode(room.toState(this.now()));
     for (const session of this.memberSessions(room)) sendRaw(session.ws, data);
   }
 
   sendState(room, session) {
-    sendSession(session, room.toState(this.now()));
+    sendSession(session, room.toState(this.now(), session.playerId));
   }
 
   /** Match broadcast: encode once, send to every connected member. @returns {string | null} the encoded frame */
