@@ -5,13 +5,32 @@ import { emptyMatch, store } from '../../store.js';
 import { localAsset } from '../../data.js';
 import { t } from '../../../../shared/i18n.js';
 
+/**
+ * 这一局是怎么没的（room.endReason，server/lobby.js 的 toState 下发）。
+ *
+ * 为什么需要区分：对局被打断时没有结算帧，玩家看到的就是这块浮层。以前这里写死成
+ * 「服务器重启导致对局中断」—— 于是**管理员主动终止**的对局也被说成服务器重启，
+ * 玩家会以为出了故障。现在按真实原因说话。
+ *
+ * 只认几个已知值，其余一律走兜底：宁可含糊，也不编一个具体原因。
+ */
+function endReasonText(reason) {
+  switch (reason) {
+    case 'admin-aborted': return t('管理员终止了这一局，同盟已返回等待室');
+    case 'restart-aborted': return t('服务器重启导致对局中断，同盟已返回等待室');
+    case 'plugin-crash': case 'plugin-hang': case 'plugin-start':
+      return t('插件运行异常，这一局已中断，同盟已返回等待室');
+    default: return t('这一局已中断，同盟已返回等待室');
+  }
+}
+
 /** The room went back to its lobby without a result (match aborted): offer the way back. */
-export function MatchEnded() {
+export function MatchEnded({ reason = null } = {}) {
   return html`<div class="awayov" role="dialog" aria-label=${t('模拟已结束')}>
     <div class="awayov__box brackets">
       <${MicroLabel} tone="mint">SIMULATION CLOSED</${MicroLabel}>
       <h2>${t('本局模拟已结束')}</h2>
-      <p class="t-lo">${t('服务器重启导致对局中断，同盟已返回等待室')}</p>
+      <p class="t-lo">${endReasonText(reason)}</p>
       <${Button} variant="primary" size="lg" icon="chevronLeft" onClick=${() => store.set({ match: emptyMatch() })}>${t('返回同盟')}<//>
     </div>
   </div>`;
