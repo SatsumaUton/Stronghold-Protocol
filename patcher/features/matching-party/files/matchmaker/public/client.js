@@ -1637,9 +1637,12 @@ const JOIN_COOKIE = (() => {
       const onTitle = !!document.querySelector('.title-screen');
       const inRoom = !!document.querySelector('.room-screen');
       const inLobby = !!document.querySelector('.lobby-screen');
+      // 只在大厅：大厅上再开着自己的弹窗（选择同盟方式 / 独立模拟 / 成就统计…）时也收起来 ——
+      // 那些弹窗铺满屏幕，角落再压一个按钮就是挡 UI。
+      const dialogOpen = !!(inLobby && hasOverlayForFeedback());
       const existing = document.getElementById('mm-feedback');
       // 不在大厅：收起来（保留节点，避免反复建删导致闪动）
-      if (onTitle || inRoom || !inLobby) {
+      if (onTitle || inRoom || !inLobby || dialogOpen) {
         if (existing) existing.style.display = 'none';
         return;
       }
@@ -1677,6 +1680,12 @@ const JOIN_COOKIE = (() => {
             box-shadow:0 0 14px rgba(23,249,183,.45);outline:none}
           #mm-feedback:active{filter:brightness(.94)}
           #mm-feedback svg{width:20px;height:20px;flex:none;display:block}
+          /* 未读红点：定位相对的是这个 fixed 按钮本身，不能把 position 改成 relative
+             （否则按钮掉回文档流，位置跟着页面内容跑偏，玩家反馈「弹了提醒框按钮就歪了」）。 */
+          #mm-feedback-badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;
+            padding:0 5px;box-sizing:border-box;border-radius:9px;background:#e2483c;color:#fff;
+            font:700 11px/18px system-ui,sans-serif;text-align:center;letter-spacing:0;
+            box-shadow:0 0 0 2px rgba(20,24,22,.9)}
           @media (max-width:640px){#mm-feedback{height:40px;padding:0 14px;font-size:14px}
             #mm-feedback svg{width:18px;height:18px}}
           @media (prefers-reduced-motion:reduce){#mm-feedback{transition:none}}
@@ -1695,8 +1704,36 @@ const JOIN_COOKIE = (() => {
       document.body.appendChild(a);
     };
 
+    // 与顶部 ticker 判「有弹窗」的口径一致，但只看真正铺在页面上的遮罩/弹窗。
+    function hasOverlayForFeedback() {
+      const sel = '.modal, [role="dialog"][aria-modal="true"], .mm-ov, .announcement-board, .guide, .lo, .spov, .awayov, .pauseov, .exp-pop';
+      const nodes = document.querySelectorAll(sel);
+      for (const node of nodes) {
+        try {
+          const r = node.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) continue;
+          const cs = getComputedStyle(node);
+          if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
+          return true;
+        } catch { /* 单个节点炸了就当它不存在 */ }
+      }
+      return false;
+    }
+
     ensure();
-    setInterval(ensure, 900);
+    // 立刻跟随界面切换：以前靠 900ms 轮询，切页面时按钮会滞留一下才消失。
+    let raf = 0;
+    const kick = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; ensure(); });
+    };
+    try {
+      new MutationObserver(kick).observe(document.body, {
+        childList: true, subtree: true,
+        attributes: true, attributeFilter: ['class', 'hidden', 'style', 'aria-hidden'],
+      });
+    } catch { /* MutationObserver 不可用就退化成轮询 */ }
+    setInterval(ensure, 4000);   // 兜底：万一 observer 没触发（比如 canvas 内切换）
   }
 
   // ---------------------------------------------------------------- 新反馈提醒（只给服主/管理员）
@@ -1747,7 +1784,8 @@ const JOIN_COOKIE = (() => {
           const st = document.createElement('style');
           st.id = 'mm-feedback-badge-css';
           st.textContent = `
-            #mm-feedback{position:relative}
+            /* 红点相对固定的按钮绝对定位 —— 这里**不能**写 #mm-feedback{position:relative}：
+               那会把按钮从 fixed 拉回文档流，玩家反馈「弹了提醒框按钮位置就偏了，关掉也不回来」。 */
             #mm-feedback-badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;
               padding:0 5px;box-sizing:border-box;border-radius:9px;background:#e2483c;color:#fff;
               font:700 11px/18px system-ui,sans-serif;text-align:center;letter-spacing:0;
@@ -1804,6 +1842,15 @@ const JOIN_COOKIE = (() => {
       setTimeout(() => { if (document.body.contains(box)) close(); }, TOAST_MS);
     };
 
+    // 已经提示过的最新一条 id：刷新页面后不要为同一批再弹一次窗。
+    const TOASTED = 'mm.fbToasted';
+    const toastedUpTo = () => {
+      try { return Number(localStorage.getItem(TOASTED)) || 0; } catch { return 0; }
+    };
+    const setToasted = (id) => {
+      try { localStorage.setItem(TOASTED, String(id)); } catch { /* 隐私模式忽略 */ }
+    };
+
     async function poll() {
       if (busy) return;
       if (document.querySelector('.title-screen')) { badge(0); return; }
@@ -1817,8 +1864,13 @@ const JOIN_COOKIE = (() => {
         const d = await r.json();
         const n = Number(d && d.count) || 0;
         badge(n);
-        // 只有「从少变多」才弹，避免每分钟重弹同一条
-        if (n > 0 && n !== lastCount) toast(d);
+        // 只有「真有一条没提示过的」才弹：条数变化不足以判断（管理员处理掉一条、
+        // 又来一条新的，count 可能没变），刷新后也不该为同一批重弹。
+        const newest = (d.latest || []).reduce((m, it) => Math.max(m, Number(it.id) || 0), 0);
+        if (n > 0 && newest > toastedUpTo()) {
+          toast(d);
+          setToasted(newest);
+        }
         lastCount = n;
       } catch { /* 网络抖动忽略 */ } finally { busy = false; }
     }
@@ -2878,6 +2930,38 @@ const JOIN_COOKIE = (() => {
     let overlayOpen = false;
     let pauseStarted = 0;
     let guardStarted = false;
+    let autoTimer = 0;
+
+    // 「今日不再提醒」（临时公告）：按自然日记住被静音的公告正文，当天 23:59 之后自然失效。
+    // 键是正文的 FNV 哈希而不是 updatedAt —— 管理面板每次保存都会写新的时间戳，
+    // 用时间戳当键的话管理员一按保存，玩家刚静音的公告就又冒出来了。
+    const MUTE_KEY = 'mm.noticeMuted';
+    const dayStamp = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const textKey = (s) => {
+      let a = 2166136261;
+      const str = String(s || '');
+      for (let i = 0; i < str.length; i++) a = Math.imul(a ^ str.charCodeAt(i), 16777619);
+      return 'nt1:' + (a >>> 0).toString(16) + ':' + str.length.toString(16);
+    };
+    const loadMute = () => {
+      try {
+        const o = JSON.parse(localStorage.getItem(MUTE_KEY) || 'null');
+        return o && o.day === dayStamp() && Array.isArray(o.keys) ? o : null;
+      } catch { return null; }
+    };
+    const isMuted = (key) => {
+      const m = loadMute();
+      return !!m && !!key && m.keys.includes(key);
+    };
+    const muteFor = (key) => {
+      if (!key) return;
+      const m = loadMute() || { day: dayStamp(), keys: [] };
+      if (!m.keys.includes(key)) m.keys.push(key);
+      try { localStorage.setItem(MUTE_KEY, JSON.stringify(m)); } catch { /* 隐私模式忽略 */ }
+    };
 
     // Any real dialog/overlay (settings, bulletin, guide, loadout, match popups) hides the ticker.
     const OVERLAY_SELECTOR = '.modal, [role="dialog"][aria-modal="true"], .mm-ov, .announcement-board, .guide, .lo, .spov, .awayov, .pauseov, .exp-pop';
@@ -2922,6 +3006,7 @@ const JOIN_COOKIE = (() => {
     };
 
     const closeTicker = () => {
+      if (autoTimer) { clearTimeout(autoTimer); autoTimer = 0; }
       queue = [];
       showing = false;
       current = null;
@@ -2936,6 +3021,20 @@ const JOIN_COOKIE = (() => {
         el = document.createElement('div');
         el.id = 'mm-ticker';
         document.body.appendChild(el);
+      }
+      // 「今日不再提醒」在 × 左边（重要公告不显示它，见 play）
+      if (!el.querySelector('.mm-ticker__mute')) {
+        const mute = document.createElement('button');
+        mute.type = 'button';
+        mute.className = 'mm-ticker__mute';
+        mute.textContent = '今日不再提醒';
+        mute.setAttribute('aria-label', '今日不再提醒');
+        mute.title = '今天不再显示这条提醒';
+        mute.addEventListener('click', () => {
+          if (current && !current.important) muteFor(current.key);
+          closeTicker();
+        });
+        el.appendChild(mute);
       }
       if (!el.querySelector('.mm-ticker__close')) {
         const close = document.createElement('button');
@@ -2964,8 +3063,18 @@ const JOIN_COOKIE = (() => {
       text.textContent = item.text;
       line.appendChild(text);
       line.title = item.text;
-      const close = el.querySelector('.mm-ticker__close');
-      if (close) el.insertBefore(line, close); else el.appendChild(line);
+      // 文案插到最左边的按钮前面，按钮始终排在右端（今日不再提醒、×）
+      const before = el.querySelector('.mm-ticker__mute') || el.querySelector('.mm-ticker__close');
+      if (before) el.insertBefore(line, before); else el.appendChild(line);
+      // 重要公告不给「今日不再提醒」，只能当次关掉
+      const muteBtn = el.querySelector('.mm-ticker__mute');
+      if (muteBtn) muteBtn.style.display = item.important ? 'none' : '';
+      // 普通公告到点自己滑走，玩家不用一直去点（autoHideSec = 0 表示不自动消失）
+      if (autoTimer) { clearTimeout(autoTimer); autoTimer = 0; }
+      const secs = Number(item.autoHideSec);
+      if (!item.important && Number.isFinite(secs) && secs > 0) {
+        autoTimer = setTimeout(() => { autoTimer = 0; closeTicker(); }, Math.min(secs, 600) * 1000);
+      }
       requestAnimationFrame(() => {
         if (!line.isConnected) return;
         const overflow = Math.ceil(text.scrollWidth - line.clientWidth);
@@ -2984,30 +3093,48 @@ const JOIN_COOKIE = (() => {
       if (item) play(item);
     };
 
-    const enqueue = (lines, key) => {
+    const enqueue = (lines, key, extra) => {
       const text = lines.join('　');
       if (!text) return;
       if (current && current.text === text && current.key === key) return;
-      queue.push({ text, key });
+      queue.push({ text, key, ...(extra || {}) });
       showNext();
     };
 
     // 公告数据来自合并轮询 /mm/api/pulse（见 refreshPulse），不再单独每 5 秒轮询。
     const applyAnnouncement = (d) => {
-      const enabled = !!(d && d.enabled && d.text);
-      if (!enabled) {
-        // 关闭公告：停止当前这条并清空排队，不再显示
+      const has = !!(d && d.enabled && d.text);
+      // 到期时间：到点以后整条不再显示（管理面板设的；没设就不过期）
+      const exp = d && d.expiresAt ? Date.parse(d.expiresAt) : NaN;
+      const expired = Number.isFinite(exp) && exp <= Date.now();
+      const key = d && d.text ? textKey(d.text) : '';
+      if (!has || expired) {
+        // 关闭 / 过期：停止当前这条并清空排队，不再显示
         lastKey = '';
         closeTicker();
         return;
       }
-      const key = String(d.updatedAt || d.text);
+      const important = d.important === true;
+      // 玩家今天点过「今日不再提醒」：这一条当天不再出现（重要公告不给静音）
+      if (!important && isMuted(key)) {
+        lastKey = key;
+        if (showing || queue.length) closeTicker();
+        return;
+      }
+      // 键用正文哈希而不是 updatedAt：管理面板每次保存都会写新时间戳，
+      // 用时间戳的话玩家刚关掉，管理员一按保存就又弹回来。
       if (key === lastKey) return;
       lastKey = key;
       const lines = String(d.text).split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+      const autoHideSec = Number(d.autoHideSec);
+      const item = {
+        key,
+        important,
+        autoHideSec: Number.isFinite(autoHideSec) ? autoHideSec : 15,
+      };
       // New content replaces the previous reminder; the player can close each one.
       if (showing) closeTicker();
-      enqueue(lines, key);
+      enqueue(lines, key, item);
     };
     onPulse('announcement', applyAnnouncement);
     // 兜底：pulse 不可用（老节点）时仍走原来的端点。

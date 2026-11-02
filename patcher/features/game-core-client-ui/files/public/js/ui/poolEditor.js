@@ -12,7 +12,7 @@
 // 编组本身在 shared/poolPlan.js：每个座位一个卡池号，规范形式按首次出现从 0 编号。
 // 一个池之所以存在，就是因为有座位在它里面 —— 所以没有空池要存。
 
-import { useLayoutEffect, useState } from '../vendor/hooks.module.js';
+import { useLayoutEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Icon, Modal } from './components.js';
 import {
   autoPoolPlan, evenPoolPlan, mergeLastPool, moveSeat, poolCount, planLabel, poolScale, poolSeats, splitPool,

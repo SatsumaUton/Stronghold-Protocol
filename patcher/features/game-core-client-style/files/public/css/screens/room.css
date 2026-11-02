@@ -1203,3 +1203,6 @@
 .poolsum__v { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: .08rem; overflow: hidden; }
 .poolsum__v b { font-size: max(calc(.16 * var(--t)), calc(13px * var(--sp-ui, 1))); color: var(--text-hi); }
 .poolsum__v em { font-style: normal; font-size: max(calc(.13 * var(--t)), calc(11px * var(--sp-ui, 1))); color: var(--text-lo); }
+
+/* 公开同盟（同盟设置里的一行）：和其它 ailast__opt 一行一样，只多一个宽度兜底 */
+.rs-opts__listed { width: 100%; justify-content: flex-start; }

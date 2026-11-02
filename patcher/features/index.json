@@ -7,7 +7,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 236840
+        "customBytes": 242149
       },
       {
         "path": "server/http/config.js",
@@ -24,7 +24,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 236840
+        "customBytes": 242149
       },
       {
         "path": "server/match/aiDigest.js",
@@ -241,7 +241,7 @@
       {
         "path": "matchmaker/feedback.cjs",
         "baseExists": false,
-        "customBytes": 26972
+        "customBytes": 27315
       },
       {
         "path": "matchmaker/package-lock.json",
@@ -261,17 +261,17 @@
       {
         "path": "matchmaker/public/admin.html",
         "baseExists": false,
-        "customBytes": 81516
+        "customBytes": 84775
       },
       {
         "path": "matchmaker/public/client.js",
         "baseExists": false,
-        "customBytes": 245643
+        "customBytes": 252607
       },
       {
         "path": "matchmaker/public/feedback.css",
         "baseExists": false,
-        "customBytes": 11512
+        "customBytes": 11823
       },
       {
         "path": "matchmaker/public/feedback.html",
@@ -281,7 +281,7 @@
       {
         "path": "matchmaker/public/feedback.js",
         "baseExists": false,
-        "customBytes": 17987
+        "customBytes": 18104
       },
       {
         "path": "matchmaker/public/index.html",
@@ -326,7 +326,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 236840
+        "customBytes": 242149
       }
     ]
   },
@@ -338,7 +338,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 236840
+        "customBytes": 242149
       },
       {
         "path": "shared/playerCapacity.js",
@@ -353,17 +353,17 @@
       {
         "path": "shared/protocol.js",
         "baseExists": true,
-        "customBytes": 53438
+        "customBytes": 53949
       },
       {
         "path": "public/css/screens/room.css",
         "baseExists": true,
-        "customBytes": 73157
+        "customBytes": 73335
       },
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 81272
+        "customBytes": 83796
       }
     ]
   },
@@ -375,7 +375,7 @@
       {
         "path": "matchmaker/public/client.js",
         "baseExists": false,
-        "customBytes": 245643
+        "customBytes": 252607
       },
       {
         "path": "mm/client.js",
@@ -409,12 +409,12 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": true,
-        "customBytes": 59627
+        "customBytes": 61059
       },
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 236840
+        "customBytes": 242149
       }
     ]
   },
@@ -426,7 +426,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 81272
+        "customBytes": 83796
       },
       {
         "path": "public/js/screens/game.js",
@@ -436,7 +436,64 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 236840
+        "customBytes": 242149
+      }
+    ]
+  },
+  {
+    "id": "client-room-list",
+    "name": "公开同盟（同盟列表）",
+    "status": "ported-ui",
+    "files": [
+      {
+        "path": "public/js/ui/roomList.js",
+        "baseExists": false,
+        "customBytes": 8172
+      },
+      {
+        "path": "public/js/screens/lobby.js",
+        "baseExists": true,
+        "customBytes": 61059
+      },
+      {
+        "path": "public/js/screens/room.js",
+        "baseExists": true,
+        "customBytes": 83796
+      },
+      {
+        "path": "public/css/screens/lobby.css",
+        "baseExists": true,
+        "customBytes": 83002
+      },
+      {
+        "path": "public/css/screens/room.css",
+        "baseExists": true,
+        "customBytes": 73335
+      },
+      {
+        "path": "server/lobby.js",
+        "baseExists": true,
+        "customBytes": 242149
+      },
+      {
+        "path": "server/net.js",
+        "baseExists": true,
+        "customBytes": 50893
+      },
+      {
+        "path": "shared/constants.js",
+        "baseExists": true,
+        "customBytes": 25040
+      },
+      {
+        "path": "shared/protocol.js",
+        "baseExists": true,
+        "customBytes": 53949
+      },
+      {
+        "path": "test/match/room-list.test.js",
+        "baseExists": false,
+        "customBytes": 13266
       }
     ]
   },
@@ -694,12 +751,12 @@
       {
         "path": "dashboard/public/app.js",
         "baseExists": false,
-        "customBytes": 54353
+        "customBytes": 56545
       },
       {
         "path": "dashboard/public/index.html",
         "baseExists": false,
-        "customBytes": 24863
+        "customBytes": 26249
       },
       {
         "path": "dashboard/public/style.css",
@@ -739,7 +796,7 @@
       {
         "path": "dashboard/server.js",
         "baseExists": false,
-        "customBytes": 60812
+        "customBytes": 61823
       },
       {
         "path": "dashboard/title-pill.png",
@@ -801,7 +858,7 @@
       {
         "path": "nginx/conf/open-nodes.conf",
         "baseExists": false,
-        "customBytes": 1980
+        "customBytes": 2647
       },
       {
         "path": "nginx/conf/scgi_params",
@@ -1527,7 +1584,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 236840
+        "customBytes": 242149
       },
       {
         "path": "server/match/aiDigest.js",
@@ -1922,7 +1979,7 @@
       {
         "path": "server/net.js",
         "baseExists": true,
-        "customBytes": 50768
+        "customBytes": 50893
       },
       {
         "path": "server/packs.js",
@@ -4124,7 +4181,7 @@
       {
         "path": "shared/constants.js",
         "baseExists": true,
-        "customBytes": 23875
+        "customBytes": 25040
       },
       {
         "path": "shared/diy.js",
@@ -4329,7 +4386,7 @@
       {
         "path": "shared/protocol.js",
         "baseExists": true,
-        "customBytes": 53438
+        "customBytes": 53949
       },
       {
         "path": "shared/sha256.js",
@@ -4944,7 +5001,7 @@
       {
         "path": "public/js/ui/poolEditor.js",
         "baseExists": false,
-        "customBytes": 10180
+        "customBytes": 10183
       },
       {
         "path": "public/js/ui/protocolBoot.js",
@@ -4975,6 +5032,11 @@
         "path": "public/js/ui/richText.js",
         "baseExists": true,
         "customBytes": 6718
+      },
+      {
+        "path": "public/js/ui/roomList.js",
+        "baseExists": false,
+        "customBytes": 8172
       },
       {
         "path": "public/js/ui/screenFit.js",
@@ -5186,7 +5248,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": true,
-        "customBytes": 59627
+        "customBytes": 61059
       },
       {
         "path": "public/js/screens/ownership.js",
@@ -5201,7 +5263,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 81272
+        "customBytes": 83796
       },
       {
         "path": "public/js/screens/settle.js",
@@ -5695,7 +5757,7 @@
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": true,
-        "customBytes": 78730
+        "customBytes": 83002
       },
       {
         "path": "public/css/screens/match-popups.css",
@@ -5715,7 +5777,7 @@
       {
         "path": "public/css/screens/room.css",
         "baseExists": true,
-        "customBytes": 73157
+        "customBytes": 73335
       },
       {
         "path": "public/css/screens/settle.css",

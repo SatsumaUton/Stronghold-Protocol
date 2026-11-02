@@ -368,16 +368,21 @@ async function lastSeenId(accountId) {
  */
 async function unreadFor(user) {
   const seen = await lastSeenId(user.id);
+  // 只数「还没处理」的：维护者要求「已经处理完的就不要再弹提示框了」。
+  // unassigned 是默认状态；unplanned / planned / updated 都表示服主或管理员已经看过并分过类，
+  // 再算新消息就只会一直弹同一条。
   const [[cnt]] = await db().query(
     `SELECT COUNT(*) AS n FROM feedback_items
-      WHERE hidden = 0 AND id > ? AND (account_id IS NULL OR account_id <> ?)`,
+      WHERE hidden = 0 AND status = 'unassigned'
+        AND id > ? AND (account_id IS NULL OR account_id <> ?)`,
     [seen, user.id]);
   const count = Number(cnt?.n) || 0;
   if (!count) return { count: 0, seen, latest: [] };
   // 最近 5 条给提示条用（标题/分类/作者/时间），不返回正文
   const [rows] = await db().query(
     `SELECT id, category, title, author, created_at FROM feedback_items
-      WHERE hidden = 0 AND id > ? AND (account_id IS NULL OR account_id <> ?)
+      WHERE hidden = 0 AND status = 'unassigned'
+        AND id > ? AND (account_id IS NULL OR account_id <> ?)
       ORDER BY id DESC LIMIT 5`,
     [seen, user.id]);
   return {
