@@ -295,3 +295,30 @@ test('房间变得不合条件时，setExperimental 会自动摘下列表', () =
   assert.equal(room.listed, false, '不合条件就别留在列表里');
   assert.equal(lobby.roomList().reply.rooms.length, 0, '列表里也没有了');
 });
+
+// ---------------------------------------------------------------- 跨节点可见性：Redis 文档必须跟着变
+//
+// 2026-11-02 实测到的坑：房主点「公开同盟」之后，内存里 room.listed = true（room.state 也带着），
+// 但匹配器读的 Redis 文档里**永远没有 listed**，别的节点看不到这间房、跨节点列表一直是空的。
+// 原因不在 roomDoc（它写对了），而在 LobbyPersister.roomKey：写不写 Redis 由「key 变了才重写」决定，
+// 而 key 里当时没有 listed / matchmaking —— 这两个开关从头到尾不触发重写。
+// 这条测试钉住 roomKey：只要它漏了这两个字段，跨节点公开同盟就又是空的。
+test('roomKey 必须随 listed / matchmaking 变化（否则改了也写不进 Redis）', async () => {
+  const { LobbyPersister } = await import('../../server/persist/persister.js');
+  const keyOf = (room) => LobbyPersister.prototype.roomKey.call({ cluster: false }, room);
+  const base = () => ({
+    hostId: 'p_1', mode: 'coop', difficulty: 'NORMAL', aiPicksLast: false, experimental: null,
+    source: 'private', ownerKey: null, ownerKeys: null, matchKey: null, matchKeys: null, matchCount: 0,
+    createdAt: 1, disposed: false, match: null, liveRound: 0, livePhase: null,
+    spectators: [], seats: [], listed: false, matchmaking: false,
+  });
+
+  const off = keyOf(base());
+  const listed = keyOf({ ...base(), listed: true });
+  const queue = keyOf({ ...base(), matchmaking: true });
+
+  assert.notDeepEqual(listed, off, '挂上公开同盟之后 key 必须变（否则 Redis 里的文档不会被重写）');
+  assert.notDeepEqual(queue, off, '开启匹配队友之后 key 也必须变');
+  assert.notDeepEqual(listed, queue, '两个开关是两件事');
+  assert.deepEqual(keyOf(base()), off, '没改动时 key 保持不变（不然每轮都重写全部房间）');
+});

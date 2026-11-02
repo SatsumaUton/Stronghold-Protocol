@@ -165,7 +165,11 @@ export class LobbyPersister {
   /** What a room's stored record is made of (scalars and references; the match's by identity): a change rewrites it. */
   roomKey(room) {
     const key = [room.hostId, room.mode, room.difficulty, room.aiPicksLast, room.experimental, room.source, room.ownerKey, room.ownerKeys,
-      room.matchKey, room.matchKeys, room.matchCount, room.createdAt, room.disposed, room.match, room.liveRound, room.livePhase, room.spectators.length];
+      room.matchKey, room.matchKeys, room.matchCount, room.createdAt, room.disposed, room.match, room.liveRound, room.livePhase, room.spectators.length,
+      // ★ 2026-11-02：这两个必须进 key。lobbyState.roomDoc 靠它们决定写不写 listed / matchmaking，
+      //   而写不写由「key 变了才重写」控制 —— 不放进来，房主点「公开同盟」之后 Redis 里的文档
+      //   永远不会更新，匹配器就永远看不到这间房（跨节点公开同盟列表一直是空的，实测复现）。
+      room.listed, room.matchmaking];
     for (const s of room.spectators) key.push(s.playerId, s.name, s.owner);
     for (const s of room.seats) {
       if (!s) { key.push(null); continue; }
