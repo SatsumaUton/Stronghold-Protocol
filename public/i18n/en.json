@@ -20,6 +20,7 @@
 "2 倍速": "2× speed",
 "票数不足，下一场战斗恢复常速": "Not enough votes; the next battle runs at normal speed",
 "{need} 人同意后，下一场战斗起以 2 倍速进行": "Once {need} players agree, battles run at 2× speed from the next one",
+"{name}博士发起了战斗 2 倍速投票（{agreed}/{need}）": "Dr. {name} started a 2× battle speed vote ({agreed}/{need})",
 "联防第 {round}/2 段：{n} 秒": "Unite segment {round}/2: {n}s",
 "联防时间：{n} 秒": "Unite time: {n}s",
 "倒计时：--": "Countdown: --",

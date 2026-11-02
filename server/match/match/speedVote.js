@@ -17,8 +17,9 @@
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { ERR, SPEED_VOTE_MULT } from '../../../shared/constants.js';
+import { msg } from '../../../shared/i18n.js';
 import { MAX_GAME_SPEED } from '../fields.js';
-import { OK, fail } from './common.js';
+import { FLOW_TICKER_PRIORITY, OK, fail } from './common.js';
 import { rerollNeed } from './setupVote.js';
 
 export class MatchSpeedVote {
@@ -31,8 +32,22 @@ export class MatchSpeedVote {
     const now = this.sched.now();
     if (now - (this._speedVoteAt.get(ps.playerId) ?? -Infinity) < 300) return fail(ERR.RATE);
     this._speedVoteAt.set(ps.playerId, now);
+    const before = this._speedVotes.size;
     if (agree) this._speedVotes.add(ps.playerId); else this._speedVotes.delete(ps.playerId);
     this.markPublic();
+    // 发起提示：以前别人发起 2 倍速投票，其他人**完全没有感觉** —— 那个开关只是自己变了个样子，
+    // 谁也不去点它就永远过不了。所以第一票投进来时广播一条提示条（m.ticker），
+    // 说明是谁发起的、现在几票通过；剩下的人看到后就知道该去按那个开关了。
+    //
+    // 只在「这一轮投票的第一票」时说：before === 0 是原始的赞成人数（不看在线），
+    // 所以后面的人跟着赞成不会再刷一条。已经能通过时不说 —— 单人对局 need=1，
+    // 赞成即通过，没必要告诉玩家自己刚干了什么。
+    if (agree && before === 0) {
+      const v = this.speedVoteView();
+      if (!v.next) {
+        this.tickerText(msg('{name}博士发起了战斗 2 倍速投票（{agreed}/{need}）', { name: ps.name, agreed: v.agreed.length, need: v.need }), FLOW_TICKER_PRIORITY);
+      }
+    }
     return OK;
   }
 
