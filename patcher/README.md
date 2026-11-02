@@ -159,6 +159,7 @@ patcher\
 | **结算页「刷新换新版本」提示** | `public/js/ui/nodeCodeHint.js`、`public/js/screens/result.js`、`public/css/screens/result.css`、`public/i18n/*.json` | 入补丁 | 玩家刷新页面 |
 | 按节点号手工设开放列表 | `tools/_set-open-nodes.mjs` | 入仓库 | 写 `open-nodes.conf` + reload |
 | nginx 配置备份 | `deploy/nginx.conf` | 入仓库 | `nginx -s reload` |
+| **一键重启全部节点**（2026-11-02，控制台运维区）<br>`POST /api/ops/restart-all { confirm:true, includeBusy?, dryRun? }`：**默认只重启 `matches = 0` 的节点**，有对局的跳过并在结果里逐台列出；勾「也重启正在对局的节点」才传 `includeBusy:true`，界面会先报出受影响节点与玩家数、再连确认两次。`dryRun:true` 只回报会动谁、绝不重启（界面就是先拿它写确认框，避免用几秒前的状态漏掉刚开局的节点）。真正动手前**逐个再探一次 `matches`**，全部复查通过才 `pm2 startOrReload --only …`；**成功才 `save`**（失败时 save 会固化一个可能不对的进程表），6 秒后再复查一次有没有没起来的。 | `dashboard/server.js:opsRestartAll`、`dashboard/public/app.js`、`dashboard/public/index.html` | `account-and-dashboard` | 重启 dashboard |
 | **只有「正开着对局」的人才被 cookie 粘在旧代码节点上**（2026-10-31）<br>`sp_route` 有效期 30 天，老 cookie 会把根本没在对局的人永久锁在跑旧代码的节点上（实测 node-6 早上 5 个新房全是这样进来的）。现在 nginx 多一层判断：cookie 指向的节点 `X-SP-Accepts-New=0`（跑旧代码）时，**只有同时带 `sp_sticky` cookie 且值等于 `sp_route` 的人才准粘住**，其余人改派到随机新代码节点。`sp_sticky` 由前端在对局中写入（`selectRoute === 'game'`）、离开对局立即删除。**只对 HTML 文档生效**，`/healthz`、`/data`、`/js`、WebSocket 一律留在页面那台。 | `public/js/ui/stickyNode.js`（写入/清除 cookie）、`public/js/main.js`（`startStickyNode`）<br>配置侧（不入补丁，部署目录）：`nginx/conf/nginx.conf`（`location /` 里的 `$sp_sticky`/`$sp_final_open`/`$sp_dispatch`）、`deploy/sync-open-nodes.ps1` 生成的 `map $cookie_sp_route $sp_cookie_accepts_new` | `client-watch` | 刷新页面 + reload nginx |
 
 > ⚠ **`sp_sticky` 只能前端写。** nginx 是「看 cookie 做决定」的那一端，它没法自己判断

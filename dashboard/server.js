@@ -650,6 +650,98 @@ async function opsRestartIdle(want) {
 }
 
 // ===================================================================
+// 一键重启全部节点
+//
+// 和「重启空闲节点」的区别：这个**不看新旧代码**，30 台全重启。
+// 但正在对局的节点会打断玩家，所以分成两种模式：
+//   默认          只重启空闲的（matches = 0），有对局的跳过并在结果里列出来
+//   includeBusy   连正在对局的也重启 —— 必须显式传，而且界面要二次确认
+//
+// 无论哪种模式，真正动手之前都会**逐个再探一次** matches：前端那份状态可能是几秒前的，
+// 中途有人开局就不能算空闲了（和 opsRestartIdle 的「最后一道闸」同一个理由）。
+// ===================================================================
+/**
+ * @param {{ includeBusy?: boolean, dryRun?: boolean }} [opts]
+ */
+async function opsRestartAll(opts = {}) {
+  const includeBusy = opts.includeBusy === true;
+  const dryRun = opts.dryRun === true;
+  opsCache = { at: 0, data: null };
+  const st = await opsState();
+
+  // 最后一次逐个复查：活着的才算候选，有对局的按 includeBusy 决定留不留
+  const safe = [];
+  const skippedBusy = [];
+  const dead = [];
+  for (const node of st.nodes) {
+    const pr = await probe(node.n);
+    if (!pr.httpOk) { dead.push(node.n); continue; }
+    const m = Number((pr.health || {}).matches) || 0;
+    if (m === 0) safe.push(node.n);
+    else if (includeBusy) safe.push(node.n);
+    else skippedBusy.push({ n: node.n, matches: m });
+  }
+
+  // 预览：只说会动谁，绝不重启。界面用它先给维护者看一眼。
+  if (dryRun) {
+    return {
+      ok: true, dryRun: true, restarted: [], wouldRestart: safe, skipped: skippedBusy, dead,
+      message: safe.length
+        ? `预览：会重启 ${safe.length} 台（${safe.join(', ')}）`
+          + (skippedBusy.length ? `；跳过 ${skippedBusy.length} 台对局中` : '')
+          + (dead.length ? `；${dead.length} 台无响应` : '')
+        : '预览：没有可重启的节点',
+    };
+  }
+
+  if (!safe.length) {
+    return {
+      ok: true, restarted: [], skipped: skippedBusy, dead,
+      message: dead.length
+        ? `没有可重启的节点（${dead.length} 台无响应：${dead.join(', ')}）`
+        : '没有可重启的节点：全部都有对局在进行',
+    };
+  }
+
+  const eco = path.join(BASE, 'ecosystem.config.cjs');
+  if (!fs.existsSync(eco)) {
+    return { ok: false, restarted: [], skipped: skippedBusy, dead, error: `找不到 ${eco}`, message: '没有重启任何节点（找不到 ecosystem.config.cjs）' };
+  }
+
+  const res = await runPm2(['startOrReload', eco, '--only', safe.map(nodeName).join(','), '--update-env']);
+  opsCache = { at: 0, data: null };
+  if (!res.ok) {
+    // pm2 失败时【绝不能】报「已重启」—— 之前就是这样误报，实际一个都没动
+    return {
+      ok: false, restarted: [], skipped: skippedBusy, dead,
+      out: res.out.slice(-1500), err: res.err.slice(-1200),
+      message: `重启失败，没有节点被重启：${(res.err || res.out || '').split('\n').filter(Boolean).pop() || '未知原因'}`,
+    };
+  }
+  await runPm2(['save']);
+
+  // 复查：都起来了吗？
+  await new Promise((r) => setTimeout(r, 6000));
+  opsCache = { at: 0, data: null };
+  const after = await opsState();
+  const down = safe.filter((n) => {
+    const x = after.nodes.find((y) => y.n === n);
+    return !x || !x.alive;
+  });
+
+  let message = `已重启 ${safe.length} 台：${safe.join(', ')}`;
+  if (skippedBusy.length) message += `；跳过 ${skippedBusy.length} 台（对局进行中）：${skippedBusy.map((x) => x.n).join(', ')}`;
+  if (dead.length) message += `；⚠ 重启前就没响应：${dead.join(', ')}`;
+  if (down.length) message += `；⚠ 重启后未响应：${down.join(', ')}`;
+  return {
+    ok: !down.length,
+    restarted: safe, skipped: skippedBusy, dead, down,
+    out: res.out.slice(-1500), err: res.err.slice(-800),
+    message,
+  };
+}
+
+// ===================================================================
 // 关闭单个房间
 //
 // 房间归某个节点所有，别的节点不认识这个房间号，必须打「房间所在的那台」。
@@ -1203,6 +1295,26 @@ const server = http.createServer(async (req, res) => {
       if (payload.confirm !== true) return sendJson(res, 400, { error: '需要 confirm:true' });
       const want = Array.isArray(payload.nodes) ? payload.nodes.map(Number) : null;
       const result = await opsRestartIdle(want);
+      refresh();
+      return sendJson(res, 200, result);
+    });
+    return;
+  }
+  if (pathname === '/api/ops/restart-all' && req.method === 'POST') {
+    if (!authorized(req)) return sendJson(res, 401, { error: 'unauthorized' });
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 4096) req.destroy(); });
+    req.on('end', async () => {
+      let payload = {};
+      try { payload = JSON.parse(body || '{}'); } catch { return sendJson(res, 400, { error: 'bad json' }); }
+      // 前端必须显式传 confirm:true —— 这个动作会打断玩家，不做静默执行
+      if (payload.confirm !== true) return sendJson(res, 400, { error: '需要 confirm:true' });
+      // includeBusy:true 才会碰正在对局的节点；不传就是「只重启空闲的」
+      // dryRun:true 只回报会动谁，不重启（界面先预览用）
+      const result = await opsRestartAll({
+        includeBusy: payload.includeBusy === true,
+        dryRun: payload.dryRun === true,
+      });
       refresh();
       return sendJson(res, 200, result);
     });
