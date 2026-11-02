@@ -1062,8 +1062,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/room-ttl' && req.method === 'GET') {
-    try { return sendJson(res, 200, JSON.parse(fs.readFileSync(path.join(BASE, 'shared', 'data', 'room-ttl.json'), 'utf8'))); }
-    catch { return sendJson(res, 200, { minutes: 15 }); }
+    try { return sendJson(res, 200, { enabled: true, minutes: 15, ...JSON.parse(fs.readFileSync(path.join(BASE, 'shared', 'data', 'room-ttl.json'), 'utf8')) }); }
+    catch { return sendJson(res, 200, { enabled: true, minutes: 15 }); }
   }
   if (pathname === '/api/room-ttl' && req.method === 'POST') {
     let body = '';
@@ -1071,13 +1071,18 @@ const server = http.createServer(async (req, res) => {
     req.on('end', () => {
       let p = {};
       try { p = JSON.parse(body || '{}'); } catch { return sendJson(res, 400, { error: 'bad json' }); }
-      const m = Number(p.minutes);
-      if (!Number.isFinite(m) || m < 1 || m > 1440) return sendJson(res, 400, { error: 'minutes 需为 1~1440' });
+      // 只传一个字段时保留另一个：前端可能只切开关、或只改分钟数。
+      let cur = { enabled: true, minutes: 15 };
+      try { cur = { ...cur, ...JSON.parse(fs.readFileSync(path.join(BASE, 'shared', 'data', 'room-ttl.json'), 'utf8')) }; } catch { /* 用默认 */ }
+      const enabled = p.enabled === undefined ? cur.enabled !== false : p.enabled !== false;
+      const raw = p.minutes === undefined ? Number(cur.minutes) : Number(p.minutes);
+      if (!Number.isFinite(raw) || raw < 1 || raw > 1440) return sendJson(res, 400, { error: 'minutes 需为 1~1440' });
+      const minutes = Math.round(raw);
       try {
         fs.mkdirSync(path.join(BASE, 'shared', 'data'), { recursive: true });
-        fs.writeFileSync(path.join(BASE, 'shared', 'data', 'room-ttl.json'), JSON.stringify({ minutes: Math.round(m) }, null, 2), 'utf8');
+        fs.writeFileSync(path.join(BASE, 'shared', 'data', 'room-ttl.json'), JSON.stringify({ enabled, minutes }, null, 2), 'utf8');
       } catch (e) { return sendJson(res, 500, { error: e.message }); }
-      return sendJson(res, 200, { ok: true, minutes: Math.round(m) });
+      return sendJson(res, 200, { ok: true, enabled, minutes });
     });
     return;
   }
@@ -1095,7 +1100,28 @@ const server = http.createServer(async (req, res) => {
     req.on('end', () => {
       let payload = {};
       try { payload = JSON.parse(body || '{}'); } catch { return sendJson(res, 400, { error: 'bad json' }); }
-      const doc = { enabled: payload.enabled === true, text: String(payload.text || "").slice(0, 2000), updatedAt: new Date().toISOString() };
+      // 2026-11-02 新增三个字段：
+      //   expiresAt   —— 到这个时间以后整条不再显示（空 = 不过期）
+      //   important   —— 重要公告：玩家端不自动消失，也不给「今日不再提醒」
+      //   autoHideSec —— 普通公告显示多少秒后自己滑走（0 = 不自动消失）
+      // 玩家端（matchmaker/public/client.js 的 applyAnnouncement）直接读这几个字段，
+      // /api/pulse 是整份 JSON 直传，所以那边不用改接口。
+      let expiresAt = null;
+      if (payload.expiresAt) {
+        const t = Date.parse(String(payload.expiresAt));
+        if (Number.isFinite(t)) expiresAt = new Date(t).toISOString();
+      }
+      let autoHideSec = Number(payload.autoHideSec);
+      if (!Number.isFinite(autoHideSec)) autoHideSec = 15;
+      autoHideSec = Math.max(0, Math.min(600, Math.round(autoHideSec)));
+      const doc = {
+        enabled: payload.enabled === true,
+        text: String(payload.text || "").slice(0, 2000),
+        updatedAt: new Date().toISOString(),
+        expiresAt,
+        important: payload.important === true,
+        autoHideSec,
+      };
       try {
         fs.mkdirSync(path.join(BASE, 'guard'), { recursive: true });
         fs.writeFileSync(path.join(BASE, 'guard', 'announcement.json'), JSON.stringify(doc, null, 1));
