@@ -2,7 +2,7 @@
 // start's deploy replay. Re-exported from ../gameLogic.js.
 
 import { PHASE } from '../../../../shared/constants.js';
-import { bossLevelSeconds } from '../matchStatus.js';
+import { battleSpeedScale, bossLevelSeconds } from '../matchStatus.js';
 import { clamp, int, isObj, sortedPlayers } from './shared.js';
 import { normalizeSp } from './draft.js';
 import { t } from '../../../../shared/i18n.js';
@@ -239,13 +239,12 @@ export function countdownState(deadline, now, total, warnAt = 10) {
  * @param {any} config data/config.json
  * @param {string|null} [myId]
  */
-/** The expanded-room 联防 budget shown above the top bar (server unitePhase.js uniteTimeLimit). */
+/** The expanded-room 联防 segment (server unitePhase.js uniteTimeLimit). Every segment is the round's own time limit. */
 export function uniteBudgetInfo(pub) {
   if (pub?.phase !== PHASE.UNITE) return null;
-  const total = pub.unite?.totalBudget;
-  const remaining = pub.unite?.remainingBudget;
-  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(remaining) || remaining < 0 || remaining > total) return null;
-  return { total, remaining };
+  const segment = pub.unite?.timeLimit;
+  if (!Number.isFinite(segment) || segment <= 0) return null;
+  return { total: segment, remaining: segment };
 }
 
 export function phaseTotalSeconds(pub, config, myId = null) {
@@ -253,6 +252,8 @@ export function phaseTotalSeconds(pub, config, myId = null) {
   const timers = isObj(config?.timers) ? config.timers : {};
   const mode = isObj(config?.modes) ? config.modes[pub.modeId] : null;
   const num = (v) => (Number.isFinite(v) && v > 0 ? v : null);
+  // a battle started at 2 倍速 has half the nominal real seconds (the gauge is against the deadline it was given)
+  const inBattle = (v) => (v == null ? null : v / battleSpeedScale(pub));
   switch (pub.phase) {
     case PHASE.INFO_CHECK: return num(timers.infoCheck) ?? 25;
     // one countdown: the current turn's (m.public.draft.turnSeconds = Match.BAND_TURN_SECONDS; user playtest #4 item 4)
@@ -264,15 +265,16 @@ export function phaseTotalSeconds(pub, config, myId = null) {
       return first ? (num(timers.spFirst) ?? 30) : (num(timers.spTurn) ?? 16);
     }
     case PHASE.PREP: return num(mode?.rounds?.[String(pub.round)]?.prepTime);
-    case PHASE.COMBAT: return num(mode?.rounds?.[String(pub.round)]?.combatTimeLimit);
+    // a battle started at 2 倍速 has half the nominal real seconds (the gauge is against the deadline it was given)
+    case PHASE.COMBAT: return inBattle(num(mode?.rounds?.[String(pub.round)]?.combatTimeLimit));
     case PHASE.UNITE: {
       const limit = num(pub.unite?.timeLimit);
       const speed = num(pub.unite?.gameSpeed);
-      return limit && speed ? limit / speed : num(mode?.rounds?.[String(pub.round)]?.combatTimeLimit);
+      return limit && speed ? limit / speed : inBattle(num(mode?.rounds?.[String(pub.round)]?.combatTimeLimit));
     }
     // 最终攻势 / 隐秘核心: m.public.deadline is the level's 120 s countdown (maxPlayTime; the battle goes on past it)
     case PHASE.FINAL_ASSAULT:
-    case PHASE.HIDDEN_CORE: return bossLevelSeconds(pub, config);
+    case PHASE.HIDDEN_CORE: return inBattle(bossLevelSeconds(pub, config));
     default: return null;
   }
 }

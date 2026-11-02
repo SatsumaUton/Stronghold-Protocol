@@ -223,6 +223,23 @@
 .pausebtn.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(23, 249, 183, .45); }
 .pausebtn.is-busy { opacity: .6; }
 
+/* 战斗 2 倍速 (ui/hud.js SpeedVote): the pause button's dark plate, mint once a battle runs at it */
+.speedvote {
+  display: inline-flex; align-items: center; gap: .08rem; height: .38rem; padding: 0 .12rem; flex: none;
+  background: rgba(10, 14, 12, .88); border: 2px solid rgba(242, 242, 242, .45); color: var(--text-md);
+  font-size: max(calc(.17 * var(--t)), calc(11px * var(--ui))); line-height: 1; white-space: nowrap;
+  box-shadow: 0 .04rem .16rem rgba(0, 0, 0, .55);
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.speedvote__glyph { font-style: normal; font-size: .8em; letter-spacing: -.12em; margin-right: .04rem; }
+.speedvote__count { font-family: var(--font-num); font-weight: 700; }
+.speedvote:hover:not(:disabled) { background: rgba(255, 255, 255, .14); border-color: #fff; color: #fff; }
+.speedvote.is-called { border-color: var(--mint-600); color: #fff; }
+.speedvote.is-mine { border-color: var(--mint-400); color: var(--mint-400); }
+.speedvote.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(23, 249, 183, .45); }
+.speedvote.is-busy { opacity: .6; }
+.speedvote:disabled { cursor: default; }
+
 /* boss-round overtime warning (ui/hud.js OvertimeWarning; red DOT look: official icon_warn / blood_icon + bg_lose_hp) */
 .otwarn {
   position: relative; display: flex; align-items: center; gap: .08rem; height: .38rem; padding: 0 .14rem 0 .1rem;

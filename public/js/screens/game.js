@@ -1885,7 +1885,7 @@ function MatchScreen() {
         pause=${canPause || paused ? { show: canPause, paused, busy: pauseBusy, onToggle: () => togglePause(!paused) } : null}
         live=${liveLpNow} spectator=${spectator}
         spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom}
-        held=${hudIn === 'wait'} />
+        held=${hudIn === 'wait'} onSpeedVote=${actions.speedVote} />
 
       <div class="gm__bonds">
         <button type="button" class="bonds-toggle" aria-expanded=${!bondsCollapsed} aria-controls="match-bond-strip"
