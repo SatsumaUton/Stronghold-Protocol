@@ -187,6 +187,9 @@ export const ERR = Object.freeze({
   // 房间里还有排队中的任务（房间串行队列，或多人匹配队列里还有它的玩家）：
   // 这会儿改规则 / 挂同盟列表 / 开局都会和排队的那件事打架，先等它跑完。
   QUEUED: 'QUEUED',
+  // 维护开关（维护手册里的「暂停开新局」）：新房间 / 开局 / 加入匹配队列都回这个码，
+  // 已经在对局里的玩家不受影响。见 server/onlineLimit.js 的开关与 Lobby 的 paused()。
+  MAINTENANCE: 'MAINTENANCE',
   WRONG_PHASE: 'WRONG_PHASE',
   NO_FUNDS: 'NO_FUNDS',
   HAND_FULL: 'HAND_FULL',
@@ -257,6 +260,7 @@ export const ERR_TEXT = {
   NOT_YOUR_TURN: N_('尚未轮到你'), ALREADY: N_('已完成该操作'), TEMP_NOT_EMPTY: N_('临时整备区不为空'), ELIMINATED: N_('你已被淘汰'),
   SPECTATOR: N_('观战中无法进行该操作'), INTERNAL: N_('服务器内部错误'),
   CREATE_DISABLED: N_('服务器暂时关闭了创建房间，请稍后再试'),
+  MAINTENANCE: N_('服务器即将维护，暂停开启新的模拟'),
   MATCH_DISABLED: N_('服务器暂时关闭了匹配队友，请稍后再试'),
   START_DISABLED: N_('服务器暂时关闭了开始游戏，请稍后再试'),
   PLUGIN_UNKNOWN: N_('本服务器没有安装该插件'), PLUGIN_BLOCKED: N_('该插件不能在房间中启用'), PLUGIN_DEPENDENCY: N_('缺少该插件需要的其他插件'),

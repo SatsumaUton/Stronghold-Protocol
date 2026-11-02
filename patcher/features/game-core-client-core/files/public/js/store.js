@@ -138,6 +138,10 @@ export function selectRoute(s) {
  * @returns {boolean}
  */
 export function isSpectating(room, playerId) {
+  // 隐身观战（adminWatch，管理员功能）：服务端只把 hiddenWatch 发给本人。
+  // 这种会话既不在 seats 也不在 spectators 里，不认这个标记的话前端会按「普通玩家」
+  // 渲染整个房间 —— 管理员看到的就是「跟平时一样，但点什么都不动」（服务端会拦掉它的 g.*）。
+  if (room && room.hiddenWatch === true) return true;
   return playerId != null && Array.isArray(room?.spectators) && room.spectators.some((s) => s && s.playerId === playerId);
 }
 

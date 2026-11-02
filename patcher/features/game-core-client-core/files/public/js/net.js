@@ -759,11 +759,36 @@ const K_WELCOME = 'sp.tokenWelcome'; // sessionStorage: { hash, at } from the fi
 const K_RECENT = 'sp.tokens';    // localStorage: this browser's recent tokens, most recent first
 const K_MATCHES = 'sp.matches'; // local metadata for explicit recovery of another closed tab's seat
 const K_ENTERED = 'sp.entered';  // sessionStorage: this tab passed the title screen
+// 隐身观战页（?adminWatch=1，管理员功能）自己的会话：**只存在这个标签页的 sessionStorage**，
+// 不进 localStorage 的共享候选列表，所以别的标签页永远不会采纳它。
+const K_WATCH_TOKEN = 'sp.watchToken';
 const RECENT_MAX = 4;
 const TOKEN_MAX_LEN = 64;        // protocol limit for hello.token
 const CHANNEL_NAME = 'sp.identity';
 /** How long init() waits for other tabs to claim a candidate token (ms). */
 export const CLAIM_QUERY_MS = 150;
+
+/**
+ * 隐身观战页（?adminWatch=1）：管理后台点「隐身观战」打开的那个页面。
+ *
+ * 它连进节点只是为了看别人的对局，进门靠的是 URL / sessionStorage 里的 watch token
+ * （服务端 lobby.spectate 的 verifyWatchToken），**和玩家的玩家会话毫无关系**。
+ * 但它以前走的是普通身份流程：先看 sessionStorage（window.open 会把开它的那个标签页的
+ * sessionStorage 一起复制过来！），再退到 localStorage 的最近 token 里挑一个 ——
+ * 挑中的往往就是管理员自己正在用的会话，于是两边抢同一个 token：
+ *   · 管理员自己的页面被顶掉，弹「该身份已在其他页面登录」；
+ *   · 点「在此页面继续」把自己的会话抢回来，观战页又变成「没席位、也不是观战者」，
+ *     前端只好按普通玩家渲染（服务端会拦掉它的 g.*，看起来就是「只能看不能动」）。
+ *
+ * 所以观战页只认它自己创建过的 token，绝不采纳、也绝不接管别人的会话，并且不往
+ * localStorage 的共享候选列表里写 —— 两边从此井水不犯河水。
+ */
+const WATCH_ONLY = (() => {
+  try {
+    const q = new URLSearchParams(globalThis.location?.search || '');
+    return q.get('adminWatch') === '1';
+  } catch { return false; }
+})();
 
 function safeStorage(kind) {
   try {
@@ -947,6 +972,12 @@ export function createIdentity(deps = {}) {
   }
 
   async function resolveToken() {
+    // 隐身观战页：只用本页自己创建过的会话。不建 BroadcastChannel、不读共享候选列表，
+    // 所以既不会抢别人的 token，也不会被别人抢（见 WATCH_ONLY 的注释）。
+    if (WATCH_ONLY) {
+      const ownWatch = sget(session, K_WATCH_TOKEN);
+      return isToken(ownWatch) ? ownWatch : null;
+    }
     channel = deps.channel !== undefined ? deps.channel : defaultChannel();
     if (channel) {
       if (typeof channel.addEventListener === 'function') channel.addEventListener('message', onChannelMessage);
@@ -1027,6 +1058,12 @@ export function createIdentity(deps = {}) {
     getToken() {
       if (current) return current;
       if (initialized) return null;
+      // 隐身观战页：window.open 会把开它的标签页的 sessionStorage 复制过来，
+      // 那份 K_TOKEN 是管理员的玩家会话，绝不能拿来发 hello（会把人家顶下线）。
+      if (WATCH_ONLY) {
+        const ownWatch = sget(session, K_WATCH_TOKEN);
+        return isToken(ownWatch) ? ownWatch : null;
+      }
       const own = sget(session, K_TOKEN);
       return isToken(own) ? own : null;
     },
@@ -1048,6 +1085,12 @@ export function createIdentity(deps = {}) {
       owned = token;
       welcomed = true;
       current = token;
+      // 隐身观战页只把会话记在自己的 sessionStorage 里：写进 K_TOKEN 不算问题（那是本标签页的），
+      // 但**绝不能**进 localStorage 的共享候选列表 —— 否则别的标签页会来采纳它、跟观战页抢。
+      if (WATCH_ONLY) {
+        sset(session, K_WATCH_TOKEN, token);
+        return;
+      }
       sset(session, K_TOKEN, token);
       sset(session, K_WELCOME, JSON.stringify({ hash: tokenHash(token), at: welcomeAt }));
       writeRecent([token, ...readRecent().filter((t) => t !== token)]);
@@ -1060,6 +1103,7 @@ export function createIdentity(deps = {}) {
       owned = null; welcomeAt = null; welcomed = false;
       sdel(session, K_TOKEN);
       sdel(session, K_WELCOME);
+      if (WATCH_ONLY) { sdel(session, K_WATCH_TOKEN); return; }
       if (t) writeRecent(readRecent().filter((x) => x !== t));
     },
     /** Whether this tab already passed the title screen (survives reloads, not new tabs). */

@@ -2908,6 +2908,18 @@ const JOIN_COOKIE = (() => {
 #mm-ticker .mm-ticker__close{width:38px;height:38px;min-width:38px;flex:none;padding:0;border:0;border-radius:0;
   background:transparent;color:#34d399;font:400 26px/1 "Noto Sans SC",system-ui,sans-serif;cursor:pointer;pointer-events:auto}
 #mm-ticker .mm-ticker__close:hover{color:#9dffe2}
+/* 「今日不再提醒」：胶囊按钮，跟这条提醒条的薄荷绿一致。
+   两个坑都在这一条里解决：
+   ① 父级 #mm-ticker 是 pointer-events:none（让点击穿过去），按钮必须自己写回 auto，否则点不动；
+   ② 以前完全没有样式，出来就是浏览器默认的灰方块按钮，跟界面完全不搭。 */
+#mm-ticker .mm-ticker__mute{flex:none;height:34px;padding:0 16px;margin-right:2px;box-sizing:border-box;
+  border:1px solid rgba(52,211,153,.5);border-radius:999px;cursor:pointer;pointer-events:auto;
+  background:rgba(52,211,153,.12);color:#9dffe2;
+  font:600 14px/1 "Noto Sans SC",system-ui,sans-serif;letter-spacing:.02em;white-space:nowrap;
+  transition:background .15s ease,border-color .15s ease,color .15s ease}
+#mm-ticker .mm-ticker__mute:hover{background:rgba(52,211,153,.24);border-color:#34d399;color:#eafff7}
+#mm-ticker .mm-ticker__mute:active{background:rgba(52,211,153,.34)}
+#mm-ticker .mm-ticker__mute:focus-visible{outline:2px solid #9dffe2;outline-offset:2px}
 @keyframes mm-notice-scroll{
   0%,15%{transform:translateX(0)}
   85%,100%{transform:translateX(var(--notice-distance,0px))}
@@ -2917,6 +2929,8 @@ const JOIN_COOKIE = (() => {
     font-size:clamp(15px,3.9vw,18px)}
   #mm-ticker::before{font-size:13px}
   #mm-ticker .mm-ticker__close{width:32px;height:32px;min-width:32px;font-size:22px}
+  /* 窄屏：文字缩一点、内边距收窄，别把公告正文挤没 */
+  #mm-ticker .mm-ticker__mute{height:30px;padding:0 11px;font-size:12px}
 }
 `;
       document.head.appendChild(st);
