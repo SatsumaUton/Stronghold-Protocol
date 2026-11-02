@@ -47,7 +47,12 @@ const runWhenHit = (v) => ({ taken(c, b, e, a) { if (a.on || !(v > 0)) return; a
 const times = (artsOnly = false) => ({
   spawn(b, e) {
     const s = Number(e.mods && e.mods.supplyHpMul);
-    setHits(e, e.base.maxHp / (Number.isFinite(s) && s > 0 ? s : 1));
+    // ★ 2026-11-02 维护者定：频次单位的 maxHp 就是「要打几下」，只按 sganggs 的设定吃难度/回合缩放，
+    //   不再叠加房间的「敌人生命倍率」—— 叠加后铜矛头从 90 下变 179 下，玩家打不完。
+    //   e.base.maxHp = 数据血量 × 难度缩放 × 房间倍率，所以这里把房间那一层除掉。
+    const room = Number(b && b.flags && b.flags.enemyHpMul);
+    const undoRoom = Number.isFinite(room) && room > 0 ? room : 1;
+    setHits(e, e.base.maxHp / undoRoom / (Number.isFinite(s) && s > 0 ? s : 1));
     hitCount(b, e, true, artsOnly);
   },
 });
