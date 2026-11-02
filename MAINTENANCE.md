@@ -658,6 +658,137 @@ node tools\_set-open-nodes.mjs <已重启的节点号，逗号分隔>
 
 ---
 
+## 实验性规则与「战斗 2 倍速」：全部开关的语义、数据形状与坑（2026-11-02）
+
+这一节把房间里那些**实验性开关**和战斗中的**2 倍速投票**一次讲清。它们分布在
+`shared/experimental.js`、`shared/playerCapacity.js`、`shared/poolPlan.js`、
+`server/match/match/speedVote.js`，界面在 `public/js/screens/room.js`（房间设置里的
+「实验性功能」弹窗）与 `public/js/ui/hud.js`（对局内的 2 倍速开关）。
+
+### 1. 房间实验性开关全表
+
+界面上的按钮文案就是下面「界面文案」那一列，改文案时两边一起改。
+生效条件那一列是**硬约束**：不满足时前端根本不显示这个开关，服务端也会把它归一化掉。
+
+| 键 | 界面文案 | 悬停提示 | 生效条件 | 语义 |
+|---|---|---|---|---|
+| `revivalEnabled` | 队友复活 | 没漏怪的队友可用 10 点生命救回队友 | 任何人数 | 队友被击倒后可以花 10 点生命救回 |
+| `disableSharedPool` | 独立卡池 | 每名博士使用自己的卡池，不与他人共享 | 任何人数；**有 `poolPlan` 时被顶掉** | 每人一个独立卡池 |
+| `playerCapacity` | 每队人数上限 | — | — | 见下节「人数」 |
+| `disableDuckLord` | 禁用鸭爵策略 | 多人大厅里不出现鸭爵策略 | **仅 >4 人** | 多人大厅的盟约池里去掉鸭爵 |
+| `allowRepeat` | 允许重复选择策略 | 允许同一队伍中重复出现同一种策略 | **仅 >4 人** | 同一队伍可重复选同一种策略 |
+| `stackDuckLord` | 鸭爵策略可叠加 | 多名队友同时选择鸭爵策略时，各自替换一部分敌人 | **仅 >4 人且开了 `allowRepeat`** | 多个鸭爵各自替换一部分敌人 |
+| `disableLayerCap` | 禁用层数上限 | 盟约层数不再停在 999，可以一直叠加（上限 1e9） | 任何人数 | `BOND_LAYER_CAP` 999 → `BOND_LAYER_SAFE_MAX` 1e9 |
+| `disableHitLimit` | 禁用单次伤害上限 | 对敌方领袖的单次 30 万以上伤害不再被取消 | 任何人数 | 取消 `BOSS_HIT_LIMIT`（300000）的单次伤害作废规则 |
+| `enemyHpMul` | 敌人生命 | — | 任何人数 | ×1 / 1.25 / 1.5 / 2 / 3 / 5，省略即 ×1 |
+| `enemyAtkMul` | 敌人攻击 | — | 任何人数 | 同上 |
+| `poolPlan` | 卡池编组 | — | 任何人数 | 每个座位一个卡池号，长度必须等于容量；**取代** `disableSharedPool` |
+
+相关常量（`shared/constants.js`）：`BOND_LAYER_CAP = 999`、`BOND_LAYER_SAFE_MAX = 1e9`、
+`BOSS_HIT_LIMIT = 300000`、`SPEED_VOTE_MULT = 2`。
+
+> 「限伤」的官方规则是**单次伤害达到 30 万（含）时整次作废、伤害归零**，不是削到 30 万。
+> 只对最终攻势 / 隐秘核心里的敌方领袖生效，普通回合、联防、训练模式以及部件、护卫、
+> 无人机都不受影响；判的是算完防御与抗性之后实际打到身上的伤害。`disableHitLimit`
+> 打开后这条规则整条失效。2026-10-30 的公告里解释过一次，玩家问得最多的是这条。
+
+### 2. 人数（`playerCapacity`）：4~20 的**任意整数**，不是只有 5 档
+
+```js
+// shared/playerCapacity.js
+export const PLAYER_CAPACITIES = Object.freeze([MAX_SEATS, 8, 12, 16, 20]); // 只是「预设档」
+export const isPlayerCapacity = (v) => Number.isInteger(v) && v >= 4 && v <= 20; // 真正的校验
+```
+
+- 房间设置里那个人数菜单是 **4、5、6 … 20 共 17 档**（`room.js` 里 `length: 17, i + 4`），
+  不是 `PLAYER_CAPACITIES` 那 5 个值。
+- `PLAYER_CAPACITIES` 只用在**多人匹配的默认档位**（`MULTI_SEAT_DEFAULT` = 第一个大于 4 的值 = 8）
+  之类的地方。写新功能时别拿它当「合法值全集」。
+- 4 人房**不写** `playerCapacity`（普通房的形状保持不变），所以 `playerCapacity` 存在 ⟺ 扩容房。
+
+### 3. 数据形状：永远用 `experimentalOptions()` 生成，别手写对象
+
+`EXPERIMENTAL_DEFAULTS = { revivalEnabled: false, disableSharedPool: false }` —— 这两个键
+**永远在、永远是 boolean**。`isExperimental()` 还要求**至少 2 个键**（就是这两个默认值），
+所以 `{}` 或 `{ playerCapacity: 8 }` 都会被判为非法。
+
+```js
+// 对
+import { experimentalOptions, EXPERIMENTAL_DEFAULTS } from '../../shared/experimental.js';
+const exp = experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, playerCapacity: 8 });
+// 错：isExperimental 只看到 1 个键 → 抛 TypeError 'invalid experimental options'
+const bad = { revivalEnabled: false, playerCapacity: 8 };
+```
+
+`experimentalOptions()` 会做这些归一化（**这些是「为什么房间文档里没有某个键」的标准答案**）：
+
+| 情况 | 结果 |
+|---|---|
+| 容量 = 4 | 不写 `playerCapacity` |
+| 容量 ≤ 4 | `disableDuckLord` / `allowRepeat` / `stackDuckLord` 全部不写 |
+| 容量 > 4 | `allowRepeat` **总是写**（false 也写），好让前端区分「支持但关着」和「老节点没这功能」 |
+| `stackDuckLord` 但没开 `allowRepeat` | 不写（去重时一队最多一个鸭爵，叠加无从谈起） |
+| 有 `poolPlan` | `disableSharedPool` 强制为 false（编组已经说清谁跟谁共享） |
+| 倍率 = 1 | 不写该倍率键 |
+
+### 4. 三个语义坑（都实际踩过）
+
+**坑 1：`!!room.experimental` 不能当「改过规则」。**
+每个扩容房都带 `playerCapacity`，所以 `!!experimental` 恒为真。判断「规则是否被改过」
+要用 `experimentalRuleChanged(value)`（`shared/experimental.js:106`），它跳过 `playerCapacity`。
+多人匹配的 `rules` 范围（标准 / 实验性）就靠它区分，写成 `!!room.experimental` 会让
+**所有扩容房都被当成实验性房**，标准局的匹配范围直接错掉。
+
+**坑 2：比较两个房间的规则用 `sameExperimental`，不要手写 `===` 或 JSON 对比。**
+`sameExperimental` 把「键不存在」和「值为 false」视为相同，并归一化倍率（`undefined` ≡ `1`）。
+手写比较会把 `{...}` 和 `{...}` 判成不同，导致同一套规则被拆成两个匹配池。
+
+**坑 3：`experimentalKey()` 是匹配队列的分池键。**
+顺序无关、`poolPlan` 会规范化（同一套布局不论编号得同一个串）。改它的拼接方式等于
+**把线上所有正在排队的票据作废**（他们拿着旧键，跟新键对不上），改之前想清楚。
+
+### 5. 战斗 2 倍速（`g.speedVote`）：常设投票，不是房间开关
+
+这是**对局内**的功能，跟上面的房间开关无关，也**不是官方规则**（代码里标了 `[ASSUMED]`，
+移植自另一 fork 的 2026-11-01 规则）。
+
+| 项目 | 规则 |
+|---|---|
+| 本质 | 每个在座真人持有的**常设投票**（`g.speedVote { agree }`），随时可改 |
+| 谁有票 | 在座**真人**；观战席与 AI 席位没有；被淘汰的真人**保留** |
+| 分母 `voters` | 当前**在线且未离开**的真人，每次读取重算 |
+| 通过线 `need` | `rerollNeed(voters)` = `ceil(0.75 × voters)`，与「重刷本局」同一道 3/4 门槛 |
+| 单人 | 一个真人自己一票就通过 |
+| 掉线的人 | **不算也不挡**；他回来后重新计入 |
+| 何时生效 | **只在开战那一刻**（`_applySpeedVote` 在构建战场之前跑，写入 `m.gameSpeed`） |
+| 正在打的仗 | **绝不中途变速**，一场仗全程同一个速度 |
+| 票数掉回线下 | 下一场回到基础速度 |
+| 缩放范围 | **只缩放时钟**：游戏秒、tick、所有结果都不变；`data` 里的时限与 `combatTimeScale` 不受影响 |
+| 持久化 | **全是一次性的**：从存档恢复会丢掉所有投票并回到基础速度（`snapshot.js` 的 `MATCH_FIELDS`） |
+| 频率限制 | 每人每次改动间隔 300 ms（`ERR.RATE`） |
+| 上限 | `MAX_GAME_SPEED = 200`（`server/match/fields.js`） |
+
+数值例子：官方战斗本身是 2×，`SPEED_VOTE_MULT` 再乘 2 → **默认 4 游戏秒 / 真实秒**。
+
+客户端看到的是 `m.public.speedVote = { agreed, voters, need, next, on, speed }`（`views.js:97`），
+HUD 上的文案按状态是「2 倍速」/「下一场起 2 倍速」/「本场 2 倍速」（`hud.js:474`）。
+
+**为什么要那条提示条**：以前别人发起 2 倍速投票，其他人**完全没有任何感觉** —— 开关只在自己那边
+变了个样子，谁也不去点，就永远过不了 3/4。所以第一票投进来时会广播一条 ticker
+（`speedVote.js:38-48`），说明是谁发起的、现在几票、还差几票。
+
+### 6. 排查清单
+
+| 现象 | 先查什么 |
+|---|---|
+| 房间设置里看不到某个开关 | 生效条件：`disableDuckLord`/`allowRepeat` 要 >4 人；`stackDuckLord` 还要开 `allowRepeat` |
+| 「独立卡池」灰着点不动 | 有手动卡池编组（`poolPlan`）时它会被禁用并提示「已由手动编组决定」 |
+| 建扩容房报 `BAD_MSG` | `experimentalOptions` 抛了 `TypeError`：检查是不是手写了对象、键数是否 ≥2 |
+| 标准局被匹配到实验性局（或反之） | 是不是用 `!!room.experimental` 判断「改过规则」，应换成 `experimentalRuleChanged` |
+| 2 倍速投票点了没反应 | 观战席 / AI 席位没有票；被淘汰的真人仍有票。看 `m.public.speedVote.agreed` 有没有涨 |
+| 2 倍速通过了但这一场没变快 | 正常：只对**下一场开战**生效，正在打的仗不变速 |
+| 恢复存档后 2 倍速没了 | 正常：投票是瞬态的，恢复即回基础速度 |
+
 ## 三、管理后台
 
 **入口**：大厅「公告」左侧的「管理后台」按钮（仅管理员可见），或直接访问 `https://stronghold.luobomiao.love/mm/admin.html`。
