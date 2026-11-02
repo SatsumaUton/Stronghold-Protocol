@@ -111,10 +111,13 @@ let matchAt = 0;
 let restoreTimer = null;
 let joinTimer = null;
 let joinInFlight = false;
+/** schedulePendingJoin 已重试几次（有界重试；清掉待加入时归零）。 */
+let pendingJoinTries = 0;
 /** The rehearsal installer (battle/rehearsal.js): its tasks follow the match on screen (see wireNet's store hook). */
 let rehearsal = null;
 
 function clearPendingJoin() {
+  pendingJoinTries = 0;
   store.patch('ui', { pendingJoin: null, pendingSpectate: false });
   clearRoomParam();
   try { sessionStorage.removeItem('mm.pendingRoom'); } catch { /* ignore */ }
@@ -133,6 +136,15 @@ function stripAccountResumeParam() {
 /** A stale /r/CODE or ?room=CODE must not advertise a room that has already closed. */
 function validatePendingInvite(code) {
   if (!code) return;
+  // 玩家刚在公开同盟里自己点的「加入同盟」（lobby.js 的 enterRoom 留的标记）：房间是他亲眼
+  // 看见的，而 /mm/api/find-room 依赖节点十秒一次的房间码上报 —— 那一刻查不到很正常，
+  // 不能据此判定「房间已关闭」并清掉待加入（那会让跨节点加入变成「跳过去但没进去」）。
+  let fromList = null;
+  try { fromList = sessionStorage.getItem('sp_join_from_list'); } catch { /* 隐私模式 */ }
+  if (fromList && fromList.toUpperCase() === String(code).toUpperCase()) {
+    try { sessionStorage.removeItem('sp_join_from_list'); } catch { /* ignore */ }
+    return;
+  }
   fetch('/mm/api/find-room?code=' + encodeURIComponent(code), { credentials: 'same-origin', cache: 'no-store' })
     .then((r) => r.ok ? r.json() : null)
     .then((j) => {
@@ -157,11 +169,18 @@ function schedulePendingJoin() {
     }
   } catch { /* ignore */ }
   clearTimeout(joinTimer);
-  joinTimer = setTimeout(async () => {
-    if (window.__SP_ACCOUNT_RESUME_PENDING) return;
+  // 条件没满足就再等一会儿，**不能一次不满足就永久放弃**：
+  // 换节点进来（公开同盟点「加入同盟」/ 邀请链接）时，账号观察器往往在这一刻正设着
+  // __SP_ACCOUNT_RESUME_PENDING，或 socket 还没回到 online、session.entered 还没落定。
+  // 旧代码在这几种情况下直接 return，玩家看到的就是「跳过去了，但什么也没发生，
+  // 还得自己再点一次公开同盟」。
+  const MAX_TRIES = 40;                 // 40 × 350 ms ≈ 14 秒，足够等身份/连接就位
+  const attempt = async () => {
+    if (window.__SP_ACCOUNT_RESUME_PENDING) { retry(); return; }
     const s = store.get();
     const code = s.ui.pendingJoin;
-    if (!code || joinInFlight || !s.session.entered || net.status !== 'online') return;
+    if (!code) return;                  // 已清掉（用户自己进了房 / 关掉了）
+    if (!s.session.entered || net.status !== 'online') { retry(); return; }
     if (s.room) {
       if (s.room.code !== code) toast(t('你已在其他同盟中，请先离开当前同盟'), 'warn');
       clearPendingJoin();
@@ -176,7 +195,14 @@ function schedulePendingJoin() {
       joinInFlight = false;
       clearPendingJoin();
     }
-  }, JOIN_DELAY_MS);
+  };
+  const retry = () => {
+    if (pendingJoinTries >= MAX_TRIES) { pendingJoinTries = 0; return; }
+    pendingJoinTries += 1;
+    clearTimeout(joinTimer);
+    joinTimer = setTimeout(() => { attempt().catch(() => {}); }, JOIN_DELAY_MS);
+  };
+  joinTimer = setTimeout(() => { attempt().catch(() => {}); }, JOIN_DELAY_MS);
 }
 
 /** End the post-resume "syncing" state early once the server re-pushed what we were showing. */
