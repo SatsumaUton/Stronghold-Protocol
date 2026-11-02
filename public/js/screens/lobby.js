@@ -1338,6 +1338,10 @@ export function LobbyScreen() {
     const mine = currentNode();
     if (node && node !== mine) {
       // 直接换页到那台节点并带上房间码：不用先进大厅再点一次
+      // ★ 留一个「这次是玩家自己点的公开同盟」标记：落地后 main.js 的 validatePendingInvite
+      //   会用 /mm/api/find-room 检查房间是否还在，而那个目录有十秒级延迟 —— 查不到就把
+      //   待加入清掉，玩家于是「跳过去了但没进房」。标记存在时跳过那次清理。
+      try { sessionStorage.setItem('sp_join_from_list', k); } catch { /* 隐私模式 */ }
       const u = new URL(location.href);
       u.searchParams.set('n', String(node));
       u.searchParams.set('room', k);
