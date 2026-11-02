@@ -111,11 +111,12 @@ export const BOND_LAYER_CAP = 999;
 /**
  * The layers a gain of `n` actually adds to a bond holding `before` under BOND_LAYER_CAP: min(n, cap − before), never
  * negative (a count already at or over the cap gains 0 and is never lowered); 0 for a non-positive / non-finite `n`
- * except +Infinity (= "the room left").
+ * except +Infinity (= "the room left"). `uncapped`: the room's experimental `disableLayerCap` lifted the cap for this
+ * match (BOND_LAYER_SAFE_MAX instead of BOND_LAYER_CAP).
  */
-export function layerGainRoom(before, n) {
+export function layerGainRoom(before, n, uncapped = false) {
   if (!(n > 0)) return 0;
-  const cap = BOND_LAYER_CAP > 0 ? BOND_LAYER_CAP : Infinity;
+  const cap = uncapped ? BOND_LAYER_SAFE_MAX : BOND_LAYER_CAP > 0 ? BOND_LAYER_CAP : Infinity;
   const b = Number.isFinite(before) && before > 0 ? before : 0;
   return Math.max(0, Math.min(n, cap - b));
 }
@@ -133,6 +134,18 @@ export function layerGainRoom(before, n) {
  * 0 / Infinity = off.
  */
 export const BOSS_HIT_LIMIT = 300000;
+
+/**
+ * 战斗 2 倍速 (server/match/match/speedVote.js, g.speedVote): how much a passed vote multiplies the match's base game
+ * speed. On top of the forced 2×: 4 game seconds per real second. 移植自另一 fork 的 2026-11-01 规则。
+ */
+export const SPEED_VOTE_MULT = 2;
+
+/**
+ * Where a bond stops in a room with the cap lifted (`experimental.disableLayerCap`). Not a game rule: it only keeps a
+ * runaway board's count an exact integer in every double the layers are multiplied into, and printable on the strip.
+ */
+export const BOND_LAYER_SAFE_MAX = 1e9;
 
 // Snapshot unit flag bits (DESIGN §8.2)
 export const UF = Object.freeze({
@@ -153,9 +166,6 @@ export const ERR = Object.freeze({
   IDENTITY_PENDING: 'IDENTITY_PENDING',
   SERVER_FULL: 'SERVER_FULL',     // the online cap (SP_MAX_ONLINE) has no seat for a new player
   ROOM_STARTED: 'ROOM_STARTED',
-  // 2026-10-31 防消极游戏：这个账号在本房间被判定挂机/消极被移出，本局不许自己加回来。
-  // 由房主或管理员重新邀请才放行（room.join 会认 seat 上的踢出记录）。
-  IDLE_KICKED: 'IDLE_KICKED',
   // a fixed alliance key (--room-code): one room at a time can hold it
   ROOM_CODE_TAKEN: 'ROOM_CODE_TAKEN',
   NOT_HOST: 'NOT_HOST',
@@ -173,6 +183,12 @@ export const ERR = Object.freeze({
   TEMP_NOT_EMPTY: 'TEMP_NOT_EMPTY',
   ELIMINATED: 'ELIMINATED',
   SPECTATOR: 'SPECTATOR',         // a spectator seat only watches (MAX_SPECTATORS)
+  // 防消极游戏：这个账号在本房间被判定挂机/消极被移出，本局不许自己加回来。
+  // 由房主或管理员重新邀请才放行（room.join 会认 seat 上的踢出记录）。
+  // ★ 2026-11-02：这个码在 git 里一直有，但部署根的 constants.js 漏了 ——
+  //   lobby.js 的 fail(ERR.IDLE_KICKED) 于是变成 fail(undefined) → {error: undefined}
+  //   → net.js 把不认识的码映射成 INTERNAL，玩家看到「服务器内部错误」而不是真正的提示。
+  IDLE_KICKED: 'IDLE_KICKED',
   // room.setPlugins (DESIGN §32): a plugin this server has not installed; one a room cannot switch on in this version
   // (not a cosmetic or content plugin it loads, not of the room's scope, or not allowed by the server owner's
   // plugins/config.json); a requirement missing or out of range, or a load-order cycle; two plugins in conflict; a set

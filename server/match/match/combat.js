@@ -44,6 +44,15 @@ export class MatchCombat {
 
   _normalBattle(ps) { return this.newBattle(this._normalOpts(ps)); }
 
+  /**
+   * The room's experimental battle rules as spec flags. A rule a battle reads rides on its spec, so the Worker, a
+   * browser's local replica, a client-run field and the server's check of it all fight the same battle. Nothing when off.
+   */
+  _ruleFlags() {
+    return { ...(this.disableLayerCap ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
+      ...(this.enemyHpMul !== 1 ? { enemyHpMul: this.enemyHpMul } : {}), ...(this.enemyAtkMul !== 1 ? { enemyAtkMul: this.enemyAtkMul } : {}) };
+  }
+
   /** Battle options of a player's normal field (after the onBattleStart handlers). */
   _normalOpts(ps, { preview = false, board = ps.board } = {}) {
     const wave = preview ? structuredClone(this.wave) : this.wave;
@@ -70,7 +79,7 @@ export class MatchCombat {
       spawns: this._sanitizeSpawns(Array.isArray(ev.spawns) ? ev.spawns : spawns, ps.playerId),
       routes: wave.routes,
       sharedBoss: null,
-      flags: { layerGainsEnabled: true, ...this.gd.dp },
+      flags: { layerGainsEnabled: true, ...this.gd.dp, ...this._ruleFlags() },
       fieldId: `n:${ps.playerId}`,
       enemyOverrides: wave.overrides,
       waveId: wave.templateId,
@@ -78,12 +87,13 @@ export class MatchCombat {
   }
 
   startCombat() {
+    // 战斗 2 倍速：本场速度在开战前一次写入（未开打时投票不改已开战斗的速度）。
+    this._applySpeedVote();
     if (this.clientCombat) { this._startCombatClient(); return; }
     this.phase = PHASE.COMBAT;
     const alive = this.alivePlayers();
     this._normalAliveCount = alive.length;
     this.lastResults = new Map();
-    if (this.capacityExperiment) this._uniteBudget = null;
     this.fields = alive.map((ps) => ({ fieldId: `n:${ps.playerId}`, kind: 'normal', players: [ps.playerId], battle: this._normalBattle(ps), live: true }));
     const limit = this.wave ? this.wave.timeLimit : 60;
     this.deadline = this.sched.instant ? 0 : this.sched.now() + Math.round((limit / this.gameSpeed) * 1000);
@@ -98,7 +108,6 @@ export class MatchCombat {
     const alive = this.alivePlayers();
     this._normalAliveCount = alive.length;
     this.lastResults = new Map();
-    if (this.capacityExperiment) this._uniteBudget = null;
     this.watchers.clear();
     const fields = alive.map((ps) => this._ccField({ fieldId: `n:${ps.playerId}`, kind: 'normal', players: [ps.playerId], opts: this._normalOpts(ps) }));
     const limit = this.wave ? this.wave.timeLimit : 60;
