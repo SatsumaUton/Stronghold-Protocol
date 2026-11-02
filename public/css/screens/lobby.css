@@ -1415,8 +1415,6 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 
 /* ==== 搜寻中面板：从匹配器（matchmaker/public/client.js 的 mm-ov 覆盖层）原样搬过来 ==== */
 /* 那边是 fixed 全屏覆盖层；这里嵌在多人匹配整屏的右列里，所以把定位改回普通流。 */
-.mm-ov{position:static;inset:auto;z-index:auto;background:none;display:block}
-.mm-ov__panel{max-width:none;width:100%;padding:0}
 .mm-ov{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;
   background:rgba(4,8,7,.86);backdrop-filter:blur(6px);font:15px/1.6 "Microsoft YaHei",system-ui,sans-serif;color:#eef0ef}
 .mm-ov__panel{display:flex;flex-direction:column;align-items:center;gap:12px;padding:26px 34px;text-align:center;
@@ -1451,3 +1449,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   font-size:15px;font-weight:800;color:#ffd9d9;background:linear-gradient(90deg,rgba(120,24,34,.9),rgba(70,14,20,.9));
   border:1px solid rgba(255,120,130,.55)}
 .mm-ov__stop:hover{filter:brightness(1.15)}
+
+/* 覆盖：把匹配器那套全屏覆盖层改成嵌在右列里的紧凑卡片（必须放在原始规则之后才生效）。 */
+.mm-ov{position:static;inset:auto;z-index:auto;background:none;backdrop-filter:none;
+  display:flex;justify-content:center;align-items:flex-start;padding:0}
+.mm-ov__panel{max-width:560px;width:100%}
