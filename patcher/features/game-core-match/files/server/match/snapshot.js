@@ -86,7 +86,7 @@ export const MATCH_FIELDS = Object.freeze({
     'requireCs', 'gd', 'isSolo', 'aiPicksLast', 'afkRemoveRounds', 'ownsScheduler', 'sched', 'registry', 'dispatcher',
     'BattleClass', 'battleContent', 'timerScale', 'baseGameSpeed', 'snapshotHz', 'localReplica', 'botRehearsal', 'botSliceMs',
     'botRehearsalDelegate', 'botRehearsalDelegateMs', 'hostId', 'ds', 'clientCombat', 'verifyMode', 'combatPool', 'trialPool',
-    'headlessSliceMs', 'battlePrefix', 'experimental', 'revivalEnabled', 'disableSharedPool', 'playerCapacity',
+    'headlessSliceMs', 'battlePrefix', 'experimental', 'revivalEnabled', 'disableSharedPool', 'poolPlan', 'playerCapacity',
     'capacityExperiment', 'twentyPlayerMode', 'disableDuckLord', 'allowRepeat', 'stackDuckLord', 'disableLayerCap', 'disableHitLimit', 'enemyHpMul', 'enemyAtkMul', 'players', 'order', 'spectators', 'botBands', 'stage', 'pool',
     'playerPools', 'itemPool', 'ended', 'disposed',
     // 本服：联合作战的战斗 id（unitePhase.js 由 battlePrefix + round + _battleSeq 拼出）。
@@ -396,7 +396,8 @@ export function restoreMatch(m, doc, { createRngFromState, log = null, replay = 
   const bans = m.bannedChess || [];
   // a six-seat match saved before the 3 + 3 rule goes on with the one enlarged pool it started with
   const poolGroups = createPoolGroups(m.gd, m.order, { banned: bans, experimental: m.capacityExperiment,
-    independent: m.disableSharedPool, fixedChunks: m.twentyPlayerMode, legacySix: doc.pools.length === 1 });
+    independent: m.disableSharedPool, fixedChunks: m.twentyPlayerMode, legacySix: doc.pools.length === 1,
+    plan: m.poolPlan });
   if (poolGroups.length !== doc.pools.length) { log?.warn?.(`[snapshot] ${m.roomCode}: checkpoint refused (pool groups)`); return false; }
   const applyLeft = (pool, saved) => {
     for (const [id, left] of Object.entries(saved || {})) {

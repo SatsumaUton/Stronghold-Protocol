@@ -100,7 +100,8 @@ export class MatchSetupVote {
       let pool;
       if (this.capacityExperiment) {
         poolGroups = createPoolGroups(this.gd, this.order, { banned: bans.banned,
-          experimental: true, independent: this.disableSharedPool, fixedChunks: this.twentyPlayerMode });
+          experimental: true, independent: this.disableSharedPool, fixedChunks: this.twentyPlayerMode,
+          plan: this.poolPlan });
         pool = this.disableSharedPool ? new SharedPool(this.gd, { banned: bans.banned }) : poolGroups[0].pool;
         if (!pool.entries.size || poolGroups.some((g) => !g.pool.entries.size)) throw new Error('rerolled chess pool is empty');
         playerPools = this.disableSharedPool || this.capacityExperiment

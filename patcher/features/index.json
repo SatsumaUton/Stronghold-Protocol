@@ -7,7 +7,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 235035
+        "customBytes": 236840
       },
       {
         "path": "server/http/config.js",
@@ -24,7 +24,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 235035
+        "customBytes": 236840
       },
       {
         "path": "server/match/aiDigest.js",
@@ -164,7 +164,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 55713
+        "customBytes": 56225
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -179,7 +179,7 @@
       {
         "path": "server/match/pool.js",
         "baseExists": true,
-        "customBytes": 14708
+        "customBytes": 15778
       },
       {
         "path": "server/match/preview.js",
@@ -199,7 +199,7 @@
       {
         "path": "server/match/snapshot.js",
         "baseExists": true,
-        "customBytes": 32200
+        "customBytes": 32234
       },
       {
         "path": "server/match/StubMatch.js",
@@ -326,7 +326,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 235035
+        "customBytes": 236840
       }
     ]
   },
@@ -338,7 +338,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 235035
+        "customBytes": 236840
       },
       {
         "path": "shared/playerCapacity.js",
@@ -348,7 +348,7 @@
       {
         "path": "shared/experimental.js",
         "baseExists": true,
-        "customBytes": 5860
+        "customBytes": 6926
       },
       {
         "path": "shared/protocol.js",
@@ -358,12 +358,12 @@
       {
         "path": "public/css/screens/room.css",
         "baseExists": true,
-        "customBytes": 67377
+        "customBytes": 73157
       },
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 78354
+        "customBytes": 81272
       }
     ]
   },
@@ -414,7 +414,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 235035
+        "customBytes": 236840
       }
     ]
   },
@@ -426,7 +426,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 78354
+        "customBytes": 81272
       },
       {
         "path": "public/js/screens/game.js",
@@ -436,7 +436,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 235035
+        "customBytes": 236840
       }
     ]
   },
@@ -801,7 +801,7 @@
       {
         "path": "nginx/conf/open-nodes.conf",
         "baseExists": false,
-        "customBytes": 2647
+        "customBytes": 1980
       },
       {
         "path": "nginx/conf/scgi_params",
@@ -1235,7 +1235,7 @@
       {
         "path": "server/match/match/setupVote.js",
         "baseExists": true,
-        "customBytes": 7445
+        "customBytes": 7476
       },
       {
         "path": "server/match/match/spDraft.js",
@@ -1260,7 +1260,7 @@
       {
         "path": "server/match/match/views.js",
         "baseExists": true,
-        "customBytes": 29706
+        "customBytes": 29723
       },
       {
         "path": "server/match/match/watch.js",
@@ -1270,7 +1270,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 55713
+        "customBytes": 56225
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -1340,7 +1340,7 @@
       {
         "path": "server/match/pool.js",
         "baseExists": true,
-        "customBytes": 14708
+        "customBytes": 15778
       },
       {
         "path": "server/match/preview.js",
@@ -1360,7 +1360,7 @@
       {
         "path": "server/match/snapshot.js",
         "baseExists": true,
-        "customBytes": 32200
+        "customBytes": 32234
       },
       {
         "path": "server/match/StubMatch.js",
@@ -1527,7 +1527,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 235035
+        "customBytes": 236840
       },
       {
         "path": "server/match/aiDigest.js",
@@ -1767,7 +1767,7 @@
       {
         "path": "server/match/match/setupVote.js",
         "baseExists": true,
-        "customBytes": 7445
+        "customBytes": 7476
       },
       {
         "path": "server/match/match/spDraft.js",
@@ -1792,7 +1792,7 @@
       {
         "path": "server/match/match/views.js",
         "baseExists": true,
-        "customBytes": 29706
+        "customBytes": 29723
       },
       {
         "path": "server/match/match/watch.js",
@@ -1802,7 +1802,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 55713
+        "customBytes": 56225
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -1872,7 +1872,7 @@
       {
         "path": "server/match/pool.js",
         "baseExists": true,
-        "customBytes": 14708
+        "customBytes": 15778
       },
       {
         "path": "server/match/preview.js",
@@ -1892,7 +1892,7 @@
       {
         "path": "server/match/snapshot.js",
         "baseExists": true,
-        "customBytes": 32200
+        "customBytes": 32234
       },
       {
         "path": "server/match/StubMatch.js",
@@ -4124,7 +4124,7 @@
       {
         "path": "shared/constants.js",
         "baseExists": true,
-        "customBytes": 23235
+        "customBytes": 23875
       },
       {
         "path": "shared/diy.js",
@@ -4134,7 +4134,7 @@
       {
         "path": "shared/experimental.js",
         "baseExists": true,
-        "customBytes": 5860
+        "customBytes": 6926
       },
       {
         "path": "shared/highGround.js",
@@ -4317,6 +4317,11 @@
         "customBytes": 60522
       },
       {
+        "path": "shared/poolPlan.js",
+        "baseExists": false,
+        "customBytes": 6315
+      },
+      {
         "path": "shared/potential.js",
         "baseExists": true,
         "customBytes": 11897
@@ -4400,22 +4405,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 181397
+        "customBytes": 182524
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 211259
+        "customBytes": 212588
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 202459
+        "customBytes": 203757
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 173148
+        "customBytes": 174315
       },
       {
         "path": "public/manifest.json",
@@ -4937,6 +4942,11 @@
         "customBytes": 7375
       },
       {
+        "path": "public/js/ui/poolEditor.js",
+        "baseExists": false,
+        "customBytes": 10180
+      },
+      {
         "path": "public/js/ui/protocolBoot.js",
         "baseExists": true,
         "customBytes": 7784
@@ -5191,7 +5201,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 78354
+        "customBytes": 81272
       },
       {
         "path": "public/js/screens/settle.js",
@@ -5705,7 +5715,7 @@
       {
         "path": "public/css/screens/room.css",
         "baseExists": true,
-        "customBytes": 67377
+        "customBytes": 73157
       },
       {
         "path": "public/css/screens/settle.css",
@@ -6122,7 +6132,7 @@
       {
         "path": "content/announcements.json",
         "baseExists": false,
-        "customBytes": 11591
+        "customBytes": 11592
       },
       {
         "path": "content/ascii-test.png",

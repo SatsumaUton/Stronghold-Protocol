@@ -110,3 +110,12 @@ export function moveSeat(plan, seat, pool) {
   next[seat] = pool;
   return canonicalPoolPlan(next);
 }
+
+/**
+ * 编组的一行摘要：各池人数从大到小排，如 `4+4`、`5`、`3+3+2`。
+ * 房间设置里那行「卡池编组 4+4」就是它；非法输入给空串，界面不会崩。
+ */
+export function planLabel(plan) {
+  if (!Array.isArray(plan) || !plan.length) return '';
+  return poolSeats(plan).map((ids) => ids.length).sort((a, b) => b - a).join('+');
+}

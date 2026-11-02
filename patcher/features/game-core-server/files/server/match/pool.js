@@ -1,5 +1,6 @@
 // server/match/pool.js — the SHARED chess pool (copies per base chess, across all players), per-match bans,
 import { MAX_PLAYER_CAPACITY } from '../../shared/playerCapacity.js';
+import { poolScale } from '../../shared/poolPlan.js';
 // copy-weighted shop rolls (research 00-INDEX §3, §6; DESIGN §6.2).
 //
 // Model:
@@ -274,10 +275,26 @@ export class SharedItemPool {
 }
 
 
-export function createPoolGroups(gd, players, { banned = [], experimental = false, independent = false, fixedChunks = false, legacySix = false } = {}) {
+export function createPoolGroups(gd, players, { banned = [], experimental = false, independent = false, fixedChunks = false, legacySix = false, plan = null } = {}) {
   if (!Array.isArray(players) || players.length < 1 || players.length > MAX_PLAYER_CAPACITY) throw new RangeError('pool groups require 1..20 players');
   const sorted = players.slice().sort((a, b) => a.seat - b.seat);
   const count = sorted.length;
+  // 手动指定卡池编组（移植自参考版，反馈 #49）：房主自己排的座位分组说了算 ——
+  // `plan[seat]` 就是那个座位的卡池号（shared/poolPlan.js 的规范形式，按首次出现从 0 编号）。
+  // 一个池之所以存在，就是因为有座位在它里面，所以不需要存空池。
+  // 卡池大小按池里的座位数缩放（4 人以内 1 份完整池，更多按比例，同自动规则的 5 人 ×5/4）。
+  if (plan) {
+    const pools = new Map();
+    for (const p of sorted) {
+      if (!Number.isInteger(plan[p.seat])) throw new RangeError('pool plan has no such seat');
+      if (!pools.has(plan[p.seat])) pools.set(plan[p.seat], []);
+      pools.get(plan[p.seat]).push(p.playerId);
+    }
+    return [...pools.keys()].sort((a, b) => a - b).map((pool, i) => {
+      const playerIds = pools.get(pool), scale = poolScale(playerIds.length);
+      return { id: i + 1, playerIds, scale, pool: new SharedPool(gd, { banned, scale }) };
+    });
+  }
   // 扩容房分组（反馈 #49）：
   //   * `fixedChunks`（目标容量 20 的合作实验局）：开局按座位升序固定每四人一组，最后一组不足四人独立用完整池
   //     —— 九人是 4＋4＋1，不是 3＋3＋3；

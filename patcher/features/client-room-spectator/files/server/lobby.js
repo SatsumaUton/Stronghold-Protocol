@@ -313,6 +313,28 @@ export const BOT_NAMES = Object.freeze(['AI·华法琳', 'AI·阿米娅', 'AI·�
 
 const OK = Object.freeze({ ok: true });
 const fail = (code, detail) => (detail ? { error: code, detail } : { error: code });
+/**
+ * 这个版本/模式的原始数据里，某个盟约是否开放。
+ *
+ * ★ 2026-11-02 修「指定 AI 策略报服务器内部错误」：
+ *   `Lobby.dataFor(room)` 返回的是 `getData()` 的**原始数据记录**（键是 assets / bands / bonds / chess …），
+ *   不是 `GameData` 实例 —— lobby 进程里根本没有 GameData。所以 `data.bandAllowed(id)` 会抛
+ *   `data.bandAllowed is not a function`，未捕获异常一路冒到 net.js，玩家看到的就是「服务器内部错误」。
+ *
+ *   这里按 `GameData.bandAllowed`（server/match/gamedata.js:561）逐字重写，只依赖原始数据：
+ *     · 盟约必须存在；
+ *     · `modeTypeList` 缺省 = 全模式开放，否则必须含 'MULTI'（合作）/ 'SINGLE'（单人）。
+ *   `disableDuckLord` 不在这里判 —— 它是 Match 开局时写到自己那份 gd 上的，lobby 看不到，
+ *   由调用方按 `room.experimental.disableDuckLord` 单独补判（见 setBotBand）。
+ * @param {object | null} data dataFor() 的结果 @param {string} bandId @param {string} mode 房间模式
+ */
+function bandOfferedIn(data, bandId, mode) {
+  const bands = data && typeof data.bands === 'object' && data.bands ? data.bands : null;
+  const band = bands && typeof bandId === 'string' ? bands[bandId] : null;
+  if (!band || typeof band !== 'object') return false;
+  const list = Array.isArray(band.modeTypeList) ? band.modeTypeList : null;
+  return !list || list.includes(mode === 'solo' ? 'SINGLE' : 'MULTI');
+}
 /** A match's answer to a request as the platform replies it: OK, or its error (an unknown code: INTERNAL). */
 const matchAnswer = (res) => (res && typeof res === 'object' && res.error
   ? fail(isErrCode(res.error) ? res.error : ERR.INTERNAL, typeof res.detail === 'string' ? res.detail : undefined)
@@ -1906,7 +1928,7 @@ export class Lobby {
    *   · 只有房主能改，且只能在对局开始前改；
    *   · 单人房没有 AI 队友，直接拒；
    *   · 目标座位必须坐着一个 AI；
-   *   · 策略必须是当前模式/版本开放的（`data.bandAllowed`）；
+   *   · 策略必须是当前模式/版本开放的（`bandOfferedIn`，GameData.bandAllowed 的 lobby 版）；
    *   · 一个策略只能指定给一个 AI 座位（两个 AI 不能抢同一个盟约）。
    *
    * 改完把其他真人的「准备」清掉 —— 和 setAiPicksLast / setDifficulty 一样，
@@ -1933,15 +1955,17 @@ export class Lobby {
     if (bandId !== null) {
       const data = this.dataFor(room);
       // 注意两件事一起判：
-      //   · data.bandAllowed —— 这个版本/模式开放哪些盟约（只看 MULTI/SINGLE，与难度无关）；
+      //   · bandOfferedIn —— 这个版本/模式开放哪些盟约（只看 MULTI/SINGLE，与难度无关）；
+      //     注意：lobby 手里只有 getData() 的原始记录，没有 GameData 实例，所以不能直接调
+      //     data.bandAllowed()（那样会抛 not a function → 玩家看到「服务器内部错误」）。
       //   · 房间实验项「禁用鸭爵策略」—— disableDuckLord 是 Match 在开局时写到它自己的 gd 上的
-      //     （Match.js: this.gd.disableDuckLord = ...），lobby 手里的这份 gd 并不知道。
-      //     只查 data.bandAllowed 会放行 band_ducklord，然后 Match 再静默丢掉它 —— 房主看到的就是
+      //     （Match.js: this.gd.disableDuckLord = ...），lobby 手里的这份数据并不知道。
+      //     只查 bandOfferedIn 会放行 band_ducklord，然后 Match 再静默丢掉它 —— 房主看到的就是
       //     「指定了但没生效」。所以这里要显式补判。
       if (bandId === 'band_ducklord' && room.experimental?.disableDuckLord === true) {
         return fail(ERR.BAD_TARGET, 'strategy disabled in this room');
       }
-      if (!data.bandAllowed(bandId)) return fail(ERR.BAD_TARGET, 'strategy not offered in this mode');
+      if (!bandOfferedIn(data, bandId, room.mode)) return fail(ERR.BAD_TARGET, 'strategy not offered in this mode');
       // ★ 2026-11-02：扩容房开了「允许重复选择策略」(allowRepeat) 时，两个 AI 可以拿同一个盟约。
       //   判据必须与 Match 完全一致（Match.js:342-345）：
       //     capacityExperiment = !isSolo && playerCapacity > 4
@@ -1973,7 +1997,7 @@ export class Lobby {
     for (const s of room.seats) {
       if (!s || !s.isBot || s.band == null) continue;
       // 与 setBotBand 同一套判据（含 disableDuckLord，见那里的说明）
-      if ((duckOff && s.band === 'band_ducklord') || !data.bandAllowed(s.band)) s.band = null;
+      if ((duckOff && s.band === 'band_ducklord') || !bandOfferedIn(data, s.band, room.mode)) s.band = null;
     }
   }
 
