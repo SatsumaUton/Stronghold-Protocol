@@ -15,6 +15,10 @@ import { Lobby } from '../../server/lobby.js';
 import { SessionRegistry } from '../../server/net.js';
 import { ERR, MAX_SEATS, ROOM_LIST_MIN_CAPACITY } from '../../shared/constants.js';
 
+// 仓库里的 data/create-room.json 存的是「关闭建房」（公开仓库不默认开放），
+// 这个文件只用 create() 搭房间，跟运维开关无关。
+process.env.SP_GATE_IGNORE = '1';
+
 const silent = { info() {}, warn() {}, error() {}, debug() {} };
 
 let seq = 0;
