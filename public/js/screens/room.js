@@ -699,7 +699,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
 
 
 function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null,
-  listed = false, onToggleListed = () => {} }) {
+  listed = false, onToggleListed = () => {}, matchmaking = false, onToggleMatchmaking = () => {} }) {
   const info = difficultyInfo(room.mode, room.difficulty);
   const title = soloOption ? t('模拟设置') : t('同盟设置');
   useEffect(() => {
@@ -740,6 +740,18 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
           class=${`dpick__opt ailast__opt rs-opts__listed${listed ? ' is-active' : ''}`} disabled=${!!busy || !isHost || !!room.match}
           onClick=${() => { if (isHost && !room.match) onToggleListed(!listed); }}>
         <${Icon} name=${listed ? 'check' : 'users'} class=${listed ? 'is-on' : ''} />${listed ? t('公开同盟：已公开') : t('公开同盟：未公开')}
+      </button>
+    <//>`}
+    ${/* 匹配队友（多人匹配）：挂上以后这个房间进入匹配状态，别的博士点大厅「多人匹配」会被塞进来；
+           人满或等到超时（服务端 MATCHMAKING_TIMEOUT_MS）就自动开局，不用房主再点一次。
+           开局后服务端会拒（ROOM_STARTED），所以对局中显示成不可操作。 */ null}
+    ${soloOption ? null : html`<${Tooltip} text=${matchmaking
+        ? t('正在等人加入：人满或等待超时后会自动开始，房主可以随时取消')
+        : t('进入匹配状态，让其他博士被自动安排到这个房间')}>
+      <button type="button" role="switch" aria-checked=${matchmaking ? 'true' : 'false'} data-testid="room-opt-matchmaking"
+          class=${`dpick__opt ailast__opt rs-opts__listed${matchmaking ? ' is-active' : ''}`} disabled=${!!busy || !isHost || !!room.match}
+          onClick=${() => { if (isHost && !room.match) onToggleMatchmaking(!matchmaking); }}>
+        <${Icon} name=${matchmaking ? 'check' : 'search'} class=${matchmaking ? 'is-on' : ''} />${matchmaking ? t('匹配队友：正在匹配') : t('匹配队友：未开启')}
       </button>
     <//>`}
     ${soloOption
@@ -911,6 +923,7 @@ export function RoomScreen() {
   const setAiLast = (on) => run('ailast', () => net.request('room.setAiPicksLast', { on }));
   // 公开同盟（同盟列表）：房主把房间挂上 / 摘下大厅的「公开同盟」列表
   const setListed = (on) => run('listed', () => net.request('room.setListed', { listed: on }));
+  const setMatchmaking = (on) => run('matchmaking', () => net.request('room.matchmaking', { on }));
   // 给 AI 座位指定策略（bandId = null 表示「自动选择」，即取消指定）
   const setBotBand = (seat, bandId) => run(`band${seat}`, async () => {
     await net.request('room.setBotBand', { seat, bandId });
@@ -1103,7 +1116,8 @@ export function RoomScreen() {
             aria-expanded=${opts ? 'true' : 'false'}><${GearGlyph} /></button>` : null}
           ${opts && (aiLast || soloOpt) ? html`<${RoomOptions} takeoverOption=${aiTakeoverOption(room, me.playerId)} onAiTakeover=${setAiTakeover} option=${aiLast} soloOption=${soloOpt} room=${room} isHost=${facts.isHost} busy=${busy} onAiLast=${setAiLast}
             onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onClose=${() => setOpts(false)} version=${versionCtl}
-              listed=${room.listed === true} onToggleListed=${setListed} />` : null}
+              listed=${room.listed === true} onToggleListed=${setListed}
+    matchmaking=${room.matchmaking === true} onToggleMatchmaking=${setMatchmaking} />` : null}
         </div>
       </div>
       <div class="room-bar__right rs-foot__right">

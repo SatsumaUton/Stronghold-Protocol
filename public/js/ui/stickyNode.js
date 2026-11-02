@@ -24,14 +24,13 @@ const MAX_AGE = 7 * 24 * 3600; // 秒。比一次对局长得多，但远短于 
 /** 对局中多久续期一次（毫秒）。 */
 const REFRESH_MS = 30_000;
 
-/** 当前页面落在这台节点上。
+/**
+ * 当前页面落在这台节点上（0 = 读不到）。
  *
- * 怎么知道是哪台：nginx 给每个 HTML 文档响应写 `sp_node` cookie
- * （`add_header Set-Cookie "sp_node=$sp_node; Path=/; Max-Age=2592000"`），
- * 它就是「这次请求实际被分到的那台」。走域名时浏览器地址里没有端口，
- * 所以不能靠 location.port 猜 —— 读这个 cookie 才是准的。
+ * 公开同盟的跨节点加入要用它判断「这间房是不是别人的节点」：
+ * 不一样就用 nginx 的 `?n=<节点>` 直接连过去，而不是在本节点发 room.join（那只会拿到「房间不存在」）。
  */
-function currentNode() {
+export function currentNode() {
   try {
     const m = document.cookie.match(/(?:^|;\s*)sp_node=(\d{1,2})/);
     if (m) {

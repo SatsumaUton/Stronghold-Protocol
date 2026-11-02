@@ -14,6 +14,24 @@ import { t } from '../../../shared/i18n.js';
 export const ROOM_LIST_POLL_MS = 10_000;
 
 /**
+ * 别的节点上正在等人的公开同盟（跨节点列表）。
+ *
+ * `room.list` 只能看见**本节点**的房间 —— 本服是 30 个独立进程，各自一个 Lobby。
+ * 所以这里另外问一次匹配服务 `/mm/api/rooms/open`：它从 Redis 把所有节点的
+ * `lobby:rooms` 哈希扫一遍，挑出「挂了公开同盟 + 没开局 + 有空位」的房，并带上节点号。
+ * 每条都带 `node`，客户端据此用 nginx 的 `?n=<node>` 直接连到那台节点。
+ * 失败就当没有（列表照旧只显示本节点，不报错、不挡住本节点的房）。
+ */
+async function fetchRemoteRooms() {
+  try {
+    const r = await fetch('/mm/api/rooms/open', { credentials: 'same-origin', cache: 'no-store' });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j?.rooms) ? j.rooms : [];
+  } catch { return []; }
+}
+
+/**
  * 一行规则摘要（参考版有 ui/experimental.js 的 experimentalSummary，本服没有那个模块，
  * 这里只挑玩家真正关心的几条）。没有改动就回「标准规则」。
  */
@@ -38,9 +56,10 @@ function RoomRow({ row, disabled, onJoin }) {
   return html`<li class="rlist__row" style=${`--d-color:${DIFFICULTY_COLORS[row.difficulty]}`} data-testid="room-row" data-code=${row.code}>
     <span class="rlist__diff"><${DifficultyIcon} difficulty=${row.difficulty} />${t(DIFFICULTY_NAMES[row.difficulty])}</span>
     <span class="rlist__who"><b class="selectable">${row.host}</b><small title=${expSummary(row.experimental)}>${expSummary(row.experimental)}</small></span>
+    ${row.node ? html`<span class="rlist__node" title=${t('这间同盟在节点 {n} 上，加入时会直接连过去', { n: row.node })} data-testid="room-node"><${Icon} name="server" />${row.node}</span>` : null}
     ${row.version ? html`<span class="rlist__ver"><${Icon} name="book" />${versionLabel(row.version)}</span>` : html`<span></span>`}
     <span class="rlist__seats num" title=${t('{humans} 名博士，{bots} 名 AI', { humans: row.humans, bots })}>${row.filled}<i>/</i>${row.capacity}</span>
-    <${Button} size="sm" variant="primary" class="rlist__join" disabled=${disabled} onClick=${() => onJoin(row.code)}>${t('加入同盟')}<//>
+    <${Button} size="sm" variant="primary" class="rlist__join" disabled=${disabled} onClick=${() => onJoin(row.code, row.node || 0)}>${t('加入同盟')}<//>
   </li>`;
 }
 
@@ -57,9 +76,13 @@ export function RoomListDialog({ online, queued = false, busy = null, onJoin, on
     if (!online || inFlight.current || document.hidden) return;
     inFlight.current = true;
     try {
-      const answer = await net.request('room.list');
+      // 本节点的房间（快、字段全）+ 别的节点的房间（跨节点）；本节点有的优先，按房间码去重。
+      const [answer, remote] = await Promise.all([net.request('room.list'), fetchRemoteRooms()]);
       if (!alive.current) return;
-      setRows(Array.isArray(answer?.rooms) ? answer.rooms : []);
+      const local = Array.isArray(answer?.rooms) ? answer.rooms : [];
+      const seen = new Set(local.map((r) => r.code));
+      const merged = [...local, ...remote.filter((r) => r && r.code && !seen.has(r.code))];
+      setRows(merged);
       setFailed(false);
     } catch { if (alive.current) setFailed(true); } finally { inFlight.current = false; }
   };
@@ -73,6 +96,7 @@ export function RoomListDialog({ online, queued = false, busy = null, onJoin, on
       class="lobby-dialog rlist-dialog" onClose=${onClose}
       actions=${html`<${Button} variant="secondary" icon="refresh" disabled=${!online} onClick=${load}>${t('刷新')}<//><${Button} icon="close" onClick=${onClose}>${t('关闭')}<//>`}>
     <p class="modal__text">${t('{n} 人及以上、由创建者公开且尚未开局的同盟显示在这里。', { n: ROOM_LIST_MIN_CAPACITY })}</p>
+    <p class="modal__text rlist__cross">${t('包括别的节点上的同盟：点「加入同盟」会直接连到那台节点并进入房间。')}</p>
     ${failed ? html`<p class="rlist__note" role="status"><${Icon} name="warn" />${t('列表暂时无法更新，稍后自动重试')}</p>` : null}
     ${rows === null ? html`<p class="rlist__note" role="status"><${Spinner} size="sm" />${t('正在载入同盟列表…')}</p>`
       : rows.length ? html`<ul class="rlist" data-testid="room-list">${rows.map((row) => html`<${RoomRow} key=${row.code} row=${row} disabled=${!online || queued || !!busy} onJoin=${onJoin} />`)}</ul>`
