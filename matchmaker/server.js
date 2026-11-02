@@ -30,6 +30,8 @@ let updateFile = null;
 try { updateFile = require('../guard/update-file.cjs'); } catch { /* 可选模块 */ }
 const account = require('./account.cjs');
 const feedback = require('./feedback.cjs');
+// 跨节点「公开同盟」的纯筛选逻辑（无 I/O，单测直接 require 它，不用起 HTTP 服务）
+const { collectOpenRooms } = require('./openRooms.cjs');
 
 const PORT = Number(process.env.MM_PORT || 3090);
 const HOST = process.env.MM_HOST || '127.0.0.1';
@@ -479,6 +481,88 @@ async function roomInfo(code, node) {
   } catch { return null; }
 }
 
+/**
+ * 通用 RESP 调用：把一个命令发到 Redis，返回解析后的值（bulk string → string，nil → null，
+ * 数组 → array）。只用到 HGETALL / KEYS 这两种，超时 800 ms，失败就返回 null。
+ *
+ * 存在的理由：原来的 `redisHget` 只会发一条写死的 `HGET <prefix>lobby:rooms <code>`，
+ * 而「公开同盟跨节点列表」要把**每个节点**的整个房间哈希取回来，得按节点发 HGETALL。
+ */
+function redisCall(args, timeoutMs = 800) {
+  return new Promise((resolve) => {
+    let host = '127.0.0.1', port = 6379;
+    try { const u = new URL(process.env.SP_REDIS_URL || 'redis://127.0.0.1:6379'); host = u.hostname; port = Number(u.port) || 6379; } catch { /* defaults */ }
+    const sock = net.createConnection({ host, port });
+    let buf = Buffer.alloc(0);
+    let done = false;
+    const finish = (v) => { if (done) return; done = true; try { sock.destroy(); } catch { /* ignore */ } resolve(v ?? null); };
+    /** 解析一个 RESP2 值；返回 [value, nextPos]，数据不够时返回 null。 */
+    const parse = (b, p) => {
+      if (p >= b.length) return null;
+      const nl = b.indexOf('\r\n', p);
+      if (nl < 0) return null;
+      const line = b.slice(p + 1, nl).toString();
+      if (b[p] === 0x2b) return [line, nl + 2];                       // +simple
+      if (b[p] === 0x2d) return [null, nl + 2];                       // -error
+      if (b[p] === 0x24) {                                            // $bulk
+        const n = Number(line);
+        if (n < 0) return [null, nl + 2];
+        if (b.length < nl + 2 + n + 2) return null;
+        return [b.slice(nl + 2, nl + 2 + n).toString(), nl + 2 + n + 2];
+      }
+      if (b[p] === 0x2a) {                                            // *array
+        const n = Number(line);
+        if (n < 0) return [null, nl + 2];
+        const out = [];
+        let q = nl + 2;
+        for (let i = 0; i < n; i++) {
+          const got = parse(b, q);
+          if (!got) return null;
+          out.push(got[0]);
+          q = got[1];
+        }
+        return [out, q];
+      }
+      return [null, nl + 2];
+    };
+    sock.setTimeout(timeoutMs, () => finish(null));
+    sock.on('error', () => finish(null));
+    sock.on('connect', () => {
+      sock.write(`*${args.length}\r\n` + args.map((a) => `$${Buffer.byteLength(String(a))}\r\n${a}\r\n`).join(''));
+    });
+    sock.on('data', (d) => {
+      buf = Buffer.concat([buf, d]);
+      const got = parse(buf, 0);
+      if (got) finish(got[0]);
+    });
+    sock.on('end', () => finish(null));
+    sock.on('close', () => finish(null));
+  });
+}
+
+/**
+ * 所有节点上「公开同盟 + 还能进」的房间（跨节点列表的唯一数据源）。
+ *
+ * 每个节点的 Lobby 把房间写进 Redis 的 `sp:n<node>:lobby:rooms` 哈希（field = 房间码），
+ * `listed` / `matchmaking` 两个字段由 server/persist/lobbyState.js 写入。这里按节点 HGETALL，
+ * 再交给 `openRooms.cjs` 的 `collectOpenRooms` 筛（纯函数，单测覆盖），
+ * 每条都带**节点号** —— 客户端拿到 node 才能用 `?n=` 跳到那台节点。
+ *
+ * 结果缓存 3 秒：大厅列表每几秒刷一次，没必要每次都发 30 条 Redis 命令。
+ */
+const openRoomsCache = { at: 0, data: null };
+async function openRooms() {
+  if (openRoomsCache.data && Date.now() - openRoomsCache.at < 3000) return openRoomsCache.data;
+  const perNode = await Promise.all(NODE_NAMES.map(async (_name, i) => {
+    const n = i + 1;
+    return { node: n, flat: await redisCall(['HGETALL', `sp:n${n}:lobby:rooms`]) };
+  }));
+  const data = { at: Date.now(), rooms: collectOpenRooms(perNode) };
+  openRoomsCache.at = Date.now();
+  openRoomsCache.data = data;
+  return data;
+}
+
 function json(res, code, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -834,6 +918,20 @@ const roomDir = new Map(); // node -> { codes: string[], at: number }
     return;
   }
 
+  // 公开同盟（跨节点）：所有节点上「挂到公开列表 + 还没开局 + 有空位」的房间。
+  // 客户端在大厅点「公开同盟」时用它补齐本节点之外的房间，每条都带 node ——
+  // 点进去时用 nginx 的 `?n=<node>` 直接落到那台节点，避免「在本节点找不到房间」。
+  if (pathname === '/api/rooms/open') {
+    try {
+      const data = await openRooms();
+      return json(res, 200, { ok: true, at: data.at, rooms: data.rooms });
+    } catch {
+      return json(res, 200, { ok: true, at: Date.now(), rooms: [] });
+    }
+  }
+
+  // 按房间码找节点已经有了：`/api/find-room`（见下面，带 roomInfo）。
+
   if (pathname === '/api/resolve-room') {
     const code = String(url.searchParams.get('code') || '').toUpperCase();
     let found = null;
@@ -879,6 +977,16 @@ const roomDir = new Map(); // node -> { codes: string[], at: number }
     for (const [node, v] of roomDirModule) {
       if (Date.now() - v.at > 45000) continue;
       if (v.codes.includes(code)) { found = node; break; }
+    }
+    // 节点每 10 秒才上报一次房间码：刚建好的房（尤其跨节点点「加入同盟」时）会查不到，
+    // 客户端据此判定「房间已关闭」并把待加入清掉 —— 玩家看到的就是「房间不存在」。
+    // 内存目录查不到时直接翻 Redis（每个节点的 lobby:rooms 哈希里就有）。
+    if (!found) {
+      const hits = await Promise.all(NODE_NAMES.map(async (_x, i) => {
+        const raw = parseRedisBulk(await redisHget(`sp:n${i + 1}:`, code));
+        return raw ? i + 1 : 0;
+      }));
+      found = hits.find((x) => x > 0) || null;
     }
     if (!found) return json(res, 200, { code, node: null });
     let info = null;
@@ -1012,9 +1120,5 @@ function readJsonBody(req, limit = 16 * 1024) {
 function sendAuthJson(res, code, obj) {
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(obj));
-}
-
-function clientIp(req) {
-  return String(req.headers['x-real-ip'] || (req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
 }
 
