@@ -2946,9 +2946,17 @@ const JOIN_COOKIE = (() => {
     let guardStarted = false;
     let autoTimer = 0;
 
-    // 「今日不再提醒」（临时公告）：按自然日记住被静音的公告正文，当天 23:59 之后自然失效。
-    // 键是正文的 FNV 哈希而不是 updatedAt —— 管理面板每次保存都会写新的时间戳，
-    // 用时间戳当键的话管理员一按保存，玩家刚静音的公告就又冒出来了。
+    // 「今日不再提醒」（临时公告）：按自然日记住，当天 23:59 之后自然失效。
+    //
+    // ★ 2026-11-02：以前是按**公告正文的哈希**记的（只记 keys），于是有个坑：
+    //   玩家点了「今日不再提醒」，管理员随后改了公告文字（很正常 —— 今天就把重启公告
+    //   换成了反馈板公告），哈希变了，同一条提醒又弹出来。玩家看到的就是
+    //   「点了今日不再提醒还是会有临时公告出来」。
+    //   按钮写的是「今日不再提醒」，本来的语义就是「今天别再打扰我」，所以现在记成
+    //   **当天总开关**（muted）。keys 仍然保留：老数据（只有 keys 的）照样认，
+    //   而且将来若要回到「按条静音」也不用改存储格式。
+    //   重要公告不受影响 —— 它自己就没有这个按钮（play 里 display:none），
+    //   而且 isMuted 只在 !important 时才会被问。
     const MUTE_KEY = 'mm.noticeMuted';
     const dayStamp = () => {
       const d = new Date();
@@ -2968,12 +2976,15 @@ const JOIN_COOKIE = (() => {
     };
     const isMuted = (key) => {
       const m = loadMute();
-      return !!m && !!key && m.keys.includes(key);
+      if (!m) return false;
+      // muted = 今天已经点过「今日不再提醒」：当天所有临时公告都不再弹
+      if (m.muted === true) return true;
+      return !!key && m.keys.includes(key);
     };
     const muteFor = (key) => {
-      if (!key) return;
       const m = loadMute() || { day: dayStamp(), keys: [] };
-      if (!m.keys.includes(key)) m.keys.push(key);
+      m.muted = true;
+      if (key && !m.keys.includes(key)) m.keys.push(key);
       try { localStorage.setItem(MUTE_KEY, JSON.stringify(m)); } catch { /* 隐私模式忽略 */ }
     };
 
