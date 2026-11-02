@@ -952,14 +952,17 @@ export function LobbyScreen() {
       </section>
     </main>
 
+    ${/* 公开同盟（同盟列表）：列表**叠在**同盟模拟上面，不关掉它（参考版就是 listOpen && allyOpen）。
+          以前这里顺手 setAllyOpen(false)，看着就是「点一下直接跳回大厅」—— 浮层先消失、
+          列表才出来，中间那一下就没有了「我还在同盟模拟里」的上下文。
+          ★ 这些说明必须留在标签**外面**：写在 <${'AllianceSelect'} …/> 里面的话，htm 会把
+          // 开头的行当成属性名，后面的属性（onBrowse）就整条丢掉 —— 表现就是
+          「同盟模拟里根本没有『公开同盟』按钮」（2026-11-02 玩家反馈，browser 探针复现）。 */ null}
     ${allyOpen ? html`<${AllianceSelect} onClose=${() => { setAllyOpen(false); setBrowseOpen(false); }} onCreate=${() => create('coop')} difficulty=${shownCoop}
       code=${code} onCode=${(v) => setCode(normalizeCode(v))} codeOk=${codeOk} online=${online} busy=${busy}
       onJoin=${join} onSpectate=${spectate} recent=${recent} marks=${marks} focusKey=${!coarse}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} short=${shortScreen} createLocked=${!createOpen}
       capacity=${coopCapacity} onCapacity=${pickCapacity}
-      // 公开同盟：列表**叠在**同盟模拟上面，不关掉它（参考版就是 listOpen && allyOpen）。
-      // 以前这里顺手 setAllyOpen(false)，看着就是「点一下直接跳回大厅」—— 浮层先消失、
-      // 列表才出来，中间那一下就没有了「我还在同盟模拟里」的上下文。
       onBrowse=${() => setBrowseOpen(true)} />` : null}    ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed}
