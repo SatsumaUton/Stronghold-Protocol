@@ -627,6 +627,10 @@
 .team__status.is-gold { color: var(--gold); animation: blink 1.2s steps(2) infinite; }
 .team__status.is-orange { color: var(--orange-hi); }
 .team__status.is-red, .team__status.is-offline { color: var(--red-premium); }
+/* 预约盟约（ui/bondPlan.js BondPlanTag，compact）：进对局以后在队友行上显示他打算走的
+   核心盟约，和 bandDraft 的选人顺序行是同一个标记。只作沟通，不影响对局。 */
+.team__plan { flex: none; border-color: rgba(78, 216, 175, .25); background: rgba(12, 15, 14, .6); }
+.team__plan .bglyph { width: .18rem; height: .18rem; }
 .team__eye { color: var(--amber); display: grid; }
 .team__eye .icon { width: .2rem; height: .2rem; }
 .team__row.is-self .pavatar { box-shadow: 0 0 0 2px var(--mint-500), 0 0 .18rem rgba(23, 249, 183, .35); }
