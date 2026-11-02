@@ -1210,6 +1210,13 @@ export function LobbyScreen() {
     const rules = req?.rules ?? matchScopeRequest(matchScopeState).rules;
     if (!createOpen) { toast(t('服务器暂时关闭了创建房间，请稍后再试'), 'warn'); return; }
     if (guest) { toast(t('游客不能参与多人匹配，请先登录'), 'warn'); return; }
+    // ★ 别只看 `guest`：它是渲染时算的，可能已经过期。真正决定服务端怎么认人的是
+    //   hello 里带的 accountToken —— 没有令牌，服务端一律按游客处理，点下去只会换回
+    //   一句「无效的请求」（BAD_MSG 的通用文案）。这种情况直接说清楚要重新登录。
+    if (!window.__SP_ACCOUNT_TOKEN) {
+      toast(t('登录状态已失效，请重新登录后再点「开始多人匹配」'), 'warn');
+      return;
+    }
     // 先把右列换成「搜寻中」，再去请求：网络慢的时候玩家至少知道在等什么。
     setMatchSearch({ difficulty: d, seats, rules });
     setMatchWait(0);
