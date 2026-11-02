@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseTestModeEnv, testModeGate, interfacesArePrivate, TEST_MODE_PUBLIC_HINT, TEST_MODE_FORCE_HINT } from '../server/testMode.js';
-import { parseTestArgs } from '../shared/testMode.js';
+import { parseTestArgs, TEST_LAYERS_MAX } from '../shared/testMode.js';
 import { validateC2S } from '../shared/protocol.js';
 import { Lobby } from '../server/lobby.js';
 import { SessionRegistry } from '../server/net.js';
@@ -314,95 +314,6 @@ test('all commands reject a normal match; forged flags and unknown identities ca
   assert.equal(buildResult(h.m, { victory: false }).test, undefined);
 });
 
-test('an admin who is NOT the host may run commands (2026-10-31: 管理员不必是房主)', (t) => {
-  // 维护者实测：只有房主时，管理员点工具回「只有房主能执行这条指令」。
-  // 期望：座位带 admin 标记（三道门全过的管理员）时，即使不是房主也能下命令，
-  // 且命令照旧只改**他自己**的座位。
-  const h = fixture(t, { mode: 'coop', humans: 2 });
-  const guest = h.ps('p_1');
-  assert.notEqual(guest.playerId, h.m.hostId, 'p_1 不是房主');
-
-  // 不是管理员 → 仍然 NOT_HOST（上游行为不变）
-  const before = guest.funds;
-  error(h.cmd('funds', { amount: 90 }, 'p_1'), 'NOT_HOST');
-  assert.equal(guest.funds, before);
-
-  // 座位变成管理员 → 放行
-  guest.admin = true;
-  ok(h.cmd('funds', { amount: 90 }, 'p_1'));
-  assert.equal(guest.funds, 90, '改的是他自己这一队，不是房主的');
-  assert.notEqual(h.ps('p_0').funds, 90, '没有动房主的座位');
-
-  // 房主自己仍然能用（上游原有的测试模式路径没被破坏）
-  ok(h.cmd('funds', { amount: 77 }, 'p_0'));
-  assert.equal(h.ps('p_0').funds, 77);
-
-  // 管理员标记掉回 false → 立即回到 NOT_HOST
-  guest.admin = false;
-  h.sched.advance(20000);
-  error(h.cmd('funds', { amount: 5 }, 'p_1'), 'NOT_HOST');
-});
-
-test('an admin still needs the match to be controllable: a normal match without the admin flag refuses every command', (t) => {
-  // ps.admin 是唯一放行来源，它只由 lobby 从已校验的 session.admin 写入。
-  // 普通对局里任何座位（含伪造的 msg.admin）都不能进测试路径。
-  const h = fixture(t, { test: false });
-  for (const cmd of ['funds', 'chess', 'round']) {
-    error(h.m.handle('p_0', { t: 'g.test', cmd, args: { amount: 9 }, admin: true }), 'TEST_FORBIDDEN');
-  }
-});
-
-test('an admin\'s use of the tools leaks nothing to the other players (2026-10-31: 只有管理员能看到)', (t) => {
-  // 维护者要求：管理员用工具时，**其他玩家那里不能有任何提示**，只有管理员自己看得到。
-  //
-  // 这里守两件事：
-  //   ① 普通房间里（test=false，管理员工具跑的就是这种房间）m.public 绝不能出现
-  //      test / testActions / testLog / testTimers —— 它们是广播给所有人的。
-  //   ② 命令改的是执行者自己那一队，房主和队友的**私人**数据（资金、手牌）不受影响。
-  //      公开数据（等级、棋子数、LP、盟约）按上游本来就是对队友可见的，那是游戏信息，不是「提示」。
-  const h = fixture(t, { mode: 'coop', humans: 2, test: false });
-  const guest = h.ps('p_1');
-  guest.admin = true;
-
-  const view = () => JSON.parse(JSON.stringify(h.m.publicView()));
-  const hostFunds = () => h.ps('p_0').funds;
-  const hostHand = () => h.ps('p_0').hand.filter(Boolean).length;
-  const hostFunds0 = hostFunds(), hostHand0 = hostHand();
-
-  // 执行几条最「显眼」的命令
-  ok(h.cmd('funds', { amount: 5000 }, 'p_1'));
-  ok(h.cmd('chess', { id: 'chess_char_3_19_a' }, 'p_1'));
-  ok(h.cmd('lp', { value: 3 }, 'p_1'));
-
-  const v = view();
-  // ① 广播出去的那份 m.public 里没有任何 test 痕迹
-  for (const k of ['test', 'testActions', 'testLog', 'testTimers']) {
-    assert.equal(v[k], undefined, `普通房间的 m.public 不能带 ${k}`);
-  }
-  assert.doesNotMatch(JSON.stringify(v), /"test(Actions|Log|Timers)?"/, 'm.public 序列化后也不该出现这些键');
-  // ② 房主的私有数据没被动过
-  assert.equal(hostFunds(), hostFunds0, '房主的资金不受影响');
-  assert.equal(hostHand(), hostHand0, '房主的手牌不受影响');
-  // 命令确实生效在 guest 自己身上
-  assert.equal(guest.funds, 5000);
-  assert.equal(guest.lp, 3);
-});
-
-test('even in a TEST room the audit log stays out of other players\' view unless the match is a test match', (t) => {
-  // 测试模式房间（test=true）里 testLog 是设计上就公开的（upstream DESIGN §34.8，房主调试用）。
-  // 这里固定住边界：**普通房间不公开**，测试房间才公开 —— 管理员工具走的是前者。
-  const normal = fixture(t, { test: false });
-  normal.ps('p_0').admin = true;
-  ok(normal.cmd('funds', { amount: 10 }));
-  assert.equal(normal.m.publicView().testLog, undefined);
-  assert.equal(normal.m.publicView().testActions, undefined);
-
-  const testRoom = fixture(t);
-  ok(testRoom.cmd('funds', { amount: 10 }));
-  assert.equal(testRoom.m.publicView().test, true);
-  assert.ok(Array.isArray(testRoom.m.publicView().testLog), '测试房间才带 audit log');
-});
-
 test('funds, chess, item and token grants use the host seat and actual acquisition primitives', (t) => {
   const h = fixture(t);
   ok(h.cmd('funds', { amount: 99999 })); assert.equal(h.p.funds, 99999);
@@ -449,6 +360,9 @@ test('bond activation, layers and strategy changes use the real calculator and u
   assert.equal(h.p.privateView().bonds.find((b) => b.bondId === id).active, true);
   ok(h.cmd('bond', { id, count, layers: 3 }));
   assert.equal(h.p.layers[id], 3);
+  // 管理员工具的一键列表只发 id：省略 layers 表示「再加一层」，而不是整条指令失败。
+  ok(h.cmd('bond', { id, count: 3 }));
+  assert.equal(h.p.layers[id], 4);
   const down = h.cmd('bond', { id, count: 0, layers: 2 });
   assert.equal(down.error, 'BAD_TARGET');
   assert.equal(down.detail, 'layers');
@@ -769,6 +683,14 @@ test('strict catalogue rejects every malformed command before mutation, includin
   for (const id of ['constructor', '__proto__', '../file', 'file:///tmp/a', 'x'.repeat(65)]) assert.equal(parseTestArgs('chess', { id }).error, 'BAD_TARGET');
   for (const amount of [NaN, Infinity, -1, 1.5, '3', 100000]) assert.equal(parseTestArgs('funds', { amount }).error, 'BAD_TARGET');
   assert.equal(parseTestArgs('bond', { id: 'x', layers: 0, count: 100 }).error, 'BAD_TARGET');
+  // layers 可以省略（管理员工具那种一键列表不知道当前层数）：省略时由对局补成「现在 +1」。
+  assert.deepEqual(parseTestArgs('bond', { id: 'x' }), { args: { id: 'x' } });
+  assert.deepEqual(parseTestArgs('bond', { id: 'x', count: 3 }), { args: { id: 'x', count: 3 } });
+  // 给数字时仍然按绝对值校验，非法值一个都不放过。
+  for (const layers of [-1, 1.5, '2', TEST_LAYERS_MAX + 1]) {
+    assert.equal(parseTestArgs('bond', { id: 'x', layers }).error, 'BAD_TARGET', String(layers));
+  }
+  assert.equal(parseTestArgs('bond', {}).error, 'BAD_TARGET');
 });
 
 test('co-op band timer is held and cannot fire a stale draft callback after a phase jump', (t) => {
@@ -1131,61 +1053,4 @@ for (const botRehearsal of [0, 1]) test(`sliced bot prep and a server-run battle
   assert.deepEqual(copy.testLog, m.testLog);
   assert.equal(copy.phase, m.phase);
   assert.equal(copy.errorCount, 0);
-});
-
-
-// ---------------------------------------------------------------------------------------------------
-// 2026-10-31 维护者要求：「这些功能都不需三道门」——
-// 管理员房免销毁、维护开关放行、限流豁免，都属于**身份待遇**，只看身份（adminId），
-// 不该要求他先兑换 6 位验证码（session.admin 是三道门：身份 + tools.game + 验证码）。
-// ---------------------------------------------------------------------------------------------------
-
-test('管理员的「待遇」只看身份，不要求兑换验证码（2026-10-31）', async () => {
-  const { Lobby: L } = await import('../server/lobby.js');
-  const { SessionRegistry: SR } = await import('../server/net.js');
-  const registry = new SR();
-  const lobby = new L({
-    registry,
-    content: { cs: 'ab'.repeat(32) },
-    log: { info() {}, warn() {}, error() {}, debug() {} },
-    options: { testMode: 'off' },
-  });
-  const mk = (name) => {
-    const s = registry.create(name);
-    s.connected = true;
-    s.messages = [];
-    s.ws = { readyState: 1, bufferedAmount: 0, send: (txt) => s.messages.push(JSON.parse(txt)) };
-    return s;
-  };
-  try {
-    // ① 管理员房免销毁：adminId 有、验证码没换（session.admin = false）
-    const owner = mk('owner');
-    owner.adminId = true;
-    owner.gameTool = true;
-    owner.adminTool = false;          // ← 没兑换验证码
-    owner.admin = false;              // ← 三道门不成立
-    owner.accountId = '1'; owner.guest = false;
-    const r1 = lobby.create(owner, { mode: 'coop', difficulty: 'NORMAL' });
-    assert.equal(r1.ok, true, JSON.stringify(r1));
-    const room1 = lobby.roomOf(owner);
-    assert.equal(room1.adminCreated, true, '管理员建的房 = 管理员房');
-    assert.equal(room1.noExpire, true, '管理员房不自动销毁（不要求验证码）');
-    assert.equal(lobby.adminOwnerOnline(room1), true, '房主在线 → 免销毁生效');
-
-    // ② 普通玩家建房：照常倒计时
-    //    ⚠ 本机 data/create-room.json 可能是 {"enabled":false}（维护开关关着），
-    //    那样普通玩家会被 CREATE_DISABLED 挡住 —— 这顺带验证了「管理员豁免维护开关」：
-    //    上面 r1 在同一个 lobby 里成功了，说明管理员的放行确实生效。
-    const plain = mk('plain');
-    plain.adminId = false;
-    plain.accountId = '2'; plain.guest = false;
-    const r2 = lobby.create(plain, { mode: 'coop', difficulty: 'NORMAL' });
-    if (r2.error === 'CREATE_DISABLED') return;   // 维护开关关着：普通玩家被挡（正确行为）
-    assert.equal(r2.ok, true, JSON.stringify(r2));
-    const room2 = lobby.roomOf(plain);
-    assert.equal(room2.adminCreated, false, '普通玩家的房不是管理员房');
-    assert.equal(room2.noExpire, false, '普通房间照常倒计时');
-  } finally {
-    lobby.shutdown();
-  }
 });

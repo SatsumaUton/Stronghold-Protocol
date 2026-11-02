@@ -384,21 +384,24 @@ export class MatchTestCommands {
     if (!this.gd.bond(id)) return fail(ERR.BAD_TARGET, 'no-such-bond');
     if (this.gd.modeInactiveBonds.has(id)) return fail(ERR.BAD_TARGET, 'bond');
     const cur = ps.layers[id] || 0;
-    if (layers < cur) return fail(ERR.BAD_TARGET, 'layers');
+    // layers 省略（管理员工具那种一键列表就是这样发的）＝加一层。绝对值语义保持不变：
+    // 明确给了数字就按数字来，给得比现在少仍然拒绝（层数不能减少）。
+    const want = layers === undefined ? cur + 1 : layers;
+    if (want < cur) return fail(ERR.BAD_TARGET, 'layers');
     // [ASSUMED] count is an absolute extra member count, applied by the ordinary bond calculator.
     // A count-only change still recomputes, so the player's own bond strip updates.
     if (count !== undefined) ps.bondCountBonus[id] = count;
-    if (layers === cur) {
+    if (want === cur) {
       if (count !== undefined) ps.recompute();
       return OK;
     }
-    const delta = layers - cur;
+    const delta = want - cur;
     if (layerGainRoom(cur, delta, this.disableLayerCap) !== delta) {
       const max = this.disableLayerCap ? BOND_LAYER_SAFE_MAX : BOND_LAYER_CAP;
-      return fail(ERR.BAD_TARGET, `cap|${JSON.stringify({ cur, want: layers, max })}`);
+      return fail(ERR.BAD_TARGET, `cap|${JSON.stringify({ cur, want, max })}`);
     }
     const add = ps.addLayers(id, delta, { reason: 'test' });
-    if (add !== delta) return fail(ERR.BAD_TARGET, `add|${JSON.stringify({ cur, want: layers, got: cur + add })}`);
+    if (add !== delta) return fail(ERR.BAD_TARGET, `add|${JSON.stringify({ cur, want, got: cur + add })}`);
     return OK;
   }
 
