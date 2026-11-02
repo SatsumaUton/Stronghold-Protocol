@@ -188,9 +188,19 @@ export function parseTestArgs(cmd, args) {
     case 'bond': {
       const r = exact(args, ['id', 'layers', 'count']);
       if (r.error) return r;
-      if (!isId(r.args.id) || !isInt(r.args.layers, 0, TEST_LAYERS_MAX)) return { error: 'BAD_TARGET' };
+      if (!isId(r.args.id)) return { error: 'BAD_TARGET' };
+      // `layers` 可选：省略表示「比这个玩家现在多一层」，由 _testBond 补（只有它知道当前层数）。
+      // 管理员工具那个面板是「点一下就生效」的列表，无从知道当前层数；以前这里强制要求绝对值，
+      // 导致在管理员工具里点任何盟约都必然 BAD_TARGET（而且是不带 detail 的那种）。
+      if (r.args.layers !== undefined && !isInt(r.args.layers, 0, TEST_LAYERS_MAX)) return { error: 'BAD_TARGET' };
       if (r.args.count !== undefined && !isInt(r.args.count, 0, 99)) return { error: 'BAD_TARGET' };
-      return { args: { id: r.args.id, layers: r.args.layers, ...(r.args.count === undefined ? {} : { count: r.args.count }) } };
+      return {
+        args: {
+          id: r.args.id,
+          ...(r.args.layers === undefined ? {} : { layers: r.args.layers }),
+          ...(r.args.count === undefined ? {} : { count: r.args.count }),
+        },
+      };
     }
     case 'strategy': {
       const r = exact(args, ['id', 'resetLp']);
