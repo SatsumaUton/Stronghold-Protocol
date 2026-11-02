@@ -1425,7 +1425,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .mm-ov__dots{display:inline-block;width:1.2em;text-align:left}
 .mm-ov__title small{font-size:.42em;font-weight:700;color:#c9cecc;font-family:Consolas,monospace}
 .mm-ov__tags{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-.mm-ov__tag{padding:4px 16px;border-radius:999px;font-size:13px;font-weight:700;color:#eef0ef;
+.mm-ov__tag{--c:#8d9391;padding:4px 16px;border-radius:999px;font-size:13px;font-weight:700;color:#eef0ef;
   background:color-mix(in srgb,var(--c) 26%,#1b1d1d);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent)}
 .mm-ov__scene{position:relative;width:min(100%,420px);padding:10px 20px;overflow:hidden;contain:paint;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);
