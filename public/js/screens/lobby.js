@@ -1216,7 +1216,25 @@ export function LobbyScreen() {
     return run('quick', async () => {
       try {
         // 服务端 net.js 把 reply 的字段平铺在 ok 帧顶层（{ ...res.reply, t:'ok', rid }），没有套一层 reply。
-        const reply = (await net.request('room.quickMatch', { difficulty: d, seats, rules })) || {};
+        const ask = () => net.request('room.quickMatch', { difficulty: d, seats, rules });
+        let reply;
+        try {
+          reply = (await ask()) || {};
+        } catch (err) {
+          // 刷新后立刻点「开始多人匹配」时，accountToken 可能还没送到服务端，它会回
+          // IDENTITY_PENDING（「还没收到账号身份」）。这不是游客，等身份到了重新握手再试一次，
+          // 和 joinKnown 同一套做法。以前这里直接把这个码翻成「无效的请求」，玩家完全看不懂。
+          if (err?.code !== ERR.IDENTITY_PENDING) throw err;
+          const got = await waitAccountToken();
+          if (!got) {
+            setMatchSearch(null);
+            toast(t('还没读到你的账号信息，请稍等一秒再点一次；如果一直这样，请重新登录'), 'warn');
+            return;
+          }
+          try { net.close(); net.connect(); } catch { /* ignore */ }
+          await new Promise((r) => setTimeout(r, 800));
+          reply = (await ask()) || {};
+        }
         // 直接进了别人正在等人的房（服务端找到合适的公开房）：跳进去
         if (reply.code && !reply.queued) { enterRoom(reply.code); return; }
         // 没人可加入：**停在匹配界面排队等**（维护者 2026-11-02：不要给玩家开一间房让他等）
@@ -1229,6 +1247,12 @@ export function LobbyScreen() {
       } catch (e) {
         // 失败就退回选择那一屏，让玩家改难度/范围再试
         setMatchSearch(null);
+        // BAD_MSG 的通用文案是「无效的请求」，可服务端在这里的拒绝其实都有具体原因
+        // （例如「游客不能参与多人匹配，请先登录」）。detail 比错误码有用得多，原样说出来。
+        if (typeof e?.detail === 'string' && e.detail) {
+          toast(t(e.detail), 'warn');
+          return;
+        }
         throw e;
       }
     });

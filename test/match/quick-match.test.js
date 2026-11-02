@@ -81,11 +81,23 @@ test('已经有房间：拒绝（页面只在大厅显示这个按钮）', () =>
   assert.equal(res.error, ERR.SESSION_IN_USE, '已经在房间里');
 });
 
-test('游客：交给既有规则拒绝', () => {
+test('游客：明确拒绝，而且要给得出原因', () => {
   const lobby = makeLobby();
-  const guest = { playerId: '', accountId: '', name: 'Guest', connected: true, ws: null };
+  // 真游客 = session.guest 为真。这种会话重试也没用，直接说清楚要登录。
+  const guest = { guest: true, playerId: '', accountId: '', name: 'Guest', connected: true, ws: null };
   const res = lobby.quickMatch(guest, {});
   assert.equal(res.error, ERR.BAD_MSG, '游客不能排队');
+  assert.match(String(res.detail || ''), /游客/, 'BAD_MSG 的通用文案是「无效的请求」，detail 必须说清是游客');
+});
+
+test('身份还没送到：回 IDENTITY_PENDING，而不是当成游客', () => {
+  const lobby = makeLobby();
+  // 刷新后立刻点「多人匹配」：客户端认为已登录，accountToken 却还没送到服务端。
+  // 口径与 join() 一致（server/lobby.js 的 join 里也是这么分的）：
+  // 不是 guest、只是暂时没有 accountId → 让客户端等身份到了再试一次。
+  const pending = { guest: false, playerId: 'p_1', accountId: '', name: 'P', connected: true, ws: null };
+  const res = lobby.quickMatch(pending, {});
+  assert.equal(res.error, ERR.IDENTITY_PENDING, '身份在途不能报成游客');
 });
 
 // -------------------------------------------------- 有可加入的房间：直接进
