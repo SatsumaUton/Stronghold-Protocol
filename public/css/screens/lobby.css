@@ -827,6 +827,11 @@
   background: #1d2223; border: 1px solid #3a3f40; border-radius: 999px;
 }
 .mm-queue__hint { display: flex; align-items: center; justify-content: center; gap: .06rem; margin: 0; font-size: max(calc(.13 * var(--t)), 11px); color: #858b89; }
+.mm-queue__wait {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: .02rem .08rem; margin: 0;
+  font-size: max(calc(.14 * var(--t)), 12px); color: #d7f4ec;
+}
+.mm-queue__wait .rs-matchwait__sep { color: rgba(79, 224, 191, .5); }
 .mm-queue__cancel {
   margin-top: .06rem; padding: .05rem .28rem; font: inherit; font-size: max(calc(.15 * var(--t)), 12px);
   color: #cfd4d2; cursor: pointer; background: #1d2223; border: 1px solid #4a4f50; border-radius: 3px;
