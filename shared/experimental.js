@@ -96,3 +96,13 @@ export const sameExperimental = (a, b) => !!a && !!b
   && enemyMultiplier(a.enemyHpMul) === enemyMultiplier(b.enemyHpMul)
   && enemyMultiplier(a.enemyAtkMul) === enemyMultiplier(b.enemyAtkMul)
   && planKey(a) === planKey(b);
+
+/**
+ * Whether a room's options change a rule of the game, whatever the seat count: any key but
+ * playerCapacity that is set (an option that is off is false or absent, see experimentalOptions).
+ * 多人匹配's rules scope reads it (server/matchmaking.js): a lone ticket asking 'standard' only
+ * makes a game whose rules are all unchanged, so this is what tells the two apart.
+ */
+export const experimentalRuleChanged = (value) => !!value
+  && Object.entries(value).some(([key, set]) => key !== 'playerCapacity' && !!set);
+
