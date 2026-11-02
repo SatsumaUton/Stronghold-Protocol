@@ -3715,7 +3715,30 @@ export class Lobby {
     // routeGameNow → roomOf → NOT_IN_ROOM，观战者看到的画面就永远停在自动打开的 P1 上，
     // 点谁都不换（玩家反馈「隐身观战不能切换观战目标」）。
     if (room && !seat && room.hiddenSpectatorOf(session.playerId)) return room;
-    if (!room || !seat || seat.left || seat.isBot) { session.roomCode = null; return null; }
+    if (!room || !seat || seat.left || seat.isBot) {
+      // ★ 2026-11-02 兜底：座位按 **playerId** 找，刷新/换设备后 playerId 会变；
+      //   旧代码一找不到就把 roomCode 清成 null → onHello 发 room.closed → 玩家掉回大厅。
+      //   这里补一次「按账号认人」：同 accountId、座位还在、且原会话已经没了（幽灵座位），
+      //   就把座位改绑到这次的新会话。只在**没有进行中的对局**时做 —— 对局中的恢复走检查点那条路。
+      const ghost = room && !room.match && session.accountId
+        ? room.seats.findIndex((x) => x && !x.left && !x.isBot
+          && x.accountId != null && String(x.accountId) === String(session.accountId)
+          && x.playerId !== session.playerId
+          && !this.registry?.byId?.(x.playerId))
+        : -1;
+      if (ghost >= 0) {
+        const s0 = room.seats[ghost];
+        const wasHost = room.hostId === s0.playerId;
+        s0.playerId = session.playerId;
+        if (wasHost) room.hostId = session.playerId;
+        session.roomCode = room.code;
+        this.roomListCache = null;
+        this.log?.info?.(`[lobby] ${room.code} 座位 ${ghost + 1} 按账号重新绑定（刷新回来）`);
+        return room;
+      }
+      session.roomCode = null;
+      return null;
+    }
     return room;
   }
 
