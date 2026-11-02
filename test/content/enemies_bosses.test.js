@@ -3720,3 +3720,23 @@ test('enemy hit shield uses phys/arts filters and continuous acquisition order o
   assert.equal(draws, 0, 'the older shield absorbs before the later ordinary dodge');
   checkInvariants(b);
 });
+
+// 频次器物的次数不能叠加房间的「敌人生命倍率」。
+// 2026-11-02 维护者反馈：终极模拟第 7 回合选了 2 倍敌人血量，铜矛头从「需要 25 次击倒」
+// 变成 179 次（25 × 3.58 难度 × 2 房间），玩家根本打不完。口径定为：
+// 保留 sganggs 的难度/回合缩放，但房间倍率不参与 —— 次数就是「要打几下」，不是血量。
+test('频次器物：房间的敌人倍率一律不参与次数，只保留难度缩放（任何倍率值都一样）', () => {
+  // 维护者 2026-11-02：铜矛头在终极模拟第 7 回合 + 2 倍血量时变成 179 下，玩家打不完。
+  // 口径：这些器物只吃「难度/回合」的缩放，房间的敌人生命倍率不参与 —— 而且对任何倍率值
+  // 都必须一样（不能只对 2 倍特殊处理）。
+  for (const key of TIMES_KEYS) {
+    for (const roomMul of [1, 1.25, 2, 3, 5]) {
+      const h = arena({ units: [{ chessId: 't_gun', row: 12, col: 3 }], hooks: ['death'], mods: { hpMul: 3 } });
+      h.step();
+      h.b.flags.enemyHpMul = roomMul;             // 房间里选的「敌人生命 ×N」
+      const e = put(h, key, [10, 7], { mods: { hpMul: 3 } });
+      assert.equal(e.s.maxHp, E[key].stats.maxHp * 3,
+        `${key} 在房间倍率 ×${roomMul} 时次数应仍是难度那 3 倍`);
+    }
+  }
+});
