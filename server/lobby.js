@@ -2800,6 +2800,7 @@ export class Lobby {
     const entry = this.quickQueue?.get(ticket);
     if (!entry) {
       const done = this.quickDone?.get(ticket);
+      if (done?.error) return { ok: true, reply: { state: 'failed', reason: done.error } };
       if (done) return { ok: true, reply: { state: 'matched', code: done.code, difficulty: done.difficulty, capacity: done.capacity } };
       return fail(ERR.ROOM_NOT_FOUND, 'queue ticket unknown');
     }
@@ -2859,7 +2860,13 @@ export class Lobby {
       : (host.standard ? null : experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, revivalEnabled: true }));
     const made = this.create(host.session, { mode: 'coop', difficulty: host.difficulty ?? undefined, experimental });
     if (made && made.error) {
-      this.log?.warn?.(`[lobby] 多人匹配建房失败: ${made.error}`);
+      // 建房失败（维护开关关掉了建房、账号冲突……）：**把这一组放掉**，不要留在队列里
+      // 每秒重试 —— 那只会刷日志，而玩家永远等不到房间。用 quickDone 告诉前端原因。
+      this.log?.warn?.(`[lobby] 多人匹配建房失败，解散这组（${group.length} 人）: ${made.error}`);
+      for (const entry of group) {
+        this.quickQueue.delete(entry.ticket);
+        this.quickDone.set(entry.ticket, { error: made.error, at: Date.now() });
+      }
       return;
     }
     const room = this.roomOf(host.session);

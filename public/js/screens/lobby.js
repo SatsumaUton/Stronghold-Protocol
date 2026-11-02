@@ -1249,6 +1249,12 @@ export function LobbyScreen() {
         const st = (await net.request('room.quickState', { ticket })) || {};
         if (!alive) return;
         if (st.state === 'matched' && st.code) { enterRoom(st.code); return; }
+        // 服务端放弃了这一局（例如管理员临时关掉建房）：告诉玩家原因，并把界面退回选择那一屏
+        if (st.state === 'failed') {
+          toast(t('匹配失败：服务端暂时无法创建同盟，请稍后再试'), 'warn');
+          setMatchSearch(null);
+          return;
+        }
         setMatchSearch((cur) => (cur && cur.ticket === ticket
           ? { ...cur, queue: { ...st, state: st.state || 'queued' } } : cur));
       } catch { /* 下一轮再问；断线由 net 自己提示 */ }
