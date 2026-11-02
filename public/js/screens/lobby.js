@@ -706,7 +706,10 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
 const MULTI_CAPACITIES = PLAYER_CAPACITIES.filter((n) => n > MAX_SEATS);
 
 /** 「多人同盟」那一档的区间文字参数：{a} 最小、{b} 最大。参考版 ui/matchmaking.js 的 multiSeats()。 */
-function multiSeats() { return { a: MULTI_CAPACITIES[0] ?? MAX_SEATS + 1, b: MULTI_CAPACITIES[MULTI_CAPACITIES.length - 1] ?? MAX_SEATS + 1 }; }
+// 「多人同盟」的范围 = 5–20 人。房间设置里的人数可以是 4~20 的**任意整数**（shared/playerCapacity.js
+// 的 isPlayerCapacity），所以多人档的起点是 MAX_SEATS + 1 = 5，不是预设档 PLAYER_CAPACITIES 的第一个
+// （那是 8，只用来给「没人时按多少人建房」做默认值）。以前显示成 8–20，跟房间设置对不上。
+function multiSeats() { return { a: MAX_SEATS + 1, b: PLAYER_CAPACITIES[PLAYER_CAPACITIES.length - 1] ?? MAX_SEATS + 1 }; }
 
 /**
  * 多人匹配的范围（参考版 ui/matchmaking.js 的 `matchScope`）：两组多选，每组至少留一个。
