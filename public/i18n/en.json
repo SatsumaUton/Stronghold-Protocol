@@ -2428,5 +2428,19 @@
   "预选盟约": "Bond plan",
   "预选盟约：{name}": "Bond plan: {name}",
   "不预选": "No plan",
-  "选择你打算发展的盟约，所有博士都能看到。只作沟通，不影响对局。": "Pick the bond you mean to develop — every Doctor sees it. Communication only; it changes nothing in the match."
+  "选择你打算发展的盟约，所有博士都能看到。只作沟通，不影响对局。": "Pick the bond you mean to develop — every Doctor sees it. Communication only; it changes nothing in the match.",
+  "空席": "Empty seat",
+  "P{n} {name}": "P{n} {name}",
+  "共 {n} 个卡池": "{n} pools",
+  "减少卡池": "Fewer pools",
+  "增加卡池": "More pools",
+  "均分": "Even split",
+  "点击席位再选择目标卡池，也可直接拖动": "Tap a seat, then the target pool — or just drag it",
+  "点击席位再选择目标卡池": "Tap a seat, then the target pool",
+  "卡池 {n}，{count} 席": "Pool {n}, {count} seats",
+  "卡池 {n}": "Pool {n}",
+  "{n} 人": "{n} players",
+  "完整牌库": "Full deck",
+  "牌库 ×{n}": "Deck ×{n}",
+  "移到此处": "Move here"
 }

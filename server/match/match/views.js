@@ -80,7 +80,7 @@ export class MatchViews {
       modeId: this.modeId,
       difficulty: this.difficulty,
       playerCapacity: this.playerCapacity,
-  ...(this.capacityExperiment ? { poolGroups: this.poolGroups.map((g) => ({ id: g.id, scale: g.scale || 1, playerIds: g.playerIds.slice() })) } : {}),
+  ...(this.capacityExperiment || this.poolPlan ? { poolGroups: this.poolGroups.map((g) => ({ id: g.id, scale: g.scale || 1, playerIds: g.playerIds.slice() })) } : {}),
       experimental: { ...this.experimental },
       stageId: this.stageId,
       // a non-default official version's match (DESIGN §35.23): its registry id, so a page that never saw the room (a
