@@ -301,7 +301,7 @@ export function TitleScreen() {
         ${resumePending ? html`<div class="title-invite title-resume" data-testid="title-resume-hint">
           <${Icon} name="refresh" />
           <span>${t('你有进行中的对局')}</span>
-          <span class="t-lo">${t('· 进入大厅后点右下角「恢复对局」切回来')}</span>
+          <span class="t-lo">${t('· 点下方「恢复对局」切回来')}</span>
         </div>` : null}
         ${pendingJoin ? html`<div class="title-invite">
           <${Icon} name="key" />
