@@ -536,6 +536,11 @@ test('audit rows use one number, the actor name, a clock and the translated reas
   assert.match(explainTestDetail('layers'), /层数不能减少/);
   assert.match(explainTestDetail('timers'), /作战进行中不能开关计时/);
   assert.match(explainTestDetail('bond'), /盟约/);
+  // 盟约指令以前几种失败都不带原因：控制台上只剩一句「无效的目标」，维护者不知道该改哪儿。
+  assert.match(explainTestDetail('no-such-bond'), /没有这个盟约/);
+  assert.match(explainTestDetail('cap|{"cur":0,"want":2000,"max":999}'), /999/);
+  assert.match(explainTestDetail('cap|{"cur":0,"want":2000,"max":999}'), /2000/);
+  assert.match(explainTestDetail('add|{"cur":0,"want":3,"got":1}'), /只加到 1 层/);
   assert.equal(explainTestDetail(''), '');
   assert.equal(formatAuditLine(log[1], '凯尔希'), '2 凯尔希 00:00:07 funds 成功');
   const bad = formatAuditLine(log[0], '凯尔希');
