@@ -83,6 +83,11 @@ export function roomDoc(room, matchRef, sessionOf) {
     // 以前这里没有 version，matchmaker 读不到就退回客户端上报值 —— 而客户端在
     // 排队时并不总会带上，于是不同版本的房间会被配进同一局。
     version: room.version,
+    // 公开同盟（room.setListed）/ 多人匹配（room.matchmaking）：跨节点的房间列表要靠这两个字段判定，
+    // 而 matchmaker 是从 Redis 读房间的 —— 不存这里，别的节点就永远看不到「这间房在等人」。
+    // 为 false 时整条省掉，默认房间的存档与以前逐字节一致。
+    ...(room.listed === true ? { listed: true } : {}),
+    ...(room.matchmaking === true ? { matchmaking: true } : {}),
     experimental: room.experimental, source: room.source, ownerKey: room.ownerKey, ownerKeys: room.ownerKeys ? [...room.ownerKeys] : null,
     matchKey: room.matchKey, matchKeys: room.matchKeys ? [...room.matchKeys] : null, matchCount: room.matchCount | 0, createdAt: room.createdAt,
     ttlMs: room.ttlMs, noExpire: room.noExpire === true, adminCreated: room.adminCreated === true,
