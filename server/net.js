@@ -32,7 +32,8 @@
 //   welcomeInfo() → object (optional)      extra fields of every `welcome` (never one of its own keys): the lobby's
 //                                          `diyKitted` (0.2.0 自选编队 — which operators a DIY slot may field) and
 //                                          `content` ({ vanilla: <cs> }, the server's content hash — DESIGN §32)
-//   onMessage(session, msg) → { ok: true } | { error: ERR code, detail?: string } | undefined — or a Promise of one
+//   onMessage(session, msg) → { ok: true, reply?: fields } | { error: ERR code, detail?: string } | undefined — or a Promise of one
+//                                          `reply`: extra fields of the ok frame (room.list)
 //                                          (a room whose match runs in a match host worker, DESIGN §32.6: the reply
 //                                          goes out when it settles; a rejection is INTERNAL)
 //   routeGame(session, msg) → same (optional): client-side combat reports `b.progress` / `b.result` (DESIGN §14) go
@@ -745,7 +746,7 @@ export class Network {
       // surface as an error toast in the browser)
       if (msg.t === 'b.progress' && !validRid(rid)) return;
       this.reply(conn, errorMsg(isErrCode(res.error) ? res.error : ERR.INTERNAL, rid, res.detail));
-    } else if (validRid(rid)) this.reply(conn, { t: 'ok', rid });
+    } else if (validRid(rid)) this.reply(conn, { ...res?.reply, t: 'ok', rid });
   }
 
   /** @param {Connection} conn @param {any} msg @param {number} now */

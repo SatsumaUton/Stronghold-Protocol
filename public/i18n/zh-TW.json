@@ -1,24 +1,5 @@
 {
   "离线导入（不下载官方数据表）": "離線匯入（不下載官方資料表）",
-  "_meta": {
-    "type": "lang",
-    "lang": "zh-TW",
-    "name": "繁體中文",
-    "englishName": "Traditional Chinese",
-    "version": "0.2.0",
-    "app": ">=0.2.0",
-    "authors": [
-      "the Stronghold Protocol contributors"
-    ],
-    "credits": "Game texts (data/i18n/zh-TW.json): the official TW client data (© Hypergryph) via ArknightsAssets/ArknightsGamedata. Interface strings machine-converted from the Simplified Chinese on 2026-10-07 (OpenCC, Taiwan phrases) using the official TW game terms, then read through by hand; corrections welcome on GitHub (docs/I18N.md §5).",
-    "fallback": [],
-    "numberUnits": [
-      "萬",
-      "億"
-    ],
-    "complete": true,
-    "machineTranslated": true
-  },
   "你已在其他同盟中，请先离开当前同盟": "你已在其他同盟中，請先離開目前的同盟",
   "你已不在该同盟中": "你已不在該同盟中",
   "创建者已离开，同盟已解散": "建立者已離開，同盟已解散",
@@ -2455,5 +2436,48 @@
   "{n} 池": "{n} 池",
   "每人独立": "每人獨立",
   "点一个座位，再点目标卡池即可移动；桌面端也可以直接拖。改动会随「应用」一起生效。": "點一個席位，再點目標卡池即可移動；桌面端也可以直接拖。改動會隨「應用」一起生效。",
-  "已由手动编组决定。": "已由手動編組決定。"
+  "已由手动编组决定。": "已由手動編組決定。",
+  "公开同盟": "公開同盟",
+  "看看有哪些同盟正在等博士，直接加入": "看看有哪些同盟正在等博士，直接加入",
+  "{n} 人及以上、由创建者公开且尚未开局的同盟显示在这里。": "{n} 人及以上、由建立者公開且尚未開局的同盟顯示在這裡。",
+  "列表暂时无法更新，稍后自动重试": "列表暫時無法更新，稍後自動重試",
+  "正在载入同盟列表…": "正在載入同盟列表…",
+  "暂时没有等待博士的公开同盟": "暫時沒有等待博士的公開同盟",
+  "要公开这个同盟吗？": "要公開這個同盟嗎？",
+  "先不公开": "先不公開",
+  "公开以后，你创建的这个同盟会出现在大厅的「公开同盟」列表里，其他博士可以直接看到并加入。": "公開以後，你建立的這個同盟會出現在大廳的「公開同盟」列表裡，其他博士可以直接看到並加入。",
+  "其他博士可以在大厅的「公开同盟」里看到这个房间并直接加入": "其他博士可以在大廳的「公開同盟」裡看到這個房間並直接加入",
+  "挂到大厅的「公开同盟」列表上，让其他博士能找到这个房间": "掛到大廳的「公開同盟」列表上，讓其他博士能找到這個房間",
+  "公开同盟：已公开": "公開同盟：已公開",
+  "公开同盟：未公开": "公開同盟：未公開",
+  "复活": "復活",
+  "禁用鸭爵": "禁用鴨爵",
+  "关闭层数上限": "關閉層數上限",
+  "关闭命中上限": "關閉命中上限",
+  "敌方生命 ×{n}": "敵方生命 ×{n}",
+  "敌方攻击 ×{n}": "敵方攻擊 ×{n}",
+  "手动卡池": "手動卡池",
+  "标准规则": "標準規則",
+  "{humans} 名博士，{bots} 名 AI": "{humans} 名博士，{bots} 名 AI",
+  "下次不再提醒": "下次不再提醒",
+  "勾选后建房不再询问。以后想公开时：进房后打开「同盟设置」，把里面的「公开同盟」打开即可；大厅「同盟模拟 → 公开同盟」里能看别人的同盟。": "勾選後建房不再詢問。以後想公開時：進房後打開「同盟設定」，把裡面的「公開同盟」打開即可；大廳「同盟模擬 → 公開同盟」裡能看別人的同盟。",
+  "_meta": {
+    "type": "lang",
+    "lang": "zh-TW",
+    "name": "繁體中文",
+    "englishName": "Traditional Chinese",
+    "version": "0.2.0",
+    "app": ">=0.2.0",
+    "authors": [
+      "the Stronghold Protocol contributors"
+    ],
+    "credits": "Game texts (data/i18n/zh-TW.json): the official TW client data (© Hypergryph) via ArknightsAssets/ArknightsGamedata. Interface strings machine-converted from the Simplified Chinese on 2026-10-07 (OpenCC, Taiwan phrases) using the official TW game terms, then read through by hand; corrections welcome on GitHub (docs/I18N.md §5).",
+    "fallback": [],
+    "numberUnits": [
+      "萬",
+      "億"
+    ],
+    "complete": true,
+    "machineTranslated": true
+  }
 }
