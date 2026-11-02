@@ -169,7 +169,7 @@ export function helperStats(m, ps, results) {
     active = true;
     const stored = Number(ps.layers && ps.layers[id]) || Number(b.layers) || 0;
     const gain = pending && Number(pending[id]);
-    const add = Number.isFinite(gain) && gain > 0 ? layerGainRoom(stored, Math.floor(gain)) : 0;
+    const add = Number.isFinite(gain) && gain > 0 ? layerGainRoom(stored, Math.floor(gain), m?.disableLayerCap) : 0;
     layers += stored + add;
   }
   const r = results && typeof results.get === 'function' ? results.get(ps.playerId) : null;

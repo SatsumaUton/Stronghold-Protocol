@@ -86,7 +86,7 @@ export function pairPlayers(alive, rng, previous = null) {
 }
 
 /** Shared boss HP for a boss id with `aliveCount` alive players (GameData.bossPoolShare / bossPoolShareOf; omitted ⇒ a full team). */
-export function bossPoolHp(gd, bossId, aliveCount, { experimental = false } = {}) {
+export function bossPoolHp(gd, bossId, aliveCount, { experimental = false, hpMul = 1 } = {}) {
   const boss = gd.boss(bossId);
   const diff = gd.difficulty;
   let base = boss && boss.bloodPoint && Number.isFinite(boss.bloodPoint[diff]) ? boss.bloodPoint[diff] : null;
@@ -97,7 +97,9 @@ export function bossPoolHp(gd, bossId, aliveCount, { experimental = false } = {}
   const shareOf = (n) => (typeof gd.bossPoolShare === 'function' ? gd.bossPoolShare(n)
     : bossPoolShareOf(gd.mode && gd.mode.bossHpScale, gd.config && gd.config.bossHpScale, !!gd.isSolo, n));
   const share = enlarged ? shareOf(4) * aliveCount / 4 : shareOf(aliveCount);
-  return Math.max(1, Math.round(base * share * tune));
+  // 实验性「敌人生命倍率」对敌方领袖的共享生命值同样生效（spec flag enemyHpMul）
+  const room = Number.isFinite(hpMul) && hpMul > 0 ? hpMul : 1;
+  return Math.max(1, Math.round(base * share * tune * room));
 }
 
 /**

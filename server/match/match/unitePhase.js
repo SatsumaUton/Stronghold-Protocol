@@ -15,6 +15,7 @@ import { onStartUnite } from '../botEmotes.js';
 export class MatchUnite {
   startUnite(plan) {
     if (this.capacityExperiment && !this.alivePlayers().length) { this.settle(null, null); return; }
+    this._applySpeedVote();
     if (plan.uniteRound === 1) this._uniteRelay = { rounds: [], eligible: new Set() };
     if (plan.uniteRound && !this.clientCombat) this.battleId = `${this.battlePrefix}.${this.round}.${++this._battleSeq}.relay${plan.uniteRound}`;
     if (this.clientCombat) { this._startUniteClient(plan); return; }
@@ -28,7 +29,7 @@ export class MatchUnite {
     this._defaultWatch();
     this.markPublic();
     this.tickerText(msg('联防阶段：{names} 迎战突破防线的敌人{extra}', { names: plan.helpers.map((p) => p.name).join('、'),
-      extra: plan.totalBudget ? `（本段 ${this._uniteRealSecs(plan.timeLimit)} 秒）` : '' }), FLOW_TICKER_PRIORITY);
+      extra: limit > 0 ? `（本段 ${this._uniteRealSecs(plan.timeLimit)} 秒）` : '' }), FLOW_TICKER_PRIORITY);
     onStartUnite(this, plan); // an AI helper says "合作愉快" once on the open of a 联防 (enabled by default; SP_BOT_EMOTES=0 silences it)
     this._uniteLeftKey = null;
     this.runner = new FieldRunner(this, this.fields, {
@@ -50,42 +51,22 @@ export class MatchUnite {
     return Math.round((gameSeconds / speed) * 100) / 100;
   }
 
-  /** Expanded rooms get a 300-game-second budget; a viable relay splits it into 150 + 150. */
+  /**
+   * 联防没有「总时间预算」：每一段都用本回合的作战时限（wave.timeLimit），接力也各自重新计时。
+   * 早期给扩容房加过 300 游戏秒的总预算 + 150/150 分段，问题是对局拖到第二段时玩家看不出还剩多少，
+   * 而且和 HUD 显示的「联防时间」对不上；改成每段独立计时后两者一致。
+   */
   uniteTimeLimit(plan) {
-    const base = this.wave ? this.wave.timeLimit : 60;
-    if (!this.capacityExperiment) return base;
-    if (!this._uniteBudget) {
-      // 判断「有没有可能接力」时看 plan.relayCandidates，**不能**用 uniteRelayHelpers()：
-      // 后者依赖 m.lastResults（上一轮每个人的战果），而这里是在**本段开始之前**分配预算的，
-      // 那时 lastResults 还没更新，于是它恒返回 []，8 人房也永远拿不到 150+150 的分段。
-      // relayCandidates 已经由 planUnite() 按本轮 results 筛过（完美玩家 ≥ maxHelpers+1，
-      // 即第一波之后至少还剩 1 个人能顶上），正是「有没有富余的完美玩家可以再来一波」的正确判据。
-      const relayPossible = plan.uniteRound === 1
-        && Array.isArray(plan.relayCandidates) && plan.relayCandidates.length > 0;
-      this._uniteBudget = {
-        total: 300,
-        remaining: 300,
-        allocations: relayPossible ? [150, 150] : [300],
-      };
+    const limit = this.wave ? this.wave.timeLimit : 60;
+    if (plan) {
+      plan.timeLimit = limit;
+      plan.gameSpeed = this.gameSpeed;
     }
-    const budget = this._uniteBudget;
-    plan.totalBudget = budget.total;
-    plan.remainingBudget = budget.remaining;
-    plan.gameSpeed = this.gameSpeed;
-    plan.timeLimit = Math.min(budget.remaining, budget.allocations[plan.uniteRound === 2 ? 1 : 0] ?? 0);
-    plan.budgetSpent = 0;
-    return plan.timeLimit;
+    return limit;
   }
 
-  _consumeUniteBudget(plan, res, field) {
-    if (!this.capacityExperiment || !this._uniteBudget || this.disposed || this.ended
-      || this.phase !== PHASE.UNITE || this.unitePlan !== plan || !this.fields.includes(field)
-      || !field.battle?.finished) return;
-    const time = Number.isFinite(res?.time) ? res.time : Number(field.battle?.time) || 0;
-    const spent = Math.min(plan.timeLimit, Math.max(plan.budgetSpent, time, 0));
-    this._uniteBudget.remaining = Math.max(0, this._uniteBudget.remaining - (spent - plan.budgetSpent));
-    plan.budgetSpent = spent;
-  }
+  /** 保留给旧快照/旧结算路径的调用点：总预算已取消，不再扣减任何东西。 */
+  _consumeUniteBudget() {}
 
   /** Archive one field; on an expanded room start the relay or settle once. */
   _finishUniteField(plan, res, field) {
@@ -112,8 +93,8 @@ export class MatchUnite {
     this.later(this.scaled(DELAYS.COMBAT_END), () => {
       if (this.phase !== PHASE.UNITE || this.unitePlan !== plan || !this.fields.includes(field) || field.uniteReleased) return;
       field.uniteReleased = true;
-      const next = this.capacityExperiment && !(Math.min(this._uniteBudget.remaining, this._uniteBudget.allocations[1] ?? 0) > 0) ? null
-        : planUniteRelay(this, plan, res, field.battle?.opts?.spawns);
+      // 总时间预算取消后，接力只看「还有没有能顶上的完美玩家」——由 planUniteRelay 自己判断
+      const next = planUniteRelay(this, plan, res, field.battle?.opts?.spawns);
       if (next) {
         this.runner?.stop();
         this.runner = null;
@@ -144,7 +125,7 @@ export class MatchUnite {
       spawns: this._sanitizeSpawns(wave.spawns),
       routes: wave.routes,
       sharedBoss: null,
-      flags: { layerGainsEnabled: false, ...this.gd.dp },
+      flags: { layerGainsEnabled: false, ...this.gd.dp, ...this._ruleFlags() },
       fieldId: plan.uniteRound === 2 ? 'u:2' : 'u',
       // leaked enemies re-enter with the stats they had: the round template's stat overrides apply again
       enemyOverrides: this.wave && this.wave.overrides ? this.wave.overrides : {},
@@ -169,7 +150,7 @@ export class MatchUnite {
     }
     this.markPublic();
     this.tickerText(msg('联防阶段：{names} 迎战突破防线的敌人{extra}', { names: plan.helpers.map((p) => p.name).join('、'),
-      extra: plan.totalBudget ? `（本段 ${this._uniteRealSecs(plan.timeLimit)} 秒）` : '' }), FLOW_TICKER_PRIORITY);
+      extra: limit > 0 ? `（本段 ${this._uniteRealSecs(plan.timeLimit)} 秒）` : '' }), FLOW_TICKER_PRIORITY);
   }
 
   _finishUniteClient() {
