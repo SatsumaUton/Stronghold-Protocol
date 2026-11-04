@@ -1512,6 +1512,3 @@ html.sp-deepecho .etag img,
 html.sp-deepecho .gicon img {
   filter: hue-rotate(120deg) saturate(1.6) brightness(1.05);
 }
-
-/* 本局禁用干员的口径说明（维护者 2026-11-05） */
-.iban-note { margin: .02rem 0 .1rem; font-size: .86em; line-height: 1.5; color: var(--text-lo); }

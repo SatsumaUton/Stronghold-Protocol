@@ -139,15 +139,11 @@ function InfoTab({ pub, priv, onChess, bandId = null, bandOwner = null }) {
         <${RichText} text=${band.descRaw || band.desc} class="iband__desc" /></div>
     </div>` : null}
     ${stage ? html`<p class="istage"><${Icon} name="rook" />${t('战场：')}<b>${stage.name || stage.id}</b></p>` : null}
-    <h4 class="ihead">${t('本局禁用干员')} <small class="num">${banned.length}</small></h4>
-    ${
-      /* 说明口径（维护者 2026-11-05）：玩家看到「阿戈尔 7」会以为整个盟约被禁，其实只有
-         全部盟约都被禁的干员才会从卡池移除。 */ null}
-    <p class="iban-note">${t('只有「全部盟约都被禁」的干员才会从卡池移除；下面的数字是该盟约中有多少名这样的干员。')}</p>
+    <h4 class="ihead">${t('本局禁用干员情况')} <small class="num">${banned.length}</small></h4>
     <div class="ibonds">
       ${withBans.length ? withBans.map((b) => html`<span key=${b.bondId} class=${cx('ibond', disabled.has(b.bondId) && 'is-off')} title=${briefingBondTip(b.name, stateOf(b.bondId), perBond.get(b.bondId) || 0)}>
         <${BondGlyph} bondId=${b.bondId} /><span>${b.name}</span>
-        ${perBond.get(b.bondId) ? html`<span class="ibond__ban num" title=${t('该盟约中有多少名干员本局无法出现（其余成员仍可出现）')}><${Icon} name="user" />${perBond.get(b.bondId)}</span>` : null}
+        ${perBond.get(b.bondId) ? html`<span class="ibond__ban num" title=${t('该盟约中被禁用的干员数')}><${Icon} name="user" />${perBond.get(b.bondId)}</span>` : null}
       </span>`) : html`<span class="t-dim">${t('本局没有禁用盟约')}</span>`}
     </div>
     ${banned.length ? html`<div class="ibanned">${banned.map((id) => html`<button key=${id} type="button" class="ibanned__one" onClick=${() => onChess(id)}>
