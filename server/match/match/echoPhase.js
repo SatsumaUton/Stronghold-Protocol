@@ -1409,67 +1409,114 @@ export class MatchEcho {
     const forced = last > 0 && depth - last >= 4;
     if (!forced && (Number(this.rngWaves()) || 0) >= 0.34) return 0;
     this.echoSupplyLastDepth = depth;
-    if (!this.echoSupply || this.echoSupply.round !== this.round) {
-      this.echoSupply = { round: this.round, byPlayer: new Map() };
-    }
-    let n = 0;
-    for (const ps of this.alivePlayers()) {
-      if (ps.isBot || this.echoSupply.byPlayer.has(ps.playerId)) continue;
-      // 三类候选（维护者 2026-11-05：**不要给资金**，换成「临时词条」）
-      const itemIds = Object.keys((this.gd.raw && this.gd.raw.items) || {});
-      const itemId = itemIds.length ? itemIds[Math.floor((Number(this.rngWaves()) || 0) * itemIds.length)] : null;
-      const once = (Array.isArray(ECHO_BLESSINGS) ? ECHO_BLESSINGS : []).filter((b) => echoBlessingOneShot(b) && b.kind !== 'counter');
-      const bless = once.length ? once[Math.floor((Number(this.rngWaves()) || 0) * once.length)] : null;
-      const words = [
-        { kind: 'word', id: 'word_atk', name: '词条 · 强攻', desc: '本层全队攻击 +8%', mods: { atkPct: 0.08 } },
-        { kind: 'word', id: 'word_bat', name: '词条 · 疾速', desc: '本层全队攻速 +6%', mods: { batPct: 0.06 } },
-        { kind: 'word', id: 'word_hp', name: '词条 · 坚韧', desc: '本层全队生命 +8%', mods: { hpPct: 0.08 } },
-      ];
-      const word = words[Math.floor((Number(this.rngWaves()) || 0) * words.length)];
-      const options = [];
-      if (itemId) options.push({ kind: 'item', id: itemId, name: (this.gd.item(itemId) || {}).name || itemId });
-      if (bless) options.push({ kind: 'blessing', id: bless.id, name: bless.name, desc: bless.desc || '' });
-      if (word) options.push({ ...word });
-      if (options.length < 2) continue;
-      this.echoSupply.byPlayer.set(ps.playerId, { options: options.slice(0, 3), pick: null });
-      n += 1;
-    }
-    if (n) this.markPublic();
-    return n;
+    if (this.echoSupply && this.echoSupply.round === this.round) return 0;
+    // 维护者 2026-11-05：补给改成**团队投票、共享一份**（原来是每人各选一次，
+    // 全员选词条/祝福叠加太超模）。候选是固定的三个方向，全队同一份。
+    const once = (Array.isArray(ECHO_BLESSINGS) ? ECHO_BLESSINGS : []).filter((b) => echoBlessingOneShot(b) && b.kind !== 'counter');
+    const bless = once.length ? once[Math.floor((Number(this.rngWaves()) || 0) * once.length)] : null;
+    const options = [
+      { kind: 'word', id: 'word_atk', name: '词条 · 强攻', desc: '本层全队攻击 +8%', mods: { atkPct: 0.08 } },
+      { kind: 'word', id: 'word_bat', name: '词条 · 疾速', desc: '本层全队攻速 +6%', mods: { batPct: 0.06 } },
+      bless
+        ? { kind: 'blessing', id: bless.id, name: bless.name, desc: bless.desc || '' }
+        : { kind: 'word', id: 'word_hp', name: '词条 · 坚韧', desc: '本层全队生命 +8%', mods: { hpPct: 0.08 } },
+    ];
+    this.echoSupply = { round: this.round, options, votes: new Map(), pick: null };
+    this.echoSupplyEndsAt = (this.sched?.now?.() ?? 0) + ECHO_BLESSING_VOTE_MS;
+    this.cancel(this._echoSupplyTimer);
+    this._echoSupplyTimer = this.later(ECHO_BLESSING_VOTE_MS, () => {
+      this._echoSupplyTimer = null;
+      try { this._echoForceResolveSupply(); } catch { /* 结算失败不该炸掉整局 */ }
+    });
+    this.markPublic();
+    return 1;
   }
 
-  /** `g.echoSupply`：领取本次补给（个人选择，不需要投票）。 */
+  /** `g.echoSupply`：投一票（团队投票，票多者得，全队共享一份）。 */
   setEchoSupplyPick(ps, idx) {
     if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE);
     if (!ps || ps.spectator) return fail(ERR.SPECTATOR);
-    const box = this.echoSupply && this.echoSupply.round === this.round ? this.echoSupply.byPlayer.get(ps.playerId) : null;
+    if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    if (ps.alive === false) return fail(ERR.SPECTATOR, 'dead players do not vote');
+    const box = this.echoSupply && this.echoSupply.round === this.round ? this.echoSupply : null;
     if (!box || box.pick != null) return fail(ERR.WRONG_PHASE);
     const at = Math.floor(Number(idx));
-    if (!(at >= 0 && at < box.options.length)) return fail(ERR.BAD_MSG);
-    const card = box.options[at];
-    if (card.kind === 'item' && card.id) ps.acquireItem(card.id, { source: 'echoSupply' });
-    else if (card.kind === 'word' && card.mods) {
-      // 临时词条：本层全队生效（结算后失效，不进祝福列表）
+    if (!(at >= 0 && at < box.options.length)) return fail(ERR.BAD_TARGET);
+    if (!box.votes) box.votes = new Map();
+    box.votes.set(ps.playerId, at);
+    this.markPublic();
+    return this._echoResolveSupply();
+  }
+
+  /** 票齐了就结算；没齐就等着（幂等，照搬祝福投票）。 */
+  _echoResolveSupply() {
+    const box = this.echoSupply && this.echoSupply.round === this.round ? this.echoSupply : null;
+    if (!box || !Array.isArray(box.options) || !box.options.length) return OK;
+    const voters = this.humans().filter((p) => p.connected && !p.spectator && p.alive !== false && !p.left).map((p) => p.playerId);
+    if (!voters.length || !voters.every((id) => (box.votes || new Map()).has(id))) return OK;
+    const tally = new Map();
+    for (const id of voters) {
+      const v = box.votes.get(id);
+      tally.set(v, (tally.get(v) || 0) + 1);
+    }
+    let best = 0;
+    let bestN = -1;
+    for (const v of [...tally.keys()].sort((a, b) => a - b)) {
+      const n = tally.get(v);
+      if (n > bestN) { best = v; bestN = n; }
+    }
+    return this._echoSettleSupply(best);
+  }
+
+  /** 30 秒超时强制结算：没人投取候选第一项，投过的按票数最高（照搬祝福投票）。 */
+  _echoForceResolveSupply() {
+    const box = this.echoSupply && this.echoSupply.round === this.round ? this.echoSupply : null;
+    if (!box || !Array.isArray(box.options) || !box.options.length) return OK;
+    const tally = new Map();
+    for (const v of (box.votes || new Map()).values()) tally.set(v, (tally.get(v) || 0) + 1);
+    let best = 0;
+    let bestN = -1;
+    for (const v of [...tally.keys()].sort((a, b) => a - b)) {
+      const n = tally.get(v);
+      if (n > bestN) { best = v; bestN = n; }
+    }
+    return this._echoSettleSupply(best);
+  }
+
+  /** 发放中选的那一项（全队共享一次），清空状态。 */
+  _echoSettleSupply(best) {
+    const box = this.echoSupply && this.echoSupply.round === this.round ? this.echoSupply : null;
+    this.cancel(this._echoSupplyTimer);
+    this._echoSupplyTimer = null;
+    if (!box || !Array.isArray(box.options)) { this.echoSupply = null; return OK; }
+    const card = box.options[best];
+    box.pick = best;
+    if (card && card.kind === 'word' && card.mods) {
+      // 临时词条：本层全队生效一次（结算后失效，不进祝福列表）
       this.echoSupplyWords = Array.isArray(this.echoSupplyWords) ? this.echoSupplyWords : [];
       this.echoSupplyWords.push({ round: this.round, mods: { ...card.mods }, name: card.name });
-    }
-    else if (card.kind === 'blessing') {
+      this._echoPushAnnounce(`深潜补给：全队共享「${card.name}」`);
+    } else if (card && card.kind === 'blessing') {
       const b = echoBlessingById(card.id);
-      if (b) this._echoGrantBlessing(b);
+      if (b) { this._echoGrantBlessing(b); this._echoPushAnnounce(`深潜补给：全队共享「${b.name}」`); }
     }
-    box.pick = at;
-    ps.dirty?.();
+    this._echoFlushAnnounce?.();
     this.markPublic();
     return OK;
   }
 
-  /** 下发给客户端的补给视图（每名玩家只看自己的）。 */
+  /** 下发给客户端的补给视图（全队同一份，含票数与倒计时）。 */
   _echoSupplyView() {
     if (this.echoVariant !== 'deepecho') return null;
-    if (!this.echoSupply || this.echoSupply.round !== this.round || !this.echoSupply.byPlayer.size) return null;
-    const out = {};
-    for (const [id, box] of this.echoSupply.byPlayer) out[id] = { options: box.options, pick: box.pick };
-    return { round: this.round, byPlayer: out };
+    const box = this.echoSupply && this.echoSupply.round === this.round ? this.echoSupply : null;
+    if (!box || !Array.isArray(box.options) || !box.options.length) return null;
+    return {
+      round: this.round,
+      options: box.options,
+      votes: Object.fromEntries(box.votes instanceof Map ? box.votes : []),
+      pick: box.pick,
+      endsAt: this.echoSupplyEndsAt ?? null,
+    };
   }
 
   /** 已拥有的祝福对象列表（HUD / 测试用）。 */

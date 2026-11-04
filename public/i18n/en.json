@@ -2525,5 +2525,8 @@
   "选一项带走（个人选择，不需要投票）": "Take one (personal pick, no vote)",
   "一次性祝福": "One-shot blessing",
   "本层词条": "This-round word",
-  "先选一张，再点「确认」": "Pick a card, then confirm"
+  "先选一张，再点「确认」": "Pick a card, then confirm",
+  "全队投票选一项，共享一份（{n}/{m}）": "Team vote for one, shared once ({n}/{m})",
+  "你已投「{name}」，等待队友…": "You voted {name}, waiting for teammates…",
+  "先选一项，再点「确认」": "Pick one, then confirm"
 }
