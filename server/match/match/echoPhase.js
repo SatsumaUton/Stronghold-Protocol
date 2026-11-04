@@ -705,6 +705,36 @@ export class MatchEcho {
     return out;
   }
 
+  /**
+   * 手动提前结束「排异 / 封锁」（维护者 2026-11-05）：持有对应的反制祝福（`counterBans`，如「开路」）时，
+   * 玩家可以不等诅咒自己到期，直接消耗一次把它清掉。
+   *
+   * `g.echoCounterUse` → 这里。没持有 / 当前没有可解除的效果都返回失败，不消耗。
+   */
+  setEchoCounterUse(ps) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE);
+    if (!ps || ps.spectator) return fail(ERR.SPECTATOR);
+    if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    const held = Array.isArray(this.echoCounterIds) ? this.echoCounterIds : [];
+    const idx = held.findIndex((id) => {
+      const b = echoBlessingById(id);
+      return !!(b && b.counterBans);
+    });
+    if (idx < 0) return fail(ERR.BAD_TARGET, 'no counter for bans');
+    const hadTiles = Array.isArray(this.echoBannedTiles) ? this.echoBannedTiles.length : 0;
+    const hadBonds = Array.isArray(this.echoBannedBonds) ? this.echoBannedBonds.length : 0;
+    if (!hadTiles && !hadBonds) return fail(ERR.WRONG_PHASE, 'nothing to lift');
+    const b = echoBlessingById(held[idx]);
+    held.splice(idx, 1);
+    this.echoBannedTiles = [];
+    this.echoBannedBonds = [];
+    if (this.echoBannedBondsUntil && typeof this.echoBannedBondsUntil === 'object') this.echoBannedBondsUntil = {};
+    this._echoPushAnnounce(`祝福「${b.name}」：提前解除封锁 / 排异`);
+    this._echoFlushAnnounce();
+    this.markPublic();
+    return OK;
+  }
+
   /** 诅咒「封锁」：从当前可部署地块里随机封掉 n 个（抽不到就少封，不硬造格子）。 */
   _echoApplyDeployBan(count = 3, rng = () => 0.5) {
     const ps = this.alivePlayers()[0];
@@ -948,6 +978,16 @@ export class MatchEcho {
       blessingMax: this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0),
       // 名额已满时的「弃选」投票（维护者 2026-11-05）：全队投掉哪个，再换入新的
       blessingReplace: this.echoBlessingReplace === true,
+      // 手上握着的反制祝福（不占名额）：客户端据此显示「提前结束排异 / 封锁」按钮（2026-11-05）
+      counters: (Array.isArray(this.echoCounterIds) ? this.echoCounterIds : []).map((id) => {
+        const b = echoBlessingById(id);
+        return { id, name: (b && b.name) || id, desc: (b && b.desc) || '', canLiftBans: !!b && b.counterBans === true };
+      }),
+      canLiftBans: (Array.isArray(this.echoCounterIds) ? this.echoCounterIds : []).some((id) => {
+        const b = echoBlessingById(id);
+        return !!b && b.counterBans === true;
+      }) && ((Array.isArray(this.echoBannedTiles) && this.echoBannedTiles.length > 0)
+        || (Array.isArray(this.echoBannedBonds) && this.echoBannedBonds.length > 0)),
       discard: Array.isArray(this.echoBlessingDiscardOffer) && this.echoBlessingDiscardOffer.length
         ? {
           pick: this.echoBlessingPendingPick || null,
