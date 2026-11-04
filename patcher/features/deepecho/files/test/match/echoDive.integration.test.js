@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeMatch } from './harness.js';
-import { ECHO_BLESSINGS, echoBlessingById } from '../../server/match/match/echoBlessing.js';
+import { ECHO_BLESSINGS, echoBlessingById, echoBlessingOffer } from '../../server/match/match/echoBlessing.js';
 import { echoCurseById, ECHO_CURSES, ECHO_ROUND_CURSES } from '../../server/match/match/echoCurse.js';
 
 /** 一间 deepecho 房（fake 战斗，不跑真实模拟）。 */
@@ -726,3 +726,79 @@ test('boss 通关继续往下打：深度跟着回合走，不会回到 1', () =
   assert.ok(!/_echoBeginDive\s*\(/.test(src.replace(/\/\/[^\n]*/g, '')), '_echoBeginDive 已删除，不应再被调用');
 });
 
+
+// 维护者 2026-11-05：「开路」可以重复出现 —— 排异会分批降临，每次都需要一次解除。
+test('开路可重复：拿过还能再抽到、不占祝福名额', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.echoBlessings = ['atk_s', 'hp_s', 'def_s'];        // 三个名额已经占满
+  m.echoBannedBonds = ['yanShip'];
+  m._echoGrantBlessing(echoBlessingById('unlock'));
+  assert.deepEqual(m.echoBannedBonds, [], '满名额也能拿到开路并生效');
+  assert.ok(m.echoBlessings.includes('unlock'));
+
+  m.echoBannedBonds = ['swiftShip'];                   // 第二批排异
+  m._echoGrantBlessing(echoBlessingById('unlock'));
+  assert.deepEqual(m.echoBannedBonds, [], '再拿一次仍然生效');
+  assert.equal(m.echoBlessings.filter((id) => id === 'unlock').length, 1, '列表里只记一次');
+
+  let s = 3;
+  const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+  let seen = false;
+  for (let i = 0; i < 80 && !seen; i++) {
+    if (echoBlessingOffer(rng, ['unlock']).some((b) => b.id === 'unlock')) seen = true;
+  }
+  assert.ok(seen, '开路能重复出现在三选一里');
+  for (let i = 0; i < 20; i++) {
+    assert.ok(!echoBlessingOffer(rng, ['atk_s']).some((b) => b.id === 'atk_s'), '普通祝福不重复');
+  }
+});
+// 维护者 2026-11-05：诅咒可以多次出现并叠层，反制祝福每次只消一层（可以重复拿）。
+test('诅咒叠层：同一诅咒多次出现，效果叠加且显示合并', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 10;
+
+  m.echoCurseIds = ['erosion'];
+  const cap1 = m._echoWordCap();
+  m.echoCurseIds = ['erosion', 'erosion'];
+  assert.equal(m._echoWordCap(), Math.min(8, cap1 + 1), '两层侵蚀 → 词条上限再 +1');
+
+  m.echoCurseIds = ['bleed'];
+  const one = m._echoLpLoss(4, 99);
+  m.echoCurseIds = ['bleed', 'bleed'];
+  const two = m._echoLpLoss(4, 99);
+  assert.ok(two > one, `两层失血应更疼（${one} → ${two}）`);
+  assert.equal(two, Math.ceil(4 * 2.25), '×1.5 叠两层 = ×2.25');
+
+  const shown = m._echoCurses().find((c) => c.id === 'bleed');
+  assert.ok(shown && shown.name.includes('×2'), '列表里合并成「失血 ×2」');
+});
+
+test('反制祝福每次只消一层，可以重复拿', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.echoCurseIds = ['bleed', 'bleed'];
+  m._echoGrantBlessing(echoBlessingById('staunch'));
+  assert.deepEqual(m.echoCurseIds, ['bleed'], '第一次只消一层');
+  m.echoBlessings = [];                                 // 模拟再抽到一次
+  m._echoGrantBlessing(echoBlessingById('staunch'));
+  assert.deepEqual(m.echoCurseIds, [], '第二次清掉剩下那层');
+});
+
+test('干员减益叠层：同一条诅咒 N 层就挂 N 个 buff', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.echoCurseIds = ['weak_melee', 'weak_melee'];
+  const handlers = {};
+  const buffs = [];
+  const battle = { on: (n, cb) => { handlers[n] = cb; }, addBuff: (u, b) => buffs.push(b.key), dealHPLose: () => {} };
+  m._echoHookBattle(battle);
+  handlers.deploy({ unit: { side: 'ally', def: { position: 'MELEE' }, buffs: [] } });
+  assert.equal(buffs.length, 2, '两层 → 两个 buff');
+  assert.notEqual(buffs[0], buffs[1], 'key 不能相同（否则会被当成同一条）');
+});

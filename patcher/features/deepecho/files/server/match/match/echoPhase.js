@@ -14,7 +14,7 @@ import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js'
 import { echoCurseList, echoCurseEffects, echoCurseById, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
-  echoBlessingFunds, echoBlessingHeal, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
+  echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR } from '../../../shared/constants.js';
@@ -288,9 +288,11 @@ export class MatchEcho {
     if (unitCurses.length) {
       battle.on('deploy', ({ unit }) => {
         if (!unit || unit.side !== 'ally' || typeof battle.addBuff !== 'function') return;
-        for (const c of unitCurses) {
+        for (let ci = 0; ci < unitCurses.length; ci++) {
+          const c = unitCurses[ci];
           if (!curseUnitMatches(c.filter, unit)) continue;
-          const key = `echo:curse:${c.id}`;
+          // 同一条诅咒叠了 N 层就要挂 N 个 buff，所以 key 带序号
+          const key = `echo:curse:${c.id}:${ci}`;
           if ((unit.buffs || []).some((x) => x && x.key === key)) continue;
           battle.addBuff(unit, { key, name: c.name, desc: '', mods: { ...c.mods }, persist: true, visible: true });
         }
@@ -857,6 +859,7 @@ export class MatchEcho {
   _echoMaybeOfferBlessing(r = this.round) {
     if (!this._echoDiveRound(r)) return null;
     const due = echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws, this._echoBlessingMax());
+    // 反制祝福不占 3 个上限，但**会消耗一次抽取机会**（否则每回合都能刷一张反制）
     const owned = Array.isArray(this.echoBlessings) ? this.echoBlessings.length : 0;
     if (due <= owned) { this.echoBlessingOffer = null; return null; }
     if (Array.isArray(this.echoBlessingOffer) && this.echoBlessingOffer.length) return this.echoBlessingOffer;
@@ -945,9 +948,13 @@ export class MatchEcho {
   _echoGrantBlessing(b) {
     if (!b) return null;
     if (!Array.isArray(this.echoBlessings)) this.echoBlessings = [];
-    if (this.echoBlessings.includes(b.id)) return null;          // 同类不叠加
-    if (this.echoBlessings.length >= this._echoBlessingMax()) return null;       // 上限（静默会压低）
-    this.echoBlessings.push(b.id);
+    // 可重复的祝福（目前只有「开路」）：不按同类去重、不占 3 个名额，每次拿到都重新执行一次效果
+    const repeatable = b.repeatable === true;
+    if (!repeatable && this.echoBlessings.includes(b.id)) return null;          // 同类不叠加
+    // 上限只看**非反制**祝福：反制不进 3 个名额（静默会压低上限）
+    const normalHeld = this.echoBlessings.filter((id) => !echoBlessingFree(echoBlessingById(id))).length;
+    if (!repeatable && normalHeld >= this._echoBlessingMax()) return null;
+    if (!this.echoBlessings.includes(b.id)) this.echoBlessings.push(b.id);
     this._echoBlessingEndsAt = null;
     // A 类：**立刻进钱包**（维护者 2026-11-04：原来走 pendingFunds，要等下一回合 prep 才入账，
     // 玩家选了 40 资金当场看不到，以为没生效）。
@@ -990,9 +997,12 @@ export class MatchEcho {
       const ids = Array.isArray(b.counterCurses) ? b.counterCurses : [];
       let removed = 0;
       if (ids.length && Array.isArray(this.echoCurseIds) && this.echoCurseIds.length) {
-        const before = this.echoCurseIds.length;
-        this.echoCurseIds = this.echoCurseIds.filter((id) => !ids.includes(id));
-        removed = before - this.echoCurseIds.length;
+        // 诅咒可以叠层（同一个 id 出现多次）：一次反制只消掉**一层**，
+        // 所以要靠重复拿反制来逐层解（维护者 2026-11-05「可以多次出现生效」）。
+        for (const id of ids) {
+          const at = this.echoCurseIds.indexOf(id);
+          if (at >= 0) { this.echoCurseIds.splice(at, 1); removed += 1; }
+        }
       }
       if (this.echoRoundCurse && ids.includes(this.echoRoundCurse)) this.echoRoundCurse = null;
       if (b.counterBans) {

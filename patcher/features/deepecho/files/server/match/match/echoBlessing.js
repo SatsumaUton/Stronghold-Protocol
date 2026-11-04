@@ -108,7 +108,8 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'staunch', rarity: 'rare', name: '止血', desc: '驱散「失血 / 溃血 / 剧痛 / 渗血」：漏怪伤害恢复正常', kind: 'counter', group: 'counter',
     counterCurses: ['bleed', 'hemorrhage', 'ache', 'r_bleed'] },
   { id: 'unlock', rarity: 'rare', name: '开路', desc: '解除「封锁 / 排异」：被封的地块重新可部署、盟约排异取消', kind: 'counter', group: 'counter',
-    counterBans: true },
+    // 可重复出现（维护者 2026-11-05）：排异会分批降临，每次都需要新的开路；且不占 3 个祝福名额
+    repeatable: true, counterBans: true },
   { id: 'recon', rarity: 'rare', name: '侦察', desc: '驱散「迷雾 / 遮蔽」：敌方情报恢复显示', kind: 'counter', group: 'counter',
     counterCurses: ['fog', 'blackout'] },
   { id: 'thrift', rarity: 'common', name: '开源', desc: '驱散所有资金类诅咒（贡赋 / 征收 / 重税 / 什一税 / 抽成）', kind: 'counter', group: 'counter',
@@ -194,7 +195,7 @@ export const ECHO_BLESSING_RARITY_LABEL = Object.freeze({ common: '普通', rare
 export function echoBlessingOffer(rng, owned = []) {
   const have = new Set(Array.isArray(owned) ? owned : []);
   const pool = ECHO_BLESSINGS
-    .filter((b) => !have.has(b.id) && b.disabled !== true)
+    .filter((b) => (echoBlessingFree(b) || b.repeatable === true || !have.has(b.id)) && b.disabled !== true)
     .map((b) => ({ b, w: ECHO_BLESSING_RARITY_WEIGHT[b.rarity] || 1 }));
   const out = [];
   while (pool.length && out.length < 3) {
@@ -253,6 +254,12 @@ export const echoBlessingFunds = (b) => (b && b.kind === 'fund' && b.funds > 0 ?
  * 数值由调用方封顶到玩家自己的初始生命（`gd.startLp`），这里只负责给出「该回多少」。
  * @param {typeof ECHO_BLESSINGS[number]} b
  */
+/**
+ * 反制祝福（kind === 'counter'）：一次性生效、**不占 3 个祝福名额**、可以重复抽到。
+ * 维护者 2026-11-05：排异/诅咒会分批降临，把反制塞进原本的名额会逼玩家在「变强」和「能玩」之间二选一。
+ */
+export const echoBlessingFree = (b) => !!(b && b.kind === 'counter');
+
 export const echoBlessingHeal = (b) => (b && b.kind === 'heal' && b.healLp > 0 ? Math.trunc(b.healLp) : 0);
 
 /**

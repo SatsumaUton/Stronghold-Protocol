@@ -74,7 +74,10 @@ test('三选一候选：不重复、最多 3 个、已拥有的不再出现', ()
   assert.ok(after.every((b) => b.id !== 'fund'), '已拥有的不该再进候选');
   assert.equal(after.length, 3, '池子还够，仍然给满 3 个候选');
 
-  assert.deepEqual(echoBlessingOffer(seq(0.1), ECHO_BLESSINGS.map((b) => b.id)), [], '全拿过就没有候选');
+  // 2026-11-05：反制祝福（kind === 'counter'）可重复，全拿过时仍会出现在候选里
+  const all = echoBlessingOffer(seq(0.1), ECHO_BLESSINGS.map((b) => b.id));
+  assert.ok(all.length > 0, '反制祝福总是可以再出现');
+  assert.ok(all.every((b) => b.kind === 'counter'), '全拿过时只可能出现反制祝福');
 });
 
 test('候选是确定性的：同样的随机序列给同样的结果', () => {
