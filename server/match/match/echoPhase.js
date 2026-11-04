@@ -1003,6 +1003,19 @@ export class MatchEcho {
     // 这里把换算结果写给玩家看，避免「多叠一层却没反应」的误解。
     const applied = echoCurseList(this.echoCurseIds).map(({ id, name, desc }) => {
       const c = echoCurseById(id);
+      // 排异（bondBan）：把「禁了哪几个盟约 + 还剩几层」写进描述，玩家一眼能看到（维护者 2026-11-05）
+      if (c && c.effect && c.effect.kind === 'bondBan' && Array.isArray(this.echoBannedBonds) && this.echoBannedBonds.length) {
+        const names = this.echoBannedBonds.map((b) => this.gd.bond(b)?.name || b).join('、');
+        const depth = this._echoDepth();
+        const left = this.echoBannedBonds
+          .map((b) => Number(this.echoBannedBondsUntil && this.echoBannedBondsUntil[b]) - depth)
+          .filter((n) => n > 0);
+        const tail = left.length ? `；剩余 ${Math.max(...left)} 层` : '';
+        return {
+          id, name, rarity: c.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c.rarity] || '普通',
+          desc: `${desc}（已禁：${names}${tail}）`,
+        };
+      }
       return { id, name, desc, rarity: c?.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c?.rarity] || '普通' };
     });
     const withRarity = (c) => ({ id: c.id, name: c.name, desc: c.desc, rarity: c.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c.rarity] || '普通' });

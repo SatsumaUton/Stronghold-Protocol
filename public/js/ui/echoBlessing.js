@@ -43,11 +43,16 @@ export function EchoBlessing({ pub }) {
     try { await fn(); } finally { pending.current = false; setBusy(false); }
   };
   const pick = (i) => { if (busy || !online || myPick != null) return; setArmed(i); send(() => actions.echoBlessing(i)); };
-  // 没有可抽的卡时：满名额的弃选投票优先，其次什么都不显示（hooks 已经全部跑过，顺序稳定）
+  // 没有可抽的卡时：满名额的弃选投票 → 护盾指定盟约的投票 → 什么都不显示（hooks 已全部跑过，顺序稳定）
   if (!offer || !Array.isArray(offer.options) || !offer.options.length) {
-    return discard && Array.isArray(discard.options) && discard.options.length
-      ? html`<${EchoBlessingDiscard} pub=${pub} myId=${myId} online=${online} now=${now} setNow=${setNow} />`
-      : null;
+    if (discard && Array.isArray(discard.options) && discard.options.length) {
+      return html`<${EchoBlessingDiscard} pub=${pub} myId=${myId} online=${online} now=${now} setNow=${setNow} />`;
+    }
+    const shield = pub?.echo?.shield?.offer;
+    if (shield && Array.isArray(shield.options) && shield.options.length) {
+      return html`<${EchoShieldVote} pub=${pub} myId=${myId} online=${online} now=${now} setNow=${setNow} />`;
+    }
+    return null;
   }
   return html`<div class="echo-bless-overlay" role="dialog" aria-label=${t('深渊祝福')} aria-live="polite">
     <div class="echo-bless">
@@ -132,6 +137,55 @@ function EchoBlessingDiscard({ pub, myId, online, now, setNow }) {
       </div>
       <footer class="echo-bless__foot">
         <span>${myPick != null ? t('已投票，等待队友…') : t('点一张卡投票要舍弃的祝福。')}</span>
+      </footer>
+    </div>
+  </div>`;
+}
+/** 「护盾」祝福的投票：全队指定一条附加盟约，排异随机到它时会被抵消（30 秒）。 */
+function EchoShieldVote({ pub, myId, online, now, setNow }) {
+  const s = pub?.echo?.shield?.offer;
+  const [armed, setArmed] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const left = Number.isFinite(s?.endsAt) && s.endsAt > 0 ? Math.max(0, Math.ceil((s.endsAt - now) / 1000)) : null;
+  const votes = s?.votes || {};
+  const myPick = votes[myId];
+  const voters = (pub?.players || []).filter((p) => !p.isBot && p.status !== 'left' && p.connected);
+  const voted = voters.filter((p) => votes[p.playerId] != null).length;
+  useEffect(() => {
+    if (left == null) return undefined;
+    const id = setInterval(() => setNow(serverNow()), 500);
+    return () => clearInterval(id);
+  }, [left == null]);
+  const pick = async (i) => {
+    if (busy || !online || myPick != null || pending.current) return;
+    pending.current = true; setBusy(true); setArmed(i);
+    try { await actions.echoShield(i); } finally { pending.current = false; setBusy(false); }
+  };
+  return html`<div class="echo-bless-overlay" role="dialog" aria-label=${t('护盾：指定盟约')} aria-live="polite">
+    <div class="echo-bless">
+      <header class="echo-bless__head">
+        <b>${t('护盾：投票指定要保护的盟约')}</b>
+        <span>${t('排异随机到这条盟约时，护盾会抵消该诅咒（一次性）。30 秒后按票数结算。')}</span>
+        ${left != null ? html`<span class="echo-bless__timer" aria-live="off"><b>${left}</b><i>秒</i></span>` : null}
+        <span class="echo-bless__count">${voted}/${voters.length}</span>
+      </header>
+      <div class="echo-bless__cards">
+        ${s.options.map((opt, i) => {
+          const mine = myPick === i;
+          const who = voters.filter((p) => votes[p.playerId] === i).map((p) => p.name);
+          return html`<button key=${opt.id} type="button"
+            class=${`echo-bless__card${mine ? ' is-mine' : ''}${armed === i && myPick == null ? ' is-armed' : ''}`}
+            disabled=${busy || !online || myPick != null}
+            onClick=${() => pick(i)}>
+            <span class="echo-bless__glyph" aria-hidden="true">${(opt.name || '?').slice(0, 1)}</span>
+            <b class="echo-bless__name">${opt.name}</b>
+            ${who.length ? html`<span class="echo-bless__votes">${who.join('、')}</span>` : null}
+          </button>`;
+        })}
+      </div>
+      <footer class="echo-bless__foot">
+        <span>${myPick != null ? t('已投票，等待队友…') : t('点一条盟约投票。')}</span>
       </footer>
     </div>
   </div>`;

@@ -13,6 +13,7 @@ import { groupEnemies, factionTypes, briefingBondTip } from './gameLogic.js';
 import { matchInfoModel, DiyBannedLine } from './matchInfo.js';
 import { factionIconUrl } from './assetUrls.js';
 import { data } from '../data.js';
+import { actions } from './gameActions.js';
 import { echoBuffChips } from './echoBuffs.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 
@@ -187,7 +188,16 @@ function BlessTab({ pub }) {
   // 反制祝福（一次性、不占名额）单独计数，别让它把 "/" 撑爆
   const normalBless = bless.filter((b) => !b.counter);
   const depth = Number(echo?.depth) || 0;
+  const counters = Array.isArray(echo?.counters) ? echo.counters : [];
   return html`<div class="edrawer__body">
+    ${counters.length ? html`<div class="echo-counters">
+      ${counters.map((c) => html`<span key=${c.id} class="echo-counter" title=${c.desc || ''}>
+        <b>${c.name}</b>
+        ${c.canLiftBans && echo?.canLiftBans
+          ? html`<button type="button" class="echo-counter__use" onClick=${() => actions.echoCounterUse()}>${t('提前结束排异/封锁')}</button>`
+          : null}
+      </span>`)}
+    </div>` : null}
     <h4 class="ihead">${t('已获祝福')} <small class="num">${normalBless.length}/${Number(echo?.blessingMax) || 3}</small>
       <small class="t-dim">${t('深度 {n}', { n: depth })}</small></h4>
     ${bless.length ? html`<ul class="echo-list">${bless.map((b) => html`<li key=${b.id}>

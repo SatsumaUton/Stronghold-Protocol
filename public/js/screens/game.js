@@ -111,7 +111,7 @@ import { ExitModal, AwayOverlay, awayStore } from '../ui/matchChrome.js';
 import { RoundPopup, PhasePopup, phasePopupOf, roundsToBoss, preloadPopupArt } from '../ui/matchPopups.js';
 import { openGuide } from '../ui/guide.js';
 import { actions, onRefreshBusy } from '../ui/gameActions.js';
-import { FacingWheel, holdPiece, setPieceDir, syncPieceDirs, showRange, useTileScreen } from '../ui/facingWheel.js';
+import { FacingWheel, holdPiece, setPieceDir, syncPieceDirs, showRange, useTileScreen, ECHO_BAN_STYLE } from '../ui/facingWheel.js';
 import { Underframe, underframeRect, TempRowNotice } from '../ui/underframe.js';
 import { StandInTags } from './game/standInTags.js';
 import { needsFacing, facingIntent, previewGrid, pieceDir, underframeActions, retreatSlot, itemDestroyable } from '../ui/facing.js';
@@ -1877,6 +1877,17 @@ function MatchScreen() {
     showRange(view, cardRange?.grid, cardRange?.row, cardRange?.col, cardRange?.dir, SEL_RANGE);
     return () => showRange(view, null, 0, 0, null, SEL_RANGE);
   }, [view, cardRangeKey, showPrep, field]);
+  // 「深渊回响」诅咒「封锁」：把禁放地块常亮标红（维护者 2026-11-05）
+  const echoBanTiles = Array.isArray(pub?.echo?.bans?.tiles) ? pub.echo.bans.tiles : [];
+  const echoBanKey = echoBanTiles.join('|');
+  useEffect(() => {
+    if (!view || typeof view.highlightTiles !== 'function') return undefined;
+    const tiles = echoBanTiles
+      .map((k) => String(k).split(',').map(Number))
+      .filter(([r, c]) => Number.isFinite(r) && Number.isFinite(c));
+    try { view.highlightTiles(tiles, ECHO_BAN_STYLE); } catch { /* 装饰性 */ }
+    return () => { try { view.highlightTiles([], ECHO_BAN_STYLE); } catch { /* 装饰性 */ } };
+  }, [view, echoBanKey]);
   // the card's bond chips — and the popup a chip opens: a battle / scouted unit's OWNER's bonds (yours, or that
   // teammate's — m.public + live layers), your own piece's yours, a popup member card the popup's player; shop / reward
   // cards read the strip's (ui/watchBonds.js detailBondOwner)
@@ -1984,7 +1995,7 @@ function MatchScreen() {
         onEnemy=${(k, n) => setDetail({ kind: 'enemy', id: k, count: n })} onChess=${(id) => setDetail({ kind: 'chess', id, foreign: true })} />` : null}
 
       ${bondPop ? html`<${BondPopup} bondId=${bondPop.bondId} entry=${bondPop.entry} priv=${bondPop.priv} banned=${pub?.bannedChess || []} owner=${bondPop.name} ownerId=${bondPop.ownerId}
-        off=${offBonds.has(bondPop.bondId)} morphMode=${morphMode}
+        off=${offBonds.has(bondPop.bondId)} echoBanned=${Array.isArray(pub?.echo?.bans?.bonds) && pub.echo.bans.bonds.includes(bondPop.bondId)} morphMode=${morphMode}
         place=${bpPlace} over=${!!resolved && bpPlace === dSide}
         onClose=${() => setBondOpen(null)} onMember=${(id, items, standInFor, diy) => setDetail({ kind: 'chess', id, owner: bondPop.ownerId, items: items || null, standInFor: standInFor || null, diy: diy || null })} />` : null}
 
