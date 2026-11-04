@@ -1,0 +1,1223 @@
+'use strict';
+// Stronghold-Protocol · 全局匹配服务（跨 30 节点）
+//
+// 玩家在 /mm/ 输入代号、选难度后进入队列；凑满 4 人时：
+//   * 选一个当前人数最少的节点；
+//   * 给 4 个人分别写好 sp_node Cookie，把他们钉到同一个节点；
+//   * 第一个（房主）自动建房并把房间码回传给本服务，其余三人拿房间码自动加入。
+//
+// 只用 node:http，无第三方依赖。数据全在内存（重启即清空）。
+// 监听 127.0.0.1:3090，对外只经 nginx 的 /mm/ 暴露。
+
+const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const net = require('node:net');
+// 项目根目录：按本文件位置推导，不写死部署路径
+const ROOT_DIR = path.join(__dirname, '..');
+const GATE_FILE = path.join(ROOT_DIR, 'content', 'game-gate.json');
+function gameGate() {
+  try {
+    const j = JSON.parse(fs.readFileSync(GATE_FILE, 'utf8'));
+    return { start: j.start !== false, match: j.match !== false, reason: String(j.reason || '') };
+  } catch {
+    return { start: true, match: true, reason: '' };
+  }
+}
+// 更新公告模块只在服务器上存在（guard/），公开仓库里没有它
+let updateFile = null;
+try { updateFile = require('../guard/update-file.cjs'); } catch { /* 可选模块 */ }
+const account = require('./account.cjs');
+const diveBoard = require('./diveBoard.cjs');
+const feedback = require('./feedback.cjs');
+// 跨节点「公开同盟」的纯筛选逻辑（无 I/O，单测直接 require 它，不用起 HTTP 服务）
+const { collectOpenRooms } = require('./openRooms.cjs');
+
+const PORT = Number(process.env.MM_PORT || 3090);
+const HOST = process.env.MM_HOST || '127.0.0.1';
+const NODES = 30;
+const SEATS = 4;
+const MAX_SEATS = 20;
+const isSeatCount = (n) => Number.isInteger(n) && n >= SEATS && n <= MAX_SEATS;
+const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
+const DIFF_NAMES = { FUNNY: '标准模拟', NORMAL: '险境模拟', HARD: '绝境模拟', ABYSS: '终极模拟' };
+const TICKET_TTL_MS = 15 * 60 * 1000;
+const MATCH_TTL_MS = 5 * 60 * 1000;
+/**
+ * 暂停接收新玩家的节点（逗号分隔节点号）。
+ * 用途：这些节点上还有未结束的对局，不能重启；先让匹配器不再把新玩家调度过去，
+ * 等在打的局自然结束后再重启。已经在房间里的人完全不受影响 ——
+ * 他们能打完、能继续开局、能被邀请进房，这里只拦「匹配分配到哪个节点」这一步。
+ */
+const DISABLED_NODES = new Set(
+  String(process.env.MM_DISABLED_NODES || '')
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= NODES),
+);
+const CODE_RE = /^[A-Za-z0-9]{4,8}$/;
+
+/**
+ * 把浏览器钉到某个节点：sp_node 给前端 nodeOf() 读，sp_route 给 nginx 选上游（两者必须一致，
+ * 否则页面会落在 A 节点却以为自己在 B 节点）。
+ */
+const pinCookies = (node) => [
+  `sp_node=${node}; Path=/; Max-Age=604800; SameSite=Lax`,
+  `sp_route=${node}; Path=/; Max-Age=604800; SameSite=Lax`,
+];
+
+const PUB = path.join(__dirname, 'public');
+
+// 后台共享样式目录（节点控制台 + matchmaker 后台共用，见 serveStatic 里的 /__admin-ui/）。
+// 单独走一层，是因为两个服务各有自己的 public/，互相读不到对方目录；
+// 房间玩家标签的样式就放在这里，避免两边各存一份副本。基准目录与 dashboard 一致。
+const SP_ROOT = process.env.SP_ROOT || path.resolve(__dirname, '..');
+const SHARED_ADMIN_UI = path.join(SP_ROOT, 'shared', 'admin-ui');
+
+/** @type {Map<string, any>} 票据 */
+const tickets = new Map();
+/** @type {Map<string, any>} 已组成的对局 */
+const matches = new Map();
+/** @type {Map<string, any>} 房间（整队）匹配：key = `${roomCode}@${node}` */
+const parties = new Map();
+/** @type {Map<number, {humans:number, rooms:number, ok:boolean, at:number}>} */
+const nodeLoad = new Map();
+
+const rid = () => crypto.randomBytes(12).toString('hex');
+const nodePort = (n) => 3000 + n;
+
+// ---------------------------------------------------------------- node 状态
+
+async function probeNode(n) {
+  try {
+    const res = await fetch(`http://127.0.0.1:${nodePort(n)}/healthz`, { signal: AbortSignal.timeout(1500) });
+    const j = await res.json();
+    return { humans: Number(j.sockets) || 0, rooms: Number(j.rooms) || 0, bots: Number(j.bots) || 0, ok: res.ok, at: Date.now() };
+  } catch {
+    return { humans: 0, rooms: 0, bots: 0, ok: false, at: Date.now() };
+  }
+}
+
+async function refreshNodes() {
+  const results = await Promise.all(Array.from({ length: NODES }, (_, i) => probeNode(i + 1)));
+  results.forEach((r, i) => nodeLoad.set(i + 1, r));
+}
+
+/** 选人最少、其次房间最少的节点；并列随机，避免总是压同一个。 */
+function pickNode() {
+  const alive = [...nodeLoad.entries()].filter(([n, v]) => v.ok && !DISABLED_NODES.has(n));
+  if (!alive.length) return null;
+  const shuffled = alive.map(([n, v]) => ({ n, v, r: Math.random() })).sort((a, b) => a.r - b.r);
+  shuffled.sort((a, b) => a.v.humans - b.v.humans || a.v.rooms - b.v.rooms);
+  return shuffled[0].n;
+}
+
+/** Expanded queues are only admitted by the isolated experimental node. */
+const EXPERIMENTAL_NODE = Number(process.env.MM_EXPERIMENTAL_NODE || 4);
+function pickNodeFor(capacity) {
+  if (capacity > SEATS) {
+    const v = nodeLoad.get(EXPERIMENTAL_NODE);
+    if (v?.ok && !DISABLED_NODES.has(EXPERIMENTAL_NODE)) return EXPERIMENTAL_NODE;
+  }
+  return pickNode();
+}
+
+// ---------------------------------------------------------------- 匹配
+// ---------------------------------------------------------------- 匹配
+
+// 规则维度（移植参考版 Matchmaking 的 rules 池）：'standard' = 房间规则全是默认，
+// 'experimental' = 房主改过规则（复活、敌人倍率、人数…）。票据可以只要一种，也可以两种都要。
+const MATCH_RULES = ['standard', 'experimental'];
+const normRules = (value) => {
+  const list = Array.isArray(value) ? value : (value == null ? MATCH_RULES : [value]);
+  const clean = MATCH_RULES.filter((r) => list.includes(r));
+  return clean.length ? clean : [...MATCH_RULES];
+};
+/** 两张票据能不能坐进同一局：规则集合有交集。 */
+const rulesOverlap = (a, b) => a.some((r) => b.includes(r));
+/** 配对用的桶键：难度 + 人数 + 规则（只有一种规则时才分桶，两种都要的票据参与两个桶）。 */
+const poolRules = (ticket) => (ticket.rules.length === 1 ? [ticket.rules[0]] : MATCH_RULES);
+
+/** 确认入场窗口：匹配成功后所有人必须在这段时间内点「进入对局」，否则整局作废。 */
+const ACCEPT_MS = 30_000;
+
+function positionOf(ticket) {
+  const waiting = [...tickets.values()]
+    .filter((t) => !t.matchId && t.difficulty === ticket.difficulty && t.capacity === ticket.capacity
+      && rulesOverlap(poolRules(t), ticket.rules))
+    .sort((a, b) => a.createdAt - b.createdAt);
+  return { position: waiting.findIndex((t) => t.id === ticket.id) + 1, waiting: waiting.length };
+}
+
+function formMatches() {
+  const now = Date.now();
+  for (const difficulty of DIFFICULTIES) {
+    // 每个（难度, 人数, 规则）一个池子。规则两种都要的票据会同时出现在两个池里，
+    // 但一旦成局就带上 matchId，后面的池子自然排除它。
+    const caps = [...new Set([...tickets.values()]
+      .filter((t) => !t.matchId && t.difficulty === difficulty && now - t.createdAt < TICKET_TTL_MS)
+      .map((t) => t.capacity))]
+      .filter(isSeatCount)
+      .sort((a, b) => a - b);
+    for (const capacity of caps) {
+      for (const rule of MATCH_RULES) {
+        for (;;) {
+          const waiting = [...tickets.values()]
+            .filter((t) => !t.matchId && t.difficulty === difficulty && t.capacity === capacity
+              && t.rules.includes(rule) && now - t.createdAt < TICKET_TTL_MS)
+            .sort((a, b) => a.createdAt - b.createdAt);
+          if (waiting.length < capacity) break;
+          const node = pickNodeFor(capacity);
+          if (!node) { console.warn('[mm] 没有可用节点，暂停组队'); break; }
+          const group = waiting.slice(0, capacity);
+          const match = {
+            id: rid(),
+            difficulty,
+            capacity,
+            rules: rule,
+            node,
+            hostId: (group.find((t) => !t.guest) || group[0]).id,
+            memberIds: group.map((t) => t.id),
+            code: null,
+            createdAt: now,
+            // 确认入场：所有人点过「进入对局」才算数，超时整局作废（参考版的 accept 步骤）
+            accepted: new Set(),
+            acceptDeadline: now + ACCEPT_MS,
+          };
+          matches.set(match.id, match);
+          for (const t of group) { t.matchId = match.id; t.node = node; }
+          console.log(`[mm] 组成对局 ${match.id.slice(0, 8)} 难度=${difficulty} 人数=${capacity} 规则=${rule} 节点=${node} 玩家=${group.map((t) => t.name).join(',')}`);
+        }
+      }
+    }
+  }
+}
+
+/** 这一局是不是所有人都确认了；host 可以直接开始建房。 */
+const allAccepted = (m) => m.memberIds.every((id) => m.accepted.has(id));
+
+function sweep() {
+  const now = Date.now();
+  for (const [id, t] of tickets) {
+    // 页面关掉/断网：25 秒没轮询就退出队列，避免和幽灵玩家凑成一局
+    if (!t.matchId && now - (t.lastSeen || t.createdAt) > 25_000) {
+      tickets.delete(id);
+      console.log(`[mm] 超时移出队列 ${t.name}`);
+      continue;
+    }
+    if (now - t.createdAt > TICKET_TTL_MS) { tickets.delete(id); continue; }
+    if (t.matchId) {
+      const m = matches.get(t.matchId);
+      if (!m) { t.matchId = null; t.node = null; }
+      // 确认超时：还没全员确认就把整局作废，确认过的人退回队列重新等（参考版 breakOffer 的思路）。
+      else if (!allAccepted(m) && now > m.acceptDeadline) {
+        console.log(`[mm] 确认超时，作废对局 ${m.id.slice(0, 8)}`);
+        for (const mid of m.memberIds) {
+          const x = tickets.get(mid);
+          if (!x) continue;
+          if (m.accepted.has(mid)) { x.matchId = null; x.node = null; x.createdAt = now; }
+          else tickets.delete(mid);   // 没确认的视为放弃
+        }
+        matches.delete(m.id);
+      }
+      // 已确认但房主迟迟没建出房来：也给一个上限
+      else if (allAccepted(m) && now - m.createdAt > MATCH_TTL_MS) {
+        if (m.code) { matches.delete(m.id); tickets.delete(t.id); }
+        else { m.memberIds.forEach((mid) => { const x = tickets.get(mid); if (x) { x.matchId = null; x.node = null; } }); matches.delete(m.id); }
+      }
+    }
+  }
+  for (const [id, m] of matches) if (now - m.createdAt > MATCH_TTL_MS * 2) matches.delete(id);
+}
+
+function publicState(ticket) {
+  if (!ticket.matchId) {
+    const { position, waiting } = positionOf(ticket);
+    return { state: 'queued', difficulty: ticket.difficulty, capacity: ticket.capacity,
+      rules: ticket.rules, position, waiting, need: ticket.capacity };
+  }
+  const match = matches.get(ticket.matchId);
+  if (!match) return { state: 'queued', difficulty: ticket.difficulty, capacity: ticket.capacity,
+    rules: ticket.rules, position: 1, waiting: 1, need: ticket.capacity };
+  const role = match.hostId === ticket.id ? 'host' : 'guest';
+  const accepted = allAccepted(match);
+  return {
+    // confirm = 匹配成功、正在等所有人点「进入对局」；matched = 全员确认，可以进局了
+    state: accepted ? 'matched' : 'confirm',
+    difficulty: match.difficulty,
+    capacity: match.capacity,
+    rules: match.rules,
+    node: match.node,
+    matchId: match.id,
+    role,
+    code: match.code,
+    accepted: match.accepted.has(ticket.id),
+    acceptedCount: match.accepted.size,
+    members: match.memberIds.length,
+    // 确认剩余毫秒（前端显示倒计时；超时整局作废）
+    acceptRemainMs: accepted ? 0 : Math.max(0, match.acceptDeadline - Date.now()),
+    ready: Boolean(match.code) || role === 'host',
+  };
+}
+
+// ---------------------------------------------------------------- 房间整队匹配（房间里的「匹配」按钮）
+// 房主点匹配后，整个房间作为一支队伍进池；同难度的几支队伍人数加起来正好 4 人时成局，
+// 所有人被钉到同一个节点：原来的房主在新节点自动建房，其余人拿房间码自动加入。
+
+const partyKey = (code, node) => `${String(code || '').toUpperCase()}@${node}`;
+
+// 本服：匹配必须按游戏版本隔离。不同版本（第二期下半 / 第二期上半 / 第一期…）的数据、
+// 干员与规则都不同，绝不能被配进同一局。老客户端没有带版本时按默认版本处理。
+const DEFAULT_GAME_VERSION = 'act2autochess';
+const normVersion = (v) => (typeof v === 'string' && /^[A-Za-z0-9_@.-]{1,64}$/.test(v) ? v : DEFAULT_GAME_VERSION);
+
+function waitingPartyPlayers(difficulty, capacity = SEATS, version = null) {
+  return [...parties.values()]
+    .filter((p) => !p.matchId && p.difficulty === difficulty
+      && (isSeatCount(p.capacity) ? p.capacity : SEATS) === capacity
+      && (version == null || normVersion(p.version) === version))
+    .reduce((n, p) => n + p.size, 0);
+}
+
+function partyState(p, clientId) {
+  const capacity = isSeatCount(p.capacity) ? p.capacity : SEATS;
+  const version = normVersion(p.version);
+  if (!p.matchId) {
+    return { state: 'queued', size: p.size, waiting: waitingPartyPlayers(p.difficulty, capacity, version), difficulty: p.difficulty, capacity, version };
+  }
+  const m = matches.get(p.matchId);
+  if (!m) {
+    p.matchId = null;
+    return { state: 'queued', size: p.size, waiting: waitingPartyPlayers(p.difficulty, capacity, version), difficulty: p.difficulty, capacity, version };
+  }
+  return {
+    state: 'matched',
+    node: m.node,
+    matchId: m.id,
+    difficulty: m.difficulty,
+    capacity: m.capacity || capacity,
+    version: m.version || version,
+    leader: clientId === m.hostClientId,
+    home: !!m.mainPartyKey && m.mainPartyKey === p.key,
+    code: m.code || null,
+  };
+}
+
+function formPartyMatches() {
+  if (!gameGate().match) return;
+  const now = Date.now();
+  for (const difficulty of DIFFICULTIES) {
+    // 先用 (版本, 人数) 分组：不同版本的队伍永远不进同一个候选池
+    const groups = [...new Set([...parties.values()]
+      .filter((p) => !p.matchId && p.difficulty === difficulty)
+      .map((p) => `${normVersion(p.version)}|${isSeatCount(p.capacity) ? p.capacity : SEATS}`))];
+    for (const group of groups) {
+      const [version, capStr] = group.split('|');
+      const capacity = Number(capStr);
+      for (let guard = 0; guard < 20; guard++) {
+        const waiting = [...parties.values()]
+          .filter((p) => !p.matchId && p.difficulty === difficulty
+            && normVersion(p.version) === version
+            && (isSeatCount(p.capacity) ? p.capacity : SEATS) === capacity
+            && now - (p.lastSeen || p.createdAt) < 25_000)
+          .sort((a, b) => a.createdAt - b.createdAt);
+        if (waiting.length < 2) break;
+        const picked = [];
+        let sum = 0;
+        for (const p of waiting) {
+          if (sum + p.size > capacity) continue;
+          picked.push(p);
+          sum += p.size;
+          if (sum === capacity) break;
+        }
+        if (sum !== capacity) break;
+        // 用人数最多的一队作为主房间；同人数时用先排队的队伍。
+        const hostParty = picked
+          .filter((p) => !p.guest)
+          .sort((a, b) => b.size - a.size || a.createdAt - b.createdAt)[0];
+        if (!hostParty) break;
+        const hostNode = hostParty.node;
+        const hostOnline = !!(hostNode && nodeLoad.get(hostNode)?.ok);
+        const node = hostOnline ? hostNode : pickNode();
+        if (!node) break;
+        const match = {
+          id: rid(), difficulty, node, party: true, capacity,
+          // 本服：把版本记进成局结果，房间按这个版本创建
+          version,
+          partyIds: picked.map((p) => p.key),
+          mainPartyKey: hostOnline ? hostParty.key : null,
+          hostClientId: hostParty.leaderClientId,
+          code: hostOnline ? hostParty.roomCode : null,
+          createdAt: now,
+        };
+        matches.set(match.id, match);
+        for (const p of picked) { p.matchId = match.id; p.node = node; }
+        scheduleWriteRoomDir();
+        console.log(`[mm] 组队成局 ${match.id.slice(0, 8)} 难度=${difficulty} 人数=${capacity} 版本=${version} 节点=${node} 房间=${picked.map((p) => `${p.roomCode}(${p.size})`).join('+')} 主房间=${hostParty.roomCode} ${hostOnline ? '沿用主房间' : '新房'}`);
+      }
+    }
+  }
+}
+
+function sweepParties() {
+  const now = Date.now();
+  for (const [key, p] of parties) {
+    if (!p.matchId && now - (p.lastSeen || p.createdAt) > 25_000) { parties.delete(key); scheduleWriteRoomDir(); continue; }
+    if (p.matchId) {
+      const m = matches.get(p.matchId);
+      if (!m) { p.matchId = null; continue; }
+      if (now - m.createdAt > MATCH_TTL_MS) {
+        if (m.code) parties.delete(key);
+        else { p.matchId = null; p.node = null; }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- HTTP
+
+/** 30 个节点的中文名（与节点目录 node-1…node-30 一一对应）。 */
+const NODE_NAMES = [
+  '阿戈尔', '玻利瓦尔', '东', '杜林', '哥伦比亚',
+  '卡西米尔', '卡兹戴尔', '拉特兰', '莱塔尼亚', '雷姆必拓',
+  '米诺斯', '萨尔贡', '萨米', '维多利亚', '乌萨斯',
+  '谢拉格', '叙拉古', '炎', '伊比利亚', '汐斯塔',
+  '龙门', '伦蒂尼姆', '切尔诺伯格', '沃伦姆德', '长泉镇',
+  '多索雷斯', '阿卡胡拉', '因非冰原', '焚风热土', '瓦伊凡',
+];
+let nodesCache = { at: 0, data: null };
+const roomDirModule = new Map();   // node -> { codes, at }
+
+/** 把内存里的房间目录写成 content/rooms.json（带模式/人数/对局状态），供控制台与后台读取。 */
+let roomDirWriting = false;
+let roomDirTimer = null;
+function scheduleWriteRoomDir() {
+  if (roomDirTimer) return;
+  roomDirTimer = setTimeout(() => { roomDirTimer = null; writeRoomDir(); }, 2000);
+  roomDirTimer.unref?.();
+}
+async function writeRoomDir() {
+  if (roomDirWriting) {
+    // 正在写：稍后补一次，避免这次匹配状态被丢掉
+    if (!roomDirTimer) {
+      roomDirTimer = setTimeout(() => { roomDirTimer = null; writeRoomDir(); }, 500);
+      roomDirTimer.unref?.();
+    }
+    return;
+  }
+  roomDirWriting = true;
+  try {
+    const nodes = [];
+    for (const [n, v] of roomDirModule) {
+      const rooms = [];
+      for (const code of v.codes) {
+        let info = null;
+        try { info = await roomInfo(code, n); } catch { info = null; }
+        // 该房间是否正在同盟整队匹配（parties 里未成局的同房号/节点）
+        let queued = false;
+        try { queued = [...parties.values()].some((p) => p.roomCode === code && p.node === n && !p.matchId); } catch { /* ignore */ }
+        rooms.push({ code, ...(info || {}), queued });
+      }
+      nodes.push({ n, at: v.at, rooms });
+    }
+    const dir = path.join(ROOT_DIR, 'content');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'rooms.json'), JSON.stringify({ at: Date.now(), nodes }));
+  } catch { /* 写不了就算了，控制台显示为空 */ } finally { roomDirWriting = false; }
+}
+// 后台管理（owner）通过 /api/admin2/rooms 读取同一份内存目录
+account.setRoomDirProvider?.(() => [...roomDirModule].map(([n, v]) => ({ n, codes: v.codes, at: v.at })));
+
+/** 所有节点的在线情况（5 秒缓存，玩家端每 15 秒取一次）。 */
+async function nodeStatus() {
+  if (nodesCache.data && Date.now() - nodesCache.at < 5000) return nodesCache.data;
+  const nodes = await Promise.all(NODE_NAMES.map(async (name, i) => {
+    const n = i + 1;
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 900);
+      const r = await fetch(`http://127.0.0.1:${3000 + n}/healthz`, { signal: ctl.signal });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error('bad');
+      const j = await r.json();
+      return { n, name, ok: true, humans: (j.sockets | 0), rooms: j.rooms | 0, matches: j.matches | 0, bots: (j.bots | 0) };
+    } catch {
+      return { n, name, ok: false, humans: 0, rooms: 0, matches: 0, bots: 0 };
+    }
+  }));
+  const data = { at: Date.now(), online: nodes.filter((x) => x.ok).length, total: nodes.length, nodes };
+  nodesCache = { at: Date.now(), data };
+  return data;
+}
+function redisHget(prefix, field) {
+  return new Promise((resolve) => {
+    let host = '127.0.0.1', port = 6379;
+    try { const u = new URL(process.env.SP_REDIS_URL || 'redis://127.0.0.1:6379'); host = u.hostname; port = Number(u.port) || 6379; } catch { /* defaults */ }
+    const sock = net.createConnection({ host, port });
+    let data = '';
+    let done = false;
+    const finish = () => { if (done) return; done = true; try { sock.destroy(); } catch { /* ignore */ } resolve(data); };
+    const complete = (s) => {
+      if (!s) return false;
+      if (s[0] === '+' || s[0] === '-') return s.includes('\r\n');
+      const m = /^\$(-?\d+)\r\n/.exec(s);
+      if (!m) return false;
+      const n = Number(m[1]);
+      return n < 0 || s.length >= m[0].length + n + 2;
+    };
+    sock.setTimeout(800, finish);
+    sock.on('error', finish);
+    sock.on('connect', () => {
+      const args = ['HGET', prefix + 'lobby:rooms', field];
+      sock.write(`*${args.length}\r\n` + args.map((a) => `$${Buffer.byteLength(a)}\r\n${a}\r\n`).join(''));
+    });
+    sock.on('data', (d) => { data += d.toString(); if (complete(data)) finish(); });
+    sock.on('end', finish);
+    sock.on('close', finish);
+  });
+}
+function parseRedisBulk(s) {
+  if (!s || s[0] === '-') return null;
+  const m = /^\$(-?\d+)\r\n/.exec(s);
+  if (!m || Number(m[1]) < 0) return null;
+  return s.slice(m[0].length, m[0].length + Number(m[1]));
+}
+async function roomInfo(code, node) {
+  const raw = parseRedisBulk(await redisHget(`sp:n${node}:`, code));
+  if (!raw) return null;
+  try {
+    const doc = JSON.parse(raw);
+    const seats = Array.isArray(doc.seats) ? doc.seats : [];
+    const seatList = seats.filter(Boolean);
+    const humans = seatList.filter((s) => !s.isBot).length;
+    const bots = seatList.length - humans;
+    const mode = doc.mode || null;
+    const players = seatList
+      .filter((s) => s && !s.isBot)
+      .map((s, i) => ({
+        name: String(s.name || ''),
+        // 账号 ID：恢复对局按「账号」而不是「昵称」精确匹配（昵称可以重名、可以改，
+        // 用昵称匹配会把玩家送去别人的对局）。guest 座位的 accountId 为 null。
+        accountId: s.accountId ? String(s.accountId) : null,
+        seat: Number.isInteger(s.seat) ? s.seat + 1 : i + 1,
+        ready: !!s.ready,
+        // 2026-10-31：这里**保持** `!== false`（缺字段=在线）。
+        //   试过改成 `=== true`，结果是节点未重启前 Redis 里没有 connected 字段，
+        //   83 个座位**全部显示离线**，比原来「全部显示在线」更误导 —— 立刻回滚。
+        //   等所有节点都重启过（lobbyState 会写真实值）之后，再统一改成 `=== true`。
+        connected: s.connected !== false,
+        host: !!doc.hostId && doc.hostId === s.playerId,
+        guest: !s.accountId,
+        // 管理员/服主：控制台把标签显示成「管理员」而不是「玩家」（仅展示用）
+        admin: s.admin === true,
+      }));
+    const spectatorPlayers = (Array.isArray(doc.spectators) ? doc.spectators : [])
+      .filter((s) => s && typeof s === 'object')
+      // 2026-10-31：**保持** `!== false`（缺字段=在线），理由同上面座位那段。
+      //   真正修的是 lobbyState 现在会存 connected（已分发到 30 个节点）；
+      //   等节点陆续重启、Redis 里都有真实值之后，这里和座位一起改成 `=== true` 才有意义。
+      .map((s) => ({ name: String(s.name || ''), connected: s.connected !== false }));
+    const round = doc.matchLive ? (Number(doc.liveRound) || 0) : (doc.match && Number.isFinite(Number(doc.match.round)) ? Number(doc.match.round) : null);
+    const maxSpectators = Number.isInteger(doc.maxSpectators) ? doc.maxSpectators
+      : (mode === 'coop' ? Math.max(2, Math.ceil(humans / 2)) : 0);
+    // 房间容量：优先 doc.capacity（lobbyState 现在会存）。
+    // 兜底读 doc.experimental.playerCapacity —— 老版本的房间文档没有 capacity 字段，
+    // 只靠 capacity 会让 5–20 人房在匹配池里被当成 4 人，被 4 人局配走。
+    const capacity = Number(
+      doc.capacity
+      ?? (doc.experimental && typeof doc.experimental === 'object' ? doc.experimental.playerCapacity : NaN),
+    );
+    return { full: seats.length > 0 && seats.every(Boolean), started: !!(doc.matchLive || doc.matchKey || doc.match), mode, difficulty: doc.difficulty || null, capacity: isSeatCount(capacity) ? capacity : SEATS, humans, bots, players, spectatorPlayers, round, seats: seats.length, spectators: spectatorPlayers.length, maxSpectators, adminCreated: doc.adminCreated === true,
+      // 本服：房间的游戏版本（默认版本在房间状态里被省略）
+      version: typeof doc.version === 'string' && doc.version ? doc.version : 'act2autochess' };
+  } catch { return null; }
+}
+
+/**
+ * 通用 RESP 调用：把一个命令发到 Redis，返回解析后的值（bulk string → string，nil → null，
+ * 数组 → array）。只用到 HGETALL / KEYS 这两种，超时 800 ms，失败就返回 null。
+ *
+ * 存在的理由：原来的 `redisHget` 只会发一条写死的 `HGET <prefix>lobby:rooms <code>`，
+ * 而「公开同盟跨节点列表」要把**每个节点**的整个房间哈希取回来，得按节点发 HGETALL。
+ */
+function redisCall(args, timeoutMs = 800) {
+  return new Promise((resolve) => {
+    let host = '127.0.0.1', port = 6379;
+    try { const u = new URL(process.env.SP_REDIS_URL || 'redis://127.0.0.1:6379'); host = u.hostname; port = Number(u.port) || 6379; } catch { /* defaults */ }
+    const sock = net.createConnection({ host, port });
+    let buf = Buffer.alloc(0);
+    let done = false;
+    const finish = (v) => { if (done) return; done = true; try { sock.destroy(); } catch { /* ignore */ } resolve(v ?? null); };
+    /** 解析一个 RESP2 值；返回 [value, nextPos]，数据不够时返回 null。 */
+    const parse = (b, p) => {
+      if (p >= b.length) return null;
+      const nl = b.indexOf('\r\n', p);
+      if (nl < 0) return null;
+      const line = b.slice(p + 1, nl).toString();
+      if (b[p] === 0x2b) return [line, nl + 2];                       // +simple
+      if (b[p] === 0x2d) return [null, nl + 2];                       // -error
+      if (b[p] === 0x24) {                                            // $bulk
+        const n = Number(line);
+        if (n < 0) return [null, nl + 2];
+        if (b.length < nl + 2 + n + 2) return null;
+        return [b.slice(nl + 2, nl + 2 + n).toString(), nl + 2 + n + 2];
+      }
+      if (b[p] === 0x2a) {                                            // *array
+        const n = Number(line);
+        if (n < 0) return [null, nl + 2];
+        const out = [];
+        let q = nl + 2;
+        for (let i = 0; i < n; i++) {
+          const got = parse(b, q);
+          if (!got) return null;
+          out.push(got[0]);
+          q = got[1];
+        }
+        return [out, q];
+      }
+      return [null, nl + 2];
+    };
+    sock.setTimeout(timeoutMs, () => finish(null));
+    sock.on('error', () => finish(null));
+    sock.on('connect', () => {
+      sock.write(`*${args.length}\r\n` + args.map((a) => `$${Buffer.byteLength(String(a))}\r\n${a}\r\n`).join(''));
+    });
+    sock.on('data', (d) => {
+      buf = Buffer.concat([buf, d]);
+      const got = parse(buf, 0);
+      if (got) finish(got[0]);
+    });
+    sock.on('end', () => finish(null));
+    sock.on('close', () => finish(null));
+  });
+}
+
+/**
+ * 所有节点上「公开同盟 + 还能进」的房间（跨节点列表的唯一数据源）。
+ *
+ * 每个节点的 Lobby 把房间写进 Redis 的 `sp:n<node>:lobby:rooms` 哈希（field = 房间码），
+ * `listed` / `matchmaking` 两个字段由 server/persist/lobbyState.js 写入。这里按节点 HGETALL，
+ * 再交给 `openRooms.cjs` 的 `collectOpenRooms` 筛（纯函数，单测覆盖），
+ * 每条都带**节点号** —— 客户端拿到 node 才能用 `?n=` 跳到那台节点。
+ *
+ * 结果缓存 3 秒：大厅列表每几秒刷一次，没必要每次都发 30 条 Redis 命令。
+ */
+const openRoomsCache = { at: 0, data: null };
+async function openRooms() {
+  if (openRoomsCache.data && Date.now() - openRoomsCache.at < 3000) return openRoomsCache.data;
+  const perNode = await Promise.all(NODE_NAMES.map(async (_name, i) => {
+    const n = i + 1;
+    return { node: n, flat: await redisCall(['HGETALL', `sp:n${n}:lobby:rooms`]) };
+  }));
+  const data = { at: Date.now(), rooms: collectOpenRooms(perNode) };
+  openRoomsCache.at = Date.now();
+  openRoomsCache.data = data;
+  return data;
+}
+
+function json(res, code, obj) {
+  const body = JSON.stringify(obj);
+  res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(body);
+}
+
+/** 客户端真实 IP：nginx 会带上 X-Real-IP / X-Forwarded-For（取最后一个，即最近一跳写的）。 */
+function clientIp(req) {
+  const real = req.headers['x-real-ip'];
+  if (typeof real === 'string' && real) return real.trim();
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string' && xff) return xff.split(',').pop().trim();
+  return (req.socket.remoteAddress || '?').replace(/^::ffff:/, '');
+}
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    let b = '';
+    req.on('data', (c) => { b += c; if (b.length > 8192) req.destroy(); });
+    req.on('end', () => { try { resolve(JSON.parse(b || '{}')); } catch { resolve({}); } });
+  });
+}
+
+function auth(ticket, id, secret) {
+  return ticket && ticket.id === id && ticket.secret === secret;
+}
+
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
+
+function serveStatic(res, pathname) {
+  // 后台共享样式（维护者 2026-10-29）：房间玩家标签原先在节点控制台和本后台
+  // 各有一份副本，改一边忘一边。现统一为 `<SP_ROOT>/shared/admin-ui/` 单一来源。
+  if (pathname.startsWith('/__admin-ui/')) {
+    const rel = pathname.slice('/__admin-ui/'.length);
+    if (!rel || rel.includes('..') || path.isAbsolute(rel)) { res.writeHead(403); return res.end('forbidden'); }
+    const sharedFile = path.join(SHARED_ADMIN_UI, rel);
+    if (!sharedFile.startsWith(SHARED_ADMIN_UI)) { res.writeHead(403); return res.end('forbidden'); }
+    return fs.readFile(sharedFile, (err, buf) => {
+      if (err) { res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }); return res.end('not found'); }
+      res.writeHead(200, { 'cache-control': 'no-store', 'content-type': MIME[path.extname(sharedFile).toLowerCase()] || 'application/octet-stream' });
+      res.end(buf);
+    });
+  }
+  const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  const file = path.join(PUB, rel);
+  if (!file.startsWith(PUB)) { res.writeHead(403); return res.end('forbidden'); }
+  fs.readFile(file, (err, buf) => {
+    if (err) { res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }); return res.end('not found'); }
+    res.writeHead(200, { 'cache-control': 'no-store', 'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' });
+    res.end(buf);
+  });
+}
+
+/**
+ * client.js 的内容指纹（本服新增）。
+ *
+ * 问题：页面加载后模块留在内存里，服务端更新送不到已打开的标签页。节点的
+ * ui/buildGuard.js 靠 `/healthz.build` 发现更新并自动刷新，但那个 buildTag 的覆盖范围是
+ * public/index.html、public/js、public/css、server/sim、shared、data —— **不含 matchmaker 的
+ * client.js**。于是改了 client.js 之后，玩家的旧页面会一直跑旧代码
+ * （2026-10-27 实测：合并轮询上线 15 分钟后，12,252 次轮询里只有 215 次走新端点，
+ *  client.js 只被请求了 9 次）。
+ *
+ * 做法：把 client.js 的 sha1 前 12 位缓存在内存里，/api/pulse 每次带出去；
+ * 页面拿自己的 `__MM_CLIENT_BUILD`（由 client.js 在启动时写入，值等于它自己的哈希）
+ * 与之比对，不同就说明服务器换过 client.js 了，按与 buildGuard 相同的克制规则刷新。
+ */
+let clientBuild = null;
+function clientBuildTag() {
+  if (clientBuild) return clientBuild;
+  try {
+    const buf = fs.readFileSync(path.join(PUB, 'client.js'));
+    clientBuild = require('node:crypto').createHash('sha1').update(buf).digest('hex').slice(0, 12);
+  } catch { clientBuild = ''; }
+  return clientBuild;
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://x');
+  const pathname = decodeURIComponent(url.pathname);
+
+  // ---- 深渊回响成绩归档（/api/dive/*）：节点上报 + 历史查询（MySQL，只留档） ----
+  if (pathname.startsWith('/api/dive')) {
+    try {
+      if (await diveBoard.handle(req, res, pathname)) return;
+      return json(res, 404, { error: 'NOT_FOUND' });
+    } catch (e) {
+      try { json(res, 500, { error: 'INTERNAL' }); } catch { /* 已发送 */ }
+      console.error('[diveBoard] unhandled', e && e.message);
+      return;
+    }
+  }
+
+  // ---- 玩家反馈板（/api/feedback/*）：读公开、写要登录、管理要 admin/owner ----
+  if (pathname.startsWith('/api/feedback')) {
+    try {
+      if (await feedback.handle(req, res, pathname)) return;
+      return json(res, 404, { error: 'NOT_FOUND' });
+    } catch (e) {
+      try { json(res, 500, { error: 'INTERNAL' }); } catch { /* 已发送 */ }
+      console.error('[feedback] unhandled', e && e.message);
+      return;
+    }
+  }
+
+  // ---- 账号与用户偏好（/api/auth/*、/api/prefs*）----
+  if (pathname.startsWith('/api/auth') || pathname.startsWith('/api/prefs') || pathname.startsWith('/api/account') || pathname.startsWith('/api/admin')) {
+    try {
+      const handled = await account.handle(req, res, pathname);
+      if (handled !== false) return;
+      return json(res, 404, { ok: false, error: 'not_found' });
+    } catch (e) {
+      const code = e && e.message === 'BODY_TOO_LARGE' ? 413 : (e && e.message === 'BAD_JSON' ? 400 : 500);
+      try { json(res, code, { ok: false, error: e && e.message ? e.message : 'server_error' }); } catch { /* 已发送 */ }
+      return;
+    }
+  }
+
+  if (pathname === '/api/join' && req.method === 'POST') {
+    const body = await readBody(req);
+    const name = String(body.name || '').trim().slice(0, 12);
+    const difficulty = String(body.difficulty || '');
+    const capacity = body.capacity == null ? SEATS : Number(body.capacity);
+    if (!name) return json(res, 400, { error: '请先填写博士代号' });
+    if (!DIFFICULTIES.includes(difficulty)) return json(res, 400, { error: '难度不正确' });
+    if (!isSeatCount(capacity)) return json(res, 400, { error: '匹配人数不正确' });
+    const ip = clientIp(req);
+    // 规则维度（参考版 MatchScope 的移植）：'standard' = 房间规则全是默认，'experimental' = 房主改过规则。
+    // 票据可以只要一种，也可以两种都要（前端「两个都选」时传数组）。
+    const rules = normRules(body.rules);
+    // 防刷：同一网络最多 3 个待匹配票据；全服最多 500 个
+    const mine = [...tickets.values()].filter((x) => x.ip === ip && !x.matchId).length;
+    if (mine >= 3) return json(res, 429, { error: '同一网络排队人数过多，请稍后再试' });
+    if (tickets.size >= 500) return json(res, 429, { error: '匹配队列已满，请稍后再试' });
+    const t = { id: rid(), secret: rid(), name, difficulty, capacity, rules, ip,
+      createdAt: Date.now(), lastSeen: Date.now(), matchId: null, node: null };
+    tickets.set(t.id, t);
+    console.log(`[mm] 排队 ${name} (${DIFF_NAMES[difficulty]}, ${capacity}人) 票据=${t.id.slice(0, 8)}`);
+    return json(res, 200, { ok: true, id: t.id, secret: t.secret, state: publicState(t) });
+  }
+
+  if (pathname === '/api/state') {
+    const t = tickets.get(url.searchParams.get('id') || '');
+    if (!auth(t, url.searchParams.get('id'), url.searchParams.get('secret'))) return json(res, 404, { error: 'ticket not found' });
+    t.lastSeen = Date.now();
+    return json(res, 200, publicState(t));
+  }
+
+  if (pathname === '/api/leave' && req.method === 'POST') {
+    const body = await readBody(req);
+    const t = tickets.get(body.id);
+    if (!auth(t, body.id, body.secret)) return json(res, 404, { error: 'ticket not found' });
+    if (t.matchId) return json(res, 409, { error: '已匹配成功，不能取消' });
+    tickets.delete(t.id);
+    return json(res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/accept' && req.method === 'POST') {
+    const body = await readBody(req);
+    const t = tickets.get(body.id);
+    if (!auth(t, body.id, body.secret)) return json(res, 404, { error: 'ticket not found' });
+    t.lastSeen = Date.now();
+    if (!t.matchId) return json(res, 409, { error: '还没有匹配成功' });
+    const m = matches.get(t.matchId);
+    if (!m) return json(res, 404, { error: '对局已失效' });
+    // 超时之后再点就没意义了：那一局已经被 sweep 作废/回收
+    if (!allAccepted(m) && Date.now() > m.acceptDeadline) return json(res, 409, { error: '确认已超时' });
+    m.accepted.add(t.id);
+    console.log(`[mm] 确认入场 ${t.name} (${m.accepted.size}/${m.memberIds.length}) ${m.id.slice(0, 8)}`);
+    return json(res, 200, { ok: true, state: publicState(t) });
+  }
+
+  if (pathname === '/api/room' && req.method === 'POST') {
+    const body = await readBody(req);
+    const t = tickets.get(body.ticketId);
+    if (!auth(t, body.ticketId, body.secret)) return json(res, 404, { error: 'ticket not found' });
+    const m = matches.get(body.matchId);
+    if (!m || m.hostId !== t.id) return json(res, 403, { error: 'not the host of this match' });
+    const code = String(body.code || '');
+    if (!CODE_RE.test(code)) return json(res, 400, { error: 'bad room code' });
+    m.code = code;
+    console.log(`[mm] 房间已就绪 ${m.id.slice(0, 8)} → ${code} @ 节点${m.node}`);
+    return json(res, 200, { ok: true });
+  }
+
+  // ---- 房间整队匹配 ----
+  if (pathname === '/api/gate') {
+    return json(res, 200, gameGate());
+  }
+  if (pathname === '/api/party/join' && req.method === 'POST') {
+    if (!gameGate().match) return json(res, 503, { error: 'maintenance', message: '匹配队友维护中' });
+    const body = await readBody(req);
+    const code = String(body.roomCode || '').toUpperCase();
+    const node = Number(body.node);
+    const difficulty = String(body.difficulty || '');
+    const info = await roomInfo(code, node);
+    const actualCapacity = info && isSeatCount(Number(info.capacity)) ? Number(info.capacity) : null;
+    const requestedCapacity = isSeatCount(Number(body.capacity)) ? Number(body.capacity) : null;
+    // Never fall back to 4 when an old page omitted capacity: that is exactly how a
+    // 20-person room used to be mixed with 4-person rooms. Make the old page refresh.
+    if (!actualCapacity && !requestedCapacity) {
+      return json(res, 409, { error: '匹配请求已过期，请刷新页面后重试' });
+    }
+    const capacity = actualCapacity || requestedCapacity;
+    const size = Math.max(1, Math.min(capacity, Number(body.size) || 1));
+    const clientId = String(body.clientId || '');
+    if (!CODE_RE.test(code) || !Number.isInteger(node) || node < 1 || node > NODES || !DIFFICULTIES.includes(difficulty) || !clientId) {
+      return json(res, 400, { error: 'bad party request' });
+    }
+    if (size >= capacity) return json(res, 409, { error: '房间已满，直接开始模拟即可' });
+    const key = partyKey(code, node);
+    // 本服：匹配按游戏版本隔离。优先用房间自己的版本（服务端权威），
+    // 房间信息取不到时才用客户端上报的版本，都没有则按默认版本。
+    const roomVersion = info && typeof info.version === 'string' ? info.version : null;
+    const version = normVersion(roomVersion || body.version);
+    let p = parties.get(key);
+    if (!p) {
+      p = { key, roomCode: code, node, difficulty, size, capacity, version, leaderClientId: clientId, guest: !!body.guest, createdAt: Date.now(), lastSeen: Date.now(), matchId: null };
+      parties.set(key, p);
+      console.log(`[mm] 房间 ${code}@${node} 开始匹配 · ${size}/${capacity} 人 · ${difficulty}`);
+    } else {
+      p.size = size;
+      p.capacity = capacity;
+      p.difficulty = difficulty;
+      // 房间可以在排队期间切换版本；以最新版本为准，避免旧版本被配进新版本的局
+      p.version = version;
+      p.lastSeen = Date.now();
+    }
+    scheduleWriteRoomDir();
+    return json(res, 200, { ok: true, partyId: key, state: partyState(p, clientId) });
+  }
+
+  if (pathname === '/api/party/state') {
+    const code = String(url.searchParams.get('code') || '').toUpperCase();
+    const node = Number(url.searchParams.get('node'));
+    const clientId = String(url.searchParams.get('client') || '');
+    // byCodeFallback：成局后队伍被切到新节点，旧键查不到时按房间码回退
+    let p = parties.get(partyKey(code, node));
+    if (!p) { for (const x of parties.values()) if (x.roomCode === code) { p = x; break; } }
+    if (!p) return json(res, 200, { state: 'idle' });
+    p.lastSeen = Date.now();
+    return json(res, 200, partyState(p, clientId));
+  }
+
+  if (pathname === '/api/party/leave' && req.method === 'POST') {
+    const body = await readBody(req);
+    let key = partyKey(String(body.roomCode || ''), Number(body.node));
+    // byCodeFallback
+    if (!parties.has(key)) { const rc = String(body.roomCode || '').toUpperCase(); for (const x of parties.values()) if (x.roomCode === rc) { key = x.key; break; } }
+    const p = parties.get(key);
+    if (!p) return json(res, 200, { ok: true });
+    if (p.matchId) return json(res, 409, { error: '已匹配成功，不能取消' });
+    // 房间里的任何成员都可以取消（页面刷新后领队身份会变，按房间码放行即可）
+    parties.delete(key);
+    scheduleWriteRoomDir();
+    console.log(`[mm] 房间 ${p.roomCode}@${p.node} 取消匹配`);
+    return json(res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/party/room' && req.method === 'POST') {
+    const body = await readBody(req);
+    const m = matches.get(body.matchId);
+    if (!m) return json(res, 404, { error: 'no such match' });
+    if (m.hostClientId !== body.clientId) return json(res, 403, { error: 'not the host' });
+    const code = String(body.code || '');
+    if (!CODE_RE.test(code)) return json(res, 400, { error: 'bad room code' });
+    m.code = code;
+    console.log(`[mm] 组队房间已就绪 ${m.id.slice(0, 8)} → ${code} @ 节点${m.node}`);
+    return json(res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/party/pin') {
+    const m = matches.get(url.searchParams.get('matchId') || '');
+    const node = Number(url.searchParams.get('node'));
+    if (!m || !m.party) return json(res, 404, { error: 'no such match' });
+    if (node !== m.node) return json(res, 400, { error: 'bad node' });
+    res.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'set-cookie': pinCookies(node),
+    });
+    return res.end(JSON.stringify({ ok: true, node }));
+  }
+
+  // 邀请链接用：把浏览器钉到指定节点（?n=），不需要票据
+  if (pathname === '/api/pin-node') {
+    const node = Number(url.searchParams.get('node'));
+    if (!Number.isInteger(node) || node < 1 || node > NODES) return json(res, 400, { error: 'bad node' });
+    res.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'set-cookie': pinCookies(node),
+    });
+    return res.end(JSON.stringify({ ok: true, node }));
+  }
+
+  // 把玩家钉到指定节点：写 sp_node + sp_route Cookie（由 nginx 透传给浏览器）
+  if (pathname === '/api/pin') {
+    const t = tickets.get(url.searchParams.get('id') || '');
+    if (!auth(t, url.searchParams.get('id'), url.searchParams.get('secret'))) return json(res, 404, { error: 'ticket not found' });
+    const node = Number(url.searchParams.get('node'));
+    if (!Number.isInteger(node) || node < 1 || node > NODES || node !== t.node) return json(res, 400, { error: 'bad node' });
+    res.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'set-cookie': pinCookies(node),
+    });
+    return res.end(JSON.stringify({ ok: true, node }));
+  }
+
+  if (pathname === '/api/announcement') {
+    try {
+      const raw = fs.readFileSync(path.join(ROOT_DIR, 'guard', 'announcement.json'), 'utf8');
+      return json(res, 200, JSON.parse(raw));
+    } catch { return json(res, 200, { enabled: false, text: '' }); }
+  }
+
+  // ---- 合并轮询（本服优化）----
+  // 真实访问日志统计：/api/gate、/api/room-ttl、/api/announcement 各自每 5 秒轮询一次，
+  // 三个端点合计约占全部请求的 55%——比素材请求（11.6%）多出近 5 倍。
+  // 它们返回的都是几十到一百多字节的小 JSON，合成的成本远低于三次往返。
+  // 这个端点一次返回三者，前端只打一个请求；老的三个端点保留（兼容已打开的旧页面）。
+  if (pathname === '/api/pulse') {
+    const readJson = (rel, fallback) => {
+      try { return JSON.parse(fs.readFileSync(path.join(ROOT_DIR, rel), 'utf8')); } catch { return fallback; }
+    };
+    const body = JSON.stringify({
+      ok: true,
+      gate: gameGate(),
+      roomTtl: readJson(path.join('shared', 'data', 'room-ttl.json'), { minutes: 15 }),
+      announcement: readJson(path.join('guard', 'announcement.json'), { enabled: false, text: '' }),
+      // 页面据此判断自己的 client.js 是否已过期（见 clientBuildTag 的注释）
+      clientBuild: clientBuildTag(),
+    });
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(body);
+    return;
+  }
+
+  if (pathname === '/api/announcements') {
+    try {
+      const raw = fs.readFileSync(path.join(ROOT_DIR, 'content', 'announcements.json'), 'utf8');
+      const list = JSON.parse(raw);
+      const body = JSON.stringify(Array.isArray(list) ? list : []);
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(body);
+    } catch {
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end('[]');
+    }
+    return;
+  }
+
+  if (pathname === '/api/room-ttl') {
+    try {
+      const raw = fs.readFileSync(path.join(ROOT_DIR, 'shared', 'data', 'room-ttl.json'), 'utf8');
+      return json(res, 200, JSON.parse(raw));
+    } catch { return json(res, 200, { minutes: 15 }); }
+  }
+
+  if (pathname === '/api/update') {
+    const doc = updateFile ? updateFile.readUpdate() : { enabled: false, text: '' };
+    const body = JSON.stringify(doc);
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(body);
+    return;
+  }
+
+// 房间目录：各节点每 10 秒上报自己的房间码，跨节点按房号找人
+const roomDir = new Map(); // node -> { codes: string[], at: number }
+
+  if (pathname === '/api/rooms/report' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 65536) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body || "{}");
+        const node = Number(d.node) | 0;
+        if (node > 0 && Array.isArray(d.codes)) roomDirModule.set(node, { codes: d.codes.filter((c) => typeof c === "string"), at: Date.now() });
+        scheduleWriteRoomDir();
+      } catch { /* ignore */ }
+      return json(res, 200, { ok: true });
+    });
+    return;
+  }
+
+  // 公开同盟（跨节点）：所有节点上「挂到公开列表 + 还没开局 + 有空位」的房间。
+  // 客户端在大厅点「公开同盟」时用它补齐本节点之外的房间，每条都带 node ——
+  // 点进去时用 nginx 的 `?n=<node>` 直接落到那台节点，避免「在本节点找不到房间」。
+  // 提示语：给 /mm 那套「匹配队友」覆盖层用，和游戏内「多人匹配」界面同源
+  // （都读 shared/data/config.json 的 tips），免得两边轮换出来的句子不一样。
+  if (pathname === '/api/tips') {
+    try {
+      const raw = fs.readFileSync(path.join(ROOT_DIR, 'shared', 'data', 'config.json'), 'utf8');
+      const cfg = JSON.parse(raw);
+      const tips = Array.isArray(cfg?.tips)
+        ? cfg.tips.map((x) => (typeof x === 'string' ? x : x?.tip)).filter((x) => typeof x === 'string' && x)
+        : [];
+      return json(res, 200, { ok: true, tips });
+    } catch {
+      return json(res, 200, { ok: true, tips: [] });
+    }
+  }
+  if (pathname === '/api/rooms/open') {
+    try {
+      const data = await openRooms();
+      return json(res, 200, { ok: true, at: data.at, rooms: data.rooms });
+    } catch {
+      return json(res, 200, { ok: true, at: Date.now(), rooms: [] });
+    }
+  }
+
+  // 按房间码找节点已经有了：`/api/find-room`（见下面，带 roomInfo）。
+
+  if (pathname === '/api/resolve-room') {
+    const code = String(url.searchParams.get('code') || '').toUpperCase();
+    let found = null;
+    for (const [node, v] of roomDirModule) {
+      if (Date.now() - v.at > 45000) continue;
+      if (v.codes.includes(code)) { found = node; break; }
+    }
+    if (!found) { res.writeHead(403, { 'cache-control': 'no-store' }); return res.end(); }
+    res.writeHead(204, { 'X-SP-Node': String(found), 'X-SP-Room': code, 'cache-control': 'no-store' });
+    return res.end();
+  }
+
+  if (pathname === '/api/room-redirect') {
+    const code = String(url.searchParams.get('code') || '').toUpperCase();
+    if (!/^[A-Z0-9]{4,6}$/.test(code)) { res.writeHead(302, { Location: '/', 'cache-control': 'no-store' }); return res.end(); }
+    let found = null;
+    for (const [node, v] of roomDirModule) {
+      if (Date.now() - v.at > 45000) continue;
+      if (v.codes.includes(code)) { found = node; break; }
+    }
+    if (!found) { res.writeHead(302, { Location: '/', 'cache-control': 'no-store' }); return res.end(); }
+    const adminNode = Number(url.searchParams.get('adminNode'));
+    const node = Number.isInteger(adminNode) && adminNode >= 1 && adminNode <= 30 ? adminNode : found;
+    const params = new URLSearchParams(url.searchParams);
+    params.delete('code');
+    params.delete('adminNode');
+    const qs = params.toString();
+    res.writeHead(302, {
+      Location: `/?room=${encodeURIComponent(code)}${qs ? '&' + qs : ''}`,
+      'Set-Cookie': [
+        `sp_route=${node}; Path=/; Max-Age=2592000; SameSite=Lax`,
+        `sp_node=${node}; Path=/; Max-Age=2592000; SameSite=Lax`,
+        `sp_join=${code}; Path=/; Max-Age=120; SameSite=Lax`,
+      ],
+      'cache-control': 'no-store',
+    });
+    return res.end();
+  }
+
+  if (pathname === '/api/find-room') {
+    const code = String(url.searchParams.get("code") || "").toUpperCase();
+    let found = null;
+    for (const [node, v] of roomDirModule) {
+      if (Date.now() - v.at > 45000) continue;
+      if (v.codes.includes(code)) { found = node; break; }
+    }
+    // 节点每 10 秒才上报一次房间码：刚建好的房（尤其跨节点点「加入同盟」时）会查不到，
+    // 客户端据此判定「房间已关闭」并把待加入清掉 —— 玩家看到的就是「房间不存在」。
+    // 内存目录查不到时直接翻 Redis（每个节点的 lobby:rooms 哈希里就有）。
+    if (!found) {
+      const hits = await Promise.all(NODE_NAMES.map(async (_x, i) => {
+        const raw = parseRedisBulk(await redisHget(`sp:n${i + 1}:`, code));
+        return raw ? i + 1 : 0;
+      }));
+      found = hits.find((x) => x > 0) || null;
+    }
+    if (!found) return json(res, 200, { code, node: null });
+    let info = null;
+    try { info = await roomInfo(code, found); } catch { /* ignore */ }
+    return json(res, 200, { code, node: found, ...(info || {}) });
+  }
+
+  if (pathname === '/api/node-status') {
+    return nodeStatus().then((data) => json(res, 200, data));
+  }
+
+  if (pathname === '/api/stats') {
+    return json(res, 200, {
+      waiting: [...tickets.values()].filter((t) => !t.matchId).length,
+      tickets: tickets.size,
+      matches: matches.size,
+      parties: parties.size,
+      partyWaiting: [...parties.values()].filter((p) => !p.matchId).reduce((n, p) => n + p.size, 0),
+      byDifficulty: Object.fromEntries(DIFFICULTIES.map((difficulty) => {
+        const queued = [...tickets.values()].filter((t) => !t.matchId && t.difficulty === difficulty);
+        const queuedParties = [...parties.values()].filter((p) => !p.matchId && p.difficulty === difficulty);
+        // 本服：按容量细分。★ capacities 必须把「正在排队的组队」也算进来，
+        // 否则只有 4 人房（SEATS）会被列出，5–20 人房的组队排队在后台/控制台看不见。
+        const partyCapacity = (p) => (isSeatCount(p.capacity) ? p.capacity : SEATS);
+        const capacities = [...new Set([
+          SEATS,
+          ...[...tickets.values()].filter((t) => t.difficulty === difficulty).map((t) => t.capacity),
+          ...queuedParties.map(partyCapacity),
+          ...[...matches.values()].filter((m) => m.difficulty === difficulty).map((m) => m.capacity == null ? SEATS : m.capacity),
+        ])].sort((a, b) => a - b);
+        return [difficulty, {
+          waiting: queued.length,
+          parties: queuedParties.length,
+          partyWaiting: queuedParties.reduce((n, p) => n + p.size, 0),
+          matches: [...matches.values()].filter((m) => m.difficulty === difficulty).length,
+          // 本服：按游戏版本细分（匹配已按版本隔离，后台/控制台要能看出来）
+          byVersion: (() => {
+            const vers = [...new Set([
+              ...[...queued].map((t) => normVersion(t.version)),
+              ...[...queuedParties].map((p) => normVersion(p.version)),
+              ...[...matches.values()].filter((m) => m.difficulty === difficulty).map((m) => normVersion(m.version)),
+            ])];
+            vers.sort();
+            return vers.map((v) => {
+              const q = queued.filter((t) => normVersion(t.version) === v);
+              const qp = queuedParties.filter((p) => normVersion(p.version) === v);
+              return {
+                version: v,
+                waiting: q.length,
+                parties: qp.length,
+                partyWaiting: qp.reduce((n, p) => n + p.size, 0),
+                matches: [...matches.values()].filter((m) => m.difficulty === difficulty && normVersion(m.version) === v).length,
+              };
+            });
+          })(),
+          // ★ 每个容量都统计组队排队。以前这里是 `capacity === SEATS ? … : 0`，
+          //   只有 4 人房有数据，5–20 人房永远显示 0 人排队 ——
+          //   后台与节点控制台的「匹配队列」对多人大厅完全失明。
+          byCapacity: capacities.map((capacity) => {
+            const qp = queuedParties.filter((p) => partyCapacity(p) === capacity);
+            return {
+              capacity,
+              waiting: queued.filter((t) => t.capacity === capacity).length,
+              parties: qp.length,
+              partyWaiting: qp.reduce((n, p) => n + p.size, 0),
+              matches: [...matches.values()].filter((m) => m.difficulty === difficulty && (m.capacity == null ? SEATS : m.capacity) === capacity).length,
+            };
+          }),
+        }];
+      })),
+      nodes: [...nodeLoad.entries()].map(([n, v]) => ({ n, ...v, disabled: DISABLED_NODES.has(n) })),
+    });
+  }
+
+  if (pathname === '/api/health') return json(res, 200, { ok: true, ts: Date.now() });
+
+  // 管理页面：没有管理员权限时连页面存在性都不暴露，直接 404
+  if (pathname === '/admin.html' || pathname === '/admin') {
+    const ok = await account.adminGate(req);
+    if (!ok) {
+      res.writeHead(404, {
+        'content-type': 'text/plain; charset=utf-8',
+        'cache-control': 'no-store',
+        'x-robots-tag': 'noindex, nofollow',
+      });
+      return res.end('Not Found');
+    }
+  }
+
+  return serveStatic(res, pathname);
+});
+
+setInterval(() => { formMatches(); formPartyMatches(); sweep(); sweepParties(); }, 1000);
+setInterval(refreshNodes, 3000);
+// Room details (players/spectator limit) change without a room-directory event; keep the
+// console snapshot fresh so a dynamic maxSpectators is not stuck at the old value.
+setInterval(() => scheduleWriteRoomDir(), 5000).unref?.();
+refreshNodes();
+
+// 账号库初始化（表不存在时自动创建），失败不阻塞匹配服务
+account.ensureSchema()
+  .then(() => console.log('[mm] account schema ready'))
+  .then(() => diveBoard.init().then((ok) => { if (ok) console.log('[mm] dive_board ready'); }))
+  .catch((e) => console.warn('[mm] account schema init failed:', e && e.message));
+
+server.listen(PORT, HOST, () => {
+  console.log(`[mm] matchmaking on http://${HOST}:${PORT}/`);
+  if (DISABLED_NODES.size) {
+    console.log(`[mm] 暂停接收新玩家的节点: ${[...DISABLED_NODES].sort((a, b) => a - b).join(',')}`);
+  }
+});
+
+
+// ---------------------------------------------------------------- 账号接口
+
+function readJsonBody(req, limit = 16 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0; const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) { reject(new Error('body too large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {}); }
+      catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
+
+function sendAuthJson(res, code, obj) {
+  res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(JSON.stringify(obj));
+}
+
