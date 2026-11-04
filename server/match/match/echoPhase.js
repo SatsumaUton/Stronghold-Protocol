@@ -878,6 +878,8 @@ export class MatchEcho {
         rangeExtend: Number(b.mods && b.mods.rangeExtend) || 0,
       })),
       offer,
+      // 祝福名额：隐藏核心通关会临时 +1（客户端显示 n/3 → n/4）
+      blessingMax: this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0),
       // 备战阶段的聚合情报（威胁值 / 是否精英 / 空中数量）；非深潜回合为 null
       curses: this._echoCurses(),
       rules: this._echoFixedRules(),
@@ -936,7 +938,13 @@ export class MatchEcho {
    */
   _echoMaybeOfferBlessing(r = this.round) {
     if (!this._echoDiveRound(r)) return null;
-    const due = echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws, this._echoBlessingMax());
+    // 隐藏核心通关会临时 +1 名额（`echoBlessingBonus`）：不发出去就会一直占着，
+    // 所以这里把上限一起抬高，开完三选一立刻清零（玩家最多能看到 4/3）。
+    const bonus = Math.max(0, Number(this.echoBlessingBonus) || 0);
+    // 名额上限 + bonus，并把应得数也 +bonus —— 只抬上限还不够：`echoBlessingDue` 的
+    // 「每 5 层一次」在 16 层刚好是 3，拿满 3 个时 due 仍然 ≤ owned，多出来的名额永远发不出去。
+    const cap = this._echoBlessingMax() + bonus;
+    const due = Math.min(cap, echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws, this._echoBlessingMax()) + bonus);
     // 反制祝福不占 3 个上限，但**每次都消耗一次抽取机会**（拿在手里也不存底）
     const owned = (Array.isArray(this.echoBlessings) ? this.echoBlessings.length : 0)
       + (Array.isArray(this.echoCounterIds) ? this.echoCounterIds.length : 0);
@@ -946,6 +954,7 @@ export class MatchEcho {
     const offer = echoBlessingOffer(rng, this.echoBlessings);
     if (!offer.length) { this.echoBlessingOffer = null; return null; }
     this.echoBlessingOffer = offer.map((b) => b.id);
+    if (bonus > 0) this.echoBlessingBonus = bonus - 1;
     this._echoBlessingVotes.clear();
     // 30 秒不投完就强制结算，否则一个人挂机会把全队卡死（维护者 2026-11-03 定）
     this.cancel(this._echoBlessingTimer);
@@ -1035,7 +1044,9 @@ export class MatchEcho {
       this.echoCounterIds.push(b.id);
     } else {
       if (this.echoBlessings.includes(b.id)) return null;                       // 同类不叠加
-      if (this.echoBlessings.length >= this._echoBlessingMax()) return null;    // 上限（静默会压低）
+      // 上限（静默会压低）；隐藏核心通关的临时名额要算进去，否则第 4 个祝福会被这里拒掉
+      const cap = this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0);
+      if (this.echoBlessings.length >= cap) return null;
       this.echoBlessings.push(b.id);
     }
     this._echoBlessingEndsAt = null;

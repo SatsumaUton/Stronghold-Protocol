@@ -1063,3 +1063,25 @@ test('排异诅咒不禁购物车：被排异的干员仍能在商店出现/购�
   m._echoGrantBlessing(echoBlessingById('unlock'));
   assert.equal(m._echoDeployBlocked({ kind: 'chess', id, items: [] }, '8,5', true), null);
 });
+// 维护者 2026-11-05：打完 15 层的隐藏核心，应该多给一次祝福三选一 ——
+// 之前只把 `echoBlessingDraws` 抬到 1，被 `_echoBlessingMax()`（3）封顶吃掉，玩家什么都看不到。
+test('隐藏核心通关：第 16 层开得出「额外那一次」三选一（3 个名额已满时）', async (t) => {
+  const { echoBlessingById } = await import('../../server/match/match/echoBlessing.js');
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  // 先拿满 3 个（用真实存在的祝福 id）
+  m.echoBlessings = ECHO_BLESSINGS.filter((b) => !b.counter).slice(0, 3).map((b) => b.id);
+  assert.equal(m.echoBlessings.length, 3);
+
+  m.round = 14;
+  m.startRound(15);                                  // 15 层：已满 3 个，不该再发
+  assert.equal(m.echoBlessingOffer, null, '15 层已满就不再发');
+
+  m.echoBlessingBonus = 1;                           // 打完隐藏核心 → 临时 +1 名额
+  m.round = 15;
+  m.startRound(16);
+  assert.ok(Array.isArray(m.echoBlessingOffer) && m.echoBlessingOffer.length === 3, '16 层要开出三选一');
+  assert.equal(m.echoBlessingBonus, 0, '名额用掉后清零');
+  assert.equal(m._echoPublic().blessingMax, 3, '发完之后名额回到 3');
+});

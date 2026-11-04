@@ -366,6 +366,14 @@ export class Match {
     /** 隐藏核心通关额外给的祝福抽取次数（DESIGN-ABYSS.md「隐藏通关的补偿」） */
     this.echoBlessingDraws = 0;
     /**
+     * 隐藏核心通关的**额外祝福名额**（维护者 2026-11-05）。
+     *
+     * 只抬 `echoBlessingDraws` 不够：`echoBlessingDue` 会按 `_echoBlessingMax()`（3）封顶，
+     * 而打完隐藏核心通常在 15 层 —— 那时 3 个名额早已拿满，多出来的抽取被静默吃掉，
+     * 玩家打完隐藏 boss 什么都看不到。这里给一个**临时 +1 名额**，发出去之后清零。
+     */
+    this.echoBlessingBonus = 0;
+    /**
      * 挑战关（深度 5 / 10）没达成清怪线时累积的**诅咒 id 列表**（维护者 2026-11-05）。
      * 词条与效果都在 `match/echoCurse.js`：现在只会推 'erosion'（+1 侵蚀词条上限），
      * 以后别的来源（隐藏 boss 失败 / 连续团灭）直接往这里推 id 即可，显示与效果自动跟上。

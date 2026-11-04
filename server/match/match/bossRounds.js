@@ -589,7 +589,12 @@ export class MatchBoss {
           this.tickerText('深潜开始', FLOW_TICKER_PRIORITY);
           // 隐藏核心多打了一关 boss → 补一次祝福抽取。原来由 `_echoBeginDive` 顺手设置，
           // 那个方法已随「深潜从 R1 起」删除，这里显式保留（不要删，否则隐藏通关的补偿会静默消失）。
+          //
+          // 2026-11-05 修正：只抬 `echoBlessingDraws` 没用 —— 15 层时 3 个名额早已拿满，
+          // `echoBlessingDue` 按 `_echoBlessingMax()` 封顶，多出来的抽取被吃掉，玩家看不到任何奖励。
+          // 改成**临时 +1 名额**（`echoBlessingBonus`），16 层开头就会开出三选一，选完名额回收。
           this.echoBlessingDraws = Math.max(Number(this.echoBlessingDraws) || 0, 1);
+          this.echoBlessingBonus = (Number(this.echoBlessingBonus) || 0) + 1;
           this.startRound(this.round + 1);
           return;
         }
