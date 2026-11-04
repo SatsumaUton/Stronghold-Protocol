@@ -63,7 +63,13 @@ export class PlayerEconomy {
     const ev = { slot, kind: slot.kind, id: slot.id, price: slot.basePrice };
     this.m.dispatch(this, 'onPrice', ev, { quiet: true });
     const p = Number(ev.price);
-    return Number.isFinite(p) ? Math.max(0, Math.round(p)) : slot.basePrice;
+    const base = Number.isFinite(p) ? Math.max(0, Math.round(p)) : slot.basePrice;
+    // 「深渊回响」诅咒「通胀 / 暴利」：商店干员与装备加价。
+    // 视图里的 price 就是这里算出来的（player/views.js），所以客户端**实际显示的**就是加价后的价。
+    const mul = this.m && this.m.echoVariant === 'deepecho' && typeof this.m._echoShopPriceMul === 'function'
+      ? this.m._echoShopPriceMul()
+      : 1;
+    return mul === 1 ? base : Math.max(0, Math.round(base * mul));
   }
 
   _rollChessSlot() {

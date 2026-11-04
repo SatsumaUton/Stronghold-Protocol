@@ -511,6 +511,56 @@ test('克制祝福：抽到就驱散对应诅咒 / 解除部署禁令', (t) => {
   assert.equal(m.echoRoundCurse, null, '本回合的渗血也被驱散');
 });
 
+// 维护者 2026-11-05：商店加价诅咒（客户端显示的就是加价后的价）+ 全图持续伤害诅咒。
+test('通胀：商店干员/装备加价，且这个价就是客户端拿到的价', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  const slot = { kind: 'chess', id: null, basePrice: 4 };
+  assert.equal(ps.priceOf(slot), 4, '没诅咒时是原价');
+  m.echoCurseIds = ['inflation'];                 // +25%
+  assert.equal(ps.priceOf(slot), 5, '4 → 5');
+  m.echoCurseIds = ['profiteer'];                 // +50%
+  assert.equal(ps.priceOf(slot), 6, '4 → 6');
+  // 视图里的 price 就是 priceOf
+  const view = ps.privateView ? ps.privateView() : null;
+  if (view && Array.isArray(view.shop?.slots)) {
+    for (const s of view.shop.slots) if (s && s.basePrice != null) assert.equal(s.price, ps.priceOf(s));
+  }
+});
+
+test('腐蚀：全图持续伤害每秒扣己方最大生命的比例', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.echoCurseIds = ['rot'];                       // 每秒 0.5%
+  const handlers = {};
+  const dealt = [];
+  const ally = { alive: true, maxHp: 1000 };
+  const battle = {
+    on: (name, cb) => { handlers[name] = cb; },
+    allyUnits: [ally],
+    dealHPLose: (c) => dealt.push(c.amount),
+    addBuff: () => {},
+  };
+  m._echoHookBattle(battle);
+  assert.equal(typeof handlers.tick, 'function', '挂上了 tick 钩子');
+  handlers.tick({ dt: 0.5 });
+  assert.deepEqual(dealt, [], '不足 1 秒不结算');
+  handlers.tick({ dt: 0.5 });
+  assert.deepEqual(dealt, [5], '1 秒 → 1000 × 0.5% = 5');
+  handlers.tick({ dt: 2 });
+  assert.deepEqual(dealt, [5, 5], '一次 tick 只结算 1 秒（不会一口气扣两次）');
+
+  // 没有诅咒时不挂钩子
+  const h2 = dive();
+  t.after(() => h2.m.dispose());
+  const hs = {};
+  h2.m._echoHookBattle({ on: (n, cb) => { hs[n] = cb; }, allyUnits: [], dealHPLose: () => {}, addBuff: () => {} });
+  assert.equal(hs.tick, undefined);
+});
+
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。

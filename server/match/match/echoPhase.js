@@ -304,6 +304,25 @@ export class MatchEcho {
       if (!Array.isArray(this.echoBountyPaid)) this.echoBountyPaid = [];
       if (!this.echoBountyPaid.includes(id)) this.echoBountyPaid.push(id);
     }, { priority: 40, owner: 'echo:bounty' });
+    // 「腐蚀 / 溃烂」诅咒（2026-11-05）：全场持续伤害 —— 己方单位每秒按最大生命比例掉血。
+    // 用 battle 的 `tick` 钩子（lifecycle.js emit('tick', { dt })），不改模拟器。
+    const dot = this._echoCurseFx().dot;
+    if (dot > 0) {
+      let acc = 0;
+      battle.on('tick', ({ dt } = {}) => {
+        acc += Math.max(0, Number(dt) || 0);
+        if (acc < 1) return;
+        acc -= 1;
+        const units = Array.isArray(battle.allyUnits) ? battle.allyUnits : [];
+        for (const u of units) {
+          if (!u || !u.alive) continue;
+          const maxHp = Number(u.maxHp ?? (u.s && u.s.maxHp)) || 0;
+          if (!(maxHp > 0)) continue;
+          const amount = Math.max(1, Math.round(maxHp * dot));
+          if (typeof battle.dealHPLose === 'function') battle.dealHPLose({ target: u, amount });
+        }
+      }, { priority: 30, owner: 'echo:curse-dot' });
+    }
   }
 
   /**
@@ -479,6 +498,11 @@ export class MatchEcho {
     const run = echoCurseEffects(this.echoCurseIds);
     const round = this.echoRoundCurse ? echoCurseEffects([this.echoRoundCurse]) : null;
     return round ? mergeCurseEffects(run, round) : run;
+  }
+
+  /** 商店加价倍率（诅咒「通胀 / 暴利」）：`player/economy.js` 的 priceOf 消费它。 */
+  _echoShopPriceMul() {
+    return this.echoVariant === 'deepecho' ? this._echoCurseFx().shopPriceMul : 1;
   }
 
   /** 漏怪扣血（含诅咒「失血 / 溃血 / 剧痛」）：只放大已有漏怪，仍受每回合上限约束。 */

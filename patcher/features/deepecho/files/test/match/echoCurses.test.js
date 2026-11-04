@@ -67,7 +67,9 @@ test('echoCurseEffects：每条诅咒的效果都算得出来（没有空转的�
       || e.intel !== neutral.intel
       || e.blackout !== neutral.blackout
       || e.lpMul !== neutral.lpMul
-      || e.lpExtra !== neutral.lpExtra;
+      || e.lpExtra !== neutral.lpExtra
+      || e.shopPriceMul !== neutral.shopPriceMul
+      || e.dot !== neutral.dot;
     assert.ok(changed, `${c.id} 的效果没有任何字段变化`);
   }
 });
