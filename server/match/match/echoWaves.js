@@ -577,8 +577,9 @@ export function echoRandomWave(gd, tpl, opts, rng, helpers) {
     }
     for (const [st, target] of byStart) {
       if (used.has(st)) continue;
-      const s = slots.find((x) => x.fly === target.fly) || slots[0];
-      if (!s) break;
+      // 只把**同移动方式**的格位挪到这个出兵口：地面怪绝不能走飞行路线
+      const s = slots.find((x) => x.fly === target.fly);
+      if (!s) continue;
       s.routeIndex = target.i;
       used.add(st);
     }
