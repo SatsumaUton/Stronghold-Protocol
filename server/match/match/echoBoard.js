@@ -65,10 +65,13 @@ export function echoBoardEntry(e = {}) {
       name: String((s && s.name) || '').slice(0, 24),
       cores: (Array.isArray(s && s.cores) ? s.cores : []).map((b) => String(b || '').slice(0, 16)).filter(Boolean).slice(0, 4),
       bonds: Math.max(0, Math.floor(Number(s && s.bonds) || 0)),
+      // 最高盟约层数（维护者 2026-11-05）：只看层数，不看词条/稀有度
+      maxLayers: Math.max(0, Math.floor(Number(s && s.maxLayers) || 0)),
     }))
     .filter((s) => s.name)
     .slice(0, 8);
   const maxBonds = Math.max(0, ...squads.map((s) => s.bonds));
+  const maxLayers = Math.max(0, ...squads.map((s) => s.maxLayers));
   const clearMs = Math.max(0, Math.floor(Number(e.clearMs) || 0));
   return {
     member: echoBoardMember({ at, roomCode: e.roomCode, matchNo: e.matchNo, seed: e.seed }),
@@ -78,6 +81,7 @@ export function echoBoardEntry(e = {}) {
     players,
     squads,
     maxBonds,
+    maxLayers,
     clearMs,
     difficulty,
     at,
@@ -112,6 +116,7 @@ export function parseEchoBoard(flat, { limit = ECHO_BOARD_LIMIT, details = null,
       players: d && Array.isArray(d.players) ? d.players.slice(0, 8) : [],
       squads: d && Array.isArray(d.squads) ? d.squads.slice(0, 8) : [],
       maxBonds: d ? Math.max(0, Math.floor(Number(d.maxBonds) || 0)) : 0,
+      maxLayers: d ? Math.max(0, Math.floor(Number(d.maxLayers) || 0)) : 0,
       clearMs: d ? Math.max(0, Math.floor(Number(d.clearMs) || 0)) : 0,
     });
   }

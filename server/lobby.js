@@ -3507,7 +3507,10 @@ export class Lobby {
               return rec && rec.isCore === true;
             })
             .map((id) => (m.gd.bond(id) || {}).name || id);
-          return { name: ps.name, cores, bonds: live.length };
+          // 最高盟约层数（维护者 2026-11-05）：只看盟约**层数**，不看词条、不看稀有度。
+          // 口径 = 该玩家在用（count>0）的盟约里 `ps.layers[本盟约]` 的最大值。
+          const maxLayers = Math.max(0, ...live.map(([id]) => Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0))));
+          return { name: ps.name, cores, bonds: live.length, maxLayers };
         }),
       clearMs: Math.max(0, Math.floor(Number(this.now()) - Number(m.startedAt || this.now()))),
       at: this.now(),

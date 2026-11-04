@@ -1105,7 +1105,8 @@ export function EchoSelect({ onClose, onStart }) {
                     const squads = Array.isArray(r.squads) && r.squads.length ? r.squads : null;
                     const names = squads ? squads.map((s) => s.name) : (Array.isArray(r.players) ? r.players : []);
                     const cores = [...new Set(squads ? squads.flatMap((s) => (Array.isArray(s.cores) ? s.cores : [])) : [])];
-                    const maxBonds = Number(r.maxBonds) || 0;
+                    // 最高盟约层数（维护者 2026-11-05）：只看层数，不看词条/稀有度
+                    const maxLayers = Number(r.maxLayers) || 0;
                     const secs = Math.max(0, Math.floor((Number(r.clearMs) || 0) / 1000));
                     const time = r.clearMs > 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '—';
                     return html`<li key=${r.member} class=${`echo-rank${r.rank <= 3 ? ` is-top is-top${r.rank}` : ''}`}>
@@ -1115,7 +1116,7 @@ export function EchoSelect({ onClose, onStart }) {
                         <span class="echo-rank__depth"><b class="num">${r.depth}</b><i>${t('层')}</i></span>
                         <span class="echo-rank__players">${names.length ? names.join('、') : (r.roomCode || '----')}</span>
                         <span class="echo-rank__cores" title=${cores.join('、')}>${cores.length ? cores.join('、') : '—'}</span>
-                        <span class="echo-rank__bonds num" title=${t('所有人里用过的盟约数量最多的一位')}>${maxBonds || '—'}</span>
+                        <span class="echo-rank__bonds num" title=${t('所有人里最高的盟约层数（只看层数，不看词条与稀有度）')}>${maxLayers || '—'}</span>
                         <span class="echo-rank__time num">${time}</span>
                       </button>
                       ${openRow === r.member ? html`<div class="echo-detail">
@@ -1128,9 +1129,9 @@ export function EchoSelect({ onClose, onStart }) {
                         ${/* 维护者 2026-11-05：展开明细也要有「玩家 / 核心盟约 / 最高盟约数」，缺数据时写 — 而不是整块消失 */ null}
                         <div class="echo-detail__full"><span>${t('玩家')}</span><b>${names.length ? names.join('、') : '—'}</b></div>
                         <div class="echo-detail__full"><span>${t('核心盟约')}</span><b>${squads
-                          ? squads.map((s) => `${s.name}：${(s.cores || []).join('、') || '—'}（${s.bonds || 0} 个盟约）`).join(' ｜ ')
+                          ? squads.map((s) => `${s.name}：${(s.cores || []).join('、') || '无核心'} · 最高 ${s.maxLayers || 0} 层`).join(' ｜ ')
                           : (cores.length ? cores.join('、') : '—')}</b></div>
-                        <div><span>${t('最高盟约数')}</span><b>${maxBonds || '—'}</b></div>
+                        <div><span>${t('最高盟约数')}</span><b>${maxLayers ? `${maxLayers} 层` : '—'}</b></div>
                         <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'} · ${r.at ? new Date(r.at).toLocaleString() : '—'}</b></div>
                       </div>` : null}
                     </li>`;
