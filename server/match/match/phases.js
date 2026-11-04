@@ -415,6 +415,8 @@ export class MatchPhases {
     // 深潜的固定节点（R20 / R25 / R30 / R35…）放**强化 boss 返场**；其余深潜回合一律普通战场
     const echoBoss = dive && (this._echoBossReturn(r) || this._echoHiddenBossRound(r));
     const isBoss = echoBoss || (!dive && (r === this.gd.bossRound || r === this.gd.hiddenRound));
+    // 排异到期要在**每一层**都检查（boss 层不走 _echoRefreshCurses，2026-11-05 实测漏掉）
+    if (dive && typeof this._echoExpireBondBans === 'function') this._echoExpireBondBans(this._echoDepth(r));
     if (isBoss) {
       // 特殊回合的入场播报（2026-11-05）：boss 返场 / 隐藏核心也要在**准备阶段**告诉玩家
       if (dive) this._echoAnnounceRoundKind(r);
