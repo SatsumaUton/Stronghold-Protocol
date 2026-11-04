@@ -3491,7 +3491,48 @@ export class Lobby {
       // 榜按难度分开存（深度跨难度不可比），所以这条必须带上
       difficulty: room.difficulty,
     });
-    if (entry) recordEchoBoard(store, entry).catch(() => {});
+    if (entry) {
+      recordEchoBoard(store, entry).catch(() => {});
+      // 同时**归档到 MySQL**（matchmaker 的 dive_board 表）：Redis 只留 90 天，这里做永久留档。
+      // fire-and-forget —— matchmaker 挂了 / 超时都不影响结算。
+      this._archiveEchoBoard(entry);
+    }
+  }
+
+  /**
+   * 把一条成绩 POST 给 matchmaker 归档（2026-11-05，维护者要求「成绩永久留档」）。
+   *
+   * 目标：`SP_MM_URL`（默认 http://127.0.0.1:3090）。1.5 秒超时、失败只写日志，
+   * 绝不阻塞或影响对局结算。matchmaker 按 member 幂等（重复上报不会多一行）。
+   */
+  _archiveEchoBoard(entry) {
+    try {
+      if (!entry || typeof fetch !== 'function') return;           // 老 Node：静默跳过
+      const base = String(process.env.SP_MM_URL || 'http://127.0.0.1:3090').replace(/\/+$/, '');
+      const body = JSON.stringify({
+        member: entry.member,
+        depth: entry.depth,
+        difficulty: entry.difficulty,
+        round: entry.round,
+        victory: entry.victory,
+        players: entry.players,
+        roomCode: entry.roomCode,
+        seed: entry.seed ?? null,
+        at: entry.at,
+      });
+      const run = async () => {
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), 1500);
+        try {
+          await fetch(`${base}/api/dive/report`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: ac.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+      run().catch((e) => { try { this.log?.warn?.(`[dive] archive failed: ${e && e.message}`); } catch { /* ignore */ } });
+    } catch { /* 归档永远不能影响结算 */ }
   }
 
   /** onEnd callback: return the room to LOBBY and dispose the match on the next macrotask. */

@@ -253,6 +253,7 @@ function notifyPartyLeave(room) {
 import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.js';
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { isEchoTester } from './echoTesters.js';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, ROOM_LIST_MAX, ROOM_LIST_MIN_CAPACITY, modeIdFor } from '../shared/constants.js';
 import { roomCapacity, PLAYER_CAPACITIES } from '../shared/playerCapacity.js';
 import { EXPERIMENTAL_DEFAULTS, isExperimental, experimentalOptions, experimentalRuleChanged } from '../shared/experimental.js';
@@ -1551,12 +1552,19 @@ export class Lobby {
     // 判据用身份 `session.adminId`（与「管理员建房免过期」同一口径），不要求兑换验证码 ——
     // 这是「谁能进这个模式」，不是「谁能改对局数据」（后者走 ps.admin 三道门）。
     const variant = askedVariant === 'deepecho' ? 'deepecho' : null;
-    if (variant && session.adminId !== true) return fail(ERR.TEST_FORBIDDEN, '「深渊回响」暂未开放，仅管理员可进入');
+    if (variant && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId)) return fail(ERR.TEST_FORBIDDEN, '「深渊回响」暂未开放，仅管理员与测试名单可进入');
     // 深潜**不支持**实验性功能（维护者 2026-11-03 定）：enemyHpMul/Atk 会和 echoScale 叠乘、
     // playerCapacity 会改变配对与 boss 半场、poolPlan 会破坏「随机出怪」这个前提、
     // disableLayerCap 本来就是深潜的固定行为。这里**直接拒绝**而不是静默丢掉 ——
     // 悄悄丢掉会让玩家以为自己开的设置生效了。
     if (variant && experimental != null) return fail(ERR.BAD_MSG, '「深渊回响」不支持实验性功能');
+    // 「深渊回响」只支持**默认版本**（第二期下半）。
+    // 原因：深渊的模板、跨版本怪物池、悬赏/词条都是按默认版本的数据标定的，
+    // 换个版本会出现「模板对不上 / 数值漂移」。这里直接拒绝。
+    if (variant && version !== DEFAULT_VERSION) {
+      return fail(ERR.VERSION_UNSUPPORTED, '「深渊回响」只支持「第二期下半」，不支持其他版本');
+    }
+
     // 深潜只开放 险境(NORMAL) / 绝境(HARD) / 终极(ABYSS) 三档：标准模拟(FUNNY)的强度曲线
     // 是按前 14 回合配的，R15 之后压力太低，谁都能潜到底 → 深度失去区分度（维护者 2026-11-03 选 B）。
     if (variant && asked === 'FUNNY') return fail(ERR.BAD_MSG, '「深渊回响」不支持标准模拟难度');
@@ -1678,7 +1686,7 @@ export class Lobby {
     // 「深渊回响」：正式开放前只有管理员能进。创建侧已经挡了（create()），但管理员开的房间
     // 一旦被设成公开同盟，普通玩家仍可能点「加入同盟」进来 —— 所以加入 / 观战 / 接管这条路也要挡。
     // 已经在本房里的人不受影响（下面的 idempotent 分支照旧），否则重连会把自己拦在门外。
-    if (room.variant === 'deepecho' && session.adminId !== true && this.roomOf(session) !== room) {
+    if (room.variant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId) && this.roomOf(session) !== room) {
       return fail(ERR.TEST_FORBIDDEN, '「深渊回响」暂未开放，仅管理员可进入');
     }
     const cur = this.roomOf(session);
@@ -1801,7 +1809,7 @@ export class Lobby {
     if (!room) return fail(ERR.ROOM_NOT_FOUND);
     if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
     // 「深渊回响」：观战席与玩家席同一道门禁（正式开放前只有管理员能进）。
-    if (room.variant === 'deepecho' && session.adminId !== true && this.roomOf(session) !== room) {
+    if (room.variant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId) && this.roomOf(session) !== room) {
       return fail(ERR.TEST_FORBIDDEN, '「深渊回响」暂未开放，仅管理员可进入');
     }
     const wantHidden = hidden === true;
@@ -3483,7 +3491,48 @@ export class Lobby {
       // 榜按难度分开存（深度跨难度不可比），所以这条必须带上
       difficulty: room.difficulty,
     });
-    if (entry) recordEchoBoard(store, entry).catch(() => {});
+    if (entry) {
+      recordEchoBoard(store, entry).catch(() => {});
+      // 同时**归档到 MySQL**（matchmaker 的 dive_board 表）：Redis 只留 90 天，这里做永久留档。
+      // fire-and-forget —— matchmaker 挂了 / 超时都不影响结算。
+      this._archiveEchoBoard(entry);
+    }
+  }
+
+  /**
+   * 把一条成绩 POST 给 matchmaker 归档（2026-11-05，维护者要求「成绩永久留档」）。
+   *
+   * 目标：`SP_MM_URL`（默认 http://127.0.0.1:3090）。1.5 秒超时、失败只写日志，
+   * 绝不阻塞或影响对局结算。matchmaker 按 member 幂等（重复上报不会多一行）。
+   */
+  _archiveEchoBoard(entry) {
+    try {
+      if (!entry || typeof fetch !== 'function') return;           // 老 Node：静默跳过
+      const base = String(process.env.SP_MM_URL || 'http://127.0.0.1:3090').replace(/\/+$/, '');
+      const body = JSON.stringify({
+        member: entry.member,
+        depth: entry.depth,
+        difficulty: entry.difficulty,
+        round: entry.round,
+        victory: entry.victory,
+        players: entry.players,
+        roomCode: entry.roomCode,
+        seed: entry.seed ?? null,
+        at: entry.at,
+      });
+      const run = async () => {
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), 1500);
+        try {
+          await fetch(`${base}/api/dive/report`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: ac.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+      run().catch((e) => { try { this.log?.warn?.(`[dive] archive failed: ${e && e.message}`); } catch { /* ignore */ } });
+    } catch { /* 归档永远不能影响结算 */ }
   }
 
   /** onEnd callback: return the room to LOBBY and dispose the match on the next macrotask. */
@@ -4095,6 +4144,8 @@ export class Lobby {
       //   「能不能改数据」由 Match 的 ps.admin 决定（三道门全过：adminId + gameTool + 验证码），
       //   那是另一回事，和徽章无关。
       admin: session.adminId === true,
+      // 深渊回响的测试名单（管理员自动算）
+      echoTester: session.adminId === true || session.echoTester === true || isEchoTester(session.accountId),
       loadout: session.loadout || null,
       ops: session.ops || null,
       notOwned: session.notOwned || null,
