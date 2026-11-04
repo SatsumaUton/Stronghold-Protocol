@@ -375,6 +375,12 @@ export class Match {
     this.echoBlessingBonus = 0;
     /** 排异诅咒的到期层数：bond → depth（到这一层自动解除，2026-11-05）。 */
     this.echoBannedBondsUntil = {};
+    /** 「护盾」祝福指定的盟约：排异抽到它时抵消该诅咒（一次性，2026-11-05）。 */
+    this.echoShieldBond = null;
+    this.echoShieldOffer = null;
+    this._echoShieldVotes = new Map();
+    this.echoShieldEndsAt = null;
+    this._echoShieldTimer = null;
     /** _echoMaybeOfferBlessing 这次是不是「名额已满、要弃选一个」的替换模式（2026-11-05）。 */
     this.echoBlessingReplace = false;
     /** 替换模式下已选定、等待弃选的新祝福 id。 */
