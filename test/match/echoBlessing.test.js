@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {
   ECHO_BLESSINGS, ECHO_BLESSING_EVERY, echoBlessingById, echoBlessingDue, echoBlessingOffer,
   echoBlessingMods, echoBlessingCoinMul, echoBlessingFunds, applyEchoBlessingMods, ECHO_BLESSING_RARITY_WEIGHT,
+  echoBlessingIsMoney,
 } from '../../server/match/match/echoBlessing.js';
 
 /** units.js 属性重算里真实读取的 mods 键（2026-11-03 从 units.js 提取，与 echoWords.test.js 同源）。 */
@@ -189,6 +190,26 @@ test('每档稀有度都有抽取权重，且普通 > 稀有 > 传说（出现�
   assert.ok(hits.rare > hits.epic, `稀有(${hits.rare}) 应多于传说(${hits.epic})`);
   assert.ok(hits.epic > 0, '传说不是抽不到');
 });
+// 维护者 2026-11-05 反馈「资金类祝福还是太多」：降权重（fund/gold_s 4→2、fund_s 4→1、bigfund/gold_m 2→1）
+// 并且**一轮三选一里最多 1 个资金类**。这里把两条都钉住，免得以后调池子又飘回去。
+test('资金类祝福：一轮最多 1 个，整体出现比例低于 15%', () => {
+  let s = 4242;
+  const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+  let offers = 0;
+  let withMoney = 0;
+  for (let i = 0; i < 2000; i++) {
+    const offer = echoBlessingOffer(rng, []);
+    if (offer.length < 3) continue;
+    offers += 1;
+    const n = offer.filter((b) => echoBlessingIsMoney(b)).length;
+    assert.ok(n <= 1, `一轮里出现了 ${n} 个资金类祝福：${offer.map((b) => b.id).join('、')}`);
+    if (n === 1) withMoney += 1;
+  }
+  assert.ok(offers > 1900, `样本不足：${offers}`);
+  const pct = withMoney / offers;
+  assert.ok(pct < 0.15, `含资金类的比例 ${(pct * 100).toFixed(1)}% 仍然偏高`);
+});
+
 // 维护者 2026-11-05 反馈「延伸范围的祝福没有真正延伸」：这里用真实 sim 战斗验一遍。
 test('祝福「远程」：单位的攻击范围真的多一格（不是只有文案）', async () => {
   const { makeBattle } = await import('../helpers/battleHarness.js');

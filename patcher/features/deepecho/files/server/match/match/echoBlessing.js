@@ -33,7 +33,7 @@ export const ECHO_BLESSING_VOTE_MS = 30000;
 export const ECHO_BLESSING_MAX = 3;   // 同时持有的最多个数（扩池后不能用池子长度当上限）
 export const ECHO_BLESSINGS = Object.freeze([
   Object.freeze({
-    id: 'fund', weight: 4, rarity: 'common',
+    id: 'fund', weight: 2, rarity: 'common',
     name: '物资补给',
     desc: '立刻获得 8 资金',
     kind: 'fund',
@@ -79,11 +79,11 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'respen', rarity: 'epic', name: '穿透', desc: '全体干员无视 10 点法抗', kind: 'mods', group: 'pen', mods: { resIgnoreFlat: 10 } },
   { id: 'rng', rarity: 'epic', name: '远程', desc: '全体干员攻击范围延伸 1 格', kind: 'mods', group: 'range', mods: { rangeExtend: 1 } },
   { id: 'tgt', rarity: 'epic', name: '多目标', desc: '全体干员最大目标数 +1', kind: 'mods', group: 'range', mods: { maxTargets: 1 } },
-  { id: 'gold_s', weight: 4, rarity: 'common', name: '余利', desc: '结算资金 +8%', kind: 'coin', group: 'coin', coinMul: 1.08 },
-  { id: 'gold_m', weight: 2, rarity: 'rare', name: '商运', desc: '结算资金 +15%', kind: 'coin', group: 'coin', coinMul: 1.15 },
-  { id: 'fund_s', weight: 4, rarity: 'common', name: '应急包', desc: '立刻获得 5 资金', kind: 'fund', group: 'fund', funds: 5 },
+  { id: 'gold_s', weight: 2, rarity: 'common', name: '余利', desc: '结算资金 +8%', kind: 'coin', group: 'coin', coinMul: 1.08 },
+  { id: 'gold_m', weight: 1, rarity: 'rare', name: '商运', desc: '结算资金 +15%', kind: 'coin', group: 'coin', coinMul: 1.15 },
+  { id: 'fund_s', weight: 1, rarity: 'common', name: '应急包', desc: '立刻获得 5 资金', kind: 'fund', group: 'fund', funds: 5 },
   { id: 'refresh_s', weight: 4, rarity: 'common', name: '机变', desc: '立刻获得 1 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 1 },
-  { id: 'bigfund', weight: 2, rarity: 'rare', name: '深渊源泉', desc: '立刻获得 15 资金', kind: 'fund', group: 'fund', funds: 15 },
+  { id: 'bigfund', weight: 1, rarity: 'rare', name: '深渊源泉', desc: '立刻获得 15 资金', kind: 'fund', group: 'fund', funds: 15 },
   { id: 'bigrefresh', weight: 2, rarity: 'rare', name: '时之沙漏', desc: '立刻获得 2 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 2 },
 
   // —— 全队回复生命（2026-11-05）：一次性、数值刻意做小 ——
@@ -204,10 +204,16 @@ export function echoBlessingDue(round, diveStart, bonus = 0, max = ECHO_BLESSING
  * 稀有度 → 抽中权重（维护者 2026-11-05：祝福也要有稀有度，越强越难抽到）。
  * 注意这是**单个候选槽**的权重，不是概率本身：三个槽一起抽，所以传说仍可能出现在三选一里。
  */
-export const ECHO_BLESSING_RARITY_WEIGHT = Object.freeze({ common: 6, rare: 3, epic: 1 });
+export const ECHO_BLESSING_RARITY_WEIGHT = Object.freeze({ common: 7, rare: 3, epic: 1 });
 
 /** 稀有度中文名（界面用）。 */
 export const ECHO_BLESSING_RARITY_LABEL = Object.freeze({ common: '普通', rare: '稀有', epic: '传说' });
+
+/**
+ * 「资金类」祝福：直接给钱（`fund`）或乘结算资金（`coin`）。
+ * 维护者 2026-11-05：这类出现得太频繁 —— 除了降权重，三选一里**最多只给 1 个**。
+ */
+export const echoBlessingIsMoney = (b) => !!b && ((b.kind === 'fund' && Number(b.funds) > 0) || (b.kind === 'coin' && Number(b.coinMul) > 0));
 
 /**
  * 本次三选一的候选：从**还没拿过**的祝福里按稀有度加权抽最多 3 个（不足 3 个时给剩下的全部）。
@@ -226,15 +232,21 @@ export function echoBlessingOffer(rng, owned = []) {
     // 允许单条祝福覆盖权重（.weight）：给钱类祝福出现得太频繁，维护者要求降频（2026-11-05）
     .map((b) => ({ b, w: Number(b.weight) > 0 ? Number(b.weight) : ECHO_BLESSING_RARITY_WEIGHT[b.rarity] || 1 }));
   const out = [];
+  let moneyTaken = false;
   while (pool.length && out.length < 3) {
-    const total = pool.reduce((sum, x) => sum + x.w, 0);
+    // 已经给过一个资金类 → 本轮剩下的槽优先给非资金祝福；池子只剩资金类时才退回，保证槽位不空
+    const nonMoney = moneyTaken ? pool.filter((x) => !echoBlessingIsMoney(x.b)) : [];
+    const cand = nonMoney.length ? nonMoney : pool;
+    const total = cand.reduce((sum, x) => sum + x.w, 0);
     let r = (Number(rng()) || 0) * total;
-    let at = pool.length - 1;
-    for (let i = 0; i < pool.length; i++) {
-      r -= pool[i].w;
-      if (r < 0) { at = i; break; }
+    let picked = cand[cand.length - 1];
+    for (let i = 0; i < cand.length; i++) {
+      r -= cand[i].w;
+      if (r < 0) { picked = cand[i]; break; }
     }
-    out.push(pool.splice(at, 1)[0].b);
+    if (echoBlessingIsMoney(picked.b)) moneyTaken = true;
+    out.push(picked.b);
+    pool.splice(pool.indexOf(picked), 1);
   }
   return out;
 }
