@@ -183,6 +183,9 @@ export function echoRoundPool(gd, dataRound, helpers) {
  *
  * 只排除 BOSS（`rank === 'BOSS'`，领袖由固定节点单独发），NORMAL / ELITE 都收。
  */
+/** 「频次怪」的血量系数：深潜里按 0.6 倍发（维护者 2026-11-05）。 */
+export const ECHO_HITCOUNT_HP_MUL = 0.6;
+
 const ECHO_SUMMON_CACHE = new WeakMap();
 
 /**
@@ -217,12 +220,34 @@ export function echoSummonOnly(gd) {
   return set;
 }
 
+const ECHO_HITCOUNT_CACHE = new WeakMap();
+
+/**
+ * 「频次怪」：靠**攻击次数**而非血量结算的敌人（数据里 `abilities` 写着「需要数次攻击击倒」）。
+ *
+ * 维护者 2026-11-05：这类怪单独出现还行，但被随机池按血量叠成一大片时，玩家清不掉 ——
+ * 深潜的随机出怪**不再抽它们**（少掉的权重自然分给其它怪）。
+ */
+export function echoHitCountEnemy(gd) {
+  const cached = ECHO_HITCOUNT_CACHE.get(gd);
+  if (cached) return cached;
+  const set = new Set();
+  const raw = gd && gd.raw && gd.raw.enemies ? gd.raw.enemies : {};
+  for (const [key, e] of Object.entries(raw)) {
+    const abil = e && Array.isArray(e.abilities) ? e.abilities : [];
+    if (abil.some((a) => a && typeof a.text === 'string' && /数次攻击/.test(a.text))) set.add(key);
+  }
+  ECHO_HITCOUNT_CACHE.set(gd, set);
+  return set;
+}
+
 export function echoAllPool(gd, helpers) {
   const isFlyKey = helpers && helpers.isFlyKey;
   const cached = ECHO_ALLPOOL_CACHE.get(gd);
   if (cached) return cached;
   const all = [];
   const summonOnly = echoSummonOnly(gd);
+  const hitCount = echoHitCountEnemy(gd);
   const raw = gd && gd.raw && gd.raw.enemies ? gd.raw.enemies : null;
   for (const [key, e] of Object.entries(raw || {})) {
     const hp = Number(e && e.stats && e.stats.maxHp) || 0;
@@ -495,9 +520,17 @@ export function echoRandomWave(gd, tpl, opts, rng, helpers) {
     all: pool.all.filter(keepNoWeakElite),
   };
   const leader = typeof isLeaderTemplate === 'function' ? isLeaderTemplate(tpl) : false;
-  const modsOf = (key) => (typeof roundMods === 'function'
-    ? { ...roundMods(scale), slot: classOf(gd, key) }
-    : { hpMul: scale.hpMul, atkMul: scale.atkMul, speedMul: scale.speedMul, slot: classOf(gd, key) });
+  let hitSeen = false;   // 本波是否已经出现过「频次怪」
+  // 「频次怪」（按攻击次数结算）血量再打个折（维护者 2026-11-05）：玩家清不掉的主因是它们血厚且扎堆。
+  const hitCount = echoHitCountEnemy(gd);
+  const hitMul = (key) => (hitCount.has(key) ? ECHO_HITCOUNT_HP_MUL : 1);
+  const modsOf = (key) => {
+    const base = typeof roundMods === 'function'
+      ? { ...roundMods(scale), slot: classOf(gd, key) }
+      : { hpMul: scale.hpMul, atkMul: scale.atkMul, speedMul: scale.speedMul, slot: classOf(gd, key) };
+    const k = hitMul(key);
+    return k === 1 ? base : { ...base, hpMul: (Number(base.hpMul) || 1) * k };
+  };
 
   // ---- 目标形状：原版该回合的形状 × 深度增幅 --------------------------------
   const dataRound = Number.isInteger(opts.dataRound) && opts.dataRound > 0 ? opts.dataRound : 1;
@@ -559,6 +592,12 @@ export function echoRandomWave(gd, tpl, opts, rng, helpers) {
     if (!use.length) continue;
     const pick = use[Math.min(use.length - 1, Math.floor((Number(rng()) || 0) * use.length))];
     const isFly = use === pool2.fly;
+    // 「频次怪」（按攻击次数结算）：每波最多 1 种、每条最多 2 只，避免成片出现清不掉（维护者 2026-11-05）
+    if (hitCount.has(pick.key)) {
+      if (hitSeen) continue;
+      hitSeen = true;
+      count = Math.min(count, 2);
+    }
     slots.push({ enemyKey: pick.key, routeIndex: -1, fly: isFly, time, count, interval, window: count * interval, threat: pick.threat });
     unitsLeft -= count;
     if (isFly) flyLeft = Math.max(0, flyLeft - count);

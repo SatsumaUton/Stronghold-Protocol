@@ -17,7 +17,7 @@ import {
   echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
-import { echoSummonOnly } from './echoWaves.js';
+import { echoSummonOnly, echoHitCountEnemy, ECHO_HITCOUNT_HP_MUL } from './echoWaves.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR } from '../../../shared/constants.js';
 import { msg } from '../../../shared/i18n.js';
 import { hiddenEligible } from '../finalAssault.js';
@@ -110,9 +110,10 @@ export class MatchEcho {
       // 召唤物（tokenOnly / 别人的 summons 目标）不能被顶成精英发出来：这里从「所有 ELITE」里抽，
       // 那批召唤物也在里面（维护者 2026-11-05：16 层后看到没本体的召唤物）。
       const summonOnly = echoSummonOnly(this.gd);
+      const hitCount = echoHitCountEnemy(this.gd);
       const pool = Object.keys((this.gd.raw && this.gd.raw.enemies) || {})
         .map((k) => ({ k, e: this.gd.enemy(k) }))
-        .filter(({ k, e }) => e && !summonOnly.has(k) && e.rank === 'ELITE' && Number(e.stats && e.stats.maxHp) <= cap && Number(e.stats && e.stats.moveSpeed) > 0);
+        .filter(({ k, e }) => e && !summonOnly.has(k) && !hitCount.has(k) && e.rank === 'ELITE' && Number(e.stats && e.stats.maxHp) <= cap && Number(e.stats && e.stats.moveSpeed) > 0);
       if (!pool.length) return wave;
       let n = 0;
       for (const s of wave.spawns) {
@@ -838,6 +839,27 @@ export class MatchEcho {
     // 封锁也是有时限的（维护者 2026-11-05）：记下到期层，到时整批解除
     if (out.length) this.echoBannedTilesUntil = this._echoDepth(this.round) + ECHO_DEPLOY_BAN_ROUNDS;
     return out.length;
+  }
+
+  /**
+   * 「频次怪」（靠攻击次数结算）统一降血（维护者 2026-11-05）。
+   *
+   * 随机波次里它们已经被限制成「每波最多 1 种、每条最多 2 只」，但 boss 返场 / 隐藏核心的分体
+   * 仍然是这些怪，血量按原版给。这里在**每一波**（普通 + boss）统一乘 0.6，首领本体不动。
+   */
+  _echoTuneHitCount(wave) {
+    if (!wave || !Array.isArray(wave.spawns)) return wave;
+    let hit = null;
+    try { hit = echoHitCountEnemy(this.gd); } catch { hit = null; }
+    if (!hit || !hit.size) return wave;
+    for (const s of wave.spawns) {
+      if (!s || s.leader === true || s.tag === 'boss' || s.role === 'boss') continue;
+      const key = String(s.enemyKey || '');
+      const base = key.replace(/^.*:/, '');
+      if (!hit.has(key) && !hit.has(base)) continue;
+      s.mods = { ...(s.mods || {}), hpMul: (Number(s.mods && s.mods.hpMul) || 1) * ECHO_HITCOUNT_HP_MUL };
+    }
+    return wave;
   }
 
   /**
