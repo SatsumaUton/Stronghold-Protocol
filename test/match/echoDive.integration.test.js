@@ -381,19 +381,41 @@ test('部署禁令：封锁地块 / 排异盟约（新上场与场上行动都�
 
   // 排异：挑一个真实干员，它带某个盟约
   const chessRaw = m.gd.raw?.chess || {};
-  const pair = Object.entries(chessRaw).find(([, rec]) => Array.isArray(rec?.bonds) && rec.bonds.length && m.gd.bond(rec.bonds[0]));
-  assert.ok(pair, '数据里至少要有一个带盟约的干员');
+  const isAdd = (b) => m.gd.bond(b) && m.gd.bond(b).isCore !== true;
+  const pair = Object.entries(chessRaw).find(([, rec]) => (rec?.bonds || []).some(isAdd));
+  assert.ok(pair, '数据里至少要有一个带附加盟约的干员');
   const [chessId, rec] = pair;
-  m.echoBannedBond = rec.bonds[0];
+  m.echoBannedBonds = [rec.bonds.find(isAdd)];
   const piece = { kind: 'chess', id: chessId, items: [] };
   assert.match(String(m._echoDeployBlocked(piece, free, true) || ''), /排异/, '排异盟约的干员不能上场');
   // 2026-11-05 修订：已经上场的也不能再移动/转向（会被收回修正区；手牌满时靠这条兜底）
   assert.match(String(m._echoDeployBlocked(piece, free, false) || ''), /无法行动/, '场上也不能再动');
+  // 核心盟约（炎 / 拉特兰 …）永远不受排异影响（维护者 2026-11-05）
+  m.echoBannedBonds = [rec.bonds.find((b) => m.gd.bond(b)?.isCore === true)];
+  assert.ok(m.echoBannedBonds[0], '这个干员应该还有一个核心盟约');
+  assert.equal(m._echoDeployBlocked(piece, free, true), null, '核心盟约不拦');
+
+  // 场上只有核心盟约干员时，排异根本抽不出目标（不会误伤阵营）
+  const ps0 = m.alivePlayers()[0];
+  const coreOnlyId = Object.keys(chessRaw).find((id) => {
+    const bs = chessRaw[id]?.bonds || [];
+    return bs.length && bs.every((b) => m.gd.bond(b)?.isCore === true);
+  });
+  assert.ok(coreOnlyId, '数据里要有「只有核心盟约」的干员');
+  const keep = m.echoBannedBonds.slice();
+  const bak = new Map(ps0.board);
+  ps0.board.clear();
+  ps0.board.set('9,5', { kind: 'chess', id: coreOnlyId, items: [], uid: 9100 });
+  m.echoBannedBonds = [];
+  assert.equal(m._echoApplyBondBan(() => 0), null, '只有核心盟约 → 无可排异');
+  ps0.board.clear();
+  for (const [k, v] of bak) ps0.board.set(k, v);
+  m.echoBannedBonds = keep;
 
   // 公开视图要带上禁令，客户端才能高亮
   const pub = m._echoPublic();
   assert.deepEqual(pub.bans.tiles, m.echoBannedTiles);
-  assert.equal(pub.bans.bond, m.echoBannedBond);
+  assert.deepEqual(pub.bans.bonds, m.echoBannedBonds);
 });
 
 // 维护者 2026-11-05：悬赏「打掉但没结算」的边界 —— 打掉的卡不能算失败。
@@ -501,10 +523,10 @@ test('克制祝福：抽到就驱散对应诅咒 / 解除部署禁令', (t) => {
   assert.equal(m._echoCurseFx().intel, false, '情报诅咒已移除（不再关闭情报）');
 
   m.echoBannedTiles = ['3,3', '4,4'];
-  m.echoBannedBond = 'yanShip';
+  m.echoBannedBonds = ['yanShip'];
   draw('unlock');                                     // 开路
   assert.deepEqual(m.echoBannedTiles, [], '封锁解除');
-  assert.equal(m.echoBannedBond, null, '排异解除');
+  assert.deepEqual(m.echoBannedBonds, [], '排异解除');
 
   // 回合诅咒也能被驱散
   m.echoRoundCurse = 'r_bleed';
@@ -569,10 +591,11 @@ test('排异：已上场的同盟约干员被收回手牌，且之后不能再�
   t.after(() => m.dispose());
   const ps = m.alivePlayers()[0];
   const chessRaw = m.gd.raw?.chess || {};
-  const pair = Object.entries(chessRaw).find(([, rec]) => Array.isArray(rec?.bonds) && rec.bonds.length && m.gd.bond(rec.bonds[0]));
-  assert.ok(pair, '数据里要有带盟约的干员');
+  const isAdd = (b) => m.gd.bond(b) && m.gd.bond(b).isCore !== true;
+  const pair = Object.entries(chessRaw).find(([, rec]) => (rec?.bonds || []).some(isAdd));
+  assert.ok(pair, '数据里要有带附加盟约的干员');
   const [chessId, rec] = pair;
-  const bond = rec.bonds[0];
+  const bond = rec.bonds.find(isAdd);
 
   const piece = { kind: 'chess', id: chessId, items: [], uid: 9001, dir: 'RIGHT' };
   ps.board.set('8,5', piece);
@@ -581,7 +604,7 @@ test('排异：已上场的同盟约干员被收回手牌，且之后不能再�
   m.echoCurseIds = ['block_bond'];
   const picked = m._echoApplyBondBan(() => 0);          // rng 0 = 取第一个盟约（就是刚摆上去这个）
   assert.equal(picked, bond);
-  assert.equal(m.echoBannedBond, bond);
+  assert.deepEqual(m.echoBannedBonds, [bond]);
   assert.equal(ps.board.has('8,5'), false, '场上的该干员被收回');
   assert.ok(ps.hand.some((p) => p && p.uid === 9001), '进了手牌（修正区）');
   assert.ok(ps.hand.length >= handBefore, '手牌数量没有丢卡');
@@ -593,6 +616,46 @@ test('排异：已上场的同盟约干员被收回手牌，且之后不能再�
   assert.equal(ps.board.has('7,5'), false);
   assert.ok([...ps.hand, ...(Array.isArray(ps.temp) ? ps.temp : [])].some((p) => p && p.uid === 9002), '卡还在玩家手里');
   assert.match(String(m._echoDeployBlocked({ kind: 'chess', id: chessId, items: [] }, '7,5', false) || ''), /无法行动/, '回收后也不能再动');
+});
+
+// 维护者 2026-11-05：排异可以叠加（不同附加盟约各禁一条），但已禁的不能重复禁，
+// 必须先被「开路」解除才能再次禁。
+test('排异叠加：不同附加盟约叠成多条，已禁的不重复，解除后可再禁', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  const chessRaw = m.gd.raw?.chess || {};
+  const isAdd = (b) => m.gd.bond(b) && m.gd.bond(b).isCore !== true;
+  // 找两个带不同附加盟约的干员摆上场
+  const picks = [];
+  for (const [id, rec] of Object.entries(chessRaw)) {
+    const add = (rec?.bonds || []).find(isAdd);
+    if (add && !picks.some((p) => p.bond === add)) picks.push({ id, bond: add });
+    if (picks.length >= 2) break;
+  }
+  assert.equal(picks.length, 2, '数据里要有两种不同附加盟约');
+  ps.board.clear();
+  ps.board.set('8,3', { kind: 'chess', id: picks[0].id, items: [], uid: 7001 });
+  ps.board.set('8,4', { kind: 'chess', id: picks[1].id, items: [], uid: 7002 });
+
+  m.echoBannedBonds = [];
+  const a = m._echoApplyBondBan(() => 0);
+  assert.ok(a, '第一次排异');
+  const b = m._echoApplyBondBan(() => 0.999);
+  assert.ok(b, '第二次排异');
+  assert.notEqual(a, b, '两次禁的是不同盟约（相同的会被跳过）');
+  assert.deepEqual(m.echoBannedBonds, [a, b], '叠加成两条');
+
+  // 再抽一次：候选里已经没有未禁的附加盟约 → 不重复禁
+  assert.equal(m._echoApplyBondBan(() => 0), null, '已禁的不能再禁');
+
+  // 「开路」解除后可以再禁（两人已被收回手牌，先放回场上）
+  m._echoGrantBlessing(echoBlessingById('unlock'));
+  assert.deepEqual(m.echoBannedBonds, [], '开路解除全部排异');
+  m.echoBlessings = [];
+  ps.board.set('8,3', { kind: 'chess', id: picks[0].id, items: [], uid: 7003 });
+  assert.ok(m._echoApplyBondBan(() => 0), '解除之后可以重新禁');
 });
 
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后

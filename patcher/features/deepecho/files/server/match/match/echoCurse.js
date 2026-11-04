@@ -140,7 +140,7 @@ export const ECHO_CURSES = Object.freeze([
     effect: Object.freeze({ kind: 'deployBan', value: 3 }),
   }),
   Object.freeze({
-    id: 'block_bond', name: '排异', desc: '随机一个盟约的干员无法部署（同构体改变后仍受限）', live: true, rarity: 'epic',
+    id: 'block_bond', name: '排异', desc: '随机一个附加盟约的干员无法部署（核心盟约不受影响；可叠加，已禁的不会重复，解除后才能再禁）', live: true, rarity: 'epic',
     effect: Object.freeze({ kind: 'bondBan', value: 1 }),
   }),
 ]);

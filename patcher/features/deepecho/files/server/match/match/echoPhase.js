@@ -613,20 +613,30 @@ export class MatchEcho {
         try { for (const b of (pieceBonds(this.gd, p, this.rules) || [])) seen.add(b); } catch { /* 数据缺失跳过 */ }
       }
     }
-    const list = [...seen].filter((b) => this.gd.bond(b));
-    if (!list.length) { this.echoBannedBond = null; return null; }
-    this.echoBannedBond = list[Math.min(list.length - 1, Math.floor((Number(rng()) || 0) * list.length))];
+    // 只排异**附加盟约**（data/bonds.json 里 isCore !== true 的那 15 条）：
+    // 8 条核心盟约（炎/萨尔贡/维多利亚/谢拉格/拉特兰/阿戈尔/叙拉古/卡西米尔）是干员身份的一部分，
+    // 禁掉它们等于禁掉整个阵营，维护者 2026-11-05 已明确不许。
+    // 已禁用的不能再禁（必须先被「开路」解除），不同附加盟约可以叠加
+    const already = Array.isArray(this.echoBannedBonds) ? this.echoBannedBonds : (this.echoBannedBonds = []);
+    const list = [...seen].filter((b) => {
+      if (!this.gd.bond(b)) return false;
+      if (this.gd.bond(b).isCore === true) return false;   // 核心盟约永不排异
+      return !already.includes(b);                          // 已禁过 → 不重复
+    });
+    if (!list.length) return null;
+    const picked = list[Math.min(list.length - 1, Math.floor((Number(rng()) || 0) * list.length))];
+    already.push(picked);
     // 已经上场的同盟约干员**当场收回修正区**（2026-11-05 维护者要求）：
     // 排异不是「不让你动」，而是「这个人不能再上战场」。
-    const moved = this._echoWithdrawBannedBond();
+    const moved = this._echoWithdrawBannedBond(picked);
     if (moved) this._echoPushAnnounce(`排异：${moved} 名干员被收回`);
-    return this.echoBannedBond;
+    return picked;
   }
 
-  /** 把场上所有带「被排异盟约」的干员收回手牌/暂存区。@returns {number} 收回人数 */
-  _echoWithdrawBannedBond() {
-    const bond = this.echoBannedBond;
-    if (!bond) return 0;
+  /** 把场上带 `bonds`（默认取全部已禁盟约）的干员收回手牌/暂存区。@returns {number} 收回人数 */
+  _echoWithdrawBannedBond(bonds = null) {
+    const list = Array.isArray(bonds) ? bonds : (Array.isArray(this.echoBannedBonds) ? this.echoBannedBonds : []);
+    if (!list.length) return 0;
     let n = 0;
     for (const ps of this.alivePlayers()) {
       if (!ps || !ps.board) continue;
@@ -634,7 +644,7 @@ export class MatchEcho {
         if (!p || p.kind !== 'chess') continue;
         let bonds = [];
         try { bonds = pieceBonds(this.gd, p, this.rules) || []; } catch { bonds = []; }
-        if (!bonds.includes(bond)) continue;
+        if (!bonds.some((x) => list.includes(x))) continue;
         if (this._echoWithdrawPiece(ps, key)) n += 1;
       }
     }
@@ -667,11 +677,14 @@ export class MatchEcho {
     if (Array.isArray(this.echoBannedTiles) && this.echoBannedTiles.includes(key)) {
       return '深渊封锁：这个地块无法部署';
     }
-    if (this.echoBannedBond && piece && piece.kind === 'chess') {
+    const bannedBonds = (Array.isArray(this.echoBannedBonds) ? this.echoBannedBonds : [])
+      .filter((b) => this.gd.bond(b)?.isCore !== true);   // 核心盟约即使混进来也不拦（防御性）
+    if (bannedBonds.length && piece && piece.kind === 'chess') {
       let bonds = [];
       try { bonds = pieceBonds(this.gd, piece, this.rules) || []; } catch { bonds = []; }
-      if (bonds.includes(this.echoBannedBond)) {
-        const name = this.gd.bond(this.echoBannedBond)?.name || this.echoBannedBond;
+      const hit = bonds.find((b) => bannedBonds.includes(b));
+      if (hit) {
+        const name = this.gd.bond(hit)?.name || hit;
         // 新上场说「无法部署」，已经在场的说「无法行动」（正常会被收回，这里兜底手牌满的情况）
         return fromHand ? `深渊排异：【${name}】干员无法部署` : `深渊排异：【${name}】干员无法行动`;
       }
@@ -780,8 +793,10 @@ export class MatchEcho {
       // 部署禁令（2026-11-05）：客户端据此把地块标成禁放 / 把盟约标成排异
       bans: {
         tiles: Array.isArray(this.echoBannedTiles) ? this.echoBannedTiles : [],
-        bond: this.echoBannedBond || null,
-        bondName: this.echoBannedBond ? (this.gd.bond(this.echoBannedBond)?.name || this.echoBannedBond) : null,
+        bonds: Array.isArray(this.echoBannedBonds) ? this.echoBannedBonds.slice() : [],
+        bondNames: (Array.isArray(this.echoBannedBonds) ? this.echoBannedBonds : []).map((b) => this.gd.bond(b)?.name || b),
+        // 兼容只认单个盟约的旧客户端：给第一个
+        bond: (Array.isArray(this.echoBannedBonds) && this.echoBannedBonds[0]) || null,
       },
       // 生命惩罚（2026-11-05）：客户端据此把「预计扣血」也乘上去，别让预览和服务端不一致
       lp: { mul: this._echoCurseFx().lpMul, extra: this._echoCurseFx().lpExtra },
@@ -970,9 +985,10 @@ export class MatchEcho {
       }
       if (this.echoRoundCurse && ids.includes(this.echoRoundCurse)) this.echoRoundCurse = null;
       if (b.counterBans) {
-        const had = (Array.isArray(this.echoBannedTiles) ? this.echoBannedTiles.length : 0) + (this.echoBannedBond ? 1 : 0);
+        const had = (Array.isArray(this.echoBannedTiles) ? this.echoBannedTiles.length : 0)
+          + (Array.isArray(this.echoBannedBonds) ? this.echoBannedBonds.length : 0);
         this.echoBannedTiles = [];
-        this.echoBannedBond = null;
+        this.echoBannedBonds = [];
         if (had) this._echoPushAnnounce(`祝福「${b.name}」：解除封锁 / 排异`);
       }
       if (removed > 0) this._echoPushAnnounce(`祝福「${b.name}」：驱散 ${removed} 层诅咒`);
