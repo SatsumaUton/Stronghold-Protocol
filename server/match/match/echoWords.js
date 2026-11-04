@@ -95,13 +95,23 @@ export function echoWordsForRound(round, diveStart, rng, opts = {}) {
   const pool = [...ECHO_WORDS];
   const out = [];
   const usedGroups = new Set();
-  // 同组不重复（维护者 2026-11-04：又加防御又加护盾 = 同一件事叠两遍，读起来像 bug）
-  for (let i = 0; i < want && pool.length; i++) {
-    const at = Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length));
+  // 同组不重复（维护者 2026-11-04：又加防御又加护盾 = 同一件事叠两遍，读起来像 bug）；
+  // 但**词条不设上限**（2026-11-05）：池子挑空 / 同组挑完还想更多时，允许重复，重复的词条各自叠 buff。
+  for (let i = 0; i < want; i++) {
     let picked = null;
-    for (let k = 0; k < pool.length; k++) {
-      const cand = pool[(at + k) % pool.length];
-      if (!usedGroups.has(cand.group)) { picked = pool.splice((at + k) % pool.length, 1)[0]; break; }
+    if (pool.length) {
+      const at = Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length));
+      for (let k = 0; k < pool.length; k++) {
+        const cand = pool[(at + k) % pool.length];
+        if (!usedGroups.has(cand.group)) { picked = pool.splice((at + k) % pool.length, 1)[0]; break; }
+      }
+      if (!picked) {
+        const alt = Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length));
+        picked = pool.splice(alt, 1)[0];
+      }
+    } else {
+      // 池子已空：从全表里再抽（重复），词条数不再受池子大小限制
+      picked = ECHO_WORDS[Math.min(ECHO_WORDS.length - 1, Math.floor((Number(rng()) || 0) * ECHO_WORDS.length))];
     }
     if (!picked) break;
     usedGroups.add(picked.group);
@@ -121,12 +131,18 @@ export function echoWordsForRound(round, diveStart, rng, opts = {}) {
 export function applyEchoWords(battle, enemy, words) {
   if (!battle || typeof battle.addBuff !== 'function' || !enemy || !Array.isArray(words)) return 0;
   const have = new Set((enemy.buffs || []).map((b) => b?.key).filter(Boolean));
+  const seen = new Map();
   let n = 0;
   for (const w of words) {
     const buff = w?.buffFor?.(enemy);
-    if (!buff || !buff.key || have.has(buff.key)) continue;
-    battle.addBuff(enemy, buff);
-    have.add(buff.key);
+    if (!buff || !buff.key) continue;
+    // 同一条词条出现多次（深层允许重复）→ key 加序号，mods 会叠加
+    const k = seen.get(buff.key) || 0;
+    const key = k === 0 ? buff.key : `${buff.key}#${k}`;
+    if (have.has(key)) continue;
+    battle.addBuff(enemy, { ...buff, key });
+    have.add(key);
+    seen.set(buff.key, k + 1);
     n += 1;
   }
   return n;

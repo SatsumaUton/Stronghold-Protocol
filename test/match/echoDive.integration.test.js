@@ -938,3 +938,21 @@ test('词条上限不封顶：深度与叠层都照加，且没有「溢出」�
   m.echoCurseIds = ['erosion', 'erosion', 'erosion'];
   assert.equal(m.gd.enemyScale(60).hpMul, baseHp, '侵蚀不再偷偷加敌方生命');
 });
+// 维护者 2026-11-05：诅咒词条**不设上限** —— 深层词条数可以超过词池（20 条），重复的词条各自叠效果。
+test('词条不设上限：深层超过词池时会重复，且重复的词条各自叠 buff', async () => {
+  const { echoWordsForRound, applyEchoWords, ECHO_WORDS } = await import('../../server/match/match/echoWords.js');
+  let s = 7;
+  const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const words = echoWordsForRound(300, 1, rng, { maxWords: 32, everyN: 3 });
+  assert.equal(words.length, 32, `不设上限：要 32 条就得给 32 条（实际 ${words.length}）`);
+  assert.ok(words.length > ECHO_WORDS.length, '超过了词池大小');
+
+  // 重复应用：同样的词条出现两次 → 两个 buff（叠加）
+  const buffs = [];
+  const enemy = { buffs: [], base: { maxHp: 1000 }, s: { maxHp: 1000 } };
+  const battle = { addBuff: (_e, b) => { buffs.push(b); enemy.buffs.push(b); } };
+  const twice = [ECHO_WORDS[0], ECHO_WORDS[0]];
+  applyEchoWords(battle, enemy, twice);
+  assert.equal(buffs.length, 2, '重复的词条要各自挂一个 buff');
+  assert.notEqual(buffs[0].key, buffs[1].key, 'key 不能相同（否则会被去重）');
+});
