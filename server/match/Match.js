@@ -365,6 +365,12 @@ export class Match {
     this.echoWordsActive = null;
     /** 隐藏核心通关额外给的祝福抽取次数（DESIGN-ABYSS.md「隐藏通关的补偿」） */
     this.echoBlessingDraws = 0;
+    /**
+     * 挑战关（深度 5 / 10）没达成清怪线时累积的**诅咒 id 列表**（维护者 2026-11-05）。
+     * 词条与效果都在 `match/echoCurse.js`：现在只会推 'erosion'（+1 侵蚀词条上限），
+     * 以后别的来源（隐藏 boss 失败 / 连续团灭）直接往这里推 id 即可，显示与效果自动跟上。
+     */
+    this.echoCurseIds = [];
     /** 已拥有的祝福 id（echoBlessing.js；同类不叠加，上限 3） */
     this.echoBlessings = [];
     /** 当前三选一的候选（id 数组；null = 没有进行中的抽取） */
