@@ -539,10 +539,11 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     bond: (id) => (ps.bonds[id] ? { ...ps.bonds[id] } : null),
     bonds: () => Object.fromEntries(Object.entries(ps.bonds).map(([k, v]) => [k, { ...v }])),
     bondActive: (id) => !!(ps.bonds[id] && ps.bonds[id].active),
-    // 「深渊回响」：按层给钱（远见 每 10 层 / 奇迹 每 100 层）结算到 **999 层**。
-    // 深潜的层数上限已经回到原版 999，但 999 层仍然够叠出上百次结算，所以这里再收一道；
-    // 普通房给 Infinity = 原版行为，一字不差（维护者 2026-11-03）。
-    bondLayerCoinCap: m.echoVariant === 'deepecho' ? 999 : Infinity,
+    // 「深渊回响」按层给钱（远见 每 10 层 / 奇迹 每 100 层）：**不再截断在 999 层**。
+    // 维护者 2026-11-05 第三次定调：深潜的层数上限已经解除，资金通道也跟着实际层数结（和普通房同一公式）。
+    // 曾经的 60 / 999 两道锁是为了堵「无限刷新型印钞机」，而现在免费刷新已改成**每回合累计 5 次**，
+    // 印钞机链条断了，这里再压着只会让「奇迹」在 999 层之后变成死效果。
+    bondLayerCoinCap: Infinity,
     bondCount: (id) => (ps.bonds[id] ? ps.bonds[id].count : 0),
     layers: (id) => ps.layers[id] || 0,
     board: () => boardOrder(ps.board).map(({ r, c, piece }) => ps.pieceView(piece, [r, c])),
