@@ -110,6 +110,8 @@ export const actions = {
   echoBlessingDiscard: (pick) => act('g.echoBlessingDiscard', { pick: Number(pick) }, { sfx: 'confirm' }),
   // 用反制祝福提前结束「排异 / 封锁」
   echoCounterUse: () => act('g.echoCounterUse', {}, { sfx: 'confirm' }),
+  // 深渊祭坛（16 层起）：kind = 'blessing' | 'buff' | 'permanent'
+  echoAltar: (kind) => act('g.echoAltar', { kind }, { sfx: 'confirm' }),
   // 护盾：投票指定要保护的盟约
   echoShield: (pick) => act('g.echoShield', { pick: Number(pick) }, { sfx: 'confirm' }),
 };

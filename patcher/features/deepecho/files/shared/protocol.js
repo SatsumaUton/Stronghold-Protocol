@@ -624,6 +624,8 @@ export const C2S = {
   'g.echoBlessingDiscard': { pick: (v) => isInt(v, 0, 15) },
   'g.echoShield': { pick: (v) => isInt(v, 0, 15) },
   'g.echoCounterUse': {},
+  // 深渊祭坛（16 层起）：买一次献祭
+  'g.echoAltar': { kind: (v) => v === 'blessing' || v === 'buff' || v === 'permanent' },
   'g.band': { bandId: isId },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is

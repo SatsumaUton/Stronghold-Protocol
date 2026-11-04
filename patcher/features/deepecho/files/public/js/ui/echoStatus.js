@@ -9,6 +9,8 @@
 import { useState } from '../../vendor/hooks.module.js';
 import { html } from './components.js';
 import { echoBuffChips } from './echoBuffs.js';
+import { actions } from './gameActions.js';
+import { useStore } from '../store.js';
 import { t } from '../../../shared/i18n.js';
 
 /**
@@ -24,8 +26,9 @@ function BuffChips({ chips, side }) {
 }
 
 export function EchoStatus({ pub }) {
-  const [open, setOpen] = useState(true);
-  const echo = pub?.echo;
+  // 默认折叠：深度已经顶替了 HUD 上的回合数字，这条只是「词条 / 祝福」的补充说明，
+  // 展开后才占地方（维护者 2026-11-04：悬浮条挡住了 HUD 和按钮）。
+  const [open, setOpen] = useState(false);  const echo = pub?.echo;
   if (!echo) return null;
   const words = Array.isArray(echo.words) ? echo.words : [];
   const blessings = Array.isArray(echo.blessings) ? echo.blessings : [];
@@ -52,4 +55,46 @@ export function EchoStatus({ pub }) {
       </button>
     </div>
   </section>`;
+}
+
+/**
+ * 「本局信息」抽屉里的一块（维护者 2026-11-04：祝福与怪物词条要放进放大镜那个面板，
+ * 不要浮在屏幕上挡 HUD）。纯展示，没有定位、不拦截点击。
+ */
+export function EchoInfoBlock({ pub }) {
+  const myId = useStore((s) => s.me.playerId);
+  const echo = pub?.echo;
+  const depth = Number(echo?.depth) || 0;
+  if (!(depth > 0)) return null;
+  const chips = echoBuffChips(echo);
+  // 词条只在「深渊回响」页和敌方情报里出现（维护者 2026-11-04：不要两个页面都放一遍）
+  const ally = chips.filter((c) => c.side === 'ally');
+  return html`<div class="echo-infoblock" data-testid="echo-infoblock">
+    <h4 class="ihead">${t('深渊回响')} <small class="num">${t('深度 {n}', { n: depth })}</small></h4>
+    ${echo && echo.altar ? (() => {
+      // 深渊祭坛（16 层起）：成型后的资金出口（维护者 2026-11-05）
+      const a = echo.altar;
+      const used = (a.used && a.used[myId]) || { blessing: 0, buff: 0, permanent: 0 };
+      const row = (kind, label, hint) => {
+        const left = (a.limits[kind] || 0) - (used[kind] || 0);
+        const disabled = left <= 0 || (kind === 'permanent' && !a.canPermanent);
+        return html`<div class="erow echo-altar__row">
+          <span class="erow__text"><b class="erow__name">${label}</b>
+            <span class="erow__tags"><span class="etag">${hint}</span></span></span>
+          <button type="button" class="btn btn--primary btn--sm" disabled=${disabled}
+            onClick=${() => actions.echoAltar(kind)}>
+            ${t('{n} 资金', { n: a.costs[kind] })}${left > 0 ? t(' · 剩 {n}', { n: left }) : t(' · 已用完')}
+          </button>
+        </div>`;
+      };
+      return html`<h4 class="ihead">${t('深渊祭坛')} <small class="num">${t('第 {d} 层起开放', { d: 16 })}</small></h4>
+        ${row('blessing', t('献祭 · 祝福'), t('抽一个一次性祝福（不占名额）'))}
+        ${row('buff', t('献祭 · 强化'), t('本层全队 +6% 攻击 / +4% 攻速 / +5% 生命（可叠 2 层）'))}
+        ${row('permanent', t('献祭 · 永久'), t('永久 +1 部署位（每 5 层一次）'))}
+        ${a.stacks ? html`<p class="echo-infoblock__row t-dim">${t('本层强化已叠 {n} 层', { n: a.stacks })}</p>` : null}`;
+    })() : null}
+    <p class="echo-infoblock__row">${t('已获祝福：')}${ally.length ? html`<span class="echochips">${ally.map((c) => html`<span key=${c.key}
+      class=${`etag ecochip ecochip--${c.tone}`} title=${c.title}><b class="ecochip__glyph">${c.glyph}</b>${c.label}</span>`)}</span>`
+      : html`<span class="etag">${t('无')}</span>`}</p>
+  </div>`;
 }

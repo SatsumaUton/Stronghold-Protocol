@@ -14,7 +14,7 @@ import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js'
 import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
-  echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
+  echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, ECHO_BLESSINGS, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { echoSummonOnly, echoHitCountEnemy, ECHO_HITCOUNT_HP_MUL } from './echoWaves.js';
@@ -284,7 +284,14 @@ export class MatchEcho {
           battle.addBuff(enemy, { key, name: b.name, desc: b.desc || '', mods: { ...d.mods }, persist: true, visible: true });
         }
       }, { priority: 59, owner: 'echo:blessing' });
-    }    const mods = echoBlessingMods(this.echoBlessings);
+    }    const altarStacks = Math.max(0, Math.min(2, Number(this.echoAltarBuffStacks) || 0));
+    const mods = echoBlessingMods(this.echoBlessings);
+    if (altarStacks > 0) {
+      // 深渊祭坛：本层全队强化（每层最多叠 2 次）
+      mods.atkPct = (Number(mods.atkPct) || 0) + 0.06 * altarStacks;
+      mods.batPct = (Number(mods.batPct) || 0) + 0.04 * altarStacks;
+      mods.hpPct = (Number(mods.hpPct) || 0) + 0.05 * altarStacks;
+    }
     if (Object.keys(mods).length) {
       battle.on('deploy', ({ unit }) => {
         if (unit && unit.side === 'ally') applyEchoBlessingMods(battle, unit, mods);
@@ -1203,6 +1210,19 @@ export class MatchEcho {
       // 生命惩罚（2026-11-05）：客户端据此把「预计扣血」也乘上去，别让预览和服务端不一致
       lp: { mul: this._echoCurseFx().lpMul, extra: this._echoCurseFx().lpExtra },
       intel: this._echoIntel(),
+      // 深渊祭坛（16 层起）：每名玩家各自的已购次数与价格
+      altar: (() => {
+        if (this.echoVariant !== 'deepecho' || this._echoDepth(this.round) < 16) return null;
+        const used = {};
+        for (const p of this.alivePlayers()) used[p.playerId] = this._echoAltarUsed(p);
+        return {
+          costs: this.echoAltarCosts(),
+          limits: { blessing: 1, buff: 2, permanent: 1 },
+          used,
+          stacks: Number(this.echoAltarBuffStacks) || 0,
+          canPermanent: this._echoDepth(this.round) % 5 === 0,
+        };
+      })(),
       // 日程信息**始终**给（不泄露敌人构成）：迷雾/遮蔽或 boss 返场回合时，客户端至少还能显示
       // 「下次节点」这一项，而不是整块空白（维护者 2026-11-05）。
       schedule: (() => {
@@ -1213,6 +1233,80 @@ export class MatchEcho {
       })(),
       // 无尽模式：没有「最大回合」可展示，只暴露安全阀（客户端不必显示它）
       safeRound: ECHO_SAFE_ROUND,
+    };
+  }
+
+  /**
+   * 【深渊祭坛】16 层以后的资金出口（维护者 2026-11-05：成型后钱没处花，只能干看着）。
+   *
+   * 三种献祭，**每层**限购，价格随深度上涨：
+   *   * `blessing`：抽一个一次性祝福（回血 / 资金 / 涤罪），不占 3 个名额；
+   *   * `buff`    ：本层全队 +6% 攻击 / +4% 攻速 / +5% 生命（可叠 2 层）；
+   *   * `permanent`：永久升级（每 5 层 1 次）：+1 部署位。
+   *
+   * 只在深潜 16 层以后开放，其它房间一行都不碰。
+   */
+  echoAltarCosts() {
+    const d = Math.max(16, this._echoDepth(this.round));
+    return {
+      blessing: 60 + 12 * (d - 16),
+      buff: 45 + 10 * (d - 16),
+      permanent: 180 + 30 * (d - 16),
+    };
+  }
+
+  /** 本层已经买过的次数（按玩家）。 */
+  _echoAltarUsed(ps) {
+    if (!this.echoAltar) this.echoAltar = { round: 0, used: new Map() };
+    if (this.echoAltar.round !== this.round) {
+      this.echoAltar.round = this.round;
+      this.echoAltar.used = new Map();
+      this.echoAltarBuffStacks = 0;
+    }
+    return this.echoAltar.used.get(ps.playerId) || { blessing: 0, buff: 0, permanent: 0 };
+  }
+
+  /** `g.echoAltar`：买一次献祭。 */
+  buyEchoAltar(ps, kind) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE);
+    if (!ps || ps.spectator) return fail(ERR.SPECTATOR);
+    if (this._echoDepth(this.round) < 16) return fail(ERR.WRONG_PHASE);
+    if (!['blessing', 'buff', 'permanent'].includes(kind)) return fail(ERR.BAD_MSG);
+    const cost = this.echoAltarCosts()[kind];
+    const used = this._echoAltarUsed(ps);
+    const limits = { blessing: 1, buff: 2, permanent: 1 };
+    if (used[kind] >= limits[kind]) return fail(ERR.BAD_MSG);
+    if (kind === 'permanent' && this._echoDepth(this.round) % 5 !== 0) return fail(ERR.WRONG_PHASE);
+    if (Number(ps.funds) < cost) return fail(ERR.NO_FUNDS);
+    ps.spend(cost);
+    used[kind] += 1;
+    this.echoAltar.used.set(ps.playerId, used);
+    if (kind === 'blessing') {
+      const once = (Array.isArray(ECHO_BLESSINGS) ? ECHO_BLESSINGS : []).filter((b) => echoBlessingOneShot(b) && b.kind !== 'counter');
+      const pick = once.length ? once[Math.floor((Number(this.rngWaves()) || 0) * once.length)] : null;
+      if (pick) this._echoGrantBlessing(pick);
+    } else if (kind === 'buff') {
+      this.echoAltarBuffStacks = Math.min(2, Math.max(0, Number(this.echoAltarBuffStacks) || 0) + 1);
+    } else if (kind === 'permanent') {
+      ps.deployCapBonus = Math.max(0, Number(ps.deployCapBonus) || 0) + 1;
+      ps.invalidateDeployMap?.();
+      ps.recompute?.();
+    }
+    ps.stats.fundsSpent = Number(ps.stats.fundsSpent) || 0;
+    this.markPublic();
+    return OK;
+  }
+
+  _echoAltarView(ps) {
+    if (this.echoVariant !== 'deepecho' || this._echoDepth(this.round) < 16) return null;
+    const used = this._echoAltarUsed(ps);
+    const costs = this.echoAltarCosts();
+    const limits = { blessing: 1, buff: 2, permanent: 1 };
+    return {
+      costs, limits, used,
+      stacks: Number(this.echoAltarBuffStacks) || 0,
+      permanent: Number(ps.echoAltarDeployBonus) || 0,
+      canPermanent: this._echoDepth(this.round) % 5 === 0,
     };
   }
 
