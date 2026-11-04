@@ -94,13 +94,15 @@ export function SpectatorPill({ spectators, myId, isHost, onRemove }) {
  */
 export function PhaseCapsule({ pub, hud, miss = null }) {
   const phase = pub?.phase;
+  // 深潜：胶囊里的官方精灵图（休息 / 作战 / 首领）把绿色转紫，白色像素不受影响（维护者 2026-11-05）
+  const diveIcon = pub?.echo ? { filter: 'hue-rotate(120deg) saturate(1.6) brightness(1.05)' } : null;
   if (isBossPhase(phase)) {
     // the battle on screen first: its snapshot carries the live pool (the local simulation's own damage on top of the
     // server's b.pool, or the server's 20 Hz stream); m.public.bossHp refreshes at ~1 Hz and lags the leader's death
     const boss = hud?.boss || pub.bossHp || null;
     const frac = bossFrac(boss);
     return html`<div class="capsule capsule--boss" role="status">
-      <${Sprite} k="hudPanel/icon_boss" class="capsule__icon" fallback=${html`<${GIcon} name="skull" class="capsule__icon" />`} />
+      <${Sprite} k="hudPanel/icon_boss" class="capsule__icon" style=${diveIcon} fallback=${html`<${GIcon} name="skull" class="capsule__icon" />`} />
       ${hud?.total != null ? html`<span class="capsule__kills num"><b>${hud.resolved ?? hud.killed ?? 0}</b>/${hud.total}</span>` : null}
       <div class="bossbar" title=${boss ? `${fmtNum(boss.hp)} / ${fmtNum(boss.max)}` : t('敌方领袖')}>
         <div class="bossbar__fill" style=${`width:${frac == null ? 100 : frac * 100}%`}></div>
@@ -110,7 +112,7 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
   }
   if (isCombatPhase(phase) || (phase === PHASE.SETTLE && hud?.total != null)) {
     return html`<div class=${cx('capsule', 'capsule--combat', phase === PHASE.UNITE && 'capsule--unite')} role="status">
-      <${Sprite} k=${phase === PHASE.UNITE ? 'hudPanel/icon_coop' : 'hudPanel/icon_battle'} class="capsule__icon"
+      <${Sprite} k=${phase === PHASE.UNITE ? 'hudPanel/icon_coop' : 'hudPanel/icon_battle'} class="capsule__icon" style=${diveIcon}
         fallback=${html`<${Icon} name="sword" class="capsule__icon" />`} />
       <span class="capsule__kills num"><b>${hud?.resolved ?? hud?.killed ?? 0}</b>/${hud?.total ?? '--'}</span>
       ${phase === PHASE.UNITE ? html`<span class="capsule__tag">${t('联防')}</span>` : null}
@@ -118,7 +120,7 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
     </div>`;
   }
   return html`<div class="capsule capsule--prep" role="status">
-    <${Sprite} k="hudPanel/icon_rest" class="capsule__icon" fallback=${html`<${Icon} name="rook" class="capsule__icon" />`} />
+    <${Sprite} k="hudPanel/icon_rest" class="capsule__icon" style=${diveIcon} fallback=${html`<${Icon} name="rook" class="capsule__icon" />`} />
     <span class="capsule__label">${prepCapsuleLabel(phase)}</span>
   </div>`;
 }
