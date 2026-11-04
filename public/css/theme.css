@@ -950,3 +950,15 @@ html.sp-deepecho .dorder__box.is-band {
 }
 html.sp-deepecho .dorder__me { background: var(--mint-500); color: #150a2b; box-shadow: 0 0 0 .02rem #150a2b; }
 html.sp-deepecho .dturn__finger, html.sp-deepecho .dorder__zoom { filter: hue-rotate(215deg) saturate(1.4); }
+
+/* 深潜：只把**绿色**的精灵图标转成紫（白色图标不受影响 —— hue-rotate 对无彩色像素是恒等变换；
+   维护者 2026-11-05：白色的问题/图标保持白色） */
+html.sp-deepecho .capsule__icon,
+html.sp-deepecho .capsule__icon img,
+html.sp-deepecho .capsule__icon svg,
+html.sp-deepecho .caption__icon,
+html.sp-deepecho .gtop__cap .sprite,
+html.sp-deepecho .gtop__cap img,
+html.sp-deepecho .gtop__cap svg {
+  filter: hue-rotate(120deg) saturate(1.6) brightness(1.05);
+}
