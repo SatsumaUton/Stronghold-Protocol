@@ -301,14 +301,28 @@ export class MatchViews {
     if (this.bossWaves) {
       const g = this.bossGroupOf(ps);
       if (!g) return [];
-      return previewOf([...g.wave.spawns, ...bountySpawns(this.gd, this.round, g.wave, ps.bounties, ps.playerId, { solo: this.isSolo, side: g.side })]);
+      return this._echoMaskBountyPreview(previewOf([...g.wave.spawns, ...bountySpawns(this.gd, this.round, g.wave, ps.bounties, ps.playerId, { solo: this.isSolo, side: g.side })]));
     }
     if (!this.wave) return [];
     // 「深渊回响」深潜：维护者 2026-11-03 定 —— 原版「敌方情报」面板的四项全部保留
     // （回合数+敌人总数 / 阵营 chips / 逐只敌人列表 / boss 领袖块），所以这里照常发明细；
     // 额外的威胁值/是否精英/下次节点是 `m.public.echo.intel` 另发的一块，两者并存。
     const bounty = bountySpawns(this.gd, this.round, this.wave, ps.bounties, ps.playerId, { solo: this.isSolo });
-    return previewOf([...this.wave.spawns, ...bounty]);
+    return this._echoMaskBountyPreview(previewOf([...this.wave.spawns, ...bounty]));
+  }
+
+  /**
+   * 深潜的悬赏目标在**准备阶段**整只隐藏成「?」占位（维护者 2026-11-05）：把对手需要打的那只
+   * 换成没有美术数据的 `enemy_unknown`，客户端自然画成占位菱形；战斗开始后 sim 用真实 key 出怪。
+   *
+   * @param {Array<object>} list previewOf 的结果
+   */
+  _echoMaskBountyPreview(list) {
+    if (this.echoVariant !== 'deepecho' || !Array.isArray(list)) return list;
+    for (const e of list) {
+      if (e && e.source === 'bounty') e.enemyKey = 'enemy_unknown';
+    }
+    return list;
   }
 
   /** A 自选 piece's pick (like the sim's UnitInfo.diy): a scout's card composes the operator from it (shared/diy.js). */
