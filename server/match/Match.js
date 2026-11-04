@@ -780,18 +780,17 @@ export class Match {
   /**
    * 盟约层数上限是否解除 —— 实验房，或「深渊回响」深潜。
    *
-   * 历史（维护者三次改动，别再来回翻）：
+   * 历史（维护者两次改动，别再来回翻）：
    *   1. 最初深潜也解除 → 叠到 1000+ 层，「奇迹（每 100 层）/ 远见（每 10 层）」变成无限刷新与无限资金；
    *   2. 于是回滚成原版 999；
    *   3. 2026-11-03 第二次改：深潜**重新解除**（1e9），但两个漏洞改为在**源头**堵死 ——
    *      `effectsMeta.js` 的 `bondLayerCoinCap = 60`（远见/奇迹 的按层给钱只结算到 60 层）、
-   *      `effectsMeta.js` 的 `grantFreeRefresh`（深潜里免费刷新总数封顶 2）；
-   *   4. 2026-11-05 第三次改：免费刷新改成**每回合累计 5 次**（`_echoGrantFreeRefresh`），印钞链条断了；
-   *      按层给钱的上限随之解除（`bondLayerCoinCap = Infinity`），「奇迹」在 999 层之后继续发钱。
-   * 所以「层数无上限」与「不会无限刷新」同时成立；普通房间仍是原版 999。
+   *      `effectsMeta.js` 的 `grantFreeRefresh`（深潜里免费刷新总数封顶 2）。
+   * 所以「层数无上限」与「不会无限刷新 / 无限资金」现在同时成立；普通房间仍是原版 999。
    */
   get layerCapOff() {
-    // 维护者 2026-11-05：深潜**恢复无限层**；按层给钱不再截断（防刷新的活由 _echoGrantFreeRefresh 按回合累计 5 次兜）。
+    // 维护者 2026-11-05：深潜**恢复无限层**（其他盟约要能突破 999），但「按层给钱」这类效果
+    // 在 effectsMeta 的 ondLayerCoinCap = 999 处单独锁死（最多结算到 999 层）。
     return this.disableLayerCap === true || this.echoVariant === 'deepecho';
   }
 
