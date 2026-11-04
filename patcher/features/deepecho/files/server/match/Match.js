@@ -856,7 +856,10 @@ export class Match {
     ps.alive = false;
     ps.pendingDeath = true;
     ps.dirty();
-    this.toast(ps, 'warn', msg('你的目标生命值耗尽，等待救援'));
+    // 深潜的救援是「任一存活队友付 10 点救 1 点」，提示语要说清楚怎么救（维护者 2026-11-05）
+    this.toast(ps, 'warn', this.echoVariant === 'deepecho'
+      ? msg('你的目标生命值耗尽：任一存活队友可支付 10 点目标生命把你救回 1 点')
+      : msg('你的目标生命值耗尽，等待救援'));
   }
 
   _finalizeDeath(ps, { round = this.round, notify = true, reason = this._revivalDeathReason(ps) } = {}) {
