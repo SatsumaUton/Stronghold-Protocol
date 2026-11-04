@@ -563,8 +563,9 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
     if (!canEdit) return;
     const experimental = {
       revivalEnabled: revival,
-      // 手动编组存在时不写 disableSharedPool（两者互斥，写了服务端也会被 poolPlan 顶掉）
-      ...(manualPools ? {} : { disableSharedPool: independent }),
+      // ⚠ `disableSharedPool` 必须**永远**写出来：`isExperimental` 要求两个默认键都存在，
+      // 少一个服务端就判成 BAD_MSG（玩家看到的「无效的请求」）—— 手动编组时写 false 即可。
+      disableSharedPool: manualPools ? false : independent,
       ...(capacity > 4 ? { playerCapacity: capacity } : {}),
       ...(capacity > 4 && noDuck ? { disableDuckLord: true } : {}),
       ...(capacity > 4 && repeat ? { allowRepeat: true } : {}),

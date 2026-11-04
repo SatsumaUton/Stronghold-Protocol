@@ -1981,8 +1981,15 @@ export class Lobby {
     // 人数调到 5–20、或者开 enemyHpMul 破坏深潜的数值口径。深潜固定最多 4 人。
     if (room.variant === 'deepecho') return fail(ERR.BAD_MSG, '「深渊回响」不支持实验性功能（固定最多 4 人）');
     if (room.match) return fail(ERR.ROOM_STARTED);
-    if (!isExperimental(experimental)) return fail(ERR.BAD_MSG, 'invalid experimental options');
-    const next = experimentalOptions(experimental);
+    // 兜底：`isExperimental` 要求两个默认键都在，老客户端 / 手动编组可能只发其中一个 ——
+    // 这里补成显式 false 再校验，避免把合法请求判成「无效的请求」（维护者 2026-11-05）。
+    const input = {
+      revivalEnabled: !!(experimental && experimental.revivalEnabled === true),
+      disableSharedPool: !!(experimental && experimental.disableSharedPool === true),
+      ...(experimental && typeof experimental === 'object' ? experimental : {}),
+    };
+    if (!isExperimental(input)) return fail(ERR.BAD_MSG, 'invalid experimental options');
+    const next = experimentalOptions(input);
     const capacity = roomCapacity(room.mode, next);
     if (room.seats.some((s, i) => s && i >= capacity)) return fail(ERR.ROOM_FULL, 'occupied seats exceed the new capacity');
     room.experimental = next;
