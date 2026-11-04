@@ -107,8 +107,22 @@ export class MatchSetupVote {
         playerPools = this.disableSharedPool || this.capacityExperiment
           ? new Map(poolGroups.flatMap((g) => g.playerIds.map((id) => [id, g.pool]))) : null;
       } else {
-        pool = new SharedPool(this.gd, { banned: bans.banned });
+        // 非 5–20 人大厅也要建编组：**独立卡池 / 手动编组**的房间靠 poolGroups 生成 playerPools。
+        // 以前这里只 new 一个 SharedPool，而下面的赋值整段被 if (capacityExperiment) 包着，
+        // 于是「重刷本局」之后 this.playerPools 仍指向开局那一池 ——
+        // 新禁用的盟约干员照样能被商店抽到（维护者 2026-11-05 实测：深渊回响 独立卡池）。
+        poolGroups = createPoolGroups(this.gd, this.order, {
+          banned: bans.banned,
+          experimental: false,
+          independent: this.disableSharedPool,
+          fixedChunks: this.twentyPlayerMode,
+          plan: this.poolPlan,
+        });
+        pool = this.disableSharedPool ? new SharedPool(this.gd, { banned: bans.banned }) : poolGroups[0].pool;
         if (!pool.entries.size) throw new Error('rerolled chess pool is empty');
+        playerPools = this.disableSharedPool || this.poolPlan
+          ? new Map(poolGroups.flatMap((g) => g.playerIds.map((id) => [id, g.pool])))
+          : null;
       }
       const off = new Set([...bans.drawn, ...bans.staticOff]);
       const stocks = this.order.map((ps) => ps.buildDiyStock(off));
@@ -129,12 +143,12 @@ export class MatchSetupVote {
     this.staticInactiveBonds = bans.staticOff;
     this.bannedChess = bans.banned;
     this.pool = pool;
-    if (this.capacityExperiment) {
-      this.poolGroups = poolGroups;
-      this.playerPools = playerPools;
-      this.playerItemPools = createItemPools(this.gd, poolGroups, (id) => this.players.get(id));
-      this.itemPool = this.playerItemPools.get(poolGroups[0].playerIds[0]);
-    }
+    // 无条件重建（对齐 Match 构造时的初始化）：独立卡池 / 手动编组 / 物品池都要跟着新的 bans 走，
+    // 不然重刷后商店还在用开局那一池（维护者 2026-11-05 实测：禁用盟约的干员仍能刷出来）。
+    this.poolGroups = poolGroups;
+    this.playerPools = playerPools;
+    this.playerItemPools = createItemPools(this.gd, poolGroups, (id) => this.players.get(id));
+    this.itemPool = this.playerItemPools.get(poolGroups[0].playerIds[0]);
     this._botPath = null;
     for (const [i, ps] of this.order.entries()) {
       ps.diyStock = stocks[i].stock;
