@@ -703,6 +703,15 @@ export class MatchEcho {
     }
     if (out.length && Array.isArray(this.echoBannedBonds)) {
       this.echoBannedBonds = this.echoBannedBonds.filter((b) => !out.includes(b));
+      // 诅咒列表也要跟着消失：`echoCurseIds` 里每条排异记一次 `block_bond`，
+      // 解除几个就删几条（维护者 2026-11-05：3 回合后诅咒还在列表里、干员也放不上去）。
+      if (Array.isArray(this.echoCurseIds)) {
+        let left = out.length;
+        this.echoCurseIds = this.echoCurseIds.filter((id) => {
+          if (left > 0 && id === 'block_bond') { left -= 1; return false; }
+          return true;
+        });
+      }
       const names = out.map((b) => this.gd.bond(b)?.name || b).join('、');
       this._echoPushAnnounce(`排异解除：【${names}】的干员可以重新部署了`);
     }
@@ -732,6 +741,8 @@ export class MatchEcho {
     held.splice(idx, 1);
     this.echoBannedTiles = [];
     this.echoBannedBonds = [];
+    // 解除后诅咒列表里对应的条目也要一起消失（维护者 2026-11-05）
+    if (Array.isArray(this.echoCurseIds)) this.echoCurseIds = this.echoCurseIds.filter((id) => id !== 'block_bond' && id !== 'block_tiles');
     if (this.echoBannedBondsUntil && typeof this.echoBannedBondsUntil === 'object') this.echoBannedBondsUntil = {};
     this._echoPushAnnounce(`祝福「${b.name}」：提前解除封锁 / 排异`);
     this._echoFlushAnnounce();
