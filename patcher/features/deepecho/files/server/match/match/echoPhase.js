@@ -17,6 +17,7 @@ import {
   echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
+import { echoSummonOnly } from './echoWaves.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR } from '../../../shared/constants.js';
 import { msg } from '../../../shared/i18n.js';
 import { hiddenEligible } from '../finalAssault.js';
@@ -106,9 +107,12 @@ export class MatchEcho {
     const inject = d === 15 ? 3 : 2;
     try {
       const cap = 3000 * 1.35 ** (Math.max(1, this._echoDepth(r)) - 1);
+      // 召唤物（tokenOnly / 别人的 summons 目标）不能被顶成精英发出来：这里从「所有 ELITE」里抽，
+      // 那批召唤物也在里面（维护者 2026-11-05：16 层后看到没本体的召唤物）。
+      const summonOnly = echoSummonOnly(this.gd);
       const pool = Object.keys((this.gd.raw && this.gd.raw.enemies) || {})
         .map((k) => ({ k, e: this.gd.enemy(k) }))
-        .filter(({ e }) => e && e.rank === 'ELITE' && Number(e.stats && e.stats.maxHp) <= cap && Number(e.stats && e.stats.moveSpeed) > 0);
+        .filter(({ k, e }) => e && !summonOnly.has(k) && e.rank === 'ELITE' && Number(e.stats && e.stats.maxHp) <= cap && Number(e.stats && e.stats.moveSpeed) > 0);
       if (!pool.length) return wave;
       let n = 0;
       for (const s of wave.spawns) {

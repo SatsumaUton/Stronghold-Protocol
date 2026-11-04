@@ -183,11 +183,36 @@ export function echoRoundPool(gd, dataRound, helpers) {
  *
  * 只排除 BOSS（`rank === 'BOSS'`，领袖由固定节点单独发），NORMAL / ELITE 都收。
  */
+const ECHO_SUMMON_CACHE = new WeakMap();
+
+/**
+ * 这个敌人是不是**只能被召唤出来**的（没有本体就不该出现）。
+ *
+ * 数据里 `tokenOnly: true` 有 8 个（刺胄之弹、枯朽之种、血珀、不祥幻影、雪怪小队破冰者…），
+ * 另外还有一批是别的敌人的 `summons` 目标 —— 它们在原版里都只跟着本体出现
+ * （维护者 2026-11-05：深潜 16 层以后看到孤零零的召唤物）。
+ */
+export function echoSummonOnly(gd) {
+  const cached = ECHO_SUMMON_CACHE.get(gd);
+  if (cached) return cached;
+  const set = new Set();
+  const raw = gd && gd.raw && gd.raw.enemies ? gd.raw.enemies : {};
+  for (const [key, e] of Object.entries(raw)) {
+    if (e && e.tokenOnly === true) set.add(key);
+    for (const s of Array.isArray(e && e.summons) ? e.summons : []) if (typeof s === 'string') set.add(s);
+    if (String(key).startsWith('token_')) set.add(key);
+    if (typeof gd.token === 'function' && gd.token(key)) set.add(key);
+  }
+  ECHO_SUMMON_CACHE.set(gd, set);
+  return set;
+}
+
 export function echoAllPool(gd, helpers) {
   const isFlyKey = helpers && helpers.isFlyKey;
   const cached = ECHO_ALLPOOL_CACHE.get(gd);
   if (cached) return cached;
   const all = [];
+  const summonOnly = echoSummonOnly(gd);
   const raw = gd && gd.raw && gd.raw.enemies ? gd.raw.enemies : null;
   for (const [key, e] of Object.entries(raw || {})) {
     const hp = Number(e && e.stats && e.stats.maxHp) || 0;
@@ -197,6 +222,9 @@ export function echoAllPool(gd, helpers) {
     // 它们只该在原版的召唤条件下出现（维护者 2026-11-05）
     if (String(key).startsWith('token_')) continue;
     if (typeof gd.token === 'function' && gd.token(key)) continue;
+    // 召唤物 / 只能被召唤出来的敌人（tokenOnly / 别人的 summons 目标）：
+    // 没有本体绝不单独出怪（维护者 2026-11-05：深潜 16 层之后看到孤零零的召唤物）
+    if (summonOnly.has(key)) continue;
     // 移速 0 的是装置/陷阱（比如「未装配刀片」），不是会走的敌人 —— 它们不该被当普通怪抽出来
     if (!(Number(e && e.stats && e.stats.moveSpeed) > 0)) continue;
     all.push({ key, threat: Math.max(1, hp), fly: typeof isFlyKey === 'function' ? !!isFlyKey(gd, key) : false, elite: e.rank === 'ELITE' });

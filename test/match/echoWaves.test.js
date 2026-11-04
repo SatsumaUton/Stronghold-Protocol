@@ -191,3 +191,28 @@ test('16 层以后：整波铺进时限的 36%，不会把 110 只挤在 20 秒�
   assert.ok(last >= 230 * 0.25, `末怪只落在 ${last.toFixed(1)} 秒（时限 230）—— 又是一波洪水`);
   assert.ok(last <= 230 * 0.8 + 1e-9, `末怪 ${last.toFixed(1)} 秒超出时限的 80%`);
 });
+
+// 维护者 2026-11-05：深潜 16 层之后看到「没有本体的召唤物」。
+// 召唤物（tokenOnly / 别人的 summons 目标）在数据里有 21 个，永远不该被当成普通怪抽出来。
+test('召唤物不会被当成普通怪抽出来（没有本体绝不出现）', async () => {
+  const { echoAllPool, echoSummonOnly, echoRoundPool } = await import('../../server/match/match/echoWaves.js');
+  const { loadData } = await import('../../server/data.js');
+  const DATA = await loadData();
+  const gd = {
+    raw: { enemies: DATA.enemies },
+    token: () => null,
+    enemy: (k) => DATA.enemies[k],
+    roundCfg: (r) => DATA.rounds?.[r] || null,
+  };
+  const only = echoSummonOnly(gd);
+  assert.ok(only.size >= 8, `召唤物名单太小：${only.size}`);
+  const pool = echoAllPool(gd, { isFlyKey: () => false });
+  const leaked = pool.all.filter((x) => only.has(x.key));
+  assert.deepEqual(leaked.map((x) => x.key), [], '随机池里不该有召唤物');
+  assert.ok(pool.all.length > 100, '池子不能因此被掏空');
+  // 深潜深层用的是这张池子；抽查 20 个真实难度也都不该出现
+  for (let r = 16; r <= 40; r += 4) {
+    const rp = echoRoundPool(gd, r, { isFlyKey: () => false });
+    for (const x of rp.all) assert.ok(!only.has(x.key), `第 ${r} 回合池里出现了召唤物 ${x.key}`);
+  }
+});
