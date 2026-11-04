@@ -133,3 +133,26 @@ test('榜键用全服共用前缀，与节点的 store.prefix 无关', async (t)
   assert.equal(keys.some((k) => k.startsWith('sp:n7:')), false, '不能再写进节点自己的前缀');
   assert.equal(typeof readEchoBoard, 'function');
 });
+// 维护者 2026-11-05：ValkeyClient 回的是 **Buffer** —— 以前 typeof v !== 'string' 把明细全丢了，
+// 榜上有名次却没有玩家名。这里用 Buffer 回包复现并锁死。
+test('读取：Redis 回 Buffer 时也要能解析出玩家名', async () => {
+  const { readEchoBoard } = await import('../../server/match/match/echoBoard.js');
+  const member = '01793730815758:JTMA:1:1878177513';
+  const detail = JSON.stringify({ players: ['武桐_Uton'], victory: false, round: 8, difficulty: 'ABYSS' });
+  const store = {
+    prefix: 'sp:n1:',
+    client: {
+      command: async (...a) => {
+        const cmd = String(a[0]).toUpperCase();
+        if (cmd === 'ZREVRANGE') return [Buffer.from(member), Buffer.from('8')];
+        if (cmd === 'HMGET') return [Buffer.from(detail)];
+        return null;
+      },
+    },
+  };
+  const rows = await readEchoBoard(store, { difficulty: 'ABYSS', limit: 5 });
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0].players, ['武桐_Uton'], 'Buffer 明细必须被解析');
+  assert.equal(rows[0].round, 8, '回合也要回来');
+  assert.equal(rows[0].roomCode, 'JTMA');
+});

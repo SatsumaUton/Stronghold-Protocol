@@ -111,6 +111,14 @@ export function parseEchoBoard(flat, { limit = ECHO_BOARD_LIMIT, details = null,
 const storeKey = (store, name) => `${ECHO_BOARD_SHARED_PREFIX}${name}`;
 
 /**
+ * 把 Redis 回包转成字符串。
+ *
+ * ⚠ ValkeyClient 默认回 **Buffer**（不是 string）：以前这里用 `typeof v !== 'string'` 过滤，
+ * 结果明细全部被当成坏值丢掉 —— 榜上有名次，但玩家名 / 回合永远是空（2026-11-05 实测）。
+ */
+const asText = (v) => (typeof v === 'string' ? v : Buffer.isBuffer(v) ? v.toString('utf8') : v == null ? '' : String(v));
+
+/**
  * 记一条成绩：写进**该难度**的榜，同时写一份明细。
  * 全程 try/catch —— Redis 挂了、命令被拒、对局在收尾，都不该让结算失败。
  *
@@ -153,7 +161,7 @@ export async function readEchoBoard(store, { difficulty = 'HARD', limit = ECHO_B
     const flat = await store.client.command('ZREVRANGE', board, '0', String(n - 1), 'WITHSCORES');
     const rows = Array.isArray(flat) ? flat : [];
     const members = [];
-    for (let i = 0; i + 1 < rows.length; i += 2) members.push(String(rows[i] ?? ''));
+    for (let i = 0; i + 1 < rows.length; i += 2) members.push(asText(rows[i]));
     let details = null;
     if (members.length) {
       try {
@@ -161,8 +169,8 @@ export async function readEchoBoard(store, { difficulty = 'HARD', limit = ECHO_B
         if (Array.isArray(raw)) {
           details = {};
           for (let i = 0; i < members.length; i++) {
-            const v = raw[i];
-            if (typeof v !== 'string' || !v) continue;
+            const v = asText(raw[i]);
+            if (!v) continue;
             try { details[members[i]] = JSON.parse(v); } catch { /* 坏值就当没有 */ }
           }
         }
