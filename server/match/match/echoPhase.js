@@ -1741,11 +1741,28 @@ export class MatchEcho {
     if (removeSpec != null && Array.isArray(this.echoCurseIds) && this.echoCurseIds.length) {
       // 'common' = 只清普通诅咒（涤罪，稀有/传说保留）；数字 = 清最早的 n 层；'all' = 全清
       const before = this.echoCurseIds.length;
-      this.echoCurseIds = removeEchoCurses(this.echoCurseIds, removeSpec).kept;
-      const removed = before - this.echoCurseIds.length;
-      if (removed > 0) {
-        this._echoPushAnnounce(`净化：移除 ${removed} 层诅咒`);
-        this._echoFlushAnnounce();
+      if (typeof removeSpec === 'number') {
+        // 数字 = 清 n 层，**优先清稀有度最高**的（维护者 2026-11-05：玩家拿了「净化」
+        // 却发现「静默」没被清掉 —— 原来是按列表顺序清的，先清到了普通诅咒）。
+        const rank = { epic: 3, rare: 2, common: 1 };
+        const order = this.echoCurseIds
+          .map((id, i) => ({ id, i, r: rank[echoCurseById(id)?.rarity] || 1 }))
+          .sort((a, b) => b.r - a.r || a.i - b.i)
+          .slice(0, Math.max(0, Math.trunc(removeSpec)));
+        const drop = new Set(order.map((x) => x.i));
+        const names = order.map((x) => echoCurseById(x.id)?.name || x.id);
+        this.echoCurseIds = this.echoCurseIds.filter((_, i) => !drop.has(i));
+        if (names.length) {
+          this._echoPushAnnounce(`净化：移除了「${names.join('、')}」`);
+          this._echoFlushAnnounce();
+        }
+      } else {
+        this.echoCurseIds = removeEchoCurses(this.echoCurseIds, removeSpec).kept;
+        const removed = before - this.echoCurseIds.length;
+        if (removed > 0) {
+          this._echoPushAnnounce(`净化：移除 ${removed} 层诅咒`);
+          this._echoFlushAnnounce();
+        }
       }
     }
     // 克制祝福（2026-11-05）：直接驱散对应的诅咒 / 解除部署禁令
