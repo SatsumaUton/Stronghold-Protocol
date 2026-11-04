@@ -962,3 +962,15 @@ html.sp-deepecho .gtop__cap img,
 html.sp-deepecho .gtop__cap svg {
   filter: hue-rotate(120deg) saturate(1.6) brightness(1.05);
 }
+
+/* 选策略右栏详情：原版薄荷绿底/标签一并换紫（维护者 2026-11-05） */
+html.sp-deepecho .draft-detail {
+  background: linear-gradient(180deg, rgba(78, 52, 140, .55), rgba(34, 22, 62, .45) 55%, rgba(12, 9, 20, .25));
+}
+html.sp-deepecho .draft-tag { color: #1a0f33; background: rgba(var(--mint-400-rgb), .7); }
+html.sp-deepecho .draft-detail__art img,
+html.sp-deepecho .draft-done__art img { filter: saturate(.85) drop-shadow(0 0 .14rem rgba(var(--mint-rgb), .45)); }
+html.sp-deepecho .draft-detail__art::before,
+html.sp-deepecho .draft-done__art::before { border-color: rgba(224, 212, 255, .55); }
+html.sp-deepecho .draft-detail__art::after,
+html.sp-deepecho .draft-done__art::after { color: rgba(224, 212, 255, .28); }
