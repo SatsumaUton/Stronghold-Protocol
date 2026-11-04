@@ -103,8 +103,8 @@ test('资金倍率：现在所有祝福都不再影响金币倍率', () => {
   assert.equal(echoBlessingCoinMul(['loot', 'loot']), 1);
 });
 
-test('一次性资金：只有物资补给给 25', () => {
-  assert.equal(echoBlessingFunds(echoBlessingById('fund')), 25);
+test('一次性资金：只有物资补给给 8（2026-11-05 大削弱，原来 25）', () => {
+  assert.equal(echoBlessingFunds(echoBlessingById('fund')), 8);
   assert.equal(echoBlessingFunds(echoBlessingById('haste')), 0);
   assert.equal(echoBlessingFunds(echoBlessingById('loot')), 0);
   assert.equal(echoBlessingFunds(null), 0);

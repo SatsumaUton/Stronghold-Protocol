@@ -35,9 +35,9 @@ export const ECHO_BLESSINGS = Object.freeze([
   Object.freeze({
     id: 'fund', weight: 4, rarity: 'common',
     name: '物资补给',
-    desc: '立刻获得 25 资金',
+    desc: '立刻获得 8 资金',
     kind: 'fund',
-    funds: 25,
+    funds: 8,
   }),
   Object.freeze({
     id: 'haste', rarity: 'rare',
@@ -81,9 +81,9 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'tgt', rarity: 'epic', name: '多目标', desc: '全体干员最大目标数 +1', kind: 'mods', group: 'range', mods: { maxTargets: 1 } },
   { id: 'gold_s', weight: 4, rarity: 'common', name: '余利', desc: '结算资金 +8%', kind: 'coin', group: 'coin', coinMul: 1.08 },
   { id: 'gold_m', weight: 2, rarity: 'rare', name: '商运', desc: '结算资金 +15%', kind: 'coin', group: 'coin', coinMul: 1.15 },
-  { id: 'fund_s', weight: 4, rarity: 'common', name: '应急包', desc: '立刻获得 12 资金', kind: 'fund', group: 'fund', funds: 12 },
+  { id: 'fund_s', weight: 4, rarity: 'common', name: '应急包', desc: '立刻获得 5 资金', kind: 'fund', group: 'fund', funds: 5 },
   { id: 'refresh_s', weight: 4, rarity: 'common', name: '机变', desc: '立刻获得 1 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 1 },
-  { id: 'bigfund', weight: 2, rarity: 'rare', name: '深渊源泉', desc: '立刻获得 45 资金', kind: 'fund', group: 'fund', funds: 45 },
+  { id: 'bigfund', weight: 2, rarity: 'rare', name: '深渊源泉', desc: '立刻获得 15 资金', kind: 'fund', group: 'fund', funds: 15 },
   { id: 'bigrefresh', weight: 2, rarity: 'rare', name: '时之沙漏', desc: '立刻获得 2 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 2 },
 
   // —— 全队回复生命（2026-11-05）：一次性、数值刻意做小 ——
