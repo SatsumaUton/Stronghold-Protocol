@@ -43,6 +43,8 @@ export class MatchSettle {
     // 「深渊回响」挑战关（深度 5 / 10）：奖励是**全队一次祝福三选一**，不再发资金（维护者 2026-11-05）。
     // 必须在 per-player 循环外调用 —— 旧实现写在循环里，「团队完美 +1 抽取」4 个人会重复发 4 次。
     if (this.echoVariant === 'deepecho') this._echoSettleChallenge();
+    // 悬赏目标没打掉 → 加诅咒（维护者 2026-11-05）：在悬赏倒计时还没减之前判断
+    if (this.echoVariant === 'deepecho') this._echoSettleBountyFailure(alive);
     for (const ps of alive) {
       const r = this.lastResults.get(ps.playerId) || { leaked: [], perfect: true, coins: 0, layerGains: {}, killed: 0, damageDealt: 0 };
       const counted = (r.leaked || []).filter((l) => l && l.counted !== false).length;

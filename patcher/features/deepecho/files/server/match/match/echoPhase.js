@@ -11,7 +11,7 @@
 
 import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
 import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js';
-import { echoCurseList, echoCurseEffects, pickEchoCurse, removeEchoCurses, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
+import { echoCurseList, echoCurseEffects, echoCurseById, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
   echoBlessingFunds, echoBlessingHeal, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
@@ -257,6 +257,22 @@ export class MatchEcho {
         if (unit && unit.side === 'ally') applyEchoBlessingMods(battle, unit, mods);
       }, { priority: 60, owner: 'echo:blessing' });
     }
+    // 干员减益诅咒（2026-11-05）：只在**命中的干员**身上挂负面 mods（按站位过滤），敌人和召唤物不吃。
+    const unitCurses = echoCurseUnitMods([
+      ...(Array.isArray(this.echoCurseIds) ? this.echoCurseIds : []),
+      ...(this.echoRoundCurse ? [this.echoRoundCurse] : []),
+    ]);
+    if (unitCurses.length) {
+      battle.on('deploy', ({ unit }) => {
+        if (!unit || unit.side !== 'ally' || typeof battle.addBuff !== 'function') return;
+        for (const c of unitCurses) {
+          if (!curseUnitMatches(c.filter, unit)) continue;
+          const key = `echo:curse:${c.id}`;
+          if ((unit.buffs || []).some((x) => x && x.key === key)) continue;
+          battle.addBuff(unit, { key, name: c.name, desc: '', mods: { ...c.mods }, persist: true, visible: true });
+        }
+      }, { priority: 59, owner: 'echo:curse' });
+    }
   }
 
   /**
@@ -320,6 +336,27 @@ export class MatchEcho {
     if (!this._echoDiveRound(r)) return false;
     const depth = this._echoDepth(r);
     return depth === 5 || depth === 10;
+  }
+
+  /**
+   * 悬赏没打掉就吃诅咒（维护者 2026-11-05）。
+   *
+   * 判定放在结算开始、悬赏倒计时还没减之前：`roundsLeft <= 1` 的卡这一轮到期，
+   * 如果目标真被打掉了，卡会在击杀时结算并移除，所以「到期还留着」就是没打掉。
+   * 每条到期卡只降一层诅咒，按深度抽（和挑战关同一套 pickEchoCurse）。
+   */
+  _echoSettleBountyFailure(players = this.alivePlayers()) {
+    const expiring = (Array.isArray(players) ? players : [])
+      .reduce((n, ps) => n + ((ps && ps.bounties) || []).filter((b) => b && b.roundsLeft <= 1).length, 0);
+    if (!expiring) return null;
+    const rng = createRng(deriveSeed(this.seed, `echo:bountyfail:${this.round}`));
+    const c = pickEchoCurse(this._echoDepth(this.round), rng);
+    if (!c) return null;
+    if (!Array.isArray(this.echoCurseIds)) this.echoCurseIds = [];
+    this.echoCurseIds.push(c.id);
+    this.tickerText?.(`悬赏未达成：深渊降下诅咒「${c.name}」`, 1);
+    this.markPublic?.();
+    return c.id;
   }
 
   /**
@@ -390,12 +427,53 @@ export class MatchEcho {
    * 已接入的 kind 及消费点见 echoCurse.js 的 ECHO_CURSE_LIVE_KINDS。
    */
   _echoCurseFx() {
-    return echoCurseEffects(this.echoCurseIds);
+    const run = echoCurseEffects(this.echoCurseIds);
+    const round = this.echoRoundCurse ? echoCurseEffects([this.echoRoundCurse]) : null;
+    return round ? mergeCurseEffects(run, round) : run;
   }
 
   /** 免费刷新上限：奇迹·诅咒的 3 次，再被「枯竭」这类减（最低 0）。 */
   _echoFreeRefreshCap() {
     return Math.max(0, MatchEcho.MAX_FREE_REFRESH + this._echoCurseFx().freeRefresh);
+  }
+
+  /**
+   * 每回合开始刷新诅咒（维护者 2026-11-05）。
+   *
+   * 两件事：
+   *   1. **固定回合**（`ECHO_FIXED_CURSE_ROUNDS`）：到这一层就永久加一条（已在列表里就不重复）；
+   *   2. **回合诅咒**（`ECHO_ROUND_CURSES`）：按深度随机，只影响本回合，下回合重刷。
+   *      其中的 `destroyEquip` 当场结算（每人随机销毁 1 件已装备的装备）。
+   */
+  _echoRefreshCurses(r = this.round) {
+    if (!this._echoDiveRound(r)) { this.echoRoundCurse = null; return null; }
+    const depth = this._echoDepth(r);
+    const fixed = ECHO_FIXED_CURSE_ROUNDS[depth];
+    if (fixed) {
+      if (!Array.isArray(this.echoCurseIds)) this.echoCurseIds = [];
+      if (!this.echoCurseIds.includes(fixed)) this.echoCurseIds.push(fixed);
+    }
+    const rng = createRng(deriveSeed(this.seed, `echo:rcurse:${r}`));
+    const pick = pickRoundCurse(depth, rng);
+    this.echoRoundCurse = pick ? pick.id : null;
+    if (pick && pick.effect && pick.effect.kind === 'destroyEquip') {
+      let n = 0;
+      for (const ps of this.alivePlayers()) n += this._echoDestroyEquipped(ps, rng);
+      if (n) this.tickerText?.(`深渊诅咒「${pick.name}」：销毁了 ${n} 件装备`, 1);
+    }
+    return this.echoRoundCurse;
+  }
+
+  /** 销毁该玩家随机 1 件已装备的装备（从棋盘干员身上摘掉，不回手牌、不退池）。 */
+  _echoDestroyEquipped(ps, rng = () => 0.5) {
+    if (!ps || !ps.board) return 0;
+    const holders = [...ps.board.values()].filter((p) => p && Array.isArray(p.items) && p.items.length);
+    if (!holders.length) return 0;
+    const piece = holders[Math.min(holders.length - 1, Math.floor((Number(rng()) || 0) * holders.length))];
+    const idx = Math.min(piece.items.length - 1, Math.floor((Number(rng()) || 0) * piece.items.length));
+    piece.items.splice(idx, 1);
+    ps.dirty?.();
+    return 1;
   }
 
   /** 战斗时限倍率（「滞重」= 0.9）。 */
@@ -473,6 +551,11 @@ export class MatchEcho {
       { id: 'foresight', name: '远见·诅咒', desc: '按层给钱结算到 999 层（与原版一致）' },
       // 挑战关没达成等来源累积的诅咒（echoCurse.js 的词条表；同类合并成「侵蚀 ×2」）
       ...applied,
+      // 本回合随机刷新的那条（只作用于本回合，下回合可能换掉或消失）
+      ...(this.echoRoundCurse ? (() => {
+        const c = echoCurseById(this.echoRoundCurse);
+        return c ? [{ id: c.id, name: `${c.name}（本回合）`, desc: c.desc }] : [];
+      })() : []),
     ];
   }
 
@@ -710,8 +793,9 @@ export class MatchEcho {
    */
   _echoIntel() {
     if (!this._echoDiveRound()) return null;
-    // 「迷雾」诅咒：本局不再显示威胁值（情报整块掐掉，玩家只能看波次数）
-    if (this._echoCurseFx().intel) return null;
+    // 「迷雾」只关威胁值；「遮蔽」更狠，连精英 / 日程一起掐掉（两者都返回 null，客户端就没有情报块）
+    const fx = this._echoCurseFx();
+    if (fx.intel || fx.blackout) return null;
     // boss 返场回合（R20 / R25 / R30…）是明牌：走原版预览（bossWaves），不给聚合情报
     if (this.bossWaves) return null;
     const spawns = Array.isArray(this.wave && this.wave.spawns) ? this.wave.spawns : [];

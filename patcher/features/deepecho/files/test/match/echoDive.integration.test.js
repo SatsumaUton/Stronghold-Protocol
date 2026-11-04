@@ -330,6 +330,39 @@ test('诅咒真的生效：时限 / 情报 / 刷新上限 / 祝福上限 / 敌�
   assert.ok(units > base.units, `蜂拥：同样预算出怪更多（${base.units} → ${units}）`);
 });
 
+// 维护者 2026-11-05：固定回合加诅咒 + 每回合随机刷新的回合诅咒 + 会销毁装备的诅咒。
+test('固定回合加诅咒、回合诅咒逐回合刷、锈蚀销毁装备', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+
+  m.round = 5;
+  m.startRound(6);                                     // 深度 6 = 固定诅咒回合
+  assert.ok(m.echoCurseIds.includes('tribute'), '深度 6 固定加「贡赋」');
+  const once = m.echoCurseIds.filter((x) => x === 'tribute').length;
+  m.round = 5;
+  m.startRound(6);                                     // 再进同一层
+  assert.equal(m.echoCurseIds.filter((x) => x === 'tribute').length, once, '同一固定回合不重复加');
+
+  // 回合诅咒：本回合的那条要么为空、要么是 scope=round
+  m.round = 9;
+  m.startRound(10);
+  if (m.echoRoundCurse) {
+    assert.equal(echoCurseById(m.echoRoundCurse).scope, 'round', '回合诅咒的 scope 必须是 round');
+    assert.ok(m._echoCurses().some((c) => c.name.includes('（本回合）')), '显示里标注本回合');
+  }
+  // 显示：手动塞一条回合诅咒
+  m.echoRoundCurse = 'r_frenzy';
+  assert.ok(m._echoCurses().some((c) => c.id === 'r_frenzy' && c.name.includes('（本回合）')));
+
+  // 锈蚀：销毁一件已装备的装备
+  const ps = m.alivePlayers()[0];
+  const piece = { uid: 9001, items: [{ id: 'it_a', uid: 1 }, { id: 'it_b', uid: 2 }] };
+  ps.board.set(9001, piece);
+  assert.equal(m._echoDestroyEquipped(ps, () => 0), 1, '销毁返回 1');
+  assert.equal(piece.items.length, 1, '少了一件装备');
+});
+
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。

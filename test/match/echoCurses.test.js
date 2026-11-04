@@ -5,8 +5,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ECHO_CURSES, ECHO_CURSE_LIVE_KINDS, echoCurseById, echoCurseEffects, echoCurseList, 
-  pickEchoCurse, removeEchoCurses, ECHO_CURSE_RARITY_LABEL,
+  ECHO_CURSES, ECHO_ROUND_CURSES, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_LIVE_KINDS,
+  echoCurseById, echoCurseEffects, echoCurseList, echoCurseUnitMods, curseUnitMatches,
+  pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_CURSE_RARITY_LABEL,
 } from '../../server/match/match/echoCurse.js';
 
 test('词条表：id 唯一、文案齐、效果形状统一', () => {
@@ -43,6 +44,13 @@ test('echoCurseEffects：未接入 / 未知的 id 只进 pending，不污染数�
 test('echoCurseEffects：每条诅咒的效果都算得出来（没有空转的条目）', () => {
   const neutral = echoCurseEffects([]);
   for (const c of ECHO_CURSES) {
+    // 干员减益（unitMods）和销毁装备（destroyEquip）不进数值包，由各自的钩子消费
+    if (c.effect.kind === 'unitMods') {
+      assert.ok(c.unitMods && Object.keys(c.unitMods).length, `${c.id} 缺 unitMods`);
+      assert.ok(echoCurseUnitMods([c.id]).length === 1, `${c.id} 没被 echoCurseUnitMods 认出来`);
+      continue;
+    }
+    if (c.effect.kind === 'destroyEquip') continue;
     const e = echoCurseEffects([c.id]);
     assert.deepEqual(e.pending, [], `${c.id} 必须是已接入的（不该进 pending）`);
     const changed = e.wordCap !== neutral.wordCap
@@ -54,9 +62,54 @@ test('echoCurseEffects：每条诅咒的效果都算得出来（没有空转的�
       || e.enemyHpMul !== neutral.enemyHpMul
       || e.bountyCoin !== neutral.bountyCoin
       || e.blessingMax !== neutral.blessingMax
-      || e.intel !== neutral.intel;
+      || e.intel !== neutral.intel
+      || e.blackout !== neutral.blackout;
     assert.ok(changed, `${c.id} 的效果没有任何字段变化`);
   }
+});
+
+// ---- 回合诅咒 / 固定回合 / 干员减益（维护者 2026-11-05）--------------------------------------
+test('回合诅咒：前 3 层不刷，之后能刷出多种，且都是 scope=round', () => {
+  assert.equal(pickRoundCurse(2, () => 0), null, '2 层不该刷');
+  let s = 1;
+  const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const seen = new Set();
+  for (let d = 4; d < 60; d++) {
+    const c = pickRoundCurse(d, rng);
+    if (c) seen.add(c.id);
+  }
+  assert.ok(seen.size >= 4, `回合诅咒种类太少：${[...seen].join(',')}`);
+  for (const id of seen) assert.equal(echoCurseById(id).scope, 'round', `${id} 不是回合诅咒`);
+});
+
+test('固定回合诅咒：每个深度都对应一条真实词条', () => {
+  const rounds = Object.keys(ECHO_FIXED_CURSE_ROUNDS);
+  assert.ok(rounds.length >= 3, '至少排 3 个固定回合');
+  for (const d of rounds) {
+    assert.ok(Number(d) > 0 && Number.isInteger(Number(d)));
+    assert.ok(echoCurseById(ECHO_FIXED_CURSE_ROUNDS[d]), `深度 ${d} 的诅咒不存在`);
+  }
+});
+
+test('干员减益：只命中匹配站位的单位，没位置信息不打', () => {
+  assert.equal(curseUnitMatches({ position: 'MELEE' }, { def: { position: 'MELEE' } }), true);
+  assert.equal(curseUnitMatches({ position: 'MELEE' }, { position: 'REMOTE' }), false);
+  assert.equal(curseUnitMatches({ position: 'MELEE' }, {}), false);
+  const mods = echoCurseUnitMods(['weak_melee', 'erosion', 'r_weak_ranged']);
+  assert.equal(mods.length, 2, '只挑 unitMods 类');
+  assert.deepEqual(mods.map((m) => m.filter.position), ['MELEE', 'REMOTE']);
+  assert.ok(mods[0].mods.atkMul < 1, '近战是减益');
+  assert.ok(mods[1].mods.batPct > 0, '攻速是变慢');
+});
+
+test('mergeCurseEffects：乘法相乘、加法相加、intel 取或', () => {
+  const a = echoCurseEffects(['tribute']);              // coinMul 0.85
+  const b = echoCurseEffects(['fog', 'erosion']);        // intel + wordCap 1
+  const m = mergeCurseEffects(a, b);
+  assert.ok(Math.abs(m.coinMul - 0.85) < 1e-9);
+  assert.equal(m.intel, true);
+  assert.equal(m.wordCap, 1);
+  assert.equal(m.timeMul, 1);
 });
 
 test('echoCurseEffects：空输入是全中性', () => {

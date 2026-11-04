@@ -23,6 +23,7 @@ export const ECHO_CURSE_PREFIX = 'echo:curse:';
 export const ECHO_CURSE_LIVE_KINDS = Object.freeze([
   'wordCap', 'coinMul', 'freeRefresh', 'timeMul', 'budgetMul',
   'enemyAtkMul', 'enemyHpMul', 'bountyCoin', 'blessingMax', 'intel',
+  'unitMods', 'destroyEquip', 'blackout',
 ]);
 
 /**
@@ -81,9 +82,69 @@ export const ECHO_CURSES = Object.freeze([
     id: 'fog', name: '迷雾', desc: '本局敌方情报不再显示威胁值', live: true, rarity: 'epic',
     effect: Object.freeze({ kind: 'intel', value: 0 }),
   }),
+  // ---- 资金类（2026-11-05，维护者要求「资金变少」多几档） ----
+  Object.freeze({
+    id: 'levy', name: '征收', desc: '资金收入 −10%', live: true, rarity: 'common',
+    effect: Object.freeze({ kind: 'coinMul', value: 0.9 }),
+  }),
+  Object.freeze({
+    id: 'heavytax', name: '重税', desc: '资金收入 −30%', live: true, rarity: 'epic',
+    effect: Object.freeze({ kind: 'coinMul', value: 0.7 }),
+  }),
+  // ---- 遮蔽（2026-11-05）：比「迷雾」更狠，敌方情报整块不给 ----
+  Object.freeze({
+    id: 'blackout', name: '遮蔽', desc: '本局完全不显示敌方情报（威胁值 / 精英 / 日程全部隐藏）', live: true, rarity: 'epic',
+    effect: Object.freeze({ kind: 'blackout', value: 0 }),
+  }),
+  // ---- 干员减益（2026-11-05，维护者要求）：只打符合条件的那部分干员 ----
+  Object.freeze({
+    id: 'weak_melee', name: '削锋', desc: '近战位干员攻击 −10%', live: true, rarity: 'rare', scope: 'run',
+    effect: Object.freeze({ kind: 'unitMods', value: 0 }),
+    filter: Object.freeze({ position: 'MELEE' }), unitMods: Object.freeze({ atkMul: 0.9 }),
+  }),
+  Object.freeze({
+    id: 'weak_ranged', name: '断弦', desc: '远程位干员攻速 −8%', live: true, rarity: 'rare', scope: 'run',
+    effect: Object.freeze({ kind: 'unitMods', value: 0 }),
+    filter: Object.freeze({ position: 'REMOTE' }), unitMods: Object.freeze({ batPct: 0.08 }),
+  }),
 ]);
 
-const BY_ID = new Map(ECHO_CURSES.map((c) => [c.id, c]));
+/**
+ * **回合诅咒**（维护者 2026-11-05）：每回合按深度随机刷新一条，**只影响本回合**。
+ *
+ * 和永久诅咒的区别：不进 `echoCurseIds`（所以「净化 / 涤罪」清不掉它，它自己下回合就没了），
+ * 也不占永久诅咒的显示位置 —— 结算时会标注「本回合」。
+ *
+ * 另外两条特殊 kind：
+ *   - `unitMods`：只作用于**符合条件的干员**（现在按站位 MELEE / REMOTE 区分），
+ *     在部署时挂 buff（和祝福同一条钩子），不影响敌人。
+ *   - `destroyEquip`：本回合开始时销毁每人随机 1 件已装备的装备（一次性）。
+ */
+export const ECHO_ROUND_CURSES = Object.freeze([
+  Object.freeze({ id: 'r_frenzy', name: '躁动', desc: '本回合敌方攻击 +8%', rarity: 'common', scope: 'round', effect: Object.freeze({ kind: 'enemyAtkMul', value: 1.08 }) }),
+  Object.freeze({ id: 'r_carapace', name: '硬壳', desc: '本回合敌方生命 +8%', rarity: 'common', scope: 'round', effect: Object.freeze({ kind: 'enemyHpMul', value: 1.08 }) }),
+  Object.freeze({ id: 'r_swarm', name: '涌潮', desc: '本回合出怪 +8%', rarity: 'common', scope: 'round', effect: Object.freeze({ kind: 'budgetMul', value: 1.08 }) }),
+  Object.freeze({ id: 'r_leaden', name: '迟滞', desc: '本回合战斗时限 −8%', rarity: 'rare', scope: 'round', effect: Object.freeze({ kind: 'timeMul', value: 0.92 }) }),
+  Object.freeze({ id: 'r_drought', name: '干涸', desc: '本回合免费刷新上限 −1', rarity: 'rare', scope: 'round', effect: Object.freeze({ kind: 'freeRefresh', value: -1 }) }),
+  Object.freeze({ id: 'r_weak_melee', name: '钝刃', desc: '本回合近战位干员攻击 −12%', rarity: 'rare', scope: 'round', effect: Object.freeze({ kind: 'unitMods', value: 0 }), filter: Object.freeze({ position: 'MELEE' }), unitMods: Object.freeze({ atkMul: 0.88 }) }),
+  Object.freeze({ id: 'r_weak_ranged', name: '断弦', desc: '本回合远程位干员攻速 −10%', rarity: 'rare', scope: 'round', effect: Object.freeze({ kind: 'unitMods', value: 0 }), filter: Object.freeze({ position: 'REMOTE' }), unitMods: Object.freeze({ batPct: 0.10 }) }),
+  Object.freeze({ id: 'r_levy', name: '抽成', desc: '本回合资金收入 −8%', rarity: 'common', scope: 'round', effect: Object.freeze({ kind: 'coinMul', value: 0.92 }) }),
+  Object.freeze({ id: 'r_rust', name: '锈蚀', desc: '本回合开始时，每人随机销毁 1 件已装备的装备', rarity: 'epic', scope: 'round', effect: Object.freeze({ kind: 'destroyEquip', value: 1 }) }),
+]);
+
+/**
+ * **固定回合诅咒**（维护者 2026-11-05）：到了这些深度就永久加一条，与随机无关。
+ * 键是深度，值是诅咒 id。每局每个深度只加一次（跨存档用 `echoCurseIds` 去重）。
+ */
+export const ECHO_FIXED_CURSE_ROUNDS = Object.freeze({
+  6: 'tribute',
+  10: 'swarm',
+  14: 'frenzy',
+  18: 'silence',
+  22: 'fog',
+});
+
+const BY_ID = new Map([...ECHO_CURSES, ...ECHO_ROUND_CURSES].map((c) => [c.id, c]));
 
 /** 按 id 取诅咒；未知 id 返回 null（客户端只显示认识的，不要抛）。 */
 export const echoCurseById = (id) => BY_ID.get(String(id)) || null;
@@ -158,7 +219,7 @@ export function removeEchoCurses(ids, spec) {
 export function echoCurseEffects(ids = []) {
   const out = {
     wordCap: 0, coinMul: 1, freeRefresh: 0, timeMul: 1, budgetMul: 1,
-    enemyAtkMul: 1, enemyHpMul: 1, bountyCoin: 0, blessingMax: 0, intel: false, pending: [],
+    enemyAtkMul: 1, enemyHpMul: 1, bountyCoin: 0, blessingMax: 0, intel: false, blackout: false, pending: [],
   };
   for (const raw of ids || []) {
     const c = echoCurseById(raw);
@@ -175,6 +236,7 @@ export function echoCurseEffects(ids = []) {
     else if (kind === 'bountyCoin') out.bountyCoin += Number(value) || 0;
     else if (kind === 'blessingMax') out.blessingMax += Number(value) || 0;
     else if (kind === 'intel') out.intel = true;
+    else if (kind === 'blackout') out.blackout = true;
   }
   return out;
 }
@@ -204,4 +266,69 @@ export function echoCurseList(ids = []) {
     desc: c.desc,
     stacks: c.stacks,
   }));
+}
+
+/**
+ * 本回合刷哪条回合诅咒（维护者 2026-11-05）。
+ *
+ * 前 3 层不刷；之后按深度给概率（0.15 + 深度×0.02，最高 0.7），抽到就从 `ECHO_ROUND_CURSES` 里随机一条。
+ * 用调用方传入的种子流，保证同一局可复现。
+ *
+ * @param {number} depth
+ * @param {() => number} rng
+ * @returns {typeof ECHO_ROUND_CURSES[number] | null} null = 本回合没有回合诅咒
+ */
+export function pickRoundCurse(depth, rng = () => 0.5) {
+  const d = Math.max(1, Math.floor(Number(depth) || 1));
+  if (d < 4 || !ECHO_ROUND_CURSES.length) return null;
+  const chance = Math.min(0.7, 0.15 + d * 0.02);
+  if ((Number(rng()) || 0) >= chance) return null;
+  const i = Math.min(ECHO_ROUND_CURSES.length - 1, Math.floor((Number(rng()) || 0) * ECHO_ROUND_CURSES.length));
+  return ECHO_ROUND_CURSES[i] || null;
+}
+
+/** 取一组 id 里的「干员减益」效果（unitMods），给部署钩子用。 */
+export function echoCurseUnitMods(ids = []) {
+  const out = [];
+  for (const raw of ids || []) {
+    const c = echoCurseById(raw);
+    if (!c || c.effect?.kind !== 'unitMods' || !c.unitMods) continue;
+    out.push({ id: c.id, name: c.name, filter: c.filter || {}, mods: c.unitMods });
+  }
+  return out;
+}
+
+/**
+ * 一条干员减益是否命中这个单位。
+ *
+ * 现在只按站位判断（`unit.def.position` 或 `unit.position`：MELEE / REMOTE）；
+ * 没有位置信息的单位**不打**（宁可漏打，也不要把增益打到召唤物/装置上）。
+ */
+export function curseUnitMatches(filter, unit) {
+  if (!unit || !filter || typeof filter !== 'object') return false;
+  if (filter.position) {
+    const pos = unit.def?.position || unit.position || null;
+    if (pos !== filter.position) return false;
+  }
+  return true;
+}
+
+/** 把两份效果合并（回合诅咒 + 永久诅咒）：乘法乘、加法加、intel 取或。 */
+export function mergeCurseEffects(a, b) {
+  const x = a || {};
+  const y = b || {};
+  return {
+    wordCap: (x.wordCap || 0) + (y.wordCap || 0),
+    coinMul: (x.coinMul ?? 1) * (y.coinMul ?? 1),
+    freeRefresh: (x.freeRefresh || 0) + (y.freeRefresh || 0),
+    timeMul: (x.timeMul ?? 1) * (y.timeMul ?? 1),
+    budgetMul: (x.budgetMul ?? 1) * (y.budgetMul ?? 1),
+    enemyAtkMul: (x.enemyAtkMul ?? 1) * (y.enemyAtkMul ?? 1),
+    enemyHpMul: (x.enemyHpMul ?? 1) * (y.enemyHpMul ?? 1),
+    bountyCoin: (x.bountyCoin || 0) + (y.bountyCoin || 0),
+    blessingMax: (x.blessingMax || 0) + (y.blessingMax || 0),
+    intel: !!(x.intel || y.intel),
+    blackout: !!(x.blackout || y.blackout),
+    pending: [...(x.pending || []), ...(y.pending || [])],
+  };
 }
