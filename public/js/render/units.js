@@ -1142,6 +1142,29 @@ export class UnitView {
     this.countText = null;
     this.ammoText = null;          // 设置「弹药数量」: the magazine's count under the ammo bar (_updateAmmoCount)
     this.itemPips = [];
+    // 「深渊回响」悬赏目标（维护者 2026-11-05）：头顶金币 + 金色光晕，战斗里一眼能认出「这只是悬赏怪」
+    this._bounty = 0;
+    this.bountyGlow = new P.Sprite(fxAtlas().tex.glow);
+    this.bountyGlow.anchor.set(0.5);
+    this.bountyGlow.tint = 0xffd34d;
+    this.bountyGlow.blendMode = P.BLEND_MODES.ADD;
+    this.bountyGlow.alpha = 0.55;
+    this.bountyGlow.visible = false;
+    h.addChild(this.bountyGlow);
+    this.bountyIcon = new P.Sprite(fxAtlas().tex.coin);
+    this.bountyIcon.anchor.set(0.5);
+    this.bountyIcon.tint = 0xffd34d;
+    this.bountyIcon.visible = false;
+    h.addChild(this.bountyIcon);
+  }
+
+  /**
+   * 悬赏目标标记：`n > 0`（金币数）时在头顶画金币 + 金色光晕。
+   * @param {number} n
+   */
+  setBounty(n) {
+    this._bounty = Math.max(0, Math.trunc(Number(n) || 0));
+    if (this.bountyIcon) this.bountyIcon.visible = false;   // 可见性由 _updateHud 每帧按状态决定
   }
 
   /** Show a stack count (token stacks in the hand) — BitmapText-free: a tiny canvas-less chip via Text. */
@@ -2026,6 +2049,23 @@ export class UnitView {
     this.shake = Math.max(0, this.shake - dt);
     const x0 = x - bw / 2 + sx;
     let cy = y - 4;
+    // 「深渊回响」悬赏目标：头顶金币 + 金色光晕（维护者 2026-11-05）。位置随血条走，
+    // 但**不依赖血条可见**（没受伤的悬赏怪也要能认出来）。
+    const bountyOn = this._bounty > 0 && !prep && this.alive;
+    if (this.bountyIcon) {
+      this.bountyIcon.visible = bountyOn;
+      this.bountyGlow.visible = bountyOn;
+      if (bountyOn) {
+        const size = clamp(bh * 2.2, 11, 22);
+        const by2 = cy - bh - size * 0.75;
+        this.bountyIcon.position.set(x, by2);
+        this.bountyIcon.width = size;
+        this.bountyIcon.height = size;
+        this.bountyGlow.position.set(x, by2);
+        this.bountyGlow.width = size * 2.6;
+        this.bountyGlow.height = size * 2.6;
+      }
+    }
     // HP
     this.hpBg.visible = this.hpFill.visible = this.hpGhost.visible = showHp;
     if (showHp) {
@@ -2037,6 +2077,7 @@ export class UnitView {
       this.hpGhost.position.set(x0, cy); this.hpGhost.width = bw * g; this.hpGhost.height = bh;
       this.hpFill.position.set(x0, cy); this.hpFill.width = bw * k; this.hpFill.height = bh;
       if (!this.isEnemy) this.hpFill.tint = k < 0.3 ? COLORS.hpAllyLow : COLORS.hpAlly;
+      else if (this._bounty > 0) this.hpFill.tint = 0xffd34d;   // 悬赏目标：血条金色描边（2026-11-05）
     }
     // 业火 我执: her HP sits on the 1-HP floor and the damage past it fills a pool — the red bar over the drained green one
     const neg = showHp ? this.neg : 0;
