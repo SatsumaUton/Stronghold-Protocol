@@ -619,6 +619,11 @@ export const C2S = {
   // `pick` 是候选下标（0..2）。**必须登记在这里** —— 漏了的话 net.js 会在客户端就把它拦掉，
   // 服务端 intents.js 的 case 永远收不到（与 g.bondPlan 踩过的是同一个坑）。
   'g.echoBlessing': { pick: (v) => isInt(v, 0, 2) },
+  // 名额满时的「弃选」投票 / 「护盾」指定盟约 / 「开路」提前解除（2026-11-05）
+  // ⚠ 同样必须在这里登记，否则客户端一发就是「无效的请求」（BAD_MSG），服务端永远收不到。
+  'g.echoBlessingDiscard': { pick: (v) => isInt(v, 0, 15) },
+  'g.echoShield': { pick: (v) => isInt(v, 0, 15) },
+  'g.echoCounterUse': {},
   'g.band': { bandId: isId },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is
