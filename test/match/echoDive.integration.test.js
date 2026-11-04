@@ -257,7 +257,9 @@ test('祝福「回复生命」：多档位、数值都小、可以超过初始�
       const before = ps.map((p) => p.lp);
       m._echoGrantBlessing(b);
       assert.deepEqual(ps.map((p) => p.lp), before.map((n) => n + b.healLp), `${b.id}：每人 +${b.healLp}`);
-      assert.ok(m.echoBlessings.includes(b.id), `${b.id} 已记入祝福`);
+      // 一次性祝福不占名额，只记进 echoOneShotIds（维护者 2026-11-05）
+      assert.ok(m.echoOneShotIds.includes(b.id), `${b.id} 已记录为一次性祝福`);
+      assert.ok(!m.echoBlessings.includes(b.id), `${b.id} 不应占用名额`);
     } finally {
       m.dispose();
     }

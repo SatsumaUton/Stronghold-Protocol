@@ -166,7 +166,10 @@ export const echoBlessingById = (id) => ECHO_BLESSINGS.find((b) => b.id === id) 
  * 或者反制祝福（`counter` / `repeatable`：用完即弃）。客户端据此打「一次性」标记
  * （维护者 2026-11-05：玩家不知道它会立刻消失）。
  */
-export const echoBlessingOneShot = (b) => !!b && (b.counter === true || b.repeatable === true || b.kind !== 'mods');
+// 只有**拿到就立刻结算**的才算一次性：回血 / 资金 / 涤罪。coin（结算资金倍率）与 shield（护盾）
+// 是持续性效果，仍占 3 个名额。
+const ONESHOT_KINDS = new Set(['heal', 'fund', 'cleanse']);
+export const echoBlessingOneShot = (b) => !!b && (b.counter === true || b.repeatable === true || ONESHOT_KINDS.has(b.kind));
 
 /**
  * 到第 `round` 回合为止**应该已经拿到几个**祝福。

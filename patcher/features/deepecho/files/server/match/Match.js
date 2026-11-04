@@ -373,6 +373,8 @@ export class Match {
      * 玩家打完隐藏 boss 什么都看不到。这里给一个**临时 +1 名额**，发出去之后清零。
      */
     this.echoBlessingBonus = 0;
+    /** 一次性祝福的**历史记录**（拿到即结算，不占名额，仅用于展示，2026-11-05）。 */
+    this.echoOneShotIds = [];
     /** 排异诅咒的到期层数：bond → depth（到这一层自动解除，2026-11-05）。 */
     this.echoBannedBondsUntil = {};
     /** 「护盾」祝福指定的盟约：排异抽到它时抵消该诅咒（一次性，2026-11-05）。 */

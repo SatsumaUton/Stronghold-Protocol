@@ -1131,8 +1131,13 @@ export class MatchEcho {
   }
 
   /** 已拥有的祝福对象列表（HUD / 测试用）。 */
+  /** 已获得的祝福：**占名额的**（echoBlessings）+ **一次性的**（echoOneShotIds，拿到即结算，仅作记录）。 */
   _echoBlessings() {
-    return Array.isArray(this.echoBlessings) ? this.echoBlessings.map((id) => echoBlessingById(id)).filter(Boolean) : [];
+    const held = Array.isArray(this.echoBlessings) ? this.echoBlessings.map((id) => echoBlessingById(id)).filter(Boolean) : [];
+    const once = Array.isArray(this.echoOneShotIds)
+      ? this.echoOneShotIds.map((id) => echoBlessingById(id)).filter(Boolean).map((b) => ({ ...b, consumed: true }))
+      : [];
+    return [...held, ...once];
   }
 
   /** 当前三选一的候选与票数（没有进行中的抽取时为 null）。 */
@@ -1271,7 +1276,8 @@ export class MatchEcho {
     if (!b) return OK;
     // 名额已满 + 这次是替换模式：先让全队投票「弃掉哪个」，投完再发新的（维护者 2026-11-05）。
     // 反制祝福不占名额，不需要弃选。
-    if (replace && !echoBlessingFree(b) && this.echoBlessings.length >= this._echoBlessingMax()) {
+    // 一次性祝福（回血 / 资金 / 涤罪）**无视名额上限**：直接发，不进入弃选流程（维护者 2026-11-05）
+    if (replace && !echoBlessingFree(b) && !echoBlessingOneShot(b) && this.echoBlessings.length >= this._echoBlessingMax()) {
       this.echoBlessingPendingPick = b.id;
       this.echoBlessingDiscardOffer = this.echoBlessings.slice();
       this._echoDiscardVotes.clear();
@@ -1372,11 +1378,22 @@ export class MatchEcho {
     if (!Array.isArray(this.echoCounterIds)) this.echoCounterIds = [];
     if (free) {
       this.echoCounterIds.push(b.id);
+    } else if (echoBlessingOneShot(b)) {
+      // 一次性祝福（回血 / 资金 / 涤罪…）**不占 3 个名额**（维护者 2026-11-05）：
+      // 它拿到就立刻结算，留在列表里只是为了给玩家看「这一局吃过什么」，不参与上限判断。
+      // 同一个 id 可以重复拿（因为是即时效果，不是持有物）。
+      if (!Array.isArray(this.echoOneShotIds)) this.echoOneShotIds = [];
+      this.echoOneShotIds.push(b.id);
     } else {
       if (this.echoBlessings.includes(b.id)) return null;                       // 同类不叠加
       // 上限（静默会压低）；隐藏核心通关的临时名额要算进去，否则第 4 个祝福会被这里拒掉
       const cap = this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0);
-      if (this.echoBlessings.length >= cap) return null;
+      // 只数**占名额**的祝福：一次性祝福不算
+      const held = this.echoBlessings.filter((id) => {
+        const x = echoBlessingById(id);
+        return x ? !echoBlessingOneShot(x) : true;
+      }).length;
+      if (held >= cap) return null;
       this.echoBlessings.push(b.id);
     }
     this._echoBlessingEndsAt = null;
