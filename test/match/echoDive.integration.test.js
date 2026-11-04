@@ -831,3 +831,51 @@ test('排异持续生效：每回合扫描，新上场的也收回', (t) => {
   m._echoRefreshCurses(13);
   assert.equal(ps.board.has('8,7'), true, '没有排异就不动它');
 });
+// 维护者 2026-11-05「确认一下」：固定回合 + 随机抽取不能重复记账、不能重复播报。
+test('诅咒入账统一：随机抽到封锁/排异真的生效；同回合两条只播一行', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  const chessRaw = m.gd.raw?.chess || {};
+  const isAdd = (b) => m.gd.bond(b) && m.gd.bond(b).isCore !== true;
+  const pair = Object.entries(chessRaw).find(([, rec]) => (rec?.bonds || []).some(isAdd));
+  const [chessId, rec] = pair;
+  const bond = rec.bonds.find(isAdd);
+
+  // 1) 随机抽到「封锁」：真的封地块（之前只记 id）
+  m.echoBannedTiles = [];
+  m.echoCurseIds = [];
+  assert.ok(m._echoAddCurse('block_tiles', () => 0.5), '封锁入账');
+  assert.equal(m.echoBannedTiles.length, 3, '真的封了 3 个地块');
+  // 再来一条：叠加而不是覆盖
+  m._echoAddCurse('block_tiles', () => 0.5);
+  assert.equal(m.echoBannedTiles.length, 6, '封锁可叠加');
+  assert.equal(m.echoCurseIds.filter((x) => x === 'block_tiles').length, 2, '两条都记账');
+
+  // 2) 随机抽到「排异」：真的禁盟约并把干员收回
+  ps.board.set('8,8', { kind: 'chess', id: chessId, items: [], uid: 8801 });
+  m.echoBannedBonds = [];
+  assert.ok(m._echoAddCurse('block_bond', () => 0), '排异入账');
+  assert.deepEqual(m.echoBannedBonds, [bond]);
+  assert.equal(ps.board.has('8,8'), false, '干员被收回');
+  // 没有可禁的盟约时：不记假账
+  const beforeIds = m.echoCurseIds.length;
+  m.echoBannedBonds = [...new Set([...m.echoBannedBonds, bond])];
+  ps.board.clear();
+  ps.board.set('8,9', { kind: 'chess', id: chessId, items: [], uid: 8802 });
+  const again = m._echoAddCurse('block_bond', () => 0);
+  assert.equal(again, null, '没有新盟约可禁 → 不成立');
+  assert.equal(m.echoCurseIds.length, beforeIds, '也不会记假账');
+
+  // 3) 同一回合的两条结算播报合成一行（不再互相覆盖）
+  const said = [];
+  m.tickerText = (txt) => said.push(String(txt));
+  m.round = 20;
+  m.echoCurseIds = [];
+  m.echoRoundCurse = null;
+  m.lastResults = new Map(m.alivePlayers().map((q) => [q.playerId, { leaked: [], perfect: true, coins: 0 }]));
+  m._echoSettleBountyFailure(m.alivePlayers());
+  m._echoSettleChallenge();
+  assert.ok(said.length <= 1, `同一回合只该有一行 ticker（实际 ${said.length}）`);
+});

@@ -420,11 +420,11 @@ export class MatchEcho {
     }
     if (!failed) return null;
     const rng = createRng(deriveSeed(this.seed, `echo:bountyfail:${this.round}`));
-    const c = pickEchoCurse(this._echoDepth(this.round), rng);
+    const picked = pickEchoCurse(this._echoDepth(this.round), rng);
+    const c = (picked && this._echoAddCurse(picked.id, rng)) || this._echoAddCurse('erosion', rng);
     if (!c) return null;
-    if (!Array.isArray(this.echoCurseIds)) this.echoCurseIds = [];
-    this.echoCurseIds.push(c.id);
-    this.tickerText?.(`悬赏未达成：深渊降下诅咒「${c.name}」`, 1);
+    this._echoPushAnnounce(`悬赏未达成：深渊降下诅咒「${c.name}」`);
+    this._echoFlushAnnounce();
     this.markPublic?.();
     return c.id;
   }
@@ -465,12 +465,14 @@ export class MatchEcho {
       // 没达成 → 不给祝福，改为深渊降下诅咒。按深度抽（echoCurse.js 的 pickEchoCurse）：
       // 5 层只会是普通诅咒，10 层起有稀有，16 层以后才可能出传说。
       const rng = createRng(deriveSeed(this.seed, `echo:curse:${this.round}`));
-      const curse = pickEchoCurse(this._echoDepth(this.round), rng)
-        || { id: 'erosion', name: '侵蚀', rarity: 'common' };
-      this.echoCurseIds = Array.isArray(this.echoCurseIds) ? this.echoCurseIds : [];
-      this.echoCurseIds.push(curse.id);
-      const tier = ECHO_CURSE_RARITY_LABEL[curse.rarity] || '普通';
-      this.tickerText?.(`挑战关：全队清怪 ${Math.round(ratio * 100)}%，深渊降下诅咒「${curse.name}」（${tier}）`, 1);
+      const picked = pickEchoCurse(this._echoDepth(this.round), rng);
+      // 统一入口：排异类若已无盟约可禁会返回 null，这时退回「侵蚀」（不记假账）
+      const curse = (picked && this._echoAddCurse(picked.id, rng)) || this._echoAddCurse('erosion', rng);
+      const tier = curse ? (ECHO_CURSE_RARITY_LABEL[curse.rarity] || '普通') : '';
+      if (curse) {
+        this._echoPushAnnounce(`挑战关：全队清怪 ${Math.round(ratio * 100)}%，深渊降下诅咒「${curse.name}」（${tier}）`);
+        this._echoFlushAnnounce();
+      }
       this.markPublic?.();
     }
     return { ratio, granted: !denied };
@@ -535,24 +537,19 @@ export class MatchEcho {
     if (!this._echoDiveRound(r)) { this.echoRoundCurse = null; return null; }
     const depth = this._echoDepth(r);
     const fixed = ECHO_FIXED_CURSE_ROUNDS[depth];
-    if (fixed) {
-      if (!Array.isArray(this.echoCurseIds)) this.echoCurseIds = [];
-      const first = !this.echoCurseIds.includes(fixed);
-      if (first) this.echoCurseIds.push(fixed);
-      // 播报（2026-11-05）：固定回合的诅咒要明确告诉玩家「你被降了一条永久诅咒」
-      if (first) {
-        const fc = echoCurseById(fixed);
-        const tier = fc ? (ECHO_CURSE_RARITY_LABEL[fc.rarity] || '普通') : '';
-        if (fc) this._echoPushAnnounce(`深渊诅咒「${fc.name}」（${tier}）：${fc.desc}`);
-      }
-      // 部署禁令类诅咒：光记 id 没用，必须**当场算出**被封的地块 / 被排异的盟约
-      const kind = echoCurseById(fixed)?.effect?.kind;
-      if (kind === 'deployBan') {
-        const n = this._echoApplyDeployBan(echoCurseById(fixed).effect.value, createRng(deriveSeed(this.seed, `echo:deployban:${r}`)));
-        if (n) this._echoPushAnnounce(`已封锁 ${n} 个地块（无法部署）`);
-      } else if (kind === 'bondBan') {
-        const bond = this._echoApplyBondBan(createRng(deriveSeed(this.seed, `echo:bondban:${r}`)));
-        if (bond) this._echoPushAnnounce(`已排异【${this.gd.bond(bond)?.name || bond}】：该盟约干员无法部署`);
+    if (fixed && !(Array.isArray(this.echoCurseIds) && this.echoCurseIds.includes(fixed))) {
+      // 统一入口：记 id + 施加副作用（封锁 / 排异）
+      const fc = this._echoAddCurse(fixed, createRng(deriveSeed(this.seed, `echo:fixed:${r}`)));
+      if (fc) {
+        const tier = ECHO_CURSE_RARITY_LABEL[fc.rarity] || '普通';
+        this._echoPushAnnounce(`深渊诅咒「${fc.name}」（${tier}）：${fc.desc}`);
+        const kind = fc.effect && fc.effect.kind;
+        if (kind === 'deployBan' && this.echoBannedTiles.length) {
+          this._echoPushAnnounce(`已封锁 ${this.echoBannedTiles.length} 个地块（无法部署）`);
+        } else if (kind === 'bondBan' && this.echoBannedBonds.length) {
+          const names = this.echoBannedBonds.map((b) => this.gd.bond(b)?.name || b).join('、');
+          this._echoPushAnnounce(`已排异【${names}】：该盟约干员无法部署`);
+        }
       }
     }
     const rng = createRng(deriveSeed(this.seed, `echo:rcurse:${r}`));
@@ -586,6 +583,26 @@ export class MatchEcho {
     return 1;
   }
 
+  /**
+   * 加一条诅咒（统一入口，维护者 2026-11-05 审计）：
+   * 记录 id 的同时**施加副作用** —— 「封锁 / 排异」不是纯数值，光记 id 等于没生效。
+   * 排异若已经没得禁（所有附加盟约都被禁过），这条不成立，返回 null（不记假账）。
+   */
+  _echoAddCurse(id, rng = () => 0.5) {
+    const c = echoCurseById(id);
+    if (!c) return null;
+    const kind = c.effect && c.effect.kind;
+    if (kind === 'bondBan') {
+      const bond = this._echoApplyBondBan(rng);
+      if (!bond) return null;
+    } else if (kind === 'deployBan') {
+      this._echoApplyDeployBan(c.effect.value, rng);
+    }
+    if (!Array.isArray(this.echoCurseIds)) this.echoCurseIds = [];
+    this.echoCurseIds.push(c.id);
+    return c;
+  }
+
   /** 诅咒「封锁」：从当前可部署地块里随机封掉 n 个（抽不到就少封，不硬造格子）。 */
   _echoApplyDeployBan(count = 3, rng = () => 0.5) {
     const ps = this.alivePlayers()[0];
@@ -596,14 +613,16 @@ export class MatchEcho {
       else if (Array.isArray(map)) keys = map.slice();
     } catch { keys = []; }
     if (!keys.length) { this.echoBannedTiles = []; return 0; }
-    const pool = keys.slice();
+    const have = Array.isArray(this.echoBannedTiles) ? this.echoBannedTiles.slice() : [];
+    const pool = keys.filter((k) => !have.includes(k));
     const out = [];
     const n = Math.max(0, Math.floor(Number(count) || 0));
     while (out.length < n && pool.length) {
       const at = Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length));
       out.push(pool.splice(at, 1)[0]);
     }
-    this.echoBannedTiles = out;
+    // 叠层：新封的追加在已有之上（维护者 2026-11-05「封锁也支持叠加」），最多留 8 个
+    this.echoBannedTiles = [...have, ...out].slice(0, 8);
     return out.length;
   }
 
