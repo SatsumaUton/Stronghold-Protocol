@@ -371,6 +371,17 @@ export class Match {
      * 以后别的来源（隐藏 boss 失败 / 连续团灭）直接往这里推 id 即可，显示与效果自动跟上。
      */
     this.echoCurseIds = [];
+    /**
+     * 本回合随机刷新的诅咒 id（2026-11-05；`null` = 本回合没有）。
+     * 只作用于本回合，不进 `echoCurseIds`，所以「净化 / 涤罪」清不掉它。
+     */
+    this.echoRoundCurse = null;
+    /**
+     * 部署禁令（2026-11-05，诅咒「封锁 / 排异」）：被封锁的地块 key（`r,c`）与被排异的盟约 id。
+     * 由 `_echoApplyDeployBan` / `_echoApplyBondBan` 写入，`_echoDeployBlocked` 在落子时读。
+     */
+    this.echoBannedTiles = [];
+    this.echoBannedBond = null;
     /** 已拥有的祝福 id（echoBlessing.js；同类不叠加，上限 3） */
     this.echoBlessings = [];
     /** 当前三选一的候选（id 数组；null = 没有进行中的抽取） */
