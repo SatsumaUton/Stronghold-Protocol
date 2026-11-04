@@ -974,3 +974,14 @@ html.sp-deepecho .draft-detail__art::before,
 html.sp-deepecho .draft-done__art::before { border-color: rgba(224, 212, 255, .55); }
 html.sp-deepecho .draft-detail__art::after,
 html.sp-deepecho .draft-done__art::after { color: rgba(224, 212, 255, .28); }
+
+/* 「已选定策略」整屏（.draft-done）：绿底 + 绿扫描线一并换紫（维护者 2026-11-05） */
+html.sp-deepecho .draft-done {
+  background: linear-gradient(180deg, rgba(96, 62, 168, .52), rgba(40, 26, 74, .46) 60%, rgba(14, 10, 24, .32));
+  box-shadow: inset 0 0 0 1px rgba(var(--mint-rgb), .22);
+}
+html.sp-deepecho .draft-done::after {
+  background: repeating-linear-gradient(0deg, rgba(var(--mint-rgb), .1) 0 2px, transparent 2px 6px);
+}
+html.sp-deepecho .draft-done__hp b { background: var(--mint-500); color: #150a2b; }
+html.sp-deepecho .draft-done__title { color: var(--mint-400); text-shadow: 0 0 .16rem rgba(var(--mint-rgb), .4); }
