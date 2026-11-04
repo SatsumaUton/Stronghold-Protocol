@@ -267,10 +267,12 @@ export function GIcon({ name, class: cls, title }) {
  */
 export function LpTower({ value, size = 'md', class: cls, tone, pending = 0, note = null, tip = null }) {
   const ok = Number.isFinite(value);
+  // 深潜：塔图标（绿色精灵图）转紫（维护者 2026-11-05）
+  const diveIcon = useStore((s) => !!s.match?.public?.echo);
   const p = ok && Number(pending) > 0 ? Math.min(value, Math.trunc(Number(pending))) : 0;
   return html`<span class=${cx('lp', `lp--${size}`, tone && `lp--${tone}`, p > 0 && 'is-pending', cls)} title=${tip || tr('目标生命值')}
       data-pending=${p > 0 ? p : null}>
-    <${Sprite} k="hudPanel/icon_hp" class="lp__icon" fallback=${html`<${Icon} name="rook" class="lp__icon" />`} />
+    <${Sprite} k="hudPanel/icon_hp" class="lp__icon" style=${diveIcon ? { filter: DIVE_ICON_FILTER } : null} fallback=${html`<${Icon} name="rook" class="lp__icon" />`} />
     <b class="num lp__val">${ok ? Math.max(0, value) : '--'}</b>
     ${p > 0 ? html`<span key=${p} class="lp__pend num" aria-label=${tr('结算时扣除 {p}', { p })}>−${p}</span>` : null}
     ${note ? html`<span class="lp__note">${note}</span>` : null}
