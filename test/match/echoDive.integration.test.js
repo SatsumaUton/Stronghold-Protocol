@@ -1029,21 +1029,21 @@ test('禁用干员：所有旁路都过同一道闸（_shopChessBanned）', (t) 
   assert.equal(m._shopChessBanned(legal), false, '合法干员不能被误拦');
 });
 
-test('免费刷新：深潜上限 2 次，回合开始夹住，诅咒可以再压低', (t) => {
+test('免费刷新：深潜上限 5 次（奇迹·诅咒），回合开始夹住，别的诅咒可以再压低', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
-  assert.equal(m._echoFreeRefreshCap(), 2, '深潜上限 = 2（不再累积）');
+  assert.equal(m._echoFreeRefreshCap(), 5, '有奇迹·诅咒时上限 = 5（不再累积）');
   const ps = m.alivePlayers()[0];
   ps.shop.freeRefreshes = 9;
   m.round = 4;
   m.startRound(5);
-  assert.equal(ps.shop.freeRefreshes, 2, '回合开始被夹到 2');
+  assert.equal(ps.shop.freeRefreshes, 5, '回合开始被夹到 5');
   m.echoCurseIds = ['drought'];                        // 枯竭：−1
-  assert.equal(m._echoFreeRefreshCap(), 1);
+  assert.equal(m._echoFreeRefreshCap(), 4);
   ps.shop.freeRefreshes = 9;
   m._echoClampFreeRefreshes();
-  assert.equal(ps.shop.freeRefreshes, 1, '诅咒生效后上限变 1');
+  assert.equal(ps.shop.freeRefreshes, 4, '诅咒生效后上限变 4');
 });
 // 维护者 2026-11-05 澄清：**诅咒『排异』是暂时的**（能被「开路」解除），
 // 所以那些干员**可以买**，只是不能上场。商店闸门只能看「本局永久禁用」，绝不能把诅咒也当禁用。
