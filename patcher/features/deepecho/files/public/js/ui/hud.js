@@ -552,8 +552,13 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   const hidden = phase === PHASE.HIDDEN_CORE || (Number.isFinite(pub?.lastRound) && pub.round > pub.lastRound);
   // 「深渊回响」：深潜里**深度就是回合**，直接顶掉原版的回合数字（维护者 2026-11-04：
   // 深潜不用另开一条悬浮状态条挡住 HUD，玩家看到的那个数就是深度）。普通房 echo 为 null，行为不变。
-  const diveDepth = Number(pub?.echo?.diveStart) > 0 ? Number(pub?.echo?.depth) || 0 : 0;
-  const inDive = diveDepth > 0;
+  //
+  // 判据用 `echo.diveStart > 0`（而不是 depth > 0）：某些阶段 pub.echo 只有 diveStart、
+  // depth 刚好缺值时，`inDive` 会假掉，退回原版的 `??` 分支 —— 那正是「15 回合起深度一直 ?？」的成因。
+  const echoDive = Number(pub?.echo?.diveStart) > 0;
+  // 深潜里深度 = 显示回合（diveStart = 1），缺值时用 round 兜底，保证永远有数字
+  const diveDepth = echoDive ? Number(pub?.echo?.depth) || Number(pub?.round) || 0 : 0;
+  const inDive = echoDive;
   // 深潜里**永远显示深度**：15 层是隐藏核心回合（原版用 ?? 藏住回合数），
   // 但深潜的深度是玩家成绩，没有任何隐藏的理由（维护者 2026-11-05 反馈「15 回合显示 ?？」）。
   const roundText = inDive ? String(diveDepth || '--') : hidden ? '??' : pub?.round > 0 ? String(pub.round) : '--';
