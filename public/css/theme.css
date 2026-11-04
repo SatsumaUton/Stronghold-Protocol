@@ -940,3 +940,13 @@ html.sp-deepecho {
   --mint-c97: rgb(164, 115, 232);
   --mint-c97-rgb: 164, 115, 232;
 }
+
+/* ================= 「深渊回响」选策略屏：把原版的薄荷绿底/框换成深潜紫（维护者 2026-11-05） ================= */
+html.sp-deepecho .draft-order {
+  background: linear-gradient(180deg, rgba(112, 78, 190, .30), rgba(46, 30, 84, .18) 70%, rgba(18, 12, 30, .06));
+}
+html.sp-deepecho .dorder__box.is-band {
+  background: radial-gradient(circle at 50% 40%, #2a1c4a, #0d0916 75%);
+}
+html.sp-deepecho .dorder__me { background: var(--mint-500); color: #150a2b; box-shadow: 0 0 0 .02rem #150a2b; }
+html.sp-deepecho .dturn__finger, html.sp-deepecho .dorder__zoom { filter: hue-rotate(215deg) saturate(1.4); }
