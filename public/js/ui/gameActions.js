@@ -108,4 +108,6 @@ export const actions = {
   echoBlessing: (pick) => act('g.echoBlessing', { pick: Number(pick) }, { sfx: 'confirm' }),
   // 名额满时的弃选投票（同样 30 秒）
   echoBlessingDiscard: (pick) => act('g.echoBlessingDiscard', { pick: Number(pick) }, { sfx: 'confirm' }),
+  // 用反制祝福提前结束「排异 / 封锁」
+  echoCounterUse: () => act('g.echoCounterUse', {}, { sfx: 'confirm' }),
 };
