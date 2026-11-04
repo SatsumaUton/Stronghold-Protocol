@@ -735,6 +735,67 @@ export class MatchEcho {
     return OK;
   }
 
+  /** 「护盾」祝福：开一次全队投票，指定要保护的附加盟约（30 秒，票多者得，2026-11-05）。 */
+  _echoOpenShieldVote() {
+    const rawBonds = (this.gd.raw && this.gd.raw.bonds) || {};
+    const banned = Array.isArray(this.echoBannedBonds) ? this.echoBannedBonds : [];
+    const cands = Object.keys(rawBonds).filter((b) => {
+      const rec = rawBonds[b];
+      return rec && rec.isCore !== true && !banned.includes(b);
+    });
+    if (!cands.length) return null;
+    this.echoShieldOffer = cands.slice(0, 12);
+    this._echoShieldVotes.clear();
+    this.echoShieldEndsAt = (this.sched?.now?.() ?? 0) + ECHO_BLESSING_VOTE_MS;
+    this.cancel(this._echoShieldTimer);
+    this._echoShieldTimer = this.later(ECHO_BLESSING_VOTE_MS, () => {
+      this._echoShieldTimer = null;
+      try { this._echoForceResolveShield(); } catch { /* 结算失败不该炸掉整局 */ }
+    });
+    this.markPublic();
+    return this.echoShieldOffer;
+  }
+
+  /** 护盾投票（`g.echoShield { pick }`），票齐才结算。 */
+  setEchoShieldVote(ps, pick) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE);
+    const offer = this.echoShieldOffer;
+    if (!Array.isArray(offer) || !offer.length) return fail(ERR.WRONG_PHASE, 'no shield offer');
+    if (ps.spectator) return fail(ERR.SPECTATOR);
+    if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    const i = Math.floor(Number(pick));
+    if (!(i >= 0 && i < offer.length)) return fail(ERR.BAD_TARGET);
+    this._echoShieldVotes.set(ps.playerId, i);
+    this.markPublic();
+    const voters = this.humans().filter((p) => p.connected && !p.spectator).map((p) => p.playerId);
+    if (!voters.length || !voters.every((id) => this._echoShieldVotes.has(id))) return OK;
+    return this._echoSettleShield(this._echoTallyPick(this._echoShieldVotes));
+  }
+
+  /** 30 秒没投完 → 强制结算（没票就取候选第一条）。 */
+  _echoForceResolveShield() {
+    if (!Array.isArray(this.echoShieldOffer) || !this.echoShieldOffer.length) return OK;
+    return this._echoSettleShield(this._echoTallyPick(this._echoShieldVotes));
+  }
+
+  /** 落定护盾盟约。 */
+  _echoSettleShield(best) {
+    const offer = this.echoShieldOffer;
+    this.cancel(this._echoShieldTimer);
+    this._echoShieldTimer = null;
+    this.echoShieldOffer = null;
+    this.echoShieldEndsAt = null;
+    this._echoShieldVotes.clear();
+    if (!Array.isArray(offer) || !offer.length) return OK;
+    const i = Math.max(0, Math.min(offer.length - 1, Math.floor(Number(best) || 0)));
+    this.echoShieldBond = offer[i];
+    const name = this.gd.bond(offer[i])?.name || offer[i];
+    this._echoPushAnnounce(`护盾：指定保护【${name}】——排异随机到它时将被抵消`);
+    this._echoFlushAnnounce();
+    this.markPublic();
+    return OK;
+  }
+
   /** 诅咒「封锁」：从当前可部署地块里随机封掉 n 个（抽不到就少封，不硬造格子）。 */
   _echoApplyDeployBan(count = 3, rng = () => 0.5) {
     const ps = this.alivePlayers()[0];
@@ -794,6 +855,14 @@ export class MatchEcho {
     const preferred = allAdd.filter((b) => seen.has(b));
     const pool = preferred.length ? preferred : allAdd;
     const picked = pool[Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length))];
+    // 「护盾」祝福（维护者 2026-11-05）：排异随机到被护盾指定的盟约 → 护盾抵消，诅咒不生效、不进咒诅列表
+    if (this.echoShieldBond && picked === this.echoShieldBond) {
+      const name = this.gd.bond(picked)?.name || picked;
+      this.echoShieldBond = null;
+      this._echoPushAnnounce(`护盾：抵消了针对【${name}】的排异`);
+      this._echoFlushAnnounce();
+      return null;
+    }
     already.push(picked);
     // 已经上场的同盟约干员**当场收回修正区**（2026-11-05 维护者要求）：
     // 排异不是「不让你动」，而是「这个人不能再上战场」。
@@ -978,6 +1047,18 @@ export class MatchEcho {
       blessingMax: this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0),
       // 名额已满时的「弃选」投票（维护者 2026-11-05）：全队投掉哪个，再换入新的
       blessingReplace: this.echoBlessingReplace === true,
+      // 「护盾」祝福：投票指定要保护的盟约 + 当前已指定的那条（2026-11-05）
+      shield: {
+        bond: this.echoShieldBond || null,
+        bondName: this.echoShieldBond ? (this.gd.bond(this.echoShieldBond)?.name || this.echoShieldBond) : null,
+        offer: Array.isArray(this.echoShieldOffer) && this.echoShieldOffer.length
+          ? {
+            options: this.echoShieldOffer.map((id) => ({ id, name: this.gd.bond(id)?.name || id })),
+            votes: Object.fromEntries(this._echoShieldVotes instanceof Map ? this._echoShieldVotes : []),
+            endsAt: this.echoShieldEndsAt ?? null,
+          }
+          : null,
+      },
       // 手上握着的反制祝福（不占名额）：客户端据此显示「提前结束排异 / 封锁」按钮（2026-11-05）
       counters: (Array.isArray(this.echoCounterIds) ? this.echoCounterIds : []).map((id) => {
         const b = echoBlessingById(id);
@@ -1272,6 +1353,7 @@ export class MatchEcho {
       this.echoBlessings.push(b.id);
     }
     this._echoBlessingEndsAt = null;
+    if (b.kind === 'shield') this._echoOpenShieldVote();
     // A 类：**立刻进钱包**（维护者 2026-11-04：原来走 pendingFunds，要等下一回合 prep 才入账，
     // 玩家选了 40 资金当场看不到，以为没生效）。
     const funds = echoBlessingFunds(b);

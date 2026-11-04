@@ -107,6 +107,8 @@ export const ECHO_BLESSINGS = Object.freeze([
   // 稀有度普遍比对应诅咒低一档，保证「抽得到」。
   { id: 'staunch', rarity: 'rare', name: '止血', desc: '驱散「失血 / 溃血 / 剧痛 / 渗血」：漏怪伤害恢复正常', kind: 'counter', group: 'counter',
     counterCurses: ['bleed', 'hemorrhage', 'ache', 'r_bleed'] },
+  // 护盾（维护者 2026-11-05）：拿到后全队投票指定一条附加盟约；排异随机到它时护盾抵消该诅咒。
+  { id: 'shield_bond', rarity: 'epic', name: '护盾', desc: '全队投票指定一条附加盟约：排异随机到它时护盾抵消该诅咒（一次性）', kind: 'shield', group: 'counter' },
   { id: 'unlock', rarity: 'rare', name: '开路', desc: '解除「封锁 / 排异」：被封的地块重新可部署、盟约排异取消', kind: 'counter', group: 'counter',
     // 可重复出现（维护者 2026-11-05）：排异会分批降临，每次都需要新的开路；且不占 3 个祝福名额
     repeatable: true, counterBans: true },
