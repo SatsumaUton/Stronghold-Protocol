@@ -127,7 +127,9 @@ export function echoTemplateLib(gd, helpers) {
     const seenSeed = new Set();
     for (let v = 0; v < SEED_TEMPLATES && all.length >= 2; v++) {
       const w = {};
-      const picks = Math.max(2, Math.min(all.length, 2 + Math.floor(rnd() * 3)));
+      // 维护者 2026-11-05：每套抽 **3–6 种**（原来 2–5，实测每波只出现 2–4 种，随机感偏弱）。
+      // 只影响 16 层以后的种子模板；1–13 层走原版该回合的变体，不经过这里。
+      const picks = Math.max(2, Math.min(all.length, 3 + Math.floor(rnd() * 4)));
       for (let i = 0; i < picks; i++) {
         const x = all[Math.floor(rnd() * all.length)];
         if (!x) continue;
