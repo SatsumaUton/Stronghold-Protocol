@@ -136,6 +136,15 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'spring', rarity: 'rare', name: '活泉', desc: '驱散「腐蚀 / 溃烂」：全场持续伤害停止', kind: 'counter', group: 'counter',
     counterCurses: ['rot', 'r_rot'] },
 
+  // —— 强效反制（2026-11-05）：一次清**多层**叠加诅咒。稀有度更高、出现概率更低 ——
+  // counterStacks = 一次能清掉同一条诅咒的层数（默认 1）。
+  { id: 'staunch_x', rarity: 'epic', name: '彻愈', desc: '一次清掉 3 层漏怪类诅咒（失血 / 溃血 / 剧痛 / 渗血）', kind: 'counter', group: 'counter',
+    counterStacks: 3, counterCurses: ['bleed', 'hemorrhage', 'ache', 'r_bleed'] },
+  { id: 'purge_x', rarity: 'epic', name: '肃清', desc: '一次清掉 3 层敌方数值类诅咒（狂怒 / 甲壳 / 躁动 / 硬壳）', kind: 'counter', group: 'counter',
+    counterStacks: 3, counterCurses: ['frenzy', 'carapace', 'r_frenzy', 'r_carapace'] },
+  { id: 'thrift_x', rarity: 'rare', name: '富源', desc: '一次清掉 2 层资金类诅咒（贡赋 / 征收 / 重税 / 什一税 / 抽成）', kind: 'counter', group: 'counter',
+    counterStacks: 2, counterCurses: ['tribute', 'levy', 'heavytax', 'tithe', 'r_levy'] },
+
   // —— 对敌方上异常（2026-11-05）：敌人**生成时**按概率挂上持续 debuff ——
   { id: 'frostbite', rarity: 'rare', name: '寒冻', group: 'debuff', kind: 'mods',
     desc: '40% 的敌人移动速度 -40%',

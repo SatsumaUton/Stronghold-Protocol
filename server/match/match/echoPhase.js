@@ -1040,9 +1040,15 @@ export class MatchEcho {
       if (ids.length && Array.isArray(this.echoCurseIds) && this.echoCurseIds.length) {
         // 诅咒可以叠层（同一个 id 出现多次）：一次反制只消掉**一层**，
         // 所以要靠重复拿反制来逐层解（维护者 2026-11-05「可以多次出现生效」）。
+        // 每次清掉多少层：普通反制 1 层，强效反制（彻愈 / 肃清 / 富源）2–3 层
+        const stacks = Math.max(1, Math.floor(Number(b.counterStacks) || 1));
         for (const id of ids) {
-          const at = this.echoCurseIds.indexOf(id);
-          if (at >= 0) { this.echoCurseIds.splice(at, 1); removed += 1; }
+          for (let k = 0; k < stacks; k++) {
+            const at = this.echoCurseIds.indexOf(id);
+            if (at < 0) break;
+            this.echoCurseIds.splice(at, 1);
+            removed += 1;
+          }
         }
       }
       if (this.echoRoundCurse && ids.includes(this.echoRoundCurse)) this.echoRoundCurse = null;

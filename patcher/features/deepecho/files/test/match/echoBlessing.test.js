@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ECHO_BLESSINGS, ECHO_BLESSING_EVERY, echoBlessingById, echoBlessingDue, echoBlessingOffer,
-  echoBlessingMods, echoBlessingCoinMul, echoBlessingFunds, applyEchoBlessingMods,
+  echoBlessingMods, echoBlessingCoinMul, echoBlessingFunds, applyEchoBlessingMods, ECHO_BLESSING_RARITY_WEIGHT,
 } from '../../server/match/match/echoBlessing.js';
 
 /** units.js 属性重算里真实读取的 mods 键（2026-11-03 从 units.js 提取，与 echoWords.test.js 同源）。 */
@@ -171,4 +171,20 @@ test('已拥有的祝福不会再出现在候选里', () => {
     const offer = echoBlessingOffer(rng, owned);
     for (const b of offer) assert.ok(!owned.includes(b.id), `${b.id} 已拥有却仍被抽出`);
   }
+});
+test('每档稀有度都有抽取权重，且普通 > 稀有 > 传说（出现概率按稀有度递减）', () => {
+  for (const b of ECHO_BLESSINGS) {
+    assert.ok(ECHO_BLESSING_RARITY_WEIGHT[b.rarity] > 0, `${b.id} 的稀有度 ${b.rarity} 没有抽取权重`);
+  }
+  assert.ok(ECHO_BLESSING_RARITY_WEIGHT.common > ECHO_BLESSING_RARITY_WEIGHT.rare);
+  assert.ok(ECHO_BLESSING_RARITY_WEIGHT.rare > ECHO_BLESSING_RARITY_WEIGHT.epic);
+
+  // 实测：同一随机序列下，普通出现的次数应明显多于传说
+  let s = 99;
+  const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const hits = { common: 0, rare: 0, epic: 0 };
+  for (let i = 0; i < 400; i++) for (const b of echoBlessingOffer(rng, [])) hits[b.rarity] += 1;
+  assert.ok(hits.common > hits.rare, `普通(${hits.common}) 应多于稀有(${hits.rare})`);
+  assert.ok(hits.rare > hits.epic, `稀有(${hits.rare}) 应多于传说(${hits.epic})`);
+  assert.ok(hits.epic > 0, '传说不是抽不到');
 });

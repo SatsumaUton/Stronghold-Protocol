@@ -897,3 +897,24 @@ test('叠层上限：同一条诅咒最多 3 层，到顶后不再入账', (t) =
   // 上限是 3
   assert.equal(3, m.echoCurseIds.length + 2);
 });
+// 维护者 2026-11-05：强效反制一次清多层，普通反制仍只清一层。
+test('反制层数：普通清 1 层，彻愈清 3 层，富源清 2 层', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const draw = (id) => { m.echoBlessings = []; m._echoGrantBlessing(echoBlessingById(id)); };
+
+  m.echoCurseIds = ['bleed', 'bleed', 'bleed'];
+  draw('staunch');                                     // 普通：1 层
+  assert.equal(m.echoCurseIds.filter((x) => x === 'bleed').length, 2, '普通只清 1 层');
+  draw('staunch_x');                                   // 强效：3 层
+  assert.equal(m.echoCurseIds.filter((x) => x === 'bleed').length, 0, '彻愈清光 3 层');
+
+  m.echoCurseIds = ['tribute', 'tribute', 'tribute'];
+  draw('thrift_x');                                    // 富源：2 层
+  assert.equal(m.echoCurseIds.filter((x) => x === 'tribute').length, 1, '富源清 2 层');
+
+  // 强效反制也是「不占名额的一次性祝福」
+  assert.ok(m.echoCounterIds.includes('staunch_x'));
+  assert.equal(m.echoBlessings.includes('staunch_x'), false, '不进 3 个名额');
+});
