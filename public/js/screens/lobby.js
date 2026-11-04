@@ -400,10 +400,13 @@ function StampRing() {
   </svg>`;
 }
 
-/** A difficulty's rounds (+ 隐秘核心) and battlefields: on its card's meta line, and in the brief when the cards show only their names. */
-function DifficultyRounds({ info }) {
+/** A difficulty's rounds (+ 隐秘核心) and battlefields: on its card's meta line, and in the brief when the cards show only their names.
+ *  `endless`: 「深渊回响」是无尽模式，不存在「打完 14 回合」——标成「深度无上限」而不是回合数。 */
+function DifficultyRounds({ info, endless = false }) {
   return [
-    html`<span key="r"><b class="num">${info.rounds}</b> ${tc('rounds', '回合')}${info.hidden ? html` ${t('+ 隐秘核心')}` : null}</span>`,
+    endless
+      ? html`<span key="r"><b class="num">∞</b> ${t('深度无上限')}</span>`
+      : html`<span key="r"><b class="num">${info.rounds}</b> ${tc('rounds', '回合')}${info.hidden ? html` ${t('+ 隐秘核心')}` : null}</span>`,
     info.stageNote ? html`<span key="s" class="pcard__stage"><${Icon} name="rook" />${info.stageNote}</span>` : null,
   ];
 }
@@ -450,7 +453,7 @@ function EchoDifficultyCard({ difficulty, index, selected, onSelect }) {
     <span class="pcard__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}</span>
     <span class="pcard__meta">
       <span class="num">${'DE'}-${index + 1}</span>
-      <${DifficultyRounds} info=${info} />
+      <${DifficultyRounds} info=${info} endless=${true} />
     </span>
     <span class="pcard__stamp" aria-hidden="true"><${StampRing} /><span class="pcard__tick"><${Icon} name="check" /></span><span class="pcard__ok">${t('已选定')}</span></span>
   </button>`;
