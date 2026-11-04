@@ -527,6 +527,22 @@ export class MatchEcho {
   }
 
   /**
+   * 特殊回合的**入场播报**（维护者 2026-11-05）：玩家一进准备阶段就知道这一回合是什么性质，
+   * 而不是打起来了才发现是挑战关 / boss 返场。普通回合什么都不播。
+   */
+  _echoAnnounceRoundKind(r = this.round) {
+    if (!this._echoDiveRound(r)) return;
+    const depth = this._echoDepth(r);
+    if (this._echoChallengeRound(r)) {
+      this._echoPushAnnounce(`挑战关：全队清怪 ≥${ECHO_CHALLENGE_BLESSING_PCT}% 得一次祝福三选一，未达成则降诅咒`);
+      return;
+    }
+    if (this._echoHiddenBossRound(r)) { this._echoPushAnnounce('隐藏核心：达成条件，本回合迎战隐藏 boss'); return; }
+    if (this._echoBossReturn(r)) { this._echoPushAnnounce('深渊节点：boss 返场（明牌）'); return; }
+    if (depth === 15) this._echoPushAnnounce('第 15 层：精英加压（本层不出 boss）');
+  }
+
+  /**
    * 每回合开始刷新诅咒（维护者 2026-11-05）。
    *
    * 两件事：
@@ -553,6 +569,7 @@ export class MatchEcho {
         }
       }
     }
+    this._echoAnnounceRoundKind(r);
     const rng = createRng(deriveSeed(this.seed, `echo:rcurse:${r}`));
     const pick = pickRoundCurse(depth, rng);
     this.echoRoundCurse = pick ? pick.id : null;

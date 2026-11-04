@@ -416,11 +416,15 @@ export class MatchPhases {
     const echoBoss = dive && (this._echoBossReturn(r) || this._echoHiddenBossRound(r));
     const isBoss = echoBoss || (!dive && (r === this.gd.bossRound || r === this.gd.hiddenRound));
     if (isBoss) {
+      // 特殊回合的入场播报（2026-11-05）：boss 返场 / 隐藏核心也要在**准备阶段**告诉玩家
+      if (dive) this._echoAnnounceRoundKind(r);
       this._planBossWaves();
     } else if (dive) {
       // 深潜：波次模板查循环的数据回合，缩放仍按显示回合（见 buildNormalWave 的 dataRound）；
       // 怪种组合从模板库抽（每回合 10 套变体随机一套），精英每 3 个深潜回合一次。
       // 诅咒「滞重」（timeMul 0.9）：本回合时限乘系数；「蜂拥」（budgetMul）加厚出怪预算。
+      // 先刷新本回合的诅咒（固定回合 + 随机回合诅咒），后面的波次/时限都吃它。
+      this._echoRefreshCurses(r);
       const curseFx = this._echoCurseFx();
       const echoTimeMul = curseFx.timeMul;
       const deepWave = this._echoDepth(r) >= ECHO_DEEP_FROM;

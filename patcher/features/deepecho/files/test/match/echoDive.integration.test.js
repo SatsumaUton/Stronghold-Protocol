@@ -960,3 +960,20 @@ test('词条不设上限：深层超过词池时会重复，且重复的词条�
   assert.equal(buffs.length, 2, '重复的词条要各自挂一个 buff');
   assert.notEqual(buffs[0].key, buffs[1].key, 'key 不能相同（否则会被去重）');
 });
+// 维护者 2026-11-05：特殊回合进准备阶段就要播报，别等打起来才知道。
+test('特殊回合入场播报：挑战关 / 第 15 层 / boss 返场', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const said = [];
+  m.tickerText = (txt) => said.push(String(txt));
+  const go = (depth) => { said.length = 0; m.round = depth - 1; m.startRound(depth); return said.join(' '); };
+
+  assert.match(go(5), /挑战关：全队清怪/, '深度 5 是挑战关');
+  assert.match(go(10), /挑战关：全队清怪/, '深度 10 是挑战关');
+  assert.match(go(15), /第 15 层：精英加压/, '深度 15 精英加压');
+  assert.match(go(25), /boss 返场/, '深度 25 是 boss 返场节点');
+  assert.match(go(35), /boss 返场/, '深度 35 也是节点');
+  const plain = go(16);                                 // 普通深层回合不播这些
+  assert.doesNotMatch(plain, /挑战关|精英加压|boss 返场/);
+});
