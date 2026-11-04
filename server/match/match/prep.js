@@ -188,10 +188,17 @@ export class MatchPrep {
     for (const ps of alive) this.dispatch(ps, 'onPrepEnd', { round: this.round });
     for (const ps of alive) ps.endPrep();
     const r = this.round;
-    if (r === this.gd.bossRound) {
+    // 「深渊回响」的 boss 返场节点（25 / 35 / 45…）不是原版的 gd.bossRound，必须单独判断，
+    // 否则会走 startCombat() —— 而深潜 boss 回合的 `this.wave` 是 null，
+    // 战斗瞬间结束、直接跳到下一层（维护者 2026-11-05 实测：25 层没打 boss 就进了 26）。
+    const echoBossRound = this.echoVariant === 'deepecho'
+      && typeof this._echoBossReturn === 'function' && this._echoBossReturn(r);
+    const echoHiddenRound = this.echoVariant === 'deepecho'
+      && typeof this._echoHiddenBossRound === 'function' && this._echoHiddenBossRound(r);
+    if (r === this.gd.bossRound || echoBossRound) {
       this.hiddenLayerSum = alive.reduce((s, p) => s + p.activatedLayers(), 0);
       this.startFinalAssault(false);
-    } else if (r === this.gd.hiddenRound) {
+    } else if (r === this.gd.hiddenRound || echoHiddenRound) {
       this.startFinalAssault(true);
     } else {
       this.startCombat();
