@@ -547,7 +547,12 @@ export class MatchEcho {
 
   /** 商店加价倍率（诅咒「通胀 / 暴利」）：`player/economy.js` 的 priceOf 消费它。 */
   _echoShopPriceMul() {
-    return this.echoVariant === 'deepecho' ? this._echoCurseFx().shopPriceMul : 1;
+    if (this.echoVariant !== 'deepecho') return 1;
+    // 16 层以后的资金出口（维护者 2026-11-05）：商店购买价 / 刷新价随深度温和上涨，
+    // 玩家此时已满级，继续买干员/装备/刷新时资金自然被消耗，不改任何界面。
+    const depth = this._echoDepth(this.round);
+    const inflate = depth >= 16 ? Math.min(1.5, 1 + 0.04 * (depth - 15)) : 1;
+    return this._echoCurseFx().shopPriceMul * inflate;
   }
 
   /** 漏怪扣血（含诅咒「失血 / 溃血 / 剧痛」）：只放大已有漏怪，仍受每回合上限约束。 */

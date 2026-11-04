@@ -20,40 +20,37 @@ const ENEMIES = {
 const gd = { enemy: (k) => ENEMIES[k] || null };
 const seq = (...xs) => { let i = 0; return () => xs[Math.min(i++, xs.length - 1)]; };
 
-test('触发节奏：挂在非 boss 的固定节点上（深度 3 / 8 / 13 / 23…）', () => {
+test('触发节奏：每 10 层一次（深度 8 / 18 / 28 / 38…），避开 boss 节点', () => {
   assert.equal(ECHO_BOUNTY_EVERY, 5);
-  // boss 返场在锚点 5/10/15（之后 25/35），悬赏错开 2 层 ——
-  // 否则 boss 回合 this.wave 为空，悬赏静默发不出来
-  assert.equal(echoBountyDue(2), false);
-  assert.equal(echoBountyDue(3), true, '深度 3 悬赏');
+  // 维护者 2026-11-05：给钱太多，频率从「每 5 层」放宽到「每 10 层」
+  assert.equal(echoBountyDue(3), false);
   assert.equal(echoBountyDue(5), false, '深度 5 是 boss 返场，不发悬赏');
   assert.equal(echoBountyDue(8), true, '深度 8 悬赏');
-  assert.equal(echoBountyDue(10), false, '深度 10 是 boss');
-  assert.equal(echoBountyDue(13), true);
-  assert.equal(echoBountyDue(15), false, '深度 15 是锚点 boss');
-  assert.equal(echoBountyDue(18), false, '15 之后节点放稀到 10 层，下一个悬赏在 23');
-  assert.equal(echoBountyDue(23), true, '深度 23 = 25 前两层');
-  assert.equal(echoBountyDue(33), true, '深度 33 = 35 前两层');
+  assert.equal(echoBountyDue(13), false, '13 不再是悬赏层');
+  assert.equal(echoBountyDue(18), true, '深度 18 悬赏');
+  assert.equal(echoBountyDue(23), false, '23 不再是悬赏层');
+  assert.equal(echoBountyDue(28), true, '深度 28 悬赏');
+  assert.equal(echoBountyDue(38), true, '深度 38 悬赏');
   // diveStart 参与换算：深度 = 回合 − 起点 + 1
-  assert.equal(echoBountyDue(3, 1), true);
-  assert.equal(echoBountyDue(18, 16), true, '起点 16 时 R18 = 深度 3');
-  assert.equal(echoBountyDue(18, 1), false, '起点 1 时 R18 = 深度 18，不是悬赏层');
+  assert.equal(echoBountyDue(8, 1), true);
+  assert.equal(echoBountyDue(23, 16), true, '起点 16 时 R23 = 深度 8 → 悬赏');
+  assert.equal(echoBountyDue(24, 16), false, '起点 16 时 R24 = 深度 9，不是悬赏层');
 });
 
-test('赏金固定档位表：按基础血量 × 数量切 1 / 2 / 3 / 6 币', () => {
+test('赏金固定档位表：按基础血量 × 数量切 1 / 1 / 2 / 3 币', () => {
   assert.equal(ECHO_BOUNTY_TIERS.length, 4);
-  assert.deepEqual(ECHO_BOUNTY_TIERS.map((t) => t.coin), [1, 2, 3, 6]);
+  assert.deepEqual(ECHO_BOUNTY_TIERS.map((t) => t.coin), [1, 1, 2, 3]);
   // 边界：档位含上界
   assert.equal(echoBountyPayout(5000), 1);
-  assert.equal(echoBountyPayout(5001), 2);
-  assert.equal(echoBountyPayout(20000), 2);
-  assert.equal(echoBountyPayout(20001), 3);
-  assert.equal(echoBountyPayout(50000), 3);
-  assert.equal(echoBountyPayout(50001), 6);
-  assert.equal(echoBountyPayout(90000), 6);
-  // 数量计入威胁值：两只 3000 血 = 6000 → 第 2 档
+  assert.equal(echoBountyPayout(5001), 1);
+  assert.equal(echoBountyPayout(20000), 1);
+  assert.equal(echoBountyPayout(20001), 2);
+  assert.equal(echoBountyPayout(50000), 2);
+  assert.equal(echoBountyPayout(50001), 3);
+  assert.equal(echoBountyPayout(90000), 3);
+  // 数量计入威胁值：两只 3000 血 = 6000 → 仍是第 1 档
   assert.equal(echoBountyPayout(3000, 1), 1);
-  assert.equal(echoBountyPayout(3000, 2), 2);
+  assert.equal(echoBountyPayout(3000, 2), 1);
 });
 
 test('数值低的怪不会被高估（用户的核心要求）', () => {
@@ -77,10 +74,10 @@ test('赏金有上下限，且随数量增长', () => {
 });
 
 test('档位与深度无关：同一只怪永远同一档（玩家可预期）', () => {
-  assert.equal(echoBountyPayout(40000), 3);
-  assert.equal(echoBountyPayout(40000, 1), 3);
+  assert.equal(echoBountyPayout(40000), 2);
+  assert.equal(echoBountyPayout(40000, 1), 2);
   // 多传一个 depth 参数也不会改变档位（旧签名兼容，参数被忽略）
-  assert.equal(echoBountyPayout(40000, 1, 20), 3);
+  assert.equal(echoBountyPayout(40000, 1, 20), 2);
 });
 
 test('目标只从已生成的波次里抽，且排除 boss / part / 悬赏怪', () => {
@@ -100,11 +97,11 @@ test('目标只从已生成的波次里抽，且排除 boss / part / 悬赏怪',
   assert.ok(cards[0].coin >= ECHO_BOUNTY_MIN);
 });
 
-test('同一 enemyKey 只出一张卡，数量按波次累加', () => {
+test('同一 enemyKey 只出一张卡，数量按波次累加（上限 4）', () => {
   const spawns = [{ enemyKey: 'mid', count: 2 }, { enemyKey: 'mid', count: 3 }];
   const cards = echoBountyCards(spawns, { gd, depth: 0, rng: seq(0.9), maxCards: 3 });
   assert.equal(cards.length, 1, '不能为同一个怪出两张卡');
-  assert.equal(cards[0].count, 5, '数量应该累加');
+  assert.equal(cards[0].count, 4, '数量累加后封顶 4');
 });
 
 test('空输入 / 无 gd / 无敌人时安全返回空', () => {

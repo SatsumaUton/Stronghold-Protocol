@@ -134,20 +134,21 @@ test('丰收：资金倍率 1.2；没有祝福时是 1；普通房恒为 1', () 
 
 test('悬赏：只在非 boss 节点发，且从本回合波次里抽', () => {
   const humans = [human(1)];
-  const m = fakeMatch({ round: 38, humans });
+  // diveStart=1 → 深度 = 回合；悬赏层 8/18/28/38…
+  const m = fakeMatch({ round: 18, diveStart: 1, humans });
   const granted = [];
   m.addBounty = (ps, card) => { granted.push({ pid: ps.playerId, card }); return 'b1'; };
   m.wave = { spawns: [{ enemyKey: 'e1', count: 2 }, { enemyKey: 'e2', count: 1 }] };
-  assert.equal(P._echoMaybeGrantBounty.call(m, 38), 1, '深度 23 是悬赏层');
+  assert.equal(P._echoMaybeGrantBounty.call(m, 18), 1, '深度 18 是悬赏层');
   assert.equal(granted.length, 1);
   assert.ok(['e1', 'e2'].includes(granted[0].card.enemyKey), '目标必须来自本回合波次');
   // boss 节点不发
-  const m2 = fakeMatch({ round: 40, humans });
+  const m2 = fakeMatch({ round: 25, diveStart: 1, humans });
   m2.addBounty = () => 'x';
   m2.wave = { spawns: [{ enemyKey: 'e1', count: 1 }] };
-  assert.equal(P._echoMaybeGrantBounty.call(m2, 40), 0, '深度 25 是 boss 返场，不发悬赏');
+  assert.equal(P._echoMaybeGrantBounty.call(m2, 25), 0, '深度 25 是 boss 返场，不发悬赏');
   // 非节点不发
-  const m3 = fakeMatch({ round: 19, humans });
+  const m3 = fakeMatch({ round: 19, diveStart: 1, humans });
   m3.addBounty = () => 'x';
   m3.wave = { spawns: [{ enemyKey: 'e1', count: 1 }] };
   assert.equal(P._echoMaybeGrantBounty.call(m3, 19), 0, 'R19 不发');

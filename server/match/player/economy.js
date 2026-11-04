@@ -276,7 +276,11 @@ export class PlayerEconomy {
       this.shop.freeRefreshes = Math.min(Math.max(0, Number(this.shop.freeRefreshes) || 0), mm._echoFreeRefreshCap());
     }
     const free = this.shop.freeRefreshes > 0;
-    const price = free ? 0 : this.gd.refreshPrice;
+    // 深潜 16 层以后：刷新价随深度上涨（资金出口，不改界面，维护者 2026-11-05）
+    const priceMul = mm && mm.echoVariant === 'deepecho' && typeof mm._echoShopPriceMul === 'function'
+      ? mm._echoShopPriceMul()
+      : 1;
+    const price = free ? 0 : Math.max(0, Math.round(this.gd.refreshPrice * priceMul));
     if (!free && this.funds < price) return fail(ERR.NO_FUNDS);
     if (free) this.shop.freeRefreshes--;
     else this.spend(price);

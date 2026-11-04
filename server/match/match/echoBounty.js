@@ -17,26 +17,22 @@
 //
 // 本文件只有纯函数 + 数据，没有 I/O、没有副作用 —— 单测直接调用。
 
-import { isEchoNodeDepth } from './echo.js';
-
 /** 深潜里几个回合发一次悬赏。 */
 export const ECHO_BOUNTY_EVERY = 5;
 /**
- * 赏金档位表（维护者 2026-11-03 定：固定档位，按血量切 1 / 2 / 3 / 6 币）。
+ * 赏金档位表（维护者 2026-11-05 二次调：给钱太多导致玩家过早膨胀，高端档砍半）。
  *
- * 为什么不再用公式：公式对玩家不可读 —— 同一只怪在不同深度给不同的钱，玩家没法预期。
- * 固定档位一眼就能看出「这只值几币」。按**基础血量 × 数量**归档（不含回合缩放），
- * 所以同一只怪永远同一档；深潜的收益靠悬赏份数与祝福，不靠单价膨胀。
+ * 固定档位、按血量切：同血量永远同一档。深潜的收益靠份数与祝福，不靠单价膨胀。
  */
 export const ECHO_BOUNTY_TIERS = Object.freeze([
   Object.freeze({ upTo: 5000, coin: 1 }),
-  Object.freeze({ upTo: 20000, coin: 2 }),
-  Object.freeze({ upTo: 50000, coin: 3 }),
-  Object.freeze({ upTo: Infinity, coin: 6 }),
+  Object.freeze({ upTo: 20000, coin: 1 }),
+  Object.freeze({ upTo: 50000, coin: 2 }),
+  Object.freeze({ upTo: Infinity, coin: 3 }),
 ]);
 /** 单张悬赏的赏金上下限（= 档位表的两端）。 */
 export const ECHO_BOUNTY_MIN = 1;
-export const ECHO_BOUNTY_MAX = 6;
+export const ECHO_BOUNTY_MAX = 3;
 
 /**
  * 这一回合该不该发悬赏：挂在**非 boss 的固定节点**上 —— 深度 3 / 8 / 13 / 23 / 33…（每 5 层一次，避开 boss 层）。
@@ -51,8 +47,10 @@ export const ECHO_BOUNTY_MAX = 6;
 export function echoBountyDue(round, diveStart = null) {
   const r = Math.floor(Number(round) || 0);
   const first = diveStart == null ? 1 : Math.max(1, Math.floor(Number(diveStart) || 1));
-  // 深度 = 回合 − 起点 + 1；悬赏挂在「节点前 2 层」
-  return isEchoNodeDepth(r - first + 1 + 2);
+  const depth = r - first + 1;
+  // 维护者 2026-11-05：悬赏给钱太多，频率从「每 5 层一次」放宽到「每 10 层一次」——
+  // 深度 8 / 18 / 28 / 38…（同样避开 5/10/15/25… 的 boss 节点）。
+  return depth >= 8 && (depth - 8) % 10 === 0;
 }
 
 /**
@@ -99,7 +97,9 @@ export function echoBountyCards(spawns, opts = {}) {
     const at = Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length));
     const t = pool.splice(at, 1)[0];
     const hp = Number(gd.enemy(t.key)?.stats?.maxHp) || 0;
-    const count = Math.max(1, Math.min(20, t.count));
+    // 维护者 2026-11-05：单张卡的目标数量上限从 20 降到 4，
+    // 避免「一大堆同种怪」一次结算出 100+ 资金。
+    const count = Math.max(1, Math.min(4, t.count));
     cards.push({
       enemyKey: t.key,
       count,

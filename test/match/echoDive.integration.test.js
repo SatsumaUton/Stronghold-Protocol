@@ -70,12 +70,12 @@ test('第 25 回合 boss 返场：真的生成了 boss 波次（数据表只到 
   assert.equal(m._echoIntel(), null, 'boss 返场是明牌，不给聚合情报');
 });
 
-test('深度 23 悬赏节点：目标从本回合生成的波次里抽出来', (t) => {
+test('深度 18 悬赏节点：目标从本回合生成的波次里抽出来', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
-  m.round = 22;
-  m.startRound(23);
+  m.round = 17;
+  m.startRound(18);
   const players = m.alivePlayers();
   assert.ok(players.length > 0);
   const keys = new Set((m.wave?.spawns || []).map((s) => s.enemyKey));
@@ -84,11 +84,11 @@ test('深度 23 悬赏节点：目标从本回合生成的波次里抽出来', (
     for (const b of ps.bounties) {
       got += 1;
       assert.ok(keys.has(b.card.enemyKey), `悬赏目标 ${b.card.enemyKey} 必须在本回合波次里`);
-      assert.ok(b.card.coin >= 1 && b.card.coin <= 8, '赏金在 1..8');
+      assert.ok(b.card.coin >= 1 && b.card.coin <= 3, '赏金在 1..3');
       assert.equal(b.card.payout, 'kill');
     }
   }
-  assert.ok(got > 0, '深度 23 必须发出悬赏');
+  assert.ok(got > 0, '深度 18 必须发出悬赏');
 });
 
 test('深度 4 不发悬赏（不是节点）', (t) => {
