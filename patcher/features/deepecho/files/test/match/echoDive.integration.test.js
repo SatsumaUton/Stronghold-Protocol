@@ -183,6 +183,55 @@ test('普通房间的独立卡池仍然只听房间设置', (t) => {
   assert.equal(on.m.playerPools.size, 2);
   assert.deepEqual(on.m._echoFixedRules(), [], '普通房间没有深潜固定规则');
 });
+
+// 维护者 2026-11-05：挑战关（深度 5 / 10）的奖励**按全队合计**判定 —— 一个人漏得多、
+// 其余人干净，只要全队清怪线到了就发；全员合计没到就吃诅咒。不是逐人结算。
+test('挑战关奖励按全队合计：个人退步不影响，队伍达标就给一次祝福三选一', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 4;
+  m.startRound(5);                                   // 深度 5 = 挑战关
+  const ps = m.alivePlayers();
+  const total = m.wave.spawns.reduce((a, s) => a + Math.max(0, s.count), 0);
+  const denom = total * ps.length;
+  const leaks = Math.ceil(denom * 0.05);             // 全队合计漏 5% → 清怪 95%
+  m.lastResults = new Map(ps.map((p, i) => [p.playerId, i === 0
+    ? { leaked: Array.from({ length: leaks }, () => ({ counted: true })), perfect: false, killed: 0 }
+    : { leaked: [], perfect: true, killed: 0 }]));
+  const funds = ps.map((p) => p.pendingFunds);
+  const draws = Number(m.echoBlessingDraws) || 0;
+  const out = m._echoSettleChallenge();
+  assert.ok(out.granted, `全队清怪应达标（实际 ${out.ratio}）`);
+  assert.ok(Math.abs(out.ratio - 0.95) < 0.02, `比例应是全队合计（实际 ${out.ratio}）`);
+  assert.equal(Number(m.echoBlessingDraws) || 0, draws + 1, '只加一次（团队级，不是每人一次）');
+  assert.deepEqual(m.echoCurseIds, [], '达标不吃诅咒');
+  assert.deepEqual(ps.map((p) => p.pendingFunds), funds, '挑战关不再发资金');
+});
+
+test('挑战关没达标：不给祝福，改加一层诅咒（侵蚀词条上限 +1）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 4;
+  m.startRound(5);
+  const ps = m.alivePlayers();
+  const total = m.wave.spawns.reduce((a, s) => a + Math.max(0, s.count), 0);
+  const denom = total * ps.length;
+  const leaks = Math.ceil(denom * 0.2);              // 全队合计漏 20% → 清怪 80%，没到 90%
+  m.lastResults = new Map(ps.map((p, i) => [p.playerId, i === 0
+    ? { leaked: Array.from({ length: leaks }, () => ({ counted: true })), perfect: false, killed: 0 }
+    : { leaked: [], perfect: true, killed: 0 }]));
+  const draws = Number(m.echoBlessingDraws) || 0;
+  const capBefore = m._echoWordCap();
+  const out = m._echoSettleChallenge();
+  assert.equal(out.granted, false);
+  assert.equal(Number(m.echoBlessingDraws) || 0, draws, '没达标不发祝福');
+  assert.deepEqual(m.echoCurseIds, ['erosion'], '改为加一层诅咒');
+  assert.ok(m._echoCurses().some((c) => c.id === 'erosion'), '深渊回响的诅咒列表里看得到');
+  assert.equal(m._echoWordCap(), Math.min(8, capBefore + 1), '诅咒真的加难度（词条上限 +1）');
+});
+
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。

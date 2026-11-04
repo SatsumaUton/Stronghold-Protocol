@@ -9,8 +9,9 @@
 //
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
-import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
+import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
 import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js';
+import { echoCurseList, echoCurseEffects } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
   echoBlessingFunds, applyEchoBlessingMods, ECHO_BLESSING_VOTE_MS,
@@ -175,7 +176,9 @@ export class MatchEcho {
   _echoWordCap(r = this.round) {
     const depth = this._echoDepth(r);
     if (!(depth > 0)) return 3;
-    return Math.min(8, 3 + Math.floor((depth - 1) / 10));
+    // 诅咒里带「侵蚀词条上限 +N」的（echoCurse.js）：按层累加，最多 8 条
+    const curseCap = Math.max(0, echoCurseEffects(this.echoCurseIds).wordCap);
+    return Math.min(8, 3 + Math.floor((depth - 1) / 10) + curseCap);
   }
 
   /**
@@ -320,6 +323,49 @@ export class MatchEcho {
   }
 
   /**
+   * 挑战关（深度 5 / 10）的结算奖励（维护者 2026-11-05 第二次改）。
+   *
+   * 旧实现：按本人漏怪发资金（30 / 15 / 8 / 1，10 层 ×1.5），团队完美再 +1 次祝福抽取。
+   * 那段写在 settle 的 per-player 循环里，4 个人会重复加 4 次，这次一并修掉。
+   *
+   * 新实现：**不发资金**。只看全队清怪率 —— 达到 `ECHO_CHALLENGE_BLESSING_PCT` 就给
+   * **全队一次祝福三选一**（完美通关 = 100%，自然也在线内）。
+   * 分母 = 本回合波次只数 × 还活着的人数（每个阵地跑同一份波次），分子 = 分母 − 全队计入的漏怪。
+   *
+   * @returns {{ ratio: number, granted: boolean } | null} 不是挑战关 / 没有波次时 null
+   */
+  _echoSettleChallenge() {
+    if (!this._echoChallengeRound(this.round)) return null;
+    const total = Array.isArray(this.wave?.spawns)
+      ? this.wave.spawns.reduce((a, s) => a + Math.max(0, Number(s.count) || 0), 0)
+      : 0;
+    const players = this.alivePlayers();
+    if (!(total > 0) || !players.length) return null;
+    let leaked = 0;
+    for (const ps of players) {
+      const r = this.lastResults.get(ps.playerId) || {};
+      leaked += (r.leaked || []).filter((l) => l && l.counted !== false).length;
+    }
+    const denom = total * players.length;
+    const ratio = Math.max(0, Math.min(1, 1 - leaked / denom));
+    const denied = !(ratio + 1e-9 >= ECHO_CHALLENGE_BLESSING_PCT / 100);
+    if (!denied) {
+      // 全队共享一次抽取（echoBlessingOffer 是团队级投票，不是每人一份）
+      this.echoBlessingDraws = (Number(this.echoBlessingDraws) || 0) + 1;
+      this.tickerText?.(`挑战关：全队清怪 ${Math.round(ratio * 100)}%，获得一次祝福三选一`, 1);
+      this.markPublic?.();
+    } else {
+      // 没达成 → 不给祝福，改为深渊降下诅咒（从 echoCurse.js 的词条表里取；现在固定「侵蚀」= 词条上限 +1）
+      const curse = 'erosion';
+      this.echoCurseIds = Array.isArray(this.echoCurseIds) ? this.echoCurseIds : [];
+      this.echoCurseIds.push(curse);
+      this.tickerText?.(`挑战关：全队清怪 ${Math.round(ratio * 100)}%，深渊降下诅咒（侵蚀词条上限 +1）`, 1);
+      this.markPublic?.();
+    }
+    return { ratio, granted: !denied };
+  }
+
+  /**
    * boss 返场借用哪一回合的模板。
    *
    * 旧入口下是 `diveStart − 1`（玩家实际打过的最后一个 boss）。现在从第 1 回合就深潜，
@@ -386,13 +432,17 @@ export class MatchEcho {
       // 维护者 2026-11-05：深潜强制独立卡池（Match 构造时覆盖房间配置，见 Match.js 的 echoIndependentPool）。
       // 玩家开局就该知道「卡池是各用各的」——否则会以为队友拿走了自己商店里的干员。
       { id: 'pool', name: '独立卡池', desc: '每名博士使用自己的卡池（固定开启，不与他人共享）' },
+      { id: 'challenge', name: '挑战关', desc: `深度 5 / 10：全队清怪 ≥${ECHO_CHALLENGE_BLESSING_PCT}% 得一次祝福三选一，否则深渊降下诅咒（侵蚀词条上限 +1）` },
     ];
   }
   _echoCurses() {
     if (this.echoVariant !== 'deepecho') return [];
+    const applied = echoCurseList(this.echoCurseIds).map(({ id, name, desc }) => ({ id, name, desc }));
     return [
       { id: 'miracle', name: '奇迹·诅咒', desc: `免费刷新总数上限 ${MatchEcho.MAX_FREE_REFRESH} 次（原版无上限）` },
       { id: 'foresight', name: '远见·诅咒', desc: '按层给钱结算到 999 层（与原版一致）' },
+      // 挑战关没达成等来源累积的诅咒（echoCurse.js 的词条表；同类合并成「侵蚀 ×2」）
+      ...applied,
     ];
   }
 
@@ -584,9 +634,10 @@ export class MatchEcho {
     return n;
   }
 
-  /** C 类祝福的资金倍率（结算入账时乘上去；没有祝福就是 1）。 */
+  /** C 类祝福的资金倍率（结算入账时乘上去；没有祝福就是 1）。诅咒的 `coinMul` 也在同一处生效。 */
   _echoCoinMul() {
-    return this.echoVariant === 'deepecho' ? echoBlessingCoinMul(this.echoBlessings) : 1;
+    if (this.echoVariant !== 'deepecho') return 1;
+    return echoBlessingCoinMul(this.echoBlessings) * echoCurseEffects(this.echoCurseIds).coinMul;
   }
 
   /**

@@ -79,6 +79,8 @@ export const MATCH_FIELDS = Object.freeze({
     // 「深渊回响」(DESIGN-ABYSS.md, 2026-11-03): the variant and the dive's own progress. 纯追加 —— 旧存档缺这几项时
     // 保留构造函数的默认值（null / 0），恢复出来的对局与加这个模式之前一模一样，所以不用抬 SNAPSHOT_VERSION。
     'echoVariant', 'echoDiveStart', 'echoWordsActive', 'echoBlessingDraws', 'echoBlessings', 'echoBlessingOffer',
+    // 挑战关未达成累积的诅咒 id 列表（2026-11-05，见 match/echoCurse.js）；同样纯追加，旧存档缺这项时用空数组。
+    'echoCurseIds',
   ]),
   special: Object.freeze([
     'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'poolGroups', 'playerItemPools',

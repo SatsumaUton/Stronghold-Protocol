@@ -40,6 +40,9 @@ export class MatchSettle {
       losses: {},
     } : null;
     const alive = this.alivePlayers();
+    // 「深渊回响」挑战关（深度 5 / 10）：奖励是**全队一次祝福三选一**，不再发资金（维护者 2026-11-05）。
+    // 必须在 per-player 循环外调用 —— 旧实现写在循环里，「团队完美 +1 抽取」4 个人会重复发 4 次。
+    if (this.echoVariant === 'deepecho') this._echoSettleChallenge();
     for (const ps of alive) {
       const r = this.lastResults.get(ps.playerId) || { leaked: [], perfect: true, coins: 0, layerGains: {}, killed: 0, damageDealt: 0 };
       const counted = (r.leaked || []).filter((l) => l && l.counted !== false).length;
@@ -52,29 +55,7 @@ export class MatchSettle {
       ps.stats.dmgDealt += Number(r.damageDealt) || 0;
       ps.stats.healing += Number(r.healingDone) || 0;
       if (r.perfect !== false && counted === 0) ps.stats.perfectRounds++;
-      // 「深渊回响」挑战关（深度 5 / 10）结算：只发给本人，按本回合漏怪分档（维护者 2026-11-05）。
-      // 完美通关的「装备三选一」另接（道具补给池），这里先落资金档位。
-      if (this.echoVariant === 'deepecho') {
-        const depth = this._echoDepth();
-        if (depth === 5 || depth === 10) {
-          // 团队完美：所有活着的人本回合都 0 漏 → 下一次选秀强制道具补给三选一
-          const teamPerfect = this.alivePlayers().every((q) => {
-            const rr = this.lastResults.get(q.playerId) || {};
-            return (rr.leaked || []).filter((l) => l && l.counted !== false).length === 0 && rr.perfect !== false;
-          });
-          // 完美通关的团队奖励改成「一次祝福选择」（维护者 2026-11-05：
-          // 装备三选一牵涉新交互，直接用现有的祝福流程更省事）
-          if (teamPerfect) this.echoBlessingDraws = (Number(this.echoBlessingDraws) || 0) + 1;
-          // 奖励随回合提升：10 层比 5 层多一档（维护者 2026-11-05）
-          const mul = depth === 10 ? 1.5 : 1;
-          const base = counted === 0 ? 30 : counted <= 2 ? 15 : counted <= 5 ? 8 : 1;
-          const coin = Math.max(1, Math.round(base * mul));
-          if (coin > 0) {
-            ps.addFunds(coin, { reason: 'echoChallenge' });
-            this.tickerText?.(`${ps.name}：挑战关奖励 +${coin} 资金`, 1);
-          }
-        }
-      }
+      // （挑战关奖励已移到循环外：全队一次祝福三选一，见上面的 _echoSettleChallenge 调用）
       // bounty coins (own battle + unite kills) are credited to the next prep
       let coins = Math.max(0, Math.trunc(Number(r.coins) || 0));
       const up = combinedUnite && combinedUnite.perPlayer && combinedUnite.perPlayer[ps.playerId];

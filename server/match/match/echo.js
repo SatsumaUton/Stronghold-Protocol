@@ -62,6 +62,14 @@ export const ECHO_SAFE_ROUND = 999;
 export const ECHO_MAX_FREE_REFRESH = 5;
 
 /**
+ * 挑战关（深度 5 / 10）的奖励线：全队清怪率 ≥ 这个百分比 → 全队 +1 次祝福三选一。
+ *
+ * 维护者 2026-11-05 第二次定：挑战关**不再发资金**，奖励只有祝福；
+ * 完美通关 = 100%，自然也在线内。改这一行就能调松紧。
+ */
+export const ECHO_CHALLENGE_BLESSING_PCT = 90;
+
+/**
  * 固定节点：boss 返场与深潜悬赏都挂在这些回合上（深度 5 / 10 / 15 / 25 / 35…，可无限延续）。
  *
  * ⚠ 2026-11-03 第二次改（维护者）：深潜**从第 1 回合开始**（`Match.echoDiveStart` 建房即 1），
