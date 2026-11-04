@@ -243,6 +243,12 @@ export class PlayerEconomy {
 
   refresh() {
     const g = this._gate(); if (g) return g;
+    // 兜底：深潜里任何来源多发的免费刷新，在**用之前**再按当前上限钳一次
+    // （维护者 2026-11-05：奇迹·诅咒的上限必须真的挡得住）。
+    const mm = this.m;
+    if (mm && mm.echoVariant === 'deepecho' && typeof mm._echoFreeRefreshCap === 'function') {
+      this.shop.freeRefreshes = Math.min(Math.max(0, Number(this.shop.freeRefreshes) || 0), mm._echoFreeRefreshCap());
+    }
     const free = this.shop.freeRefreshes > 0;
     const price = free ? 0 : this.gd.refreshPrice;
     if (!free && this.funds < price) return fail(ERR.NO_FUNDS);
