@@ -406,8 +406,11 @@ test('部署禁令：封锁地块 / 排异盟约（新上场与场上行动都�
   const bak = new Map(ps0.board);
   ps0.board.clear();
   ps0.board.set('9,5', { kind: 'chess', id: coreOnlyId, items: [], uid: 9100 });
+  // 团队模式（2026-11-05）：即使场上只有核心盟约，也能**提前**禁一条附加盟约，
+  // 之后玩家拿到的该盟约干员就上不了场。
   m.echoBannedBonds = [];
-  assert.equal(m._echoApplyBondBan(() => 0), null, '只有核心盟约 → 无可排异');
+  const preBan = m._echoApplyBondBan(() => 0);
+  assert.ok(preBan && m.gd.bond(preBan).isCore !== true, '提前禁的是附加盟约');
   ps0.board.clear();
   for (const [k, v] of bak) ps0.board.set(k, v);
   m.echoBannedBonds = keep;
@@ -647,8 +650,10 @@ test('排异叠加：不同附加盟约叠成多条，已禁的不重复，解�
   assert.notEqual(a, b, '两次禁的是不同盟约（相同的会被跳过）');
   assert.deepEqual(m.echoBannedBonds, [a, b], '叠加成两条');
 
-  // 再抽一次：候选里已经没有未禁的附加盟约 → 不重复禁
-  assert.equal(m._echoApplyBondBan(() => 0), null, '已禁的不能再禁');
+  // 再抽一次：跳过已禁的，禁下一条（团队模式可提前禁，候选是全部附加盟约）
+  const c = m._echoApplyBondBan(() => 0);
+  assert.ok(c && !m.echoBannedBonds.slice(0, 2).includes(c), '已禁的不会再出现');
+  assert.equal(m.echoBannedBonds.length, 3, '继续叠加');
 
   // 「开路」解除后可以再禁（两人已被收回手牌，先放回场上）
   m._echoGrantBlessing(echoBlessingById('unlock'));
@@ -861,11 +866,10 @@ test('诅咒入账统一：随机抽到封锁/排异真的生效；同回合两�
   assert.equal(ps.board.has('8,8'), false, '干员被收回');
   // 没有可禁的盟约时：不记假账
   const beforeIds = m.echoCurseIds.length;
-  m.echoBannedBonds = [...new Set([...m.echoBannedBonds, bond])];
-  ps.board.clear();
-  ps.board.set('8,9', { kind: 'chess', id: chessId, items: [], uid: 8802 });
+  // 把所有附加盟约都禁掉之后，再抽排异才不成立（不记假账）
+  m.echoBannedBonds = Object.keys(m.gd.raw.bonds).filter((b) => m.gd.raw.bonds[b]?.isCore !== true);
   const again = m._echoAddCurse('block_bond', () => 0);
-  assert.equal(again, null, '没有新盟约可禁 → 不成立');
+  assert.equal(again, null, '全部附加盟约都禁过 → 不成立');
   assert.equal(m.echoCurseIds.length, beforeIds, '也不会记假账');
 
   // 3) 同一回合的两条结算播报合成一行（不再互相覆盖）

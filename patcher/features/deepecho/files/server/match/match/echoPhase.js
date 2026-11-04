@@ -635,6 +635,8 @@ export class MatchEcho {
    * 用 `pieceBonds`（bondsMeta）算，所以**同构体授予的盟约也算在内** —— 维护者要求「同构体改变的干员也受影响」。
    */
   _echoApplyBondBan(rng = () => 0.5) {
+    // 2026-11-05 维护者：这是**团队模式**，可以提前禁 —— 候选不再要求「场上已经有人用」，
+    // 直接取数据里所有附加盟约；优先禁场上/商店在用的（惩罚更直观），没有就随机禁一条。
     const seen = new Set();
     for (const ps of this.alivePlayers()) {
       for (const p of (ps.board ? ps.board.values() : [])) {
@@ -642,18 +644,28 @@ export class MatchEcho {
         try { for (const b of (pieceBonds(this.gd, p, this.rules) || [])) seen.add(b); } catch { /* 数据缺失跳过 */ }
       }
     }
+    for (const ps of this.alivePlayers()) {
+      for (const s of (ps.shop && Array.isArray(ps.shop.slots) ? ps.shop.slots : [])) {
+        if (!s || s.kind !== 'chess' || !s.id) continue;
+        const rec = this.gd.chess(s.id);
+        for (const b of (rec && rec.bonds) || []) seen.add(b);
+      }
+    }
     // 只排异**附加盟约**（data/bonds.json 里 isCore !== true 的那 15 条）：
     // 8 条核心盟约（炎/萨尔贡/维多利亚/谢拉格/拉特兰/阿戈尔/叙拉古/卡西米尔）是干员身份的一部分，
     // 禁掉它们等于禁掉整个阵营，维护者 2026-11-05 已明确不许。
     // 已禁用的不能再禁（必须先被「开路」解除），不同附加盟约可以叠加
     const already = Array.isArray(this.echoBannedBonds) ? this.echoBannedBonds : (this.echoBannedBonds = []);
-    const list = [...seen].filter((b) => {
-      if (!this.gd.bond(b)) return false;
-      if (this.gd.bond(b).isCore === true) return false;   // 核心盟约永不排异
-      return !already.includes(b);                          // 已禁过 → 不重复
+    const rawBonds = (this.gd.raw && this.gd.raw.bonds) || {};
+    const allAdd = Object.keys(rawBonds).filter((b) => {
+      const rec = rawBonds[b];
+      if (!rec || rec.isCore === true) return false;        // 核心盟约永不排异
+      return !already.includes(b);                          // 已禁过 → 不重复（要先「开路」解除）
     });
-    if (!list.length) return null;
-    const picked = list[Math.min(list.length - 1, Math.floor((Number(rng()) || 0) * list.length))];
+    if (!allAdd.length) return null;
+    const preferred = allAdd.filter((b) => seen.has(b));
+    const pool = preferred.length ? preferred : allAdd;
+    const picked = pool[Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length))];
     already.push(picked);
     // 已经上场的同盟约干员**当场收回修正区**（2026-11-05 维护者要求）：
     // 排异不是「不让你动」，而是「这个人不能再上战场」。
