@@ -1125,12 +1125,12 @@ export function EchoSelect({ onClose, onStart }) {
                         <div><span>${t('通关时间')}</span><b>${time}</b></div>
                         ${/* 「到达回合」与「队伍」原来总是显示 —/未记录：服务端根本没发这两个字段，
                               留着只是噪音（维护者 2026-11-04）。有数据才显示。 */ null}
-                        ${names.length
-                          ? html`<div class="echo-detail__full"><span>${t('玩家')}</span><b>${names.join('、')}</b></div>`
-                          : null}
-                        ${squads
-                          ? html`<div class="echo-detail__full"><span>${t('核心盟约')}</span><b>${squads.map((s) => `${s.name}：${(s.cores || []).join('、') || '—'}（${s.bonds || 0} 个盟约）`).join(' ｜ ')}</b></div>`
-                          : null}
+                        ${/* 维护者 2026-11-05：展开明细也要有「玩家 / 核心盟约 / 最高盟约数」，缺数据时写 — 而不是整块消失 */ null}
+                        <div class="echo-detail__full"><span>${t('玩家')}</span><b>${names.length ? names.join('、') : '—'}</b></div>
+                        <div class="echo-detail__full"><span>${t('核心盟约')}</span><b>${squads
+                          ? squads.map((s) => `${s.name}：${(s.cores || []).join('、') || '—'}（${s.bonds || 0} 个盟约）`).join(' ｜ ')
+                          : (cores.length ? cores.join('、') : '—')}</b></div>
+                        <div><span>${t('最高盟约数')}</span><b>${maxBonds || '—'}</b></div>
                         <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'} · ${r.at ? new Date(r.at).toLocaleString() : '—'}</b></div>
                       </div>` : null}
                     </li>`;
