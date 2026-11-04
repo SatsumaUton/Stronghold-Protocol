@@ -331,9 +331,16 @@ export class MatchViews {
     } catch { out = list; }
     // 悬赏目标只在**16 层以后**才隐藏成「?」占位（维护者 2026-11-05：
     // 1–13 层的悬赏是玩家自己选的目标，准备阶段要照常显示真身）。
-    const hideBounty = this._echoDepth(this.round) >= 16;
+    // 迷雾/遮蔽：整个准备阶段的敌方情报都换成「?」占位（维护者 2026-11-05：
+    // 玩家要看不到右上角怪物等待区里的怪，只留隐藏图标）
+    let hideAll = false;
+    try {
+      const fx = typeof this._echoCurseFx === 'function' ? this._echoCurseFx() : null;
+      hideAll = !!(fx && (fx.intel || fx.blackout));
+    } catch { hideAll = false; }
+    const hideBounty = hideAll || this._echoDepth(this.round) >= 16;
     for (const e of out) {
-      if (hideBounty && e && e.source === 'bounty') e.enemyKey = 'enemy_unknown';
+      if (e && (hideAll || (hideBounty && e.source === 'bounty'))) e.enemyKey = 'enemy_unknown';
     }
     return out;
   }
