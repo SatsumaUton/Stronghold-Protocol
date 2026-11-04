@@ -461,7 +461,9 @@ export class Match {
     this.experimental = experimentalOptions(echoIndependentPool
       ? { ...expIn, disableSharedPool: true }
       : expIn);
-    this.revivalEnabled = !this.isSolo && this.experimental.revivalEnabled;
+    this.revivalEnabled = !this.isSolo && (this.echoVariant === 'deepecho' || this.experimental.revivalEnabled);
+    // 维护者 2026-11-05：不再要求「进入联防」—— 任何还活着的队友都能付 10 血救 1 血
+    this.revivalAnyDonor = !this.isSolo && this.experimental.revivalAnyDonor !== false;
     this.disableSharedPool = !this.isSolo && this.experimental.disableSharedPool;
     this.playerCapacity = roomCapacity(this.isSolo ? 'solo' : this.mode, this.experimental);
     this.capacityExperiment = !this.isSolo && this.playerCapacity > 4;
@@ -787,7 +789,16 @@ export class Match {
 
   _revivalHelpers(plan, uniteResult) {
     const eligible = new Set();
-    if (!this.revivalEnabled || !plan || !uniteResult || uniteResult.synthetic
+    if (!this.revivalEnabled) return eligible;
+    // 维护者 2026-11-05：默认**不要求进入联防** —— 只要还活着（不是机器人、没离开）就能当救援者。
+    // 原本这里只收「联防里完美清怪」的 helpers，所以没进联防的玩家永远救不了人。
+    if (this.revivalAnyDonor) {
+      for (const ps of this.order) {
+        if (ps && !ps.isBot && !ps.left && ps.alive) eligible.add(ps.playerId);
+      }
+      return eligible;
+    }
+    if (!plan || !uniteResult || uniteResult.synthetic
       || (uniteResult.reason && !['cleared', 'timeout'].includes(uniteResult.reason))) return eligible;
     for (const ps of plan.helpers || []) {
       const normal = this.lastResults.get(ps.playerId);

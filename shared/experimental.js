@@ -3,6 +3,7 @@ import { MAX_SEATS } from './constants.js';
 import { isPlayerCapacity, roomCapacity } from './playerCapacity.js';
 import { canonicalPoolPlan, isPoolPlan } from './poolPlan.js';
 
+// 维护者 2026-11-05：救援（10 血换 1 血）**默认开启**，并且不再要求进入联防。
 export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disableSharedPool: false });
 /**
  * Optional booleans: absent when off, so an ordinary room, a saved room and a queue key keep their old shape.
@@ -52,7 +53,9 @@ export function isExperimental(value) {
 export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
   if (!isExperimental(value)) throw new TypeError('invalid experimental options');
   const capacity = roomCapacity('coop', value);
-  return Object.freeze({ revivalEnabled: value.revivalEnabled, disableSharedPool: value.disableSharedPool && !value.poolPlan,
+  // 维护者 2026-11-05：救援默认开启，而且**不要求进入联防** —— 任何活着的队友都能付救援
+  return Object.freeze({ revivalEnabled: value.revivalEnabled === true, revivalAnyDonor: value.revivalAnyDonor !== false,
+    disableSharedPool: value.disableSharedPool && !value.poolPlan,
     ...(capacity === MAX_SEATS ? {} : { playerCapacity: capacity }),
     // Optional and false by default: ordinary rooms and legacy DTOs keep their two-flag shape.
     ...(capacity > MAX_SEATS && value.disableDuckLord === true ? { disableDuckLord: true } : {}),
