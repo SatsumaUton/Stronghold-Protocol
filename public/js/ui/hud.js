@@ -554,7 +554,9 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   // 深潜不用另开一条悬浮状态条挡住 HUD，玩家看到的那个数就是深度）。普通房 echo 为 null，行为不变。
   const diveDepth = Number(pub?.echo?.diveStart) > 0 ? Number(pub?.echo?.depth) || 0 : 0;
   const inDive = diveDepth > 0;
-  const roundText = hidden ? '??' : inDive ? String(diveDepth) : pub?.round > 0 ? String(pub.round) : '--';
+  // 深潜里**永远显示深度**：15 层是隐藏核心回合（原版用 ?? 藏住回合数），
+  // 但深潜的深度是玩家成绩，没有任何隐藏的理由（维护者 2026-11-05 反馈「15 回合显示 ?？」）。
+  const roundText = inDive ? String(diveDepth || '--') : hidden ? '??' : pub?.round > 0 ? String(pub.round) : '--';
   // a spectator seat (no m.private, community report #26) never readies
   const showReady = phase === PHASE.PREP && !spectator && priv?.alive !== false;
   // boss rounds: the overtime warning follows the clock (4 Hz while live; frozen while paused)
