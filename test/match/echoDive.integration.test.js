@@ -363,6 +363,38 @@ test('固定回合加诅咒、回合诅咒逐回合刷、锈蚀销毁装备', (t
   assert.equal(piece.items.length, 1, '少了一件装备');
 });
 
+// 维护者 2026-11-05：部署禁令——「封锁」封地块、「排异」禁盟约（同构体授予的盟约也算）。
+test('部署禁令：封锁地块 / 排异盟约，且只拦新上场不拦移动', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+
+  m.round = 7;
+  m.startRound(8);                                     // 深度 8 = 封锁
+  assert.ok(m.echoCurseIds.includes('block_tiles'), '深度 8 固定加「封锁」');
+  assert.equal(m.echoBannedTiles.length, 3, '封 3 个地块');
+  const banned = m.echoBannedTiles[0];
+  assert.match(String(m._echoDeployBlocked({ kind: 'chess' }, banned, true) || ''), /封锁/);
+  const free = '3,3';
+  assert.equal(m.echoBannedTiles.includes(free), false);
+  assert.equal(m._echoDeployBlocked({ kind: 'chess' }, free, true), null, '没被封的地块可以放');
+
+  // 排异：挑一个真实干员，它带某个盟约
+  const chessRaw = m.gd.raw?.chess || {};
+  const pair = Object.entries(chessRaw).find(([, rec]) => Array.isArray(rec?.bonds) && rec.bonds.length && m.gd.bond(rec.bonds[0]));
+  assert.ok(pair, '数据里至少要有一个带盟约的干员');
+  const [chessId, rec] = pair;
+  m.echoBannedBond = rec.bonds[0];
+  const piece = { kind: 'chess', id: chessId, items: [] };
+  assert.match(String(m._echoDeployBlocked(piece, free, true) || ''), /排异/, '排异盟约的干员不能上场');
+  assert.equal(m._echoDeployBlocked(piece, free, false), null, '已经在场上的干员移动不受限');
+
+  // 公开视图要带上禁令，客户端才能高亮
+  const pub = m._echoPublic();
+  assert.deepEqual(pub.bans.tiles, m.echoBannedTiles);
+  assert.equal(pub.bans.bond, m.echoBannedBond);
+});
+
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。

@@ -81,6 +81,10 @@ export const MATCH_FIELDS = Object.freeze({
     'echoVariant', 'echoDiveStart', 'echoWordsActive', 'echoBlessingDraws', 'echoBlessings', 'echoBlessingOffer',
     // 挑战关未达成累积的诅咒 id 列表（2026-11-05，见 match/echoCurse.js）；同样纯追加，旧存档缺这项时用空数组。
     'echoCurseIds',
+    // 本回合随机刷新的诅咒（2026-11-05）；读档后从下一回合重新刷
+    'echoRoundCurse',
+    // 部署禁令（2026-11-05）：被封锁的地块与被排异的盟约，读档不能丢，否则玩家可以靠重连绕过
+    'echoBannedTiles', 'echoBannedBond',
   ]),
   special: Object.freeze([
     'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'poolGroups', 'playerItemPools',

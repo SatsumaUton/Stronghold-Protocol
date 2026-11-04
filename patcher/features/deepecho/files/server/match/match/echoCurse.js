@@ -23,7 +23,7 @@ export const ECHO_CURSE_PREFIX = 'echo:curse:';
 export const ECHO_CURSE_LIVE_KINDS = Object.freeze([
   'wordCap', 'coinMul', 'freeRefresh', 'timeMul', 'budgetMul',
   'enemyAtkMul', 'enemyHpMul', 'bountyCoin', 'blessingMax', 'intel',
-  'unitMods', 'destroyEquip', 'blackout',
+  'unitMods', 'destroyEquip', 'blackout', 'deployBan', 'bondBan',
 ]);
 
 /**
@@ -107,6 +107,15 @@ export const ECHO_CURSES = Object.freeze([
     effect: Object.freeze({ kind: 'unitMods', value: 0 }),
     filter: Object.freeze({ position: 'REMOTE' }), unitMods: Object.freeze({ batPct: 0.08 }),
   }),
+  // ---- 部署禁令（2026-11-05，维护者要求）：改的是「能不能落子」，由 placement.js 拦 ----
+  Object.freeze({
+    id: 'block_tiles', name: '封锁', desc: '随机 3 个地块无法部署干员', live: true, rarity: 'epic',
+    effect: Object.freeze({ kind: 'deployBan', value: 3 }),
+  }),
+  Object.freeze({
+    id: 'block_bond', name: '排异', desc: '随机一个盟约的干员无法部署（同构体改变后仍受限）', live: true, rarity: 'epic',
+    effect: Object.freeze({ kind: 'bondBan', value: 1 }),
+  }),
 ]);
 
 /**
@@ -138,7 +147,9 @@ export const ECHO_ROUND_CURSES = Object.freeze([
  */
 export const ECHO_FIXED_CURSE_ROUNDS = Object.freeze({
   6: 'tribute',
+  8: 'block_tiles',     // 第一次部署禁令：封 3 个地块
   10: 'swarm',
+  12: 'block_bond',     // 第二次：排异一个盟约（同构体也算）
   14: 'frenzy',
   18: 'silence',
   22: 'fog',

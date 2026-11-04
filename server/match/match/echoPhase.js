@@ -20,6 +20,7 @@ import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR } from '../../../shared/constants.js';
 import { msg } from '../../../shared/i18n.js';
 import { hiddenEligible } from '../finalAssault.js';
+import { pieceBonds } from '../bondsMeta.js';
 import { roundPick } from '../waves.js';
 import { FLOW_TICKER_PRIORITY, OK, fail } from './common.js';
 
@@ -452,6 +453,13 @@ export class MatchEcho {
     if (fixed) {
       if (!Array.isArray(this.echoCurseIds)) this.echoCurseIds = [];
       if (!this.echoCurseIds.includes(fixed)) this.echoCurseIds.push(fixed);
+      // 部署禁令类诅咒：光记 id 没用，必须**当场算出**被封的地块 / 被排异的盟约
+      const kind = echoCurseById(fixed)?.effect?.kind;
+      if (kind === 'deployBan') {
+        this._echoApplyDeployBan(echoCurseById(fixed).effect.value, createRng(deriveSeed(this.seed, `echo:deployban:${r}`)));
+      } else if (kind === 'bondBan') {
+        this._echoApplyBondBan(createRng(deriveSeed(this.seed, `echo:bondban:${r}`)));
+      }
     }
     const rng = createRng(deriveSeed(this.seed, `echo:rcurse:${r}`));
     const pick = pickRoundCurse(depth, rng);
@@ -474,6 +482,69 @@ export class MatchEcho {
     piece.items.splice(idx, 1);
     ps.dirty?.();
     return 1;
+  }
+
+  /** 诅咒「封锁」：从当前可部署地块里随机封掉 n 个（抽不到就少封，不硬造格子）。 */
+  _echoApplyDeployBan(count = 3, rng = () => 0.5) {
+    const ps = this.alivePlayers()[0];
+    let keys = [];
+    try {
+      const map = ps && typeof ps.deployMap === 'function' ? ps.deployMap() : null;
+      if (map && typeof map.keys === 'function') keys = [...map.keys()];
+      else if (Array.isArray(map)) keys = map.slice();
+    } catch { keys = []; }
+    if (!keys.length) { this.echoBannedTiles = []; return 0; }
+    const pool = keys.slice();
+    const out = [];
+    const n = Math.max(0, Math.floor(Number(count) || 0));
+    while (out.length < n && pool.length) {
+      const at = Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length));
+      out.push(pool.splice(at, 1)[0]);
+    }
+    this.echoBannedTiles = out;
+    return out.length;
+  }
+
+  /**
+   * 诅咒「排异」：从场上已有的盟约里随机禁掉一个。
+   * 用 `pieceBonds`（bondsMeta）算，所以**同构体授予的盟约也算在内** —— 维护者要求「同构体改变的干员也受影响」。
+   */
+  _echoApplyBondBan(rng = () => 0.5) {
+    const seen = new Set();
+    for (const ps of this.alivePlayers()) {
+      for (const p of (ps.board ? ps.board.values() : [])) {
+        if (!p || p.kind !== 'chess') continue;
+        try { for (const b of (pieceBonds(this.gd, p, this.rules) || [])) seen.add(b); } catch { /* 数据缺失跳过 */ }
+      }
+    }
+    const list = [...seen].filter((b) => this.gd.bond(b));
+    if (!list.length) { this.echoBannedBond = null; return null; }
+    this.echoBannedBond = list[Math.min(list.length - 1, Math.floor((Number(rng()) || 0) * list.length))];
+    return this.echoBannedBond;
+  }
+
+  /**
+   * 落子前的否决（`player/placement.js` 调）。
+   *
+   * @param {any} piece 要落下的棋子
+   * @param {string} key 目标地块 `r,c`
+   * @param {boolean} fromHand true = 从手牌/暂存新上场（盟约排异只拦这一类，不拦已上场干员的移动）
+   * @returns {string|null} 非空 = 禁止，值是原因
+   */
+  _echoDeployBlocked(piece, key, fromHand = false) {
+    if (this.echoVariant !== 'deepecho') return null;
+    if (Array.isArray(this.echoBannedTiles) && this.echoBannedTiles.includes(key)) {
+      return '深渊封锁：这个地块无法部署';
+    }
+    if (fromHand && this.echoBannedBond && piece && piece.kind === 'chess') {
+      let bonds = [];
+      try { bonds = pieceBonds(this.gd, piece, this.rules) || []; } catch { bonds = []; }
+      if (bonds.includes(this.echoBannedBond)) {
+        const name = this.gd.bond(this.echoBannedBond)?.name || this.echoBannedBond;
+        return `深渊排异：【${name}】干员无法部署`;
+      }
+    }
+    return null;
   }
 
   /** 战斗时限倍率（「滞重」= 0.9）。 */
@@ -574,6 +645,12 @@ export class MatchEcho {
       // 备战阶段的聚合情报（威胁值 / 是否精英 / 空中数量）；非深潜回合为 null
       curses: this._echoCurses(),
       rules: this._echoFixedRules(),
+      // 部署禁令（2026-11-05）：客户端据此把地块标成禁放 / 把盟约标成排异
+      bans: {
+        tiles: Array.isArray(this.echoBannedTiles) ? this.echoBannedTiles : [],
+        bond: this.echoBannedBond || null,
+        bondName: this.echoBannedBond ? (this.gd.bond(this.echoBannedBond)?.name || this.echoBannedBond) : null,
+      },
       intel: this._echoIntel(),
       // 无尽模式：没有「最大回合」可展示，只暴露安全阀（客户端不必显示它）
       safeRound: ECHO_SAFE_ROUND,

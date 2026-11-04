@@ -51,6 +51,8 @@ test('echoCurseEffects：每条诅咒的效果都算得出来（没有空转的�
       continue;
     }
     if (c.effect.kind === 'destroyEquip') continue;
+    // 部署禁令类不进数值包，由 placement.js / _echoDeployBlocked 消费
+    if (c.effect.kind === 'deployBan' || c.effect.kind === 'bondBan') continue;
     const e = echoCurseEffects([c.id]);
     assert.deepEqual(e.pending, [], `${c.id} 必须是已接入的（不该进 pending）`);
     const changed = e.wordCap !== neutral.wordCap
