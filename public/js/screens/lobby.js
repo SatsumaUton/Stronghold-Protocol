@@ -1094,30 +1094,47 @@ export function EchoSelect({ onClose, onStart }) {
                 onClick=${() => setBoardOpen(!boardOpen)}>${boardOpen ? t('收起') : t('展开')}</button>
             </div>
             ${boardOpen ? html`<ol class="echo-boardlist" aria-label=${t('排行榜')}>
+              <li class="echo-boardhead__cols" aria-hidden="true">
+                <span>#</span><span>${t('层数')}</span><span>${t('玩家')}</span><span>${t('核心盟约')}</span><span>${t('最高盟约数')}</span><span>${t('通关时间')}</span>
+              </li>
               ${rows == null
                 ? html`<li class="echo-board__state">${t('读取中…')}</li>`
                 : rows.length
-                  ? rows.map((r) => html`<li key=${r.member} class=${`echo-rank${r.rank <= 3 ? ` is-top is-top${r.rank}` : ''}`}>
-                      <button type="button" class="echo-row" aria-expanded=${openRow === r.member ? 'true' : 'false'}
+                  ? rows.map((r) => {
+                    // 维护者 2026-11-05 定的五列：层数 / 玩家（全部写出）/ 核心盟约 / 最高盟约数 / 通关时间
+                    const squads = Array.isArray(r.squads) && r.squads.length ? r.squads : null;
+                    const names = squads ? squads.map((s) => s.name) : (Array.isArray(r.players) ? r.players : []);
+                    const cores = [...new Set(squads ? squads.flatMap((s) => (Array.isArray(s.cores) ? s.cores : [])) : [])];
+                    const maxBonds = Number(r.maxBonds) || 0;
+                    const secs = Math.max(0, Math.floor((Number(r.clearMs) || 0) / 1000));
+                    const time = r.clearMs > 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '—';
+                    return html`<li key=${r.member} class=${`echo-rank${r.rank <= 3 ? ` is-top is-top${r.rank}` : ''}`}>
+                      <button type="button" class="echo-row echo-row--cols" aria-expanded=${openRow === r.member ? 'true' : 'false'}
                         onClick=${() => setOpenRow(openRow === r.member ? null : r.member)}>
                         <b class="echo-rank__no num">${r.rank}</b>
                         <span class="echo-rank__depth"><b class="num">${r.depth}</b><i>${t('层')}</i></span>
-                        <span class="echo-rank__meta">${(Array.isArray(r.players) && r.players.length ? r.players.slice(0, 2).join('、') + (r.players.length > 2 ? ` 等${r.players.length}人` : '') : r.roomCode || '----')} · ${r.at ? new Date(r.at).toLocaleDateString() : '—'}</span>
-                        <i class="echo-row__more" aria-hidden="true">${openRow === r.member ? '▾' : '▸'}</i>
+                        <span class="echo-rank__players">${names.length ? names.join('、') : (r.roomCode || '----')}</span>
+                        <span class="echo-rank__cores" title=${cores.join('、')}>${cores.length ? cores.join('、') : '—'}</span>
+                        <span class="echo-rank__bonds num" title=${t('所有人里用过的盟约数量最多的一位')}>${maxBonds || '—'}</span>
+                        <span class="echo-rank__time num">${time}</span>
                       </button>
                       ${openRow === r.member ? html`<div class="echo-detail">
                         <div><span>${t('深度')}</span><b>${r.depth}</b></div>
                         <div><span>${t('难度')}</span><b>${t(DIFFICULTY_NAMES[r.difficulty] || r.difficulty || '—')}</b></div>
                         <div><span>${t('结果')}</span><b>${r.victory ? t('通关') : t('团灭')}</b></div>
+                        <div><span>${t('通关时间')}</span><b>${time}</b></div>
                         ${/* 「到达回合」与「队伍」原来总是显示 —/未记录：服务端根本没发这两个字段，
                               留着只是噪音（维护者 2026-11-04）。有数据才显示。 */ null}
-                        ${Array.isArray(r.players) && r.players.length
-                          ? html`<div class="echo-detail__full"><span>${t('队伍')}</span><b>${r.players.join('、')}</b></div>`
+                        ${names.length
+                          ? html`<div class="echo-detail__full"><span>${t('玩家')}</span><b>${names.join('、')}</b></div>`
                           : null}
-                        ${Array.isArray(r.players) && r.players.length ? html`<div class="echo-detail__full"><span>${t('玩家')}</span><b>${r.players.join('、')}</b></div>` : null}
+                        ${squads
+                          ? html`<div class="echo-detail__full"><span>${t('核心盟约')}</span><b>${squads.map((s) => `${s.name}：${(s.cores || []).join('、') || '—'}（${s.bonds || 0} 个盟约）`).join(' ｜ ')}</b></div>`
+                          : null}
                         <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'} · ${r.at ? new Date(r.at).toLocaleString() : '—'}</b></div>
                       </div>` : null}
-                    </li>`)
+                    </li>`;
+                  })
                   : html`<li class="echo-board__state echo-board__state--empty">
                       <${Icon} name="target" class="echo-board__glyph" />
                       <b>${failed ? t('排行榜暂时不可用') : t('这一档还没有人留下深度记录')}</b>
