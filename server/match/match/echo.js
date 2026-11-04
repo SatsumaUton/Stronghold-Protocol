@@ -59,7 +59,7 @@ export const ECHO_SAFE_ROUND = 999;
  * 但玩家手上还有**干员 / 策略 / 选项**给的刷新，封在 2 会把它们一起吃掉。
  * 5 既能容纳那些正当来源，又不会回到「无限刷新」。
  */
-export const ECHO_MAX_FREE_REFRESH = 5;
+export const ECHO_MAX_FREE_REFRESH = 2;
 
 /**
  * 挑战关（深度 5 / 10）的奖励线：全队清怪率 ≥ 这个百分比 → 全队 +1 次祝福三选一。

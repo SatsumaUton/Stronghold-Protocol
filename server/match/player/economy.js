@@ -82,6 +82,8 @@ export class PlayerEconomy {
   _shopBanned(id) {
     const m = this.m;
     if (!m) return false;
+    // 判定只有一处（Match._shopChessBanned），商店这边只是复用
+    if (typeof m._shopChessBanned === 'function') return m._shopChessBanned(id);
     if (Array.isArray(m.bannedChess) && m.bannedChess.includes(id)) return true;
     const c = this.gd.chess(id);
     const bonds = c && Array.isArray(c.bonds) ? c.bonds : [];

@@ -9,7 +9,7 @@
 //
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
-import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
+import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_MAX_FREE_REFRESH, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
 import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js';
 import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
@@ -31,7 +31,7 @@ export class MatchEcho {
    * 免费刷新来自选项事件 / 效果（不按层数给），但会随回合数累积 —— 打到 30 层就可能攒出几十次白嫖。
    * 这里只在**深潜**里每回合开始裁一次；普通房间的 freeRefreshes 一行都不碰。
    */
-  static MAX_FREE_REFRESH = 3;
+  static MAX_FREE_REFRESH = ECHO_MAX_FREE_REFRESH;
   /**
    * 这一回合是不是深潜回合。
    *
@@ -503,6 +503,23 @@ export class MatchEcho {
     const run = echoCurseEffects(this.echoCurseIds);
     const round = this.echoRoundCurse ? echoCurseEffects([this.echoRoundCurse]) : null;
     return round ? mergeCurseEffects(run, round) : run;
+  }
+
+  /**
+   * 商店条目的禁用判定（**所有房间通用**，不限深潜）：
+   * 在 `bannedChess` 里，或「所有盟约都在 disabledBonds / staticInactiveBonds 里」。
+   *
+   * 池子本身不会给出禁用干员，但几条旁路（自选补位、出售回填、装备特殊刷新）是直接
+   * `setShopSlot` 塞进去的 —— 这里给它们同一道闸（维护者 2026-11-05：和原版一样，
+   * 被禁用的干员不可能出现在商店）。
+   */
+  _shopChessBanned(id) {
+    if (Array.isArray(this.bannedChess) && this.bannedChess.includes(id)) return true;
+    const c = this.gd && typeof this.gd.chess === 'function' ? this.gd.chess(id) : null;
+    const bonds = c && Array.isArray(c.bonds) ? c.bonds : [];
+    if (!bonds.length) return false;
+    const off = new Set([...(this.disabledBonds || []), ...(this.staticInactiveBonds || [])]);
+    return bonds.every((b) => off.has(b));
   }
 
   /** 商店加价倍率（诅咒「通胀 / 暴利」）：`player/economy.js` 的 priceOf 消费它。 */

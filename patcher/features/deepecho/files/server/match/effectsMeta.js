@@ -600,7 +600,8 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
         // 「深渊回响」：免费刷新**总量**封顶（同 MatchEcho.MAX_FREE_REFRESH）。
         // 深潜里盟约层数高，按层数触发的效果（奇迹 每 100 层 +1 次）会把它变成无限刷新，
         // 所以在授予的那一刻就压住，而不是等回合末再夹（维护者 2026-11-03）。
-        if (m.echoVariant === 'deepecho') ps.shop.freeRefreshes = Math.min(ps.shop.freeRefreshes, 5);
+        // 上限统一由 MatchEcho._echoFreeRefreshCap() 决定（深潜常量 + 诅咒修正），不要再各自写死数字
+        if (m.echoVariant === 'deepecho' && typeof m._echoFreeRefreshCap === 'function') ps.shop.freeRefreshes = Math.min(ps.shop.freeRefreshes, m._echoFreeRefreshCap());
         ps.dirty();
       }
       return ps.shop.freeRefreshes;
@@ -728,6 +729,11 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
       if (slot == null) { ps.shop.slots[i] = null; ps.dirty(); return true; }
       const kind = slot.kind === 'item' ? 'item' : 'chess';
       if (kind === 'chess' ? !gd.chess(slot.id) : !gd.item(slot.id)) return false;
+      // 被禁用的干员不可能出现在商店（和原版一致）：旁路塞进来的直接拒绝并记日志
+      if (kind === 'chess' && m && typeof m._shopChessBanned === 'function' && m._shopChessBanned(slot.id)) {
+        m.log?.warn?.(`[shop] banned chess rejected (setShopSlot): ${slot.id} (player=${ps.playerId}, round=${m.round})`);
+        return false;
+      }
       const basePrice = Number.isFinite(slot.price) ? Math.max(0, Math.trunc(slot.price)) : kind === 'chess' ? gd.chessPrice(slot.id) : gd.itemPrice(slot.id);
       ps.shop.slots[i] = { kind, id: slot.id, basePrice, frozen: !!slot.frozen, sold: false };
       ps.dirty();

@@ -1003,3 +1003,39 @@ test('禁用干员有最后一道闸：绕过池子塞进来也会被换掉', (t
   assert.equal(ok?.id, legalId, '合法干员照常');
   ps.pool.roll = orig;
 });
+// 维护者 2026-11-05：①被禁用的干员不可能出现在商店（旁路也一样）；②免费刷新深潜里最多 2 次。
+test('禁用干员：所有旁路都过同一道闸（_shopChessBanned）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const bannedId = (m.bannedChess || [])[0];
+  assert.ok(bannedId, '本局要至少有一个禁用干员');
+  assert.equal(m._shopChessBanned(bannedId), true, 'bannedChess 里的要拦住');
+
+  const off = new Set([...(m.disabledBonds || []), ...(m.staticInactiveBonds || [])]);
+  const allOff = Object.keys(m.gd.raw.chess).find((id) => {
+    const bs = (m.gd.chess(id)?.bonds) || [];
+    return bs.length > 0 && bs.every((b) => off.has(b));
+  });
+  if (allOff) assert.equal(m._shopChessBanned(allOff), true, '所有盟约被禁的也要拦');
+
+  const legal = Object.keys(m.gd.raw.chess).find((id) => !(m.bannedChess || []).includes(id));
+  assert.equal(m._shopChessBanned(legal), false, '合法干员不能被误拦');
+});
+
+test('免费刷新：深潜上限 2 次，回合开始夹住，诅咒可以再压低', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  assert.equal(m._echoFreeRefreshCap(), 2, '深潜上限 = 2（不再累积）');
+  const ps = m.alivePlayers()[0];
+  ps.shop.freeRefreshes = 9;
+  m.round = 4;
+  m.startRound(5);
+  assert.equal(ps.shop.freeRefreshes, 2, '回合开始被夹到 2');
+  m.echoCurseIds = ['drought'];                        // 枯竭：−1
+  assert.equal(m._echoFreeRefreshCap(), 1);
+  ps.shop.freeRefreshes = 9;
+  m._echoClampFreeRefreshes();
+  assert.equal(ps.shop.freeRefreshes, 1, '诅咒生效后上限变 1');
+});
