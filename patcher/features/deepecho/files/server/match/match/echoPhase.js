@@ -616,7 +616,42 @@ export class MatchEcho {
     const list = [...seen].filter((b) => this.gd.bond(b));
     if (!list.length) { this.echoBannedBond = null; return null; }
     this.echoBannedBond = list[Math.min(list.length - 1, Math.floor((Number(rng()) || 0) * list.length))];
+    // 已经上场的同盟约干员**当场收回修正区**（2026-11-05 维护者要求）：
+    // 排异不是「不让你动」，而是「这个人不能再上战场」。
+    const moved = this._echoWithdrawBannedBond();
+    if (moved) this._echoPushAnnounce(`排异：${moved} 名干员被收回`);
     return this.echoBannedBond;
+  }
+
+  /** 把场上所有带「被排异盟约」的干员收回手牌/暂存区。@returns {number} 收回人数 */
+  _echoWithdrawBannedBond() {
+    const bond = this.echoBannedBond;
+    if (!bond) return 0;
+    let n = 0;
+    for (const ps of this.alivePlayers()) {
+      if (!ps || !ps.board) continue;
+      for (const [key, p] of [...ps.board.entries()]) {
+        if (!p || p.kind !== 'chess') continue;
+        let bonds = [];
+        try { bonds = pieceBonds(this.gd, p, this.rules) || []; } catch { bonds = []; }
+        if (!bonds.includes(bond)) continue;
+        if (this._echoWithdrawPiece(ps, key)) n += 1;
+      }
+    }
+    return n;
+  }
+
+  /** 把一个干员从棋盘收回容器（手牌/暂存）。满了就放回原位并返回 0。 */
+  _echoWithdrawPiece(ps, key) {
+    const piece = ps.board.get(key);
+    if (!piece || piece.kind !== 'chess') return 0;
+    ps.board.delete(key);
+    ps.removeTokensOf?.(piece.uid);
+    const ok = typeof ps.stow === 'function' ? ps.stow(piece, { allowTemp: true }) : false;
+    if (!ok) { ps.board.set(key, piece); return 0; }
+    ps.recompute?.();
+    ps.dirty?.();
+    return 1;
   }
 
   /**
@@ -632,12 +667,13 @@ export class MatchEcho {
     if (Array.isArray(this.echoBannedTiles) && this.echoBannedTiles.includes(key)) {
       return '深渊封锁：这个地块无法部署';
     }
-    if (fromHand && this.echoBannedBond && piece && piece.kind === 'chess') {
+    if (this.echoBannedBond && piece && piece.kind === 'chess') {
       let bonds = [];
       try { bonds = pieceBonds(this.gd, piece, this.rules) || []; } catch { bonds = []; }
       if (bonds.includes(this.echoBannedBond)) {
         const name = this.gd.bond(this.echoBannedBond)?.name || this.echoBannedBond;
-        return `深渊排异：【${name}】干员无法部署`;
+        // 新上场说「无法部署」，已经在场的说「无法行动」（正常会被收回，这里兜底手牌满的情况）
+        return fromHand ? `深渊排异：【${name}】干员无法部署` : `深渊排异：【${name}】干员无法行动`;
       }
     }
     return null;

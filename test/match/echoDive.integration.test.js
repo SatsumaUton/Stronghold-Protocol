@@ -364,7 +364,7 @@ test('固定回合加诅咒、回合诅咒逐回合刷、锈蚀销毁装备', (t
 });
 
 // 维护者 2026-11-05：部署禁令——「封锁」封地块、「排异」禁盟约（同构体授予的盟约也算）。
-test('部署禁令：封锁地块 / 排异盟约，且只拦新上场不拦移动', (t) => {
+test('部署禁令：封锁地块 / 排异盟约（新上场与场上行动都拦）', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
@@ -387,7 +387,8 @@ test('部署禁令：封锁地块 / 排异盟约，且只拦新上场不拦移�
   m.echoBannedBond = rec.bonds[0];
   const piece = { kind: 'chess', id: chessId, items: [] };
   assert.match(String(m._echoDeployBlocked(piece, free, true) || ''), /排异/, '排异盟约的干员不能上场');
-  assert.equal(m._echoDeployBlocked(piece, free, false), null, '已经在场上的干员移动不受限');
+  // 2026-11-05 修订：已经上场的也不能再移动/转向（会被收回修正区；手牌满时靠这条兜底）
+  assert.match(String(m._echoDeployBlocked(piece, free, false) || ''), /无法行动/, '场上也不能再动');
 
   // 公开视图要带上禁令，客户端才能高亮
   const pub = m._echoPublic();
@@ -559,6 +560,39 @@ test('腐蚀：全图持续伤害每秒扣己方最大生命的比例', (t) => {
   const hs = {};
   h2.m._echoHookBattle({ on: (n, cb) => { hs[n] = cb; }, allyUnits: [], dealHPLose: () => {}, addBuff: () => {} });
   assert.equal(hs.tick, undefined);
+});
+
+// 维护者 2026-11-05：排异不是「不让你动」——已经上场的同盟约干员要**当场收回修正区**。
+test('排异：已上场的同盟约干员被收回手牌，且之后不能再移动/转向', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  const chessRaw = m.gd.raw?.chess || {};
+  const pair = Object.entries(chessRaw).find(([, rec]) => Array.isArray(rec?.bonds) && rec.bonds.length && m.gd.bond(rec.bonds[0]));
+  assert.ok(pair, '数据里要有带盟约的干员');
+  const [chessId, rec] = pair;
+  const bond = rec.bonds[0];
+
+  const piece = { kind: 'chess', id: chessId, items: [], uid: 9001, dir: 'RIGHT' };
+  ps.board.set('8,5', piece);
+  const handBefore = ps.hand.length;
+
+  m.echoCurseIds = ['block_bond'];
+  const picked = m._echoApplyBondBan(() => 0);          // rng 0 = 取第一个盟约（就是刚摆上去这个）
+  assert.equal(picked, bond);
+  assert.equal(m.echoBannedBond, bond);
+  assert.equal(ps.board.has('8,5'), false, '场上的该干员被收回');
+  assert.ok(ps.hand.some((p) => p && p.uid === 9001), '进了手牌（修正区）');
+  assert.ok(ps.hand.length >= handBefore, '手牌数量没有丢卡');
+
+  // 手牌满也不丢卡：暂存区是「可扩展队列」，会进 temp（维护者 2026-11-05 要求先收回再说）
+  ps.hand.fill({ kind: 'chess', id: chessId, items: [], uid: 1 });
+  ps.board.set('7,5', { kind: 'chess', id: chessId, items: [], uid: 9002 });
+  assert.equal(m._echoWithdrawPiece(ps, '7,5'), 1, '手牌满也能收回（进暂存）');
+  assert.equal(ps.board.has('7,5'), false);
+  assert.ok([...ps.hand, ...(Array.isArray(ps.temp) ? ps.temp : [])].some((p) => p && p.uid === 9002), '卡还在玩家手里');
+  assert.match(String(m._echoDeployBlocked({ kind: 'chess', id: chessId, items: [] }, '7,5', false) || ''), /无法行动/, '回收后也不能再动');
 });
 
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
