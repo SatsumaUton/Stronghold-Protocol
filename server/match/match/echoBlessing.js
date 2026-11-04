@@ -103,7 +103,7 @@ export const ECHO_BLESSINGS = Object.freeze([
   // 只能清掉**对局中累积**的诅咒（`echoCurseIds`：挑战关失败降下的「侵蚀」等）。
   // 奇迹·诅咒 / 远见·诅咒是深渊的固定限制（`_echoCurses()` 里的两条），**永远消不掉** ——
   // 否则「免费刷新上限」「按层给钱到 999 层」会随着祝福一起被洗掉，等于没有诅咒。
-  { id: 'cleanse', rarity: 'rare', name: '净化', desc: '立刻移除 1 层诅咒（任意稀有度；固定的奇迹 / 远见不受影响）', kind: 'cleanse', group: 'cleanse', curseRemove: 1 },
+  { id: 'cleanse', rarity: 'epic', name: '净化', desc: '立刻移除 1 层诅咒（任意稀有度；固定的奇迹 / 远见不受影响）', kind: 'cleanse', group: 'cleanse', curseRemove: 1 },
   { id: 'cleanse_all', rarity: 'epic', name: '涤罪', desc: '立刻移除所有**普通**诅咒（稀有 / 传说保留；固定的奇迹 / 远见不受影响）', kind: 'cleanse', group: 'cleanse', curseRemove: 'common' },
 
   // —— 克制祝福（2026-11-05，维护者要求）：每个诅咒都能被对应的祝福抵消 ——
