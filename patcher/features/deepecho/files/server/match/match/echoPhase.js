@@ -566,7 +566,7 @@ export class MatchEcho {
     return Math.min(limit, Math.max(0, adj));
   }
 
-  /** 免费刷新上限：奇迹·诅咒的 3 次，再被「枯竭」这类减（最低 0）。 */
+  /** 免费刷新上限：奇迹·诅咒的 `ECHO_MAX_FREE_REFRESH`（当前 5）次，再被「枯竭」这类减（最低 0）。 */
   _echoFreeRefreshCap() {
     // 用常量而不是 MatchEcho.MAX_FREE_REFRESH：后者在静态初始化顺序变化时会变成 undefined，
     // 于是 Math.max(0, NaN) = NaN，所有 Math.min(NaN, x) 的钳制**静默失效**（维护者 2026-11-05 实测）。
