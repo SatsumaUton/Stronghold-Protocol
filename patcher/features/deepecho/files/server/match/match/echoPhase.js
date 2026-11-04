@@ -878,6 +878,23 @@ export class MatchEcho {
       if (only.has(key) || only.has(base)) continue;
       keep.push(s);
     }
+    // 「频次怪」再硬限一次：整波只留 1 条、每条最多 2 只（防止模板/旁路成片带出来）
+    try {
+      const hit = echoHitCountEnemy(this.gd);
+      if (hit && hit.size) {
+        let seenHit = false;
+        const lim = [];
+        for (const s of keep) {
+          const base = String(s && s.enemyKey || '').replace(/^.*:/, '');
+          if (!hit.has(base)) { lim.push(s); continue; }
+          if (seenHit) continue;
+          seenHit = true;
+          lim.push({ ...s, count: Math.min(Math.max(1, Number(s.count) || 1), 2) });
+        }
+        if (lim.length !== keep.length) { keep.length = 0; keep.push(...lim); }
+        else for (let i = 0; i < keep.length; i++) keep[i] = lim[i];
+      }
+    } catch { /* 兜底失败不影响出怪 */ }
     const removed = wave.spawns.length - keep.length;
     if (removed > 0) {
       wave.spawns = keep;

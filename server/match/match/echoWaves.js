@@ -523,13 +523,15 @@ export function echoRandomWave(gd, tpl, opts, rng, helpers) {
   let hitSeen = false;   // 本波是否已经出现过「频次怪」
   // 「频次怪」（按攻击次数结算）血量再打个折（维护者 2026-11-05）：玩家清不掉的主因是它们血厚且扎堆。
   const hitCount = echoHitCountEnemy(gd);
-  const hitMul = (key) => (hitCount.has(key) ? ECHO_HITCOUNT_HP_MUL : 1);
+  // 「频次怪」的 maxHp 其实是**需要打几下**，按深度乘血会变成几千下打不死 ——
+  // 所以它们的 hpMul 直接锁在 1（不再吃深度缩放），只保留祭坛祝福那类正向加成。
+  const hitMul = (key) => (hitCount.has(key) ? 1 : 1);
   const modsOf = (key) => {
     const base = typeof roundMods === 'function'
       ? { ...roundMods(scale), slot: classOf(gd, key) }
       : { hpMul: scale.hpMul, atkMul: scale.atkMul, speedMul: scale.speedMul, slot: classOf(gd, key) };
-    const k = hitMul(key);
-    return k === 1 ? base : { ...base, hpMul: (Number(base.hpMul) || 1) * k };
+    if (hitCount.has(key)) return { ...base, hpMul: 1 };   // 频次怪不吃深度血量缩放
+    return base;
   };
 
   // ---- 目标形状：原版该回合的形状 × 深度增幅 --------------------------------
