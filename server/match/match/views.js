@@ -329,8 +329,11 @@ export class MatchViews {
         out = list.filter((e) => !(e && (e.tag === 'boss' || e.boss === true)));
       }
     } catch { out = list; }
+    // 悬赏目标只在**16 层以后**才隐藏成「?」占位（维护者 2026-11-05：
+    // 1–13 层的悬赏是玩家自己选的目标，准备阶段要照常显示真身）。
+    const hideBounty = this._echoDepth(this.round) >= 16;
     for (const e of out) {
-      if (e && e.source === 'bounty') e.enemyKey = 'enemy_unknown';
+      if (hideBounty && e && e.source === 'bounty') e.enemyKey = 'enemy_unknown';
     }
     return out;
   }
