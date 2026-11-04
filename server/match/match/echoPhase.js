@@ -1374,7 +1374,16 @@ export class MatchEcho {
    */
   _echoOpenSupply() {
     if (this.echoVariant !== 'deepecho') return 0;
-    if (this._echoDepth(this.round) < 16) return 0;
+    const depth = this._echoDepth(this.round);
+    if (depth < 16) return 0;
+    // 不是每层都给（维护者 2026-11-05）：做成**随机触发**的补给事件，
+    // 平均每 3 层左右来一次；boss 返场层不触发。
+    if (this.bossWaves) return 0;
+    // 随机触发 + 保底间隔：连续 4 层没出就一定给一次（避免脸黑整局都没有）
+    const last = Number(this.echoSupplyLastDepth) || 0;
+    const forced = last > 0 && depth - last >= 4;
+    if (!forced && (Number(this.rngWaves()) || 0) >= 0.34) return 0;
+    this.echoSupplyLastDepth = depth;
     if (!this.echoSupply || this.echoSupply.round !== this.round) {
       this.echoSupply = { round: this.round, byPlayer: new Map() };
     }
