@@ -191,7 +191,7 @@ function BlessTab({ pub }) {
     <h4 class="ihead">${t('已获祝福')} <small class="num">${normalBless.length}/${Number(echo?.blessingMax) || 3}</small>
       <small class="t-dim">${t('深度 {n}', { n: depth })}</small></h4>
     ${bless.length ? html`<ul class="echo-list">${bless.map((b) => html`<li key=${b.id}>
-      <b>${b.name}</b>${b.rarityLabel ? html`<em class=${`echo-rar is-${b.rarity || 'common'}`}>${b.rarityLabel}</em>` : null}<span>${b.desc || ''}</span></li>`)}</ul>`
+      <b>${b.name}</b>${b.rarityLabel ? html`<em class=${`echo-rar is-${b.rarity || 'common'}`}>${b.rarityLabel}</em>` : null}${b.oneShot ? html`<em class="echo-rar is-oneshot" title=${t('一次性：拿到时立刻结算，不挂在干员身上')}>${t('一次性')}</em>` : null}<span>${b.desc || ''}</span></li>`)}</ul>`
       : html`<p class="t-dim">${t('还没有获得祝福（深度 1、5、10、15… 各有一次三选一）')}</p>`}
     <h4 class="ihead">${t('本回合侵蚀词条')} <small class="num">${words.length}</small></h4>
     ${words.length ? html`<ul class="echo-list echo-list--enemy">${words.map((w) => html`<li key=${w.id}>

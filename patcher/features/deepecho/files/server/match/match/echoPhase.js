@@ -14,7 +14,7 @@ import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js'
 import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
-  echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
+  echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { echoSummonOnly } from './echoWaves.js';
@@ -877,6 +877,8 @@ export class MatchEcho {
         desc: b.desc,
         rarity: b.rarity || 'common',
         rarityLabel: ECHO_BLESSING_RARITY_LABEL[b.rarity] || '普通',
+        // 一次性祝福（资金 / 回血 / 涤罪 / 反制）：立刻结算、不挂在干员身上
+        oneShot: echoBlessingOneShot(b),
         // 「远程」这类改攻击范围的祝福：准备阶段没有战斗、客户端拿不到 live 范围，
         // 靠这个值把棋盘上的范围预览画对（2026-11-05）。
         rangeExtend: Number(b.mods && b.mods.rangeExtend) || 0,
@@ -894,6 +896,7 @@ export class MatchEcho {
             return {
               id, name: (b && b.name) || id, desc: (b && b.desc) || '',
               rarity: (b && b.rarity) || 'common', rarityLabel: ECHO_BLESSING_RARITY_LABEL[b && b.rarity] || '普通',
+              oneShot: echoBlessingOneShot(b),
             };
           }),
           votes: Object.fromEntries(this._echoDiscardVotes instanceof Map ? this._echoDiscardVotes : []),
@@ -942,6 +945,7 @@ export class MatchEcho {
           // 稀有度（2026-11-05）：客户端可据此给卡片描边 / 加角标；没有字段的老客户端会忽略它
           rarity: (b && b.rarity) || 'common',
           rarityLabel: ECHO_BLESSING_RARITY_LABEL[(b && b.rarity) || 'common'] || '普通',
+          oneShot: echoBlessingOneShot(b),
         };
       }),
       votes,

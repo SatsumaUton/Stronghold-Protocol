@@ -1025,4 +1025,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-rar.is-epic, .echo-bless__rarity.is-epic { color: #c88bff; }
 .echo-rar.is-special, .echo-bless__rarity.is-special { color: #ffcf6b; }
 .echo-bless__rarity { position: absolute; top: .08rem; right: .08rem; background: rgba(0, 0, 0, .35); }
+/* 一次性祝福（资金 / 回血 / 涤罪 / 反制）：琥珀色标签，和稀有度分开（维护者 2026-11-05） */
+.echo-rar.is-oneshot { color: #f0b429; border-color: #f0b429; }
+.echo-bless__oneshot { flex: none; font-size: .82em; font-weight: 700; letter-spacing: .06em; padding: 0 .2em; border-radius: 2px; border: 1px solid #f0b429; color: #f0b429; background: rgba(240, 180, 41, .12); }
 .echo-bless__card { position: relative; }

@@ -158,6 +158,15 @@ export const ECHO_BLESSINGS = Object.freeze([
 export const echoBlessingById = (id) => ECHO_BLESSINGS.find((b) => b.id === id) || null;
 
 /**
+ * 这条祝福是不是**一次性**的（拿完立刻结算，不挂在干员身上）。
+ *
+ * 判据：`kind !== 'mods'`（资金 / 回血 / 涤罪 / 免费刷新这类即时效果），
+ * 或者反制祝福（`counter` / `repeatable`：用完即弃）。客户端据此打「一次性」标记
+ * （维护者 2026-11-05：玩家不知道它会立刻消失）。
+ */
+export const echoBlessingOneShot = (b) => !!b && (b.counter === true || b.repeatable === true || b.kind !== 'mods');
+
+/**
  * 到第 `round` 回合为止**应该已经拿到几个**祝福。
  *
  * 规则：深潜第 5、10、15… 个回合各一次（`depth % 5 === 0`），外加开局奖励次数 `bonus`（打过隐藏核心 = 1）。
