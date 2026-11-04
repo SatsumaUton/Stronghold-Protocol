@@ -32,12 +32,30 @@ test('已接入的词条，效果类型必须都在实现清单里（防止「�
   }
 });
 
-test('echoCurseEffects：只累加 live 的，未接入的进 pending，不污染数值', () => {
-  const e = echoCurseEffects(['erosion', 'erosion', 'tribute', 'fog', 'tithe', 'nope']);
+test('echoCurseEffects：未接入 / 未知的 id 只进 pending，不污染数值', () => {
+  const e = echoCurseEffects(['erosion', 'erosion', 'tribute', 'nope']);
   assert.equal(e.wordCap, 2, '侵蚀两层 = +2 词条上限');
   assert.ok(Math.abs(e.coinMul - 0.85) < 1e-9, '贡赋 −15%');
-  assert.deepEqual(e.pending.sort(), ['fog', 'nope', 'tithe'], '未接入 / 未知 id 只记账，不生效');
-  assert.equal(e.intel, false, 'fog 没接入就不该真的关掉情报');
+  assert.deepEqual(e.pending, ['nope'], '未知 id 只记账，不生效');
+});
+
+test('echoCurseEffects：每条诅咒的效果都算得出来（没有空转的条目）', () => {
+  const neutral = echoCurseEffects([]);
+  for (const c of ECHO_CURSES) {
+    const e = echoCurseEffects([c.id]);
+    assert.deepEqual(e.pending, [], `${c.id} 必须是已接入的（不该进 pending）`);
+    const changed = e.wordCap !== neutral.wordCap
+      || e.coinMul !== neutral.coinMul
+      || e.freeRefresh !== neutral.freeRefresh
+      || e.timeMul !== neutral.timeMul
+      || e.budgetMul !== neutral.budgetMul
+      || e.enemyAtkMul !== neutral.enemyAtkMul
+      || e.enemyHpMul !== neutral.enemyHpMul
+      || e.bountyCoin !== neutral.bountyCoin
+      || e.blessingMax !== neutral.blessingMax
+      || e.intel !== neutral.intel;
+    assert.ok(changed, `${c.id} 的效果没有任何字段变化`);
+  }
 });
 
 test('echoCurseEffects：空输入是全中性', () => {
@@ -67,12 +85,10 @@ test('echoCurseList：不认识的 id 也不崩，退回 id 本身', () => {
   assert.equal(echoCurseById('ghost'), null);
 });
 
-test('预留词条不会因为「能取到」就被当成已生效', () => {
-  const reserved = ECHO_CURSES.filter((c) => c.live !== true);
-  assert.ok(reserved.length >= 5, '至少留 5 条给后续玩法');
-  for (const c of reserved) {
-    const e = echoCurseEffects([c.id]);
-    assert.deepEqual(e.pending, [c.id], `${c.id} 必须待在 pending`);
-    assert.equal(e.wordCap + (e.coinMul - 1) + (e.timeMul - 1), 0, `${c.id} 不该动数值`);
+test('没有预留空转的条目：全部 live，且 kind 都有消费方', () => {
+  for (const c of ECHO_CURSES) {
+    assert.equal(c.live, true, `${c.id} 仍是预留（未生效）`);
+    assert.ok(ECHO_CURSE_LIVE_KINDS.includes(c.effect.kind), `${c.id} 的 kind ${c.effect.kind} 没有消费点`);
+    assert.deepEqual(echoCurseEffects([c.id]).pending, [], `${c.id} 不该进 pending`);
   }
 });

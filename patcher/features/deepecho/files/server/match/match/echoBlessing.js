@@ -125,7 +125,7 @@ export const echoBlessingById = (id) => ECHO_BLESSINGS.find((b) => b.id === id) 
  * @param {number} [bonus] 开局奖励次数（隐藏核心通关 = 1）
  * @returns {number} 应有的祝福总数（0..3）
  */
-export function echoBlessingDue(round, diveStart, bonus = 0) {
+export function echoBlessingDue(round, diveStart, bonus = 0, max = ECHO_BLESSING_MAX) {
   const first = Math.max(1, Math.floor(Number(diveStart) || 1));
   const r = Math.floor(Number(round) || 0);
   const depth = r - first + 1;
@@ -134,7 +134,9 @@ export function echoBlessingDue(round, diveStart, bonus = 0) {
   // 维护者 2026-11-04：**第 1 层就给一次**（进深潜就有选择），之后仍然是每 5 层一次。
   // 所以 1–4 层 = 1，10 层 = 2，15 层 = 3（封顶 3）。
   const every = Math.max(1, Math.floor(depth / ECHO_BLESSING_EVERY));
-  return Math.min(ECHO_BLESSING_MAX, b + every);
+  // max 可被诅咒（「静默」）压低；不传就是常规上限 3。
+  const cap = Math.max(0, Math.floor(Number(max) || ECHO_BLESSING_MAX));
+  return Math.min(cap, b + every);
 }
 
 /**

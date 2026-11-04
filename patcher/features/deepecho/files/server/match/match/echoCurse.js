@@ -20,13 +20,17 @@ export const ECHO_CURSE_PREFIX = 'echo:curse:';
  *   coinMul      本局资金 ×value                 （echoPhase._echoCoinMul → settle 入账）
  * 新增一种就要同时在 `echoCurseEffects` 里累加、并在对应位置消费，再加一条用例。
  */
-export const ECHO_CURSE_LIVE_KINDS = Object.freeze(['wordCap', 'coinMul']);
+export const ECHO_CURSE_LIVE_KINDS = Object.freeze([
+  'wordCap', 'coinMul', 'freeRefresh', 'timeMul', 'budgetMul',
+  'enemyAtkMul', 'enemyHpMul', 'bountyCoin', 'blessingMax', 'intel',
+]);
 
 /**
  * 诅咒词条表。
  *
  * 每条：`id` / `name`（玩家看到的名字）/ `desc`（一句话说明，客户端直接显示）/
- * `effect: { kind, value }` / `live`（效果是否已接入）。
+ * `effect: { kind, value }` / `live`（效果是否已接入 —— 现在全部为 true；保留这个字段是为了
+ * 以后新增词条时可以先登记文案、等消费点写好再点亮）。
  * `value` 的语义由 `kind` 决定（见上）。
  */
 export const ECHO_CURSES = Object.freeze([
@@ -39,41 +43,41 @@ export const ECHO_CURSES = Object.freeze([
     id: 'tribute', name: '贡赋', desc: '资金收入 −15%', live: true,
     effect: Object.freeze({ kind: 'coinMul', value: 0.85 }),
   }),
-  // ---- 预留（效果未接入；接的时候把 live 改 true，并在 echoCurseEffects 里消费） ----
+  // ---- 全部已接入（2026-11-05：每条都有消费点，见上面的 ECHO_CURSE_LIVE_KINDS） ----
   Object.freeze({
-    id: 'tithe', name: '什一税', desc: '资金收入 −25%', live: false,
+    id: 'tithe', name: '什一税', desc: '资金收入 −25%', live: true,
     effect: Object.freeze({ kind: 'coinMul', value: 0.75 }),
   }),
   Object.freeze({
-    id: 'drought', name: '枯竭', desc: '免费刷新上限 −1', live: false,
+    id: 'drought', name: '枯竭', desc: '免费刷新上限 −1', live: true,
     effect: Object.freeze({ kind: 'freeRefresh', value: -1 }),
   }),
   Object.freeze({
-    id: 'leaden', name: '滞重', desc: '战斗时限 −10%', live: false,
+    id: 'leaden', name: '滞重', desc: '战斗时限 −10%', live: true,
     effect: Object.freeze({ kind: 'timeMul', value: 0.9 }),
   }),
   Object.freeze({
-    id: 'swarm', name: '蜂拥', desc: '出怪预算 +10%（同样时间更多敌人）', live: false,
+    id: 'swarm', name: '蜂拥', desc: '出怪预算 +10%（同样时间更多敌人）', live: true,
     effect: Object.freeze({ kind: 'budgetMul', value: 1.1 }),
   }),
   Object.freeze({
-    id: 'frenzy', name: '狂怒', desc: '敌方攻击 +10%', live: false,
+    id: 'frenzy', name: '狂怒', desc: '敌方攻击 +10%', live: true,
     effect: Object.freeze({ kind: 'enemyAtkMul', value: 1.1 }),
   }),
   Object.freeze({
-    id: 'carapace', name: '甲壳', desc: '敌方生命 +10%', live: false,
+    id: 'carapace', name: '甲壳', desc: '敌方生命 +10%', live: true,
     effect: Object.freeze({ kind: 'enemyHpMul', value: 1.1 }),
   }),
   Object.freeze({
-    id: 'greed', name: '贪婪', desc: '深潜悬赏少 1 币（最低 1）', live: false,
+    id: 'greed', name: '贪婪', desc: '深潜悬赏少 1 币（最低 1）', live: true,
     effect: Object.freeze({ kind: 'bountyCoin', value: -1 }),
   }),
   Object.freeze({
-    id: 'silence', name: '静默', desc: '祝福名额 −1（最低 1）', live: false,
+    id: 'silence', name: '静默', desc: '祝福名额 −1（最低 1）', live: true,
     effect: Object.freeze({ kind: 'blessingMax', value: -1 }),
   }),
   Object.freeze({
-    id: 'fog', name: '迷雾', desc: '本局敌方情报不再显示威胁值', live: false,
+    id: 'fog', name: '迷雾', desc: '本局敌方情报不再显示威胁值', live: true,
     effect: Object.freeze({ kind: 'intel', value: 0 }),
   }),
 ]);

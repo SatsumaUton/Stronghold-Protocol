@@ -425,12 +425,15 @@ export function echoRandomWave(gd, tpl, opts, rng, helpers) {
   // 数据回合 1..13 循环，深度 16 会轮回到第 1 回合；若继续按它的只数出怪，深层会从 112 只掉到 14 只。
   // 所以 `echoDeepWaveShape` 给「这一层该有多少只 / 几条」，模板库只决定怪种组合。
   const deepShape = depth >= ECHO_DEEP_FROM ? echoDeepWaveShape(depth) : null;
+  // 「蜂拥」诅咒（2026-11-05）：深层只数按深度设计，不受 echoGrowth 影响，
+  // 所以单独给一个乘数 opt（echoUnitMul），由 phases.js 把诅咒的 budgetMul 传进来。
+  const unitMul = Number.isFinite(opts.echoUnitMul) && opts.echoUnitMul > 0 ? opts.echoUnitMul : 1;
   const wantActions = deepShape
     ? clampInt(deepShape.actions * fundFactor, ECHO_MIN_ACTIONS, ECHO_MAX_ACTIONS)
     : clampInt(profile.actions * growthA, ECHO_MIN_ACTIONS, ECHO_MAX_ACTIONS);
   const wantUnits = deepShape
-    ? clampInt(deepShape.units * fundFactor, wantActions, ECHO_MAX_UNITS)
-    : clampInt(profile.units * growthU, wantActions, ECHO_MAX_UNITS);
+    ? clampInt(deepShape.units * fundFactor * unitMul, wantActions, ECHO_MAX_UNITS)
+    : clampInt(profile.units * growthU * unitMul, wantActions, ECHO_MAX_UNITS);
   // 单条指令最多放几只：深层放宽到 6，否则条数封顶后只数会被 4 只/条卡死（28×4 = 112）。
   const maxPerAction = deepShape ? ECHO_DEEP_MAX_COUNT_PER_ACTION : ECHO_SHALLOW_MAX_COUNT_PER_ACTION;
   // 出怪的时间跨度：前 15 层照原版该回合的首末怪时间（形状的一部分）；16 层以后固定铺满**时限的 36%**

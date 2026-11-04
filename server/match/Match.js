@@ -382,7 +382,14 @@ export class Match {
       // 缓增段的增速可被房间配置覆盖（深潜大厅的「曲线档位」），不传配置就是默认档。
       const tier = this.gd.baseEnemyScale(ECHO_LAST_ROUND);
       const slow = echoCurveOf(this.echoCfg);
-      this.gd.echoScaleOf = (r, official) => (isEchoRound(r, ECHO_LAST_ROUND) ? echoScale(r, tier, ECHO_LAST_ROUND, slow) : official);
+      this.gd.echoScaleOf = (r, official) => {
+        if (!isEchoRound(r, ECHO_LAST_ROUND)) return official;
+        const scaled = echoScale(r, tier, ECHO_LAST_ROUND, slow);
+        // 诅咒「狂怒 / 甲壳」：敌方攻击 / 生命 ×系数。每次现算 —— 诅咒会被「净化」清掉，缓存会过期。
+        const fx = this._echoCurseFx ? this._echoCurseFx() : null;
+        if (!fx || (fx.enemyHpMul === 1 && fx.enemyAtkMul === 1)) return scaled;
+        return { ...scaled, hpMul: scaled.hpMul * fx.enemyHpMul, atkMul: scaled.atkMul * fx.enemyAtkMul };
+      };
     }
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;

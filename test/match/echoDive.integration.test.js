@@ -292,6 +292,40 @@ test('祝福「净化 / 涤罪」：清得掉累积诅咒，清不掉固定的�
   assert.ok(after.some((c) => c.id === 'foresight'), '远见·诅咒仍然在');
 });
 
+// 维护者 2026-11-05：诅咒词条不能只是「列表里有」—— 每一条都要能看到它在对局里的实际影响。
+// 这里同一条对局先跑一层做基线，再把诅咒塞进去重跑同一层，逐项对账。
+test('诅咒真的生效：时限 / 情报 / 刷新上限 / 祝福上限 / 敌方数值 / 出怪量', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+
+  const runDepth = (depth) => { m.round = depth - 1; m.startRound(depth); };
+  runDepth(20);                                        // 20 层是普通回合（固定节点是 15 / 25）
+  const base = {
+    time: m.wave.timeLimit,
+    units: m.wave.spawns.reduce((a, s) => a + (Number(s.count) || 0), 0),
+    intel: m._echoIntel(),
+    refreshCap: m._echoFreeRefreshCap(),
+    blessCap: m._echoBlessingMax(),
+    scale: m.gd.enemyScale(20),
+  };
+  assert.ok(base.intel && base.intel.threat > 0, '基线：有情报');
+
+  // 一次性把「滞重 / 迷雾 / 枯竭 / 静默 / 甲壳 / 狂怒 / 蜂拥」全挂上
+  m.echoCurseIds.push('leaden', 'fog', 'drought', 'silence', 'carapace', 'frenzy', 'swarm');
+  runDepth(20);
+
+  assert.ok(m.wave.timeLimit < base.time, `滞重：时限应变短（${base.time} → ${m.wave.timeLimit}）`);
+  assert.equal(m._echoIntel(), null, '迷雾：情报整块关闭');
+  assert.equal(m._echoFreeRefreshCap(), base.refreshCap - 1, '枯竭：免费刷新上限 -1');
+  assert.equal(m._echoBlessingMax(), base.blessCap - 1, '静默：祝福上限 -1');
+  const after = m.gd.enemyScale(20);
+  assert.ok(after.hpMul > base.scale.hpMul, '甲壳：敌方生命更高');
+  assert.ok(after.atkMul > base.scale.atkMul, '狂怒：敌方攻击更高');
+  const units = m.wave.spawns.reduce((a, s) => a + (Number(s.count) || 0), 0);
+  assert.ok(units > base.units, `蜂拥：同样预算出怪更多（${base.units} → ${units}）`);
+});
+
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。

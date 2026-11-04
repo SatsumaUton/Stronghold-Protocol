@@ -420,6 +420,13 @@ export class MatchPhases {
     } else if (dive) {
       // 深潜：波次模板查循环的数据回合，缩放仍按显示回合（见 buildNormalWave 的 dataRound）；
       // 怪种组合从模板库抽（每回合 10 套变体随机一套），精英每 3 个深潜回合一次。
+      // 诅咒「滞重」（timeMul 0.9）：本回合时限乘系数；「蜂拥」（budgetMul）加厚出怪预算。
+      const curseFx = this._echoCurseFx();
+      const echoTimeMul = curseFx.timeMul;
+      const deepWave = this._echoDepth(r) >= ECHO_DEEP_FROM;
+      const echoBaseLimit = deepWave
+        ? Math.round(230 * (echoDeepWaveShape(this._echoDepth(r)).units / 112))
+        : this.gd.combatTimeLimit(this._echoDataRound(r));
       this.wave = this._echoChallengeBoost(buildNormalWave(this.gd, this.rngWaves, this.factions, r, {
         dataRound: this._echoDataRound(r),
         // 1–15 层：以原版同回合的形状为底，再乘 echoWaveGrowth（小系数加码）。旋钮在 echo.js 的 ECHO_EARLY_GROWTH。
@@ -429,6 +436,8 @@ export class MatchPhases {
         ...(this._echoDepth(r) <= 15
           ? { pick: this._echoPickVariant(this._echoDataRound(r)) }
           : { echoGrowth: echoWaveGrowth(this._echoDepth(r)), echoShapeScale: echoWaveGrowth(this._echoDepth(r)) }),
+        // 「蜂拥」：深层只数按深度设计（echoDeepWaveShape），用单独的乘数加厚
+        echoUnitMul: curseFx.budgetMul,
         echoDepth: this._echoDepth(r),
         echoPoolRound: Math.max(1, (this.gd.bossRound || 14) - 1),
         // 池子分档（维护者 2026-11-04）：1–15 层用「原版该回合的模板变体」；
@@ -444,8 +453,8 @@ export class MatchPhases {
         // 1–15 层不传：它们仍用原版同回合的时限。
         // 16 层以后：时限按**原版比例**随出怪量增长（原版 R13 = 230 秒 / 112 只 = 基准），
         // 而不是固定 230 秒 —— 怪变多了，时间也要跟着多（维护者 2026-11-05）。
-        ...(this._echoDepth(r) >= ECHO_DEEP_FROM
-          ? { echoTimeLimitSec: Math.round(230 * (echoDeepWaveShape(this._echoDepth(r)).units / 112)) }
+        ...(deepWave || echoTimeMul !== 1
+          ? { echoTimeLimitSec: Math.max(30, Math.round(echoBaseLimit * echoTimeMul)) }
           : {}),
         // 按钱出怪：用存活玩家的平均资金作为这一波的强度基准（维护者 2026-11-04）
         echoFunds: alive.length

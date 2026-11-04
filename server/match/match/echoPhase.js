@@ -14,7 +14,7 @@ import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js'
 import { echoCurseList, echoCurseEffects } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
-  echoBlessingFunds, echoBlessingHeal, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_VOTE_MS,
+  echoBlessingFunds, echoBlessingHeal, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR } from '../../../shared/constants.js';
@@ -89,7 +89,7 @@ export class MatchEcho {
     let n = 0;
     for (const ps of this.alivePlayers()) {
       if (!ps || !ps.shop) continue;
-      ps.shop.freeRefreshes = Math.min(MatchEcho.MAX_FREE_REFRESH, (Number(ps.shop.freeRefreshes) || 0) + 1);
+      ps.shop.freeRefreshes = Math.min(this._echoFreeRefreshCap(), (Number(ps.shop.freeRefreshes) || 0) + 1);
       ps.dirty?.();
       n += 1;
     }
@@ -380,6 +380,31 @@ export class MatchEcho {
   }
 
   /**
+   * 当前诅咒的聚合效果（echoCurse.js）。
+   *
+   * 每次现算：诅咒会被挑战关加上、也会被「净化 / 涤罪」祝福清掉，缓存一定过期。
+   * 已接入的 kind 及消费点见 echoCurse.js 的 ECHO_CURSE_LIVE_KINDS。
+   */
+  _echoCurseFx() {
+    return echoCurseEffects(this.echoCurseIds);
+  }
+
+  /** 免费刷新上限：奇迹·诅咒的 3 次，再被「枯竭」这类减（最低 0）。 */
+  _echoFreeRefreshCap() {
+    return Math.max(0, MatchEcho.MAX_FREE_REFRESH + this._echoCurseFx().freeRefresh);
+  }
+
+  /** 战斗时限倍率（「滞重」= 0.9）。 */
+  _echoTimeMul() {
+    return this._echoCurseFx().timeMul;
+  }
+
+  /** 同时持有的祝福上限（「静默」−1，最低 1）。 */
+  _echoBlessingMax() {
+    return Math.max(1, ECHO_BLESSING_MAX + this._echoCurseFx().blessingMax);
+  }
+
+  /**
    * 每回合开始把超出上限的「免费刷新」裁掉（只影响深潜，普通房间一行不碰）。
    * @returns {number} 被裁过的玩家数
    */
@@ -387,7 +412,7 @@ export class MatchEcho {
     if (this.echoVariant !== 'deepecho') return 0;
     // 只在**深潜回合**夹（深潜现在从第 1 回合开始，所以实际上每回合都夹；普通房间一行不碰）
     if (!this._echoDiveRound(this.round)) return 0;
-    const cap = MatchEcho.MAX_FREE_REFRESH;
+    const cap = this._echoFreeRefreshCap();
     let n = 0;
     for (const ps of this.alivePlayers()) {
       const shop = ps && ps.shop;
@@ -440,7 +465,7 @@ export class MatchEcho {
     if (this.echoVariant !== 'deepecho') return [];
     const applied = echoCurseList(this.echoCurseIds).map(({ id, name, desc }) => ({ id, name, desc }));
     return [
-      { id: 'miracle', name: '奇迹·诅咒', desc: `免费刷新总数上限 ${MatchEcho.MAX_FREE_REFRESH} 次（原版无上限）` },
+      { id: 'miracle', name: '奇迹·诅咒', desc: `免费刷新总数上限 ${this._echoFreeRefreshCap()} 次（原版无上限）` },
       { id: 'foresight', name: '远见·诅咒', desc: '按层给钱结算到 999 层（与原版一致）' },
       // 挑战关没达成等来源累积的诅咒（echoCurse.js 的词条表；同类合并成「侵蚀 ×2」）
       ...applied,
@@ -500,7 +525,7 @@ export class MatchEcho {
    */
   _echoMaybeOfferBlessing(r = this.round) {
     if (!this._echoDiveRound(r)) return null;
-    const due = echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws);
+    const due = echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws, this._echoBlessingMax());
     const owned = Array.isArray(this.echoBlessings) ? this.echoBlessings.length : 0;
     if (due <= owned) { this.echoBlessingOffer = null; return null; }
     if (Array.isArray(this.echoBlessingOffer) && this.echoBlessingOffer.length) return this.echoBlessingOffer;
@@ -590,7 +615,7 @@ export class MatchEcho {
     if (!b) return null;
     if (!Array.isArray(this.echoBlessings)) this.echoBlessings = [];
     if (this.echoBlessings.includes(b.id)) return null;          // 同类不叠加
-    if (this.echoBlessings.length >= 3) return null;             // 上限 3
+    if (this.echoBlessings.length >= this._echoBlessingMax()) return null;       // 上限（静默会压低）
     this.echoBlessings.push(b.id);
     this._echoBlessingEndsAt = null;
     // A 类：**立刻进钱包**（维护者 2026-11-04：原来走 pendingFunds，要等下一回合 prep 才入账，
@@ -644,7 +669,12 @@ export class MatchEcho {
     const spawns = Array.isArray(this.wave && this.wave.spawns) ? this.wave.spawns : [];
     if (!spawns.length) return 0;
     const rng = createRng(deriveSeed(this.seed, `echo:bounty:${r}`));
-    const cards = echoBountyCards(spawns, { gd: this.gd, depth: this._echoDepth(r), rng, maxCards: 1 });
+    const rolled = echoBountyCards(spawns, { gd: this.gd, depth: this._echoDepth(r), rng, maxCards: 1 });
+    // 「贪婪」诅咒：每张卡少 1 币（最低 1）。不改 echoBounty 的纯函数，只在发卡前改币数。
+    const coinAdj = this._echoCurseFx().bountyCoin;
+    const cards = coinAdj
+      ? rolled.map((c) => ({ ...c, coin: Math.max(1, Math.round((Number(c.coin) || 1) + coinAdj)) }))
+      : rolled;
     if (!cards.length) return 0;
     let n = 0;
     for (const ps of this.alivePlayers()) {
@@ -668,6 +698,8 @@ export class MatchEcho {
    */
   _echoIntel() {
     if (!this._echoDiveRound()) return null;
+    // 「迷雾」诅咒：本局不再显示威胁值（情报整块掐掉，玩家只能看波次数）
+    if (this._echoCurseFx().intel) return null;
     // boss 返场回合（R20 / R25 / R30…）是明牌：走原版预览（bossWaves），不给聚合情报
     if (this.bossWaves) return null;
     const spawns = Array.isArray(this.wave && this.wave.spawns) ? this.wave.spawns : [];
