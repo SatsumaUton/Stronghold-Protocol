@@ -485,7 +485,7 @@ function applyDefault(m, ps, card) {
       case 'global_special_choice_refresh_free':
         ps.shop.freeRefreshes += count;
       // 深渊：这条路不经过 grantFreeRefresh，这里补一次封顶
-      if (ps.m && ps.m.echoVariant === 'deepecho') ps.shop.freeRefreshes = Math.min(ps.shop.freeRefreshes, 3);
+      if (ps.m && ps.m.echoVariant === 'deepecho' && typeof ps.m._echoFreeRefreshCap === 'function') ps.shop.freeRefreshes = Math.min(ps.shop.freeRefreshes, ps.m._echoFreeRefreshCap());
         ps.dirty();
         handled = true;
         break;
