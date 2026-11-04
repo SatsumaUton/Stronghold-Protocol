@@ -23,7 +23,7 @@ export const ECHO_CURSE_PREFIX = 'echo:curse:';
 export const ECHO_CURSE_LIVE_KINDS = Object.freeze([
   'wordCap', 'coinMul', 'freeRefresh', 'timeMul', 'budgetMul',
   'enemyAtkMul', 'enemyHpMul', 'bountyCoin', 'blessingMax', 'intel',
-  'unitMods', 'destroyEquip', 'blackout', 'deployBan', 'bondBan',
+  'unitMods', 'destroyEquip', 'blackout', 'deployBan', 'bondBan', 'lpMul', 'lpExtra',
 ]);
 
 /**
@@ -107,6 +107,19 @@ export const ECHO_CURSES = Object.freeze([
     effect: Object.freeze({ kind: 'unitMods', value: 0 }),
     filter: Object.freeze({ position: 'REMOTE' }), unitMods: Object.freeze({ batPct: 0.08 }),
   }),
+  // ---- 生命惩罚（2026-11-05，维护者要求「多扣生命值」）：只放大已有的漏怪，不会凭空扣血 ----
+  Object.freeze({
+    id: 'bleed', name: '失血', desc: '漏怪伤害 ×1.5', live: true, rarity: 'rare',
+    effect: Object.freeze({ kind: 'lpMul', value: 1.5 }),
+  }),
+  Object.freeze({
+    id: 'hemorrhage', name: '溃血', desc: '漏怪伤害 ×2', live: true, rarity: 'epic',
+    effect: Object.freeze({ kind: 'lpMul', value: 2 }),
+  }),
+  Object.freeze({
+    id: 'ache', name: '剧痛', desc: '有漏怪时每回合额外 −2 生命', live: true, rarity: 'rare',
+    effect: Object.freeze({ kind: 'lpExtra', value: 2 }),
+  }),
   // ---- 部署禁令（2026-11-05，维护者要求）：改的是「能不能落子」，由 placement.js 拦 ----
   Object.freeze({
     id: 'block_tiles', name: '封锁', desc: '随机 3 个地块无法部署干员', live: true, rarity: 'epic',
@@ -137,6 +150,7 @@ export const ECHO_ROUND_CURSES = Object.freeze([
   Object.freeze({ id: 'r_drought', name: '干涸', desc: '本回合免费刷新上限 −1', rarity: 'rare', scope: 'round', effect: Object.freeze({ kind: 'freeRefresh', value: -1 }) }),
   Object.freeze({ id: 'r_weak_melee', name: '钝刃', desc: '本回合近战位干员攻击 −12%', rarity: 'rare', scope: 'round', effect: Object.freeze({ kind: 'unitMods', value: 0 }), filter: Object.freeze({ position: 'MELEE' }), unitMods: Object.freeze({ atkMul: 0.88 }) }),
   Object.freeze({ id: 'r_weak_ranged', name: '断弦', desc: '本回合远程位干员攻速 −10%', rarity: 'rare', scope: 'round', effect: Object.freeze({ kind: 'unitMods', value: 0 }), filter: Object.freeze({ position: 'REMOTE' }), unitMods: Object.freeze({ batPct: 0.10 }) }),
+  Object.freeze({ id: 'r_bleed', name: '渗血', desc: '本回合漏怪伤害 ×1.25', rarity: 'rare', scope: 'round', effect: Object.freeze({ kind: 'lpMul', value: 1.25 }) }),
   Object.freeze({ id: 'r_levy', name: '抽成', desc: '本回合资金收入 −8%', rarity: 'common', scope: 'round', effect: Object.freeze({ kind: 'coinMul', value: 0.92 }) }),
   Object.freeze({ id: 'r_rust', name: '锈蚀', desc: '本回合开始时，每人随机销毁 1 件已装备的装备', rarity: 'epic', scope: 'round', effect: Object.freeze({ kind: 'destroyEquip', value: 1 }) }),
 ]);
@@ -230,12 +244,13 @@ export function removeEchoCurses(ids, spec) {
 export function echoCurseEffects(ids = []) {
   const out = {
     wordCap: 0, coinMul: 1, freeRefresh: 0, timeMul: 1, budgetMul: 1,
-    enemyAtkMul: 1, enemyHpMul: 1, bountyCoin: 0, blessingMax: 0, intel: false, blackout: false, pending: [],
+    enemyAtkMul: 1, enemyHpMul: 1, bountyCoin: 0, blessingMax: 0, intel: false, blackout: false, lpMul: 1, lpExtra: 0, pending: [],
   };
   for (const raw of ids || []) {
     const c = echoCurseById(raw);
     if (!c) { out.pending.push(String(raw)); continue; }
-    if (c.live !== true) { out.pending.push(c.id); continue; }
+    // 回合诅咒没有 live 字段（它们天生生效）；只有显式 live:false 的才算「预留」
+    if (c.live === false) { out.pending.push(c.id); continue; }
     const { kind, value } = c.effect || {};
     if (kind === 'wordCap') out.wordCap += Number(value) || 0;
     else if (kind === 'coinMul') out.coinMul *= Number(value) > 0 ? Number(value) : 1;
@@ -248,6 +263,8 @@ export function echoCurseEffects(ids = []) {
     else if (kind === 'blessingMax') out.blessingMax += Number(value) || 0;
     else if (kind === 'intel') out.intel = true;
     else if (kind === 'blackout') out.blackout = true;
+    else if (kind === 'lpMul') out.lpMul *= Number(value) > 0 ? Number(value) : 1;
+    else if (kind === 'lpExtra') out.lpExtra += Number(value) || 0;
   }
   return out;
 }
@@ -340,6 +357,8 @@ export function mergeCurseEffects(a, b) {
     blessingMax: (x.blessingMax || 0) + (y.blessingMax || 0),
     intel: !!(x.intel || y.intel),
     blackout: !!(x.blackout || y.blackout),
+    lpMul: (x.lpMul ?? 1) * (y.lpMul ?? 1),
+    lpExtra: (x.lpExtra || 0) + (y.lpExtra || 0),
     pending: [...(x.pending || []), ...(y.pending || [])],
   };
 }

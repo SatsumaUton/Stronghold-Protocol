@@ -459,6 +459,17 @@ export class MatchEcho {
     return round ? mergeCurseEffects(run, round) : run;
   }
 
+  /** 漏怪扣血（含诅咒「失血 / 溃血 / 剧痛」）：只放大已有漏怪，仍受每回合上限约束。 */
+  _echoLpLoss(raw, cap) {
+    const n = Math.max(0, Math.floor(Number(raw) || 0));
+    const limit = Math.max(0, Math.floor(Number(cap) || 0));
+    const fx = this.echoVariant === 'deepecho' ? this._echoCurseFx() : null;
+    const adj = fx && n > 0 && (fx.lpMul !== 1 || fx.lpExtra)
+      ? Math.ceil(n * (fx.lpMul || 1)) + (fx.lpExtra || 0)
+      : n;
+    return Math.min(limit, Math.max(0, adj));
+  }
+
   /** 免费刷新上限：奇迹·诅咒的 3 次，再被「枯竭」这类减（最低 0）。 */
   _echoFreeRefreshCap() {
     return Math.max(0, MatchEcho.MAX_FREE_REFRESH + this._echoCurseFx().freeRefresh);
@@ -677,6 +688,8 @@ export class MatchEcho {
         bond: this.echoBannedBond || null,
         bondName: this.echoBannedBond ? (this.gd.bond(this.echoBannedBond)?.name || this.echoBannedBond) : null,
       },
+      // 生命惩罚（2026-11-05）：客户端据此把「预计扣血」也乘上去，别让预览和服务端不一致
+      lp: { mul: this._echoCurseFx().lpMul, extra: this._echoCurseFx().lpExtra },
       intel: this._echoIntel(),
       // 无尽模式：没有「最大回合」可展示，只暴露安全阀（客户端不必显示它）
       safeRound: ECHO_SAFE_ROUND,

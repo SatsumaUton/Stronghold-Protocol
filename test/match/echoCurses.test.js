@@ -65,7 +65,9 @@ test('echoCurseEffects：每条诅咒的效果都算得出来（没有空转的�
       || e.bountyCoin !== neutral.bountyCoin
       || e.blessingMax !== neutral.blessingMax
       || e.intel !== neutral.intel
-      || e.blackout !== neutral.blackout;
+      || e.blackout !== neutral.blackout
+      || e.lpMul !== neutral.lpMul
+      || e.lpExtra !== neutral.lpExtra;
     assert.ok(changed, `${c.id} 的效果没有任何字段变化`);
   }
 });
@@ -102,6 +104,16 @@ test('干员减益：只命中匹配站位的单位，没位置信息不打', ()
   assert.deepEqual(mods.map((m) => m.filter.position), ['MELEE', 'REMOTE']);
   assert.ok(mods[0].mods.atkMul < 1, '近战是减益');
   assert.ok(mods[1].mods.batPct > 0, '攻速是变慢');
+});
+
+test('生命惩罚诅咒：倍率相乘、额外扣血相加', () => {
+  const a = echoCurseEffects(['bleed']);            // ×1.5
+  const b = echoCurseEffects(['hemorrhage']);       // ×2
+  const m = mergeCurseEffects(a, b);
+  assert.ok(Math.abs(m.lpMul - 3) < 1e-9, '两层倍率相乘');
+  assert.equal(echoCurseEffects(['ache']).lpExtra, 2);
+  assert.equal(echoCurseEffects([]).lpMul, 1, '没有诅咒时是中性');
+  assert.equal(echoCurseEffects([]).lpExtra, 0);
 });
 
 test('mergeCurseEffects：乘法相乘、加法相加、intel 取或', () => {

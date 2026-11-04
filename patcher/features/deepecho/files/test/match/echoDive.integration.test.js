@@ -425,6 +425,35 @@ test('悬赏未达成：打掉的不算失败，没打掉才降诅咒', (t) => {
   assert.equal(m._echoSettleBountyFailure([ps]), null, '还有一轮的卡不算失败');
 });
 
+// 维护者 2026-11-05：多扣生命的诅咒 —— 只放大已有漏怪，没有漏怪不扣，且仍吃每回合上限。
+test('生命惩罚诅咒：漏怪伤害按倍率/额外值放大，仍受上限', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const cap = m.gd.lpCapPerRound;
+
+  assert.equal(m._echoLpLoss(3, cap), 3, '没诅咒时等值');
+  m.echoCurseIds = ['bleed'];                       // ×1.5
+  assert.equal(m._echoLpLoss(3, cap), 5, '3 漏 ×1.5 = 4.5 向上取整 5');
+  assert.equal(m._echoLpLoss(0, cap), 0, '没漏怪一点不扣');
+
+  m.echoCurseIds = ['hemorrhage'];                  // ×2
+  assert.equal(m._echoLpLoss(4, cap), 8);
+
+  m.echoCurseIds = ['ache'];                        // +2
+  assert.equal(m._echoLpLoss(1, cap), 3, '1 漏 + 2');
+  assert.equal(m._echoLpLoss(0, cap), 0, '没漏怪也不额外扣');
+
+  m.echoCurseIds = ['hemorrhage'];
+  assert.equal(m._echoLpLoss(cap + 5, cap), cap, '仍然受每回合上限约束');
+
+  // 回合诅咒也吃到（倍率现算）
+  m.echoCurseIds = [];
+  m.echoRoundCurse = 'r_bleed';                     // ×1.25
+  assert.equal(m._echoLpLoss(4, cap), 5, '4 ×1.25 = 5');
+  m.echoRoundCurse = null;
+});
+
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。
