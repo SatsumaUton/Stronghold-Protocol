@@ -429,7 +429,9 @@ function MatchScreen() {
     priv, stage: gd.stage(pub?.stageId), editable, field: deployField,
     getChess: (id) => { const c = gd.chess(id); return ownDiyRecord(c, priv, { chess: data.get('chess'), backups: data.get('backups') }) || c; },
     getToken: gd.token, getItem: gd.item, getEffect: gd.effect, backups: gd.backups, morphMode,
-  }), [priv, pub?.stageId, editable, gd.ready, deployField, data.locale(), morphMode]);
+    // 「深渊回响」部署禁令：贴上禁放地块 / 排异盟约，普通房间是 null
+    echoBans: pub?.echo?.bans || null,
+  }), [priv, pub?.stageId, pub?.echo?.bans, editable, gd.ready, deployField, data.locale(), morphMode]);
   live.current = { pub, priv, field, view, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
 
   // ---- camera: every request goes through setCam, which remembers it for the pen's way back -----------------------
