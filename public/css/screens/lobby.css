@@ -1920,7 +1920,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .echo-row--cols .echo-rank__players { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .echo-row--cols .echo-rank__cores { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c9b8f5; font-size: .94em; }
 .echo-row--cols .echo-rank__bonds { text-align: center; color: #e8d9ff; font-weight: 700; }
-.echo-row--cols .echo-rank__time { text-align: right; color: #b9a8e0; }
+.echo-row--cols .echo-rank__time { text-align: right; color: #b9a8e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .95em; }
 .echo-boardhead__cols { display: grid; grid-template-columns: minmax(0, .7fr) minmax(0, 1.25fr) minmax(0, 2.7fr) minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: .1rem; font-size: .72em; color: #8f7fb5; letter-spacing: .04em; }
 /* 表头与数据行的左右内边距对齐（.echo-boardlist li 的 .12rem 会盖掉上面的 padding） */
 .echo-boardlist .echo-boardhead__cols { padding: 0 .1rem .04rem; }

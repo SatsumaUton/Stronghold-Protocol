@@ -1109,6 +1109,15 @@ export function EchoSelect({ onClose, onStart }) {
                     const maxLayers = Number(r.maxLayers) || 0;
                     const secs = Math.max(0, Math.floor((Number(r.clearMs) || 0) / 1000));
                     const time = r.clearMs > 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '—';
+                    // 「通关时间」这一列显示**年月日 + 时分**（维护者 2026-11-05）：榜单要能看出是哪天打的，
+                    // 纯 mm:ss 的时长放到展开明细里（只有新记录才有 clearMs）。r.at 是这条记录的结算时刻。
+                    const atText = (() => {
+                      const ms = Number(r.at);
+                      if (!(ms > 0)) return '—';
+                      const d = new Date(ms);
+                      const p2 = (n) => String(n).padStart(2, '0');
+                      return `${d.getFullYear()}/${p2(d.getMonth() + 1)}/${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+                    })();
                     return html`<li key=${r.member} class=${`echo-rank${r.rank <= 3 ? ` is-top is-top${r.rank}` : ''}`}>
                       <button type="button" class="echo-row echo-row--cols" aria-expanded=${openRow === r.member ? 'true' : 'false'}
                         onClick=${() => setOpenRow(openRow === r.member ? null : r.member)}>
@@ -1117,13 +1126,13 @@ export function EchoSelect({ onClose, onStart }) {
                         <span class="echo-rank__players">${names.length ? names.join('、') : (r.roomCode || '----')}</span>
                         <span class="echo-rank__cores" title=${cores.join('、')}>${cores.length ? cores.join('、') : '—'}</span>
                         <span class="echo-rank__bonds num" title=${t('所有人里最高的盟约层数（只看层数，不看词条与稀有度）')}>${maxLayers || '—'}</span>
-                        <span class="echo-rank__time num">${time}</span>
+                        <span class="echo-rank__time num" title=${time !== '—' ? `${t('通关时间')} ${time}` : atText}>${atText}</span>
                       </button>
                       ${openRow === r.member ? html`<div class="echo-detail">
                         <div><span>${t('深度')}</span><b>${r.depth}</b></div>
                         <div><span>${t('难度')}</span><b>${t(DIFFICULTY_NAMES[r.difficulty] || r.difficulty || '—')}</b></div>
                         <div><span>${t('结果')}</span><b>${r.victory ? t('通关') : t('团灭')}</b></div>
-                        <div><span>${t('通关时间')}</span><b>${time}</b></div>
+                        <div><span>${t('通关时间')}</span><b>${atText}${time !== '—' ? ` · ${time}` : ''}</b></div>
                         ${/* 「到达回合」与「队伍」原来总是显示 —/未记录：服务端根本没发这两个字段，
                               留着只是噪音（维护者 2026-11-04）。有数据才显示。 */ null}
                         ${/* 维护者 2026-11-05：展开明细也要有「玩家 / 核心盟约 / 最高盟约数」，缺数据时写 — 而不是整块消失 */ null}
@@ -1132,7 +1141,7 @@ export function EchoSelect({ onClose, onStart }) {
                           ? squads.map((s) => `${s.name}：${(s.cores || []).join('、') || '无核心'} · 最高 ${s.maxLayers || 0} 层`).join(' ｜ ')
                           : (cores.length ? cores.join('、') : '—')}</b></div>
                         <div><span>${t('最高盟约数')}</span><b>${maxLayers ? `${maxLayers} 层` : '—'}</b></div>
-                        <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'} · ${r.at ? new Date(r.at).toLocaleString() : '—'}</b></div>
+                        <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'}</b></div>
                       </div>` : null}
                     </li>`;
                   })
