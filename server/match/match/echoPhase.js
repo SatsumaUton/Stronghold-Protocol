@@ -1405,12 +1405,11 @@ export class MatchEcho {
     }
     const heal = echoBlessingHeal(b);
     if (heal > 0) {
-      // 桩 gd（单测里的假数据）可能没有 startLp：这时不封顶，也不让发放失败
-      const lpMax = (ps) => (typeof this.gd.startLp === 'function' ? Math.max(0, Math.floor(Number(this.gd.startLp(ps.bandId)) || 0)) : 0);
+      // 维护者 2026-11-05：回血祝福**允许超过玩家的初始生命上限**（深渊里血量就是资源，
+      // 上限只用来显示，不该把祝福的收益截断）。
       for (const ps of this.alivePlayers()) {
         const before = Math.max(0, Math.floor(Number(ps.lp) || 0));
-        const max = lpMax(ps);
-        const after = max > 0 ? Math.min(max, before + heal) : before + heal;
+        const after = before + heal;
         if (after > before) { ps.lp = after; ps.dirty?.(); }
       }
     }

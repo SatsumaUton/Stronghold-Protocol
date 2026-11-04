@@ -240,7 +240,7 @@ test('挑战关没达标：不给祝福，改加一层诅咒（侵蚀词条上�
 
 // 维护者 2026-11-05：祝福要有「全队一次性回复生命」这类，**多种档位随机到**，且数值刻意做小，
 // 封顶到各自的初始生命，避免把深渊的漏怪抹平。
-test('祝福「回复生命」：多档位、数值都小、封顶到初始生命', (t) => {
+test('祝福「回复生命」：多档位、数值都小、可以超过初始生命上限', (t) => {
   const heals = ECHO_BLESSINGS.filter((b) => b.kind === 'heal');
   assert.ok(heals.length >= 3, '至少三种回复档位（随机到才有多样性）');
   for (const b of heals) {
@@ -262,14 +262,17 @@ test('祝福「回复生命」：多档位、数值都小、封顶到初始生�
       m.dispose();
     }
   }
-  // 回满后不再溢出
+  // 维护者 2026-11-05：回血允许**超过初始生命上限**（不再封顶）
   const h = dive();
   const m = h.m;
   try {
     const ps = m.alivePlayers();
     for (const p of ps) p.lp = m.gd.startLp(p.bandId) - 1;
     m._echoGrantBlessing(echoBlessingById('heal_l'));
-    for (const p of ps) assert.equal(p.lp, m.gd.startLp(p.bandId), '不能超过初始生命');
+    for (const p of ps) {
+      assert.equal(p.lp, m.gd.startLp(p.bandId) - 1 + 8, '超过初始生命上限的部分要保留');
+      assert.ok(p.lp > m.gd.startLp(p.bandId), '应能超过上限');
+    }
   } finally {
     m.dispose();
   }

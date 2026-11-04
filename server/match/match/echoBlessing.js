@@ -90,10 +90,10 @@ export const ECHO_BLESSINGS = Object.freeze([
   // 生命（LP）一格是「一次漏怪抵扣 1 点、每回合最多扣 lpCapPerRound(10)」的量级，
   // 所以这里只给 2–8 点：够救一次失误，不够把深渊的漏怪抹平。
   // 四档分开写而不是「随机数值」，是为了让三选一里能同时出现两种不同档位。
-  { id: 'heal_xs', rarity: 'common', name: '绷带', desc: '立刻让全队回复 2 点生命（不超过上限）', kind: 'heal', group: 'heal', healLp: 2 },
-  { id: 'heal_s', rarity: 'common', name: '急救', desc: '立刻让全队回复 3 点生命（不超过上限）', kind: 'heal', group: 'heal', healLp: 3 },
-  { id: 'heal_m', rarity: 'rare', name: '支援', desc: '立刻让全队回复 6 点生命（不超过上限）', kind: 'heal', group: 'heal', healLp: 6 },
-  { id: 'heal_l', rarity: 'rare', name: '战地医疗', desc: '立刻让全队回复 8 点生命（不超过上限）', kind: 'heal', group: 'heal', healLp: 8 },
+  { id: 'heal_xs', rarity: 'common', name: '绷带', desc: '立刻让全队回复 2 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 2 },
+  { id: 'heal_s', rarity: 'common', name: '急救', desc: '立刻让全队回复 3 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 3 },
+  { id: 'heal_m', rarity: 'rare', name: '支援', desc: '立刻让全队回复 6 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 6 },
+  { id: 'heal_l', rarity: 'rare', name: '战地医疗', desc: '立刻让全队回复 8 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 8 },
 
   // —— 消除诅咒（2026-11-05）——
   // 只能清掉**对局中累积**的诅咒（`echoCurseIds`：挑战关失败降下的「侵蚀」等）。
