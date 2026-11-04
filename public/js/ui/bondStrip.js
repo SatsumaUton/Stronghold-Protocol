@@ -142,9 +142,11 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
  *   note, no 在场 count and no 当前效果 block (its numbers would promise an effect the mode never gives; the bond text stays).
  *   `entry.harmony` (the server's bond views: the +1 调和 added to `count`): 在场 n（含调和 +1） and the 调和 row
  */
-export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember, place = null, over = false, beside = null, owner = null, ownerId, off = false, morphMode = 'official' }) {
+export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember, place = null, over = false, beside = null, owner = null, ownerId, off = false, echoBanned = false, morphMode = 'official' }) {
   const b = data.lookup('bonds', bondId);
   if (!b) return null;
+  // 「深渊回响」的排异：这条盟约当前不许上人（可被「开路」或到期解除，2026-11-05）
+  const echoBannedNow = echoBanned === true;
   const count = entry?.count ?? 0;
   const layers = entry?.layers ?? 0;
   const th = Array.isArray(entry?.thresholds) && entry.thresholds.length ? entry.thresholds : b.thresholds || [];
@@ -179,7 +181,7 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
       <div class="bpop__titles">
         <${MicroLabel} tone="mint">${b.isCore ? t('CORE BOND // 核心盟约') : t('ADD-ON BOND // 附加盟约')}</${MicroLabel}>
         ${owner ? html`<span class="bpop__owner"><${GIcon} name="eye" />${tParts('{owner} 的盟约', { owner: html`<b>${owner}</b>` })}</span>` : null}
-        <h3 class="bpop__name">${b.name}</h3>
+        <h3 class="bpop__name">${b.name}${echoBannedNow ? html`<em class="bpop__echo-banned" title=${t('深渊排异：该盟约的干员暂时无法部署（可被「开路」或到期解除）')}>${t('已排异')}</em>` : null}</h3>
         <div class="bpop__facts">
           ${off ? null : html`<span>${t('在场')} <b class="num">${count}</b>${next != null ? html`<small class="num">/${next}</small>` : null}${countsHand ? html`<small>${t('（含整备区）')}</small>` : null}${harmony ? html`<small class="bpop__hnote" data-harmony=${harmony}>${t('（含{harmonyName} +{harmony}）', { harmonyName, harmony })}</small>` : null}</span>`}
           ${b.noStack ? html`<span>${t('层数不显示')}</span>` : html`<span>${t('层数')} <b class="num t-mint">${layers}</b></span>`}
