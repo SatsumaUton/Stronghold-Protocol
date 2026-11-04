@@ -120,8 +120,11 @@ export function OperatorImage({ m, chess, ownerId, skin = null, portrait = false
 }
 
 /** Official UI sprite by 'group/key' with a fallback. */
-export function Sprite({ k, class: cls, fallback = null }) {
-  return html`<${Img} src=${uiUrl(data.get('assets'), k)} class=${cx('sprite', cls)} fallback=${fallback} />`;
+/** 「深渊回响」：官方精灵图里的绿色转紫（白色像素无彩色，hue-rotate 对其是恒等变换）。 */
+export const DIVE_ICON_FILTER = 'hue-rotate(120deg) saturate(1.6) brightness(1.05)';
+
+export function Sprite({ k, class: cls, fallback = null, style = null }) {
+  return html`<${Img} src=${uiUrl(data.get('assets'), k)} class=${cx('sprite', cls)} fallback=${fallback} style=${style} />`;
 }
 
 /** Official promotion phase from the resolved record's status (not its shop tier or normal / golden form). */
