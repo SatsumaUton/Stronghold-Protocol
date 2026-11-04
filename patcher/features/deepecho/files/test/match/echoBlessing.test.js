@@ -188,3 +188,20 @@ test('每档稀有度都有抽取权重，且普通 > 稀有 > 传说（出现�
   assert.ok(hits.rare > hits.epic, `稀有(${hits.rare}) 应多于传说(${hits.epic})`);
   assert.ok(hits.epic > 0, '传说不是抽不到');
 });
+// 维护者 2026-11-05 反馈「延伸范围的祝福没有真正延伸」：这里用真实 sim 战斗验一遍。
+test('祝福「远程」：单位的攻击范围真的多一格（不是只有文案）', async () => {
+  const { makeBattle } = await import('../helpers/battleHarness.js');
+  const { applyEchoBlessingMods } = await import('../../server/match/match/echoBlessing.js');
+  const h = makeBattle({ units: [{ chessId: 'chess_char_1_01_a', row: 10, col: 5 }], enemies: [] });
+  const u = h.unit('chess_char_1_01_a');
+  h.step(0.5);
+  const before = u.rangeKeys.length;
+  assert.ok(before > 0, '基准范围要读到');
+  const mods = echoBlessingMods(['rng']);
+  assert.equal(mods.rangeExtend, 1, '远程祝福的 mods 是 rangeExtend: 1');
+  applyEchoBlessingMods(h.b, u, mods);
+  h.step(0.5);
+  assert.ok(u.rangeKeys.length > before, `范围应扩展（${before} → ${u.rangeKeys.length}）`);
+  assert.equal(u.s.rangeExtend, 1, '面板上的 rangeExtend 也是 1');
+  h.b.dispose?.();
+});

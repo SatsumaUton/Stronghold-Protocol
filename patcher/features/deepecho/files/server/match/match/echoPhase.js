@@ -856,6 +856,9 @@ export class MatchEcho {
         desc: b.desc,
         rarity: b.rarity || 'common',
         rarityLabel: ECHO_BLESSING_RARITY_LABEL[b.rarity] || '普通',
+        // 「远程」这类改攻击范围的祝福：准备阶段没有战斗、客户端拿不到 live 范围，
+        // 靠这个值把棋盘上的范围预览画对（2026-11-05）。
+        rangeExtend: Number(b.mods && b.mods.rangeExtend) || 0,
       })),
       offer,
       // 备战阶段的聚合情报（威胁值 / 是否精英 / 空中数量）；非深潜回合为 null
