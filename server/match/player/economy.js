@@ -204,31 +204,12 @@ export class PlayerEconomy {
    * check in the official game, "哪怕是已经有了两个相同干员情况"). Until 0.1.3 such a purchase was let through.
    */
   /**
-   * 「深渊回响」：买 / 卖之后**补货**，并且这次补货也算一次「免费刷新额度」（维护者 2026-11-05）。
+   * 「深渊回响」买 / 卖**不补货**（维护者 2026-11-05 更正）：买走的格子保持空位，和原版一致；
+   * 想换一批就按「刷新」（深潜自己的免费刷新额度 / 递增后的刷新价）。
    *
-   * 口径（维护者确认）：
-   *   * 补货本身**总是**会发生（不会因为额度用完就停）；
-   *   * 只要还有免费刷新额度，就消耗 1 次 —— 额度用完后再按「刷新」就要花钱。
+   * 2026-11-05 00:20 那个 commit（f557cf40）曾让买卖后自动补货并顺带扣 1 次免费额度，
+   * 实测手感是「买完立刻又冒出一个干员」，而且「卖」在没有任何已售格子时也会白扣一次额度 —— 已移除。
    */
-  _echoTradeKick() {
-    const m = this.m;
-    if (!m || m.echoVariant !== 'deepecho') return;
-    if (!Array.isArray(this.shop.slots) || !this.shop.slots.length) return;
-    if ((Number(this.shop.freeRefreshes) || 0) > 0) {
-      this.shop.freeRefreshes = Math.max(0, (Number(this.shop.freeRefreshes) || 0) - 1);
-    }
-    const layout = this.shop.layout || { chess: this.shop.slots.length, item: 0 };
-    const next = this.shop.slots.slice();
-    for (let i = 0; i < next.length; i++) {
-      const s = next[i];
-      if (s && s.sold !== true) continue;
-      next[i] = i < layout.chess ? this._rollChessSlot() : this._rollItemSlot();
-    }
-    this.shop.slots = next;
-    for (const s of next) if (s) s.frozen = this.shop.frozen;
-    this.dirty();
-  }
-
   buy(slotIdx) {    const g = this._gate(); if (g) return g;
     if (!Number.isInteger(slotIdx) || slotIdx < 0 || slotIdx >= this.shop.slots.length) return fail(ERR.BAD_TARGET);
     const slot = this.shop.slots[slotIdx];
@@ -261,7 +242,6 @@ export class PlayerEconomy {
     this.stats.buys++;
     this.round.buys++;
     this.m.dispatch(this, 'onBuy', { piece, slot, price, kind: slot.kind });
-    this._echoTradeKick();
     this._afterSpend(price, 'buy');
     this.recompute();
     return OK;
@@ -339,7 +319,6 @@ export class PlayerEconomy {
     this.addFunds(gain, { reason: 'sell' });
     this.stats.sells++;
     this.round.sells++;
-    this._echoTradeKick();
     this.checkItemMerges();
     this.recompute();
     return OK;
