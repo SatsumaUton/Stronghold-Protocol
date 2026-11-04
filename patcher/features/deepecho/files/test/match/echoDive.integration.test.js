@@ -1085,3 +1085,14 @@ test('隐藏核心通关：第 16 层开得出「额外那一次」三选一（3
   assert.equal(m.echoBlessingBonus, 0, '名额用掉后清零');
   assert.equal(m._echoPublic().blessingMax, 3, '发完之后名额回到 3');
 });
+// node-2 2026-11-05 实测卡死：`[match YMYM] guard: Cannot read properties of null (reading 'spawns')`
+// at withBounties ← _normalOpts。boss 回合 this.wave 为 null，任何普通场的 battle 选项构建都会崩。
+test('boss 回合 wave 为 null 时 _normalOpts 不再崩（防 COMBAT 卡死）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.wave = null;
+  const opts = m._normalOpts(m.alivePlayers()[0]);
+  assert.ok(opts && Array.isArray(opts.spawns), '要返回合法 opts');
+  assert.equal(opts.spawns.length, 0, '没有波次时就是空场，不是崩溃');
+});
