@@ -285,7 +285,14 @@ export class MatchEcho {
         }
       }, { priority: 59, owner: 'echo:blessing' });
     }    const altarStacks = Math.max(0, Math.min(2, Number(this.echoAltarBuffStacks) || 0));
+    // 深潜补给选的「临时词条」：只在本层生效
+    this.echoSupplyWords = (Array.isArray(this.echoSupplyWords) ? this.echoSupplyWords : []).filter((w) => w && w.round === this.round);
+    const supplyMods = {};
+    for (const w of this.echoSupplyWords) {
+      for (const [k, v] of Object.entries(w.mods || {})) supplyMods[k] = (Number(supplyMods[k]) || 0) + (Number(v) || 0);
+    }
     const mods = echoBlessingMods(this.echoBlessings);
+    for (const [k, v] of Object.entries(supplyMods)) mods[k] = (Number(mods[k]) || 0) + v;
     if (altarStacks > 0) {
       // 深渊祭坛：本层全队强化（每层最多叠 2 次）
       mods.atkPct = (Number(mods.atkPct) || 0) + 0.06 * altarStacks;
@@ -1210,6 +1217,8 @@ export class MatchEcho {
       // 生命惩罚（2026-11-05）：客户端据此把「预计扣血」也乘上去，别让预览和服务端不一致
       lp: { mul: this._echoCurseFx().lpMul, extra: this._echoCurseFx().lpExtra },
       intel: this._echoIntel(),
+      // 深潜补给（16 层起）：每名玩家自己的三选一
+      supply: this._echoSupplyView(),
       // 深渊祭坛（16 层起）：每名玩家各自的已购次数与价格
       altar: (() => {
         if (this.echoVariant !== 'deepecho' || this._echoDepth(this.round) < 16) return null;
@@ -1308,6 +1317,79 @@ export class MatchEcho {
       permanent: Number(ps.echoAltarDeployBonus) || 0,
       canPermanent: this._echoDepth(this.round) % 5 === 0,
     };
+  }
+
+  /** 已拥有的祝福对象列表（HUD / 测试用）。 */
+  /**
+   * 【深潜补给】16 层起，每层准备阶段给每名玩家一次**个人三选一**（维护者 2026-11-05：
+   * 深层没有 1–15 层那种道具 / 词条奖励界面，玩到后期就没东西可点）。
+   *
+   * 三个候选固定是三类：装备 / 资金 / 一次性祝福，各自独立随机。
+   */
+  _echoOpenSupply() {
+    if (this.echoVariant !== 'deepecho') return 0;
+    if (this._echoDepth(this.round) < 16) return 0;
+    if (!this.echoSupply || this.echoSupply.round !== this.round) {
+      this.echoSupply = { round: this.round, byPlayer: new Map() };
+    }
+    let n = 0;
+    for (const ps of this.alivePlayers()) {
+      if (ps.isBot || this.echoSupply.byPlayer.has(ps.playerId)) continue;
+      // 三类候选（维护者 2026-11-05：**不要给资金**，换成「临时词条」）
+      const itemIds = Object.keys((this.gd.raw && this.gd.raw.items) || {});
+      const itemId = itemIds.length ? itemIds[Math.floor((Number(this.rngWaves()) || 0) * itemIds.length)] : null;
+      const once = (Array.isArray(ECHO_BLESSINGS) ? ECHO_BLESSINGS : []).filter((b) => echoBlessingOneShot(b) && b.kind !== 'counter');
+      const bless = once.length ? once[Math.floor((Number(this.rngWaves()) || 0) * once.length)] : null;
+      const words = [
+        { kind: 'word', id: 'word_atk', name: '词条 · 强攻', desc: '本层全队攻击 +8%', mods: { atkPct: 0.08 } },
+        { kind: 'word', id: 'word_bat', name: '词条 · 疾速', desc: '本层全队攻速 +6%', mods: { batPct: 0.06 } },
+        { kind: 'word', id: 'word_hp', name: '词条 · 坚韧', desc: '本层全队生命 +8%', mods: { hpPct: 0.08 } },
+      ];
+      const word = words[Math.floor((Number(this.rngWaves()) || 0) * words.length)];
+      const options = [];
+      if (itemId) options.push({ kind: 'item', id: itemId, name: (this.gd.item(itemId) || {}).name || itemId });
+      if (bless) options.push({ kind: 'blessing', id: bless.id, name: bless.name, desc: bless.desc || '' });
+      if (word) options.push({ ...word });
+      if (options.length < 2) continue;
+      this.echoSupply.byPlayer.set(ps.playerId, { options: options.slice(0, 3), pick: null });
+      n += 1;
+    }
+    if (n) this.markPublic();
+    return n;
+  }
+
+  /** `g.echoSupply`：领取本次补给（个人选择，不需要投票）。 */
+  setEchoSupplyPick(ps, idx) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE);
+    if (!ps || ps.spectator) return fail(ERR.SPECTATOR);
+    const box = this.echoSupply && this.echoSupply.round === this.round ? this.echoSupply.byPlayer.get(ps.playerId) : null;
+    if (!box || box.pick != null) return fail(ERR.WRONG_PHASE);
+    const at = Math.floor(Number(idx));
+    if (!(at >= 0 && at < box.options.length)) return fail(ERR.BAD_MSG);
+    const card = box.options[at];
+    if (card.kind === 'item' && card.id) ps.acquireItem(card.id, { source: 'echoSupply' });
+    else if (card.kind === 'word' && card.mods) {
+      // 临时词条：本层全队生效（结算后失效，不进祝福列表）
+      this.echoSupplyWords = Array.isArray(this.echoSupplyWords) ? this.echoSupplyWords : [];
+      this.echoSupplyWords.push({ round: this.round, mods: { ...card.mods }, name: card.name });
+    }
+    else if (card.kind === 'blessing') {
+      const b = echoBlessingById(card.id);
+      if (b) this._echoGrantBlessing(b);
+    }
+    box.pick = at;
+    ps.dirty?.();
+    this.markPublic();
+    return OK;
+  }
+
+  /** 下发给客户端的补给视图（每名玩家只看自己的）。 */
+  _echoSupplyView() {
+    if (this.echoVariant !== 'deepecho') return null;
+    if (!this.echoSupply || this.echoSupply.round !== this.round || !this.echoSupply.byPlayer.size) return null;
+    const out = {};
+    for (const [id, box] of this.echoSupply.byPlayer) out[id] = { options: box.options, pick: box.pick };
+    return { round: this.round, byPlayer: out };
   }
 
   /** 已拥有的祝福对象列表（HUD / 测试用）。 */
