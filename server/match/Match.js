@@ -387,6 +387,8 @@ export class Match {
      * 结算时用它对账「这张卡是不是真打掉了」，避免把成功的一局判成「悬赏未达成」。
      */
     this.echoBountyPaid = [];
+    /** 待播报的深潜消息（诅咒 / 侵蚀词条 / 净化）；同一回合的多条合一行，见 _echoFlushAnnounce。 */
+    this._echoAnnounce = [];
     /** 已拥有的祝福 id（echoBlessing.js；同类不叠加，上限 3） */
     this.echoBlessings = [];
     /** 当前三选一的候选（id 数组；null = 没有进行中的抽取） */
