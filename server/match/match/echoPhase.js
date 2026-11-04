@@ -1268,6 +1268,7 @@ export class MatchEcho {
       // 深渊祭坛（16 层起）：每名玩家各自的已购次数与价格
       altar: (() => {
         if (this.echoVariant !== 'deepecho' || this._echoDepth(this.round) < 16) return null;
+        if (!this._echoAltarOpen()) return null;
         const used = {};
         for (const p of this.alivePlayers()) used[p.playerId] = this._echoAltarUsed(p);
         return {
@@ -1301,6 +1302,25 @@ export class MatchEcho {
    *
    * 只在深潜 16 层以后开放，其它房间一行都不碰。
    */
+  /**
+   * 祭坛本层是否开放（维护者 2026-11-05：不要每层都有，做成随机事件，约 45%，保底 3 层）。
+   */
+  _echoAltarOpen() {
+    if (this.echoVariant !== 'deepecho') return false;
+    const depth = this._echoDepth(this.round);
+    if (depth < 16) return false;
+    if (this.bossWaves) return false;
+    if (this.echoAltarOpenRound === this.round) return this.echoAltarOpen === true;
+    // 简化口径：每 3 层必开一次，其余层 35% 随机
+    const forced = depth % 3 === 0;
+    const roll = Number(this.rngWaves());
+    const open = forced || (Number.isFinite(roll) ? roll : 1) < 0.35;
+    this.echoAltarOpenRound = this.round;
+    this.echoAltarOpen = open;
+    if (open) this.echoAltarLastDepth = depth;
+    return open;
+  }
+
   echoAltarCosts() {
     const d = Math.max(16, this._echoDepth(this.round));
     return {
@@ -1778,6 +1798,15 @@ export class MatchEcho {
           this._echoPushAnnounce(`净化：移除 ${removed} 层诅咒`);
           this._echoFlushAnnounce();
         }
+      }
+    }
+    // 灾厄祝福（2026-11-05）：拿到就**立刻附加**一条诅咒（强力但有代价）
+    if (b && typeof b.curseOnTake === 'string' && b.curseOnTake) {
+      const seedKey = `echo:blessCurse:${b.id}:${this.round}`;
+      const added = this._echoAddCurse(b.curseOnTake, createRng(deriveSeed(this.seed, seedKey)));
+      if (added) {
+        this._echoPushAnnounce(`「${b.name}」的代价：深渊降下诅咒「${added.name}」`);
+        this._echoFlushAnnounce();
       }
     }
     // 克制祝福（2026-11-05）：直接驱散对应的诅咒 / 解除部署禁令

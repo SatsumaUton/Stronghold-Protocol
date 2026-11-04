@@ -95,6 +95,10 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'heal_m', rarity: 'rare', name: '支援', desc: '立刻让全队回复 6 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 6 },
   { id: 'heal_l', rarity: 'rare', name: '战地医疗', desc: '立刻让全队回复 8 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 8 },
 
+  // —— 灾厄祝福（2026-11-05）：强力但**拿到就立刻附上一条诅咒** ——
+  { id: 'doom_atk', rarity: 'epic', name: '血契', desc: '全体干员攻击 +18%；立刻附加诅咒「狂怒」（敌方攻击 +10%）', kind: 'mods', mods: { atkMul: 1.18 }, curseOnTake: 'frenzy' },
+  { id: 'doom_bat', rarity: 'epic', name: '疾影', desc: '全体干员攻速 +15%；立刻附加诅咒「断弦」（本回合远程干员攻速 −10%）', kind: 'mods', mods: { batPct: 0.15 }, curseOnTake: 'weak_ranged' },
+  { id: 'doom_hp', rarity: 'epic', name: '铁壁', desc: '全体干员生命 +20%；立刻附加诅咒「甲壳」（敌方防御 +200）', kind: 'mods', mods: { hpMul: 1.20 }, curseOnTake: 'carapace' },
   // —— 消除诅咒（2026-11-05）——
   // 只能清掉**对局中累积**的诅咒（`echoCurseIds`：挑战关失败降下的「侵蚀」等）。
   // 奇迹·诅咒 / 远见·诅咒是深渊的固定限制（`_echoCurses()` 里的两条），**永远消不掉** ——

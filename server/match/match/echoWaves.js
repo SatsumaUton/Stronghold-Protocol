@@ -595,14 +595,15 @@ export function echoRandomWave(gd, tpl, opts, rng, helpers) {
     const pick = use[Math.min(use.length - 1, Math.floor((Number(rng()) || 0) * use.length))];
     const isFly = use === pool2.fly;
     // 「频次怪」（按攻击次数结算）：每波最多 1 种、每条最多 2 只，避免成片出现清不掉（维护者 2026-11-05）
+    let useCount = count;
     if (hitCount.has(pick.key)) {
       if (hitSeen) continue;
       hitSeen = true;
-      count = Math.min(count, 2);
+      useCount = Math.min(useCount, 2);
     }
-    slots.push({ enemyKey: pick.key, routeIndex: -1, fly: isFly, time, count, interval, window: count * interval, threat: pick.threat });
-    unitsLeft -= count;
-    if (isFly) flyLeft = Math.max(0, flyLeft - count);
+    slots.push({ enemyKey: pick.key, routeIndex: -1, fly: isFly, time, count: useCount, interval, window: useCount * interval, threat: pick.threat });
+    unitsLeft -= useCount;
+    if (isFly) flyLeft = Math.max(0, flyLeft - useCount);
     if (unitsLeft <= 0) break;
   }
   if (!slots.length) return null;
