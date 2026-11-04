@@ -140,6 +140,8 @@ export class MatchIntents {
       case 'g.rerollVote': return this.voteSetupReroll(ps, msg.voteId, msg.agree);
       // 战斗 2 倍速: the seat's standing vote (speedVote.js)
       case 'g.speedVote': return this.setSpeedVote(ps, msg.agree === true);
+      // 深渊回响：祝福三选一的投票（echoBlessing.js）
+      case 'g.echoBlessing': return this.setEchoBlessingVote(ps, msg.pick);
       case 'g.band': return this.pickBand(ps, msg.bandId);
       case 'g.bandSkip': return this.skipBand(ps);
       // 预约盟约（纯显示，移植自参考版）：声明这一局打算走哪个核心盟约

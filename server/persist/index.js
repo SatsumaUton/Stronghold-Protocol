@@ -36,6 +36,9 @@ export async function createPersistence({ opts = {}, registry, lobby, log }) {
   lobby.persistFlush = (reason = 'event') => {
     try { persister.flush(reason).catch(() => {}); } catch { /* ignore */ }
   };
+  // 「深渊回响」深潜排行榜要用同一张共用 Redis（server/match/match/echoBoard.js）；
+  // 只暴露句柄，不改变任何持久化行为。
+  lobby.persistStore = store;
   log.info?.(`[persist] checkpoints on (every ${persister.saveMs / 1000} s)`);
   return {
     persister, store, restored,

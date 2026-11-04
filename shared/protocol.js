@@ -514,7 +514,7 @@ export const C2S = {
   // soloUnlimited: the timed-solo opt-out 「不限时」 (DESIGN §35.23.10). Optional, and only the literal boolean —
   // the server applies `true` solely to a solo room of a version whose solo is timed, and ignores it otherwise, so a
   // default create stays the message it was.
-  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, version: isVersionId, soloUnlimited: isBool, experimental: (v) => v && typeof v === 'object' && !Array.isArray(v), $optional: ['test', 'difficulty', 'version', 'soloUnlimited', 'experimental'] },
+  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, version: isVersionId, soloUnlimited: isBool, experimental: (v) => v && typeof v === 'object' && !Array.isArray(v), variant: (v) => v === 'deepecho', $optional: ['test', 'difficulty', 'version', 'soloUnlimited', 'experimental', 'variant'] },
   'room.join': { $optional: ['testAck'], testAck: (v) => v === true, code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'room.leave': {},
   'account.resume': {},
@@ -615,6 +615,10 @@ export const C2S = {
   'g.rerollVote': { voteId: (v) => isInt(v, 1, 2 ** 31), agree: isBool },
   // 战斗 2 倍速 (server/match/match/speedVote.js): this seat's standing vote; m.public speedVote is the count
   'g.speedVote': { agree: isBool },
+  // 「深渊回响」的祝福三选一 (server/match/match/echoBlessing.js, ui/echoBlessing.js):
+  // `pick` 是候选下标（0..2）。**必须登记在这里** —— 漏了的话 net.js 会在客户端就把它拦掉，
+  // 服务端 intents.js 的 case 永远收不到（与 g.bondPlan 踩过的是同一个坑）。
+  'g.echoBlessing': { pick: (v) => isInt(v, 0, 2) },
   'g.band': { bandId: isId },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is

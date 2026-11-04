@@ -91,10 +91,19 @@ export function buildResult(m, outcome) {
   const gd = m.gd;
   const { victory, hiddenReached, hiddenCleared } = outcome;
   const players = [...m.players.values()].sort((a, b) => a.seat - b.seat);
+  // 「深渊回响」：深度就是成绩。深潜房不走原版「回合 ≤ bossRound」的口径，
+  // 也不发称号 / 奖杯 / 奖励（无尽模式的成绩只体现在深度与排行榜上）。
+  const dive = m.echoVariant === 'deepecho';
+  const diveStart = dive ? Math.max(1, Math.floor(Number(m.echoDiveStart) || 1)) : 0;
+  const depthOf = (r) => (dive ? Math.max(0, Math.floor(Number(r) || 0) - diveStart + 1) : null);
   const titles = assignTitles(gd, players.filter(ps => !Number.isInteger(ps.aiTakeoverRound)), victory);
-  const teamRounds = victory ? gd.bossRound + (hiddenCleared ? 1 : 0) : Math.max(0, Math.min(m.round, gd.bossRound) - 1);
+  const teamRounds = dive
+    ? Math.max(0, Math.floor(Number(m.round) || 0))
+    : (victory ? gd.bossRound + (hiddenCleared ? 1 : 0) : Math.max(0, Math.min(m.round, gd.bossRound) - 1));
   const rows = players.map((ps) => {
-    const roundsPassed = !ps.alive && ps.eliminatedRound != null ? Math.max(0, ps.eliminatedRound - 1) : teamRounds;
+    const roundsPassed = dive
+      ? Math.max(0, Math.floor(Number(ps.eliminatedRound != null ? ps.eliminatedRound : m.round) || 0))
+      : (!ps.alive && ps.eliminatedRound != null ? Math.max(0, ps.eliminatedRound - 1) : teamRounds);
     const lineup = boardOrder(ps.board).filter((x) => x.piece.kind === 'chess').map(({ r, c, piece }) => {
       const e = { id: piece.id, golden: gd.isGolden(piece.id), tier: gd.tierOf(piece.id), row: r, col: c, items: (piece.items || []).map((i) => i.id) };
       // 0.2.0 自选编队: a DIY slot's pick — the result screen names and draws the operator (shared/diy.js diyRecord)
@@ -131,8 +140,10 @@ export function buildResult(m, outcome) {
         perfectRounds: ps.stats.perfectRounds,
       },
       title: m.test === true || Number.isInteger(ps.aiTakeoverRound) ? null : titles.get(ps.playerId) ?? null,
-      trophies: m.test === true || Number.isInteger(ps.aiTakeoverRound) ? 0 : trophiesFor(gd, roundsPassed, cleared && hiddenCleared),
-      reward: m.test === true || Number.isInteger(ps.aiTakeoverRound) ? 0 : rewardFor(gd, roundsPassed),
+      // 「深渊回响」：这个玩家自己到达的深度（中途出局取他出局的那一层，不是整局的）
+      ...(dive ? { echoDepth: depthOf(ps.eliminatedRound != null ? ps.eliminatedRound : m.round) } : {}),
+      trophies: m.test === true || Number.isInteger(ps.aiTakeoverRound) || dive ? 0 : trophiesFor(gd, roundsPassed, cleared && hiddenCleared),
+      reward: m.test === true || Number.isInteger(ps.aiTakeoverRound) || dive ? 0 : rewardFor(gd, roundsPassed),
     };
   });
   const out = {
@@ -147,6 +158,8 @@ export function buildResult(m, outcome) {
     modeId: m.modeId,
     difficulty: m.difficulty,
     stageId: m.stageId,
+    // 「深渊回响」：整局的最终深度（= 结算界面上的成绩）；普通房间不出现这个键
+    ...(dive ? { variant: 'deepecho', echoDepth: depthOf(m.round), echoDiveStart: diveStart } : {}),
     // a non-default official version's match (DESIGN §35.23): its registry id — the page records and draws the settlement
     // with that version even when it never saw the room (the lobby's replay after a kick / grace timeout); absent for
     // the default, so its result stays byte-identical

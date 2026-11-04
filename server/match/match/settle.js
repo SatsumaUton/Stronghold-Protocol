@@ -52,6 +52,29 @@ export class MatchSettle {
       ps.stats.dmgDealt += Number(r.damageDealt) || 0;
       ps.stats.healing += Number(r.healingDone) || 0;
       if (r.perfect !== false && counted === 0) ps.stats.perfectRounds++;
+      // 「深渊回响」挑战关（深度 5 / 10）结算：只发给本人，按本回合漏怪分档（维护者 2026-11-05）。
+      // 完美通关的「装备三选一」另接（道具补给池），这里先落资金档位。
+      if (this.echoVariant === 'deepecho') {
+        const depth = this._echoDepth();
+        if (depth === 5 || depth === 10) {
+          // 团队完美：所有活着的人本回合都 0 漏 → 下一次选秀强制道具补给三选一
+          const teamPerfect = this.alivePlayers().every((q) => {
+            const rr = this.lastResults.get(q.playerId) || {};
+            return (rr.leaked || []).filter((l) => l && l.counted !== false).length === 0 && rr.perfect !== false;
+          });
+          // 完美通关的团队奖励改成「一次祝福选择」（维护者 2026-11-05：
+          // 装备三选一牵涉新交互，直接用现有的祝福流程更省事）
+          if (teamPerfect) this.echoBlessingDraws = (Number(this.echoBlessingDraws) || 0) + 1;
+          // 奖励随回合提升：10 层比 5 层多一档（维护者 2026-11-05）
+          const mul = depth === 10 ? 1.5 : 1;
+          const base = counted === 0 ? 30 : counted <= 2 ? 15 : counted <= 5 ? 8 : 1;
+          const coin = Math.max(1, Math.round(base * mul));
+          if (coin > 0) {
+            ps.addFunds(coin, { reason: 'echoChallenge' });
+            this.tickerText?.(`${ps.name}：挑战关奖励 +${coin} 资金`, 1);
+          }
+        }
+      }
       // bounty coins (own battle + unite kills) are credited to the next prep
       let coins = Math.max(0, Math.trunc(Number(r.coins) || 0));
       const up = combinedUnite && combinedUnite.perPlayer && combinedUnite.perPlayer[ps.playerId];
@@ -63,6 +86,11 @@ export class MatchSettle {
       ps.creditedKills += creditedKillsOf(r) + creditedKillsOf(up);
       // perfect-payout bounties (战术特训): own phase perfect
       for (const b of ps.bounties) if (b.card.payout === 'perfect' && counted === 0 && r.perfect !== false) coins += b.card.coin;
+      // C 类祝福「丰收」：全局资金掉落 +20%（echoBlessing.js；普通房间 `_echoCoinMul()` 恒为 1，一个字节不变）
+      if (coins > 0) {
+        const mul = this._echoCoinMul();
+        if (mul !== 1) coins = Math.max(0, Math.round(coins * mul));
+      }
       if (coins > 0) { ps.pendingFunds += coins; ps.stats.fundsGained += coins; }
       for (const b of ps.bounties) b.roundsLeft--;
       ps.bounties = ps.bounties.filter((b) => b.roundsLeft > 0);
@@ -71,7 +99,7 @@ export class MatchSettle {
       for (const [bondId, n] of Object.entries(r.layerGains || {})) {
         if (!this.gd.bond(bondId) || !(n > 0)) continue;
         const before = ps.layers[bondId] || 0;
-        const add = layerGainRoom(before, Math.floor(n), this.disableLayerCap);
+        const add = layerGainRoom(before, Math.floor(n), this.layerCapOff);
         if (!(add > 0)) continue;
         ps.layers[bondId] = before + add;
         this.dispatch(ps, 'onLayers', { bondId, from: before, to: ps.layers[bondId], reason: 'battle' });
@@ -140,6 +168,8 @@ export class MatchSettle {
   afterSettle({ reason } = {}) {
     this._finalizePendingDeaths({ reason });
     if (!this.alivePlayers().length) { this.finish({ victory: false, reason: 'eliminated' }); return; }
+    // 「深渊回响」无尽：正常只会在团灭时结束（上一行），这里只有撞到安全阀（ECHO_SAFE_ROUND）才走。
+    if (this._echoAtEnd()) { this.finish({ victory: true, reason: 'victory' }); return; }
     resetRoundCounters(this); // AI bot merge-counter resets each round (server/match/botEmotes.js)
     this.startRound(this.round + 1);
   }
@@ -161,7 +191,12 @@ export class MatchSettle {
     this.phase = PHASE.RESULT;
     this.deadline = 0;
     for (const f of this.fields) f.live = false;
-    this.outcome = { victory: !!victory, hiddenReached: this.hiddenReached, hiddenCleared: !!hiddenCleared, reason };
+    this.outcome = { victory: !!victory, hiddenReached: this.hiddenReached, hiddenCleared: !!hiddenCleared, reason,
+      // 「深渊回响」无尽：把**深度**记进结算 —— 深度就是这个模式的成绩。
+      // 普通房间不出现这几个键，outcome 的形状与加这个模式之前逐字不变（golden 守着）。
+      ...(this.echoVariant === 'deepecho'
+        ? { variant: 'deepecho', echoRound: this.round, echoDepth: this._echoDepth(), echoDiveStart: this.echoDiveStart }
+        : {}) };
     let result;
     try {
       result = buildResult(this, this.outcome);

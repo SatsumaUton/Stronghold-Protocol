@@ -72,7 +72,7 @@ export function collectViolations(m, { limit = 25 } = {}) {
     if (!Number.isInteger(ps.shop.freeRefreshes) || ps.shop.freeRefreshes < 0) fail(`${id}: freeRefreshes ${ps.shop.freeRefreshes}`);
     // the official per-bond layer cap (shared/constants.js): no writer may pass it — a room's experimental
     // `disableLayerCap` lifts it to BOND_LAYER_SAFE_MAX for that match
-    const layerCap = m.disableLayerCap ? BOND_LAYER_SAFE_MAX : BOND_LAYER_CAP;
+    const layerCap = m.layerCapOff ? BOND_LAYER_SAFE_MAX : BOND_LAYER_CAP;
     for (const [b, v] of Object.entries(ps.layers || {})) {
       if (!(Number.isFinite(v) && v >= 0 && (!(layerCap > 0) || v <= layerCap))) fail(`${id}: ${b} layers ${v}`);
     }

@@ -126,7 +126,11 @@ export class MatchOffers {
     const reason = `offer:${w.pluginId}:${w.id}`;
     if (effect.funds !== undefined) ps.addFunds(effect.funds, { reason });
     else if (effect.pendingFunds !== undefined) ps.pendingFunds += effect.pendingFunds;
-    else if (effect.freeRefresh !== undefined) ps.shop.freeRefreshes += effect.freeRefresh;
+    else if (effect.freeRefresh !== undefined) {
+      ps.shop.freeRefreshes += effect.freeRefresh;
+      const mm = ps.m;
+      if (mm && mm.echoVariant === 'deepecho') ps.shop.freeRefreshes = Math.min(ps.shop.freeRefreshes, 3);
+    }
     else if (effect.layers) ps.addLayers(effect.layers.bond, effect.layers.count, { reason });
     else if (effect.item && !ps.acquireItem(effect.item, { source: reason })) return false;
     else if (effect.chess && !ps.acquireChess(effect.chess, { source: reason })) return false;

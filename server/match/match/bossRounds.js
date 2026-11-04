@@ -567,12 +567,26 @@ export class MatchBoss {
           this.bossPool = null;
           this.tickerText('隐秘核心已解锁', FLOW_TICKER_PRIORITY);
           this.startRound(this.gd.hiddenRound);
+        } else if (this.echoVariant === 'deepecho' && victory) {
+          // 「深渊回响」: 没打隐藏核心的队伍也进深潜，起点是刚打完的这一关之后（R15）
+          this.bossPool = null;
+          this.tickerText('深潜开始', FLOW_TICKER_PRIORITY);
+          this.startRound(this._echoBeginDive(this.round));
         } else {
           this.finish({ victory, reason: victory ? 'victory' : 'defeat' });
         }
       });
     } else {
-      this.later(this.scaled(DELAYS.SETTLE), () => this.finish({ victory: true, hiddenCleared: victory, reason: 'victory' }));
+      this.later(this.scaled(DELAYS.SETTLE), () => {
+        // 「深渊回响」: 打过隐藏核心 → 深潜从 R16 起，并多给一次祝福抽取（隐藏多打了一关的补偿）
+        if (this.echoVariant === 'deepecho' && victory) {
+          this.bossPool = null;
+          this.tickerText('深潜开始', FLOW_TICKER_PRIORITY);
+          this.startRound(this._echoBeginDive(this.round, { hiddenCleared: true }));
+          return;
+        }
+        this.finish({ victory: true, hiddenCleared: victory, reason: 'victory' });
+      });
     }
   }
 }

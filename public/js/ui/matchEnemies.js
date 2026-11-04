@@ -80,6 +80,9 @@ export function MatchEnemies({ pub, gd, idScope = 'brief' }) {
   const factions = gd.factions?.types || {};
   const m = gd.m;
 
+  // 「深渊回响」：整个「本局遭遇敌方」块都不显示 —— 深潜的敌人（包括返场 boss）全部由威胁预算随机组合，
+  // 提前公布某个具体领袖/特训类型反而误导（维护者 2026-11-03 定）。普通房间照旧，行为不变。
+  if (pub?.echo) return null;
   return html`<div class="brief-enemies">
     <h3 class="brief-h"><span>${t('本局遭遇敌方')}</span><${MicroLabel}>ENEMY LEADER // SPECIAL ENEMIES</${MicroLabel}></h3>
     <div class="brief-enemy">

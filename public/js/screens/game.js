@@ -153,6 +153,7 @@ import { t, tParts } from '../../../shared/i18n.js';
 import { contentSet } from '../content.js';
 import { DEFAULT_VERSION, shownVersion } from '../versions.js';
 import { VersionVote } from '../ui/versionVote.js';
+import { EchoBlessing } from '../ui/echoBlessing.js';
 import { TestConsole } from '../ui/testConsole.js';
 
 // 作战统计 is opt-in (settings `combatMetrics`, default off). The runner does not import the settings store;
@@ -214,6 +215,12 @@ export function GameScreen() {
     const id = setTimeout(() => { hold.current = null; endHold((n) => n + 1); }, Math.max(0, hold.current.until - Date.now()));
     return () => clearTimeout(id);
   }, [held]);
+  // 「深渊回响」：确认本局信息 / 选策略 / 对局中 / 结算 四类界面统一换主题（theme.css 的 html.sp-deepecho）。
+  // 必须放在下面那个 `if (!pub …) return` **之前** —— hooks 不能跟在条件返回后面。
+  // 判据两路取或：`pub.echo`（对局中一定有）**或** 房间 variant（选策略/确认本局信息阶段
+  // pub 里还没有 echo，只靠前者会让整个「选择策略」一屏仍然是绿的 —— 维护者 2026-11-04 实测）。
+  const diveRoom = useStore((s) => s.room?.variant === 'deepecho');
+  useDocClass('sp-deepecho', !!pub?.echo || diveRoom);
   if (!pub || !gd.ready || !versionReady) {
     return html`<div class="screen gload">
       <${Spinner} size="lg" label=${pub ? 'LOADING DATA' : 'ENTERING SIMULATION'} />
@@ -228,6 +235,9 @@ export function GameScreen() {
   else body = html`<${MatchScreen} />`;
   return html`${body}
     ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} room=${voteRoom} class="vervote--float" />` : null}
+    ${!hasResult && mode !== 'result' ? html`<${EchoBlessing} pub=${pub} />` : null}
+    ${/* 深潜的深度已顶替 HUD 的回合数字；词条/祝福改放在「本局信息」抽屉里（EchoInfoBlock），
+        不再有浮在屏幕上的状态条挡住 HUD 和按钮（维护者 2026-11-04） */ null}
     ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
     ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} reason=${endReason} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${TestConsole} />` : null}`;

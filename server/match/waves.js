@@ -36,6 +36,8 @@
 // largest owner group (client `_CalculateActionPredelayConsiderUid`, decoded).
 
 import { createRng, deriveSeed } from '../sim/rng.js';
+import { echoRandomWave } from './match/echoWaves.js';
+import { ECHO_BUDGET_BASE } from './match/echo.js';
 import { PLUGIN_ACTION_UNITS } from '../../shared/plugins/limits.js';
 
 const ACLOON = 'enemy_9012_acloon';
@@ -279,9 +281,9 @@ export function gateOf(start, leader) {
   return target >= PEN_UPPER_ROW ? 'upper' : 'lower';
 }
 
-const isLeaderTemplate = (tpl) => !!tpl && (tpl.kind === 'boss' || tpl.kind === 'hidden');
+export const isLeaderTemplate = (tpl) => !!tpl && (tpl.kind === 'boss' || tpl.kind === 'hidden');
 
-function previewInfo(gd, key, route, boss = false, leader = undefined) {
+export function previewInfo(gd, key, route, boss = false, leader = undefined) {
   const e = gd.enemy(key);
   const start = route && Array.isArray(route.start) ? route.start.slice(0, 2) : null;
   return { gate: gateOf(start, leader), start, fly: isFlyKey(gd, key), elite: !!(e && e.rank && e.rank !== 'NORMAL'), boss };
@@ -292,8 +294,8 @@ function previewInfo(gd, key, route, boss = false, leader = undefined) {
  * @returns {{ spawns: object[], actions: object[] }} actions[i] = { index, key, tplKey, slot, time, count, tplCount, window, routeIndex, valid,
  *   server } (`server` = client ShouldActionUpToServer: valid, not the leader, no random spawn group)
  */
-function templateSpawns(gd, tpl, round, pick) {
-  const scale = scaleFor(gd, round);
+function templateSpawns(gd, tpl, round, pick, scaleOverride = null) {
+  const scale = scaleOverride && typeof scaleOverride === 'object' ? scaleOverride : scaleFor(gd, round);
   const ph = placeholderMap(gd);
   const routes = Array.isArray(tpl.routes) ? tpl.routes : [];
   const leader = isLeaderTemplate(tpl);
@@ -363,6 +365,9 @@ function entriesView(gd, pick) {
   return pick.fly ? { ground: null, fly: view } : { ground: view, fly: null };
 }
 
+// 「深渊回响」深潜的出怪实现**不在本文件**：全部在 ./match/echoWaves.js（echoPoolFor / echoRemapByBudget /
+// echoSyncActions）。本文件只在 buildNormalWave 里保留了唯一一个调用点，普通模式不会进入。
+
 /**
  * Shared composition of a normal round.
  * @param {string[]|object} factions setupMatchWaves().factions (carries the schedule), the setup object, or a plain
@@ -370,14 +375,43 @@ function entriesView(gd, pick) {
  * @returns {{ templateId: string|null, spawns: object[], routes: object[], extraRoutes: object[], timeLimit: number,
  *   overrides: object, pick: object|null, entries: { ground: object|null, fly: object|null }, actions: object[] }}
  */
-export function buildNormalWave(gd, rng, factions, round) {
-  const rc = gd.roundCfg(round);
+export function buildNormalWave(gd, rng, factions, round, opts = null) {
+  // 「深渊回响」的深潜回合（DESIGN-ABYSS.md「第二步的拦路发现」）：显示回合与数据回合不是同一个数。
+  // 波次模板只覆盖到 bossRound-1，深潜按 1..13 循环取用；但敌人强度仍按显示回合延伸。
+  // 所以模板 / 时限 / 编组抽取查 `dataRound`，缩放（templateSpawns 里的 scaleFor）仍查 `round`。
+  // 普通回合两者相等（opts 为空 → dataRound === round），行为与加这个参数之前逐字节一致。
+  const dataRound = opts && Number.isInteger(opts.dataRound) && opts.dataRound > 0 ? opts.dataRound : round;
+  const rc = gd.roundCfg(dataRound);
   const templateId = rc && typeof rc.template === 'string' ? rc.template : null;
   const tpl = templateId ? gd.wave(templateId) : null;
-  const timeLimit = gd.combatTimeLimit(round);
+  // 深潜 16 层以后（echoWaves.echoDeepWaveShape）每一层的规模是按深度设计的，作战时限也跟着固定成
+  // 「最后一关」的时长：否则深度 16 会轮回到数据回合 1 的 90 秒时限，却要放 110 只怪 —— 挤成 20 秒的洪水，
+  // 之后整场空转（维护者 2026-11-04 §6「按层设计出怪量」的同一条要求）。
+  const limitRound = opts && Number.isInteger(opts.echoTimeLimitRound) && opts.echoTimeLimitRound > 0
+    ? opts.echoTimeLimitRound
+    : dataRound;
+  // 【深渊回响】15 层非隐藏：不用 boss 回合的时限，可以直接指定（维护者 2026-11-05）
+  const timeLimit = Number.isFinite(opts && opts.echoTimeLimitSec) && opts.echoTimeLimitSec > 0
+    ? Math.floor(opts.echoTimeLimitSec)
+    : gd.combatTimeLimit(limitRound);
   if (!tpl) return { templateId, spawns: [], routes: [], extraRoutes: [], timeLimit, overrides: {}, pick: null, entries: { ground: null, fly: null }, actions: [] };
-  const pick = roundPick(gd, rng, factions, round);
-  const { spawns, actions } = templateSpawns(gd, tpl, round, pick);
+  // 【深渊回响】预生成的编组：传了 opts.pick 就不再现场抽，
+  // 这样每回合可以从预先生成好的若干套里抽一套（仍是原版合法编组）。
+  const pick = (opts && opts.pick) || roundPick(gd, rng, factions, dataRound);
+  const built = templateSpawns(gd, tpl, round, pick);
+  // 「深渊回响」深潜：**整波随机生成**（出几条 / 什么怪 / 多少只 / 什么时候出 / 走哪条路线都随机，
+  // 不再沿用原版的出怪动作），强度仍按显示回合缩放（echoScale 放进 mods）。
+  // 普通回合 opts 里没有 echoGrowth → echoRandomWave 返回 null，走原版路径，逐字节不变。
+  const echoWave = echoRandomWave(gd, tpl, opts ? {
+    ...opts,
+    echoScale: scaleFor(gd, round),
+    echoBudget: ECHO_BUDGET_BASE * (Number(opts.echoGrowth) || 1),
+    echoTimeLimit: timeLimit,
+    // 前期（深潜前几层）沿用原版动作，之后才彻底随机 —— 由 echoWaves.ECHO_TEMPLATE_DEPTH 控制
+    echoTemplate: built.spawns,
+  } : null, rng, { isFlyKey, classOf, previewInfo, isLeaderTemplate, roundMods });
+  const spawns = echoWave ? echoWave.spawns : built.spawns;
+  const actions = echoWave ? echoWave.actions : built.actions;
   return {
     templateId,
     spawns,
@@ -395,8 +429,10 @@ export function buildNormalWave(gd, rng, factions, round) {
  * Boss / hidden round template for one boss field; escorts follow the pick of the round's own slot.
  * @param {{ bossId: string, solo: boolean }} opts solo → `_s` template (lone player or solo mode)
  */
-export function buildBossWave(gd, rng, factions, round, { bossId, solo }) {
-  const rc = gd.roundCfg(round);
+export function buildBossWave(gd, rng, factions, round, { bossId, solo, cfgRound = null, scale = null }) {
+  // 深潜的 boss 返场（R20 / R25 / R30…）没有自己的 roundCfg（数据表只到 15），模板借用玩家实际打过的
+  // 最后一个 boss 回合；但**缩放仍按显示回合**（templateSpawns 拿到的 round 就是显示回合，走 echoScale）。
+  const rc = gd.roundCfg(Number.isInteger(cfgRound) ? cfgRound : round);
   const map = rc && rc.bossTemplates && typeof rc.bossTemplates === 'object' ? rc.bossTemplates : {};
   let templateId = typeof map[bossId] === 'string' ? map[bossId] : null;
   if (!templateId) {
@@ -408,7 +444,7 @@ export function buildBossWave(gd, rng, factions, round, { bossId, solo }) {
   const tpl = templateId ? gd.wave(templateId) : null;
   if (!tpl) return { templateId, spawns: [], routes: [], extraRoutes: [], timeLimit: Infinity, overrides: {}, pick: null, entries: { ground: null, fly: null }, actions: [] };
   const pick = roundPick(gd, rng, factions, round);
-  const { spawns, actions } = templateSpawns(gd, tpl, round, pick);
+  const { spawns, actions } = templateSpawns(gd, tpl, round, pick, scale);
   return {
     templateId,
     spawns,

@@ -104,6 +104,8 @@ export class MatchViews {
       hiddenBossId: this.hiddenBossId,
       bossRound: this.gd.bossRound,
       hiddenRound: this.gd.hiddenRound,
+      // 「深渊回响」: 深潜进度与本期侵蚀词条。普通房间不出现这个键，帧与加这个模式之前逐字节相同。
+      ...(this.echoVariant === 'deepecho' ? { echo: this._echoPublic() } : {}),
       bossPairs: this.bossWaves ? this.bossWaves.map(w => w.players.slice()) : this.bossPairs ? this.bossPairs.map(ids => ids.slice()) : null,
       spRound: this.gd.spRounds().includes(this.round),
       // DESIGN §14: 'client' = battles are simulated by the browsers (b.start specs), 'server' = legacy streaming
@@ -302,6 +304,9 @@ export class MatchViews {
       return previewOf([...g.wave.spawns, ...bountySpawns(this.gd, this.round, g.wave, ps.bounties, ps.playerId, { solo: this.isSolo, side: g.side })]);
     }
     if (!this.wave) return [];
+    // 「深渊回响」深潜：维护者 2026-11-03 定 —— 原版「敌方情报」面板的四项全部保留
+    // （回合数+敌人总数 / 阵营 chips / 逐只敌人列表 / boss 领袖块），所以这里照常发明细；
+    // 额外的威胁值/是否精英/下次节点是 `m.public.echo.intel` 另发的一块，两者并存。
     const bounty = bountySpawns(this.gd, this.round, this.wave, ps.bounties, ps.playerId, { solo: this.isSolo });
     return previewOf([...this.wave.spawns, ...bounty]);
   }

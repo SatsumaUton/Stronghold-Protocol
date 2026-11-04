@@ -118,6 +118,16 @@ export function stageNote(stages) {
   return Number.isInteger(stages) && stages > 1 ? t('战场随机（共{stages}张）', { stages }) : '';
 }
 
+/**
+ * 「深渊回响」开放的难度（维护者 2026-11-03 选 B：不给 4 档，只给 3 档）。
+ *
+ * 排除「标准模拟 FUNNY」的原因：它的敌人强度曲线是按前 14 回合设计的，R15 之后压力太低，
+ * 谁去打都能潜到底，深度就失去区分度了。所以深潜只留 险境 / 绝境 / 终极 三档。
+ */
+export const DEEP_ECHO_DIFFICULTIES = Object.freeze(['NORMAL', 'HARD', 'ABYSS']);
+/** 深潜的默认难度：大厅记住的那档不在子集里时用它。 */
+export const DEEP_ECHO_DEFAULT_DIFFICULTY = 'HARD';
+
 const MODE_CARDS = [
   {
     id: 'solo', name: N_('独立模拟'), en: 'SOLO SIMULATION', icon: 'user',
@@ -145,6 +155,16 @@ const MODE_CARDS = [
     points: [N_('与陌生博士组队 · 不自动补 AI'), N_('人满即开 · 也可等待超时开局')],
     pointExtra: [N_('公开同盟：等不到人就自己开一间')],
     pointShort: N_('与陌生博士组队'),
+  },
+  {
+    // ★ 2026-11-03：第三模式「深渊回响」（mode: coop + variant: deepecho）。
+    //   **未开放**：普通玩家点不进（openMode 里拦 + 服务端三处门禁兜底），按钮上显示「未开放」。
+    //   正式开放时把 `adminOnly` 去掉即可。
+    id: 'deepecho', name: N_('深渊回响'), en: 'DEEP ECHO', icon: 'target',
+    desc: N_('打完最后一个领袖后继续深潜：无尽波次、侵蚀词条与祝福，深度就是成绩。'),
+    points: [N_('无尽深潜 · 深度即成绩'), N_('敌人按威胁预算随机组合')],
+    pointShort: N_('无尽深潜'),
+    adminOnly: true,
   },
 ];
 
@@ -412,6 +432,31 @@ function DifficultyCard({ roomMode, difficulty, selected, onSelect, disabled = f
 }
 
 /**
+ * 深潜用的难度卡：**视觉与原版 DifficultyCard 完全一致**（同一套 `pcard diff-card` 类、难度图标、
+ * 描述、要点列表、「已选定」印章），只有一处不同 —— 编号是「深潜-1/2/3」而不是全模式共用的 `AC-x`。
+ * 深潜只开三档，沿用 AC 编号（从 2 起）会让人以为漏了第一档（维护者 2026-11-03）。
+ */
+function EchoDifficultyCard({ difficulty, index, selected, onSelect }) {
+  const info = difficultyInfo('coop', difficulty);
+  return html`<button type="button" class=${`pcard diff-card${selected ? ' is-on is-selected' : ''}`}
+      style=${`--d-color:${DIFFICULTY_COLORS[difficulty]}`}
+      onClick=${() => onSelect(difficulty)} aria-pressed=${selected ? 'true' : 'false'}>
+    <span class="pcard__glow" aria-hidden="true"></span>
+    <span class="pcard__head">
+      <${DifficultyIcon} difficulty=${difficulty} class="pcard__glyph" />
+      <span class="pcard__name">${t(DIFFICULTY_NAMES[difficulty])}</span>
+    </span>
+    <span class="pcard__desc">${info.desc}</span>
+    <span class="pcard__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}</span>
+    <span class="pcard__meta">
+      <span class="num">${'DE'}-${index + 1}</span>
+      <${DifficultyRounds} info=${info} />
+    </span>
+    <span class="pcard__stamp" aria-hidden="true"><${StampRing} /><span class="pcard__tick"><${Icon} name="check" /></span><span class="pcard__ok">${t('已选定')}</span></span>
+  </button>`;
+}
+
+/**
  * How much 选择模拟协议's cards show on a screen taller than 520 px (§35.18's leftover there: at 大 / 特大, in a small
  * window or a long language the four cards ran under 开始独立模拟, 终极模拟 out of view, even at 小 in 16:9 by a few px):
  * the first level at which they fit their column — 'full' (the name, the description, the effects, the rounds), 'brief'
@@ -460,7 +505,7 @@ function ProtoFit() {
  * co-op card's long/short pair, or the solo card's single line. `timeShort` replaces the phone line; absent, the phone
  * keeps points[0] (「1 名博士」).
  */
-export function HubEntry({ card, onOpen, timePoint = null, timeShort = null }) {
+export function HubEntry({ card, onOpen, timePoint = null, timeShort = null, locked = false }) {
   const line = timePoint
     ? html`<span class="hub-entry__long">${t(card.points[0], card.pointParams)} · ${t(timePoint)}</span><span class="hub-entry__short">${timeShort ? t(timeShort) : t(card.points[0], card.pointParams)}</span>`
     : card.pointShort
@@ -477,11 +522,16 @@ export function HubEntry({ card, onOpen, timePoint = null, timeShort = null }) {
       ${extraLines.map((txt, i) => html`<span key=${i} class="hub-entry__group hub-entry__group2"><${Icon} name=${card.icon} />${t(txt, card.pointParams)}</span>`)}
       ${Array.from({ length: pad }, (_, i) => html`<span key=${'pad' + i} class="hub-entry__group hub-entry__group2 hub-entry__group--pad" aria-hidden="true"><${Icon} name=${card.icon} /><span>占位</span></span>`)}
     </div>
-    <button type="button" class=${`mode-card hub-entry hub-entry--${card.id}`} data-mode=${card.id} onClick=${() => onOpen(card.id)}
-        title=${t(card.desc, card.params)}>
+    <button type="button" class=${`mode-card hub-entry hub-entry--${card.id}${locked ? ' hub-entry--locked' : ''}`} data-mode=${card.id}
+        disabled=${locked ? true : undefined}
+        onClick=${() => onOpen(card.id)}
+        aria-disabled=${locked ? 'true' : 'false'}
+        title=${locked ? t('暂未开放，仅管理员可进入') : t(card.desc, card.params)}>
       <span class="hub-entry__icon" aria-hidden="true"><${Icon} name=${card.icon} /></span>
       <span class="hub-entry__en">${card.en}</span>
       <span class="hub-entry__name">${t(card.name)}</span>
+      ${/* 未开放：右上角一条横幅；按钮本身 disabled + 灰色（无权限的人点不动） */ null}
+      ${locked ? html`<span class="hub-entry__ribbon">${t('暂未开放')}</span>` : null}
       <span class="hub-entry__corner" aria-hidden="true"></span>
     </button>
   </div>`;
@@ -952,9 +1002,163 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
   <//>`;
 }
 
+/** 本机深潜最佳成绩的存储键（只在当前浏览器，和成就统计一样）。 */
+const ECHO_BEST_KEY = 'sp.echo.best';
+const echoReadBest = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(ECHO_BEST_KEY) || 'null');
+    return raw && Number.isFinite(raw.depth) ? raw : null;
+  } catch { return null; }
+};
+
 /**
- * 选择同盟方式 (laid out after the event's screen after 同盟模拟, research 06 §3.2): full screen — a radar at the left with
- * 玩法说明 under it, at the right the 创建同盟 card (creates the room at once at `difficulty`, the remembered one, which the
+ * 「深渊回响」的专属整屏（2026-11-03）。
+ *
+ * 骨架**照搬 多人匹配（MatchmakingSelect）**：`Modal` + `.proto*` —— 左边是所选难度的画面与简介，
+ * 右边是难度卡列 + 底部开始按钮。这样排版、背景、按钮样式都自动和原版一致，
+ * 不用再自己造一套（第一版自造的紫底整屏被维护者评价为「太丑」）。
+ *
+ * 内容上只比 多人匹配 多两块：本机/本周最佳，以及深潜排行榜（`/api/dive/board`）。
+ * 难度只给 险境 / 绝境 / 终极 三档（标准模拟的曲线不适合 R15 之后）。
+ */
+export function EchoSelect({ onClose, onStart }) {
+  // 记住上次选的深潜难度（维护者 2026-11-03：重开大厅不该跳回默认档）。
+  // 用大厅同一套 loadPref / savePref，键名与同盟难度分开，互不影响。
+  const remembered = (() => {
+    const v = loadPref('lobby.deepechoDifficulty', null);
+    return DEEP_ECHO_DIFFICULTIES.includes(v) ? v : DEEP_ECHO_DEFAULT_DIFFICULTY;
+  })();
+  const [difficulty, setDifficulty] = useState(remembered);
+  /** 榜单看哪一档（可以和「准备开始」的难度不同：先看看极限榜再决定打哪档） */
+  const [boardDiff, setBoardDiff] = useState(remembered);
+  const pickDifficulty = (d) => {
+    if (!DEEP_ECHO_DIFFICULTIES.includes(d)) return;
+    setDifficulty(d);
+    savePref('lobby.deepechoDifficulty', d);
+  };
+  const [rows, setRows] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [openRow, setOpenRow] = useState(null);
+  /** 排行榜是否可以收起（收起后难度选择顶上来，画面留给简介与开始） */
+  const [boardOpen, setBoardOpen] = useState(true);
+  const [best] = useState(() => echoReadBest());
+  useEffect(() => {
+    let alive = true;
+    setRows(null);
+    setOpenRow(null);
+    fetch(`/api/dive/board?limit=20&difficulty=${boardDiff}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((j) => { if (alive) setRows(Array.isArray(j?.rows) ? j.rows : []); })
+      .catch(() => { if (alive) { setRows([]); setFailed(true); } });
+    return () => { alive = false; };
+  }, [boardDiff]);
+  const weekBest = useMemo(() => {
+    const since = Date.now() - 7 * 24 * 3600 * 1000;
+    const recent = (rows || []).filter((r) => (r.at || 0) >= since);
+    return recent.length ? Math.max(...recent.map((r) => r.depth)) : null;
+  }, [rows]);
+  const info = difficultyInfo('coop', difficulty);
+  // 深潜自己的关卡编号：**用简称 `DE`**（DEEP ECHO 的缩写，和右上角副标题一致），从 1 开始。
+  // 不用原版的 AC-x：那是全模式共用的编号，深潜只有三档，从 2 起会让人以为漏了第一档。
+  const ECHO_CODE_PREFIX = 'DE';
+  const diffNo = Math.max(1, DEEP_ECHO_DIFFICULTIES.indexOf(difficulty) + 1);
+  const diffCode = `${ECHO_CODE_PREFIX}-${diffNo}`;
+  return html`<${Modal} open=${true} onClose=${onClose} class="proto proto--match" veilClass="proto-veil">
+    <div class="proto__body" style=${'--d-color:#b79cff'} data-difficulty=${difficulty} data-mode="deepecho" data-fit="full">
+      <div class="proto__bg" aria-hidden="true"></div>
+      <header class="proto-top">
+        <${BackPlate} onClick=${onClose} class="proto__back" />
+        <div class="proto-title">
+          <h2 class="modal__title">${t('深渊回响')}</h2>
+          <span class="proto-title__mode"><${Icon} name="target" />${t('深潜')}<i>DEEP ECHO</i></span>
+        </div>
+      </header>
+      <div class="proto-body">
+        ${/* 左：立绘 + 左下简介（原版版式），排行榜作为**浮层**贴左边，不挤动任何元素 */ null}
+        <section class="proto-stage">
+          <div key=${difficulty} class="proto__pic"><${ProtocolArt} difficulty=${difficulty} /></div>
+
+          <aside class=${`echo-boardfloat${boardOpen ? '' : ' is-closed'}${rows != null && rows.length === 0 ? ' is-empty' : ''}`} aria-label=${t('排行榜')}>
+            <div class="echo-boardhead">
+              <b class="echo-boardhead__t">${t('排行榜')}</b>
+              <div class="echo-boardtabs" role="tablist" aria-label=${t('排行榜难度')}>
+                ${DEEP_ECHO_DIFFICULTIES.map((d) => html`<button key=${d} type="button" role="tab"
+                    aria-selected=${boardDiff === d ? 'true' : 'false'}
+                    class=${`echo-tab${boardDiff === d ? ' is-on' : ''}`}
+                    onClick=${() => setBoardDiff(d)}>${t(DIFFICULTY_NAMES[d] || d)}</button>`)}
+              </div>
+              <button type="button" class="echo-tab echo-boardtoggle" aria-expanded=${boardOpen ? 'true' : 'false'}
+                onClick=${() => setBoardOpen(!boardOpen)}>${boardOpen ? t('收起') : t('展开')}</button>
+            </div>
+            ${boardOpen ? html`<ol class="echo-boardlist" aria-label=${t('排行榜')}>
+              ${rows == null
+                ? html`<li class="echo-board__state">${t('读取中…')}</li>`
+                : rows.length
+                  ? rows.map((r) => html`<li key=${r.member} class=${`echo-rank${r.rank <= 3 ? ` is-top is-top${r.rank}` : ''}`}>
+                      <button type="button" class="echo-row" aria-expanded=${openRow === r.member ? 'true' : 'false'}
+                        onClick=${() => setOpenRow(openRow === r.member ? null : r.member)}>
+                        <b class="echo-rank__no num">${r.rank}</b>
+                        <span class="echo-rank__depth"><b class="num">${r.depth}</b><i>${t('层')}</i></span>
+                        <span class="echo-rank__meta">${(Array.isArray(r.players) && r.players.length ? r.players.slice(0, 2).join('、') + (r.players.length > 2 ? ` 等${r.players.length}人` : '') : r.roomCode || '----')} · ${r.at ? new Date(r.at).toLocaleDateString() : '—'}</span>
+                        <i class="echo-row__more" aria-hidden="true">${openRow === r.member ? '▾' : '▸'}</i>
+                      </button>
+                      ${openRow === r.member ? html`<div class="echo-detail">
+                        <div><span>${t('深度')}</span><b>${r.depth}</b></div>
+                        <div><span>${t('难度')}</span><b>${t(DIFFICULTY_NAMES[r.difficulty] || r.difficulty || '—')}</b></div>
+                        <div><span>${t('结果')}</span><b>${r.victory ? t('通关') : t('团灭')}</b></div>
+                        ${/* 「到达回合」与「队伍」原来总是显示 —/未记录：服务端根本没发这两个字段，
+                              留着只是噪音（维护者 2026-11-04）。有数据才显示。 */ null}
+                        ${Array.isArray(r.players) && r.players.length
+                          ? html`<div class="echo-detail__full"><span>${t('队伍')}</span><b>${r.players.join('、')}</b></div>`
+                          : null}
+                        ${Array.isArray(r.players) && r.players.length ? html`<div class="echo-detail__full"><span>${t('玩家')}</span><b>${r.players.join('、')}</b></div>` : null}
+                        <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'} · ${r.at ? new Date(r.at).toLocaleString() : '—'}</b></div>
+                      </div>` : null}
+                    </li>`)
+                  : html`<li class="echo-board__state echo-board__state--empty">
+                      <${Icon} name="target" class="echo-board__glyph" />
+                      <b>${failed ? t('排行榜暂时不可用') : t('这一档还没有人留下深度记录')}</b>
+                      <span>${t('第一条深度记录会出现在这里。')}</span>
+                    </li>`}
+            </ol>` : null}
+          </aside>
+
+          <div class="proto-brief">
+            <span class="proto-brief__code num">${diffCode}</span>
+            <b class="proto-brief__name">${t(DIFFICULTY_NAMES[difficulty])}</b>
+            <p>${info.desc}</p>
+            <div class="proto-brief__more">
+              <span class="proto-brief__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}</span>
+            </div>
+            <p class="proto-hint">${t('打完最后一个领袖后继续深潜：无尽波次、侵蚀词条与祝福，深度就是成绩。')}</p>
+          </div>
+        </section>
+
+        ${/* 右：难度卡竖排 + 成绩 + 开始（原版版式，位置不动） */ null}
+        <section class="proto-side">
+          <div class="proto-list" role="radiogroup" aria-label=${t('模拟难度')}>
+            ${DEEP_ECHO_DIFFICULTIES.map((d, i) => html`<${EchoDifficultyCard} key=${d} difficulty=${d} index=${i}
+              selected=${difficulty === d} onSelect=${pickDifficulty} />`)}
+          </div>
+          <div class="echo-stats">
+            <div class="echo-stat"><span class="echo-stat__k">${t('本机最佳')}</span><b class="echo-stat__v">${best ? best.depth : '—'}</b></div>
+            <div class="echo-stat"><span class="echo-stat__k">${t('本周最佳')}</span><b class="echo-stat__v">${weekBest == null ? '—' : weekBest}</b></div>
+          </div>
+          <div class="proto-foot proto-foot--match">
+            <button type="button" class="proto-start" data-testid="echo-start" onClick=${() => onStart({ difficulty })}>
+              <span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>DEEP<br />ECHO</small></span>
+              <span class="proto-start__label">${t('开始深潜')}</span>
+              <span class="proto-start__deco" aria-hidden="true"></span>
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  <//>`;
+}
+
+/**
+ * 选择同盟方式 (laid out after the event's screen after 同盟模拟, research 06 §3.2): full screen — a radar at the left with * 玩法说明 under it, at the right the 创建同盟 card (creates the room at once at `difficulty`, the remembered one, which the
  * host changes in the room; the test-room box under it while the server runs in test mode; AI teammates are added in the
  * room) and the 加入同盟 card (the key field — the project's TextField — with 观战, the recent keys that only fill it,
  * 加入同盟). The project's Modal styled to fill the screen. `short`: the screen is at most 520 px tall (the lobby's
@@ -1136,7 +1340,25 @@ export function LobbyScreen() {
     return () => { stop = true; clearInterval(timer); };
   }, []);
   const createOpen = isAdminUser || createGateOpen;
+  // 身份门（owner/admin 账号）：第三张卡「深渊回响」只对它开放，其余人点进去只得到「未开放」提示
+  const adminId = useStore((s) => s.adminId === true);
+  const echoTester = useStore((s) => s.adminId === true || s.echoTester === true);
+  /**
+   * 验收用：`?unreleased=1` 让管理员也看到「未开放」的样子（灰色卡 + 斜纹横幅 + 点不动）。
+   * 只影响这张卡的**外观与可点性**，不改任何权限判定 —— 服务端该拦的照样拦。
+   */
+  const previewLocked = useMemo(() => {
+    try { return new URLSearchParams(location.search).get('unreleased') === '1'; } catch { return false; }
+  }, []);
+  /** 深潜专属大厅是否打开（只有管理员能打开） */
+  const [echoOpen, setEchoOpen] = useState(false);
   const openMode = (m) => {
+    if (m === 'deepecho') {
+      // 「深渊回响」未开放：普通玩家点了只给提示；管理员进专属大厅（难度 / 排行榜 / 开始）。
+      if (!echoTester) { toast(t('「深渊回响」暂未开放，仅管理员与测试名单可进入'), 'warn'); return; }
+      setEchoOpen(true);
+      return;
+    }
     if (m === 'solo') setSoloOpen(true);
     else if (m === 'match') setMatchOpen(true);
     else setAllyOpen(true);
@@ -1177,23 +1399,32 @@ export function LobbyScreen() {
   };
   // 独立模拟: at the difficulty picked on 选择模拟协议; 创建同盟: at the remembered one, changed in the room by the host
   // (`version`: the lobby's, only when welcome.versions is present — protocol §4; omitted when the server offers 第二期下半 alone)
-  const create = (mode) => {
-    // 后台维护开关关闭创建房间：与新版其它提示一致，用页面顶部的 toast，而不是标题/弹窗。
+  const create = (mode, variant = null, overrides = null) => {    // 后台维护开关关闭创建房间：与新版其它提示一致，用页面顶部的 toast，而不是标题/弹窗。
     if (!createOpen) { toast(t('服务器暂时关闭了创建房间，请稍后再试'), 'warn'); return; }
     // 本服账号功能：游客不能建房，先提示，服务端还会再校验一次。
     if (guest) {
       toast(mode === 'solo' ? t('游客不能开始独立模拟，请先登录') : t('游客不能创建同盟模拟房间，请先登录'), 'warn');
       return;
     }
+    // 深潜只用 3 档：大厅记住的同盟难度若不在子集里（比如「标准」），退到默认档。
+    // 从深潜大厅进来时会带 overrides.difficulty（玩家刚选的），优先用它。
+    const picked = overrides && DEEP_ECHO_DIFFICULTIES.includes(overrides.difficulty) ? overrides.difficulty : null;
+    const difficulty = variant === 'deepecho'
+      ? (picked || (DEEP_ECHO_DIFFICULTIES.includes(shownCoop) ? shownCoop : DEEP_ECHO_DEFAULT_DIFFICULTY))
+      : (mode === 'solo' ? shownSolo : shownCoop);
     return run('create', async () => {
       const answer = await net.request('room.create', {
-        mode, difficulty: mode === 'solo' ? shownSolo : shownCoop, ...(testMode && asTest ? { test: true } : {}), ...(versions ? { version } : {}),
+        mode, difficulty, ...(testMode && asTest ? { test: true } : {}), ...(versions ? { version } : {}),
         ...(mode === 'solo' && soloFree && soloTimed === true ? { soloUnlimited: true } : {}),
-        ...(() => { const experimental = experimentalForCreator(); return experimental ? { experimental } : {}; })(),
+        // 「深渊回响」：第三个模式，底层仍是 coop，靠 variant 区分（协议只接受 'deepecho'）。
+        // 它不支持实验性功能（服务端会拒），所以这里一个 experimental 都不带。
+        ...(variant
+          ? { variant, ...(overrides && overrides.echo ? { echo: overrides.echo } : {}) }
+          : (() => { const experimental = experimentalForCreator(); return experimental ? { experimental } : {}; })()),
       });
       // 建好合作房以后，进房时问一次「要不要公开到同盟列表」（ui/roomList.js 的 ListPromptDialog）：
-      // 大厅到房间是一次跳转，用 sessionStorage 把这个问题带过去。
-      if (mode === 'coop') markListPrompt();
+      // 大厅到房间是一次跳转，用 sessionStorage 把这个问题带过去。深潜房不公开，所以不问。
+      if (mode === 'coop' && !variant) markListPrompt();
       return answer;
     });
   };
@@ -1424,7 +1655,8 @@ export function LobbyScreen() {
           const timedCard = c.id === 'solo';
           const timePoint = timedCard ? soloTimeMsgid('card', { timed: soloTimed, unlimited: soloFree }) : '';
           const timeShort = timedCard ? soloTimeMsgid('short', { timed: soloTimed, unlimited: soloFree }) : '';
-          return html`<${HubEntry} key=${c.id} card=${c} onOpen=${openMode} timePoint=${timePoint || null} timeShort=${timeShort || null} />`;
+          return html`<${HubEntry} key=${c.id} card=${c} onOpen=${openMode} timePoint=${timePoint || null} timeShort=${timeShort || null}
+            locked=${c.adminOnly === true && (!echoTester || previewLocked)} />`;
         })}
       </section>
     </main>
@@ -1442,6 +1674,12 @@ export function LobbyScreen() {
       capacity=${coopCapacity} onCapacity=${pickCapacity}
       onBrowse=${() => setBrowseOpen(true)}
       onQuickMatch=${() => { setAllyOpen(false); setBrowseOpen(false); setMatchOpen(true); }} />` : null}
+    ${/* 「深渊回响」专属整屏（只有管理员能打开）：骨架照 多人匹配，样式天然一致 */ null}
+    ${echoOpen ? html`<${EchoSelect} onClose=${() => setEchoOpen(false)}
+      onStart=${({ difficulty: pickedDifficulty }) => {
+        setEchoOpen(false);
+        create('coop', 'deepecho', { difficulty: pickedDifficulty });
+      }} />` : null}
     ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed}

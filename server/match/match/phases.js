@@ -6,6 +6,7 @@
 
 import { PHASE, ERR } from '../../../shared/constants.js';
 import { buildNormalWave, buildBossWave } from '../waves.js';
+import { echoWaveGrowth, ECHO_DEEP_FROM, echoDeepWaveShape, echoBossScale, ECHO_LAST_ROUND } from './echo.js';
 import { pairPlayers, bossPairSalt } from '../finalAssault.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
 import { OK, fail, DELAYS, BAND_TURN_SECONDS } from './common.js';
@@ -407,12 +408,65 @@ export class MatchPhases {
     // round start: its recompute() checks the board on the field the player deploys on this round (deployFieldOf reads
     // the boss pairing), so R14 → R15 never re-checks a boss-field board against the normal field (user playtest #5
     // item 7). rngWaves is used only here, so the order leaves every random stream unchanged.
-    const isBoss = r === this.gd.bossRound || r === this.gd.hiddenRound;
+    // 「深渊回响」: a dive round is never a boss round — the line below would otherwise hit R15 for a team that never
+    // reached the hidden core (boss map and boss wave with no boss on the field, DESIGN-ABYSS.md「深潜的回合语义」) —
+    // and its wave template comes from the cycling data round while its enemy scaling stays on the display round.
+    const dive = this._echoDiveRound(r);
+    // 深潜的固定节点（R20 / R25 / R30 / R35…）放**强化 boss 返场**；其余深潜回合一律普通战场
+    const echoBoss = dive && (this._echoBossReturn(r) || this._echoHiddenBossRound(r));
+    const isBoss = echoBoss || (!dive && (r === this.gd.bossRound || r === this.gd.hiddenRound));
     if (isBoss) {
       this._planBossWaves();
+    } else if (dive) {
+      // 深潜：波次模板查循环的数据回合，缩放仍按显示回合（见 buildNormalWave 的 dataRound）；
+      // 怪种组合从模板库抽（每回合 10 套变体随机一套），精英每 3 个深潜回合一次。
+      this.wave = this._echoChallengeBoost(buildNormalWave(this.gd, this.rngWaves, this.factions, r, {
+        dataRound: this._echoDataRound(r),
+        // 1–15 层：以原版同回合的形状为底，再乘 echoWaveGrowth（小系数加码）。旋钮在 echo.js 的 ECHO_EARLY_GROWTH。
+        // 16 层以后这两项不再决定只数（由 echoWaves 的 echoDeepWaveShape 按深度设计），只保留给
+        // echoGrowth > 1 的判据与预算参数。
+        // 1-15 层：走原版生成机制（buildNormalWave + 预生成的 pick），不进 echoRandomWave
+        ...(this._echoDepth(r) <= 15
+          ? { pick: this._echoPickVariant(this._echoDataRound(r)) }
+          : { echoGrowth: echoWaveGrowth(this._echoDepth(r)), echoShapeScale: echoWaveGrowth(this._echoDepth(r)) }),
+        echoDepth: this._echoDepth(r),
+        echoPoolRound: Math.max(1, (this.gd.bossRound || 14) - 1),
+        // 池子分档（维护者 2026-11-04）：1–15 层用「原版该回合的模板变体」；
+        // 16 层以后走全敌人表（含跨版本并入的怪），只数仍由 echoDeepWaveShape 按深度设计。
+        // 全表池子（含跨版本）：低层由血量闸控制强度
+
+        echoPoolAll: false,
+        echoPoolRoundOnly: false,
+        echoTemplates: true,
+        echoTemplatesAny: false,
+        // 16 层以后每层的规模按深度设计（echoWaves.echoDeepWaveShape），时限也固定成最后一关的时长，
+        // 免得轮回到数据回合 1 时只有 90 秒却要放 110 只（维护者 2026-11-04 §6）。
+        // 1–15 层不传：它们仍用原版同回合的时限。
+        // 16 层以后：时限按**原版比例**随出怪量增长（原版 R13 = 230 秒 / 112 只 = 基准），
+        // 而不是固定 230 秒 —— 怪变多了，时间也要跟着多（维护者 2026-11-05）。
+        ...(this._echoDepth(r) >= ECHO_DEEP_FROM
+          ? { echoTimeLimitSec: Math.round(230 * (echoDeepWaveShape(this._echoDepth(r)).units / 112)) }
+          : {}),
+        // 按钱出怪：用存活玩家的平均资金作为这一波的强度基准（维护者 2026-11-04）
+        echoFunds: alive.length
+          ? alive.reduce((sum, ps) => sum + (Number(ps.funds) || 0), 0) / alive.length
+          : 0,
+        echoElite: this._echoEliteCount(r),
+        // 挑战关（深度 5 / 10）：不出 boss，换成更强的精英
+        echoChallenge: this._echoChallengeRound(r),
+      }), r);
     } else {
       this.wave = buildNormalWave(this.gd, this.rngWaves, this.factions, r);
     }
+    // the dive's erosion words of this round (null on every other round, and on every other room)
+    this._echoRollWords(r);
+    // 「深渊回响」的祝福三选一：深潜里每 5 个回合开一次（echoBlessing.js；普通房间直接返回 null）
+    this._echoMaybeOfferBlessing(r);
+    // 深潜的悬赏：每 5 个深潜回合一次，目标从**刚生成的波次**里现抽（echoBounty.js）
+    this._echoMaybeGrantBounty(r);
+    // 深潜的免费刷新上限（只在深潜里裁；普通房间不动）
+    this._echoClampFreeRefreshes();
+    this._echoMaybeLootRefresh(r);
     for (const ps of alive) ps.startRound(r);
     for (const ps of alive) this.dispatch(ps, 'onRoundStart', { round: r });
     // an eliminated player's pending 信标 gift still goes to its teammate (effects flagged afterElimination; GitHub #86)
@@ -431,8 +485,16 @@ export class MatchPhases {
   /** The round's pairs and their templates, generated before the prep preview / board validation. */
   _planBossWaves() {
     const r = this.round;
-    const hidden = r === this.gd.hiddenRound && r !== this.gd.bossRound;
-    const bossId = hidden ? this.hiddenBossId : this.bossId;
+    // 深潜的 boss 返场（深度 5 / 10 / 15 / 25…）：这些回合没有自己的 roundCfg（数据表只到 15），
+    // 模板借 `_echoBossTemplateRound()`（旧入口=深潜起点−1；从第 1 回合就深潜时=官方最后一关），
+    // 缩放仍按显示回合（echoScale）。
+    const cfgRound = this._echoDiveRound(r) ? this._echoBossTemplateRound() : null;
+    const eff = cfgRound ?? r;
+    const hidden = eff === this.gd.hiddenRound && eff !== this.gd.bossRound;
+    // 返场回合换一个随机 boss（不再固定 R14 那个）；隐藏核心仍用 hiddenBossId
+    const bossId = hidden
+      ? this.hiddenBossId
+      : (this.echoVariant === 'deepecho' && this._echoBossReturn(r) ? this._echoBossPick(r) : this.bossId);
     // Pairing uses an independent seeded draw, consuming no shop, wave, draft or battle randomness. The Hidden Core
     // draws its pairs and sides anew (GitHub #845: the official R15 of BV1VCXyBjEN1 p1 pairs 1-2 / 3-4 after an R14 of
     // 1-4 / 2-3; DESIGN §35.27, superseding §30.12's kept partners) from a stream of its own, so the Final Assault's
@@ -445,7 +507,7 @@ export class MatchPhases {
     this.bossPairsRound = r;
     this.bossWaves = groups.map((g) => ({
       players: g.map((p) => p.playerId),
-      wave: buildBossWave(this.gd, this.rngWaves, this.factions, r, { bossId, solo: this.isSolo || g.length === 1 }),
+      wave: buildBossWave(this.gd, this.rngWaves, this.factions, r, { ...(this.echoVariant === 'deepecho' && this._echoDepth(r) > ECHO_LAST_ROUND ? { scale: echoBossScale(r, this.gd.baseEnemyScale(ECHO_LAST_ROUND)) } : {}), bossId, solo: this.isSolo || g.length === 1, cfgRound }),
     }));
   }
 

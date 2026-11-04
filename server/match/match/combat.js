@@ -17,12 +17,16 @@ export class MatchCombat {
   newBattle(opts, { preview = false } = {}) {
     const full = { data: this.ds, content: this.battleContent, logger: this.log, ...opts, ...morphBattleOpt(this.rules),
       ...(preview ? { logger: {}, quiet: true } : {}) };
+    let battle;
     try {
-      return new this.BattleClass(full);
+      battle = new this.BattleClass(full);
     } catch (e) {
       if (!preview) this.reportError(`battle ${opts.fieldId} construct`, e);
       return new DeadBattle(full, 'forced');
     }
+    // 「深渊回响」: 深潜回合的侵蚀词条在这一场战斗的 enemySpawn 上注入（空操作 when the room is not a dive）
+    if (!preview) this._echoHookBattle(battle);
+    return battle;
   }
 
   /**
@@ -49,7 +53,9 @@ export class MatchCombat {
    * browser's local replica, a client-run field and the server's check of it all fight the same battle. Nothing when off.
    */
   _ruleFlags() {
-    return { ...(this.disableLayerCap ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
+    return { ...(this.layerCapOff ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
+      // 「深渊回响」：限伤上限跟着深度缩放（普通房没有这个键 → sim 走官方 300000）
+      ...(this.echoVariant === 'deepecho' ? { hitLimitMul: this._echoHitLimitMul() } : {}),
       ...(this.enemyHpMul !== 1 ? { enemyHpMul: this.enemyHpMul } : {}), ...(this.enemyAtkMul !== 1 ? { enemyAtkMul: this.enemyAtkMul } : {}) };
   }
 

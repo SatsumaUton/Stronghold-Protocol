@@ -42,6 +42,7 @@ import { attackInterval, rangeGridBox, fmtNum, tileKey, chessLoadout, nextThresh
 import { skillIconUrl, skillRecordIconUrl, profIconUrl, subProfIconUrl, itemIconUrl, enemyIconUrl, tokenAvatarUrl, factionIconUrl, uiUrl, moduleTypeIconUrl } from './assetUrls.js';
 import { abilityRows } from './abilityLines.js';
 import { data } from '../data.js';
+import { useStore } from '../store.js';
 import { attackRangeGrid } from '../../../shared/loadoutRecord.js';
 import { SKILL_SUMMON_START_DEPLOY } from '../../../shared/constants.js';
 import { moduleBadge, fullTraitText } from './loadoutModel.js';
@@ -530,6 +531,10 @@ export function ItemDetail({ item, piece, editable, onDestroy, offBonds = null, 
 }
 
 function EnemyDetail({ enemy, snapHp, count, live = null }) {
+  // 「深渊回响」：本回合的侵蚀词条挂在**每一个**敌人身上，所以详情面板直接列出它们
+  //（维护者 2026-11-04：看单只怪的说明时也该知道它有没有这个词条）。
+  const echo = useStore((s) => s.match.public?.echo);
+  const words = Array.isArray(echo?.words) ? echo.words : [];
   const m = data.get('assets');
   const s = enemy.stats || {};
   const types = Array.isArray(enemy.acTypes) ? enemy.acTypes : enemy.acType ? [enemy.acType] : [];
@@ -571,6 +576,9 @@ function EnemyDetail({ enemy, snapHp, count, live = null }) {
       <${Stat} k=${t('目标价值')} v=${s.lpr ?? 1} />
     </div>
     ${imm.length ? html`<p class="dhint"><${Icon} name="shield" />${t('免疫：{list}', { list: imm })}</p>` : null}
+    ${words.length ? html`<${Section} title=${t('本回合侵蚀词条')} micro="EROSION">
+      <ul class="echo-list echo-list--enemy">${words.map((w) => html`<li key=${w.id}><b>${w.name}</b><span>${w.desc || ''}</span></li>`)}</ul>
+    <//>` : null}
     ${Array.isArray(enemy.abilities) && enemy.abilities.length ? html`<${Section} title=${t('能力')} micro="ABILITIES">
       <ul class="dabil">${abilityRows(enemy.abilities, !!live?.silenced).map((a, i) => html`<li key=${i} class=${a.off ? 'is-off' : null}><${RichText} text=${a.text} /></li>`)}</ul>
     <//>` : enemy.descRaw || enemy.desc ? html`<${Section} title=${t('说明')}><${RichText} as="p" text=${enemy.descRaw || enemy.desc} class="dtext" /><//>` : null}`;

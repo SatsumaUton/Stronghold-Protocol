@@ -9,7 +9,7 @@
    the round-1 plate comes in under it. */
 .pboot {
   --px: min(.01rem, calc(100vw / 1920), calc(100vh / 1080));
-  --teal: #3fd6b4;
+  --teal: var(--mint-c51);
   --teal-deep: #0c2a25;
   position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; overflow: hidden; pointer-events: none;
   background: radial-gradient(ellipse at 50% 42%, #0d2621, #040b0a 70%);
@@ -19,7 +19,7 @@
 .pboot__stage > *, .pboot__scene > * { position: absolute; }
 .pboot__scene { inset: 0; animation: pboot-in 200ms 1200ms ease-out both; }
 .pboot::after { content: ''; position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: 0;
-  background: radial-gradient(ellipse at 50% 45%, rgba(150, 255, 225, .7), rgba(63, 214, 180, .45) 70%); animation: pboot-wash 700ms 1200ms ease-out forwards; }
+  background: radial-gradient(ellipse at 50% 45%, rgba(var(--mint-c52-rgb), .7), rgba(var(--mint-c51-rgb), .45) 70%); animation: pboot-wash 700ms 1200ms ease-out forwards; }
 /* behind: the two mountains (top left, bottom right), the contour map and the ring around the ship, the mark above */
 .pboot__mtn { opacity: .55; }
 .pboot__mtn--1 { left: calc(-60 * var(--px)); top: calc(-40 * var(--px)); width: calc(750 * var(--px)); }
@@ -48,10 +48,10 @@
 .pboot__card {
   left: calc(var(--x) * var(--px)); top: calc(var(--y) * var(--px)); width: calc(515 * var(--px)); height: calc(127 * var(--px));
   display: flex; align-items: center; justify-content: flex-end; gap: calc(14 * var(--px)); padding: 0 calc(4 * var(--px));
-  background: linear-gradient(90deg, rgba(63, 214, 180, .78), rgba(63, 214, 180, .95)); color: var(--teal-deep);
+  background: linear-gradient(90deg, rgba(var(--mint-c51-rgb), .78), rgba(var(--mint-c51-rgb), .95)); color: var(--teal-deep);
   transform-origin: 100% 50%; animation: pboot-card 420ms calc(1200ms + var(--i) * 40ms) cubic-bezier(.2, .8, .2, 1) both;
 }
-.pboot__card--r { flex-direction: row-reverse; background: linear-gradient(270deg, rgba(63, 214, 180, .78), rgba(63, 214, 180, .95)); transform-origin: 0 50%; }
+.pboot__card--r { flex-direction: row-reverse; background: linear-gradient(270deg, rgba(var(--mint-c51-rgb), .78), rgba(var(--mint-c51-rgb), .95)); transform-origin: 0 50%; }
 .pboot__card--c { transform-origin: 50% 50%; }
 /* a solo run: the one card under the ring, the words lower (the footage, video 7:50) */
 .pboot--solo .pboot__title { top: calc(805 * var(--px)); }
@@ -68,11 +68,11 @@
 .pboot__face .pavatar__img, .pboot__face img { width: 100%; height: 100%; object-fit: cover; }
 /* 协议启动！ / STRONGHOLD PROTOCOL / 正在连接… */
 .pboot__title { left: 0; right: 0; top: calc(705 * var(--px)); margin: 0; text-align: center; font-size: calc(66 * var(--px)); font-weight: 900;
-  letter-spacing: .04em; color: var(--teal); text-shadow: 0 0 calc(18 * var(--px)) rgba(63, 214, 180, .45); animation: pboot-title 420ms 1200ms cubic-bezier(.2, .8, .2, 1) both; }
+  letter-spacing: .04em; color: var(--teal); text-shadow: 0 0 calc(18 * var(--px)) rgba(var(--mint-c51-rgb), .45); animation: pboot-title 420ms 1200ms cubic-bezier(.2, .8, .2, 1) both; }
 .pboot__sub { left: calc(782 * var(--px)); top: calc(838 * var(--px)); width: calc(356 * var(--px)); height: calc(30 * var(--px)); display: grid; place-items: center;
   background: var(--teal); color: var(--teal-deep); font-family: var(--font-display); font-size: calc(20 * var(--px)); letter-spacing: .08em;
   animation: pboot-in 200ms 1300ms both; }
-.pboot__conn { right: calc(165 * var(--px)); top: calc(995 * var(--px)); font-size: calc(26 * var(--px)); color: rgba(63, 214, 180, .7); animation: pboot-in 200ms 1900ms both; }
+.pboot__conn { right: calc(165 * var(--px)); top: calc(995 * var(--px)); font-size: calc(26 * var(--px)); color: rgba(var(--mint-c51-rgb), .7); animation: pboot-in 200ms 1900ms both; }
 .pboot__dots::after { content: '…'; display: inline-block; width: 1.2em; overflow: hidden; vertical-align: bottom; animation: pboot-dots 1.2s steps(4, end) infinite; }
 .pboot__veil { inset: 0; position: absolute; background: #000; animation: pboot-veil 160ms 60ms ease-out both; }
 @keyframes pboot-veil { from { opacity: 1; } to { opacity: 0; } }
@@ -110,7 +110,7 @@
    a teal fill wipes over it with 请选择策略 and the ring, the robot's square beside it; then it folds shut (1.7 s). */
 .tbanner {
   --px: min(.01rem, calc(100vw / 1920), calc(100vh / 1080));
-  --teal: #52d6b0;
+  --teal: var(--mint-c53);
   --ink: #0b1f1b;
   position: fixed; inset: 0; z-index: 70; pointer-events: none;
 }
@@ -140,7 +140,7 @@
 .tbanner__cross--tr { right: calc(18 * var(--px)); top: calc(18 * var(--px)); }
 .tbanner__cross--br { right: calc(18 * var(--px)); bottom: calc(18 * var(--px)); }
 .tbanner__bot { flex: none; width: calc(250 * var(--px)); display: grid; place-items: center; background: #0f1f1d;
-  box-shadow: inset 0 0 calc(30 * var(--px)) rgba(82, 214, 176, .25); }
+  box-shadow: inset 0 0 calc(30 * var(--px)) rgba(var(--mint-c53-rgb), .25); }
 .tbanner__head { width: calc(120 * var(--px)); height: auto; image-rendering: pixelated; }
 @keyframes tbanner-dim { 0% { opacity: 0; } 9% { opacity: 1; } 91% { opacity: 1; } 100% { opacity: 0; } }
 /* PR #643's motion: the band shoots in and keeps drifting right until it folds shut; the teal fill wipes over it
