@@ -80,7 +80,7 @@ function ArmedTag({ reason, free }) {
  * @param {{ slot:any, idx:number, priv:any, frozen?:boolean, reason?:string|null, free?:boolean, armed?:boolean,
  *   onTap?:(idx:number)=>void, onBuy:Function, onDetail:Function }} props
  */
-export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free = false, armed = false, onTap = null, onBuy, onDetail, offBonds = null }) {
+export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free = false, armed = false, onTap = null, onBuy, onDetail, offBonds = null, bannedBond = null }) {
   const c0 = data.lookup('chess', slot.id);
   // 0.2.0 自选编队: a DIY slot the player filled is its operator (shared/diy.js, the pick of m.private.diy)
   const diyData = { chess: data.get('chess'), backups: data.get('backups') };
@@ -123,7 +123,10 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
         ${bonds.slice(0, 3).map((b) => {
           const name = data.lookup('bonds', b)?.name || b;
           const off = !!(offBonds && offBonds.has(b)); // a bond this mode never activates (gameLogic modeOffBonds)
-          return html`<span key=${b} class=${cx('scard__bond', off && 'is-off')} title=${off ? briefingBondTip(name, 'off') : undefined}><${BondGlyph} bondId=${b} /><span>${name}</span></span>`;
+          // 「深渊回响」排异（2026-11-05）：被诅咒禁掉的盟约标红，玩家一眼看出这张卡买了也上不了场
+          const banned = !!bannedBond && b === bannedBond;
+          return html`<span key=${b} class=${cx('scard__bond', off && 'is-off', banned && 'is-banned')}
+            title=${banned ? t('深渊排异：{name} 盟约的干员无法部署', { name }) : (off ? briefingBondTip(name, 'off') : undefined)}><${BondGlyph} bondId=${b} /><span>${name}</span></span>`;
         })}
       </span>
       <span class="scard__class">
@@ -323,7 +326,7 @@ function skinArtFor(m, c) {
   return chessPortraitUrl(m, c);
 }
 export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onCollapse, onBuy, onLevel, onRefresh, onFreeze, onDetail, onDetailClose, onRefuse, barRef,
-  reward = null, onReward, onRewardLater, onArm = null, offBonds = null }) {
+  reward = null, onReward, onRewardLater, onArm = null, offBonds = null, bannedBond = null }) {
   const shop = priv?.shop || {};
   const slots = Array.isArray(shop.slots) ? shop.slots : [];
   // Empty slots carry no `kind`. The server sends the real operator/equipment layout so the
@@ -407,6 +410,7 @@ export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onColl
           if (s.sold) return html`<${SoldCard} key=${`s${i}`} />`;
           const reason = shopBlockReason('buy', { priv, editable, slot: s, ...LOOKUPS });
           return html`<${ChessCard} key=${`c${i}:${s.id}`} slot=${s} idx=${i} priv=${priv} frozen=${slotFrozen(s, frozen)} onBuy=${onBuy} onDetail=${onDetail} offBonds=${offBonds}
+              bannedBond=${bannedBond}
               reason=${reason} armed=${armed === armKey('c', i, s)} onTap=${editable ? (idx) => tapCard('c', idx, s, 'chess', reason, onBuy) : null} />`;
         })}
       </div>`}
