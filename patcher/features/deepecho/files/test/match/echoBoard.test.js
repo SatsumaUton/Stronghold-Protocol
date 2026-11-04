@@ -84,10 +84,10 @@ test('记录：写进该难度的榜 + 写明细，并都设过期', async () =>
   assert.equal(await recordEchoBoard(store, e), true);
   const names = store.cmds.map((c) => c[0]);
   assert.deepEqual(names, ['ZADD', 'ZREMRANGEBYRANK', 'EXPIRE', 'HSET', 'EXPIRE']);
-  assert.equal(store.cmds[0][1], 'sp:dive:board:NORMAL', '按难度分榜');
+  assert.equal(store.cmds[0][1], 'sp:shared:dive:board:NORMAL', '按难度分榜（全服共用前缀）');
   assert.equal(store.cmds[0][3], e.member);
   assert.equal(store.cmds[1][3], String(-(ECHO_BOARD_LIMIT + 1)), '只留前 LIMIT 条');
-  assert.equal(store.cmds[3][1], `sp:${ECHO_BOARD_ENTRY_KEY}`, '明细写进 hash');
+  assert.equal(store.cmds[3][1], `sp:shared:${ECHO_BOARD_ENTRY_KEY}`, '明细写进共用 hash');
   assert.equal(store.cmds[3][2], e.member);
 });
 
@@ -98,7 +98,7 @@ test('读取：只读指定难度的榜，并把明细一起取回', async () =>
     HMGET: [JSON.stringify({ players: ['甲'], victory: false, round: 21, difficulty: 'HARD' })],
   });
   const rows = await readEchoBoard(store, { difficulty: 'HARD', limit: 5 });
-  assert.equal(store.cmds[0][1], 'sp:dive:board:HARD');
+  assert.equal(store.cmds[0][1], 'sp:shared:dive:board:HARD');
   assert.equal(store.cmds[0][3], '4', '取 limit 条');
   assert.equal(store.cmds[0][4], 'WITHSCORES');
   assert.equal(store.cmds[1][0], 'HMGET');
@@ -113,4 +113,23 @@ test('没有 store / 没有 client / 命令抛错 → 静默返回，不抛', as
   const boom = { client: { command: async () => { throw new Error('redis down'); } } };
   assert.equal(await recordEchoBoard(boom, { member: 'x', depth: 1 }), false);
   assert.deepEqual(await readEchoBoard(boom), []);
+});
+
+// 维护者 2026-11-05：排行榜必须**全服同步** —— 键不能跟节点的 SP_REDIS_PREFIX 走。
+test('榜键用全服共用前缀，与节点的 store.prefix 无关', async (t) => {
+  const { recordEchoBoard, readEchoBoard, echoBoardKeyFor, ECHO_BOARD_SHARED_PREFIX, ECHO_BOARD_ENTRY_KEY } = await import('../../server/match/match/echoBoard.js');
+  const calls = [];
+  const store = {
+    prefix: 'sp:n7:',                                    // 节点自己的命名空间
+    client: { command: async (...args) => { calls.push(args); return 'OK'; } },
+  };
+  await recordEchoBoard(store, { depth: 9, difficulty: 'ABYSS', member: 'm1', at: 1, roomCode: 'AB12', players: [] });
+  const keys = calls.map((c) => c[1]).filter(Boolean);
+  assert.ok(keys.every((k) => k.startsWith(ECHO_BOARD_SHARED_PREFIX)), `键必须走共用前缀：${keys.join(', ')}`);
+  const boardKey = ECHO_BOARD_SHARED_PREFIX + echoBoardKeyFor('ABYSS');
+  const detailKey = ECHO_BOARD_SHARED_PREFIX + ECHO_BOARD_ENTRY_KEY;
+  assert.ok(keys.includes(boardKey), `写榜键 ${boardKey}`);
+  assert.ok(keys.includes(detailKey), `写明细键 ${detailKey}`);
+  assert.equal(keys.some((k) => k.startsWith('sp:n7:')), false, '不能再写进节点自己的前缀');
+  assert.equal(typeof readEchoBoard, 'function');
 });

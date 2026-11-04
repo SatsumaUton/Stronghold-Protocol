@@ -10,7 +10,15 @@
 // 名次口径：深度降序；同深度**先到者在前**（有序集合同分按 member 字典序，所以 member 前缀是
 // 14 位零填充时间戳，天然满足，且两条成绩 member 永远不同、不会互相覆盖）。
 
-/** 明细 hash 的键名（落在 store 的 prefix 之后）。 */
+/**
+ * 全服共用的键前缀（2026-11-05 维护者：排行榜必须全服同步）。
+ *
+ * ⚠ 不能用 store.prefix —— 那是**每台节点自己的**命名空间（SP_REDIS_PREFIX = sp:n:），
+ * 用它的话 node-1 写 sp:n1:dive:board、node-7 写 sp:n7:dive:board，30 台各看各的榜。
+ */
+export const ECHO_BOARD_SHARED_PREFIX = 'sp:shared:';
+
+/** 明细 hash 的键名（落在**共用前缀**之后）。 */
 export const ECHO_BOARD_ENTRY_KEY = 'dive:entry';
 /** 深潜能上榜的难度（标准模拟不进深潜）。 */
 export const ECHO_BOARD_DIFFICULTIES = Object.freeze(['NORMAL', 'HARD', 'ABYSS']);
@@ -93,7 +101,14 @@ export function parseEchoBoard(flat, { limit = ECHO_BOARD_LIMIT, details = null,
   return out.slice(0, Math.max(1, Math.floor(Number(limit) || ECHO_BOARD_LIMIT)));
 }
 
-const storeKey = (store, name) => `${(store && store.prefix) || ''}${name}`;
+/**
+ * 键 = **全服共用前缀** + 名字。
+ *
+ * ⚠ 这里刻意**不用** `store.prefix`：那是每台节点自己的命名空间（`SP_REDIS_PREFIX = sp:n${n}:`），
+ * 用它的话 node-1 写 `sp:n1:dive:board`、node-7 写 `sp:n7:dive:board`，30 台各看各的榜，
+ * 玩家看到的排行榜就像「没同步」（2026-11-05 实测就是这样）。
+ */
+const storeKey = (store, name) => `${ECHO_BOARD_SHARED_PREFIX}${name}`;
 
 /**
  * 记一条成绩：写进**该难度**的榜，同时写一份明细。
