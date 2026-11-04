@@ -84,7 +84,7 @@ export const MATCH_FIELDS = Object.freeze({
     // 本回合随机刷新的诅咒（2026-11-05）；读档后从下一回合重新刷
     'echoRoundCurse',
     // 部署禁令（2026-11-05）：被封锁的地块与被排异的盟约，读档不能丢，否则玩家可以靠重连绕过
-    'echoBannedTiles', 'echoBannedBond',
+    'echoBannedTiles', 'echoBannedBonds',
     // 已击杀的悬赏卡回执（2026-11-05）：读档后仍能对账
     'echoBountyPaid',
   ]),
