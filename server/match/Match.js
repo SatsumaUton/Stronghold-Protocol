@@ -380,11 +380,29 @@ export class Match {
     }
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
-    /** Locked room-owned rules; absent for ordinary rooms. */
-    this.experimental = experimentalOptions(opts.experimental ?? {
+    /**
+     * Locked room-owned rules; absent for ordinary rooms.
+     *
+     * 「深渊回响」固定规则之一：**独立卡池**（每名博士用自己的卡池，不与他人共享）。
+     * 深潜房里这个开关强制开启 —— 房主不用开、也关不掉，所以在服务端把房间配置覆盖掉，
+     * 而不是只改客户端（否则读档 / 旧房间 / 直连 API 都能绕开）。
+     * 手动编组（poolPlan）同理作废：「每人一池」与「房主排的几组」不可能同时成立
+     * （experimentalOptions 里 `disableSharedPool && !poolPlan` 本来就会互相压制）。
+     */
+    const echoIndependentPool = this.echoVariant === 'deepecho';
+    let expIn = opts.experimental ?? {
       revivalEnabled: opts.revivalEnabled === true,
       disableSharedPool: opts.disableSharedPool === true,
-    });
+    };
+    if (echoIndependentPool && expIn.poolPlan) {
+      // 深潜不接受手动编组：`disableSharedPool && !poolPlan` 会让手动编组压过独立卡池。
+      // 注意必须在副本上删 —— `experimentalOptions` 见到 `poolPlan: null` 会直接抛 TypeError。
+      expIn = { ...expIn };
+      delete expIn.poolPlan;
+    }
+    this.experimental = experimentalOptions(echoIndependentPool
+      ? { ...expIn, disableSharedPool: true }
+      : expIn);
     this.revivalEnabled = !this.isSolo && this.experimental.revivalEnabled;
     this.disableSharedPool = !this.isSolo && this.experimental.disableSharedPool;
     this.playerCapacity = roomCapacity(this.isSolo ? 'solo' : this.mode, this.experimental);
