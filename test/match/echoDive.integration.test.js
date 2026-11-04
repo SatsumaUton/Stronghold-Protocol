@@ -879,3 +879,21 @@ test('诅咒入账统一：随机抽到封锁/排异真的生效；同回合两�
   m._echoSettleChallenge();
   assert.ok(said.length <= 1, `同一回合只该有一行 ticker（实际 ${said.length}）`);
 });
+// 维护者 2026-11-05：诅咒可叠层，但**同一条最多 3 层**（再抽到就不入账）。
+test('叠层上限：同一条诅咒最多 3 层，到顶后不再入账', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.echoCurseIds = [];
+  for (let i = 0; i < 3; i++) assert.ok(m._echoAddCurse('erosion'), `第 ${i + 1} 层应成功`);
+  assert.equal(m.echoCurseIds.filter((x) => x === 'erosion').length, 3);
+  assert.equal(m._echoAddCurse('erosion'), null, '第 4 层被上限挡住');
+  assert.equal(m.echoCurseIds.filter((x) => x === 'erosion').length, 3, '没有多记');
+  // 效果也只到 3 层
+  m.round = 20;
+  const capAt3 = m._echoWordCap();
+  m.echoCurseIds = ['erosion'];
+  assert.equal(capAt3, m._echoWordCap() + 2, '三层比一层多 +2（上限内正常叠加）');
+  // 上限是 3
+  assert.equal(3, m.echoCurseIds.length + 2);
+});

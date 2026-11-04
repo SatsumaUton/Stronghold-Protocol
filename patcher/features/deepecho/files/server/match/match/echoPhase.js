@@ -11,7 +11,7 @@
 
 import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
 import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js';
-import { echoCurseList, echoCurseEffects, echoCurseById, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
+import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
   echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
@@ -591,6 +591,9 @@ export class MatchEcho {
   _echoAddCurse(id, rng = () => 0.5) {
     const c = echoCurseById(id);
     if (!c) return null;
+    // 叠层上限（维护者 2026-11-05）：同一条最多 ECHO_CURSE_MAX_STACK 层，到顶就不再入账
+    if (!Array.isArray(this.echoCurseIds)) this.echoCurseIds = [];
+    if (this.echoCurseIds.filter((x) => x === id).length >= ECHO_CURSE_MAX_STACK) return null;
     const kind = c.effect && c.effect.kind;
     if (kind === 'bondBan') {
       const bond = this._echoApplyBondBan(rng);
