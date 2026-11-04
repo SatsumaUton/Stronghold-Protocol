@@ -736,12 +736,12 @@ test('开路可重复：拿过还能再抽到、不占祝福名额', (t) => {
   m.echoBannedBonds = ['yanShip'];
   m._echoGrantBlessing(echoBlessingById('unlock'));
   assert.deepEqual(m.echoBannedBonds, [], '满名额也能拿到开路并生效');
-  assert.ok(m.echoBlessings.includes('unlock'));
+  assert.ok(m.echoCounterIds.includes('unlock'), '反制记在 echoCounterIds');
 
   m.echoBannedBonds = ['swiftShip'];                   // 第二批排异
   m._echoGrantBlessing(echoBlessingById('unlock'));
   assert.deepEqual(m.echoBannedBonds, [], '再拿一次仍然生效');
-  assert.equal(m.echoBlessings.filter((id) => id === 'unlock').length, 1, '列表里只记一次');
+  assert.equal(m.echoCounterIds.filter((id) => id === 'unlock').length, 2, '每次抽到都记一次（各消耗一次抽取）');
 
   let s = 3;
   const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;

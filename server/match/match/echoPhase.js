@@ -859,8 +859,9 @@ export class MatchEcho {
   _echoMaybeOfferBlessing(r = this.round) {
     if (!this._echoDiveRound(r)) return null;
     const due = echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws, this._echoBlessingMax());
-    // 反制祝福不占 3 个上限，但**会消耗一次抽取机会**（否则每回合都能刷一张反制）
-    const owned = Array.isArray(this.echoBlessings) ? this.echoBlessings.length : 0;
+    // 反制祝福不占 3 个上限，但**每次都消耗一次抽取机会**（拿在手里也不存底）
+    const owned = (Array.isArray(this.echoBlessings) ? this.echoBlessings.length : 0)
+      + (Array.isArray(this.echoCounterIds) ? this.echoCounterIds.length : 0);
     if (due <= owned) { this.echoBlessingOffer = null; return null; }
     if (Array.isArray(this.echoBlessingOffer) && this.echoBlessingOffer.length) return this.echoBlessingOffer;
     const rng = createRng(deriveSeed(this.seed, `echo:bless:${r}`));
@@ -948,13 +949,17 @@ export class MatchEcho {
   _echoGrantBlessing(b) {
     if (!b) return null;
     if (!Array.isArray(this.echoBlessings)) this.echoBlessings = [];
-    // 可重复的祝福（目前只有「开路」）：不按同类去重、不占 3 个名额，每次拿到都重新执行一次效果
-    const repeatable = b.repeatable === true;
-    if (!repeatable && this.echoBlessings.includes(b.id)) return null;          // 同类不叠加
-    // 上限只看**非反制**祝福：反制不进 3 个名额（静默会压低上限）
-    const normalHeld = this.echoBlessings.filter((id) => !echoBlessingFree(echoBlessingById(id))).length;
-    if (!repeatable && normalHeld >= this._echoBlessingMax()) return null;
-    if (!this.echoBlessings.includes(b.id)) this.echoBlessings.push(b.id);
+    // 反制祝福（2026-11-05）：不占 3 个名额，但**每次抽到都记一次消耗** ——
+    // 即使当前没有对应的诅咒，这次抽取也照常花掉，不会存着等以后。
+    const free = echoBlessingFree(b) || b.repeatable === true;
+    if (!Array.isArray(this.echoCounterIds)) this.echoCounterIds = [];
+    if (free) {
+      this.echoCounterIds.push(b.id);
+    } else {
+      if (this.echoBlessings.includes(b.id)) return null;                       // 同类不叠加
+      if (this.echoBlessings.length >= this._echoBlessingMax()) return null;    // 上限（静默会压低）
+      this.echoBlessings.push(b.id);
+    }
     this._echoBlessingEndsAt = null;
     // A 类：**立刻进钱包**（维护者 2026-11-04：原来走 pendingFunds，要等下一回合 prep 才入账，
     // 玩家选了 40 资金当场看不到，以为没生效）。
@@ -968,6 +973,16 @@ export class MatchEcho {
     }
     // H 类（2026-11-05）：全队一次性回复生命。封顶到**各自的初始生命**（gd.startLp），
     // 所以不会把深渊的漏怪抹平，也不会让「生命」超过开局值。
+    // 消耗式祝福（机变 / 时之沙漏）：立刻给免费刷新，封顶到当前上限（维护者 2026-11-05 审计发现漏接）
+    const refresh = b.kind === 'fund' && Number(b.freeRefresh) > 0 ? Math.trunc(Number(b.freeRefresh)) : 0;
+    if (refresh > 0) {
+      for (const ps of this.alivePlayers()) {
+        const shop = ps && ps.shop;
+        if (!shop) continue;
+        shop.freeRefreshes = Math.min(this._echoFreeRefreshCap(), (Number(shop.freeRefreshes) || 0) + refresh);
+        ps.dirty?.();
+      }
+    }
     const heal = echoBlessingHeal(b);
     if (heal > 0) {
       // 桩 gd（单测里的假数据）可能没有 startLp：这时不封顶，也不让发放失败

@@ -19,6 +19,7 @@ function fakeMatch({ round = 20, diveStart = 16, humans = [human(1)], variant = 
     echoVariant: variant,
     echoDiveStart: diveStart,
     echoBlessings: [],
+  echoCounterIds: [],
     echoBlessingDraws: 0,
     echoBlessingOffer: null,
     _echoBlessingVotes: new Map(),
@@ -77,10 +78,11 @@ test('投票：全投完才结算，票多者得', () => {
   // 前两票不该结算
   P.setEchoBlessingVote.call(m, humans[0], 1);
   P.setEchoBlessingVote.call(m, humans[1], 1);
-  assert.equal(m.echoBlessings.length, 0, '还差一票，不能生效');
+  const picked = () => [...m.echoBlessings, ...(m.echoCounterIds || [])];
+  assert.equal(picked().length, 0, '还差一票，不能生效');
   P.setEchoBlessingVote.call(m, humans[2], 0);
-  assert.equal(m.echoBlessings.length, 1, '投完立即结算');
-  assert.equal(m.echoBlessings[0], offer[1], '2:1 → 选第 2 项');
+  assert.equal(picked().length, 1, '投完立即结算');
+  assert.equal(picked()[0], offer[1], '2:1 → 选第 2 项');
   assert.equal(m.echoBlessingOffer, null, '结算后候选清空');
 });
 
@@ -90,7 +92,7 @@ test('离线的人既不计数也不阻塞', () => {
   const m = fakeMatch({ round: 20, humans });
   P._echoMaybeOfferBlessing.call(m, 20);
   P.setEchoBlessingVote.call(m, humans[0], 0);
-  assert.equal(m.echoBlessings.length, 1, '在线的一个人投完就结算');
+  assert.equal([...m.echoBlessings, ...(m.echoCounterIds || [])].length, 1, '在线的一个人投完就结算');
 });
 
 test('观战席不能投，非法下标被拒', () => {  const spec = human(7, { spectator: true });
@@ -158,9 +160,9 @@ test('30 秒超时：已投的人按票数最高结算（不必等挂机的人�
   assert.equal(m.timers.length, 1, '开票时要挂一个超时');
   assert.equal(m.timers[0].ms, 30000, '维护者定的 30 秒');
   P.setEchoBlessingVote.call(m, humans[0], 2);
-  assert.equal(m.echoBlessings.length, 0, '还差一个人，不能立即结算');
+  assert.equal([...m.echoBlessings, ...(m.echoCounterIds || [])].length, 0, '还差一个人，不能立即结算');
   m.timers[0].fn(); // 模拟超时触发
-  assert.deepEqual(m.echoBlessings, [offer[2]], '超时按已投的最高票结算');
+  assert.deepEqual([...m.echoBlessings, ...(m.echoCounterIds || [])], [offer[2]], '超时按已投的最高票结算');
   assert.equal(m.echoBlessingOffer, null, '结算后候选清空');
 });
 
@@ -169,7 +171,7 @@ test('30 秒超时：一个人都没投就取候选第一项', () => {
   const offer = P._echoMaybeOfferBlessing.call(m, 20);
   assert.equal(m.timers.length, 1);
   m.timers[0].fn();
-  assert.deepEqual(m.echoBlessings, [offer[0]], '没人投 → 候选第一项');
+  assert.deepEqual([...m.echoBlessings, ...(m.echoCounterIds || [])], [offer[0]], '没人投 → 候选第一项');
 });
 
 test('结算会取消超时定时器（避免重复结算）', () => {
@@ -177,6 +179,6 @@ test('结算会取消超时定时器（避免重复结算）', () => {
   const m = fakeMatch({ round: 20, humans });
   P._echoMaybeOfferBlessing.call(m, 20);
   P.setEchoBlessingVote.call(m, humans[0], 1);
-  assert.equal(m.echoBlessings.length, 1, '立即结算');
+  assert.equal([...m.echoBlessings, ...(m.echoCounterIds || [])].length, 1, '立即结算');
   assert.ok(m.cancelled.length >= 1, '必须 cancel 掉那个定时器');
 });
