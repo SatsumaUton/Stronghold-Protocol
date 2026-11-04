@@ -11,10 +11,10 @@
 
 import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
 import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js';
-import { echoCurseList, echoCurseEffects } from './echoCurse.js';
+import { echoCurseList, echoCurseEffects, pickEchoCurse, removeEchoCurses, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
-  echoBlessingFunds, echoBlessingHeal, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS,
+  echoBlessingFunds, echoBlessingHeal, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR } from '../../../shared/constants.js';
@@ -355,11 +355,15 @@ export class MatchEcho {
       this.tickerText?.(`挑战关：全队清怪 ${Math.round(ratio * 100)}%，获得一次祝福三选一`, 1);
       this.markPublic?.();
     } else {
-      // 没达成 → 不给祝福，改为深渊降下诅咒（从 echoCurse.js 的词条表里取；现在固定「侵蚀」= 词条上限 +1）
-      const curse = 'erosion';
+      // 没达成 → 不给祝福，改为深渊降下诅咒。按深度抽（echoCurse.js 的 pickEchoCurse）：
+      // 5 层只会是普通诅咒，10 层起有稀有，16 层以后才可能出传说。
+      const rng = createRng(deriveSeed(this.seed, `echo:curse:${this.round}`));
+      const curse = pickEchoCurse(this._echoDepth(this.round), rng)
+        || { id: 'erosion', name: '侵蚀', rarity: 'common' };
       this.echoCurseIds = Array.isArray(this.echoCurseIds) ? this.echoCurseIds : [];
-      this.echoCurseIds.push(curse);
-      this.tickerText?.(`挑战关：全队清怪 ${Math.round(ratio * 100)}%，深渊降下诅咒（侵蚀词条上限 +1）`, 1);
+      this.echoCurseIds.push(curse.id);
+      const tier = ECHO_CURSE_RARITY_LABEL[curse.rarity] || '普通';
+      this.tickerText?.(`挑战关：全队清怪 ${Math.round(ratio * 100)}%，深渊降下诅咒「${curse.name}」（${tier}）`, 1);
       this.markPublic?.();
     }
     return { ratio, granted: !denied };
@@ -509,7 +513,14 @@ export class MatchEcho {
     return {
       options: offer.map((id) => {
         const b = typeof id === 'string' ? echoBlessingById(id) : id;
-        return { id: (b && b.id) || String(id), name: (b && b.name) || String(id), desc: (b && b.desc) || '' };
+        return {
+          id: (b && b.id) || String(id),
+          name: (b && b.name) || String(id),
+          desc: (b && b.desc) || '',
+          // 稀有度（2026-11-05）：客户端可据此给卡片描边 / 加角标；没有字段的老客户端会忽略它
+          rarity: (b && b.rarity) || 'common',
+          rarityLabel: ECHO_BLESSING_RARITY_LABEL[(b && b.rarity) || 'common'] || '普通',
+        };
       }),
       votes,
       // 投票截止（服务端时间戳），客户端据此显示倒计时
@@ -643,9 +654,10 @@ export class MatchEcho {
     }
     // C 类（2026-11-05）：消除诅咒。**只动 `echoCurseIds`**（挑战关失败累积的那些）；
     // 奇迹·诅咒 / 远见·诅咒写死在 `_echoCurses()` 里，不经过这个列表，所以清不掉 —— 故意的。
-    const remove = echoBlessingCurseRemove(b);
-    if (remove > 0 && Array.isArray(this.echoCurseIds) && this.echoCurseIds.length) {
-      this.echoCurseIds.splice(0, Math.min(remove, this.echoCurseIds.length));
+    const removeSpec = echoBlessingCurseRemove(b);
+    if (removeSpec != null && Array.isArray(this.echoCurseIds) && this.echoCurseIds.length) {
+      // 'common' = 只清普通诅咒（涤罪，稀有/传说保留）；数字 = 清最早的 n 层；'all' = 全清
+      this.echoCurseIds = removeEchoCurses(this.echoCurseIds, removeSpec).kept;
     }
     this.tickerText(msg('深渊回响：全队获得祝福「{name}」', { name: b.name }), FLOW_TICKER_PRIORITY);
     this.log.info?.(`[match ${this.roomCode}] echo blessing ${b.id} (R${this.round})`);

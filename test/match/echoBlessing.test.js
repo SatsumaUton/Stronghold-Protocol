@@ -133,3 +133,39 @@ test('每 5 回合一次的常量与节奏自洽', () => {
   assert.deepEqual(due.slice(0, 5), [1, 1, 1, 1, 1], '第 1 层就给，1-5 层都只有 1 次');
   assert.deepEqual(due.slice(5, 10), [1, 1, 1, 1, 2], '第 10 层第二次');
 });
+
+// ---- 稀有度（维护者 2026-11-05）--------------------------------------------------------------
+test('每条祝福都有合法稀有度，且三档都有人', () => {
+  const ok = new Set(['common', 'rare', 'epic']);
+  const seen = new Set();
+  for (const b of ECHO_BLESSINGS) {
+    assert.ok(ok.has(b.rarity), `${b.id} 的稀有度 ${b.rarity} 非法`);
+    seen.add(b.rarity);
+  }
+  assert.deepEqual([...seen].sort(), ['common', 'epic', 'rare'], '三档都要有实际词条');
+});
+
+test('三选一按稀有度加权：传说明显少于普通，但三个槽不重复、不出现已拥有的', () => {
+  let s = 20261105;
+  const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const counts = { common: 0, rare: 0, epic: 0 };
+  for (let i = 0; i < 300; i++) {
+    const offer = echoBlessingOffer(rng, []);
+    assert.equal(offer.length, 3);
+    assert.equal(new Set(offer.map((b) => b.id)).size, 3, '三个槽不能重复');
+    for (const b of offer) counts[b.rarity] += 1;
+  }
+  assert.ok(counts.common > counts.rare, `普通(${counts.common}) 应多于稀有(${counts.rare})`);
+  assert.ok(counts.rare > counts.epic, `稀有(${counts.rare}) 应多于传说(${counts.epic})`);
+  assert.ok(counts.epic > 0, '传说不是永远抽不到');
+});
+
+test('已拥有的祝福不会再出现在候选里', () => {
+  const owned = ECHO_BLESSINGS.filter((b) => b.rarity === 'epic').map((b) => b.id);
+  let s = 7;
+  const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (let i = 0; i < 50; i++) {
+    const offer = echoBlessingOffer(rng, owned);
+    for (const b of offer) assert.ok(!owned.includes(b.id), `${b.id} 已拥有却仍被抽出`);
+  }
+});

@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ECHO_CURSES, ECHO_CURSE_LIVE_KINDS, echoCurseById, echoCurseEffects, echoCurseList,
+  ECHO_CURSES, ECHO_CURSE_LIVE_KINDS, echoCurseById, echoCurseEffects, echoCurseList, 
+  pickEchoCurse, removeEchoCurses, ECHO_CURSE_RARITY_LABEL,
 } from '../../server/match/match/echoCurse.js';
 
 test('词条表：id 唯一、文案齐、效果形状统一', () => {
@@ -91,4 +92,32 @@ test('没有预留空转的条目：全部 live，且 kind 都有消费方', () 
     assert.ok(ECHO_CURSE_LIVE_KINDS.includes(c.effect.kind), `${c.id} 的 kind ${c.effect.kind} 没有消费点`);
     assert.deepEqual(echoCurseEffects([c.id]).pending, [], `${c.id} 不该进 pending`);
   }
+});
+
+// ---- 稀有度与投放（维护者 2026-11-05）----------------------------------------------------------
+test('每条诅咒都有合法稀有度，且三档都有人', () => {
+  const ok = new Set(['common', 'rare', 'epic']);
+  const seen = new Set();
+  for (const c of ECHO_CURSES) {
+    assert.ok(ok.has(c.rarity), `${c.id} 的稀有度 ${c.rarity} 非法`);
+    seen.add(c.rarity);
+  }
+  assert.deepEqual([...seen].sort(), ['common', 'epic', 'rare']);
+});
+
+test('pickEchoCurse：5 层只出普通，10 层会出稀有，16 层起会出传说', () => {
+  const at = (depth, roll) => pickEchoCurse(depth, () => roll).rarity;
+  for (const roll of [0, 0.3, 0.7, 0.95]) assert.equal(at(5, roll), 'common', '5 层不该出稀有');
+  assert.equal(at(10, 0.85), 'rare', '10 层 0.85 落在稀有带');
+  assert.equal(at(16, 0.95), 'epic', '16 层 0.95 落在传说带');
+  assert.equal(at(16, 0.1), 'common');
+});
+
+test('removeEchoCurses：数字删最早 n 层，common 只删普通，all 全删', () => {
+  const ids = ['erosion', 'swarm', 'tribute', 'fog'];
+  assert.deepEqual(removeEchoCurses(ids, 2).kept, ['tribute', 'fog']);
+  assert.deepEqual(removeEchoCurses(ids, 'common').kept, ['swarm', 'fog'], '稀有/传说保留');
+  assert.deepEqual(removeEchoCurses(ids, 'all').kept, []);
+  assert.deepEqual(removeEchoCurses(ids, 0).kept, ids, '0 不删');
+  assert.deepEqual(removeEchoCurses(undefined, 'all').kept, []);
 });

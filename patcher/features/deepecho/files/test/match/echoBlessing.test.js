@@ -22,10 +22,10 @@ const seq = (...xs) => {
   return () => xs[Math.min(i++, xs.length - 1)];
 };
 
-test('三个祝福齐全，id/name/desc 都在', () => {
-  assert.equal(ECHO_BLESSINGS.length, 3);
+test('祝福池：至少 32 个、id 唯一、name/desc 齐全', () => {
+  assert.ok(ECHO_BLESSINGS.length >= 32, '池子至少 32 个');
   const ids = ECHO_BLESSINGS.map((b) => b.id);
-  assert.deepEqual([...ids].sort(), ['fund', 'haste', 'loot']);
+  assert.equal(new Set(ids).size, ids.length, 'id 必须唯一');
   for (const b of ECHO_BLESSINGS) {
     assert.equal(typeof b.name, 'string');
     assert.ok(b.name.length > 0, `${b.id} 缺名字`);
@@ -47,13 +47,13 @@ test('攻速祝福的 mods 键是 units.js 真会读的键（batPct）', () => {
 
 test('发放节奏：深潜每 5 个回合一次，隐藏通关开局多一次', () => {
   const diveStart = 16;
-  assert.equal(echoBlessingDue(16, diveStart, 0), 0, '深潜第 1 回合不该白送');
-  assert.equal(echoBlessingDue(19, diveStart, 0), 0, '第 4 个深潜回合还没到');
-  assert.equal(echoBlessingDue(20, diveStart, 0), 1, '第 5 个深潜回合 → 1 次');
+  assert.equal(echoBlessingDue(16, diveStart, 0), 1, '深潜第 1 回合就给一次（维护者 2026-11-04）');
+  assert.equal(echoBlessingDue(19, diveStart, 0), 1, '第 4 个深潜回合仍是 1 次');
+  assert.equal(echoBlessingDue(20, diveStart, 0), 1, '第 5 个深潜回合仍是 1 次');
   assert.equal(echoBlessingDue(24, diveStart, 0), 1, '第 9 个深潜回合仍是 1 次');
   assert.equal(echoBlessingDue(25, diveStart, 0), 2, '第 10 个深潜回合 → 2 次');
   // 打过隐藏核心：开局就有一次
-  assert.equal(echoBlessingDue(16, diveStart, 1), 1);
+  assert.equal(echoBlessingDue(16, diveStart, 1), 2, '隐藏通关：开局那次 + 第 1 层');
   assert.equal(echoBlessingDue(20, diveStart, 1), 2);
 });
 
@@ -72,9 +72,9 @@ test('三选一候选：不重复、最多 3 个、已拥有的不再出现', ()
 
   const after = echoBlessingOffer(seq(0.1, 0.9, 0.5), ['fund']);
   assert.ok(after.every((b) => b.id !== 'fund'), '已拥有的不该再进候选');
-  assert.equal(after.length, 2);
+  assert.equal(after.length, 3, '池子还够，仍然给满 3 个候选');
 
-  assert.deepEqual(echoBlessingOffer(seq(0.1), ['fund', 'haste', 'loot']), [], '全拿过就没有候选');
+  assert.deepEqual(echoBlessingOffer(seq(0.1), ECHO_BLESSINGS.map((b) => b.id)), [], '全拿过就没有候选');
 });
 
 test('候选是确定性的：同样的随机序列给同样的结果', () => {
@@ -92,15 +92,16 @@ test('mods 合并：有疾风就是 batPct -0.1，没有就是空对象', () => 
   assert.deepEqual(echoBlessingMods(['haste', 'haste']), { batPct: -0.2 }, '列表重复时按加算处理（由 _echoGrantBlessing 保证不重复入列）');
 });
 
-test('资金倍率：丰收 ×1.2，其余为 1', () => {
-  assert.equal(echoBlessingCoinMul(['loot']), 1.2);
+test('资金倍率：现在所有祝福都不再影响金币倍率', () => {
+  // 「丰收」2026-11-05 改成「每 3 层 +1 次免费刷新」，不再是 coinMul
+  assert.equal(echoBlessingCoinMul(['loot']), 1);
   assert.equal(echoBlessingCoinMul([]), 1);
   assert.equal(echoBlessingCoinMul(['fund', 'haste']), 1);
-  assert.ok(Math.abs(echoBlessingCoinMul(['loot', 'loot']) - 1.44) < 1e-9);
+  assert.equal(echoBlessingCoinMul(['loot', 'loot']), 1);
 });
 
-test('一次性资金：只有物资补给给 40', () => {
-  assert.equal(echoBlessingFunds(echoBlessingById('fund')), 40);
+test('一次性资金：只有物资补给给 25', () => {
+  assert.equal(echoBlessingFunds(echoBlessingById('fund')), 25);
   assert.equal(echoBlessingFunds(echoBlessingById('haste')), 0);
   assert.equal(echoBlessingFunds(echoBlessingById('loot')), 0);
   assert.equal(echoBlessingFunds(null), 0);
@@ -129,6 +130,42 @@ test('每 5 回合一次的常量与节奏自洽', () => {
   const diveStart = 15;
   const due = [];
   for (let r = diveStart; r <= diveStart + 14; r++) due.push(echoBlessingDue(r, diveStart, 0));
-  assert.deepEqual(due.slice(0, 5), [0, 0, 0, 0, 1], '第 5 个深潜回合才第一次');
-  assert.deepEqual(due.slice(5, 10), [1, 1, 1, 1, 2], '第 10 个深潜回合第二次');
+  assert.deepEqual(due.slice(0, 5), [1, 1, 1, 1, 1], '第 1 层就给，1-5 层都只有 1 次');
+  assert.deepEqual(due.slice(5, 10), [1, 1, 1, 1, 2], '第 10 层第二次');
+});
+
+// ---- 稀有度（维护者 2026-11-05）--------------------------------------------------------------
+test('每条祝福都有合法稀有度，且三档都有人', () => {
+  const ok = new Set(['common', 'rare', 'epic']);
+  const seen = new Set();
+  for (const b of ECHO_BLESSINGS) {
+    assert.ok(ok.has(b.rarity), `${b.id} 的稀有度 ${b.rarity} 非法`);
+    seen.add(b.rarity);
+  }
+  assert.deepEqual([...seen].sort(), ['common', 'epic', 'rare'], '三档都要有实际词条');
+});
+
+test('三选一按稀有度加权：传说明显少于普通，但三个槽不重复、不出现已拥有的', () => {
+  let s = 20261105;
+  const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const counts = { common: 0, rare: 0, epic: 0 };
+  for (let i = 0; i < 300; i++) {
+    const offer = echoBlessingOffer(rng, []);
+    assert.equal(offer.length, 3);
+    assert.equal(new Set(offer.map((b) => b.id)).size, 3, '三个槽不能重复');
+    for (const b of offer) counts[b.rarity] += 1;
+  }
+  assert.ok(counts.common > counts.rare, `普通(${counts.common}) 应多于稀有(${counts.rare})`);
+  assert.ok(counts.rare > counts.epic, `稀有(${counts.rare}) 应多于传说(${counts.epic})`);
+  assert.ok(counts.epic > 0, '传说不是永远抽不到');
+});
+
+test('已拥有的祝福不会再出现在候选里', () => {
+  const owned = ECHO_BLESSINGS.filter((b) => b.rarity === 'epic').map((b) => b.id);
+  let s = 7;
+  const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (let i = 0; i < 50; i++) {
+    const offer = echoBlessingOffer(rng, owned);
+    for (const b of offer) assert.ok(!owned.includes(b.id), `${b.id} 已拥有却仍被抽出`);
+  }
 });

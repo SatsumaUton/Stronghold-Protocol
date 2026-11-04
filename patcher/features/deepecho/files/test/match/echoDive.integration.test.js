@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeMatch } from './harness.js';
 import { ECHO_BLESSINGS, echoBlessingById } from '../../server/match/match/echoBlessing.js';
+import { echoCurseById } from '../../server/match/match/echoCurse.js';
 
 /** 一间 deepecho 房（fake 战斗，不跑真实模拟）。 */
 const dive = (o = {}) => makeMatch({ mode: 'coop', humans: 2, bots: 0, seed: 16, fake: true, variant: 'deepecho', ...o });
@@ -228,7 +229,10 @@ test('挑战关没达标：不给祝福，改加一层诅咒（侵蚀词条上�
   const out = m._echoSettleChallenge();
   assert.equal(out.granted, false);
   assert.equal(Number(m.echoBlessingDraws) || 0, draws, '没达标不发祝福');
-  assert.deepEqual(m.echoCurseIds, ['erosion'], '改为加一层诅咒');
+  assert.equal(m.echoCurseIds.length, 1, '改为加一层诅咒');
+  const dropped = echoCurseById(m.echoCurseIds[0]);
+  assert.ok(dropped, '抽到的是已知诅咒');
+  assert.equal(dropped.rarity, 'common', '深度 5 只会投放普通诅咒');
   assert.ok(m._echoCurses().some((c) => c.id === 'erosion'), '深渊回响的诅咒列表里看得到');
   assert.equal(m._echoWordCap(), Math.min(8, capBefore + 1), '诅咒真的加难度（词条上限 +1）');
 });
@@ -284,9 +288,9 @@ test('祝福「净化 / 涤罪」：清得掉累积诅咒，清不掉固定的�
   assert.ok(shown.some((c) => c.id === 'miracle'), '奇迹·诅咒不受影响');
   assert.ok(shown.some((c) => c.id === 'foresight'), '远见·诅咒不受影响');
 
-  m.echoCurseIds.push('erosion', 'erosion');
+  m.echoCurseIds.push('erosion', 'erosion', 'swarm');   // 稀有（swarm）不该被涤罪清掉
   m._echoGrantBlessing(echoBlessingById('cleanse_all'));
-  assert.deepEqual(m.echoCurseIds, [], '涤罪：清空全部累积诅咒');
+  assert.deepEqual(m.echoCurseIds, ['swarm'], '涤罪：只清普通诅咒，稀有保留');
   const after = m._echoCurses();
   assert.ok(after.some((c) => c.id === 'miracle'), '奇迹·诅咒仍然在');
   assert.ok(after.some((c) => c.id === 'foresight'), '远见·诅咒仍然在');
