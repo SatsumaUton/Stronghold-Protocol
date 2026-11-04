@@ -860,6 +860,33 @@ export class MatchEcho {
   }
 
   /**
+   * 深潜普通波次的**最后一道闸**：把首领分体 / 召唤物从出怪里剔掉（维护者 2026-11-05
+   * 反复看到「碎铳之簧」这类分体单独刷出来）。
+   *
+   * 池子与精英注入都已经排除了，但模板变体 / 跨版本前缀（`act1:enemy_x`）等旁路仍可能漏，
+   * 所以在波次生成后按 key（去前缀）再筛一遍。boss 返场回合不经过这里。
+   */
+  _echoSanitizeSpawns(wave) {
+    if (!wave || !Array.isArray(wave.spawns)) return wave;
+    let only = null;
+    try { only = echoSummonOnly(this.gd); } catch { only = null; }
+    if (!only || !only.size) return wave;
+    const keep = [];
+    for (const s of wave.spawns) {
+      const key = String(s && s.enemyKey || '');
+      const base = key.replace(/^.*:/, '');
+      if (only.has(key) || only.has(base)) continue;
+      keep.push(s);
+    }
+    const removed = wave.spawns.length - keep.length;
+    if (removed > 0) {
+      wave.spawns = keep;
+      if (Array.isArray(wave.routes) && !keep.length) wave.spawns = [];
+    }
+    return wave;
+  }
+
+  /**
    * 「频次怪」（靠攻击次数结算）统一降血（维护者 2026-11-05）。
    *
    * 随机波次里它们已经被限制成「每波最多 1 种、每条最多 2 只」，但 boss 返场 / 隐藏核心的分体
