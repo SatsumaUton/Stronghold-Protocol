@@ -977,3 +977,29 @@ test('特殊回合入场播报：挑战关 / 第 15 层 / boss 返场', (t) => {
   const plain = go(16);                                 // 普通深层回合不播这些
   assert.doesNotMatch(plain, /挑战关|精英加压|boss 返场/);
 });
+// 维护者 2026-11-05：玩家反馈「被禁用的干员还能刷进商店」。池子本身是干净的（60~600 次刷新实测 0 次违规），
+// 但自选补位 / 出售回填 / 装备特殊刷新这些旁路不经过池子，所以这里加最后一道闸并有用例守住。
+test('禁用干员有最后一道闸：绕过池子塞进来也会被换掉', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  const bannedId = (m.bannedChess || [])[0];
+  assert.ok(bannedId, '本局应该至少有一个禁用干员');
+  const legalId = Object.keys(m.gd.raw.chess).find((id) => !(m.bannedChess || []).includes(id) && m.gd.chess(id));
+  assert.ok(legalId, '要有一个合法干员做对照');
+
+  const warns = [];
+  m.log = { info() {}, warn: (x) => warns.push(String(x)) };
+
+  const orig = ps.pool.roll.bind(ps.pool);
+  // 模拟旁路：池子直接吐出禁用干员
+  ps.pool.roll = () => bannedId;
+  assert.equal(ps._rollChessSlot(), null, '禁用干员不能进商店');
+  assert.ok(warns.some((w) => w.includes('banned chess')), '要留下一条 warn 方便排查');
+
+  ps.pool.roll = () => legalId;
+  const ok = ps._rollChessSlot();
+  assert.equal(ok?.id, legalId, '合法干员照常');
+  ps.pool.roll = orig;
+});

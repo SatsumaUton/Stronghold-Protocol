@@ -72,10 +72,35 @@ export class PlayerEconomy {
     return mul === 1 ? base : Math.max(0, Math.round(base * mul));
   }
 
+  /**
+   * 这个干员在本局是不是「被禁用」：在 `bannedChess` 里，或者**所有盟约都被禁**。
+   *
+   * 池子本身已经排除了禁用干员，这里是**最后一道闸**（2026-11-05 玩家反馈「禁用的干员还能刷出来」）：
+   * 有些旁路不经过池子（自选补位、出售回填商店、装备触发的特殊刷新），
+   * 万一它们塞进一个禁用干员，这里会把它替换掉并记一条 warn。
+   */
+  _shopBanned(id) {
+    const m = this.m;
+    if (!m) return false;
+    if (Array.isArray(m.bannedChess) && m.bannedChess.includes(id)) return true;
+    const c = this.gd.chess(id);
+    const bonds = c && Array.isArray(c.bonds) ? c.bonds : [];
+    if (!bonds.length) return false;
+    const off = new Set([...(m.disabledBonds || []), ...(m.staticInactiveBonds || [])]);
+    return bonds.every((b) => off.has(b));
+  }
+
   _rollChessSlot() {
     // the slotted 自�?pieces join the draw once the 调度中心 reaches their slot's level (player/diy.js diyRollEntries)
-    const id = this.pool.roll(this.m.rngShop, { maxTier: this.shop.level, extra: this.diyRollEntries() });
-    return id ? { kind: 'chess', id, basePrice: this.gd.chessPrice(id), frozen: false, sold: false } : null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const id = this.pool.roll(this.m.rngShop, { maxTier: this.shop.level, extra: this.diyRollEntries() });
+      if (!id) return null;
+      if (!this._shopBanned(id)) {
+        return { kind: 'chess', id, basePrice: this.gd.chessPrice(id), frozen: false, sold: false };
+      }
+      this.m.log?.warn?.(`[shop] banned chess rolled and replaced: ${id} (player=${this.playerId}, round=${this.m.round})`);
+    }
+    return null;
   }
 
   _rollItemSlot() {
