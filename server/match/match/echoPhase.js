@@ -884,6 +884,22 @@ export class MatchEcho {
       offer,
       // 祝福名额：隐藏核心通关会临时 +1（客户端显示 n/3 → n/4）
       blessingMax: this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0),
+      // 名额已满时的「弃选」投票（维护者 2026-11-05）：全队投掉哪个，再换入新的
+      blessingReplace: this.echoBlessingReplace === true,
+      discard: Array.isArray(this.echoBlessingDiscardOffer) && this.echoBlessingDiscardOffer.length
+        ? {
+          pick: this.echoBlessingPendingPick || null,
+          options: this.echoBlessingDiscardOffer.map((id) => {
+            const b = echoBlessingById(id);
+            return {
+              id, name: (b && b.name) || id, desc: (b && b.desc) || '',
+              rarity: (b && b.rarity) || 'common', rarityLabel: ECHO_BLESSING_RARITY_LABEL[b && b.rarity] || '普通',
+            };
+          }),
+          votes: Object.fromEntries(this._echoDiscardVotes instanceof Map ? this._echoDiscardVotes : []),
+          endsAt: this.echoBlessingDiscardEndsAt ?? null,
+        }
+        : null,
       // 备战阶段的聚合情报（威胁值 / 是否精英 / 空中数量）；非深潜回合为 null
       curses: this._echoCurses(),
       rules: this._echoFixedRules(),
@@ -952,12 +968,17 @@ export class MatchEcho {
     // 反制祝福不占 3 个上限，但**每次都消耗一次抽取机会**（拿在手里也不存底）
     const owned = (Array.isArray(this.echoBlessings) ? this.echoBlessings.length : 0)
       + (Array.isArray(this.echoCounterIds) ? this.echoCounterIds.length : 0);
-    if (due <= owned) { this.echoBlessingOffer = null; return null; }
+    // 名额已满但还有「没发出去的抽取」→ 走替换流程（维护者 2026-11-05：
+    // 祝福满了也要能拿，选中之后由全队投票弃掉一个，投票同样 30 秒）。
+    const rawDue = echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws, 999);
+    const replace = rawDue > owned && owned >= cap;
+    if (!replace && due <= owned) { this.echoBlessingOffer = null; return null; }
     if (Array.isArray(this.echoBlessingOffer) && this.echoBlessingOffer.length) return this.echoBlessingOffer;
     const rng = createRng(deriveSeed(this.seed, `echo:bless:${r}`));
     const offer = echoBlessingOffer(rng, this.echoBlessings);
     if (!offer.length) { this.echoBlessingOffer = null; return null; }
     this.echoBlessingOffer = offer.map((b) => b.id);
+    this.echoBlessingReplace = replace;
     if (bonus > 0) this.echoBlessingBonus = bonus - 1;
     this._echoBlessingVotes.clear();
     // 30 秒不投完就强制结算，否则一个人挂机会把全队卡死（维护者 2026-11-03 定）
@@ -1028,12 +1049,105 @@ export class MatchEcho {
   /** 发放选中的那一项并清空状态（正常结算与超时强制结算共用）。 */
   _echoSettleBlessing(best) {
     const offer = this.echoBlessingOffer;
+    const replace = this.echoBlessingReplace === true;
     this.cancel(this._echoBlessingTimer);
     this._echoBlessingTimer = null;
     this.echoBlessingOffer = null;
     this._echoBlessingVotes.clear();
+    this.echoBlessingReplace = false;
     const b = Array.isArray(offer) ? echoBlessingById(offer[best]) : null;
+    if (!b) return OK;
+    // 名额已满 + 这次是替换模式：先让全队投票「弃掉哪个」，投完再发新的（维护者 2026-11-05）。
+    // 反制祝福不占名额，不需要弃选。
+    if (replace && !echoBlessingFree(b) && this.echoBlessings.length >= this._echoBlessingMax()) {
+      this.echoBlessingPendingPick = b.id;
+      this.echoBlessingDiscardOffer = this.echoBlessings.slice();
+      this._echoDiscardVotes.clear();
+      this.echoBlessingDiscardEndsAt = (this.sched?.now?.() ?? 0) + ECHO_BLESSING_VOTE_MS;
+      this.cancel(this._echoDiscardTimer);
+      this._echoDiscardTimer = this.later(ECHO_BLESSING_VOTE_MS, () => {
+        this._echoDiscardTimer = null;
+        try { this._echoForceResolveDiscard(); } catch { /* 结算失败不该炸掉整局 */ }
+      });
+      this.markPublic();
+      return OK;
+    }
+    this._echoGrantBlessing(b);
+    return OK;
+  }
+
+  /**
+   * 弃选投票：`g.echoBlessingDiscard { pick }` —— pick 是 `echoBlessingDiscardOffer` 的下标。
+   * 与三选一同一套范式：票多者弃、平票取靠前、30 秒超时强制结算、离线的人不计票也不阻塞。
+   */
+  setEchoBlessingDiscardVote(ps, pick) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE);
+    const offer = this.echoBlessingDiscardOffer;
+    if (!Array.isArray(offer) || !offer.length) return fail(ERR.WRONG_PHASE, 'no discard offer');
+    if (ps.spectator) return fail(ERR.SPECTATOR);
+    if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    const i = Math.floor(Number(pick));
+    if (!(i >= 0 && i < offer.length)) return fail(ERR.BAD_TARGET);
+    if (!this._echoDiscardVotes) this._echoDiscardVotes = new Map();
+    this._echoDiscardVotes.set(ps.playerId, i);
+    this.markPublic();
+    return this._echoResolveDiscard();
+  }
+
+  /** 弃选票齐了就结算。 */
+  _echoResolveDiscard() {
+    const offer = this.echoBlessingDiscardOffer;
+    if (!Array.isArray(offer) || !offer.length) return OK;
+    const voters = this.humans().filter((p) => p.connected && !p.spectator).map((p) => p.playerId);
+    if (!voters.length || !voters.every((id) => this._echoDiscardVotes.has(id))) return OK;
+    return this._echoSettleDiscard(this._echoTallyPick(this._echoDiscardVotes));
+  }
+
+  /** 30 秒超时强制结算弃选。 */
+  _echoForceResolveDiscard() {
+    const offer = this.echoBlessingDiscardOffer;
+    if (!Array.isArray(offer) || !offer.length) return OK;
+    return this._echoSettleDiscard(this._echoTallyPick(this._echoDiscardVotes));
+  }
+
+  /** 票数最高的一项（平票取下标小的），没有票就 0。 */
+  _echoTallyPick(votes) {
+    const tally = new Map();
+    for (const v of (votes || new Map()).values()) tally.set(v, (tally.get(v) || 0) + 1);
+    let best = 0;
+    let bestN = -1;
+    for (const v of [...tally.keys()].sort((a, b) => a - b)) {
+      const n = tally.get(v);
+      if (n > bestN) { best = v; bestN = n; }
+    }
+    return best;
+  }
+
+  /** 执行弃选并发放先前选定的祝福。 */
+  _echoSettleDiscard(best) {
+    const offer = Array.isArray(this.echoBlessingDiscardOffer) ? this.echoBlessingDiscardOffer : [];
+    const pick = this.echoBlessingPendingPick;
+    this.cancel(this._echoDiscardTimer);
+    this._echoDiscardTimer = null;
+    this.echoBlessingDiscardOffer = null;
+    this.echoBlessingDiscardEndsAt = null;
+    this._echoDiscardVotes.clear();
+    this.echoBlessingPendingPick = null;
+    if (!offer.length || !pick) return OK;
+    const dropIdx = Math.max(0, Math.min(offer.length - 1, Math.floor(Number(best) || 0)));
+    const dropId = offer[dropIdx];
+    const at = this.echoBlessings.indexOf(dropId);
+    if (at >= 0) {
+      this.echoBlessings.splice(at, 1);
+      const dropped = echoBlessingById(dropId);
+      if (dropped) this._echoPushAnnounce(`全队投票舍弃「${dropped.name}」，换入新的祝福`);
+    }
+    const b = echoBlessingById(pick);
     if (b) this._echoGrantBlessing(b);
+    // 这次额外抽取已经用掉了：不扣掉的话每回合都会再开一次替换（owned 不变、rawDue 不变）
+    this.echoBlessingDraws = Math.max(0, (Number(this.echoBlessingDraws) || 0) - 1);
+    this._echoFlushAnnounce?.();
+    this.markPublic();
     return OK;
   }
   /** 真正发放：记进 `echoBlessings`（同类不叠加）并立刻结算一次性效果。 */

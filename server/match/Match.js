@@ -373,6 +373,15 @@ export class Match {
      * 玩家打完隐藏 boss 什么都看不到。这里给一个**临时 +1 名额**，发出去之后清零。
      */
     this.echoBlessingBonus = 0;
+    /** _echoMaybeOfferBlessing 这次是不是「名额已满、要弃选一个」的替换模式（2026-11-05）。 */
+    this.echoBlessingReplace = false;
+    /** 替换模式下已选定、等待弃选的新祝福 id。 */
+    this.echoBlessingPendingPick = null;
+    /** 替换模式的弃选候选（现有祝福 id 列表）与投票。 */
+    this.echoBlessingDiscardOffer = null;
+    this._echoDiscardVotes = new Map();
+    this.echoBlessingDiscardEndsAt = null;
+    this._echoDiscardTimer = null;
     /**
      * 挑战关（深度 5 / 10）没达成清怪线时累积的**诅咒 id 列表**（维护者 2026-11-05）。
      * 词条与效果都在 `match/echoCurse.js`：现在只会推 'erosion'（+1 侵蚀词条上限），

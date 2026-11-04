@@ -142,6 +142,8 @@ export class MatchIntents {
       case 'g.speedVote': return this.setSpeedVote(ps, msg.agree === true);
       // 深渊回响：祝福三选一的投票（echoBlessing.js）
       case 'g.echoBlessing': return this.setEchoBlessingVote(ps, msg.pick);
+      // 祝福名额已满时的「弃选」投票（维护者 2026-11-05，同样 30 秒时限）
+      case 'g.echoBlessingDiscard': return this.setEchoBlessingDiscardVote(ps, msg.pick);
       case 'g.band': return this.pickBand(ps, msg.bandId);
       case 'g.bandSkip': return this.skipBand(ps);
       // 预约盟约（纯显示，移植自参考版）：声明这一局打算走哪个核心盟约
