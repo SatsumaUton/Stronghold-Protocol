@@ -1868,6 +1868,8 @@ function MatchScreen() {
     snapshot: snapUnitsRef.current.get(resolved?.unitId),
     live: typeof liveStats === 'function' ? liveStats() : liveStats,
     loadout: detailLoadout, getChess: gd.chess, backups: gd.backups,
+    // 深渊祝福改攻击范围的（「远程」+1）：准备阶段没有 live 范围，靠它把预览画对
+    echoExtend: (Array.isArray(pub?.echo?.blessings) ? pub.echo.blessings : []).reduce((n, b) => n + (Number(b.rangeExtend) || 0), 0),
   }) : null;
   const cardRangeKey = cardRange ? JSON.stringify(cardRange) : '';
   useEffect(() => {
