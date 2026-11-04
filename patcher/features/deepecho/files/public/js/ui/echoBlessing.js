@@ -14,6 +14,11 @@ import { t } from '../../../shared/i18n.js';
 
 export function EchoBlessing({ pub }) {
   const myId = useStore((s) => s.me.playerId);
+  // 死亡的玩家不参与祝福/弃选/护盾投票（维护者 2026-11-05）
+  const meAlive = useStore((s) => {
+    const me = (s.match?.public?.players || []).find((p) => p.playerId === s.me.playerId);
+    return me ? me.alive !== false : true;
+  });
   const online = useStore((s) => s.connection.status === 'online');
   const [busy, setBusy] = useState(false);
   const [armed, setArmed] = useState(null);
@@ -29,7 +34,7 @@ export function EchoBlessing({ pub }) {
   const myPick = votes[myId];
   const players = pub?.players || [];
   // 只有在线真人投票（服务端同一口径：离线的人既不计数也不阻塞）
-  const voters = players.filter((p) => !p.isBot && p.status !== 'left' && p.connected);
+  const voters = players.filter((p) => !p.isBot && p.status !== 'left' && p.connected && p.alive !== false);
   const voted = voters.filter((p) => votes[p.playerId] != null).length;
   useEffect(() => {
     if (left == null) return undefined;
@@ -48,6 +53,8 @@ export function EchoBlessing({ pub }) {
     if (busy || !online || myPick != null || armed == null) return;
     send(() => actions.echoBlessing(armed));
   };
+  // 死亡的玩家不参与祝福 / 弃选 / 护盾投票（维护者 2026-11-05）：整块面板都不显示
+  if (!meAlive) return null;
   // 没有可抽的卡时：满名额的弃选投票 → 护盾指定盟约的投票 → 什么都不显示（hooks 已全部跑过，顺序稳定）
   if (!offer || !Array.isArray(offer.options) || !offer.options.length) {
     if (discard && Array.isArray(discard.options) && discard.options.length) {

@@ -8,10 +8,15 @@ import { t } from '../../../shared/i18n.js';
 
 export function EchoSupplyPanel({ pub }) {
   const myId = useStore((s) => s.me.playerId);
+  // 死亡的玩家不参与补给三选一（维护者 2026-11-05）
+  const meAlive = useStore((s) => {
+    const me = (s.match?.public?.players || []).find((p) => p.playerId === s.me.playerId);
+    return me ? me.alive !== false : true;
+  });
   const supply = pub?.echo?.supply;
   const box = supply && myId ? supply.byPlayer?.[myId] : null;
   const [armed, setArmed] = useState(null);
-  if (!box || box.pick != null || !Array.isArray(box.options) || !box.options.length) return null;
+  if (!meAlive || !box || box.pick != null || !Array.isArray(box.options) || !box.options.length) return null;
   const card = (o, i) => html`<button type="button" key=${i + o.name}
       class=${`echo-bless__card${armed === i ? ' is-armed' : ''}`}
       onClick=${() => setArmed(i)}>

@@ -797,11 +797,13 @@ export class MatchEcho {
     if (!Array.isArray(offer) || !offer.length) return fail(ERR.WRONG_PHASE, 'no shield offer');
     if (ps.spectator) return fail(ERR.SPECTATOR);
     if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    if (ps.alive === false) return fail(ERR.SPECTATOR, 'dead players do not vote');
     const i = Math.floor(Number(pick));
     if (!(i >= 0 && i < offer.length)) return fail(ERR.BAD_TARGET);
     this._echoShieldVotes.set(ps.playerId, i);
     this.markPublic();
-    const voters = this.humans().filter((p) => p.connected && !p.spectator).map((p) => p.playerId);
+    // 只有**活着**的玩家参与投票（维护者 2026-11-05：死亡的玩家不再参与祝福选择）
+    const voters = this.humans().filter((p) => p.connected && !p.spectator && p.alive !== false && !p.left).map((p) => p.playerId);
     if (!voters.length || !voters.every((id) => this._echoShieldVotes.has(id))) return OK;
     return this._echoSettleShield(this._echoTallyPick(this._echoShieldVotes));
   }
@@ -1523,6 +1525,7 @@ export class MatchEcho {
     if (!Array.isArray(offer) || !offer.length) return fail(ERR.WRONG_PHASE, 'no blessing offer');
     if (ps.spectator) return fail(ERR.SPECTATOR);
     if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    if (ps.alive === false) return fail(ERR.SPECTATOR, 'dead players do not vote');
     const i = Math.floor(Number(pick));
     if (!(i >= 0 && i < offer.length)) return fail(ERR.BAD_TARGET);
     this._echoBlessingVotes.set(ps.playerId, i);
@@ -1534,7 +1537,8 @@ export class MatchEcho {
   _echoResolveBlessing() {
     const offer = this.echoBlessingOffer;
     if (!Array.isArray(offer) || !offer.length) return OK;
-    const voters = this.humans().filter((p) => p.connected && !p.spectator).map((p) => p.playerId);
+    // 只有**活着**的玩家参与投票（维护者 2026-11-05：死亡的玩家不再参与祝福选择）
+    const voters = this.humans().filter((p) => p.connected && !p.spectator && p.alive !== false && !p.left).map((p) => p.playerId);
     if (!voters.length || !voters.every((id) => this._echoBlessingVotes.has(id))) return OK;
     const tally = new Map();
     for (const id of voters) {
@@ -1609,6 +1613,7 @@ export class MatchEcho {
     if (!Array.isArray(offer) || !offer.length) return fail(ERR.WRONG_PHASE, 'no discard offer');
     if (ps.spectator) return fail(ERR.SPECTATOR);
     if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    if (ps.alive === false) return fail(ERR.SPECTATOR, 'dead players do not vote');
     const i = Math.floor(Number(pick));
     if (!(i >= 0 && i < offer.length)) return fail(ERR.BAD_TARGET);
     if (!this._echoDiscardVotes) this._echoDiscardVotes = new Map();
@@ -1621,7 +1626,8 @@ export class MatchEcho {
   _echoResolveDiscard() {
     const offer = this.echoBlessingDiscardOffer;
     if (!Array.isArray(offer) || !offer.length) return OK;
-    const voters = this.humans().filter((p) => p.connected && !p.spectator).map((p) => p.playerId);
+    // 只有**活着**的玩家参与投票（维护者 2026-11-05：死亡的玩家不再参与祝福选择）
+    const voters = this.humans().filter((p) => p.connected && !p.spectator && p.alive !== false && !p.left).map((p) => p.playerId);
     if (!voters.length || !voters.every((id) => this._echoDiscardVotes.has(id))) return OK;
     return this._echoSettleDiscard(this._echoTallyPick(this._echoDiscardVotes));
   }
