@@ -626,6 +626,8 @@ export const C2S = {
   'g.echoCounterUse': {},
   // 深渊祭坛（16 层起）：买一次献祭
   'g.echoAltar': { kind: (v) => v === 'blessing' || v === 'buff' || v === 'permanent' },
+  // 深潜补给（16 层起）：个人三选一
+  'g.echoSupply': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 2 },
   'g.band': { bandId: isId },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is

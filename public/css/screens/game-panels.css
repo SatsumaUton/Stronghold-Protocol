@@ -1040,3 +1040,6 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 }
 .echo-bless__confirm:disabled { opacity: .42; cursor: default; box-shadow: none; }
 .echo-bless__confirm:not(:disabled):hover { filter: brightness(1.12); transform: translateY(-1px); box-shadow: 0 0 .3rem rgba(157, 123, 255, .62), inset 0 0 0 1px rgba(255, 255, 255, .35); }
+
+/* 深潜补给（16 层起，个人三选一）：复用祝福面板的浮层样式 */
+.echo-supply { position: fixed; left: 50%; top: 12%; transform: translateX(-50%); z-index: 60; width: min(46rem, 92vw); }

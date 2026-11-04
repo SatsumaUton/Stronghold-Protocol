@@ -489,6 +489,8 @@ export class MatchPhases {
     this._echoMaybeGrantBounty(r);
     // 深潜的免费刷新上限（只在深潜里裁；普通房间不动）
     this._echoClampFreeRefreshes();
+    // 深潜补给（16 层起）：每层给每名玩家一次个人三选一
+    if (typeof this._echoOpenSupply === 'function') this._echoOpenSupply();
     this._echoMaybeLootRefresh(r);
     for (const ps of alive) ps.startRound(r);
     for (const ps of alive) this.dispatch(ps, 'onRoundStart', { round: r });
