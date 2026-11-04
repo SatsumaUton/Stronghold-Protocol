@@ -479,6 +479,8 @@ export class MatchPhases {
     } else {
       this.wave = buildNormalWave(this.gd, this.rngWaves, this.factions, r);
     }
+    // 深潜：频次怪降血（普通波与 boss 返场都吃，维护者 2026-11-05）
+    if (dive && typeof this._echoTuneHitCount === 'function') this._echoTuneHitCount(this.wave);
     // the dive's erosion words of this round (null on every other round, and on every other room)
     this._echoRollWords(r);
     // 「深渊回响」的祝福三选一：深潜里每 5 个回合开一次（echoBlessing.js；普通房间直接返回 null）
