@@ -14,7 +14,7 @@ import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js'
 import { echoCurseList, echoCurseEffects } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
-  echoBlessingFunds, applyEchoBlessingMods, ECHO_BLESSING_VOTE_MS,
+  echoBlessingFunds, echoBlessingHeal, echoBlessingCurseRemove, applyEchoBlessingMods, ECHO_BLESSING_VOTE_MS,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR } from '../../../shared/constants.js';
@@ -602,6 +602,25 @@ export class MatchEcho {
         ps.stats.fundsGained += funds;
         ps.dirty?.();
       }
+    }
+    // H 类（2026-11-05）：全队一次性回复生命。封顶到**各自的初始生命**（gd.startLp），
+    // 所以不会把深渊的漏怪抹平，也不会让「生命」超过开局值。
+    const heal = echoBlessingHeal(b);
+    if (heal > 0) {
+      // 桩 gd（单测里的假数据）可能没有 startLp：这时不封顶，也不让发放失败
+      const lpMax = (ps) => (typeof this.gd.startLp === 'function' ? Math.max(0, Math.floor(Number(this.gd.startLp(ps.bandId)) || 0)) : 0);
+      for (const ps of this.alivePlayers()) {
+        const before = Math.max(0, Math.floor(Number(ps.lp) || 0));
+        const max = lpMax(ps);
+        const after = max > 0 ? Math.min(max, before + heal) : before + heal;
+        if (after > before) { ps.lp = after; ps.dirty?.(); }
+      }
+    }
+    // C 类（2026-11-05）：消除诅咒。**只动 `echoCurseIds`**（挑战关失败累积的那些）；
+    // 奇迹·诅咒 / 远见·诅咒写死在 `_echoCurses()` 里，不经过这个列表，所以清不掉 —— 故意的。
+    const remove = echoBlessingCurseRemove(b);
+    if (remove > 0 && Array.isArray(this.echoCurseIds) && this.echoCurseIds.length) {
+      this.echoCurseIds.splice(0, Math.min(remove, this.echoCurseIds.length));
     }
     this.tickerText(msg('深渊回响：全队获得祝福「{name}」', { name: b.name }), FLOW_TICKER_PRIORITY);
     this.log.info?.(`[match ${this.roomCode}] echo blessing ${b.id} (R${this.round})`);

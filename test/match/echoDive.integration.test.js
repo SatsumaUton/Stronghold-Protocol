@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeMatch } from './harness.js';
+import { ECHO_BLESSINGS, echoBlessingById } from '../../server/match/match/echoBlessing.js';
 
 /** 一间 deepecho 房（fake 战斗，不跑真实模拟）。 */
 const dive = (o = {}) => makeMatch({ mode: 'coop', humans: 2, bots: 0, seed: 16, fake: true, variant: 'deepecho', ...o });
@@ -230,6 +231,65 @@ test('挑战关没达标：不给祝福，改加一层诅咒（侵蚀词条上�
   assert.deepEqual(m.echoCurseIds, ['erosion'], '改为加一层诅咒');
   assert.ok(m._echoCurses().some((c) => c.id === 'erosion'), '深渊回响的诅咒列表里看得到');
   assert.equal(m._echoWordCap(), Math.min(8, capBefore + 1), '诅咒真的加难度（词条上限 +1）');
+});
+
+// 维护者 2026-11-05：祝福要有「全队一次性回复生命」这类，**多种档位随机到**，且数值刻意做小，
+// 封顶到各自的初始生命，避免把深渊的漏怪抹平。
+test('祝福「回复生命」：多档位、数值都小、封顶到初始生命', (t) => {
+  const heals = ECHO_BLESSINGS.filter((b) => b.kind === 'heal');
+  assert.ok(heals.length >= 3, '至少三种回复档位（随机到才有多样性）');
+  for (const b of heals) {
+    assert.ok(Number.isInteger(b.healLp) && b.healLp > 0, `${b.id} 必须有正整数 healLp`);
+    assert.ok(b.healLp <= 10, `${b.id} 的 ${b.healLp} 点太大（维护者要求数值不能很大）`);
+  }
+  // 每档各建一间房：祝福上限 3 个，同一局里连发会撞上限
+  for (const b of heals) {
+    const h = dive();
+    const m = h.m;
+    try {
+      const ps = m.alivePlayers();
+      for (const p of ps) p.lp = Math.max(1, m.gd.startLp(p.bandId) - 20);
+      const before = ps.map((p) => p.lp);
+      m._echoGrantBlessing(b);
+      assert.deepEqual(ps.map((p) => p.lp), before.map((n) => n + b.healLp), `${b.id}：每人 +${b.healLp}`);
+      assert.ok(m.echoBlessings.includes(b.id), `${b.id} 已记入祝福`);
+    } finally {
+      m.dispose();
+    }
+  }
+  // 回满后不再溢出
+  const h = dive();
+  const m = h.m;
+  try {
+    const ps = m.alivePlayers();
+    for (const p of ps) p.lp = m.gd.startLp(p.bandId) - 1;
+    m._echoGrantBlessing(echoBlessingById('heal_l'));
+    for (const p of ps) assert.equal(p.lp, m.gd.startLp(p.bandId), '不能超过初始生命');
+  } finally {
+    m.dispose();
+  }
+});
+
+// 维护者 2026-11-05：诅咒可以被祝福消掉，但**固定的奇迹 / 远见诅咒永远消不掉**。
+test('祝福「净化 / 涤罪」：清得掉累积诅咒，清不掉固定的奇迹 / 远见', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 5;                                     // 有深度，诅咒才会进词条上限
+  m.echoCurseIds.push('erosion', 'erosion');
+  assert.ok(m._echoWordCap() > 3, '先确认诅咒真的加了难度');
+  m._echoGrantBlessing(echoBlessingById('cleanse'));
+  assert.deepEqual(m.echoCurseIds, ['erosion'], '净化：只移除 1 层');
+  const shown = m._echoCurses();
+  assert.ok(shown.some((c) => c.id === 'miracle'), '奇迹·诅咒不受影响');
+  assert.ok(shown.some((c) => c.id === 'foresight'), '远见·诅咒不受影响');
+
+  m.echoCurseIds.push('erosion', 'erosion');
+  m._echoGrantBlessing(echoBlessingById('cleanse_all'));
+  assert.deepEqual(m.echoCurseIds, [], '涤罪：清空全部累积诅咒');
+  const after = m._echoCurses();
+  assert.ok(after.some((c) => c.id === 'miracle'), '奇迹·诅咒仍然在');
+  assert.ok(after.some((c) => c.id === 'foresight'), '远见·诅咒仍然在');
 });
 
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后

@@ -27,6 +27,8 @@ export const ECHO_BLESSING_VOTE_MS = 30000;
  *   `fund`   —— 拿到的那一刻直接进钱包（一次性）
  *   `mods`   —— 给每个上场的己方单位挂 buff（持续整局）
  *   `coin`   —— 结算入账时乘上去（`coinMul`）
+ *   `heal`   —— 拿到的那一刻**全队回复生命**（一次性，封顶到各自的初始生命 `gd.startLp`）
+ *   `cleanse`—— 拿到的那一刻**移除诅咒**（一次性；固定的奇迹 / 远见诅咒不在可移除列表里）
  */
 export const ECHO_BLESSING_MAX = 3;   // 同时持有的最多个数（扩池后不能用池子长度当上限）
 export const ECHO_BLESSINGS = Object.freeze([
@@ -83,6 +85,22 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'refresh_s', name: '机变', desc: '立刻获得 1 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 1 },
   { id: 'bigfund', name: '深渊源泉', desc: '立刻获得 45 资金', kind: 'fund', group: 'fund', funds: 45 },
   { id: 'bigrefresh', name: '时之沙漏', desc: '立刻获得 2 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 2 },
+
+  // —— 全队回复生命（2026-11-05）：一次性、数值刻意做小 ——
+  // 生命（LP）一格是「一次漏怪抵扣 1 点、每回合最多扣 lpCapPerRound(10)」的量级，
+  // 所以这里只给 2–8 点：够救一次失误，不够把深渊的漏怪抹平。
+  // 四档分开写而不是「随机数值」，是为了让三选一里能同时出现两种不同档位。
+  { id: 'heal_xs', name: '绷带', desc: '立刻让全队回复 2 点生命（不超过上限）', kind: 'heal', group: 'heal', healLp: 2 },
+  { id: 'heal_s', name: '急救', desc: '立刻让全队回复 3 点生命（不超过上限）', kind: 'heal', group: 'heal', healLp: 3 },
+  { id: 'heal_m', name: '支援', desc: '立刻让全队回复 6 点生命（不超过上限）', kind: 'heal', group: 'heal', healLp: 6 },
+  { id: 'heal_l', name: '战地医疗', desc: '立刻让全队回复 8 点生命（不超过上限）', kind: 'heal', group: 'heal', healLp: 8 },
+
+  // —— 消除诅咒（2026-11-05）——
+  // 只能清掉**对局中累积**的诅咒（`echoCurseIds`：挑战关失败降下的「侵蚀」等）。
+  // 奇迹·诅咒 / 远见·诅咒是深渊的固定限制（`_echoCurses()` 里的两条），**永远消不掉** ——
+  // 否则「免费刷新上限」「按层给钱到 999 层」会随着祝福一起被洗掉，等于没有诅咒。
+  { id: 'cleanse', name: '净化', desc: '立刻移除 1 层诅咒（固定的奇迹 / 远见不受影响）', kind: 'cleanse', group: 'cleanse', curseRemove: 1 },
+  { id: 'cleanse_all', name: '涤罪', desc: '立刻移除所有累积的诅咒（固定的奇迹 / 远见不受影响）', kind: 'cleanse', group: 'cleanse', curseRemove: 'all' },
 
   // —— 对敌方上异常（2026-11-05）：敌人**生成时**按概率挂上持续 debuff ——
   { id: 'frostbite', name: '寒冻', group: 'debuff', kind: 'mods',
@@ -176,6 +194,26 @@ export function echoBlessingCoinMul(ids) {
  * @param {typeof ECHO_BLESSINGS[number]} b
  */
 export const echoBlessingFunds = (b) => (b && b.kind === 'fund' && b.funds > 0 ? Math.trunc(b.funds) : 0);
+
+/**
+ * 拿到这个祝福时一次性回复的生命（`heal` 类；其它返回 0）。
+ * 数值由调用方封顶到玩家自己的初始生命（`gd.startLp`），这里只负责给出「该回多少」。
+ * @param {typeof ECHO_BLESSINGS[number]} b
+ */
+export const echoBlessingHeal = (b) => (b && b.kind === 'heal' && b.healLp > 0 ? Math.trunc(b.healLp) : 0);
+
+/**
+ * 拿到这个祝福时一次性移除几层诅咒（`cleanse` 类；其它返回 0，'all' 返回 Infinity）。
+ *
+ * ⚠ 只作用于 `echoCurseIds`（对局中累积的诅咒）。奇迹·诅咒 / 远见·诅咒是 `_echoCurses()` 里写死的
+ * 固定限制，不在这个列表里，所以这个函数天然清不掉它们 —— 这是设计，不要为了让「净化」更强去改。
+ * @param {typeof ECHO_BLESSINGS[number]} b
+ */
+export function echoBlessingCurseRemove(b) {
+  if (!b || b.kind !== 'cleanse') return 0;
+  if (b.curseRemove === 'all') return Infinity;
+  return Math.max(0, Math.trunc(Number(b.curseRemove) || 0));
+}
 
 /**
  * 给一个己方单位挂上祝福的 mods buff（幂等：同一个 key 只挂一次）。
