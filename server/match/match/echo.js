@@ -67,7 +67,7 @@ export const ECHO_MAX_FREE_REFRESH = 5;
  * ⚠ 2026-11-03 第二次改（维护者）：深潜**从第 1 回合开始**（`Match.echoDiveStart` 建房即 1），
  * 于是「显示回合」恒等于「深度」，下面的数字直接就是深度。
  * 旧方案用绝对回合（R20 起）是为「打完最后一个 boss 才进深潜」的旧入口服务的 ——
- * 那个入口已经不存在了（`_echoBeginDive` 现在只是给读档/旧存档兜底）。
+ * 那个入口已经不存在了（`_echoBeginDive` 已删除：boss 通关只做 `startRound(round + 1)`）。
  */
 export const ECHO_NODE_FIRST = 5;
 export const ECHO_NODE_EVERY = 5;

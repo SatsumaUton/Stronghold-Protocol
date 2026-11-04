@@ -7,6 +7,7 @@
 // 2026-11-03 第二次改（维护者）：深潜从**第 1 回合**开始，所以测试不再手工摆 echoDiveStart = 16。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { makeMatch } from './harness.js';
 
 /** 一间 deepecho 房（fake 战斗，不跑真实模拟）。 */
@@ -49,14 +50,14 @@ test('第 3 回合就是深潜普通回合：波次非空，且不进 boss 分�
   assert.ok(Array.isArray(m.echoWordsActive) && m.echoWordsActive.length >= 1, '深潜回合就有侵蚀词条');
 });
 
-test('第 15 回合 boss 返场：真的生成了 boss 波次（数据表只到 15 也能借模板）', (t) => {
+test('第 25 回合 boss 返场：真的生成了 boss 波次（数据表只到 15 也能借模板）', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
-  m.round = 14;
-  m.startRound(15);
-  assert.equal(m.round, 15);
-  assert.ok(Array.isArray(m.bossWaves) && m.bossWaves.length > 0, '深度 15 必须有 boss 波次');
+  m.round = 24;
+  m.startRound(25);
+  assert.equal(m.round, 25);
+  assert.ok(Array.isArray(m.bossWaves) && m.bossWaves.length > 0, '深度 25 必须有 boss 波次');
   assert.equal(m.wave, null, 'boss 回合没有普通波次');
   for (const g of m.bossWaves) {
     assert.ok(g.wave, '每组都要有波次对象');
@@ -67,12 +68,12 @@ test('第 15 回合 boss 返场：真的生成了 boss 波次（数据表只到 
   assert.equal(m._echoIntel(), null, 'boss 返场是明牌，不给聚合情报');
 });
 
-test('深度 3 悬赏节点：目标从本回合生成的波次里抽出来', (t) => {
+test('深度 23 悬赏节点：目标从本回合生成的波次里抽出来', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
-  m.round = 2;
-  m.startRound(3);
+  m.round = 22;
+  m.startRound(23);
   const players = m.alivePlayers();
   assert.ok(players.length > 0);
   const keys = new Set((m.wave?.spawns || []).map((s) => s.enemyKey));
@@ -85,7 +86,7 @@ test('深度 3 悬赏节点：目标从本回合生成的波次里抽出来', (t
       assert.equal(b.card.payout, 'kill');
     }
   }
-  assert.ok(got > 0, '深度 3 必须发出悬赏');
+  assert.ok(got > 0, '深度 23 必须发出悬赏');
 });
 
 test('深度 4 不发悬赏（不是节点）', (t) => {
@@ -130,7 +131,7 @@ test('无尽：第 30 回合不会自己结束（只有团灭才结束）', (t) 
 
 // 维护者 2026-11-04 §6：16 层以后「按层设计」而不是硬套原版模板 —— 旧实现在深度 16（轮回到数据回合 1）
 // 会从 15 层的 112 只掉到 14 只；新实现必须单调递增，且整波铺进最后一关的时限。
-test('16 层以后：真实波次的只数随深度递增（16 / 20 / 24；25 层是 boss 返场节点），时限固定成最后一关', () => {
+test('16 层以后：真实波次的只数随深度递增，时限按只数比例放大（原版 230 秒 / 112 只）', () => {
   const counts = [];
   for (const depth of [16, 20, 24]) {
     const h = dive();
@@ -143,7 +144,7 @@ test('16 层以后：真实波次的只数随深度递增（16 / 20 / 24；25 �
       assert.ok(m.wave && Array.isArray(m.wave.spawns), `深度 ${depth} 必须有普通波次`);
       for (const s of m.wave.spawns) assert.ok(m.gd.enemy(s.enemyKey), `深度 ${depth} 的 ${s.enemyKey} 必须是真实敌人`);
       counts.push(m.wave.spawns.reduce((a, s) => a + s.count, 0));
-      assert.equal(m.wave.timeLimit, m.gd.combatTimeLimit(m.gd.bossRound - 1), `深度 ${depth} 的时限应是最后一关的时长`);
+      assert.ok(m.wave.timeLimit >= 200, `深度 ${depth} 的时限应随只数放大（实际 ${m.wave.timeLimit}）`);
     } finally {
       m.dispose();
     }
@@ -152,5 +153,27 @@ test('16 层以后：真实波次的只数随深度递增（16 / 20 / 24；25 �
   assert.ok(counts[0] < counts[1], `16 层 ${counts[0]} → 20 层 ${counts[1]} 必须变多`);
   assert.ok(counts[1] < counts[2], `20 层 ${counts[1]} → 24 层 ${counts[2]} 必须变多`);
   assert.ok(counts[2] <= 160, `深度 24 的 ${counts[2]} 只超过硬顶`);
+});
+
+// 回归（2026-11-04 实测：15 层打完 HUD 变「深度 1」，出怪回到 R1 的几只狼 + 地刺）。
+// bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
+// `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
+// 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。
+test('boss 通关继续往下打：深度跟着回合走，不会回到 1', () => {
+  const h = dive();
+  const m = h.m;
+  try {
+    m.round = 14;
+    m.startRound(m.round + 1);                 // = bossRounds 现在的下一回合
+    assert.equal(m.round, 15);
+    assert.equal(m.echoDiveStart, 1, '深潜仍是从第 1 回合起算');
+    assert.equal(m._echoDepth(), 15, '深度 = 显示回合，不是 1');
+    assert.ok(m.wave || m.bossWaves, '第 15 层必须有波次');
+  } finally {
+    m.dispose();
+  }
+  const src = readFileSync(new URL('../../server/match/match/bossRounds.js', import.meta.url), 'utf8');
+  assert.ok(!/startRound\(\s*this\._echoBeginDive/.test(src), 'bossRounds 不能再拿 _echoBeginDive 当下一回合');
+  assert.ok(!/_echoBeginDive\s*\(/.test(src.replace(/\/\/[^\n]*/g, '')), '_echoBeginDive 已删除，不应再被调用');
 });
 

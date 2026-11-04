@@ -9,7 +9,7 @@
 //
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
-import { echoDataRound, echoStartRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
+import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
 import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
@@ -190,19 +190,13 @@ export class MatchEcho {
   }
 
   /**
-   * 进入深潜：把起点定在玩家实际打到的最后一个 boss 之后。
+   * 【已删除】`_echoBeginDive`。
    *
-   * `hiddenCleared` 时多给一次祝福抽取（DESIGN-ABYSS.md「隐藏通关的补偿」）—— 隐藏多打了一关 boss，
-   * 多一次祝福（≈+30% 乘算）正好抵掉消耗，又不至于变成碾压。
+   * 旧语义是「打完最后一个 boss 时把深潜起点定在 16」，bossRounds 拿它的返回值当下一回合。
+   * 2026-11-03 维护者改成**建房即深潜**（`echoDiveStart = 1`）之后，它只会返回 1，
+   * 于是 boss 通关会 `startRound(1)` 把整局打回第 1 回合（2026-11-04 实测：15 层打完变深度 1、出怪回 R1）。
+   * 现在 boss 通关只用 `startRound(this.round + 1)`；隐藏通关的「多一次祝福抽取」在 bossRounds 里显式设置。
    */
-  _echoBeginDive(lastBossRound, { hiddenCleared = false } = {}) {
-    // 深潜从**第 1 回合**就开始了（Match 构造时已把 echoDiveStart 置 1），这条路径只为旧存档 / 异常兜底：
-    // 已经进过深潜就不再改起点，否则「深度」会从中间重新算。
-    if (this.echoDiveStart != null) return this.echoDiveStart;
-    this.echoDiveStart = echoStartRound(lastBossRound);
-    this.echoBlessingDraws = hiddenCleared ? 1 : 0;
-    return this.echoDiveStart;
-  }
 
   /**
    * 本回合生效的侵蚀词条（写进 `echoWordsActive` 的 id 列表，存档也存这一项）。

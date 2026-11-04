@@ -568,10 +568,15 @@ export class MatchBoss {
           this.tickerText('隐秘核心已解锁', FLOW_TICKER_PRIORITY);
           this.startRound(this.gd.hiddenRound);
         } else if (this.echoVariant === 'deepecho' && victory) {
-          // 「深渊回响」: 没打隐藏核心的队伍也进深潜，起点是刚打完的这一关之后（R15）
+          // 「深渊回响」: 没打隐藏核心的队伍也继续往下打 —— 显示回合照常 +1（R14 打完进 R15；
+          // 没有隐藏核心资格的队伍在 R15 按普通关走，`_echoHiddenBossRound` 会自己判掉）。
+          //
+          // ⚠ 不能再用 `_echoBeginDive(...)` 当「下一回合」：深潜现在**从第 1 回合就开始**
+          // （`Match.echoDiveStart = 1`），那个方法会原样返回 1，于是整局 `startRound(1)` ——
+          // 回合、深度、商店、出怪全部回到 R1（2026-11-04 实测：15 层打完变深度 1、出怪回 R1 编组）。
           this.bossPool = null;
           this.tickerText('深潜开始', FLOW_TICKER_PRIORITY);
-          this.startRound(this._echoBeginDive(this.round));
+          this.startRound(this.round + 1);
         } else {
           this.finish({ victory, reason: victory ? 'victory' : 'defeat' });
         }
@@ -582,7 +587,10 @@ export class MatchBoss {
         if (this.echoVariant === 'deepecho' && victory) {
           this.bossPool = null;
           this.tickerText('深潜开始', FLOW_TICKER_PRIORITY);
-          this.startRound(this._echoBeginDive(this.round, { hiddenCleared: true }));
+          // 隐藏核心多打了一关 boss → 补一次祝福抽取。原来由 `_echoBeginDive` 顺手设置，
+          // 那个方法已随「深潜从 R1 起」删除，这里显式保留（不要删，否则隐藏通关的补偿会静默消失）。
+          this.echoBlessingDraws = Math.max(Number(this.echoBlessingDraws) || 0, 1);
+          this.startRound(this.round + 1);
           return;
         }
         this.finish({ victory: true, hiddenCleared: victory, reason: 'victory' });

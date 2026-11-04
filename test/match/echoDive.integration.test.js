@@ -7,6 +7,7 @@
 // 2026-11-03 第二次改（维护者）：深潜从**第 1 回合**开始，所以测试不再手工摆 echoDiveStart = 16。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { makeMatch } from './harness.js';
 
 /** 一间 deepecho 房（fake 战斗，不跑真实模拟）。 */
@@ -152,5 +153,27 @@ test('16 层以后：真实波次的只数随深度递增，时限按只数比�
   assert.ok(counts[0] < counts[1], `16 层 ${counts[0]} → 20 层 ${counts[1]} 必须变多`);
   assert.ok(counts[1] < counts[2], `20 层 ${counts[1]} → 24 层 ${counts[2]} 必须变多`);
   assert.ok(counts[2] <= 160, `深度 24 的 ${counts[2]} 只超过硬顶`);
+});
+
+// 回归（2026-11-04 实测：15 层打完 HUD 变「深度 1」，出怪回到 R1 的几只狼 + 地刺）。
+// bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
+// `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
+// 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。
+test('boss 通关继续往下打：深度跟着回合走，不会回到 1', () => {
+  const h = dive();
+  const m = h.m;
+  try {
+    m.round = 14;
+    m.startRound(m.round + 1);                 // = bossRounds 现在的下一回合
+    assert.equal(m.round, 15);
+    assert.equal(m.echoDiveStart, 1, '深潜仍是从第 1 回合起算');
+    assert.equal(m._echoDepth(), 15, '深度 = 显示回合，不是 1');
+    assert.ok(m.wave || m.bossWaves, '第 15 层必须有波次');
+  } finally {
+    m.dispose();
+  }
+  const src = readFileSync(new URL('../../server/match/match/bossRounds.js', import.meta.url), 'utf8');
+  assert.ok(!/startRound\(\s*this\._echoBeginDive/.test(src), 'bossRounds 不能再拿 _echoBeginDive 当下一回合');
+  assert.ok(!/_echoBeginDive\s*\(/.test(src.replace(/\/\/[^\n]*/g, '')), '_echoBeginDive 已删除，不应再被调用');
 });
 
