@@ -91,6 +91,15 @@ function EnemiesTab({ pub, priv, onEnemy }) {
   const boss = pub?.bossId && !inDive ? data.lookup('bosses', pub.bossId) : null;
   return html`<div class="edrawer__body">
     ${echo && echo.intel ? html`<${EchoIntel} echo=${echo} />` : null}
+    ${echo && !echo.intel && echo.schedule ? html`<div class="edrawer__intel">
+      <div class="edrawer__sum"><span>${t('深潜第 {d} 回合 · 威胁值 {threat}', { d: html`<b class="num">${echo.depth ?? '-'}</b>`, threat: html`<b class="num t-orange">—</b>`, count: 0 })}</span></div>
+      <div class="erow"><span class="erow__text"><b class="erow__name">${t('精英')}</b>
+        <span class="erow__tags"><span class="etag">—</span></span></span></div>
+      <div class="erow"><span class="erow__text"><b class="erow__name">${t('下次节点')}</b>
+        <span class="erow__tags"><span class="etag">${t('R{r} · 强化领袖返场', { r: echo.schedule.nextNodeRound })}</span></span></span>
+        <b class="erow__count num">${echo.schedule.nextNodeIn > 0 ? t('{n} 回合', { n: echo.schedule.nextNodeIn }) : t('本回合')}</b></div>
+      <p class="edrawer__empty">${t('本回合是领袖返场 / 情报被诅咒遮蔽，具体阵容开战时揭晓')}</p>
+    </div>` : null}
     ${inDive ? null : html`<div class="edrawer__sum">
       <span>${tParts('第 {r} 回合 · 即将迎击 {n} 名敌人', { r: html`<b class="num">${pub?.round ?? '-'}</b>`, n: html`<b class="num t-orange">${total}</b>`, count: total })}</span>
       ${types.length ? html`<${FactionChips} types=${types} />` : null}
