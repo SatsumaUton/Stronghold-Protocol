@@ -1311,13 +1311,12 @@ export class MatchEcho {
   }
 
   /** 已拥有的祝福对象列表（HUD / 测试用）。 */
-  /** 已获得的祝福：**占名额的**（echoBlessings）+ **一次性的**（echoOneShotIds，拿到即结算，仅作记录）。 */
+  /**
+   * 已获得的祝福：**只列占名额的**那些（维护者 2026-11-05：一次性祝福拿到就结算，
+   * 选择后应该直接消失，不要留在列表里，也不要把 n/3 撑成 6/2）。
+   */
   _echoBlessings() {
-    const held = Array.isArray(this.echoBlessings) ? this.echoBlessings.map((id) => echoBlessingById(id)).filter(Boolean) : [];
-    const once = Array.isArray(this.echoOneShotIds)
-      ? this.echoOneShotIds.map((id) => echoBlessingById(id)).filter(Boolean).map((b) => ({ ...b, consumed: true }))
-      : [];
-    return [...held, ...once];
+    return Array.isArray(this.echoBlessings) ? this.echoBlessings.map((id) => echoBlessingById(id)).filter(Boolean) : [];
   }
 
   /** 当前三选一的候选与票数（没有进行中的抽取时为 null）。 */

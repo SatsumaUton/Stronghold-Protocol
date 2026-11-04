@@ -675,12 +675,14 @@ test('稀有度下发：祝福、诅咒、固定诅咒、三选一卡片都带 r
   const m = h.m;
   t.after(() => m.dispose());
   m.echoBlessings = [];
-  m._echoGrantBlessing(echoBlessingById('heal_m'));   // 稀有
+  // 用**占名额**的稀有祝福做样本：一次性祝福（如 heal_m）拿到即结算、不再出现在列表里
+  const rareOwned = ECHO_BLESSINGS.find((x) => x.rarity === 'rare' && x.kind === 'mods');
+  m._echoGrantBlessing(rareOwned);
   m.echoCurseIds = ['bleed'];                          // 稀有
   m.echoBlessingOffer = ['heal_s'];                    // 普通（三选一）
 
   const pub = m._echoPublic();
-  const b = pub.blessings.find((x) => x.id === 'heal_m');
+  const b = pub.blessings.find((x) => x.id === rareOwned.id);
   assert.equal(b.rarity, 'rare');
   assert.equal(b.rarityLabel, '稀有');
 
