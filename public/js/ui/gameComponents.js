@@ -320,7 +320,10 @@ export function PlayerAvatar({ player, size = 'md', self = false, class: cls }) 
   const glyph = [...(player?.name || '').trim()][0] || '?';
   const dead = player?.alive === false || player?.status === 'dead';
   const left = player?.status === 'left';
-  const hue = [162, 196, 38, 280][((player?.seat | 0) % 4 + 4) % 4];
+  // 「深渊回响」：座位色改成紫色家族（原版是青绿/蓝/黄/紫四色，深潜整体换紫，维护者 2026-11-05）
+  const diveTheme = useStore((s) => s.room?.variant === 'deepecho' || !!s.match?.public?.echo);
+  const hues = diveTheme ? [262, 285, 246, 300] : [162, 196, 38, 280];
+  const hue = hues[((player?.seat | 0) % 4 + 4) % 4];
   return html`<span class=${cx('pavatar', `pavatar--${size}`, self && 'is-self', dead && 'is-dead', left && 'is-left', player?.isBot && 'is-bot',
       player?.connected === false && !player?.isBot && 'is-offline', cls)} style=${`--seat-hue:${hue}`}>
     <span class="pavatar__img">
