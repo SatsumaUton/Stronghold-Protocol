@@ -400,10 +400,13 @@ function StampRing() {
   </svg>`;
 }
 
-/** A difficulty's rounds (+ 隐秘核心) and battlefields: on its card's meta line, and in the brief when the cards show only their names. */
-function DifficultyRounds({ info }) {
+/** A difficulty's rounds (+ 隐秘核心) and battlefields: on its card's meta line, and in the brief when the cards show only their names.
+ *  `endless`: 「深渊回响」是无尽模式，不存在「打完 14 回合」——标成「深度无上限」而不是回合数。 */
+function DifficultyRounds({ info, endless = false }) {
   return [
-    html`<span key="r"><b class="num">${info.rounds}</b> ${tc('rounds', '回合')}${info.hidden ? html` ${t('+ 隐秘核心')}` : null}</span>`,
+    endless
+      ? html`<span key="r"><b class="num">∞</b> ${t('深度无上限')}</span>`
+      : html`<span key="r"><b class="num">${info.rounds}</b> ${tc('rounds', '回合')}${info.hidden ? html` ${t('+ 隐秘核心')}` : null}</span>`,
     info.stageNote ? html`<span key="s" class="pcard__stage"><${Icon} name="rook" />${info.stageNote}</span>` : null,
   ];
 }
@@ -450,7 +453,7 @@ function EchoDifficultyCard({ difficulty, index, selected, onSelect }) {
     <span class="pcard__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}</span>
     <span class="pcard__meta">
       <span class="num">${'DE'}-${index + 1}</span>
-      <${DifficultyRounds} info=${info} />
+      <${DifficultyRounds} info=${info} endless=${true} />
     </span>
     <span class="pcard__stamp" aria-hidden="true"><${StampRing} /><span class="pcard__tick"><${Icon} name="check" /></span><span class="pcard__ok">${t('已选定')}</span></span>
   </button>`;
@@ -1099,15 +1102,19 @@ export function EchoSelect({ onClose, onStart }) {
                         onClick=${() => setOpenRow(openRow === r.member ? null : r.member)}>
                         <b class="echo-rank__no num">${r.rank}</b>
                         <span class="echo-rank__depth"><b class="num">${r.depth}</b><i>${t('层')}</i></span>
-                        <span class="echo-rank__meta">${r.roomCode || '----'} · ${r.at ? new Date(r.at).toLocaleDateString() : '—'}</span>
+                        <span class="echo-rank__meta">${(Array.isArray(r.players) && r.players.length ? r.players.slice(0, 2).join('、') + (r.players.length > 2 ? ` 等${r.players.length}人` : '') : r.roomCode || '----')} · ${r.at ? new Date(r.at).toLocaleDateString() : '—'}</span>
                         <i class="echo-row__more" aria-hidden="true">${openRow === r.member ? '▾' : '▸'}</i>
                       </button>
                       ${openRow === r.member ? html`<div class="echo-detail">
                         <div><span>${t('深度')}</span><b>${r.depth}</b></div>
                         <div><span>${t('难度')}</span><b>${t(DIFFICULTY_NAMES[r.difficulty] || r.difficulty || '—')}</b></div>
                         <div><span>${t('结果')}</span><b>${r.victory ? t('通关') : t('团灭')}</b></div>
-                        <div><span>${t('到达回合')}</span><b>${r.round || '—'}</b></div>
-                        <div class="echo-detail__full"><span>${t('队伍')}</span><b>${r.players && r.players.length ? r.players.join('、') : t('未记录')}</b></div>
+                        ${/* 「到达回合」与「队伍」原来总是显示 —/未记录：服务端根本没发这两个字段，
+                              留着只是噪音（维护者 2026-11-04）。有数据才显示。 */ null}
+                        ${Array.isArray(r.players) && r.players.length
+                          ? html`<div class="echo-detail__full"><span>${t('队伍')}</span><b>${r.players.join('、')}</b></div>`
+                          : null}
+                        ${Array.isArray(r.players) && r.players.length ? html`<div class="echo-detail__full"><span>${t('玩家')}</span><b>${r.players.join('、')}</b></div>` : null}
                         <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'} · ${r.at ? new Date(r.at).toLocaleString() : '—'}</b></div>
                       </div>` : null}
                     </li>`)
@@ -1338,6 +1345,7 @@ export function LobbyScreen() {
   const createOpen = isAdminUser || createGateOpen;
   // 身份门（owner/admin 账号）：第三张卡「深渊回响」只对它开放，其余人点进去只得到「未开放」提示
   const adminId = useStore((s) => s.adminId === true);
+  const echoTester = useStore((s) => s.adminId === true || s.echoTester === true);
   /**
    * 验收用：`?unreleased=1` 让管理员也看到「未开放」的样子（灰色卡 + 斜纹横幅 + 点不动）。
    * 只影响这张卡的**外观与可点性**，不改任何权限判定 —— 服务端该拦的照样拦。
@@ -1350,7 +1358,7 @@ export function LobbyScreen() {
   const openMode = (m) => {
     if (m === 'deepecho') {
       // 「深渊回响」未开放：普通玩家点了只给提示；管理员进专属大厅（难度 / 排行榜 / 开始）。
-      if (!adminId) { toast(t('「深渊回响」暂未开放，仅管理员可进入'), 'warn'); return; }
+      if (!echoTester) { toast(t('「深渊回响」暂未开放，仅管理员与测试名单可进入'), 'warn'); return; }
       setEchoOpen(true);
       return;
     }
@@ -1651,7 +1659,7 @@ export function LobbyScreen() {
           const timePoint = timedCard ? soloTimeMsgid('card', { timed: soloTimed, unlimited: soloFree }) : '';
           const timeShort = timedCard ? soloTimeMsgid('short', { timed: soloTimed, unlimited: soloFree }) : '';
           return html`<${HubEntry} key=${c.id} card=${c} onOpen=${openMode} timePoint=${timePoint || null} timeShort=${timeShort || null}
-            locked=${c.adminOnly === true && (!adminId || previewLocked)} />`;
+            locked=${c.adminOnly === true && (!echoTester || previewLocked)} />`;
         })}
       </section>
     </main>
