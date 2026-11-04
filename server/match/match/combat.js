@@ -61,7 +61,11 @@ export class MatchCombat {
 
   /** Battle options of a player's normal field (after the onBattleStart handlers). */
   _normalOpts(ps, { preview = false, board = ps.board } = {}) {
-    const wave = preview ? structuredClone(this.wave) : this.wave;
+    // `this.wave` 为 null = 这一回合没有普通波次（boss 回合、或建波失败）。以前这里直接
+    // `structuredClone(null)` / 交给 withBounties，会抛 `Cannot read properties of null (reading 'spawns')`，
+    // 对局就卡在 COMBAT（客户端「作战结束，等待队友完成作战」，node-2 2026-11-05 实测）。
+    const src = this.wave || { spawns: [], routes: [], extraRoutes: [], overrides: {}, templateId: null, timeLimit: 0 };
+    const wave = preview ? structuredClone(src) : src;
     if (preview) ps = previewPlayer(ps, board);
     const input = ps.battleInput({ side: 'L', colOffset: 0 });
     // the client's list: bounty units inserted among their host action's own units, which are re-timed around them
