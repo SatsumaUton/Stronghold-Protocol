@@ -106,4 +106,6 @@ export const actions = {
   speedVote: (agree) => act('g.speedVote', { agree: !!agree }, { sfx: agree ? 'confirm' : 'back' }),
   // 「深渊回响」的祝福三选一（ui/echoBlessing.js）：m.public.echo.offer 跟着更新
   echoBlessing: (pick) => act('g.echoBlessing', { pick: Number(pick) }, { sfx: 'confirm' }),
+  // 名额满时的弃选投票（同样 30 秒）
+  echoBlessingDiscard: (pick) => act('g.echoBlessingDiscard', { pick: Number(pick) }, { sfx: 'confirm' }),
 };
