@@ -784,7 +784,8 @@ export class Match {
    * 所以「层数无上限」与「不会无限刷新 / 无限资金」现在同时成立；普通房间仍是原版 999。
    */
   get layerCapOff() {
-    return this.disableLayerCap === true || this.echoVariant === 'deepecho';
+    // 维护者 2026-11-05：深潜也回到原版 **999 层封顶**（不再解除到 1e9）—— 层数无限会让「每 N 层」的效果失控。
+    return this.disableLayerCap === true;
   }
 
   _revivalHelpers(plan, uniteResult) {

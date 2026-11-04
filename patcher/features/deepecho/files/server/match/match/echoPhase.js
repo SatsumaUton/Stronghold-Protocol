@@ -989,7 +989,8 @@ export class MatchEcho {
   _echoFixedRules() {
     if (this.echoVariant !== 'deepecho') return [];
     return [
-      { id: 'layer', name: '层数上限', desc: '解除到 1e9（原版 999）——深渊不限层' },
+      // 维护者 2026-11-05：深潜同样按原版 999 层封顶（层数无限会让「每 N 层」的效果失控）
+      { id: 'layer', name: '层数上限', desc: '999 层封顶（与原版一致）' },
       // 维护者 2026-11-05：深潜强制独立卡池（Match 构造时覆盖房间配置，见 Match.js 的 echoIndependentPool）。
       // 玩家开局就该知道「卡池是各用各的」——否则会以为队友拿走了自己商店里的干员。
       { id: 'pool', name: '独立卡池', desc: '每名博士使用自己的卡池（固定开启，不与他人共享）' },

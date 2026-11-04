@@ -21,9 +21,9 @@ test('variant 真的传进 Match 了，且深潜从第 1 回合开始', (t) => {
   assert.equal(h.m.echoVariant, 'deepecho');
   assert.equal(h.m.mode, 'coop', '底层仍是 coop，不新增 mode 值');
   assert.equal(h.m.echoDiveStart, 1, '建房即深潜（不再等打完最后一个 boss）');
-  // 层数上限：深潜重新解除到 1e9（2026-11-03 第二次改）。
-  // 「远见 / 奇迹」的无限刷新与无限资金改在 effectsMeta 源头堵死（bondLayerCoinCap=60、免费刷新≤2）。
-  assert.equal(h.m.layerCapOff, true, '深潜解除层数上限（1e9）');
+  // 层数上限：维护者 2026-11-05 改回**原版 999 封顶**（不再解除到 1e9）——
+  // 层数无限会把「每 N 层」的效果（奇迹的免费刷新、远见的资金）推到天文数字。
+  assert.equal(h.m.layerCapOff, false, '深潜同样 999 层封顶');
 });
 
 test('普通房间没有 echoVariant（不受影响：层数上限仍是原版 999）', (t) => {
