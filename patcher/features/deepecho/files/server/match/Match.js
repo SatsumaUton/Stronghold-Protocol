@@ -373,6 +373,8 @@ export class Match {
      * 玩家打完隐藏 boss 什么都看不到。这里给一个**临时 +1 名额**，发出去之后清零。
      */
     this.echoBlessingBonus = 0;
+    /** 排异诅咒的到期层数：bond → depth（到这一层自动解除，2026-11-05）。 */
+    this.echoBannedBondsUntil = {};
     /** _echoMaybeOfferBlessing 这次是不是「名额已满、要弃选一个」的替换模式（2026-11-05）。 */
     this.echoBlessingReplace = false;
     /** 替换模式下已选定、等待弃选的新祝福 id。 */

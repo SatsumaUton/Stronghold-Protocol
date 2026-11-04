@@ -9,7 +9,7 @@
 //
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
-import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_MAX_FREE_REFRESH, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
+import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_MAX_FREE_REFRESH, ECHO_BOND_BAN_ROUNDS, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
 import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js';
 import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
@@ -574,6 +574,8 @@ export class MatchEcho {
   _echoRefreshCurses(r = this.round) {
     if (!this._echoDiveRound(r)) { this.echoRoundCurse = null; return null; }
     const depth = this._echoDepth(r);
+    // 排异到期：到层就解除（先清名单，下面的扫场会把场上干员放回来）
+    this._echoExpireBondBans(depth);
     const fixed = ECHO_FIXED_CURSE_ROUNDS[depth];
     if (fixed && !(Array.isArray(this.echoCurseIds) && this.echoCurseIds.includes(fixed))) {
       // 统一入口：记 id + 施加副作用（封锁 / 排异）
@@ -669,12 +671,38 @@ export class MatchEcho {
     if (kind === 'bondBan') {
       const bond = this._echoApplyBondBan(rng);
       if (!bond) return null;
+      // 排异是有时限的（维护者 2026-11-05）：记下到期层，回调时自动解除
+      if (!this.echoBannedBondsUntil || typeof this.echoBannedBondsUntil !== 'object') this.echoBannedBondsUntil = {};
+      this.echoBannedBondsUntil[bond] = this._echoDepth(this.round) + ECHO_BOND_BAN_ROUNDS;
     } else if (kind === 'deployBan') {
       this._echoApplyDeployBan(c.effect.value, rng);
     }
     if (!Array.isArray(this.echoCurseIds)) this.echoCurseIds = [];
     this.echoCurseIds.push(c.id);
     return c;
+  }
+
+  /**
+   * 排异到期清理（维护者 2026-11-05）：`echoBannedBondsUntil[bond] <= depth` 的一律解除。
+   * 解除后由 `_echoWithdrawBannedBond()` 把场上那些干员收回（它在同一个 prep 里紧接着跑）。
+   *
+   * @returns {string[]} 本层刚解除的盟约 id
+   */
+  _echoExpireBondBans(depth = this._echoDepth(this.round)) {
+    const until = this.echoBannedBondsUntil;
+    if (!until || typeof until !== 'object') return [];
+    const out = [];
+    for (const [bond, at] of Object.entries(until)) {
+      if (!(Number(at) > 0) || Number(at) > depth) continue;
+      out.push(bond);
+      delete until[bond];
+    }
+    if (out.length && Array.isArray(this.echoBannedBonds)) {
+      this.echoBannedBonds = this.echoBannedBonds.filter((b) => !out.includes(b));
+      const names = out.map((b) => this.gd.bond(b)?.name || b).join('、');
+      this._echoPushAnnounce(`排异解除：【${names}】的干员可以重新部署了`);
+    }
+    return out;
   }
 
   /** 诅咒「封锁」：从当前可部署地块里随机封掉 n 个（抽不到就少封，不硬造格子）。 */
