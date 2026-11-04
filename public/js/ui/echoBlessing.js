@@ -61,6 +61,7 @@ export function EchoBlessing({ pub }) {
             onClick=${() => pick(i)}>
             <span class="echo-bless__glyph" aria-hidden="true">${(opt.name || '?').slice(0, 1)}</span>
             <b class="echo-bless__name">${opt.name}</b>
+            ${opt.rarityLabel ? html`<span class=${`echo-bless__rarity is-${opt.rarity || 'common'}`} data-rarity=${opt.rarity || 'common'}>${opt.rarityLabel}</span>` : null}
             <span class="echo-bless__desc">${opt.desc || ''}</span>
             ${who.length ? html`<span class="echo-bless__votes">${who.join('、')}</span>` : null}
           </button>`;

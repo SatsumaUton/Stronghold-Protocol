@@ -42,7 +42,8 @@ function FactionChips({ types }) {
 function EchoIntel({ echo }) {
   const i = echo.intel;
   // 本回合敌人身上挂着的侵蚀词条（复用 echoBuffs 的圆片描述，已被 test/ui/echo-buffs.test.js 覆盖）
-  const wordChips = echoBuffChips(echo).filter((c) => c.side === 'enemy');
+  // 词条圆片已挪到「深渊回响」页（维护者 2026-11-04：敌方情报里不要再重复一遍）
+  const wordChips = [];
   return html`<div class="edrawer__intel">
     <div class="edrawer__sum">
       <span>${tParts('深潜第 {d} 回合 · 威胁值 {threat}', {
@@ -157,11 +158,50 @@ function InfoTab({ pub, priv, onChess, bandId = null, bandOwner = null }) {
  *   replaces one's own in the 本局信息 tab (game.js scoutBandId; user playtest #2 item 2)
  */
 export function EnemyDrawer({ tab, onTab, pub, priv, onClose, onEnemy, onChess, bandId = null, bandOwner = null }) {
-  return html`<div class="edrawer brackets" role="dialog" aria-label=${tab === 'info' ? t('本局信息') : t('敌方情报')}>
+  // 「深渊回响」多一个「祝福」页（维护者 2026-11-04：祝福要能单独点开看效果）
+  const hasEcho = !!pub?.echo;
+  const items = [
+    { id: 'info', label: t('本局信息') },
+    { id: 'enemies', label: t('敌方情报') },
+    ...(hasEcho ? [{ id: 'bless', label: t('深渊回响') }] : []),
+  ];
+  return html`<div class="edrawer brackets" role="dialog" aria-label=${tab === 'info' ? t('本局信息') : tab === 'bless' ? t('祝福') : t('敌方情报')}>
     <div class="edrawer__top">
-      <${Tabs} size="sm" value=${tab} onChange=${onTab} items=${[{ id: 'info', label: t('本局信息') }, { id: 'enemies', label: t('敌方情报') }]} />
+      <${Tabs} size="sm" value=${tab} onChange=${onTab} items=${items} />
       <button type="button" class="edrawer__close tapx" aria-label=${t('关闭')} onClick=${onClose}><${Icon} name="close" /></button>
     </div>
-    ${tab === 'info' ? html`<${InfoTab} pub=${pub} priv=${priv} onChess=${onChess} bandId=${bandId} bandOwner=${bandOwner} />` : html`<${EnemiesTab} pub=${pub} priv=${priv} onEnemy=${onEnemy} />`}
+    ${tab === 'info' ? html`<${InfoTab} pub=${pub} priv=${priv} onChess=${onChess} bandId=${bandId} bandOwner=${bandOwner} />`
+      : tab === 'bless' ? html`<${BlessTab} pub=${pub} />`
+        : html`<${EnemiesTab} pub=${pub} priv=${priv} onEnemy=${onEnemy} />`}
+  </div>`;
+}
+
+/**
+ * 「祝福」页：已获得的祝福 + 本回合侵蚀词条，**每条都带完整说明**（维护者 2026-11-04：
+ * 原来的圆片只有缩写，玩家看不到效果）。
+ */
+function BlessTab({ pub }) {
+  const echo = pub?.echo;
+  const words = Array.isArray(echo?.words) ? echo.words : [];
+  const bless = Array.isArray(echo?.blessings) ? echo.blessings : [];
+  const depth = Number(echo?.depth) || 0;
+  return html`<div class="edrawer__body">
+    <h4 class="ihead">${t('已获祝福')} <small class="num">${bless.length}/3</small>
+      <small class="t-dim">${t('深度 {n}', { n: depth })}</small></h4>
+    ${bless.length ? html`<ul class="echo-list">${bless.map((b) => html`<li key=${b.id}>
+      <b>${b.name}</b>${b.rarityLabel ? html`<em class=${`echo-rar is-${b.rarity || 'common'}`}>${b.rarityLabel}</em>` : null}<span>${b.desc || ''}</span></li>`)}</ul>`
+      : html`<p class="t-dim">${t('还没有获得祝福（深度 1、5、10、15… 各有一次三选一）')}</p>`}
+    <h4 class="ihead">${t('本回合侵蚀词条')} <small class="num">${words.length}</small></h4>
+    ${words.length ? html`<ul class="echo-list echo-list--enemy">${words.map((w) => html`<li key=${w.id}>
+      <b>${w.name}</b><span>${w.desc || ''}</span></li>`)}</ul>`
+      : html`<p class="t-dim">${t('本回合没有词条')}</p>`}
+    ${Array.isArray(echo?.rules) && echo.rules.length ? html`
+      <h4 class="ihead">${t("\u56fa\u5b9a\u89c4\u5219")} <small class="num">${echo.rules.length}</small></h4>
+      <ul class="echo-list echo-list--rule" data-testid="echo-fixed-rules">${echo.rules.map((c) => html`<li key=${c.id}>
+        <b>${c.name}</b><span>${c.desc || ''}</span></li>`)}</ul>` : null}
+    ${Array.isArray(echo?.curses) && echo.curses.length ? html`
+      <h4 class="ihead">${t('诅咒')} <small class="num">${echo.curses.length}</small></h4>
+      <ul class="echo-list echo-list--curse">${echo.curses.map((c) => html`<li key=${c.id}>
+        <b>${c.name}</b>${c.rarityLabel ? html`<em class=${`echo-rar is-${c.rarity || 'common'}`}>${c.rarityLabel}</em>` : null}<span>${c.desc || ''}</span></li>`)}</ul>` : null}
   </div>`;
 }

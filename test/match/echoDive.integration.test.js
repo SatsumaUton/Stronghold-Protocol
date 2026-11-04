@@ -658,6 +658,35 @@ test('排异叠加：不同附加盟约叠成多条，已禁的不重复，解�
   assert.ok(m._echoApplyBondBan(() => 0), '解除之后可以重新禁');
 });
 
+// 维护者 2026-11-05：稀有度要能在游戏里看到（祝福卡 / 已获祝福 / 诅咒列表）。
+test('稀有度下发：祝福、诅咒、固定诅咒、三选一卡片都带 rarityLabel', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.echoBlessings = [];
+  m._echoGrantBlessing(echoBlessingById('heal_m'));   // 稀有
+  m.echoCurseIds = ['bleed'];                          // 稀有
+  m.echoBlessingOffer = ['heal_s'];                    // 普通（三选一）
+
+  const pub = m._echoPublic();
+  const b = pub.blessings.find((x) => x.id === 'heal_m');
+  assert.equal(b.rarity, 'rare');
+  assert.equal(b.rarityLabel, '稀有');
+
+  const c = pub.curses.find((x) => x.id === 'bleed');
+  assert.equal(c.rarity, 'rare');
+  assert.equal(c.rarityLabel, '稀有');
+
+  const fixed = pub.curses.find((x) => x.id === 'miracle');
+  assert.equal(fixed.rarity, 'special', '固定诅咒有独立稀有度');
+  assert.equal(fixed.rarityLabel, '固定');
+
+  const offer = m._echoOfferView();
+  assert.ok(offer && offer.options.length);
+  assert.equal(offer.options[0].rarity, 'common');
+  assert.equal(offer.options[0].rarityLabel, '普通');
+});
+
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。

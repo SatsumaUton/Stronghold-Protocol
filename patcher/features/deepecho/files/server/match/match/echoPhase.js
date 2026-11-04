@@ -761,16 +761,21 @@ export class MatchEcho {
   }
   _echoCurses() {
     if (this.echoVariant !== 'deepecho') return [];
-    const applied = echoCurseList(this.echoCurseIds).map(({ id, name, desc }) => ({ id, name, desc }));
+    const applied = echoCurseList(this.echoCurseIds).map(({ id, name, desc }) => {
+      const c = echoCurseById(id);
+      return { id, name, desc, rarity: c?.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c?.rarity] || '普通' };
+    });
+    const withRarity = (c) => ({ id: c.id, name: c.name, desc: c.desc, rarity: c.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c.rarity] || '普通' });
     return [
-      { id: 'miracle', name: '奇迹·诅咒', desc: `免费刷新总数上限 ${this._echoFreeRefreshCap()} 次（原版无上限）` },
-      { id: 'foresight', name: '远见·诅咒', desc: '按层给钱结算到 999 层（与原版一致）' },
+      // 固定的两条是深渊自身的限制，不属于随机诅咒池： rarity 标 special（客户端显示「固定」）
+      { id: 'miracle', name: '奇迹·诅咒', desc: `免费刷新总数上限 ${this._echoFreeRefreshCap()} 次（原版无上限）`, rarity: 'special', rarityLabel: '固定' },
+      { id: 'foresight', name: '远见·诅咒', desc: '按层给钱结算到 999 层（与原版一致）', rarity: 'special', rarityLabel: '固定' },
       // 挑战关没达成等来源累积的诅咒（echoCurse.js 的词条表；同类合并成「侵蚀 ×2」）
       ...applied,
       // 本回合随机刷新的那条（只作用于本回合，下回合可能换掉或消失）
       ...(this.echoRoundCurse ? (() => {
         const c = echoCurseById(this.echoRoundCurse);
-        return c ? [{ id: c.id, name: `${c.name}（本回合）`, desc: c.desc }] : [];
+        return c ? [{ ...withRarity(c), name: `${c.name}（本回合）` }] : [];
       })() : []),
     ];
   }
@@ -785,7 +790,13 @@ export class MatchEcho {
       depth: this._echoDepth(),
       // 词条带上说明，客户端圆片的 title 才能显示「硬化 · 防御 +200」这类效果
       words: this._echoWords().map((w) => ({ id: w.id, name: w.name, desc: w.desc })),
-      blessings: this._echoBlessings().map((b) => ({ id: b.id, name: b.name, desc: b.desc })),
+      blessings: this._echoBlessings().map((b) => ({
+        id: b.id,
+        name: b.name,
+        desc: b.desc,
+        rarity: b.rarity || 'common',
+        rarityLabel: ECHO_BLESSING_RARITY_LABEL[b.rarity] || '普通',
+      })),
       offer,
       // 备战阶段的聚合情报（威胁值 / 是否精英 / 空中数量）；非深潜回合为 null
       curses: this._echoCurses(),

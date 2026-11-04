@@ -1017,3 +1017,12 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 /* 固定规则：既不是祝福（不进随机池），也不是诅咒（不是坏处），用中性色 */
 .echo-list--rule li { border-left-color: rgba(183, 156, 255, .55); background: rgba(183, 156, 255, .07); }
 .echo-list--rule li b { color: #d9c8ff; }
+
+/* 「深渊回响」稀有度标签（2026-11-05）：祝福卡 / 已获祝福 / 诅咒列表共用 */
+.echo-rar, .echo-bless__rarity { font-style: normal; flex: none; font-size: .82em; font-weight: 700; letter-spacing: .06em; padding: 0 .18em; border-radius: 2px; border: 1px solid currentColor; opacity: .95; }
+.echo-rar.is-common, .echo-bless__rarity.is-common { color: #9fb4c8; }
+.echo-rar.is-rare, .echo-bless__rarity.is-rare { color: #6fc7ff; }
+.echo-rar.is-epic, .echo-bless__rarity.is-epic { color: #c88bff; }
+.echo-rar.is-special, .echo-bless__rarity.is-special { color: #ffcf6b; }
+.echo-bless__rarity { position: absolute; top: .08rem; right: .08rem; background: rgba(0, 0, 0, .35); }
+.echo-bless__card { position: relative; }
