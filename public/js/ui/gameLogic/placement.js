@@ -334,9 +334,12 @@ export function canPlace(ctx, uid, target) {
   if (bans && isObj(target) && target.area === 'board' && Number.isInteger(target.row) && Number.isInteger(target.col)) {
     const key = `${target.row},${target.col}`;
     if (Array.isArray(bans.tiles) && bans.tiles.includes(key)) return no('BAD_TILE', t('深渊封锁：这个地块无法部署'));
-    if (bans.bond && piece.kind === 'chess' && src.area !== 'board') {
+    if (bans.bond && piece.kind === 'chess') {
       const bonds = ctx.getChess?.(piece.id)?.bonds;
-      if (Array.isArray(bonds) && bonds.includes(bans.bond)) return no('BAD_TARGET', t('深渊排异：该盟约的干员无法部署'));
+      // 新上场和已经在场的都拦：被排异的干员会被服务端收回修正区，这里同步表现
+      if (Array.isArray(bonds) && bonds.includes(bans.bond)) {
+        return no('BAD_TARGET', src.area === 'board' ? t('深渊排异：该盟约的干员无法行动') : t('深渊排异：该盟约的干员无法部署'));
+      }
     }
   }
 
