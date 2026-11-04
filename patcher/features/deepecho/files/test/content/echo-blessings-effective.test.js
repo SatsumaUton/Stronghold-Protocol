@@ -70,6 +70,8 @@ test('非 mods 祝福必须带生效字段', () => {
     if (b.kind === 'mods') continue;
     const has = Number(b.funds) > 0 || Number(b.freeRefresh) > 0 || Number(b.coinMul) > 1 || Number(b.refreshEvery) > 0
       || Number(b.healLp) > 0 || b.kind === 'cleanse'
+      // 「护盾」：投票指定盟约，排异抽到它时抵消（2026-11-05）
+      || b.kind === 'shield'
       || (b.kind === 'counter' && ((Array.isArray(b.counterCurses) && b.counterCurses.length) || b.counterBans === true));
     if (!has) bad.push(b.id);
   }

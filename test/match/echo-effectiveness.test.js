@@ -99,6 +99,11 @@ test('祝福逐条生效：每条都能在消费端看到差异', (t) => {
     try {
       m.round = 20;
       const kind = b.kind;
+      if (kind === 'shield') {
+        // 「护盾」：投票指定盟约，排异抽到它时抵消 —— 效果在 _echoApplyBondBan 里单独验证
+        assert.ok(Array.isArray(m._echoOpenShieldVote()) && m.echoShieldOffer.length > 0, `${b.id} 开不出护盾投票`);
+        continue;
+      }
       if (kind === 'mods') {
         if (b.enemyDebuff) {
           // 对敌异常（寒冻 / 易伤）：走 enemySpawn 钩子，不挂己方 mods
