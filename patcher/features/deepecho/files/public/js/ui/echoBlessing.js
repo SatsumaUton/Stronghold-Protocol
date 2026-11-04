@@ -42,7 +42,12 @@ export function EchoBlessing({ pub }) {
     setBusy(true);
     try { await fn(); } finally { pending.current = false; setBusy(false); }
   };
-  const pick = (i) => { if (busy || !online || myPick != null) return; setArmed(i); send(() => actions.echoBlessing(i)); };
+  // 维护者 2026-11-05：点卡片只是**选中**，再按「确认」才投票（参考原版悬赏目标），确认前可以反悔改选。
+  const pick = (i) => { if (busy || !online || myPick != null) return; setArmed(i); };
+  const confirm = () => {
+    if (busy || !online || myPick != null || armed == null) return;
+    send(() => actions.echoBlessing(armed));
+  };
   // 没有可抽的卡时：满名额的弃选投票 → 护盾指定盟约的投票 → 什么都不显示（hooks 已全部跑过，顺序稳定）
   if (!offer || !Array.isArray(offer.options) || !offer.options.length) {
     if (discard && Array.isArray(discard.options) && discard.options.length) {
@@ -82,8 +87,12 @@ export function EchoBlessing({ pub }) {
       </div>
       <footer class="echo-bless__foot">
         ${myPick != null
-          ? html`<span>${t('已选择「{name}」，等待队友…', { name: offer.options[myPick]?.name || t('已选择') })}</span>`
-          : html`<span>${t('点一张卡投票；全队在线的人都选完才结算。')}</span>`}
+          ? html`<span>${t('已确认「{name}」，等待队友…', { name: offer.options[myPick]?.name || t('已选择') })}</span>`
+          : html`<span>${armed != null
+            ? t('已选中「{name}」，按「确认」才提交（确认前可以改）。', { name: offer.options[armed]?.name || '' })
+            : t('点一张卡选中，再按「确认」提交；全队在线的人都确认完才结算。')}</span>`}
+        ${myPick == null ? html`<button type="button" class="echo-bless__confirm" disabled=${busy || !online || armed == null}
+          onClick=${() => confirm()}>${t('确认')}</button>` : null}
       </footer>
     </div>
   </div>`;
@@ -105,10 +114,12 @@ function EchoBlessingDiscard({ pub, myId, online, now, setNow }) {
     const id = setInterval(() => setNow(serverNow()), 500);
     return () => clearInterval(id);
   }, [lasts == null]);
-  const pick = async (i) => {
-    if (busy || !online || myPick != null || pending.current) return;
-    pending.current = true; setBusy(true); setArmed(i);
-    try { await actions.echoBlessingDiscard(i); } finally { pending.current = false; setBusy(false); }
+  // 选中 → 确认（与三选一同一口径，2026-11-05）
+  const pick = (i) => { if (busy || !online || myPick != null) return; setArmed(i); };
+  const confirm = async () => {
+    if (busy || !online || myPick != null || armed == null || pending.current) return;
+    pending.current = true; setBusy(true);
+    try { await actions.echoBlessingDiscard(armed); } finally { pending.current = false; setBusy(false); }
   };
   return html`<div class="echo-bless-overlay" role="dialog" aria-label=${t('深渊祝福 · 舍弃一个')} aria-live="polite">
     <div class="echo-bless">
@@ -136,7 +147,8 @@ function EchoBlessingDiscard({ pub, myId, online, now, setNow }) {
         })}
       </div>
       <footer class="echo-bless__foot">
-        <span>${myPick != null ? t('已投票，等待队友…') : t('点一张卡投票要舍弃的祝福。')}</span>
+        <span>${myPick != null ? t('已投票，等待队友…') : (armed != null ? t('已选中，按「确认」提交（确认前可以改）。') : t('点一张卡选中，再按「确认」提交要舍弃的祝福。'))}</span>
+        ${myPick == null ? html`<button type="button" class="echo-bless__confirm" disabled=${busy || !online || armed == null} onClick=${() => confirm()}>${t('确认')}</button>` : null}
       </footer>
     </div>
   </div>`;
@@ -157,10 +169,12 @@ function EchoShieldVote({ pub, myId, online, now, setNow }) {
     const id = setInterval(() => setNow(serverNow()), 500);
     return () => clearInterval(id);
   }, [left == null]);
-  const pick = async (i) => {
-    if (busy || !online || myPick != null || pending.current) return;
-    pending.current = true; setBusy(true); setArmed(i);
-    try { await actions.echoShield(i); } finally { pending.current = false; setBusy(false); }
+  // 选中 → 确认（2026-11-05）
+  const pick = (i) => { if (busy || !online || myPick != null) return; setArmed(i); };
+  const confirm = async () => {
+    if (busy || !online || myPick != null || armed == null || pending.current) return;
+    pending.current = true; setBusy(true);
+    try { await actions.echoShield(armed); } finally { pending.current = false; setBusy(false); }
   };
   return html`<div class="echo-bless-overlay" role="dialog" aria-label=${t('护盾：指定盟约')} aria-live="polite">
     <div class="echo-bless">
@@ -185,7 +199,8 @@ function EchoShieldVote({ pub, myId, online, now, setNow }) {
         })}
       </div>
       <footer class="echo-bless__foot">
-        <span>${myPick != null ? t('已投票，等待队友…') : t('点一条盟约投票。')}</span>
+        <span>${myPick != null ? t('已投票，等待队友…') : (armed != null ? t('已选中，按「确认」提交（确认前可以改）。') : t('点一条盟约选中，再按「确认」提交。'))}</span>
+        ${myPick == null ? html`<button type="button" class="echo-bless__confirm" disabled=${busy || !online || armed == null} onClick=${() => confirm()}>${t('确认')}</button>` : null}
       </footer>
     </div>
   </div>`;
