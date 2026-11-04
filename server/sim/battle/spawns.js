@@ -24,12 +24,16 @@ export class BattleSpawns {
     // capped: a bogus count (Infinity, 1e9) would otherwise hang the constructor / exhaust memory
     const count = Math.min(MAX_ALIVE_ENEMIES, Math.max(1, Math.floor(fin(s.count ?? 1, 1)) || 1));
     const interval = Math.max(0, fin(s.interval, 0));
-    const def = this.data.getEnemy(s.enemyKey);
+    // 数据表里没有这个 key 时（深潜的跨版本敌人 `<version>:enemy_…`）用出怪自带的记录，
+    // 否则会拿到 FALLBACK_ENEMY（「未知敌人」，客户端贴图是红水滴）（维护者 2026-11-05）。
+    const def = this.data.getEnemy(s.enemyKey) || (s.enemyDef ? normalizeEnemy(s.enemyKey, s.enemyDef) : null);
     for (let i = 0; i < count; i++) {
       const p = {
         time: Math.max(0, fin(s.time, 0)) + i * interval, enemyKey: s.enemyKey, routeIndex: s.routeIndex ?? 0, route: s.route ?? null,
         mods: s.mods ?? null, sourcePlayerId: s.sourcePlayerId ?? null, bounty: s.bounty ?? null, tag: s.tag ?? null,
         ownerPlayerId: s.ownerPlayerId ?? null, pos: s.pos ?? null, seq: ++this._spawnSeq, countInTotal: s.countInTotal,
+        // 跨版本敌人自带记录（数据表里没有这个 key）；spawnEnemy 的 opts.def 会用它
+        def: s.enemyDef ?? null,
       };
       p.counted = p.countInTotal ?? (!(def && def.notCountInTotal) && p.tag !== 'boss' && p.tag !== 'part');
       // inTotal: the enemies THIS STAGE scheduled that count — the HUD capsule's own set (DESIGN §14 "顶栏胶囊"). A
