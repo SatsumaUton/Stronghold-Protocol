@@ -29,6 +29,7 @@ function gameGate() {
 let updateFile = null;
 try { updateFile = require('../guard/update-file.cjs'); } catch { /* 可选模块 */ }
 const account = require('./account.cjs');
+const diveBoard = require('./diveBoard.cjs');
 const feedback = require('./feedback.cjs');
 // 跨节点「公开同盟」的纯筛选逻辑（无 I/O，单测直接 require 它，不用起 HTTP 服务）
 const { collectOpenRooms } = require('./openRooms.cjs');
@@ -696,6 +697,18 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const pathname = decodeURIComponent(url.pathname);
 
+  // ---- 深渊回响成绩归档（/api/dive/*）：节点上报 + 历史查询（MySQL，只留档） ----
+  if (pathname.startsWith('/api/dive')) {
+    try {
+      if (await diveBoard.handle(req, res, pathname)) return;
+      return json(res, 404, { error: 'NOT_FOUND' });
+    } catch (e) {
+      try { json(res, 500, { error: 'INTERNAL' }); } catch { /* 已发送 */ }
+      console.error('[diveBoard] unhandled', e && e.message);
+      return;
+    }
+  }
+
   // ---- 玩家反馈板（/api/feedback/*）：读公开、写要登录、管理要 admin/owner ----
   if (pathname.startsWith('/api/feedback')) {
     try {
@@ -1174,6 +1187,7 @@ refreshNodes();
 // 账号库初始化（表不存在时自动创建），失败不阻塞匹配服务
 account.ensureSchema()
   .then(() => console.log('[mm] account schema ready'))
+  .then(() => diveBoard.init().then((ok) => { if (ok) console.log('[mm] dive_board ready'); }))
   .catch((e) => console.warn('[mm] account schema init failed:', e && e.message));
 
 server.listen(PORT, HOST, () => {
