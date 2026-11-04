@@ -197,7 +197,7 @@ export function indexPieces(priv) {
  *   getToken?:(id:string)=>any, getItem?:(id:string)=>any, getEffect?:(id:string)=>any,
  *   morphMode?:'official'|'plus' }} o
  */
-export function placementContext({ priv, stage, editable, field = 'normal', getChess = () => null, getToken = () => null, getItem = () => null, getEffect = () => null, backups = null, morphMode = 'official' }) {
+export function placementContext({ priv, stage, editable, field = 'normal', getChess = () => null, getToken = () => null, getItem = () => null, getEffect = () => null, backups = null, morphMode = 'official', echoBans = null }) {
   const pieces = indexPieces(priv);
   const boardAt = new Map();
   for (const e of pieces.values()) if (e.area === 'board') boardAt.set(tileKey(e.row, e.col), e);
@@ -213,7 +213,9 @@ export function placementContext({ priv, stage, editable, field = 'normal', getC
   const deploy = field === 'bossL' || field === 'bossR'
     ? deploySets(stage, field, ov)
     : deploySets(effectiveStage(stage, ov));
-  return { priv, pieces, boardAt, handAt, deploy, cap, count, field, editable: !!editable, getChess, getToken, getItem, backups, morphMode: morphMode === 'plus' ? 'plus' : 'official' };
+  return { priv, pieces, boardAt, handAt, deploy, cap, count, field, editable: !!editable, getChess, getToken, getItem, backups, morphMode: morphMode === 'plus' ? 'plus' : 'official',
+    // 「深渊回响」部署禁令（2026-11-05）：{ tiles: ['r,c'], bond: 'yanShip' }；普通房间为 null
+    echoBans: echoBans && typeof echoBans === 'object' ? echoBans : null };
 }
 
 /**
@@ -325,6 +327,18 @@ export function canPlace(ctx, uid, target) {
   if (!isObj(target)) return no('BAD_TILE', t('无法部署在该位置'));
   const piece = src.piece;
   const isMagic = piece.kind === 'item' && ctx.getItem(piece.id)?.itemType === 'MAGIC';
+
+  // 「深渊回响」部署禁令（2026-11-05）：被封锁的地块不能落子；被排异的盟约不能**新上场**
+  // （已经在场上的干员只是移动 / 转向，不受盟约限制）。
+  const bans = ctx.echoBans;
+  if (bans && isObj(target) && target.area === 'board' && Number.isInteger(target.row) && Number.isInteger(target.col)) {
+    const key = `${target.row},${target.col}`;
+    if (Array.isArray(bans.tiles) && bans.tiles.includes(key)) return no('BAD_TILE', t('深渊封锁：这个地块无法部署'));
+    if (bans.bond && piece.kind === 'chess' && src.area !== 'board') {
+      const bonds = ctx.getChess?.(piece.id)?.bonds;
+      if (Array.isArray(bonds) && bonds.includes(bans.bond)) return no('BAD_TARGET', t('深渊排异：该盟约的干员无法部署'));
+    }
+  }
 
   if (target.area === 'hand') {
     const idx = target.idx;

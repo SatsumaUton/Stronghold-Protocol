@@ -274,6 +274,14 @@ export class MatchEcho {
         }
       }, { priority: 59, owner: 'echo:curse' });
     }
+    // 悬赏击杀回执（2026-11-05）：悬赏怪身上带着 mods.bountyId，死的时候记一笔，
+    // 结算时用它对账「这张卡到底有没有打掉」（否则只能靠汇总 coin 猜）。
+    battle.on('kill', ({ victim }) => {
+      const id = victim && victim.mods && victim.mods.bountyId;
+      if (!id) return;
+      if (!Array.isArray(this.echoBountyPaid)) this.echoBountyPaid = [];
+      if (!this.echoBountyPaid.includes(id)) this.echoBountyPaid.push(id);
+    }, { priority: 40, owner: 'echo:bounty' });
   }
 
   /**
@@ -347,9 +355,27 @@ export class MatchEcho {
    * 每条到期卡只降一层诅咒，按深度抽（和挑战关同一套 pickEchoCurse）。
    */
   _echoSettleBountyFailure(players = this.alivePlayers()) {
-    const expiring = (Array.isArray(players) ? players : [])
-      .reduce((n, ps) => n + ((ps && ps.bounties) || []).filter((b) => b && b.roundsLeft <= 1).length, 0);
-    if (!expiring) return null;
+    // 击杀回执：_echoHookBattle 的 `kill` 钩子把 victim.mods.bountyId 记进来。
+    const paid = Array.isArray(this.echoBountyPaid) ? this.echoBountyPaid : [];
+    let failed = 0;
+    for (const ps of Array.isArray(players) ? players : []) {
+      if (!ps) continue;
+      const r = this.lastResults.get(ps.playerId) || {};
+      const coins = Math.max(0, Math.trunc(Number(r.coins) || 0));
+      for (const b of ps.bounties || []) {
+        if (!b || !(b.roundsLeft <= 1)) continue;
+        const card = b.card || {};
+        // 完美结算类：本轮 own battle 完美就直接付了，不算失败
+        if (card.payout === 'perfect' && r.perfect !== false) continue;
+        // 真的打掉了（击杀钩子有回执）
+        if (b.id && paid.includes(b.id)) continue;
+        // 兜底：本轮有悬赏收入就按「已达成」处理 —— 服务端只拿到汇总 coin，分不清是哪张卡；
+        // 宁可漏判（少降诅咒）也不要把成功的一局判成失败。
+        if (coins > 0) continue;
+        failed += 1;
+      }
+    }
+    if (!failed) return null;
     const rng = createRng(deriveSeed(this.seed, `echo:bountyfail:${this.round}`));
     const c = pickEchoCurse(this._echoDepth(this.round), rng);
     if (!c) return null;

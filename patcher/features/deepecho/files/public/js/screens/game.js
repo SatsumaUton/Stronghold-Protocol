@@ -154,7 +154,6 @@ import { contentSet } from '../content.js';
 import { DEFAULT_VERSION, shownVersion } from '../versions.js';
 import { VersionVote } from '../ui/versionVote.js';
 import { EchoBlessing } from '../ui/echoBlessing.js';
-import { EchoStatus } from '../ui/echoStatus.js';
 import { TestConsole } from '../ui/testConsole.js';
 
 // 作战统计 is opt-in (settings `combatMetrics`, default off). The runner does not import the settings store;
@@ -218,7 +217,10 @@ export function GameScreen() {
   }, [held]);
   // 「深渊回响」：确认本局信息 / 选策略 / 对局中 / 结算 四类界面统一换主题（theme.css 的 html.sp-deepecho）。
   // 必须放在下面那个 `if (!pub …) return` **之前** —— hooks 不能跟在条件返回后面。
-  useDocClass('sp-deepecho', !!pub?.echo);
+  // 判据两路取或：`pub.echo`（对局中一定有）**或** 房间 variant（选策略/确认本局信息阶段
+  // pub 里还没有 echo，只靠前者会让整个「选择策略」一屏仍然是绿的 —— 维护者 2026-11-04 实测）。
+  const diveRoom = useStore((s) => s.room?.variant === 'deepecho');
+  useDocClass('sp-deepecho', !!pub?.echo || diveRoom);
   if (!pub || !gd.ready || !versionReady) {
     return html`<div class="screen gload">
       <${Spinner} size="lg" label=${pub ? 'LOADING DATA' : 'ENTERING SIMULATION'} />
@@ -234,7 +236,8 @@ export function GameScreen() {
   return html`${body}
     ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} room=${voteRoom} class="vervote--float" />` : null}
     ${!hasResult && mode !== 'result' ? html`<${EchoBlessing} pub=${pub} />` : null}
-    ${!hasResult && mode !== 'result' ? html`<${EchoStatus} pub=${pub} />` : null}
+    ${/* 深潜的深度已顶替 HUD 的回合数字；词条/祝福改放在「本局信息」抽屉里（EchoInfoBlock），
+        不再有浮在屏幕上的状态条挡住 HUD 和按钮（维护者 2026-11-04） */ null}
     ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
     ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} reason=${endReason} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${TestConsole} />` : null}`;
@@ -426,7 +429,9 @@ function MatchScreen() {
     priv, stage: gd.stage(pub?.stageId), editable, field: deployField,
     getChess: (id) => { const c = gd.chess(id); return ownDiyRecord(c, priv, { chess: data.get('chess'), backups: data.get('backups') }) || c; },
     getToken: gd.token, getItem: gd.item, getEffect: gd.effect, backups: gd.backups, morphMode,
-  }), [priv, pub?.stageId, editable, gd.ready, deployField, data.locale(), morphMode]);
+    // 「深渊回响」部署禁令：贴上禁放地块 / 排异盟约，普通房间是 null
+    echoBans: pub?.echo?.bans || null,
+  }), [priv, pub?.stageId, pub?.echo?.bans, editable, gd.ready, deployField, data.locale(), morphMode]);
   live.current = { pub, priv, field, view, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
 
   // ---- camera: every request goes through setCam, which remembers it for the pen's way back -----------------------

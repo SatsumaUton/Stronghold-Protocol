@@ -395,6 +395,36 @@ test('部署禁令：封锁地块 / 排异盟约，且只拦新上场不拦移�
   assert.equal(pub.bans.bond, m.echoBannedBond);
 });
 
+// 维护者 2026-11-05：悬赏「打掉但没结算」的边界 —— 打掉的卡不能算失败。
+// 判定依据：kill 钩子记下的 echoBountyPaid（victim.mods.bountyId）；拿不到回执时，
+// 本轮有悬赏收入也按达成处理（服务端只有汇总 coin，宁可漏判也不误伤）。
+test('悬赏未达成：打掉的不算失败，没打掉才降诅咒', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  const card = (id) => ({ id, card: { payout: 'kill', coin: 10, enemyKey: 'enemy_x' }, roundsLeft: 1 });
+
+  ps.bounties = [card('a')];
+  m.echoBountyPaid = ['a'];
+  m.lastResults = new Map([[ps.playerId, { coins: 0, perfect: false }]]);
+  assert.equal(m._echoSettleBountyFailure([ps]), null, '击杀回执在 → 不算失败');
+
+  ps.bounties = [card('b')];
+  m.echoBountyPaid = [];
+  assert.ok(m._echoSettleBountyFailure([ps]), '没打掉 → 降诅咒');
+
+  ps.bounties = [card('c')];
+  m.lastResults = new Map([[ps.playerId, { coins: 10, perfect: false }]]);
+  assert.equal(m._echoSettleBountyFailure([ps]), null, '有悬赏收入 → 按达成处理（保守，不误伤）');
+
+  ps.bounties = [card('d')];
+  ps.bounties[0].roundsLeft = 2;                       // 还没到期
+  m.echoBountyPaid = [];
+  m.lastResults = new Map([[ps.playerId, { coins: 0, perfect: false }]]);
+  assert.equal(m._echoSettleBountyFailure([ps]), null, '还有一轮的卡不算失败');
+});
+
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。
