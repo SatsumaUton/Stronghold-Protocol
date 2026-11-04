@@ -179,7 +179,7 @@ function EchoShieldVote({ pub, myId, online, now, setNow }) {
   return html`<div class="echo-bless-overlay" role="dialog" aria-label=${t('护盾：指定盟约')} aria-live="polite">
     <div class="echo-bless">
       <header class="echo-bless__head">
-        <b>${t('护盾：投票指定要保护的盟约')}</b>
+        <b>${t('护盾：投票指定要保护的盟约（仅限附加盟约）')}</b>
         <span>${t('排异随机到这条盟约时，护盾会抵消该诅咒（一次性）。30 秒后按票数结算。')}</span>
         ${left != null ? html`<span class="echo-bless__timer" aria-live="off"><b>${left}</b><i>秒</i></span>` : null}
         <span class="echo-bless__count">${voted}/${voters.length}</span>

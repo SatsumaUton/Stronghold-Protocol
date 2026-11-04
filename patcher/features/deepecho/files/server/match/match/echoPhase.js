@@ -788,7 +788,11 @@ export class MatchEcho {
     this._echoShieldVotes.clear();
     if (!Array.isArray(offer) || !offer.length) return OK;
     const i = Math.max(0, Math.min(offer.length - 1, Math.floor(Number(best) || 0)));
-    this.echoShieldBond = offer[i];
+    // 只保护**附加盟约**：核心盟约本来就不会被排异，选了也没有意义（维护者 2026-11-05）
+    const chosen = offer[i];
+    const rec = this.gd.raw && this.gd.raw.bonds ? this.gd.raw.bonds[chosen] : null;
+    if (!rec || rec.isCore === true) return OK;
+    this.echoShieldBond = chosen;
     const name = this.gd.bond(offer[i])?.name || offer[i];
     this._echoPushAnnounce(`护盾：指定保护【${name}】——排异随机到它时将被抵消`);
     this._echoFlushAnnounce();
