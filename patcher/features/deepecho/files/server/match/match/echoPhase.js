@@ -24,6 +24,11 @@ import { pieceBonds } from '../bondsMeta.js';
 import { roundPick } from '../waves.js';
 import { FLOW_TICKER_PRIORITY, OK, fail } from './common.js';
 
+/** 侵蚀词条上限的硬顶（与 _echoWordCap 的封顶一致） */
+const ECHO_WORD_CAP_MAX = 8;
+/** 词条上限溢出后，每多一层侵蚀 → 敌方生命 +2%（2026-11-05） */
+const ECHO_WORD_OVERFLOW_HP = 0.02;
+
 export class MatchEcho {
   /**
    * 深潜每回合**最多保留多少「免费刷新」**（维护者 2026-11-03 定）。
@@ -179,7 +184,7 @@ export class MatchEcho {
     if (!(depth > 0)) return 3;
     // 诅咒里带「侵蚀词条上限 +N」的（echoCurse.js）：按层累加，最多 8 条
     const curseCap = Math.max(0, echoCurseEffects(this.echoCurseIds).wordCap);
-    return Math.min(8, 3 + Math.floor((depth - 1) / 10) + curseCap);
+    return Math.min(ECHO_WORD_CAP_MAX, 3 + Math.floor((depth - 1) / 10) + curseCap);
   }
 
   /**
@@ -501,7 +506,17 @@ export class MatchEcho {
   _echoCurseFx() {
     const run = echoCurseEffects(this.echoCurseIds);
     const round = this.echoRoundCurse ? echoCurseEffects([this.echoRoundCurse]) : null;
-    return round ? mergeCurseEffects(run, round) : run;
+    const fx = round ? mergeCurseEffects(run, round) : run;
+    // 词条上限溢出（2026-11-05，维护者提问「第 9 条怎么办」）：
+    // 侵蚀叠到 8 条上限之后，多出来的层数**不再空转**，转为敌方生命 +2%/层
+    // （侵蚀最多叠 3 层，所以最多 +6%）。这样深层抽到侵蚀仍有意义。
+    const depth = this._echoDepth();
+    if (fx.wordCap > 0 && depth > 0) {
+      const base = 3 + Math.floor((depth - 1) / 10);
+      const overflow = Math.max(0, base + fx.wordCap - ECHO_WORD_CAP_MAX);
+      if (overflow > 0) fx.enemyHpMul *= 1 + ECHO_WORD_OVERFLOW_HP * overflow;
+    }
+    return fx;
   }
 
   /** 商店加价倍率（诅咒「通胀 / 暴利」）：`player/economy.js` 的 priceOf 消费它。 */
@@ -789,9 +804,23 @@ export class MatchEcho {
   }
   _echoCurses() {
     if (this.echoVariant !== 'deepecho') return [];
+    // 词条类诅咒顶到上限之后不会空转：溢出层数转为敌方生命（见 _echoCurseFx），
+    // 这里把换算结果写给玩家看，避免「多叠一层却没反应」的误解。
+    const depthNow = this._echoDepth();
+    const baseWordCap = 3 + Math.floor((Math.max(1, depthNow) - 1) / 10);
+    const totalWordCap = echoCurseEffects(this.echoCurseIds).wordCap;
+    const overflowTotal = Math.max(0, baseWordCap + totalWordCap - ECHO_WORD_CAP_MAX);
     const applied = echoCurseList(this.echoCurseIds).map(({ id, name, desc }) => {
       const c = echoCurseById(id);
-      return { id, name, desc, rarity: c?.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c?.rarity] || '普通' };
+      const inOverflow = c?.effect?.kind === 'wordCap' && overflowTotal > 0;
+      return {
+        id,
+        name: inOverflow ? `${name}（溢出：敌方生命 +${Math.round(ECHO_WORD_OVERFLOW_HP * 100 * overflowTotal)}%）` : name,
+        desc,
+        rarity: c?.rarity || 'common',
+        rarityLabel: ECHO_CURSE_RARITY_LABEL[c?.rarity] || '普通',
+        overflow: inOverflow,
+      };
     });
     const withRarity = (c) => ({ id: c.id, name: c.name, desc: c.desc, rarity: c.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c.rarity] || '普通' });
     return [

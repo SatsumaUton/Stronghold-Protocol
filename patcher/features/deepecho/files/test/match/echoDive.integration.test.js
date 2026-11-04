@@ -918,3 +918,27 @@ test('反制层数：普通清 1 层，彻愈清 3 层，富源清 2 层', (t) =
   assert.ok(m.echoCounterIds.includes('staunch_x'));
   assert.equal(m.echoBlessings.includes('staunch_x'), false, '不进 3 个名额');
 });
+// 维护者 2026-11-05「第 9 个词条怎么办」：不空转 —— 溢出层数转为敌方生命 +2%/层。
+test('词条上限溢出：第 9 条起转成敌方生命，并在列表里说明', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 60;                                        // 基础上限 = 3 + 5 = 8
+
+  m.echoCurseIds = [];
+  const baseHp = m.gd.enemyScale(60).hpMul;
+  m.echoCurseIds = ['erosion', 'erosion', 'erosion'];
+  assert.equal(m._echoWordCap(60), 8, '词条上限仍然封顶 8');
+  const withCurse = m.gd.enemyScale(60).hpMul;
+  assert.ok(withCurse > baseHp, '溢出没有空转：敌方生命被提高');
+  assert.ok(Math.abs(withCurse / baseHp - 1.06) < 1e-9, `3 层溢出应为 +6%（实际 ${((withCurse / baseHp - 1) * 100).toFixed(1)}%）`);
+
+  const shown = m._echoCurses().find((c) => c.id === 'erosion');
+  assert.ok(shown && shown.overflow, '列表里标成溢出');
+  assert.match(shown.name, /溢出.*\+6%/, '名字里写明换算结果');
+
+  // 没有溢出时不乱标
+  m.round = 20;
+  m.echoCurseIds = ['erosion'];
+  assert.equal(m._echoCurses().find((c) => c.id === 'erosion').overflow, false);
+});
