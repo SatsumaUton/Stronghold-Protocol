@@ -452,6 +452,8 @@ export class MatchPhases {
         echoPoolRoundOnly: false,
         echoTemplates: true,
         echoTemplatesAny: false,
+        // 16 层以后两个出怪点都要用（维护者 2026-11-05）
+        echoAllRoutes: deepWave,
         // 16 层以后每层的规模按深度设计（echoWaves.echoDeepWaveShape），时限也固定成最后一关的时长，
         // 免得轮回到数据回合 1 时只有 90 秒却要放 110 只（维护者 2026-11-04 §6）。
         // 1–15 层不传：它们仍用原版同回合的时限。

@@ -415,7 +415,8 @@ export function buildNormalWave(gd, rng, factions, round, opts = null) {
   return {
     templateId,
     spawns,
-    routes: Array.isArray(tpl.routes) ? tpl.routes : [],
+    // 深层（echoAllRoutes）：wave 的路线表可能比模板大（并入了同图其他出兵口）
+    routes: echoWave && Array.isArray(echoWave.routes) && echoWave.routes.length ? echoWave.routes : (Array.isArray(tpl.routes) ? tpl.routes : []),
     extraRoutes: Array.isArray(tpl.extraRoutes) ? tpl.extraRoutes : [],
     timeLimit,
     overrides: tpl.overrides && typeof tpl.overrides === 'object' ? tpl.overrides : {},
