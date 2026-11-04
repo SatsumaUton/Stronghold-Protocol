@@ -1068,6 +1068,26 @@ test('奇迹·诅咒：每回合累计最多拿到 5 次免费刷新，换回合
   m.round += 1;                                    // 换回合 → 额度重置
   assert.equal(m._echoGrantFreeRefresh(ps, 5), 5, '新回合重新给满 5 次');
 });
+
+// 维护者 2026-11-05 实测：深渊回响房用「重刷本局」之后，商店还能刷到**当前被禁用盟约**的干员。
+// 成因：setupVote 里 poolGroups / playerPools 只在 5–20 人大厅分支里建，
+// 赋值整段又被 if (capacityExperiment) 包着 —— 独立卡池（disableSharedPool）房间重刷后，
+// this.playerPools 仍指向开局那一池，而 poolFor() 优先读它。
+test('重刷本局：独立卡池跟着新的禁用盟约重建（被禁干员不能再被抽到）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  assert.equal(m.disableSharedPool, true, '深渊回响强制独立卡池');
+  assert.equal(m.capacityExperiment, false, '4 人房不是 5–20 人大厅，走的正是出问题的分支');
+  const pid = m.alivePlayers()[0].playerId;
+  const before = m.poolFor(pid);
+  assert.equal(m.completeSetupReroll().ok, true, '重刷成功');
+  const after = m.poolFor(pid);
+  assert.notEqual(after, before, '重刷后每人必须换到新池（旧实现仍返回开局那一池）');
+  for (const id of after.entries.keys()) {
+    assert.ok(!(m.bannedChess || []).includes(id), `${id} 的盟约已被禁用，却留在重刷后的卡池里`);
+  }
+});
 // 维护者 2026-11-05 澄清：**诅咒『排异』是暂时的**（能被「开路」解除），
 // 所以那些干员**可以买**，只是不能上场。商店闸门只能看「本局永久禁用」，绝不能把诅咒也当禁用。
 test('排异诅咒不禁购物车：被排异的干员仍能在商店出现/购买，只是不能部署', (t) => {
