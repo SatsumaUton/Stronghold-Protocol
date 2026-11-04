@@ -562,6 +562,10 @@ export class MatchEcho {
       const tier = ECHO_CURSE_RARITY_LABEL[pick.rarity] || '普通';
       this._echoPushAnnounce(`本回合诅咒「${pick.name}」（${tier}）：${pick.desc}`);
     }
+    // 每回合 prep 开始时再扫一遍棋盘（维护者 2026-11-05「接入」持续约束）：
+    // 玩家可能用同构体装备临时获得被排异的盟约，或把干员重新摆上场 —— 都要当场收回。
+    const swept = this._echoWithdrawBannedBond();
+    if (swept) this._echoPushAnnounce(`排异：${swept} 名干员被收回`);
     if (pick && pick.effect && pick.effect.kind === 'destroyEquip') {
       let n = 0;
       for (const ps of this.alivePlayers()) n += this._echoDestroyEquipped(ps, rng);

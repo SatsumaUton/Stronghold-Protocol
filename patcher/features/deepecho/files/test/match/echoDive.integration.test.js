@@ -802,3 +802,32 @@ test('干员减益叠层：同一条诅咒 N 层就挂 N 个 buff', (t) => {
   assert.equal(buffs.length, 2, '两层 → 两个 buff');
   assert.notEqual(buffs[0], buffs[1], 'key 不能相同（否则会被当成同一条）');
 });
+// 维护者 2026-11-05：排异是**持续约束** —— 每回合 prep 开始时扫一遍棋盘，
+// 玩家中途用同构体装备或重新摆上场的同盟约干员都会被收回。
+test('排异持续生效：每回合扫描，新上场的也收回', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  const chessRaw = m.gd.raw?.chess || {};
+  const isAdd = (b) => m.gd.bond(b) && m.gd.bond(b).isCore !== true;
+  const pair = Object.entries(chessRaw).find(([, rec]) => (rec?.bonds || []).some(isAdd));
+  assert.ok(pair, '数据里要有带附加盟约的干员');
+  const [chessId, rec] = pair;
+  const bond = rec.bonds.find(isAdd);
+
+  m.echoCurseIds = [];
+  m.echoRoundCurse = null;
+  m.echoBannedBonds = [bond];
+  ps.board.set('8,6', { kind: 'chess', id: chessId, items: [], uid: 5566 });
+  m.round = 11;
+  m._echoRefreshCurses(12);
+  assert.equal(ps.board.has('8,6'), false, '新上场的同盟约干员被收回');
+  assert.ok([...ps.hand, ...(Array.isArray(ps.temp) ? ps.temp : [])].some((p) => p && p.uid === 5566), '卡回到手里');
+
+  // 没有排异时不误伤
+  m.echoBannedBonds = [];
+  ps.board.set('8,7', { kind: 'chess', id: chessId, items: [], uid: 5577 });
+  m._echoRefreshCurses(13);
+  assert.equal(ps.board.has('8,7'), true, '没有排异就不动它');
+});
