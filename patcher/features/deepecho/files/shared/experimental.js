@@ -56,8 +56,9 @@ export function isExperimental(value) {
 export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
   if (!isExperimental(value)) throw new TypeError('invalid experimental options');
   const capacity = roomCapacity('coop', value);
-  // 维护者 2026-11-05：救援默认开启，而且**不要求进入联防** —— 任何活着的队友都能付救援
-  return Object.freeze({ revivalEnabled: value.revivalEnabled === true, revivalAnyDonor: value.revivalAnyDonor !== false,
+  // 维护者 2026-11-05：救援默认开启，且不要求进入联防（revivalAnyDonor 只是行为开关，不写进 DTO）。
+  // 一旦写进输出，旧进程的校验器会把自己的产物判成非法（2026-11-05：所有房间 new Match 抛错、开不了局）。
+  return Object.freeze({ revivalEnabled: value.revivalEnabled === true,
     disableSharedPool: value.disableSharedPool && !value.poolPlan,
     ...(capacity === MAX_SEATS ? {} : { playerCapacity: capacity }),
     // Optional and false by default: ordinary rooms and legacy DTOs keep their two-flag shape.
