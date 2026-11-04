@@ -1073,7 +1073,7 @@ export function EchoSelect({ onClose, onStart }) {
         <${BackPlate} onClick=${onClose} class="proto__back" />
         <div class="proto-title">
           <h2 class="modal__title">${t('深渊回响')}</h2>
-          <span class="proto-title__mode"><${Icon} name="target" />${t('深潜')}<i>DEEP ECHO</i></span>
+          <span class="proto-title__mode"><${Icon} name="target" />${t('深渊回响')}<i>DEEP ECHO</i></span>
         </div>
       </header>
       <div class="proto-body">
@@ -1177,7 +1177,7 @@ export function EchoSelect({ onClose, onStart }) {
           <div class="proto-foot proto-foot--match">
             <button type="button" class="proto-start" data-testid="echo-start" onClick=${() => onStart({ difficulty })}>
               <span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>DEEP<br />ECHO</small></span>
-              <span class="proto-start__label">${t('开始深潜')}</span>
+              <span class="proto-start__label">${t('开始深渊回响')}</span>
               <span class="proto-start__deco" aria-hidden="true"></span>
             </button>
           </div>
