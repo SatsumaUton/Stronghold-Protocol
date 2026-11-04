@@ -1561,6 +1561,10 @@ export class Lobby {
     // 「深渊回响」只支持**默认版本**（第二期下半）。
     // 原因：深渊的模板、跨版本怪物池、悬赏/词条都是按默认版本的数据标定的，
     // 换个版本会出现「模板对不上 / 数值漂移」。这里直接拒绝。
+    //
+    // ⚠ `version` 必须**先解析再用**：它原来声明在下面（ticket 1591），这里提前引用会触发
+    // `ReferenceError: Cannot access 'version' before initialization` —— 深潜房一点「开始深潜」就 500。
+    const version = askedVersion ?? this.defaultVersion();
     if (variant && version !== DEFAULT_VERSION) {
       return fail(ERR.VERSION_UNSUPPORTED, '「深渊回响」只支持「第二期下半」，不支持其他版本');
     }
@@ -1587,8 +1591,7 @@ export class Lobby {
     }
     // A test room exists only when the process switch allowed it. The check runs before the room is built.
     if (test === true && this.testEnabled !== true) return fail(ERR.TEST_DISABLED);
-    // the official version (header "Official versions"): left out, the server's default
-    const version = askedVersion ?? this.defaultVersion();
+    // the official version (header "Official versions"): resolved above (before the deepecho checks)
     if (!this.versionEnabled(version)) return fail(ERR.VERSION_UNKNOWN);
     if (!this.offered(version, mode).length) return fail(ERR.VERSION_UNSUPPORTED, `${version} has no ${mode} rooms`);
     if (!this.versionAvailable(version)) return fail(ERR.VERSION_UNSUPPORTED, 'the data of this version is not available');
