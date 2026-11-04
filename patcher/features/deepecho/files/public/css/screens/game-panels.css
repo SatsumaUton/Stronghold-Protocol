@@ -1031,6 +1031,12 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-bless__card { position: relative; }
 /* 祝福「确认」按钮（选中 → 确认，参考原版悬赏目标；维护者 2026-11-05） */
 .echo-bless__foot { display: flex; align-items: center; gap: .6rem; justify-content: space-between; }
-.echo-bless__confirm { font: inherit; font-size: .92em; font-weight: 700; letter-spacing: .06em; color: #10131a; background: #b79cff; border: 0; border-radius: 3px; padding: .18em .9em; cursor: pointer; }
-.echo-bless__confirm:disabled { opacity: .45; cursor: default; }
-.echo-bless__confirm:not(:disabled):hover { filter: brightness(1.12); }
+.echo-bless__confirm {
+  font: inherit; font-size: 1.25em; font-weight: 800; letter-spacing: .1em;
+  color: #f6f1ff; background: linear-gradient(180deg, #b79cff, #7c5cf0);
+  border: 0; border-radius: 5px; padding: .42em 2.2em; min-width: 9em; min-height: 2.6em;
+  box-shadow: 0 0 .2rem rgba(157, 123, 255, .45), inset 0 0 0 1px rgba(255, 255, 255, .25);
+  cursor: pointer; transition: transform .12s ease, box-shadow .12s ease;
+}
+.echo-bless__confirm:disabled { opacity: .42; cursor: default; box-shadow: none; }
+.echo-bless__confirm:not(:disabled):hover { filter: brightness(1.12); transform: translateY(-1px); box-shadow: 0 0 .3rem rgba(157, 123, 255, .62), inset 0 0 0 1px rgba(255, 255, 255, .35); }
