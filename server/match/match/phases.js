@@ -416,7 +416,11 @@ export class MatchPhases {
     const echoBoss = dive && (this._echoBossReturn(r) || this._echoHiddenBossRound(r));
     const isBoss = echoBoss || (!dive && (r === this.gd.bossRound || r === this.gd.hiddenRound));
     // 排异到期要在**每一层**都检查（boss 层不走 _echoRefreshCurses，2026-11-05 实测漏掉）
-    if (dive && typeof this._echoExpireBondBans === 'function') this._echoExpireBondBans(this._echoDepth(r));
+    if (dive) {
+      const dd = this._echoDepth(r);
+      if (typeof this._echoExpireBondBans === 'function') this._echoExpireBondBans(dd);
+      if (typeof this._echoExpireDeployBans === 'function') this._echoExpireDeployBans(dd);
+    }
     if (isBoss) {
       // 特殊回合的入场播报（2026-11-05）：boss 返场 / 隐藏核心也要在**准备阶段**告诉玩家
       if (dive) this._echoAnnounceRoundKind(r);

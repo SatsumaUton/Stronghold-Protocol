@@ -377,6 +377,8 @@ export class Match {
     this.echoOneShotIds = [];
     /** 排异诅咒的到期层数：bond → depth（到这一层自动解除，2026-11-05）。 */
     this.echoBannedBondsUntil = {};
+    /** 封锁诅咒的到期层数（地块是整批一起解，2026-11-05）。 */
+    this.echoBannedTilesUntil = 0;
     /** 「护盾」祝福指定的盟约：排异抽到它时抵消该诅咒（一次性，2026-11-05）。 */
     this.echoShieldBond = null;
     this.echoShieldOffer = null;
