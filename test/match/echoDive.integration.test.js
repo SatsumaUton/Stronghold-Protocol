@@ -1047,6 +1047,27 @@ test('免费刷新：深潜上限 5 次（奇迹·诅咒），回合开始夹住
   m._echoClampFreeRefreshes();
   assert.equal(ps.shop.freeRefreshes, 4, '诅咒生效后上限变 4');
 });
+
+// 维护者 2026-11-05 更正口径：不是「库存上限 5」，而是**每回合累计只能拿到 5 次**。
+// 以前刷完 5 次再买/卖干员、吃祝福、触发按层效果，每个口子又各给 5 次 —— 一回合能白嫖几十次。
+test('奇迹·诅咒：每回合累计最多拿到 5 次免费刷新，换回合才重置', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  ps.shop.freeRefreshes = 0;
+  ps.shop.echoGrantRound = m.round;
+  ps.shop.echoRefreshGranted = 0;
+
+  assert.equal(m._echoGrantFreeRefresh(ps, 3), 3, '第一次给满 3');
+  ps.shop.freeRefreshes = 0;                       // 玩家把这 3 次刷掉了
+  assert.equal(m._echoGrantFreeRefresh(ps, 3), 2, '本回合只剩 2 次额度');
+  ps.shop.freeRefreshes = 0;
+  assert.equal(m._echoGrantFreeRefresh(ps, 5), 0, '额度用完：买卖干员 / 祝福都给不出来');
+
+  m.round += 1;                                    // 换回合 → 额度重置
+  assert.equal(m._echoGrantFreeRefresh(ps, 5), 5, '新回合重新给满 5 次');
+});
 // 维护者 2026-11-05 澄清：**诅咒『排异』是暂时的**（能被「开路」解除），
 // 所以那些干员**可以买**，只是不能上场。商店闸门只能看「本局永久禁用」，绝不能把诅咒也当禁用。
 test('排异诅咒不禁购物车：被排异的干员仍能在商店出现/购买，只是不能部署', (t) => {

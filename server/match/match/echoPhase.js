@@ -91,8 +91,7 @@ export class MatchEcho {
     let n = 0;
     for (const ps of this.alivePlayers()) {
       if (!ps || !ps.shop) continue;
-      ps.shop.freeRefreshes = Math.min(this._echoFreeRefreshCap(), (Number(ps.shop.freeRefreshes) || 0) + 1);
-      ps.dirty?.();
+      this._echoGrantFreeRefresh(ps, 1, r);
       n += 1;
     }
     if (n) this.markPublic?.();
@@ -573,6 +572,39 @@ export class MatchEcho {
     const base = Number(ECHO_MAX_FREE_REFRESH) || 0;
     const delta = Number(this._echoCurseFx().freeRefresh) || 0;
     return Math.max(0, base + delta);
+  }
+
+  /**
+   * 「奇迹·诅咒」的真实口径（维护者 2026-11-05 更正）：
+   * **每回合能拿到的免费刷新总数 ≤ 5**，不是「库存上限 5」。
+   *
+   * 差别很要命：库存封顶时，玩家把这 5 次刷完（库存归 0），再去买/卖干员、吃祝福、触发按层效果，
+   * 每个授予点又各给 5 次 —— 一回合实际能白嫖几十次。所以这里改成**按回合累计**：
+   *   * `shop.echoGrantRound` 记录「本回合」，换回合即把 `echoRefreshGranted` 归零；
+   *   * 每次授予只发 `min(想要, 剩余额度, 库存余量)`，买卖干员、祝福、按层效果全部走同一个口子。
+   *
+   * @param {object} ps 玩家状态
+   * @param {number} n 想给几次
+   * @returns {number} 实际发出几次
+   */
+  _echoGrantFreeRefresh(ps, n = 1, r = this.round) {
+    const shop = ps && ps.shop ? ps.shop : null;
+    const want = Math.trunc(Number(n) || 0);
+    if (!shop || !(want > 0)) return 0;
+    if (shop.echoGrantRound !== r) {
+      shop.echoGrantRound = r;
+      shop.echoRefreshGranted = 0;
+    }
+    const cap = this._echoFreeRefreshCap();
+    const granted = Math.max(0, Math.trunc(Number(shop.echoRefreshGranted) || 0));
+    const stock = Math.max(0, Math.trunc(Number(shop.freeRefreshes) || 0));
+    const add = Math.max(0, Math.min(want, cap - granted, cap - stock));
+    if (add > 0) {
+      shop.echoRefreshGranted = granted + add;
+      shop.freeRefreshes = stock + add;
+      ps.dirty?.();
+    }
+    return add;
   }
 
   /**
@@ -1808,8 +1840,7 @@ export class MatchEcho {
       for (const ps of this.alivePlayers()) {
         const shop = ps && ps.shop;
         if (!shop) continue;
-        shop.freeRefreshes = Math.min(this._echoFreeRefreshCap(), (Number(shop.freeRefreshes) || 0) + refresh);
-        ps.dirty?.();
+        this._echoGrantFreeRefresh(ps, refresh);
       }
     }
     const heal = echoBlessingHeal(b);

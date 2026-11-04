@@ -596,13 +596,10 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     grantFreeRefresh: (n = 1) => {
       const v = finiteInt(n);
       if (v > 0) {
-        ps.shop.freeRefreshes += v;
-        // 「深渊回响」：免费刷新**总量**封顶（同 MatchEcho.MAX_FREE_REFRESH）。
-        // 深潜里盟约层数高，按层数触发的效果（奇迹 每 100 层 +1 次）会把它变成无限刷新，
-        // 所以在授予的那一刻就压住，而不是等回合末再夹（维护者 2026-11-03）。
-        // 上限统一由 MatchEcho._echoFreeRefreshCap() 决定（深潜常量 + 诅咒修正），不要再各自写死数字
-        if (m.echoVariant === 'deepecho' && typeof m._echoFreeRefreshCap === 'function') ps.shop.freeRefreshes = Math.min(ps.shop.freeRefreshes, m._echoFreeRefreshCap());
-        ps.dirty();
+        // 「深渊回响」：**每回合累计**上限 5 次（奇迹·诅咒），买/卖干员触发的盟约效果也走这个口子。
+        // 以前只夹库存，玩家刷完 5 次再买/卖又能各拿 5 次 —— 等于无限刷新（维护者 2026-11-05 更正）。
+        if (m.echoVariant === 'deepecho' && typeof m._echoGrantFreeRefresh === 'function') m._echoGrantFreeRefresh(ps, v);
+        else { ps.shop.freeRefreshes += v; ps.dirty(); }
       }
       return ps.shop.freeRefreshes;
     },
