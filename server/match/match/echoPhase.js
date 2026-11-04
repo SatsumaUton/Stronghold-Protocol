@@ -873,9 +873,16 @@ export class MatchEcho {
    * @returns {number} 解除的地块数
    */
   _echoExpireDeployBans(depth = this._echoDepth(this.round)) {
-    const until = Number(this.echoBannedTilesUntil) || 0;
     const tiles = Array.isArray(this.echoBannedTiles) ? this.echoBannedTiles : [];
-    if (!tiles.length || !(until > 0) || until > depth) return 0;
+    if (!tiles.length) return 0;
+    let until = Number(this.echoBannedTilesUntil) || 0;
+    // 兜底：旧存档 / 旧进程写下的封锁没有到期层（until=0）—— 这里补成「本层 + 3」，
+    // 否则它会永远挂着（维护者 2026-11-05 实测：3 回合后地块仍在封锁）。
+    if (!(until > 0)) {
+      until = depth + ECHO_DEPLOY_BAN_ROUNDS;
+      this.echoBannedTilesUntil = until;
+    }
+    if (until > depth) return 0;
     this.echoBannedTiles = [];
     this.echoBannedTilesUntil = 0;
     if (Array.isArray(this.echoCurseIds)) {
