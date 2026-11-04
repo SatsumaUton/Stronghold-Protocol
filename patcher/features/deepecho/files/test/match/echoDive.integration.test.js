@@ -454,6 +454,35 @@ test('生命惩罚诅咒：漏怪伤害按倍率/额外值放大，仍受上限'
   m.echoRoundCurse = null;
 });
 
+// 维护者 2026-11-05：诅咒 / 侵蚀词条的播报（ticker 会互相覆盖，所以同一回合必须合成一条）。
+test('播报：诅咒降下与侵蚀词条变化都会发 ticker，且合成一行', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const said = [];
+  m.tickerText = (text) => { said.push(String(text)); };
+
+  m.round = 5;
+  m.startRound(6);                                     // 深度 6：固定诅咒 + 侵蚀词条
+  assert.ok(said.length >= 1, '至少要播一条');
+  const line = said.at(-1);
+  assert.match(line, /深渊诅咒/, `播报里要有诅咒：${line}`);
+  assert.match(line, /侵蚀词条/, `播报里要有侵蚀词条：${line}`);
+  assert.ok(line.includes('贡赋'), '深度 6 的固定诅咒是贡赋');
+
+  // 同一回合重复进不会重复播（fixed 只在第一次触发）
+  said.length = 0;
+  m.round = 5;
+  m.startRound(6);
+  assert.equal(said.some((x) => x.includes('贡赋')), false, '同一条固定诅咒不重复播');
+
+  // 净化也会播
+  said.length = 0;
+  m.echoCurseIds = ['erosion', 'erosion'];
+  m._echoGrantBlessing(echoBlessingById('cleanse'));
+  assert.ok(said.some((x) => x.includes('净化')), '净化要播报');
+});
+
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。

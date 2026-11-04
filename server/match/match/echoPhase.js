@@ -215,8 +215,30 @@ export class MatchEcho {
     }
     const rng = createRng(deriveSeed(this.seed, `echo:${r}`));
     const words = echoWordsForRound(r, this.echoDiveStart, rng, { maxWords: this._echoWordCap(r) });
+    const prev = Array.isArray(this.echoWordsActive) ? this.echoWordsActive.join(',') : '';
     this.echoWordsActive = words.map((w) => w.id);
+    // 播报（2026-11-05）：词条有变化才播，免得每回合重复刷屏
+    if (this.echoWordsActive.join(',') !== prev && words.length) {
+      this._echoPushAnnounce(`侵蚀词条：${words.map((w) => w.name).join('、')}`);
+    }
+    this._echoFlushAnnounce();
     return this.echoWordsActive;
+  }
+
+  /** 攒一条播报（同一回合的多条会在 _echoFlushAnnounce 里合成一行）。 */
+  _echoPushAnnounce(text) {
+    if (!text) return;
+    if (!Array.isArray(this._echoAnnounce)) this._echoAnnounce = [];
+    if (!this._echoAnnounce.includes(text)) this._echoAnnounce.push(text);
+  }
+
+  /** 把攒下的播报一次性发出去（ticker 会被覆盖，所以必须合并）。 */
+  _echoFlushAnnounce() {
+    if (!Array.isArray(this._echoAnnounce) || !this._echoAnnounce.length) return;
+    const text = this._echoAnnounce.join('　｜　');
+    this._echoAnnounce = [];
+    this.tickerText?.(text, 1);
+    this.log?.info?.(`[match ${this.roomCode}] echo announce: ${text}`);
   }
 
   /** 当前词条的对象形式（HUD / 测试用）。 */
@@ -489,18 +511,31 @@ export class MatchEcho {
     const fixed = ECHO_FIXED_CURSE_ROUNDS[depth];
     if (fixed) {
       if (!Array.isArray(this.echoCurseIds)) this.echoCurseIds = [];
-      if (!this.echoCurseIds.includes(fixed)) this.echoCurseIds.push(fixed);
+      const first = !this.echoCurseIds.includes(fixed);
+      if (first) this.echoCurseIds.push(fixed);
+      // 播报（2026-11-05）：固定回合的诅咒要明确告诉玩家「你被降了一条永久诅咒」
+      if (first) {
+        const fc = echoCurseById(fixed);
+        const tier = fc ? (ECHO_CURSE_RARITY_LABEL[fc.rarity] || '普通') : '';
+        if (fc) this._echoPushAnnounce(`深渊诅咒「${fc.name}」（${tier}）：${fc.desc}`);
+      }
       // 部署禁令类诅咒：光记 id 没用，必须**当场算出**被封的地块 / 被排异的盟约
       const kind = echoCurseById(fixed)?.effect?.kind;
       if (kind === 'deployBan') {
-        this._echoApplyDeployBan(echoCurseById(fixed).effect.value, createRng(deriveSeed(this.seed, `echo:deployban:${r}`)));
+        const n = this._echoApplyDeployBan(echoCurseById(fixed).effect.value, createRng(deriveSeed(this.seed, `echo:deployban:${r}`)));
+        if (n) this._echoPushAnnounce(`已封锁 ${n} 个地块（无法部署）`);
       } else if (kind === 'bondBan') {
-        this._echoApplyBondBan(createRng(deriveSeed(this.seed, `echo:bondban:${r}`)));
+        const bond = this._echoApplyBondBan(createRng(deriveSeed(this.seed, `echo:bondban:${r}`)));
+        if (bond) this._echoPushAnnounce(`已排异【${this.gd.bond(bond)?.name || bond}】：该盟约干员无法部署`);
       }
     }
     const rng = createRng(deriveSeed(this.seed, `echo:rcurse:${r}`));
     const pick = pickRoundCurse(depth, rng);
     this.echoRoundCurse = pick ? pick.id : null;
+    if (pick) {
+      const tier = ECHO_CURSE_RARITY_LABEL[pick.rarity] || '普通';
+      this._echoPushAnnounce(`本回合诅咒「${pick.name}」（${tier}）：${pick.desc}`);
+    }
     if (pick && pick.effect && pick.effect.kind === 'destroyEquip') {
       let n = 0;
       for (const ps of this.alivePlayers()) n += this._echoDestroyEquipped(ps, rng);
@@ -856,7 +891,13 @@ export class MatchEcho {
     const removeSpec = echoBlessingCurseRemove(b);
     if (removeSpec != null && Array.isArray(this.echoCurseIds) && this.echoCurseIds.length) {
       // 'common' = 只清普通诅咒（涤罪，稀有/传说保留）；数字 = 清最早的 n 层；'all' = 全清
+      const before = this.echoCurseIds.length;
       this.echoCurseIds = removeEchoCurses(this.echoCurseIds, removeSpec).kept;
+      const removed = before - this.echoCurseIds.length;
+      if (removed > 0) {
+        this._echoPushAnnounce(`净化：移除 ${removed} 层诅咒`);
+        this._echoFlushAnnounce();
+      }
     }
     this.tickerText(msg('深渊回响：全队获得祝福「{name}」', { name: b.name }), FLOW_TICKER_PRIORITY);
     this.log.info?.(`[match ${this.roomCode}] echo blessing ${b.id} (R${this.round})`);
