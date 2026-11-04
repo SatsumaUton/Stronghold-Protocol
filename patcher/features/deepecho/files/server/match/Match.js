@@ -784,8 +784,9 @@ export class Match {
    * 所以「层数无上限」与「不会无限刷新 / 无限资金」现在同时成立；普通房间仍是原版 999。
    */
   get layerCapOff() {
-    // 维护者 2026-11-05：深潜也回到原版 **999 层封顶**（不再解除到 1e9）—— 层数无限会让「每 N 层」的效果失控。
-    return this.disableLayerCap === true;
+    // 维护者 2026-11-05：深潜**恢复无限层**（其他盟约要能突破 999），但「按层给钱」这类效果
+    // 在 effectsMeta 的 ondLayerCoinCap = 999 处单独锁死（最多结算到 999 层）。
+    return this.disableLayerCap === true || this.echoVariant === 'deepecho';
   }
 
   _revivalHelpers(plan, uniteResult) {
