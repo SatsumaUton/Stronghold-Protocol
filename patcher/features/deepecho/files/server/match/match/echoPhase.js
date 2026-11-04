@@ -1203,6 +1203,14 @@ export class MatchEcho {
       // 生命惩罚（2026-11-05）：客户端据此把「预计扣血」也乘上去，别让预览和服务端不一致
       lp: { mul: this._echoCurseFx().lpMul, extra: this._echoCurseFx().lpExtra },
       intel: this._echoIntel(),
+      // 日程信息**始终**给（不泄露敌人构成）：迷雾/遮蔽或 boss 返场回合时，客户端至少还能显示
+      // 「下次节点」这一项，而不是整块空白（维护者 2026-11-05）。
+      schedule: (() => {
+        if (!this._echoDiveRound()) return null;
+        const cur = Math.floor(Number(this.round) || 0);
+        const next = this._echoNextNodeRound(cur);
+        return { nextNodeRound: next, nextNodeIn: next - cur };
+      })(),
       // 无尽模式：没有「最大回合」可展示，只暴露安全阀（客户端不必显示它）
       safeRound: ECHO_SAFE_ROUND,
     };
