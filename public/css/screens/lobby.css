@@ -1910,3 +1910,11 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 }
 .echo-boardfloat .echo-tab { min-width: 0; flex: 1 1 0; padding: .035rem .04rem; }
 .echo-boardfloat .echo-boardtoggle { flex: 0 0 auto; min-width: 1.9rem; margin-left: 0; }
+
+/* 深潜排行榜五列（维护者 2026-11-05）：层数 / 玩家 / 核心盟约 / 最高盟约数 / 通关时间 */
+.echo-row--cols { display: grid; grid-template-columns: 1.1rem 3.2rem minmax(0, 1.5fr) minmax(0, 1.1fr) 2.4rem 2.6rem; align-items: center; gap: .1rem; }
+.echo-row--cols .echo-rank__players { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.echo-row--cols .echo-rank__cores { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c9b8f5; font-size: .94em; }
+.echo-row--cols .echo-rank__bonds { text-align: center; color: #e8d9ff; font-weight: 700; }
+.echo-row--cols .echo-rank__time { text-align: right; color: #b9a8e0; }
+.echo-boardhead__cols { display: grid; grid-template-columns: 1.1rem 3.2rem minmax(0, 1.5fr) minmax(0, 1.1fr) 2.4rem 2.6rem; gap: .1rem; font-size: .72em; color: #8f7fb5; letter-spacing: .04em; padding: 0 .02rem .04rem; }

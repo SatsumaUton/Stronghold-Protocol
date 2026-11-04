@@ -59,12 +59,26 @@ export function echoBoardEntry(e = {}) {
   const players = (Array.isArray(e.players) ? e.players : [])
     .map((p) => String(p || '').slice(0, 24)).filter(Boolean).slice(0, 8);
   const difficulty = ECHO_BOARD_DIFFICULTIES.includes(e.difficulty) ? e.difficulty : 'HARD';
+  // 维护者 2026-11-05：榜上要展示「玩家 / 核心盟约 / 最高盟约数 / 通关时间」。
+  const squads = (Array.isArray(e.squads) ? e.squads : [])
+    .map((s) => ({
+      name: String((s && s.name) || '').slice(0, 24),
+      cores: (Array.isArray(s && s.cores) ? s.cores : []).map((b) => String(b || '').slice(0, 16)).filter(Boolean).slice(0, 4),
+      bonds: Math.max(0, Math.floor(Number(s && s.bonds) || 0)),
+    }))
+    .filter((s) => s.name)
+    .slice(0, 8);
+  const maxBonds = Math.max(0, ...squads.map((s) => s.bonds));
+  const clearMs = Math.max(0, Math.floor(Number(e.clearMs) || 0));
   return {
     member: echoBoardMember({ at, roomCode: e.roomCode, matchNo: e.matchNo, seed: e.seed }),
     depth,
     round: Math.max(1, Math.floor(Number(e.round) || 0)),
     victory: e.victory === true,
     players,
+    squads,
+    maxBonds,
+    clearMs,
     difficulty,
     at,
   };
@@ -96,6 +110,9 @@ export function parseEchoBoard(flat, { limit = ECHO_BOARD_LIMIT, details = null,
       victory: !!(d && d.victory === true),
       round: d ? Math.max(0, Math.floor(Number(d.round) || 0)) : 0,
       players: d && Array.isArray(d.players) ? d.players.slice(0, 8) : [],
+      squads: d && Array.isArray(d.squads) ? d.squads.slice(0, 8) : [],
+      maxBonds: d ? Math.max(0, Math.floor(Number(d.maxBonds) || 0)) : 0,
+      clearMs: d ? Math.max(0, Math.floor(Number(d.clearMs) || 0)) : 0,
     });
   }
   return out.slice(0, Math.max(1, Math.floor(Number(limit) || ECHO_BOARD_LIMIT)));
@@ -138,6 +155,7 @@ export async function recordEchoBoard(store, entry) {
     await store.client.command('EXPIRE', board, String(ECHO_BOARD_TTL_SEC));
     await store.client.command('HSET', detail, entry.member, JSON.stringify({
       players: entry.players, victory: entry.victory, round: entry.round, difficulty: entry.difficulty,
+      squads: entry.squads, maxBonds: entry.maxBonds, clearMs: entry.clearMs,
     }));
     await store.client.command('EXPIRE', detail, String(ECHO_BOARD_TTL_SEC));
     return true;

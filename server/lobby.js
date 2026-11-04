@@ -3487,6 +3487,22 @@ export class Lobby {
       players: (Array.isArray(m.order) ? m.order : [])
         .filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string')
         .map((ps) => ps.name),
+      // 榜上要展示：每名玩家的**核心盟约**与**用过的盟约数**；通关时间 = 结束时刻 − 开局时刻（维护者 2026-11-05）
+      squads: (Array.isArray(m.order) ? m.order : [])
+        .filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string')
+        .map((ps) => {
+          const used = ps.bonds && typeof ps.bonds === 'object' ? Object.entries(ps.bonds) : [];
+          const live = used.filter(([, rec]) => rec && Number(rec.count) > 0);
+          const cores = live
+            .map(([id]) => id)
+            .filter((id) => {
+              const rec = typeof m.gd.bond === 'function' ? m.gd.bond(id) : null;
+              return rec && rec.isCore === true;
+            })
+            .map((id) => (m.gd.bond(id) || {}).name || id);
+          return { name: ps.name, cores, bonds: live.length };
+        }),
+      clearMs: Math.max(0, Math.floor(Number(this.now()) - Number(m.startedAt || this.now()))),
       at: this.now(),
       roomCode: room.code,
       matchNo: room.matchCount,
