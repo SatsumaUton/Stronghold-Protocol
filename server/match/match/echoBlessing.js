@@ -119,6 +119,21 @@ export const ECHO_BLESSINGS = Object.freeze([
     counterCurses: ['silence'] },
   { id: 'quench', rarity: 'common', name: '畅饮', desc: '驱散「枯竭 / 干涸」：免费刷新上限恢复', kind: 'counter', group: 'counter',
     counterCurses: ['drought', 'r_drought'] },
+  // 2026-11-05 第二批：把后续新增的诅咒也逐类配上反制（每条诅咒都要有解法）
+  { id: 'swift_oath', rarity: 'rare', name: '疾行', desc: '驱散「滞重 / 迟滞」：战斗时限恢复', kind: 'counter', group: 'counter',
+    counterCurses: ['leaden', 'r_leaden'] },
+  { id: 'clearfield', rarity: 'rare', name: '清野', desc: '驱散「蜂拥 / 涌潮」：出怪量恢复', kind: 'counter', group: 'counter',
+    counterCurses: ['swarm', 'r_swarm'] },
+  { id: 'rally', rarity: 'rare', name: '压阵', desc: '驱散「狂怒 / 甲壳 / 躁动 / 硬壳」：敌方数值恢复', kind: 'counter', group: 'counter',
+    counterCurses: ['frenzy', 'carapace', 'r_frenzy', 'r_carapace'] },
+  { id: 'bounty_grace', rarity: 'common', name: '厚赏', desc: '驱散「贪婪」：悬赏币恢复', kind: 'counter', group: 'counter',
+    counterCurses: ['greed'] },
+  { id: 'inspire', rarity: 'rare', name: '提振', desc: '驱散「削锋 / 断弦 / 钝刃」：干员减益解除', kind: 'counter', group: 'counter',
+    counterCurses: ['weak_melee', 'weak_ranged', 'r_weak_melee', 'r_weak_ranged'] },
+  { id: 'bargain', rarity: 'rare', name: '议价', desc: '驱散「通胀 / 暴利」：商店价格恢复', kind: 'counter', group: 'counter',
+    counterCurses: ['inflation', 'profiteer'] },
+  { id: 'spring', rarity: 'rare', name: '活泉', desc: '驱散「腐蚀 / 溃烂」：全场持续伤害停止', kind: 'counter', group: 'counter',
+    counterCurses: ['rot', 'r_rot'] },
 
   // —— 对敌方上异常（2026-11-05）：敌人**生成时**按概率挂上持续 debuff ——
   { id: 'frostbite', rarity: 'rare', name: '寒冻', group: 'debuff', kind: 'mods',

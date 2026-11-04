@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeMatch } from './harness.js';
 import { ECHO_BLESSINGS, echoBlessingById } from '../../server/match/match/echoBlessing.js';
-import { echoCurseById } from '../../server/match/match/echoCurse.js';
+import { echoCurseById, ECHO_CURSES, ECHO_ROUND_CURSES } from '../../server/match/match/echoCurse.js';
 
 /** 一间 deepecho 房（fake 战斗，不跑真实模拟）。 */
 const dive = (o = {}) => makeMatch({ mode: 'coop', humans: 2, bots: 0, seed: 16, fake: true, variant: 'deepecho', ...o });
@@ -685,6 +685,24 @@ test('稀有度下发：祝福、诅咒、固定诅咒、三选一卡片都带 r
   assert.ok(offer && offer.options.length);
   assert.equal(offer.options[0].rarity, 'common');
   assert.equal(offer.options[0].rarityLabel, '普通');
+});
+
+// 维护者 2026-11-05：每条诅咒都必须有对应的「消除/克制」祝福（守卫用例，新增诅咒忘了配反制会在这里炸）。
+test('反制覆盖：每条诅咒都有对应祝福（部署禁令用 counterBans）', () => {
+  const byCurse = new Set();
+  let bans = 0;
+  for (const b of ECHO_BLESSINGS) {
+    if (b.kind !== 'counter') continue;
+    for (const id of b.counterCurses || []) byCurse.add(id);
+    if (b.counterBans) bans += 1;
+  }
+  assert.ok(bans >= 1, '部署禁令要有 counterBans 祝福');
+  const ROUND_ONLY_OK = new Set(['r_rust']);        // 回合版「锈蚀」自己会过期，且销毁不可逆
+  for (const c of [...ECHO_CURSES, ...ECHO_ROUND_CURSES]) {
+    if (c.effect.kind === 'deployBan' || c.effect.kind === 'bondBan') continue;  // 由 counterBans 覆盖
+    if (ROUND_ONLY_OK.has(c.id)) continue;
+    assert.ok(byCurse.has(c.id), `${c.id}（${c.name}）没有对应的克制祝福`);
+  }
 });
 
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
