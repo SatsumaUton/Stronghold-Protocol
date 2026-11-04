@@ -332,7 +332,8 @@ const ECHO_STAGE_ROUTE_CACHE = new WeakMap();
  */
 function stageRoutes(gd, tpl) {
   const base = usableRoutes(tpl);
-  const key = tpl && tpl.bgm ? String(tpl.bgm) : '';
+  // 缓存键要带上模板本身：几何取自本模板，跨模板共用会产生错位的路线
+  const key = `${tpl && tpl.bgm ? String(tpl.bgm) : ''}|${tpl && (tpl.id || tpl.templateId || '')}`;
   let cache = ECHO_STAGE_ROUTE_CACHE.get(gd);
   if (!cache) { cache = new Map(); ECHO_STAGE_ROUTE_CACHE.set(gd, cache); }
   if (cache.has(key)) return cache.get(key);
@@ -362,7 +363,14 @@ function stageRoutes(gd, tpl) {
       if (!r) continue;
       const fly = r.motion === 'FLY';
       if (!fly && (r.motion === 'E_NUM' || r.motion === 'E')) continue;
-      push(r, fly);
+      // 只借用**起点**：路径几何必须沿用本模板同类型的路线。
+      // 直接用别的模板的 route 会让飞行怪沿「起点→终点」直线穿场（维护者 2026-11-05 实测）。
+      const st = Array.isArray(r.start) ? r.start.join(',') : '';
+      const ownStarts = new Set(base.filter((x) => x.fly === fly).map((x) => (x.route.start || []).join(',')));
+      if (!st || ownStarts.has(st)) continue;
+      const sameType = base.find((x) => x.fly === fly);
+      if (!sameType) continue;
+      push({ ...sameType.route, start: r.start.slice(), end: sameType.route.end }, fly);
     }
   }
   cache.set(key, out);
