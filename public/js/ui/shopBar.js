@@ -123,7 +123,6 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
         ${bonds.slice(0, 3).map((b) => {
           const name = data.lookup('bonds', b)?.name || b;
           const off = !!(offBonds && offBonds.has(b)); // a bond this mode never activates (gameLogic modeOffBonds)
-          // 深渊装备格（16 层起）：多一个「深渊」角标（维护者 2026-11-05）
           // 「深渊回响」排异（2026-11-05）：被诅咒禁掉的盟约标红，玩家一眼看出这张卡买了也上不了场
           const banned = Array.isArray(bannedBonds) && bannedBonds.includes(b);
           return html`<span key=${b} class=${cx('scard__bond', off && 'is-off', banned && 'is-banned')}
