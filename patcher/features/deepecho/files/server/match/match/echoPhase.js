@@ -602,12 +602,44 @@ export class MatchEcho {
     // 玩家可能用同构体装备临时获得被排异的盟约，或把干员重新摆上场 —— 都要当场收回。
     const swept = this._echoWithdrawBannedBond();
     if (swept) this._echoPushAnnounce(`排异：${swept} 名干员被收回`);
+    // 禁放地块上的干员自动回整备区（维护者 2026-11-05：被封锁的位置不该继续站着人）
+    const recalled = this._echoRecallFromBannedTiles();
+    if (recalled) this._echoPushAnnounce(`封锁：${recalled} 名干员被收回整备区`);
     if (pick && pick.effect && pick.effect.kind === 'destroyEquip') {
       let n = 0;
       for (const ps of this.alivePlayers()) n += this._echoDestroyEquipped(ps, rng);
       if (n) this.tickerText?.(`深渊诅咒「${pick.name}」：销毁了 ${n} 件装备`, 1);
     }
     return this.echoRoundCurse;
+  }
+
+  /**
+   * 把站在「禁放地块」上的干员自动收回整备区（维护者 2026-11-05）。
+   *
+   * 诅咒「封锁」可能在本回合中途降下，也可能玩家刚把干员摆上去 —— 每回合 prep 开始都扫一遍，
+   * 命中就把棋子 detach 出场并 stow 回手牌（手牌满则进待命队列）。
+   *
+   * @returns {number} 被收回的干员数
+   */
+  _echoRecallFromBannedTiles() {
+    const banned = this.echoBannedTiles;
+    if (!Array.isArray(banned) || !banned.length) return 0;
+    const tiles = new Set(banned);
+    let n = 0;
+    for (const ps of this.alivePlayers()) {
+      if (!ps || !ps.board) continue;
+      // ps.board 的键就是 `${row},${col}`（棋子本身不带坐标）
+      for (const [key, piece] of [...ps.board.entries()]) {
+        if (!piece || piece.kind !== 'chess') continue;
+        if (!tiles.has(key)) continue;
+        try {
+          ps._detach({ area: 'board', key, piece });
+          ps.stow(piece, { allowTemp: true });
+          n += 1;
+        } catch { /* 回收失败不影响本回合 */ }
+      }
+    }
+    return n;
   }
 
   /** 销毁该玩家随机 1 件已装备的装备（从棋盘干员身上摘掉，不回手牌、不退池）。 */
