@@ -184,11 +184,11 @@ function BlessTab({ pub }) {
   const echo = pub?.echo;
   const words = Array.isArray(echo?.words) ? echo.words : [];
   const bless = Array.isArray(echo?.blessings) ? echo.blessings : [];
-  // 反制祝福（一次性、不占名额）单独计数，别让它把 "/3" 撑爆
+  // 反制祝福（一次性、不占名额）单独计数，别让它把 "/" 撑爆
   const normalBless = bless.filter((b) => !b.counter);
   const depth = Number(echo?.depth) || 0;
   return html`<div class="edrawer__body">
-    <h4 class="ihead">${t('已获祝福')} <small class="num">${normalBless.length}/3</small>
+    <h4 class="ihead">${t('已获祝福')} <small class="num">${normalBless.length}/${Number(echo?.blessingMax) || 3}</small>
       <small class="t-dim">${t('深度 {n}', { n: depth })}</small></h4>
     ${bless.length ? html`<ul class="echo-list">${bless.map((b) => html`<li key=${b.id}>
       <b>${b.name}</b>${b.rarityLabel ? html`<em class=${`echo-rar is-${b.rarity || 'common'}`}>${b.rarityLabel}</em>` : null}<span>${b.desc || ''}</span></li>`)}</ul>`
