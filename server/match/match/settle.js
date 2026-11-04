@@ -45,10 +45,14 @@ export class MatchSettle {
     if (this.echoVariant === 'deepecho') this._echoSettleChallenge();
     // 悬赏目标没打掉 → 加诅咒（维护者 2026-11-05）：在悬赏倒计时还没减之前判断
     if (this.echoVariant === 'deepecho') this._echoSettleBountyFailure(alive);
+    // 诅咒「失血 / 溃血 / 剧痛」的扣血放大在 _echoLpLoss 里（只放大已有漏怪，没有漏怪不扣）；
+    // 普通房间它等价于原来的 min(cap, raw)。
     for (const ps of alive) {
       const r = this.lastResults.get(ps.playerId) || { leaked: [], perfect: true, coins: 0, layerGains: {}, killed: 0, damageDealt: 0 };
       const counted = (r.leaked || []).filter((l) => l && l.counted !== false).length;
-      const loss = uniteRan && plan.leakers.includes(ps) ? Math.min(cap, survivors.get(ps.playerId) || 0) : Math.min(cap, counted);
+      const rawLoss = uniteRan && plan.leakers.includes(ps) ? (survivors.get(ps.playerId) || 0) : counted;
+      // 诅咒「失血 / 溃血 / 剧痛」的放大在 _echoLpLoss 里；普通房间它等价于原来的 min(cap, raw)。
+      const loss = this._echoLpLoss(rawLoss, cap);
       if (this.uniteResultView) this.uniteResultView.losses[ps.playerId] = loss;
       ps.lp -= loss;
       ps.stats.lpLost += loss;
