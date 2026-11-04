@@ -155,7 +155,34 @@ test('16 层以后：真实波次的只数随深度递增，时限按只数比�
   assert.ok(counts[2] <= 160, `深度 24 的 ${counts[2]} 只超过硬顶`);
 });
 
-// 回归（2026-11-04 实测：15 层打完 HUD 变「深度 1」，出怪回到 R1 的几只狼 + 地刺）。
+// 维护者 2026-11-05：深潜的固定规则之一「独立卡池」—— 每名博士用自己的卡池。
+// 房间层面的实验性开关在深潜房里是隐藏的，所以必须由服务端强制，且不能被旧房间 / 手动编组绕开。
+test('固定规则：深潜强制独立卡池（每人一池），房间没开也一样', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  assert.equal(m.echoVariant, 'deepecho');
+  assert.equal(m.experimental.disableSharedPool, true, '房间配置被深潜规则覆盖');
+  assert.equal(m.disableSharedPool, true);
+  assert.equal(m.poolGroups.length, m.order.length, '卡池组数 = 人数');
+  assert.equal(m.playerPools.size, m.order.length, '每人一个自己的卡池');
+  assert.equal(new Set(m.playerPools.values()).size, m.order.length, '池不是同一个对象');
+  const rules = m._echoFixedRules();
+  assert.ok(rules.some((r) => r.id === 'pool' && r.name === '独立卡池'), '固定规则里有独立卡池');
+  assert.ok(!rules.some((r) => r.id === 'pool' && !r.desc), '固定规则必须带说明（客户端直接显示 desc）');
+});
+
+test('普通房间的独立卡池仍然只听房间设置', (t) => {
+  const off = makeMatch({ mode: 'coop', humans: 2, seed: 16, fake: true });
+  t.after(() => off.m.dispose());
+  assert.equal(off.m.disableSharedPool, false, '没开就是共享卡池');
+  assert.equal(off.m.poolGroups.length, 1);
+  const on = makeMatch({ mode: 'coop', humans: 2, seed: 16, fake: true, experimental: { revivalEnabled: false, disableSharedPool: true } });
+  t.after(() => on.m.dispose());
+  assert.equal(on.m.disableSharedPool, true, '手动开仍然有效');
+  assert.equal(on.m.playerPools.size, 2);
+  assert.deepEqual(on.m._echoFixedRules(), [], '普通房间没有深潜固定规则');
+});
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。
