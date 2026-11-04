@@ -75,7 +75,7 @@ import { chessAvatarUrl, chessPortraitUrl } from '../ui/assetUrls.js';
 import { CARD_KEY, cardStore, setCard, cardOperators, cardContext, seatOperator, seatCardSkin, seatArtSrc } from '../ui/seatArt.js';
 import { skinsStore, SKINS_KEY, ownerSkin } from '../ui/skins.js';
 import { settingsStore } from '../ui/settingsStore.js';
-import { difficultyInfo, ProtocolSelect } from './lobby.js';
+import { difficultyInfo, ProtocolSelect, DEEP_ECHO_DIFFICULTIES } from './lobby.js';
 import { useRise } from '../ui/transitions.js';
 import { t, tc } from '../../../shared/i18n.js';
 // 实验性战斗规则的可选倍率（shared/experimental.js 是唯一来源，服务端校验同一份）
@@ -699,7 +699,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
 }
 
 
-function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null,
+function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSetDifficulty = null, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null,
   listed = false, onToggleListed = () => {} }) {
   const info = difficultyInfo(room.mode, room.difficulty);
   const title = soloOption ? t('模拟设置') : t('同盟设置');
@@ -714,14 +714,19 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     <h4>${title}</h4>
     ${soloOption ? null : html`<div class="rs-opts__row" data-testid="room-opt-difficulty">
       <span class="rs-opts__k">${t('模拟难度')}</span>
-      <button type="button" class="rs-opts__diff" disabled=${isHost && !!busy} onClick=${onDifficulty}
+      ${room?.variant === 'deepecho' && isHost && onSetDifficulty ? html`<select class="rs-opts__diff" disabled=${!!busy}
+          title=${t('深潜难度（DE-1 / DE-2 / DE-3）')}
+          onChange=${(e) => onSetDifficulty(e.target.value)}>
+        ${['NORMAL', 'HARD', 'ABYSS'].map((d, i) => html`<option value=${d} selected=${room.difficulty === d}>
+          DE-${i + 1} · ${DIFFICULTY_NAMES[d] ? t(DIFFICULTY_NAMES[d]) : d}</option>`)}
+      </select>` : html`<button type="button" class="rs-opts__diff" disabled=${isHost && !!busy} onClick=${onDifficulty}
           title=${isHost ? t('更改模拟难度') : t('由创建者选择')}>
         <${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span>
         ${isHost ? html`<em>${t('更改')}</em>` : null}
-      </button>
+      </button>`}
       ${isHost ? null : html`<span class="t-dim">${t('由创建者选择')}</span>`}
     </div>`}
-    ${!soloOption && version ? html`<div class="rs-opts__row" data-testid="room-opt-version">
+    ${!soloOption && version && room?.variant !== 'deepecho' ? html`<div class="rs-opts__row" data-testid="room-opt-version">
       <span class="rs-opts__k">${t('版本')}</span>
       <${Tooltip} text=${version.why}>
         <button type="button" class="rs-opts__diff rs-opts__ver" disabled=${version.disabled} onClick=${version.onOpen}
@@ -749,7 +754,7 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     ${soloOption
       ? html`<${SoloUnlimitedToggle} option=${soloOption} busy=${busy} onToggle=${onSoloUnlimited} />`
       : html`<${AiLastToggle} option=${option} busy=${busy} onToggle=${onAiLast} />`}
-    ${soloOption ? null : html`<${ExperimentalControl} room=${room} isHost=${isHost} busy=${busy} onApply=${onExperimental} />`}
+    ${soloOption || room?.variant === 'deepecho' ? null : html`<${ExperimentalControl} room=${room} isHost=${isHost} busy=${busy} onApply=${onExperimental} />`}
   </div>`;
 }
 
@@ -888,6 +893,10 @@ export function RoomScreen() {
   const facts = roomFacts(room, me.playerId);
   const myReady = !!facts.mine?.ready;
   const info = difficultyInfo(room.mode, room.difficulty);
+  // 「深渊回响」房间（2026-11-05）：难度编号是 DE-1/2/3，不是全模式共用的 AC-x；
+  // 点难度胶囊也不能打开**正式模式**的选择协议（那个界面里没有深潜档位）。
+  const echoRoom = room.variant === 'deepecho';
+  const echoCode = echoRoom ? `DE-${DEEP_ECHO_DIFFICULTIES.indexOf(room.difficulty) + 1}` : info.code;
 
   /** Runs one request at a time; resolves true once the server took it (false: not sent, or refused — toasted). */
   const run = async (kind, fn) => {
@@ -1116,14 +1125,15 @@ export function RoomScreen() {
       <div class="rs-foot__center">
         <p class="rs-hint">${coop ? html`<span class="rs-ready num" title=${t('已就绪')}>${facts.humans.map((s) => html`<${Icon} key=${s.playerId} name="user" class=${facts.isReady(s) ? 'is-on' : ''} />`)}<b>${facts.readyHumans}</b>/${facts.humans.length}</span>` : null}<span class="room-bar__status">${statusLine}</span></p>
         <div class="rs-pill">
-          <button type="button" class=${`rs-pill__diff${facts.isHost ? '' : ' is-ro'}`} disabled=${facts.isHost && !!busy} onClick=${openProto}
-            title=${facts.isHost ? t('更改模拟难度') : t('由创建者选择')}><${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span></button>
+          <button type="button" class=${`rs-pill__diff${facts.isHost ? '' : ' is-ro'}`} disabled=${facts.isHost && !!busy}
+            onClick=${echoRoom ? (facts.isHost ? () => setOpts(true) : () => {}) : openProto}
+            title=${echoRoom ? t('深潜难度（DE-1 / DE-2 / DE-3）：在同盟设置里更改') : (facts.isHost ? t('更改模拟难度') : t('由创建者选择'))}><${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${echoCode}</span></button>
           ${versionCtl ? html`<${Tooltip} text=${versionCtl.why} class="rs-pill__version"><button type="button" class=${`rs-pill__ver${versionCtl.editable ? '' : ' is-ro'}`} data-testid="room-version"
             disabled=${versionCtl.disabled} onClick=${versionCtl.onOpen} aria-label=${t('游戏版本：{name}', { name: versionLabel(curVersion) })}><${Icon} name="book" /><span class="rs-pill__vername">${versionLabel(curVersion)}</span></button><//>` : null}
           ${aiLast || soloOpt ? html`<button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${aiLast ? t('同盟设置') : t('模拟设置')} aria-label=${aiLast ? t('同盟设置') : t('模拟设置')}
             aria-expanded=${opts ? 'true' : 'false'}><${GearGlyph} /></button>` : null}
           ${opts && (aiLast || soloOpt) ? html`<${RoomOptions} takeoverOption=${aiTakeoverOption(room, me.playerId)} onAiTakeover=${setAiTakeover} option=${aiLast} soloOption=${soloOpt} room=${room} isHost=${facts.isHost} busy=${busy} onAiLast=${setAiLast}
-            onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onClose=${() => setOpts(false)} version=${versionCtl}
+            onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onSetDifficulty=${setDifficulty} onClose=${() => setOpts(false)} version=${versionCtl}
               listed=${room.listed === true} onToggleListed=${setListed} />` : null}
         </div>
       </div>
@@ -1145,7 +1155,7 @@ export function RoomScreen() {
           busy=${busy === `band${bandSeat}`} onClose=${() => setBandSeat(null)} onPick=${(bandId) => setBotBand(bandSeat, bandId)} />`
       : null}
     ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${data.get('assets')} localSkins=${localSkins} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
-    ${protoOpen ? facts.isHost
+    ${protoOpen && !echoRoom ? facts.isHost
       ? html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${protoPick || room.difficulty} onDifficulty=${setProtoPick} onClose=${closeProto}
           onCreate=${confirmDifficulty} busy=${busy === 'diff' ? 'create' : null} online=${online} action=${t('确认')} hint=${protoHint} difficulties=${protoDifficulties} />`
       : html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${room.difficulty} onDifficulty=${() => {}} onClose=${closeProto}
