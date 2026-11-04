@@ -462,8 +462,9 @@ export class Match {
       ? { ...expIn, disableSharedPool: true }
       : expIn);
     this.revivalEnabled = !this.isSolo && (this.echoVariant === 'deepecho' || this.experimental.revivalEnabled);
-    // 维护者 2026-11-05：不再要求「进入联防」—— 任何还活着的队友都能付 10 血救 1 血
-    this.revivalAnyDonor = !this.isSolo && this.experimental.revivalAnyDonor !== false;
+    // 维护者 2026-11-05：**只有深潜**放宽救援（任何存活队友都能付 10 血救 1 血）。
+    // 普通房间保持原版口径（必须进过联防）—— 不能因为深潜的开关影响普通模式。
+    this.revivalAnyDonor = this.echoVariant === 'deepecho' && !this.isSolo;
     this.disableSharedPool = !this.isSolo && this.experimental.disableSharedPool;
     this.playerCapacity = roomCapacity(this.isSolo ? 'solo' : this.mode, this.experimental);
     this.capacityExperiment = !this.isSolo && this.playerCapacity > 4;
