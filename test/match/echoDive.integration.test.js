@@ -1039,3 +1039,27 @@ test('免费刷新：深潜上限 2 次，回合开始夹住，诅咒可以再�
   m._echoClampFreeRefreshes();
   assert.equal(ps.shop.freeRefreshes, 1, '诅咒生效后上限变 1');
 });
+// 维护者 2026-11-05 澄清：**诅咒『排异』是暂时的**（能被「开路」解除），
+// 所以那些干员**可以买**，只是不能上场。商店闸门只能看「本局永久禁用」，绝不能把诅咒也当禁用。
+test('排异诅咒不禁购物车：被排异的干员仍能在商店出现/购买，只是不能部署', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+
+  const isAdd = (b) => m.gd.bond(b) && m.gd.bond(b).isCore !== true;
+  const pair = Object.entries(m.gd.raw.chess).find(([, rec]) => (rec?.bonds || []).some(isAdd));
+  const [chessId, rec] = pair;
+  const bond = rec.bonds.find(isAdd);
+  const id = chessId.replace(/_b$/, '_a');
+
+  m.echoBannedBonds = [bond];
+  // 永久禁用判定不该把它算进去（否则玩家买不到、又没东西可打）
+  assert.equal(m._shopChessBanned(id), false, '诅咒不参与「本局禁用」判定');
+  assert.ok(ps.pool.left(id) > 0, '池子里仍然有它');
+  // 但不能上场
+  assert.match(String(m._echoDeployBlocked({ kind: 'chess', id, items: [] }, '8,5', true) || ''), /排异/);
+  // 「开路」解除之后就能上场了
+  m._echoGrantBlessing(echoBlessingById('unlock'));
+  assert.equal(m._echoDeployBlocked({ kind: 'chess', id, items: [] }, '8,5', true), null);
+});

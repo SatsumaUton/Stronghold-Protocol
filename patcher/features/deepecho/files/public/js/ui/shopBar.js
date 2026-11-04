@@ -126,7 +126,7 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
           // 「深渊回响」排异（2026-11-05）：被诅咒禁掉的盟约标红，玩家一眼看出这张卡买了也上不了场
           const banned = Array.isArray(bannedBonds) && bannedBonds.includes(b);
           return html`<span key=${b} class=${cx('scard__bond', off && 'is-off', banned && 'is-banned')}
-            title=${banned ? t('深渊排异：{name} 盟约的干员无法部署', { name }) : (off ? briefingBondTip(name, 'off') : undefined)}><${BondGlyph} bondId=${b} /><span>${name}</span></span>`;
+            title=${banned ? t('深渊排异（诅咒，可购买）：{name} 盟约的干员暂不能上场，解除后可部署', { name }) : (off ? briefingBondTip(name, 'off') : undefined)}><${BondGlyph} bondId=${b} /><span>${name}</span></span>`;
         })}
       </span>
       <span class="scard__class">
