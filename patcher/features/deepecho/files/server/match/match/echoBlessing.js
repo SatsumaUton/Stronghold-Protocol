@@ -102,6 +102,24 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'cleanse', rarity: 'rare', name: '净化', desc: '立刻移除 1 层诅咒（任意稀有度；固定的奇迹 / 远见不受影响）', kind: 'cleanse', group: 'cleanse', curseRemove: 1 },
   { id: 'cleanse_all', rarity: 'epic', name: '涤罪', desc: '立刻移除所有**普通**诅咒（稀有 / 传说保留；固定的奇迹 / 远见不受影响）', kind: 'cleanse', group: 'cleanse', curseRemove: 'common' },
 
+  // —— 克制祝福（2026-11-05，维护者要求）：每个诅咒都能被对应的祝福抵消 ——
+  // 拿到就把对应的诅咒从 `echoCurseIds` 里删掉（效果现算，删掉即恢复）；部署禁令类直接解除。
+  // 稀有度普遍比对应诅咒低一档，保证「抽得到」。
+  { id: 'staunch', rarity: 'rare', name: '止血', desc: '驱散「失血 / 溃血 / 剧痛 / 渗血」：漏怪伤害恢复正常', kind: 'counter', group: 'counter',
+    counterCurses: ['bleed', 'hemorrhage', 'ache', 'r_bleed'] },
+  { id: 'unlock', rarity: 'rare', name: '开路', desc: '解除「封锁 / 排异」：被封的地块重新可部署、盟约排异取消', kind: 'counter', group: 'counter',
+    counterBans: true },
+  { id: 'recon', rarity: 'rare', name: '侦察', desc: '驱散「迷雾 / 遮蔽」：敌方情报恢复显示', kind: 'counter', group: 'counter',
+    counterCurses: ['fog', 'blackout'] },
+  { id: 'thrift', rarity: 'common', name: '开源', desc: '驱散所有资金类诅咒（贡赋 / 征收 / 重税 / 什一税 / 抽成）', kind: 'counter', group: 'counter',
+    counterCurses: ['tribute', 'levy', 'heavytax', 'tithe', 'r_levy'] },
+  { id: 'cleanse_words', rarity: 'rare', name: '净言', desc: '驱散「侵蚀」：侵蚀词条上限恢复', kind: 'counter', group: 'counter',
+    counterCurses: ['erosion'] },
+  { id: 'echo_back', rarity: 'rare', name: '回响', desc: '驱散「静默」：祝福上限恢复', kind: 'counter', group: 'counter',
+    counterCurses: ['silence'] },
+  { id: 'quench', rarity: 'common', name: '畅饮', desc: '驱散「枯竭 / 干涸」：免费刷新上限恢复', kind: 'counter', group: 'counter',
+    counterCurses: ['drought', 'r_drought'] },
+
   // —— 对敌方上异常（2026-11-05）：敌人**生成时**按概率挂上持续 debuff ——
   { id: 'frostbite', rarity: 'rare', name: '寒冻', group: 'debuff', kind: 'mods',
     desc: '40% 的敌人移动速度 -40%',

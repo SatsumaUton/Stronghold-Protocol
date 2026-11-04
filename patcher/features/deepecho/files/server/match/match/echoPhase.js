@@ -899,6 +899,25 @@ export class MatchEcho {
         this._echoFlushAnnounce();
       }
     }
+    // 克制祝福（2026-11-05）：直接驱散对应的诅咒 / 解除部署禁令
+    if (b && b.kind === 'counter') {
+      const ids = Array.isArray(b.counterCurses) ? b.counterCurses : [];
+      let removed = 0;
+      if (ids.length && Array.isArray(this.echoCurseIds) && this.echoCurseIds.length) {
+        const before = this.echoCurseIds.length;
+        this.echoCurseIds = this.echoCurseIds.filter((id) => !ids.includes(id));
+        removed = before - this.echoCurseIds.length;
+      }
+      if (this.echoRoundCurse && ids.includes(this.echoRoundCurse)) this.echoRoundCurse = null;
+      if (b.counterBans) {
+        const had = (Array.isArray(this.echoBannedTiles) ? this.echoBannedTiles.length : 0) + (this.echoBannedBond ? 1 : 0);
+        this.echoBannedTiles = [];
+        this.echoBannedBond = null;
+        if (had) this._echoPushAnnounce(`祝福「${b.name}」：解除封锁 / 排异`);
+      }
+      if (removed > 0) this._echoPushAnnounce(`祝福「${b.name}」：驱散 ${removed} 层诅咒`);
+      this._echoFlushAnnounce();
+    }
     this.tickerText(msg('深渊回响：全队获得祝福「{name}」', { name: b.name }), FLOW_TICKER_PRIORITY);
     this.log.info?.(`[match ${this.roomCode}] echo blessing ${b.id} (R${this.round})`);
     this.markPublic();

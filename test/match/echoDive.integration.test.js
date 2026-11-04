@@ -483,6 +483,34 @@ test('播报：诅咒降下与侵蚀词条变化都会发 ticker，且合成一�
   assert.ok(said.some((x) => x.includes('净化')), '净化要播报');
 });
 
+// 维护者 2026-11-05：每个诅咒都有对应的「克制祝福」，抽到即驱散。
+test('克制祝福：抽到就驱散对应诅咒 / 解除部署禁令', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const draw = (id) => { m.echoBlessings = []; m._echoGrantBlessing(echoBlessingById(id)); };
+
+  m.echoCurseIds = ['bleed', 'hemorrhage', 'tribute', 'fog'];
+  draw('staunch');                                    // 止血
+  assert.deepEqual(m.echoCurseIds, ['tribute', 'fog'], '止血只驱散漏怪类诅咒');
+  draw('thrift');                                     // 开源
+  assert.deepEqual(m.echoCurseIds, ['fog'], '开源驱散资金类诅咒');
+  draw('recon');                                      // 侦察
+  assert.deepEqual(m.echoCurseIds, [], '侦察驱散迷雾');
+  assert.equal(m._echoCurseFx().intel, false, '情报诅咒已移除（不再关闭情报）');
+
+  m.echoBannedTiles = ['3,3', '4,4'];
+  m.echoBannedBond = 'yanShip';
+  draw('unlock');                                     // 开路
+  assert.deepEqual(m.echoBannedTiles, [], '封锁解除');
+  assert.equal(m.echoBannedBond, null, '排异解除');
+
+  // 回合诅咒也能被驱散
+  m.echoRoundCurse = 'r_bleed';
+  draw('staunch');
+  assert.equal(m.echoRoundCurse, null, '本回合的渗血也被驱散');
+});
+
 // bossRounds 在 boss 通关后曾调 `startRound(this._echoBeginDive(round))`；「建房即深潜」之后
 // `_echoBeginDive` 恒返回 `echoDiveStart = 1`，于是整局被打回第 1 回合（商店/回合/深度/出怪全部重来）。
 // 现在 boss 通关只做 `startRound(round + 1)`，这条用例把接缝和源码一起钉住。

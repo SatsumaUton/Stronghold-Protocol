@@ -69,7 +69,8 @@ test('非 mods 祝福必须带生效字段', () => {
   for (const b of ECHO_BLESSINGS) {
     if (b.kind === 'mods') continue;
     const has = Number(b.funds) > 0 || Number(b.freeRefresh) > 0 || Number(b.coinMul) > 1 || Number(b.refreshEvery) > 0
-      || Number(b.healLp) > 0 || b.kind === 'cleanse';
+      || Number(b.healLp) > 0 || b.kind === 'cleanse'
+      || (b.kind === 'counter' && ((Array.isArray(b.counterCurses) && b.counterCurses.length) || b.counterBans === true));
     if (!has) bad.push(b.id);
   }
   assert.deepEqual(bad, [], `这些祝福没有任何生效字段：${bad.join(', ')}`);
