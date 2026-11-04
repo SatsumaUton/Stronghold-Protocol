@@ -58,13 +58,6 @@ export class PlayerEconomy {
   }
 
   /** Effective price of a shop slot after onPrice modifiers (never negative). */
-  /** 深潜 16 层以后：商店多一格深渊装备。 */
-  _echoDeepEquip() {
-    const m = this.m;
-    if (!m || m.echoVariant !== 'deepecho') return false;
-    return typeof m._echoDepth === 'function' && m._echoDepth(m.round) >= 16;
-  }
-
   priceOf(slot) {
     if (!slot) return 0;
     const ev = { slot, kind: slot.kind, id: slot.id, price: slot.basePrice };
@@ -73,12 +66,10 @@ export class PlayerEconomy {
     const base = Number.isFinite(p) ? Math.max(0, Math.round(p)) : slot.basePrice;
     // 「深渊回响」诅咒「通胀 / 暴利」：商店干员与装备加价。
     // 视图里的 price 就是这里算出来的（player/views.js），所以客户端**实际显示的**就是加价后的价。
-    const deepMul = slot && slot.deep ? 2 : 1;
     const mul = this.m && this.m.echoVariant === 'deepecho' && typeof this.m._echoShopPriceMul === 'function'
       ? this.m._echoShopPriceMul()
       : 1;
-    const total = mul * deepMul;
-    return total === 1 ? base : Math.max(0, Math.round(base * total));
+    return mul === 1 ? base : Math.max(0, Math.round(base * mul));
   }
 
   /**
@@ -134,10 +125,7 @@ export class PlayerEconomy {
    */
   rollShop({ keepFrozen = false } = {}) {
     if (this._consumeTestShop()) return;
-    const base = this.gd.shopSlots(this.shop.level);
-    const nChess = base.chess;
-    // 「深潜」16 层以后：商店固定多一格**深渊装备**（维护者 2026-11-05，价格 ×2）
-    const nItem = base.item + (this._echoDeepEquip() ? 1 : 0);
+    const { chess: nChess, item: nItem } = this.gd.shopSlots(this.shop.level);
     const old = this.shop.slots;
     const layout = this.shop.layout || { chess: old.length, item: 0 };
     const oldChess = old.slice(0, layout.chess);
@@ -146,12 +134,7 @@ export class PlayerEconomy {
     // frozen slots keep their position; sold / empty / unfrozen positions are rerolled
     const slots = [];
     for (let i = 0; i < nChess; i++) slots.push(keep(oldChess[i], 'chess') ?? this._rollChessSlot());
-    for (let i = 0; i < nItem; i++) {
-      const s = keep(oldItems[i], 'item') ?? this._rollItemSlot();
-      // 最后一格 = 深渊装备（价格 ×2）
-      if (s && this._echoDeepEquip() && i === nItem - 1) { s.deep = true; s.basePrice = Math.round((Number(s.basePrice) || 1) * 2); }
-      slots.push(s);
-    }
+    for (let i = 0; i < nItem; i++) slots.push(keep(oldItems[i], 'item') ?? this._rollItemSlot());
     this.shop.slots = slots;
     this.shop.layout = { chess: nChess, item: nItem };
     for (const s of slots) if (s) s.frozen = this.shop.frozen;
@@ -197,10 +180,7 @@ export class PlayerEconomy {
    * follows the freeze toggle, was [ASSUMED]); until then the extra slots waited for the next roll as well.
    */
   _openLevelSlots() {
-    const base = this.gd.shopSlots(this.shop.level);
-    const nChess = base.chess;
-    // 「深潜」16 层以后：商店固定多一格**深渊装备**（维护者 2026-11-05，价格 ×2）
-    const nItem = base.item + (this._echoDeepEquip() ? 1 : 0);
+    const { chess: nChess, item: nItem } = this.gd.shopSlots(this.shop.level);
     const old = this.shop.slots;
     const layout = this.shop.layout || { chess: old.length, item: 0 };
     if (nChess <= layout.chess && nItem <= layout.item) return;
@@ -243,10 +223,6 @@ export class PlayerEconomy {
       const s = next[i];
       if (s && s.sold !== true) continue;
       next[i] = i < layout.chess ? this._rollChessSlot() : this._rollItemSlot();
-      if (next[i] && this._echoDeepEquip() && i === next.length - 1) {
-        next[i].deep = true;
-        next[i].basePrice = Math.round((Number(next[i].basePrice) || 1) * 2);
-      }
     }
     this.shop.slots = next;
     for (const s of next) if (s) s.frozen = this.shop.frozen;
