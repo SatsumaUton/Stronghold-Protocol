@@ -319,10 +319,18 @@ export class MatchViews {
    */
   _echoMaskBountyPreview(list) {
     if (this.echoVariant !== 'deepecho' || !Array.isArray(list)) return list;
-    for (const e of list) {
+    // 隐藏核心：准备阶段**不把 boss 本身列进敌方情报**（维护者 2026-11-05：隐藏 boss 的地方情报不要了），
+    // 战斗开始后才揭晓。普通 boss 返场节点不受影响。
+    let out = list;
+    try {
+      if (typeof this._echoHiddenBossRound === 'function' && this._echoHiddenBossRound(this.round)) {
+        out = list.filter((e) => !(e && (e.tag === 'boss' || e.boss === true)));
+      }
+    } catch { out = list; }
+    for (const e of out) {
       if (e && e.source === 'bounty') e.enemyKey = 'enemy_unknown';
     }
-    return list;
+    return out;
   }
 
   /** A 自选 piece's pick (like the sim's UnitInfo.diy): a scout's card composes the operator from it (shared/diy.js). */
