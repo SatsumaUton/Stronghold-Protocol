@@ -880,22 +880,20 @@ test('诅咒入账统一：随机抽到封锁/排异真的生效；同回合两�
   assert.ok(said.length <= 1, `同一回合只该有一行 ticker（实际 ${said.length}）`);
 });
 // 维护者 2026-11-05：诅咒可叠层，但**同一条最多 3 层**（再抽到就不入账）。
-test('叠层上限：同一条诅咒最多 3 层，到顶后不再入账', (t) => {
+test('叠层上限：同一条诅咒最多 10 层，到顶后不再入账', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
   m.echoCurseIds = [];
-  for (let i = 0; i < 3; i++) assert.ok(m._echoAddCurse('erosion'), `第 ${i + 1} 层应成功`);
-  assert.equal(m.echoCurseIds.filter((x) => x === 'erosion').length, 3);
-  assert.equal(m._echoAddCurse('erosion'), null, '第 4 层被上限挡住');
-  assert.equal(m.echoCurseIds.filter((x) => x === 'erosion').length, 3, '没有多记');
-  // 效果也只到 3 层
+  for (let i = 0; i < 10; i++) assert.ok(m._echoAddCurse('erosion'), `第 ${i + 1} 层应成功`);
+  assert.equal(m.echoCurseIds.filter((x) => x === 'erosion').length, 10);
+  assert.equal(m._echoAddCurse('erosion'), null, '第 11 层被上限挡住');
+  assert.equal(m.echoCurseIds.filter((x) => x === 'erosion').length, 10, '没有多记');
+  // 效果按层数叠加（10 层就是 +10）
   m.round = 20;
-  const capAt3 = m._echoWordCap();
+  const capAt10 = m._echoWordCap();
   m.echoCurseIds = ['erosion'];
-  assert.equal(capAt3, m._echoWordCap() + 2, '三层比一层多 +2（上限内正常叠加）');
-  // 上限是 3
-  assert.equal(3, m.echoCurseIds.length + 2);
+  assert.equal(capAt10, m._echoWordCap() + 9, '十层比一层多 +9');
 });
 // 维护者 2026-11-05：强效反制一次清多层，普通反制仍只清一层。
 test('反制层数：普通清 1 层，彻愈清 3 层，富源清 2 层', (t) => {
@@ -918,27 +916,25 @@ test('反制层数：普通清 1 层，彻愈清 3 层，富源清 2 层', (t) =
   assert.ok(m.echoCounterIds.includes('staunch_x'));
   assert.equal(m.echoBlessings.includes('staunch_x'), false, '不进 3 个名额');
 });
-// 维护者 2026-11-05「第 9 个词条怎么办」：不空转 —— 溢出层数转为敌方生命 +2%/层。
-test('词条上限溢出：第 9 条起转成敌方生命，并在列表里说明', (t) => {
+// 维护者 2026-11-05「不让诅咒一直增加吗？不设上限」：
+// 词条上限不再封顶 8 —— 深度增长和侵蚀叠层都会照加（词池 20 条，最多也就 20 条）。
+test('词条上限不封顶：深度与叠层都照加，且没有「溢出」这种中间态', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
-  m.round = 60;                                        // 基础上限 = 3 + 5 = 8
-
+  m.round = 60;
+  m.echoCurseIds = [];
+  assert.equal(m._echoWordCap(60), 8, '基础：3 + ⌊59/10⌋ = 8');
+  m.echoCurseIds = ['erosion', 'erosion', 'erosion'];
+  assert.equal(m._echoWordCap(60), 11, '不封顶：8 + 3 层侵蚀 = 11');
+  m.echoCurseIds = Array(10).fill('erosion');
+  assert.equal(m._echoWordCap(60), 18, '叠满 10 层 = 18');
+  // 没有「溢出」标记了（那是封顶方案的产物）
+  m.echoCurseIds = ['erosion'];
+  assert.equal(m._echoCurses().find((c) => c.id === 'erosion').overflow, undefined, '不再有溢出标记');
+  // 敌人数值也不因为侵蚀而变（词条上限本身就是效果）
   m.echoCurseIds = [];
   const baseHp = m.gd.enemyScale(60).hpMul;
   m.echoCurseIds = ['erosion', 'erosion', 'erosion'];
-  assert.equal(m._echoWordCap(60), 8, '词条上限仍然封顶 8');
-  const withCurse = m.gd.enemyScale(60).hpMul;
-  assert.ok(withCurse > baseHp, '溢出没有空转：敌方生命被提高');
-  assert.ok(Math.abs(withCurse / baseHp - 1.06) < 1e-9, `3 层溢出应为 +6%（实际 ${((withCurse / baseHp - 1) * 100).toFixed(1)}%）`);
-
-  const shown = m._echoCurses().find((c) => c.id === 'erosion');
-  assert.ok(shown && shown.overflow, '列表里标成溢出');
-  assert.match(shown.name, /溢出.*\+6%/, '名字里写明换算结果');
-
-  // 没有溢出时不乱标
-  m.round = 20;
-  m.echoCurseIds = ['erosion'];
-  assert.equal(m._echoCurses().find((c) => c.id === 'erosion').overflow, false);
+  assert.equal(m.gd.enemyScale(60).hpMul, baseHp, '侵蚀不再偷偷加敌方生命');
 });

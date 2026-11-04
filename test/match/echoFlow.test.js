@@ -33,12 +33,12 @@ const fakeMatch = ({ round = 20, diveStart = 16, variant = 'deepecho', spawns = 
   },
 });
 
-test('词条上限：3 条起，每深 10 层 +1，最多 8', () => {
+test('词条上限：3 条起，每深 10 层 +1，不封顶（2026-11-05 维护者：让诅咒一直加）', () => {
   assert.equal(P._echoWordCap.call(fakeMatch({ round: 16 }), 16), 3, '深度 1');
   assert.equal(P._echoWordCap.call(fakeMatch({ round: 25 }), 25), 3, '深度 10 仍是 3');
   assert.equal(P._echoWordCap.call(fakeMatch({ round: 26 }), 26), 4, '深度 11 → 4');
-  assert.equal(P._echoWordCap.call(fakeMatch({ round: 66 }), 66), 8, '深度 51 → 封顶 8');
-  assert.equal(P._echoWordCap.call(fakeMatch({ round: 90 }), 90), 8, '再深也不超过 8');
+  assert.equal(P._echoWordCap.call(fakeMatch({ round: 66 }), 66), 8, '深度 51 → 8');
+  assert.equal(P._echoWordCap.call(fakeMatch({ round: 90 }), 90), 10, '深度 75 → 10（越过旧封顶继续涨）');
   assert.equal(P._echoWordCap.call(fakeMatch({ round: 5, diveStart: 16 }), 5), 3, '深潜之前按基础值');
 });
 

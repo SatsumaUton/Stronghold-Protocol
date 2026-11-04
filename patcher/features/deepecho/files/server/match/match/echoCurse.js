@@ -15,10 +15,10 @@
 export const ECHO_CURSE_PREFIX = 'echo:curse:';
 
 /**
- * 同一条诅咒的**叠层上限**（维护者 2026-11-05）：可以叠，但最多 3 层。
+ * 同一条诅咒的**叠层上限**（维护者 2026-11-05）：可以叠，但最多 10 层。
  * 深层若无限叠（比如失血 ×1.5^n）会在十几层就变成不可玩的数字。
  */
-export const ECHO_CURSE_MAX_STACK = 3;
+export const ECHO_CURSE_MAX_STACK = 10;
 
 /**
  * 已实现的效果类型 → 由谁消费：
