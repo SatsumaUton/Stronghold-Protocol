@@ -121,6 +121,8 @@ export class MatchViews {
         matchId: this.battlePrefix,
         windowOpen: this.revivalWindowOpen(),
         deadline: this.revivalWindowOpen() ? this._revival.deadline : 0,
+        // 「深渊回响」：不要求进入联防，任一存活队友都能付救援（维护者 2026-11-05）
+        anyDonor: this.revivalAnyDonor === true,
         eligible: this.revivalWindowOpen() ? this.order.filter((ps) => this.revivalDonorEligible(ps)).map((ps) => ps.playerId) : [],
       } : { enabled: false },
       players: this.order.map((ps) => ({
