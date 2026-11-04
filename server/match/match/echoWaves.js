@@ -551,6 +551,10 @@ export function echoRandomWave(gd, tpl, opts, rng, helpers) {
       interval: s.count > 1 ? s.interval : 0,
       mods: modsOf(s.enemyKey),
       actionIndex: i,
+      // 跨版本敌人（key 形如 `<version>:enemy_…`）：客户端的数据表里没有它们，
+      // 只发 key 会退化成「未知敌人」的红水滴贴图（维护者 2026-11-05）。记录本身一起带上。
+      ...(String(s.enemyKey).includes(':') && gd.raw && gd.raw.enemies && gd.raw.enemies[s.enemyKey]
+        ? { enemyDef: gd.raw.enemies[s.enemyKey] } : null),
       preview: typeof previewInfo === 'function' ? previewInfo(gd, s.enemyKey, route, false, leader) : null,
     });
     actions.push({
