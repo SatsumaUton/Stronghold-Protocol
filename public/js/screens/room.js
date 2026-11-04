@@ -983,9 +983,12 @@ export function RoomScreen() {
     // the copied link carries an invitation line (#103): 「{name}邀请你加入卫戍协议：盟约【{difficulty}】」 — with the
     // version's name for another official version (DESIGN §35.23)
     const params = { name: me.name ?? '', difficulty: DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : '' };
-    const invite = roomVersion(room) !== DEFAULT_VERSION
-      ? t('{name}邀请你加入卫戍协议：盟约·{version}【{difficulty}】', { ...params, version: versionLabel(roomVersion(room)) })
-      : t('{name}邀请你加入卫戍协议：盟约【{difficulty}】', params);
+    // 「深渊回响」不是普通同盟房间：邀请语单独写，别让玩家以为点进去是标准模拟（维护者 2026-11-05）
+    const invite = room.variant === 'deepecho'
+      ? t('{name}邀请你加入卫戍协议：深渊回响·{difficulty}（深潜模式）', params)
+      : roomVersion(room) !== DEFAULT_VERSION
+        ? t('{name}邀请你加入卫戍协议：盟约·{version}【{difficulty}】', { ...params, version: versionLabel(roomVersion(room)) })
+        : t('{name}邀请你加入卫戍协议：盟约【{difficulty}】', params);
     const ok = await copyText(what === 'code' ? room.code : `${inviteLink(room.code)} ${invite}`);
     if (ok) toast(what === 'code' ? t('已复制同盟密钥 {code}', { code: room.code }) : t('已复制邀请链接'), 'success');
     else toast(t('复制失败，请手动复制'), 'warn');

@@ -1062,7 +1062,11 @@ fetch('/mm/api/tips', { cache: 'no-store' })
       const who = (s.me && s.me.name) || '博士';
       const MODE = { FUNNY: '标准模拟', NORMAL: '险境模拟', HARD: '绝境模拟', ABYSS: '终极模拟' };
       const mode = MODE[s.room.difficulty] || '同盟模拟';
-      const text = `${link} ${who}邀请你加入卫戍协议：盟约【${mode}】`;
+      // 「深渊回响」房：邀请语点明深潜模式（维护者 2026-11-05）
+      const dive = s.room.variant === 'deepecho';
+      const text = dive
+        ? `${link} ${who}邀请你加入卫戍协议：深渊回响·${mode}（深潜模式）`
+        : `${link} ${who}邀请你加入卫戍协议：盟约【${mode}】`;
       const old = label.textContent;
       copyText(text).then((ok) => {
         label.textContent = ok ? '已复制邀请链接' : '复制失败';
