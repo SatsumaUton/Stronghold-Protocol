@@ -33,7 +33,7 @@ export const ECHO_BLESSING_VOTE_MS = 30000;
 export const ECHO_BLESSING_MAX = 3;   // 同时持有的最多个数（扩池后不能用池子长度当上限）
 export const ECHO_BLESSINGS = Object.freeze([
   Object.freeze({
-    id: 'fund', rarity: 'common',
+    id: 'fund', weight: 4, rarity: 'common',
     name: '物资补给',
     desc: '立刻获得 25 资金',
     kind: 'fund',
@@ -48,7 +48,7 @@ export const ECHO_BLESSINGS = Object.freeze([
     mods: Object.freeze({ batPct: -0.1 }),
   }),
   Object.freeze({
-    id: 'loot', rarity: 'rare',
+    id: 'loot', weight: 2, rarity: 'rare',
     name: '丰收',
     desc: '每 3 层，全队 +1 次免费刷新',
     kind: 'coin',
@@ -79,12 +79,12 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'respen', rarity: 'epic', name: '穿透', desc: '全体干员无视 10 点法抗', kind: 'mods', group: 'pen', mods: { resIgnoreFlat: 10 } },
   { id: 'rng', rarity: 'epic', name: '远程', desc: '全体干员攻击范围延伸 1 格', kind: 'mods', group: 'range', mods: { rangeExtend: 1 } },
   { id: 'tgt', rarity: 'epic', name: '多目标', desc: '全体干员最大目标数 +1', kind: 'mods', group: 'range', mods: { maxTargets: 1 } },
-  { id: 'gold_s', rarity: 'common', name: '余利', desc: '结算资金 +8%', kind: 'coin', group: 'coin', coinMul: 1.08 },
-  { id: 'gold_m', rarity: 'rare', name: '商运', desc: '结算资金 +15%', kind: 'coin', group: 'coin', coinMul: 1.15 },
-  { id: 'fund_s', rarity: 'common', name: '应急包', desc: '立刻获得 12 资金', kind: 'fund', group: 'fund', funds: 12 },
-  { id: 'refresh_s', rarity: 'common', name: '机变', desc: '立刻获得 1 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 1 },
-  { id: 'bigfund', rarity: 'rare', name: '深渊源泉', desc: '立刻获得 45 资金', kind: 'fund', group: 'fund', funds: 45 },
-  { id: 'bigrefresh', rarity: 'rare', name: '时之沙漏', desc: '立刻获得 2 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 2 },
+  { id: 'gold_s', weight: 4, rarity: 'common', name: '余利', desc: '结算资金 +8%', kind: 'coin', group: 'coin', coinMul: 1.08 },
+  { id: 'gold_m', weight: 2, rarity: 'rare', name: '商运', desc: '结算资金 +15%', kind: 'coin', group: 'coin', coinMul: 1.15 },
+  { id: 'fund_s', weight: 4, rarity: 'common', name: '应急包', desc: '立刻获得 12 资金', kind: 'fund', group: 'fund', funds: 12 },
+  { id: 'refresh_s', weight: 4, rarity: 'common', name: '机变', desc: '立刻获得 1 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 1 },
+  { id: 'bigfund', weight: 2, rarity: 'rare', name: '深渊源泉', desc: '立刻获得 45 资金', kind: 'fund', group: 'fund', funds: 45 },
+  { id: 'bigrefresh', weight: 2, rarity: 'rare', name: '时之沙漏', desc: '立刻获得 2 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 2 },
 
   // —— 全队回复生命（2026-11-05）：一次性、数值刻意做小 ——
   // 生命（LP）一格是「一次漏怪抵扣 1 点、每回合最多扣 lpCapPerRound(10)」的量级，
@@ -219,7 +219,8 @@ export function echoBlessingOffer(rng, owned = []) {
   const have = new Set(Array.isArray(owned) ? owned : []);
   const pool = ECHO_BLESSINGS
     .filter((b) => (echoBlessingFree(b) || b.repeatable === true || !have.has(b.id)) && b.disabled !== true)
-    .map((b) => ({ b, w: ECHO_BLESSING_RARITY_WEIGHT[b.rarity] || 1 }));
+    // 允许单条祝福覆盖权重（.weight）：给钱类祝福出现得太频繁，维护者要求降频（2026-11-05）
+    .map((b) => ({ b, w: Number(b.weight) > 0 ? Number(b.weight) : ECHO_BLESSING_RARITY_WEIGHT[b.rarity] || 1 }));
   const out = [];
   while (pool.length && out.length < 3) {
     const total = pool.reduce((sum, x) => sum + x.w, 0);

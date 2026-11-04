@@ -164,7 +164,8 @@ test('三选一按稀有度加权：传说明显少于普通，但三个槽不�
 });
 
 test('已拥有的祝福不会再出现在候选里', () => {
-  const owned = ECHO_BLESSINGS.filter((b) => b.rarity === 'epic').map((b) => b.id);
+  // 反制祝福（counter，一次性、不占名额）本来就允许重复出现，不能拿它们当「已拥有」样本
+  const owned = ECHO_BLESSINGS.filter((b) => b.rarity === 'epic' && b.kind !== 'counter').map((b) => b.id);
   let s = 7;
   const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
   for (let i = 0; i < 50; i++) {
