@@ -321,6 +321,54 @@ function usableRoutes(tpl) {
   return out;
 }
 
+const ECHO_STAGE_ROUTE_CACHE = new WeakMap();
+
+/**
+ * 这一张图**全部**的地面出兵口（维护者 2026-11-05：16 层以后两个口都要出怪）。
+ *
+ * 数据里单个波次模板常常只写了一个起点（`act1autochess_01` 只有 `9,10`），
+ * 所以这里按「同一张图」把其他模板里的起点并进来：判据是 bgm + 第一条路线的终点，
+ * 且起点行必须落在普通战场（9–12 行），避免把 boss 半场（2–5 行）的出兵口拉进普通回合。
+ */
+function stageRoutes(gd, tpl) {
+  const base = usableRoutes(tpl);
+  const key = tpl && tpl.bgm ? String(tpl.bgm) : '';
+  let cache = ECHO_STAGE_ROUTE_CACHE.get(gd);
+  if (!cache) { cache = new Map(); ECHO_STAGE_ROUTE_CACHE.set(gd, cache); }
+  if (cache.has(key)) return cache.get(key);
+  const firstEnd = (base.find((x) => !x.fly) || base[0] || {}).route;
+  const endKey = firstEnd && Array.isArray(firstEnd.end) ? firstEnd.end.join(',') : '';
+  const seen = new Set();
+  const out = [];
+  const push = (route, fly) => {
+    const starts = route && Array.isArray(route.start) ? route.start : null;
+    if (!starts) return;
+    if (!fly && (starts[0] < 9 || starts[0] > 12)) return;   // 普通战场才收
+    const k = `${fly ? 'f' : 'g'}|${starts.join(',')}`;
+    if (seen.has(k)) return;
+    seen.set ? null : null;
+    seen.add(k);
+    out.push({ i: out.length, route, fly });
+  };
+  for (const x of base) push(x.route, x.fly);
+  const waves = gd && gd.raw && gd.raw.waves ? gd.raw.waves : {};
+  for (const other of Object.values(waves)) {
+    if (!other || other === tpl) continue;
+    if (key && other.bgm && String(other.bgm) !== key) continue;
+    const rs = Array.isArray(other.routes) ? other.routes : [];
+    const re = rs[0] && Array.isArray(rs[0].end) ? rs[0].end.join(',') : '';
+    if (endKey && re && re !== endKey) continue;
+    for (const r of rs) {
+      if (!r) continue;
+      const fly = r.motion === 'FLY';
+      if (!fly && (r.motion === 'E_NUM' || r.motion === 'E')) continue;
+      push(r, fly);
+    }
+  }
+  cache.set(key, out);
+  return out;
+}
+
 const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(v) || 0)));
 
 /**
@@ -397,7 +445,8 @@ export function echoRandomWave(gd, tpl, opts, rng, helpers) {
       pool = { ground: g, fly: f, all: [...g, ...f] };
     }
   }
-  const routes = usableRoutes(tpl);
+  // 16 层以后：把同一张图的**所有**地面出兵口并进来，保证两个口都出怪
+  const routes = opts.echoAllRoutes ? stageRoutes(gd, tpl) : usableRoutes(tpl);
   if (!routes.length || !pool.all.length) return null;
 
   const scale = opts.echoScale && typeof opts.echoScale === 'object'
@@ -505,6 +554,27 @@ export function echoRandomWave(gd, tpl, opts, rng, helpers) {
     const use = cands.length ? cands : routes;
     s.routeIndex = use[Math.min(use.length - 1, Math.floor((Number(rng()) || 0) * use.length))].i;
   }
+  // 16 层以后（`echoAllRoutes`）：**每个出怪点都要出怪**，不再整波只从一个口出来
+  // （维护者 2026-11-05）。只在本图模板已经存在的口里补，不额外引入别的场地/ boss 场的路线。
+  if (opts.echoAllRoutes) {
+    const byStart = new Map();
+    for (const r of routes) {
+      const st = `${(r.route && r.route.start ? r.route.start.join(',') : '')}|${r.fly ? 'f' : 'g'}`;
+      if (!byStart.has(st)) byStart.set(st, r);
+    }
+    const used = new Set();
+    for (const s of slots) {
+      const r = routes.find((x) => x.i === s.routeIndex) || null;
+      if (r) used.add(`${(r.route && r.route.start ? r.route.start.join(',') : '')}|${r.fly ? 'f' : 'g'}`);
+    }
+    for (const [st, target] of byStart) {
+      if (used.has(st)) continue;
+      const s = slots.find((x) => x.fly === target.fly) || slots[0];
+      if (!s) break;
+      s.routeIndex = target.i;
+      used.add(st);
+    }
+  }
 
   // 注意：这里**不按威胁预算裁剪条数** —— 数量由「原版形状 × 深度」决定（上面），
   // 强度由 echoScale 写进每条 spawn 的 mods 决定。按预算裁会把波次一路砍到最小条数
@@ -562,5 +632,6 @@ export function echoRandomWave(gd, tpl, opts, rng, helpers) {
       tplCount: s.count, window: s.window, routeIndex: s.routeIndex, valid: true, server: true,
     });
   }
-  return { spawns, actions };
+  // echoAllRoutes 时路线表比模板大：调用方要用它替换 wave.routes（索引才对得上）
+  return { spawns, actions, routes: opts.echoAllRoutes ? routes.map((x) => x.route) : null };
 }
