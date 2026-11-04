@@ -11,7 +11,10 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
  * `disableLayerCap` / `disableHitLimit` are the battle-rule flags ported from the other fork (2026-11-01).
  * @type {ReadonlySet<string | symbol>}
  */
-const OPTIONAL_FLAGS = new Set(['disableDuckLord', 'disableLayerCap', 'disableHitLimit', 'allowRepeat', 'stackDuckLord']);
+// 
+// revivalAnyDonor：救援不要求联防（维护者 2026-11-05，默认 true）—— 必须在这里登记，
+// 否则 isExperimental 会把它判成非法键，导致**断点恢复对局失败**（invalid experimental options）。
+const OPTIONAL_FLAGS = new Set(['disableDuckLord', 'disableLayerCap', 'disableHitLimit', 'allowRepeat', 'stackDuckLord', 'revivalAnyDonor']);
 /**
  * The enemy multipliers a room can pick (反馈 #47); the first, a standard room's, is never stored: an ordinary room,
  * a saved room and a queue key keep their old shape. Applies to every enemy, the leaders' shared HP included.
