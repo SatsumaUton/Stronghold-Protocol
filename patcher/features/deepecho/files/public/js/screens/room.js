@@ -985,7 +985,7 @@ export function RoomScreen() {
     const params = { name: me.name ?? '', difficulty: DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : '' };
     // 「深渊回响」不是普通同盟房间：邀请语单独写，别让玩家以为点进去是标准模拟（维护者 2026-11-05）
     const invite = room.variant === 'deepecho'
-      ? t('{name}邀请你加入卫戍协议：深渊回响·{difficulty}（深潜模式）', params)
+      ? t('{name}邀请你加入卫戍协议：盟约【深渊回响】【{difficulty}】', params)
       : roomVersion(room) !== DEFAULT_VERSION
         ? t('{name}邀请你加入卫戍协议：盟约·{version}【{difficulty}】', { ...params, version: versionLabel(roomVersion(room)) })
         : t('{name}邀请你加入卫戍协议：盟约【{difficulty}】', params);

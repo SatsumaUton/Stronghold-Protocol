@@ -1065,7 +1065,7 @@ fetch('/mm/api/tips', { cache: 'no-store' })
       // 「深渊回响」房：邀请语点明深潜模式（维护者 2026-11-05）
       const dive = s.room.variant === 'deepecho';
       const text = dive
-        ? `${link} ${who}邀请你加入卫戍协议：深渊回响·${mode}（深潜模式）`
+        ? `${link} ${who}邀请你加入卫戍协议：盟约【深渊回响】【${mode}】`
         : `${link} ${who}邀请你加入卫戍协议：盟约【${mode}】`;
       const old = label.textContent;
       copyText(text).then((ok) => {
