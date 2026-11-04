@@ -39,7 +39,7 @@ export const ECHO_SLOW_FROM_OVER = 15;
  *   1.10 → 约 3.8 倍（明显更难）
  * 只想调 1–15 的手感时，改这一个数就够了；16 层之后走 1.2 的延伸段，不受它影响。
  */
-export const ECHO_EARLY_GROWTH = 1.05;
+export const ECHO_EARLY_GROWTH = 1.03;
 /** 缓增段的增速（维护者 2026-11-03 选「激进档」）。 */
 export const ECHO_HP_STEP_SLOW = 1.15;
 export const ECHO_ATK_STEP_SLOW = 1.08;

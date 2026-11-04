@@ -121,6 +121,10 @@ export class MatchEcho {
         const pick = pool[Math.floor((Number(this.rngWaves && this.rngWaves()) || 0) * pool.length)] || pool[0];
         if (!pick) break;
         s.enemyKey = pick.k;
+        // 注入的精英**固定 1 只**：原来只换了 key、保留原条目的 count（×3），
+        // 于是「2 条精英」实际会变成 6~8 只（维护者 2026-11-05：只保留 2 只，不要很多）
+        s.count = 1;
+        s.interval = 0;
         s.preview = null;
         n += 1;
       }

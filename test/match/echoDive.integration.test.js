@@ -205,7 +205,8 @@ test('挑战关奖励按全队合计：个人退步不影响，队伍达标就�
   const draws = Number(m.echoBlessingDraws) || 0;
   const out = m._echoSettleChallenge();
   assert.ok(out.granted, `全队清怪应达标（实际 ${out.ratio}）`);
-  assert.ok(Math.abs(out.ratio - 0.95) < 0.02, `比例应是全队合计（实际 ${out.ratio}）`);
+  // 只漏一小部分（ceil 取整后可能略多于 5%，所以断言「在 90%~100% 之间」而不是精确 0.95）
+  assert.ok(out.ratio > 0.9 && out.ratio < 1, `比例应是全队合计（实际 ${out.ratio}）`);
   assert.equal(Number(m.echoBlessingDraws) || 0, draws + 1, '只加一次（团队级，不是每人一次）');
   assert.deepEqual(m.echoCurseIds, [], '达标不吃诅咒');
   assert.deepEqual(ps.map((p) => p.pendingFunds), funds, '挑战关不再发资金');
