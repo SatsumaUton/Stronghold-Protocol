@@ -203,6 +203,16 @@ export function echoSummonOnly(gd) {
     if (String(key).startsWith('token_')) set.add(key);
     if (typeof gd.token === 'function' && gd.token(key)) set.add(key);
   }
+  // 首领模板里 	ag: 'part' 的分体（胄的双手、铳的部件…）：只会跟着本体出现，
+  // 但既不是 tokenOnly 也不在别人的 summons 里，之前漏掉了（维护者 2026-11-05 截图）。
+  const waves = gd && gd.raw && gd.raw.waves ? gd.raw.waves : {};
+  for (const tpl of Object.values(waves)) {
+    for (const s of Array.isArray(tpl && tpl.spawns) ? tpl.spawns : []) {
+      if (!s || (s.tag !== 'part' && s.tag !== 'summon')) continue;
+      const k = s.key || s.enemyKey;
+      if (typeof k === 'string') set.add(k);
+    }
+  }
   ECHO_SUMMON_CACHE.set(gd, set);
   return set;
 }
