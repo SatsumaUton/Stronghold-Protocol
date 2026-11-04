@@ -137,10 +137,19 @@ function itemCard(gd, id) {
  * Build the draft cards for an SP round.
  * @returns {{ family: string, name: string, desc: string, eventId: string|null, cards: object[] } | null}
  */
-export function generateDraft(gd, rng, round, { stageId = null, bondAvailable = null, itemAvailable = null } = {}) {
+export function generateDraft(gd, rng, round, { stageId = null, bondAvailable = null, itemAvailable = null, allowBounty = true, forceFamily = null } = {}) {
   const sch = scheduleFor(gd, round);
-  const fams = Array.isArray(sch.families) && sch.families.length ? sch.families.map((f) => [f.family, f.weight]) : [['supply', 1]];
-  let family = weightedPick(rng, fams) || 'supply';
+  const famsAll = Array.isArray(sch.families) && sch.families.length ? sch.families.map((f) => [f.family, f.weight]) : [['supply', 1]];
+  // 「深渊回响」有自己的悬赏（按最大生命值分档自动给币、目标从本波随机），所以不再抽原版的 6 选 1 悬赏决策
+  const fams = allowBounty ? famsAll : famsAll.filter(([f]) => f !== 'bounty');
+  // 注意：不能回退到 famsAll —— 有些回合的 schedule 只有 bounty 一个家族（R3 / R9 / R11），
+  // 过滤后为空再回退，等于把刚禁掉的悬赏决策又抽了回来（维护者 2026-11-04 实测还在弹）。
+  // 深潜里就退回 supply，绝不再给 bounty。
+  const fallbackFams = allowBounty ? famsAll : [['supply', 1]];
+  // 指定家族（深渊挑战关团队奖励 = 道具补给）
+  let family = (forceFamily && (allowBounty || forceFamily !== 'bounty'))
+    ? forceFamily
+    : (weightedPick(rng, fams.length ? fams : fallbackFams) || 'supply');
   const n = Number.isInteger(sch.cards) && sch.cards > 0 ? Math.min(sch.cards, 6) : formatCount(gd);
   const opts = { stageId, bondAvailable, round, itemAvailable };
   let cards = buildCards(gd, rng, family, n, sch, opts);
@@ -475,6 +484,8 @@ function applyDefault(m, ps, card) {
         break;
       case 'global_special_choice_refresh_free':
         ps.shop.freeRefreshes += count;
+      // 深渊：这条路不经过 grantFreeRefresh，这里补一次封顶
+      if (ps.m && ps.m.echoVariant === 'deepecho') ps.shop.freeRefreshes = Math.min(ps.shop.freeRefreshes, 3);
         ps.dirty();
         handled = true;
         break;

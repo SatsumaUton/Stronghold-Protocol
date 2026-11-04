@@ -104,4 +104,6 @@ export const actions = {
   removeSpectator: (playerId) => act('room.removeSpectator', { playerId }, { sfx: 'back' }),
   // 战斗 2 倍速: this seat's standing vote (m.public speedVote follows)
   speedVote: (agree) => act('g.speedVote', { agree: !!agree }, { sfx: agree ? 'confirm' : 'back' }),
+  // 「深渊回响」的祝福三选一（ui/echoBlessing.js）：m.public.echo.offer 跟着更新
+  echoBlessing: (pick) => act('g.echoBlessing', { pick: Number(pick) }, { sfx: 'confirm' }),
 };

@@ -238,6 +238,11 @@ import { MatchWatch } from './match/watch.js';
 import { MatchIntents } from './match/intents.js';
 import { MatchPause } from './match/pause.js';
 import { MatchPhases } from './match/phases.js';
+// 「深渊回响」(DESIGN-ABYSS.md): the dive's round flow and the numbers past the official table
+import { MatchEcho } from './match/echoPhase.js';
+import { ECHO_LAST_ROUND, echoScale, isEchoRound } from './match/echo.js';
+import { echoCurveOf } from './match/echoConfig.js';
+import { crossVersionEnemies } from './match/echoCrossVersion.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchSpeedVote } from './match/speedVote.js';
 import { MatchSpDraft } from './match/spDraft.js';
@@ -330,6 +335,49 @@ export class Match {
     /** window sequence (diagnostics and messages) */
     this.offerSeq = 0;
     this.gd = new GameData(this.data, this.modeId);
+    /**
+     * 「深渊回响」(DESIGN-ABYSS.md, 2026-11-03): `mode: 'coop'` + `variant: 'deepecho'`.
+     *
+     * 下面这段只有 `opts.variant === 'deepecho'` 时才成立。为 null 时：键集不变、随机流不变、
+     * gamedata 的 `echoScaleOf` 保持 null（缩放就是官方表），所以独立模拟与同盟模拟一个字节都没变。
+     */
+    this.echoVariant = opts.variant === 'deepecho' && this.mode === 'coop' ? 'deepecho' : null;
+    // 「深渊回响」：把其余三个版本里**本版没有的敌人**并进来（前缀 key，不覆盖本版），
+    // 这样深潜的怪种池能跨版本，而不是只有这张图那几种（维护者 2026-11-04）。
+    if (this.echoVariant === 'deepecho') {
+      try {
+        const extra = crossVersionEnemies(this.gd.raw && this.gd.raw.enemies);
+        const n = extra ? Object.keys(extra).length : 0;
+        if (n > 0) {
+          // 不改共享的 data 对象：给这个 GameData 实例换一份 enemies 表
+          this.gd.raw = { ...this.gd.raw, enemies: { ...this.gd.raw.enemies, ...extra } };
+        }
+      } catch { /* 数据缺失只是少一些怪种，绝不能让建局失败 */ }
+    }
+    /** 房间级深潜调参（深潜大厅的开关）；null = 默认配置。调过参的房间不进排行榜。 */
+    this.echoCfg = this.echoVariant ? (opts.echo && typeof opts.echo === 'object' ? opts.echo : null) : null;
+    /**
+     * 深潜第一回合（显示回合）。「深渊回响」**从第 1 回合就是深潜**（维护者 2026-11-03 第二次定，
+     * 取代「打完最后一个 boss 才转深潜」的旧入口）；普通房间恒为 null。
+     */
+    this.echoDiveStart = this.echoVariant === 'deepecho' ? 1 : null;
+    /** 本回合生效的词条 id（echoWords.js）；非深潜回合为 null */
+    this.echoWordsActive = null;
+    /** 隐藏核心通关额外给的祝福抽取次数（DESIGN-ABYSS.md「隐藏通关的补偿」） */
+    this.echoBlessingDraws = 0;
+    /** 已拥有的祝福 id（echoBlessing.js；同类不叠加，上限 3） */
+    this.echoBlessings = [];
+    /** 当前三选一的候选（id 数组；null = 没有进行中的抽取） */
+    this.echoBlessingOffer = null;
+    /** 三选一的投票 playerId → 选项下标（纯缓存，存档不存） */
+    this._echoBlessingVotes = new Map();
+    if (this.echoVariant) {
+      // 官方 enemyScale 表止于 ECHO_LAST_ROUND（15 档）。表内照旧用官方值，表外按同一节奏延伸。
+      // 缓增段的增速可被房间配置覆盖（深潜大厅的「曲线档位」），不传配置就是默认档。
+      const tier = this.gd.baseEnemyScale(ECHO_LAST_ROUND);
+      const slow = echoCurveOf(this.echoCfg);
+      this.gd.echoScaleOf = (r, official) => (isEchoRound(r, ECHO_LAST_ROUND) ? echoScale(r, tier, ECHO_LAST_ROUND, slow) : official);
+    }
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
     /** Locked room-owned rules; absent for ordinary rooms. */
@@ -354,6 +402,8 @@ export class Match {
     //   * disableLayerCap  —— 盟约层数上限 999 抬到 BOND_LAYER_SAFE_MAX（1e9），等于「不设上限」；
     //   * disableHitLimit  —— 不取消对敌方领袖的单次 ≥ BOSS_HIT_LIMIT(300000) 伤害；
     //   * enemyHpMul / enemyAtkMul —— 敌人生命 / 攻击倍率，对敌方领袖的共享生命值同样生效。
+    // 注意：**不含**深潜。深潜只在真正进入深潜回合后才解除层数上限（见 layerCapOff），
+    // 否则 R1–15 的开局就会和原版不同（维护者 2026-11-03 要求开局保持原版）。
     this.disableLayerCap = this.experimental.disableLayerCap === true;
     this.disableHitLimit = this.experimental.disableHitLimit === true;
     this.enemyHpMul = this.experimental.enemyHpMul ?? 1;
@@ -644,6 +694,21 @@ export class Match {
   }
 
   /** Helpers of this round's 联防 who cleared their own battle without a counted leak. */
+  /**
+   * 盟约层数上限是否解除 —— 实验房，或「深渊回响」深潜。
+   *
+   * 历史（维护者两次改动，别再来回翻）：
+   *   1. 最初深潜也解除 → 叠到 1000+ 层，「奇迹（每 100 层）/ 远见（每 10 层）」变成无限刷新与无限资金；
+   *   2. 于是回滚成原版 999；
+   *   3. 2026-11-03 第二次改：深潜**重新解除**（1e9），但两个漏洞改为在**源头**堵死 ——
+   *      `effectsMeta.js` 的 `bondLayerCoinCap = 60`（远见/奇迹 的按层给钱只结算到 60 层）、
+   *      `effectsMeta.js` 的 `grantFreeRefresh`（深潜里免费刷新总数封顶 2）。
+   * 所以「层数无上限」与「不会无限刷新 / 无限资金」现在同时成立；普通房间仍是原版 999。
+   */
+  get layerCapOff() {
+    return this.disableLayerCap === true || this.echoVariant === 'deepecho';
+  }
+
   _revivalHelpers(plan, uniteResult) {
     const eligible = new Set();
     if (!this.revivalEnabled || !plan || !uniteResult || uniteResult.synthetic
@@ -791,7 +856,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpeedVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchEcho, MatchSetupVote, MatchSpeedVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

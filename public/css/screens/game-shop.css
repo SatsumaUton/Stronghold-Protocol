@@ -61,7 +61,7 @@
 /* ---- level card ---- */
 .lvcard {
   position: relative; width: 1.24rem; height: 2.24rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .12rem;
-  padding: .2rem .1rem .1rem; background: linear-gradient(180deg, #5fe0b9, #36b690); border: 0; color: var(--text-on-mint);
+  padding: .2rem .1rem .1rem; background: linear-gradient(180deg, var(--mint-c26), var(--mint-c27)); border: 0; color: var(--text-on-mint);
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - .14rem), calc(100% - .14rem) 100%, 0 100%);
   transition: filter var(--t-fast), transform var(--t-fast);
 }
@@ -89,7 +89,7 @@
   --tc: var(--tier-1);
   position: relative; width: 1.56rem; height: 2.24rem; padding: 0; overflow: hidden; text-align: left;
   display: flex; flex-direction: column; justify-content: flex-end;
-  background: #151a18; border: 1px solid rgba(78, 216, 175, .35);
+  background: #151a18; border: 1px solid rgba(var(--mint-500-rgb), .35);
   transition: transform var(--t-fast) var(--ease-out), border-color var(--t-fast), box-shadow var(--t-fast);
 }
 .scard--t1 { --tc: var(--tier-1); } .scard--t2 { --tc: var(--tier-2); } .scard--t3 { --tc: var(--tier-3); }
@@ -117,7 +117,7 @@
 .scard__skill .icon { width: .18rem; height: .18rem; color: var(--gold); }
 /* a chosen skill without an icon in the asset manifest: its slot letter */
 .scard__sglyph { font-family: var(--font-display); font-size: .13rem; font-weight: 700; letter-spacing: .02em; color: var(--mint-400); }
-.scard__skill.is-custom { border-color: var(--mint-400); box-shadow: 0 0 0 1px var(--mint-500), 0 0 .08rem rgba(23, 249, 183, .5); }
+.scard__skill.is-custom { border-color: var(--mint-400); box-shadow: 0 0 0 1px var(--mint-500), 0 0 .08rem rgba(var(--mint-rgb), .5); }
 .scard__skill.is-custom::after { content: ''; position: absolute; right: -.04rem; top: -.04rem; width: .08rem; height: .08rem; background: var(--mint-400); transform: rotate(45deg); }
 .scard__mod { position: absolute; right: 100%; bottom: 0; margin-right: .03rem; display: flex; align-items: center; gap: .02rem; font-family: var(--font-display); font-size: .1rem; line-height: 1.4; padding: 0 .04rem; background: rgba(0, 0, 0, .75); color: var(--gold-2); white-space: nowrap; }
 /* the official module type icon (local-client art, DESIGN §13); the type text stays beside it */
@@ -137,7 +137,7 @@
 /* 0.2.0 自选编队: a DIY slot the player filled — the card is its operator, only in this player's shop (ui/shopBar.js) */
 .scard__diy { position: absolute; z-index: 3; left: 0; top: .38rem; font-size: .12rem; font-weight: 700; padding: .01rem .06rem;
   background: var(--mint-500); color: var(--text-on-mint); letter-spacing: .08em; white-space: nowrap; box-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
-.scard:not(.is-disabled):not(.scard--sold):hover { transform: translateY(-.08rem); border-color: var(--mint-400); box-shadow: 0 0 0 1px var(--mint-400), 0 .1rem .24rem rgba(23, 249, 183, .22); }
+.scard:not(.is-disabled):not(.scard--sold):hover { transform: translateY(-.08rem); border-color: var(--mint-400); box-shadow: 0 0 0 1px var(--mint-400), 0 .1rem .24rem rgba(var(--mint-rgb), .22); }
 .scard:not(.is-disabled):not(.scard--sold):active { transform: translateY(-.04rem); }
 .scard.is-disabled { cursor: not-allowed; }
 .shopbar.is-locked .scard:not(.scard--sold) { cursor: help; } /* not editable: a tap opens the detail */

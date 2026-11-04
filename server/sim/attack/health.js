@@ -19,7 +19,11 @@ export function leaderHitCancelled(battle, target, amount) {
   // A room's experimental `disableHitLimit` reaches every copy of the battle as `flags.hitLimitOff`: the limit is then
   // not checked at all (shared/constants.js BOSS_HIT_LIMIT).
   if (!(BOSS_HIT_LIMIT > 0) || battle.flags?.hitLimitOff === true || !target || !target.isBoss || (battle.kind !== 'boss' && battle.kind !== 'hidden')) return false;
-  if (!(Math.ceil(amount) >= BOSS_HIT_LIMIT)) return false;
+  // 「深渊回响」：限伤跟着深度缩放（`flags.hitLimitMul`，缺省 1 = 官方行为逐字节不变）。
+  // 不这么做的话，敌人血量在无尽里涨到几十倍之后，这道「防一击必杀」的护栏会变成隐形的降伤墙 ——
+  // 玩家叠满也打不动，而它本来只是为了防止一刀秒 boss。
+  const limit = BOSS_HIT_LIMIT * (Number.isFinite(battle.flags?.hitLimitMul) ? battle.flags.hitLimitMul : 1);
+  if (!(Math.ceil(amount) >= limit)) return false;
   battle.fx('hitCap', { x: target.x, y: target.y, id: target.id, n: Math.ceil(amount) });
   return true;
 }

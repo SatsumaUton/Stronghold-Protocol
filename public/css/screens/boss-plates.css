@@ -8,7 +8,7 @@
    pointer-events none: the field stays usable under them. Reduced motion: the final state, no motion. */
 .bpl {
   --px: min(.01rem, calc(100vw / 1920), calc(100vh / 1080));
-  --teal: #27d3ad;
+  --teal: var(--mint-c5);
   --core: #35c6dd;
   position: fixed; inset: 0; z-index: var(--z-banner); display: grid; place-items: center; pointer-events: none;
   animation: bpl-in 200ms ease-out both;
@@ -36,8 +36,8 @@
 .fa__lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .fa__line { fill: none; stroke: rgba(200, 212, 212, .42); stroke-width: 10; stroke-dasharray: 1; stroke-dashoffset: 1;
   animation: fa-draw 220ms calc(300ms + var(--i) * 40ms) ease-out forwards; }
-.fa__comet { fill: none; stroke: #5dfbd6; stroke-width: 12; stroke-linecap: round; stroke-dasharray: .14 1.2; stroke-dashoffset: .14; opacity: 0;
-  filter: drop-shadow(0 0 6px rgba(39, 211, 173, .9)); animation: fa-comet 320ms calc(480ms + var(--i) * 30ms) ease-in both; }
+.fa__comet { fill: none; stroke: var(--mint-c6); stroke-width: 12; stroke-linecap: round; stroke-dasharray: .14 1.2; stroke-dashoffset: .14; opacity: 0;
+  filter: drop-shadow(0 0 6px rgba(var(--mint-c5-rgb), .9)); animation: fa-comet 320ms calc(480ms + var(--i) * 30ms) ease-in both; }
 .fa__row { position: absolute; left: calc(132 * var(--px)); display: flex; align-items: center; gap: calc(14 * var(--px));
   animation: bpl-fade 200ms calc(280ms + var(--i) * 40ms) ease-out both; }
 .fa__ava { width: calc(90 * var(--px)); height: calc(90 * var(--px)); }
@@ -45,13 +45,13 @@
 .fa__lp { color: var(--teal); font-size: calc(30 * var(--px)); font-weight: 700; animation: fa-lp-out 200ms 700ms ease-in forwards; }
 .fa__node { position: absolute; left: calc(609 * var(--px)); top: calc(129 * var(--px)); width: calc(146 * var(--px)); height: calc(146 * var(--px)); }
 .fa__ring { position: absolute; border-radius: 50%; left: 50%; top: 50%; transform: translate(-50%, -50%); }
-.fa__ring--o { width: calc(426 * var(--px)); height: calc(426 * var(--px)); border: calc(3 * var(--px)) solid rgba(39, 211, 173, .3);
-  background: radial-gradient(closest-side, transparent 70%, rgba(39, 211, 173, .12) 72%, rgba(39, 211, 173, .12) 86%, transparent 88%);
+.fa__ring--o { width: calc(426 * var(--px)); height: calc(426 * var(--px)); border: calc(3 * var(--px)) solid rgba(var(--mint-c5-rgb), .3);
+  background: radial-gradient(closest-side, transparent 70%, rgba(var(--mint-c5-rgb), .12) 72%, rgba(var(--mint-c5-rgb), .12) 86%, transparent 88%);
   animation: fa-ring 500ms 680ms ease-out both; }
-.fa__ring--i { width: calc(224 * var(--px)); height: calc(224 * var(--px)); border: calc(4 * var(--px)) solid rgba(39, 211, 173, .35);
+.fa__ring--i { width: calc(224 * var(--px)); height: calc(224 * var(--px)); border: calc(4 * var(--px)) solid rgba(var(--mint-c5-rgb), .35);
   animation: fa-ring 400ms 700ms ease-out both; }
 .fa__box { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(4 * var(--px));
-  border: calc(4 * var(--px)) solid var(--teal); border-radius: calc(8 * var(--px)); background: rgba(39, 211, 173, .08);
+  border: calc(4 * var(--px)) solid var(--teal); border-radius: calc(8 * var(--px)); background: rgba(var(--mint-c5-rgb), .08);
   animation: fa-fill 200ms 700ms ease-out forwards; }
 .fa__rook { position: static; width: calc(36 * var(--px)); height: calc(57 * var(--px)); image-rendering: pixelated; animation: fa-rook 200ms 700ms ease-out forwards; }
 .fa__total { color: #072a22; font-size: calc(42 * var(--px)); line-height: 1; font-weight: 700; opacity: 0; animation: bpl-fade 120ms 700ms ease-out forwards; }
@@ -59,7 +59,7 @@
   align-items: center; gap: calc(8 * var(--px)); animation: bpl-fade 250ms 1700ms ease-out both; }
 .fa__micro { color: #d8e4e2; font-size: calc(24 * var(--px)); font-weight: 700; }
 .fa__title { color: var(--teal); font-size: calc(45 * var(--px)); font-weight: 900; letter-spacing: .02em; white-space: nowrap;
-  text-shadow: 0 0 calc(12 * var(--px)) rgba(39, 211, 173, .45); }
+  text-shadow: 0 0 calc(12 * var(--px)) rgba(var(--mint-c5-rgb), .45); }
 .fa__leader { position: absolute; inset: 0; animation: fa-leader 900ms 1300ms ease-out both; }
 /* the crests are ~28 / 45 px inside their glow (settle/round_info_boss_icon 74 × 77, _sp 117 × 111): scaled to the footage's size */
 .fa__leader .bpl__crest { left: calc(702 * var(--px)); top: calc(-232 * var(--px)); width: calc(814 * var(--px)); height: calc(847 * var(--px)); }
@@ -119,7 +119,7 @@
 .end__bars i { position: absolute; left: calc((60 + var(--i) * 70) * var(--px)); top: calc((60 + var(--i) * 30) * var(--px)); width: calc(250 * var(--px));
   height: calc(22 * var(--px)); border-radius: calc(4 * var(--px)); background: #e8333a; transform: rotate(-50deg); opacity: .85;
   animation: end-bar 300ms calc(var(--i) * 50ms) ease-out both; }
-.end__bars i:nth-child(even) { background: #2ad1b0; }
+.end__bars i:nth-child(even) { background: var(--mint-c7); }
 .end__title--side { left: calc(760 * var(--px)); right: auto; top: calc(180 * var(--px)); width: calc(320 * var(--px)); color: #f0353b; font-size: calc(57 * var(--px)); }
 .end__sub { position: absolute; left: calc(760 * var(--px)); top: calc(262 * var(--px)); width: calc(320 * var(--px)); text-align: center; color: #6d7779;
   font-family: var(--font-display); font-size: calc(18 * var(--px)); letter-spacing: .08em; animation: bpl-fade 250ms 300ms both; }
@@ -132,7 +132,7 @@
 @keyframes fa-comet { 0% { opacity: 1; stroke-dashoffset: .14; } 90% { opacity: 1; } 100% { opacity: 0; stroke-dashoffset: -1; } }
 @keyframes fa-lp-out { to { opacity: 0; } }
 @keyframes fa-ring { from { opacity: 0; transform: translate(-50%, -50%) scale(.6); } }
-@keyframes fa-fill { to { background: var(--teal); box-shadow: 0 0 calc(30 * var(--px)) rgba(39, 211, 173, .6); } }
+@keyframes fa-fill { to { background: var(--teal); box-shadow: 0 0 calc(30 * var(--px)) rgba(var(--mint-c5-rgb), .6); } }
 @keyframes fa-rook { to { filter: brightness(0) opacity(.75); } }
 @keyframes fa-leader { 0% { opacity: 0; filter: brightness(.35); } 22% { opacity: 1; filter: brightness(.35); } 44% { filter: brightness(1.7); } 100% { opacity: 1; filter: none; } }
 @keyframes core-blink { 0% { opacity: 0; } 50% { opacity: 1; } }

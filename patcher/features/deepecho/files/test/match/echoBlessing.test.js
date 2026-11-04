@@ -1,0 +1,134 @@
+// 「深渊回响」祝福（server/match/match/echoBlessing.js）的单元测试。
+//
+// 背景：祝福是房间级全局加成，落点是**既有字段**——钱包 `ps.pendingFunds`、玩家单位 mods `batPct`、
+// 结算入账倍率。写错一个键名（比如 batPct 写成 atkSpeedPct）buff 就是空转，所以键名要对着
+// units.js 的读取列表断言一次。
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  ECHO_BLESSINGS, ECHO_BLESSING_EVERY, echoBlessingById, echoBlessingDue, echoBlessingOffer,
+  echoBlessingMods, echoBlessingCoinMul, echoBlessingFunds, applyEchoBlessingMods,
+} from '../../server/match/match/echoBlessing.js';
+
+/** units.js 属性重算里真实读取的 mods 键（2026-11-03 从 units.js 提取，与 echoWords.test.js 同源）。 */
+const VALID_MOD_KEYS = new Set([
+  'hpFlat', 'hpPct', 'atkFlat', 'atkPct', 'atkFinal', 'defFlat', 'defPct', 'resFlat', 'resPct',
+  'aspd', 'batPct', 'blockCnt', 'moveFlat', 'moveMul', 'spRecovery',
+]);
+
+/** 固定的随机源（可复现）。 */
+const seq = (...xs) => {
+  let i = 0;
+  return () => xs[Math.min(i++, xs.length - 1)];
+};
+
+test('三个祝福齐全，id/name/desc 都在', () => {
+  assert.equal(ECHO_BLESSINGS.length, 3);
+  const ids = ECHO_BLESSINGS.map((b) => b.id);
+  assert.deepEqual([...ids].sort(), ['fund', 'haste', 'loot']);
+  for (const b of ECHO_BLESSINGS) {
+    assert.equal(typeof b.name, 'string');
+    assert.ok(b.name.length > 0, `${b.id} 缺名字`);
+    assert.equal(typeof b.desc, 'string');
+    assert.ok(b.desc.length > 0, `${b.id} 缺描述`);
+  }
+});
+
+test('攻速祝福的 mods 键是 units.js 真会读的键（batPct）', () => {
+  const haste = echoBlessingById('haste');
+  assert.equal(haste.kind, 'mods');
+  for (const k of Object.keys(haste.mods)) {
+    assert.ok(VALID_MOD_KEYS.has(k), `mods 键 ${k} 不在 units.js 的读取列表里`);
+  }
+  // 负的 batPct = 攻击间隔变短 = 攻速变快
+  assert.ok(haste.mods.batPct < 0, '攻速加成必须是负的 batPct');
+  assert.equal(haste.mods.batPct, -0.1);
+});
+
+test('发放节奏：深潜每 5 个回合一次，隐藏通关开局多一次', () => {
+  const diveStart = 16;
+  assert.equal(echoBlessingDue(16, diveStart, 0), 0, '深潜第 1 回合不该白送');
+  assert.equal(echoBlessingDue(19, diveStart, 0), 0, '第 4 个深潜回合还没到');
+  assert.equal(echoBlessingDue(20, diveStart, 0), 1, '第 5 个深潜回合 → 1 次');
+  assert.equal(echoBlessingDue(24, diveStart, 0), 1, '第 9 个深潜回合仍是 1 次');
+  assert.equal(echoBlessingDue(25, diveStart, 0), 2, '第 10 个深潜回合 → 2 次');
+  // 打过隐藏核心：开局就有一次
+  assert.equal(echoBlessingDue(16, diveStart, 1), 1);
+  assert.equal(echoBlessingDue(20, diveStart, 1), 2);
+});
+
+test('发放上限：三个都拿过就不再发', () => {
+  assert.equal(echoBlessingDue(60, 16, 0), 3, '再深也不会超过 3');
+  assert.equal(echoBlessingDue(60, 16, 1), 3, '隐藏奖励也不会顶破 3');
+  // 深潜之前一律 0
+  assert.equal(echoBlessingDue(15, 16, 0), 0);
+  assert.equal(echoBlessingDue(1, 16, 0), 0);
+});
+
+test('三选一候选：不重复、最多 3 个、已拥有的不再出现', () => {
+  const offer = echoBlessingOffer(seq(0.1, 0.9, 0.5), []);
+  assert.equal(offer.length, 3);
+  assert.equal(new Set(offer.map((b) => b.id)).size, 3, '候选不能重复');
+
+  const after = echoBlessingOffer(seq(0.1, 0.9, 0.5), ['fund']);
+  assert.ok(after.every((b) => b.id !== 'fund'), '已拥有的不该再进候选');
+  assert.equal(after.length, 2);
+
+  assert.deepEqual(echoBlessingOffer(seq(0.1), ['fund', 'haste', 'loot']), [], '全拿过就没有候选');
+});
+
+test('候选是确定性的：同样的随机序列给同样的结果', () => {
+  const a = echoBlessingOffer(seq(0.3, 0.6, 0.9), []).map((b) => b.id);
+  const b = echoBlessingOffer(seq(0.3, 0.6, 0.9), []).map((b) => b.id);
+  assert.deepEqual(a, b);
+});
+
+test('mods 合并：有疾风就是 batPct -0.1，没有就是空对象', () => {
+  assert.deepEqual(echoBlessingMods(['haste']), { batPct: -0.1 });
+  assert.deepEqual(echoBlessingMods([]), {});
+  assert.deepEqual(echoBlessingMods(['fund', 'loot']), {}, '非 mods 类不产生加成');
+  assert.deepEqual(echoBlessingMods(['nope']), {}, '未知 id 安全');
+  // 同类不叠加：即便列表里重复出现也只算一份
+  assert.deepEqual(echoBlessingMods(['haste', 'haste']), { batPct: -0.2 }, '列表重复时按加算处理（由 _echoGrantBlessing 保证不重复入列）');
+});
+
+test('资金倍率：丰收 ×1.2，其余为 1', () => {
+  assert.equal(echoBlessingCoinMul(['loot']), 1.2);
+  assert.equal(echoBlessingCoinMul([]), 1);
+  assert.equal(echoBlessingCoinMul(['fund', 'haste']), 1);
+  assert.ok(Math.abs(echoBlessingCoinMul(['loot', 'loot']) - 1.44) < 1e-9);
+});
+
+test('一次性资金：只有物资补给给 40', () => {
+  assert.equal(echoBlessingFunds(echoBlessingById('fund')), 40);
+  assert.equal(echoBlessingFunds(echoBlessingById('haste')), 0);
+  assert.equal(echoBlessingFunds(echoBlessingById('loot')), 0);
+  assert.equal(echoBlessingFunds(null), 0);
+});
+
+test('祝福 mods 注入幂等：同一单位不重复挂', () => {
+  const added = [];
+  const battle = { addBuff: (u, b) => { added.push(b); (u.buffs ||= []).push(b); } };
+  const unit = { side: 'ally', buffs: [] };
+  assert.equal(applyEchoBlessingMods(battle, unit, { batPct: -0.1 }), true);
+  assert.equal(applyEchoBlessingMods(battle, unit, { batPct: -0.1 }), false, '第二次不该再挂');
+  assert.equal(added.length, 1);
+  assert.equal(added[0].key, 'echo:bl:mods');
+  assert.deepEqual(added[0].mods, { batPct: -0.1 });
+});
+
+test('没有 addBuff 或单位为空时安全返回', () => {
+  assert.equal(applyEchoBlessingMods(null, { buffs: [] }, { batPct: -0.1 }), false);
+  assert.equal(applyEchoBlessingMods({}, { buffs: [] }, { batPct: -0.1 }), false);
+  assert.equal(applyEchoBlessingMods({ addBuff() {} }, null, { batPct: -0.1 }), false);
+  assert.equal(applyEchoBlessingMods({ addBuff() {} }, { buffs: [] }, {}), false, '空 mods 不挂');
+});
+
+test('每 5 回合一次的常量与节奏自洽', () => {
+  assert.equal(ECHO_BLESSING_EVERY, 5);
+  const diveStart = 15;
+  const due = [];
+  for (let r = diveStart; r <= diveStart + 14; r++) due.push(echoBlessingDue(r, diveStart, 0));
+  assert.deepEqual(due.slice(0, 5), [0, 0, 0, 0, 1], '第 5 个深潜回合才第一次');
+  assert.deepEqual(due.slice(5, 10), [1, 1, 1, 1, 2], '第 10 个深潜回合第二次');
+});

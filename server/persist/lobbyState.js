@@ -88,6 +88,8 @@ export function roomDoc(room, matchRef, sessionOf) {
     // 为 false 时整条省掉，默认房间的存档与以前逐字节一致。
     ...(room.listed === true ? { listed: true } : {}),
     ...(room.matchmaking === true ? { matchmaking: true } : {}),
+    // 「深渊回响」: 只为这个模式写键，普通房间的存档与以前逐字节一致
+    ...(room.variant ? { variant: room.variant } : {}),
     experimental: room.experimental, source: room.source, ownerKey: room.ownerKey, ownerKeys: room.ownerKeys ? [...room.ownerKeys] : null,
     matchKey: room.matchKey, matchKeys: room.matchKeys ? [...room.matchKeys] : null, matchCount: room.matchCount | 0, createdAt: room.createdAt,
     ttlMs: room.ttlMs, noExpire: room.noExpire === true, adminCreated: room.adminCreated === true,

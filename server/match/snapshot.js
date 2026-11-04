@@ -76,6 +76,9 @@ export const MATCH_FIELDS = Object.freeze({
     '_botEmotesSettledRound',
     // plugin interaction windows (0.3.1, match/offers.js): the id counter only — no checkpoint is taken while one is open
     'offerSeq',
+    // 「深渊回响」(DESIGN-ABYSS.md, 2026-11-03): the variant and the dive's own progress. 纯追加 —— 旧存档缺这几项时
+    // 保留构造函数的默认值（null / 0），恢复出来的对局与加这个模式之前一模一样，所以不用抬 SNAPSHOT_VERSION。
+    'echoVariant', 'echoDiveStart', 'echoWordsActive', 'echoBlessingDraws', 'echoBlessings', 'echoBlessingOffer',
   ]),
   special: Object.freeze([
     'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'poolGroups', 'playerItemPools',
@@ -112,6 +115,8 @@ export const MATCH_FIELDS = Object.freeze({
     '_rerollStartAt',
     // 战斗 2 倍速 (speedVote.js): the votes and the speed they set go with the run; a restore is back on the base speed
     '_speedVotes', '_speedVoteAt', '_speedUp', 'gameSpeed',
+    // 深渊回响的祝福投票：纯缓存，恢复后重新投（候选 `echoBlessingOffer` 本身是存档字段）
+    '_echoBlessingVotes',
     // an open plugin window and its continuation (match/offers.js): checkpoints wait for it to close (canSnapshot)
     'offerWin', '_offerTimers', '_offerResume', '_offerResumeTimer',
     // how the bot rehearsals offered to simPool ended

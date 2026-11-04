@@ -539,6 +539,10 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     bond: (id) => (ps.bonds[id] ? { ...ps.bonds[id] } : null),
     bonds: () => Object.fromEntries(Object.entries(ps.bonds).map(([k, v]) => [k, { ...v }])),
     bondActive: (id) => !!(ps.bonds[id] && ps.bonds[id].active),
+    // 「深渊回响」：按层给钱（远见 每 10 层 / 奇迹 每 100 层）结算到 **999 层**。
+    // 深潜的层数上限已经回到原版 999，但 999 层仍然够叠出上百次结算，所以这里再收一道；
+    // 普通房给 Infinity = 原版行为，一字不差（维护者 2026-11-03）。
+    bondLayerCoinCap: m.echoVariant === 'deepecho' ? 999 : Infinity,
     bondCount: (id) => (ps.bonds[id] ? ps.bonds[id].count : 0),
     layers: (id) => ps.layers[id] || 0,
     board: () => boardOrder(ps.board).map(({ r, c, piece }) => ps.pieceView(piece, [r, c])),
@@ -589,7 +593,18 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     addFunds: (n, reason = '') => ps.addFunds(finiteInt(n), { reason }),
     addPendingFunds: (n) => { const v = finiteInt(n); if (v > 0) { ps.pendingFunds += v; ps.dirty(); } return v > 0 ? v : 0; },
     spendFunds: (n) => { const v = finiteInt(n); if (!ps.spend(v)) return false; ps._afterSpend(v, 'effect'); return true; },
-    grantFreeRefresh: (n = 1) => { const v = finiteInt(n); if (v > 0) { ps.shop.freeRefreshes += v; ps.dirty(); } return ps.shop.freeRefreshes; },
+    grantFreeRefresh: (n = 1) => {
+      const v = finiteInt(n);
+      if (v > 0) {
+        ps.shop.freeRefreshes += v;
+        // 「深渊回响」：免费刷新**总量**封顶（同 MatchEcho.MAX_FREE_REFRESH）。
+        // 深潜里盟约层数高，按层数触发的效果（奇迹 每 100 层 +1 次）会把它变成无限刷新，
+        // 所以在授予的那一刻就压住，而不是等回合末再夹（维护者 2026-11-03）。
+        if (m.echoVariant === 'deepecho') ps.shop.freeRefreshes = Math.min(ps.shop.freeRefreshes, 5);
+        ps.dirty();
+      }
+      return ps.shop.freeRefreshes;
+    },
 
     // ---- prices (onPrice only; the same as writing ev.price)
     modifyPrice: (delta) => { if (hook === 'onPrice' && ev && Number.isFinite(delta)) ev.price = Math.max(0, (Number(ev.price) || 0) + delta); return ev ? ev.price : null; },

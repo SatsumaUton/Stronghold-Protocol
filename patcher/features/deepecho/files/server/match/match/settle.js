@@ -1,0 +1,222 @@
+// server/match/match/settle.js — Match methods: SETTLE (the LP loss — a leaker's 联防 survivors —, stats, bounty coins,
+// the IN_BATTLE layer gains clamped by layerGainRoom, CHAR_DAMAGE tickers, eliminations, the 联防 outcome the SETTLE
+// view carries) and RESULT (finish: m.result to every human still here, onEnd).
+// Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
+
+import { PHASE, layerGainRoom } from '../../../shared/constants.js';
+import { uniteSurvivors } from '../unite.js';
+import { buildResult } from '../results.js';
+import { FLOW_TICKER_PRIORITY, DELAYS, REVIVAL_WINDOW_SECONDS } from './common.js';
+import { msg } from '../../../shared/i18n.js';
+import { onSettle, resetRoundCounters } from '../botEmotes.js';
+import { creditedKillsOf } from '../../sim/spec.js';
+
+export class MatchSettle {
+  settle(plan, uniteResult) {
+    this.phase = PHASE.SETTLE;
+    this.runner = null;
+    this._stopClientCombat();
+    const relay = this._uniteRelay?.rounds.at(-1)?.plan === plan ? this._uniteRelay : null;
+    const revivalEligible = relay ? new Set(relay.eligible) : this._revivalHelpers(plan, uniteResult);
+    const combinedUnite = relay ? { ...uniteResult,
+      perPlayer: Object.assign({}, ...relay.rounds.map((r) => r.result?.perPlayer || {})) } : uniteResult;
+    // the pending in-battle gains the views showed become persistent below (alive players) or lapse (DESIGN §20.15)
+    for (const ps of this.order) if (ps.pendingLayerGains) { ps.pendingLayerGains = null; ps.dirty(); }
+    const cap = this.gd.lpCapPerRound;
+    // a 联防 battle that could not run at all (synthetic result) must not wipe the leakers' losses: charge their own leaks
+    const uniteRan = relay ? relay.rounds.some((r) => r.result && !r.result.synthetic)
+      : !!(plan && uniteResult && !uniteResult.synthetic);
+    const survivors = relay ? relay.rounds.at(-1).survivors : uniteRan ? uniteSurvivors(plan, uniteResult) : null;
+    // The 联防's outcome as data for the SETTLE view (m.public.uniteResult, views.js; GitHub #235, PR #112 by @Convey123):
+    // each client pops the official result box from it (ui/gameLogic/phases.js uniteResultBox) — `through` = the leakers'
+    // enemies that still got through (uncapped; only decides whether 「全员无伤！」 is true), `losses` = every alive
+    // player's own LP charge of this round, the same `loss` deducted below, so the box and the LP bar never disagree. A
+    // leaker's own battle leaks are not its charge in a 联防 round, which is why the client cannot work the number out
+    // itself. No ticker line: the official reports the outcome in the one dialog. null when no 联防 resolved.
+    this.uniteResultView = uniteRan && plan.leakers.length ? {
+      through: plan.leakers.reduce((n, lk) => n + Math.max(0, survivors.get(lk.playerId) || 0), 0),
+      helpers: plan.helpers.map((p) => p.playerId),
+      leakers: plan.leakers.map((p) => p.playerId),
+      losses: {},
+    } : null;
+    const alive = this.alivePlayers();
+    for (const ps of alive) {
+      const r = this.lastResults.get(ps.playerId) || { leaked: [], perfect: true, coins: 0, layerGains: {}, killed: 0, damageDealt: 0 };
+      const counted = (r.leaked || []).filter((l) => l && l.counted !== false).length;
+      const loss = uniteRan && plan.leakers.includes(ps) ? Math.min(cap, survivors.get(ps.playerId) || 0) : Math.min(cap, counted);
+      if (this.uniteResultView) this.uniteResultView.losses[ps.playerId] = loss;
+      ps.lp -= loss;
+      ps.stats.lpLost += loss;
+      ps.stats.leaks += counted;
+      ps.stats.kills += Number(r.killed) || 0;
+      ps.stats.dmgDealt += Number(r.damageDealt) || 0;
+      ps.stats.healing += Number(r.healingDone) || 0;
+      if (r.perfect !== false && counted === 0) ps.stats.perfectRounds++;
+      // 「深渊回响」挑战关（深度 5 / 10）结算：只发给本人，按本回合漏怪分档（维护者 2026-11-05）。
+      // 完美通关的「装备三选一」另接（道具补给池），这里先落资金档位。
+      if (this.echoVariant === 'deepecho') {
+        const depth = this._echoDepth();
+        if (depth === 5 || depth === 10) {
+          // 团队完美：所有活着的人本回合都 0 漏 → 下一次选秀强制道具补给三选一
+          const teamPerfect = this.alivePlayers().every((q) => {
+            const rr = this.lastResults.get(q.playerId) || {};
+            return (rr.leaked || []).filter((l) => l && l.counted !== false).length === 0 && rr.perfect !== false;
+          });
+          // 完美通关的团队奖励改成「一次祝福选择」（维护者 2026-11-05：
+          // 装备三选一牵涉新交互，直接用现有的祝福流程更省事）
+          if (teamPerfect) this.echoBlessingDraws = (Number(this.echoBlessingDraws) || 0) + 1;
+          // 奖励随回合提升：10 层比 5 层多一档（维护者 2026-11-05）
+          const mul = depth === 10 ? 1.5 : 1;
+          const base = counted === 0 ? 30 : counted <= 2 ? 15 : counted <= 5 ? 8 : 1;
+          const coin = Math.max(1, Math.round(base * mul));
+          if (coin > 0) {
+            ps.addFunds(coin, { reason: 'echoChallenge' });
+            this.tickerText?.(`${ps.name}：挑战关奖励 +${coin} 资金`, 1);
+          }
+        }
+      }
+      // bounty coins (own battle + unite kills) are credited to the next prep
+      let coins = Math.max(0, Math.trunc(Number(r.coins) || 0));
+      const up = combinedUnite && combinedUnite.perPlayer && combinedUnite.perPlayer[ps.playerId];
+      if (up) {
+        coins += Math.max(0, Math.trunc(Number(up.coins) || 0));
+        ps.stats.dmgDealt += Number(up.damageDealt) || 0;
+        ps.stats.kills += Number(up.killed) || 0;
+      }
+      ps.creditedKills += creditedKillsOf(r) + creditedKillsOf(up);
+      // perfect-payout bounties (战术特训): own phase perfect
+      for (const b of ps.bounties) if (b.card.payout === 'perfect' && counted === 0 && r.perfect !== false) coins += b.card.coin;
+      // C 类祝福「丰收」：全局资金掉落 +20%（echoBlessing.js；普通房间 `_echoCoinMul()` 恒为 1，一个字节不变）
+      if (coins > 0) {
+        const mul = this._echoCoinMul();
+        if (mul !== 1) coins = Math.max(0, Math.round(coins * mul));
+      }
+      if (coins > 0) { ps.pendingFunds += coins; ps.stats.fundsGained += coins; }
+      for (const b of ps.bounties) b.roundsLeft--;
+      ps.bounties = ps.bounties.filter((b) => b.roundsLeft > 0);
+      // IN_BATTLE layer gains (normal battles only), at most the room left under BOND_LAYER_CAP (999, as the battle's
+      // live copy: Battle.addLayers); a bond at the cap gains nothing and dispatches nothing
+      for (const [bondId, n] of Object.entries(r.layerGains || {})) {
+        if (!this.gd.bond(bondId) || !(n > 0)) continue;
+        const before = ps.layers[bondId] || 0;
+        const add = layerGainRoom(before, Math.floor(n), this.layerCapOff);
+        if (!(add > 0)) continue;
+        ps.layers[bondId] = before + add;
+        this.dispatch(ps, 'onLayers', { bondId, from: before, to: ps.layers[bondId], reason: 'battle' });
+      }
+      this._charDamageTickers(ps, r);
+      this.dispatch(ps, 'onBattleResult', { result: r, lpLoss: loss, perfect: counted === 0 && r.perfect !== false, unite: combinedUnite || null });
+      ps.recompute();
+    }
+    this._revival = { round: this.round, eligible: revivalEligible, windowOpen: false, deadline: 0 };
+    const canRescue = this.revivalEnabled && this.teamLp == null && this.order.some((ps) => this.revivalDonorEligible(ps));
+    for (const ps of alive) {
+      if (ps.lp <= 0) {
+        if (canRescue && ps.alive && !ps.revived && !ps.left) this._deferDeath(ps);
+        else this._finalizeDeath(ps);
+      }
+    }
+    this.fields = [];
+    this.watchers.clear();
+    const rescue = canRescue && this.order.some((ps) => this.revivalTargetEligible(ps));
+    this.setDeadline(rescue ? REVIVAL_WINDOW_SECONDS : DELAYS.SETTLE / 1000,
+      () => this.afterSettle({ reason: 'window-expired' }), { silent: !rescue && this.soloUntimed });
+    if (rescue) { this._revival.windowOpen = true; this._revival.deadline = this.deadline; }
+    this.markPublic();
+    onSettle(this); // one emote per alive AI per round (enabled by default; SP_BOT_EMOTES=0 silences it)
+  }
+
+  /**
+   * CHAR_DAMAGE tickers: one per board unit of the battle (its highest threshold); units created in battle (summons,
+   * no board uid) count once per unit type (the highest of them) — a result can never announce more units than the
+   * lineup has kinds of.
+   */
+  _charDamageTickers(ps, r) {
+    const steps = (Array.isArray(this.gd.config.broadcasts) ? this.gd.config.broadcasts : []).filter((b) => b.type === 'CHAR_DAMAGE' && Array.isArray(b.params)).map((b) => Number(b.params[0])).filter((n) => n > 0).sort((a, b) => b - a);
+    if (!steps.length) return;
+    const board = new Set();
+    for (const p of ps.board.values()) board.add(p.uid);
+    const best = new Map();
+    for (const u of r.unitStats || []) {
+      if (!u) continue;
+      const key = Number.isInteger(u.uid) && board.has(u.uid) ? `uid:${u.uid}` : `def:${u.defId}`;
+      const cur = best.get(key);
+      if (!cur || (Number(u.dmg) || 0) > (Number(cur.dmg) || 0)) best.set(key, u);
+    }
+    for (const u of best.values()) {
+      const hit = steps.find((s) => (u.dmg || 0) >= s);
+      if (hit) this.tickerFor('CHAR_DAMAGE', [ps.name, u.name || u.defId, String(hit)], { playerId: ps.playerId, param: String(hit) });
+    }
+  }
+
+  /**
+   * Drop every alive player whose LP is already gone. Settlement calls this after the round's LP loss.
+   * An accepted test round jump calls the same helper before the next round starts, so LP 0 cannot be
+   * written back into a new prep. The LP command itself stays a raw write.
+   */
+  eliminateBroken() {
+    for (const ps of this.alivePlayers()) {
+      if (ps.lp <= 0) {
+        ps.lp = 0;
+        ps.eliminate(this.round);
+        this.toast(ps, 'error', '你的目标生命值耗尽，已被淘汰');
+        this.tickerText(msg('{name}博士的目标生命值已耗尽', { name: ps.name }), FLOW_TICKER_PRIORITY);
+      }
+    }
+  }
+
+  afterSettle({ reason } = {}) {
+    this._finalizePendingDeaths({ reason });
+    if (!this.alivePlayers().length) { this.finish({ victory: false, reason: 'eliminated' }); return; }
+    // 「深渊回响」无尽：正常只会在团灭时结束（上一行），这里只有撞到安全阀（ECHO_SAFE_ROUND）才走。
+    if (this._echoAtEnd()) { this.finish({ victory: true, reason: 'victory' }); return; }
+    resetRoundCounters(this); // AI bot merge-counter resets each round (server/match/botEmotes.js)
+    this.startRound(this.round + 1);
+  }
+
+  finish({ victory, hiddenCleared = false, reason = 'defeat' }) {
+    // A command that ends a test match must be audited/counted before publishing its result.
+    if (this.test && this._testApplying) { this._testOutcome = { victory, hiddenCleared, reason }; return; }
+    if (this.ended || this.disposed) return;
+    this._finalizePendingDeaths({ notify: false, reason: 'match-ended' });
+    this.offersDispose();
+    this.ended = true;
+    this.externalAI?.close();
+    if (this.runner) { try { this.runner.stop(); } catch { /* ignore */ } this.runner = null; }
+    this._stopClientCombat();
+    this.cancel(this._phaseTimer);
+    this.cancel(this._turnTimer);
+    for (const h of this._timers) { try { this.sched.clearTimeout(h); } catch { /* ignore */ } }
+    this._timers.clear();
+    this.phase = PHASE.RESULT;
+    this.deadline = 0;
+    for (const f of this.fields) f.live = false;
+    this.outcome = { victory: !!victory, hiddenReached: this.hiddenReached, hiddenCleared: !!hiddenCleared, reason,
+      // 「深渊回响」无尽：把**深度**记进结算 —— 深度就是这个模式的成绩。
+      // 普通房间不出现这几个键，outcome 的形状与加这个模式之前逐字不变（golden 守着）。
+      ...(this.echoVariant === 'deepecho'
+        ? { variant: 'deepecho', echoRound: this.round, echoDepth: this._echoDepth(), echoDiveStart: this.echoDiveStart }
+        : {}) };
+    let result;
+    try {
+      result = buildResult(this, this.outcome);
+    } catch (e) {
+      this.reportError('buildResult', e);
+      result = { t: 'm.result', victory: !!victory, roundsPassed: 0, reason, modeId: this.modeId, difficulty: this.difficulty, players: [] };
+    }
+    if (this.test) {
+      result.test = true;
+      result.testActions = this.testActions;
+      if (this.testReplayable === false) result.testReplayable = false;
+    }
+    this.lastResultMsg = result;
+    this.markPublic();
+    try { this.flush(true); } catch (e) { this.reportError('flush', e); }
+    // every human still here gets the settlement — the spectator seats the same public rows (none of them their own)
+    for (const ps of this._viewers()) this.sendTo(ps.playerId, { ...result, playerId: ps.playerId });
+    const { t, ...summary } = result;
+    void t;
+    summary.errors = this.errorCount;
+    try { this.onEndFn(summary); } catch (e) { this.reportError('onEnd', e); }
+  }
+}
