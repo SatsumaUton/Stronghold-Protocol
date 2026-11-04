@@ -9,7 +9,7 @@
 //
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
-import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_MAX_FREE_REFRESH, ECHO_BOND_BAN_ROUNDS, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
+import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_MAX_FREE_REFRESH, ECHO_BOND_BAN_ROUNDS, ECHO_DEPLOY_BAN_ROUNDS, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
 import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js';
 import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
@@ -835,7 +835,32 @@ export class MatchEcho {
     }
     // 叠层：新封的追加在已有之上（维护者 2026-11-05「封锁也支持叠加」），最多留 8 个
     this.echoBannedTiles = [...have, ...out].slice(0, 8);
+    // 封锁也是有时限的（维护者 2026-11-05）：记下到期层，到时整批解除
+    if (out.length) this.echoBannedTilesUntil = this._echoDepth(this.round) + ECHO_DEPLOY_BAN_ROUNDS;
     return out.length;
+  }
+
+  /**
+   * 封锁到期清理（维护者 2026-11-05）：`echoBannedTilesUntil <= depth` 时整批解除，
+   * 并把 `block_tiles` 从诅咒列表里删掉（和排异同一套口径）。
+   *
+   * @returns {number} 解除的地块数
+   */
+  _echoExpireDeployBans(depth = this._echoDepth(this.round)) {
+    const until = Number(this.echoBannedTilesUntil) || 0;
+    const tiles = Array.isArray(this.echoBannedTiles) ? this.echoBannedTiles : [];
+    if (!tiles.length || !(until > 0) || until > depth) return 0;
+    this.echoBannedTiles = [];
+    this.echoBannedTilesUntil = 0;
+    if (Array.isArray(this.echoCurseIds)) {
+      let left = 1;
+      this.echoCurseIds = this.echoCurseIds.filter((id) => {
+        if (left > 0 && id === 'block_tiles') { left -= 1; return false; }
+        return true;
+      });
+    }
+    this._echoPushAnnounce('封锁解除：被封锁的地块重新可以部署了');
+    return tiles.length;
   }
 
   /**
@@ -1039,6 +1064,15 @@ export class MatchEcho {
         return {
           id, name, rarity: c.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c.rarity] || '普通',
           desc: `${desc}（已禁：${names}${tail}）`,
+        };
+      }
+      // 封锁（deployBan）：把「还剩几层」写进描述（维护者 2026-11-05）
+      if (c && c.effect && c.effect.kind === 'deployBan' && Array.isArray(this.echoBannedTiles) && this.echoBannedTiles.length) {
+        const left = Number(this.echoBannedTilesUntil) - this._echoDepth();
+        const tail = left > 0 ? `（剩余 ${left} 层）` : '';
+        return {
+          id, name, rarity: c.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c.rarity] || '普通',
+          desc: `${desc}${tail}`,
         };
       }
       return { id, name, desc, rarity: c?.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c?.rarity] || '普通' };

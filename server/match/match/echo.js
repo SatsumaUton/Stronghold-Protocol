@@ -62,6 +62,8 @@ export const ECHO_SAFE_ROUND = 999;
 export const ECHO_MAX_FREE_REFRESH = 2;
 /** 排异诅咒持续多少层（维护者 2026-11-05：不是永久，到期自动解除）。 */
 export const ECHO_BOND_BAN_ROUNDS = 3;
+/** 诅咒「封锁」（禁放地块）持续多少层（维护者 2026-11-05：与排异一致，3 层后自动解除）。 */
+export const ECHO_DEPLOY_BAN_ROUNDS = 3;
 
 /**
  * 挑战关（深度 5 / 10）的奖励线：全队清怪率 ≥ 这个百分比 → 全队 +1 次祝福三选一。
