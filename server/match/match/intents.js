@@ -146,6 +146,7 @@ export class MatchIntents {
       case 'g.echoBlessingDiscard': return this.setEchoBlessingDiscardVote(ps, msg.pick);
       // 提前结束排异 / 封锁（持有「开路」这类反制祝福时）
       case 'g.echoCounterUse': return this.setEchoCounterUse(ps);
+      case 'g.echoAltar': return this.buyEchoAltar(ps, msg.kind);
       // 「护盾」祝福：投票指定要保护的盟约
       case 'g.echoShield': return this.setEchoShieldVote(ps, msg.pick);
       case 'g.band': return this.pickBand(ps, msg.bandId);
