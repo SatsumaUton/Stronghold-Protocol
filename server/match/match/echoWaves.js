@@ -237,15 +237,14 @@ export function echoHitCountEnemy(gd) {
   const raw = gd && gd.raw && gd.raw.enemies ? gd.raw.enemies : {};
   for (const [key, e] of Object.entries(raw)) {
     const abil = e && Array.isArray(e.abilities) ? e.abilities : [];
-    // 「频次怪」的文案有两种写法：需要数次攻击击倒（11 条）与 需要 N 次伤害击倒（器物类 16 条，如青铜镜）。
-    // 只认前一种会漏掉器物，它们的血就被按深度缩放成上千（维护者 2026-11-05 实测青铜镜 1150）。
-    // 真正的「频次怪」文案是 需要 N 次伤害击倒（器物类 16 条，baseHp 恰好等于需要的次数）。
-    // 之前用 数次攻击 会误伤「能在数次攻击后晕眩我方单位」这类普通敌人（hvyslr 10000 血），
-    // 而漏掉器物 → 青铜镜被按深度缩放成 1150（维护者 2026-11-05 实测）。
-        // 只认**独立成条**的 需要 N 次伤害击倒（器物类 12 条，baseHp 恰好等于 N）。
+    // 「频次怪」= 数据里**独立成条**的「需要 N 次…击倒」（这类怪的 baseHp 恰好等于 N，sim 的 hitCount
+    // 让每次伤害只扣 1）。文案有两种写法，两种都要认：
+    //   · 需要 N 次伤害击倒        （青铜镜 / 铁矛头 …）
+    //   · 需要 N 次法术或真实伤害击倒（青瓷茶器 / 彩瓷茶器，hitCountArts：只有法术与真实伤害扣 1）
+    // 之前只认第一种，茶器被漏掉 → 血量跟着深度缩放成 13267（维护者 2026-11-05 实测）。
     // 不能只搜子串：深池逐火战士 / 假想敌·再生 的长句里也有「需要 5 次伤害击倒的<余烬>」，
-    // 但它们本体是 5000～12000 血的普通敌人，被误判就会被打回个位数血量。
-    if (abil.some((a) => a && typeof a.text === 'string' && /^需要\d+次伤害击倒$/.test(a.text.trim()))) set.add(key);
+    // 但它们本体是 5000～12000 血的普通敌人，被误判就会被打回个位数血量（所以要求整条匹配）。
+    if (abil.some((a) => a && typeof a.text === 'string' && /^需要\d+次[^<]{0,12}击倒$/.test(a.text.trim()))) set.add(key);
   }
   ECHO_HITCOUNT_CACHE.set(gd, set);
   return set;
@@ -254,17 +253,23 @@ export function echoHitCountEnemy(gd) {
 /**
  * 「频次怪」在深潜里的**绝对血量**（数值 = 需要被打几下，sim 的 hitCount 每次伤害只扣 1）。
  *
- * 维护者 2026-11-05 第二次定：之前把它们的血量封顶在数据 baseHp（30 / 45 下），深度一高就等于
- * 「一刀就没」，太简单。现在按深度给血量，落在 500–2000 区间：
- *   第 1 层 500 下 → 每深一层 +40 → 第 39 层起固定 2000 下。
+ * 维护者 2026-11-05 定：**1–15 层用原版血量**（数据 baseHp 就是需要的次数，30 / 45 / 4…），
+ * **16 层起**改成按深度给的绝对血量，落在 500–2000：
+ *   第 16 层 500 下 → 每深一层 +40 → 第 54 层起固定 2000 下。
+ * （15 层之前压力靠波次本身，频次怪保持原版手感；16 层之后才开始「越深越厚」。）
  */
+export const ECHO_HITCOUNT_HP_FROM = 16;
 export const ECHO_HITCOUNT_HP_MIN = 500;
 export const ECHO_HITCOUNT_HP_MAX = 2000;
 export const ECHO_HITCOUNT_HP_PER_DEPTH = 40;
-/** 第 depth 层「频次怪」要被打几下（500–2000）。 */
+/**
+ * 第 depth 层「频次怪」要被打几下。
+ * @returns {number|null} `null` = 这一层不覆盖，用原版血量（1–15 层）
+ */
 export function echoHitCountHp(depth) {
-  const d = Math.max(1, Math.floor(Number(depth) || 1));
-  const hp = ECHO_HITCOUNT_HP_MIN + (d - 1) * ECHO_HITCOUNT_HP_PER_DEPTH;
+  const d = Math.floor(Number(depth) || 0);
+  if (!(d >= ECHO_HITCOUNT_HP_FROM)) return null;
+  const hp = ECHO_HITCOUNT_HP_MIN + (d - ECHO_HITCOUNT_HP_FROM) * ECHO_HITCOUNT_HP_PER_DEPTH;
   return Math.max(ECHO_HITCOUNT_HP_MIN, Math.min(ECHO_HITCOUNT_HP_MAX, Math.round(hp)));
 }
 export function echoAllPool(gd, helpers) {

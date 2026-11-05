@@ -54,20 +54,22 @@ export class MatchCombat {
    * browser's local replica, a client-run field and the server's check of it all fight the same battle. Nothing when off.
    */
   _ruleFlags() {
+    // 「频次怪」的绝对血量表：1–15 层是空表（原版血量），空的时候连键都不发 —— 普通房/前期逐字节不变
+    const hpAbs = this.echoVariant === 'deepecho' ? this._echoHitCountHp() : null;
     return { ...(this.layerCapOff ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
       // 「深渊回响」：限伤上限跟着深度缩放（普通房没有这个键 → sim 走官方 300000）
       ...(this.echoVariant === 'deepecho' ? { hitLimitMul: this._echoHitLimitMul() } : {}),
-      // 「深渊回响」：「频次怪」（器物，血量 == 需要被打几下）按深度给**绝对血量**（见 _echoHitCountHp）
-      ...(this.echoVariant === 'deepecho' ? { enemyHpAbs: this._echoHitCountHp() } : {}),
+      // 「深渊回响」：「频次怪」（器物，血量 == 需要被打几下）16 层起按深度给**绝对血量**（见 _echoHitCountHp）
+      ...(hpAbs && Object.keys(hpAbs).length ? { enemyHpAbs: hpAbs } : {}),
       ...(this.enemyHpMul !== 1 ? { enemyHpMul: this.enemyHpMul } : {}), ...(this.enemyAtkMul !== 1 ? { enemyAtkMul: this.enemyAtkMul } : {}) };
   }
 
   /**
    * 「频次怪」的绝对血量表（enemyKey → 血量 = 需要被打几下），深潜专用。
    *
-   * 维护者 2026-11-05 第二次定：这类怪的 maxHp 就是「要打几下」，之前封顶在数据 baseHp（30 / 45 下），
-   * 深度一高就等于「一刀就没」。现在按深度给，落在 **500–2000** 区间（`echoHitCountHp`）：
-   * 第 1 层 500 下 → 每深一层 +40 → 第 39 层起固定 2000 下。
+   * 维护者 2026-11-05 定：**1–15 层用原版血量**（数据 baseHp 就是需要的次数：铁矛头 30、铁灯盘 45、
+   * 青瓷茶器 4 —— 也就是原版「打 N 下」的手感，不跟深度缩放），**16 层起**改成按深度给的绝对血量，
+   * 落在 500–2000 区间（`echoHitCountHp`）：第 16 层 500 下 → 每层 +40 → 第 54 层起固定 2000 下。
    *
    * 为什么不能只改波次：它们多数是**召唤物**（新硎的 DeadSpawn 出铁矛头），根本不在 `wave.spawns` 里
    * —— 只有出怪那一处（sim spawnEnemy 读 `flags.enemyHpAbs`）能统一覆盖。
@@ -75,12 +77,18 @@ export class MatchCombat {
    */
   _echoHitCountHp() {
     const depth = typeof this._echoDepth === 'function' ? this._echoDepth(this.round) : 1;
-    const hp = echoHitCountHp(depth);
+    const band = echoHitCountHp(depth);
     const cache = this._echoHpAbsCache;
-    if (cache && cache.gd === this.gd && cache.hp === hp) return cache.map;
+    if (cache && cache.gd === this.gd && cache.hp === band) return cache.map;
     const map = {};
-    try { for (const k of echoHitCountEnemy(this.gd)) map[k] = hp; } catch { /* 数据异常时按普通血量走 */ }
-    this._echoHpAbsCache = { gd: this.gd, hp, map };
+    try {
+      for (const k of echoHitCountEnemy(this.gd)) {
+        // 1–15 层：原版血量（baseHp == 需要的次数），同样走绝对覆盖，这样才不会被深度倍率放大
+        const base = band == null ? Math.max(1, Math.floor(Number(this.gd.enemy(k)?.stats?.maxHp) || 1)) : band;
+        map[k] = base;
+      }
+    } catch { /* 数据异常时按普通血量走 */ }
+    this._echoHpAbsCache = { gd: this.gd, hp: band, map };
     return map;
   }
 
