@@ -145,6 +145,9 @@ export const MATCH_FIELDS = Object.freeze({
     '_speedVotes', '_speedVoteAt', '_speedUp', 'gameSpeed',
     // 深渊回响的祝福投票：纯缓存，恢复后重新投（候选 `echoBlessingOffer` 本身是存档字段）
     '_echoBlessingVotes',
+    // 深潜决策面板按住的那段准备时间（`_echoPausePrepClock`）：面板本身不存档，所以这个也不存 ——
+    // canSnapshot 在面板开着时直接拒绝存档（见上面），读档回来的局面里不存在「按住」这个状态
+    '_echoPrepPausedMs',
     // an open plugin window and its continuation (match/offers.js): checkpoints wait for it to close (canSnapshot)
     'offerWin', '_offerTimers', '_offerResume', '_offerResumeTimer',
     // how the bot rehearsals offered to simPool ended
@@ -197,6 +200,11 @@ export function canSnapshot(m) {
   // an open plugin window (0.3.1) holds the round back on a continuation a checkpoint cannot carry; a test match never
   // checkpoints (its journal is the record)
   if ((Array.isArray(m.offerWin) && m.offerWin.length) || m._offerResume || m.test) return false;
+  // 「深渊回响」的决策面板（祝福三选一 / 弃选替换 / 刷新投票 / 深潜补给 / 盟约投影 / 护盾指定）开着时，
+  // 准备倒计时是**按住**的：deadline 被清零，剩下的时长放在 `_echoPrepPausedMs` 里（不存档）。
+  // 此刻存检查点，读档回来准备时间就是 0 秒，而面板本身也回不来 —— 玩家会白丢一整回合的备战。
+  // 所以和插件窗口一样：等面板结算完再存（维护者 2026-11-06「重启断点续玩」）。
+  if (typeof m._echoChoiceOpen === 'function' && m._echoChoiceOpen()) return false;
   if (m.phase === PHASE.PREP) for (const ps of m.alivePlayers()) if (ps.botControlled && !ps.ready) return false;
   return true;
 }
