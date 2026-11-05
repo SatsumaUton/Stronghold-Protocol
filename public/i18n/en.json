@@ -2592,5 +2592,6 @@
   "活着的玩家投票决定是否重抽这三个候选；本局最多 {cap} 次，投票不占用选择时间": "Living players vote on rerolling these three candidates; up to {cap} times this run, and the vote does not use the selection timer",
   "本局已买过（上限 {n} 次）": "Already bought this run (max {n})",
   "永久 +1 部署位（本局最多 {n} 次）": "Permanent +1 deploy slot (max {n} this run)",
-  "永久 +1 部署位": "Permanent +1 deploy slot"
+  "永久 +1 部署位": "Permanent +1 deploy slot",
+  "祭坛开放 · 放大镜里献祭": "Altar open · sacrifice in the magnifier"
 }

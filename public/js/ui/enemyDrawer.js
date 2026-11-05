@@ -16,6 +16,8 @@ import { factionIconUrl } from './assetUrls.js';
 import { data } from '../data.js';
 import { actions } from './gameActions.js';
 import { echoBuffChips } from './echoBuffs.js';
+// 「深渊祭坛」（16 层起随机开放）：以前这块组件定义了却从没挂到界面上，玩家一直没见过祭坛
+import { EchoAltar } from './echoStatus.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -205,6 +207,7 @@ function BlessTab({ pub }) {
   const depth = Number(echo?.depth) || 0;
   const counters = Array.isArray(echo?.counters) ? echo.counters : [];
   return html`<div class="edrawer__body">
+    ${echo ? html`<${EchoAltar} pub=${pub} />` : null}
     ${counters.length ? html`<div class="echo-counters">
       ${counters.map((c) => html`<span key=${c.id} class="echo-counter" title=${c.desc || ''}>
         <b>${c.name}</b>
