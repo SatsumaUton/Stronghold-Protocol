@@ -87,8 +87,30 @@ export class PlayerRound {
     // the states the last recompute stored: the change since then is reported once (_reportActiveBonds)
     const before = this.bonds;
     this.bonds = computeBonds(this.gd, this);
+    this._trackBondPeak();
     this.dirty();
     this._reportActiveBonds(before, this.bonds);
+  }
+
+  /**
+   * 记录「这一局用过的最多盟约 / 最高层数」（维护者 2026-11-05：深潜排行榜上一律显示「无核心 · 最高 0 层」）。
+   *
+   * 为什么必须单独记峰值：团灭时每个座位都会走 `eliminate()`，它把棋盘 / 手牌全部退回卡池，
+   * 于是 `this.bonds` 里所有 count 归零 —— 结算时再去读 `bonds` 就只剩 0。
+   * 这里在每次 recompute 之后把峰值往上记（只增不减），结算 / 排行榜读 `bondPeak`。
+   */
+  _trackBondPeak() {
+    if (!this.bondPeak || typeof this.bondPeak !== 'object') this.bondPeak = { cores: [], bonds: 0, maxLayers: 0 };
+    const peak = this.bondPeak;
+    if (!Array.isArray(peak.cores)) peak.cores = [];
+    const live = Object.entries(this.bonds || {}).filter(([, r]) => r && Number(r.count) > 0);
+    if (live.length > (Number(peak.bonds) || 0)) peak.bonds = live.length;
+    for (const [id] of live) {
+      const bond = typeof this.gd.bond === 'function' ? this.gd.bond(id) : null;
+      if (bond && bond.isCore === true && !peak.cores.includes(id)) peak.cores.push(id);
+      const n = Math.max(0, Math.floor(Number(this.layers && this.layers[id]) || 0));
+      if (n > (Number(peak.maxLayers) || 0)) peak.maxLayers = n;
+    }
   }
 
   /**

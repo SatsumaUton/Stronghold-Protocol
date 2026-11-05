@@ -1788,3 +1788,36 @@ test('深潜补给的选择不占用准备阶段倒计时', (t) => {
   // 真实房间里它会用这段时长把 deadline 接回去。
   assert.equal(m._echoPrepPausedMs, null, '结算后暂停状态要清掉（恢复倒计时）');
 });
+
+// 维护者 2026-11-05：深潜排行榜上「核心盟约 / 最高盟约数」全是空的（团灭那局 71 层）。
+// 根因：团灭时每个座位都走 eliminate()，它把棋盘 / 手牌退回卡池 → bonds 全部 count=0，
+// 结算时现算就只剩 0。现在每次 recompute 记一个只增不减的峰值（bondPeak），排行榜读它。
+test('团灭后仍能拿到「核心盟约 / 最高盟约层数」：bondPeak 不随棋盘清空归零', async (t) => {
+  const { PLAYER_FIELDS } = await import('../../server/match/snapshot.js');
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  // 找一个带核心盟约的干员摆上棋盘，并给它 5 层
+  const coreIds = Object.entries(m.gd.raw.bonds || {}).filter(([, b]) => b && b.isCore === true).map(([id]) => id);
+  let pick = null;
+  for (const [id, rec] of Object.entries(m.gd.raw.chess || {})) {
+    const bs = Array.isArray(rec.bonds) ? rec.bonds : [];
+    const core = bs.find((b) => coreIds.includes(b));
+    if (core) { pick = { id, core }; break; }
+  }
+  assert.ok(pick, '数据里要有带核心盟约的干员');
+  ps.board.set('10,5', { uid: 1, kind: 'chess', id: pick.id, items: [] });
+  ps.layers[pick.core] = 5;
+  ps.recompute();
+  assert.ok(ps.bondPeak.cores.includes(pick.core), '峰值要记下核心盟约');
+  assert.equal(ps.bondPeak.maxLayers, 5, '峰值要记下最高层数');
+  assert.ok(ps.bondPeak.bonds >= 1, '峰值要记下用过的盟约数');
+  // 团灭：棋盘退回卡池，现算的 bonds 全归零
+  ps.eliminate(m.round);
+  ps.recompute();
+  assert.equal(Object.values(ps.bonds).filter((r) => r && r.count > 0).length, 0, '棋盘已经清空');
+  assert.ok(ps.bondPeak.cores.includes(pick.core), '峰值不能被清空');
+  assert.equal(ps.bondPeak.maxLayers, 5, '峰值层数不能归零');
+  assert.ok(PLAYER_FIELDS.saved.includes('bondPeak'), '峰值要进存档（读档续玩后榜上仍然有数据）');
+});
