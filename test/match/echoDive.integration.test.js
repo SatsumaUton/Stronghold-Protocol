@@ -1606,3 +1606,22 @@ test('护盾祝福：不占祝福名额，且显示已指定的盟约', (t) => {
   assert.equal(e.blessings.filter((b) => b.occupiesSlot).length, 2, '只数两个真正占位的祝福');
   assert.match(shield.desc, /已指定/, '要显示保护的是哪条盟约');
 });
+
+// 维护者 2026-11-05：一次性祝福（资金/回血/净化）和反制祝福拿到就结算，
+// 但玩家要能在「已获得祝福」和 buff 栏里看到，只是不占名额。
+test('一次性 / 反制祝福也显示在祝福列表里，但不占名额', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 30;
+  m.echoBlessings = ['hp_s'];
+  m.echoOneShotIds = ['fund', 'heal_s'];
+  m.echoCounterIds = ['quench'];
+  const e = m._echoPublic();
+  const ids = e.blessings.map((b) => b.id);
+  for (const id of ['fund', 'heal_s', 'quench']) assert.ok(ids.includes(id), `${id} 要出现在列表里`);
+  assert.equal(e.blessings.filter((b) => b.occupiesSlot).length, 1, '只有真正占位的那一个计入 n/3');
+  const fund = e.blessings.find((b) => b.id === 'fund');
+  assert.equal(fund.oneShot, true);
+  assert.equal(fund.consumed, true);
+});

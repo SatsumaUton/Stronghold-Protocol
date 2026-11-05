@@ -1391,9 +1391,11 @@ export class MatchEcho {
         rarity: b.rarity || 'common',
         rarityLabel: ECHO_BLESSING_RARITY_LABEL[b.rarity] || '普通',
         // 一次性祝福（资金 / 回血 / 涤罪 / 反制）：立刻结算、不挂在干员身上
-        oneShot: echoBlessingOneShot(b),
-        // 是否占 3 个祝福名额（护盾是一次性效果：显示在列表里，但不占位）
-        occupiesSlot: b.id !== 'shield_bond' && !echoBlessingOneShot(b),
+        oneShot: echoBlessingOneShot(b) || b.kind === 'counter',
+        // 已消耗（拿到就结算过）：列表里照常显示，只是不占名额
+        consumed: b.consumed === true,
+        // 是否占 3 个祝福名额：护盾、一次性、反制都不占（显示在列表里，但不计数）
+        occupiesSlot: b.id !== 'shield_bond' && !echoBlessingOneShot(b) && !echoBlessingFree(b),
         // 护盾：把「保护的是哪条盟约」写进描述（维护者 2026-11-05）
         desc: b.id === 'shield_bond'
           ? `${b.desc}${this.echoShieldBond ? `（已指定：${this.gd.bond(this.echoShieldBond)?.name || this.echoShieldBond}）` : '（尚未指定盟约）'}`
@@ -1740,11 +1742,25 @@ export class MatchEcho {
 
   /** 已拥有的祝福对象列表（HUD / 测试用）。 */
   /**
-   * 已获得的祝福：**只列占名额的**那些（维护者 2026-11-05：一次性祝福拿到就结算，
-   * 选择后应该直接消失，不要留在列表里，也不要把 n/3 撑成 6/2）。
+   * 已获得的祝福（HUD / 列表用）。
+   *
+   * 占名额的祝福照常返回；**一次性祝福**（资金 / 回血 / 净化 / 涤罪 / 反制）虽然拿到就结算，
+   * 也以 `consumed: true` 并进列表 —— 玩家要能看到「这一局吃过什么」，
+   * 否则只出现在广播里，buff 栏和「已获得祝福」都查不到（维护者 2026-11-05）。
+   * 它们不占名额：`_echoPublic` 会给 `occupiesSlot: false`，界面计数不会把 n/3 撑爆。
    */
   _echoBlessings() {
-    return Array.isArray(this.echoBlessings) ? this.echoBlessings.map((id) => echoBlessingById(id)).filter(Boolean) : [];
+    const out = Array.isArray(this.echoBlessings) ? this.echoBlessings.map((id) => echoBlessingById(id)).filter(Boolean) : [];
+    const seen = new Set(out.map((b) => b.id));
+    const add = (id) => {
+      const b = echoBlessingById(id);
+      if (!b || seen.has(b.id)) return;
+      seen.add(b.id);
+      out.push({ ...b, consumed: true });
+    };
+    for (const id of (Array.isArray(this.echoOneShotIds) ? this.echoOneShotIds : [])) add(id);
+    for (const id of (Array.isArray(this.echoCounterIds) ? this.echoCounterIds : [])) add(id);
+    return out;
   }
 
   /** 当前三选一的候选与票数（没有进行中的抽取时为 null）。 */
