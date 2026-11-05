@@ -4,7 +4,7 @@
 // 部署位会一直涨（基础 8）。现在整局限 1 次，买过之后祭坛不再提供这一项。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeMatch } from './harness.js';
+import { makeMatch, settleEchoPanels } from './harness.js';
 import { snapshotMatch } from '../../server/match/snapshot.js';
 
 const dive = () => makeMatch({ mode: 'coop', humans: 2, bots: 0, seed: 5, fake: true, variant: 'deepecho' });
@@ -89,6 +89,8 @@ test('买过几次要进存档（读档后不能又买一次）', (t) => {
   m.startRound(16);
   const ps = atLayer(m, 20);
   m.buyEchoAltar(ps, 'permanent');
+  // 面板开着时 canSnapshot 拒绝存档（准备倒计时被按住），先结算掉
+  settleEchoPanels(m);
   const doc = snapshotMatch(m);
   assert.ok(doc, '准备阶段能存检查点');
   const saved = doc.players?.[ps.playerId] || doc.match?.players?.[ps.playerId] || null;

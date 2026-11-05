@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { makeMatch } from './harness.js';
+import { makeMatch, settleEchoPanels } from './harness.js';
 import { isFlyKey } from '../../server/match/waves.js';
 import { createRng, deriveSeed } from '../../server/sim/rng.js';
 import { ECHO_BLESSINGS, echoBlessingById, echoBlessingOffer } from '../../server/match/match/echoBlessing.js';
@@ -1664,6 +1664,8 @@ test('祭坛抽到的一次性祝福进存档：回执保留（不再显示在�
   assert.ok(m.echoOneShotIds.length >= 1, '祭坛抽到的祝福要记进 echoOneShotIds');
   const listed = (m.publicView().echo.blessings || []).map((b) => b.id);
   assert.equal(listed.some((id) => m.echoOneShotIds.includes(id)), false, '用掉的一次性祝福不再显示');
+  // 面板开着时 canSnapshot 拒绝存档（准备倒计时被按住、剩余时长不存档），先结算掉
+  settleEchoPanels(m);
   const doc = snapshotMatch(m);
   assert.ok(doc, '准备阶段能存检查点');
   assert.deepEqual(doc.match.echoOneShotIds, m.echoOneShotIds, '一次性祝福的回执要进存档');
