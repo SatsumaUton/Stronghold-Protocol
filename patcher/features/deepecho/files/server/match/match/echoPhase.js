@@ -1533,6 +1533,32 @@ export class MatchEcho {
   }
 
   /** 公开视图里的深潜信息（普通房间不出现这些键）。 */
+  /**
+   * 本回合会出场的**跨版本敌人**记录（`<version>:enemy_…`），给客户端补数据表里缺的那些条。
+   *
+   * 为什么需要：深潜的波次会从各版本的模板库里抽怪（`echoCrossVersion`），抽到第一期独有的敌人时
+   * key 会带 `act1autochess:` 前缀，而客户端加载的是本房版本的数据表 —— 查不到这条记录，
+   * 于是准备阶段「敌方情报」里没有名字和图标，战斗中点开敌人也没有说明框（维护者 2026-11-05）。
+   *
+   * 只带**本回合真正会出场**的 key（普通波次 + boss 分组波次），并且去重：一回合最多几条。
+   *
+   * @returns {Record<string, object>} key → 敌人记录（data/enemies.json 的形状）
+   */
+  _echoCrossEnemyDefs() {
+    const out = {};
+    const take = (spawns) => {
+      for (const s of Array.isArray(spawns) ? spawns : []) {
+        const key = s && s.enemyKey;
+        if (typeof key !== 'string' || !key.includes(':') || out[key]) continue;
+        const rec = this.gd && typeof this.gd.enemy === 'function' ? this.gd.enemy(key) : null;
+        if (rec) out[key] = rec;
+      }
+    };
+    take(this.wave && this.wave.spawns);
+    for (const g of Array.isArray(this.bossWaves) ? this.bossWaves : []) take(g && g.wave && g.wave.spawns);
+    return out;
+  }
+
   _echoPublic() {
     if (this.echoVariant !== 'deepecho') return null;
     const offer = this._echoOfferView();
@@ -1544,6 +1570,10 @@ export class MatchEcho {
       depth: this._echoDepth(),
       // 词条带上说明，客户端圆片的 title 才能显示「硬化 · 防御 +200」这类效果
       words: this._echoWords().map((w) => ({ id: w.id, name: w.name, desc: w.desc })),
+      // 跨版本敌人（key 形如 `act1autochess:enemy_…`）：客户端的数据表里**没有**这些记录，
+      // 只发 key 的话准备阶段的情报列表没有名字/图标、战斗中点击也没有说明框
+      //（维护者 2026-11-05 反馈：有的敌对目标查不到信息）。这里把本回合真正会出场的记录一起带上。
+      crossEnemyDefs: this._echoCrossEnemyDefs(),
       // 深潜补给选的「本层词条」（维护者 2026-11-05：HUD 上完全看不到，玩家以为补给没生效）。
       // ★ 放**己方**侧（它加的是全队属性，不是敌人词条），带 temporary + rounds 让 buff 栏打「本」角标。
       tempBuffs: (Array.isArray(this.echoSupplyWords) ? this.echoSupplyWords : [])

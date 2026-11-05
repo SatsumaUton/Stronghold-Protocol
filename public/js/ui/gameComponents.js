@@ -190,7 +190,8 @@ export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showT
     src = tokenAvatarUrl(m, id);
     name = tk?.name || '';
   } else if (kind === 'enemy') {
-    const e = data.lookup('enemies', id);
+    // rec：调用方已经查到的记录（跨版本敌人本房数据表里没有，见 ui/enemyRecords.js）
+    const e = rec || data.lookup('enemies', id);
     src = enemyIconUrl(m, id);
     name = e?.name || '';
   }
