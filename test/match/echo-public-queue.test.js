@@ -119,7 +119,19 @@ test('界面：深潜整屏有「公开深潜」「开始多人匹配」，并�
   assert.match(src, /quickMatch\(\{ difficulty: pickedDifficulty, seats: 'four', rules: 'standard', variant: 'deepecho' \}\)/, '多人匹配要带 variant');
   assert.match(src, /net\.request\('room\.setListed', \{ listed: true \}\)/, '建房后要真的挂上公开列表');
   // 样式
-  assert.match(read('public/css/screens/lobby.css'), /\.echo-pill \{/, '按钮要有样式');
+  // 三个按钮等宽等高并排（维护者 2026-11-06：和「开始深渊回响」一样大，放在它左边）
+  assert.match(src, /proto-foot--triple/, '底部要是一行三个按钮');
+  const css = read('public/css/screens/lobby.css');
+  assert.match(css, /\.proto-foot--triple \{[^}]*flex-direction: row/, '三个按钮并排');
+  assert.match(css, /\.proto-foot--triple > \.proto-start \{[^}]*flex: 1 1 0/, '三个按钮等宽');
+  assert.match(css, /\.proto-start--alt/, '次按钮要有自己的样式');
+  // 「开始多人匹配」= 立刻进队列 + 打开搜寻中那一屏（和多人匹配整屏的按钮同一个效果）
+  assert.match(src, /setMatchVariant\('deepecho'\)/, '要标记这是深潜池');
+  assert.match(src, /variant=\$\{matchVariant\}/, '多人匹配整屏要拿到 variant');
+  assert.match(src, /const echo = variant === 'deepecho';/, '搜寻面板要认深潜');
+  assert.match(src, /label: t\('深渊回响'\), color: '#b79cff'/, '深潜池的标签是深渊回响');
+  assert.match(src, /if \(matchVariant === 'deepecho'\) \{ setMatchOpen\(false\); setEchoOpen\(true\); setMatchVariant\(null\); \}/,
+    '停止搜寻要回到深潜整屏');
 });
 
 test('公开列表（跨节点）带 variant；大厅房间列表把深潜房显示成深渊回响', () => {
