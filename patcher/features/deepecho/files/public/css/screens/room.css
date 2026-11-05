@@ -30,7 +30,7 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(60% 50% at 30% 40%, rgba(23, 249, 183, .05), transparent 70%),
+    radial-gradient(60% 50% at 30% 40%, rgba(var(--mint-rgb), .05), transparent 70%),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, .02) 0 1px, transparent 1px 4px),
     linear-gradient(rgba(255, 255, 255, .025) 1px, transparent 1px) 0 0 / 1.1rem 1.1rem,
     linear-gradient(90deg, rgba(255, 255, 255, .025) 1px, transparent 1px) 0 0 / 1.1rem 1.1rem,
@@ -189,12 +189,12 @@
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(94, 224, 185, .55) transparent;
+  scrollbar-color: rgba(var(--mint-c54-rgb), .55) transparent;
 }
 .rs-seats.seats--expanded::-webkit-scrollbar { height: 8px; }
 .rs-seats.seats--expanded::-webkit-scrollbar-track { background: rgba(255, 255, 255, .05); }
-.rs-seats.seats--expanded::-webkit-scrollbar-thumb { background: rgba(94, 224, 185, .55); border-radius: 0; }
-.rs-seats.seats--expanded::-webkit-scrollbar-thumb:hover { background: rgba(94, 224, 185, .8); }
+.rs-seats.seats--expanded::-webkit-scrollbar-thumb { background: rgba(var(--mint-c54-rgb), .55); border-radius: 0; }
+.rs-seats.seats--expanded::-webkit-scrollbar-thumb:hover { background: rgba(var(--mint-c54-rgb), .8); }
 /* 转场 (PR #643): the room comes up from black, card by card — each lights up as it lands. [ASSUMED] The motion and its
    timings are the community PR #643 design, not a recording of the event. */
 @keyframes rseat-in { from { opacity: 0; transform: translateY(.16rem) scale(1.03); filter: brightness(1.9) saturate(.3); } 55% { filter: none; } }
@@ -208,12 +208,12 @@
 /* a doctor turns ready or an AI teammate is added (ui/transitions.js useRise): a green flash over the portrait, a beam from
    the clip, the state pops */
 .rseat.is-flash .rseat__art { animation: rseat-glow 700ms ease-out; }
-@keyframes rseat-glow { 20% { box-shadow: 0 0 .5rem rgba(120, 255, 215, .9), 0 0 .12rem #b9ffe9; border-color: #b9ffe9; } }
+@keyframes rseat-glow { 20% { box-shadow: 0 0 .5rem rgba(var(--mint-c14-rgb), .9), 0 0 .12rem var(--mint-s7); border-color: var(--mint-s7); } }
 .rseat.is-flash .rseat__art::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
-  background: linear-gradient(180deg, rgba(214, 255, 243, .95), rgba(79, 232, 192, .7)); animation: rseat-wash 700ms ease-out forwards; }
+  background: linear-gradient(180deg, rgba(214, 255, 243, .95), rgba(var(--mint-c55-rgb), .7)); animation: rseat-wash 700ms ease-out forwards; }
 @keyframes rseat-wash { 0% { opacity: 0; } 14% { opacity: 1; } 100% { opacity: 0; } }
 .rseat.is-flash .rseat__clip::after { content: ''; position: absolute; left: 50%; bottom: 100%; width: 6px; height: .16rem; transform-origin: 50% 100%;
-  background: linear-gradient(0deg, #c9fff0, rgba(93, 240, 198, 0)); box-shadow: 0 0 8px #5df0c6; animation: rseat-beam 700ms ease-out forwards; }
+  background: linear-gradient(0deg, #c9fff0, rgba(var(--mint-c45-rgb), 0)); box-shadow: 0 0 8px var(--mint-s1); animation: rseat-beam 700ms ease-out forwards; }
 @keyframes rseat-beam { 0% { opacity: 0; transform: translateX(-50%) scaleY(0); } 22% { opacity: 1; transform: translateX(-50%) scaleY(1); }
   100% { opacity: 0; transform: translateX(-50%) scaleY(1.3); } }
 .rseat.is-flash .rseat__state { animation: rseat-pop 380ms cubic-bezier(.3, 1.7, .5, 1) 100ms backwards; }
@@ -222,11 +222,11 @@
    narrowest, and its 「Standing by」 broke inside the word at 特大 in an 800–1100 px window) */
 .rs--solo .rseat { --w: min(calc(2.7 * var(--t)), 34vw); }  /* (capped on a short screen: below) */
 .rseat__clip { position: absolute; left: 50%; top: -.14rem; z-index: 2; width: .16rem; height: .2rem; transform: translateX(-50%); background: #3a3e3d; border: 2px solid #1a1c1c; }
-.rseat.is-lit .rseat__clip { background: #4fe8c0; }
+.rseat.is-lit .rseat__clip { background: var(--mint-s4); }
 .rseat__strip { position: relative; display: flex; align-items: center; justify-content: space-between; height: max(.26rem, 16px); padding: 0 .08rem; background: #2b2e2e; }
 .rseat__strip i { width: .5rem; height: 4px; background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .45) 0 3px, transparent 3px 5px); }
 .rseat__strip span { font-size: calc(.12 * var(--t)); color: #8d9391; }
-.rseat.is-lit .rseat__strip { background: #4fe8c0; }
+.rseat.is-lit .rseat__strip { background: var(--mint-s4); }
 .rseat.is-lit .rseat__strip i { background: repeating-linear-gradient(90deg, rgba(8, 34, 27, .6) 0 3px, transparent 3px 5px); }
 .rseat.is-lit .rseat__strip span { color: #08221b; }
 .rseat__art {
@@ -240,7 +240,7 @@
   border: 2px solid #2b2e2e;
   border-top: 0;
 }
-.rseat.is-lit .rseat__art { border-color: #4fe8c0; box-shadow: 0 0 .2rem rgba(79, 232, 192, .35); }
+.rseat.is-lit .rseat__art { border-color: var(--mint-s4); box-shadow: 0 0 .2rem rgba(var(--mint-c55-rgb), .35); }
 /* an occupied card's art: the badge (创建者 / AI 队友), 更换立绘 and the tags at the top, the avatar frame (a bot, no art pack)
    between, the operator's name and the state at the bottom — in flow, so a larger 文字大小 or a longer language pushes
    them apart and wraps them instead of drawing one over another (§35.18 review: they were placed by fixed offsets, and on
@@ -259,7 +259,7 @@
 .rseat__top { order: -1; align-items: center; }
 .rseat__low { align-items: stretch; }
 .rseat__art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
-.rseat.is-lit .rseat__art::after { content: ''; position: absolute; inset: 50% 0 0; background: linear-gradient(180deg, transparent, rgba(47, 207, 159, .85)); pointer-events: none; }
+.rseat.is-lit .rseat__art::after { content: ''; position: absolute; inset: 50% 0 0; background: linear-gradient(180deg, transparent, rgba(var(--mint-c47-rgb), .85)); pointer-events: none; }
 .rseat.is-offline .rseat__art img { filter: grayscale(.8) brightness(.6); }
 .seat__op {
   align-self: flex-start;
@@ -269,7 +269,7 @@
   font-weight: 700;
   color: #eef0ef;
   background: rgba(0, 0, 0, .5);
-  border-left: 2px solid #4fe8c0;
+  border-left: 2px solid var(--mint-s4);
 }
 .rseat__host, .rseat__bot {
   display: inline-flex;
@@ -283,7 +283,7 @@
   line-height: 1.15;
   text-align: center;
   color: #08221b;
-  background: #4fe8c0;
+  background: var(--mint-s4);
   border-radius: .04rem;
 }
 .rseat__bot { background: #c9cecc; }
@@ -297,7 +297,7 @@
   background: rgba(0, 0, 0, .6);
   border: 1px solid rgba(255, 255, 255, .25);
 }
-.seat__content.is-ready { border-color: #4fe8c0; color: #8ff3d6; }
+.seat__content.is-ready { border-color: var(--mint-s4); color: var(--mint-c56); }
 .seat__content.is-failed { border-color: #ff7a8a; color: #ff9aa6; }
 .rseat__lost {
   /* in flow between the top and the bottom text, across the art (§35.18 review: at 40% from the top it ran over the state
@@ -373,7 +373,7 @@
   transition: opacity var(--t-fast), border-color var(--t-fast);
 }
 .rseat__pick .icon { flex: none; width: 1.1em; height: 1.1em; }
-.rseat__art:hover .rseat__pick, .rseat__pick:focus-visible { opacity: 1; border-color: #5df0c6; }
+.rseat__art:hover .rseat__pick, .rseat__pick:focus-visible { opacity: 1; border-color: var(--mint-s1); }
 .rseat__plate {
   position: relative;
   display: grid;
@@ -387,14 +387,14 @@
   background: linear-gradient(90deg, #232626, #161818);
   border: 1px solid rgba(255, 255, 255, .1);
 }
-.rseat.is-lit .rseat__plate { border-color: rgba(79, 232, 192, .55); }
+.rseat.is-lit .rseat__plate { border-color: rgba(var(--mint-c55-rgb), .55); }
 .rseat.is-me .rseat__plate { background: linear-gradient(90deg, #26302d, #161a19); }
 .rseat__plate .avatar { grid-row: 1 / 3; }
 .rseat__who { display: flex; align-items: center; gap: .06rem; min-width: 0; font-size: calc(.18 * var(--t)); }
 .seat__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat__you { flex: none; padding: 0 .06rem; font-size: calc(.12 * var(--t)); font-weight: 700; color: var(--text-on-mint); background: var(--mint-500); }
 .rseat__doc { font-size: calc(.11 * var(--t)); letter-spacing: .1em; color: #7f8583; }
-.rseat__me { position: absolute; left: -.1rem; top: -.1rem; display: grid; place-items: center; width: max(.26rem, 16px); height: max(.26rem, 16px); color: #08221b; background: #4fe8c0; border-radius: 3px; }
+.rseat__me { position: absolute; left: -.1rem; top: -.1rem; display: grid; place-items: center; width: max(.26rem, 16px); height: max(.26rem, 16px); color: #08221b; background: var(--mint-s4); border-radius: 3px; }
 .rseat__me .icon { width: 80%; height: 80%; }
 .rseat__plate--empty { display: flex; justify-content: center; border-style: dashed; border-color: rgba(255, 255, 255, .12); background: none; font-size: calc(.15 * var(--t)); }
 .rseat--empty .rseat__art { grid-template-rows: 1fr auto; padding-bottom: .5rem; background: linear-gradient(135deg, transparent 47%, rgba(255, 255, 255, .06) 50%, transparent 53%), #141616; }
@@ -406,7 +406,7 @@
 .rseat__invite b { font-size: calc(.26 * var(--t)); }
 .rseat__invite small { font-size: calc(.15 * var(--t)); color: #8d9391; text-align: center; }
 .rseat__invite:hover .rseat__plus::before, .rseat__invite:hover .rseat__plus::after,
-.rseat__invite:focus-visible .rseat__plus::before, .rseat__invite:focus-visible .rseat__plus::after { background: #5df0c6; }
+.rseat__invite:focus-visible .rseat__plus::before, .rseat__invite:focus-visible .rseat__plus::after { background: var(--mint-s1); }
 .rseat__add { align-self: start; max-width: calc(100% - .12rem); height: auto; min-height: .36rem; padding-block: .03rem; margin-top: .1rem; white-space: normal; line-height: 1.1; text-align: center; }
 .rseat__wait { display: flex; flex-direction: column; align-items: center; gap: .1rem; color: #b7bdbb; }
 .rseat__wait small { font-size: calc(.16 * var(--t)); text-align: center; }
@@ -416,9 +416,9 @@
 .rseat__band { display: flex; align-items: center; gap: .06rem; width: 100%; min-height: max(.42rem, 28px); margin-top: .06rem; padding: 0 .1rem; font: inherit;
   max-width: 100%; font-size: max(calc(.14 * var(--t)), 11px); color: var(--text-hi); background: rgba(14, 20, 19, .92);
   border: 1px solid rgba(255, 255, 255, .14); text-align: left; }
-.rseat__band.is-editable { cursor: pointer; border-color: rgba(79, 232, 192, .45); }
+.rseat__band.is-editable { cursor: pointer; border-color: rgba(var(--mint-c55-rgb), .45); }
 .rseat__band.is-editable:hover:not(:disabled) { background: rgba(20, 48, 40, .92); }
-.rseat__band .seat__band-k { flex: none; padding: 0 .06rem; font-size: .9em; color: #08221b; background: #4fe8c0; }
+.rseat__band .seat__band-k { flex: none; padding: 0 .06rem; font-size: .9em; color: #08221b; background: var(--mint-s4); }
 .rseat__band .seat__band-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rseat__band > .icon { flex: none; width: 1.1em; height: 1.1em; color: var(--text-lo); }
 .rseat__band .bandicon { width: max(.3rem, 18px); height: max(.3rem, 18px); flex: none; }
@@ -550,7 +550,7 @@
 .room-bar__status .icon { width: 1.1em; height: 1.1em; margin-right: 4px; vertical-align: -2px; }
 .rs-ready { display: inline-flex; align-items: center; gap: 2px; margin-right: .14rem; font-size: calc(.16 * var(--t)); color: #9aa19e; vertical-align: middle; }
 .rs-ready .icon { width: max(.2rem, 13px); height: max(.2rem, 13px); color: #4b504e; }
-.rs-ready .icon.is-on { color: #4fe8c0; }
+.rs-ready .icon.is-on { color: var(--mint-s4); }
 .rs-ready b { margin-left: .06rem; color: #eef0ef; }
 .rs-pill {
   position: relative;
@@ -647,7 +647,7 @@
 .rs-go__box .icon { width: 80%; height: 80%; }
 .rs-go__icon { flex: none; display: grid; place-items: center; width: max(.5rem, 28px); height: max(.5rem, 28px); }
 .rs-go__icon .icon { width: 100%; height: 100%; }
-.rs-go.is-ready { background: linear-gradient(180deg, #7ff3d4, #4fe0bf); }
+.rs-go.is-ready { background: linear-gradient(180deg, var(--mint-c57), var(--mint-s6)); }
 
 /* the plugin panel's mode picker (ui/pluginPanel.js) and the 「AI 队友最后选择」 switch share these */
 .dpick { display: flex; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .3); }
@@ -709,7 +709,7 @@
 .botband__name { font-size: max(calc(.14 * var(--t)), 12px); font-weight: 700; color: var(--text-hi); text-align: center; }
 .botband__eff, .botband__used { font-size: max(calc(.11 * var(--t)), 10px); color: var(--text-lo); text-align: center; }
 .botband__used { color: var(--gold, #f6a329); }
-.botband.is-sel { border-color: var(--mint-400); background: linear-gradient(180deg, rgba(78, 216, 175, .18), rgba(12, 15, 14, .85)); }
+.botband.is-sel { border-color: var(--mint-400); background: linear-gradient(180deg, rgba(var(--mint-500-rgb), .18), rgba(12, 15, 14, .85)); }
 .botband.is-used { cursor: not-allowed; }
 .botband.is-used .bandicon { filter: grayscale(.8) brightness(.62); }
 
@@ -882,12 +882,14 @@
   position: relative; flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
   gap: .04rem .1rem; margin: 0 .6rem .1rem; padding: .06rem .16rem;
   color: #d7f4ec; font-size: calc(.14 * var(--t)); text-align: center; overflow-wrap: anywhere;
-  background: rgba(79, 224, 191, .1); border: 1px solid rgba(79, 224, 191, .42);
+  background: rgba(var(--mint-c39-rgb), .1); border: 1px solid rgba(var(--mint-c39-rgb), .42);
 }
-.rs-matchwait .icon { flex: none; width: 1.1em; height: 1.1em; color: #4fe0bf; }
+.rs-matchwait .icon { flex: none; width: 1.1em; height: 1.1em; color: var(--mint-s6); }
 .rs-matchwait b { font-weight: 700; color: #f0fffb; }
-.rs-matchwait__sep { color: rgba(79, 224, 191, .55); }
+.rs-matchwait__sep { color: rgba(var(--mint-c39-rgb), .55); }
 .rs-matchwait em { font-style: normal; color: #9fb9b3; }
+/* 深潜房的匹配等待条：模式名用深潜的紫，和房间里其它深潜标记同一套色 */
+.rs-matchwait__echo { padding: 0 .08rem; border: 1px solid rgba(183, 156, 255, .5); background: rgba(183, 156, 255, .12); color: #d6c4ff; font-weight: 700; }
 /* 小屏：座位和底部按钮要留高度，这行让出来（状态在座位区已经看得到） */
 @media (max-height: 520px) {
   .rs-matchwait { display: none; }
@@ -1163,8 +1165,8 @@
   height: .3rem; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .35);
   color: var(--text-md); font: inherit; font-size: calc(.14 * var(--t)); cursor: pointer;
 }
-.exp-cap__menu button:hover { background: rgba(78, 216, 175, .1); color: var(--text-hi); }
-.exp-cap__menu button.is-selected { background: rgba(78, 216, 175, .18); color: var(--mint-200); }
+.exp-cap__menu button:hover { background: rgba(var(--mint-500-rgb), .1); color: var(--text-hi); }
+.exp-cap__menu button.is-selected { background: rgba(var(--mint-500-rgb), .18); color: var(--mint-200); }
 /* 底部「应用」行的尺寸规则见上面 .exp-modal__body 之后那一份（不要在这里重复定义，
    重复的那条会把它覆盖回去 —— 2026-10-27 踩过）。 */
 .exp-pop__foot .btn { min-width: 1.2rem; }
@@ -1188,7 +1190,7 @@
   transition: border-color var(--t-fast), background var(--t-fast); }
 .pooled__card.is-wide { grid-column: 1 / -1; }
 .pooled__card.is-mine { border-top-color: var(--mint-400); }
-.pooled__card.is-target { border-color: var(--mint-a35); border-style: dashed; background: rgba(79, 232, 192, .05); cursor: pointer; }
+.pooled__card.is-target { border-color: var(--mint-a35); border-style: dashed; background: rgba(var(--mint-c55-rgb), .05); cursor: pointer; }
 .pooled__head { display: flex; align-items: center; gap: .08rem; min-height: max(.34rem, calc(24px * var(--sp-ui, 1))); padding: 0 .09rem; background: rgba(0, 0, 0, .24); }
 .pooled__head b { flex: none; font-size: max(calc(.15 * var(--t)), calc(12px * var(--sp-ui, 1))); color: var(--text-hi); }
 .pooled__head span { flex: 1; min-width: 0; overflow: hidden; font-size: max(calc(.13 * var(--t)), calc(11px * var(--sp-ui, 1))); color: var(--text-lo); text-overflow: ellipsis; white-space: nowrap; }
@@ -1240,7 +1242,7 @@
 /* 背景**保持原版不动**（维护者 2026-11-03：整块换成紫色不好看，原来的背景更好）。
    这里只改组件配色，不碰 .rs__bg。 */
 
-/* 开始模拟 / 匹配队友 这类大按钮：`.proto-start` 用的是**硬编码**薄荷绿（#4fe0bf/#34c8a6），
+/* 开始模拟 / 匹配队友 这类大按钮：`.proto-start` 用的是**硬编码**薄荷绿（var(--mint-s6)/var(--mint-s12)），
    不吃 --mint-* 变量，所以必须单独覆盖一次。 */
 .rs--deepecho .proto-start {
   background: linear-gradient(180deg, #9b7cf0, #6a49c4);
