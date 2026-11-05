@@ -1648,7 +1648,9 @@ if (method === 'GET' && pathname === '/api/admin2/whoami') {
         const data = JSON.parse(fs.readFileSync(p, 'utf8'));
         return sendJson(res, 200, { ok: true, at: data.at || 0, nodes: data.nodes || [] });
       } catch {
-        const nodes = (roomDirProvider ? roomDirProvider() : []).map((x) => ({ n: x.n, at: x.at, rooms: (x.codes || []).map((code) => ({ code })) }));
+        const nodes = (roomDirProvider ? roomDirProvider() : []).map((x) => ({
+          n: x.n, at: x.at, rooms: require('./roomDir.cjs').dirCodes(x).map((code) => ({ code })),
+        }));
         return sendJson(res, 200, { ok: true, at: Date.now(), nodes });
       }
     }

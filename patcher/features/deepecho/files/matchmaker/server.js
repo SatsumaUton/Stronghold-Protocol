@@ -33,6 +33,7 @@ const diveBoard = require('./diveBoard.cjs');
 const feedback = require('./feedback.cjs');
 // 跨节点「公开同盟」的纯筛选逻辑（无 I/O，单测直接 require 它，不用起 HTTP 服务）
 const { collectOpenRooms } = require('./openRooms.cjs');
+const { dirCodes } = require('./roomDir.cjs');
 
 const PORT = Number(process.env.MM_PORT || 3090);
 const HOST = process.env.MM_HOST || '127.0.0.1';
@@ -411,7 +412,7 @@ async function writeRoomDir() {
     const nodes = [];
     for (const [n, v] of roomDirModule) {
       const rooms = [];
-      for (const code of v.codes) {
+      for (const code of dirCodes(v)) {
         let info = null;
         try { info = await roomInfo(code, n); } catch { info = null; }
         // 该房间是否正在同盟整队匹配（parties 里未成局的同房号/节点）
@@ -427,7 +428,7 @@ async function writeRoomDir() {
   } catch { /* 写不了就算了，控制台显示为空 */ } finally { roomDirWriting = false; }
 }
 // 后台管理（owner）通过 /api/admin2/rooms 读取同一份内存目录
-account.setRoomDirProvider?.(() => [...roomDirModule].map(([n, v]) => ({ n, codes: v.codes, at: v.at })));
+account.setRoomDirProvider?.(() => [...roomDirModule].map(([n, v]) => ({ n, codes: v.codes, echoCodes: v.echoCodes || [], at: v.at })));
 
 /** 所有节点的在线情况（5 秒缓存，玩家端每 15 秒取一次）。 */
 async function nodeStatus() {
@@ -530,7 +531,9 @@ async function roomInfo(code, node) {
     );
     return { full: seats.length > 0 && seats.every(Boolean), started: !!(doc.matchLive || doc.matchKey || doc.match), mode, difficulty: doc.difficulty || null, capacity: isSeatCount(capacity) ? capacity : SEATS, humans, bots, players, spectatorPlayers, round, seats: seats.length, spectators: spectatorPlayers.length, maxSpectators, adminCreated: doc.adminCreated === true,
       // 本服：房间的游戏版本（默认版本在房间状态里被省略）
-      version: typeof doc.version === 'string' && doc.version ? doc.version : 'act2autochess' };
+      version: typeof doc.version === 'string' && doc.version ? doc.version : 'act2autochess',
+      // 本服：「深渊回响」（深潜）房。控制台与后台靠它把类型列显示成深渊回响、并给出深潜深度（= round）。
+      variant: doc.variant === 'deepecho' ? 'deepecho' : null };
   } catch { return null; }
 }
 
@@ -994,7 +997,15 @@ const roomDir = new Map(); // node -> { codes: string[], at: number }
       try {
         const d = JSON.parse(body || "{}");
         const node = Number(d.node) | 0;
-        if (node > 0 && Array.isArray(d.codes)) roomDirModule.set(node, { codes: d.codes.filter((c) => typeof c === "string"), at: Date.now() });
+        if (node > 0 && Array.isArray(d.codes)) {
+          // echoCodes：「深渊回响」房，节点单独上报。只进房间目录（控制台 / 后台显示），
+          // 不进 codes —— 所以不进跨节点公开同盟列表、也不参与按房间码的跳转（见 server/lobby.js）。
+          roomDirModule.set(node, {
+            codes: d.codes.filter((c) => typeof c === 'string'),
+            echoCodes: Array.isArray(d.echoCodes) ? d.echoCodes.filter((c) => typeof c === 'string') : [],
+            at: Date.now(),
+          });
+        }
         scheduleWriteRoomDir();
       } catch { /* ignore */ }
       return json(res, 200, { ok: true });
