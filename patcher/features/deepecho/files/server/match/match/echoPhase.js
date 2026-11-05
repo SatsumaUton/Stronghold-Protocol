@@ -1647,6 +1647,9 @@ export class MatchEcho {
         vote: this.echoBlessingRefreshVote ? {
           id: this.echoBlessingRefreshVote.id,
           agreed: [...this.echoBlessingRefreshVote.agreed],
+          // 明确投了「不同意」的人（维护者 2026-11-05：客户端要能把自己那一票画成「已投」，
+          // 否则点完按钮没有任何反馈、两个按钮还能继续点）
+          rejected: [...(this.echoBlessingRefreshVote.rejected || [])],
           voters: this.echoBlessingRefreshVote.voters.slice(),
           endsAt: this.echoBlessingRefreshVote.endsAt,
         } : null,

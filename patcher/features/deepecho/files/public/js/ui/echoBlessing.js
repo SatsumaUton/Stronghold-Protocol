@@ -12,6 +12,25 @@ import { actions } from './gameActions.js';
 import { useStore, serverNow } from '../store.js';
 import { t } from '../../../shared/i18n.js';
 
+/**
+ * 刷新投票里「我投了什么」：`true` = 同意，`false` = 不同意，`null` = 还没投。
+ *
+ * 维护者 2026-11-05 二次反馈：投完必须立刻变成已投状态 —— 另一个按钮消失、已投的那个也不能再点。
+ * 导出成纯函数是为了能单测（面板本身要 hooks 才能渲染）。
+ *
+ * @param {{ agreed?: string[], rejected?: string[], voters?: string[] } | null | undefined} vote
+ * @param {string | null | undefined} myId
+ * @returns {{ myVote: boolean|null, yes: number, total: number }}
+ */
+export function refreshVoteState(vote, myId) {
+  const agreed = Array.isArray(vote?.agreed) ? vote.agreed : [];
+  const rejected = Array.isArray(vote?.rejected) ? vote.rejected : [];
+  const voters = Array.isArray(vote?.voters) ? vote.voters : [];
+  const mine = myId == null ? null : String(myId);
+  const myVote = mine != null && agreed.includes(mine) ? true : mine != null && rejected.includes(mine) ? false : null;
+  return { myVote, yes: agreed.length, total: voters.length || 1 };
+}
+
 export function EchoBlessing({ pub }) {
   const myId = useStore((s) => s.me.playerId);
   // 死亡的玩家不参与祝福/弃选/护盾投票（维护者 2026-11-05）
@@ -88,13 +107,26 @@ export function EchoBlessing({ pub }) {
           onClick=${() => setShowCurses(!showCurses)}>
           ${t('查看诅咒')}${curses.length ? html`<b class="num">${curses.length}</b>` : null}
         </button>
-        ${refreshVote ? html`<span class="echo-bless__refreshvote">
-          ${t('刷新投票')} <b class="num">${(refreshVote.agreed || []).length}/${(refreshVote.voters || []).length}</b>
-          <button type="button" class="echo-bless__rbtn" disabled=${busy || !online}
-            onClick=${() => send(() => actions.echoBlessingRefreshVote(true))}>${t('同意')}</button>
-          <button type="button" class="echo-bless__rbtn" disabled=${busy || !online}
-            onClick=${() => send(() => actions.echoBlessingRefreshVote(false))}>${t('不同意')}</button>
-        </span>` : html`<button type="button" class="echo-bless__refreshbtn" disabled=${busy || !online || refreshLeft <= 0}
+        ${refreshVote ? (() => {
+          // 刷新投票（维护者 2026-11-05 二次反馈）：投完必须**立刻变成已投状态**，
+          // 另一个按钮消失、已投的那个也不能再点 —— 之前两个按钮一直可点，点了也没反馈。
+          const { myVote, yes, total } = refreshVoteState(refreshVote, myId);
+          const leftSec = Number.isFinite(refreshVote.endsAt) && refreshVote.endsAt > 0
+            ? Math.max(0, Math.ceil((refreshVote.endsAt - now) / 1000)) : null;
+          return html`<span class=${`echo-bless__refreshvote${myVote != null ? ' is-voted' : ''}`}>
+            <span class="echo-bless__rv-label">${t('刷新候选')}</span>
+            <span class="echo-bless__rv-bar" aria-hidden="true"><i style=${`width:${Math.min(100, Math.round((yes / total) * 100))}%`}></i></span>
+            <b class="num echo-bless__rv-count">${yes}/${total}</b>
+            ${myVote == null ? html`
+              <button type="button" class="echo-bless__rbtn is-yes" disabled=${busy || !online}
+                onClick=${() => send(() => actions.echoBlessingRefreshVote(true))}>${t('同意')}</button>
+              <button type="button" class="echo-bless__rbtn is-no" disabled=${busy || !online}
+                onClick=${() => send(() => actions.echoBlessingRefreshVote(false))}>${t('不同意')}</button>`
+              : html`<span class=${`echo-bless__rbtn is-voted is-${myVote ? 'yes' : 'no'}`} aria-live="polite">
+                  ${myVote ? t('已同意') : t('已拒绝')}<i>${t('等待其他人…')}</i></span>`}
+            ${leftSec != null ? html`<span class="echo-bless__rv-left num">${leftSec}s</span>` : null}
+          </span>`;
+        })() : html`<button type="button" class="echo-bless__refreshbtn" disabled=${busy || !online || refreshLeft <= 0}
           title=${t('活着的玩家投票决定是否重抽这三个候选；每局最多 3 次，投票不占用选择时间')}
           onClick=${() => send(() => actions.echoBlessingRefresh())}>${t('刷新')}<b class="num">${refreshLeft}</b></button>`}
         ${left != null ? html`<span class="echo-bless__timer" aria-live="off"><b>${left}</b><i>秒</i></span>` : null}

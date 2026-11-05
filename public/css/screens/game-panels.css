@@ -1127,12 +1127,42 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-bless__refreshbtn:hover:not(:disabled), .echo-bless__rbtn:hover:not(:disabled) { border-color: rgba(196, 166, 255, .9); background: rgba(125, 91, 214, .32); }
 .echo-bless__refreshbtn:disabled, .echo-bless__rbtn:disabled { opacity: .45; cursor: default; }
 .echo-bless__refreshbtn b { color: #ffd978; font-variant-numeric: tabular-nums; }
+
+/* 刷新投票条（维护者 2026-11-05 二次反馈：原来是一行裸文字 + 两个默认按钮，太丑；
+   而且投完还能继续点）。现在是一枚深色胶囊：标签 + 进度条 + 票数 + 两个小按钮；
+   投完那一票之后按钮**整组消失**，换成「已同意 / 已拒绝 · 等待其他人…」的只读角标。 */
 .echo-bless__refreshvote {
   display: inline-flex; align-items: center; gap: .08rem;
-  padding: .02rem .1rem; border: 1px solid rgba(255, 207, 107, .5); background: rgba(125, 91, 214, .2);
-  font-size: calc(.14 * var(--t)); color: #ffe7b0;
+  padding: .04rem .12rem .04rem .14rem;
+  border: 1px solid rgba(255, 207, 107, .38); border-radius: 999px;
+  background: linear-gradient(180deg, rgba(52, 30, 88, .92), rgba(26, 14, 44, .92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 1px 4px rgba(0, 0, 0, .45);
+  font-size: calc(.14 * var(--t)); color: #ffe7b0; white-space: nowrap;
 }
-.echo-bless__refreshvote b { color: #ffd978; }
+.echo-bless__refreshvote.is-voted { border-color: rgba(120, 214, 160, .45); }
+.echo-bless__rv-label { color: #e9d9ff; letter-spacing: .02em; }
+.echo-bless__rv-bar {
+  position: relative; width: calc(.9 * var(--t)); height: calc(.07 * var(--t));
+  border-radius: 999px; background: rgba(255, 255, 255, .12); overflow: hidden;
+}
+.echo-bless__rv-bar > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7ed6a5, #b6f0c9); transition: width .2s ease-out; }
+.echo-bless__refreshvote.is-voted .echo-bless__rv-bar > i { background: linear-gradient(90deg, #8fb6ff, #cfe0ff); }
+.echo-bless__rv-count { color: #ffd978; font-variant-numeric: tabular-nums; font-size: calc(.14 * var(--t)); }
+.echo-bless__rv-left { color: #b9a6e0; font-variant-numeric: tabular-nums; font-size: calc(.12 * var(--t)); min-width: calc(.34 * var(--t)); text-align: right; }
+.echo-bless__refreshvote .echo-bless__rbtn {
+  padding: .02rem .12rem; border-radius: 999px; font-size: calc(.13 * var(--t));
+}
+.echo-bless__rbtn.is-yes { border-color: rgba(120, 214, 160, .55); background: rgba(60, 150, 100, .22); color: #c9f2d8; }
+.echo-bless__rbtn.is-yes:hover:not(:disabled) { border-color: rgba(150, 235, 185, .95); background: rgba(70, 175, 115, .34); }
+.echo-bless__rbtn.is-no { border-color: rgba(226, 138, 138, .5); background: rgba(150, 60, 60, .2); color: #f3c9c9; }
+.echo-bless__rbtn.is-no:hover:not(:disabled) { border-color: rgba(240, 160, 160, .95); background: rgba(175, 70, 70, .32); }
+/* 已投：只读角标，没有 cursor / hover —— 明确「这一票已经交了」 */
+.echo-bless__rbtn.is-voted {
+  display: inline-flex; align-items: center; gap: .06rem; cursor: default;
+  border-color: rgba(140, 200, 170, .45); background: rgba(40, 80, 62, .35); color: #cfe9da;
+}
+.echo-bless__rbtn.is-voted.is-no { border-color: rgba(200, 150, 150, .4); background: rgba(80, 45, 45, .35); color: #e8cfcf; }
+.echo-bless__rbtn.is-voted > i { font-style: normal; color: #9d8cc4; font-size: calc(.11 * var(--t)); }
 .echo-bless__card.is-mine { background: linear-gradient(180deg, rgba(120, 80, 200, .5), rgba(40, 20, 70, .9)); }
 .echo-bless__foot { padding-top: .14rem; border-top: 1px solid rgba(183, 156, 255, .18); }
 
