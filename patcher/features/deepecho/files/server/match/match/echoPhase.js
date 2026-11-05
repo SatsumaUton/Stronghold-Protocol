@@ -1473,7 +1473,18 @@ export class MatchEcho {
       projection: this._echoProjectionView(),
       // 16 层起祝福数值 ×2.5（echoBlessing.js ECHO_BLESSING_LATE_MUL）
       ...(() => ({ blessingLateMul: echoBlessingLateMul(this._echoDepth()) }))(),
-      blessings: this._echoBlessings().map((b) => ({
+      blessings: [
+        // 「盟约投影」：也放进祝福列表（显示用，occupiesSlot: false 不占名额），
+        // 这样放大镜、敌方情报的「已获祝福」都能看到它（维护者 2026-11-05：玩家反馈列表里看不到）
+        ...(() => {
+          const proj = this.echoProjection ? echoProjectionById(this.echoProjection) : null;
+          return proj ? [{
+            id: `projection:${proj.id}`, name: `盟约投影 · ${proj.name}`, desc: proj.desc,
+            rarity: 'epic', rarityLabel: '投影', oneShot: false, consumed: false, occupiesSlot: false,
+            projection: true, lateMul: undefined, rangeExtend: 0,
+          }] : [];
+        })(),
+        ...this._echoBlessings().map((b) => ({
         id: b.id,
         name: b.name,
         rarity: b.rarity || 'common',
@@ -1492,8 +1503,9 @@ export class MatchEcho {
           : b.desc,
         // 「远程」这类改攻击范围的祝福：准备阶段没有战斗、客户端拿不到 live 范围，
         // 靠这个值把棋盘上的范围预览画对（2026-11-05）。
-        rangeExtend: Number(b.mods && b.mods.rangeExtend) || 0,
-      })),
+          rangeExtend: Number(b.mods && b.mods.rangeExtend) || 0,
+        })),
+      ],
       offer,
       // 祝福名额：隐藏核心通关会临时 +1（客户端显示 n/3 → n/4）
       blessingMax: this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0),
@@ -2383,6 +2395,7 @@ export class MatchEcho {
       this.echoBlessingSkipped = (Number(this.echoBlessingSkipped) || 0) + 1;
       this._echoPushAnnounce('全队放弃了本次祝福（本轮不发）');
       this._echoFlushAnnounce();
+      this._echoFlushProjectionIfPending();
       this.markPublic();
       return OK;
     }
@@ -2408,6 +2421,8 @@ export class MatchEcho {
     }
     this._echoGrantBlessing(b);
     this._echoFlushSupplyIfPending();
+    // 祝福面板结算完，把延后的「盟约投影」补开（维护者 2026-11-05：投影一直不弹）
+    this._echoFlushProjectionIfPending();
     return OK;
   }
 

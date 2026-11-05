@@ -81,3 +81,21 @@ test('再次触发可以替换：选新的顶掉旧的', (t) => {
   assert.notEqual(m.echoProjection, 'yanShip', '选新的要替换旧的');
   assert.equal(m._echoBlessings().length, 0, '投影不占祝福名额、不进祝福列表');
 });
+
+// 维护者 2026-11-05（玩家反馈）：投影拿到了，但盟约详情面板还是「在场 0/3 未激活」。
+// 原因：投影只注入了战斗 spec，没有注入**玩家自己的盟约视图**（bondsView）。
+test('盟约投影要反映在 bondsView：按满档激活，且不改底层 bonds', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 15;
+  m.startRound(16);
+  const ps = m.alivePlayers()[0];
+  assert.equal(ps.bondsView().yanShip.active, false, '没投影时是未激活');
+  m.echoProjection = 'yanShip';
+  const view = ps.bondsView();
+  assert.equal(view.yanShip.active, true, '投影后要显示激活');
+  assert.equal(view.yanShip.count, 6, '按满档人数显示');
+  assert.equal(view.yanShip.projected, true, '标记成投影（界面可区分）');
+  assert.equal(ps.bonds.yanShip.active, false, '底层 bonds 不被改写（只影响显示）');
+});

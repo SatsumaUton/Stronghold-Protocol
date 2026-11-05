@@ -127,12 +127,6 @@ export function echoBuffChips(echo) {
     const v = ECHO_BUFF_VISUALS[w.id] || { glyph: label.slice(0, 1) || '祝', tone: 'coin' };
     out.push({ key: `ally:${w.id}`, side: 'ally', id: w.id, raw: w, label, glyph: v.glyph, icon: echoBuffIcon(w, 'ally'), tone: v.tone, temp: true, left: 1, title: w.desc ? `${label}（本层） · ${w.desc}` : `${label}（本层）` });
   }
-  // 「盟约投影」：当前生效的那条核心盟约投影（维护者 2026-11-05）—— 己方侧、金色、单独标记
-  const proj = echo?.projection && echo.projection.current;
-  if (proj && typeof proj.id === 'string') {
-    const label = typeof proj.name === 'string' && proj.name ? proj.name : proj.id;
-    out.push({ key: `ally:projection:${proj.id}`, side: 'ally', id: proj.id, raw: proj, label, glyph: '投', icon: echoBuffIcon(proj, 'ally'), tone: 'gold', projection: true, title: `盟约投影：${label}${proj.desc ? ` · ${proj.desc}` : ''}` });
-  }
   for (const b of blessings) {
     if (!b || typeof b.id !== 'string') continue;
     const label = typeof b.name === 'string' && b.name ? b.name : b.id;
@@ -140,10 +134,12 @@ export function echoBuffChips(echo) {
     // 已消耗的祝福（护盾抵消过排异、一次性祝福）**留在列表里**，只是标成灰片 + 「已消耗」
     // （维护者 2026-11-05：护盾被诅咒抵消后不能凭空消失）
     const spent = b.consumed === true;
+    // 「盟约投影」也走祝福列表（服务端已并进来，occupiesSlot: false）—— 用金色圆片区分
+    const isProj = b.projection === true;
     // 深层强化（16 层起 ×2.5）：标题里点出来，玩家才知道后期拿到的数值更高
     const lateTag = Number(b.lateMul) > 1 ? `（深层强化 ×${b.lateMul}）` : '';
     const titleBase = `${spent ? `${label}（已消耗）` : label}${lateTag}`;
-    out.push({ key: `ally:${b.id}`, side: 'ally', id: b.id, raw: b, label, glyph: v.glyph, icon: echoBuffIcon(b, 'ally'), tone: v.tone, consumed: spent, title: b.desc ? `${titleBase} · ${b.desc}` : titleBase });
+    out.push({ key: `ally:${b.id}`, side: 'ally', id: b.id, raw: b, label, glyph: isProj ? '投' : v.glyph, icon: echoBuffIcon(b, 'ally'), tone: isProj ? 'gold' : v.tone, consumed: spent, projection: isProj, title: b.desc ? `${titleBase} · ${b.desc}` : titleBase });
   }
   for (const c of curses) {
     if (!c || typeof c.id !== 'string') continue;
