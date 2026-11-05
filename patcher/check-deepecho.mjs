@@ -119,8 +119,7 @@ const globToRe = (g) => new RegExp('^' + g.replace(/\\/g, '/').replace(/[.+^${}(
   .replace(/\*\*\//g, '\u0000').replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*').replace(/\u0000/g, '(?:.*/)?') + '$');
 const declared = entry && Array.isArray(entry.files) ? entry.files : [];
 const declaredRes = declared.map(globToRe);
-const unregistered = files.filter((rel) => !declaredRes.some((re) => re.test(rel)));
-const deadDeclared = declared.filter((g) => !globToRe(g).test(g) ? false : true).filter((g) => {
+const unregistered = files.filter((rel) => !declaredRes.some((re) => re.test(rel)));const deadDeclared = declared.filter((g) => !globToRe(g).test(g) ? false : true).filter((g) => {
   const re = globToRe(g);
   return !files.some((rel) => re.test(rel));
 });
@@ -156,6 +155,23 @@ if (FIX) {
     fs.writeFileSync(INDEX_JSON, JSON.stringify(idx, null, 2) + '\n');
     console.log(`[deepecho] 已同步 patcher/features/index.json（${rows.length} 个文件）`);
   } catch (e) { console.error('[deepecho] index.json 同步失败：' + (e && e.message)); }
+  // features.json 的 files 也要补：新增的共享文件里只要出现深潜标记词，就必须登记，
+  // 否则 `--fix` 之后仍然报「未登记」，得靠人记得手改（踩过：resumeMatch.js 的注释提到深潜）。
+  if (unregistered.length) {
+    try {
+      const doc = JSON.parse(fs.readFileSync(FEATURES_JSON, 'utf8'));
+      const list = (Array.isArray(doc) ? doc : doc.features) || [];
+      const f = list.find((x) => x && x.id === FEATURE);
+      if (f && Array.isArray(f.files)) {
+        const seen = new Set(f.files);
+        for (const rel of unregistered) if (!seen.has(rel)) { f.files.push(rel); seen.add(rel); }
+        f.files.sort();
+        fs.writeFileSync(FEATURES_JSON, JSON.stringify(doc, null, 2) + '\n');
+        console.log(`[deepecho] 已补登 patcher/features.json（${f.files.length} 个文件，新增 ${unregistered.length}）`);
+        unregistered.length = 0;   // 就地清空：下面的结论要反映「已经补完」的状态
+      }
+    } catch (e) { console.error('[deepecho] features.json 补登失败：' + (e && e.message)); }
+  }
 }
 
 console.log(`深渊回响相关运行文件: ${files.length}`);
