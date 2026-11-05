@@ -18,6 +18,7 @@ import {
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { echoSummonOnly, echoHitCountEnemy } from './echoWaves.js';
+import { isEchoProjectionLayer, pickProjectionOffer, echoProjectionById } from './echoProjection.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR, PHASE } from '../../../shared/constants.js';
 import { msg } from '../../../shared/i18n.js';
 import { hiddenEligible } from '../finalAssault.js';
@@ -1462,6 +1463,8 @@ export class MatchEcho {
           rarityLabel: ECHO_CURSE_RARITY_LABEL[c.rarity] || '普通',
         } : null;
       })(),
+      // 「盟约投影」：当前生效的那条 + 进行中的三选一（维护者 2026-11-05）
+      projection: this._echoProjectionView(),
       blessings: this._echoBlessings().map((b) => ({
         id: b.id,
         name: b.name,
@@ -1801,12 +1804,172 @@ export class MatchEcho {
     }
     this._echoFlushAnnounce?.();
     this._echoMaybeResumePrepClock();
+    // 补给结算完，把延后的「盟约投影」面板补开（维护者 2026-11-05）
+    this._echoFlushProjectionIfPending();
     this.markPublic();
     return OK;
   }
 
-  /** 下发给客户端的补给视图（全队同一份，含票数与倒计时）。 */
-  _echoSupplyView() {
+  /**
+   * 「盟约投影」：16 层起每 10 层一次的全队三选一（维护者 2026-11-05）。
+   *
+   * 拿到之后**即使没有那条核心盟约**，场上所有己方干员也按满档享受它的效果；
+   * 全程只能同时存在一个，不占 3 个祝福名额，也不进原版三选一池；再触发时选新的会替换旧的。
+   *
+   * @param {boolean} [force] 跳过「别的面板还开着」的延后判断
+   * @returns {number} 1 = 开了面板，0 = 没开
+   */
+  _echoOpenProjection(force = false) {
+    if (this.echoVariant !== 'deepecho') return 0;
+    const depth = this._echoDepth(this.round);
+    if (!isEchoProjectionLayer(depth)) return 0;
+    // boss 返场层不弹（那时候面板已经够多了）
+    if (this.bossWaves) return 0;
+    // 一次只弹一个面板：祝福 / 弃选 / 刷新投票 / 补给还开着就延后
+    if (!force && (this.echoBlessingOffer || this.echoBlessingDiscardOffer || this.echoBlessingRefreshVote || this.echoSupply)) {
+      this.echoProjectionPending = true;
+      return 0;
+    }
+    if (this.echoProjectionOffer && this.echoProjectionOffer.round === this.round) return 0;
+    if (!Array.isArray(this.echoProjectionLayers)) this.echoProjectionLayers = [];
+    if (this.echoProjectionLayers.includes(depth)) return 0;
+    this.echoProjectionLayers.push(depth);
+    const rng = createRng(deriveSeed(this.seed, `echo:projection:${this.round}`));
+    const options = pickProjectionOffer(rng, this.echoProjection || null);
+    if (!options.length) return 0;
+    this.echoProjectionOffer = { round: this.round, options, votes: new Map(), pick: null };
+    this.echoProjectionEndsAt = (this.sched?.now?.() ?? 0) + ECHO_BLESSING_VOTE_MS;
+    this._echoPausePrepClock();
+    this.cancel(this._echoProjectionTimer);
+    this._echoProjectionTimer = this.later(ECHO_BLESSING_VOTE_MS, () => {
+      this._echoProjectionTimer = null;
+      try { this._echoForceResolveProjection(); } catch { /* 投票失败不该炸掉整局 */ }
+    });
+    this.markPublic();
+    return 1;
+  }
+
+  /** 延后的投影事件：别的面板结算完之后补开。 */
+  _echoFlushProjectionIfPending() {
+    if (this.echoProjectionPending !== true) return;
+    this.echoProjectionPending = false;
+    try { this._echoOpenProjection(true); } catch { /* ignore */ }
+  }
+
+  /** `g.echoProjection { pick }`：投给第 i 个候选（全队票多者得）。 */
+  setEchoProjectionPick(ps, idx) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE);
+    if (!ps || ps.spectator) return fail(ERR.SPECTATOR);
+    if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    if (ps.alive === false) return fail(ERR.SPECTATOR, 'dead players do not vote');
+    const box = this.echoProjectionOffer && this.echoProjectionOffer.round === this.round ? this.echoProjectionOffer : null;
+    if (!box || box.pick != null) return fail(ERR.WRONG_PHASE);
+    const at = Math.floor(Number(idx));
+    if (!(at >= 0 && at < box.options.length)) return fail(ERR.BAD_TARGET);
+    if (!box.votes) box.votes = new Map();
+    box.votes.set(ps.playerId, at);
+    this.markPublic();
+    return this._echoResolveProjection();
+  }
+
+  /** 票齐了就结算，否则等着（幂等，和补给/祝福投票同款）。 */
+  _echoResolveProjection() {
+    const box = this.echoProjectionOffer && this.echoProjectionOffer.round === this.round ? this.echoProjectionOffer : null;
+    if (!box || !Array.isArray(box.options) || !box.options.length) return OK;
+    const voters = this.humans().filter((p) => p.connected && !p.spectator && p.alive !== false && !p.left).map((p) => p.playerId);
+    if (!voters.length || !voters.every((id) => (box.votes || new Map()).has(id))) return OK;
+    const tally = new Map();
+    for (const id of voters) {
+      const v = box.votes.get(id);
+      tally.set(v, (tally.get(v) || 0) + 1);
+    }
+    let best = 0;
+    let bestN = -1;
+    for (const v of [...tally.keys()].sort((a, b) => a - b)) {
+      const n = tally.get(v);
+      if (n > bestN) { best = v; bestN = n; }
+    }
+    return this._echoSettleProjection(best);
+  }
+
+  /** 倒计时到点：按当前票数直接结算（没人投票就取第 0 个）。 */
+  _echoForceResolveProjection() {
+    const box = this.echoProjectionOffer && this.echoProjectionOffer.round === this.round ? this.echoProjectionOffer : null;
+    if (!box) return OK;
+    const tally = new Map();
+    for (const v of (box.votes || new Map()).values()) tally.set(v, (tally.get(v) || 0) + 1);
+    let best = 0;
+    let bestN = -1;
+    for (const v of [...tally.keys()].sort((a, b) => a - b)) {
+      const n = tally.get(v);
+      if (n > bestN) { best = v; bestN = n; }
+    }
+    return this._echoSettleProjection(best);
+  }
+
+  /** 结算：记下（或替换）投影，然后收面板。 */
+  _echoSettleProjection(best) {
+    const box = this.echoProjectionOffer && this.echoProjectionOffer.round === this.round ? this.echoProjectionOffer : null;
+    this.cancel(this._echoProjectionTimer);
+    this._echoProjectionTimer = null;
+    this.echoProjectionEndsAt = 0;
+    if (!box || !Array.isArray(box.options) || !box.options.length) {
+      this.echoProjectionOffer = null;
+      this._echoMaybeResumePrepClock();
+      this.markPublic();
+      return OK;
+    }
+    const idx = Math.max(0, Math.min(box.options.length - 1, Math.floor(Number(best) || 0)));
+    const id = box.options[idx];
+    const proj = echoProjectionById(id);
+    box.pick = idx;
+    this.echoProjectionOffer = null;
+    if (proj) {
+      const replaced = this.echoProjection && this.echoProjection !== id ? echoProjectionById(this.echoProjection) : null;
+      this.echoProjection = id;
+      this._echoPushAnnounce(replaced
+        ? `盟约投影：「${proj.name}」替换了「${replaced.name}」（全体干员按满档生效）`
+        : `盟约投影：「${proj.name}」—— 全体干员按满档享受该核心盟约`);
+    }
+    this._echoFlushAnnounce?.();
+    this._echoMaybeResumePrepClock();
+    this._echoFlushSupplyIfPending?.();
+    this.markPublic();
+    return OK;
+  }
+
+  /** 下发给客户端的投影视图（候选 + 票数 + 倒计时 + 当前生效的那条）。 */
+  _echoProjectionView() {
+    if (this.echoVariant !== 'deepecho') return null;
+    const box = this.echoProjectionOffer && this.echoProjectionOffer.round === this.round ? this.echoProjectionOffer : null;
+    return {
+      current: this.echoProjection ? echoProjectionById(this.echoProjection) : null,
+      offer: box ? {
+        round: box.round,
+        options: box.options.map((id) => echoProjectionById(id)).filter(Boolean),
+        votes: Object.fromEntries(box.votes instanceof Map ? box.votes : []),
+        pick: box.pick,
+        endsAt: this.echoProjectionEndsAt ?? null,
+      } : null,
+    };
+  }
+
+  /**
+   * 战斗输入要用的「投影注入」：把这个盟约按满档塞进 `bonds` 快照，
+   * 并给玩家输入带上 `projectedBond`（sim 的 unitBonds 会让**所有己方干员**都算该盟约成员）。
+   * @returns {{ bondId: string, state: object } | null}
+   */
+  echoProjectionBond() {
+    if (this.echoVariant !== 'deepecho' || !this.echoProjection) return null;
+    const proj = echoProjectionById(this.echoProjection);
+    if (!proj) return null;
+    return {
+      bondId: proj.id,
+      state: { count: Math.max(0, Math.floor(Number(proj.tier) || 6)), active: true, tier: 3, layers: 0 },
+    };
+  }
+
+  /** 下发给客户端的补给视图（全队同一份，含票数与倒计时）。 */  _echoSupplyView() {
     if (this.echoVariant !== 'deepecho') return null;
     const box = this.echoSupply && this.echoSupply.round === this.round ? this.echoSupply : null;
     if (!box || !Array.isArray(box.options) || !box.options.length) return null;

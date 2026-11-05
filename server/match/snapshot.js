@@ -100,6 +100,8 @@ export const MATCH_FIELDS = Object.freeze({
     'echoBannedTilesUntil', 'echoBannedBondsUntil',
     // 深潜补给的本层词条与保底间隔（2026-11-05）：读档当层仍然要生效，间隔也要记住，否则可以刷补给
     'echoSupplyWords', 'echoSupplyLastDepth',
+    // 「盟约投影」（2026-11-05）：当前生效的那条 + 已开过投影事件的深度，读档不能丢
+    'echoProjection', 'echoProjectionLayers',
     // 已发过固定层诅咒的深度（2026-11-05）：固定层改成随机抽之后必须记住发过哪些层，
     // 否则读档 / 重进同一层会再叠一条
     'echoFixedCurseLayers',

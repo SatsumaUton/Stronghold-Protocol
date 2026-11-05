@@ -162,7 +162,7 @@ export function EchoBuffBar({ pub }) {
       title=${rc.desc ? `${t('本回合诅咒')}：${rc.name} · ${rc.desc}` : `${t('本回合诅咒')}：${rc.name}`}>
       <b>${t('本回合诅咒')}</b><span>${rc.name}</span>
     </div>` : null}
-    ${ordered.map((c) => html`<span key=${c.key} class=${`etag ecochip ecochip--${c.tone} is-${c.side}${c.consumed ? ' is-consumed' : ''}${c.left != null || c.temp ? ' is-timed' : ''}${c.roundCurse ? ' is-roundcurse' : ''}`}
+    ${ordered.map((c) => html`<span key=${c.key} class=${`etag ecochip ecochip--${c.tone} is-${c.side}${c.consumed ? ' is-consumed' : ''}${c.left != null || c.temp ? ' is-timed' : ''}${c.roundCurse ? ' is-roundcurse' : ''}${c.projection ? ' is-projection' : ''}`}
       title=${c.title} aria-label=${c.title}><${BuffSigil} chip=${c} /><${TempBadge} chip=${c} /></span>`)}
   </div>`;
 }

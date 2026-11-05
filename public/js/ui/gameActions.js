@@ -117,6 +117,8 @@ export const actions = {
   echoAltar: (kind) => act('g.echoAltar', { kind }, { sfx: 'confirm' }),
   // 深潜补给（16 层起）：个人三选一
   echoSupply: (pick) => act('g.echoSupply', { pick: Number(pick) }, { sfx: 'confirm' }),
+  // 盟约投影（16 层起每 10 层）：全队三选一投票
+  echoProjection: (pick) => act('g.echoProjection', { pick: Number(pick) }, { sfx: 'confirm' }),
   // 护盾：投票指定要保护的盟约
   echoShield: (pick) => act('g.echoShield', { pick: Number(pick) }, { sfx: 'confirm' }),
 };

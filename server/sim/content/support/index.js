@@ -258,13 +258,18 @@ export function unitBonds(u) {
   const cached = BONDS.get(u);
   const items = itemsOf(u);
   const plus = u.player?.morphPairing === 'plus';
-  // The official key stays items.join('|'), so a cached official result is unchanged.
-  const key = (plus ? 'plus|' : '') + items.join('|');
+  // 「盟约投影」（深渊回响的特殊祝福，维护者 2026-11-05）：玩家输入带 `projectedBond` 时，
+  // 场上**每个己方干员**都算该核心盟约的成员 —— 于是 server/sim/content/bonds/core.js 里那些
+  // `unitBonds(u).includes(bond)` 的分支自然对所有人生效，不用逐条改写。
+  // 不进官方 key：没这个字段时缓存行为与原来逐字节一致（golden 不受影响）。
+  const proj = typeof u.player?.projectedBond === 'string' ? u.player.projectedBond : '';
+  const key = (plus ? 'plus|' : '') + (proj ? `${proj}|` : '') + items.join('|');
   if (cached && cached.key === key) return cached.bonds;
   const out = [...(Array.isArray(u.def?.bonds) ? u.def.bonds : Array.isArray(u.def?.raw?.bonds) ? u.def.raw.bonds : [])];
   for (const b of grantedBondsByMorph(items, (id) => itemRecord(id), { mode: plus ? 'plus' : 'official', bondOk: (id) => !!bondRecord(id) })) {
     if (!out.includes(b)) out.push(b);
   }
+  if (proj && !out.includes(proj)) out.push(proj);
   const bonds = Object.freeze(out);
   BONDS.set(u, { key, bonds });
   return bonds;

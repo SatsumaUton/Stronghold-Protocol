@@ -127,6 +127,12 @@ export function echoBuffChips(echo) {
     const v = ECHO_BUFF_VISUALS[w.id] || { glyph: label.slice(0, 1) || '祝', tone: 'coin' };
     out.push({ key: `ally:${w.id}`, side: 'ally', id: w.id, raw: w, label, glyph: v.glyph, icon: echoBuffIcon(w, 'ally'), tone: v.tone, temp: true, left: 1, title: w.desc ? `${label}（本层） · ${w.desc}` : `${label}（本层）` });
   }
+  // 「盟约投影」：当前生效的那条核心盟约投影（维护者 2026-11-05）—— 己方侧、金色、单独标记
+  const proj = echo?.projection && echo.projection.current;
+  if (proj && typeof proj.id === 'string') {
+    const label = typeof proj.name === 'string' && proj.name ? proj.name : proj.id;
+    out.push({ key: `ally:projection:${proj.id}`, side: 'ally', id: proj.id, raw: proj, label, glyph: '投', icon: echoBuffIcon(proj, 'ally'), tone: 'gold', projection: true, title: `盟约投影：${label}${proj.desc ? ` · ${proj.desc}` : ''}` });
+  }
   for (const b of blessings) {
     if (!b || typeof b.id !== 'string') continue;
     const label = typeof b.name === 'string' && b.name ? b.name : b.id;
