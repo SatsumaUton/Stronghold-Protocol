@@ -163,6 +163,8 @@ export const PLAYER_FIELDS = Object.freeze({
     // 不存的话重启续玩后身份变回 false，管理员又开始被挂机判定踢。
     'adminId',
     'alive', 'lp', 'bandId', 'funds', 'pendingFunds', 'infoReady', 'lastEmoteAt', 'bondPlan',
+    // 这一局用过的最多盟约 / 最高层数（2026-11-05）：排行榜读它，团灭后 bonds 会归零
+    'bondPeak',
     'shop', 'offers', 'hand', 'temp', 'prepsEnded', '_tempDue', 'board', 'layers', 'battleLayerGains', 'pendingLayerGains',
     'bondCountBonus', 'effects', 'bounties', 'personalChoice', 'counters', 'round', 'deployCapBonus', 'deployCapMin',
     'deviceOverrides', 'tileOverrides', 'stats', 'eliminatedRound', 'creditedKills', 'lpAtFinal', 'lastResult',

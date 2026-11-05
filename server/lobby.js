@@ -3508,19 +3508,25 @@ export class Lobby {
       squads: (Array.isArray(m.order) ? m.order : [])
         .filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string')
         .map((ps) => {
+          // 优先读**峰值**（`bondPeak`）：团灭时 eliminate() 已经把棋盘退回卡池，现算出来全是 0
+          // （维护者 2026-11-05：排行榜「无核心 · 最高 0 层」就是这个问题）
+          const peak = ps.bondPeak && typeof ps.bondPeak === 'object' ? ps.bondPeak : null;
           const used = ps.bonds && typeof ps.bonds === 'object' ? Object.entries(ps.bonds) : [];
           const live = used.filter(([, rec]) => rec && Number(rec.count) > 0);
-          const cores = live
+          const liveCores = live
             .map(([id]) => id)
             .filter((id) => {
               const rec = typeof m.gd.bond === 'function' ? m.gd.bond(id) : null;
               return rec && rec.isCore === true;
-            })
+            });
+          const cores = (Array.isArray(peak && peak.cores) && peak.cores.length ? peak.cores : liveCores)
             .map((id) => (m.gd.bond(id) || {}).name || id);
           // 最高盟约层数（维护者 2026-11-05）：只看盟约**层数**，不看词条、不看稀有度。
-          // 口径 = 该玩家在用（count>0）的盟约里 `ps.layers[本盟约]` 的最大值。
-          const maxLayers = Math.max(0, ...live.map(([id]) => Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0))));
-          return { name: ps.name, cores, bonds: live.length, maxLayers };
+          // 口径 = 该玩家在用（count>0）的盟约里 `ps.layers[本盟约]` 的最大值；团灭后取峰值。
+          const nowMax = Math.max(0, ...live.map(([id]) => Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0))));
+          const maxLayers = Math.max(nowMax, Math.max(0, Math.floor(Number(peak && peak.maxLayers) || 0)));
+          const bonds = Math.max(live.length, Math.max(0, Math.floor(Number(peak && peak.bonds) || 0)));
+          return { name: ps.name, cores, bonds, maxLayers };
         }),
       clearMs: Math.max(0, Math.floor(Number(this.now()) - Number(m.startedAt || this.now()))),
       at: this.now(),
