@@ -944,8 +944,10 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-buffbar {
   /* 右上角、倒计时左边（维护者 2026-11-05）：右下角会挡住商店池 */
   position: fixed; top: .12rem; right: 1.7rem; z-index: 8;
-  display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .05rem;
-  max-width: 46vw; padding: .04rem .08rem;
+  /* 固定窄栏 + 强制换行：以前一整排会横向盖住 HUD 按钮 */
+  display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: .04rem;
+  width: 17vw; max-width: 17vw; max-height: 34vh; overflow: hidden;
+  padding: .04rem .06rem;
   background: rgba(10, 5, 22, .55); border: 1px solid rgba(183, 156, 255, .28);
   pointer-events: none;
 }
