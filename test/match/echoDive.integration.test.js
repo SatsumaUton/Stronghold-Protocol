@@ -1470,3 +1470,23 @@ test('16 层「深渊通胀」用独立广播，不与本回合诅咒合并，�
   m.startRound(17);
   assert.equal(lines.filter((s) => s.includes('深渊通胀')).length, 0, '只在 16 层播一次');
 });
+
+// 玩家 2026-11-05：深潜补给看不到队友投了哪个，且文案像个人奖励。
+test('深潜补给：全队同一份候选、票数可见、文案标明全队共享', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 20;
+  m.echoSupplyLastDepth = 0;
+  let opened = 0;
+  for (let i = 0; i < 30 && !opened; i++) opened = m._echoOpenSupply();
+  assert.equal(opened, 1, '要能开出一次补给');
+  const v = m._echoSupplyView();
+  assert.ok(v.options.length >= 2, '要有候选');
+  assert.ok(v.options.every((o) => /全队/.test(o.desc || '')), '每个候选都要写明「全队」共享');
+  const [a, b] = m.alivePlayers();
+  m.setEchoSupplyPick(a, 1);
+  m.setEchoSupplyPick(b, 1);
+  const after = m._echoSupplyView();
+  assert.deepEqual(after.votes, { [a.playerId]: 1, [b.playerId]: 1 }, '票数要按玩家下发（客户端才能显示谁投了什么）');
+});

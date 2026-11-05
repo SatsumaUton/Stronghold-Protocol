@@ -1609,7 +1609,8 @@ export class MatchEcho {
       { kind: 'word', id: 'word_atk', name: '词条 · 强攻', desc: '本层全队攻击 +8%', mods: { atkPct: 0.08 } },
       { kind: 'word', id: 'word_bat', name: '词条 · 疾速', desc: '本层全队攻速 +6%', mods: { batPct: 0.06 } },
       bless
-        ? { kind: 'blessing', id: bless.id, name: bless.name, desc: bless.desc || '' }
+        // 补给是**全队共享一次**：祝福描述前面统一加「全队」，避免玩家以为是个人奖励
+        ? { kind: 'blessing', id: bless.id, name: bless.name, desc: bless.desc ? `全队共享：${bless.desc}` : '全队共享一次' }
         : { kind: 'word', id: 'word_hp', name: '词条 · 坚韧', desc: '本层全队生命 +8%', mods: { hpPct: 0.08 } },
     ];
     this.echoSupply = { round: this.round, options, votes: new Map(), pick: null };

@@ -43,28 +43,37 @@ export function EchoSupplyPanel({ pub }) {
     pending.current = false;
   };
 
-  const card = (o, i) => html`<button type="button" key=${i + o.name}
+  const card = (o, i) => {
+    // 谁投了这一项（维护者 2026-11-05：看不到队友投了什么）
+    const who = voters.filter((p) => votes[p.playerId] === i).map((p) => p.name);
+    return html`<button type="button" key=${i + o.name}
       class=${`echo-bless__card${armed === i ? ' is-armed' : ''}${myPick === i ? ' is-picked' : ''}`}
       onClick=${() => { if (myPick == null) setArmed(i); }}>
-    <b class="echo-bless__name">${o.name}</b>
-    ${o.desc ? html`<span class="echo-bless__desc">${o.desc}</span>` : null}
-    ${o.kind === 'blessing' ? html`<em class="echo-bless__rar is-rare">${t('一次性祝福')}</em>` : null}
-    ${o.kind === 'word' ? html`<em class="echo-bless__rar is-epic">${t('本层词条')}</em>` : null}
-  </button>`;
+      <b class="echo-bless__name">${o.name}</b>
+      ${o.desc ? html`<span class="echo-bless__desc">${o.desc}</span>` : null}
+      ${o.kind === 'blessing' ? html`<em class="echo-bless__rar is-rare">${t('一次性祝福')}</em>` : null}
+      ${o.kind === 'word' ? html`<em class="echo-bless__rar is-epic">${t('本层词条')}</em>` : null}
+      <span class="echo-bless__votes">${who.length ? who.join('、') : t('无人投票')}</span>
+    </button>`;
+  };
 
-  return html`<div class="echo-bless echo-supply" role="dialog" aria-label=${t('深潜补给')}>
-    <header class="echo-bless__head">
-      <h3>${t('深潜补给')} <small>${t('全队投票选一项，共享一份（{n}/{m}）', { n: voted, m: voters.length })}</small></h3>
-      ${left != null ? html`<span class="echo-bless__count">${left}s</span>` : null}
-    </header>
-    <div class="echo-bless__cards">${options.map(card)}</div>
-    <footer class="echo-bless__foot">
-      <span class="echo-bless__hint">${myPick != null
-        ? t('你已投「{name}」，等待队友…', { name: options[myPick].name })
-        : armed == null ? t('先选一项，再点「确认」') : t('已选中「{name}」', { name: options[armed].name })}</span>
-      <${Button} class="echo-bless__confirm" disabled=${myPick != null || armed == null} onClick=${confirm}>
-        ${t('确认')}
-      </${Button}>
-    </footer>
+  return html`<div class="echo-bless-overlay" role="dialog" aria-label=${t('深潜补给')} aria-live="polite">
+    <div class="echo-bless echo-supply">
+      <header class="echo-bless__head">
+        <b>${t('深潜补给 · 全队投票')}</b>
+        <span>${t('全队同一组候选，票多者得，效果全队共享一次（不是每人各拿一份）。')}</span>
+        ${left != null ? html`<span class="echo-bless__timer" aria-live="off"><b>${left}</b><i>秒</i></span>` : null}
+        <span class="echo-bless__count">${voted}/${voters.length}</span>
+      </header>
+      <div class="echo-bless__cards">${options.map(card)}</div>
+      <footer class="echo-bless__foot">
+        <span class="echo-bless__hint">${myPick != null
+          ? t('你已投「{name}」，等待队友…', { name: options[myPick].name })
+          : armed == null ? t('先选一项，再点「确认」') : t('已选中「{name}」', { name: options[armed].name })}</span>
+        <${Button} class="echo-bless__confirm" disabled=${myPick != null || armed == null} onClick=${confirm}>
+          ${t('确认')}
+        </${Button}>
+      </footer>
+    </div>
   </div>`;
 }
