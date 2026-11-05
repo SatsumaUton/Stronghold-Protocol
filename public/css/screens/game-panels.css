@@ -946,7 +946,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   position: fixed; top: .12rem; right: 1.7rem; z-index: 8;
   /* 固定窄栏 + 强制换行：以前一整排会横向盖住 HUD 按钮 */
   display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: .04rem;
-  width: 17vw; max-width: 17vw; max-height: 34vh; overflow: hidden;
+  /* 用 px 固定宽度，保证一定换行（vw 在某些缩放档位下会被算得很大） */
+  width: 190px; max-width: 190px; max-height: 34vh; overflow: hidden;
   padding: .04rem .06rem;
   background: rgba(10, 5, 22, .55); border: 1px solid rgba(183, 156, 255, .28);
   pointer-events: none;
