@@ -528,10 +528,11 @@ export class MatchPhases {
     const cfgRound = this._echoDiveRound(r) ? this._echoBossTemplateRound() : null;
     const eff = cfgRound ?? r;
     const hidden = eff === this.gd.hiddenRound && eff !== this.gd.bossRound;
-    // 返场回合换一个随机 boss（不再固定 R14 那个）；隐藏核心仍用 hiddenBossId
-    const bossId = hidden
-      ? this.hiddenBossId
-      : (this.echoVariant === 'deepecho' && this._echoBossReturn(r) ? this._echoBossPick(r) : this.bossId);
+    // 深潜：隐藏核心层用 hiddenBossId，返场层用随机 boss（含隐秘核心那只），其余用 R14 的 boss；
+    // 普通房间沿用原来的判定。波次 / 共享血池 / 准备面板三处必须是同一个 id，所以统一走 _echoBossIdFor。
+    const bossId = this.echoVariant === 'deepecho'
+      ? this._echoBossIdFor(r)
+      : (hidden ? this.hiddenBossId : this.bossId);
     // Pairing uses an independent seeded draw, consuming no shop, wave, draft or battle randomness. The Hidden Core
     // draws its pairs and sides anew (GitHub #845: the official R15 of BV1VCXyBjEN1 p1 pairs 1-2 / 3-4 after an R14 of
     // 1-4 / 2-3; DESIGN §35.27, superseding §30.12's kept partners) from a stream of its own, so the Final Assault's

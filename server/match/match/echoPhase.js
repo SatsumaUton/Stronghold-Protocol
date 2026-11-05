@@ -518,15 +518,39 @@ export class MatchEcho {
    *  前期就放第 14 回合的 boss，玩家打不过。 */
   /**
    * 【深渊回响】返场 boss 的选择（维护者 2026-11-05）：
-   * 不再固定用 R14 的那个 boss，而是从全部 boss 里**随机换一个其他的**（排除本局已经打过的）。
+   * 不再固定用 R14 的那个 boss，而是从全部 boss 里**随机换一个其他的**（排除本局 R14 已经打过的那个）。
    * 用种子 + 回合做随机源，同一局可复现。
+   *
+   * ★ 维护者 2026-11-05 第二次定：**隐秘核心的 boss 也要能返场**（之前把它排除了，
+   *   结果 16 层以后翻来覆去只有 R14 那只）。所以池子里保留 `hiddenBossId`，只排除 `bossId`。
    */
   _echoBossPick(r = this.round) {
     const all = Object.keys((this.gd && this.gd.raw && this.gd.raw.bosses) || {});
-    const pool = all.filter((id) => id !== this.bossId && id !== this.hiddenBossId);
+    const pool = all.filter((id) => id !== this.bossId);
     if (!pool.length) return this.bossId;
     const rng = createRng(deriveSeed(this.seed, `echo:boss:${r}`));
     return pool[Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length))];
+  }
+
+  /**
+   * 这一回合**真正打的** boss id（波次、共享血池、准备阶段面板、结算全部用它）。
+   *
+   * 深潜：隐藏核心层 → `hiddenBossId`；返场层 → `_echoBossPick()`（随机，含隐秘核心那只）；
+   * 其他 → `bossId`。普通房间保持原逻辑（隐藏核心 / R14 的 boss）。
+   */
+  _echoBossIdFor(r = this.round) {
+    if (this.echoVariant !== 'deepecho') {
+      const eff = this._echoDiveRound(r) ? this._echoBossTemplateRound() : r;
+      const hidden = eff === this.gd.hiddenRound && eff !== this.gd.bossRound;
+      return hidden ? this.hiddenBossId : this.bossId;
+    }
+    if (this._echoHiddenBossRound(r)) return this.hiddenBossId;
+    if (this._echoBossReturn(r)) {
+      // 深度 14 是**原版 boss 回合**（不是返场）：就打本局那只 bossId
+      if (this._echoDepth(r) === 14) return this.bossId;
+      return this._echoBossPick(r);
+    }
+    return this.bossId;
   }
 
   _echoBossReturn(r = this.round) {
@@ -1697,7 +1721,9 @@ export class MatchEcho {
       // 本回合是不是 boss 关（14 层 / 15 层隐藏核心 / 25·35·45 返场）：
       // 客户端要在准备阶段显示「敌方领袖」块（维护者 2026-11-05：15 层 boss 看不到了）。
       bossRound: !!(this._echoBossReturn() || this._echoHiddenBossRound()),
-      bossId: this._echoHiddenBossRound() ? this.hiddenBossId : (this._echoBossReturn() ? this.bossId : null),      // 刷新三选一（维护者 2026-11-05）：剩余额度 + 进行中的投票
+      // 这一层真正打的 boss（返场层是随机那只，可能是隐秘核心；之前这里固定发 R14 的 bossId，
+      // 面板上就永远是同一只 —— 维护者 2026-11-05）
+      bossId: (this._echoBossReturn() || this._echoHiddenBossRound()) ? this._echoBossIdFor() : null,
       blessingRefresh: {
         left: this._echoBlessingRefreshLeft(),
         cap: ECHO_BLESSING_REFRESH_MAX,

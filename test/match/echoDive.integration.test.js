@@ -1458,7 +1458,10 @@ test('boss 关对准备阶段可见：15 层隐藏核心 / 25 层返场', (t) =>
   h3.m.startRound(25);
   const node = h3.m._echoPublic();
   assert.equal(node.bossRound, true, '25 层是返场 boss 关');
-  assert.equal(node.bossId, h3.m.bossId);
+  // 返场是**随机换一只**（维护者 2026-11-05：16 层以后不要只出现 R14 那只；隐秘核心也要能返场）
+  assert.equal(node.bossId, h3.m._echoBossIdFor(25), '下发的必须是这一层真正打的那只');
+  assert.notEqual(node.bossId, h3.m.bossId, '返场不该再固定 R14 那只');
+  assert.ok(h3.m.gd.boss(node.bossId), '必须是真实 boss');
 });
 
 // 维护者 2026-11-05：16 层的规则播报没在房间里看到。
