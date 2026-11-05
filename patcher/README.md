@@ -70,6 +70,38 @@ patcher\
 > 新增功能漏登记时，`check-coverage.mjs` 只能保证「文件进了补丁」，
 > 但**不能**保证「下次升级时有人记得验收它」—— 这一步只能靠这张表。
 
+### 深渊回响的独立性（2026-11-06）
+
+**要求（维护者）：原版更新不许让深渊回响失效。**
+
+上游更新走 `restore → 升级 → apply.mjs`（服务端锚点）与 `merge-features.py`（功能快照三方合并）：
+官方文件是**整文件覆盖**的，只有 `patcher/features/<id>/files/` 的快照能把我们的改动救回来。
+所以「深潜会不会被原版更新搞坏」=「带深潜逻辑的文件有没有最新快照 + 有没有在两张表里登记」。
+
+这条不变量由 **`node patcher/check-deepecho.mjs`** 守住，并且是 `npm test` 的一部分
+（`test/patcher/deepecho-isolation.test.js`）：
+
+| 检查 | 说明 |
+|---|---|
+| 文件清单不靠人记 | 扫描 `server/ public/ shared/ matchmaker/ dashboard/ data/ content/ mm/` 里所有出现 `deepecho` / `echoVariant` / `echoBlessing` / `echoPhase` / `echoCurse` / `深渊回响` / `深潜` 等标记的运行文件（当前 **96** 个） |
+| 快照逐字节一致 | 每个文件都要在 `patcher/features/deepecho/files/` 里有一份**和仓库完全相同**的副本；过期 = 上游一升级就回退到旧版本 |
+| `features.json` 登记 | 有 `deepecho` 项（状态 `ported`、文件清单、验收项），升级清单里才有人知道要移植 |
+| `index.json` 登记 | **关键**：`merge-features.py` 只读 `patcher/features/index.json`；缺项 = 合并阶段整份功能被忽略 |
+| 测试齐全 | 18 个深潜测试文件必须存在（升级后按这份清单重跑） |
+
+```bash
+node patcher/check-deepecho.mjs          # 检查（有问题退出码 1）
+node patcher/check-deepecho.mjs --list   # 打印完整清单
+node patcher/check-deepecho.mjs --fix    # 把漂移/缺失的文件补进快照，并同步 index.json
+```
+
+**每次改完深潜代码（哪怕只改一行）都要跑一次 `--fix` 再提交**，否则下次上游更新会把它吞掉。
+负向验证过：把 `echoPhase.js` 的快照改坏一个字节，守卫立刻报「快照过期: 1」并退出码 1。
+
+> 深潜没有 `base/` 副本，`merge-features.py` 对它走 `no-base-keep-ours`：**整份保留我们的版本**。
+> 这正是「原版更新不影响深潜」想要的效果；代价是这些文件里上游的新改动不会自动合并进来 ——
+> 升级后需要人工看一眼上游是否在这些文件里改了与深潜无关的东西。
+
 ### 玩法与对局
 
 | 功能 | 涉及文件 | 所属补丁 | 生效方式 |
