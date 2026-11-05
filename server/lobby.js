@@ -1554,7 +1554,7 @@ export class Lobby {
     // 判据用身份 `session.adminId`（与「管理员建房免过期」同一口径），不要求兑换验证码 ——
     // 这是「谁能进这个模式」，不是「谁能改对局数据」（后者走 ps.admin 三道门）。
     const variant = askedVariant === 'deepecho' ? 'deepecho' : null;
-    if (variant && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId)) return fail(ERR.TEST_FORBIDDEN, '「深渊回响」暂未开放，仅管理员与测试名单可进入');
+    if (variant && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId)) return fail(ERR.ECHO_FORBIDDEN, '「深渊回响」暂未开放，仅管理员与测试名单可进入');
     // 深潜**不支持**实验性功能（维护者 2026-11-03 定）：enemyHpMul/Atk 会和 echoScale 叠乘、
     // playerCapacity 会改变配对与 boss 半场、poolPlan 会破坏「随机出怪」这个前提、
     // disableLayerCap 本来就是深潜的固定行为。这里**直接拒绝**而不是静默丢掉 ——
@@ -1692,7 +1692,7 @@ export class Lobby {
     // 一旦被设成公开同盟，普通玩家仍可能点「加入同盟」进来 —— 所以加入 / 观战 / 接管这条路也要挡。
     // 已经在本房里的人不受影响（下面的 idempotent 分支照旧），否则重连会把自己拦在门外。
     if (room.variant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId) && this.roomOf(session) !== room) {
-      return fail(ERR.TEST_FORBIDDEN, '「深渊回响」暂未开放，仅管理员可进入');
+      return fail(ERR.ECHO_FORBIDDEN, '「深渊回响」暂未开放，仅管理员可进入');
     }
     const cur = this.roomOf(session);
     // idempotent for members; a spectator of this room goes on below: it may take a free player seat (header)
@@ -1815,7 +1815,7 @@ export class Lobby {
     if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
     // 「深渊回响」：观战席与玩家席同一道门禁（正式开放前只有管理员能进）。
     if (room.variant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId) && this.roomOf(session) !== room) {
-      return fail(ERR.TEST_FORBIDDEN, '「深渊回响」暂未开放，仅管理员可进入');
+      return fail(ERR.ECHO_FORBIDDEN, '「深渊回响」暂未开放，仅管理员可进入');
     }
     const wantHidden = hidden === true;
     if (wantHidden && !verifyWatchToken(adminToken, room.code)) return fail(ERR.BAD_MSG, 'admin watch denied');
