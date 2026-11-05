@@ -169,6 +169,8 @@ export const PLAYER_FIELDS = Object.freeze({
     'bondPeak',
     'shop', 'offers', 'hand', 'temp', 'prepsEnded', '_tempDue', 'board', 'layers', 'battleLayerGains', 'pendingLayerGains',
     'bondCountBonus', 'effects', 'bounties', 'personalChoice', 'counters', 'round', 'deployCapBonus', 'deployCapMin',
+    // 祭坛「永久」买过几次（整局累计，本局最多 1 次）：不存的话读档后又能再买一次 +1 部署位
+    'echoAltarDeployBought',
     'deviceOverrides', 'tileOverrides', 'stats', 'eliminatedRound', 'creditedKills', 'lpAtFinal', 'lastResult',
     '_botFocus', '_botFocusId', '_botSeenUids', '_deferItemMerge',
   ]),

@@ -94,15 +94,21 @@ export function EchoInfoBlock({ pub }) {
       // 深渊祭坛（16 层起）：成型后的资金出口（维护者 2026-11-05）
       const a = echo.altar;
       const used = (a.used && a.used[myId]) || { blessing: 0, buff: 0, permanent: 0 };
+      // 「献祭 · 永久」本局最多买 N 次（维护者 2026-11-05：+1 部署位就够）—— 买过之后按钮直接锁死
+      const permMax = Math.max(0, Number(a.permanentMax) || 0);
+      const permBought = Math.max(0, Number((a.deployBought && a.deployBought[myId]) || 0));
+      const permCapped = permMax > 0 && permBought >= permMax;
       const row = (kind, label, hint) => {
         const left = (a.limits[kind] || 0) - (used[kind] || 0);
-        const disabled = left <= 0 || (kind === 'permanent' && !a.canPermanent);
+        const capped = kind === 'permanent' && permCapped;
+        const disabled = left <= 0 || (kind === 'permanent' && !a.canPermanent) || capped;
         return html`<div class="erow echo-altar__row">
           <span class="erow__text"><b class="erow__name">${label}</b>
             <span class="erow__tags"><span class="etag">${hint}</span></span></span>
           <button type="button" class="btn btn--primary btn--sm" disabled=${disabled}
             onClick=${() => actions.echoAltar(kind)}>
-            ${t('{n} 资金', { n: a.costs[kind] })}${left > 0 ? t(' · 剩 {n}', { n: left }) : t(' · 已用完')}
+            ${capped ? t('本局已买过（上限 {n} 次）', { n: permMax })
+              : `${t('{n} 资金', { n: a.costs[kind] })}${left > 0 ? t(' · 剩 {n}', { n: left }) : t(' · 已用完')}`}
           </button>
         </div>`;
       };
@@ -113,7 +119,7 @@ export function EchoInfoBlock({ pub }) {
         </p>
         ${row('blessing', t('献祭 · 祝福'), t('抽一个一次性祝福（不占名额）'))}
         ${row('buff', t('献祭 · 强化'), t('本层全队 +6% 攻击 / +4% 攻速 / +5% 生命（可叠 2 层）'))}
-        ${row('permanent', t('献祭 · 永久'), t('永久 +1 部署位（每 5 层一次）'))}
+        ${row('permanent', t('献祭 · 永久'), permMax > 0 ? t('永久 +1 部署位（本局最多 {n} 次）', { n: permMax }) : t('永久 +1 部署位'))}
         ${a.stacks ? html`<p class="echo-infoblock__row t-dim">${t('本层强化已叠 {n} 层', { n: a.stacks })}</p>` : null}`;
     })() : null}
     <p class="echo-infoblock__row">${t('已获祝福：')}${ally.length ? html`<span class="echochips">${ally.map((c) => html`<span key=${c.key}

@@ -28,6 +28,9 @@ import { pieceBonds } from '../bondsMeta.js';
 import { roundPick, isFlyKey } from '../waves.js';
 import { FLOW_TICKER_PRIORITY, OK, fail } from './common.js';
 
+/** 「深渊祭坛 · 献祭永久」本局最多买几次（维护者 2026-11-05：+1 部署位就够，不要无限叠）。 */
+const ECHO_ALTAR_DEPLOY_MAX = 1;
+
 export class MatchEcho {
   /**
    * 深潜每回合**最多保留多少「免费刷新」**（维护者 2026-11-03 定）。
@@ -1800,11 +1803,18 @@ export class MatchEcho {
         if (this.echoVariant !== 'deepecho' || this._echoDepth(this.round) < 16) return null;
         if (!this._echoAltarOpen()) return null;
         const used = {};
-        for (const p of this.alivePlayers()) used[p.playerId] = this._echoAltarUsed(p);
+        // 「永久」买过几次（整局累计）：维护者 2026-11-05 定本局最多 +1 部署位，买过就不再提供
+        const deployBought = {};
+        for (const p of this.alivePlayers()) {
+          used[p.playerId] = this._echoAltarUsed(p);
+          deployBought[p.playerId] = Math.max(0, Number(p.echoAltarDeployBought) || 0);
+        }
         return {
           costs: this.echoAltarCosts(),
           limits: { blessing: 1, buff: 2, permanent: 1 },
           used,
+          deployBought,
+          permanentMax: ECHO_ALTAR_DEPLOY_MAX,
           stacks: Number(this.echoAltarBuffStacks) || 0,
           canPermanent: this._echoDepth(this.round) % 5 === 0,
         };
@@ -1882,6 +1892,10 @@ export class MatchEcho {
     const limits = { blessing: 1, buff: 2, permanent: 1 };
     if (used[kind] >= limits[kind]) return fail(ERR.BAD_MSG);
     if (kind === 'permanent' && this._echoDepth(this.round) % 5 !== 0) return fail(ERR.WRONG_PHASE);
+    // 维护者 2026-11-05：**本局最多买 1 次「永久」**（= +1 部署位），买过之后祭坛不再提供这一项
+    if (kind === 'permanent' && Math.max(0, Number(ps.echoAltarDeployBought) || 0) >= ECHO_ALTAR_DEPLOY_MAX) {
+      return fail(ERR.WRONG_PHASE, 'deploy slot cap reached');
+    }
     if (Number(ps.funds) < cost) return fail(ERR.NO_FUNDS);
     ps.spend(cost);
     used[kind] += 1;
@@ -1893,6 +1907,7 @@ export class MatchEcho {
     } else if (kind === 'buff') {
       this.echoAltarBuffStacks = Math.min(2, Math.max(0, Number(this.echoAltarBuffStacks) || 0) + 1);
     } else if (kind === 'permanent') {
+      ps.echoAltarDeployBought = Math.max(0, Number(ps.echoAltarDeployBought) || 0) + 1;
       ps.deployCapBonus = Math.max(0, Number(ps.deployCapBonus) || 0) + 1;
       ps.invalidateDeployMap?.();
       ps.recompute?.();
@@ -1910,8 +1925,10 @@ export class MatchEcho {
     return {
       costs, limits, used,
       stacks: Number(this.echoAltarBuffStacks) || 0,
-      permanent: Number(ps.echoAltarDeployBonus) || 0,
-      canPermanent: this._echoDepth(this.round) % 5 === 0,
+      permanent: Math.max(0, Number(ps.echoAltarDeployBought) || 0),
+      canPermanent: this._echoDepth(this.round) % 5 === 0
+        && Math.max(0, Number(ps.echoAltarDeployBought) || 0) < ECHO_ALTAR_DEPLOY_MAX,
+      permanentMax: ECHO_ALTAR_DEPLOY_MAX,
     };
   }
 
