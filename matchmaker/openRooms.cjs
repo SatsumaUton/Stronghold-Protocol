@@ -44,6 +44,8 @@ function pickOpenRoom(code, node, doc) {
     difficulty: doc.difficulty || null,
     version: typeof doc.version === 'string' && doc.version ? doc.version : 'act2autochess',
     matchmaking: doc.matchmaking === true,
+    // 「深渊回响」（深潜）：公开的深潜房也要能被认出来（列表里显示成深渊回响，维护者 2026-11-06）
+    variant: doc.variant === 'deepecho' ? 'deepecho' : null,
     experimental: !!(doc.experimental && typeof doc.experimental === 'object' && Object.keys(doc.experimental).length),
   };
 }

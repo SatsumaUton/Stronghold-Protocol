@@ -557,10 +557,12 @@ export const C2S = {
   // 省了就是「哪间匹配中的房间缺人就进哪间」。答复字段 { code, joined, matchmaking? } 或
   // { queued: true, ticket, state }（没人可加入时排队，前端停在匹配界面轮询），由 net.js 平铺在 ok 帧顶层。
   'room.quickMatch': {
-    $optional: ['difficulty', 'seats', 'rules'],
+    $optional: ['difficulty', 'seats', 'rules', 'variant'],
     difficulty: (v) => DIFFICULTIES.includes(v),
     seats: (v) => v === 'four' || v === 'multi' || v === 'both',
     rules: (v) => v === 'standard' || v === 'experimental' || v === 'both',
+    // 「深渊回响」（深潜）：自己的匹配池（server/lobby.js quickMatch 的 variant 维度）
+    variant: (v) => v === 'deepecho',
   },
   // 本服：多人匹配排队状态的轮询与取消（维护者 2026-11-02：没人匹配时停在界面等，不开房）。
   'room.quickState': { $optional: ['ticket'], ticket: (v) => typeof v === 'string' && v.length <= 64 },

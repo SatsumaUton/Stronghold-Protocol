@@ -1024,7 +1024,7 @@ const echoReadBest = () => {
  * 内容上只比 多人匹配 多两块：本机/本周最佳，以及深潜排行榜（`/api/dive/board`）。
  * 难度只给 险境 / 绝境 / 终极 三档（标准模拟的曲线不适合 R15 之后）。
  */
-export function EchoSelect({ onClose, onStart }) {
+export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, quickBusy = false }) {
   // 记住上次选的深潜难度（维护者 2026-11-03：重开大厅不该跳回默认档）。
   // 用大厅同一套 loadPref / savePref，键名与同盟难度分开，互不影响。
   const remembered = (() => {
@@ -1180,6 +1180,14 @@ export function EchoSelect({ onClose, onStart }) {
               <span class="proto-start__label">${t('开始深渊回响')}</span>
               <span class="proto-start__deco" aria-hidden="true"></span>
             </button>
+            ${onPublic || onQuick ? html`<div class="echo-links">
+              ${onPublic ? html`<button type="button" class="echo-pill" data-testid="echo-public"
+                onClick=${() => onPublic({ difficulty })} title=${t('建一间公开的深潜房，其他博士能在「公开同盟」里看到（进房仍需深潜资格）')}>
+                <${Icon} name="link" />${t('公开深潜')}</button>` : null}
+              ${onQuick ? html`<button type="button" class="echo-pill" data-testid="echo-quick" disabled=${quickBusy}
+                onClick=${() => onQuick({ difficulty })} title=${t('进入深潜匹配池，和其他深潜房配对（只会配到深潜）')}>
+                <${Icon} name="search" />${t('开始多人匹配')}</button>` : null}
+            </div>` : null}
           </div>
         </section>
       </div>
@@ -1469,6 +1477,10 @@ export function LobbyScreen() {
           ? { variant, ...(overrides && overrides.echo ? { echo: overrides.echo } : {}) }
           : (() => { const experimental = experimentalForCreator(); return experimental ? { experimental } : {}; })()),
       });
+      // 「公开深潜」：建房时带 listed，建完立刻挂到公开同盟列表（深潜房以前压根不公开）
+      if (variant === 'deepecho' && overrides && overrides.listed) {
+        try { await net.request('room.setListed', { listed: true }); } catch { /* 挂不上就还是私有房 */ }
+      }
       // 建好合作房以后，进房时问一次「要不要公开到同盟列表」（ui/roomList.js 的 ListPromptDialog）：
       // 大厅到房间是一次跳转，用 sessionStorage 把这个问题带过去。深潜房不公开，所以不问。
       if (mode === 'coop' && !variant) markListPrompt();
@@ -1508,7 +1520,7 @@ export function LobbyScreen() {
     return run('quick', async () => {
       try {
         // 服务端 net.js 把 reply 的字段平铺在 ok 帧顶层（{ ...res.reply, t:'ok', rid }），没有套一层 reply。
-        const ask = () => net.request('room.quickMatch', { difficulty: d, seats, rules });
+        const ask = () => net.request('room.quickMatch', { difficulty: d, seats, rules, ...(req?.variant === 'deepecho' ? { variant: 'deepecho' } : {}) });
         let reply;
         try {
           reply = (await ask()) || {};
@@ -1726,7 +1738,16 @@ export function LobbyScreen() {
       onStart=${({ difficulty: pickedDifficulty }) => {
         setEchoOpen(false);
         create('coop', 'deepecho', { difficulty: pickedDifficulty });
-      }} />` : null}
+      }}
+      onPublic=${({ difficulty: pickedDifficulty }) => {
+        setEchoOpen(false);
+        create('coop', 'deepecho', { difficulty: pickedDifficulty, listed: true });
+      }}
+      onQuick=${({ difficulty: pickedDifficulty }) => {
+        setEchoOpen(false);
+        quickMatch({ difficulty: pickedDifficulty, seats: 'four', rules: 'standard', variant: 'deepecho' });
+      }}
+      quickBusy=${busy === 'quick'} />` : null}
     ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed}

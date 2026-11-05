@@ -54,7 +54,7 @@ export function expSummary(exp) {
 function RoomRow({ row, disabled, onJoin }) {
   const bots = row.filled - row.humans;
   return html`<li class="rlist__row" style=${`--d-color:${DIFFICULTY_COLORS[row.difficulty]}`} data-testid="room-row" data-code=${row.code}>
-    <span class="rlist__diff"><${DifficultyIcon} difficulty=${row.difficulty} />${t(DIFFICULTY_NAMES[row.difficulty])}</span>
+    <span class="rlist__diff">${row.variant === 'deepecho' ? html`<${Icon} name="target" />${t('深渊回响')}` : html`<${DifficultyIcon} difficulty=${row.difficulty} />${t(DIFFICULTY_NAMES[row.difficulty])}`}</span>
     <span class="rlist__who"><b class="selectable">${row.host}</b><small title=${expSummary(row.experimental)}>${expSummary(row.experimental)}</small></span>
     ${/* 不显示房间在哪台节点上：编号对玩家没有意义，加入时客户端自己带 ?n= 跳过去。 */ null}
     ${row.version ? html`<span class="rlist__ver"><${Icon} name="book" />${versionLabel(row.version)}</span>` : html`<span></span>`}

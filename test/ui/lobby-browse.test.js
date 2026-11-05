@@ -46,5 +46,6 @@ test('关同盟模拟时把列表标记一起清掉（否则下次会自己弹�
 });
 
 test('从列表加入房间时两层一起收掉，再进房间', () => {
-  assert.match(code, /onJoin=\$\{\(c\) => \{ setBrowseOpen\(false\); setAllyOpen\(false\); join\(c\); \}\}/);
+  // 跨节点列表要带节点号：进房走 enterRoom(code, node)（2026-11-02 之后一直是这个实现，用例没跟上）
+  assert.match(code, /onJoin=\$\{\(c, node\) => \{ setBrowseOpen\(false\); setAllyOpen\(false\); enterRoom\(c, node\); \}\}/);
 });

@@ -583,6 +583,12 @@
 .echo-diff__tick { position: absolute; top: .03rem; right: .06rem; font-size: calc(.13 * var(--t)); color: #efe6ff; }
 
 /* 我的成绩：两块数字 */
+/* 深潜整屏：开始按钮下面那行次按钮（公开深潜 / 开始多人匹配）——同一套紫色，宽度对半 */
+.echo-links { display: flex; gap: .08rem; margin-top: .1rem; }
+.echo-pill { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: .06rem; min-height: .34rem; padding: 0 .12rem; border: 1px solid rgba(183, 156, 255, .45); background: rgba(183, 156, 255, .08); color: #d6c4ff; font-size: max(.15rem, 12px); font-weight: 700; cursor: pointer; }
+.echo-pill:hover:not(:disabled) { border-color: #b79cff; background: rgba(183, 156, 255, .16); color: #efe6ff; }
+.echo-pill:disabled { opacity: .5; cursor: default; }
+.echo-pill .icon { width: 1.05em; height: 1.05em; }
 .echo-stats { display: flex; gap: .12rem; }
 .echo-stat {
   flex: 1 1 0; display: flex; flex-direction: column; gap: .02rem;

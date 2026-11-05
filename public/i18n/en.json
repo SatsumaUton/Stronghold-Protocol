@@ -2600,5 +2600,9 @@
   "永久 +1 部署位（本局最多 {n} 次）": "Permanent +1 deploy slot (max {n} this run)",
   "永久 +1 部署位": "Permanent +1 deploy slot",
   "祭坛开放 · 放大镜里献祭": "Altar open · sacrifice in the magnifier",
-  "其他博士在深潜房里点「匹配队友」就会被配到一起，人满后自动开局": "Other Doctors who press 「Find Teammates」 in an Abyss Echo room join the same pool; the match starts when the room is full."
+  "其他博士在深潜房里点「匹配队友」就会被配到一起，人满后自动开局": "Other Doctors who press 「Find Teammates」 in an Abyss Echo room join the same pool; the match starts when the room is full.",
+  "公开深潜": "Public Deep Dive",
+  "开始多人匹配": "Start Matchmaking",
+  "建一间公开的深潜房，其他博士能在「公开同盟」里看到（进房仍需深潜资格）": "Open a public deep-dive room that other Doctors can see under 「Public Alliances」 (joining still needs deep-dive access).",
+  "进入深潜匹配池，和其他深潜房配对（只会配到深潜）": "Enter the deep-dive pool and pair with other deep-dive rooms (deep dive only)."
 }
