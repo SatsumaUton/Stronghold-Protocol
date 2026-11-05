@@ -1117,11 +1117,11 @@ export function RoomScreen() {
       <b>${t('正在等人')}</b>
       <span>${t('还差 {n} 人', { n: Math.max(0, (Number(room.capacity) || MAX_SEATS) - facts.humans.length) })}</span>
       <span class="rs-matchwait__sep" aria-hidden="true">·</span>
-      <span>${t(DIFFICULTY_NAMES[room.difficulty] || '')}</span>
+      ${echoRoom ? html`<span class="rs-matchwait__echo">${t('深渊回响')}</span>` : html`<span>${t(DIFFICULTY_NAMES[room.difficulty] || '')}</span>`}
       <span class="rs-matchwait__sep" aria-hidden="true">·</span>
       <span>${t('{n} 人同盟', { n: Number(room.capacity) || MAX_SEATS })}</span>
       <span class="rs-matchwait__sep" aria-hidden="true">·</span>
-      <em>${t('其他博士在大厅点「多人匹配」就会被安排进来，人满后自动开局')}</em>
+      <em>${echoRoom ? t('其他博士在深潜房里点「匹配队友」就会被配到一起，人满后自动开局') : t('其他博士在大厅点「多人匹配」就会被安排进来，人满后自动开局')}</em>
     </p>` : null}
 
     <footer class="room-bar rs-foot">

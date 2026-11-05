@@ -888,6 +888,8 @@
 .rs-matchwait b { font-weight: 700; color: #f0fffb; }
 .rs-matchwait__sep { color: rgba(var(--mint-c39-rgb), .55); }
 .rs-matchwait em { font-style: normal; color: #9fb9b3; }
+/* 深潜房的匹配等待条：模式名用深潜的紫，和房间里其它深潜标记同一套色 */
+.rs-matchwait__echo { padding: 0 .08rem; border: 1px solid rgba(183, 156, 255, .5); background: rgba(183, 156, 255, .12); color: #d6c4ff; font-weight: 700; }
 /* 小屏：座位和底部按钮要留高度，这行让出来（状态在座位区已经看得到） */
 @media (max-height: 520px) {
   .rs-matchwait { display: none; }

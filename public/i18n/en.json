@@ -2599,5 +2599,6 @@
   "本局已买过（上限 {n} 次）": "Already bought this run (max {n})",
   "永久 +1 部署位（本局最多 {n} 次）": "Permanent +1 deploy slot (max {n} this run)",
   "永久 +1 部署位": "Permanent +1 deploy slot",
-  "祭坛开放 · 放大镜里献祭": "Altar open · sacrifice in the magnifier"
+  "祭坛开放 · 放大镜里献祭": "Altar open · sacrifice in the magnifier",
+  "其他博士在深潜房里点「匹配队友」就会被配到一起，人满后自动开局": "Other Doctors who press 「Find Teammates」 in an Abyss Echo room join the same pool; the match starts when the room is full."
 }

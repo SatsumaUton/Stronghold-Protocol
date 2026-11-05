@@ -208,6 +208,12 @@ function updateMatchmaking(mm) {
         const vers = Array.isArray(x.byVersion) ? x.byVersion : [];
         const verTip = vers.map((v) => `${VERSION_LABELS[v.version] || v.version}：排队 ${Number(v.partyWaiting) || Number(v.waiting) || 0} 人 / 已开 ${Number(v.matches) || 0} 局`).join(' · ');
         const verTag = vers.length > 1 ? `<i class="mm-ver" title="${verTip.replace(/"/g, '&quot;')}">多版本</i>` : '';
+        // 「深渊回响」（深潜）单独一档：维护者 2026-11-06 要求节点控制台的匹配队列能看见深潜池
+        const echoPool = (Array.isArray(x.byVariant) ? x.byVariant : []).find((v) => v && v.variant === 'deepecho') || null;
+        const echoTotal = echoPool ? (Number(echoPool.waiting) || 0) + (Number(echoPool.partyWaiting) || 0) : 0;
+        const echoTag = echoPool && (echoTotal || Number(echoPool.matches) || 0)
+          ? `<span class="mm-echo" title="深渊回响（深潜）单独排队：只会配到同样在深潜队列里的队伍">深渊回响 <b>${echoTotal}</b> 人 · <b>${Number(echoPool.matches) || 0}</b> 局</span>`
+          : '';
         const exp = caps ? caps.filter((c) => Number(c.capacity) > 4 && (Number(c.waiting) || Number(c.parties) || Number(c.matches))) : [];
         if (exp.length) {
           // ★ 实验池（5–20 人）的排队人数必须同时算「单人票据」和「组队房间」。
@@ -221,13 +227,13 @@ function updateMatchmaking(mm) {
             return `${Number(c.capacity)}人 ${w}/${Number(c.capacity)}${team ? `（${team} 队）` : ''}`;
           }).join(' · ');
           const base = caps.find((c) => Number(c.capacity) === 4);
-          return `<span class="mm-pool diff-${d}"><b>${labels[d]}</b>${verTag}<i>4人 单人 <b>${Number(base?.waiting) || 0}</b></i>`
+          return `<span class="mm-pool diff-${d}"><b>${labels[d]}</b>${verTag}${echoTag}<i>4人 单人 <b>${Number(base?.waiting) || 0}</b></i>`
             + `<i>房间 <b>${Number(base?.parties) || 0}</b> 队/<b>${Number(base?.partyWaiting) || 0}</b> 人</i>`
             + `<i>已开 <b>${Number(base?.matches) || 0}</b></i>`
             + `<span class="mm-cap is-exp" title="${detail || '5～20 人实验池'}"><b>实验池 5～20人</b>`
             + `<i>排队 <b>${expWaiting}</b></i><i>房间 <b>${expParties}</b> 队</i><i>已开 <b>${expMatches}</b></i></span></span>`;
         }
-        return `<span class="mm-pool diff-${d}"><b>${labels[d]}</b>${verTag}<i>单人 <b>${Number(x.waiting) || 0}</b></i><i>房间 <b>${Number(x.parties) || 0}</b> 队/<b>${Number(x.partyWaiting) || 0}</b> 人</i><i>已开 <b>${Number(x.matches) || 0}</b></i></span>`;
+        return `<span class="mm-pool diff-${d}"><b>${labels[d]}</b>${verTag}${echoTag}<i>单人 <b>${Number(x.waiting) || 0}</b></i><i>房间 <b>${Number(x.parties) || 0}</b> 队/<b>${Number(x.partyWaiting) || 0}</b> 人</i><i>已开 <b>${Number(x.matches) || 0}</b></i></span>`;
       }).join('');
     }
   }
