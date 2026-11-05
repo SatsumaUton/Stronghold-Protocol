@@ -33,7 +33,7 @@ export const ECHO_BLESSING_VOTE_MS = 30000;
 export const ECHO_BLESSING_MAX = 3;   // 同时持有的最多个数（扩池后不能用池子长度当上限）
 export const ECHO_BLESSINGS = Object.freeze([
   Object.freeze({
-    id: 'fund', weight: 2, rarity: 'common',
+    id: 'fund', weight: 1, rarity: 'common',
     name: '物资补给',
     desc: '立刻获得 8 资金',
     kind: 'fund',
@@ -82,18 +82,18 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'gold_s', weight: 2, rarity: 'common', name: '余利', desc: '结算资金 +8%', kind: 'coin', group: 'coin', coinMul: 1.08 },
   { id: 'gold_m', weight: 1, rarity: 'rare', name: '商运', desc: '结算资金 +15%', kind: 'coin', group: 'coin', coinMul: 1.15 },
   { id: 'fund_s', weight: 1, rarity: 'common', name: '应急包', desc: '立刻获得 5 资金', kind: 'fund', group: 'fund', funds: 5 },
-  { id: 'refresh_s', weight: 4, rarity: 'common', name: '机变', desc: '立刻获得 1 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 1 },
+  { id: 'refresh_s', weight: 2, rarity: 'common', name: '机变', desc: '立刻获得 1 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 1 },
   { id: 'bigfund', weight: 1, rarity: 'rare', name: '深渊源泉', desc: '立刻获得 15 资金', kind: 'fund', group: 'fund', funds: 15 },
-  { id: 'bigrefresh', weight: 2, rarity: 'rare', name: '时之沙漏', desc: '立刻获得 2 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 2 },
+  { id: 'bigrefresh', weight: 1, rarity: 'rare', name: '时之沙漏', desc: '立刻获得 2 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 2 },
 
   // —— 全队回复生命（2026-11-05）：一次性、数值刻意做小 ——
   // 生命（LP）一格是「一次漏怪抵扣 1 点、每回合最多扣 lpCapPerRound(10)」的量级，
   // 所以这里只给 2–8 点：够救一次失误，不够把深渊的漏怪抹平。
   // 四档分开写而不是「随机数值」，是为了让三选一里能同时出现两种不同档位。
-  { id: 'heal_xs', rarity: 'common', name: '绷带', desc: '立刻让全队回复 2 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 2 },
-  { id: 'heal_s', rarity: 'common', name: '急救', desc: '立刻让全队回复 3 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 3 },
-  { id: 'heal_m', rarity: 'rare', name: '支援', desc: '立刻让全队回复 6 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 6 },
-  { id: 'heal_l', rarity: 'rare', name: '战地医疗', desc: '立刻让全队回复 8 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 8 },
+  { id: 'heal_xs', weight: 3, rarity: 'common', name: '绷带', desc: '立刻让全队回复 2 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 2 },
+  { id: 'heal_s', weight: 3, rarity: 'common', name: '急救', desc: '立刻让全队回复 3 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 3 },
+  { id: 'heal_m', weight: 2, rarity: 'rare', name: '支援', desc: '立刻让全队回复 6 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 6 },
+  { id: 'heal_l', weight: 2, rarity: 'rare', name: '战地医疗', desc: '立刻让全队回复 8 点生命（可超过上限）', kind: 'heal', group: 'heal', healLp: 8 },
 
   // —— 灾厄祝福（2026-11-05）：强力但**拿到就立刻附上一条诅咒** ——
   { id: 'doom_atk', rarity: 'epic', name: '血契', desc: '全体干员攻击 +18%；立刻附加诅咒「狂怒」（敌方攻击 +10%）', kind: 'mods', mods: { atkMul: 1.18 }, curseOnTake: 'frenzy' },
@@ -104,7 +104,7 @@ export const ECHO_BLESSINGS = Object.freeze([
   // 奇迹·诅咒 / 远见·诅咒是深渊的固定限制（`_echoCurses()` 里的两条），**永远消不掉** ——
   // 否则「免费刷新上限」「按层给钱到 999 层」会随着祝福一起被洗掉，等于没有诅咒。
   { id: 'cleanse', rarity: 'epic', name: '净化', desc: '立刻移除 1 层诅咒（任意稀有度；固定的奇迹 / 远见不受影响）', kind: 'cleanse', group: 'cleanse', curseRemove: 1 },
-  { id: 'cleanse_all', rarity: 'rare', name: '涤罪', desc: '立刻移除所有**普通**诅咒（稀有 / 传说保留；固定的奇迹 / 远见不受影响）', kind: 'cleanse', group: 'cleanse', curseRemove: 'common' },
+  { id: 'cleanse_all', weight: 2, rarity: 'rare', name: '涤罪', desc: '立刻移除所有**普通**诅咒（稀有 / 传说保留；固定的奇迹 / 远见不受影响）', kind: 'cleanse', group: 'cleanse', curseRemove: 'common' },
 
   // —— 克制祝福（2026-11-05，维护者要求）：每个诅咒都能被对应的祝福抵消 ——
   // 拿到就把对应的诅咒从 `echoCurseIds` 里删掉（效果现算，删掉即恢复）；部署禁令类直接解除。
@@ -204,7 +204,7 @@ export function echoBlessingDue(round, diveStart, bonus = 0, max = ECHO_BLESSING
  * 稀有度 → 抽中权重（维护者 2026-11-05：祝福也要有稀有度，越强越难抽到）。
  * 注意这是**单个候选槽**的权重，不是概率本身：三个槽一起抽，所以传说仍可能出现在三选一里。
  */
-export const ECHO_BLESSING_RARITY_WEIGHT = Object.freeze({ common: 7, rare: 3, epic: 1 });
+export const ECHO_BLESSING_RARITY_WEIGHT = Object.freeze({ common: 8, rare: 3, epic: 1 });
 
 /** 稀有度中文名（界面用）。 */
 export const ECHO_BLESSING_RARITY_LABEL = Object.freeze({ common: '普通', rare: '稀有', epic: '传说' });
@@ -233,10 +233,18 @@ export function echoBlessingOffer(rng, owned = []) {
     .map((b) => ({ b, w: Number(b.weight) > 0 ? Number(b.weight) : ECHO_BLESSING_RARITY_WEIGHT[b.rarity] || 1 }));
   const out = [];
   let moneyTaken = false;
+  // 一次性祝福（资金 / 回血 / 免费刷新 / 净化 / 涤罪）：拿到立刻结算、不占名额，
+  // 所以以前三选一里经常一次冒两个（维护者 2026-11-05：41% 的轮次至少一个）。
+  // 除了降权重，这里再钉一条：**一轮最多 1 个一次性**。
+  let oneShotTaken = false;
   while (pool.length && out.length < 3) {
-    // 已经给过一个资金类 → 本轮剩下的槽优先给非资金祝福；池子只剩资金类时才退回，保证槽位不空
-    const nonMoney = moneyTaken ? pool.filter((x) => !echoBlessingIsMoney(x.b)) : [];
-    const cand = nonMoney.length ? nonMoney : pool;
+    // 已经给过资金类 / 一次性 → 剩下的槽优先给别的；池子只剩那一类时才退回，保证槽位不空。
+    // 注意：反制类（开路 / 侦察 / 畅饮…）虽然也「用掉就没」，但它们是应对手段、可重复出现，
+    // 不参与这条「一轮最多 1 个」的限制（维护者 2026-11-05：限制的是回血/资金/净化这类消耗品）。
+    const ok = (x) => (!moneyTaken || !echoBlessingIsMoney(x.b))
+      && (!oneShotTaken || !echoBlessingOneShot(x.b) || echoBlessingFree(x.b));
+    const pref = pool.filter(ok);
+    const cand = pref.length ? pref : pool;
     const total = cand.reduce((sum, x) => sum + x.w, 0);
     let r = (Number(rng()) || 0) * total;
     let picked = cand[cand.length - 1];
@@ -245,6 +253,7 @@ export function echoBlessingOffer(rng, owned = []) {
       if (r < 0) { picked = cand[i]; break; }
     }
     if (echoBlessingIsMoney(picked.b)) moneyTaken = true;
+    if (echoBlessingOneShot(picked.b)) oneShotTaken = true;
     out.push(picked.b);
     pool.splice(pool.indexOf(picked), 1);
   }

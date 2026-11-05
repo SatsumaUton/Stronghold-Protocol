@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {
   ECHO_BLESSINGS, ECHO_BLESSING_EVERY, echoBlessingById, echoBlessingDue, echoBlessingOffer,
   echoBlessingMods, echoBlessingCoinMul, echoBlessingFunds, applyEchoBlessingMods, ECHO_BLESSING_RARITY_WEIGHT,
-  echoBlessingIsMoney,
+  echoBlessingIsMoney, echoBlessingOneShot, echoBlessingFree,
 } from '../../server/match/match/echoBlessing.js';
 
 /** units.js 属性重算里真实读取的 mods 键（2026-11-03 从 units.js 提取，与 echoWords.test.js 同源）。 */
@@ -226,4 +226,23 @@ test('祝福「远程」：单位的攻击范围真的多一格（不是只有�
   assert.ok(u.rangeKeys.length > before, `范围应扩展（${before} → ${u.rangeKeys.length}）`);
   assert.equal(u.s.rangeExtend, 1, '面板上的 rangeExtend 也是 1');
   h.b.dispose?.();
+});
+// 维护者 2026-11-05：一次性祝福（资金 / 回血 / 免费刷新 / 净化 / 涤罪）以前一轮能出两个，
+// 现在降权 + **一轮最多 1 个**；反制类（开路 / 侦察…）不受这条限制。
+test('一次性祝福：一轮最多 1 个，且出现比例低于 30%', () => {
+  let s = 987654;
+  const rng = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+  let offers = 0;
+  let withOne = 0;
+  for (let i = 0; i < 3000; i++) {
+    const offer = echoBlessingOffer(rng, []);
+    if (offer.length < 3) continue;
+    offers += 1;
+    const n = offer.filter((b) => echoBlessingOneShot(b) && !echoBlessingFree(b)).length;
+    assert.ok(n <= 1, `一轮出现了 ${n} 个消耗型一次性祝福：${offer.map((b) => b.id).join('、')}`);
+    if (n === 1) withOne += 1;
+  }
+  assert.ok(offers > 2900, `样本不足：${offers}`);
+  const pct = withOne / offers;
+  assert.ok(pct < 0.3, `含一次性祝福的比例 ${(pct * 100).toFixed(1)}% 仍然偏高`);
 });
