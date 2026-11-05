@@ -14,7 +14,7 @@ import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js'
 import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
-  echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, ECHO_BLESSINGS, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
+  echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, ECHO_BLESSING_REFRESH_MAX, ECHO_BLESSINGS, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { echoSummonOnly, echoHitCountEnemy, ECHO_HITCOUNT_HP_MUL } from './echoWaves.js';
@@ -1347,6 +1347,17 @@ export class MatchEcho {
       offer,
       // 祝福名额：隐藏核心通关会临时 +1（客户端显示 n/3 → n/4）
       blessingMax: this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0),
+      // 刷新三选一（维护者 2026-11-05）：剩余额度 + 进行中的投票
+      blessingRefresh: {
+        left: this._echoBlessingRefreshLeft(),
+        cap: ECHO_BLESSING_REFRESH_MAX,
+        vote: this.echoBlessingRefreshVote ? {
+          id: this.echoBlessingRefreshVote.id,
+          agreed: [...this.echoBlessingRefreshVote.agreed],
+          voters: this.echoBlessingRefreshVote.voters.slice(),
+          endsAt: this.echoBlessingRefreshVote.endsAt,
+        } : null,
+      },
       // 名额已满时的「弃选」投票（维护者 2026-11-05）：全队投掉哪个，再换入新的
       blessingReplace: this.echoBlessingReplace === true,
       // 「护盾」祝福：投票指定要保护的盟约 + 当前已指定的那条（2026-11-05）
@@ -1759,6 +1770,146 @@ export class MatchEcho {
     return this._echoResolveBlessing();
   }
 
+  // ---- 刷新祝福三选一（维护者 2026-11-05） ----------------------------------------------
+  //
+  // 口径：
+  //   * 每局开局 **3 次**刷新额度，任何来源（含「再议」祝福 / 后续条件）都**不能突破 3**；
+  //   * 刷新由**活着的在线玩家投票**决定（过半同意即刷新，1 人房直接通过）；
+  //   * 投票**不占用**选择祝福的 30 秒：开投票时把选祝福的倒计时暂停，投票结束后
+  //     —— 刷新成功 → 从 30 秒重新计时；刷新被否 → 接着用暂停时剩下的时间。
+
+  /** 当前还能刷新几次（0..ECHO_BLESSING_REFRESH_MAX）。 */
+  _echoBlessingRefreshLeft() {
+    const n = Number(this.echoBlessingRefreshes);
+    return Math.max(0, Math.min(ECHO_BLESSING_REFRESH_MAX, Number.isFinite(n) ? Math.floor(n) : ECHO_BLESSING_REFRESH_MAX));
+  }
+
+  /** 发一次刷新额度（「再议」这类祝福用），封顶 3。 */
+  _echoGrantBlessingRefresh(n = 1) {
+    const add = Math.max(0, Math.floor(Number(n) || 0));
+    if (!add) return this._echoBlessingRefreshLeft();
+    this.echoBlessingRefreshes = Math.min(ECHO_BLESSING_REFRESH_MAX, this._echoBlessingRefreshLeft() + add);
+    return this._echoBlessingRefreshLeft();
+  }
+
+  /** `g.echoBlessingRefresh { agree }`：开一次「要不要刷新当前三选一」的投票。 */
+  requestEchoBlessingRefresh(ps) {
+    if (this.echoVariant !== 'deepecho') return fail(ERR.WRONG_PHASE);
+    const offer = this.echoBlessingOffer;
+    if (!Array.isArray(offer) || !offer.length) return fail(ERR.WRONG_PHASE, 'no blessing offer');
+    if (this.echoBlessingRefreshVote) return fail(ERR.WRONG_PHASE, 'refresh vote in progress');
+    if (ps.spectator) return fail(ERR.SPECTATOR);
+    if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    if (ps.alive === false) return fail(ERR.SPECTATOR, 'dead players do not vote');
+    if (this._echoBlessingRefreshLeft() <= 0) return fail(ERR.WRONG_PHASE, 'no blessing refresh left');
+    const voters = this.humans().filter((p) => p.connected && !p.spectator && p.alive !== false && !p.left).map((p) => p.playerId);
+    if (!voters.length) return fail(ERR.WRONG_PHASE, 'no voters');
+    // 暂停选祝福的倒计时：投票时间不算进那 30 秒
+    const now = this.sched?.now?.() ?? 0;
+    const pausedMs = Math.max(0, Number(this._echoBlessingEndsAt) > 0 ? Number(this._echoBlessingEndsAt) - now : ECHO_BLESSING_VOTE_MS);
+    this.cancel(this._echoBlessingTimer);
+    this._echoBlessingTimer = null;
+    this._echoBlessingEndsAt = 0;
+    this.echoBlessingRefreshVote = {
+      id: (Number(this._echoBlessingRefreshSeq) || 0) + 1,
+      proposerId: ps.playerId,
+      voters,
+      agreed: new Set([ps.playerId]),
+      rejected: new Set(),
+      pausedMs,
+      endsAt: now + ECHO_BLESSING_VOTE_MS,
+    };
+    this._echoBlessingRefreshSeq = this.echoBlessingRefreshVote.id;
+    this.cancel(this._echoBlessingRefreshTimer);
+    this._echoBlessingRefreshTimer = this.later(ECHO_BLESSING_VOTE_MS, () => {
+      this._echoBlessingRefreshTimer = null;
+      try { this._echoResolveBlessingRefresh(true); } catch { /* 投票失败不该炸掉整局 */ }
+    });
+    this.markPublic();
+    return this._echoResolveBlessingRefresh();
+  }
+
+  /** 刷新投票：同意 / 不同意（超时按「不同意」结算，回到原来的倒计时）。 */
+  setEchoBlessingRefreshVote(ps, agree) {
+    const vote = this.echoBlessingRefreshVote;
+    if (!vote) return fail(ERR.WRONG_PHASE, 'no refresh vote');
+    if (ps.spectator) return fail(ERR.SPECTATOR);
+    if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    if (ps.alive === false) return fail(ERR.SPECTATOR, 'dead players do not vote');
+    if (!vote.voters.includes(ps.playerId)) return fail(ERR.NOT_IN_ROOM);
+    if (!vote.rejected) vote.rejected = new Set();
+    if (agree) { vote.agreed.add(ps.playerId); vote.rejected.delete(ps.playerId); }
+    else { vote.agreed.delete(ps.playerId); vote.rejected.add(ps.playerId); }
+    this.markPublic();
+    return this._echoResolveBlessingRefresh(false, ps.playerId, agree === true);
+  }
+
+  /**
+   * 刷新投票结算。
+   * @param {boolean} timedOut 超时调用（按「不刷新」处理）
+   * @param {string} [pid] 刚投票的人
+   * @param {boolean} [agree] 他投的什么
+   */
+  _echoResolveBlessingRefresh(timedOut = false, pid = null, agree = false) {
+    const vote = this.echoBlessingRefreshVote;
+    if (!vote) return OK;
+    // 有人明确拒绝且已经不可能过半 → 直接结束投票
+    // 与「重刷本局」同一条门槛：ceil(0.75 × 人数)。2 人房 = 2（要一致同意），4 人房 = 3。
+    const need = Math.ceil(vote.voters.length * 0.75);
+    // 只有**明确投了不同意**的人算反对（没投票的人不算）
+    const rejected = vote.rejected ? vote.rejected.size : 0;
+    if (!timedOut && vote.agreed.size < need && rejected > vote.voters.length - need) {
+      return this._echoCloseBlessingRefresh(false);
+    }
+    if (vote.agreed.size >= need) return this._echoCloseBlessingRefresh(true);
+    return OK;
+  }
+
+  /** 结束刷新投票：refresh=true 就重抽三选一，否则恢复原来的倒计时。 */
+  _echoCloseBlessingRefresh(refresh) {
+    const vote = this.echoBlessingRefreshVote;
+    if (!vote) return OK;
+    this.cancel(this._echoBlessingRefreshTimer);
+    this._echoBlessingRefreshTimer = null;
+    this.echoBlessingRefreshVote = null;
+    const now = this.sched?.now?.() ?? 0;
+    if (!refresh) {
+      // 不刷新：把暂停的选祝福时间接回来（至少留 1 秒，别一回来就强制结算）
+      const left = Math.max(1000, Number(vote.pausedMs) || 0);
+      this._echoBlessingEndsAt = now + left;
+      this.cancel(this._echoBlessingTimer);
+      this._echoBlessingTimer = this.later(left, () => {
+        this._echoBlessingTimer = null;
+        try { this._echoForceResolveBlessing(); } catch { /* 结算失败不该炸掉整局 */ }
+      });
+      this._echoPushAnnounce('祝福刷新投票未通过：继续从原来的候选里选');
+      this._echoFlushAnnounce();
+      this.markPublic();
+      return OK;
+    }
+    // 刷新：扣 1 次额度、重抽三个候选、**从 30 秒重新计时**
+    this.echoBlessingRefreshes = Math.max(0, this._echoBlessingRefreshLeft() - 1);
+    const r = this.round;
+    const nonce = (Number(this.echoBlessingRefreshNonce) || 0) + 1;
+    this.echoBlessingRefreshNonce = nonce;
+    const rng = createRng(deriveSeed(this.seed, `echo:bless:${r}:refresh:${nonce}`));
+    const offer = echoBlessingOffer(rng, this.echoBlessings);
+    if (!offer.length) { this.markPublic(); return OK; }
+    this.echoBlessingOffer = offer.map((b) => b.id);
+    this._echoBlessingRound = r;
+    this._echoBlessingVotes.clear();
+    this.cancel(this._echoBlessingTimer);
+    this._echoBlessingEndsAt = now + ECHO_BLESSING_VOTE_MS;
+    this._echoBlessingTimer = this.later(ECHO_BLESSING_VOTE_MS, () => {
+      this._echoBlessingTimer = null;
+      try { this._echoForceResolveBlessing(); } catch { /* 结算失败不该炸掉整局 */ }
+    });
+    this._echoPushAnnounce(`祝福已刷新：重新三选一（剩余 ${this._echoBlessingRefreshLeft()} 次）`);
+    this._echoFlushAnnounce();
+    this.markPublic();
+    return OK;
+  }
+
   /** 票齐了就结算并发放；没齐就等着（幂等）。 */
   _echoResolveBlessing() {
     const offer = this.echoBlessingOffer;
@@ -1957,6 +2108,8 @@ export class MatchEcho {
         this._echoGrantFreeRefresh(ps, refresh);
       }
     }
+    // 刷新祝福三选一（「再议」）：封顶 ECHO_BLESSING_REFRESH_MAX
+    if (Number(b.blessingRefresh) > 0) this._echoGrantBlessingRefresh(Number(b.blessingRefresh));
     const heal = echoBlessingHeal(b);
     if (heal > 0) {
       // 维护者 2026-11-05：回血祝福**允许超过玩家的初始生命上限**（深渊里血量就是资源，

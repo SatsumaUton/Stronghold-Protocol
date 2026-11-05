@@ -31,6 +31,10 @@ export function EchoBlessing({ pub }) {
   const offer = echo?.offer;
   // 当前诅咒清单（服务端 pub.echo.curses，含固定规则那几条）
   const curses = Array.isArray(echo?.curses) ? echo.curses : [];
+  // 刷新三选一（维护者 2026-11-05）：每局 3 次，活着的人投票决定是否重抽
+  const refresh = echo?.blessingRefresh;
+  const refreshLeft = Math.max(0, Number(refresh?.left) || 0);
+  const refreshVote = refresh?.vote;
   // 名额已满时的「弃选」投票（维护者 2026-11-05）：新祝福已选定 → 全队投掉哪个旧的，30 秒时限。
   const discard = echo?.discard;
   // 倒计时：服务端在 offer.endsAt 到点后强制结算（维护者 2026-11-04：看不到还剩多久）
@@ -84,6 +88,15 @@ export function EchoBlessing({ pub }) {
           onClick=${() => setShowCurses(!showCurses)}>
           ${t('查看诅咒')}${curses.length ? html`<b class="num">${curses.length}</b>` : null}
         </button>
+        ${refreshVote ? html`<span class="echo-bless__refreshvote">
+          ${t('刷新投票')} <b class="num">${(refreshVote.agreed || []).length}/${(refreshVote.voters || []).length}</b>
+          <button type="button" class="echo-bless__rbtn" disabled=${busy || !online}
+            onClick=${() => send(() => actions.echoBlessingRefreshVote(true))}>${t('同意')}</button>
+          <button type="button" class="echo-bless__rbtn" disabled=${busy || !online}
+            onClick=${() => send(() => actions.echoBlessingRefreshVote(false))}>${t('不同意')}</button>
+        </span>` : html`<button type="button" class="echo-bless__refreshbtn" disabled=${busy || !online || refreshLeft <= 0}
+          title=${t('活着的玩家投票决定是否重抽这三个候选；每局最多 3 次，投票不占用选择时间')}
+          onClick=${() => send(() => actions.echoBlessingRefresh())}>${t('刷新')}<b class="num">${refreshLeft}</b></button>`}
         ${left != null ? html`<span class="echo-bless__timer" aria-live="off"><b>${left}</b><i>秒</i></span>` : null}
         <span class="echo-bless__count">${voted}/${voters.length}</span>
       </header>

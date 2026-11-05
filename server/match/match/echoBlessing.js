@@ -31,6 +31,8 @@ export const ECHO_BLESSING_VOTE_MS = 30000;
  *   `cleanse`—— 拿到的那一刻**移除诅咒**（一次性；固定的奇迹 / 远见诅咒不在可移除列表里）
  */
 export const ECHO_BLESSING_MAX = 3;   // 同时持有的最多个数（扩池后不能用池子长度当上限）
+/** 刷新三选一的额度上限（维护者 2026-11-05：开局 3 次，任何来源都不能突破）。 */
+export const ECHO_BLESSING_REFRESH_MAX = 3;
 export const ECHO_BLESSINGS = Object.freeze([
   Object.freeze({
     id: 'fund', weight: 1, rarity: 'common',
@@ -85,6 +87,8 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'refresh_s', weight: 2, rarity: 'common', name: '机变', desc: '立刻获得 1 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 1 },
   { id: 'bigfund', weight: 1, rarity: 'rare', name: '深渊源泉', desc: '立刻获得 15 资金', kind: 'fund', group: 'fund', funds: 15 },
   { id: 'bigrefresh', weight: 1, rarity: 'rare', name: '时之沙漏', desc: '立刻获得 2 次免费刷新', kind: 'fund', group: 'refresh', funds: 0, freeRefresh: 2 },
+  // 刷新祝福三选一（维护者 2026-11-05）：「再议」一次性 +1 次刷新额度，每局最多 3 次。
+  { id: 'recall', weight: 2, rarity: 'rare', name: '再议', desc: '立刻获得 1 次刷新祝福三选一（每局最多 3 次）', kind: 'fund', group: 'refresh', funds: 0, blessingRefresh: 1 },
 
   // —— 全队回复生命（2026-11-05）：一次性、数值刻意做小 ——
   // 生命（LP）一格是「一次漏怪抵扣 1 点、每回合最多扣 lpCapPerRound(10)」的量级，

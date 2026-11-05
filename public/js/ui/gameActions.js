@@ -108,6 +108,9 @@ export const actions = {
   echoBlessing: (pick) => act('g.echoBlessing', { pick: Number(pick) }, { sfx: 'confirm' }),
   // 名额满时的弃选投票（同样 30 秒）
   echoBlessingDiscard: (pick) => act('g.echoBlessingDiscard', { pick: Number(pick) }, { sfx: 'confirm' }),
+  // 刷新三选一（维护者 2026-11-05）：发起投票 / 投同意或不同意
+  echoBlessingRefresh: () => act('g.echoBlessingRefresh', { start: true }),
+  echoBlessingRefreshVote: (agree) => act('g.echoBlessingRefresh', { agree: !!agree }),
   // 用反制祝福提前结束「排异 / 封锁」
   echoCounterUse: () => act('g.echoCounterUse', {}, { sfx: 'confirm' }),
   // 深渊祭坛（16 层起）：kind = 'blessing' | 'buff' | 'permanent'

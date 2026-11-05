@@ -144,6 +144,8 @@ export class MatchIntents {
       case 'g.echoBlessing': return this.setEchoBlessingVote(ps, msg.pick);
       // 祝福名额已满时的「弃选」投票（维护者 2026-11-05，同样 30 秒时限）
       case 'g.echoBlessingDiscard': return this.setEchoBlessingDiscardVote(ps, msg.pick);
+    // 刷新祝福三选一：start=true 发起投票，否则按 agree 投票
+    case 'g.echoBlessingRefresh': return msg.start ? this.requestEchoBlessingRefresh(ps) : this.setEchoBlessingRefreshVote(ps, msg.agree === true);
       // 提前结束排异 / 封锁（持有「开路」这类反制祝福时）
       case 'g.echoCounterUse': return this.setEchoCounterUse(ps);
       case 'g.echoAltar': return this.buyEchoAltar(ps, msg.kind);

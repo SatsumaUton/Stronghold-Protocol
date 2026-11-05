@@ -138,7 +138,12 @@ test('祝福逐条生效：每条都能在消费端看到差异', (t) => {
         if (Number(b.freeRefresh) > 0) {
           assert.ok(ps.shop.freeRefreshes > 0, `${b.id} 没给免费刷新`);
         }
-        assert.ok(Number(b.funds) > 0 || Number(b.freeRefresh) > 0, `${b.id} 没有任何发放`);
+        if (Number(b.blessingRefresh) > 0) {
+          m.echoBlessingRefreshes = 0;
+          m._echoGrantBlessing(b);
+          assert.ok(m._echoBlessingRefreshLeft() > 0, `${b.id} 没给刷新三选一的额度`);
+        }
+        assert.ok(Number(b.funds) > 0 || Number(b.freeRefresh) > 0 || Number(b.blessingRefresh) > 0, `${b.id} 没有任何发放`);
         continue;
       }
       if (kind === 'heal') {
