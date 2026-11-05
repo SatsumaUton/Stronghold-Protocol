@@ -100,6 +100,9 @@ export const MATCH_FIELDS = Object.freeze({
     'echoBannedTilesUntil', 'echoBannedBondsUntil',
     // 深潜补给的本层词条与保底间隔（2026-11-05）：读档当层仍然要生效，间隔也要记住，否则可以刷补给
     'echoSupplyWords', 'echoSupplyLastDepth',
+    // 已发过固定层诅咒的深度（2026-11-05）：固定层改成随机抽之后必须记住发过哪些层，
+    // 否则读档 / 重进同一层会再叠一条
+    'echoFixedCurseLayers',
     // 已击杀的悬赏卡回执（2026-11-05）：读档后仍能对账
     'echoBountyPaid',
   ]),
