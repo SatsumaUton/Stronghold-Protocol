@@ -1487,7 +1487,8 @@ export function LobbyScreen() {
       }
       // 建好合作房以后，进房时问一次「要不要公开到同盟列表」（ui/roomList.js 的 ListPromptDialog）：
       // 大厅到房间是一次跳转，用 sessionStorage 把这个问题带过去。深潜房不公开，所以不问。
-      if (mode === 'coop' && !variant) markListPrompt();
+      // 深潜房也会问一次（问的是「公开深潜」，维护者 2026-11-06）；已经用「公开深潜」建好的不再问
+      if (mode === 'coop' && !(variant === 'deepecho' && overrides && overrides.listed)) markListPrompt();
       return answer;
     });
   };

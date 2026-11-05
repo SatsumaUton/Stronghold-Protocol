@@ -1173,6 +1173,7 @@ export function RoomScreen() {
     ${/* 建房后的询问：要不要把这个同盟公开到大厅的「公开同盟」列表。
          只在房主、合作房、还没开局时问一次（标记由大厅 create 写入，takeListPrompt 取走后自毁）。 */ null}
     ${listAsk && facts.isHost && room.mode === 'coop' && !room.match ? html`<${ListPromptDialog}
+      echo=${echoRoom}
       busy=${listAsking}
       onPublic=${async (skip) => {
         setListAsk(false);
