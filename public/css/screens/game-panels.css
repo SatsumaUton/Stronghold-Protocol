@@ -1131,5 +1131,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-bless__confirm:disabled { opacity: .42; cursor: default; box-shadow: none; }
 .echo-bless__confirm:not(:disabled):hover { filter: brightness(1.12); transform: translateY(-1px); box-shadow: 0 0 .3rem rgba(157, 123, 255, .62), inset 0 0 0 1px rgba(255, 255, 255, .35); }
 
-/* 深潜补给（16 层起，个人三选一）：复用祝福面板的浮层样式 */
-.echo-supply { position: fixed; left: 50%; top: 12%; transform: translateX(-50%); z-index: 60; width: min(46rem, 92vw); }
+/* 深潜补给（16 层起，全队投票）：复用祝福面板的浮层样式。
+   维护者 2026-11-05：这里不要自己定位 —— 以前是 `position: fixed; top: 12%`，
+   于是补给面板比祝福三选一高出一截（祝福由浮层的 grid 垂直居中），两个面板切换时有高低差。
+   现在只留宽度，位置完全交给 `.echo-bless-overlay` 的 place-items: center，与祝福面板同一处。 */
+.echo-supply { width: min(44rem, 92vw); }
