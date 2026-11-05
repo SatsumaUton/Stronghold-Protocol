@@ -199,10 +199,9 @@ test('祝福逐条生效：每条都能在消费端看到差异', (t) => {
         continue;
       }
       if (kind === 'bonddebuff') {
-        // 主题转化（2026-11-05）：门槛盟约激活时，开局对全场敌人施压（反震走反伤，另算）
-        assert.ok(b.bondGate, `${b.id} 没有门槛盟约`);
-        const ps = m.alivePlayers()[0];
-        ps.bonds = { ...(ps.bonds || {}), [b.bondGate]: { count: 3, active: true, tier: 1, layers: 3 } };
+        // 主题转化（2026-11-05）：不看盟约，抽到就生效 —— 开局对全场敌人施压（反震走反伤，另算）
+        assert.ok(b.bondTheme, `${b.id} 没有主题来源`);
+        m.alivePlayers()[0].bonds = {};   // 棋盘上一条盟约都没有，效果照样生效
         m.echoBlessings = [b.id];
         const bh = makeBattle({ enemies: [{ key: 'enemy_1007_shield', mods: { hpMul: 500, speedMul: 0 } }], content: 'none', autoFinish: false });
         m._echoHookBattle(bh.b);

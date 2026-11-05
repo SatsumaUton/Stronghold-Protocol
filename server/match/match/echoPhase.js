@@ -287,15 +287,13 @@ export class MatchEcho {
         }
       }, { priority: 59, owner: 'echo:blessing' });
     }
-    // 主题转化（维护者 2026-11-05）：队伍激活了对应的**附加盟约**时，每回合**开局前 N 秒**
-    // 对全场敌人施压（N 按祝福稀有度：普通 10 / 稀有 15 / 传说 20）。
-    // 门槛在抽卡时已经筛过一次，这里再查一次 —— 战斗开始时算数的是**此刻**的盟约：
-    // 中间换过棋盘、那条盟约掉了，本回合这条祝福就不生效（描述里写的就是「队伍激活时」）。
+    // 主题转化（维护者 2026-11-05）：每回合**开局前 N 秒**对全场敌人施压
+    // （N 按祝福稀有度：普通 10 / 稀有 15 / 传说 20）。
+    // ★ 不看队伍有没有对应盟约（维护者 2026-11-05「不用看队伍盟约激活，直接进入祝福卡池」）：
+    //   这些是普通祝福，抽到就生效；`bondTheme` 只记录它从哪条盟约的主题来，不参与判定。
     const bondDebuffs = this._echoBlessings().filter((b) => b && b.kind === 'bonddebuff');
     if (bondDebuffs.length) {
-      const team = this._echoTeamBonds();
       for (const b of bondDebuffs) {
-        if (!team.has(b.bondGate)) continue;
         const secs = echoBondDebuffSeconds(b.rarity);
         const leftNow = () => secs - (Number(battle.time) || 0);
         const strike = (e, left) => {
@@ -2149,9 +2147,11 @@ export class MatchEcho {
   }
 
   /**
-   * 队伍当前**激活**的盟约 id 集合 —— 主题转化祝福的门槛（维护者 2026-11-05）。
+   * 队伍当前**激活**的盟约 id 集合（只读查询 / 测试用）。
    *
-   * 只看还活着的玩家：已经淘汰的人留在棋盘上的盟约不该再当门槛。
+   * 主题转化祝福**不再**用它做门槛（维护者 2026-11-05：「不用看队伍盟约激活，直接进入祝福卡池」），
+   * 所以抽卡与战斗两边都不再调用它；留着是因为「这一队现在亮了哪些盟约」本身是有用的查询。
+   *
    * `ps.bonds` 是 computeBonds 的产物（`{ [bondId]: { count, active, tier, layers } }`），
    * 备战区的干员也算人数，所以这里跟「盟约面板上亮着的」完全一致。
    */
@@ -2327,8 +2327,7 @@ export class MatchEcho {
       try { this._echoForceResolveBlessing(); } catch { /* 结算失败不阻塞新回合 */ }
     }
     const rng = createRng(deriveSeed(this.seed, `echo:bless:${r}`));
-    // 主题转化祝福只发队伍真的激活了的盟约（维护者 2026-11-05）
-    const offer = echoBlessingOffer(rng, this.echoBlessings, { bonds: this._echoTeamBonds() });
+    const offer = echoBlessingOffer(rng, this.echoBlessings);
     if (!offer.length) { this.echoBlessingOffer = null; return null; }
     this.echoBlessingOffer = offer.map((b) => b.id);
     this._echoBlessingRound = r;          // 这一版 offer 属于哪一回合（跨回合要先结算旧的）
@@ -2488,8 +2487,7 @@ export class MatchEcho {
     const nonce = (Number(this.echoBlessingRefreshNonce) || 0) + 1;
     this.echoBlessingRefreshNonce = nonce;
     const rng = createRng(deriveSeed(this.seed, `echo:bless:${r}:refresh:${nonce}`));
-    // 主题转化祝福只发队伍真的激活了的盟约（维护者 2026-11-05）
-    const offer = echoBlessingOffer(rng, this.echoBlessings, { bonds: this._echoTeamBonds() });
+    const offer = echoBlessingOffer(rng, this.echoBlessings);
     if (!offer.length) { this.markPublic(); return OK; }
     this.echoBlessingOffer = offer.map((b) => b.id);
     this._echoBlessingRound = r;

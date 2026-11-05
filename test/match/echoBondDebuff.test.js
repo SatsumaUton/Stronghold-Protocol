@@ -1,10 +1,11 @@
-// 主题转化祝福（维护者 2026-11-05「按这个做」）：把**附加盟约**的主题变成对敌压制。
+// 主题转化祝福（维护者 2026-11-05）：把**附加盟约**的主题变成对敌压制。
 //
 // 规则：
 //   · 11 条（奥术 / 坚守 / 精准 / 灵巧 / 迅捷 / 助力 / 协防 / 奇迹 / 调和 / 突袭 / 绝技），
 //     跳过 远见 / 投资人 / 不屈 / 独行（它们的效果是钱 / 招募 / 复活 / 独狼，转成对敌减益
 //     会变成另一条机制）。
-//   · 只有**队伍真的激活了那条盟约**才会进三选一 —— 否则抽到就是死牌。
+//   · **不看队伍有没有那条盟约**（维护者 2026-11-05 第二次定）：它们就是普通祝福，直接进三选一池，
+//     抽到就生效。`bondTheme` 只记录主题来源，不参与任何判定。
 //   · 生效窗口 = 每回合**开局前 N 秒**，N 按稀有度分档（普通 10 / 稀有 15 / 传说 20）。
 //   · 实现只用 sim 已有的异常状态 + dealDamage（反伤），server/sim 不改，golden 不动。
 import { test } from 'node:test';
@@ -17,8 +18,8 @@ import {
 
 const dive = () => makeMatch({ mode: 'coop', humans: 1, bots: 0, seed: 41, fake: true, variant: 'deepecho' });
 
-/** 11 条主题转化：盟约 id → 祝福 id。 */
-const PAIRS = {
+/** 11 条主题转化：主题盟约 id → 祝福 id。 */
+const THEMES = {
   arcaneShip: 'bd_arcane',
   steadShip: 'bd_stead',
   preciShip: 'bd_preci',
@@ -58,19 +59,20 @@ function fakeBattle() {
   return b;
 }
 
-test('11 条主题转化都在祝福池里，且都带盟约门槛', () => {
-  const gated = ECHO_BLESSINGS.filter((b) => b.bondGate);
-  assert.equal(gated.length, Object.keys(PAIRS).length, '一条盟约一条转化');
-  for (const [bondId, id] of Object.entries(PAIRS)) {
+test('11 条主题转化都在祝福池里，各自记着主题来源', () => {
+  const themed = ECHO_BLESSINGS.filter((b) => b.bondTheme);
+  assert.equal(themed.length, Object.keys(THEMES).length, '一条盟约一条转化');
+  for (const [bondId, id] of Object.entries(THEMES)) {
     const b = echoBlessingById(id);
     assert.ok(b, `${id} 要存在`);
-    assert.equal(b.bondGate, bondId, `${id} 的门槛是 ${bondId}`);
+    assert.equal(b.bondTheme, bondId, `${id} 的主题是 ${bondId}`);
     assert.equal(b.kind, 'bonddebuff');
     assert.ok(b.name && b.desc, `${id} 要有名字与说明`);
     // 描述里的秒数必须和稀有度分档一致（改稀有度忘了改文案会被这条钉住）
     const secs = echoBondDebuffSeconds(b.rarity);
     assert.match(b.desc, new RegExp(`每回合前 ${secs} 秒`), `${id} 的文案要写对秒数`);
-    assert.match(b.desc, new RegExp(`队伍激活【${b.bondLabel}】时`), `${id} 的文案要写出门槛盟约`);
+    // 不再写「队伍激活【X】时」—— 不看盟约是否激活
+    assert.doesNotMatch(b.desc, /队伍激活/, `${id} 的文案不该再带门槛`);
   }
 });
 
@@ -82,51 +84,30 @@ test('时长按稀有度分档：普通 10 / 稀有 15 / 传说 20', () => {
   assert.equal(echoBondDebuffSeconds('nope'), 15, '没登记按稀有算');
 });
 
-test('三选一：没激活那条盟约就抽不到，激活了才进池子', () => {
-  // rng 扫一遍，把三个候选都收下来（每个 rng 值都会给出不同的三张）
-  const seen = (bonds) => {
-    const out = new Set();
-    for (let i = 0; i < 400; i++) {
-      const rng = () => (i % 400) / 400;
-      for (const b of echoBlessingOffer(rng, [], { bonds })) out.add(b.id);
-    }
-    return out;
-  };
-  const none = seen(new Set());
-  assert.equal(none.has('bd_preci'), false, '没盟约时一条转化都不发');
-  assert.equal([...none].some((id) => id.startsWith('bd_')), false);
-  const withPreci = seen(new Set(['preciShip']));
-  assert.equal(withPreci.has('bd_preci'), true, '激活【精准】后「洞穿」要能抽到');
-  assert.equal(withPreci.has('bd_mani'), false, '没激活【调和】就抽不到「调律」');
-});
-
-test('_echoTeamBonds：只算还活着的玩家的激活盟约', (t) => {
-  const h = dive();
-  const m = h.m;
-  t.after(() => m.dispose());
-  h.ps('p_0').bonds = {
-    preciShip: { count: 3, active: true, tier: 1, layers: 3 },
-    maniShip: { count: 1, active: false, tier: 0, layers: 0 },
-  };
-  const team = m._echoTeamBonds();
-  assert.equal(team.has('preciShip'), true);
-  assert.equal(team.has('maniShip'), false, '没激活的不算');
-  h.ps('p_0').alive = false;
-  assert.equal(m._echoTeamBonds().size, 0, '淘汰的玩家不再提供门槛');
+test('三选一：不看盟约，直接进池子（维护者 2026-11-05）', () => {
+  // rng 扫一遍，把三个候选都收下来
+  const seen = new Set();
+  for (let i = 0; i < 400; i++) {
+    const rng = () => (i % 400) / 400;
+    for (const b of echoBlessingOffer(rng, [])) seen.add(b.id);
+  }
+  for (const id of Object.values(THEMES)) {
+    assert.equal(seen.has(id), true, `${id} 必须能出现在三选一里（不需要任何盟约）`);
+  }
 });
 
 test('战斗：开局给全场敌人挂上状态，窗口内出场的敌人只吃到剩余时长', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
-  h.ps('p_0').bonds = { preciShip: { count: 3, active: true, tier: 1, layers: 3 } };
+  // 棋盘上一条盟约都没有，效果照样生效
+  h.ps('p_0').bonds = {};
   m.echoBlessings = ['bd_preci'];
   const b = fakeBattle();
   const early = { alive: true, side: 'enemy' };
   b.enemies = [early];
   m._echoHookBattle(b);
   const secs = echoBondDebuffSeconds(echoBlessingById('bd_preci').rarity);
-  // 开局那一刻：场上已有的敌人拿到完整时长
   assert.equal(b.statuses.length, 1);
   assert.equal(b.statuses[0].key, 'defDown');
   assert.equal(b.statuses[0].duration, secs);
@@ -145,23 +126,10 @@ test('战斗：开局给全场敌人挂上状态，窗口内出场的敌人只�
   assert.equal(b.statuses.some((s) => s.target === after), false, '窗口过后不再挂');
 });
 
-test('战斗：那条盟约没激活就不生效（描述写的是「队伍激活时」）', (t) => {
-  const h = dive();
-  const m = h.m;
-  t.after(() => m.dispose());
-  h.ps('p_0').bonds = { maniShip: { count: 3, active: true, tier: 1, layers: 3 } };
-  m.echoBlessings = ['bd_preci'];
-  const b = fakeBattle();
-  b.enemies = [{ alive: true, side: 'enemy' }];
-  m._echoHookBattle(b);
-  assert.equal(b.statuses.length, 0, '【精准】没激活 → 洞穿不生效');
-});
-
 test('反震（坚守）：窗口内敌人打己方会吃到 30% 真实反伤，窗口外没有', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
-  h.ps('p_0').bonds = { steadShip: { count: 3, active: true, tier: 1, layers: 3 } };
   m.echoBlessings = ['bd_stead'];
   const b = fakeBattle();
   m._echoHookBattle(b);
@@ -185,7 +153,6 @@ test('真战斗里也用得上：洞穿让敌人的防御真的降下来', (t) =
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
-  h.ps('p_0').bonds = { preciShip: { count: 3, active: true, tier: 1, layers: 3 } };
   m.echoBlessings = ['bd_preci'];
   const bh = makeBattle({
     enemies: [{ key: 'enemy_1007_shield', mods: { hpMul: 500, speedMul: 0 } }],
