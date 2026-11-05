@@ -1049,6 +1049,23 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   font-size: calc(.13 * var(--t)); font-weight: 700; letter-spacing: .04em;
 }
 .echo-bless__recommend i { font-style: normal; font-weight: 600; font-size: .86em; }
+/* 刷新三选一（维护者 2026-11-05）：按钮 + 投票条 */
+.echo-bless__refreshbtn, .echo-bless__rbtn {
+  display: inline-flex; align-items: baseline; gap: .06rem;
+  padding: .04rem .14rem; cursor: pointer;
+  border: 1px solid rgba(183, 156, 255, .45); border-radius: 0;
+  background: rgba(125, 91, 214, .16); color: #e6dbff;
+  font-size: calc(.15 * var(--t));
+}
+.echo-bless__refreshbtn:hover:not(:disabled), .echo-bless__rbtn:hover:not(:disabled) { border-color: rgba(196, 166, 255, .9); background: rgba(125, 91, 214, .32); }
+.echo-bless__refreshbtn:disabled, .echo-bless__rbtn:disabled { opacity: .45; cursor: default; }
+.echo-bless__refreshbtn b { color: #ffd978; font-variant-numeric: tabular-nums; }
+.echo-bless__refreshvote {
+  display: inline-flex; align-items: center; gap: .08rem;
+  padding: .02rem .1rem; border: 1px solid rgba(255, 207, 107, .5); background: rgba(125, 91, 214, .2);
+  font-size: calc(.14 * var(--t)); color: #ffe7b0;
+}
+.echo-bless__refreshvote b { color: #ffd978; }
 .echo-bless__card.is-mine { background: linear-gradient(180deg, rgba(120, 80, 200, .5), rgba(40, 20, 70, .9)); }
 .echo-bless__foot { padding-top: .14rem; border-top: 1px solid rgba(183, 156, 255, .18); }
 

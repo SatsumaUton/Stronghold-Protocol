@@ -622,6 +622,8 @@ export const C2S = {
   // 名额满时的「弃选」投票 / 「护盾」指定盟约 / 「开路」提前解除（2026-11-05）
   // ⚠ 同样必须在这里登记，否则客户端一发就是「无效的请求」（BAD_MSG），服务端永远收不到。
   'g.echoBlessingDiscard': { pick: (v) => isInt(v, 0, 15) },
+  // 刷新三选一（维护者 2026-11-05）：start=true 发起投票；否则按 agree 投同意/不同意
+  'g.echoBlessingRefresh': { start: (v) => v === undefined || typeof v === 'boolean', agree: (v) => v === undefined || typeof v === 'boolean' },
   'g.echoShield': { pick: (v) => isInt(v, 0, 15) },
   'g.echoCounterUse': {},
   // 深渊祭坛（16 层起）：买一次献祭
