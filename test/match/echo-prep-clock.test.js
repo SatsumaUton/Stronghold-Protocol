@@ -24,6 +24,13 @@ test('面板开着时进入准备阶段不开始倒数；结算后把整段时�
   // 结算面板 → 倒计时接回来
   m.echoBlessingOffer = null;
   m._echoMaybeResumePrepClock();
+  // 16 层还会顺带补开「盟约投影」：那也是一个决策面板，所以倒计时要继续按住，
+  // 直到它结算完（维护者 2026-11-05：被延后的投影不能白丢）
+  if (m.echoProjectionOffer) {
+    assert.equal(m.deadline, 0, '投影面板补开了 → 倒计时继续按住');
+    m.echoProjectionOffer = null;
+    m._echoMaybeResumePrepClock();
+  }
   assert.ok(m.deadline > 0, '面板关掉后倒计时才恢复');
 });
 

@@ -2378,6 +2378,13 @@ export class MatchEcho {
   /** 还有面板开着就别恢复倒计时。 */
   _echoMaybeResumePrepClock() {
     if (this._echoChoiceOpen()) return;
+    // ★ 所有决策面板都关上了：把延后的「盟约投影」补开（维护者 2026-11-05）。
+    //   之前只在「祝福正常发放 / 放弃本次 / 补给结算」三条路径里 flush，
+    //   而「名额满 → 弃选替换」那条路径没有 —— 16 层同时触发祝福替换时，投影会一直挂着不弹，
+    //   于是 buff 栏和祝福列表里永远看不到盟约投影。
+    if (typeof this._echoFlushProjectionIfPending === 'function') this._echoFlushProjectionIfPending();
+    // 刚补开的面板也是决策面板：先把倒计时按住，等它结算完再恢复
+    if (this._echoChoiceOpen()) return;
     this._echoResumePrepClock();
   }
 
@@ -2658,19 +2665,20 @@ export class MatchEcho {
     this._echoBlessingRound = null;
     this._echoBlessingVotes.clear();
     this.echoBlessingReplace = false;
-    this._echoMaybeResumePrepClock();
+    // ⚠ 这里**不能**先恢复倒计时：下面可能还要开「弃选替换」面板。恢复放在每条终点路径上
+    // （_echoMaybeResumePrepClock 里会顺带把延后的盟约投影补开，维护者 2026-11-05）。
     // 「放弃本次」（维护者 2026-11-05）：全队都不想要时投它 —— 本轮不发祝福，
     // 并记一次 skipped，避免下一层又弹出同一批候选（due 会把它扣掉）。
     if (Array.isArray(offer) && best === offer.length) {
       this.echoBlessingSkipped = (Number(this.echoBlessingSkipped) || 0) + 1;
       this._echoPushAnnounce('全队放弃了本次祝福（本轮不发）');
       this._echoFlushAnnounce();
-      this._echoFlushProjectionIfPending();
+      this._echoMaybeResumePrepClock();
       this.markPublic();
       return OK;
     }
     const b = Array.isArray(offer) ? echoBlessingById(offer[best]) : null;
-    if (!b) return OK;
+    if (!b) { this._echoMaybeResumePrepClock(); return OK; }
     // 名额已满 + 这次是替换模式：先让全队投票「弃掉哪个」，投完再发新的（维护者 2026-11-05）。
     // 反制祝福不占名额，不需要弃选。
     // 一次性祝福（回血 / 资金 / 涤罪）**无视名额上限**：直接发，不进入弃选流程（维护者 2026-11-05）
@@ -2690,9 +2698,10 @@ export class MatchEcho {
       return OK;
     }
     this._echoGrantBlessing(b);
+    // 先补开延后的补给；补给若开了面板，_echoMaybeResumePrepClock 会看到「还有面板」而按住倒计时，
+    // 等补给结算完再由它补开盟约投影（维护者 2026-11-05）
     this._echoFlushSupplyIfPending();
-    // 祝福面板结算完，把延后的「盟约投影」补开（维护者 2026-11-05：投影一直不弹）
-    this._echoFlushProjectionIfPending();
+    this._echoMaybeResumePrepClock();
     return OK;
   }
 
