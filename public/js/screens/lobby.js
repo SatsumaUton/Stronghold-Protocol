@@ -1178,7 +1178,7 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
           </div>
           <div class="proto-foot proto-foot--match proto-foot--triple">
             <button type="button" class="proto-start proto-start--alt" data-testid="echo-public"
-              onClick=${() => onPublic({ difficulty })} title=${t('浏览公开的深潜房，或者自己开一间公开的（进房仍需深潜资格）')}>
+              onClick=${() => onPublic({ difficulty })} title=${t('浏览公开的深潜房（进房仍需深潜资格）；想公开自己的房，进房后打开「公开深潜」')}>
               <span class="proto-start__label"><${Icon} name="link" />${t('公开深潜')}</span>
             </button>
             <button type="button" class="proto-start proto-start--alt" data-testid="echo-quick" disabled=${quickBusy}

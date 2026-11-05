@@ -6641,7 +6641,7 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 196242
+        "customBytes": 196312
       },
       {
         "path": "public/i18n/ja.json",
@@ -6676,7 +6676,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 115473
+        "customBytes": 115500
       },
       {
         "path": "public/js/screens/result.js",
