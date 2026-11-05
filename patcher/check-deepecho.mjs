@@ -89,17 +89,24 @@ function echoFiles() {
 }
 
 const files = echoFiles();
-const missing = [];
-const drifted = [];
-const serverOnlyGap = [];
-for (const rel of files) {
-  const snap = path.join(SNAP, rel);
-  const gone = !fs.existsSync(snap) || sha(snap) !== sha(path.join(ROOT, rel));
-  if (!gone) continue;
-  // dashboard / admin.html 不入库：克隆仓库里没有快照是正常的，只提醒在服务器上刷新
-  if (isServerOnly(rel)) { serverOnlyGap.push(rel); continue; }
-  if (!fs.existsSync(snap)) missing.push(rel); else drifted.push(rel);
+
+/** 扫一遍快照：缺失 / 过期 / 只存在于服务器的（不入库）。 */
+/** 扫一遍快照：缺失 / 过期 / 只存在于服务器的（不入库）。 */
+function scanSnapshots(list) {
+  const missing = [];
+  const drifted = [];
+  const serverOnlyGap = [];
+  for (const rel of list) {
+    const snap = path.join(SNAP, rel);
+    const gone = !fs.existsSync(snap) || sha(snap) !== sha(path.join(ROOT, rel));
+    if (!gone) continue;
+    // dashboard / admin.html 不入库：克隆仓库里没有快照是正常的，只提醒在服务器上刷新
+    if (isServerOnly(rel)) { serverOnlyGap.push(rel); continue; }
+    if (!fs.existsSync(snap)) missing.push(rel); else drifted.push(rel);
+  }
+  return { missing, drifted, serverOnlyGap };
 }
+let { missing, drifted, serverOnlyGap } = scanSnapshots(files);
 
 // features.json 登记：files 里必须覆盖到每个深潜文件（支持精确路径与 * / ** 通配）
 let doc = null;
@@ -137,6 +144,8 @@ if (FIX) {
     wrote++;
   }
   console.log(`[deepecho] 已刷新 ${wrote} 个快照文件 → patcher/features/${FEATURE}/files/`);
+  // 修完重新扫一遍：下面的结论要基于修复后的状态
+  ({ missing, drifted, serverOnlyGap } = scanSnapshots(files));
   // index.json 也补齐（merge-features.py 的唯一输入）
   try {
     const idx = JSON.parse(fs.readFileSync(INDEX_JSON, 'utf8'));
@@ -159,15 +168,7 @@ if (LIST) {
   if (drifted.length) { console.log('\n--- 快照过期 ---'); drifted.forEach((f) => console.log('  ' + f)); }
   if (unregistered.length) { console.log('\n--- features.json 未登记 ---'); unregistered.forEach((f) => console.log('  ' + f)); }
   if (notIndexed.length) { console.log('\n--- index.json 未登记 ---'); notIndexed.forEach((f) => console.log('  ' + f)); }
-  if (!indexEntry || notIndexed.length) {
-  bad = true;
-  console.error('\n✗ patcher/features/index.json 里缺少 deepecho 的文件登记 —— merge-features.py 只读这份文件，');
-  console.error('  缺项的文件在升级合并时会被整个忽略（比快照过期更致命）：');
-  if (!indexEntry) console.error('  （整个 deepecho 功能项缺失）');
-  notIndexed.slice(0, 20).forEach((f) => console.error('  ' + f));
-  console.error('  修复：node patcher/check-deepecho.mjs --fix（会同时补 index.json）');
-}
-if (missingTests.length) { console.log('\n--- 测试缺失 ---'); missingTests.forEach((f) => console.log('  ' + f)); }
+  if (missingTests.length) { console.log('\n--- 测试缺失 ---'); missingTests.forEach((f) => console.log('  ' + f)); }
 }
 
 let bad = false;
@@ -186,6 +187,14 @@ if (unregistered.length) {
   bad = true;
   console.error('\n✗ 有深潜文件没写进 features.json 的 deepecho.files（快照刷新时会漏掉它们）：');
   unregistered.slice(0, 20).forEach((f) => console.error('  ' + f));
+}
+if (!indexEntry || notIndexed.length) {
+  bad = true;
+  console.error('\n✗ patcher/features/index.json 里缺少 deepecho 的文件登记 —— merge-features.py 只读这份文件，');
+  console.error('  缺项的文件在升级合并时会被整个忽略（比快照过期更致命）：');
+  if (!indexEntry) console.error('  （整个 deepecho 功能项缺失）');
+  notIndexed.slice(0, 20).forEach((f) => console.error('  ' + f));
+  console.error('  修复：node patcher/check-deepecho.mjs --fix（会同时补 index.json）');
 }
 if (missingTests.length) {
   bad = true;
