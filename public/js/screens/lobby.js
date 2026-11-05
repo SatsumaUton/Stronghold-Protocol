@@ -1274,6 +1274,23 @@ export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, 
 /** Lobby screen component. */
 export function LobbyScreen() {
   const conn = useStore((s) => s.connection, shallowEqual);
+  // 「服务器已更新，请刷新页面」那个按钮刷新前会把房间号写进 sessionStorage（维护者 2026-11-05）：
+  // 刷新回来如果已经不在房间里，就用它**自动回一次房间** —— 否则玩家点了刷新就被踢出准备室。
+  // 只认这个按钮留下的标记：普通刷新 / 新标签页不会自动回房（2026-10-27 的「恢复要玩家自己点」仍然成立）。
+  const inRoom = useStore((s) => !!s.room && !!s.room.code);
+  useEffect(() => {
+    if (conn.status !== 'online' || inRoom) return undefined;
+    let code = null;
+    try { code = sessionStorage.getItem('sp.rejoinRoom'); } catch { return undefined; }
+    if (!code) return undefined;
+    try { sessionStorage.removeItem('sp.rejoinRoom'); } catch { /* ignore */ }
+    let alive = true;
+    const t = setTimeout(() => {
+      if (!alive) return;
+      joinKnown('room.join', code).catch(() => { /* 房间没了就老实待在大厅 */ });
+    }, 400);
+    return () => { alive = false; clearTimeout(t); };
+  }, [conn.status, inRoom]);
   useData('config', 'assets');
   // 清理旧版本留下的「上次选过的同盟人数」：大厅的人数选择器已移除，建房固定默认 4 人，
   // 人数到房间里的「实验性选项」再调。这个值留着会让之前进过大房间的人每次建房都变成大房。
