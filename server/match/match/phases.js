@@ -481,6 +481,8 @@ export class MatchPhases {
     }
     // 深潜：频次怪降血（普通波与 boss 返场都吃，维护者 2026-11-05）
     if (dive && typeof this._echoSanitizeSpawns === 'function') this._echoSanitizeSpawns(this.wave);
+    // 飞行怪不能沿「起点→终点」直线穿场（维护者 2026-11-05）
+    if (dive && typeof this._echoFixFlyRoutes === 'function') this._echoFixFlyRoutes(this.wave);
     if (dive && typeof this._echoTuneHitCount === 'function') this._echoTuneHitCount(this.wave);
     // the dive's erosion words of this round (null on every other round, and on every other room)
     this._echoRollWords(r);
