@@ -49,6 +49,13 @@ export const ECHO_PROJECTIONS = Object.freeze([
 
 const BY_ID = new Map(ECHO_PROJECTIONS.map((p) => [p.id, p]));
 
+/**
+ * 每次事件展示几个候选（维护者 2026-11-05：**不是**全程只能选 3 个，而是每次从 8 条里随机展示这么多）。
+ * 想改成「8 条全展示」把这里改成 8 即可；改成 4 / 5 同理。
+ * 同一局拿过的投影**不会**被排除，可以再次出现（维护者要求）。
+ */
+export const ECHO_PROJECTION_OPTIONS = 3;
+
 /** 按盟约 id 取投影条目；未知返回 null。 */
 export const echoProjectionById = (id) => BY_ID.get(String(id)) || null;
 
@@ -69,7 +76,7 @@ export function pickProjectionOffer(rng = () => 0.5, current = null) {
     out.push(current);
     avail.splice(avail.indexOf(current), 1);
   }
-  while (out.length < 3 && avail.length) {
+  while (out.length < ECHO_PROJECTION_OPTIONS && avail.length) {
     const i = Math.min(avail.length - 1, Math.floor((Number(rng()) || 0) * avail.length));
     out.push(avail.splice(i, 1)[0]);
   }

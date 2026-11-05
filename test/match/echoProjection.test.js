@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeMatch } from './harness.js';
-import { ECHO_PROJECTIONS, echoProjectionById, isEchoProjectionLayer, pickProjectionOffer } from '../../server/match/match/echoProjection.js';
+import { ECHO_PROJECTIONS, ECHO_PROJECTION_OPTIONS, echoProjectionById, isEchoProjectionLayer, pickProjectionOffer } from '../../server/match/match/echoProjection.js';
 
 const dive = (seed = 9) => makeMatch({ mode: 'coop', humans: 2, bots: 0, seed, fake: true, variant: 'deepecho' });
 
@@ -17,13 +17,21 @@ test('盟约投影：8 条核心盟约，层数节奏 16/26/36…', () => {
   for (const d of [15, 17, 25, 27, 35]) assert.equal(isEchoProjectionLayer(d), false, `${d} 层不开`);
 });
 
-test('候选永远是 3 条且不重复；已有投影时当前那条一定在候选里', () => {
+test('同一局拿过的投影可以再次出现（不排除已用过的）', async () => {
+  const { createRng } = await import('../../server/sim/rng.js');
+  // 以「当前是炎」为例：多抽几次，8 条都要能出现（说明没有任何「用过的就排除」的逻辑）
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) for (const id of pickProjectionOffer(createRng(i + 1), 'yanShip')) seen.add(id);
+  assert.equal(seen.size, ECHO_PROJECTIONS.length, `8 条都该能再次出现，实际只有 ${[...seen].join(',')}`);
+});
+
+test('候选条数 = ECHO_PROJECTION_OPTIONS，且不重复；已有投影时当前那条一定在候选里', () => {
   const offer = pickProjectionOffer(() => 0.42, null);
   assert.equal(offer.length, 3);
   assert.equal(new Set(offer).size, 3, '候选不能重复');
   const keep = pickProjectionOffer(() => 0.7, 'yanShip');
   assert.ok(keep.includes('yanShip'), '已有投影时保留它作为「不换」选项');
-  assert.equal(new Set(keep).size, 3);
+  assert.equal(new Set(keep).size, ECHO_PROJECTION_OPTIONS);
 });
 
 test('全队投票 → 结算 → 战斗输入按满档注入（projectedBond + bonds 激活）', (t) => {
