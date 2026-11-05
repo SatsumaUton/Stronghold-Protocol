@@ -10,6 +10,7 @@
 import { html, Icon, Tabs, MicroLabel } from './components.js';
 import { Img, UnitThumb, BondGlyph, BandIcon, RichText, GIcon } from './gameComponents.js';
 import { groupEnemies, factionTypes, briefingBondTip } from './gameLogic.js';
+import { enemyRecord } from './enemyRecords.js';
 import { matchInfoModel, DiyBannedLine } from './matchInfo.js';
 import { factionIconUrl } from './assetUrls.js';
 import { data } from '../data.js';
@@ -83,7 +84,9 @@ function EnemiesTab({ pub, priv, onEnemy }) {
   // R1~15 是原版开局，照旧显示完整列表（维护者 2026-11-03）。
   const echo = pub?.echo;
   const inDive = !!(echo && echo.diveStart && Number(pub?.round) >= Number(echo.diveStart));
-  const rows = groupEnemies(priv?.nextEnemies, (k) => data.lookup('enemies', k));
+  // 敌人记录走统一查找：跨版本敌人（act1autochess:enemy_…）本房数据表里没有，
+  // 服务端随快照带了记录过来（维护者 2026-11-05）
+  const rows = groupEnemies(priv?.nextEnemies, (k) => enemyRecord(k));
   const types = factionTypes(pub?.factions);
   const f = data.get('factions')?.types || {};
   const total = rows.reduce((s, r) => s + r.count, 0);
@@ -109,7 +112,7 @@ function EnemiesTab({ pub, priv, onEnemy }) {
     ${inDive ? null : (rows.length ? html`<div class="elist">
       ${rows.map((r) => html`<button key=${`${r.enemyKey}|${r.tag}`} type="button" class=${cx('erow', r.tag && `erow--${r.tag}`, `erow--${r.rank.toLowerCase()}`)}
           onClick=${() => onEnemy(r.enemyKey, r.count)}>
-        <${UnitThumb} kind="enemy" id=${r.enemyKey} size="md" />
+        <${UnitThumb} kind="enemy" id=${r.enemyKey} rec=${enemyRecord(r.enemyKey)} size="md" />
         <span class="erow__text">
           <b class="erow__name">${r.name}</b>
           <span class="erow__tags">
@@ -123,7 +126,7 @@ function EnemiesTab({ pub, priv, onEnemy }) {
       </button>`)}
     </div>` : html`<p class="edrawer__empty"><${GIcon} name="target" />${t('暂无敌方情报')}</p>`)}
     ${boss ? html`<div class="eboss">
-      <${UnitThumb} kind="enemy" id=${boss.enemyKey} size="md" />
+      <${UnitThumb} kind="enemy" id=${boss.enemyKey} rec=${enemyRecord(boss.enemyKey)} size="md" />
       <div><${MicroLabel} tone="gold">${t('ENEMY LEADER // 敌方领袖')}</${MicroLabel}><b>${boss.name}</b>
         <span class="t-lo">${t('第 {r} 回合 · 最终攻势', { r: inDive ? (pub?.round ?? 0) : (data.get('config')?.modes?.[pub.modeId]?.bossRound ?? pub.lastRound ?? 14) })}</span></div>
     </div>` : null}

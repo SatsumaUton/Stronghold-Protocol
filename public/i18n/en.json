@@ -2560,5 +2560,7 @@
   "永久 +1 部署位（每 5 层一次）": "Permanent +1 deploy slot (once every 5 layers)",
   "本层强化已叠 {n} 层": "This layer’s buffs: {n} stacks",
   "深渊回响：当前词条 / 祝福 / 诅咒": "Abyss Echo: modifiers / blessings / curses",
-  "本回合诅咒": "Curse this round"
+  "本回合诅咒": "Curse this round",
+  "未知敌人": "Unknown enemy",
+  "情报被「迷雾 / 遮蔽」隐藏，开战时揭晓": "Intel hidden by Fog / Obscured — revealed when the battle starts"
 }
