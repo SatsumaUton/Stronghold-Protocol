@@ -143,7 +143,30 @@ export class PlayerRound {
    * in-battle gains of this round's finished normal battle (bondsMeta.bondsWithGains). The 联防 field fights with them too
    * (battleInput `reached`); no other rule reads them.
    */
-  bondsView() { return bondsWithGains(this.bonds, this.pendingLayerGains); }
+  /**
+   * 盟约视图（客户端 / 详情面板用）。
+   *
+   * 「盟约投影」（维护者 2026-11-05）：投影的那条核心盟约在这里也要**按满档激活**，
+   * 否则玩家看到的是「在场 0/3 未激活」——投影明明拿到了，面板却显示没激活。
+   * 只影响显示（战斗侧另走 battleInput 的 projectedBond），不改 this.bonds 本身。
+   */
+  bondsView() {
+    const view = bondsWithGains(this.bonds, this.pendingLayerGains);
+    const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
+    if (!proj) return view;
+    const cur = view && view[proj.bondId] ? view[proj.bondId] : null;
+    return {
+      ...view,
+      [proj.bondId]: {
+        ...(cur || {}),
+        count: Math.max(Number(proj.state && proj.state.count) || 0, Number(cur && cur.count) || 0),
+        active: true,
+        tier: Math.max(1, Number(proj.state && proj.state.tier) || 3),
+        layers: Math.max(0, Number(cur && cur.layers) || 0),
+        projected: true,
+      },
+    };
+  }
 
   /**
    * `reached`: the bonds carry the layers this round's own combat reached (bondsView: the pending in-battle gains, capped
