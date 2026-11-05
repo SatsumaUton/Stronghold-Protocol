@@ -78,6 +78,8 @@ export function EchoStatus({ pub }) {
  */
 export function EchoInfoBlock({ pub }) {
   const myId = useStore((s) => s.me.playerId);
+  // 祭坛提示里要显示「你现在有多少资金」（维护者 2026-11-05）
+  const myFunds = useStore((s) => Number(s.match?.private?.funds) || 0);
   const echo = pub?.echo;
   const depth = Number(echo?.depth) || 0;
   if (!(depth > 0)) return null;
@@ -105,6 +107,10 @@ export function EchoInfoBlock({ pub }) {
         </div>`;
       };
       return html`<h4 class="ihead">${t('深渊祭坛')} <small class="num">${t('第 {d} 层起开放', { d: 16 })}</small></h4>
+        <p class="echo-infoblock__row echo-altar__hint">
+          ${t('每次献祭都会从你的资金里扣除对应价格，不返还；不需要就直接关掉面板，不用选。')}
+          <b class="num">${t('我的资金：{n}', { n: myFunds })}</b>
+        </p>
         ${row('blessing', t('献祭 · 祝福'), t('抽一个一次性祝福（不占名额）'))}
         ${row('buff', t('献祭 · 强化'), t('本层全队 +6% 攻击 / +4% 攻速 / +5% 生命（可叠 2 层）'))}
         ${row('permanent', t('献祭 · 永久'), t('永久 +1 部署位（每 5 层一次）'))}
