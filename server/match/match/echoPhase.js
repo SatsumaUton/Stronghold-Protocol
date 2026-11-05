@@ -18,7 +18,7 @@ import {
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { echoSummonOnly, echoHitCountEnemy } from './echoWaves.js';
-import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR } from '../../../shared/constants.js';
+import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR, PHASE } from '../../../shared/constants.js';
 import { msg } from '../../../shared/i18n.js';
 import { hiddenEligible } from '../finalAssault.js';
 import { pieceBonds } from '../bondsMeta.js';
@@ -1644,6 +1644,7 @@ export class MatchEcho {
     ];
     this.echoSupply = { round: this.round, options, votes: new Map(), pick: null };
     this.echoSupplyEndsAt = (this.sched?.now?.() ?? 0) + ECHO_BLESSING_VOTE_MS;
+    this._echoPausePrepClock();
     this.cancel(this._echoSupplyTimer);
     this._echoSupplyTimer = this.later(ECHO_BLESSING_VOTE_MS, () => {
       this._echoSupplyTimer = null;
@@ -1722,6 +1723,7 @@ export class MatchEcho {
       if (b) { this._echoGrantBlessing(b); this._echoPushAnnounce(`深潜补给：全队共享「${b.name}」`); }
     }
     this._echoFlushAnnounce?.();
+    this._echoMaybeResumePrepClock();
     this.markPublic();
     return OK;
   }
@@ -1801,6 +1803,34 @@ export class MatchEcho {
    * 只在深潜回合跑，且「应得数 > 已拥有数」时才开；已经有一个没投完的候选时原样返回（不重抽，
    * 否则玩家每回合看到的三个选项都会变）。
    */
+  /**
+   * 决策面板（祝福三选一 / 深潜补给）打开时**暂停准备阶段倒计时**（维护者 2026-11-05）。
+   * 原版里这类选择不吃准备时间，深潜也不该吃 —— 否则 30 秒投票直接把一整回合的准备时间耗光。
+   */
+  _echoPausePrepClock() {
+    if (this.phase !== PHASE.PREP || !(this.deadline > 0)) return;
+    if (this._echoPrepPausedMs != null) return;          // 已经暂停过（另一个面板还开着）
+    const now = this.sched?.now?.() ?? 0;
+    this._echoPrepPausedMs = Math.max(1000, this.deadline - now);
+    this.setDeadline(0);
+  }
+
+  /** 面板全部关掉之后，把剩下的准备时间接回来。 */
+  _echoResumePrepClock() {
+    const left = Number(this._echoPrepPausedMs) || 0;
+    if (!(left > 0)) return;
+    if (this.phase !== PHASE.PREP || this.ended) { this._echoPrepPausedMs = null; return; }
+    this._echoPrepPausedMs = null;
+    this.setDeadline(left / 1000, () => this.prepDeadline());
+  }
+
+  /** 还有面板开着就别恢复倒计时。 */
+  _echoMaybeResumePrepClock() {
+    if (this.echoBlessingOffer) return;
+    if (this.echoSupply && this.echoSupply.pick == null) return;
+    this._echoResumePrepClock();
+  }
+
   _echoMaybeOfferBlessing(r = this.round) {
     if (!this._echoDiveRound(r)) return null;
     // 上回合的深潜补给还没投完就先结算掉，避免和祝福三选一叠在一起（维护者 2026-11-05）
@@ -1842,6 +1872,7 @@ export class MatchEcho {
     // 30 秒不投完就强制结算，否则一个人挂机会把全队卡死（维护者 2026-11-03 定）
     this.cancel(this._echoBlessingTimer);
     this._echoBlessingEndsAt = (this.sched?.now?.() ?? 0) + ECHO_BLESSING_VOTE_MS;
+    this._echoPausePrepClock();
     this._echoBlessingTimer = this.later(ECHO_BLESSING_VOTE_MS, () => {
       this._echoBlessingTimer = null;
       try { this._echoForceResolveBlessing(); } catch { /* 结算失败不该炸掉整局 */ }
@@ -2057,6 +2088,7 @@ export class MatchEcho {
     this._echoBlessingRound = null;
     this._echoBlessingVotes.clear();
     this.echoBlessingReplace = false;
+    this._echoMaybeResumePrepClock();
     // 「放弃本次」（维护者 2026-11-05）：全队都不想要时投它 —— 本轮不发祝福，
     // 并记一次 skipped，避免下一层又弹出同一批候选（due 会把它扣掉）。
     if (Array.isArray(offer) && best === offer.length) {

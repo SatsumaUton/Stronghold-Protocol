@@ -1625,3 +1625,29 @@ test('一次性 / 反制祝福也显示在祝福列表里，但不占名额', (t
   assert.equal(fund.oneShot, true);
   assert.equal(fund.consumed, true);
 });
+
+// 玩家 2026-11-05：深潜补给 / 祝福的选择会吃掉准备阶段的倒计时。
+// 原版里这类选择不吃准备时间，所以面板打开时暂停倒计时、关掉后把剩余时间接回来。
+test('深潜补给的选择不占用准备阶段倒计时', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 20;
+  m.startRound(21);
+  for (let i = 0; i < 40 && m.phase !== 'PREP'; i++) h.sched.advance(200);
+  assert.equal(m.phase, 'PREP');
+  const before = m.deadline - m.sched.now();
+  assert.ok(before > 0, '准备阶段应该有倒计时');
+  m.echoSupplyLastDepth = 0;
+  m.echoBlessingOffer = null;                 // 避免祝福面板占着「还有面板开着」的判断
+  m.echoBlessingDiscardOffer = null;
+  assert.equal(m._echoOpenSupply(true), 1, '要能开出补给');
+  assert.equal(m.deadline, 0, '面板开着时倒计时暂停');
+  h.sched.advance(10000);
+  const [a, b] = m.alivePlayers();
+  m.setEchoSupplyPick(a, 0);
+  m.setEchoSupplyPick(b, 0);
+  // 测试房把定时器「挂起」了（setDeadline 的 test 分支），所以这里断言「暂停时长被记下来、结算后清空」；
+  // 真实房间里它会用这段时长把 deadline 接回去。
+  assert.equal(m._echoPrepPausedMs, null, '结算后暂停状态要清掉（恢复倒计时）');
+});
