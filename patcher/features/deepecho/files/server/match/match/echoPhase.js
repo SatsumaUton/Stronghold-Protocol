@@ -1482,7 +1482,7 @@ export class MatchEcho {
         // 是否占 3 个祝福名额：护盾、一次性、反制都不占（显示在列表里，但不计数）
         occupiesSlot: b.id !== 'shield_bond' && !echoBlessingOneShot(b) && !echoBlessingFree(b),
         // 深层强化（16 层起 ×2.5）：把倍率写进描述，玩家才知道后期拿到的数值更高（维护者 2026-11-05）
-        lateMul: lateMul > 1 && ['mods', 'fund', 'coin'].includes(b.kind) ? lateMul : undefined,
+        lateMul: lateMul > 1 && b.kind === 'mods' ? lateMul : undefined,
         // 护盾：把「保护的是哪条盟约」写进描述；抵消过排异之后写「已被诅咒抵消」（维护者 2026-11-05）
         desc: b.id === 'shield_bond'
           ? `${b.desc}${b.consumed ? '（已被诅咒抵消）' : this.echoShieldBond ? `（已指定：${this.gd.bond(this.echoShieldBond)?.name || this.echoShieldBond}）` : '（尚未指定盟约）'}`
@@ -1542,7 +1542,7 @@ export class MatchEcho {
               rarity: (b && b.rarity) || 'common', rarityLabel: ECHO_BLESSING_RARITY_LABEL[b && b.rarity] || '普通',
               oneShot: echoBlessingOneShot(b),
           // 深层强化：16 层起数值型祝福 ×2.5，卡片上也要标出来
-          lateMul: echoBlessingLateMul(this._echoDepth()) > 1 && ['mods', 'fund', 'coin'].includes(b && b.kind) ? echoBlessingLateMul(this._echoDepth()) : undefined,
+          lateMul: echoBlessingLateMul(this._echoDepth()) > 1 && b && b.kind === 'mods' ? echoBlessingLateMul(this._echoDepth()) : undefined,
             };
           }),
           votes: Object.fromEntries(this._echoDiscardVotes instanceof Map ? this._echoDiscardVotes : []),
@@ -2042,7 +2042,7 @@ export class MatchEcho {
           rarityLabel: ECHO_BLESSING_RARITY_LABEL[(b && b.rarity) || 'common'] || '普通',
           oneShot: echoBlessingOneShot(b),
           // 深层强化：16 层起数值型祝福 ×2.5，卡片上也要标出来
-          lateMul: echoBlessingLateMul(this._echoDepth()) > 1 && ['mods', 'fund', 'coin'].includes(b && b.kind) ? echoBlessingLateMul(this._echoDepth()) : undefined,
+          lateMul: echoBlessingLateMul(this._echoDepth()) > 1 && b && b.kind === 'mods' ? echoBlessingLateMul(this._echoDepth()) : undefined,
           recommend: !!clear,
           recommendText: clear ? (clear.count > 1 ? `可清除 ${clear.count} 条诅咒` : `可清除「${clear.names[0]}」`) : '',
         };
@@ -2488,7 +2488,7 @@ export class MatchEcho {
     if (b.kind === 'shield') this._echoOpenShieldVote();
     // A 类：**立刻进钱包**（维护者 2026-11-04：原来走 pendingFunds，要等下一回合 prep 才入账，
     // 玩家选了 40 资金当场看不到，以为没生效）。
-    const funds = echoBlessingFunds(b, this._echoDepth());
+    const funds = echoBlessingFunds(b);
     if (funds > 0) {
       for (const ps of this.alivePlayers()) {
         ps.addFunds(funds, { reason: 'echoBlessing' });
@@ -2635,7 +2635,7 @@ export class MatchEcho {
   /** C 类祝福的资金倍率（结算入账时乘上去；没有祝福就是 1）。诅咒的 `coinMul` 也在同一处生效。 */
   _echoCoinMul() {
     if (this.echoVariant !== 'deepecho') return 1;
-    return echoBlessingCoinMul(this.echoBlessings, this._echoDepth()) * echoCurseEffects(this.echoCurseIds).coinMul;
+    return echoBlessingCoinMul(this.echoBlessings) * echoCurseEffects(this.echoCurseIds).coinMul;
   }
 
   /**

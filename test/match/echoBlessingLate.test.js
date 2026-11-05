@@ -34,16 +34,14 @@ test('计数类不放大：格挡 / 射程 / 目标数保持原值', () => {
   assert.equal(late.blockCnt, block.mods.blockCnt, '格挡数不能被放大');
 });
 
-test('资金与金币倍率同样放大', () => {
+test('资金与金币**不**放大（维护者 2026-11-05）', () => {
   const fund = echoBlessingById('fund');
   assert.ok(fund && fund.funds > 0);
-  assert.equal(echoBlessingFunds(fund, 10), Math.trunc(fund.funds));
-  assert.equal(echoBlessingFunds(fund, 20), Math.trunc(fund.funds * 2.5));
-  // 金币类：丰收(loot) 没有 coinMul，用 余利(gold_s) 测
+  assert.equal(echoBlessingFunds(fund), Math.trunc(fund.funds), '资金按原值发放');
   const gold = echoBlessingById('gold_s');
   assert.ok(gold && gold.coinMul > 1, '要找到带 coinMul 的祝福');
-  assert.equal(echoBlessingCoinMul(['gold_s'], 10), gold.coinMul);
-  assert.ok(Math.abs(echoBlessingCoinMul(['gold_s'], 20) - (1 + (gold.coinMul - 1) * 2.5)) < 1e-9);
+  assert.equal(echoBlessingCoinMul(['gold_s']), gold.coinMul, '金币倍率按原值');
+  assert.equal(echoBlessingById('fund').lateMul, undefined);
 });
 
 test('下发：16 层起 lateMul 出现在 m.public.echo 与祝福条目上', async (t) => {

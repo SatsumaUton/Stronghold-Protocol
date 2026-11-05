@@ -315,22 +315,23 @@ export function echoBlessingMods(ids, depth = 0) {
  * 已拥有祝福的资金倍率（`coin` 类相乘；没有就是 1）。
  * @param {string[]} ids
  */
-export function echoBlessingCoinMul(ids, depth = 0) {
-  const late = echoBlessingLateMul(depth);
+export function echoBlessingCoinMul(ids) {
+  // 资金 / 金币**不参与深层放大**（维护者 2026-11-05）：钱是按层给的核心资源，放大只会让经济失控
   let mul = 1;
   for (const id of Array.isArray(ids) ? ids : []) {
     const b = echoBlessingById(id);
     if (!b || b.kind !== 'coin' || !(b.coinMul > 0)) continue;
-    mul *= late > 1 ? 1 + (b.coinMul - 1) * late : b.coinMul;
+    mul *= b.coinMul;
   }
   return mul;
 }
 
 /**
  * 拿到这个祝福时一次性发放的资金（`fund` 类；其它返回 0）。
+ * 资金**不参与深层放大**（维护者 2026-11-05）。
  * @param {typeof ECHO_BLESSINGS[number]} b
  */
-export const echoBlessingFunds = (b, depth = 0) => (b && b.kind === 'fund' && b.funds > 0 ? Math.trunc(b.funds * echoBlessingLateMul(depth)) : 0);
+export const echoBlessingFunds = (b) => (b && b.kind === 'fund' && b.funds > 0 ? Math.trunc(b.funds) : 0);
 
 /**
  * 拿到这个祝福时一次性回复的生命（`heal` 类；其它返回 0）。
