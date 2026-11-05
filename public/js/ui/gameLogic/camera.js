@@ -17,19 +17,36 @@ function prepPair(pub, myId) {
 }
 
 /**
+ * 本回合是不是 boss 关（最终攻势 / 隐秘核心），准备阶段该不该把棋子摆到 boss 场地的那半边上。
+ *
+ * 原版模式只有两个固定回合（`m.public.bossRound` / `hiddenRound`，通常 14 / 15）。「深渊回响」深潜的
+ * 返场 boss（25 / 35 / 45 层…）**不在** mode 配置里，由服务端判定后发 `m.public.echo.bossRound`
+ * （server/match/match/echoPhase.js echoPublic，`_echoBossReturn()`：固定节点回合且深度 ≥ 20）。
+ * 维护者 2026-11-05 报的问题：25 / 35 层自己看是普通准备场地，切到别人视角却是 boss 场地 ——
+ * 因为老代码只认 mode 的那两个数字，而 scout 视角走的是服务端的 bossGroupOf。
+ * @param {any} pub m.public
+ * @returns {boolean}
+ */
+export function bossRoundNow(pub) {
+  const r = pub?.round;
+  if (!Number.isInteger(r) || r <= 0) return false;
+  if (r === pub.bossRound || r === pub.hiddenRound) return true;
+  return !!(pub.echo && pub.echo.bossRound === true);
+}
+
+/**
  * Camera of the own prep board (research 09 §1.2 "Final Assault, right side", DESIGN §15): in the prep of a boss round
- * (最终攻势 / 隐秘核心: `pub.round` is `bossRound` or `hiddenRound`) the pieces stand on the player's half of the shared
- * boss field — `{ kind: 'bossPrep', opts: { side } }`; the side follows the server's pairing (server/match/
- * finalAssault.js pairPlayers, sent in m.public.bossPairs; the second of a pair is on the mirrored
- * right half 'R', a lone player on 'L'). Any other prep: the own board `{ kind: 'prep', opts: { rect, side: 'L' } }`.
+ * (最终攻势 / 隐秘核心: bossRoundNow — the mode's `bossRound` / `hiddenRound`, or the dive's `echo.bossRound`) the
+ * pieces stand on the player's half of the shared boss field — `{ kind: 'bossPrep', opts: { side } }`; the side follows
+ * the server's pairing (server/match/finalAssault.js pairPlayers, sent in m.public.bossPairs; the second of a pair is on
+ * the mirrored right half 'R', a lone player on 'L'). Any other prep: the own board `{ kind: 'prep', opts: { rect, side: 'L' } }`.
  * @param {any} pub m.public
  * @param {string|null} myId
  * @returns {{ kind: 'prep'|'bossPrep', opts: { rect?: { r0: number, r1: number, c0: number, c1: number }, side: 'L'|'R' } }}
  */
 export function prepCamera(pub, myId) {
   const normal = { kind: 'prep', opts: { rect: { ...GEO.NORMAL_RECT }, side: 'L' } };
-  const r = pub?.round;
-  if (!Number.isInteger(r) || r <= 0 || !(r === pub.bossRound || r === pub.hiddenRound)) return normal;
+  if (!bossRoundNow(pub)) return normal;
   const idx = prepPair(pub, myId).indexOf(myId);
   if (idx < 0) return normal; // eliminated / unknown: no board of its own on the boss field
   return { kind: 'bossPrep', opts: { side: idx % 2 === 1 ? 'R' : 'L' } };
@@ -53,8 +70,7 @@ export function teamFrameIds(pub, myId) {
   const players = Array.isArray(pub.players) ? pub.players.filter(isObj) : [];
   const me = players.find((p) => p.playerId === myId);
   if (!me || me.alive === false) return none;
-  const r = pub.round;
-  const bossRound = Number.isInteger(r) && r > 0 && (r === pub.bossRound || r === pub.hiddenRound);
+  const bossRound = bossRoundNow(pub);
   if (pub.phase === PHASE.FINAL_ASSAULT || pub.phase === PHASE.HIDDEN_CORE) {
     const f = (Array.isArray(pub.fields) ? pub.fields : []).find((x) => isObj(x) && (x.kind === 'boss' || x.kind === 'hidden') && Array.isArray(x.players) && x.players.includes(myId));
     return f && f.players.length > 1 ? new Set(f.players) : none;
