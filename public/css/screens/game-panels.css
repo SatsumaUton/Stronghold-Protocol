@@ -940,6 +940,18 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-status__group { display: inline-flex; align-items: center; gap: .06rem; }
 .echo-status__group + .echo-status__group { padding-left: .12rem; border-left: 1px solid rgba(183, 156, 255, .28); }
 .echo-status__icons .ecochip { padding: 0 .1em; }
+/* HUD 常驻 buff 栏（维护者 2026-11-05）：右下角一小条，只读、不挡操作 */
+.echo-buffbar {
+  position: fixed; right: .5rem; bottom: .5rem; z-index: 8;
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .06rem;
+  max-width: 34vw; padding: .06rem .1rem;
+  background: rgba(10, 5, 22, .55); border: 1px solid rgba(183, 156, 255, .28);
+  pointer-events: none;
+}
+.echo-buffbar .ecochip { pointer-events: auto; font-size: calc(.14 * var(--t)); }
+.echo-buffbar .ecochip.is-enemy { border-color: rgba(255, 150, 190, .5); }
+.echo-buffbar .ecochip.is-ally { border-color: rgba(255, 210, 140, .5); }
+.echo-buffbar .ecochip.is-curse { border-color: rgba(200, 139, 255, .55); }
 /* ---- 「深渊祝福」三选一：居中的卡片选择（维护者 2026-11-04，参照悬赏目标界面） ---- */
 .echo-bless-overlay {
   position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;

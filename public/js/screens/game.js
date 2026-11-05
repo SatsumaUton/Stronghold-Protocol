@@ -154,6 +154,7 @@ import { contentSet } from '../content.js';
 import { DEFAULT_VERSION, shownVersion } from '../versions.js';
 import { VersionVote } from '../ui/versionVote.js';
 import { EchoBlessing } from '../ui/echoBlessing.js';
+import { EchoBuffBar } from '../ui/echoStatus.js';
 import { EchoSupplyPanel } from '../ui/echoSupply.js';
 import { TestConsole } from '../ui/testConsole.js';
 
@@ -237,6 +238,7 @@ export function GameScreen() {
   return html`${body}
     ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} room=${voteRoom} class="vervote--float" />` : null}
     ${!hasResult && mode !== 'result' ? html`<${EchoBlessing} pub=${pub} />` : null}
+    ${!hasResult && mode !== 'result' ? html`<${EchoBuffBar} pub=${pub} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${EchoSupplyPanel} pub=${pub} />` : null}
     ${/* 深潜的深度已顶替 HUD 的回合数字；词条/祝福改放在「本局信息」抽屉里（EchoInfoBlock），
         不再有浮在屏幕上的状态条挡住 HUD 和按钮（维护者 2026-11-04） */ null}
