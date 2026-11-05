@@ -1590,3 +1590,19 @@ test('祝福三选一可以投票放弃（下标 = 候选数）', (t) => {
   assert.equal(m.echoBlessingSkipped, 1, '记一次放弃（避免下一层又弹同一批）');
   assert.equal(m.echoBlessingOffer, null, '面板要关掉');
 });
+
+// 维护者 2026-11-05：「护盾」是一次性效果，显示在祝福列表里但不占名额；还要显示保护的是哪条盟约。
+test('护盾祝福：不占祝福名额，且显示已指定的盟约', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 30;
+  m.echoBlessings = ['hp_s', 'atk_s', 'shield_bond'];
+  m.echoShieldBond = 'yanShip';
+  const e = m._echoPublic();
+  const shield = e.blessings.find((b) => b.id === 'shield_bond');
+  assert.ok(shield, '护盾要出现在列表里');
+  assert.equal(shield.occupiesSlot, false, '护盾不占名额');
+  assert.equal(e.blessings.filter((b) => b.occupiesSlot).length, 2, '只数两个真正占位的祝福');
+  assert.match(shield.desc, /已指定/, '要显示保护的是哪条盟约');
+});

@@ -1392,6 +1392,12 @@ export class MatchEcho {
         rarityLabel: ECHO_BLESSING_RARITY_LABEL[b.rarity] || '普通',
         // 一次性祝福（资金 / 回血 / 涤罪 / 反制）：立刻结算、不挂在干员身上
         oneShot: echoBlessingOneShot(b),
+        // 是否占 3 个祝福名额（护盾是一次性效果：显示在列表里，但不占位）
+        occupiesSlot: b.id !== 'shield_bond' && !echoBlessingOneShot(b),
+        // 护盾：把「保护的是哪条盟约」写进描述（维护者 2026-11-05）
+        desc: b.id === 'shield_bond'
+          ? `${b.desc}${this.echoShieldBond ? `（已指定：${this.gd.bond(this.echoShieldBond)?.name || this.echoShieldBond}）` : '（尚未指定盟约）'}`
+          : b.desc,
         // 「远程」这类改攻击范围的祝福：准备阶段没有战斗、客户端拿不到 live 范围，
         // 靠这个值把棋盘上的范围预览画对（2026-11-05）。
         rangeExtend: Number(b.mods && b.mods.rangeExtend) || 0,
@@ -1794,7 +1800,7 @@ export class MatchEcho {
     const skipped = Math.max(0, Number(this.echoBlessingSkipped) || 0);
     const due = Math.max(0, Math.min(cap, echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws, this._echoBlessingMax()) + bonus) - skipped);
     // 反制祝福不占 3 个上限，但**每次都消耗一次抽取机会**（拿在手里也不存底）
-    const owned = (Array.isArray(this.echoBlessings) ? this.echoBlessings.length : 0)
+    const owned = (Array.isArray(this.echoBlessings) ? this.echoBlessings.filter((id) => id !== 'shield_bond').length : 0)
       + (Array.isArray(this.echoCounterIds) ? this.echoCounterIds.length : 0);
     // 名额已满但还有「没发出去的抽取」→ 走替换流程（维护者 2026-11-05：
     // 祝福满了也要能拿，选中之后由全队投票弃掉一个，投票同样 30 秒）。
@@ -2049,7 +2055,7 @@ export class MatchEcho {
     // 名额已满 + 这次是替换模式：先让全队投票「弃掉哪个」，投完再发新的（维护者 2026-11-05）。
     // 反制祝福不占名额，不需要弃选。
     // 一次性祝福（回血 / 资金 / 涤罪）**无视名额上限**：直接发，不进入弃选流程（维护者 2026-11-05）
-    if (replace && !echoBlessingFree(b) && !echoBlessingOneShot(b) && this.echoBlessings.length >= this._echoBlessingMax()) {
+    if (replace && !echoBlessingFree(b) && !echoBlessingOneShot(b) && this.echoBlessings.filter((id) => id !== 'shield_bond').length >= this._echoBlessingMax()) {
       this.echoBlessingPendingPick = b.id;
       this.echoBlessingDiscardOffer = this.echoBlessings.slice();
       this._echoDiscardVotes.clear();
@@ -2166,6 +2172,8 @@ export class MatchEcho {
       const cap = this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0);
       // 只数**占名额**的祝福：一次性祝福不算
       const held = this.echoBlessings.filter((id) => {
+        // 护盾是一次性效果（用掉就没了），不占名额（维护者 2026-11-05）
+        if (id === 'shield_bond') return false;
         const x = echoBlessingById(id);
         return x ? !echoBlessingOneShot(x) : true;
       }).length;

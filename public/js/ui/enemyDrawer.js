@@ -197,8 +197,8 @@ function BlessTab({ pub }) {
   const words = Array.isArray(echo?.words) ? echo.words : [];
   const bless = Array.isArray(echo?.blessings) ? echo.blessings : [];
   // 反制祝福（一次性、不占名额）单独计数，别让它把 "/" 撑爆；
-  // 一次性祝福（回血 / 资金…）也不占名额（维护者 2026-11-05）：列表照常显示，但不算进 n/3
-  const normalBless = bless.filter((b) => !b.counter && !b.consumed);
+  // 一次性祝福（回血 / 资金…）与「护盾」也不占名额（维护者 2026-11-05）：列表照常显示，但不算进 n/3
+  const normalBless = bless.filter((b) => !b.counter && !b.consumed && b.occupiesSlot !== false);
   const depth = Number(echo?.depth) || 0;
   const counters = Array.isArray(echo?.counters) ? echo.counters : [];
   return html`<div class="edrawer__body">
