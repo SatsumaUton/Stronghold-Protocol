@@ -2538,5 +2538,7 @@
   "无人投票": "No votes",
   "「深渊回响」暂未开放，仅管理员与测试名单可进入": "Abyss Echo is not open yet: only admins and test-list accounts may enter.",
   "（盟约投影）": " (projection)",
-  "投影": "Proj."
+  "投影": "Proj.",
+  "放弃本次": "Skip this time",
+  "保留当前投影，不替换": "Keep the current projection"
 }
