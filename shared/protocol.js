@@ -616,9 +616,11 @@ export const C2S = {
   // 战斗 2 倍速 (server/match/match/speedVote.js): this seat's standing vote; m.public speedVote is the count
   'g.speedVote': { agree: isBool },
   // 「深渊回响」的祝福三选一 (server/match/match/echoBlessing.js, ui/echoBlessing.js):
-  // `pick` 是候选下标（0..2）。**必须登记在这里** —— 漏了的话 net.js 会在客户端就把它拦掉，
-  // 服务端 intents.js 的 case 永远收不到（与 g.bondPlan 踩过的是同一个坑）。
-  'g.echoBlessing': { pick: (v) => isInt(v, 0, 2) },
+  // `pick` 是候选下标（0..2），**3 = 第四张「放弃本次」**（维护者 2026-11-05 加的）。上限必须放到 3 ——
+  // 否则点「放弃本次」会在客户端就被拦成「无效的请求」，服务端 intents.js 的 case 永远收不到
+  //（玩家反馈的正是这个：连点 13 次全是 BAD_MSG）。
+  // **必须登记在这里** —— 漏了的话 net.js 会在客户端就把它拦掉（与 g.bondPlan 踩过的是同一个坑）。
+  'g.echoBlessing': { pick: (v) => isInt(v, 0, 3) },
   // 名额满时的「弃选」投票 / 「护盾」指定盟约 / 「开路」提前解除（2026-11-05）
   // ⚠ 同样必须在这里登记，否则客户端一发就是「无效的请求」（BAD_MSG），服务端永远收不到。
   'g.echoBlessingDiscard': { pick: (v) => isInt(v, 0, 15) },
