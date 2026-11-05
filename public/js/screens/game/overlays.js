@@ -4,6 +4,7 @@ import { Button, MicroLabel, html } from '../../ui/components.js';
 import { emptyMatch, store } from '../../store.js';
 import { localAsset } from '../../data.js';
 import { t } from '../../../../shared/i18n.js';
+import { exitWords, useEchoRun } from '../../ui/matchChrome.js';
 
 /**
  * 这一局是怎么没的（room.endReason，server/lobby.js 的 toState 下发）。
@@ -39,6 +40,7 @@ export function MatchEnded({ reason = null } = {}) {
 /** Solo pause (m.public.paused): the field dims under the 暂停中 plate; 继续作战 resumes (g.pause off). */
 export function PausedOverlay({ canResume, busy, onResume, onExit }) {
   const plate = localAsset('ui/battle', 'matte_pause');
+  const w = exitWords(useEchoRun());
   return html`<div class="pauseov" role="dialog" aria-label=${t('暂停中')} data-testid="paused">
     <div class="pauseov__box">
       <div class="pauseov__plate" style=${plate ? `--pause-plate:url("${plate}")` : ''}>
@@ -47,7 +49,7 @@ export function PausedOverlay({ canResume, busy, onResume, onExit }) {
       </div>
       <p class="pauseov__note">${t('作战已暂停，计时与敌人行动均已停止')}</p>
       <div class="pauseov__btns">
-        ${onExit ? html`<${Button} variant="secondary" size="lg" icon="exit" onClick=${onExit}>${t('放弃模拟')}<//>` : null}
+        ${onExit ? html`<${Button} variant="secondary" size="lg" icon="exit" onClick=${onExit}>${t(w.quit)}<//>` : null}
         ${canResume ? html`<${Button} variant="primary" size="lg" icon="play" loading=${busy} onClick=${onResume} data-autofocus>${t('继续作战')}<//>` : null}
       </div>
     </div>

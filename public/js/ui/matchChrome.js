@@ -25,6 +25,33 @@ export const EXIT_TEXT = Object.freeze({
   soloQuit: N_('放弃模拟将立即结束本局并返回大厅，本局进度不会保留，也不会进行结算。'),
 });
 
+/**
+ * Is the match on screen a 「深渊回响」 deep dive? (the room's variant, or the running match's public frame)
+ * @param {any} s store state
+ */
+export const isEchoRun = (s) => s?.room?.variant === 'deepecho' || !!s?.match?.public?.echo?.deepecho;
+/** The same, as a hook. */
+export const useEchoRun = () => useStore(isEchoRun);
+
+/**
+ * The exit flow's wording. 深渊回响 is a deep dive, not a 模拟: the same 暂离 / 放弃 flow keeps its buttons, but they say
+ * 深潜 instead (maintainer 2026-11-06: "深渊回响中的退出按钮改一下，不再是模拟了").
+ * @param {boolean} echo whether this match is a 深渊回响 deep dive
+ */
+export const exitWords = (echo) => (echo
+  ? {
+    title: N_('离开深潜'), micro: 'LEAVE DEEP DIVE', quit: N_('放弃深潜'), back: N_('返回深潜'),
+    soloRest: N_('深潜的休整期没有时间限制，你可以随时继续。'),
+    soloQuit: N_('放弃深潜将立即结束本次深潜并返回大厅，深度进度不会保留，也不会进行结算。'),
+    quitLine: N_('{quit}：离开后无法返回本次深潜，你的干员将回到共享卡池。'),
+  }
+  : {
+    title: N_('离开模拟'), micro: 'LEAVE SIMULATION', quit: N_('放弃模拟'), back: N_('返回模拟'),
+    soloRest: EXIT_TEXT.soloRest,
+    soloQuit: EXIT_TEXT.soloQuit,
+    quitLine: N_('{quit}：离开后无法返回本局，你的干员将回到共享卡池。'),
+  });
+
 /** Local "暂离 / AI 托管" flag (the server keeps no per-client autoplay view). */
 export const awayStore = createStore({ away: false });
 
@@ -135,6 +162,8 @@ export async function quitMatch() {
  */
 export function ExitModal({ open, onClose, solo, onAway }) {
   const [busy, setBusy] = useState(null);
+  const echo = useEchoRun();
+  const w = exitWords(echo);
   // a spectator seat (community report #26) only leaves its seat: nothing of the match is given up
   // hidden admin watchers are not in room.spectators by design, but must use the same leave copy
   const adminWatch = (() => {
@@ -163,16 +192,16 @@ export function ExitModal({ open, onClose, solo, onAway }) {
     onClose();
     if (ok) { awayStore.set({ away: true }); onAway?.(); }
   };
-  return html`<${Modal} open=${open} onClose=${onClose} tone="red" title=${t('离开模拟')} micro="LEAVE SIMULATION" width="6.8rem"
+  return html`<${Modal} open=${open} onClose=${onClose} tone="red" title=${t(w.title)} micro=${w.micro} width="6.8rem"
     actions=${html`
       <${Button} variant="secondary" onClick=${onClose}>${t('取消')}<//>
       ${!solo ? html`<${Button} variant="ice" icon="robot" loading=${busy === 'away'} onClick=${away}>${t('暂离（AI 托管）')}<//>` : null}
-      <${Button} variant="danger" icon="exit" loading=${busy === 'quit'} onClick=${quit}>${t('放弃模拟')}<//>`}>
+      <${Button} variant="danger" icon="exit" loading=${busy === 'quit'} onClick=${quit}>${t(w.quit)}<//>`}>
     <div class="exitm">
       ${solo
-        ? html`<p>${t(EXIT_TEXT.soloRest)}</p><p class="t-lo">${t(EXIT_TEXT.soloQuit)}</p>`
+        ? html`<p>${t(w.soloRest)}</p><p class="t-lo">${t(w.soloQuit)}</p>`
         : html`<p>${tParts('{away}：由 AI 托管你的席位（自动部署、准备与选择），随时可以返回。', { away: html`<b class="t-ice">${t('暂离')}</b>` })}</p>
-               <p>${tParts('{quit}：离开后无法返回本局，你的干员将回到共享卡池。', { quit: html`<b class="t-red">${t('放弃模拟')}</b>` })}</p>`}
+               <p>${tParts(w.quitLine, { quit: html`<b class="t-red">${t(w.quit)}</b>` })}</p>`}
     </div>
   <//>`;
 }
@@ -180,13 +209,14 @@ export function ExitModal({ open, onClose, solo, onAway }) {
 /** Full-screen "AI 托管中" overlay with 返回模拟. */
 export function AwayOverlay({ onBack = () => {} }) {
   const [busy, setBusy] = useState(false);
+  const w = exitWords(useEchoRun());
   return html`<div class="awayov" role="dialog" aria-label=${t('AI 托管中')}>
     <div class="awayov__box brackets">
       <${GIcon} name="robot" class="awayov__icon" />
       <${MicroLabel} tone="mint">${t('AUTOPILOT // AI 托管')}</${MicroLabel}>
       <h2>${t('AI 托管中')}</h2>
       <p class="t-lo">${t('AI 正在代为操作你的席位')}</p>
-      <${Button} variant="primary" size="lg" icon="play" loading=${busy} onClick=${async () => { setBusy(true); const ok = await actions.autoplay(false); setBusy(false); if (ok) { awayStore.set({ away: false }); onBack(); } }}>${t('返回模拟')}<//>
+      <${Button} variant="primary" size="lg" icon="play" loading=${busy} onClick=${async () => { setBusy(true); const ok = await actions.autoplay(false); setBusy(false); if (ok) { awayStore.set({ away: false }); onBack(); } }}>${t(w.back)}<//>
     </div>
   </div>`;
 }
