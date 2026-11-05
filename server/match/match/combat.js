@@ -11,6 +11,7 @@ import { FieldRunner, DeadBattle } from '../fields.js';
 import { DELAYS } from './common.js';
 import { previewPlayer } from '../preview.js';
 import { morphBattleOpt } from '../../../shared/plugins/rules.js';
+import { echoHitCountEnemy } from './echoWaves.js';
 
 export class MatchCombat {
   /** Construct a battle; a constructor failure yields a finished stand-in (clean result) and is logged. */
@@ -56,7 +57,26 @@ export class MatchCombat {
     return { ...(this.layerCapOff ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
       // 「深渊回响」：限伤上限跟着深度缩放（普通房没有这个键 → sim 走官方 300000）
       ...(this.echoVariant === 'deepecho' ? { hitLimitMul: this._echoHitLimitMul() } : {}),
+      // 「深渊回响」：「频次怪」（器物，血量 == 需要被打几下）不跟着深度缩放（见 _echoHitCountHpCap）
+      ...(this.echoVariant === 'deepecho' ? { enemyHpMulCap: this._echoHitCountHpCap() } : {}),
       ...(this.enemyHpMul !== 1 ? { enemyHpMul: this.enemyHpMul } : {}), ...(this.enemyAtkMul !== 1 ? { enemyAtkMul: this.enemyAtkMul } : {}) };
+  }
+
+  /**
+   * 「频次怪」的血量封顶表（enemyKey → 最大血量倍率 = 1），深潜专用（维护者 2026-11-05）。
+   *
+   * 为什么不能只改波次：这类怪的 baseHp 就是「需要被打几下」（青铜镜 30、铁矛头 30），跟着深度缩放后
+   * 血量会是几千（实测铁矛头 6080），而它们多数是**召唤物**（新硎的 DeadSpawn 出铁矛头），根本不在
+   * `wave.spawns` 里 —— 只有出怪那一处（sim spawnEnemy 读 `flags.enemyHpMulCap`）能统一封顶。
+   * @returns {Record<string, number>}
+   */
+  _echoHitCountHpCap() {
+    const cache = this._echoHpCapCache;
+    if (cache && cache.gd === this.gd) return cache.map;
+    const map = {};
+    try { for (const k of echoHitCountEnemy(this.gd)) map[k] = 1; } catch { /* 数据异常时不给封顶 */ }
+    this._echoHpCapCache = { gd: this.gd, map };
+    return map;
   }
 
   /** Battle options of a player's normal field (after the onBattleStart handlers). */
