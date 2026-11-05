@@ -210,6 +210,8 @@ export class MatchPlatform {
     const humans = this.order.filter((p) => !p.isBot && !p.left && p.alive);
     // 第一遍：结算本回合计数（有操作 / 托管 / 掉线 → 归零，否则 +1）
     for (const ps of humans) {
+      // 维护者 2026-11-05：管理员不受任何惩罚机制 —— 挂机计数永远归零，既不警告也不移出
+      if (this._isPunishImmune(ps)) { ps.afkRounds = 0; ps.afkActed = false; continue; }
       ps.afkRounds = (ps.afkActed || ps.botControlled || !ps.connected) ? 0 : (ps.afkRounds | 0) + 1;
       ps.afkActed = false;
     }
@@ -235,6 +237,8 @@ export class MatchPlatform {
    */
   _removeIdle(ps) {
     if (!ps || ps.isBot || ps.left) return;
+    // 维护者 2026-11-05：管理员不受任何惩罚机制（双保险：_checkIdle 已经跳过，这里再挡一次）
+    if (this._isPunishImmune(ps)) return;
     if (ps._idleKicked) return;
     ps._idleKicked = true;
     try { this.log.info?.(`[match ${this.roomCode}] seat ${ps.seat} removed after ${ps.afkRounds} idle rounds (R${this.round})`); } catch { /* ignore */ }

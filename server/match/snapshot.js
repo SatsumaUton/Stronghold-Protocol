@@ -156,6 +156,9 @@ export const PLAYER_FIELDS = Object.freeze({
     // （server/persist/lobbyState.js 的「restored by fallback」注释记过这个坑）。
     // 存档只在 Redis 里，matchSeats() 的输出不发给客户端，所以带上是安全的。
     'admin',
+    // 管理员**身份**（维护者 2026-11-05：管理员无视惩罚机制，_isPunishImmune 读它）：
+    // 不存的话重启续玩后身份变回 false，管理员又开始被挂机判定踢。
+    'adminId',
     'alive', 'lp', 'bandId', 'funds', 'pendingFunds', 'infoReady', 'lastEmoteAt', 'bondPlan',
     'shop', 'offers', 'hand', 'temp', 'prepsEnded', '_tempDue', 'board', 'layers', 'battleLayerGains', 'pendingLayerGains',
     'bondCountBonus', 'effects', 'bounties', 'personalChoice', 'counters', 'round', 'deployCapBonus', 'deployCapMin',

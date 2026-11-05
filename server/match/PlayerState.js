@@ -152,6 +152,11 @@ export class PlayerState {
     // 允许在**普通房间**里使用 g.test 测试指令（本服的管理员工具，见 testCommands.js）。
     // 缺键即 false —— 普通玩家永远是 false，行为与上游一致。
     this.admin = seat.admin === true;
+    // 管理员**身份**（账号角色 owner/admin，不看 tools.game 与验证码）。
+    // 维护者 2026-11-05：惩罚机制（挂机移出 / 消极游戏）按身份豁免，见 MatchIntents._isPunishImmune。
+    // 老存档 / 老数据里没有 seat.adminId 时退回 seat.admin —— 豁免只决定「踢不踢」，
+    // 不会额外给任何权限，所以宁可宽松一点。
+    this.adminId = seat.adminId === true || seat.admin === true;
     this.left = false;
     this.autoplay = false;
     this.alive = true;
