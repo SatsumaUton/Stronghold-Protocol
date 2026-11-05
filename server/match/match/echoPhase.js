@@ -1386,7 +1386,10 @@ export class MatchEcho {
       offer,
       // 祝福名额：隐藏核心通关会临时 +1（客户端显示 n/3 → n/4）
       blessingMax: this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0),
-      // 刷新三选一（维护者 2026-11-05）：剩余额度 + 进行中的投票
+      // 本回合是不是 boss 关（14 层 / 15 层隐藏核心 / 25·35·45 返场）：
+      // 客户端要在准备阶段显示「敌方领袖」块（维护者 2026-11-05：15 层 boss 看不到了）。
+      bossRound: !!(this._echoBossReturn() || this._echoHiddenBossRound()),
+      bossId: this._echoHiddenBossRound() ? this.hiddenBossId : (this._echoBossReturn() ? this.bossId : null),      // 刷新三选一（维护者 2026-11-05）：剩余额度 + 进行中的投票
       blessingRefresh: {
         left: this._echoBlessingRefreshLeft(),
         cap: ECHO_BLESSING_REFRESH_MAX,

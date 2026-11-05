@@ -1418,3 +1418,33 @@ test('奇迹·诅咒：上回合剩下的免费刷新占用本回合额度（不
   ps.shop.freeRefreshes = 0;
   assert.equal(m._echoGrantFreeRefresh(ps, 1), 0, '花光之后也不能再拿');
 });
+
+// 玩家 2026-11-05：15 层的 boss 在准备阶段看不到。
+// 成因：敌方情报里「领袖块」在深潜被整块关掉了（`!inDive`），连 boss 关一起没了。
+// 现在服务端下发 echo.bossRound / echo.bossId，客户端只在 boss 关显示。
+test('boss 关对准备阶段可见：15 层隐藏核心 / 25 层返场', (t) => {
+  const h1 = dive();
+  t.after(() => h1.m.dispose());
+  h1.m.round = 14;
+  h1.m.startRound(15);
+  const plain = h1.m._echoPublic();
+  assert.equal(plain.bossRound, false, '没达成隐藏核心时 15 层不是 boss 关');
+
+  const h2 = dive();
+  t.after(() => h2.m.dispose());
+  h2.m.hiddenLayerSum = 2000;
+  h2.m.teamLp = 10;
+  h2.m.round = 14;
+  h2.m.startRound(15);
+  const hidden = h2.m._echoPublic();
+  assert.equal(hidden.bossRound, true, '达成隐藏核心 → 15 层是 boss 关');
+  assert.equal(hidden.bossId, h2.m.hiddenBossId, '下发的应该是隐藏 boss');
+
+  const h3 = dive();
+  t.after(() => h3.m.dispose());
+  h3.m.round = 24;
+  h3.m.startRound(25);
+  const node = h3.m._echoPublic();
+  assert.equal(node.bossRound, true, '25 层是返场 boss 关');
+  assert.equal(node.bossId, h3.m.bossId);
+});

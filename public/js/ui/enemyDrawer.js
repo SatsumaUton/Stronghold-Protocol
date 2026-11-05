@@ -87,8 +87,10 @@ function EnemiesTab({ pub, priv, onEnemy }) {
   const types = factionTypes(pub?.factions);
   const f = data.get('factions')?.types || {};
   const total = rows.reduce((s, r) => s + r.count, 0);
-  // 深潜回合不显示固定领袖块（敌人是随机组合的）；R1~15 与普通房照旧
-  const boss = pub?.bossId && !inDive ? data.lookup('bosses', pub.bossId) : null;
+  // 深潜的普通回合不显示固定领袖块（敌人是随机组合的）；但 **boss 关**要显示：
+  // 14 层 / 15 层隐藏核心 / 25·35·45 返场（维护者 2026-11-05：15 层的 boss 在准备阶段看不到了）。
+  const bossId = inDive ? (echo && echo.bossRound ? echo.bossId : null) : pub?.bossId;
+  const boss = bossId ? data.lookup('bosses', bossId) : null;
   return html`<div class="edrawer__body">
     ${echo && echo.intel ? html`<${EchoIntel} echo=${echo} />` : null}
     ${echo && !echo.intel && echo.schedule ? html`<div class="edrawer__intel">
@@ -123,7 +125,7 @@ function EnemiesTab({ pub, priv, onEnemy }) {
     ${boss ? html`<div class="eboss">
       <${UnitThumb} kind="enemy" id=${boss.enemyKey} size="md" />
       <div><${MicroLabel} tone="gold">${t('ENEMY LEADER // 敌方领袖')}</${MicroLabel}><b>${boss.name}</b>
-        <span class="t-lo">${t('第 {r} 回合 · 最终攻势', { r: data.get('config')?.modes?.[pub.modeId]?.bossRound ?? pub.lastRound ?? 14 })}</span></div>
+        <span class="t-lo">${t('第 {r} 回合 · 最终攻势', { r: inDive ? (pub?.round ?? 0) : (data.get('config')?.modes?.[pub.modeId]?.bossRound ?? pub.lastRound ?? 14) })}</span></div>
     </div>` : null}
   </div>`;
 }
