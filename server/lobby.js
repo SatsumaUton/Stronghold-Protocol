@@ -1054,6 +1054,8 @@ export class Lobby {
     if (room.match && room.match.players?.get) {
       const ps = room.match.players.get(session.playerId);
       if (ps && ps.admin !== wantTool) ps.admin = wantTool;
+      // 身份门也要同步（维护者 2026-11-05：管理员无视惩罚机制，判定读的是 ps.adminId）
+      if (ps && ps.adminId !== wantBadge) ps.adminId = wantBadge;
     }
     // a player seat, or a spectator seat (header): both carry `connected` / `name`
     const seat = room.seatOf(session.playerId) || room.watcherOf(session.playerId);
@@ -3363,6 +3365,14 @@ export class Lobby {
           const sess = this.registry?.byId ? this.registry.byId(s.playerId) : null;
           if (sess) return sess.admin === true;
           return s.admin === true;
+        })(),
+        // 管理员**身份**（账号角色 owner/admin，不看 tools.game 与验证码）：维护者 2026-11-05
+        // 要求管理员无视所有惩罚机制（挂机移出 / 消极游戏）。seat.admin 在 hello 里同步的是身份门，
+        // 这里优先用会话的 adminId，人不在（AI 托管 / 掉线）才退回座位上的值。
+        adminId: (() => {
+          const sess = this.registry?.byId ? this.registry.byId(s.playerId) : null;
+          if (sess) return sess.adminId === true;
+          return s.adminId === true || s.admin === true;
         })(),
         // 房主给这个 AI 座位指定的策略（room.setBotBand）：Match 用它填 this.botBands。
         // null = 没指定（AI 自己挑），只有 AI 座位才可能有值。

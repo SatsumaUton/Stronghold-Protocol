@@ -28,8 +28,23 @@ export class MatchIntents {
     } catch { return 0; }
   }
 
-  /** 消极游戏检测：连续 2 回合花钱（买/刷新/升级）但一次都没部署干员 → 踢出。 */
-  _trackActivity(ps, msg) {
+  /**
+   * 这个座位是不是**管理员**（维护者 2026-11-05：管理员无视所有惩罚机制）。
+   *
+   * 两个口径任一为真就算：
+   *   `ps.adminId` —— **身份门**：账号角色是 owner/admin（net.js session.adminId → 座位 adminId）。
+   *                  管理员平时就是拿普通号在打，没去后台换码也依然是管理员。
+   *   `ps.admin`   —— 三道门全过（身份 + tools.game + 验证码），也就是能用 g.test 的那个。
+   * 以前只有 `ps.admin`，且它每次 hello 都会被重算成三道门的结果，所以「没换码的管理员」
+   * 照样会被挂机 / 消极游戏判定踢出（维护者实测：自己挂机被移出对局）。
+   * @param {object} ps
+   * @returns {boolean}
+   */
+  _isPunishImmune(ps) {
+    return !!(ps && (ps.admin === true || ps.adminId === true));
+  }
+
+  /** 消极游戏检测：连续 2 回合花钱（买/刷新/升级）但一次都没部署干员 → 踢出。 */  _trackActivity(ps, msg) {
     if (!ps || ps.isBot) return;
     const t = msg && msg.t;
     // 挂机移出用的「有实质操作」标记（common.js AFK_ACTIONS）：与下面两条规则**并存**，
@@ -37,6 +52,10 @@ export class MatchIntents {
     // 放在最前面，且不受下面那些闸门（回合数、单人局）影响 ——
     // 它只是记「这个人动过」，不是判定。
     if (AFK_ACTIONS.has(t)) ps.afkActed = true;
+    // ★ 维护者 2026-11-05：**管理员不受任何惩罚机制**（消极游戏 / 挂机移出都不判）。
+    //   管理员经常在后台盯盘、改数据、写文档，几回合不动手是常态，把他踢出对局反而打断维护。
+    //   身份口径见 _isPunishImmune()（身份门 adminId 或三道门 admin 任一为真）。
+    if (this._isPunishImmune(ps)) return;
     // ★ 2026-11-02：**掉线的人不算消极游戏**。
     //   掉线的玩家发不出任何指令，若不豁免，两条规则都会把「什么都没做」判成挂机，
     //   把人踢掉 —— 而他只是网断了，回来座位已经没了。参考版也是这么处理的
