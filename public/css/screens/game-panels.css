@@ -1069,6 +1069,12 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   font-size: calc(.13 * var(--t)); font-weight: 700; letter-spacing: .04em;
 }
 .echo-bless__recommend i { font-style: normal; font-weight: 600; font-size: .86em; }
+/* 「放弃本次」卡（维护者 2026-11-05）：整行、虚线边框，和三个候选区分开 */
+.echo-bless__skip {
+  grid-column: 1 / -1; padding: .14rem .18rem;
+  background: rgba(24, 12, 44, .7); border-style: dashed;
+}
+.echo-bless__skip .echo-bless__desc { max-width: none; color: #9d8cc4; }
 /* 刷新三选一（维护者 2026-11-05）：按钮 + 投票条 */
 .echo-bless__refreshbtn, .echo-bless__rbtn {
   display: inline-flex; align-items: baseline; gap: .06rem;
