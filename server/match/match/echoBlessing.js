@@ -253,7 +253,7 @@ export const ECHO_BLESSINGS = Object.freeze([
     pulse: { secs: 15, interval: 2, atkScale: 0.6 } },
   { id: 'bd_devour', rarity: 'epic', name: '鲸吞', kind: 'bonddebuff', group: 'bonddebuff',
     bondTheme: 'egirShip', bondLabel: '阿戈尔',
-    desc: '开战吞噬 1 只当前生命最低的非领袖敌人（直接击杀）',
+    desc: '每场战斗开战时吞噬 1 只当前生命最低的非领袖敌人（直接击杀）',
     devour: true },
 ]);
 
