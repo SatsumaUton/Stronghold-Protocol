@@ -103,6 +103,41 @@ test('16 层起的「深渊通胀」是固定规则：有条目、有播报、�
   assert.match(rule.desc, /刷新价/, '固定规则条目也要写清楚影响刷新价');
 });
 
+// 维护者 2026-11-05：选祝福时切不出去看自己有什么诅咒 —— 面板里要有「查看诅咒」按钮；
+// 能消诅咒的祝福（净化 / 涤罪 / 反制）在**真的有东西可清**时要标「推荐」。
+test('祝福三选一：诅咒清单可查，消诅咒的祝福按当前局势标「推荐」', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const cleanse = echoBlessingById('cleanse');      // 净化：清 1 条（任意稀有度）
+  const purify = echoBlessingById('cleanse_all');   // 涤罪：只清普通
+  const quench = echoBlessingById('quench');        // 畅饮：驱散枯竭/干涸
+
+  m.echoCurseIds = [];
+  m.echoRoundCurse = null;
+  assert.equal(m._echoClearableCurses(cleanse), null, '身上没诅咒时不推荐净化');
+
+  m.echoCurseIds = ['frenzy', 'silence'];           // 稀有 + 传说
+  assert.equal(m._echoClearableCurses(cleanse).count, 1, '净化只能清 1 条');
+  assert.equal(m._echoClearableCurses(purify), null, '涤罪只清普通，没有普通诅咒就不推荐');
+
+  m.echoCurseIds = ['tribute', 'frenzy'];           // 普通 + 稀有
+  assert.equal(m._echoClearableCurses(purify).count, 1, '涤罪清掉那条普通诅咒');
+
+  m.echoCurseIds = ['drought'];
+  assert.equal(m._echoClearableCurses(quench).names[0], '枯竭', '反制按 id 匹配');
+
+  // 三选一的公开视图要带上 recommend / recommendText，客户端才能画角标
+  m.echoCurseIds = ['silence'];
+  m.echoBlessingOffer = ['cleanse'];
+  const opt = m._echoOfferView().options[0];
+  assert.equal(opt.recommend, true, '有传说诅咒时净化应标推荐');
+  assert.match(opt.recommendText, /静默/);
+  m.echoCurseIds = [];
+  assert.equal(m._echoOfferView().options[0].recommend, false, '没诅咒就不标');
+  m.echoBlessingOffer = null;
+});
+
 // 玩家 2026-11-05 实测：「25 层打完 boss 又回到 16 层」。
 // 成因：`_finishFinal` 的原版隐藏核心分支没有排除深潜 —— 深潜层数无上限，25/35/45 的返场 boss
 // 打赢后 `hiddenEligible()` 也可能为真，于是 `startRound(gd.hiddenRound = 15)`，下一层就是 16。

@@ -23,9 +23,14 @@ export function EchoBlessing({ pub }) {
   const [busy, setBusy] = useState(false);
   const [armed, setArmed] = useState(null);
   const [now, setNow] = useState(() => serverNow());
+  // 「查看诅咒」（维护者 2026-11-05）：选祝福时玩家切不出去看自己身上挂了什么，
+  // 所以在这个面板里直接给一个按钮，展开当前全队的诅咒清单。
+  const [showCurses, setShowCurses] = useState(false);
   const pending = useRef(false);
   const echo = pub?.echo;
   const offer = echo?.offer;
+  // 当前诅咒清单（服务端 pub.echo.curses，含固定规则那几条）
+  const curses = Array.isArray(echo?.curses) ? echo.curses : [];
   // 名额已满时的「弃选」投票（维护者 2026-11-05）：新祝福已选定 → 全队投掉哪个旧的，30 秒时限。
   const discard = echo?.discard;
   // 倒计时：服务端在 offer.endsAt 到点后强制结算（维护者 2026-11-04：看不到还剩多久）
@@ -71,9 +76,23 @@ export function EchoBlessing({ pub }) {
       <header class="echo-bless__head">
         <b>${t('深渊祝福 · 三选一')}</b>
         <span>${t('全队在线博士都选完后自动结算：票数最多的一项生效，平票取靠前的一项。')}</span>
+        <button type="button" class=${`echo-bless__cursesbtn${showCurses ? ' is-on' : ''}`}
+          aria-expanded=${showCurses ? 'true' : 'false'}
+          onClick=${() => setShowCurses(!showCurses)}>
+          ${t('查看诅咒')}${curses.length ? html`<b class="num">${curses.length}</b>` : null}
+        </button>
         ${left != null ? html`<span class="echo-bless__timer" aria-live="off"><b>${left}</b><i>秒</i></span>` : null}
         <span class="echo-bless__count">${voted}/${voters.length}</span>
       </header>
+      ${showCurses ? html`<ul class="echo-bless__curses" aria-label=${t('当前诅咒')}>
+        ${curses.length
+          ? curses.map((c) => html`<li key=${c.id} class=${`echo-bless__curse is-${c.rarity || 'common'}`}>
+              <b>${c.name}</b>
+              ${c.rarityLabel ? html`<span class="echo-bless__curseTag">${c.rarityLabel}</span>` : null}
+              <span class="echo-bless__curseDesc">${c.desc || ''}</span>
+            </li>`)
+          : html`<li class="echo-bless__curse is-empty">${t('当前没有任何诅咒')}</li>`}
+      </ul>` : null}
       <div class="echo-bless__cards">
         ${offer.options.map((opt, i) => {
           const mine = myPick === i;
@@ -87,6 +106,7 @@ export function EchoBlessing({ pub }) {
             <b class="echo-bless__name">${opt.name}</b>
             ${opt.rarityLabel ? html`<span class=${`echo-bless__rarity is-${opt.rarity || 'common'}`} data-rarity=${opt.rarity || 'common'}>${opt.rarityLabel}</span>` : null}
             ${opt.oneShot ? html`<span class="echo-bless__oneshot" title=${t('一次性：选了立刻结算，不挂在干员身上')}>${t('一次性')}</span>` : null}
+            ${opt.recommend ? html`<span class="echo-bless__recommend" title=${opt.recommendText || t('推荐')}>${t('推荐')}${opt.recommendText ? html`<i>${opt.recommendText}</i>` : null}</span>` : null}
             <span class="echo-bless__desc">${opt.desc || ''}</span>
             ${who.length ? html`<span class="echo-bless__votes">${who.join('、')}</span>` : null}
           </button>`;

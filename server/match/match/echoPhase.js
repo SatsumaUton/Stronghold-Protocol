@@ -1196,6 +1196,43 @@ export class MatchEcho {
       // 它是奖励条件而不是一局固定的规则，只在结算时用 ticker 报结果，避免把「规则」页变成任务说明。
     ];
   }
+  /**
+   * 这条祝福**当前能清掉几条诅咒**（维护者 2026-11-05：三选一界面要标「推荐」）。
+   *
+   * 口径必须和真正结算时一致（`_echoSettleBlessing`）：
+   *   * 净化（`curseRemove: 1`）：按稀有度从高到低清 n 条 → 有任意诅咒就推荐；
+   *   * 涤罪（`curseRemove: 'common'`）：只清普通 → 只有普通诅咒时才算；
+   *   * 反制（`counterCurses`）：按 id 匹配，永久诅咒和本回合诅咒都算。
+   * 固定诅咒（奇迹 / 远见 / 深渊通胀）不在 `echoCurseIds` 里，天然不会被推荐。
+   *
+   * @returns {{ count: number, names: string[] } | null} null = 这条祝福不消诅咒
+   */
+  _echoClearableCurses(b) {
+    if (!b) return null;
+    const ids = Array.isArray(this.echoCurseIds) ? this.echoCurseIds.slice() : [];
+    const round = this.echoRoundCurse ? [this.echoRoundCurse] : [];
+    const nameOf = (id) => echoCurseById(id)?.name || id;
+    const spec = echoBlessingCurseRemove(b);
+    if (typeof spec === 'number' && spec > 0) {
+      const rank = { epic: 3, rare: 2, common: 1 };
+      const picked = ids
+        .slice()
+        .sort((x, y) => (rank[echoCurseById(y)?.rarity] || 1) - (rank[echoCurseById(x)?.rarity] || 1))
+        .slice(0, spec);
+      return picked.length ? { count: picked.length, names: picked.map(nameOf) } : null;
+    }
+    if (spec === 'common') {
+      const picked = ids.filter((id) => (echoCurseById(id)?.rarity || 'common') === 'common');
+      return picked.length ? { count: picked.length, names: picked.map(nameOf) } : null;
+    }
+    const counters = Array.isArray(b.counterCurses) ? b.counterCurses : null;
+    if (counters) {
+      const picked = [...ids, ...round].filter((id) => counters.includes(id));
+      return picked.length ? { count: picked.length, names: picked.map(nameOf) } : null;
+    }
+    return null;
+  }
+
   _echoCurses() {
     if (this.echoVariant !== 'deepecho') return [];
     // 词条类诅咒顶到上限之后不会空转：溢出层数转为敌方生命（见 _echoCurseFx），
@@ -1599,6 +1636,9 @@ export class MatchEcho {
     return {
       options: offer.map((id) => {
         const b = typeof id === 'string' ? echoBlessingById(id) : id;
+        // 「推荐」标记（维护者 2026-11-05）：这条祝福此刻**真的能清掉**诅咒才亮，
+        // 并告诉玩家能清几条 / 清的是哪条（固定诅咒不算）。
+        const clear = this._echoClearableCurses(b);
         return {
           id: (b && b.id) || String(id),
           name: (b && b.name) || String(id),
@@ -1607,6 +1647,8 @@ export class MatchEcho {
           rarity: (b && b.rarity) || 'common',
           rarityLabel: ECHO_BLESSING_RARITY_LABEL[(b && b.rarity) || 'common'] || '普通',
           oneShot: echoBlessingOneShot(b),
+          recommend: !!clear,
+          recommendText: clear ? (clear.count > 1 ? `可清除 ${clear.count} 条诅咒` : `可清除「${clear.names[0]}」`) : '',
         };
       }),
       votes,
