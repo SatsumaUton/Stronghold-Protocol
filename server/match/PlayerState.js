@@ -262,6 +262,11 @@ export class PlayerState {
     this.round = { refreshes: 0, buys: 0, sells: 0, spent: 0, gainedChess: 0, arts: 0 };
     this.deployCapBonus = 0;
     this.deployCapMin = 0;
+    /**
+     * 「深渊祭坛 · 献祭永久」买过几次（整局累计）。维护者 2026-11-05：本局最多买 1 次 = +1 部署位。
+     * 和 `deployCapBonus` 分开记 —— 那个还可能被盟约 / 机变加，封顶只针对祭坛这一项。
+     */
+    this.echoAltarDeployBought = 0;
     this.deviceOverrides = {};
     this.tileOverrides = {};
     this.stats = {
