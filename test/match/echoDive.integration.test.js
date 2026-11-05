@@ -1556,6 +1556,29 @@ test('返场 boss 的血量随深度递增（R14 < R25 < R35 < R45），波次�
     assert.ok(Math.abs(v.wave - base * v.poolMul) < 1e-6, `${r} 层波次缩放与血池倍率不同源`);
   }
 });
+// 维护者 2026-11-05：16 层以后的「深渊祭坛 → 献祭 · 祝福」抽到的是一次性祝福。
+// 它拿到就结算（不占名额），但**必须一直留在「已获祝福」列表里** —— 包括断线续玩 / 节点重启读档之后。
+// 以前 echoOneShotIds 没进存档，读档后祭坛抽到的祝福会整批消失（玩家以为被诅咒吃掉了）。
+test('祭坛抽到的一次性祝福进存档：读档后仍在祝福列表里', async (t) => {
+  const { snapshotMatch } = await import('../../server/match/snapshot.js');
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 15;
+  m.startRound(16);
+  const ps = m.alivePlayers()[0];
+  ps.funds = 9999;
+  assert.equal(m.buyEchoAltar(ps, 'blessing')?.ok, true, '16 层可以献祭抽祝福');
+  const before = (m.publicView().echo.blessings || []).map((b) => b.id);
+  assert.ok(before.length >= 1, '祭坛抽到的祝福要先出现在列表里');
+  const doc = snapshotMatch(m);
+  assert.ok(doc, '准备阶段能存检查点');
+  assert.deepEqual(doc.match.echoOneShotIds, m.echoOneShotIds, '一次性祝福的回执要进存档');
+  // 同一批「整局累计」的深渊状态也不能丢（祭坛强化 / 刷新额度 / 禁令到期层）
+  for (const k of ['echoAltarBuffStacks', 'echoBlessingRefreshes', 'echoBannedTilesUntil', 'echoBannedBondsUntil', 'echoSupplyWords']) {
+    assert.ok(Object.hasOwn(doc.match, k), `${k} 要进存档`);
+  }
+});
 // 维护者 2026-11-05：16 层以后所有「频次怪」（被打 N 下才死）的血量都不能按深度缩放。
 // 器物类的 baseHp 恰好等于需要的次数，所以正确值就是 baseHp 本身。
 test('16 层以后所有频次怪血量等于基础值（不被深度缩放）', async (t) => {

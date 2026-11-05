@@ -88,6 +88,18 @@ export const MATCH_FIELDS = Object.freeze({
     // 「护盾」已用掉（抵消过排异）的标记（2026-11-05）：不存的话读档后护盾会「复活」成一条还有效的祝福。
     // 纯追加，旧存档缺这项时 = 未消耗。
     'echoShieldBond', 'echoShieldSpent',
+    // 一次性祝福（回血 / 资金 / 净化 / 涤罪 / 祭坛抽到的那些）的**回执**（维护者 2026-11-05）：
+    // 它们不占名额、拿到就结算，但「已获祝福」列表里要一直看得到。以前没进存档 ——
+    // 断线续玩 / 节点重启恢复之后，祭坛抽到的祝福会整批从列表里消失（玩家以为被诅咒吃掉了）。
+    'echoOneShotIds',
+    // 深渊祭坛（16 层起）的永久强化层数：读档丢掉等于白花资金
+    'echoAltarBuffStacks', 'echoAltarLastDepth',
+    // 祝福刷新额度 / 已放弃次数 / 隐藏核心的临时名额：都是整局累计，丢了读档后就「回血」
+    'echoBlessingRefreshes', 'echoBlessingSkipped', 'echoBlessingBonus', 'echoBlessingRefreshNonce',
+    // 部署禁令的**到期层**（2026-11-05）：只存名单不存到期层，读档后排异 / 封锁永远不会自动解除
+    'echoBannedTilesUntil', 'echoBannedBondsUntil',
+    // 深潜补给的本层词条与保底间隔（2026-11-05）：读档当层仍然要生效，间隔也要记住，否则可以刷补给
+    'echoSupplyWords', 'echoSupplyLastDepth',
     // 已击杀的悬赏卡回执（2026-11-05）：读档后仍能对账
     'echoBountyPaid',
   ]),
