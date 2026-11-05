@@ -1210,10 +1210,19 @@ export class MatchEcho {
     let n = 0;
     for (const ps of this.alivePlayers()) {
       const shop = ps && ps.shop;
-      if (!shop || !(shop.freeRefreshes > cap)) continue;
-      shop.freeRefreshes = cap;
-      ps.dirty?.();
-      n += 1;
+      if (!shop) continue;
+      // 维护者 2026-11-05：**上回合没花完的免费刷新要占用本回合的额度**。
+      // 否则「带 3 次进新回合 + 本回合再拿 5 次」= 一回合能用 8 次，玩家看到的就是「第 6 次还是免费」。
+      // 回合开始时把「已有库存」记成本回合已获得，本回合只剩 (cap − 库存) 次可拿。
+      if (shop.echoGrantRound !== this.round) {
+        shop.echoGrantRound = this.round;
+        shop.echoRefreshGranted = Math.min(cap, Math.max(0, Math.trunc(Number(shop.freeRefreshes) || 0)));
+      }
+      if (shop.freeRefreshes > cap) {
+        shop.freeRefreshes = cap;
+        ps.dirty?.();
+        n += 1;
+      }
     }
     if (n) this.markPublic();
     return n;

@@ -1400,3 +1400,21 @@ test('飞行怪不会被塞进没有航点的路线（直线穿场）', (t) => {
   m._echoFixFlyRoutes(wave);
   assert.equal(wave.spawns[0].routeIndex, 1, '飞行条目要改到带航点的路线');
 });
+
+// 玩家 2026-11-05 反馈：奇迹还能把免费刷新推到第 6 次。
+// 成因：上回合没花完的免费刷新会带进新回合，而「每回合累计 5 次」只数**本回合新发放**的，
+// 于是「带 3 次 + 再拿 5 次」= 一回合能用 8 次。现在回合开始把已有库存记成已获得。
+test('奇迹·诅咒：上回合剩下的免费刷新占用本回合额度（不会出现第 6 次）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  m.round = 19;
+  ps.shop.freeRefreshes = 3;
+  m.startRound(20);
+  assert.equal(ps.shop.echoRefreshGranted, 3, '带进新回合的库存算本回合已获得');
+  assert.equal(m._echoGrantFreeRefresh(ps, 5), 2, '本回合只剩 2 次额度');
+  assert.equal(m._echoGrantFreeRefresh(ps, 1), 0, '第 6 次拿不到');
+  ps.shop.freeRefreshes = 0;
+  assert.equal(m._echoGrantFreeRefresh(ps, 1), 0, '花光之后也不能再拿');
+});
