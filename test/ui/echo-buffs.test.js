@@ -69,6 +69,8 @@ test('诅咒 → 第三侧圆片：按稀有度配色，固定规则走 gold', (
   assert.deepEqual(chips.map((c) => c.side), ['curse', 'curse', 'curse']);
   assert.ok(chips.every((c) => c.key.startsWith('curse:')));
   assert.deepEqual(chips.map((c) => c.tone), ['rare', 'gold', 'gold']);
+  // 图标（维护者 2026-11-05：光靠首字太丑）—— 全部来自仓库 ICONS 图标集
+  assert.deepEqual(chips.map((c) => c.icon), ['warn', 'crown', 'crown']);
   assert.equal(chips[1].glyph, '奇', '用名字首字当记号');
   assert.match(chips[2].title, /固定/, 'title 要带稀有度标签');
   assert.match(chips[2].title, /每层 \+4%/, 'title 要带效果说明');
@@ -81,4 +83,17 @@ test('三侧同时存在时顺序稳定：词条 → 祝福 → 诅咒', () => {
     curses: [{ id: 'frenzy', name: '狂怒', rarity: 'rare' }],
   });
   assert.deepEqual(chips.map((c) => c.key), ['enemy:swift', 'ally:haste', 'curse:frenzy']);
+});
+
+test('词条 / 祝福也有图标（不再是问号或纯文字）', () => {
+  const chips = echoBuffChips({
+    words: [{ id: 'harden', name: '硬化' }, { id: 'swift', name: '迅捷' }, { id: 'rage', name: '狂怒' }],
+    blessings: [
+      { id: 'atk_s', name: '锐刃', group: 'atk', kind: 'mods' },
+      { id: 'hp_s', name: '韧性', group: 'hp', kind: 'mods' },
+      { id: 'fund', name: '物资补给', kind: 'fund' },
+    ],
+  });
+  assert.deepEqual(chips.map((c) => c.icon), ['shield', 'chevrons', 'sword', 'sword', 'shield', 'chart']);
+  assert.ok(chips.every((c) => typeof c.icon === 'string' && c.icon.length > 0), '每个圆片都要有图标名');
 });

@@ -53,6 +53,41 @@ const CURSE_TONE = Object.freeze({ common: 'common', rare: 'rare', epic: 'epic',
  *   curses?: Array<{id: string, name?: string, desc?: string, rarity?: string, rarityLabel?: string}> }} echo
  * @returns {Array<{ key: string, side: 'enemy'|'ally'|'curse', id: string, label: string, glyph: string, tone: string, title: string }>}
  */
+/**
+ * 圆片图标（维护者 2026-11-05：光靠首字太丑）。
+ *
+ * 全部复用仓库已有的 `ICONS` 图标集（components.js），不新增美术资源，也就不会出现缺图。
+ * 词条按 id 精确映射；祝福按效果分组（group / kind）映射；诅咒统一用警示三角，固定规则用皇冠。
+ */
+const WORD_ICON = Object.freeze({
+  shield: 'shield', harden: 'shield', tough: 'shield', colossus: 'shield', carapace: 'shield',
+  ward: 'shield', sturdy: 'shield', bulwark: 'shield', giant: 'shield', aegis: 'shield',
+  swift: 'chevrons', dash: 'chevrons', quick: 'chevrons', crawl: 'hourglass', slow: 'hourglass',
+  rage: 'sword', frenzy: 'sword', fury: 'sword', savage: 'sword',
+  regen: 'plus',
+});
+const GROUP_ICON = Object.freeze({
+  atk: 'sword', dmg: 'sword', pen: 'sword',
+  hp: 'shield', def: 'shield', res: 'shield', taken: 'shield', block: 'shield',
+  spd: 'chevrons', sp: 'refresh',
+  regen: 'plus', heal: 'plus',
+  range: 'expand',
+  coin: 'chart', fund: 'chart', refresh: 'refresh',
+  cleanse: 'rotate', counter: 'rotate',
+  debuff: 'snow',
+});
+
+/** 一个词条 / 祝福 / 诅咒该用哪个图标。 */
+export function echoBuffIcon(b, side) {
+  if (!b) return side === 'curse' ? 'warn' : 'plus';
+  if (side === 'curse') return b.rarity === 'special' ? 'crown' : 'warn';
+  if (side === 'enemy') return WORD_ICON[b.id] || 'shield';
+  if (b.id === 'shield_bond') return 'shield';
+  if (b.id === 'haste') return 'chevrons';
+  if (b.id === 'loot') return 'chart';
+  return GROUP_ICON[b.group] || GROUP_ICON[b.kind] || 'plus';
+}
+
 export function echoBuffChips(echo) {
   const words = Array.isArray(echo?.words) ? echo.words : [];
   const blessings = Array.isArray(echo?.blessings) ? echo.blessings : [];
@@ -62,13 +97,13 @@ export function echoBuffChips(echo) {
     if (!w || typeof w.id !== 'string') continue;
     const label = typeof w.name === 'string' && w.name ? w.name : w.id;
     const v = ECHO_BUFF_VISUALS[w.id] || { glyph: label.slice(0, 1) || '敌', tone: 'def' };
-    out.push({ key: `enemy:${w.id}`, side: 'enemy', id: w.id, label, glyph: v.glyph, tone: v.tone, title: w.desc ? `${label} · ${w.desc}` : label });
+    out.push({ key: `enemy:${w.id}`, side: 'enemy', id: w.id, label, glyph: v.glyph, icon: echoBuffIcon(w, 'enemy'), tone: v.tone, title: w.desc ? `${label} · ${w.desc}` : label });
   }
   for (const b of blessings) {
     if (!b || typeof b.id !== 'string') continue;
     const label = typeof b.name === 'string' && b.name ? b.name : b.id;
     const v = ECHO_BUFF_VISUALS[b.id] || { glyph: label.slice(0, 1) || '祝', tone: 'coin' };
-    out.push({ key: `ally:${b.id}`, side: 'ally', id: b.id, label, glyph: v.glyph, tone: v.tone, title: b.desc ? `${label} · ${b.desc}` : label });
+    out.push({ key: `ally:${b.id}`, side: 'ally', id: b.id, label, glyph: v.glyph, icon: echoBuffIcon(b, 'ally'), tone: v.tone, title: b.desc ? `${label} · ${b.desc}` : label });
   }
   for (const c of curses) {
     if (!c || typeof c.id !== 'string') continue;
@@ -77,7 +112,7 @@ export function echoBuffChips(echo) {
     const glyph = label.slice(0, 1) || '诅';
     const tone = CURSE_TONE[c.rarity] || 'def';
     const tag = typeof c.rarityLabel === 'string' && c.rarityLabel ? `（${c.rarityLabel}）` : '';
-    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, label, glyph, tone, title: c.desc ? `${label}${tag} · ${c.desc}` : `${label}${tag}` });
+    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, label, glyph, icon: echoBuffIcon(c, 'curse'), tone, title: c.desc ? `${label}${tag} · ${c.desc}` : `${label}${tag}` });
   }
   return out;
 }

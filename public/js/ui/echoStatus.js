@@ -7,7 +7,7 @@
 //
 // 折叠状态只在本浏览器记，不发给服务器；不阻塞任何操作（pointer-events 由 .echo-status 自己控制）。
 import { useState } from '../../vendor/hooks.module.js';
-import { html } from './components.js';
+import { html, Icon } from './components.js';
 import { echoBuffChips } from './echoBuffs.js';
 import { actions } from './gameActions.js';
 import { useStore } from '../store.js';
@@ -34,7 +34,7 @@ function CompactChips({ chips }) {
     const list = chips.filter((c) => c.side === side);
     if (!list.length) return null;
     return html`<span class=${`echo-status__group ${cls}`}>${list.map((c) => html`<span key=${c.key}
-        class=${`etag ecochip ecochip--${c.tone}`} title=${c.title} aria-label=${c.title}><b class="ecochip__glyph">${c.glyph}</b></span>`)}</span>`;
+        class=${`etag ecochip ecochip--${c.tone}`} title=${c.title} aria-label=${c.title}><${Icon} name=${c.icon} class="ecochip__icon" /></span>`)}</span>`;
   };
   const enemy = group('enemy', 'is-enemy');
   const ally = group('ally', 'is-ally');
@@ -133,6 +133,6 @@ export function EchoBuffBar({ pub }) {
   if (!chips.length) return null;
   return html`<div class="echo-buffbar" data-testid="echo-buffbar" aria-label=${t('深渊回响：当前词条 / 祝福 / 诅咒')}>
     ${chips.map((c) => html`<span key=${c.key} class=${`etag ecochip ecochip--${c.tone} is-${c.side}`}
-      title=${c.title} aria-label=${c.title}><b class="ecochip__glyph">${c.glyph}</b></span>`)}
+      title=${c.title} aria-label=${c.title}><${Icon} name=${c.icon} class="ecochip__icon" /></span>`)}
   </div>`;
 }
