@@ -45,7 +45,11 @@ export class MatchBoss {
     this.lastResults = new Map();
     if (!hidden) this._openTeamLp();
     if (!hidden) this.finalAliveCount = alive.length;
-    const bossId = hidden ? this.hiddenBossId : this.bossId;
+    // 深潜的返场 boss 是**随机**那只（可能是隐秘核心），共享血池必须跟波次、面板用同一个 id
+    // （维护者 2026-11-05：之前血池固定用 R14 的 bossId，于是 16 层以后翻来覆去只有同一只）
+    const bossId = this.echoVariant === 'deepecho' && typeof this._echoBossIdFor === 'function'
+      ? this._echoBossIdFor(this.round)
+      : (hidden ? this.hiddenBossId : this.bossId);
     // BOSS_HIT tickers ("对敌方领袖造成的伤害超过20% / 50% / 80%"): the player's damage to THIS leader over its pool —
     // the pool's own per-player tally, one pool per boss round. stats.bossDamage (the result's 领袖伤害) adds up both
     // rounds, so it would credit the Final Assault's damage to the hidden leader ("隐藏boss还没打就出了50%播报").
