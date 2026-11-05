@@ -1490,3 +1490,24 @@ test('深潜补给：全队同一份候选、票数可见、文案标明全队�
   const after = m._echoSupplyView();
   assert.deepEqual(after.votes, { [a.playerId]: 1, [b.playerId]: 1 }, '票数要按玩家下发（客户端才能显示谁投了什么）');
 });
+
+// 玩家 2026-11-05：深潜补给和祝福三选一会同时弹出、互相遮挡。
+// 现在服务端串行化：祝福面板没结束时补给挂起；补给还开着时，开祝福前先把补给结算掉。
+test('深潜补给与祝福三选一不会同时弹（先结算一个再出另一个）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 20;
+  m.echoSupplyLastDepth = 0;
+  m.echoBlessingOffer = ['atk_s', 'hp_s', 'def_s'];
+  m._echoBlessingVotes = new Map();
+  assert.equal(m._echoOpenSupply(), 0, '祝福进行中不开补给');
+  assert.equal(m.echoSupplyPending, true, '补给要挂起而不是丢弃');
+  assert.equal(m._echoSupplyView(), null, '此时界面上只有祝福面板');
+  m._echoSettleBlessing(0);
+  assert.ok(m._echoSupplyView(), '祝福结算后补给才出现');
+  assert.equal(m.echoSupplyPending, false);
+  m.round = 21;
+  m._echoMaybeOfferBlessing(21);
+  assert.equal(m._echoSupplyView(), null, '开祝福前要先把还开着的补给结算掉');
+});

@@ -1588,17 +1588,31 @@ export class MatchEcho {
    *
    * 三个候选固定是三类：装备 / 资金 / 一次性祝福，各自独立随机。
    */
-  _echoOpenSupply() {
+  /** 祝福面板结算之后，把「挂起中」的深潜补给放出来（一次只弹一个面板，维护者 2026-11-05）。 */
+  _echoFlushSupplyIfPending() {
+    if (!this.echoSupplyPending) return 0;
+    if (this.echoBlessingOffer || this.echoBlessingDiscardOffer || this.echoBlessingRefreshVote) return 0;
+    this.echoSupplyPending = false;
+    try { return this._echoOpenSupply(true); } catch { return 0; }
+  }
+
+  _echoOpenSupply(force = false) {
     if (this.echoVariant !== 'deepecho') return 0;
     const depth = this._echoDepth(this.round);
     if (depth < 16) return 0;
+    // 一次只弹一个决策面板（维护者 2026-11-05：补给和祝福三选一叠在一起了）。
+    // 祝福 / 弃选 / 刷新投票还没结束时先挂起，等它结算完再开（见 _echoFlushSupplyIfPending）。
+    if (!force && (this.echoBlessingOffer || this.echoBlessingDiscardOffer || this.echoBlessingRefreshVote)) {
+      this.echoSupplyPending = true;
+      return 0;
+    }
     // 不是每层都给（维护者 2026-11-05）：做成**随机触发**的补给事件，
     // 平均每 3 层左右来一次；boss 返场层不触发。
     if (this.bossWaves) return 0;
     // 随机触发 + 保底间隔：连续 4 层没出就一定给一次（避免脸黑整局都没有）
     const last = Number(this.echoSupplyLastDepth) || 0;
     const forced = last > 0 && depth - last >= 4;
-    if (!forced && (Number(this.rngWaves()) || 0) >= 0.34) return 0;
+    if (!force && !forced && (Number(this.rngWaves()) || 0) >= 0.34) return 0;
     this.echoSupplyLastDepth = depth;
     if (this.echoSupply && this.echoSupply.round === this.round) return 0;
     // 维护者 2026-11-05：补给改成**团队投票、共享一份**（原来是每人各选一次，
@@ -1760,6 +1774,10 @@ export class MatchEcho {
    */
   _echoMaybeOfferBlessing(r = this.round) {
     if (!this._echoDiveRound(r)) return null;
+    // 上回合的深潜补给还没投完就先结算掉，避免和祝福三选一叠在一起（维护者 2026-11-05）
+    if (this.echoSupply && this.echoSupply.pick == null && typeof this._echoForceResolveSupply === 'function') {
+      try { this._echoForceResolveSupply(); } catch { /* 结算失败不影响祝福 */ }
+    }
     // 隐藏核心通关会临时 +1 名额（`echoBlessingBonus`）：不发出去就会一直占着，
     // 所以这里把上限一起抬高，开完三选一立刻清零（玩家最多能看到 4/3）。
     const bonus = Math.max(0, Number(this.echoBlessingBonus) || 0);
@@ -2027,6 +2045,7 @@ export class MatchEcho {
       return OK;
     }
     this._echoGrantBlessing(b);
+    this._echoFlushSupplyIfPending();
     return OK;
   }
 
