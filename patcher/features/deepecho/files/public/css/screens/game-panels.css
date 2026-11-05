@@ -947,13 +947,13 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   /* 固定窄栏 + 强制换行：以前一整排会横向盖住 HUD 按钮 */
   display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: .06rem;
   /* 用 px 固定宽度，保证一定换行（vw 在某些缩放档位下会被算得很大） */
-  width: 232px; max-width: 232px; max-height: 34vh; overflow: hidden;
+  width: 268px; max-width: 268px; max-height: 40vh; overflow: hidden;
   padding: .04rem .06rem;
   background: rgba(10, 5, 22, .55); border: 1px solid rgba(183, 156, 255, .28);
   pointer-events: none;
 }
-.echo-buffbar .ecochip { pointer-events: auto; font-size: calc(.14 * var(--t)); padding: .03rem; border-radius: .03rem; }
-.echo-buffbar .ecochip__icon { width: .26rem; height: .26rem; }
+.echo-buffbar .ecochip { pointer-events: auto; font-size: calc(.14 * var(--t)); padding: .04rem; border-radius: .04rem; }
+.echo-buffbar .ecochip__icon { width: .38rem; height: .38rem; }
 .echo-buffbar .ecochip__icon { fill: currentColor; }
 .sigil-arrow.is-up { fill: #ffe08a; }
 .sigil-arrow.is-down { fill: #ff8fa8; }
