@@ -43,6 +43,20 @@ export const ECHO_EARLY_GROWTH = 1.03;
 /** 缓增段的增速（维护者 2026-11-03 选「激进档」）。 */
 export const ECHO_HP_STEP_SLOW = 1.15;
 export const ECHO_ATK_STEP_SLOW = 1.08;
+/**
+ * 返场 boss 的**血量**曲线（维护者 2026-11-05 第二次调：随深度递增，且比原来高得多）。
+ *
+ * 原来的 1.10 / 1.06 太软：返场 boss 打的是**共享血池**（finalAssault.bossPoolHp，单人 675000 固定值），
+ * 深度一到 25 层以上，玩家的盟约层数 / 祝福早把这个数秒穿 —— 实测「一进场 boss 就没了」。
+ * 现在前 15 个延伸层 ×1.25/层、之后 ×1.15/层（比杂兵的 1.20 / 1.15 再高一档，boss 永远比一波杂兵耐打）。
+ *
+ * 以单人血池 675000 为基准：R14/R15 = 675000（官方不动），R25 ≈ 6.3M，R35 ≈ 38.6M，R45 ≈ 156M。
+ */
+export const ECHO_BOSS_HP_STEP = 1.25;
+export const ECHO_BOSS_HP_STEP_SLOW = 1.15;
+/** boss 的攻击只小幅跟涨（避免「血厚 + 秒人」双重劝退，维护者 2026-11-05 只要求血量加高）。 */
+export const ECHO_BOSS_ATK_STEP = 1.06;
+export const ECHO_BOSS_ATK_STEP_SLOW = 1.03;
 /** 硬性回合上限：无限模式也不许超过它（防数值与内存失控）。 */
 /**
  * 无尽模式的安全阀（维护者 2026-11-03 选 C 方案后改）。
@@ -126,9 +140,12 @@ const fin = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 /**
  * **boss 专用**的延伸曲线（维护者 2026-11-05）。
  *
- * 为什么单开一条：boss 没有「只数」可涨，全靠倍率；
- * 用小怪那条 (1.2/层) 的话，R25→R35 血量翻 5 倍，深层会变成「打不动的墙」。
- * 这里改成 血 ×1.10/层、攻 ×1.06/层，R31 之后再放缓到 1.06 / 1.03。
+ * 为什么单开一条：boss 没有「只数」可涨，全靠倍率；杂兵那条 (1.2/层) 用在本体上时，
+ * 前期太软、后期过陡。现在血 ×1.25/层（前 15 个延伸层）→ ×1.15/层，攻 ×1.06 → ×1.03。
+ * 这条曲线同时喂给三处，保证「看到的」和「打的」是同一个数：
+ *   ① 返场 boss 的共享血池（Match._echoBossPoolMul → finalAssault.bossPoolHp 的 hpMul）
+ *   ② boss 波次里领袖单位的 mods（_planBossWaves）
+ *   ③ boss 战场 spec 的 flags.enemyScale（领袖中途召唤物的 mods，server/sim/content/bosses.js summonMods）
  *
  * @param {number} round 显示回合
  * @param {{ hpMul?: number, atkMul?: number, speedMul?: number }} base 官方最后一档
@@ -145,8 +162,8 @@ export function echoBossScale(round, base = null, lastRound = ECHO_LAST_ROUND) {
   const fast = Math.min(over, 15);
   const slowN = Math.max(0, over - 15);
   return {
-    hpMul: Math.min(ECHO_HP_CAP, hp0 * 1.10 ** fast * 1.06 ** slowN),
-    atkMul: Math.min(ECHO_ATK_CAP, atk0 * 1.06 ** fast * 1.03 ** slowN),
+    hpMul: Math.min(ECHO_HP_CAP, hp0 * ECHO_BOSS_HP_STEP ** fast * ECHO_BOSS_HP_STEP_SLOW ** slowN),
+    atkMul: Math.min(ECHO_ATK_CAP, atk0 * ECHO_BOSS_ATK_STEP ** fast * ECHO_BOSS_ATK_STEP_SLOW ** slowN),
     speedMul,
   };
 }

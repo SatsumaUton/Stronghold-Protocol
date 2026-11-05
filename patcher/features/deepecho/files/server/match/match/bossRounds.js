@@ -50,7 +50,7 @@ export class MatchBoss {
     // the pool's own per-player tally, one pool per boss round. stats.bossDamage (the result's 领袖伤害) adds up both
     // rounds, so it would credit the Final Assault's damage to the hidden leader ("隐藏boss还没打就出了50%播报").
     const hitSteps = new Map();
-    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment, hpMul: this.enemyHpMul }), {
+    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment, hpMul: this.enemyHpMul * this._echoBossPoolMul(this.round) }), {
       onHit: (pid, dmg) => {
         const ps = this.players.get(pid);
         if (!ps) return;
@@ -103,8 +103,9 @@ export class MatchBoss {
         spawns: this._sanitizeSpawns(spawns),
         routes: wave.routes,
         sharedBoss: this.bossPool,
-        // the round's enemy effects for the leaders' mid-fight summons (server/sim/content/bosses.js summonMods)
-        flags: { layerGainsEnabled: false, ...this.gd.dp, enemyScale: this.gd.enemyScale(this.echoVariant === 'deepecho' ? 15 : this.round), ...this._ruleFlags() },
+        // the round's enemy effects for the leaders' mid-fight summons (server/sim/content/bosses.js summonMods);
+        // 深潜的返场 boss 用 boss 专用曲线（_echoBossScale：随深度递增），不是固定 R15 档
+        flags: { layerGainsEnabled: false, ...this.gd.dp, enemyScale: this.echoVariant === 'deepecho' ? this._echoBossScale(this.round) : this.gd.enemyScale(this.round), ...this._ruleFlags() },
         fieldId,
         enemyOverrides: wave.overrides,
         waveId: wave.templateId,

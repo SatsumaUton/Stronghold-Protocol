@@ -1512,26 +1512,42 @@ test('深潜补给与祝福三选一不会同时弹（先结算一个再出另�
   assert.equal(m._echoSupplyView(), null, '开祝福前要先把还开着的补给结算掉');
 });
 
-// 维护者 2026-11-05：16 层以后的 boss 不要再按深层难度倍数加血，用原版 boss 的数值。
-// 返场 boss 的波次缩放现在固定成「官方最后一关」的那一套，和 R14 的原版 boss 一致。
-test('返场 boss 的血量缩放与原版 boss 一致（不随深度递增）', (t) => {
+// 维护者 2026-11-05（第二次改）：返场 boss 的血量要**随深度递增**，而且数值要更高。
+// 关键：boss 的血量来自共享血池（finalAssault.bossPoolHp），领袖单位只是按池子比例显示；
+// 之前只调波次缩放，血池一直是固定的 675000（单人），所以 25 层以后「一进场 boss 就没了」。
+test('返场 boss 的血量随深度递增（R14 < R25 < R35 < R45），波次与血池同源', async (t) => {
+  const { bossPoolHp } = await import('../../server/match/finalAssault.js');
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
-  const hpMulAt = (r) => {
+  const at = (r) => {
     m.round = r - 1;
     m.startRound(r);
     const w = m.bossWaves && m.bossWaves[0] && m.bossWaves[0].wave;
     const s = w && w.spawns && w.spawns[0];
-    return s && s.mods ? s.mods.hpMul : null;
+    return {
+      wave: s && s.mods ? s.mods.hpMul : null,
+      poolMul: m._echoBossPoolMul(r),
+      pool: bossPoolHp(m.gd, m.bossId, 1, { hpMul: m._echoBossPoolMul(r) }),
+    };
   };
-  const base = hpMulAt(14);
-  assert.ok(base > 0, 'R14 原版 boss 要有缩放');
-  assert.equal(hpMulAt(25), base, '25 层返场 boss 不能比 R14 更肉');
-  assert.equal(hpMulAt(35), base, '35 层同理');
-  assert.equal(hpMulAt(45), base, '45 层同理');
+  const r14 = at(14), r25 = at(25), r35 = at(35), r45 = at(45);
+  assert.equal(r14.poolMul, 1, 'R14 是官方档，一点不动');
+  assert.equal(r14.pool, bossPoolHp(m.gd, m.bossId, 1, {}), 'R14 血池 = 官方值');
+  for (const [name, a, b] of [['R25 > R14', r14, r25], ['R35 > R25', r25, r35], ['R45 > R35', r35, r45]]) {
+    assert.ok(b.wave > a.wave, `${name}（波次缩放 ${a.wave} → ${b.wave}）`);
+    assert.ok(b.pool > a.pool, `${name}（血池 ${a.pool} → ${b.pool}）`);
+  }
+  // 量级：25 层至少 5 倍、35 层至少 20 倍、45 层至少 60 倍（维护者要「数值加高」）
+  assert.ok(r25.poolMul >= 5, `25 层血池倍率 ${r25.poolMul.toFixed(2)} 太低`);
+  assert.ok(r35.poolMul >= 20, `35 层血池倍率 ${r35.poolMul.toFixed(2)} 太低`);
+  assert.ok(r45.poolMul >= 60, `45 层血池倍率 ${r45.poolMul.toFixed(2)} 太低`);
+  // 波次缩放 = 血池倍率 × 官方最后一档（同一个曲线，客户端看到的和打的是同一个数）
+  const base = m.gd.baseEnemyScale(15).hpMul;
+  for (const [r, v] of [[25, r25], [35, r35], [45, r45]]) {
+    assert.ok(Math.abs(v.wave - base * v.poolMul) < 1e-6, `${r} 层波次缩放与血池倍率不同源`);
+  }
 });
-
 // 维护者 2026-11-05：16 层以后所有「频次怪」（被打 N 下才死）的血量都不能按深度缩放。
 // 器物类的 baseHp 恰好等于需要的次数，所以正确值就是 baseHp 本身。
 test('16 层以后所有频次怪血量等于基础值（不被深度缩放）', async (t) => {

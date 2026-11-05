@@ -9,7 +9,7 @@
 //
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
-import { echoDataRound, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_MAX_FREE_REFRESH, ECHO_BOND_BAN_ROUNDS, ECHO_DEPLOY_BAN_ROUNDS, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
+import { echoDataRound, echoBossScale, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_MAX_FREE_REFRESH, ECHO_BOND_BAN_ROUNDS, ECHO_DEPLOY_BAN_ROUNDS, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
 import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js';
 import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
 import {
@@ -1256,6 +1256,32 @@ export class MatchEcho {
   }
 
   /**
+   * 返场 boss 本回合的缩放（维护者 2026-11-05：**随深度递增**，不再是固定值）。
+   *
+   * 三处共用同一个数：共享血池、boss 波次领袖的 mods、boss 战场 flags.enemyScale。
+   * @param {number} [r] 显示回合
+   */
+  _echoBossScale(r = this.round) {
+    const base = this.gd?.baseEnemyScale?.(ECHO_LAST_ROUND) || { hpMul: 1, atkMul: 1, speedMul: 1 };
+    if (this.echoVariant !== 'deepecho') return base;
+    return echoBossScale(r, base, ECHO_LAST_ROUND);
+  }
+
+  /**
+   * 返场 boss **共享血池**的深度倍率（相对 R15 官方档）：`_echoBossScale().hpMul / base.hpMul`。
+   *
+   * 为什么必须动血池而不是只改领袖单位：boss 的血量来自 `SharedBossPool`
+   * （finalAssault.bossPoolHp，单人 675000 的固定值），领袖单位只是按池子比例显示。
+   * 之前只调波次缩放，血池一点没变 —— 所以 25 层以后「一进场 boss 就没了」。
+   */
+  _echoBossPoolMul(r = this.round) {
+    if (this.echoVariant !== 'deepecho') return 1;
+    const base = Number(this.gd?.baseEnemyScale?.(ECHO_LAST_ROUND)?.hpMul) || 1;
+    const cur = Number(this._echoBossScale(r)?.hpMul) || base;
+    return Math.max(1, cur / Math.max(1e-6, base));
+  }
+
+  /**
    * 【诅咒】深渊对原版强力机制的限制（维护者 2026-11-05）。
    *
    * 为什么要显式告诉玩家：「奇迹」与「远见」在原版里按层无限叠，
@@ -1387,7 +1413,6 @@ export class MatchEcho {
       blessings: this._echoBlessings().map((b) => ({
         id: b.id,
         name: b.name,
-        desc: b.desc,
         rarity: b.rarity || 'common',
         rarityLabel: ECHO_BLESSING_RARITY_LABEL[b.rarity] || '普通',
         // 一次性祝福（资金 / 回血 / 涤罪 / 反制）：立刻结算、不挂在干员身上
