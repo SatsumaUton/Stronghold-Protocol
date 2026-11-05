@@ -1511,3 +1511,23 @@ test('深潜补给与祝福三选一不会同时弹（先结算一个再出另�
   m._echoMaybeOfferBlessing(21);
   assert.equal(m._echoSupplyView(), null, '开祝福前要先把还开着的补给结算掉');
 });
+
+// 维护者 2026-11-05：16 层以后的 boss 不要再按深层难度倍数加血，用原版 boss 的数值。
+// 返场 boss 的波次缩放现在固定成「官方最后一关」的那一套，和 R14 的原版 boss 一致。
+test('返场 boss 的血量缩放与原版 boss 一致（不随深度递增）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const hpMulAt = (r) => {
+    m.round = r - 1;
+    m.startRound(r);
+    const w = m.bossWaves && m.bossWaves[0] && m.bossWaves[0].wave;
+    const s = w && w.spawns && w.spawns[0];
+    return s && s.mods ? s.mods.hpMul : null;
+  };
+  const base = hpMulAt(14);
+  assert.ok(base > 0, 'R14 原版 boss 要有缩放');
+  assert.equal(hpMulAt(25), base, '25 层返场 boss 不能比 R14 更肉');
+  assert.equal(hpMulAt(35), base, '35 层同理');
+  assert.equal(hpMulAt(45), base, '45 层同理');
+});

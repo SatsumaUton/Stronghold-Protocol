@@ -6,7 +6,7 @@
 
 import { PHASE, ERR } from '../../../shared/constants.js';
 import { buildNormalWave, buildBossWave } from '../waves.js';
-import { echoWaveGrowth, ECHO_DEEP_FROM, echoDeepWaveShape, echoBossScale, ECHO_LAST_ROUND } from './echo.js';
+import { echoWaveGrowth, ECHO_DEEP_FROM, echoDeepWaveShape, ECHO_LAST_ROUND } from './echo.js';
 import { pairPlayers, bossPairSalt } from '../finalAssault.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
 import { OK, fail, DELAYS, BAND_TURN_SECONDS } from './common.js';
@@ -515,7 +515,8 @@ export class MatchPhases {
     const r = this.round;
     // 深潜的 boss 返场（深度 5 / 10 / 15 / 25…）：这些回合没有自己的 roundCfg（数据表只到 15），
     // 模板借 `_echoBossTemplateRound()`（旧入口=深潜起点−1；从第 1 回合就深潜时=官方最后一关），
-    // 缩放仍按显示回合（echoScale）。
+    // ⚠ 缩放**不再按深度递增**：维护者 2026-11-05 要求 boss 血量用官方最后一关的原始值，
+    // 深潜 25/35/45 的返场 boss 与 R15 的 boss 同一套血量（否则深层 boss 变成打不动的墙）。
     const cfgRound = this._echoDiveRound(r) ? this._echoBossTemplateRound() : null;
     const eff = cfgRound ?? r;
     const hidden = eff === this.gd.hiddenRound && eff !== this.gd.bossRound;
@@ -535,7 +536,7 @@ export class MatchPhases {
     this.bossPairsRound = r;
     this.bossWaves = groups.map((g) => ({
       players: g.map((p) => p.playerId),
-      wave: buildBossWave(this.gd, this.rngWaves, this.factions, r, { ...(this.echoVariant === 'deepecho' && this._echoDepth(r) > ECHO_LAST_ROUND ? { scale: echoBossScale(r, this.gd.baseEnemyScale(ECHO_LAST_ROUND)) } : {}), bossId, solo: this.isSolo || g.length === 1, cfgRound }),
+      wave: buildBossWave(this.gd, this.rngWaves, this.factions, r, { ...(this.echoVariant === 'deepecho' && this._echoDepth(r) > ECHO_LAST_ROUND ? { scale: this.gd.baseEnemyScale(ECHO_LAST_ROUND) } : {}), bossId, solo: this.isSolo || g.length === 1, cfgRound }),
     }));
   }
 
