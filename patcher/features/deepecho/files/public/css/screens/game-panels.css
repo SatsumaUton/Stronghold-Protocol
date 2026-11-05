@@ -929,6 +929,17 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .ecochip--atk { border-color: rgba(255, 150, 190, .45); }
 .ecochip--spd { border-color: rgba(150, 230, 255, .45); }
 .ecochip--coin { border-color: rgba(255, 210, 140, .45); }
+/* 诅咒按稀有度配色（2026-11-05）；固定规则（奇迹/远见/深渊通胀）走 gold */
+.ecochip--common { border-color: rgba(159, 180, 200, .45); }
+.ecochip--rare { border-color: rgba(111, 199, 255, .5); }
+.ecochip--epic { border-color: rgba(200, 139, 255, .55); }
+.ecochip--gold { border-color: rgba(255, 207, 107, .62); }
+.ecochip--gold .ecochip__glyph { color: #ffd978; }
+/* HUD 上常驻的紧凑图标行：只画首字，不写名字（维护者 2026-11-05） */
+.echo-status__icons { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .08rem .14rem; }
+.echo-status__group { display: inline-flex; align-items: center; gap: .06rem; }
+.echo-status__group + .echo-status__group { padding-left: .12rem; border-left: 1px solid rgba(183, 156, 255, .28); }
+.echo-status__icons .ecochip { padding: 0 .1em; }
 /* ---- 「深渊祝福」三选一：居中的卡片选择（维护者 2026-11-04，参照悬赏目标界面） ---- */
 .echo-bless-overlay {
   position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;

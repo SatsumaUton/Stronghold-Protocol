@@ -25,6 +25,24 @@ function BuffChips({ chips, side }) {
       <b class="ecochip__glyph">${c.glyph}</b>${c.label}</span>`)}</span>`;
 }
 
+/**
+ * 紧凑图标行（维护者 2026-11-05）：不用点放大镜，HUD 上直接能看到「词条 / 祝福 / 诅咒」。
+ * 只画首字圆片（不写名字），悬浮 title 给全名 + 效果；三组用不同前缀色区分。
+ */
+function CompactChips({ chips }) {
+  const group = (side, cls) => {
+    const list = chips.filter((c) => c.side === side);
+    if (!list.length) return null;
+    return html`<span class=${`echo-status__group ${cls}`}>${list.map((c) => html`<span key=${c.key}
+        class=${`etag ecochip ecochip--${c.tone}`} title=${c.title} aria-label=${c.title}><b class="ecochip__glyph">${c.glyph}</b></span>`)}</span>`;
+  };
+  const enemy = group('enemy', 'is-enemy');
+  const ally = group('ally', 'is-ally');
+  const curse = group('curse', 'is-curse');
+  if (!enemy && !ally && !curse) return html`<span class="etag">${t('无')}</span>`;
+  return html`<span class="echo-status__icons">${enemy}${ally}${curse}</span>`;
+}
+
 export function EchoStatus({ pub }) {
   // 默认折叠：深度已经顶替了 HUD 上的回合数字，这条只是「词条 / 祝福」的补充说明，
   // 展开后才占地方（维护者 2026-11-04：悬浮条挡住了 HUD 和按钮）。
@@ -35,11 +53,6 @@ export function EchoStatus({ pub }) {
   const depth = echo.depth ?? 0;
   // 深潜之前（还没打完最后一个 boss）没有深度可报，状态条只在深潜里出现
   if (!(depth > 0)) return null;
-  const summary = [
-    t('深度 {n}', { n: depth }),
-    words.length ? words.map((w) => w.name).join(' · ') : null,
-    blessings.length ? blessings.map((b) => b.name).join(' · ') : null,
-  ].filter(Boolean).join('  |  ');
   const chips = echoBuffChips(echo);
   return html`<section class="brief-reroll echo-status" aria-label=${t('深渊回响状态')}>
     <div class="brief-reroll__text">
@@ -47,7 +60,8 @@ export function EchoStatus({ pub }) {
       ${open ? html`
         <span>${t('当前词条：')}<${BuffChips} chips=${chips} side="enemy" /></span>
         <span>${t('已获祝福：')}<${BuffChips} chips=${chips} side="ally" /></span>
-      ` : html`<span>${summary}</span>`}
+        <span>${t('当前诅咒：')}<${BuffChips} chips=${chips} side="curse" /></span>
+      ` : html`<${CompactChips} chips=${chips} />`}
     </div>
     <div class="brief-reroll__actions">
       <button type="button" class="btn btn--ghost btn--sm" onClick=${() => setOpen(!open)}>
@@ -69,6 +83,8 @@ export function EchoInfoBlock({ pub }) {
   const chips = echoBuffChips(echo);
   // 词条只在「深渊回响」页和敌方情报里出现（维护者 2026-11-04：不要两个页面都放一遍）
   const ally = chips.filter((c) => c.side === 'ally');
+  // 诅咒（含固定规则：奇迹 / 远见 / 深渊通胀）—— 维护者 2026-11-05 要求放大镜里也能一眼看到
+  const curse = chips.filter((c) => c.side === 'curse');
   return html`<div class="echo-infoblock" data-testid="echo-infoblock">
     <h4 class="ihead">${t('深渊回响')} <small class="num">${t('深度 {n}', { n: depth })}</small></h4>
     ${echo && echo.altar ? (() => {
@@ -94,6 +110,9 @@ export function EchoInfoBlock({ pub }) {
         ${a.stacks ? html`<p class="echo-infoblock__row t-dim">${t('本层强化已叠 {n} 层', { n: a.stacks })}</p>` : null}`;
     })() : null}
     <p class="echo-infoblock__row">${t('已获祝福：')}${ally.length ? html`<span class="echochips">${ally.map((c) => html`<span key=${c.key}
+      class=${`etag ecochip ecochip--${c.tone}`} title=${c.title}><b class="ecochip__glyph">${c.glyph}</b>${c.label}</span>`)}</span>`
+      : html`<span class="etag">${t('无')}</span>`}</p>
+    <p class="echo-infoblock__row">${t('当前诅咒：')}${curse.length ? html`<span class="echochips">${curse.map((c) => html`<span key=${c.key}
       class=${`etag ecochip ecochip--${c.tone}`} title=${c.title}><b class="ecochip__glyph">${c.glyph}</b>${c.label}</span>`)}</span>`
       : html`<span class="etag">${t('无')}</span>`}</p>
   </div>`;

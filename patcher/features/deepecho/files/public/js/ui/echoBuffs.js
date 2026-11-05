@@ -23,15 +23,24 @@ export const ECHO_BUFF_VISUALS = Object.freeze({
   loot: { glyph: '丰', tone: 'coin' },
 });
 
+/** 稀有度 → 圆片配色（诅咒用；固定规则走 special）。 */
+const CURSE_TONE = Object.freeze({ common: 'common', rare: 'rare', epic: 'epic', special: 'gold' });
+
 /**
- * 把 m.public.echo 里的词条 / 祝福列成可渲染的图标描述。
+ * 把 m.public.echo 里的词条 / 祝福 / 诅咒列成可渲染的图标描述。
  *
- * @param {{ words?: Array<{id: string, name?: string}>, blessings?: Array<{id: string, name?: string, desc?: string}> }} echo
- * @returns {Array<{ key: string, side: 'enemy'|'ally', id: string, label: string, glyph: string, tone: string, title: string }>}
+ * 诅咒这一侧是 2026-11-05 加的（维护者：不想点放大镜才知道身上挂了什么）——
+ * 含固定规则（奇迹 / 远见 / 深渊通胀，`rarity: 'special'`）与随机诅咒，
+ * 圆片按稀有度配色，悬浮给名字 + 效果。
+ *
+ * @param {{ words?: Array<{id: string, name?: string}>, blessings?: Array<{id: string, name?: string, desc?: string}>,
+ *   curses?: Array<{id: string, name?: string, desc?: string, rarity?: string, rarityLabel?: string}> }} echo
+ * @returns {Array<{ key: string, side: 'enemy'|'ally'|'curse', id: string, label: string, glyph: string, tone: string, title: string }>}
  */
 export function echoBuffChips(echo) {
   const words = Array.isArray(echo?.words) ? echo.words : [];
   const blessings = Array.isArray(echo?.blessings) ? echo.blessings : [];
+  const curses = Array.isArray(echo?.curses) ? echo.curses : [];
   const out = [];
   for (const w of words) {
     if (!w || typeof w.id !== 'string') continue;
@@ -44,6 +53,15 @@ export function echoBuffChips(echo) {
     const v = ECHO_BUFF_VISUALS[b.id] || { glyph: '?', tone: 'coin' };
     const label = typeof b.name === 'string' && b.name ? b.name : b.id;
     out.push({ key: `ally:${b.id}`, side: 'ally', id: b.id, label, glyph: v.glyph, tone: v.tone, title: b.desc ? `${label} · ${b.desc}` : label });
+  }
+  for (const c of curses) {
+    if (!c || typeof c.id !== 'string') continue;
+    const label = typeof c.name === 'string' && c.name ? c.name : c.id;
+    // 诅咒没有预设美术：用名字首字当记号（中文名首字基本都能认出来），配色按稀有度
+    const glyph = label.slice(0, 1) || '诅';
+    const tone = CURSE_TONE[c.rarity] || 'def';
+    const tag = typeof c.rarityLabel === 'string' && c.rarityLabel ? `（${c.rarityLabel}）` : '';
+    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, label, glyph, tone, title: c.desc ? `${label}${tag} · ${c.desc}` : `${label}${tag}` });
   }
   return out;
 }

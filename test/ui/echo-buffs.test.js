@@ -56,3 +56,29 @@ test('每个词条 id 都有视觉描述（新增词条忘了配图标会在这�
     assert.ok(ECHO_BUFF_VISUALS[id], `祝福 ${id} 缺图标描述`);
   }
 });
+
+// 维护者 2026-11-05：不想点放大镜才知道身上挂了什么 —— HUD 上要有诅咒圆片。
+test('诅咒 → 第三侧圆片：按稀有度配色，固定规则走 gold', () => {
+  const chips = echoBuffChips({
+    curses: [
+      { id: 'frenzy', name: '狂怒', desc: '敌方攻击 +10%', rarity: 'rare', rarityLabel: '稀有' },
+      { id: 'miracle', name: '奇迹·诅咒', desc: '免费刷新总数上限 5 次', rarity: 'special', rarityLabel: '固定' },
+      { id: 'abyss_inflation', name: '深渊通胀', desc: '16 层起商店与刷新价每层 +4%', rarity: 'special', rarityLabel: '固定' },
+    ],
+  });
+  assert.deepEqual(chips.map((c) => c.side), ['curse', 'curse', 'curse']);
+  assert.ok(chips.every((c) => c.key.startsWith('curse:')));
+  assert.deepEqual(chips.map((c) => c.tone), ['rare', 'gold', 'gold']);
+  assert.equal(chips[1].glyph, '奇', '用名字首字当记号');
+  assert.match(chips[2].title, /固定/, 'title 要带稀有度标签');
+  assert.match(chips[2].title, /每层 \+4%/, 'title 要带效果说明');
+});
+
+test('三侧同时存在时顺序稳定：词条 → 祝福 → 诅咒', () => {
+  const chips = echoBuffChips({
+    words: [{ id: 'swift', name: '迅捷' }],
+    blessings: [{ id: 'haste', name: '疾风' }],
+    curses: [{ id: 'frenzy', name: '狂怒', rarity: 'rare' }],
+  });
+  assert.deepEqual(chips.map((c) => c.key), ['enemy:swift', 'ally:haste', 'curse:frenzy']);
+});
