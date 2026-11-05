@@ -95,7 +95,7 @@ export const MATCH_FIELDS = Object.freeze({
     // 深渊祭坛（16 层起）的永久强化层数：读档丢掉等于白花资金
     'echoAltarBuffStacks', 'echoAltarLastDepth',
     // 祝福刷新额度 / 已放弃次数 / 隐藏核心的临时名额：都是整局累计，丢了读档后就「回血」
-    'echoBlessingRefreshes', 'echoBlessingSkipped', 'echoBlessingBonus', 'echoBlessingRefreshNonce',
+    'echoBlessingRefreshes', 'echoBlessingRefreshBonus', 'echoBlessingSkipped', 'echoBlessingBonus', 'echoBlessingRefreshNonce',
     // 部署禁令的**到期层**（2026-11-05）：只存名单不存到期层，读档后排异 / 封锁永远不会自动解除
     'echoBannedTilesUntil', 'echoBannedBondsUntil',
     // 深潜补给的本层词条与保底间隔（2026-11-05）：读档当层仍然要生效，间隔也要记住，否则可以刷补给
