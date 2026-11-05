@@ -104,9 +104,23 @@ test('房间设置：深潜房的同一个开关叫「公开深潜」', () => {
   assert.match(src, /t\(echoRoom \? '其他博士可以在「深渊回响 → 公开深潜」里看到这个房间并加入（需要深潜资格）'/, '提示语按深潜说');
 });
 
+
+test('建房后「要不要公开」的询问框：深潜房说「公开深潜」，并且深潜房也会被问一次', () => {
+  const list = read('public/js/ui/roomList.js');
+  assert.match(list, /export function ListPromptDialog\(\{ busy = false, onPublic, onPrivate, echo = false \}\)/, '询问框要认深潜');
+  assert.match(list, /title=\$\{echo \? t\('要公开这次深潜吗？'\) : t\('要公开这个同盟吗？'\)\}/, '标题按模式切换');
+  assert.match(list, /\$\{echo \? t\('公开深潜'\) : t\('公开同盟'\)\}/, '按钮按模式切换');
+  assert.match(list, /公开以后，你创建的这个深潜房会出现在「深渊回响 → 公开深潜」列表里/, '说明按深潜说');
+  const room = read('public/js/screens/room.js');
+  assert.match(room, /echo=\$\{echoRoom\}/, '房间把 echoRoom 传给询问框');
+  const lobby = read('public/js/screens/lobby.js');
+  assert.match(lobby, /if \(mode === 'coop' && !\(variant === 'deepecho' && overrides && overrides\.listed\)\) markListPrompt\(\);/,
+    '深潜房也要问一次（已经公开过的不再问）');
+});
 test('英文包：新增文案都有译文', () => {
   const en = JSON.parse(read('public/i18n/en.json'));
-  for (const k of ['公开深潜', '开一间公开的', '加入深潜', '暂时没有公开的深渊回响房',
+  for (const k of ['公开深潜', '开一间公开的', '加入深潜', '暂时没有公开的深渊回响房', '要公开这次深潜吗？',
+    '公开以后，你创建的这个深潜房会出现在「深渊回响 → 公开深潜」列表里，其他博士可以直接看到并加入（需要深潜资格）。',
     '公开深潜：已公开', '公开深潜：未公开',
     '由创建者公开、尚未开局的深渊回响房显示在这里（进房仍需深潜资格）。']) {
     assert.equal(typeof en[k], 'string', `en.json 缺 ${k}`);

@@ -149,18 +149,23 @@ export function takeListPrompt() {
  * 大厅的「公开同盟」入口和房间里的开关都还在，随时可以手动公开。
  * @param {{ busy?: boolean, onPublic: (skip: boolean) => void, onPrivate: (skip: boolean) => void }} props
  */
-export function ListPromptDialog({ busy = false, onPublic, onPrivate }) {
+export function ListPromptDialog({ busy = false, onPublic, onPrivate, echo = false }) {
   const [skip, setSkip] = useState(false);
-  return html`<${Modal} open=${true} title=${t('要公开这个同盟吗？')} micro="OPEN ALLIANCE"
+  // 「深渊回响」：同一个询问框，深潜房说「公开深潜」（维护者 2026-11-06）
+  return html`<${Modal} open=${true} title=${echo ? t('要公开这次深潜吗？') : t('要公开这个同盟吗？')} micro=${echo ? 'OPEN DEEP DIVE' : 'OPEN ALLIANCE'}
       class="lobby-dialog listask-dialog" onClose=${() => onPrivate(skip)}
       actions=${html`
         <${Button} variant="secondary" onClick=${() => onPrivate(skip)} disabled=${busy}>${t('先不公开')}<//>
-        <${Button} variant="primary" icon="link" onClick=${() => onPublic(skip)} disabled=${busy}>${t('公开同盟')}<//>`}>
-    <p class="modal__text">${t('公开以后，你创建的这个同盟会出现在大厅的「公开同盟」列表里，其他博士可以直接看到并加入。')}</p>
+        <${Button} variant="primary" icon="link" onClick=${() => onPublic(skip)} disabled=${busy}>${echo ? t('公开深潜') : t('公开同盟')}<//>`}>
+    <p class="modal__text">${echo
+      ? t('公开以后，你创建的这个深潜房会出现在「深渊回响 → 公开深潜」列表里，其他博士可以直接看到并加入（需要深潜资格）。')
+      : t('公开以后，你创建的这个同盟会出现在大厅的「公开同盟」列表里，其他博士可以直接看到并加入。')}</p>
     <label class="listask__skip">
       <input type="checkbox" checked=${skip} onChange=${(e) => setSkip(e.target.checked)} data-testid="listask-skip" />
       <span>${t('下次不再提醒')}</span>
     </label>
-    <p class="modal__text rlist__hint">${t('勾选后建房不再询问。以后想公开时：进房后打开「同盟设置」，把里面的「公开同盟」打开即可；大厅「同盟模拟 → 公开同盟」里能看别人的同盟。')}</p>
+    <p class="modal__text rlist__hint">${echo
+      ? t('勾选后建房不再询问。以后想公开时：进房后打开「同盟设置」，把里面的「公开深潜」打开即可；大厅「深渊回响 → 公开深潜」里能看别人的深潜房。')
+      : t('勾选后建房不再询问。以后想公开时：进房后打开「同盟设置」，把里面的「公开同盟」打开即可；大厅「同盟模拟 → 公开同盟」里能看别人的同盟。')}</p>
   <//>`;
 }
