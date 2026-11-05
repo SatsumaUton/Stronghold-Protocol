@@ -127,7 +127,7 @@ export function echoBuffChips(echo) {
     const glyph = label.slice(0, 1) || '诅';
     const tone = CURSE_TONE[c.rarity] || 'def';
     const tag = typeof c.rarityLabel === 'string' && c.rarityLabel ? `（${c.rarityLabel}）` : '';
-    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, label, glyph, icon: echoBuffIcon(c, 'curse'), tone, title: c.desc ? `${label}${tag} · ${c.desc}` : `${label}${tag}` });
+    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, label, glyph, effectKind: (c.effect && c.effect.kind) || null, icon: echoBuffIcon(c, 'curse'), tone, title: c.desc ? `${label}${tag} · ${c.desc}` : `${label}${tag}` });
   }
   return out;
 }

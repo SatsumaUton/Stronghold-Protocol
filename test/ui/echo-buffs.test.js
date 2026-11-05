@@ -97,3 +97,18 @@ test('词条 / 祝福也有图标（不再是问号或纯文字）', () => {
   assert.deepEqual(chips.map((c) => c.icon), ['shield', 'chevrons', 'sword', 'sword', 'shield', 'chart']);
   assert.ok(chips.every((c) => typeof c.icon === 'string' && c.icon.length > 0), '每个圆片都要有图标名');
 });
+
+// 维护者 2026-11-05：每个 buff 要有自己的图标。仓库只有 39 个图标、buff 有 110+ 条，
+// 所以用「类别轮廓 + id 哈希点阵」：同类别轮廓相同、点阵必须不同。
+test('徽记：同类别不同 id 的点阵不同，同一个 id 稳定', async () => {
+  const { echoSigil } = await import('../../public/js/ui/echoSigils.js');
+  const a = echoSigil({ id: 'harden' }, 'enemy');
+  const b = echoSigil({ id: 'tough' }, 'enemy');
+  assert.equal(a.base, b.base, '同类词条轮廓相同');
+  assert.notDeepEqual(a.dots, b.dots, '点阵必须不同（否则两条 buff 图标一样）');
+  assert.deepEqual(echoSigil({ id: 'harden' }, 'enemy'), a, '同一个 id 每次结果稳定');
+  // 诅咒按效果类型选轮廓
+  assert.equal(echoSigil({ id: 'block_bond', effect: { kind: 'bondBan' } }, 'curse').base, 'key');
+  assert.equal(echoSigil({ id: 'block_tiles', effect: { kind: 'deployBan' } }, 'curse').base, 'close');
+  assert.equal(echoSigil({ id: 'miracle' }, 'curse').base, 'refresh');
+});

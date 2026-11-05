@@ -7,7 +7,8 @@
 //
 // 折叠状态只在本浏览器记，不发给服务器；不阻塞任何操作（pointer-events 由 .echo-status 自己控制）。
 import { useState } from '../../vendor/hooks.module.js';
-import { html, Icon } from './components.js';
+import { html, Icon, ICONS } from './components.js';
+import { echoSigil } from './echoSigils.js';
 import { echoBuffChips } from './echoBuffs.js';
 import { actions } from './gameActions.js';
 import { useStore } from '../store.js';
@@ -34,7 +35,7 @@ function CompactChips({ chips }) {
     const list = chips.filter((c) => c.side === side);
     if (!list.length) return null;
     return html`<span class=${`echo-status__group ${cls}`}>${list.map((c) => html`<span key=${c.key}
-        class=${`etag ecochip ecochip--${c.tone}`} title=${c.title} aria-label=${c.title}><${Icon} name=${c.icon} class="ecochip__icon" /></span>`)}</span>`;
+        class=${`etag ecochip ecochip--${c.tone}`} title=${c.title} aria-label=${c.title}><${BuffSigil} chip=${c} /></span>`)}</span>`;
   };
   const enemy = group('enemy', 'is-enemy');
   const ally = group('ally', 'is-ally');
@@ -119,6 +120,21 @@ export function EchoInfoBlock({ pub }) {
 }
 
 /**
+ * 一个 buff 的徽记：类别轮廓（仓库 ICONS 的 path）+ 由 id 哈希决定的 3 个点。
+ * 同类别的两条 buff 轮廓一样、点阵不一样 —— 仓库只有 39 个图标而 buff 有 110+ 条，
+ * 直接映射必然重复（截图里三个盾、三个皇冠），这是「每条都有独立图标」的可行做法。
+ */
+function BuffSigil({ chip }) {
+  const sig = echoSigil({ id: chip.id, effect: { kind: chip.effectKind } }, chip.side, chip.tone);
+  const ic = ICONS[sig.base];
+  if (!ic) return null;
+  return html`<svg class="ecochip__icon" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false">
+    <path d=${ic.d} fill-rule=${ic.eo ? 'evenodd' : undefined} />
+    ${sig.dots.map(([x, y], i) => html`<circle key=${i} cx=${x} cy=${y} r="2" class="sigil-dot" />`)}
+  </svg>`;
+}
+
+/**
  * HUD 常驻的 buff 图标栏（维护者 2026-11-05）。
  *
  * 为什么单独一个组件：`EchoStatus` 那条浮在屏幕上的状态条 2026-11-04 已按维护者要求摘掉
@@ -133,6 +149,6 @@ export function EchoBuffBar({ pub }) {
   if (!chips.length) return null;
   return html`<div class="echo-buffbar" data-testid="echo-buffbar" aria-label=${t('深渊回响：当前词条 / 祝福 / 诅咒')}>
     ${chips.map((c) => html`<span key=${c.key} class=${`etag ecochip ecochip--${c.tone} is-${c.side}`}
-      title=${c.title} aria-label=${c.title}><${Icon} name=${c.icon} class="ecochip__icon" /></span>`)}
+      title=${c.title} aria-label=${c.title}><${BuffSigil} chip=${c} /></span>`)}
   </div>`;
 }
