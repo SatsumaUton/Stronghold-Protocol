@@ -74,6 +74,10 @@ patcher\
 
 **要求（维护者）：原版更新不许让深渊回响失效。**
 
+
+> **仓库分离**：深渊回响有**自己的私有仓库**，独占文件（`echo*.js` / `echoLobby.js` / 深潜快照 / 深潜测试…）
+> 只放在那边，公开仓库不许出现 —— 见 [docs/DEEPECHO-REPO.md](../docs/DEEPECHO-REPO.md)，
+> 检查用 `node patcher/check-repo-split.mjs`（`--apply` 摘索引、`--strict` 接 CI）。
 上游更新走 `restore → 升级 → apply.mjs`（服务端锚点）与 `merge-features.py`（功能快照三方合并）：
 官方文件是**整文件覆盖**的，只有 `patcher/features/<id>/files/` 的快照能把我们的改动救回来。
 所以「深潜会不会被原版更新搞坏」=「带深潜逻辑的文件有没有最新快照 + 有没有在两张表里登记」。
