@@ -435,7 +435,9 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
     return !!unit;
   })();
   const mineUnit = !ownerId || !meId || ownerId === meId;
-  const projectedBond = onBoard && mineUnit ? projectedId : null;
+  // 干员**本身就有**这条盟约时不再追加、也不打「投影」角标（维护者 2026-11-05）
+  const nativelyHas = Array.isArray(c.bonds) && c.bonds.includes(projectedId);
+  const projectedBond = onBoard && mineUnit && !nativelyHas ? projectedId : null;
   const bondIds = (() => {
     const list = pieceBondIds(c, carried, getItem, morphMode);
     return projectedBond && !list.includes(projectedBond) ? [...list, projectedBond] : list;
