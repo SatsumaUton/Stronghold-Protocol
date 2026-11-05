@@ -11,7 +11,7 @@ import { FieldRunner, DeadBattle } from '../fields.js';
 import { DELAYS } from './common.js';
 import { previewPlayer } from '../preview.js';
 import { morphBattleOpt } from '../../../shared/plugins/rules.js';
-import { echoHitCountEnemy } from './echoWaves.js';
+import { echoHitCountEnemy, echoHitCountHp } from './echoWaves.js';
 
 export class MatchCombat {
   /** Construct a battle; a constructor failure yields a finished stand-in (clean result) and is logged. */
@@ -57,25 +57,30 @@ export class MatchCombat {
     return { ...(this.layerCapOff ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
       // 「深渊回响」：限伤上限跟着深度缩放（普通房没有这个键 → sim 走官方 300000）
       ...(this.echoVariant === 'deepecho' ? { hitLimitMul: this._echoHitLimitMul() } : {}),
-      // 「深渊回响」：「频次怪」（器物，血量 == 需要被打几下）不跟着深度缩放（见 _echoHitCountHpCap）
-      ...(this.echoVariant === 'deepecho' ? { enemyHpMulCap: this._echoHitCountHpCap() } : {}),
+      // 「深渊回响」：「频次怪」（器物，血量 == 需要被打几下）按深度给**绝对血量**（见 _echoHitCountHp）
+      ...(this.echoVariant === 'deepecho' ? { enemyHpAbs: this._echoHitCountHp() } : {}),
       ...(this.enemyHpMul !== 1 ? { enemyHpMul: this.enemyHpMul } : {}), ...(this.enemyAtkMul !== 1 ? { enemyAtkMul: this.enemyAtkMul } : {}) };
   }
 
   /**
-   * 「频次怪」的血量封顶表（enemyKey → 最大血量倍率 = 1），深潜专用（维护者 2026-11-05）。
+   * 「频次怪」的绝对血量表（enemyKey → 血量 = 需要被打几下），深潜专用。
    *
-   * 为什么不能只改波次：这类怪的 baseHp 就是「需要被打几下」（青铜镜 30、铁矛头 30），跟着深度缩放后
-   * 血量会是几千（实测铁矛头 6080），而它们多数是**召唤物**（新硎的 DeadSpawn 出铁矛头），根本不在
-   * `wave.spawns` 里 —— 只有出怪那一处（sim spawnEnemy 读 `flags.enemyHpMulCap`）能统一封顶。
+   * 维护者 2026-11-05 第二次定：这类怪的 maxHp 就是「要打几下」，之前封顶在数据 baseHp（30 / 45 下），
+   * 深度一高就等于「一刀就没」。现在按深度给，落在 **500–2000** 区间（`echoHitCountHp`）：
+   * 第 1 层 500 下 → 每深一层 +40 → 第 39 层起固定 2000 下。
+   *
+   * 为什么不能只改波次：它们多数是**召唤物**（新硎的 DeadSpawn 出铁矛头），根本不在 `wave.spawns` 里
+   * —— 只有出怪那一处（sim spawnEnemy 读 `flags.enemyHpAbs`）能统一覆盖。
    * @returns {Record<string, number>}
    */
-  _echoHitCountHpCap() {
-    const cache = this._echoHpCapCache;
-    if (cache && cache.gd === this.gd) return cache.map;
+  _echoHitCountHp() {
+    const depth = typeof this._echoDepth === 'function' ? this._echoDepth(this.round) : 1;
+    const hp = echoHitCountHp(depth);
+    const cache = this._echoHpAbsCache;
+    if (cache && cache.gd === this.gd && cache.hp === hp) return cache.map;
     const map = {};
-    try { for (const k of echoHitCountEnemy(this.gd)) map[k] = 1; } catch { /* 数据异常时不给封顶 */ }
-    this._echoHpCapCache = { gd: this.gd, map };
+    try { for (const k of echoHitCountEnemy(this.gd)) map[k] = hp; } catch { /* 数据异常时按普通血量走 */ }
+    this._echoHpAbsCache = { gd: this.gd, hp, map };
     return map;
   }
 

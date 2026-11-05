@@ -251,6 +251,22 @@ export function echoHitCountEnemy(gd) {
   return set;
 }
 
+/**
+ * 「频次怪」在深潜里的**绝对血量**（数值 = 需要被打几下，sim 的 hitCount 每次伤害只扣 1）。
+ *
+ * 维护者 2026-11-05 第二次定：之前把它们的血量封顶在数据 baseHp（30 / 45 下），深度一高就等于
+ * 「一刀就没」，太简单。现在按深度给血量，落在 500–2000 区间：
+ *   第 1 层 500 下 → 每深一层 +40 → 第 39 层起固定 2000 下。
+ */
+export const ECHO_HITCOUNT_HP_MIN = 500;
+export const ECHO_HITCOUNT_HP_MAX = 2000;
+export const ECHO_HITCOUNT_HP_PER_DEPTH = 40;
+/** 第 depth 层「频次怪」要被打几下（500–2000）。 */
+export function echoHitCountHp(depth) {
+  const d = Math.max(1, Math.floor(Number(depth) || 1));
+  const hp = ECHO_HITCOUNT_HP_MIN + (d - 1) * ECHO_HITCOUNT_HP_PER_DEPTH;
+  return Math.max(ECHO_HITCOUNT_HP_MIN, Math.min(ECHO_HITCOUNT_HP_MAX, Math.round(hp)));
+}
 export function echoAllPool(gd, helpers) {
   const isFlyKey = helpers && helpers.isFlyKey;
   const cached = ECHO_ALLPOOL_CACHE.get(gd);

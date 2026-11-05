@@ -120,19 +120,21 @@ export class BattleSpawns {
     // split children too. Never in `mods`: a leak carries its mods into 联防 and a child inherits them, so they would
     // apply twice.
     const roomHp = mm(this.flags.enemyHpMul, true), roomAtk = mm(this.flags.enemyAtkMul);
-    // 深潜的「频次怪」血量封顶（spec flags `enemyHpMulCap`：enemyKey → 最大血量倍率，Match._ruleFlags()）。
-    // 这类怪（器物：青铜镜、铁矛头…）的血量**就是**「需要被打几下」，数据 baseHp == N；跟着深度缩放后
-    // 会变成几千下打不死（维护者 2026-11-05 实测铁矛头 6080 / 6080）。它们多数是召唤物（新硎的 DeadSpawn），
-    // 不在波次 spawns 里，所以只能在出怪这一处统一封顶。
-    const capAll = this.flags && this.flags.enemyHpMulCap;
-    const capMul = capAll && typeof capAll === 'object' ? Number(capAll[def.key] ?? capAll[enemyKey]) : NaN;
+    // 深潜的「频次怪」绝对血量（spec flags `enemyHpAbs`：enemyKey → 血量，Match._ruleFlags()）。
+    // 这类怪（器物：青铜镜、铁矛头…）的 maxHp **就是**「需要被打几下」（sim 的 hitCount 让每次伤害只扣 1）。
+    // 数据 baseHp 只有 30 / 45 这种「击倒次数」，跟着深度缩放会变成几千下（实测铁矛头 6080）；
+    // 反过来完全不给缩放又只有 30 下、一刀就没了（维护者 2026-11-05 第二次反馈）。
+    // 所以深潜按深度直接给一个**绝对血量**（500–2000），走这里统一覆盖 —— 它们多数是召唤物
+    //（新硎的 DeadSpawn 出铁矛头），不在波次 spawns 里，只有出怪这一处管得到。
+    const absAll = this.flags && this.flags.enemyHpAbs;
+    const absHp = absAll && typeof absAll === 'object' ? Number(absAll[def.key] ?? absAll[enemyKey]) : NaN;
     const hpMulAll = (m.hpMul ?? 1) * roomHp;
-    const hpMulFinal = Number.isFinite(capMul) && capMul > 0 ? Math.min(hpMulAll, capMul) : hpMulAll;
+    const hpFinal = Number.isFinite(absHp) && absHp > 0 ? absHp : def.maxHp * hpMulAll;
     const e = new Unit({
       id: ++this._idSeq, side: 'enemy', kind: 'enemy', def, defId: def.key ?? enemyKey, name: def.name,
       x: start[1], y: start[0], motion: def.motion,
       base: {
-        maxHp: def.maxHp * hpMulFinal, atk: def.atk * (m.atkMul ?? 1) * roomAtk, def: def.def * (m.defMul ?? 1), res: def.res * (m.resMul ?? 1),
+        maxHp: hpFinal, atk: def.atk * (m.atkMul ?? 1) * roomAtk, def: def.def * (m.defMul ?? 1), res: def.res * (m.resMul ?? 1),
         aspd: def.aspd, bat: def.bat, blockCnt: 0, moveSpeed: def.moveSpeed * (m.speedMul ?? 1), spRecovery: 0,
         tauntLevel: def.tauntLevel, massLevel: def.massLevel, hpRecoveryPerSec: def.hpRecoveryPerSec, rangeRadius: def.rangeRadius,
       },
