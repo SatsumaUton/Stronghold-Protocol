@@ -22,7 +22,7 @@ function BuffChips({ chips, side }) {
   const list = chips.filter((c) => c.side === side);
   if (!list.length) return html`<span class="etag">${t('无')}</span>`;
   return html`<span class="echochips">${list.map((c) => html`<span key=${c.key}
-      class=${`etag ecochip ecochip--${c.tone}`} title=${c.title} aria-label=${c.title}>
+      class=${`etag ecochip ecochip--${c.tone}${c.consumed ? ' is-consumed' : ''}`} title=${c.title} aria-label=${c.title}>
       <b class="ecochip__glyph">${c.glyph}</b>${c.label}</span>`)}</span>`;
 }
 
@@ -35,7 +35,7 @@ function CompactChips({ chips }) {
     const list = chips.filter((c) => c.side === side);
     if (!list.length) return null;
     return html`<span class=${`echo-status__group ${cls}`}>${list.map((c) => html`<span key=${c.key}
-        class=${`etag ecochip ecochip--${c.tone}`} title=${c.title} aria-label=${c.title}><${BuffSigil} chip=${c} /></span>`)}</span>`;
+        class=${`etag ecochip ecochip--${c.tone}${c.consumed ? ' is-consumed' : ''}`} title=${c.title} aria-label=${c.title}><${BuffSigil} chip=${c} /></span>`)}</span>`;
   };
   const enemy = group('enemy', 'is-enemy');
   const ally = group('ally', 'is-ally');
@@ -111,10 +111,10 @@ export function EchoInfoBlock({ pub }) {
         ${a.stacks ? html`<p class="echo-infoblock__row t-dim">${t('本层强化已叠 {n} 层', { n: a.stacks })}</p>` : null}`;
     })() : null}
     <p class="echo-infoblock__row">${t('已获祝福：')}${ally.length ? html`<span class="echochips">${ally.map((c) => html`<span key=${c.key}
-      class=${`etag ecochip ecochip--${c.tone}`} title=${c.title}><b class="ecochip__glyph">${c.glyph}</b>${c.label}</span>`)}</span>`
+      class=${`etag ecochip ecochip--${c.tone}${c.consumed ? ' is-consumed' : ''}`} title=${c.title}><b class="ecochip__glyph">${c.glyph}</b>${c.label}</span>`)}</span>`
       : html`<span class="etag">${t('无')}</span>`}</p>
     <p class="echo-infoblock__row">${t('当前诅咒：')}${curse.length ? html`<span class="echochips">${curse.map((c) => html`<span key=${c.key}
-      class=${`etag ecochip ecochip--${c.tone}`} title=${c.title}><b class="ecochip__glyph">${c.glyph}</b>${c.label}</span>`)}</span>`
+      class=${`etag ecochip ecochip--${c.tone}${c.consumed ? ' is-consumed' : ''}`} title=${c.title}><b class="ecochip__glyph">${c.glyph}</b>${c.label}</span>`)}</span>`
       : html`<span class="etag">${t('无')}</span>`}</p>
   </div>`;
 }
@@ -154,7 +154,7 @@ export function EchoBuffBar({ pub }) {
   const chips = echoBuffChips(echo);
   if (!chips.length) return null;
   return html`<div class="echo-buffbar" data-testid="echo-buffbar" aria-label=${t('深渊回响：当前词条 / 祝福 / 诅咒')}>
-    ${chips.map((c) => html`<span key=${c.key} class=${`etag ecochip ecochip--${c.tone} is-${c.side}`}
+    ${chips.map((c) => html`<span key=${c.key} class=${`etag ecochip ecochip--${c.tone} is-${c.side}${c.consumed ? ' is-consumed' : ''}`}
       title=${c.title} aria-label=${c.title}><${BuffSigil} chip=${c} /></span>`)}
   </div>`;
 }

@@ -924,6 +924,11 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   color: #e6dbff;
 }
 .ecochip__glyph { font-weight: 900; color: var(--echo-accent, #b79cff); }
+/* 已消耗的祝福（护盾抵消过排异、一次性祝福）：留在列表里但明显是「用掉了」的状态
+   （维护者 2026-11-05：护盾被诅咒抵消后不能从列表里消失） */
+.ecochip.is-consumed { opacity: .42; filter: grayscale(.75); }
+.ecochip.is-consumed .ecochip__glyph { color: var(--text-dim, #8b8398); }
+.ecochip.is-consumed .ecochip__label { text-decoration: line-through; }
 /* 词条按效果类别给一点色差，但都收在紫色家族里 */
 .ecochip--def { border-color: rgba(140, 170, 255, .45); }
 .ecochip--atk { border-color: rgba(255, 150, 190, .45); }

@@ -118,7 +118,11 @@ export function echoBuffChips(echo) {
     if (!b || typeof b.id !== 'string') continue;
     const label = typeof b.name === 'string' && b.name ? b.name : b.id;
     const v = ECHO_BUFF_VISUALS[b.id] || { glyph: label.slice(0, 1) || '祝', tone: 'coin' };
-    out.push({ key: `ally:${b.id}`, side: 'ally', id: b.id, raw: b, label, glyph: v.glyph, icon: echoBuffIcon(b, 'ally'), tone: v.tone, title: b.desc ? `${label} · ${b.desc}` : label });
+    // 已消耗的祝福（护盾抵消过排异、一次性祝福）**留在列表里**，只是标成灰片 + 「已消耗」
+    // （维护者 2026-11-05：护盾被诅咒抵消后不能凭空消失）
+    const spent = b.consumed === true;
+    const titleBase = spent ? `${label}（已消耗）` : label;
+    out.push({ key: `ally:${b.id}`, side: 'ally', id: b.id, raw: b, label, glyph: v.glyph, icon: echoBuffIcon(b, 'ally'), tone: v.tone, consumed: spent, title: b.desc ? `${titleBase} · ${b.desc}` : titleBase });
   }
   for (const c of curses) {
     if (!c || typeof c.id !== 'string') continue;

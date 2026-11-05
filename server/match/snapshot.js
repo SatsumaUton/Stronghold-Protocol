@@ -85,6 +85,9 @@ export const MATCH_FIELDS = Object.freeze({
     'echoRoundCurse',
     // 部署禁令（2026-11-05）：被封锁的地块与被排异的盟约，读档不能丢，否则玩家可以靠重连绕过
     'echoBannedTiles', 'echoBannedBonds',
+    // 「护盾」已用掉（抵消过排异）的标记（2026-11-05）：不存的话读档后护盾会「复活」成一条还有效的祝福。
+    // 纯追加，旧存档缺这项时 = 未消耗。
+    'echoShieldBond', 'echoShieldSpent',
     // 已击杀的悬赏卡回执（2026-11-05）：读档后仍能对账
     'echoBountyPaid',
   ]),

@@ -1308,9 +1308,10 @@ test('隐藏核心通关：上一回合遗留的三选一会被结算，新回�
 });
 
 // 维护者 2026-11-05 玩家反馈：
-//   1) 护盾抵消排异后，HUD 上的「护盾」图标还挂着 → 应该一起消失（它是一次性效果）
+//   1) 护盾抵消排异后，祝福**留在列表里**但标成「已消耗」（维护者 2026-11-05 第二次改：
+//      之前是连图标一起摘掉，玩家会以为祝福丢了 / 列表出 bug）
 //   2) 诅咒被祝福清掉后，对应的**实际禁令**（封锁地块 / 排异盟约）还在 → 图标没了但依然不能部署
-test('护盾抵消排异后祝福图标消失；净化/反制掉「封锁·排异」时禁令一起解除', (t) => {
+test('护盾抵消排异后留在祝福列表里并标成已消耗；净化/反制掉「封锁·排异」时禁令一起解除', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
@@ -1325,8 +1326,15 @@ test('护盾抵消排异后祝福图标消失；净化/反制掉「封锁·排�
   m.echoBannedBonds = Object.keys(m.gd.raw.bonds || {}).filter((id) => id !== addBond && m.gd.bond(id) && m.gd.bond(id).isCore !== true);
   const got = m._echoApplyBondBan(rng);
   assert.equal(got, null, '护盾抵消了这次排异');
-  assert.ok(!m.echoBlessings.includes('shield_bond'), '护盾用掉后祝福图标必须消失');
   assert.equal(m.echoShieldBond, null);
+  // 抵消之后：列表里还在，但是「已消耗」、不占名额、描述写明被抵消
+  assert.ok(m.echoBlessings.includes('shield_bond'), '护盾用掉后祝福必须留在列表里（维护者 2026-11-05）');
+  const pub = m.publicView();
+  const shield = (pub.echo.blessings || []).find((b) => b.id === 'shield_bond');
+  assert.ok(shield, '护盾要出现在 m.public.echo.blessings 里');
+  assert.equal(shield.consumed, true, '抵消之后标成已消耗');
+  assert.equal(shield.occupiesSlot, false, '已消耗的护盾依然不占名额');
+  assert.match(shield.desc, /已被诅咒抵消/, '描述要说明它被诅咒抵消了');
 
   // —— 净化掉 block_bond：盟约禁令也要清空
   m.echoBannedBonds = ['someBond'];

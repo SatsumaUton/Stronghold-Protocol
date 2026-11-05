@@ -1126,9 +1126,10 @@ export class MatchEcho {
     if (this.echoShieldBond && picked === this.echoShieldBond) {
       const name = this.gd.bond(picked)?.name || picked;
       this.echoShieldBond = null;
-      // 护盾是「用掉就没」的一次性效果：抵消之后连祝福图标一起摘掉
-      // （维护者 2026-11-05：HUD 上还挂着「护盾」会让人以为还有一层）。
-      if (Array.isArray(this.echoBlessings)) this.echoBlessings = this.echoBlessings.filter((id) => id !== 'shield_bond');
+      // 护盾是「用掉就没」的一次性效果，但**不能从列表里消失**（维护者 2026-11-05：
+      // 「等护盾的祝福被诅咒抵消后在祝福列表消失」—— 玩家会以为祝福丢了 / 列表出 bug）。
+      // 现在留在 echoBlessings 里，用 echoShieldSpent 标成已消耗：列表与 HUD 上都显示成灰掉的「护盾」。
+      this.echoShieldSpent = true;
       this._echoPushAnnounce(`护盾：抵消了针对【${name}】的排异（护盾已消耗）`);
       this._echoFlushAnnounce();
       this.markPublic?.();
@@ -1421,9 +1422,9 @@ export class MatchEcho {
         consumed: b.consumed === true,
         // 是否占 3 个祝福名额：护盾、一次性、反制都不占（显示在列表里，但不计数）
         occupiesSlot: b.id !== 'shield_bond' && !echoBlessingOneShot(b) && !echoBlessingFree(b),
-        // 护盾：把「保护的是哪条盟约」写进描述（维护者 2026-11-05）
+        // 护盾：把「保护的是哪条盟约」写进描述；抵消过排异之后写「已被诅咒抵消」（维护者 2026-11-05）
         desc: b.id === 'shield_bond'
-          ? `${b.desc}${this.echoShieldBond ? `（已指定：${this.gd.bond(this.echoShieldBond)?.name || this.echoShieldBond}）` : '（尚未指定盟约）'}`
+          ? `${b.desc}${b.consumed ? '（已被诅咒抵消）' : this.echoShieldBond ? `（已指定：${this.gd.bond(this.echoShieldBond)?.name || this.echoShieldBond}）` : '（尚未指定盟约）'}`
           : b.desc,
         // 「远程」这类改攻击范围的祝福：准备阶段没有战斗、客户端拿不到 live 范围，
         // 靠这个值把棋盘上的范围预览画对（2026-11-05）。
@@ -1777,7 +1778,12 @@ export class MatchEcho {
    * 它们不占名额：`_echoPublic` 会给 `occupiesSlot: false`，界面计数不会把 n/3 撑爆。
    */
   _echoBlessings() {
-    const out = Array.isArray(this.echoBlessings) ? this.echoBlessings.map((id) => echoBlessingById(id)).filter(Boolean) : [];
+    const spent = this.echoShieldSpent === true;
+    const out = Array.isArray(this.echoBlessings)
+      ? this.echoBlessings.map((id) => echoBlessingById(id)).filter(Boolean)
+        // 护盾抵消过排异之后仍留在列表里，只是标成「已消耗」（维护者 2026-11-05）
+        .map((b) => (b.id === 'shield_bond' && spent ? { ...b, consumed: true } : b))
+      : [];
     const seen = new Set(out.map((b) => b.id));
     const add = (id) => {
       const b = echoBlessingById(id);
