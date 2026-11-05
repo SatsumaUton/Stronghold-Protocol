@@ -846,11 +846,13 @@ export class Lobby {
           try {
             fetch('http://127.0.0.1:3090/api/rooms/report', {
               method: 'POST', headers: { 'content-type': 'application/json' },
-              // 「深渊回响」房**不上报**给匹配服务：不进跨节点公开同盟列表，
-              // 也就永远不会被匹配器选中 → 普通玩家不可能被配进这个模式（管理员专属，公开前隔离）。
+              // 「深渊回响」房**不进** codes：不进跨节点公开同盟列表，也不会被匹配器选中
+              // （管理员专属，公开前隔离）。但单独放进 echoCodes —— 节点控制台与管理后台的房间
+              // 列表要能看到这些房在跑、跑到第几层（维护者 2026-11-06）。
               body: JSON.stringify({
                 node: nodeNo,
                 codes: [...this.rooms.values()].filter((r) => r.variant !== 'deepecho').map((r) => r.code),
+                echoCodes: [...this.rooms.values()].filter((r) => r.variant === 'deepecho').map((r) => r.code),
               }),
             }).catch(() => {});
           } catch { /* ignore */ }
