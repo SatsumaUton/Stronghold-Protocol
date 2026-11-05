@@ -70,6 +70,54 @@ test('第 25 回合 boss 返场：真的生成了 boss 波次（数据表只到 
   assert.equal(m._echoIntel(), null, 'boss 返场是明牌，不给聚合情报');
 });
 
+// 玩家 2026-11-05 实测：「25 层打完 boss 又回到 16 层」。
+// 成因：`_finishFinal` 的原版隐藏核心分支没有排除深潜 —— 深潜层数无上限，25/35/45 的返场 boss
+// 打赢后 `hiddenEligible()` 也可能为真，于是 `startRound(gd.hiddenRound = 15)`，下一层就是 16。
+// 深潜的隐藏核心只在**深度 15** 判定，返场 boss 打赢必须老老实实 +1 层。
+test('第 25 回合 boss 打赢后进 26 层，不会掉回 15/16 层（隐藏核心门槛达标也不行）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 24;
+  m.startRound(25);
+  for (let i = 0; i < 40 && m.phase !== 'PREP'; i++) h.sched.advance(200);
+  for (const ps of m.alivePlayers()) if (!ps.ready) ps.ready = true;
+  m.endPrep();
+  assert.equal(m.phase, 'FINAL_ASSAULT', '25 层是返场 boss 关');
+  // 把层数/生命顶到隐藏核心门槛之上：深潜里这很容易达到，正是触发 bug 的条件
+  m.hiddenLayerSum = 2000;
+  m.teamLp = 10;
+  const seq = [];                                     // 记录 boss 结算之后 startRound 的回合序列
+  const orig = m.startRound.bind(m);
+  m.startRound = (r, after) => { seq.push(r); return orig(r, after); };
+  m.bossPool.hp = 0;                                  // boss 被打死 → victory
+  m._finishFinal(false, () => ({ perPlayer: {}, synthetic: false }));
+  for (let i = 0; i < 200 && !seq.length; i++) h.sched.advance(200);
+  assert.ok(seq.length, 'boss 结算后必须开下一回合');
+  assert.equal(seq[0], 26, `打完 25 层 boss 的下一回合必须是 26（实际 ${seq[0]}）`);
+  assert.ok(!seq.includes(15) && !seq.includes(16), '绝不能回到 15/16 层');
+});
+
+// 16 层以后的每一个返场节点（25 / 35 / 45）都要：① 有 boss 波次 ② 准备阶段正常进 FINAL_ASSAULT。
+// 玩家 2026-11-05 反馈「16 回合以后的 boss 关准备阶段不对」，这里把三层一起钉住。
+test('返场节点 25 / 35 / 45：boss 波次存在，准备阶段正常进入 boss 战', (t) => {
+  for (const depth of [25, 35, 45]) {
+    const h = dive();
+    const m = h.m;
+    t.after(() => m.dispose());
+    m.round = depth - 1;
+    m.startRound(depth);
+    assert.equal(m.round, depth, `深度 ${depth} 回合号要对`);
+    assert.ok(Array.isArray(m.bossWaves) && m.bossWaves.length > 0, `深度 ${depth} 必须有 boss 波次`);
+    assert.ok(m.bossWaves.every((g) => g.wave && Array.isArray(g.wave.spawns) && g.wave.spawns.length > 0), `深度 ${depth} 的 boss 波次不能为空`);
+    for (let i = 0; i < 40 && m.phase !== 'PREP'; i++) h.sched.advance(200);
+    assert.equal(m.phase, 'PREP', `深度 ${depth} 要正常进准备阶段`);
+    for (const ps of m.alivePlayers()) if (!ps.ready) ps.ready = true;
+    m.endPrep();
+    assert.equal(m.phase, 'FINAL_ASSAULT', `深度 ${depth} 准备结束后进 boss 战`);
+  }
+});
+
 test('深度 18 悬赏节点：目标从本回合生成的波次里抽出来', (t) => {
   const h = dive();
   const m = h.m;
