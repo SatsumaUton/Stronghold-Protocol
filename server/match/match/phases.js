@@ -536,7 +536,8 @@ export class MatchPhases {
     this.bossPairsRound = r;
     this.bossWaves = groups.map((g) => ({
       players: g.map((p) => p.playerId),
-      wave: buildBossWave(this.gd, this.rngWaves, this.factions, r, { ...(this.echoVariant === 'deepecho' && this._echoDepth(r) > ECHO_LAST_ROUND ? { scale: this.gd.baseEnemyScale(ECHO_LAST_ROUND) } : {}), bossId, solo: this.isSolo || g.length === 1, cfgRound }),
+      // 深潜的返场 boss：用 boss 专用曲线（_echoBossScale，随深度递增；与共享血池同源）
+      wave: buildBossWave(this.gd, this.rngWaves, this.factions, r, { ...(this.echoVariant === 'deepecho' && this._echoDepth(r) > ECHO_LAST_ROUND ? { scale: this._echoBossScale(r) } : {}), bossId, solo: this.isSolo || g.length === 1, cfgRound }),
     }));
   }
 
