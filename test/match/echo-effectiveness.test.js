@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeMatch } from './harness.js';
+import { makeBattle } from '../helpers/battleHarness.js';
 import {
   ECHO_CURSES, ECHO_ROUND_CURSES, echoCurseById, echoCurseUnitMods,
 } from '../../server/match/match/echoCurse.js';
@@ -170,6 +171,18 @@ test('祝福逐条生效：每条都能在消费端看到差异', (t) => {
         m.echoCurseIds = [...ids];
         m._echoGrantBlessing(b);
         assert.ok(m.echoCurseIds.length < ids.length, `${b.id} 没清掉对应诅咒`);
+        continue;
+      }
+      if (kind === 'reveal') {
+        // 反隐匿：挂上之后，隐匿敌人要能被选中（flags.reveal）
+        const bh = makeBattle({ enemies: [{ key: 'enemy_1007_shield' }], content: 'none', autoFinish: false });
+        m.echoBlessings = [b.id];
+        m._echoHookBattle(bh.b);
+        bh.step(1);
+        const e = (bh.b.enemies || [])[0];
+        assert.ok(e, `${b.id} 的测试敌人没出场`);
+        assert.ok((e.buffs || []).some((x) => x && x.key === 'echo:reveal' && x.flags && x.flags.reveal), `${b.id} 没有让敌人现形`);
+        bh.b.dispose?.();
         continue;
       }
       assert.fail(`未知的祝福 kind：${kind}（${b.id}）`);

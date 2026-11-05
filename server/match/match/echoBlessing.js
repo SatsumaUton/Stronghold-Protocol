@@ -122,6 +122,10 @@ export const ECHO_BLESSINGS = Object.freeze([
     repeatable: true, counterBans: true },
   { id: 'recon', rarity: 'rare', name: '侦察', desc: '驱散「迷雾 / 遮蔽」：敌方情报恢复显示', kind: 'counter', group: 'counter',
     counterCurses: ['fog', 'blackout'] },
+  // ---- 反隐匿（维护者 2026-11-05）----
+  // 隐匿敌人（s.flags.stealth）默认不可选中（targeting.js）；被「照破 / 洞彻」打上 reveal 标记后可以正常打。
+  { id: 'reveal_pulse', rarity: 'rare', name: '照破', desc: '每 8 秒使全场隐匿敌人现形 3 秒', kind: 'reveal', group: 'reveal', interval: 8, duration: 3 },
+  { id: 'reveal_always', rarity: 'epic', name: '洞彻', desc: '全场敌人永久现形（反隐匿）', kind: 'reveal', group: 'reveal', always: true },
   { id: 'thrift', rarity: 'common', name: '开源', desc: '驱散所有资金类诅咒（贡赋 / 征收 / 重税 / 什一税 / 抽成）', kind: 'counter', group: 'counter',
     counterCurses: ['tribute', 'levy', 'heavytax', 'tithe', 'r_levy'] },
   { id: 'cleanse_words', rarity: 'rare', name: '净言', desc: '驱散「侵蚀」：侵蚀词条上限恢复', kind: 'counter', group: 'counter',

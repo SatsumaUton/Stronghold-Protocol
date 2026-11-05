@@ -284,7 +284,31 @@ export class MatchEcho {
           battle.addBuff(enemy, { key, name: b.name, desc: b.desc || '', mods: { ...d.mods }, persist: true, visible: true });
         }
       }, { priority: 59, owner: 'echo:blessing' });
-    }    const altarStacks = Math.max(0, Math.min(2, Number(this.echoAltarBuffStacks) || 0));
+    }
+    // 反隐匿（维护者 2026-11-05）：「照破」每 interval 秒让隐匿敌人现形 duration 秒；「洞彻」永久反隐。
+    // 隐匿敌人默认不可选中（sim/content/targeting.js：f.stealth && !f.reveal），所以挂一个 flags.reveal 的 buff；
+    // 顺带把已经 DISAPPEAR 掉的（e.hidden）拉回可见，否则它连打都打不到。
+    const reveals = this._echoBlessings().filter((b) => b && b.kind === 'reveal');
+    if (reveals.length && typeof battle.addBuff === 'function') {
+      const always = reveals.some((b) => b.always === true);
+      const pulse = reveals.find((b) => b.always !== true) || null;
+      const revealOne = (e) => {
+        if (!e || !e.alive) return;
+        if (e.hidden && typeof battle._setHidden === 'function') battle._setHidden(e, false);
+        if (always) {
+          if ((e.buffs || []).some((x) => x && x.key === 'echo:reveal')) return;
+          battle.addBuff(e, { key: 'echo:reveal', name: '洞彻', persist: true, flags: { reveal: true } });
+        } else if (pulse) {
+          battle.addBuff(e, { key: 'echo:reveal', name: '照破', duration: Math.max(0.5, Number(pulse.duration) || 3), flags: { reveal: true } });
+        }
+      };
+      battle.on('enemySpawn', ({ enemy }) => revealOne(enemy), { priority: 58, owner: 'echo:reveal' });
+      if (always) for (const e of battle.enemies || []) revealOne(e);
+      if (pulse && typeof battle.every === 'function') {
+        battle.every(Math.max(1, Number(pulse.interval) || 8), () => { for (const e of battle.enemies || []) revealOne(e); }, { owner: 'echo:reveal' });
+      }
+    }
+    const altarStacks = Math.max(0, Math.min(2, Number(this.echoAltarBuffStacks) || 0));
     // 深潜补给选的「临时词条」：只在本层生效
     this.echoSupplyWords = (Array.isArray(this.echoSupplyWords) ? this.echoSupplyWords : []).filter((w) => w && w.round === this.round);
     const supplyMods = {};
