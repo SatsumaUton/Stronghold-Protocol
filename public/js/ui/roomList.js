@@ -22,9 +22,9 @@ export const ROOM_LIST_POLL_MS = 10_000;
  * 每条都带 `node`，客户端据此用 nginx 的 `?n=<node>` 直接连到那台节点。
  * 失败就当没有（列表照旧只显示本节点，不报错、不挡住本节点的房）。
  */
-async function fetchRemoteRooms() {
+async function fetchRemoteRooms(variant = null) {
   try {
-    const r = await fetch('/mm/api/rooms/open', { credentials: 'same-origin', cache: 'no-store' });
+    const r = await fetch(`/mm/api/rooms/open${variant === 'deepecho' ? '?variant=deepecho' : ''}`, { credentials: 'same-origin', cache: 'no-store' });
     if (!r.ok) return [];
     const j = await r.json();
     return Array.isArray(j?.rooms) ? j.rooms : [];
@@ -51,7 +51,7 @@ export function expSummary(exp) {
   return bits.length ? bits.join(' · ') : t('标准规则');
 }
 
-function RoomRow({ row, disabled, onJoin }) {
+function RoomRow({ row, disabled, onJoin, joinLabel = null }) {
   const bots = row.filled - row.humans;
   return html`<li class="rlist__row" style=${`--d-color:${DIFFICULTY_COLORS[row.difficulty]}`} data-testid="room-row" data-code=${row.code}>
     <span class="rlist__diff">${row.variant === 'deepecho' ? html`<${Icon} name="target" />${t('深渊回响')}` : html`<${DifficultyIcon} difficulty=${row.difficulty} />${t(DIFFICULTY_NAMES[row.difficulty])}`}</span>
@@ -59,7 +59,7 @@ function RoomRow({ row, disabled, onJoin }) {
     ${/* 不显示房间在哪台节点上：编号对玩家没有意义，加入时客户端自己带 ?n= 跳过去。 */ null}
     ${row.version ? html`<span class="rlist__ver"><${Icon} name="book" />${versionLabel(row.version)}</span>` : html`<span></span>`}
     <span class="rlist__seats num" title=${t('{humans} 名博士，{bots} 名 AI', { humans: row.humans, bots })}>${row.filled}<i>/</i>${row.capacity}</span>
-    <${Button} size="sm" variant="primary" class="rlist__join" disabled=${disabled} onClick=${() => onJoin(row.code, row.node || 0)}>${t('加入同盟')}<//>
+    <${Button} size="sm" variant="primary" class="rlist__join" disabled=${disabled} onClick=${() => onJoin(row.code, row.node || 0)}>${joinLabel || t('加入同盟')}<//>
   </li>`;
 }
 
@@ -67,17 +67,19 @@ function RoomRow({ row, disabled, onJoin }) {
  * 公开同盟列表。
  * @param {{ online: boolean, queued?: boolean, busy?: string | null, onJoin: (code: string) => void, onClose: () => void }} props
  */
-export function RoomListDialog({ online, queued = false, busy = null, onJoin, onClose }) {
+export function RoomListDialog({ online, queued = false, busy = null, onJoin, onClose, variant = null, onCreatePublic = null }) {
   const [rows, setRows] = useState(null);
   const [failed, setFailed] = useState(false);
   const inFlight = useRef(false);
   const alive = useRef(true);
+  // 「深渊回响」有**自己的**公开列表（维护者 2026-11-06）：只列深潜房，和普通「公开同盟」互不混。
+  const echo = variant === 'deepecho';
   const load = async () => {
     if (!online || inFlight.current || document.hidden) return;
     inFlight.current = true;
     try {
       // 本节点的房间（快、字段全）+ 别的节点的房间（跨节点）；本节点有的优先，按房间码去重。
-      const [answer, remote] = await Promise.all([net.request('room.list'), fetchRemoteRooms()]);
+      const [answer, remote] = await Promise.all([net.request('room.list', echo ? { variant: 'deepecho' } : {}), fetchRemoteRooms(variant)]);
       if (!alive.current) return;
       const local = Array.isArray(answer?.rooms) ? answer.rooms : [];
       const seen = new Set(local.map((r) => r.code));
@@ -91,16 +93,18 @@ export function RoomListDialog({ online, queued = false, busy = null, onJoin, on
     load();
     const timer = setInterval(load, ROOM_LIST_POLL_MS);
     return () => { alive.current = false; clearInterval(timer); };
-  }, [online]);
-  return html`<${Modal} open=${true} title=${t('公开同盟')} micro="OPEN ALLIANCES"
+  }, [online, variant]);
+  return html`<${Modal} open=${true} title=${echo ? t('公开深潜') : t('公开同盟')} micro=${echo ? 'OPEN DEEP DIVES' : 'OPEN ALLIANCES'}
       class="lobby-dialog rlist-dialog" onClose=${onClose}
-      actions=${html`<${Button} variant="secondary" icon="refresh" disabled=${!online} onClick=${load}>${t('刷新')}<//><${Button} icon="close" onClick=${onClose}>${t('关闭')}<//>`}>
-    <p class="modal__text">${t('{n} 人及以上、由创建者公开且尚未开局的同盟显示在这里。', { n: ROOM_LIST_MIN_CAPACITY })}</p>
-    <p class="modal__text rlist__cross">${t('包括别的服务器上的同盟：点「加入同盟」会自动连过去并进入房间。')}</p>
+      actions=${html`${echo && onCreatePublic ? html`<${Button} variant="primary" icon="link" disabled=${!online || !!busy} onClick=${onCreatePublic}>${t('开一间公开的')}<//>` : null}<${Button} variant="secondary" icon="refresh" disabled=${!online} onClick=${load}>${t('刷新')}<//><${Button} icon="close" onClick=${onClose}>${t('关闭')}<//>`}>
+    <p class="modal__text">${echo
+      ? t('由创建者公开、尚未开局的深渊回响房显示在这里（进房仍需深潜资格）。')
+      : t('{n} 人及以上、由创建者公开且尚未开局的同盟显示在这里。', { n: ROOM_LIST_MIN_CAPACITY })}</p>
+    <p class="modal__text rlist__cross">${t('包括别的服务器上的同盟：点「加入」会自动连过去并进入房间。')}</p>
     ${failed ? html`<p class="rlist__note" role="status"><${Icon} name="warn" />${t('列表暂时无法更新，稍后自动重试')}</p>` : null}
     ${rows === null ? html`<p class="rlist__note" role="status"><${Spinner} size="sm" />${t('正在载入同盟列表…')}</p>`
-      : rows.length ? html`<ul class="rlist" data-testid="room-list">${rows.map((row) => html`<${RoomRow} key=${row.code} row=${row} disabled=${!online || queued || !!busy} onJoin=${onJoin} />`)}</ul>`
-      : html`<p class="rlist__note" data-testid="room-list-empty">${t('暂时没有等待博士的公开同盟')}</p>`}
+      : rows.length ? html`<ul class="rlist" data-testid="room-list">${rows.map((row) => html`<${RoomRow} key=${row.code} row=${row} disabled=${!online || queued || !!busy} onJoin=${onJoin} joinLabel=${echo ? t('加入深潜') : null} />`)}</ul>`
+      : html`<p class="rlist__note" data-testid="room-list-empty">${echo ? t('暂时没有公开的深渊回响房') : t('暂时没有等待博士的公开同盟')}</p>`}
   <//>`;
 }
 

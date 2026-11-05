@@ -533,7 +533,8 @@ export const C2S = {
   // 最多 ROOM_LIST_MAX 个，空位最少的在前 —— host 是房主显示名，filled 是已占座位（含 AI），
   // version 只在不是默认版本时出现。
   'room.setListed': { listed: isBool },
-  'room.list': {},
+  // 公开同盟 / 公开深潜共用：带 variant 只列该模式（不带 = 普通同盟，深潜有自己的列表）
+  'room.list': { $optional: ['variant'], variant: (v) => v === 'deepecho' },
 
   // Remake-only spectator handover: host opt-in before play, default off (§35.100).
   'room.setAiTakeover': { on: isBool },

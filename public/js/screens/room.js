@@ -702,6 +702,8 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
 
 function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSetDifficulty = null, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null,
   listed = false, onToggleListed = () => {} }) {
+  // 「深渊回响」：同一个开关，深潜房叫「公开深潜」（列表也是深潜专属的）
+  const echoRoom = room.variant === 'deepecho';
   const info = difficultyInfo(room.mode, room.difficulty);
   const title = soloOption ? t('模拟设置') : t('同盟设置');
   useEffect(() => {
@@ -741,12 +743,12 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     ${/* 公开同盟（同盟列表）：挂了以后别的博士能在大厅「公开同盟」里看见这个房间、直接加入。
            开局后服务端会拒（ROOM_STARTED），所以对局中这项显示成不可操作。 */ null}
     ${soloOption ? null : html`<${Tooltip} text=${listed
-        ? t('其他博士可以在大厅的「公开同盟」里看到这个房间并直接加入')
-        : t('挂到大厅的「公开同盟」列表上，让其他博士能找到这个房间')}>
+        ? t(echoRoom ? '其他博士可以在「深渊回响 → 公开深潜」里看到这个房间并加入（需要深潜资格）' : '其他博士可以在大厅的「公开同盟」里看到这个房间并直接加入')
+        : t(echoRoom ? '挂到「深渊回响 → 公开深潜」列表上，让其他博士能找到这个房间' : '挂到大厅的「公开同盟」列表上，让其他博士能找到这个房间')}>
       <button type="button" role="switch" aria-checked=${listed ? 'true' : 'false'} data-testid="room-opt-listed"
           class=${`dpick__opt ailast__opt rs-opts__listed${listed ? ' is-active' : ''}`} disabled=${!!busy || !isHost || !!room.match}
           onClick=${() => { if (isHost && !room.match) onToggleListed(!listed); }}>
-        <${Icon} name=${listed ? 'check' : 'users'} class=${listed ? 'is-on' : ''} />${listed ? t('公开同盟：已公开') : t('公开同盟：未公开')}
+          <${Icon} name=${listed ? 'check' : 'users'} class=${listed ? 'is-on' : ''} />${echoRoom ? (listed ? t('公开深潜：已公开') : t('公开深潜：未公开')) : (listed ? t('公开同盟：已公开') : t('公开同盟：未公开'))}
       </button>
     <//>`}
     ${/* ★ 2026-11-02 维护者要求：同盟设置里**不放**「匹配队友」开关。
