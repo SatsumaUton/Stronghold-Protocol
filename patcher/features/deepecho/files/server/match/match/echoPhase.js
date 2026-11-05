@@ -2019,18 +2019,13 @@ export class MatchEcho {
     const spent = this.echoShieldSpent === true;
     const out = Array.isArray(this.echoBlessings)
       ? this.echoBlessings.map((id) => echoBlessingById(id)).filter(Boolean)
-        // 护盾抵消过排异之后仍留在列表里，只是标成「已消耗」（维护者 2026-11-05）
-        .map((b) => (b.id === 'shield_bond' && spent ? { ...b, consumed: true } : b))
+        // 护盾是**唯一**「用掉之后就消失」的祝福（维护者 2026-11-05 确认）：抵消一次排异之后就不再显示
+        .filter((b) => !(b.id === 'shield_bond' && spent))
       : [];
-    const seen = new Set(out.map((b) => b.id));
-    const add = (id) => {
-      const b = echoBlessingById(id);
-      if (!b || seen.has(b.id)) return;
-      seen.add(b.id);
-      out.push({ ...b, consumed: true });
-    };
-    for (const id of (Array.isArray(this.echoOneShotIds) ? this.echoOneShotIds : [])) add(id);
-    for (const id of (Array.isArray(this.echoCounterIds) ? this.echoCounterIds : [])) add(id);
+    // 维护者 2026-11-05（第二次改）：**一次性祝福 / 反制祝福拿到就结算，用掉之后不再显示在列表里**。
+    // 之前把它们并进列表（标「已消耗」），结果列表越堆越长、还全是已经用掉的东西（玩家反馈）。
+    // 记录仍然保留在 echoOneShotIds / echoCounterIds 里（名额计数、反制能力、抽取次数都还要用），
+    // 只是不再往「已获祝福」里塞。
     return out;
   }
 

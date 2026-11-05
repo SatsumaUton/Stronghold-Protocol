@@ -1317,7 +1317,7 @@ test('隐藏核心通关：上一回合遗留的三选一会被结算，新回�
 //   1) 护盾抵消排异后，祝福**留在列表里**但标成「已消耗」（维护者 2026-11-05 第二次改：
 //      之前是连图标一起摘掉，玩家会以为祝福丢了 / 列表出 bug）
 //   2) 诅咒被祝福清掉后，对应的**实际禁令**（封锁地块 / 排异盟约）还在 → 图标没了但依然不能部署
-test('护盾抵消排异后留在祝福列表里并标成已消耗；净化/反制掉「封锁·排异」时禁令一起解除', (t) => {
+test('护盾抵消排异后从祝福列表消失（唯一用掉就消失的祝福）；净化/反制掉「封锁·排异」时禁令一起解除', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
@@ -1333,14 +1333,12 @@ test('护盾抵消排异后留在祝福列表里并标成已消耗；净化/反�
   const got = m._echoApplyBondBan(rng);
   assert.equal(got, null, '护盾抵消了这次排异');
   assert.equal(m.echoShieldBond, null);
-  // 抵消之后：列表里还在，但是「已消耗」、不占名额、描述写明被抵消
-  assert.ok(m.echoBlessings.includes('shield_bond'), '护盾用掉后祝福必须留在列表里（维护者 2026-11-05）');
+  // 抵消之后：从「已获祝福」里消失（维护者 2026-11-05 确认：只有护盾是用掉就消失的那种）
+  assert.ok(m.echoBlessings.includes('shield_bond'), '记录还在 echoBlessings 里（防止重复使用）');
+  assert.equal(m.echoShieldSpent, true, '用掉的状态要记住');
   const pub = m.publicView();
   const shield = (pub.echo.blessings || []).find((b) => b.id === 'shield_bond');
-  assert.ok(shield, '护盾要出现在 m.public.echo.blessings 里');
-  assert.equal(shield.consumed, true, '抵消之后标成已消耗');
-  assert.equal(shield.occupiesSlot, false, '已消耗的护盾依然不占名额');
-  assert.match(shield.desc, /已被诅咒抵消/, '描述要说明它被诅咒抵消了');
+  assert.equal(shield, undefined, '护盾抵消之后不再显示在列表里');
 
   // —— 净化掉 block_bond：盟约禁令也要清空
   m.echoBannedBonds = ['someBond'];
@@ -1649,7 +1647,7 @@ test('深潜 boss 回合结束后团队血池复位：队友死亡不再被判�
 // 维护者 2026-11-05：16 层以后的「深渊祭坛 → 献祭 · 祝福」抽到的是一次性祝福。
 // 它拿到就结算（不占名额），但**必须一直留在「已获祝福」列表里** —— 包括断线续玩 / 节点重启读档之后。
 // 以前 echoOneShotIds 没进存档，读档后祭坛抽到的祝福会整批消失（玩家以为被诅咒吃掉了）。
-test('祭坛抽到的一次性祝福进存档：读档后仍在祝福列表里', async (t) => {
+test('祭坛抽到的一次性祝福进存档：回执保留（不再显示在祝福列表里）', async (t) => {
   const { snapshotMatch } = await import('../../server/match/snapshot.js');
   const h = dive();
   const m = h.m;
@@ -1659,8 +1657,10 @@ test('祭坛抽到的一次性祝福进存档：读档后仍在祝福列表里',
   const ps = m.alivePlayers()[0];
   ps.funds = 9999;
   assert.equal(m.buyEchoAltar(ps, 'blessing')?.ok, true, '16 层可以献祭抽祝福');
-  const before = (m.publicView().echo.blessings || []).map((b) => b.id);
-  assert.ok(before.length >= 1, '祭坛抽到的祝福要先出现在列表里');
+  // 维护者 2026-11-05（第二次改）：一次性祝福拿到即结算，不再挂在「已获祝福」里，但回执要进存档
+  assert.ok(m.echoOneShotIds.length >= 1, '祭坛抽到的祝福要记进 echoOneShotIds');
+  const listed = (m.publicView().echo.blessings || []).map((b) => b.id);
+  assert.equal(listed.some((id) => m.echoOneShotIds.includes(id)), false, '用掉的一次性祝福不再显示');
   const doc = snapshotMatch(m);
   assert.ok(doc, '准备阶段能存检查点');
   assert.deepEqual(doc.match.echoOneShotIds, m.echoOneShotIds, '一次性祝福的回执要进存档');
@@ -1746,7 +1746,7 @@ test('护盾祝福：不占祝福名额，且显示已指定的盟约', (t) => {
 
 // 维护者 2026-11-05：一次性祝福（资金/回血/净化）和反制祝福拿到就结算，
 // 但玩家要能在「已获得祝福」和 buff 栏里看到，只是不占名额。
-test('一次性 / 反制祝福也显示在祝福列表里，但不占名额', (t) => {
+test('一次性 / 反制祝福用掉之后不再显示，但记录保留、可以重复获得', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
@@ -1756,11 +1756,15 @@ test('一次性 / 反制祝福也显示在祝福列表里，但不占名额', (t
   m.echoCounterIds = ['quench'];
   const e = m._echoPublic();
   const ids = e.blessings.map((b) => b.id);
-  for (const id of ['fund', 'heal_s', 'quench']) assert.ok(ids.includes(id), `${id} 要出现在列表里`);
+  // 维护者 2026-11-05（第二次改）：拿到即结算的一次性 / 反制祝福**不再挂在「已获祝福」里**
+  for (const id of ['fund', 'heal_s', 'quench']) assert.ok(!ids.includes(id), `${id} 用掉之后不该再显示`);
+  assert.deepEqual(ids, ['hp_s'], '列表里只剩真正占名额的祝福');
   assert.equal(e.blessings.filter((b) => b.occupiesSlot).length, 1, '只有真正占位的那一个计入 n/3');
-  const fund = e.blessings.find((b) => b.id === 'fund');
-  assert.equal(fund.oneShot, true);
-  assert.equal(fund.consumed, true);
+  // 记录仍然保留（名额计数 / 反制能力 / 抽取次数都要用），而且可以重复获得
+  assert.ok(m.echoOneShotIds.includes('fund'), '一次性祝福的记录还在');
+  assert.ok(m.echoCounterIds.includes('quench'), '反制祝福的记录还在');
+  m.echoOneShotIds.push('fund');
+  assert.equal(m.echoOneShotIds.filter((x) => x === 'fund').length, 2, '同一个一次性祝福可以重复获得');
 });
 
 // 玩家 2026-11-05：深潜补给 / 祝福的选择会吃掉准备阶段的倒计时。
