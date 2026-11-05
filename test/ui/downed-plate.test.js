@@ -48,7 +48,10 @@ test('screens/game.js: the dialog once the own alive turns false from real data;
 
 test('the stylesheet: keyframes defined, text follows 文字大小, reduced motion stops it, the project\'s rules', () => {
   const css = read('public/css/screens/game.css');
-  const block = css.slice(css.indexOf('/* 协议已失效'));
+  // 只取「协议已失效」这一段：它后面接的是别的组件的样式（进场 / 卡池 / 盟约盘…），不归这条用例管
+  const at = css.indexOf('/* 协议已失效');
+  const next = css.indexOf('/* ---- 进场', at);
+  const block = css.slice(at, next > at ? next : undefined);
   for (const n of ['downm-shake', 'downm-in']) assert.match(block, new RegExp(`@keyframes ${n} \\{`), n);
   for (const m of block.matchAll(/font-size:\s*([^;]+);/g)) assert.match(m[1], /var\(--t\)/, m[1]);
   assert.match(block, /@media \(prefers-reduced-motion: reduce\) \{\n\s+\.downm__face\.is-out, \.downm__title \{ animation: none; \}/);
