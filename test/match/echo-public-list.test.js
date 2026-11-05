@@ -85,13 +85,13 @@ test('界面：公开深潜列表用专属标题 / 加入文案 / 空态，并�
   assert.match(src, /t\('暂时没有公开的深渊回响房'\)/, '空态文案');
 });
 
-test('大厅：公开深潜按钮打开这份列表，建房走列表里的「开一间公开的」', () => {
+test('大厅：公开深潜按钮打开这份列表（列表里不再有「开一间公开的」）', () => {
   const src = read('public/js/screens/lobby.js');
   assert.match(src, /const \[echoBrowseOpen, setEchoBrowseOpen\] = useState\(false\)/, '要有列表开关');
   assert.match(src, /setEchoBrowseOpen\(true\)/, '公开深潜按钮要打开列表');
   assert.match(src, /\$\{RoomListDialog\} variant="deepecho"/, '渲染深潜列表');
   assert.doesNotMatch(src, /onCreatePublic/, '公开深潜列表不再有「开一间公开的」（维护者 2026-11-06）');
-  assert.match(src, /浏览公开的深潜房，或者自己开一间公开的（进房仍需深潜资格）/, '按钮提示语改成浏览');
+  assert.match(src, /浏览公开的深潜房（进房仍需深潜资格）；想公开自己的房，进房后打开「公开深潜」/, '按钮提示语改成浏览');
 });
 
 test('房间设置：深潜房的同一个开关叫「公开深潜」', () => {
