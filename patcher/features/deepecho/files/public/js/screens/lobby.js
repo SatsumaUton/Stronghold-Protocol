@@ -1786,7 +1786,6 @@ export function LobbyScreen() {
     ${/* 公开深潜：深潜专属的公开列表（维护者 2026-11-06） */ null}
     ${echoBrowseOpen ? html`<${RoomListDialog} variant="deepecho" online=${online} busy=${busy}
       onJoin=${(c, node) => { setEchoBrowseOpen(false); enterRoom(c, node); }}
-      onCreatePublic=${() => { setEchoBrowseOpen(false); setEchoOpen(false); create('coop', 'deepecho', { difficulty: echoPick || shownCoop, listed: true }); }}
       onClose=${() => setEchoBrowseOpen(false)} />` : null}
     ${browseOpen && allyOpen ? html`<${RoomListDialog} online=${online} busy=${busy}
       onJoin=${(c, node) => { setBrowseOpen(false); setAllyOpen(false); enterRoom(c, node); }} onClose=${() => setBrowseOpen(false)} />` : null}

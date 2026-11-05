@@ -115,7 +115,7 @@ test('界面：深潜整屏有「公开深潜」「开始多人匹配」，并�
   // 接线：公开 = 建房带 listed；匹配 = quickMatch 带 variant
   // 公开深潜 = 打开深潜专属列表（维护者 2026-11-06）；建房走列表里的「开一间公开的」
   assert.match(src, /setEchoBrowseOpen\(true\)/, '公开深潜要打开专属列表');
-  assert.match(src, /create\('coop', 'deepecho', \{ difficulty: echoPick \|\| shownCoop, listed: true \}\)/, '列表里「开一间公开的」建公开房');
+  assert.doesNotMatch(src, /onCreatePublic/, '公开深潜列表不再有「开一间公开的」');
   assert.match(src, /quickMatch\(\{ difficulty: pickedDifficulty, seats: 'four', rules: 'standard', variant: 'deepecho' \}\)/, '多人匹配要带 variant');
   assert.match(src, /net\.request\('room\.setListed', \{ listed: true \}\)/, '建房后要真的挂上公开列表');
   // 样式

@@ -75,13 +75,12 @@ test('跨节点：collectOpenRooms 按 variant 分开（默认只给普通房）
 
 test('界面：公开深潜列表用专属标题 / 加入文案 / 空态，并能一键开一间公开的', () => {
   const src = read('public/js/ui/roomList.js');
-  assert.match(src, /export function RoomListDialog\(\{ online, queued = false, busy = null, onJoin, onClose, variant = null, onCreatePublic = null \}\)/,
+  assert.match(src, /export function RoomListDialog\(\{ online, queued = false, busy = null, onJoin, onClose, variant = null \}\)/,
     '对话框要收 variant / onCreatePublic');
   assert.match(src, /const echo = variant === 'deepecho';/, '要认深潜');
   assert.match(src, /net\.request\('room\.list', echo \? \{ variant: 'deepecho' \} : \{\}\)/, '本节点列表要带 variant');
   assert.match(src, /\/mm\/api\/rooms\/open\$\{variant === 'deepecho' \? '\?variant=deepecho' : ''\}/, '跨节点列表要带 variant');
   assert.match(src, /title=\$\{echo \? t\('公开深潜'\) : t\('公开同盟'\)\}/, '标题分开');
-  assert.match(src, /t\('开一间公开的'\)/, '列表里能开一间公开的');
   assert.match(src, /t\('加入深潜'\)/, '加入按钮文案');
   assert.match(src, /t\('暂时没有公开的深渊回响房'\)/, '空态文案');
 });
@@ -91,8 +90,7 @@ test('大厅：公开深潜按钮打开这份列表，建房走列表里的「�
   assert.match(src, /const \[echoBrowseOpen, setEchoBrowseOpen\] = useState\(false\)/, '要有列表开关');
   assert.match(src, /setEchoBrowseOpen\(true\)/, '公开深潜按钮要打开列表');
   assert.match(src, /\$\{RoomListDialog\} variant="deepecho"/, '渲染深潜列表');
-  assert.match(src, /onCreatePublic=\$\{\(\) => \{ setEchoBrowseOpen\(false\); setEchoOpen\(false\); create\('coop', 'deepecho', \{ difficulty: echoPick \|\| shownCoop, listed: true \}\); \}\}/,
-    '开一间公开的 = 建深潜房 + 挂公开');
+  assert.doesNotMatch(src, /onCreatePublic/, '公开深潜列表不再有「开一间公开的」（维护者 2026-11-06）');
   assert.match(src, /浏览公开的深潜房，或者自己开一间公开的（进房仍需深潜资格）/, '按钮提示语改成浏览');
 });
 
@@ -119,7 +117,7 @@ test('建房后「要不要公开」的询问框：深潜房说「公开深潜�
 });
 test('英文包：新增文案都有译文', () => {
   const en = JSON.parse(read('public/i18n/en.json'));
-  for (const k of ['公开深潜', '开一间公开的', '加入深潜', '暂时没有公开的深渊回响房', '要公开这次深潜吗？',
+  for (const k of ['公开深潜', '加入深潜', '暂时没有公开的深渊回响房', '要公开这次深潜吗？',
     '公开以后，你创建的这个深潜房会出现在「深渊回响 → 公开深潜」列表里，其他博士可以直接看到并加入（需要深潜资格）。',
     '公开深潜：已公开', '公开深潜：未公开',
     '由创建者公开、尚未开局的深渊回响房显示在这里（进房仍需深潜资格）。']) {

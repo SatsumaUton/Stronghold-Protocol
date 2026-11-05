@@ -1785,6 +1785,33 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   color: #2a1404; background: #ff9a3c; border-radius: 999px; }
 
 .rlist-dialog .modal__text { margin-bottom: .1rem; }
+
+/* 「公开深潜」列表：整套深潜配色（维护者 2026-11-06 要求把绿色改成深渊回响的紫）。
+   只在这一层覆盖主题变量：弹窗的斜纹条 / 角标 / 主按钮 / 焦点框吃 --mint-* 与 --bk-c，自动全部变紫；
+   普通「公开同盟」列表不带 is-echo，逐字节不受影响。 */
+.modal__box.is-echo {
+  --mint-400: #c4a6ff;
+  --mint-500: #9d7bff;
+  --mint-600: #7c5cf0;
+  --mint-700: #5b3fb8;
+  --mint-800: #3a2470;
+  --mint-900: #1e1340;
+  --mint-a10: rgba(157, 123, 255, .10);
+  --mint-a20: rgba(157, 123, 255, .20);
+  --mint-a35: rgba(157, 123, 255, .35);
+  --mint-rgb: 183, 156, 255;
+  --mint-500-rgb: 157, 123, 255;
+  --mint-400-rgb: 196, 166, 255;
+  --text-on-mint: #f6f1ff;
+  --bk-c: #b79cff;
+  --mstripe: #b79cff;
+  /* 主按钮的描边用的是这两个字面量色（theme.css 的 :root），不覆盖的话按钮边还是绿的 */
+  --mint-c1: rgb(196, 166, 255);
+  --mint-c2: rgb(183, 156, 255);
+}
+/* 标题旁边的模式标记与空态文字也用深潜的紫 */
+.modal__box.is-echo .modal__title { color: #f3ecff; }
+.modal__box.is-echo .rlist__note { color: #a897c9; }
 .rlist { display: flex; flex-direction: column; gap: .06rem; margin: 0; padding: 0 .04rem 0 0; list-style: none;
   max-height: min(52vh, calc(4.2 * var(--sp-ui, 1))); overflow-y: auto; overscroll-behavior: contain; }
 /* 一行一个同盟：左缘是难度色，底色跟大厅其它深色面板一样（半透明白 + 极淡描边），
