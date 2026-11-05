@@ -762,6 +762,37 @@ export class MatchEcho {
   }
 
   /**
+   * 诅咒条目被移除后，把它的**实际效果**也撤掉（维护者 2026-11-05）。
+   *
+   * 以前「净化 / 反制」只删 `echoCurseIds`：诅咒图标从列表里消失了，可封锁的地块还在封、
+   * 排异的盟约还在禁 —— 玩家看到的是「诅咒没了但我还是不能部署」。
+   * 这里把对应的禁令一起清掉，并把场上受影响的干员收回整备区。
+   *
+   * @param {string[]} removedIds 刚被移除的诅咒 id
+   * @returns {boolean} 是否动过禁令
+   */
+  _echoSyncBanCurse(removedIds = []) {
+    const ids = Array.isArray(removedIds) ? removedIds : [];
+    let changed = false;
+    if (ids.includes('block_tiles') && Array.isArray(this.echoBannedTiles) && this.echoBannedTiles.length) {
+      this.echoBannedTiles = [];
+      this.echoBannedTilesUntil = 0;
+      changed = true;
+    }
+    if (ids.includes('block_bond') && Array.isArray(this.echoBannedBonds) && this.echoBannedBonds.length) {
+      this.echoBannedBonds = [];
+      this.echoBannedBondsUntil = {};
+      changed = true;
+    }
+    if (changed) {
+      this._echoRecallFromBannedTiles?.();
+      this._echoWithdrawBannedBond?.();
+      this.markPublic?.();
+    }
+    return changed;
+  }
+
+  /**
    * 排异到期清理（维护者 2026-11-05）：`echoBannedBondsUntil[bond] <= depth` 的一律解除。
    * 解除后由 `_echoWithdrawBannedBond()` 把场上那些干员收回（它在同一个 prep 里紧接着跑）。
    *
@@ -1052,8 +1083,12 @@ export class MatchEcho {
     if (this.echoShieldBond && picked === this.echoShieldBond) {
       const name = this.gd.bond(picked)?.name || picked;
       this.echoShieldBond = null;
-      this._echoPushAnnounce(`护盾：抵消了针对【${name}】的排异`);
+      // 护盾是「用掉就没」的一次性效果：抵消之后连祝福图标一起摘掉
+      // （维护者 2026-11-05：HUD 上还挂着「护盾」会让人以为还有一层）。
+      if (Array.isArray(this.echoBlessings)) this.echoBlessings = this.echoBlessings.filter((id) => id !== 'shield_bond');
+      this._echoPushAnnounce(`护盾：抵消了针对【${name}】的排异（护盾已消耗）`);
       this._echoFlushAnnounce();
+      this.markPublic?.();
       return null;
     }
     already.push(picked);
@@ -1949,6 +1984,8 @@ export class MatchEcho {
         const drop = new Set(order.map((x) => x.i));
         const names = order.map((x) => echoCurseById(x.id)?.name || x.id);
         this.echoCurseIds = this.echoCurseIds.filter((_, i) => !drop.has(i));
+        // 被清掉的如果是「封锁 / 排异」，对应的实际效果也要一起撤（维护者 2026-11-05）
+        this._echoSyncBanCurse(order.map((x) => x.id));
         if (names.length) {
           this._echoPushAnnounce(`净化：移除了「${names.join('、')}」`);
           this._echoFlushAnnounce();
@@ -1995,9 +2032,15 @@ export class MatchEcho {
           + (Array.isArray(this.echoBannedBonds) ? this.echoBannedBonds.length : 0);
         this.echoBannedTiles = [];
         this.echoBannedBonds = [];
+        // 禁令解了，诅咒条目也要一起消失，否则 HUD 上还挂着「封锁 / 排异」两个图标
+        if (Array.isArray(this.echoCurseIds)) {
+          this.echoCurseIds = this.echoCurseIds.filter((id) => id !== 'block_tiles' && id !== 'block_bond');
+        }
         if (had) this._echoPushAnnounce(`祝福「${b.name}」：解除封锁 / 排异`);
       }
       if (removed > 0) this._echoPushAnnounce(`祝福「${b.name}」：驱散 ${removed} 层诅咒`);
+      // 反制掉「封锁 / 排异」时，把地块禁令 / 盟约禁令也一起解除（维护者 2026-11-05）
+      this._echoSyncBanCurse(ids);
       this._echoFlushAnnounce();
     }
     this.tickerText(msg('深渊回响：全队获得祝福「{name}」', { name: b.name }), FLOW_TICKER_PRIORITY);

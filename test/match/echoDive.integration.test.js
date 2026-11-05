@@ -1305,3 +1305,40 @@ test('隐藏核心通关：上一回合遗留的三选一会被结算，新回�
   assert.equal(m.setEchoBlessingVote(ps, 0).ok, true, '新面板的第一票要收');
   assert.equal(m.setEchoBlessingVote(ps2, 0).ok, true, '第二票也要收（不会报「当前阶段无法进行该操作」）');
 });
+
+// 维护者 2026-11-05 玩家反馈：
+//   1) 护盾抵消排异后，HUD 上的「护盾」图标还挂着 → 应该一起消失（它是一次性效果）
+//   2) 诅咒被祝福清掉后，对应的**实际禁令**（封锁地块 / 排异盟约）还在 → 图标没了但依然不能部署
+test('护盾抵消排异后祝福图标消失；净化/反制掉「封锁·排异」时禁令一起解除', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+
+  // —— 护盾：指定一条附加盟约，然后让排异正好抽到它
+  m.echoBlessings = ['shield_bond'];
+  const addBond = Object.keys(m.gd.raw.bonds || {}).find((id) => m.gd.bond(id) && m.gd.bond(id).isCore !== true);
+  assert.ok(addBond, '数据里要有附加盟约');
+  m.echoShieldBond = addBond;
+  const rng = () => 0;                                   // 每次都抽池子里的第一条
+  // 让池子只剩这条：先把其它盟约都排异掉
+  m.echoBannedBonds = Object.keys(m.gd.raw.bonds || {}).filter((id) => id !== addBond && m.gd.bond(id) && m.gd.bond(id).isCore !== true);
+  const got = m._echoApplyBondBan(rng);
+  assert.equal(got, null, '护盾抵消了这次排异');
+  assert.ok(!m.echoBlessings.includes('shield_bond'), '护盾用掉后祝福图标必须消失');
+  assert.equal(m.echoShieldBond, null);
+
+  // —— 净化掉 block_bond：盟约禁令也要清空
+  m.echoBannedBonds = ['someBond'];
+  m.echoBannedBondsUntil = { someBond: 99 };
+  m.echoCurseIds = ['block_bond'];
+  assert.equal(m._echoSyncBanCurse(['block_bond']), true, '应当动过禁令');
+  assert.deepEqual(m.echoBannedBonds, [], '排异名单要清空');
+  assert.deepEqual(m.echoBannedBondsUntil, {});
+
+  // —— 封锁同理
+  m.echoBannedTiles = ['3,4'];
+  m.echoBannedTilesUntil = 99;
+  m._echoSyncBanCurse(['block_tiles']);
+  assert.deepEqual(m.echoBannedTiles, [], '封锁地块要清空');
+  assert.equal(m.echoBannedTilesUntil, 0);
+});
