@@ -1572,3 +1572,21 @@ test('刷新价按深渊通胀下发实际价格（整数），资金不够时�
   ps.shop.freeRefreshes = 0;
   assert.equal(ps.privateView().shop.refreshPrice, price);
 });
+
+// 维护者 2026-11-05：三张都不想要时可以投票放弃本次祝福。
+test('祝福三选一可以投票放弃（下标 = 候选数）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 20;
+  m.startRound(20);
+  for (let i = 0; i < 40 && m.phase !== 'PREP'; i++) h.sched.advance(200);
+  m.echoBlessingOffer = ['atk_s', 'hp_s', 'def_s'];
+  m._echoBlessingVotes = new Map();
+  const [a, b] = m.alivePlayers();
+  assert.equal(m.setEchoBlessingVote(a, 3).ok, true, '放弃票要能投进去');
+  assert.equal(m.setEchoBlessingVote(b, 3).ok, true);
+  assert.equal(m.echoBlessings.length, 0, '放弃就不发祝福');
+  assert.equal(m.echoBlessingSkipped, 1, '记一次放弃（避免下一层又弹同一批）');
+  assert.equal(m.echoBlessingOffer, null, '面板要关掉');
+});

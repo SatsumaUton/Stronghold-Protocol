@@ -127,12 +127,28 @@ export function EchoBlessing({ pub }) {
             ${who.length ? html`<span class="echo-bless__votes">${who.join('、')}</span>` : null}
           </button>`;
         })}
+        ${(() => {
+          // 「放弃本次」（维护者 2026-11-05）：三张都不想要时投它 —— 和选祝福同一套投票，
+          // 下标 = offer.options.length，服务端收到就本轮不发祝福。
+          const i = offer.options.length;
+          const mine = myPick === i;
+          const picked = armed === i && myPick == null;
+          const who = voters.filter((p) => votes[p.playerId] === i).map((p) => p.name);
+          return html`<button key="__skip" type="button"
+            class=${`echo-bless__card echo-bless__skip${mine ? ' is-mine' : ''}${picked ? ' is-armed' : ''}`}
+            disabled=${busy || !online || myPick != null}
+            onClick=${() => pick(i)}>
+            <b class="echo-bless__name">${t('放弃本次')}</b>
+            <span class="echo-bless__desc">${t('三张都不想要就投它：本轮不发祝福，也不会再弹同一批候选。')}</span>
+            ${who.length ? html`<span class="echo-bless__votes">${who.join('、')}</span>` : null}
+          </button>`;
+        })()}
       </div>
       <footer class="echo-bless__foot">
         ${myPick != null
-          ? html`<span>${t('已确认「{name}」，等待队友…', { name: offer.options[myPick]?.name || t('已选择') })}</span>`
+          ? html`<span>${t('已确认「{name}」，等待队友…', { name: offer.options[myPick]?.name || t('放弃本次') })}</span>`
           : html`<span>${armed != null
-            ? t('已选中「{name}」，按「确认」才提交（确认前可以改）。', { name: offer.options[armed]?.name || '' })
+            ? t('已选中「{name}」，按「确认」才提交（确认前可以改）。', { name: offer.options[armed]?.name || t('放弃本次') })
             : t('点一张卡选中，再按「确认」提交；全队在线的人都确认完才结算。')}</span>`}
         ${myPick == null ? html`<button type="button" class="echo-bless__confirm" disabled=${busy || !online || armed == null}
           onClick=${() => confirm()}>${t('确认')}</button>` : null}

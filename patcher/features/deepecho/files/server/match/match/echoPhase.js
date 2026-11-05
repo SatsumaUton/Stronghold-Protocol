@@ -892,7 +892,8 @@ export class MatchEcho {
     if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
     if (ps.alive === false) return fail(ERR.SPECTATOR, 'dead players do not vote');
     const i = Math.floor(Number(pick));
-    if (!(i >= 0 && i < offer.length)) return fail(ERR.BAD_TARGET);
+    // 允许 i === offer.length：那是「放弃本次」那一张（维护者 2026-11-05）
+    if (!(i >= 0 && i <= offer.length)) return fail(ERR.BAD_TARGET);
     this._echoShieldVotes.set(ps.playerId, i);
     this.markPublic();
     // 只有**活着**的玩家参与投票（维护者 2026-11-05：死亡的玩家不再参与祝福选择）
@@ -1790,7 +1791,8 @@ export class MatchEcho {
     // 名额上限 + bonus，并把应得数也 +bonus —— 只抬上限还不够：`echoBlessingDue` 的
     // 「每 5 层一次」在 16 层刚好是 3，拿满 3 个时 due 仍然 ≤ owned，多出来的名额永远发不出去。
     const cap = this._echoBlessingMax() + bonus;
-    const due = Math.min(cap, echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws, this._echoBlessingMax()) + bonus);
+    const skipped = Math.max(0, Number(this.echoBlessingSkipped) || 0);
+    const due = Math.max(0, Math.min(cap, echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws, this._echoBlessingMax()) + bonus) - skipped);
     // 反制祝福不占 3 个上限，但**每次都消耗一次抽取机会**（拿在手里也不存底）
     const owned = (Array.isArray(this.echoBlessings) ? this.echoBlessings.length : 0)
       + (Array.isArray(this.echoCounterIds) ? this.echoCounterIds.length : 0);
@@ -1837,7 +1839,8 @@ export class MatchEcho {
     if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
     if (ps.alive === false) return fail(ERR.SPECTATOR, 'dead players do not vote');
     const i = Math.floor(Number(pick));
-    if (!(i >= 0 && i < offer.length)) return fail(ERR.BAD_TARGET);
+    // 允许 i === offer.length：那是「放弃本次」那一张（维护者 2026-11-05）
+    if (!(i >= 0 && i <= offer.length)) return fail(ERR.BAD_TARGET);
     this._echoBlessingVotes.set(ps.playerId, i);
     this.markPublic();
     return this._echoResolveBlessing();
@@ -2032,6 +2035,15 @@ export class MatchEcho {
     this._echoBlessingRound = null;
     this._echoBlessingVotes.clear();
     this.echoBlessingReplace = false;
+    // 「放弃本次」（维护者 2026-11-05）：全队都不想要时投它 —— 本轮不发祝福，
+    // 并记一次 skipped，避免下一层又弹出同一批候选（due 会把它扣掉）。
+    if (Array.isArray(offer) && best === offer.length) {
+      this.echoBlessingSkipped = (Number(this.echoBlessingSkipped) || 0) + 1;
+      this._echoPushAnnounce('全队放弃了本次祝福（本轮不发）');
+      this._echoFlushAnnounce();
+      this.markPublic();
+      return OK;
+    }
     const b = Array.isArray(offer) ? echoBlessingById(offer[best]) : null;
     if (!b) return OK;
     // 名额已满 + 这次是替换模式：先让全队投票「弃掉哪个」，投完再发新的（维护者 2026-11-05）。
@@ -2067,7 +2079,8 @@ export class MatchEcho {
     if (ps.isBot || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
     if (ps.alive === false) return fail(ERR.SPECTATOR, 'dead players do not vote');
     const i = Math.floor(Number(pick));
-    if (!(i >= 0 && i < offer.length)) return fail(ERR.BAD_TARGET);
+    // 允许 i === offer.length：那是「放弃本次」那一张（维护者 2026-11-05）
+    if (!(i >= 0 && i <= offer.length)) return fail(ERR.BAD_TARGET);
     if (!this._echoDiscardVotes) this._echoDiscardVotes = new Map();
     this._echoDiscardVotes.set(ps.playerId, i);
     this.markPublic();
