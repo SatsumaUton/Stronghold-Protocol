@@ -169,6 +169,8 @@ export class MatchIntents {
       case 'g.echoCounterUse': return this.setEchoCounterUse(ps);
       case 'g.echoAltar': return this.buyEchoAltar(ps, msg.kind);
       case 'g.echoSupply': return this.setEchoSupplyPick(ps, msg.pick);
+    // 盟约投影（16 层起每 10 层）：全队三选一
+    case 'g.echoProjection': return this.setEchoProjectionPick(ps, msg.pick);
       // 「护盾」祝福：投票指定要保护的盟约
       case 'g.echoShield': return this.setEchoShieldVote(ps, msg.pick);
       case 'g.band': return this.pickBand(ps, msg.bandId);

@@ -196,7 +196,18 @@ export class PlayerRound {
       side,
       colOffset,
       units,
-      bonds: bondSnapshot(reached ? this.bondsView() : this.bonds),
+      // 「盟约投影」：把投影的盟约按满档塞进 bonds 快照，并给 sim 一个 projectedBond
+      // （sim 的 unitBonds 会让所有己方干员都算该盟约成员 —— 维护者 2026-11-05）
+      bonds: (() => {
+        const snap = bondSnapshot(reached ? this.bondsView() : this.bonds);
+        const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
+        if (proj) snap[proj.bondId] = { ...(snap[proj.bondId] || {}), ...proj.state };
+        return snap;
+      })(),
+      projectedBond: (() => {
+        const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
+        return proj ? proj.bondId : undefined;
+      })(),
       bandId: this.bandId,
       playerEffects: this.effects.filter((e) => e.battle !== false).map((e) => ({
         id: e.id, key: e.key ?? null, source: e.iconKind ?? null, params: e.params ?? null, counter: e.counter ?? null, data: e.data ?? null,

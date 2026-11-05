@@ -2528,5 +2528,12 @@
   "先选一张，再点「确认」": "Pick a card, then confirm",
   "全队投票选一项，共享一份（{n}/{m}）": "Team vote for one, shared once ({n}/{m})",
   "你已投「{name}」，等待队友…": "You voted {name}, waiting for teammates…",
-  "先选一项，再点「确认」": "Pick one, then confirm"
+  "先选一项，再点「确认」": "Pick one, then confirm",
+  "盟约投影": "Bond projection",
+  "盟约投影 · 全队投票": "Bond projection · team vote",
+  "选一条核心盟约投影：全体干员按满档享受它的效果，只能同时存在一个，不占祝福名额": "Pick one core bond to project: every operator enjoys its full-tier effect. Only one may be active, and it does not take a blessing slot.",
+  "当前投影": "Current projection",
+  "核心盟约 · 满档": "Core bond · full tier",
+  "当前投影：{name}": "Current projection: {name}",
+  "无人投票": "No votes"
 }
