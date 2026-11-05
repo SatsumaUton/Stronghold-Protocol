@@ -560,7 +560,11 @@ export class MatchBoss {
     this.markPublic();
     this.runner = null;
     if (!hidden) {
-      const eligible = victory && !!this.hiddenBossId && hiddenEligible(this.gd, { layerSum: this.hiddenLayerSum, teamLp: this.teamLp, aliveCount: this.finalAliveCount, experimental: this.capacityExperiment });
+      // ⚠ 「深渊回响」绝不能走这条原版分支（维护者 2026-11-05 玩家实测：25 层打完 boss 回到 16 层）：
+      // 深潜的盟约层数没有上限，25 / 35 / 45 的返场 boss 打完后 `hiddenEligible()` 同样可能为真，
+      // 于是 `startRound(this.gd.hiddenRound)` 把整局打回第 15 层，下一层就是 16 层。
+      // 深潜的隐藏核心只在**深度 15** 由 `_echoHiddenBossRound()` 单独判定（prep.js 直接 startFinalAssault(true)）。
+      const eligible = victory && this.echoVariant !== 'deepecho' && !!this.hiddenBossId && hiddenEligible(this.gd, { layerSum: this.hiddenLayerSum, teamLp: this.teamLp, aliveCount: this.finalAliveCount, experimental: this.capacityExperiment });
       this.later(this.scaled(DELAYS.SETTLE), () => {
         if (eligible) {
           this.hiddenReached = true;
