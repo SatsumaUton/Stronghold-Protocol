@@ -866,7 +866,7 @@ function MatchRules() {
  * 所以这一屏通常只闪一下 —— 但网络慢或服务端在筛选时它是玩家看到的第一个反馈，
  * 所以照参考版把它做完整：搜寻中、已等秒数、这次的范围、取消。
  */
-function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null }) {
+function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null, variant = null }) {
   // 排队信息（服务端 room.quickState 的答复）：还有几个人在等这个池、我排第几、还差几人。
   const waiting = Number(queue?.waiting) || 0;
   const need = Number(queue?.need) || 0;
@@ -880,10 +880,12 @@ function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null
     key: `r${i}`, color: '#8d9391',    // 规则：灰
     label: r === 'standard' ? t('标准规则') : t('实验性规则'),
   }));
+  // 「深渊回响」：深潜的匹配池是固定的（4 人 + 标准规则），标签改成「深渊回响」
+  const echo = variant === 'deepecho';
   const tags = [
     { key: 'difficulty', label: t(DIFFICULTY_NAMES[difficulty]), color: DIFFICULTY_COLORS[difficulty] },
     ...seatTags,
-    ...ruleTags,
+    ...(echo ? [{ key: 'echo', label: t('深渊回响'), color: '#b79cff' }] : ruleTags),
   ];
   // 面板只显示「本难度等待队列 N 人」（与匹配器一致）；位置/还差几人另起一行。
   const waitCount = waiting > 0 ? waiting : (online ? 1 : 0);
@@ -916,7 +918,7 @@ function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null
  */
 export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, busy, online, createLocked = false,
   difficulties = DIFFICULTIES, scope = MATCH_SCOPE_DEFAULT, onScope = () => {},
-  searching = false, elapsed = 0, onCancel = () => {}, queue = null }) {
+  searching = false, elapsed = 0, onCancel = () => {}, queue = null, variant = null }) {
   const info = difficultyInfo('coop', difficulty);
   const working = busy === 'quick';
   // 已经按过「开始多人匹配」：照参考版把右列换成搜寻中（proto--searching），
@@ -943,7 +945,7 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
               <p>${info.desc}</p>
             </div>
           </section>
-          <${MatchQueue} difficulty=${difficulty} scope=${scope} elapsed=${elapsed} online=${online} onCancel=${onCancel} queue=${queue} />
+          <${MatchQueue} difficulty=${difficulty} scope=${scope} elapsed=${elapsed} online=${online} onCancel=${onCancel} queue=${queue} variant=${variant} />
         </div>
       </div>
     <//>`;
@@ -993,7 +995,7 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
             </p>
             <button type="button" class="proto-start" data-testid="match-start"
               disabled=${!online || working || createLocked} aria-busy=${working ? 'true' : 'false'}
-              onClick=${() => onStart({ difficulty, ...matchScopeRequest(scope) })}>
+              onClick=${() => onStart({ difficulty, ...matchScopeRequest(scope), ...(variant ? { variant } : {}) })}>
               <span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>STRONGHOLD<br />PROTOCOL</small></span>
               <span class="proto-start__label">${working ? html`<${Spinner} size="sm" />` : null}${t('开始多人匹配')}</span>
               <span class="proto-start__deco" aria-hidden="true"></span>
@@ -1174,20 +1176,20 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
             <div class="echo-stat"><span class="echo-stat__k">${t('本机最佳')}</span><b class="echo-stat__v">${best ? best.depth : '—'}</b></div>
             <div class="echo-stat"><span class="echo-stat__k">${t('本周最佳')}</span><b class="echo-stat__v">${weekBest == null ? '—' : weekBest}</b></div>
           </div>
-          <div class="proto-foot proto-foot--match">
+          <div class="proto-foot proto-foot--match proto-foot--triple">
+            <button type="button" class="proto-start proto-start--alt" data-testid="echo-public"
+              onClick=${() => onPublic({ difficulty })} title=${t('浏览公开的深潜房，或者自己开一间公开的（进房仍需深潜资格）')}>
+              <span class="proto-start__label"><${Icon} name="link" />${t('公开深潜')}</span>
+            </button>
+            <button type="button" class="proto-start proto-start--alt" data-testid="echo-quick" disabled=${quickBusy}
+              onClick=${() => onQuick({ difficulty })} title=${t('进入深潜匹配池，和其他深潜房配对（只会配到深潜）')}>
+              <span class="proto-start__label"><${Icon} name="search" />${t('开始多人匹配')}</span>
+            </button>
             <button type="button" class="proto-start" data-testid="echo-start" onClick=${() => onStart({ difficulty })}>
               <span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>DEEP<br />ECHO</small></span>
               <span class="proto-start__label">${t('开始深渊回响')}</span>
               <span class="proto-start__deco" aria-hidden="true"></span>
             </button>
-            ${onPublic || onQuick ? html`<div class="echo-links">
-              ${onPublic ? html`<button type="button" class="echo-pill" data-testid="echo-public"
-                onClick=${() => onPublic({ difficulty })} title=${t('浏览公开的深潜房，或者自己开一间公开的（进房仍需深潜资格）')}>
-                <${Icon} name="link" />${t('公开深潜')}</button>` : null}
-              ${onQuick ? html`<button type="button" class="echo-pill" data-testid="echo-quick" disabled=${quickBusy}
-                onClick=${() => onQuick({ difficulty })} title=${t('进入深潜匹配池，和其他深潜房配对（只会配到深潜）')}>
-                <${Icon} name="search" />${t('开始多人匹配')}</button>` : null}
-            </div>` : null}
           </div>
         </section>
       </div>
@@ -1408,6 +1410,8 @@ export function LobbyScreen() {
   /** 深潜专属大厅是否打开（只有管理员能打开） */
   const [echoOpen, setEchoOpen] = useState(false);
 /** 「公开深潜」列表（深潜专属，维护者 2026-11-06）：只列公开的深潜房，和普通「公开同盟」分开 */
+/** 多人匹配当前进的是不是深潜池（决定标签与难度来源，维护者 2026-11-06） */
+  const [matchVariant, setMatchVariant] = useState(null);
   const [echoBrowseOpen, setEchoBrowseOpen] = useState(false);
   /** 「公开深潜」列表里点「开一间公开的」时用的难度（跟当前选的深潜难度一致） */
   const [echoPick, setEchoPick] = useState(null);
@@ -1419,7 +1423,7 @@ export function LobbyScreen() {
       return;
     }
     if (m === 'solo') setSoloOpen(true);
-    else if (m === 'match') setMatchOpen(true);
+  else if (m === 'match') { setMatchVariant(null); setMatchOpen(true); }
     else setAllyOpen(true);
   };
   const pickDifficulty = (d) => { setDifficulty(d); savePref('lobby.difficulty', d); };
@@ -1737,7 +1741,7 @@ export function LobbyScreen() {
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} short=${shortScreen} createLocked=${!createOpen}
       capacity=${coopCapacity} onCapacity=${pickCapacity}
       onBrowse=${() => setBrowseOpen(true)}
-      onQuickMatch=${() => { setAllyOpen(false); setBrowseOpen(false); setMatchOpen(true); }} />` : null}
+      onQuickMatch=${() => { setAllyOpen(false); setBrowseOpen(false); setMatchVariant(null); setMatchOpen(true); }} />` : null}
     ${/* 「深渊回响」专属整屏（只有管理员能打开）：骨架照 多人匹配，样式天然一致 */ null}
     ${echoOpen ? html`<${EchoSelect} onClose=${() => setEchoOpen(false)}
       onStart=${({ difficulty: pickedDifficulty }) => {
@@ -1750,7 +1754,11 @@ export function LobbyScreen() {
         setEchoPick(pickedDifficulty);
       }}
       onQuick=${({ difficulty: pickedDifficulty }) => {
+        // 和「多人匹配」整屏里按「开始多人匹配」完全一样：立刻进队列，右列换成搜寻中
+        setEchoPick(pickedDifficulty);
         setEchoOpen(false);
+        setMatchVariant('deepecho');
+        setMatchOpen(true);
         quickMatch({ difficulty: pickedDifficulty, seats: 'four', rules: 'standard', variant: 'deepecho' });
       }}
       quickBusy=${busy === 'quick'} />` : null}
@@ -1763,11 +1771,16 @@ export function LobbyScreen() {
     ${/* 多人匹配整屏（「同盟集结」）：大厅的入口和同盟模拟里的胶囊都开这一屏。
           按下「开始多人匹配」后同一屏的右列换成搜寻中（我们自己后端是按下即进房，
           所以没有参考版那套 30 秒确认入场，这里也不假装有）。 */ null}
-    ${matchOpen ? html`<${MatchmakingSelect} difficulty=${shownCoop} onDifficulty=${pickDifficulty}
-      onClose=${() => { setMatchOpen(false); setMatchSearch(null); }} onStart=${(req) => quickMatch(req)}
+    ${matchOpen ? html`<${MatchmakingSelect} difficulty=${matchVariant === 'deepecho' ? (echoPick || shownCoop) : shownCoop} onDifficulty=${pickDifficulty}
+      onClose=${() => { setMatchOpen(false); setMatchSearch(null); setMatchVariant(null); }}
+      onStart=${(req) => quickMatch(req)}
       busy=${busy} online=${online} createLocked=${!createOpen} difficulties=${coop}
-      scope=${matchScopeState} onScope=${pickScope}
-      searching=${!!matchSearch} elapsed=${matchWait} queue=${matchSearch?.queue ?? null} onCancel=${cancelMatch} />` : null}
+      scope=${matchScopeState} onScope=${pickScope} variant=${matchVariant}
+      searching=${!!matchSearch} elapsed=${matchWait} queue=${matchSearch?.queue ?? null}
+      onCancel=${() => {
+        cancelMatch();
+        if (matchVariant === 'deepecho') { setMatchOpen(false); setEchoOpen(true); setMatchVariant(null); }
+      }} />` : null}
     ${/* 和参考版一致：同盟模拟还开着才画这个列表。它叠在上面（Modal 的 modalStack 让
          只有最上层响应 Esc / Tab / 焦点），所以关掉列表 = 回到同盟模拟，而不是回大厅。 */ null}
     ${/* 公开深潜：深潜专属的公开列表（维护者 2026-11-06） */ null}
