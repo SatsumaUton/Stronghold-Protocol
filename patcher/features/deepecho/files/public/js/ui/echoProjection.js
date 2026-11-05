@@ -56,7 +56,15 @@ export function EchoProjectionPanel({ pub }) {
         ${left != null ? html`<span class="echo-bless__timer" aria-live="off"><b>${left}</b><i>秒</i></span>` : null}
         <span class="echo-bless__count">${voted}/${voters.length}</span>
       </header>
-      <div class="echo-bless__cards">${options.map(card)}</div>
+      <div class="echo-bless__cards">
+        ${options.map(card)}
+        <button type="button" key="skip" class=${`echo-bless__card echo-bless__skip${myPick === options.length ? ' is-picked' : ''}`}
+          onClick=${() => vote(options.length)}>
+          <b class="echo-bless__name">${t('放弃本次')}</b>
+          <span class="echo-bless__desc">${t('保留当前投影，不替换')}</span>
+          <span class="echo-bless__votes">${(() => { const who = voters.filter((p) => votes[p.playerId] === options.length).map((p) => p.name); return who.length ? who.join('、') : t('无人投票'); })()}</span>
+        </button>
+      </div>
       <footer class="echo-bless__foot">
         <span class="echo-bless__hint">${myPick != null
           ? t('你已投「{name}」，等待队友…', { name: options[myPick]?.name || '' })

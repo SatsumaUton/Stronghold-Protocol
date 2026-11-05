@@ -631,7 +631,7 @@ export const C2S = {
   // 深潜补给（16 层起）：个人三选一
   'g.echoSupply': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 2 },
   // 「盟约投影」（16 层起每 10 层）：全队三选一投票
-  'g.echoProjection': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 2 },
+  'g.echoProjection': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 3 },
   'g.band': { bandId: isId },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is

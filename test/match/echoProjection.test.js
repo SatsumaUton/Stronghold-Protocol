@@ -99,3 +99,23 @@ test('盟约投影要反映在 bondsView：按满档激活，且不改底层 bon
   assert.equal(view.yanShip.projected, true, '标记成投影（界面可区分）');
   assert.equal(ps.bonds.yanShip.active, false, '底层 bonds 不被改写（只影响显示）');
 });
+
+// 维护者 2026-11-05：投影面板也要有「放弃本次」（全队都不想换时保留当前投影）。
+test('盟约投影可以投「放弃本次」：不换投影，也不占名额', (t) => {
+  const h = dive(21);
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.echoProjection = 'yanShip';
+  m.round = 25;
+  m.startRound(26);
+  m.echoSupply = null;
+  m.echoBlessingOffer = null;
+  assert.equal(m._echoOpenProjection(true), 1, '26 层开投影面板');
+  const skip = m.echoProjectionOffer.options.length;   // 索引 = 候选数 = 放弃
+  const [a, b] = m.alivePlayers();
+  m.setEchoProjectionPick(a, skip);
+  assert.ok(m.echoProjectionOffer, '还有人没投就不结算');
+  m.setEchoProjectionPick(b, skip);
+  assert.equal(m.echoProjectionOffer, null, '结算后收面板');
+  assert.equal(m.echoProjection, 'yanShip', '放弃 = 保留当前投影');
+});

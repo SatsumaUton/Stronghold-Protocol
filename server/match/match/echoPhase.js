@@ -1889,7 +1889,8 @@ export class MatchEcho {
     const box = this.echoProjectionOffer && this.echoProjectionOffer.round === this.round ? this.echoProjectionOffer : null;
     if (!box || box.pick != null) return fail(ERR.WRONG_PHASE);
     const at = Math.floor(Number(idx));
-    if (!(at >= 0 && at < box.options.length)) return fail(ERR.BAD_TARGET);
+    // 允许投「放弃本次」（索引 = 候选数）：全队都不想换就保留当前投影（维护者 2026-11-05）
+    if (!(at >= 0 && at <= box.options.length)) return fail(ERR.BAD_TARGET);
     if (!box.votes) box.votes = new Map();
     box.votes.set(ps.playerId, at);
     this.markPublic();
@@ -1940,6 +1941,16 @@ export class MatchEcho {
     if (!box || !Array.isArray(box.options) || !box.options.length) {
       this.echoProjectionOffer = null;
       this._echoMaybeResumePrepClock();
+      this.markPublic();
+      return OK;
+    }
+    // 放弃本次：不换投影（保留当前那条），也不占任何名额
+    if (Math.floor(Number(best) || 0) === box.options.length) {
+      this.echoProjectionOffer = null;
+      this._echoPushAnnounce('全队放弃了本次盟约投影（保留当前投影）');
+      this._echoFlushAnnounce?.();
+      this._echoMaybeResumePrepClock();
+      this._echoFlushSupplyIfPending?.();
       this.markPublic();
       return OK;
     }
