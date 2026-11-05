@@ -36,7 +36,7 @@ test('两侧同时存在时，先词条后祝福，key 不冲突', () => {
 test('未知 id 不会崩，也不会把 id 当名字甩给玩家（没有名字才退回 id）', () => {
   const chips = echoBuffChips({ words: [{ id: 'future_word' }] });
   assert.equal(chips.length, 1);
-  assert.equal(chips[0].glyph, '?');
+  assert.equal(chips[0].glyph, 'f', '未知 id 退回名字首字，不再显示问号');
   assert.equal(chips[0].label, 'future_word');
 });
 

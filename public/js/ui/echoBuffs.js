@@ -12,11 +12,27 @@
 
 /** 词条 / 祝福 → 视觉描述。glyph 用首字，tone 复用仓库已有的色板类名。 */
 export const ECHO_BUFF_VISUALS = Object.freeze({
-  // 侵蚀词条（敌人侧）
+  // 侵蚀词条（敌人侧）—— 每个 id 一个可辨识的单字记号 + 按效果类别上色
   shield: { glyph: '盾', tone: 'def' },
   harden: { glyph: '硬', tone: 'def' },
   swift: { glyph: '疾', tone: 'spd' },
   rage: { glyph: '怒', tone: 'atk' },
+  tough: { glyph: '韧', tone: 'def' },
+  colossus: { glyph: '巨', tone: 'def' },
+  carapace: { glyph: '甲', tone: 'def' },
+  ward: { glyph: '护', tone: 'def' },
+  frenzy: { glyph: '狂', tone: 'atk' },
+  fury: { glyph: '愤', tone: 'atk' },
+  dash: { glyph: '冲', tone: 'spd' },
+  crawl: { glyph: '缓', tone: 'spd' },
+  quick: { glyph: '快', tone: 'spd' },
+  slow: { glyph: '滞', tone: 'spd' },
+  savage: { glyph: '凶', tone: 'atk' },
+  sturdy: { glyph: '坚', tone: 'def' },
+  regen: { glyph: '再', tone: 'hp' },
+  bulwark: { glyph: '堡', tone: 'def' },
+  giant: { glyph: '巨', tone: 'def' },
+  aegis: { glyph: '防', tone: 'def' },
   // 祝福（己方侧）
   fund: { glyph: '资', tone: 'coin' },
   haste: { glyph: '速', tone: 'spd' },
@@ -44,14 +60,14 @@ export function echoBuffChips(echo) {
   const out = [];
   for (const w of words) {
     if (!w || typeof w.id !== 'string') continue;
-    const v = ECHO_BUFF_VISUALS[w.id] || { glyph: '?', tone: 'def' };
     const label = typeof w.name === 'string' && w.name ? w.name : w.id;
+    const v = ECHO_BUFF_VISUALS[w.id] || { glyph: label.slice(0, 1) || '敌', tone: 'def' };
     out.push({ key: `enemy:${w.id}`, side: 'enemy', id: w.id, label, glyph: v.glyph, tone: v.tone, title: w.desc ? `${label} · ${w.desc}` : label });
   }
   for (const b of blessings) {
     if (!b || typeof b.id !== 'string') continue;
-    const v = ECHO_BUFF_VISUALS[b.id] || { glyph: '?', tone: 'coin' };
     const label = typeof b.name === 'string' && b.name ? b.name : b.id;
+    const v = ECHO_BUFF_VISUALS[b.id] || { glyph: label.slice(0, 1) || '祝', tone: 'coin' };
     out.push({ key: `ally:${b.id}`, side: 'ally', id: b.id, label, glyph: v.glyph, tone: v.tone, title: b.desc ? `${label} · ${b.desc}` : label });
   }
   for (const c of curses) {
