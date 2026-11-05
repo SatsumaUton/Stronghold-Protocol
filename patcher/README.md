@@ -87,7 +87,7 @@ patcher\
 
 | 检查 | 说明 |
 |---|---|
-| 文件清单不靠人记 | 扫描 `server/ public/ shared/ matchmaker/ dashboard/ data/ content/ mm/` 里所有出现 `deepecho` / `echoVariant` / `echoBlessing` / `echoPhase` / `echoCurse` / `深渊回响` / `深潜` 等标记的运行文件（当前 **96** 个） |
+| 文件清单不靠人记 | 扫描 `server/ public/ shared/ matchmaker/ dashboard/ data/ content/ mm/` 里所有出现 `deepecho` / `echoVariant` / `echoBlessing` / `echoPhase` / `echoCurse` / `深渊回响` / `深潜` 等标记的运行文件（当前 **97** 个） |
 | 快照逐字节一致 | 每个文件都要在 `patcher/features/deepecho/files/` 里有一份**和仓库完全相同**的副本；过期 = 上游一升级就回退到旧版本 |
 | `features.json` 登记 | 有 `deepecho` 项（状态 `ported`、文件清单、验收项），升级清单里才有人知道要移植 |
 | `index.json` 登记 | **关键**：`merge-features.py` 只读 `patcher/features/index.json`；缺项 = 合并阶段整份功能被忽略 |
