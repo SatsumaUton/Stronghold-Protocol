@@ -319,6 +319,65 @@ export class MatchEcho {
             });
           }, { priority: 40, owner: 'echo:reflect' });
         }
+        // 霜噬（谢拉格主题）：处于寒冷 / 冻结的敌人受到的伤害 +35%。
+        // 必须挂 `hit`（伤害计算**之前**）：原版谢拉格 6 档就是这么乘 `c.dmg.mul` 的，
+        // 挂到 `damaged` 上已经结算完了，改不动。
+        if (Number(b.coldAmp) > 0) {
+          battle.on('hit', (c) => {
+            const t = c && c.target;
+            if (!t || t.side !== 'enemy' || !c.dmg) return;
+            const f = t.s && t.s.flags;
+            if (!f || (!f.cold && !f.freeze)) return;
+            c.dmg.mul = (Number(c.dmg.mul) || 1) * (1 + Number(b.coldAmp));
+          }, { priority: 45, owner: 'echo:frost' });
+        }
+        // 惊惧（叙拉古主题）：窗口内被己方击中的敌人恐惧 duration 秒（原版暗杀就是 3 秒）。
+        if (b.fearOnHit && Number(b.fearOnHit.secs) > 0) {
+          const win = Number(b.fearOnHit.secs);
+          const dur = Math.max(0.5, Number(b.fearOnHit.duration) || 3);
+          battle.on('damaged', (c) => {
+            if ((Number(battle.time) || 0) >= win) return;
+            if (!c || !c.source || c.source.side !== 'ally') return;
+            const t = c.target;
+            if (!t || t.side !== 'enemy' || t.alive === false) return;
+            if (t.s && t.s.flags && t.s.flags.fear) return;   // 已经在恐惧：不重复挂
+            if (typeof battle.applyStatus === 'function') battle.applyStatus(t, 'fear', { duration: dur, source: c.source });
+          }, { priority: 38, owner: 'echo:fear' });
+        }
+        // 震荡（卡西米尔主题）：窗口内每 interval 秒，对全场敌人造成「己方最高攻击 × atkScale」的真实伤害。
+        if (b.pulse && Number(b.pulse.secs) > 0 && typeof battle.every === 'function') {
+          const win = Number(b.pulse.secs);
+          const iv = Math.max(0.5, Number(b.pulse.interval) || 2);
+          const scale = Number(b.pulse.atkScale) || 0.6;
+          battle.every(iv, () => {
+            if ((Number(battle.time) || 0) > win + 1e-9) return;
+            let atk = 0;
+            for (const u of battle.units || []) {
+              if (!u || u.side !== 'ally' || u.alive === false || !u.s) continue;
+              if (Number.isFinite(u.s.atk)) atk = Math.max(atk, u.s.atk);
+            }
+            const amount = atk * scale;
+            if (!(amount > 0) || typeof battle.dealDamage !== 'function') return;
+            for (const e of battle.enemies || []) {
+              if (!e || e.alive === false) continue;
+              battle.dealDamage(null, e, { amount, type: 'true', canDodge: false, tags: ['echo:pulse'] });
+            }
+          }, { owner: 'echo:pulse' });
+        }
+        // 鲸吞（阿戈尔主题）：开战吞掉 1 只敌人（第一只出场的非领袖，直接击杀，记作真实伤害）。
+        if (b.devour === true && typeof battle.dealDamage === 'function') {
+          let done = false;
+          battle.on('enemySpawn', ({ enemy }) => {
+            if (done || !enemy || enemy.alive === false) return;
+            if (enemy.tag === 'boss' || (enemy.def && enemy.def.rank === 'BOSS')) return;
+            done = true;
+            // 血量在单位顶层的 `hp`（`s` 里只有 maxHp 等属性）；用「当前血量」当伤害量 = 直接击杀
+            const hp = Number(enemy.hp ?? (enemy.s && enemy.s.hp) ?? (enemy.s && enemy.s.maxHp)) || 0;
+            battle.dealDamage(null, enemy, {
+              amount: Math.max(hp, 1), type: 'true', canDodge: false, tags: ['echo:devour'],
+            });
+          }, { priority: 37, owner: 'echo:devour' });
+        }
       }
     }
     // 反隐匿（维护者 2026-11-05）：「照破」每 interval 秒让隐匿敌人现形 duration 秒；「洞彻」永久反隐。

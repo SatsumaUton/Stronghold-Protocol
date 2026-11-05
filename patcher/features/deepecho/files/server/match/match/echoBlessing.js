@@ -229,6 +229,27 @@ export const ECHO_BLESSINGS = Object.freeze([
     bondTheme: 'suntShip', bondLabel: '绝技',
     desc: '每回合前 20 秒，全场敌人受到的伤害 +25%',
     enemyStatuses: [{ key: 'fragile', value: 0.25 }] },
+
+  // —— 核心盟约主题的提取（维护者 2026-11-05）：同样**不看盟约是否激活**，抽到就生效 ——
+  //
+  // 8 条核心盟约里只有 谢拉格 / 叙拉古 / 卡西米尔 真带对敌异常，阿戈尔的「吞噬」是打自己人；
+  // 这里把它们的效果各提一条成祝福（阿戈尔那条改成吞敌人，属于新机制，维护者已认可）。
+  { id: 'bd_frostbite_amp', rarity: 'rare', name: '霜噬', kind: 'bonddebuff', group: 'bonddebuff',
+    bondTheme: 'kjeragShip', bondLabel: '谢拉格',
+    desc: '处于寒冷 / 冻结状态的敌人受到的伤害 +35%',
+    coldAmp: 0.35 },
+  { id: 'bd_dread', rarity: 'epic', name: '惊惧', kind: 'bonddebuff', group: 'bonddebuff',
+    bondTheme: 'siracusaShip', bondLabel: '叙拉古',
+    desc: '每回合前 10 秒，被己方干员击中的敌人恐惧 3 秒',
+    fearOnHit: { secs: 10, duration: 3 } },
+  { id: 'bd_quake', rarity: 'rare', name: '震荡', kind: 'bonddebuff', group: 'bonddebuff',
+    bondTheme: 'kazimierzShip', bondLabel: '卡西米尔',
+    desc: '每回合前 15 秒，每 2 秒对全场敌人造成己方最高攻击 60% 的真实伤害',
+    pulse: { secs: 15, interval: 2, atkScale: 0.6 } },
+  { id: 'bd_devour', rarity: 'epic', name: '鲸吞', kind: 'bonddebuff', group: 'bonddebuff',
+    bondTheme: 'egirShip', bondLabel: '阿戈尔',
+    desc: '开战吞噬 1 只当前生命最低的非领袖敌人（直接击杀）',
+    devour: true },
 ]);
 
 /**

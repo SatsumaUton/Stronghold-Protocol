@@ -39,14 +39,23 @@ function fakeBattle() {
   const b = {
     time: 0,
     enemies: [],
+    units: [],
     statuses: [],
     damage: [],
+    timers: [],
     applyStatus(e, key, opts) {
       this.statuses.push({ target: e, key, ...opts });
       return true;
     },
     dealDamage(src, tgt, opts) {
       this.damage.push({ src, tgt, ...opts });
+    },
+    every(sec, fn) {
+      this.timers.push({ sec, fn });
+    },
+    /** 触发所有 every 定时器（模拟「到点了」）。 */
+    tick() {
+      for (const t of this.timers) t.fn();
     },
     on(name, fn) {
       if (!handlers.has(name)) handlers.set(name, []);
@@ -61,18 +70,21 @@ function fakeBattle() {
 
 test('11 条主题转化都在祝福池里，各自记着主题来源', () => {
   const themed = ECHO_BLESSINGS.filter((b) => b.bondTheme);
-  assert.equal(themed.length, Object.keys(THEMES).length, '一条盟约一条转化');
-  for (const [bondId, id] of Object.entries(THEMES)) {
+  // 11 条附加盟约的转化 + 4 条从核心盟约提的（霜噬 / 惊惧 / 震荡 / 鲸吞）
+  assert.equal(themed.length, Object.keys(THEMES).length + 4, '11 条附加 + 4 条核心');
+  for (const [bondId, id] of Object.entries({ ...THEMES, kjeragShip: 'bd_frostbite_amp', siracusaShip: 'bd_dread', kazimierzShip: 'bd_quake', egirShip: 'bd_devour' })) {
     const b = echoBlessingById(id);
     assert.ok(b, `${id} 要存在`);
     assert.equal(b.bondTheme, bondId, `${id} 的主题是 ${bondId}`);
     assert.equal(b.kind, 'bonddebuff');
     assert.ok(b.name && b.desc, `${id} 要有名字与说明`);
-    // 描述里的秒数必须和稀有度分档一致（改稀有度忘了改文案会被这条钉住）
+    assert.doesNotMatch(b.desc, /队伍激活/, `${id} 的文案不该再带门槛`);
+  }
+  // 11 条附加盟约的转化：描述里的秒数必须和稀有度分档一致
+  for (const id of Object.values(THEMES)) {
+    const b = echoBlessingById(id);
     const secs = echoBondDebuffSeconds(b.rarity);
     assert.match(b.desc, new RegExp(`每回合前 ${secs} 秒`), `${id} 的文案要写对秒数`);
-    // 不再写「队伍激活【X】时」—— 不看盟约是否激活
-    assert.doesNotMatch(b.desc, /队伍激活/, `${id} 的文案不该再带门槛`);
   }
 });
 
@@ -165,4 +177,102 @@ test('真战斗里也用得上：洞穿让敌人的防御真的降下来', (t) =
   assert.ok(e, '敌人要出场');
   const buffs = (e.buffs || []).map((x) => x.key).join(',');
   assert.match(buffs, /defDown/, `敌人身上要有 defDown（实际：${buffs}）`);
+});
+
+// —— 核心盟约主题的 4 条（维护者 2026-11-05）：同样不看盟约，抽到就生效 ——
+
+test('霜噬：寒冷 / 冻结的敌人受到的伤害 +35%（走 hit，伤害计算之前）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  h.ps('p_0').bonds = {};                       // 一条盟约都没有
+  m.echoBlessings = ['bd_frostbite_amp'];
+  const b = fakeBattle();
+  m._echoHookBattle(b);
+  const cold = { alive: true, side: 'enemy', s: { flags: { cold: true } } };
+  const warm = { alive: true, side: 'enemy', s: { flags: {} } };
+  const hitOn = (target) => { const dmg = { mul: 1 }; b.emit('hit', { source: { side: 'ally' }, target, dmg }); return dmg.mul; };
+  assert.equal(hitOn(cold), 1.35, '寒冷目标 ×1.35');
+  assert.equal(hitOn(warm), 1, '没寒冷的不加');
+  const frozen = { alive: true, side: 'enemy', s: { flags: { freeze: true } } };
+  assert.equal(hitOn(frozen), 1.35, '冻结也算');
+});
+
+test('惊惧：窗口内被己方击中的敌人恐惧 3 秒，窗口外不再挂', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.echoBlessings = ['bd_dread'];
+  const b = fakeBattle();
+  m._echoHookBattle(b);
+  const ally = { alive: true, side: 'ally' };
+  const enemy = { alive: true, side: 'enemy', s: { flags: {} } };
+  b.emit('damaged', { source: ally, target: enemy, amount: 10 });
+  assert.equal(b.statuses.length, 1);
+  assert.equal(b.statuses[0].key, 'fear');
+  assert.equal(b.statuses[0].duration, 3);
+  // 已经在恐惧 → 不重复挂
+  enemy.s.flags.fear = true;
+  b.emit('damaged', { source: ally, target: enemy, amount: 10 });
+  assert.equal(b.statuses.length, 1, '不重复挂');
+  enemy.s.flags.fear = false;
+  // 窗口结束（10 秒）
+  b.time = 10;
+  b.emit('damaged', { source: ally, target: enemy, amount: 10 });
+  assert.equal(b.statuses.length, 1, '窗口过后不再挂');
+  // 敌人打己方不触发
+  b.time = 0;
+  b.emit('damaged', { source: enemy, target: ally, amount: 10 });
+  assert.equal(b.statuses.length, 1, '只认己方打敌人');
+});
+
+test('震荡：窗口内每 2 秒对全场敌人造成己方最高攻击 60% 的真实伤害', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.echoBlessings = ['bd_quake'];
+  const b = fakeBattle();
+  b.units = [
+    { side: 'ally', alive: true, s: { atk: 400 } },
+    { side: 'ally', alive: true, s: { atk: 1000 } },
+    { side: 'enemy', alive: true, s: { atk: 9999 } },
+  ];
+  const e1 = { alive: true, side: 'enemy' };
+  const e2 = { alive: true, side: 'enemy' };
+  b.enemies = [e1, e2];
+  m._echoHookBattle(b);
+  assert.equal(b.timers.length, 1, '要挂一个周期定时器');
+  assert.equal(b.timers[0].sec, 2);
+  b.time = 1.5;
+  b.tick();
+  assert.equal(b.damage.length, 2, '两只敌人各吃一次');
+  assert.equal(b.damage[0].amount, 600, '最高攻击 1000 × 60%');
+  assert.equal(b.damage[0].type, 'true');
+  // 窗口结束（15 秒）之后不再造成伤害
+  b.time = 16;
+  b.tick();
+  assert.equal(b.damage.length, 2, '窗口过后不再脉冲');
+});
+
+test('鲸吞：开战吞掉 1 只非领袖敌人，领袖不吞', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.echoBlessings = ['bd_devour'];
+  const b = fakeBattle();
+  m._echoHookBattle(b);
+  // 先来一只领袖：不吞
+  const boss = { alive: true, side: 'enemy', tag: 'boss', hp: 5000, s: { maxHp: 5000 }, def: { rank: 'BOSS' } };
+  b.emit('enemySpawn', { enemy: boss });
+  assert.equal(b.damage.length, 0, '领袖不吞');
+  // 再来一只普通怪：吞掉（伤害量 = 当前血量）
+  const mob = { alive: true, side: 'enemy', hp: 1234, s: { maxHp: 1234 }, def: { rank: 'NORMAL' } };
+  b.emit('enemySpawn', { enemy: mob });
+  assert.equal(b.damage.length, 1);
+  assert.equal(b.damage[0].tgt, mob);
+  assert.equal(b.damage[0].amount, 1234);
+  // 只吞一只
+  const mob2 = { alive: true, side: 'enemy', hp: 999, s: { maxHp: 999 }, def: { rank: 'NORMAL' } };
+  b.emit('enemySpawn', { enemy: mob2 });
+  assert.equal(b.damage.length, 1, '每场只吞一只');
 });

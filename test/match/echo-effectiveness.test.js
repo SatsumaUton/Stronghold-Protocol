@@ -207,13 +207,24 @@ test('祝福逐条生效：每条都能在消费端看到差异', (t) => {
         m._echoHookBattle(bh.b);
         bh.step(1);
         const e = (bh.b.enemies || [])[0];
-        assert.ok(e, `${b.id} 的测试敌人没出场`);
+        if (b.devour === true) {
+          // 鲸吞：开战吞掉第一只非领袖敌人（我们这只测试怪就是）—— 它已经被吃掉，所以场上没有活着的敌人
+          assert.equal((bh.b.enemies || []).length, 0, `${b.id} 没吞掉敌人`);
+        } else {
+          assert.ok(e, `${b.id} 的测试敌人没出场`);
+        }
         if (Number(b.reflect) > 0) {
           // 反震：窗口内敌人打己方 → 敌人自己吃到反伤（反伤的 source 是 null，所以不会递归）
           let reflected = 0;
           bh.b.on('damaged', (c) => { if (c && c.target === e && !c.source) reflected += 1; });
           bh.b.emit('damaged', { source: e, target: { side: 'ally' }, amount: 100, type: 'phys' });
           assert.ok(reflected > 0, `${b.id} 没有反伤`);
+        } else if (b.devour === true) {
+          // 上面已经断言过
+        } else if (Number(b.coldAmp) > 0 || (b.fearOnHit && b.fearOnHit.secs > 0) || (b.pulse && b.pulse.secs > 0)) {
+          // 霜噬 / 惊惧 / 震荡：靠 hit / damaged / every 钩子，这里只确认钩子装上了
+          //（详细行为在 test/match/echoBondDebuff.test.js）
+          assert.ok(bh.b._hooks && (bh.b._hooks.hit || bh.b._hooks.damaged || bh.b._hooks.every), `${b.id} 没有挂上钩子`);
         } else {
           const keys = (e.buffs || []).map((x) => x && x.key);
           assert.ok((b.enemyStatuses || []).some((st) => keys.includes(st.key)),
