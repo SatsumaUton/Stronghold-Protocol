@@ -6779,6 +6779,11 @@
         "customBytes": 7467
       },
       {
+        "path": "public/js/ui/resumeMatch.js",
+        "baseExists": false,
+        "customBytes": 12338
+      },
+      {
         "path": "public/js/ui/revival.js",
         "baseExists": false,
         "customBytes": 5464

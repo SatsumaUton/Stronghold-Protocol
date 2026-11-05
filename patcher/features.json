@@ -481,6 +481,7 @@
         "public/js/ui/hud.js",
         "public/js/ui/matchChrome.js",
         "public/js/ui/matchEnemies.js",
+        "public/js/ui/resumeMatch.js",
         "public/js/ui/revival.js",
         "public/js/ui/roomList.js",
         "public/js/ui/shopBar.js",
