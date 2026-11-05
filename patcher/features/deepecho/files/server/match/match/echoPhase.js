@@ -1364,6 +1364,8 @@ export class MatchEcho {
         return {
           id, name, rarity: c.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c.rarity] || '普通',
           desc: `${desc}（已禁：${names}${tail}）`,
+          // buff 栏角标：还会持续几层（维护者 2026-11-05）
+          ...(left.length ? { roundsLeft: Math.max(...left) } : {}),
         };
       }
       // 封锁（deployBan）：把「还剩几层」写进描述（维护者 2026-11-05）
@@ -1373,6 +1375,7 @@ export class MatchEcho {
         return {
           id, name, rarity: c.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c.rarity] || '普通',
           desc: `${desc}${tail}`,
+          ...(left > 0 ? { roundsLeft: left } : {}),
         };
       }
       return { id, name, desc, rarity: c?.rarity || 'common', rarityLabel: ECHO_CURSE_RARITY_LABEL[c?.rarity] || '普通' };
@@ -1396,7 +1399,7 @@ export class MatchEcho {
       // 本回合随机刷新的那条（只作用于本回合，下回合可能换掉或消失）
       ...(this.echoRoundCurse ? (() => {
         const c = echoCurseById(this.echoRoundCurse);
-        return c ? [{ ...withRarity(c), name: `${c.name}（本回合）` }] : [];
+        return c ? [{ ...withRarity(c), name: `${c.name}（本回合）`, temporary: true, rounds: 1 }] : [];
       })() : []),
     ];
   }
@@ -1410,7 +1413,20 @@ export class MatchEcho {
       diveStart: this.echoDiveStart,
       depth: this._echoDepth(),
       // 词条带上说明，客户端圆片的 title 才能显示「硬化 · 防御 +200」这类效果
-      words: this._echoWords().map((w) => ({ id: w.id, name: w.name, desc: w.desc })),
+      words: [
+        ...this._echoWords().map((w) => ({ id: w.id, name: w.name, desc: w.desc })),
+        // 深潜补给选的「本层词条」（维护者 2026-11-05：HUD 上完全看不到，玩家以为补给没生效）。
+        // 带 temporary + rounds 让 buff 栏打上「本」角标，下一层自动消失。
+        ...(Array.isArray(this.echoSupplyWords) ? this.echoSupplyWords
+          .filter((w) => w && w.round === this.round)
+          .map((w) => ({
+            id: `supply:${w.round}:${w.name || 'word'}`,
+            name: w.name || '本层词条',
+            desc: '深潜补给：本层全队生效，下一层消失',
+            temporary: true,
+            rounds: 1,
+          })) : []),
+      ],
       blessings: this._echoBlessings().map((b) => ({
         id: b.id,
         name: b.name,

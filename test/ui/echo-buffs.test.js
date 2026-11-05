@@ -113,3 +113,39 @@ test('徽记按效果设计：轮廓 / 方向 / 强度', async () => {
   assert.equal(echoSigil({ id: 'miracle', desc: '免费刷新总数上限 5 次' }, 'curse').base, 'refresh');
   assert.equal(echoSigil({ id: 'harden', desc: '防御 +200' }, 'enemy').base, 'shield');
 });
+// 维护者 2026-11-05：有时效的 buff 要在 buff 栏打角标 ——
+//   temporary（深潜补给的本层词条 / 本回合随机诅咒）→ 「本」
+//   roundsLeft（排异 / 封锁按层数到期）→ 剩余层数
+// 没有时效的 buff 不打角标（left = null 且 temp = false）。
+test('本层词条带 temporary：圆片打「本」角标，title 写明本层', () => {
+  const chips = echoBuffChips({ words: [
+    { id: 'supply:20:词条 · 强攻', name: '词条 · 强攻', desc: '深潜补给：本层全队生效', temporary: true, rounds: 1 },
+    { id: 'shield', name: '护盾' },
+  ] });
+  const supply = chips.find((c) => c.label === '词条 · 强攻');
+  assert.equal(supply.temp, true, '本层词条要标记 temporary');
+  assert.equal(supply.left, 1, '角标显示 1（本层）');
+  assert.ok(supply.title.includes('本层'), '悬浮说明要写明本层');
+  const plain = chips.find((c) => c.label === '护盾');
+  assert.equal(plain.temp, false, '普通词条不标记');
+  assert.equal(plain.left, null, '普通词条没有角标');
+});
+
+test('按层数到期的诅咒带 roundsLeft：圆片打剩余层数', () => {
+  const chips = echoBuffChips({ curses: [
+    { id: 'block_bond', name: '排异', desc: '随机一个附加盟约的干员无法部署', rarity: 'rare', roundsLeft: 3 },
+    { id: 'frenzy', name: '狂怒', desc: '敌方攻击 +10%' },
+  ] });
+  const ban = chips.find((c) => c.label === '排异');
+  assert.equal(ban.left, 3);
+  assert.ok(ban.title.includes('剩余 3 层'));
+  const plain = chips.find((c) => c.label === '狂怒');
+  assert.equal(plain.left, null, '没有到期层的诅咒不打角标');
+});
+
+test('本回合随机诅咒带 temporary：圆片打「本」角标', () => {
+  const chips = echoBuffChips({ curses: [{ id: 'fog', name: '迷雾（本回合）', rarity: 'common', temporary: true, rounds: 1 }] });
+  assert.equal(chips[0].temp, true);
+  assert.equal(chips[0].left, 1);
+  assert.ok(chips[0].title.includes('本回合'));
+});

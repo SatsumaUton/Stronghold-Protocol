@@ -112,7 +112,11 @@ export function echoBuffChips(echo) {
     if (!w || typeof w.id !== 'string') continue;
     const label = typeof w.name === 'string' && w.name ? w.name : w.id;
     const v = ECHO_BUFF_VISUALS[w.id] || { glyph: label.slice(0, 1) || '敌', tone: 'def' };
-    out.push({ key: `enemy:${w.id}`, side: 'enemy', id: w.id, raw: w, label, glyph: v.glyph, icon: echoBuffIcon(w, 'enemy'), tone: v.tone, title: w.desc ? `${label} · ${w.desc}` : label });
+    // 本层词条（深潜补给）带 temporary/rounds：buff 栏打「本」角标（维护者 2026-11-05）
+    const temp = w.temporary === true;
+    const left = Number.isFinite(Number(w.roundsLeft)) ? Number(w.roundsLeft) : (temp ? 1 : null);
+    const tag = temp ? '（本层）' : left != null ? `（剩余 ${left} 层）` : '';
+    out.push({ key: `enemy:${w.id}`, side: 'enemy', id: w.id, raw: w, label, glyph: v.glyph, icon: echoBuffIcon(w, 'enemy'), tone: v.tone, temp, left, title: w.desc ? `${label}${tag} · ${w.desc}` : `${label}${tag}` });
   }
   for (const b of blessings) {
     if (!b || typeof b.id !== 'string') continue;
@@ -131,7 +135,11 @@ export function echoBuffChips(echo) {
     const glyph = label.slice(0, 1) || '诅';
     const tone = CURSE_TONE[c.rarity] || 'def';
     const tag = typeof c.rarityLabel === 'string' && c.rarityLabel ? `（${c.rarityLabel}）` : '';
-    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, raw: c, label, glyph, effectKind: (c.effect && c.effect.kind) || null, icon: echoBuffIcon(c, 'curse'), tone, title: c.desc ? `${label}${tag} · ${c.desc}` : `${label}${tag}` });
+    // 按层数到期的诅咒（排异 / 封锁）与本回合才有的诅咒：buff 栏打角标（维护者 2026-11-05）
+    const temp = c.temporary === true;
+    const left = Number.isFinite(Number(c.roundsLeft)) ? Number(c.roundsLeft) : (temp ? 1 : null);
+    const when = temp ? '（本回合）' : left != null ? `（剩余 ${left} 层）` : '';
+    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, raw: c, label, glyph, effectKind: (c.effect && c.effect.kind) || null, icon: echoBuffIcon(c, 'curse'), tone, temp, left, title: c.desc ? `${label}${tag}${when} · ${c.desc}` : `${label}${tag}${when}` });
   }
   return out;
 }

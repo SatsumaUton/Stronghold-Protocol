@@ -1556,6 +1556,37 @@ test('返场 boss 的血量随深度递增（R14 < R25 < R35 < R45），波次�
     assert.ok(Math.abs(v.wave - base * v.poolMul) < 1e-6, `${r} 层波次缩放与血池倍率不同源`);
   }
 });
+// 维护者 2026-11-05：有时效的 buff 必须在 buff 栏看得到「还有多久」——
+// 本层词条（深潜补给）以前完全不出现在 words 里，HUD 上根本看不到；排异/封锁只剩几层也没角标。
+test('本层词条进 buff 栏（temporary + rounds），按层数到期的诅咒带 roundsLeft', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 19;
+  m.startRound(20);
+  m.echoSupply = {
+    round: 20,
+    options: [{ kind: 'word', id: 'word_atk', name: '词条 · 强攻', desc: '本层全队攻击 +8%', mods: { atkPct: 0.08 } }],
+    votes: new Map(),
+    pick: null,
+  };
+  m._echoSettleSupply(0);
+  const word = m.publicView().echo.words.find((w) => w.temporary === true);
+  assert.ok(word, '本层词条要出现在 m.public.echo.words 里');
+  assert.equal(word.name, '词条 · 强攻');
+  assert.equal(word.rounds, 1, '角标要显示「本层」');
+  // 下一层自动消失
+  m.round = 20;
+  m.startRound(21);
+  assert.ok(!m.publicView().echo.words.some((w) => w.temporary === true), '下一层不再显示本层词条');
+  // 按层数到期的诅咒：排异还剩 2 层
+  m.echoCurseIds = ['block_bond'];
+  m.echoBannedBonds = ['someBond'];
+  m.echoBannedBondsUntil = { someBond: m._echoDepth() + 2 };
+  const curse = m.publicView().echo.curses.find((c) => c.id === 'block_bond');
+  assert.equal(curse.roundsLeft, 2, 'buff 栏角标要显示剩余层数');
+});
+
 // 维护者 2026-11-05（67 层实测）：队友死亡后无法救援，界面提示「本局模拟已经结束，无法救援」。
 // 根因：boss 战的**团队血池** teamLp 在 boss 回合结束后从没复位过 —— 原版只打一次 boss 所以没事，
 // 深潜的返场 boss（25 / 35 / 45…）会反复出现，于是从 R14 之后每一层都被当成「boss 战还没结束」。
