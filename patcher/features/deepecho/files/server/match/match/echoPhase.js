@@ -636,9 +636,15 @@ export class MatchEcho {
     if (depth === 15) this._echoPushAnnounce('第 15 层：精英加压（本层不出 boss）');
     // 16 层起的经济消耗：进入这一层就播报一次（挂机玩家回来也能在播报里看到），
     // 之后每层的实际倍率挂在「本局信息 → 深渊回响 → 固定规则」的「深渊通胀」条目上。
-    if (depth === 16) {
+    if (depth === 16 && this.echoInflationAnnounced !== true) {
+      this.echoInflationAnnounced = true;
       // 广播口径（维护者 2026-11-05）：要说清楚「新增了什么」，而不是只报一个倍率。
-      this._echoPushAnnounce(`新增固定规则「深渊通胀」：16 层起，商店购买价与刷新价每层 +4%（当前 ×${this._echoShopInflate(r).toFixed(2)}，封顶 ×1.5）。可在「本局信息 → 深渊回响」查看。`);
+      // ⚠ 这里**直接发一条独立 ticker**，不走 `_echoPushAnnounce` 队列：
+      // 队列会把「本回合诅咒 / 侵蚀词条」拼成一行（`　｜　` 连接），长文本还会被服务端截到 200 字，
+      // 16 层的规则播报就容易被挤没（维护者 2026-11-05 反馈「没有房间广播」）。
+      const text = `新增固定规则「深渊通胀」：16 层起，商店购买价与刷新价每层 +4%（当前 ×${this._echoShopInflate(r).toFixed(2)}，封顶 ×1.5）。可在「本局信息 → 深渊回响」查看。`;
+      this.tickerText?.(text, FLOW_TICKER_PRIORITY);
+      this.log?.info?.(`[match ${this.roomCode}] echo inflation announced`);
     }
   }
 

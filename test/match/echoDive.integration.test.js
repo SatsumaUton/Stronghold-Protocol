@@ -1448,3 +1448,25 @@ test('boss 关对准备阶段可见：15 层隐藏核心 / 25 层返场', (t) =>
   assert.equal(node.bossRound, true, '25 层是返场 boss 关');
   assert.equal(node.bossId, h3.m.bossId);
 });
+
+// 维护者 2026-11-05：16 层的规则播报没在房间里看到。
+// 原来它走 `_echoPushAnnounce` 队列，会和「本回合诅咒 / 侵蚀词条」拼成一行（还可能被 200 字截断）。
+// 现在改成独立 ticker，且只播一次。
+test('16 层「深渊通胀」用独立广播，不与本回合诅咒合并，且只播一次', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const lines = [];
+  const orig = m.tickerText.bind(m);
+  m.tickerText = (txt, p) => { lines.push(String(txt)); return orig(txt, p); };
+  m.round = 15;
+  m.startRound(16);
+  const hit = lines.filter((s) => s.includes('深渊通胀'));
+  assert.equal(hit.length, 1, '16 层要有一条独立播报');
+  assert.ok(!hit[0].includes('｜'), '不能和本回合诅咒 / 词条合并成一行');
+  assert.match(hit[0], /新增固定规则/);
+  lines.length = 0;
+  m.round = 16;
+  m.startRound(17);
+  assert.equal(lines.filter((s) => s.includes('深渊通胀')).length, 0, '只在 16 层播一次');
+});
