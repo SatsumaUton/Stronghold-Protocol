@@ -112,13 +112,13 @@ export function echoBuffChips(echo) {
     if (!w || typeof w.id !== 'string') continue;
     const label = typeof w.name === 'string' && w.name ? w.name : w.id;
     const v = ECHO_BUFF_VISUALS[w.id] || { glyph: label.slice(0, 1) || '敌', tone: 'def' };
-    out.push({ key: `enemy:${w.id}`, side: 'enemy', id: w.id, label, glyph: v.glyph, icon: echoBuffIcon(w, 'enemy'), tone: v.tone, title: w.desc ? `${label} · ${w.desc}` : label });
+    out.push({ key: `enemy:${w.id}`, side: 'enemy', id: w.id, raw: w, label, glyph: v.glyph, icon: echoBuffIcon(w, 'enemy'), tone: v.tone, title: w.desc ? `${label} · ${w.desc}` : label });
   }
   for (const b of blessings) {
     if (!b || typeof b.id !== 'string') continue;
     const label = typeof b.name === 'string' && b.name ? b.name : b.id;
     const v = ECHO_BUFF_VISUALS[b.id] || { glyph: label.slice(0, 1) || '祝', tone: 'coin' };
-    out.push({ key: `ally:${b.id}`, side: 'ally', id: b.id, label, glyph: v.glyph, icon: echoBuffIcon(b, 'ally'), tone: v.tone, title: b.desc ? `${label} · ${b.desc}` : label });
+    out.push({ key: `ally:${b.id}`, side: 'ally', id: b.id, raw: b, label, glyph: v.glyph, icon: echoBuffIcon(b, 'ally'), tone: v.tone, title: b.desc ? `${label} · ${b.desc}` : label });
   }
   for (const c of curses) {
     if (!c || typeof c.id !== 'string') continue;
@@ -127,7 +127,7 @@ export function echoBuffChips(echo) {
     const glyph = label.slice(0, 1) || '诅';
     const tone = CURSE_TONE[c.rarity] || 'def';
     const tag = typeof c.rarityLabel === 'string' && c.rarityLabel ? `（${c.rarityLabel}）` : '';
-    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, label, glyph, effectKind: (c.effect && c.effect.kind) || null, icon: echoBuffIcon(c, 'curse'), tone, title: c.desc ? `${label}${tag} · ${c.desc}` : `${label}${tag}` });
+    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, raw: c, label, glyph, effectKind: (c.effect && c.effect.kind) || null, icon: echoBuffIcon(c, 'curse'), tone, title: c.desc ? `${label}${tag} · ${c.desc}` : `${label}${tag}` });
   }
   return out;
 }

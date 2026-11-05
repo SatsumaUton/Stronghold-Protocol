@@ -98,17 +98,18 @@ test('词条 / 祝福也有图标（不再是问号或纯文字）', () => {
   assert.ok(chips.every((c) => typeof c.icon === 'string' && c.icon.length > 0), '每个圆片都要有图标名');
 });
 
-// 维护者 2026-11-05：每个 buff 要有自己的图标。仓库只有 39 个图标、buff 有 110+ 条，
-// 所以用「类别轮廓 + id 哈希点阵」：同类别轮廓相同、点阵必须不同。
-test('徽记：同类别不同 id 的点阵不同，同一个 id 稳定', async () => {
+// 维护者 2026-11-05：图标要**按效果设计**，不是随机图案。
+// 轮廓 = 被影响的东西（攻击剑 / 防御盾 / 资金图表 / 禁制钥匙…），箭头 = 方向，箭头数 = 强度。
+test('徽记按效果设计：轮廓 / 方向 / 强度', async () => {
   const { echoSigil } = await import('../../public/js/ui/echoSigils.js');
-  const a = echoSigil({ id: 'harden' }, 'enemy');
-  const b = echoSigil({ id: 'tough' }, 'enemy');
-  assert.equal(a.base, b.base, '同类词条轮廓相同');
-  assert.notDeepEqual(a.dots, b.dots, '点阵必须不同（否则两条 buff 图标一样）');
-  assert.deepEqual(echoSigil({ id: 'harden' }, 'enemy'), a, '同一个 id 每次结果稳定');
-  // 诅咒按效果类型选轮廓
-  assert.equal(echoSigil({ id: 'block_bond', effect: { kind: 'bondBan' } }, 'curse').base, 'key');
-  assert.equal(echoSigil({ id: 'block_tiles', effect: { kind: 'deployBan' } }, 'curse').base, 'close');
-  assert.equal(echoSigil({ id: 'miracle' }, 'curse').base, 'refresh');
+  const sharp = echoSigil({ id: 'atk_s', group: 'atk', kind: 'mods', desc: '全体干员攻击 +6%' }, 'ally');
+  assert.deepEqual(sharp, { base: 'sword', dir: 'up', level: 1 });
+  const strong = echoSigil({ id: 'atk_m', group: 'atk', kind: 'mods', desc: '全体干员攻击 +12%' }, 'ally');
+  assert.deepEqual(strong, { base: 'sword', dir: 'up', level: 2 }, '同一效果、强度更高 → 多一个箭头');
+  const dull = echoSigil({ id: 'r_weak_melee', effect: { kind: 'unitMods' }, desc: '近战位干员攻击 −12%' }, 'curse');
+  assert.deepEqual(dull, { base: 'sword', dir: 'down', level: 2 }, '诅咒是向下箭头');
+  assert.equal(echoSigil({ id: 'block_bond', effect: { kind: 'bondBan' }, desc: '禁止一个盟约' }, 'curse').base, 'key');
+  assert.equal(echoSigil({ id: 'tribute', effect: { kind: 'coinMul' }, desc: '资金收入 −10%' }, 'curse').base, 'chart');
+  assert.equal(echoSigil({ id: 'miracle', desc: '免费刷新总数上限 5 次' }, 'curse').base, 'refresh');
+  assert.equal(echoSigil({ id: 'harden', desc: '防御 +200' }, 'enemy').base, 'shield');
 });

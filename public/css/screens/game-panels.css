@@ -955,7 +955,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-buffbar .ecochip { pointer-events: auto; font-size: calc(.14 * var(--t)); }
 .echo-buffbar .ecochip__icon { width: .15rem; height: .15rem; }
 .echo-buffbar .ecochip__icon { fill: currentColor; }
-.sigil-dot { fill: rgba(10, 6, 20, .88); }
+.sigil-arrow.is-up { fill: #ffe08a; }
+.sigil-arrow.is-down { fill: #ff8fa8; }
 .echo-buffbar .ecochip.is-enemy { border-color: rgba(255, 150, 190, .5); }
 .echo-buffbar .ecochip.is-ally { border-color: rgba(255, 210, 140, .5); }
 .echo-buffbar .ecochip.is-curse { border-color: rgba(200, 139, 255, .55); }

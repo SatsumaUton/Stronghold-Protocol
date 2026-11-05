@@ -125,12 +125,18 @@ export function EchoInfoBlock({ pub }) {
  * 直接映射必然重复（截图里三个盾、三个皇冠），这是「每条都有独立图标」的可行做法。
  */
 function BuffSigil({ chip }) {
-  const sig = echoSigil({ id: chip.id, effect: { kind: chip.effectKind } }, chip.side, chip.tone);
+  const sig = echoSigil(chip.raw || { id: chip.id }, chip.side);
   const ic = ICONS[sig.base];
   if (!ic) return null;
+  const up = sig.dir === 'up';
+  const arrows = [];
+  for (let i = 0; i < sig.level; i++) {
+    arrows.push(html`<polygon key=${i} class=${up ? 'sigil-arrow is-up' : 'sigil-arrow is-down'}
+      points=${up ? '0,-3.2 3,2 -3,2' : '0,3.2 3,-2 -3,-2'} transform=${'translate(' + (12 + i * 5) + ', 20.5)'} />`);
+  }
   return html`<svg class="ecochip__icon" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false">
     <path d=${ic.d} fill-rule=${ic.eo ? 'evenodd' : undefined} />
-    ${sig.dots.map(([x, y], i) => html`<circle key=${i} cx=${x} cy=${y} r="2" class="sigil-dot" />`)}
+    ${arrows}
   </svg>`;
 }
 
