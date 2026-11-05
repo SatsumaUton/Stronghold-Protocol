@@ -67,7 +67,7 @@ function RoomRow({ row, disabled, onJoin, joinLabel = null }) {
  * 公开同盟列表。
  * @param {{ online: boolean, queued?: boolean, busy?: string | null, onJoin: (code: string) => void, onClose: () => void }} props
  */
-export function RoomListDialog({ online, queued = false, busy = null, onJoin, onClose, variant = null, onCreatePublic = null }) {
+export function RoomListDialog({ online, queued = false, busy = null, onJoin, onClose, variant = null }) {
   const [rows, setRows] = useState(null);
   const [failed, setFailed] = useState(false);
   const inFlight = useRef(false);
@@ -95,8 +95,8 @@ export function RoomListDialog({ online, queued = false, busy = null, onJoin, on
     return () => { alive.current = false; clearInterval(timer); };
   }, [online, variant]);
   return html`<${Modal} open=${true} title=${echo ? t('公开深潜') : t('公开同盟')} micro=${echo ? 'OPEN DEEP DIVES' : 'OPEN ALLIANCES'}
-      class="lobby-dialog rlist-dialog" onClose=${onClose}
-      actions=${html`${echo && onCreatePublic ? html`<${Button} variant="primary" icon="link" disabled=${!online || !!busy} onClick=${onCreatePublic}>${t('开一间公开的')}<//>` : null}<${Button} variant="secondary" icon="refresh" disabled=${!online} onClick=${load}>${t('刷新')}<//><${Button} icon="close" onClick=${onClose}>${t('关闭')}<//>`}>
+      class=${`lobby-dialog rlist-dialog${echo ? ' is-echo' : ''}`} onClose=${onClose}
+      actions=${html`<${Button} variant="secondary" icon="refresh" disabled=${!online} onClick=${load}>${t('刷新')}<//><${Button} icon="close" onClick=${onClose}>${t('关闭')}<//>`}>
     <p class="modal__text">${echo
       ? t('由创建者公开、尚未开局的深渊回响房显示在这里（进房仍需深潜资格）。')
       : t('{n} 人及以上、由创建者公开且尚未开局的同盟显示在这里。', { n: ROOM_LIST_MIN_CAPACITY })}</p>

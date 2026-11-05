@@ -6621,7 +6621,7 @@
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": false,
-        "customBytes": 126817
+        "customBytes": 128761
       },
       {
         "path": "public/css/screens/room.css",
@@ -6641,7 +6641,7 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 196287
+        "customBytes": 196242
       },
       {
         "path": "public/i18n/ja.json",
@@ -6676,7 +6676,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 114629
+        "customBytes": 115473
       },
       {
         "path": "public/js/screens/result.js",
@@ -6786,7 +6786,7 @@
       {
         "path": "public/js/ui/roomList.js",
         "baseExists": false,
-        "customBytes": 11237
+        "customBytes": 11074
       },
       {
         "path": "public/js/ui/shopBar.js",
