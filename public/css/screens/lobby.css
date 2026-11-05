@@ -585,12 +585,35 @@
 /* 我的成绩：两块数字 */
 /* 深潜整屏：底部三个一样大的按钮（公开深潜 / 开始多人匹配 / 开始深渊回响，维护者 2026-11-06）。
    三个都是 .proto-start，等宽等高；1/3 宽度放不下 rook 徽记，所以只留图标 + 标签，字号统一小一号。 */
-.proto-foot--triple { flex-direction: row; align-items: stretch; gap: .08rem; padding-left: 0; }
-.proto-foot--triple > .proto-start { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 .08rem; gap: 0; }
-.proto-foot--triple .proto-start__mark { display: none; }
-.proto-foot--triple .proto-start__label { flex: 0 1 auto; padding-right: 0; gap: .05rem; font-size: min(calc(.24 * var(--t)), .3rem); letter-spacing: .02em; white-space: nowrap; }
-.proto-foot--triple .proto-start__label .icon { width: 1.05em; height: 1.05em; }
-.proto-foot--triple .proto-start__deco { width: 16%; opacity: .5; }
+/* 深潜整屏：底部三个一样大的按钮（公开深潜 / 开始多人匹配 / 开始深渊回响，维护者 2026-11-06）。
+   ⚠ 选择器必须写成 .proto-foot.proto-foot--triple（两个类）：基础规则 `.proto-foot { flex-direction: column }`
+   在本文件更靠后的位置，同等特异性会把它覆盖回竖排 —— 之前就踩过这个坑。 */
+.proto-foot.proto-foot--triple {
+  flex-direction: row;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: .08rem;
+  padding-left: 0;
+}
+.proto-foot.proto-foot--triple > .proto-start {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: max(.72rem, 32px, calc(54px * var(--sp-ui, 1)));
+  justify-content: center;
+  padding: 0 .06rem;
+  gap: 0;
+}
+.proto-foot.proto-foot--triple .proto-start__mark { display: none; }
+.proto-foot.proto-foot--triple .proto-start__label {
+  flex: 0 1 auto;
+  padding-right: 0;
+  gap: .04rem;
+  font-size: min(calc(.2 * var(--t)), .24rem);
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+.proto-foot.proto-foot--triple .proto-start__label .icon { width: 1em; height: 1em; }
+.proto-foot.proto-foot--triple .proto-start__deco { width: 12%; opacity: .45; }
 /* 两个次按钮：同尺寸同位置，只是底色更淡（主按钮仍然是整屏唯一的实心紫） */
 .proto__body[data-mode="deepecho"] .proto-start.proto-start--alt {
   background: linear-gradient(160deg, rgba(138, 103, 224, .5) 0%, rgba(90, 58, 168, .55) 55%, rgba(59, 36, 112, .62) 100%);

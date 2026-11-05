@@ -122,7 +122,9 @@ test('界面：深潜整屏有「公开深潜」「开始多人匹配」，并�
   // 三个按钮等宽等高并排（维护者 2026-11-06：和「开始深渊回响」一样大，放在它左边）
   assert.match(src, /proto-foot--triple/, '底部要是一行三个按钮');
   const css = read('public/css/screens/lobby.css');
-  assert.match(css, /\.proto-foot--triple \{[^}]*flex-direction: row/, '三个按钮并排');
+  // 选择器必须用双类：`.proto-foot { flex-direction: column }` 在文件更后面，单类会被覆盖成竖排（踩过）
+  assert.match(css, /\.proto-foot\.proto-foot--triple \{[^}]*flex-direction: row/, '三个按钮必须横排（双类选择器）');
+  assert.doesNotMatch(css, /^\.proto-foot--triple \{/m, '不能再用单类选择器（会被基础规则覆盖回竖排）');
   assert.match(css, /\.proto-foot--triple > \.proto-start \{[^}]*flex: 1 1 0/, '三个按钮等宽');
   assert.match(css, /\.proto-start--alt/, '次按钮要有自己的样式');
   // 「开始多人匹配」= 立刻进队列 + 打开搜寻中那一屏（和多人匹配整屏的按钮同一个效果）
