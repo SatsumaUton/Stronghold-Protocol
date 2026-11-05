@@ -942,8 +942,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-status__icons .ecochip { padding: 0 .1em; }
 /* HUD 常驻 buff 栏（维护者 2026-11-05）：右下角一小条，只读、不挡操作 */
 .echo-buffbar {
-  /* 左上角、顶栏下方（维护者 2026-11-05）：右上角会盖住倒计时 / 2 倍速 / 取消准备这些按钮 */
-  position: fixed; top: .5rem; left: .3rem; z-index: 8;
+  /* 右上角、与倒计时留出一段距离（维护者 2026-11-05）：完全贴住会盖住倒计时 / 2 倍速 / 取消准备 */
+  position: fixed; top: .14rem; right: 3.4rem; z-index: 8;
   /* 固定窄栏 + 强制换行：以前一整排会横向盖住 HUD 按钮 */
   display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: .06rem;
   /* 用 px 固定宽度，保证一定换行（vw 在某些缩放档位下会被算得很大） */
