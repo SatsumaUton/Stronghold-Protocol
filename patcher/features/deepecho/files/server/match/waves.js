@@ -656,9 +656,13 @@ export function previewOf(spawns) {
  * preDelay + k·ACTION_INTERVAL_FOR_UID (0.5 s) + i·step.
  * @param {Array<{ enemyKey: string, mods: object|null, sourcePlayerId: string, bounty?: object|null, isToken?: boolean }>} leaked
  * @param {number} helperCount 1 | 2
+ * @param {number} [timeLimit] 未使用（保留旧签名）
+ * @param {{ maxLastSpawn?: number }} [opts] `maxLastSpawn`：**最后一只最晚什么时候出场**（游戏秒）。
+ *   深潜的漏怪动辄上百只，按默认 step 会排到时限之外（敌人还没出完联防就结束了）；
+ *   给了这个上限就把间隔等比压紧，保证全部出完。
  * @returns {{ templateId: string|null, spawns: object[], routes: object[] }}
  */
-export function buildUniteWave(gd, leaked, helperCount, timeLimit) { // eslint-disable-line no-unused-vars
+export function buildUniteWave(gd, leaked, helperCount, timeLimit, opts = {}) { // eslint-disable-line no-unused-vars
   const templates = gd.unite.templates;
   const templateId = templates[String(helperCount)] || templates[helperCount] || null;
   const tpl = templateId ? gd.wave(templateId) : null;
@@ -698,9 +702,16 @@ export function buildUniteWave(gd, leaked, helperCount, timeLimit) { // eslint-d
     let k = 0;
     for (const units of owners.values()) {
       const start = t0 + k * UNITE_OWNER_STEP;
+      // 深潜：漏怪太多时按默认 step 会排到时限之外 → 等比压紧到 maxLastSpawn 之前（最低 0.02 s，别挤成一坨）
+      let stepUse = step;
+      const cap = Number(opts && opts.maxLastSpawn);
+      if (Number.isFinite(cap) && units.length > 1) {
+        const room = cap - start;
+        if (room > 0) stepUse = Math.min(step, Math.max(0.02, room / (units.length - 1)));
+      }
       units.forEach((l, i) => {
         const spec = {
-          time: start + i * step, enemyKey: l.enemyKey, routeIndex, count: 1, interval: 0,
+          time: start + i * stepUse, enemyKey: l.enemyKey, routeIndex, count: 1, interval: 0,
           mods: l.mods ? { ...l.mods } : { slot: classOf(gd, l.enemyKey) }, sourcePlayerId: l.sourcePlayerId,
           preview: previewInfo(gd, l.enemyKey, routes[routeIndex]),
         };
@@ -714,4 +725,23 @@ export function buildUniteWave(gd, leaked, helperCount, timeLimit) { // eslint-d
   }
   spawns.sort((a, b) => a.time - b.time);
   return { templateId, spawns, routes };
+}
+
+/**
+ * 联防这一段「最后一只敌人什么时候出场」+ 总数（游戏秒）。
+ *
+ * 深潜的漏怪可能上百只，默认排队规则会把最后一只排到本回合的作战时限之外 ——
+ * 表现就是「敌人还没出完，联防时间就结束了」（维护者 2026-11-05）。调用方据此把时限抬上去。
+ *
+ * @param {any} gd
+ * @param {Array<any>} leaked
+ * @param {number} helperCount
+ * @returns {{ last: number, count: number }}
+ */
+export function uniteWaveWindow(gd, leaked, helperCount) {
+  let wave = null;
+  try { wave = buildUniteWave(gd, leaked, helperCount, 0); } catch { return { last: 0, count: 0 }; }
+  let last = 0;
+  for (const s of wave.spawns || []) last = Math.max(last, Number(s.time) || 0);
+  return { last, count: (wave.spawns || []).length };
 }

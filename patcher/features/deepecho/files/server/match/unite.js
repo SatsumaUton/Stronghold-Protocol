@@ -126,7 +126,7 @@ export function planUniteRelay(m, plan, result, fieldSpawns = null) {
   const leaked = [];
   const notReentered = new Map(plan.notReentered);
   const sources = new Set(plan.leakers.map((ps) => ps.playerId));
-  const spawns = fieldSpawns || buildUniteWave(m.gd, plan.leaked, plan.helpers.length, m.wave?.timeLimit || 60).spawns;
+    const spawns = fieldSpawns || buildUniteWave(m.gd, plan.leaked, plan.helpers.length, m.wave?.timeLimit || 60, { maxLastSpawn: plan.maxLastSpawn }).spawns;
   const pending = [];
   for (const s of spawns) for (let i = 0; i < Math.max(1, Math.trunc(s.count || 1)); i++) {
     pending.push({ ...s, time: (Number(s.time) || 0) + i * Math.max(0, Number(s.interval) || 0) });
@@ -197,7 +197,7 @@ export function helperOrder(m, perfects, results) {
 
 /** Battle options for the unite field (without data/logger, added by the match). */
 export function uniteBattleOpts(m, plan, timeLimit) {
-  const wave = buildUniteWave(m.gd, plan.leaked, plan.helpers.length, timeLimit);
+  const wave = buildUniteWave(m.gd, plan.leaked, plan.helpers.length, timeLimit, { maxLastSpawn: plan.maxLastSpawn });
   const players = plan.helpers.map((ps, i) => {
     const carry = new Map();
     const r = m.lastResults.get(ps.playerId);
