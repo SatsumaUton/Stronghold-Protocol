@@ -1680,11 +1680,19 @@ export class MatchEcho {
     const rawDue = echoBlessingDue(r, this.echoDiveStart, this.echoBlessingDraws, 999);
     const replace = rawDue > owned && owned >= cap;
     if (!replace && due <= owned) { this.echoBlessingOffer = null; return null; }
-    if (Array.isArray(this.echoBlessingOffer) && this.echoBlessingOffer.length) return this.echoBlessingOffer;
+    // 上一回合遗留的三选一：隐藏核心 / boss 结算会把回合推进，而这一版 offer 还没被投票结算。
+    // 旧代码在这里直接 `return this.echoBlessingOffer`，于是**新回合又挂出同一个面板**，
+    // 玩家看到「连续两个祝福界面」，点第二个时服务端其实已经结算过 → 「当前阶段无法进行该操作」
+    // （维护者 2026-11-05 玩家反馈）。现在先把旧的那次按票数强制结算，再开新的。
+    if (Array.isArray(this.echoBlessingOffer) && this.echoBlessingOffer.length) {
+      if (Number(this._echoBlessingRound) === r) return this.echoBlessingOffer;
+      try { this._echoForceResolveBlessing(); } catch { /* 结算失败不阻塞新回合 */ }
+    }
     const rng = createRng(deriveSeed(this.seed, `echo:bless:${r}`));
     const offer = echoBlessingOffer(rng, this.echoBlessings);
     if (!offer.length) { this.echoBlessingOffer = null; return null; }
     this.echoBlessingOffer = offer.map((b) => b.id);
+    this._echoBlessingRound = r;          // 这一版 offer 属于哪一回合（跨回合要先结算旧的）
     this.echoBlessingReplace = replace;
     if (bonus > 0) this.echoBlessingBonus = bonus - 1;
     this._echoBlessingVotes.clear();
@@ -1762,6 +1770,7 @@ export class MatchEcho {
     this.cancel(this._echoBlessingTimer);
     this._echoBlessingTimer = null;
     this.echoBlessingOffer = null;
+    this._echoBlessingRound = null;
     this._echoBlessingVotes.clear();
     this.echoBlessingReplace = false;
     const b = Array.isArray(offer) ? echoBlessingById(offer[best]) : null;

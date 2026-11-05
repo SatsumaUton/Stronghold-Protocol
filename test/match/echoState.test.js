@@ -66,8 +66,10 @@ test('祝福发放节奏：深潜第 1 层就开票，之后每 5 层一次', ()
 test('已有一个没投完的候选时不会重抽（否则每回合看到的三项都在变）', () => {
   const m = fakeMatch({ round: 20 });
   const first = P._echoMaybeOfferBlessing.call(m, 20);
-  const again = P._echoMaybeOfferBlessing.call(m, 21);
-  assert.deepEqual(again, first, '同一份候选');
+  const again = P._echoMaybeOfferBlessing.call(m, 20);
+  assert.deepEqual(again, first, '同一回合内反复调用不会重抽');
+  // 跨回合的遗留 offer 现在会先被强制结算再开新的（隐藏核心通关「两个面板」的修复，2026-11-05），
+  // 那条行为由 echoDive.integration.test.js 的真实 Match 用例覆盖。
 });
 
 test('投票：全投完才结算，票多者得', () => {

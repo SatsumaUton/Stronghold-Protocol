@@ -60,6 +60,9 @@ export function EchoBlessing({ pub }) {
   };
   // 死亡的玩家不参与祝福 / 弃选 / 护盾投票（维护者 2026-11-05）：整块面板都不显示
   if (!meAlive) return null;
+  // 已经过期的 offer 不再渲染（维护者 2026-11-05 玩家反馈）：服务端 30 秒一到就强制结算，
+  // 客户端如果还拿着上一帧的 offer 画面板，玩家点下去只会收到「当前阶段无法进行该操作」。
+  if (offer && Number.isFinite(offer.endsAt) && offer.endsAt > 0 && offer.endsAt + 2000 < now) return null;
   // 没有可抽的卡时：满名额的弃选投票 → 护盾指定盟约的投票 → 什么都不显示（hooks 已全部跑过，顺序稳定）
   if (!offer || !Array.isArray(offer.options) || !offer.options.length) {
     if (discard && Array.isArray(discard.options) && discard.options.length) {

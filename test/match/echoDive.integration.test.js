@@ -1283,3 +1283,25 @@ test('boss 回合 wave 为 null 时 _normalOpts 不再崩（防 COMBAT 卡死）
   assert.ok(opts && Array.isArray(opts.spawns), '要返回合法 opts');
   assert.equal(opts.spawns.length, 0, '没有波次时就是空场，不是崩溃');
 });
+// 玩家 2026-11-05 实测：打完隐藏 boss 连出两个祝福界面，第二个点不了（「当前阶段无法进行该操作」）。
+// 成因：15 层开的三选一还没结算，隐藏通关直接 startRound(16)，旧代码把同一个 offer 原样带回新回合；
+// 玩家点第二次时服务端已经结算过 → 没有 offer → WRONG_PHASE。
+test('隐藏核心通关：上一回合遗留的三选一会被结算，新回合的 offer 可以正常投票', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  m.round = 15;
+  m.startRound(15);
+  for (let i = 0; i < 40 && m.phase !== 'PREP'; i++) h.sched.advance(200);
+  assert.ok(Array.isArray(m.echoBlessingOffer) && m.echoBlessingOffer.length, '15 层先开一次三选一');
+  // 隐藏核心通关的补偿（bossRounds.js 里那段），然后进 16 层
+  m.echoBlessingDraws = Math.max(Number(m.echoBlessingDraws) || 0, 1);
+  m.echoBlessingBonus = (Number(m.echoBlessingBonus) || 0) + 1;
+  m.startRound(16);
+  for (let i = 0; i < 40 && m.phase !== 'PREP'; i++) h.sched.advance(200);
+  assert.ok(m.echoBlessings.length >= 1, '15 层遗留的那次 offer 必须被强制结算掉');
+  assert.ok(Array.isArray(m.echoBlessingOffer) && m.echoBlessingOffer.length, '16 层要挂出新的三选一');
+  const [ps, ps2] = m.alivePlayers();
+  assert.equal(m.setEchoBlessingVote(ps, 0).ok, true, '新面板的第一票要收');
+  assert.equal(m.setEchoBlessingVote(ps2, 0).ok, true, '第二票也要收（不会报「当前阶段无法进行该操作」）');
+});
