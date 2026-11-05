@@ -86,7 +86,9 @@ export class PlayerViews {
         level: this.shop.level,
         maxLevel: this.gd.maxShopLevel,
         upgradePrice: this.shop.level >= this.gd.maxShopLevel ? 0 : this.shop.upgradePrice,
-        refreshPrice: free ? 0 : this.gd.refreshPrice,
+        // 深潜 16 层后刷新价随深度上涨（深渊通胀）+ 诅咒通胀：这里必须发**实际价格**，
+        // 否则按钮显示 1、服务端收 2，玩家满资金点下去却提示「资金不足」（维护者 2026-11-05 实测）。
+        refreshPrice: free ? 0 : Math.max(0, Math.round(this.gd.refreshPrice * this._refreshPriceMul())),
         freeRefreshes: this.shop.freeRefreshes,
         frozen: this.shop.frozen,
         // Empty slots carry no kind. The server knows whether each slot belongs to the operator

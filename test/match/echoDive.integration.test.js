@@ -1553,3 +1553,22 @@ test('16 层以后所有频次怪血量等于基础值（不被深度缩放）',
   assert.equal(set.has('enemy_1288_duskls'), false, '深池逐火战士不是频次怪');
   assert.equal(set.has('enemy_9010_acpupp'), false, '假想敌·再生不是频次怪');
 });
+
+// 玩家 2026-11-05：资金 1、刷新按钮显示 1，点下去却「资金不足」。
+// 原因是界面发的是基础价（gd.refreshPrice），服务端按「深渊通胀」收 round(基础 × 倍率)。
+// 现在视图下发实际价格（整数），客户端预检和服务端扣费是同一个数。
+test('刷新价按深渊通胀下发实际价格（整数），资金不够时预检也能挡住', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = m.alivePlayers()[0];
+  m.round = 30;
+  ps.shop.freeRefreshes = 0;
+  const price = ps.privateView().shop.refreshPrice;
+  assert.equal(price, Math.max(0, Math.round(m.gd.refreshPrice * m._echoShopPriceMul())), '界面价格 = 实际价格');
+  assert.ok(Number.isInteger(price), '刷新价必须是整数');
+  assert.ok(price >= 1, '30 层至少要 1 资金');
+  // 免费刷新用完后，界面显示的就是要扣的钱（客户端 preflight 也读这个字段）
+  ps.shop.freeRefreshes = 0;
+  assert.equal(ps.privateView().shop.refreshPrice, price);
+});

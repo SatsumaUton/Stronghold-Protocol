@@ -58,6 +58,13 @@ export class PlayerEconomy {
   }
 
   /** Effective price of a shop slot after onPrice modifiers (never negative). */
+  /** 刷新价的实际倍率：深潜 16 层后的「深渊通胀」+ 诅咒「通胀 / 暴利」；普通房恒为 1。 */
+  _refreshPriceMul() {
+    const m = this.m;
+    if (!m || m.echoVariant !== 'deepecho' || typeof m._echoShopPriceMul !== 'function') return 1;
+    const mul = Number(m._echoShopPriceMul());
+    return Number.isFinite(mul) && mul > 0 ? mul : 1;
+  }
   priceOf(slot) {
     if (!slot) return 0;
     const ev = { slot, kind: slot.kind, id: slot.id, price: slot.basePrice };
@@ -257,10 +264,8 @@ export class PlayerEconomy {
     }
     const free = this.shop.freeRefreshes > 0;
     // 深潜 16 层以后：刷新价随深度上涨（资金出口，不改界面，维护者 2026-11-05）
-    const priceMul = mm && mm.echoVariant === 'deepecho' && typeof mm._echoShopPriceMul === 'function'
-      ? mm._echoShopPriceMul()
-      : 1;
-    const price = free ? 0 : Math.max(0, Math.round(this.gd.refreshPrice * priceMul));
+    // 与 views.js 用**同一个**倍率函数：界面显示的价格必须等于这里实际扣的钱
+    const price = free ? 0 : Math.max(0, Math.round(this.gd.refreshPrice * this._refreshPriceMul()));
     if (!free && this.funds < price) return fail(ERR.NO_FUNDS);
     if (free) this.shop.freeRefreshes--;
     else this.spend(price);
