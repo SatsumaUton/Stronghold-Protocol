@@ -18,9 +18,8 @@ const read = (p) => readFileSync(path.join(ROOT, p), 'utf8');
 
 const dive = (seed = 5) => makeMatch({ mode: 'coop', humans: 2, bots: 0, seed, fake: true, variant: 'deepecho' });
 
-test('返场池：排除本局 R14 那只，但**保留隐秘核心**（能抽到）', (t) => {
-  let hiddenHits = 0;
-  let sawBossId = false;
+test('返场池：**所有 boss 都能抽到**（含 R14 那只与 3 只隐藏 boss）', (t) => {
+  const seen = new Map();
   const rounds = [25, 35, 45, 55];
   for (let seed = 1; seed <= 40; seed++) {
     const h = dive(seed);
@@ -30,14 +29,18 @@ test('返场池：排除本局 R14 那只，但**保留隐秘核心**（能抽�
         m.round = d;
         const id = m._echoBossIdFor(d);
         assert.ok(m.gd.boss(id), `第 ${d} 层选的 ${id} 必须是真实 boss`);
-        assert.notEqual(id, m.bossId, `第 ${d} 层不该再固定 R14 那只`);
-        if (id === m.hiddenBossId) hiddenHits++;
-        if (id === m.bossId) sawBossId = true;
+        seen.set(id, (seen.get(id) || 0) + 1);
       }
     } finally { m.dispose(); }
   }
-  assert.equal(sawBossId, false, '返场永远不该是本局 R14 那只');
-  assert.ok(hiddenHits > 0, `隐秘核心必须能出现在返场里（40 个种子里一次都没抽到）`);
+  const all = Object.keys(dive(1).m.gd.raw.bosses);
+  for (const id of all) assert.ok(seen.has(id), `${id} 必须能出现在返场里（一次都没抽到）`);
+  // 3 只隐藏 boss（15 层隐秘核心会出的那几只）都要能返场
+  for (const id of ['boss_8', 'boss_9', 'boss_10']) {
+    assert.ok(seen.has(id), `${id}（隐藏 boss）必须能返场`);
+  }
+  // R14 那只也在池子里（维护者 2026-11-05：所有 boss 都能被随机抽选）
+  assert.ok(seen.has('boss_4'), 'R14 那只也要能返场');
 });
 
 test('深度 14 是原版 boss 回合：打本局那只，不是随机返场', (t) => {

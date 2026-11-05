@@ -518,16 +518,17 @@ export class MatchEcho {
    *  前期就放第 14 回合的 boss，玩家打不过。 */
   /**
    * 【深渊回响】返场 boss 的选择（维护者 2026-11-05）：
-   * 不再固定用 R14 的那个 boss，而是从全部 boss 里**随机换一个其他的**（排除本局 R14 已经打过的那个）。
+   * 不再固定用 R14 的那个 boss，而是从**全部 boss**里随机抽一只。
    * 用种子 + 回合做随机源，同一局可复现。
    *
-   * ★ 维护者 2026-11-05 第二次定：**隐秘核心的 boss 也要能返场**（之前把它排除了，
-   *   结果 16 层以后翻来覆去只有 R14 那只）。所以池子里保留 `hiddenBossId`，只排除 `bossId`。
+   * ★ 维护者 2026-11-05 最终定：**所有 boss 都能被抽到** —— 包括 R14 那只，
+   *   以及 15 层隐秘核心会出现的那几只隐藏 boss（boss_8/9/10），一只都不排除。
    */
   _echoBossPick(r = this.round) {
     const all = Object.keys((this.gd && this.gd.raw && this.gd.raw.bosses) || {});
-    const pool = all.filter((id) => id !== this.bossId);
-    if (!pool.length) return this.bossId;
+    // 维护者 2026-11-05 第三次定：**所有 boss 都能被抽到**（含 R14 那只、含全部 3 只隐秘核心 boss），
+    // 不再排除任何一只 —— 之前排除 bossId，玩家就永远遇不到 R14 那位。
+    const pool = all.length ? all : [this.bossId];
     const rng = createRng(deriveSeed(this.seed, `echo:boss:${r}`));
     return pool[Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length))];
   }
