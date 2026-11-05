@@ -544,14 +544,27 @@ export class MatchEcho {
     return bonds.every((b) => off.has(b));
   }
 
-  /** 商店加价倍率（诅咒「通胀 / 暴利」）：`player/economy.js` 的 priceOf 消费它。 */
+  /**
+   * 「深渊通胀」倍率：**16 层起**商店购买价 / 刷新价随深度 +4%/层，封顶 ×1.5（维护者 2026-11-05）。
+   *
+   * 抽成独立函数是因为它现在**既是真实价格、也是界面上的固定规则**：
+   * 「本局信息 → 深渊回响」里那条固定规则要显示当前倍率，必须和 `priceOf()` 算同一个数，
+   * 不能在两个地方各写一遍公式。
+   *
+   * @param {number} [r] 显示回合（默认当前回合）
+   * @returns {number} 1 = 未生效（≤15 层）
+   */
+  _echoShopInflate(r = this.round) {
+    if (this.echoVariant !== 'deepecho') return 1;
+    const depth = this._echoDepth(r);
+    return depth >= 16 ? Math.min(1.5, 1 + 0.04 * (depth - 15)) : 1;
+  }
+
+  /** 商店加价倍率（诅咒「通胀 / 暴利」× 深渊通胀）：`player/economy.js` 的 priceOf 消费它。 */
   _echoShopPriceMul() {
     if (this.echoVariant !== 'deepecho') return 1;
-    // 16 层以后的资金出口（维护者 2026-11-05）：商店购买价 / 刷新价随深度温和上涨，
-    // 玩家此时已满级，继续买干员/装备/刷新时资金自然被消耗，不改任何界面。
-    const depth = this._echoDepth(this.round);
-    const inflate = depth >= 16 ? Math.min(1.5, 1 + 0.04 * (depth - 15)) : 1;
-    return this._echoCurseFx().shopPriceMul * inflate;
+    // 16 层以后的资金出口：玩家此时已满级，继续买干员/装备/刷新时资金自然被消耗。
+    return this._echoCurseFx().shopPriceMul * this._echoShopInflate();
   }
 
   /** 漏怪扣血（含诅咒「失血 / 溃血 / 剧痛」）：只放大已有漏怪，仍受每回合上限约束。 */
@@ -621,6 +634,11 @@ export class MatchEcho {
     if (this._echoHiddenBossRound(r)) { this._echoPushAnnounce('隐藏核心：达成条件，本回合迎战隐藏 boss'); return; }
     if (this._echoBossReturn(r)) { this._echoPushAnnounce('深渊节点：boss 返场（明牌）'); return; }
     if (depth === 15) this._echoPushAnnounce('第 15 层：精英加压（本层不出 boss）');
+    // 16 层起的经济消耗：进入这一层就播报一次（挂机玩家回来也能在播报里看到），
+    // 之后每层的实际倍率挂在「本局信息 → 深渊回响 → 固定规则」的「深渊通胀」条目上。
+    if (depth === 16) {
+      this._echoPushAnnounce(`深渊通胀生效：商店与刷新价格每层 +4%（当前 ×${this._echoShopInflate(r).toFixed(2)}，封顶 ×1.5）`);
+    }
   }
 
   /**
@@ -1212,6 +1230,15 @@ export class MatchEcho {
       // 固定的两条是深渊自身的限制，不属于随机诅咒池： rarity 标 special（客户端显示「固定」）
       { id: 'miracle', name: '奇迹·诅咒', desc: `免费刷新总数上限 ${this._echoFreeRefreshCap()} 次（原版无上限）`, rarity: 'special', rarityLabel: '固定' },
       { id: 'foresight', name: '远见·诅咒', desc: '按层给钱结算到 999 层（与原版一致）', rarity: 'special', rarityLabel: '固定' },
+      // 16 层起的经济消耗（维护者 2026-11-05：从「不改界面」改成**明示的固定规则**）。
+      // 倍率取自 _echoShopInflate()，与真实价格同源，不会出现「界面写 ×1.2、实际收 ×1.28」。
+      {
+        id: 'abyss_inflation', name: '深渊通胀',
+        desc: this._echoShopInflate() > 1
+          ? `16 层起商店与刷新价格每层 +4%，当前 ×${this._echoShopInflate().toFixed(2)}（封顶 ×1.5）`
+          : '16 层起商店与刷新价格每层 +4%，封顶 ×1.5（16 层开始生效）',
+        rarity: 'special', rarityLabel: '固定',
+      },
       // 挑战关没达成等来源累积的诅咒（echoCurse.js 的词条表；同类合并成「侵蚀 ×2」）
       ...applied,
       // 本回合随机刷新的那条（只作用于本回合，下回合可能换掉或消失）

@@ -70,6 +70,34 @@ test('第 25 回合 boss 返场：真的生成了 boss 波次（数据表只到 
   assert.equal(m._echoIntel(), null, 'boss 返场是明牌，不给聚合情报');
 });
 
+// 维护者 2026-11-05：16 层起的经济消耗（商店/刷新价每层 +4%、封顶 ×1.5）原来「不改界面」，
+// 现在要作为**固定规则**明示，并在进入 16 层时向玩家播报（挂机回来也能在播报里看到）。
+test('16 层起的「深渊通胀」是固定规则：有条目、有播报、倍率与真实价格同源', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  assert.equal(m._echoShopInflate(15), 1, '15 层还不涨');
+  assert.equal(m._echoShopInflate(16).toFixed(2), '1.04', '16 层 ×1.04');
+  assert.equal(m._echoShopInflate(20).toFixed(2), '1.20', '20 层 ×1.20');
+  assert.equal(m._echoShopInflate(30).toFixed(2), '1.50', '封顶 ×1.5');
+  assert.equal(m._echoShopInflate(80).toFixed(2), '1.50', '再深也不超过 ×1.5');
+  // 固定规则条目
+  m.round = 16;
+  const rule = m._echoCurses().find((c) => c.id === 'abyss_inflation');
+  assert.ok(rule, '固定规则里必须有「深渊通胀」');
+  assert.equal(rule.rarityLabel, '固定');
+  assert.match(rule.desc, /×1\.04/, '描述要显示当前倍率');
+  // 真实价格走同一个倍率（不能界面写一套、收费另一套）
+  assert.equal(m._echoShopPriceMul(), 1.04);
+  // 进入 16 层要有播报
+  const tickers = [];
+  const orig = m.tickerText.bind(m);
+  m.tickerText = (text, prio) => { tickers.push(String(text)); return orig(text, prio); };
+  m._echoRefreshCurses(16);
+  m._echoFlushAnnounce();
+  assert.ok(tickers.some((s) => s.includes('深渊通胀')), '16 层要播报「深渊通胀」');
+});
+
 // 玩家 2026-11-05 实测：「25 层打完 boss 又回到 16 层」。
 // 成因：`_finishFinal` 的原版隐藏核心分支没有排除深潜 —— 深潜层数无上限，25/35/45 的返场 boss
 // 打赢后 `hiddenEligible()` 也可能为真，于是 `startRound(gd.hiddenRound = 15)`，下一层就是 16。
