@@ -70,7 +70,10 @@ test('对局记录：深渊回响在「模式」列，难度列照旧显示难�
   const diffAt = cells.indexOf('difficultyName(rec.difficulty)');
   const echoAt = cells.indexOf('is-echo');
   assert.ok(diffAt >= 0 && echoAt > diffAt, '深渊回响角标要在难度格之后的模式格里');
-  // 角标有样式
+  // 角标有样式：只换文字颜色，不加边框/底色（维护者 2026-11-06：加框像 P 上去的）
   const css = read('public/css/screens/stats.css');
-  assert.match(css, /\.st-mode\.is-echo\s*\{/);
+  const rule = css.match(/\.st-mode\.is-echo\s*\{([^}]*)\}/);
+  assert.ok(rule, '要有 .st-mode.is-echo 规则');
+  assert.doesNotMatch(rule[1], /border|background/, '不能有边框或底色');
+  assert.match(rule[1], /color:/, '只靠文字颜色区分');
 });

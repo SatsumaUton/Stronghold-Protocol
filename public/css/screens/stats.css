@@ -430,9 +430,5 @@
 @media (max-width: 760px) { .st-verfilter { padding-inline: .16rem; } }
 .sp-coarse .st-verfilter .dpick__opt { min-height: 36px; }
 
-/* 对局记录的模式列：「深渊回响」用薄荷色角标区分于难度名（维护者 2026-11-05） */
-.st-mode.is-echo {
-  display: inline-block; padding: .01rem .1rem; border-radius: .04rem;
-  border: 1px solid rgba(120, 214, 160, .45); background: rgba(60, 150, 100, .18);
-  color: #b6f0c9; font-weight: 700; white-space: nowrap;
-}
+/* 对局记录的模式列：「深渊回响」只换文字颜色，不加框不加底（维护者 2026-11-06：加框像 P 上去的） */
+.st-mode.is-echo { color: var(--mint-s10); font-weight: 700; white-space: nowrap; }
