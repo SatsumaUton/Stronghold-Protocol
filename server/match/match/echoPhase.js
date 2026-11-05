@@ -1413,20 +1413,28 @@ export class MatchEcho {
       diveStart: this.echoDiveStart,
       depth: this._echoDepth(),
       // 词条带上说明，客户端圆片的 title 才能显示「硬化 · 防御 +200」这类效果
-      words: [
-        ...this._echoWords().map((w) => ({ id: w.id, name: w.name, desc: w.desc })),
-        // 深潜补给选的「本层词条」（维护者 2026-11-05：HUD 上完全看不到，玩家以为补给没生效）。
-        // 带 temporary + rounds 让 buff 栏打上「本」角标，下一层自动消失。
-        ...(Array.isArray(this.echoSupplyWords) ? this.echoSupplyWords
-          .filter((w) => w && w.round === this.round)
-          .map((w) => ({
-            id: `supply:${w.round}:${w.name || 'word'}`,
-            name: w.name || '本层词条',
-            desc: '深潜补给：本层全队生效，下一层消失',
-            temporary: true,
-            rounds: 1,
-          })) : []),
-      ],
+      words: this._echoWords().map((w) => ({ id: w.id, name: w.name, desc: w.desc })),
+      // 深潜补给选的「本层词条」（维护者 2026-11-05：HUD 上完全看不到，玩家以为补给没生效）。
+      // ★ 放**己方**侧（它加的是全队属性，不是敌人词条），带 temporary + rounds 让 buff 栏打「本」角标。
+      tempBuffs: (Array.isArray(this.echoSupplyWords) ? this.echoSupplyWords : [])
+        .filter((w) => w && w.round === this.round)
+        .map((w) => ({
+          id: `supply:${w.round}:${w.name || 'word'}`,
+          name: w.name || '本层词条',
+          desc: '深潜补给：本层全队生效，下一层消失',
+          temporary: true,
+          rounds: 1,
+        })),
+      // 本回合的随机诅咒单独给一份（维护者 2026-11-05：buff 栏要**明显标注**是它，玩家好及时查看效果）。
+      // 它同时仍在 curses 里（带 temporary 角标），这里只是给客户端一个「本回合新出现的诅咒」入口。
+      roundCurse: (() => {
+        const c = this.echoRoundCurse ? echoCurseById(this.echoRoundCurse) : null;
+        return c ? {
+          id: c.id, name: c.name, desc: c.desc,
+          rarity: c.rarity || 'common',
+          rarityLabel: ECHO_CURSE_RARITY_LABEL[c.rarity] || '普通',
+        } : null;
+      })(),
       blessings: this._echoBlessings().map((b) => ({
         id: b.id,
         name: b.name,

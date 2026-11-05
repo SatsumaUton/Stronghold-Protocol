@@ -153,8 +153,16 @@ export function EchoBuffBar({ pub }) {
   if (!(depth > 0)) return null;
   const chips = echoBuffChips(echo);
   if (!chips.length) return null;
+  // 本回合新刷出的诅咒：排最前面 + 单独一条红色提示条（维护者 2026-11-05：
+  // 要「明显标注」，玩家才知道这一层多了哪条诅咒、好及时去看它的效果）
+  const rc = echo?.roundCurse && typeof echo.roundCurse.name === 'string' ? echo.roundCurse : null;
+  const ordered = rc ? [...chips.filter((c) => c.roundCurse), ...chips.filter((c) => !c.roundCurse)] : chips;
   return html`<div class="echo-buffbar" data-testid="echo-buffbar" aria-label=${t('深渊回响：当前词条 / 祝福 / 诅咒')}>
-    ${chips.map((c) => html`<span key=${c.key} class=${`etag ecochip ecochip--${c.tone} is-${c.side}${c.consumed ? ' is-consumed' : ''}${c.left != null || c.temp ? ' is-timed' : ''}`}
+    ${rc ? html`<div class="echo-buffbar__alert" data-testid="echo-round-curse"
+      title=${rc.desc ? `${t('本回合诅咒')}：${rc.name} · ${rc.desc}` : `${t('本回合诅咒')}：${rc.name}`}>
+      <b>${t('本回合诅咒')}</b><span>${rc.name}</span>
+    </div>` : null}
+    ${ordered.map((c) => html`<span key=${c.key} class=${`etag ecochip ecochip--${c.tone} is-${c.side}${c.consumed ? ' is-consumed' : ''}${c.left != null || c.temp ? ' is-timed' : ''}${c.roundCurse ? ' is-roundcurse' : ''}`}
       title=${c.title} aria-label=${c.title}><${BuffSigil} chip=${c} /><${TempBadge} chip=${c} /></span>`)}
   </div>`;
 }

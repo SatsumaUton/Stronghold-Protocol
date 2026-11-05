@@ -117,18 +117,32 @@ test('徽记按效果设计：轮廓 / 方向 / 强度', async () => {
 //   temporary（深潜补给的本层词条 / 本回合随机诅咒）→ 「本」
 //   roundsLeft（排异 / 封锁按层数到期）→ 剩余层数
 // 没有时效的 buff 不打角标（left = null 且 temp = false）。
-test('本层词条带 temporary：圆片打「本」角标，title 写明本层', () => {
-  const chips = echoBuffChips({ words: [
-    { id: 'supply:20:词条 · 强攻', name: '词条 · 强攻', desc: '深潜补给：本层全队生效', temporary: true, rounds: 1 },
-    { id: 'shield', name: '护盾' },
-  ] });
+test('本层词条走 tempBuffs：己方侧圆片 + 「本」角标 + title 写明本层', () => {
+  const chips = echoBuffChips({
+    words: [{ id: 'shield', name: '护盾' }],
+    tempBuffs: [{ id: 'supply:20:词条 · 强攻', name: '词条 · 强攻', desc: '深潜补给：本层全队生效', temporary: true, rounds: 1 }],
+  });
   const supply = chips.find((c) => c.label === '词条 · 强攻');
+  assert.equal(supply.side, 'ally', '全队加成要显示在己方侧，不是敌人词条侧');
   assert.equal(supply.temp, true, '本层词条要标记 temporary');
   assert.equal(supply.left, 1, '角标显示 1（本层）');
   assert.ok(supply.title.includes('本层'), '悬浮说明要写明本层');
   const plain = chips.find((c) => c.label === '护盾');
   assert.equal(plain.temp, false, '普通词条不标记');
   assert.equal(plain.left, null, '普通词条没有角标');
+});
+
+test('本回合诅咒被标成 roundCurse（buff 栏据此置顶 + 高亮）', () => {
+  const chips = echoBuffChips({
+    roundCurse: { id: 'fog', name: '迷雾', desc: '本局敌方情报不再显示威胁值' },
+    curses: [
+      { id: 'frenzy', name: '狂怒', desc: '敌方攻击 +10%', rarity: 'common' },
+      { id: 'fog', name: '迷雾（本回合）', desc: '本局敌方情报不再显示威胁值', rarity: 'common', temporary: true, rounds: 1 },
+    ],
+  });
+  const round = chips.find((c) => c.id === 'fog');
+  assert.equal(round.roundCurse, true, '本回合诅咒要打标记');
+  assert.equal(chips.find((c) => c.id === 'frenzy').roundCurse, false, '别的诅咒不标记');
 });
 
 test('按层数到期的诅咒带 roundsLeft：圆片打剩余层数', () => {

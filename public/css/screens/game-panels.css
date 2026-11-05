@@ -971,6 +971,27 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   pointer-events: none;
 }
 .echo-buffbar .ecochip { pointer-events: auto; font-size: calc(.14 * var(--t)); padding: .02rem; border-radius: .03rem; }
+/* 本回合新刷出的诅咒：红色高亮 + 呼吸，排在图标最前面（维护者 2026-11-05 要求「明显标注」） */
+.echo-buffbar .ecochip.is-roundcurse {
+  border-color: #ff7d97; border-style: solid;
+  box-shadow: 0 0 .14rem rgba(255, 90, 120, .7);
+  animation: echo-curse-pulse 1.6s ease-in-out infinite;
+}
+/* 顶部的「本回合诅咒」提示条：直接写名字，不用悬停也知道这一层多了什么 */
+.echo-buffbar__alert {
+  display: flex; align-items: baseline; gap: .06rem; width: 100%;
+  padding: .03rem .06rem; margin-bottom: .02rem;
+  background: rgba(255, 78, 108, .22); border: 1px solid rgba(255, 120, 148, .8);
+  color: #ffdde5; font-size: calc(.13 * var(--t)); line-height: 1.25;
+  pointer-events: auto;
+  animation: echo-curse-pulse 1.8s ease-in-out infinite;
+}
+.echo-buffbar__alert b { color: #ff9db2; font-weight: 900; }
+.echo-buffbar__alert span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes echo-curse-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.35); }
+}
 .echo-buffbar .ecochip__icon { width: .22rem; height: .22rem; }
 .echo-buffbar .ecochip__icon { fill: currentColor; }
 .sigil-arrow.is-up { fill: #ffe08a; }

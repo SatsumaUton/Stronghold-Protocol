@@ -105,8 +105,10 @@ export function echoBuffIcon(b, side) {
 
 export function echoBuffChips(echo) {
   const words = Array.isArray(echo?.words) ? echo.words : [];
+  const tempBuffs = Array.isArray(echo?.tempBuffs) ? echo.tempBuffs : [];
   const blessings = Array.isArray(echo?.blessings) ? echo.blessings : [];
   const curses = Array.isArray(echo?.curses) ? echo.curses : [];
+  const roundCurseId = echo?.roundCurse && typeof echo.roundCurse.id === 'string' ? echo.roundCurse.id : null;
   const out = [];
   for (const w of words) {
     if (!w || typeof w.id !== 'string') continue;
@@ -117,6 +119,13 @@ export function echoBuffChips(echo) {
     const left = Number.isFinite(Number(w.roundsLeft)) ? Number(w.roundsLeft) : (temp ? 1 : null);
     const tag = temp ? '（本层）' : left != null ? `（剩余 ${left} 层）` : '';
     out.push({ key: `enemy:${w.id}`, side: 'enemy', id: w.id, raw: w, label, glyph: v.glyph, icon: echoBuffIcon(w, 'enemy'), tone: v.tone, temp, left, title: w.desc ? `${label}${tag} · ${w.desc}` : `${label}${tag}` });
+  }
+  // 本层临时 buff（深潜补给的词条）：**己方侧**，带「本」角标
+  for (const w of tempBuffs) {
+    if (!w || typeof w.id !== 'string') continue;
+    const label = typeof w.name === 'string' && w.name ? w.name : w.id;
+    const v = ECHO_BUFF_VISUALS[w.id] || { glyph: label.slice(0, 1) || '祝', tone: 'coin' };
+    out.push({ key: `ally:${w.id}`, side: 'ally', id: w.id, raw: w, label, glyph: v.glyph, icon: echoBuffIcon(w, 'ally'), tone: v.tone, temp: true, left: 1, title: w.desc ? `${label}（本层） · ${w.desc}` : `${label}（本层）` });
   }
   for (const b of blessings) {
     if (!b || typeof b.id !== 'string') continue;
@@ -139,7 +148,10 @@ export function echoBuffChips(echo) {
     const temp = c.temporary === true;
     const left = Number.isFinite(Number(c.roundsLeft)) ? Number(c.roundsLeft) : (temp ? 1 : null);
     const when = temp ? '（本回合）' : left != null ? `（剩余 ${left} 层）` : '';
-    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, raw: c, label, glyph, effectKind: (c.effect && c.effect.kind) || null, icon: echoBuffIcon(c, 'curse'), tone, temp, left, title: c.desc ? `${label}${tag}${when} · ${c.desc}` : `${label}${tag}${when}` });
+    // 本回合新刷出的那条诅咒：单独打上 roundCurse 标记，buff 栏把它排在最前面并高亮
+    // （维护者 2026-11-05：要明显告诉玩家「这一层多了哪条诅咒」，好及时查看效果）
+    const isRoundCurse = roundCurseId != null && c.id === roundCurseId;
+    out.push({ key: `curse:${c.id}`, side: 'curse', id: c.id, raw: c, label, glyph, effectKind: (c.effect && c.effect.kind) || null, icon: echoBuffIcon(c, 'curse'), tone, temp, left, roundCurse: isRoundCurse, title: c.desc ? `${label}${tag}${when} · ${c.desc}` : `${label}${tag}${when}` });
   }
   return out;
 }

@@ -1571,20 +1571,25 @@ test('本层词条进 buff 栏（temporary + rounds），按层数到期的诅�
     pick: null,
   };
   m._echoSettleSupply(0);
-  const word = m.publicView().echo.words.find((w) => w.temporary === true);
-  assert.ok(word, '本层词条要出现在 m.public.echo.words 里');
+  const word = (m.publicView().echo.tempBuffs || []).find((w) => w.temporary === true);
+  assert.ok(word, '本层词条要出现在 m.public.echo.tempBuffs 里（己方侧）');
   assert.equal(word.name, '词条 · 强攻');
   assert.equal(word.rounds, 1, '角标要显示「本层」');
   // 下一层自动消失
   m.round = 20;
   m.startRound(21);
-  assert.ok(!m.publicView().echo.words.some((w) => w.temporary === true), '下一层不再显示本层词条');
+  assert.ok(!(m.publicView().echo.tempBuffs || []).some((w) => w.temporary === true), '下一层不再显示本层词条');
   // 按层数到期的诅咒：排异还剩 2 层
   m.echoCurseIds = ['block_bond'];
   m.echoBannedBonds = ['someBond'];
   m.echoBannedBondsUntil = { someBond: m._echoDepth() + 2 };
   const curse = m.publicView().echo.curses.find((c) => c.id === 'block_bond');
   assert.equal(curse.roundsLeft, 2, 'buff 栏角标要显示剩余层数');
+  // 本回合诅咒单独给一份，buff 栏据此置顶 + 高亮
+  m.echoRoundCurse = 'fog';
+  const rc = m.publicView().echo.roundCurse;
+  assert.equal(rc && rc.id, 'fog', '本回合诅咒要单独下发（buff 栏明显标注）');
+  assert.ok(rc.name && rc.desc, '名字与效果都要带，玩家才能及时查看');
 });
 
 // 维护者 2026-11-05（67 层实测）：队友死亡后无法救援，界面提示「本局模拟已经结束，无法救援」。
