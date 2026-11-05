@@ -2042,7 +2042,8 @@ export class Lobby {
   roomOpen(room) {
     // 「深渊回响」房永远不算「公开可进」：房间列表、多人匹配、跨节点上报全部走这个判据，
     // 所以把闸设在这里一处就够（管理员专属，公开前不暴露）。
-    if (room.variant === 'deepecho') return false;
+    // 「深渊回响」房也允许公开（维护者 2026-11-06：「公开深潜」按钮）——是否真的在等人仍由下面的 listed 判据决定。
+    // 进房仍然是管理员/测试名单专属（join 的 ECHO_FORBIDDEN 那道门），所以公开只影响「看得见」。
     return room.listed && !room.disposed && !room.match && this.listable(room)
       && room.freeSeat() >= 0 && !this.roomQueued(room)
       && room.seatOf(room.hostId)?.connected === true;
@@ -2058,9 +2059,9 @@ export class Lobby {
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (this.roomQueued(room)) return fail(ERR.QUEUED);
-    // 「深渊回响」房不能被挂到公开同盟列表上（连房主也不行）
-    if (listed && (room.variant === 'deepecho' || !this.listable(room))) return fail(ERR.BAD_TARGET, 'this room cannot be listed');
-    this.dropReplay(room, session.playerId);
+    // 「深渊回响」房也能挂到公开同盟列表（维护者 2026-11-06 的「公开深潜」按钮）：
+    // 列表里会显示成深渊回响；进房仍是管理员 / 测试名单专属。其余判据不变。
+    if (listed && !this.listable(room)) return fail(ERR.BAD_TARGET, 'this room cannot be listed');
     if (room.listed !== listed) {
       room.listed = listed;
       this.roomListCache = null;
@@ -2086,6 +2087,8 @@ export class Lobby {
         rows.push({ code: room.code, host: room.seatOf(room.hostId).name, humans: room.activeHumans().length,
           filled: taken.length, capacity: room.capacity, difficulty: room.difficulty,
           ...(room.version !== DEFAULT_VERSION ? { version: room.version } : {}),
+          // 「深渊回响」（深潜）：列表里要能认出深潜房（维护者 2026-11-06 的「公开深潜」）
+          ...(room.variant ? { variant: room.variant } : {}),
           experimental: { ...room.experimental }, free: room.capacity - taken.length, at: room.createdAt });
       }
       rows.sort((a, b) => a.free - b.free || a.at - b.at);
@@ -2783,7 +2786,13 @@ export class Lobby {
    *   参考版还有服务端队列与 30 秒确认入场，我们这边没有（见上面那段说明），
    *   所以这里只做「筛 + 自己开」，不做队列。
    */
-  quickMatch(session, { difficulty, seats, rules } = {}) {
+  quickMatch(session, { difficulty, seats, rules, variant } = {}) {
+    // 「深渊回响」（深潜）：自己的匹配池。深潜房只和深潜房配，普通房永远进不来（反之亦然）。
+    const wantVariant = variant === 'deepecho' ? 'deepecho' : null;
+    // 深潜池的门槛与建房一致：管理员 / 测试名单（否则会配进一个进不去的模式）
+    if (wantVariant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId)) {
+      return fail(ERR.ECHO_FORBIDDEN, '「深渊回响」暂未开放，仅管理员与测试名单可进入');
+    }
     if (session.adminId !== true && !maintenanceGate().match) return fail(ERR.MATCH_DISABLED);
     if (this.roomOf(session)) return fail(ERR.SESSION_IN_USE, 'already in a room');
     const asked = DIFFICULTIES.includes(difficulty) ? difficulty : null;
@@ -2805,6 +2814,7 @@ export class Lobby {
     let best = null;
     for (const room of this.rooms.values()) {
       if (!room.matchmaking || room.mode !== 'coop') continue;
+      if ((room.variant === 'deepecho') !== (wantVariant === 'deepecho')) continue;
       if (!this.roomOpen(room)) continue;
       if (asked && room.difficulty !== asked) continue;
       if (!fitsSeats(room) || !fitsRules(room)) continue;
@@ -2818,7 +2828,7 @@ export class Lobby {
     //    维护者 2026-11-02 明确要求：没人匹配时玩家就停在多人匹配界面等人，
     //    不要给他开一间房让他在房间里等 —— 那样看起来像「已经在房间里了」，
     //    而且他会看不到自己在所有节点里排第几位。
-    const queued = this.quickEnqueue(session, { difficulty: asked, seats, rules, wantMulti, wantFour, wantExperimental });
+    const queued = this.quickEnqueue(session, { difficulty: asked, seats, rules, wantMulti, wantFour, wantExperimental, variant: wantVariant });
     // 排队失败（游客 / 维护开关）要原样返回，不能套进 reply，否则前端只看得到 ok:true
     if (queued && queued.error) return queued;
     return { ok: true, reply: queued };
@@ -2833,7 +2843,7 @@ export class Lobby {
    * 不能再让一个人无限等下去）。成形后由第一个人当房主建房，其余人加入，然后**立刻开局**
    * （`forceStartMatchmaking`），这样玩家点完确认就直接进对局，不用再在房间里点开始。
    */
-  quickEnqueue(session, { difficulty, seats, rules, wantMulti, wantFour, wantExperimental }) {
+  quickEnqueue(session, { difficulty, seats, rules, wantMulti, wantFour, wantExperimental, variant = null }) {
     // 以前靠 create() 顺带拒绝游客；现在没人匹配时不再建房，所以这里要自己拦一道，
     // 否则游客会排进队列、等 2 分钟超时才发现开不了局。
     //
@@ -2854,13 +2864,15 @@ export class Lobby {
       difficulty: difficulty ?? null,
       seats: seats ?? null,
       rules: rules ?? null,
+      // 「深渊回响」（深潜）：池键多一维，深潜与普通同盟不混坐
+      variant: variant === 'deepecho' ? 'deepecho' : null,
       // 池键：难度 + 人数 + 规则。'standard' / 'experimental' 不能混坐（规则不一样打不了）。
       capacity,
       standard: !wantExperimental,
       createdAt: Date.now(),
     };
     this.quickQueue.set(ticket, entry);
-    this.log?.info?.(`[lobby] 多人匹配排队 ${session.name || session.playerId} 难度=${difficulty || '任意'} ${capacity}人`);
+    this.log?.info?.(`[lobby] 多人匹配排队 ${session.name || session.playerId} 难度=${difficulty || '任意'} ${capacity}人${variant === 'deepecho' ? ' 深潜' : ''}`);
     return { queued: true, ticket, state: this.quickQueueState(entry) };
   }
 
@@ -2870,7 +2882,7 @@ export class Lobby {
       return { state: 'matched', code: entry.room.code, difficulty: entry.room.difficulty, capacity: entry.room.capacity };
     }
     const pool = [...(this.quickQueue?.values() || [])]
-      .filter((x) => !x.room && x.difficulty === entry.difficulty && x.capacity === entry.capacity && x.standard === entry.standard)
+      .filter((x) => !x.room && x.difficulty === entry.difficulty && x.capacity === entry.capacity && x.standard === entry.standard && (x.variant || null) === (entry.variant || null))
       .sort((a, b) => a.createdAt - b.createdAt);
     const waiting = pool.length;
     const position = pool.findIndex((x) => x.ticket === entry.ticket) + 1;
@@ -2920,7 +2932,7 @@ export class Lobby {
     }
     const pools = new Map();
     for (const entry of this.quickQueue.values()) {
-      const key = `${entry.difficulty || 'any'}|${entry.capacity}|${entry.standard ? 'std' : 'exp'}`;
+      const key = `${entry.difficulty || 'any'}|${entry.capacity}|${entry.standard ? 'std' : 'exp'}|${entry.variant || 'std'}`;
       if (!pools.has(key)) pools.set(key, []);
       pools.get(key).push(entry);
     }
@@ -2948,7 +2960,7 @@ export class Lobby {
     const experimental = wantCapacity
       ? experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, playerCapacity: wantCapacity })
       : (host.standard ? null : experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, revivalEnabled: true }));
-    const made = this.create(host.session, { mode: 'coop', difficulty: host.difficulty ?? undefined, experimental });
+    const made = this.create(host.session, { mode: 'coop', difficulty: host.difficulty ?? undefined, experimental, variant: host.variant || null });
     if (made && made.error) {
       // 建房失败（维护开关关掉了建房、账号冲突……）：**把这一组放掉**，不要留在队列里
       // 每秒重试 —— 那只会刷日志，而玩家永远等不到房间。用 quickDone 告诉前端原因。
@@ -2971,7 +2983,7 @@ export class Lobby {
     for (const entry of group) {
       this.quickDone.set(entry.ticket, { code: room.code, difficulty: room.difficulty, capacity: room.capacity, at: Date.now() });
     }
-    this.log?.info?.(`[lobby] 多人匹配成局 ${room.code}（${group.length} 人）`);
+    this.log?.info?.(`[lobby] 多人匹配成局 ${room.code}（${group.length} 人${room.variant === 'deepecho' ? ' 深潜' : ''}）`);
     try { this.forceStartMatchmaking(room); } catch (e) { this.log?.warn?.('[lobby] 匹配开局失败 ' + (e && e.message)); }
   }
 
