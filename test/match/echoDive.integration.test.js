@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeMatch } from './harness.js';
+import { isFlyKey } from '../../server/match/waves.js';
 import { ECHO_BLESSINGS, echoBlessingById, echoBlessingOffer } from '../../server/match/match/echoBlessing.js';
 import { echoCurseById, ECHO_CURSES, ECHO_ROUND_CURSES } from '../../server/match/match/echoCurse.js';
 
@@ -1378,4 +1379,24 @@ test('刷新祝福三选一：3 次额度、投票通过才重抽、刷新后重
 
   // 上限：任何来源都不能突破 3
   assert.equal(m._echoGrantBlessingRefresh(99), 3, '「再议」这类来源封顶 3 次');
+});
+
+// 维护者 2026-11-05：1–16 回合里出现「飞行怪直线穿场」。
+// 数据里地面路线常常只有 start→end（cp=0，靠寻路），飞行路线才带 8–10 个航点；
+// 一旦飞行怪被塞进 cp=0 的路线，它就沿起点→终点直线飞过去。这里每层兜一次。
+test('飞行怪不会被塞进没有航点的路线（直线穿场）', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const flyKey = Object.keys(m.gd.raw.enemies).find((k) => isFlyKey(m.gd, k));
+  assert.ok(flyKey, '数据里要有飞行怪');
+  const wave = {
+    spawns: [{ enemyKey: flyKey, routeIndex: 0, count: 1 }],
+    routes: [
+      { motion: 'WALK', start: [9, 10], end: [9, 2], checkpoints: [] },
+      { motion: 'FLY', start: [9, 10], end: [9, 2], checkpoints: [[9, 8], [9, 6], [9, 4]] },
+    ],
+  };
+  m._echoFixFlyRoutes(wave);
+  assert.equal(wave.spawns[0].routeIndex, 1, '飞行条目要改到带航点的路线');
 });

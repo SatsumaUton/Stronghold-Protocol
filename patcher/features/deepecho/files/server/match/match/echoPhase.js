@@ -22,7 +22,7 @@ import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR } from '..
 import { msg } from '../../../shared/i18n.js';
 import { hiddenEligible } from '../finalAssault.js';
 import { pieceBonds } from '../bondsMeta.js';
-import { roundPick } from '../waves.js';
+import { roundPick, isFlyKey } from '../waves.js';
 import { FLOW_TICKER_PRIORITY, OK, fail } from './common.js';
 
 export class MatchEcho {
@@ -955,6 +955,36 @@ export class MatchEcho {
    * 池子与精英注入都已经排除了，但模板变体 / 跨版本前缀（`act1:enemy_x`）等旁路仍可能漏，
    * 所以在波次生成后按 key（去前缀）再筛一遍。boss 返场回合不经过这里。
    */
+  /**
+   * 飞行条目不能走「没有航点」的路线（维护者 2026-11-05）。
+   *
+   * 数据里地面路线常常只有 start → end（cp=0，靠寻路走），飞行路线才带 8–10 个航点。
+   * 一旦飞行怪被塞进这种路线（模板错配 / 旁路注入 / 召唤），它就会沿起点→终点**直线穿场**。
+   * 这里每层出怪后兜一次：把飞行条目改到同一张图上真正带航点的路线（起点相同优先）。
+   */
+  _echoFixFlyRoutes(wave) {
+    if (!wave || !Array.isArray(wave.spawns) || !Array.isArray(wave.routes) || !wave.routes.length) return wave;
+    const routes = wave.routes;
+    const cps = (r) => (r && Array.isArray(r.checkpoints) ? r.checkpoints.length : 0);
+    const withPath = routes.map((r, i) => ({ r, i })).filter(({ r }) => cps(r) > 0);
+    if (!withPath.length) return wave;
+    const flyOf = (k) => {
+      try { return isFlyKey(this.gd, String(k || '').replace(/^.*:/, '')); } catch { return false; }
+    };
+    let fixed = 0;
+    for (const s of wave.spawns) {
+      if (!s || !flyOf(s.enemyKey)) continue;
+      const at = Number.isInteger(s.routeIndex) ? s.routeIndex : 0;
+      if (cps(routes[at]) > 0) continue;
+      const start = routes[at] && Array.isArray(routes[at].start) ? routes[at].start.join(',') : '';
+      const hit = withPath.find(({ r }) => Array.isArray(r.start) && r.start.join(',') === start) || withPath[0];
+      s.routeIndex = hit.i;
+      fixed += 1;
+    }
+    if (fixed) this.log?.info?.('[match ' + this.roomCode + '] echo: ' + fixed + ' 个飞行条目改到带航点的路线');
+    return wave;
+  }
+
   _echoSanitizeSpawns(wave) {
     if (!wave || !Array.isArray(wave.spawns)) return wave;
     let only = null;
