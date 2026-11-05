@@ -922,6 +922,19 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   border: 1px solid rgba(183, 156, 255, .42);
   background: rgba(183, 156, 255, .10);
   color: #e6dbff;
+  position: relative;                     /* 时效角标的定位基准（见 .ecochip__left） */
+}
+/* 有时效的 buff（本层词条 / 按层数到期的诅咒）：右下角小角标，写着「本」或剩余层数
+   （维护者 2026-11-05：光看图标不知道它下一层就没了） */
+.ecochip.is-timed { border-style: dashed; }
+.ecochip__left {
+  position: absolute; right: -.05rem; bottom: -.07rem;
+  min-width: .1rem; padding: 0 .015rem;
+  font-size: calc(.1 * var(--t)); line-height: 1.15; font-style: normal; font-weight: 900;
+  text-align: center; border-radius: .02rem;
+  background: #ffd06e; color: #241a05;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .55);
+  pointer-events: none;
 }
 .ecochip__glyph { font-weight: 900; color: var(--echo-accent, #b79cff); }
 /* 已消耗的祝福（护盾抵消过排异、一次性祝福）：留在列表里但明显是「用掉了」的状态
