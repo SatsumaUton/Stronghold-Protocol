@@ -117,3 +117,22 @@ export function EchoInfoBlock({ pub }) {
       : html`<span class="etag">${t('无')}</span>`}</p>
   </div>`;
 }
+
+/**
+ * HUD 常驻的 buff 图标栏（维护者 2026-11-05）。
+ *
+ * 为什么单独一个组件：`EchoStatus` 那条浮在屏幕上的状态条 2026-11-04 已按维护者要求摘掉
+ * （会挡 HUD 和按钮），把图标加进它等于没加 —— 玩家根本看不到。
+ * 这里改成右下角一小条只读圆片：容器 pointer-events: none，不挡任何操作，悬停才有 title。
+ */
+export function EchoBuffBar({ pub }) {
+  const echo = pub?.echo;
+  const depth = Number(echo?.depth) || 0;
+  if (!(depth > 0)) return null;
+  const chips = echoBuffChips(echo);
+  if (!chips.length) return null;
+  return html`<div class="echo-buffbar" data-testid="echo-buffbar" aria-label=${t('深渊回响：当前词条 / 祝福 / 诅咒')}>
+    ${chips.map((c) => html`<span key=${c.key} class=${`etag ecochip ecochip--${c.tone} is-${c.side}`}
+      title=${c.title} aria-label=${c.title}><b class="ecochip__glyph">${c.glyph}</b></span>`)}
+  </div>`;
+}
