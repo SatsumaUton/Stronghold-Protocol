@@ -70,10 +70,14 @@ test('对局记录：深渊回响在「模式」列，难度列照旧显示难�
   const diffAt = cells.indexOf('difficultyName(rec.difficulty)');
   const echoAt = cells.indexOf('is-echo');
   assert.ok(diffAt >= 0 && echoAt > diffAt, '深渊回响角标要在难度格之后的模式格里');
-  // 角标有样式：只换文字颜色，不加边框/底色（维护者 2026-11-06：加框像 P 上去的）
+  // 角标有样式：只换文字颜色，不加边框/底色（维护者 2026-11-06：加框像 P 上去的），
+  // 颜色用深潜界面那套紫（#b79cff，与 .echo-status 的 --echo-accent 同值），不是薄荷绿
   const css = read('public/css/screens/stats.css');
   const rule = css.match(/\.st-mode\.is-echo\s*\{([^}]*)\}/);
   assert.ok(rule, '要有 .st-mode.is-echo 规则');
   assert.doesNotMatch(rule[1], /border|background/, '不能有边框或底色');
   assert.match(rule[1], /color:/, '只靠文字颜色区分');
+  assert.match(rule[1], /#b79cff/, '用深潜的紫');
+  assert.doesNotMatch(rule[1], /var\(--mint/, '不要再用薄荷绿主题变量');
+  assert.doesNotMatch(rule[1], /font-weight/, '不加粗，和同列其他文字一样');
 });

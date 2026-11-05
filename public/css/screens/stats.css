@@ -430,5 +430,7 @@
 @media (max-width: 760px) { .st-verfilter { padding-inline: .16rem; } }
 .sp-coarse .st-verfilter .dpick__opt { min-height: 36px; }
 
-/* 对局记录的模式列：「深渊回响」只换文字颜色，不加框不加底（维护者 2026-11-06：加框像 P 上去的） */
-.st-mode.is-echo { color: var(--mint-s10); font-weight: 700; white-space: nowrap; }
+/* 对局记录的模式列：「深渊回响」只换文字颜色，不加框不加底（维护者 2026-11-06：加框像 P 上去的）。
+   颜色取深潜界面那套紫 —— 与 game-panels.css 里 .echo-status 的 --echo-accent 同值
+   （统计页不在 html.sp-deepecho 作用域内，主题变量不会自动变紫，所以这里写死同一个色）。 */
+.st-mode.is-echo { color: var(--echo-accent, #b79cff); white-space: nowrap; }
