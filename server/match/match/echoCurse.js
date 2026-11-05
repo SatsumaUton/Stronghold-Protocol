@@ -200,15 +200,18 @@ export const ECHO_FIXED_CURSE_LAST_ANCHOR = 22;
 export const ECHO_FIXED_CURSE_STEP = 4;
 
 /**
- * 从第几层起不再出现「限制部署 / 限制盟约」这两类诅咒（维护者 2026-11-05）：
- * 25 层以后已经很难了，再随机封地块 / 排异盟约只会让人没法玩。
+ * 从第几层起不再出现「限制部署 / 限制盟约 / 随机销毁装备」这三类诅咒（维护者 2026-11-05）：
+ * 25 层以后已经很难了，再随机封地块 / 排异盟约 / 拆装备只会让人没法玩。
  */
 export const ECHO_BAN_CURSE_FROM = 25;
 
-/** 这条诅咒是不是「限制部署 / 限制盟约」那两类。 */
+/**
+ * 这条诅咒是不是**深层禁掉**的那几类：
+ *   deployBan（封锁地块）、bondBan（排异盟约）、destroyEquip（随机销毁装备）。
+ */
 export const isEchoBanCurse = (c) => {
   const kind = c && c.effect && c.effect.kind;
-  return kind === 'deployBan' || kind === 'bondBan';
+  return kind === 'deployBan' || kind === 'bondBan' || kind === 'destroyEquip';
 };
 
 /** 这个深度是不是固定层（到层必给一条诅咒，具体哪条随机）。 */
@@ -360,15 +363,19 @@ export function echoCurseList(ids = []) {
  *
  * @param {number} depth
  * @param {() => number} rng
+ * @param {{ exclude?: ((c: object) => boolean) | null }} [opts] exclude：这条候选不要（深层禁掉的几类）
  * @returns {typeof ECHO_ROUND_CURSES[number] | null} null = 本回合没有回合诅咒
  */
-export function pickRoundCurse(depth, rng = () => 0.5) {
+export function pickRoundCurse(depth, rng = () => 0.5, opts = null) {
   const d = Math.max(1, Math.floor(Number(depth) || 1));
   if (d < 4 || !ECHO_ROUND_CURSES.length) return null;
+  const exclude = opts && typeof opts.exclude === 'function' ? opts.exclude : null;
+  const pool = exclude ? ECHO_ROUND_CURSES.filter((c) => !exclude(c)) : ECHO_ROUND_CURSES;
+  if (!pool.length) return null;
   const chance = Math.min(0.7, 0.15 + d * 0.02);
   if ((Number(rng()) || 0) >= chance) return null;
-  const i = Math.min(ECHO_ROUND_CURSES.length - 1, Math.floor((Number(rng()) || 0) * ECHO_ROUND_CURSES.length));
-  return ECHO_ROUND_CURSES[i] || null;
+  const i = Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length));
+  return pool[i] || null;
 }
 
 /** 取一组 id 里的「干员减益」效果（unitMods），给部署钩子用。 */

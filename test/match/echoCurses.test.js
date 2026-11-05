@@ -227,3 +227,20 @@ test('25 层起不再抽到「限制部署 / 限制盟约」的诅咒', () => {
   for (let i = 0; i < 200; i++) before.push(pickEchoCurse(20, createRng(i + 1)));
   assert.ok(before.some((c) => c && isEchoBanCurse(c)), '20 层仍然可能抽到禁令类诅咒');
 });
+
+// 维护者 2026-11-05：25 层起「随机销毁装备」（锈蚀 r_rust）也不要出现。
+test('25 层起连「随机销毁装备」的回合诅咒也不出；20 层仍然会出', () => {
+  assert.equal(isEchoBanCurse(echoCurseById('r_rust')), true, '锈蚀要被识别成深层禁掉的那类');
+  assert.equal(isEchoBanCurse(echoCurseById('block_tiles')), true);
+  assert.equal(isEchoBanCurse(echoCurseById('block_bond')), true);
+  assert.equal(isEchoBanCurse(echoCurseById('r_frenzy')), false, '普通回合诅咒不受影响');
+
+  const deep = [];
+  for (let i = 0; i < 400; i++) deep.push(pickRoundCurse(30, createRng(i + 1), { exclude: (c) => isEchoBanCurse(c) }));
+  assert.ok(deep.some((c) => c), '深层仍然要有回合诅咒');
+  assert.equal(deep.some((c) => c && c.id === 'r_rust'), false, '25 层起不能再出锈蚀');
+
+  const early = [];
+  for (let i = 0; i < 400; i++) early.push(pickRoundCurse(20, createRng(i + 1)));
+  assert.ok(early.some((c) => c && c.id === 'r_rust'), '20 层仍然可能出锈蚀（规则只从 25 层起生效）');
+});

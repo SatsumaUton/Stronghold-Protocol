@@ -705,7 +705,8 @@ export class MatchEcho {
     }
     this._echoAnnounceRoundKind(r);
     const rng = createRng(deriveSeed(this.seed, `echo:rcurse:${r}`));
-    const pick = pickRoundCurse(depth, rng);
+    // 回合诅咒也走同一套深层排除：25 层起不再出封锁 / 排异 / 随机销毁装备（维护者 2026-11-05）
+    const pick = pickRoundCurse(depth, rng, { exclude: this._echoCurseExclude(depth) });
     this.echoRoundCurse = pick ? pick.id : null;
     if (pick) {
       const tier = ECHO_CURSE_RARITY_LABEL[pick.rarity] || '普通';
