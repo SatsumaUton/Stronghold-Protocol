@@ -945,15 +945,15 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   /* 右上角、倒计时左边（维护者 2026-11-05）：右下角会挡住商店池 */
   position: fixed; top: .12rem; right: 1.7rem; z-index: 8;
   /* 固定窄栏 + 强制换行：以前一整排会横向盖住 HUD 按钮 */
-  display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: .04rem;
+  display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: .06rem;
   /* 用 px 固定宽度，保证一定换行（vw 在某些缩放档位下会被算得很大） */
-  width: 190px; max-width: 190px; max-height: 34vh; overflow: hidden;
+  width: 232px; max-width: 232px; max-height: 34vh; overflow: hidden;
   padding: .04rem .06rem;
   background: rgba(10, 5, 22, .55); border: 1px solid rgba(183, 156, 255, .28);
   pointer-events: none;
 }
-.echo-buffbar .ecochip { pointer-events: auto; font-size: calc(.14 * var(--t)); }
-.echo-buffbar .ecochip__icon { width: .15rem; height: .15rem; }
+.echo-buffbar .ecochip { pointer-events: auto; font-size: calc(.14 * var(--t)); padding: .03rem; border-radius: .03rem; }
+.echo-buffbar .ecochip__icon { width: .26rem; height: .26rem; }
 .echo-buffbar .ecochip__icon { fill: currentColor; }
 .sigil-arrow.is-up { fill: #ffe08a; }
 .sigil-arrow.is-down { fill: #ff8fa8; }
