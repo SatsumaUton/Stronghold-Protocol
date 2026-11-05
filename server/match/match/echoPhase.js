@@ -14,7 +14,7 @@ import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js'
 import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_CURSE_RARITY_LABEL, isEchoFixedCurseLayer, isEchoBanCurse, ECHO_BAN_CURSE_FROM } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
-  echoBlessingFunds, echoBlessingLateMul, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, ECHO_BLESSING_REFRESH_MAX, ECHO_BLESSINGS, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
+  echoBlessingFunds, echoBlessingLateMul, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, ECHO_BLESSING_REFRESH_MAX, ECHO_BLESSINGS, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL, echoBondDebuffSeconds,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { echoSummonOnly, echoHitCountEnemy } from './echoWaves.js';
@@ -286,6 +286,42 @@ export class MatchEcho {
           battle.addBuff(enemy, { key, name: b.name, desc: b.desc || '', mods: { ...d.mods }, persist: true, visible: true });
         }
       }, { priority: 59, owner: 'echo:blessing' });
+    }
+    // 主题转化（维护者 2026-11-05）：队伍激活了对应的**附加盟约**时，每回合**开局前 N 秒**
+    // 对全场敌人施压（N 按祝福稀有度：普通 10 / 稀有 15 / 传说 20）。
+    // 门槛在抽卡时已经筛过一次，这里再查一次 —— 战斗开始时算数的是**此刻**的盟约：
+    // 中间换过棋盘、那条盟约掉了，本回合这条祝福就不生效（描述里写的就是「队伍激活时」）。
+    const bondDebuffs = this._echoBlessings().filter((b) => b && b.kind === 'bonddebuff');
+    if (bondDebuffs.length) {
+      const team = this._echoTeamBonds();
+      for (const b of bondDebuffs) {
+        if (!team.has(b.bondGate)) continue;
+        const secs = echoBondDebuffSeconds(b.rarity);
+        const leftNow = () => secs - (Number(battle.time) || 0);
+        const strike = (e, left) => {
+          if (!e || e.alive === false || !(left > 0)) return;
+          if (typeof battle.applyStatus !== 'function') return;
+          for (const st of b.enemyStatuses || []) {
+            battle.applyStatus(e, st.key, { duration: left, value: st.value, source: null });
+          }
+        };
+        for (const e of battle.enemies || []) strike(e, leftNow());
+        battle.on('enemySpawn', ({ enemy }) => strike(enemy, leftNow()), { priority: 57, owner: 'echo:bonddebuff' });
+        // 反震（坚守）：窗口内敌人每次对己方造成伤害，都会吃到其中 reflect 比例的真实反伤。
+        // source 为 null 的伤害不会再触发这条（`c.source.side === 'enemy'` 挡住），所以不会递归。
+        if (Number(b.reflect) > 0 && typeof battle.dealDamage === 'function') {
+          battle.on('damaged', (c) => {
+            if (!(leftNow() > 0)) return;
+            if (!c || !c.source || c.source.side !== 'enemy') return;
+            if (!c.target || c.target.side !== 'ally') return;
+            const amount = Number(c.amount) || 0;
+            if (!(amount > 0)) return;
+            battle.dealDamage(null, c.source, {
+              amount: amount * Number(b.reflect), type: 'true', canDodge: false, tags: ['echo:reflect'],
+            });
+          }, { priority: 40, owner: 'echo:reflect' });
+        }
+      }
     }
     // 反隐匿（维护者 2026-11-05）：「照破」每 interval 秒让隐匿敌人现形 duration 秒；「洞彻」永久反隐。
     // 隐匿敌人默认不可选中（sim/content/targeting.js：f.stealth && !f.reveal），所以挂一个 flags.reveal 的 buff；
@@ -2079,6 +2115,27 @@ export class MatchEcho {
     };
   }
 
+  /**
+   * 队伍当前**激活**的盟约 id 集合 —— 主题转化祝福的门槛（维护者 2026-11-05）。
+   *
+   * 只看还活着的玩家：已经淘汰的人留在棋盘上的盟约不该再当门槛。
+   * `ps.bonds` 是 computeBonds 的产物（`{ [bondId]: { count, active, tier, layers } }`），
+   * 备战区的干员也算人数，所以这里跟「盟约面板上亮着的」完全一致。
+   */
+  _echoTeamBonds() {
+    const out = new Set();
+    const list = this.players && typeof this.players.values === 'function' ? [...this.players.values()] : [];
+    for (const ps of list) {
+      if (!ps || ps.alive === false) continue;
+      const bonds = ps.bonds;
+      if (!bonds || typeof bonds !== 'object') continue;
+      for (const id of Object.keys(bonds)) {
+        if (bonds[id] && bonds[id].active === true) out.add(id);
+      }
+    }
+    return out;
+  }
+
   /** 已拥有的祝福对象列表（HUD / 测试用）。 */
   /**
    * 已获得的祝福（HUD / 列表用）。
@@ -2237,7 +2294,8 @@ export class MatchEcho {
       try { this._echoForceResolveBlessing(); } catch { /* 结算失败不阻塞新回合 */ }
     }
     const rng = createRng(deriveSeed(this.seed, `echo:bless:${r}`));
-    const offer = echoBlessingOffer(rng, this.echoBlessings);
+    // 主题转化祝福只发队伍真的激活了的盟约（维护者 2026-11-05）
+    const offer = echoBlessingOffer(rng, this.echoBlessings, { bonds: this._echoTeamBonds() });
     if (!offer.length) { this.echoBlessingOffer = null; return null; }
     this.echoBlessingOffer = offer.map((b) => b.id);
     this._echoBlessingRound = r;          // 这一版 offer 属于哪一回合（跨回合要先结算旧的）
@@ -2397,7 +2455,8 @@ export class MatchEcho {
     const nonce = (Number(this.echoBlessingRefreshNonce) || 0) + 1;
     this.echoBlessingRefreshNonce = nonce;
     const rng = createRng(deriveSeed(this.seed, `echo:bless:${r}:refresh:${nonce}`));
-    const offer = echoBlessingOffer(rng, this.echoBlessings);
+    // 主题转化祝福只发队伍真的激活了的盟约（维护者 2026-11-05）
+    const offer = echoBlessingOffer(rng, this.echoBlessings, { bonds: this._echoTeamBonds() });
     if (!offer.length) { this.markPublic(); return OK; }
     this.echoBlessingOffer = offer.map((b) => b.id);
     this._echoBlessingRound = r;

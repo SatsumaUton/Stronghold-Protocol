@@ -198,6 +198,31 @@ test('祝福逐条生效：每条都能在消费端看到差异', (t) => {
         bh.b.dispose?.();
         continue;
       }
+      if (kind === 'bonddebuff') {
+        // 主题转化（2026-11-05）：门槛盟约激活时，开局对全场敌人施压（反震走反伤，另算）
+        assert.ok(b.bondGate, `${b.id} 没有门槛盟约`);
+        const ps = m.alivePlayers()[0];
+        ps.bonds = { ...(ps.bonds || {}), [b.bondGate]: { count: 3, active: true, tier: 1, layers: 3 } };
+        m.echoBlessings = [b.id];
+        const bh = makeBattle({ enemies: [{ key: 'enemy_1007_shield', mods: { hpMul: 500, speedMul: 0 } }], content: 'none', autoFinish: false });
+        m._echoHookBattle(bh.b);
+        bh.step(1);
+        const e = (bh.b.enemies || [])[0];
+        assert.ok(e, `${b.id} 的测试敌人没出场`);
+        if (Number(b.reflect) > 0) {
+          // 反震：窗口内敌人打己方 → 敌人自己吃到反伤（反伤的 source 是 null，所以不会递归）
+          let reflected = 0;
+          bh.b.on('damaged', (c) => { if (c && c.target === e && !c.source) reflected += 1; });
+          bh.b.emit('damaged', { source: e, target: { side: 'ally' }, amount: 100, type: 'phys' });
+          assert.ok(reflected > 0, `${b.id} 没有反伤`);
+        } else {
+          const keys = (e.buffs || []).map((x) => x && x.key);
+          assert.ok((b.enemyStatuses || []).some((st) => keys.includes(st.key)),
+            `${b.id} 没给敌人挂上状态（实际：${keys.join(',')}）`);
+        }
+        bh.b.dispose?.();
+        continue;
+      }
       if (kind === 'yanyou') {
         // 炎佑：开战召唤，能看到 token
         const bh = makeBattle({ players: [{ playerId: 'p1', seat: 0, side: 'L', colOffset: 0, units: [{ uid: 1, kind: 'chess', chessId: 'chess_char_1_01_a', row: 10, col: 5, dir: 'RIGHT' }], bonds: {}, bandId: null, playerEffects: [] }] });

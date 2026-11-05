@@ -172,7 +172,73 @@ export const ECHO_BLESSINGS = Object.freeze([
   { id: 'vulnerable', rarity: 'rare', name: '易伤', group: 'debuff', kind: 'mods',
     desc: '35% 的敌人受到伤害 +15%',
     enemyDebuff: { chance: 0.35, mods: { dmgTakenMul: 0.85 }, tag: 'vuln' } },
+
+  // —— 主题转化（维护者 2026-11-05「按这个做」）：把队伍的**附加盟约**主题变成对敌压制 ——
+  //
+  // 15 条附加盟约里只有 奥术 / 坚守 本身带对敌异常，其余基本只服务己方数值。这里给它们
+  // 各配一条「转化」祝福，把盟约的主题搬到敌人身上：
+  //   · `bondGate` —— 只有**队伍真的激活了这条盟约**，它才会进三选一（echoBlessingOffer 的
+  //     opts.bonds）。所以不会出现「抽到了但我没这条盟约」的死牌。
+  //   · 生效窗口是每回合**开局前 N 秒**（不是永久）：N 按稀有度分档，见 ECHO_BOND_DEBUFF_SECONDS。
+  //   · 实现只用 sim 已有的异常状态（`battle.applyStatus`）与 `battle.dealDamage`（反伤），
+  //     server/sim 一行不改，golden 的既有场景不受影响。
+  //   · 数值口径：原版盟约效果 ×1.5~2（维护者 2026-11-05 认可这档估值）。
+  // 跳过 远见 / 投资人 / 不屈 / 独行：它们的效果是「钱 / 招募 / 复活 / 独狼」，转成对敌减益
+  // 会变成另一条机制，不像「主题转化」。
+  { id: 'bd_arcane', rarity: 'rare', name: '术蚀', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'arcaneShip', bondLabel: '奥术',
+    desc: '队伍激活【奥术】时：每回合前 15 秒，全场敌人受到的法术伤害 +25%',
+    enemyStatuses: [{ key: 'artsFragile', value: 0.25 }] },
+  { id: 'bd_stead', rarity: 'epic', name: '反震', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'steadShip', bondLabel: '坚守',
+    desc: '队伍激活【坚守】时：每回合前 20 秒，敌人对己方造成伤害时受到其中 30% 的真实反伤',
+    reflect: 0.3 },
+  { id: 'bd_preci', rarity: 'rare', name: '洞穿', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'preciShip', bondLabel: '精准',
+    desc: '队伍激活【精准】时：每回合前 15 秒，全场敌人防御 -30%',
+    enemyStatuses: [{ key: 'defDown', value: 0.3 }] },
+  { id: 'bd_skillful', rarity: 'common', name: '缠足', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'skillfulShip', bondLabel: '灵巧',
+    desc: '队伍激活【灵巧】时：每回合前 10 秒，全场敌人攻击速度 -30',
+    enemyStatuses: [{ key: 'aspdDown', value: -30 }] },
+  { id: 'bd_swift', rarity: 'rare', name: '迟滞', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'swiftShip', bondLabel: '迅捷',
+    desc: '队伍激活【迅捷】时：每回合前 15 秒，全场敌人移动速度 -60%',
+    enemyStatuses: [{ key: 'slow', value: 0.6 }] },
+  { id: 'bd_deput', rarity: 'rare', name: '削壁', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'deputShip', bondLabel: '助力',
+    desc: '队伍激活【助力】时：每回合前 15 秒，全场敌人防御 -20%、法术抗性 -15',
+    enemyStatuses: [{ key: 'defDown', value: 0.2 }, { key: 'resDown', value: 15 }] },
+  { id: 'bd_empty', rarity: 'epic', name: '压制', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'emptyShip', bondLabel: '协防',
+    desc: '队伍激活【协防】时：每回合前 20 秒，全场敌人攻击力 -25%',
+    enemyStatuses: [{ key: 'weaken', value: 0.25 }] },
+  { id: 'bd_mira', rarity: 'rare', name: '厄运', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'miraShip', bondLabel: '奇迹',
+    desc: '队伍激活【奇迹】时：每回合前 15 秒，全场敌人受到的伤害 +20%',
+    enemyStatuses: [{ key: 'fragile', value: 0.2 }] },
+  { id: 'bd_mani', rarity: 'rare', name: '调律', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'maniShip', bondLabel: '调和',
+    desc: '队伍激活【调和】时：每回合前 15 秒，全场敌人法术抗性 -25',
+    enemyStatuses: [{ key: 'resDown', value: 25 }] },
+  { id: 'bd_raid', rarity: 'common', name: '袭扰', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'raidShip', bondLabel: '突袭',
+    desc: '队伍激活【突袭】时：每回合前 10 秒，全场敌人移动速度 -40%、攻击速度 -15',
+    enemyStatuses: [{ key: 'slow', value: 0.4 }, { key: 'aspdDown', value: -15 }] },
+  { id: 'bd_sunt', rarity: 'epic', name: '绝境', kind: 'bonddebuff', group: 'bonddebuff',
+    bondGate: 'suntShip', bondLabel: '绝技',
+    desc: '队伍激活【绝技】时：每回合前 20 秒，全场敌人受到的伤害 +25%',
+    enemyStatuses: [{ key: 'fragile', value: 0.25 }] },
 ]);
+
+/**
+ * 主题转化祝福的生效时长（秒）：每回合**开局前**多久对全场敌人施压。
+ *
+ * 维护者 2026-11-05 选「按稀有度分档」（而不是统一 15 秒）：越难抽到的转化，压得越久。
+ */
+export const ECHO_BOND_DEBUFF_SECONDS = Object.freeze({ common: 10, rare: 15, epic: 20 });
+/** 这条转化祝福持续几秒（没登记稀有度时按稀有 15 秒）。 */
+export const echoBondDebuffSeconds = (rarity) => ECHO_BOND_DEBUFF_SECONDS[rarity] || ECHO_BOND_DEBUFF_SECONDS.rare;
 
 /** 按 id 取祝福。 */
 export const echoBlessingById = (id) => ECHO_BLESSINGS.find((b) => b.id === id) || null;
@@ -237,12 +303,17 @@ export const echoBlessingIsMoney = (b) => !!b && ((b.kind === 'fund' && Number(b
  *
  * @param {() => number} rng [0,1) 随机源
  * @param {string[]} [owned] 已拥有的祝福 id
+ * @param {{ bonds?: Iterable<string> }} [opts] `bonds` = 队伍当前**激活**的盟约 id（主题转化祝福只在这些
+ *   盟约上才发：没有它这条祝福什么都做不了，抽到就是死牌）
  * @returns {Array<typeof ECHO_BLESSINGS[number]>} 候选（可能为空 = 三个都拿过了）
  */
-export function echoBlessingOffer(rng, owned = []) {
+export function echoBlessingOffer(rng, owned = [], opts = {}) {
   const have = new Set(Array.isArray(owned) ? owned : []);
+  // 主题转化（bondGate）：只有队伍真的激活了那条盟约才进池子。不传 bonds = 一条都不发。
+  const bonds = new Set(opts && opts.bonds ? opts.bonds : []);
   const pool = ECHO_BLESSINGS
     .filter((b) => (echoBlessingFree(b) || b.repeatable === true || !have.has(b.id)) && b.disabled !== true)
+    .filter((b) => !b.bondGate || bonds.has(b.bondGate))
     // 允许单条祝福覆盖权重（.weight）：给钱类祝福出现得太频繁，维护者要求降频（2026-11-05）
     .map((b) => ({ b, w: Number(b.weight) > 0 ? Number(b.weight) : ECHO_BLESSING_RARITY_WEIGHT[b.rarity] || 1 }));
   const out = [];

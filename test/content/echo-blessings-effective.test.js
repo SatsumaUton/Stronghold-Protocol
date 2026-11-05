@@ -80,6 +80,9 @@ test('非 mods 祝福必须带生效字段', () => {
       || (b.kind === 'coldwind' && Number(b.interval) > 0 && Number(b.duration) > 0)
       // 炎佑之契（2026-11-05）：开战召唤 + 存在时长
       || (b.kind === 'yanyou' && Number(b.lifetime) > 0)
+      // 主题转化（2026-11-05）：门槛盟约 + 对敌异常（或反伤比例）
+      || (b.kind === 'bonddebuff' && !!b.bondGate
+        && ((Array.isArray(b.enemyStatuses) && b.enemyStatuses.length > 0) || Number(b.reflect) > 0))
       || (b.kind === 'counter' && ((Array.isArray(b.counterCurses) && b.counterCurses.length) || b.counterBans === true));
     if (!has) bad.push(b.id);
   }
