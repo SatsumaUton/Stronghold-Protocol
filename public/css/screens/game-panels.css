@@ -1007,6 +1007,37 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-bless__glyph { width: .7rem; height: .7rem; font-size: calc(.3 * var(--t)); box-shadow: 0 0 .2rem rgba(183, 156, 255, .45); }
 .echo-bless__name { font-size: calc(.24 * var(--t)); letter-spacing: .02em; }
 .echo-bless__desc { font-size: calc(.16 * var(--t)); max-width: 14em; }
+/* ---- 「查看诅咒」按钮 + 展开清单 + 祝福卡上的「推荐」角标（维护者 2026-11-05） ---- */
+.echo-bless__cursesbtn {
+  display: inline-flex; align-items: baseline; gap: .06rem;
+  padding: .04rem .14rem; cursor: pointer;
+  border: 1px solid rgba(183, 156, 255, .45); border-radius: 0;
+  background: rgba(125, 91, 214, .16); color: #e6dbff;
+  font-size: calc(.15 * var(--t));
+}
+.echo-bless__cursesbtn:hover { border-color: rgba(196, 166, 255, .9); background: rgba(125, 91, 214, .3); }
+.echo-bless__cursesbtn.is-on { border-color: #b79cff; background: rgba(125, 91, 214, .42); }
+.echo-bless__cursesbtn b { font-size: calc(.17 * var(--t)); color: #ffd978; }
+.echo-bless__curses {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .06rem .18rem;
+  margin: .14rem 0 0; padding: .12rem .14rem; list-style: none;
+  max-height: 34vh; overflow-y: auto;
+  border: 1px solid rgba(183, 156, 255, .22); background: rgba(11, 6, 22, .55);
+}
+.echo-bless__curse { display: flex; align-items: baseline; gap: .1rem; font-size: calc(.14 * var(--t)); color: #cbb9ee; }
+.echo-bless__curse b { color: #f0e9ff; }
+.echo-bless__curseTag { flex: 0 0 auto; font-size: .82em; color: #9d8cc4; border: 1px solid rgba(183, 156, 255, .35); padding: 0 .05rem; }
+.echo-bless__curseDesc { color: #9d8cc4; }
+.echo-bless__curse.is-epic b { color: #ffd978; }
+.echo-bless__curse.is-empty { grid-column: 1 / -1; color: #8f7fb5; }
+.echo-bless__recommend {
+  position: absolute; top: .1rem; left: .1rem;   /* 右上角是稀有度角标，推荐只能放左上 */
+  display: inline-flex; align-items: baseline; gap: .06rem;
+  padding: .02rem .1rem; border-radius: .04rem;
+  background: linear-gradient(180deg, #ffe08a, #d9a93a); color: #2a1a05;
+  font-size: calc(.13 * var(--t)); font-weight: 700; letter-spacing: .04em;
+}
+.echo-bless__recommend i { font-style: normal; font-weight: 600; font-size: .86em; }
 .echo-bless__card.is-mine { background: linear-gradient(180deg, rgba(120, 80, 200, .5), rgba(40, 20, 70, .9)); }
 .echo-bless__foot { padding-top: .14rem; border-top: 1px solid rgba(183, 156, 255, .18); }
 
