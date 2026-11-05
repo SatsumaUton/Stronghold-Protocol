@@ -70,7 +70,7 @@ test('诅咒 → 第三侧圆片：按稀有度配色，固定规则走 gold', (
   assert.ok(chips.every((c) => c.key.startsWith('curse:')));
   assert.deepEqual(chips.map((c) => c.tone), ['rare', 'gold', 'gold']);
   // 图标（维护者 2026-11-05：光靠首字太丑）—— 全部来自仓库 ICONS 图标集
-  assert.deepEqual(chips.map((c) => c.icon), ['warn', 'crown', 'crown']);
+  assert.deepEqual(chips.map((c) => c.icon), ['warn', 'refresh', 'chart'], '诅咒按效果类型区分：狂怒=警示、奇迹=刷新、深渊通胀=图表');
   assert.equal(chips[1].glyph, '奇', '用名字首字当记号');
   assert.match(chips[2].title, /固定/, 'title 要带稀有度标签');
   assert.match(chips[2].title, /每层 \+4%/, 'title 要带效果说明');

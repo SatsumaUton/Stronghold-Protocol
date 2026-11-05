@@ -77,10 +77,25 @@ const GROUP_ICON = Object.freeze({
   debuff: 'snow',
 });
 
+/** 诅咒按效果类型给图标（维护者 2026-11-05：全用一个三角看不出是什么）。 */
+const CURSE_ICON = Object.freeze({
+  coinMul: 'chart', bountyCoin: 'chart', shopPriceMul: 'chart',
+  lpMul: 'warn', lpExtra: 'warn',
+  enemyAtkMul: 'sword', enemyHpMul: 'shield', unitMods: 'sword', budgetMul: 'users',
+  timeMul: 'hourglass', freeRefresh: 'refresh', wordCap: 'edit', blessingMax: 'book',
+  intel: 'eye', fog: 'eye', blackout: 'eye',
+  deployBan: 'close', bondBan: 'key', destroyEquip: 'close', dot: 'snow',
+});
+
 /** 一个词条 / 祝福 / 诅咒该用哪个图标。 */
 export function echoBuffIcon(b, side) {
   if (!b) return side === 'curse' ? 'warn' : 'plus';
-  if (side === 'curse') return b.rarity === 'special' ? 'crown' : 'warn';
+  if (side === 'curse') {
+    if (b.id === 'miracle') return 'refresh';
+    if (b.id === 'foresight' || b.id === 'abyss_inflation') return 'chart';
+    const kind = b.effect && b.effect.kind;
+    return CURSE_ICON[kind] || (b.rarity === 'special' ? 'crown' : 'warn');
+  }
   if (side === 'enemy') return WORD_ICON[b.id] || 'shield';
   if (b.id === 'shield_bond') return 'shield';
   if (b.id === 'haste') return 'chevrons';
