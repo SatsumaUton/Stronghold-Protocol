@@ -95,7 +95,12 @@ test('16 层起的「深渊通胀」是固定规则：有条目、有播报、�
   m.tickerText = (text, prio) => { tickers.push(String(text)); return orig(text, prio); };
   m._echoRefreshCurses(16);
   m._echoFlushAnnounce();
-  assert.ok(tickers.some((s) => s.includes('深渊通胀')), '16 层要播报「深渊通胀」');
+  const line = tickers.find((s) => s.includes('深渊通胀')) || '';
+  assert.ok(line, '16 层要播报「深渊通胀」');
+  assert.match(line, /新增固定规则/, '要说明这是新增的规则，而不是只报倍率');
+  assert.match(line, /商店购买价与刷新价/, '要说明影响哪些价格');
+  assert.match(line, /封顶 ×1\.5/);
+  assert.match(rule.desc, /刷新价/, '固定规则条目也要写清楚影响刷新价');
 });
 
 // 玩家 2026-11-05 实测：「25 层打完 boss 又回到 16 层」。

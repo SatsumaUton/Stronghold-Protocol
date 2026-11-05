@@ -637,7 +637,8 @@ export class MatchEcho {
     // 16 层起的经济消耗：进入这一层就播报一次（挂机玩家回来也能在播报里看到），
     // 之后每层的实际倍率挂在「本局信息 → 深渊回响 → 固定规则」的「深渊通胀」条目上。
     if (depth === 16) {
-      this._echoPushAnnounce(`深渊通胀生效：商店与刷新价格每层 +4%（当前 ×${this._echoShopInflate(r).toFixed(2)}，封顶 ×1.5）`);
+      // 广播口径（维护者 2026-11-05）：要说清楚「新增了什么」，而不是只报一个倍率。
+      this._echoPushAnnounce(`新增固定规则「深渊通胀」：16 层起，商店购买价与刷新价每层 +4%（当前 ×${this._echoShopInflate(r).toFixed(2)}，封顶 ×1.5）。可在「本局信息 → 深渊回响」查看。`);
     }
   }
 
@@ -1235,8 +1236,8 @@ export class MatchEcho {
       {
         id: 'abyss_inflation', name: '深渊通胀',
         desc: this._echoShopInflate() > 1
-          ? `16 层起商店与刷新价格每层 +4%，当前 ×${this._echoShopInflate().toFixed(2)}（封顶 ×1.5）`
-          : '16 层起商店与刷新价格每层 +4%，封顶 ×1.5（16 层开始生效）',
+          ? `16 层起商店购买价与刷新价每层 +4%，当前 ×${this._echoShopInflate().toFixed(2)}（封顶 ×1.5）`
+          : '16 层起商店购买价与刷新价每层 +4%，封顶 ×1.5（16 层开始生效）',
         rarity: 'special', rarityLabel: '固定',
       },
       // 挑战关没达成等来源累积的诅咒（echoCurse.js 的词条表；同类合并成「侵蚀 ×2」）
