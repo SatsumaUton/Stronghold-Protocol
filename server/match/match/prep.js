@@ -24,6 +24,12 @@ export class MatchPrep {
     }
     // solo / single-human matches: untimed (soloUntimed); co-op: the round's prepTime
     const secs = this.soloUntimed ? null : this.gd.prepTime(this.round);
+    // 维护者 2026-11-05：**决策面板还开着就别开始倒数**。
+    // 祝福三选一 / 弃选 / 刷新投票 / 深潜补给 / 盟约投影都是在 ROUND_START 阶段就开好的，
+    // 那时 phase 还不是 PREP，`_echoPausePrepClock()` 什么也没做；等到进入 PREP 才设 deadline，
+    // 于是面板明明还开着，右上角已经在倒数（玩家反馈）。这里把整段准备时间先扣住，
+    // 等面板全部结算完由 `_echoMaybeResumePrepClock()` 接回来。
+    if (typeof this._echoHoldPrepClock === 'function' && this._echoHoldPrepClock(secs)) return;
     this.setDeadline(secs, () => this.prepDeadline());
     let i = 0;
     for (const ps of alive) if (ps.botControlled) this.scheduleBotPrep(ps, i++);

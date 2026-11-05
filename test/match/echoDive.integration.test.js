@@ -1773,6 +1773,14 @@ test('深潜补给的选择不占用准备阶段倒计时', (t) => {
   m.startRound(21);
   for (let i = 0; i < 40 && m.phase !== 'PREP'; i++) h.sched.advance(200);
   assert.equal(m.phase, 'PREP');
+  // 维护者 2026-11-05 之后：面板还开着时倒计时是**被扣住**的（deadline = 0），
+  // 所以这里先把它结算掉，再验证补给自己的暂停/恢复。
+  m.echoBlessingOffer = null;
+  m.echoBlessingDiscardOffer = null;
+  m.echoBlessingRefreshVote = null;
+  m.echoProjectionOffer = null;
+  m.echoShieldOffer = null;
+  m._echoMaybeResumePrepClock();
   const before = m.deadline - m.sched.now();
   assert.ok(before > 0, '准备阶段应该有倒计时');
   m.echoSupplyLastDepth = 0;

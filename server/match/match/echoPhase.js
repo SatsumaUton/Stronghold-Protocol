@@ -900,6 +900,8 @@ export class MatchEcho {
       return rec && rec.isCore !== true && !banned.includes(b);
     });
     if (!cands.length) return null;
+    // 护盾指定盟约也是一次决策：别吃准备时间（维护者 2026-11-05）
+    this._echoPausePrepClock();
     this.echoShieldOffer = cands.slice(0, 12);
     this._echoShieldVotes.clear();
     this.echoShieldEndsAt = (this.sched?.now?.() ?? 0) + ECHO_BLESSING_VOTE_MS;
@@ -952,6 +954,7 @@ export class MatchEcho {
     const rec = this.gd.raw && this.gd.raw.bonds ? this.gd.raw.bonds[chosen] : null;
     if (!rec || rec.isCore === true) return OK;
     this.echoShieldBond = chosen;
+    this._echoMaybeResumePrepClock();
     const name = this.gd.bond(offer[i])?.name || offer[i];
     this._echoPushAnnounce(`护盾：指定保护【${name}】——排异随机到它时将被抵消`);
     this._echoFlushAnnounce();
@@ -2080,10 +2083,39 @@ export class MatchEcho {
     this.setDeadline(left / 1000, () => this.prepDeadline());
   }
 
+  /**
+   * 现在还有没有**没结算完的决策面板**（维护者 2026-11-05：这些面板不吃准备时间）。
+   * 六处：祝福三选一 / 弃选替换 / 刷新投票 / 深潜补给 / 盟约投影 / 护盾指定盟约。
+   */
+  _echoChoiceOpen() {
+    if (this.echoBlessingOffer) return true;
+    if (this.echoBlessingDiscardOffer) return true;
+    if (this.echoBlessingRefreshVote) return true;
+    if (this.echoSupply && this.echoSupply.pick == null) return true;
+    if (this.echoProjectionOffer && this.echoProjectionOffer.pick == null) return true;
+    if (Array.isArray(this.echoShieldOffer) && this.echoShieldOffer.length) return true;
+    return false;
+  }
+
+  /**
+   * 进入准备阶段时**扣住倒计时**（返回 true = 已经扣住，调用方不要再 setDeadline）。
+   *
+   * 为什么需要它：祝福三选一 / 补给 / 投影都是在 ROUND_START 阶段就开好的，那时 phase 还不是 PREP，
+   * `_echoPausePrepClock()` 直接返回；等 `enterPrep()` 设 deadline 时面板还开着，倒计时就照跑
+   * （玩家反馈：选祝福的时候右上角一直在倒数）。这里把整段准备时间先存起来，等面板全关再放出来。
+   */
+  _echoHoldPrepClock(secs) {
+    if (!(secs > 0)) return false;
+    if (!this._echoChoiceOpen()) return false;
+    // enterPrep 是新一段准备时间：无条件覆盖（上一回合残留的暂停时长不能带过来）
+    this._echoPrepPausedMs = Math.max(1000, Math.round(secs * 1000));
+    this.setDeadline(0);
+    return true;
+  }
+
   /** 还有面板开着就别恢复倒计时。 */
   _echoMaybeResumePrepClock() {
-    if (this.echoBlessingOffer) return;
-    if (this.echoSupply && this.echoSupply.pick == null) return;
+    if (this._echoChoiceOpen()) return;
     this._echoResumePrepClock();
   }
 
@@ -2361,6 +2393,8 @@ export class MatchEcho {
     // 一次性祝福（回血 / 资金 / 涤罪）**无视名额上限**：直接发，不进入弃选流程（维护者 2026-11-05）
     if (replace && !echoBlessingFree(b) && !echoBlessingOneShot(b) && this.echoBlessings.filter((id) => id !== 'shield_bond').length >= this._echoBlessingMax()) {
       this.echoBlessingPendingPick = b.id;
+      // 弃选替换也是一次决策：别吃准备时间（维护者 2026-11-05）
+      this._echoPausePrepClock();
       this.echoBlessingDiscardOffer = this.echoBlessings.slice();
       this._echoDiscardVotes.clear();
       this.echoBlessingDiscardEndsAt = (this.sched?.now?.() ?? 0) + ECHO_BLESSING_VOTE_MS;
@@ -2451,6 +2485,7 @@ export class MatchEcho {
     // 这次额外抽取已经用掉了：不扣掉的话每回合都会再开一次替换（owned 不变、rawDue 不变）
     this.echoBlessingDraws = Math.max(0, (Number(this.echoBlessingDraws) || 0) - 1);
     this._echoFlushAnnounce?.();
+    this._echoMaybeResumePrepClock();
     this.markPublic();
     return OK;
   }
