@@ -54,11 +54,22 @@ test('回看结算：variant / 深度 要带回去（保持深渊主题）', () 
   assert.equal(res.echoDepth, 40);
 });
 
-test('对局记录的模式列：深渊回响显示成深渊回响，不是难度名', () => {
+test('对局记录：深渊回响在「模式」列，难度列照旧显示难度名', () => {
   const src = read('public/js/screens/stats.js');
   assert.match(src, /rec\.variant === 'deepecho'/, '要按 variant 判断');
   assert.match(src, /st-mode is-echo/, '要有深渊回响角标');
   assert.match(src, /\$\{t\('深渊回响'\)\}/, '文案是深渊回响');
+  // 列的顺序：表头 难度 在 模式 前面；行里难度格在前，深渊回响角标在模式格里（难度格后面）
+  const headAt = src.indexOf('<th>${t(\'时间\')}</th>');
+  const head = src.slice(headAt, src.indexOf('</thead>', headAt));
+  assert.ok(head.indexOf('难度') < head.indexOf('模式'), '表头顺序 难度 → 模式');
+  const rowStart = src.indexOf('<td class="st-t">');
+  const rowEnd = src.indexOf('<td><span class="st-band">', rowStart);
+  const cells = src.slice(rowStart, rowEnd);
+  assert.ok(cells.includes('difficultyName(rec.difficulty)'), '难度格要显示难度名');
+  const diffAt = cells.indexOf('difficultyName(rec.difficulty)');
+  const echoAt = cells.indexOf('is-echo');
+  assert.ok(diffAt >= 0 && echoAt > diffAt, '深渊回响角标要在难度格之后的模式格里');
   // 角标有样式
   const css = read('public/css/screens/stats.css');
   assert.match(css, /\.st-mode\.is-echo\s*\{/);
