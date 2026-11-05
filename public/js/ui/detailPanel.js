@@ -244,10 +244,12 @@ function ItemRow({ itemId, carried = null, off = null, mode = 'official', onUneq
  * @param {{ bondIds: string[], bonds?: any[], onBond?: (bondId: string) => void, off?: Set<string>|null, granted?: string[] }} props —
  *   off: the bonds the mode never activates (gameLogic modeOffBonds): 本局禁用 instead of the count
  */
-export function BondChips({ bondIds, bonds = [], onBond = null, off = null, granted = [] }) {
+export function BondChips({ bondIds, bonds = [], onBond = null, off = null, granted = [], projected = null }) {
   const ids = Array.isArray(bondIds) ? bondIds.filter((b) => typeof b === 'string') : [];
   if (!ids.length) return null;
   const iso = new Set(Array.isArray(granted) ? granted : []);
+  // 盟约投影：只挂在**已部署到场上**的己方干员卡上，角标写「投影」（维护者 2026-11-05）
+  const projId = typeof projected === 'string' && projected ? projected : null;
   const mine = new Map((Array.isArray(bonds) ? bonds : []).filter((b) => b && typeof b.bondId === 'string').map((b) => [b.bondId, b]));
   return html`<div class="dbonds dbonds--top" role="list" aria-label=${t('所属盟约')}>
     ${ids.map((id) => {
@@ -261,7 +263,8 @@ export function BondChips({ bondIds, bonds = [], onBond = null, off = null, gran
       const active = !isOff && (e ? !!e.active : tier > 0);
       const next = nextThreshold(count, th);
       const cap = next ?? th[th.length - 1] ?? null;
-      const isoTag = iso.has(id) ? t('（变形同构体）') : '';
+      const isProj = projId != null && id === projId;
+      const isoTag = isProj ? t('（盟约投影）') : iso.has(id) ? t('（变形同构体）') : '';
       // the count holds 调和's +1 (the server's bond entry says so, DESIGN §21.26)
       const harmonyTag = !isOff && Number.isInteger(e?.harmony) && e.harmony > 0 ? t('（含调和 +{harmony}）', { harmony: e.harmony }) : '';
       const label = isOff ? briefingBondTip(rec?.name || id, 'off')
@@ -270,15 +273,15 @@ export function BondChips({ bondIds, bonds = [], onBond = null, off = null, gran
         ? html`
         <${BondGlyph} bondId=${id} class="dbond__icon" />
         <span class="dbond__name">${rec?.name || id}</span>
-        ${iso.has(id) ? html`<span class="dbond__iso">${t('同构')}</span>` : null}
+        ${isProj ? html`<span class="dbond__iso">${t('投影')}</span>` : iso.has(id) ? html`<span class="dbond__iso">${t('同构')}</span>` : null}
         <span class="dbond__off">${t('本局禁用')}</span>`
         : html`
         <${BondGlyph} bondId=${id} class="dbond__icon" />
         <span class="dbond__name">${rec?.name || id}</span>
-        ${iso.has(id) ? html`<span class="dbond__iso">${t('同构')}</span>` : null}
+        ${isProj ? html`<span class="dbond__iso">${t('投影')}</span>` : iso.has(id) ? html`<span class="dbond__iso">${t('同构')}</span>` : null}
         <span class=${cx('dbond__count', 'num', next == null && count > 0 && 'is-max')}>${count}${cap != null ? html`<small>/${cap}</small>` : null}</span>
         ${th.length ? html`<span class="dbond__tiers" aria-hidden="true">${th.map((_, i) => html`<i key=${i} class=${i < tier ? 'on' : ''}></i>`)}</span>` : null}`;
-      const cls = cx('dbond', active && 'is-active', isOff && 'is-off', rec?.isCore && 'is-core', iso.has(id) && 'is-granted');
+      const cls = cx('dbond', active && 'is-active', isOff && 'is-off', rec?.isCore && 'is-core', (iso.has(id) || isProj) && 'is-granted');
       return onBond
         ? html`<button key=${id} type="button" role="listitem" class=${cls} title=${label} aria-label=${label}
             data-bond=${id} data-granted=${iso.has(id) ? '1' : null} onClick=${() => onBond(id)}>${body}</button>`
@@ -420,9 +423,25 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
   // teammate's unit's UnitInfo items, a bond popup 同构 row's wearer's)
   const carried = piece ? items : (Array.isArray(unitItems) ? unitItems : []);
   const getItem = (id) => data.lookup('items', id);
-  const bondIds = pieceBondIds(c, carried, getItem, morphMode);
+  // 「盟约投影」（维护者 2026-11-05）：投影对所有**已部署到场上**的己方干员生效，
+  // 所以只在棋盘上的干员卡上挂一条徽章（像「变形同构体」那样，角标写「投影」）。
+  // 备战区（手牌第 7 行 / 临时区第 8 行）的干员还没上场，不挂。
+  const meId = useStore((s) => s.me.playerId);
+  const projectedId = useStore((s) => s.match?.public?.echo?.projection?.current?.id || null);
+  const onBoard = (() => {
+    const row = Number(piece?.row);
+    if (Number.isInteger(row)) return row >= 9 && row <= 12;
+    if (piece && typeof piece.area === 'string') return piece.area === 'board';
+    return !!unit;
+  })();
+  const mineUnit = !ownerId || !meId || ownerId === meId;
+  const projectedBond = onBoard && mineUnit ? projectedId : null;
+  const bondIds = (() => {
+    const list = pieceBondIds(c, carried, getItem, morphMode);
+    return projectedBond && !list.includes(projectedBond) ? [...list, projectedBond] : list;
+  })();
   const slotPolicy = morphSlotPolicy(morphMode === 'plus' ? 'plus' : 'official', (it) => !!getItem(typeof it === 'string' ? it : it?.id)?.canGiveBond);
-  const grantedIds = bondIds.filter((b) => !(Array.isArray(c.bonds) && c.bonds.includes(b)));
+  const grantedIds = bondIds.filter((b) => !(Array.isArray(c.bonds) && c.bonds.includes(b)) && b !== projectedBond);
   const sell = c.sellPrice ?? 1;
   const blocks = {};
   blocks.head = html`
@@ -449,7 +468,7 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
           <span class="dhead__pos">${body.position === 'MELEE' ? t('近战位') : t('远程位')}</span>
         </div>
         ${hp ? html`<div class="dhp"><i style=${`width:${Math.max(0, Math.min(100, (hp.hp / Math.max(1, hp.max)) * 100))}%`}></i><span class="num">${fmtNum(hp.hp)} / ${fmtNum(hp.max)}</span></div>` : null}
-        <${BondChips} bondIds=${bondIds} bonds=${bonds} off=${offBonds} onBond=${onBond} granted=${grantedIds} />
+        <${BondChips} bondIds=${bondIds} bonds=${bonds} off=${offBonds} onBond=${onBond} granted=${grantedIds} projected=${projectedBond} />
       </div>
     </div>`;
   blocks.garrison = garrisons.length > 1
@@ -909,4 +928,3 @@ export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestr
     </div>
   </aside>`;
 }
-
