@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeMatch } from './harness.js';
 import { isFlyKey } from '../../server/match/waves.js';
+import { createRng, deriveSeed } from '../../server/sim/rng.js';
 import { ECHO_BLESSINGS, echoBlessingById, echoBlessingOffer } from '../../server/match/match/echoBlessing.js';
 import { echoCurseById, ECHO_CURSES, ECHO_ROUND_CURSES } from '../../server/match/match/echoCurse.js';
 
@@ -460,12 +461,13 @@ test('固定回合加诅咒、回合诅咒逐回合刷、锈蚀销毁装备', (t
   t.after(() => m.dispose());
 
   m.round = 5;
-  m.startRound(6);                                     // 深度 6 = 固定诅咒回合
-  assert.ok(m.echoCurseIds.includes('tribute'), '深度 6 固定加「贡赋」');
-  const once = m.echoCurseIds.filter((x) => x === 'tribute').length;
+  m.startRound(6);                                     // 深度 6 = 固定层（具体哪条随机，维护者 2026-11-05）
+  assert.equal(m.echoCurseIds.length, 1, '深度 6 固定层要加一条诅咒');
+  const firstId = m.echoCurseIds[0];
+  const once = m.echoCurseIds.filter((x) => x === firstId).length;
   m.round = 5;
   m.startRound(6);                                     // 再进同一层
-  assert.equal(m.echoCurseIds.filter((x) => x === 'tribute').length, once, '同一固定回合不重复加');
+  assert.equal(m.echoCurseIds.filter((x) => x === firstId).length, once, '同一固定层不重复加');
 
   // 回合诅咒：本回合的那条要么为空、要么是 scope=round
   m.round = 9;
@@ -493,8 +495,11 @@ test('部署禁令：封锁地块 / 排异盟约（新上场与场上行动都�
   t.after(() => m.dispose());
 
   m.round = 7;
-  m.startRound(8);                                     // 深度 8 = 封锁
-  assert.ok(m.echoCurseIds.includes('block_tiles'), '深度 8 固定加「封锁」');
+  m.startRound(8);                                     // 深度 8 = 固定层
+  // 固定层现在是随机的，这里强制抽到「封锁」来测副作用（维护者 2026-11-05）
+  m.echoCurseIds = [];
+  m._echoAddCurse('block_tiles', createRng(deriveSeed(m.seed, 'test:block')));
+  assert.ok(m.echoCurseIds.includes('block_tiles'), '深度 8 能加「封锁」');
   assert.equal(m.echoBannedTiles.length, 3, '封 3 个地块');
   const banned = m.echoBannedTiles[0];
   assert.match(String(m._echoDeployBlocked({ kind: 'chess' }, banned, true) || ''), /封锁/);
@@ -617,13 +622,14 @@ test('播报：诅咒降下与侵蚀词条变化都会发 ticker，且合成一�
   const line = said.at(-1);
   assert.match(line, /深渊诅咒/, `播报里要有诅咒：${line}`);
   assert.match(line, /侵蚀词条/, `播报里要有侵蚀词条：${line}`);
-  assert.ok(line.includes('贡赋'), '深度 6 的固定诅咒是贡赋');
+  const fixedName = m.echoCurseIds.length ? (echoCurseById(m.echoCurseIds[0])?.name || '') : '';
+  assert.ok(fixedName && line.includes(fixedName), `深度 6 的固定诅咒要在播报里：${fixedName} / ${line}`);
 
-  // 同一回合重复进不会重复播（fixed 只在第一次触发）
+  // 同一回合重复进不会重复播（固定层只在第一次触发）
   said.length = 0;
   m.round = 5;
   m.startRound(6);
-  assert.equal(said.some((x) => x.includes('贡赋')), false, '同一条固定诅咒不重复播');
+  assert.equal(said.some((x) => x.includes(fixedName)), false, '同一条固定诅咒不重复播');
 
   // 净化也会播
   said.length = 0;
@@ -1590,6 +1596,28 @@ test('本层词条进 buff 栏（temporary + rounds），按层数到期的诅�
   const rc = m.publicView().echo.roundCurse;
   assert.equal(rc && rc.id, 'fog', '本回合诅咒要单独下发（buff 栏明显标注）');
   assert.ok(rc.name && rc.desc, '名字与效果都要带，玩家才能及时查看');
+});
+
+// 维护者 2026-11-05：固定层的诅咒改成**随机**（层数不变，延伸到 22 层以后），
+// 并且 25 层起不再出现「限制部署 / 限制盟约」。
+test('固定层随机给诅咒：22 层以后还有固定层，25 层起不出禁令类', async (t) => {
+  const { echoCurseById, isEchoBanCurse } = await import('../../server/match/match/echoCurse.js');
+  const seen = new Set();
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const h = makeMatch({ mode: 'coop', humans: 2, bots: 0, seed, fake: true, variant: 'deepecho' });
+    const m = h.m;
+    t.after(() => m.dispose());
+    m.round = 29;
+    const before = new Set(m.echoCurseIds || []);
+    m.startRound(30);                       // 30 层是固定层（22 之后每 4 层）
+    const added = (m.echoCurseIds || []).filter((id) => !before.has(id));
+    assert.equal(added.length, 1, `第 30 层应当正好多一条固定层诅咒（seed ${seed}），实际 ${added.length}`);
+    for (const id of added) {
+      assert.equal(isEchoBanCurse(echoCurseById(id)), false, `30 层不该出现禁令类诅咒：${id}`);
+      seen.add(id);
+    }
+  }
+  assert.ok(seen.size > 1, `固定层应当是随机的，实际只出现过 ${[...seen].join(',')}`);
 });
 
 // 维护者 2026-11-05（67 层实测）：队友死亡后无法救援，界面提示「本局模拟已经结束，无法救援」。

@@ -8,7 +8,9 @@ import {
   ECHO_CURSES, ECHO_ROUND_CURSES, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_LIVE_KINDS,
   echoCurseById, echoCurseEffects, echoCurseList, echoCurseUnitMods, curseUnitMatches,
   pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_CURSE_RARITY_LABEL,
+  isEchoFixedCurseLayer, isEchoBanCurse,
 } from '../../server/match/match/echoCurse.js';
+import { createRng } from '../../server/sim/rng.js';
 
 test('词条表：id 唯一、文案齐、效果形状统一', () => {
   const ids = new Set();
@@ -189,4 +191,39 @@ test('removeEchoCurses：数字删最早 n 层，common 只删普通，all 全�
   assert.deepEqual(removeEchoCurses(ids, 'all').kept, []);
   assert.deepEqual(removeEchoCurses(ids, 0).kept, ids, '0 不删');
   assert.deepEqual(removeEchoCurses(undefined, 'all').kept, []);
+});
+// 维护者 2026-11-05：固定层的诅咒改成**随机**（层数不变，且延伸到 22 层以后），
+// 并且 25 层起不再出现「限制部署 / 限制盟约」两类。
+test('固定层：6/8/10/12/14/18/22 之后每 4 层，一直延伸下去', () => {
+  const fixed = [6, 8, 10, 12, 14, 18, 22];
+  for (const d of fixed) assert.equal(isEchoFixedCurseLayer(d), true, `${d} 层是固定层`);
+  for (const d of [26, 30, 34, 50, 70]) assert.equal(isEchoFixedCurseLayer(d), true, `${d} 层（22 之后每 4 层）也是固定层`);
+  for (const d of [1, 5, 7, 9, 23, 24, 25, 27, 28, 29, 31]) assert.equal(isEchoFixedCurseLayer(d), false, `${d} 层不是固定层`);
+  // 表里的旧条目仍然在（层数没变）
+  assert.deepEqual(Object.keys(ECHO_FIXED_CURSE_ROUNDS).map(Number), fixed);
+});
+
+test('固定层给哪条诅咒是随机的，不再写死表里的 id', () => {
+  const seen = new Set();
+  for (let i = 0; i < 40; i++) {
+    const pick = pickEchoCurse(6, createRng(i + 1));
+    if (pick) seen.add(pick.id);
+  }
+  assert.ok(seen.size > 1, `固定层应当随机出多条不同诅咒，实际只有 ${[...seen].join(',')}`);
+  // 旧表里 6 层写死 tribute —— 现在它只是候选之一，不该每次都是它
+  assert.ok(seen.size >= 2);
+});
+
+test('25 层起不再抽到「限制部署 / 限制盟约」的诅咒', () => {
+  for (let i = 0; i < 200; i++) {
+    const pick = pickEchoCurse(30, createRng(i + 1), {
+      exclude: (c) => isEchoBanCurse(c),
+    });
+    assert.ok(pick, '深层仍要有诅咒可抽');
+    assert.equal(isEchoBanCurse(pick), false, `第 ${i} 次抽到了禁令类：${pick.id}`);
+  }
+  // 25 层之前仍然可能出现（这条规则只从 25 层起生效）
+  const before = [];
+  for (let i = 0; i < 200; i++) before.push(pickEchoCurse(20, createRng(i + 1)));
+  assert.ok(before.some((c) => c && isEchoBanCurse(c)), '20 层仍然可能抽到禁令类诅咒');
 });

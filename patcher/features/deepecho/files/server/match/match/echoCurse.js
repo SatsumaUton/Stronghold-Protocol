@@ -190,6 +190,35 @@ export const ECHO_FIXED_CURSE_ROUNDS = Object.freeze({
   22: 'fog',
 });
 
+/**
+ * **固定层**的诅咒改成随机（维护者 2026-11-05）：
+ * 表里那些深度仍然是「固定层」（到层必给一条），但给哪一条改成按种子随机抽，
+ * 于是固定层可以一直往深处延伸，不会因为表里只有 22 层以内的条目就断掉。
+ * 22 层之后每 4 层再来一个固定层（26 / 30 / 34 …）。
+ */
+export const ECHO_FIXED_CURSE_LAST_ANCHOR = 22;
+export const ECHO_FIXED_CURSE_STEP = 4;
+
+/**
+ * 从第几层起不再出现「限制部署 / 限制盟约」这两类诅咒（维护者 2026-11-05）：
+ * 25 层以后已经很难了，再随机封地块 / 排异盟约只会让人没法玩。
+ */
+export const ECHO_BAN_CURSE_FROM = 25;
+
+/** 这条诅咒是不是「限制部署 / 限制盟约」那两类。 */
+export const isEchoBanCurse = (c) => {
+  const kind = c && c.effect && c.effect.kind;
+  return kind === 'deployBan' || kind === 'bondBan';
+};
+
+/** 这个深度是不是固定层（到层必给一条诅咒，具体哪条随机）。 */
+export const isEchoFixedCurseLayer = (depth) => {
+  const d = Math.floor(Number(depth) || 0);
+  if (!(d > 0)) return false;
+  if (Object.hasOwn(ECHO_FIXED_CURSE_ROUNDS, d)) return true;
+  return d > ECHO_FIXED_CURSE_LAST_ANCHOR && (d - ECHO_FIXED_CURSE_LAST_ANCHOR) % ECHO_FIXED_CURSE_STEP === 0;
+};
+
 const BY_ID = new Map([...ECHO_CURSES, ...ECHO_ROUND_CURSES].map((c) => [c.id, c]));
 
 /** 按 id 取诅咒；未知 id 返回 null（客户端只显示认识的，不要抛）。 */
@@ -206,9 +235,12 @@ export const ECHO_CURSE_RARITY_LABEL = Object.freeze({ common: '普通', rare: '
  *
  * @param {number} depth 深潜深度
  * @param {() => number} rng [0,1) 随机源（调用方传自己的种子流，保证可复现）
+ * @param {{ exclude?: ((c: object) => boolean) | null }} [opts] exclude：这条候选不要（已叠满 / 深层禁掉的禁令类）
  */
-export function pickEchoCurse(depth, rng = () => 0.5) {
+export function pickEchoCurse(depth, rng = () => 0.5, opts = null) {
   const d = Math.max(1, Math.floor(Number(depth) || 1));
+  const exclude = opts && typeof opts.exclude === 'function' ? opts.exclude : null;
+  const ok = (c) => !exclude || !exclude(c);
   const w = d >= 16 ? { common: 0.6, rare: 0.3, epic: 0.1 }
     : d >= 10 ? { common: 0.8, rare: 0.2, epic: 0 }
       : { common: 1, rare: 0, epic: 0 };
@@ -219,8 +251,9 @@ export function pickEchoCurse(depth, rng = () => 0.5) {
     acc += w[k];
     if (roll < acc) { tier = k; break; }
   }
-  let pool = ECHO_CURSES.filter((c) => c.rarity === tier);
-  if (!pool.length) pool = ECHO_CURSES.filter((c) => c.rarity === 'common');
+  let pool = ECHO_CURSES.filter((c) => c.rarity === tier && ok(c));
+  if (!pool.length) pool = ECHO_CURSES.filter((c) => c.rarity === 'common' && ok(c));
+  if (!pool.length) pool = ECHO_CURSES.filter(ok);
   if (!pool.length) return null;
   return pool[Math.min(pool.length - 1, Math.floor((Number(rng()) || 0) * pool.length))] || pool[0];
 }

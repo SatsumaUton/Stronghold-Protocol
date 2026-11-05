@@ -11,7 +11,7 @@
 
 import { echoDataRound, echoBossScale, isDiveRound, isEchoNodeRound, ECHO_SAFE_ROUND, ECHO_LAST_ROUND, ECHO_MAX_FREE_REFRESH, ECHO_BOND_BAN_ROUNDS, ECHO_DEPLOY_BAN_ROUNDS, ECHO_CHALLENGE_BLESSING_PCT, ECHO_NODE_FIRST, ECHO_NODE_EVERY, ECHO_NODE_ANCHOR_LAST, ECHO_NODE_LATE_EVERY } from './echo.js';
 import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js';
-import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_FIXED_CURSE_ROUNDS, ECHO_CURSE_RARITY_LABEL } from './echoCurse.js';
+import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_CURSE_RARITY_LABEL, isEchoFixedCurseLayer, isEchoBanCurse, ECHO_BAN_CURSE_FROM } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
   echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, ECHO_BLESSING_REFRESH_MAX, ECHO_BLESSINGS, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
@@ -443,7 +443,8 @@ export class MatchEcho {
     }
     if (!failed) return null;
     const rng = createRng(deriveSeed(this.seed, `echo:bountyfail:${this.round}`));
-    const picked = pickEchoCurse(this._echoDepth(this.round), rng);
+    const depth = this._echoDepth(this.round);
+    const picked = pickEchoCurse(depth, rng, { exclude: this._echoCurseExclude(depth) });
     const c = (picked && this._echoAddCurse(picked.id, rng)) || this._echoAddCurse('erosion', rng);
     if (!c) return null;
     this._echoPushAnnounce(`悬赏未达成：深渊降下诅咒「${c.name}」`);
@@ -488,7 +489,8 @@ export class MatchEcho {
       // 没达成 → 不给祝福，改为深渊降下诅咒。按深度抽（echoCurse.js 的 pickEchoCurse）：
       // 5 层只会是普通诅咒，10 层起有稀有，16 层以后才可能出传说。
       const rng = createRng(deriveSeed(this.seed, `echo:curse:${this.round}`));
-      const picked = pickEchoCurse(this._echoDepth(this.round), rng);
+      const depth = this._echoDepth(this.round);
+      const picked = pickEchoCurse(depth, rng, { exclude: this._echoCurseExclude(depth) });
       // 统一入口：排异类若已无盟约可禁会返回 null，这时退回「侵蚀」（不记假账）
       const curse = (picked && this._echoAddCurse(picked.id, rng)) || this._echoAddCurse('erosion', rng);
       const tier = curse ? (ECHO_CURSE_RARITY_LABEL[curse.rarity] || '普通') : '';
@@ -656,15 +658,39 @@ export class MatchEcho {
    *   2. **回合诅咒**（`ECHO_ROUND_CURSES`）：按深度随机，只影响本回合，下回合重刷。
    *      其中的 `destroyEquip` 当场结算（每人随机销毁 1 件已装备的装备）。
    */
+  /**
+   * 抽诅咒时的排除规则（维护者 2026-11-05）：
+   *   ① 25 层起不再出现「限制部署 / 限制盟约」两类（深层已经很难，再封地块 / 排异盟约没法玩）；
+   *   ② 已经叠到上限的同类不再抽（否则 `_echoAddCurse` 会拒收，等于白抽一条）。
+   * 固定层、悬赏失败、挑战关未达成这三处抽诅咒都用它，口径一致。
+   * @param {number} [depth]
+   * @returns {(c: object) => boolean}
+   */
+  _echoCurseExclude(depth = this._echoDepth()) {
+    const held = Array.isArray(this.echoCurseIds) ? this.echoCurseIds : [];
+    return (c) => (depth >= ECHO_BAN_CURSE_FROM && isEchoBanCurse(c))
+      || held.filter((x) => x === (c && c.id)).length >= ECHO_CURSE_MAX_STACK;
+  }
+
   _echoRefreshCurses(r = this.round) {
     if (!this._echoDiveRound(r)) { this.echoRoundCurse = null; return null; }
     const depth = this._echoDepth(r);
     // 排异到期：到层就解除（先清名单，下面的扫场会把场上干员放回来）
     this._echoExpireBondBans(depth);
-    const fixed = ECHO_FIXED_CURSE_ROUNDS[depth];
-    if (fixed && !(Array.isArray(this.echoCurseIds) && this.echoCurseIds.includes(fixed))) {
-      // 统一入口：记 id + 施加副作用（封锁 / 排异）
-      const fc = this._echoAddCurse(fixed, createRng(deriveSeed(this.seed, `echo:fixed:${r}`)));
+    const fixed = isEchoFixedCurseLayer(depth);
+    // 每层只给一次：`startRound` 可能因为重规划 / 有人退出被重跑，随机抽的话每次都会抽到新的，
+    // 同一层就会叠出好几条（维护者 2026-11-05 改成随机后必须补这个去重）。
+    if (!Array.isArray(this.echoFixedCurseLayers)) this.echoFixedCurseLayers = [];
+    if (fixed && !this.echoFixedCurseLayers.includes(depth)) {
+      this.echoFixedCurseLayers.push(depth);
+      // 维护者 2026-11-05：固定层**还是那些层**（6/8/10/12/14/18/22，之后每 4 层一个），
+      // 但给哪条诅咒改成按种子随机 —— 这样固定层能一直延伸到很后面，不再是「22 层以后就没有了」。
+      // 25 层起不再随机到「限制部署 / 限制盟约」（深层本来已经很难了）。
+      const held = Array.isArray(this.echoCurseIds) ? this.echoCurseIds : [];
+      const rngF = createRng(deriveSeed(this.seed, `echo:fixed:${r}`));
+      // 统一入口：记 id + 施加副作用（封锁 / 排异）；排除规则见 _echoCurseExclude
+      const pickFixed = pickEchoCurse(depth, rngF, { exclude: this._echoCurseExclude(depth) });
+      const fc = pickFixed ? this._echoAddCurse(pickFixed.id, rngF) : null;
       if (fc) {
         const tier = ECHO_CURSE_RARITY_LABEL[fc.rarity] || '普通';
         this._echoPushAnnounce(`深渊诅咒「${fc.name}」（${tier}）：${fc.desc}`);
