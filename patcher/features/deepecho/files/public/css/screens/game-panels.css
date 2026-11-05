@@ -1127,6 +1127,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-bless__refreshbtn:hover:not(:disabled), .echo-bless__rbtn:hover:not(:disabled) { border-color: rgba(196, 166, 255, .9); background: rgba(125, 91, 214, .32); }
 .echo-bless__refreshbtn:disabled, .echo-bless__rbtn:disabled { opacity: .45; cursor: default; }
 .echo-bless__refreshbtn b { color: #ffd978; font-variant-numeric: tabular-nums; }
+.echo-bless__refreshcap { font-style: normal; color: #9d8cc4; font-size: calc(.11 * var(--t)); }
 
 /* 刷新投票条（维护者 2026-11-05 二次反馈：原来是一行裸文字 + 两个默认按钮，太丑；
    而且投完还能继续点）。现在是一枚深色胶囊：标签 + 进度条 + 票数 + 两个小按钮；

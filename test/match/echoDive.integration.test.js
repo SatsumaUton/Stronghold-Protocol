@@ -1356,9 +1356,9 @@ test('护盾抵消排异后从祝福列表消失（唯一用掉就消失的祝�
   assert.equal(m.echoBannedTilesUntil, 0);
 });
 
-// 维护者 2026-11-05：刷新祝福三选一 —— 开局 3 次、活着的玩家投票、投票不占选择时间、
-// 刷新后从 30 秒重新计时、任何来源都不能突破 3 次。
-test('刷新祝福三选一：3 次额度、投票通过才重抽、刷新后重新 30 秒、封顶 3', (t) => {
+// 维护者 2026-11-05：刷新祝福三选一 —— 开局 5 次、活着的玩家投票、投票不占选择时间、
+// 刷新后从 30 秒重新计时、任何来源都不能突破上限（默认 5，「余韵」能抬到 7）。
+test('刷新祝福三选一：5 次额度、投票通过才重抽、刷新后重新 30 秒、封顶 5', (t) => {
   const h = dive();
   const m = h.m;
   t.after(() => m.dispose());
@@ -1366,7 +1366,7 @@ test('刷新祝福三选一：3 次额度、投票通过才重抽、刷新后重
   m.startRound(20);
   for (let i = 0; i < 40 && m.phase !== 'PREP'; i++) h.sched.advance(200);
   assert.ok(Array.isArray(m.echoBlessingOffer) && m.echoBlessingOffer.length, '先有候选');
-  assert.equal(m._echoBlessingRefreshLeft(), 3, '开局 3 次刷新额度');
+  assert.equal(m._echoBlessingRefreshLeft(), 5, '开局 5 次刷新额度');
   const [a, b] = m.alivePlayers();
 
   // 否决：两个人都投不同意 → 不刷新、倒计时接回来
@@ -1375,7 +1375,7 @@ test('刷新祝福三选一：3 次额度、投票通过才重抽、刷新后重
   m.setEchoBlessingRefreshVote(a, false);
   m.setEchoBlessingRefreshVote(b, false);
   assert.equal(m.echoBlessingRefreshVote, null, '投票结束');
-  assert.equal(m._echoBlessingRefreshLeft(), 3, '没刷新就不扣额度');
+  assert.equal(m._echoBlessingRefreshLeft(), 5, '没刷新就不扣额度');
   assert.ok(m._echoBlessingEndsAt > m.sched.now(), '倒计时恢复');
 
   // 通过：同意 → 扣 1 次、候选重抽、从 30 秒重新计时
@@ -1384,13 +1384,13 @@ test('刷新祝福三选一：3 次额度、投票通过才重抽、刷新后重
   assert.equal(m.requestEchoBlessingRefresh(a).ok, true);
   m.setEchoBlessingRefreshVote(a, true);
   m.setEchoBlessingRefreshVote(b, true);
-  assert.equal(m._echoBlessingRefreshLeft(), 2, '刷新成功扣 1 次');
+  assert.equal(m._echoBlessingRefreshLeft(), 4, '刷新成功扣 1 次');
   assert.ok(m._echoBlessingEndsAt >= now0 + 29000, '刷新后重新给满 30 秒');
   assert.ok(Array.isArray(m.echoBlessingOffer) && m.echoBlessingOffer.length, '刷新后仍有候选');
   assert.notDeepEqual(m.echoBlessingOffer, before, '候选应当换了一批');
 
-  // 上限：任何来源都不能突破 3
-  assert.equal(m._echoGrantBlessingRefresh(99), 3, '「再议」这类来源封顶 3 次');
+  // 上限：任何来源都不能突破 5（「余韵」抬上限是另一条路径）
+  assert.equal(m._echoGrantBlessingRefresh(99), 5, '「再议」这类来源封顶 5 次');
 });
 
 // 维护者 2026-11-05：1–16 回合里出现「飞行怪直线穿场」。

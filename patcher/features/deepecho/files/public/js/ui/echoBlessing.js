@@ -50,9 +50,10 @@ export function EchoBlessing({ pub }) {
   const offer = echo?.offer;
   // 当前诅咒清单（服务端 pub.echo.curses，含固定规则那几条）
   const curses = Array.isArray(echo?.curses) ? echo.curses : [];
-  // 刷新三选一（维护者 2026-11-05）：每局 3 次，活着的人投票决定是否重抽
+  // 刷新三选一（维护者 2026-11-05）：默认每局 5 次（「余韵」能把上限抬到 7），活着的人投票决定是否重抽
   const refresh = echo?.blessingRefresh;
   const refreshLeft = Math.max(0, Number(refresh?.left) || 0);
+  const refreshCap = Math.max(refreshLeft, Number(refresh?.cap) || refreshLeft);
   const refreshVote = refresh?.vote;
   // 名额已满时的「弃选」投票（维护者 2026-11-05）：新祝福已选定 → 全队投掉哪个旧的，30 秒时限。
   const discard = echo?.discard;
@@ -127,8 +128,8 @@ export function EchoBlessing({ pub }) {
             ${leftSec != null ? html`<span class="echo-bless__rv-left num">${leftSec}s</span>` : null}
           </span>`;
         })() : html`<button type="button" class="echo-bless__refreshbtn" disabled=${busy || !online || refreshLeft <= 0}
-          title=${t('活着的玩家投票决定是否重抽这三个候选；每局最多 3 次，投票不占用选择时间')}
-          onClick=${() => send(() => actions.echoBlessingRefresh())}>${t('刷新')}<b class="num">${refreshLeft}</b></button>`}
+          title=${t('活着的玩家投票决定是否重抽这三个候选；本局最多 {cap} 次，投票不占用选择时间', { cap: refreshCap })}
+          onClick=${() => send(() => actions.echoBlessingRefresh())}>${t('刷新')}<b class="num">${refreshLeft}</b><i class="echo-bless__refreshcap num">/${refreshCap}</i></button>`}
         ${left != null ? html`<span class="echo-bless__timer" aria-live="off"><b>${left}</b><i>秒</i></span>` : null}
         <span class="echo-bless__count">${voted}/${voters.length}</span>
       </header>

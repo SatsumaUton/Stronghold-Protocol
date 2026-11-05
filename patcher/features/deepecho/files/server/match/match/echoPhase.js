@@ -14,7 +14,7 @@ import { echoWordsForRound, echoWordById, applyEchoWords } from './echoWords.js'
 import { echoCurseList, echoCurseEffects, echoCurseById, ECHO_CURSE_MAX_STACK, echoCurseUnitMods, curseUnitMatches, pickEchoCurse, pickRoundCurse, removeEchoCurses, mergeCurseEffects, ECHO_CURSE_RARITY_LABEL, isEchoFixedCurseLayer, isEchoBanCurse, ECHO_BAN_CURSE_FROM } from './echoCurse.js';
 import {
   echoBlessingDue, echoBlessingOffer, echoBlessingById, echoBlessingMods, echoBlessingCoinMul,
-  echoBlessingFunds, echoBlessingLateMul, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, ECHO_BLESSING_REFRESH_MAX, ECHO_BLESSINGS, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL, echoBondDebuffSeconds,
+  echoBlessingFunds, echoBlessingLateMul, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, ECHO_BLESSING_REFRESH_MAX, ECHO_BLESSINGS, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL, ECHO_BLESSING_REFRESH_BONUS_MAX, echoBondDebuffSeconds,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { echoSummonOnly, echoHitCountEnemy } from './echoWaves.js';
@@ -1726,7 +1726,7 @@ export class MatchEcho {
       bossId: (this._echoBossReturn() || this._echoHiddenBossRound()) ? this._echoBossIdFor() : null,
       blessingRefresh: {
         left: this._echoBlessingRefreshLeft(),
-        cap: ECHO_BLESSING_REFRESH_MAX,
+        cap: this._echoBlessingRefreshCap(),
         vote: this.echoBlessingRefreshVote ? {
           id: this.echoBlessingRefreshVote.id,
           agreed: [...this.echoBlessingRefreshVote.agreed],
@@ -2452,23 +2452,43 @@ export class MatchEcho {
   // ---- 刷新祝福三选一（维护者 2026-11-05） ----------------------------------------------
   //
   // 口径：
-  //   * 每局开局 **3 次**刷新额度，任何来源（含「再议」祝福 / 后续条件）都**不能突破 3**；
+  //   * 每局开局 **5 次**刷新额度（维护者 2026-11-05 从 3 提到 5）；「再议」补到上限，
+  //     传说祝福「余韵」能把上限再往上抬（见 ECHO_BLESSING_REFRESH_BONUS_MAX）；
   //   * 刷新由**活着的在线玩家投票**决定（过半同意即刷新，1 人房直接通过）；
   //   * 投票**不占用**选择祝福的 30 秒：开投票时把选祝福的倒计时暂停，投票结束后
   //     —— 刷新成功 → 从 30 秒重新计时；刷新被否 → 接着用暂停时剩下的时间。
 
-  /** 当前还能刷新几次（0..ECHO_BLESSING_REFRESH_MAX）。 */
-  _echoBlessingRefreshLeft() {
-    const n = Number(this.echoBlessingRefreshes);
-    return Math.max(0, Math.min(ECHO_BLESSING_REFRESH_MAX, Number.isFinite(n) ? Math.floor(n) : ECHO_BLESSING_REFRESH_MAX));
+  /** 本局刷新次数上限 = 基础额度 + 「余韵」加的上限加成。 */
+  _echoBlessingRefreshCap() {
+    const bonus = Math.max(0, Math.min(ECHO_BLESSING_REFRESH_BONUS_MAX, Math.floor(Number(this.echoBlessingRefreshBonus) || 0)));
+    return ECHO_BLESSING_REFRESH_MAX + bonus;
   }
 
-  /** 发一次刷新额度（「再议」这类祝福用），封顶 3。 */
+  /** 当前还能刷新几次（0..本局上限）。 */
+  _echoBlessingRefreshLeft() {
+    const cap = this._echoBlessingRefreshCap();
+    const n = Number(this.echoBlessingRefreshes);
+    return Math.max(0, Math.min(cap, Number.isFinite(n) ? Math.floor(n) : cap));
+  }
+
+  /** 发一次刷新额度（「再议」/「余韵」用），封顶到本局上限。 */
   _echoGrantBlessingRefresh(n = 1) {
     const add = Math.max(0, Math.floor(Number(n) || 0));
     if (!add) return this._echoBlessingRefreshLeft();
-    this.echoBlessingRefreshes = Math.min(ECHO_BLESSING_REFRESH_MAX, this._echoBlessingRefreshLeft() + add);
+    this.echoBlessingRefreshes = Math.min(this._echoBlessingRefreshCap(), this._echoBlessingRefreshLeft() + add);
     return this._echoBlessingRefreshLeft();
+  }
+
+  /**
+   * 抬一次本局刷新上限（传说祝福「余韵」用）：最多叠 ECHO_BLESSING_REFRESH_BONUS_MAX 层。
+   * 注意只抬**上限**；「立刻补 1 次」由 `_echoGrantBlessingRefresh` 单独发。
+   */
+  _echoGrantBlessingRefreshCap(n = 1) {
+    const add = Math.max(0, Math.floor(Number(n) || 0));
+    if (!add) return this._echoBlessingRefreshCap();
+    const cur = Math.max(0, Math.floor(Number(this.echoBlessingRefreshBonus) || 0));
+    this.echoBlessingRefreshBonus = Math.min(ECHO_BLESSING_REFRESH_BONUS_MAX, cur + add);
+    return this._echoBlessingRefreshCap();
   }
 
   /** `g.echoBlessingRefresh { agree }`：开一次「要不要刷新当前三选一」的投票。 */
@@ -2760,7 +2780,9 @@ export class MatchEcho {
     if (!Array.isArray(this.echoBlessings)) this.echoBlessings = [];
     // 反制祝福（2026-11-05）：不占 3 个名额，但**每次抽到都记一次消耗** ——
     // 即使当前没有对应的诅咒，这次抽取也照常花掉，不会存着等以后。
-    const free = echoBlessingFree(b) || b.repeatable === true;
+    // ★ 只看 kind（echoBlessingFree）；`repeatable` 只表示「可以再抽到」（如「开路」是反制、
+    //   「余韵」是消耗品），不能拿来判断它是不是反制 —— 否则「余韵」会被记进反制名单。
+    const free = echoBlessingFree(b);
     if (!Array.isArray(this.echoCounterIds)) this.echoCounterIds = [];
     if (free) {
       this.echoCounterIds.push(b.id);
@@ -2810,7 +2832,9 @@ export class MatchEcho {
         this._echoGrantFreeRefresh(ps, refresh);
       }
     }
-    // 刷新祝福三选一（「再议」）：封顶 ECHO_BLESSING_REFRESH_MAX
+    // 刷新祝福三选一：先抬上限（「余韵」），再补次数（「再议」/「余韵」）——
+    // 顺序反了的话补出来的那 1 次会被旧上限夹掉。
+    if (Number(b.blessingRefreshCap) > 0) this._echoGrantBlessingRefreshCap(Number(b.blessingRefreshCap));
     if (Number(b.blessingRefresh) > 0) this._echoGrantBlessingRefresh(Number(b.blessingRefresh));
     const heal = echoBlessingHeal(b);
     if (heal > 0) {
