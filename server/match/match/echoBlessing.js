@@ -129,6 +129,9 @@ export const ECHO_BLESSINGS = Object.freeze([
   // ---- 谢拉格寒风（维护者 2026-11-05）----
   // 直接复用原版盟约的寒风实现（server/sim/content/devices.js startColdWind），所以数值口径与谢拉格满档一致。
   { id: 'kjerag_wind', rarity: 'epic', name: '朔风', desc: '每 10 秒刮一阵寒风，使全场敌人寒冷 3 秒', kind: 'coldwind', group: 'wind', interval: 10, duration: 3 },
+  // ---- 炎佑（维护者 2026-11-05）----
+  // 开战召唤 1 只炎佑，存在 lifetime 秒；可叠加 maxStacks 次（最多 2 只，token 本身的 deployLimit 也是 2）。
+  { id: 'yanyou_gift', rarity: 'epic', name: '炎佑之契', desc: '开战召唤 1 只炎佑，存在 20 秒；最多叠加 2 次', kind: 'yanyou', group: 'summon', lifetime: 20, stackable: true, maxStacks: 2 },
   { id: 'thrift', rarity: 'common', name: '开源', desc: '驱散所有资金类诅咒（贡赋 / 征收 / 重税 / 什一税 / 抽成）', kind: 'counter', group: 'counter',
     counterCurses: ['tribute', 'levy', 'heavytax', 'tithe', 'r_levy'] },
   { id: 'cleanse_words', rarity: 'rare', name: '净言', desc: '驱散「侵蚀」：侵蚀词条上限恢复', kind: 'counter', group: 'counter',

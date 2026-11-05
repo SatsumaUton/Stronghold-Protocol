@@ -198,6 +198,17 @@ test('祝福逐条生效：每条都能在消费端看到差异', (t) => {
         bh.b.dispose?.();
         continue;
       }
+      if (kind === 'yanyou') {
+        // 炎佑：开战召唤，能看到 token
+        const bh = makeBattle({ players: [{ playerId: 'p1', seat: 0, side: 'L', colOffset: 0, units: [{ uid: 1, kind: 'chess', chessId: 'chess_char_1_01_a', row: 10, col: 5, dir: 'RIGHT' }], bonds: {}, bandId: null, playerEffects: [] }] });
+        m.echoBlessings = [b.id];
+        m._echoHookBattle(bh.b);
+        bh.b.emit('battleStart', {});
+        bh.step(1);
+        assert.ok((bh.b.units || []).some((u) => u && u.alive && u.kind === 'token'), ` 没有召唤炎佑`);
+        bh.b.dispose?.();
+        continue;
+      }
       assert.fail(`未知的祝福 kind：${kind}（${b.id}）`);
     } finally {
       m.dispose();

@@ -20,6 +20,7 @@ import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { echoSummonOnly, echoHitCountEnemy } from './echoWaves.js';
 import { isEchoProjectionLayer, pickProjectionOffer, echoProjectionById } from './echoProjection.js';
 import { startColdWind } from '../../sim/content/devices.js';
+import { spawnYanyou } from '../../sim/content/tokens.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR, PHASE } from '../../../shared/constants.js';
 import { msg } from '../../../shared/i18n.js';
 import { hiddenEligible } from '../finalAssault.js';
@@ -316,6 +317,32 @@ export class MatchEcho {
       try {
         startColdWind(battle, { playerId: null, interval: Number(w.interval) || 10, duration: Number(w.duration) || 3 });
       } catch (e) { this.reportError('echo cold wind', e); }
+    }
+    // 炎佑之契（维护者 2026-11-05）：开战召唤 stacks 只炎佑（最多 2 只，token 自身 deployLimit 也是 2），
+    // 存在 lifetime 秒后消失。攻/血按「己方场上干员总和的 30%」——和炎盟约满档同一口径。
+    const yanyouBlessings = this._echoBlessings().filter((b) => b && b.kind === 'yanyou');
+    if (yanyouBlessings.length && typeof battle.spawnToken === 'function') {
+      const b = yanyouBlessings[0];
+      const stacks = Math.max(1, Math.min(2, Math.floor(Number(b.stacks) || 1)));
+      const lifetime = Math.max(0, Number(b.lifetime) || 0);
+      const pid = battle.players && battle.players[0] ? battle.players[0].playerId : null;
+      battle.on('battleStart', () => {
+        if (pid == null) return;
+        let atk = 0;
+        let hp = 0;
+        for (const u of battle.units || []) {
+          // 干员（kind 可能是 'op' 或 'chess'）：battleStart 时还没部署，所以不能要求 alive/deployed
+          if (u.side !== 'ally' || u.ownerId !== pid) continue;
+          if (u.kind !== 'op' && u.kind !== 'chess') continue;
+          atk += Number(u.s && u.s.atk) || 0;
+          hp += Number(u.s && u.s.maxHp) || 0;
+        }
+        if (!(hp > 0)) return;
+        const out = spawnYanyou(battle, pid, { atk: atk * 0.3, hp: hp * 0.3, count: stacks });
+        if (lifetime > 0 && out.length) {
+          battle.after(lifetime, () => { for (const y of out) if (y && y.alive) battle.kill(y, null); });
+        }
+      }, { once: true });
     }
     const altarStacks = Math.max(0, Math.min(2, Number(this.echoAltarBuffStacks) || 0));
     // 深潜补给选的「临时词条」：只在本层生效
@@ -1524,6 +1551,8 @@ export class MatchEcho {
         rarityLabel: ECHO_BLESSING_RARITY_LABEL[b.rarity] || '普通',
         // 一次性祝福（资金 / 回血 / 涤罪 / 反制）：立刻结算、不挂在干员身上
         oneShot: echoBlessingOneShot(b) || b.kind === 'counter',
+        // 可叠加的祝福（炎佑之契）带层数
+        ...(Number(b.stacks) > 1 ? { stacks: Number(b.stacks) } : {}),
         // 已消耗（拿到就结算过）：列表里照常显示，只是不占名额
         consumed: b.consumed === true,
         // 是否占 3 个祝福名额：护盾、一次性、反制都不占（显示在列表里，但不计数）
@@ -2061,11 +2090,18 @@ export class MatchEcho {
    */
   _echoBlessings() {
     const spent = this.echoShieldSpent === true;
-    const out = Array.isArray(this.echoBlessings)
-      ? this.echoBlessings.map((id) => echoBlessingById(id)).filter(Boolean)
+    const counts = new Map();
+    for (const id of (Array.isArray(this.echoBlessings) ? this.echoBlessings : [])) counts.set(id, (counts.get(id) || 0) + 1);
+    const out = [...counts.entries()]
+      .map(([id, n]) => {
+        const b = echoBlessingById(id);
+        if (!b) return null;
         // 护盾是**唯一**「用掉之后就消失」的祝福（维护者 2026-11-05 确认）：抵消一次排异之后就不再显示
-        .filter((b) => !(b.id === 'shield_bond' && spent))
-      : [];
+        if (b.id === 'shield_bond' && spent) return null;
+        // 可叠加的祝福（炎佑之契）合成一条，带 stacks（维护者 2026-11-05）
+        return n > 1 ? { ...b, stacks: n } : b;
+      })
+      .filter(Boolean);
     // 维护者 2026-11-05（第二次改）：**一次性祝福 / 反制祝福拿到就结算，用掉之后不再显示在列表里**。
     // 之前把它们并进列表（标「已消耗」），结果列表越堆越长、还全是已经用掉的东西（玩家反馈）。
     // 记录仍然保留在 echoOneShotIds / echoCounterIds 里（名额计数、反制能力、抽取次数都还要用），
@@ -2560,7 +2596,10 @@ export class MatchEcho {
       if (!Array.isArray(this.echoOneShotIds)) this.echoOneShotIds = [];
       this.echoOneShotIds.push(b.id);
     } else {
-      if (this.echoBlessings.includes(b.id)) return null;                       // 同类不叠加
+      // 同类不叠加；**可叠加**的祝福（炎佑之契）按 maxStacks 封顶（维护者 2026-11-05）
+      const copies = this.echoBlessings.filter((x) => x === b.id).length;
+      const maxCopies = b.stackable === true ? Math.max(1, Math.floor(Number(b.maxStacks) || 2)) : 1;
+      if (copies >= maxCopies) return null;
       // 上限（静默会压低）；隐藏核心通关的临时名额要算进去，否则第 4 个祝福会被这里拒掉
       const cap = this._echoBlessingMax() + Math.max(0, Number(this.echoBlessingBonus) || 0);
       // 只数**占名额**的祝福：一次性祝福不算
