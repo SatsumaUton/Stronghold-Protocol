@@ -76,6 +76,8 @@ test('非 mods 祝福必须带生效字段', () => {
       || b.kind === 'shield'
       // 反隐匿（2026-11-05）：照破（interval + duration）/ 洞彻（always）
       || (b.kind === 'reveal' && (b.always === true || (Number(b.interval) > 0 && Number(b.duration) > 0)))
+      // 谢拉格寒风（2026-11-05）：interval + duration
+      || (b.kind === 'coldwind' && Number(b.interval) > 0 && Number(b.duration) > 0)
       || (b.kind === 'counter' && ((Array.isArray(b.counterCurses) && b.counterCurses.length) || b.counterBans === true));
     if (!has) bad.push(b.id);
   }

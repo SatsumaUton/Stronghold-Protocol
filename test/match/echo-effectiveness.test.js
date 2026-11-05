@@ -185,6 +185,19 @@ test('祝福逐条生效：每条都能在消费端看到差异', (t) => {
         bh.b.dispose?.();
         continue;
       }
+      if (kind === 'coldwind') {
+        // 寒风：跑过第一个周期，敌人要进入寒冷
+        const bh = makeBattle({ enemies: [{ key: 'enemy_1007_shield', mods: { hpMul: 500, speedMul: 0 } }], content: 'none', autoFinish: false });
+        m.echoBlessings = [b.id];
+        m._echoHookBattle(bh.b);
+        bh.step(1);
+        const e = (bh.b.enemies || [])[0];
+        assert.ok(e, ` 的测试敌人没出场`);
+        bh.run((Number(b.interval) || 10) + 0.5);
+        assert.ok(e.s.flags.cold || e.s.flags.freeze, ` 没有让敌人寒冷`);
+        bh.b.dispose?.();
+        continue;
+      }
       assert.fail(`未知的祝福 kind：${kind}（${b.id}）`);
     } finally {
       m.dispose();

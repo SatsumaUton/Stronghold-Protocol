@@ -126,6 +126,9 @@ export const ECHO_BLESSINGS = Object.freeze([
   // 隐匿敌人（s.flags.stealth）默认不可选中（targeting.js）；被「照破 / 洞彻」打上 reveal 标记后可以正常打。
   { id: 'reveal_pulse', rarity: 'rare', name: '照破', desc: '每 8 秒使全场隐匿敌人现形 3 秒', kind: 'reveal', group: 'reveal', interval: 8, duration: 3 },
   { id: 'reveal_always', rarity: 'epic', name: '洞彻', desc: '全场敌人永久现形（反隐匿）', kind: 'reveal', group: 'reveal', always: true },
+  // ---- 谢拉格寒风（维护者 2026-11-05）----
+  // 直接复用原版盟约的寒风实现（server/sim/content/devices.js startColdWind），所以数值口径与谢拉格满档一致。
+  { id: 'kjerag_wind', rarity: 'epic', name: '朔风', desc: '每 10 秒刮一阵寒风，使全场敌人寒冷 3 秒', kind: 'coldwind', group: 'wind', interval: 10, duration: 3 },
   { id: 'thrift', rarity: 'common', name: '开源', desc: '驱散所有资金类诅咒（贡赋 / 征收 / 重税 / 什一税 / 抽成）', kind: 'counter', group: 'counter',
     counterCurses: ['tribute', 'levy', 'heavytax', 'tithe', 'r_levy'] },
   { id: 'cleanse_words', rarity: 'rare', name: '净言', desc: '驱散「侵蚀」：侵蚀词条上限恢复', kind: 'counter', group: 'counter',

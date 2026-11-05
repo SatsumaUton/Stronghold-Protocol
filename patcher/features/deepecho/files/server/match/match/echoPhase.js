@@ -19,6 +19,7 @@ import {
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
 import { echoSummonOnly, echoHitCountEnemy } from './echoWaves.js';
 import { isEchoProjectionLayer, pickProjectionOffer, echoProjectionById } from './echoProjection.js';
+import { startColdWind } from '../../sim/content/devices.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR, PHASE } from '../../../shared/constants.js';
 import { msg } from '../../../shared/i18n.js';
 import { hiddenEligible } from '../finalAssault.js';
@@ -307,6 +308,14 @@ export class MatchEcho {
       if (pulse && typeof battle.every === 'function') {
         battle.every(Math.max(1, Number(pulse.interval) || 8), () => { for (const e of battle.enemies || []) revealOne(e); }, { owner: 'echo:reveal' });
       }
+    }
+    // 谢拉格寒风（维护者 2026-11-05）：祝福「朔风」每 interval 秒刮一阵，让全场敌人寒冷 duration 秒。
+    // 直接调原版盟约的实现（sim/content/devices.js startColdWind），数值口径与谢拉格满档一致。
+    const winds = this._echoBlessings().filter((b) => b && b.kind === 'coldwind');
+    for (const w of winds) {
+      try {
+        startColdWind(battle, { playerId: null, interval: Number(w.interval) || 10, duration: Number(w.duration) || 3 });
+      } catch (e) { this.reportError('echo cold wind', e); }
     }
     const altarStacks = Math.max(0, Math.min(2, Number(this.echoAltarBuffStacks) || 0));
     // 深潜补给选的「临时词条」：只在本层生效
