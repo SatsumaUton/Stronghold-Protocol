@@ -1182,7 +1182,7 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
             </button>
             ${onPublic || onQuick ? html`<div class="echo-links">
               ${onPublic ? html`<button type="button" class="echo-pill" data-testid="echo-public"
-                onClick=${() => onPublic({ difficulty })} title=${t('建一间公开的深潜房，其他博士能在「公开同盟」里看到（进房仍需深潜资格）')}>
+                onClick=${() => onPublic({ difficulty })} title=${t('浏览公开的深潜房，或者自己开一间公开的（进房仍需深潜资格）')}>
                 <${Icon} name="link" />${t('公开深潜')}</button>` : null}
               ${onQuick ? html`<button type="button" class="echo-pill" data-testid="echo-quick" disabled=${quickBusy}
                 onClick=${() => onQuick({ difficulty })} title=${t('进入深潜匹配池，和其他深潜房配对（只会配到深潜）')}>
@@ -1407,6 +1407,10 @@ export function LobbyScreen() {
   }, []);
   /** 深潜专属大厅是否打开（只有管理员能打开） */
   const [echoOpen, setEchoOpen] = useState(false);
+/** 「公开深潜」列表（深潜专属，维护者 2026-11-06）：只列公开的深潜房，和普通「公开同盟」分开 */
+  const [echoBrowseOpen, setEchoBrowseOpen] = useState(false);
+  /** 「公开深潜」列表里点「开一间公开的」时用的难度（跟当前选的深潜难度一致） */
+  const [echoPick, setEchoPick] = useState(null);
   const openMode = (m) => {
     if (m === 'deepecho') {
       // 「深渊回响」未开放：普通玩家点了只给提示；管理员进专属大厅（难度 / 排行榜 / 开始）。
@@ -1740,8 +1744,9 @@ export function LobbyScreen() {
         create('coop', 'deepecho', { difficulty: pickedDifficulty });
       }}
       onPublic=${({ difficulty: pickedDifficulty }) => {
-        setEchoOpen(false);
-        create('coop', 'deepecho', { difficulty: pickedDifficulty, listed: true });
+        // 「公开深潜」= 浏览别人的公开深潜房（和「公开同盟」同一套）；想开一间就点列表里的「开一间公开的」
+        setEchoBrowseOpen(true);
+        setEchoPick(pickedDifficulty);
       }}
       onQuick=${({ difficulty: pickedDifficulty }) => {
         setEchoOpen(false);
@@ -1764,6 +1769,11 @@ export function LobbyScreen() {
       searching=${!!matchSearch} elapsed=${matchWait} queue=${matchSearch?.queue ?? null} onCancel=${cancelMatch} />` : null}
     ${/* 和参考版一致：同盟模拟还开着才画这个列表。它叠在上面（Modal 的 modalStack 让
          只有最上层响应 Esc / Tab / 焦点），所以关掉列表 = 回到同盟模拟，而不是回大厅。 */ null}
+    ${/* 公开深潜：深潜专属的公开列表（维护者 2026-11-06） */ null}
+    ${echoBrowseOpen ? html`<${RoomListDialog} variant="deepecho" online=${online} busy=${busy}
+      onJoin=${(c, node) => { setEchoBrowseOpen(false); enterRoom(c, node); }}
+      onCreatePublic=${() => { setEchoBrowseOpen(false); setEchoOpen(false); create('coop', 'deepecho', { difficulty: echoPick || shownCoop, listed: true }); }}
+      onClose=${() => setEchoBrowseOpen(false)} />` : null}
     ${browseOpen && allyOpen ? html`<${RoomListDialog} online=${online} busy=${busy}
       onJoin=${(c, node) => { setBrowseOpen(false); setAllyOpen(false); enterRoom(c, node); }} onClose=${() => setBrowseOpen(false)} />` : null}
     ${sweepOpen ? html`<${SweepReport} onClose=${() => setSweepOpen(false)} />` : null}

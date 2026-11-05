@@ -616,14 +616,17 @@ function redisCall(args, timeoutMs = 800) {
  * 结果缓存 3 秒：大厅列表每几秒刷一次，没必要每次都发 30 条 Redis 命令。
  */
 const openRoomsCache = { at: 0, data: null };
-async function openRooms() {
-  if (openRoomsCache.data && Date.now() - openRoomsCache.at < 3000) return openRoomsCache.data;
+async function openRooms(variant = null) {
+  // 「深渊回响」有**自己的**公开列表（维护者 2026-11-06）：深潜房不再混进普通「公开同盟」列表。
+  const wantEcho = variant === 'deepecho';
+  if (openRoomsCache.data && openRoomsCache.variant === wantEcho && Date.now() - openRoomsCache.at < 3000) return openRoomsCache.data;
   const perNode = await Promise.all(NODE_NAMES.map(async (_name, i) => {
     const n = i + 1;
     return { node: n, flat: await redisCall(['HGETALL', `sp:n${n}:lobby:rooms`]) };
   }));
-  const data = { at: Date.now(), rooms: collectOpenRooms(perNode) };
+  const data = { at: Date.now(), rooms: collectOpenRooms(perNode, { variant }) };
   openRoomsCache.at = Date.now();
+  openRoomsCache.variant = wantEcho;
   openRoomsCache.data = data;
   return data;
 }
@@ -1044,7 +1047,8 @@ const roomDir = new Map(); // node -> { codes: string[], at: number }
   }
   if (pathname === '/api/rooms/open') {
     try {
-      const data = await openRooms();
+      const variant = url.searchParams.get('variant') === 'deepecho' ? 'deepecho' : null;
+      const data = await openRooms(variant);
       return json(res, 200, { ok: true, at: data.at, rooms: data.rooms });
     } catch {
       return json(res, 200, { ok: true, at: Date.now(), rooms: [] });

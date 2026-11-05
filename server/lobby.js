@@ -1326,7 +1326,7 @@ export class Lobby {
       case 'room.ready': return this.ready(session, msg);
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
       case 'room.setListed': return this.setListed(session, msg);
-      case 'room.list': return this.roomList();
+case 'room.list': return this.roomList(msg);
       case 'room.setExperimental': return this.setExperimental(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
       case 'room.setBotBand': return this.setBotBand(session, msg);
@@ -2077,12 +2077,15 @@ export class Lobby {
    * 只回列表要显示的东西：没有 playerId、没有地址、没有座位明细。行过期了也不打紧 ——
    * 点进去时 room.join 会再全部校验一遍。
    */
-  roomList() {
+roomList({ variant = null } = {}) {
+    // 「深渊回响」：自己的公开列表（维护者 2026-11-06）。普通同盟列表**不再**混进深潜房。
+    const wantEcho = variant === 'deepecho';
     const now = this.now();
-    if (!this.roomListCache || now - this.roomListCache.at >= ROOM_LIST_CACHE_MS) {
+if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this.roomListCache.at >= ROOM_LIST_CACHE_MS) {
       const rows = [];
       for (const room of this.rooms.values()) {
         if (!this.roomOpen(room)) continue;
+        if ((room.variant === 'deepecho') !== wantEcho) continue;
         const taken = room.seats.filter(Boolean);
         rows.push({ code: room.code, host: room.seatOf(room.hostId).name, humans: room.activeHumans().length,
           filled: taken.length, capacity: room.capacity, difficulty: room.difficulty,
@@ -2092,7 +2095,7 @@ export class Lobby {
           experimental: { ...room.experimental }, free: room.capacity - taken.length, at: room.createdAt });
       }
       rows.sort((a, b) => a.free - b.free || a.at - b.at);
-      this.roomListCache = { at: now, rooms: rows.slice(0, ROOM_LIST_MAX).map(({ free, at, ...row }) => row) };
+      this.roomListCache = { at: now, variant: wantEcho, rooms: rows.slice(0, ROOM_LIST_MAX).map(({ free, at, ...row }) => row) };
     }
     return { ok: true, reply: { rooms: this.roomListCache.rooms } };
   }

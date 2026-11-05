@@ -51,13 +51,15 @@ test('公开深潜：深潜房能挂到公开列表，列表里带 variant', () 
   const { lobby, host, room } = echoLobby();
   assert.equal(lobby.setListed(host, { listed: true }).ok, true, '深潜房要能公开（以前被硬拒）');
   assert.equal(room.listed, true);
-  const list = lobby.roomList();
+  // 深潜房有自己的公开列表（2026-11-06）：普通列表不再混进深潜房，所以查深潜那一份
+  const list = lobby.roomList({ variant: 'deepecho' });
   const row = list.reply.rooms.find((r) => r.code === room.code);
   assert.ok(row, '公开后要出现在房间列表里');
   assert.equal(row.variant, 'deepecho', '列表行要带 variant（界面据此显示深渊回响）');
   // 取消公开照旧
   assert.equal(lobby.setListed(host, { listed: false }).ok, true);
-  assert.equal(lobby.roomList().reply.rooms.some((r) => r.code === room.code), false);
+  assert.equal(lobby.roomList({ variant: 'deepecho' }).reply.rooms.some((r) => r.code === room.code), false);
+  assert.equal(lobby.roomList().reply.rooms.some((r) => r.code === room.code), false, '普通列表里也不能有它');
 });
 
 test('开始多人匹配：深潜进自己的池，普通同盟进不来', () => {
@@ -111,7 +113,9 @@ test('界面：深潜整屏有「公开深潜」「开始多人匹配」，并�
   assert.match(src, /\$\{t\('公开深潜'\)\}/, '文案是公开深潜');
   assert.match(src, /\$\{t\('开始多人匹配'\)\}/, '文案是开始多人匹配');
   // 接线：公开 = 建房带 listed；匹配 = quickMatch 带 variant
-  assert.match(src, /create\('coop', 'deepecho', \{ difficulty: pickedDifficulty, listed: true \}\)/, '公开深潜要建公开房');
+  // 公开深潜 = 打开深潜专属列表（维护者 2026-11-06）；建房走列表里的「开一间公开的」
+  assert.match(src, /setEchoBrowseOpen\(true\)/, '公开深潜要打开专属列表');
+  assert.match(src, /create\('coop', 'deepecho', \{ difficulty: echoPick \|\| shownCoop, listed: true \}\)/, '列表里「开一间公开的」建公开房');
   assert.match(src, /quickMatch\(\{ difficulty: pickedDifficulty, seats: 'four', rules: 'standard', variant: 'deepecho' \}\)/, '多人匹配要带 variant');
   assert.match(src, /net\.request\('room\.setListed', \{ listed: true \}\)/, '建房后要真的挂上公开列表');
   // 样式
