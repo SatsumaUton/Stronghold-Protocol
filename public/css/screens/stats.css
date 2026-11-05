@@ -429,3 +429,10 @@
 .st-verfilter .dpick__opt { --d-color: #9fd3ff; height: .4rem; padding: 0 .14rem; border: 1px solid var(--line-2); font-size: calc(.14 * var(--t)); letter-spacing: .02em; }
 @media (max-width: 760px) { .st-verfilter { padding-inline: .16rem; } }
 .sp-coarse .st-verfilter .dpick__opt { min-height: 36px; }
+
+/* 对局记录的模式列：「深渊回响」用薄荷色角标区分于难度名（维护者 2026-11-05） */
+.st-mode.is-echo {
+  display: inline-block; padding: .01rem .1rem; border-radius: .04rem;
+  border: 1px solid rgba(120, 214, 160, .45); background: rgba(60, 150, 100, .18);
+  color: #b6f0c9; font-weight: 700; white-space: nowrap;
+}
