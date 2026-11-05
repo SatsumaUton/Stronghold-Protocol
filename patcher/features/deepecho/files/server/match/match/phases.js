@@ -403,6 +403,12 @@ export class MatchPhases {
     this.wave = null;
     this.bossWaves = null;
     this.bossPairsRound = null;
+    // 「深渊回响」的返场 boss（25 / 35 / 45…）打完之后必须把 boss 战的**团队血池**复位
+    // （维护者 2026-11-05 实测：67 层队友死亡救不了，界面提示「本局模拟已经结束，无法救援」）。
+    // teamLp 一旦残留成数字，`revivalWindowOpen()`、settle 的 canRescue、`_revivalDeathReason()`
+    // 都会一直按「boss 战」处理 —— 原版只打一次 boss 所以从来没暴露，深潜的 boss 回合会反复出现。
+    // 例外：R14 → R15 的隐藏核心沿用上一场的 teamLp（startFinalAssault(true) 不重新开池）。
+    if (this.teamLp != null && r !== this.gd.hiddenRound) this.teamLp = null;
     const alive = this.alivePlayers();
     // the round's enemies (shared composition, generated now so the prep preview is exact). Planned BEFORE the players'
     // round start: its recompute() checks the board on the field the player deploys on this round (deployFieldOf reads

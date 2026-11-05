@@ -1556,6 +1556,32 @@ test('返场 boss 的血量随深度递增（R14 < R25 < R35 < R45），波次�
     assert.ok(Math.abs(v.wave - base * v.poolMul) < 1e-6, `${r} 层波次缩放与血池倍率不同源`);
   }
 });
+// 维护者 2026-11-05（67 层实测）：队友死亡后无法救援，界面提示「本局模拟已经结束，无法救援」。
+// 根因：boss 战的**团队血池** teamLp 在 boss 回合结束后从没复位过 —— 原版只打一次 boss 所以没事，
+// 深潜的返场 boss（25 / 35 / 45…）会反复出现，于是从 R14 之后每一层都被当成「boss 战还没结束」。
+test('深潜 boss 回合结束后团队血池复位：队友死亡不再被判成「本局模拟已结束」', (t) => {
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  // R14 → R15 的隐藏核心要**沿用**上一场的血池（startFinalAssault(true) 不重新开池）
+  m.round = 13; m.startRound(14);
+  m.startFinalAssault(false);
+  const carried = m.teamLp;
+  assert.ok(carried != null, 'R14 最终攻势要开团队血池');
+  m.round = 14; m.startRound(15);
+  assert.equal(m.teamLp, carried, 'R14 → R15 隐藏核心沿用同一份血池');
+  // 返场 boss 打完 → 下一层必须复位
+  m.round = 24; m.startRound(25);
+  m.startFinalAssault(false);
+  assert.ok(m.teamLp != null, 'R25 返场 boss 也要开血池');
+  m.round = 25; m.startRound(26);
+  assert.equal(m.teamLp, null, 'boss 回合结束后 teamLp 必须复位');
+  const ps = m.alivePlayers()[0];
+  ps.pendingDeath = true;
+  ps.alive = false;
+  assert.notEqual(m._revivalDeathReason(ps), 'match-ended', '不该再报「本局模拟已经结束」');
+});
+
 // 维护者 2026-11-05：16 层以后的「深渊祭坛 → 献祭 · 祝福」抽到的是一次性祝福。
 // 它拿到就结算（不占名额），但**必须一直留在「已获祝福」列表里** —— 包括断线续玩 / 节点重启读档之后。
 // 以前 echoOneShotIds 没进存档，读档后祭坛抽到的祝福会整批消失（玩家以为被诅咒吃掉了）。
