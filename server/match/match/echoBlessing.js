@@ -269,13 +269,42 @@ export function echoBlessingOffer(rng, owned = []) {
  * @param {string[]} ids
  * @returns {object} 空对象 = 没有加成
  */
-export function echoBlessingMods(ids) {
+/**
+ * 祝福的「深层强化」（维护者 2026-11-05：前期拿的祝福到 16 层以后基本没感觉）。
+ *
+ * 16 层起，数值型祝福按 `ECHO_BLESSING_LATE_MUL` 放大（默认 ×2.5）：
+ *   * 乘法类（`*Mul`，如 atkMul 1.06）放大的是**增量**：1 + (v-1)×2.5 → 1.15；
+ *   * 百分比 / 平坦类（`*Pct`、`*Flat`）直接乘；
+ *   * 计数类（格挡数 / 射程 / 目标数）不放大 —— 整数机制放大只会变味。
+ * 资金 / 金币 / 回血这类一次性效果同样放大（见 echoBlessingFunds / echoBlessingCoinMul）。
+ */
+export const ECHO_BLESSING_LATE_FROM = 16;
+export const ECHO_BLESSING_LATE_MUL = 2.5;
+/** 这些键是「计数」而不是「数值」，不参与深层放大。 */
+const ECHO_BLESSING_COUNT_KEYS = new Set(['blockCnt', 'rangeExtend', 'maxTargets']);
+
+/** 这个深度下祝福的放大倍率（16 层起生效）。 */
+export const echoBlessingLateMul = (depth) => (Math.floor(Number(depth) || 0) >= ECHO_BLESSING_LATE_FROM ? ECHO_BLESSING_LATE_MUL : 1);
+
+/** 单条祝福的 mods 按倍率放大（不修改原表）。 */
+export function echoBlessingScaledMods(b, mul = 1) {
+  if (!b || !b.mods) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(b.mods)) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    if (!(mul > 1) || ECHO_BLESSING_COUNT_KEYS.has(k)) { out[k] = v; continue; }
+    out[k] = /Mul$/.test(k) ? 1 + (v - 1) * mul : v * mul;
+  }
+  return out;
+}
+
+export function echoBlessingMods(ids, depth = 0) {
+  const mul = echoBlessingLateMul(depth);
   const out = {};
   for (const id of Array.isArray(ids) ? ids : []) {
     const b = echoBlessingById(id);
     if (!b || b.kind !== 'mods' || !b.mods) continue;
-    for (const [k, v] of Object.entries(b.mods)) {
-      if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    for (const [k, v] of Object.entries(echoBlessingScaledMods(b, mul))) {
       out[k] = (out[k] ?? 0) + v;
     }
   }
@@ -286,12 +315,13 @@ export function echoBlessingMods(ids) {
  * 已拥有祝福的资金倍率（`coin` 类相乘；没有就是 1）。
  * @param {string[]} ids
  */
-export function echoBlessingCoinMul(ids) {
+export function echoBlessingCoinMul(ids, depth = 0) {
+  const late = echoBlessingLateMul(depth);
   let mul = 1;
   for (const id of Array.isArray(ids) ? ids : []) {
     const b = echoBlessingById(id);
     if (!b || b.kind !== 'coin' || !(b.coinMul > 0)) continue;
-    mul *= b.coinMul;
+    mul *= late > 1 ? 1 + (b.coinMul - 1) * late : b.coinMul;
   }
   return mul;
 }
@@ -300,7 +330,7 @@ export function echoBlessingCoinMul(ids) {
  * 拿到这个祝福时一次性发放的资金（`fund` 类；其它返回 0）。
  * @param {typeof ECHO_BLESSINGS[number]} b
  */
-export const echoBlessingFunds = (b) => (b && b.kind === 'fund' && b.funds > 0 ? Math.trunc(b.funds) : 0);
+export const echoBlessingFunds = (b, depth = 0) => (b && b.kind === 'fund' && b.funds > 0 ? Math.trunc(b.funds * echoBlessingLateMul(depth)) : 0);
 
 /**
  * 拿到这个祝福时一次性回复的生命（`heal` 类；其它返回 0）。
