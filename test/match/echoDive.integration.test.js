@@ -1531,3 +1531,25 @@ test('返场 boss 的血量缩放与原版 boss 一致（不随深度递增）',
   assert.equal(hpMulAt(35), base, '35 层同理');
   assert.equal(hpMulAt(45), base, '45 层同理');
 });
+
+// 维护者 2026-11-05：16 层以后所有「频次怪」（被打 N 下才死）的血量都不能按深度缩放。
+// 器物类的 baseHp 恰好等于需要的次数，所以正确值就是 baseHp 本身。
+test('16 层以后所有频次怪血量等于基础值（不被深度缩放）', async (t) => {
+  const { echoHitCountEnemy } = await import('../../server/match/match/echoWaves.js');
+  const h = dive();
+  const m = h.m;
+  t.after(() => m.dispose());
+  const set = echoHitCountEnemy(m.gd);
+  assert.ok(set.size >= 10, `频次怪识别数量异常：${set.size}`);
+  for (const key of set) {
+    const base = m.gd.enemy(key).stats.maxHp;
+    const wave = { spawns: [{ enemyKey: key, count: 1, mods: { hpMul: 38.2 } }] };
+    m._echoTuneHitCount(wave);
+    const mul = wave.spawns[0].mods.hpMul;
+    assert.ok(mul <= 1, `${key} 的 hpMul 仍被放大：${mul}`);
+    assert.equal(Math.round(base * mul), base, `${key} 最终血量应为 ${base}（实际 ${Math.round(base * mul)}）`);
+  }
+  // 长句里提到「需要 N 次伤害击倒」的普通敌人不能被误判
+  assert.equal(set.has('enemy_1288_duskls'), false, '深池逐火战士不是频次怪');
+  assert.equal(set.has('enemy_9010_acpupp'), false, '假想敌·再生不是频次怪');
+});

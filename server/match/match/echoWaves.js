@@ -185,6 +185,8 @@ export function echoRoundPool(gd, dataRound, helpers) {
  */
 /** 「频次怪」的血量系数：深潜里按 0.6 倍发（维护者 2026-11-05）。 */
 export const ECHO_HITCOUNT_HP_MUL = 0.6;
+/** 「频次怪」的最终血量上限（按「被打几下」计）：与深度无关，约 40 下打死（维护者 2026-11-05）。 */
+export const ECHO_HITCOUNT_HP_CAP = 40;
 
 const ECHO_SUMMON_CACHE = new WeakMap();
 
@@ -235,7 +237,15 @@ export function echoHitCountEnemy(gd) {
   const raw = gd && gd.raw && gd.raw.enemies ? gd.raw.enemies : {};
   for (const [key, e] of Object.entries(raw)) {
     const abil = e && Array.isArray(e.abilities) ? e.abilities : [];
-    if (abil.some((a) => a && typeof a.text === 'string' && /数次攻击/.test(a.text))) set.add(key);
+    // 「频次怪」的文案有两种写法：需要数次攻击击倒（11 条）与 需要 N 次伤害击倒（器物类 16 条，如青铜镜）。
+    // 只认前一种会漏掉器物，它们的血就被按深度缩放成上千（维护者 2026-11-05 实测青铜镜 1150）。
+    // 真正的「频次怪」文案是 需要 N 次伤害击倒（器物类 16 条，baseHp 恰好等于需要的次数）。
+    // 之前用 数次攻击 会误伤「能在数次攻击后晕眩我方单位」这类普通敌人（hvyslr 10000 血），
+    // 而漏掉器物 → 青铜镜被按深度缩放成 1150（维护者 2026-11-05 实测）。
+        // 只认**独立成条**的 需要 N 次伤害击倒（器物类 12 条，baseHp 恰好等于 N）。
+    // 不能只搜子串：深池逐火战士 / 假想敌·再生 的长句里也有「需要 5 次伤害击倒的<余烬>」，
+    // 但它们本体是 5000～12000 血的普通敌人，被误判就会被打回个位数血量。
+    if (abil.some((a) => a && typeof a.text === 'string' && /^需要\d+次伤害击倒$/.test(a.text.trim()))) set.add(key);
   }
   ECHO_HITCOUNT_CACHE.set(gd, set);
   return set;

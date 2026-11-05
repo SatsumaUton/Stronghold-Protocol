@@ -17,7 +17,7 @@ import {
   echoBlessingFunds, echoBlessingHeal, echoBlessingFree, echoBlessingCurseRemove, echoBlessingOneShot, ECHO_BLESSING_REFRESH_MAX, ECHO_BLESSINGS, applyEchoBlessingMods, ECHO_BLESSING_MAX, ECHO_BLESSING_VOTE_MS, ECHO_BLESSING_RARITY_LABEL,
 } from './echoBlessing.js';
 import { echoBountyDue, echoBountyCards } from './echoBounty.js';
-import { echoSummonOnly, echoHitCountEnemy, ECHO_HITCOUNT_HP_MUL } from './echoWaves.js';
+import { echoSummonOnly, echoHitCountEnemy } from './echoWaves.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';import { ERR } from '../../../shared/constants.js';
 import { msg } from '../../../shared/i18n.js';
 import { hiddenEligible } from '../finalAssault.js';
@@ -640,7 +640,7 @@ export class MatchEcho {
       this.echoInflationAnnounced = true;
       // 广播口径（维护者 2026-11-05）：要说清楚「新增了什么」，而不是只报一个倍率。
       // ⚠ 这里**直接发一条独立 ticker**，不走 `_echoPushAnnounce` 队列：
-      // 队列会把「本回合诅咒 / 侵蚀词条」拼成一行（`　｜　` 连接），长文本还会被服务端截到 200 字，
+      // 队列会把「本回合诅咒 / 侵蚀词条」拼成一行（用竖线连接），长文本还会被服务端截到 200 字，
       // 16 层的规则播报就容易被挤没（维护者 2026-11-05 反馈「没有房间广播」）。
       const text = `新增固定规则「深渊通胀」：16 层起，商店购买价与刷新价每层 +4%（当前 ×${this._echoShopInflate(r).toFixed(2)}，封顶 ×1.5）。可在「本局信息 → 深渊回响」查看。`;
       this.tickerText?.(text, FLOW_TICKER_PRIORITY);
@@ -1044,7 +1044,13 @@ export class MatchEcho {
       const key = String(s.enemyKey || '');
       const base = key.replace(/^.*:/, '');
       if (!hit.has(key) && !hit.has(base)) continue;
-      s.mods = { ...(s.mods || {}), hpMul: (Number(s.mods && s.mods.hpMul) || 1) * ECHO_HITCOUNT_HP_MUL };
+      // 「频次怪」（被打 N 下才死）的血量必须是**绝对小值**，不是「按深度缩放后再打个折」：
+      // 深层 hpMul 能到 38+，再乘 0.6 仍是几百上千（维护者 2026-11-05 实测青铜镜 1150）。
+
+      // 器物类的 baseHp 恰好就是「需要几次伤害击倒」（青铜镜 30、黄铜镜 35），
+      // 所以只要**不让它被正向缩放**即可：hpMul 封顶 1，负向修正（如果有）保留。
+      const curMul = Number(s.mods && s.mods.hpMul) || 1;
+      s.mods = { ...(s.mods || {}), hpMul: Math.min(curMul, 1) };
     }
     return wave;
   }
