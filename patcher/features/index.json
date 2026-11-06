@@ -6856,7 +6856,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": false,
-        "customBytes": 69487
+        "customBytes": 69818
       },
       {
         "path": "server/match/PlayerState.js",
@@ -6926,7 +6926,7 @@
       {
         "path": "server/match/match/echoCrossVersion.js",
         "baseExists": false,
-        "customBytes": 6388
+        "customBytes": 12946
       },
       {
         "path": "server/match/match/echoCurse.js",
@@ -6946,7 +6946,7 @@
       {
         "path": "server/match/match/echoWaves.js",
         "baseExists": false,
-        "customBytes": 40206
+        "customBytes": 40645
       },
       {
         "path": "server/match/match/echoWords.js",

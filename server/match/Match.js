@@ -347,7 +347,10 @@ export class Match {
     // 这样深潜的怪种池能跨版本，而不是只有这张图那几种（维护者 2026-11-04）。
     if (this.echoVariant === 'deepecho') {
       try {
-        const extra = crossVersionEnemies(this.gd.raw && this.gd.raw.enemies);
+        // 只收**有网页模型**的（data/assets.json 的 enemies[<裸 id>].spine）：没有模型的敌人
+        // 在浏览器里画不出来，进池子就是一只看不见的怪（维护者 2026-11-07）。
+        const artEnemies = this.gd.raw && this.gd.raw.assets ? this.gd.raw.assets.enemies : null;
+        const extra = crossVersionEnemies(this.gd.raw && this.gd.raw.enemies, artEnemies);
         const n = extra ? Object.keys(extra).length : 0;
         if (n > 0) {
           // 不改共享的 data 对象：给这个 GameData 实例换一份 enemies 表
