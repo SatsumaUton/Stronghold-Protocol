@@ -500,7 +500,7 @@ export class MatchPhases {
     this._echoClampFreeRefreshes();
     // 深潜补给（16 层起）：每层给每名玩家一次个人三选一
     if (typeof this._echoOpenSupply === 'function') this._echoOpenSupply();
-    // 「盟约投影」（16 层起每 10 层一次的全队三选一）：与补给/祝福串行，面板一次只弹一个
+    // 「盟约投影」（16 层起每 10 层一次的三选一，2026-11-07 起每人各自选）：与补给/祝福串行，面板一次只弹一个
     if (typeof this._echoOpenProjection === 'function') this._echoOpenProjection();
     this._echoMaybeLootRefresh(r);
     for (const ps of alive) ps.startRound(r);
