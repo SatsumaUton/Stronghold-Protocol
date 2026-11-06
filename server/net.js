@@ -47,7 +47,6 @@ import { isIP } from 'node:net';
 import { C2S, validateC2S } from '../shared/protocol.js';
 import { ERR, ERR_TEXT, NAME_MAX_LEN, PROTOCOL_VERSION } from '../shared/constants.js';
 import { verifyAdminToken, readAdminToken, readUserToken } from './adminAuth.js';
-import { isEchoTester } from './echoTesters.js';
 
 /** Tunables (all overridable through the Network / SessionRegistry constructors). */
 export const NET_DEFAULTS = Object.freeze({
@@ -837,9 +836,6 @@ export class Network {
     //   权限在 matchmaker 侧查库判定，随 userToken 的 gameTool 字段下发到这里；
     //   owner 恒为 true。旧令牌没有这个字段 → false（保守，重新登录即可恢复）。
     session.gameTool = account != null && account.gameTool === true;
-// 「深渊回响」测试名单：由 matchmaker 在 userToken 里带下来（和 gameTool 同一条路）
-// 令牌里的标记（新会话）或本地名单文件（老令牌兜底）—— 后者让玩家不必重新登录
-session.echoTester = (account != null && account.echoTester === true) || isEchoTester(session.accountId);
     // ★ 2026-10-31：验码门还要核对「这枚令牌是不是本人换来的」。
     //   以前只调 verifyAdminToken(msg.adminToken) —— 它只证明「这枚令牌是真的、没过期、没被吊销」，
     //   不证明**是谁**换的。实测：普通玩家把别人的 owner 令牌塞进 hello，
