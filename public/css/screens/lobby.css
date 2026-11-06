@@ -2071,3 +2071,40 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 
 /* 深潜卡（能点的那张）允许溢出：角标旋转后不会被卡片裁掉；锁住时保持原样（overflow 仍 hidden）。 */
 .hub-entry--deepecho:not(.hub-entry--locked) { overflow: visible; }
+/* ---- 「深渊图鉴」整块配色统一成深潜紫（维护者 2026-11-06）----
+   浮层里用的是通用 Button / Icon / Modal，它们的强调色是薄荷绿（--mint-*）。
+   这里把 mint 变量在浮层内整体换成紫罗兰，再补上按钮的显式覆盖 —— 这样标题、图标、边框、
+   hover、focus 环一起变紫，不用逐个元素去改。 */
+.echo-codex {
+  /* 边框括号与顶部条也走深潜紫（components.css 的 tone 类就是这么干的） */
+  --bk-c: #b79cff;
+  --mstripe: #b79cff;
+  --mint-500: #8f6fe8;
+  --mint-400: #b79cff;
+  --mint-600: #7a5cd0;
+  --mint-700: #5f45a8;
+  --mint-800: #3d2a72;
+  --mint-900: #241a44;
+  --mint-rgb: 183, 156, 255;
+  --mint-400-rgb: 183, 156, 255;
+  --mint-500-rgb: 143, 111, 232;
+  --mint-600-rgb: 122, 92, 208;
+  --mint-glow: rgba(183, 156, 255, .35);
+}
+.echo-codex .btn--secondary {
+  border-color: rgba(183, 156, 255, .45);
+  background: rgba(183, 156, 255, .08);
+  color: #ebe2ff;
+}
+.echo-codex .btn--secondary:hover { background: rgba(183, 156, 255, .18); border-color: #b79cff; }
+.echo-codex .btn--primary {
+  background: linear-gradient(160deg, #7d5bd6, #4b2f8f);
+  border-color: #b79cff;
+  color: #f4efff;
+  box-shadow: 0 0 .18rem rgba(125, 91, 214, .5);
+}
+.echo-codex .btn--primary:hover { background: linear-gradient(160deg, #8e6ce6, #57379f); }
+.echo-codex .btn--ghost { color: #cbb9ee; }
+.echo-codex .icon { color: inherit; }
+.echo-codex__tab .icon { color: currentColor; opacity: .85; }
+.echo-codex__tab.is-on .icon { color: #e8ddff; opacity: 1; }
