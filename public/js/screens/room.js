@@ -49,7 +49,6 @@
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS } from '../../../shared/constants.js';
-import { titleById } from '../../../shared/titles.js';
 import {
   html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyIcon, Tooltip, Spinner, confirmDialog, doctorNo, Modal,
   TextField,
@@ -413,7 +412,7 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
     <div class="rseat__plate">
       ${isMe ? html`<span class="rseat__me" role="img" aria-label=${t('你')} title=${t('你')}><${Icon} name="info" /></span>` : null}
       <${AvatarFrame} size="sm" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} />
-      <span class="rseat__who"><b class="seat__name">${botPrefix ? html`<span class="seat__name-pre">${botPrefix[0]}</span>${botPrefix[1]}` : seat.name || t('博士')}</b>${isMe ? html`<span class="seat__you" aria-hidden="true">${t('你')}</span>` : null}<${SeatTitle} titleId=${seat.title} /></span>
+      <span class="rseat__who"><b class="seat__name">${botPrefix ? html`<span class="seat__name-pre">${botPrefix[0]}</span>${botPrefix[1]}` : seat.name || t('博士')}</b>${isMe ? html`<span class="seat__you" aria-hidden="true">${t('你')}</span>` : null}<${SeatTitle} title=${seat.title} /></span>
       <small class="rseat__doc">${seat.isBot ? 'AUTONOMOUS UNIT' : `DOCTOR #${seatNo(seat)}`}</small>
     </div>
   </article>`;
@@ -422,13 +421,17 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
 /**
  * 称号（维护者 2026-11-07）：后台给账号设的，显示在玩家名字后面（座位卡 / 观战席）。
  *
- * 只存 id，文案与配色来自 shared/titles.js：名字走 t()（四个语言包都有），
- * 配色是 CSS 钩子 .seat__title.is-<tone>；未知 id（老数据 / 手改库）不显示，绝不抛错。
+ * 数据是服务端随令牌下发的 { id, name, tone, desc }（后台可以自定义称号，所以前端不查目录）：
+ * 名字过 t()（内置称号在四个语言包里有 msgid，自定义的原样显示），
+ * 配色是 CSS 钩子 .seat__title.is-<tone>；字段缺失就不显示，绝不抛错。
  */
-function SeatTitle({ titleId }) {
-  const rec = titleById(titleId);
-  if (!rec) return null;
-  return html`<span class=${'seat__title is-' + rec.tone} title=${rec.desc ? t(rec.desc) : ''} data-title=${rec.id}>${t(rec.name)}</span>`;
+function SeatTitle({ title }) {
+  // 称号信息**全部随令牌下发**（{ id, name, tone, desc }）：后台可以自定义，
+  // 所以浏览器不依赖 shared/titles.js 那份内置目录，少一个 ESM 依赖也就少一种 404 的可能。
+  const rec = title && typeof title === 'object' ? title : null;
+  if (!rec || !rec.name) return null;
+  const tone = rec.tone || 'echo';
+  return html`<span class=${'seat__title is-' + tone} title=${rec.desc ? t(rec.desc) : ''} data-title=${rec.id || ''}>${t(rec.name)}</span>`;
 }
 
 /** 观战席: the room's spectators (host: ✕ frees a seat), and 入座 for a spectator while a player seat is free. */
@@ -437,7 +440,7 @@ function SpectatorBar({ facts, myId, busy, onRemove, onSit }) {
   return html`<section class="specbar" aria-label=${t('观战席')}>
     <span class="specbar__label"><${Icon} name="eye" />${t('观战席')}<b class="num">${facts.spectators.length}</b><span class="num t-dim">/${facts.maxSpectators}</span></span>
     ${facts.spectators.map((s) => html`<span key=${s.playerId} class=${`specbar__who${s.playerId === myId ? ' is-me' : ''}${s.connected === false ? ' is-offline' : ''}`}>
-      ${s.connected === false ? html`<${Icon} name="wifiOff" />` : null}${s.name || t('博士')}${s.playerId === myId ? html`<span class="seat__you">${t('你')}</span>` : null}<${SeatTitle} titleId=${s.title} />
+      ${s.connected === false ? html`<${Icon} name="wifiOff" />` : null}${s.name || t('博士')}${s.playerId === myId ? html`<span class="seat__you">${t('你')}</span>` : null}<${SeatTitle} title=${s.title} />
       ${facts.isHost ? html`<${Button} variant="ghost" size="sm" square=${true} icon="close" loading=${busy === `rs${s.playerId}`}
         onClick=${() => onRemove(s.playerId)} aria-label=${t('移出观战者 {name}', { name: s.name || '' })} title=${t('移出该观战者')} />` : null}
     </span>`)}
