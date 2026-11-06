@@ -6621,7 +6621,7 @@
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": false,
-        "customBytes": 129339
+        "customBytes": 133520
       },
       {
         "path": "public/css/screens/room.css",
@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 196312
+        "customBytes": 222353
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 218403
+        "customBytes": 257554
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 209383
+        "customBytes": 247140
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 178890
+        "customBytes": 211309
       },
       {
         "path": "public/js/render/units.js",
@@ -6666,7 +6666,7 @@
       {
         "path": "public/js/screens/echoLobby.js",
         "baseExists": false,
-        "customBytes": 8212
+        "customBytes": 8248
       },
       {
         "path": "public/js/screens/game.js",
@@ -6676,7 +6676,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 115500
+        "customBytes": 116599
       },
       {
         "path": "public/js/screens/result.js",
@@ -6706,12 +6706,17 @@
       {
         "path": "public/js/ui/echoBlessing.js",
         "baseExists": false,
-        "customBytes": 19592
+        "customBytes": 19616
       },
       {
         "path": "public/js/ui/echoBuffs.js",
         "baseExists": false,
-        "customBytes": 9814
+        "customBytes": 10666
+      },
+      {
+        "path": "public/js/ui/echoCodex.js",
+        "baseExists": false,
+        "customBytes": 4029
       },
       {
         "path": "public/js/ui/echoSigils.js",
@@ -6721,12 +6726,12 @@
       {
         "path": "public/js/ui/echoStatus.js",
         "baseExists": false,
-        "customBytes": 10653
+        "customBytes": 10717
       },
       {
         "path": "public/js/ui/echoSupply.js",
         "baseExists": false,
-        "customBytes": 4040
+        "customBytes": 4048
       },
       {
         "path": "public/js/ui/enemyDrawer.js",
@@ -6811,17 +6816,17 @@
       {
         "path": "server/http/routes.js",
         "baseExists": false,
-        "customBytes": 17778
+        "customBytes": 18302
       },
       {
         "path": "server/lobby.js",
         "baseExists": false,
-        "customBytes": 276605
+        "customBytes": 276685
       },
       {
         "path": "server/match/Match.js",
         "baseExists": false,
-        "customBytes": 66659
+        "customBytes": 67274
       },
       {
         "path": "server/match/PlayerState.js",
@@ -6856,7 +6861,7 @@
       {
         "path": "server/match/match/combat.js",
         "baseExists": false,
-        "customBytes": 13534
+        "customBytes": 13956
       },
       {
         "path": "server/match/match/echo.js",
@@ -6879,6 +6884,11 @@
         "customBytes": 6117
       },
       {
+        "path": "server/match/match/echoCodex.js",
+        "baseExists": false,
+        "customBytes": 6600
+      },
+      {
         "path": "server/match/match/echoConfig.js",
         "baseExists": false,
         "customBytes": 3514
@@ -6896,7 +6906,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 164026
+        "customBytes": 170640
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -7009,9 +7019,24 @@
         "customBytes": 19463
       },
       {
+        "path": "server/sim/Battle.js",
+        "baseExists": false,
+        "customBytes": 14703
+      },
+      {
         "path": "server/sim/attack/health.js",
         "baseExists": false,
         "customBytes": 7539
+      },
+      {
+        "path": "server/sim/battle/deploy.js",
+        "baseExists": false,
+        "customBytes": 15611
+      },
+      {
+        "path": "server/sim/battle/echoRules.js",
+        "baseExists": false,
+        "customBytes": 13920
       },
       {
         "path": "server/sim/battle/spawns.js",

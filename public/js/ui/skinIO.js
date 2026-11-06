@@ -63,13 +63,13 @@ export function skinsTooLarge(size) {
  */
 export function parseSkinsFile(text) {
   let data = null;
-  try { data = JSON.parse(text); } catch { return { ok: false, error: '导入失败：无法识别的内容' }; }
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: '导入失败：无法识别的格式' };
+  try { data = JSON.parse(text); } catch { return { ok: false, error: t('导入失败：无法识别的内容') }; }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: t('导入失败：无法识别的格式') };
   const extra = Object.keys(data).filter((k) => !['type', 'version', 'skins'].includes(k));
-  if (extra.length) return { ok: false, error: '导入失败：无法识别的格式' };
-  if (data.type != null && data.type !== SKINS_FILE_TYPE) return { ok: false, error: '导入失败：这不是皮肤文件' };
+  if (extra.length) return { ok: false, error: t('导入失败：无法识别的格式') };
+  if (data.type != null && data.type !== SKINS_FILE_TYPE) return { ok: false, error: t('导入失败：这不是皮肤文件') };
   const map = data.skins;
-  if (!map || typeof map !== 'object' || Array.isArray(map)) return { ok: false, error: '导入失败：里面没有有效的皮肤条目' };
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return { ok: false, error: t('导入失败：里面没有有效的皮肤条目') };
   const clean = {};
   let dropped = 0;
   for (const [cid, sid] of Object.entries(map)) {
@@ -83,7 +83,7 @@ export function parseSkinsFile(text) {
   }
   const raw = Object.keys(map).length;
   if (!Object.keys(clean).length) {
-    return { ok: false, error: raw ? '导入失败：这份数据在当前版本没有可用的皮肤，未做任何改动' : '导入失败：里面没有有效的皮肤条目' };
+    return { ok: false, error: raw ? t('导入失败：这份数据在当前版本没有可用的皮肤，未做任何改动') : t('导入失败：里面没有有效的皮肤条目') };
   }
   return { ok: true, skins: clean, dropped, raw };
 }

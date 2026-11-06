@@ -947,6 +947,22 @@ export function validateClientResult(spec, raw, { gd = null } = {}) {
       if (unspawned.length > B.spawnCount) return bad('unspawned');
       if (unspawned.length) result.unspawned = unspawned;
     }
+    // 悬赏卡回执（2026-11-06）：客户端跑战斗时把「这一场打掉了哪几张悬赏卡」报回来。
+    // 只接受 spec 里真有的那几张卡的 id（伪造的整份结果会被拒、转服务端复算），去重后带进结果。
+    if (Array.isArray(raw.bountyPaid) && raw.bountyPaid.length) {
+      const allowedBounty = new Set();
+      for (const s of spec.spawns || []) {
+        const id = s && s.mods && s.mods.bountyId;
+        if (id != null) allowedBounty.add(String(id));
+      }
+      if (!allowedBounty.size) return bad('bounty');
+      const paid = [];
+      for (const id of raw.bountyPaid) {
+        if (typeof id !== 'string' || !allowedBounty.has(id)) return bad('bounty');
+        if (!paid.includes(id)) paid.push(id);
+      }
+      if (paid.length) result.bountyPaid = paid;
+    }
     return { ok: true, result };
   } catch (e) {
     return bad(`exception: ${e && e.message}`);
