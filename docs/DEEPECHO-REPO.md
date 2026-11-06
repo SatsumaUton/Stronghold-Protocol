@@ -27,7 +27,6 @@
 
 ```
 server/match/match/echo*.js          深潜的回合/祝福/诅咒/词条/悬赏/波次/投影/配置
-server/echoTesters.js                深潜测试名单
 public/js/ui/echo*.js                深潜的界面块（状态条、祝福、buff、印记、投影、补给）
 public/js/ui/enemyRecords.js         跨版本敌人名字/图标（深潜带旧版本敌人）
 public/js/screens/echoLobby.js       深潜大厅

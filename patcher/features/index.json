@@ -6579,11 +6579,6 @@
         "customBytes": 27779
       },
       {
-        "path": "matchmaker/account.cjs",
-        "baseExists": false,
-        "customBytes": 124639
-      },
-      {
         "path": "matchmaker/diveBoard.cjs",
         "baseExists": false,
         "customBytes": 6929
@@ -6596,7 +6591,7 @@
       {
         "path": "matchmaker/public/admin.html",
         "baseExists": false,
-        "customBytes": 88503
+        "customBytes": 87324
       },
       {
         "path": "matchmaker/public/client.js",
@@ -6656,22 +6651,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 229720
+        "customBytes": 229460
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 265733
+        "customBytes": 265436
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 255089
+        "customBytes": 254724
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 218287
+        "customBytes": 218023
       },
       {
         "path": "public/js/assets.js",
@@ -6696,7 +6691,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 122273
+        "customBytes": 120864
       },
       {
         "path": "public/js/screens/result.js",
@@ -6839,11 +6834,6 @@
         "customBytes": 18465
       },
       {
-        "path": "server/echoTesters.js",
-        "baseExists": false,
-        "customBytes": 2006
-      },
-      {
         "path": "server/http/routes.js",
         "baseExists": false,
         "customBytes": 18302
@@ -6851,7 +6841,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": false,
-        "customBytes": 278984
+        "customBytes": 276808
       },
       {
         "path": "server/match/Match.js",
@@ -7034,11 +7024,6 @@
         "customBytes": 43018
       },
       {
-        "path": "server/net.js",
-        "baseExists": false,
-        "customBytes": 51340
-      },
-      {
         "path": "server/persist/index.js",
         "baseExists": false,
         "customBytes": 2942
@@ -7102,11 +7087,6 @@
         "path": "server/sim/simdata.js",
         "baseExists": false,
         "customBytes": 47267
-      },
-      {
-        "path": "shared/constants.js",
-        "baseExists": false,
-        "customBytes": 25711
       },
       {
         "path": "shared/protocol.js",

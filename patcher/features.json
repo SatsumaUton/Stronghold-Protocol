@@ -438,7 +438,6 @@
       "files": [
         "dashboard/public/app.js",
         "dashboard/public/index.html",
-        "matchmaker/account.cjs",
         "matchmaker/diveBoard.cjs",
         "matchmaker/openRooms.cjs",
         "matchmaker/public/admin.html",
@@ -490,7 +489,6 @@
         "public/js/ui/shopBar.js",
         "public/js/ui/stats.js",
         "public/js/ui/watchBonds.js",
-        "server/echoTesters.js",
         "server/http/routes.js",
         "server/lobby.js",
         "server/match/Match.js",
@@ -529,7 +527,6 @@
         "server/match/results.js",
         "server/match/snapshot.js",
         "server/match/waves.js",
-        "server/net.js",
         "server/persist/index.js",
         "server/persist/lobbyState.js",
         "server/sim/Battle.js",
@@ -543,7 +540,6 @@
         "server/sim/content/garrisons/meta.js",
         "server/sim/content/support/index.js",
         "server/sim/simdata.js",
-        "shared/constants.js",
         "shared/protocol.js"
       ],
       "tests": [

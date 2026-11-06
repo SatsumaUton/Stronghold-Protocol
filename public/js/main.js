@@ -253,8 +253,6 @@ function onWelcome(msg) {
     // 本服：管理员工具入口开关（服务端 net.js 验签后下发；普通玩家永远拿不到这个键）
     adminTools: msg.adminTools === true,
     adminId: msg.adminId === true,
-    // \u6df1\u6e0a\u56de\u54cd\u6d4b\u8bd5\u540d\u5355\uff08\u7ba1\u7406\u5458\u4e5f\u4e3a true\uff09
-    echoTester: msg.echoTester === true,
     gameTool: msg.gameTool === true,   // 权限门：有没有 tools.game 权限
     adminCode: msg.adminCode === true,
     // the official versions the server enables (protocol §2; absent: the switch is off — versions.js)
