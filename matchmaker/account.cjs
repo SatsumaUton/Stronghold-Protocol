@@ -112,6 +112,7 @@ function userTokenFor(u, perms) {
     typ: 'user',
     uid: u.id,
     role: u.role || 'player',
+    echoTester: echoTesterFor(u.id),
     tag: u.tag || null,
     // 称号（维护者 2026-11-07）：后台可自定义，所以把显示信息一起带上（节点不需要查库）
     title: (() => { const r = titleRowSync(u.title); return r ? { id: r.id, name: r.name, tone: r.tone || 'echo', desc: r.descr || '' } : null; })(),
