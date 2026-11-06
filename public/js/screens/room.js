@@ -690,23 +690,25 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
                 disabled=${!!busy || !canEdit} onClick=${() => { setCapOpen(false); canEdit && setHpPlan(hpPlan ? null : [[1, enemyHp]]); }}>
               <${Icon} name="check" class=${hpPlan ? 'is-on' : ''} />${t('按回合设置')}
             </button>
-            ${hpPlan ? html`<span class="exp-hpplan__rows">
-              ${hpPlan.map(([from, mul], i) => html`<span key=${i} class="exp-hpplan__row">
-                <span class="t-dim">${t('第')}</span>
+            ${hpPlan ? html`<div class="exp-hpplan__rows">
+              ${hpPlan.map(([from, mul], i) => html`<div key=${i} class="exp-hpplan__row">
+                <span class="exp-hpplan__lbl">${t('第')}</span>
                 <input type="number" min="1" max="20" value=${from} disabled=${!!busy || !canEdit || i === 0}
                   onInput=${(e) => { const v = Math.max(1, Math.min(20, Number(e.currentTarget.value) || 1)); setHpPlan(hpPlan.map((s, j) => (j === i ? [v, s[1]] : s))); }} />
-                <span class="t-dim">${t('回合起')}</span>
-                <select value=${String(mul)} disabled=${!!busy || !canEdit}
-                  onChange=${(e) => { const v = Number(e.currentTarget.value); setHpPlan(hpPlan.map((s, j) => (j === i ? [s[0], v] : s))); }}>
-                  ${ENEMY_MULTIPLIERS.map((m) => html`<option key=${m} value=${String(m)}>×${m}</option>`)}
-                </select>
-                ${i > 0 ? html`<button type="button" class="btn btn--ghost btn--sm" disabled=${!!busy || !canEdit}
+                <span class="exp-hpplan__lbl">${t('回合起')}</span>
+                <span class="exp-hpplan__pick">
+                  <select value=${String(mul)} disabled=${!!busy || !canEdit}
+                    onChange=${(e) => { const v = Number(e.currentTarget.value); setHpPlan(hpPlan.map((s, j) => (j === i ? [s[0], v] : s))); }}>
+                    ${ENEMY_MULTIPLIERS.map((m) => html`<option key=${m} value=${String(m)}>×${m}</option>`)}
+                  </select>
+                </span>
+                ${i > 0 ? html`<button type="button" class="exp-hpplan__del" aria-label=${t('删除')} disabled=${!!busy || !canEdit}
                   onClick=${() => setHpPlan(hpPlan.filter((_, j) => j !== i))}>×</button>` : null}
-              </span>`)}
-              ${hpPlan.length < 6 ? html`<button type="button" class="btn btn--secondary btn--sm" data-testid="exp-hp-plan-add"
+              </div>`)}
+              ${hpPlan.length < 6 ? html`<button type="button" class="exp-hpplan__add" data-testid="exp-hp-plan-add"
                 disabled=${!!busy || !canEdit}
                 onClick=${() => setHpPlan([...hpPlan, [Math.min(20, (hpPlan[hpPlan.length - 1][0] || 1) + 5), hpPlan[hpPlan.length - 1][1]]])}>${t('＋ 添加一段')}</button>` : null}
-            </span>` : null}
+            </div>` : null}
           </div>` : null}
         </div>
         <div class="exp-mul">

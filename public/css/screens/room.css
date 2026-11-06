@@ -1064,6 +1064,123 @@
   border-color: color-mix(in srgb, var(--mint-400) 55%, var(--line-2));
   box-shadow: inset 0 -2px 0 var(--mint-400);
 }
+/* 【按回合设置】的分段编辑器（维护者 2026-11-07：「排版有点难看」）。
+   以前这里没有任何样式：每段是 inline <span>，里面是浏览器默认的 number / select，
+   与旁边的倍率芯片完全不是一套语言，几段挤在一行、「×」还漂在最右边。
+   现在：开关下面是一块缩进的分段面板（左侧薄荷竖线 + 深色底），
+   每段一行「第 [N] 回合起 [×M ▾] ×」，输入框与下拉都按面板的芯片语言重画。 */
+.exp-hpplan {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .08rem;
+  width: 100%;
+  margin-top: .02rem;
+}
+.exp-hpplan__rows {
+  display: flex;
+  flex-direction: column;
+  gap: .05rem;
+  width: 100%;
+  padding: .08rem .08rem .08rem .12rem;
+  border-left: 2px solid color-mix(in srgb, var(--mint-400) 40%, transparent);
+  background: rgba(0, 0, 0, .16);
+}
+.exp-hpplan__row { display: flex; align-items: center; gap: .06rem; min-width: 0; }
+.exp-hpplan__lbl {
+  flex: none;
+  font-size: calc(.14 * var(--t));
+  color: var(--text-lo);
+  white-space: nowrap;
+}
+/* 回合数：等宽居中，去掉浏览器自带的上下箭头（那两个小三角在深色面板上很脏） */
+.exp-hpplan input[type='number'] {
+  width: 2.4em;
+  padding: .02rem;
+  font: inherit;
+  font-size: calc(.14 * var(--t));
+  text-align: center;
+  color: var(--text-hi);
+  background: rgba(0, 0, 0, .45);
+  border: 1px solid var(--line-2);
+  border-radius: 2px;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.exp-hpplan input[type='number']::-webkit-outer-spin-button,
+.exp-hpplan input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.exp-hpplan input[type='number']:disabled { opacity: .6; }
+/* 倍率：与芯片同色，自己画一个小箭头（原生 select 的箭头在深色面板上几乎看不见） */
+.exp-hpplan__pick { position: relative; display: inline-flex; flex: none; }
+.exp-hpplan__pick::after {
+  content: '';
+  position: absolute;
+  right: .09rem;
+  top: 50%;
+  width: .05rem;
+  height: .05rem;
+  margin-top: -.04rem;
+  border-right: 1.5px solid var(--text-lo);
+  border-bottom: 1.5px solid var(--text-lo);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.exp-hpplan select {
+  min-width: .74rem;
+  padding: .02rem .26rem .02rem .1rem;
+  font: inherit;
+  font-size: calc(.14 * var(--t));
+  color: var(--text-hi);
+  background: rgba(0, 0, 0, .45);
+  border: 1px solid var(--line-2);
+  border-radius: 2px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.exp-hpplan input[type='number']:hover:not(:disabled),
+.exp-hpplan select:hover:not(:disabled) { border-color: var(--mint-400); }
+.exp-hpplan input[type='number']:focus-visible,
+.exp-hpplan select:focus-visible {
+  outline: none;
+  border-color: var(--mint-400);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--mint-400) 45%, transparent);
+}
+/* 删除这一段：小方块，悬停变红（与面板里其它「危险动作」一致） */
+.exp-hpplan__del {
+  flex: none;
+  margin-left: auto;
+  width: .24rem;
+  height: .24rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: calc(.18 * var(--t));
+  line-height: 1;
+  color: var(--text-lo);
+  background: rgba(0, 0, 0, .3);
+  border: 1px solid var(--line-2);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.exp-hpplan__del:hover:not(:disabled) { color: #ff8a8a; border-color: #ff8a8a; }
+.exp-hpplan__del:disabled { opacity: .45; cursor: default; }
+/* 添加一段：虚线框，读起来像「这里还能加」，不用实心按钮抢视线 */
+.exp-hpplan__add {
+  align-self: flex-start;
+  margin-top: .01rem;
+  padding: .03rem .14rem;
+  font: inherit;
+  font-size: calc(.14 * var(--t));
+  color: var(--text-md);
+  background: transparent;
+  border: 1px dashed var(--line-2);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.exp-hpplan__add:hover:not(:disabled) { color: var(--mint-400); border-color: var(--mint-400); }
+.exp-hpplan__add:disabled { opacity: .5; cursor: default; }
 .exp-cap { position: relative; display: inline-flex; }
 .exp-cap__btn { min-width: 1.5rem; justify-content: space-between; }
 .exp-cap__arrow { width: .14rem; height: .14rem; transform: rotate(90deg); transition: transform var(--t-fast); }
