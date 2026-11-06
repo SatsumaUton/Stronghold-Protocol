@@ -621,6 +621,43 @@
 }
 .proto__body[data-mode="deepecho"] .proto-start.proto-start--alt:hover:not(:disabled) { filter: brightness(1.14); box-shadow: 0 0 .16rem rgba(125, 91, 214, .45); }
 .proto-start--alt:disabled { filter: grayscale(.4) brightness(.8); cursor: default; }
+/* 「进别人的房」一行（维护者 2026-11-07）：深潜房号 + 观战深潜 / 加入深潜。
+   直接复用同盟界面的 .ally-key（同一条输入条的语言：图标 + 房号 + 右侧小按钮），
+   只把外边距、底色和描边换成深潜主题；加入按钮是这一行唯一的实心块，和上面的主按钮同色系。 */
+.ally-key.proto-key {
+  height: max(.5rem, 30px, calc(34px * var(--sp-ui, 1)));
+  margin: .1rem 0 0;
+  background: rgba(11, 6, 22, .6);
+  border-color: rgba(183, 156, 255, .35);
+}
+.ally-key.proto-key:focus-within { border-color: rgba(183, 156, 255, .85); }
+.proto-key .ally-key__spec {
+  color: #d7c9f5;
+  background: rgba(90, 58, 168, .3);
+  border-color: rgba(183, 156, 255, .4);
+}
+.proto-key .ally-key__spec:hover:not(:disabled),
+.proto-key .ally-key__spec:focus-visible { border-color: rgba(183, 156, 255, .9); color: #fff; }
+.proto-key__join {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: .04rem;
+  height: 80%;
+  padding: 0 .16rem;
+  font: inherit;
+  font-size: calc(.15 * var(--t));
+  font-weight: 700;
+  color: #f4f0ff;
+  background: linear-gradient(160deg, rgba(138, 103, 224, .85), rgba(90, 58, 168, .9));
+  border: 1px solid rgba(183, 156, 255, .6);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.proto-key__join:hover:not(:disabled) { filter: brightness(1.12); }
+.proto-key__join:disabled { opacity: .45; cursor: default; }
+.proto-key__join .icon, .proto-key .ally-key__spec .icon { width: 1.1em; height: 1.1em; }
 .echo-stats { display: flex; gap: .12rem; }
 .echo-stat {
   flex: 1 1 0; display: flex; flex-direction: column; gap: .02rem;
@@ -1858,6 +1895,11 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   font-variant-numeric: tabular-nums; }
 .rlist__seats i { margin: 0 .01rem; font-style: normal; color: #858b89; }
 .rlist__join { min-height: .34rem; padding-inline: .1rem; white-space: nowrap;
+  font-size: max(calc(.15 * var(--t)), 13px); }
+/* 一行两个动作（观战 + 加入，维护者 2026-11-07）：包在一个网格单元里，
+   这样「有观战 / 没观战」两种列表的行不会因为列数变化而错位。 */
+.rlist__actions { display: inline-flex; align-items: center; gap: .06rem; justify-self: end; }
+.rlist__spec { min-height: .34rem; padding-inline: .1rem; white-space: nowrap;
   font-size: max(calc(.15 * var(--t)), 13px); }
 .rlist__note { display: flex; align-items: center; justify-content: center; gap: .08rem; margin: .18rem 0;
   font-size: max(calc(.16 * var(--t)), 13px); color: #858b89; }
