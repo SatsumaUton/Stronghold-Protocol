@@ -2906,5 +2906,9 @@
   "「深渊回响」不支持实验性功能（固定最多 4 人）": "“Abyss Echo” does not support experimental features (fixed at most 4 players)",
   "全新玩法": "NEW MODE",
   "深潜匹配池固定 4 人 · 标准规则，只会和深潜房配对": "The dive pool is fixed at 4 players with standard rules; it only pairs with dive rooms",
-  "深潜匹配": "Dive matchmaking"
+  "深潜匹配": "Dive matchmaking",
+  "祭坛 16 层起开放": "Altar opens at layer 16",
+  "祭坛本层未开放": "The altar is closed this layer",
+  "第 {d} 层起开放：每 3 层必开一次，其余层随机。": "Opens from layer {d}: guaranteed every 3 layers, random on the others.",
+  "本层未开放：每 3 层必开一次，其余层随机。": "Closed this layer: guaranteed every 3 layers, random on the others."
 }
