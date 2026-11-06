@@ -111,3 +111,43 @@ test('提示：没有合格队友时是 no-helper 而不是 donor-lp', (t) => {
   const reason = m._revivalDeathReason(victim);
   assert.equal(reason, 'no-helper', '没有合格队友');
 });
+
+// 维护者 2026-11-06：深潜取消「每人每局只能被救一次」——只要条件满足就能反复救。
+// 普通房间仍是一命一次（上一条用例钉住）。
+test('深潜：救援不限次数，同一队友可以反复救回', (t) => {
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 7, fake: true, variant: 'deepecho' }).start().toPrep(1);
+  t.after(() => h.m.dispose());
+  const m = h.m;
+  const donor = h.ps('p_0');
+  const victim = h.ps('p_1');
+  assert.equal(m.revivalUnlimited, true, '深潜必须开启不限次数');
+  m.revivalEnabled = true;
+  m.phase = PHASE.SETTLE;
+  m.ended = false;
+  m.teamLp = null;
+  m._revival = { round: m.round, eligible: new Set([donor.playerId]), windowOpen: true, deadline: m.sched.now() + 15000 };
+  donor.alive = true;
+  donor.left = false;
+  donor.lp = 40;
+
+  for (let n = 1; n <= 3; n++) {
+    victim.alive = false;
+    victim.pendingDeath = true;
+    victim.left = false;
+    victim.lp = 0;
+    const r = m.revive(donor, { playerId: victim.playerId, round: m.round, matchId: m.battlePrefix });
+    assert.deepEqual(r, { ok: true }, `第 ${n} 次救援应当成功`);
+    assert.equal(victim.alive, true);
+    assert.equal(victim.lp, 1, '每次都回到 1 点生命');
+    assert.equal(victim.revivedCount, n, `复活次数应当累计到 ${n}`);
+    assert.equal(donor.lp, 40 - REVIVAL_COST * (n - 1) - REVIVAL_COST, '每次扣 10 点');
+  }
+
+  // 施救者自己没血了就不再能救 —— 上限是「生命值」，不是次数
+  donor.lp = REVIVAL_MIN_DONOR_LP - 1;
+  victim.alive = false;
+  victim.pendingDeath = true;
+  victim.lp = 0;
+  const r2 = m.revive(donor, { playerId: victim.playerId, round: m.round, matchId: m.battlePrefix });
+  assert.equal(r2.ok, undefined, '付不起时仍然拒绝');
+});

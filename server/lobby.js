@@ -1698,7 +1698,15 @@ case 'room.list': return this.roomList(msg);
     }
     const cur = this.roomOf(session);
     // idempotent for members; a spectator of this room goes on below: it may take a free player seat (header)
-    if (cur === room && !room.spectatorOf(session.playerId)) { this.sendState(room, session); return OK; }
+    // ★ 2026-11-06：**只有真的坐着**才算 idempotent。若会话仍挂在本房间、座位却已经没了
+    //   （dedupeSeats 收敛 / 同账号接管 / 释放），旧代码在这里直接 return OK，于是玩家变成
+    //   「在房间里但没有座位」：点准备时 room.seatOf() 返回 null，ready() 直接抛 TypeError，
+    //   客户端只看到一句没头没尾的「准备失败」。实测症状就是「一个人占两个座位，另一个人准备不了」。
+    //   现在没座位就继续往下走：能接管自己的旧座位就接管，否则重新落座（满员照常报 ROOM_FULL）。
+    if (cur === room && !room.spectatorOf(session.playerId) && room.seatOf(session.playerId)) {
+      this.sendState(room, session);
+      return OK;
+    }
     // ★ 2026-10-31 维护者要求：被踢出的人不能自己加回来。
     //   按**账号**判断（重连会换 playerId，按 playerId 记等于没记）。
     //   放行条件只有两个：房主主动邀请（invited 标记）或管理员——这里只做前者，
@@ -1965,13 +1973,29 @@ case 'room.list': return this.roomList(msg);
     if (room.spectatorOf(session.playerId)) return fail(ERR.SPECTATOR);
     if (room.match) return fail(ERR.ROOM_STARTED);
     this.dropReplay(room, session.playerId);
-    const seat = room.seatOf(session.playerId);
+    let seat = room.seatOf(session.playerId);
+    // ★ 2026-11-06：会话在房间里却没有座位时，旧代码会在这里抛 TypeError（seat 为 null），
+    //   客户端只拿到一句「准备失败」，看着像按钮坏了。现在：还没开局 + 有空格就自动补座；
+    //   补不了（房间满了）才给一句能看懂的错误，让玩家重新进房。
+    let reseated = false;
+    if (!seat) {
+      const idx = room.freeSeat();
+      if (idx < 0) return fail(ERR.NOT_IN_ROOM, '你已不在座位上，请重新加入房间');
+      seat = this.humanSeat(idx, session, room);
+      room.seats[idx] = seat;
+      session.roomCode = room.code;
+      if (!room.hostId) room.hostId = session.playerId;
+      this.dedupeSeats(room, session);
+      seat = room.seatOf(session.playerId) || seat;
+      reseated = true;
+    }
     // a room with gameplay plugins: ready once the page has loaded and checked its content (header "Gameplay plugins")
     if (ready && room.needsContent && seat.content !== 'ready') return fail(ERR.CONTENT_NOT_READY);
     if (seat.ready !== ready) {
       seat.ready = ready;
-      this.broadcastState(room);
+      reseated = true;
     }
+    if (reseated) this.broadcastState(room);
     return OK;
   }
 
@@ -4134,6 +4158,10 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       const seat = room.seats[i];
       room.seats[i] = null;
       removed++;
+      // ★ 2026-11-06：座位没了，会话就不能再算「在房间里」—— 否则它变成「在房间里但没有座位」
+      //   的幽灵会话，之后点准备会在 ready() 里撞到 null。
+      const gone = seat && seat.playerId ? this.registry.byId(seat.playerId) : null;
+      if (gone && gone.roomCode === room.code) gone.roomCode = null;
       this.log.info(`[lobby] ${room.code} 清除同账号重复座位 seat ${i}（${seat.name}），保留 seat ${keep}`);
     }
     if (removed) {

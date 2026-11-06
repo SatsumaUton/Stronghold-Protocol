@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 222955
+        "customBytes": 224456
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 258228
+        "customBytes": 259946
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 247748
+        "customBytes": 249396
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 211869
+        "customBytes": 213357
       },
       {
         "path": "public/js/render/units.js",
@@ -6696,12 +6696,12 @@
       {
         "path": "public/js/ui/bondStrip.js",
         "baseExists": false,
-        "customBytes": 18730
+        "customBytes": 20270
       },
       {
         "path": "public/js/ui/detailPanel.js",
         "baseExists": false,
-        "customBytes": 71286
+        "customBytes": 73898
       },
       {
         "path": "public/js/ui/echoBlessing.js",
@@ -6726,7 +6726,7 @@
       {
         "path": "public/js/ui/echoStatus.js",
         "baseExists": false,
-        "customBytes": 11460
+        "customBytes": 12895
       },
       {
         "path": "public/js/ui/echoSupply.js",
@@ -6791,7 +6791,7 @@
       {
         "path": "public/js/ui/revival.js",
         "baseExists": false,
-        "customBytes": 5464
+        "customBytes": 6091
       },
       {
         "path": "public/js/ui/roomList.js",
@@ -6821,12 +6821,12 @@
       {
         "path": "server/lobby.js",
         "baseExists": false,
-        "customBytes": 277104
+        "customBytes": 279003
       },
       {
         "path": "server/match/Match.js",
         "baseExists": false,
-        "customBytes": 67274
+        "customBytes": 67848
       },
       {
         "path": "server/match/PlayerState.js",
@@ -6906,7 +6906,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 170900
+        "customBytes": 175732
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -6921,7 +6921,7 @@
       {
         "path": "server/match/match/echoWords.js",
         "baseExists": false,
-        "customBytes": 12230
+        "customBytes": 15304
       },
       {
         "path": "server/match/match/intents.js",
@@ -6966,7 +6966,7 @@
       {
         "path": "server/match/match/views.js",
         "baseExists": false,
-        "customBytes": 32234
+        "customBytes": 32580
       },
       {
         "path": "server/match/player/economy.js",
@@ -7036,7 +7036,12 @@
       {
         "path": "server/sim/battle/echoRules.js",
         "baseExists": false,
-        "customBytes": 13920
+        "customBytes": 15972
+      },
+      {
+        "path": "server/sim/battle/players.js",
+        "baseExists": false,
+        "customBytes": 14531
       },
       {
         "path": "server/sim/battle/spawns.js",
@@ -7061,7 +7066,7 @@
       {
         "path": "shared/protocol.js",
         "baseExists": false,
-        "customBytes": 56991
+        "customBytes": 57093
       }
     ]
   }

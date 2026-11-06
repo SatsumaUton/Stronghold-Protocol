@@ -18,6 +18,35 @@ import { startColdWind } from '../content/devices.js';
 import { spawnYanyou } from '../content/tokens.js';
 
 /**
+ * 这只刚生成的敌人是不是**召唤物**（维护者 2026-11-06：侵蚀词条只挂本体，召唤物一律不吃）。
+ *
+ * 为什么必须排除：召唤物是本体的一部分（首领的分体、只会跟着本体出现的敌人），它们本来就按本体的
+ * 强度结算；词条再叠一遍生命 / 护盾 / 防御，同一条词条就收了两次费。其中一批还是「打几下就碎」的
+ * 频次怪（器物类），被护盾 + 巨兽一叠就彻底打不动 —— 玩家反馈的「召唤物打不死」就是这里。
+ *
+ * 判定（任一命中即是）：
+ *   * `tag === 'part'`：首领分体（胄的双手、铳的部件…），出怪时就带这个 tag；
+ *   * `def.tokenOnly`：数据里只能被召唤出来的敌人；
+ *   * 键名 `token_*`：数据侧另一套召唤物命名；
+ *   * `keys`：spec 下发的召唤物名单（Match 侧 `echoSummonOnly(gd)`：tokenOnly + 别人的 `summons`
+ *     目标 + 波次里 tag:part 的分体）——这是这套代码里「召唤物」的既有定义，出怪处也用它。
+ *
+ * @param {any} enemy 刚生成的单位
+ * @param {Set<string>|null} [keys] spec 下发的召唤物键集合
+ * @returns {boolean}
+ */
+export function isEchoSummon(enemy, keys = null) {
+  if (!enemy) return false;
+  if (enemy.tag === 'part' || enemy.tag === 'summon') return true;
+  const def = enemy.def || null;
+  if (def && def.tokenOnly === true) return true;
+  const key = enemy.defId ?? (def && def.key) ?? null;
+  if (typeof key !== 'string') return false;
+  if (key.startsWith('token_')) return true;
+  return !!(keys && typeof keys.has === 'function' && keys.has(key));
+}
+
+/**
  * 装上 spec 带来的深潜战斗规则。幂等（同一个 battle 调两次不会重复挂）。
  * @param {import('../Battle.js').Battle} battle
  * @returns {number} 装上的规则组数（诊断 / 测试用）
@@ -30,12 +59,16 @@ export function installEchoRules(battle) {
 
   const words = Array.isArray(rules.words) ? rules.words.filter((w) => w && w.key) : [];
   const debuffs = Array.isArray(rules.enemyDebuffs) ? rules.enemyDebuffs.filter((d) => d && d.key && d.mods) : [];
+  // 召唤物名单（spec `summonKeys`）：词条只挂本体，见 isEchoSummon
+  const summonKeys = new Set((Array.isArray(rules.summonKeys) ? rules.summonKeys : []).filter((k) => typeof k === 'string'));
   if (words.length || debuffs.length) {
     battle.on('enemySpawn', ({ enemy }) => {
       if (!enemy || enemy.alive === false || typeof battle.addBuff !== 'function') return;
       const have = new Set((enemy.buffs || []).map((b) => (b && b.key) || null).filter(Boolean));
+      // 召唤物不吃侵蚀词条（维护者 2026-11-06）；祝福的对敌异常（debuffs）照旧
+      const wordList = isEchoSummon(enemy, summonKeys) ? [] : words;
       const seen = new Map();
-      for (const w of words) {
+      for (const w of wordList) {
         // 同一条词条出现多次（深层允许重复）→ key 加序号，mods 会叠加（与 Match 层的老实现一致）
         const k = seen.get(w.key) || 0;
         seen.set(w.key, k + 1);

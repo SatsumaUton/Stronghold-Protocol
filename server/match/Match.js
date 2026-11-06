@@ -469,6 +469,9 @@ export class Match {
     // 维护者 2026-11-05：**只有深潜**放宽救援（任何存活队友都能付 10 血救 1 血）。
     // 普通房间保持原版口径（必须进过联防）—— 不能因为深潜的开关影响普通模式。
     this.revivalAnyDonor = this.echoVariant === 'deepecho' && !this.isSolo;
+    // 维护者 2026-11-06：深潜**取消「每人每局只能被救一次」** —— 只要救援窗口开着、有队友付得起 10 点，
+    // 就能反复把人救回来（真正的上限是队友自己的生命值）。普通房间保持原版的一次性规则。
+    this.revivalUnlimited = this.echoVariant === 'deepecho' && !this.isSolo;
     this.disableSharedPool = !this.isSolo && this.experimental.disableSharedPool;
     this.playerCapacity = roomCapacity(this.isSolo ? 'solo' : this.mode, this.experimental);
     this.capacityExperiment = !this.isSolo && this.playerCapacity > 4;
@@ -839,11 +842,12 @@ export class Match {
       && this._revival?.round === this.round && this._revival.eligible.has(ps.playerId));
   }
 
-  revivalTargetEligible(ps) { return !!(ps && ps.pendingDeath && !ps.alive && !ps.left && !ps.revived); }
+  revivalTargetEligible(ps) { return !!(ps && ps.pendingDeath && !ps.alive && !ps.left && (this.revivalUnlimited || !ps.revived)); }
 
   _revivalDeathReason(ps) {
     if (ps.left) return 'left';
-    if (ps.revived) return 'already-used';
+    // 深潜不限次数：救过的人再倒，仍然可以救（普通房间还是一命一次）
+    if (ps.revived && !this.revivalUnlimited) return 'already-used';
     if (!this.revivalEnabled) return 'disabled';
     if (this.teamLp != null || this.ended || this.disposed) return 'match-ended';
     // 判断「本轮到底有没有人能付救援」，口径必须和客户端看到的一致。
@@ -910,6 +914,7 @@ export class Match {
     if (target && !target.alive && !target.pendingDeath && !target.left && !target.revived) return { error: ERR.BAD_TARGET, detail: 'revival-target-finalized' };
     if (target === ps || !this.revivalTargetEligible(target)) return { error: ERR.BAD_TARGET, detail: 'revival-target-ineligible' };
     target.revived = true;
+    target.revivedCount = (Number(target.revivedCount) || 0) + 1;
     target.alive = true;
     target.pendingDeath = false;
     target.revivalUnavailableReason = null;

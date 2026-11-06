@@ -34,6 +34,11 @@ export class BattlePlayers {
       bonds: clone(p.bonds ?? {}),
       bandId: p.bandId ?? null,
       playerEffects: clone(p.playerEffects ?? []),
+      // 「盟约投影」（深渊回响，维护者 2026-11-05）：输入带这个字段时，场上每个己方干员都算该核心盟约的成员
+      // （support/index.js `unitBonds` 读 `u.player.projectedBond`）。2026-11-06 修：这里以前没把字段抄进
+      // 玩家态，于是「全场按成员生效」只在 UI / bonds 快照上成立，战斗里其实一次都没生效。
+      // 普通房 / golden 的输入没有这个键 → null，`unitBonds` 的 key 与行为逐字节不变。
+      projectedBond: typeof p.projectedBond === 'string' && p.projectedBond ? p.projectedBond : null,
       lpForBoss: p.lpForBoss ?? null,
       dp: this.flags.dpInit,
       units: [],
