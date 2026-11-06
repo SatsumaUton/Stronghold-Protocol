@@ -536,6 +536,8 @@ export function HubEntry({ card, onOpen, timePoint = null, timeShort = null, loc
       <span class="hub-entry__name">${t(card.name)}</span>
       ${/* 未开放：右上角一条横幅；按钮本身 disabled + 灰色（无权限的人点不动） */ null}
       ${locked ? html`<span class="hub-entry__ribbon">${t('暂未开放')}</span>` : null}
+      ${/* 「全新玩法」角标（维护者 2026-11-06）：只贴在**能点**的深渊回响卡右上角，斜着放；锁住时保持原样 */ null}
+      ${!locked && card.id === 'deepecho' ? html`<span class="hub-entry__new">${t('全新玩法')}</span>` : null}
       <span class="hub-entry__corner" aria-hidden="true"></span>
     </button>
   </div>`;

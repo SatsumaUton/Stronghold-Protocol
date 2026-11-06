@@ -2034,3 +2034,27 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .echo-codexbtn__sub { display: none; }
   .echo-codex__list { grid-template-columns: 1fr; max-height: 50vh; }
 }
+/* ---- 「全新玩法」角标（维护者 2026-11-06）----
+   只出现在**能点**的深渊回响卡上（锁住时走 .hub-entry__ribbon「暂未开放」），斜贴在右上角。
+   pointer-events: none：角标不吃点击，整张卡仍然是一个按钮。 */
+.hub-entry__new {
+  position: absolute; top: .02rem; right: -.02rem;
+  transform: rotate(11deg) translateY(-8%);
+  transform-origin: right top;
+  padding: .045rem .14rem .05rem;
+  font-size: calc(.108 * var(--t)); font-weight: 900; letter-spacing: .06em; line-height: 1.1;
+  color: #1a0b2e;
+  background: linear-gradient(120deg, #ffd76a 0%, #ff9ad5 55%, #b79cff 100%);
+  border-radius: .05rem;
+  box-shadow: 0 .02rem .12rem rgba(183, 156, 255, .55), inset 0 0 0 1px rgba(255, 255, 255, .35);
+  pointer-events: none;
+  z-index: 2;
+  animation: hub-new-pulse 2.4s ease-in-out infinite;
+}
+@keyframes hub-new-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-entry__new { animation: none; }
+}

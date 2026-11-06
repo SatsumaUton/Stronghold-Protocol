@@ -587,17 +587,16 @@ export class Match {
     /**
      * client-side combat (DESIGN §14) — see the header.
      *
-     * 「深渊回响」**一律在服务端模拟**（2026-11-06 修）。原因：深潜的战斗效果——侵蚀词条、祝福的属性/攻速、
-     * 对敌异常、主题转化、反震、霜噬、惊惧、震荡、鲸吞、朔风、炎佑、照破、祭坛与补给加成、干员减益诅咒——
-     * 全部由 `_echoHookBattle` 在**服务端那份 battle** 上挂事件钩子实现。客户端按 BattleSpec 重建的战斗
-     * 没有这些钩子（spec 只带 spawns/routes/flags…），而 `SP_COMBAT` 未设时深潜默认就是客户端跑，
-     * 于是玩家看到「侵蚀词条没效果」「部分祝福不生效」（2026-11-06 实报）。
-     * 终局是把这些效果搬进 spec flags（参照 `revealAll`），但那要重做 sim 的效果注入层；
-     * 在那之前，深潜走服务端模拟，保证客户端看到的与判定用的是同一份战斗。
-     * 想再试客户端跑：环境变量 `SP_ECHO_CLIENT_COMBAT=1`。
+     * 「深渊回响」**恢复客户端跑**（2026-11-06 晚）。历史上它一度被强制在服务端模拟，原因是所有战斗效果
+     * （侵蚀词条 / 祝福 / 主题转化 / 反隐 / 朔风 / 炎佑 / 照破 / 诅咒 DOT）都写在 `_echoHookBattle` 里，
+     * 只挂在服务端那份 battle 上，客户端按 BattleSpec 重建的战斗看不到。
+     * 这些效果现在**全部走 spec**（`flags.echoRules` → `server/sim/battle/echoRules.js`），悬赏回执也随
+     * `b.result` 带回（`bountyPaid`，服务端只认 spec 里真有的卡），所以客户端跑与服务端复算结果一致
+     * （`test/match/echo-client-parity.test.js` 三层验证）。
+     * 需要临时退回服务端模拟：环境变量 `SP_ECHO_CLIENT_COMBAT=0`。
      */
-    const echoClientCombat = String(env('SP_ECHO_CLIENT_COMBAT') || '') === '1';
-    this.clientCombat = this.echoVariant === 'deepecho' && !echoClientCombat
+    const echoServerCombat = String(env('SP_ECHO_CLIENT_COMBAT') || '') === '0';
+    this.clientCombat = this.echoVariant === 'deepecho' && echoServerCombat
       ? false
       : (opts.clientCombat != null ? !!opts.clientCombat : envClientCombat());
     this.verifyMode = parseVerify(opts.verify ?? env('SP_VERIFY'));
