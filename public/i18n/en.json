@@ -2929,4 +2929,19 @@
   "祭坛本层未开放": "The altar is closed this layer",
   "第 {d} 层起开放：每 3 层必开一次，其余层随机。": "Opens from layer {d}: guaranteed every 3 layers, random on the others.",
   "本层未开放：每 3 层必开一次，其余层随机。": "Closed this layer: guaranteed every 3 layers, random on the others."
+,
+  "{name} 发起": "{name} started it",
+  "{name} 已掉线，由 AI 托管其席位。超过半数在线队友同意后，该玩家按中途退出处理：干员回到卡池，不再参与本局。": "{name} is offline and the AI plays their seat. If more than half of the online teammates agree, they are treated as having left: their operators return to the pool and they take no further part in this run.",
+  "撤回": "Withdraw",
+  "发起投票": "Start vote",
+  "反对": "Against",
+  "该玩家掉线由 AI 托管，可发起投票将其移出": "Offline (AI plays the seat) — you can start a vote to remove this teammate",
+  "同意 {agreed}/{need} · 反对 {rejected}": "Yes {agreed}/{need} · No {rejected}",
+  "投票剩余": "Vote time left",
+  "投票移出": "Vote out",
+  "投票移出 {name}": "Vote out {name}",
+  "已反对": "Voted no"
+,
+  "AI 联防置后": "AI last in unite",
+  "联防阶段优先挑选真人博士；AI 队友与托管中的博士排在后面": "In the unite phase, human doctors are picked first; AI teammates and doctors under AI autoplay rank after them."
 }

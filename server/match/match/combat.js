@@ -73,7 +73,7 @@ export class MatchCombat {
       // sim 在出怪处读这个 flag（battle/spawns.js spawnEnemy），客户端/服务端两边逐字节一致。
       ...(this.echoVariant === 'deepecho' && typeof this._echoBlessings === 'function'
         && this._echoBlessings().some((b) => b && b.id === 'reveal_always') ? { revealAll: true } : {}),
-      ...(this.enemyHpMul !== 1 ? { enemyHpMul: this.enemyHpMul } : {}), ...(this.enemyAtkMul !== 1 ? { enemyAtkMul: this.enemyAtkMul } : {}) };
+      ...(this.enemyHpMulAt(this.round) !== 1 ? { enemyHpMul: this.enemyHpMulAt(this.round) } : {}), ...(this.enemyAtkMul !== 1 ? { enemyAtkMul: this.enemyAtkMul } : {}) };
   }
 
   /**
@@ -95,7 +95,8 @@ export class MatchCombat {
     const map = {};
     try {
       for (const k of echoHitCountEnemy(this.gd)) {
-        // 1–15 层：原版血量（baseHp == 需要的次数），同样走绝对覆盖，这样才不会被深度倍率放大
+        // 维护者 2026-11-06：频次类召唤物**永远用数据里的原始血量**（baseHp == 需要被打几下），
+        // 不跟深度缩放、也不再按层给 500–2000 的绝对血量。
         const base = band == null ? Math.max(1, Math.floor(Number(this.gd.enemy(k)?.stats?.maxHp) || 1)) : band;
         map[k] = base;
       }

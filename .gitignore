@@ -143,3 +143,4 @@ test/persist/echo-resume.test.js
 test/content/whitw2-stack.test.js
 test/patcher/deepecho-isolation.test.js
 test/**/*echo*.test.js
+tmp/

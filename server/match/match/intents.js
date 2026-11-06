@@ -202,6 +202,9 @@ export class MatchIntents {
       case 'g.emote': return this.emote(ps, msg.id);
       // playerId: the player tapped (a shared field names two) — the watch preference (item 56)
       case 'g.revive': return this.revive(ps, msg);
+      // 投票移出掉线队友（参考版 GitHub feedback #12 移植）
+      case 'g.kickVote': return this.requestKickVote(ps, msg.targetId);
+      case 'g.kickBallot': return this.answerKickVote(ps, msg.voteId, msg.agree === true);
       case 'g.watch': return this.watch(ps, msg.fieldId, msg.playerId ?? null);
       case 'g.autoplay': return this.setAutoplay(ps, !!msg.on);
       case 'g.pause': return this.setPause(ps, !!msg.on);

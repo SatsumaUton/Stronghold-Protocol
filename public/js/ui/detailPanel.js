@@ -456,8 +456,10 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
     const list = echo && Array.isArray(echo.blessings) ? echo.blessings : null;
     const hit = list && list.find((b) => b && b.projection === true && typeof b.id === 'string');
     if (hit) return { id: hit.id.replace(/^projection:/, ''), name: String(hit.name || '').replace(/^盟约投影\s*·\s*/, ''), desc: hit.desc || '' };
-    const rows = Array.isArray(bonds) ? bonds : [];
-    const row = rows.find((x) => x && x.projected === true && typeof x.bondId === 'string');
+    // bonds 可能是数组（视图）也可能是 { bondId: entry } 的字典，两种都兜住
+    const rows = Array.isArray(bonds) ? bonds : (bonds && typeof bonds === 'object' ? Object.values(bonds) : []);
+    const row = rows.find((x) => x && x.projected === true && (typeof x.bondId === 'string' || typeof x.id === 'string'));
+    if (row) return { id: String(row.bondId || row.id), name: '', desc: '' };
     return row ? { id: row.bondId, name: '', desc: '' } : null;
   })();
   const projectedId = projection && typeof projection.id === 'string' ? projection.id : null;

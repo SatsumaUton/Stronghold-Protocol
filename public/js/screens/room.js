@@ -494,6 +494,8 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
   // 实验性战斗规则（任意模式、任意容量都能开，与人数无关）
   const [layerCapOff, setLayerCapOff] = useState(false);
   const [hitLimitOff, setHitLimitOff] = useState(false);
+  // 【AI 联防置后】：联防优先真人，AI 队友 / 托管中的博士排后
+  const [uniteFirst, setUniteFirst] = useState(false);
   const [enemyHp, setEnemyHp] = useState(1);
   const [enemyAtk, setEnemyAtk] = useState(1);
   // 手动指定卡池编组（shared/poolPlan.js）：null = 用自动规则
@@ -553,6 +555,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       setStackDuck(exp.stackDuckLord === true);
       setLayerCapOff(exp.disableLayerCap === true);
       setHitLimitOff(exp.disableHitLimit === true);
+      setUniteFirst(exp.uniteHumansFirst === true);
       setEnemyHp(isEnemyMultiplier(exp.enemyHpMul) ? exp.enemyHpMul : 1);
       setEnemyAtk(isEnemyMultiplier(exp.enemyAtkMul) ? exp.enemyAtkMul : 1);
       // 卡池编组：房间已有的照搬，没有就从「自动规则会怎么分」开始（编辑器的起点）
@@ -573,6 +576,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       // 实验性战斗规则：关闭时一个键都不写（房间指纹与旧房间保持一致）
       ...(layerCapOff ? { disableLayerCap: true } : {}),
       ...(hitLimitOff ? { disableHitLimit: true } : {}),
+      ...(uniteFirst ? { uniteHumansFirst: true } : {}),
       ...(enemyHp !== 1 ? { enemyHpMul: enemyHp } : {}),
       ...(enemyAtk !== 1 ? { enemyAtkMul: enemyAtk } : {}),
       // 手动指定卡池编组：长度必须等于人数，对不上就不发（服务端也会拒）
@@ -658,6 +662,13 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
             class=${`dpick__opt ailast__opt${hitLimitOff ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
             onClick=${() => { setCapOpen(false); canEdit && setHitLimitOff(!hitLimitOff); }}>
           <${Icon} name="check" class=${hitLimitOff ? 'is-on' : ''} />${t('禁用单次伤害上限')}
+        </button>
+      <//>
+      <${Tooltip} text=${t('联防阶段优先挑选真人博士；AI 队友与托管中的博士排在后面')}>
+        <button type="button" role="switch" aria-checked=${uniteFirst ? 'true' : 'false'} data-testid="exp-unite-humans-first"
+            class=${`dpick__opt ailast__opt${uniteFirst ? ' is-active' : ''}`} disabled=${!!busy || !canEdit}
+            onClick=${() => { setCapOpen(false); canEdit && setUniteFirst(!uniteFirst); }}>
+          <${Icon} name="check" class=${uniteFirst ? 'is-on' : ''} />${t('AI 联防置后')}
         </button>
       <//>
       </div>

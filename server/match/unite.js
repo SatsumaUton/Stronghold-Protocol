@@ -190,9 +190,12 @@ export function helperStats(m, ps, results) {
 export function helperOrder(m, perfects, results) {
   const st = new Map(perfects.map((ps) => [ps.playerId, helperStats(m, ps, results)]));
   const S = (ps) => st.get(ps.playerId);
-  const select = perfects.slice().sort((a, b) => S(b).units - S(a).units || (S(b).active - S(a).active) || S(b).standing - S(a).standing || a.seat - b.seat)
+  // 【AI 联防置后】(维护者 2026-11-06，参考版 uniteHumansFirst)：真人永远排在引擎操作的角色之前
+  // （AI 队友 / 托管中的博士 = ps.botControlled）。开关关闭时恒为 0，排序与原来完全一致。
+  const engine = (ps) => (m?.uniteHumansFirst === true && ps.botControlled ? 1 : 0);
+  const select = perfects.slice().sort((a, b) => engine(a) - engine(b) || S(b).units - S(a).units || (S(b).active - S(a).active) || S(b).standing - S(a).standing || a.seat - b.seat)
     .slice(0, m.gd.unite.maxHelpers);
-  return select.sort((a, b) => S(b).units - S(a).units || (S(b).active - S(a).active) || S(b).layers - S(a).layers || S(b).standing - S(a).standing || a.seat - b.seat);
+  return select.sort((a, b) => engine(a) - engine(b) || S(b).units - S(a).units || (S(b).active - S(a).active) || S(b).layers - S(a).layers || S(b).standing - S(a).standing || a.seat - b.seat);
 }
 
 /** Battle options for the unite field (without data/logger, added by the match). */

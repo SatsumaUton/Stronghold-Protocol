@@ -116,6 +116,8 @@ export class MatchViews {
       // （server/match/snapshot.js restoreMatch({ replay: true })）。客户端据此提示玩家。
       ...(this.replayRound && this.phase === PHASE.PREP && this.round === this.replayRound ? { replayRound: this.replayRound } : {}),
       // experimental rescue: the client shows the window and each donor/target predicate; the server rechecks all
+      // 投票移出掉线队友（参考版 GitHub feedback #12 移植）：进行中的投票（无则 null）
+      ...(typeof this.kickVoteView === 'function' ? { kickVote: this.kickVoteView() } : {}),
       revival: this.revivalEnabled ? {
         enabled: true,
         matchId: this.battlePrefix,

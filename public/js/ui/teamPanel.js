@@ -28,6 +28,7 @@ import { MissTag, uniteRemaining } from './hud.js';
 import { localAsset } from '../data.js';
 import { t } from '../../../shared/i18n.js';
 import { ReviveAction, RevivalNotice } from './revival.js';
+import { KickAction, KickVoteNotice } from './kickVote.js';
 import { BondPlanTag } from './bondPlan.js';
 import { PHONE_QUERY, teamDensity, teamEmoteMode } from './teamLayout.js';
 
@@ -180,7 +181,7 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
       </button>
     </div>` : null}
     ${poolSummary ? html`<div class="team__pool-summary" title=${poolSummary}><span>${t('卡池')}</span><b>${poolSummary}</b></div>` : null}
-    <div class="team__notice"><${RevivalNotice} pub=${pub} /></div>
+    <div class="team__notice"><${RevivalNotice} pub=${pub} /><${KickVoteNotice} pub=${pub} /></div>
     <div class="team__players" id="team-roster" hidden=${!rosterOpen}>
     ${players.map((p) => {
       const self = p.playerId === myId;
@@ -228,6 +229,7 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
           ${back ? html`<button type="button" class="btn btn--secondary btn--sm team__back"
             onClick=${() => observe.onBack()}><span class="btn__label">${t('返回战场')}</span></button>` : null}
           <${ReviveAction} pub=${pub} myId=${myId} target=${p} compact=${players.length > 4} />
+          <${KickAction} pub=${pub} myId=${myId} target=${p} compact=${players.length > 4} />
         </div>
         ${bubble ? html`<${EmoteBubble} key=${bubble.seq} id=${bubble.id} class="team__bubble" />` : null}
       </div>`;
