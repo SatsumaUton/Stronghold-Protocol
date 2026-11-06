@@ -1806,14 +1806,14 @@ node --test test/ui/bot-band-protocol.test.js    # 3 条：协议放行 / 非法
 #### 测试
 
 ```powershell
-node --test test/match/afk.test.js      # 10 条
+node --test test/match/afk.test.js      # 11 条
 ```
 
 关键那条是 **「掉线中不算挂机」**：断言掉线的 `p_0` 连数 3 回合 `afkRounds` 恒为 0 且不被移出，
 而同时在线的 `p_1` 什么都不做就被移出。这一条就是这次移植要修的东西。
 
 其余覆盖：默认值/关闭/非法值回落、有操作归零、AI 托管归零、
-单人局（<2 真人）根本不判定、中途退到只剩一人不再判定、移出前一回合先警告、幂等不重复踢。
+单人模式 / 一真人 + AI 根本不判定、**2 人开局中途走掉一个仍继续判定**、移出前一回合先警告、幂等不重复踢。
 
 ⚠ `test/match/harness.js` 里 `afkRemoveRounds` **默认传 0（关）**。
 原因是它按回合计时，而绝大多数测试根本不发备战指令 ——
@@ -1822,8 +1822,8 @@ node --test test/match/afk.test.js      # 10 条
 
 #### 什么时候它不会踢人（避免误判投诉）
 
-- 单人局（含「一个真人 + 三个 AI」）→ 完全不判定
-- 开局 2 人、中途退了一个 → 实时数真人（`_humanCount()`），只剩 1 个就不再判
+- 单人模式（`mode: 'solo'`）、合作房「一个真人 + 若干 AI」→ 完全不判定（判据是**建局快照** `loneHuman`）
+- 开局 2 人、中途走掉一个 → **仍然继续判定**（快照不变；参考版也这么做，剩下那个人挂机照样会被移出）
 - 掉线、AI 托管 → 归零
 - `afkRemoveRounds = 0` → 整体关闭
 
@@ -4016,10 +4016,12 @@ this.onIdleKick?.(ps.playerId, 'idle');   // 可选链吞掉，永远不执行
 
 #### 两个容易写错的细节
 
-1. **不能用 `this.loneHuman` 判单人。** 它是**建局时**的一次性快照。
-   「2 人开局、中场退了一个」之后它就过期了 —— 那时其实已经是单人局，
-   再按消极踢剩下那一个人是不合理的。现在用 `_humanCount()` **每次实时数**：
-   `this.order` 里 `!isBot && !left` 的数量。
+1. **判据是建局快照 `loneHuman`（参考版口径，2026-11-07 改回）。**
+   合作房「开局只有一个真人」（一真人 + 若干 AI）→ `loneHuman === true` → 完全不判定；
+   单人模式（`mode: 'solo'`）同样不判定。
+   注意**不要**改成「实时数真人」：`_humanCount()` 那种写法在「2 人开局、中途走掉一个」之后
+   会把这局当成单人局而停止判定，等于给中途退出的房间开后门 —— 参考版在这种情况下**照样**
+   把剩下那个挂机的人移出。快照跟着存档走（`snapshot.js` 的 `loneHuman`），读档后不会变。
 2. **被踢后要留记录，否则他立刻能加回来。**
    记录放在 `room.idleKicked`（`Map<accountId, {...}>`），
    `join()` 一开始就查，命中回 `ERR.IDLE_KICKED`（「你因消极游戏被移出本局，本局不能自己加回来」）。
@@ -4033,7 +4035,7 @@ this.onIdleKick?.(ps.playerId, 'idle');   // 可选链吞掉，永远不执行
 
 | 文件 | 职责 |
 |---|---|
-| `server/match/match/intents.js` | `_trackActivity`（两条规则）、`_humanCount()`、`ps._idleKicked` |
+| `server/match/match/intents.js` | `_trackActivity`（只记 `afkActed`）、`ps._idleKicked` |
 | `server/lobby.js` | `kickIdle()`、`sweepIdle()`（**已停用**）、`idleKickMs`（**0**）、`onIdleKick` 接线、`room.idleKicked` 与 `join()` 的拦截 |
 | `shared/constants.js` | `ERR.IDLE_KICKED` + 文案 |
 | `server/match/Match.js` | `_testRate` / `testLog` / `testTimers` 的初始化（原来只在建局有管理员座位时建，对局中兑换授权码会崩，已在 `applyTestCommand` 里按需补齐） |

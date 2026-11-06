@@ -55,7 +55,7 @@ test('a spectator seat watches a whole match (各自行动, 联防, 最终攻势
   assert.equal(end.victory, true);
 
   const got = frames(h, S);
-  for (const x of got) assert.ok(['m.public', 'm.field', 'b.start', 'b.end', 'm.result'].includes(x.t), `${x.t} sent to a spectator`);
+  for (const x of got) assert.ok(['m.public', 'm.field', 'b.start', 'b.end', 'm.result', 'm.notice'].includes(x.t), `${x.t} sent to a spectator`);
   assert.equal(h.allTo(S, 'm.private').length, 0, 'no private player view');
   const starts = h.allTo(S, 'b.start');
   assert.ok(starts.length > 0);

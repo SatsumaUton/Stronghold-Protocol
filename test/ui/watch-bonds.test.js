@@ -28,12 +28,12 @@ globalThis.fetch = async (url) => {
   }
 };
 
-const { screenFieldId, bondOwnerId, ownerBonds, withLiveLayers, ownerBoard, stripView, playerBonds, watchedPlayer, playerLayer, screenStrip,
+const { screenFieldId, bondOwnerId, ownerBonds, withLiveLayers, layersUncapped, ownerBoard, stripView, playerBonds, watchedPlayer, playerLayer, screenStrip,
   detailBondOwner, toggleBond, popupView } = await import('../../public/js/ui/watchBonds.js');
 const { BondStrip, BondPopup } = await import('../../public/js/ui/bondStrip.js');
 const { CombatHud } = await import('../../public/js/ui/combatHud.js');
 const { cameraLayers } = await import('../../public/js/battle/observe.js');
-const { BOND_LAYER_CAP } = await import('../../shared/constants.js');
+const { BOND_LAYER_CAP, BOND_LAYER_SAFE_MAX } = await import('../../shared/constants.js');
 const { data } = await import('../../public/js/data.js');
 await data.loadAll('bonds', 'chess', 'assets');
 
@@ -267,6 +267,13 @@ describe('§20.15 the bonds: views + live layers', () => {
     assert.deepEqual(out[2], { bondId: 'victoriaShip', count: 0, active: false, tier: 0, layers: 2 });
     assert.equal(list[0].layers, 40, 'the view is not mutated');
     assert.equal(withLiveLayers(list, { sargonShip: 5000 })[0].layers, BOND_LAYER_CAP, 'capped at 999');
+    // 房间解除了层数上限（深潜 / 普通房的实验开关 disableLayerCap）：战斗中的盟约条也要跟着不封顶
+    assert.equal(withLiveLayers(list, { sargonShip: 5000 }, true)[0].layers, 5000, 'uncapped room: 5000 shows as 5000');
+    assert.equal(layersUncapped({ echo: { deepecho: true } }), true, '深潜恒为不封顶');
+    assert.equal(layersUncapped({ experimental: { disableLayerCap: true } }), true, '普通房的实验开关也算');
+    assert.equal(layersUncapped({ experimental: {} }), false, '没开就是原版 999');
+    assert.equal(layersUncapped(null), false);
+    assert.ok(BOND_LAYER_SAFE_MAX > BOND_LAYER_CAP);
     assert.equal(withLiveLayers(list, { sargonShip: 40 }), list, 'equal counts: the same list');
   });
   test('stripView / playerBonds: the owner, the name (null for yourself) and the list with the owner\'s live layers', () => {

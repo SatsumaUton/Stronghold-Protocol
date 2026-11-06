@@ -54,7 +54,9 @@ export class MatchBoss {
     // the pool's own per-player tally, one pool per boss round. stats.bossDamage (the result's 领袖伤害) adds up both
     // rounds, so it would credit the Final Assault's damage to the hidden leader ("隐藏boss还没打就出了50%播报").
     const hitSteps = new Map();
-    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment, hpMul: this.enemyHpMul * this._echoBossPoolMul(this.round) }), {
+    // 敌人生命倍率必须取**这一回合**的值（`enemyHpMulAt`）：按回合设置时 `enemyHpMul` 只是 1
+    // （experimentalOptions 只发 `enemyHpPlan`），用单值会让领袖血池完全不吃倍率。
+    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment, hpMul: this.enemyHpMulAt(this.round) * this._echoBossPoolMul(this.round) }), {
       onHit: (pid, dmg) => {
         const ps = this.players.get(pid);
         if (!ps) return;

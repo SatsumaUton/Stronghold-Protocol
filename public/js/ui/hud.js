@@ -444,6 +444,20 @@ export function OvertimeWarning({ ot }) {
   </div>`;
 }
 
+/**
+ * 挂机移出警告（server afkRemoveRounds → m.private afkWarn，维护者 2026-11-06 补齐移植）：
+ * 上一回合没有任何实质操作，**再挂一回合就会被移出对局**。准备阶段常驻，直到有实质操作才消失。
+ */
+export function AfkWarning({ pub, priv }) {
+  if (!priv?.afkWarn) return null;
+  if (pub?.phase !== PHASE.PREP && pub?.phase !== PHASE.SP_DRAFT) return null;
+  return html`<div class="otwarn otwarn--afk" role="alert" data-state="afk" data-testid="afk-warning">
+    <${Icon} name="warn" class="otwarn__icon" />
+    <span class="otwarn__tag">AFK</span>
+    <span class="otwarn__txt">${t('本回合仍无操作将被移出对局')}</span>
+  </div>`;
+}
+
 /** Two-bar pause glyph (the official battle pause button). */
 function PauseGlyph() {
   return html`<svg class="pausebtn__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4.5v16H6zm7.5 0H18v16h-4.5z" /></svg>`;

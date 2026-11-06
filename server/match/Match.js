@@ -489,12 +489,15 @@ export class Match {
     //   * disableLayerCap  —— 盟约层数上限 999 抬到 BOND_LAYER_SAFE_MAX（1e9），等于「不设上限」；
     //   * disableHitLimit  —— 不取消对敌方领袖的单次 ≥ BOSS_HIT_LIMIT(300000) 伤害；
     //   * enemyHpMul / enemyAtkMul —— 敌人生命 / 攻击倍率，对敌方领袖的共享生命值同样生效。
+    //     生命倍率还能「按回合设置」（enemyHpPlan，参考版 feedback #118）：那种情况下每个回合的值走 enemyHpMulAt。
     // 注意：**不含**深潜。深潜只在真正进入深潜回合后才解除层数上限（见 layerCapOff），
     // 否则 R1–15 的开局就会和原版不同（维护者 2026-11-03 要求开局保持原版）。
     this.disableLayerCap = this.experimental.disableLayerCap === true;
     this.disableHitLimit = this.experimental.disableHitLimit === true;
     /** 【AI 联防置后】(维护者 2026-11-06)：联防优先真人，AI 队友与托管中的博士排后（unite.js helperOrder）。 */
     this.uniteHumansFirst = this.experimental.uniteHumansFirst === true;
+    // 单值倍率：**按回合设置**（enemyHpPlan）时它恒为 1 —— 每回合真正的值只从 `enemyHpMulAt(round)` 取，
+    // 任何「这一回合的敌人血量」都必须走那个方法（战斗 spec 的 flags、领袖共享血池、bot 预估、对账）。
     this.enemyHpMul = this.experimental.enemyHpMul ?? 1;
     // 【按回合设置敌人生命倍率】(参考版 feedback #118，2026-11-06)：有计划时按回合取，否则就是单值
     this.enemyHpMulAt = (round = this.round) => enemyHpMulAt(this.experimental, round);
@@ -535,6 +538,13 @@ export class Match {
     this._speedVotes = new Set();
     this._speedUp = false;
     this._speedVoteAt = new Map();
+    // 投票移出（kickVote.js）：同时只允许一个投票；同一目标本回合失败过就不能再提；300 ms 防连点。
+    // ★ 这三项必须在这里初始化 —— 以前只登记在 snapshot 的 transient 清单里、从未赋值，
+    //   任何 g.kickVote 都会在 `this._kickFailed.get(...)` 抛 TypeError（整条功能是坏的）。
+    this.kickVote = null;
+    this._kickVoteSeq = 0;
+    this._kickFailed = new Map();
+    this._kickVoteAt = new Map();
     /** layouts a bot rehearses per prep with the real simulation (bot.js; 0 = heuristic placement only) */
     this.botRehearsal = Number.isInteger(opts.botRehearsal) && opts.botRehearsal >= 0 ? Math.min(opts.botRehearsal, 8) : BOT_REHEARSAL_DEFAULT;
     this.bot = getBotStrategy(opts.botStrategy ?? env('SP_BOT_STRATEGY'));

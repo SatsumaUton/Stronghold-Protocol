@@ -639,7 +639,7 @@ export const C2S = {
   'g.echoProjection': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 3 },
   // 投票移出（AI 接管的掉线队友，参考版 GitHub feedback #12）：发起 / 应答
   'g.kickVote': { targetId: (v) => typeof v === 'string' && v.length > 0 },
-  'g.kickBallot': { voteId: (v) => Number.isInteger(v) && v >= 0, agree: (v) => typeof v === 'boolean' },
+  'g.kickBallot': { voteId: (v) => Number.isInteger(v) && v >= 1, agree: (v) => typeof v === 'boolean' },
   'g.band': { bandId: isId },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is
@@ -734,6 +734,9 @@ export const S2C = [
   'welcome', 'ok', 'error', 'pong',
   'room.state', 'room.closed',
   'm.public', 'm.private', 'm.field', 'm.toast', 'm.ticker', 'm.emote', 'm.result',
+  // m.removed { reason: 'afk' | 'kicked', rounds } — 这个座位被永久移出（挂机判定 / 投票移出，platform.js _removeIdle）：
+  // 客户端收到后退出房间、回大厅并提示原因。**只在被移除的那个人身上发一次**，其他人收 m.notice。
+  'm.removed',
   // m.layer { playerId, bondId, add } — own live prep layer gain; ephemeral, never replayed on resync.
   'm.layer',
   // m.unitStats { seq, round, units: [unitStatsEntry] } — the answer to g.unitStats (the requester only)

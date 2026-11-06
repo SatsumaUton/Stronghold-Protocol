@@ -141,10 +141,10 @@ export class BattleSpawns {
     const roomHp = mm(this.flags.enemyHpMul, true), roomAtk = mm(this.flags.enemyAtkMul);
     // 深潜的「频次怪」绝对血量（spec flags `enemyHpAbs`：enemyKey → 血量，Match._ruleFlags()）。
     // 这类怪（器物：青铜镜、铁矛头…）的 maxHp **就是**「需要被打几下」（sim 的 hitCount 让每次伤害只扣 1）。
-    // 数据 baseHp 只有 30 / 45 这种「击倒次数」，跟着深度缩放会变成几千下（实测铁矛头 6080）；
-    // 反过来完全不给缩放又只有 30 下、一刀就没了（维护者 2026-11-05 第二次反馈）。
-    // 所以深潜按深度直接给一个**绝对血量**（500–2000），走这里统一覆盖 —— 它们多数是召唤物
-    //（新硎的 DeadSpawn 出铁矛头），不在波次 spawns 里，只有出怪这一处管得到。
+    // 数据 baseHp 只有 30 / 45 这种「击倒次数」，跟着深度缩放会变成几千下（实测铁矛头 6080）。
+    // 维护者 2026-11-06 最终定：**所有频次怪一律用原版血量**（不再有 500–2000 的深度曲线），
+    // 这张表就是「原版血量 + 挡住深度倍率」—— 它们多数是召唤物（新硎的 DeadSpawn 出铁矛头），
+    // 不在波次 spawns 里，只有出怪这一处管得到。
     const absAll = this.flags && this.flags.enemyHpAbs;
     const absHp = absAll && typeof absAll === 'object' ? Number(absAll[def.key] ?? absAll[enemyKey]) : NaN;
     // 「深渊回响」：召唤物用**原版**血量 / 攻击 / 移速（见 _echoSummonOf）—— 深度倍率（hpMul / atkMul /

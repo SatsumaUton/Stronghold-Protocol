@@ -94,6 +94,9 @@ export const MATCH_FIELDS = Object.freeze({
     'echoOneShotIds',
     // 深渊祭坛（16 层起）的永久强化层数：读档丢掉等于白花资金
     'echoAltarBuffStacks', 'echoAltarLastDepth',
+    // 祭坛**本层**的购买次数（blessing 1 / buff 2 / permanent 1 / life 2，`echoAltar.used` 是 playerId → 计数的 Map）：
+    // 不存的话读档后同一层可以再买一轮，等于用重连刷祭坛（2026-11-06 补，纯追加，旧存档缺这项时按空表处理）。
+    'echoAltar',
     // 祝福刷新额度 / 已放弃次数 / 隐藏核心的临时名额：都是整局累计，丢了读档后就「回血」
     'echoBlessingRefreshes', 'echoBlessingRefreshBonus', 'echoBlessingSkipped', 'echoBlessingBonus', 'echoBlessingRefreshNonce',
     // 部署禁令的**到期层**（2026-11-05）：只存名单不存到期层，读档后排异 / 封锁永远不会自动解除
@@ -159,6 +162,9 @@ export const MATCH_FIELDS = Object.freeze({
 export const PLAYER_FIELDS = Object.freeze({
   saved: Object.freeze([
     'left', 'revived', 'pendingDeath', 'revivalUnavailableReason', 'autoplay', 'afkActed', 'afkRounds',
+    // 掉线由 AI 接管（platform.js _checkOffline，2026-11-06 移植）：读档后接管状态要还在，
+    // 否则被接管的座位读档后变成「没接管」，既不能再被投票移出、也会被挂机判定重新计数。
+    'offlineRounds', 'offlineAutoplay',
     // 本服：管理员标记（三道门全过才为 true，lobby 写入，客户端改不了）。它必须跟着存档走 ——
     // 否则重启续玩后 ps.admin 变回 false，管理员在这局里再也用不了 g.test
     // （server/persist/lobbyState.js 的「restored by fallback」注释记过这个坑）。
@@ -174,6 +180,11 @@ export const PLAYER_FIELDS = Object.freeze({
     'bondCountBonus', 'effects', 'bounties', 'personalChoice', 'counters', 'round', 'deployCapBonus', 'deployCapMin',
     // 祭坛「永久」买过几次（整局累计，本局最多 1 次）：不存的话读档后又能再买一次 +1 部署位
     'echoAltarDeployBought',
+    // 「盟约投影」改成每人各自选之后，选择跟着玩家走（维护者 2026-11-07，纯追加）
+    'echoProjection',
+    // 祭坛**账户余额**（「捐献 5 / 10」存进去的钱，跨回合不清空，买献祭时优先扣）：
+    // 不存的话读档后玩家的存款直接清零 —— 这是 2026-11-06 发现的漏项（纯追加，旧存档缺这项时 = 0）。
+    'echoAltarBank',
     'deviceOverrides', 'tileOverrides', 'stats', 'eliminatedRound', 'creditedKills', 'lpAtFinal', 'lastResult',
     '_botFocus', '_botFocusId', '_botSeenUids', '_deferItemMerge',
   ]),

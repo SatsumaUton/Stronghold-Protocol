@@ -185,6 +185,10 @@ export class MatchPrep {
     // 放在 checkpoint 之后 —— 断点续玩恢复的是「备战已完成」那一刻，
     // 恢复时不该重复判定一遍（否则同一个人会被判两次）。
     this._checkIdle();
+    // 掉线由 AI 接管（OFFLINE_TAKEOVER_ROUNDS）：排在挂机判定之后 —— 掉线不算挂机，
+    // 但连续掉线 N 个备战结束就交给 AI 打，之后才允许被「投票移出」。
+    if (this.ended || this.disposed) return;
+    this._checkOffline();
     if (this.ended || this.disposed || this.phase !== PHASE.PREP) return;
     // rehearsals still waiting for a host's answer die with the prep: their bots place the default layout, a late answer
     // is ignored (Match._takeOverRehearsal / MatchRehearsal) and nothing of them runs after the phase ended

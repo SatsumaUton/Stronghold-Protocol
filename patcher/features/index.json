@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 226297
+        "customBytes": 229400
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 261958
+        "customBytes": 265417
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 251390
+        "customBytes": 254783
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 215080
+        "customBytes": 218000
       },
       {
         "path": "public/js/render/units.js",
@@ -6671,7 +6671,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": false,
-        "customBytes": 139773
+        "customBytes": 139843
       },
       {
         "path": "public/js/screens/lobby.js",
@@ -6686,7 +6686,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": false,
-        "customBytes": 90088
+        "customBytes": 92468
       },
       {
         "path": "public/js/screens/stats.js",
@@ -6726,7 +6726,7 @@
       {
         "path": "public/js/ui/echoStatus.js",
         "baseExists": false,
-        "customBytes": 13874
+        "customBytes": 14564
       },
       {
         "path": "public/js/ui/echoSupply.js",
@@ -6771,7 +6771,7 @@
       {
         "path": "public/js/ui/hud.js",
         "baseExists": false,
-        "customBytes": 47727
+        "customBytes": 48436
       },
       {
         "path": "public/js/ui/matchChrome.js",
@@ -6809,6 +6809,11 @@
         "customBytes": 49702
       },
       {
+        "path": "public/js/ui/watchBonds.js",
+        "baseExists": false,
+        "customBytes": 18465
+      },
+      {
         "path": "server/echoTesters.js",
         "baseExists": false,
         "customBytes": 2006
@@ -6821,17 +6826,17 @@
       {
         "path": "server/lobby.js",
         "baseExists": false,
-        "customBytes": 279003
+        "customBytes": 278984
       },
       {
         "path": "server/match/Match.js",
         "baseExists": false,
-        "customBytes": 68438
+        "customBytes": 69357
       },
       {
         "path": "server/match/PlayerState.js",
         "baseExists": false,
-        "customBytes": 24078
+        "customBytes": 24962
       },
       {
         "path": "server/match/choices.js",
@@ -6841,7 +6846,7 @@
       {
         "path": "server/match/effectsMeta.js",
         "baseExists": false,
-        "customBytes": 44256
+        "customBytes": 44298
       },
       {
         "path": "server/match/gamedata.js",
@@ -6856,12 +6861,12 @@
       {
         "path": "server/match/match/bossRounds.js",
         "baseExists": false,
-        "customBytes": 33296
+        "customBytes": 33535
       },
       {
         "path": "server/match/match/combat.js",
         "baseExists": false,
-        "customBytes": 14272
+        "customBytes": 13587
       },
       {
         "path": "server/match/match/echo.js",
@@ -6886,7 +6891,7 @@
       {
         "path": "server/match/match/echoCodex.js",
         "baseExists": false,
-        "customBytes": 6600
+        "customBytes": 6672
       },
       {
         "path": "server/match/match/echoConfig.js",
@@ -6906,7 +6911,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 177566
+        "customBytes": 179302
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -6916,7 +6921,7 @@
       {
         "path": "server/match/match/echoWaves.js",
         "baseExists": false,
-        "customBytes": 40426
+        "customBytes": 39510
       },
       {
         "path": "server/match/match/echoWords.js",
@@ -6926,7 +6931,7 @@
       {
         "path": "server/match/match/intents.js",
         "baseExists": false,
-        "customBytes": 18312
+        "customBytes": 13804
       },
       {
         "path": "server/match/match/offers.js",
@@ -6941,7 +6946,7 @@
       {
         "path": "server/match/match/prep.js",
         "baseExists": false,
-        "customBytes": 11454
+        "customBytes": 11736
       },
       {
         "path": "server/match/match/settle.js",
@@ -6966,7 +6971,7 @@
       {
         "path": "server/match/match/views.js",
         "baseExists": false,
-        "customBytes": 32787
+        "customBytes": 33116
       },
       {
         "path": "server/match/player/economy.js",
@@ -6981,12 +6986,12 @@
       {
         "path": "server/match/player/round.js",
         "baseExists": false,
-        "customBytes": 14712
+        "customBytes": 14724
       },
       {
         "path": "server/match/player/views.js",
         "baseExists": false,
-        "customBytes": 8602
+        "customBytes": 9663
       },
       {
         "path": "server/match/results.js",
@@ -6996,7 +7001,7 @@
       {
         "path": "server/match/snapshot.js",
         "baseExists": false,
-        "customBytes": 36555
+        "customBytes": 37573
       },
       {
         "path": "server/match/waves.js",
@@ -7046,12 +7051,17 @@
       {
         "path": "server/sim/battle/spawns.js",
         "baseExists": false,
-        "customBytes": 16803
+        "customBytes": 16777
       },
       {
         "path": "server/sim/content/bonds/addon/meta.js",
         "baseExists": false,
         "customBytes": 9275
+      },
+      {
+        "path": "server/sim/content/bonds/core.js",
+        "baseExists": false,
+        "customBytes": 44943
       },
       {
         "path": "server/sim/content/support/index.js",
@@ -7066,7 +7076,24 @@
       {
         "path": "shared/protocol.js",
         "baseExists": false,
-        "customBytes": 57388
+        "customBytes": 57688
+      }
+    ]
+  },
+  {
+    "id": "kick-vote",
+    "name": "踢人投票（票出掉线队友）",
+    "status": "patcher",
+    "files": [
+      {
+        "path": "public/js/ui/kickVote.js",
+        "baseExists": false,
+        "customBytes": 4719
+      },
+      {
+        "path": "server/match/match/kickVote.js",
+        "baseExists": false,
+        "customBytes": 8230
       }
     ]
   }

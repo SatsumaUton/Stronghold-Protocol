@@ -27,7 +27,15 @@ export class PlayerBasics {
   /** The engine acts for this seat (AI teammate or "AI 托管"; a departed human is eliminated, so nothing is left to do). */
   get botControlled() { return this.isBot || this.left || this.autoplay; }
 
-  get deployCap() { return Math.max(1, this.gd.deployCap + this.deployCapBonus, this.deployCapMin); }
+  /**
+   * 部署位上限 = max(基础, 「至少 N」的底子) + 各项加成。
+   *
+   * 为什么加成要加在 max **外面**（2026-11-06 玩家反馈修）：人事部文档是「最大可部署人数变为 9」
+   *（`deployCapMin = 9`，一条**下限**），深渊祭坛「献祭·永久」是 `deployCapBonus += 1`（一条**加成**）。
+   * 旧写法 `max(基础+加成, 下限)` 会让 9 的底子把祭坛那 1 个吞掉 —— 8+1 与 9 取大还是 9，
+   * 玩家买了两样却还是 9 人。现在 max 只决定底子，加成永远叠在上面：max(8,9)+1 = 10。
+   */
+  get deployCap() { return Math.max(1, Math.max(this.gd.deployCap, this.deployCapMin) + this.deployCapBonus); }
   get deployCount() { let n = 0; for (const p of this.board.values()) if (p.kind === 'chess') n++; return n; }
   get tempEmpty() { return this.temp.every((x) => x == null); }
 

@@ -136,6 +136,9 @@ export class MatchViews {
         isBot: ps.isBot,
         ...(Number.isInteger(ps.aiTakeoverRound) ? { aiTakeoverRound: ps.aiTakeoverRound } : {}),
         connected: ps.isBot || (ps.connected && !ps.left),
+        // 掉线由 AI 接管（platform.js _checkOffline）：这个座位是「掉线后被 AI 接管」的，
+        // 客户端据此把「投票移出」的按钮点亮（kickVote.js 的资格判定与它同一口径）。
+        ...(ps.offlineAutoplay && ps.autoplay && !ps.connected ? { offlineTakeover: true } : {}),
         alive: ps.alive,
         lp: Math.max(0, ps.lp),
         pendingDeath: ps.pendingDeath === true,

@@ -11,7 +11,7 @@ import { FieldRunner, DeadBattle } from '../fields.js';
 import { DELAYS } from './common.js';
 import { previewPlayer } from '../preview.js';
 import { morphBattleOpt } from '../../../shared/plugins/rules.js';
-import { echoHitCountEnemy, echoHitCountHp, echoSummonOnly } from './echoWaves.js';
+import { echoHitCountEnemy } from './echoWaves.js';
 
 export class MatchCombat {
   /** Construct a battle; a constructor failure yields a finished stand-in (clean result) and is logged. */
@@ -79,31 +79,24 @@ export class MatchCombat {
   /**
    * 「频次怪」的绝对血量表（enemyKey → 血量 = 需要被打几下），深潜专用。
    *
-   * 维护者 2026-11-05 定：**1–15 层用原版血量**（数据 baseHp 就是需要的次数：铁矛头 30、铁灯盘 45、
-   * 青瓷茶器 4 —— 也就是原版「打 N 下」的手感，不跟深度缩放），**16 层起**改成按深度给的绝对血量，
-   * 落在 500–2000 区间（`echoHitCountHp`）：第 16 层 500 下 → 每层 +40 → 第 54 层起固定 2000 下。
+   * 维护者 2026-11-06 **最终定**：所有频次怪一律用数据里的**原版血量**（铁矛头 30、铁灯盘 45、
+   * 青瓷茶器 4 —— 原版「打 N 下」的手感），不再有「16 层起按深度给 500–2000」那套深渊回响算法。
    *
-   * 为什么不能只改波次：它们多数是**召唤物**（新硎的 DeadSpawn 出铁矛头），根本不在 `wave.spawns` 里
-   * —— 只有出怪那一处（sim spawnEnemy 读 `flags.enemyHpAbs`）能统一覆盖。
+   * 为什么还要下发这张表：它同时挡住深度倍率 —— 波次的 `hpMul` 会把 30 下放大成 6080 下；
+   * 而它们多数是**召唤物**（新硎的 DeadSpawn 出铁矛头），根本不在 `wave.spawns` 里，
+   * 只有出怪那一处（sim spawnEnemy 读 `flags.enemyHpAbs`）能统一覆盖。
    * @returns {Record<string, number>}
    */
   _echoHitCountHp() {
-    const depth = typeof this._echoDepth === 'function' ? this._echoDepth(this.round) : 1;
-    const band = echoHitCountHp(depth);
     const cache = this._echoHpAbsCache;
-    if (cache && cache.gd === this.gd && cache.hp === band) return cache.map;
+    if (cache && cache.gd === this.gd) return cache.map;
     const map = {};
     try {
-      // 维护者 2026-11-06：**召唤物**（频次类器物召唤物 + 其它一切召唤物）一律用数据里的原始血量
-      //（baseHp == 需要被打几下），不参与 16 层起的 500–2000 深度曲线。
-      // 非召唤物的频次怪（波次里直接刷的那 2 个）仍按深度给绝对血量。
-      const summonOnly = echoSummonOnly(this.gd);
       for (const k of echoHitCountEnemy(this.gd)) {
-        const baseHp = Math.max(1, Math.floor(Number(this.gd.enemy(k)?.stats?.maxHp) || 1));
-        map[k] = band == null || summonOnly.has(k) ? baseHp : band;
+        map[k] = Math.max(1, Math.floor(Number(this.gd.enemy(k)?.stats?.maxHp) || 1));
       }
     } catch { /* 数据异常时按普通血量走 */ }
-    this._echoHpAbsCache = { gd: this.gd, hp: band, map };
+    this._echoHpAbsCache = { gd: this.gd, map };
     return map;
   }
 

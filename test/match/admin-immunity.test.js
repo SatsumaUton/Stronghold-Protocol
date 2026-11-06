@@ -30,23 +30,20 @@ test('管理员（身份门）不会被挂机移出，普通玩家照常被移�
   assert.equal(normal._idleKicked, true, '普通玩家照常被移出');
 });
 
-test('管理员不会被「消极游戏」判定踢出（花钱不部署 / 什么都不做）', (t) => {
+test('消极游戏那两条老规则已删除：_trackActivity 只记 afkActed，不踢人', (t) => {
   const h = two();
   const m = h.m;
   t.after(() => m.dispose());
-  const [admin] = m.alivePlayers();
-  admin.admin = false;
-  admin.adminId = true;
+  const [a, b] = m.alivePlayers();
   m.round = 3;
-  // 已经攒到触发线：上一回合花钱 3 次、部署 0 次
-  admin._act = { round: 2, spend: 3, place: 0, strikes: 1, idleStrikes: 1 };
-  m._trackActivity(admin, { t: 'g.buy' });
-  assert.notEqual(admin._idleKicked, true, '管理员不该被消极游戏踢出');
-  // 对照：同样的状态，普通玩家会被踢
-  const normal = m.alivePlayers()[1];
-  normal._act = { round: 2, spend: 3, place: 0, strikes: 1, idleStrikes: 1 };
-  m._trackActivity(normal, { t: 'g.buy' });
-  assert.equal(normal._idleKicked, true, '普通玩家照常被踢');
+  // 以前这种状态（上一回合花钱 3 次、部署 0 次）会直接踢人；现在规则没了，只打标记
+  a._act = { round: 2, spend: 3, place: 0, strikes: 1, idleStrikes: 1 };
+  m._trackActivity(a, { t: 'g.buy' });
+  assert.notEqual(a._idleKicked, true, '「只花钱不部署」规则已删除');
+  assert.equal(a.afkActed, true, '只记「这一回合有实质操作」');
+  b._act = { round: 2, spend: 0, place: 0, strikes: 0, idleStrikes: 1 };
+  m._trackActivity(b, { t: 'g.ready' });
+  assert.notEqual(b._idleKicked, true, '「什么都不做」规则也已删除（判定交给 _checkIdle）');
 });
 
 test('管理员标记进存档：读档续玩后仍然豁免', () => {

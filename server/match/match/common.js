@@ -35,6 +35,8 @@ export const REVIVAL_UNAVAILABLE_REASONS = Object.freeze([
  * `Match` 的 opts.afkRemoveRounds 覆盖它（server/match/match/platform.js 的 _checkIdle）。
  */
 export const AFK_REMOVE_ROUNDS = 2;
+/** 掉线多少个「备战结束」后由 AI 接管该座位（参考版口径，维护者 2026-11-06 移植）：接管后才允许被投票移出。 */
+export const OFFLINE_TAKEOVER_ROUNDS = 2;
 
 /**
  * 算作「有操作」的意图（移植自参考版 common.js）。

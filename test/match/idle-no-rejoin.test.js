@@ -170,16 +170,16 @@ test('默认配置：idleKickMs = 0（时间挂机检测关闭）', () => {
   assert.equal(lobby.opts.idleKickMs, 0, '默认不启用按时间的挂机踢人');
 });
 
-test('「操作挂机检测」仍然存在：连续 2 回合什么都不做 → 判定消极（非单人局）', async () => {
-  // 这条走 MatchIntents._trackActivity → onIdleKick，与 sweepIdle 无关。
-  // 这里只验证「判定入口还在、规则没被删」，不跑整局。
+test('挂机踢人完全用参考版口径：只记 afkActed，判定在 endPrep 的 _checkIdle', async () => {
   const { default: fs } = await import('node:fs');
   const src = fs.readFileSync(new URL('../../server/match/match/intents.js', import.meta.url), 'utf8');
-  assert.match(src, /_trackActivity\(/, '操作挂机检测的实现还在');
-  assert.match(src, /st\.strikes >= 2/, '规则一：连续 2 回合只花钱不部署');
-  assert.match(src, /st\.idleStrikes >= 2/, '规则二：连续 2 回合什么都不做');
-  assert.match(src, /_humanCount\(\) < 2/, '单人局不判定（保留）');
-  assert.match(src, /this\.onIdleKick\?\./, '踢人回调仍然接着');
+  assert.match(src, /_trackActivity\(/, '记录入口还在');
+  assert.match(src, /AFK_ACTIONS\.has\(t\)/, '按 AFK_ACTIONS 白名单记「有实质操作」');
+  assert.match(src, /ps\.afkActed = true/, '只打标记，不在这里判定');
+  // 维护者 2026-11-07：我们原先那两条更严的规则已删除，完全交给参考版的 _checkIdle
+  assert.doesNotMatch(src, /st\.strikes >= 2/, '规则一（只花钱不部署）已删除');
+  assert.doesNotMatch(src, /st\.idleStrikes >= 2/, '规则二（什么都不做）已删除');
+  assert.doesNotMatch(src, /this\._removeIdle\?\.\(/, 'intents 里不再直接移出');
 });
 
 test('对局内的消极判定确实会调用 lobby.kickIdle（没被这次改动误伤）', () => {

@@ -12,23 +12,6 @@ import { onHumanEmote } from '../botEmotes.js';
 
 export class MatchIntents {
   /**
-   * 当前还在局里的**真人**数量（不算 AI、不算已离开的）。
-   *
-   * 为什么实时算而不用 this.loneHuman：后者是建局时的快照，
-   * 「2 人开局、中场退了一个」之后它就过期了 —— 那时其实已经是单人局，
-   * 再按消极游戏踢剩下那一个人是不合理的。
-   * @returns {number}
-   */
-  _humanCount() {
-    try {
-      const list = Array.isArray(this.order) ? this.order : (this.players ? [...this.players.values()] : []);
-      let n = 0;
-      for (const p of list) if (p && !p.isBot && !p.left) n++;
-      return n;
-    } catch { return 0; }
-  }
-
-  /**
    * 这个座位是不是**管理员**（维护者 2026-11-05：管理员无视所有惩罚机制）。
    *
    * 两个口径任一为真就算：
@@ -44,73 +27,18 @@ export class MatchIntents {
     return !!(ps && (ps.admin === true || ps.adminId === true));
   }
 
-  /** 消极游戏检测：连续 2 回合花钱（买/刷新/升级）但一次都没部署干员 → 踢出。 */  _trackActivity(ps, msg) {
+  /**
+   * 记录「这一回合有没有实质操作」（common.js AFK_ACTIONS）。
+   *
+   * 维护者 2026-11-07：**挂机踢人完全改用参考版口径** —— 这里只负责打标记，
+   * 判定统一由 prep.js endPrep → platform.js `_checkIdle` 每回合结算一次
+   *（掉线 / AI 托管 / 有实质操作都归零，否则 +1；到 afkRemoveRounds 移出）。
+   * 我们原先那两条更严的规则（「只花钱不部署」「什么都不做」）已删除。
+   */
+  _trackActivity(ps, msg) {
     if (!ps || ps.isBot) return;
     const t = msg && msg.t;
-    // 挂机移出用的「有实质操作」标记（common.js AFK_ACTIONS）：与下面两条规则**并存**，
-    // 由 prep.js endPrep → platform.js _checkIdle 每回合结算一次。
-    // 放在最前面，且不受下面那些闸门（回合数、单人局）影响 ——
-    // 它只是记「这个人动过」，不是判定。
     if (AFK_ACTIONS.has(t)) ps.afkActed = true;
-    // ★ 维护者 2026-11-05：**管理员不受任何惩罚机制**（消极游戏 / 挂机移出都不判）。
-    //   管理员经常在后台盯盘、改数据、写文档，几回合不动手是常态，把他踢出对局反而打断维护。
-    //   身份口径见 _isPunishImmune()（身份门 adminId 或三道门 admin 任一为真）。
-    if (this._isPunishImmune(ps)) return;
-    // ★ 2026-11-02：**掉线的人不算消极游戏**。
-    //   掉线的玩家发不出任何指令，若不豁免，两条规则都会把「什么都没做」判成挂机，
-    //   把人踢掉 —— 而他只是网断了，回来座位已经没了。参考版也是这么处理的
-    //   （platform.js 的 _checkIdle 用 !ps.connected 归零）。这一层必须在规则之前。
-    if (!ps.connected) return;
-    // ★ 2026-10-31 维护者要求：**单人（只有一个真人）不判定消极游戏**。
-    //   理由很直接：消极游戏伤害的是「同局的其他真人」—— 一个人自己打单机，
-    //   挂机也好、不部署也好，没有别人受影响，踢掉他只会平白打断他。
-    //   同局的 AI 不算人：一真人 + 三个 AI 仍然是单人局，不判定。
-    //
-    //   ⚠ 不能用 this.loneHuman：那是**建局时**算好的一次性快照，
-    //   中途有人退出后它对不上（2 人开局、1 人退出 → 其实已经是单人局，
-    //   但 loneHuman 仍是 false，会把剩下那个人按消极踢掉）。
-    //   这里每次实时数一遍「还没离开的真人」。
-    if (this._humanCount() < 2) return;
-    // 已经被判定消极游戏、踢出去了：不再重复判定（否则每回合都弹一次提示）
-    if (ps._idleKicked) return;
-    const round = Number(this.round) || 0;
-    // 只在第 4 回合前判定（含第 4 回合）。
-    // 第 4 回合之后不再踢人：那时局面已经展开，中途踢人会让整局失衡，
-    // 而且前期没被判定的人基本已经在正常玩了。
-    if (round > 4) { if (ps._act) { ps._act.strikes = 0; ps._act.idleStrikes = 0; } return; }
-    let st = ps._act;
-    if (!st || st.round !== round) {
-      // 规则一：连续 2 回合花钱但不部署 → 消极游戏
-      if (st && st.spend > 0 && st.place === 0) {
-        st.strikes = (st.strikes || 0) + 1;
-        if (st.strikes >= 2) {
-          ps._idleKicked = true;
-          try { this.toast?.(ps, 'warn', '检测到连续 2 回合购买/刷新但未部署干员，你已被移出同盟（消极游戏）'); } catch { /* ignore */ }
-          try { this.onIdleKick?.(ps.playerId, 'idle'); } catch { /* ignore */ }
-        }
-      } else if (st) {
-        st.strikes = 0;
-      }
-      // 规则二：连续 2 回合既不购买也不部署（只点准备）→ 消极游戏
-      // （注释以前写「连续 3 回合」但代码是 2 —— 以代码为准，这里把注释改成一致的 2：
-      //   前期两回合什么都不做，基本可以确定是挂机，等三回合只会多拖一局。）
-      if (st) {
-        if (st.spend === 0 && st.place === 0) {
-          st.idleStrikes = (st.idleStrikes || 0) + 1;
-          if (st.idleStrikes >= 2) {
-            ps._idleKicked = true;
-            try { this.toast?.(ps, 'warn', '检测到连续 2 回合未购买、未部署干员，你已被移出同盟（消极游戏）'); } catch { /* ignore */ }
-            try { this.onIdleKick?.(ps.playerId, 'idle'); } catch { /* ignore */ }
-            st.idleStrikes = 0;
-          }
-        } else {
-          st.idleStrikes = 0;
-        }
-      }
-      st = ps._act = { round, spend: 0, place: 0, strikes: st ? (st.strikes || 0) : 0, idleStrikes: (st && st.idleStrikes) || 0 };
-    }
-    if (t === 'g.buy' || t === 'g.refresh' || t === 'g.levelUp') st.spend++;
-    if (t === 'g.place' || t === 'g.move' || t === 'g.deploy' || t === 'g.swap') st.place++;
   }
 
   /**
