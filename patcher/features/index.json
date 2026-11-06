@@ -6621,7 +6621,7 @@
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": false,
-        "customBytes": 135073
+        "customBytes": 135519
       },
       {
         "path": "public/css/screens/room.css",
@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 222519
+        "customBytes": 222955
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 257751
+        "customBytes": 258228
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 247301
+        "customBytes": 247748
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 211459
+        "customBytes": 211869
       },
       {
         "path": "public/js/render/units.js",
@@ -6676,7 +6676,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 117763
+        "customBytes": 120533
       },
       {
         "path": "public/js/screens/result.js",
@@ -6726,7 +6726,7 @@
       {
         "path": "public/js/ui/echoStatus.js",
         "baseExists": false,
-        "customBytes": 10717
+        "customBytes": 11460
       },
       {
         "path": "public/js/ui/echoSupply.js",
@@ -6821,7 +6821,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": false,
-        "customBytes": 276685
+        "customBytes": 277104
       },
       {
         "path": "server/match/Match.js",
@@ -6906,7 +6906,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 170640
+        "customBytes": 170900
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -6921,7 +6921,7 @@
       {
         "path": "server/match/match/echoWords.js",
         "baseExists": false,
-        "customBytes": 9550
+        "customBytes": 12230
       },
       {
         "path": "server/match/match/intents.js",
