@@ -64,3 +64,26 @@ test('深渊回响（layerCapOff）：盟约 999 层以后战斗叠层继续生�
     checkInvariants(m);
   } finally { m.dispose(); }
 });
+// sim 里的「战斗中叠层」本体（Battle.addLayers）：同一份 999 层、同一个 +10，
+// 普通房被钳住、深渊回响（spec flag layerCapOff）继续加。
+test('Battle.addLayers：999 层时普通房加 0，深渊回响 +10（spec flag layerCapOff）', async () => {
+  const { createBattleFromSpec } = await import('../../server/sim/spec.js');
+  const run = (variant) => {
+    const h = makeMatch({ mode: 'coop', humans: 1, seed: 7, instant: false, ...(variant ? { variant } : {}) });
+    const m = h.m;
+    try {
+      m.start();
+      if (variant) { m.round = 19; m.startRound(20); }
+      const ps = h.ps('p_0');
+      const opts = m._normalOpts(ps);
+      const spec = { ...opts, players: opts.players.map((p) => ({ ...p, bonds: { ...(p.bonds || {}), yanShip: { layers: 999, active: true, count: 1 } } })) };
+      const b = createBattleFromSpec(spec, m.ds, { quiet: true, recordEvents: false });
+      const added = b.addLayers('p_0', 'yanShip', 10, 'test');
+      return { added, layers: b.getPlayer('p_0').bonds.yanShip.layers, capOff: b.flags.layerCapOff === true };
+    } finally { m.dispose(); }
+  };
+  const plain = run(null);
+  assert.deepEqual(plain, { added: 0, layers: 999, capOff: false }, '普通房：999 就是上限');
+  const dive = run('deepecho');
+  assert.deepEqual(dive, { added: 10, layers: 1009, capOff: true }, '深渊回响：继续叠');
+});
