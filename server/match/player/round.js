@@ -151,7 +151,9 @@ export class PlayerRound {
    * 只影响显示（战斗侧另走 battleInput 的 projectedBond），不改 this.bonds 本身。
    */
   bondsView() {
-    const view = bondsWithGains(this.bonds, this.pendingLayerGains);
+    // 维护者 2026-11-06：深潜取消 999 层上限（`layerCapOff`），所以这里的「本回合战斗叠层」也必须按不封顶合并，
+    // 否则 999 层之后打再多层，视图里也只 +1 → 看起来像「叠层效果失效」。
+    const view = bondsWithGains(this.bonds, this.pendingLayerGains, this.m && this.m.layerCapOff === true);
     const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
     if (!proj) return view;
     const cur = view && view[proj.bondId] ? view[proj.bondId] : null;

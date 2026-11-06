@@ -533,6 +533,7 @@
         "server/sim/attack/health.js",
         "server/sim/battle/deploy.js",
         "server/sim/battle/echoRules.js",
+        "server/sim/battle/players.js",
         "server/sim/battle/spawns.js",
         "server/sim/content/bonds/addon/meta.js",
         "server/sim/content/support/index.js",

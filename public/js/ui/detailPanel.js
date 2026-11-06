@@ -227,6 +227,22 @@ export function MorphGrantLine({ item, off = null, carried = null, mode = 'offic
   </p>`;
 }
 
+/**
+ * 「盟约投影」的效果条目（维护者 2026-11-06）：拿到投影后，场上每个己方干员都算该核心盟约的成员 ——
+ * 卡面上要像变形同构体那样有一条说明：「盟约投影：视为【X】成员（满档）」+ 这条盟约的效果原文。
+ * 只有已部署、且本来不属于该盟约的干员才挂（见 ChessDetail 的 projectedBond）。
+ * @param {{ projection: any, bondId: string }} props — projection: 公开视图 `echo.projection.current`
+ */
+export function ProjectionLine({ projection, bondId, onBoard = true }) {
+  const bond = data.lookup('bonds', bondId);
+  if (!projection || !bond) return null;
+  // 投影自带的说明拿不到时用盟约原文兜底（第三条数据源只有 id）
+  const desc = projection.desc || bond.descRaw || bond.desc || '';
+  return html`<p class=${cx('dhint', 'dhint--morph', 'is-worn')} data-projection=${bondId}>
+    <${Icon} name="info" /><span>${t('盟约投影：视为【{bond}】盟约成员（满档）', { bond: bond.name })}<span class="dmorph__tag is-on">${onBoard ? t('生效中') : t('部署后生效')}</span>${desc ? html`<br /><${RichText} text=${desc} />` : null}</span>
+  </p>`;
+}
+
 /** An equipped item of the card: icon, name, effect — and for 变形同构体 / a bond item its pairing (`carried`: the wearer's items). */
 function ItemRow({ itemId, carried = null, off = null, mode = 'official', onUnequip = null, uid = null }) {
   const it = data.lookup('items', itemId);
@@ -428,15 +444,33 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
   // 所以只在棋盘上的干员卡上挂一条徽章（像「变形同构体」那样，角标写「投影」）。
   // 备战区（手牌第 7 行 / 临时区第 8 行）的干员还没上场，不挂。
   const meId = useStore((s) => s.me.playerId);
-  const projectedId = useStore((s) => s.match?.public?.echo?.projection?.current?.id || null);
+  const echo = useStore((s) => s.match?.public?.echo || null);
+  // 「盟约投影」：三条同源数据里取第一条拿得到的 ——
+  //   ① `echo.projection.current`（服务端专门下发的）
+  //   ② 祝福列表里 `projection: true` 的那条
+  //   ③ **本局盟约视图**里 `projected: true` 的那条（服务端按满档塞进去的，盟约条/面板读的就是它）
+  // ③ 是 2026-11-06 加的兜底：卡面这一路读不到前两份时，至少和盟约面板保持一致。
+  const projection = (() => {
+    const cur = echo && echo.projection && echo.projection.current;
+    if (cur && typeof cur.id === 'string') return cur;
+    const list = echo && Array.isArray(echo.blessings) ? echo.blessings : null;
+    const hit = list && list.find((b) => b && b.projection === true && typeof b.id === 'string');
+    if (hit) return { id: hit.id.replace(/^projection:/, ''), name: String(hit.name || '').replace(/^盟约投影\s*·\s*/, ''), desc: hit.desc || '' };
+    const rows = Array.isArray(bonds) ? bonds : [];
+    const row = rows.find((x) => x && x.projected === true && typeof x.bondId === 'string');
+    return row ? { id: row.bondId, name: '', desc: '' } : null;
+  })();
+  const projectedId = projection && typeof projection.id === 'string' ? projection.id : null;
   const onBoard = (() => {
     const row = Number(piece?.row);
     if (Number.isInteger(row)) return row >= 9 && row <= 12;
     if (piece && typeof piece.area === 'string') return piece.area === 'board';
     return !!unit;
   })();
-  const mineUnit = !ownerId || !meId || ownerId === meId;
-  // 干员**本身就有**这条盟约时不再追加、也不打「投影」角标（维护者 2026-11-05）
+  // ownerId 可能是 playerId 字符串，也可能是座位号 —— 统一按字符串比，否则「自己的干员」会被判成别人的
+  const mineUnit = !ownerId || !meId || String(ownerId) === String(meId);
+  // 干员**本身就有**这条盟约时不再追加、也不打「投影」角标（维护者 2026-11-05）。
+  // 2026-11-06 维护者确认：只有**已部署到场上**的干员才生效、才挂这条说明（手牌/整备区不显示）。
   const nativelyHas = Array.isArray(c.bonds) && c.bonds.includes(projectedId);
   const projectedBond = onBoard && mineUnit && !nativelyHas ? projectedId : null;
   const bondIds = (() => {
@@ -472,6 +506,7 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
         </div>
         ${hp ? html`<div class="dhp"><i style=${`width:${Math.max(0, Math.min(100, (hp.hp / Math.max(1, hp.max)) * 100))}%`}></i><span class="num">${fmtNum(hp.hp)} / ${fmtNum(hp.max)}</span></div>` : null}
         <${BondChips} bondIds=${bondIds} bonds=${bonds} off=${offBonds} onBond=${onBond} granted=${grantedIds} projected=${projectedBond} />
+        ${projectedBond && projection ? html`<${ProjectionLine} projection=${projection} bondId=${projectedBond} onBoard=${onBoard} />` : null}
       </div>
     </div>`;
   blocks.garrison = garrisons.length > 1
@@ -556,7 +591,11 @@ function EnemyDetail({ enemy, snapHp, count, live = null }) {
   // 「深渊回响」：本回合的侵蚀词条挂在**每一个**敌人身上，所以详情面板直接列出它们
   //（维护者 2026-11-04：看单只怪的说明时也该知道它有没有这个词条）。
   const echo = useStore((s) => s.match.public?.echo);
-  const words = Array.isArray(echo?.words) ? echo.words : [];
+  // 召唤物不吃侵蚀词条（维护者 2026-11-06）：`echo.words` 是「本回合全体」的列表，
+  // 不挡的话详情面板会给人「召唤物身上也挂了 4 条」的错觉；名单由服务端下发（`echo.summonKeys`）。
+  const summonKeys = Array.isArray(echo?.summonKeys) ? echo.summonKeys : [];
+  const isSummon = !!(enemy && summonKeys.includes(enemy.key));
+  const words = isSummon ? [] : (Array.isArray(echo?.words) ? echo.words : []);
   const m = data.get('assets');
   const s = enemy.stats || {};
   const types = Array.isArray(enemy.acTypes) ? enemy.acTypes : enemy.acType ? [enemy.acType] : [];
@@ -600,7 +639,7 @@ function EnemyDetail({ enemy, snapHp, count, live = null }) {
     ${imm.length ? html`<p class="dhint"><${Icon} name="shield" />${t('免疫：{list}', { list: imm })}</p>` : null}
     ${words.length ? html`<${Section} title=${t('本回合侵蚀词条')} micro="EROSION">
       <ul class="echo-list echo-list--enemy">${words.map((w) => html`<li key=${w.id}><b>${w.name}</b><span>${w.desc || ''}</span></li>`)}</ul>
-    <//>` : null}
+    <//>` : isSummon ? html`<p class="dhint"><${Icon} name="info" />${t('召唤物不受侵蚀词条影响')}</p>` : null}
     ${Array.isArray(enemy.abilities) && enemy.abilities.length ? html`<${Section} title=${t('能力')} micro="ABILITIES">
       <ul class="dabil">${abilityRows(enemy.abilities, !!live?.silenced).map((a, i) => html`<li key=${i} class=${a.off ? 'is-off' : null}><${RichText} text=${a.text} /></li>`)}</ul>
     <//>` : enemy.descRaw || enemy.desc ? html`<${Section} title=${t('说明')}><${RichText} as="p" text=${enemy.descRaw || enemy.desc} class="dtext" /><//>` : null}`;

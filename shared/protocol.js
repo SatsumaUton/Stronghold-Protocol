@@ -631,8 +631,8 @@ export const C2S = {
   'g.echoBlessingRefresh': { start: (v) => v === undefined || typeof v === 'boolean', agree: (v) => v === undefined || typeof v === 'boolean' },
   'g.echoShield': { pick: (v) => isInt(v, 0, 15) },
   'g.echoCounterUse': {},
-  // 深渊祭坛（16 层起）：买一次献祭
-  'g.echoAltar': { kind: (v) => v === 'blessing' || v === 'buff' || v === 'permanent' },
+  // 深渊祭坛（16 层起）：买一次献祭 / 主动捐献（donate10 / donate50 累进全队祭坛池）
+  'g.echoAltar': { kind: (v) => v === 'blessing' || v === 'buff' || v === 'permanent' || v === 'life' || v === 'donate5' || v === 'donate10' },
   // 深潜补给（16 层起）：个人三选一
   'g.echoSupply': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 2 },
   // 「盟约投影」（16 层起每 10 层）：全队三选一投票

@@ -123,6 +123,8 @@ export class MatchViews {
         deadline: this.revivalWindowOpen() ? this._revival.deadline : 0,
         // 「深渊回响」：不要求进入联防，任一存活队友都能付救援（维护者 2026-11-05）
         anyDonor: this.revivalAnyDonor === true,
+        // 「深渊回响」：不限次数（2026-11-06）—— 条件满足就能反复救，客户端据此不再显示「复活已用」
+        unlimited: this.revivalUnlimited === true,
         eligible: this.revivalWindowOpen() ? this.order.filter((ps) => this.revivalDonorEligible(ps)).map((ps) => ps.playerId) : [],
       } : { enabled: false },
       players: this.order.map((ps) => ({
@@ -321,14 +323,12 @@ export class MatchViews {
    */
   _echoMaskBountyPreview(list) {
     if (this.echoVariant !== 'deepecho' || !Array.isArray(list)) return list;
-    // 隐藏核心：准备阶段**不把 boss 本身列进敌方情报**（维护者 2026-11-05：隐藏 boss 的地方情报不要了），
-    // 战斗开始后才揭晓。普通 boss 返场节点不受影响。
+    // 隐藏核心（15 层）：**不再**把 boss 从 nextEnemies 里过滤掉。
+    // 2026-11-05 曾经在这里整条过滤（「隐藏 boss 的地方情报不要了」），但敌方情报的领袖块是
+    // `echo.bossId` 单独下发的（enemyDrawer），而地图上「领袖站在 boss 场」靠的正是这里的
+    // `boss + start` 条目（render/prepfield.js leaderStand）—— 只砍一边就变成「情报里有、场上没有」。
+    // 2026-11-06 玩家反馈「15 回合准备阶段看不到 boss 模型」，所以两边都保留，与 14 层 / 25·35·45 一致。
     let out = list;
-    try {
-      if (typeof this._echoHiddenBossRound === 'function' && this._echoHiddenBossRound(this.round)) {
-        out = list.filter((e) => !(e && (e.tag === 'boss' || e.boss === true)));
-      }
-    } catch { out = list; }
     // 悬赏目标只在**16 层以后**才隐藏成「?」占位（维护者 2026-11-05：
     // 1–13 层的悬赏是玩家自己选的目标，准备阶段要照常显示真身）。
     // 迷雾/遮蔽：整个准备阶段的敌方情报都换成「?」占位（维护者 2026-11-05：

@@ -38,6 +38,7 @@ import { sortBonds, bondMembers, nextThreshold, bondTier, harmonyMembers, HARMON
 import { formatBondEffect } from './richText.js';
 import { bondIconUrl } from './assetUrls.js';
 import { data } from '../data.js';
+import { useStore } from '../store.js';
 import { t, tc, tParts, tName } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -143,6 +144,9 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
  *   `entry.harmony` (the server's bond views: the +1 调和 added to `count`): 在场 n（含调和 +1） and the 调和 row
  */
 export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember, place = null, over = false, beside = null, owner = null, ownerId, off = false, echoBanned = false, morphMode = 'official' }) {
+  // 「盟约投影」：本局拿到的那条（`echo.projection.current`，拿不到就退回祝福列表里 `projection: true` 的条目）。
+  // 必须在 `if (!b) return null` 之前取，保持 hook 顺序稳定。
+  const echo = useStore((s) => s.match?.public?.echo || null);
   const b = data.lookup('bonds', bondId);
   if (!b) return null;
   // 「深渊回响」的排异：这条盟约当前不许上人（可被「开路」或到期解除，2026-11-05）
@@ -163,6 +167,20 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
   const countsHand = entry?.countsHand ?? b.countsHand;
   const next = nextThreshold(count, th);
   const hasNow = !off && !!(b.effectDescRaw || b.effectDesc);
+  // 「盟约投影」（2026-11-06）：点开的那条盟约如果正是本局投影的那条，要说明「全场都按成员算」——
+  // 玩家反馈「点盟约看不到投影效果」。别人的卡（owner）和本局禁用的盟约不挂。
+  const projEntry = (() => {
+    if (owner || off) return null;
+    // ① 服务端在**这条盟约的视图条目**上直接标了 `projected: true`（bondsView 按满档塞进去的那条）——
+    //    这是最可靠的一份：弹窗本来就拿着 `entry`。
+    if (entry && entry.projected === true) return { id: bondId, desc: '' };
+    const cur = echo && echo.projection && echo.projection.current;
+    if (cur && typeof cur.id === 'string') return cur;
+    const list = echo && Array.isArray(echo.blessings) ? echo.blessings : null;
+    const hit = list && list.find((x) => x && x.projection === true && typeof x.id === 'string');
+    return hit ? { id: hit.id.replace(/^projection:/, ''), desc: hit.desc || '' } : null;
+  })();
+  const isProjected = !!(projEntry && projEntry.id === bondId);
   const at = place || (beside === 'left' ? 'beside' : 'left');
   // 调和's +1 in this count (the server's word), and the 调和 operators on that board who give it
   const harmony = !off && Number.isInteger(entry?.harmony) && entry.harmony > 0 ? entry.harmony : 0;
@@ -186,6 +204,7 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
           ${off ? null : html`<span>${t('在场')} <b class="num">${count}</b>${next != null ? html`<small class="num">/${next}</small>` : null}${countsHand ? html`<small>${t('（含整备区）')}</small>` : null}${harmony ? html`<small class="bpop__hnote" data-harmony=${harmony}>${t('（含{harmonyName} +{harmony}）', { harmonyName, harmony })}</small>` : null}</span>`}
           ${b.noStack ? html`<span>${t('层数不显示')}</span>` : html`<span>${t('层数')} <b class="num t-mint">${layers}</b></span>`}
           <span class=${active ? 't-mint' : 't-lo'}>${active ? (th.length > 1 ? t('已激活 · {tier} 阶', { tier }) : t('已激活')) : off ? t('本局禁用') : t('未激活')}</span>
+          ${isProjected ? html`<span class="bpop__proj-tag">${t('投影')}</span>` : null}
         </div>
       </div>
     </header>
@@ -197,12 +216,17 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
       <h4>${t('当前效果')} ${b.noStack ? null : html`<small class="num">${t('（{layers} 层）', { layers })}</small>`}</h4>
       <${RichText} as="p" text=${formatBondEffect(b, layers)} class="bpop__desc" />
     </section>` : null}
+    ${isProjected ? html`<section class="bpop__sec bpop__proj" data-projection=${bondId}>
+      <h4>${t('盟约投影')}</h4>
+      <p class="bpop__desc">${t('本局全体干员都视为【{bond}】盟约成员，并按满档生效。', { bond: b.name })}${projEntry.desc ? html`<br />${projEntry.desc}` : null}</p>
+    </section>` : null}
     <section class="bpop__sec">
       <h4>${t('盟约效果')}</h4>
       <${RichText} as="p" text=${b.descRaw || b.desc} class="bpop__desc" />
     </section>
     <section class="bpop__sec">
       <h4>${t('成员')} <small>${memberHeadCount(members, countsHand)}/${members.length}</small></h4>
+      ${isProjected ? html`<p class="bpop__desc" data-projection-members>${t('投影生效：场上全部己方干员都视为本盟约成员（上方的「在场」已按满档计入）')}</p>` : null}
       ${harmony ? (harmonyBy.length
         ? html`<button type="button" class="bpop__harmony" data-harmony=${harmony} title=${harmonyText} onClick=${() => onMember?.(harmonyBy[0].id, null)}>
           <${BondGlyph} bondId=${HARMONY_BOND} /><b>${harmonyName} +${harmony}</b><span>${harmonyText}</span></button>`
