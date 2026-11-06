@@ -584,8 +584,22 @@ export class Match {
     /** how the bot rehearsals that were offered to `simPool` ended — separate from rehearsalStats (its keys are asserted) */
     this.rehearsalPoolStats = { pooled: 0, accepted: 0, fallbacks: 0 };
     this.ds = dataSourceFor(this.data);
-    /** client-side combat (DESIGN §14) — see the header */
-    this.clientCombat = opts.clientCombat != null ? !!opts.clientCombat : envClientCombat();
+    /**
+     * client-side combat (DESIGN §14) — see the header.
+     *
+     * 「深渊回响」**一律在服务端模拟**（2026-11-06 修）。原因：深潜的战斗效果——侵蚀词条、祝福的属性/攻速、
+     * 对敌异常、主题转化、反震、霜噬、惊惧、震荡、鲸吞、朔风、炎佑、照破、祭坛与补给加成、干员减益诅咒——
+     * 全部由 `_echoHookBattle` 在**服务端那份 battle** 上挂事件钩子实现。客户端按 BattleSpec 重建的战斗
+     * 没有这些钩子（spec 只带 spawns/routes/flags…），而 `SP_COMBAT` 未设时深潜默认就是客户端跑，
+     * 于是玩家看到「侵蚀词条没效果」「部分祝福不生效」（2026-11-06 实报）。
+     * 终局是把这些效果搬进 spec flags（参照 `revealAll`），但那要重做 sim 的效果注入层；
+     * 在那之前，深潜走服务端模拟，保证客户端看到的与判定用的是同一份战斗。
+     * 想再试客户端跑：环境变量 `SP_ECHO_CLIENT_COMBAT=1`。
+     */
+    const echoClientCombat = String(env('SP_ECHO_CLIENT_COMBAT') || '') === '1';
+    this.clientCombat = this.echoVariant === 'deepecho' && !echoClientCombat
+      ? false
+      : (opts.clientCombat != null ? !!opts.clientCombat : envClientCombat());
     this.verifyMode = parseVerify(opts.verify ?? env('SP_VERIFY'));
     /** wall-clock ms per slice of a server-run normal / 联防 field (virtual time: at once) */
     this.headlessSliceMs = Number.isFinite(opts.headlessSliceMs) && opts.headlessSliceMs > 0 ? opts.headlessSliceMs : this.sched.virtual ? Infinity : HEADLESS_SLICE_MS;
