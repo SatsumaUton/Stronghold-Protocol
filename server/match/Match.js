@@ -223,7 +223,7 @@ import { createRng, deriveSeed } from '../sim/rng.js';
 import { GameData } from './gamedata.js';
 import { RealScheduler } from './scheduler.js';
 import { SharedPool, drawDisabledBonds, createPoolGroups, createItemPools } from './pool.js';
-import { experimentalOptions } from '../../shared/experimental.js';
+import { experimentalOptions, enemyHpMulAt } from '../../shared/experimental.js';
 import { roomCapacity } from '../../shared/playerCapacity.js';
 import { PlayerState } from './PlayerState.js';
 import { EffectDispatcher, getDefaultRegistry } from './effectsMeta.js';
@@ -245,6 +245,7 @@ import { echoCurveOf } from './match/echoConfig.js';
 import { crossVersionEnemies } from './match/echoCrossVersion.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchSpeedVote } from './match/speedVote.js';
+import { MatchKickVote } from './match/kickVote.js';
 import { MatchSpDraft } from './match/spDraft.js';
 import { MatchPrep } from './match/prep.js';
 import { MatchCombat } from './match/combat.js';
@@ -466,9 +467,9 @@ export class Match {
       ? { ...expIn, disableSharedPool: true }
       : expIn);
     this.revivalEnabled = !this.isSolo && (this.echoVariant === 'deepecho' || this.experimental.revivalEnabled);
-    // 维护者 2026-11-05：**只有深潜**放宽救援（任何存活队友都能付 10 血救 1 血）。
-    // 普通房间保持原版口径（必须进过联防）—— 不能因为深潜的开关影响普通模式。
-    this.revivalAnyDonor = this.echoVariant === 'deepecho' && !this.isSolo;
+    // 维护者 2026-11-06：**所有多人模式**都放宽救援 —— 任何存活队友都能付 10 血救 1 血，
+    // 不再要求「未漏怪 / 参与过联防」（原版房间同样适用；独立模拟不开放）。
+    this.revivalAnyDonor = !this.isSolo;
     // 维护者 2026-11-06：深潜**取消「每人每局只能被救一次」** —— 只要救援窗口开着、有队友付得起 10 点，
     // 就能反复把人救回来（真正的上限是队友自己的生命值）。普通房间保持原版的一次性规则。
     this.revivalUnlimited = this.echoVariant === 'deepecho' && !this.isSolo;
@@ -492,7 +493,11 @@ export class Match {
     // 否则 R1–15 的开局就会和原版不同（维护者 2026-11-03 要求开局保持原版）。
     this.disableLayerCap = this.experimental.disableLayerCap === true;
     this.disableHitLimit = this.experimental.disableHitLimit === true;
+    /** 【AI 联防置后】(维护者 2026-11-06)：联防优先真人，AI 队友与托管中的博士排后（unite.js helperOrder）。 */
+    this.uniteHumansFirst = this.experimental.uniteHumansFirst === true;
     this.enemyHpMul = this.experimental.enemyHpMul ?? 1;
+    // 【按回合设置敌人生命倍率】(参考版 feedback #118，2026-11-06)：有计划时按回合取，否则就是单值
+    this.enemyHpMulAt = (round = this.round) => enemyHpMulAt(this.experimental, round);
     this.enemyAtkMul = this.experimental.enemyAtkMul ?? 1;
     // 鸭爵叠加（本服新增）：两个前置条件缺一不可。
     //   - allowRepeat：去重时一支队伍最多一个鸭爵，叠不叠加都是 1 份，开关无从谈起。
@@ -877,7 +882,8 @@ export class Match {
     ps.pendingDeath = true;
     ps.dirty();
     // 深潜的救援是「任一存活队友付 10 点救 1 点」，提示语要说清楚怎么救（维护者 2026-11-05）
-    this.toast(ps, 'warn', this.echoVariant === 'deepecho'
+    // 2026-11-06：所有多人模式都是「任一存活队友可付 10 点救援」，提示语跟着统一
+    this.toast(ps, 'warn', this.revivalAnyDonor
       ? msg('你的目标生命值耗尽：任一存活队友可支付 10 点目标生命把你救回 1 点')
       : msg('你的目标生命值耗尽，等待救援'));
   }
@@ -968,7 +974,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchEcho, MatchSetupVote, MatchSpeedVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchEcho, MatchSetupVote, MatchSpeedVote, MatchKickVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

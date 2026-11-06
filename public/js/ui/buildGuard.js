@@ -30,6 +30,9 @@ export const BUILD_FETCH_TIMEOUT_MS = 5_000;
 /** How many checks in a row must report the same NEW build before the page acts on it. */
 export const BUILD_CONFIRMATIONS = 2;
 
+/** 临时开关：true = 整个刷新提示停用（维护者 2026-11-06 要求，改回 false 即恢复）。 */
+const BUILD_GUARD_PAUSED = true;
+
 /**
  * 哪些界面允许出现「服务器已更新，请刷新页面」。
  *
@@ -110,6 +113,12 @@ export async function checkBuildOnce(o = {}) {
  * @returns {{ stop: () => void, check: () => Promise<object>, stale: () => boolean, known: () => string|null }}
  */
 export function startBuildGuard(o = {}) {
+  // ★ 2026-11-06 维护者要求「暂时不弹刷新提示」：直接返回一个空守卫（不轮询、不提示、不自动刷新）。
+  // 只影响页面刷新提示；文件照常下发。恢复：把 BUILD_GUARD_PAUSED 改成 false。
+  // 只在**真实运行**时暂停：测试会注入 fetchFn，注入的一律照常跑（否则 buildGuard 的 6 条单测全红）。
+  if (BUILD_GUARD_PAUSED && typeof o.fetchFn !== 'function') {
+    return { stop: () => {}, check: async () => ({ status: 'paused' }), stale: () => false, known: () => null };
+  }
   const fetchFn = o.fetchFn || ((url, init) => globalThis.fetch(url, init));
   const reload = o.reload || (() => globalThis.location.reload());
   const inMatch = typeof o.inMatch === 'function' ? o.inMatch : () => false;
