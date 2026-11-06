@@ -2905,5 +2905,6 @@
   "「深渊回响」暂未开放，仅管理员可进入": "“Abyss Echo” is not open yet — admins only",
   "「深渊回响」不支持实验性功能（固定最多 4 人）": "“Abyss Echo” does not support experimental features (fixed at most 4 players)",
   "全新玩法": "NEW MODE",
-  "深潜匹配池固定 4 人 · 标准规则，只会和深潜房配对": "The dive pool is fixed at 4 players with standard rules; it only pairs with dive rooms"
+  "深潜匹配池固定 4 人 · 标准规则，只会和深潜房配对": "The dive pool is fixed at 4 players with standard rules; it only pairs with dive rooms",
+  "深潜匹配": "Dive matchmaking"
 }

@@ -939,8 +939,10 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
         <header class="proto-top">
           <${BackPlate} onClick=${onClose} class="proto__back" />
           <div class="proto-title">
-            <h2 class="modal__title">${t('同盟集结')}</h2>
-            <span class="proto-title__mode"><${Icon} name="search" />${t('多人匹配')}<i>PUBLIC MATCHMAKING</i></span>
+            <h2 class="modal__title">${variant === 'deepecho' ? t('深渊回响') : t('同盟集结')}</h2>
+            <span class="proto-title__mode">${variant === 'deepecho'
+      ? html`<${Icon} name="target" />${t('深潜匹配')}<i>DEEP ECHO</i>`
+      : html`<${Icon} name="search" />${t('多人匹配')}<i>PUBLIC MATCHMAKING</i>`}</span>
           </div>
         </header>
         <div class="proto-body">
@@ -965,8 +967,10 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
       <header class="proto-top">
         <${BackPlate} onClick=${onClose} class="proto__back" />
         <div class="proto-title">
-          <h2 class="modal__title">${t('同盟集结')}</h2>
-          <span class="proto-title__mode"><${Icon} name="search" />${t('多人匹配')}<i>PUBLIC MATCHMAKING</i></span>
+          <h2 class="modal__title">${variant === 'deepecho' ? t('深渊回响') : t('同盟集结')}</h2>
+          <span class="proto-title__mode">${variant === 'deepecho'
+      ? html`<${Icon} name="target" />${t('深潜匹配')}<i>DEEP ECHO</i>`
+      : html`<${Icon} name="search" />${t('多人匹配')}<i>PUBLIC MATCHMAKING</i>`}</span>
         </div>
       </header>
       <div class="proto-body">

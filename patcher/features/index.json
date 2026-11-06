@@ -6621,7 +6621,7 @@
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": false,
-        "customBytes": 135073
+        "customBytes": 135519
       },
       {
         "path": "public/css/screens/room.css",
@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 222519
+        "customBytes": 222557
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 257751
+        "customBytes": 257794
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 247301
+        "customBytes": 247336
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 211459
+        "customBytes": 211493
       },
       {
         "path": "public/js/render/units.js",
@@ -6676,7 +6676,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 117763
+        "customBytes": 120533
       },
       {
         "path": "public/js/screens/result.js",
@@ -6821,7 +6821,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": false,
-        "customBytes": 276685
+        "customBytes": 277104
       },
       {
         "path": "server/match/Match.js",
