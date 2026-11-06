@@ -61,6 +61,13 @@ export class MatchCombat {
       ...(this.echoVariant === 'deepecho' ? { hitLimitMul: this._echoHitLimitMul() } : {}),
       // 「深渊回响」：「频次怪」（器物，血量 == 需要被打几下）16 层起按深度给**绝对血量**（见 _echoHitCountHp）
       ...(hpAbs && Object.keys(hpAbs).length ? { enemyHpAbs: hpAbs } : {}),
+      // 「深渊回响」：「洞彻」（永久反隐）必须走 **spec flags**，不能只靠 `_echoHookBattle` 的事件钩子。
+      // 深潜的战斗默认在**客户端**按 BattleSpec 跑（Match.clientCombat，SP_COMBAT 未设 = 客户端权威），
+      // 服务端钩子只挂在服务端自己那份 battle 上，玩家看到的那份没有 → 隐匿敌人照样隐匿
+      // （玩家反馈 2026-11-06「反隐匿词条没有效果，出来的敌对目标依然有隐匿状态」）。
+      // sim 在出怪处读这个 flag（battle/spawns.js spawnEnemy），客户端/服务端两边逐字节一致。
+      ...(this.echoVariant === 'deepecho' && typeof this._echoBlessings === 'function'
+        && this._echoBlessings().some((b) => b && b.id === 'reveal_always') ? { revealAll: true } : {}),
       ...(this.enemyHpMul !== 1 ? { enemyHpMul: this.enemyHpMul } : {}), ...(this.enemyAtkMul !== 1 ? { enemyAtkMul: this.enemyAtkMul } : {}) };
   }
 

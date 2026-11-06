@@ -6856,7 +6856,7 @@
       {
         "path": "server/match/match/combat.js",
         "baseExists": false,
-        "customBytes": 12712
+        "customBytes": 13534
       },
       {
         "path": "server/match/match/echo.js",
@@ -7016,7 +7016,7 @@
       {
         "path": "server/sim/battle/spawns.js",
         "baseExists": false,
-        "customBytes": 14690
+        "customBytes": 15266
       },
       {
         "path": "server/sim/content/bonds/addon/meta.js",
