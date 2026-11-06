@@ -2042,8 +2042,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   position: absolute; top: .05rem; right: .06rem;
   transform: rotate(9deg);
   transform-origin: right top;
-  padding: .045rem .14rem .05rem;
-  font-size: calc(.108 * var(--t)); font-weight: 900; letter-spacing: .06em; line-height: 1.1;
+  padding: .055rem .17rem .06rem;
+  font-size: calc(.15 * var(--t)); font-weight: 900; letter-spacing: .05em; line-height: 1.1;
   color: #1a0b2e;
   background: linear-gradient(120deg, #ffd76a 0%, #ff9ad5 55%, #b79cff 100%);
   border-radius: .05rem;
@@ -2061,8 +2061,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .hub-entry__new {
     top: .05rem; right: .05rem;
     transform: rotate(6deg);
-    padding: .035rem .1rem .04rem;
-    font-size: calc(.094 * var(--t)); letter-spacing: .04em;
+    padding: .045rem .12rem .05rem;
+    font-size: calc(.118 * var(--t)); letter-spacing: .04em;
   }
 }
 @media (prefers-reduced-motion: reduce) {
