@@ -157,7 +157,9 @@ test('a completed check reads updated manifests and downloads newly supplied fil
   manifest.b = '/assets/b';
   await queue.start();
   assert.equal(queue.get().done, 2);
-  assert.deepEqual(calls, ['/assets/a', '/assets/a', '/assets/b']);
+  // 2026-11-06：清单每次都重读（修「上新素材看不见」），已下好的 a 仍被 complete 认出来、不重下，
+  // 所以这里只该请求新增的 b —— 以前那条 ['/assets/a','/assets/a','/assets/b'] 记录的是「每次全量重下」的旧行为。
+  assert.deepEqual(calls, ['/assets/a', '/assets/b']);
 });
 
 test('the official battle effects manifest (/data/local-fx.json, DESIGN §33) is queued when the host has it', async () => {
@@ -171,4 +173,45 @@ test('the official battle effects manifest (/data/local-fx.json, DESIGN §33) is
   assert.equal(queue.get().phase, 'complete');
   assert.ok(got.includes('/assets/~fedcba0987654321/local/fx/prefabs/common_hit_01.json'));
   assert.ok(got.includes('/assets/~1234567890abcdef/a.png'));
+});
+
+// 存储配额保护（2026-11-06 玩家反馈「下载完整素材后闪退」）：移动端越过 origin 配额时浏览器直接杀页面，
+// 所以「空间不够就不开始」「写到九成就停」两条都要有。
+test('存储空间不足时直接拒绝，一个素材都不请求', async () => {
+  let assetCalls = 0;
+  const queue = createAssetDownload({
+    room: async () => ({ usage: 0, quota: 100e6, room: 40e6 }),
+    fetch: fixture({ a: '/assets/a' }, async () => { assetCalls++; return file(); }),
+  });
+  await queue.start();
+  assert.equal(queue.get().phase, 'error');
+  assert.equal(queue.get().error.status, 'quota');
+  assert.equal(assetCalls, 0, '空间不够就不该请求素材');
+});
+
+test('写入被浏览器拒绝（配额）→ 立刻停下，不再请求下一个文件', async () => {
+  const prevCaches = globalThis.caches;
+  const prevMemo = globalThis.__spDlCache;
+  globalThis.__spDlCache = undefined;
+  globalThis.caches = {
+    open: async () => ({
+      match: async () => null,
+      put: async () => { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; },
+    }),
+  };
+  try {
+    const calls = [];
+    const queue = createAssetDownload({
+      concurrency: 1,
+      room: async () => ({ usage: 0, quota: 4e9, room: 3e9 }),
+      fetch: fixture({ a: '/assets/a', b: '/assets/b', c: '/assets/c' }, async (url) => { calls.push(url); return file(); }),
+    });
+    await queue.start();
+    assert.equal(queue.get().phase, 'error');
+    assert.equal(queue.get().error.status, 'quota');
+    assert.equal(calls.length, 1, `越配额后不该继续请求（实际请求了 ${calls.length} 个）`);
+  } finally {
+    if (prevCaches === undefined) delete globalThis.caches; else globalThis.caches = prevCaches;
+    globalThis.__spDlCache = prevMemo;
+  }
 });

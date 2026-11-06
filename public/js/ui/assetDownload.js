@@ -92,13 +92,16 @@ export function AssetDownloadButton() {
     assetDownload.pause();
     setOpen(false);
   };
+  // 存储空间不足（2026-11-06）：浏览器已经不让我们写了 —— 说清楚，别让玩家以为下载失败。
+  const quotaError = state.phase === 'error' && state.error && state.error.status === 'quota';
   const status = state.phase === 'complete' ? t('本次素材下载完成')
     : state.phase === 'preparing' ? t('正在读取素材清单…')
       : state.phase === 'verifying' ? t('正在检查已缓存的素材…')
         : state.phase === 'paused' ? t('素材下载已暂停')
-          : state.phase === 'error' ? t('无法读取素材清单，请检查网络后重试。')
-            : state.phase === 'partial' ? t('有 {n} 个素材下载失败', { n: state.failures.length })
-              : t('正在下载素材…');
+          : quotaError ? t('浏览器存储空间不足，下载已停下（已下载的素材仍然可用）。')
+            : state.phase === 'error' ? t('无法读取素材清单，请检查网络后重试。')
+              : state.phase === 'partial' ? t('有 {n} 个素材下载失败', { n: state.failures.length })
+                : t('正在下载素材…');
   const label = state.phase === 'complete' ? t('素材已下载')
     : state.phase === 'paused' ? t('继续下载素材') : t('下载完整素材');
 
