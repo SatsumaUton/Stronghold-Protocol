@@ -6621,7 +6621,7 @@
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": false,
-        "customBytes": 132887
+        "customBytes": 133520
       },
       {
         "path": "public/css/screens/room.css",
@@ -6826,7 +6826,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": false,
-        "customBytes": 67293
+        "customBytes": 67274
       },
       {
         "path": "server/match/PlayerState.js",
