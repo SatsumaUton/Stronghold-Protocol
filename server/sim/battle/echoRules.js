@@ -164,6 +164,51 @@ export function installEchoRules(battle) {
     }
   }
 
+  // 干员减益诅咒：部署时按站位过滤给己方干员挂负面 mods（敌人、召唤物、装置都不吃）。
+  const unitCurses = Array.isArray(rules.unitCurses) ? rules.unitCurses : [];
+  if (unitCurses.length && typeof battle.addBuff === 'function') {
+    const matches = (filter, unit) => {
+      if (!unit || !filter || typeof filter !== 'object') return false;
+      if (filter.position) {
+        const pos = (unit.def && unit.def.position) || unit.position || null;
+        if (pos !== filter.position) return false;
+      }
+      return true;
+    };
+    battle.on('deploy', ({ unit }) => {
+      if (!unit || unit.side !== 'ally') return;
+      for (let ci = 0; ci < unitCurses.length; ci++) {
+        const c = unitCurses[ci];
+        if (!matches(c.filter, unit)) continue;
+        // 同一条诅咒叠了 N 层就要挂 N 个 buff，所以 key 带序号
+        const key = `echo:curse:${c.id}:${ci}`;
+        if ((unit.buffs || []).some((x) => x && x.key === key)) continue;
+        battle.addBuff(unit, { key, name: c.name, desc: '', mods: { ...c.mods }, persist: true, visible: true });
+      }
+    }, { priority: 59, owner: 'echo:rules' });
+    groups++;
+  }
+
+  // 「腐蚀 / 溃烂」：全场己方单位每秒按最大生命比例掉血（诅咒 DOT）。
+  if (Number(rules.curseDot) > 0) {
+    const dot = Number(rules.curseDot);
+    let acc = 0;
+    battle.on('tick', ({ dt } = {}) => {
+      acc += Math.max(0, Number(dt) || 0);
+      if (acc < 1) return;
+      acc -= 1;
+      const units = Array.isArray(battle.allyUnits) ? battle.allyUnits : [];
+      for (const u of units) {
+        if (!u || !u.alive) continue;
+        const maxHp = Number(u.maxHp ?? (u.s && u.s.maxHp)) || 0;
+        if (!(maxHp > 0)) continue;
+        const amount = Math.max(1, Math.round(maxHp * dot));
+        if (typeof battle.dealHPLose === 'function') battle.dealHPLose({ target: u, amount });
+      }
+    }, { priority: 30, owner: 'echo:rules' });
+    groups++;
+  }
+
   // 朔风（谢拉格寒风）：每 interval 秒让全场敌人寒冷 duration 秒 —— 直接用原版盟约的实现。
   if (rules.coldWind && Number(rules.coldWind.interval) > 0) {
     try {
