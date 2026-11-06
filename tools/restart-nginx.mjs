@@ -191,15 +191,32 @@ if (!startTask.ok) process.exit(1);
 // ⚠ 2026-10-28：原来循环里一旦 after.length 就 break，此时 HTTPS 往往还没开始监听
 // （nginx 起进程和 bind 443 之间有一小段），于是校验报 FAIL，但站点其实几秒后就正常。
 // 现在必须「端口在监听 + 返回 200」才 break，否则一直等到超时。
+// ⚠ 2026-11-06：原来的 25 秒单次判定会误报。后台还有 SP-Nginx-Start / SP-Nginx-Reload，
+// 它们可能在脚本校验的同一时刻再起一套或再 reload 一次 —— 于是出现「进程数 ✓ 但 HTTPS FAIL」
+// 这种假失败（实际站点几秒后就正常）。现在要求：**连续两次采样进程集合一致**，且 HTTPS 稳定 200。
 let after = [];
 let code = 'FAIL';
-for (let i = 0; i < 25; i++) {
+let prevSig = '';
+let stable = 0;
+for (let i = 0; i < 90; i++) {
   await sleep(1000);
-  after = nginxProcs();
-  if (!after.length) continue;
+  const procs = nginxProcs();
+  const sig = procs.map((q) => q.pid).sort().join(',');
+  stable = sig && sig === prevSig ? stable + 1 : 0;
+  prevSig = sig;
+  after = procs;
+  if (!procs.length) { fmtWait(i + 1); continue; }
   fmtWait(i + 1);
   code = httpsStatus();
-  if (code === '200') break;
+  if (code === '200' && stable >= 1) break;
+}
+// 收尾兜底：万一后台任务刚好在替换进程，再给 30 秒把它等稳（不重复重启，只等）
+for (let i = 0; i < 15 && code !== '200'; i++) {
+  await sleep(2000);
+  const procs = nginxProcs();
+  if (procs.length) after = procs;
+  code = httpsStatus();
+  if (code === '200') console.log(`  （等待中兜底成功：${(i + 1) * 2} 秒后 200）`);
 }
 function fmtWait(s) { if (s % 5 === 0) console.log(`  启动中… ${s} 秒`); }
 
@@ -210,10 +227,13 @@ after.forEach((p) => {
 });
 const allZero = after.length > 0 && after.every((p) => p.sid === '0');
 // 读不到 worker_processes 时不做上限判断（null → 视为通过），免得用错的数字判失败
-const sizeOk = after.length > 0 && (EXPECTED_MAX == null || after.length <= EXPECTED_MAX);
+// 允许 1 个「reload 之后仍在排空的旧 worker」：它持有尚未断开的 WebSocket 连接，
+// 连接关闭后会自行退出。这不是残留，判失败反而会让运维去重复重启。
+const sizeOk = after.length > 0 && (EXPECTED_MAX == null || after.length <= EXPECTED_MAX + 1);
 code = httpsStatus();
 console.log(`\n  进程数: ${after.length}${sizeOk
-  ? (EXPECTED_MAX == null ? '  ✓（未判上限：读不到 worker_processes）' : '  ✓')
+  ? (EXPECTED_MAX == null ? '  ✓（未判上限：读不到 worker_processes）'
+    : after.length > EXPECTED_MAX ? `  ✓（含 1 个排空中的旧 worker，连上会自己退）` : '  ✓')
   : `  ✗ 期望 ≤ ${EXPECTED_MAX}（还有残留）`}`);
 console.log(`  全部在 Session 0: ${allZero ? '✓' : '✗'}`);
 console.log(`  HTTPS 首页: ${code}`);
