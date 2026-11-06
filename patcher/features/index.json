@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 229400
+        "customBytes": 229504
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 265417
+        "customBytes": 265530
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 254783
+        "customBytes": 254889
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 218000
+        "customBytes": 218095
       },
       {
         "path": "public/js/render/units.js",
@@ -6696,7 +6696,7 @@
       {
         "path": "public/js/ui/bondStrip.js",
         "baseExists": false,
-        "customBytes": 20756
+        "customBytes": 21779
       },
       {
         "path": "public/js/ui/detailPanel.js",
