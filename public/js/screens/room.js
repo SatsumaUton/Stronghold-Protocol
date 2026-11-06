@@ -497,6 +497,8 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
   // 【AI 联防置后】：联防优先真人，AI 队友 / 托管中的博士排后
   const [uniteFirst, setUniteFirst] = useState(false);
   const [enemyHp, setEnemyHp] = useState(1);
+  // 【按回合设置敌人生命倍率】：null = 用单值；数组 = [[起始回合, 倍率], …]（第一段必须从第 1 回合起）
+  const [hpPlan, setHpPlan] = useState(null);
   const [enemyAtk, setEnemyAtk] = useState(1);
   // 手动指定卡池编组（shared/poolPlan.js）：null = 用自动规则
   const [poolPlan, setPoolPlan] = useState(null);
@@ -557,6 +559,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       setHitLimitOff(exp.disableHitLimit === true);
       setUniteFirst(exp.uniteHumansFirst === true);
       setEnemyHp(isEnemyMultiplier(exp.enemyHpMul) ? exp.enemyHpMul : 1);
+      setHpPlan(Array.isArray(exp.enemyHpPlan) ? exp.enemyHpPlan.map((s) => [s[0], s[1]]) : null);
       setEnemyAtk(isEnemyMultiplier(exp.enemyAtkMul) ? exp.enemyAtkMul : 1);
       // 卡池编组：房间已有的照搬，没有就从「自动规则会怎么分」开始（编辑器的起点）
       setPoolPlan(Array.isArray(exp.poolPlan) ? exp.poolPlan.slice() : null);
@@ -577,7 +580,7 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       ...(layerCapOff ? { disableLayerCap: true } : {}),
       ...(hitLimitOff ? { disableHitLimit: true } : {}),
       ...(uniteFirst ? { uniteHumansFirst: true } : {}),
-      ...(enemyHp !== 1 ? { enemyHpMul: enemyHp } : {}),
+      ...(hpPlan && hpPlan.length ? { enemyHpPlan: hpPlan } : enemyHp !== 1 ? { enemyHpMul: enemyHp } : {}),
       ...(enemyAtk !== 1 ? { enemyAtkMul: enemyAtk } : {}),
       // 手动指定卡池编组：长度必须等于人数，对不上就不发（服务端也会拒）
       ...(manualPools ? { poolPlan: poolPlan.slice() } : {}),
@@ -682,6 +685,29 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
                 disabled=${!!busy || !canEdit}
                 onClick=${() => { setCapOpen(false); canEdit && setEnemyHp(m); }}>×${m}</button>`)}
           </div>
+          ${canEdit || hpPlan ? html`<div class="exp-hpplan">
+            <button type="button" class=${`dpick__opt ailast__opt${hpPlan ? ' is-active' : ''}`} data-testid="exp-hp-plan-toggle"
+                disabled=${!!busy || !canEdit} onClick=${() => { setCapOpen(false); canEdit && setHpPlan(hpPlan ? null : [[1, enemyHp]]); }}>
+              <${Icon} name="check" class=${hpPlan ? 'is-on' : ''} />${t('按回合设置')}
+            </button>
+            ${hpPlan ? html`<span class="exp-hpplan__rows">
+              ${hpPlan.map(([from, mul], i) => html`<span key=${i} class="exp-hpplan__row">
+                <span class="t-dim">${t('第')}</span>
+                <input type="number" min="1" max="20" value=${from} disabled=${!!busy || !canEdit || i === 0}
+                  onInput=${(e) => { const v = Math.max(1, Math.min(20, Number(e.currentTarget.value) || 1)); setHpPlan(hpPlan.map((s, j) => (j === i ? [v, s[1]] : s))); }} />
+                <span class="t-dim">${t('回合起')}</span>
+                <select value=${String(mul)} disabled=${!!busy || !canEdit}
+                  onChange=${(e) => { const v = Number(e.currentTarget.value); setHpPlan(hpPlan.map((s, j) => (j === i ? [s[0], v] : s))); }}>
+                  ${ENEMY_MULTIPLIERS.map((m) => html`<option key=${m} value=${String(m)}>×${m}</option>`)}
+                </select>
+                ${i > 0 ? html`<button type="button" class="btn btn--ghost btn--sm" disabled=${!!busy || !canEdit}
+                  onClick=${() => setHpPlan(hpPlan.filter((_, j) => j !== i))}>×</button>` : null}
+              </span>`)}
+              ${hpPlan.length < 6 ? html`<button type="button" class="btn btn--secondary btn--sm" data-testid="exp-hp-plan-add"
+                disabled=${!!busy || !canEdit}
+                onClick=${() => setHpPlan([...hpPlan, [Math.min(20, (hpPlan[hpPlan.length - 1][0] || 1) + 5), hpPlan[hpPlan.length - 1][1]]])}>${t('＋ 添加一段')}</button>` : null}
+            </span>` : null}
+          </div>` : null}
         </div>
         <div class="exp-mul">
           <span class="exp-mul__k">${t('敌人攻击')}</span>

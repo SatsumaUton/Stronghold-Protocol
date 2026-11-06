@@ -2944,4 +2944,9 @@
 ,
   "AI 联防置后": "AI last in unite",
   "联防阶段优先挑选真人博士；AI 队友与托管中的博士排在后面": "In the unite phase, human doctors are picked first; AI teammates and doctors under AI autoplay rank after them."
+,
+  "按回合设置": "Per-round",
+  "第": "Round",
+  "回合起": "onwards",
+  "＋ 添加一段": "+ Add segment"
 }
