@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 222557
+        "customBytes": 222955
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 257794
+        "customBytes": 258228
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 247336
+        "customBytes": 247748
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 211493
+        "customBytes": 211869
       },
       {
         "path": "public/js/render/units.js",
@@ -6726,7 +6726,7 @@
       {
         "path": "public/js/ui/echoStatus.js",
         "baseExists": false,
-        "customBytes": 10717
+        "customBytes": 11460
       },
       {
         "path": "public/js/ui/echoSupply.js",
@@ -6906,7 +6906,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 170640
+        "customBytes": 170900
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -6921,7 +6921,7 @@
       {
         "path": "server/match/match/echoWords.js",
         "baseExists": false,
-        "customBytes": 9550
+        "customBytes": 11839
       },
       {
         "path": "server/match/match/intents.js",
