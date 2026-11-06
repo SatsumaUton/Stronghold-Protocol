@@ -156,6 +156,13 @@ export class BattleDeploy {
           if (pp) pp.killedInTotal++;
         }
         if (killer) killer.stats.kills++;
+        // 悬赏卡回执（2026-11-06）：这张卡到底有没有打掉，记进**战斗结果**里 ——
+        // 以前只有 Match 侧的 kill 钩子能看见，深潜改由客户端跑战斗时就拿不到了。
+        const bountyCard = unit.mods && unit.mods.bountyId;
+        if (bountyCard != null) {
+          if (!this._bountyPaid) this._bountyPaid = new Set();
+          this._bountyPaid.add(bountyCard);
+        }
         if (unit.bounty && unit.bounty.coins > 0) this.addCoins(this._bountyPayee(unit, killer), unit.bounty.coins);
       }
     }

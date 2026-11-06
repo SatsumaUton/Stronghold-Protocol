@@ -6906,7 +6906,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 170306
+        "customBytes": 170640
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -7027,6 +7027,11 @@
         "path": "server/sim/attack/health.js",
         "baseExists": false,
         "customBytes": 7539
+      },
+      {
+        "path": "server/sim/battle/deploy.js",
+        "baseExists": false,
+        "customBytes": 15611
       },
       {
         "path": "server/sim/battle/echoRules.js",
