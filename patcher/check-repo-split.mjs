@@ -24,7 +24,6 @@ const APPLY = process.argv.includes('--apply');
 /** 深潜独占文件的路径模式（与 docs/DEEPECHO-REPO.md 的第 2 节一一对应）。 */
 export const EXCLUSIVE = [
   /^server\/match\/match\/echo[\w.-]*\.js$/,
-  /^server\/echoTesters\.js$/,
   /^public\/js\/ui\/echo[\w.-]*\.js$/,
   /^public\/js\/ui\/enemyRecords\.js$/,
   /^public\/js\/screens\/echoLobby\.js$/,
@@ -40,7 +39,6 @@ export const EXCLUSIVE = [
 /** .gitignore 里必须存在的忽略行（保证摘掉以后不会再被 add 回来）。 */
 const IGNORE_LINES = [
   'server/match/match/echo*.js',
-  'server/echoTesters.js',
   'public/js/ui/echo*.js',
   'public/js/ui/enemyRecords.js',
   'public/js/screens/echoLobby.js',

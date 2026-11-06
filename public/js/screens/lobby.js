@@ -159,13 +159,11 @@ const MODE_CARDS = [
   },
   {
     // ★ 2026-11-03：第三模式「深渊回响」（mode: coop + variant: deepecho）。
-    //   **未开放**：普通玩家点不进（openMode 里拦 + 服务端三处门禁兜底），按钮上显示「未开放」。
-    //   正式开放时把 `adminOnly` 去掉即可。
+    //   2026-11-07 起**对所有人开放**（维护者定）：取消了测试名单 / 管理员限制，卡片不再有「未开放」态。
     id: 'deepecho', name: N_('深渊回响'), en: 'DEEP ECHO', icon: 'target',
     desc: N_('打完最后一个领袖后继续深潜：无尽波次、侵蚀词条与祝福，深度就是成绩。'),
     points: [N_('无尽深潜 · 深度即成绩'), N_('敌人按威胁预算随机组合')],
     pointShort: N_('无尽深潜'),
-    adminOnly: true,
   },
 ];
 
@@ -509,7 +507,7 @@ function ProtoFit() {
  * co-op card's long/short pair, or the solo card's single line. `timeShort` replaces the phone line; absent, the phone
  * keeps points[0] (「1 名博士」).
  */
-export function HubEntry({ card, onOpen, timePoint = null, timeShort = null, locked = false }) {
+export function HubEntry({ card, onOpen, timePoint = null, timeShort = null }) {
   const line = timePoint
     ? html`<span class="hub-entry__long">${t(card.points[0], card.pointParams)} · ${t(timePoint)}</span><span class="hub-entry__short">${timeShort ? t(timeShort) : t(card.points[0], card.pointParams)}</span>`
     : card.pointShort
@@ -526,18 +524,14 @@ export function HubEntry({ card, onOpen, timePoint = null, timeShort = null, loc
       ${extraLines.map((txt, i) => html`<span key=${i} class="hub-entry__group hub-entry__group2"><${Icon} name=${card.icon} />${t(txt, card.pointParams)}</span>`)}
       ${Array.from({ length: pad }, (_, i) => html`<span key=${'pad' + i} class="hub-entry__group hub-entry__group2 hub-entry__group--pad" aria-hidden="true"><${Icon} name=${card.icon} /><span>${PAD_LABEL}</span></span>`)}
     </div>
-    <button type="button" class=${`mode-card hub-entry hub-entry--${card.id}${locked ? ' hub-entry--locked' : ''}`} data-mode=${card.id}
-        disabled=${locked ? true : undefined}
+    <button type="button" class=${`mode-card hub-entry hub-entry--${card.id}`} data-mode=${card.id}
         onClick=${() => onOpen(card.id)}
-        aria-disabled=${locked ? 'true' : 'false'}
-        title=${locked ? t('暂未开放，仅管理员可进入') : t(card.desc, card.params)}>
+        title=${t(card.desc, card.params)}>
       <span class="hub-entry__icon" aria-hidden="true"><${Icon} name=${card.icon} /></span>
       <span class="hub-entry__en">${card.en}</span>
       <span class="hub-entry__name">${t(card.name)}</span>
-      ${/* 未开放：右上角一条横幅；按钮本身 disabled + 灰色（无权限的人点不动） */ null}
-      ${locked ? html`<span class="hub-entry__ribbon">${t('暂未开放')}</span>` : null}
-      ${/* 「全新玩法」角标（维护者 2026-11-06）：只贴在**能点**的深渊回响卡右上角，斜着放；锁住时保持原样 */ null}
-      ${!locked && card.id === 'deepecho' ? html`<span class="hub-entry__new">${t('全新玩法')}</span>` : null}
+      ${/* 「全新玩法」角标（维护者 2026-11-06）：贴在深渊回响卡右上角，斜着放 */ null}
+      ${card.id === 'deepecho' ? html`<span class="hub-entry__new">${t('全新玩法')}</span>` : null}
       <span class="hub-entry__corner" aria-hidden="true"></span>
     </button>
   </div>`;
@@ -1461,16 +1455,6 @@ export function LobbyScreen() {
     return () => { stop = true; clearInterval(timer); };
   }, []);
   const createOpen = isAdminUser || createGateOpen;
-  // 身份门（owner/admin 账号）：第三张卡「深渊回响」只对它开放，其余人点进去只得到「未开放」提示
-  const adminId = useStore((s) => s.adminId === true);
-  const echoTester = useStore((s) => s.adminId === true || s.echoTester === true);
-  /**
-   * 验收用：`?unreleased=1` 让管理员也看到「未开放」的样子（灰色卡 + 斜纹横幅 + 点不动）。
-   * 只影响这张卡的**外观与可点性**，不改任何权限判定 —— 服务端该拦的照样拦。
-   */
-  const previewLocked = useMemo(() => {
-    try { return new URLSearchParams(location.search).get('unreleased') === '1'; } catch { return false; }
-  }, []);
   /** 深潜专属大厅是否打开（只有管理员能打开） */
   const [echoOpen, setEchoOpen] = useState(false);
 /** 「公开深潜」列表（深潜专属，维护者 2026-11-06）：只列公开的深潜房，和普通「公开同盟」分开 */
@@ -1481,8 +1465,7 @@ export function LobbyScreen() {
   const [echoPick, setEchoPick] = useState(null);
   const openMode = (m) => {
     if (m === 'deepecho') {
-      // 「深渊回响」未开放：普通玩家点了只给提示；管理员进专属大厅（难度 / 排行榜 / 开始）。
-      if (!echoTester) { toast(t('「深渊回响」暂未开放，仅管理员与测试名单可进入'), 'warn'); return; }
+      // 「深渊回响」（2026-11-07 起对所有人开放）：直接进专属大厅（难度 / 排行榜 / 开始）。
       setEchoOpen(true);
       return;
     }
@@ -1818,7 +1801,7 @@ export function LobbyScreen() {
           const timePoint = timedCard ? soloTimeMsgid('card', { timed: soloTimed, unlimited: soloFree }) : '';
           const timeShort = timedCard ? soloTimeMsgid('short', { timed: soloTimed, unlimited: soloFree }) : '';
           return html`<${HubEntry} key=${c.id} card=${c} onOpen=${openMode} timePoint=${timePoint || null} timeShort=${timeShort || null}
-            locked=${c.adminOnly === true && (!echoTester || previewLocked)} />`;
+            />`;
         })}
       </section>
     </main>

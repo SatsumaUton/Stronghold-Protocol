@@ -61,23 +61,6 @@ function adminToolTtlMs() {
 //   「连取码界面都不给看」——没有权限的 admin 打开工具界面本身就是越权展示。
 //   只带一个布尔量（gameTool: true/false），不把整张权限表塞进令牌。
 //   owner 恒为 true（最高管理员不受权限表限制，和 adminHasPerm 的口径一致）。
-/**
- * 「深渊回响」测试名单（维护者 2026-11-05）：
- * 名单存在部署根的 content/echo-testers.json，后台可改，这里只读（3 秒缓存）。
- */
-let _echoTesterCache = { at: 0, ids: new Set() };
-function echoTesterFor(accountId) {
-  const now = Date.now();
-  if (now - _echoTesterCache.at > 3000) {
-    const ids = new Set();
-    try {
-      const doc = JSON.parse(fs.readFileSync(require('node:path').join(__dirname, '..', 'content', 'echo-testers.json'), 'utf8'));
-      for (const x of (Array.isArray(doc) ? doc : doc.ids || [])) ids.add(String(x));
-    } catch { /* 文件不存在 = 空名单 */ }
-    _echoTesterCache = { at: now, ids };
-  }
-  return !!accountId && _echoTesterCache.ids.has(String(accountId));
-}
 
 function userTokenFor(u, perms) {
   if (!u || !u.id) return null;
@@ -89,7 +72,6 @@ function userTokenFor(u, perms) {
     typ: 'user',
     uid: u.id,
     role: u.role || 'player',
-    echoTester: echoTesterFor(u.id),
     tag: u.tag || null,
     gameTool,
     exp: Date.now() + 7 * 24 * 3600_000,
@@ -1158,40 +1140,6 @@ async function handle(req, res, pathname) {
     return sendJson(res, 200, { ok: true });
   }
   // 管理员登录：必须已有游戏登录态（Cookie 会话），再通过邮箱验证码二次验证
-  // deep-echo tester list: accounts allowed to create deepecho rooms (stored in content/echo-testers.json)
-if (method === 'GET' && pathname === '/api/admin2/echo-testers') {
-  const u = await currentUser(req);
-  if (!u) return sendJson(res, 401, { ok: false, error: 'login_required' });
-  if (!u.role || u.role === 'player') return sendJson(res, 403, { ok: false, error: 'not_admin' });
-  const file = require('node:path').join(__dirname, '..', 'content', 'echo-testers.json');
-  let ids = [];
-  try { const doc = JSON.parse(fs.readFileSync(file, 'utf8')); ids = Array.isArray(doc) ? doc : (doc.ids || []); } catch { ids = []; }
-  return sendJson(res, 200, { ok: true, ids: ids.map(String) });
-}
-if (method === 'POST' && pathname === '/api/admin2/echo-testers/toggle') {
-  const u = await currentUser(req);
-  if (!u) return sendJson(res, 401, { ok: false, error: 'login_required' });
-  if (!u.role || u.role === 'player') return sendJson(res, 403, { ok: false, error: 'not_admin' });
-  // 注意：readBody() 返回的**已经是解析好的对象**（见 account.cjs 顶部），不要再 JSON.parse 一次
-  let payload = {};
-  try { payload = (await readBody(req, 8 * 1024)) || {}; } catch { return sendJson(res, 400, { ok: false, error: 'bad_json' }); }
-  if (typeof payload !== 'object') payload = {};
-  const id = String(payload.id || '').trim();
-  if (!id) return sendJson(res, 400, { ok: false, error: 'id_required' });
-  const file = require('node:path').join(__dirname, '..', 'content', 'echo-testers.json');
-  let ids = [];
-  try { const doc = JSON.parse(fs.readFileSync(file, 'utf8')); ids = Array.isArray(doc) ? doc : (doc.ids || []); } catch { ids = []; }
-  ids = ids.map(String);
-  const at = ids.indexOf(id);
-  const want = typeof payload.on === 'boolean' ? payload.on : (at < 0);
-  if (want && at < 0) ids.push(id);
-  if (!want && at >= 0) ids.splice(at, 1);
-  try {
-    fs.mkdirSync(require('node:path').join(__dirname, '..', 'content'), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ ids, updatedAt: Date.now() }, null, 2), 'utf8');
-  } catch { return sendJson(res, 500, { ok: false, error: 'write_failed' }); }
-  return sendJson(res, 200, { ok: true, ids, on: want });
-}
 if (method === 'GET' && pathname === '/api/admin2/whoami') {
     const u = await currentUser(req);
     if (!u) return sendJson(res, 401, { ok: false, error: 'login_required' });

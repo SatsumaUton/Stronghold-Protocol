@@ -253,7 +253,6 @@ function notifyPartyLeave(room) {
 import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.js';
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { isEchoTester } from './echoTesters.js';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, ROOM_LIST_MAX, ROOM_LIST_MIN_CAPACITY, modeIdFor } from '../shared/constants.js';
 import { roomCapacity, PLAYER_CAPACITIES } from '../shared/playerCapacity.js';
 import { EXPERIMENTAL_DEFAULTS, isExperimental, experimentalOptions, experimentalRuleChanged } from '../shared/experimental.js';
@@ -1552,11 +1551,9 @@ case 'room.list': return this.roomList(msg);
         ? msg('游客不能开始独立模拟，请先登录')
         : msg('游客不能创建同盟模拟房间，请先登录'));
     }
-    // 「深渊回响」（DESIGN-ABYSS.md）：正式开放前**只有管理员**能开这个模式，其他人一律拒绝。
-    // 判据用身份 `session.adminId`（与「管理员建房免过期」同一口径），不要求兑换验证码 ——
-    // 这是「谁能进这个模式」，不是「谁能改对局数据」（后者走 ps.admin 三道门）。
+    // 「深渊回响」（DESIGN-ABYSS.md）：**对所有玩家开放**（维护者 2026-11-07 取消测试名单 / 管理员限制）。
+    // 以前这里有一道 `session.adminId / echoTester` 的门禁，连同管理后台的「深渊回响测试权限」一起删掉了。
     const variant = askedVariant === 'deepecho' ? 'deepecho' : null;
-    if (variant && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId)) return fail(ERR.ECHO_FORBIDDEN, msg('「深渊回响」暂未开放，仅管理员与测试名单可进入'));
     // 深潜**不支持**实验性功能（维护者 2026-11-03 定）：enemyHpMul/Atk 会和 echoScale 叠乘、
     // playerCapacity 会改变配对与 boss 半场、poolPlan 会破坏「随机出怪」这个前提、
     // disableLayerCap 本来就是深潜的固定行为。这里**直接拒绝**而不是静默丢掉 ——
@@ -1690,12 +1687,6 @@ case 'room.list': return this.roomList(msg);
     const room = norm.length === ROOM_CODE_LEN ? this.rooms.get(norm) : undefined;
     if (!room) return fail(ERR.ROOM_NOT_FOUND);
     if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
-    // 「深渊回响」：正式开放前只有管理员能进。创建侧已经挡了（create()），但管理员开的房间
-    // 一旦被设成公开同盟，普通玩家仍可能点「加入同盟」进来 —— 所以加入 / 观战 / 接管这条路也要挡。
-    // 已经在本房里的人不受影响（下面的 idempotent 分支照旧），否则重连会把自己拦在门外。
-    if (room.variant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId) && this.roomOf(session) !== room) {
-      return fail(ERR.ECHO_FORBIDDEN, msg('「深渊回响」暂未开放，仅管理员可进入'));
-    }
     const cur = this.roomOf(session);
     // idempotent for members; a spectator of this room goes on below: it may take a free player seat (header)
     // ★ 2026-11-06：**只有真的坐着**才算 idempotent。若会话仍挂在本房间、座位却已经没了
@@ -1823,10 +1814,6 @@ case 'room.list': return this.roomList(msg);
     const room = norm.length === ROOM_CODE_LEN ? this.rooms.get(norm) : undefined;
     if (!room) return fail(ERR.ROOM_NOT_FOUND);
     if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
-    // 「深渊回响」：观战席与玩家席同一道门禁（正式开放前只有管理员能进）。
-    if (room.variant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId) && this.roomOf(session) !== room) {
-      return fail(ERR.ECHO_FORBIDDEN, msg('「深渊回响」暂未开放，仅管理员可进入'));
-    }
     const wantHidden = hidden === true;
     if (wantHidden && !verifyWatchToken(adminToken, room.code)) return fail(ERR.BAD_MSG, 'admin watch denied');
     const cur = this.roomOf(session);
@@ -2064,10 +2051,8 @@ case 'room.list': return this.roomList(msg);
 
   /** 挂在列表上的房间此刻是不是真的在等人：满员 / 已开局 / 房主掉线 / 有排队任务的自动消失。 */
   roomOpen(room) {
-    // 「深渊回响」房永远不算「公开可进」：房间列表、多人匹配、跨节点上报全部走这个判据，
-    // 所以把闸设在这里一处就够（管理员专属，公开前不暴露）。
     // 「深渊回响」房也允许公开（维护者 2026-11-06：「公开深潜」按钮）——是否真的在等人仍由下面的 listed 判据决定。
-    // 进房仍然是管理员/测试名单专属（join 的 ECHO_FORBIDDEN 那道门），所以公开只影响「看得见」。
+    // 2026-11-07 起深潜对所有人开放，公开的深潜房普通玩家也能加入（不再有 ECHO_FORBIDDEN 那道门）。
     return room.listed && !room.disposed && !room.match && this.listable(room)
       && room.freeSeat() >= 0 && !this.roomQueued(room)
       && room.seatOf(room.hostId)?.connected === true;
@@ -2816,10 +2801,6 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
   quickMatch(session, { difficulty, seats, rules, variant } = {}) {
     // 「深渊回响」（深潜）：自己的匹配池。深潜房只和深潜房配，普通房永远进不来（反之亦然）。
     const wantVariant = variant === 'deepecho' ? 'deepecho' : null;
-    // 深潜池的门槛与建房一致：管理员 / 测试名单（否则会配进一个进不去的模式）
-    if (wantVariant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId)) {
-      return fail(ERR.ECHO_FORBIDDEN, msg('「深渊回响」暂未开放，仅管理员与测试名单可进入'));
-    }
     if (session.adminId !== true && !maintenanceGate().match) return fail(ERR.MATCH_DISABLED);
     if (this.roomOf(session)) return fail(ERR.SESSION_IN_USE, 'already in a room');
     const asked = DIFFICULTIES.includes(difficulty) ? difficulty : null;
@@ -4238,8 +4219,6 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       //   「能不能改数据」由 Match 的 ps.admin 决定（三道门全过：adminId + gameTool + 验证码），
       //   那是另一回事，和徽章无关。
       admin: session.adminId === true,
-      // 深渊回响的测试名单（管理员自动算）
-      echoTester: session.adminId === true || session.echoTester === true || isEchoTester(session.accountId),
       loadout: session.loadout || null,
       ops: session.ops || null,
       notOwned: session.notOwned || null,

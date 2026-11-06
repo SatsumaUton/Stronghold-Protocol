@@ -131,7 +131,6 @@ DESIGN-*.md
 # ---- 深渊回响：独占文件只放在私有仓库（docs/DEEPECHO-REPO.md）----
 # 这里只是不让它们再被 add 回来；磁盘上的文件仍然用于部署。
 server/match/match/echo*.js
-server/echoTesters.js
 public/js/ui/echo*.js
 public/js/ui/enemyRecords.js
 public/js/screens/echoLobby.js
