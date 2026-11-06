@@ -6621,7 +6621,7 @@
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": false,
-        "customBytes": 133520
+        "customBytes": 135073
       },
       {
         "path": "public/css/screens/room.css",
@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 222353
+        "customBytes": 222519
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 257554
+        "customBytes": 257751
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 247140
+        "customBytes": 247301
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 211309
+        "customBytes": 211459
       },
       {
         "path": "public/js/render/units.js",
@@ -6676,7 +6676,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 116599
+        "customBytes": 117763
       },
       {
         "path": "public/js/screens/result.js",
@@ -6716,7 +6716,7 @@
       {
         "path": "public/js/ui/echoCodex.js",
         "baseExists": false,
-        "customBytes": 4029
+        "customBytes": 4037
       },
       {
         "path": "public/js/ui/echoSigils.js",
