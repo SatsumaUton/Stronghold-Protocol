@@ -446,21 +446,17 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
   const meId = useStore((s) => s.me.playerId);
   const echo = useStore((s) => s.match?.public?.echo || null);
   // 「盟约投影」：三条同源数据里取第一条拿得到的 ——
-  //   ① `echo.projection.current`（服务端专门下发的）
-  //   ② 祝福列表里 `projection: true` 的那条
-  //   ③ **本局盟约视图**里 `projected: true` 的那条（服务端按满档塞进去的，盟约条/面板读的就是它）
-  // ③ 是 2026-11-06 加的兜底：卡面这一路读不到前两份时，至少和盟约面板保持一致。
+  //   ① `echo.projections[myId]`（每人各自选，2026-11-07：服务端按 playerId 下发，自己的那条）
+  //   ② **本局盟约视图**里 `projected: true` 的那条（服务端按满档塞进去的，盟约条/面板读的就是它）
+  // ② 是 2026-11-06 加的兜底：卡面这一路读不到前一份时，至少和盟约面板保持一致。
   const projection = (() => {
-    const cur = echo && echo.projection && echo.projection.current;
-    if (cur && typeof cur.id === 'string') return cur;
-    const list = echo && Array.isArray(echo.blessings) ? echo.blessings : null;
-    const hit = list && list.find((b) => b && b.projection === true && typeof b.id === 'string');
-    if (hit) return { id: hit.id.replace(/^projection:/, ''), name: String(hit.name || '').replace(/^盟约投影\s*·\s*/, ''), desc: hit.desc || '' };
+    const mine = meId != null && echo && echo.projections && typeof echo.projections === 'object' ? echo.projections[meId] : null;
+    if (mine && typeof mine.id === 'string') return mine;
     // bonds 可能是数组（视图）也可能是 { bondId: entry } 的字典，两种都兜住
     const rows = Array.isArray(bonds) ? bonds : (bonds && typeof bonds === 'object' ? Object.values(bonds) : []);
     const row = rows.find((x) => x && x.projected === true && (typeof x.bondId === 'string' || typeof x.id === 'string'));
     if (row) return { id: String(row.bondId || row.id), name: '', desc: '' };
-    return row ? { id: row.bondId, name: '', desc: '' } : null;
+    return null;
   })();
   const projectedId = projection && typeof projection.id === 'string' ? projection.id : null;
   const onBoard = (() => {
