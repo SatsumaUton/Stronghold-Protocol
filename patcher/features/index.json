@@ -6621,7 +6621,7 @@
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": false,
-        "customBytes": 129339
+        "customBytes": 131842
       },
       {
         "path": "public/css/screens/room.css",
@@ -6676,7 +6676,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 115500
+        "customBytes": 116064
       },
       {
         "path": "public/js/screens/result.js",
@@ -6712,6 +6712,11 @@
         "path": "public/js/ui/echoBuffs.js",
         "baseExists": false,
         "customBytes": 9814
+      },
+      {
+        "path": "public/js/ui/echoCodex.js",
+        "baseExists": false,
+        "customBytes": 4029
       },
       {
         "path": "public/js/ui/echoSigils.js",
@@ -6811,7 +6816,7 @@
       {
         "path": "server/http/routes.js",
         "baseExists": false,
-        "customBytes": 17778
+        "customBytes": 18302
       },
       {
         "path": "server/lobby.js",
@@ -6877,6 +6882,11 @@
         "path": "server/match/match/echoBounty.js",
         "baseExists": false,
         "customBytes": 6117
+      },
+      {
+        "path": "server/match/match/echoCodex.js",
+        "baseExists": false,
+        "customBytes": 6600
       },
       {
         "path": "server/match/match/echoConfig.js",

@@ -1990,3 +1990,47 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 /* 表头与数据行的左右内边距对齐（.echo-boardlist li 的 .12rem 会盖掉上面的 padding） */
 .echo-boardlist .echo-boardhead__cols { padding: 0 .1rem .04rem; }
 .echo-boardhead__cols > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- 「深渊图鉴」（维护者 2026-11-06）：大厅顶部右侧的入口 + 全屏浮层 ---- */
+.echo-codexbtn {
+  margin-left: auto;
+  display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  padding: 8px 14px; border: 1px solid rgba(183, 156, 255, .45); border-radius: 10px;
+  background: rgba(20, 16, 34, .55); color: #e8e2ff; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.echo-codexbtn:hover, .echo-codexbtn:focus-visible { border-color: #b79cff; background: rgba(60, 44, 104, .6); }
+.echo-codexbtn__label { font-size: 14px; letter-spacing: .08em; }
+.echo-codexbtn__sub { font-size: 10px; letter-spacing: .22em; color: rgba(183, 156, 255, .75); font-style: normal; }
+
+.echo-codex__state { padding: 18px 4px; color: #cfc8e6; }
+.echo-codex__state.is-error { color: #ff9a9a; }
+.echo-codex__tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 10px; }
+.echo-codex__tab {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(183, 156, 255, .25); background: rgba(255, 255, 255, .03); color: #d8d2ee; font-size: 13px;
+}
+.echo-codex__tab i { font-style: normal; opacity: .6; font-size: 11px; }
+.echo-codex__tab.is-on { border-color: #b79cff; background: rgba(183, 156, 255, .16); color: #fff; }
+.echo-codex__note { margin: 0 0 10px; font-size: 12.5px; line-height: 1.6; color: #b9b1d4; }
+.echo-codex__list {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); max-height: 56vh; overflow-y: auto;
+}
+.echo-codex__item {
+  border: 1px solid rgba(255, 255, 255, .08); border-left: 3px solid rgba(183, 156, 255, .5);
+  border-radius: 8px; padding: 8px 10px; background: rgba(255, 255, 255, .025);
+}
+.echo-codex__item.is-common { border-left-color: #9fb7c9; }
+.echo-codex__item.is-rare { border-left-color: #7fb7ff; }
+.echo-codex__item.is-epic { border-left-color: #d59bff; }
+.echo-codex__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.echo-codex__name { font-size: 14px; color: #fff; }
+.echo-codex__tag { font-size: 11px; color: #b79cff; white-space: nowrap; }
+.echo-codex__desc { margin: 4px 0 0; font-size: 12.5px; line-height: 1.55; color: #cfc8e6; }
+
+@media (max-width: 720px) {
+  .echo-codexbtn { padding: 6px 10px; }
+  .echo-codexbtn__sub { display: none; }
+  .echo-codex__list { grid-template-columns: 1fr; max-height: 50vh; }
+}

@@ -35,6 +35,7 @@
 // config.json mode texts come localized from data.js.
 
 import { TestMark } from '../ui/testConsole.js';
+import { EchoCodex, EchoCodexButton } from '../ui/echoCodex.js';
 import { ResumeMatchButton } from '../ui/resumeMatch.js';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor, ERR } from '../../../shared/constants.js';
@@ -1046,6 +1047,8 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
   const [openRow, setOpenRow] = useState(null);
   /** 排行榜是否可以收起（收起后难度选择顶上来，画面留给简介与开始） */
   const [boardOpen, setBoardOpen] = useState(true);
+  /** 「深渊图鉴」浮层（维护者 2026-11-06：入口在顶部右侧，局内放大镜不加） */
+  const [codexOpen, setCodexOpen] = useState(false);
   const [best] = useState(() => echoReadBest());
   useEffect(() => {
     let alive = true;
@@ -1077,6 +1080,8 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
           <h2 class="modal__title">${t('深渊回响')}</h2>
           <span class="proto-title__mode"><${Icon} name="target" />${t('深渊回响')}<i>DEEP ECHO</i></span>
         </div>
+        ${/* 维护者 2026-11-06：图鉴入口放顶部右侧，不进底部三个等大按钮那一排 */ null}
+        <${EchoCodexButton} onOpen=${() => setCodexOpen(true)} />
       </header>
       <div class="proto-body">
         ${/* 左：立绘 + 左下简介（原版版式），排行榜作为**浮层**贴左边，不挤动任何元素 */ null}
@@ -1194,6 +1199,8 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
         </section>
       </div>
     </div>
+    ${/* 深渊图鉴：全屏浮层，内容来自 /api/deepecho/codex */ null}
+    <${EchoCodex} open=${codexOpen} onClose=${() => setCodexOpen(false)} />
   <//>`;
 }
 
