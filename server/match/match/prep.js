@@ -24,6 +24,12 @@ export class MatchPrep {
     }
     // solo / single-human matches: untimed (soloUntimed); co-op: the round's prepTime
     const secs = this.soloUntimed ? null : this.gd.prepTime(this.round);
+    // 维护者 2026-11-05：**决策面板还开着就别开始倒数**。
+    // 祝福三选一 / 弃选 / 刷新投票 / 深潜补给 / 盟约投影都是在 ROUND_START 阶段就开好的，
+    // 那时 phase 还不是 PREP，`_echoPausePrepClock()` 什么也没做；等到进入 PREP 才设 deadline，
+    // 于是面板明明还开着，右上角已经在倒数（玩家反馈）。这里把整段准备时间先扣住，
+    // 等面板全部结算完由 `_echoMaybeResumePrepClock()` 接回来。
+    if (typeof this._echoHoldPrepClock === 'function' && this._echoHoldPrepClock(secs)) return;
     this.setDeadline(secs, () => this.prepDeadline());
     let i = 0;
     for (const ps of alive) if (ps.botControlled) this.scheduleBotPrep(ps, i++);
@@ -188,10 +194,17 @@ export class MatchPrep {
     for (const ps of alive) this.dispatch(ps, 'onPrepEnd', { round: this.round });
     for (const ps of alive) ps.endPrep();
     const r = this.round;
-    if (r === this.gd.bossRound) {
+    // 「深渊回响」的 boss 返场节点（25 / 35 / 45…）不是原版的 gd.bossRound，必须单独判断，
+    // 否则会走 startCombat() —— 而深潜 boss 回合的 `this.wave` 是 null，
+    // 战斗瞬间结束、直接跳到下一层（维护者 2026-11-05 实测：25 层没打 boss 就进了 26）。
+    const echoBossRound = this.echoVariant === 'deepecho'
+      && typeof this._echoBossReturn === 'function' && this._echoBossReturn(r);
+    const echoHiddenRound = this.echoVariant === 'deepecho'
+      && typeof this._echoHiddenBossRound === 'function' && this._echoHiddenBossRound(r);
+    if (r === this.gd.bossRound || echoBossRound) {
       this.hiddenLayerSum = alive.reduce((s, p) => s + p.activatedLayers(), 0);
       this.startFinalAssault(false);
-    } else if (r === this.gd.hiddenRound) {
+    } else if (r === this.gd.hiddenRound || echoHiddenRound) {
       this.startFinalAssault(true);
     } else {
       this.startCombat();

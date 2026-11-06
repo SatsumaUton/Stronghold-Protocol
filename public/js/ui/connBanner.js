@@ -33,6 +33,18 @@ export function ConnectionBanner() {
   const route = useStore(selectRoute);
   const phase = useStore((s) => s.match?.public?.phase);
   const hintAllowed = updateHintAllowed(route, phase);
+  // ★ 2026-11-05（维护者：「在准备室里点刷新页面就被踢出房间了」）：
+  //   本组件所有「刷新页面」按钮都改成 reloadKeepingRoom() —— 刷新前把当前房间号写进
+  //   sessionStorage，刷新回来由大厅 LobbyScreen 自动回一次房间（读侧在 screens/lobby.js）。
+  //   只有这个按钮会留标记：普通刷新 / 新标签页 / 换浏览器都不会自动回房，
+  //   2026-10-27「恢复对局必须玩家自己点」的规矩不变。
+  const roomCode = useStore((s) => s.room?.code || null);
+  const reloadKeepingRoom = () => {
+    try {
+      if (roomCode) sessionStorage.setItem('sp.rejoinRoom', String(roomCode));
+    } catch { /* 隐私模式 / 禁用存储：退化成普通刷新 */ }
+    location.reload();
+  };
   // Hidden admin watch is not the player's page: a new build must not offer/force a 刷新状态 there.
   const adminWatch = (() => {
     try {
@@ -87,7 +99,7 @@ export function ConnectionBanner() {
     return html`<div class="conn-banner" role="alert">
       <${Icon} name="refresh" />
       <span>${t('服务器已更新，请刷新页面')}</span>
-      <${Button} size="sm" variant="secondary" icon="refresh" onClick=${() => location.reload()}>${t('刷新页面')}<//>
+      <${Button} size="sm" variant="secondary" icon="refresh" onClick=${reloadKeepingRoom}>${t('刷新页面')}<//>
     </div>`;
   }
   if (!conn.everOnline && (conn.status === 'connecting' || conn.status === 'handshaking' || conn.status === 'idle')) return null;
@@ -112,7 +124,7 @@ export function ConnectionBanner() {
         : rejected ? t(conn.lastError.text) : t('正在连接服务器');
   const action = conn.status === 'reconnecting' ? { label: t('立即重连'), run: () => net.retryNow() }
     : conn.status === 'closed' ? { label: replaced ? t('在此页面继续') : t('重新连接'), run: () => net.connect() }
-      : versionMismatch ? { label: t('刷新页面'), run: () => location.reload() }
+      : versionMismatch ? { label: t('刷新页面'), run: reloadKeepingRoom }
         : rejected ? { label: t('重试'), run: () => net.reconnectNow() } : null;
   // flap（断线重连）用 2 秒宽限；其他短状态沿用 .6 秒
   const bannerCls = `conn-banner${flapping ? ' conn-banner--flap' : transient ? ' conn-banner--soft' : ''}`;

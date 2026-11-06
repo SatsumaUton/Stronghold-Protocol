@@ -149,6 +149,10 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
           <b class="result__rnum num">${r.roundsPassed}</b>
           ${r.roundsPassed <= r.lastRound ? html`<span class="result__rof num">/${r.lastRound}</span>` : null}
         </div>
+        ${Number.isFinite(r.echoDepth) ? html`<div class="result__rounds result__depth" data-testid="result-depth">
+          <span class="result__rlabel">${t('深渊回响深度')}</span>
+          <b class="result__rnum num">${r.echoDepth}</b>
+        </div>` : null}
         <div class="result__medals">
           ${boss ? html`<div class=${cx('medal', r.victory && 'is-done')} title=${boss.name}>
             <${Img} src=${enemyIconUrl(gd.m, boss.enemyKey)} /><span class="medal__check">${r.victory ? html`<${Icon} name="check" />` : html`<${Icon} name="close" />`}</span>

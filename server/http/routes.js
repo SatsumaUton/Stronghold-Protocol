@@ -22,6 +22,7 @@ import { PROTOCOL_VERSION, APP_VERSION } from '../../shared/constants.js';
 import { buildTag } from './buildTag.js';
 import { setSecurityHeaders, sendError, sendJson, splitUrl } from './common.js';
 import { clientAddress, isLocalIp } from '../net.js';
+import { readEchoBoard, ECHO_BOARD_DIFFICULTIES } from '../match/match/echoBoard.js';
 import { readFileSync } from 'node:fs';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -251,6 +252,24 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
     if (parts.rawPath === '/healthz') {
       const withTraffic = wantsTraffic(parts.query) && isLocalIp(clientAddress(req, trustProxy).ip);
       sendJson(req, res, 200, healthReport(health, withTraffic));
+      return;
+    }
+    // 「深渊回响」深潜排行榜（只读）：GET /api/dive/board?limit=50
+    // 数据在共用的 Redis（30 台写同一张榜，所以每台读到的都一样）；没有 Redis 时返回空榜而不是报错。
+    if (parts.rawPath === '/api/dive/board') {
+      let limit = 50;
+      let difficulty = 'HARD';
+      try {
+        const q = new URLSearchParams(parts.query || '');
+        const v = Number(q.get('limit'));
+        if (Number.isFinite(v) && v > 0) limit = Math.min(100, Math.floor(v));
+        // 榜按难度分开（险境 / 绝境 / 终极）；非法值退回默认档，不报错
+        const d = String(q.get('difficulty') || '').toUpperCase();
+        if (ECHO_BOARD_DIFFICULTIES.includes(d)) difficulty = d;
+      } catch { /* 参数坏了就用默认值 */ }
+      const store = health && health.lobby ? health.lobby.persistence?.store ?? null : null;
+      const rows = await readEchoBoard(store, { limit, difficulty });
+      sendJson(req, res, 200, { ok: true, limit, difficulty, rows });
       return;
     }
     // 本服：后台维护开关的只读状态，大厅据此把「创建房间」等入口置灰并说明原因。

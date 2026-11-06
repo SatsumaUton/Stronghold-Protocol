@@ -130,7 +130,7 @@
 /* the roster inside its modal */
 .spec__roster { display: flex; flex-direction: column; gap: .06rem; margin: 0 0 .1rem; padding: 0; list-style: none; }
 .spec__row { display: flex; align-items: center; gap: .1rem; min-height: .44rem; padding: .04rem .1rem; background: rgba(255, 255, 255, .03); border: 1px solid transparent; }
-.spec__row.is-me { border-color: var(--mint-700); background: rgba(45, 212, 191, .08); }
+.spec__row.is-me { border-color: var(--mint-700); background: rgba(var(--mint-c28-rgb), .08); }
 .spec__row.is-offline .spec__name { color: var(--text-dim); }
 .spec__ico { width: .18rem; height: .18rem; flex: none; color: var(--mint-500); }
 .spec__row.is-offline .spec__ico { color: var(--text-dim); }
@@ -199,7 +199,7 @@
    sprites are 35×29 (plain) / 61×29 (with chevrons) → .555rem / .967rem × .46rem */
 .gtop__iconbtn {
   display: flex; align-items: center; justify-content: center; gap: .04rem; min-width: .46rem; height: .46rem; padding: 0 .1rem;
-  background: rgba(78, 216, 175, .06); border: 2px solid var(--mint-600); border-radius: .06rem; color: #fff;
+  background: rgba(var(--mint-500-rgb), .06); border: 2px solid var(--mint-600); border-radius: .06rem; color: #fff;
   font-family: var(--font-num); font-weight: 700;
   transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast), filter var(--t-fast), opacity var(--t-fast);
 }
@@ -220,7 +220,7 @@
 }
 .pausebtn__glyph { width: .3rem; height: .3rem; fill: currentColor; }
 .pausebtn:hover:not(:disabled) { background: rgba(255, 255, 255, .14); border-color: #fff; }
-.pausebtn.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(23, 249, 183, .45); }
+.pausebtn.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(var(--mint-rgb), .45); }
 .pausebtn.is-busy { opacity: .6; }
 
 /* 战斗 2 倍速 (ui/hud.js SpeedVote): the pause button's dark plate, mint once a battle runs at it */
@@ -236,7 +236,7 @@
 .speedvote:hover:not(:disabled) { background: rgba(255, 255, 255, .14); border-color: #fff; color: #fff; }
 .speedvote.is-called { border-color: var(--mint-600); color: #fff; }
 .speedvote.is-mine { border-color: var(--mint-400); color: var(--mint-400); }
-.speedvote.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(23, 249, 183, .45); }
+.speedvote.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(var(--mint-rgb), .45); }
 .speedvote.is-busy { opacity: .6; }
 .speedvote:disabled { cursor: default; }
 
@@ -472,10 +472,10 @@
   display: flex; align-items: center; gap: .12rem; height: .56rem; padding: 0 .16rem 0 .12rem; min-width: 2.3rem;
   background: rgba(10, 14, 12, .9); border: 2px solid var(--mint-500); color: var(--text-hi);
   font-size: .22rem; font-weight: 700; letter-spacing: .14em;
-  box-shadow: 0 0 .18rem rgba(23, 249, 183, .15);
+  box-shadow: 0 0 .18rem rgba(var(--mint-rgb), .15);
   transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
 }
-.readybtn:hover:not(:disabled) { background: rgba(78, 216, 175, .14); box-shadow: 0 0 .26rem rgba(23, 249, 183, .3); }
+.readybtn:hover:not(:disabled) { background: rgba(var(--mint-500-rgb), .14); box-shadow: 0 0 .26rem rgba(var(--mint-rgb), .3); }
 .readybtn__box { width: .3rem; height: .3rem; border: 2px solid var(--mint-500); display: grid; place-items: center; flex: none; }
 .readybtn__box .icon { width: .26rem; height: .26rem; }
 .readybtn__label { flex: 1; text-align: left; }
@@ -483,7 +483,7 @@
 .readybtn.is-on { background: var(--mint-500); color: var(--text-on-mint); }
 .readybtn.is-on .readybtn__box { border-color: var(--text-on-mint); background: var(--text-on-mint); color: var(--mint-400); }
 .readybtn.is-on .readybtn__key { color: var(--mint-900); border-color: var(--mint-700); }
-.readybtn.is-on:hover:not(:disabled) { background: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .3rem rgba(23, 249, 183, .45); }
+.readybtn.is-on:hover:not(:disabled) { background: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .3rem rgba(var(--mint-rgb), .45); }
 .readybtn:disabled { border-color: var(--line-2); color: var(--text-dim); box-shadow: none; cursor: not-allowed; }
 .readybtn:disabled .readybtn__box { border-color: var(--line-2); }
 .readybtn.is-busy { opacity: .7; }
@@ -536,7 +536,7 @@
 .bslot__count small { color: var(--text-dim); font-size: .11rem; }
 .bslot__count.is-max { border-color: var(--mint-700); color: var(--mint-400); }
 .bslot.is-active .bslot__count { border-color: var(--mint-700); }
-.bslot.is-open .bond__core { box-shadow: 0 0 0 2px var(--mint-400), 0 0 .2rem rgba(23, 249, 183, .6); }
+.bslot.is-open .bond__core { box-shadow: 0 0 0 2px var(--mint-400), 0 0 .2rem rgba(var(--mint-rgb), .6); }
 /* a bond the mode never activates, with members (the server's `off` entry): the briefing's grey ✕ disc, the chips'
    struck name, 本局禁用 under it instead of the count */
 .bslot.is-off .bond__name { color: var(--text-dim); text-decoration: line-through; text-decoration-color: rgba(255, 84, 84, .6); }
@@ -581,8 +581,8 @@
 .team--many { padding-block: .07rem; }
 .team--many::-webkit-scrollbar { width: .05rem; }
 .team--many::-webkit-scrollbar-thumb { background: var(--mint-800); border-radius: 1rem; }
-.team__pool { display: inline-flex; align-items: center; height: .21rem; padding: 0 .05rem; border: 1px solid rgba(78, 216, 175, .3); border-radius: .04rem; color: var(--mint-400); font-size: .12rem; line-height: 1; white-space: nowrap; }
-.team__pool-summary { display: flex; align-items: center; gap: .05rem; max-width: 100%; padding: .04rem .08rem; border: 1px solid rgba(78, 216, 175, .18); background: rgba(8, 11, 10, .6); color: var(--text-dim); font-size: .12rem; line-height: 1.4; pointer-events: auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.team__pool { display: inline-flex; align-items: center; height: .21rem; padding: 0 .05rem; border: 1px solid rgba(var(--mint-500-rgb), .3); border-radius: .04rem; color: var(--mint-400); font-size: .12rem; line-height: 1; white-space: nowrap; }
+.team__pool-summary { display: flex; align-items: center; gap: .05rem; max-width: 100%; padding: .04rem .08rem; border: 1px solid rgba(var(--mint-500-rgb), .18); background: rgba(8, 11, 10, .6); color: var(--text-dim); font-size: .12rem; line-height: 1.4; pointer-events: auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .team__pool-summary b { color: var(--mint-400); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
 .team__notice:empty { display: none; }
 .team-rescue { pointer-events: auto; max-width: 2.75rem; display: flex; flex-wrap: wrap; align-items: center; gap: .04rem .12rem; padding: .1rem .12rem; color: var(--mint-400); background: rgba(13, 26, 21, .95); border-left: 2px solid var(--mint-500); font-size: .14rem; }
@@ -610,7 +610,7 @@
 .team__status { width: .26rem; height: .26rem; display: grid; place-items: center; border: 1px solid currentColor; background: rgba(0, 0, 0, .5); }
 /* the shared 机变 draft's pick order on the portrait (ui/choiceOverlay.js spMarks): ✓ picked, ••• deciding */
 .team__spmark { position: absolute; right: -.07rem; bottom: -.05rem; z-index: 2; display: grid; place-items: center; width: .24rem; height: .24rem; border-radius: 50%;
-  background: var(--mint-500); color: #05261e; box-shadow: 0 0 0 2px rgba(6, 9, 8, .9), 0 0 .08rem rgba(23, 249, 183, .5); }
+  background: var(--mint-500); color: #05261e; box-shadow: 0 0 0 2px rgba(6, 9, 8, .9), 0 0 .08rem rgba(var(--mint-rgb), .5); }
 .team__spmark .icon { width: .17rem; height: .17rem; }
 .team__spmark.is-turn { display: flex; gap: 2px; width: auto; padding: 0 .05rem; border-radius: .12rem; background: rgba(8, 11, 10, .92); box-shadow: 0 0 0 1px rgba(255, 255, 255, .35); }
 .team__spmark.is-turn i { width: 3px; height: 3px; border-radius: 50%; background: #f2f5f4; animation: spmark-dot 1s ease-in-out infinite; }
@@ -629,11 +629,11 @@
 .team__status.is-red, .team__status.is-offline { color: var(--red-premium); }
 /* 预约盟约（ui/bondPlan.js BondPlanTag，compact）：进对局以后在队友行上显示他打算走的
    核心盟约，和 bandDraft 的选人顺序行是同一个标记。只作沟通，不影响对局。 */
-.team__plan { flex: none; border-color: rgba(78, 216, 175, .25); background: rgba(12, 15, 14, .6); }
+.team__plan { flex: none; border-color: rgba(var(--mint-500-rgb), .25); background: rgba(12, 15, 14, .6); }
 .team__plan .bglyph { width: .18rem; height: .18rem; }
 .team__eye { color: var(--amber); display: grid; }
 .team__eye .icon { width: .2rem; height: .2rem; }
-.team__row.is-self .pavatar { box-shadow: 0 0 0 2px var(--mint-500), 0 0 .18rem rgba(23, 249, 183, .35); }
+.team__row.is-self .pavatar { box-shadow: 0 0 0 2px var(--mint-500), 0 0 .18rem rgba(var(--mint-rgb), .35); }
 .team__row.is-watched .pavatar { box-shadow: 0 0 0 2px var(--amber), 0 0 .18rem rgba(246, 163, 41, .45); }
 .team__row.is-dead .team__name { color: var(--text-dim); text-decoration: line-through; }
 /* 最终攻势 / 隐秘核心: the viewer's pair framed in the official green from the round's start (item 51) — the official
@@ -643,7 +643,7 @@
   position: absolute; inset: -.07rem; pointer-events: none; z-index: 1;
   background: var(--mint-500); -webkit-mask: var(--frame) center / 100% 100% no-repeat; mask: var(--frame) center / 100% 100% no-repeat;
 }
-.team__frame--plain { inset: -.04rem; background: none; -webkit-mask: none; mask: none; border: 2px solid var(--mint-500); box-shadow: 0 0 .14rem rgba(78, 216, 175, .65); }
+.team__frame--plain { inset: -.04rem; background: none; -webkit-mask: none; mask: none; border: 2px solid var(--mint-500); box-shadow: 0 0 .14rem rgba(var(--mint-500-rgb), .65); }
 .team__row.is-self.is-team .pavatar { box-shadow: none; }
 .team__bubble { position: absolute; left: calc(100% + .06rem); top: 50%; transform: translateY(-50%); width: max-content; max-width: 3.2rem; }
 /* 5+ roster is a narrow vertical scroller: a bubble to the right of the row is clipped by overflow-x:hidden. */
@@ -659,7 +659,7 @@
 .danmaku__item {
   position: absolute; left: 100%; top: calc(var(--dm-lane, 0) * var(--dm-lane-h) + 2px); height: calc(var(--dm-lane-h) - 4px);
   display: flex; align-items: center; gap: 6px; padding: 0 8px 0 2px; white-space: nowrap;
-  background: rgba(8, 11, 10, .66); border: 1px solid rgba(78, 216, 175, .3); border-radius: calc(var(--dm-lane-h) / 2);
+  background: rgba(8, 11, 10, .66); border: 1px solid rgba(var(--mint-500-rgb), .3); border-radius: calc(var(--dm-lane-h) / 2);
   animation: danmaku-fly var(--dm-dur, 6000ms) linear forwards; will-change: transform;
 }
 .danmaku__item.is-self { border-color: var(--mint-500); background: rgba(13, 44, 36, .78); }
@@ -674,7 +674,7 @@
   animation: danmaku-out 1ms linear calc(var(--dm-dur, 3000ms) - 1ms) forwards; }
 @keyframes danmaku-out { to { opacity: 0; } }
 /* 前往查看 / 返回战场 (research 09 §3.1: tapping a teammate's avatar expands a mint button under it) */
-.team__row.is-open .pavatar { box-shadow: 0 0 0 2px var(--mint-400), 0 0 .2rem rgba(23, 249, 183, .45); }
+.team__row.is-open .pavatar { box-shadow: 0 0 0 2px var(--mint-400), 0 0 .2rem rgba(var(--mint-rgb), .45); }
 .team__row.is-open .team__info { background: linear-gradient(90deg, rgba(13, 44, 36, .92), rgba(8, 11, 10, 0)); }
 .team__ob, .team__back { align-self: flex-start; margin-top: .04rem; min-width: 1.1rem; animation: pop-in var(--t-fast) var(--ease-out); }
 .team__ob .btn__label, .team__back .btn__label { letter-spacing: .12em; }
@@ -709,7 +709,7 @@
 .effect img { width: 86%; height: 86%; object-fit: contain; }
 .effect .icon { width: .28rem; height: .28rem; color: var(--mint-500); }
 .effect--band { border-color: var(--mint-800); }
-.effect--team { border-color: rgba(78, 216, 175, .6); }
+.effect--team { border-color: rgba(var(--mint-500-rgb), .6); }
 .effect__n { position: absolute; right: -.05rem; bottom: -.05rem; min-width: .2rem; font-size: .12rem; line-height: 1.4; text-align: center; background: var(--gold); color: #1d1400; padding: 0 .03rem; }
 .efftip { display: flex; flex-direction: column; gap: .04rem; max-width: 3.6rem; }
 .efftip b { font-size: .17rem; color: var(--mint-400); }
@@ -853,7 +853,7 @@
 .ewheel__item:disabled { opacity: .45; cursor: default; }
 .ewheel__art { width: .6rem; height: .6rem; display: grid; place-items: center; }
 .ewheel__art:empty { display: none; }
-.ewheel__art .eart { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 .06rem rgba(23, 249, 183, .25)); }
+.ewheel__art .eart { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 .06rem rgba(var(--mint-rgb), .25)); }
 .ewheel__txt { white-space: nowrap; }
 .ewheel__panel.is-text .ewheel__grid { grid-template-columns: repeat(3, 1fr); }
 .ewheel__panel.is-text .ewheel__item { padding: .12rem .04rem; font-size: .15rem; color: var(--text-md); }
@@ -863,7 +863,7 @@
 .ebubble {
   display: flex; align-items: center; gap: .06rem; padding: .05rem .14rem .05rem .2rem; white-space: nowrap;
   background: rgba(22, 28, 26, .96); color: var(--text-hi); font-size: .15rem; font-weight: 700;
-  border: 1px solid rgba(78, 216, 175, .45);
+  border: 1px solid rgba(var(--mint-500-rgb), .45);
   clip-path: polygon(.1rem 0, 100% 0, 100% 100%, .1rem 100%, .1rem 62%, 0 50%, .1rem 38%);
   animation: bubble-in 150ms var(--ease-out), bubble-out 300ms var(--ease-in-out) 2.7s forwards;
   filter: drop-shadow(0 .04rem .1rem rgba(0, 0, 0, .55));
@@ -941,7 +941,7 @@
 .chud__progress { display: flex; flex-wrap: wrap; justify-content: center; gap: .1rem .18rem; max-width: 9rem; font-size: .15rem; color: var(--text-md); }
 .chud__prog {
   display: inline-flex; align-items: center; gap: .08rem; padding: .03rem .12rem; background: rgba(8, 11, 10, .82);
-  border: 1px solid rgba(78, 216, 175, .25); border-left: 3px solid var(--gold);
+  border: 1px solid rgba(var(--mint-500-rgb), .25); border-left: 3px solid var(--gold);
 }
 .chud__prog b { font-weight: 500; max-width: 1.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chud__prog .num { color: var(--gold); font-size: .16rem; }
@@ -1110,10 +1110,10 @@
 .ff-tile--smog { background: linear-gradient(180deg, #4a4a52, #3a3a42); }
 .ff-tile--deep { background: linear-gradient(180deg, #1e3a52, #173045); }
 .ff-tile--infect { background: linear-gradient(180deg, #4a2a3a, #3a2030); }
-.ff-tile.is-legal { box-shadow: inset 0 0 0 2px rgba(89, 244, 202, .8), inset 0 0 calc(var(--tile) * .4) rgba(23, 249, 183, .3); }
+.ff-tile.is-legal { box-shadow: inset 0 0 0 2px rgba(var(--mint-c25-rgb), .8), inset 0 0 calc(var(--tile) * .4) rgba(var(--mint-rgb), .3); }
 .ff-tile.is-illegal { box-shadow: inset 0 0 0 2px rgba(255, 84, 84, .5); }
 .ff-tile.is-range { box-shadow: inset 0 0 0 2px rgba(246, 163, 41, .7); }
-.ff-tile.is-hover-legal { background: rgba(78, 216, 175, .45); }
+.ff-tile.is-hover-legal { background: rgba(var(--mint-500-rgb), .45); }
 .ff-tile.is-hover-illegal { background: rgba(255, 60, 60, .4); }
 @keyframes gate-pulse { 50% { box-shadow: 0 0 calc(var(--tile) * .4) rgba(255, 60, 40, .8); } }
 .ff-hand-label { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: .1rem; font-size: .13rem; color: var(--text-dim); letter-spacing: .2em; }
@@ -1121,7 +1121,7 @@
 .ff-slot { box-sizing: border-box; border: 2px dashed rgba(170, 140, 90, .45); background: rgba(120, 90, 50, .16); display: grid; place-items: end start; }
 .ff-slot span { font-size: .11rem; color: rgba(210, 180, 130, .5); padding: 0 .03rem; }
 .ff-slot--temp { border-color: rgba(255, 122, 51, .6); background: rgba(232, 90, 26, .12); }
-.ff-slot.is-hover-legal { background: rgba(78, 216, 175, .35); border-color: var(--mint-400); }
+.ff-slot.is-hover-legal { background: rgba(var(--mint-500-rgb), .35); border-color: var(--mint-400); }
 .ff-slot.is-hover-illegal { background: rgba(255, 60, 60, .3); }
 .ff-piece { transition: transform 160ms var(--ease-out); z-index: 2; }
 .ff-piece.is-draggable { cursor: grab; }
@@ -1163,14 +1163,14 @@
 .ff-unit.is-dead { opacity: 0; }
 .ff-unit.is-fly { margin-top: -6%; }
 .ff-unit__bars { position: absolute; left: 8%; right: 8%; bottom: -12%; display: flex; flex-direction: column; gap: 1px; }
-.ff-unit__bars i { display: block; height: 4px; background: #3fdc6a; box-shadow: 0 0 0 1px #000; }
+.ff-unit__bars i { display: block; height: 4px; background: var(--mint-c29); box-shadow: 0 0 0 1px #000; }
 .ff-unit.is-enemy .ff-unit__bars i.hp { background: #ff4a3a; }
 .ff-unit__bars i.sp { height: 3px; background: #ffd23a; }
 .ff-float { position: absolute; z-index: 5; transform: translate(-50%, 0); font-family: var(--font-num); font-weight: 700; font-size: .2rem; pointer-events: none; text-shadow: 0 1px 2px #000, 0 0 4px #000; animation: float-up 900ms var(--ease-out) forwards; }
 .ff-float--phys { color: #ffd7a8; }
 .ff-float--arts { color: #d59cff; }
 .ff-float--true { color: #fff; }
-.ff-float--heal { color: #6dff9c; }
+.ff-float--heal { color: var(--mint-c30); }
 .ff-float--crit { color: #ff2a2a; }
 .ff-float--miss { color: #ff9000; }
 @keyframes float-up { to { transform: translate(-50%, -.4rem); opacity: 0; } }
@@ -1498,4 +1498,17 @@
 }
 .gtop .gtop__net > #mm-nodes > .chip > svg {
   transform: translateY(.5px);
+}
+
+/* 官方精灵图里的绿色图标（放大镜按钮、棋子/战场图标等）：颜色画在 PNG 里，改不了 fill，
+   只能用滤镜把绿色相转成紫色。和 theme.css 里 .bglyph img 用的是同一套思路。 */
+html.sp-deepecho .gtop__iconbtn img,
+html.sp-deepecho .gtop__iconbtn svg,
+html.sp-deepecho .gtop__iconbtn .sprite,
+html.sp-deepecho .roundbox img,
+html.sp-deepecho .rs-pill img,
+html.sp-deepecho .edrawer__ico img,
+html.sp-deepecho .etag img,
+html.sp-deepecho .gicon img {
+  filter: hue-rotate(120deg) saturate(1.6) brightness(1.05);
 }

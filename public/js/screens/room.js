@@ -54,6 +54,7 @@ import {
   TextField,
 } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
+import { useDocClass } from '../ui/device.js';
 import { useGameData, BandIcon } from '../ui/gameComponents.js';
 import { allowedBands } from './bandDraft.js';
 import { TestMark } from '../ui/testConsole.js';
@@ -74,7 +75,7 @@ import { chessAvatarUrl, chessPortraitUrl } from '../ui/assetUrls.js';
 import { CARD_KEY, cardStore, setCard, cardOperators, cardContext, seatOperator, seatCardSkin, seatArtSrc } from '../ui/seatArt.js';
 import { skinsStore, SKINS_KEY, ownerSkin } from '../ui/skins.js';
 import { settingsStore } from '../ui/settingsStore.js';
-import { difficultyInfo, ProtocolSelect } from './lobby.js';
+import { difficultyInfo, ProtocolSelect, DEEP_ECHO_DIFFICULTIES } from './lobby.js';
 import { useRise } from '../ui/transitions.js';
 import { t, tc } from '../../../shared/i18n.js';
 // 实验性战斗规则的可选倍率（shared/experimental.js 是唯一来源，服务端校验同一份）
@@ -562,8 +563,9 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
     if (!canEdit) return;
     const experimental = {
       revivalEnabled: revival,
-      // 手动编组存在时不写 disableSharedPool（两者互斥，写了服务端也会被 poolPlan 顶掉）
-      ...(manualPools ? {} : { disableSharedPool: independent }),
+      // ⚠ `disableSharedPool` 必须**永远**写出来：`isExperimental` 要求两个默认键都存在，
+      // 少一个服务端就判成 BAD_MSG（玩家看到的「无效的请求」）—— 手动编组时写 false 即可。
+      disableSharedPool: manualPools ? false : independent,
       ...(capacity > 4 ? { playerCapacity: capacity } : {}),
       ...(capacity > 4 && noDuck ? { disableDuckLord: true } : {}),
       ...(capacity > 4 && repeat ? { allowRepeat: true } : {}),
@@ -698,8 +700,10 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
 }
 
 
-function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null,
+function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, room, isHost, busy, onAiLast, onSetDifficulty = null, onSoloUnlimited, onExperimental, onDifficulty, onClose, version = null,
   listed = false, onToggleListed = () => {} }) {
+  // 「深渊回响」：同一个开关，深潜房叫「公开深潜」（列表也是深潜专属的）
+  const echoRoom = room.variant === 'deepecho';
   const info = difficultyInfo(room.mode, room.difficulty);
   const title = soloOption ? t('模拟设置') : t('同盟设置');
   useEffect(() => {
@@ -713,14 +717,19 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     <h4>${title}</h4>
     ${soloOption ? null : html`<div class="rs-opts__row" data-testid="room-opt-difficulty">
       <span class="rs-opts__k">${t('模拟难度')}</span>
-      <button type="button" class="rs-opts__diff" disabled=${isHost && !!busy} onClick=${onDifficulty}
+      ${room?.variant === 'deepecho' && isHost && onSetDifficulty ? html`<select class="rs-opts__diff" disabled=${!!busy}
+          title=${t('深渊回响难度（DE-1 / DE-2 / DE-3）')}
+          onChange=${(e) => onSetDifficulty(e.target.value)}>
+        ${['NORMAL', 'HARD', 'ABYSS'].map((d, i) => html`<option value=${d} selected=${room.difficulty === d}>
+          DE-${i + 1} · ${DIFFICULTY_NAMES[d] ? t(DIFFICULTY_NAMES[d]) : d}</option>`)}
+      </select>` : html`<button type="button" class="rs-opts__diff" disabled=${isHost && !!busy} onClick=${onDifficulty}
           title=${isHost ? t('更改模拟难度') : t('由创建者选择')}>
         <${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span>
         ${isHost ? html`<em>${t('更改')}</em>` : null}
-      </button>
+      </button>`}
       ${isHost ? null : html`<span class="t-dim">${t('由创建者选择')}</span>`}
     </div>`}
-    ${!soloOption && version ? html`<div class="rs-opts__row" data-testid="room-opt-version">
+    ${!soloOption && version && room?.variant !== 'deepecho' ? html`<div class="rs-opts__row" data-testid="room-opt-version">
       <span class="rs-opts__k">${t('版本')}</span>
       <${Tooltip} text=${version.why}>
         <button type="button" class="rs-opts__diff rs-opts__ver" disabled=${version.disabled} onClick=${version.onOpen}
@@ -734,12 +743,12 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     ${/* 公开同盟（同盟列表）：挂了以后别的博士能在大厅「公开同盟」里看见这个房间、直接加入。
            开局后服务端会拒（ROOM_STARTED），所以对局中这项显示成不可操作。 */ null}
     ${soloOption ? null : html`<${Tooltip} text=${listed
-        ? t('其他博士可以在大厅的「公开同盟」里看到这个房间并直接加入')
-        : t('挂到大厅的「公开同盟」列表上，让其他博士能找到这个房间')}>
+        ? t(echoRoom ? '其他博士可以在「深渊回响 → 公开深潜」里看到这个房间并加入（需要深潜资格）' : '其他博士可以在大厅的「公开同盟」里看到这个房间并直接加入')
+        : t(echoRoom ? '挂到「深渊回响 → 公开深潜」列表上，让其他博士能找到这个房间' : '挂到大厅的「公开同盟」列表上，让其他博士能找到这个房间')}>
       <button type="button" role="switch" aria-checked=${listed ? 'true' : 'false'} data-testid="room-opt-listed"
           class=${`dpick__opt ailast__opt rs-opts__listed${listed ? ' is-active' : ''}`} disabled=${!!busy || !isHost || !!room.match}
           onClick=${() => { if (isHost && !room.match) onToggleListed(!listed); }}>
-        <${Icon} name=${listed ? 'check' : 'users'} class=${listed ? 'is-on' : ''} />${listed ? t('公开同盟：已公开') : t('公开同盟：未公开')}
+          <${Icon} name=${listed ? 'check' : 'users'} class=${listed ? 'is-on' : ''} />${echoRoom ? (listed ? t('公开深潜：已公开') : t('公开深潜：未公开')) : (listed ? t('公开同盟：已公开') : t('公开同盟：未公开'))}
       </button>
     <//>`}
     ${/* ★ 2026-11-02 维护者要求：同盟设置里**不放**「匹配队友」开关。
@@ -748,7 +757,7 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
     ${soloOption
       ? html`<${SoloUnlimitedToggle} option=${soloOption} busy=${busy} onToggle=${onSoloUnlimited} />`
       : html`<${AiLastToggle} option=${option} busy=${busy} onToggle=${onAiLast} />`}
-    ${soloOption ? null : html`<${ExperimentalControl} room=${room} isHost=${isHost} busy=${busy} onApply=${onExperimental} />`}
+    ${soloOption || room?.variant === 'deepecho' ? null : html`<${ExperimentalControl} room=${room} isHost=${isHost} busy=${busy} onApply=${onExperimental} />`}
   </div>`;
 }
 
@@ -781,6 +790,8 @@ const PROPOSE_RETRY_MS = 1200;
 /** Room screen component. */
 export function RoomScreen() {
   const room = useStore((s) => s.room);
+  // 「深渊回响」房间：整套主题换色（见 theme.css 的 html.sp-deepecho）。普通房间不挂这个类。
+  useDocClass('sp-deepecho', room?.variant === 'deepecho');
   const me = useStore((s) => s.me, shallowEqual);
   const conn = useStore((s) => s.connection, shallowEqual);
   const [busy, setBusy] = useState(null);
@@ -885,6 +896,10 @@ export function RoomScreen() {
   const facts = roomFacts(room, me.playerId);
   const myReady = !!facts.mine?.ready;
   const info = difficultyInfo(room.mode, room.difficulty);
+  // 「深渊回响」房间（2026-11-05）：难度编号是 DE-1/2/3，不是全模式共用的 AC-x；
+  // 点难度胶囊也不能打开**正式模式**的选择协议（那个界面里没有深潜档位）。
+  const echoRoom = room.variant === 'deepecho';
+  const echoCode = echoRoom ? `DE-${DEEP_ECHO_DIFFICULTIES.indexOf(room.difficulty) + 1}` : info.code;
 
   /** Runs one request at a time; resolves true once the server took it (false: not sent, or refused — toasted). */
   const run = async (kind, fn) => {
@@ -971,9 +986,12 @@ export function RoomScreen() {
     // the copied link carries an invitation line (#103): 「{name}邀请你加入卫戍协议：盟约【{difficulty}】」 — with the
     // version's name for another official version (DESIGN §35.23)
     const params = { name: me.name ?? '', difficulty: DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : '' };
-    const invite = roomVersion(room) !== DEFAULT_VERSION
-      ? t('{name}邀请你加入卫戍协议：盟约·{version}【{difficulty}】', { ...params, version: versionLabel(roomVersion(room)) })
-      : t('{name}邀请你加入卫戍协议：盟约【{difficulty}】', params);
+    // 「深渊回响」不是普通同盟房间：邀请语单独写，别让玩家以为点进去是标准模拟（维护者 2026-11-05）
+    const invite = room.variant === 'deepecho'
+      ? t('{name}邀请你加入卫戍协议：盟约【深渊回响】【{difficulty}】', params)
+      : roomVersion(room) !== DEFAULT_VERSION
+        ? t('{name}邀请你加入卫戍协议：盟约·{version}【{difficulty}】', { ...params, version: versionLabel(roomVersion(room)) })
+        : t('{name}邀请你加入卫戍协议：盟约【{difficulty}】', params);
     const ok = await copyText(what === 'code' ? room.code : `${inviteLink(room.code)} ${invite}`);
     if (ok) toast(what === 'code' ? t('已复制同盟密钥 {code}', { code: room.code }) : t('已复制邀请链接'), 'success');
     else toast(t('复制失败，请手动复制'), 'warn');
@@ -1037,7 +1055,7 @@ export function RoomScreen() {
     if (sent && alive.current) setVersionOpen(false);
   };
 
-  return html`<div class=${`screen room-screen rs${coop ? '' : ' rs--solo'}`} style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}; --n:${facts.seats.length}`}>
+  return html`<div class=${`screen room-screen rs${coop ? '' : ' rs--solo'}${room.variant === 'deepecho' ? ' rs--deepecho' : ''}`} style=${`--d-color:${DIFFICULTY_COLORS[room.difficulty] || 'var(--amber)'}; --n:${facts.seats.length}`}>
     <div class="rs__bg" aria-hidden="true"></div>
     <header class="topbar rs-top">
       <div class="topbar__left rs-top__left">
@@ -1101,11 +1119,11 @@ export function RoomScreen() {
       <b>${t('正在等人')}</b>
       <span>${t('还差 {n} 人', { n: Math.max(0, (Number(room.capacity) || MAX_SEATS) - facts.humans.length) })}</span>
       <span class="rs-matchwait__sep" aria-hidden="true">·</span>
-      <span>${t(DIFFICULTY_NAMES[room.difficulty] || '')}</span>
+      ${echoRoom ? html`<span class="rs-matchwait__echo">${t('深渊回响')}</span>` : html`<span>${t(DIFFICULTY_NAMES[room.difficulty] || '')}</span>`}
       <span class="rs-matchwait__sep" aria-hidden="true">·</span>
       <span>${t('{n} 人同盟', { n: Number(room.capacity) || MAX_SEATS })}</span>
       <span class="rs-matchwait__sep" aria-hidden="true">·</span>
-      <em>${t('其他博士在大厅点「多人匹配」就会被安排进来，人满后自动开局')}</em>
+      <em>${echoRoom ? t('其他博士在深潜房里点「匹配队友」就会被配到一起，人满后自动开局') : t('其他博士在大厅点「多人匹配」就会被安排进来，人满后自动开局')}</em>
     </p>` : null}
 
     <footer class="room-bar rs-foot">
@@ -1113,21 +1131,22 @@ export function RoomScreen() {
       <div class="rs-foot__center">
         <p class="rs-hint">${coop ? html`<span class="rs-ready num" title=${t('已就绪')}>${facts.humans.map((s) => html`<${Icon} key=${s.playerId} name="user" class=${facts.isReady(s) ? 'is-on' : ''} />`)}<b>${facts.readyHumans}</b>/${facts.humans.length}</span>` : null}<span class="room-bar__status">${statusLine}</span></p>
         <div class="rs-pill">
-          <button type="button" class=${`rs-pill__diff${facts.isHost ? '' : ' is-ro'}`} disabled=${facts.isHost && !!busy} onClick=${openProto}
-            title=${facts.isHost ? t('更改模拟难度') : t('由创建者选择')}><${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span></button>
+          <button type="button" class=${`rs-pill__diff${facts.isHost ? '' : ' is-ro'}`} disabled=${facts.isHost && !!busy}
+            onClick=${echoRoom ? (facts.isHost ? () => setOpts(true) : () => {}) : openProto}
+            title=${echoRoom ? t('深渊回响难度（DE-1 / DE-2 / DE-3）：在同盟设置里更改') : (facts.isHost ? t('更改模拟难度') : t('由创建者选择'))}><${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${echoCode}</span></button>
           ${versionCtl ? html`<${Tooltip} text=${versionCtl.why} class="rs-pill__version"><button type="button" class=${`rs-pill__ver${versionCtl.editable ? '' : ' is-ro'}`} data-testid="room-version"
             disabled=${versionCtl.disabled} onClick=${versionCtl.onOpen} aria-label=${t('游戏版本：{name}', { name: versionLabel(curVersion) })}><${Icon} name="book" /><span class="rs-pill__vername">${versionLabel(curVersion)}</span></button><//>` : null}
           ${aiLast || soloOpt ? html`<button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${aiLast ? t('同盟设置') : t('模拟设置')} aria-label=${aiLast ? t('同盟设置') : t('模拟设置')}
             aria-expanded=${opts ? 'true' : 'false'}><${GearGlyph} /></button>` : null}
           ${opts && (aiLast || soloOpt) ? html`<${RoomOptions} takeoverOption=${aiTakeoverOption(room, me.playerId)} onAiTakeover=${setAiTakeover} option=${aiLast} soloOption=${soloOpt} room=${room} isHost=${facts.isHost} busy=${busy} onAiLast=${setAiLast}
-            onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onClose=${() => setOpts(false)} version=${versionCtl}
+            onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onSetDifficulty=${setDifficulty} onClose=${() => setOpts(false)} version=${versionCtl}
               listed=${room.listed === true} onToggleListed=${setListed} />` : null}
         </div>
       </div>
       <div class="room-bar__right rs-foot__right">
         ${facts.isHost
           ? html`<${Tooltip} text=${startLocked ? t('服务器暂时关闭了开始游戏，请稍后再试') : facts.canStart ? null : vote ? t('切换版本投票进行中，请等投票结束') : !facts.contentReady ? (facts.versionRoom ? t('仍有博士未载入「{version}」的数据', { version: versionLabel(curVersion) }) : t('仍有博士未载入房间的插件内容')) : t('仍有博士未准备就绪')}>
-              <${GoButton} label=${t('开始模拟')} loading=${busy === 'start'} disabled=${!facts.canStart || !online || busy === 'start' || !!vote || startLocked} onClick=${start} />
+              <${GoButton} label=${room.variant === 'deepecho' ? t('开始深渊回响') : t('开始模拟')} loading=${busy === 'start'} disabled=${!facts.canStart || !online || busy === 'start' || !!vote || startLocked} onClick=${start} />
             <//>`
           : facts.spectating
             ? html`<${GoButton} label=${t('观战中')} icon="eye" disabled=${true} />`
@@ -1142,7 +1161,7 @@ export function RoomScreen() {
           busy=${busy === `band${bandSeat}`} onClose=${() => setBandSeat(null)} onPick=${(bandId) => setBotBand(bandSeat, bandId)} />`
       : null}
     ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${data.get('assets')} localSkins=${localSkins} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
-    ${protoOpen ? facts.isHost
+    ${protoOpen && !echoRoom ? facts.isHost
       ? html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${protoPick || room.difficulty} onDifficulty=${setProtoPick} onClose=${closeProto}
           onCreate=${confirmDifficulty} busy=${busy === 'diff' ? 'create' : null} online=${online} action=${t('确认')} hint=${protoHint} difficulties=${protoDifficulties} />`
       : html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${room.difficulty} onDifficulty=${() => {}} onClose=${closeProto}
@@ -1154,6 +1173,7 @@ export function RoomScreen() {
     ${/* 建房后的询问：要不要把这个同盟公开到大厅的「公开同盟」列表。
          只在房主、合作房、还没开局时问一次（标记由大厅 create 写入，takeListPrompt 取走后自毁）。 */ null}
     ${listAsk && facts.isHost && room.mode === 'coop' && !room.match ? html`<${ListPromptDialog}
+      echo=${echoRoom}
       busy=${listAsking}
       onPublic=${async (skip) => {
         setListAsk(false);

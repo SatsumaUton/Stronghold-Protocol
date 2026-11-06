@@ -44,6 +44,8 @@ function pickOpenRoom(code, node, doc) {
     difficulty: doc.difficulty || null,
     version: typeof doc.version === 'string' && doc.version ? doc.version : 'act2autochess',
     matchmaking: doc.matchmaking === true,
+    // 「深渊回响」（深潜）：公开的深潜房也要能被认出来（列表里显示成深渊回响，维护者 2026-11-06）
+    variant: doc.variant === 'deepecho' ? 'deepecho' : null,
     experimental: !!(doc.experimental && typeof doc.experimental === 'object' && Object.keys(doc.experimental).length),
   };
 }
@@ -54,7 +56,9 @@ function pickOpenRoom(code, node, doc) {
  * 排序和节点内 `room.list` 一致：空位少的在前，同样多按房间码。
  * @param {Array<{ node: number, flat: string[] }>} perNode
  */
-function collectOpenRooms(perNode) {
+function collectOpenRooms(perNode, { variant = null } = {}) {
+  // 「深渊回响」有**自己的**公开列表（维护者 2026-11-06）：带 variant 只列深潜房，不带则只列普通同盟房。
+  const wantEcho = variant === 'deepecho';
   const out = [];
   for (const { node, flat } of perNode) {
     if (!Array.isArray(flat)) continue;
@@ -62,7 +66,9 @@ function collectOpenRooms(perNode) {
       let doc = null;
       try { doc = JSON.parse(flat[k + 1]); } catch { continue; }
       const row = pickOpenRoom(flat[k], node, doc);
-      if (row) out.push(row);
+      if (!row) continue;
+      if ((row.variant === 'deepecho') !== wantEcho) continue;
+      out.push(row);
     }
   }
   out.sort((a, b) => (a.capacity - a.filled) - (b.capacity - b.filled) || a.code.localeCompare(b.code));

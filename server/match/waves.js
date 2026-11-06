@@ -36,6 +36,8 @@
 // largest owner group (client `_CalculateActionPredelayConsiderUid`, decoded).
 
 import { createRng, deriveSeed } from '../sim/rng.js';
+import { echoRandomWave } from './match/echoWaves.js';
+import { ECHO_BUDGET_BASE } from './match/echo.js';
 import { PLUGIN_ACTION_UNITS } from '../../shared/plugins/limits.js';
 
 const ACLOON = 'enemy_9012_acloon';
@@ -279,9 +281,9 @@ export function gateOf(start, leader) {
   return target >= PEN_UPPER_ROW ? 'upper' : 'lower';
 }
 
-const isLeaderTemplate = (tpl) => !!tpl && (tpl.kind === 'boss' || tpl.kind === 'hidden');
+export const isLeaderTemplate = (tpl) => !!tpl && (tpl.kind === 'boss' || tpl.kind === 'hidden');
 
-function previewInfo(gd, key, route, boss = false, leader = undefined) {
+export function previewInfo(gd, key, route, boss = false, leader = undefined) {
   const e = gd.enemy(key);
   const start = route && Array.isArray(route.start) ? route.start.slice(0, 2) : null;
   return { gate: gateOf(start, leader), start, fly: isFlyKey(gd, key), elite: !!(e && e.rank && e.rank !== 'NORMAL'), boss };
@@ -292,8 +294,8 @@ function previewInfo(gd, key, route, boss = false, leader = undefined) {
  * @returns {{ spawns: object[], actions: object[] }} actions[i] = { index, key, tplKey, slot, time, count, tplCount, window, routeIndex, valid,
  *   server } (`server` = client ShouldActionUpToServer: valid, not the leader, no random spawn group)
  */
-function templateSpawns(gd, tpl, round, pick) {
-  const scale = scaleFor(gd, round);
+function templateSpawns(gd, tpl, round, pick, scaleOverride = null) {
+  const scale = scaleOverride && typeof scaleOverride === 'object' ? scaleOverride : scaleFor(gd, round);
   const ph = placeholderMap(gd);
   const routes = Array.isArray(tpl.routes) ? tpl.routes : [];
   const leader = isLeaderTemplate(tpl);
@@ -363,6 +365,9 @@ function entriesView(gd, pick) {
   return pick.fly ? { ground: null, fly: view } : { ground: view, fly: null };
 }
 
+// 「深渊回响」深潜的出怪实现**不在本文件**：全部在 ./match/echoWaves.js（echoPoolFor / echoRemapByBudget /
+// echoSyncActions）。本文件只在 buildNormalWave 里保留了唯一一个调用点，普通模式不会进入。
+
 /**
  * Shared composition of a normal round.
  * @param {string[]|object} factions setupMatchWaves().factions (carries the schedule), the setup object, or a plain
@@ -370,18 +375,48 @@ function entriesView(gd, pick) {
  * @returns {{ templateId: string|null, spawns: object[], routes: object[], extraRoutes: object[], timeLimit: number,
  *   overrides: object, pick: object|null, entries: { ground: object|null, fly: object|null }, actions: object[] }}
  */
-export function buildNormalWave(gd, rng, factions, round) {
-  const rc = gd.roundCfg(round);
+export function buildNormalWave(gd, rng, factions, round, opts = null) {
+  // 「深渊回响」的深潜回合（DESIGN-ABYSS.md「第二步的拦路发现」）：显示回合与数据回合不是同一个数。
+  // 波次模板只覆盖到 bossRound-1，深潜按 1..13 循环取用；但敌人强度仍按显示回合延伸。
+  // 所以模板 / 时限 / 编组抽取查 `dataRound`，缩放（templateSpawns 里的 scaleFor）仍查 `round`。
+  // 普通回合两者相等（opts 为空 → dataRound === round），行为与加这个参数之前逐字节一致。
+  const dataRound = opts && Number.isInteger(opts.dataRound) && opts.dataRound > 0 ? opts.dataRound : round;
+  const rc = gd.roundCfg(dataRound);
   const templateId = rc && typeof rc.template === 'string' ? rc.template : null;
   const tpl = templateId ? gd.wave(templateId) : null;
-  const timeLimit = gd.combatTimeLimit(round);
+  // 深潜 16 层以后（echoWaves.echoDeepWaveShape）每一层的规模是按深度设计的，作战时限也跟着固定成
+  // 「最后一关」的时长：否则深度 16 会轮回到数据回合 1 的 90 秒时限，却要放 110 只怪 —— 挤成 20 秒的洪水，
+  // 之后整场空转（维护者 2026-11-04 §6「按层设计出怪量」的同一条要求）。
+  const limitRound = opts && Number.isInteger(opts.echoTimeLimitRound) && opts.echoTimeLimitRound > 0
+    ? opts.echoTimeLimitRound
+    : dataRound;
+  // 【深渊回响】15 层非隐藏：不用 boss 回合的时限，可以直接指定（维护者 2026-11-05）
+  const timeLimit = Number.isFinite(opts && opts.echoTimeLimitSec) && opts.echoTimeLimitSec > 0
+    ? Math.floor(opts.echoTimeLimitSec)
+    : gd.combatTimeLimit(limitRound);
   if (!tpl) return { templateId, spawns: [], routes: [], extraRoutes: [], timeLimit, overrides: {}, pick: null, entries: { ground: null, fly: null }, actions: [] };
-  const pick = roundPick(gd, rng, factions, round);
-  const { spawns, actions } = templateSpawns(gd, tpl, round, pick);
+  // 【深渊回响】预生成的编组：传了 opts.pick 就不再现场抽，
+  // 这样每回合可以从预先生成好的若干套里抽一套（仍是原版合法编组）。
+  const pick = (opts && opts.pick) || roundPick(gd, rng, factions, dataRound);
+  const built = templateSpawns(gd, tpl, round, pick);
+  // 「深渊回响」深潜：**整波随机生成**（出几条 / 什么怪 / 多少只 / 什么时候出 / 走哪条路线都随机，
+  // 不再沿用原版的出怪动作），强度仍按显示回合缩放（echoScale 放进 mods）。
+  // 普通回合 opts 里没有 echoGrowth → echoRandomWave 返回 null，走原版路径，逐字节不变。
+  const echoWave = echoRandomWave(gd, tpl, opts ? {
+    ...opts,
+    echoScale: scaleFor(gd, round),
+    echoBudget: ECHO_BUDGET_BASE * (Number(opts.echoGrowth) || 1),
+    echoTimeLimit: timeLimit,
+    // 前期（深潜前几层）沿用原版动作，之后才彻底随机 —— 由 echoWaves.ECHO_TEMPLATE_DEPTH 控制
+    echoTemplate: built.spawns,
+  } : null, rng, { isFlyKey, classOf, previewInfo, isLeaderTemplate, roundMods });
+  const spawns = echoWave ? echoWave.spawns : built.spawns;
+  const actions = echoWave ? echoWave.actions : built.actions;
   return {
     templateId,
     spawns,
-    routes: Array.isArray(tpl.routes) ? tpl.routes : [],
+    // 深层（echoAllRoutes）：wave 的路线表可能比模板大（并入了同图其他出兵口）
+    routes: echoWave && Array.isArray(echoWave.routes) && echoWave.routes.length ? echoWave.routes : (Array.isArray(tpl.routes) ? tpl.routes : []),
     extraRoutes: Array.isArray(tpl.extraRoutes) ? tpl.extraRoutes : [],
     timeLimit,
     overrides: tpl.overrides && typeof tpl.overrides === 'object' ? tpl.overrides : {},
@@ -395,8 +430,10 @@ export function buildNormalWave(gd, rng, factions, round) {
  * Boss / hidden round template for one boss field; escorts follow the pick of the round's own slot.
  * @param {{ bossId: string, solo: boolean }} opts solo → `_s` template (lone player or solo mode)
  */
-export function buildBossWave(gd, rng, factions, round, { bossId, solo }) {
-  const rc = gd.roundCfg(round);
+export function buildBossWave(gd, rng, factions, round, { bossId, solo, cfgRound = null, scale = null }) {
+  // 深潜的 boss 返场（R20 / R25 / R30…）没有自己的 roundCfg（数据表只到 15），模板借用玩家实际打过的
+  // 最后一个 boss 回合；但**缩放仍按显示回合**（templateSpawns 拿到的 round 就是显示回合，走 echoScale）。
+  const rc = gd.roundCfg(Number.isInteger(cfgRound) ? cfgRound : round);
   const map = rc && rc.bossTemplates && typeof rc.bossTemplates === 'object' ? rc.bossTemplates : {};
   let templateId = typeof map[bossId] === 'string' ? map[bossId] : null;
   if (!templateId) {
@@ -408,7 +445,7 @@ export function buildBossWave(gd, rng, factions, round, { bossId, solo }) {
   const tpl = templateId ? gd.wave(templateId) : null;
   if (!tpl) return { templateId, spawns: [], routes: [], extraRoutes: [], timeLimit: Infinity, overrides: {}, pick: null, entries: { ground: null, fly: null }, actions: [] };
   const pick = roundPick(gd, rng, factions, round);
-  const { spawns, actions } = templateSpawns(gd, tpl, round, pick);
+  const { spawns, actions } = templateSpawns(gd, tpl, round, pick, scale);
   return {
     templateId,
     spawns,
@@ -619,9 +656,13 @@ export function previewOf(spawns) {
  * preDelay + k·ACTION_INTERVAL_FOR_UID (0.5 s) + i·step.
  * @param {Array<{ enemyKey: string, mods: object|null, sourcePlayerId: string, bounty?: object|null, isToken?: boolean }>} leaked
  * @param {number} helperCount 1 | 2
+ * @param {number} [timeLimit] 未使用（保留旧签名）
+ * @param {{ maxLastSpawn?: number }} [opts] `maxLastSpawn`：**最后一只最晚什么时候出场**（游戏秒）。
+ *   深潜的漏怪动辄上百只，按默认 step 会排到时限之外（敌人还没出完联防就结束了）；
+ *   给了这个上限就把间隔等比压紧，保证全部出完。
  * @returns {{ templateId: string|null, spawns: object[], routes: object[] }}
  */
-export function buildUniteWave(gd, leaked, helperCount, timeLimit) { // eslint-disable-line no-unused-vars
+export function buildUniteWave(gd, leaked, helperCount, timeLimit, opts = {}) { // eslint-disable-line no-unused-vars
   const templates = gd.unite.templates;
   const templateId = templates[String(helperCount)] || templates[helperCount] || null;
   const tpl = templateId ? gd.wave(templateId) : null;
@@ -661,9 +702,16 @@ export function buildUniteWave(gd, leaked, helperCount, timeLimit) { // eslint-d
     let k = 0;
     for (const units of owners.values()) {
       const start = t0 + k * UNITE_OWNER_STEP;
+      // 深潜：漏怪太多时按默认 step 会排到时限之外 → 等比压紧到 maxLastSpawn 之前（最低 0.02 s，别挤成一坨）
+      let stepUse = step;
+      const cap = Number(opts && opts.maxLastSpawn);
+      if (Number.isFinite(cap) && units.length > 1) {
+        const room = cap - start;
+        if (room > 0) stepUse = Math.min(step, Math.max(0.02, room / (units.length - 1)));
+      }
       units.forEach((l, i) => {
         const spec = {
-          time: start + i * step, enemyKey: l.enemyKey, routeIndex, count: 1, interval: 0,
+          time: start + i * stepUse, enemyKey: l.enemyKey, routeIndex, count: 1, interval: 0,
           mods: l.mods ? { ...l.mods } : { slot: classOf(gd, l.enemyKey) }, sourcePlayerId: l.sourcePlayerId,
           preview: previewInfo(gd, l.enemyKey, routes[routeIndex]),
         };
@@ -677,4 +725,23 @@ export function buildUniteWave(gd, leaked, helperCount, timeLimit) { // eslint-d
   }
   spawns.sort((a, b) => a.time - b.time);
   return { templateId, spawns, routes };
+}
+
+/**
+ * 联防这一段「最后一只敌人什么时候出场」+ 总数（游戏秒）。
+ *
+ * 深潜的漏怪可能上百只，默认排队规则会把最后一只排到本回合的作战时限之外 ——
+ * 表现就是「敌人还没出完，联防时间就结束了」（维护者 2026-11-05）。调用方据此把时限抬上去。
+ *
+ * @param {any} gd
+ * @param {Array<any>} leaked
+ * @param {number} helperCount
+ * @returns {{ last: number, count: number }}
+ */
+export function uniteWaveWindow(gd, leaked, helperCount) {
+  let wave = null;
+  try { wave = buildUniteWave(gd, leaked, helperCount, 0); } catch { return { last: 0, count: 0 }; }
+  let last = 0;
+  for (const s of wave.spawns || []) last = Math.max(last, Number(s.time) || 0);
+  return { last, count: (wave.spawns || []).length };
 }

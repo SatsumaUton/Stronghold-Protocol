@@ -88,6 +88,11 @@ export function roomDoc(room, matchRef, sessionOf) {
     // 为 false 时整条省掉，默认房间的存档与以前逐字节一致。
     ...(room.listed === true ? { listed: true } : {}),
     ...(room.matchmaking === true ? { matchmaking: true } : {}),
+    // 「深渊回响」: 只为这个模式写键，普通房间的存档与以前逐字节一致
+    ...(room.variant ? { variant: room.variant } : {}),
+    // 深潜的房间级调参（`Match` 的 opts.echo → echoCfg，决定深潜曲线）。
+    // 不存的话读档后 startMatch 不带 echo，新 Match 用默认曲线 —— 一局的难度节奏就悄悄变了。
+    ...(room.variant === 'deepecho' && plain(room.echoCfg) ? { echoCfg: room.echoCfg } : {}),
     experimental: room.experimental, source: room.source, ownerKey: room.ownerKey, ownerKeys: room.ownerKeys ? [...room.ownerKeys] : null,
     matchKey: room.matchKey, matchKeys: room.matchKeys ? [...room.matchKeys] : null, matchCount: room.matchCount | 0, createdAt: room.createdAt,
     ttlMs: room.ttlMs, noExpire: room.noExpire === true, adminCreated: room.adminCreated === true,
@@ -212,6 +217,13 @@ function roomFrom(r, sessions, lobby, now) {
   const inMatch = !!r.match;
   room.content = lobby.vanilla;
   room.aiPicksLast = r.mode === 'coop' && r.aiPicksLast === true;
+  // ★ 「深渊回响」断点续玩（维护者 2026-11-06）：variant 必须一起恢复。
+  //   丢了它 → persister.restoreLocal 的 startMatch 不带 variant → 新 Match 的构造函数
+  //   不装深潜缩放（gd.echoScaleOf）、不强制独立卡池，于是检查点里的卡池组数对不上，
+  //   `restoreMatch` 回一句「checkpoint refused (pool groups)」→ 整局被丢弃，
+  //   玩家看到的就是「服务器重启导致对局中断，同盟已返回等待室」。深度、祝福、祭坛全白存。
+  room.variant = r.variant === 'deepecho' && r.mode === 'coop' ? 'deepecho' : null;
+  if (room.variant && plain(r.echoCfg)) room.echoCfg = r.echoCfg;
   room.source = typeof r.source === 'string' ? r.source : 'private';
   room.ownerKey = typeof r.ownerKey === 'string' ? r.ownerKey : null;
   room.ownerKeys = Array.isArray(r.ownerKeys) ? new Set(r.ownerKeys.filter((k) => typeof k === 'string')) : null;
@@ -259,6 +271,9 @@ function fallbackRoom(r, lobby, now) {
     room.noExpire = room.adminCreated;
     room.matchCount = Number.isSafeInteger(r.matchCount) ? r.matchCount : 0;
     room.aiPicksLast = r.mode === 'coop' && r.aiPicksLast === true;
+    // 兜底重建同样要带上深潜标记（理由见 roomFrom）：没有它，恢复出来的深潜局会被当普通同盟局
+    room.variant = r.variant === 'deepecho' && r.mode === 'coop' ? 'deepecho' : null;
+    if (room.variant && plain(r.echoCfg)) room.echoCfg = r.echoCfg;
     (Array.isArray(r.seats) ? r.seats : []).forEach((s, i) => {
       if (!s || !s.playerId) return;
       room.seats[i] = {

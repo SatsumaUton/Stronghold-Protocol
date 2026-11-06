@@ -8,9 +8,15 @@ import { deriveSeed } from '../../sim/rng.js';
 import { uniteBattleOpts, uniteSurvivors, planUniteRelay } from '../unite.js';
 import { FieldRunner, timelineAt, uniteBillBounds } from '../fields.js';
 import { uniteLeft } from '../../sim/spec.js';
+import { uniteWaveWindow } from '../waves.js';
 import { FLOW_TICKER_PRIORITY, DELAYS } from './common.js';
 import { msg } from '../../../shared/i18n.js';
 import { onStartUnite } from '../botEmotes.js';
+
+/** 深潜联防：出完怪之后再留多少游戏秒收尾（给玩家清场）。 */
+const ECHO_UNITE_TAIL_SECS = 30;
+/** 深潜联防的时限上限（游戏秒）：再长的排队也不再拉长，改成压缩出怪间隔。 */
+const ECHO_UNITE_MAX_SECS = 300;
 
 export class MatchUnite {
   startUnite(plan) {
@@ -57,7 +63,20 @@ export class MatchUnite {
    * 而且和 HUD 显示的「联防时间」对不上；改成每段独立计时后两者一致。
    */
   uniteTimeLimit(plan) {
-    const limit = this.wave ? this.wave.timeLimit : 60;
+    let limit = this.wave ? this.wave.timeLimit : 60;
+    // 「深渊回响」：深潜 16 层以后每回合上百只怪，漏怪也跟着上百 —— 联防按模板排队出怪时，
+    // 最后一只可能排到本回合的作战时限之外（维护者 2026-11-05：敌人还没出完，联防时间就结束了）。
+    // 所以按**实际出怪窗口**把时限抬上去（留一段收尾时间）；真超过上限就把出怪间隔等比压紧。
+    if (this.echoVariant === 'deepecho' && plan && Array.isArray(plan.leaked) && plan.leaked.length) {
+      const helpers = Array.isArray(plan.helpers) && plan.helpers.length ? plan.helpers.length : 1;
+      const need = uniteWaveWindow(this.gd, plan.leaked, helpers).last;
+      if (need > 0) {
+        const wanted = Math.ceil(need + ECHO_UNITE_TAIL_SECS);
+        limit = Math.max(limit, Math.min(ECHO_UNITE_MAX_SECS, wanted));
+        // 被上限截住时：让 buildUniteWave 把间隔压到收尾时间之前，保证全部出完
+        plan.maxLastSpawn = Math.max(0, limit - ECHO_UNITE_TAIL_SECS);
+      }
+    }
     if (plan) {
       plan.timeLimit = limit;
       plan.gameSpeed = this.gameSpeed;

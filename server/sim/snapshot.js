@@ -45,6 +45,8 @@ export function unitInfo(u) {
     // from the operator's base-record guess and swung in slow motion until two attacks had been measured.
     atkInterval,
     spine: d.spine ?? d.charId ?? u.defId,
+  // 悬赏金币数（>0 = 悬赏目标）：客户端据此画金币标记与金色描边
+  bounty: Math.max(0, Math.trunc(Number(u.bounty && u.bounty.coins) || 0)),
     // 皮肤 (docs/SKINS.md): the owning player's chosen skinId. `undefined` (not null) on purpose — JSON.stringify drops
     // it, so an install with no skins produces the exact same wire format as before and the §8.2 contract holds; the key
     // only appears where a skin is actually in play.

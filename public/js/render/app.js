@@ -1720,6 +1720,8 @@ export async function createFieldView(host, options = {}) {
     if (v.setItems && battleMeta?.prep && Array.isArray(info.items) && info.items.length) {
       v.setItems(info.items.map((it) => { const r = data.item(it); return assets.itemIcon ? assets.itemIcon(r ? { trapId: r.trapId, iconId: r.iconId } : it) : null; }));
     }
+    // 悬赏目标：单位视图自己画头顶金币（维护者 2026-11-05）
+    if (typeof v.setBounty === 'function') v.setBounty(info.bounty);
     v.setWorld(info.x, info.y, 0);
     v._seen = false;
     v._born = performance.now();

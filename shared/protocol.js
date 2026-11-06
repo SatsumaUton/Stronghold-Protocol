@@ -514,7 +514,7 @@ export const C2S = {
   // soloUnlimited: the timed-solo opt-out 「不限时」 (DESIGN §35.23.10). Optional, and only the literal boolean —
   // the server applies `true` solely to a solo room of a version whose solo is timed, and ignores it otherwise, so a
   // default create stays the message it was.
-  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, version: isVersionId, soloUnlimited: isBool, experimental: (v) => v && typeof v === 'object' && !Array.isArray(v), $optional: ['test', 'difficulty', 'version', 'soloUnlimited', 'experimental'] },
+  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, version: isVersionId, soloUnlimited: isBool, experimental: (v) => v && typeof v === 'object' && !Array.isArray(v), variant: (v) => v === 'deepecho', $optional: ['test', 'difficulty', 'version', 'soloUnlimited', 'experimental', 'variant'] },
   'room.join': { $optional: ['testAck'], testAck: (v) => v === true, code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'room.leave': {},
   'account.resume': {},
@@ -533,7 +533,8 @@ export const C2S = {
   // 最多 ROOM_LIST_MAX 个，空位最少的在前 —— host 是房主显示名，filled 是已占座位（含 AI），
   // version 只在不是默认版本时出现。
   'room.setListed': { listed: isBool },
-  'room.list': {},
+  // 公开同盟 / 公开深潜共用：带 variant 只列该模式（不带 = 普通同盟，深潜有自己的列表）
+  'room.list': { $optional: ['variant'], variant: (v) => v === 'deepecho' },
 
   // Remake-only spectator handover: host opt-in before play, default off (§35.100).
   'room.setAiTakeover': { on: isBool },
@@ -557,10 +558,12 @@ export const C2S = {
   // 省了就是「哪间匹配中的房间缺人就进哪间」。答复字段 { code, joined, matchmaking? } 或
   // { queued: true, ticket, state }（没人可加入时排队，前端停在匹配界面轮询），由 net.js 平铺在 ok 帧顶层。
   'room.quickMatch': {
-    $optional: ['difficulty', 'seats', 'rules'],
+    $optional: ['difficulty', 'seats', 'rules', 'variant'],
     difficulty: (v) => DIFFICULTIES.includes(v),
     seats: (v) => v === 'four' || v === 'multi' || v === 'both',
     rules: (v) => v === 'standard' || v === 'experimental' || v === 'both',
+    // 「深渊回响」（深潜）：自己的匹配池（server/lobby.js quickMatch 的 variant 维度）
+    variant: (v) => v === 'deepecho',
   },
   // 本服：多人匹配排队状态的轮询与取消（维护者 2026-11-02：没人匹配时停在界面等，不开房）。
   'room.quickState': { $optional: ['ticket'], ticket: (v) => typeof v === 'string' && v.length <= 64 },
@@ -615,6 +618,25 @@ export const C2S = {
   'g.rerollVote': { voteId: (v) => isInt(v, 1, 2 ** 31), agree: isBool },
   // 战斗 2 倍速 (server/match/match/speedVote.js): this seat's standing vote; m.public speedVote is the count
   'g.speedVote': { agree: isBool },
+  // 「深渊回响」的祝福三选一 (server/match/match/echoBlessing.js, ui/echoBlessing.js):
+  // `pick` 是候选下标（0..2），**3 = 第四张「放弃本次」**（维护者 2026-11-05 加的）。上限必须放到 3 ——
+  // 否则点「放弃本次」会在客户端就被拦成「无效的请求」，服务端 intents.js 的 case 永远收不到
+  //（玩家反馈的正是这个：连点 13 次全是 BAD_MSG）。
+  // **必须登记在这里** —— 漏了的话 net.js 会在客户端就把它拦掉（与 g.bondPlan 踩过的是同一个坑）。
+  'g.echoBlessing': { pick: (v) => isInt(v, 0, 3) },
+  // 名额满时的「弃选」投票 / 「护盾」指定盟约 / 「开路」提前解除（2026-11-05）
+  // ⚠ 同样必须在这里登记，否则客户端一发就是「无效的请求」（BAD_MSG），服务端永远收不到。
+  'g.echoBlessingDiscard': { pick: (v) => isInt(v, 0, 15) },
+  // 刷新三选一（维护者 2026-11-05）：start=true 发起投票；否则按 agree 投同意/不同意
+  'g.echoBlessingRefresh': { start: (v) => v === undefined || typeof v === 'boolean', agree: (v) => v === undefined || typeof v === 'boolean' },
+  'g.echoShield': { pick: (v) => isInt(v, 0, 15) },
+  'g.echoCounterUse': {},
+  // 深渊祭坛（16 层起）：买一次献祭
+  'g.echoAltar': { kind: (v) => v === 'blessing' || v === 'buff' || v === 'permanent' },
+  // 深潜补给（16 层起）：个人三选一
+  'g.echoSupply': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 2 },
+  // 「盟约投影」（16 层起每 10 层）：全队三选一投票
+  'g.echoProjection': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 3 },
   'g.band': { bandId: isId },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is

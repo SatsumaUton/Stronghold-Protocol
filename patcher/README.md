@@ -70,11 +70,55 @@ patcher\
 > 新增功能漏登记时，`check-coverage.mjs` 只能保证「文件进了补丁」，
 > 但**不能**保证「下次升级时有人记得验收它」—— 这一步只能靠这张表。
 
+### 深渊回响的独立性（2026-11-06）
+
+**要求（维护者）：原版更新不许让深渊回响失效。**
+
+
+> **仓库分离**：深渊回响有**自己的私有仓库**，独占文件（`echo*.js` / `echoLobby.js` / 深潜快照 / 深潜测试…）
+> 只放在那边，公开仓库不许出现 —— 见 [docs/DEEPECHO-REPO.md](../docs/DEEPECHO-REPO.md)，
+> 检查用 `node patcher/check-repo-split.mjs`（`--apply` 摘索引、`--strict` 接 CI）。
+上游更新走 `restore → 升级 → apply.mjs`（服务端锚点）与 `merge-features.py`（功能快照三方合并）：
+官方文件是**整文件覆盖**的，只有 `patcher/features/<id>/files/` 的快照能把我们的改动救回来。
+所以「深潜会不会被原版更新搞坏」=「带深潜逻辑的文件有没有最新快照 + 有没有在两张表里登记」。
+
+这条不变量由 **`node patcher/check-deepecho.mjs`** 守住，并且是 `npm test` 的一部分
+（`test/patcher/deepecho-isolation.test.js`）：
+
+| 检查 | 说明 |
+|---|---|
+| 文件清单不靠人记 | 扫描 `server/ public/ shared/ matchmaker/ dashboard/ data/ content/ mm/` 里所有出现 `deepecho` / `echoVariant` / `echoBlessing` / `echoPhase` / `echoCurse` / `深渊回响` / `深潜` 等标记的运行文件（当前 **97** 个） |
+| 快照逐字节一致 | 每个文件都要在 `patcher/features/deepecho/files/` 里有一份**和仓库完全相同**的副本；过期 = 上游一升级就回退到旧版本 |
+| `features.json` 登记 | 有 `deepecho` 项（状态 `ported`、文件清单、验收项），升级清单里才有人知道要移植 |
+| `index.json` 登记 | **关键**：`merge-features.py` 只读 `patcher/features/index.json`；缺项 = 合并阶段整份功能被忽略 |
+| 测试齐全 | 18 个深潜测试文件必须存在（升级后按这份清单重跑） |
+
+```bash
+node patcher/check-deepecho.mjs          # 检查（有问题退出码 1）
+node patcher/check-deepecho.mjs --list   # 打印完整清单
+node patcher/check-deepecho.mjs --fix    # 把漂移/缺失的文件补进快照，并同步 index.json
+```
+
+**每次改完深潜代码（哪怕只改一行）都要跑一次 `--fix` 再提交**，否则下次上游更新会把它吞掉。
+负向验证过：把 `echoPhase.js` 的快照改坏一个字节，守卫立刻报「快照过期: 1」并退出码 1。
+
+> 深潜没有 `base/` 副本，`merge-features.py` 对它走 `no-base-keep-ours`：**整份保留我们的版本**。
+> 这正是「原版更新不影响深潜」想要的效果；代价是这些文件里上游的新改动不会自动合并进来 ——
+> 升级后需要人工看一眼上游是否在这些文件里改了与深潜无关的东西。
+
 ### 玩法与对局
 
 | 功能 | 涉及文件 | 所属补丁 | 生效方式 |
 |---|---|---|---|
 | **游戏内管理员工具**（2026-10-31）<br>在对局中点击左上角「节点状态」胶囊（`📊 汐斯塔 · 正常`），打开刷干员 / 装备 / 盟约 / 策略 / 数值 / 阶段 / 商店 / 机变 / 召唤物的面板。**权限（两道门，缺一不可）**：① 身份门 `session.adminId` = 账号 `role in (owner,admin)`；② 验码门 `session.adminTool` = 持有**只在管理后台生成**的一次性验证码换来的令牌（`typ=admin`）。服务端每次 hello 重算并通过 `welcome` 下发 `adminId` / `adminCode` / `adminTools`，普通玩家三者皆 false。**退出授权**走 `POST /api/admintool/revoke` 写吊销时间点，节点比对 `iat` 拒绝旧令牌。**二次确认**：全局类（`phase`/`round`/`timers`/`shop`）与他人座位类（`teamLp`、指定别人 uid 的 `token`）必须点确认，自身类不打断；面板顶部可选「免确认」，勾上时显示橙色警示并可一键恢复。**验证码**：后台「生成游戏内验证码」出 6 位码，10 分钟有效，兑换后得 4 小时 adminToken。 | `server/net.js`（下发 `welcome.adminTools`）<br>`server/lobby.js`（`g.test` 对 `session.admin` 放行；座位映射带 `admin`）<br>`server/match/PlayerState.js`（`this.admin`）<br>`server/match/match/testCommands.js`（`ps.admin` 放行）<br>`server/match/Match.js`（管理员座位时初始化计量/审计状态）<br>`public/js/store.js`（`adminTools` 初始字段）<br>`public/js/main.js`（`onWelcome` 赋值）<br>`public/js/ui/hud.js`（延迟胶囊开面板）<br>`public/js/ui/adminTools.js`（面板本体 + 二次确认）<br>`public/css/screens/game.css`（`.admintools*`）<br>`matchmaker/account.cjs`（`tools.game` 权限、`/api/admin2/tool-code`、`/api/admintool/exchange`）<br>`matchmaker/public/admin.html`（生成按钮、权限预设、危险权限红框） | `server` / `game-core-client-ui` / `game-core-client-style` / `matchmaker` | 刷新页面 + 重启节点 + 重启 matchmaker |
+| **深渊回响（无尽深潜）**（2026-11-03）<br>第三模式：`mode: 'coop'` + `variant: 'deepecho'`，不新增 mode 值。打完玩家实际到达的最后一个 boss（R15/16）不进结算，转入**无尽深潜**：只有团灭才结束（`ECHO_SAFE_ROUND=999` 只防爆），深度即成绩。数值两段：R15–R30 血×1.2/攻×1.1，**R31 起 ×1.10/×1.05 永不见顶**（原 120× 硬封顶已取消）。结构难度：词条上限 3→8 随深度、精英每 3 层（R30 后 2 只、R60 后 3 只、位置随机）。波次：1–15 层 = 原版该回合的波次形状 × `ECHO_EARLY_GROWTH`；**每一层都从模板库**（原版 1..13 回合各做一批配比变体）里随机抽一套，怪种永远取自原版某一关；**16 层以后只数由深度设计**（`echoDeepWaveShape`：110 × 1.2^轮 × 轮内爬升，硬顶 `ECHO_MAX_UNITS = 160`，时限固定成最后一关的时长），不再跟着数据回合的只数走（旧实现在深度 16 会从 112 只掉到 14 只）。boss 返场固定 R20/25/30/35…；悬赏 R18/23/28…（避开 boss 层，目标从本回合已生成波次现抽，赏金 `clamp(round(最大生命×数量/15000×(1+0.15×深度)),1,8)`）；祝福每 5 层三选一（资金+40 / `batPct:-0.1` / 金币×1.2）。玩家侧：`disableLayerCap` 默认开；限伤按 `hitLimitMul = 当前hpMul/6.687` 缩放（`sim` 仅加 2 行、缺省 1）。备战阶段服务端**不发明细**，只给 `m.public.echo.intel = { threat, elite, nextNodeRound, nextNodeIn }`。**管理员门禁**：`lobby.create` 只放行 `session.adminId === true`，其余 `TEST_FORBIDDEN` | `server/match/match/echo.js`<br>`server/match/match/echoPhase.js`<br>`server/match/match/echoWords.js`<br>`server/match/match/echoBlessing.js`<br>`server/match/match/echoBounty.js`<br>`server/match/match/echoWaves.js`<br>`server/match/{Match,waves,gamedata,snapshot}.js`<br>`server/match/match/{phases,bossRounds,combat,settle,views,intents}.js`<br>`server/lobby.js`、`server/persist/lobbyState.js`、`shared/protocol.js`<br>`server/sim/attack/health.js`（限伤乘数）<br>`public/js/ui/{enemyDrawer,echoBlessing,echoStatus,gameActions}.js`、`public/js/screens/game.js`<br>`test/match/echo*.test.js` | `deepecho` | 刷新页面 + **重启节点** |
+| **深渊回响：主题转化祝福**（2026-11-05）<br>11 条祝福把队伍**附加盟约**的主题转成对敌压制（奥术→术蚀 / 坚守→反震 / 精准→洞穿 / 灵巧→缠足 / 迅捷→迟滞 / 助力→削壁 / 协防→压制 / 奇迹→厄运 / 调和→调律 / 突袭→袭扰 / 绝技→绝境；跳过 远见 / 投资人 / 不屈 / 独行 —— 它们的效果是钱 / 招募 / 复活 / 独狼，转成对敌减益会变成另一条机制）。**不看队伍有没有那条盟约**（维护者 2026-11-05 第二次定：直接进祝福卡池），抽到就生效；字段 bondTheme 只记录主题来源，不参与判定。生效窗口 = 每回合**开局前 N 秒**，N 按稀有度分档（普通 10 / 稀有 15 / 传说 20，`ECHO_BOND_DEBUFF_SECONDS`）。实现只用 sim 已有的异常状态（`battle.applyStatus`）与 `battle.dealDamage` 反伤，`server/sim` 一行未改、golden 未动 | `server/match/match/echoBlessing.js`<br>`server/match/match/echoPhase.js`<br>`test/match/echoBondDebuff.test.js` | `deepecho` | **重启节点** |
+| **深渊回响：深潜说法（退出 / 记录）**（2026-11-06）<br>深潜不是「模拟」：退出弹窗标题与放弃按钮「离开深潜 / 放弃深潜」、AI 托管浮层「返回深潜」、协议已失效盘「离开深潜」、暂停盘「放弃深潜」——统一走 `matchChrome.js:exitWords(echo)`（流程一字未改：暂离 = AI 托管，放弃 = `g.leave → room.leave`）。对局记录：**模式**列显示「深渊回响」（纯文字薄荷色，不加框），**难度**列照旧显示真实难度名；深潜记录固定算第二期下半（`variant` 入库）。 | `public/js/ui/matchChrome.js`<br>`public/js/ui/downedPlate.js`<br>`public/js/screens/game/overlays.js`<br>`public/js/screens/stats.js`<br>`public/css/screens/stats.css`<br>`public/i18n/en.json` | `deepecho` | 刷新页面 |
+| **深渊回响：房间接入控制台 / 管理后台**（2026-11-06）<br>深潜房原本**完全不上报**给匹配服务（隔离：不进跨节点公开同盟列表、不被匹配器选中、不参与按房间码跳转），代价是节点控制台与管理后台的房间列表里永远看不见它们。现在节点把深潜房单独放进 `echoCodes` 上报，匹配服务只把它用于**房间目录**（`content/rooms.json` + 后台 `/api/admin2/rooms`），不并进 `codes` —— 隔离与跳转行为一字未变（`matchmaker/roomDir.cjs:dirCodes()` 是纯函数，单测钉住）。`roomInfo()` 带出 `variant`，两个界面的**类型列**显示紫色「深渊回响」角标（与玩家端深潜界面同色 `#b79cff`），统计行分列「单人 / 同盟 / 深渊回响」，深潜房的回合 tooltip 与「结束对局」确认文案说「第 N 层」。 | `server/lobby.js`<br>`matchmaker/server.js`<br>`matchmaker/account.cjs`<br>`matchmaker/roomDir.cjs`<br>`matchmaker/public/admin.html`<br>`dashboard/public/app.js`<br>`dashboard/public/index.html`<br>`test/match/echo-room-dir.test.js` | `deepecho` / `matching-party` / `account-and-dashboard` | **重启节点** + 重启 matchmaker + 重启 dashboard |
+| **深渊回响：重启断点续玩**（2026-11-06）<br>节点重启后深潜局**接着潜**，不再被丢弃（以前玩家看到「服务器重启导致对局中断，同盟已返回等待室」）。根因两层：① `lobbyState.js` 的 `roomDoc` 会写 `variant`，但读档的 `roomFrom` / `fallbackRoom` **从来不读回来** → 恢复出的房间 variant = null；② `persister.restoreLocal` 的 `startMatch(…, {restore})` 只在 `room.variant` 存在时才把 `variant` 传进 Match 的 opts，于是新 Match 不装深潜缩放（`gd.echoScaleOf`）、不强制独立卡池 → 卡池组数与检查点对不上 → `checkpoint refused (pool groups)` → `abortRestoredMatch`。修法：读档恢复 `variant` + 新增 `echoCfg`（房间级调参，一起存/一起读）；`canSnapshot` 在深潜决策面板开着时**拒绝存档**（准备倒计时被按住、剩余时长不存档，存了读回来准备 0 秒且面板丢失）。 | `server/persist/lobbyState.js`<br>`server/match/snapshot.js`<br>`test/persist/echo-resume.test.js`<br>`test/match/harness.js`（`settleEchoPanels`） | `deepecho` | **重启节点** |
+| **深渊回响：匹配队列接入后台 / 控制台**（2026-11-06）<br>深潜有了**自己的匹配池**：`variant` 成为池子的第四个维度（难度 / 版本 / 人数之外），深潜队伍只会和深潜队伍成局（`formPartyMatches` 的分组键与等待筛选都带 variant；`waitingPartyPlayers` 同样）。入队的 variant 以**房间文档**为准（客户端上报只作兜底），成局结果也带 variant，房主据此 `room.create { variant:'deepecho' }`（URL `?pv=deepecho`）。`/api/stats` 每个难度多一档 `byVariant`（`null` = 普通池，`deepecho` = 深潜池），管理后台与节点控制台的「匹配队列」各显示一枚紫色「深渊回响 N 人 · M 局」标签。匹配队友的搜寻面板：深潜房把「标准规则」换成紫色「深渊回响」；房间里的「正在等人」条也显示深渊回响，提示语改成「其他博士在深潜房里点『匹配队友』就会被配到一起」。 | `matchmaker/server.js`<br>`matchmaker/public/client.js`<br>`matchmaker/public/admin.html`（不入库，仅部署）<br>`dashboard/public/app.js`<br>`dashboard/public/index.html`<br>`public/js/screens/room.js`<br>`public/css/screens/room.css`<br>`public/i18n/en.json`<br>`test/match/echo-queue.test.js` | `deepecho` / `matching-party` / `account-and-dashboard` | 刷新页面 + 重启 matchmaker + 重启 dashboard |
+| **深渊回响：公开深潜 / 开始多人匹配**（2026-11-06）<br>深潜整屏（`EchoSelect`）在「开始深渊回响」下面补两个按钮，和大厅同盟模拟对齐：**公开深潜** = 建房后立刻 `room.setListed { listed:true }`（`roomOpen` / `setListed` 不再硬拒 deepecho；公开列表行带 `variant`，界面显示成「深渊回响」，跨节点 `/api/rooms/open` 也带 variant）；**开始多人匹配** = 进**深潜自己的**匹配池（`room.quickMatch` 的 `variant` 维度：候选房按 variant 过滤、排队票据池键多一维、成局时 `create({ variant })` 建深潜房）。协议 `room.quickMatch` 接受可选 `variant`。**进房仍是管理员 / 测试名单专属**（`ECHO_FORBIDDEN` 不动）。 | `server/lobby.js`<br>`shared/protocol.js`<br>`matchmaker/openRooms.cjs`<br>`public/js/screens/lobby.js`<br>`public/js/ui/roomList.js`<br>`public/css/screens/lobby.css`<br>`public/i18n/en.json`<br>`test/match/echo-public-queue.test.js` | `deepecho` / `matching-party` | 刷新页面 + **重启节点** + 重启 matchmaker |
+| **深渊回响：公开深潜列表（专属）**（2026-11-06）<br>深潜有了**自己的**公开列表，和普通「公开同盟」完全分开：`room.list` 接受可选 `variant`（`deepecho` = 只列深潜房；不带 = 普通同盟，且**不再混进深潜房**），跨节点 `/mm/api/rooms/open?variant=deepecho` 同理（`collectOpenRooms(perNode, { variant })`，两份列表各自缓存）。大厅「深渊回响」整屏的**公开深潜**按钮打开这份列表（标题「公开深潜 / OPEN DEEP DIVES」、加入按钮「加入深潜」、空态「暂时没有公开的深渊回响房」），列表里可以「开一间公开的」（建房 + `setListed`）。房间设置里同一个开关在深潜房显示成「公开深潜：已公开 / 未公开」。进房仍是管理员 / 测试名单专属。 | `server/lobby.js`<br>`shared/protocol.js`<br>`matchmaker/server.js`<br>`matchmaker/openRooms.cjs`<br>`public/js/ui/roomList.js`<br>`public/js/screens/lobby.js`<br>`public/js/screens/room.js`<br>`public/i18n/en.json`<br>`test/match/echo-public-list.test.js` | `deepecho` / `matching-party` | 刷新页面 + **重启节点** + 重启 matchmaker |
 | 5–20 人同盟（容量实验） | `server/match/Match.js`、`server/match/match/phases.js`、`shared/playerCapacity.js`、`shared/experimental.js`、`public/js/screens/room.js`<br>**结算显示（2026-10-27）**：`public/js/ui/stats.js`（`MAX_PLAYERS` 取 `MAX_PLAYER_CAPACITY`，原本写死 6 → 记录被截断）、`public/js/screens/settle.js`（`staggerOf`：5–20 张同盟卡片的入场步长，原本 `Math.min(i,7)` 让第 8 张之后同时出现）、`public/css/screens/settle.css`（`.tcard` 动画改用 `var(--step)`） | `server-player-capacity` / `game-core-client-ui` / `game-core-client-style` | 刷新页面 + 重启节点 |
 | 并发草稿（仅 allowRepeat 时） | `server/match/Match.js:concurrentDraft()`、`server/match/match/phases.js`<br>**提示文案（2026-10-30）**：`public/js/screens/bandDraft.js:draftTip()` 按 `concurrent` 分支——并发草稿里**没有跳过**（`phases.js:298` 直接拒），超时也**不固定给华法琳**（`taken` 置空后 `autoPickBand` 优先当前高亮），旧提示两件事都写，属于说不得的承诺 | `game-core-match` / `game-core-client-screens` / `game-core-client-ui` | 刷新页面（`bandDraft.js` + i18n） |
 | **容量实验跨 worker 转发**（5 人以上房在内容插件 host 下开不了局） | `server/match/host/proxy.js:wireOptions()` —— 白名单里有 `seats` 却漏了 `experimental`，worker 侧 `playerCapacity` 丢失回落到 4 座，第 5 个座位抛 `RangeError: seats exceed room capacity`（生产 2026-10-26～30 累计 481 次） | `server-player-capacity` | **重启节点** |

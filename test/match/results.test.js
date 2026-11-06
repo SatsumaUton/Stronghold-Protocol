@@ -126,3 +126,23 @@ test('co-op trophies / victory follow each player\'s OWN rounds passed: a teamma
   assert.equal(res.victory, true, 'the team result is still a win');
   m.dispose();
 });
+
+test('深渊回响：结算带上深度，且中途出局的人记自己出局的那一层（不发奖杯/奖励）', () => {
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 81, fake: true, variant: 'deepecho' }).start();
+  const m = h.m;
+  m.echoDiveStart = 1;
+  m.round = 20;
+  const ps = h.ps('p_1');
+  ps.eliminatedRound = 12;
+  ps.alive = false;
+  m.finish({ victory: false, reason: 'eliminated' });
+  const res = m.lastResultMsg;
+  assert.equal(res.echoDepth, 20, '整局深度 = 当前回合');
+  const row = res.players.find((p) => p.playerId === 'p_1');
+  assert.equal(row.echoDepth, 12, '出局玩家记自己的那一层');
+  assert.equal(row.trophies, 0, '无尽模式不发奖杯');
+  assert.equal(row.reward, 0, '无尽模式不发奖励');
+  const alive = res.players.find((p) => p.playerId === 'p_0');
+  assert.equal(alive.echoDepth, 20, '活着的玩家记整局深度');
+  m.dispose();
+});

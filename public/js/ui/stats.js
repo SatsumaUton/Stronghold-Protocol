@@ -289,6 +289,10 @@ export function normalizeRecord(raw) {
     vs: vsOf(r.vs),
     // the room's gameplay plugins (see the header): its content set, null for the original game
     content: contentOf(r.content),
+    // 「深渊回响」深潜对局（维护者 2026-11-05）：记录里带上 variant，对局记录才能显示成深渊回响而不是难度
+    ...(r.variant === 'deepecho' ? { variant: 'deepecho' } : {}),
+    // 深潜打到的层数（结算界面回看时用来显示「深度 N」）
+    ...(r.variant === 'deepecho' && Number.isFinite(r.echoDepth) ? { echoDepth: int(r.echoDepth, 0) } : {}),
     // the official version it played (see the header): a registry id other than 第二期下半, else left out
     ...(versionOf(r.version) ? { version: versionOf(r.version) } : {}),
     players,
@@ -537,7 +541,10 @@ export function buildRecord(res, ctx = {}) {
     selfId: myId,
     vs: vsOf(ctx.vs),
     content: contentOf(ctx.content),
-    version: ctx.version ?? null,
+    // 「深渊回响」的深潜对局**固定算第二期下半**（维护者 2026-11-05）：version 留空 = DEFAULT_VERSION
+    version: r.variant === 'deepecho' ? null : (ctx.version ?? null),
+    variant: str(r.variant) || null,
+    echoDepth: num(r.echoDepth),
     players: r.players,
   });
 }
@@ -644,7 +651,11 @@ export function buildQuitRecord(state, ctx = {}) {
     vs: vsOf(state.room?.content?.vs),
     content: contentOf(state.room?.content),
     // the room's version, else the frames' (m.public `version`; absent = 第二期下半, as versions.js matchFrameVersion)
-    version: state.room ? state.room.version ?? null : str(pub.version) ?? null,
+    // 「深渊回响」的退出记录同样固定算第二期下半（维护者 2026-11-05）
+    version: state.room?.variant === 'deepecho' || pub.echo?.deepecho
+      ? null
+      : (state.room ? state.room.version ?? null : str(pub.version) ?? null),
+    ...(state.room?.variant === 'deepecho' || pub.echo?.deepecho ? { variant: 'deepecho', echoDepth: num(pub.echo?.depth) } : {}),
     players: [{
       playerId: myId, seat: row.seat, name: row.name, isBot: false, left: true, alive, victory: false, roundsPassed,
       ...(Number.isInteger(row.aiTakeoverRound) ? { aiTakeoverRound: row.aiTakeoverRound } : {}),
@@ -681,6 +692,11 @@ export function recordToResult(rec) {
     players: r.players,
   };
   if (Number.isFinite(r.lastRound)) res.lastRound = r.lastRound;
+  // 「深渊回响」：回看结算时保持深潜主题（深度 / 深渊结算面板都靠 variant）
+  if (r.variant === 'deepecho') {
+    res.variant = 'deepecho';
+    if (Number.isFinite(r.echoDepth)) res.echoDepth = r.echoDepth;
+  }
   if (r.test === true) res.test = true;
   if (Number.isInteger(r.testActions)) res.testActions = r.testActions;
   return res;

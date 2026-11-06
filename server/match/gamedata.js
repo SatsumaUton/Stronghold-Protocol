@@ -483,9 +483,20 @@ export class GameData {
     };
   }
 
-  /** Enemy multipliers of round r = the official table (baseEnemyScale; no custom multiplier). */
+  /**
+   * Enemy multipliers of round r.
+   *
+   * `echoScaleOf` is the only extension point: 「深渊回响」(DESIGN-ABYSS.md) installs it on a deepecho room's own
+   * GameData instance to synthesise the rounds past the official table (which stops at R15 — `baseEnemyScale` answers
+   * `hpMul: 1` there, so a dive round would be as weak as R1). Every other match leaves it null and takes exactly the
+   * official values it always took.
+   * @type {null | ((round: number, official: { hpMul: number, atkMul: number, speedMul: number }) => any)}
+   */
+  echoScaleOf = null;
+
   enemyScale(r) {
-    return this.baseEnemyScale(r);
+    const official = this.baseEnemyScale(r);
+    return this.echoScaleOf ? this.echoScaleOf(r, official) : official;
   }
 
   timer(key) {

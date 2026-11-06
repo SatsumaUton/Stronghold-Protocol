@@ -94,13 +94,15 @@ export function SpectatorPill({ spectators, myId, isHost, onRemove }) {
  */
 export function PhaseCapsule({ pub, hud, miss = null }) {
   const phase = pub?.phase;
+  // 深潜：胶囊里的官方精灵图（休息 / 作战 / 首领）把绿色转紫，白色像素不受影响（维护者 2026-11-05）
+  const diveIcon = pub?.echo ? { filter: 'hue-rotate(120deg) saturate(1.6) brightness(1.05)' } : null;
   if (isBossPhase(phase)) {
     // the battle on screen first: its snapshot carries the live pool (the local simulation's own damage on top of the
     // server's b.pool, or the server's 20 Hz stream); m.public.bossHp refreshes at ~1 Hz and lags the leader's death
     const boss = hud?.boss || pub.bossHp || null;
     const frac = bossFrac(boss);
     return html`<div class="capsule capsule--boss" role="status">
-      <${Sprite} k="hudPanel/icon_boss" class="capsule__icon" fallback=${html`<${GIcon} name="skull" class="capsule__icon" />`} />
+      <${Sprite} k="hudPanel/icon_boss" class="capsule__icon" style=${diveIcon} fallback=${html`<${GIcon} name="skull" class="capsule__icon" />`} />
       ${hud?.total != null ? html`<span class="capsule__kills num"><b>${hud.resolved ?? hud.killed ?? 0}</b>/${hud.total}</span>` : null}
       <div class="bossbar" title=${boss ? `${fmtNum(boss.hp)} / ${fmtNum(boss.max)}` : t('敌方领袖')}>
         <div class="bossbar__fill" style=${`width:${frac == null ? 100 : frac * 100}%`}></div>
@@ -110,7 +112,7 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
   }
   if (isCombatPhase(phase) || (phase === PHASE.SETTLE && hud?.total != null)) {
     return html`<div class=${cx('capsule', 'capsule--combat', phase === PHASE.UNITE && 'capsule--unite')} role="status">
-      <${Sprite} k=${phase === PHASE.UNITE ? 'hudPanel/icon_coop' : 'hudPanel/icon_battle'} class="capsule__icon"
+      <${Sprite} k=${phase === PHASE.UNITE ? 'hudPanel/icon_coop' : 'hudPanel/icon_battle'} class="capsule__icon" style=${diveIcon}
         fallback=${html`<${Icon} name="sword" class="capsule__icon" />`} />
       <span class="capsule__kills num"><b>${hud?.resolved ?? hud?.killed ?? 0}</b>/${hud?.total ?? '--'}</span>
       ${phase === PHASE.UNITE ? html`<span class="capsule__tag">${t('联防')}</span>` : null}
@@ -118,7 +120,7 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
     </div>`;
   }
   return html`<div class="capsule capsule--prep" role="status">
-    <${Sprite} k="hudPanel/icon_rest" class="capsule__icon" fallback=${html`<${Icon} name="rook" class="capsule__icon" />`} />
+    <${Sprite} k="hudPanel/icon_rest" class="capsule__icon" style=${diveIcon} fallback=${html`<${Icon} name="rook" class="capsule__icon" />`} />
     <span class="capsule__label">${prepCapsuleLabel(phase)}</span>
   </div>`;
 }
@@ -550,7 +552,18 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   // normal rounds: the leaks of the own battle so far (boss rounds: the team LP above already moves live)
   const pending = !boss && Number.isFinite(lp) && live && live.pending > 0 ? Math.min(lp, live.pending) : 0;
   const hidden = phase === PHASE.HIDDEN_CORE || (Number.isFinite(pub?.lastRound) && pub.round > pub.lastRound);
-  const roundText = hidden ? '??' : pub?.round > 0 ? String(pub.round) : '--';
+  // 「深渊回响」：深潜里**深度就是回合**，直接顶掉原版的回合数字（维护者 2026-11-04：
+  // 深潜不用另开一条悬浮状态条挡住 HUD，玩家看到的那个数就是深度）。普通房 echo 为 null，行为不变。
+  //
+  // 判据用 `echo.diveStart > 0`（而不是 depth > 0）：某些阶段 pub.echo 只有 diveStart、
+  // depth 刚好缺值时，`inDive` 会假掉，退回原版的 `??` 分支 —— 那正是「15 回合起深度一直 ?？」的成因。
+  const echoDive = Number(pub?.echo?.diveStart) > 0;
+  // 深潜里深度 = 显示回合（diveStart = 1），缺值时用 round 兜底，保证永远有数字
+  const diveDepth = echoDive ? Number(pub?.echo?.depth) || Number(pub?.round) || 0 : 0;
+  const inDive = echoDive;
+  // 深潜里**永远显示深度**：15 层是隐藏核心回合（原版用 ?? 藏住回合数），
+  // 但深潜的深度是玩家成绩，没有任何隐藏的理由（维护者 2026-11-05 反馈「15 回合显示 ?？」）。
+  const roundText = inDive ? String(diveDepth || '--') : hidden ? '??' : pub?.round > 0 ? String(pub.round) : '--';
   // a spectator seat (no m.private, community report #26) never readies
   const showReady = phase === PHASE.PREP && !spectator && priv?.alive !== false;
   // boss rounds: the overtime warning follows the clock (4 Hz while live; frozen while paused)
@@ -640,7 +653,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
         <${DecoType} k="txt3" text="RHODES ISLAND TERMINAL SERVICE" side="r" />
         <div class="gtop__half gtop__half--l">
           <div class="roundbox">
-            <span class="roundbox__label">${t('回合')}</span>
+            <span class="roundbox__label">${inDive ? t('深度') : t('回合')}</span>
             <b class="roundbox__num num" key=${roundText}>${roundText}</b>
           </div>
         </div>

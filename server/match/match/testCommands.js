@@ -396,8 +396,8 @@ export class MatchTestCommands {
       return OK;
     }
     const delta = want - cur;
-    if (layerGainRoom(cur, delta, this.disableLayerCap) !== delta) {
-      const max = this.disableLayerCap ? BOND_LAYER_SAFE_MAX : BOND_LAYER_CAP;
+    if (layerGainRoom(cur, delta, this.layerCapOff) !== delta) {
+      const max = this.layerCapOff ? BOND_LAYER_SAFE_MAX : BOND_LAYER_CAP;
       return fail(ERR.BAD_TARGET, `cap|${JSON.stringify({ cur, want, max })}`);
     }
     const add = ps.addLayers(id, delta, { reason: 'test' });

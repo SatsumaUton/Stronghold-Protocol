@@ -87,8 +87,30 @@ export class PlayerRound {
     // the states the last recompute stored: the change since then is reported once (_reportActiveBonds)
     const before = this.bonds;
     this.bonds = computeBonds(this.gd, this);
+    this._trackBondPeak();
     this.dirty();
     this._reportActiveBonds(before, this.bonds);
+  }
+
+  /**
+   * 记录「这一局用过的最多盟约 / 最高层数」（维护者 2026-11-05：深潜排行榜上一律显示「无核心 · 最高 0 层」）。
+   *
+   * 为什么必须单独记峰值：团灭时每个座位都会走 `eliminate()`，它把棋盘 / 手牌全部退回卡池，
+   * 于是 `this.bonds` 里所有 count 归零 —— 结算时再去读 `bonds` 就只剩 0。
+   * 这里在每次 recompute 之后把峰值往上记（只增不减），结算 / 排行榜读 `bondPeak`。
+   */
+  _trackBondPeak() {
+    if (!this.bondPeak || typeof this.bondPeak !== 'object') this.bondPeak = { cores: [], bonds: 0, maxLayers: 0 };
+    const peak = this.bondPeak;
+    if (!Array.isArray(peak.cores)) peak.cores = [];
+    const live = Object.entries(this.bonds || {}).filter(([, r]) => r && Number(r.count) > 0);
+    if (live.length > (Number(peak.bonds) || 0)) peak.bonds = live.length;
+    for (const [id] of live) {
+      const bond = typeof this.gd.bond === 'function' ? this.gd.bond(id) : null;
+      if (bond && bond.isCore === true && !peak.cores.includes(id)) peak.cores.push(id);
+      const n = Math.max(0, Math.floor(Number(this.layers && this.layers[id]) || 0));
+      if (n > (Number(peak.maxLayers) || 0)) peak.maxLayers = n;
+    }
   }
 
   /**
@@ -121,7 +143,30 @@ export class PlayerRound {
    * in-battle gains of this round's finished normal battle (bondsMeta.bondsWithGains). The 联防 field fights with them too
    * (battleInput `reached`); no other rule reads them.
    */
-  bondsView() { return bondsWithGains(this.bonds, this.pendingLayerGains); }
+  /**
+   * 盟约视图（客户端 / 详情面板用）。
+   *
+   * 「盟约投影」（维护者 2026-11-05）：投影的那条核心盟约在这里也要**按满档激活**，
+   * 否则玩家看到的是「在场 0/3 未激活」——投影明明拿到了，面板却显示没激活。
+   * 只影响显示（战斗侧另走 battleInput 的 projectedBond），不改 this.bonds 本身。
+   */
+  bondsView() {
+    const view = bondsWithGains(this.bonds, this.pendingLayerGains);
+    const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
+    if (!proj) return view;
+    const cur = view && view[proj.bondId] ? view[proj.bondId] : null;
+    return {
+      ...view,
+      [proj.bondId]: {
+        ...(cur || {}),
+        count: Math.max(Number(proj.state && proj.state.count) || 0, Number(cur && cur.count) || 0),
+        active: true,
+        tier: Math.max(1, Number(proj.state && proj.state.tier) || 3),
+        layers: Math.max(0, Number(cur && cur.layers) || 0),
+        projected: true,
+      },
+    };
+  }
 
   /**
    * `reached`: the bonds carry the layers this round's own combat reached (bondsView: the pending in-battle gains, capped
@@ -174,7 +219,34 @@ export class PlayerRound {
       side,
       colOffset,
       units,
-      bonds: bondSnapshot(reached ? this.bondsView() : this.bonds),
+      // 「盟约投影」：把投影的盟约按满档塞进 bonds 快照，并给 sim 一个 projectedBond
+      // （sim 的 unitBonds 会让所有己方干员都算该盟约成员 —— 维护者 2026-11-05）
+      bonds: (() => {
+        const snap = bondSnapshot(reached ? this.bondsView() : this.bonds);
+        const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
+        if (proj) {
+          // 投影只负责「按满档激活」，**绝不压低**玩家自己已有的数值。
+          // 2026-11-06 玩家反馈：选到与自己已有盟约**同一条**的投影时，原本靠层数生效的加成全部消失 ——
+          // 原因是这里以前直接 `...(proj.state)` 覆盖，而 proj.state.layers 恒为 0，把真实层数抹平了
+          // （bonds.json 里 `base_x + per_stack × L()` 那类效果随之归零）。人数同理：阿戈尔 5 人档的
+          // 投影不该把场上已经 6 人的那条盟约压回 5。
+          const cur = snap[proj.bondId] || null;
+          const state = (proj.state && typeof proj.state === 'object') ? proj.state : {};
+          const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+          snap[proj.bondId] = {
+            ...(cur || {}),
+            count: Math.max(n(cur && cur.count), n(state.count)),
+            active: true,
+            tier: Math.max(1, n(cur && cur.tier), n(state.tier)),
+            layers: Math.max(0, n(cur && cur.layers), n(state.layers)),
+          };
+        }
+        return snap;
+      })(),
+      projectedBond: (() => {
+        const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
+        return proj ? proj.bondId : undefined;
+      })(),
       bandId: this.bandId,
       playerEffects: this.effects.filter((e) => e.battle !== false).map((e) => ({
         id: e.id, key: e.key ?? null, source: e.iconKind ?? null, params: e.params ?? null, counter: e.counter ?? null, data: e.data ?? null,

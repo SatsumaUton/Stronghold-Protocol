@@ -29,9 +29,11 @@ function gameGate() {
 let updateFile = null;
 try { updateFile = require('../guard/update-file.cjs'); } catch { /* 可选模块 */ }
 const account = require('./account.cjs');
+const diveBoard = require('./diveBoard.cjs');
 const feedback = require('./feedback.cjs');
 // 跨节点「公开同盟」的纯筛选逻辑（无 I/O，单测直接 require 它，不用起 HTTP 服务）
 const { collectOpenRooms } = require('./openRooms.cjs');
+const { dirCodes } = require('./roomDir.cjs');
 
 const PORT = Number(process.env.MM_PORT || 3090);
 const HOST = process.env.MM_HOST || '127.0.0.1';
@@ -271,11 +273,16 @@ const partyKey = (code, node) => `${String(code || '').toUpperCase()}@${node}`;
 const DEFAULT_GAME_VERSION = 'act2autochess';
 const normVersion = (v) => (typeof v === 'string' && /^[A-Za-z0-9_@.-]{1,64}$/.test(v) ? v : DEFAULT_GAME_VERSION);
 
-function waitingPartyPlayers(difficulty, capacity = SEATS, version = null) {
+// 「深渊回响」（深潜）单独排队：variant 是池子的第四个维度（难度 / 版本 / 人数之外）。
+// 深潜与普通同盟的规则、数值、结算完全不同，绝不能配进同一局 —— 维护者 2026-11-06。
+const normVariant = (v) => (v === 'deepecho' ? 'deepecho' : null);
+
+function waitingPartyPlayers(difficulty, capacity = SEATS, version = null, variant = null) {
   return [...parties.values()]
     .filter((p) => !p.matchId && p.difficulty === difficulty
       && (isSeatCount(p.capacity) ? p.capacity : SEATS) === capacity
-      && (version == null || normVersion(p.version) === version))
+      && (version == null || normVersion(p.version) === version)
+      && normVariant(p.variant) === normVariant(variant))
     .reduce((n, p) => n + p.size, 0);
 }
 
@@ -283,12 +290,12 @@ function partyState(p, clientId) {
   const capacity = isSeatCount(p.capacity) ? p.capacity : SEATS;
   const version = normVersion(p.version);
   if (!p.matchId) {
-    return { state: 'queued', size: p.size, waiting: waitingPartyPlayers(p.difficulty, capacity, version), difficulty: p.difficulty, capacity, version };
+    return { state: 'queued', size: p.size, waiting: waitingPartyPlayers(p.difficulty, capacity, version, p.variant), difficulty: p.difficulty, capacity, version, variant: normVariant(p.variant) };
   }
   const m = matches.get(p.matchId);
   if (!m) {
     p.matchId = null;
-    return { state: 'queued', size: p.size, waiting: waitingPartyPlayers(p.difficulty, capacity, version), difficulty: p.difficulty, capacity, version };
+    return { state: 'queued', size: p.size, waiting: waitingPartyPlayers(p.difficulty, capacity, version, p.variant), difficulty: p.difficulty, capacity, version, variant: normVariant(p.variant) };
   }
   return {
     state: 'matched',
@@ -310,15 +317,17 @@ function formPartyMatches() {
     // 先用 (版本, 人数) 分组：不同版本的队伍永远不进同一个候选池
     const groups = [...new Set([...parties.values()]
       .filter((p) => !p.matchId && p.difficulty === difficulty)
-      .map((p) => `${normVersion(p.version)}|${isSeatCount(p.capacity) ? p.capacity : SEATS}`))];
+      .map((p) => `${normVersion(p.version)}|${isSeatCount(p.capacity) ? p.capacity : SEATS}|${normVariant(p.variant) || ''}`))];
     for (const group of groups) {
-      const [version, capStr] = group.split('|');
+      const [version, capStr, varStr] = group.split('|');
+      const variant = normVariant(varStr);
       const capacity = Number(capStr);
       for (let guard = 0; guard < 20; guard++) {
         const waiting = [...parties.values()]
           .filter((p) => !p.matchId && p.difficulty === difficulty
             && normVersion(p.version) === version
             && (isSeatCount(p.capacity) ? p.capacity : SEATS) === capacity
+            && normVariant(p.variant) === variant
             && now - (p.lastSeen || p.createdAt) < 25_000)
           .sort((a, b) => a.createdAt - b.createdAt);
         if (waiting.length < 2) break;
@@ -344,6 +353,8 @@ function formPartyMatches() {
           id: rid(), difficulty, node, party: true, capacity,
           // 本服：把版本记进成局结果，房间按这个版本创建
           version,
+          // 「深渊回响」：成局结果也带 variant，房主据此建深潜房
+          variant,
           partyIds: picked.map((p) => p.key),
           mainPartyKey: hostOnline ? hostParty.key : null,
           hostClientId: hostParty.leaderClientId,
@@ -353,7 +364,7 @@ function formPartyMatches() {
         matches.set(match.id, match);
         for (const p of picked) { p.matchId = match.id; p.node = node; }
         scheduleWriteRoomDir();
-        console.log(`[mm] 组队成局 ${match.id.slice(0, 8)} 难度=${difficulty} 人数=${capacity} 版本=${version} 节点=${node} 房间=${picked.map((p) => `${p.roomCode}(${p.size})`).join('+')} 主房间=${hostParty.roomCode} ${hostOnline ? '沿用主房间' : '新房'}`);
+        console.log(`[mm] 组队成局 ${match.id.slice(0, 8)} 难度=${difficulty} 人数=${capacity} 版本=${version}${variant ? ` 模式=${variant}` : ''} 节点=${node} 房间=${picked.map((p) => `${p.roomCode}(${p.size})`).join('+')} 主房间=${hostParty.roomCode} ${hostOnline ? '沿用主房间' : '新房'}`);
       }
     }
   }
@@ -410,7 +421,7 @@ async function writeRoomDir() {
     const nodes = [];
     for (const [n, v] of roomDirModule) {
       const rooms = [];
-      for (const code of v.codes) {
+      for (const code of dirCodes(v)) {
         let info = null;
         try { info = await roomInfo(code, n); } catch { info = null; }
         // 该房间是否正在同盟整队匹配（parties 里未成局的同房号/节点）
@@ -426,7 +437,7 @@ async function writeRoomDir() {
   } catch { /* 写不了就算了，控制台显示为空 */ } finally { roomDirWriting = false; }
 }
 // 后台管理（owner）通过 /api/admin2/rooms 读取同一份内存目录
-account.setRoomDirProvider?.(() => [...roomDirModule].map(([n, v]) => ({ n, codes: v.codes, at: v.at })));
+account.setRoomDirProvider?.(() => [...roomDirModule].map(([n, v]) => ({ n, codes: v.codes, echoCodes: v.echoCodes || [], at: v.at })));
 
 /** 所有节点的在线情况（5 秒缓存，玩家端每 15 秒取一次）。 */
 async function nodeStatus() {
@@ -529,7 +540,9 @@ async function roomInfo(code, node) {
     );
     return { full: seats.length > 0 && seats.every(Boolean), started: !!(doc.matchLive || doc.matchKey || doc.match), mode, difficulty: doc.difficulty || null, capacity: isSeatCount(capacity) ? capacity : SEATS, humans, bots, players, spectatorPlayers, round, seats: seats.length, spectators: spectatorPlayers.length, maxSpectators, adminCreated: doc.adminCreated === true,
       // 本服：房间的游戏版本（默认版本在房间状态里被省略）
-      version: typeof doc.version === 'string' && doc.version ? doc.version : 'act2autochess' };
+      version: typeof doc.version === 'string' && doc.version ? doc.version : 'act2autochess',
+      // 本服：「深渊回响」（深潜）房。控制台与后台靠它把类型列显示成深渊回响、并给出深潜深度（= round）。
+      variant: doc.variant === 'deepecho' ? 'deepecho' : null };
   } catch { return null; }
 }
 
@@ -603,14 +616,17 @@ function redisCall(args, timeoutMs = 800) {
  * 结果缓存 3 秒：大厅列表每几秒刷一次，没必要每次都发 30 条 Redis 命令。
  */
 const openRoomsCache = { at: 0, data: null };
-async function openRooms() {
-  if (openRoomsCache.data && Date.now() - openRoomsCache.at < 3000) return openRoomsCache.data;
+async function openRooms(variant = null) {
+  // 「深渊回响」有**自己的**公开列表（维护者 2026-11-06）：深潜房不再混进普通「公开同盟」列表。
+  const wantEcho = variant === 'deepecho';
+  if (openRoomsCache.data && openRoomsCache.variant === wantEcho && Date.now() - openRoomsCache.at < 3000) return openRoomsCache.data;
   const perNode = await Promise.all(NODE_NAMES.map(async (_name, i) => {
     const n = i + 1;
     return { node: n, flat: await redisCall(['HGETALL', `sp:n${n}:lobby:rooms`]) };
   }));
-  const data = { at: Date.now(), rooms: collectOpenRooms(perNode) };
+  const data = { at: Date.now(), rooms: collectOpenRooms(perNode, { variant }) };
   openRoomsCache.at = Date.now();
+  openRoomsCache.variant = wantEcho;
   openRoomsCache.data = data;
   return data;
 }
@@ -695,6 +711,18 @@ function clientBuildTag() {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const pathname = decodeURIComponent(url.pathname);
+
+  // ---- 深渊回响成绩归档（/api/dive/*）：节点上报 + 历史查询（MySQL，只留档） ----
+  if (pathname.startsWith('/api/dive')) {
+    try {
+      if (await diveBoard.handle(req, res, pathname)) return;
+      return json(res, 404, { error: 'NOT_FOUND' });
+    } catch (e) {
+      try { json(res, 500, { error: 'INTERNAL' }); } catch { /* 已发送 */ }
+      console.error('[diveBoard] unhandled', e && e.message);
+      return;
+    }
+  }
 
   // ---- 玩家反馈板（/api/feedback/*）：读公开、写要登录、管理要 admin/owner ----
   if (pathname.startsWith('/api/feedback')) {
@@ -818,17 +846,20 @@ const server = http.createServer(async (req, res) => {
     // 房间信息取不到时才用客户端上报的版本，都没有则按默认版本。
     const roomVersion = info && typeof info.version === 'string' ? info.version : null;
     const version = normVersion(roomVersion || body.version);
+    // 「深渊回响」（深潜）：房间自己的 variant 是权威值（Redis 房间文档），客户端上报只作兜底。
+    const variant = normVariant(info && info.variant) || normVariant(body.variant);
     let p = parties.get(key);
     if (!p) {
-      p = { key, roomCode: code, node, difficulty, size, capacity, version, leaderClientId: clientId, guest: !!body.guest, createdAt: Date.now(), lastSeen: Date.now(), matchId: null };
+      p = { key, roomCode: code, node, difficulty, size, capacity, version, variant, leaderClientId: clientId, guest: !!body.guest, createdAt: Date.now(), lastSeen: Date.now(), matchId: null };
       parties.set(key, p);
-      console.log(`[mm] 房间 ${code}@${node} 开始匹配 · ${size}/${capacity} 人 · ${difficulty}`);
+      console.log(`[mm] 房间 ${code}@${node} 开始匹配 · ${size}/${capacity} 人 · ${difficulty}${variant ? ` · ${variant}` : ''}`);
     } else {
       p.size = size;
       p.capacity = capacity;
       p.difficulty = difficulty;
       // 房间可以在排队期间切换版本；以最新版本为准，避免旧版本被配进新版本的局
       p.version = version;
+      p.variant = variant;
       p.lastSeen = Date.now();
     }
     scheduleWriteRoomDir();
@@ -981,7 +1012,15 @@ const roomDir = new Map(); // node -> { codes: string[], at: number }
       try {
         const d = JSON.parse(body || "{}");
         const node = Number(d.node) | 0;
-        if (node > 0 && Array.isArray(d.codes)) roomDirModule.set(node, { codes: d.codes.filter((c) => typeof c === "string"), at: Date.now() });
+        if (node > 0 && Array.isArray(d.codes)) {
+          // echoCodes：「深渊回响」房，节点单独上报。只进房间目录（控制台 / 后台显示），
+          // 不进 codes —— 所以不进跨节点公开同盟列表、也不参与按房间码的跳转（见 server/lobby.js）。
+          roomDirModule.set(node, {
+            codes: d.codes.filter((c) => typeof c === 'string'),
+            echoCodes: Array.isArray(d.echoCodes) ? d.echoCodes.filter((c) => typeof c === 'string') : [],
+            at: Date.now(),
+          });
+        }
         scheduleWriteRoomDir();
       } catch { /* ignore */ }
       return json(res, 200, { ok: true });
@@ -1008,7 +1047,8 @@ const roomDir = new Map(); // node -> { codes: string[], at: number }
   }
   if (pathname === '/api/rooms/open') {
     try {
-      const data = await openRooms();
+      const variant = url.searchParams.get('variant') === 'deepecho' ? 'deepecho' : null;
+      const data = await openRooms(variant);
       return json(res, 200, { ok: true, at: data.at, rooms: data.rooms });
     } catch {
       return json(res, 200, { ok: true, at: Date.now(), rooms: [] });
@@ -1127,6 +1167,19 @@ const roomDir = new Map(); // node -> { codes: string[], at: number }
               };
             });
           })(),
+          // 「深渊回响」（深潜）单独一档：维护者 2026-11-06 要求后台与控制台的匹配队列能看见深潜队列。
+          // variant 为 null 的是普通同盟 / 单人池，两边不混。
+          byVariant: [null, 'deepecho'].map((v) => {
+            const q = queued.filter((t) => normVariant(t.variant) === v);
+            const qp = queuedParties.filter((p) => normVariant(p.variant) === v);
+            return {
+              variant: v,
+              waiting: q.length,
+              parties: qp.length,
+              partyWaiting: qp.reduce((n, p) => n + p.size, 0),
+              matches: [...matches.values()].filter((m) => m.difficulty === difficulty && normVariant(m.variant) === v).length,
+            };
+          }),
           // ★ 每个容量都统计组队排队。以前这里是 `capacity === SEATS ? … : 0`，
           //   只有 4 人房有数据，5–20 人房永远显示 0 人排队 ——
           //   后台与节点控制台的「匹配队列」对多人大厅完全失明。
@@ -1174,6 +1227,7 @@ refreshNodes();
 // 账号库初始化（表不存在时自动创建），失败不阻塞匹配服务
 account.ensureSchema()
   .then(() => console.log('[mm] account schema ready'))
+  .then(() => diveBoard.init().then((ok) => { if (ok) console.log('[mm] dive_board ready'); }))
   .catch((e) => console.warn('[mm] account schema init failed:', e && e.message));
 
 server.listen(PORT, HOST, () => {

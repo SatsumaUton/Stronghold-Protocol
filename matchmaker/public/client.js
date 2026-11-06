@@ -134,6 +134,8 @@
   })();
   const ROOM = q.get('room');
   const IS_HOST = q.get('mmhost') === '1';
+  // 「深渊回响」（深潜）：房主自动建房时要按深潜建（?pv=deepecho），否则配出来的是一间普通同盟房
+  const PV = q.get('pv');
   const MID = q.get('mid');
   const TICKET = q.get('t');
   const SECRET = q.get('tk');
@@ -287,7 +289,7 @@ fetch('/mm/api/tips', { cache: 'no-store' })
       const u = new URL(location.href);
       const keepName = !(window.__SP__ && window.__SP__.store && window.__SP__.store.get().session.entered);
       // boot/retry 是启动失败重试用的，成功进入后没有意义，留在地址栏只会难看
-      ['room', 'n', 'name', 'mmhost', 'mid', 't', 'tk', 'd', 'c', 'pmid', 'pcid', 'pd', 'mm', 'spectate', 'boot', 'retry'].forEach((k) => {
+      ['room', 'n', 'name', 'mmhost', 'mid', 't', 'tk', 'd', 'c', 'pmid', 'pcid', 'pd', 'pv', 'mm', 'spectate', 'boot', 'retry'].forEach((k) => {
         if (k === 'name' && keepName) return;   // 还没进入大厅前保留名字，进房后再清
         u.searchParams.delete(k);
       });
@@ -1062,7 +1064,11 @@ fetch('/mm/api/tips', { cache: 'no-store' })
       const who = (s.me && s.me.name) || '博士';
       const MODE = { FUNNY: '标准模拟', NORMAL: '险境模拟', HARD: '绝境模拟', ABYSS: '终极模拟' };
       const mode = MODE[s.room.difficulty] || '同盟模拟';
-      const text = `${link} ${who}邀请你加入卫戍协议：盟约【${mode}】`;
+      // 「深渊回响」房：邀请语点明深潜模式（维护者 2026-11-05）
+      const dive = s.room.variant === 'deepecho';
+      const text = dive
+        ? `${link} ${who}邀请你加入卫戍协议：盟约【深渊回响】【${mode}】`
+        : `${link} ${who}邀请你加入卫戍协议：盟约【${mode}】`;
       const old = label.textContent;
       copyText(text).then((ok) => {
         label.textContent = ok ? '已复制邀请链接' : '复制失败';
@@ -1250,6 +1256,8 @@ fetch('/mm/api/tips', { cache: 'no-store' })
               size: Math.max(1, seatsOf(room)), capacity: Number(room.capacity) || 4, clientId: CLIENT_ID,
               // 本服：上报房间的游戏版本，匹配只会在同版本之间成局
               version: room.version || undefined,
+              // 「深渊回响」（深潜）：服务端以房间文档为准，这里只是兜底
+              variant: room.variant === 'deepecho' ? 'deepecho' : undefined,
             }),
           });
           if (r.error) { showStyledToast(r.error, 'warn'); return; }
@@ -1354,6 +1362,8 @@ fetch('/mm/api/tips', { cache: 'no-store' })
     };
 
     const showSearch = (difficulty, waiting, canCancel) => {
+      // 「深渊回响」房：标签要说明这是深潜模式（维护者 2026-11-06），不是普通 4 人同盟 / 标准规则
+      const diveRoom = (() => { try { return window.__SP__.store.get().room?.variant === 'deepecho'; } catch { return false; } })();
       const d = DIFF_NAMES[difficulty] || '险境模拟';
       const color = DIFF_COLORS[difficulty] || '#e85a1a';
       if (!document.getElementById('mm-overlay')) {
@@ -1397,8 +1407,9 @@ fetch('/mm/api/tips', { cache: 'no-store' })
         }, 1000);
         tipId = setInterval(() => { tipIndex += 1; const t = document.getElementById('mm-ov-tip'); if (t) t.textContent = TIPS[tipIndex % TIPS.length]; }, 5000);
       }
-      document.getElementById('mm-ov-tags').innerHTML =
-        `<span class="mm-ov__tag" style="--c:${color}">${d}</span><span class="mm-ov__tag" style="--c:#4ed8af">4 人同盟</span><span class="mm-ov__tag" style="--c:#8d9391">标准规则</span>`;
+      document.getElementById('mm-ov-tags').innerHTML = diveRoom
+        ? `<span class="mm-ov__tag" style="--c:${color}">${d}</span><span class="mm-ov__tag" style="--c:#b79cff">深渊回响</span><span class="mm-ov__tag" style="--c:#4ed8af">4 人同盟</span>`
+        : `<span class="mm-ov__tag" style="--c:${color}">${d}</span><span class="mm-ov__tag" style="--c:#4ed8af">4 人同盟</span><span class="mm-ov__tag" style="--c:#8d9391">标准规则</span>`;
       document.getElementById('mm-ov-stop').style.display = canCancel ? '' : 'none';
       updateSearch(waiting);
     };
@@ -4295,7 +4306,7 @@ fetch('/mm/api/tips', { cache: 'no-store' })
     const sp = window.__SP__;
     const name = encodeURIComponent((sp && sp.store.get().me.name) || '');
     let target = '';
-    if (st.leader) target = `/?mmhost=1&pmid=${encodeURIComponent(st.matchId)}&pcid=${encodeURIComponent(CLIENT_ID)}&pd=${encodeURIComponent(st.difficulty)}&mm=1&name=${name}`;
+    if (st.leader) target = `/?mmhost=1&pmid=${encodeURIComponent(st.matchId)}&pcid=${encodeURIComponent(CLIENT_ID)}&pd=${encodeURIComponent(st.difficulty)}${st.variant === 'deepecho' ? '&pv=deepecho' : ''}&mm=1&name=${name}`;
     else if (st.code) target = `/?room=${encodeURIComponent(st.code)}&n=${st.node}&mm=1&name=${name}`;
     if (!target) return false;
     setTimeout(() => { location.href = target; }, 900);
@@ -4343,7 +4354,7 @@ fetch('/mm/api/tips', { cache: 'no-store' })
       if (guestHostBlocked()) return;
       if (creating || createdOk || attempts >= 6 || Date.now() - lastAt < 2000) return;
       attempts += 1; lastAt = Date.now(); creating = true;
-      net.request('room.create', { mode: 'coop', difficulty: PDIFF })
+      net.request('room.create', { mode: 'coop', difficulty: PDIFF, ...(PV === 'deepecho' ? { variant: 'deepecho' } : {}) })
         .then(() => { createdOk = true; console.info('[mm-debug] party room.create ok'); })
         .catch((e) => { console.error('[mm] 自动建房失败', e && e.message); try { addFoundBack(); } catch { /* ignore */ } })
         .finally(() => { creating = false; });

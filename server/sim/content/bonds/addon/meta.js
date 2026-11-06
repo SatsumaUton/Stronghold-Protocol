@@ -42,13 +42,35 @@ function buff(ctx, bondId, key) {
   return {};
 }
 
+/**
+ * 「每 `step` 层给 `count` 资金」这条通道的**已达成档数**。
+ *
+ * 层数上限（999）在原版是靠 `layerGainRoom` 钳住的，所以这里本来按层数算就够。
+ * 「深渊回响」把层数上限放开到 1e9（让玩家跟得上敌人），于是「远见」（每 10 层给钱）会变成
+ * 无上限印钞机 —— 所以那条通道由**本局自己**给一个上限（`ctx.bondLayerCoinCap`）。
+ *
+ * 普通房间拿到的是 `Infinity`（默认），**逐字节等于原版公式**；只有深潜才给 999。
+ *
+ * @param {number} layers 当前层数
+ * @param {number} step 每多少层一档
+ * @param {number} [cap] 只结算到多少层（默认不限 = 原版行为）
+ */
+export function layerCoinDue(layers, step, cap = Infinity) {
+  const s = Number(step) || 0;
+  if (!(s > 0)) return 0;
+  const c = Number.isFinite(cap) ? Math.max(0, cap) : Infinity;
+  const L = Math.max(0, Math.min(Number(layers) || 0, c));
+  return Math.floor(L / s);
+}
+
 /** Pay "every `layer` layers +`count` funds" up to the current layers (only while active). */
 function settleCoins(ctx, bondId, counterKey, label) {
   if (!ctx.bondActive(bondId)) return 0;
   const p = buff(ctx, bondId, 'bond_layer_gain_coin');
   const step = n(p.layer), count = n(p.count);
   if (!(step > 0) || !(count > 0)) return 0;
-  const due = Math.floor(ctx.layers(bondId) / step);
+  // 本局自己声明的上限（普通房不设 → Infinity → 与改动前完全一致）
+  const due = layerCoinDue(ctx.layers(bondId), step, ctx.bondLayerCoinCap);
   const paid = ctx.counter(counterKey);
   if (due <= paid) return 0;
   ctx.setCounter(counterKey, due);
