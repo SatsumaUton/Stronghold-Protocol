@@ -811,8 +811,11 @@ export class Network {
       session.accountId = String(account.uid);
       session.accountTag = account.tag;
       session.tag = account.tag || session.tag;
-      // 称号（维护者 2026-11-07）：后台设置，随令牌下发；房间 / 大厅显示在名字后面
-      session.title = typeof account.title === 'string' && account.title ? account.title : null;
+      // 称号（维护者 2026-11-07）：后台设置，随令牌下发**显示信息**（后台可自定义，节点不查库）
+      const ti = account.title;
+      session.title = ti && typeof ti === 'object' && typeof ti.name === 'string' && ti.name
+        ? { id: typeof ti.id === 'string' ? ti.id : '', name: ti.name, tone: typeof ti.tone === 'string' ? ti.tone : 'echo', desc: typeof ti.desc === 'string' ? ti.desc : '' }
+        : null;
     }
     session.guest = msg.guest === true;
     // 管理员/服主身份：adminToken 是后台下发的能力令牌；accountToken 里同样带有由同一把

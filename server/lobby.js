@@ -712,7 +712,7 @@ export class Room {
           // 这里下发真实 tag；拿不到（游客、老节点没这个字段）时前端回退到哈希，行为与上游一致。
           ...(typeof s.tag === 'string' && /^[0-9]{4}$/.test(s.tag) ? { tag: s.tag } : {}),
           // 称号（维护者 2026-11-07）：后台设置的，显示在座位卡的名字后面；没有就不带这个键
-          ...(typeof s.title === 'string' && s.title ? { title: s.title } : {}),
+          ...(s.title && typeof s.title === 'object' && s.title.name ? { title: s.title } : {}),
           // 管理员/服主标记：控制台据此把「玩家」显示成「管理员」（仅展示用）
           ...(s.admin === true ? { admin: true } : {}),
           // a room with gameplay plugins (header "Gameplay plugins"): has this player's page loaded and checked its content?
@@ -726,7 +726,7 @@ export class Room {
           // only a human seat with a non-empty map carries the key
           ...(!s.isBot && s.skins && Object.keys(s.skins).length ? { skins: s.skins } : {}) }
         : null)),
-      spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(typeof s.title === 'string' && s.title ? { title: s.title } : {}), ...(this.needsContent ? { content: /** @type {any} */ (s).content || 'loading' } : {}) })),
+      spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(s.title && typeof s.title === 'object' && s.title.name ? { title: s.title } : {}), ...(this.needsContent ? { content: /** @type {any} */ (s).content || 'loading' } : {}) })),
       maxSpectators: this.spectatorLimit(),
       ...(this.content ? { content: this.content.trusted ? {...this.content, trusted:{...this.content.trusted, consent:Object.fromEntries(this.seats.filter(x => x && !x.isBot).map(x => [x.seat,x.consentCs === this.content.cs]))}} : this.content } : {}),
       // another official version than 第二期下半, and its open vote (header "Official versions"): omitted otherwise, so a
@@ -1900,7 +1900,7 @@ case 'room.list': return this.roomList(msg);
       name: session.name,
       connected: session.connected,
       // 称号（维护者 2026-11-07）：观战席也显示，和座位卡同一套
-      ...(typeof session.title === 'string' && session.title ? { title: session.title } : {}),
+      ...(session.title && typeof session.title === 'object' && session.title.name ? { title: session.title } : {}),
       ...(session.accountId ? { accountId: String(session.accountId) } : {}),
       ...(session.token ? { token: String(session.token) } : {}),
     });
