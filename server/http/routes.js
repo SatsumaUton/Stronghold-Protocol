@@ -23,6 +23,7 @@ import { buildTag } from './buildTag.js';
 import { setSecurityHeaders, sendError, sendJson, splitUrl } from './common.js';
 import { clientAddress, isLocalIp } from '../net.js';
 import { readEchoBoard, ECHO_BOARD_DIFFICULTIES } from '../match/match/echoBoard.js';
+import { buildEchoCodex } from '../match/match/echoCodex.js';
 import { readFileSync } from 'node:fs';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -252,6 +253,13 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
     if (parts.rawPath === '/healthz') {
       const withTraffic = wantsTraffic(parts.query) && isLocalIp(clientAddress(req, trustProxy).ip);
       sendJson(req, res, 200, healthReport(health, withTraffic));
+      return;
+    }
+    // 「深渊图鉴」（只读，2026-11-06）：GET /api/deepecho/codex
+    // 内容全部由 echoCodex.js 从现有表生成，所以祝福/诅咒/投影/词条改了图鉴自动跟上（不手写第二份文案）。
+    // 与一局无关、不随玩家变化 → 允许缓存 5 分钟。
+    if (parts.rawPath === '/api/deepecho/codex') {
+      sendJson(req, res, 200, buildEchoCodex(), { 'Cache-Control': 'public, max-age=300' });
       return;
     }
     // 「深渊回响」深潜排行榜（只读）：GET /api/dive/board?limit=50
