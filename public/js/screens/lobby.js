@@ -875,16 +875,20 @@ function MatchQueue({ difficulty, scope, elapsed, online, onCancel, queue = null
   const need = Number(queue?.need) || 0;
   const position = Number(queue?.position) || 0;
   const multi = multiSeats();
-  const seatTags = scope.seats.map((s, i) => ({
-    key: `s${i}`, color: '#4ed8af',   // 人数：薄荷绿（照参考版第二颗标签）
-    label: s === 'four' ? t('{n} 人同盟', { n: MAX_SEATS }) : t('多人同盟 {a}–{b} 人', { a: multi.a, b: multi.b }),
-  }));
+  // 「深渊回响」：深潜的匹配池是**固定 4 人 + 标准规则**（维护者 2026-11-06 玩家反馈：
+  // 搜寻中面板还写着「多人同盟 5–20 人」，那是普通房的范围，和实际排队的 4 人池不符）。
+  const echo = variant === 'deepecho';
+  const seatTags = echo
+    ? [{ key: 'seat-echo', color: '#b79cff', label: t('{n} 人同盟', { n: MAX_SEATS }) }]
+    : scope.seats.map((s, i) => ({
+      key: `s${i}`, color: '#4ed8af',   // 人数：薄荷绿（照参考版第二颗标签）
+      label: s === 'four' ? t('{n} 人同盟', { n: MAX_SEATS }) : t('多人同盟 {a}–{b} 人', { a: multi.a, b: multi.b }),
+    }));
   const ruleTags = scope.rules.map((r, i) => ({
     key: `r${i}`, color: '#8d9391',    // 规则：灰
     label: r === 'standard' ? t('标准规则') : t('实验性规则'),
   }));
-  // 「深渊回响」：深潜的匹配池是固定的（4 人 + 标准规则），标签改成「深渊回响」
-  const echo = variant === 'deepecho';
+  // 「深渊回响」：深潜的匹配池是固定的（4 人 + 标准规则），规则标签换成「深渊回响」
   const tags = [
     { key: 'difficulty', label: t(DIFFICULTY_NAMES[difficulty]), color: DIFFICULTY_COLORS[difficulty] },
     ...seatTags,
@@ -984,21 +988,27 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
               onSelect=${onDifficulty} disabled=${working} />`)}
           </div>
           <div class="proto-foot proto-foot--match">
-            <${MatchScope} scope=${scope} onToggle=${onScope} disabled=${working} />
+            ${variant === 'deepecho' ? null : html`<${MatchScope} scope=${scope} onToggle=${onScope} disabled=${working} />`}
             <div class="proto-opts">
-              <span class="proto-mode-chip"><${Icon} name="search" />${t('多人匹配')}</span>
-              <${MatchRules} />
+              <span class="proto-mode-chip"><${Icon} name="search" />${variant === 'deepecho' ? t('深渊回响') : t('多人匹配')}</span>
+              ${variant === 'deepecho' ? null : html`<${MatchRules} />`}
             </div>
             <p class="proto-hint" data-testid="match-hint">
               ${!online
                 ? html`<${Spinner} size="sm" label="CONNECTING" /> ${t('正在连接服务器…')}`
                 : createLocked
                   ? t('服务器暂时关闭了创建房间，请稍后再试')
-                  : matchHint(scope)}
+                  : variant === 'deepecho'
+                    ? t('深潜匹配池固定 4 人 · 标准规则，只会和深潜房配对')
+                    : matchHint(scope)}
             </p>
             <button type="button" class="proto-start" data-testid="match-start"
               disabled=${!online || working || createLocked} aria-busy=${working ? 'true' : 'false'}
-              onClick=${() => onStart({ difficulty, ...matchScopeRequest(scope), ...(variant ? { variant } : {}) })}>
+              onClick=${() => onStart({
+                difficulty,
+                ...(variant === 'deepecho' ? { seats: 'four', rules: 'standard' } : matchScopeRequest(scope)),
+                ...(variant ? { variant } : {}),
+              })}>
               <span class="proto-start__mark" aria-hidden="true"><span class="proto-start__rook"><i>[</i><${Icon} name="rook" /><i>]</i></span><small>STRONGHOLD<br />PROTOCOL</small></span>
               <span class="proto-start__label">${working ? html`<${Spinner} size="sm" />` : null}${t('开始多人匹配')}</span>
               <span class="proto-start__deco" aria-hidden="true"></span>
@@ -1335,6 +1345,9 @@ export function LobbyScreen() {
   const [matchScopeState, setMatchScopeState] = useState(() => matchScope(loadPref('lobby.matchScope', null)));
   // 已按下「开始多人匹配」：显示搜寻中那屏；null = 还在选难度
   const [matchSearch, setMatchSearch] = useState(null);
+  // 这次「开始多人匹配」是哪个模式发起的（null / 'coop' / 'deepecho'）：
+  // 用来把两个模式的按钮忙碌态隔开 —— 普通房在搜寻时，深潜的按钮不该跟着转。
+  const [quickVariant, setQuickVariant] = useState(null);
   const [matchWait, setMatchWait] = useState(0);
   // 公开同盟（同盟列表）：从「选择同盟方式」里的入口打开
   const [browseOpen, setBrowseOpen] = useState(false);
@@ -1526,8 +1539,14 @@ export function LobbyScreen() {
     const ruleArg = Array.isArray(req?.rules)
       ? matchScopeRequest({ seats: ['four'], rules: req.rules }).rules
       : req?.rules;
-    const seats = seatArg ?? matchScopeRequest(matchScopeState).seats;
-    const rules = ruleArg ?? matchScopeRequest(matchScopeState).rules;
+    const seatsRaw = seatArg ?? matchScopeRequest(matchScopeState).seats;
+    const rulesRaw = ruleArg ?? matchScopeRequest(matchScopeState).rules;
+    // 「深渊回响」的匹配池是固定的 4 人 + 标准规则：不管界面上的范围开关怎么选，深潜一律钉死，
+    // 否则会把普通房的「5–20 人」范围发给服务端（维护者 2026-11-06 玩家反馈）。
+    const echoPool = req?.variant === 'deepecho';
+    setQuickVariant(echoPool ? 'deepecho' : 'coop');
+    const seats = echoPool ? 'four' : seatsRaw;
+    const rules = echoPool ? 'standard' : rulesRaw;
     if (!createOpen) { toast(t('服务器暂时关闭了创建房间，请稍后再试'), 'warn'); return; }
     if (guest) { toast(t('游客不能参与多人匹配，请先登录'), 'warn'); return; }
     // ★ 别只看 `guest`：它是渲染时算的，可能已经过期。真正决定服务端怎么认人的是
@@ -1563,6 +1582,7 @@ export function LobbyScreen() {
           const got = await waitAccountToken();
           if (!got) {
             setMatchSearch(null);
+            setQuickVariant(null);
             toast(t('还没读到你的账号信息，请稍等一秒再点一次；如果一直这样，请重新登录'), 'warn');
             return;
           }
@@ -1586,6 +1606,7 @@ export function LobbyScreen() {
       } catch (e) {
         // 失败就退回选择那一屏，让玩家改难度/范围再试
         setMatchSearch(null);
+        setQuickVariant(null);
         // BAD_MSG 的通用文案是「无效的请求」，可服务端在这里的拒绝其实都有具体原因
         // （例如「游客不能参与多人匹配，请先登录」）。detail 比错误码有用得多，原样说出来。
         if (typeof e?.detail === 'string' && e.detail) {
@@ -1604,6 +1625,7 @@ export function LobbyScreen() {
   const cancelMatch = () => {
     const ticket = matchSearch?.ticket;
     setMatchSearch(null);
+    setQuickVariant(null);
     if (ticket) net.request('room.quickLeave', { ticket }).catch(() => {});
   };
   // 排队中：每 2 秒问一次票据状态；成局了就进房（房间凑满会立刻开局，所以进房即进对局）
@@ -1620,6 +1642,7 @@ export function LobbyScreen() {
         if (st.state === 'failed') {
           toast(t('匹配失败：服务端暂时无法创建同盟，请稍后再试'), 'warn');
           setMatchSearch(null);
+          setQuickVariant(null);
           return;
         }
         setMatchSearch((cur) => (cur && cur.ticket === ticket
@@ -1775,7 +1798,7 @@ export function LobbyScreen() {
         setMatchOpen(true);
         quickMatch({ difficulty: pickedDifficulty, seats: 'four', rules: 'standard', variant: 'deepecho' });
       }}
-      quickBusy=${busy === 'quick'} />` : null}
+      quickBusy=${busy === 'quick' && quickVariant === 'deepecho'} />` : null}
     ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed}
@@ -1786,9 +1809,10 @@ export function LobbyScreen() {
           按下「开始多人匹配」后同一屏的右列换成搜寻中（我们自己后端是按下即进房，
           所以没有参考版那套 30 秒确认入场，这里也不假装有）。 */ null}
     ${matchOpen ? html`<${MatchmakingSelect} difficulty=${matchVariant === 'deepecho' ? (echoPick || shownCoop) : shownCoop} onDifficulty=${pickDifficulty}
-      onClose=${() => { setMatchOpen(false); setMatchSearch(null); setMatchVariant(null); }}
+      onClose=${() => { setMatchOpen(false); setMatchSearch(null); setMatchVariant(null); setQuickVariant(null); }}
       onStart=${(req) => quickMatch(req)}
-      busy=${busy} online=${online} createLocked=${!createOpen} difficulties=${coop}
+      busy=${busy && (matchVariant === 'deepecho' ? quickVariant === 'deepecho' : quickVariant !== 'deepecho') ? busy : null}
+      online=${online} createLocked=${!createOpen} difficulties=${coop}
       scope=${matchScopeState} onScope=${pickScope} variant=${matchVariant}
       searching=${!!matchSearch} elapsed=${matchWait} queue=${matchSearch?.queue ?? null}
       onCancel=${() => {
