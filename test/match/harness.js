@@ -60,6 +60,8 @@ export function makeMatch(o = {}) {
     if (o.script) FakeBattle.script = o.script;
   }
   h.m = new Match({
+    // 「深渊回响」：只有测试点名 variant 才带上，普通用例的 opts 键集不变
+    ...(o.variant !== undefined ? { variant: o.variant } : {}),
     roomCode: 'TEST', mode, difficulty, seats, spectators: o.spectators, seed: o.seed ?? 1, matchNo: o.matchNo, data: o.data ?? DATA, log,
     send: (id, msg) => {
       for (const fn of h.onSend) fn(id, msg);
@@ -181,6 +183,31 @@ export function checkInvariants(m) {
   const violations = collectViolations(m);
   assert.deepEqual(violations, [], `invariants violated (${m.phase} R${m.round}):\n  ${violations.join('\n  ')}`);
   return legacyInvariants(m);
+}
+
+/**
+ * 结算掉「深渊回响」当前开着的决策面板（祝福三选一 / 弃选替换 / 刷新投票 / 深潜补给 / 盟约投影 / 护盾指定）。
+ *
+ * 为什么要它：面板开着时准备倒计时是**按住**的（deadline 清零，剩余时长在 `_echoPrepPausedMs` 里，不存档），
+ * 所以 `canSnapshot` 会拒绝存档 —— 存了读回来准备时间是 0 秒、面板也没了。想存检查点的用例先调它。
+ * 结算一个可能又补开下一个（投影是延后补开的），所以循环到没有面板为止。
+ * @returns {number} 结算了几轮（0 = 本来就没面板）
+ */
+export function settleEchoPanels(m, rounds = 10) {
+  let done = 0;
+  for (let i = 0; i < rounds && typeof m._echoChoiceOpen === 'function' && m._echoChoiceOpen(); i++) {
+    const before = JSON.stringify([m.echoBlessingOffer, m.echoSupply, m.echoProjectionOffer, m.echoShieldOffer]);
+    try {
+      if (m.echoBlessingOffer) m._echoForceResolveBlessing();
+      else if (m.echoSupply && m.echoSupply.pick == null) m._echoForceResolveSupply();
+      else if (m.echoProjectionOffer && m.echoProjectionOffer.pick == null) m._echoForceResolveProjection();
+      else if (Array.isArray(m.echoShieldOffer) && m.echoShieldOffer.length) m._echoForceResolveShield();
+      else break;
+    } catch { break; }
+    done++;
+    if (JSON.stringify([m.echoBlessingOffer, m.echoSupply, m.echoProjectionOffer, m.echoShieldOffer]) === before) break;
+  }
+  return done;
 }
 
 /** The original harness checks (kept alongside collectViolations; they must agree). */

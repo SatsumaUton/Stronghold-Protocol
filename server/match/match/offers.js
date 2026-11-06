@@ -126,7 +126,12 @@ export class MatchOffers {
     const reason = `offer:${w.pluginId}:${w.id}`;
     if (effect.funds !== undefined) ps.addFunds(effect.funds, { reason });
     else if (effect.pendingFunds !== undefined) ps.pendingFunds += effect.pendingFunds;
-    else if (effect.freeRefresh !== undefined) ps.shop.freeRefreshes += effect.freeRefresh;
+    else if (effect.freeRefresh !== undefined) {
+      const mm = ps.m;
+      // 「深渊回响」：每回合累计 5 次的上限统一走 MatchEcho._echoGrantFreeRefresh
+      if (mm && mm.echoVariant === 'deepecho' && typeof mm._echoGrantFreeRefresh === 'function') mm._echoGrantFreeRefresh(ps, effect.freeRefresh);
+      else ps.shop.freeRefreshes += effect.freeRefresh;
+    }
     else if (effect.layers) ps.addLayers(effect.layers.bond, effect.layers.count, { reason });
     else if (effect.item && !ps.acquireItem(effect.item, { source: reason })) return false;
     else if (effect.chess && !ps.acquireChess(effect.chess, { source: reason })) return false;

@@ -127,3 +127,19 @@ staging/
 # 2026-11-03 维护者决定：这类文档写 DESIGN-<名字>.md，放在 D:\\Stronghold-Protocol\\ 下；
 # 万一落在仓库里也不会被提交。
 DESIGN-*.md
+
+# ---- 深渊回响：独占文件只放在私有仓库（docs/DEEPECHO-REPO.md）----
+# 这里只是不让它们再被 add 回来；磁盘上的文件仍然用于部署。
+server/match/match/echo*.js
+server/echoTesters.js
+public/js/ui/echo*.js
+public/js/ui/enemyRecords.js
+public/js/screens/echoLobby.js
+matchmaker/diveBoard.cjs
+matchmaker/roomDir.cjs
+patcher/features/deepecho/
+test/**/echo*.test.js
+test/persist/echo-resume.test.js
+test/content/whitw2-stack.test.js
+test/patcher/deepecho-isolation.test.js
+test/**/*echo*.test.js

@@ -539,6 +539,10 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     bond: (id) => (ps.bonds[id] ? { ...ps.bonds[id] } : null),
     bonds: () => Object.fromEntries(Object.entries(ps.bonds).map(([k, v]) => [k, { ...v }])),
     bondActive: (id) => !!(ps.bonds[id] && ps.bonds[id].active),
+    // 「深渊回响」：按层给钱（远见 每 10 层 / 奇迹 每 100 层）结算到 **999 层**。
+    // 深潜的层数上限已经回到原版 999，但 999 层仍然够叠出上百次结算，所以这里再收一道；
+    // 普通房给 Infinity = 原版行为，一字不差（维护者 2026-11-03）。
+    bondLayerCoinCap: m.echoVariant === 'deepecho' ? 999 : Infinity,
     bondCount: (id) => (ps.bonds[id] ? ps.bonds[id].count : 0),
     layers: (id) => ps.layers[id] || 0,
     board: () => boardOrder(ps.board).map(({ r, c, piece }) => ps.pieceView(piece, [r, c])),
@@ -589,7 +593,16 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     addFunds: (n, reason = '') => ps.addFunds(finiteInt(n), { reason }),
     addPendingFunds: (n) => { const v = finiteInt(n); if (v > 0) { ps.pendingFunds += v; ps.dirty(); } return v > 0 ? v : 0; },
     spendFunds: (n) => { const v = finiteInt(n); if (!ps.spend(v)) return false; ps._afterSpend(v, 'effect'); return true; },
-    grantFreeRefresh: (n = 1) => { const v = finiteInt(n); if (v > 0) { ps.shop.freeRefreshes += v; ps.dirty(); } return ps.shop.freeRefreshes; },
+    grantFreeRefresh: (n = 1) => {
+      const v = finiteInt(n);
+      if (v > 0) {
+        // 「深渊回响」：**每回合累计**上限 5 次（奇迹·诅咒），买/卖干员触发的盟约效果也走这个口子。
+        // 以前只夹库存，玩家刷完 5 次再买/卖又能各拿 5 次 —— 等于无限刷新（维护者 2026-11-05 更正）。
+        if (m.echoVariant === 'deepecho' && typeof m._echoGrantFreeRefresh === 'function') m._echoGrantFreeRefresh(ps, v);
+        else { ps.shop.freeRefreshes += v; ps.dirty(); }
+      }
+      return ps.shop.freeRefreshes;
+    },
 
     // ---- prices (onPrice only; the same as writing ev.price)
     modifyPrice: (delta) => { if (hook === 'onPrice' && ev && Number.isFinite(delta)) ev.price = Math.max(0, (Number(ev.price) || 0) + delta); return ev ? ev.price : null; },
@@ -713,6 +726,11 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
       if (slot == null) { ps.shop.slots[i] = null; ps.dirty(); return true; }
       const kind = slot.kind === 'item' ? 'item' : 'chess';
       if (kind === 'chess' ? !gd.chess(slot.id) : !gd.item(slot.id)) return false;
+      // 被禁用的干员不可能出现在商店（和原版一致）：旁路塞进来的直接拒绝并记日志
+      if (kind === 'chess' && m && typeof m._shopChessBanned === 'function' && m._shopChessBanned(slot.id)) {
+        m.log?.warn?.(`[shop] banned chess rejected (setShopSlot): ${slot.id} (player=${ps.playerId}, round=${m.round})`);
+        return false;
+      }
       const basePrice = Number.isFinite(slot.price) ? Math.max(0, Math.trunc(slot.price)) : kind === 'chess' ? gd.chessPrice(slot.id) : gd.itemPrice(slot.id);
       ps.shop.slots[i] = { kind, id: slot.id, basePrice, frozen: !!slot.frozen, sold: false };
       ps.dirty();

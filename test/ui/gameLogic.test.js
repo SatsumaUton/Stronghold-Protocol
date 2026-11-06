@@ -16,6 +16,7 @@ import {
   activeBubbles, sortedPlayers, tileKey, prepCapsuleLabel, prepCamera, dropFailureReason, terrainInfo,
 } from '../../public/js/ui/gameLogic.js';
 import { PHASE, GEO } from '../../shared/constants.js';
+import { MAX_DRAFT_CARDS } from '../../shared/playerCapacity.js';
 import { setLang, setMessages } from '../../shared/i18n.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -599,7 +600,9 @@ describe('drafts', () => {
     const sp2 = normalizeSp({ cards: [{}, {}], order: ['b', 'a'], turn: 0, picks: [{ playerId: 'b', idx: 1 }, { playerId: 'x', idx: 9 }] }, players);
     assert.equal(sp2.turnPid, 'b'); assert.equal(sp2.cards[1].takenBy, 'b'); assert.equal(sp2.pickOf.has('x'), false);
     assert.equal(normalizeSp(null), null);
-    assert.equal(normalizeSp({ cards: new Array(9).fill({}) }).cards.length, 6, 'at most 6 cards');
+    // 上限跟着房间容量走（shared/playerCapacity.js MAX_DRAFT_CARDS = 最大容量 20 + 2），不是写死的 6：
+    // 20 人房的机变草稿可以有 22 张（2026-11-05：这条断言在容量实验上线后就过期了）
+    assert.equal(normalizeSp({ cards: new Array(MAX_DRAFT_CARDS + 3).fill({}) }).cards.length, MAX_DRAFT_CARDS);
   });
   test('personal choice: only the living recipient in the current PREP, independent of the public draft', () => {
     const pub = { phase: PHASE.PREP, round: 14, sp: { family: 'supply', cards: ['global'] } };

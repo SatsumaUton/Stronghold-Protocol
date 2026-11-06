@@ -14,7 +14,7 @@
   background:
     repeating-linear-gradient(0deg, rgba(255, 255, 255, .02) 0 1px, transparent 1px 4px),
     radial-gradient(60% 50% at 8% 6%, rgba(160, 166, 170, .12), transparent 70%),
-    radial-gradient(40% 30% at 96% 4%, rgba(63, 230, 180, .16), transparent 70%),
+    radial-gradient(40% 30% at 96% 4%, rgba(var(--mint-c8-rgb), .16), transparent 70%),
     radial-gradient(70% 60% at 90% 100%, rgba(120, 128, 132, .08), transparent 70%),
     linear-gradient(180deg, #0c0e0e, #090a0a);
 }
@@ -45,7 +45,7 @@
 .stephead__info .icon { width: .26rem; height: .26rem; }
 .stephead__sep { flex: none; width: 1px; height: .5rem; background: linear-gradient(180deg, transparent, rgba(255, 255, 255, .28), transparent); }
 .stephead__title { display: flex; align-items: baseline; gap: .02rem; margin: 0; font-size: calc(.32 * var(--t)); font-weight: 900; letter-spacing: .06em; white-space: nowrap; }
-.stephead__title b { font-size: calc(.54 * var(--t)); line-height: 1; color: var(--mint-400); text-shadow: 0 0 .16rem rgba(23, 249, 183, .35); }
+.stephead__title b { font-size: calc(.54 * var(--t)); line-height: 1; color: var(--mint-400); text-shadow: 0 0 .16rem rgba(var(--mint-rgb), .35); }
 .stephead__of { font-size: calc(.34 * var(--t)); color: var(--text-lo); margin-right: .16rem; }
 .stephead__micro { align-self: flex-end; margin-bottom: .22rem; opacity: .35; white-space: nowrap; overflow: hidden; }
 .draft .stephead__micro { display: none; }
@@ -147,12 +147,12 @@
 .brief .brief-faction { display: flex; flex-direction: column; align-items: center; gap: .14rem; width: 1.9rem; cursor: help; }
 .brief .brief-faction__icon {
   width: 1.12rem; height: 1.12rem; display: grid; place-items: center; border-radius: 50%; outline: none; transition: box-shadow var(--t-fast);
-  background: radial-gradient(circle at 50% 45%, #2a3a38, #121817 70%); box-shadow: 0 0 .22rem rgba(140, 255, 225, .14), inset 0 0 .16rem rgba(0, 0, 0, .7);
+  background: radial-gradient(circle at 50% 45%, #2a3a38, #121817 70%); box-shadow: 0 0 .22rem rgba(var(--mint-c9-rgb), .14), inset 0 0 .16rem rgba(0, 0, 0, .7);
 }
-.brief .brief-faction__icon img { width: 78%; height: 78%; object-fit: contain; filter: grayscale(1) brightness(1.6) drop-shadow(0 0 .06rem rgba(160, 255, 230, .6)); }
-.brief .brief-faction:hover .brief-faction__icon { box-shadow: 0 0 .26rem rgba(140, 255, 225, .32), inset 0 0 .16rem rgba(0, 0, 0, .7); }
-.brief .brief-faction__icon:focus-visible { box-shadow: 0 0 0 .03rem var(--mint-400), 0 0 .26rem rgba(140, 255, 225, .32), inset 0 0 .16rem rgba(0, 0, 0, .7); }
-/* the name under the icon; the description (GitHub #484: every special enemy type with its description) in the tooltip —
+.brief .brief-faction__icon img { width: 78%; height: 78%; object-fit: contain; filter: grayscale(1) brightness(1.6) drop-shadow(0 0 .06rem rgba(var(--mint-c10-rgb), .6)); }
+.brief .brief-faction:hover .brief-faction__icon { box-shadow: 0 0 .26rem rgba(var(--mint-c9-rgb), .32), inset 0 0 .16rem rgba(0, 0, 0, .7); }
+.brief .brief-faction__icon:focus-visible { box-shadow: 0 0 0 .03rem var(--mint-400), 0 0 .26rem rgba(var(--mint-c9-rgb), .32), inset 0 0 .16rem rgba(0, 0, 0, .7); }
+/* the name under the icon; the description (GitHub var(--mint-c11): every special enemy type with its description) in the tooltip —
    hover, keyboard focus on the icon, a long press on touch — the maintainer's decision of 2026-10-22 (ui/matchEnemies.js) */
 .brief .brief-faction__text { display: flex; flex-direction: column; align-items: center; gap: .04rem; min-width: 0; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
 .brief .brief-faction__text b { font-size: calc(.22 * var(--t)); font-weight: 700; color: #e6eaea; }
@@ -181,7 +181,7 @@
 .brief__foot > * { pointer-events: auto; }
 .brief-ready { display: flex; flex-direction: column; align-items: center; gap: .06rem; }
 .brief-ready__txt { display: flex; align-items: baseline; gap: .06rem; font-size: calc(.24 * var(--t)); color: #e6eaea; }
-.brief-ready__txt b { margin-left: .08rem; font-size: calc(.5 * var(--t)); line-height: 1; color: var(--mint-400); text-shadow: 0 0 .12rem rgba(23, 249, 183, .4); }
+.brief-ready__txt b { margin-left: .08rem; font-size: calc(.5 * var(--t)); line-height: 1; color: var(--mint-400); text-shadow: 0 0 .12rem rgba(var(--mint-rgb), .4); }
 .brief-ready__txt span { font-size: calc(.34 * var(--t)); color: #d6dada; }
 .brief-ready__pips { position: relative; display: flex; gap: .04rem; padding: 0 .1rem; }
 .brief-ready__pips::before, .brief-ready__pips::after { content: ''; position: absolute; top: -.02rem; bottom: -.02rem; width: .07rem; border: 2px solid rgba(255, 255, 255, .3); }
@@ -189,10 +189,10 @@
 .brief-ready__pips::after { right: 0; border-left: 0; }
 .brief-ready__pips i { width: .34rem; height: .4rem; display: grid; place-items: center; color: #4c5152; transition: color var(--t-med), filter var(--t-med); }
 .brief-ready__pips i .icon { width: 100%; height: 100%; }
-.brief-ready__pips i.on { color: var(--mint-400); filter: drop-shadow(0 0 .06rem rgba(23, 249, 183, .6)); animation: brief-pip .5s var(--pg-ease); }
+.brief-ready__pips i.on { color: var(--mint-400); filter: drop-shadow(0 0 .06rem rgba(var(--mint-rgb), .6)); animation: brief-pip .5s var(--pg-ease); }
 @keyframes brief-pip { from { transform: translateY(-.08rem) scale(1.3); filter: brightness(2.2); } }
 .brief-go.btn--xl { height: .98rem; min-width: 3.9rem; padding: 0 .5rem 0 .3rem; justify-content: flex-start; font-size: calc(.38 * var(--t)); letter-spacing: .08em;
-  --btn-bg: #33d6a5; --btn-bg-hover: #4ee6b8; box-shadow: 0 0 0 .03rem rgba(255, 255, 255, .85), 0 .06rem .2rem rgba(0, 0, 0, .55); }
+  --btn-bg: var(--mint-c12); --btn-bg-hover: var(--mint-c13); box-shadow: 0 0 0 .03rem rgba(255, 255, 255, .85), 0 .06rem .2rem rgba(0, 0, 0, .55); }
 .brief-go .btn__icon { width: .44rem; height: .44rem; }
 .brief-go.is-active, .brief-go:disabled { --btn-bg: #3f4344; --btn-fg: #f2f4f4; --btn-bd: #6b7071; box-shadow: 0 0 0 .03rem rgba(255, 255, 255, .55); opacity: 1; }
 .brief-go.is-loading { --btn-bg: var(--mint-700); }
@@ -250,7 +250,7 @@
 @keyframes pg-rise { from { opacity: 0; transform: translateY(.22rem); } }
 @keyframes pg-pop { from { opacity: 0; transform: scale(.4); } }
 @keyframes pg-card { from { opacity: 0; transform: translateY(.16rem) scale(1.03); } }
-@keyframes pg-glow { 20% { box-shadow: 0 0 .5rem rgba(120, 255, 215, .9), 0 0 .12rem #b9ffe9; border-color: #b9ffe9; } }
+@keyframes pg-glow { 20% { box-shadow: 0 0 .5rem rgba(var(--mint-c14-rgb), .9), 0 0 .12rem var(--mint-s7); border-color: var(--mint-s7); } }
 @keyframes pg-dots { to { width: 1.1em; } }
 
 /* ---- 开局转场 (the event's): the header drops in, the sections come in from the right one after another, the corner

@@ -7,6 +7,34 @@ import { requestAccountResume } from './accountObserver.js';
 import { t } from '../../../shared/i18n.js';
 import { toast } from './toasts.js';
 
+/**
+ * 恢复对局该跳到哪个地址。
+ *
+ * ★ 2026-11-06：以前一律跳 `/r/CODE`，由 matchmaker 按房号反查节点。但**深渊回响房不参与按房号
+ *   跳转**（节点上报时它们进的是 `echoCodes` 而不是 `codes`，见 matchmaker/roomDir.cjs），于是
+ *   `/r/<深潜房号>` 一律 302 回首页：玩家点「前往该房间继续对局」后落在大厅的另一个节点上，
+ *   那里的 account.resume 当然没有他的座位 —— 看到「当前节点没有可恢复的账号对局」。
+ *   （实测：/api/resolve-room?code=PBJH → 403，/api/room-redirect?code=PBJH → 302 /）
+ *
+ *   `/mm/api/account/room` 本来就回了 `room.node`，前端以前把它丢掉了。节点已知时改用 nginx 的
+ *   显式目标通道 `/?room=CODE&n=N`（`?n=` 会无条件把请求钉到那台节点，见 nginx.conf 的
+ *   `map $arg_n $sp_room_node`），普通房也一起受益：不再依赖「节点每 10 秒上报一次房号」。
+ *   节点未知（老数据 / 昵称兜底）时才退回 `/r/CODE`。
+ * @param {{ code?: string, node?: number|string }|null|undefined} room
+ * @returns {string|null} 目标地址；没有房间码时 null
+ */
+export function resumeRoomUrl(room) {
+  const isObj = !!room && typeof room === 'object';
+  const code = String(isObj ? (room.code ?? '') : (room ?? '')).trim();
+  if (!code) return null;
+  const node = Number(isObj ? room.node : NaN);
+  const known = Number.isInteger(node) && node >= 1 && node <= 30;
+  return known
+    ? `/?room=${encodeURIComponent(code)}&n=${node}`
+    : `/r/${encodeURIComponent(code)}`;
+}
+
+/** 账号名下的房间：`{ code, node } | null`（node 可能为 null：老数据只有昵称兜底）。 */
 async function findAccountRoom() {
   let name = window.__SP_ACCOUNT_USER || '';
   if (!name) {
@@ -23,7 +51,10 @@ async function findAccountRoom() {
     const r = await fetch('/mm/api/account/room', { credentials: 'same-origin', cache: 'no-store' });
     if (!r.ok) return null;
     const j = await r.json();
-    return j?.room?.code || null;
+    const code = j?.room?.code;
+    if (!code) return null;
+    const node = Number(j?.room?.node);
+    return { code: String(code), node: Number.isInteger(node) && node >= 1 && node <= 30 ? node : null };
   } catch { /* ignore */ }
   return null;
 }
@@ -133,9 +164,9 @@ export function ResumeMatchButton() {
       //   失败时还会再跳，来回几跳。现在的规则是：**所有跳转都必须由玩家亲手点**。
       //   所以这里不跳，而是把「去那个房间所在节点继续」变成一个玩家再点一次的按钮
       //   （goToRoom 就是那次点击的处理函数）。
-      const code = await findAccountRoom();
-      if (code) {
-        setElsewhere(code);
+      const room = await findAccountRoom();
+      if (room) {
+        setElsewhere(room);
         setBusy(false);
         return;
       }
@@ -149,9 +180,12 @@ export function ResumeMatchButton() {
   // 的房间只会回 ROOM_STARTED）。这里写入的 sp.accountResume 是**本次点击**产生的意图，
   // 与以前那种「刷新/换设备自动探测就置位」完全不同 —— 只有玩家点了才会写。
   const goToRoom = () => {
-    if (!elsewhere) return;
+    const url = resumeRoomUrl(elsewhere);
+    if (!url) return;
     try { sessionStorage.setItem('sp.accountResume', '1'); } catch { /* ignore */ }
-    location.assign(`/r/${encodeURIComponent(elsewhere)}?accountResume=1`);
+    // 地址里不再带 accountResume=1：真正起作用的是上面那个一次性 sessionStorage 标记，
+    // 而 accountObserver 会（正确地）不信任 URL 参数、并把它从地址栏抹掉。
+    location.assign(url);
   };
   // urgent：这台设备刚被另一台接管过。按钮要有明显的视觉区分，否则玩家以为要自己去别处找。
   //
@@ -174,7 +208,7 @@ export function ResumeMatchButton() {
       <p>${t('选择已关闭窗口的对局。服务器重启或对局过期后无法恢复。')}</p>
       ${accountResume ? html`<${Button} variant="primary" block=${true} disabled=${busy} onClick=${resumeAccount}>${t('通过账号恢复当前对局')}<//>` : null}
       ${elsewhere ? html`<div class="resume-elsewhere">
-        <p>${t('这个页面对应的节点上没有你的对局，它在另一个节点（房间 {code}）。点下面的按钮过去继续。', { code: elsewhere })}</p>
+        <p>${t('这个页面对应的节点上没有你的对局，它在另一个节点（房间 {code}）。点下面的按钮过去继续。', { code: elsewhere.code })}</p>
         <${Button} variant="primary" block=${true} onClick=${goToRoom}>${t('前往该房间继续对局')}<//>
       <//>` : null}
       ${items.length ? items.map((item) => html`<${Button} key=${item.id} variant="secondary" block=${true} disabled=${busy} onClick=${() => resume(item)}>

@@ -104,6 +104,8 @@ export class MatchViews {
       hiddenBossId: this.hiddenBossId,
       bossRound: this.gd.bossRound,
       hiddenRound: this.gd.hiddenRound,
+      // 「深渊回响」: 深潜进度与本期侵蚀词条。普通房间不出现这个键，帧与加这个模式之前逐字节相同。
+      ...(this.echoVariant === 'deepecho' ? { echo: this._echoPublic() } : {}),
       bossPairs: this.bossWaves ? this.bossWaves.map(w => w.players.slice()) : this.bossPairs ? this.bossPairs.map(ids => ids.slice()) : null,
       spRound: this.gd.spRounds().includes(this.round),
       // DESIGN §14: 'client' = battles are simulated by the browsers (b.start specs), 'server' = legacy streaming
@@ -119,6 +121,8 @@ export class MatchViews {
         matchId: this.battlePrefix,
         windowOpen: this.revivalWindowOpen(),
         deadline: this.revivalWindowOpen() ? this._revival.deadline : 0,
+        // 「深渊回响」：不要求进入联防，任一存活队友都能付救援（维护者 2026-11-05）
+        anyDonor: this.revivalAnyDonor === true,
         eligible: this.revivalWindowOpen() ? this.order.filter((ps) => this.revivalDonorEligible(ps)).map((ps) => ps.playerId) : [],
       } : { enabled: false },
       players: this.order.map((ps) => ({
@@ -299,11 +303,46 @@ export class MatchViews {
     if (this.bossWaves) {
       const g = this.bossGroupOf(ps);
       if (!g) return [];
-      return previewOf([...g.wave.spawns, ...bountySpawns(this.gd, this.round, g.wave, ps.bounties, ps.playerId, { solo: this.isSolo, side: g.side })]);
+      return this._echoMaskBountyPreview(previewOf([...g.wave.spawns, ...bountySpawns(this.gd, this.round, g.wave, ps.bounties, ps.playerId, { solo: this.isSolo, side: g.side })]));
     }
     if (!this.wave) return [];
+    // 「深渊回响」深潜：维护者 2026-11-03 定 —— 原版「敌方情报」面板的四项全部保留
+    // （回合数+敌人总数 / 阵营 chips / 逐只敌人列表 / boss 领袖块），所以这里照常发明细；
+    // 额外的威胁值/是否精英/下次节点是 `m.public.echo.intel` 另发的一块，两者并存。
     const bounty = bountySpawns(this.gd, this.round, this.wave, ps.bounties, ps.playerId, { solo: this.isSolo });
-    return previewOf([...this.wave.spawns, ...bounty]);
+    return this._echoMaskBountyPreview(previewOf([...this.wave.spawns, ...bounty]));
+  }
+
+  /**
+   * 深潜的悬赏目标在**准备阶段**整只隐藏成「?」占位（维护者 2026-11-05）：把对手需要打的那只
+   * 换成没有美术数据的 `enemy_unknown`，客户端自然画成占位菱形；战斗开始后 sim 用真实 key 出怪。
+   *
+   * @param {Array<object>} list previewOf 的结果
+   */
+  _echoMaskBountyPreview(list) {
+    if (this.echoVariant !== 'deepecho' || !Array.isArray(list)) return list;
+    // 隐藏核心：准备阶段**不把 boss 本身列进敌方情报**（维护者 2026-11-05：隐藏 boss 的地方情报不要了），
+    // 战斗开始后才揭晓。普通 boss 返场节点不受影响。
+    let out = list;
+    try {
+      if (typeof this._echoHiddenBossRound === 'function' && this._echoHiddenBossRound(this.round)) {
+        out = list.filter((e) => !(e && (e.tag === 'boss' || e.boss === true)));
+      }
+    } catch { out = list; }
+    // 悬赏目标只在**16 层以后**才隐藏成「?」占位（维护者 2026-11-05：
+    // 1–13 层的悬赏是玩家自己选的目标，准备阶段要照常显示真身）。
+    // 迷雾/遮蔽：整个准备阶段的敌方情报都换成「?」占位（维护者 2026-11-05：
+    // 玩家要看不到右上角怪物等待区里的怪，只留隐藏图标）
+    let hideAll = false;
+    try {
+      const fx = typeof this._echoCurseFx === 'function' ? this._echoCurseFx() : null;
+      hideAll = !!(fx && (fx.intel || fx.blackout));
+    } catch { hideAll = false; }
+    const hideBounty = hideAll || this._echoDepth(this.round) >= 16;
+    for (const e of out) {
+      if (e && (hideAll || (hideBounty && e.source === 'bounty'))) e.enemyKey = 'enemy_unknown';
+    }
+    return out;
   }
 
   /** A 自选 piece's pick (like the sim's UnitInfo.diy): a scout's card composes the operator from it (shared/diy.js). */

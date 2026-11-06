@@ -3,6 +3,7 @@ import { MAX_SEATS } from './constants.js';
 import { isPlayerCapacity, roomCapacity } from './playerCapacity.js';
 import { canonicalPoolPlan, isPoolPlan } from './poolPlan.js';
 
+// 维护者 2026-11-05：救援（10 血换 1 血）**默认开启**，并且不再要求进入联防。
 export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disableSharedPool: false });
 /**
  * Optional booleans: absent when off, so an ordinary room, a saved room and a queue key keep their old shape.
@@ -10,7 +11,10 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
  * `disableLayerCap` / `disableHitLimit` are the battle-rule flags ported from the other fork (2026-11-01).
  * @type {ReadonlySet<string | symbol>}
  */
-const OPTIONAL_FLAGS = new Set(['disableDuckLord', 'disableLayerCap', 'disableHitLimit', 'allowRepeat', 'stackDuckLord']);
+// 
+// revivalAnyDonor：救援不要求联防（维护者 2026-11-05，默认 true）—— 必须在这里登记，
+// 否则 isExperimental 会把它判成非法键，导致**断点恢复对局失败**（invalid experimental options）。
+const OPTIONAL_FLAGS = new Set(['disableDuckLord', 'disableLayerCap', 'disableHitLimit', 'allowRepeat', 'stackDuckLord', 'revivalAnyDonor']);
 /**
  * The enemy multipliers a room can pick (反馈 #47); the first, a standard room's, is never stored: an ordinary room,
  * a saved room and a queue key keep their old shape. Applies to every enemy, the leaders' shared HP included.
@@ -52,7 +56,10 @@ export function isExperimental(value) {
 export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
   if (!isExperimental(value)) throw new TypeError('invalid experimental options');
   const capacity = roomCapacity('coop', value);
-  return Object.freeze({ revivalEnabled: value.revivalEnabled, disableSharedPool: value.disableSharedPool && !value.poolPlan,
+  // 维护者 2026-11-05：救援默认开启，且不要求进入联防（revivalAnyDonor 只是行为开关，不写进 DTO）。
+  // 一旦写进输出，旧进程的校验器会把自己的产物判成非法（2026-11-05：所有房间 new Match 抛错、开不了局）。
+  return Object.freeze({ revivalEnabled: value.revivalEnabled === true,
+    disableSharedPool: value.disableSharedPool && !value.poolPlan,
     ...(capacity === MAX_SEATS ? {} : { playerCapacity: capacity }),
     // Optional and false by default: ordinary rooms and legacy DTOs keep their two-flag shape.
     ...(capacity > MAX_SEATS && value.disableDuckLord === true ? { disableDuckLord: true } : {}),

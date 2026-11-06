@@ -24,12 +24,16 @@ export class BattleSpawns {
     // capped: a bogus count (Infinity, 1e9) would otherwise hang the constructor / exhaust memory
     const count = Math.min(MAX_ALIVE_ENEMIES, Math.max(1, Math.floor(fin(s.count ?? 1, 1)) || 1));
     const interval = Math.max(0, fin(s.interval, 0));
-    const def = this.data.getEnemy(s.enemyKey);
+    // 数据表里没有这个 key 时（深潜的跨版本敌人 `<version>:enemy_…`）用出怪自带的记录，
+    // 否则会拿到 FALLBACK_ENEMY（「未知敌人」，客户端贴图是红水滴）（维护者 2026-11-05）。
+    const def = this.data.getEnemy(s.enemyKey) || (s.enemyDef ? normalizeEnemy(s.enemyKey, s.enemyDef) : null);
     for (let i = 0; i < count; i++) {
       const p = {
         time: Math.max(0, fin(s.time, 0)) + i * interval, enemyKey: s.enemyKey, routeIndex: s.routeIndex ?? 0, route: s.route ?? null,
         mods: s.mods ?? null, sourcePlayerId: s.sourcePlayerId ?? null, bounty: s.bounty ?? null, tag: s.tag ?? null,
         ownerPlayerId: s.ownerPlayerId ?? null, pos: s.pos ?? null, seq: ++this._spawnSeq, countInTotal: s.countInTotal,
+        // 跨版本敌人自带记录（数据表里没有这个 key）；spawnEnemy 的 opts.def 会用它
+        def: s.enemyDef ?? null,
       };
       p.counted = p.countInTotal ?? (!(def && def.notCountInTotal) && p.tag !== 'boss' && p.tag !== 'part');
       // inTotal: the enemies THIS STAGE scheduled that count — the HUD capsule's own set (DESIGN §14 "顶栏胶囊"). A
@@ -116,11 +120,21 @@ export class BattleSpawns {
     // split children too. Never in `mods`: a leak carries its mods into 联防 and a child inherits them, so they would
     // apply twice.
     const roomHp = mm(this.flags.enemyHpMul, true), roomAtk = mm(this.flags.enemyAtkMul);
+    // 深潜的「频次怪」绝对血量（spec flags `enemyHpAbs`：enemyKey → 血量，Match._ruleFlags()）。
+    // 这类怪（器物：青铜镜、铁矛头…）的 maxHp **就是**「需要被打几下」（sim 的 hitCount 让每次伤害只扣 1）。
+    // 数据 baseHp 只有 30 / 45 这种「击倒次数」，跟着深度缩放会变成几千下（实测铁矛头 6080）；
+    // 反过来完全不给缩放又只有 30 下、一刀就没了（维护者 2026-11-05 第二次反馈）。
+    // 所以深潜按深度直接给一个**绝对血量**（500–2000），走这里统一覆盖 —— 它们多数是召唤物
+    //（新硎的 DeadSpawn 出铁矛头），不在波次 spawns 里，只有出怪这一处管得到。
+    const absAll = this.flags && this.flags.enemyHpAbs;
+    const absHp = absAll && typeof absAll === 'object' ? Number(absAll[def.key] ?? absAll[enemyKey]) : NaN;
+    const hpMulAll = (m.hpMul ?? 1) * roomHp;
+    const hpFinal = Number.isFinite(absHp) && absHp > 0 ? absHp : def.maxHp * hpMulAll;
     const e = new Unit({
       id: ++this._idSeq, side: 'enemy', kind: 'enemy', def, defId: def.key ?? enemyKey, name: def.name,
       x: start[1], y: start[0], motion: def.motion,
       base: {
-        maxHp: def.maxHp * (m.hpMul ?? 1) * roomHp, atk: def.atk * (m.atkMul ?? 1) * roomAtk, def: def.def * (m.defMul ?? 1), res: def.res * (m.resMul ?? 1),
+        maxHp: hpFinal, atk: def.atk * (m.atkMul ?? 1) * roomAtk, def: def.def * (m.defMul ?? 1), res: def.res * (m.resMul ?? 1),
         aspd: def.aspd, bat: def.bat, blockCnt: 0, moveSpeed: def.moveSpeed * (m.speedMul ?? 1), spRecovery: 0,
         tauntLevel: def.tauntLevel, massLevel: def.massLevel, hpRecoveryPerSec: def.hpRecoveryPerSec, rangeRadius: def.rangeRadius,
       },
@@ -180,6 +194,13 @@ export class BattleSpawns {
     e.hp = e.bossPool ? e.hp : e.s.maxHp;
     this.units.push(e);
     this.enemies.push(e);
+    // 深潜「洞彻」的永久反隐（spec flags `revealAll`，Match._ruleFlags()）：每只敌人一出生就挂 reveal。
+    // 为什么放在 sim 而不是服务端的事件钩子：深潜的战斗在**客户端**按 spec 跑，服务端钩子客户端看不到
+    // （玩家反馈 2026-11-06）。flag 缺失时这段是空操作，原版 / golden 逐字节不变。
+    if (this.flags && this.flags.revealAll === true) {
+      this.addBuff(e, { key: 'reveal:all', persist: true, flags: { reveal: true } });
+      if (e.hidden) this._setHidden(e, false);
+    }
     this._ev(['spawn', unitInfo(e)]);
     if (this._hooks.deploy) this.emit('deploy', { unit: e, initial: false });
     if (this._hooks.enemySpawn) this.emit('enemySpawn', { enemy: e });

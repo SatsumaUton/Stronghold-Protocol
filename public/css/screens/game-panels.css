@@ -104,7 +104,7 @@
 .drank--elite { background: var(--gold-2); color: #1d1400; }
 .drank--boss { background: var(--orange); color: #fff; }
 .dhp { position: relative; height: .18rem; margin-top: .08rem; background: #0a0d0c; border: 1px solid var(--line-2); }
-.dhp i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #2bb65a, #56e08a); }
+.dhp i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--mint-c17), var(--mint-c18)); }
 .dhp--enemy i { background: linear-gradient(90deg, #b5261a, #ff5a4a); }
 .dhp span { position: absolute; inset: 0; display: grid; place-items: center; font-size: .12rem; color: #fff; text-shadow: 0 1px 2px #000; }
 .dtrait { display: flex; gap: .08rem; align-items: flex-start; font-size: calc(.14 * var(--t)); line-height: 1.6; color: var(--text-md); padding: .08rem .1rem; background: rgba(255, 255, 255, .03); border-left: 2px solid var(--line-3); }
@@ -123,8 +123,8 @@
    them; a 实时 (battle) / 开战时 (prep preview) tag over the grid's right edge */
 .dstats.is-live, .dstats-wrap.is-live { margin-top: .14rem; }
 .dstats.is-live, .dstats-wrap.is-live .dstats { position: relative; }
-.dstat.is-up .dstat__v { color: #6dfa9c; text-shadow: 0 0 .08rem rgba(80, 240, 140, .35); }
-.dstat.is-up small { color: #56e08a; }
+.dstat.is-up .dstat__v { color: var(--mint-c19); text-shadow: 0 0 .08rem rgba(var(--mint-c20-rgb), .35); }
+.dstat.is-up small { color: var(--mint-c18); }
 .dstat.is-down .dstat__v { color: var(--red-premium); text-shadow: 0 0 .08rem rgba(255, 84, 84, .3); }
 .dstat.is-down small { color: #ff8a80; }
 .dstats__tag {
@@ -151,7 +151,7 @@
 .dskill__name { font-size: calc(.19 * var(--t)); }
 .dskill__tags { display: flex; flex-wrap: wrap; gap: .06rem; align-items: center; }
 .dsp { font-size: calc(.12 * var(--t)); padding: 0 .06rem; line-height: 1.6; font-weight: 700; }
-.dsp--time { background: #7fd37a; color: #0b1a0a; }
+.dsp--time { background: var(--mint-c21); color: #0b1a0a; }
 .dsp--atk { background: #ff8a3d; color: #1f0c00; }
 .dsp--def { background: #f2bd3e; color: #1f1400; }
 .dsp--trig { border: 1px solid var(--line-3); color: var(--text-lo); font-weight: 500; }
@@ -171,7 +171,7 @@
 .dgarrison__icon { width: .18rem; height: .18rem; object-fit: contain; }
 .dgarrison__text { font-size: calc(.15 * var(--t)); line-height: 1.55; color: var(--text-hi); }
 .dbonds { display: flex; flex-wrap: wrap; gap: .08rem; }
-.dbond { display: inline-flex; align-items: center; gap: .05rem; padding: .03rem .1rem .03rem .05rem; font-size: calc(.15 * var(--t)); background: rgba(78, 216, 175, .08); border: 1px solid var(--mint-800); color: var(--mint-400); }
+.dbond { display: inline-flex; align-items: center; gap: .05rem; padding: .03rem .1rem .03rem .05rem; font-size: calc(.15 * var(--t)); background: rgba(var(--mint-500-rgb), .08); border: 1px solid var(--mint-800); color: var(--mint-400); }
 /* the unit's bonds in the header's right column, right under name / class (user playtest #2 item 9): icon, name,
    count / next threshold, tier pips — visible as soon as the card opens */
 .dbonds--top { gap: .05rem; margin-top: .06rem; }
@@ -181,7 +181,7 @@
   background: rgba(255, 255, 255, .03); border: 1px solid var(--line-2); cursor: default; }
 .dbonds--top button.dbond { cursor: pointer; }
 .dbonds--top button.dbond:hover { border-color: var(--mint-500); color: #fff; }
-.dbonds--top .dbond.is-active { color: var(--mint-400); background: rgba(78, 216, 175, .1); border-color: var(--mint-700); }
+.dbonds--top .dbond.is-active { color: var(--mint-400); background: rgba(var(--mint-500-rgb), .1); border-color: var(--mint-700); }
 .dbonds--top .dbond.is-core .dbond__name { font-weight: 700; }
 .dbond__icon { width: .26rem; height: .26rem; }
 .dbond:not(.is-active) .dbond__icon img { filter: brightness(0) invert(.6); }
@@ -190,7 +190,7 @@
 .dbond__count.is-max { color: var(--gold-2); }
 .dbond__tiers { display: inline-flex; gap: 2px; margin-left: .02rem; }
 .dbond__tiers i { width: .05rem; height: .12rem; background: rgba(255, 255, 255, .16); transform: skewX(-18deg); }
-.dbond__tiers i.on { background: var(--mint-400); box-shadow: 0 0 .04rem rgba(78, 216, 175, .8); }
+.dbond__tiers i.on { background: var(--mint-400); box-shadow: 0 0 .04rem rgba(var(--mint-500-rgb), .8); }
 /* a bond the mode never activates (标准: 10 of 23 — gameLogic modeOffBonds) */
 .dbonds--top .dbond.is-off { border-style: dashed; border-color: rgba(255, 255, 255, .16); background: transparent; color: var(--text-dim); }
 .dbond.is-off .dbond__name { text-decoration: line-through; text-decoration-color: rgba(255, 84, 84, .6); }
@@ -228,7 +228,7 @@
 .dmorph__items { min-width: 0; overflow-wrap: anywhere; }
 .dmorph__row.is-off .dmorph__bond { color: var(--text-dim); text-decoration: line-through; text-decoration-color: rgba(255, 84, 84, .6); }
 .dmorph__row.is-off .dmorph__items { color: var(--text-dim); }
-.dmorph__row.is-worn { background: rgba(78, 216, 175, .14); border-left-color: var(--mint-400); }
+.dmorph__row.is-worn { background: rgba(var(--mint-500-rgb), .14); border-left-color: var(--mint-400); }
 .dmorph__item.is-worn { color: #fff; font-weight: 700; }
 .dmorph__tag { display: inline-block; margin-left: .06rem; padding: 0 .05rem; font-size: max(calc(.11 * var(--t)), 8px); line-height: 1.5; font-weight: 700; white-space: nowrap; }
 .dmorph__tag.is-on { background: var(--mint-500); color: #062019; }
@@ -267,7 +267,7 @@
 .bpop__disc { width: .86rem; height: .86rem; border-radius: 50%; display: grid; place-items: center; background: #1b2320; border: 3px solid rgba(255, 255, 255, .14); flex: none; }
 .bpop__disc .bglyph { width: .56rem; height: .56rem; }
 .bpop__disc .bglyph img { filter: brightness(0) invert(.8); }
-.bpop__disc.is-active { background: var(--mint-500); border-color: var(--mint-400); box-shadow: 0 0 .24rem rgba(23, 249, 183, .45); }
+.bpop__disc.is-active { background: var(--mint-500); border-color: var(--mint-400); box-shadow: 0 0 .24rem rgba(var(--mint-rgb), .45); }
 .bpop__disc.is-active .bglyph img { filter: brightness(0) opacity(.85); }
 .bpop__titles { display: flex; flex-direction: column; gap: .02rem; min-width: 0; }
 .bpop__name { font-size: calc(.32 * var(--t)); font-weight: 900; letter-spacing: .08em; }
@@ -285,12 +285,12 @@
 .bpop__sec { display: flex; flex-direction: column; gap: .06rem; }
 .bpop__sec h4 { font-size: calc(.16 * var(--t)); color: var(--mint-400); display: flex; align-items: baseline; gap: .08rem; }
 .bpop__sec h4 small { font-size: calc(.13 * var(--t)); color: var(--text-lo); font-weight: 400; }
-.bpop__sec--now { padding: .1rem .12rem; background: rgba(78, 216, 175, .06); border-left: 3px solid var(--mint-500); }
+.bpop__sec--now { padding: .1rem .12rem; background: rgba(var(--mint-500-rgb), .06); border-left: 3px solid var(--mint-500); }
 .bpop__desc { font-size: calc(.15 * var(--t)); line-height: 1.7; color: var(--text-md); }
 .bpop__members { display: grid; grid-template-columns: repeat(5, 1fr); gap: .08rem; }
 .bpop__member { position: relative; display: flex; flex-direction: column; align-items: center; gap: .03rem; padding: .04rem 0; background: none; border: 1px solid transparent; }
 .bpop__member:hover { border-color: var(--line-2); background: rgba(255, 255, 255, .03); }
-.bpop__member.is-on .uthumb__art { border-color: var(--mint-400); box-shadow: 0 0 .1rem rgba(23, 249, 183, .45); }
+.bpop__member.is-on .uthumb__art { border-color: var(--mint-400); box-shadow: 0 0 .1rem rgba(var(--mint-rgb), .45); }
 .bpop__mname { font-size: calc(.12 * var(--t)); color: var(--text-lo); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bpop__member.is-on .bpop__mname { color: var(--mint-400); }
 .bpop__member.is-owned .bpop__mname { color: var(--text-hi); }
@@ -355,7 +355,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .eboss > div { display: flex; flex-direction: column; gap: .02rem; }
 .eboss b { font-size: calc(.19 * var(--t)); }
 .eboss .t-lo { font-size: calc(.13 * var(--t)); }
-.iband { display: flex; gap: .12rem; align-items: flex-start; padding: .1rem; background: rgba(78, 216, 175, .05); border: 1px solid var(--mint-800); }
+.iband { display: flex; gap: .12rem; align-items: flex-start; padding: .1rem; background: rgba(var(--mint-500-rgb), .05); border: 1px solid var(--mint-800); }
 .iband > div { display: flex; flex-direction: column; gap: .03rem; min-width: 0; }
 .iband b { font-size: calc(.19 * var(--t)); }
 .iband b small { font-size: calc(.14 * var(--t)); font-weight: 400; margin-left: .06rem; }
@@ -392,9 +392,9 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 /* 「悬赏决策 |」 then the description over the timing line, beside the bar; a faint bracket behind the title */
 .spov__titles { position: relative; display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: .16rem; row-gap: .02rem;
   align-items: center; padding: .08rem 0 .08rem .3rem; }
-.spov__deco { position: absolute; left: 0; top: -.06rem; bottom: -.06rem; width: .7rem; border: 2px solid rgba(23, 249, 183, .16); border-right: 0; pointer-events: none; }
-.spov__deco::after { content: ''; position: absolute; left: .14rem; top: 50%; width: .9rem; height: .9rem; margin-top: -.45rem; border-radius: 50%; border: 1px solid rgba(23, 249, 183, .1); }
-.spov__title { display: contents; font-size: calc(.56 * var(--t)); font-weight: 900; letter-spacing: .08em; color: var(--mint-400); text-shadow: 0 0 .2rem rgba(23, 249, 183, .3); }
+.spov__deco { position: absolute; left: 0; top: -.06rem; bottom: -.06rem; width: .7rem; border: 2px solid rgba(var(--mint-rgb), .16); border-right: 0; pointer-events: none; }
+.spov__deco::after { content: ''; position: absolute; left: .14rem; top: 50%; width: .9rem; height: .9rem; margin-top: -.45rem; border-radius: 50%; border: 1px solid rgba(var(--mint-rgb), .1); }
+.spov__title { display: contents; font-size: calc(.56 * var(--t)); font-weight: 900; letter-spacing: .08em; color: var(--mint-400); text-shadow: 0 0 .2rem rgba(var(--mint-rgb), .3); }
 .spov__title.is-special { color: var(--gold-2); text-shadow: 0 0 .2rem rgba(242, 189, 62, .35); }
 .spov__name { grid-row: 1 / 3; grid-column: 1; line-height: 1.1; }
 /* the bar keeps its "|" for the text of the heading, drawn as a 3px rule */
@@ -429,7 +429,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 }
 .spov__turntxt { display: flex; align-items: center; gap: .08rem; font-size: calc(.24 * var(--t)); font-weight: 700; color: var(--text-md); }
 .spov__turntxt .icon { width: .26rem; height: .26rem; }
-.spov__turntxt.is-mine { color: var(--mint-400); text-shadow: 0 0 .16rem rgba(23, 249, 183, .45); animation: blink 1.2s ease-in-out infinite; }
+.spov__turntxt.is-mine { color: var(--mint-400); text-shadow: 0 0 .16rem rgba(var(--mint-rgb), .45); animation: blink 1.2s ease-in-out infinite; }
 .spov__turntxt.is-done { color: var(--mint-400); }
 /* someone else deciding: the name over 正在决策…, right-aligned, an hourglass beside them */
 .spov__turntxt.is-other { gap: .12rem; color: #eef1f0; }
@@ -580,15 +580,15 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   animation: sptp-disc 220ms cubic-bezier(.2, .8, .3, 1) both; }
 .sptp__bg { inset: 0; width: 100%; height: 100%; }
 .sptp__ring { position: absolute; left: calc(43 * var(--px)); top: calc(23 * var(--px)); width: calc(454 * var(--px)); height: calc(454 * var(--px)); border-radius: 50%;
-  background: radial-gradient(closest-side, transparent 63%, rgba(31, 230, 190, .3) 64%, rgba(31, 230, 190, .3) 70%, transparent 71%,
-    transparent 83%, rgba(31, 230, 190, .26) 84%, rgba(31, 230, 190, .18) 99%, transparent 100%); }
+  background: radial-gradient(closest-side, transparent 63%, rgba(var(--mint-c22-rgb), .3) 64%, rgba(var(--mint-c22-rgb), .3) 70%, transparent 71%,
+    transparent 83%, rgba(var(--mint-c22-rgb), .26) 84%, rgba(var(--mint-c22-rgb), .18) 99%, transparent 100%); }
 .sptp__cube { left: calc(-62 * var(--px)); top: calc(-146 * var(--px)); width: calc(131 * var(--px)); height: calc(134 * var(--px));
   animation: sptp-pop 260ms ease-out both; }
 .sptp__spark { left: calc(-111 * var(--px)); top: calc(-174 * var(--px)); width: calc(64 * var(--px)); height: calc(64 * var(--px));
   animation: sptp-pop 260ms 40ms ease-out both; }
 .sptp__text { position: absolute; left: calc(-200 * var(--px)); top: calc(9 * var(--px)); width: calc(408 * var(--px)); text-align: center; white-space: nowrap;
-  color: #2ee6c0; font-size: calc(72 * var(--px)); font-weight: 900; line-height: 1; letter-spacing: .02em;
-  text-shadow: 0 0 calc(16 * var(--px)) rgba(31, 230, 190, .55); animation: sptp-pop 200ms 60ms ease-out both; }
+  color: var(--mint-c23); font-size: calc(72 * var(--px)); font-weight: 900; line-height: 1; letter-spacing: .02em;
+  text-shadow: 0 0 calc(16 * var(--px)) rgba(var(--mint-c22-rgb), .55); animation: sptp-pop 200ms 60ms ease-out both; }
 .sptp__bar { left: calc(-134 * var(--px)); top: calc(99 * var(--px)); width: calc(279 * var(--px)); height: calc(17 * var(--px));
   animation: sptp-in 200ms 120ms ease-out both; }
 .sptp__x { width: calc(30 * var(--px)); height: calc(31 * var(--px)); opacity: .8; animation: sptp-in 200ms 120ms ease-out both; }
@@ -620,7 +620,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 
 /* ---- direction wheel (ui/facingWheel.js, research 09 §1.2): white diamond, 4 chevrons, "✕ 点击取消", orange range ---- */
 .fwheel { position: fixed; inset: 0; z-index: 6; touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
-/* the wheel takes the keyboard focus when it opens (Enter confirms there, GitHub #394): no ring around the whole screen */
+/* the wheel takes the keyboard focus when it opens (Enter confirms there, GitHub var(--mint-c24)): no ring around the whole screen */
 .fwheel:focus-visible { outline: none; }
 .fwheel__stripes { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .fwheel__dia { position: absolute; transform: translate(-50%, -50%); pointer-events: none; animation: fwheel-in 160ms var(--ease-out); }
@@ -687,7 +687,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .gm__hud > .uframe { position: absolute; transform: translate(-50%, -50%); pointer-events: none; z-index: 12; }
 .uframe__dia { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; animation: uframe-in 180ms var(--ease-out); }
 @keyframes uframe-in { from { opacity: 0; transform: scale(.85); } }
-.uframe__outer { fill: rgba(78, 216, 175, .05); stroke: rgba(255, 255, 255, .88); stroke-width: 1.6px; stroke-dasharray: 7 5; vector-effect: non-scaling-stroke; }
+.uframe__outer { fill: rgba(var(--mint-500-rgb), .05); stroke: rgba(255, 255, 255, .88); stroke-width: 1.6px; stroke-dasharray: 7 5; vector-effect: non-scaling-stroke; }
 .uframe__corner { fill: none; stroke: var(--mint-400); stroke-width: 2.4px; vector-effect: non-scaling-stroke; }
 .uframe__btn {
   position: absolute; pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: .02rem;
@@ -746,8 +746,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .eqr__incoming { display: flex; flex-direction: column; gap: .04rem; min-width: 0; flex: 0 1 4.2rem; }
 .eqr__card { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: .12rem; row-gap: .04rem; align-items: center; text-align: left; }
 .eqr__card--new {
-  padding: .1rem .14rem; border: 1px solid rgba(89, 244, 202, .45);
-  background: linear-gradient(90deg, rgba(78, 216, 175, .14), rgba(78, 216, 175, .03));
+  padding: .1rem .14rem; border: 1px solid rgba(var(--mint-c25-rgb), .45);
+  background: linear-gradient(90deg, rgba(var(--mint-500-rgb), .14), rgba(var(--mint-500-rgb), .03));
 }
 .eqr__icon { grid-row: 1; grid-column: 1; position: relative; display: grid; place-items: center; }
 .eqr__card--new .eqr__icon { width: .74rem; height: .74rem; background: var(--eqr-round, none) center / 100% 100% no-repeat; }
@@ -818,7 +818,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 /* 预选盟约 (ui/bondPlan.js, 移植自参考版): a player's planned bond — the tag (draft order rows, team panel) and the
    picker dialog. Texts go through t(); see public/i18n/*.json. */
 .bplan { display: inline-flex; align-items: center; gap: .04rem; max-width: 100%; padding: .01rem .06rem .01rem .02rem;
-  border: 1px solid rgba(78, 216, 175, .35); background: rgba(78, 216, 175, .08); color: var(--mint-400);
+  border: 1px solid rgba(var(--mint-500-rgb), .35); background: rgba(var(--mint-500-rgb), .08); color: var(--mint-400);
   font-size: max(calc(.12 * var(--t)), calc(11px * var(--ui))); font-weight: 700; white-space: nowrap; }
 .bplan .bglyph { width: .2rem; height: .2rem; }
 .bplan__name { overflow: hidden; text-overflow: ellipsis; }
@@ -838,9 +838,368 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .bplan-card__who .icon { width: .12rem; height: .12rem; flex: none; }
 .bplan-card__mine { position: absolute; right: .04rem; top: .04rem; color: var(--mint-400); }
 .bplan-card__mine .icon { width: .16rem; height: .16rem; }
-.bplan-card.is-sel { border-color: var(--mint-400); background: linear-gradient(180deg, rgba(78, 216, 175, .18), rgba(12, 15, 14, .85)); }
+.bplan-card.is-sel { border-color: var(--mint-400); background: linear-gradient(180deg, rgba(var(--mint-500-rgb), .18), rgba(12, 15, 14, .85)); }
 .bplan-card.is-off .bglyph { opacity: .6; }
 /* the order row's tag sits under the state line, in the card's text column */
 .dorder__plan { margin-top: .03rem; }
 /* the picker's entry under the draft order list */
 .draft-order__plan { margin-top: .08rem; }
+
+/* ---- 「深渊回响」深潜专属面板：深紫 + 紫光，与默认的薄荷色刻意区分 -----------------------------   这些面板只在对局里出现（祝福三选一 / 状态条 / 敌方情报里的附加块）。布局沿用 brief-reroll，
+   这里只换颜色，所以位置、间距、断行规则一行没改。 */
+.echo-bless,
+.echo-status,
+.edrawer__intel {
+  --echo-accent: #b79cff;
+  --echo-line: rgba(125, 91, 214, .55);
+  --echo-bg-1: rgba(58, 30, 99, .94);
+  --echo-bg-2: rgba(23, 11, 43, .96);
+}
+.echo-bless,
+.echo-status {
+  background: linear-gradient(160deg, var(--echo-bg-1), var(--echo-bg-2));
+  border-color: var(--echo-line);
+  box-shadow: 0 0 .28rem rgba(125, 91, 214, .34), inset 0 0 .3rem rgba(183, 156, 255, .07);
+}
+/* 状态条固定在左下角，**不占 HUD 的位置、也不拦截点击**（维护者 2026-11-04：
+   它原来浮在顶部，把回合框和「准备就绪」压住了，导致什么都点不到）。
+   深度本身已经由 HUD 的 roundbox 显示，这里只留词条/祝福的补充说明。 */
+.echo-status {
+  position: fixed;
+  left: .3rem;
+  bottom: .3rem;
+  top: auto;
+  right: auto;
+  margin: 0;
+  max-width: 46%;
+  z-index: 30;
+  pointer-events: none;
+}
+.echo-status .brief-reroll__actions { pointer-events: auto; }
+/* 「本局信息」抽屉里的深潜块（深度 / 词条 / 祝福）：普通流式布局，不定位、不挡任何东西 */
+.echo-infoblock { margin: .12rem 0 .04rem; }
+.echo-infoblock__row { display: flex; align-items: center; gap: .08rem; flex-wrap: wrap; margin: .04rem 0; color: var(--text-dim); }
+/* 「祝福」页的说明列表：一行一条，名字在前、效果在后 */
+.echo-list { list-style: none; margin: .06rem 0 .12rem; padding: 0; display: flex; flex-direction: column; gap: .06rem; }
+.echo-list li { display: flex; gap: .12rem; align-items: baseline; padding: .06rem .1rem; border-left: 2px solid var(--echo-accent); background: rgba(125, 91, 214, .08); }
+.echo-list li b { flex: none; min-width: 3.2em; color: #d9c8ff; }
+.echo-list li span { color: var(--text-dim); font-size: .92em; line-height: 1.5; }
+.echo-list--enemy li { border-left-color: #e0637a; background: rgba(224, 99, 122, .08); }
+.echo-list--enemy li b { color: #ffb3bf; }
+.echo-bless .brief-reroll__text strong,
+.echo-status .brief-reroll__text strong { color: #d9c8ff; text-shadow: 0 0 .1rem rgba(183, 156, 255, .4); }
+.echo-bless .brief-reroll__text > span,
+.echo-status .brief-reroll__text > span { color: #cbb9ee; }
+.echo-bless .brief-reroll__players { color: #b9a6dd; }
+.echo-bless .brief-reroll__players .is-agreed { color: var(--echo-accent); }
+/* 三选一：未选是紫描边，已选是紫实底 */
+.echo-bless .btn--secondary {
+  border-color: var(--echo-line);
+  background: rgba(183, 156, 255, .08);
+  color: #ebe2ff;
+}
+.echo-bless .btn--secondary:hover { background: rgba(183, 156, 255, .16); }
+.echo-bless .btn--primary {
+  background: linear-gradient(160deg, #7d5bd6, #4b2f8f);
+  border-color: var(--echo-accent);
+  color: #f4efff;
+  box-shadow: 0 0 .18rem rgba(125, 91, 214, .5);
+}
+.echo-bless .btn--primary:hover { background: linear-gradient(160deg, #8e6ce6, #57379f); }
+.echo-bless .btn--ghost { color: #cbb9ee; }
+/* 敌方情报里的附加块：左侧一条紫描边，把「本模式加的」和原版内容分开 */
+.edrawer__intel {
+  border-left: 2px solid var(--echo-line);
+  padding-left: .12rem;
+  margin-bottom: .12rem;
+}
+.edrawer__intel .edrawer__sum { color: #d9c8ff; }
+.edrawer__intel .edrawer__sum b { color: var(--echo-accent); }
+/* 词条 / 祝福的圆片 */
+.ecochips { display: inline-flex; flex-wrap: wrap; gap: .06rem; }
+.ecochip {
+  display: inline-flex; align-items: center; gap: .04rem;
+  border: 1px solid rgba(183, 156, 255, .42);
+  background: rgba(183, 156, 255, .10);
+  color: #e6dbff;
+  position: relative;                     /* 时效角标的定位基准（见 .ecochip__left） */
+}
+/* 有时效的 buff（本层词条 / 按层数到期的诅咒）：右下角小角标，写着「本」或剩余层数
+   （维护者 2026-11-05：光看图标不知道它下一层就没了） */
+.ecochip.is-timed { border-style: dashed; }
+.ecochip__left {
+  position: absolute; right: -.05rem; bottom: -.07rem;
+  min-width: .1rem; padding: 0 .015rem;
+  font-size: calc(.1 * var(--t)); line-height: 1.15; font-style: normal; font-weight: 900;
+  text-align: center; border-radius: .02rem;
+  background: #ffd06e; color: #241a05;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .55);
+  pointer-events: none;
+}
+.ecochip__glyph { font-weight: 900; color: var(--echo-accent, #b79cff); }
+/* 已消耗的祝福（护盾抵消过排异、一次性祝福）：留在列表里但明显是「用掉了」的状态
+   （维护者 2026-11-05：护盾被诅咒抵消后不能从列表里消失） */
+.ecochip.is-consumed { opacity: .42; filter: grayscale(.75); }
+.ecochip.is-consumed .ecochip__glyph { color: var(--text-dim, #8b8398); }
+.ecochip.is-consumed .ecochip__label { text-decoration: line-through; }
+/* 词条按效果类别给一点色差，但都收在紫色家族里 */
+.ecochip--def { border-color: rgba(140, 170, 255, .45); }
+.ecochip--atk { border-color: rgba(255, 150, 190, .45); }
+.ecochip--spd { border-color: rgba(150, 230, 255, .45); }
+.ecochip--coin { border-color: rgba(255, 210, 140, .45); }
+/* 诅咒按稀有度配色（2026-11-05）；固定规则（奇迹/远见/深渊通胀）走 gold */
+.ecochip--common { border-color: rgba(159, 180, 200, .45); }
+.ecochip--rare { border-color: rgba(111, 199, 255, .5); }
+.ecochip--epic { border-color: rgba(200, 139, 255, .55); }
+.ecochip--gold { border-color: rgba(255, 207, 107, .62); }
+.ecochip--gold .ecochip__glyph { color: #ffd978; }
+/* HUD 上常驻的紧凑图标行：只画首字，不写名字（维护者 2026-11-05） */
+.echo-status__icons { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .08rem .14rem; }
+.echo-status__group { display: inline-flex; align-items: center; gap: .06rem; }
+.echo-status__group + .echo-status__group { padding-left: .12rem; border-left: 1px solid rgba(183, 156, 255, .28); }
+.echo-status__icons .ecochip { padding: 0 .1em; }
+/* HUD 常驻 buff 栏（维护者 2026-11-05）：右下角一小条，只读、不挡操作 */
+.echo-buffbar {
+  /* 右上角、与倒计时留出一段距离（维护者 2026-11-05）：完全贴住会盖住倒计时 / 2 倍速 / 取消准备 */
+  position: fixed; top: .14rem; right: 3.4rem; z-index: 8;
+  /* 固定窄栏 + 强制换行：以前一整排会横向盖住 HUD 按钮 */
+  display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: .06rem;
+  /* 用 px 固定宽度，保证一定换行（vw 在某些缩放档位下会被算得很大） */
+  width: 196px; max-width: 196px; max-height: 30vh; overflow: hidden;
+  padding: .04rem .06rem;
+  background: rgba(10, 5, 22, .55); border: 1px solid rgba(183, 156, 255, .28);
+  pointer-events: none;
+}
+.echo-buffbar .ecochip { pointer-events: auto; font-size: calc(.14 * var(--t)); padding: .02rem; border-radius: .03rem; }
+/* 本回合新刷出的诅咒：红色高亮 + 呼吸，排在图标最前面（维护者 2026-11-05 要求「明显标注」） */
+/* 盟约投影（特殊祝福）：金色描边，和普通祝福区分 */
+.ecochip.is-projection { border-color: #ffd06e; box-shadow: 0 0 .12rem rgba(255, 208, 110, .65); }
+.echo-buffbar .ecochip.is-roundcurse {
+  border-color: #ff7d97; border-style: solid;
+  box-shadow: 0 0 .14rem rgba(255, 90, 120, .7);
+  animation: echo-curse-pulse 1.6s ease-in-out infinite;
+}
+/* 顶部的「本回合诅咒」提示条：直接写名字，不用悬停也知道这一层多了什么 */
+.echo-buffbar__alert {
+  display: flex; align-items: baseline; gap: .06rem; width: 100%;
+  padding: .03rem .06rem; margin-bottom: .02rem;
+  background: rgba(255, 78, 108, .22); border: 1px solid rgba(255, 120, 148, .8);
+  color: #ffdde5; font-size: calc(.13 * var(--t)); line-height: 1.25;
+  pointer-events: auto;
+  animation: echo-curse-pulse 1.8s ease-in-out infinite;
+}
+.echo-buffbar__alert b { color: #ff9db2; font-weight: 900; }
+.echo-buffbar__alert span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes echo-curse-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.35); }
+}
+.echo-buffbar .ecochip__icon { width: .22rem; height: .22rem; }
+.echo-buffbar .ecochip__icon { fill: currentColor; }
+.sigil-arrow.is-up { fill: #ffe08a; }
+.sigil-arrow.is-down { fill: #ff8fa8; }
+.echo-buffbar .ecochip.is-enemy { border-color: rgba(255, 150, 190, .5); }
+.echo-buffbar .ecochip.is-ally { border-color: rgba(255, 210, 140, .5); }
+.echo-buffbar .ecochip.is-curse { border-color: rgba(200, 139, 255, .55); }
+/* ---- 「深渊祝福」三选一：居中的卡片选择（维护者 2026-11-04，参照悬赏目标界面） ---- */
+.echo-bless-overlay {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  background: rgba(6, 4, 12, .74); backdrop-filter: blur(2px);
+}
+.echo-bless {
+  width: min(44rem, 92vw); max-height: 86vh; overflow: auto;
+  display: flex; flex-direction: column; gap: .16rem;
+  padding: .22rem .26rem; margin: 0;
+}
+.echo-bless__head { display: flex; align-items: baseline; gap: .18rem; flex-wrap: wrap; }
+.echo-bless__head b { font-size: calc(.24 * var(--t)); color: #e6dbff; }
+.echo-bless__head span { font-size: calc(.15 * var(--t)); color: var(--text-dim); }
+.echo-bless__count { margin-inline-start: auto; color: var(--echo-accent); font-variant-numeric: tabular-nums; }
+.echo-bless__cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: .16rem; }
+@media (max-width: 720px) { .echo-bless__cards { grid-template-columns: 1fr; } }
+.echo-bless__card {
+  display: flex; flex-direction: column; align-items: center; gap: .08rem; text-align: center;
+  padding: .22rem .16rem; cursor: pointer; color: inherit;
+  background: linear-gradient(165deg, rgba(58, 30, 99, .96), rgba(23, 11, 43, .98));
+  border: 1px solid var(--echo-line); border-radius: .06rem;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.echo-bless__card:hover:not(:disabled) { border-color: var(--echo-accent); box-shadow: 0 0 .4rem rgba(125, 91, 214, .5); transform: translateY(-2px); }
+.echo-bless__card:disabled { cursor: default; opacity: .62; }
+.echo-bless__card.is-armed { border-color: var(--echo-accent); box-shadow: 0 0 .5rem rgba(183, 156, 255, .6); }
+.echo-bless__card.is-mine { border-color: var(--echo-accent); box-shadow: 0 0 .5rem rgba(183, 156, 255, .65); opacity: 1; }
+.echo-bless__glyph {
+  width: .62rem; height: .62rem; display: grid; place-items: center; border-radius: .31rem;
+  background: radial-gradient(circle at 50% 35%, #e8dcff, var(--mint-500) 60%, #4b2a99 100%);
+  color: #1a0d33; font-weight: 700; font-size: calc(.26 * var(--t));
+}
+.echo-bless__name { font-size: calc(.2 * var(--t)); color: #f0e9ff; }
+.echo-bless__desc { font-size: calc(.15 * var(--t)); color: #cbb9ee; line-height: 1.5; }
+.echo-bless__votes { font-size: calc(.13 * var(--t)); color: var(--echo-accent); }
+.echo-bless__foot { font-size: calc(.15 * var(--t)); color: var(--text-dim); text-align: center; }
+
+/* 祝福投票的倒计时：参照悬赏界面的「当前轮到你决策」那种醒目度（维护者 2026-11-04） */
+.echo-bless__timer {
+  margin-inline-start: auto; display: inline-flex; align-items: baseline; gap: .04rem;
+  padding: .02rem .12rem; border: 1px solid var(--echo-accent); border-radius: .04rem;
+  background: rgba(125, 91, 214, .18); color: #f0e9ff;
+}
+.echo-bless__timer b { font-size: calc(.3 * var(--t)); line-height: 1; color: #fff; font-variant-numeric: tabular-nums; }
+.echo-bless__timer i { font-style: normal; font-size: calc(.15 * var(--t)); color: #cbb9ee; }
+.echo-bless__count { margin-inline-start: .2rem; }
+
+/* ---- 祝福三选一的美化：参照原版「悬赏决策」的版式（大标题 + 副标 + 直角边框卡片） ---- */
+.echo-bless-overlay { background: radial-gradient(120% 90% at 50% 0%, rgba(60, 30, 99, .92), rgba(6, 4, 12, .96)); }
+.echo-bless {
+  border: 1px solid rgba(183, 156, 255, .35);
+  border-radius: 0;                       /* 原版是直角 + 角标 */
+  box-shadow: 0 .3rem .9rem rgba(0, 0, 0, .55), inset 0 0 .6rem rgba(183, 156, 255, .08);
+  padding: .3rem .34rem .26rem;
+}
+.echo-bless__head { align-items: center; gap: .22rem; padding-bottom: .16rem; border-bottom: 1px solid rgba(183, 156, 255, .22); }
+.echo-bless__head b {
+  font-size: calc(.34 * var(--t)); letter-spacing: .02em;
+  color: #f4eeff; text-shadow: 0 0 .24rem rgba(183, 156, 255, .55);
+}
+.echo-bless__head > span:first-of-type { font-size: calc(.15 * var(--t)); color: #b9a6dd; }
+.echo-bless__cards { gap: .2rem; margin-top: .18rem; }
+.echo-bless__card {
+  position: relative; padding: .26rem .18rem .22rem; gap: .1rem;
+  background: linear-gradient(180deg, rgba(72, 40, 122, .55), rgba(24, 12, 44, .85));
+  border: 1px solid rgba(183, 156, 255, .28); border-radius: 0;
+}
+.echo-bless__card::before,
+.echo-bless__card::after {
+  content: ''; position: absolute; width: .16rem; height: .16rem; pointer-events: none;
+  border: 1px solid rgba(196, 166, 255, .8);
+}
+.echo-bless__card::before { left: -1px; top: -1px; border-right: 0; border-bottom: 0; }
+.echo-bless__card::after { right: -1px; bottom: -1px; border-left: 0; border-top: 0; }
+.echo-bless__card:hover:not(:disabled) { transform: translateY(-3px); border-color: rgba(196, 166, 255, .9); }
+.echo-bless__glyph { width: .7rem; height: .7rem; font-size: calc(.3 * var(--t)); box-shadow: 0 0 .2rem rgba(183, 156, 255, .45); }
+.echo-bless__name { font-size: calc(.24 * var(--t)); letter-spacing: .02em; }
+.echo-bless__desc { font-size: calc(.16 * var(--t)); max-width: 14em; }
+/* ---- 「查看诅咒」按钮 + 展开清单 + 祝福卡上的「推荐」角标（维护者 2026-11-05） ---- */
+.echo-bless__cursesbtn {
+  display: inline-flex; align-items: baseline; gap: .06rem;
+  padding: .04rem .14rem; cursor: pointer;
+  border: 1px solid rgba(183, 156, 255, .45); border-radius: 0;
+  background: rgba(125, 91, 214, .16); color: #e6dbff;
+  font-size: calc(.15 * var(--t));
+}
+.echo-bless__cursesbtn:hover { border-color: rgba(196, 166, 255, .9); background: rgba(125, 91, 214, .3); }
+.echo-bless__cursesbtn.is-on { border-color: #b79cff; background: rgba(125, 91, 214, .42); }
+.echo-bless__cursesbtn b { font-size: calc(.17 * var(--t)); color: #ffd978; }
+.echo-bless__curses {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .06rem .18rem;
+  margin: .14rem 0 0; padding: .12rem .14rem; list-style: none;
+  max-height: 34vh; overflow-y: auto;
+  border: 1px solid rgba(183, 156, 255, .22); background: rgba(11, 6, 22, .55);
+}
+.echo-bless__curse { display: flex; align-items: baseline; gap: .1rem; font-size: calc(.14 * var(--t)); color: #cbb9ee; }
+.echo-bless__curse b { color: #f0e9ff; }
+.echo-bless__curseTag { flex: 0 0 auto; font-size: .82em; color: #9d8cc4; border: 1px solid rgba(183, 156, 255, .35); padding: 0 .05rem; }
+.echo-bless__curseDesc { color: #9d8cc4; }
+.echo-bless__curse.is-epic b { color: #ffd978; }
+.echo-bless__curse.is-empty { grid-column: 1 / -1; color: #8f7fb5; }
+.echo-bless__recommend {
+  position: absolute; top: .1rem; left: .1rem;   /* 右上角是稀有度角标，推荐只能放左上 */
+  display: inline-flex; align-items: baseline; gap: .06rem;
+  padding: .02rem .1rem; border-radius: .04rem;
+  background: linear-gradient(180deg, #ffe08a, #d9a93a); color: #2a1a05;
+  font-size: calc(.13 * var(--t)); font-weight: 700; letter-spacing: .04em;
+}
+.echo-bless__recommend i { font-style: normal; font-weight: 600; font-size: .86em; }
+/* 「放弃本次」卡（维护者 2026-11-05）：整行、虚线边框，和三个候选区分开 */
+.echo-bless__skip {
+  grid-column: 1 / -1; padding: .14rem .18rem;
+  background: rgba(24, 12, 44, .7); border-style: dashed;
+}
+.echo-bless__skip .echo-bless__desc { max-width: none; color: #9d8cc4; }
+/* 刷新三选一（维护者 2026-11-05）：按钮 + 投票条 */
+.echo-bless__refreshbtn, .echo-bless__rbtn {
+  display: inline-flex; align-items: baseline; gap: .06rem;
+  padding: .04rem .14rem; cursor: pointer;
+  border: 1px solid rgba(183, 156, 255, .45); border-radius: 0;
+  background: rgba(125, 91, 214, .16); color: #e6dbff;
+  font-size: calc(.15 * var(--t));
+}
+.echo-bless__refreshbtn:hover:not(:disabled), .echo-bless__rbtn:hover:not(:disabled) { border-color: rgba(196, 166, 255, .9); background: rgba(125, 91, 214, .32); }
+.echo-bless__refreshbtn:disabled, .echo-bless__rbtn:disabled { opacity: .45; cursor: default; }
+.echo-bless__refreshbtn b { color: #ffd978; font-variant-numeric: tabular-nums; }
+.echo-bless__refreshcap { font-style: normal; color: #9d8cc4; font-size: calc(.11 * var(--t)); }
+
+/* 刷新投票条（维护者 2026-11-05 二次反馈：原来是一行裸文字 + 两个默认按钮，太丑；
+   而且投完还能继续点）。现在是一枚深色胶囊：标签 + 进度条 + 票数 + 两个小按钮；
+   投完那一票之后按钮**整组消失**，换成「已同意 / 已拒绝 · 等待其他人…」的只读角标。 */
+.echo-bless__refreshvote {
+  display: inline-flex; align-items: center; gap: .08rem;
+  padding: .04rem .12rem .04rem .14rem;
+  border: 1px solid rgba(255, 207, 107, .38); border-radius: 999px;
+  background: linear-gradient(180deg, rgba(52, 30, 88, .92), rgba(26, 14, 44, .92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 1px 4px rgba(0, 0, 0, .45);
+  font-size: calc(.14 * var(--t)); color: #ffe7b0; white-space: nowrap;
+}
+.echo-bless__refreshvote.is-voted { border-color: rgba(120, 214, 160, .45); }
+.echo-bless__rv-label { color: #e9d9ff; letter-spacing: .02em; }
+.echo-bless__rv-bar {
+  position: relative; width: calc(.9 * var(--t)); height: calc(.07 * var(--t));
+  border-radius: 999px; background: rgba(255, 255, 255, .12); overflow: hidden;
+}
+.echo-bless__rv-bar > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7ed6a5, #b6f0c9); transition: width .2s ease-out; }
+.echo-bless__refreshvote.is-voted .echo-bless__rv-bar > i { background: linear-gradient(90deg, #8fb6ff, #cfe0ff); }
+.echo-bless__rv-count { color: #ffd978; font-variant-numeric: tabular-nums; font-size: calc(.14 * var(--t)); }
+.echo-bless__rv-left { color: #b9a6e0; font-variant-numeric: tabular-nums; font-size: calc(.12 * var(--t)); min-width: calc(.34 * var(--t)); text-align: right; }
+.echo-bless__refreshvote .echo-bless__rbtn {
+  padding: .02rem .12rem; border-radius: 999px; font-size: calc(.13 * var(--t));
+}
+.echo-bless__rbtn.is-yes { border-color: rgba(120, 214, 160, .55); background: rgba(60, 150, 100, .22); color: #c9f2d8; }
+.echo-bless__rbtn.is-yes:hover:not(:disabled) { border-color: rgba(150, 235, 185, .95); background: rgba(70, 175, 115, .34); }
+.echo-bless__rbtn.is-no { border-color: rgba(226, 138, 138, .5); background: rgba(150, 60, 60, .2); color: #f3c9c9; }
+.echo-bless__rbtn.is-no:hover:not(:disabled) { border-color: rgba(240, 160, 160, .95); background: rgba(175, 70, 70, .32); }
+/* 已投：只读角标，没有 cursor / hover —— 明确「这一票已经交了」 */
+.echo-bless__rbtn.is-voted {
+  display: inline-flex; align-items: center; gap: .06rem; cursor: default;
+  border-color: rgba(140, 200, 170, .45); background: rgba(40, 80, 62, .35); color: #cfe9da;
+}
+.echo-bless__rbtn.is-voted.is-no { border-color: rgba(200, 150, 150, .4); background: rgba(80, 45, 45, .35); color: #e8cfcf; }
+.echo-bless__rbtn.is-voted > i { font-style: normal; color: #9d8cc4; font-size: calc(.11 * var(--t)); }
+.echo-bless__card.is-mine { background: linear-gradient(180deg, rgba(120, 80, 200, .5), rgba(40, 20, 70, .9)); }
+.echo-bless__foot { padding-top: .14rem; border-top: 1px solid rgba(183, 156, 255, .18); }
+
+/* 诅咒（深潜对原版强力机制的限制）：红灰色，和祝福/词条区分开 */
+.echo-list--curse li { border-left-color: #d08a5a; background: rgba(208, 138, 90, .10); }
+.echo-list--curse li b { color: #ffc79a; }
+
+/* 固定规则：既不是祝福（不进随机池），也不是诅咒（不是坏处），用中性色 */
+.echo-list--rule li { border-left-color: rgba(183, 156, 255, .55); background: rgba(183, 156, 255, .07); }
+.echo-list--rule li b { color: #d9c8ff; }
+
+/* 「深渊回响」稀有度标签（2026-11-05）：祝福卡 / 已获祝福 / 诅咒列表共用 */
+.echo-rar, .echo-bless__rarity { font-style: normal; flex: none; font-size: .82em; font-weight: 700; letter-spacing: .06em; padding: 0 .18em; border-radius: 2px; border: 1px solid currentColor; opacity: .95; }
+.echo-rar.is-common, .echo-bless__rarity.is-common { color: #9fb4c8; }
+.echo-rar.is-rare, .echo-bless__rarity.is-rare { color: #6fc7ff; }
+.echo-rar.is-epic, .echo-bless__rarity.is-epic { color: #c88bff; }
+.echo-rar.is-special, .echo-bless__rarity.is-special { color: #ffcf6b; }
+.echo-bless__rarity { position: absolute; top: .08rem; right: .08rem; background: rgba(0, 0, 0, .35); }
+/* 一次性祝福（资金 / 回血 / 涤罪 / 反制）：琥珀色标签，和稀有度分开（维护者 2026-11-05） */
+.echo-rar.is-oneshot { color: #f0b429; border-color: #f0b429; }
+.echo-bless__oneshot { flex: none; font-size: .82em; font-weight: 700; letter-spacing: .06em; padding: 0 .2em; border-radius: 2px; border: 1px solid #f0b429; color: #f0b429; background: rgba(240, 180, 41, .12); }
+.echo-bless__card { position: relative; }
+/* 祝福「确认」按钮（选中 → 确认，参考原版悬赏目标；维护者 2026-11-05） */
+.echo-bless__foot { display: flex; align-items: center; gap: .6rem; justify-content: space-between; }
+.echo-bless__confirm {
+  font: inherit; font-size: 1.25em; font-weight: 800; letter-spacing: .1em;
+  color: #f6f1ff; background: linear-gradient(180deg, #b79cff, #7c5cf0);
+  border: 0; border-radius: 5px; padding: .42em 2.2em; min-width: 9em; min-height: 2.6em;
+  box-shadow: 0 0 .2rem rgba(157, 123, 255, .45), inset 0 0 0 1px rgba(255, 255, 255, .25);
+  cursor: pointer; transition: transform .12s ease, box-shadow .12s ease;
+}
+.echo-bless__confirm:disabled { opacity: .42; cursor: default; box-shadow: none; }
+.echo-bless__confirm:not(:disabled):hover { filter: brightness(1.12); transform: translateY(-1px); box-shadow: 0 0 .3rem rgba(157, 123, 255, .62), inset 0 0 0 1px rgba(255, 255, 255, .35); }
+
+/* 深潜补给（16 层起，全队投票）：复用祝福面板的浮层样式。
+   维护者 2026-11-05：这里不要自己定位 —— 以前是 `position: fixed; top: 12%`，
+   于是补给面板比祝福三选一高出一截（祝福由浮层的 grid 垂直居中），两个面板切换时有高低差。
+   现在只留宽度，位置完全交给 `.echo-bless-overlay` 的 place-items: center，与祝福面板同一处。 */
+.echo-supply { width: min(44rem, 92vw); }

@@ -35,6 +35,8 @@ const rawOf = (view) => (view && view.raw) || view || null;
 
 /** Range highlight of the wheel / a selected unit (orange, drawn under the units by the render engine). */
 export const FACING_STYLE = Object.freeze({ group: 'facing', color: 0xff9c33, fill: 0.36, line: 1 });
+/** 深渊诅咒「封锁」：被禁放的地块用红色常亮框标出来（维护者 2026-11-05）。 */
+export const ECHO_BAN_STYLE = Object.freeze({ group: 'echoBan', color: 0xff3b3b, fill: 0.22, line: 1.25 });
 
 // ---- view bridge ---------------------------------------------------------------------------------------------------
 

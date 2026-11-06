@@ -7,7 +7,7 @@
    prefers-reduced-motion (no animation) the plate simply shows.
    ========================================================================================== */
 
-.mpop { --mp: var(--mint-500); --mp-hi: var(--mint-400); --mp-glow: rgba(23, 249, 183, .35);
+.mpop { --mp: var(--mint-500); --mp-hi: var(--mint-400); --mp-glow: rgba(var(--mint-rgb), .35);
   position: fixed; inset: 0; z-index: var(--z-banner); display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: .1rem; pointer-events: none; }
 .mpop img { max-width: none; }
@@ -55,13 +55,13 @@
 .mpop__face--css { background: #f2a01c; clip-path: polygon(12% 0, 88% 0, 100% 12%, 100% 70%, 70% 70%, 70% 100%, 30% 100%, 30% 70%, 0 70%, 0 12%); }
 .mpop__face--2.mpop__face--css { background: #ee6a2a; }
 /* the pixel dots around the head (the footage's twinkling squares; plain CSS) */
-.mpop__dot { position: absolute; width: .1rem; height: .1rem; background: #1fc79d; animation: mpop-blink 900ms steps(2, jump-none) infinite; }
+.mpop__dot { position: absolute; width: .1rem; height: .1rem; background: var(--mint-c49); animation: mpop-blink 900ms steps(2, jump-none) infinite; }
 .mpop__dot--0 { left: .79rem; top: .15rem; }
 .mpop__dot--1 { left: .52rem; top: .3rem; animation-delay: -300ms; }
 .mpop__dot--2 { left: .68rem; top: .51rem; animation-delay: -600ms; }
 .mpop__dot--3 { left: 1.94rem; top: .28rem; }
 .mpop__dot--4 { left: 2.06rem; top: .46rem; animation-delay: -450ms; }
-.mpop__head--css { background: #1aae8a; clip-path: polygon(14% 0, 86% 0, 100% 18%, 100% 82%, 86% 100%, 14% 100%, 0 82%, 0 18%);
+.mpop__head--css { background: var(--mint-c50); clip-path: polygon(14% 0, 86% 0, 100% 18%, 100% 82%, 86% 100%, 14% 100%, 0 82%, 0 18%);
   display: flex; align-items: center; justify-content: center; gap: .16rem; }
 .mpop__head--css i { width: .14rem; height: .14rem; border-radius: .03rem; background: #135e4c; }
 .mpop__tag { position: absolute; left: 50%; bottom: .07rem; width: .86rem; height: .11rem; transform: translateX(-50%); animation: mpop-fade 220ms 300ms both; }

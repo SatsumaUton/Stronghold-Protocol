@@ -238,6 +238,11 @@ import { MatchWatch } from './match/watch.js';
 import { MatchIntents } from './match/intents.js';
 import { MatchPause } from './match/pause.js';
 import { MatchPhases } from './match/phases.js';
+// 「深渊回响」(DESIGN-ABYSS.md): the dive's round flow and the numbers past the official table
+import { MatchEcho } from './match/echoPhase.js';
+import { ECHO_LAST_ROUND, echoScale, isEchoRound } from './match/echo.js';
+import { echoCurveOf } from './match/echoConfig.js';
+import { crossVersionEnemies } from './match/echoCrossVersion.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchSpeedVote } from './match/speedVote.js';
 import { MatchSpDraft } from './match/spDraft.js';
@@ -330,14 +335,140 @@ export class Match {
     /** window sequence (diagnostics and messages) */
     this.offerSeq = 0;
     this.gd = new GameData(this.data, this.modeId);
+    /**
+     * 「深渊回响」(DESIGN-ABYSS.md, 2026-11-03): `mode: 'coop'` + `variant: 'deepecho'`.
+     *
+     * 下面这段只有 `opts.variant === 'deepecho'` 时才成立。为 null 时：键集不变、随机流不变、
+     * gamedata 的 `echoScaleOf` 保持 null（缩放就是官方表），所以独立模拟与同盟模拟一个字节都没变。
+     */
+    this.echoVariant = opts.variant === 'deepecho' && this.mode === 'coop' ? 'deepecho' : null;
+    // 「深渊回响」：把其余三个版本里**本版没有的敌人**并进来（前缀 key，不覆盖本版），
+    // 这样深潜的怪种池能跨版本，而不是只有这张图那几种（维护者 2026-11-04）。
+    if (this.echoVariant === 'deepecho') {
+      try {
+        const extra = crossVersionEnemies(this.gd.raw && this.gd.raw.enemies);
+        const n = extra ? Object.keys(extra).length : 0;
+        if (n > 0) {
+          // 不改共享的 data 对象：给这个 GameData 实例换一份 enemies 表
+          this.gd.raw = { ...this.gd.raw, enemies: { ...this.gd.raw.enemies, ...extra } };
+        }
+      } catch { /* 数据缺失只是少一些怪种，绝不能让建局失败 */ }
+    }
+    /** 房间级深潜调参（深潜大厅的开关）；null = 默认配置。调过参的房间不进排行榜。 */
+    this.echoCfg = this.echoVariant ? (opts.echo && typeof opts.echo === 'object' ? opts.echo : null) : null;
+    /**
+     * 深潜第一回合（显示回合）。「深渊回响」**从第 1 回合就是深潜**（维护者 2026-11-03 第二次定，
+     * 取代「打完最后一个 boss 才转深潜」的旧入口）；普通房间恒为 null。
+     */
+    this.echoDiveStart = this.echoVariant === 'deepecho' ? 1 : null;
+    /** 本回合生效的词条 id（echoWords.js）；非深潜回合为 null */
+    this.echoWordsActive = null;
+    /** 隐藏核心通关额外给的祝福抽取次数（DESIGN-ABYSS.md「隐藏通关的补偿」） */
+    this.echoBlessingDraws = 0;
+    /**
+     * 隐藏核心通关的**额外祝福名额**（维护者 2026-11-05）。
+     *
+     * 只抬 `echoBlessingDraws` 不够：`echoBlessingDue` 会按 `_echoBlessingMax()`（3）封顶，
+     * 而打完隐藏核心通常在 15 层 —— 那时 3 个名额早已拿满，多出来的抽取被静默吃掉，
+     * 玩家打完隐藏 boss 什么都看不到。这里给一个**临时 +1 名额**，发出去之后清零。
+     */
+    this.echoBlessingBonus = 0;
+    /** 一次性祝福的**历史记录**（拿到即结算，不占名额，仅用于展示，2026-11-05）。 */
+    this.echoOneShotIds = [];
+    /** 排异诅咒的到期层数：bond → depth（到这一层自动解除，2026-11-05）。 */
+    this.echoBannedBondsUntil = {};
+    /** 封锁诅咒的到期层数（地块是整批一起解，2026-11-05）。 */
+    this.echoBannedTilesUntil = 0;
+    /** 「护盾」祝福指定的盟约：排异抽到它时抵消该诅咒（一次性，2026-11-05）。 */
+    this.echoShieldBond = null;
+    this.echoShieldOffer = null;
+    this._echoShieldVotes = new Map();
+    this.echoShieldEndsAt = null;
+    this._echoShieldTimer = null;
+    /** _echoMaybeOfferBlessing 这次是不是「名额已满、要弃选一个」的替换模式（2026-11-05）。 */
+    this.echoBlessingReplace = false;
+    /** 替换模式下已选定、等待弃选的新祝福 id。 */
+    this.echoBlessingPendingPick = null;
+    /** 替换模式的弃选候选（现有祝福 id 列表）与投票。 */
+    this.echoBlessingDiscardOffer = null;
+    this._echoDiscardVotes = new Map();
+    this.echoBlessingDiscardEndsAt = null;
+    this._echoDiscardTimer = null;
+    /**
+     * 挑战关（深度 5 / 10）没达成清怪线时累积的**诅咒 id 列表**（维护者 2026-11-05）。
+     * 词条与效果都在 `match/echoCurse.js`：现在只会推 'erosion'（+1 侵蚀词条上限），
+     * 以后别的来源（隐藏 boss 失败 / 连续团灭）直接往这里推 id 即可，显示与效果自动跟上。
+     */
+    this.echoCurseIds = [];
+    /** 已抽到的反制祝福 id（可以重复；每次抽到都算消耗一次抽取，不占 3 个名额）—— 维护者 2026-11-05 */
+    this.echoCounterIds = [];
+    /**
+     * 本回合随机刷新的诅咒 id（2026-11-05；`null` = 本回合没有）。
+     * 只作用于本回合，不进 `echoCurseIds`，所以「净化 / 涤罪」清不掉它。
+     */
+    this.echoRoundCurse = null;
+    /**
+     * 部署禁令（2026-11-05，诅咒「封锁 / 排异」）：被封锁的地块 key（`r,c`）与被排异的盟约 id。
+     * 由 `_echoApplyDeployBan` / `_echoApplyBondBan` 写入，`_echoDeployBlocked` 在落子时读。
+     */
+    this.echoBannedTiles = [];
+    this.echoBannedBonds = [];
+    /**
+     * 已击杀的悬赏卡 id（2026-11-05）：悬赏怪身上带 `mods.bountyId`，`kill` 钩子记一笔，
+     * 结算时用它对账「这张卡是不是真打掉了」，避免把成功的一局判成「悬赏未达成」。
+     */
+    this.echoBountyPaid = [];
+    /** 待播报的深潜消息（诅咒 / 侵蚀词条 / 净化）；同一回合的多条合一行，见 _echoFlushAnnounce。 */
+    this._echoAnnounce = [];
+    /** 已拥有的祝福 id（echoBlessing.js；同类不叠加，上限 3） */
+    this.echoBlessings = [];
+    /** 当前三选一的候选（id 数组；null = 没有进行中的抽取） */
+    this.echoBlessingOffer = null;
+    /** 三选一的投票 playerId → 选项下标（纯缓存，存档不存） */
+    this._echoBlessingVotes = new Map();
+    if (this.echoVariant) {
+      // 官方 enemyScale 表止于 ECHO_LAST_ROUND（15 档）。表内照旧用官方值，表外按同一节奏延伸。
+      // 缓增段的增速可被房间配置覆盖（深潜大厅的「曲线档位」），不传配置就是默认档。
+      const tier = this.gd.baseEnemyScale(ECHO_LAST_ROUND);
+      const slow = echoCurveOf(this.echoCfg);
+      this.gd.echoScaleOf = (r, official) => {
+        if (!isEchoRound(r, ECHO_LAST_ROUND)) return official;
+        const scaled = echoScale(r, tier, ECHO_LAST_ROUND, slow);
+        // 诅咒「狂怒 / 甲壳」：敌方攻击 / 生命 ×系数。每次现算 —— 诅咒会被「净化」清掉，缓存会过期。
+        const fx = this._echoCurseFx ? this._echoCurseFx() : null;
+        if (!fx || (fx.enemyHpMul === 1 && fx.enemyAtkMul === 1)) return scaled;
+        return { ...scaled, hpMul: scaled.hpMul * fx.enemyHpMul, atkMul: scaled.atkMul * fx.enemyAtkMul };
+      };
+    }
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
-    /** Locked room-owned rules; absent for ordinary rooms. */
-    this.experimental = experimentalOptions(opts.experimental ?? {
+    /**
+     * Locked room-owned rules; absent for ordinary rooms.
+     *
+     * 「深渊回响」固定规则之一：**独立卡池**（每名博士用自己的卡池，不与他人共享）。
+     * 深潜房里这个开关强制开启 —— 房主不用开、也关不掉，所以在服务端把房间配置覆盖掉，
+     * 而不是只改客户端（否则读档 / 旧房间 / 直连 API 都能绕开）。
+     * 手动编组（poolPlan）同理作废：「每人一池」与「房主排的几组」不可能同时成立
+     * （experimentalOptions 里 `disableSharedPool && !poolPlan` 本来就会互相压制）。
+     */
+    const echoIndependentPool = this.echoVariant === 'deepecho';
+    let expIn = opts.experimental ?? {
       revivalEnabled: opts.revivalEnabled === true,
       disableSharedPool: opts.disableSharedPool === true,
-    });
-    this.revivalEnabled = !this.isSolo && this.experimental.revivalEnabled;
+    };
+    if (echoIndependentPool && expIn.poolPlan) {
+      // 深潜不接受手动编组：`disableSharedPool && !poolPlan` 会让手动编组压过独立卡池。
+      // 注意必须在副本上删 —— `experimentalOptions` 见到 `poolPlan: null` 会直接抛 TypeError。
+      expIn = { ...expIn };
+      delete expIn.poolPlan;
+    }
+    this.experimental = experimentalOptions(echoIndependentPool
+      ? { ...expIn, disableSharedPool: true }
+      : expIn);
+    this.revivalEnabled = !this.isSolo && (this.echoVariant === 'deepecho' || this.experimental.revivalEnabled);
+    // 维护者 2026-11-05：**只有深潜**放宽救援（任何存活队友都能付 10 血救 1 血）。
+    // 普通房间保持原版口径（必须进过联防）—— 不能因为深潜的开关影响普通模式。
+    this.revivalAnyDonor = this.echoVariant === 'deepecho' && !this.isSolo;
     this.disableSharedPool = !this.isSolo && this.experimental.disableSharedPool;
     this.playerCapacity = roomCapacity(this.isSolo ? 'solo' : this.mode, this.experimental);
     this.capacityExperiment = !this.isSolo && this.playerCapacity > 4;
@@ -354,6 +485,8 @@ export class Match {
     //   * disableLayerCap  —— 盟约层数上限 999 抬到 BOND_LAYER_SAFE_MAX（1e9），等于「不设上限」；
     //   * disableHitLimit  —— 不取消对敌方领袖的单次 ≥ BOSS_HIT_LIMIT(300000) 伤害；
     //   * enemyHpMul / enemyAtkMul —— 敌人生命 / 攻击倍率，对敌方领袖的共享生命值同样生效。
+    // 注意：**不含**深潜。深潜只在真正进入深潜回合后才解除层数上限（见 layerCapOff），
+    // 否则 R1–15 的开局就会和原版不同（维护者 2026-11-03 要求开局保持原版）。
     this.disableLayerCap = this.experimental.disableLayerCap === true;
     this.disableHitLimit = this.experimental.disableHitLimit === true;
     this.enemyHpMul = this.experimental.enemyHpMul ?? 1;
@@ -644,9 +777,35 @@ export class Match {
   }
 
   /** Helpers of this round's 联防 who cleared their own battle without a counted leak. */
+  /**
+   * 盟约层数上限是否解除 —— 实验房，或「深渊回响」深潜。
+   *
+   * 历史（维护者两次改动，别再来回翻）：
+   *   1. 最初深潜也解除 → 叠到 1000+ 层，「奇迹（每 100 层）/ 远见（每 10 层）」变成无限刷新与无限资金；
+   *   2. 于是回滚成原版 999；
+   *   3. 2026-11-03 第二次改：深潜**重新解除**（1e9），但两个漏洞改为在**源头**堵死 ——
+   *      `effectsMeta.js` 的 `bondLayerCoinCap = 60`（远见/奇迹 的按层给钱只结算到 60 层）、
+   *      `effectsMeta.js` 的 `grantFreeRefresh`（深潜里免费刷新总数封顶 2）。
+   * 所以「层数无上限」与「不会无限刷新 / 无限资金」现在同时成立；普通房间仍是原版 999。
+   */
+  get layerCapOff() {
+    // 维护者 2026-11-05：深潜**恢复无限层**（其他盟约要能突破 999），但「按层给钱」这类效果
+    // 在 effectsMeta 的 ondLayerCoinCap = 999 处单独锁死（最多结算到 999 层）。
+    return this.disableLayerCap === true || this.echoVariant === 'deepecho';
+  }
+
   _revivalHelpers(plan, uniteResult) {
     const eligible = new Set();
-    if (!this.revivalEnabled || !plan || !uniteResult || uniteResult.synthetic
+    if (!this.revivalEnabled) return eligible;
+    // 维护者 2026-11-05：默认**不要求进入联防** —— 只要还活着（不是机器人、没离开）就能当救援者。
+    // 原本这里只收「联防里完美清怪」的 helpers，所以没进联防的玩家永远救不了人。
+    if (this.revivalAnyDonor) {
+      for (const ps of this.order) {
+        if (ps && !ps.isBot && !ps.left && ps.alive) eligible.add(ps.playerId);
+      }
+      return eligible;
+    }
+    if (!plan || !uniteResult || uniteResult.synthetic
       || (uniteResult.reason && !['cleared', 'timeout'].includes(uniteResult.reason))) return eligible;
     for (const ps of plan.helpers || []) {
       const normal = this.lastResults.get(ps.playerId);
@@ -703,7 +862,10 @@ export class Match {
     ps.alive = false;
     ps.pendingDeath = true;
     ps.dirty();
-    this.toast(ps, 'warn', msg('你的目标生命值耗尽，等待救援'));
+    // 深潜的救援是「任一存活队友付 10 点救 1 点」，提示语要说清楚怎么救（维护者 2026-11-05）
+    this.toast(ps, 'warn', this.echoVariant === 'deepecho'
+      ? msg('你的目标生命值耗尽：任一存活队友可支付 10 点目标生命把你救回 1 点')
+      : msg('你的目标生命值耗尽，等待救援'));
   }
 
   _finalizeDeath(ps, { round = this.round, notify = true, reason = this._revivalDeathReason(ps) } = {}) {
@@ -791,7 +953,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpeedVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchEcho, MatchSetupVote, MatchSpeedVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

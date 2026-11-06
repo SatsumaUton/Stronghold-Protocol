@@ -33,6 +33,8 @@ export function normalizeResult(res, pub) {
       lpShared: teamLp != null,
       bandId: p.bandId ?? pp.bandId ?? null,
       roundsPassed: Number.isFinite(p.roundsPassed) ? p.roundsPassed : (Number.isFinite(r.roundsPassed) ? r.roundsPassed : 0),
+      // 「深渊回响」：这个玩家自己到达的深度（中途出局取他出局的那一层）
+      ...(Number.isFinite(p.echoDepth) ? { echoDepth: p.echoDepth } : {}),
       title,
       lineup: (Array.isArray(p.lineup) ? p.lineup : Array.isArray(p.board) ? p.board : []).filter(isObj).slice(0, 12),
       bonds: (Array.isArray(p.bonds) ? p.bonds : Array.isArray(pp.bonds) ? pp.bonds : []).filter(isObj),
@@ -55,6 +57,8 @@ export function normalizeResult(res, pub) {
     bossId: r.bossId ?? pub?.bossId ?? null,
     hiddenBossId: r.hiddenBossId ?? pub?.hiddenBossId ?? null,
     durationMs: Number.isFinite(r.durationMs) ? r.durationMs : null,
+    // 「深渊回响」的整局深度（没有这个键 = 普通房间，结算界面不显示深度）
+    ...(Number.isFinite(r.echoDepth) ? { echoDepth: r.echoDepth } : {}),
     players,
   };
 }

@@ -152,6 +152,11 @@ export class PlayerState {
     // 允许在**普通房间**里使用 g.test 测试指令（本服的管理员工具，见 testCommands.js）。
     // 缺键即 false —— 普通玩家永远是 false，行为与上游一致。
     this.admin = seat.admin === true;
+    // 管理员**身份**（账号角色 owner/admin，不看 tools.game 与验证码）。
+    // 维护者 2026-11-05：惩罚机制（挂机移出 / 消极游戏）按身份豁免，见 MatchIntents._isPunishImmune。
+    // 老存档 / 老数据里没有 seat.adminId 时退回 seat.admin —— 豁免只决定「踢不踢」，
+    // 不会额外给任何权限，所以宁可宽松一点。
+    this.adminId = seat.adminId === true || seat.admin === true;
     this.left = false;
     this.autoplay = false;
     this.alive = true;
@@ -227,6 +232,13 @@ export class PlayerState {
     /** computed bond states */
     this.bonds = {};
     /**
+     * 这一局**用过的最多盟约 / 最高层数**（{ cores: string[], bonds: number, maxLayers: number }）。
+     * 深潜排行榜要它（维护者 2026-11-05：榜上一律「无核心 · 最高 0 层」）——
+     * 团灭时 `eliminate()` 会把棋盘退回卡池，`bonds` 全归零，只有这个峰值还在。
+     * 由 `round.js _trackBondPeak()` 在每次 recompute 后往上记（只增不减）。
+     */
+    this.bondPeak = { cores: [], bonds: 0, maxLayers: 0 };
+    /**
      * this round's IN_BATTLE layer gains of the finished normal battle ({ [bondId]: n }, Match._finishCombat) until
      * settle() makes them persistent — the views add them (bondsView, DESIGN §20.15); null otherwise
      */
@@ -250,6 +262,11 @@ export class PlayerState {
     this.round = { refreshes: 0, buys: 0, sells: 0, spent: 0, gainedChess: 0, arts: 0 };
     this.deployCapBonus = 0;
     this.deployCapMin = 0;
+    /**
+     * 「深渊祭坛 · 献祭永久」买过几次（整局累计）。维护者 2026-11-05：本局最多买 1 次 = +1 部署位。
+     * 和 `deployCapBonus` 分开记 —— 那个还可能被盟约 / 机变加，封顶只针对祭坛这一项。
+     */
+    this.echoAltarDeployBought = 0;
     this.deviceOverrides = {};
     this.tileOverrides = {};
     this.stats = {

@@ -208,6 +208,12 @@ function updateMatchmaking(mm) {
         const vers = Array.isArray(x.byVersion) ? x.byVersion : [];
         const verTip = vers.map((v) => `${VERSION_LABELS[v.version] || v.version}：排队 ${Number(v.partyWaiting) || Number(v.waiting) || 0} 人 / 已开 ${Number(v.matches) || 0} 局`).join(' · ');
         const verTag = vers.length > 1 ? `<i class="mm-ver" title="${verTip.replace(/"/g, '&quot;')}">多版本</i>` : '';
+        // 「深渊回响」（深潜）单独一档：维护者 2026-11-06 要求节点控制台的匹配队列能看见深潜池
+        const echoPool = (Array.isArray(x.byVariant) ? x.byVariant : []).find((v) => v && v.variant === 'deepecho') || null;
+        const echoTotal = echoPool ? (Number(echoPool.waiting) || 0) + (Number(echoPool.partyWaiting) || 0) : 0;
+        const echoTag = echoPool && (echoTotal || Number(echoPool.matches) || 0)
+          ? `<span class="mm-echo" title="深渊回响（深潜）单独排队：只会配到同样在深潜队列里的队伍">深渊回响 <b>${echoTotal}</b> 人 · <b>${Number(echoPool.matches) || 0}</b> 局</span>`
+          : '';
         const exp = caps ? caps.filter((c) => Number(c.capacity) > 4 && (Number(c.waiting) || Number(c.parties) || Number(c.matches))) : [];
         if (exp.length) {
           // ★ 实验池（5–20 人）的排队人数必须同时算「单人票据」和「组队房间」。
@@ -221,13 +227,13 @@ function updateMatchmaking(mm) {
             return `${Number(c.capacity)}人 ${w}/${Number(c.capacity)}${team ? `（${team} 队）` : ''}`;
           }).join(' · ');
           const base = caps.find((c) => Number(c.capacity) === 4);
-          return `<span class="mm-pool diff-${d}"><b>${labels[d]}</b>${verTag}<i>4人 单人 <b>${Number(base?.waiting) || 0}</b></i>`
+          return `<span class="mm-pool diff-${d}"><b>${labels[d]}</b>${verTag}${echoTag}<i>4人 单人 <b>${Number(base?.waiting) || 0}</b></i>`
             + `<i>房间 <b>${Number(base?.parties) || 0}</b> 队/<b>${Number(base?.partyWaiting) || 0}</b> 人</i>`
             + `<i>已开 <b>${Number(base?.matches) || 0}</b></i>`
             + `<span class="mm-cap is-exp" title="${detail || '5～20 人实验池'}"><b>实验池 5～20人</b>`
             + `<i>排队 <b>${expWaiting}</b></i><i>房间 <b>${expParties}</b> 队</i><i>已开 <b>${expMatches}</b></i></span></span>`;
         }
-        return `<span class="mm-pool diff-${d}"><b>${labels[d]}</b>${verTag}<i>单人 <b>${Number(x.waiting) || 0}</b></i><i>房间 <b>${Number(x.parties) || 0}</b> 队/<b>${Number(x.partyWaiting) || 0}</b> 人</i><i>已开 <b>${Number(x.matches) || 0}</b></i></span>`;
+        return `<span class="mm-pool diff-${d}"><b>${labels[d]}</b>${verTag}${echoTag}<i>单人 <b>${Number(x.waiting) || 0}</b></i><i>房间 <b>${Number(x.parties) || 0}</b> 队/<b>${Number(x.partyWaiting) || 0}</b> 人</i><i>已开 <b>${Number(x.matches) || 0}</b></i></span>`;
       }).join('');
     }
   }
@@ -273,10 +279,11 @@ function updateRooms(r) {
   const pages = Math.max(1, Math.ceil(rooms.length / ROOMS_PAGE_SIZE));
   if (roomsPage > pages) roomsPage = pages;
   if (roomsPage < 1) roomsPage = 1;
-  const solo = rooms.filter((x) => x.mode === 'solo').length;
-  const coop = rooms.filter((x) => x.mode === 'coop').length;
+  const solo = rooms.filter((x) => x.mode === 'solo' && x.variant !== 'deepecho').length;
+  const coop = rooms.filter((x) => x.mode === 'coop' && x.variant !== 'deepecho').length;
+  const echo = rooms.filter((x) => x.variant === 'deepecho').length;
   const queued = rooms.filter((x) => x.queued && !x.started).length;
-  count.textContent = rooms.length ? `${rooms.length} 个房间 / ${nodes.length} 个节点（单人 ${solo} · 同盟 ${coop} · 匹配中 ${queued}）` : '暂无房间';
+  count.textContent = rooms.length ? `${rooms.length} 个房间 / ${nodes.length} 个节点（单人 ${solo} · 同盟 ${coop}${echo ? ' · 深渊回响 ' + echo : ''} · 匹配中 ${queued}）` : '暂无房间';
   renderRoomsTable();
 }
 
@@ -310,6 +317,10 @@ function renderRoomsTable() {
     const count = (n) => '<span class="room-count' + (!n ? ' is-zero' : '') + '">' + (n == null ? '—' : n) + '</span>';
     const spectate = x.mode === 'solo' ? '<span class="room-empty">—</span>' : '<span class="room-count' + (!x.spectators ? ' is-zero' : '') + '">' + (x.spectators != null ? x.spectators : 0) + (x.maxSpectators ? '/' + x.maxSpectators : '') + '</span>';
     const roundText = x.round > 0 ? 'R' + x.round : (x.started && x.round === 0 ? '准备中' : '—');
+    // 类型列：深潜（深渊回响）是第三种玩法，但协议里还是 mode:'coop' + variant:'deepecho'，按 variant 显示
+    const modeCell = x.variant === 'deepecho'
+      ? '<span class="room-mode is-echo" title="深渊回响（深潜）：管理员 / 测试名单专属，不参与匹配">深渊回响</span>'
+      : '<span class="room-mode">' + (x.mode === 'solo' ? '单人模拟' : x.mode === 'coop' ? '同盟模拟' : '—') + '</span>';
     const diffName = ({ FUNNY: '标准模拟', NORMAL: '险境模拟', HARD: '绝境模拟', ABYSS: '终极模拟' })[x.difficulty] || (x.difficulty || '—');
     const cap = Number(x.seats) || 4;
     const capBadge = cap > 4 ? '<span class="room-cap">' + cap + '人</span>' : '';
@@ -332,7 +343,7 @@ function renderRoomsTable() {
         + '" data-humans="' + (Number(x.humans) || 0) + '" data-round="' + (Number(x.round) || 0) + '"'
         + ' title="结束当前这一局，房间和座位都保留，玩家可以重新开局">结束对局</button>'
       : '<button class="room-abort" disabled title="当前没有进行中的对局，无法结束">结束对局</button>';
-    return '<tr><td><span class="room-code">' + esc(x.code) + '</span>' + capBadge + adminBadge + '</td><td title="node-' + x.node + '"><span class="room-node">' + esc(NAMES[x.node - 1] || ('节点 ' + x.node)) + '</span></td><td><span class="room-mode">' + (x.mode === 'solo' ? '单人模拟' : x.mode === 'coop' ? '同盟模拟' : '—') + '</span></td><td><span class="room-diff' + (x.difficulty ? ' diff-' + esc(x.difficulty) : '') + '">' + esc(diffName) + '</span></td><td>' + verCell + '</td><td><span class="room-state' + stateClass + '">' + state + '</span></td><td><span class="room-round' + (x.round > 0 ? '' : ' is-empty') + '" title="' + (x.round > 0 ? '第 ' + x.round + ' 回合' : (x.started ? '对局准备中' : '暂无对局')) + '">' + roundText + '</span></td><td><div class="room-players' + (cap > 4 ? ' room-players--large' : '') + '">' + playerHtml + '</div></td><td>' + count(x.humans) + '</td><td>' + count(x.bots) + '</td><td>' + spectate + '</td><td><div class="room-spectators">' + spectatorHtml + '</div></td><td><span class="room-actions">' + abortBtn + closeBtn + '</span></td></tr>';
+    return '<tr><td><span class="room-code">' + esc(x.code) + '</span>' + capBadge + adminBadge + '</td><td title="node-' + x.node + '"><span class="room-node">' + esc(NAMES[x.node - 1] || ('节点 ' + x.node)) + '</span></td><td>' + modeCell + '</td><td><span class="room-diff' + (x.difficulty ? ' diff-' + esc(x.difficulty) : '') + '">' + esc(diffName) + '</span></td><td>' + verCell + '</td><td><span class="room-state' + stateClass + '">' + state + '</span></td><td><span class="room-round' + (x.round > 0 ? '' : ' is-empty') + '" title="' + (x.variant === 'deepecho' ? (x.round > 0 ? '深潜第 ' + x.round + ' 层' : (x.started ? '深潜开局中' : '深潜等待中')) : (x.round > 0 ? '第 ' + x.round + ' 回合' : (x.started ? '对局准备中' : '暂无对局'))) + '">' + roundText + '</span></td><td><div class="room-players' + (cap > 4 ? ' room-players--large' : '') + '">' + playerHtml + '</div></td><td>' + count(x.humans) + '</td><td>' + count(x.bots) + '</td><td>' + spectate + '</td><td><div class="room-spectators">' + spectatorHtml + '</div></td><td><span class="room-actions">' + abortBtn + closeBtn + '</span></td></tr>';
   }).join('') : '<tr><td colspan="13" class="muted">暂无房间</td></tr>';
   // 按钮（每次重绘表格都会重建，所以在这里绑定）
   body.querySelectorAll('[data-abort]').forEach((b) => {

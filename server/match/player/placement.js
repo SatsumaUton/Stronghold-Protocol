@@ -160,6 +160,13 @@ export class PlayerPlacement {
     const piece = loc.piece;
     if (!inField(r, c) || !this._legal(piece, r, c)) return fail(ERR.BAD_TILE);
     const key = tileKey(r, c);
+    // 「深渊回响」诅咒（2026-11-05）：封锁地块 / 排异盟约。由 Match 的 _echoDeployBlocked 判定，
+    // 普通房间没有这个方法，一行都不会执行。
+    if (this.m && typeof this.m._echoDeployBlocked === 'function') {
+      const fromHand = loc.area === 'hand' || loc.area === 'temp';
+      const why = this.m._echoDeployBlocked(piece, key, fromHand);
+      if (why) return fail(ERR.BAD_TILE, why);
+    }
     const occ = this.board.get(key) || null;
     if (occ === piece) return this._reorient(piece, dir);
     if (loc.area === 'board') {

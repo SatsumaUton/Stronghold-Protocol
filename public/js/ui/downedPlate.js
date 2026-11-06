@@ -15,6 +15,7 @@ import { GIcon } from './gameComponents.js';
 import { uiUrl } from './assetUrls.js';
 import { data } from '../data.js';
 import { t } from '../../../shared/i18n.js';
+import { exitWords, useEchoRun } from './matchChrome.js';
 
 const MAP = 'settle/settlemen_personal_fail';
 
@@ -109,6 +110,7 @@ function PixFace({ kind, class: cls }) {
  */
 export function DownedPlate({ open, onWatch, onLeave }) {
   const [out, setOut] = useState(false);
+  const w = exitWords(useEchoRun());
   useEffect(() => {
     if (!open) { setOut(false); return undefined; }
     const id = setTimeout(() => setOut(true), 500);
@@ -125,7 +127,7 @@ export function DownedPlate({ open, onWatch, onLeave }) {
     </div>
     <div class="downm__btns">
       <${Button} variant="secondary" class="downm__btn downm__btn--watch" data-autofocus=${true} onClick=${onWatch}><${GIcon} name="eye" class="btn__icon" />${t('继续观战')}<//>
-      <${Button} variant="danger" icon="exit" class="downm__btn downm__btn--leave" onClick=${onLeave}>${t('离开模拟')}<//>
+      <${Button} variant="danger" icon="exit" class="downm__btn downm__btn--leave" onClick=${onLeave}>${t(w.title)}<//>
     </div>
   <//>`;
 }

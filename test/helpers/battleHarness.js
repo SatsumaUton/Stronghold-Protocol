@@ -239,6 +239,7 @@ export function makeBattle(opts = {}) {
       time: e.time ?? 0, enemyKey: e.key, routeIndex, route, count: e.count ?? 1, interval: e.interval ?? 0,
       mods: e.mods ?? null, tag: e.tag ?? null, bounty: e.bounty ?? null, sourcePlayerId: e.sourcePlayerId ?? null,
       ownerPlayerId: e.ownerPlayerId ?? null, pos: e.pos ?? null, countInTotal: e.countInTotal,
+      enemyDef: e.enemyDef ?? null,
     });
   }
   if (extraRoutes.length) routes = routes.concat(extraRoutes);

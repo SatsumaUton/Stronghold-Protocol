@@ -15,7 +15,10 @@ const PERSONAL_OFFER_SIZE = 3;
 
 export class MatchSpDraft {
   enterSpDraft() {
-    const draft = generateDraft(this.gd, this.rngDraft, this.round, { stageId: this.stageId, bondAvailable: (bondId) => this.bondLive(bondId), itemAvailable: id => this.itemPool.canGain(id) });
+    // 维护者 2026-11-04：1–15 层完整沿用原版（悬赏决策 / 道具补给 / 机密商店 / 战术决策），
+    // 深潜自己的随机奖励从 16 层起才接管。
+    const draft = generateDraft(this.gd, this.rngDraft, this.round, { stageId: this.stageId, bondAvailable: (bondId) => this.bondLive(bondId), itemAvailable: id => this.itemPool.canGain(id), allowBounty: this._echoDepth(this.round) <= 15, forceFamily: this._echoForceSupply ? 'supply' : null });
+    if (this._echoForceSupply) this._echoForceSupply = false;   // 用掉就清，避免每回合都强制补给
     const alive = this.alivePlayers();
     if (!draft || !alive.length) { this.beforePrepOffers(); return; }
     this.phase = PHASE.SP_DRAFT;
