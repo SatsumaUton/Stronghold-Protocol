@@ -13,7 +13,7 @@ function __spRemoteAssetRe() {
 }
 
 import { mediaUrl } from './media.js';
-import { listImportedPaths, IMPORTED_ASSET_CACHE } from './assetCache.js';
+import { listImportedPaths, IMPORTED_ASSET_CACHE, isQuotaError, storageRoom } from './assetCache.js';
 
 /**
  * Collect only same-origin art files, including all Spine pages and optional local scenes.
@@ -69,7 +69,7 @@ function safeLocalStorage() {
 /** A bounded, pausable download queue. A file counts only after its entire body arrives. */
 export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.fetch(...args),
   concurrency = 4, timeoutMs = 60000, retries = 2, lookupImported = listImportedPaths,
-  store = safeLocalStorage() } = {}) {
+  room = storageRoom, store = safeLocalStorage() } = {}) {
   let state = { phase: 'idle', total: 0, done: 0, bytes: 0, failures: [], localMissing: false, cached: 0 };
   let urls = null, running = null, controller = null, paused = false, lastNotice = 0;
   const complete = new Set(), failures = new Map(), listeners = new Set();
@@ -222,22 +222,24 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
 
   async function run() {
     try {
-      if (!urls) {
-        state = { ...state, phase: 'preparing', error: null };
-        emit(true);
-        // Sequential manifest reads keep cancellation simple and never leave a rejected sibling promise.
-        const assets = await request('/data/assets.json', true);
-        const local = await request('/data/local-assets.json', true, true);
-        // the official battle effects' files (DESIGN §33): optional, like the local manifest
-        const fx = await request('/data/local-fx.json', true, true);
-        if (!assets || typeof assets !== 'object' || Array.isArray(assets)
-          || (local !== null && (!local || typeof local !== 'object' || !local.groups))
-          || (fx !== null && (!fx || typeof fx !== 'object' || !fx.groups))) throw new Error('Invalid asset manifest');
-        const list = collectAssetUrls(assets, local, fx);
-        if (!list.length) throw new Error('Empty asset manifest');
-        urls = list;
-        state = { ...state, total: urls.length, localMissing: local === null };
-      }
+      // 每次开始都重读清单（3 个小 JSON，走 no-cache 回源）：以前只在首次（urls 为空）读，
+      // 于是服主上新素材后，玩家点「检查并补齐」**永远看不到新文件**（预存在的红测试
+      // 「a completed check reads updated manifests…」说的就是这个）。重读很便宜，
+      // 而且下面「逐个确认还在不在缓存里」本来就要走一遍。
+      state = { ...state, phase: 'preparing', error: null };
+      emit(true);
+      // Sequential manifest reads keep cancellation simple and never leave a rejected sibling promise.
+      const assets = await request('/data/assets.json', true);
+      const local = await request('/data/local-assets.json', true, true);
+      // the official battle effects' files (DESIGN §33): optional, like the local manifest
+      const fx = await request('/data/local-fx.json', true, true);
+      if (!assets || typeof assets !== 'object' || Array.isArray(assets)
+        || (local !== null && (!local || typeof local !== 'object' || !local.groups))
+        || (fx !== null && (!fx || typeof fx !== 'object' || !fx.groups))) throw new Error('Invalid asset manifest');
+      const list = collectAssetUrls(assets, local, fx);
+      if (!list.length) throw new Error('Empty asset manifest');
+      urls = list;
+      state = { ...state, total: urls.length, localMissing: local === null };
       if (paused) return;
 
       // 上次已经把这一版清单下完（记录在 localStorage）：这次不再是「全量重验」。
@@ -292,9 +294,21 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
       emit(true);
       const queue = urls.filter((url) => !complete.has(url));
       let next = 0;
+      // 存储配额预检（2026-11-06 玩家反馈「下载完整素材后闪退」）：整包是几百 MB、上万条 Cache 记录。
+      // 移动端越过 origin 配额时浏览器**直接杀掉页面**（不抛任何异常），桌面端也会长时间无响应。
+      // 所以先看还剩多少空间：太少就别开始；够用的前提下边写边看，写到 90% 就停（索引与存档也要地方）。
+      let roomNow = null;
+      try { roomNow = await room(); } catch { roomNow = null; }
+      const MIN_ROOM = 96 * 1024 * 1024;
+      if (roomNow && queue.length && roomNow.room < MIN_ROOM) {
+        state = { ...state, phase: 'error', error: { status: 'quota', room: roomNow.room, need: MIN_ROOM } };
+        return;
+      }
       const dlCache = await openDownloadCache();
+      let written = 0;
+      let quotaHit = false;
       const worker = async () => {
-        while (!paused && next < queue.length) {
+        while (!paused && !quotaHit && next < queue.length) {
           const url = queue[next++];
           try {
             const body = await request(url);
@@ -308,7 +322,13 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
                 const ct = body.headers?.get?.('content-type');
                 if (ct) headers['content-type'] = ct;
                 await dlCache.put(url, new Response(blob, { status: body.status, headers }));
-              } catch { /* 写缓存失败不影响下载本身 */ }
+                written += body.size || 0;
+                // 用掉九成配额就收手：再写下去移动端会被系统杀掉，桌面端也会卡死。
+                if (roomNow && written > roomNow.room * 0.9) quotaHit = true;
+              } catch (err) {
+                // 桌面端越配额是抛错；能抛到这里的就当「空间不足」，停下但保留已下载的部分。
+                if (isQuotaError(err)) quotaHit = true;
+              }
             }
           } catch (error) {
             if (!paused) failures.set(url, { url, status: error.status || 'network' });
@@ -317,6 +337,11 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
         }
       };
       await Promise.all(Array.from({ length: Math.max(1, Math.min(8, concurrency)) }, worker));
+      if (!paused && quotaHit) {
+        state = { ...state, phase: 'error', error: { status: 'quota', room: roomNow?.room ?? null, written } };
+        clearDone();   // 没下完：下次仍然要跑（已下好的文件会被 stillCached 认出来，不重下）
+        return;
+      }
       if (!paused) {
         state = { ...state, phase: failures.size ? 'partial' : 'complete' };
         // 下完了就记住这一版清单，下次不再全量重跑
