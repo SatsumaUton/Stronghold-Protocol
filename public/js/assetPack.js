@@ -28,7 +28,7 @@ function __spRemoteAssetRe() {
 
 import { splitHashedPath } from '../../shared/assetPaths.js';
 import { mediaUrl } from './media.js';
-import { IMPORTED_ASSET_CACHE, addImportedPaths, putImportedAsset, pruneImportedPaths } from './assetCache.js';
+import { IMPORTED_ASSET_CACHE, addImportedPaths, isQuotaError, putImportedAsset, pruneImportedPaths, storageRoom } from './assetCache.js';
 
 export const MAX_ZIP_ENTRIES = 500_000;
 export const MAX_ENTRY_BYTES = 256 * 1024 * 1024;
@@ -652,6 +652,7 @@ export function createAssetImport({
       if (!path) continue;
       list.push({
         path,
+        size: Math.max(0, Number(entry.uncompSize) || 0),
         read: async () => {
           try { return await zip.read(entry); } catch { return { ok: false, code: 'bad-entry' }; }
         },
@@ -667,6 +668,7 @@ export function createAssetImport({
       if (!path || typeof file.read !== 'function') continue;
       list.push({
         path,
+        size: Math.max(0, Number(file.size) || 0),
         read: async () => {
           try {
             const data = await file.read();
@@ -727,6 +729,21 @@ export function createAssetImport({
         packByRel.set(rel, entry);
       }
 
+      // 存储配额预检（2026-11-06 玩家反馈「导入完整素材后闪退」）：整包是几百 MB、几万条 Cache 记录。
+      // iOS Safari 越过 origin 配额时**直接杀掉页面**（不抛任何异常），桌面端也会长时间无响应 ——
+      // 所以先问浏览器还剩多少空间，装不下就当场停下说清楚，绝不写到一半把标签页送走。
+      // 估计值用压缩前的字节数（偏保守），并留 10% 给索引 JSON、Service Worker 和游戏自己的存档。
+      {
+        let needBytes = 0;
+        for (const entry of packByRel.values()) needBytes += Number(entry.size) || 0;
+        const room = await storageRoom();
+        if (room && needBytes > 0 && needBytes > room.room * 0.9) {
+          phase = 'error';
+          error = 'quota';
+          return;
+        }
+      }
+
       const spineOnly = new Set();
       for (const group of plan.groups) {
         for (const member of group.members) {
@@ -754,7 +771,13 @@ export function createAssetImport({
           if (!cachesApi?.open) throw Object.assign(new Error('cache'), { code: 'unknown' });
           cache = await cachesApi.open(IMPORTED_ASSET_CACHE);
         }
-        await putImportedAsset(cache, urls, bytes);
+        try {
+          await putImportedAsset(cache, urls, bytes);
+        } catch (err) {
+          // 桌面端越配额是「抛错」，移动端可能什么都不抛就被系统杀掉：能抛到的这一支必须当成「空间不足」，
+          // 停下并保留已写入的部分（否则会退回素材下载，白等一场）。
+          throw Object.assign(new Error('quota'), { code: isQuotaError(err) ? 'quota' : 'store', cause: err });
+        }
         for (const url of urls) {
           try { storedPaths.add(new URL(url, 'http://localhost').pathname); } catch { /* not a URL: never stored */ }
         }
@@ -852,7 +875,7 @@ export function createAssetImport({
       if (cancelFlag) phase = 'cancelled';
       else {
         phase = 'error';
-        error = cause?.code === 'bad-zip' || cause?.code === 'manifest' ? cause.code : 'unknown';
+        error = ['bad-zip', 'manifest', 'quota'].includes(cause?.code) ? cause.code : 'unknown';
       }
     } finally {
       // before the end is published: the dialog's count and the download queue read the index as the import ends
