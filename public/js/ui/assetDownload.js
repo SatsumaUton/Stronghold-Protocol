@@ -30,9 +30,9 @@ export function failuresToText(failures, now = Date.now()) {
   // 现在第一行是本地时间 + 时区，括号里附 UTC 便于跨时区对账。
   const t = localStamp(now);
   const head = [
-    `# 素材下载失败清单  ${t.local}（${t.tz}，UTC ${t.iso}）`,
-    `# 共 ${list.length} 条`,
-    `# 状态\tURL`,
+    `# 素材下载失败清单  ${t.local}（${t.tz}，UTC ${t.iso}）`,  // i18n-ignore
+    `# 共 ${list.length} 条`,  // i18n-ignore
+    `# 状态\tURL`,  // i18n-ignore
   ];
   const body = list.map((f) => `${f && f.status != null ? f.status : 'network'}\t${(f && f.url) || ''}`);
   return [...head, ...body].join('\n') + '\n';
@@ -48,7 +48,7 @@ export function exportFailures(failures) {
     // 文件名也用本地时间（以前是 UTC，文件名和内容都比本地慢 8 小时）
     const stamp = localStamp(Date.now()).local.replace(/[: ]/g, '-');
     a.href = url;
-    a.download = `素材下载失败清单-${stamp}.txt`;
+    a.download = `素材下载失败清单-${stamp}.txt`;  // i18n-ignore
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
@@ -92,13 +92,16 @@ export function AssetDownloadButton() {
     assetDownload.pause();
     setOpen(false);
   };
+  // 存储空间不足（2026-11-06）：浏览器已经不让我们写了 —— 说清楚，别让玩家以为下载失败。
+  const quotaError = state.phase === 'error' && state.error && state.error.status === 'quota';
   const status = state.phase === 'complete' ? t('本次素材下载完成')
     : state.phase === 'preparing' ? t('正在读取素材清单…')
       : state.phase === 'verifying' ? t('正在检查已缓存的素材…')
         : state.phase === 'paused' ? t('素材下载已暂停')
-          : state.phase === 'error' ? t('无法读取素材清单，请检查网络后重试。')
-            : state.phase === 'partial' ? t('有 {n} 个素材下载失败', { n: state.failures.length })
-              : t('正在下载素材…');
+          : quotaError ? t('浏览器存储空间不足，下载已停下（已下载的素材仍然可用）。')
+            : state.phase === 'error' ? t('无法读取素材清单，请检查网络后重试。')
+              : state.phase === 'partial' ? t('有 {n} 个素材下载失败', { n: state.failures.length })
+                : t('正在下载素材…');
   const label = state.phase === 'complete' ? t('素材已下载')
     : state.phase === 'paused' ? t('继续下载素材') : t('下载完整素材');
 

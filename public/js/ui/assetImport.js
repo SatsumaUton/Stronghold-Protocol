@@ -21,6 +21,7 @@ function importStatus(state) {
   if (state.phase === 'cancelled') return t('导入已取消');
   if (state.phase === 'error' && state.error === 'bad-zip') return t('素材包不是有效的 zip。');
   if (state.phase === 'error' && state.error === 'manifest') return t('无法读取素材清单，导入已停止。');
+  if (state.phase === 'error' && state.error === 'quota') return t('浏览器存储空间不足，导入已停下（已导入的素材仍然可用）。');
   if (state.phase === 'error') return t('导入失败。');
   return '';
 }
@@ -119,6 +120,8 @@ export function AssetImportButton() {
     const input = event.currentTarget;
     const files = [...(input.files || [])].map((file) => ({
       path: file.webkitRelativePath || file.name,
+      // size 让 assetPack 能在写入前预检浏览器存储配额（移动端越配额会被系统直接杀掉页面）
+      size: file.size,
       read: async () => new Uint8Array(await file.arrayBuffer()),
     }));
     input.value = '';

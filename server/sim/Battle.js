@@ -52,6 +52,7 @@ import { ProjectileSystem } from './projectiles.js';
 import { remainingDistance } from './ai.js';
 import { toDataSource, normalizeRoute, normalizeStage } from './simdata.js';
 import { installContent } from './content/index.js';
+import { installEchoRules } from './battle/echoRules.js';
 import { BattlePlayers } from './battle/players.js';
 import { BattleLifecycle } from './battle/lifecycle.js';
 import { BattleHooks } from './battle/hooks.js';
@@ -192,6 +193,11 @@ export class Battle {
     } else {
       for (const u of this.allyUnits) if (!u.kit) this._setupUnit(u);
       if (typeof opts.setup === 'function') this._safe(() => opts.setup(this), 'opts.setup');
+    }
+    // 「深渊回响」的战斗规则（spec flags `echoRules`，2026-11-06）：侵蚀词条 / 对敌异常 / 祝福加成由 spec 驱动，
+    // 客户端按同一份 spec 重建战斗时也会装上。flag 缺省 = 空操作，原版与 golden 逐字节不变。
+    if (this.flags && this.flags.echoRules) {
+      try { installEchoRules(this); } catch (e) { this._handlerError('installEchoRules', null, e); }
     }
   }
 

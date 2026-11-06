@@ -35,6 +35,7 @@
 // config.json mode texts come localized from data.js.
 
 import { TestMark } from '../ui/testConsole.js';
+import { EchoCodex, EchoCodexButton } from '../ui/echoCodex.js';
 import { ResumeMatchButton } from '../ui/resumeMatch.js';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor, ERR } from '../../../shared/constants.js';
@@ -523,7 +524,7 @@ export function HubEntry({ card, onOpen, timePoint = null, timeShort = null, loc
     <div class="hub-entry__lines">
       <span class="hub-entry__group"><${Icon} name=${card.icon} />${line}</span>
       ${extraLines.map((txt, i) => html`<span key=${i} class="hub-entry__group hub-entry__group2"><${Icon} name=${card.icon} />${t(txt, card.pointParams)}</span>`)}
-      ${Array.from({ length: pad }, (_, i) => html`<span key=${'pad' + i} class="hub-entry__group hub-entry__group2 hub-entry__group--pad" aria-hidden="true"><${Icon} name=${card.icon} /><span>占位</span></span>`)}
+      ${Array.from({ length: pad }, (_, i) => html`<span key=${'pad' + i} class="hub-entry__group hub-entry__group2 hub-entry__group--pad" aria-hidden="true"><${Icon} name=${card.icon} /><span>${PAD_LABEL}</span></span>`)}
     </div>
     <button type="button" class=${`mode-card hub-entry hub-entry--${card.id}${locked ? ' hub-entry--locked' : ''}`} data-mode=${card.id}
         disabled=${locked ? true : undefined}
@@ -535,6 +536,8 @@ export function HubEntry({ card, onOpen, timePoint = null, timeShort = null, loc
       <span class="hub-entry__name">${t(card.name)}</span>
       ${/* 未开放：右上角一条横幅；按钮本身 disabled + 灰色（无权限的人点不动） */ null}
       ${locked ? html`<span class="hub-entry__ribbon">${t('暂未开放')}</span>` : null}
+      ${/* 「全新玩法」角标（维护者 2026-11-06）：只贴在**能点**的深渊回响卡右上角，斜着放；锁住时保持原样 */ null}
+      ${!locked && card.id === 'deepecho' ? html`<span class="hub-entry__new">${t('全新玩法')}</span>` : null}
       <span class="hub-entry__corner" aria-hidden="true"></span>
     </button>
   </div>`;
@@ -1008,6 +1011,7 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
 }
 
 /** 本机深潜最佳成绩的存储键（只在当前浏览器，和成就统计一样）。 */
+const PAD_LABEL = '占位';  // i18n-ignore: 列表补齐用的纯视觉占位（aria-hidden）
 const ECHO_BEST_KEY = 'sp.echo.best';
 const echoReadBest = () => {
   try {
@@ -1046,6 +1050,8 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
   const [openRow, setOpenRow] = useState(null);
   /** 排行榜是否可以收起（收起后难度选择顶上来，画面留给简介与开始） */
   const [boardOpen, setBoardOpen] = useState(true);
+  /** 「深渊图鉴」浮层（维护者 2026-11-06：入口在顶部右侧，局内放大镜不加） */
+  const [codexOpen, setCodexOpen] = useState(false);
   const [best] = useState(() => echoReadBest());
   useEffect(() => {
     let alive = true;
@@ -1077,6 +1083,8 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
           <h2 class="modal__title">${t('深渊回响')}</h2>
           <span class="proto-title__mode"><${Icon} name="target" />${t('深渊回响')}<i>DEEP ECHO</i></span>
         </div>
+        ${/* 维护者 2026-11-06：图鉴入口放顶部右侧，不进底部三个等大按钮那一排 */ null}
+        <${EchoCodexButton} onOpen=${() => setCodexOpen(true)} />
       </header>
       <div class="proto-body">
         ${/* 左：立绘 + 左下简介（原版版式），排行榜作为**浮层**贴左边，不挤动任何元素 */ null}
@@ -1140,9 +1148,13 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
                         ${/* 维护者 2026-11-05：展开明细也要有「玩家 / 核心盟约 / 最高盟约数」，缺数据时写 — 而不是整块消失 */ null}
                         <div class="echo-detail__full"><span>${t('玩家')}</span><b>${names.length ? names.join('、') : '—'}</b></div>
                         <div class="echo-detail__full"><span>${t('核心盟约')}</span><b>${squads
-                          ? squads.map((s) => `${s.name}：${(s.cores || []).join('、') || '无核心'} · 最高 ${s.maxLayers || 0} 层`).join(' ｜ ')
+                          ? squads.map((s) => t('{name}：{cores} · 最高 {n} 层', {
+                            name: s.name,
+                            cores: (s.cores || []).join('、') || t('无核心'),
+                            n: s.maxLayers || 0,
+                          })).join(' ｜ ')
                           : (cores.length ? cores.join('、') : '—')}</b></div>
-                        <div><span>${t('最高盟约数')}</span><b>${maxLayers ? `${maxLayers} 层` : '—'}</b></div>
+                        <div><span>${t('最高盟约数')}</span><b>${maxLayers ? t('{n} 层', { n: maxLayers }) : '—'}</b></div>
                         <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'}</b></div>
                       </div>` : null}
                     </li>`;
@@ -1194,6 +1206,8 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
         </section>
       </div>
     </div>
+    ${/* 深渊图鉴：全屏浮层，内容来自 /api/deepecho/codex */ null}
+    <${EchoCodex} open=${codexOpen} onClose=${() => setCodexOpen(false)} />
   <//>`;
 }
 

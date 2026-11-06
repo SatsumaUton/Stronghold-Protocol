@@ -242,6 +242,25 @@ export async function storageEstimate(nav = globalThis.navigator) {
 }
 
 /**
+ * Room left for imported art: `{ usage, quota, room }`, or null where the browser cannot say.
+ *
+ * A whole pack is hundreds of MB and tens of thousands of cache entries. iOS Safari **kills the page** when an origin
+ * runs past its storage quota instead of throwing a JS error, which a player reads as 「导入完就闪退」 (2026-11-06).
+ * So the importer asks this *before* it writes anything (assetPack.js) and refuses with 「存储空间不足」 instead.
+ */
+export async function storageRoom(nav = globalThis.navigator) {
+  const est = await storageEstimate(nav);
+  if (!est || !(est.quota > 0)) return null;
+  return { usage: est.usage, quota: est.quota, room: Math.max(0, est.quota - est.usage) };
+}
+
+/** Whether a thrown value is the browser refusing a write for lack of space (Chrome / Safari / Firefox codes). */
+export function isQuotaError(err) {
+  return !!err && (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    || err.code === 22 || err.code === 1014);
+}
+
+/**
  * Whether the browser already keeps the origin's storage (`navigator.storage.persisted()`), or null where it cannot say:
  * StorageManager exists only in a secure context, so plain http to a LAN IP reads null too. 设置 → 素材存储 shows it.
  * @returns {Promise<boolean | null>}

@@ -584,8 +584,18 @@ export class Match {
     /** how the bot rehearsals that were offered to `simPool` ended — separate from rehearsalStats (its keys are asserted) */
     this.rehearsalPoolStats = { pooled: 0, accepted: 0, fallbacks: 0 };
     this.ds = dataSourceFor(this.data);
-    /** client-side combat (DESIGN §14) — see the header */
-    this.clientCombat = opts.clientCombat != null ? !!opts.clientCombat : envClientCombat();
+    /**
+     * client-side combat (DESIGN §14) — see the header.
+     *
+     * 「深渊回响」**走客户端运算**（维护者 2026-11-06 定）。它的战斗效果全部写在 spec 里
+     * （`flags.echoRules` → `server/sim/battle/echoRules.js`），悬赏回执也随 `b.result` 带回，
+     * 所以浏览器跑战斗与服务端复算结果一致（`test/match/echo-client-parity.test.js` 三层验证）。
+     * 需要临时退回服务端模拟：环境变量 `SP_ECHO_CLIENT_COMBAT=0`。
+     */
+    const echoServerCombat = String(env('SP_ECHO_CLIENT_COMBAT') || '') === '0';
+    this.clientCombat = this.echoVariant === 'deepecho' && echoServerCombat
+      ? false
+      : (opts.clientCombat != null ? !!opts.clientCombat : envClientCombat());
     this.verifyMode = parseVerify(opts.verify ?? env('SP_VERIFY'));
     /** wall-clock ms per slice of a server-run normal / 联防 field (virtual time: at once) */
     this.headlessSliceMs = Number.isFinite(opts.headlessSliceMs) && opts.headlessSliceMs > 0 ? opts.headlessSliceMs : this.sched.virtual ? Infinity : HEADLESS_SLICE_MS;

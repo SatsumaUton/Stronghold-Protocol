@@ -56,7 +56,12 @@ export class MatchCombat {
   _ruleFlags() {
     // 「频次怪」的绝对血量表：1–15 层是空表（原版血量），空的时候连键都不发 —— 普通房/前期逐字节不变
     const hpAbs = this.echoVariant === 'deepecho' ? this._echoHitCountHp() : null;
+    // 「深渊回响」的战斗规则（侵蚀词条 / 对敌异常 / 部署加成）：以**纯 JSON** 随 spec 下发，
+    // 由 server/sim/battle/echoRules.js 在两端（服务端复算 + 浏览器）用同一份代码装上。
+    const echoRules = this.echoVariant === 'deepecho' && typeof this._echoBattleRules === 'function'
+      ? this._echoBattleRules() : null;
     return { ...(this.layerCapOff ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
+      ...(echoRules ? { echoRules } : {}),
       // 「深渊回响」：限伤上限跟着深度缩放（普通房没有这个键 → sim 走官方 300000）
       ...(this.echoVariant === 'deepecho' ? { hitLimitMul: this._echoHitLimitMul() } : {}),
       // 「深渊回响」：「频次怪」（器物，血量 == 需要被打几下）16 层起按深度给**绝对血量**（见 _echoHitCountHp）

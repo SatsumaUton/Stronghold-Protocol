@@ -170,4 +170,31 @@ node patcher/check-repo-split.mjs --apply     # 只摘 git 索引（文件留在
 
 ---
 
+## 8. 公开仓库怎么推（2026-11-06 起：只能推「干净提交」）
+
+本地 `custom/production` 里有几百个提交，其中 200 多个提交的**树里**带着
+`server/match/match/echo*.js` 这类深潜独占文件（2026-11-06 才把它们从索引里摘掉）。
+所以一旦把本地分支推上去，这些文件会**连同历史**进入公开仓库 —— `check-repo-split.mjs`
+拦得住「现在」，拦不住「历史」。规矩是：**只推一个干净提交**。
+
+```bash
+# 1) 当前树必须是干净的
+node patcher/check-repo-split.mjs        # 必须是 0 / 0
+node patcher/check-deepecho.mjs          # 97 文件快照齐全
+
+# 2) 用当前树造一个「父 = 远端 HEAD」的提交（内容干净，且是快进）
+SHA=$(git commit-tree "HEAD^{tree}" -p "$(git rev-parse origin/custom/production)" -m "发布：<这一版改了什么>")
+git branch -f public-clean "$SHA"
+
+# 3) 推它
+git push origin public-clean:custom/production
+```
+
+- 代价：公开仓库里看不到本地这几百个提交的粒度（**一次发布 = 一个提交**）；本地历史不受影响。
+- 推完 `local custom/production` 与远端就**分叉**了（本地领先 N、远端领先 1）。`git push` 会报
+  non-fast-forward —— **不要 force**，按上面重来一次即可。
+- 想在公开仓库里也有细粒度历史，只能先 `git filter-repo` 把那些路径从历史里删掉再推（重写全部 SHA，另案）。
+
+---
+
 *这份文件在公开仓库与深渊回响仓库里各有一份，内容相同；改的时候两边一起改。*

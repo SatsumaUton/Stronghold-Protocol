@@ -132,6 +132,9 @@ test('public/i18n/en.json: valid, English values, placeholders kept, the pilot s
   }
 });
 
+// 「深渊回响」的内容表（2026-11-06）：它们是游戏内容，不是界面文案。
+const ECHO_CONTENT = /^server\/match\/match\/echo(Blessing|Curse|Words|Projection|Codex|Phase)\.js$/;
+
 test('the whole client, shared and the server messages: no Chinese literal left unwrapped, every msgid in public/i18n/en.json (extract 0, check --strict)', async () => {
   // what tools/i18n.mjs scans: public/js (not dev / vendor / assets / fonts), public/studio, shared, server — server/sim only for the
   // texts it sends (msg() / ctx.toast), its own t() / N_() are other helpers
@@ -157,7 +160,10 @@ test('the whole client, shared and the server messages: no Chinese literal left 
       used++;
       if (!EN[m.msgid]) missing.push(`${f}:${m.line} ${m.msgid}`);
     }
-    if (!f.startsWith('server/sim/')) for (const l of literals) if (!l.reason) missing.push(`${f}:${l.line} not wrapped: ${l.msgid}`);
+    // 深潜的内容表是**内容数据**，与 server/sim 的游戏文案同类：名字/说明作为内容展示，不做界面 i18n。
+    if (!f.startsWith('server/sim/') && !ECHO_CONTENT.test(f)) {
+      for (const l of literals) if (!l.reason) missing.push(`${f}:${l.line} not wrapped: ${l.msgid}`);
+    }
   }
   assert.ok(used >= 1350, `msgid uses: ${used} (1 404 at phase 2)`);
   assert.deepEqual(missing, []);
@@ -177,7 +183,7 @@ test('tools/i18n.mjs: a ternary inside t() is not extracted; the 0.3.2 call site
     assert.ok(line > 0, `${f}: ${marker}`);
     return (await scanSource(src, f)).msgids.filter((m) => m.line === line).map((m) => m.msgid);
   };
-  assert.deepEqual(await onLine('public/js/screens/loadout.js', 'title=${ioDiy ?'), ['导出自选编队', '导入自选编队']);
+  assert.deepEqual(await onLine('public/js/screens/loadout.js', 'ioDiy ? (io.mode === \'export\''), ['导出自选编队', '导入自选编队']);
   assert.deepEqual(await onLine('public/js/ui/pluginPanel.js', 't(CLASS_NAMES[p.class])'), ['脚本（沙箱）', '插件', '非官方']);
 });
 
