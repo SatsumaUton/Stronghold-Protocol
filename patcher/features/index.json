@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 220234
+        "customBytes": 220441
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 255142
+        "customBytes": 255353
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 244760
+        "customBytes": 244969
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 209249
+        "customBytes": 209457
       },
       {
         "path": "public/js/render/units.js",
@@ -6666,7 +6666,7 @@
       {
         "path": "public/js/screens/echoLobby.js",
         "baseExists": false,
-        "customBytes": 8212
+        "customBytes": 8248
       },
       {
         "path": "public/js/screens/game.js",
@@ -6676,7 +6676,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 116064
+        "customBytes": 116328
       },
       {
         "path": "public/js/screens/result.js",
@@ -6711,7 +6711,7 @@
       {
         "path": "public/js/ui/echoBuffs.js",
         "baseExists": false,
-        "customBytes": 9814
+        "customBytes": 10182
       },
       {
         "path": "public/js/ui/echoCodex.js",

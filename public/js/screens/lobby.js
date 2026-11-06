@@ -524,7 +524,7 @@ export function HubEntry({ card, onOpen, timePoint = null, timeShort = null, loc
     <div class="hub-entry__lines">
       <span class="hub-entry__group"><${Icon} name=${card.icon} />${line}</span>
       ${extraLines.map((txt, i) => html`<span key=${i} class="hub-entry__group hub-entry__group2"><${Icon} name=${card.icon} />${t(txt, card.pointParams)}</span>`)}
-      ${Array.from({ length: pad }, (_, i) => html`<span key=${'pad' + i} class="hub-entry__group hub-entry__group2 hub-entry__group--pad" aria-hidden="true"><${Icon} name=${card.icon} /><span>占位</span></span>`)}
+      ${Array.from({ length: pad }, (_, i) => html`<span key=${'pad' + i} class="hub-entry__group hub-entry__group2 hub-entry__group--pad" aria-hidden="true"><${Icon} name=${card.icon} /><span>${PAD_LABEL}</span></span>`)}
     </div>
     <button type="button" class=${`mode-card hub-entry hub-entry--${card.id}${locked ? ' hub-entry--locked' : ''}`} data-mode=${card.id}
         disabled=${locked ? true : undefined}
@@ -1009,6 +1009,7 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
 }
 
 /** 本机深潜最佳成绩的存储键（只在当前浏览器，和成就统计一样）。 */
+const PAD_LABEL = '占位';  // i18n-ignore: 列表补齐用的纯视觉占位（aria-hidden）
 const ECHO_BEST_KEY = 'sp.echo.best';
 const echoReadBest = () => {
   try {
@@ -1145,9 +1146,13 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
                         ${/* 维护者 2026-11-05：展开明细也要有「玩家 / 核心盟约 / 最高盟约数」，缺数据时写 — 而不是整块消失 */ null}
                         <div class="echo-detail__full"><span>${t('玩家')}</span><b>${names.length ? names.join('、') : '—'}</b></div>
                         <div class="echo-detail__full"><span>${t('核心盟约')}</span><b>${squads
-                          ? squads.map((s) => `${s.name}：${(s.cores || []).join('、') || '无核心'} · 最高 ${s.maxLayers || 0} 层`).join(' ｜ ')
+                          ? squads.map((s) => t('{name}：{cores} · 最高 {n} 层', {
+                            name: s.name,
+                            cores: (s.cores || []).join('、') || t('无核心'),
+                            n: s.maxLayers || 0,
+                          })).join(' ｜ ')
                           : (cores.length ? cores.join('、') : '—')}</b></div>
-                        <div><span>${t('最高盟约数')}</span><b>${maxLayers ? `${maxLayers} 层` : '—'}</b></div>
+                        <div><span>${t('最高盟约数')}</span><b>${maxLayers ? t('{n} 层', { n: maxLayers }) : '—'}</b></div>
                         <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'}</b></div>
                       </div>` : null}
                     </li>`;

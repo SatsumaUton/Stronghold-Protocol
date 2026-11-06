@@ -2879,5 +2879,9 @@
   "你的目标生命值耗尽，等待救援": "Your target life ran out — waiting to be rescued",
   "深潜开始": "The dive begins",
   "深渊回响：全队获得祝福「{name}」": "Abyss Echo: the team gains the blessing “{name}”",
-  "联防阶段：{names} 迎战突破防线的敌人{extra}": "Defence phase: {names} face the enemies that broke through{extra}"
+  "联防阶段：{names} 迎战突破防线的敌人{extra}": "Defence phase: {names} face the enemies that broke through{extra}",
+  "{name}：{cores} · 最高 {n} 层": "{name}: {cores} · max {n} layers",
+  "无核心": "No core",
+  "深度 {depth} · {room} · {when}": "Depth {depth} · {room} · {when}",
+  "{n} 层": "{n} layers"
 }
