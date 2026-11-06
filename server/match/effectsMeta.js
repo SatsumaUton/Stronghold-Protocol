@@ -51,6 +51,7 @@ import { msg, dn } from '../../shared/i18n.js';
 import { onGiftTicker } from './botEmotes.js';
 import { previewContext } from './preview.js';
 import { deriveSeed } from '../sim/rng.js';
+import { BOND_LAYER_CAP } from '../../shared/constants.js';
 
 export const HOOKS = Object.freeze([
   'onRoundStart', 'onIncome', 'onPrepStart', 'onPrepEnd', 'onGain', 'onSold', 'onRefresh', 'onPrice', 'onBuy',
@@ -539,10 +540,11 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     bond: (id) => (ps.bonds[id] ? { ...ps.bonds[id] } : null),
     bonds: () => Object.fromEntries(Object.entries(ps.bonds).map(([k, v]) => [k, { ...v }])),
     bondActive: (id) => !!(ps.bonds[id] && ps.bonds[id].active),
-    // 「深渊回响」：按层给钱（远见 每 10 层 / 奇迹 每 100 层）结算到 **999 层**。
-    // 深潜的层数上限已经回到原版 999，但 999 层仍然够叠出上百次结算，所以这里再收一道；
-    // 普通房给 Infinity = 原版行为，一字不差（维护者 2026-11-03）。
-    bondLayerCoinCap: m.echoVariant === 'deepecho' ? 999 : Infinity,
+    // 「按层给钱」（远见 每 10 层 / 奇迹 每 100 层）结算到 **999 层** —— 只要本局解除了层数上限
+    // （`layerCapOff`：深渊回响，或实验房的 disableLayerCap）。层数照旧能继续叠（战斗增益不变），
+    // 但资金通道不再跟着涨，否则就是无上限印钞机（维护者 2026-11-03 / 2026-11-07）。
+    // 普通房给 Infinity = 原版行为，一字不差。
+    bondLayerCoinCap: m.layerCapOff ? BOND_LAYER_CAP : Infinity,
     bondCount: (id) => (ps.bonds[id] ? ps.bonds[id].count : 0),
     layers: (id) => ps.layers[id] || 0,
     board: () => boardOrder(ps.board).map(({ r, c, piece }) => ps.pieceView(piece, [r, c])),

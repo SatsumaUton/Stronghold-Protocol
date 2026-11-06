@@ -75,6 +75,14 @@ export function baseCharId(id) {
   if (!s) return null;
   return s.replace(/_(1|2)$/, '');
 }
+/**
+ * An asset-manifest key without its data-version prefix: `act1autochess:enemy_1275_dwlock` → `enemy_1275_dwlock`.
+ *
+ * 深潜会从别的版本的数据表里抽敌人（server/match/match/echoCrossVersion.js），key 带 `<version>:` 前缀；
+ * 而 `data/assets.json` 按裸 id 索引（素材与版本无关）。查素材前先剥掉前缀，否则这些敌人
+ * 没有图标也没有模型 —— 备战与战斗里都只剩占位菱形。
+ */
+export const plainAssetId = (id) => String(id).replace(/^[^:]+:/, '');
 
 /**
  * Operator avatar. Accepts a charId (`char_002_amiya`) or an asset id with the E2 suffix (`char_002_amiya_2`).
@@ -145,7 +153,10 @@ export function illustUrl(m, id, opts) {
 }
 
 export function enemyIconUrl(m, enemyId) {
-  const rec = get(get(m, 'enemies'), str(enemyId) || '');
+  const s = str(enemyId);
+  if (!s) return null;
+  // 跨版本敌人（深潜的 `act1autochess:enemy_…`）在清单里只有裸 key
+  const rec = get(get(m, 'enemies'), s) || get(get(m, 'enemies'), plainAssetId(s));
   return str(rec && rec.icon);
 }
 
@@ -251,7 +262,8 @@ export function spineEntry(m, id, opts) {
     const web = validSpine(tk.spine) ? tk.spine : null;
     return (opts && opts.local && localSpineEntry(tk.spineLocal, opts.local, web)) || web;
   }
-  const en = get(get(m, 'enemies'), s);
+  // 跨版本敌人（深潜的 `act1autochess:enemy_…`）：素材清单按裸 id 索引
+  const en = get(get(m, 'enemies'), s) || get(get(m, 'enemies'), plainAssetId(s));
   if (en) {
     let web = null;
     if (validSpine(en.spine)) web = en.spine;

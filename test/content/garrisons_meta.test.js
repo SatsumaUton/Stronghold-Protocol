@@ -649,6 +649,23 @@ test('pools: 凯瑟琳 127 odd rounds, 佩佩 94, 洛洛 91, 焰尾 149, 歌蕾�
       s.prepStart();
       s.m.round = 1;
       assert.equal(handItems(s.ps).length, g.bb.count, `${gid}: round 2 nothing`);
+      // 「深渊回响」打到 16 层以后：数据里的回合表只写到 15，特质不能就此停掉（维护者 2026-11-07 反馈：
+      // 凯瑟琳 16 层以后不再给装备）。表外按等差步长延续 —— 1,3,…,15 → 所有奇数回合。
+      const count = () => handItems(s.ps).length;
+      s.m.round = 16;
+      const at16 = count();
+      s.prepStart();
+      assert.equal(count(), at16, `${gid}: 16 层是偶数回合，不给`);
+      s.m.round = 17;
+      s.prepStart();
+      assert.equal(count(), at16 + g.bb.count, `${gid}: 17 层（表外的奇数回合）照常给`);
+      s.m.round = 20;
+      const at20 = count();
+      s.prepStart();
+      assert.equal(count(), at20, `${gid}: 20 层是偶数回合，不给`);
+      s.m.round = 21;
+      s.prepStart();
+      assert.ok(count() > at20, `${gid}: 21 层照常给（装备池可能已见底，只要求有增加）`);
       for (const id of handItems(s.ps)) assert.ok(DATA.items[id].tier <= s.ps.shop.level, id);
     }
     cover(gid);

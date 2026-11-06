@@ -44,3 +44,23 @@ test('IN_BATTLE gains merged at settlement stop at 999 too; below the cap they a
   checkInvariants(m);
   m.dispose();
 });
+
+// 维护者 2026-11-07：深渊回响里「战斗叠层」在盟约到达 999 层以后必须继续生效
+// （layerCapOff 会把上限抬到 BOND_LAYER_SAFE_MAX，战斗 spec 的 flags 也带着它）。
+test('深渊回响（layerCapOff）：盟约 999 层以后战斗叠层继续生效；普通房仍然停在 999', () => {
+  const dive = makeMatch({
+    mode: 'coop', humans: 2, seed: 83, fake: true, variant: 'deepecho',
+    script: (b) => (b.round === 1 ? { layerGains: { p_0: { yanShip: 50 } } } : {}),
+  }).start();
+  const m = dive.m;
+  try {
+    dive.toPrep(1);
+    const a = dive.ps('p_0');
+    a.layers.yanShip = 999;
+    assert.equal(m.layerCapOff, true, '深潜解除层数上限');
+    assert.equal(m._ruleFlags().layerCapOff, true, '战斗 spec 也带这个 flag（客户端复算同一份）');
+    dive.drive(() => m.phase === PHASE.SETTLE);
+    assert.equal(a.layers.yanShip, 1049, '999 + 50：深潜里继续叠，不再停在 999');
+    checkInvariants(m);
+  } finally { m.dispose(); }
+});

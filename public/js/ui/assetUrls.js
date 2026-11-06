@@ -144,11 +144,16 @@ export function itemIconUrl(m, item) {
 
 /** Enemy icon (manifest keeps fallbacks resolved). */
 export function enemyIconUrl(m, enemyKey) {
-  const e = enemyKey ? obj(obj(obj(m)?.enemies)?.[enemyKey]) : null;
+  const enemies = obj(obj(m)?.enemies);
+  const key = typeof enemyKey === 'string' ? enemyKey : null;
+  if (!enemies || !key) return null;
+  // 深潜会抽到别的版本的敌人（key = `<version>:enemy_…`）：素材清单只按裸 id 索引
+  const plain = key.replace(/^[^:]+:/, '');
+  const e = obj(enemies[key]) || obj(enemies[plain]);
   if (e?.icon) return str(e.icon);
   // `_2` / `_3` variants fall back to their base enemy
-  const base = typeof enemyKey === 'string' ? enemyKey.replace(/_\d+$/, '') : null;
-  return base && base !== enemyKey ? str(obj(obj(obj(m)?.enemies)?.[base])?.icon) : null;
+  const base = plain.replace(/_\d+$/, '');
+  return base !== plain ? str(obj(enemies[base])?.icon) : null;
 }
 
 /** Token avatar, falling back to its owner operator's avatar. */
