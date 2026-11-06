@@ -6621,7 +6621,7 @@
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": false,
-        "customBytes": 131842
+        "customBytes": 132887
       },
       {
         "path": "public/css/screens/room.css",
@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 222323
+        "customBytes": 222353
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 257520
+        "customBytes": 257554
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 247108
+        "customBytes": 247140
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 211275
+        "customBytes": 211309
       },
       {
         "path": "public/js/render/units.js",
@@ -6676,7 +6676,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 116328
+        "customBytes": 116599
       },
       {
         "path": "public/js/screens/result.js",
@@ -6826,7 +6826,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": false,
-        "customBytes": 67813
+        "customBytes": 67624
       },
       {
         "path": "server/match/PlayerState.js",
