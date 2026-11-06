@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 197209
+        "customBytes": 220207
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 219489
+        "customBytes": 255142
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 210409
+        "customBytes": 244760
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 179778
+        "customBytes": 209249
       },
       {
         "path": "public/js/render/units.js",
