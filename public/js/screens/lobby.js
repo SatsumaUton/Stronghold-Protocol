@@ -1044,7 +1044,36 @@ const echoReadBest = () => {
  * 内容上只比 多人匹配 多两块：本机/本周最佳，以及深潜排行榜（`/api/dive/board`）。
  * 难度只给 险境 / 绝境 / 终极 三档（标准模拟的曲线不适合 R15 之后）。
  */
-export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, quickBusy = false }) {
+/**
+ * 深潜整屏的「进别人的房」一行（维护者 2026-11-07）：深潜房号 + 观战深潜 / 加入深潜。
+ *
+ * 和同盟界面的「加入同盟」是同一套语言（同一条 .ally-key 输入条：图标 + 房号 + 右侧小按钮），
+ * 但三个主按钮是「开一局」、这一行是「进一局」，所以单独一行、视觉更轻。
+ * 观战走 `room.spectate`（不占博士席位，模拟进行中也能进）；加入走 `room.join`。
+ * 无钩子：可以直接当 vnode 树渲染（test/ui/echo-key-row.test.js）。
+ */
+export function EchoKeyRow({ code = '', onCode = null, codeOk = false, online = true, busy = null,
+  onJoin = null, onSpectate = null }) {
+  return html`<div class="ally-key proto-key">
+    <${TextField} class="ally-key__field" size="key" icon="key" value=${code} transform=${normalizeCode}
+      onInput=${onCode} onEnter=${() => onJoin && onJoin()} placeholder=${t('深潜房号')} placeholderShort=${t('深潜房号')}
+      ariaLabel=${t('深潜房号')} />
+    <button type="button" class="ally-key__spec proto-key__spec" data-testid="echo-spectate"
+      disabled=${!codeOk || !online || busy === 'spectate'} onClick=${() => onSpectate && onSpectate()}
+      title=${t('以观战者身份进入：不占博士席位，只能观看（每个同盟最多 {MAX_SPECTATORS} 名，模拟进行中也可进入）', { MAX_SPECTATORS })}>
+      ${busy === 'spectate' ? html`<${Spinner} size="sm" />` : html`<${Icon} name="eye" />`}${t('观战深潜')}
+    </button>
+    <button type="button" class="proto-key__join" data-testid="echo-join"
+      disabled=${!codeOk || !online || busy === 'join'} onClick=${() => onJoin && onJoin()}
+      title=${t('加入别人的深潜房（需要深潜资格）')}>
+      <${Icon} name="users" />${t('加入深潜')}${busy === 'join' ? html`<${Spinner} size="sm" />` : null}
+    </button>
+  </div>`;
+}
+
+export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, quickBusy = false,
+  // 「进别人的房」那一行（维护者 2026-11-07）：房号 + 加入深潜 / 观战深潜，和同盟界面的「加入同盟」同一套状态
+  code = '', onCode = null, codeOk = false, online = true, busy = null, onJoin = null, onSpectate = null }) {
   // 记住上次选的深潜难度（维护者 2026-11-03：重开大厅不该跳回默认档）。
   // 用大厅同一套 loadPref / savePref，键名与同盟难度分开，互不影响。
   const remembered = (() => {
@@ -1217,6 +1246,10 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
               <span class="proto-start__deco" aria-hidden="true"></span>
             </button>
           </div>
+          ${/* 进别人的房：房号 + 加入 / 观战（维护者 2026-11-07）。和同盟界面的「加入同盟」是同一套语言，
+               但三个主按钮是「开一局」、这一行是「进一局」，所以单独一行、视觉更轻。 */ null}
+          <${EchoKeyRow} code=${code} onCode=${onCode} codeOk=${codeOk} online=${online} busy=${busy}
+            onJoin=${onJoin} onSpectate=${onSpectate} />
         </section>
       </div>
     </div>
@@ -1702,6 +1735,26 @@ export function LobbyScreen() {
     }
     join(k);
   };
+  /**
+   * 从列表里**观战**：和 enterRoom 同一套跨节点处理，只是落地后按观战进房
+   * （main.js 认 `?spectate=1`：boot 时把 pendingSpectate 置上，进房走 room.spectate）。
+   */
+  const spectateRoom = (c, node) => {
+    const k = codeArg(c, code);
+    if (!k) return;
+    const mine = currentNode();
+    if (node && node !== mine) {
+      try { sessionStorage.setItem('sp_join_from_list', k); } catch { /* 隐私模式 */ }
+      const u = new URL(location.href);
+      u.searchParams.set('n', String(node));
+      u.searchParams.set('room', k);
+      u.searchParams.set('spectate', '1');
+      u.searchParams.delete('adminWatch');
+      location.assign(u.toString());
+      return;
+    }
+    spectate(k);
+  };
   // a spectator seat: no player seat taken, nothing to do but watch (also a match already running)
   const spectate = (c = code) => {
     // same guard as join: `onClick=${spectate}` passes the click event, not a code
@@ -1802,7 +1855,9 @@ export function LobbyScreen() {
         setMatchOpen(true);
         quickMatch({ difficulty: pickedDifficulty, seats: 'four', rules: 'standard', variant: 'deepecho' });
       }}
-      quickBusy=${busy === 'quick' && quickVariant === 'deepecho'} />` : null}
+      quickBusy=${busy === 'quick' && quickVariant === 'deepecho'}
+      code=${code} onCode=${setCode} codeOk=${codeOk} online=${online} busy=${busy}
+      onJoin=${() => join()} onSpectate=${() => spectate()} />` : null}
     ${soloOpen ? html`<${ProtocolSelect} roomMode="solo" difficulty=${shownSolo} onDifficulty=${pickDifficulty}
       onClose=${() => setSoloOpen(false)} onCreate=${() => create('solo')} busy=${busy} online=${online}
       testMode=${testMode} asTest=${asTest} onTest=${setAsTest} difficulties=${solo} loading=${versionLoading} failed=${versionFailed}
@@ -1828,6 +1883,7 @@ export function LobbyScreen() {
     ${/* 公开深潜：深潜专属的公开列表（维护者 2026-11-06） */ null}
     ${echoBrowseOpen ? html`<${RoomListDialog} variant="deepecho" online=${online} busy=${busy}
       onJoin=${(c, node) => { setEchoBrowseOpen(false); enterRoom(c, node); }}
+      onSpectate=${(c, node) => { setEchoBrowseOpen(false); spectateRoom(c, node); }}
       onClose=${() => setEchoBrowseOpen(false)} />` : null}
     ${browseOpen && allyOpen ? html`<${RoomListDialog} online=${online} busy=${busy}
       onJoin=${(c, node) => { setBrowseOpen(false); setAllyOpen(false); enterRoom(c, node); }} onClose=${() => setBrowseOpen(false)} />` : null}

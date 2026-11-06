@@ -4,7 +4,7 @@
 // 列表只在弹窗开着、页面可见时问（ROOM_LIST_POLL_MS），服务端自己 3 秒内共用一次扫描，
 // 从不主动推。加入走页面平常的密钥加入，服务端会再全部校验一遍 —— 行过期了只是被正常拒绝。
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTY_COLORS, DIFFICULTY_NAMES, ROOM_LIST_MIN_CAPACITY } from '../../../shared/constants.js';
+import { DIFFICULTY_COLORS, DIFFICULTY_NAMES, ROOM_LIST_MIN_CAPACITY, MAX_SPECTATORS } from '../../../shared/constants.js';
 import { html, Button, DifficultyIcon, Icon, Modal, Spinner } from './components.js';
 import { net } from '../net.js';
 import { versionLabel } from '../versions.js';
@@ -51,7 +51,7 @@ export function expSummary(exp) {
   return bits.length ? bits.join(' · ') : t('标准规则');
 }
 
-function RoomRow({ row, disabled, onJoin, joinLabel = null }) {
+function RoomRow({ row, disabled, onJoin, joinLabel = null, onSpectate = null }) {
   const bots = row.filled - row.humans;
   return html`<li class="rlist__row" style=${`--d-color:${DIFFICULTY_COLORS[row.difficulty]}`} data-testid="room-row" data-code=${row.code}>
     <span class="rlist__diff">${row.variant === 'deepecho' ? html`<${Icon} name="target" />${t('深渊回响')}` : html`<${DifficultyIcon} difficulty=${row.difficulty} />${t(DIFFICULTY_NAMES[row.difficulty])}`}</span>
@@ -59,7 +59,14 @@ function RoomRow({ row, disabled, onJoin, joinLabel = null }) {
     ${/* 不显示房间在哪台节点上：编号对玩家没有意义，加入时客户端自己带 ?n= 跳过去。 */ null}
     ${row.version ? html`<span class="rlist__ver"><${Icon} name="book" />${versionLabel(row.version)}</span>` : html`<span></span>`}
     <span class="rlist__seats num" title=${t('{humans} 名博士，{bots} 名 AI', { humans: row.humans, bots })}>${row.filled}<i>/</i>${row.capacity}</span>
-    <${Button} size="sm" variant="primary" class="rlist__join" disabled=${disabled} onClick=${() => onJoin(row.code, row.node || 0)}>${joinLabel || t('加入同盟')}<//>
+    ${/* 观战（维护者 2026-11-07）：只想看的人不必占一个博士席位；跨节点的房间同样带 ?n= 跳过去。
+         两个按钮包在一个格子里，行的 4 列网格不因「有没有观战」而错位。 */ null}
+    <span class="rlist__actions">
+      ${onSpectate ? html`<${Button} size="sm" variant="secondary" class="rlist__spec" data-testid="room-spectate" disabled=${disabled}
+          title=${t('以观战者身份进入：不占博士席位，只能观看（每个同盟最多 {MAX_SPECTATORS} 名，模拟进行中也可进入）', { MAX_SPECTATORS })}
+          onClick=${() => onSpectate(row.code, row.node || 0)}>${t('观战')}<//>` : null}
+      <${Button} size="sm" variant="primary" class="rlist__join" disabled=${disabled} onClick=${() => onJoin(row.code, row.node || 0)}>${joinLabel || t('加入同盟')}<//>
+    </span>
   </li>`;
 }
 
@@ -67,7 +74,7 @@ function RoomRow({ row, disabled, onJoin, joinLabel = null }) {
  * 公开同盟列表。
  * @param {{ online: boolean, queued?: boolean, busy?: string | null, onJoin: (code: string) => void, onClose: () => void }} props
  */
-export function RoomListDialog({ online, queued = false, busy = null, onJoin, onClose, variant = null }) {
+export function RoomListDialog({ online, queued = false, busy = null, onJoin, onClose, variant = null, onSpectate = null }) {
   const [rows, setRows] = useState(null);
   const [failed, setFailed] = useState(false);
   const inFlight = useRef(false);
@@ -103,7 +110,7 @@ export function RoomListDialog({ online, queued = false, busy = null, onJoin, on
     <p class="modal__text rlist__cross">${t('包括别的服务器上的同盟：点「加入」会自动连过去并进入房间。')}</p>
     ${failed ? html`<p class="rlist__note" role="status"><${Icon} name="warn" />${t('列表暂时无法更新，稍后自动重试')}</p>` : null}
     ${rows === null ? html`<p class="rlist__note" role="status"><${Spinner} size="sm" />${t('正在载入同盟列表…')}</p>`
-      : rows.length ? html`<ul class="rlist" data-testid="room-list">${rows.map((row) => html`<${RoomRow} key=${row.code} row=${row} disabled=${!online || queued || !!busy} onJoin=${onJoin} joinLabel=${echo ? t('加入深潜') : null} />`)}</ul>`
+      : rows.length ? html`<ul class="rlist" data-testid="room-list">${rows.map((row) => html`<${RoomRow} key=${row.code} row=${row} disabled=${!online || queued || !!busy} onJoin=${onJoin} onSpectate=${onSpectate} joinLabel=${echo ? t('加入深潜') : null} />`)}</ul>`
       : html`<p class="rlist__note" data-testid="room-list-empty">${echo ? t('暂时没有公开的深渊回响房') : t('暂时没有等待博士的公开同盟')}</p>`}
   <//>`;
 }

@@ -6659,6 +6659,11 @@
         "customBytes": 218095
       },
       {
+        "path": "public/js/assets.js",
+        "baseExists": false,
+        "customBytes": 63774
+      },
+      {
         "path": "public/js/render/units.js",
         "baseExists": false,
         "customBytes": 170221
@@ -6692,6 +6697,11 @@
         "path": "public/js/screens/stats.js",
         "baseExists": false,
         "customBytes": 51444
+      },
+      {
+        "path": "public/js/ui/assetUrls.js",
+        "baseExists": false,
+        "customBytes": 10078
       },
       {
         "path": "public/js/ui/bondStrip.js",
@@ -6831,7 +6841,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": false,
-        "customBytes": 69357
+        "customBytes": 69487
       },
       {
         "path": "server/match/PlayerState.js",
@@ -6846,7 +6856,7 @@
       {
         "path": "server/match/effectsMeta.js",
         "baseExists": false,
-        "customBytes": 44298
+        "customBytes": 44469
       },
       {
         "path": "server/match/gamedata.js",
@@ -6911,7 +6921,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 179302
+        "customBytes": 180137
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -7064,9 +7074,19 @@
         "customBytes": 44943
       },
       {
+        "path": "server/sim/content/garrisons/meta.js",
+        "baseExists": false,
+        "customBytes": 24101
+      },
+      {
         "path": "server/sim/content/support/index.js",
         "baseExists": false,
         "customBytes": 24030
+      },
+      {
+        "path": "server/sim/simdata.js",
+        "baseExists": false,
+        "customBytes": 47267
       },
       {
         "path": "shared/constants.js",
