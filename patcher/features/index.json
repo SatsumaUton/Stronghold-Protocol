@@ -6861,7 +6861,7 @@
       {
         "path": "server/match/match/combat.js",
         "baseExists": false,
-        "customBytes": 13534
+        "customBytes": 13956
       },
       {
         "path": "server/match/match/echo.js",
@@ -6906,7 +6906,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 164026
+        "customBytes": 167077
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -7019,9 +7019,19 @@
         "customBytes": 19463
       },
       {
+        "path": "server/sim/Battle.js",
+        "baseExists": false,
+        "customBytes": 14703
+      },
+      {
         "path": "server/sim/attack/health.js",
         "baseExists": false,
         "customBytes": 7539
+      },
+      {
+        "path": "server/sim/battle/echoRules.js",
+        "baseExists": false,
+        "customBytes": 4417
       },
       {
         "path": "server/sim/battle/spawns.js",
