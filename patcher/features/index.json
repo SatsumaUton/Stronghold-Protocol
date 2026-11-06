@@ -6564,6 +6564,23 @@
     ]
   },
   {
+    "id": "client-observe-in-combat",
+    "name": "战斗中切换观战队友（自己的作战在后台继续）",
+    "status": "ported-ui",
+    "files": [
+      {
+        "path": "public/js/battle/observe.js",
+        "baseExists": true,
+        "customBytes": 11840
+      },
+      {
+        "path": "public/js/ui/combatHud.js",
+        "baseExists": true,
+        "customBytes": 7329
+      }
+    ]
+  },
+  {
     "id": "deepecho",
     "name": "深渊回响（无尽深潜）——第三模式，含深潜大厅 / 祝福 / 诅咒 / 祭坛 / 排行 / 公开深潜 / 匹配池 / 断点续玩",
     "status": "ported",

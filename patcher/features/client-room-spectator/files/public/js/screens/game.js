@@ -87,7 +87,7 @@ import { ruleOption } from '../../../shared/plugins/rules.js';
 import { html, Spinner, PhaseBanner, ResultDialog, Icon, Button, confirmDialog, closeAllDialogs, useTicker } from '../ui/components.js';
 import { useGameData, GIcon } from '../ui/gameComponents.js';
 import { useFieldView } from '../ui/fieldHost.js';
-import { TopBar, liveLp, ownLeaks, uniteRemaining, tempInfo, tempReadyReason } from '../ui/hud.js';
+import { TopBar, liveLp, ownLeaks, uniteRemaining, tempInfo, tempReadyReason, AfkWarning } from '../ui/hud.js';
 import { BondStrip, BondPopup } from '../ui/bondStrip.js';
 import { TeamPanel } from '../ui/teamPanel.js';
 import { ShopBar } from '../ui/shopBar.js';
@@ -111,7 +111,7 @@ import { ExitModal, AwayOverlay, awayStore } from '../ui/matchChrome.js';
 import { RoundPopup, PhasePopup, phasePopupOf, roundsToBoss, preloadPopupArt } from '../ui/matchPopups.js';
 import { openGuide } from '../ui/guide.js';
 import { actions, onRefreshBusy } from '../ui/gameActions.js';
-import { FacingWheel, holdPiece, setPieceDir, syncPieceDirs, showRange, useTileScreen } from '../ui/facingWheel.js';
+import { FacingWheel, holdPiece, setPieceDir, syncPieceDirs, showRange, useTileScreen, ECHO_BAN_STYLE } from '../ui/facingWheel.js';
 import { Underframe, underframeRect, TempRowNotice } from '../ui/underframe.js';
 import { StandInTags } from './game/standInTags.js';
 import { needsFacing, facingIntent, previewGrid, pieceDir, underframeActions, retreatSlot, itemDestroyable } from '../ui/facing.js';
@@ -153,6 +153,10 @@ import { t, tParts } from '../../../shared/i18n.js';
 import { contentSet } from '../content.js';
 import { DEFAULT_VERSION, shownVersion } from '../versions.js';
 import { VersionVote } from '../ui/versionVote.js';
+import { EchoBlessing } from '../ui/echoBlessing.js';
+import { EchoBuffBar } from '../ui/echoStatus.js';
+import { EchoSupplyPanel } from '../ui/echoSupply.js';
+import { EchoProjectionPanel } from '../ui/echoProjection.js';
 import { TestConsole } from '../ui/testConsole.js';
 
 // 作战统计 is opt-in (settings `combatMetrics`, default off). The runner does not import the settings store;
@@ -181,7 +185,14 @@ export const BOOT_MIN_MS = 2300;
 export function GameScreen() {
   const pub = useStore((s) => s.match.public);
   const hasResult = useStore((s) => !!s.match.result);
+  // 盟约投影面板 (ui/echoProjection.js) is rendered here, beside the other 深潜 panels: it reads the pick from the
+  // private view (priv.projectionPick). Until 2026-11-07 this line passed a `priv` that this component never declared
+  // (no-undef) — the match screen threw a ReferenceError as soon as a match was entered.
+  const priv = useStore((s) => s.match.private);
   const ended = useStore((s) => !!s.room && !s.room.inMatch && !!s.match.public);
+  // 上一局是怎么没的（server/lobby.js toState 的 endReason）：被打断的对局没有结算帧，
+  // 只能靠这个说对话 —— 管理员终止 ≠ 服务器重启。
+  const endReason = useStore((s) => (s.room && !s.room.inMatch ? s.room.endReason || null : null));
   const away = useStore((s) => s.away, Object.is, awayStore);
   const autoplay = useStore((s) => !!(Array.isArray(s.match.public?.players) && s.match.public.players.find((p) => p && p.playerId === s.me.playerId)?.autoplay));
   const gd = useGameData();
@@ -211,6 +222,12 @@ export function GameScreen() {
     const id = setTimeout(() => { hold.current = null; endHold((n) => n + 1); }, Math.max(0, hold.current.until - Date.now()));
     return () => clearTimeout(id);
   }, [held]);
+  // 「深渊回响」：确认本局信息 / 选策略 / 对局中 / 结算 四类界面统一换主题（theme.css 的 html.sp-deepecho）。
+  // 必须放在下面那个 `if (!pub …) return` **之前** —— hooks 不能跟在条件返回后面。
+  // 判据两路取或：`pub.echo`（对局中一定有）**或** 房间 variant（选策略/确认本局信息阶段
+  // pub 里还没有 echo，只靠前者会让整个「选择策略」一屏仍然是绿的 —— 维护者 2026-11-04 实测）。
+  const diveRoom = useStore((s) => s.room?.variant === 'deepecho');
+  useDocClass('sp-deepecho', !!pub?.echo || diveRoom);
   if (!pub || !gd.ready || !versionReady) {
     return html`<div class="screen gload">
       <${Spinner} size="lg" label=${pub ? 'LOADING DATA' : 'ENTERING SIMULATION'} />
@@ -225,8 +242,14 @@ export function GameScreen() {
   else body = html`<${MatchScreen} />`;
   return html`${body}
     ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} room=${voteRoom} class="vervote--float" />` : null}
+    ${!hasResult && mode !== 'result' ? html`<${EchoBlessing} pub=${pub} />` : null}
+    ${!hasResult && mode !== 'result' ? html`<${EchoBuffBar} pub=${pub} />` : null}
+    ${!hasResult && mode !== 'result' ? html`<${EchoSupplyPanel} pub=${pub} />` : null}
+    ${!hasResult && mode !== 'result' ? html`<${EchoProjectionPanel} pub=${pub} priv=${priv} />` : null}
+    ${/* 深潜的深度已顶替 HUD 的回合数字；词条/祝福改放在「本局信息」抽屉里（EchoInfoBlock），
+        不再有浮在屏幕上的状态条挡住 HUD 和按钮（维护者 2026-11-04） */ null}
     ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
-    ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} />` : null}
+    ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} reason=${endReason} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${TestConsole} />` : null}`;
 }
 
@@ -416,7 +439,9 @@ function MatchScreen() {
     priv, stage: gd.stage(pub?.stageId), editable, field: deployField,
     getChess: (id) => { const c = gd.chess(id); return ownDiyRecord(c, priv, { chess: data.get('chess'), backups: data.get('backups') }) || c; },
     getToken: gd.token, getItem: gd.item, getEffect: gd.effect, backups: gd.backups, morphMode,
-  }), [priv, pub?.stageId, editable, gd.ready, deployField, data.locale(), morphMode]);
+    // 「深渊回响」部署禁令：贴上禁放地块 / 排异盟约，普通房间是 null
+    echoBans: pub?.echo?.bans || null,
+  }), [priv, pub?.stageId, pub?.echo?.bans, editable, gd.ready, deployField, data.locale(), morphMode]);
   live.current = { pub, priv, field, view, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
 
   // ---- camera: every request goes through setCam, which remembers it for the pen's way back -----------------------
@@ -1175,7 +1200,7 @@ function MatchScreen() {
     const L = live.current;
     if (isClientCombat(L.pub)) {
       const observing = !!L.watching && L.watching !== L.home && L.watching !== ownFieldId(L.myId);
-      const t = observeTarget(p, L.pub, L.myId, { observing, ownDone: L.localDone });
+      const t = observeTarget(p, L.pub, L.myId, { observing });
       if (t.back) { backHome(); return; }
       if (t.reason) { toast(t.reason, 'warn'); audio.sfx('error', { volume: 0.5 }); return; }
       if (t.fieldId) requestWatch(t.fieldId, p.playerId);
@@ -1853,6 +1878,8 @@ function MatchScreen() {
     snapshot: snapUnitsRef.current.get(resolved?.unitId),
     live: typeof liveStats === 'function' ? liveStats() : liveStats,
     loadout: detailLoadout, getChess: gd.chess, backups: gd.backups,
+    // 深渊祝福改攻击范围的（「远程」+1）：准备阶段没有 live 范围，靠它把预览画对
+    echoExtend: (Array.isArray(pub?.echo?.blessings) ? pub.echo.blessings : []).reduce((n, b) => n + (Number(b.rangeExtend) || 0), 0),
   }) : null;
   const cardRangeKey = cardRange ? JSON.stringify(cardRange) : '';
   useEffect(() => {
@@ -1860,6 +1887,17 @@ function MatchScreen() {
     showRange(view, cardRange?.grid, cardRange?.row, cardRange?.col, cardRange?.dir, SEL_RANGE);
     return () => showRange(view, null, 0, 0, null, SEL_RANGE);
   }, [view, cardRangeKey, showPrep, field]);
+  // 「深渊回响」诅咒「封锁」：把禁放地块常亮标红（维护者 2026-11-05）
+  const echoBanTiles = Array.isArray(pub?.echo?.bans?.tiles) ? pub.echo.bans.tiles : [];
+  const echoBanKey = echoBanTiles.join('|');
+  useEffect(() => {
+    if (!view || typeof view.highlightTiles !== 'function') return undefined;
+    const tiles = echoBanTiles
+      .map((k) => String(k).split(',').map(Number))
+      .filter(([r, c]) => Number.isFinite(r) && Number.isFinite(c));
+    try { view.highlightTiles(tiles, ECHO_BAN_STYLE); } catch { /* 装饰性 */ }
+    return () => { try { view.highlightTiles([], ECHO_BAN_STYLE); } catch { /* 装饰性 */ } };
+  }, [view, echoBanKey]);
   // the card's bond chips — and the popup a chip opens: a battle / scouted unit's OWNER's bonds (yours, or that
   // teammate's — m.public + live layers), your own piece's yours, a popup member card the popup's player; shop / reward
   // cards read the strip's (ui/watchBonds.js detailBondOwner)
@@ -1907,7 +1945,7 @@ function MatchScreen() {
       <${TeamPanel} pub=${pub} myId=${myId} watching=${watchingNow} bubbles=${bubbles} onWatch=${watchPlayer} cap=${gd.config?.lpCapPerRound ?? 10} uniteLocal=${uniteLocal}
         spMarks=${sp ? spMarks(sp, { solo }) : null}
         self=${Number.isFinite(priv?.lp) ? { lp: priv.lp, pending: liveLpNow.pending, unite: liveLpNow.unite, left: liveLpNow.left } : null}
-        observe=${cc ? { canObserve: (p) => observeTarget(p, pub, myId, { observing: watchingOther, ownDone: localDone }), observing: watchingOther, onBack: backHome } : null}
+        observe=${cc ? { canObserve: (p) => observeTarget(p, pub, myId, { observing: watchingOther }), observing: watchingOther, onBack: backHome } : null}
         onRosterOpen=${setTeamRosterOpen} />
 
       <div class="gm__effects"><${EffectsList} effects=${watchingOther && field ? (field.effects ?? null) : priv?.effects} /></div>
@@ -1920,7 +1958,7 @@ function MatchScreen() {
       </div>` : null}
 
       ${showShop ? html`<${ShopBar} priv=${priv} editable=${editable} collapsed=${barCollapsed} refreshBusy=${refreshBusy} onCollapse=${setCollapsed}
-        barRef=${barRef} offBonds=${offBonds}
+        barRef=${barRef} offBonds=${offBonds} bannedBonds=${pub?.echo?.bans?.bonds || null}
         onBuy=${buy} onLevel=${() => actions.levelUp()} onRefresh=${() => actions.refresh()} onFreeze=${() => actions.freeze()}
         onDetail=${(id, kind, hint) => setDetail({ kind: kind === 'item' ? 'item' : 'chess', id, hint: hint || null, tap: ++cardTap.current })}
         onDetailClose=${() => setDetail((d) => (d?.kind === 'chess' || d?.kind === 'item' ? null : d))}
@@ -1933,7 +1971,9 @@ function MatchScreen() {
 
       ${combat || mode === 'settle' ? html`<${CombatHud} pub=${pub} myId=${myId} watching=${watchingNow} hud=${hud} myDone=${!!myDone && alive}
         spectating=${!alive} spectator=${spectator} onWatch=${watchField}
-        client=${cc ? { progress, observing: observingName ? { name: observingName } : null, onBack: alive ? backHome : null, layers, layer, onLayer: setLayer } : null} />` : null}
+        client=${cc ? { progress, observing: observingName ? { name: observingName } : null, onBack: alive ? backHome : null, layers, layer, onLayer: setLayer,
+          // 战斗中观战队友: the own battle keeps running off screen — the HUD says so under the observing pill
+          ownRunning: phase === PHASE.COMBAT && !!alive && !spectator && !myDone } : null} />` : null}
 
       ${showDeadPill(alive, phase) ? (spectator
         ? html`<div class="gm__dead gm__dead--spectator" role="status"><${GIcon} name="eye" />${t('观战中 · 点击左侧成员头像切换查看')}</div>`
@@ -1967,7 +2007,7 @@ function MatchScreen() {
         onEnemy=${(k, n) => setDetail({ kind: 'enemy', id: k, count: n })} onChess=${(id) => setDetail({ kind: 'chess', id, foreign: true })} />` : null}
 
       ${bondPop ? html`<${BondPopup} bondId=${bondPop.bondId} entry=${bondPop.entry} priv=${bondPop.priv} banned=${pub?.bannedChess || []} owner=${bondPop.name} ownerId=${bondPop.ownerId}
-        off=${offBonds.has(bondPop.bondId)} morphMode=${morphMode}
+        off=${offBonds.has(bondPop.bondId)} echoBanned=${Array.isArray(pub?.echo?.bans?.bonds) && pub.echo.bans.bonds.includes(bondPop.bondId)} morphMode=${morphMode}
         place=${bpPlace} over=${!!resolved && bpPlace === dSide}
         onClose=${() => setBondOpen(null)} onMember=${(id, items, standInFor, diy) => setDetail({ kind: 'chess', id, owner: bondPop.ownerId, items: items || null, standInFor: standInFor || null, diy: diy || null })} />` : null}
 
@@ -2022,6 +2062,7 @@ function MatchScreen() {
       onConfirm=${(uid) => closeReplace(uid)} onCancel=${() => closeReplace(null)} />` : null}
 
     <${SettingsModal} open=${settingsOpen} onClose=${() => setSettingsOpen(false)} />
+    <${AfkWarning} pub=${pub} priv=${priv} />
     <${DownedPlate} open=${downed} onWatch=${() => setDowned(false)} onLeave=${() => { setDowned(false); setExitOpen(true); }} />
     <${ExitModal} open=${exitOpen} onClose=${() => setExitOpen(false)} solo=${solo} />
   </div>`;

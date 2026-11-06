@@ -32,8 +32,9 @@ function ProgressList({ list }) {
 
 /**
  * @param {{ pub:any, myId:string, watching:string|null, hud:any, myDone:boolean, onWatch:(fieldId:string)=>void, spectating?: boolean,
- *   client?: null | { progress?: any[]|null, observing?: { name: string }|null, onBack?: () => void,
+ *   client?: null | { progress?: any[]|null, observing?: { name: string }|null, onBack?: () => void, ownRunning?: boolean,
  *                     layers?: Array<{ key: string, label: string, self: boolean, watch: boolean }>, layer?: string, onLayer?: (k: string) => void } }} props
+ *   ownRunning: a fighting player observing a teammate — the own battle keeps running in the background (2026-11-07)
  */
 export function CombatHud({ pub, myId, watching, hud, myDone, onWatch, spectating = false, spectator = false, client = null }) {
   // `spectator`: a spectator seat (community report #26) watches like an eliminated player, under its own caption
@@ -81,6 +82,10 @@ function ClientHud({ hud, myDone, spectating, spectator = false, client }) {
         <span class="vswitch__label"><${GIcon} name="eye" /><span>${observing.name}</span></span>
         ${client.onBack ? html`<button type="button" class="btn btn--secondary btn--sm chud__back" onClick=${() => client.onBack()}>
           <span class="btn__label">${t('返回战场')}</span></button>` : null}
+      </div>` : null}
+      ${/* 战斗中观战队友 (maintainer's decision 2026-11-07): the own battle runs off screen and is never paused */ null}
+      ${observing && !halves && client.ownRunning ? html`<div class="chud__msg chud__msg--note" role="status">
+        <${Icon} name="hourglass" /><span>${t('你的作战仍在后台进行')}</span>
       </div>` : null}
       ${halves ? html`<div class=${cx('vswitch', 'chud__layers', observing && 'is-observing')}>
         <button type="button" class="vswitch__arrow" disabled=${idx <= 0} aria-label=${t('左侧战场')} onClick=${() => step(-1)}><${Icon} name="chevronLeft" /></button>

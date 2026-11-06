@@ -1,7 +1,10 @@
 // Observing rules and labels of client-side combat (research 09 §3.1 / §6.3, DESIGN §14 "Spectating") — pure helpers
 // for the game screen, the team panel and the combat HUD (mirror of server/match/match/watch.js _watchClient):
 //   * prep (休整期): tap a teammate → 前往查看 → their board (read-only);
-//   * own normal battle running: no observing ("当前无法查看");
+//   * own normal battle running: observing a teammate's battle IS allowed (the maintainer's decision of 2026-11-07,
+//     replacing the official "no watching while your own battle runs"): the own battle is simulated locally and keeps
+//     running in the background (battle/runner.js advances every authoritative battle, rendered or not), so the view
+//     can switch to a teammate's live replica and back with 返回战场 without touching the own battle's outcome;
 //   * own battle over: "⌛ 作战结束，等待队友完成作战" + the teammates' progress; tap a teammate → 前往查看 → a local
 //     replica of their battle; 返回战场 goes back;
 //   * 联防 / 最终攻势: the ‹ › pill switches the camera LEFT half / 全景 / RIGHT half of the own field; the other pair's
@@ -34,13 +37,15 @@ export function nameOf(pub, playerId) {
 
 /**
  * What tapping a team row does: `{ back: true }` (own row while observing), `{ fieldId }` to observe, or `{ reason }`.
+ * A fighting player may observe a teammate's normal battle while the own one still runs (the own battle keeps running
+ * in the background — battle/runner.js); only the other pair's boss field and a field the player is already on stay
+ * refused. Eliminated players and spectator seats watch anything (no own field to protect).
  * @param {any} p m.public player row
  * @param {any} pub
  * @param {string} myId
- * @param {{ observing?: boolean, ownDone?: boolean }} [o] ownDone: the local simulation of the own battle already ended
- *   (its result is on the way to the server)
+ * @param {{ observing?: boolean }} [o]
  */
-export function observeTarget(p, pub, myId, { observing = false, ownDone = false } = {}) {
+export function observeTarget(p, pub, myId, { observing = false } = {}) {
   if (!isObj(p)) return { reason: t('无效的目标') };
   if (p.playerId === myId) return observing ? { back: true } : { reason: null };
   if (p.alive === false || p.status === 'left') return { reason: t('该队友已被淘汰，无法查看') };
@@ -54,7 +59,7 @@ export function observeTarget(p, pub, myId, { observing = false, ownDone = false
   if (!meAlive || !own) return { fieldId: target.fieldId };
   if (own.fieldId === target.fieldId) return { reason: t('队友与你在同一战场，使用 ‹ › 切换视角') };
   if (target.kind === 'boss' || target.kind === 'hidden') return { reason: t('无法查看另一组队友的战场') };
-  if (own.kind === 'normal' && own.live !== false && !ownDone) return { reason: t('作战中无法查看队友，作战结束后可前往查看') };
+  // a teammate's normal battle: open while the own battle runs too — its simulation continues off screen
   return { fieldId: target.fieldId };
 }
 

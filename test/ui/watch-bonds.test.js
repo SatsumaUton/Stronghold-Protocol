@@ -249,6 +249,20 @@ describe('§20.15 the ‹ › pill of a shared field watched with 前往查看 (
     const p2 = [...walk(own)].find((x) => hasClass(x, 'chud__layers'));
     assert.ok(p2 && !hasClass(p2, 'is-observing') && !/返回战场/.test(textOf(p2)));
   });
+  // 2026-11-07: a fighting player may observe a teammate — the HUD says the own battle keeps running off screen
+  test('observing while the own battle still runs: a note under the pill; none once the own battle ended', () => {
+    const watching = (ownRunning) => CombatHud({ pub: {}, myId: ME, watching: 'n:p2', hud: null, myDone: false,
+      client: { observing: { name: '阿米娅' }, onBack() {}, layers: [], layer: 'ALL', ownRunning } });
+    const running = watching(true);
+    const note = [...walk(running)].find((x) => hasClass(x, 'chud__msg--note'));
+    assert.ok(note && /后台/.test(textOf(note)), 'the note names the background battle');
+    assert.ok([...walk(running)].some((x) => hasClass(x, 'chud__observe')), 'the observing pill stays');
+    assert.ok(![...walk(watching(false))].some((x) => hasClass(x, 'chud__msg--note')), 'no note once the own battle is done');
+    // the note never shows on a 联防 / boss half pill (there the halves carry the caption)
+    const halves = CombatHud({ pub: {}, myId: ME, watching: 'u', hud: null, myDone: false,
+      client: { observing: { name: '阿米娅' }, onBack() {}, layers, layer: 'R', onLayer() {}, ownRunning: true } });
+    assert.ok(![...walk(halves)].some((x) => hasClass(x, 'chud__msg--note')));
+  });
 });
 
 describe('§20.15 the bonds: views + live layers', () => {

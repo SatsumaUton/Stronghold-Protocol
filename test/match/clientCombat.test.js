@@ -222,15 +222,21 @@ test('takeover: a connected client that never reports is taken over at time limi
   m.dispose();
 });
 
-test('observing: no watching while the own battle runs; after it ends a teammate\'s spec + clock; eliminated players watch anything', () => {
+test('observing: a teammate\'s battle while the own one runs or after it ends (spec + clock); eliminated players watch anything', () => {
   const h = makeMatch({ mode: 'coop', humans: 3, seed: 9107, fake: true, clientCombat: true, instant: false, pace: 'paced',
     script: (b) => ({ duration: b.players.includes('p_0') ? 2 : 30 }) }).start();
   const m = h.m;
   h.toPrep(1);
   for (const pid of ['p_0', 'p_1', 'p_2']) m.handle(pid, { t: 'g.ready', ready: true });
   h.run(() => m.phase === PHASE.COMBAT);
-  // p_1 still fights: it may not look elsewhere
-  assert.deepEqual(m.handle('p_1', { t: 'g.watch', fieldId: 'n:p_2' }), { error: 'WRONG_PHASE', detail: 'own battle running' });
+  // 2026-11-07: p_1 still fights and may look at p_2 — its own battle keeps running in the browser (the runner advances
+  // every authoritative battle), so the server hands out the display replica like it does after the own battle ends
+  assert.deepEqual(m.handle('p_1', { t: 'g.watch', fieldId: 'n:p_2' }), { ok: true });
+  const mid = h.lastTo('p_1', 'b.start');
+  assert.deepEqual([mid.fieldId, mid.watch, mid.authoritative], ['n:p_2', true, false]);
+  assert.equal(m.watchers.get('p_1'), 'n:p_2');
+  assert.deepEqual(m.handle('p_1', { t: 'g.watch', fieldId: 'n:p_1' }), { ok: true }, '返回战场');
+  assert.deepEqual([h.lastTo('p_1', 'b.start').fieldId, h.lastTo('p_1', 'b.start').watch], ['n:p_1', false]);
   h.run(() => fields(h).find((f) => f.fieldId === 'n:p_0').done);
   const target = fields(h).find((f) => f.fieldId === 'n:p_2');
   assert.equal(target.live, true);

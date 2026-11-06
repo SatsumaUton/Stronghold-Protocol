@@ -184,6 +184,7 @@ node patcher/check-deepecho.mjs --fix    # 把漂移/缺失的文件补进快照
 |---|---|---|---|
 | 公告条 | `matchmaker/public/client.js` | `client-announcement` | 刷新页面 |
 | 观战 / 房间旁观 | `public/js/screens/*`、`matchmaker/public/client.js` | `client-room-spectator` / `client-watch` | 刷新页面 |
+| **战斗中切换观战队友**（2026-11-07）<br>自己的作战进行中也能点队友头像 →「前往查看」切到他的战场：自己的那场战斗在浏览器里继续模拟（`battle/runner.js` 对每场权威战斗都推进，渲染与否不影响结果），HUD 提示「你的作战仍在后台进行」，「返回战场」回到同一场战斗（不重开）。另一组队友的首领战场仍不可查看；被淘汰玩家 / 观战席规则不变。服务端 `Match._watchClient` 不再回 `WRONG_PHASE 'own battle running'`。 | `public/js/battle/observe.js`、`public/js/ui/combatHud.js`、`server/match/match/watch.js`、`public/js/screens/game.js`、`public/css/screens/game.css`、`public/i18n/*.json` | `client-observe-in-combat`（其余文件已在 `game-core-match` / `game-core-client-screens` / `game-core-client-style` / `client-i18n` 里） | `server/**` 需重启节点，`public/**` 刷新页面 |
 | 游客建房 | `public/js/screens/lobby.js`、`matchmaker/public/client.js` | `client-guest-create` | 刷新页面 |
 | 表情弹幕 | `public/js/ui/*` | `client-emote-danmaku` | 刷新页面 |
 | 资源缓存（资源包） | `public/js/assetPack.js`、`public/js/assets.js` | `client-asset-cache` | 刷新页面 |

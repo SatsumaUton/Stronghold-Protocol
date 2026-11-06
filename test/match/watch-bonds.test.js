@@ -323,7 +323,9 @@ for (const elite of [false, true]) test(`runner: watched ${elite ? 'elite' : 'no
   assert.equal(diyRows('yanShip', h.ps('p_0').privateView()).some((x) => x.diy), false);
   for (const pid of ['p_0', 'p_1']) assert.deepEqual(h.m.handle(pid, { t: 'g.ready', ready: true }), { ok: true });
   h.runToPhase(PHASE.COMBAT, 1);
-  assert.deepEqual(h.m.handle('p_0', { t: 'g.watch', fieldId: 'n:p_1' }), { error: 'WRONG_PHASE', detail: 'own battle running' });
+  // 2026-11-07: watching a teammate while the own battle runs is allowed (the own battle keeps running off screen)
+  assert.deepEqual(h.m.handle('p_0', { t: 'g.watch', fieldId: 'n:p_1' }), { ok: true });
+  assert.deepEqual(h.m.handle('p_0', { t: 'g.watch', fieldId: 'n:p_0' }), { ok: true });
   assert.deepEqual(h.m.handle('s_spec', { t: 'g.watch', fieldId: 'n:p_1' }), { ok: true });
   const start = JSON.parse(JSON.stringify(h.lastTo('s_spec', 'b.start')));
   assert.deepEqual([start.watch, start.authoritative, start.elapsed], [true, false, 0]);
