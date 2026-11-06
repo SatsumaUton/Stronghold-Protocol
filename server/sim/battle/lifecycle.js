@@ -261,6 +261,8 @@ export class BattleLifecycle {
     const res = { time: Math.round(this.time * 1000) / 1000, reason: this.reason, perPlayer, killed: this.killed, total: this.total, resolved: this.resolved, errors: this.errorCount };
     if (this.unspawned && this.unspawned.length) res.unspawned = this.unspawned;
     if (this.sharedBoss) res.bossHpLeft = Math.max(0, this.sharedBoss.hp);
+    // 悬赏卡回执（2026-11-06）：只在真的打掉过卡时出现 —— 普通对局与 golden 的 result 逐字节不变。
+    if (this._bountyPaid && this._bountyPaid.size) res.bountyPaid = [...this._bountyPaid].sort();
     return res;
   }
 

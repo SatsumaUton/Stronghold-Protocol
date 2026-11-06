@@ -531,6 +531,7 @@
         "server/persist/lobbyState.js",
         "server/sim/Battle.js",
         "server/sim/attack/health.js",
+        "server/sim/battle/deploy.js",
         "server/sim/battle/echoRules.js",
         "server/sim/battle/spawns.js",
         "server/sim/content/bonds/addon/meta.js",
