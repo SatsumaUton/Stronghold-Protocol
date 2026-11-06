@@ -243,7 +243,7 @@ function onWelcome(msg) {
   const name = typeof msg.name === 'string' && msg.name ? msg.name : prev.me.name;
   identity.saveName(name);
   store.set({
-    me: { playerId: msg.playerId ?? null, name, tag: typeof msg.tag === 'string' && /^[0-9]{4}$/.test(msg.tag) ? msg.tag : null, token: typeof msg.token === 'string' ? msg.token : null },
+    me: { playerId: msg.playerId ?? null, name, tag: typeof msg.tag === 'string' && /^[0-9]{4}$/.test(msg.tag) ? msg.tag : null, title: typeof msg.title === 'string' && msg.title ? msg.title : null, token: typeof msg.token === 'string' ? msg.token : null },
     // the server's content identity (DESIGN §32): the diagnostics name it (diag.js contentLine)
     content: msg.content && typeof msg.content.vanilla === 'string' ? { vanilla: msg.content.vanilla } : null,
     // how many unofficial plugins it has (P1a — absent: none; content.js fetches the catalogue only when there are some)

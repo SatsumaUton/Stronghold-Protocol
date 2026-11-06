@@ -6591,7 +6591,7 @@
       {
         "path": "matchmaker/public/admin.html",
         "baseExists": false,
-        "customBytes": 87324
+        "customBytes": 88678
       },
       {
         "path": "matchmaker/public/client.js",
@@ -6636,7 +6636,7 @@
       {
         "path": "public/css/screens/room.css",
         "baseExists": false,
-        "customBytes": 81165
+        "customBytes": 81821
       },
       {
         "path": "public/css/screens/stats.css",
@@ -6651,22 +6651,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 229460
+        "customBytes": 230769
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 265436
+        "customBytes": 266928
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 254724
+        "customBytes": 256114
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 218023
+        "customBytes": 219287
       },
       {
         "path": "public/js/assets.js",
@@ -6701,7 +6701,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": false,
-        "customBytes": 91306
+        "customBytes": 92014
       },
       {
         "path": "public/js/screens/stats.js",
@@ -6841,7 +6841,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": false,
-        "customBytes": 276808
+        "customBytes": 277299
       },
       {
         "path": "server/match/Match.js",
@@ -7092,6 +7092,11 @@
         "path": "shared/protocol.js",
         "baseExists": false,
         "customBytes": 57688
+      },
+      {
+        "path": "shared/titles.js",
+        "baseExists": false,
+        "customBytes": 2605
       }
     ]
   },

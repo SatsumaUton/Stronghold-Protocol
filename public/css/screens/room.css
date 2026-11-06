@@ -393,6 +393,26 @@
 .rseat__who { display: flex; align-items: center; gap: .06rem; min-width: 0; font-size: calc(.18 * var(--t)); }
 .seat__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat__you { flex: none; padding: 0 .06rem; font-size: calc(.12 * var(--t)); font-weight: 700; color: var(--text-on-mint); background: var(--mint-500); }
+/* 称号（维护者 2026-11-07）：显示在名字（和「你」）后面，小而克制；配色只区分来源，不抢名字。 */
+.seat__title {
+  flex: none;
+  max-width: 6.4em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 .05rem;
+  font-size: calc(.115 * var(--t));
+  font-weight: 600;
+  letter-spacing: .02em;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  opacity: .92;
+}
+.seat__title.is-echo { color: #c9b4ff; }
+.seat__title.is-gold { color: #ffd899; }
+.seat__title.is-mint { color: var(--mint-s4); }
+.seat__title.is-blue { color: #9fc8ff; }
+.specbar__who .seat__title { margin-left: .04rem; }
 .rseat__doc { font-size: calc(.11 * var(--t)); letter-spacing: .1em; color: #7f8583; }
 .rseat__me { position: absolute; left: -.1rem; top: -.1rem; display: grid; place-items: center; width: max(.26rem, 16px); height: max(.26rem, 16px); color: #08221b; background: var(--mint-s4); border-radius: 3px; }
 .rseat__me .icon { width: 80%; height: 80%; }

@@ -2972,5 +2972,21 @@
   "盟约投影：「{name}」替换了「{old}」（你的全体干员按满档生效）": "Bond projection: \"{name}\" replaced \"{old}\" (all your operators enjoy it at full tier)",
   "盟约投影：「{name}」—— 你的全体干员按满档享受该核心盟约": "Bond projection: \"{name}\" — all your operators enjoy this core bond at full tier"
 ,
-  "（盟约投影：视为本盟约成员）": " (bond projection: counts as a member of this bond)"
+  "（盟约投影：视为本盟约成员）": " (bond projection: counts as a member of this bond)",
+  "初响见证者": "First Echo Witness",
+  "在「深渊回响」第一次开放时就踏进深渊的博士": "A doctor who stepped into the abyss the day Deep Echo first opened",
+  "深渊开拓者": "Abyss Pioneer",
+  "早期参与深潜测试、帮我们摸清深层机制的博士": "Took part in the early deep-dive tests and helped map the deep layers",
+  "深渊行者": "Abyss Walker",
+  "深潜深度长期排在全服前列的博士": "Long ranked near the top of the server's deep-dive depths",
+  "盟约学者": "Bond Scholar",
+  "对盟约搭配与数值有研究、给出过可靠结论的博士": "Studies bond line-ups and numbers, and has given reliable conclusions",
+  "资深博士": "Veteran Doctor",
+  "从公测第一天就在的老玩家": "Has been here since the first day of the open beta",
+  "战术顾问": "Tactical Advisor",
+  "经常给出高质量战术建议、并被采纳的博士": "Often gives high-quality tactical advice that gets adopted",
+  "社区之星": "Community Star",
+  "在玩家群 / 论坛活跃、热心帮助新人的博士": "Active in the player groups and forums, always helping newcomers",
+  "服务器守护者": "Server Guardian",
+  "帮忙排查线上问题、参与维护服务器的博士": "Helps diagnose live issues and maintain the server"
 }
