@@ -2038,8 +2038,9 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
    只出现在**能点**的深渊回响卡上（锁住时走 .hub-entry__ribbon「暂未开放」），斜贴在右上角。
    pointer-events: none：角标不吃点击，整张卡仍然是一个按钮。 */
 .hub-entry__new {
-  position: absolute; top: .02rem; right: -.02rem;
-  transform: rotate(11deg) translateY(-8%);
+  /* 位置必须在卡片内部：`.hub-entry` 有 overflow: hidden，超出哪怕一点点都会被裁掉（手机上尤其明显）。 */
+  position: absolute; top: .05rem; right: .06rem;
+  transform: rotate(9deg);
   transform-origin: right top;
   padding: .045rem .14rem .05rem;
   font-size: calc(.108 * var(--t)); font-weight: 900; letter-spacing: .06em; line-height: 1.1;
@@ -2055,6 +2056,18 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.18); }
 }
+@media (max-width: 720px) {
+  /* 手机：卡片更窄，角标再收小一点、转角更平，确保完整显示 */
+  .hub-entry__new {
+    top: .05rem; right: .05rem;
+    transform: rotate(6deg);
+    padding: .035rem .1rem .04rem;
+    font-size: calc(.094 * var(--t)); letter-spacing: .04em;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .hub-entry__new { animation: none; }
 }
+
+/* 深潜卡（能点的那张）允许溢出：角标旋转后不会被卡片裁掉；锁住时保持原样（overflow 仍 hidden）。 */
+.hub-entry--deepecho:not(.hub-entry--locked) { overflow: visible; }
