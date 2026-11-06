@@ -291,11 +291,12 @@ test('data/versions/act2autochess-v2_1: the same-id records that differ from tod
     'char_4055_bgsnow', 'char_4132_ascln', 'char_4133_logos', 'char_4195_radian', 'char_4204_mantra']);
   assert.deepEqual(changedIn((b) => b.units, (u) => Object.values(u.forms || {}).map((f) => (f.modules || []).map((m) => m.uniEquipId))),
     ['char_2012_typhon', 'char_2025_shu', 'char_300_phenxi', 'char_4138_narant']);
-  // the 自选 pools: the 9 operators released after 03-14 are absent (怒潮凛冬 among them); 银灰, 空弦, 卡涅利安 and 伺夜 are
+  // the 自选 pools: the 9 operators released after 03-14 are absent (怒潮凛冬 among them), plus the three 2025-11 picks
+  // 冻河 / 国度 / 塔露拉 (char_4244_tocka, char_4246_dminon, char_4247_oxi); 银灰, 空弦, 卡涅利安 and 伺夜 are
   // V2_1-only 自选 picks (pending: the kitted gate drops them); 焰狐龙梓兰 and 结城理 are not excluded yet
   const minus = (a, b) => a.filter((c) => !b.includes(c)).sort();
   const later = ['char_1015_aglna2', 'char_1051_headb2', 'char_1052_kalts2', 'char_4226_veen', 'char_4228_closur', 'char_4229_aphris',
-    'char_4230_mcnist', 'char_4231_clemnt', 'char_4235_thumpy'];
+    'char_4230_mcnist', 'char_4231_clemnt', 'char_4235_thumpy', 'char_4244_tocka', 'char_4246_dminon', 'char_4247_oxi'];
   const own = ['char_172_svrash', 'char_332_archet', 'char_426_billro', 'char_427_vigil'];
   assert.deepEqual([minus(Object.keys(today.diy.operators), Object.keys(v21b.diy.operators)), minus(Object.keys(v21b.diy.operators), Object.keys(today.diy.operators))], [later, own]);
   assert.deepEqual([minus(today.diy.ownedPool, v21b.diy.ownedPool), minus(v21b.diy.ownedPool, today.diy.ownedPool), v21b.diy.ownedPool.length], [later, own, 67]);
@@ -469,7 +470,9 @@ test('HTTP (M1, DESIGN §35.23): an enabled version\'s data is served (immutable
     const vanilla = await vr.json();
     assert.equal(Object.hasOwn(vanilla, 'version'), false);
     assert.equal(Object.hasOwn(vanilla, 'bounds'), false);
-    assert.ok(Object.values(vanilla.data).every((d) => /^\/data\/[a-z]+\.json\?v=[0-9a-f]{8}$/.test(d.url)));
+    // The names are the data files' basenames, so the pattern allows this fork's hyphenated runtime config
+    // (data/create-room.json, data/room-ttl.json) next to the built ones.
+    assert.ok(Object.values(vanilla.data).every((d) => /^\/data\/[a-z0-9-]+\.json\?v=[0-9a-f]{8}$/.test(d.url)));
     assert.deepEqual(vanilla, srv.content.index);
     assert.equal((await get(`/cs/${srv.versions.csOf('act1autochess').slice(0, 16)}/data/chess.json`)).status, 404);
     // /healthz names them and their match hosts

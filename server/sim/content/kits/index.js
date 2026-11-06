@@ -162,6 +162,12 @@ export const OPERATOR_KIT_FILES = Object.freeze([
   'op-kalts2.js',
   'op-monstr.js',
   'op-clemnt.js',
+  // 三位甄选干员（维护者 2026-11-07）：数据在 data/backups.json 的 units + diy.operators + ownedPool，
+  // 与 chess.json 无关（甄选干员本来就没有 chess 记录）。先注册 kit，再把三位登记进甄选池 ——
+  // test/diy.test.js 要求「每个 operator kit 都是甄选池里的 6★」，两边必须同时改。
+  'op-tocka.js',
+  'op-dminon.js',
+  'op-oxi.js',
 ]);
 
 /**

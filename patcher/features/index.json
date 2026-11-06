@@ -3272,6 +3272,11 @@
         "customBytes": 21744
       },
       {
+        "path": "server/sim/content/kits/ops/op-dminon.js",
+        "baseExists": false,
+        "customBytes": 15577
+      },
+      {
         "path": "server/sim/content/kits/ops/op-doroth.js",
         "baseExists": true,
         "customBytes": 20469
@@ -3432,6 +3437,11 @@
         "customBytes": 12093
       },
       {
+        "path": "server/sim/content/kits/ops/op-oxi.js",
+        "baseExists": false,
+        "customBytes": 18907
+      },
+      {
         "path": "server/sim/content/kits/ops/op-pallas.js",
         "baseExists": true,
         "customBytes": 11691
@@ -3510,6 +3520,11 @@
         "path": "server/sim/content/kits/ops/op-thumpy.js",
         "baseExists": true,
         "customBytes": 21283
+      },
+      {
+        "path": "server/sim/content/kits/ops/op-tocka.js",
+        "baseExists": false,
+        "customBytes": 20953
       },
       {
         "path": "server/sim/content/kits/ops/op-typhon.js",
@@ -6621,12 +6636,12 @@
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": false,
-        "customBytes": 135519
+        "customBytes": 135468
       },
       {
         "path": "public/css/screens/room.css",
         "baseExists": false,
-        "customBytes": 77118
+        "customBytes": 81165
       },
       {
         "path": "public/css/screens/stats.css",
@@ -6641,22 +6656,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 229504
+        "customBytes": 229696
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 265530
+        "customBytes": 265727
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 254889
+        "customBytes": 255074
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 218095
+        "customBytes": 218269
       },
       {
         "path": "public/js/assets.js",
@@ -6681,7 +6696,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": false,
-        "customBytes": 120533
+        "customBytes": 122273
       },
       {
         "path": "public/js/screens/result.js",
@@ -6691,7 +6706,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": false,
-        "customBytes": 92468
+        "customBytes": 91306
       },
       {
         "path": "public/js/screens/stats.js",
@@ -6806,7 +6821,7 @@
       {
         "path": "public/js/ui/roomList.js",
         "baseExists": false,
-        "customBytes": 11074
+        "customBytes": 11854
       },
       {
         "path": "public/js/ui/shopBar.js",
