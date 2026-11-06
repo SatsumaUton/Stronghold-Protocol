@@ -224,7 +224,23 @@ export class PlayerRound {
       bonds: (() => {
         const snap = bondSnapshot(reached ? this.bondsView() : this.bonds);
         const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
-        if (proj) snap[proj.bondId] = { ...(snap[proj.bondId] || {}), ...proj.state };
+        if (proj) {
+          // 投影只负责「按满档激活」，**绝不压低**玩家自己已有的数值。
+          // 2026-11-06 玩家反馈：选到与自己已有盟约**同一条**的投影时，原本靠层数生效的加成全部消失 ——
+          // 原因是这里以前直接 `...(proj.state)` 覆盖，而 proj.state.layers 恒为 0，把真实层数抹平了
+          // （bonds.json 里 `base_x + per_stack × L()` 那类效果随之归零）。人数同理：阿戈尔 5 人档的
+          // 投影不该把场上已经 6 人的那条盟约压回 5。
+          const cur = snap[proj.bondId] || null;
+          const state = (proj.state && typeof proj.state === 'object') ? proj.state : {};
+          const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+          snap[proj.bondId] = {
+            ...(cur || {}),
+            count: Math.max(n(cur && cur.count), n(state.count)),
+            active: true,
+            tier: Math.max(1, n(cur && cur.tier), n(state.tier)),
+            layers: Math.max(0, n(cur && cur.layers), n(state.layers)),
+          };
+        }
         return snap;
       })(),
       projectedBond: (() => {
