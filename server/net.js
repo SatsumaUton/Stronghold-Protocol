@@ -811,6 +811,8 @@ export class Network {
       session.accountId = String(account.uid);
       session.accountTag = account.tag;
       session.tag = account.tag || session.tag;
+      // 称号（维护者 2026-11-07）：后台设置，随令牌下发；房间 / 大厅显示在名字后面
+      session.title = typeof account.title === 'string' && account.title ? account.title : null;
     }
     session.guest = msg.guest === true;
     // 管理员/服主身份：adminToken 是后台下发的能力令牌；accountToken 里同样带有由同一把
@@ -859,7 +861,7 @@ export class Network {
 
     let extra = null;
     try { extra = this.handler.welcomeInfo?.() ?? null; } catch (e) { this.log.error('[net] welcomeInfo crashed', e); }
-    const welcome = { ...(extra && typeof extra === 'object' ? extra : null), t: 'welcome', playerId: session.playerId, token: session.token, name: session.name, tag: session.tag || null, serverNow: now, version: PROTOCOL_VERSION, resumed };
+    const welcome = { ...(extra && typeof extra === 'object' ? extra : null), t: 'welcome', playerId: session.playerId, token: session.token, name: session.name, tag: session.tag || null, title: session.title || null, serverNow: now, version: PROTOCOL_VERSION, resumed };
     // 本服：告诉前端「这个连接是管理员」（adminToken 已验签，见上面 session.admin）。
     // 前端据此渲染游戏内管理员工具（点延迟胶囊）。真正的放行在服务端
     // （routeGameNow + Match.applyTestCommand 都查 session.admin / ps.admin），改前端没用。

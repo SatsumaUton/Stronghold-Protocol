@@ -62,6 +62,15 @@ function adminToolTtlMs() {
 //   只带一个布尔量（gameTool: true/false），不把整张权限表塞进令牌。
 //   owner 恒为 true（最高管理员不受权限表限制，和 adminHasPerm 的口径一致）。
 
+// 称号目录（shared/titles.js 是 ESM；CJS 这边用动态 import 读一次并缓存）。
+// 后台「称号」下拉的选项、以及设置时的合法性校验都走它 —— 加称号只改 shared/titles.js。
+let _titleCatalog = null;
+async function titleCatalog() {
+  if (_titleCatalog) return _titleCatalog;
+  try { _titleCatalog = await import('../shared/titles.js'); } catch { _titleCatalog = { TITLES: [] }; }
+  return _titleCatalog;
+}
+
 function userTokenFor(u, perms) {
   if (!u || !u.id) return null;
   const isOwner = u.role === 'owner';
@@ -73,6 +82,7 @@ function userTokenFor(u, perms) {
     uid: u.id,
     role: u.role || 'player',
     tag: u.tag || null,
+    title: u.title || null,
     gameTool,
     exp: Date.now() + 7 * 24 * 3600_000,
   })).toString('base64url');
@@ -526,6 +536,7 @@ async function ensureSchema() {
       nickname VARCHAR(32) NULL,
       tag CHAR(4) NULL,
       name VARCHAR(40) NULL,
+      title VARCHAR(32) NULL,
       pass_hash VARCHAR(255) NOT NULL,
       disabled TINYINT NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -533,7 +544,7 @@ async function ensureSchema() {
       UNIQUE KEY uk_email (email),
       KEY idx_nick_tag (nickname, tag)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-    for (const [col, ddl] of [['email', 'VARCHAR(120) NULL'], ['nickname', 'VARCHAR(32) NULL'], ['tag', 'CHAR(4) NULL']]) {
+    for (const [col, ddl] of [['email', 'VARCHAR(120) NULL'], ['nickname', 'VARCHAR(32) NULL'], ['tag', 'CHAR(4) NULL'], ['title', 'VARCHAR(32) NULL']]) {
       try { await c.query(`ALTER TABLE accounts ADD COLUMN ${col} ${ddl}`); } catch { /* 已有 */ }
     }
     try { await c.query('ALTER TABLE accounts ADD UNIQUE KEY uk_email (email)'); } catch { /* 已有 */ }
@@ -1360,6 +1371,11 @@ if (method === 'GET' && pathname === '/api/admin2/whoami') {
     const isOwner = me2.role === 'owner';
     me2.perms = isOwner ? ['*'] : await getAdminPerms();
     if (method === 'GET' && pathname === '/api/admin2/me') return sendJson(res, 200, { ok: true, admin: { id: me2.admin_id, email: me2.email, nickname: me2.nickname, tag: me2.tag, role: me2.role }, perms: me2.perms });
+    // 称号目录（维护者 2026-11-07）：后台「称号」下拉的选项，来源是 shared/titles.js
+    if (method === 'GET' && pathname === '/api/admin2/titles') {
+      const mod = await titleCatalog();
+      return sendJson(res, 200, { ok: true, titles: (mod.TITLES || []).map((t) => ({ id: t.id, name: t.name, desc: t.desc })) });
+    }
     if (method === 'POST' && pathname === '/api/admin2/watch-token') {
       // 独立权限 rooms.watch：隐身观战能看到房间里的一切（包括玩家名字与会话），
       // 但不占观战席、不算房间成员，属于「只读但范围最大」的能力，单独授权。
@@ -1473,11 +1489,11 @@ if (method === 'GET' && pathname === '/api/admin2/whoami') {
       if (onlyDeleted && !adminCan(me2, 'accounts.delete')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
       const like = '%' + q + '%';
       const [rows] = q
-        ? await db().query('SELECT id, email, nickname, tag, role, disabled, deleted_at, created_at, last_login_at FROM accounts WHERE (email LIKE ? OR nickname LIKE ? OR tag LIKE ?)' + (onlyDeleted ? ' AND deleted_at IS NOT NULL' : '') + ' ORDER BY id DESC', [like, like, like])
-        : await db().query('SELECT id, email, nickname, tag, role, disabled, deleted_at, created_at, last_login_at FROM accounts' + (onlyDeleted ? ' WHERE deleted_at IS NOT NULL' : '') + ' ORDER BY id DESC');
+        ? await db().query('SELECT id, email, nickname, tag, title, role, disabled, deleted_at, created_at, last_login_at FROM accounts WHERE (email LIKE ? OR nickname LIKE ? OR tag LIKE ?)' + (onlyDeleted ? ' AND deleted_at IS NOT NULL' : '') + ' ORDER BY id DESC', [like, like, like])
+        : await db().query('SELECT id, email, nickname, tag, title, role, disabled, deleted_at, created_at, last_login_at FROM accounts' + (onlyDeleted ? ' WHERE deleted_at IS NOT NULL' : '') + ' ORDER BY id DESC');
       return sendJson(res, 200, { ok: true, accounts: rows });
     }
-    const mr = /^\/api\/admin2\/accounts\/([0-9]+)\/(role|disabled|password|delete|restore|nickname)$/.exec(pathname);
+    const mr = /^\/api\/admin2\/accounts\/([0-9]+)\/(role|disabled|password|delete|restore|nickname|title)$/.exec(pathname);
     if (mr && method === 'POST') {
       const id = Number(mr[1]);
       const body = await readBody(req, 8 * 1024);
@@ -1498,6 +1514,16 @@ if (method === 'GET' && pathname === '/api/admin2/whoami') {
         await db().query('UPDATE accounts SET nickname = ?, name = ?, tag = ? WHERE id = ?', [nick, nick, tag, id]);
         await audit({ id: me2.admin_id, email: me2.email }, 'set-nickname', id, nick, ipOf(req));
         return sendJson(res, 200, { ok: true, id, nickname: nick, tag });
+      }
+      if (mr[2] === 'title') {
+        if (!adminCan(me2, 'accounts.rename')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
+        const mod = await titleCatalog();
+        const rawTitle = String(body.title || '').trim();
+        const titleId = rawTitle === '' || rawTitle === 'none' ? null : rawTitle;
+        if (titleId && !(mod.TITLES || []).some((t) => t.id === titleId)) return sendJson(res, 400, { ok: false, error: 'invalid_title' });
+        await db().query('UPDATE accounts SET title = ? WHERE id = ?', [titleId, id]);
+        await audit({ id: me2.admin_id, email: me2.email }, 'set-title', id, titleId, ipOf(req));
+        return sendJson(res, 200, { ok: true, id, title: titleId });
       }
       if (mr[2] === 'role') {
         if (!adminCan(me2, 'accounts.role')) return sendJson(res, 403, { ok: false, error: 'forbidden' });

@@ -540,7 +540,8 @@
         "server/sim/content/garrisons/meta.js",
         "server/sim/content/support/index.js",
         "server/sim/simdata.js",
-        "shared/protocol.js"
+        "shared/protocol.js",
+        "shared/titles.js"
       ],
       "tests": [
         "深潜大厅（难度 DE-1/2/3、本机最佳、本周最佳、排行榜）",
