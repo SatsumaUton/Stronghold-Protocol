@@ -2800,11 +2800,15 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     if (this.roomOf(session)) return fail(ERR.SESSION_IN_USE, 'already in a room');
     const asked = DIFFICULTIES.includes(difficulty) ? difficulty : null;
     // 人数范围：'multi' 只找多人同盟，'both' 两种都要，其余（含不传）按标准的 MAX_SEATS 人同盟
-    const wantMulti = seats === 'multi' || seats === 'both';
-    const wantFour = seats !== 'multi';
+    // 「深渊回响」的池子固定 4 人 + 标准规则：客户端就算带上了普通房的 5–20 人 / 实验规则参数，
+    // 这里也一律按 4 人 / 标准处理（否则深潜房 capacity 永远不满足 >4，玩家会一直等不到人）。
+    const seatsEff = wantVariant === 'deepecho' ? 'four' : seats;
+    const rulesEff = wantVariant === 'deepecho' ? 'standard' : rules;
+    const wantMulti = seatsEff === 'multi' || seatsEff === 'both';
+    const wantFour = seatsEff !== 'multi';
     // 规则：'experimental' 只找改过规则的，'both' 都要，其余（含不传）只要标准规则的
-    const wantExperimental = rules === 'experimental' || rules === 'both';
-    const wantStandard = rules !== 'experimental';
+    const wantExperimental = rulesEff === 'experimental' || rulesEff === 'both';
+    const wantStandard = rulesEff !== 'experimental';
     const fitsSeats = (room) => (wantFour && room.capacity === MAX_SEATS) || (wantMulti && room.capacity > MAX_SEATS);
     // 「改过规则」必须用 experimentalRuleChanged，不能只看 `!!room.experimental`：
     // 容量 4 的房间也会带一个 experimental 对象（playerCapacity 恒在），
