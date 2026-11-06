@@ -283,13 +283,17 @@ export function branchSpawn(b, tpl, name, phaseIdx, { fallback = null, mods = nu
  * only 炎佑 and, for 补给线, the 器物) reach a summon like any enemy; only the leader's own HP, the server pool, is exempt
  * ("领袖单位于服务器的生命值加成不受上述加成影响", PRTS 下半). They come as the battle's `flags.enemyScale` (gd.enemyScale of the
  * boss round, set by the match — a BattleSpec flag, so browsers run the same); `hpRatio` = the skill's own summon HP ratio
- * (死亡集群 `summon.hp_ratio`), multiplied in. No flags (tests, tools): the ratio alone. Until 0.2.1 the summons took no
+ * (死亡集群 `summon.hp_ratio`), which rides as `mods.hpRatio` — a **relative** multiplier the spawn applies on top of
+ * whatever scale it uses, so a deep dive can hand a summon the official per-difficulty HP and still keep the ratio
+ * (maintainer 2026-11-07). No flags (tests, tools): the ratio alone. Until 0.2.1 the summons took no
  * round effect at all (PR #272). 王权号令's equipment is left out: invulnerable, untargetable, it never fights.
  */
 function summonMods(b, hpRatio = null) {
   const s = b.flags && b.flags.enemyScale;
-  if (!s || typeof s !== 'object') return hpRatio ? { hpMul: hpRatio } : null;
-  const m = { hpMul: (Number.isFinite(s.hpMul) && s.hpMul > 0 ? s.hpMul : 1) * (hpRatio || 1), atkMul: s.atkMul, speedMul: s.speedMul };
+  const ratio = Number.isFinite(Number(hpRatio)) && Number(hpRatio) > 0 ? Number(hpRatio) : null;
+  if (!s || typeof s !== 'object') return ratio ? { hpRatio: ratio } : null;
+  const m = { hpMul: Number.isFinite(s.hpMul) && s.hpMul > 0 ? s.hpMul : 1, atkMul: s.atkMul, speedMul: s.speedMul };
+  if (ratio) m.hpRatio = ratio;
   if (s.supplyHpMul != null) m.supplyHpMul = s.supplyHpMul;
   return m;
 }
@@ -495,7 +499,7 @@ function kitShell(ab, e) {
   const stun = T(ab, 'killed.duration') ?? 0, dot = T(ab, 'killed.value') ?? 0;
   return [{
     spawn(b, e2) {
-      setHits(e2, e2.base.maxHp); hitCount(b, e2, true);                      // 需要数次攻击击倒 (× the round's HP: summonMods)
+      setHits(e2, e2.base.maxHp / (Number.isFinite(Number(b && b.flags && b.flags.enemyHpMul)) && Number(b.flags.enemyHpMul) > 0 ? Number(b.flags.enemyHpMul) : 1)); hitCount(b, e2, true);                      // 需要数次攻击击倒 (× the round's HP: summonMods)
       b.addBuff(e2, { key: 'boss:shellGuard', persist: true, flags: { noDisplace: true } }); // 失衡免疫 (PRTS 天赋; also 静态刚体)
     },
     tick(b, e2, a, dt) {
@@ -858,7 +862,7 @@ function kitEcho(ab, e) {
   const s = ab.sk.Skill;
   return [
     {
-      spawn(b, e2) { setHits(e2, e2.base.maxHp); hitCount(b, e2, true); e2.blockWeight = ECHO_BLOCK_WEIGHT; setEchoForm(b, e2, 'dark'); }, // hits × the round's HP (summonMods)
+      spawn(b, e2) { setHits(e2, e2.base.maxHp / (Number.isFinite(Number(b && b.flags && b.flags.enemyHpMul)) && Number(b.flags.enemyHpMul) > 0 ? Number(b.flags.enemyHpMul) : 1)); hitCount(b, e2, true); e2.blockWeight = ECHO_BLOCK_WEIGHT; setEchoForm(b, e2, 'dark'); }, // hits × the round's HP (summonMods)
       taken(c, b, e2) { const s = c.source || c.credit; if (s && s.side === 'ally') echoHit(b, e2); }, // 受到伤害时以自身为中心造成一次范围伤害 (a 无来源 burst too)
     },
     s && {

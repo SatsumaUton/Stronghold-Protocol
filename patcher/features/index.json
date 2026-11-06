@@ -6936,7 +6936,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 180137
+        "customBytes": 181152
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -6946,7 +6946,7 @@
       {
         "path": "server/match/match/echoWaves.js",
         "baseExists": false,
-        "customBytes": 39510
+        "customBytes": 40206
       },
       {
         "path": "server/match/match/echoWords.js",
@@ -7076,7 +7076,7 @@
       {
         "path": "server/sim/battle/spawns.js",
         "baseExists": false,
-        "customBytes": 16777
+        "customBytes": 18791
       },
       {
         "path": "server/sim/content/bonds/addon/meta.js",

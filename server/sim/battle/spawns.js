@@ -116,6 +116,19 @@ export class BattleSpawns {
     }
     if (!def) def = this.data.getEnemy(enemyKey);
     if (!def) { this.log(`unknown enemy ${enemyKey}`); def = { ...FALLBACK_ENEMY, id: enemyKey, key: enemyKey }; }
+    // 「深渊回响」里这只是不是**召唤物**（见 _echoSummonOf）：后面三处都要用，所以先算出来
+    const isSummon = this._echoSummonOf(def, enemyKey, opts.tag);
+    // 召唤物的**同场数量上限**（spec `echoRules.summonCaps`，Match 侧 ECHO_SUMMON_CAPS）：
+    // 只数还活着的 —— 打掉之后照常可以再召唤（维护者 2026-11-07：枯朽之种同场最多 50 只）。
+    if (isSummon) {
+      const caps = this.flags && this.flags.echoRules && this.flags.echoRules.summonCaps;
+      const cap = caps && typeof caps === 'object' ? Number(caps[def.key] ?? caps[enemyKey]) : NaN;
+      if (Number.isFinite(cap) && cap > 0) {
+        let alive = 0;
+        for (const u of this.enemies) if (u.alive && u.defId === (def.key ?? enemyKey)) alive++;
+        if (alive >= cap) return null;
+      }
+    }
     const ov = this.enemyOverrides[def.key] ?? this.enemyOverrides[enemyKey];
     if (ov && ov.stats) {
       const st = ov.stats;
@@ -134,6 +147,10 @@ export class BattleSpawns {
     // multipliers: finite and ≥ 0 (hp > 0), anything else counts as 1
     const mm = (v, pos = false) => { const n = fin(v, 1); return n < 0 || (pos && n <= 0) ? 1 : n; };
     const m0 = opts.mods || {};
+    // 召唤物自带的**相对**血量倍率（首领分体的 `summon.hp_ratio`：手 = 本体的 30%）。它与「本回合的
+    // 敌人缩放」分开传（content/bosses.js summonMods），因为召唤物要按原版各难度算血量，不能把深度倍率
+    // 混进来（维护者 2026-11-07）。
+    const hpRatio = Number(m0.hpRatio) > 0 && Number.isFinite(Number(m0.hpRatio)) ? Number(m0.hpRatio) : 1;
     const m = { hpMul: mm(m0.hpMul, true), atkMul: mm(m0.atkMul), defMul: mm(m0.defMul), resMul: mm(m0.resMul), speedMul: mm(m0.speedMul) };
     // a room's experimental multipliers (spec flags, on every copy of the battle) reach every enemy here, summons and
     // split children too. Never in `mods`: a leak carries its mods into 联防 and a child inherits them, so they would
@@ -147,13 +164,19 @@ export class BattleSpawns {
     // 不在波次 spawns 里，只有出怪这一处管得到。
     const absAll = this.flags && this.flags.enemyHpAbs;
     const absHp = absAll && typeof absAll === 'object' ? Number(absAll[def.key] ?? absAll[enemyKey]) : NaN;
-    // 「深渊回响」：召唤物用**原版**血量 / 攻击 / 移速（见 _echoSummonOf）—— 深度倍率（hpMul / atkMul /
-    // speedMul，含从父体波次继承下来的 mods）与 `enemyHpAbs` 的绝对血量表都不套用（维护者 2026-11-06）。
-    const isSummon = this._echoSummonOf(def, enemyKey, opts.tag);
-    const hpMulAll = isSummon ? 1 : (m.hpMul ?? 1) * roomHp;
+    // 「深渊回响」：召唤物用**原版**数值（见 _echoSummonOf）—— 深度倍率（hpMul / atkMul / speedMul，含从父体
+    // 波次继承下来的 mods）与 `enemyHpAbs` 的绝对血量表都不套用（维护者 2026-11-06）。
+    // 血量另有口径（维护者 2026-11-07）：**原版各难度下的血量** = 数据血量 × 官方该难度该回合的倍率
+    // （spec `echoRules.summonScale.hpMul`，表外取最后一档） × 召唤物自带的相对倍率（`mods.hpRatio`）。
+    // 普通房没有 summonScale，走原来的 mods.hpMul，逐字节不变。
+    const summonScale = isSummon && this.flags && this.flags.echoRules && this.flags.echoRules.summonScale;
+    const summonHpMul = summonScale && typeof summonScale === 'object' ? mm(summonScale.hpMul, true) : null;
+    const hpMulAll = isSummon ? (summonHpMul == null ? 1 : summonHpMul) : (m.hpMul ?? 1) * roomHp;
     const atkMulAll = isSummon ? 1 : (m.atkMul ?? 1) * roomAtk;
     const speedMulAll = isSummon ? 1 : (m.speedMul ?? 1);
-    const hpFinal = !isSummon && Number.isFinite(absHp) && absHp > 0 ? absHp : def.maxHp * hpMulAll;
+    // 绝对血量表（`enemyHpAbs`：频次怪「需要被打几下」）永远优先 —— 它本身就是原版血量，
+    // 召唤物也照用（否则 30 下会被召唤物的官方档乘成 86 下）。
+    const hpFinal = Number.isFinite(absHp) && absHp > 0 ? absHp : def.maxHp * hpMulAll * hpRatio;
     const e = new Unit({
       id: ++this._idSeq, side: 'enemy', kind: 'enemy', def, defId: def.key ?? enemyKey, name: def.name,
       x: start[1], y: start[0], motion: def.motion,

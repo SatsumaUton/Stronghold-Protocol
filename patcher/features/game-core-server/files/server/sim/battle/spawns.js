@@ -10,6 +10,7 @@ import { compileRoute } from '../ai.js';
 import { unitInfo } from '../snapshot.js';
 import { normalizeRoute, normalizeEnemy } from '../simdata.js';
 import { fin } from './util.js';
+import { isEchoSummon } from './echoRules.js';
 
 const FALLBACK_ENEMY = Object.freeze({
   type: 'enemy', id: 'enemy_unknown', key: 'enemy_unknown', name: '未知敌人', rank: 'NORMAL', maxHp: 2000, atk: 200, def: 100, res: 0,
@@ -24,12 +25,16 @@ export class BattleSpawns {
     // capped: a bogus count (Infinity, 1e9) would otherwise hang the constructor / exhaust memory
     const count = Math.min(MAX_ALIVE_ENEMIES, Math.max(1, Math.floor(fin(s.count ?? 1, 1)) || 1));
     const interval = Math.max(0, fin(s.interval, 0));
-    const def = this.data.getEnemy(s.enemyKey);
+    // 数据表里没有这个 key 时（深潜的跨版本敌人 `<version>:enemy_…`）用出怪自带的记录，
+    // 否则会拿到 FALLBACK_ENEMY（「未知敌人」，客户端贴图是红水滴）（维护者 2026-11-05）。
+    const def = this.data.getEnemy(s.enemyKey) || (s.enemyDef ? normalizeEnemy(s.enemyKey, s.enemyDef) : null);
     for (let i = 0; i < count; i++) {
       const p = {
         time: Math.max(0, fin(s.time, 0)) + i * interval, enemyKey: s.enemyKey, routeIndex: s.routeIndex ?? 0, route: s.route ?? null,
         mods: s.mods ?? null, sourcePlayerId: s.sourcePlayerId ?? null, bounty: s.bounty ?? null, tag: s.tag ?? null,
         ownerPlayerId: s.ownerPlayerId ?? null, pos: s.pos ?? null, seq: ++this._spawnSeq, countInTotal: s.countInTotal,
+        // 跨版本敌人自带记录（数据表里没有这个 key）；spawnEnemy 的 opts.def 会用它
+        def: s.enemyDef ?? null,
       };
       p.counted = p.countInTotal ?? (!(def && def.notCountInTotal) && p.tag !== 'boss' && p.tag !== 'part');
       // inTotal: the enemies THIS STAGE scheduled that count — the HUD capsule's own set (DESIGN §14 "顶栏胶囊"). A
@@ -78,6 +83,24 @@ export class BattleSpawns {
   }
 
   /**
+   * 「深渊回响」里这只刚出场的敌人是不是**召唤物**（与 Match 侧 `echoSummonOnly(gd)` 同口径：
+   * tokenOnly / 别人的 `summons` 目标 / 首领分体 tag:part / `token_*` / 频次类器物召唤物）。
+   *
+   * 维护者 2026-11-06：**所有召唤物都用原版数值** —— 不吃深度倍率（hpMul / atkMul / speedMul），
+   * 也不吃 `enemyHpAbs` 的绝对血量表。普通房 / 原版没有这两个 flag，这里恒为 false，逐字节不变。
+   */
+  _echoSummonOf(def, enemyKey, tag) {
+    const f = this.flags;
+    const rules = f && f.echoRules;
+    if (!rules && !(f && f.enemyHpAbs)) return false;   // 普通房 / 原版：完全不动
+    if (this.__echoSummonKeys === undefined) {
+      const arr = rules && Array.isArray(rules.summonKeys) ? rules.summonKeys : [];
+      this.__echoSummonKeys = new Set(arr.filter((k) => typeof k === 'string'));
+    }
+    return isEchoSummon({ tag, def, defId: (def && def.key) || enemyKey }, this.__echoSummonKeys);
+  }
+
+  /**
    * Spawn an enemy now. opts: { routeIndex, route, pos:[r,c], mods:{hpMul,atkMul,defMul,resMul,speedMul}, tag,
    * sourcePlayerId, ownerPlayerId, bounty:{coins,ownerPlayerId}, countInTotal, inTotal }
    */
@@ -93,6 +116,19 @@ export class BattleSpawns {
     }
     if (!def) def = this.data.getEnemy(enemyKey);
     if (!def) { this.log(`unknown enemy ${enemyKey}`); def = { ...FALLBACK_ENEMY, id: enemyKey, key: enemyKey }; }
+    // 「深渊回响」里这只是不是**召唤物**（见 _echoSummonOf）：后面三处都要用，所以先算出来
+    const isSummon = this._echoSummonOf(def, enemyKey, opts.tag);
+    // 召唤物的**同场数量上限**（spec `echoRules.summonCaps`，Match 侧 ECHO_SUMMON_CAPS）：
+    // 只数还活着的 —— 打掉之后照常可以再召唤（维护者 2026-11-07：枯朽之种同场最多 50 只）。
+    if (isSummon) {
+      const caps = this.flags && this.flags.echoRules && this.flags.echoRules.summonCaps;
+      const cap = caps && typeof caps === 'object' ? Number(caps[def.key] ?? caps[enemyKey]) : NaN;
+      if (Number.isFinite(cap) && cap > 0) {
+        let alive = 0;
+        for (const u of this.enemies) if (u.alive && u.defId === (def.key ?? enemyKey)) alive++;
+        if (alive >= cap) return null;
+      }
+    }
     const ov = this.enemyOverrides[def.key] ?? this.enemyOverrides[enemyKey];
     if (ov && ov.stats) {
       const st = ov.stats;
@@ -111,17 +147,42 @@ export class BattleSpawns {
     // multipliers: finite and ≥ 0 (hp > 0), anything else counts as 1
     const mm = (v, pos = false) => { const n = fin(v, 1); return n < 0 || (pos && n <= 0) ? 1 : n; };
     const m0 = opts.mods || {};
+    // 召唤物自带的**相对**血量倍率（首领分体的 `summon.hp_ratio`：手 = 本体的 30%）。它与「本回合的
+    // 敌人缩放」分开传（content/bosses.js summonMods），因为召唤物要按原版各难度算血量，不能把深度倍率
+    // 混进来（维护者 2026-11-07）。
+    const hpRatio = Number(m0.hpRatio) > 0 && Number.isFinite(Number(m0.hpRatio)) ? Number(m0.hpRatio) : 1;
     const m = { hpMul: mm(m0.hpMul, true), atkMul: mm(m0.atkMul), defMul: mm(m0.defMul), resMul: mm(m0.resMul), speedMul: mm(m0.speedMul) };
     // a room's experimental multipliers (spec flags, on every copy of the battle) reach every enemy here, summons and
     // split children too. Never in `mods`: a leak carries its mods into 联防 and a child inherits them, so they would
     // apply twice.
     const roomHp = mm(this.flags.enemyHpMul, true), roomAtk = mm(this.flags.enemyAtkMul);
+    // 深潜的「频次怪」绝对血量（spec flags `enemyHpAbs`：enemyKey → 血量，Match._ruleFlags()）。
+    // 这类怪（器物：青铜镜、铁矛头…）的 maxHp **就是**「需要被打几下」（sim 的 hitCount 让每次伤害只扣 1）。
+    // 数据 baseHp 只有 30 / 45 这种「击倒次数」，跟着深度缩放会变成几千下（实测铁矛头 6080）。
+    // 维护者 2026-11-06 最终定：**所有频次怪一律用原版血量**（不再有 500–2000 的深度曲线），
+    // 这张表就是「原版血量 + 挡住深度倍率」—— 它们多数是召唤物（新硎的 DeadSpawn 出铁矛头），
+    // 不在波次 spawns 里，只有出怪这一处管得到。
+    const absAll = this.flags && this.flags.enemyHpAbs;
+    const absHp = absAll && typeof absAll === 'object' ? Number(absAll[def.key] ?? absAll[enemyKey]) : NaN;
+    // 「深渊回响」：召唤物用**原版**数值（见 _echoSummonOf）—— 深度倍率（hpMul / atkMul / speedMul，含从父体
+    // 波次继承下来的 mods）与 `enemyHpAbs` 的绝对血量表都不套用（维护者 2026-11-06）。
+    // 血量另有口径（维护者 2026-11-07）：**原版各难度下的血量** = 数据血量 × 官方该难度该回合的倍率
+    // （spec `echoRules.summonScale.hpMul`，表外取最后一档） × 召唤物自带的相对倍率（`mods.hpRatio`）。
+    // 普通房没有 summonScale，走原来的 mods.hpMul，逐字节不变。
+    const summonScale = isSummon && this.flags && this.flags.echoRules && this.flags.echoRules.summonScale;
+    const summonHpMul = summonScale && typeof summonScale === 'object' ? mm(summonScale.hpMul, true) : null;
+    const hpMulAll = isSummon ? (summonHpMul == null ? 1 : summonHpMul) : (m.hpMul ?? 1) * roomHp;
+    const atkMulAll = isSummon ? 1 : (m.atkMul ?? 1) * roomAtk;
+    const speedMulAll = isSummon ? 1 : (m.speedMul ?? 1);
+    // 绝对血量表（`enemyHpAbs`：频次怪「需要被打几下」）永远优先 —— 它本身就是原版血量，
+    // 召唤物也照用（否则 30 下会被召唤物的官方档乘成 86 下）。
+    const hpFinal = Number.isFinite(absHp) && absHp > 0 ? absHp : def.maxHp * hpMulAll * hpRatio;
     const e = new Unit({
       id: ++this._idSeq, side: 'enemy', kind: 'enemy', def, defId: def.key ?? enemyKey, name: def.name,
       x: start[1], y: start[0], motion: def.motion,
       base: {
-        maxHp: def.maxHp * (m.hpMul ?? 1) * roomHp, atk: def.atk * (m.atkMul ?? 1) * roomAtk, def: def.def * (m.defMul ?? 1), res: def.res * (m.resMul ?? 1),
-        aspd: def.aspd, bat: def.bat, blockCnt: 0, moveSpeed: def.moveSpeed * (m.speedMul ?? 1), spRecovery: 0,
+        maxHp: hpFinal, atk: def.atk * atkMulAll, def: def.def * (m.defMul ?? 1), res: def.res * (m.resMul ?? 1),
+        aspd: def.aspd, bat: def.bat, blockCnt: 0, moveSpeed: def.moveSpeed * speedMulAll, spRecovery: 0,
         tauntLevel: def.tauntLevel, massLevel: def.massLevel, hpRecoveryPerSec: def.hpRecoveryPerSec, rangeRadius: def.rangeRadius,
       },
     });
@@ -180,6 +241,13 @@ export class BattleSpawns {
     e.hp = e.bossPool ? e.hp : e.s.maxHp;
     this.units.push(e);
     this.enemies.push(e);
+    // 深潜「洞彻」的永久反隐（spec flags `revealAll`，Match._ruleFlags()）：每只敌人一出生就挂 reveal。
+    // 为什么放在 sim 而不是服务端的事件钩子：深潜的战斗在**客户端**按 spec 跑，服务端钩子客户端看不到
+    // （玩家反馈 2026-11-06）。flag 缺失时这段是空操作，原版 / golden 逐字节不变。
+    if (this.flags && this.flags.revealAll === true) {
+      this.addBuff(e, { key: 'reveal:all', persist: true, flags: { reveal: true } });
+      if (e.hidden) this._setHidden(e, false);
+    }
     this._ev(['spawn', unitInfo(e)]);
     if (this._hooks.deploy) this.emit('deploy', { unit: e, initial: false });
     if (this._hooks.enemySpawn) this.emit('enemySpawn', { enemy: e });
