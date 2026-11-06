@@ -253,7 +253,6 @@ function notifyPartyLeave(room) {
 import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.js';
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { isEchoTester } from './echoTesters.js';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, ROOM_LIST_MAX, ROOM_LIST_MIN_CAPACITY, modeIdFor } from '../shared/constants.js';
 import { roomCapacity, PLAYER_CAPACITIES } from '../shared/playerCapacity.js';
 import { EXPERIMENTAL_DEFAULTS, isExperimental, experimentalOptions, experimentalRuleChanged } from '../shared/experimental.js';
@@ -1690,12 +1689,6 @@ case 'room.list': return this.roomList(msg);
     const room = norm.length === ROOM_CODE_LEN ? this.rooms.get(norm) : undefined;
     if (!room) return fail(ERR.ROOM_NOT_FOUND);
     if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
-    // 「深渊回响」：正式开放前只有管理员能进。创建侧已经挡了（create()），但管理员开的房间
-    // 一旦被设成公开同盟，普通玩家仍可能点「加入同盟」进来 —— 所以加入 / 观战 / 接管这条路也要挡。
-    // 已经在本房里的人不受影响（下面的 idempotent 分支照旧），否则重连会把自己拦在门外。
-    if (room.variant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId) && this.roomOf(session) !== room) {
-      return fail(ERR.ECHO_FORBIDDEN, msg('「深渊回响」暂未开放，仅管理员可进入'));
-    }
     const cur = this.roomOf(session);
     // idempotent for members; a spectator of this room goes on below: it may take a free player seat (header)
     // ★ 2026-11-06：**只有真的坐着**才算 idempotent。若会话仍挂在本房间、座位却已经没了
@@ -1823,10 +1816,6 @@ case 'room.list': return this.roomList(msg);
     const room = norm.length === ROOM_CODE_LEN ? this.rooms.get(norm) : undefined;
     if (!room) return fail(ERR.ROOM_NOT_FOUND);
     if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
-    // 「深渊回响」：观战席与玩家席同一道门禁（正式开放前只有管理员能进）。
-    if (room.variant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId) && this.roomOf(session) !== room) {
-      return fail(ERR.ECHO_FORBIDDEN, msg('「深渊回响」暂未开放，仅管理员可进入'));
-    }
     const wantHidden = hidden === true;
     if (wantHidden && !verifyWatchToken(adminToken, room.code)) return fail(ERR.BAD_MSG, 'admin watch denied');
     const cur = this.roomOf(session);
@@ -4234,8 +4223,6 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       //   「能不能改数据」由 Match 的 ps.admin 决定（三道门全过：adminId + gameTool + 验证码），
       //   那是另一回事，和徽章无关。
       admin: session.adminId === true,
-      // 深渊回响的测试名单（管理员自动算）
-      echoTester: session.adminId === true || session.echoTester === true || isEchoTester(session.accountId),
       loadout: session.loadout || null,
       ops: session.ops || null,
       notOwned: session.notOwned || null,

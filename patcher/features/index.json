@@ -6651,22 +6651,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 230769
+        "customBytes": 230657
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 266928
+        "customBytes": 266786
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 256114
+        "customBytes": 255948
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 219287
+        "customBytes": 219169
       },
       {
         "path": "public/js/assets.js",
@@ -6881,7 +6881,7 @@
       {
         "path": "server/match/match/combat.js",
         "baseExists": false,
-        "customBytes": 13587
+        "customBytes": 13575
       },
       {
         "path": "server/match/match/echo.js",
