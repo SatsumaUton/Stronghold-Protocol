@@ -168,6 +168,13 @@ export class PlayerState {
     // 否则断点续玩回来，挂机计数被清零，挂机的人可以靠重启洗掉记录。
     this.afkActed = false;
     this.afkRounds = 0;
+    // 掉线由 AI 接管（OFFLINE_TAKEOVER_ROUNDS，platform.js 的 _checkOffline；维护者 2026-11-06 移植参考版）：
+    //   offlineRounds   —— 连续多少个「备战结束」时该座位处于掉线；在线即归零。
+    //   offlineAutoplay —— 是否由「掉线接管」交给 AI 打（区别于玩家自己开的 AI 托管）；
+    //                      **只有它为 true 的座位才能被投票移出**。重连即收回。
+    // 两个字段跟着存档走（snapshot.js PLAYER_FIELDS.saved），否则读档后接管状态丢失。
+    this.offlineRounds = 0;
+    this.offlineAutoplay = false;
     this.lp = 0;
     this.bandId = null;
     /**
@@ -267,6 +274,9 @@ export class PlayerState {
      * 和 `deployCapBonus` 分开记 —— 那个还可能被盟约 / 机变加，封顶只针对祭坛这一项。
      */
     this.echoAltarDeployBought = 0;
+    // 「盟约投影」（维护者 2026-11-07 改为**每人各自选**）：这个玩家自己选中的核心盟约 id。
+    // 只影响他自己的战斗（battleInput 的 projectedBond），必须进存档。
+    this.echoProjection = null;
     this.deviceOverrides = {};
     this.tileOverrides = {};
     this.stats = {

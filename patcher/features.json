@@ -487,6 +487,7 @@
         "public/js/ui/roomList.js",
         "public/js/ui/shopBar.js",
         "public/js/ui/stats.js",
+        "public/js/ui/watchBonds.js",
         "server/echoTesters.js",
         "server/http/routes.js",
         "server/lobby.js",
@@ -536,6 +537,7 @@
         "server/sim/battle/players.js",
         "server/sim/battle/spawns.js",
         "server/sim/content/bonds/addon/meta.js",
+        "server/sim/content/bonds/core.js",
         "server/sim/content/support/index.js",
         "shared/constants.js",
         "shared/protocol.js"

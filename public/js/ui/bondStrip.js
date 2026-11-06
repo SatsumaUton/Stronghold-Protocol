@@ -181,6 +181,19 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
     return hit ? { id: hit.id.replace(/^projection:/, ''), desc: hit.desc || '' } : null;
   })();
   const isProjected = !!(projEntry && projEntry.id === bondId);
+  // 【盟约投影】成员行（2026-11-07）：投影的那条盟约，**场上所有己方干员**都算成员（服务端口径），
+  // 所以这里把还没进 members 的场上棋子补进来，标 projected（渲染成「（盟约投影）」标签，和「同构」并列）。
+  if (isProjected) {
+    const have = new Set(members.map((x) => x && x.id));
+    for (const p of (Array.isArray(priv?.board) ? priv.board : [])) {
+      if (!p || p.kind !== 'chess') continue;
+      const id = rawChess(p.id)?.baseId || String(p.id).replace(/_b$/, '_a');
+      if (!id || have.has(id)) continue;
+      const rec = getChess(id) || rawChess(id);
+      have.add(id);
+      members.push({ id, tier: rec?.tier ?? 0, name: rec?.name ?? id, onBoard: true, owned: true, inHand: false, banned: false, projected: true });
+    }
+  }
   const at = place || (beside === 'left' ? 'beside' : 'left');
   // 调和's +1 in this count (the server's word), and the 调和 operators on that board who give it
   const harmony = !off && Number.isInteger(entry?.harmony) && entry.harmony > 0 ? entry.harmony : 0;
@@ -240,10 +253,11 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
           return html`<button key=${mb.id} type="button" class=${cx('bpop__member', mb.onBoard && 'is-on', mb.owned && !mb.onBoard && 'is-owned', mb.banned && 'is-banned', mb.granted && 'is-granted', si && 'is-standin')}
               onClick=${() => (si ? onMember?.(mb.id, items, si.standInFor) : mb.pick ? onMember?.(mb.id, items, null, mb.pick) : onMember?.(mb.id, items))}
               data-granted=${mb.granted ? '1' : null} data-standin=${si ? si.charId : null} data-diy=${mb.diy ? mb.rec?.charId || '1' : null}
-              title=${`${name}${si ? t('（{note}）', { note: standInForText(mb.name) }) : ''}${mb.granted ? t('（变形同构体：视为本盟约成员）') : ''}${mb.banned ? t('（本局禁用）') : mb.onBoard ? t('（在场）') : mb.owned ? t('（整备区）') : ''}`}>
+              title=${`${name}${si ? t('（{note}）', { note: standInForText(mb.name) }) : ''}${mb.projected ? t('（盟约投影：视为本盟约成员）') : mb.granted ? t('（变形同构体：视为本盟约成员）') : ''}${mb.banned ? t('（本局禁用）') : mb.onBoard ? t('（在场）') : mb.owned ? t('（整备区）') : ''}`}>
             <${UnitThumb} kind="chess" id=${mb.id} ownerId=${ownerId ?? priv?.playerId} size="sm" dim=${!mb.owned || mb.banned} rec=${si || mb.rec || null} title=${name} />
             <span class="bpop__mname">${name}</span>
             ${mb.banned ? html`<span class="bpop__ban"><${Icon} name="close" /></span>` : null}
+            ${mb.projected ? html`<span class="bpop__iso" data-projection="1" aria-hidden="true">${t('投影')}</span>` : null}
             ${mb.granted ? html`<span class="bpop__iso" aria-hidden="true">${t('同构')}</span>` : null}
             ${mb.diy ? html`<span class="bpop__iso bpop__diy" data-diy="1" aria-hidden="true">${t('自选')}</span>` : null}
           </button>`;

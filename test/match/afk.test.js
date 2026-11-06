@@ -6,7 +6,7 @@
 //   · 掉线中 → 归零（**这是这次移植修的主要问题**：掉线的人发不出指令，
 //     旧的两条规则会把他当挂机踢掉，而他只是网断了）
 //   · AI 托管中 → 归零
-//   · 单人局（<2 真人）→ 根本不判定
+//   · 单人局（一真人 + AI，或真正单人）→ 根本不判定（判据是建局快照 soloUntimed/loneHuman）
 //   · afkRemoveRounds = 0 → 完全关闭
 //   · 到上限前一回合先警告一次，不直接踢
 import { test } from 'node:test';
@@ -64,7 +64,7 @@ test('连续 2 回合没有实质操作 → 移出（走 onIdleKick）', () => {
   assert.equal(p0.afkRounds, 1, '第 1 回合：只是计数');
   assert.deepEqual(kicked, [], '还没到上限，不该踢');
   m._checkIdle();
-  assert.deepEqual(kicked, [['p_0', 'idle'], ['p_1', 'idle']], '第 2 回合：两个真人都到上限，都被移出');
+  assert.deepEqual(kicked, [['p_0', 'afk'], ['p_1', 'afk']], '第 2 回合：两个真人都到上限，都被移出');
   assert.ok(p0._idleKicked && p1._idleKicked);
   // 幂等：再数一遍不重复踢
   kicked.length = 0;
@@ -115,25 +115,41 @@ test('AI 托管中不算挂机', () => {
   assert.ok(!kicked.includes('p_0'));
 });
 
-test('单人局（<2 个真人）根本不判定', () => {
+test('合作房里一真人 + 三个 AI（建局快照 loneHuman）根本不判定', () => {
   const h = makeMatch({ mode: 'coop', humans: 1, bots: 3, seed: 7, afkRemoveRounds: LIMIT });
   const m = h.m;
   const p0 = m.players.get('p_0');
   const kicked = [];
   m.onIdleKick = (playerId) => kicked.push(playerId);
   m.round = 5;
+  assert.equal(m.loneHuman, true, '建局时只有一个真人');
   for (let i = 0; i < 5; i++) m._checkIdle();
   assert.equal(p0.afkRounds, 0, '一真人 + 三个 AI 仍然是单人局，计数都不维护');
   assert.deepEqual(kicked, []);
 });
 
-test('中途退到只剩一个真人 → 不再判定', () => {
-  const { m, p1 } = idleScenario({ afkRemoveRounds: LIMIT });
+test('单人模式（mode: solo）不判定：一个人打单机，挂机不伤害别人', () => {
+  const h = makeMatch({ mode: 'solo', humans: 1, seed: 7, afkRemoveRounds: LIMIT });
+  const m = h.m;
+  const p0 = m.players.get('p_0');
+  const kicked = [];
+  m.onIdleKick = (playerId) => kicked.push(playerId);
+  m.round = 5;
+  for (let i = 0; i < 5; i++) m._checkIdle();
+  assert.equal(p0.afkRounds, 0);
+  assert.deepEqual(kicked, []);
+});
+
+test('2 人开局、中途走掉一个 → 仍然继续判定（判据是建局快照 loneHuman，参考版口径）', () => {
+  const { m, p0, p1 } = idleScenario({ afkRemoveRounds: LIMIT });
   const kicked = [];
   m.onIdleKick = (playerId) => kicked.push(playerId);
   p1.left = true;
-  for (let i = 0; i < 5; i++) m._checkIdle();
-  assert.deepEqual(kicked, [], '只剩一个真人时不该再按消极游戏踢人');
+  assert.equal(m.loneHuman, false, '快照还是「开局 2 个真人」——中途退出不改变它');
+  m._checkIdle();
+  assert.equal(p0.afkRounds, 1, '剩下的真人照样计数');
+  m._checkIdle();
+  assert.ok(kicked.includes('p_0'), '连续 2 个备战没操作 → 移出（参考版也这么做）');
 });
 
 test('到上限前一回合先警告一次，不直接踢', () => {

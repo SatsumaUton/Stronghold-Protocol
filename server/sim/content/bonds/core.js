@@ -731,7 +731,9 @@ export function payHammers(ctx) {
       const id = ctx.rollItem({ pool: p.pool });
       // onPrepEnd: grantItem stows this and does not merge until the next prep start, so a second copy does not
       // take an equipped hammer off for the fight (effectsMeta _deferItemMerge). [ASSUMED] every item that hook grants.
-      if (id && ctx.grantItem(id, { source: 'bond:victoriaShip' })) granted++;
+      // overdraw: 「每 25 层一件」是无条件给的（官方没有库存门槛）—— 深潜层数涨得快，
+      // 不这么写的话 16 层前后就把那几份库存领完，之后永远拿不到（玩家反馈「凯瑟琳的盟约 16 层后不触发」）。
+      if (id && ctx.grantItem(id, { source: 'bond:victoriaShip', overdraw: true })) granted++;
     }
   }
   if (granted && typeof ctx.toast === 'function') ctx.toast(msg('【维多利亚】获得{n}件维式重锤', { n: granted }), 'info');

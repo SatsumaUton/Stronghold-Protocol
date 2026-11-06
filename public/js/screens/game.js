@@ -87,7 +87,7 @@ import { ruleOption } from '../../../shared/plugins/rules.js';
 import { html, Spinner, PhaseBanner, ResultDialog, Icon, Button, confirmDialog, closeAllDialogs, useTicker } from '../ui/components.js';
 import { useGameData, GIcon } from '../ui/gameComponents.js';
 import { useFieldView } from '../ui/fieldHost.js';
-import { TopBar, liveLp, ownLeaks, uniteRemaining, tempInfo, tempReadyReason } from '../ui/hud.js';
+import { TopBar, liveLp, ownLeaks, uniteRemaining, tempInfo, tempReadyReason, AfkWarning } from '../ui/hud.js';
 import { BondStrip, BondPopup } from '../ui/bondStrip.js';
 import { TeamPanel } from '../ui/teamPanel.js';
 import { ShopBar } from '../ui/shopBar.js';
@@ -241,7 +241,7 @@ export function GameScreen() {
     ${!hasResult && mode !== 'result' ? html`<${EchoBlessing} pub=${pub} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${EchoBuffBar} pub=${pub} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${EchoSupplyPanel} pub=${pub} />` : null}
-    ${!hasResult && mode !== 'result' ? html`<${EchoProjectionPanel} pub=${pub} />` : null}
+    ${!hasResult && mode !== 'result' ? html`<${EchoProjectionPanel} pub=${pub} priv=${priv} />` : null}
     ${/* 深潜的深度已顶替 HUD 的回合数字；词条/祝福改放在「本局信息」抽屉里（EchoInfoBlock），
         不再有浮在屏幕上的状态条挡住 HUD 和按钮（维护者 2026-11-04） */ null}
     ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
@@ -2056,6 +2056,7 @@ function MatchScreen() {
       onConfirm=${(uid) => closeReplace(uid)} onCancel=${() => closeReplace(null)} />` : null}
 
     <${SettingsModal} open=${settingsOpen} onClose=${() => setSettingsOpen(false)} />
+    <${AfkWarning} pub=${pub} priv=${priv} />
     <${DownedPlate} open=${downed} onWatch=${() => setDowned(false)} onLeave=${() => { setDowned(false); setExitOpen(true); }} />
     <${ExitModal} open=${exitOpen} onClose=${() => setExitOpen(false)} solo=${solo} />
   </div>`;

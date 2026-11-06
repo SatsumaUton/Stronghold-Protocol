@@ -154,7 +154,7 @@ export class PlayerRound {
     // 维护者 2026-11-06：深潜取消 999 层上限（`layerCapOff`），所以这里的「本回合战斗叠层」也必须按不封顶合并，
     // 否则 999 层之后打再多层，视图里也只 +1 → 看起来像「叠层效果失效」。
     const view = bondsWithGains(this.bonds, this.pendingLayerGains, this.m && this.m.layerCapOff === true);
-    const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
+    const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond(this) : null;
     if (!proj) return view;
     const cur = view && view[proj.bondId] ? view[proj.bondId] : null;
     return {
@@ -225,7 +225,7 @@ export class PlayerRound {
       // （sim 的 unitBonds 会让所有己方干员都算该盟约成员 —— 维护者 2026-11-05）
       bonds: (() => {
         const snap = bondSnapshot(reached ? this.bondsView() : this.bonds);
-        const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
+        const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond(this) : null;
         if (proj) {
           // 投影只负责「按满档激活」，**绝不压低**玩家自己已有的数值。
           // 2026-11-06 玩家反馈：选到与自己已有盟约**同一条**的投影时，原本靠层数生效的加成全部消失 ——
@@ -246,7 +246,7 @@ export class PlayerRound {
         return snap;
       })(),
       projectedBond: (() => {
-        const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond() : null;
+        const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond(this) : null;
         return proj ? proj.bondId : undefined;
       })(),
       bandId: this.bandId,

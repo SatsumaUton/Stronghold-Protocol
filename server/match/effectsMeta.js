@@ -642,6 +642,7 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
         toTemp: !!opts.toTemp,
         deferMerge: ps._deferItemMerge > 0,
         requirePool: opts.requirePool !== false,
+        overdraw: opts.overdraw === true,
       });
       return p ? view(p) : null;
     },

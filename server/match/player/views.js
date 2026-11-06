@@ -54,9 +54,17 @@ export class PlayerViews {
     return out;
   }
 
+  /**
+   * 挂机移出警告：下一回合备战结束仍没有实质操作就会被移出（参考版口径，维护者 2026-11-06 补齐移植）。
+   * 与 `_checkIdle` 的判定同源：差一回合时给客户端一条常驻提示，而不是只弹一次几秒就消失的 toast。
+   */
+  afkWarned() {
+    const limit = this.m.afkRemoveRounds;
+    return limit > 1 && !this.isBot && !this.left && !this.botControlled && !this.afkActed && this.afkRounds >= limit - 1;
+  }
+
   privateView() {
-    const slots = this.shop.slots.map((s) => (s ? { kind: s.kind, id: s.id, price: this.priceOf(s), basePrice: s.basePrice, sold: !!s.sold, frozen: !!s.frozen } : null));
-    const offer = this.offers[0] || null;
+    const slots = this.shop.slots.map((s) => (s ? { kind: s.kind, id: s.id, price: this.priceOf(s), basePrice: s.basePrice, sold: !!s.sold, frozen: !!s.frozen } : null));    const offer = this.offers[0] || null;
     const free = this.shop.freeRefreshes > 0;
     const board = [];
     for (const { r, c, piece } of boardOrder(this.board)) board.push(this.pieceView(piece, [r, c]));
@@ -76,6 +84,14 @@ export class PlayerViews {
       bandId: this.bandId,
       ready: this.ready,
       canReady: this.alive && this.tempEmpty && !this.personalChoice && this.m.phase === PHASE.PREP,
+      // 挂机移出警告（维护者 2026-11-06 补齐）：差一回合就被踢时常驻显示，而不是只弹一次 toast
+      afkWarn: this.afkWarned(),
+      // 「盟约投影」每人各自选（维护者 2026-11-07）：自己已经选过哪一项（候选索引；= 候选数表示放弃）
+      projectionPick: (() => {
+        const box = this.m && this.m.echoProjectionOffer;
+        if (!box || box.round !== this.m.round || !(box.picks instanceof Map)) return null;
+        return box.picks.has(this.playerId) ? box.picks.get(this.playerId) : null;
+      })(),
       personalChoice: this.personalChoice ? {
         id: this.personalChoice.id,
         round: this.personalChoice.round,

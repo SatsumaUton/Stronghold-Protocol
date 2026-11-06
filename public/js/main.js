@@ -450,6 +450,24 @@ function wireNet() {
     // msgid + params (server ≥ 0.2.0) or the text itself as a msgid, in the current language
     toast(translateWire(msg), kind);
   });
+  // 被永久移出（挂机判定 / 队友投票，server Match _removeIdle）：退出房间、回大厅，并说明原因。
+  // 这条只发给被移出的那个人；其他人收到的是 m.notice（afkRemoved / kickPassed）。
+  net.on('m.removed', async (msg) => {
+    const rounds = Number.isInteger(msg.rounds) && msg.rounds > 0 ? msg.rounds : 2;
+    try { await net.request('room.leave', {}); } catch { /* already out of the room */ }
+    backToLobby();
+    toast(msg.reason === 'afk'
+      ? t('连续 {n} 回合没有任何操作，你已被移出对局', { n: rounds })
+      : msg.reason === 'kicked'
+        ? t('你掉线期间被队友投票移出了对局')
+        : t('你已被移出对局'), 'warn', { ttl: 10000 });
+  });
+  // 其他人看到的回执：谁被移出了、为什么
+  net.on('m.notice', (msg) => {
+    const name = typeof msg.name === 'string' && msg.name ? msg.name : t('博士');
+    if (msg.kind === 'afkRemoved') toast(t('{name} 连续 {n} 回合没有任何操作，已被移出对局', { name, n: Number(msg.rounds) || 2 }), 'info', { ttl: 6000 });
+    else if (msg.kind === 'kickPassed') toast(t('{name} 已被投票移出对局', { name }), 'info', { ttl: 6000 });
+  });
   net.on('m.ticker', (msg) => {
     if (typeof msg.text !== 'string') return;
     const text = tickerText(msg);

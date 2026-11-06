@@ -1980,7 +1980,7 @@ case 'room.list': return this.roomList(msg);
     let reseated = false;
     if (!seat) {
       const idx = room.freeSeat();
-      if (idx < 0) return fail(ERR.NOT_IN_ROOM, '你已不在座位上，请重新加入房间');
+      if (idx < 0) return fail(ERR.NOT_IN_ROOM, 'seat lost; rejoin the room');
       seat = this.humanSeat(idx, session, room);
       room.seats[idx] = seat;
       session.roomCode = room.code;
