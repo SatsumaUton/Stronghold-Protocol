@@ -44,16 +44,16 @@ const ERR_HINT = {
 };
 
 const TABS = [
-  { id: 'chess', label: '干员', field: 'chess' },
-  { id: 'item', label: '装备', field: 'items' },
-  { id: 'bond', label: '盟约', field: 'bonds' },
-  { id: 'strategy', label: '策略', field: 'bands' },
-  { id: 'bounty', label: '悬赏', field: 'enemies' },
-  { id: 'funds', label: '数值' },
-  { id: 'phase', label: '阶段' },
-  { id: 'token', label: '召唤' },
-  { id: 'shop', label: '商店' },
-  { id: 'choice', label: '机变' },
+  { id: 'chess', label: '干员', field: 'chess' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'item', label: '装备', field: 'items' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'bond', label: '盟约', field: 'bonds' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'strategy', label: '策略', field: 'bands' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'bounty', label: '悬赏', field: 'enemies' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'funds', label: '数值' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'phase', label: '阶段' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'token', label: '召唤' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'shop', label: '商店' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'choice', label: '机变' },  // i18n-ignore: 管理员面板（中文专用）
 ];
 
 const nameOf = (rec, key) => (rec && (data.localeName?.(rec.name || rec.displayName) || rec.name)) || key;
@@ -176,14 +176,14 @@ export function AdminTools({ open, onClose, anchor = null }) {
   const GLOBAL = new Set(['phase', 'round', 'timers', 'shop']);
   const OTHERS = new Set(['teamLp']);
   function confirmKind(cmd, args) {
-    if (OTHERS.has(cmd)) return '他人';
-    if (GLOBAL.has(cmd)) return '全局';
+    if (OTHERS.has(cmd)) return '他人';  // i18n-ignore: 管理员面板（中文专用）
+    if (GLOBAL.has(cmd)) return '全局';  // i18n-ignore: 管理员面板（中文专用）
     // 给自己发东西是「自身」，指定了别人的 ownerUid 就是「他人」。
     if (cmd === 'token') {
       const mine = Number(window.__SP_SELF_UID) || 0;
-      return args && args.ownerUid && mine && args.ownerUid !== mine ? '他人' : '自身';
+      return args && args.ownerUid && mine && args.ownerUid !== mine ? '他人' : '自身';  // i18n-ignore: 管理员面板（中文专用）
     }
-    return '自身';
+    return '自身';  // i18n-ignore: 管理员面板（中文专用）
   }
   // 会话内「本次不再确认」：这类指令勾过之后不再弹窗，关掉面板即失效。默认关闭。
   const [trusted, setTrusted] = useState({});
@@ -191,11 +191,11 @@ export function AdminTools({ open, onClose, anchor = null }) {
     if (kind === '自身') return true;              // 只动自己这一份，误点可撤销，不打断
     if (trusted[kind]) return true;
     const detail = kind === '全局'
-      ? '这条会改变整个房间的状态，场上所有人立刻可见'
-      : '这条会影响其他玩家的座位，对方会直接受到变化';
+      ? '这条会改变整个房间的状态，场上所有人立刻可见'  // i18n-ignore: 管理员面板（中文专用）
+      : '这条会影响其他玩家的座位，对方会直接受到变化';  // i18n-ignore: 管理员面板（中文专用）
     // 一段式确认：确认框里直接说明影响范围。免确认走面板顶部的开关，不在弹窗里问第二次，
     // 这样每次全局操作只要一次确认，不会因为两次弹窗把人烦到养成「连点确定」的坏习惯。
-    return window.confirm(`【${kind}影响】${note}\n\n${detail}。\n\n确定执行吗？`);
+    return window.confirm(`【${kind}影响】${note}\n\n${detail}。\n\n确定执行吗？`);  // i18n-ignore: 管理员面板（中文专用）
   };
 
   const send = async (cmd, args, note) => {

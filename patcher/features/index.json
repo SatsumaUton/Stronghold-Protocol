@@ -6641,22 +6641,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 220441
+        "customBytes": 222323
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 255353
+        "customBytes": 257520
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 244969
+        "customBytes": 247108
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 209457
+        "customBytes": 211275
       },
       {
         "path": "public/js/render/units.js",
@@ -6706,12 +6706,12 @@
       {
         "path": "public/js/ui/echoBlessing.js",
         "baseExists": false,
-        "customBytes": 19592
+        "customBytes": 19616
       },
       {
         "path": "public/js/ui/echoBuffs.js",
         "baseExists": false,
-        "customBytes": 10182
+        "customBytes": 10666
       },
       {
         "path": "public/js/ui/echoCodex.js",
@@ -6726,12 +6726,12 @@
       {
         "path": "public/js/ui/echoStatus.js",
         "baseExists": false,
-        "customBytes": 10653
+        "customBytes": 10717
       },
       {
         "path": "public/js/ui/echoSupply.js",
         "baseExists": false,
-        "customBytes": 4040
+        "customBytes": 4048
       },
       {
         "path": "public/js/ui/enemyDrawer.js",
@@ -6821,7 +6821,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": false,
-        "customBytes": 276605
+        "customBytes": 276685
       },
       {
         "path": "server/match/Match.js",

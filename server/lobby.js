@@ -1523,8 +1523,8 @@ case 'room.list': return this.roomList(msg);
       session.lastActiveAt = this.now();
     }
     const text = reason === 'idle' && room.match
-      ? '检测到消极游戏，你已被移出同盟'
-      : '长时间未操作，你已被自动移出同盟';
+      ? msg('检测到消极游戏，你已被移出同盟')
+      : msg('长时间未操作，你已被自动移出同盟');
     if (session && session.connected) {
       sendSession(session, { t: 'm.toast', kind: 'warn', text });
       sendSession(session, { t: 'room.closed', reason: 'kicked' });
@@ -1549,19 +1549,19 @@ case 'room.list': return this.roomList(msg);
     // 本服：游客不能建房，先给出明确原因，避免只拿到 BAD_MSG。
     if (session.guest || !session.accountId) {
       return fail(ERR.BAD_MSG, mode === 'solo'
-        ? '游客不能开始独立模拟，请先登录'
-        : '游客不能创建同盟模拟房间，请先登录');
+        ? msg('游客不能开始独立模拟，请先登录')
+        : msg('游客不能创建同盟模拟房间，请先登录'));
     }
     // 「深渊回响」（DESIGN-ABYSS.md）：正式开放前**只有管理员**能开这个模式，其他人一律拒绝。
     // 判据用身份 `session.adminId`（与「管理员建房免过期」同一口径），不要求兑换验证码 ——
     // 这是「谁能进这个模式」，不是「谁能改对局数据」（后者走 ps.admin 三道门）。
     const variant = askedVariant === 'deepecho' ? 'deepecho' : null;
-    if (variant && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId)) return fail(ERR.ECHO_FORBIDDEN, '「深渊回响」暂未开放，仅管理员与测试名单可进入');
+    if (variant && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId)) return fail(ERR.ECHO_FORBIDDEN, msg('「深渊回响」暂未开放，仅管理员与测试名单可进入'));
     // 深潜**不支持**实验性功能（维护者 2026-11-03 定）：enemyHpMul/Atk 会和 echoScale 叠乘、
     // playerCapacity 会改变配对与 boss 半场、poolPlan 会破坏「随机出怪」这个前提、
     // disableLayerCap 本来就是深潜的固定行为。这里**直接拒绝**而不是静默丢掉 ——
     // 悄悄丢掉会让玩家以为自己开的设置生效了。
-    if (variant && experimental != null) return fail(ERR.BAD_MSG, '「深渊回响」不支持实验性功能');
+    if (variant && experimental != null) return fail(ERR.BAD_MSG, msg('「深渊回响」不支持实验性功能'));
     // 「深渊回响」只支持**默认版本**（第二期下半）。
     // 原因：深渊的模板、跨版本怪物池、悬赏/词条都是按默认版本的数据标定的，
     // 换个版本会出现「模板对不上 / 数值漂移」。这里直接拒绝。
@@ -1570,12 +1570,12 @@ case 'room.list': return this.roomList(msg);
     // `ReferenceError: Cannot access 'version' before initialization` —— 深潜房一点「开始深潜」就 500。
     const version = askedVersion ?? this.defaultVersion();
     if (variant && version !== DEFAULT_VERSION) {
-      return fail(ERR.VERSION_UNSUPPORTED, '「深渊回响」只支持「第二期下半」，不支持其他版本');
+      return fail(ERR.VERSION_UNSUPPORTED, msg('「深渊回响」只支持「第二期下半」，不支持其他版本'));
     }
 
     // 深潜只开放 险境(NORMAL) / 绝境(HARD) / 终极(ABYSS) 三档：标准模拟(FUNNY)的强度曲线
     // 是按前 14 回合配的，R15 之后压力太低，谁都能潜到底 → 深度失去区分度（维护者 2026-11-03 选 B）。
-    if (variant && asked === 'FUNNY') return fail(ERR.BAD_MSG, '「深渊回响」不支持标准模拟难度');
+    if (variant && asked === 'FUNNY') return fail(ERR.BAD_MSG, msg('「深渊回响」不支持标准模拟难度'));
     // 房间级调参：只有管理员能传（上面那道门已经挡住非管理员建房），且**只有真的改了默认值才记下来** ——
     // 调过参的房间不进排行榜（榜要的是「标准配置下的深度」，否则深度之间不可比）。
     let echoCfg = null;
@@ -1591,7 +1591,7 @@ case 'room.list': return this.roomList(msg);
       conflict = this.accountRoomConflict(session);
     }
     if (conflict && conflict.room !== this.roomOf(session)) {
-      return fail(ERR.SESSION_IN_USE, '该账号已在其他房间中，请先离开原房间');
+      return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
     }
     // A test room exists only when the process switch allowed it. The check runs before the room is built.
     if (test === true && this.testEnabled !== true) return fail(ERR.TEST_DISABLED);
@@ -1694,7 +1694,7 @@ case 'room.list': return this.roomList(msg);
     // 一旦被设成公开同盟，普通玩家仍可能点「加入同盟」进来 —— 所以加入 / 观战 / 接管这条路也要挡。
     // 已经在本房里的人不受影响（下面的 idempotent 分支照旧），否则重连会把自己拦在门外。
     if (room.variant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId) && this.roomOf(session) !== room) {
-      return fail(ERR.ECHO_FORBIDDEN, '「深渊回响」暂未开放，仅管理员可进入');
+      return fail(ERR.ECHO_FORBIDDEN, msg('「深渊回响」暂未开放，仅管理员可进入'));
     }
     const cur = this.roomOf(session);
     // idempotent for members; a spectator of this room goes on below: it may take a free player seat (header)
@@ -1765,7 +1765,7 @@ case 'room.list': return this.roomList(msg);
       if (room.match) { try { this.callMatch(room, 'onReconnect', session.playerId); } catch { /* ignore */ } }
       return OK;
     }
-    if (conflict) return fail(ERR.SESSION_IN_USE, '该账号已在其他房间中，请先离开原房间');
+    if (conflict) return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
     const idx = room.freeSeat();
@@ -1817,7 +1817,7 @@ case 'room.list': return this.roomList(msg);
     if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
     // 「深渊回响」：观战席与玩家席同一道门禁（正式开放前只有管理员能进）。
     if (room.variant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId) && this.roomOf(session) !== room) {
-      return fail(ERR.ECHO_FORBIDDEN, '「深渊回响」暂未开放，仅管理员可进入');
+      return fail(ERR.ECHO_FORBIDDEN, msg('「深渊回响」暂未开放，仅管理员可进入'));
     }
     const wantHidden = hidden === true;
     if (wantHidden && !verifyWatchToken(adminToken, room.code)) return fail(ERR.BAD_MSG, 'admin watch denied');
@@ -1840,7 +1840,7 @@ case 'room.list': return this.roomList(msg);
         this.dropStaleAccountSeats(session);
         conflict = this.accountRoomConflict(session);
       }
-      if (conflict) return fail(ERR.SESSION_IN_USE, '该账号已在其他房间中，请先离开原房间');
+      if (conflict) return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
     }
     if (!wantHidden && room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
     // ★ 2026-10-30：**先去重、再判满员**。
@@ -1983,7 +1983,7 @@ case 'room.list': return this.roomList(msg);
     if (room.mode === 'solo') return fail(ERR.BAD_MSG, 'experimental options are for co-op only');
     // 「深渊回响」：不支持实验性功能（建房时已拒），房间里同样不许改 —— 否则房主能把
     // 人数调到 5–20、或者开 enemyHpMul 破坏深潜的数值口径。深潜固定最多 4 人。
-    if (room.variant === 'deepecho') return fail(ERR.BAD_MSG, '「深渊回响」不支持实验性功能（固定最多 4 人）');
+    if (room.variant === 'deepecho') return fail(ERR.BAD_MSG, msg('「深渊回响」不支持实验性功能（固定最多 4 人）'));
     if (room.match) return fail(ERR.ROOM_STARTED);
     // 兜底：`isExperimental` 要求两个默认键都在，老客户端 / 手动编组可能只发其中一个 ——
     // 这里补成显式 false 再校验，避免把合法请求判成「无效的请求」（维护者 2026-11-05）。
@@ -2794,7 +2794,7 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     const wantVariant = variant === 'deepecho' ? 'deepecho' : null;
     // 深潜池的门槛与建房一致：管理员 / 测试名单（否则会配进一个进不去的模式）
     if (wantVariant === 'deepecho' && session.adminId !== true && session.echoTester !== true && !isEchoTester(session.accountId)) {
-      return fail(ERR.ECHO_FORBIDDEN, '「深渊回响」暂未开放，仅管理员与测试名单可进入');
+      return fail(ERR.ECHO_FORBIDDEN, msg('「深渊回响」暂未开放，仅管理员与测试名单可进入'));
     }
     if (session.adminId !== true && !maintenanceGate().match) return fail(ERR.MATCH_DISABLED);
     if (this.roomOf(session)) return fail(ERR.SESSION_IN_USE, 'already in a room');
@@ -2855,7 +2855,7 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     //   直接回 BAD_MSG 会让玩家只看到一句「无效的请求」（BAD_MSG 的通用文案），
     //   完全看不出该怎么办。口径与 join() 一致：身份在途 → IDENTITY_PENDING，
     //   客户端等 sp-account-token 到了重新握手再试一次。
-    if (session.guest) return fail(ERR.BAD_MSG, '游客不能参与多人匹配，请先登录');
+    if (session.guest) return fail(ERR.BAD_MSG, msg('游客不能参与多人匹配，请先登录'));
     if (!session.accountId) return fail(ERR.IDENTITY_PENDING, 'account identity not received yet');
     if (!this.quickQueue) this.quickQueue = new Map();
     const ticket = `q${(this.quickSeq = (this.quickSeq || 0) + 1)}${Math.random().toString(36).slice(2, 8)}`;

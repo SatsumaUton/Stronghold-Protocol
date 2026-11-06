@@ -47,6 +47,8 @@ const STATUS_SPRITE = { ready: 'icon_ready', deciding: 'icon_waiting', done: 'ic
  * @param {{ uniteLocal?: Record<string, number> | null, cap?: number }} [opts]
  * @returns {{ lp: number|null, pending: number, unite: boolean, left: number|null }}
  */
+const POOL_BADGE = '池';  // i18n-ignore: 角标字形
+
 export function rowLp(p, pub, self = null, { uniteLocal = null, cap = 10 } = {}) {
   const pubLp = Number.isFinite(p?.lp) ? p.lp : null;
   if ((pub?.phase !== PHASE.COMBAT && pub?.phase !== PHASE.UNITE) || p?.alive === false) return { lp: pubLp, pending: 0, unite: false, left: null };
@@ -205,7 +207,7 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
         <div class="team__info">
           <span class="team__name">${p.name || t('博士')}</span>
           <div class="team__line">
-            ${Number(pub?.playerCapacity) > 4 ? html`<span class="team__pool" title=${t('卡池分组 {n}', { n: p.poolGroup || 1 })}>池${p.poolGroup || 1}</span>` : null}
+            ${Number(pub?.playerCapacity) > 4 ? html`<span class="team__pool" title=${t('卡池分组 {n}', { n: p.poolGroup || 1 })}>${POOL_BADGE}${p.poolGroup || 1}</span>` : null}
             <${LpTower} value=${lp.lp} size="sm" tone=${Number.isFinite(lp.lp) && lp.lp - lp.pending <= 5 ? 'danger' : null} pending=${lp.pending}
               tip=${rowLpTip(lp, cap)} />
             ${lp.left != null ? html`<${MissTag} n=${lp.left} name=${self ? null : p.name || t('博士')} />` : null}
