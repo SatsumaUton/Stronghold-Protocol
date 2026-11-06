@@ -194,6 +194,13 @@ export class BattleSpawns {
     e.hp = e.bossPool ? e.hp : e.s.maxHp;
     this.units.push(e);
     this.enemies.push(e);
+    // 深潜「洞彻」的永久反隐（spec flags `revealAll`，Match._ruleFlags()）：每只敌人一出生就挂 reveal。
+    // 为什么放在 sim 而不是服务端的事件钩子：深潜的战斗在**客户端**按 spec 跑，服务端钩子客户端看不到
+    // （玩家反馈 2026-11-06）。flag 缺失时这段是空操作，原版 / golden 逐字节不变。
+    if (this.flags && this.flags.revealAll === true) {
+      this.addBuff(e, { key: 'reveal:all', persist: true, flags: { reveal: true } });
+      if (e.hidden) this._setHidden(e, false);
+    }
     this._ev(['spawn', unitInfo(e)]);
     if (this._hooks.deploy) this.emit('deploy', { unit: e, initial: false });
     if (this._hooks.enemySpawn) this.emit('enemySpawn', { enemy: e });
