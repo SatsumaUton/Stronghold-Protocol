@@ -11,7 +11,7 @@ import { FieldRunner, DeadBattle } from '../fields.js';
 import { DELAYS } from './common.js';
 import { previewPlayer } from '../preview.js';
 import { morphBattleOpt } from '../../../shared/plugins/rules.js';
-import { echoHitCountEnemy, echoHitCountHp } from './echoWaves.js';
+import { echoHitCountEnemy, echoHitCountHp, echoSummonOnly } from './echoWaves.js';
 
 export class MatchCombat {
   /** Construct a battle; a constructor failure yields a finished stand-in (clean result) and is logged. */
@@ -94,11 +94,13 @@ export class MatchCombat {
     if (cache && cache.gd === this.gd && cache.hp === band) return cache.map;
     const map = {};
     try {
+      // 维护者 2026-11-06：**召唤物**（频次类器物召唤物 + 其它一切召唤物）一律用数据里的原始血量
+      //（baseHp == 需要被打几下），不参与 16 层起的 500–2000 深度曲线。
+      // 非召唤物的频次怪（波次里直接刷的那 2 个）仍按深度给绝对血量。
+      const summonOnly = echoSummonOnly(this.gd);
       for (const k of echoHitCountEnemy(this.gd)) {
-        // 维护者 2026-11-06：频次类召唤物**永远用数据里的原始血量**（baseHp == 需要被打几下），
-        // 不跟深度缩放、也不再按层给 500–2000 的绝对血量。
-        const base = band == null ? Math.max(1, Math.floor(Number(this.gd.enemy(k)?.stats?.maxHp) || 1)) : band;
-        map[k] = base;
+        const baseHp = Math.max(1, Math.floor(Number(this.gd.enemy(k)?.stats?.maxHp) || 1));
+        map[k] = band == null || summonOnly.has(k) ? baseHp : band;
       }
     } catch { /* 数据异常时按普通血量走 */ }
     this._echoHpAbsCache = { gd: this.gd, hp: band, map };

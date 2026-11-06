@@ -10,6 +10,7 @@ import { compileRoute } from '../ai.js';
 import { unitInfo } from '../snapshot.js';
 import { normalizeRoute, normalizeEnemy } from '../simdata.js';
 import { fin } from './util.js';
+import { isEchoSummon } from './echoRules.js';
 
 const FALLBACK_ENEMY = Object.freeze({
   type: 'enemy', id: 'enemy_unknown', key: 'enemy_unknown', name: '未知敌人', rank: 'NORMAL', maxHp: 2000, atk: 200, def: 100, res: 0,
@@ -82,6 +83,24 @@ export class BattleSpawns {
   }
 
   /**
+   * 「深渊回响」里这只刚出场的敌人是不是**召唤物**（与 Match 侧 `echoSummonOnly(gd)` 同口径：
+   * tokenOnly / 别人的 `summons` 目标 / 首领分体 tag:part / `token_*` / 频次类器物召唤物）。
+   *
+   * 维护者 2026-11-06：**所有召唤物都用原版数值** —— 不吃深度倍率（hpMul / atkMul / speedMul），
+   * 也不吃 `enemyHpAbs` 的绝对血量表。普通房 / 原版没有这两个 flag，这里恒为 false，逐字节不变。
+   */
+  _echoSummonOf(def, enemyKey, tag) {
+    const f = this.flags;
+    const rules = f && f.echoRules;
+    if (!rules && !(f && f.enemyHpAbs)) return false;   // 普通房 / 原版：完全不动
+    if (this.__echoSummonKeys === undefined) {
+      const arr = rules && Array.isArray(rules.summonKeys) ? rules.summonKeys : [];
+      this.__echoSummonKeys = new Set(arr.filter((k) => typeof k === 'string'));
+    }
+    return isEchoSummon({ tag, def, defId: (def && def.key) || enemyKey }, this.__echoSummonKeys);
+  }
+
+  /**
    * Spawn an enemy now. opts: { routeIndex, route, pos:[r,c], mods:{hpMul,atkMul,defMul,resMul,speedMul}, tag,
    * sourcePlayerId, ownerPlayerId, bounty:{coins,ownerPlayerId}, countInTotal, inTotal }
    */
@@ -128,14 +147,19 @@ export class BattleSpawns {
     //（新硎的 DeadSpawn 出铁矛头），不在波次 spawns 里，只有出怪这一处管得到。
     const absAll = this.flags && this.flags.enemyHpAbs;
     const absHp = absAll && typeof absAll === 'object' ? Number(absAll[def.key] ?? absAll[enemyKey]) : NaN;
-    const hpMulAll = (m.hpMul ?? 1) * roomHp;
-    const hpFinal = Number.isFinite(absHp) && absHp > 0 ? absHp : def.maxHp * hpMulAll;
+    // 「深渊回响」：召唤物用**原版**血量 / 攻击 / 移速（见 _echoSummonOf）—— 深度倍率（hpMul / atkMul /
+    // speedMul，含从父体波次继承下来的 mods）与 `enemyHpAbs` 的绝对血量表都不套用（维护者 2026-11-06）。
+    const isSummon = this._echoSummonOf(def, enemyKey, opts.tag);
+    const hpMulAll = isSummon ? 1 : (m.hpMul ?? 1) * roomHp;
+    const atkMulAll = isSummon ? 1 : (m.atkMul ?? 1) * roomAtk;
+    const speedMulAll = isSummon ? 1 : (m.speedMul ?? 1);
+    const hpFinal = !isSummon && Number.isFinite(absHp) && absHp > 0 ? absHp : def.maxHp * hpMulAll;
     const e = new Unit({
       id: ++this._idSeq, side: 'enemy', kind: 'enemy', def, defId: def.key ?? enemyKey, name: def.name,
       x: start[1], y: start[0], motion: def.motion,
       base: {
-        maxHp: hpFinal, atk: def.atk * (m.atkMul ?? 1) * roomAtk, def: def.def * (m.defMul ?? 1), res: def.res * (m.resMul ?? 1),
-        aspd: def.aspd, bat: def.bat, blockCnt: 0, moveSpeed: def.moveSpeed * (m.speedMul ?? 1), spRecovery: 0,
+        maxHp: hpFinal, atk: def.atk * atkMulAll, def: def.def * (m.defMul ?? 1), res: def.res * (m.resMul ?? 1),
+        aspd: def.aspd, bat: def.bat, blockCnt: 0, moveSpeed: def.moveSpeed * speedMulAll, spRecovery: 0,
         tauntLevel: def.tauntLevel, massLevel: def.massLevel, hpRecoveryPerSec: def.hpRecoveryPerSec, rangeRadius: def.rangeRadius,
       },
     });
