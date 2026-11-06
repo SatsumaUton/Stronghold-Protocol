@@ -929,6 +929,9 @@
 .chud__msg .icon { width: .22rem; height: .22rem; color: var(--gold); }
 .chud__msg--dead { border-color: rgba(255, 84, 84, .5); color: var(--red-premium); }
 .chud__msg--dead .icon { color: var(--red-premium); }
+/* 战斗中观战队友 (维护者 2026-11-07): a quieter line under the observing pill — the own battle keeps running off screen */
+.chud__msg--note { padding: .04rem .2rem; font-size: .15rem; color: var(--text-md); border-color: rgba(var(--mint-500-rgb), .25); }
+.chud__msg--note .icon { width: .17rem; height: .17rem; color: var(--text-md); }
 .vswitch { display: flex; align-items: center; gap: .1rem; height: .5rem; padding: 0 .06rem; background: rgba(8, 11, 10, .9); border: 1px solid var(--line-2); }
 .vswitch__arrow { width: .4rem; height: .4rem; display: grid; place-items: center; background: none; border: 0; color: var(--mint-500); }
 .vswitch__arrow .icon { width: .3rem; height: .3rem; }

@@ -210,9 +210,11 @@ fields' `startAt` / `lastProgressAt` and the boss start by the paused time and r
 
 ### 1.4 Watching fields
 Client-side combat (the default, DESIGN §14 Spectating; `Match._watchClient`): `g.watch` answers with the field's
-`b.start` (a display replica fast-forwarded to the field clock); an alive player may not watch another normal field
-while its own normal battle runs (`WRONG_PHASE 'own battle running'`) nor the other pair's boss field (`BAD_TARGET 'other
-group hidden'`); eliminated players watch anything. Whatever is watched, the viewer's bond strip shows the bonds of the
+`b.start` (a display replica fast-forwarded to the field clock); an alive player may watch a teammate's normal field
+while its own normal battle runs (the maintainer's decision of 2026-11-07 — the own battle is simulated in that
+player's browser and keeps running off screen, `public/js/battle/runner.js` advances every authoritative battle), and
+the other pair's boss field stays refused (`BAD_TARGET 'other group hidden'`); eliminated players watch anything.
+Whatever is watched, the viewer's bond strip shows the bonds of the
 player on screen from that player's `m.public players[].bonds` (§5) plus the replica's live layers (DESIGN §20.15) — no
 extra message. On a shared field (联防 / a pair's boss field) the client remembers the teammate picked with 前往查看
 (the `g.watch` request still names the field) and frames that player's half; a viewer who does not fight on the field
@@ -220,7 +222,7 @@ never gets its own strip there. A detail card's bond chips — and the popup a c
 (the popup carries the player it was opened for); a teammate's popup lists as members their operators in the battle on
 screen (the runner's `ownerOps`, its field meta predating their deploy). A client-side 返回战场 without an own field to return to (a 联防 leaker, an eliminated
 player) sends no `g.watch` (it would be refused with `BAD_TARGET 'no such field'`). A reload / reconnect while watching a
-teammate's battle after the own one gets the watched field again (`_resendBattle`, `b.start watch: true`); the fresh
+teammate's battle (after or during the own one) gets the watched field again (`_resendBattle`, `b.start watch: true`); the fresh
 screen adopts it as the watched field once per battle (`battle/observe.js resumedWatch`: a living player's teammate
 normal battle in COMBAT, first seen while watching nothing), so the observing pill, 返回战场 and the own row work again.
 Spectator seats (a remake feature, community report #26; server/lobby.js): `opts.spectators` / `addSpectator(id)` register

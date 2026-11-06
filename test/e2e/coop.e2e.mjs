@@ -711,26 +711,9 @@ async function forcedDisconnect(c, srv) {
   return true;
 }
 
-/**
- * research 09 §3.1: while the own normal battle runs a teammate cannot be observed; once it is over the waiting pill
- * (with the teammates' progress) shows, a teammate row → 前往查看 runs a local replica of a still running teammate
- * battle, and 返回战场 goes back to the own field.
- */
-async function observeAfterFinish(c) {
-  const s0 = await runnerState(c);
-  if (!s0 || !s0.own) return false;
-  if (!s0.done) {
-    // not yet: tapping a teammate never offers 前往查看 while the own battle runs (checked once)
-    if (!observeAfterFinish.refusedChecked) {
-      observeAfterFinish.refusedChecked = true;
-      await c.click('.team__row:not(.is-self) .team__btn', null, { nth: 0, optional: true, timeout: 2000 });
-      await sleep(300);
-      assert.equal(await c.exists('.team__ob'), false, 'no 前往查看 while the own battle runs');
-      c.note('own battle running: a teammate row offers no 前往查看');
-    }
-    return false;
-  }
-  const other = await c.page.evaluate(() => {
+/** The first live teammate field (with its team-row index) a viewer could 前往查看 — null when there is none. */
+async function watchableTeammate(c) {
+  return c.page.evaluate(() => {
     const s = globalThis.__SP__.store.get();
     const pub = s.match.public;
     if (pub?.phase !== 'COMBAT') return null;
@@ -739,6 +722,40 @@ async function observeAfterFinish(c) {
     const rows = (pub.players || []).slice().sort((a, b) => a.seat - b.seat).filter((p) => p.playerId !== s.me.playerId);
     return { fieldId: f.fieldId, nth: rows.findIndex((p) => p.playerId === f.players[0]) };
   });
+}
+
+/**
+ * research 09 §3.1, with the maintainer's decision of 2026-11-07: a fighting player may switch to a teammate's battle
+ * while the own one runs (the own battle keeps running in the background — battle/runner.js advances every
+ * authoritative battle, rendered or not), and 返回战场 comes back to it. Once the own battle is over the waiting pill
+ * (with the teammates' progress) shows, a teammate row → 前往查看 runs a local replica of a still running teammate
+ * battle, and 返回战场 goes back to the own field.
+ */
+async function observeAfterFinish(c) {
+  const s0 = await runnerState(c);
+  if (!s0 || !s0.own) return false;
+  if (!s0.done) {
+    // still fighting: the switch works, the own battle is neither restarted nor ended by it (checked once)
+    if (!observeAfterFinish.midChecked) {
+      const other = await watchableTeammate(c);
+      if (!other || other.nth < 0) return false;
+      await c.click('.team__row:not(.is-self) .team__btn', null, { nth: other.nth });
+      if (!(await c.click('.team__ob', '前往查看', { optional: true, timeout: 3000 }))) return false;
+      const ok = await c.page.waitForFunction((fid) => { const s = globalThis.__SP_RUNNER__?.state(); return !!s && s.fieldId === fid && s.watch; }, { timeout: 15000 }, other.fieldId).then(() => true, () => false);
+      if (!ok) return false; // the phase moved on
+      observeAfterFinish.midChecked = true;
+      assert.ok(await c.exists('.chud__observe'), 'observing pill while the own battle runs');
+      assert.ok(await c.exists('.chud__msg--note'), 'the note says the own battle keeps running in the background');
+      await c.shot('combat-observe-mid');
+      await c.click('.team__back, .chud__back', '返回战场', { optional: true, timeout: 3000 });
+      await c.page.waitForFunction(() => { const s = globalThis.__SP_RUNNER__?.state(); return !s || (s.own && !s.watch); }, { timeout: 10000 }).catch(() => {});
+      const s1 = await runnerState(c);
+      assert.ok(s1 && s1.battleId === s0.battleId, '返回战场 shows the own battle again, not a rebuild');
+      c.note(`own battle running: 前往查看 ${other.fieldId} and back, the own battle kept going`);
+    }
+    return false;
+  }
+  const other = await watchableTeammate(c);
   if (!other || other.nth < 0) return false;
   const pill = await c.page.waitForSelector('.chud__wait', { timeout: 5000 }).then(() => true, () => false);
   if (!pill && (await c.st()).phase !== 'COMBAT') return false; // the round moved on meanwhile

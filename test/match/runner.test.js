@@ -189,6 +189,41 @@ test('fast-forward to `elapsed` before showing; display replicas never report; b
   r3.runner.dispose();
 });
 
+test('watching a teammate while the own battle runs: the own authoritative battle keeps stepping off screen and reports its result', async () => {
+  const start = realStart(7312);
+  const r = rig();
+  r.net.emit('b.start', start);
+  await r.settle();
+  r.advance(1000);
+  const e = r.runner._entries.get(start.battleId);
+  const ticks = e.battle.tickCount;
+  // 前往查看 a teammate (a display replica) while the own battle is still running — 2026-11-07
+  const teammate = structuredClone(start);
+  teammate.battleId = 'watch-teammate';
+  teammate.fieldId = 'n:watch-teammate';
+  teammate.authoritative = false;
+  teammate.watch = true;
+  teammate.spec = { ...teammate.spec, fieldId: 'n:watch-teammate' };
+  for (const player of teammate.spec.players) player.playerId = 'watch-teammate';
+  r.net.emit('b.start', teammate);
+  await r.settle();
+  assert.equal(r.runner.state().fieldId, 'n:watch-teammate', 'the teammate battle is on screen');
+  r.advance(1000);
+  assert.ok(e.battle.tickCount > ticks, `the own battle keeps stepping off screen (${ticks} → ${e.battle.tickCount})`);
+  assert.equal(r.feed.snaps[r.feed.snaps.length - 1].fieldId, 'n:watch-teammate', "the frames on screen are the teammate's");
+  // the own battle finishes off screen and still reports its result (the server settles the round from it)
+  for (let i = 0; i < 400 && !e.done; i++) r.advance(1000, 50);
+  assert.ok(e.done, 'the own battle finished while another was on screen');
+  await r.settle();
+  assert.equal(r.net.sent.filter((x) => x.t === 'b.result').length, 1);
+  // 返回战场: the same battle is shown again, not rebuilt
+  r.net.emit('b.start', start);
+  await r.settle();
+  assert.equal(r.runner._entries.get(start.battleId), e);
+  assert.equal(r.runner.state().fieldId, start.fieldId);
+  r.runner.dispose();
+});
+
 test('b.end forced ends the local battle and reports at once; a new prep clears every battle', async () => {
   const start = realStart(7303);
   const r = rig();

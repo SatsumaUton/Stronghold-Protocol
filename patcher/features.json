@@ -432,6 +432,21 @@
       ]
     },
     {
+      "id": "client-observe-in-combat",
+      "name": "战斗中切换观战队友（自己的作战在后台继续）",
+      "status": "ported-ui",
+      "files": [
+        "public/js/battle/observe.js",
+        "public/js/ui/combatHud.js"
+      ],
+      "tests": [
+        "作战中点头像 →「前往查看」→ 切到队友战场，HUD 提示自己的作战仍在后台进行",
+        "自己的战斗不在画面上也照常推进并上报 b.result（返回战场是同一场，不重开）",
+        "另一组队友的首领战场仍不可查看；被淘汰 / 观战席规则不变",
+        "刷新页面后仍回到正在观看的队友战场（resumedWatch）"
+      ]
+    },
+    {
       "id": "deepecho",
       "name": "深渊回响（无尽深潜）——第三模式，含深潜大厅 / 祝福 / 诅咒 / 祭坛 / 排行 / 公开深潜 / 匹配池 / 断点续玩",
       "status": "ported",
