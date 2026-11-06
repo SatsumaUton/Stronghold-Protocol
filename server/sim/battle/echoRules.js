@@ -72,6 +72,98 @@ export function installEchoRules(battle) {
     groups++;
   }
 
+  // 主题转化（11 条祝福）：开局前 N 秒的对敌施压 / 反震 / 霜噬 / 惊惧 / 震荡 / 鲸吞。
+  // 逻辑与 Match 层的老实现逐行对应（`secs` 由 Match 按稀有度算好一起下发）。
+  const bondDebuffs = Array.isArray(rules.bondDebuffs) ? rules.bondDebuffs : [];
+  if (bondDebuffs.length) {
+    for (const b of bondDebuffs) {
+      const secs = Number(b.secs) || 0;
+      const leftNow = () => secs - (Number(battle.time) || 0);
+      // 开局窗口内对全场敌人挂异常（new 出来的敌人也补挂）
+      const strike = (e, left) => {
+        if (!e || e.alive === false || !(left > 0)) return;
+        if (typeof battle.applyStatus !== 'function') return;
+        for (const st of (b.statuses || [])) {
+          battle.applyStatus(e, st.key, { duration: left, value: st.value == null ? undefined : st.value, source: null });
+        }
+      };
+      if (Array.isArray(b.statuses) && b.statuses.length) {
+        for (const e of battle.enemies || []) strike(e, leftNow());
+        battle.on('enemySpawn', ({ enemy }) => strike(enemy, leftNow()), { priority: 57, owner: 'echo:rules' });
+      }
+      // 反震：窗口内敌人对己方造成伤害时吃真实反伤（source 为 null 的伤害不会触发，所以不递归）
+      if (Number(b.reflect) > 0 && typeof battle.dealDamage === 'function') {
+        battle.on('damaged', (c) => {
+          if (!(leftNow() > 0)) return;
+          if (!c || !c.source || c.source.side !== 'enemy') return;
+          if (!c.target || c.target.side !== 'ally') return;
+          const amount = Number(c.amount) || 0;
+          if (!(amount > 0)) return;
+          battle.dealDamage(null, c.source, {
+            amount: amount * Number(b.reflect), type: 'true', canDodge: false, tags: ['echo:reflect'],
+          });
+        }, { priority: 40, owner: 'echo:rules' });
+      }
+      // 霜噬：处于寒冷 / 冻结的敌人受到的伤害 +X%
+      if (Number(b.coldAmp) > 0) {
+        battle.on('hit', (c) => {
+          const t = c && c.target;
+          if (!t || t.side !== 'enemy' || !c.dmg) return;
+          const f = t.s && t.s.flags;
+          if (!f || (!f.cold && !f.freeze)) return;
+          c.dmg.mul = (Number(c.dmg.mul) || 1) * (1 + Number(b.coldAmp));
+        }, { priority: 45, owner: 'echo:rules' });
+      }
+      // 惊惧：窗口内被己方击中的敌人恐惧 duration 秒
+      if (b.fearOnHit && Number(b.fearOnHit.secs) > 0) {
+        const win = Number(b.fearOnHit.secs);
+        const dur = Math.max(0.5, Number(b.fearOnHit.duration) || 3);
+        battle.on('damaged', (c) => {
+          if ((Number(battle.time) || 0) >= win) return;
+          if (!c || !c.source || c.source.side !== 'ally') return;
+          const t = c.target;
+          if (!t || t.side !== 'enemy' || t.alive === false) return;
+          if (t.s && t.s.flags && t.s.flags.fear) return;
+          if (typeof battle.applyStatus === 'function') battle.applyStatus(t, 'fear', { duration: dur, source: c.source });
+        }, { priority: 38, owner: 'echo:rules' });
+      }
+      // 震荡：窗口内每 interval 秒对全场敌人造成「己方最高攻击 × atkScale」的真实伤害
+      if (b.pulse && Number(b.pulse.secs) > 0 && typeof battle.every === 'function') {
+        const win = Number(b.pulse.secs);
+        const iv = Math.max(0.5, Number(b.pulse.interval) || 2);
+        const scale = Number(b.pulse.atkScale) || 0.6;
+        battle.every(iv, () => {
+          if ((Number(battle.time) || 0) > win + 1e-9) return;
+          let atk = 0;
+          for (const u of battle.units || []) {
+            if (!u || u.side !== 'ally' || u.alive === false || !u.s) continue;
+            if (Number.isFinite(u.s.atk)) atk = Math.max(atk, u.s.atk);
+          }
+          const amount = atk * scale;
+          if (!(amount > 0) || typeof battle.dealDamage !== 'function') return;
+          for (const e of battle.enemies || []) {
+            if (!e || e.alive === false) continue;
+            battle.dealDamage(null, e, { amount, type: 'true', canDodge: false, tags: ['echo:pulse'] });
+          }
+        }, { owner: 'echo:rules' });
+      }
+      // 鲸吞：开战吞掉第一只出场的非领袖敌人（直接击杀，记真实伤害）
+      if (b.devour === true && typeof battle.dealDamage === 'function') {
+        let done = false;
+        battle.on('enemySpawn', ({ enemy }) => {
+          if (done || !enemy || enemy.alive === false) return;
+          if (enemy.tag === 'boss' || (enemy.def && enemy.def.rank === 'BOSS')) return;
+          done = true;
+          const hp = Number(enemy.hp ?? (enemy.s && enemy.s.hp) ?? (enemy.s && enemy.s.maxHp)) || 0;
+          battle.dealDamage(null, enemy, {
+            amount: Math.max(hp, 1), type: 'true', canDodge: false, tags: ['echo:devour'],
+          });
+        }, { priority: 37, owner: 'echo:rules' });
+      }
+      groups++;
+    }
+  }
+
   // 朔风（谢拉格寒风）：每 interval 秒让全场敌人寒冷 duration 秒 —— 直接用原版盟约的实现。
   if (rules.coldWind && Number(rules.coldWind.interval) > 0) {
     try {
