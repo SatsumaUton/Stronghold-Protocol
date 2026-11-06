@@ -33,6 +33,25 @@ import { metaBonds, frontPiece, behindPiece, distinctTiers } from '../support/me
 const ids = (s) => String(s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
 const num = (v, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(+v) ? +v : d);
 
+/**
+ * 「仅第 N 回合」表（garrison `bbStr.round_list`）是否放行 `round`。
+ *
+ * 官方数据只写到本期的最后一回合：凯瑟琳「整备能力」（garrison_127_a/b）是 `1,3,5,7,9,11,13,15`。
+ * 「深渊回响」会一直往后打，16 层以后表里一个都不匹配 → 特质彻底不触发（维护者 2026-11-07 反馈）。
+ * 所以：表内严格照表，超出表尾后按这张表的**等差步长**继续（1,3,…,15 → 所有奇数回合）；
+ * 不是等差序列（例如 `1,4,9` 这种「指定回合」）就只认表里的回合，不外推。
+ */
+export function roundListAllows(roundList, round) {
+  const rounds = ids(roundList).map((x) => num(x, -1)).filter((r) => r >= 0).sort((a, b) => a - b);
+  if (!rounds.length) return true;
+  if (rounds.includes(round)) return true;
+  if (!(round > rounds[rounds.length - 1]) || rounds.length < 2) return false;
+  const step = rounds[1] - rounds[0];
+  if (!(step > 0)) return false;
+  for (let i = 1; i < rounds.length; i++) if (rounds[i] - rounds[i - 1] !== step) return false;
+  return (round - rounds[0]) % step === 0;
+}
+
 /** "（无需激活盟约）" → false; "使已激活的…" / "当前激活且…" / "自身已激活的盟约" → true. */
 export function requireActiveOf(g) {
   const d = (g && g.desc) || '';
@@ -280,8 +299,8 @@ H.SERVER_GAIN_FREE_REFRESH_COUNT = {
 H.SERVER_GAIN_RANDOM_EQUIP_CHESS_IN_POOL = {
   run(ctx) {
     const { bb, bbStr } = ctx.source;
-    const rounds = ids(bbStr.round_list).map((x) => num(x, -1));
-    if (rounds.length && !rounds.includes(ctx.round)) return;
+    // 「若当前为奇数回合」在数据里是一张回合表（1,3,…,15）：表外（深潜 16 层以后）按步长延续，见 roundListAllows
+    if (!roundListAllows(bbStr.round_list, ctx.round)) return;
     for (let i = 0; i < Math.min(10, num(bb.count, 1)); i++) {
       const r = ctx.rollPool(bbStr.pool);
       const id = r && r.kind === 'item' ? r.id : ctx.rollItem({ maxTier: ctx.shopLevel() });
