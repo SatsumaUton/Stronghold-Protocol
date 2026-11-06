@@ -11,6 +11,9 @@ export const ENEMY_MOD_KEYS = new Set([
   'atkFlat', 'atkPct', 'atkMul', 'atkFinal', 'defFlat', 'defPct', 'defMul',
   'hpFlat', 'hpPct', 'hpMul', 'resFlat', 'resMul', 'moveFlat', 'moveMul',
   'aspd', 'blockCnt', 'rangeExtend', 'taunt', 'costMul',
+  // 2026-11-06 补：这三个键 units.js §stats 对**所有单位**（含敌人）都算，
+  // 之前白名单漏了它们，词条作者只好拿 hpPct / atkPct 凑，结果语义错成 ×16。
+  'dmgDealtMul', 'dmgTakenMul', 'hpRegen',
 ]);
 
 /** \u5e72\u5458\u8def\u5f84\u4f1a\u8bfb\u7684 mods \u952e\uff08\u795d\u798f\u7528\uff09\u3002 */
