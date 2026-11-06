@@ -12,8 +12,10 @@
 //   * 侵蚀词条（敌人生成时挂 buff，含「护盾 = 最大生命 30%」这种按敌人算的字段）
 //   * 对敌异常祝福（按概率挂永久 debuff）
 //   * 祝福 / 祭坛 / 补给的部署加成（deploy 时挂 mods）
-// 仍在 Match 层（尚未搬运）：主题转化的反震/霜噬/惊惧/震荡/鲸吞、朔风、炎佑、照破、干员减益诅咒。
-// 那些在「服务端跑战斗」的路径上照常生效（深潜目前强制服务端模拟）。
+//   * 朔风（周期性寒冷）、炎佑之契（开战召唤）、照破（周期性现形）
+// 仍在 Match 层（尚未搬运）：主题转化的反震/霜噬/惊惧/震荡/鲸吞、干员减益诅咒。
+import { startColdWind } from '../content/devices.js';
+import { spawnYanyou } from '../content/tokens.js';
 
 /**
  * 装上 spec 带来的深潜战斗规则。幂等（同一个 battle 调两次不会重复挂）。
@@ -67,6 +69,59 @@ export function installEchoRules(battle) {
       if ((unit.buffs || []).some((x) => x && x.key === key)) return;
       battle.addBuff(unit, { key, name: '疾风', desc: '攻速 +10%', mods: { ...mods }, persist: true, visible: true });
     }, { priority: 60, owner: 'echo:rules' });
+    groups++;
+  }
+
+  // 朔风（谢拉格寒风）：每 interval 秒让全场敌人寒冷 duration 秒 —— 直接用原版盟约的实现。
+  if (rules.coldWind && Number(rules.coldWind.interval) > 0) {
+    try {
+      startColdWind(battle, {
+        playerId: null,
+        interval: Number(rules.coldWind.interval),
+        duration: Number(rules.coldWind.duration) || 3,
+      });
+      groups++;
+    } catch { /* 数值异常时当作没有这条祝福 */ }
+  }
+
+  // 炎佑之契：开战召唤 count 只炎佑，攻/血按「己方场上干员总和的 30%」，lifetime 秒后消失。
+  if (rules.yanyou && typeof battle.spawnToken === 'function') {
+    const stacks = Math.max(1, Math.min(2, Math.floor(Number(rules.yanyou.stacks) || 1)));
+    const lifetime = Math.max(0, Number(rules.yanyou.lifetime) || 0);
+    battle.on('battleStart', () => {
+      const pid = battle.players && battle.players[0] ? battle.players[0].playerId : null;
+      if (pid == null) return;
+      let atk = 0;
+      let hp = 0;
+      for (const u of battle.units || []) {
+        if (u.side !== 'ally' || u.ownerId !== pid) continue;
+        if (u.kind !== 'op' && u.kind !== 'chess') continue;
+        atk += Number(u.s && u.s.atk) || 0;
+        hp += Number(u.s && u.s.maxHp) || 0;
+      }
+      if (!(hp > 0)) return;
+      const out = spawnYanyou(battle, pid, { atk: atk * 0.3, hp: hp * 0.3, count: stacks });
+      if (lifetime > 0 && out && out.length) {
+        battle.after(lifetime, () => { for (const y of out) if (y && y.alive) battle.kill(y, null); });
+      }
+    }, { once: true, owner: 'echo:rules' });
+    groups++;
+  }
+
+  // 照破：每 interval 秒让隐匿敌人现形 duration 秒（出场时也给一次，和 Match 层原实现一致）。
+  if (rules.revealPulse && Number(rules.revealPulse.interval) > 0 && typeof battle.addBuff === 'function') {
+    const dur = Math.max(0.5, Number(rules.revealPulse.duration) || 3);
+    const reveal = (e) => {
+      if (!e || e.alive === false) return;
+      if (e.hidden && typeof battle._setHidden === 'function') battle._setHidden(e, false);
+      battle.addBuff(e, { key: 'echo:reveal', name: '照破', duration: dur, flags: { reveal: true } });
+    };
+    battle.on('enemySpawn', ({ enemy }) => reveal(enemy), { priority: 58, owner: 'echo:rules' });
+    if (typeof battle.every === 'function') {
+      battle.every(Math.max(1, Number(rules.revealPulse.interval)), () => {
+        for (const e of battle.enemies || []) reveal(e);
+      }, { owner: 'echo:rules' });
+    }
     groups++;
   }
 
