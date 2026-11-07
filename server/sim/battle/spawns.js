@@ -244,6 +244,10 @@ export class BattleSpawns {
       if (this.sharedBoss) { e.bossPool = this.sharedBoss; this._syncBossHp(e); }
     }
     e.hp = e.bossPool ? e.hp : e.s.maxHp;
+    // 「深渊回响」场地（spec flags `echoRules`）：频次怪（hitCount，含逐火战士倒下后的余烬 / 火灰）的
+    // maxHp = 「要打几下」，不吃侵蚀词条的生命倍率 —— units.js `_recalc` 靠这个标记判断（维护者 2026-11-07）。
+    // 普通房间没有 echoRules，这段不执行，golden 逐字节不变。
+    if (this.flags && this.flags.echoRules) e.mem.echoField = true;
     this.units.push(e);
     this.enemies.push(e);
     // 深潜「洞彻」的永久反隐（spec flags `revealAll`，Match._ruleFlags()）：每只敌人一出生就挂 reveal。
