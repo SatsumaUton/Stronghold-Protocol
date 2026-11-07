@@ -348,6 +348,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 /* 祭坛里「现在买了也没用」的货（维护者 2026-11-08）：压暗 + 左侧灰条，按钮上直接写原因 */
 .echo-altar__row.is-blocked { opacity: .55; border-left: 3px solid rgba(200, 190, 220, .35); }
 .echo-altar__row.is-blocked:hover { border-color: var(--line); background: rgba(255, 255, 255, .025); }
+/* 「仅本回合」的角标：和「整局 1 次」区分开（维护者 2026-11-08：非永久的商品也要有说明） */
+.echo-altar__scope--round { color: #a9c7ff; }
 .erow__text { display: flex; flex-direction: column; gap: .03rem; min-width: 0; flex: 1; }
 .erow__name { font-size: calc(.16 * var(--t)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .erow__tags { display: flex; gap: .04rem; flex-wrap: wrap; }
