@@ -3544,14 +3544,26 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
           const peak = ps.bondPeak && typeof ps.bondPeak === 'object' ? ps.bondPeak : null;
           const used = ps.bonds && typeof ps.bonds === 'object' ? Object.entries(ps.bonds) : [];
           const live = used.filter(([, rec]) => rec && Number(rec.count) > 0);
-          const liveCores = live
-            .map(([id]) => id)
-            .filter((id) => {
-              const rec = typeof m.gd.bond === 'function' ? m.gd.bond(id) : null;
-              return rec && rec.isCore === true;
-            });
-          const cores = (Array.isArray(peak && peak.cores) && peak.cores.length ? peak.cores : liveCores)
-            .map((id) => (m.gd.bond(id) || {}).name || id);
+          // 只显示**最高的一个已激活核心盟约**（维护者 2026-11-07 晚：玩家反馈「没有激活的盟约也会出现在上面」）。
+          // 峰值里存的是「已激活核心盟约里层数最高的那一个」（player/round.js _trackBondPeak）；
+          // 旧存档没有 top 字段时退回现算：只在**已激活**的核心盟约里挑层数最高的。
+          const coreName = (id) => (id ? (m.gd.bond(id) || {}).name || id : null);
+          let topId = peak && typeof peak.top === 'string' ? peak.top : null;
+          if (!topId) {
+            let best = null;
+            for (const [id, rec] of live) {
+              const bond = typeof m.gd.bond === 'function' ? m.gd.bond(id) : null;
+              if (!bond || bond.isCore !== true || !rec || rec.active !== true) continue;
+              const n = Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0));
+              const count = Math.max(0, Math.floor(Number(rec.count) || 0));
+              if (!best || n > best.n || (n === best.n && count > best.count)
+                || (n === best.n && count === best.count && (Number(bond.bondOrder) || 0) < best.order)) {
+                best = { id, n, count, order: Number(bond.bondOrder) || 0 };
+              }
+            }
+            topId = best ? best.id : null;
+          }
+          const cores = topId ? [coreName(topId)] : [];
           // 最高盟约层数（维护者 2026-11-05）：只看盟约**层数**，不看词条、不看稀有度。
           // 口径 = 该玩家在用（count>0）的盟约里 `ps.layers[本盟约]` 的最大值；团灭后取峰值。
           const nowMax = Math.max(0, ...live.map(([id]) => Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0))));

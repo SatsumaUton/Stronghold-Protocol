@@ -239,12 +239,16 @@ export class PlayerState {
     /** computed bond states */
     this.bonds = {};
     /**
-     * 这一局**用过的最多盟约 / 最高层数**（{ cores: string[], bonds: number, maxLayers: number }）。
-     * 深潜排行榜要它（维护者 2026-11-05：榜上一律「无核心 · 最高 0 层」）——
+     * 这一局**用过的最多盟约 / 最高层数**（{ cores: string[], bonds: number, maxLayers: number, top: string|null,
+     * topLayers: number }）。深潜排行榜要它（维护者 2026-11-05：榜上一律「无核心 · 最高 0 层」）——
      * 团灭时 `eliminate()` 会把棋盘退回卡池，`bonds` 全归零，只有这个峰值还在。
      * 由 `round.js _trackBondPeak()` 在每次 recompute 后往上记（只增不减）。
+     *
+     * `top` / `topLayers`（维护者 2026-11-07 晚）：**已激活**的核心盟约里层数最高的那**一个**。
+     * 排行榜只显示它 —— 以前把用过的核心盟约全列出来（`cores`），没激活的、只放了一两个干员的也会上榜，
+     * 玩家反馈「没有激活的盟约也会出现在上面」。
      */
-    this.bondPeak = { cores: [], bonds: 0, maxLayers: 0 };
+    this.bondPeak = { cores: [], bonds: 0, maxLayers: 0, top: null, topLayers: 0 };
     /**
      * this round's IN_BATTLE layer gains of the finished normal battle ({ [bondId]: n }, Match._finishCombat) until
      * settle() makes them persistent — the views add them (bondsView, DESIGN §20.15); null otherwise
