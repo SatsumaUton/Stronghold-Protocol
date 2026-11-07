@@ -6648,7 +6648,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": true,
-        "customBytes": 99048
+        "customBytes": 100139
       },
       {
         "path": "public/css/screens/game-shop.css",
@@ -6718,7 +6718,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 140388
+        "customBytes": 141148
       },
       {
         "path": "public/js/screens/lobby.js",
@@ -6778,7 +6778,7 @@
       {
         "path": "public/js/ui/echoStatus.js",
         "baseExists": false,
-        "customBytes": 17000
+        "customBytes": 18015
       },
       {
         "path": "public/js/ui/echoSupply.js",
