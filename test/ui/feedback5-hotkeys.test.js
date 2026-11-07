@@ -30,9 +30,9 @@ const rebound = { ...DEFAULT_HOTKEYS, retreat: 'KeyW', buy: 'KeyQ' };
 
 describe('the key map: defaults and labels', () => {
   test('the defaults include W to buy (W / R / F / D / Q / X / Space), in the settings order', () => {
-    assert.deepEqual([...HOTKEY_ACTIONS], ['buy', 'refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'ready']);
-    assert.deepEqual({ ...DEFAULT_HOTKEYS }, { buy: 'KeyW', refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', ready: 'Space' });
-    assert.deepEqual(HOTKEY_ACTIONS.map((a) => hotkeyLabel(DEFAULT_HOTKEYS[a])), ['W', 'R', 'F', 'D', 'Q', 'X', 'Space']);
+    assert.deepEqual([...HOTKEY_ACTIONS], ['buy', 'refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'destroy', 'ready']);
+    assert.deepEqual({ ...DEFAULT_HOTKEYS }, { buy: 'KeyW', refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', destroy: 'KeyG', ready: 'Space' });
+    assert.deepEqual(HOTKEY_ACTIONS.map((a) => hotkeyLabel(DEFAULT_HOTKEYS[a])), ['W', 'R', 'F', 'D', 'Q', 'X', 'G', 'Space']);
     assert.ok(Object.isFrozen(DEFAULT_HOTKEYS) && Object.isFrozen(HOTKEY_ACTIONS));
     assert.equal(DEFAULT_SETTINGS.keys, DEFAULT_HOTKEYS, 'the settings default is the same map');
     assert.deepEqual(sanitizeSettings(null).keys, { ...DEFAULT_HOTKEYS });
@@ -71,7 +71,7 @@ describe('the key map: sanitising (the settings store, localStorage sp.pref.sett
     assert.deepEqual(sanitizeHotkeys(legacy), { ...legacy, buy: 'KeyW' }, 'free W is the default');
   });
   test('a valid map is kept as saved; it survives the JSON round trip of the store', () => {
-    const mine = { buy: 'KeyB', refresh: 'KeyG', freeze: 'Digit2', levelUp: 'Comma', retreat: 'KeyW', sell: 'Delete', ready: 'KeyE' };
+    const mine = { buy: 'KeyB', refresh: 'KeyG', freeze: 'Digit2', levelUp: 'Comma', retreat: 'KeyW', sell: 'Delete', destroy: 'KeyT', ready: 'KeyE' };
     assert.deepEqual(sanitizeHotkeys(mine), mine);
     const saved = JSON.parse(JSON.stringify(sanitizeSettings({ bgm: 0.3, keys: mine })));
     assert.deepEqual(sanitizeSettings(saved).keys, mine);
@@ -108,7 +108,7 @@ describe('the key map: rebinding and conflicts', () => {
   test('rebinding retreat to W swaps the new buy key onto Q', () => {
     const r = rebindHotkey(DEFAULT_HOTKEYS, 'retreat', 'KeyW');
     assert.deepEqual(r, { keys: rebound, changed: true, swapped: 'buy' });
-    assert.deepEqual({ ...DEFAULT_HOTKEYS }, { buy: 'KeyW', refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', ready: 'Space' }, 'the defaults are untouched');
+    assert.deepEqual({ ...DEFAULT_HOTKEYS }, { buy: 'KeyW', refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', destroy: 'KeyG', ready: 'Space' }, 'the defaults are untouched');
   });
 
   test('a key another action holds is swapped: that action takes the old key', () => {
@@ -150,6 +150,7 @@ function oldShortcut(e) {
   if (code === 'KeyD' || key === 'd') return 'levelUp';
   if (code === 'KeyQ' || key === 'q') return 'retreat';
   if (code === 'KeyX' || key === 'x') return 'sell';
+  if (code === 'KeyG' || key === 'g') return 'destroy';
   if (code === 'Space' || key === ' ') return 'ready';
   return null;
 }
@@ -212,10 +213,10 @@ describe('the one lookup (actionForKey) and shortcutFor', () => {
   });
 
   test('the facing wheel swallows Space and every key of the map — the rebound one, not the old one', () => {
-    for (const [key, code] of [[' ', 'Space'], ['w', 'KeyW'], ['r', 'KeyR'], ['f', 'KeyF'], ['d', 'KeyD'], ['q', 'KeyQ'], ['x', 'KeyX']]) {
+    for (const [key, code] of [[' ', 'Space'], ['w', 'KeyW'], ['r', 'KeyR'], ['f', 'KeyF'], ['d', 'KeyD'], ['q', 'KeyQ'], ['x', 'KeyX'], ['g', 'KeyG']]) {
       assert.equal(facingSwallows({ key, code }), true, code);
     }
-    const g = { ...DEFAULT_HOTKEYS, refresh: 'KeyG' };
+    const g = { ...DEFAULT_HOTKEYS, refresh: 'KeyG', destroy: 'KeyT' };
     assert.equal(facingSwallows({ key: 'g', code: 'KeyG' }, g), true);
     assert.equal(facingSwallows({ key: 'r', code: 'KeyR' }, g), false, 'R is free once refresh moved');
     assert.equal(facingSwallows({ key: ' ', code: 'Space' }, { ...DEFAULT_HOTKEYS, ready: 'KeyE' }), true, 'Space always: a focused button must not activate');
@@ -373,7 +374,7 @@ describe('every handler and key hint reads the map', () => {
       return null;
     };
     const priv = { ready: false, alive: true, temp: [], funds: 0 };
-    assert.deepEqual(HOTKEY_ACTIONS.map(hotkeyLabelOf), ['W', 'R', 'F', 'D', 'Q', 'X', 'Space']);
+    assert.deepEqual(HOTKEY_ACTIONS.map(hotkeyLabelOf), ['W', 'R', 'F', 'D', 'Q', 'X', 'G', 'Space']);
     assert.equal(kbdOf(ReadyToggle({ priv, onToggle() {} })), 'Space');
     updateSettings({ keys: rebindHotkey(settingsStore.get().keys, 'ready', 'KeyE').keys });
     updateSettings({ keys: rebindHotkey(settingsStore.get().keys, 'retreat', 'KeyW').keys });

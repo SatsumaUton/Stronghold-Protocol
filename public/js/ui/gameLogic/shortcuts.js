@@ -7,10 +7,10 @@ import { isObj } from './shared.js';
 // ---- the key map ------------------------------------------------------------------------------------------------
 
 /** The rebindable shortcuts in the settings' order (the ready key also pauses / resumes a solo battle). Esc is fixed. */
-export const HOTKEY_ACTIONS = Object.freeze(['buy', 'refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'ready']);
+export const HOTKEY_ACTIONS = Object.freeze(['buy', 'refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'destroy', 'ready']);
 
 /** Default key of each action (a KeyboardEvent.code), including W to buy the hovered shop card. */
-export const DEFAULT_HOTKEYS = Object.freeze({ buy: 'KeyW', refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', ready: 'Space' });
+export const DEFAULT_HOTKEYS = Object.freeze({ buy: 'KeyW', refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', destroy: 'KeyG', ready: 'Space' });
 
 // The keys a shortcut may use → the `key` value each types on a US layout (lower case): letters, digits, Space, the
 // punctuation keys, and six named keys whose `key` equals their `code`. Everything else stays with the interface: Esc
@@ -53,7 +53,7 @@ export function hotkeyLabel(code) {
  * Sanitize a persisted key map: each action keeps a saved key that may be a shortcut, else gets its default; a map in
  * which two saved actions would share a key is bad data — the defaults instead. Legacy maps receive an unused buy key.
  * @param {any} raw
- * @returns {Record<'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready', string>}
+ * @returns {Record<'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'destroy'|'ready', string>}
  */
 export function sanitizeHotkeys(raw) {
   const r = isObj(raw) && !Array.isArray(raw) ? raw : {};
@@ -64,6 +64,13 @@ export function sanitizeHotkeys(raw) {
   if (!Object.hasOwn(r, 'buy')) {
     const used = new Set(HOTKEY_ACTIONS.filter((a) => a !== 'buy').map((a) => out[a]));
     out.buy = Object.values(DEFAULT_HOTKEYS).find((code) => !used.has(code));
+  }
+  // 销毁道具 (2026-11-08) joined the map later: a saved profile has no binding for it. Give it the first free default
+  // key so an existing key map is never thrown away (the Set check below would otherwise reset every binding).
+  if (!Object.hasOwn(r, 'destroy')) {
+    const used = new Set(HOTKEY_ACTIONS.filter((a) => a !== 'destroy').map((a) => out[a]));
+    out.destroy = !used.has(DEFAULT_HOTKEYS.destroy) ? DEFAULT_HOTKEYS.destroy
+      : Object.values(DEFAULT_HOTKEYS).find((code) => !used.has(code));
   }
   return new Set(Object.values(out)).size === HOTKEY_ACTIONS.length ? out : { ...DEFAULT_HOTKEYS };
 }
@@ -109,7 +116,7 @@ export function hotkeyOf(e) {
  * key === 'r'`: a Russian layout or an IME still works by position). No modifier or focus checks (shortcutFor).
  * @param {{ key?: string, code?: string }} e
  * @param {any} [keys] the player's map (settings `keys`); the defaults when omitted
- * @returns {'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready'|null}
+ * @returns {'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'destroy'|'ready'|null}
  */
 export function actionForKey(e, keys = DEFAULT_HOTKEYS) {
   const map = keys === DEFAULT_HOTKEYS ? keys : sanitizeHotkeys(keys);
@@ -150,7 +157,7 @@ export function captureHotkey(e) {
  * facingEnter). Nothing while Ctrl / ⌘ / Alt is held or a text field has the focus.
  * @param {{ key?: string, code?: string, ctrlKey?: boolean, metaKey?: boolean, altKey?: boolean, repeat?: boolean, target?: any }} e
  * @param {any} [keys] the player's map (settings `keys`)
- * @returns {'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready'|'escape'|null}
+ * @returns {'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'destroy'|'ready'|'escape'|null}
  */
 export function shortcutFor(e, keys = DEFAULT_HOTKEYS) {
   if (!e || e.ctrlKey || e.metaKey || e.altKey) return null;
@@ -205,7 +212,7 @@ export const closesOnFieldPress = (detail) => detail?.kind === 'piece' || detail
  * Whether an open overlay swallows a game shortcut: a modal / the guide own the keyboard (Esc included — they close
  * themselves); the match-info / enemy-intel drawer is a dialog too — only Esc (it closes the drawer) passes, the other
  * shortcuts never act behind it.
- * @param {'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready'|'escape'|null} act shortcutFor
+ * @param {'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'destroy'|'ready'|'escape'|null} act shortcutFor
  * @param {{ modal?: boolean, drawer?: boolean }} open
  */
 export function shortcutBlocked(act, { modal = false, drawer = false } = {}) {

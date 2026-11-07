@@ -99,6 +99,7 @@ import { DownedPlate, downedDue, preloadDownedArt, downedArtReady } from '../ui/
 import { OfferOverlay, offerBlocksPrep } from '../ui/offerOverlay.js';
 import { ChoiceOverlay, spMarks } from '../ui/choiceOverlay.js';
 import { EnemyDrawer } from '../ui/enemyDrawer.js';
+import { confirmDestroy } from '../ui/destroyConfirm.js';
 import { Ticker } from '../ui/ticker.js';
 import { EmoteWheel } from '../ui/emotes.js';
 import { Danmaku } from '../ui/danmaku.js';
@@ -1152,8 +1153,8 @@ function MatchScreen() {
       // an equipped item is locked (the server refuses g.destroy): replacing it is the equip-replace dialog's job
       if (!itemDestroyable(live.current.placeCtx, piece.uid)) { toast(t('已配发的装备无法销毁'), 'warn'); audio.sfx('error', { volume: 0.5 }); return false; }
       const it = data.lookup('items', piece.id);
-      const ok = await confirmDialog({ title: t('销毁道具'), text: t('道具无法出售。确定要销毁「{name}」吗？', { name: it?.name || t('道具') }), okText: t('销毁'), danger: true });
-      if (ok && await actions.destroy(piece.uid)) { closeIt(); return true; }
+      // 设置「销毁道具前确认」：提示框里勾了「下次不再提醒」就关掉，之后直接销毁（ui/destroyConfirm.js）
+      if (await confirmDestroy(it?.name || t('道具')) && await actions.destroy(piece.uid)) { closeIt(); return true; }
       return false;
     }
     if (await actions.sell(piece.uid)) { closeIt(); return true; }
@@ -1749,6 +1750,16 @@ function MatchScreen() {
         const available = underframeActions(L.placeCtx, uid);
         if (act === 'retreat' && available?.retreat) await retreatPiece(uid);
         else if (act === 'sell' && available?.sell != null) await sellOwnPiece(uid);
+        return;
+      }
+      // 销毁道具（设置 → 快捷键「销毁道具（选中优先）」，默认 G）：只对道具 / 技艺生效，干员走「出售」
+      if (act === 'destroy') {
+        if (!L.showPrep || L.drag || L.facing || L.selBusy || L.pen || pointer?.buttons) return;
+        const uid = L.sel ? L.sel.uid : pointer ? L.view?.pieceAtClientPoint(pointer.x, pointer.y) : null;
+        const target = Number.isInteger(uid) ? L.placeCtx.pieces.get(uid) : null;
+        if (target?.piece.kind !== 'item') return;
+        if (!itemDestroyable(L.placeCtx, uid)) { toast(t('已配发的装备无法销毁'), 'warn'); audio.sfx('error', { volume: 0.5 }); return; }
+        await sellOwnPiece(uid); // item → 销毁（确认框由 ui/destroyConfirm.js 决定弹不弹）
         return;
       }
       const reason = shopBlockReason(act, { priv: L.priv, editable: L.editable });

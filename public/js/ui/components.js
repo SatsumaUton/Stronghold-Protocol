@@ -492,6 +492,14 @@ function closeDialog(id, result) {
  */
 export const confirmDialog = (opts) => openDialog(opts, 'confirm');
 /**
+ * Imperative confirm dialog with a 「下次不再提醒」 checkbox (设置 → 销毁道具前确认). Resolves `{ ok, checked }`: the
+ * caller persists `checked` (设置里的同一个开关) when the player confirmed with it ticked.
+ * @param {{ title?: string, text?: any, okText?: string, cancelText?: string, tone?: string, danger?: boolean,
+ *   micro?: string, checkLabel: string, checkDefault?: boolean }} opts
+ * @returns {Promise<{ ok: boolean, checked: boolean }>}
+ */
+export const confirmWithCheck = (opts) => openDialog(opts, 'confirmCheck');
+/**
  * Imperative alert dialog.
  * @param {{ title?: string, text?: any, okText?: string, tone?: string, micro?: string }} opts
  * @returns {Promise<true>}
@@ -507,7 +515,10 @@ export function closeAllDialogs() {
   if (!all.length) return;
   dialogs = [];
   emitDialogs();
-  for (const d of all) { try { d.resolve(d.kind !== 'confirm'); } catch { /* ignore */ } }
+  // confirm → false, alert → true, confirmCheck → { ok: false, checked: false } (cancelled, nothing remembered)
+  for (const d of all) {
+    try { d.resolve(d.kind === 'confirmCheck' ? { ok: false, checked: false } : d.kind !== 'confirm'); } catch { /* ignore */ }
+  }
 }
 
 /** Renders queued imperative dialogs (one at a time). */
@@ -518,20 +529,32 @@ export function DialogHost() {
     return () => dialogListeners.delete(force);
   }, []);
   const d = dialogs[0];
+  // the 「下次不再提醒」 checkbox of a confirmCheck dialog (reset per dialog)
+  const [checked, setChecked] = useState(false);
+  const dialogId = d ? d.id : null;
+  useEffect(() => { setChecked(!!(d && d.opts && d.opts.checkDefault)); }, [dialogId]);
   if (!d) return null;
-  const { title = t('确认'), text, okText = t('确认'), cancelText = t('取消'), tone, danger, micro = 'CONFIRMATION' } = d.opts;
+  const { title = t('确认'), text, okText = t('确认'), cancelText = t('取消'), tone, danger, micro = 'CONFIRMATION',
+    checkLabel = null } = d.opts;
   const isConfirm = d.kind === 'confirm';
+  const isCheck = d.kind === 'confirmCheck';
+  /** Close with the answer; a confirmCheck dialog resolves { ok, checked }. */
+  const done = (ok) => closeDialog(d.id, isCheck ? { ok, checked } : isConfirm ? ok : true);
   // Enter confirms unless a specific button has focus (then the native click decides).
   const onKey = (e) => {
-    if (e.key === 'Enter' && e.target?.tagName !== 'BUTTON') { e.preventDefault(); closeDialog(d.id, true); }
+    if (e.key === 'Enter' && e.target?.tagName !== 'BUTTON') { e.preventDefault(); done(true); }
   };
   return html`<div onKeyDown=${onKey}>
     <${Modal} key=${d.id} open=${true} title=${title} micro=${micro} tone=${tone || (danger ? 'red' : 'mint')}
-      onClose=${() => closeDialog(d.id, isConfirm ? false : true)}
+      onClose=${() => done(false)}
       actions=${html`
-        ${isConfirm ? html`<${Button} variant="secondary" onClick=${() => closeDialog(d.id, false)}>${cancelText}<//>` : null}
-        <${Button} variant=${danger ? 'danger' : 'primary'} icon="check" data-autofocus onClick=${() => closeDialog(d.id, true)}>${okText}<//>`}>
+        ${isConfirm || isCheck ? html`<${Button} variant="secondary" onClick=${() => done(false)}>${cancelText}<//>` : null}
+        <${Button} variant=${danger ? 'danger' : 'primary'} icon="check" data-autofocus onClick=${() => done(true)}>${okText}<//>`}>
       ${typeof text === 'string' ? html`<p class="modal__text">${text}</p>` : text}
+      ${isCheck && checkLabel ? html`<label class="modal__check">
+        <input type="checkbox" checked=${checked} onChange=${(e) => setChecked(!!e.target.checked)} />
+        <span>${checkLabel}</span>
+      </label>` : null}
     <//>
   </div>`;
 }
