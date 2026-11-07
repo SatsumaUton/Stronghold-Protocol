@@ -14,6 +14,7 @@ import { PLUGIN_OFFER_SLOTS } from './plugins/limits.js';
 /** 「深渊祭坛」可购买的档位：服务端 ECHO_ALTAR_GOODS 的 id 全表 + 两个捐献档。 */
 const ECHO_ALTAR_KINDS = new Set([
   'blessing', 'buff', 'permanent', 'life',                       // 老四项（旧服务端仍在用）
+  'refresh', 'word', 'counter', 'cash',                          // 老三项 + 提现（20 种商品里的另外四件）
   'cleanse', 'purge', 'guard', 'haste', 'might', 'bulwark', 'mend',   // 本层商品
   'slot', 'insight', 'frost', 'titan', 'pierce',                 // 整局唯一
   'donate5', 'donate10',                                         // 捐献（存钱罐）
