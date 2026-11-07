@@ -3051,5 +3051,15 @@
 ,
   "敌方领袖生命": "Leader HP",
   "敌方领袖攻击": "Leader ATK",
-  "盟约投影不占祝福名额，同一时间只有一条": "A covenant projection takes no blessing slot; only one is active at a time"
+  "盟约投影不占祝福名额，同一时间只有一条": "A covenant projection takes no blessing slot; only one is active at a time",
+  "主动放弃深潜": "Abandon the dive",
+  "全队放弃了本次深潜": "The team abandoned this dive",
+  "已同意 {n}/{m}：所有存活玩家都同意后立刻结算": "{n}/{m} agreed: settle as soon as every surviving player agrees",
+  "同意放弃": "Agree to abandon",
+  "继续深潜": "Keep diving",
+  "只能在休整期（准备阶段）放弃深潜": "You can only abandon a dive during the prep phase",
+  "确定放弃本次深潜？会立刻进入结算界面。": "Abandon this dive? The settlement screen opens right away.",
+  "发起全员投票？所有存活玩家都同意后才会结算。": "Start a team vote? The run settles only after every surviving player agrees.",
+  "确定放弃": "Abandon",
+  "放弃后直接进入结算界面；多人房间需要所有存活玩家同意。": "Abandoning goes straight to the settlement screen; in a multiplayer room every surviving player must agree."
 }

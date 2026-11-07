@@ -646,6 +646,8 @@ export const C2S = {
   'g.echoSupply': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 2 },
   // 「盟约投影」（16 层起每 10 层）：全队三选一投票
   'g.echoProjection': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 3 },
+  // 主动放弃深潜（维护者 2026-11-07）：start=true 发起（单人立刻结算 / 多人开全员投票），否则按 agree 投票
+  'g.echoGiveUp': { start: (v) => v === undefined || typeof v === 'boolean', agree: (v) => v === undefined || typeof v === 'boolean' },
   // 投票移出（AI 接管的掉线队友，参考版 GitHub feedback #12）：发起 / 应答
   'g.kickVote': { targetId: (v) => typeof v === 'string' && v.length > 0 },
   'g.kickBallot': { voteId: (v) => Number.isInteger(v) && v >= 1, agree: (v) => typeof v === 'boolean' },
