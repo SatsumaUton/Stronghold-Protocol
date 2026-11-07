@@ -59,10 +59,15 @@ function membership(gd, ps) {
   const onBoardVariant = new Map();
   const inHand = new Map();
   const add = (m, bond, key) => { let s = m.get(bond); if (!s) m.set(bond, (s = new Set())); s.add(key); };
+  // 「盟约投影」（维护者 2026-11-07 晚）：投影的那条核心盟约把场上**每一名**干员都算作成员，
+  // 但**同名干员只算一个激活名额** —— 下面的集合按 baseId 收集，天然去重；激活 / 档位仍走原版人数门槛
+  // （countMode BOARD / BOARD_AND_DECK / BOARD_ALL_CHESS 不变，见 rawCount）。
+  const proj = typeof ps.echoProjection === 'string' && ps.echoProjection && gd.bond(ps.echoProjection) ? ps.echoProjection : null;
   for (const p of boardChess) {
     const base = gd.baseIdOf(p.id);
     const golden = gd.isGolden(p.id);
     for (const b of pieceBonds(gd, p, ps.m?.rules)) { add(onBoard, b, base); add(onBoardVariant, b, `${base}|${golden ? 1 : 0}`); }
+    if (proj) { add(onBoard, proj, base); add(onBoardVariant, proj, `${base}|${golden ? 1 : 0}`); }
   }
   for (const p of handChess) {
     const base = gd.baseIdOf(p.id);

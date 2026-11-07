@@ -229,7 +229,7 @@ export function MorphGrantLine({ item, off = null, carried = null, mode = 'offic
 
 /**
  * 「盟约投影」的效果条目（维护者 2026-11-06）：拿到投影后，场上每个己方干员都算该核心盟约的成员 ——
- * 卡面上要像变形同构体那样有一条说明：「盟约投影：视为【X】成员（满档）」+ 这条盟约的效果原文。
+ * 卡面上要像变形同构体那样有一条说明：「盟约投影：视为【X】成员」+ 这条盟约的效果原文。
  * 本来不属于该盟约的干员都挂（见 ChessDetail 的 projectedBond）：场上写「生效中」，
  * 商店 / 备战区的卡片写「部署后生效」（维护者 2026-11-07 晚：描述卡片上也要能看到投影）。
  * @param {{ projection: any, bondId: string }} props — projection: 公开视图 `echo.projections[playerId]`
@@ -239,8 +239,10 @@ export function ProjectionLine({ projection, bondId, onBoard = true }) {
   if (!projection || !bond) return null;
   // 投影自带的说明拿不到时用盟约原文兜底（第三条数据源只有 id）
   const desc = projection.desc || bond.descRaw || bond.desc || '';
+  // 维护者 2026-11-07 晚：投影不再强制「满档」—— 场上一名干员算一个成员（同名只算一个），
+  // 激活 / 档位按原版人数门槛走，所以这里只说「视为成员」，档位由盟约条自己显示。
   return html`<p class=${cx('dhint', 'dhint--morph', 'is-worn')} data-projection=${bondId}>
-    <${Icon} name="info" /><span>${t('盟约投影：视为【{bond}】盟约成员（满档）', { bond: bond.name })}<span class="dmorph__tag is-on">${onBoard ? t('生效中') : t('部署后生效')}</span>${desc ? html`<br /><${RichText} text=${desc} />` : null}</span>
+    <${Icon} name="info" /><span>${t('盟约投影：视为【{bond}】盟约成员', { bond: bond.name })}<span class="dmorph__tag is-on">${onBoard ? t('生效中') : t('部署后生效')}</span>${desc ? html`<br /><${RichText} text=${desc} />` : null}</span>
   </p>`;
 }
 
@@ -451,7 +453,7 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
   // 「盟约投影」：三条同源数据里取第一条拿得到的 ——
   //   ① `echo.projections[那位玩家]`（每人各自选，2026-11-07：服务端按 playerId 下发）
   //      自己的卡 = 自己那条；观战队友的卡 = **他**那条（否则看到的内容和对局中玩家不一致）
-  //   ② **本局盟约视图**里 `projected: true` 的那条（服务端按满档塞进去的，盟约条/面板读的就是它）
+  //   ② **本局盟约视图**里 `projected: true` 的那条（服务端给投影那条打的标记，盟约条/面板读的就是它）
   // ② 是 2026-11-06 加的兜底：卡面这一路读不到前一份时，至少和盟约面板保持一致。
   const projOwner = ownerId != null ? String(ownerId) : (watchTarget || meId);
   const projection = (() => {
@@ -900,8 +902,8 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
     // 0.2.2: another player's unit says its 潜能 / 练度 itself (UnitInfo potential / cultivate); an own piece's unit follows
     // m.private.ops (the panel's `cultOpts`)
     const cv = own?.piece ? null : { cultOpts: { cultivation: unitCultivation(u) } };
-    if (dr) return { type: 'chess', ...appearance, chess: dr, piece: own?.piece || null, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: null, diy: pick, ...cv };
-    if (c) return { type: 'chess', ...appearance, chess: c, piece: own?.piece || null, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: si, ...cv };
+    if (dr) return { type: 'chess', ...appearance, chess: dr, piece: own?.piece || null, unit: u, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: null, diy: pick, ...cv };
+    if (c) return { type: 'chess', ...appearance, chess: c, piece: own?.piece || null, unit: u, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: si, ...cv };
     const t = data.lookup('tokens', u.defId) || diyToken(u.defId);
     if (t) return { type: 'token', token: t, unitId: u.id, ownerId: tokenOwnerId(own?.piece, pieces) };
     const en = enemyRecord(u.defId);
@@ -971,7 +973,7 @@ export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestr
     <button type="button" class="dpanel__close" aria-label=${t('关闭')} onClick=${onClose}><${Icon} name="close" /></button>
     <div class="dpanel__scroll">
       ${bondTimers ? html`<${BondTimers} rows=${bondTimers()} />` : null}
-      ${detail.type === 'chess' ? html`<${ChessDetail} chess=${detail.chess} ownerId=${detail.ownerId} skin=${detail.skin} piece=${detail.piece} snapHp=${snapHp} editable=${editable} onSell=${sellIt}
+      ${detail.type === 'chess' ? html`<${ChessDetail} chess=${detail.chess} ownerId=${detail.ownerId} skin=${detail.skin} piece=${detail.piece} unit=${detail.unit || null} snapHp=${snapHp} editable=${editable} onSell=${sellIt}
         bonds=${bonds} offBonds=${offBonds} loadout=${loadout} onBond=${onBond} live=${liveNow} hint=${detail.hint || null} unitItems=${detail.unitItems || null}
         standIn=${detail.standIn || null} diy=${detail.diy || null} cultOpts=${detail.cultOpts || { ops }} morphMode=${morphMode} onUnequip=${onUnequip} />` : null}
       ${detail.type === 'item' ? html`<${ItemDetail} item=${detail.item} piece=${detail.piece} editable=${editable} onDestroy=${destroyIt} offBonds=${offBonds} morphMode=${morphMode} unequipAllowed=${unequipAllowed} />` : null}

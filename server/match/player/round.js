@@ -163,28 +163,19 @@ export class PlayerRound {
   /**
    * 盟约视图（客户端 / 详情面板用）。
    *
-   * 「盟约投影」（维护者 2026-11-05）：投影的那条核心盟约在这里也要**按满档激活**，
-   * 否则玩家看到的是「在场 0/3 未激活」——投影明明拿到了，面板却显示没激活。
-   * 只影响显示（战斗侧另走 battleInput 的 projectedBond），不改 this.bonds 本身。
+   * 「盟约投影」（维护者 2026-11-05；2026-11-07 晚改）：投影的那条核心盟约在 computeBonds 里就已经按
+   * **原版人数**算好（场上一名干员算一个成员，同名只算一个），所以这里只补一个 `projected` 标记给界面。
+   * 以前这里强制 count=6 / active / tier=3 —— 维护者 2026-11-07 晚：投影不能绕过激活人数要求，
+   * 场上不到 3 名干员依然不能激活。
    */
   bondsView() {
     // 维护者 2026-11-06：深潜取消 999 层上限（`layerCapOff`），所以这里的「本回合战斗叠层」也必须按不封顶合并，
     // 否则 999 层之后打再多层，视图里也只 +1 → 看起来像「叠层效果失效」。
     const view = bondsWithGains(this.bonds, this.pendingLayerGains, this.m && this.m.layerCapOff === true);
     const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond(this) : null;
-    if (!proj) return view;
-    const cur = view && view[proj.bondId] ? view[proj.bondId] : null;
-    return {
-      ...view,
-      [proj.bondId]: {
-        ...(cur || {}),
-        count: Math.max(Number(proj.state && proj.state.count) || 0, Number(cur && cur.count) || 0),
-        active: true,
-        tier: Math.max(1, Number(proj.state && proj.state.tier) || 3),
-        layers: Math.max(0, Number(cur && cur.layers) || 0),
-        projected: true,
-      },
-    };
+    const cur = proj && view && view[proj.bondId] ? view[proj.bondId] : null;
+    if (!cur) return view;
+    return { ...view, [proj.bondId]: { ...cur, projected: true } };
   }
 
   /**
@@ -238,30 +229,10 @@ export class PlayerRound {
       side,
       colOffset,
       units,
-      // 「盟约投影」：把投影的盟约按满档塞进 bonds 快照，并给 sim 一个 projectedBond
-      // （sim 的 unitBonds 会让所有己方干员都算该盟约成员 —— 维护者 2026-11-05）
-      bonds: (() => {
-        const snap = bondSnapshot(reached ? this.bondsView() : this.bonds);
-        const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond(this) : null;
-        if (proj) {
-          // 投影只负责「按满档激活」，**绝不压低**玩家自己已有的数值。
-          // 2026-11-06 玩家反馈：选到与自己已有盟约**同一条**的投影时，原本靠层数生效的加成全部消失 ——
-          // 原因是这里以前直接 `...(proj.state)` 覆盖，而 proj.state.layers 恒为 0，把真实层数抹平了
-          // （bonds.json 里 `base_x + per_stack × L()` 那类效果随之归零）。人数同理：阿戈尔 5 人档的
-          // 投影不该把场上已经 6 人的那条盟约压回 5。
-          const cur = snap[proj.bondId] || null;
-          const state = (proj.state && typeof proj.state === 'object') ? proj.state : {};
-          const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-          snap[proj.bondId] = {
-            ...(cur || {}),
-            count: Math.max(n(cur && cur.count), n(state.count)),
-            active: true,
-            tier: Math.max(1, n(cur && cur.tier), n(state.tier)),
-            layers: Math.max(0, n(cur && cur.layers), n(state.layers)),
-          };
-        }
-        return snap;
-      })(),
+      // 「盟约投影」：投影那条盟约的**人数 / 激活 / 档位**已经由 computeBonds 按原版规则算进 this.bonds
+      // （场上一名干员算一个成员，同名只算一个），这里只把 `projectedBond` 交给 sim —— sim 的 unitBonds
+      // 让所有己方干员都算该盟约成员，于是它像「变形同构体」一样触发叠层 / 效果（维护者 2026-11-07 晚）。
+      bonds: bondSnapshot(reached ? this.bondsView() : this.bonds),
       projectedBond: (() => {
         const proj = this.m && typeof this.m.echoProjectionBond === 'function' ? this.m.echoProjectionBond(this) : null;
         return proj ? proj.bondId : undefined;

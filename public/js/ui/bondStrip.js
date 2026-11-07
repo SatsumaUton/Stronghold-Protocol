@@ -174,7 +174,7 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
   const projEntry = (() => {
     if (off) return null;
     const projOwner = ownerId != null ? String(ownerId) : meId;
-    // ① 服务端在**这条盟约的视图条目**上直接标了 `projected: true`（bondsView 按满档塞进去的那条）——
+    // ① 服务端在**这条盟约的视图条目**上直接标了 `projected: true`（bondsView 给投影那条打的标记）——
     //    这是最可靠的一份：弹窗本来就拿着 `entry`。
     if (entry && entry.projected === true) return { id: bondId, desc: '' };
     // ② 那位玩家自己的投影：服务端按 playerId 下发（echo.projections[playerId]）
@@ -232,7 +232,7 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
     </section>` : null}
     ${isProjected ? html`<section class="bpop__sec bpop__proj" data-projection=${bondId}>
       <h4>${t('盟约投影')}</h4>
-      <p class="bpop__desc">${t('你自己的全体干员都视为【{bond}】盟约成员，并按满档生效。', { bond: b.name })}${projEntry.desc ? html`<br />${projEntry.desc}` : null}</p>
+      <p class="bpop__desc">${t('你自己的全体干员都视为【{bond}】盟约成员（同名干员只算一个，按原版人数门槛激活）。', { bond: b.name })}${projEntry.desc ? html`<br />${projEntry.desc}` : null}</p>
     </section>` : null}
     <section class="bpop__sec">
       <h4>${t('盟约效果')}</h4>
@@ -240,7 +240,7 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
     </section>
     <section class="bpop__sec">
       <h4>${t('成员')} <small>${memberHeadCount(members, countsHand)}/${members.length}</small></h4>
-      ${isProjected ? html`<p class="bpop__desc" data-projection-members>${t('投影生效：你自己场上全部干员都视为本盟约成员（上方的「在场」已按满档计入）')}</p>` : null}
+      ${isProjected ? html`<p class="bpop__desc" data-projection-members>${t('投影生效：你自己场上全部干员都视为本盟约成员（上方的「在场」已按干员数计入，同名只算一个）')}</p>` : null}
       ${harmony ? (harmonyBy.length
         ? html`<button type="button" class="bpop__harmony" data-harmony=${harmony} title=${harmonyText} onClick=${() => onMember?.(harmonyBy[0].id, null)}>
           <${BondGlyph} bondId=${HARMONY_BOND} /><b>${harmonyName} +${harmony}</b><span>${harmonyText}</span></button>`

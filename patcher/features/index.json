@@ -6683,22 +6683,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 239025
+        "customBytes": 239637
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 275943
+        "customBytes": 276658
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 264898
+        "customBytes": 265669
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 227126
+        "customBytes": 227759
       },
       {
         "path": "public/js/assets.js",
@@ -6748,12 +6748,12 @@
       {
         "path": "public/js/ui/bondStrip.js",
         "baseExists": true,
-        "customBytes": 21911
+        "customBytes": 21974
       },
       {
         "path": "public/js/ui/detailPanel.js",
         "baseExists": true,
-        "customBytes": 76280
+        "customBytes": 76558
       },
       {
         "path": "public/js/ui/echoBlessing.js",
@@ -6963,12 +6963,12 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 211498
+        "customBytes": 211963
       },
       {
         "path": "server/match/match/echoProjection.js",
         "baseExists": false,
-        "customBytes": 4489
+        "customBytes": 4652
       },
       {
         "path": "server/match/match/echoWaves.js",
@@ -7043,7 +7043,7 @@
       {
         "path": "server/match/player/round.js",
         "baseExists": true,
-        "customBytes": 16241
+        "customBytes": 14971
       },
       {
         "path": "server/match/player/views.js",
