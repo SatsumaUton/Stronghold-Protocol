@@ -27,7 +27,7 @@ function idleScenario(o = {}) {
 
 test('AFK_ACTIONS 是「实质操作」白名单：买/卖/移动/选盟约都算，点准备/发表情不算', () => {
   assert.ok(AFK_ACTIONS instanceof Set);
-  assert.equal(AFK_ACTIONS.size, 13);
+  assert.equal(AFK_ACTIONS.size, 22, '普通房 13 条 + 深渊回响 9 条');
   for (const t of ['g.buy', 'g.sell', 'g.move', 'g.refresh', 'g.levelUp', 'g.freeze', 'g.equip',
     'g.destroy', 'g.choice', 'g.reward', 'g.revive', 'g.band', 'g.bandSkip']) {
     assert.ok(AFK_ACTIONS.has(t), `${t} 应该算有操作`);
@@ -35,6 +35,57 @@ test('AFK_ACTIONS 是「实质操作」白名单：买/卖/移动/选盟约都�
   for (const t of ['g.ready', 'g.infoReady', 'g.emote', 'g.watch', 'g.autoplay']) {
     assert.ok(!AFK_ACTIONS.has(t), `${t} 不该算有操作`);
   }
+});
+
+test('深渊回响的操作也算「实质操作」：祭坛/祝福/补给/投影/护盾/反制/放弃深潜', () => {
+  for (const t of ['g.echoAltar', 'g.echoBlessing', 'g.echoBlessingDiscard', 'g.echoBlessingRefresh',
+    'g.echoSupply', 'g.echoProjection', 'g.echoShield', 'g.echoCounterUse', 'g.echoGiveUp']) {
+    assert.ok(AFK_ACTIONS.has(t), `${t} 应该算有操作`);
+  }
+});
+
+test('★ 深渊回响的挂机回合数至少 3：2 回合不动不踢，第 3 回合才移出', () => {
+  const h = makeMatch({ mode: 'coop', humans: 2, bots: 0, seed: 7, variant: 'deepecho', afkRemoveRounds: LIMIT });
+  const m = h.m;
+  m.round = 5;
+  assert.equal(m._afkLimit(), 3, '深潜至少 3 回合（普通房是 2）');
+  const kicked = [];
+  m.onIdleKick = (playerId) => kicked.push(playerId);
+  m._checkIdle();
+  m._checkIdle();
+  assert.deepEqual(kicked, [], '2 回合不动：普通房会踢，深潜不踢');
+  m._checkIdle();
+  assert.deepEqual(kicked.sort(), ['p_0', 'p_1'], '第 3 回合才移出');
+  m.dispose();
+});
+
+test('深潜的挂机警告也按 3 回合口径（第 2 回合提示，第 3 回合才移出）', () => {
+  const h = makeMatch({ mode: 'coop', humans: 2, bots: 0, seed: 7, variant: 'deepecho', afkRemoveRounds: LIMIT });
+  const m = h.m;
+  m.round = 5;
+  const p0 = m.players.get('p_0');
+  m._checkIdle();
+  assert.equal(p0.afkWarned(), false, '第 1 回合还不提示');
+  m._checkIdle();
+  assert.equal(p0.afkWarned(), true, '第 2 回合提示「下回合再不动就移出」');
+  m.dispose();
+});
+
+test('★ 深潜里在祭坛买东西就算操作（以前会被判挂机）', () => {
+  const h = makeMatch({ mode: 'coop', humans: 2, bots: 0, seed: 7, variant: 'deepecho', afkRemoveRounds: LIMIT });
+  const m = h.m;
+  m.round = 5;
+  const p0 = m.players.get('p_0');
+  const kicked = [];
+  m.onIdleKick = (playerId) => kicked.push(playerId);
+  m._checkIdle();
+  assert.equal(p0.afkRounds, 1);
+  m._handle(p0, { t: 'g.echoAltar', kind: 'life' });
+  assert.equal(p0.afkActed, true, 'g.echoAltar 是 AFK_ACTIONS 之一');
+  m._checkIdle();
+  assert.equal(p0.afkRounds, 0, '在祭坛操作过 → 归零');
+  assert.ok(!kicked.includes('p_0'));
+  m.dispose();
 });
 
 test('默认 afkRemoveRounds 是 2，且 0 表示关闭', () => {

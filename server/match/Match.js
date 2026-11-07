@@ -524,6 +524,9 @@ export class Match {
      * 挂机移出（消极游戏，opts.afkRemoveRounds；默认 common.js 的 AFK_REMOVE_ROUNDS = 2，0 = 关闭）：
      * 连续这么多回合没有任何实质操作（AFK_ACTIONS）就移出该真人座位。
      *
+     * 「深渊回响」另有更宽的生效下限（common.js 的 AFK_REMOVE_ROUNDS_DEEPECHO = 3，见 platform.js _afkLimit）：
+     * 深潜准备期更长、深层可做的事更少，普通房的 2 回合太严格（维护者 2026-11-07 晚）。
+     *
      * 只在**开局时至少 2 个真人**的对局里生效 —— 一个人自己打单机，挂机不伤害别人，不该踢他
      * （维护者 2026-10-31 的要求，与 intents.js 的两条旧规则同一口径）。
      * 判定在每回合备战结束时（prep.js endPrep → platform.js _checkIdle）。

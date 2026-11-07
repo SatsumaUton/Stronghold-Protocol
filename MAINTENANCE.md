@@ -1768,21 +1768,24 @@ node --test test/ui/bot-band-protocol.test.js    # 3 条：协议放行 / 非法
 #### 参考版的做法（`_ref/.../server/match/match/platform.js` 的 `_checkIdle`）
 
 1. **按回合判，不按消息判**：每回合**备战结束**时数一次（`prep.js` 的 `endPrep`）。
-2. **判据是「有没有实质操作」**：`common.js` 的 `AFK_ACTIONS` 白名单 13 条
-   （买/卖/移动/刷新/升级/冻结/装备/销毁/选择/领奖/复活/选盟约/跳过盟约）。
+2. **判据是「有没有实质操作」**：`common.js` 的 `AFK_ACTIONS` 白名单 22 条
+   （普通房 13 条：买/卖/移动/刷新/升级/冻结/装备/销毁/选择/领奖/复活/选盟约/跳过盟约；
+   **深渊回响 9 条**：祭坛/祝福/弃选/刷新祝福/补给/投影/护盾/反制/放弃深潜 —— 2026-11-07 晚补，玩家反馈「祭坛里的操作也算挂机」）。
    点准备、发表情、观战都**不算**。
 3. **三条豁免，任一命中就归零**：
    - `!ps.connected` —— **掉线不算挂机**（这是关键修复）
    - `ps.botControlled` —— AI 托管中是主动交出去的，不算消极
    - `ps.afkActed` —— 这回合动过
 4. **移出前一回合先警告一次**（`toast` + 私有视图），不是突然踢人。
-5. `afkRemoveRounds` 可配，`0` = 关闭，默认 2。
+5. `afkRemoveRounds` 可配，`0` = 关闭，默认 2；**「深渊回响」的生效回合数至少
+   `AFK_REMOVE_ROUNDS_DEEPECHO`（3）**（`Match._afkLimit`）—— 深潜准备期更长、深层可做的事更少，
+   普通房的 2 回合对深潜太严格（维护者 2026-11-07 晚）。判定与警告（`player/views.js afkWarned`）共用这个口径。
 
 #### 这次怎么接的
 
 | 位置 | 改动 |
 |---|---|
-| `server/match/match/common.js` | 新增 `AFK_ACTIONS`（13 条）与 `AFK_REMOVE_ROUNDS = 2` |
+| `server/match/match/common.js` | 新增 `AFK_ACTIONS`（普通房 13 条 + 深渊回响 9 条）、`AFK_REMOVE_ROUNDS = 2` 与 `AFK_REMOVE_ROUNDS_DEEPECHO = 3` |
 | `server/match/PlayerState.js` | 新增 `afkActed` / `afkRounds`（两个字段 `snapshot.js` 本来就列了，只是从来没人写） |
 | `server/match/Match.js` | 新增 `this.afkRemoveRounds`（`opts` 覆盖，非整数回落默认，上限 100） |
 | `server/match/match/platform.js` | 新增 `_checkIdle()` / `_removeIdle()` |
@@ -1806,7 +1809,7 @@ node --test test/ui/bot-band-protocol.test.js    # 3 条：协议放行 / 非法
 #### 测试
 
 ```powershell
-node --test test/match/afk.test.js      # 11 条
+node --test test/match/afk.test.js      # 15 条
 ```
 
 关键那条是 **「掉线中不算挂机」**：断言掉线的 `p_0` 连数 3 回合 `afkRounds` 恒为 0 且不被移出，
@@ -1825,6 +1828,7 @@ node --test test/match/afk.test.js      # 11 条
 - 单人模式（`mode: 'solo'`）、合作房「一个真人 + 若干 AI」→ 完全不判定（判据是**建局快照** `loneHuman`）
 - 开局 2 人、中途走掉一个 → **仍然继续判定**（快照不变；参考版也这么做，剩下那个人挂机照样会被移出）
 - 掉线、AI 托管 → 归零
+- 「深渊回响」至少 3 个备战（`AFK_REMOVE_ROUNDS_DEEPECHO`；祭坛/祝福等操作也算实质操作）
 - `afkRemoveRounds = 0` → 整体关闭
 
 

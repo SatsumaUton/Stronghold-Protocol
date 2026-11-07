@@ -7,7 +7,7 @@
 import { C2S } from '../../../shared/protocol.js';
 import { PHASE, ERR } from '../../../shared/constants.js';
 import { syntheticResult } from '../fields.js';
-import { FLOW_TICKER_PRIORITY, OK, fail, OFFLINE_TAKEOVER_ROUNDS } from './common.js';
+import { FLOW_TICKER_PRIORITY, OK, fail, OFFLINE_TAKEOVER_ROUNDS, AFK_REMOVE_ROUNDS_DEEPECHO } from './common.js';
 import { msg } from '../../../shared/i18n.js';
 import { ruleOption } from '../../../shared/plugins/rules.js';
 
@@ -205,7 +205,9 @@ export class MatchPlatform {
    * 挂机移出 / 消极游戏（移植自参考版 platform.js 的 _checkIdle，维护者 2026-11-02 要求）。
    *
    * 判据与参考版一致：**每回合备战结束时**数一遍，看这个真人在这一回合有没有**实质操作**
-   * （common.js 的 AFK_ACTIONS，13 条：买/卖/移动/刷新/升级/冻结/装备/销毁/选择/领奖/复活/选盟约/跳过盟约）。
+   * （common.js 的 AFK_ACTIONS：普通房 13 条 —— 买/卖/移动/刷新/升级/冻结/装备/销毁/选择/领奖/复活/选盟约/跳过盟约；
+   * 另有「深渊回响」的 9 条 —— 祭坛/祝福/弃选/刷新祝福/补给/投影/护盾/反制/放弃深潜）。
+   * 深潜的回合数下限是 `AFK_REMOVE_ROUNDS_DEEPECHO`（3），普通房用配置值（默认 2）。
    *
    * ★ 三条关键口径（这是参考版比原来那两条规则好的地方）：
    *   1. **掉线不算挂机**（`!ps.connected` 归零）。原来那版没有这个判断 ——
@@ -222,8 +224,19 @@ export class MatchPlatform {
    * 把他移出。实时数的写法会让这局变成「单人局」而停止判定，等于给中途退出的房间开后门。
    * `afkRemoveRounds = 0` 可整体关闭。
    */
+  /**
+   * 实际生效的挂机回合数：普通房用配置值（`afkRemoveRounds`，0 = 关闭）；
+   * 「深渊回响」至少 `AFK_REMOVE_ROUNDS_DEEPECHO` 回合 —— 深潜准备期更长、深层可做的事更少，
+   * 普通房的 2 回合对深潜太严格（维护者 2026-11-07 晚）。判定与警告（player/views.js afkWarned）共用这一个口径。
+   */
+  _afkLimit() {
+    const base = this.afkRemoveRounds;
+    if (!(base > 0)) return base;
+    return this.echoVariant === 'deepecho' ? Math.max(base, AFK_REMOVE_ROUNDS_DEEPECHO) : base;
+  }
+
   _checkIdle() {
-    const limit = this.afkRemoveRounds;
+    const limit = this._afkLimit();
     if (!(limit > 0) || this.ended || this.disposed) return;
     // 单人模式 / 合作房里开局就只有一个真人：连计数都不必维护（合作房看建局快照 soloUntimed === loneHuman，
     // 中途有人退出不改变这个判定；solo 模式恒不判定）
