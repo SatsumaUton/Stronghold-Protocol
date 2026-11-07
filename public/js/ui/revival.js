@@ -33,22 +33,20 @@ export function revivalReason(pub, myId, targetId, online = true, now = serverNo
   // 深潜（unlimited）不设次数限制：救过的人再倒还能救
   if (target.revived && !rule.unlimited) return t('该队友本局复活次数已经用完');
   if (!target.pendingDeath) return reasonText(target.revivalUnavailableReason);
-  if (pub.phase !== PHASE.SETTLE || !rule.windowOpen || !(rule.deadline > now)) return t(rule.anyDonor ? '等待本回合结算后的救援窗口' : '等待联防结算后的救援窗口');
+  if (pub.phase !== PHASE.SETTLE || !rule.windowOpen || !(rule.deadline > now)) return t('等待联防结算后的救援窗口');
   if (!me?.alive || me.left || me.isBot) return t('只有存活玩家可以提供救援');
   if (!(me.lp >= 11)) return t('至少需要 11 点生命值（支付 10 点）');
-  // 深潜（anyDonor）：任何存活队友都能救援，不再要求参与联防
-  if (!rule.anyDonor && !rule.eligible?.includes(myId)) return t('仅限本轮未漏怪且实际参与联防的队友');
+  // 救援资格由服务端按参考版计算（联防结算后、本轮未漏怪的 helper）
+  if (!rule.eligible?.includes(myId)) return t('仅限本轮未漏怪且实际参与联防的队友');
   return null;
 }
 
 export function RevivalNotice({ pub }) {
   if (!pub?.revival?.enabled || !pub.revival.windowOpen) return null;
   return html`<div class="team-rescue" role="status">
-    <strong><${Icon} name="plus" /> ${t(pub.revival.anyDonor ? '救援窗口' : '联防救援窗口')}</strong>
+    <strong><${Icon} name="plus" /> ${t('联防救援窗口')}</strong>
     <${Countdown} deadline=${pub.revival.deadline} size="sm" gauge=${false} label=${t('救援剩余')} />
-    <small>${t(pub.revival.anyDonor
-      ? (pub.revival.unlimited ? '任一存活队友、至少 11 点生命，可支付 10 点救援；本模式可反复救援' : '任一存活队友、至少 11 点生命，可支付 10 点救援')
-      : '符合资格且至少 11 生命，可支付 10 点救援')}</small>
+    <small>${t('符合资格且至少 11 生命，可支付 10 点救援')}</small>
   </div>`;
 }
 

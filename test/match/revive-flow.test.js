@@ -152,13 +152,13 @@ test('深潜：救援不限次数，同一队友可以反复救回', (t) => {
   assert.equal(r2.ok, undefined, '付不起时仍然拒绝');
 });
 
-// 维护者 2026-11-07：普通房间恢复参考版（原版）设计 —— 救援只发生在联防结算后，
-// 且只有「本轮实际出场、自己这一轮没漏怪」的 helper 能付 10 血救人；深潜保持不变。
+// 维护者 2026-11-07：救援资格的计算统一成参考版（原版）—— 救援只发生在联防结算后，
+// 且只有「本轮实际出场、自己这一轮没漏怪」的 helper 能付 10 血救人；深潜同一套计算、只保留不限次数。
 test('普通房间（参考版口径）：非联防回合没有救援资格，0 血直接淘汰', (t) => {
   const h = makeMatch({ mode: 'coop', humans: 2, seed: 7, fake: true }).start().toPrep(1);
   t.after(() => h.m.dispose());
   const m = h.m;
-  assert.equal(m.revivalAnyDonor, false, '普通房间不放开 anyDonor');
+  assert.equal(m.revivalUnlimited, false, '普通房间一命一次');
   m.revivalEnabled = true;
   m.phase = PHASE.SETTLE;
   assert.equal(m._revivalHelpers(null, null).size, 0, '各自行动的回合没人有资格');
@@ -189,14 +189,22 @@ test('普通房间（参考版口径）：联防回合只收「实际出场且�
   assert.equal(m._revivalHelpers({ helpers: [a], leakers: [] }, { reason: 'cleared', perPlayer }).size, 0);
 });
 
-test('深潜（不变）：任何存活队友、任何回合都能救援', (t) => {
+test('深潜：救援资格与参考版同一套计算（非联防回合没有资格），次数仍不限', (t) => {
   const h = makeMatch({ mode: 'coop', humans: 2, seed: 7, fake: true, variant: 'deepecho' }).start().toPrep(1);
   t.after(() => h.m.dispose());
   const m = h.m;
-  assert.equal(m.revivalAnyDonor, true);
-  assert.equal(m.revivalUnlimited, true);
+  assert.equal(m.revivalUnlimited, true, '深潜保留不限次数');
   m.revivalEnabled = true;
   m.phase = PHASE.COMBAT;
-  const alive = m.order.filter((ps) => !ps.isBot && ps.alive && !ps.left).map((ps) => ps.playerId).sort();
-  assert.deepEqual([...m._revivalHelpers(null, null)].sort(), alive, '不要求联防、不要求完美');
+  assert.equal(m._revivalHelpers(null, null).size, 0, '深潜也不在各自行动回合放行救援');
+  // 联防回合：和普通房间一样只收「实际出场且本轮未漏怪」的 helper
+  const [a, b] = ['p_0', 'p_1'].map((id) => h.ps(id));
+  const plan = { helpers: [a, b], leakers: [], leaked: [], notReentered: new Map() };
+  m.phase = PHASE.UNITE;
+  m.unitePlan = plan;
+  m.fields = [{ fieldId: 'u', kind: 'unite', players: [a.playerId], live: false }];
+  m.lastResults.set(a.playerId, { perfect: true, leaked: [] });
+  m.lastResults.set(b.playerId, { perfect: true, leaked: [] });
+  const perPlayer = { [a.playerId]: { perfect: true, leaked: [] }, [b.playerId]: { perfect: true, leaked: [] } };
+  assert.deepEqual([...m._revivalHelpers(plan, { reason: 'cleared', perPlayer })], [a.playerId], 'b 没上联防场');
 });

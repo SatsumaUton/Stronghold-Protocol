@@ -470,10 +470,9 @@ export class Match {
       ? { ...expIn, disableSharedPool: true }
       : expIn);
     this.revivalEnabled = !this.isSolo && (this.echoVariant === 'deepecho' || this.experimental.revivalEnabled);
-    // 维护者 2026-11-07：**普通房间恢复参考版（原版）的救援设计** —— 救援只发生在联防结算后，
-    // 且只有「这一轮没漏怪、实际站在联防场上」的 helper 才能付 10 血救 1 血（见 _revivalHelpers）。
-    // 深潜保持不变（2026-11-05/06 的决定）：任何存活队友都能救，不限次数。
-    this.revivalAnyDonor = this.echoVariant === 'deepecho' && !this.isSolo;
+    // 维护者 2026-11-07：救援资格的计算统一成参考版（`_revivalHelpers`）—— 普通房间与深潜同一套：
+    // 只在联防结算后、且只有「本轮实际出场、自己这一轮没漏怪」的 helper 能付 10 血救 1 血。
+    // 深潜仍保留「不限次数」（2026-11-06 的决定），见 revivalUnlimited。
     // 维护者 2026-11-06：深潜**取消「每人每局只能被救一次」** —— 只要救援窗口开着、有队友付得起 10 点，
     // 就能反复把人救回来（真正的上限是队友自己的生命值）。普通房间保持原版的一次性规则。
     this.revivalUnlimited = this.echoVariant === 'deepecho' && !this.isSolo;
@@ -828,21 +827,13 @@ export class Match {
   }
 
   /**
-   * Who may pay for a rescue after this round's settlement.
-   * 深潜（`revivalAnyDonor`，维护者 2026-11-05/06）：任何存活真人队友，任何回合都行 —— 不变。
-   * 普通房间（维护者 2026-11-07：与参考版一致）：救援只发生在**联防结算后**，且只收「本轮联防实际出场、
-   * 自己这一轮（普通战斗 + 联防）都没有 counted 漏怪」的 helper —— 非联防回合没有救援，0 血直接淘汰。
+   * Who may pay for a rescue after this round's settlement — the reference version's computation, shared by every
+   * mode (maintainer 2026-11-07): only a 联防 settle, and only a helper who actually stood on that 联防 field and
+   * leaked nothing in this round (their own battle and the 联防 alike). 各自行动 rounds have no rescue at all.
    */
   _revivalHelpers(plan, uniteResult) {
     const eligible = new Set();
-    if (!this.revivalEnabled) return eligible;
-    if (this.revivalAnyDonor) {
-      for (const ps of this.order) {
-        if (ps && !ps.isBot && !ps.left && ps.alive) eligible.add(ps.playerId);
-      }
-      return eligible;
-    }
-    if (this.phase !== PHASE.UNITE || !plan || plan !== this.unitePlan
+    if (!this.revivalEnabled || this.phase !== PHASE.UNITE || !plan || plan !== this.unitePlan
       || !uniteResult || uniteResult.synthetic || !['cleared', 'timeout'].includes(uniteResult.reason)) return eligible;
     const field = this.fields.find((f) => f.kind === 'unite' && !f.live);
     if (!field) return eligible;
@@ -902,11 +893,8 @@ export class Match {
     ps.alive = false;
     ps.pendingDeath = true;
     ps.dirty();
-    // 深潜的救援是「任一存活队友付 10 点救 1 点」，提示语要说清楚怎么救（维护者 2026-11-05）
-    // 2026-11-06：所有多人模式都是「任一存活队友可付 10 点救援」，提示语跟着统一
-    this.toast(ps, 'warn', this.revivalAnyDonor
-      ? msg('你的目标生命值耗尽：任一存活队友可支付 10 点目标生命把你救回 1 点')
-      : msg('你的目标生命值耗尽，等待救援'));
+    // 参考版的提示：进入 15 秒救援窗口，等合格的队友付款
+    this.toast(ps, 'warn', msg('你的目标生命值耗尽，等待救援'));
   }
 
   _finalizeDeath(ps, { round = this.round, notify = true, reason = this._revivalDeathReason(ps) } = {}) {

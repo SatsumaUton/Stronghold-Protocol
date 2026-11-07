@@ -123,10 +123,8 @@ export class MatchViews {
         matchId: this.battlePrefix,
         windowOpen: this.revivalWindowOpen(),
         deadline: this.revivalWindowOpen() ? this._revival.deadline : 0,
-        // 只有「深渊回响」放宽：不要求进入联防，任一存活队友都能付救援（维护者 2026-11-05）；
-        // 普通房间保持参考版口径（2026-11-07）：仅联防结算后、本轮未漏怪的 helper
-        anyDonor: this.revivalAnyDonor === true,
-        // 「深渊回响」：不限次数（2026-11-06）—— 条件满足就能反复救，客户端据此不再显示「复活已用」
+        // 救援资格走参考版计算（2026-11-07 起所有模式一致）：只有联防结算后、本轮未漏怪的 helper 在 eligible 里
+        // 「深渊回响」只保留不限次数（unlimited，2026-11-06）
         unlimited: this.revivalUnlimited === true,
         eligible: this.revivalWindowOpen() ? this.order.filter((ps) => this.revivalDonorEligible(ps)).map((ps) => ps.playerId) : [],
       } : { enabled: false },
