@@ -230,8 +230,9 @@ export function MorphGrantLine({ item, off = null, carried = null, mode = 'offic
 /**
  * 「盟约投影」的效果条目（维护者 2026-11-06）：拿到投影后，场上每个己方干员都算该核心盟约的成员 ——
  * 卡面上要像变形同构体那样有一条说明：「盟约投影：视为【X】成员（满档）」+ 这条盟约的效果原文。
- * 只有已部署、且本来不属于该盟约的干员才挂（见 ChessDetail 的 projectedBond）。
- * @param {{ projection: any, bondId: string }} props — projection: 公开视图 `echo.projection.current`
+ * 本来不属于该盟约的干员都挂（见 ChessDetail 的 projectedBond）：场上写「生效中」，
+ * 商店 / 备战区的卡片写「部署后生效」（维护者 2026-11-07 晚：描述卡片上也要能看到投影）。
+ * @param {{ projection: any, bondId: string }} props — projection: 公开视图 `echo.projections[playerId]`
  */
 export function ProjectionLine({ projection, bondId, onBoard = true }) {
   const bond = data.lookup('bonds', bondId);
@@ -470,14 +471,20 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
     return !!unit;
   })();
   // 干员**本身就有**这条盟约时不再追加、也不打「投影」角标（维护者 2026-11-05）。
-  // 2026-11-06 维护者确认：只有**已部署到场上**的干员才生效、才挂这条说明（手牌/整备区不显示）。
+  // 2026-11-06 维护者确认：投影只对**已部署到场上**的干员生效。
   // 2026-11-07：不再限定「自己的干员」—— 观战队友时他的干员同样挂着**他**那条投影，
   // 否则观战看到的内容和对局中玩家自己看到的不一致（玩家反馈）。
+  // ★ 2026-11-07 晚（维护者截图反馈「buff 栏和已获祝福里都有了，干员描述卡片里还是没有」）：
+  //   **描述卡片上任何干员都要能看到投影**。以前 `projectedBond` 带着 `onBoard` 条件，
+  //   商店 / 备战区（手牌第 7 行、临时区第 8 行）的卡片整条说明都不画 —— 玩家在买人、编队时
+  //   根本看不到自己这层选的是哪条投影；而 ProjectionLine 本来就有 `onBoard` 参数
+  //   （场上写「生效中」，没上场写「部署后生效」）。所以说明行不再看 `onBoard`；
+  //   盟约条上的「投影」角标仍只在场上打（没上场的干员不该标成已生效）。
   const nativelyHas = Array.isArray(c.bonds) && c.bonds.includes(projectedId);
-  const projectedBond = onBoard && !nativelyHas ? projectedId : null;
+  const projectedBond = nativelyHas ? null : projectedId;
   const bondIds = (() => {
     const list = pieceBondIds(c, carried, getItem, morphMode);
-    return projectedBond && !list.includes(projectedBond) ? [...list, projectedBond] : list;
+    return onBoard && projectedBond && !list.includes(projectedBond) ? [...list, projectedBond] : list;
   })();
   const slotPolicy = morphSlotPolicy(morphMode === 'plus' ? 'plus' : 'official', (it) => !!getItem(typeof it === 'string' ? it : it?.id)?.canGiveBond);
   const grantedIds = bondIds.filter((b) => !(Array.isArray(c.bonds) && c.bonds.includes(b)) && b !== projectedBond);
@@ -507,7 +514,7 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
           <span class="dhead__pos">${body.position === 'MELEE' ? t('近战位') : t('远程位')}</span>
         </div>
         ${hp ? html`<div class="dhp"><i style=${`width:${Math.max(0, Math.min(100, (hp.hp / Math.max(1, hp.max)) * 100))}%`}></i><span class="num">${fmtNum(hp.hp)} / ${fmtNum(hp.max)}</span></div>` : null}
-        <${BondChips} bondIds=${bondIds} bonds=${bonds} off=${offBonds} onBond=${onBond} granted=${grantedIds} projected=${projectedBond} />
+        <${BondChips} bondIds=${bondIds} bonds=${bonds} off=${offBonds} onBond=${onBond} granted=${grantedIds} projected=${onBoard ? projectedBond : null} />
         ${projectedBond && projection ? html`<${ProjectionLine} projection=${projection} bondId=${projectedBond} onBoard=${onBoard} />` : null}
       </div>
     </div>`;
