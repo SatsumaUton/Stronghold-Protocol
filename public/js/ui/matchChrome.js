@@ -212,6 +212,14 @@ export function ExitModal({ open, onClose, solo, onAway }) {
   const quitLine = echo && !echoGiveUp
     ? tParts(w.quitElsewhere, { quit: html`<b class="t-red">${t(w.quit)}</b>` })
     : solo ? t(w.soloQuit) : tParts(w.quitLine, { quit: html`<b class="t-red">${t(w.quit)}</b>` });
+  // 单人房（房间里只有一个真人：单人模式 / 1 真人 + 3 AI / 单人深潜）关掉页面就等于存档 ——
+  // 服务端把重连窗口拉到 24 小时（lobby.soloLikeRun / soloResumeWindowMs）。维护者 2026-11-08：
+  // 「在保存的位置告诉玩家怎么继续打开自己的 24 小时的房间」，否则玩家以为「离开 = 丢局」。
+  const loneHuman = (() => {
+    const ps = pub && Array.isArray(pub.players) ? pub.players.filter(Boolean) : null;
+    if (!ps) return !!solo;
+    return ps.filter((p) => !p.isBot).length <= 1;
+  })();
   return html`<${Modal} open=${open} onClose=${onClose} tone="red" title=${t(w.title)} micro=${w.micro} width="6.8rem"
     actions=${html`
       <${Button} variant="secondary" onClick=${onClose}>${t('取消')}<//>
@@ -222,6 +230,10 @@ export function ExitModal({ open, onClose, solo, onAway }) {
         ? html`<p>${t(w.soloRest)}</p><p class="t-lo">${quitLine}</p>`
         : html`<p>${tParts('{away}：由 AI 托管你的席位（自动部署、准备与选择），随时可以返回。', { away: html`<b class="t-ice">${t('暂离')}</b>` })}</p>
                <p>${quitLine}</p>`}
+      ${(solo || loneHuman) ? html`<div class="exitm__save" role="note">
+        <b class="exitm__save-t">${t('想留着这局？直接关掉页面就行')}</b>
+        <span class="exitm__save-d">${t('24 小时内用同一浏览器打开本站会自动回到这一局；换设备就在大厅右上角点「恢复对局」。')}</span>
+      </div>` : null}
       ${echoVote ? html`<p class="t-dim">${t(w.voteLine, { n: (echoVote.agreed || []).length, m: (echoVote.voters || []).length })}</p>` : null}
     </div>
   <//>`;
