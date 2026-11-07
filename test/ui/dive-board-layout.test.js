@@ -54,7 +54,7 @@ test('表头也换行，不再出现「最高…」这种看不出列名的截�
   assert.equal(decl(b, 'text-overflow'), null);
 });
 
-test('数值列仍然单行：名次 / 层数 / 最高盟约数 / 通关时间 不换行', () => {
+test('名次 / 层数 / 通关时间 仍然单行；最高盟约数每人一行但整体居中', () => {
   assert.match(decl(lastBlock('.echo-row--cols .echo-rank__time'), 'white-space') || '', /nowrap/);
   assert.match(decl(lastBlock('.echo-row--cols .echo-rank__bonds'), 'text-align') || '', /center/);
 });
@@ -74,8 +74,32 @@ test('表头与数据行共用同一份 grid-template-columns（否则两行会�
 test('行内把所有人的名字与所有核心盟约都拼出来（不截前 N 个）', () => {
   assert.match(lobby, /const names = squads \? squads\.map\(\(s\) => s\.name\) : \(Array\.isArray\(r\.players\) \? r\.players : \[\]\);/);
   assert.match(lobby, /const cores = \[\.\.\.new Set\(squads \? squads\.flatMap\(\(s\) => \(Array\.isArray\(s\.cores\) \? s\.cores : \[\]\)\) : \[\]\)\];/);
-  assert.match(lobby, /<span class="echo-rank__players">\$\{names\.length \? names\.join\('、'\) : \(r\.roomCode \|\| '----'\)\}<\/span>/);
+  // 有 squads 时一个队员一行；没有（旧记录）才退回「、」拼接
+  assert.match(lobby, /names\.map\(\(n, i\) => html`<i key=\$\{i\}>\$\{n\}<\/i>`\)/);
   assert.match(lobby, /<span class="echo-rank__cores" title=\$\{cores\.join\('、'\)\}>\$\{cores\.length \? cores\.join\('、'\) : '—'\}<\/span>/);
   assert.doesNotMatch(lobby, /names\.slice\(0,/, '不能只显示前几个玩家');
   assert.doesNotMatch(lobby, /cores\.slice\(0,/, '不能只显示前几条核心盟约');
+});
+
+// 维护者 2026-11-08：「最高盟约」是**小队里每个人的**最高盟约层数，不是一个人的数字。
+test('最高盟约数按人一行：每个队员自己那条 squads[].maxLayers，与「玩家」列同序', () => {
+  assert.match(lobby, /const layersOf = squads \? squads\.map\(\(s\) => Math\.max\(0, Math\.floor\(Number\(s\.maxLayers\) \|\| 0\)\)\) : \[\];/);
+  // 一个人一个 <i>（不是 join 成一个数字），旧记录没有 squads 才退回聚合值 r.maxLayers
+  assert.match(lobby, /layersOf\.map\(\(v, i\) => html`<i key=\$\{i\}>\$\{v \|\| '—'\}<\/i>`\)/);
+  assert.match(lobby, /: \(maxLayers \|\| '—'\)\}<\/span>/);
+  // 悬停能看到「谁 = 多少层」，长名字换行时也不会认错人
+  assert.match(lobby, /const layersTitle = squads\s*\? squads\.map\(\(s, i\) => `\$\{s\.name\} \$\{layersOf\[i\] \|\| '—'\}`\)\.join\(' ｜ '\)/);
+  // 展开明细同样按人写
+  assert.match(lobby, /squads\.map\(\(s, i\) => `\$\{s\.name\} \$\{layersOf\[i\] \? t\('\{n\} 层', \{ n: layersOf\[i\] \}\) : '—'\}`\)\.join\(' ｜ '\)/);
+});
+
+test('两列逐行对齐：同一个 flex 竖排 + 同一个 line-height', () => {
+  const players = lastBlock('.echo-row--cols .echo-rank__players');
+  const bonds = lastBlock('.echo-row--cols .echo-rank__bonds');
+  for (const [name, b] of [['玩家', players], ['最高盟约数', bonds]]) {
+    assert.equal(decl(b, 'display'), 'flex', `${name} 要竖排（一个人一行）`);
+    assert.equal(decl(b, 'flex-direction'), 'column', `${name} 要竖排`);
+  }
+  assert.equal(decl(players, 'line-height'), decl(bonds, 'line-height'), '两列行高一致才能逐行对齐');
+  assert.match(decl(bonds, 'text-align') || '', /center/);
 });
