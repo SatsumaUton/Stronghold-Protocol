@@ -444,13 +444,17 @@ async function currentUser(req) {
   }
   if (!sid || !/^[A-Za-z0-9_-]{20,64}$/.test(sid)) return null;
   const [rows] = await db().query(
-    'SELECT u.id, u.email, u.nickname, u.tag, u.name, u.role, s.expires_at FROM user_sessions s JOIN accounts u ON u.id = s.user_id WHERE s.sid = ? AND u.disabled = 0 AND u.deleted_at IS NULL',
+    // ★ 2026-11-07：`u.title` 必须一起取回来 —— 令牌里的称号就是靠它（`userTokenFor` → `titleRowSync`）。
+    //   以前这里没选 title，于是 /api/auth/me 发的令牌永远没有称号，房间座位卡自然也不显示。
+    'SELECT u.id, u.email, u.nickname, u.tag, u.name, u.role, u.title, s.expires_at FROM user_sessions s JOIN accounts u ON u.id = s.user_id WHERE s.sid = ? AND u.disabled = 0 AND u.deleted_at IS NULL',
     [sid],
   );
   const r = rows[0];
   if (!r || new Date(r.expires_at).getTime() < Date.now()) return null;
   const display = displayOf(r);
-  return { id: r.id, email: r.email, nickname: r.nickname, tag: r.tag, role: r.role || 'player', name: display, displayName: display, titleName: r.nickname ? r.nickname + '#' + r.tag : null };
+  // ★ 2026-11-07：`title` 也要一起带出去 —— 这里是**手工拼的返回对象**，漏一个字段，
+  //   后面 `userTokenFor(u)` 就拿不到称号（令牌里 title 永远是 null，房间座位卡不显示称号）。
+  return { id: r.id, email: r.email, nickname: r.nickname, tag: r.tag, role: r.role || 'player', title: r.title ?? null, name: display, displayName: display, titleName: r.nickname ? r.nickname + '#' + r.tag : null };
 }
 
 async function createSession(userId, req, res) {
@@ -949,7 +953,8 @@ async function handle(req, res, pathname) {
     if (!checkCaptcha(body)) return sendJson(res, 400, { ok: false, error: 'captcha_wrong' });
     const email = String(body.email || '').trim().toLowerCase();
     if (limited('login:' + ip + ':' + email, 10, 60_000)) return sendJson(res, 429, { ok: false, error: 'too_many_requests' });
-    const [rows] = await db().query('SELECT id, email, nickname, tag, name, role, pass_hash, disabled FROM accounts WHERE email = ? AND deleted_at IS NULL', [email]);
+    // 称号（2026-11-07）：登录发的令牌也要带上，否则刚登录的这一局看不到称号，要等下次刷新页面
+    const [rows] = await db().query('SELECT id, email, nickname, tag, name, role, title, pass_hash, disabled FROM accounts WHERE email = ? AND deleted_at IS NULL', [email]);
     const u = rows[0];
     if (!u || u.disabled || !verifyPassword(String(body.password || ''), u.pass_hash)) {
       return sendJson(res, 401, { ok: false, error: 'bad_credentials' });
