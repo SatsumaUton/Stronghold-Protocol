@@ -6638,7 +6638,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": false,
-        "customBytes": 98144
+        "customBytes": 99048
       },
       {
         "path": "public/css/screens/game-shop.css",
@@ -6673,22 +6673,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 230741
+        "customBytes": 232942
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 266886
+        "customBytes": 269272
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 256050
+        "customBytes": 258364
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 219239
+        "customBytes": 221323
       },
       {
         "path": "public/js/assets.js",
@@ -6768,7 +6768,7 @@
       {
         "path": "public/js/ui/echoStatus.js",
         "baseExists": false,
-        "customBytes": 14755
+        "customBytes": 15472
       },
       {
         "path": "public/js/ui/echoSupply.js",
@@ -6833,7 +6833,7 @@
       {
         "path": "public/js/ui/revival.js",
         "baseExists": false,
-        "customBytes": 6091
+        "customBytes": 5756
       },
       {
         "path": "public/js/ui/roomList.js",
@@ -6868,7 +6868,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": false,
-        "customBytes": 70404
+        "customBytes": 69684
       },
       {
         "path": "server/match/PlayerState.js",
@@ -6948,7 +6948,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 181360
+        "customBytes": 187027
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -6988,7 +6988,7 @@
       {
         "path": "server/match/match/settle.js",
         "baseExists": false,
-        "customBytes": 13157
+        "customBytes": 13120
       },
       {
         "path": "server/match/match/setupVote.js",
@@ -7008,7 +7008,7 @@
       {
         "path": "server/match/match/views.js",
         "baseExists": false,
-        "customBytes": 33241
+        "customBytes": 33036
       },
       {
         "path": "server/match/player/economy.js",
@@ -7038,7 +7038,7 @@
       {
         "path": "server/match/snapshot.js",
         "baseExists": false,
-        "customBytes": 37573
+        "customBytes": 37898
       },
       {
         "path": "server/match/waves.js",
