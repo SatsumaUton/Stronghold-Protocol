@@ -36,7 +36,7 @@ export function readAdminToken(token) {
   return { uid: Number(data.uid) || 0, role: data.role, iat: Number(data.iat) || 0 };
 }
 
-/** @param {unknown} token @returns {{ uid: number, role: string, tag: string|null } | null} */
+/** @param {unknown} token @returns {{ uid: number, role: string, tag: string|null, title: { id: string, name: string, tone: string, desc: string }|null } | null} */
 export function readUserToken(token) {
   const data = readSigned(token);
   if (!data) return null;
@@ -51,7 +51,20 @@ export function readUserToken(token) {
   //   旧版令牌没有这个字段：按 false 处理 —— admin 必须重新登录才会带上，
   //   期间只是看不到入口（保守一侧），不会误放开。
   const gameTool = data.role === 'owner' ? true : data.gameTool === true;
-  return { uid, role: data.role, tag, gameTool };
+  // ★ 2026-11-07 晚：**称号必须一起带出去**。之前这里只返回 uid/role/tag/gameTool，
+  //   `net.js` 里 `account.title` 永远是 undefined，于是 session.title 恒为 null、
+  //   房间座位卡永远不显示称号（令牌里明明带着 title）。这里顺手做一次校验：
+  //   只接受 { id?, name, tone?, desc? }，name 为空就当没有称号。
+  const t = data.title;
+  const title = t && typeof t === 'object' && typeof t.name === 'string' && t.name
+    ? {
+      id: typeof t.id === 'string' ? t.id : '',
+      name: t.name,
+      tone: typeof t.tone === 'string' && t.tone ? t.tone : 'echo',
+      desc: typeof t.desc === 'string' ? t.desc : '',
+    }
+    : null;
+  return { uid, role: data.role, tag, gameTool, title };
 }
 
 // ── 吊销支持（2026-10-31）───────────────────────────────────────────────
