@@ -6683,22 +6683,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 238786
+        "customBytes": 238827
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 275657
+        "customBytes": 275699
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 264625
+        "customBytes": 264666
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 226882
+        "customBytes": 226924
       },
       {
         "path": "public/js/assets.js",
@@ -6723,7 +6723,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": true,
-        "customBytes": 120864
+        "customBytes": 121064
       },
       {
         "path": "public/js/screens/result.js",
@@ -6933,7 +6933,7 @@
       {
         "path": "server/match/match/echoBoard.js",
         "baseExists": false,
-        "customBytes": 10694
+        "customBytes": 11163
       },
       {
         "path": "server/match/match/echoBounty.js",

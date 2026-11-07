@@ -1185,12 +1185,13 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
                         ${/* 维护者 2026-11-05：展开明细也要有「玩家 / 核心盟约 / 最高盟约数」，缺数据时写 — 而不是整块消失 */ null}
                         <div class="echo-detail__full"><span>${t('玩家')}</span><b>${names.length ? names.join('、') : '—'}</b></div>
                         <div class="echo-detail__full"><span>${t('核心盟约')}</span><b>${squads
-                          ? squads.map((s) => t('{name}：{cores} · 最高 {n} 层', {
+                          ? squads.map((s) => t('{name}：{cores}', {
                             name: s.name,
                             cores: (s.cores || []).join('、') || t('无核心'),
-                            n: s.maxLayers || 0,
                           })).join(' ｜ ')
                           : (cores.length ? cores.join('、') : '—')}</b></div>
+                        ${/* 维护者 2026-11-07 晚：层数不再跟在核心盟约后面，单独一行「最高盟约数」——
+                              以前这里的值漏存（recordEchoBoard 没写 maxLayers），所以永远显示「—」 */ null}
                         <div><span>${t('最高盟约数')}</span><b>${maxLayers ? t('{n} 层', { n: maxLayers }) : '—'}</b></div>
                         <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'}</b></div>
                       </div>` : null}
