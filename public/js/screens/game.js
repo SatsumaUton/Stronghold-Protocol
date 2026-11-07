@@ -293,17 +293,6 @@ function MatchScreen() {
 
   const [watching, setWatching] = useState(null);        // fieldId the player chose to watch (null = home)
   const [watchWho, setWatchWho] = useState(null);        // { fieldId, playerId }: the teammate picked with 前往查看
-  // 「盟约投影」每人各自选（维护者 2026-11-07）：HUD 的 buff 栏要显示**屏幕上是哪位**的投影，
-  // 而不是自己的（观战 / 前往查看时自己的投影不该占着那一格）。栏在 GameScreen 层渲染，
-  // 所以把「正在看谁」发布到 store 里，由 ui/echoStatus.js 的 EchoBuffBar 读取。
-  useEffect(() => {
-    const list = Array.isArray(pub?.players) ? pub.players : [];
-    const p = watching
-      ? list.find((x) => x && x.playerId !== myId && (watching === ownFieldId(x.playerId) || watching === x.fieldId)) || null
-      : null;
-    store.patch('ui', { watchTarget: p?.playerId || null });
-  }, [watching, pub, myId]);
-  useEffect(() => () => store.patch('ui', { watchTarget: null }), []);
   const [drawer, setDrawer] = useState(null);            // 'enemies' | 'info' | null
   const [bondOpen, setBondOpen] = useState(null);        // { id, ownerId, from }: the bond popup and whose bond it shows
   const [bondsCollapsed, setBondsCollapsed] = useState(false);
@@ -1823,6 +1812,13 @@ function MatchScreen() {
     stripOwnerRef.current = strip.ownerId;
     setBondOpen((b) => (b && b.from === 'strip' ? null : b));
   }, [strip.ownerId]);
+  // 「盟约投影」每人各自选（维护者 2026-11-07）：屏幕上是**谁的**状态，投影就按那位取 ——
+  // 观战 / 前往查看 / 联防半边 / 被淘汰后自动观战都算（`strip.ownerId` 已经是「盟约条显示的是谁的盟约」，
+  // 比只看 `watching` 覆盖得全）。HUD 的 buff 栏、已获祝福列表、干员卡上的投影徽章都读这个值，
+  // 这样观战玩家看到的内容和对局中的玩家完全一致。
+  const stripOwner = strip.self ? null : (strip.ownerId || null);
+  useEffect(() => { store.patch('ui', { watchTarget: stripOwner }); }, [stripOwner]);
+  useEffect(() => () => store.patch('ui', { watchTarget: null }), []);
   // the popup shows the player it was opened for (ui/watchBonds.js popupView): their entry + live layers, their name,
   // and as members your pieces or their operators on the field on screen — under client-side combat the battle's own
   // (the runner's field meta is taken before they deploy); a battle sends no bench (a prep scout does: ownerBoard)
