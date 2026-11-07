@@ -2991,5 +2991,20 @@
   "社区之星": "Community Star",
   "在玩家群 / 论坛活跃、热心帮助新人的博士": "Active in the player groups and forums, always helping newcomers",
   "服务器守护者": "Server Guardian",
-  "帮忙排查线上问题、参与维护服务器的博士": "Helps diagnose live issues and maintain the server"
+  "帮忙排查线上问题、参与维护服务器的博士": "Helps diagnose live issues and maintain the server",
+  "+1 目标生命": "+1 Target HP",
+  "本层可买；永久 +1 部署位，每买一次都会涨价": "Available this layer; +1 deployment slot, the price rises with each purchase",
+  "献祭 · 刷新": "Offering · Refresh",
+  "本层 +2 次免费刷新": "+2 free refreshes this layer",
+  "献祭 · 词条": "Offering · Affix",
+  "本层随机词条：攻击 +8% / 攻速 +6% / 生命 +8%": "Random affix this layer: ATK +8% / ASPD +6% / HP +8%",
+  "献祭 · 反制": "Offering · Counter",
+  "随机一张反制祝福（可提前结束「排异 / 封锁」）": "A random counter blessing (ends Rejection / Blockade early)",
+  "已用完": "Used up",
+  "本层商品每次开启都会随机更换；每次献祭都会从你的资金里扣除对应价格，不返还。": "The goods change every time the altar opens; each offering deducts its price from your funds and is not refunded.",
+  "献祭 · 永久：部署位 +1（下一次 {n} 资金）": "Offering · Permanent: +1 deployment slot (next one {n} funds)",
+  "献祭 · 刷新：免费刷新 +{n}": "Offering · Refresh: +{n} free refresh",
+  "献祭 · 刷新：本回合的免费刷新额度已满，未生效": "Offering · Refresh: the free-refresh quota of this round is full — no effect",
+  "献祭 · 词条：本层全队「{name}」": "Offering · Affix: the whole team gets \"{name}\" this layer",
+  "献祭 · 反制：抽到「{name}」": "Offering · Counter: drew \"{name}\""
 }

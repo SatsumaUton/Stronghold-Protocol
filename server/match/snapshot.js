@@ -94,6 +94,9 @@ export const MATCH_FIELDS = Object.freeze({
     'echoOneShotIds',
     // 深渊祭坛（16 层起）的永久强化层数：读档丢掉等于白花资金
     'echoAltarBuffStacks', 'echoAltarLastDepth',
+    // 本层上架的商品与「本层开没开」（维护者 2026-11-07：每次开启随机 4 件）：读档后要看到同一批商品，
+    // 否则重连就能刷一次货。纯追加，旧存档缺这项时按「没上架表 = 全部可买」处理。
+    'echoAltarGoods', 'echoAltarOpen', 'echoAltarOpenRound',
     // 祭坛**本层**的购买次数（blessing 1 / buff 2 / permanent 1 / life 2，`echoAltar.used` 是 playerId → 计数的 Map）：
     // 不存的话读档后同一层可以再买一轮，等于用重连刷祭坛（2026-11-06 补，纯追加，旧存档缺这项时按空表处理）。
     'echoAltar',
