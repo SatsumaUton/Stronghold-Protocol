@@ -75,12 +75,22 @@ export function roundHalfEven(x) {
 const gen = (gd) => (gd.factions.generation && typeof gd.factions.generation === 'object' ? gd.factions.generation : {});
 const intOr = (v, d) => (Number.isInteger(v) && v > 0 ? v : d);
 
-/** Official movement class of an enemy key (randomEnemyAttributeDict.isFlyEnemy, else its motion). */
+/**
+ * Official movement class of an enemy key: **its motion first** (`stats.motion === 'FLY'` is what the sim flies by,
+ * simdata.js normalizeEnemy → `def.motion`), else `randomEnemyAttributeDict.isFlyEnemy`.
+ *
+ * 2026-11-08 (maintainer: 「部分飞行怪的路径还是有问题，依然会直线飞到终点」): the hidden core's two ELITE halves
+ * `enemy_9014_acstma` / `enemy_9015_acstmb` carry `isFlyEnemy: false` (they are not in randomEnemyAttributeDict) but
+ * `stats.motion: 'FLY'` — and the official enemy_database says motion 1 (FLY) for both. Reading `isFlyEnemy` first made
+ * the match layer call them ground: they went into the ground pools / were left on a ground route (start → end, no
+ * checkpoints), while the sim flew them — straight across the whole field. Motion is the sim's rule, so it decides here;
+ * `isFlyEnemy` only fills in for a record without stats.
+ */
 export function isFlyKey(gd, key) {
   const e = gd.enemy(key);
   if (!e) return false;
-  if (typeof e.isFlyEnemy === 'boolean') return e.isFlyEnemy;
-  return !!(e.stats && e.stats.motion === 'FLY');
+  if (e.stats && e.stats.motion === 'FLY') return true;
+  return e.isFlyEnemy === true;
 }
 
 /** Official attribute power P(k) (float32), enemies.json `attrPower`; derived from the stats when absent. */
