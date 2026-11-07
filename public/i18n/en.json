@@ -1,6 +1,20 @@
 {
-  "离线导入（不下载官方数据表）": "Import offline (do not download official data tables)",
   "_about": "English UI strings: Chinese msgid → English (shared/i18n.js t(); docs/I18N.md). Placeholders {name} and {n|one|other} as in the msgid; a 'context::msgid' key is a tc() variant. Seeded from GitHub PR #70 (branch en-translation) by @YuriRestia, reused with credit (NOTICE.md). Game texts are not here: data/i18n/en.json (tools/build-i18n.mjs).",
+  "_meta": {
+    "type": "lang",
+    "lang": "en",
+    "name": "English",
+    "englishName": "English",
+    "version": "0.2.0",
+    "app": ">=0.2.0",
+    "authors": [
+      "@YuriRestia (GitHub PR #70, the seed of these strings)",
+      "the Stronghold Protocol contributors"
+    ],
+    "credits": "Game texts (data/i18n/en.json): the official EN client data (© Hypergryph / Yostar) via ArknightsAssets/ArknightsGamedata.",
+    "complete": true
+  },
+  "离线导入（不下载官方数据表）": "Import offline (do not download official data tables)",
   "你已在其他同盟中，请先离开当前同盟": "You are already in another Alliance. Leave it first.",
   "你已不在该同盟中": "You are no longer in this Alliance",
   "创建者已离开，同盟已解散": "The host left. The Alliance has been disbanded.",
@@ -2508,20 +2522,6 @@
   "{humans} 名博士，{bots} 名 AI": "{humans} doctors, {bots} AI",
   "下次不再提醒": "Don’t ask again",
   "勾选后建房不再询问。以后想公开时：进房后打开「同盟设置」，把里面的「公开同盟」打开即可；大厅「同盟模拟 → 公开同盟」里能看别人的同盟。": "Ticked, creating a room no longer asks. To list later: open “Alliance settings” in the room and turn on “Public Alliance” there. The lobby’s “Alliance Simulation → Public Alliance” shows other doctors’ alliances.",
-  "_meta": {
-    "type": "lang",
-    "lang": "en",
-    "name": "English",
-    "englishName": "English",
-    "version": "0.2.0",
-    "app": ">=0.2.0",
-    "authors": [
-      "@YuriRestia (GitHub PR #70, the seed of these strings)",
-      "the Stronghold Protocol contributors"
-    ],
-    "credits": "Game texts (data/i18n/en.json): the official EN client data (© Hypergryph / Yostar) via ArknightsAssets/ArknightsGamedata.",
-    "complete": true
-  },
   "最高盟约数": "Most Bonds",
   "通关时间": "Clear Time",
   "玩家": "Players",
@@ -3041,14 +3041,11 @@
   "献祭 · {name}：本层全队生效": "Offering · {name}: active for the whole team this layer",
   "献祭 · 扩容": "Offering · Expansion",
   "祝福名额 +1（本局，全队共享），并立刻补一次抽取": "Blessing slots +1 (this run, shared by the team) and one extra draw right away",
-  "献祭 · 扩容：祝福名额 +1（本局，全队共享）": "Offering · Expansion: blessing slots +1 (this run, shared by the team)"
-,
+  "献祭 · 扩容：祝福名额 +1（本局，全队共享）": "Offering · Expansion: blessing slots +1 (this run, shared by the team)",
   "攻击按回合设置": "Per-round ATK",
   "BOSS 生命倍率": "Leader HP multiplier",
-  "BOSS 攻击倍率": "Leader ATK multiplier"
-,
-  "生命": "HP"
-,
+  "BOSS 攻击倍率": "Leader ATK multiplier",
+  "生命": "HP",
   "敌方领袖生命": "Leader HP",
   "敌方领袖攻击": "Leader ATK",
   "盟约投影不占祝福名额，同一时间只有一条": "A covenant projection takes no blessing slot; only one is active at a time",
@@ -3061,5 +3058,15 @@
   "确定放弃本次深潜？会立刻进入结算界面。": "Abandon this dive? The settlement screen opens right away.",
   "发起全员投票？所有存活玩家都同意后才会结算。": "Start a team vote? The run settles only after every surviving player agrees.",
   "确定放弃": "Abandon",
-  "放弃后直接进入结算界面；多人房间需要所有存活玩家同意。": "Abandoning goes straight to the settlement screen; in a multiplayer room every surviving player must agree."
+  "放弃后直接进入结算界面；多人房间需要所有存活玩家同意。": "Abandoning goes straight to the settlement screen; in a multiplayer room every surviving player must agree.",
+  "放弃深潜会立刻结算本次深潜并显示结算界面（深度、祝福、盟约都会保留在结算里）。": "Abandoning the dive settles this run at once and shows the settlement screen (depth, blessings and bonds are kept in the result).",
+  "{quit}：需要全队投票 —— 所有存活玩家都同意后才会结算；有人不同意或 30 秒未投完则继续深潜。": "{quit}: needs a team vote — the run settles only when every living player agrees; a single refusal or 30 seconds without all votes keeps the dive going.",
+  "现在不在休整期：{quit} 会直接退出本次深潜，不会结算（想结算请等休整期）。": "Not in the rest phase right now: {quit} leaves this dive directly without a settlement (wait for the rest phase to settle it).",
+  "「放弃深潜」的投票正在进行：已同意 {n}/{m}，所有存活玩家都同意后立刻结算。": "The “abandon the dive” vote is running: {n}/{m} agreed; the run settles as soon as every living player agrees.",
+  "献祭 · 祝福：当前祝福表里没有一次性祝福（不扣钱）": "Altar · Blessing: the blessing table has no one-shot blessing right now (no charge).",
+  "献祭 · 反制：当前祝福表里没有反制祝福（不扣钱）": "Altar · Counter: the blessing table has no counter blessing right now (no charge).",
+  "献祭 · 刷新：本回合的免费刷新额度已满，未生效（不扣钱）": "Altar · Refresh: this round's free-refresh quota is full, no effect (no charge).",
+  "献祭 · 提现：祭坛账户里没有可提现的资金（不扣钱）": "Altar · Withdraw: the altar account has no funds to withdraw (no charge).",
+  "献祭 · {name}：这张祝福在当前的祝福表里不存在（不扣钱）": "Altar · {name}: this blessing is not in the current blessing table (no charge).",
+  "献祭 · {name}：这件商品没有可结算的效果（不扣钱）": "Altar · {name}: this item has no effect to settle (no charge)."
 }

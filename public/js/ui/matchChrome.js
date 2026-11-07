@@ -42,8 +42,12 @@ export const exitWords = (echo) => (echo
   ? {
     title: N_('离开深潜'), micro: 'LEAVE DEEP DIVE', quit: N_('放弃深潜'), back: N_('返回深潜'),
     soloRest: N_('深潜的休整期没有时间限制，你可以随时继续。'),
-    soloQuit: N_('放弃深潜将立即结束本次深潜并返回大厅，深度进度不会保留，也不会进行结算。'),
-    quitLine: N_('{quit}：离开后无法返回本次深潜，你的干员将回到共享卡池。'),
+    // 2026-11-07 晚：放弃深潜不再「直接离开不结算」，而是走「主动放弃」——单/双人立刻结算，
+    // 多人全员投票；发起入口就是左上角这个对话框（原来另做的抽屉入口已删）。
+    soloQuit: N_('放弃深潜会立刻结算本次深潜并显示结算界面（深度、祝福、盟约都会保留在结算里）。'),
+    quitLine: N_('{quit}：需要全队投票 —— 所有存活玩家都同意后才会结算；有人不同意或 30 秒未投完则继续深潜。'),
+    quitElsewhere: N_('现在不在休整期：{quit} 会直接退出本次深潜，不会结算（想结算请等休整期）。'),
+    voteLine: N_('「放弃深潜」的投票正在进行：已同意 {n}/{m}，所有存活玩家都同意后立刻结算。'),
   }
   : {
     title: N_('离开模拟'), micro: 'LEAVE SIMULATION', quit: N_('放弃模拟'), back: N_('返回模拟'),
@@ -172,8 +176,21 @@ export function ExitModal({ open, onClose, solo, onAway }) {
     } catch { return false; }
   })();
   const spectator = useStore((s) => isSpectating(s.room, s.me.playerId)) || adminWatch;
+  // 「放弃深潜」的发起入口就是这里（维护者 2026-11-07 晚：不要再另做一个）。
+  // 休整期 + 存活 → 走「主动放弃」：单人立刻结算、多人全员投票；其他阶段 / 已淘汰 → 还是原来的直接离开。
+  const pub = useStore((s) => (s.match && s.match.public) || null);
+  const myId = useStore((s) => (s.me && s.me.playerId) || null);
+  const echoVote = echo && pub && pub.echo && pub.echo.giveUp ? pub.echo.giveUp : null;
+  const meRow = pub && Array.isArray(pub.players) ? pub.players.find((p) => p && p.playerId === myId) : null;
+  const echoGiveUp = !!(echo && pub && !spectator && pub.phase === 'PREP' && (!meRow || meRow.alive !== false) && !echoVote);
   const quit = async () => {
     setBusy('quit');
+    if (echoGiveUp) {
+      const ok = await actions.echoGiveUp();
+      setBusy(null);
+      if (ok) onClose();
+      return;
+    }
     await quitMatch();
     setBusy(null);
     onClose();
@@ -192,16 +209,20 @@ export function ExitModal({ open, onClose, solo, onAway }) {
     onClose();
     if (ok) { awayStore.set({ away: true }); onAway?.(); }
   };
+  const quitLine = echo && !echoGiveUp
+    ? tParts(w.quitElsewhere, { quit: html`<b class="t-red">${t(w.quit)}</b>` })
+    : solo ? t(w.soloQuit) : tParts(w.quitLine, { quit: html`<b class="t-red">${t(w.quit)}</b>` });
   return html`<${Modal} open=${open} onClose=${onClose} tone="red" title=${t(w.title)} micro=${w.micro} width="6.8rem"
     actions=${html`
       <${Button} variant="secondary" onClick=${onClose}>${t('取消')}<//>
       ${!solo ? html`<${Button} variant="ice" icon="robot" loading=${busy === 'away'} onClick=${away}>${t('暂离（AI 托管）')}<//>` : null}
-      <${Button} variant="danger" icon="exit" loading=${busy === 'quit'} onClick=${quit}>${t(w.quit)}<//>`}>
+      <${Button} variant="danger" icon="exit" loading=${busy === 'quit'} disabled=${!!echoVote} onClick=${quit}>${t(w.quit)}<//>`}>
     <div class="exitm">
       ${solo
-        ? html`<p>${t(w.soloRest)}</p><p class="t-lo">${t(w.soloQuit)}</p>`
+        ? html`<p>${t(w.soloRest)}</p><p class="t-lo">${quitLine}</p>`
         : html`<p>${tParts('{away}：由 AI 托管你的席位（自动部署、准备与选择），随时可以返回。', { away: html`<b class="t-ice">${t('暂离')}</b>` })}</p>
-               <p>${tParts(w.quitLine, { quit: html`<b class="t-red">${t(w.quit)}</b>` })}</p>`}
+               <p>${quitLine}</p>`}
+      ${echoVote ? html`<p class="t-dim">${t(w.voteLine, { n: (echoVote.agreed || []).length, m: (echoVote.voters || []).length })}</p>` : null}
     </div>
   <//>`;
 }

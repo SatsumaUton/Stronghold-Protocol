@@ -7,7 +7,6 @@
 //              match's factions and the enemy leader on boss rounds. The primary enemy preview is the pen on the board
 //              (the right 🔍▶▶ pans the camera there; tapping an enemy in the pen opens its detail card) — research 09 §6.2.
 
-import { useState } from '../../vendor/hooks.module.js';
 import { html, Icon, Tabs, MicroLabel } from './components.js';
 import { Img, UnitThumb, BondGlyph, BandIcon, RichText, GIcon } from './gameComponents.js';
 import { groupEnemies, factionTypes, briefingBondTip } from './gameLogic.js';
@@ -196,41 +195,27 @@ export function EnemyDrawer({ tab, onTab, pub, priv, onClose, onEnemy, onChess, 
 }
 
 /**
- * 「主动放弃深潜」（维护者 2026-11-07）：准备阶段可以放弃整局、直接进结算界面。
- * 单人房点了立刻结算；多人房是**全员投票** —— 所有存活真人都同意才结束，有人不同意 / 30 秒没投完就继续。
+ * 「放弃深潜」投票（维护者 2026-11-07）。
+ *
+ * **发起入口统一在左上角的「离开深潜」对话框**（ui/matchChrome.js ExitModal，维护者 2026-11-07 晚：
+ * 「放弃深潜的投票发起为什么不直接使用左上角退出界面里面的，而是你重新做了一个新的」）——
+ * 这里只在投票进行中显示进度和「同意 / 继续」，不再重复一个发起按钮。
  */
-function GiveUpBlock({ pub }) {
+function GiveUpVoteBlock({ pub }) {
   const echo = pub?.echo;
   const myId = useStore((s) => s.me.playerId);
-  const [confirm, setConfirm] = useState(false);
-  if (!echo || !echo.deepecho) return null;
-  const vote = echo.giveUp || null;
-  const prep = pub?.phase === 'PREP';
-  const humans = (Array.isArray(pub?.players) ? pub.players : [])
-    .filter((p) => p && !p.isBot && p.alive !== false && !p.left);
-  const solo = humans.length <= 1;
-  const agreed = vote && Array.isArray(vote.agreed) ? vote.agreed.length : 0;
-  const total = vote && Array.isArray(vote.voters) ? vote.voters.length : 0;
-  const mine = !!(vote && Array.isArray(vote.agreed) && vote.agreed.includes(myId));
-  const acts = (children) => html`<div class="echo-giveup__acts">${children}</div>`;
+  const vote = echo && echo.giveUp ? echo.giveUp : null;
+  if (!vote) return null;
+  const agreed = Array.isArray(vote.agreed) ? vote.agreed.length : 0;
+  const total = Array.isArray(vote.voters) ? vote.voters.length : 0;
+  const mine = Array.isArray(vote.agreed) && vote.agreed.includes(myId);
   return html`<div class="echo-giveup" data-testid="echo-giveup">
     <h4 class="ihead">${t('放弃深潜')}</h4>
-    ${vote
-      ? html`<p class="echo-giveup__note">${t('已同意 {n}/{m}：所有存活玩家都同意后立刻结算', { n: agreed, m: total })}</p>
-        ${acts(html`
-          <button type="button" class="btn btn--primary btn--sm" disabled=${mine} onClick=${() => actions.echoGiveUpVote(true)}>${t('同意放弃')}</button>
-          <button type="button" class="btn btn--ghost btn--sm" onClick=${() => actions.echoGiveUpVote(false)}>${t('继续深潜')}</button>`)}`
-      : !prep
-        ? html`<p class="echo-giveup__note t-dim">${t('只能在休整期（准备阶段）放弃深潜')}</p>`
-        : confirm
-          ? html`<p class="echo-giveup__note">${solo
-            ? t('确定放弃本次深潜？会立刻进入结算界面。')
-            : t('发起全员投票？所有存活玩家都同意后才会结算。')}</p>
-            ${acts(html`
-              <button type="button" class="btn btn--primary btn--sm" onClick=${() => { setConfirm(false); actions.echoGiveUp(); }}>${t('确定放弃')}</button>
-              <button type="button" class="btn btn--ghost btn--sm" onClick=${() => setConfirm(false)}>${t('取消')}</button>`)}`
-          : html`<p class="echo-giveup__note t-dim">${t('放弃后直接进入结算界面；多人房间需要所有存活玩家同意。')}</p>
-            ${acts(html`<button type="button" class="btn btn--ghost btn--sm" onClick=${() => setConfirm(true)}>${t('放弃深潜')}</button>`)}`}
+    <p class="echo-giveup__note">${t('已同意 {n}/{m}：所有存活玩家都同意后立刻结算', { n: agreed, m: total })}</p>
+    <div class="echo-giveup__acts">
+      <button type="button" class="btn btn--primary btn--sm" disabled=${mine} onClick=${() => actions.echoGiveUpVote(true)}>${t('同意放弃')}</button>
+      <button type="button" class="btn btn--ghost btn--sm" onClick=${() => actions.echoGiveUpVote(false)}>${t('继续深潜')}</button>
+    </div>
   </div>`;
 }
 
@@ -284,6 +269,6 @@ function BlessTab({ pub }) {
       <h4 class="ihead">${t('诅咒')} <small class="num">${echo.curses.length}</small></h4>
       <ul class="echo-list echo-list--curse">${echo.curses.map((c) => html`<li key=${c.id}>
         <b>${c.name}</b>${c.rarityLabel ? html`<em class=${`echo-rar is-${c.rarity || 'common'}`}>${c.rarityLabel}</em>` : null}<span>${c.desc || ''}</span></li>`)}</ul>` : null}
-    <${GiveUpBlock} pub=${pub} />
+    <${GiveUpVoteBlock} pub=${pub} />
   </div>`;
 }
