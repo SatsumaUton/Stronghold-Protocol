@@ -102,6 +102,9 @@ export const MATCH_FIELDS = Object.freeze({
     'echoAltar',
     // 祭坛「本层团队 buff」（守护 / 疾行 / 强攻 / 重甲 / 治愈，维护者 2026-11-07）：带 round 标记，读档后本层仍生效
     'echoAltarLayerMods',
+    // 祭坛「扩容」给的永久祝福名额 +1，以及全队共享商品的已买次数（维护者 2026-11-07）：
+    // 不存的话读档后名额回退、或者全队又能再买一次扩容
+    'echoAltarBlessingSlots', 'echoAltarTeamBought',
     // 祝福刷新额度 / 已放弃次数 / 隐藏核心的临时名额：都是整局累计，丢了读档后就「回血」
     'echoBlessingRefreshes', 'echoBlessingRefreshBonus', 'echoBlessingSkipped', 'echoBlessingBonus', 'echoBlessingRefreshNonce',
     // 部署禁令的**到期层**（2026-11-05）：只存名单不存到期层，读档后排异 / 封锁永远不会自动解除
