@@ -6683,22 +6683,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 240047
+        "customBytes": 240251
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 277098
+        "customBytes": 277377
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 266106
+        "customBytes": 266359
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 228141
+        "customBytes": 228324
       },
       {
         "path": "public/js/assets.js",
@@ -6718,7 +6718,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 141088
+        "customBytes": 141982
       },
       {
         "path": "public/js/screens/lobby.js",
