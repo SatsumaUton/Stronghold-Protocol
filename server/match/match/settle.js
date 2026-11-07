@@ -13,11 +13,15 @@ import { creditedKillsOf } from '../../sim/spec.js';
 
 export class MatchSettle {
   settle(plan, uniteResult) {
+    // 救援资格必须在 phase 改成 SETTLE 之前算：参考版的 _revivalHelpers 只在 UNITE 阶段认人
+    // （维护者 2026-11-07：普通房间恢复参考版设计 —— 只有联防结算后、未漏怪的 helper 能救人）。
+    const relay = this._uniteRelay?.rounds.at(-1)?.plan === plan ? this._uniteRelay : null;
+    // 深潜（anyDonor）永远用「任何存活队友」；普通房间沿用参考版：接力联防取 relay.eligible（完美 helper），
+    // 单轮联防走 _revivalHelpers 的严格口径。
+    const revivalEligible = relay && !this.revivalAnyDonor ? new Set(relay.eligible) : this._revivalHelpers(plan, uniteResult);
     this.phase = PHASE.SETTLE;
     this.runner = null;
     this._stopClientCombat();
-    const relay = this._uniteRelay?.rounds.at(-1)?.plan === plan ? this._uniteRelay : null;
-    const revivalEligible = relay ? new Set(relay.eligible) : this._revivalHelpers(plan, uniteResult);
     const combinedUnite = relay ? { ...uniteResult,
       perPlayer: Object.assign({}, ...relay.rounds.map((r) => r.result?.perPlayer || {})) } : uniteResult;
     // the pending in-battle gains the views showed become persistent below (alive players) or lapse (DESIGN §20.15)
