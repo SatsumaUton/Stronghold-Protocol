@@ -1154,6 +1154,12 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
                     const cores = [...new Set(squads ? squads.flatMap((s) => (Array.isArray(s.cores) ? s.cores : [])) : [])];
                     // 最高盟约层数（维护者 2026-11-05）：只看层数，不看词条/稀有度
                     const maxLayers = Number(r.maxLayers) || 0;
+                    // 维护者 2026-11-08：「最高盟约」这一列是**小队里每个人的**最高盟约层数，不是一个人的数字 ——
+                    // 一个队员一行，和「玩家」列同序（旧记录没有 squads 时退回聚合值）。
+                    const layersOf = squads ? squads.map((s) => Math.max(0, Math.floor(Number(s.maxLayers) || 0))) : [];
+                    const layersTitle = squads
+                      ? squads.map((s, i) => `${s.name} ${layersOf[i] || '—'}`).join(' ｜ ')
+                      : t('所有人里最高的盟约层数（只看层数，不看词条与稀有度）');
                     const secs = Math.max(0, Math.floor((Number(r.clearMs) || 0) / 1000));
                     const time = r.clearMs > 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '—';
                     // 「通关时间」这一列显示**年月日 + 时分**（维护者 2026-11-05）：榜单要能看出是哪天打的，
@@ -1170,9 +1176,13 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
                         onClick=${() => setOpenRow(openRow === r.member ? null : r.member)}>
                         <b class="echo-rank__no num">${r.rank}</b>
                         <span class="echo-rank__depth"><b class="num">${r.depth}</b><i>${t('层')}</i></span>
-                        <span class="echo-rank__players">${names.length ? names.join('、') : (r.roomCode || '----')}</span>
+                        <span class="echo-rank__players">${names.length
+                          ? (squads ? names.map((n, i) => html`<i key=${i}>${n}</i>`) : names.join('、'))
+                          : (r.roomCode || '----')}</span>
                         <span class="echo-rank__cores" title=${cores.join('、')}>${cores.length ? cores.join('、') : '—'}</span>
-                        <span class="echo-rank__bonds num" title=${t('所有人里最高的盟约层数（只看层数，不看词条与稀有度）')}>${maxLayers || '—'}</span>
+                        <span class="echo-rank__bonds num" title=${layersTitle}>${layersOf.length
+                          ? layersOf.map((v, i) => html`<i key=${i}>${v || '—'}</i>`)
+                          : (maxLayers || '—')}</span>
                         <span class="echo-rank__time num" title=${time !== '—' ? `${t('通关时间')} ${time}` : atText}>${atText}</span>
                       </button>
                       ${openRow === r.member ? html`<div class="echo-detail">
@@ -1192,7 +1202,10 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
                           : (cores.length ? cores.join('、') : '—')}</b></div>
                         ${/* 维护者 2026-11-07 晚：层数不再跟在核心盟约后面，单独一行「最高盟约数」——
                               以前这里的值漏存（recordEchoBoard 没写 maxLayers），所以永远显示「—」 */ null}
-                        <div><span>${t('最高盟约数')}</span><b>${maxLayers ? t('{n} 层', { n: maxLayers }) : '—'}</b></div>
+                        ${/* 维护者 2026-11-08：明细里也写**每个队员各自**的最高盟约层数（和榜上那一列一致） */ null}
+                        <div class="echo-detail__full"><span>${t('最高盟约数')}</span><b>${squads
+                          ? squads.map((s, i) => `${s.name} ${layersOf[i] ? t('{n} 层', { n: layersOf[i] }) : '—'}`).join(' ｜ ')
+                          : (maxLayers ? t('{n} 层', { n: maxLayers }) : '—')}</b></div>
                         <div class="echo-detail__full"><span>${t('房间')}</span><b>${r.roomCode || '----'}</b></div>
                       </div>` : null}
                     </li>`;
