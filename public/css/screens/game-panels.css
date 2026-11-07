@@ -965,10 +965,12 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
      手机窄屏时（right: 3.4rem + 196px 宽）正好横跨顶栏中间：芯片是 pointer-events: auto，
      于是顶栏的 🔍（放大镜）和「本局信息」抽屉顶部的「敌方情报」「深渊回响」标签页都被它吃掉点击，
      玩家要点很多次才点得中。现在它只在战场之上、所有 HUD 控件和抽屉之下，不再参与命中测试。
-     ★ 2026-11-07 晚：整条栏再往下挪到顶栏下方（top 从 .14rem → .9rem）。z-index 2 时它被顶栏的
+     ★ 2026-11-07 晚：整条栏再往下挪到顶栏下方（top 从 .14rem → .62rem）。z-index 2 时它被顶栏的
      HUD 子元素盖住，鼠标悬停落在 HUD 上，圆片的 title 气泡就再也不出现了（玩家反馈）。
-     挪到顶栏下方的空白战场区后，圆片既能悬停（桌面）也能点（触屏），又不会挡住任何按钮。 */
-  position: fixed; top: .9rem; right: 3.4rem; z-index: 2;
+     挪到顶栏下方的空白战场区后，圆片既能悬停（桌面）也能点（触屏），又不会挡住任何按钮。
+     ⚠ 别挪太低（一度试过 .9rem，玩家反馈「下降太多」）：`.gtop` 是 `padding: .2rem .3rem 0 .26rem` +
+     约 .4rem 的内容，所以 .62rem 刚好贴住顶栏下沿。 */
+  position: fixed; top: .62rem; right: 3.4rem; z-index: 2;
   /* 固定窄栏 + 强制换行：以前一整排会横向盖住 HUD 按钮 */
   display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: .06rem;
   /* 用 px 固定宽度，保证一定换行（vw 在某些缩放档位下会被算得很大） */
