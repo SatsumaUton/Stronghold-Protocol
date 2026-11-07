@@ -6648,7 +6648,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": true,
-        "customBytes": 101043
+        "customBytes": 101785
       },
       {
         "path": "public/css/screens/game-shop.css",
@@ -6683,22 +6683,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 238827
+        "customBytes": 239003
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 275699
+        "customBytes": 275915
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 264666
+        "customBytes": 264873
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 226924
+        "customBytes": 227104
       },
       {
         "path": "public/js/assets.js",
@@ -6758,7 +6758,7 @@
       {
         "path": "public/js/ui/echoBlessing.js",
         "baseExists": false,
-        "customBytes": 19616
+        "customBytes": 21542
       },
       {
         "path": "public/js/ui/echoBuffs.js",

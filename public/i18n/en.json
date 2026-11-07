@@ -3069,5 +3069,8 @@
   "献祭 · 提现：祭坛账户里没有可提现的资金（不扣钱）": "Altar · Withdraw: the altar account has no funds to withdraw (no charge).",
   "献祭 · {name}：这张祝福在当前的祝福表里不存在（不扣钱）": "Altar · {name}: this blessing is not in the current blessing table (no charge).",
   "献祭 · {name}：这件商品没有可结算的效果（不扣钱）": "Altar · {name}: this item has no effect to settle (no charge).",
-  "{name}：{cores}": "{name}: {cores}"
+  "{name}：{cores}": "{name}: {cores}",
+  "查看诅咒与祝福": "Curses & blessings",
+  "还没有获得祝福": "No blessings yet",
+  "展开当前诅咒与已获祝福": "Show the current curses and blessings"
 }
