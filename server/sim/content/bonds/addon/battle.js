@@ -599,7 +599,10 @@ export function install(battle) {
       if (u.alive || u.removed || u.mem[ID.indom] === battle.time) return;
       if (banked || (st && battle.rng() < prob(bb, L(battle, st, ID.indom)))) {
         u.mem[ID.indom] = battle.time;
+        // 落点被占（敌人踩着原地 / 没有合法 rest tile）时 redeploy 会失败：那就退化成官方的
+        // 「下次部署 0 费 0 冷却」（indomFreeDeploy），不要白丢这次 100% 的触发。
         if (battle.redeploy(u, { free: true })) fxOn(battle, 'revive', u, 'bond:indomShip', 'redeploy');
+        else if (u.mem) u.mem.indomFreeDeploy = true;
       }
     }, { priority: 10 });
     battle.on('dollSwap', ({ unit: u }) => {
