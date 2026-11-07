@@ -41,7 +41,7 @@ test('isEnemyHpPlan：只接受「从第 1 回合起、严格递增、≤20 回�
   assert.equal(isEnemyHpPlan([[1, 1], [8, 2], [5, 3]]), false, '不能回退');
   assert.equal(isEnemyHpPlan([[1, 1], [21, 2]]), false, '回合上限 20');
   assert.equal(isEnemyHpPlan([[1, 1.1]]), false, '倍率必须是房间里能选的档位');
-  assert.equal(isEnemyHpPlan([[1, 4]]), false);
+  assert.equal(isEnemyHpPlan([[1, 7]]), false);
   assert.equal(isEnemyHpPlan([[1.5, 2]]), false, '回合必须是整数');
   for (const m of ENEMY_MULTIPLIERS) assert.equal(isEnemyHpPlan([[1, m]]), true, `×${m} 是合法档位`);
 });
