@@ -6878,7 +6878,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 69943
+        "customBytes": 70206
       },
       {
         "path": "server/match/PlayerState.js",
@@ -6914,6 +6914,11 @@
         "path": "server/match/match/combat.js",
         "baseExists": true,
         "customBytes": 13914
+      },
+      {
+        "path": "server/match/match/common.js",
+        "baseExists": false,
+        "customBytes": 4800
       },
       {
         "path": "server/match/match/echo.js",
@@ -6991,6 +6996,11 @@
         "customBytes": 31433
       },
       {
+        "path": "server/match/match/platform.js",
+        "baseExists": false,
+        "customBytes": 22781
+      },
+      {
         "path": "server/match/match/prep.js",
         "baseExists": true,
         "customBytes": 11736
@@ -7038,7 +7048,7 @@
       {
         "path": "server/match/player/views.js",
         "baseExists": true,
-        "customBytes": 9663
+        "customBytes": 9832
       },
       {
         "path": "server/match/results.js",

@@ -59,7 +59,8 @@ export class PlayerViews {
    * 与 `_checkIdle` 的判定同源：差一回合时给客户端一条常驻提示，而不是只弹一次几秒就消失的 toast。
    */
   afkWarned() {
-    const limit = this.m.afkRemoveRounds;
+    // 与 _checkIdle 同一个口径：深渊回响的生效回合数比普通房宽（Match._afkLimit）
+    const limit = typeof this.m._afkLimit === 'function' ? this.m._afkLimit() : this.m.afkRemoveRounds;
     return limit > 1 && !this.isBot && !this.left && !this.botControlled && !this.afkActed && this.afkRounds >= limit - 1;
   }
 
