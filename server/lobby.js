@@ -1768,7 +1768,15 @@ case 'room.list': return this.roomList(msg);
       return OK;
     }
     if (conflict) return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
-    if (room.match) return fail(ERR.ROOM_STARTED);
+    // 对局进行中（维护者 2026-11-07）：刷新页面后点「刷新按钮」会重新 room.join 回原房，
+    // 但新会话的账号身份可能还没送到 —— 直接回 ROOM_STARTED 的话客户端以为进不去、退回大厅
+    // （深潜 / 普通房在结算界面点刷新都踩过）。身份在途时回 IDENTITY_PENDING，
+    // 客户端等 sp-account-token 到了重新握手再试一次，那时走上面的「同账号接管座位」，
+    // 连对局一起恢复。真游客没有身份可等，照旧 ROOM_STARTED。
+    if (room.match) {
+      if (!session.guest && !session.accountId) return fail(ERR.IDENTITY_PENDING, 'account identity not received yet');
+      return fail(ERR.ROOM_STARTED);
+    }
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
     const idx = room.freeSeat();
     if (idx < 0) {
