@@ -3039,7 +3039,7 @@
   "献祭 · {name}：祝福名额已满或已持有，未生效": "Offering · {name}: blessing slots full or already held — no effect",
   "献祭 · {name}：全队获得「{b}」": "Offering · {name}: the whole team gains \"{b}\"",
   "献祭 · {name}：本层全队生效": "Offering · {name}: active for the whole team this layer",
-  "献祭 · 晋阶": "Offering · Ascension",
-  "商店等级 +1（本局，最多到上限）": "Shop level +1 (this run, up to the cap)",
-  "献祭 · 晋阶：商店等级 +1（本局）": "Offering · Ascension: shop level +1 (this run)"
+  "献祭 · 扩容": "Offering · Expansion",
+  "祝福名额 +1（本局，全队共享），并立刻补一次抽取": "Blessing slots +1 (this run, shared by the team) and one extra draw right away",
+  "献祭 · 扩容：祝福名额 +1（本局，全队共享）": "Offering · Expansion: blessing slots +1 (this run, shared by the team)"
 }
