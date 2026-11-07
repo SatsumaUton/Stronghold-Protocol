@@ -212,7 +212,12 @@ export class MatchIntents {
     const units = [];
     // the flags of the battle it previews: a normal round gains IN_BATTLE layers from its start (a <战斗开始时> layer gain
     // raises bond stats at t = 0 there too); the Final Assault / Hidden Core fight without (previewed as a normal field)
-    const bossRound = this.round === this.gd.bossRound || this.round === this.gd.hiddenRound;
+    // 深潜：显示回合会一路涨（15、16…），不能直接跟 gd.bossRound / hiddenRound 比 —— 那样会把普通深潜回合
+    // 误判成 boss 回合、把 layerGainsEnabled 关掉（玩家反馈：15 回合以后战斗中触发叠层完全不涨）。
+    // 判据改成**映射后的数据回合**：只有真正的 boss 回合才关层。
+    const bossRound = this.echoVariant === 'deepecho'
+      ? (typeof this._echoDataRound === 'function' && this._echoDataRound(this.round) === this.gd.bossRound)
+      : (this.round === this.gd.bossRound || this.round === this.gd.hiddenRound);
     const b = this.newBattle({
       seed: deriveSeed(this.seed, `preview:${this.round}:${ps.seat}`), kind: 'normal', modeId: this.modeId, round: this.round,
       stageId: this.stageId, rect: { ...GEO.NORMAL_RECT }, timeLimit: 60, players, spawns: [], routes: this.wave ? this.wave.routes : [],
