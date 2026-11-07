@@ -62,7 +62,7 @@ function SkinTile({ row, chosen, onPick, onPreview }) {
     <span class="lo-skin__text">
       <b class="lo-skin__name">${isDefault ? t('默认') : row.name}</b>
       <span class="lo-skin__group">${isDefault ? 'DEFAULT' : row.group || t('时装')}</span>
-      ${row.pictureOnly ? html`<span class="lo-skin__note">${t('仅更换头像与立绘')}</span>` : null}
+      ${/* 「仅更换头像与立绘」的提示已按维护者要求移除（2026-11-07）：精英二那一格不再写说明。 */ null}
     </span>
   </button>`;
 }
