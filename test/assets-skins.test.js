@@ -7,6 +7,7 @@
 // 地板文件由 `node tools/skins-floor.mjs --update` 刷新；**只允许调高**，调低必须在提交信息里写明原因。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -86,4 +87,64 @@ test('立绘 / 头像 / 模型文件都在，且都属于本人', () => {
     }
   }
   assert.deepEqual(problems.slice(0, 20), [], `素材缺失或串图 ${problems.length} 处（只列前 20）`);
+});
+
+// 立绘的**比例**与**内容归属**（2026-11-07：7 套皮肤把方形插画（2200×2200 等）写进了
+// `char/skin/<皮肤>.png`，卡面按 180×360 显示，只剩中间一条被裁过的插画；另外暴行「又一年秋季」
+// 的立绘是拿插画裁成 1:2 的，比例对但内容不是官方胸像）。
+//   - portrait / portraitE2 必须是 1:2 的竖图（官方胸像 180×360）；
+//   - 非 e2 皮肤的立绘不能和本人本体立绘是同一张图（否则换了皮肤还是本体那张）。
+// 内容是否「官方那张」由 `node tools/audit-portrait-mirror.mjs` 对照镜像站核对（要联网，不进 CI）。
+test('立绘比例是 1:2，且换皮肤不会退回本体立绘', () => {
+  const candidates = [join(ROOT, 'public', 'assets'), join(ROOT, '..', 'shared', 'assets')];
+  const assetsDir = candidates.find((p) => existsSync(p));
+  if (!assetsDir) return; // 没有素材（纯代码检出）：跳过
+
+  const relOf = (u) => String(u || '').replace(/^https?:\/\/[^/]+/, '').replace(/^\/assets\//, '');
+  const fileOf = (u) => { const r = relOf(u); return r ? join(assetsDir, r) : null; };
+
+  /** PNG / WebP 的宽高；读不出来返回 null。 */
+  const sizeOf = (file) => {
+    if (!file || !existsSync(file)) return null;
+    const b = readFileSync(file);
+    if (b.length < 30) return null;
+    if (b[0] === 0x89 && b[1] === 0x50) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+    if (b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') {
+      const kind = b.toString('ascii', 12, 16);
+      if (kind === 'VP8X') return { w: 1 + b.readUIntLE(24, 3), h: 1 + b.readUIntLE(27, 3) };
+      if (kind === 'VP8 ') return { w: b.readUInt16LE(26) & 0x3fff, h: b.readUInt16LE(28) & 0x3fff };
+      if (kind === 'VP8L') { const v = b.readUInt32LE(21); return { w: (v & 0x3fff) + 1, h: ((v >> 14) & 0x3fff) + 1 }; }
+    }
+    return null;
+  };
+  const isPortraitShape = (s) => !!s && Math.abs(s.w / s.h - 0.5) <= 0.015;
+
+  const problems = [];
+  const shape = (where, url) => {
+    if (!url) return;
+    const s = sizeOf(fileOf(url));
+    if (!s) return;                                   // 缺文件由上一条测试报
+    if (!isPortraitShape(s)) problems.push(`立绘不是 1:2 ${where} → ${relOf(url)}（${s.w}×${s.h}）`);
+  };
+  const fingerprint = (url) => {
+    const file = fileOf(url);
+    return file && existsSync(file) ? crypto.createHash('md5').update(readFileSync(file)).digest('hex') : null;
+  };
+
+  for (const [charId, ch] of Object.entries(assets.chars || {})) {
+    shape(`${charId}.portrait`, ch.portrait);
+    shape(`${charId}.portraitE2`, ch.portraitE2);
+    const base = new Set([fingerprint(ch.portrait), fingerprint(ch.portraitE2)].filter(Boolean));
+    for (const [skinId, sk] of Object.entries(ch.skins || {})) {
+      if (!sk || typeof sk !== 'object') continue;
+      shape(`${charId}/${skinId}.portrait`, sk.portrait);
+      shape(`${charId}/${skinId}.portraitE2`, sk.portraitE2);
+      if (sk.type === 'e2') continue;                 // e2 皮肤本来就复用精英二立绘
+      for (const k of ['portrait', 'portraitE2']) {
+        const fp = fingerprint(sk[k]);
+        if (fp && base.has(fp)) problems.push(`皮肤立绘就是本体立绘 ${charId}/${skinId}.${k} → ${relOf(sk[k])}`);
+      }
+    }
+  }
+  assert.deepEqual(problems.slice(0, 20), [], `立绘比例/归属有问题 ${problems.length} 处（只列前 20）`);
 });
