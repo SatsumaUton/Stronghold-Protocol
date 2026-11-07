@@ -243,7 +243,6 @@ export function GameScreen() {
   return html`${body}
     ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} room=${voteRoom} class="vervote--float" />` : null}
     ${!hasResult && mode !== 'result' ? html`<${EchoBlessing} pub=${pub} />` : null}
-    ${!hasResult && mode !== 'result' ? html`<${EchoBuffBar} pub=${pub} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${EchoSupplyPanel} pub=${pub} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${EchoProjectionPanel} pub=${pub} priv=${priv} />` : null}
     ${/* 深潜的深度已顶替 HUD 的回合数字；词条/祝福改放在「本局信息」抽屉里（EchoInfoBlock），
@@ -2029,6 +2028,15 @@ function MatchScreen() {
         name=${(selEntry.piece.kind === 'item' ? gd.item(selEntry.piece.id) : selEntry.piece.kind === 'token' ? gd.token(selEntry.piece.id) : ownShown(selEntry.piece.id))?.name || ''}
         onRetreat=${retreatSel} onSell=${sellSel} onDestroy=${sellSel} />` : null}
     </div>
+
+    ${/* 「深渊回响」常驻词条栏：**必须留在 .gm 里**（维护者 2026-11-08，玩家反馈「有广播时只能点到抽屉按钮的
+         上半部分」）。它原来是屏幕包装层里 `<${MatchScreen}/>` 的**兄弟**（.screen 是 z-index 1 的独立层叠
+         上下文），于是 `position: fixed; z-index: 2` 的它其实压在**整个游戏画面**之上 —— 里面 pointer-events:
+         auto 的圆片 / 「本回合诅咒」提示条（宽 100%）正好落在抽屉标签页上，把下半部分吃掉点击。
+         2026-11-07 那次「z-index 8 → 2」比较的是不同层叠上下文里的数字（.gm__hud 的 3 在 .gm 里面），
+         所以从来没有真的把它压到 HUD 下面。放进 .gm 之后 2 < 3 才有意义：在战场之上、HUD 与抽屉之下。 */ ''}
+    ${/* 自己会在「没有深潜深度 / 没有词条」时返回 null，这里不用再判阶段 */ ''}
+    <${EchoBuffBar} pub=${pub} />
 
     ${hasOffers && !sp && !personalChoice ? html`<${OfferOverlay} pub=${pub} myId=${myId} readOnly=${spectator || !alive} onAction=${actions.offer} />` : null}
     ${sp ? html`<${ChoiceOverlay} pub=${pub} sp=${sp} myId=${myId} solo=${solo} busyIdx=${spBusy} total=${total}
