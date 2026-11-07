@@ -22,6 +22,13 @@ export class MatchPrep {
       this.dispatch(ps, 'onPrepStart', { round: this.round });
       ps.recompute();
     }
+    // 被淘汰的玩家 / 观战席：进入准备阶段时**再推一次**它跟随的那块棋盘。
+    // 回合开始（_startRoundAfterOffers → _followScout）那一次推送可能被上一场战斗的 m.field 顶掉 —— 客户端
+    // 的 runner 在 reshow / 掉帧重进时会把「屏幕上那一场」的 meta 重新写回 store（battle/runner.js show()），
+    // 于是 screen 收到的最后一条 m.field 是战斗棋盘（没有 prep:true），`followedScout` 认不出来，整个准备阶段
+    // 就停在自己的空棋盘上（玩家反馈 2026-11-08：深渊回响第 15 回合的准备阶段，视角回到自己场地的主视角）。
+    // 在 PREP 里再推一次（keep：本阶段已经手动选的观战对象不被覆盖）就把这条竞态关掉了。
+    for (const ps of this._viewers()) this._followScout(ps, { keep: true });
     // solo / single-human matches: untimed (soloUntimed); co-op: the round's prepTime
     const secs = this.soloUntimed ? null : this.gd.prepTime(this.round);
     // 维护者 2026-11-05：**决策面板还开着就别开始倒数**。
