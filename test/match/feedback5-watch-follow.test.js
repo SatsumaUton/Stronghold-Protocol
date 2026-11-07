@@ -139,6 +139,44 @@ test('a resync in prep sends the followed board: a spectator joining, an elimina
   m.dispose();
 });
 
+test('entering the prep pushes the followed board again: a battle m.field that overwrote the round-start push cannot strand a viewer', () => {
+  const h = makeMatch({ mode: 'coop', humans: 3, seed: 1011, fake: true, spectators: [S] }).start();
+  h.toPrep(1);
+  const m = h.m;
+  // the viewer's preference is p_2 — the re-push must be that player's board, not the first seat's
+  assert.deepEqual(m.handle('p_0', { t: 'g.watch', fieldId: 'n:p_2' }), { ok: true });
+  h.ps('p_0').eliminate(1);
+  const pushes = [];   // the prep boards sent to the eliminated viewer, tagged with the phase they were sent in
+  const spec = [];
+  h.onSend.push((pid, msg) => {
+    if (msg.t !== 'm.field' || !msg.prep) return;
+    if (pid === 'p_0') pushes.push([m.phase, msg.fieldId]);
+    if (pid === S) spec.push([m.phase, msg.fieldId]);
+  });
+  h.toPrep(2);
+  // 回合开始一次、准备阶段开始再一次：客户端 store 里最后那条 m.field 可能是上一场战斗的（runner 的 show()/reshow
+  // 会把屏幕上那场的 meta 重新写回），只推一次时观战者整个准备阶段停在自己的空棋盘上（玩家反馈 2026-11-08，
+  // 深渊回响第 15 回合的准备阶段）
+  assert.deepEqual(pushes, [[PHASE.ROUND_START, 'n:p_2'], [PHASE.PREP, 'n:p_2']], 'round start, then the prep itself');
+  assert.deepEqual(spec, [[PHASE.ROUND_START, 'n:p_1'], [PHASE.PREP, 'n:p_1']], 'a spectator seat (no pick) follows the first player still in');
+  assert.equal(m.watchers.get('p_0'), 'n:p_2', 'the re-push keeps the followed player');
+  m.dispose();
+});
+
+test('the prep re-push goes to eliminated viewers and spectator seats only — a living player and a bot get none', () => {
+  const h = makeMatch({ mode: 'coop', humans: 2, bots: 1, seed: 1012, fake: true }).start();
+  h.toPrep(1);
+  const m = h.m;
+  h.ps('p_0').eliminate(1);
+  const got = [];
+  h.onSend.push((pid, msg) => { if (msg.t === 'm.field' && msg.prep) got.push([pid, m.phase]); });
+  h.toPrep(2);
+  const prep = got.filter(([, ph]) => ph === PHASE.PREP);
+  assert.deepEqual(prep.map(([pid]) => pid), ['p_0'], 'only the eliminated human');
+  assert.ok(!prep.some(([pid]) => pid === 'p_1' || pid === 'ai_0'), 'the living player and the AI seat are not scouted');
+  m.dispose();
+});
+
 test('g.watch\'s optional playerId passes the protocol check; junk does not', () => {
   assert.equal(validateC2S({ t: 'g.watch', fieldId: 'b1' }), null);
   assert.equal(validateC2S({ t: 'g.watch', fieldId: 'b1', playerId: 'p_1' }), null);

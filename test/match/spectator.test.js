@@ -96,8 +96,10 @@ test('during a battle a spectator may watch any field at once; one added mid-bat
   h.sched.advance(500);
   const first = h.lastTo(S, 'b.start');
   assert.deepEqual([first.fieldId, first.watch, first.authoritative], ['n:p_0', true, false], 'auto-observes the first field');
-  // a fighting player may not look elsewhere — a spectator (like an eliminated player) may
-  assert.equal(m.handle('p_0', { t: 'g.watch', fieldId: 'n:p_1' }).error, ERR.WRONG_PHASE);
+  // a fighting player may switch to a teammate's normal battle since 2026-11-07 (its own battle keeps running in its
+  // browser, battle/runner.js); the other pair's boss field stays refused (feedback5-watch-follow.test.js). A spectator
+  // (like an eliminated player) may watch any field at once.
+  assert.deepEqual(m.handle('p_0', { t: 'g.watch', fieldId: 'n:p_1' }), { ok: true });
   assert.deepEqual(m.handle(S, { t: 'g.watch', fieldId: 'n:p_1' }), { ok: true });
   const st = h.lastTo(S, 'b.start');
   assert.deepEqual([st.fieldId, st.watch, st.authoritative], ['n:p_1', true, false]);
