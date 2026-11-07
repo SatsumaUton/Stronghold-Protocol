@@ -745,6 +745,44 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
                 disabled=${!!busy || !canEdit}
                 onClick=${() => { setCapOpen(false); canEdit && setEnemyAtk(m); }}>×${m}</button>`)}
           </div>
+          ${canEdit || atkPlan ? html`<div class="exp-hpplan">
+            <button type="button" class=${`dpick__opt ailast__opt${atkPlan ? ' is-active' : ''}`} data-testid="exp-atk-plan-toggle"
+                disabled=${!!busy || !canEdit} onClick=${() => { setCapOpen(false); canEdit && setAtkPlan(atkPlan ? null : [[1, enemyAtk]]); }}>
+              <${Icon} name="check" class=${atkPlan ? 'is-on' : ''} />${t('攻击按回合设置')}
+            </button>
+            ${atkPlan ? html`<span class="exp-hpplan__rows">
+              ${atkPlan.map(([from, mul], i) => html`<span key=${i} class="exp-hpplan__row">
+                <span class="t-dim">${t('第')}</span>
+                <input type="number" min="1" max="20" value=${from} disabled=${!!busy || !canEdit || i === 0}
+                  onInput=${(e) => { const v = Math.max(1, Math.min(20, Number(e.currentTarget.value) || 1)); setAtkPlan(atkPlan.map((x, j) => (j === i ? [v, x[1]] : x))); }} />
+                <span class="t-dim">${t('回合起')}</span>
+                <select value=${String(mul)} disabled=${!!busy || !canEdit}
+                  onChange=${(e) => { const v = Number(e.currentTarget.value); setAtkPlan(atkPlan.map((x, j) => (j === i ? [x[0], v] : x))); }}>
+                  ${ENEMY_MULTIPLIERS.map((m) => html`<option key=${m} value=${String(m)}>×${m}</option>`)}
+                </select>
+                ${i > 0 ? html`<button type="button" class="btn btn--ghost btn--sm" disabled=${!!busy || !canEdit}
+                  onClick=${() => setAtkPlan(atkPlan.filter((_, j) => j !== i))}>×</button>` : null}
+              </span>`)}
+              ${atkPlan.length < 6 ? html`<button type="button" class="btn btn--secondary btn--sm" data-testid="exp-atk-plan-add"
+                disabled=${!!busy || !canEdit}
+                onClick=${() => setAtkPlan([...atkPlan, [Math.min(20, (atkPlan[atkPlan.length - 1][0] || 1) + 5), atkPlan[atkPlan.length - 1][1]]])}>${t('＋ 添加一段')}</button>` : null}
+            </span>` : null}
+          </div>` : null}
+        </div>
+        <div class="exp-mul">
+          <span class="exp-mul__k">${t('敌方领袖')}</span>
+          <div class="exp-mul__opts" role="group" aria-label=${t('BOSS 生命倍率')}>
+            ${ENEMY_MULTIPLIERS.map((m) => html`<button key=${`hp${m}`} type="button" data-testid=${`exp-boss-hp-${m}`}
+                class=${`dpick__opt ailast__opt exp-mul__opt${bossHp === m ? ' is-active' : ''}`}
+                aria-pressed=${bossHp === m ? 'true' : 'false'} disabled=${!!busy || !canEdit}
+                onClick=${() => { setCapOpen(false); canEdit && setBossHp(m); }}>×${m}</button>`)}
+          </div>
+          <div class="exp-mul__opts" role="group" aria-label=${t('BOSS 攻击倍率')}>
+            ${ENEMY_MULTIPLIERS.map((m) => html`<button key=${`atk${m}`} type="button" data-testid=${`exp-boss-atk-${m}`}
+                class=${`dpick__opt ailast__opt exp-mul__opt${bossAtk === m ? ' is-active' : ''}`}
+                aria-pressed=${bossAtk === m ? 'true' : 'false'} disabled=${!!busy || !canEdit}
+                onClick=${() => { setCapOpen(false); canEdit && setBossAtk(m); }}>×${m}</button>`)}
+          </div>
         </div>
       </div>
       ${capacity > 4 ? html`<${PoolSummary} plan=${Array.isArray(poolPlan) && poolPlan.length === capacity ? poolPlan : null}

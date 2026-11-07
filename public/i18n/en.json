@@ -3042,4 +3042,8 @@
   "献祭 · 扩容": "Offering · Expansion",
   "祝福名额 +1（本局，全队共享），并立刻补一次抽取": "Blessing slots +1 (this run, shared by the team) and one extra draw right away",
   "献祭 · 扩容：祝福名额 +1（本局，全队共享）": "Offering · Expansion: blessing slots +1 (this run, shared by the team)"
+,
+  "攻击按回合设置": "Per-round ATK",
+  "BOSS 生命倍率": "Leader HP multiplier",
+  "BOSS 攻击倍率": "Leader ATK multiplier"
 }
