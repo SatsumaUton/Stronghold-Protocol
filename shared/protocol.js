@@ -11,6 +11,14 @@ import { isPluginId } from './plugins/manifest.js';
 import { isTestCommand } from './testMode.js';
 import { PLUGIN_OFFER_SLOTS } from './plugins/limits.js';
 
+/** 「深渊祭坛」可购买的档位：服务端 ECHO_ALTAR_GOODS 的 id 全表 + 两个捐献档。 */
+const ECHO_ALTAR_KINDS = new Set([
+  'blessing', 'buff', 'permanent', 'life',                       // 老四项（旧服务端仍在用）
+  'cleanse', 'purge', 'guard', 'haste', 'might', 'bulwark', 'mend',   // 本层商品
+  'slot', 'insight', 'frost', 'titan', 'pierce',                 // 整局唯一
+  'donate5', 'donate10',                                         // 捐献（存钱罐）
+]);
+
 // ---- tiny validators -------------------------------------------------------
 const isInt = (v, lo = -Infinity, hi = Infinity) => Number.isInteger(v) && v >= lo && v <= hi;
 const isStr = (v, max = 64) => typeof v === 'string' && v.length <= max;
@@ -632,7 +640,7 @@ export const C2S = {
   'g.echoShield': { pick: (v) => isInt(v, 0, 15) },
   'g.echoCounterUse': {},
   // 深渊祭坛（16 层起）：买一次献祭 / 主动捐献（donate10 / donate50 累进全队祭坛池）
-  'g.echoAltar': { kind: (v) => v === 'blessing' || v === 'buff' || v === 'permanent' || v === 'life' || v === 'donate5' || v === 'donate10' },
+  'g.echoAltar': { kind: (v) => ECHO_ALTAR_KINDS.has(v) },
   // 深潜补给（16 层起）：个人三选一
   'g.echoSupply': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 2 },
   // 「盟约投影」（16 层起每 10 层）：全队三选一投票
