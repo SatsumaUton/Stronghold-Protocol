@@ -46,6 +46,31 @@ test('每条皮肤都有名字与立绘/头像路径', () => {
   }
 });
 
+// 皮肤模型必须带骨骼元数据（2026-11-07 玩家反馈「换了皮肤，战斗中干员的模型没变」）：
+// 批量导入的 300 套皮肤模型里有 297 套只有 skel / atlas / textures 三个地址、**没有 `anims`**，
+// 而客户端 `assets.js validSpine()` 要求 `anims` 是对象，于是判定模型不可用、退回干员本体模型
+// （立绘和头像都换了，战斗里的小人不变）。修法见 tools/fix-skin-spine-meta.mjs。
+test('皮肤模型都带骨骼元数据（缺 anims 会退回本体模型）', () => {
+  const problems = [];
+  for (const [charId, ch] of withSkins) {
+    for (const [key, s] of Object.entries(ch.skins || {})) {
+      if (!s || typeof s !== 'object' || !s.spine || typeof s.spine !== 'object') continue;
+      for (const side of ['front', 'back']) {
+        const sp = s.spine[side];
+        if (!sp) continue;
+        if (typeof sp.skel !== 'string' || !sp.skel) problems.push(`${charId}/${key}.spine.${side}: 缺 skel`);
+        if (typeof sp.atlas !== 'string' || !sp.atlas) problems.push(`${charId}/${key}.spine.${side}: 缺 atlas`);
+        if (!sp.anims || typeof sp.anims !== 'object' || Array.isArray(sp.anims)) {
+          problems.push(`${charId}/${key}.spine.${side}: 缺 anims（客户端会退回本体模型）`);
+          continue;
+        }
+        if (!sp.anims.idle && !sp.anims.move) problems.push(`${charId}/${key}.spine.${side}: anims 里没有 idle/move`);
+      }
+    }
+  }
+  assert.deepEqual(problems.slice(0, 20), [], `皮肤骨骼元数据有问题 ${problems.length} 处（只列前 20）`);
+});
+
 // 立绘 / 头像 / 模型：**文件存在**且**属于本人**（2026-11-07 维护者要求：「确认所有干员的立绘显示正常，
 // 不要因为切换皮肤导致立绘使用错误」）。
 // 只有拿到素材目录时才校验（纯代码检出没有 public/assets，自动跳过）；

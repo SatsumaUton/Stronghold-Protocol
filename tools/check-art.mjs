@@ -25,11 +25,12 @@ const STRICT = process.argv.includes('--strict');
 
 const doc = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 const relOf = (u) => String(u || '').replace(/^https?:\/\/[^/]+/, '').replace(/^\/assets\//, '');
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const localOf = (u) => { const rel = relOf(u); return rel ? path.join(ASSETS, rel) : null; };
 const exists = (u) => { const rel = relOf(u); return rel ? fs.existsSync(path.join(ASSETS, rel)) : false; };
 
 const problems = [];
-const stats = { chars: 0, skins: 0, missing: 0, foreign: 0, shape: 0, same: 0 };
+const stats = { chars: 0, skins: 0, missing: 0, foreign: 0, shape: 0, same: 0, spine: 0 };
 
 /** PNG / WebP 的宽高，读不出来时返回 null。 */
 function imageSize(file) {
@@ -118,6 +119,16 @@ for (const [charId, ch] of Object.entries(doc.chars || {})) {
     }
     checkPortraitShape(skin.portrait, `${charId}/${skinId}.portrait`);
     checkPortraitShape(skin.portraitE2, `${charId}/${skinId}.portraitE2`);
+    // 皮肤模型必须能加载：客户端 assets.js validSpine() 要求 skel + atlas + **anims**，
+    // 缺 anims 就判定模型不可用、退回干员本体模型 —— 立绘变了、战斗里的小人不变（2026-11-07 玩家反馈）。
+    for (const side of ['front', 'back']) {
+      const sp = skin.spine && skin.spine[side];
+      if (!sp) continue;
+      if (!isObj(sp.anims)) {
+        stats.spine += 1;
+        problems.push(`皮肤模型缺 anims（会退回本体模型）${charId}/${skinId}.spine.${side}`);
+      }
+    }
     // 非 e2 皮肤不能和本体立绘是同一张图（换了皮肤还显示本体，就是「立绘不对」）
     if (skin.type !== 'e2') {
       for (const key of ['portrait', 'portraitE2']) {
@@ -148,7 +159,7 @@ for (const [charId, ch] of Object.entries(doc.chars || {})) {
 
 console.log(`清单：${MANIFEST}`);
 console.log(`干员 ${stats.chars} 位 · 皮肤 ${stats.skins} 套 · 缺文件 ${stats.missing} · 疑似别人的图 ${stats.foreign}`
-  + ` · 立绘比例不对 ${stats.shape} · 皮肤退回本体立绘 ${stats.same}`);
+  + ` · 立绘比例不对 ${stats.shape} · 皮肤退回本体立绘 ${stats.same} · 皮肤模型缺 anims ${stats.spine}`);
 if (problems.length) {
   console.log(`\n问题 ${problems.length} 条：`);
   for (const p of problems.slice(0, 60)) console.log('  - ' + p);
