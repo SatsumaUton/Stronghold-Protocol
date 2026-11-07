@@ -1119,12 +1119,21 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-bless__cursesbtn:hover { border-color: rgba(196, 166, 255, .9); background: rgba(125, 91, 214, .3); }
 .echo-bless__cursesbtn.is-on { border-color: #b79cff; background: rgba(125, 91, 214, .42); }
 .echo-bless__cursesbtn b { font-size: calc(.17 * var(--t)); color: #ffd978; }
+.echo-bless__cursesbtn b.is-bless { color: #8ff0cf; }
+.echo-bless__cursesbtn .echo-bless__sep { font-style: normal; color: #9d8cc4; }
 .echo-bless__curses {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .06rem .18rem;
   margin: .14rem 0 0; padding: .12rem .14rem; list-style: none;
   max-height: 34vh; overflow-y: auto;
   border: 1px solid rgba(183, 156, 255, .22); background: rgba(11, 6, 22, .55);
 }
+/* 「查看诅咒与祝福」展开块：两份清单一起滚，避免两个各自 34vh 把面板撑爆 */
+.echo-bless__look { display: flex; flex-direction: column; max-height: 42vh; overflow-y: auto; }
+.echo-bless__look .echo-bless__curses { max-height: none; overflow: visible; }
+.echo-bless__lookh { display: flex; align-items: baseline; gap: .06rem; margin: .12rem 0 0; font-size: calc(.15 * var(--t)); font-weight: 600; color: #cbb9ee; }
+.echo-bless__lookh b { color: #ffd978; }
+.echo-bless__curses--bless { border-color: rgba(120, 230, 200, .26); }
+.echo-bless__curse.is-bless b { color: #b9f5e4; }
 .echo-bless__curse { display: flex; align-items: baseline; gap: .1rem; font-size: calc(.14 * var(--t)); color: #cbb9ee; }
 .echo-bless__curse b { color: #f0e9ff; }
 .echo-bless__curseTag { flex: 0 0 auto; font-size: .82em; color: #9d8cc4; border: 1px solid rgba(183, 156, 255, .35); padding: 0 .05rem; }
