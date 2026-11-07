@@ -964,8 +964,11 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   /* ★ 2026-11-07：z-index 从 8 降到 2 —— 它原来压在 HUD（.gm__hud z-index: 3）**上面**，
      手机窄屏时（right: 3.4rem + 196px 宽）正好横跨顶栏中间：芯片是 pointer-events: auto，
      于是顶栏的 🔍（放大镜）和「本局信息」抽屉顶部的「敌方情报」「深渊回响」标签页都被它吃掉点击，
-     玩家要点很多次才点得中。现在它只在战场之上、所有 HUD 控件和抽屉之下，不再参与命中测试。 */
-  position: fixed; top: .14rem; right: 3.4rem; z-index: 2;
+     玩家要点很多次才点得中。现在它只在战场之上、所有 HUD 控件和抽屉之下，不再参与命中测试。
+     ★ 2026-11-07 晚：整条栏再往下挪到顶栏下方（top 从 .14rem → .9rem）。z-index 2 时它被顶栏的
+     HUD 子元素盖住，鼠标悬停落在 HUD 上，圆片的 title 气泡就再也不出现了（玩家反馈）。
+     挪到顶栏下方的空白战场区后，圆片既能悬停（桌面）也能点（触屏），又不会挡住任何按钮。 */
+  position: fixed; top: .9rem; right: 3.4rem; z-index: 2;
   /* 固定窄栏 + 强制换行：以前一整排会横向盖住 HUD 按钮 */
   display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: .06rem;
   /* 用 px 固定宽度，保证一定换行（vw 在某些缩放档位下会被算得很大） */
@@ -974,12 +977,21 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   background: rgba(10, 5, 22, .55); border: 1px solid rgba(183, 156, 255, .28);
   pointer-events: none;
 }
-/* 触屏：这条栏是只读的，任何情况下都不该吃掉手指（桌面保留芯片的 title 悬停）。
-   选择器写得比下面的 `.echo-buffbar .ecochip` / `.echo-buffbar__alert` 更具体，免得被它们后面的 auto 覆盖。 */
-@media (pointer: coarse), (any-pointer: coarse) {
-  .echo-buffbar .ecochip.ecochip, .echo-buffbar .echo-buffbar__alert { pointer-events: none; }
+/* 触屏也要能看：圆片一直可点（点一下在栏里弹出说明，见 ui/echoStatus.js 的 EchoBuffBar）。
+   以前这里用 `@media (pointer: coarse), (any-pointer: coarse) { pointer-events: none }` 把芯片整个禁掉了 ——
+   `any-pointer: coarse` 连「带触摸屏的笔记本」都算触屏，于是那些机器上连鼠标悬停都没了（玩家反馈）。
+   现在栏本身在顶栏下方，不会挡住任何按钮，所以不需要再靠 pointer-events: none 让点击穿透。 */
+.echo-buffbar .ecochip { pointer-events: auto; font-size: calc(.14 * var(--t)); padding: .02rem; border-radius: .03rem; cursor: pointer; }
+/* 点圆片 / 点「本回合诅咒」条时弹出的说明框（触屏没有 hover，桌面点了也能看全文） */
+.echo-buffbar__tip {
+  width: 100%; margin-top: .04rem; padding: .05rem .07rem;
+  display: flex; flex-direction: column; gap: .02rem;
+  background: rgba(10, 5, 22, .92); border: 1px solid rgba(183, 156, 255, .55); border-radius: .05rem;
+  color: #e8e2ff; font-size: calc(.13 * var(--t)); line-height: 1.35;
+  pointer-events: auto; cursor: pointer;
 }
-.echo-buffbar .ecochip { pointer-events: auto; font-size: calc(.14 * var(--t)); padding: .02rem; border-radius: .03rem; }
+.echo-buffbar__tip b { color: #ffd978; font-weight: 900; }
+.echo-buffbar__tip span { word-break: break-word; }
 /* 本回合新刷出的诅咒：红色高亮 + 呼吸，排在图标最前面（维护者 2026-11-05 要求「明显标注」） */
 /* 盟约投影（特殊祝福）：金色描边，和普通祝福区分 */
 .ecochip.is-projection { border-color: #ffd06e; box-shadow: 0 0 .12rem rgba(255, 208, 110, .65); }
