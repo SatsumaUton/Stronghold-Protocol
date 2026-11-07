@@ -6899,6 +6899,30 @@ git fetch origin custom/production                                  # 成功后�
 `.gitignore` 已加 `*.bak` 和 `*.bak-*`。改文件时随手留在仓库里的
 `xxx.js.bak-before-<时间戳>` 不会再出现在 `git status` 里。
 
+
+### 9.x 皮肤登记的地板（2026-11-07 事故之后新增）
+
+**事故**：一次 `data/assets.json` 的重写（回滚 + 重新生成时顺序写回）把已登记的 296 套皮肤全部冲掉，界面回退成「只有默认」，
+而且**没有任何测试会红** —— 因为皮肤是可选数据，测试当时只校验「引用的文件存在」。
+
+**现在的防线**（两道，都在仓库里）：
+
+| 文件 | 作用 |
+|---|---|
+| `data/assets.skins-floor.json` | 记录地板：`{ owners, entries }`（当前 194 / 299） |
+| `test/assets-skins.test.js` | 断言 `chars[*].skins` 的干员数与条目数**不得低于地板**；并逐条校验 `name / portrait / avatar`（有 `spine` 时三段齐全） |
+| `tools/skins-floor.mjs` | 查看/抬高地板：`node tools/skins-floor.mjs` 打印现状，`--update` 抬到当前规模（**只升不降**） |
+
+**什么时候会红**：任何把 `chars[*].skins` 清空、删条目、或让某条缺 `name/portrait/avatar` 的改动，都会让
+`node --test test/assets-skins.test.js` 失败 —— 这正是上次事故缺失的那道闸。
+
+**规则**：
+1. 加皮肤 → 跑 `node tools/skins-floor.mjs --update` 把地板抬高，和皮肤一起提交；
+2. 地板**严禁调低**；确需调低（例如官方撤掉某套时装）必须在提交信息里写明原因和范围；
+3. 这个测试属于默认套件，`npm run ci` 会跑到，不需要额外配置。
+
+**教训**：`data/assets.json` 是**生成物 + 手工登记混合**的文件（皮肤靠外观插件 overlay 或手工登记，不由 build-data 产生）。
+改写它时必须**读进来改、不要重新构造对象**；任何「整体重写」都要先跑 `test/assets-skins.test.js`。
 ## 十、安全与红线
 
 1. `.secrets/`、`matchmaker/public/admin.html` 不上传 GitHub（`admin.html` 已被上游 `.gitignore` 排除）；
