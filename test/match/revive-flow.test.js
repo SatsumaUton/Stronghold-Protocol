@@ -151,3 +151,52 @@ test('深潜：救援不限次数，同一队友可以反复救回', (t) => {
   const r2 = m.revive(donor, { playerId: victim.playerId, round: m.round, matchId: m.battlePrefix });
   assert.equal(r2.ok, undefined, '付不起时仍然拒绝');
 });
+
+// 维护者 2026-11-07：普通房间恢复参考版（原版）设计 —— 救援只发生在联防结算后，
+// 且只有「本轮实际出场、自己这一轮没漏怪」的 helper 能付 10 血救人；深潜保持不变。
+test('普通房间（参考版口径）：非联防回合没有救援资格，0 血直接淘汰', (t) => {
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 7, fake: true }).start().toPrep(1);
+  t.after(() => h.m.dispose());
+  const m = h.m;
+  assert.equal(m.revivalAnyDonor, false, '普通房间不放开 anyDonor');
+  m.revivalEnabled = true;
+  m.phase = PHASE.SETTLE;
+  assert.equal(m._revivalHelpers(null, null).size, 0, '各自行动的回合没人有资格');
+  m.phase = PHASE.COMBAT;
+  assert.equal(m._revivalHelpers(null, null).size, 0);
+});
+
+test('普通房间（参考版口径）：联防回合只收「实际出场且本轮未漏怪」的 helper', (t) => {
+  const h = makeMatch({ mode: 'coop', humans: 3, seed: 7, fake: true }).start().toPrep(1);
+  t.after(() => h.m.dispose());
+  const m = h.m;
+  m.revivalEnabled = true;
+  const [a, b, c] = ['p_0', 'p_1', 'p_2'].map((id) => h.ps(id));
+  const plan = { helpers: [a, b, c], leakers: [], leaked: [], notReentered: new Map() };
+  m.phase = PHASE.UNITE;
+  m.unitePlan = plan;
+  m.fields = [{ fieldId: 'u', kind: 'unite', players: [a.playerId, b.playerId], live: false }];
+  m.lastResults.set(a.playerId, { perfect: true, leaked: [] });
+  m.lastResults.set(b.playerId, { perfect: false, leaked: [{ counted: true }] });
+  m.lastResults.set(c.playerId, { perfect: true, leaked: [] });
+  const perPlayer = { [a.playerId]: { perfect: true, leaked: [] }, [b.playerId]: { perfect: true, leaked: [] } };
+  assert.deepEqual([...m._revivalHelpers(plan, { reason: 'cleared', perPlayer })], [a.playerId],
+    'c 没上联防场、b 自己漏了怪，只有 a 合格');
+  // 没打穿 / 没跑起来的联防：一个人都不合格
+  assert.equal(m._revivalHelpers(plan, { reason: 'failed', perPlayer }).size, 0);
+  assert.equal(m._revivalHelpers(plan, { reason: 'cleared', synthetic: true, perPlayer }).size, 0);
+  // 不是本轮的联防（旧 plan）：不合格
+  assert.equal(m._revivalHelpers({ helpers: [a], leakers: [] }, { reason: 'cleared', perPlayer }).size, 0);
+});
+
+test('深潜（不变）：任何存活队友、任何回合都能救援', (t) => {
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 7, fake: true, variant: 'deepecho' }).start().toPrep(1);
+  t.after(() => h.m.dispose());
+  const m = h.m;
+  assert.equal(m.revivalAnyDonor, true);
+  assert.equal(m.revivalUnlimited, true);
+  m.revivalEnabled = true;
+  m.phase = PHASE.COMBAT;
+  const alive = m.order.filter((ps) => !ps.isBot && ps.alive && !ps.left).map((ps) => ps.playerId).sort();
+  assert.deepEqual([...m._revivalHelpers(null, null)].sort(), alive, '不要求联防、不要求完美');
+});

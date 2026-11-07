@@ -13,11 +13,15 @@ import { creditedKillsOf } from '../../sim/spec.js';
 
 export class MatchSettle {
   settle(plan, uniteResult) {
+    // 救援资格必须在 phase 改成 SETTLE 之前算：参考版的 _revivalHelpers 只在 UNITE 阶段认人
+    // （维护者 2026-11-07：普通房间恢复参考版设计 —— 只有联防结算后、未漏怪的 helper 能救人）。
+    const relay = this._uniteRelay?.rounds.at(-1)?.plan === plan ? this._uniteRelay : null;
+    // 深潜（anyDonor）永远用「任何存活队友」；普通房间沿用参考版：接力联防取 relay.eligible（完美 helper），
+    // 单轮联防走 _revivalHelpers 的严格口径。
+    const revivalEligible = relay && !this.revivalAnyDonor ? new Set(relay.eligible) : this._revivalHelpers(plan, uniteResult);
     this.phase = PHASE.SETTLE;
     this.runner = null;
     this._stopClientCombat();
-    const relay = this._uniteRelay?.rounds.at(-1)?.plan === plan ? this._uniteRelay : null;
-    const revivalEligible = relay ? new Set(relay.eligible) : this._revivalHelpers(plan, uniteResult);
     const combinedUnite = relay ? { ...uniteResult,
       perPlayer: Object.assign({}, ...relay.rounds.map((r) => r.result?.perPlayer || {})) } : uniteResult;
     // the pending in-battle gains the views showed become persistent below (alive players) or lapse (DESIGN §20.15)
@@ -40,10 +44,19 @@ export class MatchSettle {
       losses: {},
     } : null;
     const alive = this.alivePlayers();
+    // 「深渊回响」挑战关（深度 5 / 10）：奖励是**全队一次祝福三选一**，不再发资金（维护者 2026-11-05）。
+    // 必须在 per-player 循环外调用 —— 旧实现写在循环里，「团队完美 +1 抽取」4 个人会重复发 4 次。
+    if (this.echoVariant === 'deepecho') this._echoSettleChallenge();
+    // 悬赏目标没打掉 → 加诅咒（维护者 2026-11-05）：在悬赏倒计时还没减之前判断
+    if (this.echoVariant === 'deepecho') this._echoSettleBountyFailure(alive);
+    // 诅咒「失血 / 溃血 / 剧痛」的扣血放大在 _echoLpLoss 里（只放大已有漏怪，没有漏怪不扣）；
+    // 普通房间它等价于原来的 min(cap, raw)。
     for (const ps of alive) {
       const r = this.lastResults.get(ps.playerId) || { leaked: [], perfect: true, coins: 0, layerGains: {}, killed: 0, damageDealt: 0 };
       const counted = (r.leaked || []).filter((l) => l && l.counted !== false).length;
-      const loss = uniteRan && plan.leakers.includes(ps) ? Math.min(cap, survivors.get(ps.playerId) || 0) : Math.min(cap, counted);
+      const rawLoss = uniteRan && plan.leakers.includes(ps) ? (survivors.get(ps.playerId) || 0) : counted;
+      // 诅咒「失血 / 溃血 / 剧痛」的放大在 _echoLpLoss 里；普通房间它等价于原来的 min(cap, raw)。
+      const loss = this._echoLpLoss(rawLoss, cap);
       if (this.uniteResultView) this.uniteResultView.losses[ps.playerId] = loss;
       ps.lp -= loss;
       ps.stats.lpLost += loss;
@@ -52,6 +65,7 @@ export class MatchSettle {
       ps.stats.dmgDealt += Number(r.damageDealt) || 0;
       ps.stats.healing += Number(r.healingDone) || 0;
       if (r.perfect !== false && counted === 0) ps.stats.perfectRounds++;
+      // （挑战关奖励已移到循环外：全队一次祝福三选一，见上面的 _echoSettleChallenge 调用）
       // bounty coins (own battle + unite kills) are credited to the next prep
       let coins = Math.max(0, Math.trunc(Number(r.coins) || 0));
       const up = combinedUnite && combinedUnite.perPlayer && combinedUnite.perPlayer[ps.playerId];
@@ -63,6 +77,11 @@ export class MatchSettle {
       ps.creditedKills += creditedKillsOf(r) + creditedKillsOf(up);
       // perfect-payout bounties (战术特训): own phase perfect
       for (const b of ps.bounties) if (b.card.payout === 'perfect' && counted === 0 && r.perfect !== false) coins += b.card.coin;
+      // C 类祝福「丰收」：全局资金掉落 +20%（echoBlessing.js；普通房间 `_echoCoinMul()` 恒为 1，一个字节不变）
+      if (coins > 0) {
+        const mul = this._echoCoinMul();
+        if (mul !== 1) coins = Math.max(0, Math.round(coins * mul));
+      }
       if (coins > 0) { ps.pendingFunds += coins; ps.stats.fundsGained += coins; }
       for (const b of ps.bounties) b.roundsLeft--;
       ps.bounties = ps.bounties.filter((b) => b.roundsLeft > 0);
@@ -71,7 +90,7 @@ export class MatchSettle {
       for (const [bondId, n] of Object.entries(r.layerGains || {})) {
         if (!this.gd.bond(bondId) || !(n > 0)) continue;
         const before = ps.layers[bondId] || 0;
-        const add = layerGainRoom(before, Math.floor(n), this.disableLayerCap);
+        const add = layerGainRoom(before, Math.floor(n), this.layerCapOff);
         if (!(add > 0)) continue;
         ps.layers[bondId] = before + add;
         this.dispatch(ps, 'onLayers', { bondId, from: before, to: ps.layers[bondId], reason: 'battle' });
@@ -140,6 +159,8 @@ export class MatchSettle {
   afterSettle({ reason } = {}) {
     this._finalizePendingDeaths({ reason });
     if (!this.alivePlayers().length) { this.finish({ victory: false, reason: 'eliminated' }); return; }
+    // 「深渊回响」无尽：正常只会在团灭时结束（上一行），这里只有撞到安全阀（ECHO_SAFE_ROUND）才走。
+    if (this._echoAtEnd()) { this.finish({ victory: true, reason: 'victory' }); return; }
     resetRoundCounters(this); // AI bot merge-counter resets each round (server/match/botEmotes.js)
     this.startRound(this.round + 1);
   }
@@ -161,7 +182,12 @@ export class MatchSettle {
     this.phase = PHASE.RESULT;
     this.deadline = 0;
     for (const f of this.fields) f.live = false;
-    this.outcome = { victory: !!victory, hiddenReached: this.hiddenReached, hiddenCleared: !!hiddenCleared, reason };
+    this.outcome = { victory: !!victory, hiddenReached: this.hiddenReached, hiddenCleared: !!hiddenCleared, reason,
+      // 「深渊回响」无尽：把**深度**记进结算 —— 深度就是这个模式的成绩。
+      // 普通房间不出现这几个键，outcome 的形状与加这个模式之前逐字不变（golden 守着）。
+      ...(this.echoVariant === 'deepecho'
+        ? { variant: 'deepecho', echoRound: this.round, echoDepth: this._echoDepth(), echoDiveStart: this.echoDiveStart }
+        : {}) };
     let result;
     try {
       result = buildResult(this, this.outcome);
