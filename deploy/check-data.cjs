@@ -40,9 +40,15 @@ if (!assets) {
   const chars = Object.keys(assets.chars || {});
   const withSkins = chars.filter((id) => assets.chars[id] && assets.chars[id].skins && Object.keys(assets.chars[id].skins).length);
   const skinCount = withSkins.reduce((n, id) => n + Object.keys(assets.chars[id].skins).length, 0);
-  const ok = size > 3 * 1024 * 1024 && skinCount > 0;
-  say(ok, `资源清单 ${(size / 1048576).toFixed(2)} MB · ${chars.length} 名干员 · ${skinCount} 套皮肤`);
-  if (!ok) problems.push(`assets.json 看起来是仓库里的 vanilla 版（${(size / 1048576).toFixed(2)} MB、${skinCount} 套皮肤）——线上必须用各机生成的那份`);
+  // ★ 2026-11-07 之后：线上清单可能就是仓库里那份（519 套皮肤、相对地址），
+  //   所以判据不再是「>3 MB 的机器生成版」，而是**皮肤规模**——`data/assets.skins-floor.json`
+  //   记着地板（216 位 / 519 套），低于它才说明清单被 vanilla 版盖过。
+  const floorPath = path.join(SP, 'data', 'assets.skins-floor.json');
+  let floor = { owners: 216, entries: 519 };
+  try { floor = JSON.parse(fs.readFileSync(floorPath, 'utf8')); } catch { /* 没有地板文件就用默认值 */ }
+  const ok = skinCount >= Math.max(1, Number(floor.entries) || 1) && chars.length >= 200;
+  say(ok, `资源清单 ${(size / 1048576).toFixed(2)} MB · ${chars.length} 名干员 · ${skinCount} 套皮肤（地板 ${floor.entries}）`);
+  if (!ok) problems.push(`assets.json 的皮肤只有 ${skinCount} 套，低于地板 ${floor.entries} —— 清单被 vanilla 版盖过或皮肤被清空`);
   const hash = String(assets.hash || '');
   console.log(`  hash=${hash || '(空)'}  stats.chars=${assets.stats?.chars} skills=${assets.stats?.skills}`);
   if (Number(assets.stats?.chars) !== chars.length) warns.push(`stats.chars(${assets.stats?.chars}) 与 chars 实际数(${chars.length}) 不一致`);
@@ -76,6 +82,8 @@ if (!backups) {
 }
 
 // 4) 各机运行时配置：仓库版与线上版不该相同（相同说明被覆盖过）
+//    ★ assets.json 例外：2026-11-07 起仓库里那份**也带皮肤**（519 套，相对地址），
+//      线上与它逐字节相同是正常的（客户端本地优先，nginx 仍会回源），不再当成覆盖事故。
 const REPO_DATA = path.join(ROOT, 'data');
 for (const rel of ['create-room.json', 'room-ttl.json', 'config.json', 'local-assets.json', 'local-fx.json']) {
   const live = path.join(SP, 'shared', 'data', rel);
