@@ -3085,5 +3085,9 @@
   "诅咒「静默」让祝福名额 −1 —— 由你们自己选丢掉哪一个，游戏不会替你丢；名额恢复后面板会自动关掉。": "The curse 「Silence」 cut your blessing slots by 1 — you choose which one to drop; the game will not drop one for you, and this panel closes by itself if the slots come back.",
   "想留着这局？直接关掉页面就行": "Want to keep this run? Just close the page.",
   "24 小时内用同一浏览器打开本站会自动回到这一局；换设备就在大厅右上角点「恢复对局」。": "Open this site again in the same browser within 24 hours and you come back to this run; on another device, click “Resume match” at the top right of the lobby.",
-  "对局已在另一设备/标签页继续。要在这台切回来，点大厅右上角的「恢复对局」。": "The match continued on another device or tab. To switch back to this one, click “Resume match” at the top right of the lobby."
+  "对局已在另一设备/标签页继续。要在这台切回来，点大厅右上角的「恢复对局」。": "The match continued on another device or tab. To switch back to this one, click “Resume match” at the top right of the lobby.",
+  "+1 目标生命（上限 {n}）": "+1 target HP (cap {n})",
+  "生命已满（{n}）": "HP is full ({n})",
+  "目标生命已到上限 {n}，本次未扣钱": "Target HP is already at the cap {n}; nothing was charged.",
+  "全队目标生命已到上限 {n}，「{name}」未生效": "The whole team's target HP is at the cap {n}; “{name}” had no effect."
 }
