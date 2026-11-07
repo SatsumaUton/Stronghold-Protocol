@@ -13,6 +13,7 @@
 //   node tools/fix-skin-spine-meta.mjs --apply                  # 写回线上清单（先备份）
 //   node tools/fix-skin-spine-meta.mjs --apply --sync           # 同时写回仓库与补丁快照
 import fs from 'node:fs';
+import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +31,10 @@ const APPLY = process.argv.includes('--apply');
 const SYNC = process.argv.includes('--sync');
 const DRY = process.argv.includes('--dry-run') || CHECK;
 const IMPORT = process.argv.includes('--import-missing');
+// --import-mirror：素材包里根本没有模型的皮肤，去镜像站（fexli/ArknightsResource）下载 Front/Back
+const IMPORT_MIRROR = process.argv.includes('--import-mirror');
+// --refresh：连已经有 anims 的也重新解析一遍（例如 atlas 还没规范化，或元数据是从旧快照搬来的）
+const REFRESH = process.argv.includes('--refresh');
 const ONLY = (() => {
   const i = process.argv.indexOf('--only');
   return i >= 0 ? new Set(String(process.argv[i + 1] || '').split(',').filter(Boolean)) : null;
@@ -68,6 +73,62 @@ if (IMPORT) {
   console.log(`补回 ${imported} 套皮肤模型`);
 }
 
+// ---- 镜像站补齐：素材包和补丁快照都没有的皮肤，去 fexli/ArknightsResource 下载 -------------------
+const MIRROR = 'https://gh-proxy.com/https://raw.githubusercontent.com/fexli/ArknightsResource/main/spine';
+const CDN = 'https://assets.luobomiao.love/assets';
+
+/** GET 一个地址（跟随跳转），返回 Buffer；失败返回 null。 */
+function download(url, n = 0) {
+  return new Promise((resolve) => {
+    const u = new URL(url);
+    const req = https.get({ host: u.host, path: u.pathname + u.search, headers: { 'User-Agent': 'dsh' }, timeout: 180000 }, (r) => {
+      if ([301, 302, 303, 307, 308].includes(r.statusCode) && r.headers.location && n < 5) {
+        r.resume();
+        return download(new URL(r.headers.location, url).toString(), n + 1).then(resolve);
+      }
+      if (r.statusCode !== 200) { r.resume(); return resolve(null); }
+      const c = [];
+      r.on('data', (d) => c.push(d));
+      r.on('end', () => resolve(Buffer.concat(c)));
+    });
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+    req.on('error', () => resolve(null));
+  });
+}
+
+let mirrored = 0;
+if (IMPORT_MIRROR) {
+  for (const [charId, ch] of Object.entries(doc.chars || {})) {
+    for (const [skinId, skin] of Object.entries(ch.skins || {})) {
+      if (!skin || typeof skin !== 'object' || skin.type === 'e2') continue;
+      if (ONLY && !ONLY.has(skinId) && !ONLY.has(charId)) continue;
+      if (skin.spine && skin.spine.front) continue;
+      const spine = {};
+      let ok = true;
+      for (const side of ['front', 'back']) {
+        const cap = side === 'front' ? 'Front' : 'Back';
+        const rel = `spine/op/${charId}/${skinId}/${side}/${skinId}`;
+        const files = {};
+        for (const ext of ['skel', 'atlas', 'png']) {
+          const buf = await download(`${MIRROR}/${charId}/${skinId}/${cap}/${skinId}.${ext}`);
+          if (!buf || buf.length < 1000) { ok = false; break; }
+          const dst = path.join(ASSETS, `${rel}.${ext}`);
+          fs.mkdirSync(path.dirname(dst), { recursive: true });
+          fs.writeFileSync(dst, buf);
+          files[ext] = `${CDN}/${rel}.${ext}`;
+        }
+        if (!ok) break;
+        spine[side] = { skel: files.skel, atlas: files.atlas, textures: [files.png] };
+      }
+      if (!ok || !spine.front) continue;
+      skin.spine = spine;
+      mirrored += 1;
+      console.log(`  从镜像站补模型 ${charId}/${skinId}`);
+    }
+  }
+  console.log(`镜像站补回 ${mirrored} 套皮肤模型`);
+}
+
 /** 本体模型用了哪些技能槽（皮肤沿用同一套）：`anims.skills` 的键，或 `anims.skill.index`。 */
 function skillIndicesOf(base) {
   const a = base && base.anims;
@@ -89,7 +150,7 @@ for (const [charId, ch] of Object.entries(doc.chars || {})) {
     for (const side of ['front', 'back']) {
       const sp = skin.spine[side];
       if (!sp || typeof sp.skel !== 'string') continue;
-      if (sp.anims) continue;                      // 已经有元数据
+      if (sp.anims && !REFRESH) continue;           // 已经有元数据
       const skelRel = relOf(sp.skel), atlasRel = relOf(sp.atlas);
       const pngs = (Array.isArray(sp.textures) ? sp.textures : []).map(relOf);
       if (!skelRel || !atlasRel) continue;
@@ -192,10 +253,10 @@ if (SYNC) {
           skin.spine = clone;
           spineCount += 1;
         }
-        // 2) 元数据按同样的键补上
+        // 2) 元数据按同样的键补上（覆盖写：它是从磁盘重新解析出来的派生数据）
         for (const side of ['front', 'back']) {
           const sp = skin.spine && skin.spine[side];
-          if (!sp || sp.anims) continue;
+          if (!sp) continue;
           const meta = metaByKey.get(`${skinId}|${side}`);
           if (!meta) continue;
           Object.assign(sp, meta);
