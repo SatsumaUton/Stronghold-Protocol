@@ -60,7 +60,8 @@ export class MatchCombat {
     // 由 server/sim/battle/echoRules.js 在两端（服务端复算 + 浏览器）用同一份代码装上。
     const echoRules = this.echoVariant === 'deepecho' && typeof this._echoBattleRules === 'function'
       ? this._echoBattleRules() : null;
-    return { ...(this.bossMuls && this.bossMuls.hp !== 1 ? { bossHpMul: this.bossMuls.hp } : {}), ...(this.bossMuls && this.bossMuls.atk !== 1 ? { bossAtkMul: this.bossMuls.atk } : {}), ...(this.layerCapOff ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
+    return { ...(this.bossMuls && this.bossMuls.hp !== 1 ? { bossHpMul: this.bossMuls.hp } : {}), ...(this.bossMuls && this.bossMuls.atk !== 1 ? { bossAtkMul: this.bossMuls.atk } : {}),
+      ...([this.bossId, this.hiddenBossId].filter(Boolean).length ? { bossKeys: [this.bossId, this.hiddenBossId].filter(Boolean) } : {}), ...(this.layerCapOff ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
       ...(echoRules ? { echoRules } : {}),
       // 「深渊回响」：限伤上限跟着深度缩放（普通房没有这个键 → sim 走官方 300000）
       ...(this.echoVariant === 'deepecho' ? { hitLimitMul: this._echoHitLimitMul() } : {}),
