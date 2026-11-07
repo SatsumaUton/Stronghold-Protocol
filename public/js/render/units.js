@@ -711,6 +711,7 @@ export class UnitView {
     this.energy = null;           // [stored energies, the trait's maximum] of a 秘术师, including zero (sync; b.snap `energy`)
     this.energyHud = null;
     this.neg = 0;                 // the share of its cap a negative-HP pool holds, 0 = none (sync; b.snap `neg`, 斩业星熊's 我执)
+    this.shield = 0;              // the HP shield's points left, 0 = none (sync; b.snap `shield`: the strip under the HP bar)
     this.motes = null;            // 魔王's orbiting 「微尘」: { n, wide } | null (sync; b.snap `motes`, render/motes.js)
     this.moteRing = null;
     this.layers = 0;              // hit-negating 护盾 layers (sync; b.snap `layers`: the official layer effect, vfx/talentfx.js)
@@ -1232,6 +1233,7 @@ export class UnitView {
     this.hp = hp;
     this.sp = s.sp; this.spMax = s.spMax;
     this.ammo = s.ammo || null; this.wolves = s.wolves || null; this.neg = s.neg > 0 ? Math.min(1, s.neg) : 0;
+    this.shield = s.shield > 0 ? s.shield : 0;
     this.motes = s.motes && s.motes.n > 0 ? s.motes : null;
     this.coins = s.coins || null;
     this.energy = s.energy || null;
@@ -2040,7 +2042,10 @@ export class UnitView {
     const prep = this.prep;
     const showBars = !prep && this.alive && this.info.kind !== 'item';
     const damaged = this.hp < this.maxHp - 0.5;
-    const showHp = showBars && (!this.isEnemy || damaged || this.isBoss) && !NO_HP_BAR.has(this.info.defId);
+    // a shielded enemy shows its bar before it is hit too (维护者 2026-11-07: the shield's share must be readable while it
+    // is still up — the strip below rides on this bar)
+    const shielded = showBars && !!(this.flags & UF.SHIELD);
+    const showHp = showBars && (!this.isEnemy || damaged || this.isBoss || shielded) && !NO_HP_BAR.has(this.info.defId);
     const bw = clamp(s * (this.isBoss ? UNIT.bossBarWidth : UNIT.barWidth), 24, this.isBoss ? 260 : 96);
     const bh = clamp(s * (this.isBoss ? 0.12 : 0.075), 3, this.isBoss ? 12 : 7);
     // a knocked-down operator's HUD is its redeploy ring alone, drawn at full strength over the greyed model
@@ -2083,9 +2088,16 @@ export class UnitView {
     const neg = showHp ? this.neg : 0;
     this.negFill.visible = neg > 0;
     if (neg > 0) { this.negFill.position.set(x0, cy); this.negFill.width = bw * neg; this.negFill.height = bh; }
-    const shielded = showHp && (this.flags & UF.SHIELD);
-    this.shieldBar.visible = !!shielded;
-    if (shielded) { this.shieldBar.position.set(x0, cy - bh / 2 - 1); this.shieldBar.width = bw; this.shieldBar.height = Math.max(1.5, bh * 0.35); }
+    // the HP shield: a strip right under the bar whose width is the shield's share of max HP, so it visibly shrinks as
+    // the shield absorbs the hits (维护者 2026-11-07: the player must see how much shield is left). A hit-count barrier
+    // (shieldHits: 泥岩's layers) has no amount in the snapshot — it keeps the whole strip as before.
+    this.shieldBar.visible = !!(shielded && showHp);
+    if (this.shieldBar.visible) {
+      const share = this.shield > 0 && this.maxHp > 0 ? clamp(this.shield / this.maxHp, 0, 1) : 0;
+      this.shieldBar.position.set(x0, cy - bh / 2 - 1);
+      this.shieldBar.width = this.shield > 0 ? Math.min(bw, Math.max(2, bw * share)) : bw;
+      this.shieldBar.height = Math.max(1.5, bh * 0.35);
+    }
     // SP — or, while an ammo skill runs, its magazine: yellow cells, one per round, emptying from the right (b.snap `ammo`;
     // the SP bar's own fraction, ammoLeft / ammoMax, is the same width). Without an `ammo` row the bar is the plain SP bar.
     const ammo = !this.isEnemy ? this.ammo : null;

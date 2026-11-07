@@ -53,11 +53,15 @@ test('unitStatsEntry: effective stats next to the base, rounded for display; the
   const u = { id: 3, uid: 44, defId: 'chess_x', hp: 812.6, alive: true, base: { maxHp: 1000, atk: 300, def: 100, res: 10, aspd: 100, bat: 1.2, blockCnt: 2, moveSpeed: 0 } };
   const e = unitStatsEntry(u, { maxHp: 1250.4, atk: 420.49, def: 90, res: 12.34, interval: 1.0833333, blockCnt: 3, moveSpeed: 0 });
   assert.deepEqual(e, {
-    id: 3, uid: 44, defId: 'chess_x', hp: 813, alive: true,
+    id: 3, uid: 44, defId: 'chess_x', hp: 813, alive: true, shield: 0,
     maxHp: 1250, atk: 420, def: 90, res: 12.3, interval: 1.08, blockCnt: 3, moveSpeed: 0,
     base: { maxHp: 1000, atk: 300, def: 100, res: 10, interval: 1.2, blockCnt: 2, moveSpeed: 0 },
     silenced: false,
   });
+  // the HP shield it still holds rides along (维护者 2026-11-07: the enemy card shows how much is left)
+  assert.equal(unitStatsEntry(u, { maxHp: 1000, shield: 380.4 }).shield, 380);
+  assert.equal(unitStatsEntry(u, { maxHp: 1000, shield: 0 }).shield, 0, 'no shield: 0, never a missing key');
+  assert.equal(unitStatsEntry(u, { maxHp: 1000, shield: -5 }).shield, 0);
   const plain = unitStatsEntry(u);
   assert.equal(plain.atk, 300, 'no aggregated stats: the base');
   assert.equal(plain.interval, 1.2);

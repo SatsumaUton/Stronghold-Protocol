@@ -612,6 +612,8 @@ function EnemyDetail({ enemy, snapHp, count, live = null }) {
   const imm = Object.entries(s.immunities || {}).filter(([, v]) => v).map(([k]) => ({ stun: t('晕眩'), silence: t('沉默'), sleep: t('沉睡'), frozen: t('冻结'), levitate: t('浮空') }[k] || k));
   const interval = attackInterval(s.bat, s.aspd);
   const hp = hpOf(live, snapHp);
+  // the HP shield it still holds (维护者 2026-11-07: 敌对目标的护盾要能看到还剩多少) — the battle's live number, 0 without
+  const shield = live && live.src === 'battle' && Number.isFinite(live.shield) && live.shield > 0 ? live.shield : 0;
   // a battle enemy: its live stats against its spawned ones (the round's multipliers included — unitStatsEntry base)
   const st = {
     maxHp: liveStat(live, 'maxHp', s.maxHp), atk: liveStat(live, 'atk', s.atk), def: liveStat(live, 'def', s.def),
@@ -632,6 +634,7 @@ function EnemyDetail({ enemy, snapHp, count, live = null }) {
         <h3 class="dhead__name">${enemy.name}</h3>
         <div class="dfactions">${types.map((t) => html`<span key=${t} class="dfaction"><${Img} src=${factionIconUrl(m, factions[t]?.icon)} />${factions[t]?.name || t}</span>`)}</div>
         ${hp ? html`<div class="dhp dhp--enemy"><i style=${`width:${Math.max(0, Math.min(100, (hp.hp / Math.max(1, hp.max)) * 100))}%`}></i><span class="num">${fmtNum(hp.hp)} / ${fmtNum(hp.max)}</span></div>` : null}
+        ${shield ? html`<div class="dshield" data-testid="enemy-shield"><${Icon} name="shield" /><b class="num">${fmtNum(shield)}</b><span>${t('护盾')}</span></div>` : null}
       </div>
     </div>
     <div class=${cx('dstats', live && 'is-live')} data-live=${live ? live.src || 'battle' : undefined}>

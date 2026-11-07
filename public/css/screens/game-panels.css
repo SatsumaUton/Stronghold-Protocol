@@ -107,6 +107,11 @@
 .dhp i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--mint-c17), var(--mint-c18)); }
 .dhp--enemy i { background: linear-gradient(90deg, #b5261a, #ff5a4a); }
 .dhp span { position: absolute; inset: 0; display: grid; place-items: center; font-size: .12rem; color: #fff; text-shadow: 0 1px 2px #000; }
+/* 护盾（维护者 2026-11-07）：血量条下方一行，数字是它还剩多少 —— 战斗里那根血条下的护盾条就是同一份数据 */
+.dshield { display: flex; align-items: center; gap: .05rem; margin-top: .06rem; font-size: calc(.13 * var(--t)); color: #a8dcff; }
+.dshield .icon { width: .16rem; height: .16rem; flex: none; color: #7fc4f5; }
+.dshield b { font-size: calc(.16 * var(--t)); color: #e6f4ff; }
+.dshield span { color: var(--text-lo); }
 .dtrait { display: flex; gap: .08rem; align-items: flex-start; font-size: calc(.14 * var(--t)); line-height: 1.6; color: var(--text-md); padding: .08rem .1rem; background: rgba(255, 255, 255, .03); border-left: 2px solid var(--line-3); }
 .dtrait .icon { width: .16rem; height: .16rem; margin-top: .03rem; color: var(--text-lo); flex: none; }
 .dstats-wrap { display: flex; gap: .12rem; align-items: stretch; }

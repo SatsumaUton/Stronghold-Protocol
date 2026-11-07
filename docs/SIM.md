@@ -1615,7 +1615,7 @@ Unknown subprofessions fall back to the profession default (test `professions.te
 
 ## 9. Wire format (snapshot.js, DESIGN §8.2)
 
-- `snapshot()` → `{ fieldId, t, units: [[id, x, y, hp, maxHp, sp, spMax, flags, anim]], dp, killed, total, resolved, dps?, boss?, down?, elem?, ammo?, coins?, energy?, wolves?, neg?, layers?, charges?, stand?, standCut?, face? }`.
+- `snapshot()` → `{ fieldId, t, units: [[id, x, y, hp, maxHp, sp, spMax, flags, anim]], dp, killed, total, resolved, dps?, boss?, down?, elem?, ammo?, coins?, energy?, wolves?, neg?, shield?, layers?, charges?, stand?, standCut?, face? }`.
   `killed` counts every `counted` knock-out (§1.3) and `total` only the enemies this field scheduled (`inTotal`), so it may
   exceed it; `resolved = min(total, killedInTotal + leakedInTotal)` is the HUD capsule's numerator (DESIGN §14 顶栏胶囊).
   `sp/spMax` show remaining duration/ammo as a draining bar while a timed skill is active (ammo: `ammoLeft / ammoMax`, the
@@ -1638,6 +1638,11 @@ Unknown subprofessions fall back to the profession default (test `professions.te
   `layers: [[id, n]]` and `charges: [[id, stored, max]]` (each only when non-empty; display only, 0.3.0 round 46) =
   `snapshot.js` `layerView` (the sum of a unit's buffs' `shieldHits`: 泥岩's 护盾 layers) and `chargeView` (an ally skill
   with maxCharges > 1: `skill.charges`), read by the official effects (DESIGN §33.16).
+  `shield: [[id, points]]` (only when non-empty; display only, 维护者 2026-11-07) = `snapshot.js` `shieldView`: the HP
+  shield a unit holds right now, whole points, the sum of its buffs' `shield` as the damage it absorbed has left it
+  (`attack/effects.js absorbShields`). The renderer draws it as a strip under the HP bar whose width is
+  `points / maxHp` (a shielded enemy shows its bar even before it is hit), and the detail card prints the number; a
+  hit-count barrier (`shieldHits`) has no amount and is only the `UF.SHIELD` flag.
   `fieldMeta()` lists the knocked-out operators too (a client joining mid-battle shows them; DESIGN §18.3).
   `stand: [[id, until]]` (only when non-empty) = the game time each enemy's attack recovery ends (`atkStandUntil`: it
   stands for the rest of its attack clip, §1.2 `attackStand`) — enemies alive, deployed, visible, neither feared nor stunned;

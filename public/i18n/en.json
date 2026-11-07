@@ -2606,6 +2606,7 @@
   "已投票，等待队友…": "Voted, waiting for teammates…",
   "已选中，按「确认」提交（确认前可以改）。": "Selected; press Confirm to submit (you can change it before that).",
   "点一张卡选中，再按「确认」提交要舍弃的祝福。": "Tap a card to select the blessing to discard, then press Confirm.",
+  "护盾": "Shield",
   "护盾：指定盟约": "Shield: choose a bond",
   "护盾：投票指定要保护的盟约（仅限附加盟约）": "Shield: vote for the bond to protect (additional bonds only)",
   "排异随机到这条盟约时，护盾会抵消该诅咒（一次性）。30 秒后按票数结算。": "When rejection lands on this bond, the shield cancels that curse (one-shot). It settles on the votes after 30 s.",

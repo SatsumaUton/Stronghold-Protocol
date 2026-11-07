@@ -203,6 +203,19 @@ export function negView(u) {
 }
 
 /**
+ * `shieldView(u)` = the HP shield a unit holds right now, in whole points (the sum of its buffs' `shield` —
+ * attack/effects.js absorbShields spends them, so the number is what is left), null without one. Display only: the
+ * renderer draws the HP bar's shield strip as that share of max HP and the detail card shows the number, so a player
+ * knows how much shield is still up (维护者 2026-11-07). A hit-count barrier (`shieldHits`, e.g. 泥岩's layers) has no
+ * amount and is not listed — the UF.SHIELD flag still marks it.
+ */
+export function shieldView(u) {
+  const n = u?.s?.shield;
+  if (!(typeof n === 'number' && Number.isFinite(n) && n > 0)) return null;
+  return Math.max(1, Math.round(n));
+}
+
+/**
  * `layerView(u)` = the hit-negating 护盾 layers a unit holds (the sum of its buffs' shieldHits — 泥岩's 沃土予身), null
  * without any. Display only: render/vfx/talentfx.js shows the official effect of that many layers (mudrok_buff_03 / 02 /
  * 01_start).
