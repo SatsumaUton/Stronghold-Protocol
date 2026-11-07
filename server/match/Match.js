@@ -398,6 +398,10 @@ export class Match {
     this._echoDiscardVotes = new Map();
     this.echoBlessingDiscardEndsAt = null;
     this._echoDiscardTimer = null;
+    /** 弃选面板的来源：'replace'（名额满换新祝福）/ 'curse'（诅咒「静默」压低名额，只弃不发，2026-11-07）。 */
+    this.echoBlessingDiscardReason = null;
+    /** 因为别的决策面板还开着而延后的弃选（值 = 来源，见 echoBlessingDiscardReason）。 */
+    this.echoDiscardPending = null;
     /**
      * 挑战关（深度 5 / 10）没达成清怪线时累积的**诅咒 id 列表**（维护者 2026-11-05）。
      * 词条与效果都在 `match/echoCurse.js`：现在只会推 'erosion'（+1 侵蚀词条上限），
