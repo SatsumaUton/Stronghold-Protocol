@@ -771,12 +771,14 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
         </div>
         <div class="exp-mul">
           <span class="exp-mul__k">${t('敌方领袖')}</span>
+          <span class="exp-mul__k">${t('生命')}</span>
           <div class="exp-mul__opts" role="group" aria-label=${t('BOSS 生命倍率')}>
             ${ENEMY_MULTIPLIERS.map((m) => html`<button key=${`hp${m}`} type="button" data-testid=${`exp-boss-hp-${m}`}
                 class=${`dpick__opt ailast__opt exp-mul__opt${bossHp === m ? ' is-active' : ''}`}
                 aria-pressed=${bossHp === m ? 'true' : 'false'} disabled=${!!busy || !canEdit}
                 onClick=${() => { setCapOpen(false); canEdit && setBossHp(m); }}>×${m}</button>`)}
           </div>
+          <span class="exp-mul__k">${t('攻击')}</span>
           <div class="exp-mul__opts" role="group" aria-label=${t('BOSS 攻击倍率')}>
             ${ENEMY_MULTIPLIERS.map((m) => html`<button key=${`atk${m}`} type="button" data-testid=${`exp-boss-atk-${m}`}
                 class=${`dpick__opt ailast__opt exp-mul__opt${bossAtk === m ? ' is-active' : ''}`}
