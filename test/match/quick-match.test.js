@@ -14,6 +14,7 @@ import { Lobby, MULTI_SEAT_DEFAULT } from '../../server/lobby.js';
 import { SessionRegistry } from '../../server/net.js';
 import { ERR } from '../../shared/constants.js';
 import { experimentalRuleChanged } from '../../shared/experimental.js';
+import { renderMessage } from '../../shared/i18n.js';
 
 // 仓库里的 data/create-room.json 存的是「关闭建房」（公开仓库不默认开放），
 // 这些用例只关心 quickMatch / 排队的逻辑，与运维开关无关，所以先忽略开关文件。
@@ -87,7 +88,7 @@ test('游客：明确拒绝，而且要给得出原因', () => {
   const guest = { guest: true, playerId: '', accountId: '', name: 'Guest', connected: true, ws: null };
   const res = lobby.quickMatch(guest, {});
   assert.equal(res.error, ERR.BAD_MSG, '游客不能排队');
-  assert.match(String(res.detail || ''), /游客/, 'BAD_MSG 的通用文案是「无效的请求」，detail 必须说清是游客');
+  assert.match(renderMessage(res.detail), /游客/, 'BAD_MSG 的通用文案是「无效的请求」，detail 必须说清是游客');
 });
 
 test('身份还没送到：回 IDENTITY_PENDING，而不是当成游客', () => {
