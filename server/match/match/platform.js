@@ -275,6 +275,10 @@ export class MatchPlatform {
       if (ps.connected || ps.autoplay || ps.offlineRounds < OFFLINE_TAKEOVER_ROUNDS) continue;
       ps.autoplay = true;
       ps.offlineAutoplay = true;
+      // 和玩家自己点「暂离（AI 托管）」（intents.js setAutoplay → kickBot）保持同一口径：
+      // 立刻让机器人接手**当前阶段**（开着的领奖 / 选择窗口也会被它处理掉），
+      // 否则接管要等下一次 enterPrep 才生效，中间开着的窗口没人应。
+      try { this.kickBot(ps); } catch (e) { this.reportError('offline takeover kickBot', e); }
       try {
         this.log.info?.(`[match ${this.roomCode}] seat ${ps.seat} offline for ${ps.offlineRounds} rounds: AI takes over (R${this.round})`);
       } catch { /* ignore */ }
