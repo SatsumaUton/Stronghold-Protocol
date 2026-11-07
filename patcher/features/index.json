@@ -6643,7 +6643,7 @@
       {
         "path": "public/css/screens/game.css",
         "baseExists": false,
-        "customBytes": 119990
+        "customBytes": 120339
       },
       {
         "path": "public/css/screens/lobby.css",
@@ -6668,22 +6668,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": false,
-        "customBytes": 230657
+        "customBytes": 230741
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": false,
-        "customBytes": 266786
+        "customBytes": 266886
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": false,
-        "customBytes": 255948
+        "customBytes": 256050
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": false,
-        "customBytes": 219169
+        "customBytes": 219239
       },
       {
         "path": "public/js/assets.js",
@@ -6703,7 +6703,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": false,
-        "customBytes": 139843
+        "customBytes": 140388
       },
       {
         "path": "public/js/screens/lobby.js",
@@ -6863,7 +6863,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": false,
-        "customBytes": 69818
+        "customBytes": 70404
       },
       {
         "path": "server/match/PlayerState.js",
@@ -6983,7 +6983,7 @@
       {
         "path": "server/match/match/settle.js",
         "baseExists": false,
-        "customBytes": 12678
+        "customBytes": 13157
       },
       {
         "path": "server/match/match/setupVote.js",
@@ -7003,7 +7003,7 @@
       {
         "path": "server/match/match/views.js",
         "baseExists": false,
-        "customBytes": 33116
+        "customBytes": 33241
       },
       {
         "path": "server/match/player/economy.js",
