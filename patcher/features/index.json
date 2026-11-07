@@ -6648,7 +6648,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": true,
-        "customBytes": 100139
+        "customBytes": 100312
       },
       {
         "path": "public/css/screens/game-shop.css",
@@ -6683,22 +6683,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 235724
+        "customBytes": 235865
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 272164
+        "customBytes": 272300
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 261231
+        "customBytes": 261384
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 223953
+        "customBytes": 224077
       },
       {
         "path": "public/js/assets.js",
@@ -6788,7 +6788,7 @@
       {
         "path": "public/js/ui/enemyDrawer.js",
         "baseExists": true,
-        "customBytes": 17334
+        "customBytes": 18388
       },
       {
         "path": "public/js/ui/enemyRecords.js",

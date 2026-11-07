@@ -3050,5 +3050,6 @@
   "生命": "HP"
 ,
   "敌方领袖生命": "Leader HP",
-  "敌方领袖攻击": "Leader ATK"
+  "敌方领袖攻击": "Leader ATK",
+  "盟约投影不占祝福名额，同一时间只有一条": "A covenant projection takes no blessing slot; only one is active at a time"
 }

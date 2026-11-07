@@ -14,6 +14,7 @@ import { enemyRecord } from './enemyRecords.js';
 import { matchInfoModel, DiyBannedLine } from './matchInfo.js';
 import { factionIconUrl } from './assetUrls.js';
 import { data } from '../data.js';
+import { useStore } from '../store.js';
 import { actions } from './gameActions.js';
 import { echoBuffChips } from './echoBuffs.js';
 // 「深渊祭坛」（16 层起随机开放）：以前这块组件定义了却从没挂到界面上，玩家一直没见过祭坛
@@ -199,13 +200,21 @@ export function EnemyDrawer({ tab, onTab, pub, priv, onClose, onEnemy, onChess, 
  */
 function BlessTab({ pub }) {
   const echo = pub?.echo;
+  // 「盟约投影」每人各自选（维护者 2026-11-07）：它**不占祝福名额**，所以不在 echo.blessings 里，
+  // 图鉴式的「已获祝福」列表以前因此完全看不到自己选的那条投影（玩家反馈）。
+  // 这里把它作为列表末尾一行补进来（金色「盟约投影」角标），观战 / 前往查看时取屏幕上那位的。
+  const myId = useStore((s) => s.me.playerId);
+  const watchTarget = useStore((s) => s.ui?.watchTarget || null);
   const words = Array.isArray(echo?.words) ? echo.words : [];
   const bless = Array.isArray(echo?.blessings) ? echo.blessings : [];
+  const projOf = (echo && echo.projections && typeof echo.projections === 'object') ? echo.projections[watchTarget || myId] : null;
+  const proj = projOf && typeof projOf.id === 'string' ? projOf : null;
   // 反制祝福（一次性、不占名额）单独计数，别让它把 "/" 撑爆；
   // 一次性祝福（回血 / 资金…）与「护盾」也不占名额（维护者 2026-11-05）：列表照常显示，但不算进 n/3
   const normalBless = bless.filter((b) => !b.counter && !b.consumed && b.occupiesSlot !== false);
   const depth = Number(echo?.depth) || 0;
   const counters = Array.isArray(echo?.counters) ? echo.counters : [];
+  const rows = proj ? [...bless, { id: `projection:${proj.id}`, name: proj.name, desc: proj.desc, projection: true }] : bless;
   return html`<div class="edrawer__body">
     ${echo ? html`<${EchoAltar} pub=${pub} />` : null}
     ${counters.length ? html`<div class="echo-counters">
@@ -218,8 +227,10 @@ function BlessTab({ pub }) {
     </div>` : null}
     <h4 class="ihead">${t('已获祝福')} <small class="num">${normalBless.length}/${Number(echo?.blessingMax) || 3}</small>
       <small class="t-dim">${t('深度 {n}', { n: depth })}</small></h4>
-    ${bless.length ? html`<ul class="echo-list">${bless.map((b) => html`<li key=${b.id}>
-      <b>${b.name}</b>${b.rarityLabel ? html`<em class=${`echo-rar is-${b.rarity || 'common'}`}>${b.rarityLabel}</em>` : null}${b.oneShot ? html`<em class="echo-rar is-oneshot" title=${t('一次性：拿到时立刻结算，不挂在干员身上')}>${t('一次性')}</em>` : null}<span>${b.desc || ''}</span></li>`)}</ul>`
+    ${rows.length ? html`<ul class="echo-list">${rows.map((b) => html`<li key=${b.id}>
+      <b>${b.name}</b>${b.projection
+        ? html`<em class="echo-rar is-projection" title=${t('盟约投影不占祝福名额，同一时间只有一条')}>${t('盟约投影')}</em>`
+        : null}${b.rarityLabel ? html`<em class=${`echo-rar is-${b.rarity || 'common'}`}>${b.rarityLabel}</em>` : null}${b.oneShot ? html`<em class="echo-rar is-oneshot" title=${t('一次性：拿到时立刻结算，不挂在干员身上')}>${t('一次性')}</em>` : null}<span>${b.desc || ''}</span></li>`)}</ul>`
       : html`<p class="t-dim">${t('还没有获得祝福（深度 1、5、10、15… 各有一次三选一）')}</p>`}
     <h4 class="ihead">${t('本回合侵蚀词条')} <small class="num">${words.length}</small></h4>
     ${words.length ? html`<ul class="echo-list echo-list--enemy">${words.map((w) => html`<li key=${w.id}>
