@@ -56,7 +56,7 @@ export class MatchBoss {
     const hitSteps = new Map();
     // 敌人生命倍率必须取**这一回合**的值（`enemyHpMulAt`）：按回合设置时 `enemyHpMul` 只是 1
     // （experimentalOptions 只发 `enemyHpPlan`），用单值会让领袖血池完全不吃倍率。
-    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment, hpMul: this.enemyHpMulAt(this.round) * this._echoBossPoolMul(this.round) }), {
+    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment, hpMul: this.enemyHpMulAt(this.round) * this._echoBossPoolMul(this.round) * (this.bossMuls ? this.bossMuls.hp : 1) }), {
       onHit: (pid, dmg) => {
         const ps = this.players.get(pid);
         if (!ps) return;
