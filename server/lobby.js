@@ -1945,7 +1945,30 @@ case 'room.list': return this.roomList(msg);
     if (session.guest) return fail(ERR.BAD_TARGET, 'guest cannot resume');
     const candidates = this.registry.byAccount(session.accountId)
       .filter((s) => s !== session && s.roomCode && this.rooms.get(s.roomCode)?.seatOf(s.playerId));
-    if (!candidates.length) return fail(ERR.BAD_TARGET, 'no active match for this account');
+    // 2026-11-08（玩家反馈跨设备恢复报「当前节点没有可恢复的账号对局」）：
+    // 旧设备的会话可能已经不在了（关掉超过重连窗口 / 被 evict / 节点重启后只剩存档），
+    // 但**座位还在** —— 房间里的 `accountId` 认人。以前这里直接失败，明明对局还活着却救不回来。
+    // 现在：先按会话找（原来的路，能接管在线的那台）；找不到就按**座位**接管，重建一个会话。
+    if (!candidates.length) {
+      const hit = this._accountSeat(session.accountId);
+      const seatSession = hit ? this.registry.adopt(hit.seat.playerId, hit.seat.name || session.name) : null;
+      if (!seatSession) {
+        this.log?.info?.(`[lobby] account.resume：账号 ${session.accountId} 在这台节点既没有会话也没有座位（房间不在本节点？）`);
+        return fail(ERR.BAD_TARGET, 'no active match for this account');
+      }
+      seatSession.accountId = session.accountId;
+      seatSession.roomCode = hit.room.code;
+      seatSession.connected = false;
+      this.log?.info?.(`[lobby] account.resume：座位 ${hit.seat.playerId}@${hit.room.code} 的旧会话已不在，按座位重建会话接管`);
+      sendSession(session, {
+        t: 'account.resume',
+        token: seatSession.token,
+        roomCode: hit.room.code,
+        playerId: hit.seat.playerId,
+        name: hit.seat.name || '',
+      });
+      return OK;
+    }
     const old = candidates.find((s) => s.connected) || candidates[0];
     const token = this.registry.rotateToken(old);
     if (!token) return fail(ERR.INTERNAL, 'cannot rotate seat token');
@@ -1965,6 +1988,24 @@ case 'room.list': return this.roomList(msg);
       name: old.name,
     });
     return OK;
+  }
+
+  /**
+   * 这台节点上某个账号的座位（只认**已开局**的对局，且座位没离开）。
+   *
+   * `resumeAccount` 的兜底：会话表里找不到时按座位认人。房间里的座位记着 `accountId`
+   * （`humanSeat`），所以旧设备关掉 / 会话被回收之后，跨设备恢复依然能回到原位。
+   * @param {string} accountId @returns {{ room: Room, seat: any } | null}
+   */
+  _accountSeat(accountId) {
+    if (typeof accountId !== 'string' || !accountId) return null;
+    for (const room of this.rooms.values()) {
+      if (!room || room.disposed || !room.match) continue;
+      const seat = room.seats.find((s) => s && !s.isBot && !s.left
+        && s.accountId != null && String(s.accountId) === accountId);
+      if (seat) return { room, seat };
+    }
+    return null;
   }
 
   ready(session, { ready }) {

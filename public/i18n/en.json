@@ -3089,5 +3089,7 @@
   "+1 目标生命（上限 {n}）": "+1 target HP (cap {n})",
   "生命已满（{n}）": "HP is full ({n})",
   "目标生命已到上限 {n}，本次未扣钱": "Target HP is already at the cap {n}; nothing was charged.",
-  "全队目标生命已到上限 {n}，「{name}」未生效": "The whole team's target HP is at the cap {n}; “{name}” had no effect."
+  "全队目标生命已到上限 {n}，「{name}」未生效": "The whole team's target HP is at the cap {n}; “{name}” had no effect.",
+  "对局还在：房间 {code} 在第 {n} 台节点上。请点大厅右上角的「恢复对局」，再点「去该房间所在节点继续」。": "Your match is still running: room {code} is on node {n}. Click “Resume match” at the top right of the lobby, then “Go to that room’s node to continue”.",
+  "对局还在：房间 {code}。请点大厅右上角的「恢复对局」继续。": "Your match is still running: room {code}. Click “Resume match” at the top right of the lobby to continue."
 }

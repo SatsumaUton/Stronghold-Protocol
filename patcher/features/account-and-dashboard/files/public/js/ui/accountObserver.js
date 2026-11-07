@@ -3,6 +3,7 @@
 import { identity, net } from '../net.js';
 import { store } from '../store.js';
 import { toast } from './toasts.js';
+import { findAccountRoom } from './accountRoom.js';
 import { t } from '../../../shared/i18n.js';
 
 let installed = false;
@@ -272,7 +273,21 @@ export function installAccountObserver() {
         autoWanted = false;
         try { window.__SP_ACCOUNT_RESUME_PENDING = false; } catch { /* ignore */ }
         // A local refresh is silent: never tell the player something is wrong for their own reload.
-        if (!silentResume) toast(t('当前节点没有可恢复的账号对局'), 'warn');
+        if (!silentResume) {
+          // 2026-11-08（玩家反馈「跨设备恢复对局只看到『当前节点没有可恢复的账号对局』」）：
+          // 这句话以前是死胡同 —— 座位在**另一台节点**上时，玩家不知道该去哪，只能再点一遍
+          // 「恢复对局」碰运气。现在查一下房间目录（/mm/api/account/room），把房间号和节点说出来，
+          // 并指明下一步：大厅右上角「恢复对局」→「去该房间所在节点继续」。
+          let room = null;
+          try { room = await findAccountRoom(); } catch { room = null; }
+          if (room && room.code) {
+            toast(room.node
+              ? t('对局还在：房间 {code} 在第 {n} 台节点上。请点大厅右上角的「恢复对局」，再点「去该房间所在节点继续」。', { code: room.code, n: room.node })
+              : t('对局还在：房间 {code}。请点大厅右上角的「恢复对局」继续。', { code: room.code }), 'warn', { ttl: 12000 });
+          } else {
+            toast(t('当前节点没有可恢复的账号对局'), 'warn');
+          }
+        }
       }
     });
   };

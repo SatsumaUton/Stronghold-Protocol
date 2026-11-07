@@ -6658,12 +6658,12 @@
       {
         "path": "public/css/screens/game.css",
         "baseExists": true,
-        "customBytes": 120339
+        "customBytes": 120887
       },
       {
         "path": "public/css/screens/lobby.css",
         "baseExists": true,
-        "customBytes": 135468
+        "customBytes": 136462
       },
       {
         "path": "public/css/screens/room.css",
@@ -6683,22 +6683,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 240669
+        "customBytes": 241936
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 277920
+        "customBytes": 279428
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 266835
+        "customBytes": 268273
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 228732
+        "customBytes": 229910
       },
       {
         "path": "public/js/assets.js",
@@ -6723,7 +6723,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": true,
-        "customBytes": 121064
+        "customBytes": 122232
       },
       {
         "path": "public/js/screens/result.js",
@@ -6739,6 +6739,11 @@
         "path": "public/js/screens/stats.js",
         "baseExists": true,
         "customBytes": 51444
+      },
+      {
+        "path": "public/js/ui/accountRoom.js",
+        "baseExists": false,
+        "customBytes": 3287
       },
       {
         "path": "public/js/ui/assetUrls.js",
@@ -6778,7 +6783,7 @@
       {
         "path": "public/js/ui/echoStatus.js",
         "baseExists": false,
-        "customBytes": 18342
+        "customBytes": 19082
       },
       {
         "path": "public/js/ui/echoSupply.js",
@@ -6828,17 +6833,12 @@
       {
         "path": "public/js/ui/matchChrome.js",
         "baseExists": true,
-        "customBytes": 15434
+        "customBytes": 16374
       },
       {
         "path": "public/js/ui/matchEnemies.js",
         "baseExists": false,
         "customBytes": 7467
-      },
-      {
-        "path": "public/js/ui/resumeMatch.js",
-        "baseExists": true,
-        "customBytes": 12338
       },
       {
         "path": "public/js/ui/revival.js",
@@ -6873,7 +6873,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 279996
+        "customBytes": 282629
       },
       {
         "path": "server/match/Match.js",
@@ -6928,7 +6928,7 @@
       {
         "path": "server/match/match/echoBlessing.js",
         "baseExists": false,
-        "customBytes": 34558
+        "customBytes": 34536
       },
       {
         "path": "server/match/match/echoBoard.js",
@@ -6963,7 +6963,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 219055
+        "customBytes": 221110
       },
       {
         "path": "server/match/match/echoProjection.js",
@@ -7003,7 +7003,7 @@
       {
         "path": "server/match/match/prep.js",
         "baseExists": true,
-        "customBytes": 11736
+        "customBytes": 12612
       },
       {
         "path": "server/match/match/settle.js",

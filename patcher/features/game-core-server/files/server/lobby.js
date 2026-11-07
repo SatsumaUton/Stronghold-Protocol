@@ -254,12 +254,14 @@ import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.j
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, ROOM_LIST_MAX, ROOM_LIST_MIN_CAPACITY, modeIdFor } from '../shared/constants.js';
-import { roomCapacity } from '../shared/playerCapacity.js';
-import { EXPERIMENTAL_DEFAULTS, isExperimental, experimentalOptions } from '../shared/experimental.js';
+import { roomCapacity, PLAYER_CAPACITIES } from '../shared/playerCapacity.js';
+import { EXPERIMENTAL_DEFAULTS, isExperimental, experimentalOptions, experimentalRuleChanged } from '../shared/experimental.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
 import { encode, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
 import { Match as DefaultMatch } from './match/Match.js';
+import { echoBoardEntry, recordEchoBoard } from './match/match/echoBoard.js';
+import { normalizeEchoConfig } from './match/match/echoConfig.js';
 import { KITTED_CHARS } from './sim/content/kits/index.js';
 
 const VANILLA_KITTED = new Set(KITTED_CHARS);
@@ -271,6 +273,13 @@ import { parseTestModeEnv, testModeGate, unrecognizedTestMode } from './testMode
 
 /** Room code alphabet: uppercase letters without I and O (and no digits, so no 0/1). */
 export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+/**
+ * 多人匹配「多人同盟」那一档自己开房时用的人数：`PLAYER_CAPACITIES` 里第一个大于标准
+ * {MAX_SEATS} 人的档位（本服是 8）。参考版 ui/matchmaking.js 的 `SCOPE_SEATS.multi`
+ * 取的是 `PLAYER_CAPACITIES.filter((n) => n > MAX_SEATS)`，其最小值就是这里这个。
+ */
+export const MULTI_SEAT_DEFAULT = PLAYER_CAPACITIES.find((n) => n > MAX_SEATS) ?? MAX_SEATS + 1;
 
 /** Tunables. */
 export const LOBBY_DEFAULTS = Object.freeze({
@@ -466,6 +475,10 @@ function roomTtlEnabled() { return roomTtlConfig().enabled; }
  */
 let __gateCache = { at: 0, create: true, start: true, match: true };
 function maintenanceGate() {
+  // 测试 / 排障开关：置 1 时三个门全开，完全不读配置文件。
+  // 存在的理由：仓库里的 data/create-room.json 存的是「关闭」（公开仓库不该默认开放建房），
+  // 而单测跑的就是仓库那份 —— 不忽略开关的话，quickMatch / create 相关测试在仓库里永远是红的。
+  if (process.env.SP_GATE_IGNORE === '1') return { at: 0, create: true, start: true, match: true };
   if (Date.now() - __gateCache.at > 5000) {
     let create = true, start = true, match = true;
     try {
@@ -514,6 +527,13 @@ export class Room {
     this.mode = mode;
     this.difficulty = difficulty;
     this.experimental = experimental || null;
+    /**
+     * 「深渊回响」(DESIGN-ABYSS.md, 2026-11-03): `mode: 'coop'` + `variant: 'deepecho'`. 不新增 mode 值 ——
+     * 客户端 26 处 `mode === 'coop'` 分支因此全部自动成立，variant 只影响标题、结算文案与延伸逻辑。
+     * null（默认）时房间文档不带这个键。
+     * @type {'deepecho' | null}
+     */
+    this.variant = null;
     /** 5–20 人房间：座位数由实验选项决定 */
     this.capacity = roomCapacity(mode, this.experimental);
     /** 15 分钟未开始对局解散（管理员房**房主在线时**才 noExpire） */
@@ -564,6 +584,17 @@ export class Room {
     this.matchCount = 0;
     /** @type {any} summary passed to onEnd by the last match */
     this.lastSummary = null;
+    /**
+     * 上一局是**怎么**没的（'admin-aborted' / 'restart-aborted' / 'plugin-crash' / …）。
+     *
+     * 为什么需要它：对局被打断时客户端没有结算帧（m.result 根本没生成），只能靠房间状态判断
+     * 「这一局没了」—— 以前它没有原因可读，于是不管是被管理员终止、还是重启后恢复失败，
+     * 一律显示「服务器重启导致对局中断，同盟已返回等待室」（ui/game/overlays.js MatchEnded）。
+     * 管理员主动关的对局被说成服务器重启，玩家会以为是故障。
+     * 只有房间**没有在跑对局**时才下发（见 toState），所以正常情况下 room.state 不变。
+     * @type {string | null}
+     */
+    this.lastEndReason = null;
     /**
      * Frames of the last match's end, replayed on resync to humans who have not moved on yet.
      * @type {{ publicFrame: string | null, frames: Map<string, string>, pending: Set<string> } | null}
@@ -680,6 +711,8 @@ export class Room {
           // 于是同一账号的编号每次重连都变，玩家会以为"我的编号不对/立绘被改了"。
           // 这里下发真实 tag；拿不到（游客、老节点没这个字段）时前端回退到哈希，行为与上游一致。
           ...(typeof s.tag === 'string' && /^[0-9]{4}$/.test(s.tag) ? { tag: s.tag } : {}),
+          // 称号（维护者 2026-11-07）：后台设置的，显示在座位卡的名字后面；没有就不带这个键
+          ...(s.title && typeof s.title === 'object' && s.title.name ? { title: s.title } : {}),
           // 管理员/服主标记：控制台据此把「玩家」显示成「管理员」（仅展示用）
           ...(s.admin === true ? { admin: true } : {}),
           // a room with gameplay plugins (header "Gameplay plugins"): has this player's page loaded and checked its content?
@@ -693,7 +726,7 @@ export class Room {
           // only a human seat with a non-empty map carries the key
           ...(!s.isBot && s.skins && Object.keys(s.skins).length ? { skins: s.skins } : {}) }
         : null)),
-      spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(this.needsContent ? { content: /** @type {any} */ (s).content || 'loading' } : {}) })),
+      spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(s.title && typeof s.title === 'object' && s.title.name ? { title: s.title } : {}), ...(this.needsContent ? { content: /** @type {any} */ (s).content || 'loading' } : {}) })),
       maxSpectators: this.spectatorLimit(),
       ...(this.content ? { content: this.content.trusted ? {...this.content, trusted:{...this.content.trusted, consent:Object.fromEntries(this.seats.filter(x => x && !x.isBot).map(x => [x.seat,x.consentCs === this.content.cs]))}} : this.content } : {}),
       // another official version than 第二期下半, and its open vote (header "Official versions"): omitted otherwise, so a
@@ -708,12 +741,18 @@ export class Room {
       ...(this.soloUnlimited === true ? { soloUnlimited: true } : {}),
       // 同盟列表 (room.setListed): omitted unless on, like the others
       ...(this.listed ? { listed: true } : {}),
+      // 「深渊回响」：房间界面按这个标记换整套配色（深紫），并且房间标题也认它。
+      // 普通房不带这个键 → room.state 与加这个模式之前逐字节一致。
+      ...(this.variant === 'deepecho' ? { variant: 'deepecho' } : {}),
       // 隐身观战（adminWatch，管理员功能）：这个会话既不在 seats 也不在 spectators，
       // 所以前端以前分不清它和「普通玩家」，直接按玩家界面渲染 —— 管理员看到的就是
       // 「跟我自己玩的时候一样，但点什么都不动」（服务端会拦掉隐身观战者的 g.*）。
       // 标记**只发给本人**：broadcastState 在房间里有隐身观战者时逐会话编码，
       // 其余人拿到的 room.state 与以前逐字节一致。
       ...(viewerId && this.hiddenSpectatorOf(viewerId) ? { hiddenWatch: true } : {}),
+      // 上一局是怎么没的（'admin-aborted' / 'restart-aborted' / 'plugin-crash' / …）。
+      // 只在房间**没在跑对局**、且确实有原因时才下发，所以正常房间的 room.state 逐字节不变。
+      ...(!this.match && this.lastEndReason ? { endReason: this.lastEndReason } : {}),
     };
   }
 }
@@ -808,7 +847,14 @@ export class Lobby {
           try {
             fetch('http://127.0.0.1:3090/api/rooms/report', {
               method: 'POST', headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ node: nodeNo, codes: [...this.rooms.keys()] }),
+              // 「深渊回响」房**不进** codes：不进跨节点公开同盟列表，也不会被匹配器选中
+              // （管理员专属，公开前隔离）。但单独放进 echoCodes —— 节点控制台与管理后台的房间
+              // 列表要能看到这些房在跑、跑到第几层（维护者 2026-11-06）。
+              body: JSON.stringify({
+                node: nodeNo,
+                codes: [...this.rooms.values()].filter((r) => r.variant !== 'deepecho').map((r) => r.code),
+                echoCodes: [...this.rooms.values()].filter((r) => r.variant === 'deepecho').map((r) => r.code),
+              }),
             }).catch(() => {});
           } catch { /* ignore */ }
         }, 10_000);
@@ -843,6 +889,11 @@ export class Lobby {
       try { this.sweepOldRooms(); } catch (e) { this.log.warn('[lobby] room sweep failed', e); }
     }, 20_000);
     this.roomTimer.unref?.();
+    /** 多人匹配排队：每秒扫一次（凑够人就成形；等满 MATCHMAKING_TIMEOUT_MS 也成形） */
+    this.quickTimer = setInterval(() => {
+      try { this.sweepQuickQueue(); } catch (e) { this.log.warn('[lobby] quick queue sweep failed', e); }
+    }, 1_000);
+    this.quickTimer.unref?.();
     /** per-network limit warnings: at most one log line per 10 s (the rest are counted) */
     this.limitLog = { at: -Infinity, suppressed: 0 };
     /** log lines said once (warnOnce) */
@@ -947,7 +998,9 @@ export class Lobby {
       for (const s of r.seats) if (s && !s.left) (s.isBot ? bots++ : humans++);
       spectators += r.spectators.length;
     }
-    return { rooms: this.rooms.size, matches, humans, bots, spectators };
+    // queued：多人匹配**正在排队等**的人数。他们没有房间、没进对局，光看 rooms/matches 完全看不见，
+  // 所以控制台和后台要能读到 —— 否则「有人点了开始多人匹配但还没成局」在运维侧是隐形的。
+  return { rooms: this.rooms.size, matches, humans, bots, spectators, queued: this.quickQueue?.size || 0 };
   }
 
   // ---------------------------------------------------------------------------------------------------
@@ -1004,6 +1057,8 @@ export class Lobby {
     if (room.match && room.match.players?.get) {
       const ps = room.match.players.get(session.playerId);
       if (ps && ps.admin !== wantTool) ps.admin = wantTool;
+      // 身份门也要同步（维护者 2026-11-05：管理员无视惩罚机制，判定读的是 ps.adminId）
+      if (ps && ps.adminId !== wantBadge) ps.adminId = wantBadge;
     }
     // a player seat, or a spectator seat (header): both carry `connected` / `name`
     const seat = room.seatOf(session.playerId) || room.watcherOf(session.playerId);
@@ -1098,8 +1153,11 @@ export class Lobby {
       }
       if (room.matchmaking) {
         const started = Number(room.matchmakingAt) || now;
-        if (now - started >= MATCHMAKING_TIMEOUT_MS) {
-          try { this.forceStartMatchmaking(room); } catch (e) { this.log?.warn?.('[lobby] 匹配超时开局失败 ' + (e && e.message)); }
+        // 人满即开：匹配的目的就是凑齐人，等满员了还让房主再点一次「开始」是多余的。
+        // 只有 1 个真人时不这么干（房间里可能有 AI 座位把座位占满，那不算「匹配到了」）。
+        const full = room.freeSeat() < 0 && room.activeHumans().length >= 2;
+        if (full || now - started >= MATCHMAKING_TIMEOUT_MS) {
+          try { this.forceStartMatchmaking(room); } catch (e) { this.log?.warn?.('[lobby] 匹配开局失败 ' + (e && e.message)); }
         }
         continue;
       }
@@ -1138,7 +1196,7 @@ export class Lobby {
    * @param {Room} room
    */
   refreshMatchWindows(room) {
-    if (!room?.match || room.disposed || room.mode === 'solo') return;
+    if (!room?.match || room.disposed || this.soloLikeRun(room)) return;
     const humans = room.activeHumans();
     const online = humans.some((s) => s && s.connected);
     const now = this.now();
@@ -1269,7 +1327,7 @@ export class Lobby {
       case 'room.ready': return this.ready(session, msg);
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
       case 'room.setListed': return this.setListed(session, msg);
-      case 'room.list': return this.roomList();
+case 'room.list': return this.roomList(msg);
       case 'room.setExperimental': return this.setExperimental(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
       case 'room.setBotBand': return this.setBotBand(session, msg);
@@ -1281,6 +1339,9 @@ export class Lobby {
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
       case 'room.matchmaking': return this.matchmaking(session, msg);
+    case 'room.quickMatch': return this.quickMatch(session, msg);
+    case 'room.quickState': return this.quickState(session, msg);
+    case 'room.quickLeave': return this.quickLeave(session, msg);
       case 'room.start': return this.start(session);
       case 'room.rerollSetup': return this.rerollSetup(session, msg);
       case 'room.cancelReroll': return this.rerollSetup(session, msg, true);
@@ -1313,7 +1374,8 @@ export class Lobby {
     this.clearResync(session.playerId); // the next resume resyncs immediately
     const room = this.roomOf(session);
     // a solo run may be resumed within singleReconnectTime (24 h); everything else keeps the registry's window
-    session.resumeWindowMs = room && room.match && room.mode === 'solo' ? this.soloResumeWindowMs(room) : null;
+    // （维护者 2026-11-07：单人深潜也算 —— 深潜房是 mode:'coop' + variant:'deepecho'，见 soloLikeRun）
+    session.resumeWindowMs = this.soloLikeRun(room) ? this.soloResumeWindowMs(room) : null;
     if (!room) return;
     const player = room.seatOf(session.playerId);
     // roomOf() 认三种身份：座位、普通观战、隐身观战（hiddenSpectators）。这里必须同样认全，
@@ -1463,8 +1525,8 @@ export class Lobby {
       session.lastActiveAt = this.now();
     }
     const text = reason === 'idle' && room.match
-      ? '检测到消极游戏，你已被移出同盟'
-      : '长时间未操作，你已被自动移出同盟';
+      ? msg('检测到消极游戏，你已被移出同盟')
+      : msg('长时间未操作，你已被自动移出同盟');
     if (session && session.connected) {
       sendSession(session, { t: 'm.toast', kind: 'warn', text });
       sendSession(session, { t: 'room.closed', reason: 'kicked' });
@@ -1478,7 +1540,7 @@ export class Lobby {
   // room.* handlers
   // ---------------------------------------------------------------------------------------------------
 
-  create(session, { mode, difficulty: asked, test, version: askedVersion, soloUnlimited, experimental = null } = {}) {
+  create(session, { mode, difficulty: asked, test, version: askedVersion, soloUnlimited, variant: askedVariant, echo: askedEcho, experimental = null } = {}) {
     // 5–20 人实验房：只接受合法选项；独立模拟始终只有 1 个座位。
     if (experimental != null && !isExperimental(experimental)) return fail(ERR.BAD_MSG, 'invalid experimental options');
     if (mode === 'solo') experimental = null;
@@ -1489,8 +1551,38 @@ export class Lobby {
     // 本服：游客不能建房，先给出明确原因，避免只拿到 BAD_MSG。
     if (session.guest || !session.accountId) {
       return fail(ERR.BAD_MSG, mode === 'solo'
-        ? '游客不能开始独立模拟，请先登录'
-        : '游客不能创建同盟模拟房间，请先登录');
+        ? msg('游客不能开始独立模拟，请先登录')
+        : msg('游客不能创建同盟模拟房间，请先登录'));
+    }
+    // 「深渊回响」（DESIGN-ABYSS.md）：**对所有玩家开放**（维护者 2026-11-07 取消测试名单 / 管理员限制）。
+    // 以前这里有一道 `session.adminId / echoTester` 的门禁，连同管理后台的「深渊回响测试权限」一起删掉了。
+    const variant = askedVariant === 'deepecho' ? 'deepecho' : null;
+    // 深潜**不支持**实验性功能（维护者 2026-11-03 定）：enemyHpMul/Atk 会和 echoScale 叠乘、
+    // playerCapacity 会改变配对与 boss 半场、poolPlan 会破坏「随机出怪」这个前提、
+    // disableLayerCap 本来就是深潜的固定行为。这里**直接拒绝**而不是静默丢掉 ——
+    // 悄悄丢掉会让玩家以为自己开的设置生效了。
+    if (variant && experimental != null) return fail(ERR.BAD_MSG, msg('「深渊回响」不支持实验性功能'));
+    // 「深渊回响」只支持**默认版本**（第二期下半）。
+    // 原因：深渊的模板、跨版本怪物池、悬赏/词条都是按默认版本的数据标定的，
+    // 换个版本会出现「模板对不上 / 数值漂移」。这里直接拒绝。
+    //
+    // ⚠ `version` 必须**先解析再用**：它原来声明在下面（ticket 1591），这里提前引用会触发
+    // `ReferenceError: Cannot access 'version' before initialization` —— 深潜房一点「开始深潜」就 500。
+    const version = askedVersion ?? this.defaultVersion();
+    if (variant && version !== DEFAULT_VERSION) {
+      return fail(ERR.VERSION_UNSUPPORTED, msg('「深渊回响」只支持「第二期下半」，不支持其他版本'));
+    }
+
+    // 深潜只开放 险境(NORMAL) / 绝境(HARD) / 终极(ABYSS) 三档：标准模拟(FUNNY)的强度曲线
+    // 是按前 14 回合配的，R15 之后压力太低，谁都能潜到底 → 深度失去区分度（维护者 2026-11-03 选 B）。
+    if (variant && asked === 'FUNNY') return fail(ERR.BAD_MSG, msg('「深渊回响」不支持标准模拟难度'));
+    // 房间级调参：只有管理员能传（上面那道门已经挡住非管理员建房），且**只有真的改了默认值才记下来** ——
+    // 调过参的房间不进排行榜（榜要的是「标准配置下的深度」，否则深度之间不可比）。
+    let echoCfg = null;
+    if (variant && askedEcho != null) {
+      const norm = normalizeEchoConfig(askedEcho);
+      if (norm.errors.length) return fail(ERR.BAD_MSG, `invalid echo config: ${norm.errors.join(', ')}`);
+      if (norm.changed) echoCfg = norm.cfg;
     }
     let conflict = this.accountRoomConflict(session);
     // 遗留座位（刷新页面 / 换设备后的旧会话）不再是拦路石：清掉它即可建房。
@@ -1499,12 +1591,11 @@ export class Lobby {
       conflict = this.accountRoomConflict(session);
     }
     if (conflict && conflict.room !== this.roomOf(session)) {
-      return fail(ERR.SESSION_IN_USE, '该账号已在其他房间中，请先离开原房间');
+      return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
     }
     // A test room exists only when the process switch allowed it. The check runs before the room is built.
     if (test === true && this.testEnabled !== true) return fail(ERR.TEST_DISABLED);
-    // the official version (header "Official versions"): left out, the server's default
-    const version = askedVersion ?? this.defaultVersion();
+    // the official version (header "Official versions"): resolved above (before the deepecho checks)
     if (!this.versionEnabled(version)) return fail(ERR.VERSION_UNKNOWN);
     if (!this.offered(version, mode).length) return fail(ERR.VERSION_UNSUPPORTED, `${version} has no ${mode} rooms`);
     if (!this.versionAvailable(version)) return fail(ERR.VERSION_UNSUPPORTED, 'the data of this version is not available');
@@ -1559,6 +1650,10 @@ export class Lobby {
     if (cur) this.removeMember(cur, session.playerId);
     const room = new Room(code, mode, difficulty, this.now(), version, experimental);
     room.test = test === true;
+    // 「深渊回响」的房间标记：只有管理员能走到这里（上面那道门）。普通房间保持 null，键集不变。
+    room.variant = variant;
+    // 调过参的房间（没有调参就是 null，协议里不带这个键）
+    room.echoCfg = echoCfg;
     // 管理员建房：不自动过期，并在控制台标记。
     // noExpire 只在房主本身是管理员/服主时成立，房主换人会由 migrateHost 重新判定。
     //
@@ -1597,7 +1692,15 @@ export class Lobby {
     if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
     const cur = this.roomOf(session);
     // idempotent for members; a spectator of this room goes on below: it may take a free player seat (header)
-    if (cur === room && !room.spectatorOf(session.playerId)) { this.sendState(room, session); return OK; }
+    // ★ 2026-11-06：**只有真的坐着**才算 idempotent。若会话仍挂在本房间、座位却已经没了
+    //   （dedupeSeats 收敛 / 同账号接管 / 释放），旧代码在这里直接 return OK，于是玩家变成
+    //   「在房间里但没有座位」：点准备时 room.seatOf() 返回 null，ready() 直接抛 TypeError，
+    //   客户端只看到一句没头没尾的「准备失败」。实测症状就是「一个人占两个座位，另一个人准备不了」。
+    //   现在没座位就继续往下走：能接管自己的旧座位就接管，否则重新落座（满员照常报 ROOM_FULL）。
+    if (cur === room && !room.spectatorOf(session.playerId) && room.seatOf(session.playerId)) {
+      this.sendState(room, session);
+      return OK;
+    }
     // ★ 2026-10-31 维护者要求：被踢出的人不能自己加回来。
     //   按**账号**判断（重连会换 playerId，按 playerId 记等于没记）。
     //   放行条件只有两个：房主主动邀请（invited 标记）或管理员——这里只做前者，
@@ -1664,8 +1767,16 @@ export class Lobby {
       if (room.match) { try { this.callMatch(room, 'onReconnect', session.playerId); } catch { /* ignore */ } }
       return OK;
     }
-    if (conflict) return fail(ERR.SESSION_IN_USE, '该账号已在其他房间中，请先离开原房间');
-    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (conflict) return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
+    // 对局进行中（维护者 2026-11-07）：刷新页面后点「刷新按钮」会重新 room.join 回原房，
+    // 但新会话的账号身份可能还没送到 —— 直接回 ROOM_STARTED 的话客户端以为进不去、退回大厅
+    // （深潜 / 普通房在结算界面点刷新都踩过）。身份在途时回 IDENTITY_PENDING，
+    // 客户端等 sp-account-token 到了重新握手再试一次，那时走上面的「同账号接管座位」，
+    // 连对局一起恢复。真游客没有身份可等，照旧 ROOM_STARTED。
+    if (room.match) {
+      if (!session.guest && !session.accountId) return fail(ERR.IDENTITY_PENDING, 'account identity not received yet');
+      return fail(ERR.ROOM_STARTED);
+    }
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
     const idx = room.freeSeat();
     if (idx < 0) {
@@ -1735,7 +1846,7 @@ export class Lobby {
         this.dropStaleAccountSeats(session);
         conflict = this.accountRoomConflict(session);
       }
-      if (conflict) return fail(ERR.SESSION_IN_USE, '该账号已在其他房间中，请先离开原房间');
+      if (conflict) return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
     }
     if (!wantHidden && room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
     // ★ 2026-10-30：**先去重、再判满员**。
@@ -1797,6 +1908,8 @@ export class Lobby {
       playerId: session.playerId,
       name: session.name,
       connected: session.connected,
+      // 称号（维护者 2026-11-07）：观战席也显示，和座位卡同一套
+      ...(session.title && typeof session.title === 'object' && session.title.name ? { title: session.title } : {}),
       ...(session.accountId ? { accountId: String(session.accountId) } : {}),
       ...(session.token ? { token: String(session.token) } : {}),
     });
@@ -1832,7 +1945,30 @@ export class Lobby {
     if (session.guest) return fail(ERR.BAD_TARGET, 'guest cannot resume');
     const candidates = this.registry.byAccount(session.accountId)
       .filter((s) => s !== session && s.roomCode && this.rooms.get(s.roomCode)?.seatOf(s.playerId));
-    if (!candidates.length) return fail(ERR.BAD_TARGET, 'no active match for this account');
+    // 2026-11-08（玩家反馈跨设备恢复报「当前节点没有可恢复的账号对局」）：
+    // 旧设备的会话可能已经不在了（关掉超过重连窗口 / 被 evict / 节点重启后只剩存档），
+    // 但**座位还在** —— 房间里的 `accountId` 认人。以前这里直接失败，明明对局还活着却救不回来。
+    // 现在：先按会话找（原来的路，能接管在线的那台）；找不到就按**座位**接管，重建一个会话。
+    if (!candidates.length) {
+      const hit = this._accountSeat(session.accountId);
+      const seatSession = hit ? this.registry.adopt(hit.seat.playerId, hit.seat.name || session.name) : null;
+      if (!seatSession) {
+        this.log?.info?.(`[lobby] account.resume：账号 ${session.accountId} 在这台节点既没有会话也没有座位（房间不在本节点？）`);
+        return fail(ERR.BAD_TARGET, 'no active match for this account');
+      }
+      seatSession.accountId = session.accountId;
+      seatSession.roomCode = hit.room.code;
+      seatSession.connected = false;
+      this.log?.info?.(`[lobby] account.resume：座位 ${hit.seat.playerId}@${hit.room.code} 的旧会话已不在，按座位重建会话接管`);
+      sendSession(session, {
+        t: 'account.resume',
+        token: seatSession.token,
+        roomCode: hit.room.code,
+        playerId: hit.seat.playerId,
+        name: hit.seat.name || '',
+      });
+      return OK;
+    }
     const old = candidates.find((s) => s.connected) || candidates[0];
     const token = this.registry.rotateToken(old);
     if (!token) return fail(ERR.INTERNAL, 'cannot rotate seat token');
@@ -1854,19 +1990,53 @@ export class Lobby {
     return OK;
   }
 
+  /**
+   * 这台节点上某个账号的座位（只认**已开局**的对局，且座位没离开）。
+   *
+   * `resumeAccount` 的兜底：会话表里找不到时按座位认人。房间里的座位记着 `accountId`
+   * （`humanSeat`），所以旧设备关掉 / 会话被回收之后，跨设备恢复依然能回到原位。
+   * @param {string} accountId @returns {{ room: Room, seat: any } | null}
+   */
+  _accountSeat(accountId) {
+    if (typeof accountId !== 'string' || !accountId) return null;
+    for (const room of this.rooms.values()) {
+      if (!room || room.disposed || !room.match) continue;
+      const seat = room.seats.find((s) => s && !s.isBot && !s.left
+        && s.accountId != null && String(s.accountId) === accountId);
+      if (seat) return { room, seat };
+    }
+    return null;
+  }
+
   ready(session, { ready }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.spectatorOf(session.playerId)) return fail(ERR.SPECTATOR);
     if (room.match) return fail(ERR.ROOM_STARTED);
     this.dropReplay(room, session.playerId);
-    const seat = room.seatOf(session.playerId);
+    let seat = room.seatOf(session.playerId);
+    // ★ 2026-11-06：会话在房间里却没有座位时，旧代码会在这里抛 TypeError（seat 为 null），
+    //   客户端只拿到一句「准备失败」，看着像按钮坏了。现在：还没开局 + 有空格就自动补座；
+    //   补不了（房间满了）才给一句能看懂的错误，让玩家重新进房。
+    let reseated = false;
+    if (!seat) {
+      const idx = room.freeSeat();
+      if (idx < 0) return fail(ERR.NOT_IN_ROOM, 'seat lost; rejoin the room');
+      seat = this.humanSeat(idx, session, room);
+      room.seats[idx] = seat;
+      session.roomCode = room.code;
+      if (!room.hostId) room.hostId = session.playerId;
+      this.dedupeSeats(room, session);
+      seat = room.seatOf(session.playerId) || seat;
+      reseated = true;
+    }
     // a room with gameplay plugins: ready once the page has loaded and checked its content (header "Gameplay plugins")
     if (ready && room.needsContent && seat.content !== 'ready') return fail(ERR.CONTENT_NOT_READY);
     if (seat.ready !== ready) {
       seat.ready = ready;
-      this.broadcastState(room);
+      reseated = true;
     }
+    if (reseated) this.broadcastState(room);
     return OK;
   }
 
@@ -1876,9 +2046,19 @@ export class Lobby {
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.mode === 'solo') return fail(ERR.BAD_MSG, 'experimental options are for co-op only');
+    // 「深渊回响」：不支持实验性功能（建房时已拒），房间里同样不许改 —— 否则房主能把
+    // 人数调到 5–20、或者开 enemyHpMul 破坏深潜的数值口径。深潜固定最多 4 人。
+    if (room.variant === 'deepecho') return fail(ERR.BAD_MSG, msg('「深渊回响」不支持实验性功能（固定最多 4 人）'));
     if (room.match) return fail(ERR.ROOM_STARTED);
-    if (!isExperimental(experimental)) return fail(ERR.BAD_MSG, 'invalid experimental options');
-    const next = experimentalOptions(experimental);
+    // 兜底：`isExperimental` 要求两个默认键都在，老客户端 / 手动编组可能只发其中一个 ——
+    // 这里补成显式 false 再校验，避免把合法请求判成「无效的请求」（维护者 2026-11-05）。
+    const input = {
+      revivalEnabled: !!(experimental && experimental.revivalEnabled === true),
+      disableSharedPool: !!(experimental && experimental.disableSharedPool === true),
+      ...(experimental && typeof experimental === 'object' ? experimental : {}),
+    };
+    if (!isExperimental(input)) return fail(ERR.BAD_MSG, 'invalid experimental options');
+    const next = experimentalOptions(input);
     const capacity = roomCapacity(room.mode, next);
     if (room.seats.some((s, i) => s && i >= capacity)) return fail(ERR.ROOM_FULL, 'occupied seats exceed the new capacity');
     room.experimental = next;
@@ -1925,6 +2105,8 @@ export class Lobby {
 
   /** 挂在列表上的房间此刻是不是真的在等人：满员 / 已开局 / 房主掉线 / 有排队任务的自动消失。 */
   roomOpen(room) {
+    // 「深渊回响」房也允许公开（维护者 2026-11-06：「公开深潜」按钮）——是否真的在等人仍由下面的 listed 判据决定。
+    // 2026-11-07 起深潜对所有人开放，公开的深潜房普通玩家也能加入（不再有 ECHO_FORBIDDEN 那道门）。
     return room.listed && !room.disposed && !room.match && this.listable(room)
       && room.freeSeat() >= 0 && !this.roomQueued(room)
       && room.seatOf(room.hostId)?.connected === true;
@@ -1940,8 +2122,9 @@ export class Lobby {
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (this.roomQueued(room)) return fail(ERR.QUEUED);
+    // 「深渊回响」房也能挂到公开同盟列表（维护者 2026-11-06 的「公开深潜」按钮）：
+    // 列表里会显示成深渊回响；进房仍是管理员 / 测试名单专属。其余判据不变。
     if (listed && !this.listable(room)) return fail(ERR.BAD_TARGET, 'this room cannot be listed');
-    this.dropReplay(room, session.playerId);
     if (room.listed !== listed) {
       room.listed = listed;
       this.roomListCache = null;
@@ -1957,20 +2140,25 @@ export class Lobby {
    * 只回列表要显示的东西：没有 playerId、没有地址、没有座位明细。行过期了也不打紧 ——
    * 点进去时 room.join 会再全部校验一遍。
    */
-  roomList() {
+roomList({ variant = null } = {}) {
+    // 「深渊回响」：自己的公开列表（维护者 2026-11-06）。普通同盟列表**不再**混进深潜房。
+    const wantEcho = variant === 'deepecho';
     const now = this.now();
-    if (!this.roomListCache || now - this.roomListCache.at >= ROOM_LIST_CACHE_MS) {
+if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this.roomListCache.at >= ROOM_LIST_CACHE_MS) {
       const rows = [];
       for (const room of this.rooms.values()) {
         if (!this.roomOpen(room)) continue;
+        if ((room.variant === 'deepecho') !== wantEcho) continue;
         const taken = room.seats.filter(Boolean);
         rows.push({ code: room.code, host: room.seatOf(room.hostId).name, humans: room.activeHumans().length,
           filled: taken.length, capacity: room.capacity, difficulty: room.difficulty,
           ...(room.version !== DEFAULT_VERSION ? { version: room.version } : {}),
+          // 「深渊回响」（深潜）：列表里要能认出深潜房（维护者 2026-11-06 的「公开深潜」）
+          ...(room.variant ? { variant: room.variant } : {}),
           experimental: { ...room.experimental }, free: room.capacity - taken.length, at: room.createdAt });
       }
       rows.sort((a, b) => a.free - b.free || a.at - b.at);
-      this.roomListCache = { at: now, rooms: rows.slice(0, ROOM_LIST_MAX).map(({ free, at, ...row }) => row) };
+      this.roomListCache = { at: now, variant: wantEcho, rooms: rows.slice(0, ROOM_LIST_MAX).map(({ free, at, ...row }) => row) };
     }
     return { ok: true, reply: { rooms: this.roomListCache.rooms } };
   }
@@ -2642,6 +2830,229 @@ export class Lobby {
     this.broadcastState(room);
     return OK;
   }
+
+  /**
+   * room.quickMatch（大厅「多人匹配」）：一键参与匹配。
+   *
+   * 本服是 30 个独立节点进程，每个节点的 Lobby 只认识自己那批房间，所以这里**不做跨节点配对**：
+   * 候选来自本节点「公开同盟 + 匹配中 + 还缺人」的房间，凑不到就自己开一间并立刻进入匹配状态，
+   * 由既有的 matchmaking 超时（MATCHMAKING_TIMEOUT_MS）或「人满即开」负责开局。
+   * 跨节点配对需要一套共享队列（参考版的 server/matchmaking.js + cluster/lobby.js），
+   * 那是另一个量级的改动，见 MAINTENANCE.md「多人匹配」一节。
+   *
+   * 语义：已经在房间里就用 SESSION_IN_USE 拒绝（页面侧只在大厅显示这个按钮，正常不会撞上）。
+   *
+   * ★ 2026-11-02 维护者要求移植参考版「多人匹配」屏下方的设置项，所以这里多了两个维度
+   *   （参考版 ui/matchmaking.js 的 `matchScope`）：
+   *   - `seats`：'four'（只要标准 {MAX_SEATS} 人同盟，默认）/ 'multi'（只要 5–20 人的多人同盟）/
+   *     'both'（两种都行，人最多的优先）。
+   *   - `rules`：'standard'（只要没改过规则的，默认）/ 'experimental'（只要改过规则的）/
+   *     'both'。改过规则 = `room.experimental` 非空（复活、敌人倍率、人数上限那些）。
+   *   两个维度都用在**筛选候选**上；自己开房时按 `seats` 决定人数、按 `rules` 决定是否带实验性选项。
+   *   参考版还有服务端队列与 30 秒确认入场，我们这边没有（见上面那段说明），
+   *   所以这里只做「筛 + 自己开」，不做队列。
+   */
+  quickMatch(session, { difficulty, seats, rules, variant } = {}) {
+    // 「深渊回响」（深潜）：自己的匹配池。深潜房只和深潜房配，普通房永远进不来（反之亦然）。
+    const wantVariant = variant === 'deepecho' ? 'deepecho' : null;
+    if (session.adminId !== true && !maintenanceGate().match) return fail(ERR.MATCH_DISABLED);
+    if (this.roomOf(session)) return fail(ERR.SESSION_IN_USE, 'already in a room');
+    const asked = DIFFICULTIES.includes(difficulty) ? difficulty : null;
+    // 人数范围：'multi' 只找多人同盟，'both' 两种都要，其余（含不传）按标准的 MAX_SEATS 人同盟
+    // 「深渊回响」的池子固定 4 人 + 标准规则：客户端就算带上了普通房的 5–20 人 / 实验规则参数，
+    // 这里也一律按 4 人 / 标准处理（否则深潜房 capacity 永远不满足 >4，玩家会一直等不到人）。
+    const seatsEff = wantVariant === 'deepecho' ? 'four' : seats;
+    const rulesEff = wantVariant === 'deepecho' ? 'standard' : rules;
+    const wantMulti = seatsEff === 'multi' || seatsEff === 'both';
+    const wantFour = seatsEff !== 'multi';
+    // 规则：'experimental' 只找改过规则的，'both' 都要，其余（含不传）只要标准规则的
+    const wantExperimental = rulesEff === 'experimental' || rulesEff === 'both';
+    const wantStandard = rulesEff !== 'experimental';
+    const fitsSeats = (room) => (wantFour && room.capacity === MAX_SEATS) || (wantMulti && room.capacity > MAX_SEATS);
+    // 「改过规则」必须用 experimentalRuleChanged，不能只看 `!!room.experimental`：
+    // 容量 4 的房间也会带一个 experimental 对象（playerCapacity 恒在），
+    // 直接判断会把所有普通房都当成实验房，标准规则就永远匹配不到人。
+    const fitsRules = (room) => {
+      const custom = experimentalRuleChanged(room.experimental);
+      return (wantStandard && !custom) || (wantExperimental && custom);
+    };
+    // 1) 找一间正在匹配、还缺人、且在公开列表上的房间：人最多的优先（更快凑满开局）
+    let best = null;
+    for (const room of this.rooms.values()) {
+      if (!room.matchmaking || room.mode !== 'coop') continue;
+      if ((room.variant === 'deepecho') !== (wantVariant === 'deepecho')) continue;
+      if (!this.roomOpen(room)) continue;
+      if (asked && room.difficulty !== asked) continue;
+      if (!fitsSeats(room) || !fitsRules(room)) continue;
+      if (!best || room.activeHumans().length > best.activeHumans().length) best = room;
+    }
+    if (best) {
+      const res = this.join(session, { code: best.code });
+      if (!res || !res.error) return { ok: true, reply: { code: best.code, joined: true } };
+    }
+    // 2) 没有可加入的房间：**排队等**，不替玩家建房。
+    //    维护者 2026-11-02 明确要求：没人匹配时玩家就停在多人匹配界面等人，
+    //    不要给他开一间房让他在房间里等 —— 那样看起来像「已经在房间里了」，
+    //    而且他会看不到自己在所有节点里排第几位。
+    const queued = this.quickEnqueue(session, { difficulty: asked, seats, rules, wantMulti, wantFour, wantExperimental, variant: wantVariant });
+    // 排队失败（游客 / 维护开关）要原样返回，不能套进 reply，否则前端只看得到 ok:true
+    if (queued && queued.error) return queued;
+    return { ok: true, reply: queued };
+  }
+
+  /**
+   * 多人匹配的节点内排队（维护者 2026-11-02）：没人可加入时不建房，先把玩家放进队列，
+   * 前端停在「搜寻中」界面轮询 `room.quickState`。
+   *
+   * 成形条件（`sweepQuickQueue`）：同一个池（难度 + 人数 + 规则）里等够 `capacity` 个人；
+   * 或者最老的一个人已经等满 `MATCHMAKING_TIMEOUT_MS`（照既有超时语义：到点了就开局，
+   * 不能再让一个人无限等下去）。成形后由第一个人当房主建房，其余人加入，然后**立刻开局**
+   * （`forceStartMatchmaking`），这样玩家点完确认就直接进对局，不用再在房间里点开始。
+   */
+  quickEnqueue(session, { difficulty, seats, rules, wantMulti, wantFour, wantExperimental, variant = null }) {
+    // 以前靠 create() 顺带拒绝游客；现在没人匹配时不再建房，所以这里要自己拦一道，
+    // 否则游客会排进队列、等 2 分钟超时才发现开不了局。
+    //
+    // ★ 但要把「真游客」和「身份还在路上」分开：刷新后立刻点「多人匹配」时，
+    //   accountToken 可能还没送到服务端（session.accountId 空）。那不是游客，
+    //   直接回 BAD_MSG 会让玩家只看到一句「无效的请求」（BAD_MSG 的通用文案），
+    //   完全看不出该怎么办。口径与 join() 一致：身份在途 → IDENTITY_PENDING，
+    //   客户端等 sp-account-token 到了重新握手再试一次。
+    if (session.guest) return fail(ERR.BAD_MSG, msg('游客不能参与多人匹配，请先登录'));
+    if (!session.accountId) return fail(ERR.IDENTITY_PENDING, 'account identity not received yet');
+    if (!this.quickQueue) this.quickQueue = new Map();
+    const ticket = `q${(this.quickSeq = (this.quickSeq || 0) + 1)}${Math.random().toString(36).slice(2, 8)}`;
+    const capacity = wantMulti && !wantFour ? MULTI_SEAT_DEFAULT : MAX_SEATS;
+    const entry = {
+      ticket,
+      playerId: session.playerId,
+      session,
+      difficulty: difficulty ?? null,
+      seats: seats ?? null,
+      rules: rules ?? null,
+      // 「深渊回响」（深潜）：池键多一维，深潜与普通同盟不混坐
+      variant: variant === 'deepecho' ? 'deepecho' : null,
+      // 池键：难度 + 人数 + 规则。'standard' / 'experimental' 不能混坐（规则不一样打不了）。
+      capacity,
+      standard: !wantExperimental,
+      createdAt: Date.now(),
+    };
+    this.quickQueue.set(ticket, entry);
+    this.log?.info?.(`[lobby] 多人匹配排队 ${session.name || session.playerId} 难度=${difficulty || '任意'} ${capacity}人${variant === 'deepecho' ? ' 深潜' : ''}`);
+    return { queued: true, ticket, state: this.quickQueueState(entry) };
+  }
+
+  /** 一条排队票据的对外状态：还在等（位置 / 队列人数 / 还差几人），或已成局（房间码）。 */
+  quickQueueState(entry) {
+    if (entry.room) {
+      return { state: 'matched', code: entry.room.code, difficulty: entry.room.difficulty, capacity: entry.room.capacity };
+    }
+    const pool = [...(this.quickQueue?.values() || [])]
+      .filter((x) => !x.room && x.difficulty === entry.difficulty && x.capacity === entry.capacity && x.standard === entry.standard && (x.variant || null) === (entry.variant || null))
+      .sort((a, b) => a.createdAt - b.createdAt);
+    const waiting = pool.length;
+    const position = pool.findIndex((x) => x.ticket === entry.ticket) + 1;
+    return {
+      state: 'queued',
+      difficulty: entry.difficulty,
+      capacity: entry.capacity,
+      position: position || 1,
+      waiting,
+      need: Math.max(0, entry.capacity - waiting),
+      elapsedMs: Date.now() - entry.createdAt,
+    };
+  }
+
+  /** 前端轮询：还我这条票据的状态。票据不在队列里了（成局后已转成房间）就看分配结果。 */
+  quickState(session, { ticket } = {}) {
+    const entry = this.quickQueue?.get(ticket);
+    if (!entry) {
+      const done = this.quickDone?.get(ticket);
+      if (done?.error) return { ok: true, reply: { state: 'failed', reason: done.error } };
+      if (done) return { ok: true, reply: { state: 'matched', code: done.code, difficulty: done.difficulty, capacity: done.capacity } };
+      return fail(ERR.ROOM_NOT_FOUND, 'queue ticket unknown');
+    }
+    if (entry.playerId !== session.playerId) return fail(ERR.BAD_MSG, 'not your ticket');
+    return { ok: true, reply: this.quickQueueState(entry) };
+  }
+
+  /** 玩家点了「取消匹配」：把他从队列里拿掉。 */
+  quickLeave(session, { ticket } = {}) {
+    const entry = this.quickQueue?.get(ticket);
+    if (!entry) return { ok: true, reply: { state: 'left' } };
+    if (entry.playerId !== session.playerId) return fail(ERR.BAD_MSG, 'not your ticket');
+    this.quickQueue.delete(ticket);
+    this.log?.info?.(`[lobby] 多人匹配取消排队 ${session.name || session.playerId}`);
+    return { ok: true, reply: { state: 'left' } };
+  }
+
+  /** 每秒扫一次队列：够人就成形，等太久的也成形。 */
+  sweepQuickQueue() {
+    if (!this.quickQueue?.size) return;
+    const now = Date.now();
+    if (!this.quickDone) this.quickDone = new Map();
+    // 断线 / 已经进了别的房间的票据直接丢掉
+    for (const [ticket, entry] of this.quickQueue) {
+      const alive = entry.session?.connected !== false;
+      if (!alive || this.roomOf(entry.session)) this.quickQueue.delete(ticket);
+    }
+    const pools = new Map();
+    for (const entry of this.quickQueue.values()) {
+      const key = `${entry.difficulty || 'any'}|${entry.capacity}|${entry.standard ? 'std' : 'exp'}|${entry.variant || 'std'}`;
+      if (!pools.has(key)) pools.set(key, []);
+      pools.get(key).push(entry);
+    }
+    for (const pool of pools.values()) {
+      pool.sort((a, b) => a.createdAt - b.createdAt);
+      const capacity = pool[0].capacity;
+      const oldest = now - pool[0].createdAt;
+      const full = pool.length >= capacity;
+      if (!full && oldest < MATCHMAKING_TIMEOUT_MS) continue;
+      const group = pool.slice(0, Math.max(1, Math.min(pool.length, capacity)));
+      this.formQuickMatch(group);
+    }
+    // 成局结果留着给前端取一次，5 分钟后清掉
+    for (const [ticket, done] of this.quickDone) {
+      if (now - done.at > 5 * 60_000) this.quickDone.delete(ticket);
+    }
+  }
+
+  /** 把一组排队玩家变成一间真正的房间，并立刻开局。 */
+  formQuickMatch(group) {
+    const host = group[0];
+    if (!host?.session?.connected) { this.quickQueue.delete(host?.ticket); return; }
+    // 建房要带人数（多人同盟）与规则（改过规则就带上，否则标准房）
+    const wantCapacity = host.capacity > MAX_SEATS ? host.capacity : null;
+    const experimental = wantCapacity
+      ? experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, playerCapacity: wantCapacity })
+      : (host.standard ? null : experimentalOptions({ ...EXPERIMENTAL_DEFAULTS, revivalEnabled: true }));
+    const made = this.create(host.session, { mode: 'coop', difficulty: host.difficulty ?? undefined, experimental, variant: host.variant || null });
+    if (made && made.error) {
+      // 建房失败（维护开关关掉了建房、账号冲突……）：**把这一组放掉**，不要留在队列里
+      // 每秒重试 —— 那只会刷日志，而玩家永远等不到房间。用 quickDone 告诉前端原因。
+      this.log?.warn?.(`[lobby] 多人匹配建房失败，解散这组（${group.length} 人）: ${made.error}`);
+      for (const entry of group) {
+        this.quickQueue.delete(entry.ticket);
+        this.quickDone.set(entry.ticket, { error: made.error, at: Date.now() });
+      }
+      return;
+    }
+    const room = this.roomOf(host.session);
+    if (!room) return;
+    try { if (this.listable(room)) this.setListed(host.session, { listed: true }); } catch { /* ignore */ }
+    for (const entry of group.slice(1)) {
+      try { this.join(entry.session, { code: room.code }); } catch { /* ignore */ }
+    }
+    // 所有人都进房了：直接开局（凑满的意义就是马上能打），不等房主再点开始
+    this.quickQueue.delete(host.ticket);
+    for (const entry of group.slice(1)) this.quickQueue.delete(entry.ticket);
+    for (const entry of group) {
+      this.quickDone.set(entry.ticket, { code: room.code, difficulty: room.difficulty, capacity: room.capacity, at: Date.now() });
+    }
+    this.log?.info?.(`[lobby] 多人匹配成局 ${room.code}（${group.length} 人${room.variant === 'deepecho' ? ' 深潜' : ''}）`);
+    try { this.forceStartMatchmaking(room); } catch (e) { this.log?.warn?.('[lobby] 匹配开局失败 ' + (e && e.message)); }
+  }
+
   start(session) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -3035,6 +3446,14 @@ export class Lobby {
           if (sess) return sess.admin === true;
           return s.admin === true;
         })(),
+        // 管理员**身份**（账号角色 owner/admin，不看 tools.game 与验证码）：维护者 2026-11-05
+        // 要求管理员无视所有惩罚机制（挂机移出 / 消极游戏）。seat.admin 在 hello 里同步的是身份门，
+        // 这里优先用会话的 adminId，人不在（AI 托管 / 掉线）才退回座位上的值。
+        adminId: (() => {
+          const sess = this.registry?.byId ? this.registry.byId(s.playerId) : null;
+          if (sess) return sess.adminId === true;
+          return s.adminId === true || s.admin === true;
+        })(),
         // 房主给这个 AI 座位指定的策略（room.setBotBand）：Match 用它填 this.botBands。
         // null = 没指定（AI 自己挑），只有 AI 座位才可能有值。
         band: s.isBot && s.band ? s.band : null,
@@ -3079,6 +3498,10 @@ export class Lobby {
         ...(versioned ? { version: room.version } : {}),
         // 「不限时」 (header): only while the room's flag is on, so a default match's opts keep their keys
         ...(room.mode === 'solo' && room.soloUnlimited === true ? { soloUnlimited: true } : {}),
+        // 「深渊回响」(DESIGN-ABYSS.md): 只有带 variant 的房间才传这个键；普通 match 的 opts 键集不变
+        ...(room.variant ? { variant: room.variant } : {}),
+        // 深潜的房间级调参（没有调参就不带这个键 → Match 用默认配置）
+        ...(room.echoCfg ? { echo: room.echoCfg } : {}),
         // 本服：5–20 人实验房。Match 由 room.experimental 推出 playerCapacity，并在座位数超过容量时抛
         // RangeError（Match.js「seats exceed room capacity」）。之前这里漏传，match 一律按默认 4 人算，
         // 于是只要有第 5 个座位就「服务器内部错误」。普通房不带这个键（保持上游 match 的键集不变）。
@@ -3142,11 +3565,124 @@ export class Lobby {
     return OK;
   }
 
+  /**
+   * 「深渊回响」深潜排行榜：把这一局的深度写进共用 Redis（server/match/match/echoBoard.js）。
+   *
+   * 只记真进过深潜的对局（`echoDiveStart > 0`）；没有 Redis（`SP_REDIS_URL` 未设）时 store 为空，
+   * 这里直接返回 —— 功能静默关闭，不影响对局与结算。
+   */
+  _recordEchoBoard(room, summary) {
+    const m = room && room.match;
+    const store = this.persistStore;
+    if (!store || !m || m.echoVariant !== 'deepecho' || !(m.echoDiveStart > 0)) return;
+    // 「深渊回响」：调过参的房间**不进排行榜**（深度只在标准配置下可比）
+    if (room.echoCfg) return;
+    const entry = echoBoardEntry({
+      depth: Math.max(0, Math.floor(Number(m.round) || 0) - m.echoDiveStart + 1),
+      round: m.round,
+      victory: !!(summary && summary.victory === true),
+      players: (Array.isArray(m.order) ? m.order : [])
+        .filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string')
+        .map((ps) => ps.name),
+      // 榜上要展示：每名玩家的**核心盟约**与**用过的盟约数**；通关时间 = 结束时刻 − 开局时刻（维护者 2026-11-05）
+      squads: (Array.isArray(m.order) ? m.order : [])
+        .filter((ps) => ps && ps.isBot !== true && typeof ps.name === 'string')
+        .map((ps) => {
+          // 优先读**峰值**（`bondPeak`）：团灭时 eliminate() 已经把棋盘退回卡池，现算出来全是 0
+          // （维护者 2026-11-05：排行榜「无核心 · 最高 0 层」就是这个问题）
+          const peak = ps.bondPeak && typeof ps.bondPeak === 'object' ? ps.bondPeak : null;
+          const used = ps.bonds && typeof ps.bonds === 'object' ? Object.entries(ps.bonds) : [];
+          const live = used.filter(([, rec]) => rec && Number(rec.count) > 0);
+          // 只显示**最高的一个已激活核心盟约**（维护者 2026-11-07 晚：玩家反馈「没有激活的盟约也会出现在上面」）。
+          // 峰值里存的是「已激活核心盟约里层数最高的那一个」（player/round.js _trackBondPeak）；
+          // 旧存档没有 top 字段时退回现算：只在**已激活**的核心盟约里挑层数最高的。
+          const coreName = (id) => (id ? (m.gd.bond(id) || {}).name || id : null);
+          let topId = peak && typeof peak.top === 'string' ? peak.top : null;
+          if (!topId) {
+            let best = null;
+            for (const [id, rec] of live) {
+              const bond = typeof m.gd.bond === 'function' ? m.gd.bond(id) : null;
+              if (!bond || bond.isCore !== true || !rec || rec.active !== true) continue;
+              const n = Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0));
+              const count = Math.max(0, Math.floor(Number(rec.count) || 0));
+              if (!best || n > best.n || (n === best.n && count > best.count)
+                || (n === best.n && count === best.count && (Number(bond.bondOrder) || 0) < best.order)) {
+                best = { id, n, count, order: Number(bond.bondOrder) || 0 };
+              }
+            }
+            topId = best ? best.id : null;
+          }
+          const cores = topId ? [coreName(topId)] : [];
+          // 最高盟约层数（维护者 2026-11-05）：只看盟约**层数**，不看词条、不看稀有度。
+          // 口径 = 该玩家在用（count>0）的盟约里 `ps.layers[本盟约]` 的最大值；团灭后取峰值。
+          const nowMax = Math.max(0, ...live.map(([id]) => Math.max(0, Math.floor(Number(ps.layers && ps.layers[id]) || 0))));
+          const maxLayers = Math.max(nowMax, Math.max(0, Math.floor(Number(peak && peak.maxLayers) || 0)));
+          const bonds = Math.max(live.length, Math.max(0, Math.floor(Number(peak && peak.bonds) || 0)));
+          return { name: ps.name, cores, bonds, maxLayers };
+        }),
+      clearMs: Math.max(0, Math.floor(Number(this.now()) - Number(m.startedAt || this.now()))),
+      at: this.now(),
+      roomCode: room.code,
+      matchNo: room.matchCount,
+      seed: m.seed,
+      // 榜按难度分开存（深度跨难度不可比），所以这条必须带上
+      difficulty: room.difficulty,
+    });
+    if (entry) {
+      recordEchoBoard(store, entry).catch(() => {});
+      // 同时**归档到 MySQL**（matchmaker 的 dive_board 表）：Redis 只留 90 天，这里做永久留档。
+      // fire-and-forget —— matchmaker 挂了 / 超时都不影响结算。
+      this._archiveEchoBoard(entry);
+    }
+  }
+
+  /**
+   * 把一条成绩 POST 给 matchmaker 归档（2026-11-05，维护者要求「成绩永久留档」）。
+   *
+   * 目标：`SP_MM_URL`（默认 http://127.0.0.1:3090）。1.5 秒超时、失败只写日志，
+   * 绝不阻塞或影响对局结算。matchmaker 按 member 幂等（重复上报不会多一行）。
+   */
+  _archiveEchoBoard(entry) {
+    try {
+      if (!entry || typeof fetch !== 'function') return;           // 老 Node：静默跳过
+      const base = String(process.env.SP_MM_URL || 'http://127.0.0.1:3090').replace(/\/+$/, '');
+      const body = JSON.stringify({
+        member: entry.member,
+        depth: entry.depth,
+        difficulty: entry.difficulty,
+        round: entry.round,
+        victory: entry.victory,
+        players: entry.players,
+        roomCode: entry.roomCode,
+        seed: entry.seed ?? null,
+        at: entry.at,
+      });
+      const run = async () => {
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), 1500);
+        try {
+          await fetch(`${base}/api/dive/report`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: ac.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+      run().catch((e) => { try { this.log?.warn?.(`[dive] archive failed: ${e && e.message}`); } catch { /* ignore */ } });
+    } catch { /* 归档永远不能影响结算 */ }
+  }
+
   /** onEnd callback: return the room to LOBBY and dispose the match on the next macrotask. */
   onMatchEnd(room, ctx, summary) {
     if (ctx.ended || !ctx.live || room.matchCtx !== ctx || room.disposed) return;
     ctx.ended = true;
+    // 「深渊回响」深潜排行榜：必须在 room.match 置空**之前**读冻结前的状态。普通房一行都不走。
+    try { this._recordEchoBoard(room, summary); } catch { /* 记不上不影响结算 */ }
     room.lastSummary = summary ?? null;
+    // 这一局为什么没的：给客户端说对话用（管理员终止 ≠ 服务器重启）。自然打完的一局里
+    // summary.victory 是有值的（settle.js finish 把 m.result 原样传进来），客户端那时看结算
+    // 界面、不会读这个字段；被打断的只有 reason。
+    room.lastEndReason = summary && typeof summary.reason === 'string' ? summary.reason : null;
     resetAiTakeover(room);
     room.match = null;
     room.matchCtx = null;
@@ -3444,6 +3980,28 @@ export class Lobby {
     return (typeof sec === 'number' && Number.isFinite(sec) && sec > 0 ? sec : SOLO_RECONNECT_FALLBACK_SEC) * 1000;
   }
 
+  /**
+   * 这局是不是「一个人在打」—— **房间里只有一个真人**，就按单人房处理（维护者 2026-11-08 定的判据）：
+   *   · 大厅单人房（`mode:'solo'`）；
+   *   · 1 真人 + 3 个 AI 队友（`room.addBot`，AI 座位不算人）；
+   *   · 1 真人不带 AI；
+   *   · 「深渊回响」单人房（深潜是 `mode:'coop'` + `variant:'deepecho'`）。
+   *
+   * 用途：掉线后的重连窗口（`soloResumeWindowMs` = 官方 `singleReconnectTime` 24 小时）与
+   * `refreshMatchWindows` 的「不缩短」判定。单人房没有「等队友回来」的问题，所以只要人走了就一直
+   * 保留到他回来为止（`sweepOldRooms` 见到还有 session 在走窗口就不碰房间）。
+   *
+   * 历史：2026-11-07 只有 `mode==='solo'` 或深潜房算，于是「1 真人 + 3 AI」的同盟房掉线后走 15 分钟
+   * 普通窗口，一到点座位被释放、对局以 abandoned 结束 —— 「24 小时保存」对它们不生效。
+   * @param {Room | null} [room]
+   */
+  soloLikeRun(room = null) {
+    if (!room || !room.match) return false;
+    if (room.mode === 'solo') return true;
+    // AI 座位不算人（activeHumans 已经过滤掉 isBot / left）
+    return room.activeHumans().length <= 1;
+  }
+
   // ---------------------------------------------------------------------------------------------------
   // Membership helpers
   // ---------------------------------------------------------------------------------------------------
@@ -3459,7 +4017,30 @@ export class Lobby {
     // routeGameNow → roomOf → NOT_IN_ROOM，观战者看到的画面就永远停在自动打开的 P1 上，
     // 点谁都不换（玩家反馈「隐身观战不能切换观战目标」）。
     if (room && !seat && room.hiddenSpectatorOf(session.playerId)) return room;
-    if (!room || !seat || seat.left || seat.isBot) { session.roomCode = null; return null; }
+    if (!room || !seat || seat.left || seat.isBot) {
+      // ★ 2026-11-02 兜底：座位按 **playerId** 找，刷新/换设备后 playerId 会变；
+      //   旧代码一找不到就把 roomCode 清成 null → onHello 发 room.closed → 玩家掉回大厅。
+      //   这里补一次「按账号认人」：同 accountId、座位还在、且原会话已经没了（幽灵座位），
+      //   就把座位改绑到这次的新会话。只在**没有进行中的对局**时做 —— 对局中的恢复走检查点那条路。
+      const ghost = room && !room.match && session.accountId
+        ? room.seats.findIndex((x) => x && !x.left && !x.isBot
+          && x.accountId != null && String(x.accountId) === String(session.accountId)
+          && x.playerId !== session.playerId
+          && !this.registry?.byId?.(x.playerId))
+        : -1;
+      if (ghost >= 0) {
+        const s0 = room.seats[ghost];
+        const wasHost = room.hostId === s0.playerId;
+        s0.playerId = session.playerId;
+        if (wasHost) room.hostId = session.playerId;
+        session.roomCode = room.code;
+        this.roomListCache = null;
+        this.log?.info?.(`[lobby] ${room.code} 座位 ${ghost + 1} 按账号重新绑定（刷新回来）`);
+        return room;
+      }
+      session.roomCode = null;
+      return null;
+    }
     return room;
   }
 
@@ -3646,6 +4227,10 @@ export class Lobby {
       const seat = room.seats[i];
       room.seats[i] = null;
       removed++;
+      // ★ 2026-11-06：座位没了，会话就不能再算「在房间里」—— 否则它变成「在房间里但没有座位」
+      //   的幽灵会话，之后点准备会在 ready() 里撞到 null。
+      const gone = seat && seat.playerId ? this.registry.byId(seat.playerId) : null;
+      if (gone && gone.roomCode === room.code) gone.roomCode = null;
       this.log.info(`[lobby] ${room.code} 清除同账号重复座位 seat ${i}（${seat.name}），保留 seat ${keep}`);
     }
     if (removed) {
@@ -3706,7 +4291,7 @@ export class Lobby {
   humanSeat(idx, session, room) {
     const card = session.card && chessCharIds(this.dataFor(room)).has(session.card) ? session.card : null;
     return {
-      seat: idx, playerId: session.playerId, name: session.name, tag: session.tag || null, accountId: session.accountId || null, isBot: false, ready: false, connected: session.connected, left: false,
+      seat: idx, playerId: session.playerId, name: session.name, tag: session.tag || null, title: session.title || null, accountId: session.accountId || null, isBot: false, ready: false, connected: session.connected, left: false,
       // 游客标记：游客只能游玩/旁观，不能当选房主（migrateHost 用它排除游客）。
       guest: session.guest === true || !session.accountId,
       // 后台/服主标记：只用于控制台把「玩家」显示成「管理员」，不参与任何规则判定。
@@ -3894,8 +4479,14 @@ export class Lobby {
    * 并把「15 分钟未开始对局就解散」的计时重新推到现在 —— 所以不会因为
    * 「房间创建时间太早」而在结束对局后立刻被解散。
    *
-   * 用 summary.reason = 'admin-aborted'：结算界面会据此显示「对局已被管理员终止」，
-   * 而不是伪装成一次正常打完的结算。
+   * 用 summary.reason = 'admin-aborted'：这个值会经 room.lastEndReason 下发给客户端
+   * （room.state.endReason），ui/game/overlays.js 的 MatchEnded 据它显示「管理员终止了这一局」，
+   * 而不是那句写死的服务器重启文案。
+   *
+   * ★ 2026-11-02：这里以前写的是「结算界面会据此显示『对局已被管理员终止』」—— 并不存在。
+   *   打断的对局没有结算帧（m.result 压根没生成），客户端也就没有结算界面可显示，
+   *   它看到的是 MatchEnded 那个浮层，而那个浮层把原因写死成了「服务器重启」。
+   *   现在原因真的下发了，两边才对得上。
    *
    * @param {Room} room @param {{ reason?: string }} [opts]
    * @returns {{ ok: true, code: string, wasRunning: boolean } | { ok: false, reason: string }}
