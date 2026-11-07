@@ -6683,22 +6683,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 236791
+        "customBytes": 238786
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 273298
+        "customBytes": 275657
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 262433
+        "customBytes": 264625
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 224967
+        "customBytes": 226882
       },
       {
         "path": "public/js/assets.js",
@@ -6788,7 +6788,7 @@
       {
         "path": "public/js/ui/enemyDrawer.js",
         "baseExists": true,
-        "customBytes": 21138
+        "customBytes": 19889
       },
       {
         "path": "public/js/ui/enemyRecords.js",
@@ -6828,7 +6828,7 @@
       {
         "path": "public/js/ui/matchChrome.js",
         "baseExists": true,
-        "customBytes": 13694
+        "customBytes": 15434
       },
       {
         "path": "public/js/ui/matchEnemies.js",

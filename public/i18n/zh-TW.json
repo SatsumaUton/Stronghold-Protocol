@@ -1,4 +1,23 @@
 {
+  "_meta": {
+    "type": "lang",
+    "lang": "zh-TW",
+    "name": "繁體中文",
+    "englishName": "Traditional Chinese",
+    "version": "0.2.0",
+    "app": ">=0.2.0",
+    "authors": [
+      "the Stronghold Protocol contributors"
+    ],
+    "credits": "Game texts (data/i18n/zh-TW.json): the official TW client data (© Hypergryph) via ArknightsAssets/ArknightsGamedata. Interface strings machine-converted from the Simplified Chinese on 2026-10-07 (OpenCC, Taiwan phrases) using the official TW game terms, then read through by hand; corrections welcome on GitHub (docs/I18N.md §5).",
+    "fallback": [],
+    "numberUnits": [
+      "萬",
+      "億"
+    ],
+    "complete": true,
+    "machineTranslated": true
+  },
   "离线导入（不下载官方数据表）": "離線匯入（不下載官方資料表）",
   "你已在其他同盟中，请先离开当前同盟": "你已在其他同盟中，請先離開目前的同盟",
   "你已不在该同盟中": "你已不在該同盟中",
@@ -2501,25 +2520,6 @@
   "{humans} 名博士，{bots} 名 AI": "{humans} 名博士，{bots} 名 AI",
   "下次不再提醒": "下次不再提醒",
   "勾选后建房不再询问。以后想公开时：进房后打开「同盟设置」，把里面的「公开同盟」打开即可；大厅「同盟模拟 → 公开同盟」里能看别人的同盟。": "勾選後建房不再詢問。以後想公開時：進房後打開「同盟設定」，把裡面的「公開同盟」打開即可；大廳「同盟模擬 → 公開同盟」裡能看別人的同盟。",
-  "_meta": {
-    "type": "lang",
-    "lang": "zh-TW",
-    "name": "繁體中文",
-    "englishName": "Traditional Chinese",
-    "version": "0.2.0",
-    "app": ">=0.2.0",
-    "authors": [
-      "the Stronghold Protocol contributors"
-    ],
-    "credits": "Game texts (data/i18n/zh-TW.json): the official TW client data (© Hypergryph) via ArknightsAssets/ArknightsGamedata. Interface strings machine-converted from the Simplified Chinese on 2026-10-07 (OpenCC, Taiwan phrases) using the official TW game terms, then read through by hand; corrections welcome on GitHub (docs/I18N.md §5).",
-    "fallback": [],
-    "numberUnits": [
-      "萬",
-      "億"
-    ],
-    "complete": true,
-    "machineTranslated": true
-  },
   "最高盟约数": "最高盟約數",
   "通关时间": "通關時間",
   "玩家": "玩家",
@@ -3040,14 +3040,11 @@
   "献祭 · {name}：本层全队生效": "獻祭 · {name}：本層全隊生效",
   "献祭 · 扩容": "獻祭 · 擴容",
   "祝福名额 +1（本局，全队共享），并立刻补一次抽取": "祝福名額 +1（本局，全隊共享），並立刻補一次抽取",
-  "献祭 · 扩容：祝福名额 +1（本局，全队共享）": "獻祭 · 擴容：祝福名額 +1（本局，全隊共享）"
-,
+  "献祭 · 扩容：祝福名额 +1（本局，全队共享）": "獻祭 · 擴容：祝福名額 +1（本局，全隊共享）",
   "攻击按回合设置": "攻擊按回合設定",
   "BOSS 生命倍率": "BOSS 生命倍率",
-  "BOSS 攻击倍率": "BOSS 攻擊倍率"
-,
-  "生命": "生命"
-,
+  "BOSS 攻击倍率": "BOSS 攻擊倍率",
+  "生命": "生命",
   "敌方领袖生命": "敵方領袖生命",
   "敌方领袖攻击": "敵方領袖攻擊",
   "盟约投影不占祝福名额，同一时间只有一条": "盟約投影不佔祝福名額，同一時間只有一條",
@@ -3060,5 +3057,15 @@
   "确定放弃本次深潜？会立刻进入结算界面。": "確定放棄本次深潛？會立刻進入結算畫面。",
   "发起全员投票？所有存活玩家都同意后才会结算。": "發起全員投票？所有存活玩家都同意後才會結算。",
   "确定放弃": "確定放棄",
-  "放弃后直接进入结算界面；多人房间需要所有存活玩家同意。": "放棄後直接進入結算畫面；多人房間需要所有存活玩家同意。"
+  "放弃后直接进入结算界面；多人房间需要所有存活玩家同意。": "放棄後直接進入結算畫面；多人房間需要所有存活玩家同意。",
+  "放弃深潜会立刻结算本次深潜并显示结算界面（深度、祝福、盟约都会保留在结算里）。": "放棄深潛會立刻結算本次深潛並顯示結算畫面（深度、祝福、盟約都會保留在結算裡）。",
+  "{quit}：需要全队投票 —— 所有存活玩家都同意后才会结算；有人不同意或 30 秒未投完则继续深潜。": "{quit}：需要全隊投票 —— 所有存活玩家都同意後才會結算；有人不同意或 30 秒未投完則繼續深潛。",
+  "现在不在休整期：{quit} 会直接退出本次深潜，不会结算（想结算请等休整期）。": "現在不在休整期：{quit} 會直接退出本次深潛，不會結算（想結算請等休整期）。",
+  "「放弃深潜」的投票正在进行：已同意 {n}/{m}，所有存活玩家都同意后立刻结算。": "「放棄深潛」的投票正在進行：已同意 {n}/{m}，所有存活玩家都同意後立刻結算。",
+  "献祭 · 祝福：当前祝福表里没有一次性祝福（不扣钱）": "獻祭 · 祝福：目前祝福表裡沒有一次性祝福（不扣錢）",
+  "献祭 · 反制：当前祝福表里没有反制祝福（不扣钱）": "獻祭 · 反制：目前祝福表裡沒有反制祝福（不扣錢）",
+  "献祭 · 刷新：本回合的免费刷新额度已满，未生效（不扣钱）": "獻祭 · 刷新：本回合的免費刷新額度已滿，未生效（不扣錢）",
+  "献祭 · 提现：祭坛账户里没有可提现的资金（不扣钱）": "獻祭 · 提現：祭壇帳戶裡沒有可提現的資金（不扣錢）",
+  "献祭 · {name}：这张祝福在当前的祝福表里不存在（不扣钱）": "獻祭 · {name}：這張祝福在目前的祝福表裡不存在（不扣錢）",
+  "献祭 · {name}：这件商品没有可结算的效果（不扣钱）": "獻祭 · {name}：這件商品沒有可結算的效果（不扣錢）"
 }
