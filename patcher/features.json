@@ -558,6 +558,7 @@
         "server/sim/content/garrisons/meta.js",
         "server/sim/content/support/index.js",
         "server/sim/simdata.js",
+        "server/sim/units.js",
         "shared/protocol.js",
         "shared/titles.js"
       ],

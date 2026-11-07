@@ -7103,7 +7103,7 @@
       {
         "path": "server/sim/battle/spawns.js",
         "baseExists": true,
-        "customBytes": 19384
+        "customBytes": 19815
       },
       {
         "path": "server/sim/content/bonds/addon/meta.js",
@@ -7129,6 +7129,11 @@
         "path": "server/sim/simdata.js",
         "baseExists": true,
         "customBytes": 47267
+      },
+      {
+        "path": "server/sim/units.js",
+        "baseExists": false,
+        "customBytes": 17179
       },
       {
         "path": "shared/protocol.js",
