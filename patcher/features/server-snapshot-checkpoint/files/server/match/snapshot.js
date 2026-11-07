@@ -76,6 +76,43 @@ export const MATCH_FIELDS = Object.freeze({
     '_botEmotesSettledRound',
     // plugin interaction windows (0.3.1, match/offers.js): the id counter only — no checkpoint is taken while one is open
     'offerSeq',
+    // 「深渊回响」(DESIGN-ABYSS.md, 2026-11-03): the variant and the dive's own progress. 纯追加 —— 旧存档缺这几项时
+    // 保留构造函数的默认值（null / 0），恢复出来的对局与加这个模式之前一模一样，所以不用抬 SNAPSHOT_VERSION。
+    'echoVariant', 'echoDiveStart', 'echoWordsActive', 'echoBlessingDraws', 'echoBlessings', 'echoBlessingOffer',
+    // 挑战关未达成累积的诅咒 id 列表（2026-11-05，见 match/echoCurse.js）；同样纯追加，旧存档缺这项时用空数组。
+    'echoCurseIds', 'echoCounterIds',
+    // 本回合随机刷新的诅咒（2026-11-05）；读档后从下一回合重新刷
+    'echoRoundCurse',
+    // 部署禁令（2026-11-05）：被封锁的地块与被排异的盟约，读档不能丢，否则玩家可以靠重连绕过
+    'echoBannedTiles', 'echoBannedBonds',
+    // 「护盾」已用掉（抵消过排异）的标记（2026-11-05）：不存的话读档后护盾会「复活」成一条还有效的祝福。
+    // 纯追加，旧存档缺这项时 = 未消耗。
+    'echoShieldBond', 'echoShieldSpent',
+    // 一次性祝福（回血 / 资金 / 净化 / 涤罪 / 祭坛抽到的那些）的**回执**（维护者 2026-11-05）：
+    // 它们不占名额、拿到就结算，但「已获祝福」列表里要一直看得到。以前没进存档 ——
+    // 断线续玩 / 节点重启恢复之后，祭坛抽到的祝福会整批从列表里消失（玩家以为被诅咒吃掉了）。
+    'echoOneShotIds',
+    // 深渊祭坛（16 层起）的永久强化层数：读档丢掉等于白花资金
+    'echoAltarBuffStacks', 'echoAltarLastDepth',
+    // 本层上架的商品与「本层开没开」（维护者 2026-11-07：每次开启随机 4 件）：读档后要看到同一批商品，
+    // 否则重连就能刷一次货。纯追加，旧存档缺这项时按「没上架表 = 全部可买」处理。
+    'echoAltarGoods', 'echoAltarOpen', 'echoAltarOpenRound',
+    // 祭坛**本层**的购买次数（blessing 1 / buff 2 / permanent 1 / life 2，`echoAltar.used` 是 playerId → 计数的 Map）：
+    // 不存的话读档后同一层可以再买一轮，等于用重连刷祭坛（2026-11-06 补，纯追加，旧存档缺这项时按空表处理）。
+    'echoAltar',
+    // 祝福刷新额度 / 已放弃次数 / 隐藏核心的临时名额：都是整局累计，丢了读档后就「回血」
+    'echoBlessingRefreshes', 'echoBlessingRefreshBonus', 'echoBlessingSkipped', 'echoBlessingBonus', 'echoBlessingRefreshNonce',
+    // 部署禁令的**到期层**（2026-11-05）：只存名单不存到期层，读档后排异 / 封锁永远不会自动解除
+    'echoBannedTilesUntil', 'echoBannedBondsUntil',
+    // 深潜补给的本层词条与保底间隔（2026-11-05）：读档当层仍然要生效，间隔也要记住，否则可以刷补给
+    'echoSupplyWords', 'echoSupplyLastDepth',
+    // 「盟约投影」（2026-11-05）：当前生效的那条 + 已开过投影事件的深度，读档不能丢
+    'echoProjection', 'echoProjectionLayers',
+    // 已发过固定层诅咒的深度（2026-11-05）：固定层改成随机抽之后必须记住发过哪些层，
+    // 否则读档 / 重进同一层会再叠一条
+    'echoFixedCurseLayers',
+    // 已击杀的悬赏卡回执（2026-11-05）：读档后仍能对账
+    'echoBountyPaid',
   ]),
   special: Object.freeze([
     'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'poolGroups', 'playerItemPools',
@@ -112,6 +149,11 @@ export const MATCH_FIELDS = Object.freeze({
     '_rerollStartAt',
     // 战斗 2 倍速 (speedVote.js): the votes and the speed they set go with the run; a restore is back on the base speed
     '_speedVotes', '_speedVoteAt', '_speedUp', 'gameSpeed',
+    // 深渊回响的祝福投票：纯缓存，恢复后重新投（候选 `echoBlessingOffer` 本身是存档字段）
+    '_echoBlessingVotes',
+    // 深潜决策面板按住的那段准备时间（`_echoPausePrepClock`）：面板本身不存档，所以这个也不存 ——
+    // canSnapshot 在面板开着时直接拒绝存档（见上面），读档回来的局面里不存在「按住」这个状态
+    '_echoPrepPausedMs',
     // an open plugin window and its continuation (match/offers.js): checkpoints wait for it to close (canSnapshot)
     'offerWin', '_offerTimers', '_offerResume', '_offerResumeTimer',
     // how the bot rehearsals offered to simPool ended
@@ -123,14 +165,29 @@ export const MATCH_FIELDS = Object.freeze({
 export const PLAYER_FIELDS = Object.freeze({
   saved: Object.freeze([
     'left', 'revived', 'pendingDeath', 'revivalUnavailableReason', 'autoplay', 'afkActed', 'afkRounds',
+    // 掉线由 AI 接管（platform.js _checkOffline，2026-11-06 移植）：读档后接管状态要还在，
+    // 否则被接管的座位读档后变成「没接管」，既不能再被投票移出、也会被挂机判定重新计数。
+    'offlineRounds', 'offlineAutoplay',
     // 本服：管理员标记（三道门全过才为 true，lobby 写入，客户端改不了）。它必须跟着存档走 ——
     // 否则重启续玩后 ps.admin 变回 false，管理员在这局里再也用不了 g.test
     // （server/persist/lobbyState.js 的「restored by fallback」注释记过这个坑）。
     // 存档只在 Redis 里，matchSeats() 的输出不发给客户端，所以带上是安全的。
     'admin',
+    // 管理员**身份**（维护者 2026-11-05：管理员无视惩罚机制，_isPunishImmune 读它）：
+    // 不存的话重启续玩后身份变回 false，管理员又开始被挂机判定踢。
+    'adminId',
     'alive', 'lp', 'bandId', 'funds', 'pendingFunds', 'infoReady', 'lastEmoteAt', 'bondPlan',
+    // 这一局用过的最多盟约 / 最高层数（2026-11-05）：排行榜读它，团灭后 bonds 会归零
+    'bondPeak',
     'shop', 'offers', 'hand', 'temp', 'prepsEnded', '_tempDue', 'board', 'layers', 'battleLayerGains', 'pendingLayerGains',
     'bondCountBonus', 'effects', 'bounties', 'personalChoice', 'counters', 'round', 'deployCapBonus', 'deployCapMin',
+    // 祭坛「永久」买过几次（整局累计，本局最多 1 次）：不存的话读档后又能再买一次 +1 部署位
+    'echoAltarDeployBought',
+    // 「盟约投影」改成每人各自选之后，选择跟着玩家走（维护者 2026-11-07，纯追加）
+    'echoProjection',
+    // 祭坛**账户余额**（「捐献 5 / 10」存进去的钱，跨回合不清空，买献祭时优先扣）：
+    // 不存的话读档后玩家的存款直接清零 —— 这是 2026-11-06 发现的漏项（纯追加，旧存档缺这项时 = 0）。
+    'echoAltarBank',
     'deviceOverrides', 'tileOverrides', 'stats', 'eliminatedRound', 'creditedKills', 'lpAtFinal', 'lastResult',
     '_botFocus', '_botFocusId', '_botSeenUids', '_deferItemMerge',
   ]),
@@ -157,6 +214,11 @@ export function canSnapshot(m) {
   // an open plugin window (0.3.1) holds the round back on a continuation a checkpoint cannot carry; a test match never
   // checkpoints (its journal is the record)
   if ((Array.isArray(m.offerWin) && m.offerWin.length) || m._offerResume || m.test) return false;
+  // 「深渊回响」的决策面板（祝福三选一 / 弃选替换 / 刷新投票 / 深潜补给 / 盟约投影 / 护盾指定）开着时，
+  // 准备倒计时是**按住**的：deadline 被清零，剩下的时长放在 `_echoPrepPausedMs` 里（不存档）。
+  // 此刻存检查点，读档回来准备时间就是 0 秒，而面板本身也回不来 —— 玩家会白丢一整回合的备战。
+  // 所以和插件窗口一样：等面板结算完再存（维护者 2026-11-06「重启断点续玩」）。
+  if (typeof m._echoChoiceOpen === 'function' && m._echoChoiceOpen()) return false;
   if (m.phase === PHASE.PREP) for (const ps of m.alivePlayers()) if (ps.botControlled && !ps.ready) return false;
   return true;
 }
