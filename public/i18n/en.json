@@ -3006,5 +3006,9 @@
   "献祭 · 刷新：免费刷新 +{n}": "Offering · Refresh: +{n} free refresh",
   "献祭 · 刷新：本回合的免费刷新额度已满，未生效": "Offering · Refresh: the free-refresh quota of this round is full — no effect",
   "献祭 · 词条：本层全队「{name}」": "Offering · Affix: the whole team gets \"{name}\" this layer",
-  "献祭 · 反制：抽到「{name}」": "Offering · Counter: drew \"{name}\""
+  "献祭 · 反制：抽到「{name}」": "Offering · Counter: drew \"{name}\"",
+  "本局已买过：部署位只能买一次": "Already bought this match: a deployment slot can only be bought once",
+  "本层可买；+1 部署位，整局只能买一次，价格随深度上涨": "Available this layer; +1 deployment slot, once per match, the price rises with depth",
+  "本局已买过": "Bought this match",
+  "献祭 · 永久：部署位 +1（本局仅此一次）": "Offering · Permanent: +1 deployment slot (once per match)"
 }
