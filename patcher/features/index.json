@@ -6591,6 +6591,11 @@
     "status": "ported",
     "files": [
       {
+        "path": "content/announcements.json",
+        "baseExists": false,
+        "customBytes": 21812
+      },
+      {
         "path": "dashboard/public/app.js",
         "baseExists": false,
         "customBytes": 61607
