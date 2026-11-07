@@ -3048,4 +3048,7 @@
   "BOSS 攻击倍率": "Leader ATK multiplier"
 ,
   "生命": "HP"
+,
+  "敌方领袖生命": "Leader HP",
+  "敌方领袖攻击": "Leader ATK"
 }
