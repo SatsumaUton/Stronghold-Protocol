@@ -102,6 +102,10 @@ const results = await pool(skins, async (s) => {
   return { ...s, kind: 'absent' };
 });
 
+// 本体立绘（char/portrait/<charId>_1|_2.png）不在这里比：文件名就是官方 id，但本服这批是从
+// 素材包（客户端提取）来的，和镜像站只是编码不同、字节永远对不上。它由 tools/audit-assets-pack.mjs
+// 跟素材包逐字节核对。
+
 const same = results.filter((r) => r.kind === 'same');
 const known = results.filter((r) => r.kind === 'known');
 const diff = results.filter((r) => r.kind === 'diff');
