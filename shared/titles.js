@@ -24,7 +24,7 @@ export const TITLES = Object.freeze([
   },
   {
     id: 'abyss_pioneer',
-    name: '深渊开拓者',
+    name: '深渊先区者',
     desc: '早期参与深潜测试、帮我们摸清深层机制的博士',
     tone: 'echo',
   },
