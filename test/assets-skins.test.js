@@ -44,3 +44,46 @@ test('每条皮肤都有名字与立绘/头像路径', () => {
     }
   }
 });
+
+// 立绘 / 头像 / 模型：**文件存在**且**属于本人**（2026-11-07 维护者要求：「确认所有干员的立绘显示正常，
+// 不要因为切换皮肤导致立绘使用错误」）。
+// 只有拿到素材目录时才校验（纯代码检出没有 public/assets，自动跳过）；
+// 归属规则：路径里必须出现本人的 charId（或这套皮肤自己的 skinId），否则就是「用了别人的图」。
+test('立绘 / 头像 / 模型文件都在，且都属于本人', () => {
+  const candidates = [join(ROOT, 'public', 'assets'), join(ROOT, '..', 'shared', 'assets')];
+  const assetsDir = candidates.find((p) => existsSync(p));
+  if (!assetsDir) return; // 没有素材（纯代码检出）：跳过
+  const relOf = (u) => String(u || '').replace(/^https?:\/\/[^/]+/, '').replace(/^\/assets\//, '');
+  const has = (u) => { const r = relOf(u); return !r || existsSync(join(assetsDir, r)); };
+  const belongs = (u, charId, skinId = null) => {
+    const r = relOf(u);
+    return !r || r.includes(charId) || (skinId ? r.includes(skinId) : false);
+  };
+  const problems = [];
+  const check = (where, url, charId, skinId = null) => {
+    if (!url) return;
+    if (!has(url)) problems.push(`缺文件 ${where} → ${relOf(url)}`);
+    else if (!belongs(url, charId, skinId)) problems.push(`别人的图 ${where} → ${relOf(url)}`);
+  };
+  for (const [charId, ch] of Object.entries(assets.chars || {})) {
+    for (const k of ['portrait', 'portraitE2', 'avatar', 'avatarE2', 'illust']) check(`${charId}.${k}`, ch[k], charId);
+    for (const side of ['front', 'back']) {
+      const s = ch.spine && ch.spine[side];
+      if (!s) continue;
+      check(`${charId}.spine.${side}.skel`, s.skel, charId);
+      check(`${charId}.spine.${side}.atlas`, s.atlas, charId);
+      for (const t of Array.isArray(s.textures) ? s.textures : []) check(`${charId}.spine.${side}.tex`, t, charId);
+    }
+    for (const [skinId, sk] of Object.entries(ch.skins || {})) {
+      for (const k of ['portrait', 'portraitE2', 'avatar', 'avatarE2', 'illust']) check(`${charId}/${skinId}.${k}`, sk && sk[k], charId, skinId);
+      for (const side of ['front', 'back']) {
+        const s = sk && sk.spine && sk.spine[side];
+        if (!s) continue;
+        check(`${charId}/${skinId}.spine.${side}.skel`, s.skel, charId, skinId);
+        check(`${charId}/${skinId}.spine.${side}.atlas`, s.atlas, charId, skinId);
+        for (const t of Array.isArray(s.textures) ? s.textures : []) check(`${charId}/${skinId}.spine.${side}.tex`, t, charId, skinId);
+      }
+    }
+  }
+  assert.deepEqual(problems.slice(0, 20), [], `素材缺失或串图 ${problems.length} 处（只列前 20）`);
+});
