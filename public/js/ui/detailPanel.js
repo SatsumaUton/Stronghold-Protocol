@@ -38,6 +38,7 @@ import { BondTimers } from './bondTimers.js';
 import { useEffect } from '../../vendor/hooks.module.js';
 import { html, Icon, TierChip, MicroLabel, Button, confirmDialog, useTicker } from './components.js';
 import { OperatorImage, Img, RichText, UnitThumb, BondGlyph, GIcon, diyToken } from './gameComponents.js';
+import { confirmDestroy } from './destroyConfirm.js';
 import { attackInterval, rangeGridBox, fmtNum, tileKey, chessLoadout, nextThreshold, bondTier, briefingBondTip, pieceBondIds, grantedBonds, morphPairings, ownStandIn, standInOf, standInLoadout, standInLabel, standInTip, standInForText, ownDiyRecord, ownDiyPick, diyRecordFor, pickGetter, unitPick, unitCultivation } from './gameLogic.js';
 import { skillIconUrl, skillRecordIconUrl, profIconUrl, subProfIconUrl, itemIconUrl, enemyIconUrl, tokenAvatarUrl, factionIconUrl, uiUrl, moduleTypeIconUrl } from './assetUrls.js';
 import { abilityRows } from './abilityLines.js';
@@ -965,8 +966,7 @@ export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestr
     onSell(piece);
   };
   const destroyIt = async (piece, item) => {
-    const ok = await confirmDialog({ title: t('销毁道具'), text: t('道具无法出售。确定要销毁「{name}」吗？', { name: item?.name || '' }), okText: t('销毁'), danger: true });
-    if (ok) onDestroy(piece);
+    if (await confirmDestroy(item?.name || '')) onDestroy(piece);
   };
   return html`<aside class=${cx('dpanel', 'brackets', `dpanel--${detail.type}`, side === 'right' && 'dpanel--right', side === 'right' && shopOpen && 'is-shop')} role="dialog" aria-label=${t('详情')}
       data-side=${side === 'right' ? 'right' : 'left'}>

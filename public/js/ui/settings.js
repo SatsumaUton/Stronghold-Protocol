@@ -94,7 +94,7 @@ export const useSettings = () => useStore((s) => s, Object.is, settingsStore);
 /**
  * The label of the key a rebindable shortcut has right now ('R', 'Space' …) — the HUD's key hints (shop bar, ready /
  * pause, underframe). Read at render: the game screen re-renders when the settings dialog closes.
- * @param {'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready'} action
+ * @param {'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'destroy'|'ready'} action
  */
 export const hotkeyLabelOf = (action) => hotkeyLabel(settingsStore.get().keys?.[action]);
 
@@ -140,7 +140,7 @@ const VOICE_LANG_NAMES = { cn: '中文', jp: '日本語', en: 'English', kr: '�
 const VOICE_LANG_TAGS = { cn: 'zh', jp: 'ja', en: 'en', kr: 'ko' };
 /** The rebindable shortcuts' names (msgids), by action. */
 const HOTKEY_NAMES = { buy: N_('购买鼠标指向的商品'), refresh: N_('刷新商店'), freeze: N_('冻结 / 解冻商店'), levelUp: N_('升级调度中心'), retreat: N_('撤退干员（选中优先）'),
-  sell: N_('出售干员（选中优先）'), ready: N_('准备就绪 / 暂停（独立模拟）') };
+  sell: N_('出售干员（选中优先）'), destroy: N_('销毁道具（选中优先）'), ready: N_('准备就绪 / 暂停（独立模拟）') };
 
 /**
  * 快捷键: each shortcut with its key. Click its key (or Enter / Space on it) and press the new one: Esc cancels (the
@@ -509,6 +509,8 @@ export function SettingsModal({ open, onClose }) {
       <p class="set-hint">${t('打开后，对局左下角可以查看自己干员的伤害、治疗和 DPS / HPS。官方界面没有这个窗口。改变玩法的插件对局在 Worker 里演算，统计不到，按钮不显示。')}</p>
       <${Toggle} label=${t('部署时收起商店')} micro="DEPLOY FOLD" value=${s.prepDeployFold} onChange=${(v) => updateSettings({ prepDeployFold: v })} />
       <p class="set-hint">${t('拖起干员、装备或召唤物，以及放下后选择朝向时，临时收起商店并放大棋盘。关闭后，拿起时既不改变商店的收起状态，也不缩放镜头。')}</p>
+      <${Toggle} label=${t('销毁道具前确认')} micro="DESTROY CONFIRM" value=${s.confirmDestroy} onChange=${(v) => updateSettings({ confirmDestroy: v })} />
+      <p class="set-hint">${t('销毁道具前弹出确认框。在提示框里勾选「下次不再提醒」会关掉这里；想恢复提醒就在这里重新打开。')}</p>
       <${Toggle} label=${t('全屏时保持屏幕常亮')} micro="SCREEN WAKE LOCK" value=${s.fullscreenWakeLock} onChange=${(v) => updateSettings({ fullscreenWakeLock: v })} />
       <p class="set-hint" data-testid="wake-lock-hint">${tParts(isIOS()
         ? N_('全屏期间始终保持屏幕常亮（{support}）；iOS低电量模式下可能不生效。')

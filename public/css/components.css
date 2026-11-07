@@ -478,6 +478,15 @@
 .modal__title { font-size: calc(.26 * var(--t)); font-weight: 700; letter-spacing: .04em; }
 .modal__body { padding: .14rem .3rem .26rem; color: var(--text-md); overflow: auto; }
 .modal__text { font-size: calc(.18 * var(--t)); line-height: 1.7; }
+/* 确认框里的「下次不再提醒」（ui/components.js confirmWithCheck）：一整行都可点，触屏也够大 */
+.modal__check {
+  display: flex; align-items: center; gap: .1rem; margin-top: .14rem;
+  min-height: 44px; padding: .06rem .08rem; cursor: pointer;
+  font-size: calc(.16 * var(--t)); color: var(--text-md);
+  border: 1px solid var(--line); background: rgba(255, 255, 255, .03);
+}
+.modal__check:hover { border-color: var(--line-3); color: var(--text-hi); }
+.modal__check input { width: max(.2rem, 16px); height: max(.2rem, 16px); flex: none; accent-color: var(--mint-500); margin: 0; }
 .modal__actions {
   flex: none;
   display: flex;
