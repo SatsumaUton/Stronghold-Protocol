@@ -241,6 +241,31 @@ export class SessionRegistry {
     return token;
   }
 
+  /**
+   * 为一个**座位还在、会话却没了**的玩家重新开一个会话（跨设备恢复用，2026-11-08）。
+   *
+   * 为什么需要：`lobby.resumeAccount` 以前只在**本节点的会话表**里找「同账号的另一个会话」。
+   * 旧设备关掉超过重连窗口、会话被 evict、或者节点重启后只剩房间存档时，会话不在了，
+   * 座位（房间里的 `accountId` 认人）却还在 —— 于是玩家跨设备点「恢复对局」只拿到
+   * 「当前节点没有可恢复的账号对局」，明明对局还活着。
+   *
+   * 这里按**座位上的 playerId** 重建一个会话（新 token），房间/对局那边完全不用动：
+   * 客户端拿到 token 重连后就是原来那个人回到原来的座位。
+   * @param {string} playerId 座位上记的玩家 id @param {string} [name]
+   * @returns {Session | null} 该 playerId 已经有会话、或注册表满了就返回 null
+   */
+  adopt(playerId, name = '') {
+    if (typeof playerId !== 'string' || !playerId) return null;
+    if (this.byPlayerId.has(playerId)) return null;
+    if (this.byPlayerId.size >= this.maxSessions && !this.evictOne()) return null;
+    let token;
+    do token = newToken(); while (this.byTokenMap.has(token));
+    const s = new Session({ playerId, token, name: String(name || ''), now: this.now() });
+    this.byPlayerId.set(playerId, s);
+    this.byTokenMap.set(token, s);
+    return s;
+  }
+
   /** @param {Session} s */
   remove(s) {
     if (this.byPlayerId.get(s.playerId) === s) this.byPlayerId.delete(s.playerId);

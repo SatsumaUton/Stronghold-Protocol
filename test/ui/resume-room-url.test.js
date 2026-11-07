@@ -55,3 +55,28 @@ test('组件不再直接拼 /r/CODE?accountResume=1，而是走 resumeRoomUrl', 
   // 真正起作用的是这个一次性标记，不是 URL 参数
   assert.match(src, /sessionStorage\.setItem\('sp\.accountResume', '1'\)/);
 });
+
+// 2026-11-08（玩家反馈「跨设备恢复对局只看到『当前节点没有可恢复的账号对局』」）：
+// 这两个函数搬进 ui/accountRoom.js，因为落地后的自动恢复（accountObserver）也要用 —— 它已经被
+// resumeMatch import 了，反向 import 会成环。resumeMatch 继续 re-export，旧引用不受影响。
+test('节点查询与地址拼接抽到 ui/accountRoom.js，resumeMatch 继续 re-export（避免循环依赖）', () => {
+  const room = read('public/js/ui/accountRoom.js');
+  assert.match(room, /export function resumeRoomUrl\(room\)/);
+  assert.match(room, /export async function findAccountRoom\(\)/);
+  assert.match(room, /\/mm\/api\/account\/room/);
+  const resume = read('public/js/ui/resumeMatch.js');
+  assert.match(resume, /import \{ resumeRoomUrl, findAccountRoom \} from '\.\/accountRoom\.js';/);
+  assert.match(resume, /export \{ resumeRoomUrl, findAccountRoom \};/);
+});
+
+test('自动恢复失败时不再只说「当前节点没有可恢复的账号对局」，而是指出房间与节点', () => {
+  const obs = read('public/js/ui/accountObserver.js');
+  assert.match(obs, /import \{ findAccountRoom \} from '\.\/accountRoom\.js';/);
+  assert.match(obs, /let room = null;[\s\S]{0,120}room = await findAccountRoom\(\);/, '失败分支要查房间目录');
+  assert.match(obs, /对局还在：房间 \{code\} 在第 \{n\} 台节点上/, '有节点时说出节点号');
+  assert.match(obs, /对局还在：房间 \{code\}。请点大厅右上角的「恢复对局」继续。/, '没有节点时至少给出房间号');
+  // 实在查不到房间才退回原来那句（它是「房间已经没了」的意思，不该是第一选择）
+  const dead = obs.indexOf("t('当前节点没有可恢复的账号对局')");
+  assert.ok(dead > 0, '兜底提示还在');
+  assert.ok(obs.indexOf('对局还在：房间 {code}') < dead, '先给「对局还在」的可操作提示，再考虑兜底');
+});
