@@ -430,6 +430,69 @@ describe('UnitView: the 我执 pool as the red bar', () => {
   });
 });
 
+// 护盾（维护者 2026-11-07）：血条下面那根护盾条按「剩余护盾 / 生命上限」显示长度，掉多少短多少；描述面板里另有数字。
+describe('UnitView: the HP shield strip', () => {
+  test('under the bar, its width the shield\'s share of max HP: it shrinks as the shield is spent and goes with the last point', () => {
+    const v = view();
+    try {
+      v.sync(sample({ flags: UF.SHIELD, shield: 300 }));
+      frames(v);
+      const bw = barWidth(v);
+      assert.equal(v.shieldBar.visible, true);
+      assert.equal(v.shieldBar.tint, COLORS.shield);
+      assert.ok(Math.abs(v.shieldBar.width - bw * 0.3) < 1e-9, '300 of 1000 max HP: 30 % of the bar');
+      assert.equal(v.shieldBar.position.x, v.hpFill.position.x, 'from the bar\'s left edge');
+      assert.ok(v.shieldBar.position.y < v.hpFill.position.y, 'right under the HP bar');
+      assert.ok(v.shieldBar.height < v.hpFill.height, 'a thin strip, not a second HP bar');
+      v.sync(sample({ flags: UF.SHIELD, shield: 100 }));
+      frames(v);
+      assert.ok(Math.abs(v.shieldBar.width - bw * 0.1) < 1e-9, 'a third of the shield: a third of the strip');
+      v.sync(sample({ flags: 0, shield: 0 }));
+      frames(v);
+      assert.equal(v.shieldBar.visible, false, 'no shield, no strip');
+    } finally { v.destroy(); }
+  });
+
+  test('a hit-count barrier (shieldHits: no amount in the snapshot) keeps the whole strip, as before', () => {
+    const v = view();
+    try {
+      v.sync(sample({ flags: UF.SHIELD }));
+      frames(v);
+      assert.equal(v.shieldBar.visible, true);
+      assert.ok(Math.abs(v.shieldBar.width - barWidth(v)) < 1e-9, 'the full width');
+    } finally { v.destroy(); }
+  });
+
+  test('an undamaged enemy with a shield shows its HP bar, so the shield\'s share is readable; without one it keeps its bar hidden', () => {
+    const e = view({ id: 2, side: 'enemy', kind: 'enemy', defId: 'enemy_x' });
+    try {
+      e.sync(sample({ hp: 1000, maxHp: 1000, flags: UF.SHIELD, shield: 250 }));
+      frames(e);
+      assert.equal(e.hpFill.visible, true, 'the HP bar shows while the shield is up');
+      assert.ok(Math.abs(e.shieldBar.width - barWidth(e) * 0.25) < 1e-9);
+      e.sync(sample({ hp: 1000, maxHp: 1000, flags: 0, shield: 0 }));
+      frames(e);
+      assert.equal(e.hpFill.visible, false, 'an untouched enemy without a shield still hides its bar');
+      assert.equal(e.shieldBar.visible, false);
+      // a shield bigger than max HP: the strip stops at the bar's end, never spills over it
+      e.sync(sample({ hp: 400, maxHp: 1000, flags: UF.SHIELD, shield: 5000 }));
+      frames(e);
+      assert.ok(Math.abs(e.shieldBar.width - barWidth(e)) < 1e-9);
+    } finally { e.destroy(); }
+  });
+
+  test('normalizeSnapshot: only the snapshot\'s units, positive numbers; a snapshot without the list clears it', () => {
+    const s = normalizeSnapshot({ t: 1, units: [tuple(1), tuple(2)], shield: [[1, 300], [2, 0], [9, 50], [1, -3], [1, 'x'], null] });
+    assert.deepEqual([...s.shield], [[1, 300]]);
+    assert.equal(normalizeSnapshot({ t: 1, units: [tuple(1)] }).shield, null, 'no list: no map');
+    const b = new SnapshotBuffer({ delay: 0 });
+    b.push({ t: 0, units: [tuple(1)], shield: [[1, 300]] });
+    b.push({ t: 1, units: [tuple(1)] });
+    assert.equal(b.sample(0).get(1).shield, 300);
+    assert.equal(b.sample(1).get(1).shield, 0, 'the readout is snapshot-owned');
+  });
+});
+
 describe('an ammo skill has no standing aura', () => {
   const unit = (id, info) => ({ id, x: 3, y: 10, z: 0, hover: 0, _headTiles: 1.2, alive: true, destroyed: false, isEnemy: false, maxHp: 3000, info, onHit() {} });
   const makeFx = (views) => {

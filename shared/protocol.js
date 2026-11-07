@@ -455,7 +455,8 @@ const statView = (x) => ({
  * The detail card's stats of a sim unit (server/sim/units.js Unit): its effective stats `s` (the aggregated `unit.s`,
  * or the last ones the sim computed) next to its own numbers — `unit.base` with its 练度 multiplier (`unit.cultMul`,
  * 0.2.2: part of the operator's own numbers, as on the record cards; no buffs) — max HP, ATK, DEF, RES, attack interval
- * (s), block, move speed — rounded for display (the sim keeps floats), plus the current HP. The shape of the
+ * (s), block, move speed — rounded for display (the sim keeps floats), plus the current HP and the HP shield it holds
+ * (`shield`: the sum of its shield buffs, 0 without one). The shape of the
  * `m.unitStats` units (Match.unitStats: what the board's units start their next battle with) and of the browser
  * runner's live battle stats (public/js/battle/runner.js unitStats). An ally with a range also carries `range`: the grid
  * (`[dRow, dCol]`, facing RIGHT) it attacks with now — a running skill's range, rangeExtend included, not a kit's
@@ -464,7 +465,7 @@ const statView = (x) => ({
  * at send time and the snapshot tuples carry none) — the detail card's range overlay rotates by it (GitHub PR #281).
  * @param {{ id?: number, uid?: number|null, defId?: string, hp?: number, alive?: boolean, base?: any, liveRangeGrid?: any, dir?: string } | null} u
  * @param {any} [s] aggregated stats (missing ⇒ the base)
- * @returns {{ id: number|null, uid: number|null, defId: string|null, hp: number, alive: boolean, maxHp: number, atk: number,
+ * @returns {{ id: number|null, uid: number|null, defId: string|null, hp: number, alive: boolean, shield: number, maxHp: number, atk: number,
  *   def: number, res: number, interval: number|null, blockCnt: number, moveSpeed: number,
  *   base: { maxHp: number, atk: number, def: number, res: number, interval: number|null, blockCnt: number, moveSpeed: number },
  *   range?: Array<[number, number]>, dir?: string }}
@@ -482,6 +483,9 @@ export function unitStatsEntry(u, s = null) {
     defId: typeof u?.defId === 'string' ? u.defId : null,
     hp: Math.max(0, Math.round(fin(u?.hp))),
     alive: u?.alive !== false,
+    // the HP shield it holds right now (the sum of its shield buffs; 0 without one) — the enemy card shows it beside the
+    // HP so a player knows how much shield is left (维护者 2026-11-07)
+    shield: Math.max(0, Math.round(fin(cur.shield))),
     ...statView(cur),
     base: statView(base),
     ...(range ? { range } : {}),

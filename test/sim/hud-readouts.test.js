@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
 import { unitInfo, unitTuple, mysticView } from '../../server/sim/snapshot.js';
+import { UF } from '../../shared/constants.js';
 import { getDefaultSource } from '../../server/sim/simdata.js';
 
 const DUMMY = { enemies: { enemy_dummy: enemyRec({ key: 'enemy_dummy', hp: 1e7, speed: 0 }) } };
@@ -242,6 +243,54 @@ test('a 秘术师 whose kit keeps a store of its own (维伊\'s 转置能量) re
   assert.ok(h.runUntil(() => (u.trait.veen?.t ?? 0) > 0, 60), 'she stores 转置能量 with no target on the field');
   assert.equal(u.trait.stored, undefined, 'the shared trait counter is never touched');
   assert.equal(h.b.snapshot().energy, undefined, 'nothing to count: no row, and no misleading zero');
+  checkInvariants(h.b);
+  assert.deepEqual(h.b.errors, []);
+});
+
+// 护盾（维护者 2026-11-07）：血条下面那根护盾条要知道还剩多少 —— b.snap `shield` 就是那个数，按 buff 的 shield 求和。
+test('b.snap `shield`: the shield left in whole points, for an enemy as for an ally; it drops as the shield absorbs and goes with its last point', () => {
+  const h = makeBattle({
+    defs: DUMMY, timeLimit: 200, seed: 7,
+    units: [{ chessId: 'chess_char_1_02_a', row: 10, col: 3 }],
+    enemies: [{ key: 'enemy_dummy', pos: [10, 5] }],
+  });
+  h.run(0.2);
+  const e = h.enemy('enemy_dummy');
+  const row = (id = e.id) => (h.b.snapshot().shield || []).find((r) => r[0] === id);
+  assert.equal(h.b.snapshot().shield, undefined, 'no shield: no list at all');
+  h.b.addBuff(e, { key: 'test:shield', shield: 500, duration: Infinity, visible: true });
+  assert.deepEqual(row(), [e.id, 500], 'the whole shield, whole points');
+  assert.equal(h.b.snapshot().units.find((t) => t[0] === e.id).length, 9, 'the tuple is not widened');
+  // the shield absorbs before the HP does: 200 off it, the HP untouched
+  const hp = e.hp;
+  h.b.dealDamage(null, e, { amount: 200, type: 'phys' });
+  assert.equal(e.hp, hp, 'the shield took the hit');
+  assert.deepEqual(row(), [e.id, 300]);
+  // a fraction of a point left still reads as one point; the last point takes the list away
+  h.b.dealDamage(null, e, { amount: 299.4, type: 'phys' });
+  assert.deepEqual(row(), [e.id, 1]);
+  h.b.dealDamage(null, e, { amount: 5, type: 'phys' });
+  assert.equal(h.b.snapshot().shield, undefined, 'the shield is gone: no row');
+  checkInvariants(h.b);
+  assert.deepEqual(h.b.errors, []);
+});
+
+test('`shield` lists an ally too, sums several shields, and a hit-count barrier (shieldHits) has no amount — only the UF.SHIELD flag', () => {
+  const h = makeBattle({
+    defs: DUMMY, timeLimit: 200, seed: 7,
+    units: [{ chessId: 'chess_char_1_02_a', row: 10, col: 3 }],
+    enemies: [{ key: 'enemy_dummy', pos: [10, 5] }],
+  });
+  const u = h.unit('chess_char_1_02_a');
+  h.run(0.2);
+  const row = (id = u.id) => (h.b.snapshot().shield || []).find((r) => r[0] === id);
+  h.b.addBuff(u, { key: 'test:a', shield: 120, duration: Infinity });
+  h.b.addBuff(u, { key: 'test:b', shield: 80, duration: Infinity });
+  assert.deepEqual(row(), [u.id, 200], 'the shields add up');
+  h.b.addBuff(u, { key: 'test:hits', shieldHits: 2, duration: Infinity });
+  const flags = unitTuple(u, h.b.time)[7];
+  assert.ok(flags & UF.SHIELD, 'the hit-count barrier still sets the flag (the strip stays, without an amount)');
+  assert.deepEqual(row(), [u.id, 200], 'the barrier adds no points');
   checkInvariants(h.b);
   assert.deepEqual(h.b.errors, []);
 });
