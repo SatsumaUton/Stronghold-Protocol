@@ -515,6 +515,10 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
   const [enemyHp, setEnemyHp] = useState(1);
   // 【按回合设置敌人生命倍率】：null = 用单值；数组 = [[起始回合, 倍率], …]（第一段必须从第 1 回合起）
   const [hpPlan, setHpPlan] = useState(null);
+  const [atkPlan, setAtkPlan] = useState(null);
+  // BOSS 独立倍率：1 = 跟全体走
+  const [bossHp, setBossHp] = useState(1);
+  const [bossAtk, setBossAtk] = useState(1);
   const [enemyAtk, setEnemyAtk] = useState(1);
   // 手动指定卡池编组（shared/poolPlan.js）：null = 用自动规则
   const [poolPlan, setPoolPlan] = useState(null);
@@ -576,6 +580,9 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       setUniteFirst(exp.uniteHumansFirst === true);
       setEnemyHp(isEnemyMultiplier(exp.enemyHpMul) ? exp.enemyHpMul : 1);
       setHpPlan(Array.isArray(exp.enemyHpPlan) ? exp.enemyHpPlan.map((s) => [s[0], s[1]]) : null);
+      setAtkPlan(Array.isArray(exp.enemyAtkPlan) ? exp.enemyAtkPlan.map((s) => [s[0], s[1]]) : null);
+      setBossHp(isEnemyMultiplier(exp.bossHpMul) ? exp.bossHpMul : 1);
+      setBossAtk(isEnemyMultiplier(exp.bossAtkMul) ? exp.bossAtkMul : 1);
       setEnemyAtk(isEnemyMultiplier(exp.enemyAtkMul) ? exp.enemyAtkMul : 1);
       // 卡池编组：房间已有的照搬，没有就从「自动规则会怎么分」开始（编辑器的起点）
       setPoolPlan(Array.isArray(exp.poolPlan) ? exp.poolPlan.slice() : null);
@@ -597,7 +604,9 @@ function ExperimentalControl({ room, isHost, busy, onApply }) {
       ...(hitLimitOff ? { disableHitLimit: true } : {}),
       ...(uniteFirst ? { uniteHumansFirst: true } : {}),
       ...(hpPlan && hpPlan.length ? { enemyHpPlan: hpPlan } : enemyHp !== 1 ? { enemyHpMul: enemyHp } : {}),
-      ...(enemyAtk !== 1 ? { enemyAtkMul: enemyAtk } : {}),
+      ...(atkPlan && atkPlan.length ? { enemyAtkPlan: atkPlan } : enemyAtk !== 1 ? { enemyAtkMul: enemyAtk } : {}),
+      ...(bossHp !== 1 ? { bossHpMul: bossHp } : {}),
+      ...(bossAtk !== 1 ? { bossAtkMul: bossAtk } : {}),
       // 手动指定卡池编组：长度必须等于人数，对不上就不发（服务端也会拒）
       ...(manualPools ? { poolPlan: poolPlan.slice() } : {}),
     };

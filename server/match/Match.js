@@ -223,7 +223,7 @@ import { createRng, deriveSeed } from '../sim/rng.js';
 import { GameData } from './gamedata.js';
 import { RealScheduler } from './scheduler.js';
 import { SharedPool, drawDisabledBonds, createPoolGroups, createItemPools } from './pool.js';
-import { experimentalOptions, enemyHpMulAt } from '../../shared/experimental.js';
+import { experimentalOptions, enemyHpMulAt, enemyAtkMulAt, bossMultipliers } from '../../shared/experimental.js';
 import { roomCapacity } from '../../shared/playerCapacity.js';
 import { PlayerState } from './PlayerState.js';
 import { EffectDispatcher, getDefaultRegistry } from './effectsMeta.js';
@@ -504,6 +504,9 @@ export class Match {
     this.enemyHpMul = this.experimental.enemyHpMul ?? 1;
     // 【按回合设置敌人生命倍率】(参考版 feedback #118，2026-11-06)：有计划时按回合取，否则就是单值
     this.enemyHpMulAt = (round = this.round) => enemyHpMulAt(this.experimental, round);
+    // 维护者 2026-11-07：攻击也支持按回合；BOSS 另有独立倍率
+    this.enemyAtkMulAt = (round = this.round) => enemyAtkMulAt(this.experimental, round);
+    this.bossMuls = bossMultipliers(this.experimental);
     this.enemyAtkMul = this.experimental.enemyAtkMul ?? 1;
     // 鸭爵叠加（本服新增）：两个前置条件缺一不可。
     //   - allowRepeat：去重时一支队伍最多一个鸭爵，叠不叠加都是 1 份，开关无从谈起。

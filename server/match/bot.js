@@ -1335,7 +1335,7 @@ function bossCandidateOpts(m, ps, byUid, plan) {
     if (Array.isArray(ev.spawns)) spawns = ev.spawns;
     if (Array.isArray(ev.routes)) routes = ev.routes;
   }
-  const hp = bossPoolHp(m.gd, bossId, alive.length, { hpMul: m.enemyHpMulAt(m.round) });
+  const hp = bossPoolHp(m.gd, bossId, alive.length, { hpMul: m.enemyHpMulAt(m.round) * (m.bossMuls ? m.bossMuls.hp : 1) });
   return {
     seed: faRehearsalSeed(m, ps),
     kind,
