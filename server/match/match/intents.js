@@ -101,6 +101,8 @@ export class MatchIntents {
     case 'g.echoProjection': return this.setEchoProjectionPick(ps, msg.pick);
       // 「护盾」祝福：投票指定要保护的盟约
       case 'g.echoShield': return this.setEchoShieldVote(ps, msg.pick);
+      // 主动放弃深潜（维护者 2026-11-07）：start=true 发起（单人直接结算 / 多人开全员投票），否则按 agree 投票
+      case 'g.echoGiveUp': return msg.start ? this.requestEchoGiveUp(ps) : this.setEchoGiveUpVote(ps, msg.agree === true);
       case 'g.band': return this.pickBand(ps, msg.bandId);
       case 'g.bandSkip': return this.skipBand(ps);
       // 预约盟约（纯显示，移植自参考版）：声明这一局打算走哪个核心盟约

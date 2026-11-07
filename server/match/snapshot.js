@@ -156,6 +156,8 @@ export const MATCH_FIELDS = Object.freeze({
     '_speedVotes', '_speedVoteAt', '_speedUp', 'gameSpeed',
     // 深渊回响的祝福投票：纯缓存，恢复后重新投（候选 `echoBlessingOffer` 本身是存档字段）
     '_echoBlessingVotes',
+    // 「主动放弃深潜」的全员投票（2026-11-07）：纯缓存，读档回来重新发起即可
+    'echoGiveUpVote', '_echoGiveUpTimer', '_echoGiveUpSeq',
     // 深潜决策面板按住的那段准备时间（`_echoPausePrepClock`）：面板本身不存档，所以这个也不存 ——
     // canSnapshot 在面板开着时直接拒绝存档（见上面），读档回来的局面里不存在「按住」这个状态
     '_echoPrepPausedMs',

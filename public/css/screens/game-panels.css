@@ -886,6 +886,12 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-list li span { color: var(--text-dim); font-size: .92em; line-height: 1.5; }
 .echo-list--enemy li { border-left-color: #e0637a; background: rgba(224, 99, 122, .08); }
 .echo-list--enemy li b { color: #ffb3bf; }
+/* 「主动放弃深潜」（2026-11-07）：放在「祝福」页底部，红描边表示不可逆 */
+.echo-giveup { margin: .18rem 0 .06rem; padding-top: .1rem; border-top: 1px solid var(--line-3); }
+.echo-giveup__note { margin: .04rem 0 .08rem; color: var(--text-dim); font-size: .94em; line-height: 1.5; }
+.echo-giveup__acts { display: flex; gap: .1rem; flex-wrap: wrap; }
+.echo-giveup .btn--ghost { border-color: rgba(224, 99, 122, .5); color: #ffb3bf; }
+.echo-giveup .btn--ghost:hover { background: rgba(224, 99, 122, .14); }
 .echo-bless .brief-reroll__text strong,
 .echo-status .brief-reroll__text strong { color: #d9c8ff; text-shadow: 0 0 .1rem rgba(183, 156, 255, .4); }
 .echo-bless .brief-reroll__text > span,

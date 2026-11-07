@@ -139,11 +139,11 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         <div class="result__summary">
         <div class="result__logo"><${Sprite} k="entry/season_logo_settle" class="result__logoimg" fallback=${html`<${MicroLabel} tone="mint">STRONGHOLD PROTOCOL</${MicroLabel}>`} /></div>
         ${r.difficulty ? html`<${DifficultyTag} difficulty=${r.difficulty} size="lg" />` : null}
-        <h1 class="result__headline">${r.victory ? t('模拟完成') : t('模拟失败')}</h1>
+        <h1 class="result__headline">${r.victory ? t('模拟完成') : r.reason === 'abandoned' ? t('主动放弃深潜') : t('模拟失败')}</h1>
         <${UnofficialMark} room=${content ? { content } : null} class="result__modmark" /><${VersionTag} version=${version} class="result__vertag" />
         ${res?.test === true ? html`<p class="result__test" data-testid="result-test"><${TestMark} /> ${t('测试对局')}${Number.isInteger(res.testActions) ? html` · ${t('测试指令 {n} 次', { n: res.testActions })}` : null}</p>
           <p class="t-dim">${t('本局为测试对局，不计入统计、成就、称号、徽章与卫戍认证。')}</p>` : null}
-        <p class="result__sub">${r.victory ? t('成功卫戍 · 敌方领袖已被击败') : t('防线已被突破')}</p>
+        <p class="result__sub">${r.victory ? t('成功卫戍 · 敌方领袖已被击败') : r.reason === 'abandoned' ? t('全队放弃了本次深潜') : t('防线已被突破')}</p>
         <div class="result__rounds">
           <span class="result__rlabel">${t('通过回合')}</span>
           <b class="result__rnum num">${r.roundsPassed}</b>

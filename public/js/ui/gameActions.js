@@ -121,4 +121,7 @@ export const actions = {
   echoProjection: (pick) => act('g.echoProjection', { pick: Number(pick) }, { sfx: 'confirm' }),
   // 护盾：投票指定要保护的盟约
   echoShield: (pick) => act('g.echoShield', { pick: Number(pick) }, { sfx: 'confirm' }),
+  // 主动放弃深潜（维护者 2026-11-07）：start=true 发起（单人立刻结算 / 多人开全员投票），否则按 agree 投票
+  echoGiveUp: () => act('g.echoGiveUp', { start: true }, { sfx: 'back' }),
+  echoGiveUpVote: (agree) => act('g.echoGiveUp', { agree: !!agree }, { sfx: agree ? 'confirm' : 'back' }),
 };
