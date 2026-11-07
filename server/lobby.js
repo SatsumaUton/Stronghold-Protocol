@@ -1196,7 +1196,7 @@ export class Lobby {
    * @param {Room} room
    */
   refreshMatchWindows(room) {
-    if (!room?.match || room.disposed || room.mode === 'solo') return;
+    if (!room?.match || room.disposed || this.soloLikeRun(room)) return;
     const humans = room.activeHumans();
     const online = humans.some((s) => s && s.connected);
     const now = this.now();
@@ -1374,7 +1374,8 @@ case 'room.list': return this.roomList(msg);
     this.clearResync(session.playerId); // the next resume resyncs immediately
     const room = this.roomOf(session);
     // a solo run may be resumed within singleReconnectTime (24 h); everything else keeps the registry's window
-    session.resumeWindowMs = room && room.match && room.mode === 'solo' ? this.soloResumeWindowMs(room) : null;
+    // （维护者 2026-11-07：单人深潜也算 —— 深潜房是 mode:'coop' + variant:'deepecho'，见 soloLikeRun）
+    session.resumeWindowMs = this.soloLikeRun(room) ? this.soloResumeWindowMs(room) : null;
     if (!room) return;
     const player = room.seatOf(session.playerId);
     // roomOf() 认三种身份：座位、普通观战、隐身观战（hiddenSpectators）。这里必须同样认全，
@@ -3916,6 +3917,22 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     const data = room && room.version !== DEFAULT_VERSION ? this.dataFor(room) : this.safeData();
     const sec = data?.config?.constants?.singleReconnectTime;
     return (typeof sec === 'number' && Number.isFinite(sec) && sec > 0 ? sec : SOLO_RECONNECT_FALLBACK_SEC) * 1000;
+  }
+
+  /**
+   * 这局是不是「一个人在潜」：真正的大厅单人房，或者**深渊回响单人房**
+   * （深潜是 `mode:'coop'` + `variant:'deepecho'`，房间里只有一个真人）。
+   *
+   * 维护者 2026-11-07：单人深潜要能**24 小时内随时恢复**，所以这两者共用同一档重连窗口 ——
+   * 以前只有 `room.mode === 'solo'` 才算，深潜单人房掉线后走的是普通重连窗口（10 分钟），
+   * 十分钟一到座位就被释放、对局以 abandoned 结束，「24 小时保存」根本无从谈起。
+   * @param {Room | null} [room]
+   */
+  soloLikeRun(room = null) {
+    if (!room || !room.match) return false;
+    if (room.mode === 'solo') return true;
+    if (room.variant !== 'deepecho') return false;
+    return room.activeHumans().filter((s) => s && !s.isBot).length <= 1;
   }
 
   // ---------------------------------------------------------------------------------------------------
