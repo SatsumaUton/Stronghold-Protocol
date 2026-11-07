@@ -212,6 +212,8 @@
   "房间已满": "Room is full",
   "服务器已满": "The server is full",
   "模拟已开始": "Simulation already started",
+  "账号身份尚未送达，请稍后重试": "Account identity has not arrived yet, please try again shortly",
+  "正在连接服务器，请求已排队": "Connecting to the server, request queued",
   "固定同盟密钥已被另一个房间占用，请先关闭那个房间": "The fixed Alliance Key is already used by another room; close that room first",
   "只有房主可以操作": "Only the host can do that",
   "仍有玩家未就绪": "Some players are not ready",
