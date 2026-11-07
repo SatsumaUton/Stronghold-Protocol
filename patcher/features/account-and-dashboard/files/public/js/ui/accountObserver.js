@@ -349,7 +349,7 @@ export function installAccountObserver() {
     //   只写 sessionStorage：刷新后仍在（刷新是同一台设备），换标签页不继承。
     try { sessionStorage.setItem('sp.resumeAvailable', '1'); } catch { /* 隐私模式 */ }
     try { window.dispatchEvent(new Event('sp-resume-available')); } catch { /* ignore */ }
-    toast(t('对局已在另一设备/标签页继续。要在这台切回来，点大厅右下角的「恢复对局」。'), 'warn', { ttl: 12000 });
+    toast(t('对局已在另一设备/标签页继续。要在这台切回来，点大厅右上角的「恢复对局」。'), 'warn', { ttl: 12000 });
     try { store.set({ room: null, match: null }); } catch { /* ignore */ }
     try { store.patch('ui', { pendingJoin: null, restoring: false }); } catch { /* ignore */ }
     for (const id of ['mm-overlay', 'mm-back', 'mm-room-timer']) {

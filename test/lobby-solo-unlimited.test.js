@@ -13,6 +13,9 @@ import { DIFFICULTIES, ERR, modeIdFor } from '../shared/constants.js';
 import { validateC2S } from '../shared/protocol.js';
 import { DEFAULT_VERSION, VERSIONS, versionById } from '../shared/versions.js';
 
+// 仓库里的 data/create-room.json 是「关闭」（公开仓库不该默认开放建房），单测要忽略这个维护开关
+process.env.SP_GATE_IGNORE = '1';
+
 const VANILLA = 'a0'.repeat(32);
 const CS = { 'act2autochess@V2_1': 'b1'.repeat(32), act1autochess: 'c1'.repeat(32), 'act1autochess@V1_1': 'd1'.repeat(32) };
 const ALL = VERSIONS.map((v) => v.id);
@@ -58,6 +61,10 @@ function harness() {
     const s = registry.create(name);
     s.connected = true;
     s.disconnectedAt = null;
+    // 本服规则（比上游晚加的）：游客不能建房 / 开始，所以测试会话要带账号身份；维护开关也不读
+    // （data/create-room.json 在仓库里是「关闭」，见 lobby.js 的 maintenanceGate）。
+    s.accountId = `acc_${s.playerId}`;
+    s.guest = false;
     const box = [];
     frames.set(s.playerId, box);
     s.ws = { readyState: 1, bufferedAmount: 0, send(data) { box.push(JSON.parse(data)); }, terminate() {} };
