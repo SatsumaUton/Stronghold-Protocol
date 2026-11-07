@@ -98,18 +98,35 @@ export class PlayerRound {
    * 为什么必须单独记峰值：团灭时每个座位都会走 `eliminate()`，它把棋盘 / 手牌全部退回卡池，
    * 于是 `this.bonds` 里所有 count 归零 —— 结算时再去读 `bonds` 就只剩 0。
    * 这里在每次 recompute 之后把峰值往上记（只增不减），结算 / 排行榜读 `bondPeak`。
+   *
+   * 2026-11-07 晚（玩家反馈「没有激活的盟约也会出现在排行榜上」）：
+   *   * `cores` 只记**已激活**（`active === true`）的核心盟约 —— 只放了一两个干员、没激活的不算；
+   *   * `top` / `topLayers` 记**已激活核心盟约里层数最高的那一个**，排行榜只显示它
+   *     （以前把用过的核心全列出来，看起来像「这局同时走了四条核心」）。
    */
   _trackBondPeak() {
-    if (!this.bondPeak || typeof this.bondPeak !== 'object') this.bondPeak = { cores: [], bonds: 0, maxLayers: 0 };
+    if (!this.bondPeak || typeof this.bondPeak !== 'object') this.bondPeak = { cores: [], bonds: 0, maxLayers: 0, top: null, topLayers: 0 };
     const peak = this.bondPeak;
     if (!Array.isArray(peak.cores)) peak.cores = [];
+    if (peak.top !== null && typeof peak.top !== 'string') peak.top = null;
+    if (!Number.isFinite(Number(peak.topLayers))) peak.topLayers = 0;
     const live = Object.entries(this.bonds || {}).filter(([, r]) => r && Number(r.count) > 0);
     if (live.length > (Number(peak.bonds) || 0)) peak.bonds = live.length;
-    for (const [id] of live) {
+    for (const [id, rec] of live) {
       const bond = typeof this.gd.bond === 'function' ? this.gd.bond(id) : null;
-      if (bond && bond.isCore === true && !peak.cores.includes(id)) peak.cores.push(id);
+      if (bond && bond.isCore === true && rec && rec.active === true && !peak.cores.includes(id)) peak.cores.push(id);
       const n = Math.max(0, Math.floor(Number(this.layers && this.layers[id]) || 0));
       if (n > (Number(peak.maxLayers) || 0)) peak.maxLayers = n;
+      // 最高的一个**已激活**核心盟约：层数优先，同层比人数，再同则按 bondOrder 靠前的
+      if (!(bond && bond.isCore === true && rec && rec.active === true)) continue;
+      const top = peak.top ? (typeof this.gd.bond === 'function' ? this.gd.bond(peak.top) : null) : null;
+      const count = Math.max(0, Math.floor(Number(rec.count) || 0));
+      const topCount = peak.top && this.bonds && this.bonds[peak.top] ? Math.max(0, Math.floor(Number(this.bonds[peak.top].count) || 0)) : 0;
+      const better = !peak.top || n > (Number(peak.topLayers) || 0)
+        || (n === (Number(peak.topLayers) || 0) && count > topCount)
+        || (n === (Number(peak.topLayers) || 0) && count === topCount
+          && (Number(bond.bondOrder) || 0) < (Number(top && top.bondOrder) || 0));
+      if (better) { peak.top = id; peak.topLayers = n; }
     }
   }
 
