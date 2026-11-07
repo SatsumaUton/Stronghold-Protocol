@@ -3091,5 +3091,16 @@
   "目标生命已到上限 {n}，本次未扣钱": "Target HP is already at the cap {n}; nothing was charged.",
   "全队目标生命已到上限 {n}，「{name}」未生效": "The whole team's target HP is at the cap {n}; “{name}” had no effect.",
   "对局还在：房间 {code} 在第 {n} 台节点上。请点大厅右上角的「恢复对局」，再点「去该房间所在节点继续」。": "Your match is still running: room {code} is on node {n}. Click “Resume match” at the top right of the lobby, then “Go to that room’s node to continue”.",
-  "对局还在：房间 {code}。请点大厅右上角的「恢复对局」继续。": "Your match is still running: room {code}. Click “Resume match” at the top right of the lobby to continue."
+  "对局还在：房间 {code}。请点大厅右上角的「恢复对局」继续。": "Your match is still running: room {code}. Click “Resume match” at the top right of the lobby to continue.",
+  "祝福已满": "Blessings full",
+  "没有诅咒": "No curses",
+  "刷新已满": "Refresh full",
+  "账户没钱": "Account empty",
+  "强化已满": "Stacks full",
+  "现在买不了": "Cannot buy",
+  "献祭 · {name}：本回合的免费刷新额度已满（不扣钱）": "Sacrifice · {name}: this round’s free-refresh allowance is full (nothing charged)",
+  "献祭 · {name}：祭坛账户里没有可提现的资金（不扣钱）": "Sacrifice · {name}: nothing to withdraw from the altar account (nothing charged)",
+  "献祭 · {name}：本层团队 buff 已经叠满 {n} 层（不扣钱）": "Sacrifice · {name}: this layer’s team buff is already at {n} stacks (nothing charged)",
+  "献祭 · {name}：当前没有可清除的诅咒（不扣钱）": "Sacrifice · {name}: there is no curse to remove (nothing charged)",
+  "献祭 · {name}：祝福名额已满或已持有（不扣钱）": "Sacrifice · {name}: blessing slots are full or you already hold it (nothing charged)"
 }
