@@ -1881,6 +1881,20 @@ git diff --cached --name-only | Select-String '\.key$|privkey|\.pem$|\.pfx$|\.se
 | `server/**`（含 `server/net.js`、`server/lobby.js`、`server/match/**`） | **必须重启节点** |
 | `dashboard/server.js`、`ecosystem.config.cjs`、`nginx/conf/nginx.conf` | 重启对应进程 / `nginx -s reload` |
 
+> 🚫 **`data/assets.json` 不能用仓库里的那份覆盖线上！**（2026-11-07 事故）
+>
+> 线上那份是**各机自己生成**的资源清单：带 `chars[].skins`（皮肤）、语音、以及
+> `https://<资源站>/assets/…` 绝对地址，约 **3.7 MB**；仓库里 `data/assets.json` 是
+> vanilla 生成物（**1.98 MB，没有 skins**）。直接 `Copy-Item` 过去 = 全服玩家的皮肤消失。
+>
+> 新增干员 / 素材时，正确做法是**以线上那份为底做合并**（只追加新条目，并同步
+> `stats.chars / skills / files / spineModels / bytes` 与 `hash`），再把同一份并进
+> `patcher/features/game-core-data/files/data/assets.json`（升级时不丢）。
+>
+> 同理**不要覆盖**：`data/create-room.json`（建房开关）、`data/room-ttl.json`、
+> `data/config.json`、`data/local-assets.json`、`data/local-fx.json` —— 都是各机运行时配置。
+> `data/backups.json` 不是各机的（全站一致），可以按仓库覆盖。
+
 **关键陷阱**：`healthz` 的 `build` 字段只覆盖
 `public/index.html`、`public/js`、`public/css`、`server/sim`、`shared`、`data`，
 **不包含 `server/net.js`、`server/lobby.js`、`server/match/**`**。
