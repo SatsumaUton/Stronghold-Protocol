@@ -168,15 +168,17 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
   const countsHand = entry?.countsHand ?? b.countsHand;
   const next = nextThreshold(count, th);
   const hasNow = !off && !!(b.effectDescRaw || b.effectDesc);
-  // 「盟约投影」（2026-11-06，2026-11-07 改每人各自选）：点开的那条盟约如果正是**你自己**投影的那条，
-  // 要说明「你自己的干员全按成员算」—— 玩家反馈「点盟约看不到投影效果」。别人的卡（owner）和本局禁用的盟约不挂。
+  // 「盟约投影」（2026-11-06，2026-11-07 改每人各自选）：点开的那条盟约如果正是**你正在看的那位**投影的，
+  // 要说明「他的干员全按成员算」—— 观战 / 前往查看时看到的内容必须和对局中玩家自己看到的一致，
+  // 所以投影按 `ownerId`（这条盟约属于谁）取，而不是永远取自己的。本局禁用的盟约不挂。
   const projEntry = (() => {
-    if (owner || off) return null;
+    if (off) return null;
+    const projOwner = ownerId != null ? String(ownerId) : meId;
     // ① 服务端在**这条盟约的视图条目**上直接标了 `projected: true`（bondsView 按满档塞进去的那条）——
     //    这是最可靠的一份：弹窗本来就拿着 `entry`。
     if (entry && entry.projected === true) return { id: bondId, desc: '' };
-    // ② 自己的那条投影：服务端按 playerId 下发（echo.projections[myId]）
-    const mine = meId != null && echo && echo.projections && typeof echo.projections === 'object' ? echo.projections[meId] : null;
+    // ② 那位玩家自己的投影：服务端按 playerId 下发（echo.projections[playerId]）
+    const mine = projOwner != null && echo && echo.projections && typeof echo.projections === 'object' ? echo.projections[projOwner] : null;
     return mine && typeof mine.id === 'string' ? mine : null;
   })();
   const isProjected = !!(projEntry && projEntry.id === bondId);

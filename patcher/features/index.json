@@ -6718,7 +6718,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 141148
+        "customBytes": 141088
       },
       {
         "path": "public/js/screens/lobby.js",
@@ -6748,12 +6748,12 @@
       {
         "path": "public/js/ui/bondStrip.js",
         "baseExists": true,
-        "customBytes": 21732
+        "customBytes": 21911
       },
       {
         "path": "public/js/ui/detailPanel.js",
         "baseExists": true,
-        "customBytes": 74617
+        "customBytes": 75036
       },
       {
         "path": "public/js/ui/echoBlessing.js",
@@ -6778,7 +6778,7 @@
       {
         "path": "public/js/ui/echoStatus.js",
         "baseExists": false,
-        "customBytes": 18015
+        "customBytes": 18205
       },
       {
         "path": "public/js/ui/echoSupply.js",

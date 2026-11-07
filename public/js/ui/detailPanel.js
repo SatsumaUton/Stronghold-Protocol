@@ -445,12 +445,16 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
   // 备战区（手牌第 7 行 / 临时区第 8 行）的干员还没上场，不挂。
   const meId = useStore((s) => s.me.playerId);
   const echo = useStore((s) => s.match?.public?.echo || null);
+  // 观战 / 前往查看：卡片可能属于**别人**，投影要按那位玩家取（`watchTarget` 由 screens/game.js 按屏幕上的盟约主人发布）
+  const watchTarget = useStore((s) => s.ui?.watchTarget || null);
   // 「盟约投影」：三条同源数据里取第一条拿得到的 ——
-  //   ① `echo.projections[myId]`（每人各自选，2026-11-07：服务端按 playerId 下发，自己的那条）
+  //   ① `echo.projections[那位玩家]`（每人各自选，2026-11-07：服务端按 playerId 下发）
+  //      自己的卡 = 自己那条；观战队友的卡 = **他**那条（否则看到的内容和对局中玩家不一致）
   //   ② **本局盟约视图**里 `projected: true` 的那条（服务端按满档塞进去的，盟约条/面板读的就是它）
   // ② 是 2026-11-06 加的兜底：卡面这一路读不到前一份时，至少和盟约面板保持一致。
+  const projOwner = ownerId != null ? String(ownerId) : (watchTarget || meId);
   const projection = (() => {
-    const mine = meId != null && echo && echo.projections && typeof echo.projections === 'object' ? echo.projections[meId] : null;
+    const mine = projOwner != null && echo && echo.projections && typeof echo.projections === 'object' ? echo.projections[projOwner] : null;
     if (mine && typeof mine.id === 'string') return mine;
     // bonds 可能是数组（视图）也可能是 { bondId: entry } 的字典，两种都兜住
     const rows = Array.isArray(bonds) ? bonds : (bonds && typeof bonds === 'object' ? Object.values(bonds) : []);
@@ -465,12 +469,12 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
     if (piece && typeof piece.area === 'string') return piece.area === 'board';
     return !!unit;
   })();
-  // ownerId 可能是 playerId 字符串，也可能是座位号 —— 统一按字符串比，否则「自己的干员」会被判成别人的
-  const mineUnit = !ownerId || !meId || String(ownerId) === String(meId);
   // 干员**本身就有**这条盟约时不再追加、也不打「投影」角标（维护者 2026-11-05）。
   // 2026-11-06 维护者确认：只有**已部署到场上**的干员才生效、才挂这条说明（手牌/整备区不显示）。
+  // 2026-11-07：不再限定「自己的干员」—— 观战队友时他的干员同样挂着**他**那条投影，
+  // 否则观战看到的内容和对局中玩家自己看到的不一致（玩家反馈）。
   const nativelyHas = Array.isArray(c.bonds) && c.bonds.includes(projectedId);
-  const projectedBond = onBoard && mineUnit && !nativelyHas ? projectedId : null;
+  const projectedBond = onBoard && !nativelyHas ? projectedId : null;
   const bondIds = (() => {
     const list = pieceBondIds(c, carried, getItem, morphMode);
     return projectedBond && !list.includes(projectedBond) ? [...list, projectedBond] : list;
