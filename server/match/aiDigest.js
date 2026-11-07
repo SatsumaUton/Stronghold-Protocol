@@ -30,7 +30,9 @@ export function aiDigest(m, ps, kind, pub, own, pack = null) {
     if (!e) return undefined;
     const effect = effectText([e.desc, ...(e.abilities || [])]).replace(/<@[^>]*>|<\/>/g, '').slice(0, 160);
     return { hp: e.stats?.maxHp || 0, def: e.stats?.def || 0, res: e.stats?.res || 0, motion: e.stats?.motion || '',
-      fly: typeof e.isFlyEnemy === 'boolean' ? e.isFlyEnemy : e.stats?.motion === 'FLY', ...(effect ? { effect } : {}) };
+      // the sim flies by motion (waves.js isFlyKey, 2026-11-08): a record whose isFlyEnemy is false but whose motion
+      // is FLY (the hidden core's two ELITE halves) is still a flyer
+      fly: e.stats?.motion === 'FLY' || e.isFlyEnemy === true, ...(effect ? { effect } : {}) };
   };
   const withBounty = card => {
     if (!card || card.kind !== 'bounty') return card;
