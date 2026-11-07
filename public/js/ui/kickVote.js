@@ -16,8 +16,11 @@ export function kickable(pub, myId, target) {
   if (pub.phase !== PHASE.SP_DRAFT && pub.phase !== PHASE.PREP) return false;
   const me = pub.players?.find((p) => p.playerId === myId);
   if (!me || me.isBot || me.status === 'left' || me.connected === false) return false;
-  // 本服没有参考版的 `offlineTakeover` 标记：直接用「掉线 + 存活 + 未退出」判定（与服务端 kickTargetEligible 同口径）
-  return !target.isBot && target.connected === false && target.alive !== false && target.status !== 'left';
+  // 只有「掉线且已经被 AI 接管」的座位才能点名（views.js players[].offlineTakeover = 掉线 + 自动接管开启，
+  // 与 server 的 kickTargetEligible 同一口径）。以前这里只看 `connected === false`：刚掉线、还没到
+  // 2 个备战结束（OFFLINE_TAKEOVER_ROUNDS）的队友也会亮出「投票移出」，点下去服务端回 BAD_TARGET
+  // ——玩家看到的就是「无效的目标」（维护者 2026-11-07 晚反馈）。
+  return !target.isBot && target.offlineTakeover === true && target.alive !== false && target.status !== 'left';
 }
 
 function useSend() {
