@@ -446,6 +446,15 @@
 }
 .bossbar { position: relative; flex: 1; min-width: 2.2rem; height: .2rem; background: rgba(0, 0, 0, .6); border: 1px solid rgba(255, 122, 51, .5); overflow: hidden; }
 .bossbar__fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #b8340d, var(--orange-hi)); box-shadow: 0 0 .1rem rgba(255, 110, 40, .8); transition: width 300ms var(--ease-out); }
+/* 护盾（维护者 2026-11-08）：共享血池的领袖身上还有屏障时，血条看着「卡住不动」——
+   屏障的绝对量按整池算，池子只剩 17% 时它还是 16.8%×整池，等于剩余血的 99%。这里把盾按同一把尺子画在血条上，
+   压在血条填充之上、百分比文字之下，玩家一眼能看出「血没动是被盾吃了」。 */
+.bossbar__shield {
+  position: absolute; inset: 0 auto 0 0; pointer-events: none;
+  background: repeating-linear-gradient(115deg, rgba(190, 226, 255, .55) 0 .06rem, rgba(120, 176, 236, .55) .06rem .12rem);
+  border-right: 1px solid rgba(215, 238, 255, .9);
+  box-shadow: 0 0 .1rem rgba(150, 200, 255, .75); transition: width 300ms var(--ease-out);
+}
 .bossbar__txt { position: absolute; inset: 0; display: grid; place-items: center; font-size: .14rem; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
 
 /* LP tower */

@@ -39,7 +39,7 @@ import { serverNow } from '../store.js';
 import { store, useStore } from '../store.js';
 import { AdminTools } from './adminTools.js';
 import { canOpenAdminTools } from './adminGate.js';
-import { isCombatPhase, isBossPhase, prepCapsuleLabel, bossFrac, bossPctText, fmtNum, shopBlockReason } from './gameLogic.js';
+import { isCombatPhase, isBossPhase, prepCapsuleLabel, bossFrac, bossPctText, bossShieldFrac, fmtNum, shopBlockReason } from './gameLogic.js';
 import { uniteBudgetInfo } from './gameLogic/phases.js';
 import { overtimeState, overtimeDrainPerSec, remainAt, speedVoteState, speedVoteCountShown, battleSpeedScale } from './matchStatus.js';
 import { hotkeyLabelOf } from './settings.js';
@@ -101,11 +101,16 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
     // server's b.pool, or the server's 20 Hz stream); m.public.bossHp refreshes at ~1 Hz and lags the leader's death
     const boss = hud?.boss || pub.bossHp || null;
     const frac = bossFrac(boss);
+    // 护盾（维护者 2026-11-08）：共享血池的领袖身上还有屏障时，血条几乎不动 —— 玩家看到的是「17% 却打了好久」。
+    // 屏障的绝对量是按**整池**算的（sim snapshot.js bossShield），所以按同一把尺子（池上限）画在血条上：
+    // 于是「血条只剩 17%、但盾条还有 16.8%」一眼就能看出来是被盾吃掉了，而不是血条卡住。
+    const shFrac = bossShieldFrac(boss);
     return html`<div class="capsule capsule--boss" role="status">
       <${Sprite} k="hudPanel/icon_boss" class="capsule__icon" style=${diveIcon} fallback=${html`<${GIcon} name="skull" class="capsule__icon" />`} />
       ${hud?.total != null ? html`<span class="capsule__kills num"><b>${hud.resolved ?? hud.killed ?? 0}</b>/${hud.total}</span>` : null}
-      <div class="bossbar" title=${boss ? `${fmtNum(boss.hp)} / ${fmtNum(boss.max)}` : t('敌方领袖')}>
+      <div class=${cx('bossbar', shFrac != null && 'has-shield')} title=${boss ? `${fmtNum(boss.hp)} / ${fmtNum(boss.max)}${shFrac != null ? ` · ${t('护盾')} ${fmtNum(boss.shield)}` : ''}` : t('敌方领袖')}>
         <div class="bossbar__fill" style=${`width:${frac == null ? 100 : frac * 100}%`}></div>
+        ${shFrac != null ? html`<div class="bossbar__shield" data-testid="boss-shield" style=${`width:${shFrac * 100}%`}></div>` : null}
         <span class="bossbar__txt num">${frac == null ? t('敌方领袖') : bossPctText(frac)}</span>
       </div>
     </div>`;

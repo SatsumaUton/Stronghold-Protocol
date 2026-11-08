@@ -100,6 +100,26 @@ export function abOf(b, e) {
   return e.mem.ab;
 }
 
+/**
+ * 「这只敌人的生命上限」——用作**按比例**生成的屏障 / 护盾的基准。
+ *
+ * 共享血池的领袖（`bossPool`）不能用 `s.maxHp`：那是**整个池子**（battle/spawns.js `_syncBossHp` 把
+ * `pool.maxHp` 抄进 `base.maxHp`），而它血条上显示的是池子的**剩余**。按池子上限算出来的屏障会成为
+ * 「剩余血的 N 倍」——池子剩 17 % 时一个 10 % 的屏障已经是剩余血的 59 %，血条看起来冻住，屏障一破血
+ * 立刻见底（维护者 2026-11-08 实测：池 675 000、剩 17 % 时「墓碑」的屏障 = 67 500 = 剩余血的 0.6 倍）。
+ * 官方没有共享血池，所以「按上限算」在原版是对的；这里只在有池子时改用剩余血量。
+ *
+ * @param {any} e 敌人
+ * @returns {number} ≥ 0
+ */
+export function hpBasisOf(e) {
+  if (!e) return 0;
+  // 共享血池的领袖：血条上显示的是**剩余**，所以按剩余算
+  if (e.bossPool) return Math.max(0, Number(e.hp) || 0);
+  // 其余单位维持原口径（`base.maxHp` 优先，回退 `s.maxHp`）—— 原版逐字节不变
+  return Math.max(0, Number(e.base && e.base.maxHp) || Number(e.s && e.s.maxHp) || 0);
+}
+
 /** Native ordinary-priority phys/arts count shield; repeated grants keep the held instance and stronger count. */
 export function grantHitShield(battle, enemy, count) {
   if (!Number.isFinite(count) || !(count > 0)) return null;

@@ -5,7 +5,7 @@
 import { bondTimerView } from '../content/bonds/timers.js';
 import { EVENT_BUFFER_CAP } from '../constants.js';
 import { elementView } from '../attack.js';
-import { unitInfo, snapshotUnits, ammoView, wolfView, negView, moteView, coinView, mysticView, layerView, chargeView, shieldView } from '../snapshot.js';
+import { unitInfo, snapshotUnits, ammoView, wolfView, negView, moteView, coinView, mysticView, layerView, chargeView, shieldView, bossShieldView } from '../snapshot.js';
 
 export class BattleEvents {
   fx(kind, params = {}) {
@@ -115,7 +115,18 @@ export class BattleEvents {
       snap.dps = {};
       for (const p of this.players) snap.dps[p.playerId] = Math.floor(p.dp);
     }
-    if (this.sharedBoss) snap.boss = { hp: Math.max(0, Math.round(this.sharedBoss.hp)), max: Math.round(this.sharedBoss.maxHp) };
+    if (this.sharedBoss) {
+      snap.boss = { hp: Math.max(0, Math.round(this.sharedBoss.hp)), max: Math.round(this.sharedBoss.maxHp) };
+      // the shield the leader on the field still holds (snapshot.js bossShield): the HUD's boss bar draws it over the
+      // pool remainder, so a barrier sized off the whole pool does not read as a frozen empty bar (维护者 2026-11-08)
+      let bossShield = null;
+      for (const u of this.enemies) {
+        if (!u.alive || !u.deployed || u.hidden) continue;
+        const v = bossShieldView(u);
+        if (v != null && (bossShield == null || v > bossShield)) bossShield = v;
+      }
+      if (bossShield != null) snap.boss.shield = bossShield;
+    }
     const r2 = (v) => Math.round(v * 100) / 100;
     let down = null;
     for (const u of this.allyUnits) {

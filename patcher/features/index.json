@@ -6663,7 +6663,7 @@
       {
         "path": "public/css/screens/game.css",
         "baseExists": true,
-        "customBytes": 124589
+        "customBytes": 125327
       },
       {
         "path": "public/css/screens/lobby.css",
@@ -6848,7 +6848,7 @@
       {
         "path": "public/js/ui/hud.js",
         "baseExists": true,
-        "customBytes": 51840
+        "customBytes": 52567
       },
       {
         "path": "public/js/ui/matchChrome.js",
@@ -7003,7 +7003,7 @@
       {
         "path": "server/match/match/echoWords.js",
         "baseExists": false,
-        "customBytes": 22000
+        "customBytes": 22489
       },
       {
         "path": "server/match/match/intents.js",
@@ -7128,7 +7128,7 @@
       {
         "path": "server/sim/battle/echoRules.js",
         "baseExists": false,
-        "customBytes": 15972
+        "customBytes": 17008
       },
       {
         "path": "server/sim/battle/players.js",
