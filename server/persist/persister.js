@@ -22,7 +22,7 @@
 
 import { snapshotMatch, restoreMatch, CHECKPOINT_PREP_END } from '../match/snapshot.js';
 import { createRngFromState } from '../sim/rng.js';
-import { restoreLobby, roomDoc, sessionDoc, LOBBY_DOC_VERSION, SESSION_FIELDS } from './lobbyState.js';
+import { restoreLobby, roomDoc, sessionDoc, soloHoldDoc, LOBBY_DOC_VERSION, SESSION_FIELDS } from './lobbyState.js';
 import { TRANSIENT_FAILURES } from './store.js';
 
 /** Default interval between rounds of writes (ms). */
@@ -170,6 +170,14 @@ export class LobbyPersister {
       //   而写不写由「key 变了才重写」控制 —— 不放进来，房主点「公开同盟」之后 Redis 里的文档
       //   永远不会更新，匹配器就永远看不到这间房（跨节点公开同盟列表一直是空的，实测复现）。
       room.listed, room.matchmaking];
+    // ★ 2026-11-08：「深渊回响」单人房的 24 小时保存标记（lobbyState.soloHoldDoc）也要进 key。
+    //   `roomDoc` 里的座位字段不含「谁在线」（`connected` 在 SEAT_FIELDS 里，但 roomKey 不比较它），
+    //   所以玩家关掉页面时房间文档本来**不会重写** —— 不把标记算进 key，控制台就永远看不到
+    //   「已保存 · 剩 N 小时」，直到别的原因让这间房重写一次为止。
+    {
+      const hold = soloHoldDoc(room, (id) => this.registry.byId(id));
+      key.push(hold ? hold.since : null, hold ? hold.until : null);
+    }
     for (const s of room.spectators) key.push(s.playerId, s.name, s.owner);
     for (const s of room.seats) {
       if (!s) { key.push(null); continue; }

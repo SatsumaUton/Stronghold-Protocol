@@ -6608,12 +6608,12 @@
       {
         "path": "dashboard/public/app.js",
         "baseExists": false,
-        "customBytes": 61607
+        "customBytes": 64672
       },
       {
         "path": "dashboard/public/index.html",
         "baseExists": false,
-        "customBytes": 27779
+        "customBytes": 28489
       },
       {
         "path": "matchmaker/diveBoard.cjs",
@@ -6628,7 +6628,7 @@
       {
         "path": "matchmaker/public/admin.html",
         "baseExists": false,
-        "customBytes": 92333
+        "customBytes": 95691
       },
       {
         "path": "matchmaker/public/client.js",
@@ -6643,7 +6643,7 @@
       {
         "path": "matchmaker/server.js",
         "baseExists": false,
-        "customBytes": 61435
+        "customBytes": 62613
       },
       {
         "path": "mm/client.js",
@@ -7083,7 +7083,12 @@
       {
         "path": "server/persist/lobbyState.js",
         "baseExists": true,
-        "customBytes": 19463
+        "customBytes": 22890
+      },
+      {
+        "path": "server/persist/persister.js",
+        "baseExists": false,
+        "customBytes": 22783
       },
       {
         "path": "server/sim/Battle.js",

@@ -26,6 +26,41 @@ const nodeLabel = (target) => {
   const n = Number(String(target).replace(/^node-/, ''));
   return NAMES[n - 1] || String(target);
 };
+
+/**
+ * 「深渊回响」单人房的 24 小时保存标记（维护者 2026-11-08）。
+ *
+ * 服务端（`server/persist/lobbyState.js` 的 `soloHoldDoc`）只有在**真的处于「没人玩、等他回来」**
+ * 时才下发 `soloHold = { since, until, windowMs, name }`：
+ * 深潜房 + 只有一个真人 + 那个人不在线。界面这边只负责说清楚「保存到什么时候」。
+ *
+ * 剩余时间按小时向上取整（还剩 30 分钟也写「剩 1 小时」，不会写成「剩 0 小时」让人以为已经到期）；
+ * 过期的窗口标成红色「已过期」（这时房间正在被回收，运维要能立刻看出来）。
+ * @param {{ since?: number, until?: number, windowMs?: number, name?: string } | null | undefined} hold
+ * @returns {{ text: string, title: string, expired: boolean } | null}
+ */
+function soloHoldBadge(hold) {
+  if (!hold || typeof hold !== 'object') return null;
+  const until = Number(hold.until);
+  if (!Number.isFinite(until) || until <= 0) return null;
+  const left = until - Date.now();
+  const hours = Math.max(0, Math.ceil(left / 3600000));
+  const who = String(hold.name || '').trim();
+  const since = Number(hold.since);
+  const when = Number.isFinite(since) && since > 0 ? fmtClock(since) : '';
+  const text = left > 0 ? '已保存 · 剩 ' + hours + ' 小时' : '已过期';
+  const title = '深渊回响单人房：' + (who ? who + ' ' : '') + '关掉页面 / 掉线后，座位和这一局替他保留 24 小时'
+    + (when ? '（从 ' + when + ' 开始算）' : '') + (left > 0 ? '，回来点大厅右上角「恢复对局」就能接着打。' : '，现在正在被回收。');
+  return { text, title, expired: !(left > 0) };
+}
+
+/** 毫秒时间戳 → 「MM-DD HH:mm」（本地时区，控制台只用来核对，不需要秒）。 */
+function fmtClock(ms) {
+  const d = new Date(Number(ms) || 0);
+  if (!Number.isFinite(d.getTime())) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
 const grid = $('grid');
 const cards = new Map();
 let logsTimer = null;
@@ -283,7 +318,9 @@ function updateRooms(r) {
   const coop = rooms.filter((x) => x.mode === 'coop' && x.variant !== 'deepecho').length;
   const echo = rooms.filter((x) => x.variant === 'deepecho').length;
   const queued = rooms.filter((x) => x.queued && !x.started).length;
-  count.textContent = rooms.length ? `${rooms.length} 个房间 / ${nodes.length} 个节点（单人 ${solo} · 同盟 ${coop}${echo ? ' · 深渊回响 ' + echo : ''} · 匹配中 ${queued}）` : '暂无房间';
+  // 「深渊回响」单人房正被 24 小时保存的数量（维护者 2026-11-08）
+  const holds = rooms.filter((x) => x.soloHold).length;
+  count.textContent = rooms.length ? `${rooms.length} 个房间 / ${nodes.length} 个节点（单人 ${solo} · 同盟 ${coop}${echo ? ' · 深渊回响 ' + echo : ''} · 匹配中 ${queued}${holds ? ' · 保存中 ' + holds : ''}）` : '暂无房间';
   renderRoomsTable();
 }
 
@@ -298,8 +335,10 @@ function renderRoomsTable() {
   const start = (roomsPage - 1) * ROOMS_PAGE_SIZE;
   const pageRows = rooms.slice(start, start + ROOMS_PAGE_SIZE);
   body.innerHTML = pageRows.length ? pageRows.map((x) => {
-    const state = x.started ? '对局中' : (x.queued ? '匹配中' : '等待中');
-    const stateClass = x.started ? ' is-live' : (x.queued ? ' is-queued' : '');
+    // 状态列：「保存中」优先于「对局中」—— 单人深潜房没人玩时 room.match 还在（对局没结束），
+    // 但把它显示成「对局中」会让运维以为有人在打。维护者 2026-11-08 要的正是「看得出来它在被保存」。
+    const state = x.soloHold ? '保存中' : x.started ? '对局中' : (x.queued ? '匹配中' : '等待中');
+    const stateClass = x.soloHold ? ' is-hold' : x.started ? ' is-live' : (x.queued ? ' is-queued' : '');
     const playerHtml = (x.players || []).map((p) => {
       // 身份标签：管理员/服主 > 游客 > 玩家
       const kind = p.admin ? { cls: 'is-admin', text: '管理员' } : p.guest ? { cls: 'is-guest', text: '游客' } : { cls: 'is-player', text: '玩家' };
@@ -321,6 +360,10 @@ function renderRoomsTable() {
     const modeCell = x.variant === 'deepecho'
       ? '<span class="room-mode is-echo" title="深渊回响（深潜）：管理员 / 测试名单专属，不参与匹配">深渊回响</span>'
       : '<span class="room-mode">' + (x.mode === 'solo' ? '单人模拟' : x.mode === 'coop' ? '同盟模拟' : '—') + '</span>';
+    // 「深渊回响」单人房**正被 24 小时保存**（维护者 2026-11-08）：房间里只有一个真人、他人不在线，
+    // 座位和整局都替他留着，回来还能接着打。标记放在房间号后面，附剩余时间。
+    const hold = soloHoldBadge(x.soloHold);
+    const holdBadge = hold ? '<span class="room-hold' + (hold.expired ? ' is-expired' : '') + '" title="' + esc(hold.title) + '">' + esc(hold.text) + '</span>' : '';
     const diffName = ({ FUNNY: '标准模拟', NORMAL: '险境模拟', HARD: '绝境模拟', ABYSS: '终极模拟' })[x.difficulty] || (x.difficulty || '—');
     const cap = Number(x.seats) || 4;
     const capBadge = cap > 4 ? '<span class="room-cap">' + cap + '人</span>' : '';
@@ -343,7 +386,7 @@ function renderRoomsTable() {
         + '" data-humans="' + (Number(x.humans) || 0) + '" data-round="' + (Number(x.round) || 0) + '"'
         + ' title="结束当前这一局，房间和座位都保留，玩家可以重新开局">结束对局</button>'
       : '<button class="room-abort" disabled title="当前没有进行中的对局，无法结束">结束对局</button>';
-    return '<tr><td><span class="room-code">' + esc(x.code) + '</span>' + capBadge + adminBadge + '</td><td title="node-' + x.node + '"><span class="room-node">' + esc(NAMES[x.node - 1] || ('节点 ' + x.node)) + '</span></td><td>' + modeCell + '</td><td><span class="room-diff' + (x.difficulty ? ' diff-' + esc(x.difficulty) : '') + '">' + esc(diffName) + '</span></td><td>' + verCell + '</td><td><span class="room-state' + stateClass + '">' + state + '</span></td><td><span class="room-round' + (x.round > 0 ? '' : ' is-empty') + '" title="' + (x.variant === 'deepecho' ? (x.round > 0 ? '深潜第 ' + x.round + ' 层' : (x.started ? '深潜开局中' : '深潜等待中')) : (x.round > 0 ? '第 ' + x.round + ' 回合' : (x.started ? '对局准备中' : '暂无对局'))) + '">' + roundText + '</span></td><td><div class="room-players' + (cap > 4 ? ' room-players--large' : '') + '">' + playerHtml + '</div></td><td>' + count(x.humans) + '</td><td>' + count(x.bots) + '</td><td>' + spectate + '</td><td><div class="room-spectators">' + spectatorHtml + '</div></td><td><span class="room-actions">' + abortBtn + closeBtn + '</span></td></tr>';
+    return '<tr><td><span class="room-code">' + esc(x.code) + '</span>' + capBadge + adminBadge + holdBadge + '</td><td title="node-' + x.node + '"><span class="room-node">' + esc(NAMES[x.node - 1] || ('节点 ' + x.node)) + '</span></td><td>' + modeCell + '</td><td><span class="room-diff' + (x.difficulty ? ' diff-' + esc(x.difficulty) : '') + '">' + esc(diffName) + '</span></td><td>' + verCell + '</td><td><span class="room-state' + stateClass + '">' + state + '</span></td><td><span class="room-round' + (x.round > 0 ? '' : ' is-empty') + '" title="' + (x.variant === 'deepecho' ? (x.round > 0 ? '深潜第 ' + x.round + ' 层' : (x.started ? '深潜开局中' : '深潜等待中')) : (x.round > 0 ? '第 ' + x.round + ' 回合' : (x.started ? '对局准备中' : '暂无对局'))) + '">' + roundText + '</span></td><td><div class="room-players' + (cap > 4 ? ' room-players--large' : '') + '">' + playerHtml + '</div></td><td>' + count(x.humans) + '</td><td>' + count(x.bots) + '</td><td>' + spectate + '</td><td><div class="room-spectators">' + spectatorHtml + '</div></td><td><span class="room-actions">' + abortBtn + closeBtn + '</span></td></tr>';
   }).join('') : '<tr><td colspan="13" class="muted">暂无房间</td></tr>';
   // 按钮（每次重绘表格都会重建，所以在这里绑定）
   body.querySelectorAll('[data-abort]').forEach((b) => {

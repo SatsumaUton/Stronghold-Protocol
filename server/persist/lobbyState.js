@@ -21,7 +21,9 @@
 // is dropped. Lobby rooms get the usual lobby grace for their absent players.
 
 import { Session } from '../net.js';
-import { Room } from '../lobby.js';
+// SOLO_RECONNECT_FALLBACK_SEC：单人房「24 小时保存」的兜底时长（官方 singleReconnectTime 缺失时用它）。
+// 这里已经 import 了 Room，同一个模块再多取一个常量不会新增依赖边。
+import { Room, SOLO_RECONNECT_FALLBACK_SEC } from '../lobby.js';
 import { experimentalOptions, isExperimental } from '../../shared/experimental.js';
 import { DIFFICULTIES, ROOM_CODE_LEN } from '../../shared/constants.js';
 
@@ -49,6 +51,48 @@ export function persistableRoom(room) {
 }
 
 /**
+ * 「深渊回响」单人房正被**24 小时保存**着（维护者 2026-11-08：控制台 / 后台要能一眼看出来）。
+ *
+ * 判据（与 `Lobby.soloLikeRun` + `Lobby.soloResumeWindowMs` 同一条链路）：
+ *   * `variant === 'deepecho'`，而且这一局真的开着（`room.match`）；
+ *   * 房间里**只有 1 个真人**（AI 座位不算人）；
+ *   * 这个人**不在线** —— 关掉页面 / 掉线 / 换设备，总之没有人在玩；
+ *   * 他的会话还挂着 `resumeWindowMs`（单人房 = 官方 `singleReconnectTime` 24 小时）。
+ *
+ * 于是 `since` = 他断线的时刻，`until` = 窗口到期时刻（到点 onExpire 释放座位、对局以 abandoned 结束）。
+ * 这些字段只进房间文档（Redis → matchmaker → `content/rooms.json`），**不参与任何玩法判定**。
+ *
+ * 为什么放在房间文档里而不是让界面去猜：界面拿到的只有 `rooms.json`，它既没有会话表也没有
+ * 「谁在什么时候断的线」；`roomDoc` 这里正好有 `sessionOf`，是唯一算得准的地方。
+ *
+ * @param {any} room @param {((playerId: string) => any) | null | undefined} sessionOf
+ * @returns {{ since: number, until: number, windowMs: number, name: string, playerId: string } | null}
+ */
+export function soloHoldDoc(room, sessionOf) {
+  // 深潜房在协议里是 `mode:'coop'` + `variant:'deepecho'`（见 roomDoc 的 variant 注释）——
+  // 两个条件都要，别让一个只带 variant 的怪文档在控制台上标出「保存中」。
+  if (!room || room.disposed || room.mode !== 'coop' || room.variant !== 'deepecho' || !room.match) return null;
+  const humans = typeof room.activeHumans === 'function' ? room.activeHumans() : [];
+  if (humans.length !== 1) return null;              // 多人局没有「保存单人房」这回事
+  const seat = humans[0];
+  if (!seat || seat.connected) return null;          // 有人在玩 → 不是在「保存」
+  const session = sessionOf ? sessionOf(seat.playerId) : null;
+  const own = session && Number.isFinite(Number(session.resumeWindowMs)) && Number(session.resumeWindowMs) > 0
+    ? Number(session.resumeWindowMs) : 0;
+  // 没有会话（重启后 session 还没回来 / 被清理）时退回单人房的官方 24 小时，并从「最后一个人离开」算起
+  const windowMs = own || SOLO_RECONNECT_FALLBACK_SEC * 1000;
+  const since = Number(session && session.disconnectedAt) || Number(room.lastHumanLeftAt) || 0;
+  if (!(since > 0)) return null;                     // 连断线时刻都不知道：宁可不标，也不给假倒计时
+  return {
+    since: Math.round(since),
+    until: Math.round(since + windowMs),
+    windowMs: Math.round(windowMs),
+    name: String(seat.name || ''),
+    playerId: String(seat.playerId || ''),
+  };
+}
+
+/**
  * One room's record, or null when it is not saved (persistableRoom; a running match without a reference cannot come
  * back, and neither can its room). A human seat's settings that are its session's very values are not repeated: `$same`
  * names them and the restore takes them from the session.
@@ -72,6 +116,7 @@ export function roomDoc(room, matchRef, sessionOf) {
     if (same.length) out.$same = same;
     return out;
   };
+  const soloHold = soloHoldDoc(room, sessionOf);
   return {
     code: room.code, mode: room.mode, difficulty: room.difficulty, aiPicksLast: !!room.aiPicksLast, hostId: room.hostId,
     // 房间容量必须单独存一份：匹配端 roomInfo() 读的是 doc.capacity，
@@ -98,6 +143,9 @@ export function roomDoc(room, matchRef, sessionOf) {
     ttlMs: room.ttlMs, noExpire: room.noExpire === true, adminCreated: room.adminCreated === true,
     matchLive: !!room.match, liveRound: room.liveRound | 0, livePhase: room.livePhase || null,
     maxSpectators: typeof room.spectatorLimit === 'function' ? room.spectatorLimit() : 0,
+    // 「深渊回响」单人房正在被 24 小时保存（维护者 2026-11-08）：控制台 / 后台据此打「已保存 · 剩 N 小时」的标记。
+    // 只在真的处于「没人玩、等回来」时才有这个键，普通房间的存档与以前逐字节一致。
+    ...(soloHold ? { soloHold } : {}),
     seats: room.seats.map(seat),
     // ★ 2026-10-31：必须存 `connected`。以前这里只存 playerId/name，于是 dashboard 拿到的
     //   观战者永远没有连接状态 —— matchmaker 用 `s.connected !== false` 判在线，

@@ -59,6 +59,11 @@
 #rooms-bar .room-state:before{content:"";width:6px;height:6px;border-radius:50%;background:#7e9295;box-shadow:0 0 0 3px rgba(126,146,149,.12)}
 #rooms-bar .room-state.is-live:before{background:#4ed8af;box-shadow:0 0 0 3px rgba(78,216,175,.14)}
 #rooms-bar .room-state.is-queued:before{background:#e8b25a;box-shadow:0 0 0 3px rgba(232,178,90,.14)}
+/* 「深渊回响」单人房 24 小时保存（维护者 2026-11-08）：状态点用紫色，和「深渊回响」角标同一套色，
+   一眼能看出这不是在等人、也不是有人在打，而是「替他留着」。 */
+#rooms-bar .room-state.is-hold:before{background:#b79cff;box-shadow:0 0 0 3px rgba(183,156,255,.16)}
+#rooms-bar .room-hold{display:inline-flex;align-items:center;margin-left:5px;padding:1px 6px;border:1px solid rgba(183,156,255,.45);border-radius:5px;background:rgba(183,156,255,.12);color:#c9b6ff;font-size:10px;line-height:1.4;vertical-align:1px;white-space:nowrap}
+#rooms-bar .room-hold.is-expired{border-color:rgba(255,0,36,.38);background:rgba(255,0,36,.1);color:#ff9caa}
 #rooms-bar .room-round{display:inline-block;min-width:74px;padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.04);color:#cfe0dd;font-size:12px;text-align:center;white-space:nowrap}
 #rooms-bar .room-round.is-empty{background:transparent;color:#687c7f}
 #rooms-bar .room-ver{display:inline-block;padding:2px 6px;border-radius:5px;border:1px solid rgba(120,160,165,.22);background:rgba(255,255,255,.03);color:#8fa4a6;font-size:11px;white-space:nowrap}
