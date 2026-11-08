@@ -340,33 +340,36 @@ function onRoomState(msg) {
   maybeFinishRestore();
 }
 
-// 房间关闭的提示文案。每条都可以给 `solo` / `coop` 两个说法：
-// 独立模拟（solo）里没有「同盟」这个概念，说「同盟已解散」会很怪。
-// 只写一个字符串的条目（ended / shutdown）两种模式通用。
+// 房间关闭的提示文案。每种模式一个说法：solo（独立模拟）、coop（同盟模拟）、echo（深渊回响）——
+// 深潜房不是同盟，说「同盟已解散」同样很怪（维护者 2026-11-08）。没写 echo 的条目退回 coop 的说法，
+// 避免为了措辞漏一条就退化成没有文案。
+// 只写一个字符串的条目（ended / shutdown）三种模式通用。
 // 2026-10-28 维护者要求：「独立模拟和同盟模拟的关闭信息」要分开。
 const CLOSE_REASON = {
   // 'timeout' = this player was removed after staying disconnected past the lobby grace (server/lobby.js)
-  host_left: { solo: N_('创建者已离开，模拟已结束'), coop: N_('创建者已离开，同盟已解散') },
-  timeout: { solo: N_('由于长时间断开连接，你已离开模拟'), coop: N_('由于长时间断开连接，你已离开同盟') },
-  empty: { solo: N_('模拟已结束'), coop: N_('同盟已解散') },
-  kicked: { solo: N_('你已被移出模拟'), coop: N_('你已被移出同盟') },
+  host_left: { solo: N_('创建者已离开，模拟已结束'), coop: N_('创建者已离开，同盟已解散'), echo: N_('发起者已离开，深潜已结束') },
+  timeout: { solo: N_('由于长时间断开连接，你已离开模拟'), coop: N_('由于长时间断开连接，你已离开同盟'), echo: N_('由于长时间断开连接，你已离开这次深潜') },
+  empty: { solo: N_('模拟已结束'), coop: N_('同盟已解散'), echo: N_('深潜已结束') },
+  kicked: { solo: N_('你已被移出模拟'), coop: N_('你已被移出同盟'), echo: N_('你已被移出这次深潜') },
   ended: N_('模拟已结束'),
-  expired: { solo: N_('模拟已过期'), coop: N_('同盟已过期') },
+  expired: { solo: N_('模拟已过期'), coop: N_('同盟已过期'), echo: N_('深潜已过期') },
   shutdown: N_('服务器维护中，模拟已关闭'),
-  'stuck-preparing': { solo: N_('模拟超时未开始，已自动结束'), coop: N_('同盟超时未开始，已自动解散') },
+  'stuck-preparing': { solo: N_('模拟超时未开始，已自动结束'), coop: N_('同盟超时未开始，已自动解散'), echo: N_('深潜超时未开始，已自动结束') },
   // 管理员从控制台 / 管理后台手动关闭（服务器 /admin/room/close）
-  'admin-closed': { solo: N_('该模拟已被管理员关闭'), coop: N_('该同盟已被管理员关闭') },
+  'admin-closed': { solo: N_('该模拟已被管理员关闭'), coop: N_('该同盟已被管理员关闭'), echo: N_('这次深潜已被管理员关闭') },
 };
 
 /**
  * 一条关闭原因在当前模式下的文案键。
  * @param {string | Record<string, string>} entry CLOSE_REASON 的值
  * @param {string | null} mode 关闭前的房间模式：'solo' | 'coop' | null
+ * @param {boolean} [echo] 这一局是不是「深渊回响」（room.variant === 'deepecho'）
  * @returns {string}
  */
-function closeText(entry, mode) {
+function closeText(entry, mode, echo = false) {
   if (typeof entry === 'string') return t(entry);
-  // 单人房就是 solo；其余（含模式未知）按同盟的说法，保持改动前的行为
+  // 单人房就是 solo；深潜房用自己的说法（缺了退回 coop）；其余（含模式未知）按同盟的说法
+  if (mode !== 'solo' && echo && entry.echo) return t(entry.echo);
   return t(mode === 'solo' ? entry.solo : entry.coop);
 }
 
@@ -424,12 +427,15 @@ function wireNet() {
   net.on('room.closed', (msg) => {
     // 房间关闭提示要按模式说人话：独立模拟（solo）里没有「同盟」这个概念。
     // backToLobby() 会把 store.room 清空，所以模式必须在它之前抓（2026-10-28）。
+    // ★ 2026-11-08：深渊回响房也不是同盟（维护者：「深渊回响房间中的同盟模拟去掉改成深渊回响」）——
+    //   coop 的文案在深潜房里换成「深潜」的说法，别让玩家以为自己是跟同盟打的标准模拟。
     const mode = store.get().room?.mode ?? null;
+    const echo = store.get().room?.variant === 'deepecho';
     clearPendingJoin();
     backToLobby();
     const known = Object.hasOwn(CLOSE_REASON, String(msg.reason)) ? CLOSE_REASON[msg.reason] : null;
-    const text = known ? closeText(known, mode) : typeof msg.reason === 'string' && msg.reason.length < 60
-      ? t('同盟已关闭：{reason}', { reason: msg.reason }) : t('同盟已关闭');
+    const text = known ? closeText(known, mode, echo) : typeof msg.reason === 'string' && msg.reason.length < 60
+      ? t(echo ? '深潜已关闭：{reason}' : '同盟已关闭：{reason}', { reason: msg.reason }) : t(echo ? '深潜已关闭' : '同盟已关闭');
     toast(text, 'warn');
   });
   net.on('m.public', (msg) => { matchAt = Date.now(); store.patch('match', { public: payload(msg) }); maybeFinishRestore(); });

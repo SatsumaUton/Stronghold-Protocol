@@ -68,6 +68,8 @@ const TESTS = [
   'test/match/echo-projection-bonds.test.js',
   'test/ui/stats-echo-record.test.js',
   'test/ui/echo-exit-words.test.js',
+  'test/ui/echo-room-wording.test.js',
+  'test/ui/join-cross-node.test.js',
 ];
 
 const sha = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
