@@ -540,9 +540,12 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     bond: (id) => (ps.bonds[id] ? { ...ps.bonds[id] } : null),
     bonds: () => Object.fromEntries(Object.entries(ps.bonds).map(([k, v]) => [k, { ...v }])),
     bondActive: (id) => !!(ps.bonds[id] && ps.bonds[id].active),
-    // 「按层给钱」（远见 每 10 层 / 奇迹 每 100 层）结算到 **999 层** —— 只要本局解除了层数上限
-    // （`layerCapOff`：深渊回响，或实验房的 disableLayerCap）。层数照旧能继续叠（战斗增益不变），
-    // 但资金通道不再跟着涨，否则就是无上限印钞机（维护者 2026-11-03 / 2026-11-07）。
+    // 「按层结算」的上限 —— 只要本局解除了层数上限（`layerCapOff`：深渊回响，或实验房的 disableLayerCap）。
+    // 「远见」每 10 层给钱、「奇迹」每 100 层给钱（addon/meta.js layerCoinDue）结算到 **999 层**，
+    // 「维多利亚」每 25 层一件维式重锤（bonds/core.js payHammers）同样结算到 **999 层**：
+    // 层数照旧能继续叠（战斗增益不变），但按层发的**奖励**不再跟着涨，
+    // 否则就是无上限印钞机（远见 / 奇迹，维护者 2026-11-03 / 2026-11-07）或一次补发上百件维式重锤
+    // （玩家 2026-11-08 反馈「重启后给了很多维多利亚锤子」，见 bonds/core.js payHammers 的注释）。
     // 普通房给 Infinity = 原版行为，一字不差。
     bondLayerCoinCap: m.layerCapOff ? BOND_LAYER_CAP : Infinity,
     bondCount: (id) => (ps.bonds[id] ? ps.bonds[id].count : 0),
