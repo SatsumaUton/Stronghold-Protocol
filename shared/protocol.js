@@ -631,6 +631,10 @@ export const C2S = {
   'g.rerollVote': { voteId: (v) => isInt(v, 1, 2 ** 31), agree: isBool },
   // 战斗 2 倍速 (server/match/match/speedVote.js): this seat's standing vote; m.public speedVote is the count
   'g.speedVote': { agree: isBool },
+  // 「暂停游戏」的全员投票（维护者 2026-11-08，server/match/match/pauseVote.js）：agree=true 发起/同意、false 撤回；
+  // 暂停中每个人发 g.pauseResume 确认，全员确认后恢复
+  'g.pauseVote': { agree: isBool },
+  'g.pauseResume': {},
   // 「深渊回响」的祝福三选一 (server/match/match/echoBlessing.js, ui/echoBlessing.js):
   // `pick` 是候选下标（0..2），**3 = 第四张「放弃本次」**（维护者 2026-11-05 加的）。上限必须放到 3 ——
   // 否则点「放弃本次」会在客户端就被拦成「无效的请求」，服务端 intents.js 的 case 永远收不到

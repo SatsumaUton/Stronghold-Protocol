@@ -208,6 +208,27 @@ always. While paused (`m.public.paused`) the field clocks, the authority deadlin
 fields' `startAt` / `lastProgressAt` and the boss start by the paused time and re-arms the timers. A disconnect or
 `onLeave` resumes; the battle phase ending clears it (`pausedMs` totals the paused time).
 
+### 1.3b 「暂停游戏」的全员投票（深渊回响多人局）
+`g.pauseVote { agree }` / `g.pauseResume {}` (`Match.setPauseVote` / `Match.pauseResume`,
+`server/match/match/pauseVote.js`): only for `echoVariant === 'deepecho'` rooms with **≥ 2 humans** (a solo room uses
+the Space pause above; other rooms have no such field at all, so `m.public` keeps its exact bytes).
+* Proposing / agreeing is a side-taking vote like `g.speedVote`; **every connected human** must agree
+  (`pauseVoteView().pass`, `voters` = connected, not bot-controlled, not spectating, alive). 300 ms per-player rate
+  limit. Allowed phases: PREP / SP_DRAFT / COMBAT / FINAL_ASSAULT / HIDDEN_CORE.
+* On passing, `paused` + `_pausedAt` come from the solo pause (every clock stops), the phase deadline timer is lifted
+  (`_pauseHoldPhaseTimer` keeps `{ fn, left }`), the fields' deadlines / release timers and the boss clock are
+  cancelled, `g.ready` is refused (`WRONG_PHASE 'paused'`) and `maybeEndPrep` returns early — a fully-ready prep
+  cannot advance while paused.
+* `m.public.pauseActive` = `{ by, byName, resumed, voters, need, ready, endsAt }`; each online human sends
+  `g.pauseResume`, and the last one calls `_echoPauseEnd('all')` → `_resume()` shifts every clock by the paused time
+  and `_pauseReleasePhaseTimer` re-arms the phase timer with its remaining time.
+* A player who disconnects / leaves is no longer counted (`_pauseMemberGone`); when nobody is left the pause ends
+  (`'gone'`). A pause longer than `PAUSE_VOTE_MAX_MS` (10 min) resumes by itself (`'timeout'`) so one idle player
+  cannot hold the match. `onDisconnect` / `onLeave` no longer call the solo `_resume()` while `echoPaused` — otherwise
+  losing a connection would silently un-freeze the room behind the overlay.
+* Everything is transient (`snapshot.js`): `canSnapshot` returns false while `echoPaused` (a restored pause would be
+  permanent with nobody able to confirm).
+
 ### 1.4 Watching fields
 Client-side combat (the default, DESIGN §14 Spectating; `Match._watchClient`): `g.watch` answers with the field's
 `b.start` (a display replica fast-forwarded to the field clock); an alive player may watch a teammate's normal field

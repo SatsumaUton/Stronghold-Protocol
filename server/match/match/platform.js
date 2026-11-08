@@ -141,8 +141,12 @@ export class MatchPlatform {
       ps.connected = false;
       // A disconnected human's silence is never consent to a new setup.
       this.cancelSetupVote();
-      // a paused solo battle resumes (the server takes the field over; nobody is left to resume it)
-      this._resume();
+      // 「暂停游戏」：掉线的人不算「没确认」，全员走光就直接恢复（pauseVote.js）
+      try { this._pauseMemberGone?.(); } catch { /* ignore */ }
+      // a paused solo battle resumes (the server takes the field over; nobody is left to resume it) —— 但**投票暂停**
+      // 例外：一个人的连接断了不代表别人同意继续，这里 _resume 会把 `paused` 直接清掉（玩家仍停在浮层上，
+      // 却已经恢复计时）。投票暂停的结束只走 `_echoPauseEnd`。
+      if (!this.echoPaused) this._resume();
       if (this.clientCombat) this._authorityLost(ps, 'disconnect');
       // a rehearsal this host was running falls back to the server (DESIGN §14; a no-op without tasks)
       this._rehearsalHostChanged();
@@ -165,6 +169,8 @@ export class MatchPlatform {
       if (released) ps.autoplay = false;
       // 针对这个座位的投票随接管一起结束（kickVote.js）
       try { this._kickVoteMemberGone?.(playerId, true); } catch { /* ignore */ }
+      // 「暂停游戏」中回来：他要重新确认一次才能继续（pauseVote.js 只数在线的人）
+      if (this.echoPaused) this.markPublic();
       this._resync(ps);
       if (released) {
         try { this.toast(ps, 'info', msg('你已重新连接，AI 托管已解除')); } catch { /* ignore */ }
@@ -335,6 +341,8 @@ export class MatchPlatform {
     if (!ps || ps.isBot || ps.left || this.disposed) return;
     this.guard(() => {
       ps.left = true;
+      // 「暂停游戏」：永久离开的人不再挡着继续（pauseVote.js）
+      try { this._pauseMemberGone?.(); } catch { /* ignore */ }
       // 投票移出：这个座位走了，针对它的投票结束（proposer 退出同理）
       try { this._kickVoteMemberGone?.(playerId); } catch { /* ignore */ }
       this.cancelSetupVote();
@@ -344,7 +352,8 @@ export class MatchPlatform {
       ps.autoplay = false;
       this.watchers.delete(playerId);
       if (this.ended) return;
-      this._resume();
+      // 投票暂停中：上面 `_pauseMemberGone` 已经在「全员走光」时收尾；还有人留在浮层上就别偷偷恢复
+      if (!this.echoPaused) this._resume();
       if (this.clientCombat) this._authorityLost(ps, 'left');
       // a rehearsal the departed seat was running falls back to the server (DESIGN §14; a no-op without tasks)
       this._rehearsalHostChanged();

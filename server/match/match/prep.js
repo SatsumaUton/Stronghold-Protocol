@@ -160,6 +160,8 @@ export class MatchPrep {
 
   maybeEndPrep() {
     if (this.phase !== PHASE.PREP || this._prepEndQueued) return;
+    // 「暂停游戏」（投票暂停）期间不结束准备阶段：全员就绪也不能把这一回合推走（维护者 2026-11-08）
+    if (this.echoPaused) return;
     const allReady = () => { const alive = this.alivePlayers(); return alive.length > 0 && alive.every((p) => p.ready); };
     if (!allReady()) return;
     const round = this.round;

@@ -531,6 +531,7 @@
         "server/match/match/echoWords.js",
         "server/match/match/intents.js",
         "server/match/match/offers.js",
+        "server/match/match/pauseVote.js",
         "server/match/match/phases.js",
         "server/match/match/platform.js",
         "server/match/match/prep.js",

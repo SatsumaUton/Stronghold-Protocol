@@ -229,6 +229,9 @@ export function canSnapshot(m) {
   // 此刻存检查点，读档回来准备时间就是 0 秒，而面板本身也回不来 —— 玩家会白丢一整回合的备战。
   // 所以和插件窗口一样：等面板结算完再存（维护者 2026-11-06「重启断点续玩」）。
   if (typeof m._echoChoiceOpen === 'function' && m._echoChoiceOpen()) return false;
+  // 「投票暂停」中不存检查点（2026-11-08）：`paused` / `_pausedAt` 会进存档，但 `echoPaused`（谁发起的、
+  // 谁已经确认）是 transient 的 —— 读档回来会变成一个**永远暂停**、又没有人能点「继续」的对局。
+  if (m.echoPaused) return false;
   if (m.phase === PHASE.PREP) for (const ps of m.alivePlayers()) if (ps.botControlled && !ps.ready) return false;
   return true;
 }

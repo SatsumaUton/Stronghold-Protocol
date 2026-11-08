@@ -87,6 +87,10 @@ export class MatchIntents {
       case 'g.rerollVote': return this.voteSetupReroll(ps, msg.voteId, msg.agree);
       // 战斗 2 倍速: the seat's standing vote (speedVote.js)
       case 'g.speedVote': return this.setSpeedVote(ps, msg.agree === true);
+      // 「暂停游戏」的全员投票（维护者 2026-11-08，pauseVote.js）：agree=true 发起/同意，false 撤回
+      case 'g.pauseVote': return this.setPauseVote(ps, msg.agree === true);
+      // 暂停中确认「可以继续」：全员确认后恢复
+      case 'g.pauseResume': return this.pauseResume(ps);
       // 深渊回响：祝福三选一的投票（echoBlessing.js）
       case 'g.echoBlessing': return this.setEchoBlessingVote(ps, msg.pick);
       // 祝福名额已满时的「弃选」投票（维护者 2026-11-05，同样 30 秒时限）
@@ -128,7 +132,10 @@ export class MatchIntents {
       // the host applies the declared primitive, a plugin never reaches the match state itself
       case 'g.offer': return this.requestOffer(ps, msg.offerId, msg.idx, msg);
       case 'g.offerRefresh': return this.requestOfferRefresh(ps, msg.offerId, msg.idx, msg);
-      case 'g.ready': return ps.setReady(!!msg.ready);
+      case 'g.ready':
+        // 「暂停游戏」期间不接受准备：全员就绪会把这一回合推走（维护者 2026-11-08）
+        if (this.echoPaused) return fail(ERR.WRONG_PHASE, 'paused');
+        return ps.setReady(!!msg.ready);
       case 'g.emote': return this.emote(ps, msg.id);
       // playerId: the player tapped (a shared field names two) — the watch preference (item 56)
       case 'g.revive': return this.revive(ps, msg);
