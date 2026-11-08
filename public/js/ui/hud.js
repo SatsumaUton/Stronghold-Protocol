@@ -601,7 +601,7 @@ export function UniteBudgetNote({ pub }) {
 export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, onReady, readyBusy, readyCount, playerCount, pen = false, penAvail = false, onPen = () => {},
   config = null, frozenAt = null, pause = null, live = null, spectator = false,
   spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null, held = false, onSpeedVote = null,
-  onPauseVote = null }) {
+  onPauseVote = null, effectsSlot = null }) {
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
   const lp = boss && Number.isFinite(pub?.teamLp) ? pub.teamLp : Number.isFinite(priv?.lp) ? priv.lp : null;
@@ -743,6 +743,11 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
       ${showReady ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} />` : null}
       ${/* 「暂停游戏」的全员投票（维护者 2026-11-08）：按钮就放在「准备就绪」下面 */ null}
       ${onPauseVote ? html`<${PauseVote} pub=${pub} myId=${myId} spectator=${spectator} onVote=${onPauseVote} />` : null}
+      ${/* 效果栏（策略 / 机变 / 团队增益 …）也排在这一列的最后（维护者 2026-11-08：暂停按钮被「策略」图标压住）。
+             它以前是 .gm__hud 里单独一块绝对定位（top: 2.4rem），和这一列的高度是两份互不相干的数字 ——
+             这一列每加一颗按钮（这次是「暂停游戏」），下沿就往下长，而 top 还是 2.4rem，于是第一个图标
+             正好盖在按钮上。放进这一列以后它自己就跟着往下让，再也不用同步那两个数。 */ null}
+      ${effectsSlot}
     </div>
     <${UniteBudgetNote} pub=${pub} />
   </header>`;

@@ -6663,7 +6663,7 @@
       {
         "path": "public/css/screens/game.css",
         "baseExists": true,
-        "customBytes": 123826
+        "customBytes": 124589
       },
       {
         "path": "public/css/screens/lobby.css",
@@ -6728,7 +6728,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 144996
+        "customBytes": 145449
       },
       {
         "path": "public/js/screens/game/overlays.js",
@@ -6848,7 +6848,7 @@
       {
         "path": "public/js/ui/hud.js",
         "baseExists": true,
-        "customBytes": 51225
+        "customBytes": 51840
       },
       {
         "path": "public/js/ui/matchChrome.js",

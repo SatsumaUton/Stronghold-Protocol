@@ -1967,6 +1967,7 @@ function MatchScreen() {
         live=${liveLpNow} spectator=${spectator}
         spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom}
         onPauseVote=${pub?.pauseVote && !spectator ? votePause : null}
+        effectsSlot=${html`<div class="gm__effects"><${EffectsList} effects=${watchingOther && field ? (field.effects ?? null) : priv?.effects} /></div>`}
         held=${hudIn === 'wait'} onSpeedVote=${actions.speedVote} />
 
       <div class="gm__bonds">
@@ -1992,7 +1993,9 @@ function MatchScreen() {
         observe=${cc ? { canObserve: (p) => observeTarget(p, pub, myId, { observing: watchingOther }), observing: watchingOther, onBack: backHome } : null}
         onRosterOpen=${setTeamRosterOpen} />
 
-      <div class="gm__effects"><${EffectsList} effects=${watchingOther && field ? (field.effects ?? null) : priv?.effects} /></div>
+      ${/* 效果栏（策略 / 机变 / 团队增益 / 道具）现在排在右上角那一列的最后（见上面 effectsSlot）：
+             它以前是这里的一块绝对定位，top 写死 2.4rem，和那一列的高度是两份互不相干的数字 ——
+             那一列加了「暂停游戏」这颗按钮之后，第一个图标（策略）正好压在按钮上（维护者 2026-11-08 反馈）。 */ null}
 
       ${emoteMode === 'danmaku' ? html`<${Danmaku} players=${players} myId=${myId} ttl=${bubbleMs} />` : null}
 

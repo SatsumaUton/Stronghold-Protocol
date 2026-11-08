@@ -738,10 +738,18 @@
 .pavatar__x .icon, .pavatar__door .icon { width: 60%; height: 60%; filter: drop-shadow(0 0 4px #000); }
 
 /* ---- effects ---------------------------------------------------------------------------------------------- */
-.gm__effects { position: absolute; right: .3rem; top: 2.4rem; }
-/* 准备就绪 refused (the temp row holds pieces): its reason shows under the button and pushes the ready count down —
-   the effects column follows, or the count runs into it on phones */
-.gm.has-readywhy .gm__effects { top: calc(2.4rem + max(.3rem, calc(16px * var(--sp-ui, 1)))); }
+/* 效果栏（策略 / 机变 / 团队增益 / 道具，ui/effectsList.js）：**排在右上角那一列的最后**
+   （ui/hud.js TopBar 的 .gtop__right，由 screens/game.js 的 effectsSlot 传进去），不再是 .gm__hud 底下
+   一块自己钉 top 的绝对定位。
+
+   维护者 2026-11-08：「暂停游戏按钮被策略显示图标压住了」。原因就是两份互不相干的数字：
+     · .gtop__right 是竖排 flex（时钟 .7 + 2 倍速 .38 + 准备就绪 .56 + 已就绪行 ~.2 + 暂停游戏 .38
+       + gap 与 padding）下沿已经到 ~2.7rem；
+     · 而这里以前写死 `top: 2.4rem` —— 第一个图标正好落在按钮上，且它在 DOM 里更靠后，所以压在上面。
+   加「暂停游戏」之前那一列的下沿约 2.34rem，刚好在 2.4rem 之上，所以以前看不出问题。
+   现在它就在那一列里，按钮再怎么加都自动往下让；`.gm.has-readywhy` 那条「原因行把效果栏推下去」
+   的补丁也就不需要了（跟着列一起长）。 */
+.gm__effects { align-self: flex-end; display: flex; justify-content: flex-end; }
 .effects { display: flex; flex-direction: column; align-items: flex-end; gap: .08rem; }
 .effect {
   position: relative; width: .5rem; height: .5rem; display: grid; place-items: center;
