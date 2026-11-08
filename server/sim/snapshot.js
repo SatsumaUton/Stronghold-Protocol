@@ -216,6 +216,23 @@ export function shieldView(u) {
 }
 
 /**
+ * `bossShieldView(u)` = the HP shield a **shared-pool leader** holds, in whole points, null when it holds none.
+ *
+ * Why it is separate from `shieldView`: a leader's `s.maxHp` is the whole pool (`spawns._syncBossHp` copies
+ * `pool.maxHp` into `base.maxHp`), while its HP bar shows the pool's **remainder**. A shield sized as a share of
+ * `maxHp` therefore reads as a far bigger share of what is left — measured on a 675 000 pool a 16.8 % barrier is
+ * 17 % of the bar at full HP but 99 % at 17 % left, and 336 % at 5 % left: the bar freezes near empty and then
+ * collapses once the shield breaks (维护者 2026-11-08: 「护盾打很久，打完血几秒钟就没了」).
+ *
+ * The HUD's boss bar draws this as a second strip over the pool remainder (`snap.boss.shield`), which is what shows
+ * the player why the number is not moving (维护者 2026-11-08).
+ */
+export function bossShieldView(u) {
+  if (!u?.bossPool) return null;
+  return shieldView(u);
+}
+
+/**
  * `layerView(u)` = the hit-negating 护盾 layers a unit holds (the sum of its buffs' shieldHits — 泥岩's 沃土予身), null
  * without any. Display only: render/vfx/talentfx.js shows the official effect of that many layers (mudrok_buff_03 / 02 /
  * 01_start).

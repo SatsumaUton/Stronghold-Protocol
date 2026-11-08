@@ -22,18 +22,38 @@ export const STATUS_META = Object.freeze({
 // ---- snapshots / battle HUD ---------------------------------------------------------------------------------
 
 /**
- * HUD numbers from a b.snap: { killed, resolved, total, dp, boss } (boss: { hp, max } when present).
+ * HUD numbers from a b.snap: { killed, resolved, total, dp, boss } (boss: { hp, max, shield? } when present).
  * `resolved` is the capsule's numerator — knocked out + leaked among the round's own enemies (Battle.leakedInTotal);
  * an older snapshot without it falls back to the kill count.
+ * `boss.shield` is the HP shield the leader on the field still holds (sim snapshot.js bossShield): the boss bar draws
+ * it, so a barrier sized off the whole pool reads as a shield instead of a frozen empty HP bar (维护者 2026-11-08).
  * @param {any} snap
  */
 export function snapHud(snap) {
   if (!isObj(snap)) return null;
   const n = (v) => (Number.isFinite(v) ? v : null);
   let boss = null;
-  if (isObj(snap.boss) && Number.isFinite(snap.boss.hp)) boss = { hp: snap.boss.hp, max: n(snap.boss.max) ?? n(snap.boss.maxHp) };
+  if (isObj(snap.boss) && Number.isFinite(snap.boss.hp)) {
+    boss = { hp: snap.boss.hp, max: n(snap.boss.max) ?? n(snap.boss.maxHp) };
+    const shield = n(snap.boss.shield);
+    if (shield != null && shield > 0) boss.shield = shield;
+  }
   const killed = n(snap.killed);
   return { killed, resolved: n(snap.resolved) ?? killed, total: n(snap.total), dp: n(snap.dp), boss };
+}
+
+/**
+ * The boss bar's shield share 0..1 (null without a shield): the shield's points as a share of the pool's max.
+ * A barrier on a shared-pool leader is a share of `maxHp`, i.e. of the whole pool — draw it on the same scale as the
+ * HP fill, and let it cover the remainder when it is bigger than what is left (维护者 2026-11-08).
+ * @param {{ hp:number, max:number, shield?:number }|null} bossHp
+ */
+export function bossShieldFrac(bossHp) {
+  if (!isObj(bossHp)) return null;
+  const shield = Number(bossHp.shield);
+  const max = Number(bossHp.max ?? bossHp.maxHp);
+  if (!Number.isFinite(shield) || shield <= 0 || !Number.isFinite(max) || max <= 0) return null;
+  return clamp(shield / max, 0, 1);
 }
 
 /** Boss HP fraction 0..1 (null when unknown). */

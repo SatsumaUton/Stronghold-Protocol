@@ -177,7 +177,11 @@ export function runBattle(sc, probe = {}) {
     if (snapEvery > 0 && ticks % snapEvery === 0) {
       const s = b.snapshot();
       const canon = {
-        t: s.t, dp: s.dp, dps: s.dps ?? null, killed: s.killed, total: s.total, boss: s.boss ?? null,
+        // boss: the shared pool only. `boss.shield` is the leader's barrier — display metadata for the HUD's boss bar
+        // (snapshot.js bossShieldView, 维护者 2026-11-08), like `stand` / `layers` / `elem`'s display neighbours: no sim
+        // state reads it, so it is kept out of the canon and the goldens stay byte-identical.
+        t: s.t, dp: s.dp, dps: s.dps ?? null, killed: s.killed, total: s.total,
+        boss: s.boss ? { hp: s.boss.hp, max: s.boss.max } : null,
         units: s.units.map((u) => [cid(u[0]), ...u.slice(1)]),
         down: (s.down || []).map((d) => [cid(d[0]), ...d.slice(1)]),
         elem: (s.elem || []).map((d) => [cid(d[0]), ...d.slice(1)]),

@@ -16,6 +16,7 @@
 // 仍在 Match 层（尚未搬运）：主题转化的反震/霜噬/惊惧/震荡/鲸吞、干员减益诅咒。
 import { startColdWind } from '../content/devices.js';
 import { spawnYanyou } from '../content/tokens.js';
+import { hpBasisOf } from '../content/enemies/helpers.js';
 
 /**
  * 这只刚生成的敌人是不是**召唤物**（维护者 2026-11-06：侵蚀词条只挂本体，召唤物一律不吃）。
@@ -44,6 +45,28 @@ export function isEchoSummon(enemy, keys = null) {
   if (typeof key !== 'string') return false;
   if (key.startsWith('token_')) return true;
   return !!(keys && typeof keys.has === 'function' && keys.has(key));
+}
+
+/**
+ * 「护盾」词条给一只敌人的绝对盾量（spec 只发比例 `shieldPct`，这里按这只敌人的血量换算）。
+ *
+ * 共享血池的领袖（`enemy.bossPool`）要按**剩余血量**算，不能按 `maxHp`：
+ * `spawns._syncBossHp` 把 `pool.maxHp`（整池）抄进 `base.maxHp`，而它的血条显示的是池子的剩余。
+ * 按 maxHp 算的话盾永远是「整池的 16.8%」—— 池子剩 17% 时盾等于剩余血的 99%，剩 5% 时是 336%，
+ * 血条看起来冻住，打穿盾之后血「几秒钟就没了」（维护者 2026-11-08 实测并反馈）。
+ * 按剩余血量算，盾就始终是「当前这条命的 16.8%」。
+ *
+ * Match 层的老钩子路径（match/echoWords.js applyEchoWords → buffFor）也调这里，两条路径逐字节一致。
+ * @param {any} enemy 刚生成的单位
+ * @param {number} shieldPct 比例（0.12 × 深度系数）
+ * @returns {number} 至少 1
+ */
+export function echoShieldAmount(enemy, shieldPct) {
+  const pct = Number(shieldPct);
+  if (!(pct > 0)) return 0;
+  const basis = hpBasisOf(enemy) || (enemy && enemy.bossPool ? Number(enemy.bossPool.hp) || 0 : 0);
+  if (!(basis > 0)) return 1;
+  return Math.max(1, Math.round(basis * pct));
 }
 
 /**
@@ -76,11 +99,7 @@ export function installEchoRules(battle) {
         if (have.has(key)) continue;
         const buff = { key, name: w.name, desc: w.desc || '', persist: true, visible: true };
         if (w.mods && typeof w.mods === 'object') buff.mods = { ...w.mods };
-        if (Number(w.shieldPct) > 0) {
-          // 「护盾」要按这只敌人的血量算，所以 spec 只发比例，这里用实际 maxHp 换算
-          const hp = Number((enemy.base && enemy.base.maxHp) ?? (enemy.s && enemy.s.maxHp) ?? 0) || 0;
-          buff.shield = Math.max(1, Math.round(hp * Number(w.shieldPct)));
-        }
+        if (Number(w.shieldPct) > 0) buff.shield = echoShieldAmount(enemy, w.shieldPct);
         battle.addBuff(enemy, buff);
       }
       for (const d of debuffs) {
