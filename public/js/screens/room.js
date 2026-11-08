@@ -220,7 +220,7 @@ function CardThumb({ src, name }) {
  * the current choice takes the focus (no on-screen keyboard on a phone). A local picker: each tile wears this browser's
  * outfit for that operator (`localSkins`, docs/SKINS.md), as the card will.
  */
-function CardPicker({ current, list, m, localSkins = {}, onPick, onClose }) {
+function CardPicker({ current, list, m, localSkins = {}, onPick, onClose, echo = false }) {
   const [q, setQ] = useState('');
   const [star, setStar] = useState(0);
   const stars = useMemo(() => [...new Set(list.map((c) => c.rarity).filter((r) => r > 0))].sort((a, b) => b - a), [list]);
@@ -253,7 +253,7 @@ function CardPicker({ current, list, m, localSkins = {}, onPick, onClose }) {
       })}
     </div>
     ${shown.length ? null : html`<p class="cardpick__empty">${t('没有符合条件的干员')}</p>`}
-    <p class="cardpick__note"><${Icon} name="info" />${t('选择后，同盟里的博士都会看到这张立绘')}</p>
+    <p class="cardpick__note"><${Icon} name="info" />${echo ? t('选择后，深潜房里的博士都会看到这张立绘') : t('选择后，同盟里的博士都会看到这张立绘')}</p>
   <//>`;
 }
 
@@ -341,6 +341,9 @@ function BotBandPicker({ seat, room, gd, busy, onClose, onPick }) {
 function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onKick, onInvite, portrait = null, portraitDefault = null, operator = null, onPickCard = null, fresh = false, gd = null, onBotBand = null }) {
   const [badArt, setBadArt] = useState([]);
   const coop = room.mode !== 'solo';
+  // 「深渊回响」房间：同一张座位卡，深潜房说「深潜密钥 / 移出深潜」（维护者 2026-11-08：
+  // 「深渊回响房间中的同盟模拟去掉改成深渊回响，同盟密钥也改成深渊回响使用的名字的密钥」）
+  const echo = room.variant === 'deepecho';
   // the 转场 flash: a seat that turns ready (or becomes the host's), and an AI teammate added while the room is open
   // (`fresh`: this card mounted after the room was already on screen)
   const flash = useRise(!!seat && (seat.ready || seat.isBot || seat.playerId === room.hostId), 700, fresh);
@@ -352,8 +355,8 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
       <header class="rseat__strip"><i></i><span class="num">P${index + 1}</span></header>
       <div class="rseat__art">
         ${invitable
-          ? html`<button type="button" class="rseat__invite" onClick=${onInvite} title=${t('复制同盟密钥以邀请队友')}>
-              <span class="rseat__plus" aria-hidden="true"></span><b>${t('邀请')}</b><small>${t('复制同盟密钥以邀请队友')}</small></button>`
+          ? html`<button type="button" class="rseat__invite" onClick=${onInvite} title=${echo ? t('复制深潜密钥以邀请队友') : t('复制同盟密钥以邀请队友')}>
+              <span class="rseat__plus" aria-hidden="true"></span><b>${t('邀请')}</b><small>${echo ? t('复制深潜密钥以邀请队友') : t('复制同盟密钥以邀请队友')}</small></button>`
           : html`<span class="rseat__wait"><small>${t('等待博士加入')}</small></span>`}
         ${canAdd ? html`<${Button} variant="secondary" size="sm" icon="robot" class="rseat__add" loading=${busy === 'add'} onClick=${onAddBot}>${t('添加 AI 队友')}<//>` : null}
         <span class="rseat__noinfo" aria-hidden="true">NOINFO</span>
@@ -408,7 +411,7 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
     ${seat.isBot && facts.isHost ? html`<button type="button" class="rseat__kick" disabled=${busy === `rm${index}`} onClick=${() => onRemoveBot(index)}
       title=${t('移除该 AI 队友')} aria-label=${t('移除 AI 队友')}><${Icon} name="robot" /><${Icon} name="close" /></button>` : null}
     ${!seat.isBot && !isMe && facts.isHost ? html`<button type="button" class="rseat__kick" disabled=${busy === `kick${index}`}
-      onClick=${() => onKick(index, seat.name, seat.playerId)} title=${t('将该博士移出同盟')} aria-label=${t('移出该博士')}><${Icon} name="user" /><${Icon} name="close" /></button>` : null}
+      onClick=${() => onKick(index, seat.name, seat.playerId)} title=${echo ? t('将该博士移出深潜') : t('将该博士移出同盟')} aria-label=${t('移出该博士')}><${Icon} name="user" /><${Icon} name="close" /></button>` : null}
     <div class="rseat__plate">
       ${isMe ? html`<span class="rseat__me" role="img" aria-label=${t('你')} title=${t('你')}><${Icon} name="info" /></span>` : null}
       <${AvatarFrame} size="sm" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} />
@@ -810,7 +813,8 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
   // 「深渊回响」：同一个开关，深潜房叫「公开深潜」（列表也是深潜专属的）
   const echoRoom = room.variant === 'deepecho';
   const info = difficultyInfo(room.mode, room.difficulty);
-  const title = soloOption ? t('模拟设置') : t('同盟设置');
+  // 深潜房不叫「同盟设置 / 同盟人数 / 出同盟」——它根本不是同盟（维护者 2026-11-08）
+  const title = soloOption ? t('模拟设置') : echoRoom ? t('深潜设置') : t('同盟设置');
   useEffect(() => {
     const away = (e) => { if (!e.target.closest?.('.rs-opts, .rs-pill__gear')) onClose(); };
     const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
@@ -951,7 +955,7 @@ export function RoomScreen() {
     seenVersion.current = key;
     if (!before || before === key || !before.startsWith(`${room.code}|`)) return;
     setVersionOpen(false);
-    toast(t('同盟已切换到「{version}」', { version: versionLabel(roomVersion(room)) }), 'success');
+    toast(t(room.variant === 'deepecho' ? '深潜已切换到「{version}」' : '同盟已切换到「{version}」', { version: versionLabel(roomVersion(room)) }), 'success');
   }, [room?.code, room?.version]);
   // the room sees one's pick once the server has it (seats[].card): ui/loadoutSync.js installCardSync sends it after
   // every pick, welcome and content change and retries a RATE / TIMEOUT / OFFLINE refusal (review of PR #813)
@@ -1026,7 +1030,7 @@ export function RoomScreen() {
   // confirmed player's id goes along: if they left and someone else took the seat meanwhile, the server refuses it.
   const kick = async (seat, name, playerId) => {
     if (inFlight.current) return;
-    const ok = await confirmDialog({ title: t('移出同盟'), text: t('确定将「{name}」移出同盟吗？对方可以凭同盟密钥重新加入。', { name: name || t('博士') }), okText: t('移出'), danger: true });
+    const ok = await confirmDialog({ title: echoRoom ? t('移出深潜') : t('移出同盟'), text: echoRoom ? t('确定将「{name}」移出这次深潜吗？对方可以凭深潜密钥重新加入。', { name: name || t('博士') }) : t('确定将「{name}」移出同盟吗？对方可以凭同盟密钥重新加入。', { name: name || t('博士') }), okText: t('移出'), danger: true });
     if (ok) run(`kick${seat}`, () => net.request('room.kick', { seat, playerId }));
   };
   const setDifficulty = (difficulty) => run('diff', () => net.request('room.setDifficulty', { difficulty }));
@@ -1052,7 +1056,7 @@ export function RoomScreen() {
     if (inFlight.current) return;
     const othersHere = facts.humans.some((s) => s.playerId !== me.playerId);
     if (facts.isHost && othersHere) {
-      const ok = await confirmDialog({ title: t('离开同盟'), text: t('你是同盟的创建者，离开后创建者身份将移交或同盟解散。确定离开吗？'), okText: t('离开'), danger: true });
+      const ok = await confirmDialog({ title: echoRoom ? t('离开深潜') : t('离开同盟'), text: echoRoom ? t('你是这次深潜的发起者，离开后发起者身份将移交或这次深潜结束。确定离开吗？') : t('你是同盟的创建者，离开后创建者身份将移交或同盟解散。确定离开吗？'), okText: t('离开'), danger: true });
       if (!ok) return;
     }
     inFlight.current = true;
@@ -1072,7 +1076,7 @@ export function RoomScreen() {
   const statusLine = !online
     ? html`<span class="t-orange"><${Icon} name="wifiOff" />${t('连接中断，正在重连…')}</span>`
     : facts.spectating
-      ? html`<span class="t-lo"><${Icon} name="eye" />${t('观战中 · 不占博士席位，模拟开始后可切换观看各位博士')}</span>`
+      ? html`<span class="t-lo"><${Icon} name="eye" />${echoRoom ? t('观战中 · 不占博士席位，深潜开始后可切换观看各位博士') : t('观战中 · 不占博士席位，模拟开始后可切换观看各位博士')}</span>`
     : !coop
       ? html`<span class="t-mint">${t('*模拟协议已就绪，准许进入模拟')}</span>`
     : facts.versionRoom && !facts.contentReady
@@ -1081,11 +1085,11 @@ export function RoomScreen() {
       ? html`<span class="t-lo">${t('等待所有博士载入房间的插件内容')}</span>`
     : facts.isHost
       ? facts.canStart
-        ? html`<span class="t-mint">${t('*同盟人数达标，准许进入模拟')}</span>`
+        ? html`<span class="t-mint">${echoRoom ? t('*深潜人数达标，准许开始深潜') : t('*同盟人数达标，准许进入模拟')}</span>`
         : html`<span class="t-lo">${t('等待所有博士准备就绪')}</span>`
       : myReady
-        ? html`<span class="t-mint">${t('已就绪 · 等待创建者开始模拟')}</span>`
-        : html`<span class="t-lo">${t('准备就绪后，创建者即可开始模拟')}</span>`;
+        ? html`<span class="t-mint">${echoRoom ? t('已就绪 · 等待发起者开始深潜') : t('已就绪 · 等待创建者开始模拟')}</span>`
+        : html`<span class="t-lo">${echoRoom ? t('准备就绪后，发起者即可开始深潜') : t('准备就绪后，创建者即可开始模拟')}</span>`;
 
   const copy = async (what) => {
     // the copied link carries an invitation line (#103): 「{name}邀请你加入卫戍协议：盟约【{difficulty}】」 — with the
@@ -1098,7 +1102,7 @@ export function RoomScreen() {
         ? t('{name}邀请你加入卫戍协议：盟约·{version}【{difficulty}】', { ...params, version: versionLabel(roomVersion(room)) })
         : t('{name}邀请你加入卫戍协议：盟约【{difficulty}】', params);
     const ok = await copyText(what === 'code' ? room.code : `${inviteLink(room.code)} ${invite}`);
-    if (ok) toast(what === 'code' ? t('已复制同盟密钥 {code}', { code: room.code }) : t('已复制邀请链接'), 'success');
+    if (ok) toast(what === 'code' ? (echoRoom ? t('已复制深潜密钥 {code}', { code: room.code }) : t('已复制同盟密钥 {code}', { code: room.code })) : t('已复制邀请链接'), 'success');
     else toast(t('复制失败，请手动复制'), 'warn');
   };
   // 选择模拟协议 over the room: the host picks and sends the difficulty on 确认 (nothing to send when it did not change —
@@ -1127,7 +1131,9 @@ export function RoomScreen() {
   const soloTimed = soloTimedOf(pageVersion() === roomVersion(room) ? getConfig() : null, roomVersion(room));
   const soloOpt = soloUnlimitedOption(room, me.playerId, soloTimed);
   const soloBrief = soloTimeMsgid('brief', { timed: soloTimed, unlimited: room.soloUnlimited === true });
-  const modeName = coop ? t('同盟模拟') : t('独立模拟');
+  // 深潜房不是同盟：左上角写「深渊回响」，不写「同盟模拟」（维护者 2026-11-08：
+  // 「深渊回响房间中的同盟模拟去掉改成深渊回响，同盟密钥也改成深渊回响使用的名字的密钥」）
+  const modeName = !coop ? t('独立模拟') : room.variant === 'deepecho' ? t('深渊回响') : t('同盟模拟');
   // the room's version (DESIGN §35.23): the pill and ⚙'s row on a server that enables versions (or in a version room)
   const vote = versionVoteOf(room);
   const curVersion = roomVersion(room);
@@ -1164,8 +1170,8 @@ export function RoomScreen() {
     <div class="rs__bg" aria-hidden="true"></div>
     <header class="topbar rs-top">
       <div class="topbar__left rs-top__left">
-        <${Tooltip} text=${t('离开同盟')} placement="bottom">
-          <button type="button" class="rs-exit" disabled=${busy === 'leave'} onClick=${leave} aria-label=${t('离开同盟')}><${Icon} name="exit" /></button>
+        <${Tooltip} text=${echoRoom ? t('离开深潜') : t('离开同盟')} placement="bottom">
+          <button type="button" class="rs-exit" disabled=${busy === 'leave'} onClick=${leave} aria-label=${echoRoom ? t('离开深潜') : t('离开同盟')}><${Icon} name="exit" /></button>
         <//>
         <div class="rs-clock">
           <b>${modeName}${room.test ? html` <${TestMark} />` : null}<${VersionTag} room=${room} class="rs-clock__ver" />
@@ -1182,8 +1188,8 @@ export function RoomScreen() {
       <div class="rs-top__right">
         <${LoadoutButton} from="room" size="md" class="hub-plate hub-plate--loadout rs-loadout room-loadout" label=${t('干员调配')} />
         ${coop ? html`<div class="rs-key">
-          <span class="rs-key__k">${t('同盟密钥')}</span>
-          <b class="rs-key__code num selectable" aria-label=${t('同盟密钥 {code}', { code: room.code })}>${room.code}</b>
+          <span class="rs-key__k">${echoRoom ? t('深潜密钥') : t('同盟密钥')}</span>
+          <b class="rs-key__code num selectable" aria-label=${echoRoom ? t('深潜密钥 {code}', { code: room.code }) : t('同盟密钥 {code}', { code: room.code })}>${room.code}</b>
           <button type="button" class="rs-key__copy" onClick=${() => copy('code')} title=${t('复制密钥')}>${t('复制')}</button>
           <button type="button" class="rs-key__link" onClick=${() => copy('link')} title=${t('复制链接')} aria-label=${t('复制链接')}><${Icon} name="link" /></button>
         </div>` : html`<div class="rs-key rs-key--solo"><${MicroLabel}>SINGLE OPERATOR<//><span>${t('仅限 1 名博士')}</span></div>`}
@@ -1226,7 +1232,7 @@ export function RoomScreen() {
       <span class="rs-matchwait__sep" aria-hidden="true">·</span>
       ${echoRoom ? html`<span class="rs-matchwait__echo">${t('深渊回响')}</span>` : html`<span>${t(DIFFICULTY_NAMES[room.difficulty] || '')}</span>`}
       <span class="rs-matchwait__sep" aria-hidden="true">·</span>
-      <span>${t('{n} 人同盟', { n: Number(room.capacity) || MAX_SEATS })}</span>
+      <span>${echoRoom ? t('{n} 人深潜', { n: Number(room.capacity) || MAX_SEATS }) : t('{n} 人同盟', { n: Number(room.capacity) || MAX_SEATS })}</span>
       <span class="rs-matchwait__sep" aria-hidden="true">·</span>
       <em>${echoRoom ? t('其他博士在深潜房里点「匹配队友」就会被配到一起，人满后自动开局') : t('其他博士在大厅点「多人匹配」就会被安排进来，人满后自动开局')}</em>
     </p>` : null}
@@ -1238,10 +1244,10 @@ export function RoomScreen() {
         <div class="rs-pill">
           <button type="button" class=${`rs-pill__diff${facts.isHost ? '' : ' is-ro'}`} disabled=${facts.isHost && !!busy}
             onClick=${echoRoom ? (facts.isHost ? () => setOpts(true) : () => {}) : openProto}
-            title=${echoRoom ? t('深渊回响难度（DE-1 / DE-2 / DE-3）：在同盟设置里更改') : (facts.isHost ? t('更改模拟难度') : t('由创建者选择'))}><${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${echoCode}</span></button>
+            title=${echoRoom ? t('深渊回响难度（DE-1 / DE-2 / DE-3）：在深潜设置里更改') : (facts.isHost ? t('更改模拟难度') : t('由创建者选择'))}><${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${echoCode}</span></button>
           ${versionCtl ? html`<${Tooltip} text=${versionCtl.why} class="rs-pill__version"><button type="button" class=${`rs-pill__ver${versionCtl.editable ? '' : ' is-ro'}`} data-testid="room-version"
             disabled=${versionCtl.disabled} onClick=${versionCtl.onOpen} aria-label=${t('游戏版本：{name}', { name: versionLabel(curVersion) })}><${Icon} name="book" /><span class="rs-pill__vername">${versionLabel(curVersion)}</span></button><//>` : null}
-          ${aiLast || soloOpt ? html`<button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${aiLast ? t('同盟设置') : t('模拟设置')} aria-label=${aiLast ? t('同盟设置') : t('模拟设置')}
+          ${aiLast || soloOpt ? html`<button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${aiLast ? (echoRoom ? t('深潜设置') : t('同盟设置')) : t('模拟设置')} aria-label=${aiLast ? (echoRoom ? t('深潜设置') : t('同盟设置')) : t('模拟设置')}
             aria-expanded=${opts ? 'true' : 'false'}><${GearGlyph} /></button>` : null}
           ${opts && (aiLast || soloOpt) ? html`<${RoomOptions} takeoverOption=${aiTakeoverOption(room, me.playerId)} onAiTakeover=${setAiTakeover} option=${aiLast} soloOption=${soloOpt} room=${room} isHost=${facts.isHost} busy=${busy} onAiLast=${setAiLast}
             onSoloUnlimited=${setSoloUnlimited} onExperimental=${setExperimental} onDifficulty=${openProto} onSetDifficulty=${setDifficulty} onClose=${() => setOpts(false)} version=${versionCtl}
@@ -1265,7 +1271,7 @@ export function RoomScreen() {
       ? html`<${BotBandPicker} seat=${facts.seats[bandSeat]} room=${room} gd=${gd}
           busy=${busy === `band${bandSeat}`} onClose=${() => setBandSeat(null)} onPick=${(bandId) => setBotBand(bandSeat, bandId)} />`
       : null}
-    ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${data.get('assets')} localSkins=${localSkins} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
+    ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${data.get('assets')} localSkins=${localSkins} echo=${echoRoom} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
     ${protoOpen && !echoRoom ? facts.isHost
       ? html`<${ProtocolSelect} roomMode=${room.mode} difficulty=${protoPick || room.difficulty} onDifficulty=${setProtoPick} onClose=${closeProto}
           onCreate=${confirmDifficulty} busy=${busy === 'diff' ? 'create' : null} online=${online} action=${t('确认')} hint=${protoHint} difficulties=${protoDifficulties} />`

@@ -107,9 +107,9 @@ export function RoomListDialog({ online, queued = false, busy = null, onJoin, on
     <p class="modal__text">${echo
       ? t('由创建者公开、尚未开局的深渊回响房显示在这里（进房仍需深潜资格）。')
       : t('{n} 人及以上、由创建者公开且尚未开局的同盟显示在这里。', { n: ROOM_LIST_MIN_CAPACITY })}</p>
-    <p class="modal__text rlist__cross">${t('包括别的服务器上的同盟：点「加入」会自动连过去并进入房间。')}</p>
+    <p class="modal__text rlist__cross">${echo ? t('包括别的服务器上的深渊回响房：点「加入深潜」会自动连过去并进入房间。') : t('包括别的服务器上的同盟：点「加入」会自动连过去并进入房间。')}</p>
     ${failed ? html`<p class="rlist__note" role="status"><${Icon} name="warn" />${t('列表暂时无法更新，稍后自动重试')}</p>` : null}
-    ${rows === null ? html`<p class="rlist__note" role="status"><${Spinner} size="sm" />${t('正在载入同盟列表…')}</p>`
+    ${rows === null ? html`<p class="rlist__note" role="status"><${Spinner} size="sm" />${echo ? t('正在载入深潜列表…') : t('正在载入同盟列表…')}</p>`
       : rows.length ? html`<ul class="rlist" data-testid="room-list">${rows.map((row) => html`<${RoomRow} key=${row.code} row=${row} disabled=${!online || queued || !!busy} onJoin=${onJoin} onSpectate=${onSpectate} joinLabel=${echo ? t('加入深潜') : null} />`)}</ul>`
       : html`<p class="rlist__note" data-testid="room-list-empty">${echo ? t('暂时没有公开的深渊回响房') : t('暂时没有等待博士的公开同盟')}</p>`}
   <//>`;

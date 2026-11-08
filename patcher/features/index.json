@@ -6688,22 +6688,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 247178
+        "customBytes": 249776
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 285760
+        "customBytes": 288649
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 274225
+        "customBytes": 277277
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 234957
+        "customBytes": 237431
       },
       {
         "path": "public/js/assets.js",
@@ -6713,7 +6713,7 @@
       {
         "path": "public/js/main.js",
         "baseExists": false,
-        "customBytes": 44986
+        "customBytes": 46061
       },
       {
         "path": "public/js/render/units.js",
@@ -6748,7 +6748,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 96260
+        "customBytes": 98285
       },
       {
         "path": "public/js/screens/stats.js",
@@ -6868,7 +6868,7 @@
       {
         "path": "public/js/ui/roomList.js",
         "baseExists": false,
-        "customBytes": 11854
+        "customBytes": 12013
       },
       {
         "path": "public/js/ui/shopBar.js",
