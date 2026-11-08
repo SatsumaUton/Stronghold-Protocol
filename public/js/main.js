@@ -188,6 +188,15 @@ function schedulePendingJoin() {
     }
     joinInFlight = true;
     try {
+      // 换页前留下的那句话（跨节点跳转时的「这间深潜已经开始，无法中途加入：已作为观战者进入。」）：
+      // hopToRoomNode 写进 sessionStorage，这里念一次就删 —— toast 活不过一次换页。
+      try {
+        const note = sessionStorage.getItem('sp.joinNote');
+        if (note) {
+          sessionStorage.removeItem('sp.joinNote');
+          toast(t(note), 'warn', { ttl: 7000 });
+        }
+      } catch { /* 隐私模式 */ }
       await joinKnown(s.ui.pendingSpectate ? 'room.spectate' : 'room.join', code);
     } catch (err) {
       toastError(err);

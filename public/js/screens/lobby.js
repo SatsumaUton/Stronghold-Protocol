@@ -286,6 +286,17 @@ function waitAccountToken(ms = 6000) {
   });
 }
 
+/** 问匹配服务：这个房间码在哪台节点上（顺带带回房间信息：是否已开局、是不是深潜房）。 */
+async function findRoomInfo(code) {
+  const k = String(code || '').toUpperCase();
+  if (!k) return null;
+  try {
+    const r = await fetch('/mm/api/find-room?code=' + encodeURIComponent(k), { credentials: 'same-origin', cache: 'no-store' });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
 /**
  * 房间不在本节点时，问匹配服务它在哪台节点上，然后跳过去。
  *
@@ -294,28 +305,50 @@ function waitAccountToken(ms = 6000) {
  * 匹配服务有 `sp:n<节点>:lobby:rooms` 的全局目录，能答出节点号，我们再用 nginx 的
  * `?n=<节点>&room=<码>` 换过去 —— 落到那台节点后 `?room=` 深链会自动加入。
  *
+ * ★ 2026-11-08 维护者：「加入深潜功能输入房间号以后会先跳转到对应的节点，然后再重新输入一次」。
+ *   手输房号这条跳法和「公开同盟」列表那条（enterRoom / spectateRoom）**不一样**，差了三件事，
+ *   每一条都会让落地页把这次加入丢掉：
+ *     ① 没写 `sp_join_from_list` 标记 —— 落地页的 validatePendingInvite 会用 /mm/api/find-room
+ *        再查一次房间，而那个目录有十秒级延迟，查不到就把待加入清掉（玩家看到的就是「跳过去了，
+ *        停在大厅，还得重新点进深潜界面重输房号」）。列表那条路 2026-11-02 就补过这个标记，手输这条漏了。
+ *     ② 观战（room.spectate）以前根本不会跳：joinKnown 只在 room.join 时调这里，所以跨节点
+ *        「观战深潜」只能报「没有找到密钥」。
+ *     ③ 观战跳过去时不带 `spectate=1`，落地页会按「加入」处理。
+ *
  * 防死循环：同一个房间码只在 sessionStorage 里允许跳一次。跳过去还是找不到
  * （房刚解散），就不再跳，让它照常报「房间不存在」。
+ * @param {string} code 房间码
+ * @param {{ spectate?: boolean, note?: string }} [opts] 这次是要观战（room.spectate）还是加入（room.join）；
+ *   `note` 是一句要念给玩家的 msgid —— 换页会把它吞掉，所以写进 sessionStorage 交给落地页念。
  * @returns {Promise<boolean>} 真的跳走了就 true（调用方别再弹错）
  */
-async function hopToRoomNode(code) {
+async function hopToRoomNode(code, opts = {}) {
   const k = String(code || '').toUpperCase();
   if (!k) return false;
   const guardKey = 'sp.hopNode';
   try {
     if (sessionStorage.getItem(guardKey) === k) { sessionStorage.removeItem(guardKey); return false; }
   } catch { /* ignore */ }
-  let node = 0;
-  try {
-    const r = await fetch('/mm/api/find-room?code=' + encodeURIComponent(k), { credentials: 'same-origin', cache: 'no-store' });
-    if (r.ok) { const j = await r.json(); node = Number(j?.node) || 0; }
-  } catch { return false; }
+  const info = await findRoomInfo(k);
+  const node = Number(info?.node) || 0;
   if (!(node >= 1 && node <= 30)) return false;
   if (node === currentNode()) return false; // 已经在本节点上了，跳了也没用
-  try { sessionStorage.setItem(guardKey, k); } catch { /* ignore */ }
+  const spectate = opts.spectate === true;
+  try {
+    sessionStorage.setItem(guardKey, k);
+    // 和「公开同盟」列表那条路一样：告诉落地页「这次的房间是玩家亲口要进的」，
+    // validatePendingInvite 就不会因为目录延迟把它清掉。
+    sessionStorage.setItem('sp_join_from_list', k);
+    // 换页会把 toast 吞掉：把要念的话留给落地页（main.js 的 schedulePendingJoin 念一次就删）。
+    if (opts.note) sessionStorage.setItem('sp.joinNote', String(opts.note));
+    else sessionStorage.removeItem('sp.joinNote');
+  } catch { /* ignore */ }
   const u = new URL(location.href);
   u.searchParams.set('n', String(node));
   u.searchParams.set('room', k);
+  // 观战必须带过去，否则落地页按「加入」进（已经开局的房必然 ROOM_STARTED，等于白跳一趟）。
+  if (spectate) u.searchParams.set('spectate', '1');
+  else u.searchParams.delete('spectate');
   u.searchParams.delete('adminWatch');
   location.assign(u.toString());
   return true;
@@ -339,10 +372,27 @@ export async function joinKnown(type, key) {
       // 等不到身份（未登录 / 网络慢）：退化成原来的「房间已满」，不再无限等
       throw Object.assign(new Error('房间已满'), { code: ERR.ROOM_FULL });
     }
+    // ★ 2026-11-08：「这间深潜已经开始了」不该是个死胡同。
+    //   深潜房一旦开局（`room.match` 存在）就**不能中途加入**，服务端一律回 ROOM_STARTED ——
+    //   玩家点了「加入深潜」只会看到一句「模拟已开始」，然后被丢回大厅，再自己点一遍观战。
+    //   深潜房（find-room 的 variant）此时只剩观战这一条路，所以直接按观战进，并说清楚发生了什么。
+    //   普通同盟房不受影响：它们的 variant 是 null，照旧报错（已开局确实不能中途加入）。
+    if (err?.code === ERR.ROOM_STARTED && type === 'room.join') {
+      const info = await findRoomInfo(key);
+      if (info?.variant === 'deepecho') {
+        // 房在别的节点上时，观战请求同样发不到 —— 先按观战跳过去，落地页会用 room.spectate 落地。
+        // 提示语要跨过这次换页，所以交给落地页念（hopToRoomNode 的 note）。
+        if (await hopToRoomNode(key, { spectate: true, note: '这间深潜已经开始，无法中途加入：已作为观战者进入。' })) return { ok: true };
+        toast(t('这间深潜已经开始，无法中途加入：已作为观战者进入。'), 'warn', { ttl: 7000 });
+        return net.request('room.spectate', { code: key });
+      }
+    }
     // 本节点没有这间房：可能是别的节点上的（邀请链接 / 公开同盟里的跨节点房）。
     // 查得到节点就跳过去，跳成功了就别再弹「房间不存在」。
-    if (err?.code === ERR.ROOM_NOT_FOUND && type === 'room.join') {
-      if (await hopToRoomNode(key)) return { ok: true };
+    // 观战同样要跳（维护者 2026-11-08：手输房号的「观战深潜」以前跨节点必然失败）。
+    if (err?.code === ERR.ROOM_NOT_FOUND) {
+      const wantSpectate = type === 'room.spectate';
+      if (await hopToRoomNode(key, { spectate: wantSpectate })) return { ok: true };
     }
     if (err?.code !== ERR.TEST_CONFIRM) throw err;
     const text = type === 'room.spectate'
