@@ -6,6 +6,7 @@ import { battleSpeedScale, bossLevelSeconds } from '../matchStatus.js';
 import { clamp, int, isObj, sortedPlayers } from './shared.js';
 import { normalizeSp } from './draft.js';
 import { t } from '../../../../shared/i18n.js';
+import { diveSoonBanner, isDivePub } from '../diveWords.js';
 
 
 // ---- phases ----------------------------------------------------------------------------------------
@@ -51,7 +52,7 @@ export const isBossPhase = (phase) => phase === PHASE.FINAL_ASSAULT || phase ===
 export function phaseBanner(phase, pub, { alive = true, spectator = false } = {}) {
   const r = int(pub?.round, 0);
   switch (phase) {
-    case PHASE.BATTLE_CHECK: return { title: t('协议启动'), micro: 'PROTOCOL START', tone: 'mint', sub: t('模拟即将开始'), duration: 2600 };
+    case PHASE.BATTLE_CHECK: return { title: t('协议启动'), micro: 'PROTOCOL START', tone: 'mint', sub: diveSoonBanner(isDivePub(pub)), duration: 2600 };
     // round income goes to the seats still in only (server/match/match/phases.js startRound; eliminate() zeroes funds
     // and pendingFunds): an eliminated player or a spectator seat reads 观战中, never 资金已到账 (GitHub #236, PR #237)
     case PHASE.ROUND_START: return { title: t('第 {r} 回合', { r }), micro: `ROUND ${String(r).padStart(2, '0')}`, tone: 'mint',

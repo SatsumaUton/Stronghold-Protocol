@@ -2578,6 +2578,13 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     if (room.spectatorOf(session.playerId)) return fail(ERR.SPECTATOR);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
+    // 「深渊回响」只玩默认版本（第二期下半）：`create` 早就拒绝了这种组合，这里以前**漏了**——
+    // 深潜房能通过 room.proposeVersion 被切到第一期下半，于是「建房时不许、进房后随便切」，
+    // 而深渊的模板 / 怪物池 / 词条都是按默认版本标定的，切过去只会数值漂移。
+    // 维护者 2026-11-08：「深潜房里那个版本标签也不该显示」—— 界面不再给入口，服务端也必须堵住。
+    if (room.variant === 'deepecho' && version !== DEFAULT_VERSION) {
+      return fail(ERR.VERSION_UNSUPPORTED, msg('「深渊回响」只支持「第二期下半」，不支持其他版本'));
+    }
     if (!this.versionEnabled(version)) return fail(ERR.VERSION_UNKNOWN);
     if (!this.offered(version, room.mode).length) return fail(ERR.VERSION_UNSUPPORTED, `${version} has no ${room.mode} rooms`);
     if (room.modded && version !== DEFAULT_VERSION) return fail(ERR.VERSION_UNSUPPORTED, 'gameplay plugins play the default version (act2autochess) only');

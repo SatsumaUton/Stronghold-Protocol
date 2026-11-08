@@ -6,6 +6,7 @@ import { emptyMatch, serverNow, store } from '../../store.js';
 import { localAsset } from '../../data.js';
 import { t } from '../../../../shared/i18n.js';
 import { exitWords, useEchoRun } from '../../ui/matchChrome.js';
+import { diveBack, diveClosed, diveRunEnded } from '../../ui/diveWords.js';
 import { cx } from './marks.js';
 
 /**
@@ -17,24 +18,28 @@ import { cx } from './marks.js';
  *
  * 只认几个已知值，其余一律走兜底：宁可含糊，也不编一个具体原因。
  */
-function endReasonText(reason) {
+function endReasonText(reason, dive = false) {
+  // 深潜房不叫「同盟已返回等待室」：它根本不是同盟（维护者 2026-11-08）
   switch (reason) {
-    case 'admin-aborted': return t('管理员终止了这一局，同盟已返回等待室');
-    case 'restart-aborted': return t('服务器重启导致对局中断，同盟已返回等待室');
+    case 'admin-aborted': return t(dive ? '管理员终止了这一局，深潜已返回等待室' : '管理员终止了这一局，同盟已返回等待室');
+    case 'restart-aborted': return t(dive ? '服务器重启导致对局中断，深潜已返回等待室' : '服务器重启导致对局中断，同盟已返回等待室');
     case 'plugin-crash': case 'plugin-hang': case 'plugin-start':
-      return t('插件运行异常，这一局已中断，同盟已返回等待室');
-    default: return t('这一局已中断，同盟已返回等待室');
+      return t(dive ? '插件运行异常，这一局已中断，深潜已返回等待室' : '插件运行异常，这一局已中断，同盟已返回等待室');
+    default: return t(dive ? '这一局已中断，深潜已返回等待室' : '这一局已中断，同盟已返回等待室');
   }
 }
 
-/** The room went back to its lobby without a result (match aborted): offer the way back. */
-export function MatchEnded({ reason = null } = {}) {
-  return html`<div class="awayov" role="dialog" aria-label=${t('模拟已结束')}>
+/**
+ * The room went back to its lobby without a result (match aborted): offer the way back.
+ * `dive`: a 深渊回响 room — 深潜 instead of 同盟 / 模拟 (维护者 2026-11-08).
+ */
+export function MatchEnded({ reason = null, dive = false } = {}) {
+  return html`<div class="awayov" role="dialog" aria-label=${diveClosed(dive)}>
     <div class="awayov__box brackets">
       <${MicroLabel} tone="mint">SIMULATION CLOSED</${MicroLabel}>
-      <h2>${t('本局模拟已结束')}</h2>
-      <p class="t-lo">${endReasonText(reason)}</p>
-      <${Button} variant="primary" size="lg" icon="chevronLeft" onClick=${() => store.set({ match: emptyMatch() })}>${t('返回同盟')}<//>
+      <h2>${diveRunEnded(dive)}</h2>
+      <p class="t-lo">${endReasonText(reason, dive)}</p>
+      <${Button} variant="primary" size="lg" icon="chevronLeft" onClick=${() => store.set({ match: emptyMatch() })}>${diveBack(dive)}<//>
     </div>
   </div>`;
 }

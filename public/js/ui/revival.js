@@ -7,8 +7,9 @@ import { net } from '../net.js';
 import { store, useStore, serverNow } from '../store.js';
 import { toast, toastError } from './toasts.js';
 import { t } from '../../../shared/i18n.js';
+import { diveReviveGone, isDivePub } from './diveWords.js';
 
-function reasonText(reason) {
+function reasonText(reason, dive = false) {
   return ({
     disabled: t('本局未开启复活'),
     'no-helper': t('本轮没有可以救援的存活队友'),
@@ -17,7 +18,7 @@ function reasonText(reason) {
     'window-closed': t('救援阶段已经结束，死亡已经结算'),
     'already-used': t('该队友本局复活次数已经用完'),
     left: t('队友已经主动退出'),
-    'match-ended': t('本局模拟已经结束，无法救援'),
+    'match-ended': diveReviveGone(dive),
   })[reason] || t('当前无法救援');
 }
 
@@ -32,7 +33,7 @@ export function revivalReason(pub, myId, targetId, online = true, now = serverNo
   if (target.left) return t('队友已经主动退出');
   // 深潜（unlimited）不设次数限制：救过的人再倒还能救
   if (target.revived && !rule.unlimited) return t('该队友本局复活次数已经用完');
-  if (!target.pendingDeath) return reasonText(target.revivalUnavailableReason);
+  if (!target.pendingDeath) return reasonText(target.revivalUnavailableReason, isDivePub(pub));
   if (pub.phase !== PHASE.SETTLE || !rule.windowOpen || !(rule.deadline > now)) return t('等待联防结算后的救援窗口');
   if (!me?.alive || me.left || me.isBot) return t('只有存活玩家可以提供救援');
   if (!(me.lp >= 11)) return t('至少需要 11 点生命值（支付 10 点）');

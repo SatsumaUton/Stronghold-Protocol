@@ -6688,22 +6688,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 249776
+        "customBytes": 251634
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 288649
+        "customBytes": 290712
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 277277
+        "customBytes": 279475
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 237431
+        "customBytes": 239187
       },
       {
         "path": "public/js/assets.js",
@@ -6713,7 +6713,7 @@
       {
         "path": "public/js/main.js",
         "baseExists": false,
-        "customBytes": 46061
+        "customBytes": 46566
       },
       {
         "path": "public/js/render/units.js",
@@ -6721,39 +6721,54 @@
         "customBytes": 171152
       },
       {
+        "path": "public/js/screens/bandDraft.js",
+        "baseExists": false,
+        "customBytes": 41882
+      },
+      {
         "path": "public/js/screens/echoLobby.js",
         "baseExists": false,
         "customBytes": 8466
       },
       {
+        "path": "public/js/screens/entering.js",
+        "baseExists": false,
+        "customBytes": 2263
+      },
+      {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 145449
+        "customBytes": 145611
       },
       {
         "path": "public/js/screens/game/overlays.js",
         "baseExists": false,
-        "customBytes": 10425
+        "customBytes": 10991
       },
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": true,
-        "customBytes": 126496
+        "customBytes": 127009
       },
       {
         "path": "public/js/screens/result.js",
         "baseExists": true,
-        "customBytes": 14353
+        "customBytes": 14651
       },
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 98285
+        "customBytes": 98937
+      },
+      {
+        "path": "public/js/screens/settle.js",
+        "baseExists": false,
+        "customBytes": 42824
       },
       {
         "path": "public/js/screens/stats.js",
         "baseExists": true,
-        "customBytes": 51444
+        "customBytes": 51380
       },
       {
         "path": "public/js/ui/accountRoom.js",
@@ -6771,9 +6786,24 @@
         "customBytes": 21974
       },
       {
+        "path": "public/js/ui/bossPlates.js",
+        "baseExists": false,
+        "customBytes": 15087
+      },
+      {
+        "path": "public/js/ui/connBanner.js",
+        "baseExists": false,
+        "customBytes": 9630
+      },
+      {
         "path": "public/js/ui/detailPanel.js",
         "baseExists": true,
         "customBytes": 76452
+      },
+      {
+        "path": "public/js/ui/diveWords.js",
+        "baseExists": false,
+        "customBytes": 5359
       },
       {
         "path": "public/js/ui/echoBlessing.js",
@@ -6853,7 +6883,7 @@
       {
         "path": "public/js/ui/matchChrome.js",
         "baseExists": true,
-        "customBytes": 16374
+        "customBytes": 16330
       },
       {
         "path": "public/js/ui/matchEnemies.js",
@@ -6863,12 +6893,12 @@
       {
         "path": "public/js/ui/revival.js",
         "baseExists": true,
-        "customBytes": 5756
+        "customBytes": 5822
       },
       {
         "path": "public/js/ui/roomList.js",
         "baseExists": false,
-        "customBytes": 12013
+        "customBytes": 12348
       },
       {
         "path": "public/js/ui/shopBar.js",
@@ -6879,6 +6909,11 @@
         "path": "public/js/ui/stats.js",
         "baseExists": true,
         "customBytes": 51535
+      },
+      {
+        "path": "public/js/ui/teamPanel.js",
+        "baseExists": false,
+        "customBytes": 17840
       },
       {
         "path": "public/js/ui/watchBonds.js",
@@ -6893,7 +6928,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 282629
+        "customBytes": 283340
       },
       {
         "path": "server/match/Match.js",

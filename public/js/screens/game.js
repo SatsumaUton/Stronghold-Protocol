@@ -159,6 +159,7 @@ import { EchoBuffBar } from '../ui/echoStatus.js';
 import { EchoSupplyPanel } from '../ui/echoSupply.js';
 import { EchoProjectionPanel } from '../ui/echoProjection.js';
 import { TestConsole } from '../ui/testConsole.js';
+import { isDivePub, diveEntering, diveLoadingData } from '../ui/diveWords.js';
 
 // 作战统计 is opt-in (settings `combatMetrics`, default off). The runner does not import the settings store;
 // this screen pushes the switch. Outside a browser battleRunner is null, so this is a no-op.
@@ -232,7 +233,7 @@ export function GameScreen() {
   if (!pub || !gd.ready || !versionReady) {
     return html`<div class="screen gload">
       <${Spinner} size="lg" label=${pub ? 'LOADING DATA' : 'ENTERING SIMULATION'} />
-      <p class="t-lo">${versionState === 'failed' && version ? t('版本数据未能通过校验，请刷新页面重试') : pub ? t('正在载入模拟数据…') : t('正在进入模拟…')}</p>
+      <p class="t-lo">${versionState === 'failed' && version ? t('版本数据未能通过校验，请刷新页面重试') : pub ? diveLoadingData(isDivePub(pub) || diveRoom) : diveEntering(isDivePub(pub) || diveRoom)}</p>
     </div>`;
   }
   const mode = phaseMode(pub.phase);
@@ -249,7 +250,7 @@ export function GameScreen() {
     ${/* 深潜的深度已顶替 HUD 的回合数字；词条/祝福改放在「本局信息」抽屉里（EchoInfoBlock），
         不再有浮在屏幕上的状态条挡住 HUD 和按钮（维护者 2026-11-04） */ null}
     ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
-    ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} reason=${endReason} />` : null}
+    ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} reason=${endReason} dive=${isDivePub(pub) || diveRoom} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${TestConsole} />` : null}`;
 }
 
@@ -2107,7 +2108,7 @@ function MatchScreen() {
       myId=${myId} onDone=${() => setBossPlate(null)} />`
       : bossPlate?.kind === 'core' ? html`<${HiddenCorePlate} key=${bossPlate.key} bossId=${pub?.hiddenBossId} onDone=${() => setBossPlate(null)} />`
       : bossPlate?.kind === 'end' ? html`<${EndPlate} key=${bossPlate.key} kind=${bossPlate.end} bossId=${pub?.bossId} hiddenBossId=${pub?.hiddenBossId}
-        onDone=${() => setBossPlate(null)} />` : null}
+        dive=${isDivePub(pub)} onDone=${() => setBossPlate(null)} />` : null}
 
     ${facing && view ? html`<${FacingWheel} key=${`${facing.uid}:${facing.row},${facing.col}`} view=${view} row=${facing.row} col=${facing.col}
       grid=${facing.grid} name=${facing.name} onPreview=${previewFacing} onCommit=${commitFacing} onCancel=${cancelFacing} />` : null}

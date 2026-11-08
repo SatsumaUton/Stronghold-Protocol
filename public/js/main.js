@@ -76,6 +76,8 @@ import { recordError, installTrafficMeter } from './diag.js';
 import { installContent, installContentSet } from './content.js';
 import { cosmetics } from './cosmetics.js';
 import { sanitizeVersions, roomVersion, isDefaultVersion, matchFrameVersion } from './versions.js';
+import { diveAlreadyIn, diveSeatGone } from './ui/diveWords.js';
+import { takeJoinDive } from './screens/entering.js';
 
 const RESTORE_GRACE_MS = 1500;
 const JOIN_DELAY_MS = 350;
@@ -182,7 +184,9 @@ function schedulePendingJoin() {
     if (!code) return;                  // 已清掉（用户自己进了房 / 关掉了）
     if (!s.session.entered || net.status !== 'online') { retry(); return; }
     if (s.room) {
-      if (s.room.code !== code) toast(t('你已在其他同盟中，请先离开当前同盟'), 'warn');
+      // 深潜房不是同盟（维护者 2026-11-08）：说的对象跟着当前房间的模式走
+      const inDive = s.room.variant === 'deepecho';
+      if (s.room.code !== code) toast(diveAlreadyIn(inDive), 'warn');
       clearPendingJoin();
       return;
     }
@@ -323,7 +327,7 @@ function onRoomState(msg) {
   if (!adminWatch && !identityPending && myId != null && seats.length
     && !seats.some((s) => s && s.playerId === myId) && !isSpectating(room, myId)) {
     // We are no longer seated (kicked / left elsewhere) — neither in a player seat nor a spectator seat.
-    if (store.get().room) toast(t('你已不在该同盟中'), 'warn');
+    if (store.get().room) toast(diveSeatGone(room.variant === 'deepecho'), 'warn');
     store.set({ room: null, match: emptyMatch() });
     return;
   }
@@ -623,6 +627,9 @@ async function boot() {
 
   const pendingJoin = parseRoomParam(location.search);
   const pendingSpectate = /(?:^|[?&])spectate=1(?:&|$)/.test(location.search);
+  // 这一跳是去深潜房吗（screens/entering.js 的 takeJoinDive：lobby.js 的 enterRoom 换页前留的标记）——
+  // 「正在进入深潜…」要说对（维护者 2026-11-08）
+  const pendingJoinDive = takeJoinDive();
   // Consume a closed-watch cleanup request exactly once on a normal game page.
   try {
     const qs = new URLSearchParams(location.search);
@@ -641,7 +648,7 @@ async function boot() {
   store.set((s) => ({
     me: { ...s.me, name: savedName },
     session: { entered },
-    ui: { ...s.ui, pendingJoin, pendingSpectate },
+    ui: { ...s.ui, pendingJoin, pendingSpectate, pendingJoinDive },
   }));
   const bootAdminWatch = (() => {
     try {
