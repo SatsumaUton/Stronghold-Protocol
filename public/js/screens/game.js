@@ -148,7 +148,7 @@ import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady, TURN_CUE_WAIT_MS, TU
 // MatchEnded, PausedOverlay, the highlight styles and keepEarly live in ./game/*.js.
 import { HUD_HZ_MS, MERGE_HL, SEL_RANGE, cx } from './game/marks.js';
 import { keepEarly, audioEarly } from './game/early.js';
-import { MatchEnded, PausedOverlay, PauseVoteOverlay } from './game/overlays.js';
+import { MatchEnded, PausedOverlay, PauseVoteOverlay, GiveUpVoteOverlay } from './game/overlays.js';
 import { inspectRange } from './game/range.js';
 import { t, tParts } from '../../../shared/i18n.js';
 import { contentSet } from '../content.js';
@@ -1455,6 +1455,16 @@ function MatchScreen() {
     setPauseVoteBusy(false);
   }, []);
 
+  // ---- 「放弃深潜」的全员投票（g.echoGiveUp；m.public.echo.giveUp）------------------------------------
+  // 维护者 2026-11-08：这块以前只画在放大镜 → 深渊回响 抽屉最下面，发起之后面板一关就看不见了。
+  // 现在和「暂停游戏」一样是盖在整局上的浮层（GiveUpVoteOverlay），投票一开自动出现。
+  const [giveUpBusy, setGiveUpBusy] = useState(false);
+  const voteGiveUp = useCallback(async (agree) => {
+    setGiveUpBusy(true);
+    await actions.echoGiveUpVote(agree);
+    setGiveUpBusy(false);
+  }, []);
+
   // ---- solo pause (g.pause; m.public.paused) ---------------------------------------------------------------------------
   const togglePause = useCallback(async (on) => {
     setPauseBusy(true);
@@ -2103,6 +2113,9 @@ function MatchScreen() {
     ${/* 「暂停游戏」的全员投票：暂停中盖整局，每个在线队友各点一次「继续游戏」（维护者 2026-11-08） */ null}
     ${pub?.pauseActive ? html`<${PauseVoteOverlay} active=${pub.pauseActive} players=${pub.players} myId=${myId}
       busy=${pauseVoteBusy} onResume=${confirmPauseResume} />` : null}
+    ${/* 「放弃深潜」的全员投票：投票一开就盖整局（维护者 2026-11-08，以前只在放大镜抽屉最下面） */ null}
+    ${!spectator && pub?.echo?.giveUp ? html`<${GiveUpVoteOverlay} vote=${pub.echo.giveUp} players=${pub.players}
+      myId=${myId} busy=${giveUpBusy} onVote=${voteGiveUp} />` : null}
 
     ${replace ? html`<${EquipReplaceDialog} request=${replace.request} getItem=${gd.item}
       onConfirm=${(uid) => closeReplace(uid)} onCancel=${() => closeReplace(null)} />` : null}

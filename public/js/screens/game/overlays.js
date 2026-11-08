@@ -1,7 +1,8 @@
-// public/js/screens/game/overlays.js — the match-ended plate and the solo pause plate.
+// public/js/screens/game/overlays.js — the match-ended plate, the solo pause plate and the two 深渊回响 vote overlays.
 
+import { useEffect, useState } from '../../../vendor/hooks.module.js';
 import { Button, MicroLabel, html } from '../../ui/components.js';
-import { emptyMatch, store } from '../../store.js';
+import { emptyMatch, serverNow, store } from '../../store.js';
 import { localAsset } from '../../data.js';
 import { t } from '../../../../shared/i18n.js';
 import { exitWords, useEchoRun } from '../../ui/matchChrome.js';
@@ -93,6 +94,66 @@ export function PauseVoteOverlay({ active, players = [], myId = null, busy = fal
       <${Button} variant="primary" size="lg" icon="play" loading=${busy} disabled=${mine} onClick=${onResume} data-autofocus>
         ${mine ? t('已确认 · 等待队友（{n}/{m}）', { n: resumed.length, m: need }) : t('继续游戏')}<//>
       <p class="t-dim pausevote__note">${t('暂停超过 10 分钟会自动继续。')}</p>
+    </div>
+  </div>`;
+}
+
+/**
+ * 「放弃深潜」的全员投票浮层（维护者 2026-11-08）。
+ *
+ * 以前这块只画在放大镜 → 深渊回响 抽屉的**最下面**：玩家点左上角「放弃深潜」发起之后，
+ * 面板关掉、抽屉没打开，就什么都看不见了 —— 不知道投票开没开、谁同意了、还剩多少时间。
+ * 现在和「暂停游戏」一样是**盖在整局上的浮层**（同 awayov 骨架），投票一开就自动出现：
+ *   * 谁发起的、要几个人同意、还剩几秒；
+ *   * 每个存活真人的状态（✓ 已同意 / … 等待中 / ✗ 不同意）；
+ *   * 「同意放弃」按钮（自己投过就变成只读的「已同意 · 等待队友（n/N）」，仍可点「继续深潜」撤回）。
+ *
+ * 抽屉里那块进度（ui/enemyDrawer.js GiveUpVoteBlock）保留：它是「翻资料时也能看到」，不是唯一入口。
+ * @param {{ vote: any, players?: any[], myId?: string|null, busy?: boolean, onVote: (agree: boolean) => void }} props
+ */
+export function GiveUpVoteOverlay({ vote, players = [], myId = null, busy = false, onVote }) {
+  const [now, setNow] = useState(() => serverNow());
+  const live = !!vote;
+  const endsAt = vote && Number.isFinite(vote.endsAt) && vote.endsAt > 0 ? vote.endsAt : 0;
+  useEffect(() => {
+    if (!live || !endsAt) return undefined;
+    const id = setInterval(() => setNow(serverNow()), 500);
+    return () => clearInterval(id);
+  }, [live, endsAt]);
+  if (!vote) return null;
+  const agreed = Array.isArray(vote.agreed) ? vote.agreed : [];
+  const rejected = Array.isArray(vote.rejected) ? vote.rejected : [];
+  const voters = Array.isArray(vote.voters) ? vote.voters : [];
+  const mine = !!myId && agreed.includes(myId);
+  const need = Math.max(1, voters.length);
+  const left = endsAt ? Math.max(0, Math.ceil((endsAt - now) / 1000)) : null;
+  // 名单：优先 pub.players 里的名字；拿不到就按 voters 里的 id 兜底（不显示空白行）
+  const roster = voters.map((id) => {
+    const p = (Array.isArray(players) ? players : []).find((x) => x && x.playerId === id);
+    return { id, name: (p && p.name) || t('队友'), agreed: agreed.includes(id), rejected: rejected.includes(id) };
+  });
+  const proposer = roster.find((r) => r.id === (vote.proposerId || ''));
+  return html`<div class="awayov" role="dialog" aria-label=${t('放弃深潜')} data-testid="giveup-vote-overlay">
+    <div class="awayov__box brackets pausevote__box giveup__box">
+      <${MicroLabel} tone="mint">ABANDON · ${t('全员同意后结算')}</${MicroLabel}>
+      <h2>${t('放弃深潜')}</h2>
+      <p class="t-lo">${proposer
+        ? t('{name} 发起了「放弃深潜」。所有存活玩家都同意后，本局会立刻结算并显示成绩（深度、祝福、盟约都会保留）。', { name: proposer.name })
+        : t('有人发起了「放弃深潜」。所有存活玩家都同意后，本局会立刻结算并显示成绩（深度、祝福、盟约都会保留）。')}</p>
+      ${roster.length ? html`<ul class="pausevote__list">
+        ${roster.map((r) => html`<li key=${r.id} class=${cx('pausevote__who', r.agreed && 'is-ok', r.rejected && 'is-no')}>
+          <i class="pausevote__mark" aria-hidden="true">${r.agreed ? '✓' : r.rejected ? '✗' : '…'}</i>
+          <span>${r.name}</span>
+          <em>${r.agreed ? t('已同意') : r.rejected ? t('不同意') : t('等待中')}</em>
+        </li>`)}
+      </ul>` : null}
+      <p class="pausevote__countline">${t('已同意 {n}/{m} 人', { n: agreed.length, m: need })}${left != null ? html`<span class="giveup__timer"> · ${t('剩 {n} 秒', { n: left })}</span>` : null}</p>
+      <div class="giveup__acts">
+        <${Button} variant="danger" size="lg" icon="exit" loading=${busy && !mine} disabled=${mine} onClick=${() => onVote(true)} data-autofocus>
+          ${mine ? t('已同意 · 等待队友（{n}/{m}）', { n: agreed.length, m: need }) : t('同意放弃')}<//>
+        <${Button} variant="secondary" size="lg" icon="play" disabled=${busy} onClick=${() => onVote(false)}>${t('继续深潜')}<//>
+      </div>
+      <p class="t-dim pausevote__note">${t('有一人不同意、或 30 秒内没投完，就继续深潜。')}</p>
     </div>
   </div>`;
 }

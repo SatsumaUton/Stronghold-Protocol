@@ -3125,5 +3125,12 @@
   "这个页面对应的节点上没有你的对局，它在「{node}」节点上（房间 {code}）。点下面的按钮过去继续。": "Your match is not on this page’s node — it is on the “{node}” node (room {code}). Click the button below to go there and continue.",
   "每人各自选一条核心盟约：你自己的全体干员都算它的成员（同名只算一个），不影响队友；选中后按「确认」才生效": "Each player picks one core bond: all your operators count as its members (an operator counts once), teammates unaffected; press Confirm to apply",
   "点一张卡选中，再按「确认」提交（不用等队友）。": "Tap a card to select it, then press Confirm (no need to wait for teammates).",
-  "我的最佳": "My best"
+  "我的最佳": "My best",
+  "全员同意后结算": "Settles when everyone agrees",
+  "{name} 发起了「放弃深潜」。所有存活玩家都同意后，本局会立刻结算并显示成绩（深度、祝福、盟约都会保留）。": "{name} proposed abandoning the deep dive. Once every surviving player agrees, this run settles at once and shows the result (depth, blessings and bonds are all kept).",
+  "有人发起了「放弃深潜」。所有存活玩家都同意后，本局会立刻结算并显示成绩（深度、祝福、盟约都会保留）。": "Someone proposed abandoning the deep dive. Once every surviving player agrees, this run settles at once and shows the result (depth, blessings and bonds are all kept).",
+  "已同意 {n}/{m} 人": "Agreed {n}/{m}",
+  "剩 {n} 秒": "{n}s left",
+  "已同意 · 等待队友（{n}/{m}）": "Agreed · waiting for teammates ({n}/{m})",
+  "有一人不同意、或 30 秒内没投完，就继续深潜。": "If one player disagrees, or not everyone votes within 30 seconds, the dive continues."
 }
