@@ -473,6 +473,7 @@
         "public/i18n/ko.json",
         "public/i18n/zh-TW.json",
         "public/js/assets.js",
+        "public/js/main.js",
         "public/js/render/units.js",
         "public/js/screens/echoLobby.js",
         "public/js/screens/game.js",

@@ -3132,5 +3132,6 @@
   "已同意 {n}/{m} 人": "Agreed {n}/{m}",
   "剩 {n} 秒": "{n}s left",
   "已同意 · 等待队友（{n}/{m}）": "Agreed · waiting for teammates ({n}/{m})",
-  "有一人不同意、或 30 秒内没投完，就继续深潜。": "If one player disagrees, or not everyone votes within 30 seconds, the dive continues."
+  "有一人不同意、或 30 秒内没投完，就继续深潜。": "If one player disagrees, or not everyone votes within 30 seconds, the dive continues.",
+  "这间深潜已经开始，无法中途加入：已作为观战者进入。": "This deep dive has already started, so you cannot join midway: you are entering as a spectator."
 }
