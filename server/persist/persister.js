@@ -72,11 +72,14 @@ export class LobbyPersister {
     this.busy = null;
     this.closed = false;
     this.counts = { captures: 0, captureSkips: 0, docWrites: 0, docFailures: 0, restoredSessions: 0, restoredRooms: 0,
-      restoredMatches: 0, droppedMatches: 0, deleted: 0 };
+      restoredMatches: 0, droppedMatches: 0, deleted: 0, tombstones: 0 };
     // every local match the lobby starts offers its safe points here (Lobby.startMatch: opts.onCheckpoint); a cluster
     // lobby rebuilds a lost node's matches from their checkpoints (ClusterLobby.recoverRemote)
     lobby.onCheckpoint = (room, ctx, match, reason) => this.capture(room, match, reason);
     lobby.checkpointsOn = true;
+    // ★ 2026-11-09（墓碑）：房间被回收的**那一刻**先留一份副本 —— 必须在 disposeRoom 动手之前，
+    //   那时 room.match / seats / 检查点都还完整。等到下一轮 flush 从 goneRooms 里发现它时已经晚了。
+    lobby.onRoomDisposing = (room, reason) => { void this.tombstone(room, reason); };
   }
 
   /** The checkpoint record of a local match (created on first use). */
@@ -220,6 +223,8 @@ export class LobbyPersister {
     }
     const goneRooms = [...this.roomsStored.keys()].filter((code) => !roomCodes.has(code));
     const goneSessions = [...this.sessionsStored.keys()].filter((id) => !keys.has(id));
+    // 墓碑在 disposeRoom 的那一刻就写好了（lobby.onRoomDisposing）—— 这里只剩删文档 / 检查点。
+    // 之所以不在这里补写：房间这会儿已经被清空并从 lobby.rooms 删掉，写出来是空壳（第一次实现踩到过）。
     // the records first, the head last: a head always comes after the records it describes
     // a refused write: nothing of this round is known to be stored — every record is written (or deleted) again next time
     const unsure = (stored, attempted) => { for (const k of [...stored.keys(), ...attempted.map(([k]) => k)]) stored.set(k, []); };
@@ -232,6 +237,51 @@ export class LobbyPersister {
     if (!await this.store.saveLobby({ v: LOBBY_DOC_VERSION, kind: this.cluster ? 'cluster' : 'local', savedAt: this.now(),
       sessions: this.sessionsStored.size, rooms: this.roomsStored.size })) return null;
     return named;
+  }
+
+  /**
+   * 给一个即将被删掉的房间写墓碑：那一刻的房间文档 + 对局检查点（有就带）。
+   *
+   * ⚠ 必须在 `disposeRoom` **动手之前**调用（`lobby.onRoomDisposing` 钩子）：那一刻 `room.match`、
+   * `room.seats`、检查点都还完整。等到下一轮 flush 从 `goneRooms` 里发现它时，房间已经被清空、
+   * 也从 `lobby.rooms` 里删掉了，写出来的墓碑只剩时间与原因 —— 救不回来（这个坑第一次实现时踩到了）。
+   *
+   * 读回来用 `store.loadTombstone(code)`；运维脚本 `tools/restore-room.mjs` 会把它写回
+   * `lobby:rooms` / `cp:<id>`，节点下次重启就能照常恢复（`restoreLobby` 现成的路径）。
+   * @param {any} room 即将被回收的房间（还没被 disposeRoom 清空）
+   * @param {string} [reason] 回收原因
+   */
+  async tombstone(room, reason) {
+    const code = room && typeof room.code === 'string' ? room.code : null;
+    if (!code) return false;
+    const why = typeof reason === 'string' ? reason : (typeof room.disposeReason === 'string' ? room.disposeReason : null);
+    /** 房间文档：拿不到就写一张只有时间与原因的（至少能看出「这里曾经有间房」） */
+    let doc;
+    try { doc = roomDoc(room, (r) => this.matchRef(r), (id) => this.registry.byId(id)); } catch { doc = null; }
+    let checkpoint = null;
+    const m = room.match;
+    if (m && !room.disposed) {
+      try {
+        const rec = this.matches.get(m) || null;
+        if (rec && rec.json) checkpoint = { id: rec.id, json: rec.json };
+        else {
+          // 没有现成的就现抓一份（房间正在被回收，这是最后一次机会）
+          const snap = snapshotMatch(m);
+          if (snap) {
+            const seed = m.seed >>> 0, matchNo = room.matchCount;
+            const id = localCheckpointId(code, matchNo, seed);
+            checkpoint = { id, json: JSON.stringify({ v: 1, kind: 'local', room: code, matchNo, seed, reason: 'tombstone', match: snap }) };
+          }
+        }
+      } catch { checkpoint = null; }
+    }
+    const ok = await this.store.saveTombstone(code, {
+      v: 1, code, at: this.now(), kind: this.cluster ? 'cluster' : 'local',
+      reason: why, room: doc, checkpoint,
+    });
+    if (ok) this.counts.tombstones = (this.counts.tombstones || 0) + 1;
+    this.log.info?.(`[persist] ${code} tombstone ${ok ? 'written' : 'FAILED'}${checkpoint ? ' (with checkpoint)' : ''}`);
+    return ok;
   }
 
   /** The stored lobby document (head + records), or { ok: false, error } when the store did not answer (store.js get). */

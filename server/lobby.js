@@ -4549,6 +4549,13 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
    */
   disposeRoom(room, reason) {
     if (room.disposed) return;
+    // 记下回收原因：persister 的墓碑（tomb:<房号>）要把它一起存，运维复盘时才知道是谁删的（维护者 2026-11-09）
+    room.disposeReason = reason;
+    // 房间被删前的最后一次机会（persister 的墓碑钩子）：这一刻 match / seats / 检查点都还完整。
+    // 钩子自己吞掉异常 —— 写不了墓碑也不能挡住回收（持久化是尽力而为）。
+    if (typeof this.onRoomDisposing === 'function') {
+      try { this.onRoomDisposing(room, reason); } catch (e) { this.log.warn?.(`[lobby] ${room.code} onRoomDisposing failed (${e.message})`); }
+    }
     room.disposed = true;
     if (this.rooms.get(room.code) === room) { this.trustedRuntime?.event('roomClosed',{room:room.toState(this.now())}); this.rooms.delete(room.code); }
     // an open version vote ends with the room (its timer)
@@ -4581,6 +4588,8 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     if (ctx) this.disposeMatchCtx(ctx);
     // the room's visual set and content set are no longer held by it (server/plugins/visualSet.js, contentSets.js)
     this.releaseContent(room.content);
+    // 记下回收原因：persister 的墓碑（tomb:<房号>）要把它一起存，运维复盘时才知道是谁删的（维护者 2026-11-09）
+    room.disposeReason = reason;
     this.log.info(`[lobby] ${room.code} disposed (${reason})`);
   }
 
