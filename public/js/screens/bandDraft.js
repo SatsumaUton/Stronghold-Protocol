@@ -58,6 +58,7 @@ import { chessPortraitUrl, uiUrl } from '../ui/assetUrls.js';
 import { aggregateStats, peekStatsRecords, strategyBadgeIds, trophyMedalOf } from '../ui/stats.js';
 import { modeOffBonds, bandOffBonds, bandOffLine } from '../ui/gameLogic.js';
 import { t, tParts, tName } from '../../../shared/i18n.js';
+import { diveEntering, diveWonTimes, isDivePub } from '../ui/diveWords.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -181,7 +182,7 @@ export function autoPickBand(sel, { bands, taken, myPick = null, defaultId = DEF
  *   selected: the auto pick is the highlighted band (not the default standing in for a band a teammate holds)
  *   concurrent: 并发草稿（5–20 人大厅 allowRepeat）
  */
-export function draftTip({ timed, turnSeconds = null, autoName = null, selected = true, concurrent = false }) {
+export function draftTip({ timed, turnSeconds = null, autoName = null, selected = true, concurrent = false, dive = false }) {
   const clock = Number(turnSeconds) > 0 ? t('每位博士有 {n} 秒', { n: Math.round(turnSeconds) }) : t('每位博士限时决策');
   if (concurrent) {
     // 并发：每人同时选一次，可重复；超时按当前高亮
@@ -190,7 +191,8 @@ export function draftTip({ timed, turnSeconds = null, autoName = null, selected 
     if (!autoName) return t('{head}；{clock}', { head, clock });
     return t('{head}；{clock}，超时将自动选择当前选中的「{autoName}」', { head, clock, autoName });
   }
-  const skip = t('联合模拟在选择策略时可以进行一次跳过');
+  // 深潜房里不叫「联合模拟」（维护者 2026-11-08）
+  const skip = dive ? t('深渊回响在选择策略时可以进行一次跳过') : t('联合模拟在选择策略时可以进行一次跳过');
   if (!timed) return t('{skip}；本局不限时', { skip });
   if (!autoName) return t('{skip}；{clock}', { skip, clock });
   return selected ? t('{skip}；{clock}，超时将自动选择当前选中的「{autoName}」', { skip, clock, autoName })
@@ -462,7 +464,7 @@ export function BandDraftScreen({ held = null } = {}) {
   const shownBand = peek ? gd.band(peek) : band;
   const rows = solo ? players.filter((p) => p.playerId === myId) : draft.order.map((pid) => players.find((p) => p.playerId === pid)).filter(Boolean);
 
-  const head = allPicked ? html`<div class="dturn is-done"><span class="dturn__txt"><b>${t('策略选择完成')}</b><span>${t('正在进入模拟…')}</span></span><${Icon} name="hourglass" class="dturn__glass" /></div>`
+  const head = allPicked ? html`<div class="dturn is-done"><span class="dturn__txt"><b>${t('策略选择完成')}</b><span>${diveEntering(isDivePub(pub))}</span></span><${Icon} name="hourglass" class="dturn__glass" /></div>`
     : myTurn ? html`<div class="dturn is-turn">
         <span class="dturn__go"><${Sprite} k="bandChoose/youturn_finger" class="dturn__finger" fallback=${html`<${Icon} name="chevronLeft" class="dturn__finger" />`} />
           <b>${t('请选择策略')}</b></span>
@@ -505,7 +507,7 @@ export function BandDraftScreen({ held = null } = {}) {
         </div>
         ${canPlan ? html`<${Button} variant="secondary" icon="users" block=${true} class="draft-order__plan" data-testid="bond-plan-open"
           aria-haspopup="dialog" onClick=${() => setPlanOpen(true)}>${myPlan ? t('预选盟约：{name}', { name: gd.bond(myPlan)?.name || myPlan }) : t('预选盟约')}<//>` : null}
-        ${!solo ? html`<p class="draft-order__tip" data-testid="draft-tip">${draftTip({ timed, turnSeconds: turnLen, autoName: myPick ? null : autoName, selected: open && autoId === sel, concurrent: draft.concurrent })}</p>` : null}
+        ${!solo ? html`<p class="draft-order__tip" data-testid="draft-tip">${draftTip({ timed, turnSeconds: turnLen, autoName: myPick ? null : autoName, selected: open && autoId === sel, concurrent: draft.concurrent, dive: isDivePub(pub) })}</p>` : null}
       </aside>
       <i class="draft__link" aria-hidden="true"></i>
 
@@ -545,7 +547,7 @@ export function BandDraftScreen({ held = null } = {}) {
         ${view === 'detail' && shownBand ? html`<aside class="draft-detail" key="detail">
           <div class="draft-detail__body" key=${shownBand.bandId}>
             <div class="draft-detail__art"><${BandIcon} bandId=${shownBand.bandId} size="xl" /></div>
-            ${local.won[shownBand.bandId] ? html`<span class="draft-detail__medal">${t('已通过模拟{n}次', { n: local.won[shownBand.bandId] })}</span>` : null}
+            ${local.won[shownBand.bandId] ? html`<span class="draft-detail__medal">${diveWonTimes(isDivePub(pub), local.won[shownBand.bandId])}</span>` : null}
             <div class="draft-detail__hp">${t('初始生命值')}<b class="num">${shownBand.totalHp ?? '--'}</b></div>
             <span class="draft-tag">STRATEGY</span>
             <h2 class="draft-detail__name">${shownBand.name}</h2>

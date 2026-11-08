@@ -13,6 +13,7 @@ import { useState, useEffect } from '../../vendor/hooks.module.js';
 import { checkNodeAcceptsNew } from './nodeCodeHint.js';
 import { updateHintAllowed } from './buildGuard.js';
 import { t } from '../../../shared/i18n.js';
+import { diveSyncing } from './diveWords.js';
 
 /** Whether the banner shows for this connection state (mirrors the early returns below). */
 export function bannerVisible(conn, entered, restoring, buildStale = false) {
@@ -39,6 +40,7 @@ export function ConnectionBanner() {
   //   只有这个按钮会留标记：普通刷新 / 新标签页 / 换浏览器都不会自动回房，
   //   2026-10-27「恢复对局必须玩家自己点」的规矩不变。
   const roomCode = useStore((s) => s.room?.code || null);
+  const inDive = useStore((s) => s.room?.variant === 'deepecho' || s.match?.public?.echo?.deepecho === true);
   const reloadKeepingRoom = () => {
     try {
       if (roomCode) sessionStorage.setItem('sp.rejoinRoom', String(roomCode));
@@ -91,7 +93,8 @@ export function ConnectionBanner() {
   if (!entered) return null;
   if (conn.status === 'online' && !restoring && !staleShown) return null;
   if (conn.status === 'online' && restoring) {
-    return html`<div class="conn-banner" role="status"><${Icon} name="refresh" /><span>${t('正在同步同盟状态…')}</span></div>`;
+    // 深潜房不是同盟（维护者 2026-11-08）：说的对象跟着当前房间的模式走
+    return html`<div class="conn-banner" role="status"><${Icon} name="refresh" /><span>${diveSyncing(inDive)}</span></div>`;
   }
   if (conn.status === 'online' && staleShown) {
     // the server has a newer build than this page: the guard reloads by itself once the match is over, the button is

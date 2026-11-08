@@ -53,6 +53,8 @@ export function expSummary(exp) {
 
 function RoomRow({ row, disabled, onJoin, joinLabel = null, onSpectate = null }) {
   const bots = row.filled - row.humans;
+  // 深潜房不是同盟：观战的提示里要说「每次深潜」（维护者 2026-11-08）
+  const dive = row.variant === 'deepecho';
   return html`<li class="rlist__row" style=${`--d-color:${DIFFICULTY_COLORS[row.difficulty]}`} data-testid="room-row" data-code=${row.code}>
     <span class="rlist__diff">${row.variant === 'deepecho' ? html`<${Icon} name="target" />${t('深渊回响')}` : html`<${DifficultyIcon} difficulty=${row.difficulty} />${t(DIFFICULTY_NAMES[row.difficulty])}`}</span>
     <span class="rlist__who"><b class="selectable">${row.host}</b><small title=${expSummary(row.experimental)}>${expSummary(row.experimental)}</small></span>
@@ -63,7 +65,9 @@ function RoomRow({ row, disabled, onJoin, joinLabel = null, onSpectate = null })
          两个按钮包在一个格子里，行的 4 列网格不因「有没有观战」而错位。 */ null}
     <span class="rlist__actions">
       ${onSpectate ? html`<${Button} size="sm" variant="secondary" class="rlist__spec" data-testid="room-spectate" disabled=${disabled}
-          title=${t('以观战者身份进入：不占博士席位，只能观看（每个同盟最多 {MAX_SPECTATORS} 名，模拟进行中也可进入）', { MAX_SPECTATORS })}
+          title=${dive
+            ? t('以观战者身份进入：不占博士席位，只能观看（每次深潜最多 {MAX_SPECTATORS} 名，深潜进行中也可进入）', { MAX_SPECTATORS })
+            : t('以观战者身份进入：不占博士席位，只能观看（每个同盟最多 {MAX_SPECTATORS} 名，模拟进行中也可进入）', { MAX_SPECTATORS })}
           onClick=${() => onSpectate(row.code, row.node || 0)}>${t('观战')}<//>` : null}
       <${Button} size="sm" variant="primary" class="rlist__join" disabled=${disabled} onClick=${() => onJoin(row.code, row.node || 0)}>${joinLabel || t('加入同盟')}<//>
     </span>

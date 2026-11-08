@@ -31,6 +31,7 @@ import { ReviveAction, RevivalNotice } from './revival.js';
 import { KickAction, KickVoteNotice } from './kickVote.js';
 import { BondPlanTag } from './bondPlan.js';
 import { PHONE_QUERY, teamDensity, teamEmoteMode } from './teamLayout.js';
+import { diveTeam, isDivePub } from './diveWords.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -133,6 +134,8 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
   useEffect(() => { setOpenPid(null); }, [phaseKey, watching, observe?.observing]);
   const players = sortedPlayers(pub);
   if (!players.length) return null;
+  // 「深渊回响」不是同盟：面板标题和折叠头都要说深潜（维护者 2026-11-08）
+  const teamName = diveTeam(isDivePub(pub));
   // 表情走弹幕时，行里不再挂气泡（否则同一句表情放两次）。
   const rowBubbles = teamEmoteMode({ density: teamDensity({ count: players.length, phone: globalThis.matchMedia?.(PHONE_QUERY)?.matches }), open: rosterOpen }) === 'bubble' ? bubbles : null;
   const poolGroups = Array.isArray(pub?.poolGroups) ? pub.poolGroups.filter((g) => g && Array.isArray(g.playerIds) && g.playerIds.length) : [];
@@ -172,11 +175,11 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
     noteAsked(p);
     onWatch(p);
   };
-  return html`<aside class=${cx('team', compact && 'team--compact', players.length > 4 && 'team--many', !rosterOpen && 'is-folded')} aria-label=${t('同盟成员')}>
+  return html`<aside class=${cx('team', compact && 'team--compact', players.length > 4 && 'team--many', !rosterOpen && 'is-folded')} aria-label=${teamName}>
     ${players.length > 4 ? html`<div class="team__head">
       <button type="button" class="team__toggle" aria-expanded=${String(rosterOpen)} aria-controls="team-roster"
         onClick=${() => setRosterOpen((v) => !v)}>
-        <${Icon} name="users" /><span>${t('同盟成员')}</span><b class="num">${players.length}</b>
+        <${Icon} name="users" /><span>${teamName}</span><b class="num">${players.length}</b>
         <${Icon} name="chevronRight" class="team__chev" />
       </button>
     </div>` : null}

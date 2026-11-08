@@ -25,6 +25,7 @@ import { sortedPlayers } from './gameLogic.js';
 import { data, getBoss, localAsset } from '../data.js';
 import { PHASE } from '../../../shared/constants.js';
 import { t, tParts } from '../../../shared/i18n.js';
+import { diveInterrupted } from './diveWords.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -249,14 +250,15 @@ export function HiddenCorePlate({ bossId = null, onDone }) {
 
 /**
  * The run's end (endPlateOf kinds), over the field in the server's last pause before RESULT.
- * @param {{ kind: 'allClear'|'coreFail'|'abort', bossId?: string|null, hiddenBossId?: string|null, onDone?: Function }} props
+ * `dive`: a 深渊回响 run — the plate says 深潜中断, not 模拟中断 (维护者 2026-11-08).
+ * @param {{ kind: 'allClear'|'coreFail'|'abort', bossId?: string|null, hiddenBossId?: string|null, dive?: boolean, onDone?: Function }} props
  */
-export function EndPlate({ kind, bossId = null, hiddenBossId = null, onDone }) {
+export function EndPlate({ kind, bossId = null, hiddenBossId = null, dive = false, onDone }) {
   const leaving = useTimedLeave(END_PLATE_MS, onDone);
   let body;
   if (kind === 'abort') {
     body = html`<span class="end__bars" aria-hidden="true">${[0, 1, 2, 3, 4, 5].map((i) => html`<i key=${i} style=${`--i:${i}`}></i>`)}</span>
-      <b class="end__title end__title--side">${t('模拟中断')}</b>
+      <b class="end__title end__title--side">${diveInterrupted(dive)}</b>
       <span class="end__sub" aria-hidden="true">STRONGHOLD PROTOCOL</span>`;
   } else {
     const all = kind === 'allClear';

@@ -47,8 +47,8 @@ test('the wall gates the badge on draftRecords().badges with the official sprite
   assert.match(src, /\$\{badged \? html`<span class="dband__badge" data-testid="band-badge"/);
   assert.match(src, /<\$\{Sprite\} k="statistics\/strategyBadge" class="dband__badge-art"/);
   assert.doesNotMatch(src, /\$\{wins \? html`<span class="dband__medal"/, 'no badge after one win');
-  // the detail pane's count stays plain text
-  assert.match(src, /local\.won\[shownBand\.bandId\] \? html`<span class="draft-detail__medal">\$\{t\('已通过模拟\{n\}次'/);
+  // the detail pane's count stays plain text（深潜房说「深潜」，见 ui/diveWords.js）
+  assert.match(src, /local\.won\[shownBand\.bandId\] \? html`<span class="draft-detail__medal">\$\{diveWonTimes\(isDivePub\(pub\), local\.won\[shownBand\.bandId\]\)\}/);
   // not parsed while the screen mounts (the stats store can be large): an idle callback after it is up
   assert.match(src, /const \[local, setLocal\] = useState\(NO_RECORDS\);/);
   assert.match(src, /setLocal\(draftRecords\(peekStatsRecords\(\), data\.get\('bands'\)\)\)/);

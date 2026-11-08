@@ -1107,7 +1107,7 @@ export function EchoKeyRow({ code = '', onCode = null, codeOk = false, online = 
       ariaLabel=${t('深潜房号')} />
     <button type="button" class="ally-key__spec proto-key__spec" data-testid="echo-spectate"
       disabled=${!codeOk || !online || busy === 'spectate'} onClick=${() => onSpectate && onSpectate()}
-      title=${t('以观战者身份进入：不占博士席位，只能观看（每个同盟最多 {MAX_SPECTATORS} 名，模拟进行中也可进入）', { MAX_SPECTATORS })}>
+      title=${t('以观战者身份进入：不占博士席位，只能观看（每次深潜最多 {MAX_SPECTATORS} 名，深潜进行中也可进入）', { MAX_SPECTATORS })}>
       ${busy === 'spectate' ? html`<${Spinner} size="sm" />` : html`<${Icon} name="eye" />`}${t('观战深潜')}
     </button>
     <button type="button" class="proto-key__join" data-testid="echo-join"
@@ -1766,9 +1766,12 @@ export function LobbyScreen() {
    * 为什么要跳一下：30 个节点是各自独立的进程，每个 Lobby 只认识自己的房间，
    * 在本节点发 room.join 只会拿到「房间不存在」。
    */
-  const enterRoom = (c, node) => {
+  const enterRoom = (c, node, dive = false) => {
     const k = codeArg(c, code);
     if (!k) return;
+    // 「正在进入深潜…」还是「正在进入同盟…」：跨节点换页时靠这个会话标记带过去
+    // （screens/entering.js 的 takeJoinDive 读一次就删，维护者 2026-11-08）
+    try { sessionStorage.setItem('sp.joinDive', dive ? '1' : '0'); } catch { /* 隐私模式 */ }
     const mine = currentNode();
     if (node && node !== mine) {
       // 直接换页到那台节点并带上房间码：不用先进大厅再点一次
@@ -1789,9 +1792,11 @@ export function LobbyScreen() {
    * 从列表里**观战**：和 enterRoom 同一套跨节点处理，只是落地后按观战进房
    * （main.js 认 `?spectate=1`：boot 时把 pendingSpectate 置上，进房走 room.spectate）。
    */
-  const spectateRoom = (c, node) => {
+  const spectateRoom = (c, node, dive = false) => {
     const k = codeArg(c, code);
     if (!k) return;
+    // 同 enterRoom：观战也要说对「正在进入深潜…」
+    try { sessionStorage.setItem('sp.joinDive', dive ? '1' : '0'); } catch { /* 隐私模式 */ }
     const mine = currentNode();
     if (node && node !== mine) {
       try { sessionStorage.setItem('sp_join_from_list', k); } catch { /* 隐私模式 */ }
@@ -1932,8 +1937,8 @@ export function LobbyScreen() {
          只有最上层响应 Esc / Tab / 焦点），所以关掉列表 = 回到同盟模拟，而不是回大厅。 */ null}
     ${/* 公开深潜：深潜专属的公开列表（维护者 2026-11-06） */ null}
     ${echoBrowseOpen ? html`<${RoomListDialog} variant="deepecho" online=${online} busy=${busy}
-      onJoin=${(c, node) => { setEchoBrowseOpen(false); enterRoom(c, node); }}
-      onSpectate=${(c, node) => { setEchoBrowseOpen(false); spectateRoom(c, node); }}
+      onJoin=${(c, node) => { setEchoBrowseOpen(false); enterRoom(c, node, true); }}
+      onSpectate=${(c, node) => { setEchoBrowseOpen(false); spectateRoom(c, node, true); }}
       onClose=${() => setEchoBrowseOpen(false)} />` : null}
     ${browseOpen && allyOpen ? html`<${RoomListDialog} online=${online} busy=${busy}
       onJoin=${(c, node) => { setBrowseOpen(false); setAllyOpen(false); enterRoom(c, node); }} onClose=${() => setBrowseOpen(false)} />` : null}

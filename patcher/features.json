@@ -475,17 +475,23 @@
         "public/js/assets.js",
         "public/js/main.js",
         "public/js/render/units.js",
+        "public/js/screens/bandDraft.js",
         "public/js/screens/echoLobby.js",
+        "public/js/screens/entering.js",
         "public/js/screens/game.js",
         "public/js/screens/game/overlays.js",
         "public/js/screens/lobby.js",
         "public/js/screens/result.js",
         "public/js/screens/room.js",
+        "public/js/screens/settle.js",
         "public/js/screens/stats.js",
         "public/js/ui/accountRoom.js",
         "public/js/ui/assetUrls.js",
         "public/js/ui/bondStrip.js",
+        "public/js/ui/bossPlates.js",
+        "public/js/ui/connBanner.js",
         "public/js/ui/detailPanel.js",
+        "public/js/ui/diveWords.js",
         "public/js/ui/echoBlessing.js",
         "public/js/ui/echoBuffs.js",
         "public/js/ui/echoCodex.js",
@@ -507,6 +513,7 @@
         "public/js/ui/roomList.js",
         "public/js/ui/shopBar.js",
         "public/js/ui/stats.js",
+        "public/js/ui/teamPanel.js",
         "public/js/ui/watchBonds.js",
         "server/http/routes.js",
         "server/lobby.js",
@@ -581,7 +588,8 @@
         "断点续玩：房间读档恢复 variant / echoCfg，检查点整份恢复",
         "公开深潜列表（room.list variant / openRooms variant）与管理后台、节点控制台可见",
         "匹配池 variant 维度（深潜只和深潜配）",
-        "深渊结算 / 排行榜写入 / 对局记录显示「深渊回响」"
+        "深渊结算 / 排行榜写入 / 对局记录显示「深渊回响」",
+        "深潜用语（深潜房里不出现「同盟 / 模拟」，版本胶囊不显示；ui/diveWords.js）"
       ]
     }
   ]

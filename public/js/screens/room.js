@@ -825,14 +825,14 @@ function RoomOptions({ option, takeoverOption, onAiTakeover, soloOption = null, 
   return html`<div class="rs-opts" role="dialog" aria-label=${title}>
     <h4>${title}</h4>
     ${soloOption ? null : html`<div class="rs-opts__row" data-testid="room-opt-difficulty">
-      <span class="rs-opts__k">${t('模拟难度')}</span>
+      <span class="rs-opts__k">${echoRoom ? t('深潜难度') : t('模拟难度')}</span>
       ${room?.variant === 'deepecho' && isHost && onSetDifficulty ? html`<select class="rs-opts__diff" disabled=${!!busy}
           title=${t('深渊回响难度（DE-1 / DE-2 / DE-3）')}
           onChange=${(e) => onSetDifficulty(e.target.value)}>
         ${['NORMAL', 'HARD', 'ABYSS'].map((d, i) => html`<option value=${d} selected=${room.difficulty === d}>
           DE-${i + 1} · ${DIFFICULTY_NAMES[d] ? t(DIFFICULTY_NAMES[d]) : d}</option>`)}
       </select>` : html`<button type="button" class="rs-opts__diff" disabled=${isHost && !!busy} onClick=${onDifficulty}
-          title=${isHost ? t('更改模拟难度') : t('由创建者选择')}>
+          title=${isHost ? t(echoRoom ? '更改深潜难度' : '更改模拟难度') : t('由创建者选择')}>
         <${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span>
         ${isHost ? html`<em>${t('更改')}</em>` : null}
       </button>`}
@@ -939,7 +939,8 @@ export function RoomScreen() {
     seenDiff.current = key;
     if (!before || before === key || !before.startsWith(`${room.code}|`) || room.hostId === me.playerId) return;
     const name = DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : room.difficulty;
-    toast(t('创建者已将模拟难度改为「{name}」', { name }), 'info');
+    // 深潜房不叫「模拟难度」（维护者 2026-11-08：深潜房里不该出现「同盟 / 模拟」）
+    toast(t(room.variant === 'deepecho' ? '创建者已将深潜难度改为「{name}」' : '创建者已将模拟难度改为「{name}」', { name }), 'info');
   }, [room?.code, room?.difficulty]);
   // official versions (DESIGN §35.23): the room's switch is told to everybody (the host's own page included — a vote's
   // result arrives later than the pick); never on entering a room or switching rooms
@@ -1134,10 +1135,13 @@ export function RoomScreen() {
   // 深潜房不是同盟：左上角写「深渊回响」，不写「同盟模拟」（维护者 2026-11-08：
   // 「深渊回响房间中的同盟模拟去掉改成深渊回响，同盟密钥也改成深渊回响使用的名字的密钥」）
   const modeName = !coop ? t('独立模拟') : room.variant === 'deepecho' ? t('深渊回响') : t('同盟模拟');
-  // the room's version (DESIGN §35.23): the pill and ⚙'s row on a server that enables versions (or in a version room)
+  // the room's version (DESIGN §35.23): the pill and ⚙'s row on a server that enables versions (or in a version room).
+  // 「深渊回响」永远玩第二期下半（server/lobby.js 的 create / proposeVersion 都只接受默认版本），
+  // 所以深潜房既不显示版本胶囊、也不给切换入口 —— 那个「第二期下半」标签在这里只是噪音
+  // （维护者 2026-11-08：VersionTag 在深潜房里要不要显示 → 不显示）。
   const vote = versionVoteOf(room);
   const curVersion = roomVersion(room);
-  const showVersion = Array.isArray(versions) || curVersion !== DEFAULT_VERSION;
+  const showVersion = !echoRoom && (Array.isArray(versions) || curVersion !== DEFAULT_VERSION);
   const versionWhy = !online ? t('连接中断，请稍候重试')
     : vote ? t('切换版本投票进行中，请等投票结束')
     : facts.modded ? t('请先关闭改变玩法的插件')
@@ -1174,7 +1178,7 @@ export function RoomScreen() {
           <button type="button" class="rs-exit" disabled=${busy === 'leave'} onClick=${leave} aria-label=${echoRoom ? t('离开深潜') : t('离开同盟')}><${Icon} name="exit" /></button>
         <//>
         <div class="rs-clock">
-          <b>${modeName}${room.test ? html` <${TestMark} />` : null}<${VersionTag} room=${room} class="rs-clock__ver" />
+          <b>${modeName}${room.test ? html` <${TestMark} />` : null}${echoRoom ? null : html`<${VersionTag} room=${room} class="rs-clock__ver" />`}
             ${pluginMode ? html`<span class="rs-clock__sep"></span><span class="room-mode" data-testid="room-mode">${pluginMode}</span>` : null}</b>
           <span class="rs-clock__ping">${t('当前延迟')}<${PingPill} ms=${conn.ping} online=${online} /></span>
         </div>

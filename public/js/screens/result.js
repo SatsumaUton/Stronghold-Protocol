@@ -27,6 +27,7 @@ import { UnofficialMark, VersionTag } from '../ui/pluginTag.js';
 import { TestMark } from '../ui/testConsole.js';
 import { NodeCodeHint } from '../ui/nodeCodeHint.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
+import { diveCleared, diveFailed, diveTeam, diveTeamLp, isDivePub, isDiveResult } from '../ui/diveWords.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -65,7 +66,7 @@ export function LineupThumb({ u, gd, ownerId }) {
     title=${si ? t('{name}（{note}）', { name: si.name, note: standInForText(chess.name) }) : undefined} />`;
 }
 
-function PlayerCard({ p, myId, titles, best, solo = false, skinOwnerId = null }) {
+function PlayerCard({ p, myId, titles, best, solo = false, skinOwnerId = null, dive = false }) {
   const gd = useGameData();
   const titleRec = p.title ? titles.find((x) => x.id === p.title.id) || null : null;
   // (the server sends the title's Chinese name: the localized config.titles record when it is that record's)
@@ -101,7 +102,7 @@ function PlayerCard({ p, myId, titles, best, solo = false, skinOwnerId = null })
     </header>
     <div class="rcard__stats">
       ${stats.map(([k, label]) => html`<div key=${k} class=${cx('rstat', best[k] === p.playerId && 'is-best')}><span>${t(label)}</span><b class="num">${fmtNum(p.stats[k])}</b></div>`)}
-      ${Number.isFinite(p.lp) ? html`<div class="rstat" title=${p.lpShared && !solo ? t('最终攻势起全队共享目标生命值') : ''}><span>${p.lpShared && !solo ? t('同盟剩余生命') : t('剩余生命')}</span><${LpTower} value=${p.lp} size="sm" /></div>` : null}
+      ${Number.isFinite(p.lp) ? html`<div class="rstat" title=${p.lpShared && !solo ? t('最终攻势起全队共享目标生命值') : ''}><span>${p.lpShared && !solo ? diveTeamLp(dive) : t('剩余生命')}</span><${LpTower} value=${p.lp} size="sm" /></div>` : null}
     </div>
   </article>`;
 }
@@ -117,6 +118,8 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
   // [ASSUMED] Stored statistics have no outfit snapshot: without pub, do not borrow a live match's choices.
   const gd = useGameData();
   const r = normalizeResult(res, pub);
+  // 「深渊回响」：结算里不出现「同盟 / 模拟」（维护者 2026-11-08）
+  const dive = isDiveResult(res) || isDivePub(pub) || r?.variant === 'deepecho';
   const titles = Array.isArray(gd.config?.titles) ? gd.config.titles : [];
   const best = {};
   for (const [k] of STAT_ROWS) {
@@ -139,7 +142,7 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         <div class="result__summary">
         <div class="result__logo"><${Sprite} k="entry/season_logo_settle" class="result__logoimg" fallback=${html`<${MicroLabel} tone="mint">STRONGHOLD PROTOCOL</${MicroLabel}>`} /></div>
         ${r.difficulty ? html`<${DifficultyTag} difficulty=${r.difficulty} size="lg" />` : null}
-        <h1 class="result__headline">${r.victory ? t('模拟完成') : r.reason === 'abandoned' ? t('主动放弃深潜') : t('模拟失败')}</h1>
+        <h1 class="result__headline">${r.victory ? diveCleared(dive) : r.reason === 'abandoned' ? t('主动放弃深潜') : diveFailed(dive)}</h1>
         <${UnofficialMark} room=${content ? { content } : null} class="result__modmark" /><${VersionTag} version=${version} class="result__vertag" />
         ${res?.test === true ? html`<p class="result__test" data-testid="result-test"><${TestMark} /> ${t('测试对局')}${Number.isInteger(res.testActions) ? html` · ${t('测试指令 {n} 次', { n: res.testActions })}` : null}</p>
           <p class="t-dim">${t('本局为测试对局，不计入统计、成就、称号、徽章与卫戍认证。')}</p>` : null}
@@ -169,8 +172,8 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         </footer>
       </section>
       <section class="result__players">
-        <h2 class="brief-h"><span>${t('同盟成员')}</span><${MicroLabel}>ALLIANCE REPORT</${MicroLabel}></h2>
-        ${r.players.length ? r.players.map((p) => html`<${PlayerCard} key=${p.playerId} p=${p} skinOwnerId=${pub ? p.playerId : null} myId=${myId} titles=${titles} best=${best} solo=${r.players.length < 2} />`)
+        <h2 class="brief-h"><span>${diveTeam(dive)}</span><${MicroLabel}>ALLIANCE REPORT</${MicroLabel}></h2>
+        ${r.players.length ? r.players.map((p) => html`<${PlayerCard} key=${p.playerId} p=${p} skinOwnerId=${pub ? p.playerId : null} myId=${myId} titles=${titles} best=${best} solo=${r.players.length < 2} dive=${dive} />`)
           : html`<p class="t-dim">${t('暂无结算数据')}</p>`}
       </section>
       ${slot ? html`<div class="ui-slot" data-ui-slot="result.tab" aria-label=${t('界面插件')} dangerouslySetInnerHTML=${{ __html: '' }}></div>` : null}
