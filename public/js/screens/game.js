@@ -148,7 +148,7 @@ import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady, TURN_CUE_WAIT_MS, TU
 // MatchEnded, PausedOverlay, the highlight styles and keepEarly live in ./game/*.js.
 import { HUD_HZ_MS, MERGE_HL, SEL_RANGE, cx } from './game/marks.js';
 import { keepEarly, audioEarly } from './game/early.js';
-import { MatchEnded, PausedOverlay } from './game/overlays.js';
+import { MatchEnded, PausedOverlay, PauseVoteOverlay } from './game/overlays.js';
 import { inspectRange } from './game/range.js';
 import { t, tParts } from '../../../shared/i18n.js';
 import { contentSet } from '../content.js';
@@ -381,6 +381,9 @@ function MatchScreen() {
   const total = phaseTotalSeconds(pub, gd.config, myId);
   // solo pause: offered in the own battle; while m.public.paused every HUD clock stops at the pause moment
   const paused = isPaused(pub);
+  // 「暂停游戏」的全员投票（m.public.pauseActive）：同样是 m.public.paused（时钟一起停），
+  // 但它有自己的浮层（PauseVoteOverlay，等所有人确认），所以**不**走单人的那块「暂停中 / 继续作战」。
+  const soloPaused = paused && !pub?.pauseActive;
   const pauseSeenRef = useRef(null);
   if (!paused) pauseSeenRef.current = null;
   else if (pauseSeenRef.current == null) pauseSeenRef.current = serverNow();
@@ -1439,6 +1442,19 @@ function MatchScreen() {
   }, [replace, placeCtx, editable]);
   useEffect(() => () => { const cur = replaceRef.current; replaceRef.current = null; try { cur?.resolve(null); } catch { /* ignore */ } }, []);
 
+  // ---- 「暂停游戏」的全员投票（g.pauseVote / g.pauseResume；m.public.pauseVote / pauseActive）--------------------------
+  const [pauseVoteBusy, setPauseVoteBusy] = useState(false);
+  const votePause = useCallback(async (agree) => {
+    setPauseVoteBusy(true);
+    await actions.pauseVote(agree);
+    setPauseVoteBusy(false);
+  }, []);
+  const confirmPauseResume = useCallback(async () => {
+    setPauseVoteBusy(true);
+    await actions.pauseResume();
+    setPauseVoteBusy(false);
+  }, []);
+
   // ---- solo pause (g.pause; m.public.paused) ---------------------------------------------------------------------------
   const togglePause = useCallback(async (on) => {
     setPauseBusy(true);
@@ -1940,6 +1956,7 @@ function MatchScreen() {
         pause=${canPause || paused ? { show: canPause, paused, busy: pauseBusy, onToggle: () => togglePause(!paused) } : null}
         live=${liveLpNow} spectator=${spectator}
         spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom}
+        onPauseVote=${pub?.pauseVote && !spectator ? votePause : null}
         held=${hudIn === 'wait'} onSpeedVote=${actions.speedVote} />
 
       <div class="gm__bonds">
@@ -2082,7 +2099,10 @@ function MatchScreen() {
     ${facing && view ? html`<${FacingWheel} key=${`${facing.uid}:${facing.row},${facing.col}`} view=${view} row=${facing.row} col=${facing.col}
       grid=${facing.grid} name=${facing.name} onPreview=${previewFacing} onCommit=${commitFacing} onCancel=${cancelFacing} />` : null}
 
-    ${paused ? html`<${PausedOverlay} canResume=${solo} busy=${pauseBusy} onResume=${() => togglePause(false)} onExit=${() => setExitOpen(true)} />` : null}
+    ${soloPaused ? html`<${PausedOverlay} canResume=${solo} busy=${pauseBusy} onResume=${() => togglePause(false)} onExit=${() => setExitOpen(true)} />` : null}
+    ${/* 「暂停游戏」的全员投票：暂停中盖整局，每个在线队友各点一次「继续游戏」（维护者 2026-11-08） */ null}
+    ${pub?.pauseActive ? html`<${PauseVoteOverlay} active=${pub.pauseActive} players=${pub.players} myId=${myId}
+      busy=${pauseVoteBusy} onResume=${confirmPauseResume} />` : null}
 
     ${replace ? html`<${EquipReplaceDialog} request=${replace.request} getItem=${gd.item}
       onConfirm=${(uid) => closeReplace(uid)} onCancel=${() => closeReplace(null)} />` : null}

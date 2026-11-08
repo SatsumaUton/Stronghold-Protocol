@@ -99,6 +99,10 @@ export const actions = {
   autoplay: (on) => act('g.autoplay', { on }),
   // solo battles only (ui/matchStatus.js pauseAvailable): m.public.paused follows
   pause: (on) => act('g.pause', { on: !!on }, { sfx: on ? 'click' : 'confirm' }),
+  // 「暂停游戏」的全员投票（深渊回响多人局，server/match/match/pauseVote.js）：
+  // agree=true 发起/同意、false 撤回；暂停中每个人发 pauseResume 确认，全员确认后恢复
+  pauseVote: (agree) => act('g.pauseVote', { agree: !!agree }, { sfx: 'click' }),
+  pauseResume: () => act('g.pauseResume', {}, { sfx: 'confirm' }),
   // room-level intent (NOT g.*): the host frees a spectator seat while the match runs — the server takes room.removeSpectator at
   // any time (server/lobby.js removeSpectator), the game screen had no entry for it (ui/hud.js SpectatorPill; GitHub #120)
   removeSpectator: (playerId) => act('room.removeSpectator', { playerId }, { sfx: 'back' }),

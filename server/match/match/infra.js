@@ -68,7 +68,9 @@ export class MatchInfra {
     }
     const ms = this.scaled(seconds * 1000);
     this.deadline = silent ? 0 : this.sched.now() + ms;
-    this._phaseTimer = this.later(ms, () => { this._phaseTimer = null; if (this.test === true) { this._testArmed = null; this._testHeld = null; } fn(); });
+    // 投票暂停要把这个计时器摘下来、恢复时按剩余时间挂回去（match/pauseVote.js）
+    this._phaseDeadlineFn = fn;
+    this._phaseTimer = this.later(ms, () => { this._phaseTimer = null; this._phaseDeadlineFn = null; if (this.test === true) { this._testArmed = null; this._testHeld = null; } fn(); });
     if (this.test === true) this._testArmed = { seconds, fn, silent: !!silent };
   }
 

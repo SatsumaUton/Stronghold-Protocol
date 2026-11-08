@@ -96,6 +96,10 @@ export class MatchViews {
       } : null,
       // 战斗 2 倍速 (speedVote.js): { agreed, voters, need, next, on, speed }
       speedVote: this.speedVoteView(),
+      // 「暂停游戏」的全员投票（维护者 2026-11-08，pauseVote.js）：只在深渊回响的多人局下发，
+      // 普通房间的视图保持逐字不变。pauseVote = { voters, agreed, need, pass, paused }，
+      // pauseActive = { by, byName, resumed, voters, need, ready, endsAt }（没暂停时是 null）
+      ...(this.pauseVoteAllowed() ? { pauseVote: this.pauseVoteView(), pauseActive: this.pauseResumeView() } : {}),
       factions: this.factions.slice(),
       disabledBonds: [...new Set([...this.disabledBonds, ...this.staticInactiveBonds])].sort(),
       drawnDisabledBonds: this.disabledBonds.slice(),

@@ -511,9 +511,50 @@ export function SpeedVote({ pub, myId, spectator = false, onVote }) {
 }
 
 /**
+ * 「暂停游戏」的全员投票（维护者 2026-11-08，server/match/match/pauseVote.js）。
+ *
+ * 只对**深渊回响的多人局**下发（`m.public.pauseVote` 存在才渲染）；按钮就排在「准备就绪」下面。
+ *   * 没人发起：一颗「暂停游戏」按钮；
+ *   * 有人在发起：同一颗按钮变成「暂停 n/N」，自己投过就是选中态，再点一次撤回；
+ *   * 已经暂停：变成只读的「已暂停 · 确认 n/N」—— 继续要在浮层里点（screens/game/overlays.js PauseVoteOverlay）。
+ * 投票**全票通过**才真的暂停（暂停影响所有人，不能多数压着人停）。
+ * @param {{ pub: any, myId: string|null, spectator?: boolean, onVote: (agree:boolean)=>void }} props
+ */
+export function PauseVote({ pub, myId, spectator = false, onVote }) {
+  const [busy, setBusy] = useState(false);
+  const v = pub && pub.pauseVote;
+  if (!v || spectator) return null;
+  const active = pub.pauseActive || null;
+  const agreed = Array.isArray(v.agreed) ? v.agreed : [];
+  const mine = !!myId && agreed.includes(myId);
+  const count = `${agreed.length}/${Math.max(1, Number(v.need) || 1)}`;
+  const paused = !!v.paused || !!active;
+  const label = paused ? t('已暂停') : mine ? t('暂停中') : t('暂停游戏');
+  const tip = paused
+    ? t('对局已暂停：在浮层里点「继续游戏」，所有在线队友都确认后恢复')
+    : mine
+      ? t('你已经投了赞成票：{need} 人全部同意后暂停（再点一次撤回）', { need: Math.max(1, Number(v.need) || 1) })
+      : t('发起「暂停游戏」投票：{need} 个在线队友全部同意后暂停，暂停期间倒计时与战斗都会停下', { need: Math.max(1, Number(v.need) || 1) });
+  const press = async () => {
+    if (paused) return;
+    setBusy(true);
+    await onVote?.(!mine);
+    setBusy(false);
+  };
+  return html`<${Tooltip} text=${tip} placement="bottom">
+    <button type="button" class=${cx('pausevote', 'tapx', mine && 'is-mine', paused && 'is-paused', busy && 'is-busy')}
+      aria-pressed=${mine ? 'true' : 'false'} aria-label=${`${label} ${count}`} disabled=${busy || paused}
+      data-testid="pause-vote" data-state=${paused ? 'paused' : mine ? 'voted' : 'idle'}
+      onKeyDown=${(e) => { if (e.key === ' ') e.stopPropagation(); }} onClick=${press}>
+      <i class="pausevote__glyph" aria-hidden="true">❚❚</i><span class="pausevote__label">${label}</span>
+      <span class="pausevote__count num">${count}</span>
+    </button>
+  <//>`;
+}
+
+/**
  * Top bar. Its centre (PR #643 / #827, the event's top bar, video 8:01): [🔍] in a bracket frame · + · a long thin band
- * with 回合 N on the left half and the LP tower on the right half, the phase capsule as a bevelled plate in the middle
- * · + · [🔍▶▶] in a bracket frame (css/screens/game.css 顶部中栏), with the official deco type above it (hudPanel
+ * with 回合 N on the left half and the LP tower on the right half, the phase capsule as a bevelled plate in the middle · + · [🔍▶▶] in a bracket frame (css/screens/game.css 顶部中栏), with the official deco type above it (hudPanel
  * frame_deco_txt1 / txt3 RHODES ISLAND TERMINAL SERVICE over the halves, frame_deco_txt2 STRONGHOLD PROTOCOL over the
  * plate — [ASSUMED] that placement: txt2 is as wide as the gap in the top edge of frame_mid_normal, the plate's frame;
  * the same words as text without the art pack, hidden from screen readers either way). It comes in as 协议启动！ leaves
@@ -559,7 +600,8 @@ export function UniteBudgetNote({ pub }) {
 
 export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, onReady, readyBusy, readyCount, playerCount, pen = false, penAvail = false, onPen = () => {},
   config = null, frozenAt = null, pause = null, live = null, spectator = false,
-  spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null, held = false, onSpeedVote = null }) {
+  spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null, held = false, onSpeedVote = null,
+  onPauseVote = null }) {
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
   const lp = boss && Number.isFinite(pub?.teamLp) ? pub.teamLp : Number.isFinite(priv?.lp) ? priv.lp : null;
@@ -699,6 +741,8 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
       <${SpeedVote} pub=${pub} myId=${myId} spectator=${spectator} onVote=${onSpeedVote} />
       <${OvertimeWarning} ot=${ot} />
       ${showReady ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} />` : null}
+      ${/* 「暂停游戏」的全员投票（维护者 2026-11-08）：按钮就放在「准备就绪」下面 */ null}
+      ${onPauseVote ? html`<${PauseVote} pub=${pub} myId=${myId} spectator=${spectator} onVote=${onPauseVote} />` : null}
     </div>
     <${UniteBudgetNote} pub=${pub} />
   </header>`;

@@ -245,6 +245,7 @@ import { echoCurveOf } from './match/echoConfig.js';
 import { crossVersionEnemies } from './match/echoCrossVersion.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchSpeedVote } from './match/speedVote.js';
+import { MatchPauseVote } from './match/pauseVote.js';
 import { MatchKickVote } from './match/kickVote.js';
 import { MatchSpDraft } from './match/spDraft.js';
 import { MatchPrep } from './match/prep.js';
@@ -637,6 +638,17 @@ export class Match {
     this._pausedAt = 0;
     /** real ms spent paused this match (diagnostics) */
     this.pausedMs = 0;
+    /**
+     * 「暂停游戏」的全员投票（维护者 2026-11-08，match/pauseVote.js）：站队式的赞成票 + 通过后的暂停状态。
+     * `echoPaused` = { at, by, byName, resumed:Set, timer }；全是 transient（不进快照，见 snapshot.js）。
+     */
+    this._pauseVotes = new Set();
+    this._pauseVoteAt = new Map();
+    this.echoPaused = null;
+    /** 暂停期间被摘下来的准备阶段截止计时器 { fn, left } */
+    this._pauseHeld = null;
+    /** setDeadline 挂的截止回调（暂停时要把它摘下来再按剩余时间挂回去） */
+    this._phaseDeadlineFn = null;
     /** boss rounds (client-side combat): the throttled m.public refresh (_bossPublic) */
     this._bossPubTimer = null;
     this._bossPubAt = -Infinity;
@@ -993,7 +1005,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchEcho, MatchSetupVote, MatchSpeedVote, MatchKickVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchEcho, MatchSetupVote, MatchSpeedVote, MatchPauseVote, MatchKickVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

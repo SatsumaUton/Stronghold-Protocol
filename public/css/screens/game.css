@@ -240,6 +240,38 @@
 .speedvote.is-busy { opacity: .6; }
 .speedvote:disabled { cursor: default; }
 
+/* 「暂停游戏」的全员投票（ui/hud.js PauseVote，维护者 2026-11-08）：和 2 倍速那颗同一块深色牌子，
+   投过票变蓝、暂停中整块变蓝并不可点（继续要在浮层里点） */
+.pausevote {
+  display: inline-flex; align-items: center; gap: .08rem; height: .38rem; padding: 0 .12rem; flex: none;
+  background: rgba(10, 12, 16, .88); border: 2px solid rgba(242, 242, 242, .45); color: var(--text-md);
+  font-size: max(calc(.17 * var(--t)), calc(11px * var(--ui))); line-height: 1; white-space: nowrap;
+  box-shadow: 0 .04rem .16rem rgba(0, 0, 0, .55);
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.pausevote__glyph { font-style: normal; font-size: .72em; letter-spacing: -.06em; margin-right: .04rem; }
+.pausevote__label { font-weight: 600; }
+.pausevote__count { font-family: var(--font-num); font-weight: 700; }
+.pausevote:hover:not(:disabled) { background: rgba(255, 255, 255, .14); border-color: #fff; color: #fff; }
+.pausevote.is-mine { border-color: var(--mint-400); color: var(--mint-400); }
+.pausevote.is-paused { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(var(--mint-rgb), .45); }
+.pausevote.is-busy { opacity: .6; }
+.pausevote:disabled { cursor: default; }
+
+/* 暂停浮层（screens/game/overlays.js PauseVoteOverlay）：沿用 awayov 的骨架，只补「谁确认了」那一列 */
+.pausevote__box { min-width: 4.6rem; }
+.pausevote__list { display: flex; flex-direction: column; gap: .04rem; margin: .08rem 0 0; padding: 0; list-style: none; }
+.pausevote__who {
+  display: flex; align-items: center; gap: .08rem; padding: .03rem .08rem;
+  background: rgba(255, 255, 255, .04); border-left: 2px solid rgba(255, 255, 255, .18);
+  font-size: max(calc(.15 * var(--t)), calc(11px * var(--ui)));
+}
+.pausevote__who.is-ok { border-left-color: var(--mint-400); background: rgba(var(--mint-rgb), .12); }
+.pausevote__who em { margin-left: auto; font-style: normal; opacity: .8; }
+.pausevote__mark { font-style: normal; width: .18rem; text-align: center; }
+.pausevote__countline { margin: .06rem 0 0; opacity: .85; }
+.pausevote__note { margin: .02rem 0 0; font-size: .9em; }
+
 /* boss-round overtime warning (ui/hud.js OvertimeWarning; red DOT look: official icon_warn / blood_icon + bg_lose_hp) */
 .otwarn {
   position: relative; display: flex; align-items: center; gap: .08rem; height: .38rem; padding: 0 .14rem 0 .1rem;
