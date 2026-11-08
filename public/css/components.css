@@ -1243,6 +1243,33 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 「你的深潜正在保存 · 还剩 N 小时」（维护者 2026-11-08：B 保持硬截止，剩余时间要醒目）。
+   和服务端之间是**硬截止**：到点座位释放、这局按 abandoned 结算，所以这条比 resume-banner 更显眼
+   （深潜紫 + 沙漏 + 剩余时间单独一行）。 */
+.resume-hold {
+  display: inline-flex;
+  align-items: center;
+  gap: .06rem;
+  margin-left: .16rem;
+  padding: .05rem .14rem;
+  border: 1px solid rgba(183, 156, 255, .65);
+  background: rgba(120, 90, 200, .18);
+  color: #e4dcff;
+  font-size: calc(.13 * var(--t));
+  line-height: 1.5;
+  white-space: nowrap;
+  max-width: 46vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.resume-hold .icon { flex: none; width: 1.1em; height: 1.1em; color: #c4b0ff; }
+.resume-hold b { font-weight: 800; color: #fff; }
+.resume-hold span { font-variant-numeric: tabular-nums; color: #ffd98a; font-weight: 700; }
+.resume-hold em { font-style: normal; color: rgba(228, 220, 255, .7); }
+@media (max-width: 720px) {
+  .resume-hold { max-width: 62vw; }
+  .resume-hold em { display: none; }
+}
 .verchip:hover:not(.verchip--ro), .verchip:focus-visible { filter: brightness(1.2); }
 .verchip--ro { cursor: default; }
 .verchip__retry { flex: none; height: max(.42rem, 28px); padding: 0 .12rem; border: 1px solid rgba(255, 106, 61, .7); background: rgba(255, 106, 61, .14); color: #ffb39a; font: inherit; font-size: calc(.13 * var(--t)); }

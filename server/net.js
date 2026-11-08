@@ -47,6 +47,7 @@ import { isIP } from 'node:net';
 import { C2S, validateC2S } from '../shared/protocol.js';
 import { ERR, ERR_TEXT, NAME_MAX_LEN, PROTOCOL_VERSION } from '../shared/constants.js';
 import { verifyAdminToken, readAdminToken, readUserToken } from './adminAuth.js';
+import { renderMessage, wireMessage } from '../shared/i18n.js';
 
 /** Tunables (all overridable through the Network / SessionRegistry constructors). */
 export const NET_DEFAULTS = Object.freeze({
@@ -424,15 +425,24 @@ export const isErrCode = (code) => typeof code === 'string' && Object.hasOwn(ERR
 
 /**
  * Build an `error` frame.
+ *
+ * `detail` is normally a short **developer** string (a code like `revival-lp-insufficient`, capped at 120 chars).
+ * It may also be a `msg()` — a msgid with params meant for the player (server/lobby.js refuses things like
+ * 「深渊回响」只支持第二期下半 that way). Before 2026-11-08 such a detail was stringified into `"[object Object]"`,
+ * so the sentence never reached anyone; now it goes out twice: `detail` = the Chinese rendering (older clients,
+ * logs, tests), `detailMsg` = the structured message the page translates (shared/i18n.js translateWire).
  * @param {string} code ERR code
  * @param {unknown} [rid]
- * @param {string} [detail] developer-facing reason
+ * @param {string | { msgid: string, params?: unknown } | null} [detail] developer reason, or a msg() for the player
  */
 export function errorMsg(code, rid, detail) {
   const known = isErrCode(code);
   const m = { t: 'error', code: known ? code : ERR.INTERNAL, msg: known ? ERR_TEXT[code] || ERR_TEXT.INTERNAL : ERR_TEXT.INTERNAL };
   if (validRid(rid)) m.rid = rid;
-  if (detail) m.detail = String(detail).slice(0, 120);
+  if (detail && typeof detail === 'object' && typeof (/** @type {any} */ (detail).msgid) === 'string') {
+    m.detail = renderMessage(detail).slice(0, 120);
+    m.detailMsg = wireMessage(detail);
+  } else if (detail) m.detail = String(detail).slice(0, 120);
   return m;
 }
 

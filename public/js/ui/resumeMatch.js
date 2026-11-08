@@ -4,9 +4,10 @@ import { html, Button, Icon, Modal } from './components.js';
 import { identity, net } from '../net.js';
 import { store } from '../store.js';
 import { requestAccountResume } from './accountObserver.js';
-import { resumeRoomUrl, findAccountRoom, roomNodeLabel } from './accountRoom.js';
+import { resumeRoomUrl, findAccountRoom, roomNodeLabel, normalizeHold } from './accountRoom.js';
 import { t } from '../../../shared/i18n.js';
 import { toast } from './toasts.js';
+import { holdLeftLabel } from './diveWords.js';
 
 // 兼容旧引用（测试与其它模块一直从 resumeMatch 取这两个函数）：实现搬到了 ./accountRoom.js
 export { resumeRoomUrl, findAccountRoom, roomNodeLabel };
@@ -15,6 +16,10 @@ export function ResumeMatchButton() {
   const [items, setItems] = useState(() => identity.recoverable());
   const [account, setAccount] = useState(() => !!window.__SP_ACCOUNT_USER);
   const [accountRoom, setAccountRoom] = useState(false);
+  // 「深渊回响」单人房的 24 小时保存倒计时（/mm/api/account/room 的 room.soloHold）：
+  // 维护者 2026-11-08 —— B 保持硬截止，但**剩余时间要显示得更醒目**。所以这里不只是「有没有房间」，
+  // 还把倒计时一起取回来，按钮和弹窗都写「还剩 N 小时」。
+  const [hold, setHold] = useState(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   // 这台设备刚被另一台接管过（accountObserver 的 account.detached 写入 sp.resumeAvailable）。
@@ -30,12 +35,15 @@ export function ResumeMatchButton() {
   useEffect(() => {
     let alive = true;
     const checkAccountRoom = async () => {
-      if (!window.__SP_ACCOUNT_USER) { if (alive) setAccountRoom(false); return; }
+      if (!window.__SP_ACCOUNT_USER) { if (alive) { setAccountRoom(false); setHold(null); } return; }
       try {
         const r = await fetch('/mm/api/account/room', { credentials: 'same-origin', cache: 'no-store' });
         const j = r.ok ? await r.json() : null;
-        if (alive) setAccountRoom(!!j?.room?.code);
-      } catch { if (alive) setAccountRoom(false); }
+        if (alive) {
+          setAccountRoom(!!j?.room?.code);
+          setHold(normalizeHold(j?.room?.soloHold));
+        }
+      } catch { if (alive) { setAccountRoom(false); setHold(null); } }
     };
     const refresh = () => {
       setItems(identity.recoverable());
@@ -70,7 +78,11 @@ export function ResumeMatchButton() {
   // 那正是这次要修的问题。让按钮先出现，点开弹窗后 findAccountRoom() 会给出准确去向。
   if (!items.length && !(account && accountRoom) && !urgent) return null;
   const accountResume = account && accountRoom;
-  const resumeLabel = accountResume ? t('恢复账号对局') : t('恢复本机对局');
+  // 保存中的单人深潜：按钮上直接写「还剩 N 小时」（维护者 2026-11-08：B 保持硬截止，但剩余时间要醒目）
+  const holdLeft = hold ? holdLeftLabel(hold.leftMs) : null;
+  const resumeLabel = accountResume
+    ? (holdLeft ? t('恢复深潜 · {left}', { left: holdLeft }) : t('恢复账号对局'))
+    : t('恢复本机对局');
   /** 对局已经抢回来（或玩家已经离开），这条「请点恢复」的提示就该收回了。 */
   const clearUrgent = () => {
     try { sessionStorage.removeItem('sp.resumeAvailable'); } catch { /* ignore */ }
@@ -152,6 +164,11 @@ export function ResumeMatchButton() {
   })();
   return html`${urgent && showBanner ? html`<span class="resume-banner" role="status" data-testid="resume-banner">
       ${t('你有进行中的对局（已在另一台设备或标签页继续）。点下面的「恢复对局」可以切回这台。')}
+    </span>` : null}
+    ${hold ? html`<span class="resume-hold" role="status" data-testid="resume-hold">
+      <${Icon} name="hourglass" /><b>${t('你的深潜正在保存')}</b>
+      <span>${holdLeft}</span>
+      <em>${t('点「{label}」回去接着打；到时会自动放弃。', { label: resumeLabel })}</em>
     </span>` : null}
     <button type="button" class=${chipClass} data-testid="resume-local-match" onClick=${() => setOpen(true)} title=${chipTitle}>
       <${Icon} name="refresh" /><span class="verchip__label">${resumeLabel}</span>

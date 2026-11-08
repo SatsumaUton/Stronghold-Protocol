@@ -65,7 +65,7 @@ test('节点查询与地址拼接抽到 ui/accountRoom.js，resumeMatch 继续 r
   assert.match(room, /export async function findAccountRoom\(\)/);
   assert.match(room, /\/mm\/api\/account\/room/);
   const resume = read('public/js/ui/resumeMatch.js');
-  assert.match(resume, /import \{ resumeRoomUrl, findAccountRoom, roomNodeLabel \} from '\.\/accountRoom\.js';/);
+  assert.match(resume, /import \{ resumeRoomUrl, findAccountRoom, roomNodeLabel, normalizeHold \} from '\.\/accountRoom\.js';/);
   assert.match(resume, /export \{ resumeRoomUrl, findAccountRoom, roomNodeLabel \};/);
 });
 
@@ -97,7 +97,8 @@ test('matchmaker：/api/account/room 同时下发 nodeName，名字表只有一�
   const account = read('matchmaker/account.cjs');
   assert.match(account, /const \{ nodeNameOf \} = require\('\.\/nodeNames\.cjs'\);/, 'account.cjs 共用名字表');
   assert.match(account, /nodeName: nodeNameOf\(n\)/, '响应里带 nodeName');
-  assert.match(account, /const named = \(code, n\) => \(\{ code, node: Number\(n\) \|\| null, nodeName: nodeNameOf\(n\) \}\)/, '两条返回路径共用 named()');
+  // 两条返回路径共用 named()；2026-11-08 起它还负责带上「保存中的单人深潜」倒计时（soloHold）
+  assert.match(account, /const named = \(code, n, soloHold\) => \(\{ code, node: Number\(n\) \|\| null, nodeName: nodeNameOf\(n\),/, '两条返回路径共用 named()');
 
   const names = read('matchmaker/nodeNames.cjs');
   assert.match(names, /module\.exports = \{ NODE_NAMES, nodeNameOf \}/);
