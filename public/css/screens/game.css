@@ -272,6 +272,15 @@
 .pausevote__countline { margin: .06rem 0 0; opacity: .85; }
 .pausevote__note { margin: .02rem 0 0; font-size: .9em; }
 
+/* 「放弃深潜」的全员投票浮层（screens/game/overlays.js GiveUpVoteOverlay，维护者 2026-11-08）：
+   和暂停浮层同一套骨架 / 名单样式，只多一个红色动作区（放弃是不可逆的）。
+   以前这块只在放大镜抽屉最下面，发起之后面板一关就看不见了。 */
+.giveup__box { min-width: 5.2rem; }
+.giveup__acts { display: flex; align-items: center; justify-content: center; gap: .14rem; flex-wrap: wrap; margin-top: .12rem; }
+.giveup__timer { font-variant-numeric: tabular-nums; }
+.pausevote__who.is-no { border-left-color: #e07474; background: rgba(224, 116, 116, .12); }
+.pausevote__who.is-no em { color: #f3c9c9; }
+
 /* boss-round overtime warning (ui/hud.js OvertimeWarning; red DOT look: official icon_warn / blood_icon + bg_lose_hp) */
 .otwarn {
   position: relative; display: flex; align-items: center; gap: .08rem; height: .38rem; padding: 0 .14rem 0 .1rem;

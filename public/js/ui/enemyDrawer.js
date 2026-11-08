@@ -195,29 +195,16 @@ export function EnemyDrawer({ tab, onTab, pub, priv, onClose, onEnemy, onChess, 
 }
 
 /**
- * 「放弃深潜」投票（维护者 2026-11-07）。
+ * 「放弃深潜」的投票（维护者 2026-11-07 / 2026-11-08）。
  *
- * **发起入口统一在左上角的「离开深潜」对话框**（ui/matchChrome.js ExitModal，维护者 2026-11-07 晚：
- * 「放弃深潜的投票发起为什么不直接使用左上角退出界面里面的，而是你重新做了一个新的」）——
- * 这里只在投票进行中显示进度和「同意 / 继续」，不再重复一个发起按钮。
+ * **发起入口**在左上角的「离开深潜」对话框（ui/matchChrome.js ExitModal，维护者 2026-11-07 晚：
+ * 「放弃深潜的投票发起为什么不直接使用左上角退出界面里面的，而是你重新做了一个新的」）。
+ *
+ * **投票进行中的界面**是一个盖在整局上的浮层（screens/game/overlays.js GiveUpVoteOverlay，
+ * 维护者 2026-11-08：「放弃深潜的投票你可以做个弹窗界面，不用放在放大镜中深渊回响按钮的最下面」）——
+ * 投票一开自动出现，谁发起的、谁同意了、剩几秒都在上面，不用去翻放大镜。
+ * 所以这个抽屉里**不再画投票块**（以前画在「已获祝福」最下面，发起之后抽屉没打开就什么都看不到）。
  */
-function GiveUpVoteBlock({ pub }) {
-  const echo = pub?.echo;
-  const myId = useStore((s) => s.me.playerId);
-  const vote = echo && echo.giveUp ? echo.giveUp : null;
-  if (!vote) return null;
-  const agreed = Array.isArray(vote.agreed) ? vote.agreed.length : 0;
-  const total = Array.isArray(vote.voters) ? vote.voters.length : 0;
-  const mine = Array.isArray(vote.agreed) && vote.agreed.includes(myId);
-  return html`<div class="echo-giveup" data-testid="echo-giveup">
-    <h4 class="ihead">${t('放弃深潜')}</h4>
-    <p class="echo-giveup__note">${t('已同意 {n}/{m}：所有存活玩家都同意后立刻结算', { n: agreed, m: total })}</p>
-    <div class="echo-giveup__acts">
-      <button type="button" class="btn btn--primary btn--sm" disabled=${mine} onClick=${() => actions.echoGiveUpVote(true)}>${t('同意放弃')}</button>
-      <button type="button" class="btn btn--ghost btn--sm" onClick=${() => actions.echoGiveUpVote(false)}>${t('继续深潜')}</button>
-    </div>
-  </div>`;
-}
 
 /**
  * 「祝福」页：已获得的祝福 + 本回合侵蚀词条，**每条都带完整说明**（维护者 2026-11-04：
@@ -269,6 +256,5 @@ function BlessTab({ pub }) {
       <h4 class="ihead">${t('诅咒')} <small class="num">${echo.curses.length}</small></h4>
       <ul class="echo-list echo-list--curse">${echo.curses.map((c) => html`<li key=${c.id}>
         <b>${c.name}</b>${c.rarityLabel ? html`<em class=${`echo-rar is-${c.rarity || 'common'}`}>${c.rarityLabel}</em>` : null}<span>${c.desc || ''}</span></li>`)}</ul>` : null}
-    <${GiveUpVoteBlock} pub=${pub} />
   </div>`;
 }

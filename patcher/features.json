@@ -476,6 +476,7 @@
         "public/js/render/units.js",
         "public/js/screens/echoLobby.js",
         "public/js/screens/game.js",
+        "public/js/screens/game/overlays.js",
         "public/js/screens/lobby.js",
         "public/js/screens/result.js",
         "public/js/screens/room.js",
