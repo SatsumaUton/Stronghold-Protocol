@@ -71,14 +71,22 @@ export function errorText(code, msg) {
 
 /** Error thrown/rejected by requests. `code` is an ERR code or a CLIENT_ERR_TEXT key. */
 export class NetError extends Error {
-  /** @param {string} code @param {string} [msg] server text @param {string} [detail] server developer detail */
-  constructor(code, msg, detail) {
+  /**
+   * @param {string} code
+   * @param {string} [msg] server text
+   * @param {string} [detail] server developer detail (or the Chinese rendering of `detailMsg`)
+   * @param {{ msgid?: string, params?: unknown } | null} [detailMsg] the same detail as a translatable message
+   */
+  constructor(code, msg, detail, detailMsg = null) {
     const versionMismatch = typeof detail === 'string' && /version/i.test(detail);
     super(versionMismatch ? CLIENT_ERR_TEXT.VERSION : errorText(code, msg));
     this.name = 'NetError';
     this.code = String(code || 'INTERNAL');
     this.serverMsg = msg ?? null;
     this.detail = typeof detail === 'string' ? detail : null;
+    // 2026-11-08：`fail(ERR.X, msg('…'))` 的 detail 以前在路上变成 "[object Object]"，玩家永远看不到那句
+    // 解释（例如「深潜房只支持第二期下半」）。现在服务端同时发 detailMsg（结构化），这里留着给上层翻译。
+    this.detailMsg = detailMsg && typeof detailMsg === 'object' && typeof detailMsg.msgid === 'string' ? detailMsg : null;
   }
 }
 
@@ -463,7 +471,7 @@ export class Net {
     this._helloRid = null;
     // hello 被拒不会有 welcome，标志必须在这里清掉，否则 room.state 的身份比对会一直被跳过。
     this.playerIdPending = false;
-    this.lastError = new NetError(msg.code, msg.msg, msg.detail);
+    this.lastError = new NetError(msg.code, msg.msg, msg.detail, msg.detailMsg);
     this._setStatus('connected');
     // Queued requests can't be sent without a session.
     this._failPending('OFFLINE', true);
@@ -642,13 +650,13 @@ export class Net {
       this._clearEntryTimer(entry);
       handled = true;
       try {
-        if (t === 'error') entry.reject(new NetError(msg.code, msg.msg, msg.detail));
+        if (t === 'error') entry.reject(new NetError(msg.code, msg.msg, msg.detail, msg.detailMsg));
         else entry.resolve(msg);
       } catch (err) { console.error('[net] request callback failed', err); }
     }
     const late = rid != null && !handled && this._expired.delete(rid); // reply to a request that already timed out
     if (t === 'error' && !handled && !isHelloError && !late) {
-      this._emit('unhandledError', new NetError(msg.code, msg.msg, msg.detail));
+      this._emit('unhandledError', new NetError(msg.code, msg.msg, msg.detail, msg.detailMsg));
     }
 
     this._emit(t, msg);
@@ -1118,3 +1126,4 @@ export const identity = createIdentity({ onYield: () => net.reconnectNow(net.hel
 
 /** Browser connection singleton (created lazily-safe: nothing touches the network until connect()). */
 export const net = new Net({ getToken: () => identity.getToken(), getTokenClaim: () => identity.getTokenClaim() });
+

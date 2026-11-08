@@ -454,6 +454,7 @@
         "content/announcements.json",
         "dashboard/public/app.js",
         "dashboard/public/index.html",
+        "matchmaker/account.cjs",
         "matchmaker/diveBoard.cjs",
         "matchmaker/openRooms.cjs",
         "matchmaker/public/admin.html",
@@ -461,6 +462,7 @@
         "matchmaker/roomDir.cjs",
         "matchmaker/server.js",
         "mm/client.js",
+        "public/css/components.css",
         "public/css/screens/game-panels.css",
         "public/css/screens/game-shop.css",
         "public/css/screens/game.css",
@@ -474,6 +476,7 @@
         "public/i18n/zh-TW.json",
         "public/js/assets.js",
         "public/js/main.js",
+        "public/js/net.js",
         "public/js/render/units.js",
         "public/js/screens/bandDraft.js",
         "public/js/screens/echoLobby.js",
@@ -509,11 +512,13 @@
         "public/js/ui/hud.js",
         "public/js/ui/matchChrome.js",
         "public/js/ui/matchEnemies.js",
+        "public/js/ui/resumeMatch.js",
         "public/js/ui/revival.js",
         "public/js/ui/roomList.js",
         "public/js/ui/shopBar.js",
         "public/js/ui/stats.js",
         "public/js/ui/teamPanel.js",
+        "public/js/ui/toasts.js",
         "public/js/ui/watchBonds.js",
         "server/http/routes.js",
         "server/lobby.js",
@@ -557,6 +562,7 @@
         "server/match/results.js",
         "server/match/snapshot.js",
         "server/match/waves.js",
+        "server/net.js",
         "server/persist/index.js",
         "server/persist/lobbyState.js",
         "server/persist/persister.js",
@@ -572,6 +578,7 @@
         "server/sim/content/support/index.js",
         "server/sim/simdata.js",
         "server/sim/units.js",
+        "server/soloHold.js",
         "shared/protocol.js",
         "shared/titles.js"
       ],
@@ -589,7 +596,8 @@
         "公开深潜列表（room.list variant / openRooms variant）与管理后台、节点控制台可见",
         "匹配池 variant 维度（深潜只和深潜配）",
         "深渊结算 / 排行榜写入 / 对局记录显示「深渊回响」",
-        "深潜用语（深潜房里不出现「同盟 / 模拟」，版本胶囊不显示；ui/diveWords.js）"
+        "深潜用语（深潜房里不出现「同盟 / 模拟」，版本胶囊不显示；ui/diveWords.js）",
+        "单人深潜 24 小时保存：剩余时间醒目显示 + 被挡住时说明「离开 = 放弃」（server/soloHold.js）"
       ]
     }
   ]

@@ -234,6 +234,7 @@ export function ExitModal({ open, onClose, solo, onAway }) {
       ${(solo || loneHuman) ? html`<div class="exitm__save" role="note">
         <b class="exitm__save-t">${t('想留着这局？直接关掉页面就行')}</b>
         <span class="exitm__save-d">${t('24 小时内用同一浏览器打开本站会自动回到这一局；换设备就在大厅右上角点「恢复对局」。')}</span>
+        <span class="exitm__save-hard">${t('这 24 小时从你关掉页面那一刻开始算，中途去玩别的对局也照样走，到点就会自动放弃 —— 大厅里会一直显示还剩多久。')}</span>
       </div>` : null}
       ${echoVote ? html`<p class="t-dim">${t(w.voteLine, { n: (echoVote.agreed || []).length, m: (echoVote.voters || []).length })}</p>` : null}
     </div>

@@ -724,7 +724,7 @@ async function handle(req, res, pathname) {
   if (method === 'GET' && pathname === '/api/account/room') {
     const u = await currentUser(req);
     if (!u) return sendJson(res, 401, { ok: false, error: 'unauthorized' });
-    const named = (code, n) => ({ code, node: Number(n) || null, nodeName: nodeNameOf(n) });
+    const named = (code, n, soloHold) => ({ code, node: Number(n) || null, nodeName: nodeNameOf(n), ...(soloHold ? { soloHold } : {}) });
     // 主判据是账号 ID：昵称会重名、会改，用昵称匹配会把玩家送去别人的对局。
     const uid = u.id != null ? String(u.id) : null;
     // 兼容旧数据：早期座位没有 accountId，只能退回昵称匹配。
@@ -743,7 +743,10 @@ async function handle(req, res, pathname) {
             const players = (room.players || []).filter(Boolean);
             // 1) 账号 ID 精确命中：这是唯一可信的判据
             if (uid && players.some((p) => p && p.accountId != null && String(p.accountId) === uid)) {
-              return sendJson(res, 200, { ok: true, room: named(room.code, n.n), by: 'account' });
+              // 「深渊回响」单人房的 24 小时保存倒计时（维护者 2026-11-08：要显示得更醒目）。
+              // roomInfo 已经从房间文档里清洗好了（soloHoldView），这里原样带给页面 ——
+              // 大厅的「恢复对局」据此写「还剩 N 小时」。
+              return sendJson(res, 200, { ok: true, room: named(room.code, n.n, room.soloHold || null), by: 'account' });
             }
             // 2) 昵称兜底：只在该房间所有座位都没有 accountId（纯旧数据）时记录，稍后再决定
             if (!nameFallback) {

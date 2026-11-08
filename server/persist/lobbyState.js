@@ -23,7 +23,8 @@
 import { Session } from '../net.js';
 // SOLO_RECONNECT_FALLBACK_SEC：单人房「24 小时保存」的兜底时长（官方 singleReconnectTime 缺失时用它）。
 // 这里已经 import 了 Room，同一个模块再多取一个常量不会新增依赖边。
-import { Room, SOLO_RECONNECT_FALLBACK_SEC } from '../lobby.js';
+import { Room } from '../lobby.js';
+import { soloHoldOf } from '../soloHold.js';
 import { experimentalOptions, isExperimental } from '../../shared/experimental.js';
 import { DIFFICULTIES, ROOM_CODE_LEN } from '../../shared/constants.js';
 
@@ -69,27 +70,10 @@ export function persistableRoom(room) {
  * @returns {{ since: number, until: number, windowMs: number, name: string, playerId: string } | null}
  */
 export function soloHoldDoc(room, sessionOf) {
-  // 深潜房在协议里是 `mode:'coop'` + `variant:'deepecho'`（见 roomDoc 的 variant 注释）——
-  // 两个条件都要，别让一个只带 variant 的怪文档在控制台上标出「保存中」。
-  if (!room || room.disposed || room.mode !== 'coop' || room.variant !== 'deepecho' || !room.match) return null;
-  const humans = typeof room.activeHumans === 'function' ? room.activeHumans() : [];
-  if (humans.length !== 1) return null;              // 多人局没有「保存单人房」这回事
-  const seat = humans[0];
-  if (!seat || seat.connected) return null;          // 有人在玩 → 不是在「保存」
-  const session = sessionOf ? sessionOf(seat.playerId) : null;
-  const own = session && Number.isFinite(Number(session.resumeWindowMs)) && Number(session.resumeWindowMs) > 0
-    ? Number(session.resumeWindowMs) : 0;
-  // 没有会话（重启后 session 还没回来 / 被清理）时退回单人房的官方 24 小时，并从「最后一个人离开」算起
-  const windowMs = own || SOLO_RECONNECT_FALLBACK_SEC * 1000;
-  const since = Number(session && session.disconnectedAt) || Number(room.lastHumanLeftAt) || 0;
-  if (!(since > 0)) return null;                     // 连断线时刻都不知道：宁可不标，也不给假倒计时
-  return {
-    since: Math.round(since),
-    until: Math.round(since + windowMs),
-    windowMs: Math.round(windowMs),
-    name: String(seat.name || ''),
-    playerId: String(seat.playerId || ''),
-  };
+  const hold = soloHoldOf(room, sessionOf);
+  if (!hold) return null;
+  // leftMs 是**给页面用的**（room.state.soloHold），文档里只存不随时间变化的那几个字段
+  return { since: hold.since, until: hold.until, windowMs: hold.windowMs, name: hold.name, playerId: hold.playerId };
 }
 
 /**
@@ -258,6 +242,7 @@ function roomFrom(r, sessions, lobby, now) {
     || !DIFFICULTIES.includes(r.difficulty) || !isExperimental(r.experimental) || !Array.isArray(r.seats)) return null;
   const room = new Room(r.code, r.mode, r.difficulty, Number.isFinite(r.createdAt) ? r.createdAt : now,
     typeof r.version === 'string' && r.version ? r.version : undefined, experimentalOptions(r.experimental));
+    room.lobby = lobby;
     room.ttlMs = Number.isFinite(r.ttlMs) ? r.ttlMs : null;
     room.adminCreated = r.adminCreated === true;
     room.noExpire = room.adminCreated;
@@ -314,6 +299,7 @@ function fallbackRoom(r, lobby, now) {
   try {
     const room = new Room(r.code, r.mode, r.difficulty, Number.isFinite(r.createdAt) ? r.createdAt : now,
       typeof r.version === 'string' && r.version ? r.version : undefined);
+    room.lobby = lobby;
     room.content = lobby.vanilla;
     room.adminCreated = r.adminCreated === true;
     room.noExpire = room.adminCreated;

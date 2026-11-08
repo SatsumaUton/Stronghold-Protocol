@@ -270,6 +270,7 @@ import { ruleOption } from '../shared/plugins/rules.js';
 import { msg, wireMessage } from '../shared/i18n.js';
 import { DEFAULT_VERSION } from '../shared/versions.js';
 import { parseTestModeEnv, testModeGate, unrecognizedTestMode } from './testMode.js';
+import { soloHoldConflictDetail, soloHoldOf } from './soloHold.js';
 
 /** Room code alphabet: uppercase letters without I and O (and no digits, so no 0/1). */
 export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -347,7 +348,17 @@ function bandOfferedIn(data, bandId, mode) {
   const list = Array.isArray(band.modeTypeList) ? band.modeTypeList : null;
   return !list || list.includes(mode === 'solo' ? 'SINGLE' : 'MULTI');
 }
-/** A match's answer to a request as the platform replies it: OK, or its error (an unknown code: INTERNAL). */
+/**
+ * 「这个账号已经在别的房间里」的拒绝。普通情形的文案保持不变；**保存中的单人深潜**另说一句 ——
+ * 那时「请先离开原房间」是错的办法（离开 = 放弃这局），要带上房号与剩余时间，
+ * 客户端据 detail 换成 diverge 的说法（public/js/ui/diveWords.js）。
+ * @param {{ room?: { code?: string }, hold?: { leftMs: number } | null } | null} conflict
+ */
+function inUseFail(conflict) {
+  const detail = soloHoldConflictDetail(conflict);
+  if (detail) return fail(ERR.SESSION_IN_USE, detail);
+  return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
+}
 const matchAnswer = (res) => (res && typeof res === 'object' && res.error
   ? fail(isErrCode(res.error) ? res.error : ERR.INTERNAL, typeof res.detail === 'string' ? res.detail : undefined)
   : OK);
@@ -575,6 +586,8 @@ export class Room {
     this.hiddenSpectators = [];
     /** @type {any} running Match instance */
     this.match = null;
+    /** the lobby that owns this room (toState reads the session table for the solo-hold badge) */
+    this.lobby = null;
     // 匹配队友期间暂停 15 分钟解散计时（本服）
     this.matchmaking = false;
     this.matchmakingAt = 0;
@@ -674,6 +687,11 @@ export class Room {
    * @param {number} [now] the lobby's clock (an open version vote's remainingMs)
    */
   toState(now = Date.now(), viewerId = null) {
+    // 「深渊回响」单人房的 24 小时保存标记（维护者 2026-11-08：B 保持硬截止，但剩余时间要**醒目**）。
+    // 整间房只有 1 个真人、他又不在线时才有值 —— 和存档 / 控制台用的是同一条判据（server/soloHold.js）。
+    // 只在深潜房里算，普通房的 room.state 逐字节不变。
+    const hold = this.variant === 'deepecho' && !this.disposed
+      ? soloHoldOf(this, (id) => this.lobby?.registry?.byId?.(id), undefined, now) : null;
     return {
       t: 'room.state',
       ...(this.aiTakeoverEnabled ? { aiTakeoverEnabled: true, aiTakeoverVotes: this.aiTakeoverVotes || [] } : {}),
@@ -744,8 +762,10 @@ export class Room {
       // 「深渊回响」：房间界面按这个标记换整套配色（深紫），并且房间标题也认它。
       // 普通房不带这个键 → room.state 与加这个模式之前逐字节一致。
       ...(this.variant === 'deepecho' ? { variant: 'deepecho' } : {}),
+      // 保存中的单人深潜：页面据此**醒目地**写「还剩 N 小时、点哪里回去」
+      // （以前只有退出确认框里一句，玩家以为「离开 = 丢局」）。`leftMs` 是发给页面的剩余毫秒。
+      ...(hold ? { soloHold: { since: hold.since, until: hold.until, windowMs: hold.windowMs, name: hold.name, leftMs: hold.leftMs } } : {}),
       // 隐身观战（adminWatch，管理员功能）：这个会话既不在 seats 也不在 spectators，
-      // 所以前端以前分不清它和「普通玩家」，直接按玩家界面渲染 —— 管理员看到的就是
       // 「跟我自己玩的时候一样，但点什么都不动」（服务端会拦掉隐身观战者的 g.*）。
       // 标记**只发给本人**：broadcastState 在房间里有隐身观战者时逐会话编码，
       // 其余人拿到的 room.state 与以前逐字节一致。
@@ -1591,7 +1611,7 @@ case 'room.list': return this.roomList(msg);
       conflict = this.accountRoomConflict(session);
     }
     if (conflict && conflict.room !== this.roomOf(session)) {
-      return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
+      return inUseFail(conflict);
     }
     // A test room exists only when the process switch allowed it. The check runs before the room is built.
     if (test === true && this.testEnabled !== true) return fail(ERR.TEST_DISABLED);
@@ -1649,6 +1669,7 @@ case 'room.list': return this.roomList(msg);
     }
     if (cur) this.removeMember(cur, session.playerId);
     const room = new Room(code, mode, difficulty, this.now(), version, experimental);
+    room.lobby = this;
     room.test = test === true;
     // 「深渊回响」的房间标记：只有管理员能走到这里（上面那道门）。普通房间保持 null，键集不变。
     room.variant = variant;
@@ -1767,7 +1788,7 @@ case 'room.list': return this.roomList(msg);
       if (room.match) { try { this.callMatch(room, 'onReconnect', session.playerId); } catch { /* ignore */ } }
       return OK;
     }
-    if (conflict) return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
+    if (conflict) return inUseFail(conflict);
     // 对局进行中（维护者 2026-11-07）：刷新页面后点「刷新按钮」会重新 room.join 回原房，
     // 但新会话的账号身份可能还没送到 —— 直接回 ROOM_STARTED 的话客户端以为进不去、退回大厅
     // （深潜 / 普通房在结算界面点刷新都踩过）。身份在途时回 IDENTITY_PENDING，
@@ -1846,7 +1867,7 @@ case 'room.list': return this.roomList(msg);
         this.dropStaleAccountSeats(session);
         conflict = this.accountRoomConflict(session);
       }
-      if (conflict) return fail(ERR.SESSION_IN_USE, msg('该账号已在其他房间中，请先离开原房间'));
+      if (conflict) return inUseFail(conflict);
     }
     if (!wantHidden && room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
     // ★ 2026-10-30：**先去重、再判满员**。
@@ -4092,14 +4113,15 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
         // 同一账号的另一处座位：判断是不是「已经没人的旧会话」
         const old = this.registry.byId(seat.playerId);
         const stale = !old || old.connected !== true;
-        return { room, kind: 'player', seat, stale };
+        // 那间房是不是「保存中的单人深潜」：是的话，拒绝语要说清楚「离开 = 放弃这局」（维护者 2026-11-08）
+        return { room, kind: 'player', seat, stale, hold: soloHoldOf(room, (id) => this.registry.byId(id), undefined, this.now()) };
       }
       for (const spec of room.spectators) {
         if (!spec || spec.playerId === session.playerId) continue;
         if (accountId ? seatAccountId(spec) !== accountId : !this.sameGhostSeat(session, spec, room)) continue;
         const old = this.registry.byId(spec.playerId);
         const stale = !old || old.connected !== true;
-        return { room, kind: 'spectator', seat: spec, stale };
+        return { room, kind: 'spectator', seat: spec, stale, hold: null };
       }
     }
     return null;

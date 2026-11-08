@@ -6616,6 +6616,11 @@
         "customBytes": 28489
       },
       {
+        "path": "matchmaker/account.cjs",
+        "baseExists": false,
+        "customBytes": 130234
+      },
+      {
         "path": "matchmaker/diveBoard.cjs",
         "baseExists": false,
         "customBytes": 6929
@@ -6649,6 +6654,11 @@
         "path": "mm/client.js",
         "baseExists": false,
         "customBytes": 232398
+      },
+      {
+        "path": "public/css/components.css",
+        "baseExists": false,
+        "customBytes": 67167
       },
       {
         "path": "public/css/screens/game-panels.css",
@@ -6688,22 +6698,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 251634
+        "customBytes": 252777
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 290712
+        "customBytes": 291955
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 279475
+        "customBytes": 280736
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 239187
+        "customBytes": 240255
       },
       {
         "path": "public/js/assets.js",
@@ -6714,6 +6724,11 @@
         "path": "public/js/main.js",
         "baseExists": false,
         "customBytes": 46566
+      },
+      {
+        "path": "public/js/net.js",
+        "baseExists": false,
+        "customBytes": 50892
       },
       {
         "path": "public/js/render/units.js",
@@ -6773,7 +6788,7 @@
       {
         "path": "public/js/ui/accountRoom.js",
         "baseExists": false,
-        "customBytes": 4515
+        "customBytes": 5780
       },
       {
         "path": "public/js/ui/assetUrls.js",
@@ -6803,7 +6818,7 @@
       {
         "path": "public/js/ui/diveWords.js",
         "baseExists": false,
-        "customBytes": 5359
+        "customBytes": 7122
       },
       {
         "path": "public/js/ui/echoBlessing.js",
@@ -6883,12 +6898,17 @@
       {
         "path": "public/js/ui/matchChrome.js",
         "baseExists": true,
-        "customBytes": 16330
+        "customBytes": 16547
       },
       {
         "path": "public/js/ui/matchEnemies.js",
         "baseExists": false,
         "customBytes": 7467
+      },
+      {
+        "path": "public/js/ui/resumeMatch.js",
+        "baseExists": true,
+        "customBytes": 11565
       },
       {
         "path": "public/js/ui/revival.js",
@@ -6916,6 +6936,11 @@
         "customBytes": 17840
       },
       {
+        "path": "public/js/ui/toasts.js",
+        "baseExists": false,
+        "customBytes": 8093
+      },
+      {
         "path": "public/js/ui/watchBonds.js",
         "baseExists": true,
         "customBytes": 18465
@@ -6928,7 +6953,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 283340
+        "customBytes": 284921
       },
       {
         "path": "server/match/Match.js",
@@ -7131,6 +7156,11 @@
         "customBytes": 43792
       },
       {
+        "path": "server/net.js",
+        "baseExists": false,
+        "customBytes": 53732
+      },
+      {
         "path": "server/persist/index.js",
         "baseExists": true,
         "customBytes": 2942
@@ -7138,7 +7168,7 @@
       {
         "path": "server/persist/lobbyState.js",
         "baseExists": true,
-        "customBytes": 22890
+        "customBytes": 21778
       },
       {
         "path": "server/persist/persister.js",
@@ -7204,6 +7234,11 @@
         "path": "server/sim/units.js",
         "baseExists": false,
         "customBytes": 17179
+      },
+      {
+        "path": "server/soloHold.js",
+        "baseExists": false,
+        "customBytes": 5200
       },
       {
         "path": "shared/protocol.js",

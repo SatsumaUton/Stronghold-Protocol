@@ -66,3 +66,40 @@ export const diveSyncing = (dive) => (dive ? t('正在同步深潜状态…') : 
 export const diveAlreadyIn = (dive) => (dive ? t('你已在其他深潜中，请先离开当前深潜') : t('你已在其他同盟中，请先离开当前同盟'));
 /** 座位已经不在了（被移出 / 在别处离开） */
 export const diveSeatGone = (dive) => (dive ? t('你已不在该深潜中') : t('你已不在该同盟中'));
+
+/**
+ * 「还剩 N 小时 / N 分钟」——大厅的「恢复对局」、房间顶部、退出确认框共用一句。
+ * 不到 1 小时说分钟（最后关头玩家要知道是 12 分钟还是 2 分钟）。
+ * @param {number} leftMs
+ */
+export function holdLeftLabel(leftMs) {
+  const ms = Number(leftMs);
+  if (!(ms > 0)) return t('已过期');
+  if (ms >= 3_600_000) return t('还剩 {h} 小时', { h: Math.ceil(ms / 3_600_000) });
+  return t('还剩 {m} 分钟', { m: Math.max(1, Math.ceil(ms / 60_000)) });
+}
+
+/**
+ * 服务端 `SESSION_IN_USE` 的 detail 里「这个账号挡在一间**保存中的单人深潜**门口」
+ * （server/soloHold.js 的 `soloHoldConflictDetail`，格式 `solo-hold:<房号>:<剩余分钟>`）。
+ *
+ * 为什么需要它：这种情形下通用的 SESSION_IN_USE 文案是「请关闭原窗口后重试」—— 而这里
+ * 「离开那间房」恰恰会把这局按 abandoned 结算掉。必须换成「还剩多久、离开就没了」。
+ * @param {unknown} detail
+ * @returns {{ code: string, minutes: number } | null}
+ */
+export function parseSoloHoldDetail(detail) {
+  if (typeof detail !== 'string') return null;
+  const m = /^solo-hold:([A-Za-z0-9]{2,12}):(\d{1,7})$/.exec(detail);
+  if (!m) return null;
+  return { code: m[1], minutes: Number(m[2]) };
+}
+
+/**
+ * 「你的单人深潜 {code} 正在保存中（{left}）……」
+ * @param {{ code: string, minutes: number }} held
+ */
+export function soloHoldBlockedText(held) {
+  const left = holdLeftLabel(held.minutes * 60_000);
+  return t('你的单人深潜 {code} 正在保存中（{left}），现在还开着别的对局就会把它放弃掉。要玩别的，请先回那间房离开这局；不想保留就直接放弃。', { code: held.code, left });
+}

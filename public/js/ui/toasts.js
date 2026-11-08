@@ -8,9 +8,10 @@ import { h } from '../../vendor/preact.module.js';
 import { useEffect, useReducer } from '../../vendor/hooks.module.js';
 import htm from '../../vendor/htm.module.js';
 import { ERR_TEXT, SETUP_REROLL_COOLDOWN_MS } from '../../../shared/constants.js';
-import { t, N_ } from '../../../shared/i18n.js';
+import { t, N_, translateWire } from '../../../shared/i18n.js';
 import { recordError } from '../diag.js';
 import { catalog, pluginName } from '../content.js';
+import { parseSoloHoldDetail, soloHoldBlockedText } from './diveWords.js';
 
 // no shared static vnodes (see components.js hFresh: htm's static cache would retain unmounted DOM)
 function hFresh(type, props, ...children) {
@@ -106,6 +107,17 @@ export function dismissToast(id) {
 export function describeError(err) {
   if (!err) return t('发生未知错误');
   if (typeof err === 'string') return t(Object.hasOwn(ERR_TEXT, err) ? ERR_TEXT[err] : err);
+  // 2026-11-08：服务端用 `fail(ERR.X, msg('…'))` 给出的**给玩家看的**那句解释（以前在路上变成
+  // "[object Object]"，只剩通用文案 —— 例如深潜房的「只支持第二期下半」）。有它就优先说它。
+  if (err.detailMsg && typeof err.detailMsg === 'object' && typeof err.detailMsg.msgid === 'string') {
+    return translateWire(err.detailMsg);
+  }
+  // 保存中的单人深潜挡住了别的房间：通用文案会让玩家「先离开」，而离开正好放弃那局
+  // （server/soloHold.js 的 soloHoldConflictDetail）
+  if (err.code === 'SESSION_IN_USE' && typeof err.detail === 'string') {
+    const held = parseSoloHoldDetail(err.detail);
+    if (held) return soloHoldBlockedText(held);
+  }
   if (err.code === 'PLUGIN_RULE_CONFLICT') {
     // Existing wire detail is bounded to 120 characters. The ids precede the longer developer explanation.
     const match = typeof err.detail === 'string' && /^PLUGIN_RULE_CONFLICT (\w+): ([a-z0-9-]{2,32}) and ([a-z0-9-]{2,32}) set /.exec(err.detail);
