@@ -3073,8 +3073,6 @@
   "生命已满（{n}）": "HP is full ({n})",
   "目标生命已到上限 {n}，本次未扣钱": "Target HP is already at the cap {n}; nothing was charged.",
   "全队目标生命已到上限 {n}，「{name}」未生效": "The whole team's target HP is at the cap {n}; “{name}” had no effect.",
-  "对局还在：房间 {code} 在第 {n} 台节点上。请点大厅右上角的「恢复对局」，再点「去该房间所在节点继续」。": "Your match is still running: room {code} is on node {n}. Click “Resume match” at the top right of the lobby, then “Go to that room’s node to continue”.",
-  "对局还在：房间 {code}。请点大厅右上角的「恢复对局」继续。": "Your match is still running: room {code}. Click “Resume match” at the top right of the lobby to continue.",
   "祝福已满": "Blessings full",
   "没有诅咒": "No curses",
   "刷新已满": "Refresh full",
@@ -3122,5 +3120,8 @@
   "暂停已超过 {n} 分钟，自动继续": "Paused for over {n} minutes — resuming automatically",
   "对局已暂停（{name}发起）：所有在线队友都点「继续游戏」后恢复": "Match paused (by {name}): it resumes once every online teammate clicks “Continue game”",
   "全员已确认，对局继续": "Everyone confirmed — the match continues",
-  "暂停中已无人在线，对局恢复": "Nobody is online during the pause — the match resumes"
+  "暂停中已无人在线，对局恢复": "Nobody is online during the pause — the match resumes",
+  "对局还在：房间 {code} 在「{node}」节点上。请点大厅右上角的「恢复对局」，再点「去该房间所在节点继续」。": "Your match is still running: room {code} is on the “{node}” node. Click “Resume match” at the top right of the lobby, then “Go to that room’s node to continue”.",
+  "对局还在：房间 {code}。它不在当前节点上，请点大厅右上角的「恢复对局」，再点「去该房间所在节点继续」。": "Your match is still running: room {code}. It is not on this node — click “Resume match” at the top right of the lobby, then “Go to that room’s node to continue”.",
+  "这个页面对应的节点上没有你的对局，它在「{node}」节点上（房间 {code}）。点下面的按钮过去继续。": "Your match is not on this page’s node — it is on the “{node}” node (room {code}). Click the button below to go there and continue."
 }

@@ -244,6 +244,11 @@
         "customBytes": 27315
       },
       {
+        "path": "matchmaker/nodeNames.cjs",
+        "baseExists": false,
+        "customBytes": 1675
+      },
+      {
         "path": "matchmaker/package-lock.json",
         "baseExists": false,
         "customBytes": 5487
@@ -6638,7 +6643,7 @@
       {
         "path": "matchmaker/server.js",
         "baseExists": false,
-        "customBytes": 61678
+        "customBytes": 61435
       },
       {
         "path": "mm/client.js",
@@ -6683,22 +6688,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 245337
+        "customBytes": 245762
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 283613
+        "customBytes": 284119
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 272133
+        "customBytes": 272597
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 233193
+        "customBytes": 233603
       },
       {
         "path": "public/js/assets.js",
@@ -6743,7 +6748,7 @@
       {
         "path": "public/js/ui/accountRoom.js",
         "baseExists": false,
-        "customBytes": 3287
+        "customBytes": 4515
       },
       {
         "path": "public/js/ui/assetUrls.js",
