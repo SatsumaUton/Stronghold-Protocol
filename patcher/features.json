@@ -548,6 +548,7 @@
         "server/match/waves.js",
         "server/persist/index.js",
         "server/persist/lobbyState.js",
+        "server/persist/persister.js",
         "server/sim/Battle.js",
         "server/sim/attack/health.js",
         "server/sim/battle/deploy.js",

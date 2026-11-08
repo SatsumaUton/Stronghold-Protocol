@@ -533,12 +533,30 @@ async function roomInfo(code, node) {
       doc.capacity
       ?? (doc.experimental && typeof doc.experimental === 'object' ? doc.experimental.playerCapacity : NaN),
     );
+    // 「深渊回响」单人房的 24 小时保存标记（维护者 2026-11-08）：没人玩、等玩家回来。
+    // `{ since, until, windowMs, name }`；不是这种房间时整条省掉（两个界面的默认行不变）。
+    // 由 lobbyState.soloHoldDoc 在写房间文档时算好 —— 这是唯一同时知道「谁在什么时候断线」的地方。
+    const soloHold = soloHoldView(doc.soloHold);
     return { full: seats.length > 0 && seats.every(Boolean), started: !!(doc.matchLive || doc.matchKey || doc.match), mode, difficulty: doc.difficulty || null, capacity: isSeatCount(capacity) ? capacity : SEATS, humans, bots, players, spectatorPlayers, round, seats: seats.length, spectators: spectatorPlayers.length, maxSpectators, adminCreated: doc.adminCreated === true,
       // 本服：房间的游戏版本（默认版本在房间状态里被省略）
       version: typeof doc.version === 'string' && doc.version ? doc.version : 'act2autochess',
       // 本服：「深渊回响」（深潜）房。控制台与后台靠它把类型列显示成深渊回响、并给出深潜深度（= round）。
-      variant: doc.variant === 'deepecho' ? 'deepecho' : null };
+      variant: doc.variant === 'deepecho' ? 'deepecho' : null,
+      ...(soloHold ? { soloHold } : {}) };
   } catch { return null; }
+}
+
+/**
+ * 把房间文档里的 `soloHold` 清洗成界面能直接用的形状（缺字段 / 时间戳不合法 → null，界面就当没有）。
+ * @param {any} raw
+ * @returns {{ since: number, until: number, windowMs: number, name: string } | null}
+ */
+function soloHoldView(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const since = Number(raw.since), until = Number(raw.until);
+  if (!Number.isFinite(since) || !Number.isFinite(until) || since <= 0 || until <= since) return null;
+  const windowMs = Number(raw.windowMs) > 0 ? Number(raw.windowMs) : until - since;
+  return { since: Math.round(since), until: Math.round(until), windowMs: Math.round(windowMs), name: String(raw.name || '') };
 }
 
 /**
