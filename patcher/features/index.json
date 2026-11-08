@@ -6903,7 +6903,7 @@
       {
         "path": "server/match/effectsMeta.js",
         "baseExists": true,
-        "customBytes": 44861
+        "customBytes": 45231
       },
       {
         "path": "server/match/gamedata.js",
@@ -7133,7 +7133,7 @@
       {
         "path": "server/sim/content/bonds/core.js",
         "baseExists": true,
-        "customBytes": 44943
+        "customBytes": 45958
       },
       {
         "path": "server/sim/content/garrisons/meta.js",

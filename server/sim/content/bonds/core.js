@@ -717,7 +717,18 @@ export function payHammers(ctx) {
   const p = S.buffParams(ctx.data?.bonds?.victoriaShip ?? S.bondRecord('victoriaShip'), VICTORIA_REWARD_KEY);
   const step = Math.floor(num(p?.layer, 0));
   if (!p || !(step > 0)) return 0;
-  const due = Math.floor(ctx.layers('victoriaShip') / step);
+  // 层数**结算上限**：与「按层给钱」（远见 每 10 层 / 奇迹 每 100 层，addon/meta.js 的 layerCoinDue）
+  // 用同一个口径 `ctx.bondLayerCoinCap`。
+  //
+  // 原版层数被 `layerGainRoom` 钳在 BOND_LAYER_CAP = 999，所以「每 25 层一件」最多 39 件，不需要另设上限。
+  // 「深渊回响」为了让玩家跟得上敌人把**层数**放开到 1e9（Match.layerCapOff），这里如果不跟着封顶：
+  //   2000 层 → 80 件、5000 层 → 200 件维式重锤（`grantItem` 是 overdraw 的，不消耗库存）；
+  // 玩家反馈「重启后给了很多维多利亚锤子」就是这条路径 —— 重启时 restoreMatch 的 recompute 触发
+  // onActiveBonds，payHammers 把攒下的档位一次性补发出来。
+  //
+  // 普通房间拿到 Infinity（`layerCapOff` 为假）→ **逐字节等于改动前**。
+  const cap = Number.isFinite(ctx.bondLayerCoinCap) ? Math.max(0, ctx.bondLayerCoinCap) : Infinity;
+  const due = Math.floor(Math.min(Math.max(0, num(ctx.layers('victoriaShip'), 0)), cap) / step);
   // [ASSUMED] DESIGN §32.5: each milestone pays at most the official `count` cap. Official count is 1.
   const count = Math.min(bbCap('count'), Math.max(0, Math.floor(num(p.count, 1))));
   let granted = 0;
