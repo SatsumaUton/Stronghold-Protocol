@@ -509,6 +509,7 @@
         "server/lobby.js",
         "server/match/Match.js",
         "server/match/PlayerState.js",
+        "server/match/bondsMeta.js",
         "server/match/choices.js",
         "server/match/effectsMeta.js",
         "server/match/gamedata.js",

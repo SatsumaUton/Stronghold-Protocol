@@ -30,13 +30,14 @@ export const HARMONY_BOND = 'maniShip';
 export const DEPUTY_BOND = 'deputShip';
 
 /**
- * Bonds of a chess piece: own bonds ∪ bonds granted by 变形同构体 pairings.
+ * Bonds of a chess piece: own bonds ∪ bonds granted by 变形同构体 pairings ∪ `extra` (a 「盟约投影」 bond).
  * @param {import('./gamedata.js').GameData} gd
  * @param {{ id: string, items?: Array<{ id: string }> }} piece
  * @param {Record<string, string>|null} [rules] the room's rule switches; omitted keeps the official pairing
+ * @param {string|null} [extra] a bond this piece counts as a member of without carrying it (盟约投影)
  * @returns {string[]}
  */
-export function pieceBonds(gd, piece, rules = null) {
+export function pieceBonds(gd, piece, rules = null, extra = null) {
   const c = gd.chess(piece.id);
   const out = c && Array.isArray(c.bonds) ? c.bonds.slice() : [];
   const items = Array.isArray(piece.items) ? piece.items : [];
@@ -44,12 +45,22 @@ export function pieceBonds(gd, piece, rules = null) {
   for (const b of grantedBondsByMorph(items, (id) => gd.item(id), { mode, bondOk: (id) => !!gd.bond(id) })) {
     if (!out.includes(b)) out.push(b);
   }
+  // 「盟约投影」（深渊回响）：拿到投影之后，这个玩家的**每一名**干员都**真的**算那条核心盟约的成员 ——
+  // 和「变形同构体 + 对应核心盟约道具」达到的状态完全一样（维护者 2026-11-08）。
+  // 所以它必须出现在这里，而不是只出现在 computeBonds 的人数里：`<获得时>自身所属盟约+N` 这类特质
+  // 读的就是这个函数（metaBonds → ctx.pieceBonds），少了它，忍冬吃到铃兰的「获得时」也不会给投影加层。
+  if (typeof extra === 'string' && extra && gd.bond(extra) && !out.includes(extra)) out.push(extra);
   return out;
 }
 
 /**
  * Who carries which bond (computeBonds' and offBondCounts' shared first step): bondId → Set(baseId) on the board / in
  * the hand (the 5 temporary slots never count), bondId → Set(baseId|golden) on the board, and the elite chess on the board.
+ *
+ * 「盟约投影」（维护者 2026-11-08）：投影那条盟约算进**每一名干员的自身盟约**（`pieceBonds` 的 `extra`），
+ * 于是凡是从「这块棋子属于哪些盟约」出发的效果都一致 —— 人数 / 激活（本函数）、
+ * `<获得时>自身所属盟约+N` 特质（metaBonds）、排异的收回与部署拦截（echoPhase）、AI 摘要（aiDigest）。
+ * 以前只在**人数**上补一条，于是「忍冬吃到铃兰的『获得时』」不给投影加层，效果看上去是假的。
  */
 function membership(gd, ps) {
   const boardChess = [];
@@ -59,21 +70,34 @@ function membership(gd, ps) {
   const onBoardVariant = new Map();
   const inHand = new Map();
   const add = (m, bond, key) => { let s = m.get(bond); if (!s) m.set(bond, (s = new Set())); s.add(key); };
-  // 「盟约投影」（维护者 2026-11-07 晚）：投影的那条核心盟约把场上**每一名**干员都算作成员，
-  // 但**同名干员只算一个激活名额** —— 下面的集合按 baseId 收集，天然去重；激活 / 档位仍走原版人数门槛
+  // 同一名干员只算一个激活名额 —— 集合按 baseId 收集，天然去重；激活 / 档位仍走原版人数门槛
   // （countMode BOARD / BOARD_AND_DECK / BOARD_ALL_CHESS 不变，见 rawCount）。
-  const proj = typeof ps.echoProjection === 'string' && ps.echoProjection && gd.bond(ps.echoProjection) ? ps.echoProjection : null;
+  const proj = projectionOf(gd, ps);
   for (const p of boardChess) {
     const base = gd.baseIdOf(p.id);
     const golden = gd.isGolden(p.id);
-    for (const b of pieceBonds(gd, p, ps.m?.rules)) { add(onBoard, b, base); add(onBoardVariant, b, `${base}|${golden ? 1 : 0}`); }
-    if (proj) { add(onBoard, proj, base); add(onBoardVariant, proj, `${base}|${golden ? 1 : 0}`); }
+    for (const b of pieceBonds(gd, p, ps.m?.rules, proj)) { add(onBoard, b, base); add(onBoardVariant, b, `${base}|${golden ? 1 : 0}`); }
   }
   for (const p of handChess) {
     const base = gd.baseIdOf(p.id);
-    for (const b of pieceBonds(gd, p, ps.m?.rules)) add(inHand, b, base);
+    // 整备区（手牌）也带上投影：变形同构体对手牌里的干员一样生效（pieceBonds 只看装备），
+    // 投影要与它同口径 ——「这个干员属于哪些盟约」不该因为在手上就少一条。
+    // 投影那 8 条盟约都是 `countMode: BOARD`，所以这条不会改变激活 / 档位，只是让「自身所属盟约」
+    // 类效果（获得时 +N）在手上拿到时也算投影。
+    for (const b of pieceBonds(gd, p, ps.m?.rules, proj)) add(inHand, b, base);
   }
   return { onBoard, onBoardVariant, inHand, goldenOnBoard: boardChess.filter((p) => gd.isGolden(p.id)).length };
+}
+
+/**
+ * 这个玩家的「盟约投影」盟约 id（没有 / 数据里不存在时 null）。
+ * @param {import('./gamedata.js').GameData} gd
+ * @param {{ echoProjection?: string|null }} ps
+ * @returns {string|null}
+ */
+export function projectionOf(gd, ps) {
+  const id = ps && typeof ps.echoProjection === 'string' ? ps.echoProjection : null;
+  return id && gd.bond(id) ? id : null;
 }
 
 /** A bond's member count by its counting mode (before 调和's +1), with the effects' per-bond count bonus. */

@@ -6891,6 +6891,11 @@
         "customBytes": 25375
       },
       {
+        "path": "server/match/bondsMeta.js",
+        "baseExists": false,
+        "customBytes": 15192
+      },
+      {
         "path": "server/match/choices.js",
         "baseExists": true,
         "customBytes": 31817
@@ -6898,7 +6903,7 @@
       {
         "path": "server/match/effectsMeta.js",
         "baseExists": true,
-        "customBytes": 44469
+        "customBytes": 44861
       },
       {
         "path": "server/match/gamedata.js",

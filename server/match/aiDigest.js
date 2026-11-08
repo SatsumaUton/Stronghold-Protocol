@@ -3,7 +3,7 @@ import { FIELD, legalTiles, parseKey } from './board.js';
 import { interestDigest, effectText } from '../ai/knowledge.js';
 import { operatorCaps } from '../ai/playbook.js';
 import { ruleOption } from '../../shared/plugins/rules.js';
-import { pieceBonds } from './bondsMeta.js';
+import { pieceBonds, projectionOf } from './bondsMeta.js';
 import { advisorBanks } from './aiEconomy.js';
 
 export function aiDigest(m, ps, kind, pub, own, pack = null) {
@@ -21,7 +21,7 @@ export function aiDigest(m, ps, kind, pub, own, pack = null) {
     // name is already applied by named(). class is the official profession. caps match the playbook hints.
     return { class: rec.profession || '', caps: operatorCaps(rec) };
   };
-  const operator = p => p.kind === 'chess' ? { baseId: gd.baseIdOf(p.id), bonds: pieceBonds(gd, p, m.rules),
+  const operator = p => p.kind === 'chess' ? { baseId: gd.baseIdOf(p.id), bonds: pieceBonds(gd, p, m.rules, projectionOf(gd, ps)),
     stars: gd.isGolden(p.id) ? 2 : 1, ...chessView(p.id) } : {};
   // [ASSUMED] Kill chance is the seat strategy's bountyKillChance (legacy exposure model) when that hook returns
   // a finite number. Compact enemy stats are the catalogue row, not the round's scaled combat values.
