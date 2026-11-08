@@ -42,7 +42,7 @@
 import { dispatchOperatorTraits, operatorTraitHandler } from './operatorTraits.js';
 import { itemKey } from './gamedata.js';
 import { boardOrder, parseKey, tileKey } from './board.js';
-import { pieceBonds as bondsOfPiece } from './bondsMeta.js';
+import { pieceBonds as bondsOfPiece, projectionOf } from './bondsMeta.js';
 import { charge } from '../sim/content/dsl/budget.js';
 import { registerExtensionMeta, extensionMetaOwner } from '../sim/content/extensions.js';
 import { registerAllMeta } from '../sim/content/index.js';
@@ -568,7 +568,10 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     pieceBonds: (uid, fallbackPiece = null) => {
       const piece = ps.find(uid)?.piece || (source?.piece?.uid === uid ? source.piece : null)
         || (fallbackPiece?.uid === uid ? fallbackPiece : null);
-      return piece?.kind === 'chess' ? bondsOfPiece(gd, piece, ps.m?.rules) : [];
+      // 「盟约投影」（维护者 2026-11-08）：投影那条盟约算进**这块棋子自己的**盟约列表，
+      // 于是「<获得时>自身所属盟约+N」这类特质（忍冬吃到铃兰的触发就是这条路）真的会给投影加层 ——
+      // 和「变形同构体 + 对应核心盟约道具」达到的状态一模一样。
+      return piece?.kind === 'chess' ? bondsOfPiece(gd, piece, ps.m?.rules, projectionOf(gd, ps)) : [];
     },
     /** 特质 of a chess piece: [{ garrisonId, effectKey, eventType, bb, bbStr, desc }]. */
     garrisonsOf: (uid) => {

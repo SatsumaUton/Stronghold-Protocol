@@ -20,8 +20,11 @@ export function operatorTraitLayerAllowance(player, gd) {
     const base = gd.chess(u.chessId);
     const rec = u.standIn === true ? gd.standIn?.(u.chessId) : u.diy && base?.isDiy ? diyRecordOf(base, u.diy, gd.raw) : base;
     if (!rec) continue;
+    // 「盟约投影」：这一名干员也算投影那条盟约的成员（与 match/bondsMeta.pieceBonds 的 `extra` 同一口径），
+    // 否则「自身所属盟约 +N」的战斗侧额度会把投影漏掉。
+    const proj = typeof player.projectedBond === 'string' && player.projectedBond ? player.projectedBond : null;
     const ownBonds = pieceBonds({ chess: () => rec, item: id => gd.item(id), bond: id => gd.bond(id) },
-      { id: u.chessId, items: (u.items ?? []).map(id => ({ id })) });
+      { id: u.chessId, items: (u.items ?? []).map(id => ({ id })) }, null, proj);
     const visit = node => {
       if (!node || typeof node !== 'object') return;
       if (node.layers) {
