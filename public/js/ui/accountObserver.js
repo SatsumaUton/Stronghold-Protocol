@@ -3,7 +3,7 @@
 import { identity, net } from '../net.js';
 import { store } from '../store.js';
 import { toast } from './toasts.js';
-import { findAccountRoom } from './accountRoom.js';
+import { findAccountRoom, roomNodeLabel } from './accountRoom.js';
 import { t } from '../../../shared/i18n.js';
 
 let installed = false;
@@ -278,12 +278,18 @@ export function installAccountObserver() {
           // 这句话以前是死胡同 —— 座位在**另一台节点**上时，玩家不知道该去哪，只能再点一遍
           // 「恢复对局」碰运气。现在查一下房间目录（/mm/api/account/room），把房间号和节点说出来，
           // 并指明下一步：大厅右上角「恢复对局」→「去该房间所在节点继续」。
+          //
+          // ★ 2026-11-08 晚（维护者：「第 N 台节点应该改成 XXX 节点，因为玩家又不知道每个节点的编号」）：
+          //   节点**编号**只给程序用来拼 `?room=&n=`，说给玩家的必须是**节点名**（顶栏那颗状态胶囊
+          //   上的「维多利亚 · 正常」）。matchmaker 现在一起下发 `room.nodeName`；老服务端没有名字时
+          //   就说「不在当前节点上」，绝不把「第 26 台节点」这种编号丢给玩家。
           let room = null;
           try { room = await findAccountRoom(); } catch { room = null; }
           if (room && room.code) {
-            toast(room.node
-              ? t('对局还在：房间 {code} 在第 {n} 台节点上。请点大厅右上角的「恢复对局」，再点「去该房间所在节点继续」。', { code: room.code, n: room.node })
-              : t('对局还在：房间 {code}。请点大厅右上角的「恢复对局」继续。', { code: room.code }), 'warn', { ttl: 12000 });
+            const where = roomNodeLabel(room);
+            toast(where
+              ? t('对局还在：房间 {code} 在「{node}」节点上。请点大厅右上角的「恢复对局」，再点「去该房间所在节点继续」。', { code: room.code, node: where })
+              : t('对局还在：房间 {code}。它不在当前节点上，请点大厅右上角的「恢复对局」，再点「去该房间所在节点继续」。', { code: room.code }), 'warn', { ttl: 12000 });
           } else {
             toast(t('当前节点没有可恢复的账号对局'), 'warn');
           }

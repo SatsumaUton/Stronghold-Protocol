@@ -65,16 +65,53 @@ test('节点查询与地址拼接抽到 ui/accountRoom.js，resumeMatch 继续 r
   assert.match(room, /export async function findAccountRoom\(\)/);
   assert.match(room, /\/mm\/api\/account\/room/);
   const resume = read('public/js/ui/resumeMatch.js');
-  assert.match(resume, /import \{ resumeRoomUrl, findAccountRoom \} from '\.\/accountRoom\.js';/);
-  assert.match(resume, /export \{ resumeRoomUrl, findAccountRoom \};/);
+  assert.match(resume, /import \{ resumeRoomUrl, findAccountRoom, roomNodeLabel \} from '\.\/accountRoom\.js';/);
+  assert.match(resume, /export \{ resumeRoomUrl, findAccountRoom, roomNodeLabel \};/);
+});
+
+// 维护者 2026-11-08：「第 N 台节点应该改成 XXX 节点，因为玩家又不知道每个节点的编号。」
+// 玩家认得的只有顶栏节点状态胶囊里的名字（「维多利亚 · 正常」），所以提示语说名字，编号只用来拼地址。
+test('提示语用节点名：renamed 的键不再带「第 {n} 台节点」', () => {
+  const obs = read('public/js/ui/accountObserver.js');
+  assert.match(obs, /import \{ findAccountRoom, roomNodeLabel \} from '\.\/accountRoom\.js';/);
+  assert.match(obs, /对局还在：房间 \{code\} 在「\{node\}」节点上。/, '有名字时说「在『维多利亚』节点上」');
+  assert.match(obs, /对局还在：房间 \{code\}。它不在当前节点上，/, '没有名字时不提编号');
+  assert.doesNotMatch(obs, /第 \{n\} 台节点/, '不能再把节点编号说给玩家');
+  assert.match(obs, /const where = roomNodeLabel\(room\);/, '名字来自 roomNodeLabel');
+
+  const resume = read('public/js/ui/resumeMatch.js');
+  assert.match(resume, /它在「\{node\}」节点上（房间 \{code\}）/, '弹窗里也用名字');
+  assert.doesNotMatch(resume, /另一个节点（房间 \{code\}）[\s\S]{0,40}第 \{n\} 台/, '弹窗里不能出现编号');
+});
+
+test('roomNodeLabel：有名字给名字，没有就是 null（调用方降级，不暴露编号）', async () => {
+  const { roomNodeLabel } = await import('../../public/js/ui/accountRoom.js');
+  assert.equal(roomNodeLabel({ code: 'PBJH', node: 26, nodeName: '多索雷斯' }), '多索雷斯');
+  assert.equal(roomNodeLabel({ code: 'PBJH', node: 26 }), null, '老服务端没有 nodeName → 不给编号');
+  assert.equal(roomNodeLabel({ code: 'PBJH', node: 26, nodeName: '' }), null, '空名字当没有');
+  assert.equal(roomNodeLabel(null), null);
+  assert.equal(roomNodeLabel({}), null);
+});
+
+test('matchmaker：/api/account/room 同时下发 nodeName，名字表只有一份（nodeNames.cjs）', () => {
+  const account = read('matchmaker/account.cjs');
+  assert.match(account, /const \{ nodeNameOf \} = require\('\.\/nodeNames\.cjs'\);/, 'account.cjs 共用名字表');
+  assert.match(account, /nodeName: nodeNameOf\(n\)/, '响应里带 nodeName');
+  assert.match(account, /const named = \(code, n\) => \(\{ code, node: Number\(n\) \|\| null, nodeName: nodeNameOf\(n\) \}\)/, '两条返回路径共用 named()');
+
+  const names = read('matchmaker/nodeNames.cjs');
+  assert.match(names, /module\.exports = \{ NODE_NAMES, nodeNameOf \}/);
+  assert.match(names, /'阿戈尔', '玻利瓦尔'[\s\S]*'多索雷斯', '阿卡胡拉'[\s\S]*'瓦伊凡'/, '30 个名字都在');
+
+  const server = read('matchmaker/server.js');
+  assert.match(server, /const \{ NODE_NAMES \} = require\('\.\/nodeNames\.cjs'\);/, 'server.js 也从这里取，别各写一份');
+  assert.doesNotMatch(server, /^const NODE_NAMES = \[/m, 'server.js 里的那份已抽走');
 });
 
 test('自动恢复失败时不再只说「当前节点没有可恢复的账号对局」，而是指出房间与节点', () => {
   const obs = read('public/js/ui/accountObserver.js');
-  assert.match(obs, /import \{ findAccountRoom \} from '\.\/accountRoom\.js';/);
+  assert.match(obs, /import \{ findAccountRoom, roomNodeLabel \} from '\.\/accountRoom\.js';/);
   assert.match(obs, /let room = null;[\s\S]{0,120}room = await findAccountRoom\(\);/, '失败分支要查房间目录');
-  assert.match(obs, /对局还在：房间 \{code\} 在第 \{n\} 台节点上/, '有节点时说出节点号');
-  assert.match(obs, /对局还在：房间 \{code\}。请点大厅右上角的「恢复对局」继续。/, '没有节点时至少给出房间号');
   // 实在查不到房间才退回原来那句（它是「房间已经没了」的意思，不该是第一选择）
   const dead = obs.indexOf("t('当前节点没有可恢复的账号对局')");
   assert.ok(dead > 0, '兜底提示还在');

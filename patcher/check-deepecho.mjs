@@ -146,7 +146,37 @@ if (FIX) {
   console.log(`[deepecho] 已刷新 ${wrote} 个快照文件 → patcher/features/${FEATURE}/files/`);
   // 修完重新扫一遍：下面的结论要基于修复后的状态
   ({ missing, drifted, serverOnlyGap } = scanSnapshots(files));
-  // index.json 也补齐（merge-features.py 的唯一输入）
+  // features.json 的 files 也要补：新增的共享文件里只要出现深潜标记词，就必须登记，
+  // 否则 `--fix` 之后仍然报「未登记」，得靠人记得手改（踩过：resumeMatch.js 的注释提到深潜）。
+  //
+  // ★ 2026-11-08：这里同时**删掉不再匹配任何深潜文件的确切路径**。
+  //   起因：`resumeMatch.js` 的注释里原来提到深潜，被 `--fix` 补登进 `deepecho.files`；
+  //   后来那段注释搬走，文件不再带标记词，于是 features.json 留着 112 条、实际扫描只有 111 条，
+  //   两份清单对不上（`test/patcher/deepecho-isolation.test.js` 报「文件数要一致」）。
+  //   通配符（* / **）一律不动：它们本来就该覆盖未来新增的文件。
+  try {
+    const doc = JSON.parse(fs.readFileSync(FEATURES_JSON, 'utf8'));
+    const list = (Array.isArray(doc) ? doc : doc.features) || [];
+    const f = list.find((x) => x && x.id === FEATURE);
+    if (f && Array.isArray(f.files)) {
+      const hasGlob = (g) => /[*?]/.test(g);
+      const kept = f.files.filter((g) => hasGlob(g) || files.includes(g));
+      const pruned = f.files.filter((g) => !hasGlob(g) && !files.includes(g));
+      const seen = new Set(kept);
+      const added = unregistered.filter((rel) => !seen.has(rel));
+      for (const rel of added) { kept.push(rel); seen.add(rel); }
+      kept.sort();
+      f.files = kept;
+      fs.writeFileSync(FEATURES_JSON, JSON.stringify(doc, null, 2) + '\n');
+      if (added.length || pruned.length) {
+        console.log(`[deepecho] 已更新 patcher/features.json（${f.files.length} 个文件：新增 ${added.length}，移除已不再匹配的 ${pruned.length}）`);
+        if (pruned.length) console.log(`[deepecho]   移除：${pruned.join(', ')}`);
+      }
+      unregistered.length = 0;   // 就地清空：下面的结论要反映「已经补完」的状态
+    }
+  } catch (e) { console.error('[deepecho] features.json 同步失败：' + (e && e.message)); }
+  // index.json 最后写（merge-features.py 的唯一输入），顺序不能颠倒：先 features.json 再 index.json，
+  // 否则 index 会按旧清单生成，守卫照样红。
   try {
     const idx = JSON.parse(fs.readFileSync(INDEX_JSON, 'utf8'));
     const i = idx.findIndex((f) => f && f.id === FEATURE);
@@ -156,23 +186,6 @@ if (FIX) {
     fs.writeFileSync(INDEX_JSON, JSON.stringify(idx, null, 2) + '\n');
     console.log(`[deepecho] 已同步 patcher/features/index.json（${rows.length} 个文件）`);
   } catch (e) { console.error('[deepecho] index.json 同步失败：' + (e && e.message)); }
-  // features.json 的 files 也要补：新增的共享文件里只要出现深潜标记词，就必须登记，
-  // 否则 `--fix` 之后仍然报「未登记」，得靠人记得手改（踩过：resumeMatch.js 的注释提到深潜）。
-  if (unregistered.length) {
-    try {
-      const doc = JSON.parse(fs.readFileSync(FEATURES_JSON, 'utf8'));
-      const list = (Array.isArray(doc) ? doc : doc.features) || [];
-      const f = list.find((x) => x && x.id === FEATURE);
-      if (f && Array.isArray(f.files)) {
-        const seen = new Set(f.files);
-        for (const rel of unregistered) if (!seen.has(rel)) { f.files.push(rel); seen.add(rel); }
-        f.files.sort();
-        fs.writeFileSync(FEATURES_JSON, JSON.stringify(doc, null, 2) + '\n');
-        console.log(`[deepecho] 已补登 patcher/features.json（${f.files.length} 个文件，新增 ${unregistered.length}）`);
-        unregistered.length = 0;   // 就地清空：下面的结论要反映「已经补完」的状态
-      }
-    } catch (e) { console.error('[deepecho] features.json 补登失败：' + (e && e.message)); }
-  }
 }
 
 console.log(`深渊回响相关运行文件: ${files.length}`);

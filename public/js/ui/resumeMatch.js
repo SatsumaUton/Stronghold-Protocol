@@ -4,12 +4,12 @@ import { html, Button, Icon, Modal } from './components.js';
 import { identity, net } from '../net.js';
 import { store } from '../store.js';
 import { requestAccountResume } from './accountObserver.js';
-import { resumeRoomUrl, findAccountRoom } from './accountRoom.js';
+import { resumeRoomUrl, findAccountRoom, roomNodeLabel } from './accountRoom.js';
 import { t } from '../../../shared/i18n.js';
 import { toast } from './toasts.js';
 
 // 兼容旧引用（测试与其它模块一直从 resumeMatch 取这两个函数）：实现搬到了 ./accountRoom.js
-export { resumeRoomUrl, findAccountRoom };
+export { resumeRoomUrl, findAccountRoom, roomNodeLabel };
 
 export function ResumeMatchButton() {
   const [items, setItems] = useState(() => identity.recoverable());
@@ -160,7 +160,9 @@ export function ResumeMatchButton() {
       <p>${t('选择已关闭窗口的对局。服务器重启或对局过期后无法恢复。')}</p>
       ${accountResume ? html`<${Button} variant="primary" block=${true} disabled=${busy} onClick=${resumeAccount}>${t('通过账号恢复当前对局')}<//>` : null}
       ${elsewhere ? html`<div class="resume-elsewhere">
-        <p>${t('这个页面对应的节点上没有你的对局，它在另一个节点（房间 {code}）。点下面的按钮过去继续。', { code: elsewhere.code })}</p>
+        <p>${/* 2026-11-08（维护者「玩家又不知道每个节点的编号」）：说**节点名**，不说编号 */ ''}${roomNodeLabel(elsewhere)
+          ? t('这个页面对应的节点上没有你的对局，它在「{node}」节点上（房间 {code}）。点下面的按钮过去继续。', { node: roomNodeLabel(elsewhere), code: elsewhere.code })
+          : t('这个页面对应的节点上没有你的对局，它在另一个节点（房间 {code}）。点下面的按钮过去继续。', { code: elsewhere.code })}</p>
         <${Button} variant="primary" block=${true} onClick=${goToRoom}>${t('前往该房间继续对局')}<//>
       <//>` : null}
       ${items.length ? items.map((item) => html`<${Button} key=${item.id} variant="secondary" block=${true} disabled=${busy} onClick=${() => resume(item)}>

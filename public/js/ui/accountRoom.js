@@ -34,7 +34,25 @@ export function resumeRoomUrl(room) {
     : `/r/${encodeURIComponent(code)}`;
 }
 
-/** 账号名下的房间：`{ code, node } | null`（node 可能为 null：老数据只有昵称兜底）。 */
+/**
+ * 提示语里「对局在哪台节点」的说法。
+ *
+ * 维护者 2026-11-08：「第 N 台节点应该改成 XXX 节点，因为玩家又不知道每个节点的编号。」
+ * 玩家认得的只有顶栏节点状态胶囊里的名字（「维多利亚 · 正常」），所以优先用它；
+ * 老 matchmaker 没给名字时退回「另一台服务器」这种不带编号的说法，绝不把编号丢给玩家。
+ * @param {{ node?: number|string, nodeName?: string|null }|null|undefined} room
+ * @returns {string|null} 节点名；说不出来时 null
+ */
+export function roomNodeLabel(room) {
+  if (!room || typeof room !== 'object') return null;
+  if (typeof room.nodeName === 'string' && room.nodeName) return room.nodeName;
+  return null;
+}
+
+/**
+ * 账号名下的房间：`{ code, node, nodeName } | null`
+ * （`node` 可能为 null：老数据只有昵称兜底；`nodeName` 是给人看的节点中文名，可能为 null）。
+ */
 export async function findAccountRoom() {
   let name = window.__SP_ACCOUNT_USER || '';
   if (!name) {
@@ -54,7 +72,14 @@ export async function findAccountRoom() {
     const code = j?.room?.code;
     if (!code) return null;
     const node = Number(j?.room?.node);
-    return { code: String(code), node: Number.isInteger(node) && node >= 1 && node <= 30 ? node : null };
+    // 2026-11-08（维护者「玩家又不知道每个节点的编号」）：提示语里用**节点名**（「维多利亚」），
+    // 编号只留着拼跳转地址。老 matchmaker 没有 nodeName 时退回 null，调用方自己降级。
+    const nodeName = typeof j?.room?.nodeName === 'string' && j.room.nodeName ? j.room.nodeName : null;
+    return {
+      code: String(code),
+      node: Number.isInteger(node) && node >= 1 && node <= 30 ? node : null,
+      nodeName,
+    };
   } catch { /* ignore */ }
   return null;
 }

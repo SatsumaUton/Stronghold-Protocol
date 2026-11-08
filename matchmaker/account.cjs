@@ -2,6 +2,8 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const nodemailer = require('nodemailer');
+// 节点中文名（「维多利亚」而不是「第 26 台节点」）：和 server.js 的节点状态共用一份表
+const { nodeNameOf } = require('./nodeNames.cjs');
 
 // 私有密钥：优先环境变量，其次项目根目录 .secrets/secrets.json（不进入仓库）
 function readSecret(key) {
@@ -714,9 +716,15 @@ async function handle(req, res, pathname) {
   }
 
   // 跨节点恢复：只告诉当前登录账号它自己所在的房间，不暴露全服房间目录。
+  //
+  // 2026-11-08（维护者「玩家又不知道每个节点的编号」）：`node` 是给**程序**用的（客户端拼
+  // `?room=CODE&n=N` 钉节点），`nodeName` 才是给**人**看的 —— 玩家面板上认识的是顶栏那颗
+  // 节点状态胶囊里的名字（「维多利亚 · 正常」），不是「第 26 台节点」。名字表只有一份
+  // （./nodeNames.cjs），与 server.js 的节点状态共用。
   if (method === 'GET' && pathname === '/api/account/room') {
     const u = await currentUser(req);
     if (!u) return sendJson(res, 401, { ok: false, error: 'unauthorized' });
+    const named = (code, n) => ({ code, node: Number(n) || null, nodeName: nodeNameOf(n) });
     // 主判据是账号 ID：昵称会重名、会改，用昵称匹配会把玩家送去别人的对局。
     const uid = u.id != null ? String(u.id) : null;
     // 兼容旧数据：早期座位没有 accountId，只能退回昵称匹配。
@@ -735,13 +743,13 @@ async function handle(req, res, pathname) {
             const players = (room.players || []).filter(Boolean);
             // 1) 账号 ID 精确命中：这是唯一可信的判据
             if (uid && players.some((p) => p && p.accountId != null && String(p.accountId) === uid)) {
-              return sendJson(res, 200, { ok: true, room: { code: room.code, node: Number(n.n) || null }, by: 'account' });
+              return sendJson(res, 200, { ok: true, room: named(room.code, n.n), by: 'account' });
             }
             // 2) 昵称兜底：只在该房间所有座位都没有 accountId（纯旧数据）时记录，稍后再决定
             if (!nameFallback) {
               const anyHasAccount = players.some((p) => p && p.accountId != null);
               if (!anyHasAccount && players.some((p) => p && names.has(String(p.name)))) {
-                nameFallback = { code: room.code, node: Number(n.n) || null };
+                nameFallback = named(room.code, n.n);
               }
             }
           }
