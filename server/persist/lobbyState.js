@@ -31,6 +31,15 @@ import { DIFFICULTIES, ROOM_CODE_LEN } from '../../shared/constants.js';
 /** Document layout version; another version is not restored (logged). Raise it when the shape below changes. */
 export const LOBBY_DOC_VERSION = 1;
 
+/**
+ * 重启后普通房的会话最多还能恢复多久（旧规则：防止陈旧断线长期挂着）。
+ * 单人房 / 单人深潜不走这条上限 —— 它们本来就该拿到 24 小时（见 `soloLikeRoomDoc`）。
+ */
+export const RESTORED_WINDOW_CAP_MS = 30 * 60 * 1000;
+
+/** 单人房 / 单人深潜重启后能恢复的上限：官方 `singleReconnectTime` = 24 小时。 */
+export const SOLO_HOLD_CEILING_MS = 24 * 3600 * 1000;
+
 const ROOM_RE = new RegExp(`^[A-Z]{${ROOM_CODE_LEN}}$`);
 const ID_RE = /^[A-Za-z0-9_-][A-Za-z0-9_.:-]{0,127}$/;
 const TOKEN_RE = /^[0-9a-f]{32}$/;
@@ -126,6 +135,11 @@ export function roomDoc(room, matchRef, sessionOf) {
     matchKey: room.matchKey, matchKeys: room.matchKeys ? [...room.matchKeys] : null, matchCount: room.matchCount | 0, createdAt: room.createdAt,
     ttlMs: room.ttlMs, noExpire: room.noExpire === true, adminCreated: room.adminCreated === true,
     matchLive: !!room.match, liveRound: room.liveRound | 0, livePhase: room.livePhase || null,
+    // 「最后一个真人是什么时候走的」（维护者 2026-11-09）：`sweepOldRooms` 的僵尸房兜底拿它当 `since`，
+    // 而它以前**没有进存档** —— 重启后恒为 0，`since` 就退到 `restoredAt`（= 重启那一刻），
+    // 于是「保存中」的房间在重启后只剩 15 分钟，日志里是
+    // `对局无任何在线 session 且已过 15 分钟，回收僵尸房间`。现在跟着房间一起存。
+    ...(room.lastHumanLeftAt ? { lastHumanLeftAt: room.lastHumanLeftAt } : {}),
     maxSpectators: typeof room.spectatorLimit === 'function' ? room.spectatorLimit() : 0,
     // 「深渊回响」单人房正在被 24 小时保存（维护者 2026-11-08）：控制台 / 后台据此打「已保存 · 剩 N 小时」的标记。
     // 只在真的处于「没人玩、等回来」时才有这个键，普通房间的存档与以前逐字节一致。
@@ -175,6 +189,27 @@ export function snapshotLobby({ registry, lobby, matchRef, now = Date.now(), kin
 }
 
 /**
+ * 房间文档描述的是不是「一个人在打的一局」（`Lobby.soloLikeRun` 的存档侧同一条判据）：
+ * 单人房，或者**只有一个真人**的同盟房（AI 座位不算人）。
+ *
+ * 为什么恢复时要认它：单人房 / 单人深潜的会话拿的是 24 小时窗口（维护者 2026-11-07 / 11-08），
+ * 而 `restoreLobby` 以前把**所有**会话的窗口一律砍到 30 分钟（见下面「30 分钟封顶」那段）。
+ * 于是玩家关掉页面两小时后重启，他的会话当场被判过期 → 房间没人持有窗口 → 15 分钟后被当僵尸房
+ * 回收（2026-11-09 实测 14 台节点全灭，日志 `restored 0 session(s) (1 expired)` 紧接
+ * `回收僵尸房间`）。24 小时保存正是为了扛住这件事。
+ * @param {any} r 房间文档
+ * @returns {boolean}
+ */
+export function soloLikeRoomDoc(r) {
+  if (!plain(r) || !['solo', 'coop'].includes(String(r.mode))) return false;
+  // 没开局的房间不在此列：那时没人拿过 24 小时窗口
+  if (!r.match && r.matchLive !== true) return false;
+  if (r.mode === 'solo') return true;
+  const humans = (Array.isArray(r.seats) ? r.seats : []).filter((s) => plain(s) && !s.isBot && !s.left);
+  return humans.length <= 1;
+}
+
+/**
  * Re-create the sessions and rooms of a document (before the server listens). Never throws for a bad record: it is
  * skipped and counted. Returns the rooms whose match is to be restored, with the seats that departed meanwhile.
  * @param {{ doc: any, registry: import('../net.js').SessionRegistry, lobby: import('../lobby.js').Lobby, now?: number,
@@ -186,6 +221,11 @@ export function restoreLobby({ doc, registry, lobby, now = Date.now(), log = nul
   const out = { ok: false, sessions: 0, expired: 0, rooms: 0, dropped: 0, matches: [] };
   if (!plain(doc)) return { ...out, reason: 'empty' };
   if (doc.v !== LOBBY_DOC_VERSION) return { ...out, reason: `version ${doc.v}` };
+  // 会话先恢复、房间后建，但「这个会话属于单人房吗」要看房间文档 —— 所以先建一份房间索引
+  const roomDocs = new Map();
+  for (const r of Array.isArray(doc.rooms) ? doc.rooms : []) {
+    if (plain(r) && typeof r.code === 'string') roomDocs.set(r.code, r);
+  }
   const restored = new Map();
   for (const s of Array.isArray(doc.sessions) ? doc.sessions : []) {
     try {
@@ -194,9 +234,19 @@ export function restoreLobby({ doc, registry, lobby, now = Date.now(), log = nul
       // a session that was online when the document was written was cut off by the restart: its window starts now
       const since = s.connected || !Number.isFinite(s.disconnectedAt) ? now : Number(s.disconnectedAt);
       const ownRaw = Number.isFinite(s.resumeWindowMs) && s.resumeWindowMs > 0 ? Number(s.resumeWindowMs) : null;
-      // Keep a restored disconnect recoverable for at most 30 minutes, even when an older
-      // record (before this cap) stored the old 24-hour solo window.
-      const own = ownRaw != null ? Math.min(ownRaw, 30 * 60 * 1000) : null;
+      /**
+       * 「重启后还能恢复多久」。
+       *
+       * 普通房：最多 30 分钟（旧规则，防陈旧断线挂太久）。
+       * **单人房 / 单人深潜：按它自己的 24 小时算**（维护者 2026-11-09 实测：「重启以后原本显示保存的房间没有了」）。
+       *   `soloLikeRun` 就是为这一局发的 24 小时窗口，重启不该把它砍成 30 分钟 ——
+       *   砍掉之后会话消失、没人持有窗口，房间 15 分钟后会被 sweepOldRooms 当僵尸房回收。
+       *   上限仍是官方 `singleReconnectTime`（24 小时），所以不会出现「无限期」的陈旧会话。
+       */
+      const soloLike = soloLikeRoomDoc(roomDocs.get(String(s.roomCode || '')));
+      const own = ownRaw != null
+        ? (soloLike ? Math.min(ownRaw, SOLO_HOLD_CEILING_MS) : Math.min(ownRaw, RESTORED_WINDOW_CAP_MS))
+        : null;
       const window = own != null && own > registry.reconnectWindowMs ? own : registry.reconnectWindowMs;
       if (now - since > window) { out.expired++; continue; }
       const session = new Session({ playerId: s.playerId, token: s.token, name: s.name, now });
@@ -246,6 +296,8 @@ function roomFrom(r, sessions, lobby, now) {
     room.ttlMs = Number.isFinite(r.ttlMs) ? r.ttlMs : null;
     room.adminCreated = r.adminCreated === true;
     room.noExpire = room.adminCreated;
+    // 「最后一个真人走的那一刻」要一起恢复：sweepOldRooms 的僵尸房兜底拿它当 since（见 roomDoc）
+    if (Number.isFinite(r.lastHumanLeftAt) && r.lastHumanLeftAt > 0) room.lastHumanLeftAt = Number(r.lastHumanLeftAt);
   if (r.seats.length !== room.seats.length) return null;
   const inMatch = !!r.match;
   room.content = lobby.vanilla;
@@ -305,6 +357,8 @@ function fallbackRoom(r, lobby, now) {
     room.noExpire = room.adminCreated;
     room.matchCount = Number.isSafeInteger(r.matchCount) ? r.matchCount : 0;
     room.aiPicksLast = r.mode === 'coop' && r.aiPicksLast === true;
+    // 同 roomFrom：恢复「最后一个人离开的时刻」
+    if (Number.isFinite(r.lastHumanLeftAt) && r.lastHumanLeftAt > 0) room.lastHumanLeftAt = Number(r.lastHumanLeftAt);
     // 兜底重建同样要带上深潜标记（理由见 roomFrom）：没有它，恢复出来的深潜局会被当普通同盟局
     room.variant = r.variant === 'deepecho' && r.mode === 'coop' ? 'deepecho' : null;
     if (room.variant && plain(r.echoCfg)) room.echoCfg = r.echoCfg;

@@ -6728,7 +6728,7 @@
       {
         "path": "public/js/net.js",
         "baseExists": false,
-        "customBytes": 50892
+        "customBytes": 50891
       },
       {
         "path": "public/js/render/units.js",
@@ -6953,7 +6953,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 284921
+        "customBytes": 285725
       },
       {
         "path": "server/match/Match.js",
@@ -7168,7 +7168,7 @@
       {
         "path": "server/persist/lobbyState.js",
         "baseExists": true,
-        "customBytes": 21778
+        "customBytes": 25415
       },
       {
         "path": "server/persist/persister.js",

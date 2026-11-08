@@ -1166,6 +1166,14 @@ export class Lobby {
           Number(room.restoredAt) || 0,
           Number(room.createdAt) || 0,
         );
+        // ★ 2026-11-09（维护者：「重启以后原本显示保存的房间没有了」）：
+        //   「保存中的单人房」（单人 / 单人深潜）不走 15 分钟 TTL —— 它拿的就是 24 小时窗口，
+        //   到点由 soloHoldOf 的 until 说话。以前重启后会话被判过期、房间只剩 15 分钟，
+        //   14 台节点上的保存房**全部**在这个分支被回收（日志 `对局无任何在线 session 且已过 15 分钟`）。
+        //   判据与存档 / 控制台同一个（server/soloHold.js），所以「界面上显示保存中」和
+        //   「服务端还留着」永远是同一件事。
+        const hold = soloHoldOf(room, (id) => this.registry?.byId?.(id), undefined, now);
+        if (hold && now < hold.until) continue;
         if (now - since < (room.ttlMs || roomTtlMs())) continue;
         this.log?.info?.(`[lobby] ${room.code} 对局无任何在线 session 且已过 ${Math.round((room.ttlMs || roomTtlMs()) / 60000)} 分钟，回收僵尸房间`);
         try { this.disposeRoom(room, 'expired'); } catch { /* ignore */ }
