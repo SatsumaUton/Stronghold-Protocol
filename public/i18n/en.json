@@ -3124,5 +3124,6 @@
   "对局还在：房间 {code}。它不在当前节点上，请点大厅右上角的「恢复对局」，再点「去该房间所在节点继续」。": "Your match is still running: room {code}. It is not on this node — click “Resume match” at the top right of the lobby, then “Go to that room’s node to continue”.",
   "这个页面对应的节点上没有你的对局，它在「{node}」节点上（房间 {code}）。点下面的按钮过去继续。": "Your match is not on this page’s node — it is on the “{node}” node (room {code}). Click the button below to go there and continue.",
   "每人各自选一条核心盟约：你自己的全体干员都算它的成员（同名只算一个），不影响队友；选中后按「确认」才生效": "Each player picks one core bond: all your operators count as its members (an operator counts once), teammates unaffected; press Confirm to apply",
-  "点一张卡选中，再按「确认」提交（不用等队友）。": "Tap a card to select it, then press Confirm (no need to wait for teammates)."
+  "点一张卡选中，再按「确认」提交（不用等队友）。": "Tap a card to select it, then press Confirm (no need to wait for teammates).",
+  "我的最佳": "My best"
 }
