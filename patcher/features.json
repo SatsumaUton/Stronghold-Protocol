@@ -487,6 +487,7 @@
         "public/js/ui/echoBlessing.js",
         "public/js/ui/echoBuffs.js",
         "public/js/ui/echoCodex.js",
+        "public/js/ui/echoProjection.js",
         "public/js/ui/echoSigils.js",
         "public/js/ui/echoStatus.js",
         "public/js/ui/echoSupply.js",

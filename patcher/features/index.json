@@ -6653,7 +6653,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": true,
-        "customBytes": 102754
+        "customBytes": 103245
       },
       {
         "path": "public/css/screens/game-shop.css",
@@ -6688,22 +6688,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 245762
+        "customBytes": 245933
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 284119
+        "customBytes": 284390
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 272597
+        "customBytes": 272885
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 233603
+        "customBytes": 233781
       },
       {
         "path": "public/js/assets.js",
@@ -6779,6 +6779,11 @@
         "path": "public/js/ui/echoCodex.js",
         "baseExists": false,
         "customBytes": 4037
+      },
+      {
+        "path": "public/js/ui/echoProjection.js",
+        "baseExists": false,
+        "customBytes": 6168
       },
       {
         "path": "public/js/ui/echoSigils.js",

@@ -1213,6 +1213,10 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-bless__rbtn.is-voted.is-no { border-color: rgba(200, 150, 150, .4); background: rgba(80, 45, 45, .35); color: #e8cfcf; }
 .echo-bless__rbtn.is-voted > i { font-style: normal; color: #9d8cc4; font-size: calc(.11 * var(--t)); }
 .echo-bless__card.is-mine { background: linear-gradient(180deg, rgba(120, 80, 200, .5), rgba(40, 20, 70, .9)); }
+/* 盟约投影：自己**当前生效**的那条（金色描边，弱于「已选中」的 is-armed）——
+   选中态表示「还没提交」，当前态表示「现在生效的是它」，两者必须能同时看清。 */
+.echo-bless__card.is-current { border-color: rgba(255, 208, 110, .8); box-shadow: 0 0 0 .02rem rgba(255, 208, 110, .45) inset; }
+.echo-bless__card.is-armed.is-current { box-shadow: 0 0 .5rem rgba(183, 156, 255, .6), 0 0 0 .02rem rgba(255, 208, 110, .45) inset; }
 .echo-bless__foot { padding-top: .14rem; border-top: 1px solid rgba(183, 156, 255, .18); }
 
 /* 诅咒（深潜对原版强力机制的限制）：红灰色，和祝福/词条区分开 */
