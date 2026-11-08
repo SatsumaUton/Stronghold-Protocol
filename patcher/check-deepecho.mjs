@@ -61,8 +61,11 @@ const TESTS = [
   'test/persist/echo-resume.test.js',
   'test/content/whitw2-stack.test.js',
   'test/ui/echo-altar-visible.test.js',
+  'test/ui/echo-best-account.test.js',
   'test/ui/echo-blessing-refresh-vote.test.js',
   'test/ui/echo-blessing-look.test.js',
+  'test/ui/echo-projection-confirm.test.js',
+  'test/match/echo-projection-bonds.test.js',
   'test/ui/stats-echo-record.test.js',
   'test/ui/echo-exit-words.test.js',
 ];

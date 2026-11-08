@@ -43,7 +43,7 @@ import { PLAYER_CAPACITIES } from '../../../shared/playerCapacity.js';
 import { html, confirmDialog, Button, Icon, MicroLabel, Modal, PingPill, Spinner, DifficultyIcon, TextField } from '../ui/components.js';
 import { Sprite, Img } from '../ui/gameComponents.js';
 import { uiUrl } from '../ui/assetUrls.js';
-import { peekStatsRecords, trophyMedalOf, aggregateStats, recordsOfSeason } from '../ui/stats.js';
+import { peekStatsRecords, trophyMedalOf, aggregateStats, recordsOfSeason, bestEchoDepth } from '../ui/stats.js';
 import { levelProgress, levelOf } from './settle.js';
 import { OwnBackdrop, LobbyScene, LobbyMediaButton } from '../ui/lobbyMedia.js';
 import { toast, toastError } from '../ui/toasts.js';
@@ -1018,14 +1018,17 @@ export function MatchmakingSelect({ difficulty, onDifficulty, onClose, onStart, 
   <//>`;
 }
 
-/** 本机深潜最佳成绩的存储键（只在当前浏览器，和成就统计一样）。 */
+/**
+ * 「我的最佳」深度 —— **来自对局记录**（`ui/stats.js` bestEchoDepth），不是另存的一个数。
+ *
+ * 以前这里自己读 localStorage 的 `sp.echo.best`，而那个键没有任何活着的写入者（唯一的写入点在
+ * `screens/echoLobby.js`，一个没人 import 的旧大厅，而且写的是旧值），所以它永远是「—」。
+ * 记录里的 `stats` 域本来就跟着账号走（`matchmaker/account.cjs` DOMAINS + 前端 PREF_MAP），
+ * 于是这个数字是**账号级**的：换设备、清缓存、换浏览器登录同一个账号，最佳成绩都不变。
+ */
 const PAD_LABEL = '占位';  // i18n-ignore: 列表补齐用的纯视觉占位（aria-hidden）
-const ECHO_BEST_KEY = 'sp.echo.best';
 const echoReadBest = () => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(ECHO_BEST_KEY) || 'null');
-    return raw && Number.isFinite(raw.depth) ? raw : null;
-  } catch { return null; }
+  try { return bestEchoDepth(peekStatsRecords()); } catch { return null; }
 };
 
 /**
@@ -1236,7 +1239,7 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
               selected=${difficulty === d} onSelect=${pickDifficulty} />`)}
           </div>
           <div class="echo-stats">
-            <div class="echo-stat"><span class="echo-stat__k">${t('本机最佳')}</span><b class="echo-stat__v">${best ? best.depth : '—'}</b></div>
+            <div class="echo-stat"><span class="echo-stat__k">${t('我的最佳')}</span><b class="echo-stat__v">${best == null ? '—' : best}</b></div>
             <div class="echo-stat"><span class="echo-stat__k">${t('本周最佳')}</span><b class="echo-stat__v">${weekBest == null ? '—' : weekBest}</b></div>
           </div>
           <div class="proto-foot proto-foot--match proto-foot--triple">

@@ -405,7 +405,10 @@ export function peekStatsRecords() {
 // ---- compaction + the storage budget ---------------------------------------------------------------------------
 
 const COMPACT_FRAME = ['id', 'v', 't', 'end', 'victory', 'roundsPassed', 'lastRound', 'hiddenReached', 'hiddenCleared', 'reason', 'modeId',
-  'difficulty', 'roomMode', 'durationMs', 'selfId', 'vs', 'content', 'version', 'test', 'testActions'];
+  'difficulty', 'roomMode', 'durationMs', 'selfId', 'vs', 'content', 'version', 'test', 'testActions',
+  // 「深渊回响」：深度是成绩，也是大厅「我的最佳」的数据源（bestEchoDepth）。
+  // 不进这一份的话，30 局以后老的深潜记录被压成 compact 就**丢了深度** —— 玩家的最佳成绩会莫名其妙变小。
+  'variant', 'echoDepth'];
 
 /**
  * The compact form of a record: the frame and the player's OWN row without lineup, bonds and name — everything the
@@ -465,6 +468,33 @@ export function highestBondRecord(records) {
     }
   }
   return best;
+}
+
+/**
+ * 「深渊回响」的个人最佳深度 —— **从对局记录里算**（记录的 `echoDepth`），不另存一份。
+ *
+ * 以前大厅那个「本机最佳」读的是 localStorage 的 `sp.echo.best`，可那个键**没有任何活着的写入者**：
+ * 唯一的写入点在 `screens/echoLobby.js`（一个没人 import 的旧大厅），而且写的是
+ * `depth: readBest()?.depth ?? 0` —— 把旧值原样写回，永远涨不上去。于是它始终是「—」或 0。
+ *
+ * 记录里的深度本来就跟账号走：`stats` 是账号云同步的一个域（`matchmaker/account.cjs` 的 DOMAINS，
+ * 前端 `account-title.js` 的 PREF_MAP `stats: 'sp.pref.stats'`），所以用它算出来的就是**账号级**的
+ * 最佳成绩 —— 换设备、清缓存、换个浏览器登录同一个账号，数字都不变。
+ *
+ * 深度取整；「测试模式」的局不算（它们不进统计）。中途退出的局**算**：深度是真实到达过的，
+ * 与「结算」与否无关。没有深潜记录时返回 null（界面上显示「—」，不是 0）。
+ * @param {any[]} records
+ * @returns {number|null}
+ */
+export function bestEchoDepth(records) {
+  let best = 0;
+  for (const rec of Array.isArray(records) ? records : []) {
+    if (!rec || rec.variant !== 'deepecho' || rec.test === true) continue;
+    if (Number.isInteger(selfRowOf(rec)?.aiTakeoverRound)) continue;
+    const d = Math.floor(Number(rec.echoDepth));
+    if (Number.isFinite(d) && d > best) best = d;
+  }
+  return best > 0 ? best : null;
 }
 
 /**

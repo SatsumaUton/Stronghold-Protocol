@@ -6688,22 +6688,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 245933
+        "customBytes": 245962
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 284390
+        "customBytes": 284427
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 272885
+        "customBytes": 272917
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 233781
+        "customBytes": 233815
       },
       {
         "path": "public/js/assets.js",
@@ -6718,7 +6718,7 @@
       {
         "path": "public/js/screens/echoLobby.js",
         "baseExists": false,
-        "customBytes": 8248
+        "customBytes": 8466
       },
       {
         "path": "public/js/screens/game.js",
@@ -6728,7 +6728,7 @@
       {
         "path": "public/js/screens/lobby.js",
         "baseExists": true,
-        "customBytes": 122232
+        "customBytes": 122637
       },
       {
         "path": "public/js/screens/result.js",
@@ -6868,7 +6868,7 @@
       {
         "path": "public/js/ui/stats.js",
         "baseExists": true,
-        "customBytes": 49702
+        "customBytes": 51535
       },
       {
         "path": "public/js/ui/watchBonds.js",
