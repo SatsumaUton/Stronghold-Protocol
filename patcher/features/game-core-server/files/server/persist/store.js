@@ -26,6 +26,8 @@ const inflate = promisify(zlib.inflateRaw);
 
 /** Key lifetime (ms). */
 export const STORE_TTL_MS = 25 * 3600_000;
+/** 墓碑（被回收房间的最后一份副本）保留多久：24 小时，够运维发现并救回来。 */
+export const TOMB_TTL_MS = 24 * 3600_000;
 /** Values larger than this are deflated. */
 const DEFLATE_MIN = 1024;
 /** First byte of a deflated value (JSON values start with `{`). */
@@ -100,11 +102,11 @@ export class CheckpointStore {
   }
 
   /** Write a value (an object, or its JSON text). @returns {Promise<boolean>} */
-  async put(key, value) {
+  async put(key, value, ttlMs = this.ttlMs) {
     if (this.closed) return false;
     try {
       const bytes = await this.encode(value);
-      await this.client.command('SET', key, bytes, 'PX', this.ttlMs);
+      await this.client.command('SET', key, bytes, 'PX', ttlMs);
       this.stats.writes++;
       this.stats.bytesWritten += bytes.length;
       this.stats.lastWriteAt = Date.now();
@@ -185,6 +187,39 @@ export class CheckpointStore {
   deleteCheckpoint(id) { return this.del(this.checkpointKey(id)); }
   saveLobby(value) { return this.put(this.key('lobby'), value); }
   loadLobby() { return this.get(this.key('lobby')); }
+
+  /**
+   * 「墓碑」：房间被回收时留下的最后一份副本（维护者 2026-11-09）。
+   *
+   * 为什么需要：持久化对「删错了」是**零容忍**的 —— `disposeRoom` → `goneRooms` 会把房间文档和
+   * 检查点真删掉，一次误回收就是玩家整局数据永久消失（当日 15 间房就是这样没的，Redis 也没有
+   * AOF / 从库 / 快照可回滚）。现在删除前先写一份 `tomb:<房号>`，TTL 24 小时，可以读回来重建。
+   *
+   * 键：`<prefix>tomb:<房号>`；值是 `{ v, code, reason, at, room, checkpoint }`（room 是 roomDoc 的结果，
+   * checkpoint 是那一刻的对局快照，有就一起存）。
+   * @param {string} code 房号
+   * @param {any} record 墓碑内容
+   * @param {number} [ttlMs] 保留多久，默认 {@link TOMB_TTL_MS}
+   */
+  saveTombstone(code, record, ttlMs = TOMB_TTL_MS) {
+    if (!ID_RE.test(String(code))) return false;
+    return this.put(this.tombstoneKey(code), record, ttlMs);
+  }
+  loadTombstone(code) {
+    if (!ID_RE.test(String(code))) return { ok: false, value: null, error: 'BAD_ID' };
+    return this.get(this.tombstoneKey(code));
+  }
+  deleteTombstone(code) { return this.del(this.tombstoneKey(code)); }
+  tombstoneKey(code) { return this.key(`tomb:${code}`); }
+  /** 所有墓碑的房号（运维脚本用；KEYS 只在这类一次性命令里出现）。 */
+  async listTombstones() {
+    if (this.closed) return { ok: false, value: [], error: 'CLOSED' };
+    let flat;
+    try { flat = await this.client.command('KEYS', this.key('tomb:*')); } catch (e) { const f = this.readFailed(e); return { ok: false, value: [], error: f.error }; }
+    this.stats.reads++;
+    const head = this.key('tomb:');
+    return { ok: true, value: (flat || []).map((k) => k.toString()).filter((k) => k.startsWith(head)).map((k) => k.slice(head.length)) };
+  }
 
   snapshot() {
     const c = this.client.stats || {};
