@@ -6953,7 +6953,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 285725
+        "customBytes": 286531
       },
       {
         "path": "server/match/Match.js",
@@ -7173,7 +7173,7 @@
       {
         "path": "server/persist/persister.js",
         "baseExists": false,
-        "customBytes": 22783
+        "customBytes": 25905
       },
       {
         "path": "server/sim/Battle.js",
