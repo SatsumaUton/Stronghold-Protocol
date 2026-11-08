@@ -268,14 +268,25 @@ describe('3: the temp overflow row (临时整备区)', () => {
     assert.match(css, /\.tempnote \{ position: fixed; inset: 0; z-index: 2; pointer-events: none; \}/, 'over the field, under the HUD, never takes the pointer');
   });
 
-  test('while the ready button shows its reason the effects column moves down a line (on phones the ready count ran into it)', () => {
+  test('the effects column sits at the bottom of the right-hand HUD column, so it cannot cover a control there', () => {
+    // 2026-11-08（维护者：「暂停游戏按钮被策略显示图标压住了」）：效果栏以前是 .gm__hud 底下一块
+    // 自己钉 `top: 2.4rem` 的绝对定位，而右上角那一列是竖排 flex —— 这一列每加一颗按钮，下沿就往下长，
+    // top 却不动。加了「暂停游戏」之后第一个图标（策略）正好盖在按钮上。
+    // 现在它排进那一列的最后（game.js 的 effectsSlot → ui/hud.js TopBar 的 .gtop__right），跟着一起让位。
     const game = read('public/js/screens/game.js');
-    // the same condition as ReadyToggle's reason: PREP, alive, not ready, pieces in the row
-    assert.match(game, /const readyWhy = phase === PHASE\.PREP && alive && !priv\?\.ready && \(hasPersonalChoice \|\| temp\.count > 0\);/);
-    assert.match(game, /readyWhy && 'has-readywhy'/);
+    assert.match(game, /effectsSlot=\$\{html`<div class="gm__effects">/, '效果栏作为 slot 传给 TopBar');
+    const hud = read('public/js/ui/hud.js');
+    assert.match(hud, /\$\{effectsSlot\}/, '效果栏排在那一列的最后');
+    // 顺序：准备就绪 → 暂停游戏 → 效果栏（后者永远在最后，不会压住按钮）
+    const ready = hud.indexOf('<${ReadyToggle}');
+    const vote = hud.indexOf('<${PauseVote} pub=');
+    const slot = hud.indexOf('${effectsSlot}');
+    assert.ok(ready > 0 && vote > ready && slot > vote, '准备就绪 → 暂停游戏 → 效果栏');
+    // 不再自己钉 top（那正是被压住的原因）
     const css = read('public/css/screens/game.css');
-    assert.match(css, /\.gm__effects \{ position: absolute; right: \.3rem; top: 2\.4rem; \}/);
-    assert.match(css, /\.gm\.has-readywhy \.gm__effects \{ top: calc\(2\.4rem \+ max\(\.3rem, 16px\)\); \}/);
+    assert.doesNotMatch(css, /\.gm__effects \{ position: absolute; right: \.3rem; top: 2\.4rem; \}/, '旧的固定定位不能再回来');
+    assert.doesNotMatch(css, /\.gm\.has-readywhy \.gm__effects \{ top:/, '「原因行把效果栏推下去」的补丁也不需要了');
+    assert.match(css, /\.gm__effects \{ align-self: flex-end;/, '在自己那一列里右对齐');
   });
 });
 
