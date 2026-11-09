@@ -394,6 +394,8 @@ export class Match {
     this.echoBlessingReplace = false;
     /** 替换模式下已选定、等待弃选的新祝福 id。 */
     this.echoBlessingPendingPick = null;
+    /** 祭坛买的永久祝福正在等弃选（维护者 2026-11-09）：它不算三选一的抽取，关面板时必须照发。 */
+    this.echoAltarPendingPick = null;
     /** 替换模式的弃选候选（现有祝福 id 列表）与投票。 */
     this.echoBlessingDiscardOffer = null;
     this._echoDiscardVotes = new Map();
