@@ -1224,6 +1224,15 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .echo-list--rule li { border-left-color: rgba(183, 156, 255, .55); background: rgba(183, 156, 255, .07); }
 .echo-list--rule li b { color: #d9c8ff; }
 
+/* 手上的反制祝福（2026-11-09）：以前这里是几个没有样式的 span，名字会挤成「畅饮开源肃清…」一整串。
+   现在和「已获祝福」用同一套列表（.echo-list），只换左侧色条 —— 青色代表「还握着、随时能点」。 */
+.echo-counters { display: block; }
+.echo-list--counter li { border-left-color: #5fd3c4; background: rgba(95, 211, 196, .09); }
+.echo-list--counter li b { color: #a9f0e6; }
+.echo-counter__use { flex: none; margin-left: auto; align-self: center; font-size: .9em; padding: .04rem .3rem; border-radius: 3px;
+  border: 1px solid #5fd3c4; background: rgba(95, 211, 196, .14); color: #a9f0e6; cursor: pointer; }
+.echo-counter__use:hover { background: rgba(95, 211, 196, .26); }
+
 /* 「深渊回响」稀有度标签（2026-11-05）：祝福卡 / 已获祝福 / 诅咒列表共用 */
 .echo-rar, .echo-bless__rarity { font-style: normal; flex: none; font-size: .82em; font-weight: 700; letter-spacing: .06em; padding: 0 .18em; border-radius: 2px; border: 1px solid currentColor; opacity: .95; }
 .echo-rar.is-common, .echo-bless__rarity.is-common { color: #9fb4c8; }

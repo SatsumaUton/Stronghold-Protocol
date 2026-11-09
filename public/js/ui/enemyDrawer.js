@@ -230,12 +230,13 @@ function BlessTab({ pub }) {
   return html`<div class="edrawer__body">
     ${echo ? html`<${EchoAltar} pub=${pub} />` : null}
     ${counters.length ? html`<div class="echo-counters">
-      ${counters.map((c) => html`<span key=${c.id} class="echo-counter" title=${c.desc || ''}>
-        <b>${c.name}</b>
+      <h4 class="ihead">${t('手上的反制')} <small class="num">${counters.length}</small></h4>
+      <ul class="echo-list echo-list--counter">${counters.map((c) => html`<li key=${c.id}>
+        <b>${c.name}</b>${Number(c.count) > 1 ? html`<em class="echo-rar is-common">${t('×{n}', { n: c.count })}</em>` : null}<span>${c.desc || ''}</span>
         ${c.canLiftBans && echo?.canLiftBans
           ? html`<button type="button" class="echo-counter__use" onClick=${() => actions.echoCounterUse()}>${t('提前结束排异/封锁')}</button>`
           : null}
-      </span>`)}
+      </li>`)}</ul>
     </div>` : null}
     <h4 class="ihead">${t('已获祝福')} <small class="num">${normalBless.length}/${Number(echo?.blessingMax) || 3}</small>
       <small class="t-dim">${t('深度 {n}', { n: depth })}</small></h4>
