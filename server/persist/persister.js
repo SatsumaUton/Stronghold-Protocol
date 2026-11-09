@@ -71,6 +71,10 @@ export class LobbyPersister {
     this.timer = null;
     this.busy = null;
     this.closed = false;
+    // 「关闭已经开始」：flush 的定时 tick 不再起飞，writeLobby 也不再删记录（见 flush / writeLobby 的说明）
+    this.stopping = false;
+    /** @type {Set<Promise<boolean>>} 正在写的墓碑（关闭时要等它们落完，见 tombstone / close） */
+    this.pendingTombstones = new Set();
     this.counts = { captures: 0, captureSkips: 0, docWrites: 0, docFailures: 0, restoredSessions: 0, restoredRooms: 0,
       restoredMatches: 0, droppedMatches: 0, deleted: 0, tombstones: 0 };
     // every local match the lobby starts offers its safe points here (Lobby.startMatch: opts.onCheckpoint); a cluster
@@ -129,6 +133,12 @@ export class LobbyPersister {
 
   /** One round of writes (never throws): local checkpoints, the lobby document, then stale checkpoints. */
   async flush(reason = 'tick') {
+    // 关闭开始之后，**定时 tick 一律不再跑**（维护者 2026-11-10）。
+    // 为什么：定时器每 10 秒触发一次，若它正好在 `lobby.shutdown()` 之前起飞，等它跑到 `writeLobby()` 时
+    // 房间已经全部被 dispose、`lobby.rooms` 是空的 —— `goneRooms` 就是「全部房间」，它会把 Redis 里的
+    // 存档**整批删掉**。实测（store 延迟 80ms 模拟网络）：`lobby:rooms 1 → 0`。
+    // 重启 30 个节点 = 30 次抽奖，而且是最难复现的那种「房间莫名其妙没了」。
+    if (reason === 'tick' && this.stopping) return false;
     if (this.busy) { if (reason === 'tick') return false; await this.busy; }
     const run = (async () => {
       const pending = [];
@@ -221,8 +231,11 @@ export class LobbyPersister {
       keys.set(s.playerId, key);
       if (!prev || prev.length !== key.length || prev.some((v, i) => v !== key[i])) sessions.push([s.playerId, JSON.stringify(sessionDoc(s))]);
     }
-    const goneRooms = [...this.roomsStored.keys()].filter((code) => !roomCodes.has(code));
-    const goneSessions = [...this.sessionsStored.keys()].filter((id) => !keys.has(id));
+    // 关闭开始后**不删任何记录**（维护者 2026-11-10）：这一刻 `lobby.rooms` 可能已经被 `lobby.shutdown()`
+    // 清空，于是「文档不再提到的房间」就是「全部房间」—— 那是在删活人的存档，不是在清陈旧数据。
+    // 宁可留一条陈旧记录让 `sweepOldRooms` 按 TTL 清掉（它本来就管这个），也不能在关闭窗口里删。
+    const goneRooms = this.stopping ? [] : [...this.roomsStored.keys()].filter((code) => !roomCodes.has(code));
+    const goneSessions = this.stopping ? [] : [...this.sessionsStored.keys()].filter((id) => !keys.has(id));
     // 墓碑在 disposeRoom 的那一刻就写好了（lobby.onRoomDisposing）—— 这里只剩删文档 / 检查点。
     // 之所以不在这里补写：房间这会儿已经被清空并从 lobby.rooms 删掉，写出来是空壳（第一次实现踩到过）。
     // the records first, the head last: a head always comes after the records it describes
@@ -254,6 +267,16 @@ export class LobbyPersister {
   async tombstone(room, reason) {
     const code = room && typeof room.code === 'string' ? room.code : null;
     if (!code) return false;
+    // 记下这笔写入：关闭时 `lobby.shutdown()` 会同步地一口气回收所有房间（fire-and-forget 的墓碑），
+    // `close()` 要等它们落完再关 store，否则最后一批墓碑会被掐断（维护者 2026-11-10）。
+    const pending = this._tombstone(room, reason).catch(() => false);
+    this.pendingTombstones.add(pending);
+    try { return await pending; } finally { this.pendingTombstones.delete(pending); }
+  }
+
+  /** `tombstone` 的本体（外面只负责跟踪在飞的写入）。 */
+  async _tombstone(room, reason) {
+    const code = room.code;
     const why = typeof reason === 'string' ? reason : (typeof room.disposeReason === 'string' ? room.disposeReason : null);
     /** 房间文档：拿不到就写一张只有时间与原因的（至少能看出「这里曾经有间房」） */
     let doc;
@@ -427,12 +450,20 @@ export class LobbyPersister {
     return true;
   }
 
-  /** Stop the timer and write everything one last time; the lobby then closes its rooms without telling anybody. */
+  /**
+   * Stop the timer and write everything one last time; the lobby then closes its rooms without telling anybody.
+   *
+   * ⚠ 调用顺序（维护者 2026-11-10）：**必须先于 `lobby.shutdown()`**。这一刻房间还在 `lobby.rooms` 里，
+   * 最后一轮落盘能把它们完整写下；等房间被 dispose 之后再 flush，`goneRooms` 就是「全部房间」。
+   * `stopping` 在第一时间置位，所以在飞的那轮 tick 也不会删东西。
+   */
   async shutdown() {
     if (this.closed) return false;
+    this.stopping = true;
     clearInterval(this.timer);
     this.timer = null;
     let ok;
+    try { await this.busy; } catch { /* 在飞的那轮无论成败都不影响下面这轮 */ }
     try { ok = await this.flush('shutdown'); } catch { ok = false; }
     this.closed = true;
     if (ok) this.lobby.closingQuietly = true;
@@ -445,8 +476,15 @@ export class LobbyPersister {
   }
 
   async close() {
+    // 关闭从这里开始：定时 tick 不再起飞（`shutdown()` 已经置过位时保持原样）
+    this.stopping = true;
     clearInterval(this.timer);
     this.timer = null;
+    // 先把在飞的墓碑等完（`lobby.shutdown()` 是 fire-and-forget 地一次回收所有房间，
+    // 不等的话 store 一关，最后一批墓碑就被掐断了 —— 那正是「删除前的最后一份副本」）
+    if (this.pendingTombstones.size) {
+      try { await Promise.allSettled([...this.pendingTombstones]); } catch { /* 尽力而为 */ }
+    }
     this.closed = true;
     if (this.lobby.onCheckpoint) this.lobby.onCheckpoint = null;
     this.lobby.checkpointsOn = false;
