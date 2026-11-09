@@ -493,6 +493,9 @@ export class MatchPhases {
     // the dive's erosion words of this round (null on every other round, and on every other room)
     this._echoRollWords(r);
     // 「深渊回响」的祝福三选一：深潜里每 5 个回合开一次（echoBlessing.js；普通房间直接返回 null）
+    // 先自愈一次「持有数超过上限」的存档状态（维护者 2026-11-09）：重连读档 / 诅咒或名额从别处变化之后，
+    // 超出上限的祝福不会自己消失，也不能由服务端替玩家丢 —— 开一次「舍弃一个」面板交还给玩家。
+    if (typeof this._echoHealBlessingCap === 'function') this._echoHealBlessingCap();
     this._echoMaybeOfferBlessing(r);
     // 深潜的悬赏：每 5 个深潜回合一次，目标从**刚生成的波次**里现抽（echoBounty.js）
     this._echoMaybeGrantBounty(r);
