@@ -91,7 +91,16 @@ export function installEchoRules(battle) {
       // 召唤物不吃侵蚀词条（维护者 2026-11-06）；祝福的对敌异常（debuffs）照旧
       const wordList = isEchoSummon(enemy, summonKeys) ? [] : words;
       const seen = new Map();
+      // 「护盾」一条就够（维护者 2026-11-10）：词条是**绝对值**，两条叠起来就是 33.6%、三条 50.4%，
+      // 而玩家在界面上只看到「护盾」两个字 —— 数值翻倍却没有任何提示，实测 45 层起词池抽空后允许重复，
+      // 就成了「小怪盾特别厚、盾破了瞬间就死」。所以这一条**每只敌人只吃一次**，
+      // 其它词条仍按老规矩叠（mods 是乘率，重复时按 key 加序号叠加）。
+      let shieldGiven = false;
       for (const w of wordList) {
+        if (Number(w.shieldPct) > 0) {
+          if (shieldGiven) continue;
+          shieldGiven = true;
+        }
         // 同一条词条出现多次（深层允许重复）→ key 加序号，mods 会叠加（与 Match 层的老实现一致）
         const k = seen.get(w.key) || 0;
         seen.set(w.key, k + 1);

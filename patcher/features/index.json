@@ -6733,7 +6733,7 @@
       {
         "path": "public/js/render/units.js",
         "baseExists": true,
-        "customBytes": 171152
+        "customBytes": 173015
       },
       {
         "path": "public/js/screens/bandDraft.js",
@@ -7063,7 +7063,7 @@
       {
         "path": "server/match/match/echoWords.js",
         "baseExists": false,
-        "customBytes": 22489
+        "customBytes": 23229
       },
       {
         "path": "server/match/match/intents.js",
@@ -7193,7 +7193,7 @@
       {
         "path": "server/sim/battle/echoRules.js",
         "baseExists": false,
-        "customBytes": 17008
+        "customBytes": 17653
       },
       {
         "path": "server/sim/battle/players.js",

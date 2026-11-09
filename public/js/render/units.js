@@ -712,6 +712,10 @@ export class UnitView {
     this.energyHud = null;
     this.neg = 0;                 // the share of its cap a negative-HP pool holds, 0 = none (sync; b.snap `neg`, 斩业星熊's 我执)
     this.shield = 0;              // the HP shield's points left, 0 = none (sync; b.snap `shield`: the strip under the HP bar)
+    // 护盾条要画成「满格 + 剩余」（维护者 2026-11-10）：只画剩余的话，盾一被啃小，剩下的那截又细又短，
+    // 玩家看不出「我到底打掉多少」—— 而盾期内血条是**完全不动**的（护盾全额吸收时那次伤害被整条取消，
+    // 连伤害数字都不弹），于是主观感受就是「打不动」。所以记下这条盾升起时的大小，当它自己的满格。
+    this.shieldMax = 0;           // the shield's size when it was raised — the strip's full width (display only)
     this.motes = null;            // 魔王's orbiting 「微尘」: { n, wide } | null (sync; b.snap `motes`, render/motes.js)
     this.moteRing = null;
     this.layers = 0;              // hit-negating 护盾 layers (sync; b.snap `layers`: the official layer effect, vfx/talentfx.js)
@@ -1111,6 +1115,10 @@ export class UnitView {
     this.hpFill = bar(P, h, this.isEnemy ? (this.isBoss ? COLORS.hpBoss : COLORS.hpEnemy) : COLORS.hpAlly);
     // a negative-HP pool (斩业星熊's 我执), drawn over the drained HP bar as the red bar
     this.negFill = bar(P, h, COLORS.hpNeg);
+    // 护盾条是**两条**（维护者 2026-11-10）：底下的暗条是这条盾升起时的满格，上面的亮条是剩余。
+    // 只画剩余的话，盾被打掉一截后剩下的又细又短，玩家读不出「我打掉了多少」—— 盾期内血条本来就不动
+    // （全额吸收的那次伤害被整条取消，连数字都不弹），于是就成了「打不动」。暗条给出分母，亮条给出分子。
+    this.shieldGhost = bar(P, h, COLORS.shield, 0.3);
     this.shieldBar = bar(P, h, COLORS.shield, 0.95);
     this.spBg = bar(P, h, COLORS.hpBack, 0.85);
     this.spFill = bar(P, h, COLORS.sp);
@@ -1120,7 +1128,7 @@ export class UnitView {
     this.spGlow.blendMode = P.BLEND_MODES.ADD;
     h.addChild(this.spGlow);
     // nothing shows until the first HUD update decides (a culled or prep view never draws bars)
-    for (const b of [this.hpBg, this.hpGhost, this.hpFill, this.negFill, this.shieldBar, this.spBg, this.spFill, this.spGlow]) b.visible = false;
+    for (const b of [this.hpBg, this.hpGhost, this.hpFill, this.negFill, this.shieldGhost, this.shieldBar, this.spBg, this.spFill, this.spGlow]) b.visible = false;
     this.chip = null;
     // operators only: summon tokens have no tier (hand and field alike)
     if (!this.isEnemy && !this.isToken && this.info.kind !== 'device') {
@@ -1234,6 +1242,10 @@ export class UnitView {
     this.sp = s.sp; this.spMax = s.spMax;
     this.ammo = s.ammo || null; this.wolves = s.wolves || null; this.neg = s.neg > 0 ? Math.min(1, s.neg) : 0;
     this.shield = s.shield > 0 ? s.shield : 0;
+    // 这条盾的「满格」：升起 / 变大时记下新的峰值，缩小时保留（见构造器里的说明）。盾归零就清掉，
+    // 这样下一次升起（includes 换形态后重新挂盾）从头算，不会停在旧尺度上。
+    if (!(this.shield > 0)) this.shieldMax = 0;
+    else if (this.shield > this.shieldMax) this.shieldMax = this.shield;
     this.motes = s.motes && s.motes.n > 0 ? s.motes : null;
     this.coins = s.coins || null;
     this.energy = s.energy || null;
@@ -2092,10 +2104,16 @@ export class UnitView {
     // the shield absorbs the hits (维护者 2026-11-07: the player must see how much shield is left). A hit-count barrier
     // (shieldHits: 泥岩's layers) has no amount in the snapshot — it keeps the whole strip as before.
     this.shieldBar.visible = !!(shielded && showHp);
+    this.shieldGhost.visible = this.shieldBar.visible;
     if (this.shieldBar.visible) {
-      const share = this.shield > 0 && this.maxHp > 0 ? clamp(this.shield / this.maxHp, 0, 1) : 0;
+      // 满格 = 这条盾升起时的大小（shieldMax），没有数值时退回整条（hit-count 护盾，见上）
+      const full = this.shieldMax > 0 ? clamp(this.shieldMax / Math.max(1, this.maxHp), 0, 1) : 1;
+      const left = this.shield > 0 && this.shieldMax > 0 ? clamp(this.shield / this.shieldMax, 0, 1) : 1;
+      this.shieldGhost.position.set(x0, cy - bh / 2 - 1);
+      this.shieldGhost.width = Math.max(2, bw * full);
+      this.shieldGhost.height = Math.max(1.5, bh * 0.35);
       this.shieldBar.position.set(x0, cy - bh / 2 - 1);
-      this.shieldBar.width = this.shield > 0 ? Math.min(bw, Math.max(2, bw * share)) : bw;
+      this.shieldBar.width = Math.max(2, bw * full * left);
       this.shieldBar.height = Math.max(1.5, bh * 0.35);
     }
     // SP — or, while an ammo skill runs, its magazine: yellow cells, one per round, emptying from the right (b.snap `ammo`;
