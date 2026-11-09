@@ -271,8 +271,12 @@ export async function startServer(opts = {}) {
   async function close() {
     if (closing) return closing;
     closing = (async () => {
+      // 顺序很关键（维护者 2026-11-10）：**先**让持久化做最后一轮落盘（这时房间还在 `lobby.rooms` 里，
+      // 能完整写下），**再**关掉大厅的房间。反过来做的话，落盘看到的 `goneRooms` 就是「全部房间」，
+      // 会把 Redis 里的存档整批删掉 —— 实测 `lobby:rooms 1 → 0`（见 test/persist/shutdown-keeps-rooms.test.js）。
+      try { await persistence?.shutdown(); } catch (e) { log.error('[shutdown] persist', e); }
       try { lobby.shutdown('shutdown'); } catch (e) { log.error('[shutdown] lobby', e); }
-  try { await persistence?.close(); } catch (e) { log.error('[shutdown] persist', e); }
+      try { await persistence?.close(); } catch (e) { log.error('[shutdown] persist close', e); }
       try { hosts.close(); } catch (e) { log.error('[shutdown] match hosts', e); }
       try { versionHosts?.close(); } catch (e) { log.error('[shutdown] version hosts', e); }
       // after the lobby: every room is gone, so no rehearsal can still be waiting on a thread
