@@ -6663,7 +6663,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": true,
-        "customBytes": 103041
+        "customBytes": 103797
       },
       {
         "path": "public/css/screens/game-shop.css",
@@ -6698,22 +6698,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 252845
+        "customBytes": 252906
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 292040
+        "customBytes": 292112
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 280820
+        "customBytes": 280888
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 240313
+        "customBytes": 240373
       },
       {
         "path": "public/js/assets.js",
@@ -6858,7 +6858,7 @@
       {
         "path": "public/js/ui/enemyDrawer.js",
         "baseExists": true,
-        "customBytes": 18998
+        "customBytes": 19227
       },
       {
         "path": "public/js/ui/enemyRecords.js",
@@ -7048,7 +7048,7 @@
       {
         "path": "server/match/match/echoPhase.js",
         "baseExists": false,
-        "customBytes": 237090
+        "customBytes": 238227
       },
       {
         "path": "server/match/match/echoProjection.js",
