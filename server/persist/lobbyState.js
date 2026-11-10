@@ -189,10 +189,14 @@ export function snapshotLobby({ registry, lobby, matchRef, now = Date.now(), kin
 }
 
 /**
- * 房间文档描述的是不是「一个人在打的一局」（`Lobby.soloLikeRun` 的存档侧同一条判据）：
- * 单人房，或者**只有一个真人**的同盟房（AI 座位不算人）。
+ * 房间文档描述的是不是「**深渊回响的单人深潜**」（`Lobby.soloLikeRun` 的存档侧同一条判据）：
+ * 单人模式，或者 `variant:'deepecho'` 且**只有一个真人**的房间（AI 座位不算人）。
  *
- * 为什么恢复时要认它：单人房 / 单人深潜的会话拿的是 24 小时窗口（维护者 2026-11-07 / 11-08），
+ * **普通同盟模拟不在此列**（维护者 2026-11-10：「24 小时的保存功能只对深渊回响有效」）：
+ * 2026-11-08 曾把它放宽成「1 个真人就算」，于是重启后普通同盟房也按 24 小时恢复窗口，
+ * 与线上退回的 15 分钟规则不一致。
+ *
+ * 为什么恢复时要认它：单人房 / 单人深潜的会话拿的是 24 小时窗口（维护者 2026-11-07），
  * 而 `restoreLobby` 以前把**所有**会话的窗口一律砍到 30 分钟（见下面「30 分钟封顶」那段）。
  * 于是玩家关掉页面两小时后重启，他的会话当场被判过期 → 房间没人持有窗口 → 15 分钟后被当僵尸房
  * 回收（2026-11-09 实测 14 台节点全灭，日志 `restored 0 session(s) (1 expired)` 紧接
@@ -205,6 +209,8 @@ export function soloLikeRoomDoc(r) {
   // 没开局的房间不在此列：那时没人拿过 24 小时窗口
   if (!r.match && r.matchLive !== true) return false;
   if (r.mode === 'solo') return true;
+  // 只有深潜房才享受 24 小时（普通同盟房无论几个真人都走 15 分钟）
+  if (String(r.variant) !== 'deepecho') return false;
   const humans = (Array.isArray(r.seats) ? r.seats : []).filter((s) => plain(s) && !s.isBot && !s.left);
   return humans.length <= 1;
 }

@@ -4017,23 +4017,26 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
   }
 
   /**
-   * 这局是不是「一个人在打」—— **房间里只有一个真人**，就按单人房处理（维护者 2026-11-08 定的判据）：
-   *   · 大厅单人房（`mode:'solo'`）；
-   *   · 1 真人 + 3 个 AI 队友（`room.addBot`，AI 座位不算人）；
-   *   · 1 真人不带 AI；
-   *   · 「深渊回响」单人房（深潜是 `mode:'coop'` + `variant:'deepecho'`）。
+   * 这局是不是「深渊回响的单人深潜」—— **只有深潜房**才享受 24 小时保存（维护者 2026-11-10 重申）：
+   *   · 必须是深潜房（`variant === 'deepecho'`）；
+   *   · 房间里只有一个真人（AI 座位不算人）；
+   *   · 大厅单人房（`mode:'solo'`）照旧算，但那是原版的单人模式，与「保存 24 小时」无关
+   *     —— 它走 `solo` 分支自己的窗口逻辑。
+   *
+   * **普通同盟模拟不在此列**（维护者 2026-11-10：「24 小时的保存功能只对深渊回响有效」）。
+   * 历史上 2026-11-08 曾把判据放宽成「1 个真人就算单人房」（含同盟房），导致一个人开同盟模拟
+   * 退出时也会弹「想留着这局？直接关掉页面就行」—— 那不是玩家要的语义，已收回。
    *
    * 用途：掉线后的重连窗口（`soloResumeWindowMs` = 官方 `singleReconnectTime` 24 小时）与
-   * `refreshMatchWindows` 的「不缩短」判定。单人房没有「等队友回来」的问题，所以只要人走了就一直
-   * 保留到他回来为止（`sweepOldRooms` 见到还有 session 在走窗口就不碰房间）。
-   *
-   * 历史：2026-11-07 只有 `mode==='solo'` 或深潜房算，于是「1 真人 + 3 AI」的同盟房掉线后走 15 分钟
-   * 普通窗口，一到点座位被释放、对局以 abandoned 结束 —— 「24 小时保存」对它们不生效。
+   * `refreshMatchWindows` 的「不缩短」判定。深潜单人房没有「等队友回来」的问题，所以只要人走了
+   * 就一直保留到他回来为止（`sweepOldRooms` 见到还有 session 在走窗口就不碰房间）。
    * @param {Room | null} [room]
    */
   soloLikeRun(room = null) {
     if (!room || !room.match) return false;
     if (room.mode === 'solo') return true;
+    // 深渊回响的单人房：深潜是 `mode:'coop'` + `variant:'deepecho'`
+    if (room.variant !== 'deepecho') return false;
     // AI 座位不算人（activeHumans 已经过滤掉 isBot / left）
     return room.activeHumans().length <= 1;
   }

@@ -67,11 +67,13 @@ function freshLobby(now) {
   return { registry, lobby };
 }
 
-test('soloLikeRoomDoc：单人 / 单人深潜 / 1 真人 + AI 都算，两真人或多则不算', () => {
+test('soloLikeRoomDoc：只有单人模式与单人深潜算，普通同盟房（哪怕只有 1 个真人）不算', () => {
   assert.equal(soloLikeRoomDoc(archive({ mode: 'solo' }).rooms[0]), true, '单人房');
   assert.equal(soloLikeRoomDoc(archive({ variant: 'deepecho', humans: 1 }).rooms[0]), true, '单人深潜（1 真人 + 3 AI）');
-  assert.equal(soloLikeRoomDoc(archive({ variant: null, humans: 1 }).rooms[0]), true, '1 真人 + 3 AI 的同盟房');
+  // 维护者 2026-11-10：「24 小时的保存功能只对深渊回响有效」—— 普通同盟房一个人开也不算
+  assert.equal(soloLikeRoomDoc(archive({ variant: null, humans: 1 }).rooms[0]), false, '1 真人 + 3 AI 的普通同盟房不算');
   assert.equal(soloLikeRoomDoc(archive({ variant: null, humans: 2 }).rooms[0]), false, '两个真人不是单人房');
+  assert.equal(soloLikeRoomDoc(archive({ variant: 'deepecho', humans: 2 }).rooms[0]), false, '深潜房两个真人也不算单人房');
   assert.equal(soloLikeRoomDoc(archive({ matchLive: false }).rooms[0]), false, '没开局的房间没拿过 24 小时窗口');
   assert.equal(soloLikeRoomDoc(null), false);
 });

@@ -213,12 +213,14 @@ export function ExitModal({ open, onClose, solo, onAway }) {
   const quitLine = echo && !echoGiveUp
     ? tParts(w.quitElsewhere, { quit: html`<b class="t-red">${t(w.quit)}</b>` })
     : solo ? t(w.soloQuit) : tParts(w.quitLine, { quit: html`<b class="t-red">${t(w.quit)}</b>` });
-  // 单人房（房间里只有一个真人：单人模式 / 1 真人 + 3 AI / 单人深潜）关掉页面就等于存档 ——
-  // 服务端把重连窗口拉到 24 小时（lobby.soloLikeRun / soloResumeWindowMs）。维护者 2026-11-08：
-  // 「在保存的位置告诉玩家怎么继续打开自己的 24 小时的房间」，否则玩家以为「离开 = 丢局」。
+  // 24 小时保存**只对深渊回响的单人深潜有效**（维护者 2026-11-10：「24 小时的保存功能只对深渊回响有效」）。
+  // 以前这里是 `solo || loneHuman`，`loneHuman` 只要「1 个真人」就成立 —— 于是一个人开**普通同盟模拟**
+  // 退出时也会弹「想留着这局？直接关掉页面就行」，可服务端并不会给他 24 小时窗口，等于骗玩家。
+  // 现在与服务端 `Lobby.soloLikeRun` 同口径：大厅单人模式（solo）/ 深潜房里只有 1 个真人。
   const loneHuman = (() => {
+    if (!echo) return false;                       // 不是深潜 → 没有 24 小时保存
     const ps = pub && Array.isArray(pub.players) ? pub.players.filter(Boolean) : null;
-    if (!ps) return !!solo;
+    if (!ps) return true;                          // 拿不到名单时按「单人深潜」保守处理
     return ps.filter((p) => !p.isBot).length <= 1;
   })();
   return html`<${Modal} open=${open} onClose=${onClose} tone="red" title=${t(w.title)} micro=${w.micro} width="6.8rem"

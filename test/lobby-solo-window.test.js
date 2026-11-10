@@ -51,38 +51,46 @@ function addSecondHuman(room) {
   room.seats[1] = { ...room.seats[0], seat: 1, playerId: 'p_two', name: 'T', isBot: false, left: false, connected: true };
 }
 
-test('判据：只有一个真人就是单人房 —— 1 真人 + 3 AI、不带 AI、单人房、单人深潜都算', () => {
+test('判据：只有单人模式与单人深潜算 24 小时；普通同盟房（哪怕 1 个真人）不算', () => {
   const cases = [
-    ['1 真人不带 AI', { bots: 0 }],
-    ['1 真人 + 3 AI', { bots: 3 }],
-    ['大厅单人房', { mode: 'solo' }],
-    ['深渊回响 1 真人 + 3 AI', { variant: 'deepecho', bots: 3 }],
+    ['大厅单人房', { mode: 'solo' }, true],
+    ['深渊回响 1 真人不带 AI', { variant: 'deepecho', bots: 0 }, true],
+    ['深渊回响 1 真人 + 3 AI', { variant: 'deepecho', bots: 3 }, true],
+    // 维护者 2026-11-10：「24 小时的保存功能只对深渊回响有效」
+    ['普通同盟 1 真人不带 AI', { bots: 0 }, false],
+    ['普通同盟 1 真人 + 3 AI', { bots: 3 }, false],
   ];
-  for (const [label, opts] of cases) {
+  for (const [label, opts, want] of cases) {
     const h = harness(opts);
     assert.equal(h.room.activeHumans().length, 1, `${label}：只有一个真人座位`);
-    assert.equal(h.lobby.soloLikeRun(h.room), true, `${label} 要算单人房`);
+    assert.equal(h.lobby.soloLikeRun(h.room), want, `${label} → ${want ? '算' : '不算'}单人房`);
   }
 });
 
-test('判据看**当前**还有几个真人：另一个真人永久离开后就按单人房算', () => {
-  const h = harness({ bots: 0 });
+test('判据看**当前**还有几个真人：深潜房里另一个真人永久离开后才算单人房', () => {
+  const h = harness({ variant: 'deepecho', bots: 0 });
   addSecondHuman(h.room);
   assert.equal(h.lobby.soloLikeRun(h.room), false, '2 真人');
   h.room.seats[1].left = true; // 另一个真人永久离开
-  assert.equal(h.lobby.soloLikeRun(h.room), true, '只剩一个真人 → 单人房（他一个人不该丢局）');
+  assert.equal(h.lobby.soloLikeRun(h.room), true, '深潜房只剩一个真人 → 单人房');
 });
 
-test('掉线：1 真人 + 3 AI 的同盟房拿 24 小时窗口；两个真人都离线时只拿普通窗口', () => {
-  const solo = harness({ bots: 3 });
+test('掉线：单人深潜拿 24 小时窗口；普通同盟房（1 真人）只拿普通窗口', () => {
+  const solo = harness({ variant: 'deepecho', bots: 3 });
   solo.host.connected = false;
   solo.lobby.onDisconnect(solo.host);
   assert.equal(solo.host.resumeWindowMs, solo.lobby.soloResumeWindowMs(solo.room), '窗口 = 单人那一档');
   assert.ok(solo.host.resumeWindowMs >= 24 * 3600_000 - 60_000, '至少 24 小时');
   assert.ok(solo.room.seatOf(solo.host.playerId), '座位还在');
 
-  // 两个真人都离线：谁也不是「一个人在打」，走 registry 的普通窗口（15 分钟）
-  const duo = harness({ bots: 0 });
+  // 普通同盟房一个人掉线：没有 24 小时（维护者 2026-11-10）
+  const coop = harness({ bots: 3 });
+  coop.host.connected = false;
+  coop.lobby.onDisconnect(coop.host);
+  assert.equal(coop.host.resumeWindowMs, null, '普通同盟房走 registry 默认窗口（15 分钟）');
+
+  // 深潜房两个真人都离线：谁也不是「一个人在打」，走普通窗口
+  const duo = harness({ variant: 'deepecho', bots: 0 });
   addSecondHuman(duo.room);
   duo.room.seats[1].connected = false;
   duo.host.connected = false;
