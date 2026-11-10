@@ -34,7 +34,9 @@ const MARK = /deepecho|echoVariant|EchoAltar|echoBlessing|echoCurse|echoPhase|ec
 
 /** 扫描范围：运行时会跑到的目录（不含 test/tools/docs，也不含第三方与素材）。 */
 const ROOTS = ['server', 'public', 'shared', 'matchmaker', 'dashboard', 'data', 'content', 'mm'];
-const SKIP_DIR = /(^|\/)(node_modules|logs|state|\.cache|bundles|\.git|assets|fonts|vendor)\//;
+// `recordings`：tools/record-battle.mjs、tools/record-dive.mjs 生成的**录像产物**（不是运行时代码，
+// 上游升级不会覆盖、也不需要被补丁「救回来」；深潜那几份还被 .gitignore 排除，本来就不入库）。
+const SKIP_DIR = /(^|\/)(node_modules|logs|state|\.cache|bundles|\.git|assets|fonts|vendor|recordings)\//;
 const EXT = /\.(js|mjs|cjs|json|css|html)$/;
 
 /**
