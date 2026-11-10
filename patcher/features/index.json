@@ -6898,7 +6898,7 @@
       {
         "path": "public/js/ui/matchChrome.js",
         "baseExists": true,
-        "customBytes": 16547
+        "customBytes": 16885
       },
       {
         "path": "public/js/ui/matchEnemies.js",
@@ -6953,7 +6953,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 286531
+        "customBytes": 286847
       },
       {
         "path": "server/match/Match.js",
@@ -7168,7 +7168,7 @@
       {
         "path": "server/persist/lobbyState.js",
         "baseExists": true,
-        "customBytes": 25415
+        "customBytes": 25885
       },
       {
         "path": "server/persist/persister.js",
