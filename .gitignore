@@ -142,4 +142,10 @@ test/persist/echo-resume.test.js
 test/content/whitw2-stack.test.js
 test/patcher/deepecho-isolation.test.js
 test/**/*echo*.test.js
+
+# 深渊回响的**宣传片素材**（2026-11-10）：tools/record-dive.mjs 生成的深潜录像与它自己的索引。
+# 它们是深潜的独占内容，不进公开仓库（公开的 index.json 仍只列原版录像）；
+# 本机 / 线上生成后由 /dev/render-demo.html 通过 extra.json 读进来。
+public/dev/recordings/dive-d*.json
+public/dev/recordings/extra.json
 tmp/
