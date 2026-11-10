@@ -148,4 +148,14 @@ test/**/*echo*.test.js
 # 本机 / 线上生成后由 /dev/render-demo.html 通过 extra.json 读进来。
 public/dev/recordings/dive-d*.json
 public/dev/recordings/extra.json
+
+# ---- 宣传片工具与页面：**维护者的本机工作台，不进仓库**（维护者 2026-11-10）----
+# 这些只是拍片用的临时工具，不属于游戏运行时，也不该被上游补丁管理。
+# 磁盘上保留（部署脚本会把它们分发到节点，好让维护者在浏览器里用），但永不提交。
+public/dev/promo.html
+public/dev/promo.js
+tools/record-dive.mjs
+tools/capture-video.mjs
+docs/DEEPECHO-PROMO.md
+docs/DEEPECHO-PROMO-HOWTO.md
 tmp/
