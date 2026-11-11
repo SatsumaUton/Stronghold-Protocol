@@ -46,10 +46,6 @@ async function main() {
   await data.loadAll('chess', 'tokens', 'items', 'enemies', 'stages', 'bonds', 'config');
   await assets.ready();
   const index = await fetch('/dev/recordings/index.json').then((r) => (r.ok ? r.json() : []), () => []);
-  // A second, optional list: `extra.json` next to index.json (same shape). Kept separate because the committed
-  // index.json is a tracked file while these lists are generated locally (they are gitignored and may not exist).
-  const extra = await fetch('/dev/recordings/extra.json').then((r) => (r.ok ? r.json() : []), () => []);
-  if (Array.isArray(extra)) index.push(...extra);
   const view = await createFieldView($('field'), {
     data, assets, settings: { quality: q.get('quality') || 'high', damageNumbers: true, ...(q.has('fx') ? { officialFx: q.get('fx') } : {}) },
     ...(q.has('aa') ? { antialias: q.get('aa') !== '0' } : {}),

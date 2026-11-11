@@ -34,12 +34,7 @@ const MARK = /deepecho|echoVariant|EchoAltar|echoBlessing|echoCurse|echoPhase|ec
 
 /** 扫描范围：运行时会跑到的目录（不含 test/tools/docs，也不含第三方与素材）。 */
 const ROOTS = ['server', 'public', 'shared', 'matchmaker', 'dashboard', 'data', 'content', 'mm'];
-// `recordings`：tools/record-battle.mjs、tools/record-dive.mjs 生成的**录像产物**（不是运行时代码，
-// 上游升级不会覆盖、也不需要被补丁「救回来」；深潜那几份还被 .gitignore 排除，本来就不入库）。
-// `public/dev/promo.*`：宣传片工作台，同样是本机工具（.gitignore 已排除），不属于游戏运行时。
-const SKIP_DIR = /(^|\/)(node_modules|logs|state|\.cache|bundles|\.git|assets|fonts|vendor|recordings)\//;
-/** 被扫描、但**不属于运行时代码**的具体文件（维护者 2026-11-10：宣传片工具不进补丁）。 */
-const SKIP_FILES = new Set(['public/dev/promo.html', 'public/dev/promo.js']);
+const SKIP_DIR = /(^|\/)(node_modules|logs|state|\.cache|bundles|\.git|assets|fonts|vendor)\//;
 const EXT = /\.(js|mjs|cjs|json|css|html)$/;
 
 /**
@@ -90,7 +85,6 @@ function echoFiles() {
       if (SKIP_DIR.test(`${p}/`)) continue;
       if (e.isDirectory()) { walk(p); continue; }
       if (!EXT.test(p)) continue;
-      if (SKIP_FILES.has(p)) continue;   // 本机工具（宣传片工作台），不是运行时代码
       let txt;
       try { txt = fs.readFileSync(path.join(ROOT, p), 'utf8'); } catch { continue; }
       if (MARK.test(txt)) out.push(p);
