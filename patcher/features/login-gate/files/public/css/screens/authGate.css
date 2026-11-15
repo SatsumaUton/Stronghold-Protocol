@@ -1,0 +1,909 @@
+/* ============================================================================
+   卫戍协议：盟约 —— 独立登录 / 注册界面样式
+   ----------------------------------------------------------------------------
+   视觉语言全部取自上游 PR #878 的 ui/allianceScene.js 的 CSS 常量：
+     面板/切口底色   #13181d  #12181d  #1b252c  #212226
+     暗色反白块      #0e1a1e  #252e31
+     琥珀（官方强调）#9a7638  #d9a548  #f0c674
+     青（我方强调）  #47c9a9  #42c7a9  #7ff0cf
+     正文            #dfe9ea  #c9dbe0  #9fb4b8
+     警示            #ffb4a8
+
+   命名：一律 sp-lg- 前缀（与 spa- 一样不占元素 id，免得和别的层撞）。
+
+   ⚠ 这个文件是**设计稿**，尚未接入。接入时把 @font-face 的地址按实际部署改：
+      游戏侧（/fonts/fonts.css 已经在 public/index.html 里引了）→ 直接继承，无需 @font-face
+      matchmaker 侧（/mm/ 前缀）→ 字体在 nginx 的 /fonts/ 下，用绝对地址 /fonts/xxx.woff2
+   ========================================================================== */
+
+.sp-lg-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #000;
+  color: #dfe9ea;
+  font-family: Bender, 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sp-lg-screen *,
+.sp-lg-screen *::before,
+.sp-lg-screen *::after { box-sizing: border-box; }
+
+/* ---------------------------------------------------------------- 背景层 */
+
+/* 山景 / 夜图。接入时由 ui/allianceScene.js 的 AllianceBackdrop 承担（含昼夜循环）；
+   单张静态图也能用（预览页就是），缺图时下面的渐变兜底。 */
+.sp-lg-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, #0d2027 0%, #050b0e 70%, #000 100%);
+}
+.sp-lg-bg__art {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 130%;
+  min-height: 100%;
+  transform: translate(-50%, -50%);
+  object-fit: cover;
+  /* PR #878 的夜景调色（.spaNightTone 的等效近似）：把原图压暗并偏青，
+     让琥珀/青两种强调色从背景里跳出来，同时不至于把面板压成一片黑。 */
+  opacity: .82;
+  filter: brightness(.72) saturate(.85) sepia(.16) hue-rotate(158deg);
+  user-select: none;
+  pointer-events: none;
+}
+/* 上下压暗：顶部给状态行留呼吸，底部给版本行留呼吸。
+   注意别压太狠 —— 中间段要留给山景，否则整屏变纯黑。 */
+.sp-lg-bg__shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(0, 0, 0, .66) 0, rgba(0, 0, 0, .26) 16%, transparent 38%,
+                    transparent 66%, rgba(0, 0, 0, .55) 88%, rgba(0, 0, 0, .86) 100%);
+}
+/* 扫描线（只在大屏开，手机上关掉省 GPU） */
+.sp-lg-bg__scan {
+  position: absolute;
+  inset: 0;
+  opacity: .10;
+  mix-blend-mode: screen;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(190, 220, 228, .55) 0 1px,
+    transparent 1px 3px);
+  pointer-events: none;
+}
+/* 暗角 */
+.sp-lg-bg__vig {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, transparent 48%, rgba(0, 0, 0, .78) 100%);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ 四角标记 */
+
+.sp-lg-corner {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(150, 158, 162, .5);
+  pointer-events: none;
+}
+.sp-lg-corner--tl { left: 22px; top: 22px; border-right: none; border-bottom: none; }
+.sp-lg-corner--tr { right: 22px; top: 22px; border-left: none; border-bottom: none; }
+.sp-lg-corner--bl { left: 22px; bottom: 22px; border-right: none; border-top: none; }
+.sp-lg-corner--br { right: 22px; bottom: 22px; border-left: none; border-top: none; }
+
+/* -------------------------------------------------------------- 状态行 */
+
+.sp-lg-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 30px 62px 0;
+  flex: none;
+}
+.sp-lg-micro {
+  font-size: 10px;
+  letter-spacing: .26em;
+  color: #6f8188;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sp-lg-micro b { color: #9fb4b8; font-weight: 400; }
+.sp-lg-micro em { color: #47c9a9; font-style: normal; }
+
+/* 状态胶囊：小方块 + 文案，方块颜色即连接状态 */
+.sp-lg-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 9px;
+  border: 1px solid rgba(150, 158, 162, .28);
+  background: rgba(19, 24, 29, .82);
+  font-size: 11px;
+  letter-spacing: .08em;
+  color: #9fb4b8;
+}
+.sp-lg-status__dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  background: #6f8188;
+}
+.sp-lg-status--ok .sp-lg-status__dot { background: #47c9a9; box-shadow: 0 0 7px rgba(71, 201, 169, .8); }
+.sp-lg-status--ok { color: #7ff0cf; border-color: rgba(71, 201, 169, .4); }
+.sp-lg-status--warn .sp-lg-status__dot { background: #f0c674; box-shadow: 0 0 7px rgba(240, 198, 116, .7); }
+.sp-lg-status--warn { color: #f0c674; border-color: rgba(240, 198, 116, .4); }
+.sp-lg-status--bad .sp-lg-status__dot { background: #ff8f7d; }
+.sp-lg-status--bad { color: #ffb4a8; border-color: rgba(255, 143, 125, .4); }
+
+/* 语言开关 */
+.sp-lg-lang {
+  display: inline-flex;
+  border: 1px solid rgba(150, 158, 162, .28);
+  background: rgba(19, 24, 29, .82);
+  overflow: hidden;
+}
+.sp-lg-lang button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #9fb4b8;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: .1em;
+  padding: 4px 11px;
+  cursor: pointer;
+  transition: background .16s, color .16s;
+}
+.sp-lg-lang button + button { border-left: 1px solid rgba(150, 158, 162, .2); }
+.sp-lg-lang button:hover { color: #dfe9ea; }
+.sp-lg-lang button.is-on { background: #252e31; color: #7ff0cf; }
+
+/* ---------------------------------------------------------------- 主区 */
+
+.sp-lg-main {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 24px;
+  min-height: 0;
+}
+
+/* min-width:0 是必须的：作为 flex 子项，默认 min-width:auto 会被内容撑破，
+   窄屏（390px 竖屏）卡片右侧会被切掉。 */
+.sp-lg-card {
+  width: 100%;
+  min-width: 0;
+  max-width: 464px;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* 卡片标题区：左黑块「01」+ 琥珀线 + 中文标题 + 拉丁副标题 */
+.sp-lg-head {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 2px;
+}
+.sp-lg-head__no {
+  flex: none;
+  width: 58px;
+  display: grid;
+  place-items: center;
+  background: #13181d;
+  color: #2e383d;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: .02em;
+}
+.sp-lg-head__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 9px 14px 9px 14px;
+  border-left: 2px solid #9a7638;
+  background: linear-gradient(90deg, rgba(19, 24, 29, .96), rgba(19, 24, 29, .72) 62%, rgba(19, 24, 29, .34));
+}
+.sp-lg-head__cn {
+  font: 700 19px/1.15 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  letter-spacing: .16em;
+  color: #f2f2ec;
+}
+.sp-lg-head__cn em { font-style: normal; color: #42c7a9; }
+.sp-lg-head__en {
+  font-size: 9.5px;
+  letter-spacing: .3em;
+  color: #6f8188;
+  text-transform: uppercase;
+}
+
+/* 面板本体：规整矩形。
+   ⚠ 原来这里有 10px 宽的左侧凹口（clip-path 的 0 68%,10px 68%,10px 32%,0 32%），
+   照搬 allianceScene 的 .spa-rslab。但那是 99px 高的横条，凹口是形状的一部分；
+   这里是竖着的表单面板，凹口正好压在输入框那一侧，看起来就是「左边缺了一块」
+   （维护者截图圈了两次）。去掉，只保留右侧那条青色短边作装饰。 */
+.sp-lg-panel {
+  position: relative;
+  padding: 16px 18px 18px;
+  background: linear-gradient(180deg, rgba(18, 24, 29, .97), rgba(14, 20, 24, .97));
+  border: 1px solid rgba(150, 158, 162, .16);
+  border-top-color: rgba(150, 158, 162, .3);
+}
+/* 琥珀角标 */
+.sp-lg-panel::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 34px;
+  height: 2px;
+  background: #9a7638;
+}
+.sp-lg-panel::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 2px;
+  height: 22px;
+  background: rgba(71, 201, 169, .7);
+}
+
+/* ------------------------------------------------------------ 标签页 */
+
+.sp-lg-tabs {
+  display: flex;
+  margin-bottom: 14px;
+  border: 1px solid rgba(150, 158, 162, .2);
+  background: #0b1416;
+}
+.sp-lg-tab {
+  appearance: none;
+  flex: 1 1 0;
+  border: 0;
+  background: transparent;
+  color: #9fb4b8;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: .2em;
+  padding: 10px 0;
+  cursor: pointer;
+  transition: background .18s, color .18s;
+}
+.sp-lg-tab + .sp-lg-tab { border-left: 1px solid rgba(150, 158, 162, .2); }
+.sp-lg-tab:hover { color: #dfe9ea; background: rgba(37, 46, 49, .6); }
+.sp-lg-tab.is-on {
+  background: #9ff0d8;
+  color: #07100f;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------ 输入项 */
+
+.sp-lg-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.sp-lg-field {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #27393b;
+  background: #0a1114;
+  transition: border-color .16s, box-shadow .16s;
+}
+.sp-lg-field:focus-within {
+  border-color: rgba(71, 201, 169, .62);
+  box-shadow: 0 0 0 1px rgba(71, 201, 169, .16), 0 0 14px rgba(71, 201, 169, .1) inset;
+}
+/* 左侧拉丁标签：CALLSIGN / PASSWORD 这类 */
+.sp-lg-field__tag {
+  flex: none;
+  width: 84px;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  letter-spacing: .18em;
+  color: #5d7178;
+  text-transform: uppercase;
+  background: rgba(19, 24, 29, .9);
+  border-right: 1px solid rgba(39, 57, 59, .9);
+  user-select: none;
+  padding: 0 4px;
+  text-align: center;
+  line-height: 1.25;
+}
+.sp-lg-field:focus-within .sp-lg-field__tag { color: #7ff0cf; }
+
+/* 输入框下方的一行约束说明（邮箱格式这类「必须知道才能填对」的规则）。
+   用琥珀而不是灰色：它是规则，不是装饰。 */
+.sp-lg-hint {
+  margin: -3px 0 1px;
+  padding-left: 2px;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: .02em;
+  color: #8a7a52;
+}
+.sp-lg-hint b { color: #d9a548; font-weight: 400; }
+
+.sp-lg-field__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #dfe9ea;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: .04em;
+  padding: 12px 12px;
+  outline: none;
+}
+.sp-lg-field__input::placeholder { color: #4f6168; letter-spacing: .02em; }
+.sp-lg-field__input:-webkit-autofill {
+  -webkit-text-fill-color: #dfe9ea;
+  -webkit-box-shadow: 0 0 0 1000px #0a1114 inset;
+}
+
+/* 右侧附属按钮（发送验证码 / 换一张） */
+.sp-lg-field__act {
+  flex: none;
+  appearance: none;
+  border: 0;
+  border-left: 1px solid rgba(39, 57, 59, .9);
+  background: transparent;
+  color: #7ff0cf;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: .06em;
+  padding: 0 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .16s, color .16s;
+}
+.sp-lg-field__act:hover:not(:disabled) { background: rgba(37, 46, 49, .85); }
+.sp-lg-field__act:disabled { color: #5d7178; cursor: default; }
+
+/* 验证码行：图 + 输入 + 换一张 */
+.sp-lg-captcha {
+  display: flex;
+  align-items: stretch;
+  gap: 9px;
+}
+.sp-lg-captcha .sp-lg-field { flex: 1 1 auto; min-width: 0; }
+/* ⚠ 图的自绘尺寸必须靠 flex-basis 撑住，只写 width/height 会被 flex 压缩：
+   它原来是 118×44，实际渲染成 88×34，左边还比上面 PASS 标签内缩 22px
+   （截图反馈「这个位置是不是缺了一块」就是这条）。
+   flex:0 0 118px + box-sizing:border-box 让宽度成为下限，align-self:stretch
+   让高度跟随同一行的输入框，两者对齐。 */
+.sp-lg-captcha__pic {
+  flex: 0 0 118px;
+  width: 118px;
+  min-width: 118px;
+  align-self: stretch;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #0b1416;
+  border: 1px solid #27393b;
+  cursor: pointer;
+}
+.sp-lg-captcha__pic svg { width: 100%; height: 100%; display: block; }
+.sp-lg-captcha__pic:hover { border-color: rgba(71, 201, 169, .5); }
+
+/* ------------------------------------------------------------ 主按钮 */
+
+.sp-lg-submit {
+  appearance: none;
+  width: 100%;
+  margin-top: 3px;
+  border: 1px solid #9ff0d8;
+  background: #9ff0d8;
+  color: #07100f;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .3em;
+  padding: 12px 0 12px .3em;
+  cursor: pointer;
+  transition: background .16s, color .16s, box-shadow .16s;
+}
+.sp-lg-submit:hover:not(:disabled) {
+  background: #c4f8e8;
+  box-shadow: 0 0 18px rgba(159, 240, 216, .3);
+}
+.sp-lg-submit:active:not(:disabled) { background: #7fdcc2; }
+.sp-lg-submit:disabled {
+  background: transparent;
+  border-color: rgba(150, 158, 162, .26);
+  color: #5d7178;
+  cursor: default;
+  box-shadow: none;
+}
+/* 提交中：左侧一条流光 */
+.sp-lg-submit.is-busy {
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+  border-color: rgba(71, 201, 169, .45);
+  color: #7ff0cf;
+}
+.sp-lg-submit.is-busy::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(71, 201, 169, .28), transparent);
+  animation: sp-lg-sweep 1.1s linear infinite;
+}
+
+/* ------------------------------------------------------------ 提示行 */
+
+.sp-lg-msg {
+  min-height: 17px;
+  margin-top: 9px;
+  font-size: 12px;
+  letter-spacing: .03em;
+  color: #9fb4b8;
+  word-break: break-word;
+}
+.sp-lg-msg.is-err { color: #ffb4a8; }
+.sp-lg-msg.is-ok { color: #7ff0cf; }
+
+/* ------------------------------------------------------ 游客 / 通行分隔 */
+
+.sp-lg-alt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 13px 0 11px;
+  color: #4f6168;
+  font-size: 9px;
+  letter-spacing: .28em;
+  text-transform: uppercase;
+}
+.sp-lg-alt::before,
+.sp-lg-alt::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: rgba(150, 158, 162, .18);
+}
+
+.sp-lg-guest {
+  appearance: none;
+  display: block;
+  width: 100%;
+  border: 1px solid rgba(150, 158, 162, .26);
+  background: transparent;
+  color: #c9dbe0;
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: .1em;
+  padding: 10px 0;
+  cursor: pointer;
+  transition: background .16s, border-color .16s, color .16s;
+}
+.sp-lg-guest:hover {
+  background: rgba(37, 46, 49, .85);
+  border-color: rgba(71, 201, 169, .45);
+  color: #7ff0cf;
+}
+.sp-lg-guest span { color: #6f8188; font-size: 11px; letter-spacing: .02em; }
+
+/* -------------------------------------------------------------- 底栏 */
+
+.sp-lg-foot {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 62px 26px;
+  font-size: 10px;
+  letter-spacing: .14em;
+  color: #4f6168;
+}
+.sp-lg-foot__keys {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sp-lg-foot__keys b {
+  color: #6f8188;
+  font-weight: 400;
+  padding: 1px 5px;
+  margin-right: 4px;
+  border: 1px solid rgba(150, 158, 162, .24);
+}
+
+/* -------------------------------------------------- 左下角功能按钮组
+   对应线上 account-title 所在标题屏左下角那两个入口：
+     · 官方Q群（群号 312990596）—— 青色实心，线上是绝对定位叠在「添加到桌面」上方
+     · 添加到桌面（PWA 安装）—— 描边款
+   线上由 matchmaker/public/client.js 注入（QQ 按钮 bottom 由脚本按「添加到桌面」
+   的实际位置动态写行内样式）。这里做成一个纵向 flex 组，顺序一致、不会互相压。 */
+.sp-lg-actions {
+  position: absolute;
+  left: 62px;
+  bottom: 54px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.sp-lg-actions__btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: .06em;
+  padding: 7px 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .16s, border-color .16s, color .16s;
+}
+.sp-lg-actions__btn svg { width: 14px; height: 14px; flex: none; display: block; }
+/* 官方Q群：青色实心，用开场动画的青色 #42c7a9 */
+.sp-lg-actions__qq {
+  border: 1px solid #42c7a9;
+  background: #42c7a9;
+  color: #06100d;
+  font-weight: 600;
+}
+.sp-lg-actions__qq:hover { background: #58dabb; border-color: #58dabb; }
+.sp-lg-actions__qq svg { fill: #06100d; }
+/* 添加到桌面：描边款，与提交按钮的次级样式同族 */
+.sp-lg-actions__pwa {
+  border: 1px solid rgba(150, 158, 162, .34);
+  background: rgba(19, 24, 29, .82);
+  color: #dfe9ea;
+}
+.sp-lg-actions__pwa:hover { border-color: rgba(71, 201, 169, .55); color: #7ff0cf; }
+.sp-lg-actions__pwa svg { stroke: currentColor; fill: none; stroke-width: 1.6; }
+
+/* -------------------------------------------------------------- 动效 */
+
+@keyframes sp-lg-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes sp-lg-pulse {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+/* 入场：卡片自下方轻微淡入，动画结束接「点击进入」时不会突兀 */
+.sp-lg-card { animation: sp-lg-in .28s ease-out both; }
+@keyframes sp-lg-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 无障碍：减动效时不入场、不扫光 */
+@media (prefers-reduced-motion: reduce) {
+  .sp-lg-card { animation: none; }
+  .sp-lg-submit.is-busy::after { animation: none; opacity: .5; }
+  .sp-lg-screen button { transition: none; }
+}
+
+/* ------------------------------------------------------ 窄屏 / 矮屏 */
+
+@media (max-width: 720px) {
+  .sp-lg-top { padding: 18px 20px 0; gap: 8px; flex-wrap: wrap; }
+  .sp-lg-micro { font-size: 9px; letter-spacing: .16em; }
+  /* min-height:0 + width:100% —— 否则卡片在窄屏会被内容撑出右边 */
+  .sp-lg-main { padding: 6px 14px; min-width: 0; }
+  .sp-lg-card { max-width: 100%; width: 100%; }
+  .sp-lg-foot { padding: 0 20px 16px; font-size: 9px; }
+  .sp-lg-foot__keys { display: none; }
+  .sp-lg-corner { display: none; }
+  .sp-lg-bg__scan { display: none; }
+  .sp-lg-head__no { width: 46px; font-size: 24px; }
+  .sp-lg-head__cn { font-size: 17px; letter-spacing: .12em; }
+  .sp-lg-field__tag { width: 62px; font-size: 8px; letter-spacing: .1em; }
+  .sp-lg-captcha__pic { flex: 0 0 96px; width: 96px; min-width: 96px; min-height: 42px; }
+  .sp-lg-status { font-size: 10px; padding: 3px 9px 3px 7px; }
+  .sp-lg-lang button { padding: 3px 9px; font-size: 10px; }
+}
+
+/* 横屏手机（高度极小）：整行更紧凑，卡片可滚 */
+/* ---------------------------------------------------------------------------
+   矮屏规则：既按真实视口高度触发（手机上），也按 .is-phone 容器触发（设计稿
+   里那个 400px 的预览框）。
+   为什么需要后者：媒体查询 @media (max-height: …) 只认**浏览器视口**，不认容器。
+   在 800px 高的窗口里看设计稿时，400px 的预览框不会触发矮屏档，于是桌面尺寸
+   硬塞进小框 → 溢出 + 滚动条，看起来「手机上太挤」（维护者 2026-10-30 反馈）。
+   两条路走同一套数值，改一处要改两处。
+   --------------------------------------------------------------------------- */
+
+@media (max-height: 460px) {
+  .sp-lg-top { padding: 6px 14px 0; }
+  .sp-lg-main { padding: 0 12px; }
+  .sp-lg-foot { padding: 0 14px 5px; }
+  .sp-lg-foot__keys { display: none; }
+  .sp-lg-head { margin-bottom: 1px; }
+  .sp-lg-head__no { width: 36px; font-size: 18px; }
+  .sp-lg-head__body { padding: 3px 9px; }
+  .sp-lg-head__cn { font-size: 14px; }
+  .sp-lg-head__en { display: none; }
+  .sp-lg-panel { padding: 7px 10px 9px; }
+  .sp-lg-tabs { margin-bottom: 6px; }
+  .sp-lg-tab { padding: 5px 0; font-size: 12px; }
+  .sp-lg-fields { gap: 5px; }
+  .sp-lg-field__input { padding: 6px 10px; font-size: 13px; }
+  .sp-lg-field__tag { width: 54px; font-size: 8px; }
+  /* 矮屏把约束说明压到一行，别把面板顶高 */
+  .sp-lg-hint { font-size: 10px; line-height: 1.35; margin: -1px 0 0; }
+  .sp-lg-captcha__pic { flex: 0 0 84px; width: 84px; min-width: 84px; min-height: 30px; }
+  .sp-lg-captcha { gap: 6px; }
+  .sp-lg-submit { padding: 7px 0; font-size: 13px; }
+  /* 提示行是固定占位（min-height）—— 横屏手机上它白占一行高度，
+     没有提示时也挤着下面的 OR。压到最小。 */
+  .sp-lg-msg { margin-top: 3px; min-height: 12px; font-size: 11px; line-height: 1.2; }
+  .sp-lg-alt { margin: 5px 0 4px; }
+  .sp-lg-guest { padding: 6px 0; font-size: 12px; }
+}
+
+/* 同上，给设计稿里的 .is-phone 预览框用（与上面那条逐项一致） */
+.is-phone .sp-lg-top { padding: 6px 14px 0; }
+.is-phone .sp-lg-main { padding: 0 12px; }
+.is-phone .sp-lg-foot { padding: 0 14px 5px; }
+.is-phone .sp-lg-foot__keys { display: none; }
+.is-phone .sp-lg-head { margin-bottom: 1px; }
+.is-phone .sp-lg-head__no { width: 36px; font-size: 18px; }
+.is-phone .sp-lg-head__body { padding: 3px 9px; }
+.is-phone .sp-lg-head__cn { font-size: 14px; }
+.is-phone .sp-lg-head__en { display: none; }
+.is-phone .sp-lg-panel { padding: 7px 10px 9px; }
+.is-phone .sp-lg-tabs { margin-bottom: 6px; }
+.is-phone .sp-lg-tab { padding: 5px 0; font-size: 12px; }
+.is-phone .sp-lg-fields { gap: 5px; }
+.is-phone .sp-lg-field__input { padding: 6px 10px; font-size: 13px; }
+.is-phone .sp-lg-field__tag { width: 54px; font-size: 8px; }
+.is-phone .sp-lg-hint { font-size: 10px; line-height: 1.35; margin: -1px 0 0; }
+.is-phone .sp-lg-captcha__pic { flex: 0 0 84px; width: 84px; min-width: 84px; min-height: 30px; }
+.is-phone .sp-lg-captcha { gap: 6px; }
+.is-phone .sp-lg-submit { padding: 7px 0; font-size: 13px; }
+.is-phone .sp-lg-msg { margin-top: 3px; min-height: 12px; font-size: 11px; line-height: 1.2; }
+.is-phone .sp-lg-alt { margin: 5px 0 4px; }
+.is-phone .sp-lg-guest { padding: 6px 0; font-size: 12px; }
+
+/* 更极端：高度不到 360px（手机横屏 + 浏览器地址栏）—— 只保登录三件套，
+   标题只留编号和中文，OR 分隔线省掉，游客入口缩成一行小字。 */
+@media (max-height: 360px) {
+  .sp-lg-head { display: none; }
+  .sp-lg-top .sp-lg-micro { display: none; }
+  .sp-lg-top { padding: 4px 12px 0; }
+  .sp-lg-foot { display: none; }
+  .sp-lg-main { padding: 0 10px; }
+  .sp-lg-panel { padding: 6px 9px 8px; }
+  .sp-lg-tabs { margin-bottom: 5px; }
+  .sp-lg-tab { padding: 4px 0; font-size: 11px; }
+  .sp-lg-fields { gap: 4px; }
+  .sp-lg-field__input { padding: 5px 9px; font-size: 12px; }
+  .sp-lg-captcha__pic { flex: 0 0 76px; width: 76px; min-width: 76px; }
+  .sp-lg-submit { padding: 6px 0; font-size: 12px; }
+  .sp-lg-msg { min-height: 0; margin-top: 2px; }
+  .sp-lg-msg:empty { display: none; }
+  .sp-lg-alt { display: none; }
+  .sp-lg-guest { padding: 4px 0; font-size: 11px; }
+  .sp-lg-guest span { display: none; }
+}
+/* 左下角按钮组在窄屏 / 矮屏跟着收，别压住表单 */
+@media (max-width: 720px) {
+  .sp-lg-actions { left: 20px; bottom: 44px; }
+}
+
+/* ------------------------------------------------------------ 备案号
+   线上由 matchmaker/public/client.js 的 installIcpBadge() 注入，位置是
+   「页脚那句非官方同人复刻…的前面」，链接到工信部备案系统。
+
+   ⚠ 这里必须用绝对定位，不能塞进 .sp-lg-foot 的 flex 行：
+   .sp-lg-foot 是 justify-content:space-between 的两端对齐，加第三个子项会
+   换行把它顶到容器外（实测 y=867 落在 400px 预览框之外，被 overflow:hidden
+   裁掉，看起来就是「没加上」）。绝对定位贴着页脚基线走，不参与 flex 计算。 */
+/* 放进 .sp-lg-foot 的第一行（它是 space-between 的 flex），
+   占住中间位置；窄屏时整行换到下一行。不要再抽成绝对定位 ——
+   .sp-lg-screen 是 position:fixed，绝对定位的子元素会相对**浏览器视口**，
+   跑到预览框外面去（实测 y=887，框高只有 400）。 */
+.sp-lg-foot { flex-wrap: wrap; }
+.sp-lg-icp {
+  flex: 0 0 auto;
+  color: #4f6168;
+  text-decoration: none;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  transition: color .16s;
+}
+.sp-lg-icp:hover { color: #7ff0cf; text-decoration: underline; }
+@media (max-width: 720px) {
+  /* 窄屏放不下时藏起来，别压住「非官方同人复刻」那句 */
+  .sp-lg-icp { display: none; }
+}
+/* ===========================================================================
+   横屏手机（高度 ≤ 460px）—— 重做版（2026-10-30）
+   ---------------------------------------------------------------------------
+   原来的做法是把桌面版等比缩小：所有元素平铺、没有层次，看着像「桌面版压扁」。
+   这一档给单独的视觉语言：
+     · 卡片外包一层仪器框：四角括号 + 顶部刻度尺
+     · 面板加内发光 / 外投影，右上青色短边加长作「现役」标记
+     · 主按钮改渐变 + 内侧高光，不是纯色块
+     · 顶栏压成细带，输入框收紧但保留左侧标签条
+   装饰全部走伪元素与背景，不加 DOM、不影响功能。
+   =========================================================================== */
+@media (max-height: 460px) {
+  /* 顶栏：压成一条细带 */
+  .sp-lg-top { padding: 5px 13px 0; }
+  .sp-lg-top > div:first-child { display: flex; align-items: center; gap: 7px; }
+  .sp-lg-status {
+    font-size: 9px; letter-spacing: .06em; padding: 2px 8px 2px 6px;
+    border-color: rgba(150, 158, 162, .2); background: rgba(10, 15, 18, .9);
+  }
+  .sp-lg-status__dot { width: 5px; height: 5px; }
+  .sp-lg-lang button { padding: 2px 8px; font-size: 9px; letter-spacing: .08em; }
+
+  /* 手机横屏时空间本来就少：卡片**贴顶**排，不要垂直居中。
+     实测垂直居中会让 278px 的卡片在 381px 的容器里上下各空 50px，
+     看起来就像「卡片被拉得很长、内容挤在中间」。 */
+  /* 手机横屏空间少：让 main 只占内容高度，剩余空间交给上下留白，
+     卡片就不会被撑成「一条长卡片 + 底部大片空白」。 */
+  .sp-lg-main { padding: 11px 12px 8px; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .sp-lg-card { max-width: 660px; position: relative; }
+
+  /* 仪器框：四角括号 + 细边框 */
+  .sp-lg-card::before {
+    content: '';
+    position: absolute;
+    inset: -9px -11px;
+    pointer-events: none;
+    border: 1px solid rgba(71, 201, 169, .16);
+    background:
+      linear-gradient(90deg, rgba(88, 226, 191, .95) 0 16px, transparent 14px) top left / 100% 1.5px no-repeat,
+      linear-gradient(90deg, transparent calc(100% - 14px), rgba(88, 226, 191, .95) calc(100% - 16px)) top left / 100% 1.5px no-repeat,
+      linear-gradient(90deg, rgba(88, 226, 191, .95) 0 16px, transparent 14px) bottom left / 100% 1.5px no-repeat,
+      linear-gradient(90deg, transparent calc(100% - 14px), rgba(88, 226, 191, .95) calc(100% - 16px)) bottom left / 100% 1.5px no-repeat,
+      linear-gradient(180deg, rgba(88, 226, 191, .95) 0 14px, transparent 12px) top left / 1.5px 100% no-repeat,
+      linear-gradient(180deg, rgba(88, 226, 191, .95) 0 14px, transparent 12px) top right / 1.5px 100% no-repeat,
+      linear-gradient(0deg, rgba(88, 226, 191, .95) 0 14px, transparent 12px) bottom left / 1.5px 100% no-repeat,
+      linear-gradient(0deg, rgba(88, 226, 191, .95) 0 14px, transparent 12px) bottom right / 1.5px 100% no-repeat;
+  }
+  /* 顶部刻度尺：不再用 ::after（会随卡片定位被裁），改挂在标题块的
+     编号块上 —— 它本来就在卡片顶部，位置稳定，也不会溢出。 */
+  /* 刻度尺画在编号块**内部顶端**（top:0，不越界），保证不会被任何容器裁掉。 */
+  /* 编号块：刻度尺画在它内部顶端。标题块本身要有 min-height，
+     否则 padding-top 会把「01」往上顶、和刻度尺叠在一起。 */
+  .sp-lg-head { align-items: stretch; }
+  .sp-lg-head__no {
+    position: relative;
+    box-sizing: border-box;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+  }
+
+
+  /* 标题块 */
+  .sp-lg-head { margin-bottom: 3px; }
+  /* 编号块：左侧一道青色竖条 + 深色渐变底，比刻度尺干净，
+     而且竖条正好和右边「登录 / 注册」的琥珀左边线形成双色呼应。 */
+  .sp-lg-head__no {
+    width: 34px; font-size: 17px;
+    background:
+      linear-gradient(180deg, rgba(66, 199, 169, .55), rgba(66, 199, 169, .06)) left / 2px 100% no-repeat,
+      linear-gradient(180deg, #1b252c, #10161a);
+    color: #5d7178;
+    letter-spacing: .04em;
+  }
+  .sp-lg-head__body {
+    padding: 3px 10px;
+    background: linear-gradient(90deg, rgba(19, 24, 29, .98), rgba(19, 24, 29, .55) 70%, rgba(19, 24, 29, .18));
+  }
+  .sp-lg-head__cn { font-size: 14px; letter-spacing: .14em; }
+  .sp-lg-head__en { display: none; }
+
+  /* 面板：内发光 + 外投影 */
+  .sp-lg-panel {
+    padding: 7px 10px 9px;
+    background: linear-gradient(180deg, rgba(22, 30, 36, .98), rgba(12, 17, 21, .98));
+    box-shadow: inset 0 1px 0 rgba(120, 200, 180, .1), inset 0 0 22px rgba(0, 0, 0, .5), 0 6px 20px rgba(0, 0, 0, .45);
+  }
+  .sp-lg-panel::after { height: 30px; background: linear-gradient(180deg, #42c7a9, rgba(66, 199, 169, 0)); }
+
+  /* 标签页 */
+  .sp-lg-tabs { margin-bottom: 6px; border-color: rgba(150, 158, 162, .16); }
+  .sp-lg-tab { padding: 4.5px 0; font-size: 11.5px; letter-spacing: .24em; }
+  .sp-lg-tab.is-on {
+    background: linear-gradient(180deg, #b6f7e2, #8ee6cd);
+    box-shadow: 0 0 14px rgba(159, 240, 216, .28), inset 0 -1px 0 rgba(0, 60, 45, .18);
+  }
+
+  /* 输入行 */
+  .sp-lg-fields { gap: 4px; }
+  .sp-lg-field { border-color: rgba(45, 66, 70, .9); background: linear-gradient(180deg, rgba(8, 13, 16, .96), rgba(10, 16, 19, .96)); }
+  .sp-lg-field__input { padding: 5.5px 9px; font-size: 12.5px; }
+  .sp-lg-field__tag { width: 50px; font-size: 7.5px; letter-spacing: .12em; }
+  .sp-lg-captcha { gap: 5px; }
+  .sp-lg-captcha__pic {
+    flex: 0 0 78px; width: 78px; min-width: 78px; min-height: 28px;
+    border-color: rgba(45, 66, 70, .9); box-shadow: inset 0 0 10px rgba(0, 0, 0, .6);
+  }
+
+  /* 主按钮：渐变 + 内侧高光 */
+  .sp-lg-submit {
+    margin-top: 3px; padding: 6.5px 0 6.5px .3em;
+    font-size: 12.5px; letter-spacing: .34em;
+    background: linear-gradient(180deg, #b6f7e2 0%, #8ee6cd 55%, #7ad9bf 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 70, 52, .22), 0 0 16px rgba(126, 230, 205, .18);
+  }
+
+  /* 提示 / 分隔 / 游客 */
+  .sp-lg-msg { margin-top: 3px; min-height: 11px; font-size: 10.5px; line-height: 1.2; }
+  .sp-lg-alt { margin: 4px 0 3px; font-size: 8px; letter-spacing: .34em; }
+  .sp-lg-guest { padding: 5px 0; font-size: 11.5px; border-color: rgba(150, 158, 162, .2); }
+
+  /* 左下角 */
+  .sp-lg-actions { left: 13px; bottom: 17px; gap: 4px; }
+  .sp-lg-actions__btn { font-size: 10.5px; padding: 4px 9px; gap: 5px; }
+  .sp-lg-actions__btn svg { width: 11px; height: 11px; }
+
+  .sp-lg-foot { padding: 0 13px 4px; font-size: 8.5px; }
+}
+
+/* 极矮（≤ 360px）：只留表单本体 */
+@media (max-height: 360px) {
+  .sp-lg-head { display: none; }
+  .sp-lg-top .sp-lg-micro { display: none; }
+  .sp-lg-top { padding: 3px 11px 0; }
+  .sp-lg-foot { display: none; }
+  .sp-lg-main { padding: 0 9px; }
+  .sp-lg-card::before { inset: -6px -8px; }
+  .sp-lg-card::after { top: -6px; }
+  .sp-lg-panel { padding: 5px 8px 7px; }
+  .sp-lg-tabs { margin-bottom: 4px; }
+  .sp-lg-tab { padding: 3.5px 0; font-size: 11px; }
+  .sp-lg-fields { gap: 3px; }
+  .sp-lg-field__input { padding: 4.5px 8px; font-size: 12px; }
+  .sp-lg-captcha__pic { flex: 0 0 70px; width: 70px; min-width: 70px; }
+  .sp-lg-submit { padding: 5.5px 0 5.5px .3em; font-size: 12px; }
+  .sp-lg-msg { min-height: 0; margin-top: 2px; }
+  .sp-lg-msg:empty { display: none; }
+  .sp-lg-alt { display: none; }
+  .sp-lg-guest { padding: 3.5px 0; font-size: 10.5px; }
+  .sp-lg-guest span { display: none; }
+  .sp-lg-actions__qq { display: none; }
+  .sp-lg-actions { bottom: 11px; }
+}

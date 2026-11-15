@@ -16,7 +16,7 @@
 // when the request settles, ≤ 8 s, or the phase moves on). Untimed drafts (solo, a single-human match: sp.untimed) show
 // no countdown and say so. The selected card's frame and its ☑ 确认选择 strip are white, as in the event's video (10:16).
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { useSettings } from './settings.js';
 import { usePrefabPack } from './prefab/view.js';
 import { RegDeadlineCountdown } from './prefab/hud.js';
@@ -25,7 +25,6 @@ import { Img, RichText, PlayerAvatar, GIcon } from './gameComponents.js';
 import { itemIconUrl, enemyIconUrl, uiUrl } from './assetUrls.js';
 import { richTextPlain } from './richText.js';
 import { sortedPlayers } from './gameLogic.js';
-import { draftMyTurn } from './gameLogic/draft.js';
 import { data } from '../data.js';
 import { t, tName } from '../../../shared/i18n.js';
 import { sentText } from './lang.js';
@@ -100,9 +99,8 @@ export function pickBusy(busyIdx, card, mine) {
  */
 export function cardPickable(sp, card, { myId, solo, busyIdx = null }) {
   if (!sp || !card) return false;
-  const myTurn = draftMyTurn(sp, myId, solo);
-  const free = sp.allowRepeat === true || !card.takenBy;
-  return myTurn && sp.pickOf.get(myId) == null && free && !card.soldOut && busyIdx == null;
+  const myTurn = solo || sp.turnPid === myId;
+  return myTurn && sp.pickOf.get(myId) == null && !card.takenBy && !card.soldOut && busyIdx == null;
 }
 
 /**
@@ -137,7 +135,6 @@ export function armedCard(armed, sp, o) {
 export function ChoiceOverlay(props) {
   const { sp, myId, solo, busyIdx = null, onPick } = props;
   const [sel, setSel] = useState(null);
-  const orderRef = useRef(null);
   // 收起 (the official 机密商店 has it at the right edge, BV13LWM6BEvY match 9 29:44): the board shows through until 展开;
   // a new draft opens expanded again
   const [collapsed, setCollapsed] = useState(false);
@@ -152,9 +149,6 @@ export function ChoiceOverlay(props) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [armed]);
-  useEffect(() => {
-    orderRef.current?.querySelector('.is-cur')?.scrollIntoView({ block: 'nearest', inline: 'center' });
-  }, [sp?.turnPid]);
   // The pack also draws its official 机变 countdown. The shared your-turn cue is owned by screens/game.js so a theme
   // banner and its sound are emitted once from the same place.
   const settings = useSettings();
@@ -167,7 +161,7 @@ export function ChoiceOverlay(props) {
     if (r.pick != null) onPick(r.pick);
   };
   if (collapsed) return html`<${ChoicePill} sp=${sp} myId=${myId} solo=${solo} onExpand=${() => setCollapsed(false)} />`;
-  return html`<${ChoiceView} ...${props} armed=${armed} orderRef=${orderRef} onTap=${tap} pfPack=${pack} pfStill=${settings?.themeMotion === false}
+  return html`<${ChoiceView} ...${props} armed=${armed} onTap=${tap} pfPack=${pack} pfStill=${settings?.themeMotion === false}
     onConfirm=${() => { if (armed != null) tap(armed); }} onDisarm=${() => setSel(null)} onCollapse=${() => { setSel(null); setCollapsed(true); }} />`;
 }
 
@@ -199,7 +193,7 @@ export function spMarks(sp, { solo }) {
   if (!sp || solo || !Array.isArray(sp.order)) return out;
   for (const pid of sp.order) {
     if (sp.pickOf.has(pid)) out.set(pid, 'done');
-    else if (sp.concurrent === true || sp.turnPid === pid) out.set(pid, 'turn');
+    else if (sp.turnPid === pid) out.set(pid, 'turn');
   }
   return out;
 }
@@ -210,14 +204,13 @@ export function spMarks(sp, { solo }) {
  *   onTap?:(idx:number)=>void, onConfirm?:()=>void, onDisarm?:()=>void, pfPack?: any, pfStill?: boolean }} props
  *   pfPack: 规程's official pack — 乌萨斯齐心团 draws its own 机变 countdown (panel_countdown_effect_choose)
  */
-export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = null, total = null, armed = null, orderRef = null, onTap = () => {}, onConfirm = () => {}, onDisarm = () => {}, onCollapse = null, pfPack = null, pfStill = false }) {
+export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = null, total = null, armed = null, onTap = () => {}, onConfirm = () => {}, onDisarm = () => {}, onCollapse = null, pfPack = null, pfStill = false }) {
   if (!sp) return null;
   const fam = data.get('choices')?.families?.[sp.family] || null;
   const rawFam = data.getRaw('choices')?.families?.[sp.family] || null;
   const players = new Map(sortedPlayers(pub).map((p) => [p.playerId, p]));
-  const myTurn = draftMyTurn(sp, myId, solo);
+  const myTurn = solo || sp.turnPid === myId;
   const mine = sp.pickOf.get(myId);
-  const order = personal || solo ? [] : (Array.isArray(sp.order) ? sp.order : []);
   const turnName = players.get(sp.turnPid)?.name || t('队友');
   const special = /_s$/.test(String(sp.family || ''));
   const timed = personal ? pub?.deadline > 0 : !solo && !sp.untimed;
@@ -233,7 +226,7 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
   // the official header (the event's 悬赏决策, video 9:59): 「悬赏决策 |」 with the description and the timing line stacked
   // beside the bar; on the right the player deciding (name over 正在决策…, an hourglass) or 当前轮到你决策, then the
   // countdown. The pick order lives on the team panel (✓ / ••• on the portraits, ui/teamPanel.js spMarks).
-  return html`<div class=${cx('spov', armed != null && 'has-armed', personal && 'spov--personal', (sp.cards.length > 6 || order.length > 4) && 'spov--expanded')} role="dialog" aria-label=${personal ? t('教鞭选择') : t('机变阶段')} onPointerDown=${onDown}>
+  return html`<div class=${cx('spov', armed != null && 'has-armed', personal && 'spov--personal')} role="dialog" aria-label=${personal ? t('教鞭选择') : t('机变阶段')} onPointerDown=${onDown}>
     <div class="spov__veil" aria-hidden="true"></div>
     <div class="spov__inner">
       <header class="spov__head">
@@ -241,13 +234,11 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
           <i class="spov__deco" aria-hidden="true"></i>
           <h2 class=${cx('spov__title', special && 'is-special')}><span class="spov__name">${sentText(sp.name, rawFam?.name, fam?.name) || fam?.name || t('机变')}</span><span class="spov__bar">|</span><span class="spov__desc"><${RichText} text=${sentText(sp.desc, rawFam?.desc, fam?.desc) || fam?.desc || t('选择一项')} /></span></h2>
           <p class="spov__sub">${timed ? (personal ? t('休整期结束时未选择将自动选定') : t('倒计时结束后仍未选定将自动分配')) : t('选择一项（无时间限制）')}${mine == null && myTurn ? t(' · 点击卡牌选中，再次点击确认') : ''}</p>
-          ${sp.allowRepeat === true ? html`<p class="spov__repeat">${sp.concurrent === true ? t('所有博士同时选择，可重复选择，每人只能选择一次') : t('可重复选择，每人只能选择一次')}</p>` : null}
         </div>
         <div class="spov__turn">
           ${personal ? html`<span class="spov__turntxt is-mine">${t('从候选中选择一项战术特训')}</span>`
             : mine != null ? html`<span class="spov__turntxt is-done"><${Icon} name="check" />${t('已完成选择')}</span>`
-            : myTurn ? html`<span class="spov__turntxt is-mine">${sp.concurrent === true ? t('选择一项') : t('当前轮到你决策')}</span>`
-            : sp.concurrent === true ? html`<span class="spov__turntxt is-other"><span class="spov__tw"><small>${t('其他博士正在决策…')}</small></span><${Icon} name="hourglass" /></span>`
+            : myTurn ? html`<span class="spov__turntxt is-mine">${t('当前轮到你决策')}</span>`
             : html`<span class="spov__turntxt is-other"><span class="spov__tw"><b>${turnName}</b><small>${t('正在决策…')}</small></span><${Icon} name="hourglass" /></span>`}
           ${armed != null ? html`<${Button} variant="primary" size="lg" icon="check" class="spov__confirm" data-testid="sp-confirm"
               title=${armedName ? t('确认选择「{armedName}」（再次点击卡牌亦可）', { armedName }) : t('确认选择')} onClick=${onConfirm}>${t('确认选择')}<//>` : null}
@@ -256,25 +247,6 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
             : html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />`) : null}
         </div>
       </header>
-      ${order.length > 4 ? html`<div class="spov__order" ref=${orderRef} aria-label=${t('决策顺序')}>
-        ${order.map((pid, i) => {
-          const p = players.get(pid);
-          const pick = sp.cards.find((c) => c.idx === sp.pickOf.get(pid));
-          const picked = !!pick;
-          const pickName = pick ? resolveSpCard(pick, sp.family).name : null;
-          const cur = (sp.concurrent === true || sp.turnPid === pid) && !picked;
-          const left = p?.status === 'left';
-          return html`<div key=${pid} class=${cx('spov__who', cur && 'is-cur', picked && 'is-done', pid === myId && 'is-self')}>
-            <span class="spov__idx num">${i + 1}</span>
-            <${PlayerAvatar} player=${p || { name: '?' }} size="sm" self=${pid === myId} />
-            <span class="spov__wtext"><span class="spov__wname">${p?.name || t('博士')}</span>
-              ${pickName ? html`<span class="spov__wpick" title=${pickName}>${pickName}</span>` : null}
-            </span>
-            <span class="spov__wstate">${left ? html`<${Icon} name="exit" />` : picked ? html`<${Icon} name="check" />` : cur ? html`<${Icon} name="hourglass" />` : html`<${Icon} name="dots" />`}</span>
-          </div>`;
-        })}
-      </div>` : null}
-      <div class=${cx('spov__grid', sp.cards.length <= 3 && 'spov__grid--3')}>
       ${onCollapse ? html`<button type="button" class="spov__collapse" data-testid="sp-collapse" onClick=${onCollapse} title=${t('收起，查看战场')}>
         <${Icon} name="collapse" /><span>${t('收起')}</span></button>` : null}
       <div class=${cx('spov__grid', sp.cards.length <= 3 && 'spov__grid--3', onCollapse && 'spov__grid--collapse')}>

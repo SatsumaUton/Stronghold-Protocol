@@ -261,7 +261,7 @@
       {
         "path": "matchmaker/public/account-title.js",
         "baseExists": false,
-        "customBytes": 47150
+        "customBytes": 48363
       },
       {
         "path": "matchmaker/public/admin.html",
@@ -402,7 +402,7 @@
       {
         "path": "public/js/main.js",
         "baseExists": true,
-        "customBytes": 50473
+        "customBytes": 50915
       },
       {
         "path": "public/js/ui/buildGuard.js",
@@ -4497,22 +4497,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 269486
+        "customBytes": 271857
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 311815
+        "customBytes": 314779
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 299918
+        "customBytes": 302723
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 256019
+        "customBytes": 258273
       },
       {
         "path": "public/manifest.json",
@@ -4584,7 +4584,7 @@
       {
         "path": "public/js/main.js",
         "baseExists": true,
-        "customBytes": 50473
+        "customBytes": 50915
       },
       {
         "path": "public/js/media.js",
@@ -4706,7 +4706,7 @@
       {
         "path": "public/js/ui/choiceOverlay.js",
         "baseExists": true,
-        "customBytes": 21995
+        "customBytes": 19701
       },
       {
         "path": "public/js/ui/clipboard.js",
@@ -5777,7 +5777,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": true,
-        "customBytes": 111023
+        "customBytes": 109154
       },
       {
         "path": "public/css/screens/game-shop.css",
@@ -6678,7 +6678,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": true,
-        "customBytes": 111023
+        "customBytes": 109154
       },
       {
         "path": "public/css/screens/game-shop.css",
@@ -6713,22 +6713,22 @@
       {
         "path": "public/i18n/en.json",
         "baseExists": true,
-        "customBytes": 269486
+        "customBytes": 271857
       },
       {
         "path": "public/i18n/ja.json",
         "baseExists": true,
-        "customBytes": 311815
+        "customBytes": 314779
       },
       {
         "path": "public/i18n/ko.json",
         "baseExists": true,
-        "customBytes": 299918
+        "customBytes": 302723
       },
       {
         "path": "public/i18n/zh-TW.json",
         "baseExists": true,
-        "customBytes": 256019
+        "customBytes": 258273
       },
       {
         "path": "public/js/assets.js",
@@ -6738,7 +6738,7 @@
       {
         "path": "public/js/main.js",
         "baseExists": true,
-        "customBytes": 50473
+        "customBytes": 50915
       },
       {
         "path": "public/js/net.js",
@@ -7208,7 +7208,7 @@
       {
         "path": "server/sim/battle/echoRules.js",
         "baseExists": false,
-        "customBytes": 17653
+        "customBytes": 17665
       },
       {
         "path": "server/sim/battle/players.js",
@@ -7281,6 +7281,38 @@
         "path": "server/match/match/kickVote.js",
         "baseExists": false,
         "customBytes": 8175
+      }
+    ]
+  },
+  {
+    "id": "login-gate",
+    "name": "登录 / 注册前置第一屏（authGate）",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "public/js/screens/authGate.js",
+        "baseExists": false,
+        "customBytes": 13621
+      },
+      {
+        "path": "public/js/screens/authSession.js",
+        "baseExists": false,
+        "customBytes": 5677
+      },
+      {
+        "path": "public/js/ui/authGateHost.js",
+        "baseExists": false,
+        "customBytes": 2849
+      },
+      {
+        "path": "public/css/screens/authGate.css",
+        "baseExists": false,
+        "customBytes": 32421
+      },
+      {
+        "path": "public/index.html",
+        "baseExists": true,
+        "customBytes": 5459
       }
     ]
   }

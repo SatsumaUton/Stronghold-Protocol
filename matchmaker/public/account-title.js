@@ -159,32 +159,45 @@
     wrap.id = 'mm-acc-wrap';
     wrap.style.cssText = 'margin-top:2px;margin-bottom:0;display:flex;flex-direction:column;gap:3px;overflow:visible';
 
+    // ★ 2026-11-16（维护者）：登录 / 注册**搬到了游戏客户端的第一屏**
+    //   （public/js/screens/authGate.js，流程 [登录/注册] → [点击进入] → [片头] → [本页] → [大厅]）。
+    //   这里因此不再建登录/注册表单（tabs + 输入框 + 游客入口），只留「已登录 / 游客」那一行与提示行。
+    //   `form` 与 `fields` 仍然存在（空壳）：render() 用它们判断标题页在不在，删掉会让已登录态也不渲染。
     const form = document.createElement('div');
     form.id = 'mm-acc-form';
-    form.style.cssText = 'display:flex;flex-direction:column;gap:5px';
-
-    const tabs = document.createElement('div');
-    tabs.style.cssText = 'display:flex;width:100%;border:1px solid #2f4a4f;border-radius:2px;overflow:hidden;margin-bottom:2px';
-    tabs.innerHTML = '<button type="button" id="mm-tab-login" style="flex:1;border:0;cursor:pointer;padding:7px 0;font-size:13px;letter-spacing:3px;background:#9ff0d8;color:#07100f;font-weight:600">登录</button>'
-      + '<button type="button" id="mm-tab-reg" style="flex:1;border:0;border-left:1px solid #2f4a4f;cursor:pointer;padding:7px 0;font-size:13px;letter-spacing:3px;background:#0b1416;color:#c9dbe0">注册</button>';
+    form.style.cssText = 'display:none';
 
     const fields = document.createElement('div');
     fields.id = 'mm-acc-fields';
-    fields.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+    fields.style.cssText = 'display:none';
+
+    // ★ 2026-11-16：登录/注册表单搬去第一屏之后，未登录状态下这一页仍然需要一个入口 ——
+    //   否则「登出」（本页 logged 行里那个按钮）之后玩家会卡在标题页、开始按钮永远是灰的。
+    //   这个按钮把第一屏的登录闸门重新叫出来（main.js 挂的全局函数）。
+    const gateBtn = document.createElement('button');
+    gateBtn.type = 'button';
+    gateBtn.id = 'mm-acc-gate';
+    gateBtn.textContent = '登录 / 注册 ›';
+    gateBtn.style.cssText = 'width:100%;padding:9px 0;border:1px solid #2f4a4f;border-radius:2px;'
+      + 'background:#9ff0d8;color:#07100f;font-size:14px;letter-spacing:2px;font-weight:600;cursor:pointer';
+    gateBtn.onclick = (e) => {
+      e.preventDefault();
+      try {
+        if (typeof window.__SP_OPEN_AUTH_GATE === 'function') window.__SP_OPEN_AUTH_GATE();
+      } catch { /* 降级：没有闸门就没什么可点的 */ }
+    };
 
     const msg = document.createElement('div');
     msg.id = 'mm-acc-msg';
-    msg.style.cssText = 'font-size:12px;color:#ffb4a8;min-height:14px';
+    msg.style.cssText = 'display:none';
 
-    form.appendChild(tabs);
+    form.appendChild(gateBtn);
     form.appendChild(fields);
     form.appendChild(msg);
 
     const guestRow = document.createElement('div');
     guestRow.id = 'mm-acc-guest-row';
-    guestRow.style.cssText = 'display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;font-size:14px;color:#9fb4b8;line-height:1.35;text-align:center;padding:2px 0';
-    guestRow.innerHTML = '<a href="#" id="mm-acc-guest" style="color:#7ff0cf;text-decoration:none;font-size:14px;white-space:nowrap">游客访问 ›</a>'
-      + '<span style="font-size:14px">不登录也能游玩，但不能创建同盟/添加 AI</span>';
+    guestRow.style.cssText = 'display:none';
 
     const logged = document.createElement('div');
     logged.id = 'mm-acc-logged';
@@ -209,19 +222,8 @@
     wrap.appendChild(hint);
     afterEl.insertAdjacentElement('afterend', wrap);
 
-    tabs.querySelector('#mm-tab-login').onclick = (e) => { e.preventDefault(); state.mode = 'login'; renderFields(); };
-    tabs.querySelector('#mm-tab-reg').onclick = (e) => { e.preventDefault(); state.mode = 'register'; renderFields(); };
-    guestRow.querySelector('#mm-acc-guest').onclick = (e) => {
-      e.preventDefault();
-      state.guest = true;
-      // 进入游客模式时清掉账号残留的代号（避免把账号名带进游客身份）
-      const cs = findCallsign();
-      if (cs && /#\d{4}\s*$/.test(cs.value || '')) {
-        cs.value = '';
-        try { cs.dispatchEvent(new Event('input', { bubbles: true })); } catch { /* 忽略 */ }
-      }
-      render();
-    };
+    // 登录/注册的那几个按钮已经随表单一起搬去了游戏客户端的第一屏（见上面的注释），
+    // 这里只剩「返回」——游客态的退出口。
     hint.querySelector('#mm-acc-back').onclick = (e) => { e.preventDefault(); state.guest = false; render(); };
     logged.querySelector('#mm-acc-rename').onclick = async (e) => {
       e.preventDefault();
@@ -584,10 +586,11 @@
       callsign.style.opacity = '';
       setStartEnabled(true);
     } else {
-      // 登录/注册态：连「博士代号 CALLSIGN」标题一起隐藏
+      // 未登录：不显示表单（它在第一屏），只留「登录 / 注册 ›」这一个入口。
+      // 代号那一栏仍然隐藏 —— 代号要等登录之后才轮到玩家填（流程最后一屏）。
       setLabelVisible(label, false);
       form.style.display = 'flex';
-      guestRow.style.display = 'flex';
+      guestRow.style.display = 'none';
       hint.style.display = 'none';
       if (box) box.style.display = 'none';
       setStartEnabled(false);
@@ -831,6 +834,26 @@
     const anchor = anchorOf(findCallsign());
     if (anchor && !document.getElementById('mm-acc-wrap')) build(anchor);
     render();
+
+    // ★ 2026-11-16（维护者）：登录/注册搬去游戏客户端的第一屏之后，登录是在**那边的组件**里完成的
+    //   （public/js/screens/authGate.js adoptAuth），本文件不会走 doAuth 的赋值路径 —— 于是上面那次
+    //   /me 拿到的仍是「未登录」，state.user 空着，这一页会一直停在「登录 / 注册 ›」，开始按钮永远是灰的。
+    //   第一屏登录成功会派发 `sp-account-token`（adoptAuth 里那一次），这里接住它，把账号态补回来。
+    window.addEventListener('sp-account-token', () => {
+      if (state.user) { render(); return; }
+      void (async () => {
+        try {
+          const r = await api('/api/auth/me');
+          if (r.status === 200 && r.body && r.body.user) {
+            state.user = r.body.user;
+            window.__SP_ACCOUNT_TOKEN = r.body.userToken || window.__SP_ACCOUNT_TOKEN || null;
+            try { if (state.user.tag) localStorage.setItem('mm.tag', String(state.user.tag)); } catch { /* 隐私模式 */ }
+            pullPrefs();
+            render();
+          }
+        } catch { /* 忽略：下一次事件/刷新还有机会 */ }
+      })();
+    });
 
     // 首次设置代号：点「开始」前自动保存并追加 #代码
     document.addEventListener('click', async (e) => {

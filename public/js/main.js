@@ -767,17 +767,25 @@ async function boot() {
   try { document.dispatchEvent(new Event('sp-boot-ok')); } catch { /* ignore */ }
   try { sessionStorage.removeItem('sp_boot_retry'); } catch { /* ignore */ }
   globalThis.__SP__ = { store, net, data, version: 1 };
-  // the start-up version's entry animation before the title screen (ui/entryFilm.js): 盟约's film, or for a 规程 start
-  // (versions.js startupVersion) 规程's own opening (ui/regulationFilm.js); never over a restored match. `entryFilm`
-  // settles once the film has decided: its overlay is up by then, or none comes this page load (the browser tests get
-  // past it before their first click: test/e2e/client.mjs passEntryFilm)
-  const entryFilm = import('./ui/entryFilm.js')
+  // 登录 / 注册前置（维护者 2026-11-16；docs-plan/login-design + 开场动画与登录前置-预案）：
+  //   [登录 / 注册] → [点击进入] → [开场动画] → [原标题页：代号 + 开始] → [大厅]
+  // 这里必须在片头**之前**：没登录就先挡在第一屏，登录/注册/游客访问之后才轮到 entryFilm 的
+  // 「点击进入」卡片。已登录（有 cookie 会话）或本标签页选过游客访问时直接跳过，不多闪一帧。
+  const authGate = import('./ui/authGateHost.js')
+    .then((m) => {
+      // 「登出」之后再登录（matchmaker 注入的 account-title.js 里那个按钮）走这个全局函数
+      m.installAuthGateOpener();
+      return m.ensureAuthGate();
+    })
+    .catch((err) => { console.warn('[app] login gate unavailable', err); return 'off'; });
+  const entryFilm = authGate
+    .then(() => import('./ui/entryFilm.js'))
     .then((m) => m.playEntryFilm({
       skip: () => selectRoute(store.get()) === 'game',
       regulation: () => seasonOf(startupVersion(store.get())) === REGULATION_SEASON,
     }))
     .catch((err) => console.warn('[app] entry film unavailable', err));
-  globalThis.__SP__ = { store, net, data, entryFilm, version: 1 };
+  globalThis.__SP__ = { store, net, data, authGate, entryFilm, version: 1 };
   // A page keeps the modules it imported at load time for its whole lifetime, so a deploy cannot reach an open tab
   // (ui/buildGuard.js): watch `/healthz.build`. Never reload on our own: show the banner and let the player press
   // 刷新页面, so leaving a room or visiting the lobby is not turned into an unexplained refresh.
