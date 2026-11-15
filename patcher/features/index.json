@@ -4651,7 +4651,7 @@
       {
         "path": "public/js/ui/adminTools.js",
         "baseExists": false,
-        "customBytes": 32202
+        "customBytes": 35948
       },
       {
         "path": "public/js/ui/aiTakeover.js",

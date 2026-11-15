@@ -44,16 +44,16 @@ const ERR_HINT = {
 };
 
 const TABS = [
-  { id: 'chess', label: '干员', field: 'chess' },
-  { id: 'item', label: '装备', field: 'items' },
-  { id: 'bond', label: '盟约', field: 'bonds' },
-  { id: 'strategy', label: '策略', field: 'bands' },
-  { id: 'bounty', label: '悬赏', field: 'enemies' },
-  { id: 'funds', label: '数值' },
-  { id: 'phase', label: '阶段' },
-  { id: 'token', label: '召唤' },
-  { id: 'shop', label: '商店' },
-  { id: 'choice', label: '机变' },
+  { id: 'chess', label: '干员', field: 'chess' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'item', label: '装备', field: 'items' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'bond', label: '盟约', field: 'bonds' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'strategy', label: '策略', field: 'bands' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'bounty', label: '悬赏', field: 'enemies' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'funds', label: '数值' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'phase', label: '阶段' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'token', label: '召唤' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'shop', label: '商店' },  // i18n-ignore: 管理员面板（中文专用）
+  { id: 'choice', label: '机变' },  // i18n-ignore: 管理员面板（中文专用）
 ];
 
 const nameOf = (rec, key) => (rec && (data.localeName?.(rec.name || rec.displayName) || rec.name)) || key;
@@ -145,8 +145,14 @@ export function AdminTools({ open, onClose, anchor = null }) {
     }, 5000);
     return () => clearInterval(t2);
   }, []);
-  // 订阅 adminTools 只为触发重渲染（退出授权 / 重新验码后界面要跟着更新），值本身不用。
-  useStore((s) => s.adminTools === true);
+  // ★ 服务端这一次连接认不认（welcome.adminTools = 身份门 + 权限门 + 验码门全过）。
+  //   这是唯一可信的「已生效」依据：本地计时器只知道兑换过、还没到 4 小时，
+  //   但令牌可能已被后台「退出授权」吊销（.secrets/admin-revoke-at 早于令牌 iat），
+  //   或者这一局的座位标记还没同步。只看本地计时会骗人（维护者 2026-11-15 实测）。
+  const serverOk = useStore((s) => s.adminTools === true);
+  // 服务端实际拒绝过一次（TEST_FORBIDDEN / NOT_HOST）：比任何本地判断都可信，
+  // 一旦发生就在面板上说明「授权没被认」，而不是让玩家自己去猜。
+  const [denied, setDenied] = useState(false);
   // 身份门：是 owner/admin 账号（不看有没有验证码）。面板的「能不能打开」用它判断。
   const adminId = useStore((s) => s.adminId === true);
   // 权限门（2026-10-31）：这个管理员账号有没有 tools.game 权限。owner 恒真。
@@ -176,14 +182,14 @@ export function AdminTools({ open, onClose, anchor = null }) {
   const GLOBAL = new Set(['phase', 'round', 'timers', 'shop']);
   const OTHERS = new Set(['teamLp']);
   function confirmKind(cmd, args) {
-    if (OTHERS.has(cmd)) return '他人';
-    if (GLOBAL.has(cmd)) return '全局';
+    if (OTHERS.has(cmd)) return '他人';  // i18n-ignore: 管理员面板（中文专用）
+    if (GLOBAL.has(cmd)) return '全局';  // i18n-ignore: 管理员面板（中文专用）
     // 给自己发东西是「自身」，指定了别人的 ownerUid 就是「他人」。
     if (cmd === 'token') {
       const mine = Number(window.__SP_SELF_UID) || 0;
-      return args && args.ownerUid && mine && args.ownerUid !== mine ? '他人' : '自身';
+      return args && args.ownerUid && mine && args.ownerUid !== mine ? '他人' : '自身';  // i18n-ignore: 管理员面板（中文专用）
     }
-    return '自身';
+    return '自身';  // i18n-ignore: 管理员面板（中文专用）
   }
   // 会话内「本次不再确认」：这类指令勾过之后不再弹窗，关掉面板即失效。默认关闭。
   const [trusted, setTrusted] = useState({});
@@ -191,11 +197,11 @@ export function AdminTools({ open, onClose, anchor = null }) {
     if (kind === '自身') return true;              // 只动自己这一份，误点可撤销，不打断
     if (trusted[kind]) return true;
     const detail = kind === '全局'
-      ? '这条会改变整个房间的状态，场上所有人立刻可见'
-      : '这条会影响其他玩家的座位，对方会直接受到变化';
+      ? '这条会改变整个房间的状态，场上所有人立刻可见'  // i18n-ignore: 管理员面板（中文专用）
+      : '这条会影响其他玩家的座位，对方会直接受到变化';  // i18n-ignore: 管理员面板（中文专用）
     // 一段式确认：确认框里直接说明影响范围。免确认走面板顶部的开关，不在弹窗里问第二次，
     // 这样每次全局操作只要一次确认，不会因为两次弹窗把人烦到养成「连点确定」的坏习惯。
-    return window.confirm(`【${kind}影响】${note}\n\n${detail}。\n\n确定执行吗？`);
+    return window.confirm(`【${kind}影响】${note}\n\n${detail}。\n\n确定执行吗？`);  // i18n-ignore: 管理员面板（中文专用）
   };
 
   const send = async (cmd, args, note) => {
@@ -207,10 +213,12 @@ export function AdminTools({ open, onClose, anchor = null }) {
     setBusy(cmd);
     try {
       await net.request('g.test', { cmd, args });
+      if (denied) setDenied(false);
       push(true, note || cmd);
       toast(t('已执行'), 'info');
     } catch (e) {
       const code = e?.code || String(e?.message || e);
+      if (code === 'TEST_FORBIDDEN' || code === 'NOT_HOST') setDenied(true);
       // 服务端会拒绝：WRONG_PHASE（战斗中不能改经济/棋子）、NOT_HOST、RATE、TEST_FORBIDDEN…
       // 原始错误码对使用者没有意义（"TEST_FORBIDDEN" 看不出该怎么办），所以翻成一句话再说。
       // 顺序：detail 里的具体原因 > 本面板的友好提示 > 错误码的通用文案。
@@ -285,13 +293,19 @@ export function AdminTools({ open, onClose, anchor = null }) {
   // 验证码区块：未验证时是面板里的唯一内容；已验证时这块不渲染，
   // 因为 owner/admin 账号只要登录游戏就自带 session.admin —— 他们不需要验证码也能用，
   // 但仍然应该能换一枚 4 小时的 adminToken（比如游戏账号换了设备、或想让授权自动过期）。
+  // 管理员面板（中文专用）：下面三句不入 i18n 词条，按本文件的约定用字面量。
+  const stickWarn = '● 服务端未确认';  // i18n-ignore: 管理员面板（中文专用）
+  const waitText = '等待服务端确认';  // i18n-ignore: 管理员面板（中文专用）
+  const staleHint = '本机记着兑换没过期，但服务端这次连接没有认这份授权：通常是令牌已被后台「退出授权」吊销，或这一局的座位标记还没同步。到管理后台重新生成一个验证码再兑换；若本局在兑换之前就已开始，还要退出房间重进。';  // i18n-ignore: 管理员面板（中文专用）
   const codeBox = (autoOpen) => html`<div class=${'admintools__code' + (autoOpen ? ' is-open' : '')}>
     <div class="admintools__codehead">
       <span>${t('验证码授权')}</span>
-      <b class="admintools__stick--on">${t('● 验码已生效')}</b>
+      ${serverOk
+        ? html`<b class="admintools__stick--on">${t('● 验码已生效')}</b>`
+        : html`<b class="admintools__stick--on" style="color:#ff9f43">${stickWarn}</b>`}
       ${codeLeftMin > 0
-        ? html`<span class="admintools__stick--id">${t('剩余 {m} 分钟', { m: codeLeftMin })}</span>`
-        : html`<span class="admintools__stick--id" title=${t('本机没记剩余时间，以服务端授权为准')}>${t('服务端已授权')}</span>`}
+        ? html`<span class="admintools__stick--id" title=${serverOk ? t('剩余 {m} 分钟', { m: codeLeftMin }) : '本机计时（服务端未确认时不可信）'}>${t('剩余 {m} 分钟', { m: codeLeftMin })}</span>`
+        : html`<span class="admintools__stick--id" title=${t('本机没记剩余时间，以服务端授权为准')}>${serverOk ? t('服务端已授权') : waitText}</span>`}
       <button type="button" class="admintools__mini" onClick=${async () => {
           // 退出授权：调服务端吊销接口，让**所有已签发**的验码令牌失效。
           // 令牌是无状态 HMAC，前端删不干净 —— 必须由服务端记一个吊销时间点，
@@ -312,6 +326,9 @@ export function AdminTools({ open, onClose, anchor = null }) {
           setCodeMsg(t('已退出授权'));
         }} title=${t('已吊销全部验码令牌，下次要重新输码')}>${t('退出授权')}</button>
     </div>
+    ${(!serverOk && codeAuthed) || denied ? html`<p class="admintools__note" style="color:#ff9f43" data-testid="admintool-stale">
+      ${staleHint}
+    </p>` : null}
     ${(autoOpen || showCode) ? html`
       <p class="admintools__note">${t('到管理后台点「生成游戏内验证码」，把 6 位码填在下面。码 10 分钟内有效，兑换后本面板可用 4 小时。')}</p>
       <div class="admintools__funds">
