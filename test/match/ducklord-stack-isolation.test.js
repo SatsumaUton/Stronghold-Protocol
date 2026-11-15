@@ -82,7 +82,7 @@ test('★ 开关只影响鸭爵：经济/商店/策略/敌人总数都不变', (
     assert.deepEqual(invariantPart(on), invariantPart(off), `economy/shop/bands unchanged, seed ${500 + k}`);
     // 2) 敌人总数守恒：叠加只替换，不增不减
     assert.deepEqual(on.waves.map((w) => w.total), off.waves.map((w) => w.total), `enemy count conserved, seed ${500 + k}`);
-    // 3) 叠加只会换更���或一样多的鸭爵，永远不减少
+    // 3) 叠加只会换更多或一样多的鸭爵，永远不减少
     for (let i = 0; i < on.ducks.length; i++) assert.ok(on.ducks[i] >= off.ducks[i], `stacking must not replace fewer ducks, seed ${500 + k}`);
     // 4) 非鸭爵敌人种类不变：被换掉的是"格子"，不该冒出新的敌种
     for (let i = 0; i < on.waves.length; i++) {

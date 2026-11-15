@@ -919,7 +919,7 @@ function opsSetOpenList() {
         opsCache = { at: 0, data: null };
         const after = readOpenList();
         // powershell.exe 往管道里写的是控制台代码页（中文系统 = GBK/936），
-        // 直接当 UTF-8 用会得到一串「ڵ�̽��」这样的乱码，面板上没法看。
+        // 直接当 UTF-8 用会得到一串「<GBK 乱码>」这样的乱码，面板上没法看。
         // 这里按 UTF-8 解一次，解出替换字符就退回 GBK 再解。
         const decode = (buf) => {
           if (!buf || !buf.length) return '';

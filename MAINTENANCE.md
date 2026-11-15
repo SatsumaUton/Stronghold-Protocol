@@ -2837,7 +2837,7 @@ if ($b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) { '✓ 有 BOM' } el
 #### 连带问题：被 dashboard 调用时中文变乱码
 
 `powershell.exe` 作为子进程时 stdout 是管道，默认按控制台代码页（中文系统 = GBK/936）输出，
-而 `dashboard/server.js` 按 UTF-8 读 → 面板上显示成 `ڵ�̽��: ��� 30`。
+而 `<GBK 乱码>` 按 UTF-8 读 → 面板上显示成 `<GBK 乱码>`。
 
 修法是在脚本开头强制管道输出用 UTF-8（已加进 `sync-open-nodes.ps1`）：
 
