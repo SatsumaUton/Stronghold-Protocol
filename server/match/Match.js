@@ -253,7 +253,7 @@ import { MatchPhases } from './match/phases.js';
 import { MatchEcho } from './match/echoPhase.js';
 import { ECHO_LAST_ROUND, echoScale, isEchoRound } from './match/echo.js';
 import { echoCurveOf } from './match/echoConfig.js';
-import { crossVersionEnemies } from './match/echoCrossVersion.js';
+import { crossVersionEnemies, crossVersionStages } from './match/echoCrossVersion.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchSpeedVote } from './match/speedVote.js';
 import { MatchPauseVote } from './match/pauseVote.js';
@@ -374,7 +374,16 @@ export class Match {
           // 不改共享的 data 对象：给这个 GameData 实例换一份 enemies 表
           this.gd.raw = { ...this.gd.raw, enemies: { ...this.gd.raw.enemies, ...extra } };
         }
-      } catch { /* 数据缺失只是少一些怪种，绝不能让建局失败 */ }
+        // 战场：把各版本**同一难度**里本版没有的地图并进来（维护者 2026-11-16）。
+        // 规程·序列Ⅰ 的 12 张新图、以及其它版本缺的图，都按当前难度各自补齐。
+        const st = crossVersionStages(this.modeId, this.gd.raw && this.gd.raw.stages);
+        if (st && st.ids.length) {
+          this.gd.raw = { ...this.gd.raw, stages: { ...this.gd.raw.stages, ...st.stages } };
+          const cur = Array.isArray(this.gd.mode.stages) ? this.gd.mode.stages.slice() : [];
+          for (const id of st.ids) if (!cur.includes(id)) cur.push(id);
+          try { this.gd.mode.stages = cur; } catch { /* mode 只读：只补 stages 表也能用 */ }
+        }
+      } catch { /* 少几张图不影响建局 */ }
     }
     /** 房间级深潜调参（深潜大厅的开关）；null = 默认配置。调过参的房间不进排行榜。 */
     this.echoCfg = this.echoVariant ? (opts.echo && typeof opts.echo === 'object' ? opts.echo : null) : null;

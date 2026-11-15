@@ -31,6 +31,7 @@
 //                    for the match; those chess fight as their stand-ins (PlayerState setNotOwned; bots own everything).
 //                    `diy` (0.2.0 自选编队, optional): the human's 自选 picks (shared/protocol.js checkDiyPicks) — fixed for
 //                    the match; the slotted operators join the human's own shop (PlayerState setDiy / initDiyStock).
+//                    A version with diyBringLimits waits for 选择自编 and stocks only the confirmed slots.
 //   opts.kitted      string[] (optional)        the operators a 自选 slot may field in this room (the content set's
 //                                              list, lobby.kittedFor). Absent on a vanilla match, so setDiy keeps
 //                                              KITTED_CHARS and a normal match stays byte-identical. A modded room
@@ -77,6 +78,14 @@
 //   → { ok: true }          platform turns into onLeave). Return { error: ERR code (shared/constants.js),
 //   | { error, detail? }    detail?: string } to reject. Must not throw (if it does, the platform logs and
 //                           replies ERR.INTERNAL). Replies ('ok'/'error' with rid) are sent by the platform.
+// aiHandoverView()          Spectator AI handover, read by the lobby (in-process or through the version match
+//   → { ok: true, ... }     host). Phase, round, ended, disposed, emergencyFrozen, and per player isBot / left /
+//                           alive / autoplay. funds and pieceUids ride along so a test can see the inherited
+//                           inventory; the lobby does not vote on them. Same { error, detail } refusal as handle.
+// acceptAiHandover(botId, name) → { ok: true } | { error, detail? }
+//                           Match half of inheriting that bot seat: cancel its prep token and its rehearsal only,
+//                           clear bot/autoplay, set the spectator's name, loneHuman, aiTakeoverRound. The lobby
+//                           rebinds the session, seat and token. A version match host answers this like handle.
 // onDisconnect(playerId)    A human's socket dropped. The seat is kept; apply the auto-play policy.
 // onReconnect(playerId)     The human is back (new socket with its token) or re-sent hello on a live socket
 //                           (a resync request). May be called without a preceding onDisconnect. Resend full
@@ -155,9 +164,11 @@
 //   opts.battleContent 'full' | 'generic' | 'none' (sim content mode, default 'full')
 //   opts.timerScale    multiplier on every real-time phase timer (default 1)
 //   opts.combatSpeed   game seconds per real second while battles run in real time (default 2, the forced 2×)
-//   opts.botRehearsal  candidate layouts a bot simulates per prep before placing (default 3, 0 = heuristic only;
+//   opts.botRehearsal  candidate layouts a bot simulates per prep before placing (default 6, 0 = heuristic only;
 //                      a whole battle per candidate: ~20–300 ms of CPU each, see server/match/bot.js createRehearsal)
 //   opts.botStrategy  a registered ID or trusted server-side strategy object; defaults to SP_BOT_STRATEGY / 'legacy'
+//   opts.botStrategySeats  per-seat overrides { [seat 0..3]: ID | object } or 'seat:id,…'; defaults to
+//                      SP_BOT_STRATEGY_SEATS (none); a seat not listed plays opts.botStrategy (getBotStrategySeats)
 //   opts.botSliceMs    wall-clock ms of rehearsal per scheduler callback (default 8 with a real scheduler, unbounded
 //                      with a virtual one); the rest runs in later callbacks (scheduleBotPrep)
 //   opts.botRehearsalDelegate  offer each bot prep's layout rehearsal to the current host's browser instead (DESIGN §14;
@@ -195,7 +206,7 @@
 //   watch.js         spectator seats, g.watch, who is shown which field, resend on reconnect, prep-scout pushes
 //   intents.js       the g.* / b.* router, emotes, AI 托管, g.unitStats
 //   pause.js         the solo pause
-//   phases.js        INFO_CHECK, BAND_DRAFT (the strategy draft), BATTLE_CHECK, ROUND_START
+//   phases.js        INFO_CHECK, BAND_DRAFT (the strategy draft), CUSTOM_CHECK (选择自编, when diyBringLimits is set), BATTLE_CHECK, ROUND_START
 //   spDraft.js       SP_DRAFT (机变) and the rolls the meta effects ask for (bounties, item ids, pools)
 //   prep.js          PREP: its start, the AI seats' sliced preps, Ready, the deadline, its end
 //   combat.js        battle construction, COMBAT (both modes), the per-field results, then 联防 or SETTLE
@@ -223,12 +234,12 @@ import { createRng, deriveSeed } from '../sim/rng.js';
 import { GameData } from './gamedata.js';
 import { RealScheduler } from './scheduler.js';
 import { SharedPool, drawDisabledBonds, createPoolGroups, createItemPools } from './pool.js';
-import { experimentalOptions, enemyHpMulAt } from '../../shared/experimental.js';
+import { experimentalOptions, enemyHpMulAt, enemyAtkMulAt, bossMultipliers } from '../../shared/experimental.js';
 import { roomCapacity } from '../../shared/playerCapacity.js';
 import { PlayerState } from './PlayerState.js';
 import { EffectDispatcher, getDefaultRegistry } from './effectsMeta.js';
 import { setupMatchWaves } from './waves.js';
-import { getBotStrategy } from './botStrategies.js';
+import { getBotStrategy, getBotStrategySeats } from './botStrategies.js';
 import { GAME_SPEED, MAX_GAME_SPEED, HEADLESS_SLICE_MS } from './fields.js';
 import { MatchPlatform } from './match/platform.js';
 import { MatchInfra } from './match/infra.js';
@@ -242,9 +253,10 @@ import { MatchPhases } from './match/phases.js';
 import { MatchEcho } from './match/echoPhase.js';
 import { ECHO_LAST_ROUND, echoScale, isEchoRound } from './match/echo.js';
 import { echoCurveOf } from './match/echoConfig.js';
-import { crossVersionEnemies } from './match/echoCrossVersion.js';
+import { crossVersionEnemies, crossVersionStages } from './match/echoCrossVersion.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchSpeedVote } from './match/speedVote.js';
+import { MatchPauseVote } from './match/pauseVote.js';
 import { MatchKickVote } from './match/kickVote.js';
 import { MatchSpDraft } from './match/spDraft.js';
 import { MatchPrep } from './match/prep.js';
@@ -262,7 +274,13 @@ import { createExternalAI } from './llmGate.js';
 
 export { FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS } from './match/common.js';
 
-const BOT_REHEARSAL_DEFAULT = 3;
+/**
+ * §37.47 [ASSUMED]: 6 (was 3) — every distinct layout variant of a normal round (the positional plan and the five
+ * REHEARSAL_VARIANTS; 8 rehearsed exactly the same games). In one rehearsal of six the winner was past the third candidate
+ * (终极 solo, 419 rehearsals: hold 8 and kill 3 won 12 %); 终极 1–320 solo +2.19 ± 0.90, co-op +5.60 ± 1.65 (wins 73 → 92),
+ * for about a third more rehearsal time per prep. More layouts only in the Final Assault changed nothing.
+ */
+const BOT_REHEARSAL_DEFAULT = 6;
 /** Wall-clock ms of bot layout rehearsal per scheduler callback (real time; virtual time runs it in one go). */
 const BOT_SLICE_MS = 8;
 const env = (k) => (typeof process !== 'undefined' && process.env ? process.env[k] : undefined);
@@ -356,7 +374,16 @@ export class Match {
           // 不改共享的 data 对象：给这个 GameData 实例换一份 enemies 表
           this.gd.raw = { ...this.gd.raw, enemies: { ...this.gd.raw.enemies, ...extra } };
         }
-      } catch { /* 数据缺失只是少一些怪种，绝不能让建局失败 */ }
+        // 战场：把各版本**同一难度**里本版没有的地图并进来（维护者 2026-11-16）。
+        // 规程·序列Ⅰ 的 12 张新图、以及其它版本缺的图，都按当前难度各自补齐。
+        const st = crossVersionStages(this.modeId, this.gd.raw && this.gd.raw.stages);
+        if (st && st.ids.length) {
+          this.gd.raw = { ...this.gd.raw, stages: { ...this.gd.raw.stages, ...st.stages } };
+          const cur = Array.isArray(this.gd.mode.stages) ? this.gd.mode.stages.slice() : [];
+          for (const id of st.ids) if (!cur.includes(id)) cur.push(id);
+          try { this.gd.mode.stages = cur; } catch { /* mode 只读：只补 stages 表也能用 */ }
+        }
+      } catch { /* 少几张图不影响建局 */ }
     }
     /** 房间级深潜调参（深潜大厅的开关）；null = 默认配置。调过参的房间不进排行榜。 */
     this.echoCfg = this.echoVariant ? (opts.echo && typeof opts.echo === 'object' ? opts.echo : null) : null;
@@ -393,11 +420,17 @@ export class Match {
     this.echoBlessingReplace = false;
     /** 替换模式下已选定、等待弃选的新祝福 id。 */
     this.echoBlessingPendingPick = null;
+    /** 祭坛买的永久祝福正在等弃选（维护者 2026-11-09）：它不算三选一的抽取，关面板时必须照发。 */
+    this.echoAltarPendingPick = null;
     /** 替换模式的弃选候选（现有祝福 id 列表）与投票。 */
     this.echoBlessingDiscardOffer = null;
     this._echoDiscardVotes = new Map();
     this.echoBlessingDiscardEndsAt = null;
     this._echoDiscardTimer = null;
+    /** 弃选面板的来源：'replace'（名额满换新祝福）/ 'curse'（诅咒「静默」压低名额，只弃不发，2026-11-07）。 */
+    this.echoBlessingDiscardReason = null;
+    /** 因为别的决策面板还开着而延后的弃选（值 = 来源，见 echoBlessingDiscardReason）。 */
+    this.echoDiscardPending = null;
     /**
      * 挑战关（深度 5 / 10）没达成清怪线时累积的**诅咒 id 列表**（维护者 2026-11-05）。
      * 词条与效果都在 `match/echoCurse.js`：现在只会推 'erosion'（+1 侵蚀词条上限），
@@ -504,6 +537,9 @@ export class Match {
     this.enemyHpMul = this.experimental.enemyHpMul ?? 1;
     // 【按回合设置敌人生命倍率】(参考版 feedback #118，2026-11-06)：有计划时按回合取，否则就是单值
     this.enemyHpMulAt = (round = this.round) => enemyHpMulAt(this.experimental, round);
+    // 维护者 2026-11-07：攻击也支持按回合；BOSS 另有独立倍率
+    this.enemyAtkMulAt = (round = this.round) => enemyAtkMulAt(this.experimental, round);
+    this.bossMuls = bossMultipliers(this.experimental);
     this.enemyAtkMul = this.experimental.enemyAtkMul ?? 1;
     // 鸭爵叠加（本服新增）：两个前置条件缺一不可。
     //   - allowRepeat：去重时一支队伍最多一个鸭爵，叠不叠加都是 1 份，开关无从谈起。
@@ -520,6 +556,9 @@ export class Match {
     /**
      * 挂机移出（消极游戏，opts.afkRemoveRounds；默认 common.js 的 AFK_REMOVE_ROUNDS = 2，0 = 关闭）：
      * 连续这么多回合没有任何实质操作（AFK_ACTIONS）就移出该真人座位。
+     *
+     * 「深渊回响」另有更宽的生效下限（common.js 的 AFK_REMOVE_ROUNDS_DEEPECHO = 3，见 platform.js _afkLimit）：
+     * 深潜准备期更长、深层可做的事更少，普通房的 2 回合太严格（维护者 2026-11-07 晚）。
      *
      * 只在**开局时至少 2 个真人**的对局里生效 —— 一个人自己打单机，挂机不伤害别人，不该踢他
      * （维护者 2026-10-31 的要求，与 intents.js 的两条旧规则同一口径）。
@@ -551,6 +590,8 @@ export class Match {
     /** layouts a bot rehearses per prep with the real simulation (bot.js; 0 = heuristic placement only) */
     this.botRehearsal = Number.isInteger(opts.botRehearsal) && opts.botRehearsal >= 0 ? Math.min(opts.botRehearsal, 8) : BOT_REHEARSAL_DEFAULT;
     this.bot = getBotStrategy(opts.botStrategy ?? env('SP_BOT_STRATEGY'));
+    /** per-seat overrides of this.bot (seat → strategy; empty by default — botFor) */
+    this.seatBots = getBotStrategySeats(opts.botStrategySeats ?? env('SP_BOT_STRATEGY_SEATS'));
     /** wall-clock budget of one rehearsal slice (scheduleBotPrep) */
     this.botSliceMs = Number.isFinite(opts.botSliceMs) && opts.botSliceMs > 0 ? opts.botSliceMs : this.sched.virtual ? Infinity : BOT_SLICE_MS;
     /**
@@ -627,6 +668,17 @@ export class Match {
     this._pausedAt = 0;
     /** real ms spent paused this match (diagnostics) */
     this.pausedMs = 0;
+    /**
+     * 「暂停游戏」的全员投票（维护者 2026-11-08，match/pauseVote.js）：站队式的赞成票 + 通过后的暂停状态。
+     * `echoPaused` = { at, by, byName, resumed:Set, timer }；全是 transient（不进快照，见 snapshot.js）。
+     */
+    this._pauseVotes = new Set();
+    this._pauseVoteAt = new Map();
+    this.echoPaused = null;
+    /** 暂停期间被摘下来的准备阶段截止计时器 { fn, left } */
+    this._pauseHeld = null;
+    /** setDeadline 挂的截止回调（暂停时要把它摘下来再按剩余时间挂回去） */
+    this._phaseDeadlineFn = null;
     /** boss rounds (client-side combat): the throttled m.public refresh (_bossPublic) */
     this._bossPubTimer = null;
     this._bossPubAt = -Infinity;
@@ -714,6 +766,7 @@ export class Match {
     this.bossId = setup.bossId;
     this.hiddenBossId = setup.hiddenBossId;
     const bans = drawDisabledBonds(this.gd, this.rngSetup);
+    this.bondChoice = bans.choice ?? null;
     this.disabledBonds = bans.drawn;
     this.staticInactiveBonds = bans.staticOff;
     this.bannedChess = bans.banned;
@@ -983,7 +1036,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchEcho, MatchSetupVote, MatchSpeedVote, MatchKickVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchEcho, MatchSetupVote, MatchSpeedVote, MatchPauseVote, MatchKickVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);
