@@ -41,7 +41,7 @@
 // The operators' 「<进入休整期时>」 traits (SERVER_PREP_START garrisons) run on onPrepStart too (effectsMeta.js GARRISON_HOOK,
 // DESIGN §35.53), after the strategy's grants of that dispatch (global → band → bonds → garrisons).
 
-import { GEO } from '../../../../shared/constants.js';
+import { GEO, gateOf } from '../../../../shared/constants.js';
 import { bbCap } from '../../../../shared/plugins/officialBounds.js';
 import { burstLimit } from '../../../../shared/plugins/steps.js';
 import { createRng } from '../../rng.js';
@@ -117,7 +117,7 @@ K.prep_finish_char_bond_add_layer = (ps) => ({
     }
     for (const t of [...byTier.keys()].sort((a, b) => a - b)) {
       const p = ctx.rng.pick(byTier.get(t));
-      for (const b of metaBonds(ctx, p)) ctx.addLayers(b, n, { requireActive: false, reason: 'band' });
+      for (const b of metaBonds(ctx, p)) ctx.addLayers(b, n, { requireActive: ctx.data?.config?.version?.family === 'regulation', reason: 'band' });
     }
   },
 });
@@ -241,7 +241,7 @@ K.gain_bond_char_per_round = (ps) => ({
     const r0 = int(p.round, 1), every = Math.max(1, int(p.preround, 1));
     if (ctx.round < r0 || (ctx.round - r0) % every !== 0) return;
     for (let k = 0; k < timesOf(p.count, 1); k++) {
-      const id = rollBond(ctx, p.bond, { anyTier: true });
+      const id = rollBond(ctx, p.bond, { anyTier: ctx.data?.config?.version?.family !== 'regulation' });
       if (id) ctx.grantChess(id, { source: 'band' });
     }
   },
@@ -379,7 +379,9 @@ K.refresh_shop_count_gain_coin_bond_char_chess = (ps) => ({
     const p = ps[0];
     const every = int(p.refresh_count, 0);
     if (every <= 0) return;
-    if (ctx.incCounter('band:chiave:refreshes', 1) % every !== 0) return;
+    const refreshes = ctx.data?.config?.version?.family === 'regulation'
+      ? ctx.roundStats().refreshes : ctx.incCounter('band:chiave:refreshes', 1);
+    if (refreshes % every !== 0) return;
     if (roundCounter(ctx, 'band:chiave') >= int(p.max_count, Infinity)) return;
     const id = rollBond(ctx, p.bond);
     if (id && ctx.grantChess(id, { source: 'band' })) bumpRound(ctx, 'band:chiave');
@@ -397,21 +399,28 @@ K.preparation_start_add_special_goods_every_n_round = (ps) => ({
   },
 });
 
+K.shop_up_bond_refresh_once = K.up_shop_next_refresh_must_present_bond_char;
+K.buy_bond_char_gain_coin = K.round_start_gain_coin_by_bond_char_chess_buy;
+K.round_buy_bond_char_price = K.first_buy_in_round_char_price_change;
+
 // ---------------------------------------------------------------------------------------------------------------
 // 鸭爵 “神秘顾客”: "从第5回合起，你和队友遭遇的部分敌人可能会替换为<鸭爵><高普尼克><流泪小子><圆仔>，击倒这些敌人者获得1资金奖励
 // （包括联防阶段）". A global handler rewrites the battle spawn list of every alive player while the band is held by that
-// player or a teammate: from round `round`, in the normal battle, the Final Assault and the Hidden Core (PRTS Stronghold-Protocol：盟约
+// player or a teammate: from round `round`, in the normal battle, the Final Assault and the Hidden Core (PRTS 卫戍协议：盟约
 // 下半/PRTS盟约记录 鸭爵 备注 "每回合将有0~2名敌人被替换为上述敌人之一…且在最终回合和隐秘核心回合中仍然生效"; the 联防 phase
 // replaces nothing: its enemies are leaks, which keep their bounty). One draw per round for every player (GitHub #839:
 // 「每回合…被替换」, the key's `all_player`): min..max (0–2, uniform [ASSUMED]) ground enemies of the round's own wave
 // (`ev.waveSpawns`: before the player's bounty units, which differ per player) from the `minweight`–`maxweight` share of
 // that wave's units in time order, the leader and its parts left out of the share [ASSUMED reading of the two weights] —
 // any wave enemy but the leader, its parts and uncounted units —, with a stream of its own from the match seed
-// (`ctx.seedFor('duck:<round>')`: no player's meta stream, the same in the previews), so every player has the same count,
-// the same units and the same enemies [ASSUMED: the same enemy for every player — the report says the same enemy is
-// swapped]; each player's list swaps the k-th own unit of the picked action at its own (bounty-re-timed) time and route.
-// The draw keeps the time share: no lane rule (the report's 「总在下路」 is not settled by its recording; [ASSUMED] until a
-// recording or the maintainer's recall shows the upper lane is never used). Elites are eligible
+// (`ctx.seedFor('duck:<round>')`: no player's meta stream, the same in the previews), so every player has the same count
+// and the same units [ASSUMED: the same units]; each player's list swaps the k-th own unit of the picked action at its own
+// (bounty-re-timed) time and route. Only units of the lower lane are drawn: a route starting at the lower gate
+// (shared/constants.js gateOf — normal fields (9,10), not (12,10)). The swapped-in kind is drawn per player, one per round
+// (a stream of its own, `duck:<round>:<playerId>`), so a player's two swaps are the same kind while players can differ.
+// All three from the reporter's recordings of the official game (GitHub #839, 2026-10-23: four players 2鼠 / 2狗 / 2鼠 /
+// 2鸭 in one wave, all on the lower lane; a 联防 of 6熊 = three teammates' 2熊 each; the maintainer's decision of
+// 2026-11-01). Elites are eligible
 // too [ASSUMED: the text names no rank; one rule for every battle; about two thirds of the leader rounds' escorts in that
 // share are elites, so a NORMAL-only rule would leave most Final Assault halves without a candidate — ≈ 80 % instead of
 // ≈ 36 % of the R14 pair-field halves over 40 seeds]. Flyers are never swapped [ASSUMED: the four are ground units and a
@@ -436,8 +445,9 @@ const DUCK_KINDS = new Set(['normal', 'boss', 'hidden']);
 /** Boss-field column between the left ('L') and the right ('R') player's half (the goals are at cols 2–3 / 17). */
 const BOSS_MID_COL = (GEO.BOSS_RECT.c0 + GEO.BOSS_RECT.c1) / 2;
 
-function duckParams(bandId = DUCK_BAND) {
-  for (const b of buffsOf(bandRecord(bandId))) if (b.key === 'round_start_all_player_change_enemy_2') return b.p;
+function duckParams(bandId = DUCK_BAND, commandEffectId = null) {
+  const record = commandEffectId ? gameData().effects?.[commandEffectId] : bandRecord(bandId);
+  for (const b of buffsOf(record)) if (b.key === 'round_start_all_player_change_enemy_2') return b.p;
   return null;
 }
 
@@ -449,8 +459,10 @@ const notOwn = (s) => !s || s.tag === 'bounty' || s.tag === 'duck';
 /**
  * The round's swaps (exported for tests): `{ action, k, enemyKey }` — the k-th unit of a wave action becomes enemyKey.
  * Drawn from `base`, the round's own wave (no bounty units: they differ per player), so every player who uses the same
- * `rng` stream on the same wave gets the same count, the same units and the same 鸭爵 enemies (GitHub #839). `side`
- * ('L' | 'R', a pair boss field) limits the draw to the units whose route (`routes[routeIndex]`) ends on that half.
+ * `rng` stream on the same wave gets the same count and the same units (GitHub #839); only units whose route
+ * (`routes[routeIndex]`) starts at the lower gate (gateOf; `leader`: a boss / hidden field's rows). The 鸭爵 enemy is one
+ * per call, drawn with `typeRng` (the player's own stream; default `rng`). `side` ('L' | 'R', a pair boss field) limits
+ * the draw to the units whose route ends on that half.
  *
  * 鸭爵叠加（本服新增，2026-10-27 维护者要求「补抽」）：`exclude` 是一组已经被别的持有者选走的槽位
  * （`${action}#${k}`）。传入时这些槽位**不参与本次抽取**，于是这一路抽到的每一个都落在「还没被换过的敌人」上，
@@ -459,7 +471,7 @@ const notOwn = (s) => !s || s.tag === 'bounty' || s.tag === 'duck';
  * ⚠ `exclude` 为空/未传时，`rng.shuffle(ok)` 的输入与上游逐字相同，随机流的消耗顺序也完全一致 ——
  *   不叠加（只有 1 个持有者）时行为与上游**一字不差**，这是硬约束（见 duckGlobal 的注释）。
  */
-export function duckPicks(gd, rng, base, p, { routes = null, side = null, exclude = null } = {}) {
+export function duckPicks(gd, rng, base, p, { routes = null, side = null, leader = false, typeRng = rng, exclude = null } = {}) {
   const ducks = list(p.enemylist).filter((k) => gd.enemy(k));
   if (!ducks.length || !Array.isArray(base)) return [];
   const lo = Math.max(0, int(p.min, 0)), hi = Math.max(lo, int(p.max, lo));
@@ -497,15 +509,19 @@ export function duckPicks(gd, rng, base, p, { routes = null, side = null, exclud
     const s = base[f.i];
     const e = gd.enemy(s.enemyKey);
     const frac = n > 1 ? j / (n - 1) : 0;
+    const route = Array.isArray(routes) ? routes[s.routeIndex] : null;
     return !s.tag && s.countInTotal !== false && e && e.rank !== 'BOSS' && !e.notCountInTotal && e.stats?.motion !== 'FLY'
-      && frac >= w0 - 1e-9 && frac <= w1 + 1e-9;
+      && frac >= w0 - 1e-9 && frac <= w1 + 1e-9 && gateOf(route?.start, leader) === 'lower';
   });
   // 叠加时把已被别人选走的槽位剔除，让这一路的 want 个全都落在新目标上（补抽）。
   // 只在真的传了 exclude 时才做，保证不叠加时与上游逐字相同。
   if (exclude && exclude.size) {
     ok = ok.filter((f) => !exclude.has(`${f.action}#${f.k}`));
   }
-  return rng.shuffle(ok).slice(0, want).map((f) => ({ action: f.action, k: f.k, enemyKey: rng.pick(ducks) }));
+  const picked = rng.shuffle(ok).slice(0, want);
+  if (!picked.length) return [];
+  const enemyKey = typeRng.pick(ducks);
+  return picked.map((f) => ({ action: f.action, k: f.k, enemyKey }));
 }
 
 /**
@@ -594,52 +610,53 @@ export function applyDuckPicks(spawns, picks, ownerPlayerId) {
  * Rewrite `spawns` in place (exported for tests): draw the swaps from `base` (default: `spawns` without its bounty
  * units) with `rng` (default ctx.rng) and apply them. Returns the replaced spawn specs.
  */
-export function duckReplace(ctx, spawns, p, ownerPlayerId, { routes = null, side = null, base = null, rng = ctx.rng } = {}) {
+export function duckReplace(ctx, spawns, p, ownerPlayerId, { routes = null, side = null, leader = false, base = null, rng = ctx.rng, typeRng = rng } = {}) {
   if (!Array.isArray(spawns)) return [];
-  const picks = duckPicks(ctx.gd, rng, Array.isArray(base) ? base : spawns.filter((s) => !notOwn(s)), p, { routes, side });
+  const picks = duckPicks(ctx.gd, rng, Array.isArray(base) ? base : spawns.filter((s) => !notOwn(s)), p, { routes, side, leader, typeRng });
   return applyDuckPicks(spawns, picks, ownerPlayerId);
 }
 
 const duckGlobal = {
   onBattleStart(ctx, ev) {
     if (!ev || !DUCK_KINDS.has(ev.kind) || !Array.isArray(ev.spawns)) return;
-    const holders = [ctx, ...ctx.teammates()]
-      .filter(t => (t.gd.band(t.bandId())?.effectRef ?? t.bandId()) === DUCK_BAND);
+    const holders = [ctx, ...ctx.teammates()].filter((t) => duckParams(t.bandId(), t.commandEffectId));
     if (!holders.length) return;
-    const p = duckParams(holders[0].bandId());
+    const p = duckParams(holders[0].bandId(), holders[0].commandEffectId);
     if (!p || ctx.round < int(p.round, 1)) return;
-    // 鸭爵叠加（本服新增，实验性开关 stackDuckLord）：上游是 find() 取第一个持有者，多个队友选鸭爵也只算 1 份。
+    // 鸭爵叠加（本服新增，实验性开关 stackDuckLord）：上游取第一个持有者，多个队友选鸭爵也只算 1 份。
     // 开关打开时每个持有者各抽一份，用各自的随机流（带持有者序号），合并后统一去重 —— 同一只敌人只换一次。
     // 只有一个持有者时走下面同一条路，随机流与上游逐字相同（`duck:<round>`），行为完全不变。
     const stack = ctx.gd.stackDuckLord === true && holders.length > 1;
     // one draw per round for every player (GitHub #839): its own stream from the match seed — no player's meta stream,
-    // the same in the stats preview and the bot rehearsals — on the wave before the player's bounties (ev.waveSpawns)
-    // 第 0 路必须与上游逐字相同（`duck:<round>`），否则叠加会偏离"单人时的抽取结果"——
-    // 实测会出现叠加后鸭爵反而变少甚至为 0 的情况。第 1 路起才加序号。
+    // the same in the stats preview and the bot rehearsals — on the wave before the player's bounties (ev.waveSpawns);
+    // the kind from the player's own stream
+    //
+    // 第 0 路必须与上游逐字相同（`duck:<round>`），否则叠加会偏离「单人时的抽取结果」。第 1 路起才加序号。
+    const seeded = typeof ctx.seedFor === 'function';
     const streamOf = (i) => (i === 0 ? `duck:${ctx.round}` : `duck:${ctx.round}:${stack ? i : 0}`);
-    const rngFor = (i) => (typeof ctx.seedFor === 'function' ? createRng(ctx.seedFor(streamOf(i))) : ctx.rng);
+    const rngFor = (i) => (seeded ? createRng(ctx.seedFor(streamOf(i))) : ctx.rng);
+    const typeRngFor = (i) => (seeded ? createRng(ctx.seedFor(`${streamOf(i)}:${ctx.playerId}`)) : rngFor(i));
     if (!stack) {
-      duckReplace(ctx, ev.spawns, p, ctx.playerId, { routes: ev.routes, side: ev.side, base: ev.waveSpawns, rng: rngFor(0) });
+      duckReplace(ctx, ev.spawns, p, ctx.playerId, { routes: ev.routes, side: ev.side, leader: ev.kind !== 'normal', base: ev.waveSpawns, rng: rngFor(0), typeRng: typeRngFor(0) });
       return;
     }
     const base = Array.isArray(ev.waveSpawns) ? ev.waveSpawns : ev.spawns.filter((s) => !notOwn(s));
     const bySlot = new Map();
-    // 第 0 路就是上游那一路（`duck:<round>`）：它单独决定了"至少换这么多"，保证叠加永远不弱于不叠加。
+    // 第 0 路就是上游那一路（`duck:<round>`）：它单独决定了「至少换这么多」，保证叠加永远不弱于不叠加。
     //
-    // ★ 2026-10-27 改为「补抽」（维护者要求）：后一路抽取时把已选槽位传给 duckPicks，让它的 want 个
+    // ★ 「补抽」（维护者 2026-10-27）：后一路抽取时把已选槽位传给 duckPicks，让它的 want 个
     //   全都落在**还没被换过的敌人**上，而不是撞到已选的就跳过。
     //   改前：20 人叠加时有 33% 的抽取因为撞车被浪费（实测 20 路抽 21 次只落下 14 个不同槽位）。
     //   改后：每人次的抽取都有效，覆盖数提升到 min(总抽取次数, 候选池大小)。
     //   第 0 路不传 exclude，随机流与上游逐字相同（单持有者时行为不变）。
     //
-    // ★ 还会「耗尽即停」（维护者要求）：「如果已经没有怪可以变了就停止触发效果」。
+    // ★ 「耗尽即停」（维护者要求）：「如果已经没有怪可以变了就停止触发效果」。
     //   候选池被换完之后，后面的持有者**不再抽取** —— 既不做无意义的随机、也不产生空转。
-    //   这在 20 人叠加 + 小波次时很常见（候选只有 1~3 个，第一个持有者就换完了）。
     const candidates = duckCandidates(ctx.gd, base, p, { routes: ev.routes, side: ev.side });
     for (let i = 0; i < holders.length; i++) {
       if (bySlot.size >= candidates.length) break;   // 没有可换的了，停止触发
       const taken = i === 0 ? null : new Set(bySlot.keys());
-      for (const pk of duckPicks(ctx.gd, rngFor(i), base, p, { routes: ev.routes, side: ev.side, exclude: taken })) {
+      for (const pk of duckPicks(ctx.gd, rngFor(i), base, p, { routes: ev.routes, side: ev.side, leader: ev.kind !== 'normal', typeRng: typeRngFor(i), exclude: taken })) {
         const slot = `${pk.action}#${pk.k}`;
         if (!bySlot.has(slot)) bySlot.set(slot, pk);
       }
@@ -664,9 +681,9 @@ function merge(parts) {
 }
 
 /** Hooks of one band (null when it has no prep effect). */
-export function bandMetaHandler(bandId) {
+export function bandMetaHandler(bandId, record = bandRecord(bandId)) {
   const groups = new Map();
-  for (const b of buffsOf(bandRecord(bandId))) {
+  for (const b of buffsOf(record)) {
     if (!b.key || !K[b.key]) continue;
     if (!groups.has(b.key)) groups.set(b.key, []);
     groups.get(b.key).push(b.p);

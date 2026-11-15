@@ -84,6 +84,7 @@ export class MatchIntents {
         if ((msg.setupRevision ?? 0) !== this.setupRevision) return fail(ERR.BAD_TARGET, 'setup changed; confirm the current revision');
         if (!ps.infoReady) { ps.infoReady = true; this.markPublic(); this.maybeEndInfo(); }
         return OK;
+      case 'g.bondGroup': return this.pickBondGroup(ps, msg.idx, msg.setupRevision);
       case 'g.rerollVote': return this.voteSetupReroll(ps, msg.voteId, msg.agree);
       // 战斗 2 倍速: the seat's standing vote (speedVote.js)
       case 'g.speedVote': return this.setSpeedVote(ps, msg.agree === true);
@@ -108,12 +109,15 @@ export class MatchIntents {
       // 主动放弃深潜（维护者 2026-11-07）：start=true 发起（单人直接结算 / 多人开全员投票），否则按 agree 投票
       case 'g.echoGiveUp': return msg.start ? this.requestEchoGiveUp(ps) : this.setEchoGiveUpVote(ps, msg.agree === true);
       case 'g.band': return this.pickBand(ps, msg.bandId);
+      case 'g.diyBring': return this.confirmDiyBring(ps, msg.slots);
       case 'g.bandSkip': return this.skipBand(ps);
       // 预约盟约（纯显示，移植自参考版）：声明这一局打算走哪个核心盟约
       case 'g.bondPlan': return this.planBond(ps, msg.bondId ?? null);
       // the strategy highlighted in the draft screen (what a timed-out turn takes, timeoutBand)
       case 'g.bandFocus': return this.bandFocus(ps, msg.bandId ?? null);
       case 'g.buy': return ps.buy(msg.slot);
+      case 'g.command': return ps.useCommand(msg.effectId, msg.target);
+      case 'g.commandChoice': return ps.pickCommand(msg.choiceId, msg.idx);
       case 'g.refresh': return ps.refresh();
       case 'g.freeze': return ps.freeze();
       case 'g.levelUp': return ps.levelUp();
@@ -181,8 +185,10 @@ export class MatchIntents {
   kickBot(ps) {
     if (!ps.botControlled || this.ended) return;
     this.offersChanged();
-    if (this.phase === PHASE.INFO_CHECK && !ps.infoReady) { ps.infoReady = true; this.markPublic(); this.maybeEndInfo(); }
+    if (this.phase === PHASE.INFO_CHECK) { this.pickBotBondGroup(ps); ps.infoReady = true; this.markPublic(); this.maybeEndInfo(); }
     else if (this.phase === PHASE.BAND_DRAFT && this.draftTurn() === ps.playerId) this.scheduleBandBot();
+    // 选择自编: a seat that turns AI-controlled (托管, AI handover) confirms its bring at once, as at the step's start
+    else if (this.phase === PHASE.CUSTOM_CHECK && ps.diyBring == null) { this._applyDiyBring(ps, this._diyChoice(ps)); this.markPublic(); this.maybeEndCustom(); }
     else if (this.phase === PHASE.SP_DRAFT && this.spTurn() === ps.playerId) this.scheduleSpBot();
     else if (this.phase === PHASE.PREP && ps.alive && !ps.ready) this.scheduleBotPrep(ps, 0);
   }

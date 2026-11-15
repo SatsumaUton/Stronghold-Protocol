@@ -3,6 +3,7 @@
 import { attackRangeGrid, extendedGrid } from '../../../../shared/loadoutRecord.js';
 import { chessLoadout, standInLoadout } from '../../ui/gameLogic.js';
 import { tokenVariantFor } from '../../ui/gameLogic/loadout.js';
+import { isHealingRange } from '../../ui/rangeStyle.js';
 import { normDir } from '../../ui/facing.js';
 
 /** Resolve the inspected field unit without granting placement or sale actions. */
@@ -35,5 +36,5 @@ export function inspectRange({ target, detail, pieces, showPrep = false, field, 
   const base = Array.isArray(live?.range) ? live.range : attackRangeGrid(record);
   const ext = Array.isArray(live?.range) ? 0 : Math.max(0, Math.floor(Number(echoExtend) || 0));
   const grid = ext > 0 && Array.isArray(base) ? extendedGrid(base, ext) : base;
-  return grid?.length ? { grid, row, col, dir } : null;
+  return grid?.length ? { grid, row, col, dir, healing: isHealingRange(record) } : null;
 }

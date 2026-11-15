@@ -3,6 +3,7 @@
 import { VOICE_LANGS, sanitizeVoiceOverrides } from '../../voicePrefs.js';
 export { VOICE_LANGS } from '../../voicePrefs.js';
 
+import { BUILTIN_ID } from '../../../../shared/uiTheme.js';
 import { clamp, isObj } from './shared.js';
 import { DEFAULT_HOTKEYS, sanitizeHotkeys } from './shortcuts.js';
 
@@ -36,7 +37,8 @@ export const TEXT_SIZES = Object.freeze(['sm', 'md', 'lg', 'xl']);
  *  combatMetrics: 设置「作战统计」 (PR #618), off by default: the official HUD has no such panel.
  *  prepDeployFold: 设置「部署时收起商店」 — picking up a piece on the own prep board folds the shop and zooms
  *  (GitHub #602, PR #646). Default on (the 0.3.0 behaviour). Off: the pickup changes neither the shop's fold nor the
- *  camera. [ASSUMED] the label; only an explicit false turns it off (a missing or junk value stays on).
+ *  camera. #692 adds 'partial': keep the shop at 70%, with halfway camera offsets. [ASSUMED] this middle level.
+ *  [ASSUMED] the label; only an explicit false turns it off (a missing or junk value stays on).
  *  officialFx: 设置「官方特效」 (0.3.0, render/vfx): 'auto' (完整 on a desktop, 精简 on a touch device — render/vfx/tier.js),
  *  'off', 'lite' (精简), 'full' (完整); only shown when effects were extracted from the local client.
  *  otherSkins: 设置「显示其他玩家的皮肤」 (docs/SKINS.md), ON by default — draw the appearance another player chose instead
@@ -44,6 +46,8 @@ export const TEXT_SIZES = Object.freeze(['sm', 'md', 'lg', 'xl']);
  *  confirmDestroy: 设置「销毁道具前确认」(2026-11-08, maintainer: 销毁道具的提示框加「下次不再提醒」) — the confirm dialog
  *  before an item / Art is destroyed. ON by default (the dialog as it always was); the dialog's own checkbox writes the
  *  same switch off, and 设置 can turn it back on. [ASSUMED] the label; only an explicit false turns it off.
+ *  uiTheme: 设置「界面主题」 (docs/THEMES.md). Empty is the built-in 卫戍协议终端. A stored id is this browser's
+ *  pack only — never sent, and it does not change a match.
  */
 export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, fullscreenWakeLock: false, bondTimers: false, combatMetrics: false, prepDeployFold: true, confirmDestroy: true, quality: 'high', officialFx: 'auto', otherSkins: true, textSize: 'sm', keys: DEFAULT_HOTKEYS });
 const QUALITIES = ['high', 'medium', 'low'];
@@ -67,6 +71,14 @@ function ammoEnergyCountOf(r) {
  * @returns {{ bgm: number, sfx: number, voice: number, voiceLang: 'cn'|'jp'|'en'|'kr', voiceNative: boolean, voiceOverrides: Record<string, string>, muted: boolean, damageNumbers: boolean, officialDamageNumbers: boolean, ammoEnergyCount: boolean, fullscreenWakeLock: boolean, bondTimers: boolean, combatMetrics: boolean, prepDeployFold: boolean, confirmDestroy: boolean, quality: 'high'|'medium'|'low', officialFx: 'auto'|'off'|'lite'|'full', otherSkins: boolean,
  *   textSize: 'sm'|'md'|'lg'|'xl', keys: Record<'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'destroy'|'ready', string> }}
  */
+const THEME_ID = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+
+/** Empty, the built-in id, or a pack id. Anything else is the built-in look. */
+function uiThemeOf(raw) {
+  if (raw == null || raw === '' || raw === BUILTIN_ID) return '';
+  return typeof raw === 'string' && THEME_ID.test(raw) ? raw : '';
+}
+
 export function sanitizeSettings(raw) {
   const r = isObj(raw) ? raw : {};
   const vol = (v, d) => (Number.isFinite(v) ? clamp(Math.round(v * 100) / 100, 0, 1) : d);
@@ -84,12 +96,14 @@ export function sanitizeSettings(raw) {
     bondTimers: r.bondTimers === true,
     combatMetrics: typeof r.combatMetrics === 'boolean' ? r.combatMetrics : DEFAULT_SETTINGS.combatMetrics,
     prepDeployFold: typeof r.prepDeployFold === 'boolean' ? r.prepDeployFold : true,
-    confirmDestroy: typeof r.confirmDestroy === 'boolean' ? r.confirmDestroy : DEFAULT_SETTINGS.confirmDestroy,
     fullscreenWakeLock: typeof r.fullscreenWakeLock === 'boolean' ? r.fullscreenWakeLock : DEFAULT_SETTINGS.fullscreenWakeLock,
     quality: QUALITIES.includes(r.quality) ? r.quality : DEFAULT_SETTINGS.quality,
     officialFx: OFFICIAL_FX_MODES.includes(r.officialFx) ? r.officialFx : DEFAULT_SETTINGS.officialFx,
     otherSkins: r.otherSkins !== false,
     textSize: TEXT_SIZES.includes(r.textSize) ? r.textSize : DEFAULT_SETTINGS.textSize,
+    uiTheme: uiThemeOf(r.uiTheme),
+    // 主题动画: the official packs' looping tweens and clips (ui/prefab); off draws them still
+    themeMotion: r.themeMotion !== false,
     keys: sanitizeHotkeys(r.keys),
   };
 }

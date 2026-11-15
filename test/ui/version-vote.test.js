@@ -117,7 +117,9 @@ test('the room screen: the strip between the 观战席 and the footer, the versi
   assert.match(src, /data-testid="room-version"/);
   // (startLocked was added later: 服务器暂时关闭了开始游戏 — the same button, one more gate)
   assert.match(src, /disabled=\$\{!facts\.canStart \|\| !online \|\| busy === 'start' \|\| !!vote(?:\s*\|\| startLocked)?\}/);
-  assert.match(src, /t\('请先关闭改变玩法的插件'\)/);
+  assert.match(src, /disabled=\$\{!facts\.canStart \|\| !online \|\| busy === 'start' \|\| !!vote\}/);
+  // gameplay plugins no longer block a proposal on the page: the server checks their manifest versions
+  assert.doesNotMatch(src, /facts\.modded \? t\('请先关闭改变玩法的插件'\)/);
   assert.match(src, /data-testid="version-banner"/);
   assert.match(src, /t\('\{name\}邀请你加入卫戍协议：盟约·\{version\}【\{difficulty\}】'/);
   assert.match(src, /net\.request\('room\.proposeVersion', \{ version \}\)/);
