@@ -6603,7 +6603,7 @@
       {
         "path": "content/announcements.json",
         "baseExists": false,
-        "customBytes": 21812
+        "customBytes": 21806
       },
       {
         "path": "dashboard/public/app.js",
@@ -6657,7 +6657,7 @@
       },
       {
         "path": "public/css/components.css",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 67167
       },
       {
@@ -6722,12 +6722,12 @@
       },
       {
         "path": "public/js/main.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 46566
       },
       {
         "path": "public/js/net.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 50891
       },
       {
@@ -6737,7 +6737,7 @@
       },
       {
         "path": "public/js/screens/bandDraft.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 41882
       },
       {
@@ -6757,7 +6757,7 @@
       },
       {
         "path": "public/js/screens/game/overlays.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 10991
       },
       {
@@ -6777,7 +6777,7 @@
       },
       {
         "path": "public/js/screens/settle.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 42824
       },
       {
@@ -6802,12 +6802,12 @@
       },
       {
         "path": "public/js/ui/bossPlates.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 15087
       },
       {
         "path": "public/js/ui/connBanner.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 9630
       },
       {
@@ -6932,12 +6932,12 @@
       },
       {
         "path": "public/js/ui/teamPanel.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 17840
       },
       {
         "path": "public/js/ui/toasts.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 8093
       },
       {
@@ -6967,7 +6967,7 @@
       },
       {
         "path": "server/match/bondsMeta.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 15192
       },
       {
@@ -7002,7 +7002,7 @@
       },
       {
         "path": "server/match/match/common.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 4800
       },
       {
@@ -7087,7 +7087,7 @@
       },
       {
         "path": "server/match/match/platform.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 24114
       },
       {
@@ -7123,7 +7123,7 @@
       {
         "path": "server/match/player/economy.js",
         "baseExists": true,
-        "customBytes": 17080
+        "customBytes": 17073
       },
       {
         "path": "server/match/player/placement.js",
@@ -7157,7 +7157,7 @@
       },
       {
         "path": "server/net.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 53732
       },
       {
@@ -7172,7 +7172,7 @@
       },
       {
         "path": "server/persist/persister.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 28880
       },
       {
@@ -7218,7 +7218,7 @@
       {
         "path": "server/sim/content/garrisons/meta.js",
         "baseExists": true,
-        "customBytes": 24101
+        "customBytes": 23614
       },
       {
         "path": "server/sim/content/support/index.js",
@@ -7232,7 +7232,7 @@
       },
       {
         "path": "server/sim/units.js",
-        "baseExists": false,
+        "baseExists": true,
         "customBytes": 17179
       },
       {

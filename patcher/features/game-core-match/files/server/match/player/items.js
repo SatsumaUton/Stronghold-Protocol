@@ -20,10 +20,10 @@ export class PlayerItems {
    */
   releaseItemStock(piece) {
     if (!piece || piece.kind !== 'item' || !this.m?.itemPool) return 0;
-    // 必须是 this.m.itemPool（不是 this.itemPool）：PlayerItems 自己没有 itemPool，
-    // 2026-10-27 那次「把已在跑但没进 git 的改动补进来」的同步把这里错改成了 this.itemPool，
-    // 于是 releaseItemStock 一定抛 TypeError（守卫查的是 this.m?.itemPool，闸门放行）。
-    return this.m.itemPool.repay(piece.id, this.m.itemPool.need(piece.id));
+    // `this.itemPool` 是 PlayerState 的 getter（`get itemPool() { return this.m.itemPoolFor(this); }`），
+    // 也就是**本座位**的装备池；`this.m.itemPool` 是全队共享池。这里要的是本座位那份。
+    // （2026-11-15 曾误判为「this.itemPool 不存在 → 崩溃」而改成 this.m.itemPool，已改回。）
+    return this.itemPool.repay(piece.id, this.itemPool.need(piece.id));
   }
 
   /**
