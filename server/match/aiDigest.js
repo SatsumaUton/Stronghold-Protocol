@@ -4,7 +4,6 @@ import { interestDigest, effectText } from '../ai/knowledge.js';
 import { operatorCaps } from '../ai/playbook.js';
 import { ruleOption } from '../../shared/plugins/rules.js';
 import { pieceBonds, projectionOf } from './bondsMeta.js';
-import { advisorBanks } from './aiEconomy.js';
 import { fieldModel, botIntent } from './bot.js';
 import { bossPoolHp } from './finalAssault.js';
 import { keepsFunds } from './bandCommands.js';
