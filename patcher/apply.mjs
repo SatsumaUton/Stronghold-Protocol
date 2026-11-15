@@ -526,8 +526,11 @@ const EDITS = [
     file: 'server/lobby.js',
     marker: '游客不能创建同盟模拟房间',
     apply(src) {
-      const anchor = "  create(session, { mode, difficulty: asked, test, version: askedVersion, soloUnlimited } = {}) {\n";
-      if (!src.includes(anchor)) return null;
+      // 0.4.0 起这个签名多了 modeId（官方加了版本维度），所以用正则匹配
+      // 「create(session, { …解构… } = {}) {」整行，而不是钉死参数列表。
+      const re = /^ {2}create\(session, \{ [^\n]*\} = \{\}\) \{\n/m;
+      if (!re.test(src)) return null;
+      const anchor = src.match(re)[0];
       const block = [
         '    // 本服：游客不能建房，先给出明确原因，避免只拿到 BAD_MSG。',
         '    if (session.guest || !session.accountId) {',
