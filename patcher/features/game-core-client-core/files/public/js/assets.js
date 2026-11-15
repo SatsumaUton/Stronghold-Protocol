@@ -58,6 +58,15 @@ function __spRemoteAssetRe() {
       && window.__SP__.data.get && (window.__SP__.data.get('config') || {}).assetOrigin)
     || '';
   const host = String(origin).replace(/^https?:\/\//, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // ★ 2026-11-16 兜底：清单是在 config 之前 adopt 的，那时 origin 还是空串，正则变成
+  //   `^https?:\/\/\/assets\/`，永远匹配不上 —— 于是清单里的绝对地址整场都留在资源站上
+  //   （spine / 立绘 / 界面贴图 / BGM 全走外链），而资源站上那份是旧的：实测
+  //   `local/themes/ac_n_initial/layout.json` 只有 20 字节、`operator_preset.png` 448 字节
+  //   （本地 767 KB / 642 B），season 背景 1.12 MB vs 1.27 MB。没有 origin 时按
+  //   「任意域名的 /assets/」收同源 —— 和 ui/skins.js、ui/gameComponents.js 同一条规则；
+  //   插件/自制素材不走 /assets/，不受影响。带 `~<hash>/` 的地址也一并收：nginx 的
+  //   `location ^~ /assets/` 本来就有 `rewrite ^/assets/~[0-9a-f]+/(.*)$ /assets/$1 last`。
+  if (!host) return /^https?:\/\/[^/]+\/assets\//i;
   return new RegExp('^https?:\\/\\/' + host + '\\/assets\\/');
 }
 
@@ -75,6 +84,14 @@ export function baseCharId(id) {
   if (!s) return null;
   return s.replace(/_(1|2)$/, '');
 }
+/**
+ * An asset-manifest key without its data-version prefix: `act1autochess:enemy_1275_dwlock` → `enemy_1275_dwlock`.
+ *
+ * 深潜会从别的版本的数据表里抽敌人（server/match/match/echoCrossVersion.js），key 带 `<version>:` 前缀；
+ * 而 `data/assets.json` 按裸 id 索引（素材与版本无关）。查素材前先剥掉前缀，否则这些敌人
+ * 没有图标也没有模型 —— 备战与战斗里都只剩占位菱形。
+ */
+export const plainAssetId = (id) => String(id).replace(/^[^:]+:/, '');
 
 /**
  * Operator avatar. Accepts a charId (`char_002_amiya`) or an asset id with the E2 suffix (`char_002_amiya_2`).
@@ -145,15 +162,21 @@ export function illustUrl(m, id, opts) {
 }
 
 export function enemyIconUrl(m, enemyId) {
-  const rec = get(get(m, 'enemies'), str(enemyId) || '');
+  const s = str(enemyId);
+  if (!s) return null;
+  // 跨版本敌人（深潜的 `act1autochess:enemy_…`）在清单里只有裸 key
+  const rec = get(get(m, 'enemies'), s) || get(get(m, 'enemies'), plainAssetId(s));
   return str(rec && rec.icon);
 }
 
-/** Token avatar, falling back to its owner's avatar (docs/ASSETS.md token fallbacks). */
-export function tokenAvatarUrl(m, tokenId) {
+/** Token avatar: `tokens[id].skins[opts.skin]`, else the token's avatar, else its owner's (docs/ASSETS.md token
+ * fallbacks, docs/SKINS.md). */
+export function tokenAvatarUrl(m, tokenId, opts) {
   const rec = get(get(m, 'tokens'), str(tokenId) || '');
   if (!rec) return null;
-  return str(rec.avatar) || (rec.owner ? avatarUrl(m, rec.owner) : null) || str(get(get(get(m, 'prof'), 'battlecard'), 'token'));
+  const wanted = opts && str(opts.skin) ? String(opts.skin) : null;
+  const skin = wanted ? get(get(rec, 'skins'), wanted) : null;
+  return str(skin && skin.avatar) || str(rec.avatar) || (rec.owner ? avatarUrl(m, rec.owner) : null) || str(get(get(get(m, 'prof'), 'battlecard'), 'token'));
 }
 
 export const bondIconUrl = (m, bondId) => str(get(get(m, 'bonds'), str(bondId) || ''));
@@ -248,10 +271,21 @@ export function spineEntry(m, id, opts) {
   }
   const tk = get(get(m, 'tokens'), s);
   if (tk) {
+    // A summon's own appearance (docs/SKINS.md): `tokens[id].skins[<owner skin id>]`, the official tokenSkinMap, written
+    // by a cosmetic plugin. A skin the manifest does not hold (or none asked for) draws the token's own model.
+    const wanted = opts && str(opts.skin) ? String(opts.skin) : null;
+    if (wanted) {
+      const skin = get(get(tk, 'skins'), wanted);
+      if (isObj(skin) && isObj(skin.spine)) {
+        const sp = (opts && opts.back && isObj(skin.spine.back)) ? skin.spine.back : skin.spine.front;
+        if (validSpine(sp)) return sp;
+      }
+    }
     const web = validSpine(tk.spine) ? tk.spine : null;
     return (opts && opts.local && localSpineEntry(tk.spineLocal, opts.local, web)) || web;
   }
-  const en = get(get(m, 'enemies'), s);
+  // 跨版本敌人（深潜的 `act1autochess:enemy_…`）：素材清单按裸 id 索引
+  const en = get(get(m, 'enemies'), s) || get(get(m, 'enemies'), plainAssetId(s));
   if (en) {
     let web = null;
     if (validSpine(en.spine)) web = en.spine;
@@ -295,19 +329,26 @@ export function localSpineEntry(sl, local, web) {
  */
 export function hasBackSpine(m, id, skinId) {
   const ch = get(get(m, 'chars'), str(id) || '') || get(get(m, 'chars'), baseCharId(id) || '');
-  if (!ch) return false;
-  const skin = str(skinId) ? get(get(ch, 'skins'), String(skinId)) : null;
-  const src = skinHasModel(skin) ? skin.spine : ch.spine;
+  if (ch) {
+    const skin = str(skinId) ? get(get(ch, 'skins'), String(skinId)) : null;
+    const src = skinHasModel(skin) ? skin.spine : ch.spine;
+    return !!(isObj(src) && validSpine(src.back));
+  }
+  // 召唤物皮肤 (docs/SKINS.md): a token's skin may ship its own Back; otherwise the token's own model decides
+  const tk = get(get(m, 'tokens'), str(id) || '');
+  if (!tk) return false;
+  const skin = str(skinId) ? get(get(tk, 'skins'), String(skinId)) : null;
+  const src = skin && isObj(skin.spine) ? skin.spine : tk.spine;
   return !!(isObj(src) && validSpine(src.back));
 }
 
 export function validSpine(sp) {
-  return isObj(sp) && typeof sp.skel === 'string' && /^(?:\/|https?:\/\/)[^\s]*\.skel$/.test(sp.skel) && typeof sp.atlas === 'string' && isObj(sp.anims);
+  return isObj(sp) && typeof sp.skel === 'string' && /^(?:\/|https?:\/\/)[^\s]*\.(?:skel|json)$/.test(sp.skel) && typeof sp.atlas === 'string' && isObj(sp.anims);
 }
 
 /** Best 2D picture for a unit asset id (operator avatar, token avatar, enemy icon, item icon); `opts` reaches avatarUrl. */
 export function unitPictureUrl(m, id, opts) {
-  return avatarUrl(m, id, opts) || tokenAvatarUrl(m, id) || enemyIconUrl(m, id) || itemIconUrl(m, id) || null;
+  return avatarUrl(m, id, opts) || tokenAvatarUrl(m, id, opts) || enemyIconUrl(m, id) || itemIconUrl(m, id) || null;
 }
 
 // ---- audio ---------------------------------------------------------------------------------------------------
@@ -929,7 +970,10 @@ export function createAssets(options) {
   function adopt(m) {
     if (manifest || !isObj(m)) return false;
     manifest = localizeAssetUrls(m);
-    readyPromise = Promise.resolve(m);
+    // ★ 2026-11-16：这里原来 resolve 的是**没改写过的** `m`。`ready()` 在 manifest 就绪后走的是
+    //   `Promise.resolve(manifest)`（已改写），但在这之前已经 await 的调用方拿到的是原始地址 ——
+    //   同一份清单两种形态，谁先到谁得外链（battle/商店/盟约图标就是这样漏到资源站上的）。
+    readyPromise = Promise.resolve(manifest);
     backoffN = 0;
     if (backoffTimer != null) { timers.clear(backoffTimer); backoffTimer = null; }
     notify('manifest');
@@ -1119,7 +1163,7 @@ export function createAssets(options) {
     portrait: (id, o) => portraitUrl(m(), id, o),
     illust: (id, o) => illustUrl(m(), id, o),
     enemyIcon: (id) => enemyIconUrl(m(), id),
-    tokenAvatar: (id) => tokenAvatarUrl(m(), id),
+    tokenAvatar: (id, o) => tokenAvatarUrl(m(), id, o),
     bondIcon: (id) => bondIconUrl(m(), id),
     bandIcon: (id) => bandIconUrl(m(), id),
     itemIcon: (item) => itemIconUrl(m(), item),

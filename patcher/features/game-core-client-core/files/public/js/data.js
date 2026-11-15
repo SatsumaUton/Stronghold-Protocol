@@ -121,6 +121,36 @@ export const ART_MANIFEST_TIMEOUT_MS = 8000;
 const ART_MANIFESTS = new Set(['local', 'assets']);
 
 /**
+ * 资源站绝对地址 → 本机 `/assets/…`（data/assets.json、data/local-assets.json 里的图 / BGM 一律走同源）。
+ *
+ * 为什么放在 data 层：`assets.js` 只改写**它自己读到的那份**清单，可站内还有一批直接用
+ * `data.get('assets')` 取地址的调用（`components.js tierChipUrl`、盟约舰船图标、难度图标…），
+ * 它们绕过了 assets.js —— 线上实测这些 `<img src>` 仍是
+ * `https://assets.luobomiao.love/assets/~<hash>/ui/…`，而资源站上那份是旧的
+ * （实测 `local/themes/ac_n_initial/layout.json` 只有 20 字节）。在 data 层收一次，谁都绕不过去。
+ *
+ * 规则与 `ui/skins.js` / `ui/gameComponents.js` / `assets.js` 的兜底一致：任意域名的 `/assets/`
+ * 都收同源；带 `~<hash>/` 的地址一并收（nginx 的 `location ^~ /assets/` 有
+ * `rewrite ^/assets/~[0-9a-f]+/(.*)$ /assets/$1 last`）。插件/自制素材不走 `/assets/`，不受影响。
+ */
+const REMOTE_ASSET_RE = /^https?:\/\/[^/]+\/assets\//i;
+function sameOriginArt(value, seen = new Set()) {
+  if (typeof value === 'string') {
+    return REMOTE_ASSET_RE.test(value) ? `/assets/${value.replace(REMOTE_ASSET_RE, '')}` : value;
+  }
+  if (!value || typeof value !== 'object' || seen.has(value)) return value;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    const out = new Array(value.length);
+    for (let i = 0; i < value.length; i++) out[i] = sameOriginArt(value[i], seen);
+    return out;
+  }
+  const out = {};
+  for (const k of Object.keys(value)) out[k] = sameOriginArt(value[k], seen);
+  return out;
+}
+
+/**
  * A failed load worth retrying: the request itself failed (network error) or the server answered 5xx / 408 / 429 — not a
  * definite 4xx (the file is not there) nor a delivered file that is not valid JSON (`badJson`).
  */
@@ -232,7 +262,8 @@ export function createDataStore(opts = {}) {
       let toldMissing = false;
       for (let attempt = 0; ; attempt++) {
         try {
-          entry.value = await readJson(name);
+          const raw = await readJson(name);
+          entry.value = art ? sameOriginArt(raw) : raw;
           entry.status = 'ready';
           break;
         } catch (err) {
@@ -418,7 +449,11 @@ export function createDataStore(opts = {}) {
     get: (name) => {
       const v = localizedEntry(name)?.value ?? entries.get(name)?.value ?? null;
       const view = views.get(name);
-      return view && v != null ? view(v) : v;
+      if (!view) return v;
+      if (v != null) return view(v);
+      // a view marked `withMissing` also stands in for a file the server does not have (the official themes this
+      // browser imported over a host without local art, §37.232) — once it is known missing, never while it loads
+      return view.withMissing === true && entries.get(name)?.status === 'missing' ? view(null) : null;
     },
     /** The file exactly as downloaded (Chinese texts), whatever the locale. */
     getRaw: (name) => entries.get(name)?.value ?? null,

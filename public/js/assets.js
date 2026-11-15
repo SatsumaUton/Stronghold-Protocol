@@ -58,6 +58,15 @@ function __spRemoteAssetRe() {
       && window.__SP__.data.get && (window.__SP__.data.get('config') || {}).assetOrigin)
     || '';
   const host = String(origin).replace(/^https?:\/\//, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // ★ 2026-11-16 兜底：清单是在 config 之前 adopt 的，那时 origin 还是空串，正则变成
+  //   `^https?:\/\/\/assets\/`，永远匹配不上 —— 于是清单里的绝对地址整场都留在资源站上
+  //   （spine / 立绘 / 界面贴图 / BGM 全走外链），而资源站上那份是旧的：实测
+  //   `local/themes/ac_n_initial/layout.json` 只有 20 字节、`operator_preset.png` 448 字节
+  //   （本地 767 KB / 642 B），season 背景 1.12 MB vs 1.27 MB。没有 origin 时按
+  //   「任意域名的 /assets/」收同源 —— 和 ui/skins.js、ui/gameComponents.js 同一条规则；
+  //   插件/自制素材不走 /assets/，不受影响。带 `~<hash>/` 的地址也一并收：nginx 的
+  //   `location ^~ /assets/` 本来就有 `rewrite ^/assets/~[0-9a-f]+/(.*)$ /assets/$1 last`。
+  if (!host) return /^https?:\/\/[^/]+\/assets\//i;
   return new RegExp('^https?:\\/\\/' + host + '\\/assets\\/');
 }
 
@@ -961,7 +970,10 @@ export function createAssets(options) {
   function adopt(m) {
     if (manifest || !isObj(m)) return false;
     manifest = localizeAssetUrls(m);
-    readyPromise = Promise.resolve(m);
+    // ★ 2026-11-16：这里原来 resolve 的是**没改写过的** `m`。`ready()` 在 manifest 就绪后走的是
+    //   `Promise.resolve(manifest)`（已改写），但在这之前已经 await 的调用方拿到的是原始地址 ——
+    //   同一份清单两种形态，谁先到谁得外链（battle/商店/盟约图标就是这样漏到资源站上的）。
+    readyPromise = Promise.resolve(manifest);
     backoffN = 0;
     if (backoffTimer != null) { timers.clear(backoffTimer); backoffTimer = null; }
     notify('manifest');
