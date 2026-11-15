@@ -200,7 +200,10 @@ export function GameScreen() {
   const version = useStore((s) => { const v = shownVersion(s); return v !== DEFAULT_VERSION ? v : null; });
   const versionState = useStore((c) => (c.kind === 'version' && c.version === version ? c.status : 'loading'), Object.is, contentSet);
   const versionReady = !version || versionState === 'ready';
-  const voteRoom = useStore((s) => (s.room?.versionVote && !s.room.inMatch ? s.room : null));
+
+  // 子节点里要判「测试房房主」与「深渊回响」（见下面的 testHost / dive）
+  const myId = useStore((s) => s.me.playerId);
+  const room = useStore((s) => s.room);
   // 协议启动！'s official sprites (ui/protocolBoot.js), fetched while the briefing and the band draft run
   useEffect(() => { if (gd.ready) preloadBootArt(); }, [gd.ready]);
   // 已选定策略 (PR #643, the event's draft end, video 7:36–7:44): once the draft is over the screen stays DRAFT_HOLD_MS on

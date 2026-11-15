@@ -441,7 +441,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 136779
+        "customBytes": 140482
       },
       {
         "path": "server/lobby.js",
@@ -530,7 +530,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 136779
+        "customBytes": 140482
       }
     ]
   },
@@ -5268,7 +5268,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 136779
+        "customBytes": 157531
       },
       {
         "path": "public/js/screens/loadout.js",
@@ -6758,7 +6758,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 156725
+        "customBytes": 157531
       },
       {
         "path": "public/js/screens/game/overlays.js",

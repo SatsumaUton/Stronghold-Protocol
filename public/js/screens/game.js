@@ -218,6 +218,9 @@ export function GameScreen() {
   const versionState = useStore((c) => versionContentStatus(c, version, roomCs), Object.is, contentSet);
   const versionReady = !version || versionState === 'ready';
   const voteRoom = useStore((s) => (s.room?.versionVote && !s.room.inMatch ? s.room : null));
+  // 子节点里要判「测试房房主」与「深渊回响」（见下面的 testHost / dive）
+  const myId = useStore((s) => s.me.playerId);
+  const room = useStore((s) => s.room);
   // 协议启动！'s official sprites (ui/protocolBoot.js), fetched while the briefing and the band draft run
   useEffect(() => { if (gd.ready) preloadBootArt(); }, [gd.ready]);
   // 已选定策略 (PR #643, the event's draft end, video 7:36–7:44): once the draft is over the screen stays DRAFT_HOLD_MS on
@@ -258,16 +261,21 @@ export function GameScreen() {
   else if (mode === 'diy') body = html`<${DiyCheckScreen} />`;
   else if (mode === 'draft' || held) body = html`<${BandDraftScreen} held=${held} />`;
   else body = html`<${MatchScreen} />`;
+  // 这几个面板只在深渊回响里有内容、别的对局里都返回 null —— 返回 null 的组件没有 _dom，
+  // 排在子节点列表尾部时，尾部一增一删就会 insertBefore(undefined) 崩掉（诊断面板抓到的链：
+  // 「… EchoProjectionPanel < TestConsole < App」）。所以按条件**不挂载**，并且都给稳定 key。
+  const dive = !!pub?.echo || isDivePub(pub) || diveRoom;
+  const testHost = pub?.test === true && myId === room?.hostId;
   return html`${body}
-    ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} room=${voteRoom} class="vervote--float" />` : null}
-    ${!hasResult && mode !== 'result' ? html`<${EchoBlessing} pub=${pub} />` : null}
-    ${!hasResult && mode !== 'result' ? html`<${EchoSupplyPanel} pub=${pub} />` : null}
-    ${!hasResult && mode !== 'result' ? html`<${EchoProjectionPanel} pub=${pub} priv=${priv} />` : null}
+    ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} key="vervote" room=${voteRoom} class="vervote--float" />` : null}
+    ${dive && !hasResult && mode !== 'result' ? html`<${EchoBlessing} key="echo-blessing" pub=${pub} />` : null}
+    ${dive && !hasResult && mode !== 'result' ? html`<${EchoSupplyPanel} key="echo-supply" pub=${pub} />` : null}
+    ${dive && !hasResult && mode !== 'result' ? html`<${EchoProjectionPanel} key="echo-projection" pub=${pub} priv=${priv} />` : null}
     ${/* 深潜的深度已顶替 HUD 的回合数字；词条/祝福改放在「本局信息」抽屉里（EchoInfoBlock），
         不再有浮在屏幕上的状态条挡住 HUD 和按钮（维护者 2026-11-04） */ null}
-    ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
-    ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} reason=${endReason} dive=${isDivePub(pub) || diveRoom} />` : null}
-    ${!hasResult && mode !== 'result' ? html`<${TestConsole} />` : null}`;
+    ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} key="away" />` : null}
+    ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} key="ended" reason=${endReason} dive=${dive} />` : null}
+    ${testHost && !hasResult && mode !== 'result' ? html`<${TestConsole} key="test-console" />` : null}`;
 }
 
 // ---- match screen ----------------------------------------------------------------------------------------
