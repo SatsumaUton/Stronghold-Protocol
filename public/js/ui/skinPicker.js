@@ -42,6 +42,26 @@ const cx = (...p) => p.flat().filter(Boolean).join(' ');
  * operator no avatar at all has no second image and keeps its portrait everywhere.
  * @param {{ row: any, chosen: boolean, onPick: () => void, onPreview: () => void }} props
  */
+/**
+ * 皮肤格子的 <img> 失败处理：先带 ?retry=1 重试一次（瞬时失败很常见），
+ * 还失败就清掉 src —— 宁可显示空格子，也不要浏览器那个「破图」图标。
+ */
+function retryOnce(e) {
+  const el = e && (e.currentTarget || e.target);
+  if (!el) return;
+  const src = String(el.getAttribute("src") || "");
+  if (!src) return;
+  if (!el.dataset.retry) {
+    el.dataset.retry = "1";
+    try {
+      const u = new URL(src, location.origin);
+      u.searchParams.set("retry", "1");
+      el.src = u.href;
+      return;
+    } catch { /* 落下去清 src */ }
+  }
+  el.removeAttribute("src");
+}
 function SkinTile({ row, chosen, onPick, onPreview }) {
   const isDefault = row.own;
   const title = isDefault ? t('干员本体，不使用时装') : chosen ? t('点击放大预览') : t('点击选择这套外观');
@@ -50,10 +70,10 @@ function SkinTile({ row, chosen, onPick, onPreview }) {
       title=${title} onClick=${() => (chosen && !isDefault ? onPreview() : onPick())}>
     <span class=${cx('lo-skin__art', row.face && 'lo-skin__art--face')}>
       ${row.art
-        ? html`<img class="lo-skin__art--big" src=${row.art} alt="" loading="lazy" />`
+        ? html`<img class="lo-skin__art--big" src=${row.art} alt="" loading="lazy" onError=${retryOnce} />`
         : null}
       ${row.face
-        ? html`<img class="lo-skin__art--faceimg" src=${row.face} alt="" loading="lazy" />`
+        ? html`<img class="lo-skin__art--faceimg" src=${row.face} alt="" loading="lazy" onError=${retryOnce} />`
         : null}
       ${!row.art && !row.face
         ? html`<span class="lo-skin__art--none"></span>`
