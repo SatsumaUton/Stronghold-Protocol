@@ -41,6 +41,7 @@ import { StepHeader, ExitModal } from '../ui/matchChrome.js';
 import { MatchInfoDialog, matchInfoModel, MatchBondDialog, regulationCoreAbsent } from '../ui/matchInfo.js';
 import { MatchEnemies, stagePoolLine } from '../ui/matchEnemies.js';
 import { StageMiniMap } from '../ui/stagePreview.js';
+import { shownVersion, seasonOf, REGULATION_SEASON } from '../versions.js';
 import { plannableBonds, bondPlanOpen, bondPlanHolders, BondPlanTag, BondPlanPicker } from '../ui/bondPlan.js';
 import { actions, act } from '../ui/gameActions.js';
 import { normalizeDraft, sortedPlayers, draftMyTurn, pregameStepCount, pregameStepIndex } from '../ui/gameLogic.js';
@@ -325,6 +326,10 @@ export function BandDraftScreen({ held = null } = {}) {
   const bands = useMemo(() => allowedBands(gd.list('bands'), mode?.type || (solo ? 'SINGLE' : 'MULTI'), disableDuckLord), [gd.ready, mode?.type, solo, disableDuckLord, data.locale(), data.contentId()]);
   // 本局的战场（左栏小地图，ui/stagePreview.js）与它的池说明
   const stage = pub?.stageId ? gd.stage(pub.stageId) : null;
+  // 规程（第三期）在选策略这一步不再画战场小地图（维护者 2026-11-15）：
+  // 新版把战场信息放在「本局信息」里，这一块留着只是占位、还容易让人以为要按它选。
+  const draftVersion = useStore(shownVersion);
+  const hideDraftMap = seasonOf(draftVersion) === REGULATION_SEASON;
   const stagePool = stagePoolLine(mode);
   const players = sortedPlayers(pub);
   const draft = normalizeDraft(pub?.draft, players);
@@ -497,7 +502,7 @@ export function BandDraftScreen({ held = null } = {}) {
     <main class="draft__main">
       <aside class=${cx('draft-order', draft.concurrent && 'is-wide')}>
         <div class="draft-order__deco" aria-hidden="true"><i></i><i></i><span>STRONGHOLD PROTOCOL<br />${solo ? 'SINGLE OPERATOR' : 'COLLABORATIVE SYSTEM'}</span></div>
-        ${stage ? html`<div class="draft-map" data-testid="draft-map" title=${stage.name}>
+        ${stage && !hideDraftMap ? html`<div class="draft-map" data-testid="draft-map" title=${stage.name}>
           <${StageMiniMap} stage=${stage} />
           <div class="draft-map__text">
             <span class="draft-tag">BATTLEFIELD</span>
