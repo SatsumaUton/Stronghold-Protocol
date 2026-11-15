@@ -253,7 +253,7 @@ import { MatchPhases } from './match/phases.js';
 import { MatchEcho } from './match/echoPhase.js';
 import { ECHO_LAST_ROUND, echoScale, isEchoRound } from './match/echo.js';
 import { echoCurveOf } from './match/echoConfig.js';
-import { crossVersionEnemies, crossVersionStages } from './match/echoCrossVersion.js';
+import { crossVersionEnemies, crossVersionStages, crossVersionBosses } from './match/echoCrossVersion.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchSpeedVote } from './match/speedVote.js';
 import { MatchPauseVote } from './match/pauseVote.js';
@@ -382,6 +382,13 @@ export class Match {
           const cur = Array.isArray(this.gd.mode.stages) ? this.gd.mode.stages.slice() : [];
           for (const id of st.ids) if (!cur.includes(id)) cur.push(id);
           try { this.gd.mode.stages = cur; } catch { /* mode 只读：只补 stages 表也能用 */ }
+        }
+        // BOSS / 隐藏 BOSS：同一难度下本版没有的那些也并进来（维护者 2026-11-16）。
+        const bs = crossVersionBosses(this.modeId, this.gd.raw && this.gd.raw.bosses);
+        if (bs && Object.keys(bs.bosses).length) {
+          this.gd.raw = { ...this.gd.raw, bosses: { ...this.gd.raw.bosses, ...bs.bosses } };
+          try { this.gd.mode.bossWeights = { ...(this.gd.mode.bossWeights || {}), ...bs.bossWeights }; } catch { /* 只读就跳过 */ }
+          try { this.gd.mode.hiddenBossWeights = { ...(this.gd.mode.hiddenBossWeights || {}), ...bs.hiddenBossWeights }; } catch { /* 只读就跳过 */ }
         }
       } catch { /* 少几张图不影响建局 */ }
     }
