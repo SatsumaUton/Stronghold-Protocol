@@ -1,4 +1,4 @@
-import { useState } from '../../../vendor/hooks.module.js';
+import { useState } from '../../../vendor/hooks.module.v2.js';
 import { html, Button, Modal } from '../../../js/ui/components.js';
 import { t } from '../../../../shared/i18n.js';
 import { availableSkins } from '../../../js/ui/skins.js';

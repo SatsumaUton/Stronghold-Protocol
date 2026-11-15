@@ -1,5 +1,5 @@
 // Manifest-driven controls shared by the room panel and the studio's trial selector.
-import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button } from './components.js';
 import { ComboBox } from './comboBox.js';
 import { getLang, t } from '../../../shared/i18n.js';

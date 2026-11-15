@@ -6,7 +6,7 @@
 // still in their lane and fade out after the official bubble time. The band reads the store itself (no re-render of the
 // match screen per emote) and wakes on a timer only while something is queued or on screen.
 
-import { useEffect, useReducer, useRef } from '../../vendor/hooks.module.js';
+import { useEffect, useReducer, useRef } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { useStore } from '../store.js';
 import { PlayerAvatar } from './gameComponents.js';

@@ -5,7 +5,7 @@
 import { bondTimerView } from '../content/bonds/timers.js';
 import { EVENT_BUFFER_CAP } from '../constants.js';
 import { elementView } from '../attack.js';
-import { unitInfo, snapshotUnits, ammoView, wolfView, negView, moteView, coinView, mysticView, layerView, chargeView } from '../snapshot.js';
+import { unitInfo, snapshotUnits, ammoView, wolfView, negView, moteView, coinView, mysticView, layerView, chargeView, shieldView, bossShieldView } from '../snapshot.js';
 
 export class BattleEvents {
   fx(kind, params = {}) {
@@ -81,6 +81,9 @@ export class BattleEvents {
    *         count under the HP bar;
    *   layers: [[id, n]] — the hit-negating 护盾 layers a unit holds (snapshot.js layerView: 泥岩's): the official layer
    *         effect it shows;
+   *   shield: [[id, points]] — the HP shield a unit holds (snapshot.js shieldView: the sum of its shield buffs, what is
+   *         left after the damage it absorbed): the strip under its HP bar and the detail card's number (维护者
+   *         2026-11-07); a hit-count barrier has no amount and is only the UF.SHIELD flag;
    *   charges: [[id, stored, maximum]] — the charges an ally's charge skill stores (snapshot.js chargeView: 卡涅利安's): the
    *         official sand armour of her charges;
    *   bondTimers: [[id, [{ id: effectId, count, remaining }]]] — selected-unit timed bond readouts (#746);
@@ -112,7 +115,18 @@ export class BattleEvents {
       snap.dps = {};
       for (const p of this.players) snap.dps[p.playerId] = Math.floor(p.dp);
     }
-    if (this.sharedBoss) snap.boss = { hp: Math.max(0, Math.round(this.sharedBoss.hp)), max: Math.round(this.sharedBoss.maxHp) };
+    if (this.sharedBoss) {
+      snap.boss = { hp: Math.max(0, Math.round(this.sharedBoss.hp)), max: Math.round(this.sharedBoss.maxHp) };
+      // the shield the leader on the field still holds (snapshot.js bossShield): the HUD's boss bar draws it over the
+      // pool remainder, so a barrier sized off the whole pool does not read as a frozen empty bar (维护者 2026-11-08)
+      let bossShield = null;
+      for (const u of this.enemies) {
+        if (!u.alive || !u.deployed || u.hidden) continue;
+        const v = bossShieldView(u);
+        if (v != null && (bossShield == null || v > bossShield)) bossShield = v;
+      }
+      if (bossShield != null) snap.boss.shield = bossShield;
+    }
     const r2 = (v) => Math.round(v * 100) / 100;
     let down = null;
     for (const u of this.allyUnits) {
@@ -121,6 +135,7 @@ export class BattleEvents {
     }
     if (down) snap.down = down;
     let elem = null, ammo = null, wolves = null, neg = null, motes = null, energy = null, stand = null, standCut = null, face = null;
+    let shields = null;
     let listed = null;   // the ids in snap.units, built for the first enemy with a cut to report
     for (const u of this.units) {
       if (u.side === 'enemy' && u.atkStandCutAt >= 0) {
@@ -151,6 +166,8 @@ export class BattleEvents {
       if (en) (energy || (energy = [])).push([u.id, en[0], en[1]]);
       const ly = layerView(u);
       if (ly) (snap.layers || (snap.layers = [])).push([u.id, ly]);
+      const sv = shieldView(u);
+      if (sv) (shields || (shields = [])).push([u.id, sv]);
       const ch = chargeView(u);
     if (motes) snap.motes = motes;
       if (ch) (snap.charges || (snap.charges = [])).push([u.id, ch[0], ch[1]]);
@@ -159,6 +176,7 @@ export class BattleEvents {
     if (ammo) snap.ammo = ammo;
     if (wolves) snap.wolves = wolves;
     if (neg) snap.neg = neg;
+    if (shields) snap.shield = shields;
     if (energy) snap.energy = energy;
     if (stand) snap.stand = stand;
     if (standCut) snap.standCut = standCut;

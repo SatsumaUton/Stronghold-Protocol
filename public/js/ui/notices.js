@@ -2,7 +2,7 @@
 // one notice. Opening the popup marks every notice on screen as seen (sp.pref.notices-seen). The body is text,
 // never HTML. With no notices the button is not rendered.
 
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Modal, Button } from './components.js';
 import { useStore } from '../store.js';
 import { catalog, loadCatalog, installedCount, pluginName } from '../content.js';

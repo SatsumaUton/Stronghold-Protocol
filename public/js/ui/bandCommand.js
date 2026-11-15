@@ -1,5 +1,5 @@
 // Server-approved targets and command state are authoritative, including after reconnect.
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Tooltip, Modal, Button } from './components.js';
 import { BandIcon, RichText } from './gameComponents.js';
 import { actions } from './gameActions.js';

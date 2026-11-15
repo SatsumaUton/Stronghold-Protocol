@@ -149,7 +149,14 @@ export class Unit {
     const b = this.base;
     const cm = this.cultMul || NO_MUL;
     const bHp = fin(b.maxHp, 1) > 0 ? fin(b.maxHp, 1) : 1;
-    const maxHp = Math.max(1, fin((bHp + a('hpFlat')) * Math.max(0, 1 + a('hpPct')) * m('hpMul') * cm.hp, bHp));
+    // 「频次怪」（hitCount / hitCountArts：青铜镜、茶器、逐火战士倒下后的余烬 / 火灰…）的 maxHp **就是**
+    // 「需要被打几下」—— 深渊回响里侵蚀词条（巨人 +11% 生命…）不能把 10 下变成 12 下，深度倍率也不该放大它
+    // （维护者 2026-11-07：贪欲的火灰要和原版一样 10 下）。所以深潜场地里的频次怪一律用 base 血量，不吃血量加成；
+    // 普通房间照旧（`e.mem.echoField` 只在带 `echoRules` 的深潜战场置真，golden 不受影响）。
+    const hitCounted = !!(flags && (flags.hitCount || flags.hitCountArts)) && this.mem.echoField === true;
+    const maxHp = hitCounted
+      ? Math.max(1, bHp)
+      : Math.max(1, fin((bHp + a('hpFlat')) * Math.max(0, 1 + a('hpPct')) * m('hpMul') * cm.hp, bHp));
     // PRTS 游戏数据基础 属性基本公式 A_f = F_t[(A + D_p)(1 + D_t) + F_p]: `atkFinal` is the 最终加算 (FINAL_ADDITION) —
     // added after the percentages, inside the Πmul (阿戈尔's devoured base ATK, DESIGN §24.7)
     const atk = Math.max(0, fin(((b.atk + a('atkFlat')) * Math.max(0, 1 + a('atkPct')) + a('atkFinal')) * m('atkMul') * cm.atk, fin(b.atk, 0)));

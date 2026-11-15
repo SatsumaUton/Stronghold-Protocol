@@ -14,8 +14,8 @@
 // language packs); the findings' explanations come from the error catalogue (shared/plugins/errors.js) in Chinese or
 // English.
 
-import { render } from '../../vendor/preact.module.js';
-import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { render } from '../../vendor/preact.module.v2.js';
+import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Modal, UiHosts, alertDialog, confirmDialog } from '../../js/ui/components.js';
 import { initLang, useLang, LangToggle } from '../../js/ui/lang.js';
 import { data } from '../../js/data.js';

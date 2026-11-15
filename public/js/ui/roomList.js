@@ -3,7 +3,7 @@
 // 服务端见 server/lobby.js 的 setListed / roomList（room.setListed / room.list）。
 // 列表只在弹窗开着、页面可见时问（ROOM_LIST_POLL_MS），服务端自己 3 秒内共用一次扫描，
 // 从不主动推。加入走页面平常的密钥加入，服务端会再全部校验一遍 —— 行过期了只是被正常拒绝。
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { DIFFICULTY_COLORS, DIFFICULTY_NAMES, ROOM_LIST_MIN_CAPACITY, MAX_SPECTATORS } from '../../../shared/constants.js';
 import { html, Button, DifficultyIcon, Icon, Modal, Spinner } from './components.js';
 import { net } from '../net.js';

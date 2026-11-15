@@ -1,7 +1,7 @@
 
     import '/js/ui/compat.js';
-    import { render } from '/vendor/preact.module.js';
-    import { useState } from '/vendor/hooks.module.js';
+    import { render } from '/vendor/preact.module.v2.js';
+    import { useState } from '/vendor/hooks.module.v2.js';
     import {
       html, Button, Panel, MicroLabel, Chevrons, HexBadge, TierChip, BondDisc, SevenSeg, Countdown, Modal, confirmDialog,
       alertDialog, Tooltip, ProgressBar, Tabs, Spinner, AvatarFrame, PhaseBanner, PingPill, DifficultyTag, TextField,

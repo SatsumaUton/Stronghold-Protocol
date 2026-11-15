@@ -1,25 +1,61 @@
 // server/match/match/phases.js — Match methods: the round flow up to the prep — INFO_CHECK, the strategy draft
 // (BAND_DRAFT: one countdown of BAND_TURN_SECONDS per turn, 队友已选, the highlighted strategy on a timeout, skips),
-// BATTLE_CHECK and ROUND_START (the round's enemies — a normal wave or the boss pairing — planned before the players'
-// round start).
+// CUSTOM_CHECK (选择自编, only when the data has diyBringLimits), BATTLE_CHECK and ROUND_START (the round's enemies —
+// a normal wave or the boss pairing — planned before the players' round start).
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { PHASE, ERR } from '../../../shared/constants.js';
 import { buildNormalWave, buildBossWave } from '../waves.js';
+import { echoWaveGrowth, ECHO_DEEP_FROM, echoDeepWaveShape, ECHO_LAST_ROUND } from './echo.js';
 import { pairPlayers, bossPairSalt } from '../finalAssault.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
 import { OK, fail, DELAYS, BAND_TURN_SECONDS } from './common.js';
+import { SharedPool, bannedChessForBonds } from '../pool.js';
+import { botPickBondGroup } from '../botBondGroups.js';
+import { LEGACY_BOT } from '../botStrategyContract.js';
+import { diySlot, diySlotIds } from '../../../shared/diy.js';
+import { botPickDiy, checkDiyBring, defaultDiyBring } from '../../../shared/diyBring.js';
 
 export class MatchPhases {
   enterInfoCheck() {
     this.phase = PHASE.INFO_CHECK;
-    for (const ps of this.order) if (ps.botControlled) ps.infoReady = true;
+    for (const ps of this.order) if (ps.botControlled) {
+      this.pickBotBondGroup(ps);
+      ps.infoReady = true;
+    }
     // solo: no time limit (the player confirms); co-op: the official 25 s guard
     this.setDeadline(this.soloUntimed ? 0 : this.gd.timer('infoCheck'), () => this.enterBandDraft());
     this.markPublic();
     for (const ps of this.order) this.markPrivate(ps);
     this.flush(true);
     this.maybeEndInfo();
+  }
+
+  pickBotBondGroup(ps) {
+    if (this.bondChoice?.picked === null) this.pickBondGroup(ps, botPickBondGroup(this, ps), this.setupRevision);
+  }
+
+  pickBondGroup(ps, idx, revision) {
+    if (this.phase !== PHASE.INFO_CHECK || this.setupVote || !this.bondChoice || this.bondChoice.picked !== null) return fail(ERR.WRONG_PHASE);
+    if (ps.left || !this.players.has(ps.playerId)) return fail(ERR.NOT_IN_ROOM);
+    if (revision !== this.setupRevision || !Number.isInteger(idx) || idx < 0 || idx > 1) return fail(ERR.BAD_TARGET);
+    // INFO_CHECK has no shop roll or opening grants. Rebuild its provisional stock before the strategy draft.
+    const drawn = [...this.disabledBonds, ...this.bondChoice.groups[1 - idx]].sort();
+    const banned = bannedChessForBonds(this.gd, drawn, this.staticInactiveBonds);
+    const pool = new SharedPool(this.gd, { banned });
+    const off = new Set([...drawn, ...this.staticInactiveBonds]);
+    const stocks = this.order.map(p => p.buildDiyStock(off));
+    this.disabledBonds = drawn;
+    this.bannedChess = banned;
+    this.pool = pool;
+    this.bondChoice.picked = idx;
+    for (const [i, p] of this.order.entries()) {
+      p.diyStock = stocks[i].stock;
+      p.diyBanned = stocks[i].banned;
+      this.markPrivate(p);
+    }
+    this.markPublic();
+    return OK;
   }
 
   maybeEndInfo() {
@@ -42,6 +78,8 @@ export class MatchPhases {
    */
   enterBandDraft() {
     if (this.phase !== PHASE.INFO_CHECK) return;
+    // [ASSUMED] A human who confirms or times out without choosing keeps the seeded first group.
+    if (this.bondChoice?.picked === null) this.pickBondGroup(this.order[0], 0, this.setupRevision);
     this.phase = PHASE.BAND_DRAFT;
     // The opening is settled, so no reroll cooldown outlives this phase.
     this._rerollStartAt.clear();
@@ -194,15 +232,18 @@ export class MatchPhases {
       // 而且该策略一直为它保留着（见 bandTaken / reservedBands），所以此刻仍然可选。
       const own = this.designatedBand(ps);
       if (own) { this._applyBand(ps, own, { dedupe: true }); return; }
+      // a co-op seat gone before its pick has no game of its own to play: whatever strategy plays the AI seats, it drafts
+      // by the team's rule (botPickBand's departedWeight: Touch while nobody else holds it, never 歌利亚; §37.65)
+      const bot = !this.isSolo && ps.alive === false ? LEGACY_BOT : this.botFor(ps);
       const fallback = () => {
         // a strategy a teammate already took is not selectable (队友已选): the bot re-draws, else the first free one.
         // 「允许重复选择策略」开着时 bandTaken 恒为 false，AI 就按自己的意愿挑（可能与人重复）—— 与本服原始设计一致。
-        let id = this.bot.pickBand(this, ps);
-        for (let k = 0; k < 8 && this.bandTaken(id, ps.playerId); k++) id = this.bot.pickBand(this, ps);
+          let id = bot.pickBand(this, ps);
+          for (let k = 0; k < 8 && this.bandTaken(id, ps.playerId); k++) id = bot.pickBand(this, ps);
         if (this.bandTaken(id, ps.playerId)) id = this.gd.bandIds().find((b) => !this.bandTaken(b, ps.playerId)) || id;
         this._applyBand(ps, id, { dedupe: true });
       };
-      if (this.bot.decide?.(this, ps, { kind: 'band',
+      if (bot.decide?.(this, ps, { kind: 'band',
         valid: () => this.phase === PHASE.BAND_DRAFT && token === this._turnToken,
         complete: () => token !== this._turnToken || !!this.draft?.picks[ps.playerId], fallback })) return;
       fallback();
@@ -212,12 +253,8 @@ export class MatchPhases {
   /**
    * Whether `bandId` was already picked by another player of this draft. Research 09 §5 / DESIGN §14 corrections:
    * the strategy draft marks a teammate's pick as 队友已选 and it cannot be chosen again (co-op). The automatic
-   * assignments — a turn that runs out and a departing seat — obey the same rule: see timeoutBand / defaultBand.
-   *
-   * 实验选项「允许重复选择策略」(allowRepeat，5–20 人大厅) 打开后**整支队伍都不再判重**：
-   * 玩家可以主动选别人已拿过的盟约，AI 也照常按自己的意愿挑（可能与人重复）。
-   * 这是本服原始设计（0.3.3 升级时 `_concurrentBandStep` 那套并发草稿连同本行一起被丢掉，
-   * 导致开关只剩「下发给前端」一个作用，实际选的时候仍被拦成「队友已选」）。
+   * assignments — a turn that runs out, the AI's pick (also for a departed seat, scheduleBandBot) — obey the same rule:
+   * see timeoutBand / defaultBand.
    */
   bandTaken(bandId, playerId) {
     if (this.allowRepeat) return false;
@@ -317,7 +354,9 @@ export class MatchPhases {
     if (dedupe && this.bandTaken(id, ps.playerId)) id = this.gd.bandIds().find((b) => !this.bandTaken(b, ps.playerId)) || id;
     d.picks[ps.playerId] = id;
     ps.bandId = id;
-    ps.lp = this.gd.startLp(id);
+    // the strategy's starting LP is a living seat's: one gone before its pick (its turn is the AI's) keeps the 0 it left
+    // with (_quit), in m.public and the result as well (§37.65)
+    if (ps.alive) ps.lp = this.gd.startLp(id);
     this.markPrivate(ps);
     this.markPublic();
     this.startDraftTurn();
@@ -359,11 +398,124 @@ export class MatchPhases {
         const id = this.defaultBand(ps.playerId);
         this.draft.picks[ps.playerId] = id;
         ps.bandId = id;
-        ps.lp = this.gd.startLp(id);
+        if (ps.alive) ps.lp = this.gd.startLp(id); // a seat gone before its pick keeps its 0 (_applyBand)
       }
       this.markPrivate(ps);
     }
     void timeout;
+    if (this.gd.diyBringLimits) this.enterCustomCheck();
+    else this.enterBattleCheck();
+  }
+
+  _diyOff() { return new Set([...this.disabledBonds, ...this.staticInactiveBonds]); }
+
+  /** Bond-excluded slot ids of this player's current roster (the cards 选择自编 greys out). */
+  _diyBannedSlots(ps) {
+    const off = this._diyOff();
+    const banned = [];
+    for (const slotId of Object.keys(ps?.diy || {})) {
+      const rec = ps._diyRecords.get(slotId);
+      if (rec && this.gd.bondsExclude(rec, off)) banned.push(slotId);
+    }
+    return banned;
+  }
+
+  /**
+   * The bring a seat gets when it does not choose: a bot's ranked picks, otherwise the first legal slots per tier
+   * [ASSUMED]. An empty bot roster is synthesized first.
+   * @param {any} ps
+   * @returns {string[]}
+   */
+  _diyChoice(ps) {
+    const limits = this.gd.diyBringLimits;
+    const off = this._diyOff();
+    if (ps.isBot && Object.keys(ps.diy || {}).length === 0) ps.synthesizeBotRoster(off, limits);
+    const data = this.gd.raw;
+    const tierOf = (id) => diySlot(id, data)?.tier ?? null;
+    const order = diySlotIds(data);
+    const ctx = { roster: ps.diy || {}, banned: this._diyBannedSlots(ps), limits, tierOf };
+    if (ps.isBot) {
+      return botPickDiy(order, {
+        ...ctx,
+        rank: (id) => {
+          const rec = ps._diyRecords.get(id);
+          const bonds = Array.isArray(rec?.bonds) ? rec.bonds : [];
+          return { count: bonds.filter((b) => !off.has(b)).length, charId: ps.diy[id]?.charId || '' };
+        },
+      });
+    }
+    return defaultDiyBring(order, ctx);
+  }
+
+  _applyDiyBring(ps, slots) {
+    if (!ps || ps.diyBring != null) return;
+    ps.diyBring = Object.freeze([...slots]);
+    const built = ps.buildDiyStock(this._diyOff());
+    ps.diyStock = built.stock;
+    ps.diyBanned = built.banned;
+    this.markPrivate(ps);
+  }
+
+  /**
+   * 选择自编. Bot-controlled seats confirm immediately.
+   * [ASSUMED] Solo and a lone human are untimed, like the other decision steps. Co-op with two or more humans uses
+   * the enter-step seconds (30 on 规程).
+   */
+  enterCustomCheck() {
+    if (!this.gd.diyBringLimits) { this.enterBattleCheck(); return; }
+    this.phase = PHASE.CUSTOM_CHECK;
+    for (const ps of this.order) {
+      if (ps.botControlled) this._applyDiyBring(ps, this._diyChoice(ps));
+    }
+    this.setDeadline(this.soloUntimed ? 0 : this.gd.customCheckSeconds(), () => this.finishCustomCheck(true));
+    this.markPublic();
+    for (const ps of this.order) this.markPrivate(ps);
+    this.flush(true);
+    this.maybeEndCustom();
+  }
+
+  /**
+   * g.diyBring { slots }: confirm the slots this match brings. Any illegal slot refuses the whole list.
+   * An empty list is 禁用自选.
+   * @param {any} ps
+   * @param {string[]} slots
+   */
+  confirmDiyBring(ps, slots) {
+    if (this.phase !== PHASE.CUSTOM_CHECK || !this.gd.diyBringLimits) return fail(ERR.WRONG_PHASE);
+    if (!ps || ps.left || ps.spectator || !this.players.has(ps.playerId)) return fail(ERR.NOT_IN_ROOM);
+    if (ps.diyBring != null) return fail(ERR.ALREADY);
+    const data = this.gd.raw;
+    const res = checkDiyBring(slots, {
+      roster: ps.diy || {},
+      banned: this._diyBannedSlots(ps),
+      limits: this.gd.diyBringLimits,
+      tierOf: (id) => diySlot(id, data)?.tier ?? null,
+    });
+    if (!res.ok) return fail(res.error === 'BAD_MSG' ? ERR.BAD_MSG : ERR.BAD_TARGET, res.detail);
+    this._applyDiyBring(ps, res.slots);
+    this.markPublic();
+    this.maybeEndCustom();
+    return OK;
+  }
+
+  maybeEndCustom() {
+    if (this.phase !== PHASE.CUSTOM_CHECK || this._diyAdvanceTimer) return;
+    if (!this.order.every((p) => p.diyBring != null || p.left)) return;
+    this.setDeadline(0);
+    this._diyAdvanceTimer = this.later(0, () => {
+      this._diyAdvanceTimer = null;
+      if (this.phase === PHASE.CUSTOM_CHECK) this.finishCustomCheck(false);
+    });
+  }
+
+  finishCustomCheck(timeout) {
+    if (this.phase !== PHASE.CUSTOM_CHECK) return;
+    this.cancel(this._diyAdvanceTimer);
+    this._diyAdvanceTimer = null;
+    void timeout;
+    for (const ps of this.order) {
+      if (ps.diyBring == null) this._applyDiyBring(ps, this._diyChoice(ps));
+    }
     this.enterBattleCheck();
   }
 
@@ -402,17 +554,109 @@ export class MatchPhases {
     this.wave = null;
     this.bossWaves = null;
     this.bossPairsRound = null;
+    // 「深渊回响」的返场 boss（25 / 35 / 45…）打完之后必须把 boss 战的**团队血池**复位
+    // （维护者 2026-11-05 实测：67 层队友死亡救不了，界面提示「本局模拟已经结束，无法救援」）。
+    // teamLp 一旦残留成数字，`revivalWindowOpen()`、settle 的 canRescue、`_revivalDeathReason()`
+    // 都会一直按「boss 战」处理 —— 原版只打一次 boss 所以从来没暴露，深潜的 boss 回合会反复出现。
+    // 例外：R14 → R15 的隐藏核心沿用上一场的 teamLp（startFinalAssault(true) 不重新开池）。
+    if (this.teamLp != null && r !== this.gd.hiddenRound) this.teamLp = null;
     const alive = this.alivePlayers();
     // the round's enemies (shared composition, generated now so the prep preview is exact). Planned BEFORE the players'
     // round start: its recompute() checks the board on the field the player deploys on this round (deployFieldOf reads
     // the boss pairing), so R14 → R15 never re-checks a boss-field board against the normal field (user playtest #5
     // item 7). rngWaves is used only here, so the order leaves every random stream unchanged.
-    const isBoss = r === this.gd.bossRound || r === this.gd.hiddenRound;
+    // 「深渊回响」: a dive round is never a boss round — the line below would otherwise hit R15 for a team that never
+    // reached the hidden core (boss map and boss wave with no boss on the field, DESIGN-ABYSS.md「深潜的回合语义」) —
+    // and its wave template comes from the cycling data round while its enemy scaling stays on the display round.
+    const dive = this._echoDiveRound(r);
+    // 深潜的固定节点（R20 / R25 / R30 / R35…）放**强化 boss 返场**；其余深潜回合一律普通战场
+    const echoBoss = dive && (this._echoBossReturn(r) || this._echoHiddenBossRound(r));
+    const isBoss = echoBoss || (!dive && (r === this.gd.bossRound || r === this.gd.hiddenRound));
+    // 排异到期要在**每一层**都检查（boss 层不走 _echoRefreshCurses，2026-11-05 实测漏掉）
+    if (dive) {
+      const dd = this._echoDepth(r);
+      if (typeof this._echoExpireBondBans === 'function') this._echoExpireBondBans(dd);
+      if (typeof this._echoExpireDeployBans === 'function') this._echoExpireDeployBans(dd);
+    }
     if (isBoss) {
+      // 特殊回合的入场播报（2026-11-05）：boss 返场 / 隐藏核心也要在**准备阶段**告诉玩家
+      if (dive) this._echoAnnounceRoundKind(r);
       this._planBossWaves();
+    } else if (dive) {
+      // 深潜：波次模板查循环的数据回合，缩放仍按显示回合（见 buildNormalWave 的 dataRound）；
+      // 怪种组合从模板库抽（每回合 10 套变体随机一套），精英每 3 个深潜回合一次。
+      // 诅咒「滞重」（timeMul 0.9）：本回合时限乘系数；「蜂拥」（budgetMul）加厚出怪预算。
+      // 先刷新本回合的诅咒（固定回合 + 随机回合诅咒），后面的波次/时限都吃它。
+      this._echoRefreshCurses(r);
+      const curseFx = this._echoCurseFx();
+      const echoTimeMul = curseFx.timeMul;
+      const deepWave = this._echoDepth(r) >= ECHO_DEEP_FROM;
+      const echoBaseLimit = deepWave
+        ? Math.round(230 * (echoDeepWaveShape(this._echoDepth(r)).units / 112))
+        : this.gd.combatTimeLimit(this._echoDataRound(r));
+      this.wave = this._echoChallengeBoost(buildNormalWave(this.gd, this.rngWaves, this.factions, r, {
+        dataRound: this._echoDataRound(r),
+        // 1–15 层：以原版同回合的形状为底，再乘 echoWaveGrowth（小系数加码）。旋钮在 echo.js 的 ECHO_EARLY_GROWTH。
+        // 16 层以后这两项不再决定只数（由 echoWaves 的 echoDeepWaveShape 按深度设计），只保留给
+        // echoGrowth > 1 的判据与预算参数。
+        // 1-15 层：走原版生成机制（buildNormalWave + 预生成的 pick），不进 echoRandomWave
+        ...(this._echoDepth(r) <= 15
+          ? { pick: this._echoPickVariant(this._echoDataRound(r)) }
+          : { echoGrowth: echoWaveGrowth(this._echoDepth(r)), echoShapeScale: echoWaveGrowth(this._echoDepth(r)) }),
+        // 「蜂拥」：深层只数按深度设计（echoDeepWaveShape），用单独的乘数加厚
+        echoUnitMul: curseFx.budgetMul,
+        echoDepth: this._echoDepth(r),
+        echoPoolRound: Math.max(1, (this.gd.bossRound || 14) - 1),
+        // 池子分档（维护者 2026-11-04）：1–15 层用「原版该回合的模板变体」；
+        // 16 层以后走全敌人表（含跨版本并入的怪），只数仍由 echoDeepWaveShape 按深度设计。
+        // 全表池子（含跨版本）：低层由血量闸控制强度
+
+        echoPoolAll: false,
+        echoPoolRoundOnly: false,
+        echoTemplates: true,
+        echoTemplatesAny: false,
+        // 16 层以后两个出怪点都要用（维护者 2026-11-05）
+        echoAllRoutes: deepWave,
+        // 16 层以后每层的规模按深度设计（echoWaves.echoDeepWaveShape），时限也固定成最后一关的时长，
+        // 免得轮回到数据回合 1 时只有 90 秒却要放 110 只（维护者 2026-11-04 §6）。
+        // 1–15 层不传：它们仍用原版同回合的时限。
+        // 16 层以后：时限按**原版比例**随出怪量增长（原版 R13 = 230 秒 / 112 只 = 基准），
+        // 而不是固定 230 秒 —— 怪变多了，时间也要跟着多（维护者 2026-11-05）。
+        ...(deepWave || echoTimeMul !== 1
+          ? { echoTimeLimitSec: Math.max(30, Math.round(echoBaseLimit * echoTimeMul)) }
+          : {}),
+        // 按钱出怪：用存活玩家的平均资金作为这一波的强度基准（维护者 2026-11-04）
+        echoFunds: alive.length
+          ? alive.reduce((sum, ps) => sum + (Number(ps.funds) || 0), 0) / alive.length
+          : 0,
+        echoElite: this._echoEliteCount(r),
+        // 挑战关（深度 5 / 10）：不出 boss，换成更强的精英
+        echoChallenge: this._echoChallengeRound(r),
+      }), r);
     } else {
       this.wave = buildNormalWave(this.gd, this.rngWaves, this.factions, r);
     }
+    // 深潜：频次怪降血（普通波与 boss 返场都吃，维护者 2026-11-05）
+    if (dive && typeof this._echoSanitizeSpawns === 'function') this._echoSanitizeSpawns(this.wave);
+    // 飞行怪不能沿「起点→终点」直线穿场（维护者 2026-11-05）
+    if (dive && typeof this._echoFixFlyRoutes === 'function') this._echoFixFlyRoutes(this.wave);
+    if (dive && typeof this._echoTuneHitCount === 'function') this._echoTuneHitCount(this.wave);
+    // the dive's erosion words of this round (null on every other round, and on every other room)
+    this._echoRollWords(r);
+    // 「深渊回响」的祝福三选一：深潜里每 5 个回合开一次（echoBlessing.js；普通房间直接返回 null）
+    // 先自愈一次「持有数超过上限」的存档状态（维护者 2026-11-09）：重连读档 / 诅咒或名额从别处变化之后，
+    // 超出上限的祝福不会自己消失，也不能由服务端替玩家丢 —— 开一次「舍弃一个」面板交还给玩家。
+    if (typeof this._echoHealBlessingCap === 'function') this._echoHealBlessingCap();
+    this._echoMaybeOfferBlessing(r);
+    // 深潜的悬赏：每 5 个深潜回合一次，目标从**刚生成的波次**里现抽（echoBounty.js）
+    this._echoMaybeGrantBounty(r);
+    // 深潜的免费刷新上限（只在深潜里裁；普通房间不动）
+    this._echoClampFreeRefreshes();
+    // 深潜补给（16 层起）：每层给每名玩家一次个人三选一
+    if (typeof this._echoOpenSupply === 'function') this._echoOpenSupply();
+    // 「盟约投影」（16 层起每 10 层一次的三选一，2026-11-07 起每人各自选）：与补给/祝福串行，面板一次只弹一个
+    if (typeof this._echoOpenProjection === 'function') this._echoOpenProjection();
+    this._echoMaybeLootRefresh(r);
     for (const ps of alive) ps.startRound(r);
     for (const ps of alive) this.dispatch(ps, 'onRoundStart', { round: r });
     // an eliminated player's pending 信标 gift still goes to its teammate (effects flagged afterElimination; GitHub #86)
@@ -431,8 +675,18 @@ export class MatchPhases {
   /** The round's pairs and their templates, generated before the prep preview / board validation. */
   _planBossWaves() {
     const r = this.round;
-    const hidden = r === this.gd.hiddenRound && r !== this.gd.bossRound;
-    const bossId = hidden ? this.hiddenBossId : this.bossId;
+    // 深潜的 boss 返场（深度 5 / 10 / 15 / 25…）：这些回合没有自己的 roundCfg（数据表只到 15），
+    // 模板借 `_echoBossTemplateRound()`（旧入口=深潜起点−1；从第 1 回合就深潜时=官方最后一关），
+    // ⚠ 缩放**不再按深度递增**：维护者 2026-11-05 要求 boss 血量用官方最后一关的原始值，
+    // 深潜 25/35/45 的返场 boss 与 R15 的 boss 同一套血量（否则深层 boss 变成打不动的墙）。
+    const cfgRound = this._echoDiveRound(r) ? this._echoBossTemplateRound() : null;
+    const eff = cfgRound ?? r;
+    const hidden = eff === this.gd.hiddenRound && eff !== this.gd.bossRound;
+    // 深潜：隐藏核心层用 hiddenBossId，返场层用随机 boss（含隐秘核心那只），其余用 R14 的 boss；
+    // 普通房间沿用原来的判定。波次 / 共享血池 / 准备面板三处必须是同一个 id，所以统一走 _echoBossIdFor。
+    const bossId = this.echoVariant === 'deepecho'
+      ? this._echoBossIdFor(r)
+      : (hidden ? this.hiddenBossId : this.bossId);
     // Pairing uses an independent seeded draw, consuming no shop, wave, draft or battle randomness. The Hidden Core
     // draws its pairs and sides anew (GitHub #845: the official R15 of BV1VCXyBjEN1 p1 pairs 1-2 / 3-4 after an R14 of
     // 1-4 / 2-3; DESIGN §35.27, superseding §30.12's kept partners) from a stream of its own, so the Final Assault's
@@ -445,7 +699,8 @@ export class MatchPhases {
     this.bossPairsRound = r;
     this.bossWaves = groups.map((g) => ({
       players: g.map((p) => p.playerId),
-      wave: buildBossWave(this.gd, this.rngWaves, this.factions, r, { bossId, solo: this.isSolo || g.length === 1 }),
+      // 深潜的返场 boss：用 boss 专用曲线（_echoBossScale，随深度递增；与共享血池同源）
+      wave: buildBossWave(this.gd, this.rngWaves, this.factions, r, { ...(this.echoVariant === 'deepecho' && this._echoDepth(r) > ECHO_LAST_ROUND ? { scale: this._echoBossScale(r) } : {}), bossId, solo: this.isSolo || g.length === 1, cfgRound }),
     }));
   }
 

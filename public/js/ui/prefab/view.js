@@ -11,7 +11,7 @@
 // fonts glyph by glyph. Particle holders are not drawn. Looping tweens (alpha, rotation, anchored position, size)
 // become CSS animations, which stop under prefers-reduced-motion and the 主题动画 setting.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../components.js';
 import { importedPrefabDoc, officialAssetUrl, officialThemeById, themeCharacterKey } from '../../../../shared/uiTheme.js';
 import { layoutPrefab, applySliders } from './layout.js';

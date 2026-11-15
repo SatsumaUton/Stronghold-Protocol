@@ -1,5 +1,5 @@
 // Browser-local download selection. Playback and interface preferences stay independent.
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button } from './components.js';
 import { data, useData } from '../data.js';
 import { useStore } from '../store.js';

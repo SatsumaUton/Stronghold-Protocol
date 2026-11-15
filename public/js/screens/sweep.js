@@ -18,7 +18,7 @@
 // codex first, then the report; the focus returns to the lobby's button). The tab is remembered (sp.pref).
 // Styles: css/screens/sweep.css (sw-*).
 
-import { useMemo, useState } from '../../vendor/hooks.module.js';
+import { useMemo, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Icon, Modal, TierChip, roman } from '../ui/components.js';
 import { Img, RichText, GIcon } from '../ui/gameComponents.js';
 import { bondIconUrl, bandIconUrl, enemyIconUrl, factionIconUrl, chessAvatarUrl, itemIconUrl } from '../ui/assetUrls.js';

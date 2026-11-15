@@ -7,7 +7,7 @@
 import { C2S } from '../../../shared/protocol.js';
 import { PHASE, ERR } from '../../../shared/constants.js';
 import { syntheticResult } from '../fields.js';
-import { FLOW_TICKER_PRIORITY, OK, fail } from './common.js';
+import { FLOW_TICKER_PRIORITY, OK, fail, OFFLINE_TAKEOVER_ROUNDS, AFK_REMOVE_ROUNDS_DEEPECHO } from './common.js';
 import { msg } from '../../../shared/i18n.js';
 import { ruleOption } from '../../../shared/plugins/rules.js';
 
@@ -38,6 +38,67 @@ export class MatchPlatform {
     const ps = this.players.get(playerId) || this.spectators.get(playerId);
     if (!ps || ps.isBot || ps.left) return fail(ERR.NOT_IN_ROOM);
     return this._handleSeatIntent(ps, msg);
+  }
+
+  /**
+   * What the lobby needs to admit or cancel a spectator AI handover, read in this process or across the
+   * version-host IPC. `funds` and `pieceUids` are observational: the lobby ignores them when it chooses voters.
+   * [ASSUMED] `emergencyFrozen` is reported as the match flag. Nothing sets that flag today, so it stays false
+   * unless a later rule does.
+   * @returns {{ ok: true, phase: string, round: number, ended: boolean, disposed: boolean, emergencyFrozen: boolean,
+   *   players: Array<{ playerId: string, isBot: boolean, left: boolean, alive: boolean, autoplay: boolean, funds: number, pieceUids: string[] }> }}
+   */
+  aiHandoverView() {
+    const players = [];
+    for (const p of this.order) {
+      const pieceUids = [];
+      const pushUid = (piece) => {
+        if (!piece || piece.uid == null || piece.uid === '') return;
+        pieceUids.push(String(piece.uid));
+      };
+      if (Array.isArray(p.hand)) for (const piece of p.hand) pushUid(piece);
+      if (p.board && typeof p.board.values === 'function') for (const piece of p.board.values()) pushUid(piece);
+      pieceUids.sort();
+      players.push({
+        playerId: p.playerId,
+        isBot: p.isBot === true,
+        left: p.left === true,
+        alive: p.alive === true,
+        autoplay: p.autoplay === true,
+        funds: typeof p.funds === 'number' && Number.isFinite(p.funds) ? p.funds : 0,
+        pieceUids,
+      });
+    }
+    return {
+      ok: true,
+      phase: this.phase,
+      round: this.round,
+      ended: !!this.ended,
+      disposed: !!this.disposed,
+      emergencyFrozen: !!this.emergencyFrozen,
+      players,
+    };
+  }
+
+  /**
+   * The match half of a spectator inheriting a bot seat (DESIGN §35.100). The lobby still rebinds the session,
+   * the seat and the reconnect token. Same answer shape as handle.
+   * @param {string} botId @param {string} name the inheriting spectator's name
+   * @returns {{ ok: true } | { error: string, detail?: string }}
+   */
+  acceptAiHandover(botId, name) {
+    const ps = this.players.get(botId);
+    if (typeof name !== 'string' || !ps?.isBot || ps.left || !ps.alive || this.phase !== PHASE.PREP || this.ended || this.disposed || this.emergencyFrozen) {
+      return fail(ERR.BAD_TARGET, 'AI handover unavailable');
+    }
+    ps._botPrepToken = (ps._botPrepToken || 0) + 1;
+    this.cancelSeatRehearsal(botId);
+    Object.assign(ps, { isBot: false, autoplay: false, connected: true, ready: false, name });
+    this.loneHuman = this.order.filter((p) => !p.isBot && !p.left).length === 1;
+    ps.aiTakeoverRound = this.round;
+    this.markPublic();
+    ps.dirty();
+    return OK;
   }
 
   /** Shared human / external-AI semantic validation and dispatch. C2S schema: net.js / the adapter. */
@@ -141,11 +202,17 @@ export class MatchPlatform {
       ps.connected = false;
       // A disconnected human's silence is never consent to a new setup.
       this.cancelSetupVote();
-      // a paused solo battle resumes (the server takes the field over; nobody is left to resume it)
-      this._resume();
+      // 「暂停游戏」：掉线的人不算「没确认」，全员走光就直接恢复（pauseVote.js）
+      try { this._pauseMemberGone?.(); } catch { /* ignore */ }
+      // a paused solo battle resumes (the server takes the field over; nobody is left to resume it) —— 但**投票暂停**
+      // 例外：一个人的连接断了不代表别人同意继续，这里 _resume 会把 `paused` 直接清掉（玩家仍停在浮层上，
+      // 却已经恢复计时）。投票暂停的结束只走 `_echoPauseEnd`。
+      if (!this.echoPaused) this._resume();
       if (this.clientCombat) this._authorityLost(ps, 'disconnect');
       // a rehearsal this host was running falls back to the server (DESIGN §14; a no-op without tasks)
       this._rehearsalHostChanged();
+      // 投票移出：掉线的投票人会被剔除并重算（目标掉线不算，它本来就不在投票人里）
+      try { this._kickVoteMemberGone?.(playerId); } catch { /* ignore */ }
       this.markPublic();
     });
   }
@@ -156,8 +223,23 @@ export class MatchPlatform {
     this.guard(() => {
       const was = ps.connected;
       ps.connected = true;
+      ps.offlineRounds = 0;
+      // 掉线由 AI 接管：回到局里就重新自己打（玩家自己开的 AI 托管保持不动）
+      const released = ps.offlineAutoplay && ps.autoplay && !this.ended;
+      ps.offlineAutoplay = false;
+      if (released) ps.autoplay = false;
+      // 针对这个座位的投票随接管一起结束（kickVote.js）
+      try { this._kickVoteMemberGone?.(playerId, true); } catch { /* ignore */ }
+      // 「暂停游戏」中回来：他要重新确认一次才能继续（pauseVote.js 只数在线的人）
+      if (this.echoPaused) this.markPublic();
       this._resync(ps);
-      if (!was) this.markPublic();
+      if (released) {
+        try { this.toast(ps, 'info', msg('你已重新连接，AI 托管已解除')); } catch { /* ignore */ }
+        try {
+          this.tickerText(msg('{name}博士已重新连接，收回了 AI 托管的席位', { name: ps.name }), FLOW_TICKER_PRIORITY);
+        } catch { /* ignore */ }
+      }
+      if (!was || released) this.markPublic();
     });
   }
 
@@ -190,7 +272,9 @@ export class MatchPlatform {
    * 挂机移出 / 消极游戏（移植自参考版 platform.js 的 _checkIdle，维护者 2026-11-02 要求）。
    *
    * 判据与参考版一致：**每回合备战结束时**数一遍，看这个真人在这一回合有没有**实质操作**
-   * （common.js 的 AFK_ACTIONS，13 条：买/卖/移动/刷新/升级/冻结/装备/销毁/选择/领奖/复活/选盟约/跳过盟约）。
+   * （common.js 的 AFK_ACTIONS：普通房 13 条 —— 买/卖/移动/刷新/升级/冻结/装备/销毁/选择/领奖/复活/选盟约/跳过盟约；
+   * 另有「深渊回响」的 9 条 —— 祭坛/祝福/弃选/刷新祝福/补给/投影/护盾/反制/放弃深潜）。
+   * 深潜的回合数下限是 `AFK_REMOVE_ROUNDS_DEEPECHO`（3），普通房用配置值（默认 2）。
    *
    * ★ 三条关键口径（这是参考版比原来那两条规则好的地方）：
    *   1. **掉线不算挂机**（`!ps.connected` 归零）。原来那版没有这个判断 ——
@@ -199,17 +283,36 @@ export class MatchPlatform {
    *   2. **AI 托管中不算挂机**（`ps.botControlled` 归零）：托管是主动交出去的，不是消极。
    *   3. **移出前一回合先警告**一次（toast + 私有视图），不是突然踢人。
    *
-   * 单人局不判定（`_humanCount() < 2`）：一个人自己打单机，挂机不伤害别人。
+   * 谁不判定（判据与参考版一致，维护者 2026-11-07 定：改回**建局快照**，不再实时数真人）：
+   *   * **单人模式**（`mode: 'solo'`）：一个人自己打单机，挂机不伤害别人（维护者 2026-10-31 的要求保留）。
+   *   * **合作房里开局就只有一个真人**（一真人 + 若干 AI，`loneHuman`）：同上，参考版也不判定。
+   * 判据是 `Match.loneHuman`（Match.js 构造函数里算的那一次，存档也存它），**不是**实时数真人：
+   * 「2 人开局、中途走掉一个」之后**仍然继续判定** —— 剩下那个人挂机，参考版照样在第 N 个备战结束
+   * 把他移出。实时数的写法会让这局变成「单人局」而停止判定，等于给中途退出的房间开后门。
    * `afkRemoveRounds = 0` 可整体关闭。
    */
+  /**
+   * 实际生效的挂机回合数：普通房用配置值（`afkRemoveRounds`，0 = 关闭）；
+   * 「深渊回响」至少 `AFK_REMOVE_ROUNDS_DEEPECHO` 回合 —— 深潜准备期更长、深层可做的事更少，
+   * 普通房的 2 回合对深潜太严格（维护者 2026-11-07 晚）。判定与警告（player/views.js afkWarned）共用这一个口径。
+   */
+  _afkLimit() {
+    const base = this.afkRemoveRounds;
+    if (!(base > 0)) return base;
+    return this.echoVariant === 'deepecho' ? Math.max(base, AFK_REMOVE_ROUNDS_DEEPECHO) : base;
+  }
+
   _checkIdle() {
-    const limit = this.afkRemoveRounds;
+    const limit = this._afkLimit();
     if (!(limit > 0) || this.ended || this.disposed) return;
-    // 单人局：连计数都不必维护（开局 2 人、中途退了一个的情况用实时计数，见 _humanCount）
-    if (this._humanCount() < 2) return;
+    // 单人模式 / 合作房里开局就只有一个真人：连计数都不必维护（合作房看建局快照 soloUntimed === loneHuman，
+    // 中途有人退出不改变这个判定；solo 模式恒不判定）
+    if (this.isSolo || this.soloUntimed) return;
     const humans = this.order.filter((p) => !p.isBot && !p.left && p.alive);
     // 第一遍：结算本回合计数（有操作 / 托管 / 掉线 → 归零，否则 +1）
     for (const ps of humans) {
+      // 维护者 2026-11-05：管理员不受任何惩罚机制 —— 挂机计数永远归零，既不警告也不移出
+      if (this._isPunishImmune(ps)) { ps.afkRounds = 0; ps.afkActed = false; continue; }
       ps.afkRounds = (ps.afkActed || ps.botControlled || !ps.connected) ? 0 : (ps.afkRounds | 0) + 1;
       ps.afkActed = false;
     }
@@ -226,22 +329,72 @@ export class MatchPlatform {
   }
 
   /**
-   * 把一个挂机的真人移出对局（`_checkIdle` 的唯一调用点）。
-   *
-   * 与参考版的一处有意差别：参考版自己发 `m.removed` 给本人、`m.notice {kind:'afkRemoved'}` 给其他人，
-   * 再调 opts.onRemove 让平台摘座位。我们没有那两条消息的客户端实现，
-   * 而 `onIdleKick → lobby.kickIdle → removeMember` 这条路已经在用（提示 + room.closed + 踢出记录），
-   * 所以这里直接复用它，客户端不需要新消息类型。
+   * 掉线由 AI 接管（OFFLINE_TAKEOVER_ROUNDS，参考版口径；维护者 2026-11-06 要求移植）：
+   * 每次**备战结束**数一遍（排在挂机判定之后）。连续 N 个备战结束时该座位都掉线 → 从下一阶段起由 AI 打
+   *（`autoplay = true` + `offlineAutoplay = true`），全队看到一条 ticker；重连即收回（onReconnect）。
+   * **只有 `offlineAutoplay` 的座位才允许被「投票移出」** —— 掉线一两回合的人不该被踢。
    */
-  _removeIdle(ps) {
+  _checkOffline() {
+    if (this.ended || this.disposed) return;
+    for (const ps of this.order) {
+      if (ps.isBot || ps.left || !ps.alive) continue;
+      ps.offlineRounds = ps.connected ? 0 : (ps.offlineRounds | 0) + 1;
+      if (ps.connected || ps.autoplay || ps.offlineRounds < OFFLINE_TAKEOVER_ROUNDS) continue;
+      ps.autoplay = true;
+      ps.offlineAutoplay = true;
+      // 和玩家自己点「暂离（AI 托管）」（intents.js setAutoplay → kickBot）保持同一口径：
+      // 立刻让机器人接手**当前阶段**（开着的领奖 / 选择窗口也会被它处理掉），
+      // 否则接管要等下一次 enterPrep 才生效，中间开着的窗口没人应。
+      try { this.kickBot(ps); } catch (e) { this.reportError('offline takeover kickBot', e); }
+      try {
+        this.log.info?.(`[match ${this.roomCode}] seat ${ps.seat} offline for ${ps.offlineRounds} rounds: AI takes over (R${this.round})`);
+      } catch { /* ignore */ }
+      try {
+        this.tickerText(msg('{name}博士掉线超过 {rounds} 回合，由 AI 托管其席位，重新连接后可收回',
+          { name: ps.name, rounds: OFFLINE_TAKEOVER_ROUNDS }), FLOW_TICKER_PRIORITY);
+      } catch { /* ignore */ }
+      this.markPublic();
+    }
+  }
+
+  /**
+   * 把一个真人移出对局：挂机（`_checkIdle`，reason 'afk'）或被投票移出（`kickVote.js`，reason 'kicked'）。
+   *
+   * 移植参考版（维护者 2026-11-06）：
+   *   1. 先给本人 `m.removed { reason, rounds }` —— 客户端据此退出房间、回大厅并提示原因；
+   *   2. 再给其余所有人（含观战）一条 `m.notice`（挂机 = afkRemoved；投票 = 调用方给的 kickPassed）；
+   *   3. `opts.onRemove(playerId, { reason, rounds })` 让平台摘座位（大厅的 removeMember）；
+   *   4. `onLeave` 收尾。
+   * 本服既有的 `onIdleKick` 保留为兜底：没有 onRemove 时仍然能踢掉（老测试与老调用方不受影响）。
+   */
+  _removeIdle(ps, reason = 'afk', notice = null) {
     if (!ps || ps.isBot || ps.left) return;
+    // 维护者 2026-11-05：管理员不受任何惩罚机制（双保险：_checkIdle 已经跳过，这里再挡一次）
+    if (reason === 'afk' && this._isPunishImmune(ps)) return;
     if (ps._idleKicked) return;
     ps._idleKicked = true;
-    try { this.log.info?.(`[match ${this.roomCode}] seat ${ps.seat} removed after ${ps.afkRounds} idle rounds (R${this.round})`); } catch { /* ignore */ }
+    const rounds = reason === 'afk' ? this.afkRemoveRounds : Math.min(100, Math.max(1, ps.offlineRounds | 0));
     try {
-      this.tickerText(msg('{name}博士长时间没有操作，已被移出对局', { name: ps.name }), FLOW_TICKER_PRIORITY);
+      this.log.info?.(`[match ${this.roomCode}] seat ${ps.seat} removed (${reason}, ${rounds} rounds, R${this.round})`);
     } catch { /* ignore */ }
-    try { this.onIdleKick?.(ps.playerId, 'idle'); } catch (e) { this.reportError('onIdleKick', e); }
+    // 1) 本人
+    try { this.sendTo(ps.playerId, { t: 'm.removed', reason, rounds }); } catch { /* ignore */ }
+    // 2) 其他人（挂机 / 投票两种口径）
+    const note = notice || { t: 'm.notice', kind: 'afkRemoved', playerId: ps.playerId, name: ps.name, rounds };
+    try {
+      for (const p of this.order) if (p !== ps && !p.isBot && !p.left) this.sendTo(p.playerId, note);
+      for (const id of this.spectators.keys()) this.sendTo(id, note);
+    } catch { /* ignore */ }
+    // 3) 平台摘座位；没有 onRemove 就退回既有的 onIdleKick
+    if (typeof this.opts?.onRemove === 'function') {
+      try { this.opts.onRemove(ps.playerId, { reason, rounds }); } catch (e) { this.reportError('onRemove', e); }
+    } else {
+      try { this.onIdleKick?.(ps.playerId, reason); } catch (e) { this.reportError('onIdleKick', e); }
+    }
+    // 4) 真正退出：只有在**有平台钩子**时才自己摘座位（onRemove / onIdleKick）。
+    //    投票移出（'kicked'）是投票结果，必须落地，所以不受这条限制。
+    const hooked = reason === 'kicked' || typeof this.opts?.onRemove === 'function' || typeof this.onIdleKick === 'function';
+    if (hooked && !ps.left) { try { this.onLeave(ps.playerId); } catch (e) { this.reportError('onLeave', e); } }
   }
 
   onLeave(playerId) {
@@ -249,6 +402,10 @@ export class MatchPlatform {
     if (!ps || ps.isBot || ps.left || this.disposed) return;
     this.guard(() => {
       ps.left = true;
+      // 「暂停游戏」：永久离开的人不再挡着继续（pauseVote.js）
+      try { this._pauseMemberGone?.(); } catch { /* ignore */ }
+      // 投票移出：这个座位走了，针对它的投票结束（proposer 退出同理）
+      try { this._kickVoteMemberGone?.(playerId); } catch { /* ignore */ }
       this.cancelSetupVote();
       // A seat that is gone for good takes its reroll cooldown with it (it cannot ask again in this match anyway).
       this._rerollStartAt.delete(playerId);
@@ -256,7 +413,8 @@ export class MatchPlatform {
       ps.autoplay = false;
       this.watchers.delete(playerId);
       if (this.ended) return;
-      this._resume();
+      // 投票暂停中：上面 `_pauseMemberGone` 已经在「全员走光」时收尾；还有人留在浮层上就别偷偷恢复
+      if (!this.echoPaused) this._resume();
       if (this.clientCombat) this._authorityLost(ps, 'left');
       // a rehearsal the departed seat was running falls back to the server (DESIGN §14; a no-op without tasks)
       this._rehearsalHostChanged();
@@ -279,14 +437,6 @@ export class MatchPlatform {
     this.maybeEndInfo();
     if (!ps.alive) return;
     const phase = this.phase;
-    const d = this.draft;
-    if (phase === PHASE.BAND_DRAFT && d && !d.picks[ps.playerId]) {
-      // the departed seat passes its turn with the default band (never one a teammate holds — defaultBand)
-      const turn = this.draftTurn() === ps.playerId;
-      d.picks[ps.playerId] = this.defaultBand(ps.playerId);
-      ps.bandId = d.picks[ps.playerId];
-      if (turn) this.startDraftTurn();
-    }
     const passedRound = phase === PHASE.SETTLE ? this.round + 1 : Math.max(1, this.round);
     // its own normal battle has nobody left to fight for
     for (const f of this.fields) {
@@ -319,6 +469,12 @@ export class MatchPlatform {
       return;
     }
     if (phase === PHASE.SP_DRAFT && this.sp && this.spTurn() === ps.playerId) this.startSpTurn();
+    // a seat leaving during the strategy draft keeps its place in the order, like one gone before it: at its turn the AI
+    // drafts for it (botControlled → scheduleBandBot; botPickBand's departedWeight: Touch while nobody else holds it,
+    // never 歌利亚) and it keeps the 0 LP it left with (_applyBand; §37.65)
+    else if (phase === PHASE.BAND_DRAFT && this.draft && this.draftTurn() === ps.playerId) this.startDraftTurn();
+    // 选择自编: the last seat still choosing left — the others need not wait for the deadline
+    else if (phase === PHASE.CUSTOM_CHECK) this.maybeEndCustom();
     else if (phase === PHASE.PREP) this.maybeEndPrep();
   }
 

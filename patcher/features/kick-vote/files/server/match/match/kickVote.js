@@ -25,9 +25,9 @@ export const KICK_VOTE_MS = 30_000;
 export const kickNeed = (n) => Math.floor(n / 2) + 1;
 
 export class MatchKickVote {
-  /** The seat a kick vote may name: 本服口径 = 掉线、存活、没主动退出（本仓库没有 offlineAutoplay 机制）。 */
+  /** The seat a kick vote may name: 掉线、存活、没主动退出，且**已被掉线接管**（platform.js _checkOffline）。 */
   kickTargetEligible(ps) {
-    return !!ps && !ps.isBot && !ps.spectator && !ps.left && ps.alive && !ps.connected;
+    return !!ps && !ps.isBot && !ps.spectator && !ps.left && ps.alive && !ps.connected && ps.offlineAutoplay && ps.autoplay;
   }
 
   /** g.kickVote { targetId } */
@@ -106,13 +106,12 @@ export class MatchKickVote {
     if (vote.agreed.size >= vote.need) {
       this._endKickVote();
       this.log.info?.(`[match ${this.roomCode}] seat ${target.seat} removed by a vote ${vote.agreed.size}/${vote.voters.length} (R${this.round})`);
-      // 本服没有 _removeIdle：按「中途退出」处理 —— 标记 left + 淘汰（回池 / 退出 boss 配对由 eliminate 走）
-      target.left = true;
-      try { target.eliminate(this.round); } catch { /* eliminate 失败也不能把投票卡住 */ }
-      try {
-        this.sendTo?.(vote.targetId, { t: 'm.notice', kind: 'kickPassed', voteId: vote.id, targetId: vote.targetId,
-          name: target.name, agreed: vote.agreed.size, need: vote.need });
-      } catch { /* 玩家已掉线，通知失败无所谓 */ }
+      // 与参考版一致：走 _removeIdle —— 给本人 m.removed{reason:'kicked'}、给其他人 kickPassed、
+      // 调 opts.onRemove 让平台摘座位，最后 onLeave（没有 onRemove 时退回既有的 onIdleKick）。
+      this._removeIdle(target, 'kicked', {
+        t: 'm.notice', kind: 'kickPassed', voteId: vote.id, targetId: vote.targetId,
+        name: target.name, agreed: vote.agreed.size, need: vote.need,
+      });
       this.markPublic();
       return OK;
     }

@@ -12,7 +12,7 @@ function __spRemoteAssetRe() {
   return new RegExp('^https?:\\/\\/' + host + '\\/assets\\/');
 }
 
-import { useState, useMemo } from '../../vendor/hooks.module.js';
+import { useState, useMemo } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, TierChip, Tooltip } from './components.js';
 import { data, useData, localAsset } from '../data.js';
 import { parseRichText, rtClassName } from './richText.js';

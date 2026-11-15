@@ -1,7 +1,7 @@
 // Settings → 界面主题. The same dialog on the title, in the lobby and in a match (ui/settings.js).
 // Import stays on this device. Switching calls selectTheme, which paints immediately.
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Icon, MicroLabel, confirmDialog } from './components.js';
 import { t } from '../../../shared/i18n.js';
 import { THEME_LIMITS } from '../../../shared/uiTheme.js';

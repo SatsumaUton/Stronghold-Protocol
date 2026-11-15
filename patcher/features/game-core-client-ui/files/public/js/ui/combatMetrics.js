@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, useTicker } from './components.js';
 import { UnitThumb } from './gameComponents.js';
 import { battleRunner } from '../battle/runner.js';

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../../vendor/hooks.module.v2.js';
 import { html, Button } from '../../../js/ui/components.js';
 import { t } from '../../../../shared/i18n.js';
 import { THEME_TOKENS, acceptThemeValue } from '../../../../shared/plugins/theme.js';

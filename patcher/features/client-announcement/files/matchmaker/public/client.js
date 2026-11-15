@@ -134,6 +134,8 @@
   })();
   const ROOM = q.get('room');
   const IS_HOST = q.get('mmhost') === '1';
+  // 「深渊回响」（深潜）：房主自动建房时要按深潜建（?pv=deepecho），否则配出来的是一间普通同盟房
+  const PV = q.get('pv');
   const MID = q.get('mid');
   const TICKET = q.get('t');
   const SECRET = q.get('tk');
@@ -256,12 +258,18 @@ const JOIN_COOKIE = (() => {
   }
   const seatsOf = (room) => (room && Array.isArray(room.seats) ? room.seats.filter(Boolean).length : 0);
 
-  const TIPS = [
-    '联合模拟在选择策略时可以进行一次跳过',
-    '调度中心即使冻结，依然可以主动刷新',
-    '两件同名装备可以合成一件更强力的装备',
-    '只有达成完美作战的队友可以进行联防',
-  ];
+// 提示语：**和游戏内「多人匹配」界面同源** —— 都读 shared/data/config.json 的 tips（21 条）。
+// 以前这里硬编码 4 条，两边轮换出来的句子不一样（维护者当成 bug 报了）。取不到再退回内置几条。
+let TIPS = [
+  '联合模拟在选择策略时可以进行一次跳过',
+  '调度中心即使冻结，依然可以主动刷新',
+  '两件同名装备可以合成一件更强力的装备',
+  '只有达成完美作战的队友可以进行联防',
+];
+fetch('/mm/api/tips', { cache: 'no-store' })
+  .then((r) => (r.ok ? r.json() : null))
+  .then((j) => { if (Array.isArray(j?.tips) && j.tips.length) TIPS = j.tips.filter((x) => typeof x === "string" && x); })
+  .catch(() => { /* 用内置的 */ });
   const DIFF_NAMES = { FUNNY: '标准模拟', NORMAL: '险境模拟', HARD: '绝境模拟', ABYSS: '终极模拟' };
   const DIFF_COLORS = { FUNNY: '#f6a329', NORMAL: '#e85a1a', HARD: '#e73118', ABYSS: '#ff0024' };
 
@@ -281,7 +289,7 @@ const JOIN_COOKIE = (() => {
       const u = new URL(location.href);
       const keepName = !(window.__SP__ && window.__SP__.store && window.__SP__.store.get().session.entered);
       // boot/retry 是启动失败重试用的，成功进入后没有意义，留在地址栏只会难看
-      ['room', 'n', 'name', 'mmhost', 'mid', 't', 'tk', 'd', 'c', 'pmid', 'pcid', 'pd', 'mm', 'spectate', 'boot', 'retry'].forEach((k) => {
+      ['room', 'n', 'name', 'mmhost', 'mid', 't', 'tk', 'd', 'c', 'pmid', 'pcid', 'pd', 'pv', 'mm', 'spectate', 'boot', 'retry'].forEach((k) => {
         if (k === 'name' && keepName) return;   // 还没进入大厅前保留名字，进房后再清
         u.searchParams.delete(k);
       });
@@ -1056,7 +1064,11 @@ const JOIN_COOKIE = (() => {
       const who = (s.me && s.me.name) || '博士';
       const MODE = { FUNNY: '标准模拟', NORMAL: '险境模拟', HARD: '绝境模拟', ABYSS: '终极模拟' };
       const mode = MODE[s.room.difficulty] || '同盟模拟';
-      const text = `${link} ${who}邀请你加入卫戍协议：盟约【${mode}】`;
+      // 「深渊回响」房：邀请语点明深潜模式（维护者 2026-11-05）
+      const dive = s.room.variant === 'deepecho';
+      const text = dive
+        ? `${link} ${who}邀请你加入卫戍协议：盟约【深渊回响】【${mode}】`
+        : `${link} ${who}邀请你加入卫戍协议：盟约【${mode}】`;
       const old = label.textContent;
       copyText(text).then((ok) => {
         label.textContent = ok ? '已复制邀请链接' : '复制失败';
@@ -1244,6 +1256,8 @@ const JOIN_COOKIE = (() => {
               size: Math.max(1, seatsOf(room)), capacity: Number(room.capacity) || 4, clientId: CLIENT_ID,
               // 本服：上报房间的游戏版本，匹配只会在同版本之间成局
               version: room.version || undefined,
+              // 「深渊回响」（深潜）：服务端以房间文档为准，这里只是兜底
+              variant: room.variant === 'deepecho' ? 'deepecho' : undefined,
             }),
           });
           if (r.error) { showStyledToast(r.error, 'warn'); return; }
@@ -1348,6 +1362,8 @@ const JOIN_COOKIE = (() => {
     };
 
     const showSearch = (difficulty, waiting, canCancel) => {
+      // 「深渊回响」房：标签要说明这是深潜模式（维护者 2026-11-06），不是普通 4 人同盟 / 标准规则
+      const diveRoom = (() => { try { return window.__SP__.store.get().room?.variant === 'deepecho'; } catch { return false; } })();
       const d = DIFF_NAMES[difficulty] || '险境模拟';
       const color = DIFF_COLORS[difficulty] || '#e85a1a';
       if (!document.getElementById('mm-overlay')) {
@@ -1391,8 +1407,9 @@ const JOIN_COOKIE = (() => {
         }, 1000);
         tipId = setInterval(() => { tipIndex += 1; const t = document.getElementById('mm-ov-tip'); if (t) t.textContent = TIPS[tipIndex % TIPS.length]; }, 5000);
       }
-      document.getElementById('mm-ov-tags').innerHTML =
-        `<span class="mm-ov__tag" style="--c:${color}">${d}</span><span class="mm-ov__tag" style="--c:#4ed8af">4 人 · 不补 AI</span>`;
+      document.getElementById('mm-ov-tags').innerHTML = diveRoom
+        ? `<span class="mm-ov__tag" style="--c:${color}">${d}</span><span class="mm-ov__tag" style="--c:#b79cff">深渊回响</span><span class="mm-ov__tag" style="--c:#4ed8af">4 人同盟</span>`
+        : `<span class="mm-ov__tag" style="--c:${color}">${d}</span><span class="mm-ov__tag" style="--c:#4ed8af">4 人同盟</span><span class="mm-ov__tag" style="--c:#8d9391">标准规则</span>`;
       document.getElementById('mm-ov-stop').style.display = canCancel ? '' : 'none';
       updateSearch(waiting);
     };
@@ -2946,9 +2963,17 @@ const JOIN_COOKIE = (() => {
     let guardStarted = false;
     let autoTimer = 0;
 
-    // 「今日不再提醒」（临时公告）：按自然日记住被静音的公告正文，当天 23:59 之后自然失效。
-    // 键是正文的 FNV 哈希而不是 updatedAt —— 管理面板每次保存都会写新的时间戳，
-    // 用时间戳当键的话管理员一按保存，玩家刚静音的公告就又冒出来了。
+    // 「今日不再提醒」（临时公告）：按自然日记住，当天 23:59 之后自然失效。
+    //
+    // ★ 2026-11-02：以前是按**公告正文的哈希**记的（只记 keys），于是有个坑：
+    //   玩家点了「今日不再提醒」，管理员随后改了公告文字（很正常 —— 今天就把重启公告
+    //   换成了反馈板公告），哈希变了，同一条提醒又弹出来。玩家看到的就是
+    //   「点了今日不再提醒还是会有临时公告出来」。
+    //   按钮写的是「今日不再提醒」，本来的语义就是「今天别再打扰我」，所以现在记成
+    //   **当天总开关**（muted）。keys 仍然保留：老数据（只有 keys 的）照样认，
+    //   而且将来若要回到「按条静音」也不用改存储格式。
+    //   重要公告不受影响 —— 它自己就没有这个按钮（play 里 display:none），
+    //   而且 isMuted 只在 !important 时才会被问。
     const MUTE_KEY = 'mm.noticeMuted';
     const dayStamp = () => {
       const d = new Date();
@@ -2968,12 +2993,15 @@ const JOIN_COOKIE = (() => {
     };
     const isMuted = (key) => {
       const m = loadMute();
-      return !!m && !!key && m.keys.includes(key);
+      if (!m) return false;
+      // muted = 今天已经点过「今日不再提醒」：当天所有临时公告都不再弹
+      if (m.muted === true) return true;
+      return !!key && m.keys.includes(key);
     };
     const muteFor = (key) => {
-      if (!key) return;
       const m = loadMute() || { day: dayStamp(), keys: [] };
-      if (!m.keys.includes(key)) m.keys.push(key);
+      m.muted = true;
+      if (key && !m.keys.includes(key)) m.keys.push(key);
       try { localStorage.setItem(MUTE_KEY, JSON.stringify(m)); } catch { /* 隐私模式忽略 */ }
     };
 
@@ -4278,7 +4306,7 @@ const JOIN_COOKIE = (() => {
     const sp = window.__SP__;
     const name = encodeURIComponent((sp && sp.store.get().me.name) || '');
     let target = '';
-    if (st.leader) target = `/?mmhost=1&pmid=${encodeURIComponent(st.matchId)}&pcid=${encodeURIComponent(CLIENT_ID)}&pd=${encodeURIComponent(st.difficulty)}&mm=1&name=${name}`;
+    if (st.leader) target = `/?mmhost=1&pmid=${encodeURIComponent(st.matchId)}&pcid=${encodeURIComponent(CLIENT_ID)}&pd=${encodeURIComponent(st.difficulty)}${st.variant === 'deepecho' ? '&pv=deepecho' : ''}&mm=1&name=${name}`;
     else if (st.code) target = `/?room=${encodeURIComponent(st.code)}&n=${st.node}&mm=1&name=${name}`;
     if (!target) return false;
     setTimeout(() => { location.href = target; }, 900);
@@ -4326,7 +4354,7 @@ const JOIN_COOKIE = (() => {
       if (guestHostBlocked()) return;
       if (creating || createdOk || attempts >= 6 || Date.now() - lastAt < 2000) return;
       attempts += 1; lastAt = Date.now(); creating = true;
-      net.request('room.create', { mode: 'coop', difficulty: PDIFF })
+      net.request('room.create', { mode: 'coop', difficulty: PDIFF, ...(PV === 'deepecho' ? { variant: 'deepecho' } : {}) })
         .then(() => { createdOk = true; console.info('[mm-debug] party room.create ok'); })
         .catch((e) => { console.error('[mm] 自动建房失败', e && e.message); try { addFoundBack(); } catch { /* ignore */ } })
         .finally(() => { creating = false; });

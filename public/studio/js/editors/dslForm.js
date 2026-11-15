@@ -1,5 +1,5 @@
 // A structured DSL editor. The spec remains data; every edit is checked by the server's validateDsl.
-import { useEffect, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../../vendor/hooks.module.v2.js';
 import { html, Button } from '../../../js/ui/components.js';
 import { data } from '../../../js/data.js';
 import { t, N_ } from '../../../../shared/i18n.js';

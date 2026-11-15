@@ -18,7 +18,7 @@
 //
 // Kept dependency-free and injectable so test/ui/nodeCodeHint.test.js can drive it.
 
-import { useState, useEffect } from '../../vendor/hooks.module.js';
+import { useState, useEffect } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { t } from '../../../shared/i18n.js';
 

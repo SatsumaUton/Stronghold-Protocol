@@ -20,7 +20,7 @@
 // A missing piece of art still falls back to the OPERATOR's own (its 立绘 / portrait / avatar), never to a slash or a
 // placeholder, so the 默认 tile of a picture-only plugin draws the picture that plugin wrote.
 
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 import { html, MicroLabel, Modal } from './components.js';
 import { useStore } from '../store.js';
 import { useData } from '../data.js';

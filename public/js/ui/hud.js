@@ -27,7 +27,7 @@
 // 准备就绪 is refused while the temp overflow row (临时整备区) holds pieces: the reason shows under the button
 // (user playtest #3 item 3; the row's own label is ui/underframe.js TempRowNotice).
 
-import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { PHASE, DIFFICULTY_NAMES } from '../../../shared/constants.js';
 import { html, Button, Icon, PingPill, Countdown, Tooltip, MicroLabel, DifficultyTag, Modal, useTicker, secondsLeft } from './components.js';
 import { Sprite, LpTower, GIcon, LocalSprite } from './gameComponents.js';

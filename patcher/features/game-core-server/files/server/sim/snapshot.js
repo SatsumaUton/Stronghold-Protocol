@@ -13,6 +13,7 @@
 //   after the change, a field opened mid-battle, draws it: render/units.js FORMS)
 //   dir = 'UP'|'RIGHT'|'DOWN'|'LEFT' (allies: the deploy direction, sim/dir.js); facing = its horizontal sign (±1).
 //   items = an ally operator's equipped item ids (absent without any).
+//   itemProgress? = [{uid,id,current,total}], display-only counters captured at prep end; not in b.snap tuples.
 // flags bits & anim codes come from shared/constants.js (UF / ANIM); an enemy's stealth bit = its 隐匿 is on (not while it
 // is blocked or revealed, nor in the seconds after a block before it hides again — targeting.js enemyStealthed), an
 // ally's = 隐匿 / 迷彩 whatever it blocks.
@@ -45,10 +46,16 @@ export function unitInfo(u) {
     // from the operator's base-record guess and swung in slow motion until two attacks had been measured.
     atkInterval,
     spine: d.spine ?? d.charId ?? u.defId,
+  // 悬赏金币数（>0 = 悬赏目标）：客户端据此画金币标记与金色描边
+  bounty: Math.max(0, Math.trunc(Number(u.bounty && u.bounty.coins) || 0)),
     // 皮肤 (docs/SKINS.md): the owning player's chosen skinId. `undefined` (not null) on purpose — JSON.stringify drops
     // it, so an install with no skins produces the exact same wire format as before and the §8.2 contract holds; the key
     // only appears where a skin is actually in play.
     skin: u.skin ?? undefined,
+    // 召唤物皮肤 (docs/SKINS.md): the owner operator's charId, so a client can re-read the live public choice; display
+    // only, absent for a non-token.
+    ownerCharId: u.kind === 'token' && u.ownerUnit
+      ? (u.ownerUnit.def?.loadout?.diy?.charId || u.ownerUnit.def?.charId || undefined) : undefined,
     avatar: d.avatar ?? d.charId ?? u.defId,
     ...(d.voice ? { voice: d.voice } : {}),
     x: r2(u.x),
@@ -73,6 +80,7 @@ export function unitInfo(u) {
     // an ally operator's equipped item ids (display: a 变形同构体 wearer counts for the bond it grants — the bond popup's
     // member list and the detail card's bond chips of a teammate's unit)
     items: u.side === 'ally' && u.kind === 'op' && Array.isArray(u.items) && u.items.length ? [...u.items] : undefined,
+    itemProgress: u.itemProgress?.map(p => ({ ...p })),
     // 补位: the replaced operator's charId when the chess fights as its stand-in (spine / avatar are the stand-in's; the
     // detail card composes the stand-in record, shared/standIn.js standInRecord)
     standInFor: u.side === 'ally' && u.kind === 'op' && typeof d.standInFor === 'string' ? d.standInFor : undefined,
@@ -114,6 +122,7 @@ export function animOf(u, t) {
   if (t < (u.skillAnimUntil ?? -1)) return ANIM.SKILL;
   if (t - u.lastAttackAt < ATTACK_ANIM_TIME) return u.skill && u.skill.active && u.skill.kind !== 'passive' ? ANIM.SKILL : ANIM.ATTACK;
   if (u.side === 'enemy' && u.moving && !u.blockedBy) return ANIM.MOVE;
+  if (u.side === 'ally' && u.kind === 'token' && u.mem.lethaniaPursuit && u.moving && !u.blocking.length) return ANIM.MOVE;
   return ANIM.IDLE;
 }
 
@@ -198,6 +207,36 @@ export function negView(u) {
   if (typeof u.negFill !== 'function') return null;
   const v = u.negFill();
   return v > 0 ? Math.min(1, Math.max(0.01, r2(v))) : null;
+}
+
+/**
+ * `shieldView(u)` = the HP shield a unit holds right now, in whole points (the sum of its buffs' `shield` —
+ * attack/effects.js absorbShields spends them, so the number is what is left), null without one. Display only: the
+ * renderer draws the HP bar's shield strip as that share of max HP and the detail card shows the number, so a player
+ * knows how much shield is still up (维护者 2026-11-07). A hit-count barrier (`shieldHits`, e.g. 泥岩's layers) has no
+ * amount and is not listed — the UF.SHIELD flag still marks it.
+ */
+export function shieldView(u) {
+  const n = u?.s?.shield;
+  if (!(typeof n === 'number' && Number.isFinite(n) && n > 0)) return null;
+  return Math.max(1, Math.round(n));
+}
+
+/**
+ * `bossShieldView(u)` = the HP shield a **shared-pool leader** holds, in whole points, null when it holds none.
+ *
+ * Why it is separate from `shieldView`: a leader's `s.maxHp` is the whole pool (`spawns._syncBossHp` copies
+ * `pool.maxHp` into `base.maxHp`), while its HP bar shows the pool's **remainder**. A shield sized as a share of
+ * `maxHp` therefore reads as a far bigger share of what is left — measured on a 675 000 pool a 16.8 % barrier is
+ * 17 % of the bar at full HP but 99 % at 17 % left, and 336 % at 5 % left: the bar freezes near empty and then
+ * collapses once the shield breaks (维护者 2026-11-08: 「护盾打很久，打完血几秒钟就没了」).
+ *
+ * The HUD's boss bar draws this as a second strip over the pool remainder (`snap.boss.shield`), which is what shows
+ * the player why the number is not moving (维护者 2026-11-08).
+ */
+export function bossShieldView(u) {
+  if (!u?.bossPool) return null;
+  return shieldView(u);
 }
 
 /**

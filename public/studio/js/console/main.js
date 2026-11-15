@@ -1,5 +1,5 @@
-import { render } from '../../../vendor/preact.module.js';
-import { useEffect, useRef, useState } from '../../../vendor/hooks.module.js';
+import { render } from '../../../vendor/preact.module.v2.js';
+import { useEffect, useRef, useState } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../../../js/ui/components.js';
 import { initLang, useLang, LangToggle } from '../../../js/ui/lang.js';
 import { data } from '../../../js/data.js';

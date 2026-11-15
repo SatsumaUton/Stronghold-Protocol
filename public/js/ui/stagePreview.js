@@ -6,7 +6,7 @@
 // [ASSUMED] the crop, that the magnifier opens a larger copy of the same picture, and that INFO_CHECK
 // frames every seat's own left board (not the boss-right half and not the 联防 partner half).
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, Button, Modal } from './components.js';
 import { Img } from './gameComponents.js';
 import { fallbackTileClass } from './fallbackField.js';

@@ -100,6 +100,11 @@ export const MATCH_FIELDS = Object.freeze({
     // 祭坛**本层**的购买次数（blessing 1 / buff 2 / permanent 1 / life 2，`echoAltar.used` 是 playerId → 计数的 Map）：
     // 不存的话读档后同一层可以再买一轮，等于用重连刷祭坛（2026-11-06 补，纯追加，旧存档缺这项时按空表处理）。
     'echoAltar',
+    // 祭坛「本层团队 buff」（守护 / 疾行 / 强攻 / 重甲 / 治愈，维护者 2026-11-07）：带 round 标记，读档后本层仍生效
+    'echoAltarLayerMods',
+    // 祭坛「扩容」给的永久祝福名额 +1，以及全队共享商品的已买次数（维护者 2026-11-07）：
+    // 不存的话读档后名额回退、或者全队又能再买一次扩容
+    'echoAltarBlessingSlots', 'echoAltarTeamBought',
     // 祝福刷新额度 / 已放弃次数 / 隐藏核心的临时名额：都是整局累计，丢了读档后就「回血」
     'echoBlessingRefreshes', 'echoBlessingRefreshBonus', 'echoBlessingSkipped', 'echoBlessingBonus', 'echoBlessingRefreshNonce',
     // 部署禁令的**到期层**（2026-11-05）：只存名单不存到期层，读档后排异 / 封锁永远不会自动解除
@@ -151,6 +156,8 @@ export const MATCH_FIELDS = Object.freeze({
     '_speedVotes', '_speedVoteAt', '_speedUp', 'gameSpeed',
     // 深渊回响的祝福投票：纯缓存，恢复后重新投（候选 `echoBlessingOffer` 本身是存档字段）
     '_echoBlessingVotes',
+    // 「主动放弃深潜」的全员投票（2026-11-07）：纯缓存，读档回来重新发起即可
+    'echoGiveUpVote', '_echoGiveUpTimer', '_echoGiveUpSeq',
     // 深潜决策面板按住的那段准备时间（`_echoPausePrepClock`）：面板本身不存档，所以这个也不存 ——
     // canSnapshot 在面板开着时直接拒绝存档（见上面），读档回来的局面里不存在「按住」这个状态
     '_echoPrepPausedMs',
@@ -183,6 +190,9 @@ export const PLAYER_FIELDS = Object.freeze({
     'bondCountBonus', 'effects', 'bounties', 'personalChoice', 'counters', 'round', 'deployCapBonus', 'deployCapMin',
     // 祭坛「永久」买过几次（整局累计，本局最多 1 次）：不存的话读档后又能再买一次 +1 部署位
     'echoAltarDeployBought',
+    // 祭坛「整局唯一」商品的已买次数（部署位 / 扩容 / 洞彻 / 朔风 / 阵列 / 破甲，维护者 2026-11-07 纯追加）：
+    // 不存的话读档后这些商品又能各买一次 —— 永久收益被重连刷成两倍。
+    'echoAltarBought',
     // 「盟约投影」改成每人各自选之后，选择跟着玩家走（维护者 2026-11-07，纯追加）
     'echoProjection',
     // 祭坛**账户余额**（「捐献 5 / 10」存进去的钱，跨回合不清空，买献祭时优先扣）：
@@ -219,6 +229,9 @@ export function canSnapshot(m) {
   // 此刻存检查点，读档回来准备时间就是 0 秒，而面板本身也回不来 —— 玩家会白丢一整回合的备战。
   // 所以和插件窗口一样：等面板结算完再存（维护者 2026-11-06「重启断点续玩」）。
   if (typeof m._echoChoiceOpen === 'function' && m._echoChoiceOpen()) return false;
+  // 「投票暂停」中不存检查点（2026-11-08）：`paused` / `_pausedAt` 会进存档，但 `echoPaused`（谁发起的、
+  // 谁已经确认）是 transient 的 —— 读档回来会变成一个**永远暂停**、又没有人能点「继续」的对局。
+  if (m.echoPaused) return false;
   if (m.phase === PHASE.PREP) for (const ps of m.alivePlayers()) if (ps.botControlled && !ps.ready) return false;
   return true;
 }

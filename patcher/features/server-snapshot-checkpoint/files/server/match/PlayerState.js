@@ -3,7 +3,7 @@
 // Handlers validate → mutate → recompute bonds → mark the private view dirty. They never throw on bad input; they
 // return `{ ok: true }` or `{ error: ERR.*, detail? }`. Rules (research 00-INDEX §3–§4, 01 A1, 04 §2):
 //   * Hand: 10 slots filled right-to-left; temp: an expandable queue with five visible slots. A full hand refuses buys and reward picks —
-//     also one that would complete a merge at once (PRTS Stronghold-Protocol/帮助 §手牌区 "例如招募/购入等通常情况下会增加手牌的操作";
+//     also one that would complete a merge at once (PRTS 卫戍协议/帮助 §手牌区 "例如招募/购入等通常情况下会增加手牌的操作";
 //     GitHub #82) — and withdrawals, except one whose own summon stack frees a slot. Passive gains (merge results,
 //     grants, returned equipment) overflow into temp, and a free hand slot pulls them back in at once, right→left
 //     (_fillHandFromTemp at every recompute: "常规手牌区出现空位时自动移入"); temp blocks Ready ("直到溢出情况排除才可开始
@@ -15,6 +15,8 @@
 //     SETTLE (battle-result grants, merges, returned equipment) or at the next round start / 机变 stays visible and
 //     usable (move to a free hand slot, place, equip, destroy, sell) through the NEXT prep — nothing is destroyed before
 //     the player saw it in a prep ("处于临时整备区的调度资源，在进入下一回合后会自动销毁").
+//     With config.version.rules.equipHand (规程), hand holds characters/summons only and temp[0..4] is permanent
+//     equipment storage. Hidden temp[5..] alone blocks Ready and expires; see pieces.js and docs/META.md.
 //   * Board: own region rows 9–12 × cols 2–10, legality from the stage legend (board.js); deploy cap 8 (+effects);
 //     tokens (placeable summons) don't use deploy slots. Board↔hand swaps are always allowed. In a boss round the
 //     legality reads the player's half of the boss field (Match.deployFieldOf → board.js field 'bossL' / 'bossR',
@@ -48,7 +50,7 @@
 //     2 identical normal items (hand/temp/equipped) merge into the golden item in the hand, items are never sold
 //     (destroy for 0). consume-on-equip items resolve through the effect registry and never take a slot — on a full
 //     carrier they still replace (destroy) the picked item first, leaving a free slot (PRTS 帮助, GitHub #263).
-//   * Tokens (PRTS Stronghold-Protocol/帮助 §战斗部署, user playtest #6): placing an owner with manually deployable summons
+//   * Tokens (PRTS 卫戍协议/帮助 §战斗部署, user playtest #6): placing an owner with manually deployable summons
 //     (tokens.json `placeable`: 赫默's 医疗探机 and 巫恋's 诅咒娃娃 with their S2, 凯瑟琳's 爬行号·防护单元, 海嗣 / 狼群 /
 //     流形) sends one stack (deployLimit copies — 凯瑟琳 2) to the hand, placed by hand like any piece (no deploy slot);
 //     withdrawing/selling/merging the owner removes its tokens (an elite that takes a merged copy's tile gets a fresh
@@ -91,7 +93,8 @@
 //     and what shows it shows the stand-in (the owner's recall of the official mode, 2026-10-06): the scouting views
 //     (board and bench), the m.result lineup (`standInFor`), the elite / gift tickers' names. m.private exposes `standIns`.
 //   * 自选编队 (0.2.0 DIY, the owner's decisions of 2026-10-05; player/diy.js): the human's `seat.diy` picks are re-checked
-//     against this match's data and kits and fixed for the match (`diy`; bots none [ASSUMED]). With picks, `this.gd` is the
+//     against this match's data and kits and fixed for the match (`diy`; bots field no lobby roster [ASSUMED];
+//     规程 gives an empty bot a capped roster at 选择自编). With picks, `this.gd` is the
 //     player's data view: the slotted slots' ids (normal and elite) are the composed 自选 records, so the player's piece
 //     of a slot is the operator for every rule (name, class, position, bonds from its factions, no 特质, the pick's skill
 //     and module; tier, price, sell price and the 3 → elite merge are the slot's). Each slotted piece has its own stock
@@ -134,6 +137,7 @@ import { PlayerPrep } from './player/prep.js';
 import { PlayerRound } from './player/round.js';
 import { PlayerViews } from './player/views.js';
 import { PlayerDiy, DiyStock } from './player/diy.js';
+import { PlayerCommands } from './player/commands.js';
 
 export class PlayerState {
   /**
@@ -152,6 +156,11 @@ export class PlayerState {
     // 允许在**普通房间**里使用 g.test 测试指令（本服的管理员工具，见 testCommands.js）。
     // 缺键即 false —— 普通玩家永远是 false，行为与上游一致。
     this.admin = seat.admin === true;
+    // 管理员**身份**（账号角色 owner/admin，不看 tools.game 与验证码）。
+    // 维护者 2026-11-05：惩罚机制（挂机移出 / 消极游戏）按身份豁免，见 MatchIntents._isPunishImmune。
+    // 老存档 / 老数据里没有 seat.adminId 时退回 seat.admin —— 豁免只决定「踢不踢」，
+    // 不会额外给任何权限，所以宁可宽松一点。
+    this.adminId = seat.adminId === true || seat.admin === true;
     this.left = false;
     this.autoplay = false;
     this.alive = true;
@@ -163,6 +172,13 @@ export class PlayerState {
     // 否则断点续玩回来，挂机计数被清零，挂机的人可以靠重启洗掉记录。
     this.afkActed = false;
     this.afkRounds = 0;
+    // 掉线由 AI 接管（OFFLINE_TAKEOVER_ROUNDS，platform.js 的 _checkOffline；维护者 2026-11-06 移植参考版）：
+    //   offlineRounds   —— 连续多少个「备战结束」时该座位处于掉线；在线即归零。
+    //   offlineAutoplay —— 是否由「掉线接管」交给 AI 打（区别于玩家自己开的 AI 托管）；
+    //                      **只有它为 true 的座位才能被投票移出**。重连即收回。
+    // 两个字段跟着存档走（snapshot.js PLAYER_FIELDS.saved），否则读档后接管状态丢失。
+    this.offlineRounds = 0;
+    this.offlineAutoplay = false;
     this.lp = 0;
     this.bandId = null;
     /**
@@ -172,6 +188,10 @@ export class PlayerState {
      * 必须跟着存档走（snapshot.js 的 PLAYER_FIELDS.saved），否则断点续玩回来预约就丢了。
      */
     this.bondPlan = null;
+    this.command = null;
+    this.commandMarks = [];
+    this.commandDrafts = [];
+    this.commandDiscounts = [];
     this.funds = 0;
     this.pendingFunds = 0;
     this.ready = false;
@@ -192,7 +212,7 @@ export class PlayerState {
     if (!this.isBot && seat.notOwned) this.setNotOwned(seat.notOwned);
     /**
      * 自选编队 (0.2.0): the slotted picks { [slotBaseId]: { charId, skillIndex, uniEquipId } } — the seat's when the match
-     * started, re-checked; frozen; {} = none (bots always). setDiy makes `this.gd` the player's data view.
+     * started, re-checked; frozen; {} = none (bots have no lobby roster). setDiy makes `this.gd` the player's data view.
      */
     this.diy = Object.freeze({});
     /** @type {Map<string, object>} slot id (normal / elite) → composed 自选 record (setDiy) */
@@ -201,9 +221,16 @@ export class PlayerState {
     this.diyStock = new DiyStock();
     /** slotted slots without stock: every bond of the operator is switched off this match */
     this.diyBanned = Object.freeze([]);
+    /**
+     * 选择自编 confirmation: null until the player confirms; an array afterwards (possibly empty = 禁用自选).
+     * A season without the step leaves it null and stocks every legal lobby slot.
+     * @type {string[]|null}
+     */
+    this.diyBring = null;
     // A modded room's content list (Match.diyKitted) is what the lobby already accepted. Without it setDiy
     // keeps the vanilla kit list and drops a plugin operator with no error (checkDiyPicks is lenient).
-    // Bots never slot 自选; they read the human's composed records once this succeeds (bot.js chessRec).
+    // Bots have no lobby roster; 规程 synthesizes one at 选择自编. They read a human's composed records once setDiy
+    // succeeds (bot.js chessRec).
     if (!this.isBot && seat.diy) this.setDiy(seat.diy, this.m.diyKitted ? { kitted: this.m.diyKitted } : undefined);
     /** 皮肤 (docs/SKINS.md): frozen `{ [charId]: skinId }`, {} = every operator on its default model. Unlike the
      * loadout these are PUBLIC (a teammate sees your skin), so they travel in Match.publicView().players[]. */
@@ -226,6 +253,17 @@ export class PlayerState {
     this.layers = {};
     /** computed bond states */
     this.bonds = {};
+    /**
+     * 这一局**用过的最多盟约 / 最高层数**（{ cores: string[], bonds: number, maxLayers: number, top: string|null,
+     * topLayers: number }）。深潜排行榜要它（维护者 2026-11-05：榜上一律「无核心 · 最高 0 层」）——
+     * 团灭时 `eliminate()` 会把棋盘退回卡池，`bonds` 全归零，只有这个峰值还在。
+     * 由 `round.js _trackBondPeak()` 在每次 recompute 后往上记（只增不减）。
+     *
+     * `top` / `topLayers`（维护者 2026-11-07 晚）：**已激活**的核心盟约里层数最高的那**一个**。
+     * 排行榜只显示它 —— 以前把用过的核心盟约全列出来（`cores`），没激活的、只放了一两个干员的也会上榜，
+     * 玩家反馈「没有激活的盟约也会出现在上面」。
+     */
+    this.bondPeak = { cores: [], bonds: 0, maxLayers: 0, top: null, topLayers: 0 };
     /**
      * this round's IN_BATTLE layer gains of the finished normal battle ({ [bondId]: n }, Match._finishCombat) until
      * settle() makes them persistent — the views add them (bondsView, DESIGN §20.15); null otherwise
@@ -250,11 +288,21 @@ export class PlayerState {
     this.round = { refreshes: 0, buys: 0, sells: 0, spent: 0, gainedChess: 0, arts: 0 };
     this.deployCapBonus = 0;
     this.deployCapMin = 0;
+    /**
+     * 「深渊祭坛 · 献祭永久」买过几次（整局累计）。维护者 2026-11-05：本局最多买 1 次 = +1 部署位。
+     * 和 `deployCapBonus` 分开记 —— 那个还可能被盟约 / 机变加，封顶只针对祭坛这一项。
+     */
+    this.echoAltarDeployBought = 0;
+    // 「盟约投影」（维护者 2026-11-07 改为**每人各自选**）：这个玩家自己选中的核心盟约 id。
+    // 只影响他自己的战斗（battleInput 的 projectedBond），必须进存档。
+    this.echoProjection = null;
     this.deviceOverrides = {};
     this.tileOverrides = {};
     this.stats = {
       dmgDealt: 0, kills: 0, leaks: 0, gold: 0, refreshes: 0, merges: 0, itemMerges: 0, itemsEquipped: 0,
       bossDamage: 0, lpLost: 0, buys: 0, sells: 0, perfectRounds: 0, fundsGained: 0, healing: 0,
+      // 完美连胜 (§37.148): the rounds in a row this player settled without an LP loss, now (0 after a loss)
+      perfectStreak: 0,
     };
     this.eliminatedRound = null;
     this.creditedKills = 0;
@@ -283,7 +331,7 @@ export class PlayerState {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [PlayerBasics, PlayerPieces, PlayerAcquire, PlayerEconomy, PlayerPlacement, PlayerItems, PlayerPrep, PlayerRound, PlayerViews, PlayerDiy]) {
+for (const part of [PlayerBasics, PlayerPieces, PlayerAcquire, PlayerEconomy, PlayerPlacement, PlayerItems, PlayerPrep, PlayerRound, PlayerViews, PlayerDiy, PlayerCommands]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(PlayerState.prototype, key)) throw new Error(`PlayerState.${String(key)} is defined twice`);

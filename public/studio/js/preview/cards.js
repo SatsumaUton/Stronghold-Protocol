@@ -4,7 +4,7 @@
 // layers: the plugin's entry under `<key>~plugin`, ./layers.js); a summon's card; and for every other picture (an
 // enemy's icon, an item's, a bond's, a strategy's, an interface picture) the two images side by side.
 
-import { useState } from '../../../vendor/hooks.module.js';
+import { useState } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../../../js/ui/components.js';
 import { UnitThumb, Img } from '../../../js/ui/gameComponents.js';
 import { ChessDetail } from '../../../js/ui/detailPanel.js';

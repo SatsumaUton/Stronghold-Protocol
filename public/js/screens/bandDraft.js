@@ -34,7 +34,7 @@
 // [ASSUMED] the corner badge, the count and the name card's trophy medal read this browser's records (ui/stats.js,
 // read once after the screen is up) in place of the event's account data — there are no accounts here.
 
-import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Icon, useTicker, secondsLeft } from '../ui/components.js';
 import { useGameData, BandIcon, RichText, PlayerAvatar, Sprite, Img } from '../ui/gameComponents.js';
 import { StepHeader, ExitModal } from '../ui/matchChrome.js';

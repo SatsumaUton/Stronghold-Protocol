@@ -8,7 +8,7 @@
 // spec settles the keyboard map; it follows the APG select-only combobox, with the first
 // ArrowUp / ArrowDown opening onto the current value instead of jumping to an end.
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon } from './components.js';
 
 const cx = (...parts) => parts.flat().filter(Boolean).join(' ');

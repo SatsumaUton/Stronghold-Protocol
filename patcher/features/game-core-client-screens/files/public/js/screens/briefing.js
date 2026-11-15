@@ -13,7 +13,7 @@
 // (css/screens/briefing.css 开局转场). 规程 (config.version.family === 'regulation') uses ui/regulationBriefing.js
 // instead; the return below is every other version, unchanged.
 
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Icon } from '../ui/components.js';
 import { useGameData } from '../ui/gameComponents.js';
 import { StepHeader, ExitModal } from '../ui/matchChrome.js';

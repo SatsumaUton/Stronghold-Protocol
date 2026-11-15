@@ -160,17 +160,9 @@ export const skinFor = (charId) => (str(charId) ? (skinsStore.get()[SKINS_KEY] |
 function sameOriginAsset(u) {
   const src = typeof u === 'string' ? u : '';
   if (!src) return null;
-  let origin = "";
-  try {
-    origin = (typeof window !== "undefined" && window.__SP_ASSET_ORIGIN)
-      || (typeof window !== "undefined" && window.__SP__ && window.__SP__.data
-        && window.__SP__.data.get && (window.__SP__.data.get("config") || {}).assetOrigin)
-      || "";
-  } catch { origin = ""; }
-  const host = String(origin).replace(/^https?:\/\//, "").replace(/[.*+?^${}()|[\]\\]/g, "\\export function availableSkins(charId) {");
-  if (!host) return src;
-  const re = new RegExp("^https?:\\/\\/" + host + "\\/assets\\/");
-  return re.test(src) ? "/assets/" + src.replace(re, "") : src;
+  // 任意域名的 /assets/ 一律收成同源（不依赖 config.assetOrigin 是否已加载）
+  const ANY = /^https?:\/\/[^/]+\/assets\//i;
+  return ANY.test(src) ? '/assets/' + src.replace(ANY, '') : src;
 }
 export function availableSkins(charId) {
   const id = str(charId);

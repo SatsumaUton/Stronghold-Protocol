@@ -1,5 +1,5 @@
 // Download transfers are explicit; switching resource-manager sections or closing pauses pending requests.
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, ProgressBar } from './components.js';
 import { assetDownload } from '../assetDownload.js';
 import { askPersistStorage } from '../assetCache.js';

@@ -9,7 +9,7 @@
 // player's own pieces). The list lives in ui/loadoutSync.js (localStorage + room.ownership); the model is
 // ui/ownershipModel.js. Styles: css/screens/loadout.css (own-*).
 
-import { useMemo, useState } from '../../vendor/hooks.module.js';
+import { useMemo, useState } from '../../vendor/hooks.module.v2.js';
 import { html, TierChip, Icon } from '../ui/components.js';
 import { OperatorImage } from '../ui/gameComponents.js';
 import { data } from '../data.js';

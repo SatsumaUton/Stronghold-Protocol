@@ -6,6 +6,25 @@
 import { PHASE } from '../../../shared/constants.js';
 import { testSlice } from '../testTrace.js';
 import { DELAYS } from './common.js';
+import { beginCommandPrep } from '../bandCommands.js';
+
+/**
+ * §37.72 [ASSUMED] Wall-clock ms the built-in bot's prep may still need once an external plan seat's decision ends (its
+ * plan arrives or its budget runs out): server/match/externalAI.js keeps this much of a timed prep out of the plan's
+ * budget (planReserveMs, never more than half of what is left). Measured in the round-62 coop4 终极 botbench (480
+ * matches, about 9 busy threads; handoff/round65 diag coop-timing §4): 1.5 × the p99 of the four seats' summed prep wall
+ * time — four plans can land together and then share one event loop — is at most 3.9 s in R1–R5, 8.0 s in R6–R8, 10.7 s
+ * in R9–R13, 35.4 s at the Final Assault prep and 23.7 s at the Hidden Core prep. `rounds` lists [last round, ms] (a
+ * later normal round takes the last entry), `boss` / `hidden` are gd.bossRound / gd.hiddenRound, `choice` a band, 机变
+ * or offer decision (a weighted draw or the window's default, far below a millisecond; the second keeps the pick ahead
+ * of the turn timer). Revisit when the prep gets heavier (§37.47 doubled the rehearsal candidates).
+ */
+export const BOT_PREP_RESERVE_MS = Object.freeze({
+  rounds: Object.freeze([Object.freeze([5, 5000]), Object.freeze([8, 9000]), Object.freeze([13, 12000])]),
+  boss: 36000,
+  hidden: 24000,
+  choice: 1000,
+});
 
 export class MatchPrep {
   enterPrep() {
@@ -14,16 +33,31 @@ export class MatchPrep {
     const alive = this.alivePlayers();
     for (const ps of alive) {
       ps.ready = false;
-      // Items gained as the previous prep ended waited unmerged (acquireItem deferMerge). Merge them now, before
-      // this prep's onPrepStart grants and before the player acts — not in endPrep, which runs in the same prep
-      // that granted them and would take an equipped copy off for the fight about to start.
-      ps.checkItemMerges();
+      beginCommandPrep(ps);
+      // Items gained as the previous prep ended waited unmerged (acquireItem deferMerge), including a fusion
+      // component. Merge them now, before this prep's onPrepStart grants and before the player acts — not in
+      // endPrep, which runs in the same prep that granted them and would take an equipped copy off for the fight
+      // about to start. releaseDeferred is this call only: a scroll's equipDirect must still see the mark.
+      ps.checkItemMerges({ releaseDeferred: true });
       ps.recompute();
       this.dispatch(ps, 'onPrepStart', { round: this.round });
       ps.recompute();
     }
+    // 被淘汰的玩家 / 观战席：进入准备阶段时**再推一次**它跟随的那块棋盘。
+    // 回合开始（_startRoundAfterOffers → _followScout）那一次推送可能被上一场战斗的 m.field 顶掉 —— 客户端
+    // 的 runner 在 reshow / 掉帧重进时会把「屏幕上那一场」的 meta 重新写回 store（battle/runner.js show()），
+    // 于是 screen 收到的最后一条 m.field 是战斗棋盘（没有 prep:true），`followedScout` 认不出来，整个准备阶段
+    // 就停在自己的空棋盘上（玩家反馈 2026-11-08：深渊回响第 15 回合的准备阶段，视角回到自己场地的主视角）。
+    // 在 PREP 里再推一次（keep：本阶段已经手动选的观战对象不被覆盖）就把这条竞态关掉了。
+    for (const ps of this._viewers()) this._followScout(ps, { keep: true });
     // solo / single-human matches: untimed (soloUntimed); co-op: the round's prepTime
     const secs = this.soloUntimed ? null : this.gd.prepTime(this.round);
+    // 维护者 2026-11-05：**决策面板还开着就别开始倒数**。
+    // 祝福三选一 / 弃选 / 刷新投票 / 深潜补给 / 盟约投影都是在 ROUND_START 阶段就开好的，
+    // 那时 phase 还不是 PREP，`_echoPausePrepClock()` 什么也没做；等到进入 PREP 才设 deadline，
+    // 于是面板明明还开着，右上角已经在倒数（玩家反馈）。这里把整段准备时间先扣住，
+    // 等面板全部结算完由 `_echoMaybeResumePrepClock()` 接回来。
+    if (typeof this._echoHoldPrepClock === 'function' && this._echoHoldPrepClock(secs)) return;
     this.setDeadline(secs, () => this.prepDeadline());
     let i = 0;
     for (const ps of alive) if (ps.botControlled) this.scheduleBotPrep(ps, i++);
@@ -74,6 +108,7 @@ export class MatchPrep {
     };
     const ready = () => {
       if (!ps.ready) {
+        ps.autoPickCommands();
         this.autoPickPersonalChoice(ps, 'random');
         ps.resolveTemp();
         ps.setReady(true);
@@ -81,7 +116,7 @@ export class MatchPrep {
     };
     const end = (job) => {
       let gen = null;
-      try { gen = this.bot.prepEnd(this, ps, job); } catch (e) { this.reportError(`bot ${ps.playerId}`, e); }
+      try { gen = this.botFor(ps).prepEnd(this, ps, job); } catch (e) { this.reportError(`bot ${ps.playerId}`, e); }
       if (!gen) { ready(); return; }
       drive(gen, '', ready);
     };
@@ -106,7 +141,7 @@ export class MatchPrep {
     const begin = () => {
       if (!valid()) return;
       let gen;
-      try { gen = this.bot.prepBegin(this, ps, { delegate: this.botRehearsalDelegate, pooled: !!this.simPool }); }
+      try { gen = this.botFor(ps).prepBegin(this, ps, { delegate: this.botRehearsalDelegate, pooled: !!this.simPool }); }
       catch (e) { this.reportError(`bot ${ps.playerId}`, e); end(null); return; }
       drive(gen, '', (job) => {
         if (!job) { end(null); return; }
@@ -133,7 +168,7 @@ export class MatchPrep {
     };
     this.later(this.scaled(DELAYS.BOT_ACTION + i * DELAYS.BOT_STAGGER), () => {
       if (!valid()) return;
-      if (this.bot.decide?.(this, ps, { kind: 'prep', valid, complete: () => ps.ready,
+      if (this.botFor(ps).decide?.(this, ps, { kind: 'prep', valid, complete: () => ps.ready,
         fallback: () => this.later(0, begin) })) return;
       begin();
     });
@@ -147,6 +182,8 @@ export class MatchPrep {
 
   maybeEndPrep() {
     if (this.phase !== PHASE.PREP || this._prepEndQueued) return;
+    // 「暂停游戏」（投票暂停）期间不结束准备阶段：全员就绪也不能把这一回合推走（维护者 2026-11-08）
+    if (this.echoPaused) return;
     const allReady = () => { const alive = this.alivePlayers(); return alive.length > 0 && alive.every((p) => p.ready); };
     if (!allReady()) return;
     const round = this.round;
@@ -162,6 +199,7 @@ export class MatchPrep {
     if (this.phase !== PHASE.PREP) return;
     for (const ps of this.alivePlayers()) {
       if (ps.ready) continue;
+      ps.autoPickCommands();
       this.autoPickPersonalChoice(ps, 'random');
       ps.resolveTemp();
       ps.ready = true;
@@ -179,6 +217,10 @@ export class MatchPrep {
     // 放在 checkpoint 之后 —— 断点续玩恢复的是「备战已完成」那一刻，
     // 恢复时不该重复判定一遍（否则同一个人会被判两次）。
     this._checkIdle();
+    // 掉线由 AI 接管（OFFLINE_TAKEOVER_ROUNDS）：排在挂机判定之后 —— 掉线不算挂机，
+    // 但连续掉线 N 个备战结束就交给 AI 打，之后才允许被「投票移出」。
+    if (this.ended || this.disposed) return;
+    this._checkOffline();
     if (this.ended || this.disposed || this.phase !== PHASE.PREP) return;
     // rehearsals still waiting for a host's answer die with the prep: their bots place the default layout, a late answer
     // is ignored (Match._takeOverRehearsal / MatchRehearsal) and nothing of them runs after the phase ended
@@ -188,10 +230,17 @@ export class MatchPrep {
     for (const ps of alive) this.dispatch(ps, 'onPrepEnd', { round: this.round });
     for (const ps of alive) ps.endPrep();
     const r = this.round;
-    if (r === this.gd.bossRound) {
+    // 「深渊回响」的 boss 返场节点（25 / 35 / 45…）不是原版的 gd.bossRound，必须单独判断，
+    // 否则会走 startCombat() —— 而深潜 boss 回合的 `this.wave` 是 null，
+    // 战斗瞬间结束、直接跳到下一层（维护者 2026-11-05 实测：25 层没打 boss 就进了 26）。
+    const echoBossRound = this.echoVariant === 'deepecho'
+      && typeof this._echoBossReturn === 'function' && this._echoBossReturn(r);
+    const echoHiddenRound = this.echoVariant === 'deepecho'
+      && typeof this._echoHiddenBossRound === 'function' && this._echoHiddenBossRound(r);
+    if (r === this.gd.bossRound || echoBossRound) {
       this.hiddenLayerSum = alive.reduce((s, p) => s + p.activatedLayers(), 0);
       this.startFinalAssault(false);
-    } else if (r === this.gd.hiddenRound) {
+    } else if (r === this.gd.hiddenRound || echoHiddenRound) {
       this.startFinalAssault(true);
     } else {
       this.startCombat();

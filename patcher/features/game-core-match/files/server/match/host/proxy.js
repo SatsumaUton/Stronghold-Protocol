@@ -5,8 +5,10 @@
 //
 //   start()                                  the worker creates the match and starts it (the worker may still be booting:
 //                                            the host queues the messages; the match exists for the lobby at once)
-//   handle / setLoadout / requestSetupReroll / cancelSetupReroll → Promise of the match's answer ({ ok } | { error, detail })
-//                                            — the lobby answers the request when it settles (server/net.js)
+//   handle / setLoadout / requestSetupReroll / cancelSetupReroll / aiHandoverView / acceptAiHandover
+//                                            → Promise of the match's answer ({ ok } | { error, detail })
+//                                            — the lobby answers the request when it settles (server/net.js).
+//                                            aiHandoverView's ok result also carries the eligibility snapshot.
 //   onDisconnect / onReconnect / onLeave / addSpectator / removeSpectator → posted, no answer
 //   dispose()                                posted; nothing of this match reaches the lobby afterwards
 //   diag()                                   → Promise of the match's diagnostics (verifyStats, errors, fields — tests,
@@ -51,6 +53,10 @@ export function wireOptions(opts) {
   for (const k of ['roomCode', 'mode', 'difficulty', 'modeId', 'aiPicksLast', 'soloUnlimited', 'seats', 'spectators', 'seed', 'matchNo', 'cs', 'vs', 'requireCs', 'kitted', 'version']) {
     if (opts[k] !== undefined) out[k] = opts[k];
   }
+  // 「深渊回响」：variant 是房间级模式标记。白名单里漏了它的话，走内容插件 host（跨 worker/子进程）
+  // 的 deepecho 房会被静默降级成普通 coop 房 —— 与上面 experimental 漏传是同一类 bug。
+  // 只在房间真的带了这个键时转发，别的房间 worker payload 保持不变。
+  if (opts.variant === 'deepecho') out.variant = 'deepecho';
   // 5–20 人容量实验是本服新增的：Match 从 opts.experimental 推 playerCapacity，
   // 座位数超过容量时抛 RangeError（Match.js「seats exceed room capacity」）。
   // 上面那份白名单里有 seats 却没有 experimental —— 于是走内容插件 host（跨 worker/子进程）
@@ -134,6 +140,13 @@ export class MatchProxy {
   }
 
   handle(playerId, msg) { return this._request('handle', [playerId, msg]); }
+  /** Eligibility snapshot for a spectator AI handover. @returns {Promise<any>} */
+  aiHandoverView() { return this._request('aiHandoverView', []); }
+  /**
+   * Match half of inheriting a bot seat. @param {string} botId @param {string} name
+   * @returns {Promise<{ ok?: boolean, error?: string, detail?: string }>}
+   */
+  acceptAiHandover(botId, name) { return this._request('acceptAiHandover', [botId, name]); }
   setLoadout(playerId, loadout, ops) { return this._request('setLoadout', [playerId, loadout, ops]); }
   requestSetupReroll(playerId, revision) { return this._request('requestSetupReroll', [playerId, revision]); }
   cancelSetupReroll(playerId, voteId) { return this._request('cancelSetupReroll', [playerId, voteId]); }

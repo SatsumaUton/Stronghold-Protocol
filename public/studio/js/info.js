@@ -3,7 +3,7 @@
 // (every file of the folder, the ones nothing uses marked, each removable), 清单 (plugin.json itself, for those who
 // prefer to write it — PUT …/manifest; the same checks answer).
 
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button } from '../../js/ui/components.js';
 import { getLang, t } from '../../../shared/i18n.js';
 import { IssueList, issuesAt } from './issues.js';

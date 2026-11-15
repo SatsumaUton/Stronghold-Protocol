@@ -2,6 +2,8 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const nodemailer = require('nodemailer');
+// 节点中文名（「维多利亚」而不是「第 26 台节点」）：和 server.js 的节点状态共用一份表
+const { nodeNameOf } = require('./nodeNames.cjs');
 
 // 私有密钥：优先环境变量，其次项目根目录 .secrets/secrets.json（不进入仓库）
 function readSecret(key) {
@@ -61,6 +63,47 @@ function adminToolTtlMs() {
 //   「连取码界面都不给看」——没有权限的 admin 打开工具界面本身就是越权展示。
 //   只带一个布尔量（gameTool: true/false），不把整张权限表塞进令牌。
 //   owner 恒为 true（最高管理员不受权限表限制，和 adminHasPerm 的口径一致）。
+
+// 称号目录：数据库是**唯一真相**（维护者 2026-11-07：后台可以自己加 / 删，不用改代码）。
+//   · 表 titles(id, name, descr, tone, builtin, created_at, deleted_at)
+//   · 首次启动把 shared/titles.js 里的内置称号播种进去（INSERT IGNORE：删掉的不会被重新加回来）
+//   · 删是**软删**（deleted_at），重启后播种也不会复活；同时把用了它的账号清空
+//   · 进程内 5 秒缓存：登录发令牌时同步取，避免每条令牌都查库
+let _titleRows = { at: 0, rows: [] };
+
+/** 读目录（带缓存）。force = 刚改过，立刻重读。 */
+async function loadTitles(force = false) {
+  const now = Date.now();
+  if (!force && now - _titleRows.at < 5000) return _titleRows.rows;
+  try {
+    const [rows] = await db().query('SELECT id, name, descr, tone, builtin FROM titles WHERE deleted_at IS NULL ORDER BY builtin DESC, created_at ASC, id ASC');
+    _titleRows = { at: now, rows };
+  } catch { /* 读失败沿用上一份（首次为空，令牌里就没有称号） */ }
+  return _titleRows.rows;
+}
+
+/** 同步取一条（发令牌用；缓存最多落后 5 秒）。 */
+function titleRowSync(id) {
+  if (!id) return null;
+  return _titleRows.rows.find((r) => r.id === String(id)) || null;
+}
+
+/** 把 shared/titles.js 的内置称号播种进表（已存在的不动 → 删掉的不会复活）。 */
+async function seedTitles(conn) {
+  let mod = null;
+  // 部署根（shared/titles.js）优先；仓库工作副本里跑（repo-sync/shared/titles.js）也能读到
+  for (const rel of ['../shared/titles.js', '../repo-sync/shared/titles.js']) {
+    try { mod = await import(require('node:url').pathToFileURL(require('node:path').join(__dirname, rel)).href); break; } catch { mod = null; }
+  }
+  const list = (mod && Array.isArray(mod.TITLES)) ? mod.TITLES : [];
+  for (const t of list) {
+    try {
+      await conn.query('INSERT IGNORE INTO titles (id, name, descr, tone, builtin) VALUES (?,?,?,?,1)', [t.id, t.name, t.desc || '', t.tone || 'echo']);
+    } catch { /* 单条失败不影响启动 */ }
+  }
+  await loadTitles(true);
+}
+
 function userTokenFor(u, perms) {
   if (!u || !u.id) return null;
   const isOwner = u.role === 'owner';
@@ -72,6 +115,8 @@ function userTokenFor(u, perms) {
     uid: u.id,
     role: u.role || 'player',
     tag: u.tag || null,
+    // 称号（维护者 2026-11-07）：后台可自定义，所以把显示信息一起带上（节点不需要查库）
+    title: (() => { const r = titleRowSync(u.title); return r ? { id: r.id, name: r.name, tone: r.tone || 'echo', desc: r.descr || '' } : null; })(),
     gameTool,
     exp: Date.now() + 7 * 24 * 3600_000,
   })).toString('base64url');
@@ -401,13 +446,17 @@ async function currentUser(req) {
   }
   if (!sid || !/^[A-Za-z0-9_-]{20,64}$/.test(sid)) return null;
   const [rows] = await db().query(
-    'SELECT u.id, u.email, u.nickname, u.tag, u.name, u.role, s.expires_at FROM user_sessions s JOIN accounts u ON u.id = s.user_id WHERE s.sid = ? AND u.disabled = 0 AND u.deleted_at IS NULL',
+    // ★ 2026-11-07：`u.title` 必须一起取回来 —— 令牌里的称号就是靠它（`userTokenFor` → `titleRowSync`）。
+    //   以前这里没选 title，于是 /api/auth/me 发的令牌永远没有称号，房间座位卡自然也不显示。
+    'SELECT u.id, u.email, u.nickname, u.tag, u.name, u.role, u.title, s.expires_at FROM user_sessions s JOIN accounts u ON u.id = s.user_id WHERE s.sid = ? AND u.disabled = 0 AND u.deleted_at IS NULL',
     [sid],
   );
   const r = rows[0];
   if (!r || new Date(r.expires_at).getTime() < Date.now()) return null;
   const display = displayOf(r);
-  return { id: r.id, email: r.email, nickname: r.nickname, tag: r.tag, role: r.role || 'player', name: display, displayName: display, titleName: r.nickname ? r.nickname + '#' + r.tag : null };
+  // ★ 2026-11-07：`title` 也要一起带出去 —— 这里是**手工拼的返回对象**，漏一个字段，
+  //   后面 `userTokenFor(u)` 就拿不到称号（令牌里 title 永远是 null，房间座位卡不显示称号）。
+  return { id: r.id, email: r.email, nickname: r.nickname, tag: r.tag, role: r.role || 'player', title: r.title ?? null, name: display, displayName: display, titleName: r.nickname ? r.nickname + '#' + r.tag : null };
 }
 
 async function createSession(userId, req, res) {
@@ -525,6 +574,7 @@ async function ensureSchema() {
       nickname VARCHAR(32) NULL,
       tag CHAR(4) NULL,
       name VARCHAR(40) NULL,
+      title VARCHAR(32) NULL,
       pass_hash VARCHAR(255) NOT NULL,
       disabled TINYINT NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -532,12 +582,23 @@ async function ensureSchema() {
       UNIQUE KEY uk_email (email),
       KEY idx_nick_tag (nickname, tag)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-    for (const [col, ddl] of [['email', 'VARCHAR(120) NULL'], ['nickname', 'VARCHAR(32) NULL'], ['tag', 'CHAR(4) NULL']]) {
+    for (const [col, ddl] of [['email', 'VARCHAR(120) NULL'], ['nickname', 'VARCHAR(32) NULL'], ['tag', 'CHAR(4) NULL'], ['title', 'VARCHAR(32) NULL']]) {
       try { await c.query(`ALTER TABLE accounts ADD COLUMN ${col} ${ddl}`); } catch { /* 已有 */ }
     }
     try { await c.query('ALTER TABLE accounts ADD UNIQUE KEY uk_email (email)'); } catch { /* 已有 */ }
     try { await c.query("ALTER TABLE accounts ADD COLUMN role VARCHAR(16) NOT NULL DEFAULT 'player'"); } catch { /* 已有 */ }
     try { await c.query('ALTER TABLE accounts ADD COLUMN deleted_at DATETIME NULL'); } catch { /* 已有 */ }
+    // 称号目录（维护者 2026-11-07）：后台自己加 / 删，所以存在库里；首次启动播种内置那 8 个
+    await c.query(`CREATE TABLE IF NOT EXISTS titles (
+      id VARCHAR(32) NOT NULL PRIMARY KEY,
+      name VARCHAR(32) NOT NULL,
+      descr VARCHAR(160) NULL,
+      tone VARCHAR(16) NULL,
+      builtin TINYINT NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      deleted_at DATETIME NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    try { await seedTitles(c); } catch { /* 播种失败不影响登录，后台可以手动加 */ }
     await c.query(`CREATE TABLE IF NOT EXISTS admin_devices (
       account_id BIGINT UNSIGNED NOT NULL,
       device CHAR(64) NOT NULL,
@@ -655,9 +716,15 @@ async function handle(req, res, pathname) {
   }
 
   // 跨节点恢复：只告诉当前登录账号它自己所在的房间，不暴露全服房间目录。
+  //
+  // 2026-11-08（维护者「玩家又不知道每个节点的编号」）：`node` 是给**程序**用的（客户端拼
+  // `?room=CODE&n=N` 钉节点），`nodeName` 才是给**人**看的 —— 玩家面板上认识的是顶栏那颗
+  // 节点状态胶囊里的名字（「维多利亚 · 正常」），不是「第 26 台节点」。名字表只有一份
+  // （./nodeNames.cjs），与 server.js 的节点状态共用。
   if (method === 'GET' && pathname === '/api/account/room') {
     const u = await currentUser(req);
     if (!u) return sendJson(res, 401, { ok: false, error: 'unauthorized' });
+    const named = (code, n, soloHold) => ({ code, node: Number(n) || null, nodeName: nodeNameOf(n), ...(soloHold ? { soloHold } : {}) });
     // 主判据是账号 ID：昵称会重名、会改，用昵称匹配会把玩家送去别人的对局。
     const uid = u.id != null ? String(u.id) : null;
     // 兼容旧数据：早期座位没有 accountId，只能退回昵称匹配。
@@ -676,13 +743,16 @@ async function handle(req, res, pathname) {
             const players = (room.players || []).filter(Boolean);
             // 1) 账号 ID 精确命中：这是唯一可信的判据
             if (uid && players.some((p) => p && p.accountId != null && String(p.accountId) === uid)) {
-              return sendJson(res, 200, { ok: true, room: { code: room.code, node: Number(n.n) || null }, by: 'account' });
+              // 「深渊回响」单人房的 24 小时保存倒计时（维护者 2026-11-08：要显示得更醒目）。
+              // roomInfo 已经从房间文档里清洗好了（soloHoldView），这里原样带给页面 ——
+              // 大厅的「恢复对局」据此写「还剩 N 小时」。
+              return sendJson(res, 200, { ok: true, room: named(room.code, n.n, room.soloHold || null), by: 'account' });
             }
             // 2) 昵称兜底：只在该房间所有座位都没有 accountId（纯旧数据）时记录，稍后再决定
             if (!nameFallback) {
               const anyHasAccount = players.some((p) => p && p.accountId != null);
               if (!anyHasAccount && players.some((p) => p && names.has(String(p.name)))) {
-                nameFallback = { code: room.code, node: Number(n.n) || null };
+                nameFallback = named(room.code, n.n);
               }
             }
           }
@@ -894,7 +964,8 @@ async function handle(req, res, pathname) {
     if (!checkCaptcha(body)) return sendJson(res, 400, { ok: false, error: 'captcha_wrong' });
     const email = String(body.email || '').trim().toLowerCase();
     if (limited('login:' + ip + ':' + email, 10, 60_000)) return sendJson(res, 429, { ok: false, error: 'too_many_requests' });
-    const [rows] = await db().query('SELECT id, email, nickname, tag, name, role, pass_hash, disabled FROM accounts WHERE email = ? AND deleted_at IS NULL', [email]);
+    // 称号（2026-11-07）：登录发的令牌也要带上，否则刚登录的这一局看不到称号，要等下次刷新页面
+    const [rows] = await db().query('SELECT id, email, nickname, tag, name, role, title, pass_hash, disabled FROM accounts WHERE email = ? AND deleted_at IS NULL', [email]);
     const u = rows[0];
     if (!u || u.disabled || !verifyPassword(String(body.password || ''), u.pass_hash)) {
       return sendJson(res, 401, { ok: false, error: 'bad_credentials' });
@@ -1139,7 +1210,7 @@ async function handle(req, res, pathname) {
     return sendJson(res, 200, { ok: true });
   }
   // 管理员登录：必须已有游戏登录态（Cookie 会话），再通过邮箱验证码二次验证
-  if (method === 'GET' && pathname === '/api/admin2/whoami') {
+if (method === 'GET' && pathname === '/api/admin2/whoami') {
     const u = await currentUser(req);
     if (!u) return sendJson(res, 401, { ok: false, error: 'login_required' });
     if (!u.role || u.role === 'player') return sendJson(res, 403, { ok: false, error: 'not_admin' });
@@ -1359,6 +1430,50 @@ async function handle(req, res, pathname) {
     const isOwner = me2.role === 'owner';
     me2.perms = isOwner ? ['*'] : await getAdminPerms();
     if (method === 'GET' && pathname === '/api/admin2/me') return sendJson(res, 200, { ok: true, admin: { id: me2.admin_id, email: me2.email, nickname: me2.nickname, tag: me2.tag, role: me2.role }, perms: me2.perms });
+    // 称号目录（维护者 2026-11-07）：数据库是唯一真相，后台自己加 / 删
+    if (method === 'GET' && pathname === '/api/admin2/titles') {
+      await loadTitles(true);
+      let used = {};
+      try {
+        const [rows] = await db().query('SELECT title, COUNT(*) AS n FROM accounts WHERE title IS NOT NULL AND title <> \'\' GROUP BY title');
+        for (const r of rows) used[r.title] = Number(r.n) || 0;
+      } catch { used = {}; }
+      return sendJson(res, 200, {
+        ok: true,
+        titles: _titleRows.rows.map((r) => ({ id: r.id, name: r.name, desc: r.descr || '', tone: r.tone || 'echo', builtin: r.builtin === 1, used: used[r.id] || 0 })),
+      });
+    }
+    // 加一个称号：{ name, desc, tone } → id 自动生成（t_ + 时间戳 36 进制）
+    if (method === 'POST' && pathname === '/api/admin2/titles/add') {
+      if (!adminCan(me2, 'accounts.rename')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
+      const body = await readBody(req, 8 * 1024);
+      const name = String((body && body.name) || '').trim();
+      const desc = String((body && body.desc) || '').trim().slice(0, 120);
+      const tone = ['echo', 'gold', 'mint', 'blue'].includes(body && body.tone) ? body.tone : 'echo';
+      if (!name || name.length > 16) return sendJson(res, 400, { ok: false, error: 'invalid_name' });
+      if (/[\u0000-\u001f]/.test(name)) return sendJson(res, 400, { ok: false, error: 'invalid_name' });
+      const id = 't_' + Date.now().toString(36);
+      try {
+        await db().query('INSERT INTO titles (id, name, descr, tone, builtin) VALUES (?,?,?,?,0)', [id, name, desc, tone]);
+      } catch { return sendJson(res, 500, { ok: false, error: 'write_failed' }); }
+      await audit({ id: me2.admin_id, email: me2.email }, 'add-title', null, id + ' ' + name, ipOf(req));
+      await loadTitles(true);
+      return sendJson(res, 200, { ok: true, id, name, desc, tone });
+    }
+    // 删一个称号：软删（重启播种也不会复活）+ 把用了它的账号清空
+    if (method === 'POST' && pathname === '/api/admin2/titles/delete') {
+      if (!adminCan(me2, 'accounts.rename')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
+      const body = await readBody(req, 8 * 1024);
+      const id = String((body && body.id) || '').trim();
+      if (!id) return sendJson(res, 400, { ok: false, error: 'id_required' });
+      const [rows] = await db().query('SELECT id FROM titles WHERE id = ? AND deleted_at IS NULL', [id]);
+      if (!rows.length) return sendJson(res, 404, { ok: false, error: 'not_found' });
+      await db().query('UPDATE titles SET deleted_at = NOW() WHERE id = ?', [id]);
+      const [cleared] = await db().query('UPDATE accounts SET title = NULL WHERE title = ?', [id]);
+      await audit({ id: me2.admin_id, email: me2.email }, 'delete-title', null, id, ipOf(req));
+      await loadTitles(true);
+      return sendJson(res, 200, { ok: true, id, cleared: cleared.affectedRows || 0 });
+    }
     if (method === 'POST' && pathname === '/api/admin2/watch-token') {
       // 独立权限 rooms.watch：隐身观战能看到房间里的一切（包括玩家名字与会话），
       // 但不占观战席、不算房间成员，属于「只读但范围最大」的能力，单独授权。
@@ -1472,11 +1587,11 @@ async function handle(req, res, pathname) {
       if (onlyDeleted && !adminCan(me2, 'accounts.delete')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
       const like = '%' + q + '%';
       const [rows] = q
-        ? await db().query('SELECT id, email, nickname, tag, role, disabled, deleted_at, created_at, last_login_at FROM accounts WHERE (email LIKE ? OR nickname LIKE ? OR tag LIKE ?)' + (onlyDeleted ? ' AND deleted_at IS NOT NULL' : '') + ' ORDER BY id DESC', [like, like, like])
-        : await db().query('SELECT id, email, nickname, tag, role, disabled, deleted_at, created_at, last_login_at FROM accounts' + (onlyDeleted ? ' WHERE deleted_at IS NOT NULL' : '') + ' ORDER BY id DESC');
+        ? await db().query('SELECT id, email, nickname, tag, title, role, disabled, deleted_at, created_at, last_login_at FROM accounts WHERE (email LIKE ? OR nickname LIKE ? OR tag LIKE ?)' + (onlyDeleted ? ' AND deleted_at IS NOT NULL' : '') + ' ORDER BY id DESC', [like, like, like])
+        : await db().query('SELECT id, email, nickname, tag, title, role, disabled, deleted_at, created_at, last_login_at FROM accounts' + (onlyDeleted ? ' WHERE deleted_at IS NOT NULL' : '') + ' ORDER BY id DESC');
       return sendJson(res, 200, { ok: true, accounts: rows });
     }
-    const mr = /^\/api\/admin2\/accounts\/([0-9]+)\/(role|disabled|password|delete|restore|nickname)$/.exec(pathname);
+    const mr = /^\/api\/admin2\/accounts\/([0-9]+)\/(role|disabled|password|delete|restore|nickname|title)$/.exec(pathname);
     if (mr && method === 'POST') {
       const id = Number(mr[1]);
       const body = await readBody(req, 8 * 1024);
@@ -1497,6 +1612,16 @@ async function handle(req, res, pathname) {
         await db().query('UPDATE accounts SET nickname = ?, name = ?, tag = ? WHERE id = ?', [nick, nick, tag, id]);
         await audit({ id: me2.admin_id, email: me2.email }, 'set-nickname', id, nick, ipOf(req));
         return sendJson(res, 200, { ok: true, id, nickname: nick, tag });
+      }
+      if (mr[2] === 'title') {
+        if (!adminCan(me2, 'accounts.rename')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
+        const list = await loadTitles(true);
+        const rawTitle = String(body.title || '').trim();
+        const titleId = rawTitle === '' || rawTitle === 'none' ? null : rawTitle;
+        if (titleId && !list.some((t) => t.id === titleId)) return sendJson(res, 400, { ok: false, error: 'invalid_title' });
+        await db().query('UPDATE accounts SET title = ? WHERE id = ?', [titleId, id]);
+        await audit({ id: me2.admin_id, email: me2.email }, 'set-title', id, titleId, ipOf(req));
+        return sendJson(res, 200, { ok: true, id, title: titleId });
       }
       if (mr[2] === 'role') {
         if (!adminCan(me2, 'accounts.role')) return sendJson(res, 403, { ok: false, error: 'forbidden' });
@@ -1595,7 +1720,9 @@ async function handle(req, res, pathname) {
         const data = JSON.parse(fs.readFileSync(p, 'utf8'));
         return sendJson(res, 200, { ok: true, at: data.at || 0, nodes: data.nodes || [] });
       } catch {
-        const nodes = (roomDirProvider ? roomDirProvider() : []).map((x) => ({ n: x.n, at: x.at, rooms: (x.codes || []).map((code) => ({ code })) }));
+        const nodes = (roomDirProvider ? roomDirProvider() : []).map((x) => ({
+          n: x.n, at: x.at, rooms: require('./roomDir.cjs').dirCodes(x).map((code) => ({ code })),
+        }));
         return sendJson(res, 200, { ok: true, at: Date.now(), nodes });
       }
     }

@@ -1,6 +1,6 @@
 // Unified title-screen resource controls. Mount only the active section: opening never starts a transfer,
 // and switching sections/closing pauses downloads or cancels imports through the panels' cleanup.
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Modal } from './components.js';
 import { AssetDownloadPanel } from './assetDownload.js';
 import { AssetImportPanel } from './assetImport.js';

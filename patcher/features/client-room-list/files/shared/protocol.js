@@ -1,7 +1,7 @@
 // Normative message catalogue (DESIGN §8). Used by server (validation) and client (building requests).
 // Every client→server message is `{ t, rid?, ...fields }`. Unknown `t` or invalid fields ⇒ ERR.BAD_MSG.
 
-import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, MAX_SEATS, EMOTES, GEO } from './constants.js';
+import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, MAX_SEATS, EMOTES, GEO, REHEARSAL_MAX_CANDIDATES } from './constants.js';
 import { MAX_PLAYER_CAPACITY } from './playerCapacity.js';
 import { isDroppableChess } from './standIn.js';
 import { diySlotIds, validateDiyPicks } from './diy.js';
@@ -10,6 +10,16 @@ import { isContentHash } from './plugins/identity.js';
 import { isPluginId } from './plugins/manifest.js';
 import { isTestCommand } from './testMode.js';
 import { PLUGIN_OFFER_SLOTS } from './plugins/limits.js';
+import { LEADER_OPS_MAX } from './leaderOps.js';
+
+/** 「深渊祭坛」可购买的档位：服务端 ECHO_ALTAR_GOODS 的 id 全表 + 两个捐献档。 */
+const ECHO_ALTAR_KINDS = new Set([
+  'blessing', 'buff', 'permanent', 'life',                       // 老四项（旧服务端仍在用）
+  'refresh', 'word', 'counter', 'cash',                          // 老三项 + 提现（20 种商品里的另外四件）
+  'cleanse', 'purge', 'guard', 'haste', 'might', 'bulwark', 'mend',   // 本层商品
+  'slot', 'insight', 'frost', 'titan', 'pierce',                 // 整局唯一
+  'donate5', 'donate10',                                         // 捐献（存钱罐）
+]);
 
 // ---- tiny validators -------------------------------------------------------
 const isInt = (v, lo = -Infinity, hi = Infinity) => Number.isInteger(v) && v >= lo && v <= hi;
@@ -33,6 +43,9 @@ const isList = (v, max, item) => Array.isArray(v) && v.length <= max && v.every(
 const isScalar = (v) => isStr(v, 64) || isNum(v) || isBool(v);
 /** An official version id (shared/versions.js: the activity id, `@<sub-version>` for a sub-version) — structural only; the lobby answers VERSION_UNKNOWN for one this server does not enable (DESIGN §35.23). */
 export const isVersionId = (v) => typeof v === 'string' && v.length <= 40 && /^[a-z0-9]{1,32}(?:@[A-Za-z0-9_]{1,16})?$/.test(v);
+const isPeerDescription = (v) => isPlain(v) && (v.type === 'offer' || v.type === 'answer') && isStr(v.sdp, 16 * 1024);
+const isPeerCandidate = (v) => isPlain(v) && isStr(v.candidate, 2048)
+  && (v.sdpMid === null || isStr(v.sdpMid, 256)) && (v.sdpMLineIndex === null || isInt(v.sdpMLineIndex, 0, 65535));
 
 // ---- client-side combat (DESIGN §14): b.progress / b.result payloads -------------------------------------------
 
@@ -58,11 +71,17 @@ const isPerPlayer = (p) => isPlain(p) && isInt(p.killed, 0, 1e5) && isInt(p.tota
   && optional((x) => isInt(x, 0, 1e9))(p.creditedKills)
   && isList(p.leaked, RESULT_LIMITS.leaked, isLeak) && isBool(p.perfect)
   && isMap(p.layerGains, RESULT_LIMITS.layerGains, isId, (v) => isNum(v, 0, 1e4))
+  // 规程: temporary layers converted at settle. Absent on every result that has none.
+  && (p.tempLayerGains === undefined || isMap(p.tempLayerGains, RESULT_LIMITS.layerGains, isId, (v) => isNum(v, 0, 1e4)))
   && isStat(p.coins) && isStat(p.damageDealt) && isStat(p.bossDamage) && isStat(p.healingDone) && isStat(p.deaths)
+  && optional(v => isList(v, 64, c => isPlain(c) && isUid(c.id) && isBool(c.alive)))(p.commandChests)
   && isList(p.unitsEnd, RESULT_LIMITS.unitsEnd, isUnitEnd)
   && (p.unitStats === undefined || isList(p.unitStats, RESULT_LIMITS.unitStats, isUnitStat));
 const isUnspawned = (u) => isPlain(u) && isId(u.enemyKey) && nullable(isId)(u.sourcePlayerId) && nullable((v) => isStr(v, 16))(u.tag)
   && optional((v) => isNum(v, 0, 1e6))(u.time);
+// 规程 leader ranking (b.progress `ops`): exactly these five keys. A 盟约 server accepts the field and stores nothing.
+const isLeaderOp = (row) => isPlain(row) && Object.keys(row).length === 5
+  && isUid(row.uid) && isId(row.pid) && isId(row.chess) && isInt(row.tier, 0, 10) && isNum(row.dmg, 0, BIG);
 
 /**
  * Structural check of a client BattleResult (DESIGN §5.1 / §14 `b.result`): types, ranges and size limits only —
@@ -383,17 +402,17 @@ export function checkNotOwned(list, getChess) {
 
 /**
  * `room.diy { picks }`: the player's 自选编队 — `{ [slotBaseId]: { charId, skillIndex?, uniEquipId? } | null }` for the
- * four DIY slots (data/backups.json `diy.slots`: two at tier 5, two at tier 6; shared/diy.js). An out-of-match setting
- * like 干员持有: stored per session / seat, a match takes the picks its seat had at its start. Structural limit below
- * (room for more slots in a later season); the semantic check (`checkDiyPicks`) is LENIENT, like checkNotOwned: an
+ * DIY slots (data/backups.json `diy.slots`: 盟约 is two at tier 5 and two at tier 6; 规程 is six at each. shared/diy.js).
+ * An out-of-match setting like 干员持有: stored per session / seat, a match takes the picks its seat had at its start.
+ * Structural limit below (12: the 规程 roster); the semantic check (`checkDiyPicks`) is LENIENT, like checkNotOwned: an
  * illegal pick — not a pick of the slot's tier, an operator without a kit, a prototype off its locked skill, an unknown
  * skill / module, the same operator twice in a tier, an owned operator in a second slot, an unknown slot — is dropped,
  * never the whole roster; only malformed input is BAD_MSG.
  */
-export const DIY_LIMITS = Object.freeze({ slots: 8 });
+export const DIY_LIMITS = Object.freeze({ slots: 12 });
 const isDiyPickWire = (p) => p === null || (isPlain(p) && isId(p.charId)
   && nullable((v) => isInt(v, 0, 9))(p.skillIndex) && nullable(isId)(p.uniEquipId));
-/** Structural check of `room.diy.picks`: a map of ≤ 8 slot ids → a pick `{ charId, skillIndex?, uniEquipId? }` or null. */
+/** Structural check of `room.diy.picks`: a map of ≤ 12 slot ids → a pick `{ charId, skillIndex?, uniEquipId? }` or null. */
 export const isDiyPicks = (v) => isMap(v, DIY_LIMITS.slots, isId, isDiyPickWire);
 
 /**
@@ -446,7 +465,8 @@ const statView = (x) => ({
  * The detail card's stats of a sim unit (server/sim/units.js Unit): its effective stats `s` (the aggregated `unit.s`,
  * or the last ones the sim computed) next to its own numbers — `unit.base` with its 练度 multiplier (`unit.cultMul`,
  * 0.2.2: part of the operator's own numbers, as on the record cards; no buffs) — max HP, ATK, DEF, RES, attack interval
- * (s), block, move speed — rounded for display (the sim keeps floats), plus the current HP. The shape of the
+ * (s), block, move speed — rounded for display (the sim keeps floats), plus the current HP and the HP shield it holds
+ * (`shield`: the sum of its shield buffs, 0 without one). The shape of the
  * `m.unitStats` units (Match.unitStats: what the board's units start their next battle with) and of the browser
  * runner's live battle stats (public/js/battle/runner.js unitStats). An ally with a range also carries `range`: the grid
  * (`[dRow, dCol]`, facing RIGHT) it attacks with now — a running skill's range, rangeExtend included, not a kit's
@@ -455,7 +475,7 @@ const statView = (x) => ({
  * at send time and the snapshot tuples carry none) — the detail card's range overlay rotates by it (GitHub PR #281).
  * @param {{ id?: number, uid?: number|null, defId?: string, hp?: number, alive?: boolean, base?: any, liveRangeGrid?: any, dir?: string } | null} u
  * @param {any} [s] aggregated stats (missing ⇒ the base)
- * @returns {{ id: number|null, uid: number|null, defId: string|null, hp: number, alive: boolean, maxHp: number, atk: number,
+ * @returns {{ id: number|null, uid: number|null, defId: string|null, hp: number, alive: boolean, shield: number, maxHp: number, atk: number,
  *   def: number, res: number, interval: number|null, blockCnt: number, moveSpeed: number,
  *   base: { maxHp: number, atk: number, def: number, res: number, interval: number|null, blockCnt: number, moveSpeed: number },
  *   range?: Array<[number, number]>, dir?: string }}
@@ -473,6 +493,9 @@ export function unitStatsEntry(u, s = null) {
     defId: typeof u?.defId === 'string' ? u.defId : null,
     hp: Math.max(0, Math.round(fin(u?.hp))),
     alive: u?.alive !== false,
+    // the HP shield it holds right now (the sum of its shield buffs; 0 without one) — the enemy card shows it beside the
+    // HP so a player knows how much shield is left (维护者 2026-11-07)
+    shield: Math.max(0, Math.round(fin(cur.shield))),
     ...statView(cur),
     base: statView(base),
     ...(range ? { range } : {}),
@@ -490,6 +513,7 @@ const target = (v) => {
   if (!v || typeof v !== 'object') return false;
   if (v.area === 'board') return isInt(v.row, 0, GEO.ROWS - 1) && isInt(v.col, 0, GEO.COLS - 1);
   if (v.area === 'hand') return isInt(v.idx, 0, GEO.HAND_SIZE - 1);
+  if (v.area === 'temp') return isInt(v.idx, 0, GEO.TEMP_SIZE - 1);
   return false;
 };
 
@@ -514,8 +538,11 @@ export const C2S = {
   // soloUnlimited: the timed-solo opt-out 「不限时」 (DESIGN §35.23.10). Optional, and only the literal boolean —
   // the server applies `true` solely to a solo room of a version whose solo is timed, and ignores it otherwise, so a
   // default create stays the message it was.
-  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, version: isVersionId, soloUnlimited: isBool, experimental: (v) => v && typeof v === 'object' && !Array.isArray(v), $optional: ['test', 'difficulty', 'version', 'soloUnlimited', 'experimental'] },
+  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, version: isVersionId, soloUnlimited: isBool, experimental: (v) => v && typeof v === 'object' && !Array.isArray(v), variant: (v) => v === 'deepecho', $optional: ['test', 'difficulty', 'version', 'soloUnlimited', 'experimental', 'variant'] },
   'room.join': { $optional: ['testAck'], testAck: (v) => v === true, code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
+  'p2p.enable': { enabled: isBool },
+  'p2p.signal': { epoch: isId, to: isId, description: isPeerDescription, candidate: isPeerCandidate, $optional: ['description', 'candidate'] },
+  'p2p.ready': { epoch: isId, ready: isBool, seq: (v) => Number.isSafeInteger(v) && v >= 0 },
   'room.leave': {},
   'account.resume': {},
   'room.ready': { ready: isBool },
@@ -533,7 +560,8 @@ export const C2S = {
   // 最多 ROOM_LIST_MAX 个，空位最少的在前 —— host 是房主显示名，filled 是已占座位（含 AI），
   // version 只在不是默认版本时出现。
   'room.setListed': { listed: isBool },
-  'room.list': {},
+  // 公开同盟 / 公开深潜共用：带 variant 只列该模式（不带 = 普通同盟，深潜有自己的列表）
+  'room.list': { $optional: ['variant'], variant: (v) => v === 'deepecho' },
 
   // Remake-only spectator handover: host opt-in before play, default off (§35.100).
   'room.setAiTakeover': { on: isBool },
@@ -553,6 +581,20 @@ export const C2S = {
   // 本服：匹配队友（server/lobby.js matchmaking）。0.3.3 上游拆掉了这条协议，但本服的
   // 「匹配队友」按钮与匹配服务器仍在用，必须放行，否则玩家点了只会拿到 unknown type。
   'room.matchmaking': { on: isBool },
+  // 本服：大厅「多人匹配」一键参与匹配（server/lobby.js quickMatch）。difficulty 可省：
+  // 省了就是「哪间匹配中的房间缺人就进哪间」。答复字段 { code, joined, matchmaking? } 或
+  // { queued: true, ticket, state }（没人可加入时排队，前端停在匹配界面轮询），由 net.js 平铺在 ok 帧顶层。
+  'room.quickMatch': {
+    $optional: ['difficulty', 'seats', 'rules', 'variant'],
+    difficulty: (v) => DIFFICULTIES.includes(v),
+    seats: (v) => v === 'four' || v === 'multi' || v === 'both',
+    rules: (v) => v === 'standard' || v === 'experimental' || v === 'both',
+    // 「深渊回响」（深潜）：自己的匹配池（server/lobby.js quickMatch 的 variant 维度）
+    variant: (v) => v === 'deepecho',
+  },
+  // 本服：多人匹配排队状态的轮询与取消（维护者 2026-11-02：没人匹配时停在界面等，不开房）。
+  'room.quickState': { $optional: ['ticket'], ticket: (v) => typeof v === 'string' && v.length <= 64 },
+  'room.quickLeave': { $optional: ['ticket'], ticket: (v) => typeof v === 'string' && v.length <= 64 },
   'room.start': {},
   'room.rerollSetup': { setupRevision: (v) => isInt(v, 0, 2 ** 31) },
   'room.cancelReroll': { voteId: (v) => isInt(v, 1, 2 ** 31) },
@@ -599,11 +641,48 @@ export const C2S = {
   'room.contentReady': { cs: isContentHash, ok: isBool, $optional: ['ok'] },
 
   // match
+  'g.bondGroup': { idx: (v) => isInt(v, 0, 1), setupRevision: (v) => isInt(v, 0, 2 ** 31) },
   'g.infoReady': { setupRevision: (v) => isInt(v, 0, 2 ** 31), $optional: ['setupRevision'] },
   'g.rerollVote': { voteId: (v) => isInt(v, 1, 2 ** 31), agree: isBool },
   // 战斗 2 倍速 (server/match/match/speedVote.js): this seat's standing vote; m.public speedVote is the count
   'g.speedVote': { agree: isBool },
+  // 「暂停游戏」的全员投票（维护者 2026-11-08，server/match/match/pauseVote.js）：agree=true 发起/同意、false 撤回；
+  // 暂停中每个人发 g.pauseResume 确认，全员确认后恢复
+  'g.pauseVote': { agree: isBool },
+  'g.pauseResume': {},
+  // 「深渊回响」的祝福三选一 (server/match/match/echoBlessing.js, ui/echoBlessing.js):
+  // `pick` 是候选下标（0..2），**3 = 第四张「放弃本次」**（维护者 2026-11-05 加的）。上限必须放到 3 ——
+  // 否则点「放弃本次」会在客户端就被拦成「无效的请求」，服务端 intents.js 的 case 永远收不到
+  //（玩家反馈的正是这个：连点 13 次全是 BAD_MSG）。
+  // **必须登记在这里** —— 漏了的话 net.js 会在客户端就把它拦掉（与 g.bondPlan 踩过的是同一个坑）。
+  'g.echoBlessing': { pick: (v) => isInt(v, 0, 3) },
+  // 名额满时的「弃选」投票 / 「护盾」指定盟约 / 「开路」提前解除（2026-11-05）
+  // ⚠ 同样必须在这里登记，否则客户端一发就是「无效的请求」（BAD_MSG），服务端永远收不到。
+  'g.echoBlessingDiscard': { pick: (v) => isInt(v, 0, 15) },
+  // 刷新三选一（维护者 2026-11-05）：start=true 发起投票；否则按 agree 投同意/不同意
+  'g.echoBlessingRefresh': { start: (v) => v === undefined || typeof v === 'boolean', agree: (v) => v === undefined || typeof v === 'boolean' },
+  'g.echoShield': { pick: (v) => isInt(v, 0, 15) },
+  'g.echoCounterUse': {},
+  // 深渊祭坛（16 层起）：买一次献祭 / 主动捐献（donate10 / donate50 累进全队祭坛池）
+  'g.echoAltar': { kind: (v) => ECHO_ALTAR_KINDS.has(v) },
+  // 深潜补给（16 层起）：个人三选一
+  'g.echoSupply': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 2 },
+  // 「盟约投影」（16 层起每 10 层）：全队三选一投票
+  'g.echoProjection': { pick: (v) => Number.isInteger(v) && v >= 0 && v <= 3 },
+  // 主动放弃深潜（维护者 2026-11-07）：start=true 发起（单人立刻结算 / 多人开全员投票），否则按 agree 投票
+  'g.echoGiveUp': { start: (v) => v === undefined || typeof v === 'boolean', agree: (v) => v === undefined || typeof v === 'boolean' },
+  // 投票移出（AI 接管的掉线队友，参考版 GitHub feedback #12）：发起 / 应答
+  'g.kickVote': { targetId: (v) => typeof v === 'string' && v.length > 0 },
+  'g.kickBallot': { voteId: (v) => Number.isInteger(v) && v >= 1, agree: (v) => typeof v === 'boolean' },
   'g.band': { bandId: isId },
+  // 规程 选择自编: the slots this match brings (0–2 per tier). Shape only; the match re-checks caps, bans and the roster.
+  'g.diyBring': { slots: (v) => isList(v, DIY_LIMITS.slots, isId) },
+  'g.command': { effectId: isId, target: (v) => isPlain(v) && (
+    Object.keys(v).length === 0
+    || (Object.keys(v).length === 1 && (isUid(v.uid) || isInt(v.slot, 0, 15)))
+    || (Object.keys(v).length === 2 && isInt(v.row, GEO.FIELD.r0, GEO.FIELD.r1) && isInt(v.col, GEO.FIELD.c0, GEO.FIELD.c1))
+  ) },
+  'g.commandChoice': { choiceId: isId, idx: v => isInt(v, 0, 2) },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is
   // free (Match.timeoutBand); absent / null clears it
@@ -660,7 +739,9 @@ export const C2S = {
   // field's own scheduled enemies that were knocked out **or leaked** (official: 漏一个 1/3, 打死一个 2/3,
   // 打死会分裂的 3/3 — Battle.leakedInTotal; runtime splits / summons stay out of both parts of the capsule). A boss / hidden field adds
   // `leaksBy` = { [playerId]: the cumulative LP the enemies that reached that player's goal cost } — `leaks` minus its
-  // sum is the leader's own "扣除目标生命" effects; the server holds the b.result's leaked lists to it (Match._bossLeaksAgree)
+  // sum is the leader's own "扣除目标生命" effects; the server holds the b.result's leaked lists to it (Match._bossLeaksAgree).
+  // `ops` (规程 ranking; a 盟约 server accepts it and stores nothing) = up to 48 { uid, pid, chess, tier, dmg } rows,
+  // this field's cumulative per-operator damage to the leader. The server credits no operator past the player's clamped `by`.
   'b.progress': {
     battleId: isId, gt: (v) => isNum(v, 0, 1e5), killed: (v) => isInt(v, 0, 1e5), total: (v) => isInt(v, 0, 1e5),
     resolved: (v) => isInt(v, 0, 1e5),
@@ -668,7 +749,8 @@ export const C2S = {
     by: (v) => isMap(v, RESULT_LIMITS.players, isId, (x) => isNum(x, 0, BIG)), done: isBool,
     left: (v) => isMap(v, RESULT_LIMITS.players, isId, (x) => isInt(x, 0, 1e5)),
     leaksBy: (v) => isMap(v, RESULT_LIMITS.players, isId, (x) => isNum(x, 0, 1e6)),
-    $optional: ['resolved', 'leaks', 'bossDmg', 'by', 'done', 'left', 'leaksBy'],
+    ops: (v) => isList(v, LEADER_OPS_MAX, isLeaderOp),
+    $optional: ['resolved', 'leaks', 'bossDmg', 'by', 'done', 'left', 'leaksBy', 'ops'],
   },
   // `cs` (DESIGN §32, optional): the content hash the reporting browser ran the battle on — its spec's `cs`. In a room
   // with gameplay plugins (P1c, DESIGN §32.6) the match refuses a result without it or with another one (and runs the
@@ -680,9 +762,9 @@ export const C2S = {
   // match state of its own; `error: true` says this client cannot run the task at all (no module Worker, or the
   // simulation data did not load), so the server takes the rehearsal over at once instead of waiting for its timeout.
   // An unknown task, another sender or a task the server already took over is ignored; an invalid `choice` makes the
-  // server run the candidates itself. `choice` stops at 7 because a match rehearses at most 8 candidates.
+  // server run the candidates itself. `choice` stops below REHEARSAL_MAX_CANDIDATES, the most one prep rehearses.
   'b.rehearsalResult': {
-    taskId: isId, choice: (v) => v === undefined || isInt(v, 0, 7), error: (v) => v === undefined || v === true,
+    taskId: isId, choice: (v) => v === undefined || isInt(v, 0, REHEARSAL_MAX_CANDIDATES - 1), error: (v) => v === undefined || v === true,
     $optional: ['choice', 'error'],
   },
   // State-delta transport (shared/stateDelta.js): the client asks for one full frame after it missed one. The server
@@ -695,8 +777,12 @@ export const C2S = {
 // Server → client message types (documentation + client dispatch table keys).
 export const S2C = [
   'welcome', 'ok', 'error', 'pong',
+  'p2p.config', 'p2p.signal', 'p2p.frame',
   'room.state', 'room.closed',
   'm.public', 'm.private', 'm.field', 'm.toast', 'm.ticker', 'm.emote', 'm.result',
+  // m.removed { reason: 'afk' | 'kicked', rounds } — 这个座位被永久移出（挂机判定 / 投票移出，platform.js _removeIdle）：
+  // 客户端收到后退出房间、回大厅并提示原因。**只在被移除的那个人身上发一次**，其他人收 m.notice。
+  'm.removed',
   // m.layer { playerId, bondId, add } — own live prep layer gain; ephemeral, never replayed on resync.
   'm.layer',
   // m.unitStats { seq, round, units: [unitStatsEntry] } — the answer to g.unitStats (the requester only)
@@ -722,6 +808,7 @@ export function validateC2S(msg) {
   if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return 'not an object';
   const spec = typeof msg.t === 'string' && Object.hasOwn(C2S, msg.t) ? C2S[msg.t] : null;
   if (!spec) return `unknown type ${String(msg.t).slice(0, 32)}`;
+  if (msg.t === 'p2p.signal' && (msg.description !== undefined) === (msg.candidate !== undefined)) return 'exactly one signal required';
   if (msg.rid != null && !isInt(msg.rid, 0, 2 ** 31)) return 'bad rid';
   const optional = spec.$optional || [];
   for (const [k, check] of Object.entries(spec)) {
@@ -747,6 +834,8 @@ export const EV = Object.freeze({
   // only: the renderer paces the attack clip over it (render/attackRate.js) instead of waiting to measure two attacks,
   // which is what made the first swing of a skill / buff change slow-motion for a while.
   RATE: 'rate',
+  // ['resource', id, 'cost'|'sp', actual signed delta, source reason]: optional live-display receipts (#657).
+  RESOURCE: 'resource',
 });
 
 /**

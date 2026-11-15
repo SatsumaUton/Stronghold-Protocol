@@ -13,7 +13,7 @@
 // ticks every second and stays out of what is announced (aria-hidden; 重刷本局's live region has no ticking text either).
 // Texts go through t() (docs/I18N.md).
 
-import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Icon } from './components.js';
 import { net } from '../net.js';
 import { useStore, createStore } from '../store.js';

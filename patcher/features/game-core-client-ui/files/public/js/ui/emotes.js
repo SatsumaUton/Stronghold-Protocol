@@ -19,7 +19,7 @@
 // Official UI sprites come from the local ui/battle extraction when present; CSS draws look-alikes otherwise.
 // Styles: public/css/emotes.css (injected on first use when the page does not link it).
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { EMOTE_THEMES, EMOTE_COOLDOWN_MS, EMOTE_BUBBLE_MS, emoteInfo, emoteArtGroup } from '../../../shared/constants.js';
 import { html } from './components.js';
 import { GIcon } from './gameComponents.js';

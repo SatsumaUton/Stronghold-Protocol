@@ -15,7 +15,7 @@
 // so a device counts what it recorded (cleared browser data starts again at LV 0). A spectator seat (no row of its own)
 // opens on the team page. The stats page re-views a stored match with ResultView.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, DifficultyIcon, Spinner } from '../ui/components.js';
 import { OperatorImage, useGameData, Img, Sprite, PromotionIcon, PlayerAvatar, BondGlyph, BandIcon } from '../ui/gameComponents.js';
 import { normalizeResult, diyRecordFor, cardStandIn, standInForText } from '../ui/gameLogic.js';
@@ -29,8 +29,10 @@ import { recordId, selfRowOf, loadStats, isModdedRecord, recordsOfSeason } from 
 import { UnofficialMark, VersionTag, isModdedRoom } from '../ui/pluginTag.js';
 import { shownVersion, seasonOf } from '../versions.js';
 import { TestMark } from '../ui/testConsole.js';
+import { ladderName } from '../ui/hud.js';
 import { ResultView, resultBonds } from './result.js';
 import { NodeCodeHint } from '../ui/nodeCodeHint.js';
+import { diveBack, diveCleared, diveInterrupted, diveRounds, isDiveResult, isDivePub } from '../ui/diveWords.js';
 import { DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
 import { t } from '../../../shared/i18n.js';
 
@@ -235,14 +237,25 @@ function Logo() {
   </div>`;
 }
 
-/** The mode pill: the official difficulty plate (its emblem, no text) under the difficulty's name. */
+/**
+ * The result's mode name: 规程's own mode name where it is not its difficulty's (规程等级 n / 极速模拟, as the in-match tag:
+ * the official settlement of a solo 规程等级20 match says 「规程等级20」, BV12ZWP6pE7m 11:40), else the difficulty's.
+ * @param {{ difficulty?: string|null, modeId?: string|null }} r
+ */
+export function modePillName(r) {
+  const d = r?.difficulty;
+  if (!d) return '';
+  return ladderName({ modeId: r.modeId || undefined, difficulty: d }) || (DIFFICULTY_NAMES[d] ? t(DIFFICULTY_NAMES[d]) : d);
+}
+
+/** The mode pill: the official difficulty plate (its emblem, no text) under the mode's name (modePillName). */
 function ModePill({ r }) {
   const d = r.difficulty;
   if (!d) return null;
   const key = String(d).toLowerCase();
   return html`<span class=${cx('smode', `smode--${key}`)} style=${`--d-color:${DIFFICULTY_COLORS[d] || 'var(--text-lo)'}`}>
     <${Sprite} k=${`settle/mode_${key}`} class="smode__bg" fallback=${html`<span class="smode__bg smode__bg--css"><${DifficultyIcon} difficulty=${d} /></span>`} />
-    <b class="smode__name">${DIFFICULTY_NAMES[d] ? t(DIFFICULTY_NAMES[d]) : d}</b>
+    <b class="smode__name">${modePillName(r)}</b>
   </span>`;
 }
 
@@ -436,6 +449,8 @@ function SettleTestMark({ res }) {
 
 function SelfPage({ r, res, raw, self, gd, prog, content, onNext, version = null }) {
   const cleared = rowCleared(raw, self, r.victory);
+  // 「深渊回响」不是模拟：标题说深潜（维护者 2026-11-08）
+  const dive = isDiveResult(res);
   const [leaving, setLeaving] = useState(false);
   const nextRef = useRef(null);
   const rounds = useCountUp(self.roundsPassed, { ms: 700, delay: 350 });
@@ -465,7 +480,7 @@ function SelfPage({ r, res, raw, self, gd, prog, content, onNext, version = null
       <${Logo} />
       <div class="sself__band">${self.bandId ? html`<${BandIcon} bandId=${self.bandId} size="lg" />` : html`<${PlayerAvatar} player=${self} self=${true} />`}<i aria-hidden="true"></i></div>
       <div class="sself__mode"><${ModePill} r=${r} /><${UnofficialMark} room=${content ? { content } : null} class="sself__modmark" /><${VersionTag} version=${version} class="sself__vertag" /><${SettleTestMark} res=${res} /></div>
-      <${SettleTitle} class="sself__title">${cleared ? t('模拟完成') : t('模拟中断')}</${SettleTitle}>
+      <${SettleTitle} class="sself__title">${cleared ? diveCleared(dive) : diveInterrupted(dive)}</${SettleTitle}>
       <div class="sself__rounds"><span>${t('通过回合')}</span><b class="num">${rounds}</b></div>
       ${medals.length ? html`<div class="sself__medals">${medals.map((m, i) => html`<${Medal} key=${m.kind} m=${m} i=${i} />`)}</div>` : null}
       <div class="splate">
@@ -559,6 +574,8 @@ function TeamCard({ p, i, step, gd, self, victory, raw }) {
 
 function TeamPage({ r, res, gd, myId, at: when, content, backLabel, onBack, onDetail, version = null }) {
   const rounds = useCountUp(r.roundsPassed, { ms: 900, delay: 450 });
+  // 「深渊回响」不是同盟：标题与「通过回合」都说深潜（维护者 2026-11-08）
+  const dive = isDiveResult(res);
   const backRef = useRef(null);
   const rowRef = useRef(null);
   const rawOf = (pid) => (Array.isArray(res?.players) ? res.players.find((x) => x && x.playerId === pid) : null) || null;
@@ -598,10 +615,10 @@ function TeamPage({ r, res, gd, myId, at: when, content, backLabel, onBack, onDe
       <div class="settle__barbg steam__barbg" aria-hidden="true"><${Sprite} k="settle/bottom_bg" /></div>
       <div class="steam__outcome">
         <span class="steam__tags"><${ModePill} r=${r} /><${UnofficialMark} room=${content ? { content } : null} /><${VersionTag} version=${version} /><${SettleTestMark} res=${res} /></span>
-        <${SettleTitle} as="b" class="steam__title">${r.victory ? t('模拟完成') : t('模拟中断')}</${SettleTitle}>
+        <${SettleTitle} as="b" class="steam__title">${r.victory ? diveCleared(dive) : diveInterrupted(dive)}</${SettleTitle}>
       </div>
       <${NodeCodeHint} class="steam__nodehint" />
-      <div class="steam__rounds"><span>${t('同盟通过回合')}</span><b class="num">${rounds}</b></div>
+      <div class="steam__rounds"><span>${diveRounds(dive)}</span><b class="num">${rounds}</b></div>
       <div class="steam__when">
         <span class="steam__row"><${Sprite} k="settle/date_time_bg" class="steam__rowbg" /><${Sprite} k="settle/time_icon" class="steam__ico" />${fmtDuration(r.durationMs)}</span>
         <span class="steam__row"><${Sprite} k="settle/date_time_bg" class="steam__rowbg" /><${Sprite} k="settle/date_icon" class="steam__ico" />${fmtDate(when)}</span>
@@ -670,5 +687,5 @@ export function ResultScreen() {
   const version = useStore(shownVersion);
   const back = () => store.set({ match: emptyMatch() });
   if (!res) return html`<div class="screen result settle" data-testid="settle-wait"><${Spinner} size="lg" /></div>`;
-  return html`<${SettleFlow} res=${res} pub=${pub} myId=${myId} content=${content} version=${version} backLabel=${hasRoom ? t('返回同盟') : t('返回大厅')} onBack=${back} />`;
+  return html`<${SettleFlow} res=${res} pub=${pub} myId=${myId} content=${content} version=${version} backLabel=${hasRoom ? diveBack(isDiveResult(res) || isDivePub(pub)) : t('返回大厅')} onBack=${back} />`;
 }

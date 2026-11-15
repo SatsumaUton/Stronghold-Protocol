@@ -1,5 +1,5 @@
 // A server-owned unanimous vote. Reconnects render the current vote from m.public.
-import { useRef, useState } from '../../vendor/hooks.module.js';
+import { useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button } from './components.js';
 import { actions } from './gameActions.js';
 import { useStore } from '../store.js';

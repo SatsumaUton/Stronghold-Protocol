@@ -37,7 +37,7 @@
 import { TestMark } from '../ui/testConsole.js';
 import { EchoCodex, EchoCodexButton } from '../ui/echoCodex.js';
 import { ResumeMatchButton } from '../ui/resumeMatch.js';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor, ERR } from '../../../shared/constants.js';
 import { PLAYER_CAPACITIES } from '../../../shared/playerCapacity.js';
 import { html, confirmDialog, Button, Icon, MicroLabel, Modal, PingPill, Spinner, DifficultyIcon, TextField } from '../ui/components.js';

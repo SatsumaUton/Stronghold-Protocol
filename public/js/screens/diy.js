@@ -15,7 +15,7 @@
 // one semantic difference is the DRAFT — a row's quick choice writes it (确认 saves it, 取消 / Esc drop it) while a 潜能 /
 // 练度 write stays immediate like the roster's; a taken option disables its row, a prototype's locked cells are static.
 
-import { useLayoutEffect, useState } from '../../vendor/hooks.module.js';
+import { useLayoutEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, Button, TierChip, TextField } from '../ui/components.js';
 import { OperatorImage, Img, BondGlyph } from '../ui/gameComponents.js';
 import { profIconUrl, subProfIconUrl, bondIconUrl, skillRecordIconUrl, moduleTypeIconUrl } from '../ui/assetUrls.js';

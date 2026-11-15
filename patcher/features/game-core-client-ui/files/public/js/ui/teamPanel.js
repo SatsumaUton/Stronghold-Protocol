@@ -17,18 +17,25 @@
 // local 联防 replica's count while it is on screen (`uniteLocal`: the battle runner's state().uniteLeft, the same battle
 // the player watches, so the number moves with the kills on screen), else m.public players[].uniteLeft (the authority's
 // report, ~1 Hz).
+// 完美连胜 / 领袖伤害 (DESIGN §37.148, every version; ui/avatarBadges.js): the streak badge on the avatar's top-right corner
+// (the own row's "you" marker moves to the bottom-left corner while it shows), the leader-damage scan over the avatar
+// during a leader fight; `badges` = { pack, still } (the theme's avatar prefabs, else ac_n_initial's; null pack: CSS).
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { PHASE } from '../../../shared/constants.js';
 import { html, Icon, Tooltip } from './components.js';
 import { PlayerAvatar, LpTower, GIcon, LocalSprite } from './gameComponents.js';
 import { EmoteBubble } from './emotes.js';
 import { STATUS_META, sortedPlayers, teamFrameIds } from './gameLogic.js';
 import { MissTag, uniteRemaining } from './hud.js';
+import { WinStreakBadge, BossDamageBadge, avatarBadgeTips } from './avatarBadges.js';
 import { localAsset } from '../data.js';
 import { t } from '../../../shared/i18n.js';
 import { ReviveAction, RevivalNotice } from './revival.js';
+import { KickAction, KickVoteNotice } from './kickVote.js';
+import { BondPlanTag } from './bondPlan.js';
 import { PHONE_QUERY, teamDensity, teamEmoteMode } from './teamLayout.js';
+import { diveTeam, isDivePub } from './diveWords.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -46,6 +53,8 @@ const STATUS_SPRITE = { ready: 'icon_ready', deciding: 'icon_waiting', done: 'ic
  * @param {{ uniteLocal?: Record<string, number> | null, cap?: number }} [opts]
  * @returns {{ lp: number|null, pending: number, unite: boolean, left: number|null }}
  */
+const POOL_BADGE = '池';  // i18n-ignore: 角标字形
+
 export function rowLp(p, pub, self = null, { uniteLocal = null, cap = 10 } = {}) {
   const pubLp = Number.isFinite(p?.lp) ? p.lp : null;
   if ((pub?.phase !== PHASE.COMBAT && pub?.phase !== PHASE.UNITE) || p?.alive === false) return { lp: pubLp, pending: 0, unite: false, left: null };
@@ -115,10 +124,12 @@ export function rowLpTip(lp, cap = 10) {
  * @param {{ pub:any, myId:string, watching:string|null, bubbles: Map<string,{id:string,seq:number}>, onWatch:(p:any)=>void,
  *   compact?: boolean, teamLp?: number|null, self?: { lp?: number|null, pending: number, unite: boolean, left?: number|null } | null,
  *   cap?: number, uniteLocal?: Record<string, number> | null,
- *   observe?: null | { canObserve: (p:any) => { fieldId?: string, reason?: string|null, back?: boolean }, observing: boolean, onBack: () => void } }} props
+ *   observe?: null | { canObserve: (p:any) => { fieldId?: string, reason?: string|null, back?: boolean }, observing: boolean, onBack: () => void },
+ *   badges?: { pack: any, still?: boolean } | null }} props
  *   uniteLocal: the local 联防 replica's per-leaker counts while it is on screen (battle runner state().uniteLeft), else null
+ *   badges: how the 完美连胜 / 领袖伤害 badges are drawn (ui/avatarBadges.js); null draws the CSS stand-ins
  */
-export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = false, observe = null, self: selfLive = null, cap = 10, uniteLocal = null, spMarks = null, onRosterOpen = null }) {
+export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = false, observe = null, self: selfLive = null, cap = 10, uniteLocal = null, spMarks = null, onRosterOpen = null, badges = null }) {
   const [openPid, setOpenPid] = useState(null);
   const [rosterOpen, setRosterOpen] = useState(true);
   // 花名册开合上报给对局屏：表情要在「气泡」与「弹幕」之间切（ui/teamLayout.js teamEmoteMode）。
@@ -129,6 +140,8 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
   useEffect(() => { setOpenPid(null); }, [phaseKey, watching, observe?.observing]);
   const players = sortedPlayers(pub);
   if (!players.length) return null;
+  // 「深渊回响」不是同盟：面板标题和折叠头都要说深潜（维护者 2026-11-08）
+  const teamName = diveTeam(isDivePub(pub));
   // 表情走弹幕时，行里不再挂气泡（否则同一句表情放两次）。
   const rowBubbles = teamEmoteMode({ density: teamDensity({ count: players.length, phone: globalThis.matchMedia?.(PHONE_QUERY)?.matches }), open: rosterOpen }) === 'bubble' ? bubbles : null;
   const poolGroups = Array.isArray(pub?.poolGroups) ? pub.poolGroups.filter((g) => g && Array.isArray(g.playerIds) && g.playerIds.length) : [];
@@ -168,16 +181,16 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
     noteAsked(p);
     onWatch(p);
   };
-  return html`<aside class=${cx('team', compact && 'team--compact', players.length > 4 && 'team--many', !rosterOpen && 'is-folded')} aria-label=${t('同盟成员')}>
+  return html`<aside class=${cx('team', compact && 'team--compact', players.length > 4 && 'team--many', !rosterOpen && 'is-folded')} aria-label=${teamName}>
     ${players.length > 4 ? html`<div class="team__head">
       <button type="button" class="team__toggle" aria-expanded=${String(rosterOpen)} aria-controls="team-roster"
         onClick=${() => setRosterOpen((v) => !v)}>
-        <${Icon} name="users" /><span>${t('同盟成员')}</span><b class="num">${players.length}</b>
+        <${Icon} name="users" /><span>${teamName}</span><b class="num">${players.length}</b>
         <${Icon} name="chevronRight" class="team__chev" />
       </button>
     </div>` : null}
     ${poolSummary ? html`<div class="team__pool-summary" title=${poolSummary}><span>${t('卡池')}</span><b>${poolSummary}</b></div>` : null}
-    <div class="team__notice"><${RevivalNotice} pub=${pub} /></div>
+    <div class="team__notice"><${RevivalNotice} pub=${pub} /><${KickVoteNotice} pub=${pub} /></div>
     <div class="team__players" id="team-roster" hidden=${!rosterOpen}>
     ${players.map((p) => {
       const self = p.playerId === myId;
@@ -191,20 +204,25 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
       const title = observe ? (self ? (observe.observing ? t('返回战场') : t('你自己')) : t('查看 {name} 的战场', { name: p.name })) : (self ? t('查看自己的阵地') : t('查看 {name} 的阵地', { name: p.name }));
       const lp = rowLp(p, pub, self ? selfLive : null, { uniteLocal, cap });
       const inTeam = team.has(p.playerId);
+      const streakLevel = p.alive === false ? 0 : Math.trunc(Number(p.winStreakLevel) || 0);
+      const damageLevel = p.alive === false ? 0 : Math.trunc(Number(p.bossDamageLevel) || 0);
+      const tip = [inTeam && !self ? `${title} · ${t('与你在同一战场')}` : title, ...avatarBadgeTips(p)].join('\n');
       return html`<div key=${p.playerId} class=${cx('team__row', self && 'is-self', inTeam && 'is-team', watched && 'is-watched', p.alive === false && 'is-dead', open && 'is-open')}>
-        <button type="button" class="team__btn" onClick=${() => click(p, self)} onDblClick=${(e) => dblClick(e, p, self)} title=${inTeam && !self ? `${title} · ${t('与你在同一战场')}` : title} aria-expanded=${observe && !self ? String(open) : undefined}>
+        <button type="button" class="team__btn" onClick=${() => click(p, self)} onDblClick=${(e) => dblClick(e, p, self)} title=${tip} aria-expanded=${observe && !self ? String(open) : undefined}>
           <${PlayerAvatar} player=${p} self=${self} />
+          ${damageLevel > 0 ? html`<${BossDamageBadge} pack=${badges?.pack || null} level=${damageLevel} still=${!!badges?.still} />` : null}
           ${inTeam ? html`<span class=${cx('team__frame', !frameArt && 'team__frame--plain')} style=${frameArt ? `--frame:url("${frameArt}")` : undefined} aria-hidden="true"></span>` : null}
           <span class="team__seat num">P${(p.seat ?? 0) + 1}</span>
           ${p.isBot ? html`<span class="team__ai">AI</span>` : null}
-          ${self ? html`<span class="team__you"><${Icon} name="user" /></span>` : null}
+          ${self ? html`<span class=${cx('team__you', streakLevel > 0 && 'is-low')}><${Icon} name="user" /></span>` : null}
+          ${streakLevel > 0 ? html`<${WinStreakBadge} pack=${badges?.pack || null} level=${streakLevel} streak=${p.winStreak} still=${!!badges?.still} />` : null}
           ${spMarks?.get(p.playerId) === 'done' ? html`<span class="team__spmark is-done" title=${t('已完成选择')}><${Icon} name="check" /></span>`
             : spMarks?.get(p.playerId) === 'turn' ? html`<span class="team__spmark is-turn" title=${t('正在决策…')}><i></i><i></i><i></i></span>` : null}
         </button>
         <div class="team__info">
           <span class="team__name">${p.name || t('博士')}</span>
           <div class="team__line">
-            ${Number(pub?.playerCapacity) > 4 ? html`<span class="team__pool" title=${t('卡池分组 {n}', { n: p.poolGroup || 1 })}>池${p.poolGroup || 1}</span>` : null}
+            ${Number(pub?.playerCapacity) > 4 ? html`<span class="team__pool" title=${t('卡池分组 {n}', { n: p.poolGroup || 1 })}>${POOL_BADGE}${p.poolGroup || 1}</span>` : null}
             <${LpTower} value=${lp.lp} size="sm" tone=${Number.isFinite(lp.lp) && lp.lp - lp.pending <= 5 ? 'danger' : null} pending=${lp.pending}
               tip=${rowLpTip(lp, cap)} />
             ${lp.left != null ? html`<${MissTag} n=${lp.left} name=${self ? null : p.name || t('博士')} />` : null}
@@ -215,6 +233,9 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
                   : html`<${GIcon} name=${meta.glyph} />`}
               </span>
             <//>
+            ${/* 预约盟约：进对局以后在队友行上也看得见（和 bandDraft 的选人顺序行同一个标记）。
+                 AI 不会预约，所以只有真人会带这个图标；compact 只出图标不出名字。 */ null}
+            ${p.bondPlan ? html`<${BondPlanTag} bondId=${p.bondPlan} compact=${true} class="team__plan" />` : null}
             ${watched && !self ? html`<span class="team__eye" title=${t('正在查看')}><${GIcon} name="eye" /></span>` : null}
           </div>
           ${open ? html`<button type="button" class="btn btn--primary btn--sm team__ob"
@@ -222,6 +243,7 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
           ${back ? html`<button type="button" class="btn btn--secondary btn--sm team__back"
             onClick=${() => observe.onBack()}><span class="btn__label">${t('返回战场')}</span></button>` : null}
           <${ReviveAction} pub=${pub} myId=${myId} target=${p} compact=${players.length > 4} />
+          <${KickAction} pub=${pub} myId=${myId} target=${p} compact=${players.length > 4} />
         </div>
         ${bubble ? html`<${EmoteBubble} key=${bubble.seq} id=${bubble.id} class="team__bubble" />` : null}
       </div>`;

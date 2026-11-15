@@ -3,7 +3,7 @@
 //   CreateArt / JoinArt — the pictures of the 创建同盟 / 加入同盟 cards (an octagon emblem with circuit lines; a row of
 //   isometric blocks under a target).
 // Decorative only (aria-hidden). Styles: css/screens/lobby.css (mf-*).
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { reducedMotion } from './device.js';
 

@@ -1,6 +1,6 @@
 // Post-unite rescue controls (ported from the reference team panel): the server owns eligibility,
 // the window and the one-use limit; these components only explain and send g.revive.
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { PHASE } from '../../../shared/constants.js';
 import { html, Button, Icon, Tooltip, Countdown, confirmDialog } from './components.js';
 import { net } from '../net.js';

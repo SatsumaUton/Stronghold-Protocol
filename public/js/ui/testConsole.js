@@ -8,7 +8,7 @@
 // field runs the command. The host drags it by the header. The default sits on the field only (right of the
 // team roster, below the bond strip, above the hand) at 1280×720 and 1920×1080. At ≤720px it stays the top sheet.
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { useStore } from '../store.js';
 import { data, getMode, useData } from '../data.js';

@@ -5,7 +5,7 @@
 // 「不生成脚本插件」 sends noScripts (the CLI's --no-scripts): the pack's kits/ do not become a script plugin. Toggling it
 // clears the report, so confirm always writes what the last preview showed.
 
-import { useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Modal, Button } from '../../js/ui/components.js';
 import { t } from '../../../shared/i18n.js';
 import { post, fileBase64 } from './api.js';

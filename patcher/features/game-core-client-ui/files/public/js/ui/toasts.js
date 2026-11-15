@@ -4,13 +4,14 @@
 // once near the app root. Identical messages shown within a short window are merged (with a ×N
 // counter) instead of stacking, and the stack is capped so an error storm cannot flood the screen.
 
-import { h } from '../../vendor/preact.module.js';
-import { useEffect, useReducer } from '../../vendor/hooks.module.js';
-import htm from '../../vendor/htm.module.js';
+import { h } from '../../vendor/preact.module.v2.js';
+import { useEffect, useReducer } from '../../vendor/hooks.module.v2.js';
+import htm from '../../vendor/htm.module.v2.js';
 import { ERR_TEXT, SETUP_REROLL_COOLDOWN_MS } from '../../../shared/constants.js';
-import { t, N_ } from '../../../shared/i18n.js';
+import { t, N_, translateWire } from '../../../shared/i18n.js';
 import { recordError } from '../diag.js';
 import { catalog, pluginName } from '../content.js';
+import { parseSoloHoldDetail, soloHoldBlockedText } from './diveWords.js';
 
 // no shared static vnodes (see components.js hFresh: htm's static cache would retain unmounted DOM)
 function hFresh(type, props, ...children) {
@@ -106,6 +107,17 @@ export function dismissToast(id) {
 export function describeError(err) {
   if (!err) return t('发生未知错误');
   if (typeof err === 'string') return t(Object.hasOwn(ERR_TEXT, err) ? ERR_TEXT[err] : err);
+  // 2026-11-08：服务端用 `fail(ERR.X, msg('…'))` 给出的**给玩家看的**那句解释（以前在路上变成
+  // "[object Object]"，只剩通用文案 —— 例如深潜房的「只支持第二期下半」）。有它就优先说它。
+  if (err.detailMsg && typeof err.detailMsg === 'object' && typeof err.detailMsg.msgid === 'string') {
+    return translateWire(err.detailMsg);
+  }
+  // 保存中的单人深潜挡住了别的房间：通用文案会让玩家「先离开」，而离开正好放弃那局
+  // （server/soloHold.js 的 soloHoldConflictDetail）
+  if (err.code === 'SESSION_IN_USE' && typeof err.detail === 'string') {
+    const held = parseSoloHoldDetail(err.detail);
+    if (held) return soloHoldBlockedText(held);
+  }
   if (err.code === 'PLUGIN_RULE_CONFLICT') {
     // Existing wire detail is bounded to 120 characters. The ids precede the longer developer explanation.
     const match = typeof err.detail === 'string' && /^PLUGIN_RULE_CONFLICT (\w+): ([a-z0-9-]{2,32}) and ([a-z0-9-]{2,32}) set /.exec(err.detail);
@@ -117,6 +129,10 @@ export function describeError(err) {
   }
   // the per-seat 重刷本局 cooldown (PR #860, DESIGN §28.21): say which limit it is, not the generic RATE text
   if (err.code === 'RATE' && err.detail === 'setup reroll cooldown') return t('每人 {s} 秒内只能发起一次重刷投票', { s: SETUP_REROLL_COOLDOWN_MS / 1000 });
+  // room.spectate role change: these two refusals name themselves. A solo room's ROOM_FULL ('solo room') and a start
+  // blocked by NOT_READY keep the generic texts.
+  if (err.code === 'NOT_READY' && err.detail === 'at least one player must remain seated') return t('至少保留一名参赛博士');
+  if (err.code === 'ROOM_FULL' && err.detail === 'no free spectator seat') return t('观战席已满');
   if (err.code && Object.hasOwn(ERR_TEXT, err.code)) return t(ERR_TEXT[err.code]);
   if (typeof err.message === 'string' && err.message) return t(err.message);
   if (typeof err.msg === 'string' && err.msg) return t(err.msg);

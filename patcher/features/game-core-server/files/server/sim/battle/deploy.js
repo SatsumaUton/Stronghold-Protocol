@@ -13,9 +13,14 @@ export class BattleDeploy {
    * operator that left the field comes back on its body tile, restTile). `keepSp` = { sp, charges }
    * restored right after the skill reset, before the `deploy` hook fires.
    */
-  _deploy(u, { initial = false, carry = null, tile = null, keepSp = null, preBattleAggroSeq = null } = {}) {
+  _deploy(u, { initial = false, carry = null, tile = null, keepSp = null, preBattleAggroSeq = null, mobilePosition = null } = {}) {
     if ((u.alive && u.deployed) || u._removing) return false;
     const R0 = tile ? tile[0] : u.homeR, C0 = tile ? tile[1] : u.homeC;
+    const mobile = u.kind === 'token' && u.mem?.lethaniaPursuit === true;
+    if (mobile && (!mobilePosition || !Number.isFinite(mobilePosition.x) || !Number.isFinite(mobilePosition.y))) {
+      this.log(`mobile token ${u} needs an explicit position; not deployed`);
+      return false;
+    }
     if (!this.grid.inRect(R0, C0)) {
       this.log(`${u} at ${R0},${C0} is outside the field rect; not deployed`);
       if (!tile) u.removed = true;
@@ -23,9 +28,9 @@ export class BattleDeploy {
     }
     const k = R0 * COLS + C0;
     const occ = this._occ[k];
-    if (occ && occ !== u && occ.alive && occ.deployed) { this.log(`tile ${R0},${C0} occupied; ${u} not deployed`); return false; }
-    // "倒地干员所在地块视为可部署，但所有我方单位在此处的部署行为将被阻止" (PRTS Stronghold-Protocol/帮助 §作战阶段 单位部署)
-    if (this.downOn(R0, C0, u)) { this.log(`a knocked-out operator lies on ${R0},${C0}; ${u} not deployed`); return false; }
+    if (!mobile && occ && occ !== u && occ.alive && occ.deployed) { this.log(`tile ${R0},${C0} occupied; ${u} not deployed`); return false; }
+    // "倒地干员所在地块视为可部署，但所有我方单位在此处的部署行为将被阻止" (PRTS 卫戍协议/帮助 §作战阶段 单位部署)
+    if (!mobile && this.downOn(R0, C0, u)) { this.log(`a knocked-out operator lies on ${R0},${C0}; ${u} not deployed`); return false; }
     const first = u.deploySeq === 0;
     u.alive = true;
     u.deployed = true;
@@ -34,7 +39,9 @@ export class BattleDeploy {
     u.body = null;
     u.countdown = null; // a countdown summon's content starts its new life in the deploy hook (content/tokens.js startCountdown)
     u.downAtHome = false; // a new deployment: a later knock-out lies where it falls again (Battle._layBody)
-    u.x = C0; u.y = R0; u.tileR = R0; u.tileC = C0;
+    u.x = mobile ? mobilePosition.x : C0;
+    u.y = mobile ? mobilePosition.y : R0;
+    u.tileR = R0; u.tileC = C0;
     u.blocking = [];
     u.deploySeq = ++this._deploySeq;
     // A prepared map character is instantiated after the board deployment but keeps an earlier target order.
@@ -47,18 +54,20 @@ export class BattleDeploy {
     u.ground = this.grid.isLow(R0, C0) && !this._elevated?.has(k);
     u.markDirty();
     u.hp = u.s.maxHp;
-    // 联防 carry (PRTS Stronghold-Protocol/帮助 §联防阶段 "将对应单位的生命比例、技力修改至与上一阶段结束时相同（召唤物仅修改技力…）"):
+    // 联防 carry (PRTS 卫戍协议/帮助 §联防阶段 "将对应单位的生命比例、技力修改至与上一阶段结束时相同（召唤物仅修改技力…）"):
     // an operator restores HP/SP, a summon SP only; actual 联防 opening restoration is deferred until Battle.start ends
     const cs = initial || (first && this._startDeploying) ? (carry ?? u.carry) : null;
     // 联防 reconstructs deployment/battle-start effects first, then restores HP/SP once in Battle.start.
     const restoreLater = this.kind === 'unite' && this._startDeploying;
     if (!restoreLater && cs && u.kind === 'op' && Number.isFinite(cs.hpPct) && cs.hpPct > 0) u.hp = u.s.maxHp * Math.min(1, cs.hpPct);
-    this._occ[k] = u;
+    // The marked Leithania pursuers are continuous entities, not deployment-tile occupants. Their exact death-site
+    // position may overlap a friend, a downed body, another pursuer, or a non-deployable road tile.
+    if (!mobile) this._occ[k] = u;
     this._refreshRange(u); // also rebuilds baseRangeKeys (initial range incl. permanent rangeExtend)
     if (!u.skill) this._setupUnit(u);
     u.skill.reset(restoreLater ? null : cs);
     const sk = u.skill;
-    // "自动操作具有3s冷却，在完成一次操作或作战开始时部署的单位将进入冷却" (PRTS Stronghold-Protocol/帮助; skills.js)
+    // "自动操作具有3s冷却，在完成一次操作或作战开始时部署的单位将进入冷却" (PRTS 卫戍协议/帮助; skills.js)
     if (initial) sk.opReadyAt = this.time + this.flags.startOpCooldown;
     // keepSp (突袭 "保留技力"): the SP / charges before the jump — not for a skill that costs no SP (spCost 0, the
     // deploy-timed skills), which reset() just re-armed as at every deployment: the retreat ended it, so its snapshot
@@ -156,6 +165,13 @@ export class BattleDeploy {
           if (pp) pp.killedInTotal++;
         }
         if (killer) killer.stats.kills++;
+        // 悬赏卡回执（2026-11-06）：这张卡到底有没有打掉，记进**战斗结果**里 ——
+        // 以前只有 Match 侧的 kill 钩子能看见，深潜改由客户端跑战斗时就拿不到了。
+        const bountyCard = unit.mods && unit.mods.bountyId;
+        if (bountyCard != null) {
+          if (!this._bountyPaid) this._bountyPaid = new Set();
+          this._bountyPaid.add(bountyCard);
+        }
         if (unit.bounty && unit.bounty.coins > 0) this.addCoins(this._bountyPayee(unit, killer), unit.bounty.coins);
       }
     }
@@ -230,7 +246,7 @@ export class BattleDeploy {
 
   /**
    * Automatic redeploys (DESIGN §5.5): an operator that left the field and whose timer is done comes back on its rest
-   * tile — where it lies ("满足再部署条件时，移除场上的该倒地干员并自动部署至该位置", PRTS Stronghold-Protocol/帮助) — when that tile
+   * tile — where it lies ("满足再部署条件时，移除场上的该倒地干员并自动部署至该位置", PRTS 卫戍协议/帮助) — when that tile
    * is free and its player has the DP.
    */
   _checkRedeploys() {

@@ -4,7 +4,7 @@
 // 暂离 (co-op): turns on AI 托管 (g.autoplay on) so the seat keeps playing; the overlay's 返回模拟 turns it
 // off. 放弃模拟: g.leave (room.leave when no match remains), back to the lobby.
 
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Modal, PingPill, DifficultyTag, Countdown, MicroLabel } from './components.js';
 import { actions } from './gameActions.js';
 import { toastError } from './toasts.js';

@@ -16,7 +16,7 @@
 // when the request settles, ≤ 8 s, or the phase moves on). Untimed drafts (solo, a single-human match: sp.untimed) show
 // no countdown and say so. The selected card's frame and its ☑ 确认选择 strip are white, as in the event's video (10:16).
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { useSettings } from './settings.js';
 import { usePrefabPack } from './prefab/view.js';
 import { RegDeadlineCountdown } from './prefab/hud.js';

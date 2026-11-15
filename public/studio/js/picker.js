@@ -3,7 +3,7 @@
 // interface pictures, music, sounds), each result with its picture, its name and its kind; the author never types an
 // internal id (it is shown small for those who want it).
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html } from '../../js/ui/components.js';
 import { t } from '../../../shared/i18n.js';
 import { get } from './api.js';

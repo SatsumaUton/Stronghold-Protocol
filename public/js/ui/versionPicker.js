@@ -15,7 +15,7 @@
 // Texts go through t() (docs/I18N.md). [ASSUMED] The existing book glyph represents an archived event period;
 // the room's version controls use the same glyph.
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Icon, Modal, Spinner } from './components.js';
 import { useStore } from '../store.js';
 import { contentSet, retryContentSet } from '../content.js';

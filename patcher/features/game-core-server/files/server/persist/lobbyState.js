@@ -21,12 +21,24 @@
 // is dropped. Lobby rooms get the usual lobby grace for their absent players.
 
 import { Session } from '../net.js';
+// SOLO_RECONNECT_FALLBACK_SEC：单人房「24 小时保存」的兜底时长（官方 singleReconnectTime 缺失时用它）。
+// 这里已经 import 了 Room，同一个模块再多取一个常量不会新增依赖边。
 import { Room } from '../lobby.js';
+import { soloHoldOf } from '../soloHold.js';
 import { experimentalOptions, isExperimental } from '../../shared/experimental.js';
 import { DIFFICULTIES, ROOM_CODE_LEN } from '../../shared/constants.js';
 
 /** Document layout version; another version is not restored (logged). Raise it when the shape below changes. */
 export const LOBBY_DOC_VERSION = 1;
+
+/**
+ * 重启后普通房的会话最多还能恢复多久（旧规则：防止陈旧断线长期挂着）。
+ * 单人房 / 单人深潜不走这条上限 —— 它们本来就该拿到 24 小时（见 `soloLikeRoomDoc`）。
+ */
+export const RESTORED_WINDOW_CAP_MS = 30 * 60 * 1000;
+
+/** 单人房 / 单人深潜重启后能恢复的上限：官方 `singleReconnectTime` = 24 小时。 */
+export const SOLO_HOLD_CEILING_MS = 24 * 3600 * 1000;
 
 const ROOM_RE = new RegExp(`^[A-Z]{${ROOM_CODE_LEN}}$`);
 const ID_RE = /^[A-Za-z0-9_-][A-Za-z0-9_.:-]{0,127}$/;
@@ -46,6 +58,31 @@ const SEAT_FIELDS = ['seat', 'playerId', 'name', 'isBot', 'ready', 'left', 'conn
 /** A room the document can carry: not disposed, no gameplay plugins. */
 export function persistableRoom(room) {
   return !!room && !room.disposed && !room.modded;
+}
+
+/**
+ * 「深渊回响」单人房正被**24 小时保存**着（维护者 2026-11-08：控制台 / 后台要能一眼看出来）。
+ *
+ * 判据（与 `Lobby.soloLikeRun` + `Lobby.soloResumeWindowMs` 同一条链路）：
+ *   * `variant === 'deepecho'`，而且这一局真的开着（`room.match`）；
+ *   * 房间里**只有 1 个真人**（AI 座位不算人）；
+ *   * 这个人**不在线** —— 关掉页面 / 掉线 / 换设备，总之没有人在玩；
+ *   * 他的会话还挂着 `resumeWindowMs`（单人房 = 官方 `singleReconnectTime` 24 小时）。
+ *
+ * 于是 `since` = 他断线的时刻，`until` = 窗口到期时刻（到点 onExpire 释放座位、对局以 abandoned 结束）。
+ * 这些字段只进房间文档（Redis → matchmaker → `content/rooms.json`），**不参与任何玩法判定**。
+ *
+ * 为什么放在房间文档里而不是让界面去猜：界面拿到的只有 `rooms.json`，它既没有会话表也没有
+ * 「谁在什么时候断的线」；`roomDoc` 这里正好有 `sessionOf`，是唯一算得准的地方。
+ *
+ * @param {any} room @param {((playerId: string) => any) | null | undefined} sessionOf
+ * @returns {{ since: number, until: number, windowMs: number, name: string, playerId: string } | null}
+ */
+export function soloHoldDoc(room, sessionOf) {
+  const hold = soloHoldOf(room, sessionOf);
+  if (!hold) return null;
+  // leftMs 是**给页面用的**（room.state.soloHold），文档里只存不随时间变化的那几个字段
+  return { since: hold.since, until: hold.until, windowMs: hold.windowMs, name: hold.name, playerId: hold.playerId };
 }
 
 /**
@@ -72,6 +109,7 @@ export function roomDoc(room, matchRef, sessionOf) {
     if (same.length) out.$same = same;
     return out;
   };
+  const soloHold = soloHoldDoc(room, sessionOf);
   return {
     code: room.code, mode: room.mode, difficulty: room.difficulty, aiPicksLast: !!room.aiPicksLast, hostId: room.hostId,
     // 房间容量必须单独存一份：匹配端 roomInfo() 读的是 doc.capacity，
@@ -83,11 +121,29 @@ export function roomDoc(room, matchRef, sessionOf) {
     // 以前这里没有 version，matchmaker 读不到就退回客户端上报值 —— 而客户端在
     // 排队时并不总会带上，于是不同版本的房间会被配进同一局。
     version: room.version,
+    // 公开同盟（room.setListed）/ 多人匹配（room.matchmaking）：跨节点的房间列表要靠这两个字段判定，
+    // 而 matchmaker 是从 Redis 读房间的 —— 不存这里，别的节点就永远看不到「这间房在等人」。
+    // 为 false 时整条省掉，默认房间的存档与以前逐字节一致。
+    ...(room.listed === true ? { listed: true } : {}),
+    ...(room.matchmaking === true ? { matchmaking: true } : {}),
+    // 「深渊回响」: 只为这个模式写键，普通房间的存档与以前逐字节一致
+    ...(room.variant ? { variant: room.variant } : {}),
+    // 深潜的房间级调参（`Match` 的 opts.echo → echoCfg，决定深潜曲线）。
+    // 不存的话读档后 startMatch 不带 echo，新 Match 用默认曲线 —— 一局的难度节奏就悄悄变了。
+    ...(room.variant === 'deepecho' && plain(room.echoCfg) ? { echoCfg: room.echoCfg } : {}),
     experimental: room.experimental, source: room.source, ownerKey: room.ownerKey, ownerKeys: room.ownerKeys ? [...room.ownerKeys] : null,
     matchKey: room.matchKey, matchKeys: room.matchKeys ? [...room.matchKeys] : null, matchCount: room.matchCount | 0, createdAt: room.createdAt,
     ttlMs: room.ttlMs, noExpire: room.noExpire === true, adminCreated: room.adminCreated === true,
     matchLive: !!room.match, liveRound: room.liveRound | 0, livePhase: room.livePhase || null,
+    // 「最后一个真人是什么时候走的」（维护者 2026-11-09）：`sweepOldRooms` 的僵尸房兜底拿它当 `since`，
+    // 而它以前**没有进存档** —— 重启后恒为 0，`since` 就退到 `restoredAt`（= 重启那一刻），
+    // 于是「保存中」的房间在重启后只剩 15 分钟，日志里是
+    // `对局无任何在线 session 且已过 15 分钟，回收僵尸房间`。现在跟着房间一起存。
+    ...(room.lastHumanLeftAt ? { lastHumanLeftAt: room.lastHumanLeftAt } : {}),
     maxSpectators: typeof room.spectatorLimit === 'function' ? room.spectatorLimit() : 0,
+    // 「深渊回响」单人房正在被 24 小时保存（维护者 2026-11-08）：控制台 / 后台据此打「已保存 · 剩 N 小时」的标记。
+    // 只在真的处于「没人玩、等回来」时才有这个键，普通房间的存档与以前逐字节一致。
+    ...(soloHold ? { soloHold } : {}),
     seats: room.seats.map(seat),
     // ★ 2026-10-31：必须存 `connected`。以前这里只存 playerId/name，于是 dashboard 拿到的
     //   观战者永远没有连接状态 —— matchmaker 用 `s.connected !== false` 判在线，
@@ -133,6 +189,33 @@ export function snapshotLobby({ registry, lobby, matchRef, now = Date.now(), kin
 }
 
 /**
+ * 房间文档描述的是不是「**深渊回响的单人深潜**」（`Lobby.soloLikeRun` 的存档侧同一条判据）：
+ * 单人模式，或者 `variant:'deepecho'` 且**只有一个真人**的房间（AI 座位不算人）。
+ *
+ * **普通同盟模拟不在此列**（维护者 2026-11-10：「24 小时的保存功能只对深渊回响有效」）：
+ * 2026-11-08 曾把它放宽成「1 个真人就算」，于是重启后普通同盟房也按 24 小时恢复窗口，
+ * 与线上退回的 15 分钟规则不一致。
+ *
+ * 为什么恢复时要认它：单人房 / 单人深潜的会话拿的是 24 小时窗口（维护者 2026-11-07），
+ * 而 `restoreLobby` 以前把**所有**会话的窗口一律砍到 30 分钟（见下面「30 分钟封顶」那段）。
+ * 于是玩家关掉页面两小时后重启，他的会话当场被判过期 → 房间没人持有窗口 → 15 分钟后被当僵尸房
+ * 回收（2026-11-09 实测 14 台节点全灭，日志 `restored 0 session(s) (1 expired)` 紧接
+ * `回收僵尸房间`）。24 小时保存正是为了扛住这件事。
+ * @param {any} r 房间文档
+ * @returns {boolean}
+ */
+export function soloLikeRoomDoc(r) {
+  if (!plain(r) || !['solo', 'coop'].includes(String(r.mode))) return false;
+  // 没开局的房间不在此列：那时没人拿过 24 小时窗口
+  if (!r.match && r.matchLive !== true) return false;
+  if (r.mode === 'solo') return true;
+  // 只有深潜房才享受 24 小时（普通同盟房无论几个真人都走 15 分钟）
+  if (String(r.variant) !== 'deepecho') return false;
+  const humans = (Array.isArray(r.seats) ? r.seats : []).filter((s) => plain(s) && !s.isBot && !s.left);
+  return humans.length <= 1;
+}
+
+/**
  * Re-create the sessions and rooms of a document (before the server listens). Never throws for a bad record: it is
  * skipped and counted. Returns the rooms whose match is to be restored, with the seats that departed meanwhile.
  * @param {{ doc: any, registry: import('../net.js').SessionRegistry, lobby: import('../lobby.js').Lobby, now?: number,
@@ -144,6 +227,11 @@ export function restoreLobby({ doc, registry, lobby, now = Date.now(), log = nul
   const out = { ok: false, sessions: 0, expired: 0, rooms: 0, dropped: 0, matches: [] };
   if (!plain(doc)) return { ...out, reason: 'empty' };
   if (doc.v !== LOBBY_DOC_VERSION) return { ...out, reason: `version ${doc.v}` };
+  // 会话先恢复、房间后建，但「这个会话属于单人房吗」要看房间文档 —— 所以先建一份房间索引
+  const roomDocs = new Map();
+  for (const r of Array.isArray(doc.rooms) ? doc.rooms : []) {
+    if (plain(r) && typeof r.code === 'string') roomDocs.set(r.code, r);
+  }
   const restored = new Map();
   for (const s of Array.isArray(doc.sessions) ? doc.sessions : []) {
     try {
@@ -152,9 +240,19 @@ export function restoreLobby({ doc, registry, lobby, now = Date.now(), log = nul
       // a session that was online when the document was written was cut off by the restart: its window starts now
       const since = s.connected || !Number.isFinite(s.disconnectedAt) ? now : Number(s.disconnectedAt);
       const ownRaw = Number.isFinite(s.resumeWindowMs) && s.resumeWindowMs > 0 ? Number(s.resumeWindowMs) : null;
-      // Keep a restored disconnect recoverable for at most 30 minutes, even when an older
-      // record (before this cap) stored the old 24-hour solo window.
-      const own = ownRaw != null ? Math.min(ownRaw, 30 * 60 * 1000) : null;
+      /**
+       * 「重启后还能恢复多久」。
+       *
+       * 普通房：最多 30 分钟（旧规则，防陈旧断线挂太久）。
+       * **单人房 / 单人深潜：按它自己的 24 小时算**（维护者 2026-11-09 实测：「重启以后原本显示保存的房间没有了」）。
+       *   `soloLikeRun` 就是为这一局发的 24 小时窗口，重启不该把它砍成 30 分钟 ——
+       *   砍掉之后会话消失、没人持有窗口，房间 15 分钟后会被 sweepOldRooms 当僵尸房回收。
+       *   上限仍是官方 `singleReconnectTime`（24 小时），所以不会出现「无限期」的陈旧会话。
+       */
+      const soloLike = soloLikeRoomDoc(roomDocs.get(String(s.roomCode || '')));
+      const own = ownRaw != null
+        ? (soloLike ? Math.min(ownRaw, SOLO_HOLD_CEILING_MS) : Math.min(ownRaw, RESTORED_WINDOW_CAP_MS))
+        : null;
       const window = own != null && own > registry.reconnectWindowMs ? own : registry.reconnectWindowMs;
       if (now - since > window) { out.expired++; continue; }
       const session = new Session({ playerId: s.playerId, token: s.token, name: s.name, now });
@@ -200,13 +298,23 @@ function roomFrom(r, sessions, lobby, now) {
     || !DIFFICULTIES.includes(r.difficulty) || !isExperimental(r.experimental) || !Array.isArray(r.seats)) return null;
   const room = new Room(r.code, r.mode, r.difficulty, Number.isFinite(r.createdAt) ? r.createdAt : now,
     typeof r.version === 'string' && r.version ? r.version : undefined, experimentalOptions(r.experimental));
+    room.lobby = lobby;
     room.ttlMs = Number.isFinite(r.ttlMs) ? r.ttlMs : null;
     room.adminCreated = r.adminCreated === true;
     room.noExpire = room.adminCreated;
+    // 「最后一个真人走的那一刻」要一起恢复：sweepOldRooms 的僵尸房兜底拿它当 since（见 roomDoc）
+    if (Number.isFinite(r.lastHumanLeftAt) && r.lastHumanLeftAt > 0) room.lastHumanLeftAt = Number(r.lastHumanLeftAt);
   if (r.seats.length !== room.seats.length) return null;
   const inMatch = !!r.match;
   room.content = lobby.vanilla;
   room.aiPicksLast = r.mode === 'coop' && r.aiPicksLast === true;
+  // ★ 「深渊回响」断点续玩（维护者 2026-11-06）：variant 必须一起恢复。
+  //   丢了它 → persister.restoreLocal 的 startMatch 不带 variant → 新 Match 的构造函数
+  //   不装深潜缩放（gd.echoScaleOf）、不强制独立卡池，于是检查点里的卡池组数对不上，
+  //   `restoreMatch` 回一句「checkpoint refused (pool groups)」→ 整局被丢弃，
+  //   玩家看到的就是「服务器重启导致对局中断，同盟已返回等待室」。深度、祝福、祭坛全白存。
+  room.variant = r.variant === 'deepecho' && r.mode === 'coop' ? 'deepecho' : null;
+  if (room.variant && plain(r.echoCfg)) room.echoCfg = r.echoCfg;
   room.source = typeof r.source === 'string' ? r.source : 'private';
   room.ownerKey = typeof r.ownerKey === 'string' ? r.ownerKey : null;
   room.ownerKeys = Array.isArray(r.ownerKeys) ? new Set(r.ownerKeys.filter((k) => typeof k === 'string')) : null;
@@ -249,11 +357,17 @@ function fallbackRoom(r, lobby, now) {
   try {
     const room = new Room(r.code, r.mode, r.difficulty, Number.isFinite(r.createdAt) ? r.createdAt : now,
       typeof r.version === 'string' && r.version ? r.version : undefined);
+    room.lobby = lobby;
     room.content = lobby.vanilla;
     room.adminCreated = r.adminCreated === true;
     room.noExpire = room.adminCreated;
     room.matchCount = Number.isSafeInteger(r.matchCount) ? r.matchCount : 0;
     room.aiPicksLast = r.mode === 'coop' && r.aiPicksLast === true;
+    // 同 roomFrom：恢复「最后一个人离开的时刻」
+    if (Number.isFinite(r.lastHumanLeftAt) && r.lastHumanLeftAt > 0) room.lastHumanLeftAt = Number(r.lastHumanLeftAt);
+    // 兜底重建同样要带上深潜标记（理由见 roomFrom）：没有它，恢复出来的深潜局会被当普通同盟局
+    room.variant = r.variant === 'deepecho' && r.mode === 'coop' ? 'deepecho' : null;
+    if (room.variant && plain(r.echoCfg)) room.echoCfg = r.echoCfg;
     (Array.isArray(r.seats) ? r.seats : []).forEach((s, i) => {
       if (!s || !s.playerId) return;
       room.seats[i] = {

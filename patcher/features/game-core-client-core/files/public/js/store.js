@@ -24,7 +24,7 @@
 // Updates are immutable at the top level: `set` shallow-merges a patch object, `patch(key, obj)`
 // shallow-merges into one nested object. Subscribers are notified synchronously.
 
-import { useLayoutEffect, useReducer, useRef } from '../vendor/hooks.module.js';
+import { useLayoutEffect, useReducer, useRef } from '../vendor/hooks.module.v2.js';
 import { PHASE } from '../../shared/constants.js';
 import { t } from '../../shared/i18n.js';
 
@@ -127,6 +127,10 @@ export function selectRoute(s) {
   if (phase && phase !== PHASE.LOBBY) return 'game';
   if (s.room?.inMatch) return 'game'; // match starting: m.public is on its way
   if (s.room) return 'room';
+  // 已经认下了房间码、正在加入（含跨节点 `?n=` 跳过来的深链）：先显示「正在进入同盟…」，
+  // 不要先闪一格大厅再切进房间 —— 玩家从「公开同盟」进来应该是一步到位。
+  // 加入失败时 main.js 的 schedulePendingJoin 会清掉 pendingJoin，这个状态自然结束。
+  if (s.ui?.pendingJoin) return 'entering';
   return 'lobby';
 }
 

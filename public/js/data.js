@@ -43,7 +43,7 @@
 // take only their content set's own game texts, never the language folder's data/i18n overlays, which are keyed by the
 // default data's record ids (versionFiles). `localeName` still maps Chinese names.
 
-import { useEffect, useReducer } from '../vendor/hooks.module.js';
+import { useEffect, useReducer } from '../vendor/hooks.module.v2.js';
 import { applyFileOverlay } from '../../shared/i18nData.js';
 import { canonicalLang } from '../../shared/i18nPacks.js';
 

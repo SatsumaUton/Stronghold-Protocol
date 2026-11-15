@@ -10,7 +10,7 @@
 // or as soon as the sprites arrive while the turn is still the player's, up to TURN_BANNER_LATE_MS after it began (a cold
 // cache no longer skips it); never with prefers-reduced-motion — the draft's header says whose turn it is. It never
 // takes a click (pointer-events none). Styles: css/screens/protocol-boot.css (.tbanner).
-import { useEffect } from '../../vendor/hooks.module.js';
+import { useEffect } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { uiUrl } from './assetUrls.js';
 import { data } from '../data.js';

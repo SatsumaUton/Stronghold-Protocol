@@ -11,7 +11,7 @@
 // match changes.
 // [ASSUMED] the sizes and the timing, measured frame by frame from that footage; the rings are plain CSS circles; the
 // order plate → banner → disc and the wait's bounds (the footage shows a turn coming round mid-draft, not a draft opening).
-import { useEffect } from '../../vendor/hooks.module.js';
+import { useEffect } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { uiUrl } from './assetUrls.js';
 import { data } from '../data.js';

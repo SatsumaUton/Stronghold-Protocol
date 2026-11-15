@@ -4,7 +4,7 @@
 // and sum well under 100, a share of the damage dealt so far could shrink.
 // The viewer’s 隐藏 choice is local (this browser), not part of the match.
 
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon } from './components.js';
 import { UnitThumb } from './gameComponents.js';
 import { t } from '../../../shared/i18n.js';

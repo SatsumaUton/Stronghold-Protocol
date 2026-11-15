@@ -11,18 +11,24 @@ import { FieldRunner, DeadBattle } from '../fields.js';
 import { DELAYS } from './common.js';
 import { previewPlayer } from '../preview.js';
 import { morphBattleOpt } from '../../../shared/plugins/rules.js';
+import { echoHitCountEnemy } from './echoWaves.js';
+import { reconcileCommandChests } from '../bandCommands.js';
 
 export class MatchCombat {
   /** Construct a battle; a constructor failure yields a finished stand-in (clean result) and is logged. */
   newBattle(opts, { preview = false } = {}) {
-    const full = { data: this.ds, content: this.battleContent, logger: this.log, ...opts, ...morphBattleOpt(this.rules),
+    const full = { resourceNumbers: !preview, data: this.ds, content: this.battleContent, logger: this.log, ...opts, ...morphBattleOpt(this.rules),
       ...(preview ? { logger: {}, quiet: true } : {}) };
+    let battle;
     try {
-      return new this.BattleClass(full);
+      battle = new this.BattleClass(full);
     } catch (e) {
       if (!preview) this.reportError(`battle ${opts.fieldId} construct`, e);
       return new DeadBattle(full, 'forced');
     }
+    // 「深渊回响」: 深潜回合的侵蚀词条在这一场战斗的 enemySpawn 上注入（空操作 when the room is not a dive）
+    if (!preview) this._echoHookBattle(battle);
+    return battle;
   }
 
   /**
@@ -49,21 +55,68 @@ export class MatchCombat {
    * browser's local replica, a client-run field and the server's check of it all fight the same battle. Nothing when off.
    */
   _ruleFlags() {
-    return { ...(this.disableLayerCap ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
-      ...(this.enemyHpMul !== 1 ? { enemyHpMul: this.enemyHpMul } : {}), ...(this.enemyAtkMul !== 1 ? { enemyAtkMul: this.enemyAtkMul } : {}) };
+    // 「频次怪」的绝对血量表：1–15 层是空表（原版血量），空的时候连键都不发 —— 普通房/前期逐字节不变
+    const hpAbs = this.echoVariant === 'deepecho' ? this._echoHitCountHp() : null;
+    // 「深渊回响」的战斗规则（侵蚀词条 / 对敌异常 / 部署加成）：以**纯 JSON** 随 spec 下发，
+    // 由 server/sim/battle/echoRules.js 在两端（服务端复算 + 浏览器）用同一份代码装上。
+    const echoRules = this.echoVariant === 'deepecho' && typeof this._echoBattleRules === 'function'
+      ? this._echoBattleRules() : null;
+    return { ...(this.bossMuls && this.bossMuls.hp !== 1 ? { bossHpMul: this.bossMuls.hp } : {}), ...(this.bossMuls && this.bossMuls.atk !== 1 ? { bossAtkMul: this.bossMuls.atk } : {}),
+      ...([this.bossId, this.hiddenBossId].filter(Boolean).length ? { bossKeys: [this.bossId, this.hiddenBossId].filter(Boolean) } : {}), ...(this.layerCapOff ? { layerCapOff: true } : {}), ...(this.disableHitLimit ? { hitLimitOff: true } : {}),
+      ...(echoRules ? { echoRules } : {}),
+      // 「深渊回响」：限伤上限跟着深度缩放（普通房没有这个键 → sim 走官方 300000）
+      ...(this.echoVariant === 'deepecho' ? { hitLimitMul: this._echoHitLimitMul() } : {}),
+      // 「深渊回响」：「频次怪」（器物，血量 == 需要被打几下）**一律用原版血量**（见 _echoHitCountHp）
+      ...(hpAbs && Object.keys(hpAbs).length ? { enemyHpAbs: hpAbs } : {}),
+      // 「深渊回响」：「洞彻」（永久反隐）必须走 **spec flags**，不能只靠 `_echoHookBattle` 的事件钩子。
+      // 深潜的战斗默认在**客户端**按 BattleSpec 跑（Match.clientCombat，SP_COMBAT 未设 = 客户端权威），
+      // 服务端钩子只挂在服务端自己那份 battle 上，玩家看到的那份没有 → 隐匿敌人照样隐匿
+      // （玩家反馈 2026-11-06「反隐匿词条没有效果，出来的敌对目标依然有隐匿状态」）。
+      // sim 在出怪处读这个 flag（battle/spawns.js spawnEnemy），客户端/服务端两边逐字节一致。
+      ...(this.echoVariant === 'deepecho' && typeof this._echoBlessings === 'function'
+        && this._echoBlessings().some((b) => b && b.id === 'reveal_always') ? { revealAll: true } : {}),
+      ...(this.enemyHpMulAt(this.round) !== 1 ? { enemyHpMul: this.enemyHpMulAt(this.round) } : {}), ...(this.enemyAtkMulAt(this.round) !== 1 ? { enemyAtkMul: this.enemyAtkMulAt(this.round) } : {}) };
+  }
+
+  /**
+   * 「频次怪」的绝对血量表（enemyKey → 血量 = 需要被打几下），深潜专用。
+   *
+   * 维护者 2026-11-06 **最终定**：所有频次怪一律用数据里的**原版血量**（铁矛头 30、铁灯盘 45、
+   * 青瓷茶器 4 —— 原版「打 N 下」的手感），不再有「16 层起按深度给 500–2000」那套深渊回响算法。
+   *
+   * 为什么还要下发这张表：它同时挡住深度倍率 —— 波次的 `hpMul` 会把 30 下放大成 6080 下；
+   * 而它们多数是**召唤物**（新硎的 DeadSpawn 出铁矛头），根本不在 `wave.spawns` 里，
+   * 只有出怪那一处（sim spawnEnemy 读 `flags.enemyHpAbs`）能统一覆盖。
+   * @returns {Record<string, number>}
+   */
+  _echoHitCountHp() {
+    const cache = this._echoHpAbsCache;
+    if (cache && cache.gd === this.gd) return cache.map;
+    const map = {};
+    try {
+      for (const k of echoHitCountEnemy(this.gd)) {
+        map[k] = Math.max(1, Math.floor(Number(this.gd.enemy(k)?.stats?.maxHp) || 1));
+      }
+    } catch { /* 数据异常时按普通血量走 */ }
+    this._echoHpAbsCache = { gd: this.gd, map };
+    return map;
   }
 
   /** Battle options of a player's normal field (after the onBattleStart handlers). */
   _normalOpts(ps, { preview = false, board = ps.board } = {}) {
-    const wave = preview ? structuredClone(this.wave) : this.wave;
+    // `this.wave` 为 null = 这一回合没有普通波次（boss 回合、或建波失败）。以前这里直接
+    // `structuredClone(null)` / 交给 withBounties，会抛 `Cannot read properties of null (reading 'spawns')`，
+    // 对局就卡在 COMBAT（客户端「作战结束，等待队友完成作战」，node-2 2026-11-05 实测）。
+    const src = this.wave || { spawns: [], routes: [], extraRoutes: [], overrides: {}, templateId: null, timeLimit: 0 };
+    const wave = preview ? structuredClone(src) : src;
     if (preview) ps = previewPlayer(ps, board);
     const input = ps.battleInput({ side: 'L', colOffset: 0 });
     // the client's list: bounty units inserted among their host action's own units, which are re-timed around them
     const spawns = withBounties(this.gd, this.round, wave, ps.bounties, ps.playerId).map((s) => ({ ...s, ownerPlayerId: ps.playerId }));
     // `waveSpawns`: the round's own wave before this player's bounties (a copy), so a draw every player shares picks the
-    // same units (鸭爵, GitHub #839)
+    // same units; `routes`: their lanes (鸭爵, GitHub #839)
     const waveSpawns = (wave.spawns || []).map((s) => ({ ...s, mods: s.mods ? { ...s.mods } : undefined }));
-    const ev = { input, kind: 'normal', round: this.round, spawns, waveSpawns, ...(preview ? { preview: true } : {}) };
+    const ev = { input, kind: 'normal', round: this.round, spawns, waveSpawns, routes: wave.routes, ...(preview ? { preview: true } : {}) };
     // Preview construction failures go to the rehearsal's discard path, never Match.dispatch's live error sink.
     if (preview) this.dispatcher.dispatch(ps, 'onBattleStart', ev);
     else this.dispatch(ps, 'onBattleStart', ev);
@@ -166,6 +219,7 @@ export class MatchCombat {
         this.lastResults.set(pid, pp || { killed: 0, total: 0, leaked: [], perfect: true, layerGains: {}, coins: 0, damageDealt: 0, unitsEnd: [], unitStats: [] });
         // the views show the layers the battle reached until settle() makes them persistent (DESIGN §20.15)
         const ps = this.players.get(pid);
+        if (ps) reconcileCommandChests(ps, pp);
         const gains = pp && pp.layerGains && typeof pp.layerGains === 'object' ? pp.layerGains : null;
         if (ps && gains && Object.keys(gains).length) { ps.pendingLayerGains = { ...gains }; ps.dirty(); }
       }

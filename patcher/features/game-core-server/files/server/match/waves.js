@@ -7,7 +7,9 @@
 //     标准 (FUNNY) / 入门 = 战场#01 only, 险境 = 8 stages, 绝境 / 终极 = 7 (no 战场#01), weight 50 each, so the match seed
 //     picks uniformly (test/match/stagepick.test.js)
 //   * factions: `specialEnemyNum` (3) distinct types among the involveRandom ones (FLY/TIMES/ELEMENT/DOT/INVISIBLE/
-//     REFLECTION), uniform (shuffle, take 3)
+//     REFLECTION), uniform (shuffle, take 3). Solo (GameData.isSolo) with a positive `specialEnemyNumSingle` keeps
+//     that many types instead, and a positive `types[t].countSingle` is that type's slot count (规程). Multi, and any
+//     version without those fields, keeps `specialEnemyNum` and `count`.
 //   * type schedule: each chosen type owns `count` (3) of the `maxLevelCnt` (15) round slots, SPECIAL fills the other 6;
 //     the slots are shuffled — typeSlots[r-1] = the ONE type of round r (the briefing shows the 3 types, the order
 //     stays hidden)
@@ -36,7 +38,10 @@
 // largest owner group (client `_CalculateActionPredelayConsiderUid`, decoded).
 
 import { createRng, deriveSeed } from '../sim/rng.js';
+import { echoRandomWave } from './match/echoWaves.js';
+import { ECHO_BUDGET_BASE } from './match/echo.js';
 import { PLUGIN_ACTION_UNITS } from '../../shared/plugins/limits.js';
+import { gateOf } from '../../shared/constants.js';
 
 const ACLOON = 'enemy_9012_acloon';
 const DEFAULT_PLACEHOLDERS = Object.freeze({
@@ -73,12 +78,37 @@ export function roundHalfEven(x) {
 const gen = (gd) => (gd.factions.generation && typeof gd.factions.generation === 'object' ? gd.factions.generation : {});
 const intOr = (v, d) => (Number.isInteger(v) && v > 0 ? v : d);
 
-/** Official movement class of an enemy key (randomEnemyAttributeDict.isFlyEnemy, else its motion). */
+/** Slot count of one chosen type. Solo uses a positive `countSingle` when the row has one; otherwise `count`. */
+function typeCount(gd, type) {
+  const types = gd.factions.types && typeof gd.factions.types === 'object' ? gd.factions.types : {};
+  const row = types[type] || {};
+  if (gd.isSolo) { const solo = intOr(row.countSingle, 0); if (solo > 0) return solo; }
+  return intOr(row.count, 3);
+}
+
+/** How many involveRandom types the match keeps. Solo uses a positive `specialEnemyNumSingle` when present. */
+function specialTypeCount(gd) {
+  const g = gen(gd);
+  if (gd.isSolo) { const solo = intOr(g.specialEnemyNumSingle, 0); if (solo > 0) return solo; }
+  return Number.isInteger(g.specialEnemyNum) ? g.specialEnemyNum : 3;
+}
+
+/**
+ * Official movement class of an enemy key: **its motion first** (`stats.motion === 'FLY'` is what the sim flies by,
+ * simdata.js normalizeEnemy → `def.motion`), else `randomEnemyAttributeDict.isFlyEnemy`.
+ *
+ * 2026-11-08 (maintainer: 「部分飞行怪的路径还是有问题，依然会直线飞到终点」): the hidden core's two ELITE halves
+ * `enemy_9014_acstma` / `enemy_9015_acstmb` carry `isFlyEnemy: false` (they are not in randomEnemyAttributeDict) but
+ * `stats.motion: 'FLY'` — and the official enemy_database says motion 1 (FLY) for both. Reading `isFlyEnemy` first made
+ * the match layer call them ground: they went into the ground pools / were left on a ground route (start → end, no
+ * checkpoints), while the sim flew them — straight across the whole field. Motion is the sim's rule, so it decides here;
+ * `isFlyEnemy` only fills in for a record without stats.
+ */
 export function isFlyKey(gd, key) {
   const e = gd.enemy(key);
   if (!e) return false;
-  if (typeof e.isFlyEnemy === 'boolean') return e.isFlyEnemy;
-  return !!(e.stats && e.stats.motion === 'FLY');
+  if (e.stats && e.stats.motion === 'FLY') return true;
+  return e.isFlyEnemy === true;
 }
 
 /** Official attribute power P(k) (float32), enemies.json `attrPower`; derived from the stats when absent. */
@@ -161,10 +191,9 @@ export function makeTypeSchedule(gd, rng, factions) {
   const g = gen(gd);
   const max = Math.min(256, Math.max(0, intOr(g.maxLevelCnt, 15))); // loop-cap: schedule length [ASSUMED] DESIGN §32.5
   const fill = typeof g.fillType === 'string' ? g.fillType : (typeof g.alwaysIncludedType === 'string' ? g.alwaysIncludedType : 'SPECIAL');
-  const types = gd.factions.types && typeof gd.factions.types === 'object' ? gd.factions.types : {};
   const slots = [];
   for (const t of factions) {
-    const n = intOr(types[t]?.count, 3);
+    const n = typeCount(gd, t);
     for (let i = 0; i < n && slots.length < max; i++) slots.push(t);
   }
   while (slots.length < max) slots.push(fill); // loop-cap: schedule length
@@ -195,7 +224,7 @@ export function setupMatchWaves(gd, rng) {
   }
   // factions
   const types = gd.factions.types && typeof gd.factions.types === 'object' ? gd.factions.types : {};
-  const n = Number.isInteger(gen(gd).specialEnemyNum) ? gen(gd).specialEnemyNum : 3;
+  const n = specialTypeCount(gd);
   const random = Object.values(types).filter((t) => t && t.involveRandom).map((t) => t.type).sort();
   const shuffled = random.slice();
   rng.shuffle(shuffled);
@@ -227,9 +256,8 @@ export function roundPick(gd, rng, factionsOrSetup, round) {
   if (picks) return picks[round] ?? null;
   const factions = Array.isArray(src) ? src : (src && Array.isArray(src.factions) ? src.factions : []);
   const g = gen(gd);
-  const types = gd.factions.types && typeof gd.factions.types === 'object' ? gd.factions.types : {};
   const max = intOr(g.maxLevelCnt, 15);
-  const pairs = factions.map((t) => [t, intOr(types[t]?.count, 3)]);
+  const pairs = factions.map((t) => [t, typeCount(gd, t)]);
   const used = pairs.reduce((s, [, w]) => s + w, 0);
   pairs.push([typeof g.fillType === 'string' ? g.fillType : 'SPECIAL', Math.max(1, max - used)]);
   return pickRoundEntry(gd, rng, weightedPick(rng, pairs), round);
@@ -256,32 +284,12 @@ export function classOf(gd, enemyKey) {
   return elite ? 'E' : 'N';
 }
 
-/** Preview pen upper zone anchor row ((18,7); the lower anchor is (15,7)) and the client's row offsets. */
-const PEN_UPPER_ROW = 18;
-const PREVIEW_ROW_OFFSET = 6;
-const PREVIEW_ROW_OFFSET_LEADER = 13;
+/** 'upper' | 'lower' preview zone of a route start: shared/constants.js gateOf (鸭爵's lane rule reads it too, GitHub #839). */
+export { gateOf };
 
-/**
- * 'upper' | 'lower' preview zone of a route start (client `AutoChessEnemyPreviewManager`, research 08 §4.2): target row =
- * start row + 6 (leader rounds: + 13); the zone is the Manhattan-nearest anchor among those with anchor row ≤ target
- * row — (18,7) upper, (15,7) lower — so only a target row ≥ 18 reaches the upper zone: normal fields row 12 (upper
- * gate (12,10); rows 9–11 lower), boss fields row 5 (rows 2–4 lower: the leaders at (3,x)/(4,x) and the (2,10) gate).
- * A target below row 15 has no zone (the client picks a random pen tile) and is reported 'lower'.
- * @param {number[]|null} start [row, col]
- * @param {boolean} [leader] leader / hidden round (default: a boss-field row, ≤ 8)
- */
-export function gateOf(start, leader) {
-  const r = Array.isArray(start) ? start[0] : null;
-  if (!Number.isFinite(r)) return 'lower';
-  const lead = typeof leader === 'boolean' ? leader : r <= 8;
-  const target = r + (lead ? PREVIEW_ROW_OFFSET_LEADER : PREVIEW_ROW_OFFSET);
-  // both anchors share col 7, so with target ≥ 18 the upper one is always the nearer; below it only (15,7) qualifies
-  return target >= PEN_UPPER_ROW ? 'upper' : 'lower';
-}
+export const isLeaderTemplate = (tpl) => !!tpl && (tpl.kind === 'boss' || tpl.kind === 'hidden');
 
-const isLeaderTemplate = (tpl) => !!tpl && (tpl.kind === 'boss' || tpl.kind === 'hidden');
-
-function previewInfo(gd, key, route, boss = false, leader = undefined) {
+export function previewInfo(gd, key, route, boss = false, leader = undefined) {
   const e = gd.enemy(key);
   const start = route && Array.isArray(route.start) ? route.start.slice(0, 2) : null;
   return { gate: gateOf(start, leader), start, fly: isFlyKey(gd, key), elite: !!(e && e.rank && e.rank !== 'NORMAL'), boss };
@@ -292,8 +300,8 @@ function previewInfo(gd, key, route, boss = false, leader = undefined) {
  * @returns {{ spawns: object[], actions: object[] }} actions[i] = { index, key, tplKey, slot, time, count, tplCount, window, routeIndex, valid,
  *   server } (`server` = client ShouldActionUpToServer: valid, not the leader, no random spawn group)
  */
-function templateSpawns(gd, tpl, round, pick) {
-  const scale = scaleFor(gd, round);
+function templateSpawns(gd, tpl, round, pick, scaleOverride = null) {
+  const scale = scaleOverride && typeof scaleOverride === 'object' ? scaleOverride : scaleFor(gd, round);
   const ph = placeholderMap(gd);
   const routes = Array.isArray(tpl.routes) ? tpl.routes : [];
   const leader = isLeaderTemplate(tpl);
@@ -363,6 +371,9 @@ function entriesView(gd, pick) {
   return pick.fly ? { ground: null, fly: view } : { ground: view, fly: null };
 }
 
+// 「深渊回响」深潜的出怪实现**不在本文件**：全部在 ./match/echoWaves.js（echoPoolFor / echoRemapByBudget /
+// echoSyncActions）。本文件只在 buildNormalWave 里保留了唯一一个调用点，普通模式不会进入。
+
 /**
  * Shared composition of a normal round.
  * @param {string[]|object} factions setupMatchWaves().factions (carries the schedule), the setup object, or a plain
@@ -370,18 +381,48 @@ function entriesView(gd, pick) {
  * @returns {{ templateId: string|null, spawns: object[], routes: object[], extraRoutes: object[], timeLimit: number,
  *   overrides: object, pick: object|null, entries: { ground: object|null, fly: object|null }, actions: object[] }}
  */
-export function buildNormalWave(gd, rng, factions, round) {
-  const rc = gd.roundCfg(round);
+export function buildNormalWave(gd, rng, factions, round, opts = null) {
+  // 「深渊回响」的深潜回合（DESIGN-ABYSS.md「第二步的拦路发现」）：显示回合与数据回合不是同一个数。
+  // 波次模板只覆盖到 bossRound-1，深潜按 1..13 循环取用；但敌人强度仍按显示回合延伸。
+  // 所以模板 / 时限 / 编组抽取查 `dataRound`，缩放（templateSpawns 里的 scaleFor）仍查 `round`。
+  // 普通回合两者相等（opts 为空 → dataRound === round），行为与加这个参数之前逐字节一致。
+  const dataRound = opts && Number.isInteger(opts.dataRound) && opts.dataRound > 0 ? opts.dataRound : round;
+  const rc = gd.roundCfg(dataRound);
   const templateId = rc && typeof rc.template === 'string' ? rc.template : null;
   const tpl = templateId ? gd.wave(templateId) : null;
-  const timeLimit = gd.combatTimeLimit(round);
+  // 深潜 16 层以后（echoWaves.echoDeepWaveShape）每一层的规模是按深度设计的，作战时限也跟着固定成
+  // 「最后一关」的时长：否则深度 16 会轮回到数据回合 1 的 90 秒时限，却要放 110 只怪 —— 挤成 20 秒的洪水，
+  // 之后整场空转（维护者 2026-11-04 §6「按层设计出怪量」的同一条要求）。
+  const limitRound = opts && Number.isInteger(opts.echoTimeLimitRound) && opts.echoTimeLimitRound > 0
+    ? opts.echoTimeLimitRound
+    : dataRound;
+  // 【深渊回响】15 层非隐藏：不用 boss 回合的时限，可以直接指定（维护者 2026-11-05）
+  const timeLimit = Number.isFinite(opts && opts.echoTimeLimitSec) && opts.echoTimeLimitSec > 0
+    ? Math.floor(opts.echoTimeLimitSec)
+    : gd.combatTimeLimit(limitRound);
   if (!tpl) return { templateId, spawns: [], routes: [], extraRoutes: [], timeLimit, overrides: {}, pick: null, entries: { ground: null, fly: null }, actions: [] };
-  const pick = roundPick(gd, rng, factions, round);
-  const { spawns, actions } = templateSpawns(gd, tpl, round, pick);
+  // 【深渊回响】预生成的编组：传了 opts.pick 就不再现场抽，
+  // 这样每回合可以从预先生成好的若干套里抽一套（仍是原版合法编组）。
+  const pick = (opts && opts.pick) || roundPick(gd, rng, factions, dataRound);
+  const built = templateSpawns(gd, tpl, round, pick);
+  // 「深渊回响」深潜：**整波随机生成**（出几条 / 什么怪 / 多少只 / 什么时候出 / 走哪条路线都随机，
+  // 不再沿用原版的出怪动作），强度仍按显示回合缩放（echoScale 放进 mods）。
+  // 普通回合 opts 里没有 echoGrowth → echoRandomWave 返回 null，走原版路径，逐字节不变。
+  const echoWave = echoRandomWave(gd, tpl, opts ? {
+    ...opts,
+    echoScale: scaleFor(gd, round),
+    echoBudget: ECHO_BUDGET_BASE * (Number(opts.echoGrowth) || 1),
+    echoTimeLimit: timeLimit,
+    // 前期（深潜前几层）沿用原版动作，之后才彻底随机 —— 由 echoWaves.ECHO_TEMPLATE_DEPTH 控制
+    echoTemplate: built.spawns,
+  } : null, rng, { isFlyKey, classOf, previewInfo, isLeaderTemplate, roundMods });
+  const spawns = echoWave ? echoWave.spawns : built.spawns;
+  const actions = echoWave ? echoWave.actions : built.actions;
   return {
     templateId,
     spawns,
-    routes: Array.isArray(tpl.routes) ? tpl.routes : [],
+    // 深层（echoAllRoutes）：wave 的路线表可能比模板大（并入了同图其他出兵口）
+    routes: echoWave && Array.isArray(echoWave.routes) && echoWave.routes.length ? echoWave.routes : (Array.isArray(tpl.routes) ? tpl.routes : []),
     extraRoutes: Array.isArray(tpl.extraRoutes) ? tpl.extraRoutes : [],
     timeLimit,
     overrides: tpl.overrides && typeof tpl.overrides === 'object' ? tpl.overrides : {},
@@ -395,8 +436,10 @@ export function buildNormalWave(gd, rng, factions, round) {
  * Boss / hidden round template for one boss field; escorts follow the pick of the round's own slot.
  * @param {{ bossId: string, solo: boolean }} opts solo → `_s` template (lone player or solo mode)
  */
-export function buildBossWave(gd, rng, factions, round, { bossId, solo }) {
-  const rc = gd.roundCfg(round);
+export function buildBossWave(gd, rng, factions, round, { bossId, solo, cfgRound = null, scale = null }) {
+  // 深潜的 boss 返场（R20 / R25 / R30…）没有自己的 roundCfg（数据表只到 15），模板借用玩家实际打过的
+  // 最后一个 boss 回合；但**缩放仍按显示回合**（templateSpawns 拿到的 round 就是显示回合，走 echoScale）。
+  const rc = gd.roundCfg(Number.isInteger(cfgRound) ? cfgRound : round);
   const map = rc && rc.bossTemplates && typeof rc.bossTemplates === 'object' ? rc.bossTemplates : {};
   let templateId = typeof map[bossId] === 'string' ? map[bossId] : null;
   if (!templateId) {
@@ -408,7 +451,7 @@ export function buildBossWave(gd, rng, factions, round, { bossId, solo }) {
   const tpl = templateId ? gd.wave(templateId) : null;
   if (!tpl) return { templateId, spawns: [], routes: [], extraRoutes: [], timeLimit: Infinity, overrides: {}, pick: null, entries: { ground: null, fly: null }, actions: [] };
   const pick = roundPick(gd, rng, factions, round);
-  const { spawns, actions } = templateSpawns(gd, tpl, round, pick);
+  const { spawns, actions } = templateSpawns(gd, tpl, round, pick, scale);
   return {
     templateId,
     spawns,
@@ -619,9 +662,13 @@ export function previewOf(spawns) {
  * preDelay + k·ACTION_INTERVAL_FOR_UID (0.5 s) + i·step.
  * @param {Array<{ enemyKey: string, mods: object|null, sourcePlayerId: string, bounty?: object|null, isToken?: boolean }>} leaked
  * @param {number} helperCount 1 | 2
+ * @param {number} [timeLimit] 未使用（保留旧签名）
+ * @param {{ maxLastSpawn?: number }} [opts] `maxLastSpawn`：**最后一只最晚什么时候出场**（游戏秒）。
+ *   深潜的漏怪动辄上百只，按默认 step 会排到时限之外（敌人还没出完联防就结束了）；
+ *   给了这个上限就把间隔等比压紧，保证全部出完。
  * @returns {{ templateId: string|null, spawns: object[], routes: object[] }}
  */
-export function buildUniteWave(gd, leaked, helperCount, timeLimit) { // eslint-disable-line no-unused-vars
+export function buildUniteWave(gd, leaked, helperCount, timeLimit, opts = {}) { // eslint-disable-line no-unused-vars
   const templates = gd.unite.templates;
   const templateId = templates[String(helperCount)] || templates[helperCount] || null;
   const tpl = templateId ? gd.wave(templateId) : null;
@@ -661,9 +708,16 @@ export function buildUniteWave(gd, leaked, helperCount, timeLimit) { // eslint-d
     let k = 0;
     for (const units of owners.values()) {
       const start = t0 + k * UNITE_OWNER_STEP;
+      // 深潜：漏怪太多时按默认 step 会排到时限之外 → 等比压紧到 maxLastSpawn 之前（最低 0.02 s，别挤成一坨）
+      let stepUse = step;
+      const cap = Number(opts && opts.maxLastSpawn);
+      if (Number.isFinite(cap) && units.length > 1) {
+        const room = cap - start;
+        if (room > 0) stepUse = Math.min(step, Math.max(0.02, room / (units.length - 1)));
+      }
       units.forEach((l, i) => {
         const spec = {
-          time: start + i * step, enemyKey: l.enemyKey, routeIndex, count: 1, interval: 0,
+          time: start + i * stepUse, enemyKey: l.enemyKey, routeIndex, count: 1, interval: 0,
           mods: l.mods ? { ...l.mods } : { slot: classOf(gd, l.enemyKey) }, sourcePlayerId: l.sourcePlayerId,
           preview: previewInfo(gd, l.enemyKey, routes[routeIndex]),
         };
@@ -677,4 +731,23 @@ export function buildUniteWave(gd, leaked, helperCount, timeLimit) { // eslint-d
   }
   spawns.sort((a, b) => a.time - b.time);
   return { templateId, spawns, routes };
+}
+
+/**
+ * 联防这一段「最后一只敌人什么时候出场」+ 总数（游戏秒）。
+ *
+ * 深潜的漏怪可能上百只，默认排队规则会把最后一只排到本回合的作战时限之外 ——
+ * 表现就是「敌人还没出完，联防时间就结束了」（维护者 2026-11-05）。调用方据此把时限抬上去。
+ *
+ * @param {any} gd
+ * @param {Array<any>} leaked
+ * @param {number} helperCount
+ * @returns {{ last: number, count: number }}
+ */
+export function uniteWaveWindow(gd, leaked, helperCount) {
+  let wave = null;
+  try { wave = buildUniteWave(gd, leaked, helperCount, 0); } catch { return { last: 0, count: 0 }; }
+  let last = 0;
+  for (const s of wave.spawns || []) last = Math.max(last, Number(s.time) || 0);
+  return { last, count: (wave.spawns || []).length };
 }

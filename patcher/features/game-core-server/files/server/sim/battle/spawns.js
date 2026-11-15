@@ -176,12 +176,17 @@ export class BattleSpawns {
     const speedMulAll = isSummon ? 1 : (m.speedMul ?? 1);
     // 绝对血量表（`enemyHpAbs`：频次怪「需要被打几下」）永远优先 —— 它本身就是原版血量，
     // 召唤物也照用（否则 30 下会被召唤物的官方档乘成 86 下）。
-    const hpFinal = Number.isFinite(absHp) && absHp > 0 ? absHp : def.maxHp * hpMulAll * hpRatio;
+    // 维护者 2026-11-07：BOSS（敌方领袖）可以额外叠一个攻击/生命倍率（spec flags bossAtkMul / bossHpMul），
+    // 与全体的 enemyHpMul / enemyAtkMul **叠乘**。普通房没有这两个 flag，`mm(undefined)` = 1，逐字节不变。
+    const bossHere = !!(def.isBoss || def.tag === 'boss' || (Array.isArray(this.flags.bossKeys) && this.flags.bossKeys.includes(String(def.key ?? enemyKey))));
+    const bossAtkMul = bossHere ? mm(this.flags.bossAtkMul) : 1;
+    const bossHpMul = bossHere ? mm(this.flags.bossHpMul, true) : 1;
+    const hpFinalBoss = Number.isFinite(absHp) && absHp > 0 ? absHp : def.maxHp * hpMulAll * hpRatio * bossHpMul;
     const e = new Unit({
       id: ++this._idSeq, side: 'enemy', kind: 'enemy', def, defId: def.key ?? enemyKey, name: def.name,
       x: start[1], y: start[0], motion: def.motion,
       base: {
-        maxHp: hpFinal, atk: def.atk * atkMulAll, def: def.def * (m.defMul ?? 1), res: def.res * (m.resMul ?? 1),
+        maxHp: hpFinalBoss, atk: def.atk * atkMulAll * bossAtkMul, def: def.def * (m.defMul ?? 1), res: def.res * (m.resMul ?? 1),
         aspd: def.aspd, bat: def.bat, blockCnt: 0, moveSpeed: def.moveSpeed * speedMulAll, spRecovery: 0,
         tauntLevel: def.tauntLevel, massLevel: def.massLevel, hpRecoveryPerSec: def.hpRecoveryPerSec, rangeRadius: def.rangeRadius,
       },
@@ -239,6 +244,10 @@ export class BattleSpawns {
       if (this.sharedBoss) { e.bossPool = this.sharedBoss; this._syncBossHp(e); }
     }
     e.hp = e.bossPool ? e.hp : e.s.maxHp;
+    // 「深渊回响」场地（spec flags `echoRules`）：频次怪（hitCount，含逐火战士倒下后的余烬 / 火灰）的
+    // maxHp = 「要打几下」，不吃侵蚀词条的生命倍率 —— units.js `_recalc` 靠这个标记判断（维护者 2026-11-07）。
+    // 普通房间没有 echoRules，这段不执行，golden 逐字节不变。
+    if (this.flags && this.flags.echoRules) e.mem.echoField = true;
     this.units.push(e);
     this.enemies.push(e);
     // 深潜「洞彻」的永久反隐（spec flags `revealAll`，Match._ruleFlags()）：每只敌人一出生就挂 reveal。

@@ -28,7 +28,7 @@
 // the season) shows its alliance and layers, and 切换到「X」查看 in place of the operators and gear — chess and item ids
 // are reused across versions for other operators and items (第一期下半: 100 chess ids, 72 item ids; review fix).
 
-import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
 import { html, Icon, MicroLabel, Spinner, Button, Modal, confirmDialog } from '../ui/components.js';
 import { useGameData, makeLookups, BandIcon, BondGlyph, Img } from '../ui/gameComponents.js';

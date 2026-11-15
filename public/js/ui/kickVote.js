@@ -3,7 +3,7 @@
 // the proposer counting as yes; it then leaves like a 中途退出. KickAction is the row button of the team panel,
 // KickVoteNotice the open vote (m.public kickVote) above the rows: 同意 / 反对 for the voters, 撤回 for the proposer.
 // UI hints only: the authority rechecks every rule.
-import { useRef, useState } from '../../vendor/hooks.module.js';
+import { useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { PHASE } from '../../../shared/constants.js';
 import { html, Button, Icon, Countdown, confirmDialog } from './components.js';
 import { act } from './gameActions.js';

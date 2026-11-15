@@ -33,6 +33,7 @@ import { PROTOCOL_VERSION, ERR_TEXT } from '../../shared/constants.js';
 import { validateC2S } from '../../shared/protocol.js';
 import { N_ } from '../../shared/i18n.js';
 import { STATE_DELTA_VERSION, StateReceiver } from '../../shared/stateDelta.js';
+import { PeerTransport } from './p2p.js';
 
 export const REQUEST_TIMEOUT_MS = 8000;
 export const HELLO_TIMEOUT_MS = 8000;
@@ -71,14 +72,22 @@ export function errorText(code, msg) {
 
 /** Error thrown/rejected by requests. `code` is an ERR code or a CLIENT_ERR_TEXT key. */
 export class NetError extends Error {
-  /** @param {string} code @param {string} [msg] server text @param {string} [detail] server developer detail */
-  constructor(code, msg, detail) {
+  /**
+   * @param {string} code
+   * @param {string} [msg] server text
+   * @param {string} [detail] server developer detail (or the Chinese rendering of `detailMsg`)
+   * @param {{ msgid?: string, params?: unknown } | null} [detailMsg] the same detail as a translatable message
+   */
+  constructor(code, msg, detail, detailMsg = null) {
     const versionMismatch = typeof detail === 'string' && /version/i.test(detail);
     super(versionMismatch ? CLIENT_ERR_TEXT.VERSION : errorText(code, msg));
     this.name = 'NetError';
     this.code = String(code || 'INTERNAL');
     this.serverMsg = msg ?? null;
     this.detail = typeof detail === 'string' ? detail : null;
+    // 2026-11-08：`fail(ERR.X, msg('…'))` 的 detail 以前在路上变成 "[object Object]"，玩家永远看不到那句
+    // 解释（例如「深潜房只支持第二期下半」）。现在服务端同时发 detailMsg（结构化），这里留着给上层翻译。
+    this.detailMsg = detailMsg && typeof detailMsg === 'object' && typeof detailMsg.msgid === 'string' ? detailMsg : null;
   }
 }
 
@@ -121,6 +130,7 @@ export class Net {
    * @param {() => number} [opts.now]
    * @param {() => number} [opts.random]
    * @param {{setTimeout: Function, clearTimeout: Function, setInterval: Function, clearInterval: Function}} [opts.timers]
+   * @param {object} [opts.p2p] optional WebRTC transport dependencies; enabled:false opts out
    */
   constructor(opts = {}) {
     this.url = opts.url || null;
@@ -175,6 +185,7 @@ export class Net {
     this._receiver = new StateReceiver();
     this._stateRoom = null;
     this._resyncAt = 0;        // epoch ms of the last resync request we sent
+    this.peers = new PeerTransport(this, opts.p2p);
   }
 
   // ---- events ----------------------------------------------------------------------------------
@@ -463,7 +474,7 @@ export class Net {
     this._helloRid = null;
     // hello 被拒不会有 welcome，标志必须在这里清掉，否则 room.state 的身份比对会一直被跳过。
     this.playerIdPending = false;
-    this.lastError = new NetError(msg.code, msg.msg, msg.detail);
+    this.lastError = new NetError(msg.code, msg.msg, msg.detail, msg.detailMsg);
     this._setStatus('connected');
     // Queued requests can't be sent without a session.
     this._failPending('OFFLINE', true);
@@ -618,6 +629,9 @@ export class Net {
       if (message == null) return;
       msg = message;
     }
+    // Peer delivery (public/js/p2p.js): every snapshot — WebSocket or decoded from m.state — passes the same
+    // server-issued delivery order, so a delayed frame from either transport cannot overwrite newer state.
+    if (msg.t === 'm.public' && !this.peers.directSnapshot(msg)) return;
     const { t } = msg;
     const rid = msg.rid;
     const isHelloError = t === 'error' && rid != null && rid === this._helloRid;
@@ -642,13 +656,13 @@ export class Net {
       this._clearEntryTimer(entry);
       handled = true;
       try {
-        if (t === 'error') entry.reject(new NetError(msg.code, msg.msg, msg.detail));
+        if (t === 'error') entry.reject(new NetError(msg.code, msg.msg, msg.detail, msg.detailMsg));
         else entry.resolve(msg);
       } catch (err) { console.error('[net] request callback failed', err); }
     }
     const late = rid != null && !handled && this._expired.delete(rid); // reply to a request that already timed out
     if (t === 'error' && !handled && !isHelloError && !late) {
-      this._emit('unhandledError', new NetError(msg.code, msg.msg, msg.detail));
+      this._emit('unhandledError', new NetError(msg.code, msg.msg, msg.detail, msg.detailMsg));
     }
 
     this._emit(t, msg);
@@ -656,6 +670,18 @@ export class Net {
   }
 
   // ---- heartbeat & clock -----------------------------------------------------------------------
+
+  /** A verified public snapshot; peer traffic never answers a WebSocket heartbeat or request. */
+  acceptPeerSnapshot(msg) {
+    const continuingHandshake = this.status === 'handshaking' && this.ws
+      && this.peers.sessionWs === this.ws && this.peers.sessionPlayerId === this.playerId;
+    if ((this.status !== 'online' && !continuingHandshake) || msg?.t !== 'm.public') return;
+    if (Number.isFinite(msg.serverNow) && !this.clockSynced) {
+      this._addClockSample(msg.serverNow + (this.ping ?? 0) / 2 - this.now(), Infinity);
+    }
+    this._emit('m.public', msg);
+    this._emit('*', msg);
+  }
 
   _startHeartbeat() {
     this._clearTimer('_pingTimer', 'clearInterval');
@@ -1118,3 +1144,4 @@ export const identity = createIdentity({ onYield: () => net.reconnectNow(net.hel
 
 /** Browser connection singleton (created lazily-safe: nothing touches the network until connect()). */
 export const net = new Net({ getToken: () => identity.getToken(), getTokenClaim: () => identity.getTokenClaim() });
+

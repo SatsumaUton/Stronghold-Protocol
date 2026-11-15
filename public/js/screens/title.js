@@ -39,7 +39,7 @@ function __spRemoteAssetRe() {
 import { ReleaseNotesButton } from '../ui/releaseNotes.js';
 import { ResumeMatchButton } from '../ui/resumeMatch.js';
 import { ResourceManagerButton } from '../ui/resourceManager.js';
-import { useEffect, useMemo, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useMemo, useState } from '../../vendor/hooks.module.v2.js';
 import { NAME_MAX_LEN, APP_VERSION, DEV_BUILD } from '../../../shared/constants.js';
 import { html, Button, Icon, MicroLabel, TextField, PingPill } from '../ui/components.js';
 import { GuideButton } from '../ui/guide.js';

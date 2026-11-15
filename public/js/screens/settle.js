@@ -15,7 +15,7 @@
 // so a device counts what it recorded (cleared browser data starts again at LV 0). A spectator seat (no row of its own)
 // opens on the team page. The stats page re-views a stored match with ResultView.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, DifficultyIcon, Spinner } from '../ui/components.js';
 import { OperatorImage, useGameData, Img, Sprite, PromotionIcon, PlayerAvatar, BondGlyph, BandIcon } from '../ui/gameComponents.js';
 import { normalizeResult, diyRecordFor, cardStandIn, standInForText } from '../ui/gameLogic.js';

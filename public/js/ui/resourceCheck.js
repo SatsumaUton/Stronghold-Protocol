@@ -1,5 +1,5 @@
 // Resource checks inspect local caches; they never download missing art to make the check pass.
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, ProgressBar } from './components.js';
 import { checkResources } from '../resourceCheck.js';
 import { data } from '../data.js';

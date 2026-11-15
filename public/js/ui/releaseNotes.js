@@ -1,5 +1,5 @@
-import { h } from '../../vendor/preact.module.js';
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { h } from '../../vendor/preact.module.v2.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Modal, Button } from './components.js';
 import { createStore, useStore, selectRoute } from '../store.js';
 import { APP_VERSION } from '../../../shared/constants.js';

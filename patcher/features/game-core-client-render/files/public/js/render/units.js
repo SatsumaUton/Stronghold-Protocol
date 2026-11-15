@@ -81,6 +81,7 @@
 // screen rect for tooltips and overlays (view.pieceScreenRect). A dragged (lifted) item plate is drawn centred on its
 // ground point, i.e. on the pointer (render/app.js).
 
+import { progressLabel } from '../itemProgress.js';
 import { MoteRing } from './motes.js';
 import { UF, ANIM } from '../../../shared/constants.js';
 import { SpineActor } from './spine.js';
@@ -711,6 +712,11 @@ export class UnitView {
     this.energy = null;           // [stored energies, the trait's maximum] of a 秘术师, including zero (sync; b.snap `energy`)
     this.energyHud = null;
     this.neg = 0;                 // the share of its cap a negative-HP pool holds, 0 = none (sync; b.snap `neg`, 斩业星熊's 我执)
+    this.shield = 0;              // the HP shield's points left, 0 = none (sync; b.snap `shield`: the strip under the HP bar)
+    // 护盾条要画成「满格 + 剩余」（维护者 2026-11-10）：只画剩余的话，盾一被啃小，剩下的那截又细又短，
+    // 玩家看不出「我到底打掉多少」—— 而盾期内血条是**完全不动**的（护盾全额吸收时那次伤害被整条取消，
+    // 连伤害数字都不弹），于是主观感受就是「打不动」。所以记下这条盾升起时的大小，当它自己的满格。
+    this.shieldMax = 0;           // the shield's size when it was raised — the strip's full width (display only)
     this.motes = null;            // 魔王's orbiting 「微尘」: { n, wide } | null (sync; b.snap `motes`, render/motes.js)
     this.moteRing = null;
     this.layers = 0;              // hit-negating 护盾 layers (sync; b.snap `layers`: the official layer effect, vfx/talentfx.js)
@@ -1110,6 +1116,10 @@ export class UnitView {
     this.hpFill = bar(P, h, this.isEnemy ? (this.isBoss ? COLORS.hpBoss : COLORS.hpEnemy) : COLORS.hpAlly);
     // a negative-HP pool (斩业星熊's 我执), drawn over the drained HP bar as the red bar
     this.negFill = bar(P, h, COLORS.hpNeg);
+    // 护盾条是**两条**（维护者 2026-11-10）：底下的暗条是这条盾升起时的满格，上面的亮条是剩余。
+    // 只画剩余的话，盾被打掉一截后剩下的又细又短，玩家读不出「我打掉了多少」—— 盾期内血条本来就不动
+    // （全额吸收的那次伤害被整条取消，连数字都不弹），于是就成了「打不动」。暗条给出分母，亮条给出分子。
+    this.shieldGhost = bar(P, h, COLORS.shield, 0.3);
     this.shieldBar = bar(P, h, COLORS.shield, 0.95);
     this.spBg = bar(P, h, COLORS.hpBack, 0.85);
     this.spFill = bar(P, h, COLORS.sp);
@@ -1119,7 +1129,7 @@ export class UnitView {
     this.spGlow.blendMode = P.BLEND_MODES.ADD;
     h.addChild(this.spGlow);
     // nothing shows until the first HUD update decides (a culled or prep view never draws bars)
-    for (const b of [this.hpBg, this.hpGhost, this.hpFill, this.negFill, this.shieldBar, this.spBg, this.spFill, this.spGlow]) b.visible = false;
+    for (const b of [this.hpBg, this.hpGhost, this.hpFill, this.negFill, this.shieldGhost, this.shieldBar, this.spBg, this.spFill, this.spGlow]) b.visible = false;
     this.chip = null;
     // operators only: summon tokens have no tier (hand and field alike)
     if (!this.isEnemy && !this.isToken && this.info.kind !== 'device') {
@@ -1142,6 +1152,48 @@ export class UnitView {
     this.countText = null;
     this.ammoText = null;          // 设置「弹药数量」: the magazine's count under the ammo bar (_updateAmmoCount)
     this.itemPips = [];
+    // 「深渊回响」悬赏目标（维护者 2026-11-05）：头顶金币 + 金色光晕，战斗里一眼能认出「这只是悬赏怪」
+    this._bounty = 0;
+    this.bountyGlow = new P.Sprite(fxAtlas().tex.glow);
+    this.bountyGlow.anchor.set(0.5);
+    this.bountyGlow.tint = 0xffd34d;
+    this.bountyGlow.blendMode = P.BLEND_MODES.ADD;
+    this.bountyGlow.alpha = 0.55;
+    this.bountyGlow.visible = false;
+    h.addChild(this.bountyGlow);
+    this.bountyIcon = new P.Sprite(fxAtlas().tex.coin);
+    this.bountyIcon.anchor.set(0.5);
+    this.bountyIcon.tint = 0xffd34d;
+    this.bountyIcon.visible = false;
+    h.addChild(this.bountyIcon);
+  }
+
+  /**
+   * 悬赏目标标记：`n > 0`（金币数）时在头顶画金币 + 金色光晕。
+   * @param {number} n
+   */
+  setBounty(n) {
+    this._bounty = Math.max(0, Math.trunc(Number(n) || 0));
+    if (this.bountyIcon) this.bountyIcon.visible = false;   // 可见性由 _updateHud 每帧按状态决定
+    this._itemPipRows = 0;
+    this.itemProgressText = null;
+    this.setItemProgress(this.info.itemProgress);
+  }
+
+  /** Equipment's prep-side progress, below the carrier's feet in prep and combat. */
+  setItemProgress(rows) {
+    const label = (rows || []).map(progressLabel).filter(Boolean).join('\n');
+    if (!label) {
+      if (this.itemProgressText) { this.itemProgressText.text = ''; this.itemProgressText.visible = false; }
+      return;
+    }
+    if (!this.itemProgressText) {
+      this.itemProgressText = new this.P.Text('', { fontFamily: 'Bender, Oxanium, sans-serif', fontSize: 16, fontWeight: '700', fill: '#4ed8af', stroke: '#0b0f0e', strokeThickness: 4, align: 'center' });
+      this.itemProgressText.anchor.set(0.5, 0);
+      this.hud.addChild(this.itemProgressText);
+    }
+    if (this.itemProgressText.text !== label) this.itemProgressText.text = label;
+    this.itemProgressText.visible = true;
   }
 
   /** Show a stack count (token stacks in the hand) — BitmapText-free: a tiny canvas-less chip via Text. */
@@ -1160,12 +1212,20 @@ export class UnitView {
   /** Equipped item pips (prep): list of item icon URLs. */
   setItems(urls) {
     const P = this.P;
-    // morphPairing plus can carry two ordinary items and one zero-slot morph (DESIGN §34.15).
-    const list = Array.isArray(urls) ? urls.slice(0, 3) : [];
-    while (this.itemPips.length > list.length) this.itemPips.pop().destroy(); // loop-cap: at most three item pips
+    // Display every carried item, including zero-slot equipment. Balance at most three icons per row:
+    // 4 → 2+2, 5 → 3+2, 6 → 3+3; larger valid inventories use more rows instead of truncating.
+    const list = Array.isArray(urls) ? urls : [];
+    const rows = Math.ceil(list.length / 3);
+    this._itemPipRows = rows;
+    const shortRow = rows ? Math.floor(list.length / rows) : 0, longRows = rows ? list.length % rows : 0;
+    let row = 0, col = 0;
+    while (this.itemPips.length > list.length) this.itemPips.pop().destroy(); // loop-cap: the previous carried-item count
     list.forEach((u, i) => {
       let s = this.itemPips[i];
       if (!s) { s = new P.Sprite(P.Texture.EMPTY); s.anchor.set(0.5); this.hud.addChild(s); this.itemPips[i] = s; }
+      const columns = shortRow + (row < longRows ? 1 : 0);
+      s._itemRow = row; s._itemCol = col; s._itemColumns = columns;
+      if (++col === columns) { row++; col = 0; }
       if (s._url === u) return;
       s._url = u;
       const a = this.ctx.assets;
@@ -1209,6 +1269,11 @@ export class UnitView {
     this.hp = hp;
     this.sp = s.sp; this.spMax = s.spMax;
     this.ammo = s.ammo || null; this.wolves = s.wolves || null; this.neg = s.neg > 0 ? Math.min(1, s.neg) : 0;
+    this.shield = s.shield > 0 ? s.shield : 0;
+    // 这条盾的「满格」：升起 / 变大时记下新的峰值，缩小时保留（见构造器里的说明）。盾归零就清掉，
+    // 这样下一次升起（includes 换形态后重新挂盾）从头算，不会停在旧尺度上。
+    if (!(this.shield > 0)) this.shieldMax = 0;
+    else if (this.shield > this.shieldMax) this.shieldMax = this.shield;
     this.motes = s.motes && s.motes.n > 0 ? s.motes : null;
     this.coins = s.coins || null;
     this.energy = s.energy || null;
@@ -1503,12 +1568,8 @@ export class UnitView {
       }
       this.lastAtk = now;
     }
-    if (target && !this.isEnemy && this.info.kind !== 'device') {
-      // operators keep their deploy direction (research 09 §1.2); enemies may turn towards their target
-    } else if (target && this.isEnemy) {
-      const dx = target.x - this.x;
-      if (Math.abs(dx) > 0.1) this.visFacing = dx < 0 ? -1 : 1;
-    }
+    // operators keep their deploy direction (research 09 §1.2); an enemy turns toward the target
+    this._faceAttack(target);
     if (target) {
       const dx = target.x - this.x, dy = target.y - this.y, len = Math.hypot(dx, dy) || 1;
       this.lungeDir.x = dx / len; this.lungeDir.y = dy / len;
@@ -1554,16 +1615,30 @@ export class UnitView {
   }
 
   /**
+   * Face this attack's target. An enemy turns when the target is not straight ahead (|dx| > 0.1); an operator keeps
+   * its deploy direction (research 09 §1.2). The wind-up uses the same rule the moment its clip starts (GitHub #869):
+   * the strike used to be the first time the model turned, so a blocker redeployed behind a walking enemy was swung
+   * at while the model still faced the old walk.
+   */
+  _faceAttack(target) {
+    if (!target || !this.isEnemy) return;
+    const dx = target.x - this.x;
+    if (Math.abs(dx) > 0.1) this.visFacing = dx < 0 ? -1 : 1;
+  }
+
+  /**
    * An attack by this unit is `lead` game seconds ahead in the snapshot buffer: start the Spine attack wind-up now
    * so the strike frame lines up with the attack. True once started (then stop calling for that attack). `kind` = the
-   * 'atk' projKind (a one-off cast winds up at the clip's own speed).
+   * 'atk' projKind (a one-off cast winds up at the clip's own speed). `target` = that attack's view: the model faces
+   * it as the clip starts, by the same rule as onAttack.
    */
-  windUp(lead, kind, castSlot = null, interval = this.atkInterval) {
+  windUp(lead, kind, castSlot = null, interval = this.atkInterval, target = null) {
     if (!this.alive || !this.actor || !this.spineReady) return false;
     this._attackForm(kind);
     this.actor.castStrike?.(this._strikeClip(castSlot));
     const ok = this.actor.windUp(clampAtkInterval(interval), lead, !!PROJ[kind]?.once);
     if (!ok) this.actor.castStrike?.(null);
+    else this._faceAttack(target);
     if (ok && this.imp) this.imp.dirty = true;
     return ok;
   }
@@ -2017,7 +2092,10 @@ export class UnitView {
     const prep = this.prep;
     const showBars = !prep && this.alive && this.info.kind !== 'item';
     const damaged = this.hp < this.maxHp - 0.5;
-    const showHp = showBars && (!this.isEnemy || damaged || this.isBoss) && !NO_HP_BAR.has(this.info.defId);
+    // a shielded enemy shows its bar before it is hit too (维护者 2026-11-07: the shield's share must be readable while it
+    // is still up — the strip below rides on this bar)
+    const shielded = showBars && !!(this.flags & UF.SHIELD);
+    const showHp = showBars && (!this.isEnemy || damaged || this.isBoss || shielded) && !NO_HP_BAR.has(this.info.defId);
     const bw = clamp(s * (this.isBoss ? UNIT.bossBarWidth : UNIT.barWidth), 24, this.isBoss ? 260 : 96);
     const bh = clamp(s * (this.isBoss ? 0.12 : 0.075), 3, this.isBoss ? 12 : 7);
     // a knocked-down operator's HUD is its redeploy ring alone, drawn at full strength over the greyed model
@@ -2026,6 +2104,23 @@ export class UnitView {
     this.shake = Math.max(0, this.shake - dt);
     const x0 = x - bw / 2 + sx;
     let cy = y - 4;
+    // 「深渊回响」悬赏目标：头顶金币 + 金色光晕（维护者 2026-11-05）。位置随血条走，
+    // 但**不依赖血条可见**（没受伤的悬赏怪也要能认出来）。
+    const bountyOn = this._bounty > 0 && !prep && this.alive;
+    if (this.bountyIcon) {
+      this.bountyIcon.visible = bountyOn;
+      this.bountyGlow.visible = bountyOn;
+      if (bountyOn) {
+        const size = clamp(bh * 2.2, 11, 22);
+        const by2 = cy - bh - size * 0.75;
+        this.bountyIcon.position.set(x, by2);
+        this.bountyIcon.width = size;
+        this.bountyIcon.height = size;
+        this.bountyGlow.position.set(x, by2);
+        this.bountyGlow.width = size * 2.6;
+        this.bountyGlow.height = size * 2.6;
+      }
+    }
     // HP
     this.hpBg.visible = this.hpFill.visible = this.hpGhost.visible = showHp;
     if (showHp) {
@@ -2037,14 +2132,28 @@ export class UnitView {
       this.hpGhost.position.set(x0, cy); this.hpGhost.width = bw * g; this.hpGhost.height = bh;
       this.hpFill.position.set(x0, cy); this.hpFill.width = bw * k; this.hpFill.height = bh;
       if (!this.isEnemy) this.hpFill.tint = k < 0.3 ? COLORS.hpAllyLow : COLORS.hpAlly;
+      else if (this._bounty > 0) this.hpFill.tint = 0xffd34d;   // 悬赏目标：血条金色描边（2026-11-05）
     }
     // 业火 我执: her HP sits on the 1-HP floor and the damage past it fills a pool — the red bar over the drained green one
     const neg = showHp ? this.neg : 0;
     this.negFill.visible = neg > 0;
     if (neg > 0) { this.negFill.position.set(x0, cy); this.negFill.width = bw * neg; this.negFill.height = bh; }
-    const shielded = showHp && (this.flags & UF.SHIELD);
-    this.shieldBar.visible = !!shielded;
-    if (shielded) { this.shieldBar.position.set(x0, cy - bh / 2 - 1); this.shieldBar.width = bw; this.shieldBar.height = Math.max(1.5, bh * 0.35); }
+    // the HP shield: a strip right under the bar whose width is the shield's share of max HP, so it visibly shrinks as
+    // the shield absorbs the hits (维护者 2026-11-07: the player must see how much shield is left). A hit-count barrier
+    // (shieldHits: 泥岩's layers) has no amount in the snapshot — it keeps the whole strip as before.
+    this.shieldBar.visible = !!(shielded && showHp);
+    this.shieldGhost.visible = this.shieldBar.visible;
+    if (this.shieldBar.visible) {
+      // 满格 = 这条盾升起时的大小（shieldMax），没有数值时退回整条（hit-count 护盾，见上）
+      const full = this.shieldMax > 0 ? clamp(this.shieldMax / Math.max(1, this.maxHp), 0, 1) : 1;
+      const left = this.shield > 0 && this.shieldMax > 0 ? clamp(this.shield / this.shieldMax, 0, 1) : 1;
+      this.shieldGhost.position.set(x0, cy - bh / 2 - 1);
+      this.shieldGhost.width = Math.max(2, bw * full);
+      this.shieldGhost.height = Math.max(1.5, bh * 0.35);
+      this.shieldBar.position.set(x0, cy - bh / 2 - 1);
+      this.shieldBar.width = Math.max(2, bw * full * left);
+      this.shieldBar.height = Math.max(1.5, bh * 0.35);
+    }
     // SP — or, while an ammo skill runs, its magazine: yellow cells, one per round, emptying from the right (b.snap `ammo`;
     // the SP bar's own fraction, ammoLeft / ammoMax, is the same width). Without an `ammo` row the bar is the plain SP bar.
     const ammo = !this.isEnemy ? this.ammo : null;
@@ -2119,12 +2228,21 @@ export class UnitView {
       this.countText.scale.set(clamp(s / 90, 0.5, 1.2));
       this.countText.position.set(x + s * 0.32, this.screen.y - s * 0.12);
     }
+    const pipSize = clamp(s * 0.26, 12, 30);
     for (let i = 0; i < this.itemPips.length; i++) {
       const pip = this.itemPips[i];
-      const ps = clamp(s * 0.26, 12, 30);
-      pip.width = pip.height = ps;
-      pip.position.set(this.screen.x - s * 0.36 + i * (ps + 1), this.screen.y - s * 0.05);
+      pip.width = pip.height = pipSize;
+      pip.position.set(
+        this.screen.x + (pip._itemCol - (pip._itemColumns - 1) / 2) * (pipSize + 1),
+        this.screen.y - s * 0.05 - (this._itemPipRows - 1 - pip._itemRow) * (pipSize + 2),
+      );
       pip.visible = this.alive;
+    }
+    if (this.itemProgressText) {
+      this.itemProgressText.visible = this.alive && !!this.itemProgressText.text;
+      this.itemProgressText.scale.set(clamp(s * 0.2, 10, 16) / 16);
+      const progressTop = this.itemPips.length ? Math.max(s * 0.14, -s * 0.05 + pipSize / 2 + 2) : s * 0.14;
+      this.itemProgressText.position.set(this.screen.x, this.screen.y + progressTop);
     }
   }
 

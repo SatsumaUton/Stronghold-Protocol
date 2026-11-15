@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from '../../../vendor/hooks.module.js';
+import { useLayoutEffect, useRef } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../../../js/ui/components.js';
 import { inputNumber, syncNumberInput } from '../../../js/ui/numberInput.js';
 import { t, N_ } from '../../../../shared/i18n.js';

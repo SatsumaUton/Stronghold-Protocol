@@ -1,5 +1,5 @@
 // Local import panel in resource management. Unmounting cancels imports; stored bytes remain.
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, ProgressBar, confirmDialog } from './components.js';
 import { assetImport } from '../assetPack.js';
 import { askPersistStorage, clearImportedAssets, countImportedFiles, importSupport, storageEstimate } from '../assetCache.js';

@@ -23,7 +23,7 @@
 // dropped on pointercancel / blur and by −, + and 重置, and ignored once the stored size changes (Chrome fires no
 // `change` when a drag ends on its start value; a touch drag can turn into a scroll — DESIGN §35.45).
 
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Icon, MicroLabel } from './components.js';
 import { createStore, useStore, loadPref, savePref } from '../store.js';
 import { settingsStore } from './settingsStore.js';

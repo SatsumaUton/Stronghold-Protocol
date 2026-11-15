@@ -14,7 +14,7 @@
 // reduced motion it stands on its first frame, and so does a picture that moves (GIF, APNG, animated WebP / AVIF). The
 // site CSP allows blob: media for that video and for the music's length check (server/http/csp.js); the music itself
 // is decoded from its bytes (no media element). Texts go through t() (docs/I18N.md).
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Icon, MicroLabel, Modal, Tooltip } from './components.js';
 import { createStore, useStore, loadPref, savePref } from '../store.js';
 import { audio } from '../audio.js';

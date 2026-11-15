@@ -1,5 +1,5 @@
 // Native offer UI: two-tap confirmation and the choice overlay's responsive cards.
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, Countdown, Button } from './components.js';
 import { GIcon } from './gameComponents.js';
 import { spTap } from './choiceOverlay.js';

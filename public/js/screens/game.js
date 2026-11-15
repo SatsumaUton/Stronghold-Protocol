@@ -82,7 +82,7 @@ import { AiTakeoverPanel } from '../ui/aiTakeover.js';
 // team row → 前往查看 any player; in 休整期 / 机变 / round start it is shown the first player's board by itself (once per
 // phase). Its pill reads 观战中, never "你已被淘汰"; its exit only leaves the seat (ui/matchChrome.js ExitModal).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { PHASE, GEO } from '../../../shared/constants.js';
 import { ruleOption } from '../../../shared/plugins/rules.js';
 import { html, Spinner, PhaseBanner, ResultDialog, Icon, Button, confirmDialog, closeAllDialogs, useTicker } from '../ui/components.js';

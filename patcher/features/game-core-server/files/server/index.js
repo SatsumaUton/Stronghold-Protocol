@@ -45,7 +45,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { getData, loadData } from './data.js';
 import { createPersistence } from './persist/index.js';
-import { getBotStrategy } from './match/botStrategies.js';
+import { getBotStrategy, getBotStrategySeats } from './match/botStrategies.js';
 import { noteLlmIgnored, releaseIgnoresExternalAi, validateExternalConfig } from './match/llmGate.js';
 import { ROOT, listenAddress, bindCandidates, serveDirs, makeLogger, parseTrustProxy, assetIndexOptionsFrom, versionsFrom, parseRoomCode } from './http/config.js';
 import { WS_MAX_PAYLOAD, createSessionStack, attachWebSocket } from './http/websocket.js';
@@ -125,6 +125,12 @@ export async function startServer(opts = {}) {
   } catch (cause) {
     throw new Error(`Invalid SP_BOT_STRATEGY: ${cause.message}. Unset SP_BOT_STRATEGY to use the original bot (legacy).`, { cause });
   }
+  try {
+    const seats = getBotStrategySeats(process.env.SP_BOT_STRATEGY_SEATS);
+    if (Object.values(seats).some((s) => s.id === 'external')) validateExternalConfig();
+  } catch (cause) {
+    throw new Error(`Invalid SP_BOT_STRATEGY_SEATS: ${cause.message}. Unset SP_BOT_STRATEGY_SEATS to use SP_BOT_STRATEGY for every seat.`, { cause });
+  }
   const { port, host } = listenAddress(opts);
   const { publicDir, dataDir, sharedDir, packsDir, pluginsDir } = serveDirs(opts);
   const simDir = path.join(ROOT, 'server', 'sim');
@@ -148,8 +154,10 @@ export async function startServer(opts = {}) {
   const visual = createVisualSets({ registry: packs, log });
   // the server owner's policy (plugins/config.json), the content sets of the gameplay plugins (served at /cs/<cs16>/…),
   // what a room's plugins make of both, and the match hosts a room with gameplay plugins plays in (DESIGN §32.6)
+  const versionCfg = versionsFrom(opts, log);
+  const versions = createVersionSets({ enabled: versionCfg.enabled, defaultId: versionCfg.default, dataDir, vanilla: content, defaultData: data, log });
   const policy = createPluginPolicy({ pluginsDir, log });
-  const contents = createContentSets({ registry: packs, vanillaData: data, log, maxSets: () => policy.get().maxSets });
+  const contents = createContentSets({ registry: packs, vanillaData: data, versions, log, maxSets: () => policy.get().maxSets });
   const roomSets = createRoomSets({ registry: packs, visual, contents, policy });
   // a child process per content set; SP_MATCH_HOST=worker asks for a worker thread instead (match/host/index.js header:
   // an out-of-memory abort in a worker thread ends the whole server)
@@ -157,8 +165,6 @@ export async function startServer(opts = {}) {
   const hosts = createMatchHosts({ contents, log, options: { transport, maxWorkers: Math.max(1, policy.get().maxSets), ...(opts.matchHost || {}) } });
   // the official versions (DESIGN §35.23, M1): which ones (the option, else SP_VERSIONS …), their content, and — only
   // when one beyond 第二期下半 is enabled — the match hosts their rooms play in (counted apart from the plugin hosts)
-  const versionCfg = versionsFrom(opts, log);
-  const versions = createVersionSets({ enabled: versionCfg.enabled, defaultId: versionCfg.default, dataDir, vanilla: content, defaultData: data, log });
   // (the test options of matchHost apply to both pools, but never the version pool's kind or its own SP_MAX_VERSION_HOSTS)
   const versionHosts = versions.nonDefault.length
     ? createMatchHosts({ contents: versions, log, options: { transport, ...(opts.matchHost || {}), kind: 'version', maxWorkers: Math.max(1, versionCfg.maxHosts) } })
@@ -271,8 +277,12 @@ export async function startServer(opts = {}) {
   async function close() {
     if (closing) return closing;
     closing = (async () => {
+      // 顺序很关键（维护者 2026-11-10）：**先**让持久化做最后一轮落盘（这时房间还在 `lobby.rooms` 里，
+      // 能完整写下），**再**关掉大厅的房间。反过来做的话，落盘看到的 `goneRooms` 就是「全部房间」，
+      // 会把 Redis 里的存档整批删掉 —— 实测 `lobby:rooms 1 → 0`（见 test/persist/shutdown-keeps-rooms.test.js）。
+      try { await persistence?.shutdown(); } catch (e) { log.error('[shutdown] persist', e); }
       try { lobby.shutdown('shutdown'); } catch (e) { log.error('[shutdown] lobby', e); }
-  try { await persistence?.close(); } catch (e) { log.error('[shutdown] persist', e); }
+      try { await persistence?.close(); } catch (e) { log.error('[shutdown] persist close', e); }
       try { hosts.close(); } catch (e) { log.error('[shutdown] match hosts', e); }
       try { versionHosts?.close(); } catch (e) { log.error('[shutdown] version hosts', e); }
       // after the lobby: every room is gone, so no rehearsal can still be waiting on a thread

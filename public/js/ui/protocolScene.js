@@ -7,7 +7,7 @@
 // --d-color). Without the art pack (or when the picture fails) the PR's own stepped wireframe hull stands in. Choosing
 // another difficulty remounts it (key): it comes up from dark in the new colour.
 import { html } from './components.js';
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 
 const S = 15;            // one unit in px of the 1000 × 640 view box
 const OX = 230, OY = 400; // where the origin lands

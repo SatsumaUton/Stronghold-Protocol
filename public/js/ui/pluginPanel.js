@@ -24,7 +24,7 @@
 // The tag and the small facts (roomPluginFacts, sizeText, pluginTagText, pluginMicro) are ui/pluginTag.js's, re-exported
 // here. Texts go through t() (docs/I18N.md).
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { APP_VERSION } from '../../../shared/constants.js';
 import { html, Modal, Button, Icon } from './components.js';
 import { PluginSettings, settingsSelection } from './pluginSettings.js';

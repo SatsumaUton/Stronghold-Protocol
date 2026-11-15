@@ -42,6 +42,7 @@
 //   displacement.js  push / pull / displace (受力等级 = force − weight); pushTiles
 //   economy.js       DP, IN_BATTLE bond layers, bounty coins
 //   events.js        client events, snapshot, field meta, fx, the sim log
+//   leaderHits.js    per-operator damage taken off the current leader pool (boss / hidden only; not in BattleResult)
 //   util.js          fin / clone
 
 import { TICK, ROWS, COLS, DP_DEFAULTS, MAX_HOOK_DEPTH, AUTO_OP_COOLDOWN } from './constants.js';
@@ -52,6 +53,7 @@ import { ProjectileSystem } from './projectiles.js';
 import { remainingDistance } from './ai.js';
 import { toDataSource, normalizeRoute, normalizeStage } from './simdata.js';
 import { installContent } from './content/index.js';
+import { installEchoRules } from './battle/echoRules.js';
 import { BattlePlayers } from './battle/players.js';
 import { BattleLifecycle } from './battle/lifecycle.js';
 import { BattleHooks } from './battle/hooks.js';
@@ -66,6 +68,7 @@ import { BattleTiles } from './battle/tiles.js';
 import { BattleDisplacement } from './battle/displacement.js';
 import { BattleEconomy } from './battle/economy.js';
 import { BattleEvents } from './battle/events.js';
+import { BattleLeaderHits } from './battle/leaderHits.js';
 
 export { pushTiles } from './battle/displacement.js';
 
@@ -193,6 +196,11 @@ export class Battle {
       for (const u of this.allyUnits) if (!u.kit) this._setupUnit(u);
       if (typeof opts.setup === 'function') this._safe(() => opts.setup(this), 'opts.setup');
     }
+    // 「深渊回响」的战斗规则（spec flags `echoRules`，2026-11-06）：侵蚀词条 / 对敌异常 / 祝福加成由 spec 驱动，
+    // 客户端按同一份 spec 重建战斗时也会装上。flag 缺省 = 空操作，原版与 golden 逐字节不变。
+    if (this.flags && this.flags.echoRules) {
+      try { installEchoRules(this); } catch (e) { this._handlerError('installEchoRules', null, e); }
+    }
   }
 
   /**
@@ -212,7 +220,7 @@ export class Battle {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [BattlePlayers, BattleLifecycle, BattleHooks, BattleSpawns, BattleDeploy, BattleBlocking, BattleStatus, BattleCombat, BattleQueries, BattleSummons, BattleTiles, BattleDisplacement, BattleEconomy, BattleEvents]) {
+for (const part of [BattlePlayers, BattleLifecycle, BattleHooks, BattleSpawns, BattleDeploy, BattleBlocking, BattleStatus, BattleCombat, BattleQueries, BattleSummons, BattleTiles, BattleDisplacement, BattleEconomy, BattleEvents, BattleLeaderHits]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Battle.prototype, key)) throw new Error(`Battle.${String(key)} is defined twice`);

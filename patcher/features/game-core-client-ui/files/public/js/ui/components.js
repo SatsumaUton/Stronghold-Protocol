@@ -11,9 +11,9 @@
 // (orange ≤10 s), chevron phase banners. Motion 150–250 ms. All sizes are rem (1rem = 100 design
 // px at 1920×1080, see css/theme.css).
 
-import { h, Fragment } from '../../vendor/preact.module.js';
-import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from '../../vendor/hooks.module.js';
-import htm from '../../vendor/htm.module.js';
+import { h, Fragment } from '../../vendor/preact.module.v2.js';
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from '../../vendor/hooks.module.v2.js';
+import htm from '../../vendor/htm.module.v2.js';
 import { DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
 import { t } from '../../../shared/i18n.js';
 import { serverNow } from '../store.js';
@@ -21,19 +21,45 @@ import { data, useData, localAsset } from '../data.js';
 import { uiUrl } from './assetUrls.js';
 
 /**
- * h() for htm with its static-subtree cache switched off. htm keeps the vnode it built for a fully static subtree in
- * the template's op list and hands the SAME object out on every render; Preact mounts that shared vnode (it gets
- * its DOM node and parent chain written into it), so after the screen unmounts the module-level template cache
- * still points at the detached DOM, its listeners and the old component tree — whole stale screens pile up over a
- * session. `this[0] = 3` marks the element dynamic (htm's documented opt-out), so every render gets fresh vnodes.
+ * h() for htm **with the static-subtree cache neutralised** — not by mutating htm's op list
+ * (`this[0] = 3`, the old trick), but by cloning whatever htm hands back that has already been mounted.
+ *
+ * Why the old trick had to go: writing into htm's ops array leaves an internal flag out of sync, and for
+ * some templates the next build returns the **argument list** instead of a vnode (`['div', props, child,
+ * child]` — reproduced in a real browser with the 悬赏决策 overlay). Preact then inserts `undefined` and the
+ * screen dies with `insertBefore … parameter 1 is not of type 'Node'`. That is fixed at the vendor level too
+ * (preact.module.js skips a null `__e`), but the root cause is here.
+ *
+ * `freshen` walks the template result: a vnode that has been through a render already carries `__e` / `__c` /
+ * `__k` (htm's cache hands the same object out again); rebuilding it through `h()` gives Preact a brand-new
+ * vnode — same behaviour the `this[0] = 3` hack aimed at (no detached screen left in a module-level cache),
+ * without touching htm's bookkeeping.
  */
 export function hFresh(type, props, ...children) {
-  if (this && typeof this === 'object') this[0] = 3;
   return h(type, props, ...children);
 }
 
-/** Tagged-template JSX replacement bound to Preact's h() (no shared static vnodes, see hFresh). */
-export const html = htm.bind(hFresh);
+/** Rebuild the vnodes htm may have cached (see hFresh). Cheap: a straight walk, no allocation when already fresh. */
+function freshen(node) {
+  if (Array.isArray(node)) return node.map(freshen);
+  if (!node || typeof node !== 'object') return node;
+  // htm 的模板缓存偶尔会交回「参数数组」（`['div', props, …]`）—— 里面的 props 对象不是 vnode。
+  // 这种对象交给 Preact 就是 insertBefore(undefined)（整屏崩），直接丢掉。
+  if (node.type === undefined) return null;
+  const kids = node.props && node.props.children;
+  const freshKids = kids == null ? kids : freshen(kids);
+  const mounted = node.__e != null || node.__c != null || node.__k != null;
+  if (!mounted && freshKids === kids) return node;
+  const v = h(node.type, node.props);
+  if (v.key !== node.key) v.key = node.key;
+  if (v.ref !== node.ref) v.ref = node.ref;
+  if (freshKids !== kids) v.props = Object.assign({}, node.props, { children: freshKids });
+  return v;
+}
+
+/** Tagged-template JSX replacement bound to Preact's h() (fresh vnodes every render, see hFresh). */
+const htmlRaw = htm.bind(hFresh);
+export const html = (strings, ...values) => freshen(htmlRaw(strings, ...values));
 export { h, Fragment };
 
 const cx = (...parts) => parts.flat().filter(Boolean).join(' ');
@@ -200,13 +226,14 @@ export function tierChipUrl(t) {
  * Golden = elite (精锐) variant (gold glow).
  * @param {{ tier: number, golden?: boolean, size?: 'sm'|'md'|'lg', class?: string }} props
  */
-export function TierChip({ tier, golden = false, size = 'md', class: cls }) {
+export function TierChip({ tier, golden = false, size = 'md', class: cls, overlay = null, style = null }) {
   const n = Math.max(1, Math.min(6, Number(tier) | 0 || 1));
   const src = tierChipUrl(n);
   const [bad, setBad] = useState(null);
   const img = !!src && bad !== src;
-  return html`<span class=${cx('tier', `tier--${n}`, `tier--${size}`, golden && 'tier--golden', img && 'tier--img', cls)} aria-label=${t('{tier}阶', { tier: n })}>
+  return html`<span class=${cx('tier', `tier--${n}`, `tier--${size}`, golden && 'tier--golden', img && 'tier--img', cls)} style=${style} aria-label=${t('{tier}阶', { tier: n })}>
     ${img ? html`<img src=${src} alt="" draggable=${false} onError=${() => setBad(src)} />` : roman(n)}
+    ${overlay}
   </span>`;
 }
 
@@ -214,11 +241,13 @@ export function TierChip({ tier, golden = false, size = 'md', class: cls }) {
  * Bond disc: round glyph disc with segmented tier ring, stack count and name.
  * @param {{ name?: string, icon?: string, count?: number, layers?: number, tier?: number, maxTier?: number,
  *   active?: boolean, disabled?: boolean, layersDisabled?: boolean, size?: 'sm'|'md'|'lg', showName?: boolean,
- *   onClick?: Function, class?: string, title?: string }} props
+ *   onClick?: Function, class?: string, title?: string, cross?: boolean, tag?: any }} props
+ *   cross: the red ✕ corner (default: when disabled); tag: a corner mark drawn in its place, on the disc's box (the
+ *   briefing's official 阵容不完整 corner, ui/matchInfo.js BondLackTag)
  */
 export function BondDisc({
   name = '', icon, count, layers, tier = 0, maxTier = 3, active = false, disabled = false, layersDisabled = false,
-  size = 'md', showName = true, onClick, class: cls, title,
+  size = 'md', showName = true, onClick, class: cls, title, cross = disabled, tag = null,
 }) {
   // Remember which URL failed (a per-URL flag can't race a reset effect).
   const [badSrc, setBadSrc] = useState(null);
@@ -247,7 +276,8 @@ export function BondDisc({
           : html`<span class="bond__glyph">${glyph}</span>`}
       </span>
       ${stack != null ? html`<span class="bond__count">${stack}</span>` : null}
-      ${disabled ? html`<span class="bond__ban" aria-label=${t('禁用')}><${Icon} name="close" /></span>` : null}
+      ${cross ? html`<span class="bond__ban" aria-label=${t('禁用')}><${Icon} name="close" /></span>` : null}
+      ${tag}
     </span>
     ${showName && name ? html`<span class="bond__name">${name}</span>` : null}
   <//>`;
@@ -396,13 +426,10 @@ export function Countdown({ deadline, seconds, total, warnAt = 10, label = 'COUN
 const modalStack = []; // open modals, topmost last: only the topmost handles keyboard focus / Escape
 
 /**
- * Modal dialog (declarative). Esc / backdrop click call onClose.
- * @param {{ open: boolean, title?: any, micro?: string, tone?: string, onClose?: Function, actions?: any,
- *   width?: string, closeOnBackdrop?: boolean, class?: string, veilClass?: string, children?: any }} props
- * `veilClass` styles the backdrop itself (e.g. a dialog that dims the field without blurring it).
+ * Share keyboard/focus ownership between Modal and custom cards using the same stack.
+ * @param {boolean} open @param {Function} onClose @param {{ current: any }} boxRef
  */
-export function Modal({ open, title, micro, tone = 'mint', onClose, actions, width, closeOnBackdrop = true, class: cls, veilClass, children }) {
-  const boxRef = useRef(null);
+export function useModalFocus(open, onClose, boxRef) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useLayoutEffect(() => {
@@ -450,6 +477,17 @@ export function Modal({ open, title, micro, tone = 'mint', onClose, actions, wid
       prevFocus?.focus?.();
     };
   }, [open]);
+}
+
+/**
+ * Modal dialog (declarative). Esc / backdrop click call onClose.
+ * @param {{ open: boolean, title?: any, micro?: string, tone?: string, onClose?: Function, actions?: any,
+ *   width?: string, closeOnBackdrop?: boolean, class?: string, veilClass?: string, children?: any }} props
+ * `veilClass` styles the backdrop itself (e.g. a dialog that dims the field without blurring it).
+ */
+export function Modal({ open, title, micro, tone = 'mint', onClose, actions, width, closeOnBackdrop = true, class: cls, veilClass, children }) {
+  const boxRef = useRef(null);
+  useModalFocus(open, onClose, boxRef);
   if (!open) return null;
   return html`<div class=${cx('modal', veilClass)} role="presentation"
       onMouseDown=${(e) => { if (closeOnBackdrop && e.target === e.currentTarget && onClose) onClose(); }}>
@@ -492,6 +530,14 @@ function closeDialog(id, result) {
  */
 export const confirmDialog = (opts) => openDialog(opts, 'confirm');
 /**
+ * Imperative confirm dialog with a 「下次不再提醒」 checkbox (设置 → 销毁道具前确认). Resolves `{ ok, checked }`: the
+ * caller persists `checked` (设置里的同一个开关) when the player confirmed with it ticked.
+ * @param {{ title?: string, text?: any, okText?: string, cancelText?: string, tone?: string, danger?: boolean,
+ *   micro?: string, checkLabel: string, checkDefault?: boolean }} opts
+ * @returns {Promise<{ ok: boolean, checked: boolean }>}
+ */
+export const confirmWithCheck = (opts) => openDialog(opts, 'confirmCheck');
+/**
  * Imperative alert dialog.
  * @param {{ title?: string, text?: any, okText?: string, tone?: string, micro?: string }} opts
  * @returns {Promise<true>}
@@ -507,7 +553,10 @@ export function closeAllDialogs() {
   if (!all.length) return;
   dialogs = [];
   emitDialogs();
-  for (const d of all) { try { d.resolve(d.kind !== 'confirm'); } catch { /* ignore */ } }
+  // confirm → false, alert → true, confirmCheck → { ok: false, checked: false } (cancelled, nothing remembered)
+  for (const d of all) {
+    try { d.resolve(d.kind === 'confirmCheck' ? { ok: false, checked: false } : d.kind !== 'confirm'); } catch { /* ignore */ }
+  }
 }
 
 /** Renders queued imperative dialogs (one at a time). */
@@ -518,20 +567,32 @@ export function DialogHost() {
     return () => dialogListeners.delete(force);
   }, []);
   const d = dialogs[0];
+  // the 「下次不再提醒」 checkbox of a confirmCheck dialog (reset per dialog)
+  const [checked, setChecked] = useState(false);
+  const dialogId = d ? d.id : null;
+  useEffect(() => { setChecked(!!(d && d.opts && d.opts.checkDefault)); }, [dialogId]);
   if (!d) return null;
-  const { title = t('确认'), text, okText = t('确认'), cancelText = t('取消'), tone, danger, micro = 'CONFIRMATION' } = d.opts;
+  const { title = t('确认'), text, okText = t('确认'), cancelText = t('取消'), tone, danger, micro = 'CONFIRMATION',
+    checkLabel = null } = d.opts;
   const isConfirm = d.kind === 'confirm';
+  const isCheck = d.kind === 'confirmCheck';
+  /** Close with the answer; a confirmCheck dialog resolves { ok, checked }. */
+  const done = (ok) => closeDialog(d.id, isCheck ? { ok, checked } : isConfirm ? ok : true);
   // Enter confirms unless a specific button has focus (then the native click decides).
   const onKey = (e) => {
-    if (e.key === 'Enter' && e.target?.tagName !== 'BUTTON') { e.preventDefault(); closeDialog(d.id, true); }
+    if (e.key === 'Enter' && e.target?.tagName !== 'BUTTON') { e.preventDefault(); done(true); }
   };
   return html`<div onKeyDown=${onKey}>
     <${Modal} key=${d.id} open=${true} title=${title} micro=${micro} tone=${tone || (danger ? 'red' : 'mint')}
-      onClose=${() => closeDialog(d.id, isConfirm ? false : true)}
+      onClose=${() => done(false)}
       actions=${html`
-        ${isConfirm ? html`<${Button} variant="secondary" onClick=${() => closeDialog(d.id, false)}>${cancelText}<//>` : null}
-        <${Button} variant=${danger ? 'danger' : 'primary'} icon="check" data-autofocus onClick=${() => closeDialog(d.id, true)}>${okText}<//>`}>
+        ${isConfirm || isCheck ? html`<${Button} variant="secondary" onClick=${() => done(false)}>${cancelText}<//>` : null}
+        <${Button} variant=${danger ? 'danger' : 'primary'} icon="check" data-autofocus onClick=${() => done(true)}>${okText}<//>`}>
       ${typeof text === 'string' ? html`<p class="modal__text">${text}</p>` : text}
+      ${isCheck && checkLabel ? html`<label class="modal__check">
+        <input type="checkbox" checked=${checked} onChange=${(e) => setChecked(!!e.target.checked)} />
+        <span>${checkLabel}</span>
+      </label>` : null}
     <//>
   </div>`;
 }
@@ -845,10 +906,11 @@ export function AvatarFrame({ name = '', src, size = 'md', seat = 0, host, bot, 
 /**
  * Chevron phase banner (full-width strip that wipes in horizontally).
  * @param {{ title: any, sub?: any, micro?: string, tone?: 'mint'|'orange'|'red'|'gold'|'ice', mode?: 'overlay'|'inline',
- *   duration?: number, onDone?: Function, class?: string }} props
+ *   duration?: number, onDone?: Function, class?: string, banner?: string|null }} props
  *   mode 'overlay' = fixed over the screen; duration (ms) > 0 auto-hides then calls onDone. Re-key to replay.
+ *   `banner` is a theme plate id (docs/THEMES.md). Absent, the plate is the built-in art.
  */
-export function PhaseBanner({ title, sub, micro, tone = 'mint', mode = 'inline', duration = 0, onDone, class: cls }) {
+export function PhaseBanner({ title, sub, micro, tone = 'mint', mode = 'inline', duration = 0, onDone, class: cls, banner = null }) {
   const [leaving, setLeaving] = useState(false);
   const [gone, setGone] = useState(false);
   useEffect(() => {
@@ -858,7 +920,7 @@ export function PhaseBanner({ title, sub, micro, tone = 'mint', mode = 'inline',
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [duration]);
   if (gone) return null;
-  return html`<div class=${cx('pbanner', `pbanner--${tone}`, `pbanner--${mode}`, leaving && 'is-leaving', cls)} role="status" aria-live="polite">
+  return html`<div class=${cx('pbanner', `pbanner--${tone}`, `pbanner--${mode}`, leaving && 'is-leaving', cls)} role="status" aria-live="polite" data-banner=${banner || undefined}>
     <div class="pbanner__band">
       <${Chevrons} count=${4} tone=${tone} class="pbanner__chev pbanner__chev--l" />
       <div class="pbanner__text">
@@ -876,10 +938,11 @@ export function PhaseBanner({ title, sub, micro, tone = 'mint', mode = 'inline',
  * a centred framed plate — tone-coloured frame and corner ticks, chevrons either side of the title — that opens, holds
  * `duration` ms and closes by itself. Purely presentational: ui/gameLogic/phases.js (roundResultBox / uniteResultBox /
  * battleResultBox) picks the words, screens/game.js the moment (SETTLE). `pointer-events: none`: it never takes a click.
- * @param {{ title: any, sub?: any, micro?: string, tone?: 'mint'|'orange'|'red', duration?: number, onDone?: Function }} props
+ * @param {{ title: any, sub?: any, micro?: string, tone?: 'mint'|'orange'|'red', duration?: number, onDone?: Function, perfect?: boolean }} props
  *   duration (ms) > 0 auto-hides then calls onDone. Re-key to replay.
+ *   `perfect` is the 全员无伤 box (tone mint). A theme may paint a different picture there; the words stay.
  */
-export function ResultDialog({ title, sub, micro, tone = 'mint', duration = 2800, onDone }) {
+export function ResultDialog({ title, sub, micro, tone = 'mint', duration = 2800, onDone, perfect = false }) {
   const [leaving, setLeaving] = useState(false);
   const [gone, setGone] = useState(false);
   useEffect(() => {
@@ -889,7 +952,7 @@ export function ResultDialog({ title, sub, micro, tone = 'mint', duration = 2800
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [duration]);
   if (gone) return null;
-  return html`<div class=${cx('rdialog', `rdialog--${tone}`, leaving && 'is-leaving')} role="status" aria-live="polite">
+  return html`<div class=${cx('rdialog', `rdialog--${tone}`, leaving && 'is-leaving')} role="status" aria-live="polite" data-banner="battleEnd" data-perfect=${perfect ? '1' : undefined}>
     <div class="rdialog__box">
       <span class="rdialog__tick rdialog__tick--tl"></span><span class="rdialog__tick rdialog__tick--tr"></span>
       <span class="rdialog__tick rdialog__tick--bl"></span><span class="rdialog__tick rdialog__tick--br"></span>
@@ -951,11 +1014,12 @@ export function DifficultyIcon({ difficulty, class: cls }) {
 }
 
 /**
- * Difficulty tag: coloured glyph + name (标准/险境/绝境/终极模拟).
- * @param {{ difficulty: string, size?: 'sm'|'md'|'lg', class?: string, code?: string }} props
+ * Difficulty tag: coloured glyph + name (标准/险境/绝境/终极模拟); `name` replaces the difficulty's name (a laddered mode's
+ * own: 规程等级 n, 极速模拟).
+ * @param {{ difficulty: string, size?: 'sm'|'md'|'lg', class?: string, code?: string, name?: string | null }} props
  */
-export function DifficultyTag({ difficulty, size = 'md', class: cls, code }) {
-  const name = DIFFICULTY_NAMES[difficulty] ? t(DIFFICULTY_NAMES[difficulty]) : difficulty || '—';
+export function DifficultyTag({ difficulty, size = 'md', class: cls, code, name: own = null }) {
+  const name = own || (DIFFICULTY_NAMES[difficulty] ? t(DIFFICULTY_NAMES[difficulty]) : difficulty || '—');
   const color = DIFFICULTY_COLORS[difficulty] || 'var(--text-lo)';
   return html`<span class=${cx('dtag', `dtag--${size}`, cls)} style=${`--d-color:${color}`}>
     <${DifficultyIcon} difficulty=${difficulty} class="dtag__icon" />

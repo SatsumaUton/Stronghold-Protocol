@@ -16,7 +16,7 @@
 // 第二期下半's and some rules of that version differ [ASSUMED: a remake note until the version notes page of M3]; the
 // tips follow its config.
 
-import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, MicroLabel, Button, Spinner } from './components.js';
 import { createStore, useStore } from '../store.js';
 import { data, useData, artUrls, nextArtUrl } from '../data.js';

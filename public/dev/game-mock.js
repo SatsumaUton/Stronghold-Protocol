@@ -4,7 +4,7 @@
 // exercised. Combat phases stream b.snap / b.ev at 20 Hz through net._emit like the real socket.
 
 import '/js/ui/compat.js';
-import { render } from '/vendor/preact.module.js';
+import { render } from '/vendor/preact.module.v2.js';
 import { installDeviceSupport } from '/js/ui/device.js';
 import { html, UiHosts } from '/js/ui/components.js';
 import { ToastHost, toast } from '/js/ui/toasts.js';

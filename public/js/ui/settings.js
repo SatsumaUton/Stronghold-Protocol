@@ -26,7 +26,7 @@
 // 界面主题 (docs/THEMES.md): a pack this browser imported. The choice is `uiTheme` (empty = 卫戍协议终端). Nothing is
 // uploaded. uiTheme.js must not import this file; the store is handed over with bindThemeSettings.
 
-import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Modal, Button, Icon, MicroLabel, Tooltip, confirmDialog } from './components.js';
 import { GIcon } from './gameComponents.js';
 import { useStore, savePref, store } from '../store.js';

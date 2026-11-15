@@ -9,7 +9,7 @@ import { html, Button, Icon, useTicker } from './components.js';
 import { net, CLIENT_ERR_TEXT } from '../net.js';
 import { useStore, shallowEqual, selectRoute } from '../store.js';
 import { useDocClass } from './device.js';
-import { useState, useEffect } from '../../vendor/hooks.module.js';
+import { useState, useEffect } from '../../vendor/hooks.module.v2.js';
 import { checkNodeAcceptsNew } from './nodeCodeHint.js';
 import { updateHintAllowed } from './buildGuard.js';
 import { t } from '../../../shared/i18n.js';

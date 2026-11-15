@@ -688,7 +688,12 @@ export class DataSource {
   getEnemy(key) {
     if (this._enemy.has(key)) return this._enemy.get(key);
     const r = this.rawEnemy(key);
-    const k = String(key).startsWith('enemy_') ? key : 'enemy_' + key;
+    // 完整 id 原样保留：深潜会抽到别的版本数据表里的敌人，key 形如 `act1autochess:enemy_1275_dwlock`
+    // （server/match/match/echoCrossVersion.js 注入时加的前缀）。以前这里无条件补 `enemy_`，于是变成
+    // `enemy_act1autochess:enemy_1275_dwlock` —— 这个 `def.key` 会作为 `defId` 进战斗快照，客户端拿它
+    // 查敌人记录（说明框）和素材清单（图标 / 模型）全都查不到，备战与战斗里只剩占位菱形。
+    const s = String(key);
+    const k = s.startsWith('enemy_') || s.includes(':enemy_') ? s : 'enemy_' + s;
     const d = r ? freezeDef(normalizeEnemy(k, r)) : null;
     this._enemy.set(key, d);
     return d;

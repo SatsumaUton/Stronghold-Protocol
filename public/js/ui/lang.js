@@ -13,7 +13,7 @@
 // overlays have downloaded (data.js notifies its subscribers). Without an index (a static host that lacks the file) the
 // stored or requested pack still loads by its code, and the menu offers it beside Chinese.
 
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import {
   DEFAULT_LANG, normalizeLang, getLang, setLang, onLangChange, addMessages, setNameResolver, tName, format, translateWire, t, N_,
   registerLangs, getLangs, langInfo, langChain, onLangsChange, setI18nWarn, checkTranslation,

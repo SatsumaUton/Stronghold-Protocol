@@ -15,7 +15,7 @@
 // fallback.
 // screens/game.js picks the moment; pointer-events none, so the field stays usable under them. Styles:
 // css/screens/match-popups.css. With prefers-reduced-motion they still show (the information), without the motion.
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { CoinGlyph, Sprite } from './gameComponents.js';
 import { uiUrl } from './assetUrls.js';

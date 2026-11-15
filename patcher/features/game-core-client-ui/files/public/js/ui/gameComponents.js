@@ -12,7 +12,7 @@ function __spRemoteAssetRe() {
   return new RegExp('^https?:\\/\\/' + host + '\\/assets\\/');
 }
 
-import { useState, useMemo } from '../../vendor/hooks.module.js';
+import { useState, useMemo } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, TierChip, Tooltip } from './components.js';
 import { data, useData, localAsset } from '../data.js';
 import { parseRichText, rtClassName } from './richText.js';
@@ -39,8 +39,12 @@ const cx = (...p) => p.flat().filter(Boolean).join(' ');
 //
 //   改法：**每次调用时现算**。构造一个正则很便宜，正确性远比这点开销重要。
 //   assets.js 里那份是同样的写法，也已一并改成延迟求值。
+// 任意域名的 /assets/ 都收成同源：不依赖 config 是否已加载（游戏内往往只有 assets 这份数据，
+// 而 config 没到 → 原来的 assetOrigin 正则会失效，绝对地址原样外链到资源站 → 全 404）。
+const ANY_ASSET_RE = /^https?:\/\/[^/]+\/assets\//i;
 const localAssetSrc = (src) => {
   if (typeof src !== 'string') return src;
+  if (ANY_ASSET_RE.test(src)) return '/assets/' + src.replace(ANY_ASSET_RE, '');
   const re = __spRemoteAssetRe();
   return re.test(src) ? '/assets/' + src.replace(re, '') : src;
 };

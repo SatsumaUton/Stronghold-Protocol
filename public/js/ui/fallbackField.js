@@ -21,7 +21,7 @@
 
 import { resourceFloat } from '../render/resourceNumbers.js';
 import { pieceItemProgress, progressLabel } from '../itemProgress.js';
-import { render } from '../../vendor/preact.module.js';
+import { render } from '../../vendor/preact.module.v2.js';
 import { html, TierChip } from './components.js';
 import { GEO } from '../../../shared/constants.js';
 import { chessAvatarUrl, itemIconUrl, tokenAvatarUrl, enemyIconUrl } from './assetUrls.js';

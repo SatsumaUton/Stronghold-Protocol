@@ -1,6 +1,6 @@
 // public/js/screens/game/overlays.js — the match-ended plate, the solo pause plate and the two 深渊回响 vote overlays.
 
-import { useEffect, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../../vendor/hooks.module.v2.js';
 import { Button, MicroLabel, html } from '../../ui/components.js';
 import { emptyMatch, serverNow, store } from '../../store.js';
 import { localAsset } from '../../data.js';

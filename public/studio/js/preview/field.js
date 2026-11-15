@@ -5,7 +5,7 @@
 // `[id, x, y, hp, maxHp, sp, spMax, flags, anim]` and b.ev events: shared/protocol.js), so what plays here is what plays
 // in a match. Its art comes from the preview layers (./layers.js): a new preview re-draws the models in place.
 
-import { useEffect, useRef, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../../../js/ui/components.js';
 import { createFieldView } from '../../../js/render/app.js';
 import { data } from '../../../js/data.js';

@@ -37,7 +37,7 @@
 import { progressLabel } from '../itemProgress.js';
 import { itemText, garrisonText } from './showTags.js';
 import { BondTimers } from './bondTimers.js';
-import { useEffect, useMemo } from '../../vendor/hooks.module.js';
+import { useEffect, useMemo } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, TierChip, MicroLabel, Button, confirmDialog, useTicker } from './components.js';
 import { OperatorImage, Img, RichText, UnitThumb, BondGlyph, GIcon, diyToken, TokenAvatar } from './gameComponents.js';
 import { confirmDestroy } from './destroyConfirm.js';

@@ -11,9 +11,9 @@
 // (orange ≤10 s), chevron phase banners. Motion 150–250 ms. All sizes are rem (1rem = 100 design
 // px at 1920×1080, see css/theme.css).
 
-import { h, Fragment } from '../../vendor/preact.module.js';
-import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from '../../vendor/hooks.module.js';
-import htm from '../../vendor/htm.module.js';
+import { h, Fragment } from '../../vendor/preact.module.v2.js';
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from '../../vendor/hooks.module.v2.js';
+import htm from '../../vendor/htm.module.v2.js';
 import { DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
 import { t } from '../../../shared/i18n.js';
 import { serverNow } from '../store.js';
@@ -21,19 +21,45 @@ import { data, useData, localAsset } from '../data.js';
 import { uiUrl } from './assetUrls.js';
 
 /**
- * h() for htm with its static-subtree cache switched off. htm keeps the vnode it built for a fully static subtree in
- * the template's op list and hands the SAME object out on every render; Preact mounts that shared vnode (it gets
- * its DOM node and parent chain written into it), so after the screen unmounts the module-level template cache
- * still points at the detached DOM, its listeners and the old component tree — whole stale screens pile up over a
- * session. `this[0] = 3` marks the element dynamic (htm's documented opt-out), so every render gets fresh vnodes.
+ * h() for htm **with the static-subtree cache neutralised** — not by mutating htm's op list
+ * (`this[0] = 3`, the old trick), but by cloning whatever htm hands back that has already been mounted.
+ *
+ * Why the old trick had to go: writing into htm's ops array leaves an internal flag out of sync, and for
+ * some templates the next build returns the **argument list** instead of a vnode (`['div', props, child,
+ * child]` — reproduced in a real browser with the 悬赏决策 overlay). Preact then inserts `undefined` and the
+ * screen dies with `insertBefore … parameter 1 is not of type 'Node'`. That is fixed at the vendor level too
+ * (preact.module.js skips a null `__e`), but the root cause is here.
+ *
+ * `freshen` walks the template result: a vnode that has been through a render already carries `__e` / `__c` /
+ * `__k` (htm's cache hands the same object out again); rebuilding it through `h()` gives Preact a brand-new
+ * vnode — same behaviour the `this[0] = 3` hack aimed at (no detached screen left in a module-level cache),
+ * without touching htm's bookkeeping.
  */
 export function hFresh(type, props, ...children) {
-  if (this && typeof this === 'object') this[0] = 3;
   return h(type, props, ...children);
 }
 
-/** Tagged-template JSX replacement bound to Preact's h() (no shared static vnodes, see hFresh). */
-export const html = htm.bind(hFresh);
+/** Rebuild the vnodes htm may have cached (see hFresh). Cheap: a straight walk, no allocation when already fresh. */
+function freshen(node) {
+  if (Array.isArray(node)) return node.map(freshen);
+  if (!node || typeof node !== 'object') return node;
+  // htm 的模板缓存偶尔会交回「参数数组」（`['div', props, …]`）—— 里面的 props 对象不是 vnode。
+  // 这种对象交给 Preact 就是 insertBefore(undefined)（整屏崩），直接丢掉。
+  if (node.type === undefined) return null;
+  const kids = node.props && node.props.children;
+  const freshKids = kids == null ? kids : freshen(kids);
+  const mounted = node.__e != null || node.__c != null || node.__k != null;
+  if (!mounted && freshKids === kids) return node;
+  const v = h(node.type, node.props);
+  if (v.key !== node.key) v.key = node.key;
+  if (v.ref !== node.ref) v.ref = node.ref;
+  if (freshKids !== kids) v.props = Object.assign({}, node.props, { children: freshKids });
+  return v;
+}
+
+/** Tagged-template JSX replacement bound to Preact's h() (fresh vnodes every render, see hFresh). */
+const htmlRaw = htm.bind(hFresh);
+export const html = (strings, ...values) => freshen(htmlRaw(strings, ...values));
 export { h, Fragment };
 
 const cx = (...parts) => parts.flat().filter(Boolean).join(' ');

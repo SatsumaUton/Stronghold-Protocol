@@ -8,7 +8,7 @@
 // picture in every language; the one sentence of the lockup, 卫戍协议: 盟约, goes through t().
 // Plain DOM in a 1280×720 stage; class names carry the `spa-` prefix (the film and a backdrop can be on screen
 // together, so nothing here uses an element id).
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { data, useData } from '../data.js';
 import { uiUrl } from './assetUrls.js';

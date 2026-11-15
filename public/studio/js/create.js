@@ -3,7 +3,7 @@
 // legal id nobody has; editable), an author and a licence if wanted — and the server makes the folder from the template
 // (POST /studio/api/plugins: plugin.json and a README, no file of the game).
 
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Modal, Button } from '../../js/ui/components.js';
 import { getLang, t } from '../../../shared/i18n.js';
 import { get, post } from './api.js';

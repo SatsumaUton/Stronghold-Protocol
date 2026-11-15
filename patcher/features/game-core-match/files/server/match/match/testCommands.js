@@ -42,7 +42,7 @@
 //   * bond count sets the ordinary extra-member bonus (0..99), allowing activation without
 //     pieces. computeBonds still decides the tier; a mode-disabled bond is refused.
 
-import { ERR, PHASE, layerGainRoom } from '../../../shared/constants.js';
+import { ERR, PHASE, layerGainRoom, BOND_LAYER_CAP, BOND_LAYER_SAFE_MAX } from '../../../shared/constants.js';
 import { parseTestArgs, isTestCommand, TEST_LOG_CAP, TEST_RATE_COUNT, TEST_RATE_WINDOW_MS } from '../../../shared/testMode.js';
 import { OK, fail } from './common.js';
 
@@ -379,20 +379,29 @@ export class MatchTestCommands {
   _testBond(ps, id, layers, count) {
     const blocked = this._testQuiet();
     if (blocked) return blocked;
-    if (!this.gd.bond(id) || this.gd.modeInactiveBonds.has(id)) return fail(ERR.BAD_TARGET, 'bond');
+    // 每种拒绝都带 detail：不带 detail 的 BAD_TARGET 在控制台里只能显示成一句
+    // 通用话（更糟的情况是漏出原始 code），维护者看不出到底哪儿不对。
+    if (!this.gd.bond(id)) return fail(ERR.BAD_TARGET, 'no-such-bond');
+    if (this.gd.modeInactiveBonds.has(id)) return fail(ERR.BAD_TARGET, 'bond');
     const cur = ps.layers[id] || 0;
-    if (layers < cur) return fail(ERR.BAD_TARGET, 'layers');
+    // layers 省略（管理员工具那种一键列表就是这样发的）＝加一层。绝对值语义保持不变：
+    // 明确给了数字就按数字来，给得比现在少仍然拒绝（层数不能减少）。
+    const want = layers === undefined ? cur + 1 : layers;
+    if (want < cur) return fail(ERR.BAD_TARGET, 'layers');
     // [ASSUMED] count is an absolute extra member count, applied by the ordinary bond calculator.
     // A count-only change still recomputes, so the player's own bond strip updates.
     if (count !== undefined) ps.bondCountBonus[id] = count;
-    if (layers === cur) {
+    if (want === cur) {
       if (count !== undefined) ps.recompute();
       return OK;
     }
-    const delta = layers - cur;
-    if (layerGainRoom(cur, delta, this.disableLayerCap) !== delta) return fail(ERR.BAD_TARGET);
+    const delta = want - cur;
+    if (layerGainRoom(cur, delta, this.layerCapOff) !== delta) {
+      const max = this.layerCapOff ? BOND_LAYER_SAFE_MAX : BOND_LAYER_CAP;
+      return fail(ERR.BAD_TARGET, `cap|${JSON.stringify({ cur, want, max })}`);
+    }
     const add = ps.addLayers(id, delta, { reason: 'test' });
-    if (add !== delta) return fail(ERR.BAD_TARGET);
+    if (add !== delta) return fail(ERR.BAD_TARGET, `add|${JSON.stringify({ cur, want, got: cur + add })}`);
     return OK;
   }
 
@@ -403,6 +412,7 @@ export class MatchTestCommands {
     if (this.phase === PHASE.BAND_DRAFT) return this.pickBand(ps, id);
     if (this.bandTaken(id, ps.playerId)) return fail(ERR.BAD_TARGET);
     ps.bandId = id;
+    if (this.gd.band(id)?.skills) ps.recompute();
     if (this.draft) this.draft.picks[ps.playerId] = id;
     if (resetLp) ps.lp = this.gd.startLp(id);
     ps.dirty();

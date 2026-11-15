@@ -20,7 +20,7 @@
 //   reducedMotion()         prefers-reduced-motion (the CSS side lives in css/theme.css + css/devices.css).
 // CSS counterpart: public/css/devices.css (safe-area insets, touch-action, overscroll, tap-target expansion).
 
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { pwaInstall } from '../pwa.js';
 import { html, Icon, Button } from './components.js';
 import { t } from '../../../shared/i18n.js';

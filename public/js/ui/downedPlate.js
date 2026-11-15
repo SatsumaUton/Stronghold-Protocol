@@ -9,7 +9,7 @@
 // sprite is in (downedArtReady): without the art pack 0.3.0's toast and pill stay. With prefers-reduced-motion it shows
 // without the motion. Styles: css/screens/game-panels.css (.downm). [ASSUMED] the positions, sizes and timing, measured
 // from that footage.
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Modal, Button } from './components.js';
 import { GIcon } from './gameComponents.js';
 import { uiUrl } from './assetUrls.js';

@@ -6,7 +6,7 @@
 // followed every frame like the direction wheel follows its tile); never takes the pointer, so the pieces stay
 // draggable.
 
-import { useEffect, useRef, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../../ui/components.js';
 import { ownStandIn, standInLabel, standInTip, ownDiyRecord } from '../../ui/gameLogic.js';
 import { t } from '../../../../shared/i18n.js';

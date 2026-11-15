@@ -1,4 +1,4 @@
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Modal } from './components.js';
 import { useStore } from '../store.js';
 import { net } from '../net.js';

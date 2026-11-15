@@ -1,7 +1,7 @@
 // Official theme prefab lab (see prefab-lab.html): every prefab of a pack, a status picker per status driver.
 import '/js/ui/compat.js';
-import { render } from '/vendor/preact.module.js';
-import { useState } from '/vendor/hooks.module.js';
+import { render } from '/vendor/preact.module.v2.js';
+import { useState } from '/vendor/hooks.module.v2.js';
 import { html } from '/js/ui/components.js';
 import { data } from '/js/data.js';
 import { OFFICIAL_THEMES } from '/shared/uiTheme.js';

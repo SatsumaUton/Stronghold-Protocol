@@ -17,7 +17,7 @@
 // (关闭, a tap outside or Esc close it) with a status line (the draft's turn and countdown stays in view).
 // Styles: css/screens/briefing.css (.brief-*), css/screens/draft.css (.minfo-dlg).
 
-import { useRef } from '../../vendor/hooks.module.js';
+import { useRef } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Icon, MicroLabel, BondDisc, Tooltip, Modal, useModalFocus } from './components.js';
 import { BondPopup } from './bondStrip.js';
 import { UnitThumb } from './gameComponents.js';

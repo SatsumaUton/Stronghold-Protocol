@@ -38,6 +38,11 @@ export function explainTestDetail(detail) {
     case 'layers': return t('层数不能减少');
     case 'timers': return t('作战进行中不能开关计时');
     case 'bond': return t('这个盟约不能在本模式使用');
+    // 盟约指令失败时以前回的是不带原因的 BAD_TARGET：控制台上只显示一句「无效的目标」，
+    // 甚至漏出原始 code（bad_target），维护者不知道该改哪儿。现在每种都带上具体原因。
+    case 'no-such-bond': return t('没有这个盟约：检查盟约 id 是否拼对');
+    case 'cap': return t('层数超过上限：现在是 {cur} 层，最多 {max} 层，请求的是 {want} 层', params);
+    case 'add': return t('这个盟约加不上去（现在是 {cur} 层，请求 {want} 层，只加到 {got} 层）', params);
     default: return '';
   }
 }

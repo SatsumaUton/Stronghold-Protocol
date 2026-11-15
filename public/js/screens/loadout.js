@@ -37,7 +37,7 @@
 // (css/screens/loadout.css) and ONE combined 甄选干员 card per tier showing filled / total, where the official data
 // lists two slots.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, MicroLabel, Button, TierChip, TextField, Countdown, Spinner, confirmDialog, hasDeadline, Modal, Fragment } from '../ui/components.js';
 import { ComboBox } from '../ui/comboBox.js';
 import { OperatorImage, Img, UnitThumb, PromotionIcon } from '../ui/gameComponents.js';

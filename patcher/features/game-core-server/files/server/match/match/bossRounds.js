@@ -10,6 +10,7 @@ import { createRng, deriveSeed } from '../../sim/rng.js';
 import { creditedKillsOf } from '../../sim/spec.js';
 import { buildBossWave, bountySpawns } from '../waves.js';
 import { pairPlayers, bossPairSalt, bossPoolHp, SharedBossPool, CreditPool, hiddenEligible, BOSS_HIT_STEPS } from '../finalAssault.js';
+import { cleanLeaderOps, syncFieldLeaderOps, leaderTopRows } from '../leaderRank.js';
 import { FieldRunner, HeadlessPacer, syntheticResult, BOSS_SILENCE_MS, CATCHUP_TICKS_PER_INTERVAL } from '../fields.js';
 import { FLOW_TICKER_PRIORITY, BOSS_CLOCK_MS, DELAYS } from './common.js';
 
@@ -45,12 +46,18 @@ export class MatchBoss {
     this.lastResults = new Map();
     if (!hidden) this._openTeamLp();
     if (!hidden) this.finalAliveCount = alive.length;
-    const bossId = hidden ? this.hiddenBossId : this.bossId;
+    // 深潜的返场 boss 是**随机**那只（可能是隐秘核心），共享血池必须跟波次、面板用同一个 id
+    // （维护者 2026-11-05：之前血池固定用 R14 的 bossId，于是 16 层以后翻来覆去只有同一只）
+    const bossId = this.echoVariant === 'deepecho' && typeof this._echoBossIdFor === 'function'
+      ? this._echoBossIdFor(this.round)
+      : (hidden ? this.hiddenBossId : this.bossId);
     // BOSS_HIT tickers ("对敌方领袖造成的伤害超过20% / 50% / 80%"): the player's damage to THIS leader over its pool —
     // the pool's own per-player tally, one pool per boss round. stats.bossDamage (the result's 领袖伤害) adds up both
     // rounds, so it would credit the Final Assault's damage to the hidden leader ("隐藏boss还没打就出了50%播报").
     const hitSteps = new Map();
-    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment, hpMul: this.enemyHpMul }), {
+    // 敌人生命倍率必须取**这一回合**的值（`enemyHpMulAt`）：按回合设置时 `enemyHpMul` 只是 1
+    // （experimentalOptions 只发 `enemyHpPlan`），用单值会让领袖血池完全不吃倍率。
+    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment, hpMul: this.enemyHpMulAt(this.round) * this._echoBossPoolMul(this.round) * (this.bossMuls ? this.bossMuls.hp : 1) }), {
       onHit: (pid, dmg) => {
         const ps = this.players.get(pid);
         if (!ps) return;
@@ -66,6 +73,9 @@ export class MatchBoss {
       },
     });
     this.bossPool = pool;
+    // the operator tally of the leader ranking lives on this pool, every version (§37.149: the owner asked for it in 盟约
+    // too; 规程 only from §37.124). A new pool (the hidden round) starts empty.
+    pool.ops = new Map();
     // the round's plan (_planBossWaves: the Hidden Core's own draw, GitHub #845); a departure since keeps intact pairs
     const groups = pairPlayers(alive, createRng(deriveSeed(this.seed, bossPairSalt(this.gd, this.round))), this.bossPairs);
     this.bossPairs = groups.map(g => g.map(p => p.playerId));
@@ -103,8 +113,9 @@ export class MatchBoss {
         spawns: this._sanitizeSpawns(spawns),
         routes: wave.routes,
         sharedBoss: this.bossPool,
-        // the round's enemy effects for the leaders' mid-fight summons (server/sim/content/bosses.js summonMods)
-        flags: { layerGainsEnabled: false, ...this.gd.dp, enemyScale: this.gd.enemyScale(this.round), ...this._ruleFlags() },
+        // the round's enemy effects for the leaders' mid-fight summons (server/sim/content/bosses.js summonMods);
+        // 深潜的返场 boss 用 boss 专用曲线（_echoBossScale：随深度递增），不是固定 R15 档
+        flags: { layerGainsEnabled: false, ...this.gd.dp, enemyScale: this.echoVariant === 'deepecho' ? this._echoBossScale(this.round) : this.gd.enemyScale(this.round), ...this._ruleFlags() },
         fieldId,
         enemyOverrides: wave.overrides,
         waveId: wave.templateId,
@@ -204,15 +215,26 @@ export class MatchBoss {
    * A boss field's shared-pool damage, as reported cumulatively by its client (`by`: per player) — credited up to the
    * plausibility budget of the field clock; the rest is credited by later reports / the boss clock (`bossReported`).
    */
-  _creditBoss(f, cum, by) {
+  _creditBoss(f, cum, by, ops) {
     const pool = this.bossPool;
     const reported = Number(cum);
     // the team LP ran out first: the run failed at that moment (PRTS "…使目标生命值扣除至0，则无视倒计时直接失败"), so
     // damage reported afterwards — in flight, or rounded up in the final b.result — changes nothing (user playtest #6)
     if (!pool || !Number.isFinite(reported) || this._finalEnding === 'forced') return;
-    if (!f.bossReported || reported > f.bossReported.cum) f.bossReported = { cum: reported, by: by && typeof by === 'object' ? { ...by } : null };
+    if (!f.bossReported || reported > f.bossReported.cum) {
+      const next = { cum: reported, by: by && typeof by === 'object' ? { ...by } : null };
+      // a later report with no `ops` keeps the previous split; an explicit list replaces it (an empty list clears)
+      next.ops = Array.isArray(ops) ? cleanLeaderOps(ops) : (f.bossReported && Array.isArray(f.bossReported.ops) ? f.bossReported.ops : null);
+      f.bossReported = next;
+    } else if (Array.isArray(ops) && f.bossReported) {
+      f.bossReported.ops = cleanLeaderOps(ops);
+    }
+    f.opsReport = f.bossReported && Array.isArray(f.bossReported.ops) ? f.bossReported.ops : null;
     const c = Math.min(reported, this._bossDmgBudget(f));
-    if (!(c > f.bossAcked)) return;
+    if (!(c > f.bossAcked)) {
+      this._syncLeaderOps(f);
+      return;
+    }
     const delta = c - f.bossAcked;
     f.bossAcked = c;
     let attributed = 0;
@@ -230,6 +252,29 @@ export class MatchBoss {
       if (pid) f.bossBy[pid] = (f.bossBy[pid] || 0) + (delta - attributed);
       pool.damage(pid, delta - attributed);
     }
+    this._syncLeaderOps(f);
+  }
+
+  /** Fold this field's operator rows into the current pool. No-op without the pool's operator map. */
+  _syncLeaderOps(f) {
+    if (!f || !this.bossPool || !this.bossPool.ops || this._finalEnding === 'forced') return;
+    syncFieldLeaderOps(this.bossPool, f);
+  }
+
+  /**
+   * The public top 3. Server-run fields are folded here so a tick that dealt damage shows up even when no
+   * client report arrived. The cursor makes a second read add nothing.
+   */
+  _leaderTopView() {
+    const pool = this.bossPool;
+    if (!pool || !pool.ops) return [];
+    if (this._finalEnding !== 'forced') {
+      for (const f of this.fields) this._syncLeaderOps(f);
+    }
+    return leaderTopRows(pool, (pid) => {
+      const ps = this.players.get(pid);
+      return ps && Number.isInteger(ps.seat) ? ps.seat : 1e9;
+    });
   }
 
   /** A boss field's LP cost (leaks × lpr + leader LP effects): `cumulative` totals from its client, deltas from the server run. */
@@ -511,6 +556,9 @@ export class MatchBoss {
 
   _bossTick(runner) {
     this._applyOvertime(runner.time);
+    if (this.bossPool && this.bossPool.ops && this._finalEnding !== 'forced') {
+      for (const f of this.fields) this._syncLeaderOps(f);
+    }
     if (this.teamLp <= 0 && this.bossPool.hp > 0) runner.forceAll('forced');
     // client-side combat with every boss field on the server: humans that reconnect / watch run display replicas
     // whose LocalBossPool follows b.pool
@@ -560,19 +608,50 @@ export class MatchBoss {
     this.markPublic();
     this.runner = null;
     if (!hidden) {
-      const eligible = victory && !!this.hiddenBossId && hiddenEligible(this.gd, { layerSum: this.hiddenLayerSum, teamLp: this.teamLp, aliveCount: this.finalAliveCount, experimental: this.capacityExperiment });
+      // ⚠ 「深渊回响」绝不能走这条原版分支（维护者 2026-11-05 玩家实测：25 层打完 boss 回到 16 层）：
+      // 深潜的盟约层数没有上限，25 / 35 / 45 的返场 boss 打完后 `hiddenEligible()` 同样可能为真，
+      // 于是 `startRound(this.gd.hiddenRound)` 把整局打回第 15 层，下一层就是 16 层。
+      // 深潜的隐藏核心只在**深度 15** 由 `_echoHiddenBossRound()` 单独判定（prep.js 直接 startFinalAssault(true)）。
+      const eligible = victory && this.echoVariant !== 'deepecho' && !!this.hiddenBossId && hiddenEligible(this.gd, { layerSum: this.hiddenLayerSum, teamLp: this.teamLp, aliveCount: this.finalAliveCount, experimental: this.capacityExperiment });
       this.later(this.scaled(DELAYS.SETTLE), () => {
         if (eligible) {
           this.hiddenReached = true;
           this.bossPool = null;
           this.tickerText('隐秘核心已解锁', FLOW_TICKER_PRIORITY);
           this.startRound(this.gd.hiddenRound);
+        } else if (this.echoVariant === 'deepecho' && victory) {
+          // 「深渊回响」: 没打隐藏核心的队伍也继续往下打 —— 显示回合照常 +1（R14 打完进 R15；
+          // 没有隐藏核心资格的队伍在 R15 按普通关走，`_echoHiddenBossRound` 会自己判掉）。
+          //
+          // ⚠ 不能再用 `_echoBeginDive(...)` 当「下一回合」：深潜现在**从第 1 回合就开始**
+          // （`Match.echoDiveStart = 1`），那个方法会原样返回 1，于是整局 `startRound(1)` ——
+          // 回合、深度、商店、出怪全部回到 R1（2026-11-04 实测：15 层打完变深度 1、出怪回 R1 编组）。
+          this.bossPool = null;
+          this.tickerText('深潜开始', FLOW_TICKER_PRIORITY);
+          this.startRound(this.round + 1);
         } else {
           this.finish({ victory, reason: victory ? 'victory' : 'defeat' });
         }
       });
     } else {
-      this.later(this.scaled(DELAYS.SETTLE), () => this.finish({ victory: true, hiddenCleared: victory, reason: 'victory' }));
+      this.later(this.scaled(DELAYS.SETTLE), () => {
+        // 「深渊回响」: 打过隐藏核心 → 深潜从 R16 起，并多给一次祝福抽取（隐藏多打了一关的补偿）
+        if (this.echoVariant === 'deepecho' && victory) {
+          this.bossPool = null;
+          this.tickerText('深潜开始', FLOW_TICKER_PRIORITY);
+          // 隐藏核心多打了一关 boss → 补一次祝福抽取。原来由 `_echoBeginDive` 顺手设置，
+          // 那个方法已随「深潜从 R1 起」删除，这里显式保留（不要删，否则隐藏通关的补偿会静默消失）。
+          //
+          // 2026-11-05 修正：只抬 `echoBlessingDraws` 没用 —— 15 层时 3 个名额早已拿满，
+          // `echoBlessingDue` 按 `_echoBlessingMax()` 封顶，多出来的抽取被吃掉，玩家看不到任何奖励。
+          // 改成**临时 +1 名额**（`echoBlessingBonus`），16 层开头就会开出三选一，选完名额回收。
+          this.echoBlessingDraws = Math.max(Number(this.echoBlessingDraws) || 0, 1);
+          this.echoBlessingBonus = (Number(this.echoBlessingBonus) || 0) + 1;
+          this.startRound(this.round + 1);
+          return;
+        }
+        this.finish({ victory: true, hiddenCleared: victory, reason: 'victory' });
+      });
     }
   }
 }

@@ -12,7 +12,7 @@
 //     row [ASSUMED placement]); nothing for 第二期下半. Not unofficial: an official version is the original game.
 // Texts go through t() (docs/I18N.md).
 
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon } from './components.js';
 import { t } from '../../../shared/i18n.js';
 import { rulePhrases } from '../../../shared/plugins/rules.js';

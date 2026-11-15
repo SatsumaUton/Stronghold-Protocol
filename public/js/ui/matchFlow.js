@@ -7,7 +7,7 @@
 //
 // 参考版（_ref）里那份 matchFlow.js 是另一套 mf-* 样式，两者视觉接近但不是同一个东西；
 // 维护者要的是我们自己匹配器的那套，所以这个文件渲染的是 mm-ov 标记。
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon } from './components.js';
 import { getConfig } from '../data.js';
 import { t, N_ } from '../../../shared/i18n.js';

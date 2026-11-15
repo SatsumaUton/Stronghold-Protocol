@@ -1,4 +1,4 @@
-import { useState } from '../../../vendor/hooks.module.js';
+import { useState } from '../../../vendor/hooks.module.v2.js';
 import { html, Button } from '../../../js/ui/components.js';
 import { getLang, t } from '../../../../shared/i18n.js';
 import { localizeNotice, NOTICE_LIMITS } from '../../../../shared/plugins/notices.js';

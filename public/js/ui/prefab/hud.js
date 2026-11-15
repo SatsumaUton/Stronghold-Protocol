@@ -5,7 +5,7 @@
 // state is the prefab's status driver entry (hud_rest_settled …, countdown / cd_color_last / content_timer …) or the
 // ready button's own switch clip, drawn at the end of its clips (ui/prefab/anim.js applyStatuses).
 
-import { useMemo, useRef } from '../../../vendor/hooks.module.js';
+import { useMemo, useRef } from '../../../vendor/hooks.module.v2.js';
 import { html, useTicker, secondsLeft } from '../components.js';
 import { t } from '../../../../shared/i18n.js';
 import { PHASE } from '../../../../shared/constants.js';

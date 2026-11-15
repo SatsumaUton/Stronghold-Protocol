@@ -13,7 +13,7 @@
 //
 // 入口：对局中点击左上角的「节点状态」胶囊（mm/client.js 派发 sp-open-admin-tools，
 // ui/hud.js 监听）。★ 不是延迟胶囊：PingPill 只是个延迟显示，没有点击事件。
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon } from './components.js';
 import { store, useStore } from '../store.js';
 import { data, useData } from '../data.js';

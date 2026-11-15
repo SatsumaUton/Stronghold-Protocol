@@ -19,7 +19,10 @@
 // 上一阶段为退场状态的干员强制退场）" — the sim deploys it with everyone and forces it out at once (constants.js
 // FORCED_EXIT), so it lies on its own tile with the redeploy ring and comes back like after any knock-out (user
 // playtest #5 item 2: it used to be left out and vanished). Its timer is its full redeploy time (the official 联防
-// setup carries only hp / tech per operator, research 09 §3 HelpBattleInfo; the user confirmed it restarts). The board's summon
+// setup carries only hp / tech per operator, research 09 §3 HelpBattleInfo; the user confirmed it restarts), except a
+// member of a reached 阿戈尔 revive tier (blackboard max_free_respawn_cnt; not 规程 bondeffect_egir_2, which disables
+// the free redeploy): that bond revives it on the battle-start scan and spends one slot (BV1auHq67Eoi). With no slot
+// left the full timer remains. The board's summon
 // pieces are fielded as the board has them and keep only their SP ("召唤物仅修改技力": carryState `{ sp }`, unitsEnd lists
 // them beside the operators; one off the field at the end enters fresh [ASSUMED]). Enemies = the union of every leaker's
 // counted leaks (same stats: the SpawnSpec mods travel with the leak), routed on the escaped template (`escaped_single`
@@ -126,7 +129,7 @@ export function planUniteRelay(m, plan, result, fieldSpawns = null) {
   const leaked = [];
   const notReentered = new Map(plan.notReentered);
   const sources = new Set(plan.leakers.map((ps) => ps.playerId));
-  const spawns = fieldSpawns || buildUniteWave(m.gd, plan.leaked, plan.helpers.length, m.wave?.timeLimit || 60).spawns;
+    const spawns = fieldSpawns || buildUniteWave(m.gd, plan.leaked, plan.helpers.length, m.wave?.timeLimit || 60, { maxLastSpawn: plan.maxLastSpawn }).spawns;
   const pending = [];
   for (const s of spawns) for (let i = 0; i < Math.max(1, Math.trunc(s.count || 1)); i++) {
     pending.push({ ...s, time: (Number(s.time) || 0) + i * Math.max(0, Number(s.interval) || 0) });
@@ -169,7 +172,7 @@ export function helperStats(m, ps, results) {
     active = true;
     const stored = Number(ps.layers && ps.layers[id]) || Number(b.layers) || 0;
     const gain = pending && Number(pending[id]);
-    const add = Number.isFinite(gain) && gain > 0 ? layerGainRoom(stored, Math.floor(gain), m?.disableLayerCap) : 0;
+    const add = Number.isFinite(gain) && gain > 0 ? layerGainRoom(stored, Math.floor(gain), m?.layerCapOff) : 0;
     layers += stored + add;
   }
   const r = results && typeof results.get === 'function' ? results.get(ps.playerId) : null;
@@ -190,14 +193,17 @@ export function helperStats(m, ps, results) {
 export function helperOrder(m, perfects, results) {
   const st = new Map(perfects.map((ps) => [ps.playerId, helperStats(m, ps, results)]));
   const S = (ps) => st.get(ps.playerId);
-  const select = perfects.slice().sort((a, b) => S(b).units - S(a).units || (S(b).active - S(a).active) || S(b).standing - S(a).standing || a.seat - b.seat)
+  // 【AI 联防置后】(维护者 2026-11-06，参考版 uniteHumansFirst)：真人永远排在引擎操作的角色之前
+  // （AI 队友 / 托管中的博士 = ps.botControlled）。开关关闭时恒为 0，排序与原来完全一致。
+  const engine = (ps) => (m?.uniteHumansFirst === true && ps.botControlled ? 1 : 0);
+  const select = perfects.slice().sort((a, b) => engine(a) - engine(b) || S(b).units - S(a).units || (S(b).active - S(a).active) || S(b).standing - S(a).standing || a.seat - b.seat)
     .slice(0, m.gd.unite.maxHelpers);
-  return select.sort((a, b) => S(b).units - S(a).units || (S(b).active - S(a).active) || S(b).layers - S(a).layers || S(b).standing - S(a).standing || a.seat - b.seat);
+  return select.sort((a, b) => engine(a) - engine(b) || S(b).units - S(a).units || (S(b).active - S(a).active) || S(b).layers - S(a).layers || S(b).standing - S(a).standing || a.seat - b.seat);
 }
 
 /** Battle options for the unite field (without data/logger, added by the match). */
 export function uniteBattleOpts(m, plan, timeLimit) {
-  const wave = buildUniteWave(m.gd, plan.leaked, plan.helpers.length, timeLimit);
+  const wave = buildUniteWave(m.gd, plan.leaked, plan.helpers.length, timeLimit, { maxLastSpawn: plan.maxLastSpawn });
   const players = plan.helpers.map((ps, i) => {
     const carry = new Map();
     const r = m.lastResults.get(ps.playerId);

@@ -4,9 +4,9 @@
 // once near the app root. Identical messages shown within a short window are merged (with a ×N
 // counter) instead of stacking, and the stack is capped so an error storm cannot flood the screen.
 
-import { h } from '../../vendor/preact.module.js';
-import { useEffect, useReducer } from '../../vendor/hooks.module.js';
-import htm from '../../vendor/htm.module.js';
+import { h } from '../../vendor/preact.module.v2.js';
+import { useEffect, useReducer } from '../../vendor/hooks.module.v2.js';
+import htm from '../../vendor/htm.module.v2.js';
 import { ERR_TEXT, SETUP_REROLL_COOLDOWN_MS } from '../../../shared/constants.js';
 import { t, N_, translateWire } from '../../../shared/i18n.js';
 import { recordError } from '../diag.js';

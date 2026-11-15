@@ -1,4 +1,4 @@
-import { useEffect, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../../../js/ui/components.js';
 import { data } from '../../../js/data.js';
 import { t } from '../../../../shared/i18n.js';

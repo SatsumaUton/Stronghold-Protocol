@@ -1,5 +1,5 @@
 // Recover an explicitly selected local seat; nickname and IP never identify a player.
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, Icon, Modal } from './components.js';
 import { identity, net } from '../net.js';
 import { store } from '../store.js';

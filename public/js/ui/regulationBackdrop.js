@@ -2,7 +2,7 @@
 // versions.js startupVersion). Styles: css/screens/lobby.css `.hub-reg`. The title screen of a 规程 start draws the last
 // frame of 规程's opening instead when that group is extracted (RegulationStill: the official season screen's ground,
 // key art, skyline and title art, where ui/regulationFilm.js leaves them).
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { localAsset } from '../data.js';
 import { loadRegulationPack, mountRegulationIntro, REG_END } from './regulationFilm.js';

@@ -1,5 +1,5 @@
 // Playback consumes the game's real m.field, b.snap and b.ev shapes; no browser re-simulation or script execution.
-import { useEffect, useRef, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../../../js/ui/components.js';
 import { data } from '../../../js/data.js';
 import { createAssets } from '../../../js/assets.js';

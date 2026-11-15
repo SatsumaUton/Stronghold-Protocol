@@ -4,7 +4,7 @@
 // the installation's own art instead (a reference, `{ "ref": "<key>" }`); empty it; and its issues in plain words right
 // under it.
 
-import { useRef, useState } from '../../vendor/hooks.module.js';
+import { useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Modal, Button } from '../../js/ui/components.js';
 import { data } from '../../js/data.js';
 import { t } from '../../../shared/i18n.js';

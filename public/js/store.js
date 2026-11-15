@@ -24,7 +24,7 @@
 // Updates are immutable at the top level: `set` shallow-merges a patch object, `patch(key, obj)`
 // shallow-merges into one nested object. Subscribers are notified synchronously.
 
-import { useLayoutEffect, useReducer, useRef } from '../vendor/hooks.module.js';
+import { useLayoutEffect, useReducer, useRef } from '../vendor/hooks.module.v2.js';
 import { PHASE } from '../../shared/constants.js';
 import { t } from '../../shared/i18n.js';
 

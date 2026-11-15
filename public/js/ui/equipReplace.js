@@ -13,7 +13,7 @@
 //   replaceIntent(intent, replaceUid)            → { t: 'g.equip', fields: { itemUid, targetUid, replaceUid } }
 //   <EquipReplaceDialog request onConfirm(replaceUid) onCancel />
 
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Modal, Button, TierChip, MicroLabel } from './components.js';
 import { UnitThumb, RichText, GIcon } from './gameComponents.js';
 import { localAsset } from '../data.js';

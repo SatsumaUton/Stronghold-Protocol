@@ -47,6 +47,7 @@ import { isIP } from 'node:net';
 import { C2S, validateC2S } from '../shared/protocol.js';
 import { ERR, ERR_TEXT, NAME_MAX_LEN, PROTOCOL_VERSION } from '../shared/constants.js';
 import { verifyAdminToken, readAdminToken, readUserToken } from './adminAuth.js';
+import { renderMessage, wireMessage } from '../shared/i18n.js';
 
 /** Tunables (all overridable through the Network / SessionRegistry constructors). */
 export const NET_DEFAULTS = Object.freeze({
@@ -76,7 +77,7 @@ export const NET_DEFAULTS = Object.freeze({
  * Intents that also draw from the per-connection heavy bucket: g.watch (its reply is a large state resend, m.field),
  * room.loadout (a ≤ 160-entry map and ≤ 256 operator settings validated against the game data; the client debounces its
  * edits), room.ownership
- * (a ≤ 160-id list, the same way), room.diy (≤ 8 自选 picks checked against the data, the same way), room.spectate
+ * (a ≤ 160-id list, the same way), room.diy (≤ 12 自选 picks checked against the data, the same way), room.spectate
  * (taking a spectator seat in a running match resends its state like a watcher's g.watch — server/lobby.js spectate) and
  * room.setPlugins (a new visual set: every member downloads its art manifest — server/plugins/visualSet.js).
  * room.skins (docs/SKINS.md) is a small `{ [charId]: skinId }` map, sent on every edit of the appearance; a changed map
@@ -424,15 +425,24 @@ export const isErrCode = (code) => typeof code === 'string' && Object.hasOwn(ERR
 
 /**
  * Build an `error` frame.
+ *
+ * `detail` is normally a short **developer** string (a code like `revival-lp-insufficient`, capped at 120 chars).
+ * It may also be a `msg()` — a msgid with params meant for the player (server/lobby.js refuses things like
+ * 「深渊回响」只支持第二期下半 that way). Before 2026-11-08 such a detail was stringified into `"[object Object]"`,
+ * so the sentence never reached anyone; now it goes out twice: `detail` = the Chinese rendering (older clients,
+ * logs, tests), `detailMsg` = the structured message the page translates (shared/i18n.js translateWire).
  * @param {string} code ERR code
  * @param {unknown} [rid]
- * @param {string} [detail] developer-facing reason
+ * @param {string | { msgid: string, params?: unknown } | null} [detail] developer reason, or a msg() for the player
  */
 export function errorMsg(code, rid, detail) {
   const known = isErrCode(code);
   const m = { t: 'error', code: known ? code : ERR.INTERNAL, msg: known ? ERR_TEXT[code] || ERR_TEXT.INTERNAL : ERR_TEXT.INTERNAL };
   if (validRid(rid)) m.rid = rid;
-  if (detail) m.detail = String(detail).slice(0, 120);
+  if (detail && typeof detail === 'object' && typeof (/** @type {any} */ (detail).msgid) === 'string') {
+    m.detail = renderMessage(detail).slice(0, 120);
+    m.detailMsg = wireMessage(detail);
+  } else if (detail) m.detail = String(detail).slice(0, 120);
   return m;
 }
 

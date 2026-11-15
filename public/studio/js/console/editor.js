@@ -1,4 +1,4 @@
-import { useState } from '../../../vendor/hooks.module.js';
+import { useState } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../../../js/ui/components.js';
 import { data, useData } from '../../../js/data.js';
 import { useLang } from '../../../js/ui/lang.js';

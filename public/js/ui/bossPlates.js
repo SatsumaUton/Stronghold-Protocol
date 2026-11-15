@@ -16,7 +16,7 @@
 // pack the 0.3.0 banners stay. pointer-events none: the field stays usable. With prefers-reduced-motion they show
 // without the motion. Styles: css/screens/boss-plates.css. [ASSUMED] the positions, sizes and timings, measured frame by
 // frame from that footage.
-import { useEffect, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { Img, PlayerAvatar } from './gameComponents.js';
 import { uiUrl, enemyIconUrl } from './assetUrls.js';

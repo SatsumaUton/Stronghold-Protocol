@@ -28,14 +28,14 @@
 // the season) shows its alliance and layers, and 切换到「X」查看 in place of the operators and gear — chess and item ids
 // are reused across versions for other operators and items (第一期下半: 100 chess ids, 72 item ids; review fix).
 
-import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS } from '../../../shared/constants.js';
 import { html, Icon, MicroLabel, Spinner, Button, Modal, confirmDialog } from '../ui/components.js';
 import { useGameData, makeLookups, BandIcon, BondGlyph, Img } from '../ui/gameComponents.js';
 import { data, useData } from '../data.js';
 import { fmtNum, diyRecordFor, cardStandIn } from '../ui/gameLogic.js';
 import { useDocClass } from '../ui/device.js';
-import { uiUrl, chessAvatarUrl, chessPortraitUrl, itemIconUrl } from '../ui/assetUrls.js';
+import { uiUrl, chessAvatarUrl, chessPortraitUrl, itemIconUrl, medalIconUrl } from '../ui/assetUrls.js';
 import { identity } from '../net.js';
 import { TITLE_HEX_SECTORS, titleSectorClip } from '../ui/titleHexagon.js';
 import { store, createStore, useStore, selectRoute } from '../store.js';
@@ -49,8 +49,9 @@ import {
 import { t, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { VersionTag } from '../ui/pluginTag.js';
+import { diveRecordNote } from '../ui/diveWords.js';
 import { contentSet, retryContentSet } from '../content.js';
-import { DEFAULT_VERSION, shownVersion, seasonOf, versionLabel, welcomeVersion } from '../versions.js';
+import { DEFAULT_VERSION, roomPluginCs, shownVersion, seasonOf, versionContentStatus, versionLabel, welcomeVersion } from '../versions.js';
 import { VERSIONS } from '../../../shared/versions.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -168,7 +169,7 @@ function ProfileBlock({ agg, gd, nickname }) {
         <div class="st-profile">
           <b class="st-profile__name">Dr. ${nickname || t('未知')}</b>
           <div class="st-profile__trophies" title=${t('累计本机保留战绩中获得的奖杯')}>
-            <${Img} src=${uiUrl(gd.m, `medalIcon/${trophyMedalOf(agg.trophies, gd.config?.trophies?.medals)?.iconId || ''}`)}
+            <${Img} src=${medalIconUrl(gd.m, trophyMedalOf(agg.trophies, gd.config?.trophies?.medals)?.iconId || '')}
               class="st-profile__medal" fallback=${html`<${Icon} name="crown" />`} />
             <div><span>${t('获得奖杯')}</span><b class="num">${fmtNum(agg.trophies)}</b></div>
           </div>
@@ -524,14 +525,16 @@ function HistoryRow({ rec, gd, onOpen }) {
   const view = !quit && !rec.compact && !(other && (inRoom || !offered));
   const open = () => onOpen(rec);
   return html`<tr class=${cx(quit ? 'is-quit' : won ? 'is-win' : 'is-lose', !counted && 'is-excluded', view && 'is-clickable')} data-version=${version}
-      title=${!quit && !rec.compact && other ? (inRoom ? t('同盟中的数据由房间的版本决定，离开同盟后才能回看「{version}」的结算', { version: versionLabel(version) })
+      title=${!quit && !rec.compact && other ? (inRoom ? diveRecordNote(rec.variant === 'deepecho', versionLabel(version))
         : !offered ? t('这台服务器没有提供「{version}」，不能回看该局结算', { version: versionLabel(version) }) : t('切换到「{version}」查看', { version: versionLabel(version) }))
         : view ? t('点击查看该局结算') : !counted ? t('没有清完第一个回合就退出，不计入统计') : quit ? t('中途退出的对局没有结算可看') : t('较早的对局只保留汇总，不能回看结算')}
       tabIndex=${view ? 0 : undefined}
       onClick=${view ? open : undefined} onKeyDown=${view ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } : undefined}>
     <td class="st-t">${dateTime(rec.t)}</td>
     <td>${difficultyName(rec.difficulty)}</td>
-    <td>${rec.roomMode === 'solo' ? t('单人') : rec.roomMode === 'coop' ? t('同盟') : '—'}</td>
+    <td>${rec.variant === 'deepecho'
+      ? html`<span class="st-mode is-echo" title=${t('深渊回响')}>${t('深渊回响')}</span>`
+      : rec.roomMode === 'solo' ? t('单人') : rec.roomMode === 'coop' ? t('同盟') : '—'}</td>
     <td><span class="st-band">${band ? html`<${BandIcon} bandId=${band.bandId} size="xs" />${band.name}` : self?.bandId || '—'}</span></td>
     <td class="st-res">${quit ? html`<span class="t-quit">${t('中途退出')}</span>` : html`<span class=${won ? 't-win' : 't-lose'}>${won ? t('胜') : t('负')}</span>`}
       ${!counted ? html`<em class="st-chip">${t('不计入统计')}</em>` : null}
@@ -563,9 +566,9 @@ function History({ records, gd, onOpen }) {
  * outside a room; 返回统计 always.
  * @param {{ version: string, otherInRoom: boolean, offered: boolean, failed: boolean, inRoom: boolean, onBack: () => void }} props
  */
-export function ReplayWait({ version, otherInRoom, offered, failed, inRoom, onBack }) {
+export function ReplayWait({ version, otherInRoom, offered, failed, inRoom, onBack, dive = false }) {
   const label = versionLabel(version);
-  const why = otherInRoom ? t('同盟中的数据由房间的版本决定，离开同盟后才能回看「{version}」的结算', { version: label })
+  const why = otherInRoom ? diveRecordNote(dive, label)
     : !offered ? t('这台服务器没有提供「{version}」，不能回看该局结算', { version: label })
       : failed ? t('版本数据校验失败') : null;
   return html`<div class="st-loading st-replay-wait" data-testid="stats-replay-wait">
@@ -590,13 +593,16 @@ function Replay({ rec, onBack }) {
   const gd = useGameData();
   const res = useMemo(() => recordToResult(rec), [rec]);
   const version = recordVersion(rec);
-  const versionReady = useStore((c) => (version === DEFAULT_VERSION ? c.kind !== 'version' : c.kind === 'version' && c.version === version && c.status === 'ready'), Object.is, contentSet);
-  const failed = useStore((c) => version !== DEFAULT_VERSION && c.kind === 'version' && c.version === version && c.status === 'failed', Object.is, contentSet);
-  const shown = useStore(shownVersion);
   const inRoom = useStore((s) => !!s.room);
+  // the default data: any set but another version's; another version: its own set or the room's plugin set on it (§37.210)
+  const roomCs = useStore(roomPluginCs);
+  const versionState = useStore((c) => (version === DEFAULT_VERSION ? (c.kind === 'version' ? 'loading' : 'ready') : versionContentStatus(c, version, roomCs)), Object.is, contentSet);
+  const versionReady = versionState === 'ready';
+  const failed = version !== DEFAULT_VERSION && versionState === 'failed';
+  const shown = useStore(shownVersion);
   const offered = useStore((s) => versionOffered(s, version));
   if (!gd.ready || !versionReady || shown !== version) {
-    return html`<${ReplayWait} version=${version} otherInRoom=${inRoom && shown !== version} offered=${offered} failed=${failed} inRoom=${inRoom} onBack=${onBack} />`;
+    return html`<${ReplayWait} version=${version} otherInRoom=${inRoom && shown !== version} offered=${offered} failed=${failed} inRoom=${inRoom} dive=${rec.variant === 'deepecho'} onBack=${onBack} />`;
   }
   return html`<${ResultView} res=${res} pub=${null} myId=${rec.selfId} backLabel=${t('返回统计')} onBack=${onBack} quiet=${true}
     content=${rec.content ? { cs: rec.content.cs, vanilla: false, plugins: rec.content.plugins } : null} version=${rec.version ?? null} />`;

@@ -3,7 +3,7 @@
 // downloaded by the browser and not uploaded: POST /studio/api/catalog/install tells the server the https address and
 // the sha256, and the server downloads, checks and installs it (server/plugins/install.js). Nothing in the package runs.
 
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button } from '../../js/ui/components.js';
 import { t } from '../../../shared/i18n.js';
 import { post } from './api.js';

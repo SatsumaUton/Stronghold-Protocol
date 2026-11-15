@@ -22,7 +22,7 @@
 // the dropped piece's view on the target tile, re-orienting its model). All of it is guarded: a missing hook only
 // loses the visual, never the interaction.
 
-import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { html } from './components.js';
 import { LocalSprite } from './gameComponents.js';
 import { DIRS, DIR_LABEL, DEAD_ZONE_TILES, dirFromDelta, dirFromKey, rangeTiles, normDir, boardDir, viewMirrored } from './facing.js';

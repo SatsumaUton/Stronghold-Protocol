@@ -22,11 +22,11 @@ import { grantedBondsByMorph } from '../../../../shared/plugins/rules.js';
 import { RECORD_MAPS } from '../../../../shared/plugins/dataUtils.js';
 import { COLS, DIRECT_BONUS_STACKING } from '../../constants.js';
 import { frontOf, offsetTile } from '../../dir.js';
-import { bodyInKeys, bodyDist, bodyInRadius, bodyOnTile, bodyTileReach, bodyInRange } from '../../body.js';
+import { bodyInKeys, bodyDist, bodyInRadius, bodyOnTile, bodyTileReach, bodyInRange, bodyInRangeTile } from '../../body.js';
 
 export { COLS };
 /** Where an enemy can be hit (a huge enemy's whole hit rectangle, sim/body.js) — for every range test on enemies. */
-export { bodyInKeys, bodyDist, bodyInRadius, bodyOnTile, bodyTileReach };
+export { bodyInKeys, bodyDist, bodyInRadius, bodyOnTile, bodyTileReach, bodyInRangeTile };
 
 // =====================================================================================================================
 // numbers & data
@@ -48,6 +48,13 @@ export function gameData() {
 export function setGameData(d) { DATA = d ?? null; CORE = null; EFFECT_ITEMS = new WeakMap(); }
 
 export const bondRecord = (id) => own(gameData().bonds, id);
+/** Per-player 规程 strategy replacement. The map is effect-id → effect-id, never a reused bond id. */
+export function playerBondRecord(battle, playerId, bondId) {
+  const record = bondRecord(bondId);
+  const effectId = battle.getPlayer(playerId)?.input?.bondEffectOverrides?.[record?.effectId];
+  const effect = effectId && battle.data.raw.effects?.[effectId];
+  return effect ? { ...record, effectId, buffs: effect.buffs, params: effect.params, effectDesc: effect.desc, effectDescRaw: effect.descRaw } : record;
+}
 export const itemRecord = (id) => own(gameData().items, id);
 export const garrisonRecord = (id) => own(gameData().garrisons, id);
 export const bandRecord = (id) => own(gameData().bands, id);
@@ -258,13 +265,18 @@ export function unitBonds(u) {
   const cached = BONDS.get(u);
   const items = itemsOf(u);
   const plus = u.player?.morphPairing === 'plus';
-  // The official key stays items.join('|'), so a cached official result is unchanged.
-  const key = (plus ? 'plus|' : '') + items.join('|');
+  // 「盟约投影」（深渊回响的特殊祝福，维护者 2026-11-05）：玩家输入带 `projectedBond` 时，
+  // 场上**每个己方干员**都算该核心盟约的成员 —— 于是 server/sim/content/bonds/core.js 里那些
+  // `unitBonds(u).includes(bond)` 的分支自然对所有人生效，不用逐条改写。
+  // 不进官方 key：没这个字段时缓存行为与原来逐字节一致（golden 不受影响）。
+  const proj = typeof u.player?.projectedBond === 'string' ? u.player.projectedBond : '';
+  const key = (plus ? 'plus|' : '') + (proj ? `${proj}|` : '') + items.join('|');
   if (cached && cached.key === key) return cached.bonds;
   const out = [...(Array.isArray(u.def?.bonds) ? u.def.bonds : Array.isArray(u.def?.raw?.bonds) ? u.def.raw.bonds : [])];
   for (const b of grantedBondsByMorph(items, (id) => itemRecord(id), { mode: plus ? 'plus' : 'official', bondOk: (id) => !!bondRecord(id) })) {
     if (!out.includes(b)) out.push(b);
   }
+  if (proj && !out.includes(proj)) out.push(proj);
   const bonds = Object.freeze(out);
   BONDS.set(u, { key, bonds });
   return bonds;

@@ -47,6 +47,7 @@ import { isIP } from 'node:net';
 import { C2S, validateC2S } from '../shared/protocol.js';
 import { ERR, ERR_TEXT, NAME_MAX_LEN, PROTOCOL_VERSION } from '../shared/constants.js';
 import { verifyAdminToken, readAdminToken, readUserToken } from './adminAuth.js';
+import { renderMessage, wireMessage } from '../shared/i18n.js';
 
 /** Tunables (all overridable through the Network / SessionRegistry constructors). */
 export const NET_DEFAULTS = Object.freeze({
@@ -76,7 +77,7 @@ export const NET_DEFAULTS = Object.freeze({
  * Intents that also draw from the per-connection heavy bucket: g.watch (its reply is a large state resend, m.field),
  * room.loadout (a ≤ 160-entry map and ≤ 256 operator settings validated against the game data; the client debounces its
  * edits), room.ownership
- * (a ≤ 160-id list, the same way), room.diy (≤ 8 自选 picks checked against the data, the same way), room.spectate
+ * (a ≤ 160-id list, the same way), room.diy (≤ 12 自选 picks checked against the data, the same way), room.spectate
  * (taking a spectator seat in a running match resends its state like a watcher's g.watch — server/lobby.js spectate) and
  * room.setPlugins (a new visual set: every member downloads its art manifest — server/plugins/visualSet.js).
  * room.skins (docs/SKINS.md) is a small `{ [charId]: skinId }` map, sent on every edit of the appearance; a changed map
@@ -241,6 +242,31 @@ export class SessionRegistry {
     return token;
   }
 
+  /**
+   * 为一个**座位还在、会话却没了**的玩家重新开一个会话（跨设备恢复用，2026-11-08）。
+   *
+   * 为什么需要：`lobby.resumeAccount` 以前只在**本节点的会话表**里找「同账号的另一个会话」。
+   * 旧设备关掉超过重连窗口、会话被 evict、或者节点重启后只剩房间存档时，会话不在了，
+   * 座位（房间里的 `accountId` 认人）却还在 —— 于是玩家跨设备点「恢复对局」只拿到
+   * 「当前节点没有可恢复的账号对局」，明明对局还活着。
+   *
+   * 这里按**座位上的 playerId** 重建一个会话（新 token），房间/对局那边完全不用动：
+   * 客户端拿到 token 重连后就是原来那个人回到原来的座位。
+   * @param {string} playerId 座位上记的玩家 id @param {string} [name]
+   * @returns {Session | null} 该 playerId 已经有会话、或注册表满了就返回 null
+   */
+  adopt(playerId, name = '') {
+    if (typeof playerId !== 'string' || !playerId) return null;
+    if (this.byPlayerId.has(playerId)) return null;
+    if (this.byPlayerId.size >= this.maxSessions && !this.evictOne()) return null;
+    let token;
+    do token = newToken(); while (this.byTokenMap.has(token));
+    const s = new Session({ playerId, token, name: String(name || ''), now: this.now() });
+    this.byPlayerId.set(playerId, s);
+    this.byTokenMap.set(token, s);
+    return s;
+  }
+
   /** @param {Session} s */
   remove(s) {
     if (this.byPlayerId.get(s.playerId) === s) this.byPlayerId.delete(s.playerId);
@@ -399,15 +425,24 @@ export const isErrCode = (code) => typeof code === 'string' && Object.hasOwn(ERR
 
 /**
  * Build an `error` frame.
+ *
+ * `detail` is normally a short **developer** string (a code like `revival-lp-insufficient`, capped at 120 chars).
+ * It may also be a `msg()` — a msgid with params meant for the player (server/lobby.js refuses things like
+ * 「深渊回响」只支持第二期下半 that way). Before 2026-11-08 such a detail was stringified into `"[object Object]"`,
+ * so the sentence never reached anyone; now it goes out twice: `detail` = the Chinese rendering (older clients,
+ * logs, tests), `detailMsg` = the structured message the page translates (shared/i18n.js translateWire).
  * @param {string} code ERR code
  * @param {unknown} [rid]
- * @param {string} [detail] developer-facing reason
+ * @param {string | { msgid: string, params?: unknown } | null} [detail] developer reason, or a msg() for the player
  */
 export function errorMsg(code, rid, detail) {
   const known = isErrCode(code);
   const m = { t: 'error', code: known ? code : ERR.INTERNAL, msg: known ? ERR_TEXT[code] || ERR_TEXT.INTERNAL : ERR_TEXT.INTERNAL };
   if (validRid(rid)) m.rid = rid;
-  if (detail) m.detail = String(detail).slice(0, 120);
+  if (detail && typeof detail === 'object' && typeof (/** @type {any} */ (detail).msgid) === 'string') {
+    m.detail = renderMessage(detail).slice(0, 120);
+    m.detailMsg = wireMessage(detail);
+  } else if (detail) m.detail = String(detail).slice(0, 120);
   return m;
 }
 
@@ -811,6 +846,11 @@ export class Network {
       session.accountId = String(account.uid);
       session.accountTag = account.tag;
       session.tag = account.tag || session.tag;
+      // 称号（维护者 2026-11-07）：后台设置，随令牌下发**显示信息**（后台可自定义，节点不查库）
+      const ti = account.title;
+      session.title = ti && typeof ti === 'object' && typeof ti.name === 'string' && ti.name
+        ? { id: typeof ti.id === 'string' ? ti.id : '', name: ti.name, tone: typeof ti.tone === 'string' ? ti.tone : 'echo', desc: typeof ti.desc === 'string' ? ti.desc : '' }
+        : null;
     }
     session.guest = msg.guest === true;
     // 管理员/服主身份：adminToken 是后台下发的能力令牌；accountToken 里同样带有由同一把
@@ -859,7 +899,7 @@ export class Network {
 
     let extra = null;
     try { extra = this.handler.welcomeInfo?.() ?? null; } catch (e) { this.log.error('[net] welcomeInfo crashed', e); }
-    const welcome = { ...(extra && typeof extra === 'object' ? extra : null), t: 'welcome', playerId: session.playerId, token: session.token, name: session.name, tag: session.tag || null, serverNow: now, version: PROTOCOL_VERSION, resumed };
+    const welcome = { ...(extra && typeof extra === 'object' ? extra : null), t: 'welcome', playerId: session.playerId, token: session.token, name: session.name, tag: session.tag || null, title: session.title || null, serverNow: now, version: PROTOCOL_VERSION, resumed };
     // 本服：告诉前端「这个连接是管理员」（adminToken 已验签，见上面 session.admin）。
     // 前端据此渲染游戏内管理员工具（点延迟胶囊）。真正的放行在服务端
     // （routeGameNow + Match.applyTestCommand 都查 session.admin / ps.admin），改前端没用。
@@ -872,7 +912,7 @@ export class Network {
     //   （包括取码框）。普通 admin 没被授予权限时，连界面都不该出现。
     if (session.admin === true) welcome.adminTools = true;
     if (session.adminId === true) welcome.adminId = true;
-    if (session.adminTool === true) welcome.adminCode = true;
+      if (session.adminTool === true) welcome.adminCode = true;
     if (session.gameTool === true) welcome.gameTool = true;
     if (session.aiTakeoverFrom) { welcome.takeoverFrom = session.aiTakeoverFrom; session.aiTakeoverFrom = null; }
     if (validRid(rid)) welcome.rid = rid;

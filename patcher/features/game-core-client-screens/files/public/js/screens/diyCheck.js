@@ -4,7 +4,7 @@
 // diyBanned list). Confirming none is 禁用自选. The screen opens with the timeout default checked [ASSUMED]:
 // the first legal slots of each tier, in data order, up to the cap.
 
-import { useState } from '../../vendor/hooks.module.js';
+import { useState } from '../../vendor/hooks.module.v2.js';
 import { html, Button, TierChip } from '../ui/components.js';
 import { useGameData, OperatorImage, BondGlyph } from '../ui/gameComponents.js';
 import { StepHeader, ExitModal } from '../ui/matchChrome.js';

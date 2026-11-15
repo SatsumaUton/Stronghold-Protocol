@@ -34,14 +34,20 @@
 // The stats block (chessStatsBlock), the 特性 text (traitText) and the talent list (chessTalents) are exported: the 干员调配
 // screen's 局内数值 section draws the same ones for the chosen skill / module, without a live entry (GitHub issue #64).
 
+import { progressLabel } from '../itemProgress.js';
+import { itemText, garrisonText } from './showTags.js';
 import { BondTimers } from './bondTimers.js';
-import { useEffect } from '../../vendor/hooks.module.js';
+import { useEffect, useMemo } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, TierChip, MicroLabel, Button, confirmDialog, useTicker } from './components.js';
-import { OperatorImage, Img, RichText, UnitThumb, BondGlyph, GIcon, diyToken } from './gameComponents.js';
+import { OperatorImage, Img, RichText, UnitThumb, BondGlyph, GIcon, diyToken, TokenAvatar } from './gameComponents.js';
+import { confirmDestroy } from './destroyConfirm.js';
 import { attackInterval, rangeGridBox, fmtNum, tileKey, chessLoadout, nextThreshold, bondTier, briefingBondTip, pieceBondIds, grantedBonds, morphPairings, ownStandIn, standInOf, standInLoadout, standInLabel, standInTip, standInForText, ownDiyRecord, ownDiyPick, diyRecordFor, pickGetter, unitPick, unitCultivation } from './gameLogic.js';
 import { skillIconUrl, skillRecordIconUrl, profIconUrl, subProfIconUrl, itemIconUrl, enemyIconUrl, tokenAvatarUrl, factionIconUrl, uiUrl, moduleTypeIconUrl } from './assetUrls.js';
 import { abilityRows } from './abilityLines.js';
 import { data } from '../data.js';
+import { enemyRecord } from './enemyRecords.js';
+import { store, useStore } from '../store.js';
+import { equipmentCapacity } from '../../../shared/itemRules.js';
 import { attackRangeGrid } from '../../../shared/loadoutRecord.js';
 import { SKILL_SUMMON_START_DEPLOY } from '../../../shared/constants.js';
 import { moduleBadge, fullTraitText } from './loadoutModel.js';
@@ -49,8 +55,29 @@ import { t, tc, N_ } from '../../../shared/i18n.js';
 import { morphSlotPolicy } from '../../../shared/plugins/rules.js';
 import { audio } from '../audio.js';
 import { tokenVariantFor } from './gameLogic/loadout.js';
+import { useSettings } from './settings.js';
+import { usePrefabPack } from './prefab/view.js';
+import { prefabCssRotation, regChromeTheme, regShopCardFaceModel, regTierViImageStyle } from './regHud.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
+
+/** The tier-VI stencil belongs on the full detail card as well as the shop card, not on small field chips. */
+function DetailTierChip({ tier, golden = false }) {
+  const settings = useSettings();
+  const groups = data.get('local')?.groups;
+  const theme = regChromeTheme(groups, settings?.uiTheme);
+  const pack = usePrefabPack(groups, theme || null, { includeDefault: true });
+  const still = settings?.themeMotion === false;
+  const face = useMemo(() => pack ? regShopCardFaceModel(pack, { tier: 6, kind: 'chess', still }) : null, [pack, still]);
+  const vi = Number(tier) === 6 && face?.theme === 'ac_s_closur' ? face.vi : null;
+  const overlay = vi ? html`<i class="tier__prefab-vi" aria-hidden="true" style=${{
+    ...vi.style,
+    ...regTierViImageStyle(face, pack, { unitRemX: 0.44 / 64, unitRemY: 0.44 / 64, still }),
+    transform: `rotate(${prefabCssRotation(vi.node.rot)}deg)`,
+    transformOrigin: `${(vi.box.pivot?.[0] ?? 0.5) * 100}% ${(1 - (vi.box.pivot?.[1] ?? 0.5)) * 100}%`,
+  }} />` : null;
+  return html`<${TierChip} tier=${tier} golden=${golden} size="lg" class=${vi ? 'tier--prefab-vi' : ''} overlay=${overlay} />`;
+}
 
 const PROF_NAME = { PIONEER: N_('先锋'), WARRIOR: N_('近卫'), TANK: N_('重装'), SNIPER: N_('狙击'), CASTER: N_('术师'), MEDIC: N_('医疗'), SUPPORT: N_('辅助'), SPECIAL: N_('特种'), TOKEN: N_('召唤物') };
 const SP_TYPE = { INCREASE_WITH_TIME: N_('自动回复'), INCREASE_WHEN_ATTACK: N_('攻击回复'), INCREASE_WHEN_TAKEN_DAMAGE: N_('受击回复'), ON_DEPLOY: N_('被动') };
@@ -175,7 +202,10 @@ function hpOf(live, snapHp) {
 
 function Section({ title, micro, children, class: cls }) {
   return html`<section class=${cx('dsec', cls)}>
-    <h4 class="dsec__title">${title}${micro ? html`<${MicroLabel}>${micro}</${MicroLabel}>` : null}</h4>
+    <h4 class="dsec__title sw-sec__head">
+      <span class="sw-sec__name"><i>[</i> ${title} <i>]</i></span>
+      ${micro ? html`<${MicroLabel}>${micro}</${MicroLabel}>` : null}
+    </h4>
     ${children}
   </section>`;
 }
@@ -225,13 +255,33 @@ export function MorphGrantLine({ item, off = null, carried = null, mode = 'offic
   </p>`;
 }
 
+/**
+ * 「盟约投影」的效果条目（维护者 2026-11-06）：拿到投影后，场上每个己方干员都算该核心盟约的成员 ——
+ * 卡面上要像变形同构体那样有一条说明：「盟约投影：视为【X】成员」+ 这条盟约的效果原文。
+ * 本来不属于该盟约的干员都挂（见 ChessDetail 的 projectedBond）：场上写「生效中」，
+ * 商店 / 备战区的卡片写「部署后生效」（维护者 2026-11-07 晚：描述卡片上也要能看到投影）。
+ * @param {{ projection: any, bondId: string }} props — projection: 公开视图 `echo.projections[playerId]`
+ */
+export function ProjectionLine({ projection, bondId, onBoard = true }) {
+  const bond = data.lookup('bonds', bondId);
+  if (!projection || !bond) return null;
+  // 投影自带的说明拿不到时用盟约原文兜底（第三条数据源只有 id）
+  const desc = projection.desc || bond.descRaw || bond.desc || '';
+  // 维护者 2026-11-07 晚：投影不再强制「满档」—— 场上一名干员算一个成员（同名只算一个），
+  // 激活 / 档位按原版人数门槛走，所以这里只说「视为成员」，档位由盟约条自己显示。
+  return html`<p class=${cx('dhint', 'dhint--morph', 'is-worn')} data-projection=${bondId}>
+    <${Icon} name="info" /><span>${t('盟约投影：视为【{bond}】盟约成员', { bond: bond.name })}<span class="dmorph__tag is-on">${onBoard ? t('生效中') : t('部署后生效')}</span>${desc ? html`<br /><${RichText} text=${desc} />` : null}</span>
+  </p>`;
+}
+
 /** An equipped item of the card: icon, name, effect — and for 变形同构体 / a bond item its pairing (`carried`: the wearer's items). */
-function ItemRow({ itemId, carried = null, off = null, mode = 'official', onUnequip = null, uid = null }) {
+function ItemRow({ itemId, progress = null, showTag = null, carried = null, off = null, mode = 'official', onUnequip = null, uid = null }) {
   const it = data.lookup('items', itemId);
   const free = mode === 'plus' && !!it?.canGiveBond;
   return html`<div class="ditem">
     <${UnitThumb} kind="item" id=${itemId} size="sm" />
-    <div class="ditem__text"><b>${it?.name || itemId}</b>${free ? html`<span class="dtag" data-testid="morph-free">${t('不占装备格')}</span>` : null}<${RichText} text=${it?.descRaw || it?.desc || ''} class="ditem__desc" />
+    <div class="ditem__text"><b>${it?.name || itemId}</b>${free ? html`<span class="dtag" data-testid="morph-free">${t('不占装备格')}</span>` : null}<${RichText} text=${itemText(it, { showTag })} class="ditem__desc" />
+      <${ItemProgress} progress=${progress} />
       ${it?.canGiveBond ? html`<${MorphPairings} off=${off} carried=${carried || []} mode=${mode} />` : it?.giveBondId ? html`<${MorphGrantLine} item=${it} off=${off} carried=${carried} mode=${mode} />` : null}
       ${onUnequip && Number.isInteger(uid) ? html`<${Button} variant="secondary" size="sm" data-testid="unequip" onClick=${() => onUnequip(uid)}>${t('卸下')}<//>` : null}</div>
   </div>`;
@@ -243,10 +293,12 @@ function ItemRow({ itemId, carried = null, off = null, mode = 'official', onUneq
  * @param {{ bondIds: string[], bonds?: any[], onBond?: (bondId: string) => void, off?: Set<string>|null, granted?: string[] }} props —
  *   off: the bonds the mode never activates (gameLogic modeOffBonds): 本局禁用 instead of the count
  */
-export function BondChips({ bondIds, bonds = [], onBond = null, off = null, granted = [] }) {
+export function BondChips({ bondIds, bonds = [], onBond = null, off = null, granted = [], projected = null }) {
   const ids = Array.isArray(bondIds) ? bondIds.filter((b) => typeof b === 'string') : [];
   if (!ids.length) return null;
   const iso = new Set(Array.isArray(granted) ? granted : []);
+  // 盟约投影：只挂在**已部署到场上**的己方干员卡上，角标写「投影」（维护者 2026-11-05）
+  const projId = typeof projected === 'string' && projected ? projected : null;
   const mine = new Map((Array.isArray(bonds) ? bonds : []).filter((b) => b && typeof b.bondId === 'string').map((b) => [b.bondId, b]));
   return html`<div class="dbonds dbonds--top" role="list" aria-label=${t('所属盟约')}>
     ${ids.map((id) => {
@@ -260,7 +312,8 @@ export function BondChips({ bondIds, bonds = [], onBond = null, off = null, gran
       const active = !isOff && (e ? !!e.active : tier > 0);
       const next = nextThreshold(count, th);
       const cap = next ?? th[th.length - 1] ?? null;
-      const isoTag = iso.has(id) ? t('（变形同构体）') : '';
+      const isProj = projId != null && id === projId;
+      const isoTag = isProj ? t('（盟约投影）') : iso.has(id) ? t('（变形同构体）') : '';
       // the count holds 调和's +1 (the server's bond entry says so, DESIGN §21.26)
       const harmonyTag = !isOff && Number.isInteger(e?.harmony) && e.harmony > 0 ? t('（含调和 +{harmony}）', { harmony: e.harmony }) : '';
       const label = isOff ? briefingBondTip(rec?.name || id, 'off')
@@ -269,15 +322,15 @@ export function BondChips({ bondIds, bonds = [], onBond = null, off = null, gran
         ? html`
         <${BondGlyph} bondId=${id} class="dbond__icon" />
         <span class="dbond__name">${rec?.name || id}</span>
-        ${iso.has(id) ? html`<span class="dbond__iso">${t('同构')}</span>` : null}
+        ${isProj ? html`<span class="dbond__iso">${t('投影')}</span>` : iso.has(id) ? html`<span class="dbond__iso">${t('同构')}</span>` : null}
         <span class="dbond__off">${t('本局禁用')}</span>`
         : html`
         <${BondGlyph} bondId=${id} class="dbond__icon" />
         <span class="dbond__name">${rec?.name || id}</span>
-        ${iso.has(id) ? html`<span class="dbond__iso">${t('同构')}</span>` : null}
+        ${isProj ? html`<span class="dbond__iso">${t('投影')}</span>` : iso.has(id) ? html`<span class="dbond__iso">${t('同构')}</span>` : null}
         <span class=${cx('dbond__count', 'num', next == null && count > 0 && 'is-max')}>${count}${cap != null ? html`<small>/${cap}</small>` : null}</span>
         ${th.length ? html`<span class="dbond__tiers" aria-hidden="true">${th.map((_, i) => html`<i key=${i} class=${i < tier ? 'on' : ''}></i>`)}</span>` : null}`;
-      const cls = cx('dbond', active && 'is-active', isOff && 'is-off', rec?.isCore && 'is-core', iso.has(id) && 'is-granted');
+      const cls = cx('dbond', active && 'is-active', isOff && 'is-off', rec?.isCore && 'is-core', (iso.has(id) || isProj) && 'is-granted');
       return onBond
         ? html`<button key=${id} type="button" role="listitem" class=${cls} title=${label} aria-label=${label}
             data-bond=${id} data-granted=${iso.has(id) ? '1' : null} onClick=${() => onBond(id)}>${body}</button>`
@@ -320,7 +373,7 @@ export function garrisonTypeIconKey(garrison) {
 }
 
 /** The operator's own effect (特质, garrisons.json): trigger chip + description, compact. */
-export function GarrisonBlock({ garrison, m }) {
+export function GarrisonBlock({ garrison, m, piece = null }) {
   return html`<section class="dgarrison" aria-label=${t('特质')} data-garrison=${garrison.garrisonId || ''}>
     <div class="dgarrison__head">
       <span class="dgarrison__k">${t('特质')}</span>
@@ -329,7 +382,7 @@ export function GarrisonBlock({ garrison, m }) {
         ${garrison.eventTypeDesc || ''}
       </span>
     </div>
-    <${RichText} as="p" text=${garrison.descRaw || garrison.desc} class="dgarrison__text" />
+    <${RichText} as="p" text=${garrisonText(garrison, piece)} class="dgarrison__text" />
   </section>`;
 }
 
@@ -388,7 +441,12 @@ function skillTextNote(sk) {
   return note ? html`<p class="dhint dhint--rule" data-skill-note=${sk.skillId}><${Icon} name="info" />${t(note)}</p>` : null;
 }
 
-export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bonds, offBonds = null, loadout, onBond, live = null, hint = null, unitItems = null, standIn = null, diy = null, cultOpts = null, morphMode = 'official', onUnequip = null, ownerId, skin = null }) {
+function ItemProgress({ progress }) {
+  const label = progressLabel(progress);
+  return label ? html`<p class="ditem__progress">${t('出售干员')} <strong>${label}</strong></p>` : null;
+}
+
+export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bonds, offBonds = null, loadout, onBond, live = null, hint = null, unitItems = null, unitItemProgress = null, standIn = null, diy = null, cultOpts = null, morphMode = 'official', onUnequip = null, ownerId, skin = null }) {
   const m = data.get('assets');
   const hp = hpOf(live, snapHp);
   // 0.2.0 自选编队: `chess` is then the composed 自选 record (the operator, the slot's tier / price); its skill and module are
@@ -404,6 +462,7 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
   // (`cultOpts.cultivation`); a stand-in has neither
   const lo = si ? standInLoadout(si, getChess, data.get('backups')) : chessLoadout(chess, loadout, getChess, { ...(cultOpts || {}), effects: data.get('effects') });
   const c = chess;
+  const equipCap = equipmentCapacity(c, data.get('config')?.economy?.equipPerChess);
   // stats / talents the unit fights with: the chosen module's (or none — statsBase) for an elite (DESIGN §16)
   const fr = lo?.record || body;
   const golden = !!(c.isGolden || piece?.golden);
@@ -419,10 +478,54 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
   // teammate's unit's UnitInfo items, a bond popup 同构 row's wearer's)
   const carried = piece ? items : (Array.isArray(unitItems) ? unitItems : []);
   const getItem = (id) => data.lookup('items', id);
-  const bondIds = pieceBondIds(c, carried, getItem, morphMode);
+  // 「盟约投影」（维护者 2026-11-05）：投影对所有**已部署到场上**的己方干员生效，
+  // 所以只在棋盘上的干员卡上挂一条徽章（像「变形同构体」那样，角标写「投影」）。
+  // 备战区（手牌第 7 行 / 临时区第 8 行）的干员还没上场，不挂。
+  const meId = useStore((s) => s.me.playerId);
+  const echo = useStore((s) => s.match?.public?.echo || null);
+  // 观战 / 前往查看：卡片可能属于**别人**，投影要按那位玩家取（`watchTarget` 由 screens/game.js 按屏幕上的盟约主人发布）
+  const watchTarget = useStore((s) => s.ui?.watchTarget || null);
+  // 「盟约投影」：三条同源数据里取第一条拿得到的 ——
+  //   ① `echo.projections[那位玩家]`（每人各自选，2026-11-07：服务端按 playerId 下发）
+  //      自己的卡 = 自己那条；观战队友的卡 = **他**那条（否则看到的内容和对局中玩家不一致）
+  //   ② **本局盟约视图**里 `projected: true` 的那条（服务端给投影那条打的标记，盟约条/面板读的就是它）
+  // ② 是 2026-11-06 加的兜底：卡面这一路读不到前一份时，至少和盟约面板保持一致。
+  const projOwner = ownerId != null ? String(ownerId) : (watchTarget || meId);
+  const projection = (() => {
+    const mine = projOwner != null && echo && echo.projections && typeof echo.projections === 'object' ? echo.projections[projOwner] : null;
+    if (mine && typeof mine.id === 'string') return mine;
+    // bonds 可能是数组（视图）也可能是 { bondId: entry } 的字典，两种都兜住
+    const rows = Array.isArray(bonds) ? bonds : (bonds && typeof bonds === 'object' ? Object.values(bonds) : []);
+    const row = rows.find((x) => x && x.projected === true && (typeof x.bondId === 'string' || typeof x.id === 'string'));
+    if (row) return { id: String(row.bondId || row.id), name: '', desc: '' };
+    return null;
+  })();
+  const projectedId = projection && typeof projection.id === 'string' ? projection.id : null;
+  const onBoard = (() => {
+    const row = Number(piece?.row);
+    if (Number.isInteger(row)) return row >= 9 && row <= 12;
+    if (piece && typeof piece.area === 'string') return piece.area === 'board';
+    return !!unit;
+  })();
+  // 干员**本身就有**这条盟约时不再追加、也不打「投影」角标（维护者 2026-11-05）。
+  // 2026-11-06 维护者确认：投影只对**已部署到场上**的干员生效。
+  // 2026-11-07：不再限定「自己的干员」—— 观战队友时他的干员同样挂着**他**那条投影，
+  // 否则观战看到的内容和对局中玩家自己看到的不一致（玩家反馈）。
+  // ★ 2026-11-07 晚（维护者截图反馈「buff 栏和已获祝福里都有了，干员描述卡片里还是没有」）：
+  //   **描述卡片上任何干员都要能看到投影**。以前 `projectedBond` 带着 `onBoard` 条件，
+  //   商店 / 备战区（手牌第 7 行、临时区第 8 行）的卡片整条说明都不画 —— 玩家在买人、编队时
+  //   根本看不到自己这层选的是哪条投影；而 ProjectionLine 本来就有 `onBoard` 参数
+  //   （场上写「生效中」，没上场写「部署后生效」）。所以说明行不再看 `onBoard`；
+  //   盟约条上的「投影」角标仍只在场上打（没上场的干员不该标成已生效）。
+  const nativelyHas = Array.isArray(c.bonds) && c.bonds.includes(projectedId);
+  const projectedBond = nativelyHas ? null : projectedId;
+  const bondIds = (() => {
+    const list = pieceBondIds(c, carried, getItem, morphMode);
+    return onBoard && projectedBond && !list.includes(projectedBond) ? [...list, projectedBond] : list;
+  })();
   const slotPolicy = morphSlotPolicy(morphMode === 'plus' ? 'plus' : 'official', (it) => !!getItem(typeof it === 'string' ? it : it?.id)?.canGiveBond);
-  const grantedIds = bondIds.filter((b) => !(Array.isArray(c.bonds) && c.bonds.includes(b)));
-  const sell = c.sellPrice ?? 1;
+  const grantedIds = bondIds.filter((b) => !(Array.isArray(c.bonds) && c.bonds.includes(b)) && b !== projectedBond);
+  const sell = Number.isFinite(piece?.sellPrice) ? piece.sellPrice : (c.sellPrice ?? 1);
   const blocks = {};
   blocks.head = html`
     <div key="head" class="dhead">
@@ -431,7 +534,7 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
       </div>
       <div class="dhead__info">
         <div class="dhead__chips">
-          <${TierChip} tier=${c.tier} golden=${golden} size="lg" />
+          <${DetailTierChip} tier=${c.tier} golden=${golden} />
           ${golden ? html`<span class="dtag-elite">${t('精锐')}</span>` : null}
           ${piece?.kind === 'token' ? html`<span class="dtag-token">${t('召唤物')}</span>` : null}
           ${si ? html`<span class="dtag-standin" data-standin=${si.charId} title=${standInTip(si, c.name)}>${standInLabel(si)}</span>` : null}
@@ -448,12 +551,13 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
           <span class="dhead__pos">${body.position === 'MELEE' ? t('近战位') : t('远程位')}</span>
         </div>
         ${hp ? html`<div class="dhp"><i style=${`width:${Math.max(0, Math.min(100, (hp.hp / Math.max(1, hp.max)) * 100))}%`}></i><span class="num">${fmtNum(hp.hp)} / ${fmtNum(hp.max)}</span></div>` : null}
-        <${BondChips} bondIds=${bondIds} bonds=${bonds} off=${offBonds} onBond=${onBond} granted=${grantedIds} />
+        <${BondChips} bondIds=${bondIds} bonds=${bonds} off=${offBonds} onBond=${onBond} granted=${grantedIds} projected=${onBoard ? projectedBond : null} />
+        ${projectedBond && projection ? html`<${ProjectionLine} projection=${projection} bondId=${projectedBond} onBoard=${onBoard} />` : null}
       </div>
     </div>`;
   blocks.garrison = garrisons.length > 1
-    ? garrisons.map(garrison => html`<${GarrisonBlock} key=${garrison.garrisonId} garrison=${garrison} m=${m} />`)
-    : garrisons[0] ? html`<${GarrisonBlock} key="garrison" garrison=${garrisons[0]} m=${m} />` : null;
+    ? garrisons.map(garrison => html`<${GarrisonBlock} key=${garrison.garrisonId} garrison=${garrison} m=${m} piece=${piece} />`)
+    : garrisons[0] ? html`<${GarrisonBlock} key="garrison" garrison=${garrisons[0]} m=${m} piece=${piece} />` : null;
   blocks.trait = body.trait?.desc ? html`<p key="trait" class="dtrait"><${Icon} name="info" /><${RichText} text=${traitText(body, golden, lo)} /></p>` : null;
   // (`fr` is the body the unit fights with — a stand-in's record for a 补位 chess; `chess` is only the range's fallback)
   blocks.stats = chessStatsBlock({ rec: fr, chess: c, live });
@@ -478,12 +582,12 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
       </div>
     <//>` : null;
   // (a 变形同构体 / bond item row shows its pairing against what this operator carries: ItemRow `carried`)
-  blocks.equip = piece?.kind === 'chess' ? html`<${Section} key="equip" title=${t('装备')} micro=${`EQUIP ${slotPolicy.slotsUsed(items)}/${slotPolicy.slotCap(2)}`} class="dsec--equip">
-      ${items.length ? items.map((it) => html`<${ItemRow} key=${it.uid} itemId=${it.id} carried=${items} off=${offBonds} mode=${morphMode} uid=${it.uid} onUnequip=${onUnequip} />`) : html`<p class="t-dim dempty">${t('拖拽装备至该干员以配发（最多 2 件）')}</p>`}
+  blocks.equip = piece?.kind === 'chess' ? html`<${Section} key="equip" title=${t('装备')} micro=${`EQUIP ${slotPolicy.slotsUsed(items)}/${slotPolicy.slotCap(equipCap)}`} class="dsec--equip">
+      ${items.length ? items.map((it) => html`<${ItemRow} key=${it.uid} itemId=${it.id} progress=${it.progress} showTag=${it.showTag} carried=${items} off=${offBonds} mode=${morphMode} uid=${it.uid} onUnequip=${onUnequip} />`) : html`<p class="t-dim dempty">${t('拖拽装备至该干员以配发（最多 {max} 件）', { max: equipCap })}</p>`}
     <//>`
     // no own piece (a teammate's unit, a bond popup's 变形同构体 row): what it carries, read-only
-    : !piece && carried.length ? html`<${Section} key="equip" title=${t('装备')} micro=${`EQUIP ${slotPolicy.slotsUsed(carried)}/${slotPolicy.slotCap(2)}`} class="dsec--equip">
-      ${carried.map((id, i) => html`<${ItemRow} key=${`${i}:${id}`} itemId=${id} carried=${carried} off=${offBonds} mode=${morphMode} />`)}
+    : !piece && carried.length ? html`<${Section} key="equip" title=${t('装备')} micro=${`EQUIP ${slotPolicy.slotsUsed(carried)}/${slotPolicy.slotCap(equipCap)}`} class="dsec--equip">
+      ${carried.map((id, i) => html`<${ItemRow} key=${`${i}:${id}`} itemId=${id} progress=${unitItemProgress?.filter(p => p.id === id)[carried.slice(0, i).filter(x => x === id).length]} carried=${carried} off=${offBonds} mode=${morphMode} />`)}
     <//>` : null;
   const talents = chessTalents(fr);
   blocks.talents = talents.length ? html`<${Section} key="talents" title=${t('天赋')} micro="TALENT" class="dsec--talent">
@@ -505,31 +609,39 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
  * 变形同构体 lists its pairings (its 天赋栏: MorphPairings, `offBonds` marks 本局禁用); a bond item says which bond it gives
  * a 变形同构体 wearer (MorphGrantLine). (An equipped item is shown on its wearer's card: ChessDetail's 装备 rows.)
  */
-export function ItemDetail({ item, piece, editable, onDestroy, offBonds = null, morphMode = 'official', unequipAllowed = false }) {
+export function ItemDetail({ item, piece, progress = piece?.progress, editable, onDestroy, offBonds = null, morphMode = 'official', unequipAllowed = false }) {
   const m = data.get('assets');
   return html`
     <div class="dhead dhead--item">
       <div class=${cx('dhead__icon', item.isGolden && 'is-golden')}><${Img} src=${itemIconUrl(m, item)} fallback=${html`<${GIcon} name="bolt" />`} /></div>
       <div class="dhead__info">
-        <div class="dhead__chips"><${TierChip} tier=${item.tier} golden=${item.isGolden} size="lg" />${item.isGolden ? html`<span class="dtag-elite">${t('进阶')}</span>` : null}
+        <div class="dhead__chips"><${DetailTierChip} tier=${item.tier} golden=${item.isGolden} />${item.isGolden ? html`<span class="dtag-elite">${t('进阶')}</span>` : null}
           <span class="dtag-kind">${item.itemType === 'MAGIC' ? t('奇术') : t('装备')}</span></div>
         <h3 class="dhead__name">${item.name}</h3>
         ${item.flavor ? html`<span class="dhead__flavor">${item.flavor}</span>` : null}
       </div>
     </div>
-    <${Section} title=${t('效果')} micro="EFFECT"><${RichText} as="p" text=${item.descRaw || item.desc} class="dtext" /><//>
+    <${Section} title=${t('效果')} micro="EFFECT"><${RichText} as="p" text=${itemText(item, piece)} class="dtext" /><${ItemProgress} progress=${progress} /><//>
     ${item.canGiveBond ? html`<${Section} title=${t('天赋')} micro="TALENT" class="dsec--morph"><${MorphPairings} off=${offBonds} mode=${morphMode} /><//>` : null}
     ${item.canGiveBond && morphMode === 'plus' ? html`<p class="dhint" data-testid="morph-free"><${Icon} name="info" />${t('不占装备格')}</p>` : null}
     ${!item.canGiveBond && item.giveBondId ? html`<${MorphGrantLine} item=${item} off=${offBonds} mode=${morphMode} />` : null}
     ${item.note ? html`<p class="dhint dhint--rule"><${Icon} name="info" />${item.note}</p>` : null}
     ${item.itemType === 'MAGIC'
       ? html`<p class="dhint"><${Icon} name="info" />${t('将其拖拽至战场上的格子使用')}</p>`
-      : html`<p class="dhint"><${Icon} name="info" />${unequipAllowed ? t('拖拽至干员身上进行配发（每名干员最多 2 件）') : t('拖拽至干员身上进行配发（每名干员最多 2 件，配发后无法取下）')}${item.mergeable ? t('；2 件相同装备自动合成进阶装备') : ''}</p>`}
+      : html`<p class="dhint"><${Icon} name="info" />${unequipAllowed ? t('拖拽至干员身上进行配发（装备容量依干员而定）') : t('拖拽至干员身上进行配发（装备容量依干员而定，配发后无法取下）')}${item.mergeable ? t('；2 件相同装备自动合成进阶装备') : ''}</p>`}
     ${item.shopExcluded ? html`<p class="dhint dhint--source"><${Icon} name="info" />${t('调度中心不出售 · 获取途径：{source}', { source: item.shopExcludedBy || t('效果获得') })}</p>` : null}
     ${piece && editable ? html`<div class="dactions"><${Button} variant="danger" onClick=${() => onDestroy(piece, item)}>${t('销毁道具')}<//></div>` : null}`;
 }
 
 function EnemyDetail({ enemy, snapHp, count, live = null }) {
+  // 「深渊回响」：本回合的侵蚀词条挂在**每一个**敌人身上，所以详情面板直接列出它们
+  //（维护者 2026-11-04：看单只怪的说明时也该知道它有没有这个词条）。
+  const echo = useStore((s) => s.match.public?.echo);
+  // 召唤物不吃侵蚀词条（维护者 2026-11-06）：`echo.words` 是「本回合全体」的列表，
+  // 不挡的话详情面板会给人「召唤物身上也挂了 4 条」的错觉；名单由服务端下发（`echo.summonKeys`）。
+  const summonKeys = Array.isArray(echo?.summonKeys) ? echo.summonKeys : [];
+  const isSummon = !!(enemy && summonKeys.includes(enemy.key));
+  const words = isSummon ? [] : (Array.isArray(echo?.words) ? echo.words : []);
   const m = data.get('assets');
   const s = enemy.stats || {};
   const types = Array.isArray(enemy.acTypes) ? enemy.acTypes : enemy.acType ? [enemy.acType] : [];
@@ -537,6 +649,8 @@ function EnemyDetail({ enemy, snapHp, count, live = null }) {
   const imm = Object.entries(s.immunities || {}).filter(([, v]) => v).map(([k]) => ({ stun: t('晕眩'), silence: t('沉默'), sleep: t('沉睡'), frozen: t('冻结'), levitate: t('浮空') }[k] || k));
   const interval = attackInterval(s.bat, s.aspd);
   const hp = hpOf(live, snapHp);
+  // the HP shield it still holds (维护者 2026-11-07: 敌对目标的护盾要能看到还剩多少) — the battle's live number, 0 without
+  const shield = live && live.src === 'battle' && Number.isFinite(live.shield) && live.shield > 0 ? live.shield : 0;
   // a battle enemy: its live stats against its spawned ones (the round's multipliers included — unitStatsEntry base)
   const st = {
     maxHp: liveStat(live, 'maxHp', s.maxHp), atk: liveStat(live, 'atk', s.atk), def: liveStat(live, 'def', s.def),
@@ -557,6 +671,7 @@ function EnemyDetail({ enemy, snapHp, count, live = null }) {
         <h3 class="dhead__name">${enemy.name}</h3>
         <div class="dfactions">${types.map((t) => html`<span key=${t} class="dfaction"><${Img} src=${factionIconUrl(m, factions[t]?.icon)} />${factions[t]?.name || t}</span>`)}</div>
         ${hp ? html`<div class="dhp dhp--enemy"><i style=${`width:${Math.max(0, Math.min(100, (hp.hp / Math.max(1, hp.max)) * 100))}%`}></i><span class="num">${fmtNum(hp.hp)} / ${fmtNum(hp.max)}</span></div>` : null}
+        ${shield ? html`<div class="dshield" data-testid="enemy-shield"><${Icon} name="shield" /><b class="num">${fmtNum(shield)}</b><span>${t('护盾')}</span></div>` : null}
       </div>
     </div>
     <div class=${cx('dstats', live && 'is-live')} data-live=${live ? live.src || 'battle' : undefined}>
@@ -571,6 +686,9 @@ function EnemyDetail({ enemy, snapHp, count, live = null }) {
       <${Stat} k=${t('目标价值')} v=${s.lpr ?? 1} />
     </div>
     ${imm.length ? html`<p class="dhint"><${Icon} name="shield" />${t('免疫：{list}', { list: imm })}</p>` : null}
+    ${words.length ? html`<${Section} title=${t('本回合侵蚀词条')} micro="EROSION">
+      <ul class="echo-list echo-list--enemy">${words.map((w) => html`<li key=${w.id}><b>${w.name}</b><span>${w.desc || ''}</span></li>`)}</ul>
+    <//>` : isSummon ? html`<p class="dhint"><${Icon} name="info" />${t('召唤物不受侵蚀词条影响')}</p>` : null}
     ${Array.isArray(enemy.abilities) && enemy.abilities.length ? html`<${Section} title=${t('能力')} micro="ABILITIES">
       <ul class="dabil">${abilityRows(enemy.abilities, !!live?.silenced).map((a, i) => html`<li key=${i} class=${a.off ? 'is-off' : null}><${RichText} text=${a.text} /></li>`)}</ul>
     <//>` : enemy.descRaw || enemy.desc ? html`<${Section} title=${t('说明')}><${RichText} as="p" text=${enemy.descRaw || enemy.desc} class="dtext" /><//>` : null}`;
@@ -651,7 +769,7 @@ function MapCharDetail({ token, snapHp, live, m }) {
     <//>` : null}`;
 }
 
-export function TokenDetail({ token, piece, ownerId = null, snapHp = null, live = null }) {
+export function TokenDetail({ token, piece, ownerId = null, skin = null, snapHp = null, live = null }) {
   const m = data.get('assets');
   // a band map character (外勤医疗's Touch / 预备干员-医疗, tokens.json kind 'mapChar') is an operator of the mode, not a
   // summon: no owner variants — its stats, skill, talents and 特性 are on the record (GitHub #260, PR #278)
@@ -670,7 +788,7 @@ export function TokenDetail({ token, piece, ownerId = null, snapHp = null, live 
   const hint = piece ? summonDeployHint(token) : null;
   return html`
     <div class="dhead dhead--item">
-      <div class="dhead__icon"><${Img} src=${tokenAvatarUrl(m, token.tokenId)} fallback=${html`<${GIcon} name="target" />`} /></div>
+      <div class="dhead__icon"><${TokenAvatar} m=${m} tokenId=${token.tokenId} ownerId=${ownerId} skin=${skin} fallback=${html`<${GIcon} name="target" />`} /></div>
       <div class="dhead__info">
         <div class="dhead__chips"><span class="dtag-token">${t('召唤物')}</span>${piece?.count > 1 ? html`<span class="dtag-kind num">×${piece.count}</span>` : null}</div>
         <h3 class="dhead__name">${token.name}</h3>
@@ -771,7 +889,7 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
     if (!e) return null;
     const p = e.piece;
     if (p.kind === 'item') { const it = data.lookup('items', p.id); return it ? { type: 'item', item: it, piece: p } : null; }
-    if (p.kind === 'token') { const t = data.lookup('tokens', p.id) || diyToken(p.id); return t ? { type: 'token', token: t, piece: p, ownerId: tokenOwnerId(p, pieces) } : null; }
+    if (p.kind === 'token') { const t = data.lookup('tokens', p.id) || diyToken(p.id); return t ? { type: 'token', token: t, piece: p, ownerId: tokenOwnerId(p, pieces), skin: p.skin || null } : null; }
     const c = data.lookup('chess', p.id);
     const d = ownDiy(c);
     if (d) return { type: 'chess', ...appearance, chess: d.chess, piece: p, standIn: null, diy: d.diy };
@@ -798,14 +916,14 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
     return c ? { type: 'chess', ...appearance, chess: c, hint: target.hint || null, standIn: si, ...(items.length ? { unitItems: items } : {}), ...(cv ? { cultOpts: cv } : {}), ...tap } : null;
   }
   if (target.kind === 'item') { const it = data.lookup('items', target.id); return it ? { type: 'item', item: it } : null; }
-  if (target.kind === 'enemy') { const en = data.lookup('enemies', target.id); return en ? { type: 'enemy', enemy: en, count: target.count } : null; }
+  if (target.kind === 'enemy') { const en = enemyRecord(target.id); return en ? { type: 'enemy', enemy: en, count: target.count } : null; }
   if (target.kind === 'token') { const t = data.lookup('tokens', target.id) || diyToken(target.id); return t ? { type: 'token', token: t } : null; }
   if (target.kind === 'unit') {
     const u = target.unit || {};
     const own = Number.isInteger(u.uid) ? pieces?.get(u.uid) : null;
-    if (u.side === 'enemy') { const en = data.lookup('enemies', u.defId); return en ? { type: 'enemy', enemy: en, unitId: u.id } : null; }
+    if (u.side === 'enemy') { const en = enemyRecord(u.defId); return en ? { type: 'enemy', enemy: en, unitId: u.id } : null; }
     // a hand item on a scouted prep board (m.field units, kind 'item'): the item's own card
-    if (u.kind === 'item') { const it = data.lookup('items', u.defId); return it ? { type: 'item', item: it } : null; }
+    if (u.kind === 'item') { const it = data.lookup('items', u.defId); return it ? { type: 'item', item: it, progress: u.progress } : null; }
     const c = data.lookup('chess', u.defId);
     // a unit says itself whether it is a stand-in (UnitInfo standInFor: the sim's, prep scouting's); an own piece's unit
     // follows m.private.standIns like the piece
@@ -818,12 +936,14 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
     const dr = pick ? diyRecordFor(c, pick, dd) : null;
     // 0.2.2: another player's unit says its 潜能 / 练度 itself (UnitInfo potential / cultivate); an own piece's unit follows
     // m.private.ops (the panel's `cultOpts`)
-    const cv = own?.piece ? null : { cultOpts: { cultivation: unitCultivation(u) } };
-    if (dr) return { type: 'chess', ...appearance, chess: dr, piece: own?.piece || null, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: null, diy: pick, ...cv };
-    if (c) return { type: 'chess', ...appearance, chess: c, piece: own?.piece || null, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: si, ...cv };
+    const cv = { ...(own?.piece ? {} : { cultOpts: { cultivation: unitCultivation(u) } }), unitItemProgress: u.itemProgress };
+    if (dr) return { type: 'chess', ...appearance, chess: dr, piece: own?.piece || null, unit: u, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: null, diy: pick, ...cv };
+    if (c) return { type: 'chess', ...appearance, chess: c, piece: own?.piece || null, unit: u, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: si, ...cv };
     const t = data.lookup('tokens', u.defId) || diyToken(u.defId);
     if (t) return { type: 'token', token: t, unitId: u.id, ownerId: tokenOwnerId(own?.piece, pieces) };
-    const en = data.lookup('enemies', u.defId);
+    // 跨版本敌人（带 `<version>:` 前缀）只出现在深渊回响：那时服务端把记录随快照发下来，
+    // 必须走 enemyRecord 才能查到。普通对局仍读本房数据表，行为与上游逐字节一致。
+    const en = store.getState?.()?.match?.public?.echo ? enemyRecord(u.defId) : data.lookup('enemies', u.defId);
     return en ? { type: 'enemy', enemy: en, unitId: u.id } : null;
   }
   return null;
@@ -876,14 +996,14 @@ export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestr
   const sellIt = async (piece, chess) => {
     const golden = piece.golden || chess?.isGolden;
     if (golden) {
-      const ok = await confirmDialog({ title: t('出售精锐干员'), text: t('确定要出售精锐干员「{name}」吗？出售后获得 {price} 资金。', { name: chess?.name || '', price: chess?.sellPrice ?? 1 }), okText: t('出售'), danger: true });
+      const price = Number.isFinite(piece?.sellPrice) ? piece.sellPrice : (chess?.sellPrice ?? 1);
+      const ok = await confirmDialog({ title: t('出售精锐干员'), text: t('确定要出售精锐干员「{name}」吗？出售后获得 {price} 资金。', { name: chess?.name || '', price }), okText: t('出售'), danger: true });
       if (!ok) return;
     }
     onSell(piece);
   };
   const destroyIt = async (piece, item) => {
-    const ok = await confirmDialog({ title: t('销毁道具'), text: t('道具无法出售。确定要销毁「{name}」吗？', { name: item?.name || '' }), okText: t('销毁'), danger: true });
-    if (ok) onDestroy(piece);
+    if (await confirmDestroy(item?.name || '')) onDestroy(piece);
   };
   return html`<aside class=${cx('dpanel', 'brackets', `dpanel--${detail.type}`, side === 'right' && 'dpanel--right', side === 'right' && shopOpen && 'is-shop')} role="dialog" aria-label=${t('详情')}
       data-side=${side === 'right' ? 'right' : 'left'}>
@@ -891,14 +1011,13 @@ export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestr
     <div class="dpanel__scroll">
       ${bondTimers ? html`<${BondTimers} rows=${bondTimers()} />` : null}
       ${detail.type === 'chess' ? html`<${ChessDetail} chess=${detail.chess} ownerId=${detail.ownerId} skin=${detail.skin} piece=${detail.piece} snapHp=${snapHp} editable=${editable} onSell=${sellIt}
-        bonds=${bonds} offBonds=${offBonds} loadout=${loadout} onBond=${onBond} live=${liveNow} hint=${detail.hint || null} unitItems=${detail.unitItems || null}
+        bonds=${bonds} offBonds=${offBonds} loadout=${loadout} onBond=${onBond} live=${liveNow} hint=${detail.hint || null} unitItems=${detail.unitItems || null} unitItemProgress=${detail.unitItemProgress || null}
         standIn=${detail.standIn || null} diy=${detail.diy || null} cultOpts=${detail.cultOpts || { ops }} morphMode=${morphMode} onUnequip=${onUnequip} />` : null}
-      ${detail.type === 'item' ? html`<${ItemDetail} item=${detail.item} piece=${detail.piece} editable=${editable} onDestroy=${destroyIt} offBonds=${offBonds} morphMode=${morphMode} unequipAllowed=${unequipAllowed} />` : null}
+      ${detail.type === 'item' ? html`<${ItemDetail} item=${detail.item} progress=${detail.progress || detail.piece?.progress} piece=${detail.piece} editable=${editable} onDestroy=${destroyIt} offBonds=${offBonds} morphMode=${morphMode} unequipAllowed=${unequipAllowed} />` : null}
       ${detail.type === 'enemy' ? html`<${EnemyDetail} enemy=${detail.enemy} snapHp=${snapHp} count=${detail.count} live=${liveNow} />` : null}
-      ${detail.type === 'token' ? html`<${TokenDetail} token=${detail.token} piece=${detail.piece} ownerId=${detail.ownerId ?? null} snapHp=${snapHp} live=${liveNow} />` : null}
+      ${detail.type === 'token' ? html`<${TokenDetail} token=${detail.token} piece=${detail.piece} ownerId=${detail.ownerId ?? null} skin=${detail.skin ?? null} snapHp=${snapHp} live=${liveNow} />` : null}
       ${detail.type === 'terrain' ? html`<${TerrainDetail} terrain=${detail.terrain} />` : null}
       ${detail.type === 'device' ? html`<${DeviceDetail} device=${detail.device} snapHp=${snapHp} live=${liveNow} />` : null}
     </div>
   </aside>`;
 }
-

@@ -25,16 +25,37 @@
   --line-3: #58675f;
 
   /* accents (official hex values where research marks [DATA]) */
-  --mint-500: #4ed8af;
-  --mint-400: #59f4ca;
-  --mint-600: #35d8b4;
-  --mint-glow: #17f9b7;
-  --mint-700: #2a9e7f;
+  --mint-500: var(--mint-s5);
+  --mint-400: var(--mint-s2);
+  --mint-600: var(--mint-c86);
+  --mint-glow: var(--mint-s11);
+  --mint-700: var(--mint-c87);
   --mint-800: #145443;
   --mint-900: #0d2c24;
-  --mint-a10: rgba(78, 216, 175, .10);
-  --mint-a20: rgba(78, 216, 175, .20);
-  --mint-a35: rgba(78, 216, 175, .35);
+  /* RGB 三元组：半透明发光/描边是用 rgba(...) 写死的，换成变量后深潜主题才能整体换色。
+     普通模式的值与原硬编码逐位相同，所以原版界面不受影响。 */
+  --mint-rgb: 23, 249, 183;
+  --mint-500-rgb: 78, 216, 175;
+  /* 选择策略一屏里另有两种写死的薄荷绿（120,240,205 / 60,230,185），同样收进变量 */
+  --mint-400-rgb: 120, 240, 205;
+  --mint-600-rgb: 60, 230, 185;
+
+  /* 房间/大厅里散落的手写薄荷绿（每个都保持原值，深潜主题里统一换成紫） */
+  --mint-s1: var(--mint-c45);
+  --mint-s2: var(--mint-c25);
+  --mint-s3: var(--mint-c75);
+  --mint-s4: var(--mint-c55);
+  --mint-s5: var(--mint-c88);
+  --mint-s6: var(--mint-c39);
+  --mint-s7: var(--mint-c89);
+  --mint-s8: var(--mint-c90);
+  --mint-s9: var(--mint-c91);
+  --mint-s10: var(--mint-c92);
+  --mint-s11: var(--mint-c93);
+  --mint-s12: var(--mint-c94);
+  --mint-a10: rgba(var(--mint-500-rgb), .10);
+  --mint-a20: rgba(var(--mint-500-rgb), .20);
+  --mint-a35: rgba(var(--mint-500-rgb), .35);
   --gold: #ffc600;
   --gold-2: #f2bd3e;
   --gold-a20: rgba(255, 198, 0, .2);
@@ -67,7 +88,7 @@
   /* chess tier accents (I–VI), sampled from the official tier chips (img_chess_level_1..6) */
   --tier-1: #a8a8a8;
   --tier-2: #f2f2f2;
-  --tier-3: #34e6b2;
+  --tier-3: var(--mint-c95);
   --tier-4: #34b8d8;
   --tier-5: #f8bf00;
   --tier-6: #f88000;
@@ -109,6 +130,128 @@
   --bk-l: .14rem;
   --bk-w: 2px;
 }
+
+/* ---- 「深渊回响」：整套主题换色（房间 / 确认本局信息 / 选策略 / 对局中 全屏通用） --------------------
+   维护者 2026-11-03 要求「所有深潜相关的都单独做一套」。做法是**在 <html> 上挂一个类，重定义主题变量**：
+   整个界面里所有用 var(--mint-*) 的东西（按钮、选中态、焦点框、分隔线、进度条、就绪灯、BOND 铭牌…）
+   自动变紫，不需要为四类界面各复制一套样式，也不会漏掉某个角落。
+   类名由房间/对局组件按 `variant === 'deepecho'` 挂上：room.js（房间）、game.js（本局信息/选策略/对局/结算）。
+   普通模式下 <html> 上没有这个类，所有变量都是原来的值 —— 逐字节不受影响。 */
+html.sp-deepecho {
+  --mint-400: #c4a6ff;
+  --mint-500: #9d7bff;
+  --mint-600: #7c5cf0;
+  --mint-700: #5b3fb8;
+  /* 深色档与半透明档也要一起换：暗背景、槽底、描边用的就是这些 */
+  --mint-800: #3a2470;
+  --mint-900: #1e1340;
+  --mint-a10: rgba(157, 123, 255, .10);
+  --mint-a20: rgba(157, 123, 255, .20);
+  --mint-a35: rgba(157, 123, 255, .35);
+  /* 倒计时数码管、以及若干发光组件用的就是这个变量（原值 var(--mint-s11) 是荧光绿） */
+  --mint-glow: #b79cff;
+  /* 半透明发光/描边用的三元组（见 :root 的注释） */
+  --mint-rgb: 183, 156, 255;
+  --mint-500-rgb: 157, 123, 255;
+  --mint-400-rgb: 196, 166, 255;
+  --mint-600-rgb: 124, 92, 240;
+
+  /* 同上：手写薄荷绿的深潜配色 */
+  --mint-s1: #d6c4ff;
+  --mint-s2: #c4a6ff;
+  --mint-s3: #cbb2ff;
+  --mint-s4: #bfa2ff;
+  --mint-s5: #9d7bff;
+  --mint-s6: #a98cf5;
+  --mint-s7: #e8dcff;
+  --mint-s8: #8a63f0;
+  --mint-s9: #9673ff;
+  --mint-s10: #5b3fb8;
+  --mint-s11: #b79cff;
+  --mint-s12: #7c5cf0;
+  --text-on-mint: #f6f1ff;
+  --bk-c: #9d7bff;
+}
+/* 盟约/干员图标是**用滤镜染色的**（不是 SVG 填色），所以只改变量会把「环」变紫、图标留在青色 —— 两色相撞。
+   这里把滤镜的色相一起转到紫色家族（sepia 偏橙 ~35° + 215° ≈ 250° 紫罗兰）。 */
+html.sp-deepecho .bglyph img {
+  filter: brightness(0) invert(.88) sepia(.55) hue-rotate(215deg) saturate(2.2);
+}
+/* 盟约圆盘：原版是薄荷径向渐变 + 绿光，换成紫色系（含高光与外发光的绿） */
+html.sp-deepecho .bond.is-active .bond__core {
+  background: radial-gradient(circle at 50% 28%, #e8dcff, var(--mint-500) 52%, #4b2a99 100%);
+  box-shadow: 0 0 .16rem rgba(157, 123, 255, .5), inset 0 0 0 1px rgba(255, 255, 255, .45), inset 0 -4px 8px rgba(40, 10, 90, .45);
+}
+html.sp-deepecho .bond.is-active .bond__glyph { color: #150a2b; }
+html.sp-deepecho .bond.is-active .bond__icon { filter: brightness(0) opacity(.8); }
+/**
+ * 大按钮（`.proto-start`：房间的「开始模拟」、确认本局信息的「准备就绪」、深潜大厅的「开始深潜」）
+ * 用的是**硬编码**薄荷绿，不吃 --mint-* 变量，所以要在全局这一层单独覆盖一次。
+ * 挂在 html.sp-deepecho 下 → 房间 / 确认本局信息 / 选策略 / 对局中 四屏一起生效。
+ */
+html.sp-deepecho .proto-start {
+  background: linear-gradient(180deg, #9b7cf0, #6a49c4);
+  color: #f6f1ff;
+}
+html.sp-deepecho .proto-start__label { color: #f6f1ff; }
+html.sp-deepecho .proto-start__mark { color: rgba(246, 241, 255, .72); }
+html.sp-deepecho .proto-start__deco { opacity: .5; }
+html.sp-deepecho .proto-start:disabled { filter: grayscale(.5) brightness(.8); }
+/**
+ * 选择策略（draft）里的绿是**硬编码 rgb 字面量**（rgba(var(--mint-c96-rgb), 205) / rgba(var(--mint-c93-rgb), 183) / rgba(var(--mint-c97-rgb), 185)），
+ * 不经过 --mint-* 变量，所以必须逐条覆盖。下面这几条就是那一屏最显眼的绿：卡面悬停/选中描边、
+ * 选中括号的外发光、卡面底光的绿调。
+ */
+html.sp-deepecho .dband:hover { box-shadow: 0 0 0 .03rem rgba(180, 150, 255, .7), inset 0 0 0 .02rem #000; }
+html.sp-deepecho .dband.is-sel { box-shadow: 0 0 0 .03rem rgba(180, 150, 255, .55); }
+html.sp-deepecho .dband.is-sel::before { filter: drop-shadow(0 0 .06rem rgba(180, 150, 255, .75)); }
+/* 卡面底：原来的深绿底 + 绿色扫描光，换成深紫底 + 紫色扫描光 */
+html.sp-deepecho .dband__frame { background: radial-gradient(circle at 50% 42%, #2a1c4a, #0d0916 72%); }
+html.sp-deepecho .dband__frame::after {
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, .16) 0 1px, transparent 1px 3px),
+    radial-gradient(circle at 50% 46%, transparent 48%, rgba(8, 4, 16, .78) 74%),
+    linear-gradient(180deg, rgba(150, 120, 255, .1), rgba(150, 120, 255, .2));
+}
+/* 选中时从格子里射出的那道光 */
+html.sp-deepecho .dorder.is-flash::after {
+  background: radial-gradient(closest-side, rgba(232, 220, 255, .95), rgba(157, 123, 255, .55) 45%, transparent);
+}
+
+/**
+ * 剩下的绿色大多不是填充色，而是 **`rgba(var(--mint-rgb), …)` 的外发光**：
+ * 填充已经跟着 --mint-* 变成紫色了，只有辉光还绿，于是看起来像"紫底罩着绿光"。
+ * 下面把这些辉光逐条换成紫色（alpha 保持原值，所以亮度关系不变）。
+ */
+html.sp-deepecho .pausebtn.is-on,
+html.sp-deepecho .speedvote.is-on,
+html.sp-deepecho .readybtn.is-on:hover:not(:disabled) { box-shadow: 0 0 .3rem rgba(157, 123, 255, .45); }
+html.sp-deepecho .readybtn:hover:not(:disabled) { background: rgba(157, 123, 255, .14); box-shadow: 0 0 .26rem rgba(157, 123, 255, .3); }
+html.sp-deepecho .bslot.is-open .bond__core { box-shadow: 0 0 0 2px var(--mint-400), 0 0 .2rem rgba(157, 123, 255, .6); }
+html.sp-deepecho .team__row.is-self .pavatar { box-shadow: 0 0 0 2px var(--mint-500), 0 0 .18rem rgba(157, 123, 255, .35); }
+html.sp-deepecho .team__row.is-open .pavatar { box-shadow: 0 0 0 2px var(--mint-400), 0 0 .2rem rgba(157, 123, 255, .45); }
+html.sp-deepecho .ewheel__art .eart { filter: drop-shadow(0 0 .06rem rgba(157, 123, 255, .25)); }
+html.sp-deepecho .ff-tile.is-legal { box-shadow: inset 0 0 0 2px rgba(196, 166, 255, .8), inset 0 0 calc(var(--tile) * .4) rgba(157, 123, 255, .3); }
+html.sp-deepecho .bpop__disc.is-active { box-shadow: 0 0 .24rem rgba(157, 123, 255, .45); }
+html.sp-deepecho .bpop__member.is-on .uthumb__art { box-shadow: 0 0 .1rem rgba(157, 123, 255, .45); }
+html.sp-deepecho .spov__deco { border-color: rgba(157, 123, 255, .16); }
+html.sp-deepecho .spov__deco::after { border-color: rgba(157, 123, 255, .1); }
+html.sp-deepecho .spov__title { text-shadow: 0 0 .2rem rgba(157, 123, 255, .3); }
+html.sp-deepecho .spov__turntxt.is-mine { text-shadow: 0 0 .16rem rgba(157, 123, 255, .45); }
+/* 倒计时进度条：槽底与点亮都是硬编码的荧光绿 */
+html.sp-deepecho .countdown__gauge i { background: rgba(157, 123, 255, .1); }
+html.sp-deepecho .countdown__gauge i.on { box-shadow: 0 0 6px rgba(157, 123, 255, .55); }
+/* 商店的「升级」卡：背景是硬编码的薄荷渐变 */
+html.sp-deepecho .lvcard { background: linear-gradient(180deg, #a98cf5, #6a49c4); color: #f6f1ff; }
+html.sp-deepecho .lvcard__key { color: #2a1550 !important; }
+/**
+ * 干员卡片上的**盟约字样保持原色**（维护者 2026-11-03：这两行不该跟着模式变紫）。
+ * 它读的是 --mint-400，而那个变量在深潜下已被改成紫色，所以这里把原值写死回来。
+ */
+html.sp-deepecho .scard__bond { color: var(--mint-s2); }
+/* 选中/焦点这类「强调底」在白字上要压深一点，否则紫底白字在浅色主题下发灰 */
+html.sp-deepecho ::selection { background: #6f4fc4; color: #f6f1ff; }
+html.sp-deepecho :focus-visible { outline-color: #b79cff; }
 
 /* Language packs (docs/I18N.md): the same characters take their own glyph forms per language — Japanese kanji,
    Traditional Chinese, a Korean face for Hangul (each stack falls back to the Simplified Chinese faces). */
@@ -264,7 +407,7 @@ h1, h2, h3, h4, p { margin: 0; }
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(120% 80% at 50% 110%, rgba(23, 249, 183, .10), transparent 55%),
+    radial-gradient(120% 80% at 50% 110%, rgba(var(--mint-rgb), .10), transparent 55%),
     radial-gradient(80% 60% at 50% 40%, rgba(40, 60, 52, .35), transparent 70%),
     linear-gradient(180deg, #0b0e0d 0%, #0e1311 55%, #0a0d0c 100%);
 }
@@ -274,8 +417,8 @@ h1, h2, h3, h4, p { margin: 0; }
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(rgba(78, 216, 175, .045) 1px, transparent 1px) 0 0 / .8rem .8rem,
-    linear-gradient(90deg, rgba(78, 216, 175, .045) 1px, transparent 1px) 0 0 / .8rem .8rem;
+    linear-gradient(rgba(var(--mint-500-rgb), .045) 1px, transparent 1px) 0 0 / .8rem .8rem,
+    linear-gradient(90deg, rgba(var(--mint-500-rgb), .045) 1px, transparent 1px) 0 0 / .8rem .8rem;
   -webkit-mask-image: radial-gradient(90% 80% at 50% 50%, #000 30%, transparent 85%);
   mask-image: radial-gradient(90% 80% at 50% 50%, #000 30%, transparent 85%);
 }
@@ -340,7 +483,7 @@ h1, h2, h3, h4, p { margin: 0; }
   border: 2px solid var(--mint-500);
   clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%);
   animation: boot-spin 1.4s linear infinite;
-  background: linear-gradient(135deg, transparent 45%, rgba(78, 216, 175, .35) 50%, transparent 55%);
+  background: linear-gradient(135deg, transparent 45%, rgba(var(--mint-500-rgb), .35) 50%, transparent 55%);
 }
 .boot__text { font-family: var(--font-display); font-size: .13rem; letter-spacing: .4em; color: var(--mint-700); }
 .boot__err { max-width: 6rem; text-align: center; color: var(--text-lo); font-size: .16rem; }
@@ -368,7 +511,7 @@ h1, h2, h3, h4, p { margin: 0; }
   border-radius: 9px;
   position: relative;
   animation: rotate-phone 2.4s var(--ease-in-out) infinite;
-  box-shadow: 0 0 24px rgba(23, 249, 183, .25);
+  box-shadow: 0 0 24px rgba(var(--mint-rgb), .25);
 }
 .rotate-hint__phone::after {
   content: '';
@@ -401,3 +544,444 @@ h1, h2, h3, h4, p { margin: 0; }
     transition-duration: 1ms !important;
   }
 }
+
+
+/* ==== 自动收口：散落各屏的绿色字面量 ====
+   默认值与原硬编码逐位相同（原版界面不变），深潜主题下按亮度映射到紫色。 */
+:root {
+  --mint-c1: rgb(111, 232, 196);
+  --mint-c1-rgb: 111, 232, 196;
+  --mint-c2: rgb(157, 255, 226);
+  --mint-c2-rgb: 157, 255, 226;
+  --mint-c3: rgb(182, 255, 234);
+  --mint-c3-rgb: 182, 255, 234;
+  --mint-c4: rgb(22, 144, 110);
+  --mint-c4-rgb: 22, 144, 110;
+  --mint-c5: rgb(39, 211, 173);
+  --mint-c5-rgb: 39, 211, 173;
+  --mint-c6: rgb(93, 251, 214);
+  --mint-c6-rgb: 93, 251, 214;
+  --mint-c7: rgb(42, 209, 176);
+  --mint-c7-rgb: 42, 209, 176;
+  --mint-c8: rgb(63, 230, 180);
+  --mint-c8-rgb: 63, 230, 180;
+  --mint-c9: rgb(140, 255, 225);
+  --mint-c9-rgb: 140, 255, 225;
+  --mint-c10: rgb(160, 255, 230);
+  --mint-c10-rgb: 160, 255, 230;
+  --mint-c11: rgb(68, 136, 68);
+  --mint-c11-rgb: 68, 136, 68;
+  --mint-c12: rgb(51, 214, 165);
+  --mint-c12-rgb: 51, 214, 165;
+  --mint-c13: rgb(78, 230, 184);
+  --mint-c13-rgb: 78, 230, 184;
+  --mint-c14: rgb(120, 255, 215);
+  --mint-c14-rgb: 120, 255, 215;
+  --mint-c15: rgb(79, 191, 159);
+  --mint-c15-rgb: 79, 191, 159;
+  --mint-c16: rgb(170, 255, 232);
+  --mint-c16-rgb: 170, 255, 232;
+  --mint-c17: rgb(43, 182, 90);
+  --mint-c17-rgb: 43, 182, 90;
+  --mint-c18: rgb(86, 224, 138);
+  --mint-c18-rgb: 86, 224, 138;
+  --mint-c19: rgb(109, 250, 156);
+  --mint-c19-rgb: 109, 250, 156;
+  --mint-c20: rgb(80, 240, 140);
+  --mint-c20-rgb: 80, 240, 140;
+  --mint-c21: rgb(127, 211, 122);
+  --mint-c21-rgb: 127, 211, 122;
+  --mint-c22: rgb(31, 230, 190);
+  --mint-c22-rgb: 31, 230, 190;
+  --mint-c23: rgb(46, 230, 192);
+  --mint-c23-rgb: 46, 230, 192;
+  --mint-c24: rgb(51, 153, 68);
+  --mint-c24-rgb: 51, 153, 68;
+  --mint-c25: rgb(89, 244, 202);
+  --mint-c25-rgb: 89, 244, 202;
+  --mint-c26: rgb(95, 224, 185);
+  --mint-c26-rgb: 95, 224, 185;
+  --mint-c27: rgb(54, 182, 144);
+  --mint-c27-rgb: 54, 182, 144;
+  --mint-c28: rgb(45, 212, 191);
+  --mint-c28-rgb: 45, 212, 191;
+  --mint-c29: rgb(63, 220, 106);
+  --mint-c29-rgb: 63, 220, 106;
+  --mint-c30: rgb(109, 255, 156);
+  --mint-c30-rgb: 109, 255, 156;
+  --mint-c31: rgb(51, 153, 136);
+  --mint-c31-rgb: 51, 153, 136;
+  --mint-c32: rgb(155, 210, 107);
+  --mint-c32-rgb: 155, 210, 107;
+  --mint-c33: rgb(52, 211, 153);
+  --mint-c33-rgb: 52, 211, 153;
+  --mint-c34: rgb(110, 226, 196);
+  --mint-c34-rgb: 110, 226, 196;
+  --mint-c35: rgb(150, 240, 215);
+  --mint-c35-rgb: 150, 240, 215;
+  --mint-c36: rgb(170, 245, 225);
+  --mint-c36-rgb: 170, 245, 225;
+  --mint-c37: rgb(44, 240, 184);
+  --mint-c37-rgb: 44, 240, 184;
+  --mint-c38: rgb(31, 143, 114);
+  --mint-c38-rgb: 31, 143, 114;
+  --mint-c39: rgb(79, 224, 191);
+  --mint-c39-rgb: 79, 224, 191;
+  --mint-c40: rgb(159, 232, 210);
+  --mint-c40-rgb: 159, 232, 210;
+  --mint-c41: rgb(46, 210, 160);
+  --mint-c41-rgb: 46, 210, 160;
+  --mint-c42: rgb(30, 140, 110);
+  --mint-c42-rgb: 30, 140, 110;
+  --mint-c43: rgb(60, 230, 180);
+  --mint-c43-rgb: 60, 230, 180;
+  --mint-c44: rgb(159, 233, 211);
+  --mint-c44-rgb: 159, 233, 211;
+  --mint-c45: rgb(93, 240, 198);
+  --mint-c45-rgb: 93, 240, 198;
+  --mint-c46: rgb(47, 214, 166);
+  --mint-c46-rgb: 47, 214, 166;
+  --mint-c47: rgb(47, 207, 159);
+  --mint-c47-rgb: 47, 207, 159;
+  --mint-c48: rgb(72, 226, 182);
+  --mint-c48-rgb: 72, 226, 182;
+  --mint-c49: rgb(31, 199, 157);
+  --mint-c49-rgb: 31, 199, 157;
+  --mint-c50: rgb(26, 174, 138);
+  --mint-c50-rgb: 26, 174, 138;
+  --mint-c51: rgb(63, 214, 180);
+  --mint-c51-rgb: 63, 214, 180;
+  --mint-c52: rgb(150, 255, 225);
+  --mint-c52-rgb: 150, 255, 225;
+  --mint-c53: rgb(82, 214, 176);
+  --mint-c53-rgb: 82, 214, 176;
+  --mint-c54: rgb(94, 224, 185);
+  --mint-c54-rgb: 94, 224, 185;
+  --mint-c55: rgb(79, 232, 192);
+  --mint-c55-rgb: 79, 232, 192;
+  --mint-c56: rgb(143, 243, 214);
+  --mint-c56-rgb: 143, 243, 214;
+  --mint-c57: rgb(127, 243, 212);
+  --mint-c57-rgb: 127, 243, 212;
+  --mint-c58: rgb(102, 153, 136);
+  --mint-c58-rgb: 102, 153, 136;
+  --mint-c59: rgb(68, 230, 184);
+  --mint-c59-rgb: 68, 230, 184;
+  --mint-c60: rgb(51, 216, 171);
+  --mint-c60-rgb: 51, 216, 171;
+  --mint-c61: rgb(150, 230, 210);
+  --mint-c61-rgb: 150, 230, 210;
+  --mint-c62: rgb(87, 214, 196);
+  --mint-c62-rgb: 87, 214, 196;
+  --mint-c63: rgb(70, 230, 190);
+  --mint-c63-rgb: 70, 230, 190;
+  --mint-c64: rgb(40, 220, 180);
+  --mint-c64-rgb: 40, 220, 180;
+  --mint-c65: rgb(60, 240, 190);
+  --mint-c65-rgb: 60, 240, 190;
+  --mint-c66: rgb(30, 240, 180);
+  --mint-c66-rgb: 30, 240, 180;
+  --mint-c67: rgb(36, 150, 122);
+  --mint-c67-rgb: 36, 150, 122;
+  --mint-c68: rgb(160, 230, 210);
+  --mint-c68-rgb: 160, 230, 210;
+  --mint-c69: rgb(80, 224, 141);
+  --mint-c69-rgb: 80, 224, 141;
+  --mint-c70: rgb(52, 233, 182);
+  --mint-c70-rgb: 52, 233, 182;
+  --mint-c71: rgb(17, 169, 130);
+  --mint-c71-rgb: 17, 169, 130;
+  --mint-c72: rgb(40, 230, 180);
+  --mint-c72-rgb: 40, 230, 180;
+  --mint-c73: rgb(34, 212, 164);
+  --mint-c73-rgb: 34, 212, 164;
+  --mint-c74: rgb(51, 220, 174);
+  --mint-c74-rgb: 51, 220, 174;
+  --mint-c75: rgb(74, 242, 196);
+  --mint-c75-rgb: 74, 242, 196;
+  --mint-c76: rgb(140, 220, 200);
+  --mint-c76-rgb: 140, 220, 200;
+  --mint-c77: rgb(20, 200, 150);
+  --mint-c77-rgb: 20, 200, 150;
+  --mint-c78: rgb(36, 170, 136);
+  --mint-c78-rgb: 36, 170, 136;
+  --mint-c79: rgb(77, 255, 216);
+  --mint-c79-rgb: 77, 255, 216;
+  --mint-c80: rgb(64, 238, 201);
+  --mint-c80-rgb: 64, 238, 201;
+  --mint-c81: rgb(64, 238, 200);
+  --mint-c81-rgb: 64, 238, 200;
+  --mint-c82: rgb(52, 196, 164);
+  --mint-c82-rgb: 52, 196, 164;
+  --mint-c83: rgb(47, 172, 144);
+  --mint-c83-rgb: 47, 172, 144;
+  --mint-c84: rgb(88, 255, 227);
+  --mint-c84-rgb: 88, 255, 227;
+  --mint-c85: rgb(143, 240, 210);
+  --mint-c85-rgb: 143, 240, 210;
+  --mint-c86: rgb(53, 216, 180);
+  --mint-c86-rgb: 53, 216, 180;
+  --mint-c87: rgb(42, 158, 127);
+  --mint-c87-rgb: 42, 158, 127;
+  --mint-c88: rgb(78, 216, 175);
+  --mint-c88-rgb: 78, 216, 175;
+  --mint-c89: rgb(185, 255, 233);
+  --mint-c89-rgb: 185, 255, 233;
+  --mint-c90: rgb(50, 220, 174);
+  --mint-c90-rgb: 50, 220, 174;
+  --mint-c91: rgb(78, 215, 184);
+  --mint-c91-rgb: 78, 215, 184;
+  --mint-c92: rgb(69, 145, 129);
+  --mint-c92-rgb: 69, 145, 129;
+  --mint-c93: rgb(23, 249, 183);
+  --mint-c93-rgb: 23, 249, 183;
+  --mint-c94: rgb(52, 200, 166);
+  --mint-c94-rgb: 52, 200, 166;
+  --mint-c95: rgb(52, 230, 178);
+  --mint-c95-rgb: 52, 230, 178;
+  --mint-c96: rgb(120, 240, 205);
+  --mint-c96-rgb: 120, 240, 205;
+  --mint-c97: rgb(60, 230, 185);
+  --mint-c97-rgb: 60, 230, 185;
+}
+html.sp-deepecho {
+  --mint-c1: rgb(184, 145, 237);
+  --mint-c1-rgb: 184, 145, 237;
+  --mint-c2: rgb(218, 198, 246);
+  --mint-c2-rgb: 218, 198, 246;
+  --mint-c3: rgb(221, 202, 246);
+  --mint-c3-rgb: 221, 202, 246;
+  --mint-c4: rgb(92, 29, 180);
+  --mint-c4-rgb: 92, 29, 180;
+  --mint-c5: rgb(144, 84, 227);
+  --mint-c5-rgb: 144, 84, 227;
+  --mint-c6: rgb(192, 159, 239);
+  --mint-c6-rgb: 192, 159, 239;
+  --mint-c7: rgb(144, 84, 227);
+  --mint-c7-rgb: 144, 84, 227;
+  --mint-c8: rgb(164, 115, 232);
+  --mint-c8-rgb: 164, 115, 232;
+  --mint-c9: rgb(212, 189, 244);
+  --mint-c9-rgb: 212, 189, 244;
+  --mint-c10: rgb(221, 202, 246);
+  --mint-c10-rgb: 221, 202, 246;
+  --mint-c11: rgb(94, 30, 184);
+  --mint-c11-rgb: 94, 30, 184;
+  --mint-c12: rgb(149, 93, 229);
+  --mint-c12-rgb: 149, 93, 229;
+  --mint-c13: rgb(169, 123, 234);
+  --mint-c13-rgb: 169, 123, 234;
+  --mint-c14: rgb(204, 176, 242);
+  --mint-c14-rgb: 204, 176, 242;
+  --mint-c15: rgb(141, 80, 226);
+  --mint-c15-rgb: 141, 80, 226;
+  --mint-c16: rgb(221, 202, 246);
+  --mint-c16-rgb: 221, 202, 246;
+  --mint-c17: rgb(115, 40, 220);
+  --mint-c17-rgb: 115, 40, 220;
+  --mint-c18: rgb(164, 115, 232);
+  --mint-c18-rgb: 164, 115, 232;
+  --mint-c19: rgb(189, 154, 239);
+  --mint-c19-rgb: 189, 154, 239;
+  --mint-c20: rgb(172, 128, 234);
+  --mint-c20-rgb: 172, 128, 234;
+  --mint-c21: rgb(166, 119, 233);
+  --mint-c21-rgb: 166, 119, 233;
+  --mint-c22: rgb(155, 101, 230);
+  --mint-c22-rgb: 155, 101, 230;
+  --mint-c23: rgb(161, 110, 231);
+  --mint-c23-rgb: 161, 110, 231;
+  --mint-c24: rgb(99, 31, 193);
+  --mint-c24-rgb: 99, 31, 193;
+  --mint-c25: rgb(186, 150, 238);
+  --mint-c25-rgb: 186, 150, 238;
+  --mint-c26: rgb(172, 128, 234);
+  --mint-c26-rgb: 172, 128, 234;
+  --mint-c27: rgb(126, 58, 223);
+  --mint-c27-rgb: 126, 58, 223;
+  --mint-c28: rgb(149, 93, 229);
+  --mint-c28-rgb: 149, 93, 229;
+  --mint-c29: rgb(149, 93, 229);
+  --mint-c29-rgb: 149, 93, 229;
+  --mint-c30: rgb(192, 159, 239);
+  --mint-c30-rgb: 192, 159, 239;
+  --mint-c31: rgb(105, 34, 206);
+  --mint-c31-rgb: 105, 34, 206;
+  --mint-c32: rgb(172, 128, 234);
+  --mint-c32-rgb: 172, 128, 234;
+  --mint-c33: rgb(146, 88, 228);
+  --mint-c33-rgb: 146, 88, 228;
+  --mint-c34: rgb(181, 141, 236);
+  --mint-c34-rgb: 181, 141, 236;
+  --mint-c35: rgb(204, 176, 242);
+  --mint-c35-rgb: 204, 176, 242;
+  --mint-c36: rgb(215, 194, 245);
+  --mint-c36-rgb: 215, 194, 245;
+  --mint-c37: rgb(166, 119, 233);
+  --mint-c37-rgb: 166, 119, 233;
+  --mint-c38: rgb(94, 30, 184);
+  --mint-c38-rgb: 94, 30, 184;
+  --mint-c39: rgb(166, 119, 233);
+  --mint-c39-rgb: 166, 119, 233;
+  --mint-c40: rgb(201, 172, 241);
+  --mint-c40-rgb: 201, 172, 241;
+  --mint-c41: rgb(144, 84, 227);
+  --mint-c41-rgb: 144, 84, 227;
+  --mint-c42: rgb(92, 29, 180);
+  --mint-c42-rgb: 92, 29, 180;
+  --mint-c43: rgb(164, 115, 232);
+  --mint-c43-rgb: 164, 115, 232;
+  --mint-c44: rgb(204, 176, 242);
+  --mint-c44-rgb: 204, 176, 242;
+  --mint-c45: rgb(184, 145, 237);
+  --mint-c45-rgb: 184, 145, 237;
+  --mint-c46: rgb(146, 88, 228);
+  --mint-c46-rgb: 146, 88, 228;
+  --mint-c47: rgb(141, 80, 226);
+  --mint-c47-rgb: 141, 80, 226;
+  --mint-c48: rgb(166, 119, 233);
+  --mint-c48-rgb: 166, 119, 233;
+  --mint-c49: rgb(129, 62, 224);
+  --mint-c49-rgb: 129, 62, 224;
+  --mint-c50: rgb(110, 35, 215);
+  --mint-c50-rgb: 110, 35, 215;
+  --mint-c51: rgb(155, 101, 230);
+  --mint-c51-rgb: 155, 101, 230;
+  --mint-c52: rgb(215, 194, 245);
+  --mint-c52-rgb: 215, 194, 245;
+  --mint-c53: rgb(161, 110, 231);
+  --mint-c53-rgb: 161, 110, 231;
+  --mint-c54: rgb(172, 128, 234);
+  --mint-c54-rgb: 172, 128, 234;
+  --mint-c55: rgb(172, 128, 234);
+  --mint-c55-rgb: 172, 128, 234;
+  --mint-c56: rgb(204, 176, 242);
+  --mint-c56-rgb: 204, 176, 242;
+  --mint-c57: rgb(198, 167, 241);
+  --mint-c57-rgb: 198, 167, 241;
+  --mint-c58: rgb(121, 49, 221);
+  --mint-c58-rgb: 121, 49, 221;
+  --mint-c59: rgb(166, 119, 233);
+  --mint-c59-rgb: 166, 119, 233;
+  --mint-c60: rgb(149, 93, 229);
+  --mint-c60-rgb: 149, 93, 229;
+  --mint-c61: rgb(198, 167, 241);
+  --mint-c61-rgb: 198, 167, 241;
+  --mint-c62: rgb(164, 115, 232);
+  --mint-c62-rgb: 164, 115, 232;
+  --mint-c63: rgb(169, 123, 234);
+  --mint-c63-rgb: 169, 123, 234;
+  --mint-c64: rgb(149, 93, 229);
+  --mint-c64-rgb: 149, 93, 229;
+  --mint-c65: rgb(172, 128, 234);
+  --mint-c65-rgb: 172, 128, 234;
+  --mint-c66: rgb(161, 110, 231);
+  --mint-c66-rgb: 161, 110, 231;
+  --mint-c67: rgb(99, 31, 193);
+  --mint-c67-rgb: 99, 31, 193;
+  --mint-c68: rgb(201, 172, 241);
+  --mint-c68-rgb: 201, 172, 241;
+  --mint-c69: rgb(161, 110, 231);
+  --mint-c69-rgb: 161, 110, 231;
+  --mint-c70: rgb(164, 115, 232);
+  --mint-c70-rgb: 164, 115, 232;
+  --mint-c71: rgb(105, 34, 206);
+  --mint-c71-rgb: 105, 34, 206;
+  --mint-c72: rgb(158, 106, 231);
+  --mint-c72-rgb: 158, 106, 231;
+  --mint-c73: rgb(141, 80, 226);
+  --mint-c73-rgb: 141, 80, 226;
+  --mint-c74: rgb(152, 97, 229);
+  --mint-c74-rgb: 152, 97, 229;
+  --mint-c75: rgb(178, 137, 236);
+  --mint-c75-rgb: 178, 137, 236;
+  --mint-c76: rgb(186, 150, 238);
+  --mint-c76-rgb: 186, 150, 238;
+  --mint-c77: rgb(126, 58, 223);
+  --mint-c77-rgb: 126, 58, 223;
+  --mint-c78: rgb(110, 35, 215);
+  --mint-c78-rgb: 110, 35, 215;
+  --mint-c79: rgb(189, 154, 239);
+  --mint-c79-rgb: 189, 154, 239;
+  --mint-c80: rgb(172, 128, 234);
+  --mint-c80-rgb: 172, 128, 234;
+  --mint-c81: rgb(172, 128, 234);
+  --mint-c81-rgb: 172, 128, 234;
+  --mint-c82: rgb(138, 75, 226);
+  --mint-c82-rgb: 138, 75, 226;
+  --mint-c83: rgb(118, 44, 221);
+  --mint-c83-rgb: 118, 44, 221;
+  --mint-c84: rgb(195, 163, 240);
+  --mint-c84-rgb: 195, 163, 240;
+  --mint-c85: rgb(201, 172, 241);
+  --mint-c85-rgb: 201, 172, 241;
+  --mint-c86: rgb(152, 97, 229);
+  --mint-c86-rgb: 152, 97, 229;
+  --mint-c87: rgb(105, 34, 206);
+  --mint-c87-rgb: 105, 34, 206;
+  --mint-c88: rgb(161, 110, 231);
+  --mint-c88-rgb: 161, 110, 231;
+  --mint-c89: rgb(221, 202, 246);
+  --mint-c89-rgb: 221, 202, 246;
+  --mint-c90: rgb(152, 97, 229);
+  --mint-c90-rgb: 152, 97, 229;
+  --mint-c91: rgb(161, 110, 231);
+  --mint-c91-rgb: 161, 110, 231;
+  --mint-c92: rgb(105, 34, 206);
+  --mint-c92-rgb: 105, 34, 206;
+  --mint-c93: rgb(164, 115, 232);
+  --mint-c93-rgb: 164, 115, 232;
+  --mint-c94: rgb(141, 80, 226);
+  --mint-c94-rgb: 141, 80, 226;
+  --mint-c95: rgb(161, 110, 231);
+  --mint-c95-rgb: 161, 110, 231;
+  --mint-c96: rgb(192, 159, 239);
+  --mint-c96-rgb: 192, 159, 239;
+  --mint-c97: rgb(164, 115, 232);
+  --mint-c97-rgb: 164, 115, 232;
+}
+
+/* ================= 「深渊回响」选策略屏：把原版的薄荷绿底/框换成深潜紫（维护者 2026-11-05） ================= */
+html.sp-deepecho .draft-order {
+  background: linear-gradient(180deg, rgba(112, 78, 190, .30), rgba(46, 30, 84, .18) 70%, rgba(18, 12, 30, .06));
+}
+html.sp-deepecho .dorder__box.is-band {
+  background: radial-gradient(circle at 50% 40%, #2a1c4a, #0d0916 75%);
+}
+html.sp-deepecho .dorder__me { background: var(--mint-500); color: #150a2b; box-shadow: 0 0 0 .02rem #150a2b; }
+html.sp-deepecho .dturn__finger, html.sp-deepecho .dorder__zoom { filter: hue-rotate(215deg) saturate(1.4); }
+
+/* 深潜：只把**绿色**的精灵图标转成紫（白色图标不受影响 —— hue-rotate 对无彩色像素是恒等变换；
+   维护者 2026-11-05：白色的问题/图标保持白色） */
+html.sp-deepecho .capsule__icon,
+html.sp-deepecho .capsule__icon img,
+html.sp-deepecho .capsule__icon svg,
+html.sp-deepecho .caption__icon,
+html.sp-deepecho .gtop__cap .sprite,
+html.sp-deepecho .gtop__cap img,
+html.sp-deepecho .gtop__cap svg {
+  filter: hue-rotate(120deg) saturate(1.6) brightness(1.05);
+}
+
+/* 选策略右栏详情：原版薄荷绿底/标签一并换紫（维护者 2026-11-05） */
+html.sp-deepecho .draft-detail {
+  background: linear-gradient(180deg, rgba(78, 52, 140, .55), rgba(34, 22, 62, .45) 55%, rgba(12, 9, 20, .25));
+}
+html.sp-deepecho .draft-tag { color: #1a0f33; background: rgba(var(--mint-400-rgb), .7); }
+html.sp-deepecho .draft-detail__art img,
+html.sp-deepecho .draft-done__art img { filter: saturate(.85) drop-shadow(0 0 .14rem rgba(var(--mint-rgb), .45)); }
+html.sp-deepecho .draft-detail__art::before,
+html.sp-deepecho .draft-done__art::before { border-color: rgba(224, 212, 255, .55); }
+html.sp-deepecho .draft-detail__art::after,
+html.sp-deepecho .draft-done__art::after { color: rgba(224, 212, 255, .28); }
+
+/* 「已选定策略」整屏（.draft-done）：绿底 + 绿扫描线一并换紫（维护者 2026-11-05） */
+html.sp-deepecho .draft-done {
+  background: linear-gradient(180deg, rgba(96, 62, 168, .52), rgba(40, 26, 74, .46) 60%, rgba(14, 10, 24, .32));
+  box-shadow: inset 0 0 0 1px rgba(var(--mint-rgb), .22);
+}
+html.sp-deepecho .draft-done::after {
+  background: repeating-linear-gradient(0deg, rgba(var(--mint-rgb), .1) 0 2px, transparent 2px 6px);
+}
+html.sp-deepecho .draft-done__hp b { background: var(--mint-500); color: #150a2b; }
+html.sp-deepecho .draft-done__title { color: var(--mint-400); text-shadow: 0 0 .16rem rgba(var(--mint-rgb), .4); }

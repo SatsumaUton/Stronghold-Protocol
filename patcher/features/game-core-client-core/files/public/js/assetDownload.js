@@ -1,6 +1,9 @@
-// Explicit title-screen predownload. Reuse the game's HTTP cache and exact manifest URLs;
-// never decode every model/image/audio file into RAM or persist an unverified "complete" flag.
-// A URL already stored by a local import (assetPack.js) is marked done and not requested again.
+// Explicit title-screen predownload of the exact manifest URLs; never decode every model/image/audio file into RAM or
+// persist an unverified "complete" flag. In a secure context each downloaded file is also kept in the import cache
+// (assetCache.js openDownloadStore, GitHub #725), which the worker answers from; elsewhere only the HTTP cache keeps it.
+// A URL already stored there — by a local import (assetPack.js) or an earlier download — is marked done and not
+// requested again.
+
 // 资源站源：window.__SP_ASSET_ORIGIN 由服务端注入（换域名不必改代码），缺省用内置值。
 function __spRemoteAssetRe() {
   // 优先级：服务端注入 > data/config.json 的 assetOrigin > 空（不匹配任何远程地址）
@@ -13,12 +16,13 @@ function __spRemoteAssetRe() {
 }
 
 import { mediaUrl } from './media.js';
-import { listImportedPaths, IMPORTED_ASSET_CACHE, isQuotaError, storageRoom } from './assetCache.js';
+import { listImportedPaths, IMPORTED_ASSET_CACHE, isQuotaError, storageRoom, openDownloadStore } from './assetCache.js';
+import { DOWNLOAD_VOICE_TREES, downloadVoiceLanguages, voiceDownloadStore } from './voiceDownloads.js';
 
 /**
  * Collect only same-origin art files, including all Spine pages and optional local scenes.
  * The served 0.3.0 views are walked as they are: hashed `/assets/~…` and `/fonts/~…` URLs, the extra dub banks
- * (`voiceEn` / `voiceKr` / `voiceNative`), statistics-page art, and local groups such as the 射击台 mesh. A cosmetic
+ * (`voiceEn` / `voiceKr` / `voiceNative`, filtered before queuing), statistics-page art and local groups. A cosmetic
  * plugin's own files are `/p/<id>/<hash8>/…` and are not in these manifests, so they are not queued here. The official
  * battle effects (DESIGN §33) come in their own manifest, /data/local-fx.json, read the same way when the host has them.
  */
@@ -66,12 +70,29 @@ function safeLocalStorage() {
   }
 }
 
+
+/** Keep only the explicitly selected download dubs per operator; never mutate the served manifest. */
+export function selectVoiceAssets(manifest, settings) {
+  const audio = manifest?.audio;
+  if (!audio || typeof audio !== 'object') return manifest;
+  const selected = { ...audio };
+  for (const [lang, tree] of Object.entries(DOWNLOAD_VOICE_TREES)) {
+    selected[tree] = Object.fromEntries(Object.entries(audio[tree] || {}).filter(([charId]) =>
+      downloadVoiceLanguages(settings, charId, audio).includes(lang)));
+  }
+  return { ...manifest, audio: selected };
+}
+
 /** A bounded, pausable download queue. A file counts only after its entire body arrives. */
 export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.fetch(...args),
-  concurrency = 4, timeoutMs = 60000, retries = 2, lookupImported = listImportedPaths,
-  room = storageRoom, store = safeLocalStorage() } = {}) {
-  let state = { phase: 'idle', total: 0, done: 0, bytes: 0, failures: [], localMissing: false, cached: 0 };
-  let urls = null, running = null, controller = null, paused = false, lastNotice = 0;
+    concurrency = 4, timeoutMs = 60000, retries = 2, lookupImported = listImportedPaths,
+    room = storageRoom, store = safeLocalStorage(),
+    openStore = openDownloadStore, readVoiceSettings = () => voiceDownloadStore.get() } = {}) {
+  // `storage`: where downloads are kept — 'site' (the import cache), 'http' (the HTTP cache only: no secure context or no
+  // Cache Storage), 'full' (a write failed, e.g. over quota: the rest of this run goes to the HTTP cache only)
+  let state = { phase: 'idle', total: 0, done: 0, bytes: 0, failures: [], localMissing: false, cached: 0, storage: null };
+  let urls = null, running = null, controller = null, paused = false, lastNotice = 0, keeper = null;
+  let voiceKey = null, voiceSettings = null;
   const complete = new Set(), failures = new Map(), listeners = new Set();
 
   // ---- 已完成状态持久化 ----------------------------------------------------------------
@@ -181,7 +202,7 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
         let size = 0;
         // 边读边收集字节：读完要写进 Cache Storage 的话直接用这份，
         // 不能再发一次请求（那样每个文件要下载两遍，实测请求数直接翻倍）。
-        const chunks = [];
+        const chunks = keeper ? [] : null;
         if (response.body?.getReader) {
           const reader = response.body.getReader();
           try {
@@ -189,20 +210,20 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
               const { done, value } = await reader.read();
               if (done) break;
               size += value.byteLength;
-              chunks.push(value);
+              chunks?.push(value);
               state = { ...state, bytes: state.bytes + value.byteLength };
               emit();
             }
           } finally { reader.releaseLock(); }
         } else {
-          const buf = await response.arrayBuffer();
-          size = buf.byteLength;
-          chunks.push(new Uint8Array(buf));
+          const body = new Uint8Array(await response.arrayBuffer());
+          size = body.byteLength;
+          chunks?.push(body);
           state = { ...state, bytes: state.bytes + size };
         }
         if (!size) throw Object.assign(new Error('Empty asset response'), { status: 'empty' });
-        // 把这份响应交给调用方，用于写进我们自己的 Cache Storage
-        return { chunks, size, headers: response.headers, status: response.status };
+        if (chunks) await keep(url, chunks, size, response.headers.get('content-type'));
+        return;
       } catch (error) {
         if (paused) throw error;
         // 404/410 以前算「永久失败」直接放弃。但服务器的 404 也可能是浏览器缓存里的旧结论
@@ -220,26 +241,41 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
     }
   }
 
+  /** Keep a whole body in the import cache; a failed write (over quota …) sends the rest of the run to the HTTP cache. */
+  async function keep(url, chunks, size, type) {
+    const store = keeper;
+    if (!store) return;
+    const body = new Uint8Array(size);
+    let at = 0;
+    for (const chunk of chunks) { body.set(chunk, at); at += chunk.byteLength; }
+    try {
+      await store.put(url, body, type || undefined);
+    } catch {
+      if (keeper === store) { keeper = null; state = { ...state, storage: 'full' }; }
+    }
+  }
+
   async function run() {
     try {
       // 每次开始都重读清单（3 个小 JSON，走 no-cache 回源）：以前只在首次（urls 为空）读，
       // 于是服主上新素材后，玩家点「检查并补齐」**永远看不到新文件**（预存在的红测试
-      // 「a completed check reads updated manifests…」说的就是这个）。重读很便宜，
-      // 而且下面「逐个确认还在不在缓存里」本来就要走一遍。
-      state = { ...state, phase: 'preparing', error: null };
-      emit(true);
-      // Sequential manifest reads keep cancellation simple and never leave a rejected sibling promise.
-      const assets = await request('/data/assets.json', true);
-      const local = await request('/data/local-assets.json', true, true);
-      // the official battle effects' files (DESIGN §33): optional, like the local manifest
-      const fx = await request('/data/local-fx.json', true, true);
-      if (!assets || typeof assets !== 'object' || Array.isArray(assets)
-        || (local !== null && (!local || typeof local !== 'object' || !local.groups))
-        || (fx !== null && (!fx || typeof fx !== 'object' || !fx.groups))) throw new Error('Invalid asset manifest');
-      const list = collectAssetUrls(assets, local, fx);
-      if (!list.length) throw new Error('Empty asset manifest');
-      urls = list;
-      state = { ...state, total: urls.length, localMissing: local === null };
+      if (!urls) {
+        state = { ...state, phase: 'preparing', error: null };
+        emit(true);
+        // Sequential manifest reads keep cancellation simple and never leave a rejected sibling promise.
+        const assets = await request('/data/assets.json', true);
+        const local = await request('/data/local-assets.json', true, true);
+        // the official battle effects' files (DESIGN §33): optional, like the local manifest
+        const fx = await request('/data/local-fx.json', true, true);
+        if (!assets || typeof assets !== 'object' || Array.isArray(assets)
+          || (local !== null && (!local || typeof local !== 'object' || !local.groups))
+          || (fx !== null && (!fx || typeof fx !== 'object' || !fx.groups))) throw new Error('Invalid asset manifest');
+        const list = collectAssetUrls(selectVoiceAssets(assets, voiceSettings), local, fx);
+        if (!list.length) throw new Error('Empty asset manifest');
+        urls = list;
+        for (const url of complete) if (!urls.includes(url)) complete.delete(url);
+        state = { ...state, total: urls.length, localMissing: local === null };
+      }
       if (paused) return;
 
       // 上次已经把这一版清单下完（记录在 localStorage）：这次不再是「全量重验」。
@@ -288,6 +324,9 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
         }
       }
       state = { ...state, cached };
+      if (paused) return;
+      try { keeper = await openStore(); } catch { keeper = null; }
+      state = { ...state, storage: keeper ? 'site' : 'http' };
       if (paused) return;
       state = { ...state, phase: 'downloading' };
       failures.clear();
@@ -351,6 +390,9 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
     } catch (error) {
       if (!paused) state = { ...state, phase: 'error', error: { url: error.url, status: error.status || 'manifest' } };
     } finally {
+      // the stored files reach the import index, so the next check counts them ready and requests none of them
+      if (keeper) { try { await keeper.flush(); } catch { /* the entries stay; the worker still answers them */ } }
+      keeper = null;
       if (paused) state = { ...state, phase: 'paused' };
       emit(true);
     }
@@ -365,8 +407,17 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
       controller = new AbortController();
       // 以前这里只要 phase 是 complete 就 urls = null、complete.clear()，
       // 把「已完成」整个抹掉重新走一遍 —— 玩家点一次就重新请求全部素材（实测 10742 个请求）。
-      // 现在：不清空计数，只让 run() 用「已完成记录 + 缓存逐个确认」的方式判断
-      // 哪些真的还在缓存里；清理过缓存的文件会被重新排队，功能不受影响。
+      const nextSettings = readVoiceSettings();
+      const nextKey = JSON.stringify(nextSettings);
+      const changed = voiceKey !== nextKey;
+      voiceKey = nextKey;
+      voiceSettings = nextSettings;
+      // A new check after completion revalidates the manifest and all files through the HTTP cache.
+      if (state.phase === 'complete' && !changed) {
+        urls = null; complete.clear();
+        state = { phase: 'idle', total: 0, done: 0, bytes: 0, failures: [], localMissing: false, cached: 0, storage: null };
+      }
+      if (changed) urls = null; // Reconcile URLs after rereading manifests; retain completed non-voice files.
       running = run().finally(() => { running = null; });
       return running;
     },

@@ -1,7 +1,7 @@
 // 转场 helpers (PR #643): small hooks for the one-off motion of the room and the pre-game screens. With
 // prefers-reduced-motion nothing plays. [ASSUMED] The motion and its timings (700 ms here, the room's 480 / 70 ms rise in
 // css/screens/room.css) come from the community PR #643 design, not from a recording of the event.
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { reducedMotion } from './device.js';
 
 /**

@@ -2,7 +2,7 @@
 // music track (its intro and loop), a sound — each file with a play button, the installation's on the left, the plugin's
 // on the right (the preview layers' `<key>~plugin` entries, ./layers.js). One sound plays at a time.
 
-import { useEffect, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../../../js/ui/components.js';
 import { data } from '../../../js/data.js';
 import { t } from '../../../../shared/i18n.js';

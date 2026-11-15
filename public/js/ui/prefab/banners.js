@@ -7,7 +7,7 @@
 // 可露希尔's window shows the theme's UI Spine where the prefab has its SkeletonGraphic ([ASSUMED] idle, as in the
 // funds card; the prefab's spine view loads it at run time and names no clip).
 
-import { useEffect, useMemo, useRef, useState } from '../../../vendor/hooks.module.js';
+import { useEffect, useMemo, useRef, useState } from '../../../vendor/hooks.module.v2.js';
 import { html } from '../components.js';
 import { t } from '../../../../shared/i18n.js';
 import { PrefabView } from './view.js';
