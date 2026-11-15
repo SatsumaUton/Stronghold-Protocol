@@ -6550,7 +6550,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_1027_greyy2_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_1027_greyy2_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_1027_greyy2_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_1027_greyy2_2.png"
+        }
+      }
     },
     "char_1028_texas2": {
       "avatar": "/assets/char/avatar/char_1028_texas2.png",
@@ -10780,7 +10790,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_1036_fang2_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_1036_fang2_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_1036_fang2_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_1036_fang2_2.png"
+        }
+      }
     },
     "char_1037_amiya3": {
       "avatar": "/assets/char/avatar/char_1037_amiya3_2.png",
@@ -20104,7 +20124,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_129_bluep_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_129_bluep_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_129_bluep_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_129_bluep_2.png"
+        }
+      }
     },
     "char_133_mm": {
       "avatar": "/assets/char/avatar/char_133_mm.png",
@@ -28115,7 +28145,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_185_frncat_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_185_frncat_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_185_frncat_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_185_frncat_2.png"
+        }
+      }
     },
     "char_188_helage": {
       "avatar": "/assets/char/avatar/char_188_helage.png",
@@ -28665,7 +28705,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_193_frostl_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_193_frostl_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_193_frostl_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_193_frostl_2.png"
+        }
+      }
     },
     "char_194_leto": {
       "avatar": "/assets/char/avatar/char_194_leto.png",
@@ -28839,7 +28889,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_194_leto_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_194_leto_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_194_leto_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_194_leto_2.png"
+        }
+      }
     },
     "char_195_glassb": {
       "avatar": "/assets/char/avatar/char_195_glassb.png",
@@ -28988,7 +29048,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_195_glassb_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_195_glassb_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_195_glassb_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_195_glassb_2.png"
+        }
+      }
     },
     "char_196_sunbr": {
       "avatar": "/assets/char/avatar/char_196_sunbr.png",
@@ -37824,7 +37894,17 @@
           "bounds": null
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_219_meteo_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_219_meteo_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_219_meteo_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_219_meteo_2.png"
+        }
+      }
     },
     "char_222_bpipe": {
       "avatar": "/assets/char/avatar/char_222_bpipe.png",
@@ -44808,7 +44888,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_274_astesi_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_274_astesi_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_274_astesi_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_274_astesi_2.png"
+        }
+      }
     },
     "char_279_excu": {
       "avatar": "/assets/char/avatar/char_279_excu.png",
@@ -49752,7 +49842,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_325_bison_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_325_bison_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_325_bison_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_325_bison_2.png"
+        }
+      }
     },
     "char_328_cammou": {
       "avatar": "/assets/char/avatar/char_328_cammou.png",
@@ -49910,7 +50010,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_328_cammou_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_328_cammou_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_328_cammou_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_328_cammou_2.png"
+        }
+      }
     },
     "char_332_archet": {
       "avatar": "/assets/char/avatar/char_332_archet.png",
@@ -50602,7 +50712,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_333_sidero_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_333_sidero_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_333_sidero_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_333_sidero_2.png"
+        }
+      }
     },
     "char_337_utage": {
       "avatar": "/assets/char/avatar/char_337_utage.png",
@@ -52738,7 +52858,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_346_aosta_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_346_aosta_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_346_aosta_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_346_aosta_2.png"
+        }
+      }
     },
     "char_347_jaksel": {
       "avatar": "/assets/char/avatar/char_347_jaksel.png",
@@ -52902,7 +53032,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_347_jaksel_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_347_jaksel_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_347_jaksel_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_347_jaksel_2.png"
+        }
+      }
     },
     "char_348_ceylon": {
       "avatar": "/assets/char/avatar/char_348_ceylon.png",
@@ -55349,7 +55489,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_367_swllow_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_367_swllow_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_367_swllow_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_367_swllow_2.png"
+        }
+      }
     },
     "char_373_lionhd": {
       "avatar": "/assets/char/avatar/char_373_lionhd.png",
@@ -61997,7 +62147,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4031_liesel_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4031_liesel_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4031_liesel_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4031_liesel_2.png"
+        }
+      }
     },
     "char_4036_forcer": {
       "avatar": "/assets/char/avatar/char_4036_forcer.png",
@@ -63783,7 +63943,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4041_chnut_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4041_chnut_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4041_chnut_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4041_chnut_2.png"
+        }
+      }
     },
     "char_4042_lumen": {
       "avatar": "/assets/char/avatar/char_4042_lumen.png",
@@ -65135,7 +65305,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4047_pianst_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4047_pianst_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4047_pianst_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4047_pianst_2.png"
+        }
+      }
     },
     "char_4048_doroth": {
       "avatar": "/assets/char/avatar/char_4048_doroth.png",
@@ -68770,7 +68950,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4066_highmo_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4066_highmo_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4066_highmo_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4066_highmo_2.png"
+        }
+      }
     },
     "char_4072_ironmn": {
       "avatar": "/assets/char/avatar/char_4072_ironmn.png",
@@ -79484,7 +79674,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4147_mitm_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4147_mitm_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4147_mitm_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4147_mitm_2.png"
+        }
+      }
     },
     "char_4148_philae": {
       "avatar": "/assets/char/avatar/char_4148_philae.png",
@@ -80980,7 +81180,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4165_ctrail_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4165_ctrail_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4165_ctrail_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4165_ctrail_2.png"
+        }
+      }
     },
     "char_4166_varkis": {
       "avatar": "/assets/char/avatar/char_4166_varkis.png",
@@ -81154,7 +81364,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4166_varkis_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4166_varkis_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4166_varkis_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4166_varkis_2.png"
+        }
+      }
     },
     "char_416_zumama": {
       "avatar": "/assets/char/avatar/char_416_zumama.png",
@@ -81714,7 +81934,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4177_brigid_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4177_brigid_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4177_brigid_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4177_brigid_2.png"
+        }
+      }
     },
     "char_4179_monstr": {
       "avatar": "/assets/char/avatar/char_4179_monstr.png",
@@ -84132,7 +84362,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4198_christ_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4198_christ_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4198_christ_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4198_christ_2.png"
+        }
+      }
     },
     "char_4202_haruka": {
       "avatar": "/assets/char/avatar/char_4202_haruka.png",
@@ -84728,7 +84968,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4203_kichi_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4203_kichi_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4203_kichi_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4203_kichi_2.png"
+        }
+      }
     },
     "char_4204_mantra": {
       "avatar": "/assets/char/avatar/char_4204_mantra.png",
@@ -86385,7 +86635,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4221_ju_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4221_ju_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4221_ju_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4221_ju_2.png"
+        }
+      }
     },
     "char_4222_taraxa": {
       "avatar": "/assets/char/avatar/char_4222_taraxa.png",
@@ -86576,7 +86836,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4222_taraxa_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4222_taraxa_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4222_taraxa_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4222_taraxa_2.png"
+        }
+      }
     },
     "char_4224_turdus": {
       "avatar": "/assets/char/avatar/char_4224_turdus.png",
@@ -86738,7 +87008,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4224_turdus_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4224_turdus_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4224_turdus_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4224_turdus_2.png"
+        }
+      }
     },
     "char_4226_veen": {
       "avatar": "/assets/char/avatar/char_4226_veen.png",
@@ -88324,7 +88604,17 @@
           "bounds": null
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4232_hbound_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4232_hbound_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4232_hbound_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4232_hbound_2.png"
+        }
+      }
     },
     "char_4235_thumpy": {
       "avatar": "/assets/char/avatar/char_4235_thumpy.png",
@@ -89488,6 +89778,15 @@
               }
             }
           }
+        },
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4244_tocka_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4244_tocka_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4244_tocka_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4244_tocka_2.png"
         }
       }
     },
@@ -89660,7 +89959,17 @@
           "bounds": null
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4245_alga_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4245_alga_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4245_alga_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4245_alga_2.png"
+        }
+      }
     },
     "char_4246_dminon": {
       "avatar": "/assets/char/avatar/char_4246_dminon.png",
@@ -90062,6 +90371,15 @@
               }
             }
           }
+        },
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4246_dminon_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4246_dminon_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4246_dminon_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4246_dminon_2.png"
         }
       }
     },
@@ -90407,6 +90725,15 @@
               "bounds": null
             }
           }
+        },
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_4247_oxi_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_4247_oxi_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_4247_oxi_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_4247_oxi_2.png"
         }
       }
     },
@@ -94690,7 +95017,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_455_nothin_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_455_nothin_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_455_nothin_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_455_nothin_2.png"
+        }
+      }
     },
     "char_469_indigo": {
       "avatar": "/assets/char/avatar/char_469_indigo.png",
@@ -97009,7 +97346,17 @@
           "bounds": null
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_484_robrta_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_484_robrta_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_484_robrta_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_484_robrta_2.png"
+        }
+      }
     },
     "char_485_pallas": {
       "avatar": "/assets/char/avatar/char_485_pallas.png",
@@ -97767,7 +98114,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_488_buildr_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_488_buildr_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_488_buildr_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_488_buildr_2.png"
+        }
+      }
     },
     "char_491_humus": {
       "avatar": "/assets/char/avatar/char_491_humus.png",
@@ -98260,7 +98617,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_492_quercu_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_492_quercu_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_492_quercu_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_492_quercu_2.png"
+        }
+      }
     },
     "char_494_vendla": {
       "avatar": "/assets/char/avatar/char_494_vendla.png",
@@ -99665,7 +100032,17 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_499_kaitou_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_499_kaitou_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_499_kaitou_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_499_kaitou_2.png"
+        }
+      }
     },
     "char_600_cpione": {
       "avatar": "/assets/char/avatar/char_600_cpione.png",
@@ -99824,7 +100201,8 @@
             "height": 366.027
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_601_cguard": {
       "avatar": "/assets/char/avatar/char_601_cguard.png",
@@ -99981,7 +100359,8 @@
             "height": 402.504
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_602_cdfend": {
       "avatar": "/assets/char/avatar/char_602_cdfend.png",
@@ -100141,7 +100520,8 @@
             "height": 374.498
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_603_csnipe": {
       "avatar": "/assets/char/avatar/char_603_csnipe.png",
@@ -100300,7 +100680,8 @@
             "height": 397.507
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_604_ccast": {
       "avatar": "/assets/char/avatar/char_604_ccast.png",
@@ -100459,7 +100840,8 @@
             "height": 354.01
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_605_cmedic": {
       "avatar": "/assets/char/avatar/char_605_cmedic.png",
@@ -100618,7 +101000,8 @@
             "height": 391.02
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_606_csuppo": {
       "avatar": "/assets/char/avatar/char_606_csuppo.png",
@@ -100777,7 +101160,8 @@
             "height": 392.034
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_607_cspec": {
       "avatar": "/assets/char/avatar/char_607_cspec.png",
@@ -100936,7 +101320,8 @@
             "height": 452.026
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_608_acpion": {
       "avatar": "/assets/char/avatar/char_608_acpion.png",
@@ -101113,7 +101498,8 @@
             "height": 414.518
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_609_acguad": {
       "avatar": "/assets/char/avatar/char_609_acguad.png",
@@ -101272,7 +101658,8 @@
             "height": 380.447
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_610_acfend": {
       "avatar": "/assets/char/avatar/char_610_acfend.png",
@@ -101431,7 +101818,8 @@
             "height": 388.941
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_611_acnipe": {
       "avatar": "/assets/char/avatar/char_611_acnipe.png",
@@ -101590,7 +101978,8 @@
             "height": 411.581
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_612_accast": {
       "avatar": "/assets/char/avatar/char_612_accast.png",
@@ -101749,7 +102138,8 @@
             "height": 371.271
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_613_acmedc": {
       "avatar": "/assets/char/avatar/char_613_acmedc.png",
@@ -101908,7 +102298,8 @@
             "height": 425.276
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_614_acsupo": {
       "avatar": "/assets/char/avatar/char_614_acsupo.png",
@@ -102067,7 +102458,8 @@
             "height": 403.656
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_615_acspec": {
       "avatar": "/assets/char/avatar/char_615_acspec.png",
@@ -102232,7 +102624,8 @@
             "height": 412.988
           }
         }
-      }
+      },
+      "skins": {}
     },
     "char_616_pithst": {
       "avatar": "/assets/char/avatar/char_616_pithst.png",
@@ -102543,7 +102936,17 @@
           "bounds": null
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_618_acrbot_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_618_acrbot_2.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/avatar/char_618_acrbot_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_618_acrbot_2.png"
+        }
+      }
     }
   },
   "enemies": {
