@@ -1,7 +1,7 @@
-// server/sim/battle/echoRules.js — 「深渊回响」的战斗规则，由 **BattleSpec.flags.echoRules** 驱动（2026-11-06）。
+// server/sim/battle/echoRules.js — 特殊模式的战斗规则，由 **BattleSpec.flags.echoRules** 驱动（2026-11-06）。
 //
-// 为什么要有这一层：深潜的战斗效果原先全部写在 `server/match/match/echoPhase.js` 的 `_echoHookBattle()`
-// 里 —— 那是 Match 层，只挂在**服务端那份 battle** 上。而 `SP_COMBAT` 未设时深潜默认由浏览器按 BattleSpec
+// 为什么要有这一层：特殊模式的战斗效果原先全部写在 `server/match/match/echoPhase.js` 的 `_echoHookBattle()`
+// 里 —— 那是 Match 层，只挂在**服务端那份 battle** 上。而 `SP_COMBAT` 未设时特殊模式默认由浏览器按 BattleSpec
 // 跑（`public/js/battle/runner.js` → `/sim/spec.js`），客户端重建出来的战斗里没有这些钩子，于是玩家反馈
 // 「侵蚀词条没效果」「部分祝福不生效」。
 //
@@ -70,7 +70,7 @@ export function echoShieldAmount(enemy, shieldPct) {
 }
 
 /**
- * 装上 spec 带来的深潜战斗规则。幂等（同一个 battle 调两次不会重复挂）。
+ * 装上 spec 带来的特殊模式战斗规则。幂等（同一个 battle 调两次不会重复挂）。
  * @param {import('../Battle.js').Battle} battle
  * @returns {number} 装上的规则组数（诊断 / 测试用）
  */
