@@ -10784,9 +10784,9 @@
     },
     "char_1037_amiya3": {
       "avatar": "/assets/char/avatar/char_1037_amiya3_2.png",
-      "avatarE2": "/assets/char/avatar/char_1037_amiya3_2.png",
-      "portrait": "/assets/char/portrait/char_1037_amiya3_2.png",
-      "portraitE2": "/assets/char/portrait/char_1037_amiya3_2.png",
+      "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_1037_amiya3_2.png",
+      "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_1037_amiya3_2.png",
+      "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_1037_amiya3_2.png",
       "spine": {
         "front": {
           "skel": "/assets/spine/op/char_1037_amiya3/front/char_1037_amiya3.skel",
@@ -10954,7 +10954,138 @@
           }
         }
       },
-      "skins": {}
+      "skins": {
+        "e2": {
+          "name": "精英二",
+          "type": "e2",
+          "group": "",
+          "portrait": "https://assets.luobomiao.love/assets/char/portrait/char_1037_amiya3_2.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/portrait/char_1037_amiya3_2.png",
+          "avatar": "/assets/char/avatar/char_1037_amiya3_2.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/avatar/char_1037_amiya3_2.png"
+        },
+        "char_1037_amiya3_sale_13": {
+          "name": "寰宇独奏",
+          "type": "outfit",
+          "group": "忒斯特收藏/XIV",
+          "portrait": "https://assets.luobomiao.love/assets/char/skin/char_1037_amiya3_sale_13.png",
+          "portraitE2": "https://assets.luobomiao.love/assets/char/skin/char_1037_amiya3_sale_13.png",
+          "avatar": "https://assets.luobomiao.love/assets/char/skin_avatar/char_1037_amiya3_sale_13.png",
+          "avatarE2": "https://assets.luobomiao.love/assets/char/skin_avatar/char_1037_amiya3_sale_13.png",
+          "spine": {
+            "front": {
+              "skel": "https://assets.luobomiao.love/assets/spine/op/char_1037_amiya3/char_1037_amiya3_sale_13/front/char_1037_amiya3_sale_13.skel",
+              "atlas": "https://assets.luobomiao.love/assets/spine/op/char_1037_amiya3/char_1037_amiya3_sale_13/front/char_1037_amiya3_sale_13.atlas",
+              "textures": [
+                "https://assets.luobomiao.love/assets/spine/op/char_1037_amiya3/char_1037_amiya3_sale_13/front/char_1037_amiya3_sale_13.png"
+              ],
+              "pma": false,
+              "anims": {
+                "idle": "Idle",
+                "deploy": "Start",
+                "attack": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null
+                },
+                "attackDown": null,
+                "skill": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null,
+                  "via": "attack",
+                  "index": 0,
+                  "idle": null
+                },
+                "die": "Die",
+                "move": null,
+                "stun": null,
+                "skills": {
+                  "0": {
+                    "begin": null,
+                    "loop": "Attack",
+                    "end": null,
+                    "via": "attack",
+                    "index": 0,
+                    "idle": null
+                  },
+                  "1": {
+                    "begin": null,
+                    "loop": "Attack",
+                    "end": null,
+                    "via": "attack",
+                    "index": 1,
+                    "idle": null
+                  },
+                  "2": {
+                    "begin": null,
+                    "loop": "Attack",
+                    "end": null,
+                    "via": "attack",
+                    "index": 2,
+                    "idle": null
+                  }
+                }
+              }
+            },
+            "back": {
+              "skel": "https://assets.luobomiao.love/assets/spine/op/char_1037_amiya3/char_1037_amiya3_sale_13/back/char_1037_amiya3_sale_13.skel",
+              "atlas": "https://assets.luobomiao.love/assets/spine/op/char_1037_amiya3/char_1037_amiya3_sale_13/back/char_1037_amiya3_sale_13.atlas",
+              "textures": [
+                "https://assets.luobomiao.love/assets/spine/op/char_1037_amiya3/char_1037_amiya3_sale_13/back/char_1037_amiya3_sale_13.png"
+              ],
+              "pma": false,
+              "anims": {
+                "idle": "Idle",
+                "deploy": "Start",
+                "attack": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null
+                },
+                "attackDown": null,
+                "skill": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null,
+                  "via": "attack",
+                  "index": 0,
+                  "idle": null
+                },
+                "die": "Die",
+                "move": null,
+                "stun": null,
+                "skills": {
+                  "0": {
+                    "begin": null,
+                    "loop": "Attack",
+                    "end": null,
+                    "via": "attack",
+                    "index": 0,
+                    "idle": null
+                  },
+                  "1": {
+                    "begin": null,
+                    "loop": "Attack",
+                    "end": null,
+                    "via": "attack",
+                    "index": 1,
+                    "idle": null
+                  },
+                  "2": {
+                    "begin": null,
+                    "loop": "Attack",
+                    "end": null,
+                    "via": "attack",
+                    "index": 2,
+                    "idle": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "char_1038_whitw2": {
       "avatar": "/assets/char/avatar/char_1038_whitw2.png",
