@@ -39,6 +39,7 @@
 
 // Polyfills first (older Safari / Firefox ESR): every module evaluated after this one sees them.
 import './ui/compat.js';
+import { ReleaseNotesHost } from './ui/releaseNotes.js';
 import { render, options } from '../vendor/preact.module.js';
 import { useErrorBoundary } from '../vendor/hooks.module.js';
 import { html, UiHosts, Button, MicroLabel, closeAllDialogs } from './ui/components.js';
@@ -51,6 +52,7 @@ import { GAME_FILES } from './ui/gameComponents.js';
 import { TitleScreen, sanitizeName } from './screens/title.js';
 import { LobbyScreen, rememberRoom, parseRoomParam, joinKnown } from './screens/lobby.js';
 import { RoomScreen, TrustedNotice } from './screens/room.js';
+import { EnteringRoomScreen } from './screens/entering.js';
 import { GameScreen } from './screens/game.js';
 import { preloadBootArt } from './ui/protocolBoot.js';
 import { audio, installAudio } from './audio.js';
@@ -58,6 +60,7 @@ import { installLobbyMedia } from './ui/lobbyMedia.js';
 import { settingsStore } from './ui/settings.js';
 import { GuideHost } from './ui/guide.js';
 import { installDeviceSupport, useFullscreen, useScreenWakeLock } from './ui/device.js';
+import { migrateLobbyVersionOnce } from './versions.js';
 import { isCombatPhase } from './ui/gameLogic/phases.js';
 import { registerImportedAssetWorker } from './assetCache.js';
 import { LoadoutHost } from './screens/loadout.js';
@@ -74,14 +77,16 @@ import { t, N_, translateWire } from '../../shared/i18n.js';
 import { recordError, installTrafficMeter } from './diag.js';
 import { installContent, installContentSet } from './content.js';
 import { cosmetics } from './cosmetics.js';
-import { sanitizeVersions, roomVersion, isDefaultVersion, matchFrameVersion } from './versions.js';
+import { sanitizeVersions, roomVersion, isDefaultVersion, matchFrameVersion, musicSeason, seasonOf, startupVersion, REGULATION_SEASON } from './versions.js';
+import { diveAlreadyIn, diveSeatGone } from './ui/diveWords.js';
+import { takeJoinDive } from './screens/entering.js';
 
 const RESTORE_GRACE_MS = 1500;
 const JOIN_DELAY_MS = 350;
 const TICKER_KEEP = 20;
 const EMOTE_KEEP = 20;
 
-const SCREENS = { title: TitleScreen, lobby: LobbyScreen, room: RoomScreen, game: GameScreen };
+const SCREENS = { title: TitleScreen, lobby: LobbyScreen, room: RoomScreen, game: GameScreen, entering: EnteringRoomScreen };
 
 /** Copy of a server message without transport fields. */
 function payload(msg) {
@@ -110,10 +115,13 @@ let matchAt = 0;
 let restoreTimer = null;
 let joinTimer = null;
 let joinInFlight = false;
+/** schedulePendingJoin 已重试几次（有界重试；清掉待加入时归零）。 */
+let pendingJoinTries = 0;
 /** The rehearsal installer (battle/rehearsal.js): its tasks follow the match on screen (see wireNet's store hook). */
 let rehearsal = null;
 
 function clearPendingJoin() {
+  pendingJoinTries = 0;
   store.patch('ui', { pendingJoin: null, pendingSpectate: false });
   clearRoomParam();
   try { sessionStorage.removeItem('mm.pendingRoom'); } catch { /* ignore */ }
@@ -132,6 +140,15 @@ function stripAccountResumeParam() {
 /** A stale /r/CODE or ?room=CODE must not advertise a room that has already closed. */
 function validatePendingInvite(code) {
   if (!code) return;
+  // 玩家刚在公开同盟里自己点的「加入同盟」（lobby.js 的 enterRoom 留的标记）：房间是他亲眼
+  // 看见的，而 /mm/api/find-room 依赖节点十秒一次的房间码上报 —— 那一刻查不到很正常，
+  // 不能据此判定「房间已关闭」并清掉待加入（那会让跨节点加入变成「跳过去但没进去」）。
+  let fromList = null;
+  try { fromList = sessionStorage.getItem('sp_join_from_list'); } catch { /* 隐私模式 */ }
+  if (fromList && fromList.toUpperCase() === String(code).toUpperCase()) {
+    try { sessionStorage.removeItem('sp_join_from_list'); } catch { /* ignore */ }
+    return;
+  }
   fetch('/mm/api/find-room?code=' + encodeURIComponent(code), { credentials: 'same-origin', cache: 'no-store' })
     .then((r) => r.ok ? r.json() : null)
     .then((j) => {
@@ -156,18 +173,36 @@ function schedulePendingJoin() {
     }
   } catch { /* ignore */ }
   clearTimeout(joinTimer);
-  joinTimer = setTimeout(async () => {
-    if (window.__SP_ACCOUNT_RESUME_PENDING) return;
+  // 条件没满足就再等一会儿，**不能一次不满足就永久放弃**：
+  // 换节点进来（公开同盟点「加入同盟」/ 邀请链接）时，账号观察器往往在这一刻正设着
+  // __SP_ACCOUNT_RESUME_PENDING，或 socket 还没回到 online、session.entered 还没落定。
+  // 旧代码在这几种情况下直接 return，玩家看到的就是「跳过去了，但什么也没发生，
+  // 还得自己再点一次公开同盟」。
+  const MAX_TRIES = 40;                 // 40 × 350 ms ≈ 14 秒，足够等身份/连接就位
+  const attempt = async () => {
+    if (window.__SP_ACCOUNT_RESUME_PENDING) { retry(); return; }
     const s = store.get();
     const code = s.ui.pendingJoin;
-    if (!code || joinInFlight || !s.session.entered || net.status !== 'online') return;
+    if (!code) return;                  // 已清掉（用户自己进了房 / 关掉了）
+    if (!s.session.entered || net.status !== 'online') { retry(); return; }
     if (s.room) {
-      if (s.room.code !== code) toast(t('你已在其他同盟中，请先离开当前同盟'), 'warn');
+      // 深潜房不是同盟（维护者 2026-11-08）：说的对象跟着当前房间的模式走
+      const inDive = s.room.variant === 'deepecho';
+      if (s.room.code !== code) toast(diveAlreadyIn(inDive), 'warn');
       clearPendingJoin();
       return;
     }
     joinInFlight = true;
     try {
+      // 换页前留下的那句话（跨节点跳转时的「这间深潜已经开始，无法中途加入：已作为观战者进入。」）：
+      // hopToRoomNode 写进 sessionStorage，这里念一次就删 —— toast 活不过一次换页。
+      try {
+        const note = sessionStorage.getItem('sp.joinNote');
+        if (note) {
+          sessionStorage.removeItem('sp.joinNote');
+          toast(t(note), 'warn', { ttl: 7000 });
+        }
+      } catch { /* 隐私模式 */ }
       await joinKnown(s.ui.pendingSpectate ? 'room.spectate' : 'room.join', code);
     } catch (err) {
       toastError(err);
@@ -175,7 +210,14 @@ function schedulePendingJoin() {
       joinInFlight = false;
       clearPendingJoin();
     }
-  }, JOIN_DELAY_MS);
+  };
+  const retry = () => {
+    if (pendingJoinTries >= MAX_TRIES) { pendingJoinTries = 0; return; }
+    pendingJoinTries += 1;
+    clearTimeout(joinTimer);
+    joinTimer = setTimeout(() => { attempt().catch(() => {}); }, JOIN_DELAY_MS);
+  };
+  joinTimer = setTimeout(() => { attempt().catch(() => {}); }, JOIN_DELAY_MS);
 }
 
 /** End the post-resume "syncing" state early once the server re-pushed what we were showing. */
@@ -216,7 +258,7 @@ function onWelcome(msg) {
   const name = typeof msg.name === 'string' && msg.name ? msg.name : prev.me.name;
   identity.saveName(name);
   store.set({
-    me: { playerId: msg.playerId ?? null, name, tag: typeof msg.tag === 'string' && /^[0-9]{4}$/.test(msg.tag) ? msg.tag : null, token: typeof msg.token === 'string' ? msg.token : null },
+    me: { playerId: msg.playerId ?? null, name, tag: typeof msg.tag === 'string' && /^[0-9]{4}$/.test(msg.tag) ? msg.tag : null, title: typeof msg.title === 'string' && msg.title ? msg.title : null, token: typeof msg.token === 'string' ? msg.token : null },
     // the server's content identity (DESIGN §32): the diagnostics name it (diag.js contentLine)
     content: msg.content && typeof msg.content.vanilla === 'string' ? { vanilla: msg.content.vanilla } : null,
     // how many unofficial plugins it has (P1a — absent: none; content.js fetches the catalogue only when there are some)
@@ -287,7 +329,7 @@ function onRoomState(msg) {
   if (!adminWatch && !identityPending && myId != null && seats.length
     && !seats.some((s) => s && s.playerId === myId) && !isSpectating(room, myId)) {
     // We are no longer seated (kicked / left elsewhere) — neither in a player seat nor a spectator seat.
-    if (store.get().room) toast(t('你已不在该同盟中'), 'warn');
+    if (store.get().room) toast(diveSeatGone(room.variant === 'deepecho'), 'warn');
     store.set({ room: null, match: emptyMatch() });
     return;
   }
@@ -304,33 +346,36 @@ function onRoomState(msg) {
   maybeFinishRestore();
 }
 
-// 房间关闭的提示文案。每条都可以给 `solo` / `coop` 两个说法：
-// 独立模拟（solo）里没有「同盟」这个概念，说「同盟已解散」会很怪。
-// 只写一个字符串的条目（ended / shutdown）两种模式通用。
+// 房间关闭的提示文案。每种模式一个说法：solo（独立模拟）、coop（同盟模拟）、echo（深渊回响）——
+// 深潜房不是同盟，说「同盟已解散」同样很怪（维护者 2026-11-08）。没写 echo 的条目退回 coop 的说法，
+// 避免为了措辞漏一条就退化成没有文案。
+// 只写一个字符串的条目（ended / shutdown）三种模式通用。
 // 2026-10-28 维护者要求：「独立模拟和同盟模拟的关闭信息」要分开。
 const CLOSE_REASON = {
   // 'timeout' = this player was removed after staying disconnected past the lobby grace (server/lobby.js)
-  host_left: { solo: N_('创建者已离开，模拟已结束'), coop: N_('创建者已离开，同盟已解散') },
-  timeout: { solo: N_('由于长时间断开连接，你已离开模拟'), coop: N_('由于长时间断开连接，你已离开同盟') },
-  empty: { solo: N_('模拟已结束'), coop: N_('同盟已解散') },
-  kicked: { solo: N_('你已被移出模拟'), coop: N_('你已被移出同盟') },
+  host_left: { solo: N_('创建者已离开，模拟已结束'), coop: N_('创建者已离开，同盟已解散'), echo: N_('发起者已离开，深潜已结束') },
+  timeout: { solo: N_('由于长时间断开连接，你已离开模拟'), coop: N_('由于长时间断开连接，你已离开同盟'), echo: N_('由于长时间断开连接，你已离开这次深潜') },
+  empty: { solo: N_('模拟已结束'), coop: N_('同盟已解散'), echo: N_('深潜已结束') },
+  kicked: { solo: N_('你已被移出模拟'), coop: N_('你已被移出同盟'), echo: N_('你已被移出这次深潜') },
   ended: N_('模拟已结束'),
-  expired: { solo: N_('模拟已过期'), coop: N_('同盟已过期') },
+  expired: { solo: N_('模拟已过期'), coop: N_('同盟已过期'), echo: N_('深潜已过期') },
   shutdown: N_('服务器维护中，模拟已关闭'),
-  'stuck-preparing': { solo: N_('模拟超时未开始，已自动结束'), coop: N_('同盟超时未开始，已自动解散') },
+  'stuck-preparing': { solo: N_('模拟超时未开始，已自动结束'), coop: N_('同盟超时未开始，已自动解散'), echo: N_('深潜超时未开始，已自动结束') },
   // 管理员从控制台 / 管理后台手动关闭（服务器 /admin/room/close）
-  'admin-closed': { solo: N_('该模拟已被管理员关闭'), coop: N_('该同盟已被管理员关闭') },
+  'admin-closed': { solo: N_('该模拟已被管理员关闭'), coop: N_('该同盟已被管理员关闭'), echo: N_('这次深潜已被管理员关闭') },
 };
 
 /**
  * 一条关闭原因在当前模式下的文案键。
  * @param {string | Record<string, string>} entry CLOSE_REASON 的值
  * @param {string | null} mode 关闭前的房间模式：'solo' | 'coop' | null
+ * @param {boolean} [echo] 这一局是不是「深渊回响」（room.variant === 'deepecho'）
  * @returns {string}
  */
-function closeText(entry, mode) {
+function closeText(entry, mode, echo = false) {
   if (typeof entry === 'string') return t(entry);
-  // 单人房就是 solo；其余（含模式未知）按同盟的说法，保持改动前的行为
+  // 单人房就是 solo；深潜房用自己的说法（缺了退回 coop）；其余（含模式未知）按同盟的说法
+  if (mode !== 'solo' && echo && entry.echo) return t(entry.echo);
   return t(mode === 'solo' ? entry.solo : entry.coop);
 }
 
@@ -388,12 +433,15 @@ function wireNet() {
   net.on('room.closed', (msg) => {
     // 房间关闭提示要按模式说人话：独立模拟（solo）里没有「同盟」这个概念。
     // backToLobby() 会把 store.room 清空，所以模式必须在它之前抓（2026-10-28）。
+    // ★ 2026-11-08：深渊回响房也不是同盟（维护者：「深渊回响房间中的同盟模拟去掉改成深渊回响」）——
+    //   coop 的文案在深潜房里换成「深潜」的说法，别让玩家以为自己是跟同盟打的标准模拟。
     const mode = store.get().room?.mode ?? null;
+    const echo = store.get().room?.variant === 'deepecho';
     clearPendingJoin();
     backToLobby();
     const known = Object.hasOwn(CLOSE_REASON, String(msg.reason)) ? CLOSE_REASON[msg.reason] : null;
-    const text = known ? closeText(known, mode) : typeof msg.reason === 'string' && msg.reason.length < 60
-      ? t('同盟已关闭：{reason}', { reason: msg.reason }) : t('同盟已关闭');
+    const text = known ? closeText(known, mode, echo) : typeof msg.reason === 'string' && msg.reason.length < 60
+      ? t(echo ? '深潜已关闭：{reason}' : '同盟已关闭：{reason}', { reason: msg.reason }) : t(echo ? '深潜已关闭' : '同盟已关闭');
     toast(text, 'warn');
   });
   net.on('m.public', (msg) => { matchAt = Date.now(); store.patch('match', { public: payload(msg) }); maybeFinishRestore(); });
@@ -420,6 +468,24 @@ function wireNet() {
     const kind = ['info', 'success', 'warn', 'error'].includes(msg.kind) ? msg.kind : 'info';
     // msgid + params (server ≥ 0.2.0) or the text itself as a msgid, in the current language
     toast(translateWire(msg), kind);
+  });
+  // 被永久移出（挂机判定 / 队友投票，server Match _removeIdle）：退出房间、回大厅，并说明原因。
+  // 这条只发给被移出的那个人；其他人收到的是 m.notice（afkRemoved / kickPassed）。
+  net.on('m.removed', async (msg) => {
+    const rounds = Number.isInteger(msg.rounds) && msg.rounds > 0 ? msg.rounds : 2;
+    try { await net.request('room.leave', {}); } catch { /* already out of the room */ }
+    backToLobby();
+    toast(msg.reason === 'afk'
+      ? t('连续 {n} 回合没有任何操作，你已被移出对局', { n: rounds })
+      : msg.reason === 'kicked'
+        ? t('你掉线期间被队友投票移出了对局')
+        : t('你已被移出对局'), 'warn', { ttl: 10000 });
+  });
+  // 其他人看到的回执：谁被移出了、为什么
+  net.on('m.notice', (msg) => {
+    const name = typeof msg.name === 'string' && msg.name ? msg.name : t('博士');
+    if (msg.kind === 'afkRemoved') toast(t('{name} 连续 {n} 回合没有任何操作，已被移出对局', { name, n: Number(msg.rounds) || 2 }), 'info', { ttl: 6000 });
+    else if (msg.kind === 'kickPassed') toast(t('{name} 已被投票移出对局', { name }), 'info', { ttl: 6000 });
   });
   net.on('m.ticker', (msg) => {
     if (typeof msg.text !== 'string') return;
@@ -525,6 +591,7 @@ function App() {
     <${ToastHost} />
     <${UiHosts} />
     <${GuideHost} />
+    <${ReleaseNotesHost} />
     <${LoadoutHost} />
     <${StatsHost} />
     <${VoteOverOverlays} />
@@ -576,6 +643,9 @@ async function boot() {
   installTrafficMeter();
   // touch / hover / fullscreen classes, zoom-gesture blocking, rotation re-layout (ui/device.js, css/devices.css)
   installDeviceSupport();
+  // 维护者 2026-11-16：把老玩家的大厅版本一次性切到服务器默认（规程·序列Ⅰ）。
+  // 只跑一次；之后玩家自己选的版本会被尊重（见 versions.js migrateLobbyVersionOnce）。
+  try { migrateLobbyVersionOnce(); } catch { /* 迁移失败不影响启动 */ }
   // Hashed art a player imported. HTTPS or localhost only; a failure here must not stop boot.
   void registerImportedAssetWorker();
   // A page restored from the back/forward cache has a dead socket and a stale token choice: start over.
@@ -585,6 +655,9 @@ async function boot() {
 
   const pendingJoin = parseRoomParam(location.search);
   const pendingSpectate = /(?:^|[?&])spectate=1(?:&|$)/.test(location.search);
+  // 这一跳是去深潜房吗（screens/entering.js 的 takeJoinDive：lobby.js 的 enterRoom 换页前留的标记）——
+  // 「正在进入深潜…」要说对（维护者 2026-11-08）
+  const pendingJoinDive = takeJoinDive();
   // Consume a closed-watch cleanup request exactly once on a normal game page.
   try {
     const qs = new URLSearchParams(location.search);
@@ -603,7 +676,7 @@ async function boot() {
   store.set((s) => ({
     me: { ...s.me, name: savedName },
     session: { entered },
-    ui: { ...s.ui, pendingJoin, pendingSpectate },
+    ui: { ...s.ui, pendingJoin, pendingSpectate, pendingJoinDive },
   }));
   const bootAdminWatch = (() => {
     try {
@@ -641,7 +714,7 @@ async function boot() {
   net.attachBrowserHooks();
   // Audio: unlock on first gesture, BGM follows the route / match phase (js/audio.js).
   // a cosmetic plugin's sound that will not load falls back like its art (content.js, DESIGN §32 P1a)
-  installAudio({ getManifest: () => data.get('assets'), subscribe: store.subscribe, getState: store.get, selectRoute, settings: settingsStore.get(),
+  installAudio({ getManifest: () => data.get('assets'), subscribe: store.subscribe, getState: store.get, selectRoute, seasonOf: musicSeason, settings: settingsStore.get(),
     onFailed: (url) => cosmetics.fail(url) });
   // …and the music follows the art: the screen's track again when the cosmetic layers change its URLs
   cosmetics.subscribe(() => audio.refreshBgm());
@@ -674,6 +747,17 @@ async function boot() {
   try { document.dispatchEvent(new Event('sp-boot-ok')); } catch { /* ignore */ }
   try { sessionStorage.removeItem('sp_boot_retry'); } catch { /* ignore */ }
   globalThis.__SP__ = { store, net, data, version: 1 };
+  // the start-up version's entry animation before the title screen (ui/entryFilm.js): 盟约's film, or for a 规程 start
+  // (versions.js startupVersion) 规程's own opening (ui/regulationFilm.js); never over a restored match. `entryFilm`
+  // settles once the film has decided: its overlay is up by then, or none comes this page load (the browser tests get
+  // past it before their first click: test/e2e/client.mjs passEntryFilm)
+  const entryFilm = import('./ui/entryFilm.js')
+    .then((m) => m.playEntryFilm({
+      skip: () => selectRoute(store.get()) === 'game',
+      regulation: () => seasonOf(startupVersion(store.get())) === REGULATION_SEASON,
+    }))
+    .catch((err) => console.warn('[app] entry film unavailable', err));
+  globalThis.__SP__ = { store, net, data, entryFilm, version: 1 };
   // A page keeps the modules it imported at load time for its whole lifetime, so a deploy cannot reach an open tab
   // (ui/buildGuard.js): watch `/healthz.build`. Never reload on our own: show the banner and let the player press
   // 刷新页面, so leaving a room or visiting the lobby is not turned into an unexplained refresh.

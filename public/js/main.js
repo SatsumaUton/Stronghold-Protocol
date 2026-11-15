@@ -60,6 +60,7 @@ import { installLobbyMedia } from './ui/lobbyMedia.js';
 import { settingsStore } from './ui/settings.js';
 import { GuideHost } from './ui/guide.js';
 import { installDeviceSupport, useFullscreen, useScreenWakeLock } from './ui/device.js';
+import { migrateLobbyVersionOnce } from './versions.js';
 import { isCombatPhase } from './ui/gameLogic/phases.js';
 import { registerImportedAssetWorker } from './assetCache.js';
 import { LoadoutHost } from './screens/loadout.js';
@@ -642,6 +643,9 @@ async function boot() {
   installTrafficMeter();
   // touch / hover / fullscreen classes, zoom-gesture blocking, rotation re-layout (ui/device.js, css/devices.css)
   installDeviceSupport();
+  // 维护者 2026-11-16：把老玩家的大厅版本一次性切到服务器默认（规程·序列Ⅰ）。
+  // 只跑一次；之后玩家自己选的版本会被尊重（见 versions.js migrateLobbyVersionOnce）。
+  try { migrateLobbyVersionOnce(); } catch { /* 迁移失败不影响启动 */ }
   // Hashed art a player imported. HTTPS or localhost only; a failure here must not stop boot.
   void registerImportedAssetWorker();
   // A page restored from the back/forward cache has a dead socket and a stale token choice: start over.

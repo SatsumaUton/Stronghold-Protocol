@@ -19,12 +19,12 @@
 // data.js as it reads a gameplay plugin's content set.
 // Texts go through t() (docs/I18N.md).
 
-import { DEFAULT_VERSION, VERSIONS, versionById, versionSlug } from '../../shared/versions.js';
+import { DEFAULT_VERSION, LOBBY_DEFAULT_VERSION, VERSIONS, versionById, versionSlug } from '../../shared/versions.js';
 import { DIFFICULTIES, modeIdFor } from '../../shared/constants.js';
 import { t, N_ } from '../../shared/i18n.js';
-import { loadPref, savePref, store as appStore } from './store.js';
+import { loadPref, savePref, selectRoute, store as appStore } from './store.js';
 
-export { DEFAULT_VERSION, versionById, versionSlug };
+export { DEFAULT_VERSION, LOBBY_DEFAULT_VERSION, versionById, versionSlug };
 
 /** The lobby preference (`sp.pref.lobby.version`): a registry id. */
 export const LOBBY_VERSION_PREF = 'lobby.version';
@@ -151,6 +151,36 @@ export function setLobbyVersion(id, { store = appStore } = {}) {
   if (store.get().lobbyVersion !== id) store.set({ lobbyVersion: id });
 }
 
+/** 一次性迁移的标记（localStorage）：跑过一次就不再覆盖玩家的选择。 */
+const LOBBY_FORCE_DEFAULT_KEY = 'sp.pref.lobby.version.forced';   // 值 = 已经强制过的目标版本 id
+
+/**
+ * 一次性把大厅版本切到服务器的默认版本（0.4.0 起 = 规程·序列Ⅰ）。
+ *
+ * 为什么需要：大厅版本是**本机偏好**（localStorage `sp.pref.lobby.version`），老玩家上一次选的
+ * 「第二期下半」会永远压过服务器默认，所以他们永远看不到默认的规程。这里在启动时补一次迁移：
+ * 只跑一次（localStorage 里留标记），之后玩家自己改的版本会被尊重，不会被反复覆盖。
+ * 服务器没提供该版本时（例如还在跑 0.3.3 的节点），lobbyVersion() 本来就会回退到
+ * serverDefaultVersion()，所以强制写入也不会把人卡在一个不存在的版本上。
+ *
+ * @returns {boolean} 是否真的改了
+ */
+export function migrateLobbyVersionOnce() {
+  try {
+    const ls = globalThis.localStorage;
+    if (!ls) return false;
+    // 标记存的是「已经为哪个目标版本强制过一次」。
+    // 同一个目标不再强制 → 玩家这次更新之后自己选的版本永远被尊重；
+    // 将来默认版本换成新赛季，标记就不等于新目标，会自动再强制一次。
+    if (ls.getItem(LOBBY_FORCE_DEFAULT_KEY) === LOBBY_DEFAULT_VERSION) return false;
+    ls.setItem(LOBBY_FORCE_DEFAULT_KEY, LOBBY_DEFAULT_VERSION);
+  } catch { return false; }
+  if (!versionById(LOBBY_DEFAULT_VERSION)) return false;
+  if (storedLobbyVersion() === LOBBY_DEFAULT_VERSION && appStore.get().lobbyVersion === LOBBY_DEFAULT_VERSION) return false;
+  setLobbyVersion(LOBBY_DEFAULT_VERSION);
+  return true;
+}
+
 /** A version's name in the interface language (its registry msgid), or the id itself for an unknown one. */
 export function versionLabel(id) {
   const v = versionById(id);
@@ -169,9 +199,12 @@ export const VERSION_PERIODS = Object.freeze({
   'act2autochess@V2_1': { half: 'second', sub: 'V2_1', from: '2026-03-14', to: '2026-03-27' },
   act1autochess: { half: 'first', sub: 'V1_2', from: '2025-11-25', to: '2025-12-12' },
   'act1autochess@V1_1': { half: 'first', sub: 'V1_1', from: '2025-11-14', to: '2025-11-25' },
+  // 序列Ⅰ: open from 2026-11-08 16:00; its 修订期 starts 2026-11-30 04:00 (PRTS 卫戍协议·规程)
+  'act3autochess@V3_1': { half: 'regulation', sub: 'V3_1', from: '2026-11-08', to: '2026-11-30' },
 });
 
-const PERIOD_TEXT = { first: N_('官方「盟约·上半」{sub}（{from} – {to}）'), second: N_('官方「盟约·下半」{sub}（{from} – {to}）') };
+const PERIOD_TEXT = { first: N_('官方「盟约·上半」{sub}（{from} – {to}）'), second: N_('官方「盟约·下半」{sub}（{from} – {to}）'),
+  regulation: N_('官方「卫戍协议·规程」{sub}（{from} – {to}）') };
 
 /** The official period line of a version (VERSION_PERIODS), or '' for one the table lacks. @param {string} id */
 export function periodLine(id) {
@@ -189,8 +222,34 @@ export function periodLine(id) {
 export function offeredDifficulties(config, roomMode) {
   const modes = isObj(config?.modes) ? config.modes : null;
   if (!modes) return [...DIFFICULTIES];
-  const list = DIFFICULTIES.filter((d) => isObj(modes[modeIdFor(roomMode, d)]));
+  // a laddered room mode (规程's solo): the difficulties its modes have — its mode_single_funny is 极速模拟, not 标准
+  const ladder = ladderModes(config, roomMode);
+  const list = ladder ? DIFFICULTIES.filter((d) => ladder.some((m) => m.difficulty === d)) : DIFFICULTIES.filter((d) => isObj(modes[modeIdFor(roomMode, d)]));
   return list.length ? list : [...DIFFICULTIES];
+}
+
+/**
+ * The official modes of a laddered room mode — more than one per difficulty: 规程's solo plays 极速模拟 and 规程等级 1–20
+ * (the server's rule: server/versions.js laddered, server/lobby.js ladderMode) — in sortId order, each the config's mode
+ * with its `id`; null when the room mode has one mode per difficulty (every 盟约 version, 规程's co-op) or no config.
+ * @param {any} config @param {'solo' | 'coop'} roomMode
+ * @returns {any[] | null}
+ */
+export function ladderModes(config, roomMode) {
+  const modes = isObj(config?.modes) ? config.modes : null;
+  if (!modes) return null;
+  const type = roomMode === 'solo' ? 'SINGLE' : 'MULTI';
+  const list = Object.entries(modes).filter(([, m]) => isObj(m) && m.type === type).map(([id, m]) => ({ ...m, id }))
+    .sort((a, b) => (a.sortId ?? 0) - (b.sortId ?? 0) || (a.id < b.id ? -1 : 1));
+  return list.some((m) => m.id !== modeIdFor(roomMode, String(m.difficulty))) ? list : null;
+}
+
+/**
+ * A laddered room mode's mode to show: `pick` when the ladder has it, else the first of `difficulty`, else the first.
+ * @param {any[]} ladder @param {string | null} pick @param {string} difficulty
+ */
+export function ladderPick(ladder, pick, difficulty) {
+  return (ladder.find((m) => m.id === pick) ?? ladder.find((m) => m.difficulty === difficulty) ?? ladder[0])?.id ?? null;
 }
 
 /**
@@ -212,8 +271,46 @@ export function fallbackDifficulty(offered, d) {
  */
 export const needsContent = (room) => !!room && ((!!room.content && room.content.vanilla === false) || typeof room.version === 'string');
 
-/** The activity a version belongs to (its season: 第一期 / 第二期), the default's for an unknown id. @param {unknown} id */
+/** The activity a version belongs to (its season: 第一期 / 第二期 / 规程), the default's for an unknown id. @param {unknown} id */
 export const seasonOf = (id) => versionById(id)?.season ?? DEFAULT_VERSION;
+
+/** 规程's season id (the activity act3autochess). */
+export const REGULATION_SEASON = 'act3autochess';
+
+/**
+ * The version the start-up screens wear (the entry film, the title backdrop, the title music): this browser's lobby
+ * version as stored (`sp.pref.lobby.version`, the list not loaded yet), else 规程 — a first start opens on 规程, a later
+ * one on the version the lobby was left on (the owner, 2026-11-13).
+ * @param {any} s the app store's state
+ */
+export function startupVersion(s) {
+  const pref = s?.lobbyVersion;
+  if (typeof pref === 'string' && versionById(pref)) return pref;
+  return VERSIONS.find((v) => v.season === REGULATION_SEASON)?.id || DEFAULT_VERSION;
+}
+
+/**
+ * The season whose music the screen plays (public/js/audio.js). The title uses the start-up version's season
+ * (startupVersion: the stored lobby version, else 规程; the entry film, 盟约's and timed to that lobby track, plays only
+ * for a 盟约 start, ui/entryFilm.js). The lobby uses the lobby version, or the stored
+ * match's while 统计数据 replays it (`replayVersion`). A room — players and spectators — uses the room's version,
+ * including a game whose room is another version than the lobby. A game whose room is gone (settlement, `?replay`)
+ * uses the match frames' version.
+ * @param {any} s the app store's state
+ * @returns {string}
+ */
+export function musicSeason(s) {
+  const route = selectRoute(s);
+  if (route === 'title') return seasonOf(startupVersion(s));
+  if (route === 'lobby') {
+    if (typeof s?.replayVersion === 'string' && versionById(s.replayVersion)) return seasonOf(s.replayVersion);
+    return seasonOf(lobbyVersion(s));
+  }
+  if (s?.room) return seasonOf(roomVersion(s.room));
+  if (typeof s?.replayVersion === 'string' && versionById(s.replayVersion)) return seasonOf(s.replayVersion);
+  if (s?.match?.public || s?.match?.result) return seasonOf(matchFrameVersion(s.match));
+  return seasonOf(DEFAULT_VERSION);
+}
 
 /**
  * Whether a version is the default's data (第二期下半) or another's — what `version` the records and logs carry (only a
@@ -221,3 +318,27 @@ export const seasonOf = (id) => versionById(id)?.season ?? DEFAULT_VERSION;
  * @param {unknown} id
  */
 export const isDefaultVersion = (id) => id == null || id === DEFAULT_VERSION;
+
+/**
+ * How far the data of another official version is on this page (content.js contentSet), for the screens that wait for it
+ * (the match, a replay): its own checked set (`kind: 'version'`), or the room's content set with gameplay plugins built
+ * on that version (`kind: 'plugins'`, its index names the version — §37.210, from PR #949): a 规程 room with plugins
+ * never loads the plain 规程 set, so a match there waited on 正在载入模拟数据… for ever. 'ready' for the default data.
+ * @param {any} c the contentSet state
+ * @param {string | null | undefined} version the version shown
+ * @param {string | null} [roomCs] the room's content set with gameplay plugins, when there is one
+ * @returns {'idle' | 'loading' | 'ready' | 'failed'}
+ */
+export function versionContentStatus(c, version, roomCs = null) {
+  if (!version || version === DEFAULT_VERSION) return 'ready';
+  if (!c) return 'loading';
+  if (c.kind === 'version' && c.version === version) return c.status;
+  if (c.kind === 'plugins' && roomCs && c.cs === roomCs) {
+    if (c.status === 'ready') return c.version === version ? 'ready' : 'loading';
+    return c.status;
+  }
+  return 'loading';
+}
+
+/** The room's content set with gameplay plugins (its cs), else null (versionContentStatus). @param {any} s */
+export const roomPluginCs = (s) => (s?.room?.content?.vanilla === false && typeof s.room.content.cs === 'string' ? s.room.content.cs : null);

@@ -19,12 +19,12 @@
 // data.js as it reads a gameplay plugin's content set.
 // Texts go through t() (docs/I18N.md).
 
-import { DEFAULT_VERSION, VERSIONS, versionById, versionSlug } from '../../shared/versions.js';
+import { DEFAULT_VERSION, LOBBY_DEFAULT_VERSION, VERSIONS, versionById, versionSlug } from '../../shared/versions.js';
 import { DIFFICULTIES, modeIdFor } from '../../shared/constants.js';
 import { t, N_ } from '../../shared/i18n.js';
 import { loadPref, savePref, selectRoute, store as appStore } from './store.js';
 
-export { DEFAULT_VERSION, versionById, versionSlug };
+export { DEFAULT_VERSION, LOBBY_DEFAULT_VERSION, versionById, versionSlug };
 
 /** The lobby preference (`sp.pref.lobby.version`): a registry id. */
 export const LOBBY_VERSION_PREF = 'lobby.version';
@@ -149,6 +149,36 @@ export function setLobbyVersion(id, { store = appStore } = {}) {
   if (!versionById(id)) return;
   savePref(LOBBY_VERSION_PREF, id);
   if (store.get().lobbyVersion !== id) store.set({ lobbyVersion: id });
+}
+
+/** 一次性迁移的标记（localStorage）：跑过一次就不再覆盖玩家的选择。 */
+const LOBBY_FORCE_DEFAULT_KEY = 'sp.pref.lobby.version.forced';   // 值 = 已经强制过的目标版本 id
+
+/**
+ * 一次性把大厅版本切到服务器的默认版本（0.4.0 起 = 规程·序列Ⅰ）。
+ *
+ * 为什么需要：大厅版本是**本机偏好**（localStorage `sp.pref.lobby.version`），老玩家上一次选的
+ * 「第二期下半」会永远压过服务器默认，所以他们永远看不到默认的规程。这里在启动时补一次迁移：
+ * 只跑一次（localStorage 里留标记），之后玩家自己改的版本会被尊重，不会被反复覆盖。
+ * 服务器没提供该版本时（例如还在跑 0.3.3 的节点），lobbyVersion() 本来就会回退到
+ * serverDefaultVersion()，所以强制写入也不会把人卡在一个不存在的版本上。
+ *
+ * @returns {boolean} 是否真的改了
+ */
+export function migrateLobbyVersionOnce() {
+  try {
+    const ls = globalThis.localStorage;
+    if (!ls) return false;
+    // 标记存的是「已经为哪个目标版本强制过一次」。
+    // 同一个目标不再强制 → 玩家这次更新之后自己选的版本永远被尊重；
+    // 将来默认版本换成新赛季，标记就不等于新目标，会自动再强制一次。
+    if (ls.getItem(LOBBY_FORCE_DEFAULT_KEY) === LOBBY_DEFAULT_VERSION) return false;
+    ls.setItem(LOBBY_FORCE_DEFAULT_KEY, LOBBY_DEFAULT_VERSION);
+  } catch { return false; }
+  if (!versionById(LOBBY_DEFAULT_VERSION)) return false;
+  if (storedLobbyVersion() === LOBBY_DEFAULT_VERSION && appStore.get().lobbyVersion === LOBBY_DEFAULT_VERSION) return false;
+  setLobbyVersion(LOBBY_DEFAULT_VERSION);
+  return true;
 }
 
 /** A version's name in the interface language (its registry msgid), or the id itself for an unknown one. */
