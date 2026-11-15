@@ -40,7 +40,7 @@
 // Polyfills first (older Safari / Firefox ESR): every module evaluated after this one sees them.
 import './ui/compat.js';
 import { ReleaseNotesHost } from './ui/releaseNotes.js';
-import { render } from '../vendor/preact.module.js';
+import { render, options } from '../vendor/preact.module.js';
 import { useErrorBoundary } from '../vendor/hooks.module.js';
 import { html, UiHosts, Button, MicroLabel, closeAllDialogs } from './ui/components.js';
 import { ConnectionBanner } from './ui/connBanner.js';
@@ -539,12 +539,34 @@ function warmGameData() {
 
 // ---- UI chrome (the connection banner lives in ui/connBanner.js) -----------------------------------
 
+// ---- 崩溃诊断：最近渲染过的组件链 ------------------------------------------------
+// 为什么需要：Preact 的 `insertBefore: parameter 1 is not of type 'Node'` 只在某些瞬态下抛，
+// 合成状态复现不出来，而面板原来只印 message —— 玩家截图看不出是哪棵树崩的。
+// 用 Preact 的 options.__b 记一个 24 长的环形缓冲；**必须链式调用**：preact/hooks 自己也占用 __b，
+// 直接覆盖会让 hooks 全废。诊断代码自己包 try/catch，永不抛。
+const __crashChain = [];
+const __prevBefore = options.__b;
+options.__b = function __recordBefore(vnode, oldVNode) {
+  try {
+    const t = vnode && vnode.type;
+    const name = typeof t === 'function' ? (t.displayName || t.name || 'anon')
+      : (typeof t === 'string' ? t : null);
+    if (name && __crashChain[__crashChain.length - 1] !== name) {
+      __crashChain.push(name);
+      if (__crashChain.length > 24) __crashChain.shift();
+    }
+  } catch { /* 诊断代码永不抛 */ }
+  if (__prevBefore) __prevBefore(vnode, oldVNode);
+};
+/** 最近 12 个组件，用来在面板上指出崩在哪条链上（ASCII 标签：这是给维护者看的诊断信息）。 */
+const crashChainText = () => __crashChain.slice(-12).join(' < ');
 function ScreenCrashed({ error, reset }) {
   return html`<div class="screen crash">
     <div class="crash__box brackets">
       <${MicroLabel} tone="mint">SYSTEM FAULT<//>
       <h2>${t('界面发生错误')}</h2>
       <p class="t-lo">${String(error?.message || error).slice(0, 200)}</p>
+      <p class="t-dim" data-testid="crash-chain" style="font-size:.12rem;word-break:break-all">crash-chain: ${crashChainText() || '—'}</p>
       <${Button} variant="primary" icon="refresh" onClick=${reset}>${t('重新加载界面')}<//>
     </div>
   </div>`;
@@ -558,7 +580,7 @@ function App() {
   const fullscreenActive = useFullscreen();
   useScreenWakeLock(combatActive || (fullscreenWakeLock && fullscreenActive));
   useLang(); // a language switch re-renders the whole tree in place
-  const [error, resetError] = useErrorBoundary((err) => console.error('[ui] screen crashed', err));
+  const [error, resetError] = useErrorBoundary((err) => console.error('[ui] screen crashed', err, '\ncrash-chain:', crashChainText()));
   const Screen = SCREENS[route] || LobbyScreen;
   return html`<div class="app-root">
     <div class="app-bg" aria-hidden="true"></div>
