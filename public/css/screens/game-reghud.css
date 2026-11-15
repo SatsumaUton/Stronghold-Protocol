@@ -59,15 +59,19 @@
    玩家反馈「新版本看不到快捷键提示」（维护者 2026-11-15）：改成**右上角小角标**放回来 ——
    绝对定位、不参与板内的居中排版，贴图板本身分毫不动。 */
 .shopbar--reg .toolbtn kbd {
-  display: inline-flex; position: absolute; top: -.07rem; right: -.06rem; z-index: 2;
+  /* 贴在板**内部**的右上角：早期版本用负偏移挂到板外，结果压到相邻的「刷新/冻结」上。
+     这里只留 .02rem 的内缩，既在贴图里又不碰邻居；pointer-events: none 让它不吃点击。 */
+  display: inline-flex; position: absolute; top: .02rem; right: .02rem; z-index: 2;
   align-items: center; justify-content: center;
-  min-width: .22rem; height: .22rem; padding: 0 .05rem;
-  font-family: var(--font-num); font-size: .11rem; line-height: 1; font-weight: 700;
-  color: #f2f2f2; background: rgba(10, 14, 12, .84);
-  border: 1px solid rgba(242, 242, 242, .38); border-radius: .04rem;
-  box-shadow: 0 .02rem .08rem rgba(0, 0, 0, .5);
+  min-width: .18rem; height: .18rem; padding: 0 .04rem;
+  font-family: var(--font-num); font-size: .1rem; line-height: 1; font-weight: 700;
+  color: #f2f2f2; background: rgba(10, 14, 12, .7);
+  border: 1px solid rgba(242, 242, 242, .3); border-radius: .03rem;
+  opacity: .92;
   pointer-events: none;
 }
+/* 悬停 / 按下时板本身会提亮，角标跟着淡一点，避免抢「冻结 / 刷新」这两个字。 */
+.shopbar--reg .toolbtn:hover kbd, .shopbar--reg .toolbtn:focus-visible kbd { opacity: 1; background: rgba(10, 14, 12, .82); }
 .shopbar--reg .toolbtn__ticon { display: none; }
 /* The freeze plate follows the prefab's states: not frozen (reads 冻结) is frozen_bg_normal, frozen (reads 解冻) is
    frozen_bg_unselect / frozen_bg_unlock, unavailable is bg_lock / frozen_bg_disable (ui/regHud.js). With a sprite the
