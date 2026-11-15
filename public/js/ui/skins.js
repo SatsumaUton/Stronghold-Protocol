@@ -151,6 +151,27 @@ export const skinFor = (charId) => (str(charId) ? (skinsStore.get()[SKINS_KEY] |
  * @returns {{ id: string, name: string, group: string, playable: boolean, portrait: string|null, avatar: string|null,
  *   illust: string|null }[]}
  */
+/**
+ * 把 manifest 里的资源站绝对地址改写成本站同源路径（`/assets/…`）。
+ * 为什么需要：同源那份资源是完整的，资源站域名上缺一批 _1 立绘与 act3 BGM ——
+ * 皮肤格子直接用了原始地址，于是 404、格子空白（维护者 2026-11-16 的 404 截图）。
+ * 与 gameComponents.js 的 localAssetSrc 保持一致：每次调用现算 origin（模块求值时它还没就绪）。
+ */
+function sameOriginAsset(u) {
+  const src = typeof u === 'string' ? u : '';
+  if (!src) return null;
+  let origin = "";
+  try {
+    origin = (typeof window !== "undefined" && window.__SP_ASSET_ORIGIN)
+      || (typeof window !== "undefined" && window.__SP__ && window.__SP__.data
+        && window.__SP__.data.get && (window.__SP__.data.get("config") || {}).assetOrigin)
+      || "";
+  } catch { origin = ""; }
+  const host = String(origin).replace(/^https?:\/\//, "").replace(/[.*+?^${}()|[\]\\]/g, "\\export function availableSkins(charId) {");
+  if (!host) return src;
+  const re = new RegExp("^https?:\\/\\/" + host + "\\/assets\\/");
+  return re.test(src) ? "/assets/" + src.replace(re, "") : src;
+}
 export function availableSkins(charId) {
   const id = str(charId);
   if (!id) return [];
@@ -159,9 +180,9 @@ export function availableSkins(charId) {
   // a record without `skins` still has its own appearance (the 默认 row below), because the picker's global display rule
   // shows the section for an operator the plugins wrote no skin for (hasAnySkinChoices, docs/SKINS.md)
   if (!rec) return [];
-  const ownIllust = str(rec.illust);
-  const ownPortrait = str(rec.portrait);
-  const ownAvatar = str(rec.avatar);
+  const ownIllust = sameOriginAsset(str(rec.illust));
+  const ownPortrait = sameOriginAsset(str(rec.portrait));
+  const ownAvatar = sameOriginAsset(str(rec.avatar));
   const rows = [];
   for (const [skinId, skin] of Object.entries(isObj(rec.skins) ? rec.skins : {})) {
     if (!str(skinId) || !isObj(skin)) continue;
@@ -170,10 +191,10 @@ export function availableSkins(charId) {
     // the tile art: the fixed-size portrait family first (a 1:2 box the grid lines up on), then the illustration, then
     // the avatar; the operator's own portrait when the skin ships none (`fallbackArt`, which the picker draws a little
     // differently so a plugin that replaced only the model is legible)
-    const ownArt = str(skin.portrait) || str(skin.portraitE2) || str(skin.illust);
+    const ownArt = sameOriginAsset(str(skin.portrait)) || sameOriginAsset(str(skin.portraitE2)) || sameOriginAsset(str(skin.illust));
     const portrait = ownArt || ownPortrait;
-    const avatar = str(skin.avatar) || str(skin.avatarE2) || str(skin.illust) || ownAvatar;
-    const illust = str(skin.illust) || portrait;
+    const avatar = sameOriginAsset(str(skin.avatar)) || sameOriginAsset(str(skin.avatarE2)) || sameOriginAsset(str(skin.illust)) || ownAvatar;
+    const illust = sameOriginAsset(str(skin.illust)) || portrait;
     rows.push({
       id: skinId,
       name: str(skin.name) || skinId,
