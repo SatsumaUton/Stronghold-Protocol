@@ -2100,7 +2100,7 @@ function MatchScreen() {
         live=${liveLpNow} spectator=${spectator}
         spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom}
         onPauseVote=${pub?.pauseVote && !spectator ? votePause : null}
-        effectsSlot=${html`<div class="gm__effects"><${EffectsList} effects=${watchingOther && field ? (field.effects ?? null) : priv?.effects} /></div>`}
+        effectsSlot=${html`<div class="gm__effects"><${EffectsList} effects=${viewedEffects} command=${showPrep && priv?.command && !spectator ? html`<${BandCommand} command=${priv.command} priv=${priv} view=${view} editable=${editable} />` : null} /></div>`}
         held=${hudIn === 'wait'} onSpeedVote=${actions.speedVote} />
 
       <div class=${cx('gm__bonds', pfBondRings && 'gm__bonds--pf')} style=${pfBondRings || null}>
@@ -2132,7 +2132,6 @@ function MatchScreen() {
              那一列加了「暂停游戏」这颗按钮之后，第一个图标（策略）正好压在按钮上（维护者 2026-11-08 反馈）。 */ null}
 
       ${emoteMode === 'danmaku' ? html`<${Danmaku} players=${players} myId=${myId} ttl=${bubbleMs} />` : null}
-      <div class="gm__effects"><${EffectsList} effects=${viewedEffects} command=${showPrep && priv?.command && !spectator ? html`<${BandCommand} command=${priv.command} priv=${priv} view=${view} editable=${editable} />` : null} /></div>
 
       ${watchingOther && !combat ? html`<div class="gm__watching" role="status">
         <${GIcon} name="eye" /><span>${tParts('正在查看 {name} 的阵地（只读）', { name: html`<b>${watchedName}</b>` })}</span>
