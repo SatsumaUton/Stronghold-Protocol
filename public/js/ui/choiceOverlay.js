@@ -274,7 +274,6 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
           </div>`;
         })}
       </div>` : null}
-      <div class=${cx('spov__grid', sp.cards.length <= 3 && 'spov__grid--3')}>
       ${onCollapse ? html`<button type="button" class="spov__collapse" data-testid="sp-collapse" onClick=${onCollapse} title=${t('收起，查看战场')}>
         <${Icon} name="collapse" /><span>${t('收起')}</span></button>` : null}
       <div class=${cx('spov__grid', sp.cards.length <= 3 && 'spov__grid--3', onCollapse && 'spov__grid--collapse')}>
@@ -307,7 +306,6 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
             ${busy ? html`<span class="spcard__busy" role="status">${t('选择中')}</span>` : null}
           </button>`;
         })}
-      </div>
     </div>
   </div>`;
 }
