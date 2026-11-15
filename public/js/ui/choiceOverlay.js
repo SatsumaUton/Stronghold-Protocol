@@ -166,10 +166,8 @@ export function ChoiceOverlay(props) {
     setSel(r.armed);
     if (r.pick != null) onPick(r.pick);
   };
-  return html`<${ChoiceView} ...${props} armed=${armed} orderRef=${orderRef} onTap=${tap}
-    onConfirm=${() => { if (armed != null) tap(armed); }} onDisarm=${() => setSel(null)} />`;
   if (collapsed) return html`<${ChoicePill} sp=${sp} myId=${myId} solo=${solo} onExpand=${() => setCollapsed(false)} />`;
-  return html`<${ChoiceView} ...${props} armed=${armed} onTap=${tap} pfPack=${pack} pfStill=${settings?.themeMotion === false}
+  return html`<${ChoiceView} ...${props} armed=${armed} orderRef=${orderRef} onTap=${tap} pfPack=${pack} pfStill=${settings?.themeMotion === false}
     onConfirm=${() => { if (armed != null) tap(armed); }} onDisarm=${() => setSel(null)} onCollapse=${() => { setSel(null); setCollapsed(true); }} />`;
 }
 

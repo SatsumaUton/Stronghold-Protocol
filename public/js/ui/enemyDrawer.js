@@ -264,7 +264,5 @@ function BlessTab({ pub }) {
       <h4 class="ihead">${t('诅咒')} <small class="num">${echo.curses.length}</small></h4>
       <ul class="echo-list echo-list--curse">${echo.curses.map((c) => html`<li key=${c.id}>
         <b>${c.name}</b>${c.rarityLabel ? html`<em class=${`echo-rar is-${c.rarity || 'common'}`}>${c.rarityLabel}</em>` : null}<span>${c.desc || ''}</span></li>`)}</ul>` : null}
-||||||| base
-    ${tab === 'info' ? html`<${InfoTab} pub=${pub} priv=${priv} onChess=${onChess} bandId=${bandId} bandOwner=${bandOwner} />` : html`<${EnemiesTab} pub=${pub} priv=${priv} onEnemy=${onEnemy} />`}
   </div>`;
 }

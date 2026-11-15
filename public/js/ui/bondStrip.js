@@ -246,7 +246,7 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
   const siOf = (mb) => (mb.diy || mb.rec ? null : memberStandIn(priv, rawChess(mb.id), data.get('backups'), rawChess));
   const countsHand = entry?.countsHand ?? b.countsHand;
   const next = nextThreshold(count, th);
-  // 「盟约投影」（2026-11-06，2026-11-07 改每人各自选）：点开的那条盟约如果正是**你正在看的那位**投影的，
+  const hasNow = !modeOff && !!(b.effectDescRaw || b.effectDesc);
   // 要说明「他的干员全按成员算」—— 观战 / 前往查看时看到的内容必须和对局中玩家自己看到的一致，
   // 所以投影按 `ownerId`（这条盟约属于谁）取，而不是永远取自己的。本局禁用的盟约不挂。
   const projEntry = (() => {

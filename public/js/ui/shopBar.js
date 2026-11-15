@@ -36,6 +36,12 @@ import { skinFor, availableSkins } from './skins.js';
 import { data, localAsset } from '../data.js';
 import { t } from '../../../shared/i18n.js';
 import { itemText } from './showTags.js';
+import { hotkeyLabelOf, useSettings } from './settings.js';
+import { themePack } from '../uiTheme.js';
+import { mountThemeCharacter } from './themeCharacter.js';
+import { themeCharacterKey } from '../../../shared/uiTheme.js';
+import { regLook, regulationCharacter, regChromeUrls, regChromeStyle, regChromeTheme, regUpgradeModel, regShopCardFaceModel, regShopEmptyCardModel, regShopBackdropModel, regTierViImageStyle, prefabCssRotation } from './regHud.js';
+import { usePrefabPack } from './prefab/view.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -568,7 +574,7 @@ function useRegFit(clusterRef, on) {
 }
 
 export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onCollapse, onBuy, onLevel, onRefresh, onFreeze, onDetail, onDetailClose, onRefuse, barRef,
-  reward = null, onReward, onRewardLater, onArm = null, offBonds = null }) {
+  reward = null, onReward, onRewardLater, onArm = null, offBonds = null, bannedBonds = null }) {
   const settings = useSettings();
   const themeCharacter = themePack(settings?.uiTheme)?.character || null;
   // the 规程 shop in 规程, and in every version with 乌萨斯齐心团 / 可露希尔 (§37.206)

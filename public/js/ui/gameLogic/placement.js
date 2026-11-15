@@ -214,9 +214,6 @@ export function placementContext({ priv, stage, editable, field = 'normal', getC
   const deploy = field === 'bossL' || field === 'bossR'
     ? deploySets(stage, field, ov)
     : deploySets(effectiveStage(stage, ov));
-  return { priv, pieces, boardAt, handAt, deploy, cap, count, field, editable: !!editable, getChess, getToken, getItem, backups, morphMode: morphMode === 'plus' ? 'plus' : 'official',
-    // 「深渊回响」部署禁令（2026-11-05）：{ tiles: ['r,c'], bond: 'yanShip' }；普通房间为 null
-    echoBans: echoBans && typeof echoBans === 'object' ? echoBans : null };
   // “模拟宝藏” (enemy_9038_achest) occupies its tile: prepMapChars is the read-only preview, and that tile is not a deploy.
   const chestTiles = new Set();
   if (Array.isArray(priv?.prepMapChars)) {
@@ -224,7 +221,7 @@ export function placementContext({ priv, stage, editable, field = 'normal', getC
       if (u && u.defId === 'enemy_9038_achest' && Number.isInteger(u.y) && Number.isInteger(u.x)) chestTiles.add(tileKey(u.y, u.x));
     }
   }
-  return { priv, pieces, boardAt, handAt, deploy, cap, count, field, editable: !!editable, getChess, getToken, getItem, backups, chestTiles, equipPerChess: config?.economy?.equipPerChess, equipHand: config?.version?.rules?.equipHand === true, morphMode: morphMode === 'plus' ? 'plus' : 'official' };
+  return { priv, pieces, boardAt, handAt, deploy, cap, count, field, editable: !!editable, getChess, getToken, getItem, backups, chestTiles, equipPerChess: config?.economy?.equipPerChess, equipHand: config?.version?.rules?.equipHand === true, echoBans: echoBans && typeof echoBans === 'object' ? echoBans : null, morphMode: morphMode === 'plus' ? 'plus' : 'official' };
 }
 
 /**

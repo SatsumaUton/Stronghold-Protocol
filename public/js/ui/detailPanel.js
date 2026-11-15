@@ -46,7 +46,7 @@ import { skillIconUrl, skillRecordIconUrl, profIconUrl, subProfIconUrl, itemIcon
 import { abilityRows } from './abilityLines.js';
 import { data } from '../data.js';
 import { enemyRecord } from './enemyRecords.js';
-import { useStore } from '../store.js';
+import { store, useStore } from '../store.js';
 import { equipmentCapacity } from '../../../shared/itemRules.js';
 import { attackRangeGrid } from '../../../shared/loadoutRecord.js';
 import { SKILL_SUMMON_START_DEPLOY } from '../../../shared/constants.js';
@@ -526,6 +526,7 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
   const slotPolicy = morphSlotPolicy(morphMode === 'plus' ? 'plus' : 'official', (it) => !!getItem(typeof it === 'string' ? it : it?.id)?.canGiveBond);
   const grantedIds = bondIds.filter((b) => !(Array.isArray(c.bonds) && c.bonds.includes(b)) && b !== projectedBond);
   const sell = Number.isFinite(piece?.sellPrice) ? piece.sellPrice : (c.sellPrice ?? 1);
+  const blocks = {};
   blocks.head = html`
     <div key="head" class="dhead">
       <div class=${cx('dhead__art', golden && 'is-golden', `dhead__art--t${c.tier}`)}>
@@ -940,7 +941,9 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
     if (c) return { type: 'chess', ...appearance, chess: c, piece: own?.piece || null, unit: u, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: si, ...cv };
     const t = data.lookup('tokens', u.defId) || diyToken(u.defId);
     if (t) return { type: 'token', token: t, unitId: u.id, ownerId: tokenOwnerId(own?.piece, pieces) };
-  const en = enemyRecord(u.defId);
+    // 跨版本敌人（带 `<version>:` 前缀）只出现在深渊回响：那时服务端把记录随快照发下来，
+    // 必须走 enemyRecord 才能查到。普通对局仍读本房数据表，行为与上游逐字节一致。
+    const en = store.getState?.()?.match?.public?.echo ? enemyRecord(u.defId) : data.lookup('enemies', u.defId);
     return en ? { type: 'enemy', enemy: en, unitId: u.id } : null;
   }
   return null;

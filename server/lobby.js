@@ -234,7 +234,7 @@
 //     another content keeps only the ids whose operator (charId) is the same in both data sets.
 
 import { aiTakeover, resetAiTakeover, reconcileAiTakeover, afterReconcile } from './aiTakeover.js';
-import { randomBytes, randomInt } from 'node:crypto';
+import { randomBytes, randomInt, createHmac, timingSafeEqual } from 'node:crypto';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, ROOM_LIST_MAX, ROOM_LIST_MIN_CAPACITY, modeIdFor } from '../shared/constants.js';
 /** 匹配队友最长搜索时间（默认 2 分钟；测试可用 SP_MATCHMAKING_TIMEOUT_MS 缩短）。 */
 const MATCHMAKING_TIMEOUT_MS = Math.max(1000, Number(process.env.SP_MATCHMAKING_TIMEOUT_MS) || 2 * 60 * 1000);

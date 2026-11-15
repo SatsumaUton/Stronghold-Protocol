@@ -699,7 +699,7 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
         if (opts.bond) { const c = gd.chess(id); if (!c || !Array.isArray(c.bonds) || !c.bonds.includes(opts.bond)) return false; }
         return typeof opts.filter === 'function' ? !!opts.filter(id) : true;
       };
-      const extra = typeof ps.diyStockEntries === 'function' ? ps.diyStockEntries() : null;
+      let extra = typeof ps.diyStockEntries === 'function' ? ps.diyStockEntries() : null;
       if (Array.isArray(opts.tierExemptChess) && opts.tierExemptChess.length) {
         const exempt = [];
         // Only explicitly marked, non-shop normal forms may bypass a shop-level gate. Callers name the eligible copy.
