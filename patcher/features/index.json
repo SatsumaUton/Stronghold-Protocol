@@ -7315,5 +7315,267 @@
         "customBytes": 5459
       }
     ]
+  },
+  {
+    "id": "vendor-v2",
+    "name": "vendor 换名（preact/hooks/htm.module.v2.js）",
+    "status": "ported-main",
+    "files": [
+      {
+        "path": "public/dev/battle-perf.html",
+        "baseExists": true,
+        "customBytes": 9416
+      },
+      {
+        "path": "public/dev/game-mock.html",
+        "baseExists": true,
+        "customBytes": 3958
+      },
+      {
+        "path": "public/dev/game-mock.js",
+        "baseExists": true,
+        "customBytes": 54477
+      },
+      {
+        "path": "public/dev/prefab-lab.js",
+        "baseExists": true,
+        "customBytes": 3227
+      },
+      {
+        "path": "public/dev/render-demo.html",
+        "baseExists": true,
+        "customBytes": 4214
+      },
+      {
+        "path": "public/dev/uikit.html",
+        "baseExists": true,
+        "customBytes": 4987
+      },
+      {
+        "path": "public/dev/uikit.js",
+        "baseExists": true,
+        "customBytes": 17684
+      },
+      {
+        "path": "public/js/ui/allianceScene.js",
+        "baseExists": true,
+        "customBytes": 57226
+      },
+      {
+        "path": "public/js/ui/bandCommand.js",
+        "baseExists": true,
+        "customBytes": 12201
+      },
+      {
+        "path": "public/js/ui/comboBox.js",
+        "baseExists": true,
+        "customBytes": 10298
+      },
+      {
+        "path": "public/js/ui/leaderRank.js",
+        "baseExists": true,
+        "customBytes": 7990
+      },
+      {
+        "path": "public/js/ui/prefab/banners.js",
+        "baseExists": true,
+        "customBytes": 12098
+      },
+      {
+        "path": "public/js/ui/prefab/hud.js",
+        "baseExists": true,
+        "customBytes": 11902
+      },
+      {
+        "path": "public/js/ui/prefab/view.js",
+        "baseExists": true,
+        "customBytes": 43139
+      },
+      {
+        "path": "public/js/ui/regulationBackdrop.js",
+        "baseExists": true,
+        "customBytes": 3454
+      },
+      {
+        "path": "public/js/ui/releaseNotes.js",
+        "baseExists": true,
+        "customBytes": 4748
+      },
+      {
+        "path": "public/js/ui/resourceCheck.js",
+        "baseExists": true,
+        "customBytes": 3778
+      },
+      {
+        "path": "public/js/ui/resourceManager.js",
+        "baseExists": true,
+        "customBytes": 2122
+      },
+      {
+        "path": "public/js/ui/themeSettings.js",
+        "baseExists": true,
+        "customBytes": 8896
+      },
+      {
+        "path": "public/js/ui/voiceLibrary.js",
+        "baseExists": true,
+        "customBytes": 5983
+      },
+      {
+        "path": "public/studio/console.html",
+        "baseExists": true,
+        "customBytes": 1358
+      },
+      {
+        "path": "public/studio/index.html",
+        "baseExists": true,
+        "customBytes": 1327
+      },
+      {
+        "path": "public/studio/js/authoring.js",
+        "baseExists": true,
+        "customBytes": 2644
+      },
+      {
+        "path": "public/studio/js/catalog.js",
+        "baseExists": true,
+        "customBytes": 5604
+      },
+      {
+        "path": "public/studio/js/console/editor.js",
+        "baseExists": true,
+        "customBytes": 17944
+      },
+      {
+        "path": "public/studio/js/console/main.js",
+        "baseExists": true,
+        "customBytes": 8632
+      },
+      {
+        "path": "public/studio/js/console/view.js",
+        "baseExists": true,
+        "customBytes": 9353
+      },
+      {
+        "path": "public/studio/js/create.js",
+        "baseExists": true,
+        "customBytes": 7432
+      },
+      {
+        "path": "public/studio/js/editors/controls.js",
+        "baseExists": true,
+        "customBytes": 2229
+      },
+      {
+        "path": "public/studio/js/editors/dsl.js",
+        "baseExists": true,
+        "customBytes": 2198
+      },
+      {
+        "path": "public/studio/js/editors/dslForm.js",
+        "baseExists": true,
+        "customBytes": 20573
+      },
+      {
+        "path": "public/studio/js/editors/fx.js",
+        "baseExists": true,
+        "customBytes": 7655
+      },
+      {
+        "path": "public/studio/js/editors/gameplayControls.js",
+        "baseExists": true,
+        "customBytes": 3600
+      },
+      {
+        "path": "public/studio/js/editors/item.js",
+        "baseExists": true,
+        "customBytes": 3466
+      },
+      {
+        "path": "public/studio/js/editors/mode.js",
+        "baseExists": true,
+        "customBytes": 1750
+      },
+      {
+        "path": "public/studio/js/editors/notices.js",
+        "baseExists": true,
+        "customBytes": 3291
+      },
+      {
+        "path": "public/studio/js/editors/numbers.js",
+        "baseExists": true,
+        "customBytes": 2387
+      },
+      {
+        "path": "public/studio/js/editors/operator.js",
+        "baseExists": true,
+        "customBytes": 4479
+      },
+      {
+        "path": "public/studio/js/editors/skins.js",
+        "baseExists": true,
+        "customBytes": 4152
+      },
+      {
+        "path": "public/studio/js/editors/theme.js",
+        "baseExists": true,
+        "customBytes": 4538
+      },
+      {
+        "path": "public/studio/js/editors/ui.js",
+        "baseExists": true,
+        "customBytes": 1631
+      },
+      {
+        "path": "public/studio/js/forge.js",
+        "baseExists": true,
+        "customBytes": 9953
+      },
+      {
+        "path": "public/studio/js/info.js",
+        "baseExists": true,
+        "customBytes": 8216
+      },
+      {
+        "path": "public/studio/js/main.js",
+        "baseExists": true,
+        "customBytes": 28290
+      },
+      {
+        "path": "public/studio/js/picker.js",
+        "baseExists": true,
+        "customBytes": 3834
+      },
+      {
+        "path": "public/studio/js/preview/cards.js",
+        "baseExists": true,
+        "customBytes": 5060
+      },
+      {
+        "path": "public/studio/js/preview/field.js",
+        "baseExists": true,
+        "customBytes": 12597
+      },
+      {
+        "path": "public/studio/js/preview/replay.js",
+        "baseExists": true,
+        "customBytes": 3510
+      },
+      {
+        "path": "public/studio/js/preview/sound.js",
+        "baseExists": true,
+        "customBytes": 4137
+      },
+      {
+        "path": "public/studio/js/slots.js",
+        "baseExists": true,
+        "customBytes": 7118
+      },
+      {
+        "path": "public/studio/js/trial.js",
+        "baseExists": true,
+        "customBytes": 7117
+      }
+    ]
   }
 ]
