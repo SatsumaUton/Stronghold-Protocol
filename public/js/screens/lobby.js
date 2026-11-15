@@ -1607,12 +1607,14 @@ export function LobbyScreen() {
   }, []);
   const isAdminUser = !!accountRole && accountRole !== 'player';
   const [createGateOpen, setCreateGateOpen] = useState(true);
+  // 「深渊回响」的独立维护开关（维护者 2026-11-16）：关掉时只挡深潜，同盟照常。
+  const [echoGateOpen, setEchoGateOpen] = useState(true);
   useEffect(() => {
     let stop = false;
     const load = () => {
       fetch('/maintenance.json', { cache: 'no-store' })
         .then((r) => (r.ok ? r.json() : null))
-        .then((j) => { if (!stop && j) setCreateGateOpen(j.create !== false); })
+        .then((j) => { if (!stop && j) { setCreateGateOpen(j.create !== false); setEchoGateOpen(j.echo !== false); } })
         .catch(() => {});
     };
     load();
@@ -1688,6 +1690,12 @@ export function LobbyScreen() {
     const difficulty = variant === 'deepecho'
       ? (picked || (DEEP_ECHO_DIFFICULTIES.includes(shownCoop) ? shownCoop : DEEP_ECHO_DEFAULT_DIFFICULTY))
       : (mode === 'solo' ? shownSolo : shownCoop);
+    // 「深渊回响」独立维护开关（维护者 2026-11-16）：关掉时只挡深潜，同盟/单人照常。
+    // 管理员豁免，与 server/lobby.js 的 create 判定一致；服务端仍是最终判据。
+    if (variant === 'deepecho' && !isAdminUser && !echoGateOpen) {
+      toast(t('服务器暂时关闭了「深渊回响」，请稍后再试'), 'warn');
+      return undefined;
+    }
     return run('create', async () => {
       const answer = await net.request('room.create', {
         mode, difficulty, ...(testMode && asTest ? { test: true } : {}), ...(!variant && versions ? { version } : {}),   // 深潜房不带版本：服务端把它钉在 DEFAULT_VERSION（第二期下半）

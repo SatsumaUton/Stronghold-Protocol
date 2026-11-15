@@ -28,10 +28,10 @@ import { readFileSync } from 'node:fs';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /** 后台维护开关（与 server/lobby.js 的 maintenanceGate 读同一批文件）；任何读取失败都按“开放”处理。 */
-let __gateStatus = { at: 0, value: { create: true, start: true, match: true } };
+let __gateStatus = { at: 0, value: { create: true, start: true, match: true, echo: true } };
 function maintenanceStatus() {
   if (Date.now() - __gateStatus.at > 5000) {
-    let create = true, start = true, match = true;
+    let create = true, start = true, match = true, echo = true;
     try {
       // 本文件在 node-N/server/http/ 下：上两级是节点根，上三级是项目根（content/ 在项目根）。
       const j = JSON.parse(readFileSync(new URL('../../data/create-room.json', import.meta.url), 'utf8'));
@@ -41,8 +41,9 @@ function maintenanceStatus() {
       const j = JSON.parse(readFileSync(new URL('../../../content/game-gate.json', import.meta.url), 'utf8'));
       if (j && j.start === false) start = false;
       if (j && j.match === false) match = false;
+      if (j && j.echo === false) echo = false;   // 「深渊回响」专属开关（维护者 2026-11-16）
     } catch { /* 缺失 = 开放 */ }
-    __gateStatus = { at: Date.now(), value: { create, start, match } };
+    __gateStatus = { at: Date.now(), value: { create, start, match, echo } };
   }
   return __gateStatus.value;
 }

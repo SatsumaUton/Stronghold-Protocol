@@ -31,9 +31,9 @@ const GATE_PATH = path.join(BASE, 'content', 'game-gate.json');
 function readGameGate() {
   try {
     const j = JSON.parse(fs.readFileSync(GATE_PATH, 'utf8'));
-    return { start: j.start !== false, match: j.match !== false, reason: String(j.reason || ''), updatedAt: j.updatedAt || 0 };
+    return { start: j.start !== false, match: j.match !== false, echo: j.echo !== false, reason: String(j.reason || ''), updatedAt: j.updatedAt || 0 };
   } catch {
-    return { start: true, match: true, reason: '', updatedAt: 0 };
+    return { start: true, match: true, echo: true, reason: '', updatedAt: 0 };
   }
 }
 
@@ -1080,9 +1080,13 @@ const server = http.createServer(async (req, res) => {
       if (typeof payload.start !== 'boolean' || typeof payload.match !== 'boolean') {
         return sendJson(res, 400, { error: 'start and match must be boolean' });
       }
+      // 「深渊回响」独立开关（维护者 2026-11-16）：没给就保留原值，老客户端不带这个字段。
+      let prevEcho = true;
+      try { prevEcho = JSON.parse(fs.readFileSync(GATE_PATH, 'utf8')).echo !== false; } catch { /* ignore */ }
       const doc = {
         start: payload.start,
         match: payload.match,
+        echo: typeof payload.echo === 'boolean' ? payload.echo : prevEcho,
         reason: String(payload.reason || '').slice(0, 200),
         updatedAt: Date.now(),
       };

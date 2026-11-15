@@ -22,14 +22,16 @@ import { PROTOCOL_VERSION, APP_VERSION } from '../../shared/constants.js';
 import { buildTag } from './buildTag.js';
 import { setSecurityHeaders, sendError, sendJson, splitUrl } from './common.js';
 import { clientAddress, isLocalIp } from '../net.js';
+import { readEchoBoard, ECHO_BOARD_DIFFICULTIES } from '../match/match/echoBoard.js';
+import { buildEchoCodex } from '../match/match/echoCodex.js';
 import { readFileSync } from 'node:fs';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /** 后台维护开关（与 server/lobby.js 的 maintenanceGate 读同一批文件）；任何读取失败都按“开放”处理。 */
-let __gateStatus = { at: 0, value: { create: true, start: true, match: true } };
+let __gateStatus = { at: 0, value: { create: true, start: true, match: true, echo: true } };
 function maintenanceStatus() {
   if (Date.now() - __gateStatus.at > 5000) {
-    let create = true, start = true, match = true;
+    let create = true, start = true, match = true, echo = true;
     try {
       // 本文件在 node-N/server/http/ 下：上两级是节点根，上三级是项目根（content/ 在项目根）。
       const j = JSON.parse(readFileSync(new URL('../../data/create-room.json', import.meta.url), 'utf8'));
@@ -39,8 +41,9 @@ function maintenanceStatus() {
       const j = JSON.parse(readFileSync(new URL('../../../content/game-gate.json', import.meta.url), 'utf8'));
       if (j && j.start === false) start = false;
       if (j && j.match === false) match = false;
+      if (j && j.echo === false) echo = false;   // 「深渊回响」专属开关（维护者 2026-11-16）
     } catch { /* 缺失 = 开放 */ }
-    __gateStatus = { at: Date.now(), value: { create, start, match } };
+    __gateStatus = { at: Date.now(), value: { create, start, match, echo } };
   }
   return __gateStatus.value;
 }
@@ -251,6 +254,31 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
     if (parts.rawPath === '/healthz') {
       const withTraffic = wantsTraffic(parts.query) && isLocalIp(clientAddress(req, trustProxy).ip);
       sendJson(req, res, 200, healthReport(health, withTraffic));
+      return;
+    }
+    // 「深渊图鉴」（只读，2026-11-06）：GET /api/deepecho/codex
+    // 内容全部由 echoCodex.js 从现有表生成，所以祝福/诅咒/投影/词条改了图鉴自动跟上（不手写第二份文案）。
+    // 与一局无关、不随玩家变化 → 允许缓存 5 分钟。
+    if (parts.rawPath === '/api/deepecho/codex') {
+      sendJson(req, res, 200, buildEchoCodex(), { 'Cache-Control': 'public, max-age=300' });
+      return;
+    }
+    // 「深渊回响」深潜排行榜（只读）：GET /api/dive/board?limit=50
+    // 数据在共用的 Redis（30 台写同一张榜，所以每台读到的都一样）；没有 Redis 时返回空榜而不是报错。
+    if (parts.rawPath === '/api/dive/board') {
+      let limit = 50;
+      let difficulty = 'HARD';
+      try {
+        const q = new URLSearchParams(parts.query || '');
+        const v = Number(q.get('limit'));
+        if (Number.isFinite(v) && v > 0) limit = Math.min(100, Math.floor(v));
+        // 榜按难度分开（险境 / 绝境 / 终极）；非法值退回默认档，不报错
+        const d = String(q.get('difficulty') || '').toUpperCase();
+        if (ECHO_BOARD_DIFFICULTIES.includes(d)) difficulty = d;
+      } catch { /* 参数坏了就用默认值 */ }
+      const store = health && health.lobby ? health.lobby.persistence?.store ?? null : null;
+      const rows = await readEchoBoard(store, { limit, difficulty });
+      sendJson(req, res, 200, { ok: true, limit, difficulty, rows });
       return;
     }
     // 本服：后台维护开关的只读状态，大厅据此把「创建房间」等入口置灰并说明原因。

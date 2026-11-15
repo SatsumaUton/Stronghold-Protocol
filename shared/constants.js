@@ -278,6 +278,7 @@ export const ERR = Object.freeze({
   CREATE_DISABLED: 'CREATE_DISABLED',
   MATCH_DISABLED: 'MATCH_DISABLED',
   START_DISABLED: 'START_DISABLED',
+  ECHO_DISABLED: 'ECHO_DISABLED',
 });
 
 export const ERR_TEXT = {
@@ -299,6 +300,7 @@ export const ERR_TEXT = {
   MAINTENANCE: N_('服务器即将维护，暂停开启新的模拟'),
   MATCH_DISABLED: N_('服务器暂时关闭了匹配队友，请稍后再试'),
   START_DISABLED: N_('服务器暂时关闭了开始游戏，请稍后再试'),
+  ECHO_DISABLED: N_('服务器暂时关闭了「深渊回响」，请稍后再试'),
   PLUGIN_UNKNOWN: N_('本服务器没有安装该插件'), PLUGIN_BLOCKED: N_('该插件不能在房间中启用'), PLUGIN_DEPENDENCY: N_('缺少该插件需要的其他插件'),
   PLUGIN_CONFLICT: N_('所选插件互相冲突'), PLUGIN_LIMIT: N_('所选插件的素材总量超出本服务器的上限'),
   PLUGIN_RULE_CONFLICT: N_('两个插件把同一个规则开关设成了不同的选项'),

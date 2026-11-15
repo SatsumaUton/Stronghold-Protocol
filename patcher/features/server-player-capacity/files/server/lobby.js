@@ -496,14 +496,14 @@ function roomTtlEnabled() { return roomTtlConfig().enabled; }
  *   content/game-gate.json 的 start / match：是否允许开始游戏 / 匹配队友（匹配另见匹配服务器自己的校验）
  * 与 roomTtlMs 一样 5 秒缓存，后台一开关到点内生效。文件缺失或损坏时视为开放。
  */
-let __gateCache = { at: 0, create: true, start: true, match: true };
+let __gateCache = { at: 0, create: true, start: true, match: true, echo: true };
 function maintenanceGate() {
   // 测试 / 排障开关：置 1 时三个门全开，完全不读配置文件。
   // 存在的理由：仓库里的 data/create-room.json 存的是「关闭」（公开仓库不该默认开放建房），
   // 而单测跑的就是仓库那份 —— 不忽略开关的话，quickMatch / create 相关测试在仓库里永远是红的。
-  if (process.env.SP_GATE_IGNORE === '1') return { at: 0, create: true, start: true, match: true };
+  if (process.env.SP_GATE_IGNORE === '1') return { at: 0, create: true, start: true, match: true, echo: true };
   if (Date.now() - __gateCache.at > 5000) {
-    let create = true, start = true, match = true;
+    let create = true, start = true, match = true, echo = true;
     try {
       // 每个节点自己的开关文件：node-N/data/create-room.json（本文件在 node-N/server/ 下，故为 ../data）。
       const j = JSON.parse(readFileSync(new URL('../data/create-room.json', import.meta.url), 'utf8'));
@@ -513,8 +513,9 @@ function maintenanceGate() {
       const j = JSON.parse(readFileSync(new URL('../../content/game-gate.json', import.meta.url), 'utf8'));
       if (j && j.start === false) start = false;
       if (j && j.match === false) match = false;
+      if (j && j.echo === false) echo = false;   // 「深渊回响」专属门（维护者 2026-11-16）
     } catch { /* 配置缺失 = 开放 */ }
-    __gateCache = { at: Date.now(), create, start, match };
+    __gateCache = { at: Date.now(), create, start, match, echo };
   }
   return __gateCache;
 }
@@ -1627,6 +1628,9 @@ case 'room.list': return this.roomList(msg);
     // 「深渊回响」（DESIGN-ABYSS.md）：**对所有玩家开放**（维护者 2026-11-07 取消测试名单 / 管理员限制）。
     // 以前这里有一道 `session.adminId / echoTester` 的门禁，连同管理后台的「深渊回响测试权限」一起删掉了。
     const variant = askedVariant === 'deepecho' ? 'deepecho' : null;
+    // 「深渊回响」有独立维护开关（维护者 2026-11-16）：关掉它只挡深潜，同盟/单人建房不受影响。
+    // 管理员同样无视（与上面 create 门一致，便于维护期自测）。
+    if (variant && session.adminId !== true && !maintenanceGate().echo) return fail(ERR.ECHO_DISABLED);
     // 深潜**不支持**实验性功能（维护者 2026-11-03 定）：enemyHpMul/Atk 会和 echoScale 叠乘、
     // playerCapacity 会改变配对与 boss 半场、poolPlan 会破坏「随机出怪」这个前提、
     // disableLayerCap 本来就是深潜的固定行为。这里**直接拒绝**而不是静默丢掉 ——

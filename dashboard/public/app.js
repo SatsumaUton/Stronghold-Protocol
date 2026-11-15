@@ -934,8 +934,10 @@ async function loadGameGate() {
     const j = await res.json();
     const s = document.getElementById('gate-start');
     const m = document.getElementById('gate-match');
+    const e = document.getElementById('gate-echo');
     if (s) s.checked = j.start !== false;
     if (m) m.checked = j.match !== false;
+    if (e) e.checked = j.echo !== false;
     const create = !!document.getElementById('create-room-toggle')?.checked;
     const st = document.getElementById('gate-state');
     if (st) st.textContent = (create ? '创建房间开放' : '创建房间已关闭') + ' · ' + (j.start === false ? '开始游戏已关闭' : '开始游戏开放') + ' · ' + (j.match === false ? '匹配队友已关闭' : '匹配队友开放');
@@ -948,6 +950,7 @@ function bindGameGate() {
   btn.dataset.bound = '1';
   btn.onclick = async () => {
     const start = !!document.getElementById('gate-start')?.checked;
+    const echoNow = !!document.getElementById('gate-echo')?.checked;
     const match = !!document.getElementById('gate-match')?.checked;
     const create = !!document.getElementById('create-room-toggle')?.checked;
     const st = document.getElementById('gate-state');
