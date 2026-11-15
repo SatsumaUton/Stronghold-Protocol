@@ -19,6 +19,7 @@ const VERSION_LABELS = {
   'act2autochess@V2_1': '第二期上半',
   act1autochess: '第一期下半',
   'act1autochess@V1_1': '第一期上半',
+  'act3autochess@V3_1': '规程·序列Ⅰ',
 };
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const nodeLabel = (target) => {

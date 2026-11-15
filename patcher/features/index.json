@@ -266,7 +266,7 @@
       {
         "path": "matchmaker/public/admin.html",
         "baseExists": false,
-        "customBytes": 84775
+        "customBytes": 95736
       },
       {
         "path": "matchmaker/public/client.js",
@@ -761,7 +761,7 @@
       {
         "path": "dashboard/public/app.js",
         "baseExists": false,
-        "customBytes": 56545
+        "customBytes": 64717
       },
       {
         "path": "dashboard/public/index.html",
@@ -6638,7 +6638,7 @@
       {
         "path": "matchmaker/public/admin.html",
         "baseExists": false,
-        "customBytes": 95691
+        "customBytes": 95736
       },
       {
         "path": "matchmaker/public/client.js",
