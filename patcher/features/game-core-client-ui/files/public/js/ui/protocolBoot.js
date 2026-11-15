@@ -97,7 +97,8 @@ export function bootLayout(n) {
 /** An official sprite as a positioned image (no lazy loading: the screen lasts about 2.3 s). */
 function Art({ k, class: cls, mask = false }) {
   const src = uiUrl(data.get('assets'), k);
-  if (!src) return null;
+  // 返回 null 的组件没有 _dom，父节点里兄弟一增删就会 insertBefore 崩溃（本服多次踩到）。
+  if (!src) return html`<span hidden data-art-empty="" />`;
   return mask
     ? html`<i class=${cls} style=${`--src:url("${src}")`}></i>`
     : html`<img class=${cls} src=${src} alt="" draggable="false" />`;
@@ -111,7 +112,7 @@ export function ProtocolBoot({ players, myId, leaving = false }) {
   const list = (Array.isArray(players) ? players : []).slice(0, 6);
   const spots = bootLayout(list.length);
   return html`<div class=${cx('pboot', list.length <= 1 && 'pboot--solo', leaving && 'is-leaving')} role="status" aria-live="polite" aria-label=${t('协议启动！')}
-      data-testid="protocol-boot">
+      data-testid="protocol-boot" data-banner="gameStart">
     <div class="pboot__stage">
       <div class="pboot__scene" aria-hidden="true">
         <${Art} k="battleReady/bg_mountain1" class="pboot__mtn pboot__mtn--1" />

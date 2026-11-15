@@ -30,7 +30,8 @@ export const TURN_BANNER_LATE_MS = 5000;
 /** An official sprite: an image, or (`mask`) a box its shape is painted through in the CSS colour. */
 function Art({ k, class: cls, mask = false }) {
   const src = uiUrl(data.get('assets'), k);
-  if (!src) return null;
+  // 返回 null 的组件没有 _dom，父节点里兄弟一增删就会 insertBefore 崩溃（本服多次踩到）。
+  if (!src) return html`<span hidden data-art-empty="" />`;
   return mask
     ? html`<i class=${cls} style=${`--src:url("${src}")`}></i>`
     : html`<img class=${cls} src=${src} alt="" draggable="false" />`;

@@ -4696,7 +4696,7 @@
       {
         "path": "public/js/ui/bossPlates.js",
         "baseExists": true,
-        "customBytes": 14899
+        "customBytes": 15278
       },
       {
         "path": "public/js/ui/buildGuard.js",
@@ -4816,7 +4816,7 @@
       {
         "path": "public/js/ui/gameComponents.js",
         "baseExists": true,
-        "customBytes": 19112
+        "customBytes": 21988
       },
       {
         "path": "public/js/ui/gameLogic/bonds.js",
@@ -5041,7 +5041,7 @@
       {
         "path": "public/js/ui/protocolBoot.js",
         "baseExists": true,
-        "customBytes": 7784
+        "customBytes": 7964
       },
       {
         "path": "public/js/ui/protocolScene.js",
@@ -5181,12 +5181,12 @@
       {
         "path": "public/js/ui/turnBanner.js",
         "baseExists": true,
-        "customBytes": 4110
+        "customBytes": 4266
       },
       {
         "path": "public/js/ui/turnPopup.js",
         "baseExists": true,
-        "customBytes": 4793
+        "customBytes": 4524
       },
       {
         "path": "public/js/ui/uiPlugins.js",
@@ -6808,7 +6808,7 @@
       {
         "path": "public/js/ui/bossPlates.js",
         "baseExists": true,
-        "customBytes": 15114
+        "customBytes": 15278
       },
       {
         "path": "public/js/ui/connBanner.js",
@@ -6878,7 +6878,7 @@
       {
         "path": "public/js/ui/gameComponents.js",
         "baseExists": true,
-        "customBytes": 21674
+        "customBytes": 21988
       },
       {
         "path": "public/js/ui/gameLogic/camera.js",

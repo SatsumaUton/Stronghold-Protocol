@@ -136,7 +136,10 @@ export function bossIconOf(bossId) {
 
 function Art({ k, class: cls }) {
   const src = uiUrl(data.get('assets'), k);
-  return src ? html`<img class=${cls} src=${src} alt="" draggable="false" />` : null;
+  // 返回 null 的组件没有 _dom，父节点里兄弟一增删就会 insertBefore 崩溃（本服多次踩到）。
+  return src
+    ? html`<img class=${cls} src=${src} alt="" draggable="false" />`
+    : html`<span hidden data-art-empty="" />`;
 }
 
 /**

@@ -16,9 +16,10 @@ import { useState, useMemo } from '../../vendor/hooks.module.js';
 import { html, Icon, TierChip, Tooltip } from './components.js';
 import { data, useData, localAsset } from '../data.js';
 import { parseRichText, rtClassName } from './richText.js';
+import { fillShowTags } from './showTags.js';
 import { t as tr } from '../../../shared/i18n.js';
-import { useStore } from '../store.js';
-import { skinsStore, ownerSkin } from './skins.js';
+import { useStore, store } from '../store.js';
+import { skinsStore, ownerSkin, tokenSkinShown } from './skins.js';
 import { settingsStore } from './settingsStore.js';
 import {
   uiUrl, chessAvatarUrl, chessPortraitUrl, itemIconUrl, tokenAvatarUrl, enemyIconUrl, bondIconUrl, bandIconUrl,
@@ -98,7 +99,9 @@ export function makeLookups(ready = true) {
 export function Img({ src, class: cls, alt = '', fallback = null, style, loading = 'lazy' }) {
   const [bad, setBad] = useState(null);
   const displaySrc = localAssetSrc(src);
-  if (!displaySrc || bad === src) return fallback;
+  // 没有图片、或加载失败（且没有 fallback 节点）时返回一个 hidden 空元素，**不要返回 null**：
+  // 返回 null 的组件没有 _dom，兄弟节点一增删就会插入失败（本服多次踩到 insertBefore 崩溃）。
+  if (!displaySrc || bad === src) return fallback == null ? html`<span hidden data-img-empty="" />` : fallback;
   return html`<img class=${cls} src=${displaySrc} alt=${alt} draggable=${false} loading=${loading} decoding="async" style=${style} onError=${(e) => { const el = e && (e.currentTarget || e.target); const s = String(displaySrc || ''); if (el && !el.dataset.retry && /^(https?:\/\/|\/)/i.test(s)) { el.dataset.retry = '1'; try { const u = new URL(s, location.origin); u.searchParams.set('retry', '1'); el.src = u.href; return; } catch { /* ignore */ } } setBad(src); }} />`;
 }
 
@@ -120,8 +123,11 @@ export function OperatorImage({ m, chess, ownerId, skin = null, portrait = false
 }
 
 /** Official UI sprite by 'group/key' with a fallback. */
-export function Sprite({ k, class: cls, fallback = null }) {
-  return html`<${Img} src=${uiUrl(data.get('assets'), k)} class=${cx('sprite', cls)} fallback=${fallback} />`;
+/** 「深渊回响」：官方精灵图里的绿色转紫（白色像素无彩色，hue-rotate 对其是恒等变换）。 */
+export const DIVE_ICON_FILTER = 'hue-rotate(120deg) saturate(1.6) brightness(1.05)';
+
+export function Sprite({ k, class: cls, fallback = null, style = null }) {
+  return html`<${Img} src=${uiUrl(data.get('assets'), k)} class=${cx('sprite', cls)} fallback=${fallback} style=${style} />`;
 }
 
 /** Official promotion phase from the resolved record's status (not its shop tier or normal / golden form). */
@@ -141,11 +147,12 @@ export function LocalSprite({ group = 'ui/battle', name, class: cls, fallback = 
 }
 
 /**
- * Rich text (official markup) → spans. Newlines become <br>.
+ * Rich text (official markup) → spans. Newlines become <br>. A {showtag_value_N} the caller did not fill (ui/showTags.js
+ * itemText / garrisonText give the live or starting value) reads 0 rather than the raw placeholder (§37.201).
  * @param {{ text: any, class?: string, as?: string }} props
  */
 export function RichText({ text, class: cls, as = 'span' }) {
-  const segs = useMemo(() => parseRichText(text), [text]);
+  const segs = useMemo(() => parseRichText(typeof text === 'string' ? fillShowTags(text, null) : text), [text]);
   const Tag = as;
   return html`<${Tag} class=${cx('rt', cls)}>${segs.map((s, i) => (s.br
     ? html`<br key=${i} />`
@@ -164,8 +171,22 @@ export const isGoldenPiece = (piece, chess) => !!(piece?.golden || chess?.isGold
  *   `rec`: the chess record to draw instead of the data's (a 自选 piece's composed record — 0.2.0, gameLogic/diy.js; a
  *   补位 stand-in's — gameLogic/standIn.js: drawn with a small 「替补」 mark in the corner)
  */
+/** The summon outfit this viewer may see (#876; round-54 audit): read without hooks — thumbnails and the detail head are
+ * also rendered as plain functions — and only when there is a skin to gate. */
+function shownTokenSkin(skin, ownerId) {
+  if (!skin) return null;
+  return tokenSkinShown(skin, { ownerId, myId: store.get()?.me?.playerId ?? null, otherSkins: settingsStore.get()?.otherSkins !== false });
+}
+
+/** A summon's avatar in its owner's outfit (#876) under the operators' 显示其他玩家的皮肤 gate (round-54 audit). */
+export function TokenAvatar({ m, tokenId, ownerId = null, skin = null, fallback = null }) {
+  return html`<${Img} src=${tokenAvatarUrl(m, tokenId, { skin: shownTokenSkin(skin, ownerId) })} fallback=${fallback} />`;
+}
+
 export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showTier = true, class: cls, dim = false, badge = null, title, rec = null, ownerId, skin = null }) {
   const m = data.get('assets');
+  // a summon wears its owner's outfit (#876) under the operators' 显示其他玩家的皮肤 gate (round-54 audit)
+  const tokenSkin = kind === 'token' ? shownTokenSkin(skin, ownerId) : null;
   let src = null;
   let name = '';
   let t = tier;
@@ -184,10 +205,11 @@ export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showT
     golden = golden ?? !!it?.isGolden;
   } else if (kind === 'token') {
     const tk = data.lookup('tokens', id);
-    src = tokenAvatarUrl(m, id);
+    src = tokenAvatarUrl(m, id, { skin: tokenSkin });
     name = tk?.name || '';
   } else if (kind === 'enemy') {
-    const e = data.lookup('enemies', id);
+    // rec：调用方已经查到的记录（跨版本敌人本房数据表里没有，见 ui/enemyRecords.js）
+    const e = rec || data.lookup('enemies', id);
     src = enemyIconUrl(m, id);
     name = e?.name || '';
   }
@@ -267,10 +289,12 @@ export function GIcon({ name, class: cls, title }) {
  */
 export function LpTower({ value, size = 'md', class: cls, tone, pending = 0, note = null, tip = null }) {
   const ok = Number.isFinite(value);
+  // 深潜：塔图标（绿色精灵图）转紫（维护者 2026-11-05）
+  const diveIcon = useStore((s) => !!s.match?.public?.echo);
   const p = ok && Number(pending) > 0 ? Math.min(value, Math.trunc(Number(pending))) : 0;
   return html`<span class=${cx('lp', `lp--${size}`, tone && `lp--${tone}`, p > 0 && 'is-pending', cls)} title=${tip || tr('目标生命值')}
       data-pending=${p > 0 ? p : null}>
-    <${Sprite} k="hudPanel/icon_hp" class="lp__icon" fallback=${html`<${Icon} name="rook" class="lp__icon" />`} />
+    <${Sprite} k="hudPanel/icon_hp" class="lp__icon" style=${diveIcon ? { filter: DIVE_ICON_FILTER } : null} fallback=${html`<${Icon} name="rook" class="lp__icon" />`} />
     <b class="num lp__val">${ok ? Math.max(0, value) : '--'}</b>
     ${p > 0 ? html`<span key=${p} class="lp__pend num" aria-label=${tr('结算时扣除 {p}', { p })}>−${p}</span>` : null}
     ${note ? html`<span class="lp__note">${note}</span>` : null}
@@ -285,9 +309,15 @@ export function CoinGlyph({ class: cls }) {
 }
 
 /** Bond glyph image (white mask tinted by CSS) or first-letter fallback. */
-export function BondGlyph({ bondId, class: cls }) {
+export function BondGlyph({ bondId, class: cls, mask = false }) {
   const b = data.lookup('bonds', bondId);
   const src = bondIconUrl(data.get('assets'), bondId);
+  // `mask`: the icon's shape filled with the current text colour (the 规程 card: the official cards draw a bond's icon in
+  // the same colour as its name — the theme's bondColor —, not the fixed mint filter below)
+  if (mask && src) {
+    const url = `url("${src}")`;
+    return html`<span class=${cx('bglyph', 'bglyph--mask', cls)} title=${b?.name || bondId} style=${{ WebkitMaskImage: url, maskImage: url }}></span>`;
+  }
   return html`<span class=${cx('bglyph', cls)} title=${b?.name || bondId}>
     <${Img} src=${src} fallback=${html`<span class="bglyph__txt">${[...(b?.name || '?')][0]}</span>`} />
   </span>`;
@@ -320,7 +350,10 @@ export function PlayerAvatar({ player, size = 'md', self = false, class: cls }) 
   const glyph = [...(player?.name || '').trim()][0] || '?';
   const dead = player?.alive === false || player?.status === 'dead';
   const left = player?.status === 'left';
-  const hue = [162, 196, 38, 280][((player?.seat | 0) % 4 + 4) % 4];
+  // 「深渊回响」：座位色改成紫色家族（原版是青绿/蓝/黄/紫四色，深潜整体换紫，维护者 2026-11-05）
+  const diveTheme = useStore((s) => s.room?.variant === 'deepecho' || !!s.match?.public?.echo);
+  const hues = diveTheme ? [262, 285, 246, 300] : [162, 196, 38, 280];
+  const hue = hues[((player?.seat | 0) % 4 + 4) % 4];
   return html`<span class=${cx('pavatar', `pavatar--${size}`, self && 'is-self', dead && 'is-dead', left && 'is-left', player?.isBot && 'is-bot',
       player?.connected === false && !player?.isBot && 'is-offline', cls)} style=${`--seat-hue:${hue}`}>
     <span class="pavatar__img">

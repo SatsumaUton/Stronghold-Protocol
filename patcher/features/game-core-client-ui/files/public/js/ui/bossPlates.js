@@ -25,6 +25,7 @@ import { sortedPlayers } from './gameLogic.js';
 import { data, getBoss, localAsset } from '../data.js';
 import { PHASE } from '../../../shared/constants.js';
 import { t, tParts } from '../../../shared/i18n.js';
+import { diveInterrupted } from './diveWords.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -135,7 +136,10 @@ export function bossIconOf(bossId) {
 
 function Art({ k, class: cls }) {
   const src = uiUrl(data.get('assets'), k);
-  return src ? html`<img class=${cls} src=${src} alt="" draggable="false" />` : null;
+  // 返回 null 的组件没有 _dom，父节点里兄弟一增删就会 insertBefore 崩溃（本服多次踩到）。
+  return src
+    ? html`<img class=${cls} src=${src} alt="" draggable="false" />`
+    : html`<span hidden data-art-empty="" />`;
 }
 
 /**
@@ -192,7 +196,7 @@ export function FinalAssaultPlate({ rows, total, bossId = null, myId = null, onD
   const shown = useCountUp(total, 700, 450);
   const ys = finalRowsY(rows.length);
   return html`<div class=${cx('bpl', 'bpl--final', leaving && 'is-leaving')} role="status" aria-live="polite"
-      aria-label=${`${t('最终攻势')}：${t('合力击败敌方领袖！')}`} data-testid="final-plate">
+      aria-label=${`${t('最终攻势')}：${t('合力击败敌方领袖！')}`} data-testid="final-plate" data-banner="finalAssault">
     <div class="bpl__panel">
       <${Art} k="settle/settlemen_personal_fail" class="bpl__map" />
       <div class="fa__group">
@@ -249,14 +253,15 @@ export function HiddenCorePlate({ bossId = null, onDone }) {
 
 /**
  * The run's end (endPlateOf kinds), over the field in the server's last pause before RESULT.
- * @param {{ kind: 'allClear'|'coreFail'|'abort', bossId?: string|null, hiddenBossId?: string|null, onDone?: Function }} props
+ * `dive`: a 深渊回响 run — the plate says 深潜中断, not 模拟中断 (维护者 2026-11-08).
+ * @param {{ kind: 'allClear'|'coreFail'|'abort', bossId?: string|null, hiddenBossId?: string|null, dive?: boolean, onDone?: Function }} props
  */
-export function EndPlate({ kind, bossId = null, hiddenBossId = null, onDone }) {
+export function EndPlate({ kind, bossId = null, hiddenBossId = null, dive = false, onDone }) {
   const leaving = useTimedLeave(END_PLATE_MS, onDone);
   let body;
   if (kind === 'abort') {
     body = html`<span class="end__bars" aria-hidden="true">${[0, 1, 2, 3, 4, 5].map((i) => html`<i key=${i} style=${`--i:${i}`}></i>`)}</span>
-      <b class="end__title end__title--side">${t('模拟中断')}</b>
+      <b class="end__title end__title--side">${diveInterrupted(dive)}</b>
       <span class="end__sub" aria-hidden="true">STRONGHOLD PROTOCOL</span>`;
   } else {
     const all = kind === 'allClear';

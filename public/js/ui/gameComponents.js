@@ -99,7 +99,9 @@ export function makeLookups(ready = true) {
 export function Img({ src, class: cls, alt = '', fallback = null, style, loading = 'lazy' }) {
   const [bad, setBad] = useState(null);
   const displaySrc = localAssetSrc(src);
-  if (!displaySrc || bad === src) return fallback;
+  // 没有图片、或加载失败（且没有 fallback 节点）时返回一个 hidden 空元素，**不要返回 null**：
+  // 返回 null 的组件没有 _dom，兄弟节点一增删就会插入失败（本服多次踩到 insertBefore 崩溃）。
+  if (!displaySrc || bad === src) return fallback == null ? html`<span hidden data-img-empty="" />` : fallback;
   return html`<img class=${cls} src=${displaySrc} alt=${alt} draggable=${false} loading=${loading} decoding="async" style=${style} onError=${(e) => { const el = e && (e.currentTarget || e.target); const s = String(displaySrc || ''); if (el && !el.dataset.retry && /^(https?:\/\/|\/)/i.test(s)) { el.dataset.retry = '1'; try { const u = new URL(s, location.origin); u.searchParams.set('retry', '1'); el.src = u.href; return; } catch { /* ignore */ } } setBad(src); }} />`;
 }
 
