@@ -286,3 +286,39 @@ export function validateDiyPicks(picks, { data, kitted = null } = { data: null }
   }
   return { ok: true, picks: out };
 }
+
+/** 自选编队按版本分键的旧存档兼容：老格式是「一张 picks 平表」，按默认版本对待。 */
+const LEGACY_DIY_SLUG = 'act2autochess';
+
+/**
+ * 取某个版本的自选编队 picks。
+ * `map` 有两种形态：新格式 `{ [slug]: picks }`，或旧格式的平表 picks（只有版本槽位，没有版本键）。
+ * @param {any} map @param {string} slug @returns {object|null}
+ */
+export function pickDiyFor(map, slug) {
+  if (!map || typeof map !== 'object') return null;
+  // 新格式：键是版本 slug
+  if (Object.prototype.hasOwnProperty.call(map, slug)) {
+    const v = map[slug];
+    return v && typeof v === 'object' ? v : null;
+  }
+  // 旧格式：整张表就是 picks（含 self 的槽位键），只在默认版本下认它
+  const isFlat = Object.keys(map).some((k) => /_diy\d+_?[ab]?$/.test(k));
+  if (isFlat) return slug === LEGACY_DIY_SLUG ? map : null;
+  return null;
+}
+
+/**
+ * 把某个版本的自选编队写进分键表，返回**新对象**（不改原对象，服务端会对它 freeze）。
+ * @param {any} map @param {string} slug @param {object} picks @returns {object}
+ */
+export function storeDiyFor(map, slug, picks) {
+  const out = {};
+  if (map && typeof map === 'object') {
+    const isFlat = Object.keys(map).some((k) => /_diy\d+_?[ab]?$/.test(k));
+    if (isFlat) out[LEGACY_DIY_SLUG] = map;
+    else for (const [k, v] of Object.entries(map)) out[k] = v;
+  }
+  out[slug] = picks && typeof picks === 'object' ? picks : {};
+  return out;
+}

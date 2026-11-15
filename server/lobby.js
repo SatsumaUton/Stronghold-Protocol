@@ -263,6 +263,8 @@ import { readFileSync } from 'node:fs';
 import { roomCapacity, PLAYER_CAPACITIES } from '../shared/playerCapacity.js';
 import { EXPERIMENTAL_DEFAULTS, isExperimental, experimentalOptions, experimentalRuleChanged } from '../shared/experimental.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
+// 自选编队按版本分键（维护者 2026-11-16）：读/写某个版本那一格
+import { pickDiyFor, storeDiyFor } from '../shared/diy.js';
 import { encode, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
 import { Match as DefaultMatch } from './match/Match.js';
@@ -275,7 +277,7 @@ const VANILLA_KITTED = new Set(KITTED_CHARS);
 import { isContentHash } from '../shared/plugins/identity.js';
 import { ruleOption } from '../shared/plugins/rules.js';
 import { msg, wireMessage } from '../shared/i18n.js';
-import { DEFAULT_VERSION } from '../shared/versions.js';
+import { DEFAULT_VERSION, versionById, versionSlug } from '../shared/versions.js';
 import { parseTestModeEnv, testModeGate, unrecognizedTestMode } from './testMode.js';
 import { soloHoldConflictDetail, soloHoldOf } from './soloHold.js';
 
@@ -3314,11 +3316,20 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
    * room with gameplay plugins), store them on the session and the seat (see the header). A running match never takes
    * them: it keeps the picks its seat had at its start.
    */
-  diy(session, { picks }) {
+  diy(session, { picks, version }) {
     const room = this.roomOf(session);
     const res = checkDiyPicks(picks, { data: this.dataFor(room), kitted: this.kittedFor(room) });
     if (!res || !('ok' in res)) return fail(ERR.BAD_MSG, res && res.detail);
-    const kept = freezeDiy(res.picks);
+    // 按版本分键（维护者 2026-11-16）：规程 5/6 阶各 6 槽、二期各 2 槽，混在一张表里会互相裁掉。
+    // 版本取客户端上报的那一版（它校验用的就是这版数据），没有就退回房间版本、再退回默认。
+    const diySlug = (() => {
+      const want = typeof version === 'string' ? version : null;
+      for (const id of [want, room ? room.version : null, DEFAULT_VERSION]) {
+        if (typeof id === 'string' && id) return versionSlug(versionById(id) || { id, dir: '' });
+      }
+      return 'act2autochess';
+    })();
+    const kept = storeDiyFor(session.diy, diySlug, freezeDiy(res.picks));
     const cs = this.settingsCs(room, session.playerId);
     session.diy = kept;
     session.diyCs = cs;
@@ -3584,7 +3595,8 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
         // 0.2.0 补位: the chess the human marked as not owned (bots own every operator)
         notOwned: own ? own.notOwned : null,
         // 0.2.0 自选编队: the human's checked DIY picks (bots field no 自选 piece [ASSUMED])
-        diy: own ? own.diy : null,
+        // 只把这个房间版本的自选编队传下去（按版本分键存，见 Lobby.diy）。
+        diy: own ? pickDiyFor(own.diy, versionSlug(versionById(room.version) || { id: room.version, dir: '' })) : null,
         // 干员皮肤 (docs/SKINS.md): the appearances the human wears, keyed by operator charId (bots always default)
         skins: own ? own.skins : null,
         // 本服：管理员标记必须一起传下去 —— PlayerState 用 seat.admin 得出 ps.admin，

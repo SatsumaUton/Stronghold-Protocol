@@ -435,7 +435,7 @@ export function canSendSettings({ store: app = store, content = appContentSet, c
  * content change only when the payload changed (a version switch or a room's arrival then spends no heavy-message budget
  * on them).
  */
-function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, field, prepare, lockedText, tag, content = appContentSet, gate = null, app = store, seatBound = true }) {
+function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, field, prepare, lockedText, tag, content = appContentSet, gate = null, extra = null, app = store, seatBound = true }) {
   const T = timers || { setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms), clearTimeout: (id) => globalThis.clearTimeout(id) };
   // (`lockedText` is a msgid: the toast is translated when it shows — docs/I18N.md)
   const tell = notify || ((text) => toast(t(text), 'warn'));
@@ -488,7 +488,7 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
       pendingJson = json;
       setState('sending');
       try {
-        await net.request(msgType, field ? { [field]: payload } : payload);
+        await net.request(msgType, field ? { [field]: payload, ...(extra ? extra() : {}) } : payload);
         if (my !== seq) return;
         pendingJson = null;
         lastSent = json;
@@ -738,6 +738,8 @@ export function installDiySync({ net, timers, target = loadoutStore, notify, con
   const offKitContent = content ? content.subscribe(() => { const l = pickList(); if (l !== target.get().diyKitted) target.set({ diyKitted: l }); }) : null;
   const sync = installPrefSync({
     net, timers, target, notify, content, app, gate, key: 'diy', stateKey: 'diySync', msgType: 'room.diy', field: 'picks', tag: 'diy',
+    // 自选编队按版本分键：把「这一页是哪一版」一起报上去，服务端据此决定写进哪一格。
+    extra: () => ({ version: pageVersion() }),
     lockedText: N_('自选编队是局外设置，修改将在下一局生效'),
     async prepare() {
       if (target === loadoutStore) refreshViews(); // the picks of the version on screen

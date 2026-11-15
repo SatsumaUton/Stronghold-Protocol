@@ -7,7 +7,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 243331
+        "customBytes": 299866
       },
       {
         "path": "server/http/config.js",
@@ -24,7 +24,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 243331
+        "customBytes": 299866
       },
       {
         "path": "server/match/aiDigest.js",
@@ -331,7 +331,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 243331
+        "customBytes": 299866
       },
       {
         "path": "server/phaseMetrics.js",
@@ -348,7 +348,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 243331
+        "customBytes": 299866
       },
       {
         "path": "shared/playerCapacity.js",
@@ -424,7 +424,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 243331
+        "customBytes": 299866
       }
     ]
   },
@@ -446,7 +446,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 243331
+        "customBytes": 299866
       }
     ]
   },
@@ -483,7 +483,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 243331
+        "customBytes": 299866
       },
       {
         "path": "server/net.js",
@@ -1594,7 +1594,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 243331
+        "customBytes": 299866
       },
       {
         "path": "server/match/aiDigest.js",
@@ -4216,7 +4216,7 @@
       {
         "path": "shared/diy.js",
         "baseExists": true,
-        "customBytes": 17264
+        "customBytes": 18768
       },
       {
         "path": "shared/experimental.js",
@@ -4946,7 +4946,7 @@
       {
         "path": "public/js/ui/loadoutSync.js",
         "baseExists": true,
-        "customBytes": 45551
+        "customBytes": 46807
       },
       {
         "path": "public/js/ui/lobbyMedia.js",
@@ -5212,6 +5212,11 @@
         "path": "public/js/ui/watchBonds.js",
         "baseExists": true,
         "customBytes": 17667
+      },
+      {
+        "path": "public/js/ui/regulationBriefing.js",
+        "baseExists": true,
+        "customBytes": 5368
       }
     ]
   },
@@ -5319,6 +5324,11 @@
         "path": "public/js/screens/title.js",
         "baseExists": false,
         "customBytes": 18167
+      },
+      {
+        "path": "public/js/screens/diyCheck.js",
+        "baseExists": true,
+        "customBytes": 7865
       }
     ]
   },
@@ -6958,7 +6968,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 298876
+        "customBytes": 299866
       },
       {
         "path": "server/match/Match.js",
