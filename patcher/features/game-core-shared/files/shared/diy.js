@@ -295,18 +295,41 @@ const LEGACY_DIY_SLUG = 'act2autochess';
  * `map` 有两种形态：新格式 `{ [slug]: picks }`，或旧格式的平表 picks（只有版本槽位，没有版本键）。
  * @param {any} map @param {string} slug @returns {object|null}
  */
+/**
+ * 取某个版本的自选编队 picks。
+ * `map` 有两种形态：新格式 `{ [slug]: picks }`，或旧格式的平表 picks（只有版本槽位，没有版本键）。
+ *
+ * **跨版本继承**（维护者 2026-11-16）：某个版本没配的槽位，回退默认版本（第二期下半）**同一槽位**的配置。
+ * 这样 `5_diy1` / `5_diy2` / `6_diy1` / `6_diy2` 这 4 个各版本都有的槽，配一次各版本都认；
+ * 而规程独有的 3~6 号槽只存在于规程那一格里，不会被默认版本影响。
+ *
+ * 注意：在**新版本里显式清空**某个共有槽位，会回退成默认版本的值（没有墓碑字段可区分
+ * 「没设过」和「设成了空」）。要彻底清空，把默认版本那一格也清掉。
+ *
+ * @param {any} map @param {string} slug @returns {object|null}
+ */
 export function pickDiyFor(map, slug) {
-  if (!map || typeof map !== 'object') return null;
-  // 新格式：键是版本 slug
-  if (Object.prototype.hasOwnProperty.call(map, slug)) {
-    const v = map[slug];
-    return v && typeof v === 'object' ? v : null;
-  }
-  // 旧格式：整张表就是 picks（含 self 的槽位键），只在默认版本下认它
-  const isFlat = Object.keys(map).some((k) => /_diy\d+_?[ab]?$/.test(k));
-  if (isFlat) return slug === LEGACY_DIY_SLUG ? map : null;
-  return null;
+  const bucketOf = (s2) => {
+    if (!map || typeof map !== 'object') return null;
+    if (Object.prototype.hasOwnProperty.call(map, s2)) {
+      const v = map[s2];
+      return v && typeof v === 'object' ? v : null;
+    }
+    return null;
+  };
+  const own = bucketOf(slug);
+  // 默认版本自己就是回退源，不用再回退
+  if (slug === LEGACY_DIY_SLUG) return own;
+  // 旧格式（整张表就是 picks）：按默认版本认
+  const isFlat = !!map && typeof map === 'object' && Object.keys(map).some((k) => /_diy\d+_?[ab]?$/.test(k));
+  if (isFlat) return map;
+  const base = bucketOf(LEGACY_DIY_SLUG);
+  if (!base) return own;
+  if (!own) return base;                                  // 这一版还没配过 → 直接用默认版本那份
+  if (!Object.keys(own).length) return base;              // 配过但空 → 同样回退
+  return { ...base, ...own };                             // 逐槽合并：本版本设过的优先
 }
+
 
 /**
  * 把某个版本的自选编队写进分键表，返回**新对象**（不改原对象，服务端会对它 freeze）。
