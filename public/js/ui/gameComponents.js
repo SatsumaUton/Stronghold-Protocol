@@ -100,7 +100,7 @@ export function Img({ src, class: cls, alt = '', fallback = null, style, loading
   const [bad, setBad] = useState(null);
   const displaySrc = localAssetSrc(src);
   if (!displaySrc || bad === src) return fallback;
-  return html`<img class=${cls} src=${displaySrc} alt=${alt} draggable=${false} loading=${loading} decoding="async" style=${style} onError=${(e) => { const el = e && (e.currentTarget || e.target); const s = String(displaySrc || ''); if (el && !el.dataset.retry && /^https?:\/\//i.test(s)) { el.dataset.retry = '1'; try { const u = new URL(s); u.searchParams.set('retry', '1'); el.src = u.href; return; } catch { /* ignore */ } } setBad(src); }} />`;
+  return html`<img class=${cls} src=${displaySrc} alt=${alt} draggable=${false} loading=${loading} decoding="async" style=${style} onError=${(e) => { const el = e && (e.currentTarget || e.target); const s = String(displaySrc || ''); if (el && !el.dataset.retry && /^(https?:\/\/|\/)/i.test(s)) { el.dataset.retry = '1'; try { const u = new URL(s, location.origin); u.searchParams.set('retry', '1'); el.src = u.href; return; } catch { /* ignore */ } } setBad(src); }} />`;
 }
 
 /** Owner-aware operator pictures, with live selection / settings updates even on an already open card.

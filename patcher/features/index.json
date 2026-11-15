@@ -4816,7 +4816,7 @@
       {
         "path": "public/js/ui/gameComponents.js",
         "baseExists": true,
-        "customBytes": 19090
+        "customBytes": 19112
       },
       {
         "path": "public/js/ui/gameLogic/bonds.js",
@@ -6878,7 +6878,7 @@
       {
         "path": "public/js/ui/gameComponents.js",
         "baseExists": true,
-        "customBytes": 21652
+        "customBytes": 21674
       },
       {
         "path": "public/js/ui/gameLogic/camera.js",
