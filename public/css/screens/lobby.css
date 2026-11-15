@@ -2280,25 +2280,20 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .lobby-hub[data-season="act3autochess"] .hub-entry--coop .hub-entry__en { color: rgba(143, 33, 23, .85); }
 .lobby-hub[data-season="act3autochess"] .hub-entry--coop .hub-entry__icon { color: rgba(143, 33, 23, .3); }
 .lobby-hub[data-season="act3autochess"] .hub-entry--coop .hub-entry__corner { background: linear-gradient(135deg, transparent 50%, var(--reg-red) 50%); }
-/* 深渊回响 on 规程: the season's cream and red instead of the violet — the abyss card still reads as the darker,
-   accented one (deeper cream, heavier red 斜纹), so it never looks like a second 同盟模拟 card. */
-.lobby-hub[data-season="act3autochess"] .hub-entry--deepecho {
-  background: repeating-linear-gradient(135deg, rgba(226, 65, 44, .26) 0 .06rem, transparent .06rem .18rem), linear-gradient(160deg, #d9cfae, #a89a76);
-  color: #1a0d0a;
-  border-color: var(--reg-red);
-  box-shadow: 0 0 .26rem rgba(226, 65, 44, .34), inset 0 0 .3rem rgba(232, 223, 196, .16);
+/* ---- 深渊回响卡：**不跟随版本（赛季）换色**（维护者 2026-11-15）----
+   深渊回响是本服自己的模式，它的紫罗兰配色就是它的身份，切版本时不该跟着大厅一起变。
+   通用赛季规则 `.lobby-hub[data-season] .hub-entry` 会刷所有模式卡的底色 —— 下面这几条与它**同权重**、
+   位置在它**之后**，所以能盖住它，把这张卡钉回自己的紫罗兰；将来新增赛季也不会被带跑。 */
+.lobby-hub[data-season] .hub-entry--deepecho {
+  background: linear-gradient(160deg, #3a1e63 0%, #241242 55%, #170b2b 100%);
+  color: #efe6ff;
+  border-color: #7d5bd6;
 }
-.lobby-hub[data-season="act3autochess"] .hub-entry--deepecho .hub-entry__en { color: rgba(143, 33, 23, .9); }
-.lobby-hub[data-season="act3autochess"] .hub-entry--deepecho .hub-entry__icon { color: rgba(143, 33, 23, .26); }
-.lobby-hub[data-season="act3autochess"] .hub-entry--deepecho .hub-entry__name { color: #2a0f0b; text-shadow: 0 0 .1rem rgba(232, 223, 196, .5); }
-.lobby-hub[data-season="act3autochess"] .hub-entry--deepecho .hub-entry__corner { background: linear-gradient(135deg, transparent 50%, var(--reg-cream) 50%); }
-@media (prefers-reduced-motion: no-preference) {
-  .lobby-hub[data-season="act3autochess"] .hub-entry--deepecho:not(.hub-entry--locked) { animation: abyss-breathe-reg 4.5s ease-in-out infinite; }
-  @keyframes abyss-breathe-reg {
-    0%, 100% { box-shadow: 0 0 .22rem rgba(226, 65, 44, .26), inset 0 0 .3rem rgba(232, 223, 196, .12); }
-    50% { box-shadow: 0 0 .34rem rgba(226, 65, 44, .46), inset 0 0 .4rem rgba(232, 223, 196, .2); }
-  }
-}
+.lobby-hub[data-season] .hub-entry--deepecho .hub-entry__en { color: #b79cff; }
+.lobby-hub[data-season] .hub-entry--deepecho .hub-entry__icon { color: rgba(183, 156, 255, .26); }
+.lobby-hub[data-season] .hub-entry--deepecho .hub-entry__name { color: #f3ecff; text-shadow: 0 0 .12rem rgba(183, 156, 255, .45); }
+.lobby-hub[data-season] .hub-entry--deepecho .hub-entry__corner { background: linear-gradient(135deg, transparent 50%, #b79cff 50%); }
+.lobby-hub[data-season] .hub-entry__new { color: #1a0b2e; }
 /* 选择模拟协议 on 规程 (data-season on its body): the season's red ground under the drawn grid, cream rules, the red start
    plate of the season's banners */
 .proto__body[data-season="act3autochess"] .proto__bg {
