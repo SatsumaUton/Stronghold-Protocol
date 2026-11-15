@@ -54,7 +54,20 @@
   background-repeat: no-repeat; background-size: 100% 100%;
   font-size: .16rem; letter-spacing: .06em;
 }
-.shopbar--reg .toolbtn kbd { display: none; }
+/* 规程的冻结/刷新是官方贴图板，行内 kbd 会挤坏板上的中文标签，所以上游在这里隐藏了它
+   （0.4.0 原样：`.shopbar--reg .toolbtn kbd { display: none; }`）。
+   玩家反馈「新版本看不到快捷键提示」（维护者 2026-11-15）：改成**右上角小角标**放回来 ——
+   绝对定位、不参与板内的居中排版，贴图板本身分毫不动。 */
+.shopbar--reg .toolbtn kbd {
+  display: inline-flex; position: absolute; top: -.07rem; right: -.06rem; z-index: 2;
+  align-items: center; justify-content: center;
+  min-width: .22rem; height: .22rem; padding: 0 .05rem;
+  font-family: var(--font-num); font-size: .11rem; line-height: 1; font-weight: 700;
+  color: #f2f2f2; background: rgba(10, 14, 12, .84);
+  border: 1px solid rgba(242, 242, 242, .38); border-radius: .04rem;
+  box-shadow: 0 .02rem .08rem rgba(0, 0, 0, .5);
+  pointer-events: none;
+}
 .shopbar--reg .toolbtn__ticon { display: none; }
 /* The freeze plate follows the prefab's states: not frozen (reads 冻结) is frozen_bg_normal, frozen (reads 解冻) is
    frozen_bg_unselect / frozen_bg_unlock, unavailable is bg_lock / frozen_bg_disable (ui/regHud.js). With a sprite the
