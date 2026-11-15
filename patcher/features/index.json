@@ -402,7 +402,7 @@
       {
         "path": "public/js/main.js",
         "baseExists": true,
-        "customBytes": 49354
+        "customBytes": 50467
       },
       {
         "path": "public/js/ui/buildGuard.js",
@@ -441,7 +441,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 140482
+        "customBytes": 157554
       },
       {
         "path": "server/lobby.js",
@@ -530,7 +530,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 140482
+        "customBytes": 157554
       }
     ]
   },
@@ -4584,7 +4584,7 @@
       {
         "path": "public/js/main.js",
         "baseExists": true,
-        "customBytes": 49354
+        "customBytes": 50467
       },
       {
         "path": "public/js/media.js",
@@ -5223,12 +5223,12 @@
       {
         "path": "public/js/screens/bandDraft.js",
         "baseExists": true,
-        "customBytes": 41622
+        "customBytes": 43989
       },
       {
         "path": "public/js/screens/briefing.js",
         "baseExists": true,
-        "customBytes": 5563
+        "customBytes": 6877
       },
       {
         "path": "public/js/screens/cultivation.js",
@@ -5268,7 +5268,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 157531
+        "customBytes": 157554
       },
       {
         "path": "public/js/screens/loadout.js",
@@ -6728,7 +6728,7 @@
       {
         "path": "public/js/main.js",
         "baseExists": true,
-        "customBytes": 49354
+        "customBytes": 50467
       },
       {
         "path": "public/js/net.js",
@@ -6743,7 +6743,7 @@
       {
         "path": "public/js/screens/bandDraft.js",
         "baseExists": true,
-        "customBytes": 43966
+        "customBytes": 43989
       },
       {
         "path": "public/js/screens/echoLobby.js",
@@ -6758,7 +6758,7 @@
       {
         "path": "public/js/screens/game.js",
         "baseExists": true,
-        "customBytes": 157531
+        "customBytes": 157554
       },
       {
         "path": "public/js/screens/game/overlays.js",

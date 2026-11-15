@@ -38,12 +38,13 @@ import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.
 import { html, Button, Icon, useTicker, secondsLeft } from '../ui/components.js';
 import { useGameData, BandIcon, RichText, PlayerAvatar, Sprite, Img } from '../ui/gameComponents.js';
 import { StepHeader, ExitModal } from '../ui/matchChrome.js';
-import { MatchInfoDialog, matchInfoModel } from '../ui/matchInfo.js';
+import { MatchInfoDialog, matchInfoModel, MatchBondDialog, regulationCoreAbsent } from '../ui/matchInfo.js';
 import { MatchEnemies, stagePoolLine } from '../ui/matchEnemies.js';
 import { StageMiniMap } from '../ui/stagePreview.js';
+import { shownVersion, seasonOf, REGULATION_SEASON } from '../versions.js';
 import { plannableBonds, bondPlanOpen, bondPlanHolders, BondPlanTag, BondPlanPicker } from '../ui/bondPlan.js';
 import { actions, act } from '../ui/gameActions.js';
-import { normalizeDraft, sortedPlayers, draftMyTurn } from '../ui/gameLogic.js';
+import { normalizeDraft, sortedPlayers, draftMyTurn, pregameStepCount, pregameStepIndex } from '../ui/gameLogic.js';
 import { useStore } from '../store.js';
 import { data } from '../data.js';
 import { audio } from '../audio.js';
@@ -54,12 +55,19 @@ import { useRise } from '../ui/transitions.js';
 import { CARD_KEY, cardStore, cardOperators, cardContext, seatOperator, seatCardSkin, seatArtSrc } from '../ui/seatArt.js';
 import { skinsStore, SKINS_KEY } from '../ui/skins.js';
 import { settingsStore } from '../ui/settingsStore.js';
-import { chessPortraitUrl, uiUrl } from '../ui/assetUrls.js';
+import { chessPortraitUrl, medalIconUrl } from '../ui/assetUrls.js';
 import { aggregateStats, peekStatsRecords, strategyBadgeIds, trophyMedalOf } from '../ui/stats.js';
 import { modeOffBonds, bandOffBonds, bandOffLine } from '../ui/gameLogic.js';
-import { t, tParts, tName } from '../../../shared/i18n.js';
+import { t, tParts, tName, N_ } from '../../../shared/i18n.js';
+import { diveEntering, diveWonTimes, isDivePub } from '../ui/diveWords.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
+
+/** 规程's strategy sections (activity_table bandDataListDict bandType) in the draft grid, with the official captions. */
+const BAND_SECTIONS = Object.freeze({
+  GENERAL: Object.freeze({ id: 'general', name: N_('泛用型策略'), icon: 'crown' }),
+  BONDRELEVANT: Object.freeze({ id: 'bond', name: N_('盟约型策略'), icon: 'link' }),
+});
 
 /** 本局禁用 on a strategy card whose bonds `names` the mode switches off (bandOffBonds); nothing otherwise. */
 export function BandOffTag({ names = [] }) {
@@ -181,7 +189,7 @@ export function autoPickBand(sel, { bands, taken, myPick = null, defaultId = DEF
  *   selected: the auto pick is the highlighted band (not the default standing in for a band a teammate holds)
  *   concurrent: 并发草稿（5–20 人大厅 allowRepeat）
  */
-export function draftTip({ timed, turnSeconds = null, autoName = null, selected = true, concurrent = false }) {
+export function draftTip({ timed, turnSeconds = null, autoName = null, selected = true, concurrent = false, dive = false }) {
   const clock = Number(turnSeconds) > 0 ? t('每位博士有 {n} 秒', { n: Math.round(turnSeconds) }) : t('每位博士限时决策');
   if (concurrent) {
     // 并发：每人同时选一次，可重复；超时按当前高亮
@@ -190,7 +198,8 @@ export function draftTip({ timed, turnSeconds = null, autoName = null, selected 
     if (!autoName) return t('{head}；{clock}', { head, clock });
     return t('{head}；{clock}，超时将自动选择当前选中的「{autoName}」', { head, clock, autoName });
   }
-  const skip = t('联合模拟在选择策略时可以进行一次跳过');
+  // 深潜房里不叫「联合模拟」（维护者 2026-11-08）
+  const skip = dive ? t('深渊回响在选择策略时可以进行一次跳过') : t('联合模拟在选择策略时可以进行一次跳过');
   if (!timed) return t('{skip}；本局不限时', { skip });
   if (!autoName) return t('{skip}；{clock}', { skip, clock });
   return selected ? t('{skip}；{clock}，超时将自动选择当前选中的「{autoName}」', { skip, clock, autoName })
@@ -306,6 +315,8 @@ export function BandDraftScreen({ held = null } = {}) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);   // 预约盟约选择框（ui/bondPlan.js）
   const [planBusy, setPlanBusy] = useState(false);
+  const [bondId, setBondId] = useState(null);
+  useEffect(() => { setBondId(null); }, [infoOpen]);
 
   const mode = gd.config?.modes?.[pub?.modeId];
   const offBonds = modeOffBonds(mode); // the bonds this mode never activates (标准: 10 of 23)
@@ -315,6 +326,10 @@ export function BandDraftScreen({ held = null } = {}) {
   const bands = useMemo(() => allowedBands(gd.list('bands'), mode?.type || (solo ? 'SINGLE' : 'MULTI'), disableDuckLord), [gd.ready, mode?.type, solo, disableDuckLord, data.locale(), data.contentId()]);
   // 本局的战场（左栏小地图，ui/stagePreview.js）与它的池说明
   const stage = pub?.stageId ? gd.stage(pub.stageId) : null;
+  // 规程（第三期）在选策略这一步不再画战场小地图（维护者 2026-11-15）：
+  // 新版把战场信息放在「本局信息」里，这一块留着只是占位、还容易让人以为要按它选。
+  const draftVersion = useStore(shownVersion);
+  const hideDraftMap = seasonOf(draftVersion) === REGULATION_SEASON;
   const stagePool = stagePoolLine(mode);
   const players = sortedPlayers(pub);
   const draft = normalizeDraft(pub?.draft, players);
@@ -431,7 +446,8 @@ export function BandDraftScreen({ held = null } = {}) {
   // for the seat cards; ui/seatArt.js seatCardSkin): one's own choice at once, a teammate's from the match's public
   // players (m.public.players[].skins), none for another seat while 「显示其他玩家的皮肤」 is off, the default art when the
   // outfit's pictures are not here (chessPortraitUrl) — or fail to load (the row falls back to them: §35.51)
-  const cards = useMemo(() => cardContext(cardOperators(gd.list('chess'))), [gd.ready]);
+  // (gd.backups: the room version's 自选编队 pool joins the card list, as on the room's seat cards)
+  const cards = useMemo(() => cardContext(cardOperators(gd.list('chess'), gd.backups), { pending: !gd.backups }), [gd.ready, gd.backups]);
   const myCard = useStore((s) => s[CARD_KEY], Object.is, cardStore);
   const localSkins = useStore((s) => s[SKINS_KEY], Object.is, skinsStore);
   const otherSkins = useStore((s) => s.otherSkins !== false, Object.is, settingsStore);
@@ -453,7 +469,7 @@ export function BandDraftScreen({ held = null } = {}) {
   }, []);
   const myMedal = useMemo(() => {
     const medal = trophyMedalOf(local.trophies, gd.config?.trophies?.medals);
-    return medal ? uiUrl(data.get('assets'), `medalIcon/${medal.iconId}`) : null;
+    return medal ? medalIconUrl(data.get('assets'), medal.iconId) : null;
   }, [gd.ready, local]);
 
   // what the right side shows: 已选定策略 after my pick, else the detail pane once opened, else only the wall
@@ -462,7 +478,7 @@ export function BandDraftScreen({ held = null } = {}) {
   const shownBand = peek ? gd.band(peek) : band;
   const rows = solo ? players.filter((p) => p.playerId === myId) : draft.order.map((pid) => players.find((p) => p.playerId === pid)).filter(Boolean);
 
-  const head = allPicked ? html`<div class="dturn is-done"><span class="dturn__txt"><b>${t('策略选择完成')}</b><span>${t('正在进入模拟…')}</span></span><${Icon} name="hourglass" class="dturn__glass" /></div>`
+  const head = allPicked ? html`<div class="dturn is-done"><span class="dturn__txt"><b>${t('策略选择完成')}</b><span>${diveEntering(isDivePub(pub))}</span></span><${Icon} name="hourglass" class="dturn__glass" /></div>`
     : myTurn ? html`<div class="dturn is-turn">
         <span class="dturn__go"><${Sprite} k="bandChoose/youturn_finger" class="dturn__finger" fallback=${html`<${Icon} name="chevronLeft" class="dturn__finger" />`} />
           <b>${t('请选择策略')}</b></span>
@@ -478,7 +494,7 @@ export function BandDraftScreen({ held = null } = {}) {
   // open dialogs the match screen tears down a moment later
   return html`<div class=${cx('screen draft', `draft--${view}`, held && 'is-held', head && 'has-status')} inert=${held ? true : undefined} aria-busy=${held ? 'true' : undefined}>
     <div class="brief__bg" aria-hidden="true"></div>
-    <${StepHeader} step=${2} of=${2} title=${t('选择策略')} micro="STRATEGY // BAND CHECK" pub=${clock ? { ...pub, deadline: clock.deadline } : { ...pub, deadline: 0 }}
+    <${StepHeader} step=${pregameStepIndex(gd.config, 'BAND_CHECK')} of=${pregameStepCount(gd.config)} title=${t('选择策略')} micro="STRATEGY // BAND CHECK" pub=${clock ? { ...pub, deadline: clock.deadline } : { ...pub, deadline: 0 }}
       total=${clock ? clock.total : null} onExit=${() => setExit(true)}
       extra=${html`<button type="button" class="stephead__info" data-testid="match-info-open" aria-haspopup="dialog" onClick=${() => setInfoOpen(true)}
         title=${t('本局信息')}><${Icon} name="search" /><span>${t('本局信息')}</span></button>`}
@@ -486,7 +502,7 @@ export function BandDraftScreen({ held = null } = {}) {
     <main class="draft__main">
       <aside class=${cx('draft-order', draft.concurrent && 'is-wide')}>
         <div class="draft-order__deco" aria-hidden="true"><i></i><i></i><span>STRONGHOLD PROTOCOL<br />${solo ? 'SINGLE OPERATOR' : 'COLLABORATIVE SYSTEM'}</span></div>
-        ${stage ? html`<div class="draft-map" data-testid="draft-map" title=${stage.name}>
+        ${stage && !hideDraftMap ? html`<div class="draft-map" data-testid="draft-map" title=${stage.name}>
           <${StageMiniMap} stage=${stage} />
           <div class="draft-map__text">
             <span class="draft-tag">BATTLEFIELD</span>
@@ -505,7 +521,7 @@ export function BandDraftScreen({ held = null } = {}) {
         </div>
         ${canPlan ? html`<${Button} variant="secondary" icon="users" block=${true} class="draft-order__plan" data-testid="bond-plan-open"
           aria-haspopup="dialog" onClick=${() => setPlanOpen(true)}>${myPlan ? t('预选盟约：{name}', { name: gd.bond(myPlan)?.name || myPlan }) : t('预选盟约')}<//>` : null}
-        ${!solo ? html`<p class="draft-order__tip" data-testid="draft-tip">${draftTip({ timed, turnSeconds: turnLen, autoName: myPick ? null : autoName, selected: open && autoId === sel, concurrent: draft.concurrent })}</p>` : null}
+        ${!solo ? html`<p class="draft-order__tip" data-testid="draft-tip">${draftTip({ timed, turnSeconds: turnLen, autoName: myPick ? null : autoName, selected: open && autoId === sel, concurrent: draft.concurrent, dive: isDivePub(pub) })}</p>` : null}
       </aside>
       <i class="draft__link" aria-hidden="true"></i>
 
@@ -521,15 +537,21 @@ export function BandDraftScreen({ held = null } = {}) {
           <p class="draft-detail__status t-mint"><${Icon} name="check" />${t('已选择「{name}」', { name: gd.band(myPick)?.name || '' })}${!solo && !allPicked ? t('，等待其他博士') : ''}</p>
         </section>` : html`
         <section class="draft-grid" role="listbox" aria-label=${t('策略')}>
-          ${bands.map((b, i) => {
+          ${bands.flatMap((b, i) => {
+            // 规程 sorts its strategies into 泛用型策略 (bandType GENERAL) and 盟约型策略 (BONDRELEVANT), each under a header,
+            // as the official draft shows them (BV11NW869ELq part 4 0:28, BV13LWM6BEvY match 1 1:36); a version without
+            // bandType has no header
+            const sec = BAND_SECTIONS[b.bandType];
+            const head = sec && bands[i - 1]?.bandType !== b.bandType
+              ? [html`<div key=${`sec-${b.bandType}`} class="draft-grid__sec" role="presentation" data-testid=${`band-section-${sec.id}`}><${Icon} name=${sec.icon} /><span>${t(sec.name)}</span></div>`] : [];
             const isTaken = taken.has(b.bandId);
             // 这个策略是「房主指定给某个 AI、而它还没选走」的（不是被队友选走的）
             const isReserved = isTaken && reserved.has(b.bandId) && !draft.picks.has(reserved.get(b.bandId));
             const offNames = bandOffBonds(b, offBonds).map((id) => gd.bond(id)?.name || id); // 本局禁用 (still selectable)
             const on = view === 'detail' && !peek && sel === b.bandId;
             const badged = local.badges.has(b.bandId); // (the count is the detail pane's 已通过模拟 N 次)
-            return html`<button key=${b.bandId} type="button" role="option" aria-selected=${on ? 'true' : 'false'} data-band=${b.bandId}
-                aria-disabled=${isTaken ? 'true' : 'false'} title=${isReserved ? t('已指定给 AI 队友') : isTaken ? t('已被选择') : offNames.length ? bandOffLine(offNames) : b.name}
+                return [...head, html`<button key=${b.bandId} type="button" role="option" aria-selected=${on ? 'true' : 'false'} data-band=${b.bandId}
+                    aria-disabled=${isTaken ? 'true' : 'false'} title=${isReserved ? t('已指定给 AI 队友') : isTaken ? t('已被选择') : offNames.length ? bandOffLine(offNames) : b.name}
                 class=${cx('dband', on && 'is-sel', myPick === b.bandId && 'is-mine', isTaken && 'is-taken', offNames.length && 'is-off')} style=${`--n:${Math.min(i, 15)}`}
                 onClick=${() => pickTile(b.bandId)}>
               <span class="dband__frame"><${BandIcon} bandId=${b.bandId} size="lg" /></span>
@@ -539,13 +561,13 @@ export function BandDraftScreen({ held = null } = {}) {
               <${BandOffTag} names=${offNames} />
               ${isTaken ? html`<span class="dband__taken">${isReserved ? t('AI 已指定') : t('已被选择')}</span>` : null}
               ${on ? html`<span class="dband__selmark" aria-hidden="true">SELECTED</span>` : null}
-            </button>`;
+            </button>`];
           })}
         </section>
         ${view === 'detail' && shownBand ? html`<aside class="draft-detail" key="detail">
           <div class="draft-detail__body" key=${shownBand.bandId}>
             <div class="draft-detail__art"><${BandIcon} bandId=${shownBand.bandId} size="xl" /></div>
-            ${local.won[shownBand.bandId] ? html`<span class="draft-detail__medal">${t('已通过模拟{n}次', { n: local.won[shownBand.bandId] })}</span>` : null}
+            ${local.won[shownBand.bandId] ? html`<span class="draft-detail__medal">${diveWonTimes(isDivePub(pub), local.won[shownBand.bandId])}</span>` : null}
             <div class="draft-detail__hp">${t('初始生命值')}<b class="num">${shownBand.totalHp ?? '--'}</b></div>
             <span class="draft-tag">STRATEGY</span>
             <h2 class="draft-detail__name">${shownBand.name}</h2>
@@ -564,14 +586,15 @@ export function BandDraftScreen({ held = null } = {}) {
           </div>
         </aside>` : null}`}
     </main>
-    <${ExitModal} open=${exit} onClose=${() => setExit(false)} solo=${solo} />
-    <${MatchInfoDialog} open=${infoOpen} onClose=${() => setInfoOpen(false)} model=${info}
-      enemies=${infoOpen ? html`<${MatchEnemies} pub=${pub} gd=${gd} idScope="minfo" />` : null}
+    ${exit ? html`<${ExitModal} open=${true} onClose=${() => setExit(false)} solo=${solo} />` : null}
+        <${MatchInfoDialog} open=${infoOpen} onClose=${() => setInfoOpen(false)} model=${info} onBond=${setBondId}
+          enemies=${infoOpen && !pub?.echo ? html`<${MatchEnemies} pub=${pub} gd=${gd} idScope="minfo" />` : null}
       status=${infoStatus ? html`<span class=${cx('minfo-dlg__turn', `is-${infoStatus.tone}`)}>
         <${Icon} name=${infoStatus.tone === 'mint' ? 'check' : 'hourglass'} />${infoStatus.text}${infoStatus.secs != null ? html`<b class="num">${infoStatus.secs}s</b>` : null}
       </span>` : null} />
-    <${BondPlanPicker} open=${planOpen && canPlan} onClose=${() => setPlanOpen(false)} bonds=${planBonds} value=${myPlan}
-      holders=${bondPlanHolders(players, myId)} off=${offBonds} busy=${planBusy} onPick=${pickPlan} />
+        <${MatchBondDialog} bondId=${infoOpen ? bondId : null} onClose=${() => setBondId(null)} priv=${priv} banned=${info?.banned} off=${!!info?.sets.off.has(bondId)} coreAbsent=${regulationCoreAbsent(info, bondId)} />
+        <${BondPlanPicker} open=${planOpen && canPlan} onClose=${() => setPlanOpen(false)} bonds=${planBonds} value=${myPlan}
+          holders=${bondPlanHolders(players, myId)} off=${offBonds} busy=${planBusy} onPick=${pickPlan} />
     ${turnBanner ? html`<${TurnBanner} key=${turnBanner} onDone=${() => setTurnBanner(0)} />` : null}
   </div>`;
 }

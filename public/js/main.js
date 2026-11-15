@@ -41,7 +41,7 @@
 import './ui/compat.js';
 import { ReleaseNotesHost } from './ui/releaseNotes.js';
 import { render, options } from '../vendor/preact.module.js';
-import { useErrorBoundary } from '../vendor/hooks.module.js';
+import { useErrorBoundary, useEffect, useRef, useState } from '../vendor/hooks.module.js';
 import { html, UiHosts, Button, MicroLabel, closeAllDialogs } from './ui/components.js';
 import { ConnectionBanner } from './ui/connBanner.js';
 import { ToastHost, toast, toastError, describeError } from './ui/toasts.js';
@@ -573,7 +573,25 @@ function ScreenCrashed({ error, reset }) {
   </div>`;
 }
 
+/** 崩溃后自动重挂一次的小组件：挂载 1.2 秒后回调 onFire（达到上限就不再触发）。
+ *  @param {{ tries: any, max: number, onFire: Function }} props */
+function AutoRemount({ tries, max, onFire }) {
+  useEffect(() => {
+    if (!tries || tries.current >= max) return undefined;
+    tries.current += 1;
+    const id = setTimeout(() => { try { onFire(); } catch { /* ignore */ } }, 1200);
+    return () => clearTimeout(id);
+  }, []);
+  return null;
+}
+
 function App() {
+  // 自动恢复：同一次会话里的**第一次**崩溃，隔 1.2 秒换个 key 重挂整棵树。
+  // 崩溃多半来自某个瞬态（某张图失败、某个面板多挂了一下、Preact 的 null 子节点），
+  // 重挂一次基本都能过去；第二次还崩就停住，交给玩家点「重新加载界面」，避免无限闪烁。
+  const AUTO_REMOUNT_MAX = 1;
+  const autoTries = useRef(0);
+  const [remount, setRemount] = useState(0);
   const route = useStore(selectRoute);
   const combatActive = useStore((s) => selectRoute(s) === 'game' && s.room?.inMatch === true
     && !s.match?.result && isCombatPhase(s.match?.public?.phase));
@@ -585,7 +603,9 @@ function App() {
   const Screen = SCREENS[route] || LobbyScreen;
   return html`<div class="app-root">
     <div class="app-bg" aria-hidden="true"></div>
-    ${error ? html`<${ScreenCrashed} error=${error} reset=${resetError} />` : html`<${Screen} key=${route} />`}
+    ${error
+      ? html`<${ScreenCrashed} error=${error} reset=${resetError} /><${AutoRemount} tries=${autoTries} max=${AUTO_REMOUNT_MAX} onFire=${() => { setRemount((n) => n + 1); resetError(); }} />`
+      : html`<${Screen} key=${route + ':' + remount} />`}
     <${TrustedNotice} />
     <${ConnectionBanner} />
     <${ToastHost} />

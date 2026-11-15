@@ -99,7 +99,7 @@ export function BriefingScreen() {
       <${Button} variant="primary" size="xl" class="brief-go" icon=${me?.ready ? 'check' : me ? 'play' : 'eye'} active=${!!me?.ready} loading=${busy}
         disabled=${!!me?.ready || !me || !!pub.rerollVote || info.choice?.picked === null} onClick=${ready}>${me?.ready ? t('已就绪') : me ? t('准备就绪') : t('观战中')}<//>
     </footer>
-    <${ExitModal} open=${exit} onClose=${() => setExit(false)} solo=${solo} />
+    ${exit ? html`<${ExitModal} open=${true} onClose=${() => setExit(false)} solo=${solo} />` : null}
     <${MatchBondDialog} bondId=${bondId} onClose=${() => setBondId(null)} priv=${priv} banned=${info.banned} off=${info.sets.off.has(bondId)} coreAbsent=${regulationCoreAbsent(info, bondId)} />
   </div>`;
 }

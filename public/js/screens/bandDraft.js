@@ -586,7 +586,7 @@ export function BandDraftScreen({ held = null } = {}) {
           </div>
         </aside>` : null}`}
     </main>
-    <${ExitModal} open=${exit} onClose=${() => setExit(false)} solo=${solo} />
+    ${exit ? html`<${ExitModal} open=${true} onClose=${() => setExit(false)} solo=${solo} />` : null}
         <${MatchInfoDialog} open=${infoOpen} onClose=${() => setInfoOpen(false)} model=${info} onBond=${setBondId}
           enemies=${infoOpen && !pub?.echo ? html`<${MatchEnemies} pub=${pub} gd=${gd} idScope="minfo" />` : null}
       status=${infoStatus ? html`<span class=${cx('minfo-dlg__turn', `is-${infoStatus.tone}`)}>

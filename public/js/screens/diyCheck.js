@@ -139,6 +139,6 @@ export function DiyCheckScreen() {
         active=${!!confirmed} loading=${busy} disabled=${!canEdit}
         onClick=${() => confirm(shown)}>${confirmed ? t('已就绪') : inMap ? t('确认编队') : t('观战中')}<//>
     </footer>
-    <${ExitModal} open=${exit} onClose=${() => setExit(false)} solo=${solo} />
+    ${exit ? html`<${ExitModal} open=${true} onClose=${() => setExit(false)} solo=${solo} />` : null}
   </div>`;
 }

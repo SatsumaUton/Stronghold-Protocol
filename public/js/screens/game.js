@@ -2288,6 +2288,6 @@ function MatchScreen() {
     <${SettingsModal} open=${settingsOpen} onClose=${() => setSettingsOpen(false)} />
     <${AfkWarning} pub=${pub} priv=${priv} />
     <${DownedPlate} open=${downed} onWatch=${() => setDowned(false)} onLeave=${() => { setDowned(false); setExitOpen(true); }} />
-    <${ExitModal} open=${exitOpen} onClose=${() => setExitOpen(false)} solo=${solo} />
+    ${exitOpen ? html`<${ExitModal} open=${true} onClose=${() => setExitOpen(false)} solo=${solo} />` : null}
   </div>`;
 }

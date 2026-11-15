@@ -73,7 +73,7 @@ export function RegulationBriefing({ pub, gd, room, solo, info, players, me, rea
       </aside>
     </div>
     <${SetupReroll} pub=${pub} />
-    <${ExitModal} open=${exit} onClose=${() => setExit(false)} solo=${solo} />
+    ${exit ? html`<${ExitModal} open=${true} onClose=${() => setExit(false)} solo=${solo} />` : null}
     <${MatchBondDialog} bondId=${bondId} onClose=${() => setBondId(null)} priv=${priv} banned=${info.banned} off=${info.sets.off.has(bondId)} coreAbsent=${regulationCoreAbsent(info, bondId)} />
   </div>`;
 }
