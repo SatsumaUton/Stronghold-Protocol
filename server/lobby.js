@@ -1590,13 +1590,19 @@ case 'room.list': return this.roomList(msg);
     // disableLayerCap 本来就是深潜的固定行为。这里**直接拒绝**而不是静默丢掉 ——
     // 悄悄丢掉会让玩家以为自己开的设置生效了。
     if (variant && experimental != null) return fail(ERR.BAD_MSG, msg('「深渊回响」不支持实验性功能'));
-    // 「深渊回响」只支持**默认版本**（第二期下半）。
-    // 原因：深渊的模板、跨版本怪物池、悬赏/词条都是按默认版本的数据标定的，
+    // 「深渊回响」只支持**基础版本**（`DEFAULT_VERSION`，第二期下半）。
+    // 原因：深渊的模板、跨版本怪物池、悬赏/词条都是按这个版本的数据标定的，
     // 换个版本会出现「模板对不上 / 数值漂移」。这里直接拒绝。
     //
     // ⚠ `version` 必须**先解析再用**：它原来声明在下面（ticket 1591），这里提前引用会触发
     // `ReferenceError: Cannot access 'version' before initialization` —— 深潜房一点「开始深潜」就 500。
-    const version = askedVersion ?? this.defaultVersion();
+    //
+    // ⚠ 深潜**不能**跟着大厅默认版本走（2026-11-15，上游 0.4.0）：
+    //   0.4.0 起大厅默认版本是「规程」（`LOBBY_DEFAULT_VERSION = 'act3autochess@V3_1'`），
+    //   而 `DEFAULT_VERSION` 仍是 `act2autochess`。原来这里写 `askedVersion ?? this.defaultVersion()`，
+    //   升级后 `defaultVersion()` 返回规程 → 下面那道检查直接把深潜房拒掉，
+    //   玩家点「开始深潜」只会看到「只支持第二期下半」。深潜必须自己钉住基础版本。
+    const version = variant ? (askedVersion ?? DEFAULT_VERSION) : (askedVersion ?? this.defaultVersion());
     if (variant && version !== DEFAULT_VERSION) {
       return fail(ERR.VERSION_UNSUPPORTED, msg('「深渊回响」只支持「第二期下半」，不支持其他版本'));
     }
