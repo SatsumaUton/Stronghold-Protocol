@@ -51,6 +51,16 @@ export function vendor({ log = console.log, warn = console.warn } = {}) {
     const from = join(root, src);
     if (optional && !existsSync(from)) { warn(`vendor: ${dst} skipped (${src} not installed; the 3D board falls back to 2D)`); continue; }
     if (VENDOR_REWRITES[dst]) writeFileSync(join(out, dst), rewriteBare(readFileSync(from, 'utf8'), VENDOR_REWRITES[dst]));
+
+// SP_PREACT_GUARD（维护者 2026-11-16）：Preact 提交阶段的 `insertBefore(n.__e, …)` 在
+// 某个 vnode 没有 DOM 节点时（组件返回 null/undefined）会抛「parameter 1 is not of type Node」，
+// 整屏被错误边界接住 —— 本服踩过多次。这里在复制后加一道判空跳过，重生成 vendor 时自动保留。
+if (dst === 'preact.module.js') {
+  const file = join(out, dst);
+  const txt = readFileSync(file, 'utf8');
+  const guarded = txt.replace('l=u.insertBefore(n.__e,l||null)', 'n.__e==null?0:(l=u.insertBefore(n.__e,l||null))');
+  if (guarded !== txt) writeFileSync(file, guarded);
+}
     else copyFileSync(from, join(out, dst));
     done.push(dst);
     log('vendor:', dst);
