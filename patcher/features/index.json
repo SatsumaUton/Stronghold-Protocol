@@ -5737,7 +5737,7 @@
       {
         "path": "public/css/components.css",
         "baseExists": true,
-        "customBytes": 65365
+        "customBytes": 71821
       },
       {
         "path": "public/css/devices.css",
@@ -6663,7 +6663,7 @@
       {
         "path": "public/css/components.css",
         "baseExists": true,
-        "customBytes": 71633
+        "customBytes": 71821
       },
       {
         "path": "public/css/screens/game-panels.css",

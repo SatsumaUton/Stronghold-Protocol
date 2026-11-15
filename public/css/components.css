@@ -1304,6 +1304,8 @@
 .verpick__row.is-on { box-shadow: inset 0 0 0 2px currentColor; }
 .verpick__pick {
   display: flex; flex-direction: column; align-items: flex-start; gap: .06rem; width: 100%; min-height: max(.44rem, calc(44px * var(--sp-ui, 1)), 32px);
+  /* 同一行里另一张卡更高时，本卡的悬停底色只盖住上半截（上游 0.4.0 的缺陷，维护者 2026-11-15 反馈）：让按钮撑满整张卡。 */
+  height: 100%;
   padding: .12rem .14rem; border: 0; background: none; color: inherit; font: inherit; text-align: left;
 }
 .verpick__pick:disabled { cursor: default; }
