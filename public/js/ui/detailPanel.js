@@ -940,8 +940,7 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
     if (c) return { type: 'chess', ...appearance, chess: c, piece: own?.piece || null, unit: u, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: si, ...cv };
     const t = data.lookup('tokens', u.defId) || diyToken(u.defId);
     if (t) return { type: 'token', token: t, unitId: u.id, ownerId: tokenOwnerId(own?.piece, pieces) };
-    if (t) return { type: 'token', token: t, unitId: u.id, ownerId: u.ownerId ?? tokenOwnerId(own?.piece, pieces), skin: u.skin || null };
-    const en = data.lookup('enemies', u.defId);
+  const en = enemyRecord(u.defId);
     return en ? { type: 'enemy', enemy: en, unitId: u.id } : null;
   }
   return null;
