@@ -46,7 +46,7 @@ import { plannableBonds, bondPlanOpen, bondPlanHolders, BondPlanTag, BondPlanPic
 import { actions, act } from '../ui/gameActions.js';
 import { normalizeDraft, sortedPlayers, draftMyTurn, pregameStepCount, pregameStepIndex } from '../ui/gameLogic.js';
 import { useStore } from '../store.js';
-import { data } from '../data.js';
+import { data, useData } from '../data.js';
 import { ECHO_STAGES_FILE, echoStagePool } from '../ui/echoStages.js';
 import { audio } from '../audio.js';
 import { TurnBanner, TURN_BANNER_LATE_MS } from '../ui/turnBanner.js';
