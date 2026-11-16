@@ -526,8 +526,12 @@
   flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  /* 维护者 2026-11-16：页脚整行**居中**，备案号紧跟在「非官方同人复刻…」那句后面
+     （原来是 space-between，会把备案号甩到最右边、整行看起来贴在左边）。 */
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  text-align: center;
   padding: 0 62px 26px;
   font-size: 10px;
   letter-spacing: .14em;
