@@ -146,3 +146,8 @@ test/content/whitw2-stack.test.js
 test/patcher/deepecho-isolation.test.js
 test/**/*echo*.test.js
 tmp/
+
+# 安卓外壳的构建中间产物（APK 在仓库外的 dist/）
+android/build/
+*.apk
+

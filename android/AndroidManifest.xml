@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 卫戍协议：盟约 · 萝卜喵公益服 —— WebView 外壳。
+     package 与签名固定不变，否则后续版本无法覆盖安装。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="love.luobomiao.stronghold"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <!-- 打开外链用的 intent（Android 11+ 需要声明可见性） -->
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.VIEW" />
+      <data android:scheme="https" />
+    </intent>
+  </queries>
+
+  <application
+      android:label="@string/app_name"
+      android:icon="@mipmap/ic_launcher"
+      android:hardwareAccelerated="true"
+      android:usesCleartextTraffic="false"
+      android:allowBackup="false"
+      android:supportsRtl="true"
+      android:theme="@style/AppTheme">
+
+    <activity
+        android:name=".MainActivity"
+        android:exported="true"
+        android:launchMode="singleTask"
+        android:screenOrientation="fullSensor"
+        android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|navigation|uiMode|density|fontScale"
+        android:windowSoftInputMode="adjustResize">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      <!-- 点房间邀请链接直接进房：https://stronghold.luobomiao.love/?room=XXXX -->
+      <intent-filter android:autoVerify="false">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="stronghold.luobomiao.love" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>
