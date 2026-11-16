@@ -1941,22 +1941,6 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .mf-cross::before, .mf-cross::after { content: ''; position: absolute; background: rgba(var(--mint-500-rgb), .55); }
 .mf-cross::before { left: 50%; top: 0; bottom: 0; width: 1px; } .mf-cross::after { top: 50%; left: 0; right: 0; height: 1px; }
 .mf-cross--tl { left: .1rem; top: 0; } .mf-cross--tr { right: .1rem; top: 0; } .mf-cross--bl { left: .1rem; bottom: 0; } .mf-cross--br { right: .1rem; bottom: 0; }
-.mf-scout { display: block; width: 100%; height: auto; overflow: visible; }
-.mf-scout__wave { fill: none; stroke: rgba(var(--mint-500-rgb), .35); stroke-width: 6; filter: blur(2px); animation: mf-wave 3s ease-in-out infinite alternate; }
-@keyframes mf-wave { to { transform: translateX(-12px); } }
-.mf-scout__sky { fill: var(--mint-c48); opacity: .9; animation: mf-sky 4s linear infinite; }
-@keyframes mf-sky { from { transform: translateX(0); } to { transform: translateX(-120px); } }
-.mf-scout__bot rect { fill: var(--mint-s1); }
-.mf-scout__bot { animation: mf-hop .5s steps(2) infinite; }
-@keyframes mf-hop { 50% { transform: translateY(-3px); } }
-.mf-scout__eye { animation: mf-blink 3s steps(1) infinite; }
-/* the eyes stay dark over the mint body: raise the selector's specificity rather than force the declaration (DESIGN bans the force flag) */
-.mf-scout__bot rect.mf-scout__eye { fill: #0b2620; }
-@keyframes mf-blink { 0%, 92% { opacity: 1; } 94%, 100% { opacity: 0; } }
-.mf-scout__leg--a { animation: mf-leg .3s steps(2) infinite; } .mf-scout__leg--b { animation: mf-leg .3s steps(2) infinite reverse; }
-@keyframes mf-leg { 50% { transform: translateY(-3px); } }
-.mf-scout__ground { stroke: rgba(var(--mint-c45-rgb), .5); stroke-width: 2; stroke-dasharray: 6 4; }
-.mf-scout text { fill: var(--mint-s1); font: 700 8px var(--font-num, monospace); letter-spacing: 2px; opacity: .8; }
 .mf-search__tip { min-height: 2.8em; margin: 0; max-width: 5rem; font-size: max(calc(.2 * var(--t)), 12px); line-height: 1.45; color: #e6e9e8; animation: sw-in 300ms var(--ease-out) backwards; }
 .mf-search__note { margin: 0; font-size: max(calc(.15 * var(--t)), 10px); color: #8d9391; }
 .mf-stop { display: inline-flex; align-items: center; gap: .12rem; margin-top: auto; align-self: flex-end; height: max(.62rem, 32px, calc(36px * var(--sp-ui, 1))); padding: 0 .3rem 0 .14rem;
