@@ -21,6 +21,8 @@ import { LobbyPersister } from '../../server/persist/persister.js';
 import { snapshotLobby, LOBBY_DOC_VERSION } from '../../server/persist/lobbyState.js';
 import { snapshotMatch } from '../../server/match/snapshot.js';
 import { DATA } from '../match/harness.js';
+// 仓库里的 data/create-room.json 默认关闭建房（公开仓库不该默认开放）；与本目录其它测试一样绕过维护门。
+process.env.SP_GATE_IGNORE = '1';
 
 const quiet = { info() {}, warn() {}, error() {}, debug() {} };
 
