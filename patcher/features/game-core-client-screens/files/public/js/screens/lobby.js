@@ -64,6 +64,7 @@ import { data, getConfig, getMode, getStage, localAsset, useData } from '../data
 import { t, tc, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { NoticesButton } from '../ui/notices.js';
+import { FeedbackNotice } from '../ui/feedbackNotice.js';
 import { RoomListDialog, markListPrompt } from '../ui/roomList.js';
 // 搜寻中面板：直接用同盟模拟里「匹配队友」那套界面（品牌行 + 像素侦察兵 + 轮换提示 + 停止搜寻）
 import { SearchPanel } from '../ui/matchFlow.js';
@@ -1945,6 +1946,7 @@ export function LobbyScreen() {
   const season = seasonOf(version);
   return html`<div class="screen lobby-screen lobby-hub" data-season=${season}>
     <${HubBackdrop} season=${season} />
+      <${FeedbackNotice} />
     <header class="topbar">
       <div class="topbar__left">
         <${Button} variant="ghost" size="sm" icon="chevronLeft" onClick=${backToTitle} title=${t('返回标题')}>${t('返回')}<//>

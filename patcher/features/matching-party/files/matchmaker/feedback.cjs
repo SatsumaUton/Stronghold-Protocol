@@ -218,6 +218,19 @@ function ensureSchema() {
       last_seen_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
       seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    // ★ 2026-11-16（维护者）：管理员回复后要通知**作者本人** —— 邮件 + 大厅提示。
+    //   作者读没读过这条回复记在 reply_seen_at（NULL = 还没看过）。
+    //   MySQL 8 没有 ADD COLUMN IF NOT EXISTS，先查 information_schema。
+    const [col] = await db().query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'feedback_items' AND COLUMN_NAME = 'reply_seen_at'`);
+    if (!col.length) {
+      await db().query('ALTER TABLE feedback_items ADD COLUMN reply_seen_at DATETIME NULL AFTER reply_at');
+      // 已经存在的旧回复不算「新回复」：把它们的 reply_seen_at 补成 reply_at，
+      // 否则功能上线的瞬间，所有历史回复都会在玩家大厅里弹一次（维护者 2026-11-16）。
+      await db().query(
+        'UPDATE feedback_items SET reply_seen_at = reply_at WHERE reply_seen_at IS NULL AND reply_at IS NOT NULL');
+    }
   })().catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }
@@ -447,6 +460,79 @@ async function notifyAdmins(item, log = console) {
   }
 }
 
+/**
+ * 回复 → 给**作者本人**发一封邮件（fire-and-forget，发不出去不影响回复保存）。
+ *
+ * 维护者 2026-11-16：「给反馈板增加，在管理员回复后会用邮件的方式通知对方，
+ * 并且在打开网页后在大厅界面有提示。」——邮件是大厅那条提示之外的第二个通道。
+ * 作者没有账号或账号没邮箱时静默跳过（游客发的反馈就只能看大厅提示）。
+ */
+async function notifyAuthor(item, admin) {
+  try {
+    if (!item || item.account_id == null) return;
+    const { mail, MAIL } = require('./account.cjs');
+    const [rows] = await db().query(
+      'SELECT email, nickname FROM accounts WHERE id = ? AND disabled = 0 AND deleted_at IS NULL',
+      [item.account_id]);
+    const row = rows[0];
+    const to = row && row.email ? String(row.email).trim() : '';
+    if (!to) return;
+    const link = 'https://stronghold.luobomiao.love/mm/feedback.html#' + item.id;
+    const text = [
+      `你提交的反馈 #${item.id}「${item.title}」有了回复：`,
+      '',
+      item.reply,
+      '',
+      admin && admin.nickname ? `—— ${admin.nickname}（管理员）` : '—— 管理员',
+      '',
+      '查看完整内容：' + link,
+      '（下次打开游戏大厅时也会提示你。）',
+    ].join('\n');
+    await mail().sendMail({
+      from: `"萝卜喵公益服" <${MAIL.user}>`,
+      to,
+      subject: `【萝卜喵公益服】你的反馈 #${item.id} 有回复了`.slice(0, 180),
+      text,
+    });
+  } catch (e) {
+    console.error('[feedback] 回复邮件发送失败: ' + (e && e.message));
+  }
+}
+
+/**
+ * 读：当前登录账号**还没看过的回复**（大厅提示用）。
+ * 判定：有 reply、且 reply_seen_at 为空或早于 reply_at。
+ */
+async function myUnreadReplies(accountId) {
+  if (accountId == null) return { count: 0, items: [] };
+  const [rows] = await db().query(
+    `SELECT id, title, reply, reply_at FROM feedback_items
+      WHERE account_id = ? AND hidden = 0 AND reply IS NOT NULL AND reply <> ''
+        AND (reply_seen_at IS NULL OR reply_seen_at < reply_at)
+      ORDER BY reply_at DESC LIMIT 20`,
+    [accountId]);
+  return {
+    count: rows.length,
+    items: rows.map((r) => ({
+      id: Number(r.id),
+      title: r.title,
+      reply: r.reply.length > 400 ? r.reply.slice(0, 400) + '…' : r.reply,
+      replyAt: ms(r.reply_at),
+    })),
+  };
+}
+
+/** 写：把当前账号那些回复标成已读（玩家点了「知道了」或打开过反馈板）。 */
+async function markMyRepliesSeen(accountId) {
+  if (accountId == null) return { seen: 0 };
+  const [res] = await db().query(
+    `UPDATE feedback_items SET reply_seen_at = NOW()
+      WHERE account_id = ? AND reply IS NOT NULL AND reply <> ''
+        AND (reply_seen_at IS NULL OR reply_seen_at < reply_at)`,
+    [accountId]);
+  return { seen: Number(res.affectedRows) || 0 };
+}
+
 /** 服主操作：改状态 / 回复 / 隐藏。`reply: ''` 清除回复。 */
 async function adminUpdate(id, req, user) {
   const body = await readJson(req);
@@ -467,10 +553,23 @@ async function adminUpdate(id, req, user) {
     sets.push('hidden = ?'); params.push(body.hidden ? 1 : 0);
   }
   if (!sets.length) return { error: 'INVALID', field: 'body' };
+  // 记下改之前的回复，判断这次是不是真的写了新内容（避免反复保存重复发信）
+  const [[before]] = await db().query('SELECT reply, reply_at FROM feedback_items WHERE id = ?', [id]);
+  const replyBefore = before ? before.reply : null;
   const [res] = await db().query(`UPDATE feedback_items SET ${sets.join(', ')} WHERE id = ?`, [...params, id]);
   if (!res.affectedRows) return { error: 'NOT_FOUND' };
   const [rows] = await db().query('SELECT * FROM feedback_items WHERE id = ?', [id]);
-  return { item: toItem(rows[0], { admin: true, viewerId: user.id }) };
+  const row = rows[0];
+  // ★ 2026-11-16（维护者）：管理员**写了新回复**就通知作者本人（邮件 + 大厅提示）。
+  //   清空回复（reply = null）不发；内容没变也不发。
+  try {
+    if (body.reply !== undefined && row && row.reply && row.reply !== replyBefore) {
+      await notifyAuthor(row, user);
+    }
+  } catch (e) {
+    console.error('[feedback] 回复通知作者失败: ' + (e && e.message));
+  }
+  return { item: toItem(row, { admin: true, viewerId: user.id }) };
 }
 
 // ── 路由 ────────────────────────────────────────────────────────────────────
@@ -528,6 +627,23 @@ async function handle(req, res, pathname) {
       const user = await currentUser(req).catch(() => null);
       if (!isAdmin(user)) return fail(res, 403, 'OWNER'), true;
       const out = await markSeen(user);
+      return sendJson(res, 200, out), true;
+    }
+
+    // ★ 2026-11-16（维护者）：**作者本人**的「我的反馈有回复」提示（大厅横幅）。
+    //   与上面 /unread、/seen 是两套：那套给管理员看新反馈，这套给玩家看自己的回复。
+    if (rest === '/my-replies' && method === 'GET') {
+      const user = await currentUser(req).catch(() => null);
+      if (!user) return sendJson(res, 200, { count: 0, items: [] }), true;
+      const out = await myUnreadReplies(user.id);
+      return sendJson(res, 200, out), true;
+    }
+
+    if (rest === '/my-replies-seen' && method === 'POST') {
+      if (!sameOrigin(req)) return fail(res, 403, 'ORIGIN'), true;
+      const user = await currentUser(req).catch(() => null);
+      if (!user) return fail(res, 401, 'LOGIN_REQUIRED'), true;
+      const out = await markMyRepliesSeen(user.id);
       return sendJson(res, 200, out), true;
     }
 
@@ -590,4 +706,6 @@ module.exports = {
   CATEGORIES, STATUSES, LIMITS, cleanLine, cleanBody, cps,
   // ★ 2026-11-02：新反馈提醒（服主/管理员）。导出是为了让 test/feedback.test.cjs 能直接测。
   unreadFor, markSeen, lastSeenId,
+  // ★ 2026-11-16：回复通知作者（邮件 + 大厅提示）。导出供 test/feedback.test.cjs 直接测。
+  notifyAuthor, myUnreadReplies, markMyRepliesSeen,
 };

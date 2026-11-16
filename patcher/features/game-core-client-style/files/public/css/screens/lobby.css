@@ -2313,3 +2313,43 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .proto__body[data-season="act3autochess"] .ladder__grid, .proto__body[data-season="act3autochess"] .pcard { background: linear-gradient(180deg, #2a1411, #160c0a); border-color: rgba(232, 223, 196, .26); }
 .proto-reg-art { position: absolute; inset: 0; display: grid; place-items: center; }
 .proto-reg-art img { width: 92%; height: 88%; object-fit: contain; filter: drop-shadow(0 .1rem .4rem rgba(0, 0, 0, .7)); -webkit-mask: radial-gradient(75% 70% at 50% 50%, #000 55%, transparent 100%); mask: radial-gradient(75% 70% at 50% 50%, #000 55%, transparent 100%); }
+
+/* ---- 反馈回复提醒条（维护者 2026-11-16）------------------------------------
+   大厅顶部一条细横幅：管理员回复了你的反馈时出现，点「查看」去反馈板、点 ✕ 表示知道了。
+   位置固定在大厅顶栏下方居中，不参与布局（pointer-events 只在自己的按钮上）。 */
+.fb-notice {
+  position: fixed; z-index: 40; left: 50%; transform: translateX(-50%);
+  top: max(.62rem, calc(env(safe-area-inset-top, 0px) + .5rem));
+  display: flex; align-items: center; gap: .12rem;
+  max-width: min(92vw, 6.4rem);
+  padding: .1rem .12rem;
+  border: 1px solid rgba(var(--mint-rgb), .55);
+  background: rgba(8, 20, 18, .94);
+  box-shadow: 0 .06rem .22rem rgba(0, 0, 0, .5), 0 0 .16rem rgba(var(--mint-rgb), .18);
+  color: var(--text-hi, #eef4f2);
+  font-size: calc(.15 * var(--t));
+  pointer-events: auto;
+  animation: fb-notice-in .22s ease-out;
+}
+@keyframes fb-notice-in { from { opacity: 0; transform: translate(-50%, -.08rem); } }
+.fb-notice__icon { display: grid; color: var(--mint-400); }
+.fb-notice__icon .icon { width: calc(.2 * var(--t)); height: calc(.2 * var(--t)); }
+.fb-notice__text { display: flex; flex-direction: column; gap: .02rem; min-width: 0; }
+.fb-notice__text b { color: var(--mint-400); font-weight: 700; white-space: nowrap; }
+.fb-notice__title {
+  color: var(--text-lo); font-size: calc(.13 * var(--t));
+  max-width: 4.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fb-notice__go {
+  flex: none; font: inherit; font-size: calc(.14 * var(--t));
+  padding: .05rem .12rem; cursor: pointer;
+  color: #05201a; background: var(--mint-400); border: 0;
+}
+.fb-notice__go:hover { filter: brightness(1.08); }
+.fb-notice__close {
+  flex: none; display: grid; place-items: center; width: calc(.24 * var(--t)); height: calc(.24 * var(--t));
+  padding: 0; cursor: pointer; color: var(--text-lo);
+  background: transparent; border: 1px solid rgba(255, 255, 255, .22);
+}
+.fb-notice__close:hover { color: var(--text-hi, #fff); border-color: rgba(255, 255, 255, .45); }
+.fb-notice__close .icon { width: calc(.14 * var(--t)); height: calc(.14 * var(--t)); }
