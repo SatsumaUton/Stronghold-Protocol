@@ -309,22 +309,30 @@ const LEGACY_DIY_SLUG = 'act2autochess';
  * @param {any} map @param {string} slug @returns {object|null}
  */
 export function pickDiyFor(map, slug) {
+  if (!map || typeof map !== 'object') return null;
   const bucketOf = (s2) => {
-    if (!map || typeof map !== 'object') return null;
-    if (Object.prototype.hasOwnProperty.call(map, s2)) {
-      const v = map[s2];
-      return v && typeof v === 'object' ? v : null;
-    }
-    return null;
+    if (!Object.prototype.hasOwnProperty.call(map, s2)) return null;
+    const v = map[s2];
+    return v && typeof v === 'object' ? v : null;
   };
-  const own = bucketOf(slug);
-  // 默认版本自己就是回退源，不用再回退
-  if (slug === LEGACY_DIY_SLUG) return own;
-  // 旧格式（整张表就是 picks）：按默认版本认
-  const isFlat = !!map && typeof map === 'object' && Object.keys(map).some((k) => /_diy\d+_?[ab]?$/.test(k));
+  // ★ 旧格式（整张表就是 picks，键是 `5_diy1` 这种槽位）→ 它就是**默认版本**那一份。
+  //   必须放在「默认版本直接返回 own」之前：以前顺序反了，老存档读默认版本时 bucketOf('act2autochess')
+  //   找不到键就返回 null —— 玩家看到「选择自编」列表是空的、自选干员整局不出现
+  //   （玩家反馈 2026-11-16；老格式的 session.diy 会一直留到玩家下次保存）。
+  const isFlat = Object.keys(map).some((k) => /_diy\d+_?[ab]?$/.test(k));
   if (isFlat) return map;
+  const own = bucketOf(slug);
   const base = bucketOf(LEGACY_DIY_SLUG);
-  if (!base) return own;
+  if (!base) {
+    // 没有默认版本那一格：本版配过就用本版；只**有一个**版本配过时用它
+    // （配一次各版本都认；多出来的本版独有槽会被开局 checkDiyPicks 逐槽丢掉，不会整份被拒）。
+    // 否则这个玩家会「明明配过却是空列表」（玩家反馈 2026-11-16）。
+    if (own && Object.keys(own).length) return own;
+    const keys = Object.keys(map).filter((k) => map[k] && typeof map[k] === 'object');
+    return keys.length === 1 ? map[keys[0]] : own;
+  }
+  // 默认版本自己就是回退源
+  if (slug === LEGACY_DIY_SLUG) return base;
   if (!own) return base;                                  // 这一版还没配过 → 直接用默认版本那份
   if (!Object.keys(own).length) return base;              // 配过但空 → 同样回退
   return { ...base, ...own };                             // 逐槽合并：本版本设过的优先

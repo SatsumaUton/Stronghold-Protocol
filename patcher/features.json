@@ -303,7 +303,8 @@
       "name": "前后端共享常量与规则",
       "status": "ported-main",
       "files": [
-        "shared/**"
+        "shared/**",
+        "shared/diy.js"
       ],
       "tests": [
         "协议版本",

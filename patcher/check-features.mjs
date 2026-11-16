@@ -284,6 +284,15 @@ const CHECKS = [
     ],
   },
   {
+    id: 'diy-per-version-roster',
+    name: '自选编队按版本分键 + 跨版本继承（读不到就是空名单）',
+    rules: [
+      ['shared/diy.js', /const isFlat = Object\.keys\(map\)\.some\(\(k\) => \/_diy\\d\+_/, '★ 旧格式（整张表就是 picks）先判，别让默认版本返回 null'],
+      ['shared/diy.js', /return keys\.length === 1 \? map\[keys\[0\]\] : own/, '★ 只配过一个版本时用它（否则「明明配过却是空列表」）'],
+      ['server/lobby.js', /diy: own \? pickDiyFor\(own\.diy, versionSlug\(/, '★ 开局交给 Match 的是**本房间版本**那份 picks，不是整张分键表'],
+    ],
+  },
+  {
     id: 'feedback-board',
     name: '反馈板：管理员回复 → 邮件通知 + 大厅提示',
     rules: [
