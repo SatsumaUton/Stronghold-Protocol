@@ -25,5 +25,6 @@ export function siteCsp(publicDir) {
   // 注意：这里只放行这一个固定域名，不是通配符，安全性不变。
   // 资源站源：可用环境变量 SP_ASSET_ORIGIN 覆盖（换域名不必改代码）。
 const ASSET_ORIGIN = process.env.SP_ASSET_ORIGIN || 'https://assets.luobomiao.love';
-  return `default-src 'self'; script-src 'self'${hashes.size ? ' ' + [...hashes].join(' ') : ''}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: ${ASSET_ORIGIN}; media-src 'self' blob: ${ASSET_ORIGIN}; connect-src 'self' ${ASSET_ORIGIN}; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'`;
+  return `default-src 'self'; script-src 'self'${hashes.size ? ' ' + [...hashes].join(' ') : ''}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: ${ASSET_ORIGIN}; media-src 'self' blob: ${ASSET_ORIGIN}; connect-src 'self' data: blob: ${ASSET_ORIGIN}; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'`;
 }
+
