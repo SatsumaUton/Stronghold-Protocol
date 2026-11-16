@@ -31,6 +31,16 @@
       e.textContent = why === 'old' || !im
         ? '当前浏览器版本过旧，无法运行本游戏。请升级到 iOS / iPadOS 16.4+（Safari 16.4+）、Chrome / Edge 90+ 或 Firefox 108+ 后刷新。'
         : '游戏脚本加载失败，请检查网络连接后重试。（如果反复刷新都停在这里，请按 Ctrl+F5 强制刷新，或用浏览器菜单清除本站缓存）';
+      // 维护者 2026-11-16：把失败的脚本地址一并显示出来（便于玩家截图定位）
+      try {
+        var bad = window.__spBootBadUrl;
+        if (bad && why !== 'old') {
+          var line = document.createElement('div');
+          line.style.cssText = 'margin-top:8px;font-size:12px;opacity:.7;word-break:break-all';
+          line.textContent = '失败的资源：' + bad;
+          e.appendChild(line);
+        }
+      } catch (_d) { /* 忽略 */ }
       try {
         var retry = document.createElement('button');
         retry.type = 'button';
@@ -59,6 +69,12 @@
     window.addEventListener('error', function (ev) {
       var b = document.getElementById('boot');
       if (!b || b.classList.contains('is-done')) return;
+      // 维护者 2026-11-16：把**加载失败的那个 URL**记下来，错误页会显示出来 ——
+      // 玩家只发一张「加载失败」的截图时，我们能直接看出是哪个模块 404 / 被拦。
+      try {
+        var src = (ev && ev.target && (ev.target.src || ev.target.href)) || '';
+        if (src) window.__spBootBadUrl = String(src);
+      } catch (_u) { /* 忽略 */ }
       if (/specifier|resolve|import|module/i.test(String(ev && ev.message))) window.__spBootFail('load');
     });
   

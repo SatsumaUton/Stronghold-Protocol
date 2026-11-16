@@ -4559,7 +4559,7 @@
       {
         "path": "public/js/boot.js",
         "baseExists": true,
-        "customBytes": 4913
+        "customBytes": 5792
       },
       {
         "path": "public/js/bootLegacy.js",
