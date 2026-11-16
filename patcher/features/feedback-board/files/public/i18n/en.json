@@ -3406,5 +3406,11 @@
   "注册": "Register",
   "注册并登录": "Register and log in",
   "QQ 邮箱（如 10001@qq.com）": "QQ email (e.g. 10001@qq.com)",
-  "你的反馈有 {n} 条新回复": "{n} new replies to your feedback"
+  "你的反馈有 {n} 条新回复": "{n} new replies to your feedback",
+  "安装萝卜喵服 APP": "Install the ROBOMIAO app",
+  "检测到你用的是安卓设备。装上「萝卜喵服 · 卫戍协议」APP，可以全屏、免浏览器地址栏，功能和网页版完全一样，还能在游戏里直接更新，不用重装。": "You are on an Android device. Install the \"ROBOMIAO · Stronghold Protocol\" app to play full screen without the browser bar — same features as the web version, and it updates itself without reinstalling.",
+  "当前版本：{v}": "Current version: {v}",
+  "下载并安装": "Download and install",
+  "以后再说": "Later",
+  "下载安卓版": "Get the Android app"
 }

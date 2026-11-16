@@ -50,7 +50,7 @@ import { parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks, diyPrefKey }
 import { skinsStore, SKINS_KEY, SKINS_SYNC_KEY, parseStoredSkins } from './skins.js';
 import { cardStore, CARD_KEY, CARD_SYNC_KEY, cardOperators } from './seatArt.js';
 import { needsContent, serverDefaultVersion } from '../versions.js';
-import { DEFAULT_VERSION } from '../../../shared/versions.js';
+import { DEFAULT_VERSION, versionById } from '../../../shared/versions.js';
 import { toast } from './toasts.js';
 import { t, N_ } from '../../../shared/i18n.js';
 
@@ -67,7 +67,17 @@ function readStoredOps() {
   try { return parseStoredOps(storedLoadout); } catch { return {}; }
 }
 function readStoredDiy(version = DEFAULT_VERSION) {
-  try { return parseStoredDiy(loadPref(diyPrefKey(version), null)); } catch { return {}; }
+  const read = (v) => { try { return parseStoredDiy(loadPref(diyPrefKey(v), null)); } catch { return {}; } };
+  const own = read(version);
+  // 维护者 2026-11-16（玩家反馈「规程版本里自选编队看不到自己携带的干员」）：
+  // 自选编队按版本分键存（`sp.pref.diy` = 第二期下半，`sp.pref.diy.<slug>` = 其它版本）。
+  // 玩家通常只在默认版本那一格配过，规程页读到的是空表 → 列表里一个干员都没有。
+  // 这里与服务端 shared/diy.js:pickDiyFor 同口径：本版没配就回退默认版本；都配过则逐槽合并（本版优先）。
+  const v = versionById(version);
+  if (!v || v.id === DEFAULT_VERSION) return own;
+  const base = read(DEFAULT_VERSION);
+  if (!Object.keys(own).length) return base;
+  return { ...base, ...own };
 }
 
 /**
