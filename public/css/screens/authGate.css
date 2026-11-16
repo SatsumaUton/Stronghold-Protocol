@@ -747,7 +747,8 @@
   flex: 0 0 auto;
   color: #4f6168;
   text-decoration: none;
-  letter-spacing: .04em;
+  font-size: inherit;
+  letter-spacing: inherit;
   white-space: nowrap;
   transition: color .16s;
 }
