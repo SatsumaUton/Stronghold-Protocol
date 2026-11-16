@@ -182,7 +182,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 24px;
+  /* 维护者 2026-11-16：底部多留 64px —— 法务行（备案号 + 版权）要独占一行，
+     不留空间会被裁掉；同时这段底部内边距会把整张卡片往上顶。 */
+  padding: 8px 24px 64px;
   min-height: 0;
 }
 
@@ -532,7 +534,8 @@
   flex-wrap: wrap;
   gap: 8px 16px;
   text-align: center;
-  padding: 0 62px 26px;
+  padding: 0 62px 22px;
+  row-gap: 6px;
   font-size: 10px;
   letter-spacing: .14em;
   color: #4f6168;
