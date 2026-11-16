@@ -65,6 +65,10 @@ export const DATA_FILES = Object.freeze({
   // Optional art extracted from a local game client (DESIGN §13): { groups: { '<subdir>': { name: { path, w, h } } } }.
   // The emotes and the 玩法说明 pages are in data/assets.json too (downloaded from the mirror): artUrls().
   local: 'local-assets.json',
+  // 本服独有「深渊回响」跨版本战场：`data/echo-stages.json`（tools/build-echo-stages.mjs 生成）。
+  // 池子 = 四个版本全部正式战场；`stages` = 本版 data/stages.json 里没有的那几张记录。
+  // 只有深潜大厅 / 深潜对局会去 load 它，别的模式一次都不下载。
+  echoStages: 'echo-stages.json',
 });
 
 const ID_KEYS = ['id', 'chessId', 'bondId', 'itemId', 'bandId', 'enemyKey', 'enemyId', 'stageId', 'bossId', 'tokenId', 'choiceId', 'key'];

@@ -582,7 +582,9 @@
         "server/soloHold.js",
         "shared/constants.js",
         "shared/protocol.js",
-        "shared/titles.js"
+        "shared/titles.js",
+        "public/js/ui/echoStages.js",
+        "public/js/data.js"
       ],
       "tests": [
         "深潜大厅（难度 DE-1/2/3、本机最佳、本周最佳、排行榜）",
@@ -601,6 +603,43 @@
         "深潜用语（深潜房里不出现「同盟 / 模拟」，版本胶囊不显示；ui/diveWords.js）",
         "单人深潜 24 小时保存：剩余时间醒目显示 + 被挡住时说明「离开 = 放弃」（server/soloHold.js）",
         "深潜只用第二期下半的干员 / 策略 / 盟约：房间版本钉 DEFAULT_VERSION，不跟大厅默认版本（echo-version-lock / echo-data-scope）"
+      ]
+    },
+    {
+      "id": "feedback-board",
+      "name": "反馈板：管理员回复后邮件通知作者 + 大厅红点提示",
+      "status": "patcher",
+      "files": [
+        "matchmaker/feedback.cjs",
+        "matchmaker/server.js",
+        "public/js/ui/feedbackNotice.js",
+        "public/js/screens/lobby.js",
+        "public/css/screens/lobby.css",
+        "public/i18n/en.json",
+        "public/i18n/ja.json",
+        "public/i18n/ko.json",
+        "public/i18n/zh-TW.json"
+      ],
+      "tests": [
+        "提交反馈",
+        "管理员回复",
+        "收到邮件",
+        "大厅提示出现",
+        "看过之后提示消失"
+      ]
+    },
+    {
+      "id": "android-app",
+      "name": "安卓 APK 壳（WebView，PC 版全功能，可直接热更）",
+      "status": "patcher",
+      "files": [
+        "android/**"
+      ],
+      "tests": [
+        "装配 build.ps1",
+        "启动进站点首页",
+        "返回键回上一页",
+        "版本号 version.json"
       ]
     }
   ]

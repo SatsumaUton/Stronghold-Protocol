@@ -266,6 +266,34 @@ const CHECKS = [
       ['../matchmaker/public/client.js', /mm-notice-btn|announcement/, '公告按钮'],
     ],
   },
+  {
+    id: 'deepecho-cross-stages',
+    name: '深渊回响跨版本战场（四个版本全部正式战场的并集）',
+    rules: [
+      ['data/echo-stages.json', /act3autochess_m12/, '★ 生成物在（池子 + 规程的 10 条记录）'],
+      ['tools/build-echo-stages.mjs', /export function buildEchoStages/, '生成脚本在'],
+      ['server/match/match/echoCrossVersion.js', /export function echoStageLib/, '读生成物的入口'],
+      ['server/match/match/echoCrossVersion.js', /for \(const id of lib\.pool\)/, '★ 池子按并集走'],
+      ['server/match/match/echoCrossVersion.js', /stages\[id\] = \{ \.\.\.rec, active: true, weight: 50, modes \}/, '★ 本版关掉的图在这里打开'],
+      ['server/match/Match.js', /crossVersionStages\(this\.modeId, this\.gd\.raw && this\.gd\.raw\.stages, this\.gd\.mode && this\.gd\.mode\.stages\)/, '★ 传本版池子（否则战场#01 这类「记录开着但不在本难度池里」的图会被跳过）'],
+      ['public/js/ui/echoStages.js', /export function echoStageRec/, '客户端兜底查表'],
+      ['public/js/ui/gameComponents.js', /stage: \(id\) => data\.lookup\('stages', id\) \|\| echoStageRec\(id\)/, '★ makeLookups 兜底'],
+      ['public/js/data.js', /echoStages: 'echo-stages\.json'/, 'data store 认得这份文件'],
+      ['public/js/screens/game.js', /useData\(\.\.\.\(echoMatch \? \[ECHO_STAGES_FILE\]/, '★ 对局页订阅生成物（否则抽到规程的图就是黑图）'],
+      ['public/js/screens/lobby.js', /stageNote: stageNote\(pool\)/, '★ 难度按钮上的「共 N 张」用实际池子'],
+    ],
+  },
+  {
+    id: 'feedback-board',
+    name: '反馈板：管理员回复 → 邮件通知 + 大厅提示',
+    rules: [
+      ['../matchmaker/feedback.cjs', /reply_seen_at/, '回复已读列'],
+      ['../matchmaker/feedback.cjs', /notifyAuthor/, '★ 回复时通知作者'],
+      ['../matchmaker/feedback.cjs', /rest === '\/my-replies' && method === 'GET'/, '未读回复接口'],
+      ['public/js/ui/feedbackNotice.js', /feedback\/my-replies/, '★ 大厅提示读未读回复'],
+      ['public/js/screens/lobby.js', /<\$\{FeedbackNotice\}/, '★ 大厅真的渲染了它'],
+    ],
+  },
 ];
 
 // ---- 执行 ------------------------------------------------------------------------

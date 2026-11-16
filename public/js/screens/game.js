@@ -151,7 +151,9 @@ import { battleRunner } from '../battle/runner.js';
 import '../ui/pluginFrame.js';
 import { isClientCombat, observeTarget, teammateProgress, cameraLayers, layerCamera, loneHalf, sidesOf, resumedWatch, followedScout } from '../battle/observe.js';
 import { screenStrip, playerBonds, playerLayer, detailBondOwner, toggleBond, popupView } from '../ui/watchBonds.js';
-import { data, getMode } from '../data.js';
+import { data, getMode, useData } from '../data.js';
+// 本服独有：深渊回响可能抽到「规程·序列Ⅰ」等别的版本的战场，记录在 data/echo-stages.json 里
+import { ECHO_STAGES_FILE } from '../ui/echoStages.js';
 import { audio, resultSpeaker, resultVoiceSlot } from '../audio.js';
 import { useDocClass, FullscreenButton, reducedMotion } from '../ui/device.js';
 import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady, TURN_CUE_WAIT_MS, TURN_CUE_PLATE_WAIT_MS } from '../ui/turnPopup.js';
@@ -332,6 +334,11 @@ function MatchScreen() {
     isHost: !!s.room && s.room.hostId === s.me.playerId,
   }), shallowEqual);
   const gd = useGameData();
+  // 深渊回响：抽到的图可能不在 data/stages.json 里（规程的 10 张在 data/echo-stages.json）。
+  // 只有深潜房才订阅它 —— 那份文件 130KB，普通房不该多下这一个请求。
+  // 订阅到之后本组件重渲染一次，baseStage 才查得到记录（否则「进对局地图一片黑」）。
+  const echoMatch = useStore((s) => !!(s.room && s.room.variant === 'deepecho'));
+  useData(...(echoMatch ? [ECHO_STAGES_FILE] : []));
 
   const hostRef = useRef(null);
   const barRef = useRef(null);

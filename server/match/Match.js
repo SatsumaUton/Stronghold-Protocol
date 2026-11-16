@@ -376,7 +376,7 @@ export class Match {
         }
         // 战场：把各版本**同一难度**里本版没有的地图并进来（维护者 2026-11-16）。
         // 规程·序列Ⅰ 的 12 张新图、以及其它版本缺的图，都按当前难度各自补齐。
-        const st = crossVersionStages(this.modeId, this.gd.raw && this.gd.raw.stages);
+        const st = crossVersionStages(this.modeId, this.gd.raw && this.gd.raw.stages, this.gd.mode && this.gd.mode.stages);
         if (st && st.ids.length) {
           this.gd.raw = { ...this.gd.raw, stages: { ...this.gd.raw.stages, ...st.stages } };
           const cur = Array.isArray(this.gd.mode.stages) ? this.gd.mode.stages.slice() : [];

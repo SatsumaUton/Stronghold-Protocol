@@ -15,6 +15,7 @@ function __spRemoteAssetRe() {
 import { useState, useMemo } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, TierChip, Tooltip } from './components.js';
 import { data, useData, localAsset } from '../data.js';
+import { echoStageRec } from './echoStages.js';
 import { parseRichText, rtClassName } from './richText.js';
 import { fillShowTags } from './showTags.js';
 import { t as tr } from '../../../shared/i18n.js';
@@ -84,7 +85,9 @@ export function makeLookups(ready = true) {
     band: (id) => data.lookup('bands', id),
     enemy: (k) => data.lookup('enemies', k),
     boss: (id) => data.lookup('bosses', id),
-    stage: (id) => data.lookup('stages', id),
+    // 本服独有：深渊回响会用「规程·序列Ⅰ」等别的版本的战场，它们的记录在 data/echo-stages.json 里
+    // （data/stages.json 是上游生成物，不含它们）。查不到就走原来那条路，别的模式的键集与结果完全不变。
+    stage: (id) => data.lookup('stages', id) || echoStageRec(id),
     // (a 自选 operator's summons are data/backups.json tokens — 0.2.0, the hand piece of a placeable one)
     token: (id) => data.lookup('tokens', id) || diyToken(id),
     effect: (id) => data.lookup('effects', id),

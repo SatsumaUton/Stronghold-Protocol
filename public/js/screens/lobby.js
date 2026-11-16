@@ -42,6 +42,8 @@ import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_S
 import { PLAYER_CAPACITIES } from '../../../shared/playerCapacity.js';
 import { html, confirmDialog, Button, Icon, MicroLabel, Modal, PingPill, Spinner, DifficultyIcon, TextField } from '../ui/components.js';
 import { Sprite, Img } from '../ui/gameComponents.js';
+// 本服独有：深渊回响的跨版本战场池（data/echo-stages.json）
+import { ECHO_STAGES_FILE, echoStagePool } from '../ui/echoStages.js';
 import { uiUrl, medalIconUrl } from '../ui/assetUrls.js';
 import { peekStatsRecords, trophyMedalOf, aggregateStats, recordsOfSeason, bestEchoDepth } from '../ui/stats.js';
 import { levelProgress, levelOf } from './settle.js';
@@ -522,7 +524,13 @@ function DifficultyCard({ roomMode, difficulty, selected, onSelect, disabled = f
  * 深潜只开三档，沿用 AC 编号（从 2 起）会让人以为漏了第一档（维护者 2026-11-03）。
  */
 function EchoDifficultyCard({ difficulty, index, selected, onSelect }) {
+  // 深潜的战场池是**四个版本全部正式战场的并集**（data/echo-stages.json，含规程的 10 张），
+  // 比本版 data/config.json 里那张表大得多。这里用池子的实际张数，别让按钮上的「共 N 张」跟
+  // 对局里真抽的对不上（维护者 2026-11-16 第二次反馈）。
+  useData(ECHO_STAGES_FILE);
   const info = difficultyInfo('coop', difficulty);
+  const pool = echoStagePool();
+  const shown = pool && pool.length ? { ...info, stageNote: stageNote(pool) } : info;
   return html`<button type="button" class=${`pcard diff-card${selected ? ' is-on is-selected' : ''}`}
       style=${`--d-color:${DIFFICULTY_COLORS[difficulty]}`}
       onClick=${() => onSelect(difficulty)} aria-pressed=${selected ? 'true' : 'false'}>
@@ -535,7 +543,7 @@ function EchoDifficultyCard({ difficulty, index, selected, onSelect }) {
     <span class="pcard__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}</span>
     <span class="pcard__meta">
       <span class="num">${'DE'}-${index + 1}</span>
-      <${DifficultyRounds} info=${info} endless=${true} />
+      <${DifficultyRounds} info=${shown} endless=${true} />
     </span>
     <span class="pcard__stamp" aria-hidden="true"><${StampRing} /><span class="pcard__tick"><${Icon} name="check" /></span><span class="pcard__ok">${t('已选定')}</span></span>
   </button>`;
