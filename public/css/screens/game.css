@@ -1716,3 +1716,9 @@ html.sp-deepecho .gicon img {
 .cmd-aim.is-plain .cmd-aim__c { -webkit-mask: none; mask: none; clip-path: polygon(50% 0, 100% 72%, 100% 100%, 50% 32%, 0 100%, 0 72%); }
 .command-draft { display: flex; gap: .16rem; flex-wrap: wrap; }
 .command-draft__card { flex: 1 1 1.8rem; padding: .16rem; border: 1px solid #7fffc966; }
+
+/* 决策界面（机变 / 战术 / 悬赏）按 0.4.0 的观感：这层盖住整个屏幕时，商店条与加宽的玩家卡片都不该露出来。
+   0.4.0 的决策在独立阶段、那时商店条本来就不渲染；本服是「准备阶段 + 覆盖层」，所以需要这两条适配
+   （只影响显示，不改并发决策/公共计时等任何功能）。用 !important 覆盖 `.shopbar--reg` / `.is-locked` 的 display。 */
+.gm.has-sp .shopbar { display: none !important; }
+.gm.has-sp .team__players { display: none !important; }
