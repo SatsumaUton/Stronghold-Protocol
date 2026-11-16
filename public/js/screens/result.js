@@ -102,7 +102,7 @@ function PlayerCard({ p, myId, titles, best, solo = false, skinOwnerId = null, d
     </header>
     <div class="rcard__stats">
       ${stats.map(([k, label]) => html`<div key=${k} class=${cx('rstat', best[k] === p.playerId && 'is-best')}><span>${t(label)}</span><b class="num">${fmtNum(p.stats[k])}</b></div>`)}
-      ${Number.isFinite(p.lp) ? html`<div class="rstat" title=${p.lpShared && !solo ? t('最终攻势起全队共享目标生命值') : ''}><span>${p.lpShared && !solo ? diveTeamLp(dive) : t('剩余生命')}</span><${LpTower} value=${p.lp} size="sm" /></div>` : null}
+      ${Number.isFinite(p.lp) ? html`<div class="rstat" title=${p.lpShared && !solo ? t('最终攻势起全队共享目标生命值') : ''}><span>${p.lpShared && !solo ? diveTeamLp(dive) : t('剩余生命')}</span><${LpTower} value=${p.lp} size="sm" dive=${dive} /></div>` : null}
     </div>
   </article>`;
 }

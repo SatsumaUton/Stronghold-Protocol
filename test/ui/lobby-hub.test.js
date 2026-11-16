@@ -289,23 +289,25 @@ test('no server-only features: accounts, friends, federation, 无限火力, Andr
   for (const re of [/accounts\.js/, /friends\.js/, /federation/, /match\.queue/, /randomMode/, /AndroidNative/, /__onRoomFound/, /room\.list/]) {
     assert.doesNotMatch(lobbySrc, re, String(re));
   }
-  // ★ 本服是有意的例外（2026-11-02 维护者要求「多人匹配按钮 + 界面」）：大厅里可以有一个「多人匹配」胶囊，
-  //   它只做两件事——发 room.quickMatch、读答复里的 matchmaking 标记。除此之外一概不许出现：
-  //   不 import 匹配子系统、不留上游的 match.queue / __onRoomFound / room.list 轮询。
+  // ★ 本服是有意的例外（2026-11-02 维护者要求「多人匹配按钮 + 界面」）：大厅里有整屏的「多人匹配」
+  //   （MatchmakingSelect，参考版 ui/matchmaking.js 的移植）与它的 .matchmaking__* 样式，所以注释和类名里
+  //   出现 matchmaking 是允许的。仍然不许出现的是上游那套退役的机制：不 import 匹配子系统、
+  //   不留 match.queue / __onRoomFound / room.list 轮询，服务端入口只有 room.quickMatch 一族。
   assert.doesNotMatch(lobbySrc, /import[^\n]*matchmaking/i, '不许 import 匹配子系统');
-  for (const m of lobbySrc.matchAll(/matchmaking/gi)) {
-    const line = lobbySrc.slice(0, m.index).split('\n').length;
-    const text = lobbySrc.split('\n')[line - 1];
-    assert.match(text, /reply\.matchmaking/, `第 ${line} 行的 matchmaking 只允许读答复标记：${text.trim().slice(0, 80)}`);
+  for (const m of lobbySrc.matchAll(/net\.request\('([\w.]+)'/g)) {
+    assert.ok(!/queue|^match\./i.test(m[1]), `不许调用退役的匹配协议：${m[1]}`);
   }
   assert.match(lobbySrc, /room\.quickMatch/, '本服的多人匹配入口就是 room.quickMatch 这一条');
+  assert.match(lobbySrc, /reply\.matchmaking/, '答复里的 matchmaking 标记照读');
 });
 
 test('lobby.css: text follows 文字大小 (var(--t)), no !important, no :has()', () => {
   const sizes = [...lobbyCss.matchAll(/font-size:\s*([^;}]+)/g)].map((m) => m[1].trim());
   assert.ok(sizes.length >= 25, `${sizes.length} font sizes`);
-  // (a plain px value is a touch floor of the 0.3.x test-room box, never a rem that would ignore 文字大小)
-  for (const s of sizes) assert.ok(/var\(--t\)/.test(s) || /^\d+px$/.test(s), s);
+  // (a plain px value is a readability / touch floor of the 0.3.x test-room box; a decimal one too. `em` is relative to
+  // the inherited size, which itself follows --t — the merged 多人匹配 / 深渊回响 tables size their captions that way.
+  // What must never appear is a rem, which would ignore 文字大小)
+  for (const s of sizes) assert.ok(/var\(--t\)/.test(s) || /^\d+(?:\.\d+)?px$/.test(s) || /^\d*\.?\d+em$/.test(s), s);
   assert.doesNotMatch(lobbyCss, /!important/);
   assert.doesNotMatch(lobbyCss, /:has\(/);
 });
@@ -320,11 +322,8 @@ test('选择同盟方式 on a short screen (≤ 520 px tall): 创建同盟 keeps
   const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
   // the column centres with auto margins (they give way when it is too tall; justify-content: center spilled it past both ends)
   assert.match(css, /\n\.ally-side \{(?![^}]*justify-content)[^}]*\}\n\.ally-side > :first-child \{ margin-top: auto; \}\n\.ally-side > :last-child \{ margin-bottom: auto; \}/);
-  // the @media block, up to its own closing brace
-  const at = css.indexOf('@media (max-height: 520px) {');
-  let end = css.indexOf('{', at) + 1;
-  for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
-  const short = css.slice(at, end);
+  // the hub's @media block, up to its own closing brace (the merged stylesheet has an earlier one for 多人匹配)
+  const short = shortBlock();
   assert.ok(short.includes('.ally-card__bar {'), 'the short-screen block');
   assert.doesNotMatch(short, /\.ally-card__bar small \{ display: none; \}/, 'no longer hidden');
   assert.match(short, /\.ally-card__bar \{ font-size: clamp\(16px, calc\(\.3 \* var\(--t\)\), 26px\); \}/, 'the names a step smaller, capped');
@@ -339,7 +338,10 @@ test('选择同盟方式 on a short screen (≤ 520 px tall): 创建同盟 keeps
 /** The short-screen @media block of lobby.css (comments dropped), up to its own closing brace. */
 function shortBlock() {
   const css = lobbyCss.replace(/\/\*[\s\S]*?\*\//g, '');
-  const at = css.indexOf('@media (max-height: 520px) {');
+  // the merged stylesheet has an earlier `max-height: 520px` block too (多人匹配's footer switches): the hub's own is
+  // the one with the 128 px entries, so start from that rule rather than from the first block
+  const at = css.lastIndexOf('@media (max-height: 520px) {', css.indexOf('.lobby-hub { --hub-entry-w: max(2.1rem'));
+  assert.ok(at >= 0, 'the hub\'s short-screen block');
   let end = css.indexOf('{', at) + 1;
   for (let depth = 1; depth > 0 && end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}') depth--; } // loop-cap: the stylesheet's length
   return css.slice(at, end);
@@ -434,10 +436,11 @@ test('选择模拟协议 above 520 px tall (§35.18 leftover: the label cut, the
   assert.match(base, /\n\.proto-start__rook \{[^}]*font-size: calc\(\.36 \* var\(--t\)\);/);
   assert.match(base, /\n\.proto-foot \.proto-start__rook \{ font-size: min\(calc\(\.36 \* var\(--t\)\), \.4rem\); \}/);
   assert.match(base, /\n\.pcard__name \{ font-size: min\(calc\(\.28 \* var\(--t\)\), \.36rem\);/);
-  // no rule of lobby.css outside the dialog wraps the label (the room's button shares the class)
+  // no rule of lobby.css outside the dialog wraps the label (the room's button shares the class); the dialog's own
+  // footer has more than the one shared rule now (the 深潜 variant's triple footer), all of them under .proto-foot
   for (const [, sel, body] of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
     if (/\.proto-start__label/.test(sel) && /white-space: normal|flex: 1 1 auto|padding-right/.test(body)) {
-      assert.ok(sel.split(',').every((x) => !/\.proto-start__label/.test(x) || /\.proto-foot \.proto-start__label/.test(x)), `scoped to the dialog: ${sel.trim()}`);
+      assert.ok(sel.split(',').every((x) => !/\.proto-start__label/.test(x) || /^\.proto-foot(?![-\w])/.test(x.trim())), `scoped to the dialog: ${sel.trim()}`);
     }
   }
   // the cards' column: 5.6rem with a 300 px floor (the review: in a 960×540 / 1100×530 / 800×600 window English names
@@ -517,7 +520,7 @@ test('选择同盟方式 on a short screen (§35.18 leftover: the key field\'s p
   assert.ok(lobbyCss.includes(`@media ${dev.SHORT_SCREEN_QUERY} {`));
   assert.equal(typeof dev.useMediaQuery, 'function');
   assert.match(lobbySrc, /const shortScreen = useMediaQuery\(SHORT_SCREEN_QUERY\);/);
-  assert.match(lobbySrc.match(/<\$\{AllianceSelect\}[\s\S]*? \/>/)[0], /short=\$\{shortScreen\} \/>$/);
+  assert.match(lobbySrc.match(/<\$\{AllianceSelect\}[\s\S]*? \/>/)[0], /short=\$\{shortScreen\}/);
   assert.match(readFileSync(path.join(ROOT, 'public/js/ui/device.js'), 'utf8'), /m\.addEventListener\('change', sync\); return \(\) => m\.removeEventListener\('change', sync\);/);
 });
 
@@ -614,7 +617,9 @@ test('official versions (DESIGN §35.23): the cards of the version shown, the wa
   assert.equal(byId(failed, 'proto-loading').length, 0, 'no spinner');
   assert.ok(byClass(failed, 'diff-card').every((c) => c.props.disabled === true));
   // the lobby: the version only on a server that enables versions; the shown difficulty (the fallback) is the one sent
-  assert.match(lobbySrc, /mode, difficulty: mode === 'solo' \? shownSolo : shownCoop, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\), \.\.\.\(versions \? \{ version \} : \{\}\),\n {4}\.\.\.\(mode === 'solo' && soloFree && soloTimed === true \? \{ soloUnlimited: true \} : \{\}\),/);
+  // — create() resolves it into `difficulty` (深潜 rooms leave the version off: the server pins them to the default)
+  assert.match(lobbySrc, /mode, difficulty, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\), \.\.\.\(!variant && versions \? \{ version \} : \{\}\),[^\n]*\n\s+\.\.\.\(mode === 'solo' && soloFree && soloTimed === true \? \{ soloUnlimited: true \} : \{\}\),/);
+  assert.match(lobbySrc, /: \(mode === 'solo' \? shownSolo : shownCoop\);/);
   assert.match(lobbySrc, /const shownSolo = fallbackDifficulty\(solo, difficulty\);/);
   assert.match(lobbySrc, /const pickDifficulty = \(d\) => \{ setDifficulty\(d\); savePref\('lobby\.difficulty', d\); \};/, 'the pref changes only on a pick');
   assert.match(lobbySrc, /<\$\{VersionSwitch\} \/>\s*<\$\{ResumeMatchButton\} \/>/, 'the chip before 恢复本机对局');

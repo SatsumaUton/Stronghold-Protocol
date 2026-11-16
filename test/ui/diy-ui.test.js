@@ -48,6 +48,8 @@ const SHARP = 'char_609_acguad';
 const KALTS = 'char_003_kalts'; // 凯尔希: an ISW-A module at both elite stages
 const SIEGE_PICK = { charId: SIEGE, skillIndex: 2, uniEquipId: 'uniequip_002_siege' };
 const KIT = [...KITTED_CHARS];
+// 0.4.0: room.diy 按版本分键（共享 shared/diy.js pickDiyFor），每条消息都带上这一页的版本
+const PAGE_VERSION = 'act2autochess';
 
 function* walk(v) {
   if (Array.isArray(v)) { for (const x of v) yield* walk(x); return; }
@@ -178,11 +180,11 @@ test('diy sync: welcome brings the kit list and sends room.diy; edits are deboun
   net.emit('welcome', { diyKitted: [SIEGE, SHARP, 7] });
   assert.deepEqual(target.get().diyKitted, [SIEGE, SHARP]);
   await T.advance(100);
-  assert.deepEqual(net.sent, [{ t: 'room.diy', picks: { [T5A]: SIEGE_PICK } }]);
+  assert.deepEqual(net.sent, [{ t: 'room.diy', picks: { [T5A]: SIEGE_PICK }, version: PAGE_VERSION }]);
   assert.equal(target.get().diySync, 'synced');
   target.set({ diy: { [T5A]: SIEGE_PICK, [T6A]: { charId: SHARP } } });
   await T.advance(SYNC_DEBOUNCE_MS + 10);
-  assert.deepEqual(net.sent[1], { t: 'room.diy', picks: { [T5A]: SIEGE_PICK, [T6A]: { charId: SHARP } } });
+  assert.deepEqual(net.sent[1], { t: 'room.diy', picks: { [T5A]: SIEGE_PICK, [T6A]: { charId: SHARP } }, version: PAGE_VERSION });
   net.replies.push({ error: 'ROOM_STARTED' });
   target.set({ diy: {} });
   await T.advance(SYNC_DEBOUNCE_MS + 10);
@@ -190,7 +192,7 @@ test('diy sync: welcome brings the kit list and sends room.diy; edits are deboun
   assert.deepEqual(told, ['自选编队是局外设置，修改将在下一局生效']);
   net.emit('room.state', { inMatch: false });
   await T.advance(SYNC_DEBOUNCE_MS + 10);
-  assert.deepEqual(net.sent.at(-1), { t: 'room.diy', picks: {} });
+  assert.deepEqual(net.sent.at(-1), { t: 'room.diy', picks: {}, version: PAGE_VERSION });
   s.dispose();
 });
 

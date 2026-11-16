@@ -328,10 +328,13 @@ describe('the picture / video / music guards (ui/lobbyMedia.js)', () => {
   });
 });
 
-test('the site CSP: blob: media for the own video, no remote media origin', () => {
+test('the site CSP: blob: media for the own video, no remote media origin besides the asset CDN', () => {
   const csp = siteCsp(path.join(ROOT, 'public'));
   const media = csp.split(';').map((d) => d.trim()).find((d) => d.startsWith('media-src'));
-  assert.equal(media, "media-src 'self' blob:");
+  // 本服：美术与音频托管在资源站，server/http/csp.js 除了同源代理之外显式放行它的源（漏改写时不至于被 CSP 静默拦掉）；
+  // 除此之外仍然不许出现别的远端媒体源
+  const assetOrigin = process.env.SP_ASSET_ORIGIN || JSON.parse(readFileSync(path.join(ROOT, 'data/config.json'), 'utf8')).assetOrigin;
+  assert.equal(media, `media-src 'self' blob: ${assetOrigin}`);
   assert.ok(!/script-src[^;]*blob:/.test(csp));
 });
 
@@ -345,5 +348,8 @@ test('lobby.css: the own backdrop and its dialog follow 文字大小, no !import
   for (const v of sizes) assert.match(v, /^calc\(\.\d+ \* var\(--t\)\)$/, v);
   assert.ok(!/!important|:has\(/.test(block));
   assert.match(block, /\.hub-bg__own::after[^}]*var\(--own-dim/);
-  assert.match(css.slice(css.lastIndexOf('prefers-reduced-motion')), /\.hub-bg__own/);
+  // the reduced-motion blocks of the merged stylesheet: the hub's own is the one that lists the backdrop among the
+  // animations it stops (a later block only quiets the deep-echo card's corner)
+  const reduced = [...css.matchAll(/@media \(prefers-reduced-motion: reduce\) \{[^}]*\}/g)].map((m) => m[0]);
+  assert.ok(reduced.some((b) => /\.hub-bg__own/.test(b)), 'the own backdrop stops animating under 减少动态效果');
 });

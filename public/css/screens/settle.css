@@ -366,14 +366,14 @@ span.settle__nexticon .icon { width: .34rem; height: .34rem; }
    普通流内元素会被盖住 / 撑乱版面，所以这里必须自己绝对定位。
    位置选在**顶栏下方的空白横条**（公告条下方、立绘上方），
    不压底部那排「模拟完成 / 同盟通过回合 / 数据详情 / 返回同盟」。
-   用 !important 压掉 .result__nodehint 自带的 max-width:60%（那是给单人结算页排版用的）。 */
+   选择器比 .result__nodehint（result.css 的单人结算页排版）多两个类，靠优先级压掉它的 max-width:60%。 */
 .settle .result__nodehint.steam__nodehint {
   position: absolute;
   left: 50%;
   top: .22rem;
   transform: translateX(-50%);
   width: auto;
-  max-width: 13rem !important;
+  max-width: 13rem;
   margin: 0;
   padding: .06rem .14rem;
   border-radius: .06rem;

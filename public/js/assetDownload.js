@@ -91,7 +91,7 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
   // `storage`: where downloads are kept — 'site' (the import cache), 'http' (the HTTP cache only: no secure context or no
   // Cache Storage), 'full' (a write failed, e.g. over quota: the rest of this run goes to the HTTP cache only)
   let state = { phase: 'idle', total: 0, done: 0, bytes: 0, failures: [], localMissing: false, cached: 0, storage: null };
-  let urls = null, running = null, controller = null, paused = false, lastNotice = 0, keeper = null;
+  let urls = null, running = null, controller = null, paused = false, lastNotice = 0, keeper = null, downloadCache = null;
   let voiceKey = null, voiceSettings = null;
   const complete = new Set(), failures = new Map(), listeners = new Set();
 
@@ -202,7 +202,7 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
         let size = 0;
         // 边读边收集字节：读完要写进 Cache Storage 的话直接用这份，
         // 不能再发一次请求（那样每个文件要下载两遍，实测请求数直接翻倍）。
-        const chunks = keeper ? [] : null;
+        const chunks = keeper || downloadCache ? [] : null;
         if (response.body?.getReader) {
           const reader = response.body.getReader();
           try {
@@ -223,7 +223,8 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
         }
         if (!size) throw Object.assign(new Error('Empty asset response'), { status: 'empty' });
         if (chunks) await keep(url, chunks, size, response.headers.get('content-type'));
-        return;
+        // 把这份响应交给 worker，写进「已下载」用的 Cache Storage（复用刚读到的字节，不重复请求）。
+        return chunks ? { chunks, size, headers: response.headers, status: response.status } : undefined;
       } catch (error) {
         if (paused) throw error;
         // 404/410 以前算「永久失败」直接放弃。但服务器的 404 也可能是浏览器缓存里的旧结论
@@ -343,7 +344,8 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
         state = { ...state, phase: 'error', error: { status: 'quota', room: roomNow.room, need: MIN_ROOM } };
         return;
       }
-      const dlCache = await openDownloadCache();
+      downloadCache = await openDownloadCache();
+      const dlCache = downloadCache;
       let written = 0;
       let quotaHit = false;
       const worker = async () => {
@@ -414,7 +416,7 @@ export function createAssetDownload({ fetch: doFetch = (...args) => globalThis.f
       voiceSettings = nextSettings;
       // A new check after completion revalidates the manifest and all files through the HTTP cache.
       if (state.phase === 'complete' && !changed) {
-        urls = null; complete.clear();
+        urls = null;   // 重读清单；complete 留着，同一批素材不重新请求（run() 会把清单里已没有的删掉）
         state = { phase: 'idle', total: 0, done: 0, bytes: 0, failures: [], localMissing: false, cached: 0, storage: null };
       }
       if (changed) urls = null; // Reconcile URLs after rereading manifests; retain completed non-voice files.

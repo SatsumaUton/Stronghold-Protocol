@@ -272,9 +272,24 @@ describe('solo exit text and htm vnodes', () => {
 
   test('static templates give fresh vnodes (no shared, DOM-holding cached vnode)', async () => {
     const { html } = await import('../../public/js/ui/components.js');
+    // Preact marks a vnode it has mounted with `__e` (the DOM node); hFresh rebuilds exactly those (an unmounted
+    // template is safe to share, which is why hFresh allocates nothing until then — see components.js).
+    const mounted = (v) => {
+      if (Array.isArray(v)) { v.forEach(mounted); return v; }
+      if (!v || typeof v !== 'object') return v;
+      if (v.type !== undefined) v.__e = {};
+      if (v.props) mounted(v.props.children);
+      return v;
+    };
     const f = () => html`<div class="a"><span>static</span></div>`;
     const g = (x) => html`<div class="b"><span>static</span><i>${x}</i></div>`;
-    assert.notEqual(f(), f());
-    assert.notEqual(g(1).props.children[0], g(2).props.children[0]);
+    const oldF = mounted(f());
+    const newF = f();
+    assert.notEqual(newF, oldF);
+    assert.equal(newF.__e, null, 'the rebuilt vnode holds no DOM');
+    assert.notEqual(newF.props.children, oldF.props.children);
+    const oldG = mounted(g(1));
+    assert.notEqual(g(2), oldG);
+    assert.notEqual(g(2).props.children[0], oldG.props.children[0]);
   });
 });

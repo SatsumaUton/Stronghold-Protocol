@@ -119,8 +119,10 @@ test('对局结束浮层：深潜房说深潜，不再说「同盟已返回等�
   assert.match(src, /export function MatchEnded\(\{ reason = null, dive = false \} = \{\}\)/, 'MatchEnded 收 dive');
   assert.match(src, /diveRunEnded\(dive\)/, '标题');
   assert.match(src, /diveBack\(dive\)/, '返回按钮');
-  // 调用方要真的把 dive 传进来
-  assert.match(read('public/js/screens/game.js'), /<\$\{MatchEnded\} reason=\$\{endReason\} dive=\$\{isDivePub\(pub\) \|\| diveRoom\} \/>/);
+  // 调用方要真的把 dive 传进来（screens/game.js 先把 pub.echo / 房间变体算成 `dive`；`key` 可以夹在组件和 props 之间）
+  const game = read('public/js/screens/game.js');
+  assert.match(game, /const dive = !!pub\?\.echo \|\| diveRoom;/);
+  assert.match(game, /<\$\{MatchEnded\}[^>]*reason=\$\{endReason\}[^>]*dive=\$\{dive\}[^>]*\/>/);
 });
 
 test('房间页：深潜房的难度行、提示 toast 也不说「模拟」', () => {

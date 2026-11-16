@@ -69,7 +69,9 @@ test('text-fit: ellipsis exceptions stay scoped; only player names may break ins
 
 test('the room: a 确认 that drops a plugin mode says so to the host', () => {
   const js = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
-  assert.match(js, /if \(!\(await setDifficulty\(d\)\)\) return;\n\s+savePref\('lobby\.difficulty', d\);\n[^\n]*\n\s+if \(pluginMode\) toast\(t\('已退出插件模式「\{name\}」', \{ name: pluginMode \}\), 'info'\);/);
+  // the comment between the preference write and the toast may grow; the rule is: an accepted difficulty is saved, and a
+  // dropped plugin mode is then told to the host.
+  assert.match(js, /if \(!\(await setDifficulty\(d\)\)\) return;\n\s+savePref\('lobby\.difficulty', d\);[\s\S]{0,400}?if \(pluginMode\) toast\(t\('已退出插件模式「\{name\}」', \{ name: pluginMode \}\), 'info'\);/);
 });
 
 test('the other event screens at a big 文字大小: 成就统计\'s banner, the briefing\'s header, 已被选择, the top bar\'s ping, the loadout card view', () => {

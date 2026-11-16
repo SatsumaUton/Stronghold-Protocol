@@ -129,7 +129,11 @@ test('the client renders no research texts of the data (spec / implFormula / how
   // the one allowed: 突变细胞's rule line (data/items.json `note`, tools/build-data.mjs ITEM_RULES — a corrected Chinese rule,
   // the same in every version's build), shown on the detail card on purpose
   const allowed = (h) => /^public\/js\/ui\/detailPanel\.js:\d+: \$\{item\.note \?/.test(h);
-  assert.deepEqual(hits.filter((h) => /\.(implFormula|howToPlay|note)\b/.test(h) && !allowed(h)), [], 'no research text is read');
+  // 本服自己的 `note` 不是资料文本：大厅「邀请附言」把它带给落地页（sp.joinNote），
+  // 深渊图鉴的每个分页也有自己的一句说明（echoCodex 的 sections[].note）。
+  const unrelated = (h) => /^public\/js\/screens\/lobby\.js:\d+: if \(opts\.note\) sessionStorage\.setItem\('sp\.joinNote'/.test(h)
+    || /^public\/js\/ui\/echoCodex\.js:\d+: <p class="echo-codex__note">\$\{t\(current\.note\)\}<\/p>/.test(h);
+  assert.deepEqual(hits.filter((h) => /\.(implFormula|howToPlay|note)\b/.test(h) && !allowed(h) && !unrelated(h)), [], 'no research text is read');
 });
 
 test('versionContentStatus / roomPluginCs: a 规程 room with gameplay plugins counts its plugin set (§37.210)', () => {

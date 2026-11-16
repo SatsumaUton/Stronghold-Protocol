@@ -96,8 +96,6 @@ export async function quitMatch() {
       try { await net.request('room.leave', {}); } catch (err) { if (err?.code !== 'NOT_IN_ROOM') throw err; }
       left = true;
     }
-    try { await net.request('room.leave', {}); } catch (err) { if (err?.code !== 'NOT_IN_ROOM' && err?.code !== 'OFFLINE') throw err; }
-    left = true;
     // 记录「刚刚主动离开对局」：账号观察者据此在一段时间内不把玩家自动送回对局，
     // 否则服务端房间尚未清理时，一退出就会被 /api/account/room 重新导航回去，页面反复刷新。
     try { sessionStorage.setItem('sp.matchExitAt', String(Date.now())); } catch { /* ignore */ }

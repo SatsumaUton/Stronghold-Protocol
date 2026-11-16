@@ -380,7 +380,8 @@ test('the briefing, the strategy draft and the in-game 本局信息 tab all read
   // (PR #643: 本局信息 in the step header, beside the difficulty)
   assert.match(draft, /class="stephead__info" data-testid="match-info-open" aria-haspopup="dialog" onClick=\$\{\(\) => setInfoOpen\(true\)\}\n\s+title=\$\{t\('本局信息'\)\}><\$\{Icon\} name="search" \/><span>\$\{t\('本局信息'\)\}<\/span><\/button>/);
   assert.match(draft, /<\$\{MatchInfoDialog\} open=\$\{infoOpen\} onClose=\$\{\(\) => setInfoOpen\(false\)\} model=\$\{info\}/);
-  assert.match(draft, /enemies=\$\{infoOpen \? html`<\$\{MatchEnemies\} pub=\$\{pub\} gd=\$\{gd\} idScope="minfo" \/>` : null\}/);
+  // (本服：深渊回响的战场和敌人不走这套 brief，弹窗里也不列 `pub.echo` 的敌方栏)
+  assert.match(draft, /enemies=\$\{infoOpen && !pub\?\.echo \? html`<\$\{MatchEnemies\} pub=\$\{pub\} gd=\$\{gd\} idScope="minfo" \/>` : null\}/);
   // a turn change or my pick closes it; the draft's end unmounts the screen
   assert.match(draft, /const turnKey = `\$\{draft\.turnPid \|\| ''\}\|\$\{myPick \|\| ''\}`;\n\s*useEffect\(\(\) => \{ setInfoOpen\(false\); \}, \[turnKey\]\);/);
   const drawer = read('public/js/ui/enemyDrawer.js');

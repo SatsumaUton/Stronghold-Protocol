@@ -1310,9 +1310,9 @@
 
 /* 本服：5–20 人房 / 手机 / 花名册折起时的表情弹幕样式（从 merge-040 原样搬回） */
 /* ---- emotes as field danmaku (reference team.css; used by the 5+ roster) ------------------------------------------ */
-/* This fork has --t but no --ui scale variable: keep the reference dimensions in px so the lane height is valid. */
+/* this fork's scale is --sp-ui (界面大小): the lane floor keeps 32 px unscaled and scales above it */
 .gm__hud > .danmaku {
-  --dm-lane-h: max(.5rem, 40px);
+  --dm-lane-h: max(.5rem, 32px, calc(40px * var(--sp-ui, 1)));
   position: absolute; left: 0; right: 0; top: 2.16rem; height: calc(var(--dm-lanes, 3) * var(--dm-lane-h));
   overflow: hidden; pointer-events: none;
 }

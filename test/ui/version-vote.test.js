@@ -116,8 +116,9 @@ test('the room screen: the strip between the 观战席 and the footer, the versi
   assert.match(src, /<\$\{SpectatorBar\}[^\n]*\/>\n\s*<\$\{VersionVote\} room=\$\{room\} \/>/);
   assert.match(src, /data-testid="room-version"/);
   // (startLocked was added later: 服务器暂时关闭了开始游戏 — the same button, one more gate)
-  assert.match(src, /disabled=\$\{!facts\.canStart \|\| !online \|\| busy === 'start' \|\| !!vote(?:\s*\|\| startLocked)?\}/);
-  assert.match(src, /disabled=\$\{!facts\.canStart \|\| !online \|\| busy === 'start' \|\| !!vote\}/);
+  assert.match(src, /disabled=\$\{!facts\.canStart \|\| !online \|\| busy === 'start' \|\| !!vote \|\| startLocked\}/);
+  // one 开始模拟 button only: no second copy of the disabled expression without the gate
+  assert.equal([...src.matchAll(/disabled=\$\{!facts\.canStart/g)].length, 1);
   // gameplay plugins no longer block a proposal on the page: the server checks their manifest versions
   assert.doesNotMatch(src, /facts\.modded \? t\('请先关闭改变玩法的插件'\)/);
   assert.match(src, /data-testid="version-banner"/);
