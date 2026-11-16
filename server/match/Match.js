@@ -381,7 +381,11 @@ export class Match {
           this.gd.raw = { ...this.gd.raw, stages: { ...this.gd.raw.stages, ...st.stages } };
           const cur = Array.isArray(this.gd.mode.stages) ? this.gd.mode.stages.slice() : [];
           for (const id of st.ids) if (!cur.includes(id)) cur.push(id);
-          try { this.gd.mode.stages = cur; } catch { /* mode 只读：只补 stages 表也能用 */ }
+          // ★ 2026-11-16：`gd.mode` 来自 getData 的**冻结**记录，`this.gd.mode.stages = cur`
+          //   在严格模式下抛错并被吞掉 —— 别的版本的场地记录虽然并进了 gd.raw.stages，
+          //   但**场地池**（gd.mode.stages）没变，所以深渊回响永远只出本版那几张图。
+          //   改成换一个可写副本。
+          try { this.gd.mode = { ...this.gd.mode, stages: cur }; } catch { /* 只读就跳过 */ }
         }
         // BOSS / 隐藏 BOSS：同一难度下本版没有的那些也并进来（维护者 2026-11-16）。
         const bs = crossVersionBosses(this.modeId, this.gd.raw && this.gd.raw.bosses);
