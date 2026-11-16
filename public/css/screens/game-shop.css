@@ -289,8 +289,3 @@
 
 /* [ASSUMED] #692: retain the shop at 70% during the middle deploy level. */
 .gm.is-deploy-partial .shopbar { transform: scale(.7); animation: none; }
-
-/* 维护者 2026-11-16：决策界面（机变 / 战术 / 悬赏）打开时隐藏商店条 —— 这是 0.4.0 的观感：
-   0.4.0 的决策跑在独立阶段、商店条本来就不在；本服是「准备阶段 + 覆盖层」，所以要把商店条收起。
-   只影响显示，不碰并发决策/公共计时等任何功能。 */
-.gm.has-sp .shopbar { display: none; }
