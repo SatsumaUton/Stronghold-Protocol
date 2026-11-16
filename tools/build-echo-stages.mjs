@@ -54,10 +54,18 @@ function versionPools() {
 export function buildEchoStages() {
   const base = readJson('data/stages.json');
   const versions = versionPools();
+  // ★ 本版（页面当前版本，第二期下半）自己 config.json 的清单也是一路来源 ——
+  //   不加它，深渊档就只剩规程那 9 张（本版深渊的 7 张被漏掉，界面显示 9 张而同局实际 16 张）。
+  let baseModes = {};
+  try { baseModes = readJson('data/config.json').modes || {}; } catch { baseModes = {}; }
+  const baseList = (m) => {
+    const list = baseModes[m] && Array.isArray(baseModes[m].stages) ? baseModes[m].stages : [];
+    return list.filter((id) => typeof id === 'string' && STAGE_RE.test(id) && !!base[id]);
+  };
   const pools = {};
   const allIds = new Set();
   for (const m of MODES) {
-    const ids = new Set();
+    const ids = new Set(baseList(m));
     for (const v of versions) for (const id of v.byMode[m] || []) ids.add(id);
     pools[m] = [...ids].sort();
     for (const id of pools[m]) allIds.add(id);
