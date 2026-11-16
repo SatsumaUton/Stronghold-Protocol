@@ -427,7 +427,20 @@ html[data-script="alphabetic"] .title-login .btn--xl { letter-spacing: .3em; }
 .title-icp:hover { color: var(--mint-400); text-decoration: underline; }
 
 /* 法务行：备案号 + ` · ` + 「非官方同人复刻…」作为一组（维护者 2026-11-16：连成一句、居中） */
-.title-foot__legal { display: inline-flex; align-items: baseline; flex-wrap: wrap; justify-content: center; white-space: nowrap; margin: 0 auto; }
+/* 维护者 2026-11-16：这一行要**相对画面居中**。
+   光写 `margin: 0 auto` 不够：.title-foot 是 space-between + 右侧 `.title-foot__meta` 带
+   `margin-left: auto`，自由空间被它吃掉，法务行仍然贴左。所以让它单独占一整行、再居中。 */
+.title-foot__legal {
+  flex: 1 0 100%;
+  order: 2;
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: center;
+  white-space: nowrap;
+  text-align: center;
+  margin: 0;
+}
 @media (max-width: 720px) { .title-foot__legal { white-space: normal; } }
 
 /* 同 authGate.css：老注入器塞的 .mm-icp 一律不显示（备案号只写在页脚那一处） */

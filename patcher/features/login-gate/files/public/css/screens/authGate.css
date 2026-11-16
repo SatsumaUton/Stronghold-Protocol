@@ -918,12 +918,16 @@ html.sp-gate-open .app-root { visibility: hidden; }
 
 /* 页脚法务行：备案号 + ` · ` + 「非官方同人复刻…」作为一个整体居中（维护者 2026-11-16） */
 .sp-lg-foot__legal {
+  /* 同理：单独占一整行、相对画面居中（ENGER/TAB 提示留在上一行左侧） */
+  flex: 1 0 100%;
+  order: 3;
   display: inline-flex;
   align-items: baseline;
   justify-content: center;
   flex-wrap: wrap;
   gap: 0;
   white-space: nowrap;
+  text-align: center;
 }
 @media (max-width: 720px) {
   .sp-lg-foot__legal { white-space: normal; }
