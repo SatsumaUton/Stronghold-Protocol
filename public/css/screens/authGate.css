@@ -907,3 +907,6 @@
   .sp-lg-actions__qq { display: none; }
   .sp-lg-actions { bottom: 11px; }
 }
+/* 登录 / 注册第一屏是全屏界面：把后面的标题页整个藏起来。
+   否则标题页会从半透明背景里透出来，页脚的版权行和备案号会和闸门页脚的那份叠在一起（两个备案号）。 */
+html.sp-gate-open .app-root { visibility: hidden; }

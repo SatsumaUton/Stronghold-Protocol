@@ -271,7 +271,7 @@
       {
         "path": "matchmaker/public/client.js",
         "baseExists": false,
-        "customBytes": 260963
+        "customBytes": 263204
       },
       {
         "path": "matchmaker/public/feedback.css",
@@ -385,7 +385,7 @@
       {
         "path": "matchmaker/public/client.js",
         "baseExists": false,
-        "customBytes": 260963
+        "customBytes": 263204
       },
       {
         "path": "mm/client.js",
@@ -5328,7 +5328,7 @@
       {
         "path": "public/js/screens/title.js",
         "baseExists": false,
-        "customBytes": 22017
+        "customBytes": 23151
       },
       {
         "path": "public/js/screens/diyCheck.js",
@@ -5847,7 +5847,7 @@
       {
         "path": "public/css/screens/title.css",
         "baseExists": false,
-        "customBytes": 21230
+        "customBytes": 21548
       },
       {
         "path": "public/css/screens/game-reghud.css",
@@ -6663,7 +6663,7 @@
       {
         "path": "matchmaker/public/client.js",
         "baseExists": false,
-        "customBytes": 260963
+        "customBytes": 263204
       },
       {
         "path": "matchmaker/roomDir.cjs",
@@ -7317,12 +7317,12 @@
       {
         "path": "public/js/ui/authGateHost.js",
         "baseExists": false,
-        "customBytes": 4477
+        "customBytes": 5212
       },
       {
         "path": "public/css/screens/authGate.css",
         "baseExists": false,
-        "customBytes": 32421
+        "customBytes": 32710
       },
       {
         "path": "public/index.html",

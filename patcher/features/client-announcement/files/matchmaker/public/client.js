@@ -2334,6 +2334,13 @@ fetch('/mm/api/tips', { cache: 'no-store' })
     const ICP = '鲁ICP备2026010707号-1';
     let busy = false;
 
+    // ★ 2026-11-16（维护者反馈「登录注册界面有 2 个备案号」）：
+    //   备案号已经写进页面本身了（screens/title.js 的 `.title-icp`、screens/authGate.js 的 `.sp-lg-icp`），
+    //   所以这个「找一个含『非官方同人』的叶子节点、把它改成 position:fixed 再塞一个 .mm-icp」的注入器
+    //   整体停用 —— 它以前会在登录第一屏出现时把徽章塞进第一屏自己的页脚，屏幕上就多出一个备案号。
+    //   函数保留（main 里还在调）但直接返回；要恢复旧行为时把下面这行删掉即可。
+    if (document.querySelector('.title-icp')) return;
+
     const findLeaf = () => {
       let best = null;
       for (const el of document.querySelectorAll('div,span,p')) {
@@ -2346,8 +2353,25 @@ fetch('/mm/api/tips', { cache: 'no-store' })
       return best;
     };
 
+    /** 登录 / 注册第一屏（public/js/screens/authGate.js）开着吗。 */
+    const gateOpen = () => !!document.querySelector('[data-testid=auth-gate], .sp-lg-screen');
+
     const apply = () => {
       if (busy) return;
+      // ★ 2026-11-16（维护者反馈「登录注册界面有 2 个备案号」）：
+      //   第一屏自己的页脚已经有一个备案号（`.sp-lg-icp`，设计稿原文）。这个注入器会去找页脚里
+      //   含「非官方同人」的最短叶子节点、把它改成 position:fixed 并塞一个 `.mm-icp` —— 闸门开着时
+      //   它找到的正是闸门自己的那行，于是屏幕上出现两个备案号（一个跟着注入浮动，一个在页脚）。
+      //   闸门开着时这里什么都不做；关掉后再还原并重新注入。
+      // 幂等：每次都按「闸门在不在」重算，不依赖调用顺序（MutationObserver 的时序不可靠）。
+      const hide = gateOpen();
+      for (const a of document.querySelectorAll('.mm-icp')) {
+        const host = a.parentElement;
+        if (!host) continue;
+        if (hide) { if (host.style.display !== 'none') host.style.display = 'none'; }
+        else if (host.style.display === 'none') host.style.display = '';
+      }
+      if (hide) return;
       const leaf = findLeaf();
       if (!leaf) return;
       busy = true;
@@ -2389,6 +2413,9 @@ fetch('/mm/api/tips', { cache: 'no-store' })
 
     apply();
     try { new MutationObserver(apply).observe(document.body, { childList: true, subtree: true }); } catch { /* ignore */ }
+    // 闸门（登录 / 注册第一屏）出现与放行时立刻重算，不等 MutationObserver 的下一拍
+    try { window.addEventListener('sp-auth-gate-open', () => apply()); } catch { /* ignore */ }
+    try { window.addEventListener('sp-auth-gate-done', () => apply()); } catch { /* ignore */ }
   }
   /* @sp-strip-icp:end */
 

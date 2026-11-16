@@ -30,12 +30,19 @@ export async function ensureAuthGate({ force = false, check = checkAuth, doc = g
   const host = doc.createElement('div');
   host.id = 'sp-auth-gate';
   doc.body.appendChild(host);
+  // 闸门是整屏界面：把后面的标题页整个藏起来（否则它会从半透明的背景里透出来，玩家会同时看到
+  // 标题页页脚和闸门页脚两份版权/备案号）。CSS 在 css/screens/authGate.css 的 html.sp-gate-open。
+  try { doc.documentElement.classList.add('sp-gate-open'); } catch { /* ignore */ }
+  // 闸门出现：通知注入脚本（matchmaker/public/client.js 的备案号徽章）暂时让位 ——
+  // 否则它会在闸门页脚里再塞一个备案号，屏幕上出现两个（维护者反馈）。
+  try { win.dispatchEvent(new CustomEvent('sp-auth-gate-open')); } catch { /* ignore */ }
   const how = await new Promise((resolve) => {
     const onDone = (value) => resolve(value || 'guest');
     render(html`<${AuthGate} checkError=${state === 'error'} onDone=${onDone} />`, host);
   });
   render(null, host);
   host.remove();
+  try { doc.documentElement.classList.remove('sp-gate-open'); } catch { /* ignore */ }
   // ★ 2026-11-16：`account-title.js`（matchmaker 注入的那支脚本）里的 `state.guest` 是内存态。
   //   第一屏选「游客访问」时它不会自己去改，所以这里广播一次，让它把「代号 + 开始」那一版渲染出来
   //   （否则玩家会看到「点了游客却还停在登录界面」—— 维护者的反馈）。

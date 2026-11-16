@@ -421,3 +421,7 @@ html[data-script="alphabetic"] .title-login .btn--xl { letter-spacing: .3em; }
   pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) { .rf [data-n="effect_season_on"]::before { animation: none; } }
+
+/* 备案号（screens/title.js 直接渲染，不再靠注入脚本的浮动徽章）：跟在版权行后面，低调但可点 */
+.title-icp { color: var(--text-dim, #6f8188); text-decoration: none; font-size: .1rem; letter-spacing: .02em; }
+.title-icp:hover { color: var(--mint-400); text-decoration: underline; }

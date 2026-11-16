@@ -82,6 +82,10 @@ export function enterSession(rawName) {
 
 // data/assets.json `ui` keys are 'group/key' (docs/ASSETS.md).
 const BACKDROP_KEYS = ['titleBackdrop', 'entry/bkg_01', 'entry/bkg_02'];
+// 备案号（i18n-ignore）：与 matchmaker/public/client.js 里那份必须一致。
+// 2026-11-16 起直接写在页脚里，不再靠注入脚本塞一个 position:fixed 的徽章 —— 那个徽章在登录第一屏
+// 出现时会被塞进第一屏自己的页脚，屏幕上就有两个备案号（维护者反馈）。
+const ICP_NO = '鲁ICP备2026010707号-1';
 const RIDGE_KEYS = ['titleRidges', 'entry/bg_mountains_tiled'];
 
 /**
@@ -381,6 +385,9 @@ export function TitleScreen() {
       ${installed ? html`<button type="button" class="title-plugins" data-testid="title-plugins" onClick=${openPlugins}>
         <${Icon} name="info" />${t('本服务器安装了 {n} 个插件', { n: installed })}</button>` : null}
       <span>${t('非官方同人复刻 · 游戏素材版权归 上海鹰角网络 / Yostar 所有')}</span>
+      ${/* 备案号：2026-11-16 起直接写在页面里（以前是 matchmaker/public/client.js 动态注入一个
+           position:fixed 的徽章，登录第一屏出现时会再多塞一个，屏幕上就有两个备案号）。 */ ''}
+      <a class="title-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">${ICP_NO}</a>
       <span class="title-foot__meta">
         <${ReleaseNotesButton} />
         <a class="title-repo" href="https://github.com/sganggs/Stronghold-Protocol" target="_blank" rel="noopener noreferrer">${t('项目仓库')}</a>
