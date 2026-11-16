@@ -274,7 +274,8 @@
       "name": "对局核心（5–20 人大厅、并发草稿、悬赏/盟约、跳过、联防分段、视图下发）",
       "status": "ported-main",
       "files": [
-        "server/match/**"
+        "server/match/**",
+        "public/js/ui/choiceOverlay.js"
       ],
       "tests": [
         "4 人房顺序选策略、可跳过",

@@ -245,12 +245,24 @@ export async function createFieldView(host, options = {}) {
   signal?.throwIfAborted();
 
   const size = () => ({ width: Math.max(1, host.clientWidth || 1), height: Math.max(1, host.clientHeight || 1) });
-  // 维护者 2026-11-16：这两行**还原成 0.4.0**。
-  // 之前给触屏另加了一层 DPR 上限（TOUCH_DPR_CAP / TOUCH_BOARD_DPR_CAP），大窗口/全屏时
-  // 棋盘画布位图尺寸与拾取用的 CSS 尺寸比例不一致，表现为「全屏/大窗口点不中格子、干员放不上，
-  // 小窗口正常」。现在与 upstream/master 逐字相同。
-  const dpr = () => Math.min(globalThis.devicePixelRatio || 1, QUALITY_RES[settings.quality] || 2);
-  const boardDpr = () => Math.min(globalThis.devicePixelRatio || 1, BOARD_RES[settings.quality] || 2);
+  // 触屏（手机/平板）的像素上限【按画质分档】，不再是一刀切的 1。
+  //
+  // 以前的写法是 `lean ? 1 : 2`：只要是触屏设备，不管画质选的是什么，DPR 一律夹到 1。
+  // 手机 DPR 通常是 3，夹到 1 等于只画了 1/9 的像素，画面当然糊 ——
+  // 玩家反馈「手机调到最高画质还是很模糊」就是这个原因。
+  // 现在高画质给 2（手机 2x 已经很清晰，3x 太耗电），中画质 1.5，低画质保持 1 省电。
+  const TOUCH_DPR_CAP = { high: 2, medium: 1.5, low: 1 };
+  const TOUCH_BOARD_DPR_CAP = { high: 1.5, medium: 1.25, low: 0.85 };
+  const dpr = () => Math.min(
+    globalThis.devicePixelRatio || 1,
+    QUALITY_RES[settings.quality] || 2,
+    lean ? (TOUCH_DPR_CAP[settings.quality] || 1) : 2,
+  );
+  const boardDpr = () => Math.min(
+    globalThis.devicePixelRatio || 1,
+    BOARD_RES[settings.quality] || 2,
+    lean ? (TOUCH_BOARD_DPR_CAP[settings.quality] || 0.85) : 2,
+  );
   const s0 = size();
   // Construction is synchronous until the complete view can own cancellation. If setup throws,
   // dispose only the resources acquired by this attempt, never another view's host contents.
