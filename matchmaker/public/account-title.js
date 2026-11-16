@@ -224,7 +224,19 @@
 
     // 登录/注册的那几个按钮已经随表单一起搬去了游戏客户端的第一屏（见上面的注释），
     // 这里只剩「返回」——游客态的退出口。
-    hint.querySelector('#mm-acc-back').onclick = (e) => { e.preventDefault(); state.guest = false; render(); };
+    // ★ 2026-11-16（维护者反馈「游客模式点返回登录，掉到只有『登录 / 注册 ›』按钮的页面」）：
+    //   登录/注册已经是**第一屏**（public/js/screens/authGate.js），所以这里不能只是把 state.guest
+    //   置回 false 就重绘 —— 那只会重绘出「未登录」的标题页（表单已经搬走，只剩一个入口按钮）。
+    //   正确做法：清掉游客标记 + 把第一屏闸门直接叫出来。
+    hint.querySelector('#mm-acc-back').onclick = (e) => {
+      e.preventDefault();
+      state.guest = false;
+      try { sessionStorage.removeItem('sp.authGate.guest'); } catch { /* 隐私模式 */ }
+      render();
+      try {
+        if (typeof window.__SP_OPEN_AUTH_GATE === 'function') window.__SP_OPEN_AUTH_GATE();
+      } catch { /* 降级：至少回到未登录状态，还留着那个入口按钮 */ }
+    };
     logged.querySelector('#mm-acc-rename').onclick = async (e) => {
       e.preventDefault();
       const cur = state.user ? (state.user.nickname || '') : '';
