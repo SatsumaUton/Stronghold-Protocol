@@ -97,13 +97,130 @@ public class MainActivity extends Activity {
       web.loadUrl(url);
     }
     hideSystemBars();
+    checkForUpdate(false);
   }
 
+  // -------------------------------------------------------------------------------------------------------------------
+  // 版本检查（维护者 2026-11-16：「发现新版本就提示更新」）
+  //
+  // 站点上有一份 /download/android-version.json：{ name: "1.2", code: 6 }。App 启动后（以及回到前台时，每 6 小时最多一次）
+  // 拉一次，用 versionCode 比大小 —— 有更新的就弹一个原生对话框：
+  //   「下载更新」→ 用系统浏览器打开 /download/stronghold-android.apk（浏览器负责下载 + 调起安装器）
+  //   「以后再说」→ 记住这个版本号（SharedPreferences），同一个版本不再问；出现更新的版本会再问。
+  // 只做提示，不静默下载、不自动安装（Android 需要用户点确认 + 允许「安装未知应用」）。
+  // -------------------------------------------------------------------------------------------------------------------
+  static final String VERSION_URL = "https://stronghold.luobomiao.love/download/android-version.json";
+  static final String APK_URL = "https://stronghold.luobomiao.love/download/stronghold-android.apk";
+  static final String PREFS = "sp-app";
+  static final String KEY_SKIP = "skipVersionCode";
+  static final String KEY_LAST_CHECK = "lastUpdateCheck";
+  static final long CHECK_EVERY_MS = 6L * 60 * 60 * 1000;
+
+  void checkForUpdate(boolean force) {
+    try {
+      android.content.SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
+      long now = System.currentTimeMillis();
+      if (!force && now - sp.getLong(KEY_LAST_CHECK, 0L) < CHECK_EVERY_MS) return;
+      sp.edit().putLong(KEY_LAST_CHECK, now).apply();
+      int mine = getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+      new Thread(new UpdateCheck(this, mine, sp.getInt(KEY_SKIP, 0))).start();
+    } catch (Throwable ignored) { /* 版本检查永远不能影响启动 */ }
+  }
+
+  /** 后台拉版本文件（Android 不允许在主线程做网络）。 */
+  static final class UpdateCheck implements Runnable {
+    final MainActivity act;
+    final int mine;
+    final int skipped;
+    UpdateCheck(MainActivity a, int m, int s) { act = a; mine = m; skipped = s; }
+    @Override public void run() {
+      int remote = 0;
+      String name = "";
+      try {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(VERSION_URL).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(8000);
+        c.setRequestProperty("Cache-Control", "no-cache");
+        java.io.InputStream in = c.getInputStream();
+        java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+        byte[] tmp = new byte[1024];
+        int n;
+        while ((n = in.read(tmp)) > 0) buf.write(tmp, 0, n);
+        in.close();
+        c.disconnect();
+        org.json.JSONObject j = new org.json.JSONObject(buf.toString("UTF-8"));
+        remote = j.optInt("code", 0);
+        name = j.optString("name", "");
+      } catch (Throwable ignored) {
+        return;   // 没网 / 站点没那份文件：安静跳过，不打扰玩家
+      }
+      if (remote <= mine || remote == skipped) return;
+      act.runOnUiThread(new UpdateAsk(act, remote, name, mine));
+    }
+  }
+
+  /** 回主线程弹对话框。 */
+  static final class UpdateAsk implements Runnable {
+    final MainActivity act;
+    final int remote;
+    final String name;
+    final int mine;
+    UpdateAsk(MainActivity a, int r, String n, int m) { act = a; remote = r; name = n; mine = m; }
+    @Override public void run() { act.askUpdate(remote, name, mine); }
+  }
+
+  /** 「下载更新」：交给系统浏览器下载并调起安装器。 */
+  static final class DownloadClick implements android.content.DialogInterface.OnClickListener {
+    @Override public void onClick(android.content.DialogInterface d, int w) {
+      try {
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(APK_URL));
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        d.dismiss();
+        // 需要 context：用对话框自己的 context（Android 里 Dialog 实现了 Context 之外还带 getContext? 不保证），
+        // 所以这里由 AskUpdate 传入的 Activity 发起 —— 见 askUpdate() 里 new DownloadClick(act)
+      } catch (Throwable ignored) { /* 没有浏览器就什么都不做 */ }
+    }
+  }
+
+  /** 「以后再说」：记住这个 versionCode，同一个版本不再问。 */
+  static final class SkipClick implements android.content.DialogInterface.OnClickListener {
+    final MainActivity act;
+    final int remote;
+    SkipClick(MainActivity a, int r) { act = a; remote = r; }
+    @Override public void onClick(android.content.DialogInterface d, int w) {
+      try { act.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt(KEY_SKIP, remote).apply(); } catch (Throwable ignored) { }
+      d.dismiss();
+    }
+  }
+
+  /** 「下载更新」的实际动作（需要 Activity context 去 startActivity）。 */
+  static final class DownloadClick2 implements android.content.DialogInterface.OnClickListener {
+    final MainActivity act;
+    DownloadClick2(MainActivity a) { act = a; }
+    @Override public void onClick(android.content.DialogInterface d, int w) {
+      try { act.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(APK_URL))); } catch (Throwable ignored) { }
+      d.dismiss();
+    }
+  }
+
+  void askUpdate(final int remote, String name, int mine) {
+    try {
+      String msg = "萝卜喵服 · 卫戍协议  " + (name.isEmpty() ? ("v" + remote) : ("v" + name))
+          + "\n当前版本 v" + mine + "，点「下载更新」会打开下载页（装完覆盖安装即可，数据不会丢）。";
+      new android.app.AlertDialog.Builder(this)
+          .setTitle("发现新版本")
+          .setMessage(msg)
+          .setPositiveButton("下载更新", new DownloadClick2(this))
+          .setNegativeButton("以后再说", new SkipClick(this, remote))
+          .setCancelable(true)
+          .show();
+    } catch (Throwable ignored) { /* 弹不出来也不能崩 */ }
+  }
   /** UA 后面加一个标记，方便在服务端日志里认出 App 客户端。 */
   static String uaWithTag(String base) {
     StringBuilder sb = new StringBuilder();
     sb.append(base);
-    sb.append(" StrongholdProtocolApp/1.0");
+    sb.append(" StrongholdProtocolApp/1.2");
     return sb.toString();
   }
 
@@ -169,6 +286,7 @@ public class MainActivity extends Activity {
     super.onResume();
     web.onResume();
     hideSystemBars();
+    checkForUpdate(false);
   }
 
   @Override
