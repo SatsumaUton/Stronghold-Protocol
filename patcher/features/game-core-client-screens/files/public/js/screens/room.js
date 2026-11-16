@@ -941,10 +941,36 @@ function useDragScroll(ref) {
     const el = ref.current;
     if (!el) return undefined;
     let id = null, startX = 0, startLeft = 0, moved = false, panning = false;
+    // 惯性滑动（维护者 2026-11-16：要「有延迟感」的滑动，不是「拖多少走多少」）：
+    // 记最近几次采样的位移与时间算速度，松手后按速度继续滚，每帧乘摩擦衰减，
+    // 到边界或速度足够小就停 —— 手感接近手机原生滚动（甩一下会滑一段）。
+    let lastX = 0, lastT = 0, vel = 0, raf = 0;
+    const FRICTION = 0.94;          // 每帧速度衰减（0.94 ≈ 顺滑且不飘）
+    const MIN_VEL = 0.015;          // px/ms，低于这个就停
+    const stopMomentum = () => { if (raf) cancelAnimationFrame(raf); raf = 0; vel = 0; };
+    const tick = () => {
+      raf = 0;
+      if (!Math.abs(vel)) return;
+      const before = el.scrollLeft;
+      // 每帧 16ms 的位移；速度是 px/ms，负号因为「往右拖 = scrollLeft 变小」
+      el.scrollLeft = before - vel * 16;
+      const moved = el.scrollLeft !== before;
+      if (!moved) { stopMomentum(); return; }   // 到边界了
+      vel *= FRICTION;
+      if (Math.abs(vel) < MIN_VEL) { stopMomentum(); return; }
+      raf = requestAnimationFrame(tick);
+    };
+    const startMomentum = () => {
+      if (Math.abs(vel) < MIN_VEL * 4) return;   // 甩得太轻就不滑，避免「点一下就飘走」
+      stopMomentum();
+      raf = requestAnimationFrame(tick);
+    };
     const onDown = (e) => {
-      if (e.pointerType === 'touch' || e.button !== 0) return;      // 触屏走原生平移
+      if (e.pointerType === 'touch' || e.button !== 0) return;      // 触屏走原生平移（自带惯性）
       if (el.scrollWidth <= el.clientWidth + 1) return;             // 没有可滚内容
+      stopMomentum();                                               // 按住就刹住
       id = e.pointerId; startX = e.clientX; startLeft = el.scrollLeft; moved = false; panning = false;
+      lastX = e.clientX; lastT = e.timeStamp || performance.now(); vel = 0;
     };
     const onMove = (e) => {
       if (id == null || e.pointerId !== id) return;
@@ -955,6 +981,10 @@ function useDragScroll(ref) {
         el.classList.add('is-panning');
         try { el.setPointerCapture(id); } catch { /* ignore */ }
       }
+      const now = e.timeStamp || performance.now();
+      const dt = Math.max(1, now - lastT);
+      vel = (e.clientX - lastX) / dt;                                // px/ms（右为正）
+      lastX = e.clientX; lastT = now;
       el.scrollLeft = startLeft - dx;
       e.preventDefault();
     };
@@ -970,16 +1000,26 @@ function useDragScroll(ref) {
       el.classList.remove('is-panning');
       try { if (id != null) el.releasePointerCapture(id); } catch { /* ignore */ }
       id = null; moved = false; panning = false;
+      if (wasPanning) {
+        // 松手前若停顿过（速度自然衰减到 0），就不要滑
+        const now = (e && e.timeStamp) || performance.now();
+        if (now - lastT > 80) vel = 0;
+        startMomentum();
+      }
     };
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', finish);
     el.addEventListener('pointercancel', finish);
+    // 滚轮/触控板自己滚的时候把惯性停掉，避免两套动画打架
+    el.addEventListener('wheel', stopMomentum, { passive: true });
     return () => {
+      stopMomentum();
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', finish);
       el.removeEventListener('pointercancel', finish);
+      el.removeEventListener('wheel', stopMomentum);
       el.classList.remove('is-panning');
     };
   }, [ref]);

@@ -6,7 +6,7 @@
 // 邮件通道由后端在管理员保存回复时发出；这里只负责「打开网页后在大厅界面有提示」。
 //
 // 只在已登录时请求：游客没有 account_id，后端会直接回 { count: 0 }，但少一个请求更好。
-import { useEffect, useState } from '../vendor/hooks.module.v2.js';
+import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { html, Icon } from './components.js';
 import { t } from '../../../shared/i18n.js';
 

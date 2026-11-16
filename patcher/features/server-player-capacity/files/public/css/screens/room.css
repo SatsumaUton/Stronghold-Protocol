@@ -200,6 +200,8 @@
   /* 鼠标按住行体即可左右拖动；触屏保持原生平移（pan-x），不抢手势 */
   cursor: grab;
   touch-action: pan-x;
+  /* 惯性由脚本（useDragScroll）自己做：这里禁掉浏览器的平滑滚动，避免两套动画叠加 */
+  scroll-behavior: auto;
 }
 .rs-seats.seats--expanded::-webkit-scrollbar { width: 0; height: 0; display: none; }
 /* 拖动时：抓手光标、禁止选中文字、子元素不吃指针（不然拖到按钮上会被按钮捕获） */

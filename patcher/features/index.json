@@ -368,12 +368,12 @@
       {
         "path": "public/css/screens/room.css",
         "baseExists": true,
-        "customBytes": 87701
+        "customBytes": 89331
       },
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 107363
+        "customBytes": 109604
       }
     ]
   },
@@ -441,7 +441,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 107363
+        "customBytes": 109604
       },
       {
         "path": "public/js/screens/game.js",
@@ -473,7 +473,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 107363
+        "customBytes": 109604
       },
       {
         "path": "public/css/screens/lobby.css",
@@ -483,7 +483,7 @@
       {
         "path": "public/css/screens/room.css",
         "baseExists": true,
-        "customBytes": 87701
+        "customBytes": 89331
       },
       {
         "path": "server/lobby.js",
@@ -5308,7 +5308,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 107363
+        "customBytes": 109604
       },
       {
         "path": "public/js/screens/settle.js",
@@ -5827,7 +5827,7 @@
       {
         "path": "public/css/screens/room.css",
         "baseExists": true,
-        "customBytes": 87701
+        "customBytes": 89331
       },
       {
         "path": "public/css/screens/settle.css",
@@ -6708,7 +6708,7 @@
       {
         "path": "public/css/screens/room.css",
         "baseExists": true,
-        "customBytes": 87701
+        "customBytes": 89331
       },
       {
         "path": "public/css/screens/stats.css",
@@ -6798,7 +6798,7 @@
       {
         "path": "public/js/screens/room.js",
         "baseExists": true,
-        "customBytes": 107363
+        "customBytes": 109604
       },
       {
         "path": "public/js/screens/settle.js",
