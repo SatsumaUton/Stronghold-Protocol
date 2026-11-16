@@ -51,6 +51,10 @@ export function validHostMessage(m) {
       && (m.result.ok === undefined || typeof m.result.ok === 'boolean') && boundedJson(m, HOST_IPC_LIMITS.reply);
     case 'end': return (m.summary == null || object(m.summary)) && boundedJson(m, HOST_IPC_LIMITS.reply);
     case 'failed': return str(m.error, HOST_IPC_LIMITS.error) && boundedJson(m, HOST_IPC_LIMITS.error + 512);
+    // 断点续玩：宿主在安全点回传的检查点文档（server/match/snapshot.js 的 snapshotMatch 结果）
+    case 'checkpoint': return str(m.reason, 64) && object(m.doc) && boundedJson(m, HOST_IPC_LIMITS.reply * 4);
+    // 带存档创建的完成信号
+    case 'restored': return m.ok === true;
     default: return false;
   }
 }

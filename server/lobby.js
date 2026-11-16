@@ -3554,6 +3554,13 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
   // Match wiring
   // ---------------------------------------------------------------------------------------------------
 
+  /** Is this room's match run in a match host (another official version / a content plugin set)? */
+  matchIsHosted(room) {
+    if (!room) return false;
+    if (room.modded) return !!this.hosts;
+    return room.version !== DEFAULT_VERSION && !!this.versionHosts;
+  }
+
   /** @param {Room} room @param {string | null} [key] per-network limit key of the starter */
   /**
    * 开一局。
@@ -3704,6 +3711,14 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
         onCheckpoint: (match, reason) => {
           if (ctx.live && room.matchCtx === ctx) this.onCheckpoint?.(room, ctx, match, reason);
         },
+        // 断点续玩（版本宿主）：宿主在安全点把 snapshotMatch 的结果回传，这里转给 persister 存。
+        // 只有本进程开着持久化（persister 设了 onCheckpoint）时才让宿主做快照。
+        ...(this.onCheckpoint ? { checkpoints: true } : {}),
+        onCheckpointDoc: (doc, reason) => {
+          if (ctx.live && room.matchCtx === ctx) this.onHostedCheckpoint?.(room, ctx, ctx.match, doc, reason);
+        },
+        // 带存档创建：由宿主在 create 里 restoreMatch（主进程拿不到 Match 本体）
+        ...(restore?.hostedDoc ? { restoreDoc: restore.hostedDoc, restoreReplay: restore.replay === true } : {}),
       };
       // a room with gameplay plugins plays in its content set's match host, a room of another official version in that
       // version's; every other room here, as always
@@ -3721,7 +3736,8 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       this.log.info(`[lobby] ${room.code} match #${room.matchCount} ${restore ? 'restored' : 'starting'} (${room.mode}/${room.difficulty}, ${seats.length} seats, seed ${seed}${room.test ? ', test' : ''}${modded ? `, content ${room.content.cs.slice(0, 8)}${match.hosted ? ' in its match host' : ''}` : ''}${versioned ? `, version ${room.version}${match.hosted ? ' in its match host' : ''}` : ''})`);
       this.broadcastState(room);
       // ★ 恢复走 apply(match)（把存档灌回 Match），正常开局走 match.start()
-      if (restore) restore.apply(match); else match.start();
+      // 版本宿主的恢复例外：存档随 create 一起送进宿主（opts.restoreDoc），start() 就是发那条 create。
+      if (restore) { if (restore.hostedDoc) match.start(); else restore.apply(match); } else match.start();
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match failed to start`, e);
       if (room.matchCtx === ctx) {

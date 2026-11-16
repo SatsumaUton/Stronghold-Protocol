@@ -53,6 +53,11 @@ export function wireOptions(opts) {
   for (const k of ['roomCode', 'mode', 'difficulty', 'modeId', 'aiPicksLast', 'soloUnlimited', 'seats', 'spectators', 'seed', 'matchNo', 'cs', 'vs', 'requireCs', 'kitted', 'version']) {
     if (opts[k] !== undefined) out[k] = opts[k];
   }
+  // 断点续玩：`checkpoints` 让宿主在安全点把检查点回传（主进程开启持久化时才置位）；
+  // `restoreDoc` / `restoreReplay` 是带存档创建 —— 宿主拿到就直接 restoreMatch，不 start()。
+  if (opts.checkpoints === true) out.checkpoints = true;
+  if (opts.restoreDoc && typeof opts.restoreDoc === 'object') out.restoreDoc = opts.restoreDoc;
+  if (opts.restoreReplay === true) out.restoreReplay = true;
   // 「深渊回响」：variant 是房间级模式标记。白名单里漏了它的话，走内容插件 host（跨 worker/子进程）
   // 的 deepecho 房会被静默降级成普通 coop 房 —— 与上面 experimental 漏传是同一类 bug。
   // 只在房间真的带了这个键时转发，别的房间 worker payload 保持不变。
@@ -100,6 +105,12 @@ export class MatchProxy {
     this.disposed = false;
     /** the host no longer routes this match's messages (dispose with nothing pending, or the worker stopped) */
     this.forgotten = false;
+    /**
+     * 断点续玩：带存档创建（opts.restoreDoc）时，等宿主回 'restored' 才表示存档真的灌回去了；
+     * 失败（'failed' / worker 崩）解析为 false。没有存档时是 null。
+     * @type {Promise<boolean> | null}
+     */
+    this.restoreDone = opts.restoreDoc ? new Promise((resolve) => { this._resolveRestore = resolve; }) : null;
   }
 
   /** Post one message of this match to the worker (never throws). */
@@ -206,6 +217,9 @@ export class MatchProxy {
       return;
     }
     if (this.disposed) return;
+    // 断点续玩：宿主的检查点文档（主进程 persister 存）与「带存档创建」的结果
+    if (m.type === 'checkpoint') { try { this.opts.onCheckpointDoc?.(m.doc, m.reason ?? 'tick'); } catch (e) { this.log.error?.(`[match ${this.roomCode}] checkpoint handler failed`, e); } return; }
+    if (m.type === 'restored') { this.restored = true; this._resolveRestore?.(true); return; }
     if (m.type === 'send') { try { this.opts.send(m.playerId, m.msg); } catch (e) { this.log.error?.(`[match ${this.roomCode}] send failed`, e); } return; }
     if (m.type === 'broadcast') { try { this.opts.broadcast(m.msg); } catch (e) { this.log.error?.(`[match ${this.roomCode}] broadcast failed`, e); } return; }
     if (m.type === 'end') { this._end(m.summary ?? null); return; }
@@ -235,6 +249,7 @@ export class MatchProxy {
    * @param {string} [detail]
    */
   crash(reason, detail = '') {
+    this._resolveRestore?.(false);
     this.forgotten = true; // the worker is gone: nothing more to route (the host already dropped its matches)
     if (this.ended || this.disposed) { this._settle({ error: ERR.INTERNAL, detail: 'the match host stopped' }); return; }
     this._settle({ error: ERR.INTERNAL, detail: 'the match host stopped' });

@@ -35,6 +35,8 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { getData, setData } from '../../data.js';
+import { snapshotMatch, restoreMatch } from '../snapshot.js';
+import { createRngFromState } from '../../sim/rng.js';
 import { installOfficialBounds } from '../../../shared/plugins/officialBounds.js';
 import { contentHashOf } from '../../../shared/plugins/identity.js';
 import { DEFAULT_VERSION, versionOfData } from '../../../shared/versions.js';
@@ -226,6 +228,14 @@ function create(matchId, opts) {
     match = new MatchClass({
       ...(options.matchOptions || {}),
       ...opts,
+      // 断点续玩：宿主里的对局也在安全点把检查点回传主进程（server/persist/persister.js）。
+      // 主进程拿不到 Match 本体，只能由这里 snapshotMatch（opts.checkpoints 由 lobby 在开启持久化时置位）。
+      ...(opts.checkpoints === true ? { onCheckpoint: (m, reason) => {
+        try {
+          const doc = snapshotMatch(m);
+          if (doc) post({ type: 'checkpoint', matchId, reason: String(reason || 'tick'), doc });
+        } catch (e) { log.warn?.(`[host] match ${matchId} checkpoint failed: ${e?.message || e}`); }
+      } } : {}),
       // the content set installed at boot (server/data.js getData)
       data: installed,
       // the match names itself in its lines ([match <code>] …), as in the server process (the host adds [cs:<8 hex>])
@@ -242,6 +252,25 @@ function create(matchId, opts) {
     return;
   }
   matches.set(matchId, match);
+  // 断点续玩：带存档创建时不再 start()，而是把存档灌回去（与主进程 restoreLocal 的 apply 同一个函数）
+  if (opts.restoreDoc) {
+    let ok = false;
+    try {
+      ok = restoreMatch(match, opts.restoreDoc, { createRngFromState, log, replay: opts.restoreReplay === true });
+    } catch (e) {
+      log.error(`[host] match ${matchId} could not be restored: ${e?.message || e}`);
+      ok = false;
+    }
+    if (!ok) {
+      matches.delete(matchId);
+      try { match.dispose?.(); } catch { /* ignore */ }
+      post({ type: 'failed', matchId, error: 'checkpoint refused' });
+      return;
+    }
+    post({ type: 'restored', matchId, ok: true });
+    if (sched) pump(match, sched);
+    return;
+  }
   try { match.start(); } catch (e) {
     log.error(`[host] match ${matchId} failed to start`, e);
     matches.delete(matchId);
