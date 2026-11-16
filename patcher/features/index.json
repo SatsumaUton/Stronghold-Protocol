@@ -5792,7 +5792,7 @@
       {
         "path": "public/css/screens/game.css",
         "baseExists": true,
-        "customBytes": 135194
+        "customBytes": 137293
       },
       {
         "path": "public/css/screens/guide.css",
@@ -6698,7 +6698,7 @@
       {
         "path": "public/css/screens/game.css",
         "baseExists": true,
-        "customBytes": 135194
+        "customBytes": 137293
       },
       {
         "path": "public/css/screens/lobby.css",

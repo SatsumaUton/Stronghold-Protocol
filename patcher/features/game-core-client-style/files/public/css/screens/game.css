@@ -1693,3 +1693,26 @@ html.sp-deepecho .etag img,
 html.sp-deepecho .gicon img {
   filter: hue-rotate(120deg) saturate(1.6) brightness(1.05);
 }
+
+/* 规程 command: the strategy badge remains the anchor for click and drag interactions. */
+.effects__row { display: flex; align-items: center; gap: .12rem; }
+.band-command { display: flex; align-items: center; gap: .08rem; padding: .06rem .1rem; max-width: 2.4rem; min-height: .5rem;
+  color: var(--mint-400); background: #122722ed; border: 1px solid #7fffc988; border-radius: .04rem; text-align: left; touch-action: none; cursor: grab; }
+.band-command > .bandicon { width: .34rem; height: .34rem; }
+.band-command b, .band-command small { display: block; font-size: calc(.11 * var(--t)); line-height: 1.35; }
+.band-command small { color: var(--text-lo); font-size: calc(.1 * var(--t)); }
+.band-command.is-unavailable { opacity: .65; cursor: default; }
+.band-command.is-dragging { box-shadow: 0 0 .12rem #7fffc9; }
+[data-shop-slot].is-command-target { outline: 2px solid #7fffc9; outline-offset: -2px; }
+/* the target under the dragged command turns orange, as its board square does (ui/bandCommand.js HOVER, §37.201) */
+[data-shop-slot].is-command-target.is-command-hover { outline: 3px solid #ff9a3c; }
+/* the aiming arrow from the command to the pointer (ui/bandCommand.js aimLayer): the client's chevron (ui/battle fx_arrow)
+   as a mask in mint, orange over a valid target; a clipped chevron without the art */
+.cmd-aim { position: fixed; inset: 0; z-index: 60; pointer-events: none; --cmd-aim-c: #7fffc9; }
+.cmd-aim.is-on { --cmd-aim-c: #ff9a3c; }
+.cmd-aim__c { position: absolute; left: 0; top: 0; width: 22px; height: 14px; margin: -7px 0 0 -11px; opacity: .85;
+  background: var(--cmd-aim-c); -webkit-mask: var(--cmd-aim-art) center / contain no-repeat; mask: var(--cmd-aim-art) center / contain no-repeat; }
+.cmd-aim__c.is-tip { width: 30px; height: 20px; margin: -10px 0 0 -15px; opacity: 1; }
+.cmd-aim.is-plain .cmd-aim__c { -webkit-mask: none; mask: none; clip-path: polygon(50% 0, 100% 72%, 100% 100%, 50% 32%, 0 100%, 0 72%); }
+.command-draft { display: flex; gap: .16rem; flex-wrap: wrap; }
+.command-draft__card { flex: 1 1 1.8rem; padding: .16rem; border: 1px solid #7fffc966; }
