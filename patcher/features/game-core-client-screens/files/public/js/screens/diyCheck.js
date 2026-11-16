@@ -5,7 +5,7 @@
 // the first legal slots of each tier, in data order, up to the cap.
 
 import { useState } from '../../vendor/hooks.module.v2.js';
-import { html, Button, TierChip } from '../ui/components.js';
+import { html, Button, Icon, TierChip } from '../ui/components.js';
 import { useGameData, OperatorImage, BondGlyph } from '../ui/gameComponents.js';
 import { StepHeader, ExitModal } from '../ui/matchChrome.js';
 import { actions } from '../ui/gameActions.js';
@@ -132,7 +132,7 @@ export function DiyCheckScreen() {
       ${!pub.diyCheck?.untimed ? html`<p class="diy-check__hint">${t('超时未确认时，按槽位顺序自动带入')}</p>` : null}
       <div class="brief-ready">
         <span class="brief-ready__txt">${t('已就绪')}<b class="num">${readyN}</b><span class="num">/${players.length}</span></span>
-        <span class="brief-ready__pips">${players.map((p) => html`<i key=${p.playerId} class=${cx(Array.isArray(picks?.[p.playerId]) && 'on', p.playerId === myId && 'me')} title=${p.name}></i>`)}</span>
+        <span class="brief-ready__pips">${players.map((p) => html`<i key=${p.playerId} class=${cx(Array.isArray(picks?.[p.playerId]) && 'on', p.playerId === myId && 'me')} title=${p.name}><${Icon} name="user" /></i>`)}</span>
       </div>
       <${Button} variant="ghost" size="lg" data-testid="diy-check-none" disabled=${!canEdit} onClick=${() => confirm([])}>${t('不带入自选')}<//>
       <${Button} variant="primary" size="xl" class="brief-go" data-testid="diy-check-confirm" icon=${confirmed ? 'check' : inMap ? 'play' : 'eye'}
