@@ -465,9 +465,9 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 /* 「悬赏决策 |」 then the description over the timing line, beside the bar; a faint bracket behind the title */
 .spov__titles { position: relative; display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: .16rem; row-gap: .02rem;
   align-items: center; padding: .08rem 0 .08rem .3rem; }
-.spov__deco { position: absolute; left: 0; top: -.06rem; bottom: -.06rem; width: .7rem; border: 2px solid rgba(23, 249, 183, .16); border-right: 0; pointer-events: none; }
-.spov__deco::after { content: ''; position: absolute; left: .14rem; top: 50%; width: .9rem; height: .9rem; margin-top: -.45rem; border-radius: 50%; border: 1px solid rgba(23, 249, 183, .1); }
-.spov__title { display: contents; font-size: calc(.56 * var(--t)); font-weight: 900; letter-spacing: .08em; color: var(--mint-400); text-shadow: 0 0 .2rem rgba(23, 249, 183, .3); }
+.spov__deco { position: absolute; left: 0; top: -.06rem; bottom: -.06rem; width: .7rem; border: 2px solid rgba(var(--mint-rgb), .16); border-right: 0; pointer-events: none; }
+.spov__deco::after { content: ''; position: absolute; left: .14rem; top: 50%; width: .9rem; height: .9rem; margin-top: -.45rem; border-radius: 50%; border: 1px solid rgba(var(--mint-rgb), .1); }
+.spov__title { display: contents; font-size: calc(.56 * var(--t)); font-weight: 900; letter-spacing: .08em; color: var(--mint-400); text-shadow: 0 0 .2rem rgba(var(--mint-rgb), .3); }
 .spov__title.is-special { color: var(--gold-2); text-shadow: 0 0 .2rem rgba(242, 189, 62, .35); }
 .spov__name { grid-row: 1 / 3; grid-column: 1; line-height: 1.1; }
 /* the bar keeps its "|" for the text of the heading, drawn as a 3px rule */
@@ -502,7 +502,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 }
 .spov__turntxt { display: flex; align-items: center; gap: .08rem; font-size: calc(.24 * var(--t)); font-weight: 700; color: var(--text-md); }
 .spov__turntxt .icon { width: .26rem; height: .26rem; }
-.spov__turntxt.is-mine { color: var(--mint-400); text-shadow: 0 0 .16rem rgba(23, 249, 183, .45); animation: blink 1.2s ease-in-out infinite; }
+.spov__turntxt.is-mine { color: var(--mint-400); text-shadow: 0 0 .16rem rgba(var(--mint-rgb), .45); animation: blink 1.2s ease-in-out infinite; }
 .spov__turntxt.is-done { color: var(--mint-400); }
 /* someone else deciding: the name over 正在决策…, right-aligned, an hourglass beside them */
 .spov__turntxt.is-other { gap: .12rem; color: #eef1f0; }
@@ -511,6 +511,25 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .spov__tw b { max-width: 2.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: calc(.22 * var(--t)); font-weight: 700; color: #f2f5f4; }
 .spov__tw small { font-size: calc(.17 * var(--t)); font-weight: 400; color: #c2c8c6; }
 .spov__turn .countdown { padding-left: .22rem; border-left: 1px solid rgba(220, 228, 225, .22); }
+.spov__repeat { grid-column: 1 / -1; margin: 0; color: var(--gold-2); font-size: calc(.14 * var(--t)); line-height: 1.5; }
+.spov__order { display: flex; gap: .1rem; flex: none; overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-bottom: .04rem; }
+.spov__who { display: flex; align-items: center; gap: .08rem; flex: none; padding: .05rem .12rem .05rem .06rem; background: rgba(255, 255, 255, .03); border: 1px solid var(--line); }
+.spov__who.is-cur { border-color: var(--gold); background: rgba(255, 198, 0, .08); }
+.spov__who.is-done { border-color: var(--mint-800); }
+.spov__who.is-self .spov__wname { color: var(--mint-400); }
+.spov__idx { font-size: calc(.16 * var(--t)); color: var(--text-dim); width: .2rem; text-align: center; }
+.spov__wtext { display: flex; flex-direction: column; gap: .03rem; min-width: 0; max-width: 1.6rem; }
+.spov__wname { font-size: calc(.15 * var(--t)); max-width: 1.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spov__wpick { font-size: calc(.13 * var(--t)); color: var(--mint-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spov__wstate { display: grid; }
+.spov__who.is-done .spov__wstate { color: var(--mint-400); }
+.spov__who.is-cur .spov__wstate { color: var(--gold); }
+.spov--expanded .spov__head, .spov--expanded .spov__order { flex: none; }
+.spov--expanded .spov__order { overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-bottom: 4px; }
+.spov--expanded .spov__who { flex: none; }
+.spov--expanded .spov__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: minmax(180px, 2.6rem); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 2px; }
+.spov--expanded .spov__titles { min-width: 0; }
+.spov--expanded .spov__title { flex-wrap: wrap; }
 .spov__grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: .2rem; }
 /* the part of 收起 that is not in the .42rem it hangs out, plus a gap */
 .spov__grid.spov__grid--collapse { margin-right: max(0px, calc(.32 * var(--t) + .24rem + 2px - .42rem + .06rem)); }

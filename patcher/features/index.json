@@ -4711,7 +4711,7 @@
       {
         "path": "public/js/ui/choiceOverlay.js",
         "baseExists": true,
-        "customBytes": 19701
+        "customBytes": 21903
       },
       {
         "path": "public/js/ui/clipboard.js",
@@ -5782,7 +5782,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": true,
-        "customBytes": 109154
+        "customBytes": 111023
       },
       {
         "path": "public/css/screens/game-shop.css",
@@ -6688,7 +6688,7 @@
       {
         "path": "public/css/screens/game-panels.css",
         "baseExists": true,
-        "customBytes": 109154
+        "customBytes": 111023
       },
       {
         "path": "public/css/screens/game-shop.css",
