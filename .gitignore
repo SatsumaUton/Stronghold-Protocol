@@ -151,3 +151,7 @@ tmp/
 android/build/
 *.apk
 
+
+# 深渊回响（私有仓库）的生成物与生成脚本：公开仓库不留（维护者 2026-11-16 追问「为什么进了公共仓库」）
+data/echo-stages.json
+tools/build-echo-stages.mjs

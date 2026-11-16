@@ -27,6 +27,8 @@ export const EXCLUSIVE = [
   /^public\/js\/ui\/echo[\w.-]*\.js$/,
   /^public\/js\/ui\/enemyRecords\.js$/,
   /^public\/js\/screens\/echoLobby\.js$/,
+  /^data\/echo-stages\.json$/,
+  /^tools\/build-echo-stages\.mjs$/,
   /^matchmaker\/diveBoard\.cjs$/,
   /^matchmaker\/roomDir\.cjs$/,
   /^patcher\/features\/deepecho\//,
