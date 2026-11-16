@@ -31,7 +31,7 @@ export class MatchSpDraft {
     // ★ 2026-11-16 维护者：「悬赏决策回退成 0.4.0」—— 不再走 5–20 人的并发草稿（所有人同时各选一张、
     //   整段共用一个倒计时），恢复 0.4.0 的**轮流决策**（order + idx + 每位自己的 turnDeadline）。
     //   并发那套实现（_concurrentSpStep / spPending / concurrentDraft）保留在文件里，以后想启用把这里改回去即可。
-    const concurrent = false;
+    const concurrent = this.concurrentDraft();
     this.sp = { ...draft, order, idx: 0, picks: {}, taken: {}, untimed, turnDeadline: 0, ...(concurrent ? { concurrent: true } : {}) };
     this.setDeadline(0);
     this.startSpTurn();
