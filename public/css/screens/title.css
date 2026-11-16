@@ -425,3 +425,10 @@ html[data-script="alphabetic"] .title-login .btn--xl { letter-spacing: .3em; }
 /* 备案号（screens/title.js 直接渲染，不再靠注入脚本的浮动徽章）：跟在版权行后面，低调但可点 */
 .title-icp { color: var(--text-dim, #6f8188); text-decoration: none; font-size: .1rem; letter-spacing: .02em; }
 .title-icp:hover { color: var(--mint-400); text-decoration: underline; }
+
+/* 法务行：备案号 + ` · ` + 「非官方同人复刻…」作为一组（维护者 2026-11-16：连成一句、居中） */
+.title-foot__legal { display: inline-flex; align-items: baseline; flex-wrap: wrap; justify-content: center; white-space: nowrap; }
+@media (max-width: 720px) { .title-foot__legal { white-space: normal; } }
+
+/* 同 authGate.css：老注入器塞的 .mm-icp 一律不显示（备案号只写在页脚那一处） */
+.mm-icp { display: none !important; }

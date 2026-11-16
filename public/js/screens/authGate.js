@@ -260,8 +260,13 @@ export function AuthGate({ onDone, checkError = false }) {
         <span><b>ENTER</b>${t(N_('提交'))}</span>
         <span><b>TAB</b>${t(N_('切换输入'))}</span>
       </div>
-      <div>${t('非官方同人复刻 · 游戏素材版权归 上海鹰角网络 / Yostar 所有')}</div>
-      <a class="sp-lg-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">${ICP}</a>
+      ${/* 维护者 2026-11-16：备案号写在「非官方同人复刻…」**前面**、用 ` · ` 连成一句，
+           整组居中（以前是分开的两个 flex 子项，space-between 把备案号甩到最右边）。 */ ''}
+      <div class="sp-lg-foot__legal">
+        <a class="sp-lg-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">${ICP}</a>
+        <span aria-hidden="true"> · </span>
+        <span>${t('非官方同人复刻 · 游戏素材版权归 上海鹰角网络 / Yostar 所有')}</span>
+      </div>
     </div>
   </div>`;
 }

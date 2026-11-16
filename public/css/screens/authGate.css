@@ -914,3 +914,20 @@
 /* 登录 / 注册第一屏是全屏界面：把后面的标题页整个藏起来。
    否则标题页会从半透明背景里透出来，页脚的版权行和备案号会和闸门页脚的那份叠在一起（两个备案号）。 */
 html.sp-gate-open .app-root { visibility: hidden; }
+
+/* 页脚法务行：备案号 + ` · ` + 「非官方同人复刻…」作为一个整体居中（维护者 2026-11-16） */
+.sp-lg-foot__legal {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0;
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .sp-lg-foot__legal { white-space: normal; }
+}
+
+/* 线上还有一条老注入器会塞 `.mm-icp`（固定在右下/底部），维护者 2026-11-16 要求备案号只跟
+   「非官方同人复刻…」写在一起一处，所以任何 `.mm-icp` 一律不显示（我们自己的锚点是 .sp-lg-icp / .title-icp）。 */
+.mm-icp { display: none !important; }
