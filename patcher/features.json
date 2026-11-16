@@ -454,6 +454,7 @@
         "content/announcements.json",
         "dashboard/public/app.js",
         "dashboard/public/index.html",
+        "dashboard/server.js",
         "matchmaker/account.cjs",
         "matchmaker/diveBoard.cjs",
         "matchmaker/openRooms.cjs",
@@ -579,6 +580,7 @@
         "server/sim/simdata.js",
         "server/sim/units.js",
         "server/soloHold.js",
+        "shared/constants.js",
         "shared/protocol.js",
         "shared/titles.js"
       ],

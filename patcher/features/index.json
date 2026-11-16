@@ -391,6 +391,11 @@
         "path": "mm/client.js",
         "baseExists": false,
         "customBytes": 232398
+      },
+      {
+        "path": "mm/README.md",
+        "baseExists": false,
+        "customBytes": 2686
       }
     ]
   },
@@ -6631,6 +6636,11 @@
         "customBytes": 28627
       },
       {
+        "path": "dashboard/server.js",
+        "baseExists": false,
+        "customBytes": 67419
+      },
+      {
         "path": "matchmaker/account.cjs",
         "baseExists": false,
         "customBytes": 130234
@@ -7254,6 +7264,11 @@
         "path": "server/soloHold.js",
         "baseExists": false,
         "customBytes": 5200
+      },
+      {
+        "path": "shared/constants.js",
+        "baseExists": false,
+        "customBytes": 27882
       },
       {
         "path": "shared/protocol.js",
