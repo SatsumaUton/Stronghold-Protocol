@@ -151,11 +151,11 @@ const CHECKS = [
     id: 'client-mobile-quality',
     name: '手机「画面质量」真正生效',
     rules: [
-      // 以前 `lean ? 1 : 2`：触屏一律夹到 DPR 1，手机上高画质等于没设，画面糊
-      ['public/js/render/app.js', /const TOUCH_DPR_CAP = \{/, '★ 触屏像素上限按画质分档'],
-      ['public/js/render/app.js', /lean \? \(TOUCH_DPR_CAP\[settings\.quality\] \|\| 1\) : 2/, '★ dpr() 用分档表'],
-      ['public/js/render/app.js', /lean \? \(TOUCH_BOARD_DPR_CAP\[settings\.quality\] \|\| 0\.85\) : 2/, '★ boardDpr() 用分档表'],
-      ['public/js/render/app.js', /TOUCH_DPR_CAP = \{ high: 2, medium: 1\.5, low: 1 \}/, '★ 手机高画质 = 2x'],
+      // 2026-11-16：原来的「触屏 DPR 分档上限」在大窗口/全屏下会让棋盘拾取错位
+      // （玩家实测：改回 0.4.0 的两行即恢复），所以这条断言现在检查的是 0.4.0 的写法；
+      // 画质只经 QUALITY_RES / BOARD_RES 生效。
+      ['public/js/render/app.js', /const dpr = \(\) => Math\.min\(globalThis\.devicePixelRatio \|\| 1, QUALITY_RES\[settings\.quality\] \|\| 2\)/, '★ dpr() 与 0.4.0 一致'],
+      ['public/js/render/app.js', /const boardDpr = \(\) => Math\.min\(globalThis\.devicePixelRatio \|\| 1, BOARD_RES\[settings\.quality\] \|\| 2\)/, '★ boardDpr() 与 0.4.0 一致（大窗口拾取正确）'],
     ],
   },
   {
