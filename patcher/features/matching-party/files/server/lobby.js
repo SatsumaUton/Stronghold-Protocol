@@ -4185,12 +4185,16 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
     if (!session.roomCode) return null;
     const room = this.rooms.get(session.roomCode);
     const seat = room ? room.seatOf(session.playerId) : null;
-    if (room && !seat && room.spectatorOf(session.playerId)) return room; // a spectator seat
-    // 隐身观战（adminWatch）：只存在于 hiddenSpectators，既不是座位也不在 spectators 里。
-    // 以前这里漏了它，roomCode 会被当成「无效」清成 null —— 于是 g.watch 走进
-    // routeGameNow → roomOf → NOT_IN_ROOM，观战者看到的画面就永远停在自动打开的 P1 上，
-    // 点谁都不换（玩家反馈「隐身观战不能切换观战目标」）。
-    if (room && !seat && room.hiddenSpectatorOf(session.playerId)) return room;
+    // ★ 2026-11-16（玩家反馈「对局中退出、用观战进来，切换观战目标一直报『你不在房间中』」）：
+    //   观战席优先于**失效的**旧座位。`removeMember` 在对局进行中退场时只把座位标记成 `seat.left = true`
+    //   （座位记录保留给结算/重连），于是这个人身上同时有「一张 left 的旧座位」和「一条新的观战记录」。
+    //   旧代码的观战判定要求 `!seat`（完全没有座位），这里 seat 是存在的 → 跳到下一行 `seat.left`
+    //   → `session.roomCode = null` → 之后每一次 g.watch 都走 routeGameNow → roomOf → NOT_IN_ROOM，
+    //   玩家看到的就是「观战中，但点谁都不换、一直弹你不在房间中」。
+    //   判定条件改成「没有**有效**座位时，观战席说了算」：有效座位（未离场、非 AI）仍走原来的座位路径。
+    const liveSeat = !!seat && !seat.left && !seat.isBot;
+    // 观战席（含隐身观战 adminWatch）在「没有有效座位」时说了算：有效座位（未离场、非 AI）仍走下面的座位路径。
+    if (room && !liveSeat && (room.spectatorOf(session.playerId) || room.hiddenSpectatorOf(session.playerId))) return room;
     if (!room || !seat || seat.left || seat.isBot) {
       // ★ 2026-11-02 兜底：座位按 **playerId** 找，刷新/换设备后 playerId 会变；
       //   旧代码一找不到就把 roomCode 清成 null → onHello 发 room.closed → 玩家掉回大厅。

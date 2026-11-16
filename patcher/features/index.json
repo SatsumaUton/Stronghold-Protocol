@@ -7,7 +7,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 300341
+        "customBytes": 301005
       },
       {
         "path": "server/http/config.js",
@@ -24,7 +24,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 300341
+        "customBytes": 301005
       },
       {
         "path": "server/match/aiDigest.js",
@@ -331,7 +331,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 300341
+        "customBytes": 301005
       },
       {
         "path": "server/phaseMetrics.js",
@@ -348,7 +348,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 300341
+        "customBytes": 301005
       },
       {
         "path": "shared/playerCapacity.js",
@@ -429,7 +429,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 300341
+        "customBytes": 301005
       }
     ]
   },
@@ -451,7 +451,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 300341
+        "customBytes": 301005
       }
     ]
   },
@@ -488,7 +488,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 300341
+        "customBytes": 301005
       },
       {
         "path": "server/net.js",
@@ -1599,7 +1599,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 300341
+        "customBytes": 301005
       },
       {
         "path": "server/match/aiDigest.js",
@@ -6978,7 +6978,7 @@
       {
         "path": "server/lobby.js",
         "baseExists": true,
-        "customBytes": 300341
+        "customBytes": 301005
       },
       {
         "path": "server/match/Match.js",

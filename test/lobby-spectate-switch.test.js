@@ -166,3 +166,38 @@ test('the spectate button and the error text use the same online-human and full-
   assert.equal(describeError({ code: ERR.NOT_READY }), '仍有玩家未就绪');
   assert.equal(describeError({ code: ERR.ROOM_FULL }), '房间已满');
 });
+
+test('a departed player who re-enters as a spectator can still switch what they watch', (t) => {
+  // 本服规定「游客不能创建同盟模拟房间」，这里给两个会话补登录账号，其余与 setup() 一致。
+  const registry = new SessionRegistry();
+  const lobby = new Lobby({ registry, getData, MatchClass: StubMatch, log: quiet });
+  t.after(() => lobby.shutdown());
+  const player = (name, accountId) => {
+    const session = registry.create(name);
+    session.connected = true;
+    session.accountId = accountId;
+    session.ws = { readyState: 1, bufferedAmount: 0, send() {} };
+    return session;
+  };
+  const host = player('Host', 'acc-host');
+  ok(lobby.create(host, { mode: 'coop', difficulty: 'FUNNY' }));
+  const room = lobby.roomOf(host);
+  const guest = player('Guest', 'acc-guest');
+  ok(lobby.join(guest, { code: room.code }));
+  ok(lobby.ready(guest, { ready: true }));
+  ok(lobby.start(host));
+
+  // 对局中退场：removeMember 只把座位标记成 left（记录保留给结算 / 重连）
+  lobby.removeMember(room, guest.playerId);
+  const seat = room.seatOf(guest.playerId);
+  assert.equal(seat != null && seat.left === true, true, '退场后座位应保留但标记 left');
+  assert.equal(lobby.roomOf(guest), null);
+
+  // 用观战重新进来：拿到观战席
+  ok(lobby.spectate(guest, { code: room.code }));
+  assert.equal(room.spectatorOf(guest.playerId) != null, true);
+
+  // 关键回归点：left 的旧座位不能把观战席盖掉 —— 否则 g.watch 会一路 NOT_IN_ROOM
+  assert.equal(lobby.roomOf(guest), room, '观战者必须还能被认作房间成员');
+  assert.equal(guest.roomCode, room.code);
+});
