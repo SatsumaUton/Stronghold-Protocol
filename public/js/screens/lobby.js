@@ -182,14 +182,19 @@ const MAX_HUB_LINES = 3;
 
 /**
  * Text for a difficulty card, preferring data/config.json.
+ *
+ * `generic: true`（维护者 2026-11-16）：**忽略当前版本** config.json 里的模式文案，用通用难度文案
+ * （MODE_TEXT）。深渊回响用它 —— 否则页面停在「规程·序列Ⅰ」时会显示规程专用的解锁提示
+ * （「追加更多盟约，解锁时可开放至【规程等级3】」），而深潜的 DE-1/2/3 跟规程等级没有关系。
  * @param {'solo'|'coop'} roomMode
  * @param {string} difficulty
+ * @param {{ generic?: boolean }} [opts]
  * @returns {{ code: string, desc: string, effects: string[], rounds: number, hidden: boolean, stageNote: string }}
  */
-export function difficultyInfo(roomMode, difficulty) {
+export function difficultyInfo(roomMode, difficulty, opts = {}) {
   const fallback = MODE_TEXT[roomMode === 'solo' ? 'single' : 'multi'][difficulty] || { code: '', desc: '', effects: [] };
   // modeIdFor() lower-cases the difficulty: never call it with a value the server did not validate.
-  const m = DIFFICULTIES.includes(difficulty) ? getMode(modeIdFor(roomMode, difficulty)) : null;
+  const m = !opts.generic && DIFFICULTIES.includes(difficulty) ? getMode(modeIdFor(roomMode, difficulty)) : null;
   const effects = Array.isArray(m?.effectDescList)
     ? m.effectDescList.map((e) => String(e).replace(/^[·•・･\s]+/, '')).filter(Boolean)
     : fallback.effects.map((e) => t(e));
@@ -529,7 +534,8 @@ function EchoDifficultyCard({ difficulty, index, selected, onSelect }) {
   // 用该难度实际会抽的池子算「共 N 张」，别让按钮上的数字跟对局里真抽的对不上
   // （维护者 2026-11-16 第二次反馈）。
   useData(ECHO_STAGES_FILE);
-  const info = difficultyInfo('coop', difficulty);
+  // generic：用通用难度文案，不读当前版本（规程）的模式文案 —— 深潜的 DE-1/2/3 与「规程等级」无关
+  const info = difficultyInfo('coop', difficulty, { generic: true });
   const modeId = modeIdFor('coop', difficulty);
   const pool = echoStagePool(modeId);
   const shown = pool && pool.length ? { ...info, stageNote: stageNote(pool) } : info;
@@ -1262,7 +1268,8 @@ export function EchoSelect({ onClose, onStart, onPublic = null, onQuick = null, 
     const recent = (rows || []).filter((r) => (r.at || 0) >= since);
     return recent.length ? Math.max(...recent.map((r) => r.depth)) : null;
   }, [rows]);
-  const info = difficultyInfo('coop', difficulty);
+  // generic：左下角那段说明也用通用难度文案（不要规程专属的「解锁时可开放至【规程等级 N】」）
+  const info = difficultyInfo('coop', difficulty, { generic: true });
   // 深潜自己的关卡编号：**用简称 `DE`**（DEEP ECHO 的缩写，和右上角副标题一致），从 1 开始。
   // 不用原版的 AC-x：那是全模式共用的编号，深潜只有三档，从 2 起会让人以为漏了第一档。
   const ECHO_CODE_PREFIX = 'DE';
