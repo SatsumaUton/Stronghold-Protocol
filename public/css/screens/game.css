@@ -1716,3 +1716,8 @@ html.sp-deepecho .gicon img {
 .cmd-aim.is-plain .cmd-aim__c { -webkit-mask: none; mask: none; clip-path: polygon(50% 0, 100% 72%, 100% 100%, 50% 32%, 0 100%, 0 72%); }
 .command-draft { display: flex; gap: .16rem; flex-wrap: wrap; }
 .command-draft__card { flex: 1 1 1.8rem; padding: .16rem; border: 1px solid #7fffc966; }
+
+/* 决策界面（机变 / 战术 / 悬赏）打开时，左侧玩家条按 0.4.0 收窄：只留 P1 那枚小牌，
+   加宽的玩家卡片不再压到决策卡片上（维护者 2026-11-16：「都按 0.4.0 收窄」）。
+   .spov 的左内缩本身就是 0.4.0 的 2.8rem（已逐字还原），这里只把多出来的玩家卡片收起来。 */
+.gm.has-sp .team__players { display: none; }
