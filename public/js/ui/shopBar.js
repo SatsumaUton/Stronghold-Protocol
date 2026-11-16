@@ -27,21 +27,20 @@
 // piece (0.2.0, m.private.diy — a DIY slot the player filled, only ever in its own shop) shows the operator — name,
 // portrait, class, the bonds of its factions, the pick's skill and module — with a mint 「自选」 badge.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Icon, HexBadge, TierChip, Tooltip, MicroLabel, Fragment } from './components.js';
 import { OperatorImage, Img, BondGlyph, CoinGlyph, GIcon, RichText } from './gameComponents.js';
 import { priceTone, mergeProgress, mergeTarget, shopBlockReason, chessLoadout, offerHeader, briefingBondTip, ownStandIn, standInLoadout, standInLabel, standInTip, standInForText, ownDiyRecord, diyGetter } from './gameLogic.js';
-import { chessPortraitUrl, itemIconUrl, profIconUrl, profMarkUrl, uiUrl, skillIconUrl, skillRecordIconUrl, moduleTypeIconUrl } from './assetUrls.js';
-import { skinFor, availableSkins } from './skins.js';
+import { itemIconUrl, profIconUrl, profMarkUrl, uiUrl, skillIconUrl, skillRecordIconUrl, moduleTypeIconUrl } from './assetUrls.js';
 import { data, localAsset } from '../data.js';
-import { t } from '../../../shared/i18n.js';
-import { itemText } from './showTags.js';
 import { hotkeyLabelOf, useSettings } from './settings.js';
 import { themePack } from '../uiTheme.js';
 import { mountThemeCharacter } from './themeCharacter.js';
 import { themeCharacterKey } from '../../../shared/uiTheme.js';
 import { regLook, regulationCharacter, regChromeUrls, regChromeStyle, regChromeTheme, regUpgradeModel, regShopCardFaceModel, regShopEmptyCardModel, regShopBackdropModel, regTierViImageStyle, prefabCssRotation } from './regHud.js';
 import { usePrefabPack } from './prefab/view.js';
+import { t } from '../../../shared/i18n.js';
+import { itemText } from './showTags.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -144,7 +143,7 @@ function ArmedTag({ reason, free }) {
  * @param {{ slot:any, idx:number, priv:any, frozen?:boolean, reason?:string|null, free?:boolean, armed?:boolean,
  *   onTap?:(idx:number)=>void, onBuy:Function, onDetail:Function }} props
  */
-export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free = false, armed = false, still = false, faceModel = null, facePack = null, onTap = null, onBuy, onDetail, offBonds = null, bannedBonds = null, reg = false, backing = null }) {
+export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free = false, armed = false, still = false, faceModel = null, facePack = null, onTap = null, onBuy, onDetail, offBonds = null, reg = false, backing = null }) {
   const c0 = data.lookup('chess', slot.id);
   // 0.2.0 自选编队: a DIY slot the player filled is its operator (shared/diy.js, the pick of m.private.diy)
   const diyData = { chess: data.get('chess'), backups: data.get('backups') };
@@ -214,7 +213,7 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
       aria-label=${`${t('{name}，价格 {price}', { name, price: slot.price })}${armed ? (disabled ? t('，无法购买') : t('，再次点击确认')) : ''}`} aria-pressed=${onTap ? String(!!armed) : undefined}>
     <span class="scard__bg" aria-hidden="true"></span>
     <span class="scard__water" aria-hidden="true">${bonds[0] ? html`<${BondGlyph} bondId=${bonds[0]} />` : null}</span>
-    <${Img} src=${skinArtFor(m, c)} class="scard__art" loading="eager" />
+    <${OperatorImage} m=${m} chess=${c} portrait ownerId=${priv?.playerId} class="scard__art" />
     <span class="scard__top">
       <${TierChip} tier=${tier} size="md" />
       <${PriceHex} slot=${slot} free=${free} poor=${reason === t('资金不足')} />
@@ -231,10 +230,7 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
         ${bonds.slice(0, 3).map((b) => {
           const name = data.lookup('bonds', b)?.name || b;
           const off = !!(offBonds && offBonds.has(b)); // a bond this mode never activates (gameLogic modeOffBonds)
-          // 「深渊回响」排异（2026-11-05）：被诅咒禁掉的盟约标红，玩家一眼看出这张卡买了也上不了场
-          const banned = Array.isArray(bannedBonds) && bannedBonds.includes(b);
-          return html`<span key=${b} class=${cx('scard__bond', off && 'is-off', banned && 'is-banned')}
-            title=${banned ? t('深渊排异（诅咒，可购买）：{name} 盟约的干员暂不能上场，解除后可部署', { name }) : (off ? briefingBondTip(name, 'off') : undefined)}><${BondGlyph} bondId=${b} /><span>${name}</span></span>`;
+          return html`<span key=${b} class=${cx('scard__bond', off && 'is-off')} title=${off ? briefingBondTip(name, 'off') : undefined}><${BondGlyph} bondId=${b} /><span>${name}</span></span>`;
         })}
       </span>
       <span class="scard__class">
@@ -504,29 +500,6 @@ export function RewardCards({ offer, priv, editable, onPick, onDetail, onLater, 
  *   reward?: any, onReward?: (idx:number)=>void, onRewardLater?: Function, offBonds?: Set<string>|null }} props — offBonds:
  *   the bonds this mode never activates (gameLogic modeOffBonds), struck through on the operator cards
  */
-// 商店卡立绘：优先使用玩家为该干员选择的皮肤立绘
-function skinArtFor(m, c) {
-  try {
-    // 皮肤键：干员 id（棋盘上的 id 可能带 _2 之类的后缀，需要还原成基础干员 id）
-    // 直接读 localStorage：账号云同步可能在 skinsStore 初始化之后才写入，store 会是旧的
-    const readSkinsMap = () => {
-      try { return JSON.parse(localStorage.getItem('sp.pref.skins') || '{}') || {}; } catch { return {}; }
-    };
-    const map = readSkinsMap();
-    // 干员记录的字段是 charId；棋子的 id 可能带 _2 后缀，两种都试
-    const raw = String((c && (c.charId || c.id)) || '');
-    const candidates = [String((c && c.charId) || ''), raw, raw.replace(/_\d+$/, '')].filter(Boolean);
-    for (const cid of candidates) {
-      if (!cid) continue;
-      const sid = skinFor(cid) || map[cid];
-      if (!sid) continue;
-      const row = availableSkins(cid).find((x) => x.id === sid);
-      if (row && row.portrait) return row.portrait;
-    }
-  } catch { /* 忽略 */ }
-  return chessPortraitUrl(m, c);
-}
-
 /** Official theme character, drawn inside the funds card. No `character` keeps today's box. */
 function FundsChar({ character }) {
   const hostRef = useRef(null);
@@ -574,7 +547,7 @@ function useRegFit(clusterRef, on) {
 }
 
 export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onCollapse, onBuy, onLevel, onRefresh, onFreeze, onDetail, onDetailClose, onRefuse, barRef,
-  reward = null, onReward, onRewardLater, onArm = null, offBonds = null, bannedBonds = null }) {
+  reward = null, onReward, onRewardLater, onArm = null, offBonds = null }) {
   const settings = useSettings();
   const themeCharacter = themePack(settings?.uiTheme)?.character || null;
   // the 规程 shop in 规程, and in every version with 乌萨斯齐心团 / 可露希尔 (§37.206)
@@ -747,8 +720,7 @@ export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onColl
           if (s.sold) return html`<${SoldCard} key=${`s${i}`} face=${emptyFace} />`;
           const reason = shopBlockReason('buy', { config: data.get('config'), priv, editable, slot: s, ...LOOKUPS });
           return html`<${ChessCard} key=${`c${i}:${s.id}`} slot=${s} idx=${i} priv=${priv} frozen=${slotFrozen(s, frozen)} onBuy=${onBuy} onDetail=${onDetail} offBonds=${offBonds}
-                  backing=${covenantBacking} bannedBonds=${bannedBonds}
-                  reason=${reason} armed=${armed === armKey('c', i, s)} onTap=${editable ? (idx) => tapCard('c', idx, s, 'chess', reason, onBuy) : null} />`;
+              backing=${covenantBacking} reason=${reason} armed=${armed === armKey('c', i, s)} onTap=${editable ? (idx) => tapCard('c', idx, s, 'chess', reason, onBuy) : null} />`;
         })}
       </div>`}
       ${showReward ? null : html`<div class="shopbar__item">

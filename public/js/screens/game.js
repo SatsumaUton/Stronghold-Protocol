@@ -1,3 +1,10 @@
+import { EchoBlessing } from '../ui/echoBlessing.js';
+import { EchoBuffBar } from '../ui/echoStatus.js';
+import { EchoSupplyPanel } from '../ui/echoSupply.js';
+import { EchoProjectionPanel } from '../ui/echoProjection.js';
+import { ECHO_STAGES_FILE } from '../ui/echoStages.js';
+import { Danmaku } from '../ui/danmaku.js';
+import { PHONE_QUERY, teamDensity, teamEmoteMode } from '../ui/teamLayout.js';
 import { AiTakeoverPanel } from '../ui/aiTakeover.js';
 // Game screen — every in-match screen, dispatched by m.public.phase (DESIGN §10):
 //   INFO_CHECK → Briefing (screens/briefing.js), BAND_DRAFT → Band draft (screens/bandDraft.js),
@@ -82,13 +89,13 @@ import { AiTakeoverPanel } from '../ui/aiTakeover.js';
 // team row → 前往查看 any player; in 休整期 / 机变 / round start it is shown the first player's board by itself (once per
 // phase). Its pill reads 观战中, never "你已被淘汰"; its exit only leaves the seat (ui/matchChrome.js ExitModal).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { PHASE, GEO } from '../../../shared/constants.js';
 import { ruleOption } from '../../../shared/plugins/rules.js';
 import { html, Spinner, PhaseBanner, ResultDialog, Icon, Button, confirmDialog, closeAllDialogs, useTicker } from '../ui/components.js';
 import { useGameData, GIcon } from '../ui/gameComponents.js';
 import { useFieldView } from '../ui/fieldHost.js';
-import { TopBar, liveLp, ownLeaks, uniteRemaining, tempInfo, tempReadyReason, AfkWarning } from '../ui/hud.js';
+import { TopBar, liveLp, ownLeaks, uniteRemaining, tempInfo, tempReadyReason } from '../ui/hud.js';
 import { BondStrip, BondPopup } from '../ui/bondStrip.js';
 import { TeamPanel } from '../ui/teamPanel.js';
 import { ShopBar } from '../ui/shopBar.js';
@@ -101,12 +108,9 @@ import { DownedPlate, downedDue, preloadDownedArt, downedArtReady } from '../ui/
 import { OfferOverlay, offerBlocksPrep } from '../ui/offerOverlay.js';
 import { ChoiceOverlay, spMarks } from '../ui/choiceOverlay.js';
 import { EnemyDrawer } from '../ui/enemyDrawer.js';
-import { confirmDestroy } from '../ui/destroyConfirm.js';
 import { MatchBondDialog, matchInfoModel, regulationCoreAbsent } from '../ui/matchInfo.js';
 import { Ticker } from '../ui/ticker.js';
 import { EmoteWheel } from '../ui/emotes.js';
-import { Danmaku } from '../ui/danmaku.js';
-import { PHONE_QUERY, teamDensity, teamEmoteMode } from '../ui/teamLayout.js';
 import { BandCommand, CommandDraft } from '../ui/bandCommand.js';
 import { EffectsList } from '../ui/effectsList.js';
 import { CombatHud } from '../ui/combatHud.js';
@@ -152,8 +156,6 @@ import '../ui/pluginFrame.js';
 import { isClientCombat, observeTarget, teammateProgress, cameraLayers, layerCamera, loneHalf, sidesOf, resumedWatch, followedScout } from '../battle/observe.js';
 import { screenStrip, playerBonds, playerLayer, detailBondOwner, toggleBond, popupView } from '../ui/watchBonds.js';
 import { data, getMode, useData } from '../data.js';
-// 本服独有：深渊回响可能抽到「规程·序列Ⅰ」等别的版本的战场，记录在 data/echo-stages.json 里
-import { ECHO_STAGES_FILE } from '../ui/echoStages.js';
 import { audio, resultSpeaker, resultVoiceSlot } from '../audio.js';
 import { useDocClass, FullscreenButton, reducedMotion } from '../ui/device.js';
 import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady, TURN_CUE_WAIT_MS, TURN_CUE_PLATE_WAIT_MS } from '../ui/turnPopup.js';
@@ -161,7 +163,7 @@ import { spTurnCueKey } from '../ui/gameLogic/phases.js';
 // MatchEnded, PausedOverlay, the highlight styles and keepEarly live in ./game/*.js.
 import { HUD_HZ_MS, MERGE_HL, SEL_RANGE, cx } from './game/marks.js';
 import { keepEarly, audioEarly } from './game/early.js';
-import { MatchEnded, PausedOverlay, PauseVoteOverlay, GiveUpVoteOverlay } from './game/overlays.js';
+import { MatchEnded, PausedOverlay } from './game/overlays.js';
 import { inspectRange } from './game/range.js';
 import { t, tParts } from '../../../shared/i18n.js';
 import { buyVoiceTrigger, themeViewSnap } from '../../../shared/uiTheme.js';
@@ -169,12 +171,7 @@ import { noteThemeBuy, noteThemeView, themePack } from '../uiTheme.js';
 import { contentSet } from '../content.js';
 import { DEFAULT_VERSION, roomPluginCs, shownVersion, versionContentStatus } from '../versions.js';
 import { VersionVote } from '../ui/versionVote.js';
-import { EchoBlessing } from '../ui/echoBlessing.js';
-import { EchoBuffBar } from '../ui/echoStatus.js';
-import { EchoSupplyPanel } from '../ui/echoSupply.js';
-import { EchoProjectionPanel } from '../ui/echoProjection.js';
 import { TestConsole } from '../ui/testConsole.js';
-import { isDivePub, diveEntering, diveLoadingData } from '../ui/diveWords.js';
 
 // 作战统计 is opt-in (settings `combatMetrics`, default off). The runner does not import the settings store;
 // this screen pushes the switch. Outside a browser battleRunner is null, so this is a no-op.
@@ -202,17 +199,18 @@ export const BOOT_MIN_MS = 2300;
 export function GameScreen() {
   const pub = useStore((s) => s.match.public);
   const hasResult = useStore((s) => !!s.match.result);
-  // 盟约投影面板 (ui/echoProjection.js) is rendered here, beside the other 深潜 panels: it reads the pick from the
-  // private view (priv.projectionPick). Until 2026-11-07 this line passed a `priv` that this component never declared
-  // (no-undef) — the match screen threw a ReferenceError as soon as a match was entered.
-  const priv = useStore((s) => s.match.private);
+  // 深渊回响（本服）：房间变体或 pub.echo 任一成立就挂深潜面板并切主题（theme.css 的 html.sp-deepecho）
+  const diveRoom = useStore((s) => s.room?.variant === 'deepecho');
+  const dive = !!pub?.echo || diveRoom;
+  useDocClass('sp-deepecho', dive);
   const ended = useStore((s) => !!s.room && !s.room.inMatch && !!s.match.public);
-  // 上一局是怎么没的（server/lobby.js toState 的 endReason）：被打断的对局没有结算帧，
-  // 只能靠这个说对话 —— 管理员终止 ≠ 服务器重启。
-  const endReason = useStore((s) => (s.room && !s.room.inMatch ? s.room.endReason || null : null));
   const away = useStore((s) => s.away, Object.is, awayStore);
   const autoplay = useStore((s) => !!(Array.isArray(s.match.public?.players) && s.match.public.players.find((p) => p && p.playerId === s.me.playerId)?.autoplay));
   const gd = useGameData();
+  // 深渊回响：抽到的图可能不在 data/stages.json 里（规程的 10 张在 data/echo-stages.json），
+  // 只有深潜房订阅它；加载完组件重渲染一次，baseStage 才查得到记录（否则进对局是黑图）。
+  const echoMatch = useStore((s) => !!(s.room && s.room.variant === 'deepecho'));
+  useData(...(echoMatch ? [ECHO_STAGES_FILE] : []));
   // another official version: its checked data on the page first (see the header) — its own set, or the room's set with
   // gameplay plugins built on it (§37.210)
   const version = useStore((s) => { const v = shownVersion(s); return v !== DEFAULT_VERSION ? v : null; });
@@ -220,9 +218,6 @@ export function GameScreen() {
   const versionState = useStore((c) => versionContentStatus(c, version, roomCs), Object.is, contentSet);
   const versionReady = !version || versionState === 'ready';
   const voteRoom = useStore((s) => (s.room?.versionVote && !s.room.inMatch ? s.room : null));
-  // 子节点里要判「测试房房主」与「深渊回响」（见下面的 testHost / dive）
-  const myId = useStore((s) => s.me.playerId);
-  const room = useStore((s) => s.room);
   // 协议启动！'s official sprites (ui/protocolBoot.js), fetched while the briefing and the band draft run
   useEffect(() => { if (gd.ready) preloadBootArt(); }, [gd.ready]);
   // 已选定策略 (PR #643, the event's draft end, video 7:36–7:44): once the draft is over the screen stays DRAFT_HOLD_MS on
@@ -244,16 +239,10 @@ export function GameScreen() {
     const id = setTimeout(() => { hold.current = null; endHold((n) => n + 1); }, Math.max(0, hold.current.until - Date.now()));
     return () => clearTimeout(id);
   }, [held]);
-  // 「深渊回响」：确认本局信息 / 选策略 / 对局中 / 结算 四类界面统一换主题（theme.css 的 html.sp-deepecho）。
-  // 必须放在下面那个 `if (!pub …) return` **之前** —— hooks 不能跟在条件返回后面。
-  // 判据两路取或：`pub.echo`（对局中一定有）**或** 房间 variant（选策略/确认本局信息阶段
-  // pub 里还没有 echo，只靠前者会让整个「选择策略」一屏仍然是绿的 —— 维护者 2026-11-04 实测）。
-  const diveRoom = useStore((s) => s.room?.variant === 'deepecho');
-  useDocClass('sp-deepecho', !!pub?.echo || diveRoom);
   if (!pub || !gd.ready || !versionReady) {
     return html`<div class="screen gload">
       <${Spinner} size="lg" label=${pub ? 'LOADING DATA' : 'ENTERING SIMULATION'} />
-      <p class="t-lo">${versionState === 'failed' && version ? t('版本数据未能通过校验，请刷新页面重试') : pub ? diveLoadingData(isDivePub(pub) || diveRoom) : diveEntering(isDivePub(pub) || diveRoom)}</p>
+      <p class="t-lo">${versionState === 'failed' && version ? t('版本数据未能通过校验，请刷新页面重试') : pub ? t('正在载入模拟数据…') : t('正在进入模拟…')}</p>
     </div>`;
   }
   const mode = phaseMode(pub.phase);
@@ -263,21 +252,11 @@ export function GameScreen() {
   else if (mode === 'diy') body = html`<${DiyCheckScreen} />`;
   else if (mode === 'draft' || held) body = html`<${BandDraftScreen} held=${held} />`;
   else body = html`<${MatchScreen} />`;
-  // 这几个面板只在深渊回响里有内容、别的对局里都返回 null —— 返回 null 的组件没有 _dom，
-  // 排在子节点列表尾部时，尾部一增一删就会 insertBefore(undefined) 崩掉（诊断面板抓到的链：
-  // 「… EchoProjectionPanel < TestConsole < App」）。所以按条件**不挂载**，并且都给稳定 key。
-  const dive = !!pub?.echo || isDivePub(pub) || diveRoom;
-  const testHost = pub?.test === true && myId === room?.hostId;
   return html`${body}
-    ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} key="vervote" room=${voteRoom} class="vervote--float" />` : null}
-    ${dive && !hasResult && mode !== 'result' ? html`<${EchoBlessing} key="echo-blessing" pub=${pub} />` : null}
-    ${dive && !hasResult && mode !== 'result' ? html`<${EchoSupplyPanel} key="echo-supply" pub=${pub} />` : null}
-    ${dive && !hasResult && mode !== 'result' ? html`<${EchoProjectionPanel} key="echo-projection" pub=${pub} priv=${priv} />` : null}
-    ${/* 深潜的深度已顶替 HUD 的回合数字；词条/祝福改放在「本局信息」抽屉里（EchoInfoBlock），
-        不再有浮在屏幕上的状态条挡住 HUD 和按钮（维护者 2026-11-04） */ null}
-    ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} key="away" />` : null}
-    ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} key="ended" reason=${endReason} dive=${dive} />` : null}
-    ${testHost && !hasResult && mode !== 'result' ? html`<${TestConsole} key="test-console" />` : null}`;
+    ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} room=${voteRoom} class="vervote--float" />` : null}
+    ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
+    ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} />` : null}
+    ${!hasResult && mode !== 'result' ? html`<${TestConsole} />` : null}`;
 }
 
 // ---- match screen ----------------------------------------------------------------------------------------
@@ -298,12 +277,7 @@ function MatchScreen() {
   const conn = useStore((s) => s.connection, shallowEqual);
   const emotes = useStore((s) => s.emotes);
   const roomSolo = useStore((s) => s.room?.mode === 'solo');
-  const adminWatchUrl = (() => {
-    try {
-      return /(?:^|[?&])adminWatch=1(?:&|$)/.test(location.search) || !!sessionStorage.getItem('sp_admin_watch_code');
-    } catch { return false; }
-  })();
-  const spectator = useStore((s) => isSpectating(s.room, s.me.playerId)) || adminWatchUrl;
+  const spectator = useStore((s) => isSpectating(s.room, s.me.playerId));
   const playerSettings = useSettings();
   const metricsSetting = playerSettings.combatMetrics === true;
   // the installed official theme's pack (乌萨斯齐心团 / 可露希尔), every version: its bond rings and avatar badges (§37.205:
@@ -334,11 +308,6 @@ function MatchScreen() {
     isHost: !!s.room && s.room.hostId === s.me.playerId,
   }), shallowEqual);
   const gd = useGameData();
-  // 深渊回响：抽到的图可能不在 data/stages.json 里（规程的 10 张在 data/echo-stages.json）。
-  // 只有深潜房才订阅它 —— 那份文件 130KB，普通房不该多下这一个请求。
-  // 订阅到之后本组件重渲染一次，baseStage 才查得到记录（否则「进对局地图一片黑」）。
-  const echoMatch = useStore((s) => !!(s.room && s.room.variant === 'deepecho'));
-  useData(...(echoMatch ? [ECHO_STAGES_FILE] : []));
 
   const hostRef = useRef(null);
   const barRef = useRef(null);
@@ -449,9 +418,6 @@ function MatchScreen() {
   const total = phaseTotalSeconds(pub, gd.config, myId);
   // solo pause: offered in the own battle; while m.public.paused every HUD clock stops at the pause moment
   const paused = isPaused(pub);
-  // 「暂停游戏」的全员投票（m.public.pauseActive）：同样是 m.public.paused（时钟一起停），
-  // 但它有自己的浮层（PauseVoteOverlay，等所有人确认），所以**不**走单人的那块「暂停中 / 继续作战」。
-  const soloPaused = paused && !pub?.pauseActive;
   const pauseSeenRef = useRef(null);
   if (!paused) pauseSeenRef.current = null;
   else if (pauseSeenRef.current == null) pauseSeenRef.current = serverNow();
@@ -510,9 +476,7 @@ function MatchScreen() {
     priv, stage: gd.stage(pub?.stageId), editable, field: deployField, config: data.get('config'),
     getChess: (id) => { const c = gd.chess(id); return ownDiyRecord(c, priv, { chess: data.get('chess'), backups: data.get('backups') }) || c; },
     getToken: gd.token, getItem: gd.item, getEffect: gd.effect, backups: gd.backups, morphMode,
-    // 「深渊回响」部署禁令：贴上禁放地块 / 排异盟约，普通房间是 null
-    echoBans: pub?.echo?.bans || null,
-  }), [priv, pub?.stageId, pub?.echo?.bans, editable, gd.ready, deployField, data.locale(), morphMode]);
+  }), [priv, pub?.stageId, editable, gd.ready, deployField, data.locale(), morphMode]);
   live.current = { pub, priv, field, view, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
 
   // ---- camera: every request goes through setCam, which remembers it for the pen's way back -----------------------
@@ -1216,25 +1180,14 @@ function MatchScreen() {
   // emote bubbles (and a sound for teammates' emotes)
   const bubbleMs = (gd.config?.timers?.chatBubble ?? 3) * 1000;
   const bubbles = activeBubbles(emotes, Date.now(), bubbleMs);
+  // 本服：5–20 人房 / 手机 / 花名册折起时，表情改走弹幕（ui/teamLayout.js teamEmoteMode）
+  const emoteMode = teamEmoteMode({ density: teamDensity({ count: players.length, phone: globalThis.matchMedia?.(PHONE_QUERY)?.matches === true }), open: false });
   useTicker(bubbles.size ? 500 : 0); // re-render only while a bubble is showing (to expire it)
   const lastEmote = useRef(emotes.length ? emotes[emotes.length - 1].seq : 0);
   useEffect(() => {
     const e = emotes[emotes.length - 1];
     if (e && e.seq > lastEmote.current) { lastEmote.current = e.seq; if (e.playerId !== myId) audio.sfx('emote', { volume: 0.6 }); }
   }, [emotes]);
-
-  // 5–20 人房 / 手机 / 折起的花名册：表情改走弹幕（ui/danmaku.js），房间行里不再挂气泡。
-  const [teamRosterOpen, setTeamRosterOpen] = useState(true);
-  const [phoneNow, setPhoneNow] = useState(() => !!globalThis.matchMedia?.(PHONE_QUERY)?.matches);
-  useEffect(() => {
-    const mq = globalThis.matchMedia?.(PHONE_QUERY);
-    if (!mq) return undefined;
-    const onChange = (e) => setPhoneNow(e.matches);
-    if (mq.addEventListener) mq.addEventListener('change', onChange);
-    else mq.addListener?.(onChange);
-    return () => { if (mq.removeEventListener) mq.removeEventListener('change', onChange); else mq.removeListener?.(onChange); };
-  }, []);
-  const emoteMode = teamEmoteMode({ density: teamDensity({ count: players.length, phone: phoneNow }), open: teamRosterOpen });
 
   // ---- actions ----------------------------------------------------------------------------------------------
   const buy = useCallback(async (i) => {
@@ -1298,8 +1251,8 @@ function MatchScreen() {
       // an equipped item is locked (the server refuses g.destroy): replacing it is the equip-replace dialog's job
       if (!itemDestroyable(live.current.placeCtx, piece.uid)) { toast(t('已配发的装备无法销毁'), 'warn'); audio.sfx('error', { volume: 0.5 }); return false; }
       const it = data.lookup('items', piece.id);
-      // 设置「销毁道具前确认」：提示框里勾了「下次不再提醒」就关掉，之后直接销毁（ui/destroyConfirm.js）
-      if (await confirmDestroy(it?.name || t('道具')) && await actions.destroy(piece.uid)) { closeIt(); return true; }
+      const ok = await confirmDialog({ title: t('销毁道具'), text: t('道具无法出售。确定要销毁「{name}」吗？', { name: it?.name || t('道具') }), okText: t('销毁'), danger: true });
+      if (ok && await actions.destroy(piece.uid)) { closeIt(); return true; }
       return false;
     }
     if (await actions.sell(piece.uid)) { closeIt(); return true; }
@@ -1345,7 +1298,7 @@ function MatchScreen() {
     const L = live.current;
     if (isClientCombat(L.pub)) {
       const observing = !!L.watching && L.watching !== L.home && L.watching !== ownFieldId(L.myId);
-      const t = observeTarget(p, L.pub, L.myId, { observing });
+      const t = observeTarget(p, L.pub, L.myId, { observing, ownDone: L.localDone });
       if (t.back) { backHome(); return; }
       if (t.reason) { toast(t.reason, 'warn'); audio.sfx('error', { volume: 0.5 }); return; }
       if (t.fieldId) requestWatch(t.fieldId, p.playerId);
@@ -1374,30 +1327,6 @@ function MatchScreen() {
   // Until 0.2.0 every round's reset dropped an eliminated player onto its own empty board (a spectator seat asked for
   // the first player itself).
   const followRef = useRef(null);
-  // 隐藏观战：进入模拟后自动打开 P1，避免停在“选择干员”页。
-  const autoP1Ref = useRef(false);
-  useEffect(() => {
-    if (!adminWatchUrl || !spectator || autoP1Ref.current || watching || !pub) return;
-    const first = (Array.isArray(pub.players) ? pub.players : [])
-      .find((p) => p && p.playerId && p.playerId !== myId && p.alive !== false && p.left !== true);
-    if (!first) return;
-    const f = (Array.isArray(pub.fields) ? pub.fields : [])
-      .find((x) => x && Array.isArray(x.players) && x.players.includes(first.playerId));
-    if (f && typeof f.fieldId === 'string') {
-      autoP1Ref.current = true;
-      setWatching(f.fieldId);
-      setWatchWho({ fieldId: f.fieldId, playerId: first.playerId });
-      actions.watch(f.fieldId, first.playerId).catch(() => { autoP1Ref.current = false; });
-      return;
-    }
-    if (phase === PHASE.PREP && !field) {
-      autoP1Ref.current = true;
-      const fid = 'n:' + first.playerId;
-      setWatching(fid);
-      setWatchWho({ fieldId: fid, playerId: first.playerId });
-      actions.watch(fid).catch(() => { autoP1Ref.current = false; });
-    }
-  }, [adminWatchUrl, spectator, watching, pub, field, phase, myId]);
   useEffect(() => {
     const fid = followedScout({ field, watching, alive, spectator, myId });
     if (!fid || !pub) return;
@@ -1583,29 +1512,6 @@ function MatchScreen() {
     if (!still) closeReplace(null);
   }, [replace, placeCtx, editable]);
   useEffect(() => () => { const cur = replaceRef.current; replaceRef.current = null; try { cur?.resolve(null); } catch { /* ignore */ } }, []);
-
-  // ---- 「暂停游戏」的全员投票（g.pauseVote / g.pauseResume；m.public.pauseVote / pauseActive）--------------------------
-  const [pauseVoteBusy, setPauseVoteBusy] = useState(false);
-  const votePause = useCallback(async (agree) => {
-    setPauseVoteBusy(true);
-    await actions.pauseVote(agree);
-    setPauseVoteBusy(false);
-  }, []);
-  const confirmPauseResume = useCallback(async () => {
-    setPauseVoteBusy(true);
-    await actions.pauseResume();
-    setPauseVoteBusy(false);
-  }, []);
-
-  // ---- 「放弃深潜」的全员投票（g.echoGiveUp；m.public.echo.giveUp）------------------------------------
-  // 维护者 2026-11-08：这块以前只画在放大镜 → 深渊回响 抽屉最下面，发起之后面板一关就看不见了。
-  // 现在和「暂停游戏」一样是盖在整局上的浮层（GiveUpVoteOverlay），投票一开自动出现。
-  const [giveUpBusy, setGiveUpBusy] = useState(false);
-  const voteGiveUp = useCallback(async (agree) => {
-    setGiveUpBusy(true);
-    await actions.echoGiveUpVote(agree);
-    setGiveUpBusy(false);
-  }, []);
 
   // ---- solo pause (g.pause; m.public.paused) ---------------------------------------------------------------------------
   const togglePause = useCallback(async (on) => {
@@ -1921,17 +1827,7 @@ function MatchScreen() {
         else if (act === 'sell' && available?.sell != null) await sellOwnPiece(uid);
         return;
       }
-      // 销毁道具（设置 → 快捷键「销毁道具（选中优先）」，默认 G）：只对道具 / 技艺生效，干员走「出售」
-      if (act === 'destroy') {
-        if (!L.showPrep || L.drag || L.facing || L.selBusy || L.pen || pointer?.buttons) return;
-        const uid = L.sel ? L.sel.uid : pointer ? L.view?.pieceAtClientPoint(pointer.x, pointer.y) : null;
-        const target = Number.isInteger(uid) ? L.placeCtx.pieces.get(uid) : null;
-        if (target?.piece.kind !== 'item') return;
-        if (!itemDestroyable(L.placeCtx, uid)) { toast(t('已配发的装备无法销毁'), 'warn'); audio.sfx('error', { volume: 0.5 }); return; }
-        await sellOwnPiece(uid); // item → 销毁（确认框由 ui/destroyConfirm.js 决定弹不弹）
-        return;
-      }
-    const reason = shopBlockReason(act, { config: data.get('config'), priv: L.priv, editable: L.editable });
+      const reason = shopBlockReason(act, { config: data.get('config'), priv: L.priv, editable: L.editable });
       if (reason) { audio.sfx('error', { volume: 0.5 }); return; }
       if (act === 'refresh') actions.refresh();
       else if (act === 'freeze') actions.freeze();
@@ -1991,13 +1887,6 @@ function MatchScreen() {
     stripOwnerRef.current = strip.ownerId;
     setBondOpen((b) => (b && (b.from === 'strip' || b.from === 'info') ? null : b));
   }, [strip.ownerId]);
-  // 「盟约投影」每人各自选（维护者 2026-11-07）：屏幕上是**谁的**状态，投影就按那位取 ——
-  // 观战 / 前往查看 / 联防半边 / 被淘汰后自动观战都算（`strip.ownerId` 已经是「盟约条显示的是谁的盟约」，
-  // 比只看 `watching` 覆盖得全）。HUD 的 buff 栏、已获祝福列表、干员卡上的投影徽章都读这个值，
-  // 这样观战玩家看到的内容和对局中的玩家完全一致。
-  const stripOwner = strip.self ? null : (strip.ownerId || null);
-  useEffect(() => { store.patch('ui', { watchTarget: stripOwner }); }, [stripOwner]);
-  useEffect(() => () => store.patch('ui', { watchTarget: null }), []);
   // the popup shows the player it was opened for (ui/watchBonds.js popupView): their entry + live layers, their name,
   // and as members your pieces or their operators on the field on screen — under client-side combat the battle's own
   // (the runner's field meta is taken before they deploy); a battle sends no bench (a prep scout does: ownerBoard)
@@ -2065,8 +1954,6 @@ function MatchScreen() {
     snapshot: snapUnitsRef.current.get(resolved?.unitId),
     live: typeof liveStats === 'function' ? liveStats() : liveStats,
     loadout: detailLoadout, getChess: gd.chess, backups: gd.backups,
-    // 深渊祝福改攻击范围的（「远程」+1）：准备阶段没有 live 范围，靠它把预览画对
-    echoExtend: (Array.isArray(pub?.echo?.blessings) ? pub.echo.blessings : []).reduce((n, b) => n + (Number(b.rangeExtend) || 0), 0),
   }) : null;
   const cardRangeKey = cardRange ? JSON.stringify(cardRange) : '';
   useEffect(() => {
@@ -2097,7 +1984,7 @@ function MatchScreen() {
     bonds: data.list('bonds'), chess: (id) => data.lookup('chess', id), mode: getMode(pub?.modeId),
   }) : null;
 
-    return html`<div class=${cx('screen', 'gm', `gm--${mode}`, pub?.playerCapacity > 4 && 'gm--expanded', regView && 'gm--reg', isBossPhase(phase) && 'is-boss', drag && 'is-dragging', barCollapsed && 'is-collapsed', deployPartial && 'is-deploy-partial', (sp || hasPersonalChoice || offerBlocksPrep(pub?.offers)) && 'has-sp', sp && 'has-spdraft', pen && 'is-pen', readyWhy && 'has-readywhy')}
+  return html`<div class=${cx('screen', 'gm', `gm--${mode}`, pub?.playerCapacity > 4 && 'gm--expanded', regView && 'gm--reg', isBossPhase(phase) && 'is-boss', drag && 'is-dragging', barCollapsed && 'is-collapsed', deployPartial && 'is-deploy-partial', (sp || hasPersonalChoice || offerBlocksPrep(pub?.offers)) && 'has-sp', sp && 'has-spdraft', pen && 'is-pen', readyWhy && 'has-readywhy')}
       data-camera=${pen ? 'pen' : camKind}>
     <div class="gm__field" ref=${hostRef} onContextMenu=${(e) => e.preventDefault()}></div>
     ${viewKind === 'loading' ? html`<div class="gm__loading"><${Spinner} label="LOADING FIELD" /></div>` : null}
@@ -2107,6 +1994,11 @@ function MatchScreen() {
     ${showPrep && view && viewKind !== 'loading' && priv && !pen ? html`<${StandInTags} view=${view} priv=${priv} getChess=${gd.chess} backups=${gd.backups} diyData=${{ chess: data.get('chess'), backups: data.get('backups') }} />` : null}
 
     <div class=${cx('gm__hud', hudIn && `is-${hudIn}`)} ref=${hudElRef}>
+      ${dive && !hasResult && mode !== 'result' ? html`<${EchoBlessing} key="echo-blessing" pub=${pub} />` : null}
+      ${dive && !hasResult && mode !== 'result' ? html`<${EchoSupplyPanel} key="echo-supply" pub=${pub} />` : null}
+      ${dive && !hasResult && mode !== 'result' ? html`<${EchoProjectionPanel} key="echo-projection" pub=${pub} priv=${priv} />` : null}
+      <${EchoBuffBar} pub=${pub} />
+      ${emoteMode === 'danmaku' ? html`<${Danmaku} players=${players} myId=${myId} ttl=${bubbleMs} />` : null}
       <${TopBar} pub=${pub} priv=${priv} conn=${conn} hud=${hud} total=${total} drawer=${drawer}
         onExit=${() => setExitOpen(true)} onDrawer=${(t) => setDrawer((d) => (d ? null : t))} onReady=${toggleReady}
         readyBusy=${readyBusy} readyCount=${readyCount} playerCount=${solo ? 1 : aliveCount}
@@ -2114,9 +2006,7 @@ function MatchScreen() {
         pause=${canPause || paused ? { show: canPause, paused, busy: pauseBusy, onToggle: () => togglePause(!paused) } : null}
         live=${liveLpNow} spectator=${spectator}
         spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom}
-        onPauseVote=${pub?.pauseVote && !spectator ? votePause : null}
-        effectsSlot=${html`<div class="gm__effects"><${EffectsList} effects=${viewedEffects} command=${showPrep && priv?.command && !spectator ? html`<${BandCommand} command=${priv.command} priv=${priv} view=${view} editable=${editable} />` : null} /></div>`}
-        held=${hudIn === 'wait'} onSpeedVote=${actions.speedVote} />
+        held=${hudIn === 'wait'} />
 
       <div class=${cx('gm__bonds', pfBondRings && 'gm__bonds--pf')} style=${pfBondRings || null}>
         <button type="button" class="bonds-toggle" aria-expanded=${!bondsCollapsed} aria-controls="match-bond-strip"
@@ -2138,15 +2028,10 @@ function MatchScreen() {
       <${TeamPanel} pub=${pub} myId=${myId} watching=${watchingNow} bubbles=${bubbles} onWatch=${watchPlayer} cap=${gd.config?.lpCapPerRound ?? 10} uniteLocal=${uniteLocal}
         spMarks=${sp ? spMarks(sp, { solo }) : null}
         self=${Number.isFinite(priv?.lp) ? { lp: priv.lp, pending: liveLpNow.pending, unite: liveLpNow.unite, left: liveLpNow.left } : null}
-            observe=${cc ? { canObserve: (p) => observeTarget(p, pub, myId, { observing: watchingOther, ownDone: localDone }), observing: watchingOther, onBack: backHome } : null}
-            onRosterOpen=${setTeamRosterOpen}
-            badges=${teamBadges} />
+        observe=${cc ? { canObserve: (p) => observeTarget(p, pub, myId, { observing: watchingOther, ownDone: localDone }), observing: watchingOther, onBack: backHome } : null}
+        badges=${teamBadges} />
 
-      ${/* 效果栏（策略 / 机变 / 团队增益 / 道具）现在排在右上角那一列的最后（见上面 effectsSlot）：
-             它以前是这里的一块绝对定位，top 写死 2.4rem，和那一列的高度是两份互不相干的数字 ——
-             那一列加了「暂停游戏」这颗按钮之后，第一个图标（策略）正好压在按钮上（维护者 2026-11-08 反馈）。 */ null}
-
-      ${emoteMode === 'danmaku' ? html`<${Danmaku} players=${players} myId=${myId} ttl=${bubbleMs} />` : null}
+      <div class="gm__effects"><${EffectsList} effects=${viewedEffects} command=${showPrep && priv?.command && !spectator ? html`<${BandCommand} command=${priv.command} priv=${priv} view=${view} editable=${editable} />` : null} /></div>
 
       ${watchingOther && !combat ? html`<div class="gm__watching" role="status">
         <${GIcon} name="eye" /><span>${tParts('正在查看 {name} 的阵地（只读）', { name: html`<b>${watchedName}</b>` })}</span>
@@ -2154,7 +2039,7 @@ function MatchScreen() {
       </div>` : null}
 
       ${showShop ? html`<${ShopBar} priv=${priv} editable=${editable} collapsed=${barCollapsed} refreshBusy=${refreshBusy} onCollapse=${setCollapsed}
-        barRef=${barRef} offBonds=${offBonds} bannedBonds=${pub?.echo?.bans?.bonds || null}
+        barRef=${barRef} offBonds=${offBonds}
         onBuy=${buy} onLevel=${() => actions.levelUp()} onRefresh=${() => actions.refresh()} onFreeze=${() => actions.freeze()}
         onDetail=${(id, kind, hint) => setDetail({ kind: kind === 'item' ? 'item' : 'chess', id, hint: hint || null, tap: ++cardTap.current })}
         onDetailClose=${() => setDetail((d) => (d?.kind === 'chess' || d?.kind === 'item' ? null : d))}
@@ -2167,9 +2052,7 @@ function MatchScreen() {
 
       ${combat || mode === 'settle' ? html`<${CombatHud} pub=${pub} myId=${myId} watching=${watchingNow} hud=${hud} myDone=${!!myDone && alive}
         spectating=${!alive} spectator=${spectator} onWatch=${watchField}
-        client=${cc ? { progress, observing: observingName ? { name: observingName } : null, onBack: alive ? backHome : null, layers, layer, onLayer: setLayer,
-          // 战斗中观战队友: the own battle keeps running off screen — the HUD says so under the observing pill
-          ownRunning: phase === PHASE.COMBAT && !!alive && !spectator && !myDone } : null} />` : null}
+        client=${cc ? { progress, observing: observingName ? { name: observingName } : null, onBack: alive ? backHome : null, layers, layer, onLayer: setLayer } : null} />` : null}
 
       ${showDeadPill(alive, phase) ? (spectator
         ? html`<div class="gm__dead gm__dead--spectator" role="status"><${GIcon} name="eye" />${t('观战中 · 点击左侧成员头像切换查看')}</div>`
@@ -2206,8 +2089,8 @@ function MatchScreen() {
         onBond=${id => openBond(id, strip.ownerId, 'info')}
         onEnemy=${(k, n) => setDetail({ kind: 'enemy', id: k, count: n })} onChess=${(id) => setDetail({ kind: 'chess', id, foreign: true })} />` : null}
 
-        ${bondPop ? html`<${bondOpen?.from === 'info' ? MatchBondDialog : BondPopup} bondId=${bondPop.bondId} entry=${bondPop.entry} priv=${bondPop.priv} banned=${pub?.bannedChess || []} owner=${bondPop.name} ownerId=${bondPop.ownerId}
-          off=${offBonds.has(bondPop.bondId)} echoBanned=${Array.isArray(pub?.echo?.bans?.bonds) && pub.echo.bans.bonds.includes(bondPop.bondId)} coreAbsent=${regulationCoreAbsent(bondInfo, bondPop.bondId)} morphMode=${morphMode}
+      ${bondPop ? html`<${bondOpen?.from === 'info' ? MatchBondDialog : BondPopup} bondId=${bondPop.bondId} entry=${bondPop.entry} priv=${bondPop.priv} banned=${pub?.bannedChess || []} owner=${bondPop.name} ownerId=${bondPop.ownerId}
+        off=${offBonds.has(bondPop.bondId)} coreAbsent=${regulationCoreAbsent(bondInfo, bondPop.bondId)} morphMode=${morphMode}
         place=${bpPlace} over=${!!resolved && bpPlace === dSide}
         onClose=${() => setBondOpen(null)} onMember=${(id, items, standInFor, diy) => {
           if (bondOpen?.from === 'info') { setBondOpen(null); setDrawer(null); }
@@ -2225,15 +2108,6 @@ function MatchScreen() {
         name=${(selEntry.piece.kind === 'item' ? gd.item(selEntry.piece.id) : selEntry.piece.kind === 'token' ? gd.token(selEntry.piece.id) : ownShown(selEntry.piece.id))?.name || ''}
         onRetreat=${retreatSel} onSell=${sellSel} onDestroy=${sellSel} />` : null}
     </div>
-
-    ${/* 「深渊回响」常驻词条栏：**必须留在 .gm 里**（维护者 2026-11-08，玩家反馈「有广播时只能点到抽屉按钮的
-         上半部分」）。它原来是屏幕包装层里 `<${MatchScreen}/>` 的**兄弟**（.screen 是 z-index 1 的独立层叠
-         上下文），于是 `position: fixed; z-index: 2` 的它其实压在**整个游戏画面**之上 —— 里面 pointer-events:
-         auto 的圆片 / 「本回合诅咒」提示条（宽 100%）正好落在抽屉标签页上，把下半部分吃掉点击。
-         2026-11-07 那次「z-index 8 → 2」比较的是不同层叠上下文里的数字（.gm__hud 的 3 在 .gm 里面），
-         所以从来没有真的把它压到 HUD 下面。放进 .gm 之后 2 < 3 才有意义：在战场之上、HUD 与抽屉之下。 */ ''}
-    ${/* 自己会在「没有深潜深度 / 没有词条」时返回 null，这里不用再判阶段 */ ''}
-    <${EchoBuffBar} pub=${pub} />
 
     ${showPrep && priv?.commandDraft && !spectator ? html`<${CommandDraft} key=${priv.commandDraft.id} draft=${priv.commandDraft} />` : null}
     ${hasOffers && !sp && !personalChoice ? html`<${OfferOverlay} pub=${pub} myId=${myId} readOnly=${spectator || !alive} onAction=${actions.offer} />` : null}
@@ -2276,25 +2150,18 @@ function MatchScreen() {
       myId=${myId} onDone=${() => setBossPlate(null)} />`
       : bossPlate?.kind === 'core' ? html`<${HiddenCorePlate} key=${bossPlate.key} bossId=${pub?.hiddenBossId} onDone=${() => setBossPlate(null)} />`
       : bossPlate?.kind === 'end' ? html`<${EndPlate} key=${bossPlate.key} kind=${bossPlate.end} bossId=${pub?.bossId} hiddenBossId=${pub?.hiddenBossId}
-        dive=${isDivePub(pub)} onDone=${() => setBossPlate(null)} />` : null}
+        onDone=${() => setBossPlate(null)} />` : null}
 
     ${facing && view ? html`<${FacingWheel} key=${`${facing.uid}:${facing.row},${facing.col}`} view=${view} row=${facing.row} col=${facing.col}
       grid=${facing.grid} healing=${facing.healing} name=${facing.name} onPreview=${previewFacing} onCommit=${commitFacing} onCancel=${cancelFacing} />` : null}
 
-    ${soloPaused ? html`<${PausedOverlay} canResume=${solo} busy=${pauseBusy} onResume=${() => togglePause(false)} onExit=${() => setExitOpen(true)} />` : null}
-    ${/* 「暂停游戏」的全员投票：暂停中盖整局，每个在线队友各点一次「继续游戏」（维护者 2026-11-08） */ null}
-    ${pub?.pauseActive ? html`<${PauseVoteOverlay} active=${pub.pauseActive} players=${pub.players} myId=${myId}
-      busy=${pauseVoteBusy} onResume=${confirmPauseResume} />` : null}
-    ${/* 「放弃深潜」的全员投票：投票一开就盖整局（维护者 2026-11-08，以前只在放大镜抽屉最下面） */ null}
-    ${!spectator && pub?.echo?.giveUp ? html`<${GiveUpVoteOverlay} vote=${pub.echo.giveUp} players=${pub.players}
-      myId=${myId} busy=${giveUpBusy} onVote=${voteGiveUp} />` : null}
+    ${paused ? html`<${PausedOverlay} canResume=${solo} busy=${pauseBusy} onResume=${() => togglePause(false)} onExit=${() => setExitOpen(true)} />` : null}
 
     ${replace ? html`<${EquipReplaceDialog} request=${replace.request} getItem=${gd.item}
       onConfirm=${(uid) => closeReplace(uid)} onCancel=${() => closeReplace(null)} />` : null}
 
     <${SettingsModal} open=${settingsOpen} onClose=${() => setSettingsOpen(false)} />
-    <${AfkWarning} pub=${pub} priv=${priv} />
     <${DownedPlate} open=${downed} onWatch=${() => setDowned(false)} onLeave=${() => { setDowned(false); setExitOpen(true); }} />
-    ${exitOpen ? html`<${ExitModal} open=${true} onClose=${() => setExitOpen(false)} solo=${solo} />` : null}
+    <${ExitModal} open=${exitOpen} onClose=${() => setExitOpen(false)} solo=${solo} />
   </div>`;
 }
