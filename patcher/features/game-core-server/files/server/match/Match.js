@@ -749,7 +749,12 @@ export class Match {
       const held = new Set();
       for (const ps of this.order) {
         const band = wanted.get(ps.playerId);
-        if (!ps.isBot || !band || held.has(band) || !this.gd.bandAllowed(band)) continue;
+        if (!ps.isBot || !band || !this.gd.bandAllowed(band)) continue;
+        // ★ 2026-11-16（玩家反馈「5–20 人房勾了允许重复选择策略、给两个 AI 预选同一个策略，
+        //   进游戏后 AI 却各选各的」）：这里以前无条件 `held.has(band)` 去重，把「允许重复」
+        //   判定在外 —— 房主指定的第二个策略被直接丢掉，那个 AI 座位于是退回自己挑（不重复）。
+        //   现在与 phases.js 的 bandTaken() 同一条口径：allowRepeat 下允许多个 AI 拿同一个。
+        if (!this.allowRepeat && held.has(band)) continue;
         held.add(band);
         this.botBands.set(ps.playerId, band);
       }

@@ -164,7 +164,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 74775
+        "customBytes": 75317
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -1342,7 +1342,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 74775
+        "customBytes": 75317
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -1874,7 +1874,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 74775
+        "customBytes": 75317
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -6983,7 +6983,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 74775
+        "customBytes": 75317
       },
       {
         "path": "server/match/PlayerState.js",
