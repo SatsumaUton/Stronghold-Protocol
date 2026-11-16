@@ -50,12 +50,7 @@ import { REGULATION_INSTALLERS, runChild, inGarrisonRange, grantBondRange } from
 const ids = (s) => String(s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
 const EMPTY = Object.freeze([]);
 /** Status keys for check_ab_flag values used by the data (16 = 冻结). */
-const AB_FLAG_STATUS = Object.freeze({
-  16: 'freeze',
-  // 33 = 恐惧 / 诱导（妮芙系干员「溃心领域」的判定）：**缺这一条**会让 ?? 'freeze' 兜底把 33 当成冻结，
-  // 特质在恐惧期间永远不触发（玩家反馈「妮芙不能触发特质叠层」，2026-11-16 定位到本表）。
-  33: 'fear',
-});
+const AB_FLAG_STATUS = Object.freeze({ 16: 'freeze' });
 
 function garrisonIdsOf(u) {
   const list = u?.def?.raw?.garrisonIds ?? u?.def?.garrisonIds;
