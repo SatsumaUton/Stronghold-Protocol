@@ -2353,3 +2353,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 }
 .fb-notice__close:hover { color: var(--text-hi, #fff); border-color: rgba(255, 255, 255, .45); }
 .fb-notice__close .icon { width: calc(.14 * var(--t)); height: calc(.14 * var(--t)); }
+
+/* 安卓 APP 安装提示（public/js/ui/androidApp.js 的 AndroidAppPrompt） */
+.android-app__body { display: grid; gap: 0.5rem; line-height: 1.65; }
+.android-app__ver { color: #7f9a92; font-size: 0.92em; }
+.android-app__actions { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap; }
