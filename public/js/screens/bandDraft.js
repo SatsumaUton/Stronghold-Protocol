@@ -47,6 +47,7 @@ import { actions, act } from '../ui/gameActions.js';
 import { normalizeDraft, sortedPlayers, draftMyTurn, pregameStepCount, pregameStepIndex } from '../ui/gameLogic.js';
 import { useStore } from '../store.js';
 import { data } from '../data.js';
+import { ECHO_STAGES_FILE, echoStagePool } from '../ui/echoStages.js';
 import { audio } from '../audio.js';
 import { TurnBanner, TURN_BANNER_LATE_MS } from '../ui/turnBanner.js';
 import { onBootArt, preloadBootArt } from '../ui/protocolBoot.js';
@@ -330,7 +331,12 @@ export function BandDraftScreen({ held = null } = {}) {
   // 新版把战场信息放在「本局信息」里，这一块留着只是占位、还容易让人以为要按它选。
   const draftVersion = useStore(shownVersion);
   const hideDraftMap = seasonOf(draftVersion) === REGULATION_SEASON;
-  const stagePool = stagePoolLine(mode);
+  // 深渊回响的战场池按难度分（data/echo-stages.json 的 pools），张数不等于当前版本 config 的
+  // stages 长度（决斗/深渊只有 7 张，实际 16 张）—— 这里用深潜自己的池子，维护者 2026-11-16。
+  useData(ECHO_STAGES_FILE);
+  const echoMatch = useStore((s) => !!(s.room && s.room.variant === 'deepecho'));
+  const echoPool = echoMatch ? echoStagePool(pub?.modeId) : null;
+  const stagePool = stagePoolLine(mode, echoPool ? echoPool.length : undefined);
   const players = sortedPlayers(pub);
   const draft = normalizeDraft(pub?.draft, players);
   const myPick = draft.picks.get(myId) || priv?.bandId || null;

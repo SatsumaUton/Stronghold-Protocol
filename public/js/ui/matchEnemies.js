@@ -32,8 +32,9 @@ export const leaderBlockOf = (el) => el.closest('.brief-enemy')?.querySelectorAl
 
 /** 该模式的战场池（config.json modes[].stages）：标准永远是战场#01，险境+ 随机抽一张。
  *  @param {any} mode */
-export function stagePoolLine(mode) {
-  const poolN = Array.isArray(mode?.stages) ? mode.stages.length : 0;
+export function stagePoolLine(mode, overrideN) {
+  // overrideN：深渊回响用（它按难度分池，张数不等于当前版本 config 的 stages 长度）
+  const poolN = Number.isInteger(overrideN) ? overrideN : Array.isArray(mode?.stages) ? mode.stages.length : 0;
   return poolN > 1 ? t('战场随机（共{poolN}张）', { poolN }) : poolN === 1 ? t('战场固定') : '';
 }
 
