@@ -3602,15 +3602,18 @@ fetch('/mm/api/tips', { cache: 'no-store' })
   // 两者都不会改变服务端权限，只是把入口正确地显示出来。
   let __spRoleCache = null;      // 已确认的角色（'owner' / 'admin' / 'player' …）
   let __spRoleProbe = null;      // 进行中的探测 Promise
+  // 未登录时这个探测会被 1.5s 循环反复触发 → 一片 401（维护者 2026-11-16）。探到没有会话就记住，本页不再重探。
+  let __spRoleNone = false;
   function currentRole() {
     const known = (typeof window !== 'undefined' && window.__SP_ACCOUNT_ROLE) || '';
     if (known) return known;
     if (__spRoleCache) return __spRoleCache;
+    if (__spRoleNone) return '';
     if (!__spRoleProbe) {
       __spRoleProbe = (async () => {
         try {
           const r = await fetch('/mm/api/auth/me', { credentials: 'same-origin', cache: 'no-store' });
-          if (!r.ok) return '';
+          if (!r.ok) { __spRoleNone = r.status === 401 || r.status === 403; return ''; }
           const j = await r.json();
           const role = (j && j.user && j.user.role) || '';
           if (role) {
