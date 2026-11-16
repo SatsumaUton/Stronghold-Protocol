@@ -446,7 +446,7 @@ function ItemProgress({ progress }) {
   return label ? html`<p class="ditem__progress">${t('出售干员')} <strong>${label}</strong></p>` : null;
 }
 
-export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bonds, offBonds = null, loadout, onBond, live = null, hint = null, unitItems = null, unitItemProgress = null, standIn = null, diy = null, cultOpts = null, morphMode = 'official', onUnequip = null, ownerId, skin = null }) {
+export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bonds, offBonds = null, loadout, onBond, live = null, hint = null, unitItems = null, unitItemProgress = null, standIn = null, diy = null, cultOpts = null, morphMode = 'official', onUnequip = null, ownerId, skin = null, echo = null, meId = null, watchTarget = null }) {
   const m = data.get('assets');
   const hp = hpOf(live, snapHp);
   // 0.2.0 自选编队: `chess` is then the composed 自选 record (the operator, the slot's tier / price); its skill and module are
@@ -481,10 +481,8 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, onSell, bond
   // 「盟约投影」（维护者 2026-11-05）：投影对所有**已部署到场上**的己方干员生效，
   // 所以只在棋盘上的干员卡上挂一条徽章（像「变形同构体」那样，角标写「投影」）。
   // 备战区（手牌第 7 行 / 临时区第 8 行）的干员还没上场，不挂。
-  const meId = useStore((s) => s.me.playerId);
-  const echo = useStore((s) => s.match?.public?.echo || null);
+  // `meId` / `echo` / `watchTarget` 由 DetailPanel 从 store 读出传进来 —— 本组件保持纯函数（测试直接调用它）。
   // 观战 / 前往查看：卡片可能属于**别人**，投影要按那位玩家取（`watchTarget` 由 screens/game.js 按屏幕上的盟约主人发布）
-  const watchTarget = useStore((s) => s.ui?.watchTarget || null);
   // 「盟约投影」：三条同源数据里取第一条拿得到的 ——
   //   ① `echo.projections[那位玩家]`（每人各自选，2026-11-07：服务端按 playerId 下发）
   //      自己的卡 = 自己那条；观战队友的卡 = **他**那条（否则看到的内容和对局中玩家不一致）
@@ -980,6 +978,10 @@ export function selectVoiceKey(detail) {
  */
 export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestroy, bonds = [], offBonds = null, loadout = null, ops = null, onBond = null, side = 'left', shopOpen = false, live = null, bondTimers = null, voice = false, morphMode = 'official', onUnequip = null, unequipAllowed = false }) {
   const getter = typeof live === 'function' ? live : null;
+  // 「盟约投影」：ChessDetail 是纯函数（测试直接调用），三份 store 状态在这里读、按 props 传下去
+  const meId = useStore((s) => s.me.playerId);
+  const echo = useStore((s) => s.match?.public?.echo || null);
+  const watchTarget = useStore((s) => s.ui?.watchTarget || null);
   useTicker(detail && (getter || bondTimers) ? 250 : 0);
   // 选中干员 voice (audio.voice 'select'): once per opened operator — the panel stays mounted while the target changes,
   // so the key carries what identifies it (its chess record, its piece / battle unit id, the card tap: selectVoiceKey)
@@ -1010,9 +1012,10 @@ export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestr
     <button type="button" class="dpanel__close" aria-label=${t('关闭')} onClick=${onClose}><${Icon} name="close" /></button>
     <div class="dpanel__scroll">
       ${bondTimers ? html`<${BondTimers} rows=${bondTimers()} />` : null}
-      ${detail.type === 'chess' ? html`<${ChessDetail} chess=${detail.chess} ownerId=${detail.ownerId} skin=${detail.skin} piece=${detail.piece} snapHp=${snapHp} editable=${editable} onSell=${sellIt}
+      ${detail.type === 'chess' ? html`<${ChessDetail} chess=${detail.chess} ownerId=${detail.ownerId} skin=${detail.skin} piece=${detail.piece} unit=${detail.unit || null} snapHp=${snapHp} editable=${editable} onSell=${sellIt}
         bonds=${bonds} offBonds=${offBonds} loadout=${loadout} onBond=${onBond} live=${liveNow} hint=${detail.hint || null} unitItems=${detail.unitItems || null} unitItemProgress=${detail.unitItemProgress || null}
-        standIn=${detail.standIn || null} diy=${detail.diy || null} cultOpts=${detail.cultOpts || { ops }} morphMode=${morphMode} onUnequip=${onUnequip} />` : null}
+        standIn=${detail.standIn || null} diy=${detail.diy || null} cultOpts=${detail.cultOpts || { ops }} morphMode=${morphMode} onUnequip=${onUnequip}
+        echo=${echo} meId=${meId} watchTarget=${watchTarget} />` : null}
       ${detail.type === 'item' ? html`<${ItemDetail} item=${detail.item} progress=${detail.progress || detail.piece?.progress} piece=${detail.piece} editable=${editable} onDestroy=${destroyIt} offBonds=${offBonds} morphMode=${morphMode} unequipAllowed=${unequipAllowed} />` : null}
       ${detail.type === 'enemy' ? html`<${EnemyDetail} enemy=${detail.enemy} snapHp=${snapHp} count=${detail.count} live=${liveNow} />` : null}
       ${detail.type === 'token' ? html`<${TokenDetail} token=${detail.token} piece=${detail.piece} ownerId=${detail.ownerId ?? null} skin=${detail.skin ?? null} snapHp=${snapHp} live=${liveNow} />` : null}

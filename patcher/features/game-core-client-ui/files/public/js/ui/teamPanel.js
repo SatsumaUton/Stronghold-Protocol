@@ -34,8 +34,8 @@ import { t } from '../../../shared/i18n.js';
 import { ReviveAction, RevivalNotice } from './revival.js';
 import { KickAction, KickVoteNotice } from './kickVote.js';
 import { BondPlanTag } from './bondPlan.js';
-import { PHONE_QUERY, teamDensity, teamEmoteMode } from './teamLayout.js';
 import { diveTeam, isDivePub } from './diveWords.js';
+import { PHONE_QUERY, teamDensity, teamEmoteMode } from './teamLayout.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -132,7 +132,7 @@ export function rowLpTip(lp, cap = 10) {
 export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = false, observe = null, self: selfLive = null, cap = 10, uniteLocal = null, spMarks = null, onRosterOpen = null, badges = null }) {
   const [openPid, setOpenPid] = useState(null);
   const [rosterOpen, setRosterOpen] = useState(true);
-  // 花名册开合上报给对局屏：表情要在「气泡」与「弹幕」之间切（ui/teamLayout.js teamEmoteMode）。
+  // 花名册开合状态交给 game.js：折起时表情改走弹幕（ui/danmaku.js），行内气泡让位
   useEffect(() => { onRosterOpen?.(rosterOpen); }, [rosterOpen]);
   // the playerId whose avatar just called onWatch, so the other click of a double-click does not open the view again
   const askedAt = useRef(/** @type {{ id: string|null, at: number }} */ ({ id: null, at: 0 }));
@@ -142,8 +142,6 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
   if (!players.length) return null;
   // 「深渊回响」不是同盟：面板标题和折叠头都要说深潜（维护者 2026-11-08）
   const teamName = diveTeam(isDivePub(pub));
-  // 表情走弹幕时，行里不再挂气泡（否则同一句表情放两次）。
-  const rowBubbles = teamEmoteMode({ density: teamDensity({ count: players.length, phone: globalThis.matchMedia?.(PHONE_QUERY)?.matches }), open: rosterOpen }) === 'bubble' ? bubbles : null;
   const poolGroups = Array.isArray(pub?.poolGroups) ? pub.poolGroups.filter((g) => g && Array.isArray(g.playerIds) && g.playerIds.length) : [];
   const poolSummary = Number(pub?.playerCapacity) > 4 && poolGroups.length
     ? poolGroups.every((g) => g.playerIds.length === 1)
@@ -153,6 +151,8 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
   // a boss round: the viewer's pair framed in green from the round's start (item 51 — the official bg_team_border,
   // tinted like the official green; a plain green ring without the local art)
   const team = teamFrameIds(pub, myId);
+  // 5–20 人房 / 手机 / 折起的花名册：表情改走弹幕，行内不再挂气泡（ui/teamLayout.js teamEmoteMode）
+  const rowBubbles = teamEmoteMode({ density: teamDensity({ count: players.length, phone: globalThis.matchMedia?.(PHONE_QUERY)?.matches }), open: rosterOpen }) === 'bubble' ? bubbles : null;
   const frameArt = team.size ? localAsset('ui/battle', 'bg_team_border') : null;
   const askedRecently = (p) => askedAt.current.id === p?.playerId && Date.now() - askedAt.current.at < AVATAR_CLICK_GAP_MS;
   const noteAsked = (p) => { askedAt.current = { id: p.playerId, at: Date.now() }; };
@@ -223,7 +223,7 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
           <span class="team__name">${p.name || t('博士')}</span>
           <div class="team__line">
             ${Number(pub?.playerCapacity) > 4 ? html`<span class="team__pool" title=${t('卡池分组 {n}', { n: p.poolGroup || 1 })}>${POOL_BADGE}${p.poolGroup || 1}</span>` : null}
-            <${LpTower} value=${lp.lp} size="sm" tone=${Number.isFinite(lp.lp) && lp.lp - lp.pending <= 5 ? 'danger' : null} pending=${lp.pending}
+            <${LpTower} value=${lp.lp} size="sm" tone=${Number.isFinite(lp.lp) && lp.lp - lp.pending <= 5 ? 'danger' : null} pending=${lp.pending} dive=${!!pub?.echo}
               tip=${rowLpTip(lp, cap)} />
             ${lp.left != null ? html`<${MissTag} n=${lp.left} name=${self ? null : p.name || t('博士')} />` : null}
             <${Tooltip} text=${offline ? t('连接已断开') : t(meta.text)} placement="right">

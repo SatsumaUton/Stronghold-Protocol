@@ -625,7 +625,7 @@
    直接复用同盟界面的 .ally-key（同一条输入条的语言：图标 + 房号 + 右侧小按钮），
    只把外边距、底色和描边换成深潜主题；加入按钮是这一行唯一的实心块，和上面的主按钮同色系。 */
 .ally-key.proto-key {
-  height: max(.5rem, 30px, calc(34px * var(--sp-ui, 1)));
+  height: max(.5rem, 32px, calc(34px * var(--sp-ui, 1)));
   margin: .1rem 0 0;
   background: rgba(11, 6, 22, .6);
   border-color: rgba(183, 156, 255, .35);
@@ -1321,7 +1321,7 @@
   border: 1px solid #3a3f40; border-radius: 4px;
 }
 /* 雷达：三个同心圈 + 一圈缓慢旋转的高光，纯 CSS，不用额外资源。 */
-.mm-queue__radar { position: relative; width: max(1.5rem, 84px); aspect-ratio: 1; display: grid; place-items: center; }
+.mm-queue__radar { position: relative; width: max(1.5rem, 32px, calc(84px * var(--sp-ui, 1))); aspect-ratio: 1; display: grid; place-items: center; }
 .mm-queue__radar span {
   position: absolute; inset: 0; border: 1px solid color-mix(in srgb, var(--d-color, #8f9496) 55%, transparent);
   border-radius: 50%; opacity: .55;
@@ -1949,7 +1949,9 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .mf-scout__bot rect { fill: var(--mint-s1); }
 .mf-scout__bot { animation: mf-hop .5s steps(2) infinite; }
 @keyframes mf-hop { 50% { transform: translateY(-3px); } }
-.mf-scout__eye { fill: #0b2620 !important; animation: mf-blink 3s steps(1) infinite; }
+.mf-scout__eye { animation: mf-blink 3s steps(1) infinite; }
+/* the eyes stay dark over the mint body: raise the selector's specificity rather than force the declaration (DESIGN bans the force flag) */
+.mf-scout__bot rect.mf-scout__eye { fill: #0b2620; }
 @keyframes mf-blink { 0%, 92% { opacity: 1; } 94%, 100% { opacity: 0; } }
 .mf-scout__leg--a { animation: mf-leg .3s steps(2) infinite; } .mf-scout__leg--b { animation: mf-leg .3s steps(2) infinite reverse; }
 @keyframes mf-leg { 50% { transform: translateY(-3px); } }
@@ -1957,7 +1959,7 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .mf-scout text { fill: var(--mint-s1); font: 700 8px var(--font-num, monospace); letter-spacing: 2px; opacity: .8; }
 .mf-search__tip { min-height: 2.8em; margin: 0; max-width: 5rem; font-size: max(calc(.2 * var(--t)), 12px); line-height: 1.45; color: #e6e9e8; animation: sw-in 300ms var(--ease-out) backwards; }
 .mf-search__note { margin: 0; font-size: max(calc(.15 * var(--t)), 10px); color: #8d9391; }
-.mf-stop { display: inline-flex; align-items: center; gap: .12rem; margin-top: auto; align-self: flex-end; height: max(.62rem, 36px); padding: 0 .3rem 0 .14rem;
+.mf-stop { display: inline-flex; align-items: center; gap: .12rem; margin-top: auto; align-self: flex-end; height: max(.62rem, 32px, calc(36px * var(--sp-ui, 1))); padding: 0 .3rem 0 .14rem;
   font: inherit; font-size: max(calc(.24 * var(--t)), 14px); font-weight: 800; color: #ffd9d9; cursor: pointer;
   background: linear-gradient(90deg, rgba(120, 24, 34, .85), rgba(70, 14, 20, .85)); border: 1px solid rgba(255, 120, 130, .55); }
 .mf-stop:hover:not(:disabled) { filter: brightness(1.15); }
@@ -1988,7 +1990,9 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 @keyframes mmSky{from{transform:translateX(0)}to{transform:translateX(-120px)}}
 .mm-ov__bot rect{fill:var(--mint-s1)}.mm-ov__bot{animation:mmHop .5s steps(2) infinite}
 @keyframes mmHop{50%{transform:translateY(-3px)}}
-.mm-ov__eye{fill:#0b2620!important;animation:mmBlink 3s steps(1) infinite}
+.mm-ov__eye{animation:mmBlink 3s steps(1) infinite}
+/* 同上：眼睛压在薄荷机身之上靠选择器权重，不用强制声明 */
+.mm-ov__bot rect.mm-ov__eye{fill:#0b2620}
 @keyframes mmBlink{0%,92%{opacity:1}94%,100%{opacity:0}}
 .mm-ov__leg{animation:mmLeg .3s steps(2) infinite}.mm-ov__leg--b{animation-direction:reverse}
 @keyframes mmLeg{50%{transform:translateY(-3px)}}
@@ -2353,3 +2357,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 }
 .fb-notice__close:hover { color: var(--text-hi, #fff); border-color: rgba(255, 255, 255, .45); }
 .fb-notice__close .icon { width: calc(.14 * var(--t)); height: calc(.14 * var(--t)); }
+
+/* 安卓 APP 安装提示（public/js/ui/androidApp.js 的 AndroidAppPrompt） */
+.android-app__body { display: grid; gap: 0.5rem; line-height: 1.65; }
+.android-app__ver { color: #7f9a92; font-size: 0.92em; }
+.android-app__actions { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap; }

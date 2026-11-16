@@ -15,6 +15,7 @@ function __spRemoteAssetRe() {
 import { useState, useMemo } from '../../vendor/hooks.module.v2.js';
 import { html, Icon, TierChip, Tooltip } from './components.js';
 import { data, useData, localAsset } from '../data.js';
+import { echoStageRec } from './echoStages.js';
 import { parseRichText, rtClassName } from './richText.js';
 import { fillShowTags } from './showTags.js';
 import { t as tr } from '../../../shared/i18n.js';
@@ -51,7 +52,7 @@ const localAssetSrc = (src) => {
 
 /** Data files the in-match screens use (`backups`: the 补位 stand-ins' bodies — cards, the board model, the detail card). */
 export const GAME_FILES = ['config', 'assets', 'chess', 'bonds', 'items', 'bands', 'enemies', 'bosses', 'stages', 'tokens',
-  'choices', 'effects', 'garrisons', 'factions', 'local', 'backups'];
+  'choices', 'effects', 'garrisons', 'factions', 'local', 'backups', 'charNames'];
 
 /**
  * Load every in-match data file; returns lookups (sync, null until loaded).
@@ -84,7 +85,9 @@ export function makeLookups(ready = true) {
     band: (id) => data.lookup('bands', id),
     enemy: (k) => data.lookup('enemies', k),
     boss: (id) => data.lookup('bosses', id),
-    stage: (id) => data.lookup('stages', id),
+    // 本服独有：深渊回响会用「规程·序列Ⅰ」等别的版本的战场，它们的记录在 data/echo-stages.json 里
+    // （data/stages.json 是上游生成物，不含它们）。查不到就走原来那条路，别的模式的键集与结果完全不变。
+    stage: (id) => data.lookup('stages', id) || echoStageRec(id),
     // (a 自选 operator's summons are data/backups.json tokens — 0.2.0, the hand piece of a placeable one)
     token: (id) => data.lookup('tokens', id) || diyToken(id),
     effect: (id) => data.lookup('effects', id),
@@ -288,13 +291,14 @@ export function GIcon({ name, class: cls, title }) {
  * Green LP tower + number. `pending` (> 0): the loss the running battle's leaks will cost at settlement (user
  * playtest #3 item 2) — the number keeps the settled LP (owner-approved #479 / #504),
  * shown in red with a −N tick that pops again on every change (keyed); `note` a
- * small tag after it (联防中); `tip` the title text.
- * @param {{ value: any, size?: 'sm'|'md'|'lg', class?: string, tone?: string|null, pending?: number, note?: string|null, tip?: string|null }} props
+ * small tag after it (联防中); `tip` the title text; `dive` tints the tower icon for 深潜（调用方从 m.public.echo 读，
+ * 本组件不占 hook —— 测试会直接调用它）。
+ * @param {{ value: any, size?: 'sm'|'md'|'lg', class?: string, tone?: string|null, pending?: number, note?: string|null, tip?: string|null, dive?: boolean }} props
  */
-export function LpTower({ value, size = 'md', class: cls, tone, pending = 0, note = null, tip = null }) {
+export function LpTower({ value, size = 'md', class: cls, tone, pending = 0, note = null, tip = null, dive = false }) {
   const ok = Number.isFinite(value);
   // 深潜：塔图标（绿色精灵图）转紫（维护者 2026-11-05）
-  const diveIcon = useStore((s) => !!s.match?.public?.echo);
+  const diveIcon = dive === true;
   const p = ok && Number(pending) > 0 ? Math.min(value, Math.trunc(Number(pending))) : 0;
   return html`<span class=${cx('lp', `lp--${size}`, tone && `lp--${tone}`, p > 0 && 'is-pending', cls)} title=${tip || tr('目标生命值')}
       data-pending=${p > 0 ? p : null}>

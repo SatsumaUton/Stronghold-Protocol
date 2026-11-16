@@ -110,14 +110,9 @@
 .drank--elite { background: var(--gold-2); color: #1d1400; }
 .drank--boss { background: var(--orange); color: #fff; }
 .dhp { position: relative; height: .18rem; margin-top: .08rem; background: #0a0d0c; border: 1px solid var(--line-2); }
-.dhp i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--mint-c17), var(--mint-c18)); }
+.dhp i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #2bb65a, #56e08a); }
 .dhp--enemy i { background: linear-gradient(90deg, #b5261a, #ff5a4a); }
 .dhp span { position: absolute; inset: 0; display: grid; place-items: center; font-size: .12rem; color: #fff; text-shadow: 0 1px 2px #000; }
-/* 护盾（维护者 2026-11-07）：血量条下方一行，数字是它还剩多少 —— 战斗里那根血条下的护盾条就是同一份数据 */
-.dshield { display: flex; align-items: center; gap: .05rem; margin-top: .06rem; font-size: calc(.13 * var(--t)); color: #a8dcff; }
-.dshield .icon { width: .16rem; height: .16rem; flex: none; color: #7fc4f5; }
-.dshield b { font-size: calc(.16 * var(--t)); color: #e6f4ff; }
-.dshield span { color: var(--text-lo); }
 .dtrait { display: flex; gap: .08rem; align-items: flex-start; font-size: calc(.14 * var(--t)); line-height: 1.6; color: var(--text-md); padding: .08rem .1rem; background: rgba(255, 255, 255, .03); border-left: 2px solid var(--line-3); }
 .dtrait .icon { width: .16rem; height: .16rem; margin-top: .03rem; color: var(--text-lo); flex: none; }
 .dstats-wrap { display: flex; gap: .12rem; align-items: stretch; }
@@ -137,8 +132,8 @@
    them; a 实时 (battle) / 开战时 (prep preview) tag over the grid's right edge */
 .dstats.is-live, .dstats-wrap.is-live { margin-top: .14rem; }
 .dstats.is-live, .dstats-wrap.is-live .dstats { position: relative; }
-.dstat.is-up .dstat__v { color: var(--mint-c19); text-shadow: 0 0 .08rem rgba(var(--mint-c20-rgb), .35); }
-.dstat.is-up small { color: var(--mint-c18); }
+.dstat.is-up .dstat__v { color: #6dfa9c; text-shadow: 0 0 .08rem rgba(80, 240, 140, .35); }
+.dstat.is-up small { color: #56e08a; }
 .dstat.is-down .dstat__v { color: var(--red-premium); text-shadow: 0 0 .08rem rgba(255, 84, 84, .3); }
 .dstat.is-down small { color: #ff8a80; }
 .dstats__tag {
@@ -165,7 +160,7 @@
 .dskill__name { font-size: calc(.19 * var(--t)); }
 .dskill__tags { display: flex; flex-wrap: wrap; gap: .06rem; align-items: center; }
 .dsp { font-size: calc(.12 * var(--t)); padding: 0 .06rem; line-height: 1.6; font-weight: 700; }
-.dsp--time { background: var(--mint-c21); color: #0b1a0a; }
+.dsp--time { background: #7fd37a; color: #0b1a0a; }
 .dsp--atk { background: #ff8a3d; color: #1f0c00; }
 .dsp--def { background: #f2bd3e; color: #1f1400; }
 .dsp--trig { border: 1px solid var(--line-3); color: var(--text-lo); font-weight: 500; }
@@ -185,7 +180,7 @@
 .dgarrison__icon { width: .18rem; height: .18rem; object-fit: contain; }
 .dgarrison__text { font-size: calc(.15 * var(--t)); line-height: 1.55; color: var(--text-hi); }
 .dbonds { display: flex; flex-wrap: wrap; gap: .08rem; }
-.dbond { display: inline-flex; align-items: center; gap: .05rem; padding: .03rem .1rem .03rem .05rem; font-size: calc(.15 * var(--t)); background: rgba(var(--mint-500-rgb), .08); border: 1px solid var(--mint-800); color: var(--mint-400); }
+.dbond { display: inline-flex; align-items: center; gap: .05rem; padding: .03rem .1rem .03rem .05rem; font-size: calc(.15 * var(--t)); background: rgba(78, 216, 175, .08); border: 1px solid var(--mint-800); color: var(--mint-400); }
 /* the unit's bonds in the header's right column, right under name / class (user playtest #2 item 9): icon, name,
    count / next threshold, tier pips — visible as soon as the card opens */
 .dbonds--top { gap: .05rem; margin-top: .06rem; }
@@ -195,7 +190,7 @@
   background: rgba(255, 255, 255, .03); border: 1px solid var(--line-2); cursor: default; }
 .dbonds--top button.dbond { cursor: pointer; }
 .dbonds--top button.dbond:hover { border-color: var(--mint-500); color: #fff; }
-.dbonds--top .dbond.is-active { color: var(--mint-400); background: rgba(var(--mint-500-rgb), .1); border-color: var(--mint-700); }
+.dbonds--top .dbond.is-active { color: var(--mint-400); background: rgba(78, 216, 175, .1); border-color: var(--mint-700); }
 .dbonds--top .dbond.is-core .dbond__name { font-weight: 700; }
 .dbond__icon { width: .26rem; height: .26rem; }
 .dbond:not(.is-active) .dbond__icon img { filter: brightness(0) invert(.6); }
@@ -204,7 +199,7 @@
 .dbond__count.is-max { color: var(--gold-2); }
 .dbond__tiers { display: inline-flex; gap: 2px; margin-left: .02rem; }
 .dbond__tiers i { width: .05rem; height: .12rem; background: rgba(255, 255, 255, .16); transform: skewX(-18deg); }
-.dbond__tiers i.on { background: var(--mint-400); box-shadow: 0 0 .04rem rgba(var(--mint-500-rgb), .8); }
+.dbond__tiers i.on { background: var(--mint-400); box-shadow: 0 0 .04rem rgba(78, 216, 175, .8); }
 /* a bond the mode never activates (标准: 10 of 23 — gameLogic modeOffBonds) */
 .dbonds--top .dbond.is-off { border-style: dashed; border-color: rgba(255, 255, 255, .16); background: transparent; color: var(--text-dim); }
 .dbond.is-off .dbond__name { text-decoration: line-through; text-decoration-color: rgba(255, 84, 84, .6); }
@@ -244,7 +239,7 @@
 .dmorph__items { min-width: 0; overflow-wrap: anywhere; }
 .dmorph__row.is-off .dmorph__bond { color: var(--text-dim); text-decoration: line-through; text-decoration-color: rgba(255, 84, 84, .6); }
 .dmorph__row.is-off .dmorph__items { color: var(--text-dim); }
-.dmorph__row.is-worn { background: rgba(var(--mint-500-rgb), .14); border-left-color: var(--mint-400); }
+.dmorph__row.is-worn { background: rgba(78, 216, 175, .14); border-left-color: var(--mint-400); }
 .dmorph__item.is-worn { color: #fff; font-weight: 700; }
 .dmorph__tag { display: inline-block; margin-left: .06rem; padding: 0 .05rem; font-size: max(calc(.11 * var(--t)), 8px); line-height: 1.5; font-weight: 700; white-space: nowrap; }
 .dmorph__tag.is-on { background: var(--mint-500); color: #062019; }
@@ -296,7 +291,7 @@
 .bpop__disc { width: .86rem; height: .86rem; border-radius: 50%; display: grid; place-items: center; background: #1b2320; border: 3px solid rgba(255, 255, 255, .14); flex: none; }
 .bpop__disc .bglyph { width: .56rem; height: .56rem; }
 .bpop__disc .bglyph img { filter: brightness(0) invert(.8); }
-.bpop__disc.is-active { background: var(--mint-500); border-color: var(--mint-400); box-shadow: 0 0 .24rem rgba(var(--mint-rgb), .45); }
+.bpop__disc.is-active { background: var(--mint-500); border-color: var(--mint-400); box-shadow: 0 0 .24rem rgba(23, 249, 183, .45); }
 .bpop__disc.is-active .bglyph img { filter: brightness(0) opacity(.85); }
 .bpop__titles { display: flex; flex-direction: column; gap: .02rem; min-width: 0; }
 .bpop__name { font-size: max(calc(.32 * var(--t)), 16px); font-weight: 900; letter-spacing: .08em; }
@@ -370,11 +365,6 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .erow:hover { border-color: var(--line-3); background: rgba(255, 255, 255, .05); }
 .erow--boss { border-color: rgba(255, 110, 40, .6); background: rgba(232, 90, 26, .1); }
 .erow--bounty { border-color: rgba(255, 198, 0, .45); }
-/* 祭坛里「现在买了也没用」的货（维护者 2026-11-08）：压暗 + 左侧灰条，按钮上直接写原因 */
-.echo-altar__row.is-blocked { opacity: .55; border-left: 3px solid rgba(200, 190, 220, .35); }
-.echo-altar__row.is-blocked:hover { border-color: var(--line); background: rgba(255, 255, 255, .025); }
-/* 「仅本回合」的角标：和「整局 1 次」区分开（维护者 2026-11-08：非永久的商品也要有说明） */
-.echo-altar__scope--round { color: #a9c7ff; }
 .erow__text { display: flex; flex-direction: column; gap: .03rem; min-width: 0; flex: 1; }
 .erow__name { font-size: max(calc(.18 * var(--t)), 14px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .erow__tags { display: flex; gap: .04rem; flex-wrap: wrap; }
@@ -390,7 +380,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .eboss > div { display: flex; flex-direction: column; gap: .02rem; }
 .eboss b { font-size: calc(.19 * var(--t)); }
 .eboss .t-lo { font-size: calc(.13 * var(--t)); }
-.iband { display: flex; gap: .12rem; align-items: flex-start; padding: .1rem; background: rgba(var(--mint-500-rgb), .05); border: 1px solid var(--mint-800); }
+.iband { display: flex; gap: .12rem; align-items: flex-start; padding: .1rem; background: rgba(78, 216, 175, .05); border: 1px solid var(--mint-800); }
 .iband > div { display: flex; flex-direction: column; gap: .03rem; min-width: 0; }
 .iband b { font-size: calc(.19 * var(--t)); }
 .iband b small { font-size: calc(.14 * var(--t)); font-weight: 400; margin-left: .06rem; }
@@ -438,6 +428,9 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 
 /* ---- 机变 overlay ---- */
 .spov { position: absolute; inset: 0 0 0 2.8rem; z-index: 20; }
+/* 5–20 人房（.gm--expanded）：队友行多一颗「池N」角标，行比 --dock-team-right（2.8）宽出约 .5rem ——
+   遮罩左边不多让这一段，第一张悬赏卡就被花名册压住（维护者 2026-11-16 截图）。4 人房不受影响。 */
+.gm--expanded .spov { inset: 0 0 0 calc(var(--dock-team-right, 2.8) * 1rem + .5rem + .06rem); }
 /* the corner's buttons stay left of the veil (§35.51: in one row at 1280–1920 px 「玩法说明」 sat half and 「全屏」 wholly under it
    — the HUD is below the overlay): they wrap upwards within the 2.8rem column, as a phone's always do (devices.css) */
 @media (min-width: 768px) {
@@ -465,9 +458,9 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 /* 「悬赏决策 |」 then the description over the timing line, beside the bar; a faint bracket behind the title */
 .spov__titles { position: relative; display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: .16rem; row-gap: .02rem;
   align-items: center; padding: .08rem 0 .08rem .3rem; }
-.spov__deco { position: absolute; left: 0; top: -.06rem; bottom: -.06rem; width: .7rem; border: 2px solid rgba(var(--mint-rgb), .16); border-right: 0; pointer-events: none; }
-.spov__deco::after { content: ''; position: absolute; left: .14rem; top: 50%; width: .9rem; height: .9rem; margin-top: -.45rem; border-radius: 50%; border: 1px solid rgba(var(--mint-rgb), .1); }
-.spov__title { display: contents; font-size: calc(.56 * var(--t)); font-weight: 900; letter-spacing: .08em; color: var(--mint-400); text-shadow: 0 0 .2rem rgba(var(--mint-rgb), .3); }
+.spov__deco { position: absolute; left: 0; top: -.06rem; bottom: -.06rem; width: .7rem; border: 2px solid rgba(23, 249, 183, .16); border-right: 0; pointer-events: none; }
+.spov__deco::after { content: ''; position: absolute; left: .14rem; top: 50%; width: .9rem; height: .9rem; margin-top: -.45rem; border-radius: 50%; border: 1px solid rgba(23, 249, 183, .1); }
+.spov__title { display: contents; font-size: calc(.56 * var(--t)); font-weight: 900; letter-spacing: .08em; color: var(--mint-400); text-shadow: 0 0 .2rem rgba(23, 249, 183, .3); }
 .spov__title.is-special { color: var(--gold-2); text-shadow: 0 0 .2rem rgba(242, 189, 62, .35); }
 .spov__name { grid-row: 1 / 3; grid-column: 1; line-height: 1.1; }
 /* the bar keeps its "|" for the text of the heading, drawn as a 3px rule */
@@ -502,7 +495,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 }
 .spov__turntxt { display: flex; align-items: center; gap: .08rem; font-size: calc(.24 * var(--t)); font-weight: 700; color: var(--text-md); }
 .spov__turntxt .icon { width: .26rem; height: .26rem; }
-.spov__turntxt.is-mine { color: var(--mint-400); text-shadow: 0 0 .16rem rgba(var(--mint-rgb), .45); animation: blink 1.2s ease-in-out infinite; }
+.spov__turntxt.is-mine { color: var(--mint-400); text-shadow: 0 0 .16rem rgba(23, 249, 183, .45); animation: blink 1.2s ease-in-out infinite; }
 .spov__turntxt.is-done { color: var(--mint-400); }
 /* someone else deciding: the name over 正在决策…, right-aligned, an hourglass beside them */
 .spov__turntxt.is-other { gap: .12rem; color: #eef1f0; }
@@ -511,25 +504,6 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .spov__tw b { max-width: 2.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: calc(.22 * var(--t)); font-weight: 700; color: #f2f5f4; }
 .spov__tw small { font-size: calc(.17 * var(--t)); font-weight: 400; color: #c2c8c6; }
 .spov__turn .countdown { padding-left: .22rem; border-left: 1px solid rgba(220, 228, 225, .22); }
-.spov__repeat { grid-column: 1 / -1; margin: 0; color: var(--gold-2); font-size: calc(.14 * var(--t)); line-height: 1.5; }
-.spov__order { display: flex; gap: .1rem; flex: none; overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-bottom: .04rem; }
-.spov__who { display: flex; align-items: center; gap: .08rem; flex: none; padding: .05rem .12rem .05rem .06rem; background: rgba(255, 255, 255, .03); border: 1px solid var(--line); }
-.spov__who.is-cur { border-color: var(--gold); background: rgba(255, 198, 0, .08); }
-.spov__who.is-done { border-color: var(--mint-800); }
-.spov__who.is-self .spov__wname { color: var(--mint-400); }
-.spov__idx { font-size: calc(.16 * var(--t)); color: var(--text-dim); width: .2rem; text-align: center; }
-.spov__wtext { display: flex; flex-direction: column; gap: .03rem; min-width: 0; max-width: 1.6rem; }
-.spov__wname { font-size: calc(.15 * var(--t)); max-width: 1.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.spov__wpick { font-size: calc(.13 * var(--t)); color: var(--mint-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.spov__wstate { display: grid; }
-.spov__who.is-done .spov__wstate { color: var(--mint-400); }
-.spov__who.is-cur .spov__wstate { color: var(--gold); }
-.spov--expanded .spov__head, .spov--expanded .spov__order { flex: none; }
-.spov--expanded .spov__order { overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-bottom: 4px; }
-.spov--expanded .spov__who { flex: none; }
-.spov--expanded .spov__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: minmax(180px, 2.6rem); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 2px; }
-.spov--expanded .spov__titles { min-width: 0; }
-.spov--expanded .spov__title { flex-wrap: wrap; }
 .spov__grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: .2rem; }
 /* the part of 收起 that is not in the .42rem it hangs out, plus a gap */
 .spov__grid.spov__grid--collapse { margin-right: max(0px, calc(.32 * var(--t) + .24rem + 2px - .42rem + .06rem)); }
@@ -655,15 +629,15 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   animation: sptp-disc 220ms cubic-bezier(.2, .8, .3, 1) both; }
 .sptp__bg { inset: 0; width: 100%; height: 100%; }
 .sptp__ring { position: absolute; left: calc(43 * var(--px)); top: calc(23 * var(--px)); width: calc(454 * var(--px)); height: calc(454 * var(--px)); border-radius: 50%;
-  background: radial-gradient(closest-side, transparent 63%, rgba(var(--mint-c22-rgb), .3) 64%, rgba(var(--mint-c22-rgb), .3) 70%, transparent 71%,
-    transparent 83%, rgba(var(--mint-c22-rgb), .26) 84%, rgba(var(--mint-c22-rgb), .18) 99%, transparent 100%); }
+  background: radial-gradient(closest-side, transparent 63%, rgba(31, 230, 190, .3) 64%, rgba(31, 230, 190, .3) 70%, transparent 71%,
+    transparent 83%, rgba(31, 230, 190, .26) 84%, rgba(31, 230, 190, .18) 99%, transparent 100%); }
 .sptp__cube { left: calc(-62 * var(--px)); top: calc(-146 * var(--px)); width: calc(131 * var(--px)); height: calc(134 * var(--px));
   animation: sptp-pop 260ms ease-out both; }
 .sptp__spark { left: calc(-111 * var(--px)); top: calc(-174 * var(--px)); width: calc(64 * var(--px)); height: calc(64 * var(--px));
   animation: sptp-pop 260ms 40ms ease-out both; }
 .sptp__text { position: absolute; left: calc(-200 * var(--px)); top: calc(9 * var(--px)); width: calc(408 * var(--px)); text-align: center; white-space: nowrap;
-  color: var(--mint-c23); font-size: calc(72 * var(--px)); font-weight: 900; line-height: 1; letter-spacing: .02em;
-  text-shadow: 0 0 calc(16 * var(--px)) rgba(var(--mint-c22-rgb), .55); animation: sptp-pop 200ms 60ms ease-out both; }
+  color: #2ee6c0; font-size: calc(72 * var(--px)); font-weight: 900; line-height: 1; letter-spacing: .02em;
+  text-shadow: 0 0 calc(16 * var(--px)) rgba(31, 230, 190, .55); animation: sptp-pop 200ms 60ms ease-out both; }
 .sptp__bar { left: calc(-134 * var(--px)); top: calc(99 * var(--px)); width: calc(279 * var(--px)); height: calc(17 * var(--px));
   animation: sptp-in 200ms 120ms ease-out both; }
 .sptp__x { width: calc(30 * var(--px)); height: calc(31 * var(--px)); opacity: .8; animation: sptp-in 200ms 120ms ease-out both; }
@@ -695,7 +669,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 
 /* ---- direction wheel (ui/facingWheel.js, research 09 §1.2): white diamond, 4 chevrons, "✕ 点击取消", orange range ---- */
 .fwheel { position: fixed; inset: 0; z-index: 6; touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
-/* the wheel takes the keyboard focus when it opens (Enter confirms there, GitHub var(--mint-c24)): no ring around the whole screen */
+/* the wheel takes the keyboard focus when it opens (Enter confirms there, GitHub #394): no ring around the whole screen */
 .fwheel:focus-visible { outline: none; }
 .fwheel__stripes { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .fwheel__dia { position: absolute; transform: translate(-50%, -50%); pointer-events: none; animation: fwheel-in 160ms var(--ease-out); }
@@ -765,7 +739,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .gm__hud > .uframe { position: fixed; transform: translate(-50%, -50%); pointer-events: none; z-index: 12; }
 .uframe__dia { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; animation: uframe-in 180ms var(--ease-out); }
 @keyframes uframe-in { from { opacity: 0; transform: scale(.85); } }
-.uframe__outer { fill: rgba(var(--mint-500-rgb), .05); stroke: rgba(255, 255, 255, .88); stroke-width: 1.6px; stroke-dasharray: 7 5; vector-effect: non-scaling-stroke; }
+.uframe__outer { fill: rgba(78, 216, 175, .05); stroke: rgba(255, 255, 255, .88); stroke-width: 1.6px; stroke-dasharray: 7 5; vector-effect: non-scaling-stroke; }
 .uframe__corner { fill: none; stroke: var(--mint-400); stroke-width: 2.4px; vector-effect: non-scaling-stroke; }
 .uframe__btn {
   position: absolute; pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: .02rem;
@@ -824,8 +798,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .eqr__incoming { display: flex; flex-direction: column; gap: .04rem; min-width: 0; flex: 0 1 4.2rem; }
 .eqr__card { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: .12rem; row-gap: .04rem; align-items: center; text-align: left; }
 .eqr__card--new {
-  padding: .1rem .14rem; border: 1px solid rgba(var(--mint-c25-rgb), .45);
-  background: linear-gradient(90deg, rgba(var(--mint-500-rgb), .14), rgba(var(--mint-500-rgb), .03));
+  padding: .1rem .14rem; border: 1px solid rgba(89, 244, 202, .45);
+  background: linear-gradient(90deg, rgba(78, 216, 175, .14), rgba(78, 216, 175, .03));
 }
 .eqr__icon { grid-row: 1; grid-column: 1; position: relative; display: grid; place-items: center; }
 .eqr__card--new .eqr__icon { width: .74rem; height: .74rem; background: var(--eqr-round, none) center / 100% 100% no-repeat; }
@@ -893,6 +867,31 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 /* #746: optional selected-unit bond timers; labels wrap at narrow widths and large text sizes. */
 .dbond-times__row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .08rem .2rem; margin: .1rem 0; font-size: calc(.24 * var(--t)); }
 .dbond-times__row > span { min-width: 0; overflow-wrap: anywhere; }
+
+
+/* === 本服新增（0.4.0 基板回填）：本服新增：并发悬赏决策（同时选择提示 / 决策顺序条 / 展开布局） === */
+.spov__repeat { grid-column: 1 / -1; margin: 0; color: var(--gold-2); font-size: calc(.14 * var(--t)); line-height: 1.5; }
+.spov__order { display: flex; gap: .1rem; flex: none; overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-bottom: .04rem; }
+.spov__who { display: flex; align-items: center; gap: .08rem; flex: none; padding: .05rem .12rem .05rem .06rem; background: rgba(255, 255, 255, .03); border: 1px solid var(--line); }
+.spov__who.is-cur { border-color: var(--gold); background: rgba(255, 198, 0, .08); }
+.spov__who.is-done { border-color: var(--mint-800); }
+.spov__who.is-self .spov__wname { color: var(--mint-400); }
+.spov__idx { font-size: calc(.16 * var(--t)); color: var(--text-dim); width: .2rem; text-align: center; }
+.spov__wtext { display: flex; flex-direction: column; gap: .03rem; min-width: 0; max-width: 1.6rem; }
+.spov__wname { font-size: calc(.15 * var(--t)); max-width: 1.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spov__wpick { font-size: calc(.13 * var(--t)); color: var(--mint-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spov__wstate { display: grid; }
+.spov__who.is-done .spov__wstate { color: var(--mint-400); }
+.spov__who.is-cur .spov__wstate { color: var(--gold); }
+.spov--expanded .spov__head, .spov--expanded .spov__order { flex: none; }
+.spov--expanded .spov__order { overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-bottom: 4px; }
+.spov--expanded .spov__who { flex: none; }
+.spov--expanded .spov__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: minmax(180px, 2.6rem); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 2px; }
+.spov--expanded .spov__titles { min-width: 0; }
+.spov--expanded .spov__title { flex-wrap: wrap; }
+
+
+/* === 本服新增（深潜/盟约 UI，第二批）：预约盟约 / 深潜面板（祝福三选一、状态条、词条圆片、敌方情报附加块、投影、放弃深潜） === */
 /* 预选盟约 (ui/bondPlan.js, 移植自参考版): a player's planned bond — the tag (draft order rows, team panel) and the
    picker dialog. Texts go through t(); see public/i18n/*.json. */
 .bplan { display: inline-flex; align-items: center; gap: .04rem; max-width: 100%; padding: .01rem .06rem .01rem .02rem;
@@ -1331,3 +1330,34 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
    于是补给面板比祝福三选一高出一截（祝福由浮层的 grid 垂直居中），两个面板切换时有高低差。
    现在只留宽度，位置完全交给 `.echo-bless-overlay` 的 place-items: center，与祝福面板同一处。 */
 .echo-supply { width: min(44rem, 92vw); }
+
+/* ==== 本服 5–20 人房 / 多人草稿顺序条用的 .spov 扩展（0.4.0 没有这一套，还原时要保留） ==== */
+.spov__turntxt.is-mine { color: var(--mint-400); text-shadow: 0 0 .16rem rgba(var(--mint-rgb), .45); animation: blink 1.2s ease-in-out infinite; }
+.spov__turntxt.is-done { color: var(--mint-400); }
+.spov__repeat { grid-column: 1 / -1; margin: 0; color: var(--gold-2); font-size: calc(.14 * var(--t)); line-height: 1.5; }
+.spov__order { display: flex; gap: .1rem; flex: none; overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-bottom: .04rem; }
+.spov__who { display: flex; align-items: center; gap: .08rem; flex: none; padding: .05rem .12rem .05rem .06rem; background: rgba(255, 255, 255, .03); border: 1px solid var(--line); }
+.spov__who.is-cur { border-color: var(--gold); background: rgba(255, 198, 0, .08); }
+.spov__who.is-done { border-color: var(--mint-800); }
+.spov__who.is-self .spov__wname { color: var(--mint-400); }
+.spov__idx { font-size: calc(.16 * var(--t)); color: var(--text-dim); width: .2rem; text-align: center; }
+.spov__wtext { display: flex; flex-direction: column; gap: .03rem; min-width: 0; max-width: 1.6rem; }
+.spov__wname { font-size: calc(.15 * var(--t)); max-width: 1.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spov__wpick { font-size: calc(.13 * var(--t)); color: var(--mint-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spov__wstate { display: grid; }
+.spov__who.is-done .spov__wstate { color: var(--mint-400); }
+.spov__who.is-cur .spov__wstate { color: var(--gold); }
+.spov--expanded .spov__head, .spov--expanded .spov__order { flex: none; }
+.spov--expanded .spov__order { overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-bottom: 4px; }
+.spov--expanded .spov__who { flex: none; }
+.spov--expanded .spov__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: minmax(180px, 2.6rem); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 2px; }
+.spov--expanded .spov__titles { min-width: 0; }
+.spov--expanded .spov__title { flex-wrap: wrap; }
+.spov__grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: .2rem; }
+
+
+/* === 本服新增：护盾读数（enemy-shield-readout） === */
+.dshield { display: flex; align-items: center; gap: .05rem; margin-top: .06rem; font-size: calc(.13 * var(--t)); color: #a8dcff; }
+.dshield .icon { width: .16rem; height: .16rem; flex: none; color: #7fc4f5; }
+.dshield b { font-size: calc(.16 * var(--t)); color: #e6f4ff; }
+.dshield span { color: var(--text-lo); }

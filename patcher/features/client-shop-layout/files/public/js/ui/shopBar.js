@@ -31,17 +31,16 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../ven
 import { html, Icon, HexBadge, TierChip, Tooltip, MicroLabel, Fragment } from './components.js';
 import { OperatorImage, Img, BondGlyph, CoinGlyph, GIcon, RichText } from './gameComponents.js';
 import { priceTone, mergeProgress, mergeTarget, shopBlockReason, chessLoadout, offerHeader, briefingBondTip, ownStandIn, standInLoadout, standInLabel, standInTip, standInForText, ownDiyRecord, diyGetter } from './gameLogic.js';
-import { chessPortraitUrl, itemIconUrl, profIconUrl, profMarkUrl, uiUrl, skillIconUrl, skillRecordIconUrl, moduleTypeIconUrl } from './assetUrls.js';
-import { skinFor, availableSkins } from './skins.js';
+import { itemIconUrl, profIconUrl, profMarkUrl, uiUrl, skillIconUrl, skillRecordIconUrl, moduleTypeIconUrl } from './assetUrls.js';
 import { data, localAsset } from '../data.js';
-import { t } from '../../../shared/i18n.js';
-import { itemText } from './showTags.js';
 import { hotkeyLabelOf, useSettings } from './settings.js';
 import { themePack } from '../uiTheme.js';
 import { mountThemeCharacter } from './themeCharacter.js';
 import { themeCharacterKey } from '../../../shared/uiTheme.js';
 import { regLook, regulationCharacter, regChromeUrls, regChromeStyle, regChromeTheme, regUpgradeModel, regShopCardFaceModel, regShopEmptyCardModel, regShopBackdropModel, regTierViImageStyle, prefabCssRotation } from './regHud.js';
 import { usePrefabPack } from './prefab/view.js';
+import { t } from '../../../shared/i18n.js';
+import { itemText } from './showTags.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -214,7 +213,7 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
       aria-label=${`${t('{name}，价格 {price}', { name, price: slot.price })}${armed ? (disabled ? t('，无法购买') : t('，再次点击确认')) : ''}`} aria-pressed=${onTap ? String(!!armed) : undefined}>
     <span class="scard__bg" aria-hidden="true"></span>
     <span class="scard__water" aria-hidden="true">${bonds[0] ? html`<${BondGlyph} bondId=${bonds[0]} />` : null}</span>
-    <${Img} src=${skinArtFor(m, c)} class="scard__art" loading="eager" />
+    <${OperatorImage} m=${m} chess=${c} portrait ownerId=${priv?.playerId} class="scard__art" />
     <span class="scard__top">
       <${TierChip} tier=${tier} size="md" />
       <${PriceHex} slot=${slot} free=${free} poor=${reason === t('资金不足')} />
@@ -504,28 +503,6 @@ export function RewardCards({ offer, priv, editable, onPick, onDetail, onLater, 
  *   reward?: any, onReward?: (idx:number)=>void, onRewardLater?: Function, offBonds?: Set<string>|null }} props — offBonds:
  *   the bonds this mode never activates (gameLogic modeOffBonds), struck through on the operator cards
  */
-// 商店卡立绘：优先使用玩家为该干员选择的皮肤立绘
-function skinArtFor(m, c) {
-  try {
-    // 皮肤键：干员 id（棋盘上的 id 可能带 _2 之类的后缀，需要还原成基础干员 id）
-    // 直接读 localStorage：账号云同步可能在 skinsStore 初始化之后才写入，store 会是旧的
-    const readSkinsMap = () => {
-      try { return JSON.parse(localStorage.getItem('sp.pref.skins') || '{}') || {}; } catch { return {}; }
-    };
-    const map = readSkinsMap();
-    // 干员记录的字段是 charId；棋子的 id 可能带 _2 后缀，两种都试
-    const raw = String((c && (c.charId || c.id)) || '');
-    const candidates = [String((c && c.charId) || ''), raw, raw.replace(/_\d+$/, '')].filter(Boolean);
-    for (const cid of candidates) {
-      if (!cid) continue;
-      const sid = skinFor(cid) || map[cid];
-      if (!sid) continue;
-      const row = availableSkins(cid).find((x) => x.id === sid);
-      if (row && row.portrait) return row.portrait;
-    }
-  } catch { /* 忽略 */ }
-  return chessPortraitUrl(m, c);
-}
 
 /** Official theme character, drawn inside the funds card. No `character` keeps today's box. */
 function FundsChar({ character }) {

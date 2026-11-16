@@ -39,7 +39,6 @@ import { formatBondEffect } from './richText.js';
 import { bondEffectRecord } from './bondEffect.js';
 import { bondIconUrl } from './assetUrls.js';
 import { data } from '../data.js';
-import { useStore } from '../store.js';
 import { t, tc, tParts, tName } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -218,12 +217,11 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
  *   activates). It keeps the effect and the members, and says 「{name}：该核心盟约的干员无法出现，同属其他亮着的核心盟约的除外」.
  *   An add-on stays on `off`.
  *   `entry.harmony` (the server's bond views: the +1 调和 added to `count`): 在场 n（含调和 +1） and the 调和 row
+ *   `echo` / `meId` (the caller's m.public.echo and player id): the 盟约投影 lookup — props so the popup stays a plain
+ *   function (the tests call it directly)
  */
-export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember, place = null, over = false, beside = null, owner = null, ownerId, off = false, echoBanned = false, coreAbsent = false, morphMode = 'official', modal = false }) {
-  // 「盟约投影」：本局**你自己**拿到的那条（每人各自选，2026-11-07）。
-  // 必须在 `if (!b) return null` 之前取，保持 hook 顺序稳定。
-  const echo = useStore((s) => s.match?.public?.echo || null);
-  const meId = useStore((s) => s.me.playerId);
+export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember, place = null, over = false, beside = null, owner = null, ownerId, off = false, echoBanned = false, coreAbsent = false, morphMode = 'official', modal = false, echo = null, meId = null }) {
+  // 「盟约投影」：本局**你自己**拿到的那条（每人各自选，2026-11-07）。`echo` / `meId` 由调用方传入。
   const b = data.lookup('bonds', bondId);
   if (!b) return null;
   // 「深渊回响」的排异：这条盟约当前不许上人（可被「开路」或到期解除，2026-11-05）

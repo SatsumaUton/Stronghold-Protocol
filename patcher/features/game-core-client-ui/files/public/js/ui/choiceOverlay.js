@@ -306,6 +306,7 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
             ${busy ? html`<span class="spcard__busy" role="status">${t('选择中')}</span>` : null}
           </button>`;
         })}
+      </div>
     </div>
   </div>`;
 }

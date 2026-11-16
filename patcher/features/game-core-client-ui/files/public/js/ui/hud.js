@@ -16,7 +16,7 @@
 // gate — the settled lp stays until settlement, in red with a −min(lpCapPerRound, counted leaks) tick (GitHub #479: the
 // official keeps the current value until settlement), 联防中 while a 联防 may still save part of it (liveLp;
 // the leaks come from the local battle runner, else m.public players[].pendingLp). 联防 (user playtest #6 item 7; PRTS
-// Stronghold-Protocol/帮助 "防卫失败的玩家可通过上方信息栏确认自身所属敌人的剩余数量"): a leaker's phase capsule carries the official
+// 卫戍协议/帮助 "防卫失败的玩家可通过上方信息栏确认自身所属敌人的剩余数量"): a leaker's phase capsule carries the official
 // runner tag ×N (research 09 `tag_miss`; art ui/battle bg_miss_enemy [ASSUMED]) = its enemies still standing on the 联防
 // field, uncapped and live — falling as the helpers kill them, rising when one splits or summons (the local 联防
 // replica's runner state().uniteLeft, else m.public players[].uniteLeft); the LP tower marks lp with −min(lpCapPerRound, N).
@@ -112,11 +112,10 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
     // server's b.pool, or the server's 20 Hz stream); m.public.bossHp refreshes at ~1 Hz and lags the leader's death
     const boss = hud?.boss || pub.bossHp || null;
     const frac = bossFrac(boss);
-    // 护盾（维护者 2026-11-08）：共享血池的领袖身上还有屏障时，血条几乎不动 —— 玩家看到的是「17% 却打了好久」。
-    // 屏障的绝对量是按**整池**算的（sim snapshot.js bossShield），所以按同一把尺子（池上限）画在血条上：
-    // 于是「血条只剩 17%、但盾条还有 16.8%」一眼就能看出来是被盾吃掉了，而不是血条卡住。
+    // 护盾：共享血池的领袖身上还有屏障时血条几乎不动，按池上限同一把尺子画出来（维护者 2026-11-08）
     const shFrac = bossShieldFrac(boss);
-        return html`<div class="capsule capsule--boss" role="status" data-banner="bossDamage">
+    return html`<div class="capsule capsule--boss" role="status" data-banner="bossDamage">
+      <${Sprite} k="hudPanel/icon_boss" class="capsule__icon" style=${diveIcon} fallback=${html`<${GIcon} name="skull" class="capsule__icon" />`} />
       ${hud?.total != null ? html`<span class="capsule__kills num"><b>${hud.resolved ?? hud.killed ?? 0}</b>/${hud.total}</span>` : null}
       <div class=${cx('bossbar', shFrac != null && 'has-shield')} title=${boss ? `${fmtNum(boss.hp)} / ${fmtNum(boss.max)}${shFrac != null ? ` · ${t('护盾')} ${fmtNum(boss.shield)}` : ''}` : t('敌方领袖')}>
         <div class="bossbar__fill" style=${`width:${frac == null ? 100 : frac * 100}%`}></div>
@@ -579,7 +578,8 @@ export function PauseVote({ pub, myId, spectator = false, onVote }) {
 
 /**
  * Top bar. Its centre (PR #643 / #827, the event's top bar, video 8:01): [🔍] in a bracket frame · + · a long thin band
- * with 回合 N on the left half and the LP tower on the right half, the phase capsule as a bevelled plate in the middle · + · [🔍▶▶] in a bracket frame (css/screens/game.css 顶部中栏), with the official deco type above it (hudPanel
+ * with 回合 N on the left half and the LP tower on the right half, the phase capsule as a bevelled plate in the middle
+ * · + · [🔍▶▶] in a bracket frame (css/screens/game.css 顶部中栏), with the official deco type above it (hudPanel
  * frame_deco_txt1 / txt3 RHODES ISLAND TERMINAL SERVICE over the halves, frame_deco_txt2 STRONGHOLD PROTOCOL over the
  * plate — [ASSUMED] that placement: txt2 is as wide as the gap in the top edge of frame_mid_normal, the plate's frame;
  * the same words as text without the art pack, hidden from screen readers either way). It comes in as 协议启动！ leaves
@@ -707,7 +707,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
     window.addEventListener('sp-open-admin-tools', open);
     return () => window.removeEventListener('sp-open-admin-tools', open);
   }, []);
-    return html`<header class=${cx('gtop', pen && 'is-pen', pf.band && 'gtop--pf')}>
+  return html`<header class=${cx('gtop', pen && 'is-pen', pf.band && 'gtop--pf')}>
     <div class="gtop__left">
       <${Button} variant="danger" size="lg" square=${true} icon="exit" onClick=${onExit} aria-label=${t('离开')} title=${t('离开 / 暂离')} class="gtop__exit tapx" />
       <div class="gtop__meta">
@@ -723,6 +723,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
         ${ruleLine(room?.content?.rules) ? html`<span class="gtop__rules" data-testid="plugin-rules">${ruleLine(room?.content?.rules)}</span>` : null}
       </div>
     </div>
+
     ${/* 判据用 adminId && gameTool（身份门 + 权限门），**不是** adminTools（三道门全过）：
            ① 普通玩家 adminId=false → 连子元素都不创建，DOM 里没有任何管理员痕迹；
            ② 管理员没有 tools.game 权限 → 同样什么都不创建（2026-10-31 维护者要求）；
@@ -756,7 +757,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
           ${fx.kind && fx.kind !== 'enter' ? html`<${CapsuleScene} kind=${fx.kind} />` : null}
         </div>
         <div class="gtop__half gtop__half--r">
-          <${LpTower} value=${lp} size="lg" tone=${lowLp ? 'danger' : boss ? 'team' : null} pending=${pending}
+          <${LpTower} value=${lp} size="lg" tone=${lowLp ? 'danger' : boss ? 'team' : null} pending=${pending} dive=${!!pub?.echo}
             note=${pending > 0 && live?.unite ? t('联防中') : null} tip=${pendingTip(lp, pending, { unite: !!live?.unite, cap, left: live?.left ?? null })} />
         </div>
       </div>`}
@@ -792,6 +793,8 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
              正好盖在按钮上。放进这一列以后它自己就跟着往下让，再也不用同步那两个数。 */ null}
       ${effectsSlot}
     </div>
+    ${/* 联防预算条必须排在最后（merge-040 的位置）：它是 grid-column: 1/-1 的整行，排在最前面会占掉第一行，
+           左/中/右三栏被挤到第二行 —— 5–20 人房一进联防，顶栏的「回合」「放大镜」就整体往下掉一格。 */ null}
     <${UniteBudgetNote} pub=${pub} />
   </header>`;
 }
