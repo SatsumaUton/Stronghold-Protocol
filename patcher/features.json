@@ -634,13 +634,43 @@
       "name": "安卓 APK 壳（WebView，PC 版全功能，可直接热更）",
       "status": "patcher",
       "files": [
-        "android/**"
+        "android/**",
+        "android/version.json",
+        "android/AndroidManifest.xml",
+        "android/res/values/strings.xml",
+        "android/res/values/styles.xml",
+        "android/build.ps1",
+        "android/README.md",
+        "android/java/love/luobomiao/stronghold/MainActivity.java"
       ],
       "tests": [
         "装配 build.ps1",
         "启动进站点首页",
         "返回键回上一页",
         "版本号 version.json"
+      ]
+    },
+    {
+      "id": "android-apk-download",
+      "name": "安卓 APP 下载：安卓浏览器上「添加到桌面」换成「下载安卓版」+ 首次弹窗提示",
+      "status": "patcher",
+      "files": [
+        "public/js/ui/androidApp.js",
+        "public/js/ui/device.js",
+        "public/js/screens/lobby.js",
+        "public/css/screens/lobby.css",
+        "public/i18n/en.json",
+        "public/i18n/ja.json",
+        "public/i18n/ko.json",
+        "public/i18n/zh-TW.json",
+        "public/download/stronghold-android.apk",
+        "public/download/android-version.json"
+      ],
+      "tests": [
+        "安卓浏览器显示下载按钮",
+        "APP 壳里不再提示",
+        "首次只弹一次",
+        "APK 直链可下载"
       ]
     }
   ]

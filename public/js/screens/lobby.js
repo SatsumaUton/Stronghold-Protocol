@@ -67,6 +67,7 @@ import { t, tc, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { NoticesButton } from '../ui/notices.js';
 import { FeedbackNotice } from '../ui/feedbackNotice.js';
+import { AndroidAppPrompt } from '../ui/androidApp.js';
 import { RoomListDialog, markListPrompt } from '../ui/roomList.js';
 // 搜寻中面板：直接用同盟模拟里「匹配队友」那套界面（品牌行 + 像素侦察兵 + 轮换提示 + 停止搜寻）
 import { SearchPanel } from '../ui/matchFlow.js';
@@ -1955,6 +1956,8 @@ export function LobbyScreen() {
   return html`<div class="screen lobby-screen lobby-hub" data-season=${season}>
     <${HubBackdrop} season=${season} />
       <${FeedbackNotice} />
+      ${/* 安卓浏览器首次进入：弹一次「要不要装 APP」（ui/androidApp.js，问过就记在 localStorage） */ null}
+      <${AndroidAppPrompt} />
     <header class="topbar">
       <div class="topbar__left">
         <${Button} variant="ghost" size="sm" icon="chevronLeft" onClick=${backToTitle} title=${t('返回标题')}>${t('返回')}<//>

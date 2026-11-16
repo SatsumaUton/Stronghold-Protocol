@@ -2,9 +2,7 @@
 <!-- 卫戍协议：盟约 · 萝卜喵公益服 —— WebView 外壳。
      package 与签名固定不变，否则后续版本无法覆盖安装。 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="love.luobomiao.stronghold"
-    android:versionCode="1"
-    android:versionName="1.0">
+    package="love.luobomiao.stronghold">
 
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

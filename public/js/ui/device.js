@@ -22,6 +22,7 @@
 
 import { useEffect, useState } from '../../vendor/hooks.module.v2.js';
 import { pwaInstall } from '../pwa.js';
+import { apkUrl, markAsked, shouldOfferApp } from './androidApp.js';
 import { html, Icon, Button } from './components.js';
 import { t } from '../../../shared/i18n.js';
 
@@ -256,10 +257,20 @@ export function FullscreenButton({ class: cls = '' }) {
 /**
  * Only a browser-issued install offer shows a button; installed and unsupported environments stay quiet.
  * `square`: the glyph alone (the lobby's top bar, beside ⚙ / 📖), the name stays title / aria-label.
+ *
+ * 安卓（本服 2026-11-16）：安卓浏览器上「添加到桌面」换成「下载安卓版」——直接下我们自己的 APK
+ * （ui/androidApp.js）。APK 里 UA 带 `StrongholdProtocolApp/` 标记，所以在壳里不会显示这个按钮。
  */
 export function PwaInstallButton({ class: cls = '', size = 'sm', square = false }) {
   const [available, setAvailable] = useState(pwaInstall.available);
   useEffect(() => pwaInstall.subscribe(setAvailable), []);
+  const [android] = useState(() => shouldOfferApp());
+  if (android) {
+    const label = t('下载安卓版');
+    return html`<a class=${`btn btn--secondary btn--${size}${square ? ' btn--square' : ''} ${cls}`.trim()}
+      href=${apkUrl()} download rel="noopener" title=${label} aria-label=${label}
+      data-testid="apk-install" onClick=${() => markAsked()}>${square ? null : label}</a>`;
+  }
   if (!available) return null;
   return html`<${Button} variant="secondary" size=${size} icon="homePlus" square=${square} class=${cls}
     title=${t('添加到桌面')} aria-label=${t('添加到桌面')}
@@ -365,8 +376,15 @@ export function installDeviceSupport(win = globalThis) {
   const pwaBtn = doc?.getElementById?.('rotate-hint-pwa');
   if (pwaBtn) {
     updateRotateHintPwaI18n(doc);
-    offs.push(pwaInstall.subscribe((available) => { pwaBtn.hidden = !available; }));
-    on(pwaBtn, 'click', () => { pwaInstall.request(); });
+    if (shouldOfferApp(win)) {
+      // 安卓：同一个按钮改成「下载安卓版」（APK 直链，不再是浏览器的安装提示）
+      pwaBtn.hidden = false;
+      pwaBtn.textContent = t('下载安卓版');
+      on(pwaBtn, 'click', () => { markAsked(win); win.location.href = apkUrl(); });
+    } else {
+      offs.push(pwaInstall.subscribe((available) => { pwaBtn.hidden = !available; }));
+      on(pwaBtn, 'click', () => { pwaInstall.request(); });
+    }
   }
 
   installed = () => { for (const off of offs.splice(0)) { try { off(); } catch { /* ignore */ } } clearTimeout(rotTimer); installed = null; };

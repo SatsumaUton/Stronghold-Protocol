@@ -284,6 +284,18 @@ const CHECKS = [
     ],
   },
   {
+    id: 'android-apk-download',
+    name: '安卓 APP 下载（添加到桌面 → 下载安卓版 + 首次弹窗）',
+    rules: [
+      ['android/res/values/strings.xml', /<string name="app_name">[^<]*萝卜喵服/, '★ APP 名称含「萝卜喵服」'],
+      ['public/download/android-version.json', /"name"/, '版本小文件在'],
+      ['public/js/ui/androidApp.js', /export function shouldOfferApp/, '设备判定'],
+      ['public/js/ui/androidApp.js', /export function AndroidAppPrompt/, '★ 首次弹窗组件'],
+      ['public/js/ui/device.js', /data-testid="apk-install"/, '★ 安卓分支是 APK 直链'],
+      ['public/js/screens/lobby.js', /<\$\{AndroidAppPrompt\}/, '★ 大厅挂上首次提示'],
+    ],
+  },
+  {
     id: 'diy-per-version-roster',
     name: '自选编队按版本分键 + 跨版本继承（读不到就是空名单）',
     rules: [
