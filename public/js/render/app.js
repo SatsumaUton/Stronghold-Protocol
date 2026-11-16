@@ -2458,6 +2458,9 @@ export async function createFieldView(host, options = {}) {
   await withTimeout(artPromise, 2500, signal);
   if (want3d) await withTimeout(boardReady, 6000, signal);
   signal?.throwIfAborted();
+  // 排障钩子（维护者 2026-11-16）：玩家反馈「干员不能部署 / 不能移动 / 点不出范围与描述卡」时，
+  // 控制台可以直接读 __SP_VIEW__（mode / drag.dragging / destroyed），不用再猜。
+  try { globalThis.__SP_VIEW__ = view; } catch { /* ignore */ }
   return view;
   } catch (err) {
     if (view) view.destroy();

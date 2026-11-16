@@ -1559,7 +1559,7 @@
       {
         "path": "server/http/csp.js",
         "baseExists": true,
-        "customBytes": 2396
+        "customBytes": 2439
       },
       {
         "path": "server/http/files.js",
@@ -5390,7 +5390,7 @@
       {
         "path": "public/js/render/app.js",
         "baseExists": true,
-        "customBytes": 143229
+        "customBytes": 145999
       },
       {
         "path": "public/js/render/attackRate.js",
