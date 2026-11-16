@@ -56,7 +56,9 @@ const CHECKS = [
       ['server/lobby.js', /\.\.\.\(Array\.isArray\(room\.hiddenSpectators\)/, '★ 广播覆盖隐身观战者'],
       // 隐身观战者不在 seats 也不在 spectators 里：roomOf() 漏了它的话，roomCode 会被清空，
       // g.watch 直接回 NOT_IN_ROOM —— 表现就是「观战画面永远停在 P1，点谁都不换」。
-      ['server/lobby.js', /if \(room && !seat && room\.hiddenSpectatorOf\(session\.playerId\)\) return room;/, '★ roomOf 认隐身观战者（否则无法切换观战目标）'],
+      // 2026-11-16：这条判定与「对局中退场后座位被标记 left」的普通观战合并成一条，
+      // 条件是「没有有效座位时，观战席（含隐身）说了算」，所以这里匹配合并后的写法。
+      ['server/lobby.js', /if \(room && !liveSeat && \(room\.spectatorOf\(session\.playerId\) \|\| room\.hiddenSpectatorOf\(session\.playerId\)\)\) return room;/, '★ roomOf 认观战席与隐身观战者（否则无法切换观战目标）'],
       ['server/lobby.js', /msg\.t !== 'g\.watch'[\s\S]{0,200}room\.watcherOf\(session\.playerId\)/, '★ 隐身观战者只能 watch，不能替玩家操作'],
       ['server/match/match/watch.js', /addSpectator\(playerId, hidden = false\)/, 'Match.addSpectator 支持 hidden'],
     ],

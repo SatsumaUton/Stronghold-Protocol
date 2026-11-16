@@ -927,10 +927,71 @@ function GoButton({ label, onClick, disabled, loading = false, ready = null, ico
 /** How long a version proposal refused as too frequent (RATE) waits before it is sent once more [ASSUMED]. */
 const PROPOSE_RETRY_MS = 1200;
 
+/**
+ * 5–20 人房座位行的「拖动翻页」（维护者 2026-11-16：不要底部滚动条，直接拖座位行）。
+ *
+ * 只接管鼠标/笔（pointerType !== 'touch'）：触屏保持浏览器原生横扫（CSS 已设 touch-action: pan-x），
+ * 不去抢手势。拖动超过 6px 才进入平移，否则放过点击（卡片上的按钮照常可点）。
+ * 触屏设备/带触摸屏的笔记本同样能用鼠标拖。
+ *
+ * @param {import('../../vendor/hooks.module.v2.js').RefObject<HTMLElement|null>} ref
+ */
+function useDragScroll(ref) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    let id = null, startX = 0, startLeft = 0, moved = false, panning = false;
+    const onDown = (e) => {
+      if (e.pointerType === 'touch' || e.button !== 0) return;      // 触屏走原生平移
+      if (el.scrollWidth <= el.clientWidth + 1) return;             // 没有可滚内容
+      id = e.pointerId; startX = e.clientX; startLeft = el.scrollLeft; moved = false; panning = false;
+    };
+    const onMove = (e) => {
+      if (id == null || e.pointerId !== id) return;
+      const dx = e.clientX - startX;
+      if (!moved && Math.abs(dx) < 6) return;                        // 抖动阈值：短按仍是点击
+      if (!moved) {
+        moved = true; panning = true;
+        el.classList.add('is-panning');
+        try { el.setPointerCapture(id); } catch { /* ignore */ }
+      }
+      el.scrollLeft = startLeft - dx;
+      e.preventDefault();
+    };
+    const finish = (e) => {
+      if (id == null || (e && e.pointerId !== id)) return;
+      const wasPanning = panning;
+      if (wasPanning) {
+        // 拖完那一下的 click 要吞掉，否则会误触卡片上的按钮（如 添加 AI / 移出）
+        const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+        el.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(() => el.removeEventListener('click', swallow, true), 0);
+      }
+      el.classList.remove('is-panning');
+      try { if (id != null) el.releasePointerCapture(id); } catch { /* ignore */ }
+      id = null; moved = false; panning = false;
+    };
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', finish);
+    el.addEventListener('pointercancel', finish);
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', finish);
+      el.removeEventListener('pointercancel', finish);
+      el.classList.remove('is-panning');
+    };
+  }, [ref]);
+}
+
 /** Room screen component. */
 export function RoomScreen() {
   const room = useStore((s) => s.room);
   // 「深渊回响」房间：整套主题换色（见 theme.css 的 html.sp-deepecho）。普通房间不挂这个类。
+  // 5–20 人房座位行的拖动滚动（维护者 2026-11-16：去掉底部滚动条，改成拖座位行）
+  const seatsRef = useRef(null);
+  useDragScroll(seatsRef);
   useDocClass('sp-deepecho', room?.variant === 'deepecho');
   const me = useStore((s) => s.me, shallowEqual);
   const conn = useStore((s) => s.connection, shallowEqual);
@@ -1251,7 +1312,7 @@ export function RoomScreen() {
       </div>
     </header>
 
-    <main class=${`seats rs-seats${coop ? '' : ' seats--solo'}${facts.seats.length > 4 ? ' seats--expanded' : ''}`}>
+    <main ref=${seatsRef} class=${`seats rs-seats${coop ? '' : ' seats--solo'}${facts.seats.length > 4 ? ' seats--expanded' : ''}`}>
       ${facts.seats.map((s, i) => {
         const op = seatOperator(s, cards, { myId: me.playerId, myCard });
         // the player's outfit for that operator (header "Outfits"); null = the default art

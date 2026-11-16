@@ -192,13 +192,21 @@
   justify-content: flex-start;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(var(--mint-c54-rgb), .55) transparent;
+  /* 维护者 2026-11-16：不要底部的横向滚动条 —— 直接用鼠标拖动座位行本身来往后翻。
+     滚动条隐藏（Firefox 的 scrollbar-width + Chromium/Safari 的 ::-webkit-scrollbar），
+     仍保留 overflow-x: auto，所以触屏的原生横扫、鼠标滚轮横滚、键盘都照旧可用。 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* 鼠标按住行体即可左右拖动；触屏保持原生平移（pan-x），不抢手势 */
+  cursor: grab;
+  touch-action: pan-x;
 }
-.rs-seats.seats--expanded::-webkit-scrollbar { height: 8px; }
-.rs-seats.seats--expanded::-webkit-scrollbar-track { background: rgba(255, 255, 255, .05); }
-.rs-seats.seats--expanded::-webkit-scrollbar-thumb { background: rgba(var(--mint-c54-rgb), .55); border-radius: 0; }
-.rs-seats.seats--expanded::-webkit-scrollbar-thumb:hover { background: rgba(var(--mint-c54-rgb), .8); }
+.rs-seats.seats--expanded::-webkit-scrollbar { width: 0; height: 0; display: none; }
+/* 拖动时：抓手光标、禁止选中文字、子元素不吃指针（不然拖到按钮上会被按钮捕获） */
+.rs-seats.seats--expanded.is-panning { cursor: grabbing; }
+.rs-seats.seats--expanded.is-panning > * { pointer-events: none; }
+.rs-seats.seats--expanded.is-panning,
+.rs-seats.seats--expanded.is-panning * { user-select: none; -webkit-user-select: none; }
 /* 转场 (PR #643): the room comes up from black, card by card — each lights up as it lands. [ASSUMED] The motion and its
    timings are the community PR #643 design, not a recording of the event. */
 @keyframes rseat-in { from { opacity: 0; transform: translateY(.16rem) scale(1.03); filter: brightness(1.9) saturate(.3); } 55% { filter: none; } }
