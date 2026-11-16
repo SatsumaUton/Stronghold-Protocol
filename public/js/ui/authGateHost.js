@@ -36,6 +36,12 @@ export async function ensureAuthGate({ force = false, check = checkAuth, doc = g
   });
   render(null, host);
   host.remove();
+  // ★ 2026-11-16：`account-title.js`（matchmaker 注入的那支脚本）里的 `state.guest` 是内存态。
+  //   第一屏选「游客访问」时它不会自己去改，所以这里广播一次，让它把「代号 + 开始」那一版渲染出来
+  //   （否则玩家会看到「点了游客却还停在登录界面」—— 维护者的反馈）。
+  try {
+    win.dispatchEvent(new CustomEvent('sp-auth-gate-done', { detail: { how } }));
+  } catch { /* ignore */ }
   return how;
 }
 

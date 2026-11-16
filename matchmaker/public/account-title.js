@@ -300,6 +300,14 @@
         try { cs.dispatchEvent(new Event('input', { bubbles: true })); } catch { /* 忽略 */ }
       }
       render();
+      // ★ 2026-11-16（维护者反馈「登出后停在原标题页、只看到登录 / 注册 › 按钮」）：
+      //   登录/注册已经是**第一屏**（public/js/screens/authGate.js），登出之后必须把它重新叫出来，
+      //   而不是留在标题页等玩家自己点那个小按钮。闸门由 main.js 挂的全局函数负责（authGateHost.js）。
+      //   这里可能有两种情况：① 玩家本来就在第一屏后面（闸门关着）→ 重开；
+      //   ② 玩家已经从第一屏走到标题页 → 同样重开，登录成功后再回到标题页继续。
+      try {
+        if (typeof window.__SP_OPEN_AUTH_GATE === 'function') window.__SP_OPEN_AUTH_GATE();
+      } catch { /* 降级：至少还留着那个按钮 */ }
     };
 
     renderFields();
@@ -831,6 +839,12 @@
       } else clearAccountCache();
     } catch { clearAccountCache(); }
     state.authReady = true;
+    // ★ 2026-11-16（维护者反馈「点游客访问应该跳到原版输入名字的界面，但现在没有」）：
+    //   第一屏（public/js/screens/authGate.js）点「游客访问」时只写了 sessionStorage 的
+    //   `sp.authGate.guest`，本文件的 `state.guest` 是内存态、没人同步 —— 于是这一页仍然按
+    //   「未登录」渲染（代号框隐藏、开始按钮灰着），玩家看到的就是「停在登录界面」。
+    //   这里在启动时读一次那个标记，让游客态从第一屏接过来（渲染出来就是原版的代号输入 + 开始）。
+    try { state.guest = sessionStorage.getItem('sp.authGate.guest') === '1'; } catch { /* 隐私模式 */ }
     const anchor = anchorOf(findCallsign());
     if (anchor && !document.getElementById('mm-acc-wrap')) build(anchor);
     render();
@@ -853,6 +867,28 @@
           }
         } catch { /* 忽略：下一次事件/刷新还有机会 */ }
       })();
+    });
+
+    // ★ 2026-11-16：登录闸门（第一屏）走完时广播 `sp-auth-gate-done`。
+    //   游客访问 → 本页要切到「代号 + 开始」（原版那一屏）；登录/注册成功 → 补账号态。
+    window.addEventListener('sp-auth-gate-done', (ev) => {
+      const how = ev && ev.detail ? ev.detail.how : null;
+      if (how === 'guest') {
+        state.guest = true;
+        render();
+        return;
+      }
+      if (how === 'login' || how === 'register') {
+        // adoptAuth 已经写了全局量并派发过 sp-account-token；这里只补 state.user（万一那次 /me 还没回来）
+        if (!state.user) {
+          void (async () => {
+            try {
+              const r = await api('/api/auth/me');
+              if (r.status === 200 && r.body && r.body.user) { state.user = r.body.user; render(); }
+            } catch { /* ignore */ }
+          })();
+        } else render();
+      }
     });
 
     // 首次设置代号：点「开始」前自动保存并追加 #代码
