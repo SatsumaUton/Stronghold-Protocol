@@ -342,7 +342,11 @@
       "status": "ported-main",
       "files": [
         "public/i18n/**",
-        "public/manifest.json"
+        "public/manifest.json",
+        "public/js/ui/voiceLibrary.js",
+        "public/js/data.js",
+        "tools/build-char-names.mjs",
+        "data/char-names.json"
       ],
       "tests": [
         "中文串即 msgid，英文包 public/i18n/en.json 查不到就回落中文",

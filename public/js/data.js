@@ -69,6 +69,9 @@ export const DATA_FILES = Object.freeze({
   // 池子 = 四个版本全部正式战场；`stages` = 本版 data/stages.json 里没有的那几张记录。
   // 只有深潜大厅 / 深潜对局会去 load 它，别的模式一次都不下载。
   echoStages: 'echo-stages.json',
+  // 干员代号表（本服独有）：语音下载面板要显示**全部有语音**的干员名，而本版 chess/backups 只含本赛季卡池，
+  // 其余 50 多个人只会显示 char_xxx_yyy 这种文件代号（维护者 2026-11-16 反馈）。见 tools/build-char-names.mjs。
+  charNames: 'char-names.json',
 });
 
 const ID_KEYS = ['id', 'chessId', 'bondId', 'itemId', 'bandId', 'enemyKey', 'enemyId', 'stageId', 'bossId', 'tokenId', 'choiceId', 'key'];

@@ -11,11 +11,16 @@ import { t, tc } from '../../../shared/i18n.js';
 
 const NAMES = { cn: '中文', jp: '日本語', en: 'English', kr: '한국어' }; // i18n-ignore
 
-/** Only voiced operators, deduplicated across chess forms and including DIY operators. */
-export function voiceRoster(audio, records) {
+/**
+ * Only voiced operators, deduplicated across chess forms and including DIY operators.
+ * `charNames`: 全部干员代号表（data/char-names.json）—— 本版 chess/backups 只含本赛季卡池，
+ * 其余有语音的干员原本只显示 `char_215_mantic` 这种文件代号（维护者 2026-11-16 反馈）。
+ */
+export function voiceRoster(audio, records, charNames = null) {
   const names = new Map(records.filter((r) => r?.charId).map((r) => [r.charId, r.name || r.charId]));
   const ids = new Set(['voice', ...Object.values(VOICE_TREES)].flatMap((tree) => Object.keys(audio?.[tree] || {})));
-  return [...ids].map((charId) => ({ charId, name: names.get(charId) || charId }))
+  const extra = charNames && typeof charNames === 'object' ? charNames : {};
+  return [...ids].map((charId) => ({ charId, name: names.get(charId) || extra[charId] || charId }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -47,13 +52,13 @@ function VoiceRow({ operator, settings, manifest }) {
 }
 
 export function VoiceLibrary() {
-  const ready = useData('assets', 'chess', 'backups');
+  const ready = useData('assets', 'chess', 'backups', 'charNames');
   const settings = useStore((s) => s, Object.is, voiceDownloadStore);
   const [query, setQuery] = useState('');
   const backups = data.get('backups');
   const roster = voiceRoster(data.get('assets')?.audio, [
     ...data.list('chess'), ...Object.values(backups?.units || {}), ...Object.entries(backups?.diy?.operators || {}).map(([charId, r]) => ({ ...r, charId })),
-  ]);
+  ], data.get('charNames'));
   const search = query.trim().toLocaleLowerCase();
   const rows = roster.filter((r) => `${r.name} ${r.charId}`.toLocaleLowerCase().includes(search));
   return html`<div class="voice-library" data-testid="voice-library">
