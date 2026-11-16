@@ -610,11 +610,22 @@ export class MatchPhases {
         // 池子分档（维护者 2026-11-04）：1–15 层用「原版该回合的模板变体」；
         // 16 层以后走全敌人表（含跨版本并入的怪），只数仍由 echoDeepWaveShape 按深度设计。
         // 全表池子（含跨版本）：低层由血量闸控制强度
-
-        echoPoolAll: false,
+        // ★ 2026-11-16（维护者）：
+        //   ① 1–15 层：模板库里已经有**所有版本 1–13 回合**的变体（echoTemplateLib 的跨版本部分），
+        //      所以这里放开 echoTemplatesAny，主题/搭配从整库随机抽，而不再局限「本版 ±2 回合」；
+        //      同时 echoSkipSeeds 让全局种子不要盖掉回合模板（否则抽的其实是全表随机组合）。
+        //   ② 16 层以后：池子改成**全敌人表**（echoPoolAll），跨版本并入的 82 只怪就能进来；
+        //      以前这里硬编码 false，注释说「16 层以后走全敌人表」但代码没做。
+        echoPoolAll: deepWave,
         echoPoolRoundOnly: false,
         echoTemplates: true,
-        echoTemplatesAny: false,
+        // ★ 2026-11-16（维护者）：
+        //   ① 1–15 层：模板库里已经有**所有版本 1–13 回合**的预生成变体（echoTemplateLib 的跨版本部分），
+        //      所以放开 echoTemplatesAny 从整库随机抽，同时 echoSkipSeeds 别让全局种子盖掉回合模板。
+        //   ② 16 层以后：改回用**全局种子模板 + 全敌人表池**（echoPoolAll）—— 种子是从全表（含
+        //      跨版本并入的 82 只怪）预生成的，这样深层才会真的出跨版本敌人。
+        echoTemplatesAny: !deepWave,
+        echoSkipSeeds: !deepWave,
         // 16 层以后两个出怪点都要用（维护者 2026-11-05）
         echoAllRoutes: deepWave,
         // 16 层以后每层的规模按深度设计（echoWaves.echoDeepWaveShape），时限也固定成最后一关的时长，

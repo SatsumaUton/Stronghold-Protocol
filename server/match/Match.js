@@ -387,8 +387,17 @@ export class Match {
         const bs = crossVersionBosses(this.modeId, this.gd.raw && this.gd.raw.bosses);
         if (bs && Object.keys(bs.bosses).length) {
           this.gd.raw = { ...this.gd.raw, bosses: { ...this.gd.raw.bosses, ...bs.bosses } };
-          try { this.gd.mode.bossWeights = { ...(this.gd.mode.bossWeights || {}), ...bs.bossWeights }; } catch { /* 只读就跳过 */ }
-          try { this.gd.mode.hiddenBossWeights = { ...(this.gd.mode.hiddenBossWeights || {}), ...bs.hiddenBossWeights }; } catch { /* 只读就跳过 */ }
+          // ★ 2026-11-16：`gd.mode` 是 getData 里 **被冻结** 的记录，直接 `this.gd.mode.bossWeights = …`
+          //   在严格模式下抛错并被 catch 吞掉 —— 于是新 boss 只进了 gd.raw.bosses（返场时抽得到），
+          //   却没进权重表（开局那只 boss / 深度 15 的隐藏核心永远抽不到它们）。
+          //   改成用一个可写副本替换整个 mode。
+          try {
+            this.gd.mode = {
+              ...this.gd.mode,
+              bossWeights: { ...(this.gd.mode.bossWeights || {}), ...bs.bossWeights },
+              hiddenBossWeights: { ...(this.gd.mode.hiddenBossWeights || {}), ...bs.hiddenBossWeights },
+            };
+          } catch { /* 只读就跳过 */ }
         }
       } catch { /* 少几张图不影响建局 */ }
     }

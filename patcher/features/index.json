@@ -164,7 +164,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 75317
+        "customBytes": 75778
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -1277,7 +1277,7 @@
       {
         "path": "server/match/match/phases.js",
         "baseExists": true,
-        "customBytes": 38077
+        "customBytes": 39334
       },
       {
         "path": "server/match/match/platform.js",
@@ -1342,7 +1342,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 75317
+        "customBytes": 75778
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -1809,7 +1809,7 @@
       {
         "path": "server/match/match/phases.js",
         "baseExists": true,
-        "customBytes": 38077
+        "customBytes": 39334
       },
       {
         "path": "server/match/match/platform.js",
@@ -1874,7 +1874,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 75317
+        "customBytes": 75778
       },
       {
         "path": "server/match/operatorTraits.js",
@@ -6983,7 +6983,7 @@
       {
         "path": "server/match/Match.js",
         "baseExists": true,
-        "customBytes": 75317
+        "customBytes": 75778
       },
       {
         "path": "server/match/PlayerState.js",
@@ -7083,7 +7083,7 @@
       {
         "path": "server/match/match/echoWaves.js",
         "baseExists": false,
-        "customBytes": 40645
+        "customBytes": 40938
       },
       {
         "path": "server/match/match/echoWords.js",
@@ -7108,7 +7108,7 @@
       {
         "path": "server/match/match/phases.js",
         "baseExists": true,
-        "customBytes": 38077
+        "customBytes": 39334
       },
       {
         "path": "server/match/match/platform.js",
