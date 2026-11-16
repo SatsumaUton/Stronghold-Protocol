@@ -21,17 +21,21 @@
 // (the own row's "you" marker moves to the bottom-left corner while it shows), the leader-damage scan over the avatar
 // during a leader fight; `badges` = { pack, still } (the theme's avatar prefabs, else ac_n_initial's; null pack: CSS).
 
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { PHASE } from '../../../shared/constants.js';
 import { html, Icon, Tooltip } from './components.js';
 import { PlayerAvatar, LpTower, GIcon, LocalSprite } from './gameComponents.js';
 import { EmoteBubble } from './emotes.js';
-import { PHONE_QUERY, teamDensity, teamEmoteMode } from './teamLayout.js';
 import { STATUS_META, sortedPlayers, teamFrameIds } from './gameLogic.js';
 import { MissTag, uniteRemaining } from './hud.js';
 import { WinStreakBadge, BossDamageBadge, avatarBadgeTips } from './avatarBadges.js';
 import { localAsset } from '../data.js';
 import { t } from '../../../shared/i18n.js';
+import { ReviveAction, RevivalNotice } from './revival.js';
+import { KickAction, KickVoteNotice } from './kickVote.js';
+import { BondPlanTag } from './bondPlan.js';
+import { diveTeam, isDivePub } from './diveWords.js';
+import { PHONE_QUERY, teamDensity, teamEmoteMode } from './teamLayout.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -49,6 +53,8 @@ const STATUS_SPRITE = { ready: 'icon_ready', deciding: 'icon_waiting', done: 'ic
  * @param {{ uniteLocal?: Record<string, number> | null, cap?: number }} [opts]
  * @returns {{ lp: number|null, pending: number, unite: boolean, left: number|null }}
  */
+const POOL_BADGE = '池';  // i18n-ignore: 角标字形
+
 export function rowLp(p, pub, self = null, { uniteLocal = null, cap = 10 } = {}) {
   const pubLp = Number.isFinite(p?.lp) ? p.lp : null;
   if ((pub?.phase !== PHASE.COMBAT && pub?.phase !== PHASE.UNITE) || p?.alive === false) return { lp: pubLp, pending: 0, unite: false, left: null };
@@ -123,17 +129,30 @@ export function rowLpTip(lp, cap = 10) {
  *   uniteLocal: the local 联防 replica's per-leaker counts while it is on screen (battle runner state().uniteLeft), else null
  *   badges: how the 完美连胜 / 领袖伤害 badges are drawn (ui/avatarBadges.js); null draws the CSS stand-ins
  */
-export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = false, observe = null, self: selfLive = null, cap = 10, uniteLocal = null, spMarks = null, badges = null }) {
+export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = false, observe = null, self: selfLive = null, cap = 10, uniteLocal = null, spMarks = null, onRosterOpen = null, badges = null }) {
   const [openPid, setOpenPid] = useState(null);
+  const [rosterOpen, setRosterOpen] = useState(true);
+  // 花名册开合状态交给 game.js：折起时表情改走弹幕（ui/danmaku.js），行内气泡让位
+  useEffect(() => { onRosterOpen?.(rosterOpen); }, [rosterOpen]);
   // the playerId whose avatar just called onWatch, so the other click of a double-click does not open the view again
   const askedAt = useRef(/** @type {{ id: string|null, at: number }} */ ({ id: null, at: 0 }));
   const phaseKey = `${pub?.phase}:${pub?.round}`;
   useEffect(() => { setOpenPid(null); }, [phaseKey, watching, observe?.observing]);
   const players = sortedPlayers(pub);
   if (!players.length) return null;
+  // 「深渊回响」不是同盟：面板标题和折叠头都要说深潜（维护者 2026-11-08）
+  const teamName = diveTeam(isDivePub(pub));
+  const poolGroups = Array.isArray(pub?.poolGroups) ? pub.poolGroups.filter((g) => g && Array.isArray(g.playerIds) && g.playerIds.length) : [];
+  const poolSummary = Number(pub?.playerCapacity) > 4 && poolGroups.length
+    ? poolGroups.every((g) => g.playerIds.length === 1)
+      ? t('独立卡池 · 每人 1 池')
+      : poolGroups.map((g) => `${t('池')}${g.id}(${g.playerIds.length})`).join(' · ')
+    : null;
   // a boss round: the viewer's pair framed in green from the round's start (item 51 — the official bg_team_border,
   // tinted like the official green; a plain green ring without the local art)
   const team = teamFrameIds(pub, myId);
+  // 5–20 人房 / 手机 / 折起的花名册：表情改走弹幕，行内不再挂气泡（ui/teamLayout.js teamEmoteMode）
+  const rowBubbles = teamEmoteMode({ density: teamDensity({ count: players.length, phone: globalThis.matchMedia?.(PHONE_QUERY)?.matches }), open: rosterOpen }) === 'bubble' ? bubbles : null;
   const frameArt = team.size ? localAsset('ui/battle', 'bg_team_border') : null;
   const askedRecently = (p) => askedAt.current.id === p?.playerId && Date.now() - askedAt.current.at < AVATAR_CLICK_GAP_MS;
   const noteAsked = (p) => { askedAt.current = { id: p.playerId, at: Date.now() }; };
@@ -162,16 +181,23 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
     noteAsked(p);
     onWatch(p);
   };
-  return html`<aside class=${cx('team', compact && 'team--compact')} aria-label=${t('同盟成员')}>
+  return html`<aside class=${cx('team', compact && 'team--compact', players.length > 4 && 'team--many', !rosterOpen && 'is-folded')} aria-label=${teamName}>
+    ${players.length > 4 ? html`<div class="team__head">
+      <button type="button" class="team__toggle" aria-expanded=${String(rosterOpen)} aria-controls="team-roster"
+        onClick=${() => setRosterOpen((v) => !v)}>
+        <${Icon} name="users" /><span>${teamName}</span><b class="num">${players.length}</b>
+        <${Icon} name="chevronRight" class="team__chev" />
+      </button>
+    </div>` : null}
+    ${poolSummary ? html`<div class="team__pool-summary" title=${poolSummary}><span>${t('卡池')}</span><b>${poolSummary}</b></div>` : null}
+    <div class="team__notice"><${RevivalNotice} pub=${pub} /><${KickVoteNotice} pub=${pub} /></div>
+    <div class="team__players" id="team-roster" hidden=${!rosterOpen}>
     ${players.map((p) => {
       const self = p.playerId === myId;
       const status = p.alive === false ? 'dead' : p.status;
       const meta = STATUS_META[status] || STATUS_META.acting;
       const watched = teammateFieldShown(watching, p);
-      // 本服：5–20 人房 / 手机 / 花名册折起时，行内气泡让位给弹幕（ui/teamLayout.js teamEmoteMode）。
-  // 0.4.0 的 TeamPanel 没有「花名册开合」状态，这里按「不开合」适配。
-  const rowBubbles = teamEmoteMode({ density: teamDensity({ count: (pub?.players??[]).length || 4, phone: globalThis.matchMedia?.(PHONE_QUERY)?.matches === true }), open: false });
-  const bubble = bubbles?.get(p.playerId);
+      const bubble = rowBubbles?.get(p.playerId);
       const offline = p.connected === false && !p.isBot;
       const open = !!observe && openPid === p.playerId && !self;
       const back = !!observe && self && observe.observing;
@@ -196,6 +222,7 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
         <div class="team__info">
           <span class="team__name">${p.name || t('博士')}</span>
           <div class="team__line">
+            ${Number(pub?.playerCapacity) > 4 ? html`<span class="team__pool" title=${t('卡池分组 {n}', { n: p.poolGroup || 1 })}>${POOL_BADGE}${p.poolGroup || 1}</span>` : null}
             <${LpTower} value=${lp.lp} size="sm" tone=${Number.isFinite(lp.lp) && lp.lp - lp.pending <= 5 ? 'danger' : null} pending=${lp.pending}
               tip=${rowLpTip(lp, cap)} />
             ${lp.left != null ? html`<${MissTag} n=${lp.left} name=${self ? null : p.name || t('博士')} />` : null}
@@ -206,15 +233,21 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
                   : html`<${GIcon} name=${meta.glyph} />`}
               </span>
             <//>
+            ${/* 预约盟约：进对局以后在队友行上也看得见（和 bandDraft 的选人顺序行同一个标记）。
+                 AI 不会预约，所以只有真人会带这个图标；compact 只出图标不出名字。 */ null}
+            ${p.bondPlan ? html`<${BondPlanTag} bondId=${p.bondPlan} compact=${true} class="team__plan" />` : null}
             ${watched && !self ? html`<span class="team__eye" title=${t('正在查看')}><${GIcon} name="eye" /></span>` : null}
           </div>
           ${open ? html`<button type="button" class="btn btn--primary btn--sm team__ob"
             onClick=${() => { setOpenPid(null); onWatch(p); }}><span class="btn__label">${t('前往查看')}</span></button>` : null}
           ${back ? html`<button type="button" class="btn btn--secondary btn--sm team__back"
             onClick=${() => observe.onBack()}><span class="btn__label">${t('返回战场')}</span></button>` : null}
+          <${ReviveAction} pub=${pub} myId=${myId} target=${p} compact=${players.length > 4} />
+          <${KickAction} pub=${pub} myId=${myId} target=${p} compact=${players.length > 4} />
         </div>
         ${bubble ? html`<${EmoteBubble} key=${bubble.seq} id=${bubble.id} class="team__bubble" />` : null}
       </div>`;
     })}
+    </div>
   </aside>`;
 }

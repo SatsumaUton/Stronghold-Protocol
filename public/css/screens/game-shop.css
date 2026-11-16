@@ -285,3 +285,9 @@
 
 /* [ASSUMED] #692: retain the shop at 70% during the middle deploy level. */
 .gm.is-deploy-partial .shopbar { transform: scale(.7); animation: none; }
+
+
+/* === 本服新增（0.4.0 基板回填）：本服新增：深渊排异盟约（可购买、不可上场） === */
+.scard__bond.is-banned { color: var(--amber, #f0b429); }  /* 诅咒排异：可购买、不可上场（不是本局禁用） */
+.scard__bond.is-banned .bglyph { color: var(--amber, #f0b429); }
+.scard__bond.is-banned span { text-decoration: underline dotted; text-decoration-color: var(--amber, #f0b429); }

@@ -659,10 +659,10 @@
 .pavatar__x .icon, .pavatar__door .icon { width: 60%; height: 60%; filter: drop-shadow(0 0 4px #000); }
 
 /* ---- effects ---------------------------------------------------------------------------------------------- */
-.gm__effects { position: absolute; right: .3rem; top: 2.4rem; }
-/* 准备就绪 refused (the temp row holds pieces): its reason shows under the button and pushes the ready count down —
-   the effects column follows, or the count runs into it on phones */
-.gm.has-readywhy .gm__effects { top: calc(2.4rem + max(.3rem, calc(16px * var(--sp-ui, 1)))); }
+/* 效果栏（策略 / 机变 / 团队增益 / 道具，ui/effectsList.js）：排在右上角那一列的最后
+   （ui/hud.js TopBar 的 .gtop__right，由 screens/game.js 的 effectsSlot 传进去），不再是 .gm__hud 底下
+   一块自己钉 top 的绝对定位 —— 否则「暂停游戏」/「2 倍速」一加就被策略图标压住（维护者 2026-11-08）。 */
+.gm__effects { align-self: flex-end; display: flex; justify-content: flex-end; }
 .effects { display: flex; flex-direction: column; align-items: flex-end; gap: .08rem; }
 .effect {
   position: relative; width: .5rem; height: .5rem; display: grid; place-items: center;
@@ -1426,6 +1426,7 @@
 
 .gm--unite-budget .team { top: 2.85rem; }
 
+@media (max-width: 600px) and (orientation: portrait) {
   .gm--expanded .gtop { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "connection clock" "phase phase"; padding-inline: 16px; gap: .18rem; }
 
   .gm--expanded .gtop__left { grid-area: connection; min-width: 0; }
@@ -1449,6 +1450,7 @@
   .gm--expanded.gm--unite-budget .gm__bonds { top: 4.2rem; }
 
   .gm--expanded.gm--unite-budget .team { top: 5.1rem; }
+}
 
 .team--many { bottom: 2.9rem; max-height: none; overflow-y: auto; overflow-x: hidden; padding-right: .08rem; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--mint-800) transparent; pointer-events: auto; }
 
@@ -1459,3 +1461,330 @@
 .team--many::-webkit-scrollbar-thumb { background: var(--mint-800); border-radius: 1rem; }
 
 .team--many .team__bubble { left: auto; right: .08rem; max-width: calc(100% - .16rem); }
+
+
+/* === 本服新增（0.4.0 基板回填）：本服新增：2 倍速投票 / 暂停投票 / 放弃深潜浮层 / 花名册折起 / 卡池分组 / 预约盟约 / 管理员工具 / 顶栏胶囊等高 === */
+/* 战斗 2 倍速 (ui/hud.js SpeedVote): the pause button's dark plate, mint once a battle runs at it */
+.speedvote {
+  display: inline-flex; align-items: center; gap: .08rem; height: .38rem; padding: 0 .12rem; flex: none;
+  background: rgba(10, 14, 12, .88); border: 2px solid rgba(242, 242, 242, .45); color: var(--text-md);
+  font-size: max(calc(.17 * var(--t)), calc(11px * var(--ui))); line-height: 1; white-space: nowrap;
+  box-shadow: 0 .04rem .16rem rgba(0, 0, 0, .55);
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.speedvote__glyph { font-style: normal; font-size: .8em; letter-spacing: -.12em; margin-right: .04rem; }
+.speedvote__count { font-family: var(--font-num); font-weight: 700; }
+.speedvote:hover:not(:disabled) { background: rgba(255, 255, 255, .14); border-color: #fff; color: #fff; }
+.speedvote.is-called { border-color: var(--mint-600); color: #fff; }
+.speedvote.is-mine { border-color: var(--mint-400); color: var(--mint-400); }
+.speedvote.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(var(--mint-rgb), .45); }
+.speedvote.is-busy { opacity: .6; }
+.speedvote:disabled { cursor: default; }
+
+/* 「暂停游戏」的全员投票（ui/hud.js PauseVote，维护者 2026-11-08）：和 2 倍速那颗同一块深色牌子，
+   投过票变蓝、暂停中整块变蓝并不可点（继续要在浮层里点） */
+.pausevote {
+  display: inline-flex; align-items: center; gap: .08rem; height: .38rem; padding: 0 .12rem; flex: none;
+  background: rgba(10, 12, 16, .88); border: 2px solid rgba(242, 242, 242, .45); color: var(--text-md);
+  font-size: max(calc(.17 * var(--t)), calc(11px * var(--ui))); line-height: 1; white-space: nowrap;
+  box-shadow: 0 .04rem .16rem rgba(0, 0, 0, .55);
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.pausevote__glyph { font-style: normal; font-size: .72em; letter-spacing: -.06em; margin-right: .04rem; }
+.pausevote__label { font-weight: 600; }
+.pausevote__count { font-family: var(--font-num); font-weight: 700; }
+.pausevote:hover:not(:disabled) { background: rgba(255, 255, 255, .14); border-color: #fff; color: #fff; }
+.pausevote.is-mine { border-color: var(--mint-400); color: var(--mint-400); }
+.pausevote.is-paused { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(var(--mint-rgb), .45); }
+.pausevote.is-busy { opacity: .6; }
+.pausevote:disabled { cursor: default; }
+
+/* 暂停浮层（screens/game/overlays.js PauseVoteOverlay）：沿用 awayov 的骨架，只补「谁确认了」那一列 */
+.pausevote__box { min-width: 4.6rem; }
+.pausevote__list { display: flex; flex-direction: column; gap: .04rem; margin: .08rem 0 0; padding: 0; list-style: none; }
+.pausevote__who {
+  display: flex; align-items: center; gap: .08rem; padding: .03rem .08rem;
+  background: rgba(255, 255, 255, .04); border-left: 2px solid rgba(255, 255, 255, .18);
+  font-size: max(calc(.15 * var(--t)), calc(11px * var(--ui)));
+}
+.pausevote__who.is-ok { border-left-color: var(--mint-400); background: rgba(var(--mint-rgb), .12); }
+.pausevote__who em { margin-left: auto; font-style: normal; opacity: .8; }
+.pausevote__mark { font-style: normal; width: .18rem; text-align: center; }
+.pausevote__countline { margin: .06rem 0 0; opacity: .85; }
+.pausevote__note { margin: .02rem 0 0; font-size: .9em; }
+
+/* 「放弃深潜」的全员投票浮层（screens/game/overlays.js GiveUpVoteOverlay，维护者 2026-11-08）：
+   和暂停浮层同一套骨架 / 名单样式，只多一个红色动作区（放弃是不可逆的）。
+   以前这块只在放大镜抽屉最下面，发起之后面板一关就看不见了。 */
+.giveup__box { min-width: 5.2rem; }
+.giveup__acts { display: flex; align-items: center; justify-content: center; gap: .14rem; flex-wrap: wrap; margin-top: .12rem; }
+.giveup__timer { font-variant-numeric: tabular-nums; }
+.pausevote__who.is-no { border-left-color: #e07474; background: rgba(224, 116, 116, .12); }
+.pausevote__who.is-no em { color: #f3c9c9; }
+
+.team__players { display: flex; flex-direction: column; gap: .14rem; min-height: 0; }
+.team__players[hidden] { display: none; }
+.team__head { pointer-events: auto; }
+.team__toggle { display: inline-flex; align-items: center; gap: .06rem; height: .3rem; padding: 0 .1rem; border: 1px solid var(--line-2); background: rgba(8, 11, 10, .82); color: var(--text-md); font: inherit; font-size: .13rem; cursor: pointer; }
+.team__toggle .icon { width: .15rem; height: .15rem; }
+.team__toggle b { color: var(--mint-400); font-family: var(--font-num); }
+.team__chev { transform: rotate(90deg); transition: transform var(--t-fast); }
+.team.is-folded .team__chev { transform: rotate(0); }
+.team--many { bottom: 2.9rem; max-height: none; overflow-y: auto; overflow-x: hidden; padding-right: .08rem; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--mint-800) transparent; pointer-events: auto; }
+/* 选中框 (.team__frame) 用 inset: -.07rem 向行外扩，而 .team--many 的 overflow-y: auto 会把这个
+   外扩裁掉：第一行的框上沿被裁、相邻两行的框互相压住（4 人房是 overflow: visible，所以看不出来）。
+   给滚动容器补上下内边距，外扩部分才有地方画。 */
+.team--many { padding-block: .07rem; }
+.team--many::-webkit-scrollbar { width: .05rem; }
+.team--many::-webkit-scrollbar-thumb { background: var(--mint-800); border-radius: 1rem; }
+.team__pool { display: inline-flex; align-items: center; height: .21rem; padding: 0 .05rem; border: 1px solid rgba(var(--mint-500-rgb), .3); border-radius: .04rem; color: var(--mint-400); font-size: .12rem; line-height: 1; white-space: nowrap; }
+.team__pool-summary { display: flex; align-items: center; gap: .05rem; max-width: 100%; padding: .04rem .08rem; border: 1px solid rgba(var(--mint-500-rgb), .18); background: rgba(8, 11, 10, .6); color: var(--text-dim); font-size: .12rem; line-height: 1.4; pointer-events: auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.team__pool-summary b { color: var(--mint-400); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.team__notice:empty { display: none; }
+
+.team__plan { flex: none; border-color: rgba(var(--mint-500-rgb), .25); background: rgba(12, 15, 14, .6); }
+.team__plan .bglyph { width: .18rem; height: .18rem; }
+
+/* ===== 管理员工具（本服新增 2026-10-31）=====
+   入口：对局中点击左上角延迟胶囊。只有登录 owner/admin 账号时才渲染（server welcome.adminTools）。
+   风格对齐游戏本体：深色玻璃卡片 + 金色描边，和测试房那个 ami 黄块面板区分开。 */
+.admintools {
+  /* 面板必须相对**视口**定位，不能相对 .gtop。
+     .gtop 是 display:grid，之前用 absolute + grid-area:1/1 让它以第一个网格单元为参照 ——
+     那个单元是 1fr，超宽屏上左边缘会飘到屏幕外（维护者截图里整个面板跑出屏幕）。
+     现在用 fixed，并给它自己的最小宽度保护。 */
+  position: fixed;
+  right: 16px;
+  top: 76px;
+  z-index: 60;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(62vh, 540px);
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px 10px;
+  background: linear-gradient(180deg, rgba(10,16,18,.97), rgba(6,10,12,.98));
+  border: 1px solid var(--gold-a20); border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,198,0,.06);
+  color: var(--text-md); font-size: 12px;
+  overflow: hidden;
+}
+/* 包住面板的宿主：display:contents 会让子元素重新进入 .gtop 的网格，
+     所以这里用 absolute + 0 尺寸把面板托住，宿主自己不占任何网格轨道。 */
+/* 包住面板的宿主：必须是**零尺寸且完全脱离流**的盒子。
+   .admintools 自己虽然是 absolute，但宿主若参与布局（哪怕 0 宽但仍在 grid 里），
+   也会因为 grid 的自动轨道计算让 gtop__left 变宽/变窄 —— 于是「开没开面板」
+   节点状态胶囊的横坐标就不一样。下面把宿主钉死在 1/1 格、0 尺寸、不占轨道。 */
+.admintools-host {
+  /* 宿主只用来把面板从 .gtop 的 grid 里摘出来。
+     不能写 grid-area —— 写了就等于「参与网格定位」，超宽屏上会被推到屏幕外。
+     position:fixed + 零尺寸 + pointer-events:none，对布局零影响。 */
+  position: fixed; left: 0; top: 0; width: 0; height: 0;
+  overflow: visible; pointer-events: none;
+  z-index: 60;
+}
+.admintools-host > .admintools { pointer-events: auto; }
+.admintools-host > .admintools { pointer-events: auto; }
+
+.admintools__head { display: flex; align-items: center; gap: 8px; }
+.admintools__head b { color: var(--gold); font-size: 13px; letter-spacing: .04em; }
+.admintools__hint { color: var(--text-dim); font-size: 11px; }
+.admintools__x { margin-left: auto; width: 22px; height: 22px; display: grid; place-items: center;
+  background: transparent; border: 1px solid var(--gold-a20); border-radius: 6px; color: var(--text-lo); cursor: pointer; }
+.admintools__x:hover { color: var(--gold); border-color: var(--gold); }
+.admintools__tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.admintools__tab { padding: 5px 0; background: rgba(255,198,0,.05); border: 1px solid var(--gold-a20);
+  border-radius: 6px; color: var(--text-lo); cursor: pointer; font-size: 12px; }
+.admintools__tab.is-on { background: var(--gold-a20); border-color: var(--gold); color: var(--gold); font-weight: 600; }
+.admintools__search { padding: 5px 8px; background: #0b1214; border: 1px solid #27393b; border-radius: 6px;
+  color: var(--text-hi); font-size: 12px; }
+.admintools__search:focus { outline: none; border-color: var(--gold-a20); }
+.admintools__list { flex: 1 1 auto; min-height: 60px; overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column; gap: 2px; padding-right: 2px; }
+.admintools__row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; text-align: left;
+  background: transparent; border: 1px solid transparent; border-radius: 5px; color: var(--text-md); cursor: pointer; }
+.admintools__row:hover:not(:disabled) { background: rgba(255,198,0,.08); border-color: var(--gold-a20); color: var(--text-hi); }
+.admintools__row:disabled { opacity: .45; cursor: default; }
+.admintools__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admintools__tier { flex: none; color: var(--gold); font-size: 11px; }
+.admintools__empty { padding: 12px 0; text-align: center; color: var(--text-dim); }
+.admintools__funds { display: flex; gap: 6px; }
+.admintools__funds input { flex: 1 1 auto; min-width: 0; padding: 5px 8px; background: #0b1214;
+  border: 1px solid #27393b; border-radius: 6px; color: var(--text-hi); }
+.admintools__funds button { flex: none; padding: 5px 10px; background: var(--gold-a20);
+  border: 1px solid var(--gold); border-radius: 6px; color: var(--gold); cursor: pointer; font-weight: 600; }
+/* flex:none 是关键 —— 上面 .admintools__list 是 flex:1 1 auto 会吃满剩余高度，
+   日志区若不加 none 就会被压到接近 0，长中文只能露出一条缝（截图里那条红线）。 */
+.admintools__log { list-style: none; margin: 0; padding: 8px 0 0; border-top: 1px solid #1b2a2c;
+  flex: none; max-height: 168px; overflow-y: auto; font-size: 11.5px; }
+.admintools__log li { padding: 4px 0; color: var(--text-lo); line-height: 1.6;
+  white-space: normal; word-break: break-word; }
+.admintools__log li.is-ok { color: var(--mint-600); }
+.admintools__log li.is-bad { color: var(--red-premium); background: rgba(255,90,90,.08);
+  border-left: 2px solid var(--red-premium); padding-left: 6px; border-radius: 3px; }
+.admintools__note { margin: 0; color: var(--text-lo); font-size: 12px; line-height: 1.6; }
+.admintools__msg { color: var(--amber); font-size: 12px; }
+/* 二次确认开关：常驻一行；勾上后出现警示文字与「恢复确认」，避免静默免确认。 */
+.admintools__warn { display: flex; align-items: center; gap: 8px; padding: 2px 2px 6px; font-size: 12px; }
+.admintools__chk { display: inline-flex; align-items: center; gap: 6px; color: var(--text-lo); cursor: pointer; }
+.admintools__chk input { margin: 0; accent-color: var(--amber); }
+.admintools__warnon { color: var(--amber); font-weight: 600; }
+.admintools__mini { margin-left: auto; padding: 2px 10px; font-size: 12px; cursor: pointer;
+  background: transparent; color: var(--gold); border: 1px solid var(--gold-a20); border-radius: 6px; }
+.admintools__mini:hover { background: var(--gold-a20); }
+
+
+/* 游戏内管理员工具的入口按钮（本服 2026-10-31）。
+   挂在 .gtop__meta 里难度标签前面：比延迟胶囊显眼 —— 胶囊上只有 "45ms"，
+   玩家（包括服主本人）根本不会想到去点它。金色描边与面板同色系。 */
+.gtop__admintool {
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+  height: 22px; padding: 0 8px; cursor: pointer;
+  background: rgba(255, 198, 0, .10); color: var(--gold);
+  border: 1px solid var(--gold-a20); border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; line-height: 1;
+  transition: background .12s, border-color .12s;
+}
+.gtop__admintool .icon { width: 12px; height: 12px; }
+.gtop__admintool:hover { background: var(--gold-a20); border-color: var(--gold); }
+.gtop__admintool:active { background: rgba(255, 198, 0, .28); }
+/* 小屏（对局 HUD 在手机上是精简的）：只留图标，省横向空间 */
+@media (max-width: 560px) { .gtop__admintool span { display: none; } .gtop__admintool { padding: 0 6px; } }
+/* 验证码授权区块（本服 2026-10-31）。owner/admin 登录游戏即已授权，
+   所以这块默认折叠成一行，点「换码」才展开输入框。 */
+.admintools__code { border-top: 1px solid #1b2a2c; padding-top: 6px; margin-top: 2px; }
+.admintools__codehead { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-lo); }
+.admintools__stick--on { color: var(--mint-400); font-weight: 600; }
+.admintools__stick--off { color: var(--text-dim); font-weight: 600; }
+.admintools__stick--id { color: var(--text-dim); font-size: 11px; }
+/* 延迟胶囊与节点状态胶囊必须严格等高：两处都读同一个变量，
+   谁都不许自己定高。.32rem 是延迟胶囊原本的高度，这里把它提出来共用。 */
+.gtop__net { --gtop-pill-h: .32rem; }
+.gtop__net > .ping,
+.gtop__net > #mm-nodes,
+.gtop__net > #mm-nodes > .chip {
+  box-sizing: border-box;
+  height: var(--gtop-pill-h);
+  min-height: var(--gtop-pill-h);
+  max-height: var(--gtop-pill-h);
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+/* .ping 必须与节点胶囊同高：padding 置零、高度锁到同一个变量，
+   否则它的 min-height:.32rem + 上下 1px padding 会和节点胶囊差 2px。 */
+.gtop__net > .ping { padding-top: 0; padding-bottom: 0; height: var(--gtop-pill-h); min-height: var(--gtop-pill-h); max-height: var(--gtop-pill-h); box-sizing: border-box; align-self: center; }
+.gtop__net > #mm-nodes > .chip { padding-top: 0; padding-bottom: 0; justify-content: center; }
+/* ═══ 对局顶栏：延迟胶囊 / 节点状态胶囊 必须严格等高同线（2026-10-31） ═══
+   历史遗留：.ping 有 min-height:.32rem + 上下 1px padding（两条规则互相覆盖），
+   节点胶囊是内容高（图标 14px 或圆点 7px）。两者差 10px 以上，肉眼明显。
+   这里用 !important 一次性压死所有来源，两种身份的胶囊读同一个高度。 */
+.gtop .gtop__net { --gtop-pill-h: .32rem; align-items: center; }
+.gtop .gtop__net > .ping,
+.gtop .gtop__net > #mm-nodes,
+.gtop .gtop__net > #mm-nodes > .chip {
+  box-sizing: border-box !important;
+  height: var(--gtop-pill-h) !important;
+  min-height: var(--gtop-pill-h) !important;
+  max-height: var(--gtop-pill-h) !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  align-self: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
+}
+/* ═══ 超宽屏（带鱼屏）下的胶囊对齐（2026-10-31）═══
+   带鱼屏上 1rem 由 100vw/19.2 推高，.32rem 可到 40px 以上；
+   .ping 里的数字与单位（ms）字号更大，容易把固定高度撑破，
+   而节点胶囊的字号是另一套 —— 两者基线随之错开。
+   这里不锁像素，改成「跟随内容、但两边用同一套行高与字号比例」。 */
+@media (min-aspect-ratio: 21/9) {
+  .gtop .gtop__net { align-items: center; }
+  .gtop .gtop__net > .ping,
+  .gtop .gtop__net > #mm-nodes,
+  .gtop .gtop__net > #mm-nodes > .chip {
+    height: auto !important;
+    min-height: var(--gtop-pill-h) !important;
+    max-height: none !important;
+    align-self: center !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    line-height: 1 !important;
+  }
+  /* 两边的字号统一到同一条基准，避免数字 vs 中文的基线差异 */
+  .gtop .gtop__net > .ping,
+  .gtop .gtop__net > #mm-nodes > .chip { font-size: calc(.16 * var(--t)) !important; }
+}
+/* ═══ 对局顶栏胶囊等高：最终裁决（2026-10-31，实测数据驱动）═══
+   实测带鱼屏 3440×1440：1rem = 179.17px，.32rem = 57.33px，
+   .ping 的实际高度就是 57.34px。节点胶囊（#mm-nodes，由 mm/client.js 注入）
+   若不跟着这个值，就会差几十像素。
+   这里不再用「内容撑高」，三个元素全部锁定到同一个 .32rem。 */
+.gtop .gtop__net > .ping,
+.gtop .gtop__net > #mm-nodes,
+.gtop .gtop__net > #mm-nodes > .chip {
+  box-sizing: border-box !important;
+  height: .32rem !important;
+  min-height: .32rem !important;
+  max-height: .32rem !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  align-self: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 1 !important;
+}
+/* ═══ 胶囊视觉对齐微调（2026-10-31）═══
+   .ping 里是「27 ms」（数字+拉丁字母），.chip 里是中文「汐斯塔 · 正常」。
+   两者盒子实测完全等高（top/bottom 逐位相同），但**中文的视觉重心比数字高** ——
+   字形方块顶到行盒顶部，而数字上下留白多，看起来就像节点胶囊「偏上」。
+   这里给中文那侧一点上行补偿，让两边的视觉中心落到同一条线上。 */
+.gtop .gtop__net > #mm-nodes > .chip #mm-nodes-text,
+.gtop .gtop__net > #mm-nodes > .chip > span {
+  transform: translateY(.5px);
+}
+.gtop .gtop__net > #mm-nodes > .chip > svg {
+  transform: translateY(.5px);
+}
+
+
+/* === 本服新增（深潜/盟约 UI，第二批）：救援栏 / 观战提示行 / 退出保存说明 / 深潜色相（官方精灵图转紫） === */
+.team-rescue { pointer-events: auto; max-width: 2.75rem; display: flex; flex-wrap: wrap; align-items: center; gap: .04rem .12rem; padding: .1rem .12rem; color: var(--mint-400); background: rgba(13, 26, 21, .95); border-left: 2px solid var(--mint-500); font-size: .14rem; }
+.team-rescue > strong { display: flex; gap: .06rem; align-items: center; }
+.team-rescue > small { flex-basis: 100%; font-size: .12rem; color: var(--text-lo); }
+.team-rescue-action { display: flex; flex-direction: column; align-items: flex-start; gap: .02rem; margin-top: .04rem; max-width: 1.8rem; pointer-events: auto; }
+.team-rescue-action > small { color: var(--text-dim); font-size: .11rem; line-height: 1.35; }
+.team-rescue-action .btn { min-height: .32rem; }
+
+/* 战斗中观战队友 (维护者 2026-11-07): a quieter line under the observing pill — the own battle keeps running off screen */
+.chud__msg--note { padding: .04rem .2rem; font-size: .15rem; color: var(--text-md); border-color: rgba(var(--mint-500-rgb), .25); }
+.chud__msg--note .icon { width: .17rem; height: .17rem; color: var(--text-md); }
+
+/* 「这一局会替你留着」：单人房的 24 小时保存说明（维护者 2026-11-08）。一眼能看见、又不抢按钮的注意力 */
+.exitm__save {
+  display: flex; flex-direction: column; gap: .02rem;
+  padding: .1rem .12rem;
+  border: 1px solid rgba(140, 226, 190, .38);
+  border-left: 3px solid rgba(140, 226, 190, .8);
+  border-radius: .05rem;
+  background: rgba(30, 62, 50, .35);
+}
+.exitm__save-t { color: #b9f0d4; font-size: 1em; letter-spacing: .02em; }
+.exitm__save-d { color: #9fc7b6; font-size: .92em; line-height: 1.55; }
+
+/* 官方精灵图里的绿色图标（放大镜按钮、棋子/战场图标等）：颜色画在 PNG 里，改不了 fill，
+   只能用滤镜把绿色相转成紫色。和 theme.css 里 .bglyph img 用的是同一套思路。 */
+html.sp-deepecho .gtop__iconbtn img,
+html.sp-deepecho .gtop__iconbtn svg,
+html.sp-deepecho .gtop__iconbtn .sprite,
+html.sp-deepecho .roundbox img,
+html.sp-deepecho .rs-pill img,
+html.sp-deepecho .edrawer__ico img,
+html.sp-deepecho .etag img,
+html.sp-deepecho .gicon img {
+  filter: hue-rotate(120deg) saturate(1.6) brightness(1.05);
+}

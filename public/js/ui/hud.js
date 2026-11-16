@@ -27,7 +27,7 @@
 // 准备就绪 is refused while the temp overflow row (临时整备区) holds pieces: the reason shows under the button
 // (user playtest #3 item 3; the row's own label is ui/underframe.js TempRowNotice).
 
-import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.v2.js';
 import { PHASE, DIFFICULTY_NAMES } from '../../../shared/constants.js';
 import { html, Button, Icon, PingPill, Countdown, Tooltip, MicroLabel, DifficultyTag, Modal, useTicker, secondsLeft } from './components.js';
 import { Sprite, LpTower, GIcon, LocalSprite } from './gameComponents.js';
@@ -35,8 +35,12 @@ import { data, getMode, localAsset } from '../data.js';
 import { uiUrl } from './assetUrls.js';
 import { reducedMotion } from './device.js';
 import { serverNow } from '../store.js';
+// 本服：游戏内管理员工具（点左上角「节点状态」胶囊开关，不是延迟胶囊）
+import { store, useStore } from '../store.js';
+import { AdminTools } from './adminTools.js';
+import { canOpenAdminTools } from './adminGate.js';
 import { isCombatPhase, isBossPhase, prepCapsuleLabel, bossFrac, bossPctText, bossShieldFrac, fmtNum, shopBlockReason, uniteBudgetInfo } from './gameLogic.js';
-import { overtimeState, overtimeDrainPerSec, remainAt } from './matchStatus.js';
+import { overtimeState, overtimeDrainPerSec, remainAt, battleSpeedScale, speedVoteState, speedVoteCountShown } from './matchStatus.js';
 import { hotkeyLabelOf, useSettings, settingsStore } from './settings.js';
 import { usePrefabPack } from './prefab/view.js';
 import { RegHudBand, RegCountdown, RegReadyFace, packHud, cornerOffset } from './prefab/hud.js';
@@ -101,6 +105,8 @@ export function SpectatorPill({ spectators, myId, isHost, onRemove }) {
  */
 export function PhaseCapsule({ pub, hud, miss = null }) {
   const phase = pub?.phase;
+  // 深潜：胶囊里的官方精灵图（休息 / 作战 / 首领）把绿色转紫，白色像素不受影响（维护者 2026-11-05）
+  const diveIcon = pub?.echo ? { filter: 'hue-rotate(120deg) saturate(1.6) brightness(1.05)' } : null;
   if (isBossPhase(phase)) {
     // the battle on screen first: its snapshot carries the live pool (the local simulation's own damage on top of the
     // server's b.pool, or the server's 20 Hz stream); m.public.bossHp refreshes at ~1 Hz and lags the leader's death
@@ -109,9 +115,9 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
     // 护盾：共享血池的领袖身上还有屏障时血条几乎不动，按池上限同一把尺子画出来（维护者 2026-11-08）
     const shFrac = bossShieldFrac(boss);
     return html`<div class="capsule capsule--boss" role="status" data-banner="bossDamage">
-      <${Sprite} k="hudPanel/icon_boss" class="capsule__icon" fallback=${html`<${GIcon} name="skull" class="capsule__icon" />`} />
+      <${Sprite} k="hudPanel/icon_boss" class="capsule__icon" style=${diveIcon} fallback=${html`<${GIcon} name="skull" class="capsule__icon" />`} />
       ${hud?.total != null ? html`<span class="capsule__kills num"><b>${hud.resolved ?? hud.killed ?? 0}</b>/${hud.total}</span>` : null}
-      <div class=${cx('bossbar', shFrac != null && 'has-shield')} title=${boss ? `${fmtNum(boss.hp)} / ${fmtNum(boss.max)}${shFrac != null ? ` · 护盾 ${Math.round(shFrac * 100)}%` : ''}` : t('敌方领袖')}>
+      <div class=${cx('bossbar', shFrac != null && 'has-shield')} title=${boss ? `${fmtNum(boss.hp)} / ${fmtNum(boss.max)}${shFrac != null ? ` · ${t('护盾')} ${fmtNum(boss.shield)}` : ''}` : t('敌方领袖')}>
         <div class="bossbar__fill" style=${`width:${frac == null ? 100 : frac * 100}%`}></div>
         ${shFrac != null ? html`<div class="bossbar__shield" data-testid="boss-shield" style=${`width:${shFrac * 100}%`}></div>` : null}
         <span class="bossbar__txt num">${frac == null ? t('敌方领袖') : bossPctText(frac)}</span>
@@ -120,7 +126,7 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
   }
   if (isCombatPhase(phase) || (phase === PHASE.SETTLE && hud?.total != null)) {
     return html`<div class=${cx('capsule', 'capsule--combat', phase === PHASE.UNITE && 'capsule--unite')} role="status">
-      <${Sprite} k=${phase === PHASE.UNITE ? 'hudPanel/icon_coop' : 'hudPanel/icon_battle'} class="capsule__icon"
+      <${Sprite} k=${phase === PHASE.UNITE ? 'hudPanel/icon_coop' : 'hudPanel/icon_battle'} class="capsule__icon" style=${diveIcon}
         fallback=${html`<${Icon} name="sword" class="capsule__icon" />`} />
       <span class="capsule__kills num"><b>${hud?.resolved ?? hud?.killed ?? 0}</b>/${hud?.total ?? '--'}</span>
       ${phase === PHASE.UNITE ? html`<span class="capsule__tag">${t('联防')}</span>` : null}
@@ -128,7 +134,7 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
     </div>`;
   }
   return html`<div class="capsule capsule--prep" role="status">
-    <${Sprite} k="hudPanel/icon_rest" class="capsule__icon" fallback=${html`<${Icon} name="rook" class="capsule__icon" />`} />
+    <${Sprite} k="hudPanel/icon_rest" class="capsule__icon" style=${diveIcon} fallback=${html`<${Icon} name="rook" class="capsule__icon" />`} />
     <span class="capsule__label">${prepCapsuleLabel(phase)}</span>
   </div>`;
 }
@@ -462,6 +468,20 @@ export function OvertimeWarning({ ot }) {
   </div>`;
 }
 
+/**
+ * 挂机移出警告（server afkRemoveRounds → m.private afkWarn，维护者 2026-11-06 补齐移植）：
+ * 上一回合没有任何实质操作，**再挂一回合就会被移出对局**。准备阶段常驻，直到有实质操作才消失。
+ */
+export function AfkWarning({ pub, priv }) {
+  if (!priv?.afkWarn) return null;
+  if (pub?.phase !== PHASE.PREP && pub?.phase !== PHASE.SP_DRAFT) return null;
+  return html`<div class="otwarn otwarn--afk" role="alert" data-state="afk" data-testid="afk-warning">
+    <${Icon} name="warn" class="otwarn__icon" />
+    <span class="otwarn__tag">AFK</span>
+    <span class="otwarn__txt">${t('本回合仍无操作将被移出对局')}</span>
+  </div>`;
+}
+
 /** Two-bar pause glyph (the official battle pause button). */
 function PauseGlyph() {
   return html`<svg class="pausebtn__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4.5v16H6zm7.5 0H18v16h-4.5z" /></svg>`;
@@ -478,6 +498,80 @@ export function PauseButton({ paused, busy = false, onToggle }) {
     <button type="button" class=${cx('pausebtn', 'tapx', paused && 'is-on', busy && 'is-busy')} aria-pressed=${paused ? 'true' : 'false'}
         aria-label=${label} disabled=${busy} data-testid="pause" onClick=${() => onToggle?.()}>
       ${paused ? html`<${Icon} name="play" class="pausebtn__glyph" />` : html`<${PauseGlyph} />`}
+    </button>
+  <//>`;
+}
+
+/**
+ * 战斗 2 倍速 (server/match/match/speedVote.js): this seat's standing vote with the count, and what the votes do. A spectator
+ * seat has no vote: it only sees that a battle runs at it.
+ */
+export function SpeedVote({ pub, myId, spectator = false, onVote }) {
+  const [busy, setBusy] = useState(false);
+  const v = speedVoteState(pub, myId);
+  if (!v || (spectator && v.status !== 'on' && v.status !== 'ending')) return null;
+  const on = v.status === 'on' || v.status === 'ending';
+  const label = on ? t('本场 2 倍速') : v.status === 'next' ? t('下一场起 2 倍速') : t('2 倍速');
+  // 票已经通过、这一场就在 2 倍速上跑，而且下一场也确定了（status 'on'）：票数（3/3、4/4）没有意义了，
+  // 只留「本场 2 倍速」。'ending' 不在此列 —— 那时这一场虽然是 2 倍速，但下一场的票数不够，
+  // 那个 1/3 是在提示还差几票，得留着（规则见 matchStatus.js speedVoteCountShown）。
+  const count = `${v.count}/${v.need}`;
+  const showCount = !spectator && speedVoteCountShown(v);
+  const tip = v.status === 'ending' ? t('票数不足，下一场战斗恢复常速')
+    : t('{need} 人同意后，下一场战斗起以 2 倍速进行', { need: v.need });
+  const press = async () => {
+    setBusy(true);
+    await onVote?.(!v.mine);
+    setBusy(false);
+  };
+  return html`<${Tooltip} text=${tip} placement="bottom">
+    <button type="button" class=${cx('speedvote', 'tapx', on && 'is-on', v.mine && 'is-mine', v.count > 0 && 'is-called', busy && 'is-busy')}
+        aria-pressed=${v.mine ? 'true' : 'false'} aria-label=${showCount ? `${label} ${count}` : label} disabled=${busy || spectator} data-testid="speed-vote" data-status=${v.status}
+        onKeyDown=${(e) => { if (e.key === ' ') e.stopPropagation(); }} onClick=${press}>
+      <i class="speedvote__glyph" aria-hidden="true">▶▶</i><span class="speedvote__label">${label}</span>
+      ${showCount ? html`<span class="speedvote__count num">${count}</span>` : null}
+    </button>
+  <//>`;
+}
+
+/**
+ * 「暂停游戏」的全员投票（维护者 2026-11-08，server/match/match/pauseVote.js）。
+ *
+ * 只对**深渊回响的多人局**下发（`m.public.pauseVote` 存在才渲染）；按钮就排在「准备就绪」下面。
+ *   * 没人发起：一颗「暂停游戏」按钮；
+ *   * 有人在发起：同一颗按钮变成「暂停 n/N」，自己投过就是选中态，再点一次撤回；
+ *   * 已经暂停：变成只读的「已暂停 · 确认 n/N」—— 继续要在浮层里点（screens/game/overlays.js PauseVoteOverlay）。
+ * 投票**全票通过**才真的暂停（暂停影响所有人，不能多数压着人停）。
+ * @param {{ pub: any, myId: string|null, spectator?: boolean, onVote: (agree:boolean)=>void }} props
+ */
+export function PauseVote({ pub, myId, spectator = false, onVote }) {
+  const [busy, setBusy] = useState(false);
+  const v = pub && pub.pauseVote;
+  if (!v || spectator) return null;
+  const active = pub.pauseActive || null;
+  const agreed = Array.isArray(v.agreed) ? v.agreed : [];
+  const mine = !!myId && agreed.includes(myId);
+  const count = `${agreed.length}/${Math.max(1, Number(v.need) || 1)}`;
+  const paused = !!v.paused || !!active;
+  const label = paused ? t('已暂停') : mine ? t('暂停中') : t('暂停游戏');
+  const tip = paused
+    ? t('对局已暂停：在浮层里点「继续游戏」，所有在线队友都确认后恢复')
+    : mine
+      ? t('你已经投了赞成票：{need} 人全部同意后暂停（再点一次撤回）', { need: Math.max(1, Number(v.need) || 1) })
+      : t('发起「暂停游戏」投票：{need} 个在线队友全部同意后暂停，暂停期间倒计时与战斗都会停下', { need: Math.max(1, Number(v.need) || 1) });
+  const press = async () => {
+    if (paused) return;
+    setBusy(true);
+    await onVote?.(!mine);
+    setBusy(false);
+  };
+  return html`<${Tooltip} text=${tip} placement="bottom">
+    <button type="button" class=${cx('pausevote', 'tapx', mine && 'is-mine', paused && 'is-paused', busy && 'is-busy')}
+      aria-pressed=${mine ? 'true' : 'false'} aria-label=${`${label} ${count}`} disabled=${busy || paused}
+      data-testid="pause-vote" data-state=${paused ? 'paused' : mine ? 'voted' : 'idle'}
+      onKeyDown=${(e) => { if (e.key === ' ') e.stopPropagation(); }} onClick=${press}>
+      <i class="pausevote__glyph" aria-hidden="true">❚❚</i><span class="pausevote__label">${label}</span>
+      <span class="pausevote__count num">${count}</span>
     </button>
   <//>`;
 }
@@ -531,21 +625,33 @@ export function UniteBudgetNote({ pub }) {
 
 export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, onReady, readyBusy, readyCount, playerCount, pen = false, penAvail = false, onPen = () => {},
   config = null, frozenAt = null, pause = null, live = null, spectator = false,
-  spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null, held = false }) {
+  spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null, held = false, onSpeedVote = null,
+  onPauseVote = null, effectsSlot = null }) {
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
   const lp = boss && Number.isFinite(pub?.teamLp) ? pub.teamLp : Number.isFinite(priv?.lp) ? priv.lp : null;
   // normal rounds: the leaks of the own battle so far (boss rounds: the team LP above already moves live)
   const pending = !boss && Number.isFinite(lp) && live && live.pending > 0 ? Math.min(lp, live.pending) : 0;
   const hidden = phase === PHASE.HIDDEN_CORE || (Number.isFinite(pub?.lastRound) && pub.round > pub.lastRound);
-  const roundText = hidden ? '??' : pub?.round > 0 ? String(pub.round) : '--';
+  // 「深渊回响」：深潜里**深度就是回合**，直接顶掉原版的回合数字（维护者 2026-11-04：
+  // 深潜不用另开一条悬浮状态条挡住 HUD，玩家看到的那个数就是深度）。普通房 echo 为 null，行为不变。
+  //
+  // 判据用 `echo.diveStart > 0`（而不是 depth > 0）：某些阶段 pub.echo 只有 diveStart、
+  // depth 刚好缺值时，`inDive` 会假掉，退回原版的 `??` 分支 —— 那正是「15 回合起深度一直 ?？」的成因。
+  const echoDive = Number(pub?.echo?.diveStart) > 0;
+  // 深潜里深度 = 显示回合（diveStart = 1），缺值时用 round 兜底，保证永远有数字
+  const diveDepth = echoDive ? Number(pub?.echo?.depth) || Number(pub?.round) || 0 : 0;
+  const inDive = echoDive;
+  // 深潜里**永远显示深度**：15 层是隐藏核心回合（原版用 ?? 藏住回合数），
+  // 但深潜的深度是玩家成绩，没有任何隐藏的理由（维护者 2026-11-05 反馈「15 回合显示 ?？」）。
+  const roundText = inDive ? String(diveDepth || '--') : hidden ? '??' : pub?.round > 0 ? String(pub.round) : '--';
   // a spectator seat (no m.private, community report #26) never readies
   const showReady = phase === PHASE.PREP && !spectator && priv?.alive !== false;
   // boss rounds: the overtime warning follows the clock (4 Hz while live; frozen while paused)
   const otLive = boss && Number(pub?.overtimeAt) > 0;
   useTicker(otLive && frozenAt == null ? 250 : 0);
   const now = Number.isFinite(frozenAt) ? frozenAt : serverNow();
-  const ot = otLive ? overtimeState(pub, now, { perSec: overtimeDrainPerSec(config) }) : null;
+  const ot = otLive ? overtimeState(pub, now, { perSec: overtimeDrainPerSec(config) * battleSpeedScale(pub) }) : null;
   const draining = ot?.state === 'drain';
   const lowLp = (Number.isFinite(lp) && lp - pending <= 5) || draining;
   const cap = Number(config?.lpCapPerRound) > 0 ? Number(config.lpCapPerRound) : 10;
@@ -566,13 +672,49 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   useTicker(pf.countdown && frozenSecs == null && pfRemain != null ? 1000 : 0);
   const onLeft = () => (pen ? onPen(false) : onDrawer('info'));
   const onRight = () => (pen ? onPen(false) : penAvail ? onPen(true) : null);
+  // 本服：管理员工具。只有登录 owner/admin 账号（服务端 welcome.adminTools）时，点左上角的
+  // 「节点状态」胶囊才打开面板。★ 注意不是延迟胶囊：PingPill 只是个延迟显示、没有点击事件，
+  // 真正派发 sp-open-admin-tools 的是 mm/client.js 里那颗节点状态胶囊。
+  // 普通玩家这里连 onClick 都不会挂 —— 点了只是原本的延迟 / 节点状态显示，没有任何反应。
+  // adminTools（两道门都过）在这里只用来触发重渲染：退出授权后组件要跟着更新。
+  // 真正的开关判据是 adminId + canOpenAdminTools，不看这个值 ——
+  // 否则退出授权后连面板都打不开，就没地方重新输码了（2026-10-31 的死锁）。
+  useStore((s) => s.adminTools === true);
+  const adminId = useStore((s) => s.adminId === true);
+  // 权限门（2026-10-31）：没被授予 tools.game 的 admin 不创建面板。
+  const gameTool = useStore((s) => s.gameTool === true);
+  const [adminOpen, setAdminOpen] = useState(false);
+  // 面板锚点：从节点胶囊的实际屏幕位置来，面板开在它正下方。
+  const [adminAnchor, setAdminAnchor] = useState(null);
+  // 对局中那颗「节点状态」胶囊也开这个面板（mm/client.js 派发事件）：
+  // 那次点击发生在注入的 DOM 里，够不到 React 状态，所以用 window 事件转一手。
+  //
+  // ★ 2026-10-31：这个监听**自己也要再判一次**，不能只信派发方。
+  //   维护者的规则是「只有在自己参与的对局里才能开管理员工具」，观战/隐身观战一律不能。
+  //   判据统一在 ui/adminGate.js。mm/client.js 因为要同步判断、又是 IIFE，
+  //   没法 import 它，所以那边有一份等价副本 —— test/ui/adminGate.test.js 会盯着两份别走样。
+  //   派发方已经挡了一层，但如果哪天它被绕过（或有人手动 dispatch 一个事件），
+  //   这里就是唯一的防线。
+  useEffect(() => {
+    const open = (e) => {
+      let s = null;
+      try { s = store.get(); } catch { /* 拿不到状态就当「不能开」 */ }
+      if (!canOpenAdminTools(s)) return;
+      const d = e && e.detail;
+      setAdminAnchor(d && Number.isFinite(d.left) ? { left: d.left, top: d.top, width: d.width } : null);
+      setAdminOpen(true);
+    };
+    window.addEventListener('sp-open-admin-tools', open);
+    return () => window.removeEventListener('sp-open-admin-tools', open);
+  }, []);
   return html`<header class=${cx('gtop', pen && 'is-pen', pf.band && 'gtop--pf')}>
-      <${UniteBudgetNote} pub=${pub} />
     <div class="gtop__left">
       <${Button} variant="danger" size="lg" square=${true} icon="exit" onClick=${onExit} aria-label=${t('离开')} title=${t('离开 / 暂离')} class="gtop__exit tapx" />
       <div class="gtop__meta">
         <div class="gtop__net">
-          <${PingPill} ms=${conn?.ping} online=${conn?.status === 'online'} />
+          <span class="gtop__pingbox">
+            <${PingPill} ms=${conn?.ping} online=${conn?.status === 'online'} />
+          </span>
           <${SpectatorPill} spectators=${spectators} myId=${myId} isHost=${isHost} onRemove=${onRemoveSpectator} />
         </div>
         ${pub?.difficulty ? html`<${DifficultyTag} difficulty=${pub.difficulty} size="sm" name=${ladderName(pub)} />` : null}
@@ -581,6 +723,13 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
         ${ruleLine(room?.content?.rules) ? html`<span class="gtop__rules" data-testid="plugin-rules">${ruleLine(room?.content?.rules)}</span>` : null}
       </div>
     </div>
+
+    ${/* 判据用 adminId && gameTool（身份门 + 权限门），**不是** adminTools（三道门全过）：
+           ① 普通玩家 adminId=false → 连子元素都不创建，DOM 里没有任何管理员痕迹；
+           ② 管理员没有 tools.game 权限 → 同样什么都不创建（2026-10-31 维护者要求）；
+           ③ 管理员退出授权后两道门仍为 true → 能打开面板去重新输码（否则死锁）。
+           能不能用功能，由 AdminTools 内部的验码门把关。 */
+        adminId && gameTool && adminOpen ? html`<div class="admintools-host"><${AdminTools} open=${true} anchor=${adminAnchor} onClose=${() => setAdminOpen(false)} /></div>` : null}
 
     <div class="gtop__center">
       <span class="gtop__frame gtop__frame--l">
@@ -599,7 +748,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
         <${DecoType} k="txt3" text="RHODES ISLAND TERMINAL SERVICE" side="r" />
         <div class="gtop__half gtop__half--l">
           <div class="roundbox">
-            <span class="roundbox__label">${t('回合')}</span>
+            <span class="roundbox__label">${inDive ? t('深度') : t('回合')}</span>
             <b class="roundbox__num num" key=${roundText}>${roundText}</b>
           </div>
         </div>
@@ -633,9 +782,20 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
         ${pause && (pause.show || pause.paused) ? html`<${PauseButton} paused=${!!pause.paused} busy=${pause.busy} onToggle=${pause.onToggle} />` : null}
         ${corner && pfClock && showReady ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} pack=${pack} corner=${true} />` : null}
       </div>
+      <${SpeedVote} pub=${pub} myId=${myId} spectator=${spectator} onVote=${onSpeedVote} />
       <${OvertimeWarning} ot=${ot} />
       ${showReady && !(corner && pfClock) ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} pack=${pf.ready ? pack : null} />` : null}
+      ${/* 「暂停游戏」的全员投票（维护者 2026-11-08）：按钮就放在「准备就绪」下面 */ null}
+      ${onPauseVote ? html`<${PauseVote} pub=${pub} myId=${myId} spectator=${spectator} onVote=${onPauseVote} />` : null}
+      ${/* 效果栏（策略 / 机变 / 团队增益 …）也排在这一列的最后（维护者 2026-11-08：暂停按钮被「策略」图标压住）。
+             它以前是 .gm__hud 里单独一块绝对定位（top: 2.4rem），和这一列的高度是两份互不相干的数字 ——
+             这一列每加一颗按钮（这次是「暂停游戏」），下沿就往下长，而 top 还是 2.4rem，于是第一个图标
+             正好盖在按钮上。放进这一列以后它自己就跟着往下让，再也不用同步那两个数。 */ null}
+      ${effectsSlot}
     </div>
+    ${/* 联防预算条必须排在最后（merge-040 的位置）：它是 grid-column: 1/-1 的整行，排在最前面会占掉第一行，
+           左/中/右三栏被挤到第二行 —— 5–20 人房一进联防，顶栏的「回合」「放大镜」就整体往下掉一格。 */ null}
+    <${UniteBudgetNote} pub=${pub} />
   </header>`;
 }
 
