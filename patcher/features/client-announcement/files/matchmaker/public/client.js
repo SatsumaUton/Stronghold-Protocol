@@ -2334,12 +2334,13 @@ fetch('/mm/api/tips', { cache: 'no-store' })
     const ICP = '鲁ICP备2026010707号-1';
     let busy = false;
 
-    // ★ 2026-11-16（维护者反馈「登录注册界面有 2 个备案号」）：
-    //   备案号已经写进页面本身了（screens/title.js 的 `.title-icp`、screens/authGate.js 的 `.sp-lg-icp`），
-    //   所以这个「找一个含『非官方同人』的叶子节点、把它改成 position:fixed 再塞一个 .mm-icp」的注入器
-    //   整体停用 —— 它以前会在登录第一屏出现时把徽章塞进第一屏自己的页脚，屏幕上就多出一个备案号。
-    //   函数保留（main 里还在调）但直接返回；要恢复旧行为时把下面这行删掉即可。
-    if (document.querySelector('.title-icp')) return;
+    // ★ 2026-11-16（维护者：「只去掉我圈起来的那个备案号，别动别的位置」）：
+    //   这个注入器会去找含「非官方同人」的叶子节点、把它改成 position:fixed（**搬动页脚**），
+    //   再往前面塞一个 `.mm-icp`。页面上本来就有备案号（screens/title.js 的 `.title-icp`、
+    //   screens/authGate.js 的 `.sp-lg-icp`，都在页脚原位），所以这里整体停用 ——
+    //   既不再多造一个备案号，也不再挪动任何元素的位置。
+    //   函数与 main 里的调用保留（要恢复旧行为时删掉下面这行）。
+    return;
 
     const findLeaf = () => {
       let best = null;

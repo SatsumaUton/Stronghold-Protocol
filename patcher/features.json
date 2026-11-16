@@ -672,6 +672,21 @@
         "首次只弹一次",
         "APK 直链可下载"
       ]
+    },
+    {
+      "id": "login-gate",
+      "name": "登录闸门 / 标题页（authGate + 标题页外壳）",
+      "status": "patcher",
+      "files": [
+        "public/js/screens/authGate.js",
+        "public/js/ui/authGateHost.js",
+        "public/css/screens/authGate.css"
+      ],
+      "tests": [
+        "账号登录进大厅",
+        "游客进大厅",
+        "标题页按钮"
+      ]
     }
   ]
 }
