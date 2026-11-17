@@ -160,6 +160,20 @@ for (const [charId, ch] of Object.entries(doc.chars || {})) {
 console.log(`清单：${MANIFEST}`);
 console.log(`干员 ${stats.chars} 位 · 皮肤 ${stats.skins} 套 · 缺文件 ${stats.missing} · 疑似别人的图 ${stats.foreign}`
   + ` · 立绘比例不对 ${stats.shape} · 皮肤退回本体立绘 ${stats.same} · 皮肤模型缺 anims ${stats.spine}`);
+// 召唤物皮肤的「期望口径」（维护者 2026-11-18）：官方有些召唤物皮肤**本来就不画**（预制件是
+// EmptyAnimator、没有 Spine，portraitId 也是 null），镜像与整包里对这些是 0 命中 —— 不是我们缺，
+// 也不该出现在任何「待补」清单里。判定见 tools/token-skin-catalogue.mjs。
+try {
+  const { readOfficialTables, tokenSkinCatalogue } = await import('./token-skin-catalogue.mjs');
+  const { skinTable } = readOfficialTables(ROOT);
+  if (skinTable) {
+    const cat = tokenSkinCatalogue(skinTable);
+    if (cat.hiddenSkins.size) {
+      console.log(`召唤物皮肤：官方本就不画 ${cat.hiddenSkins.size} 套（无 Spine、无立绘，**不计入缺**）：`);
+      for (const s of cat.hiddenSkins) console.log('  · ' + s);
+    }
+  }
+} catch { /* 没有官方表就跳过这一节 */ }
 if (problems.length) {
   console.log(`\n问题 ${problems.length} 条：`);
   for (const p of problems.slice(0, 60)) console.log('  - ' + p);

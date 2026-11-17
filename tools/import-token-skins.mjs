@@ -83,7 +83,13 @@ for (const [cid, ch] of Object.entries(assets.chars || {})) {
 const plan = [];
 const seenModels = new Set();
 const seenOwners = new Set();
+// 官方本来就不画 Spine 的召唤物（tools/token-skin-catalogue.mjs 的 NO_SPINE_TOKEN_PREFIXES，
+// 出处是 tools/local-extract/extract.py 的 TOKEN_SPINES 注释）：它们的皮肤在镜像/整包里
+// 永远是 0 命中，不该出现在「镜像缺」的报告里 —— 否则每次巡检都在追一个不存在的东西。
+const { isNoSpineToken } = await import(pathToFileURL(path.join(ROOT, 'tools/token-skin-catalogue.mjs')).href);
+const skippedNoSpine = [];
 for (const [tokenId, tk] of Object.entries(assets.tokens || {})) {
+  if (isNoSpineToken(tokenId)) { skippedNoSpine.push(tokenId); continue; }
   const owner = tk.owner;
   if (!owner || !skinsByOwner.has(owner)) continue;
   const mine = skinsByOwner.get(owner).filter((k) => k !== 'e2');

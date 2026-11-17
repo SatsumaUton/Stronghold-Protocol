@@ -70,6 +70,20 @@ operator's outfits, not as a second choice:
 maintainer's decision, and the data model above is the official skin table's. Display only: `Unit.skin` is never read by
 a rule and `Battle.result()` is unchanged (`test/skins.test.js`).
 
+**召唤物皮肤里有一批「官方本来就不画」的**（维护者 2026-11-18，乌尔比安「注目深渊」的阻挡物）：
+
+- 官方 `charSkins[<owner skin>].tokenSkinMap` **确实**把皮肤接到了召唤物上
+  （`char_4145_ulpia@epoque#48` → `token_10039_ulpia_block_epoque#48`），但那件召唤物皮肤自己的
+  `portraitId` 是 `null`，而该 token 的战斗预制件（`dyn/battle/prefabs/[uc]tokens/<id>.prefab`）
+  里放的是 **EmptyAnimator**（不是 Spine）——`tools/local-extract/extract.py` 的 `TOKEN_SPINES`
+  注释列了这五个：`token_10039` / `10058` / `10055` / `10065` / `10071`。
+- 因此它们在**所有**公开镜像与本机 17.8 GB 作者整包里都是 0 命中，这不是「漏了」。
+  目前官方 skin table 里有 2 套属于这一类：`token_10039_ulpia_block_epoque#48`、
+  `token_10055_phatm2_mndclv_sightseer#4`。
+- 口径落在 `tools/token-skin-catalogue.mjs`（`NO_SPINE_TOKEN_PREFIXES` / `tokenSkinCatalogue`）：
+  `tools/check-art.mjs` 把它们单独列成「官方本就不画（不计入缺）」，`tools/import-token-skins.mjs`
+  直接跳过这些 token，不再报「镜像缺」。**只影响统计与巡检口径，不改任何美术与玩法。**
+
 ## Picture-only outfits (0.3.2, B6)
 
 The maintainer's 2026-10-18 **option A** makes a `skins` record with pictures but no Spine wearable.
