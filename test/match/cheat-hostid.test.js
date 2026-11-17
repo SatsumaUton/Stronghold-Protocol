@@ -48,28 +48,39 @@ test('宿主里 hostId 丢了会让房主吃到 NOT_HOST（这就是玩家看到
   assert.equal(a.m.hostId, 'p_host');
   assert.equal(b.m.hostId, null);
 
-  // 用真实 Match 验证「hostId 为 null 时房主也过不了」→ 反向证明修 wireOptions 是对的
-  const sched = new (class { now() { return 0; } setTimeout() { return 0; } clearTimeout() {} setInterval() { return 0; } clearInterval() {} dispose() {} })();
+  // 用真实 Match 验证 hostId 的作用。
+  //
+  // ★ 2026-11-17（维护者后续要求「开了控制台的房间，房内所有玩家都能用」）之后，作弊房不再判 hostId，
+  //   所以「hostId 丢了」只在**测试房**（上游那条老路径，仍然只给房主）上才表现为 NOT_HOST。
+  //   这正好把两种房间的语义分开钉住：
+  //     * 测试房：hostId 到位 → 房主可用；hostId 丢了 → NOT_HOST（就是玩家看到的那句）
+  //     * 作弊房：hostId 丢了 → 房内每名真人照样可用（新要求）
   const seats = [
     { seat: 0, playerId: 'p_host', name: 'H', isBot: false, connected: true },
-    { seat: 1, playerId: 'ai_0', name: 'AI', isBot: true, connected: true },
-    { seat: 2, playerId: 'ai_1', name: 'AI', isBot: true, connected: true },
-    { seat: 3, playerId: 'ai_2', name: 'AI', isBot: true, connected: true },
+    { seat: 1, playerId: 'p_guest', name: 'G', isBot: false, connected: true },
+    { seat: 2, playerId: 'ai_0', name: 'AI', isBot: true, connected: true },
+    { seat: 3, playerId: 'ai_1', name: 'AI', isBot: true, connected: true },
   ];
   const base = {
     roomCode: 'RT', mode: 'coop', difficulty: 'NORMAL', modeId: 'mode_multi_normal',
     seats, spectators: [], seed: 3, matchNo: 1, data: DATA, log: quiet, botRehearsal: 0,
-    experimental: { revivalEnabled: false, disableSharedPool: false, cheatConsole: true },
     send: () => true, broadcast: () => {}, onEnd: () => {},
   };
-  const withHost = new Match({ ...base, hostId: 'p_host' });
-  const without = new Match(base);
-  withHost.start();
-  without.start();
-  const r1 = withHost.applyTestCommand(withHost.players.get('p_host'), { cmd: 'funds', args: { amount: 50 } });
-  const r2 = without.applyTestCommand(without.players.get('p_host'), { cmd: 'funds', args: { amount: 50 } });
-  assert.equal(r1.ok, true, 'hostId 到位时房主能下命令');
-  assert.equal(r2.error, 'NOT_HOST', 'hostId 丢了就回 NOT_HOST —— 就是「只有房主可以操作」那句');
-  withHost.dispose?.();
-  without.dispose?.();
+  const run = (opts, who) => {
+    const m = new Match({ ...base, ...opts });
+    m.start();
+    const r = m.applyTestCommand(m.players.get(who), { cmd: 'funds', args: { amount: 50 } });
+    m.dispose?.();
+    return r;
+  };
+
+  // 测试房：hostId 是这个房间唯一的主键
+  assert.equal(run({ test: true, hostId: 'p_host' }, 'p_host').ok, true, '测试房：hostId 到位时房主能下命令');
+  assert.equal(run({ test: true }, 'p_host').error, 'NOT_HOST', '测试房：hostId 丢了就回 NOT_HOST —— 就是「只有房主可以操作」那句');
+
+  // 作弊房：不判 hostId，房内每名真人（不只是房主）都能用
+  const cheat = { experimental: { revivalEnabled: false, disableSharedPool: false, cheatConsole: true } };
+  assert.equal(run(cheat, 'p_host').ok, true, '作弊房：房主可用');
+  assert.equal(run(cheat, 'p_guest').ok, true, '作弊房：非房主也可用（维护者 2026-11-17）');
+  assert.equal(run({ ...cheat, hostId: 'p_host' }, 'p_guest').ok, true, '作弊房：hostId 到位时非房主照样可用');
 });

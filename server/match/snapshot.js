@@ -113,6 +113,10 @@ export const MATCH_FIELDS = Object.freeze({
     'echoSupplyWords', 'echoSupplyLastDepth',
     // 「盟约投影」（2026-11-05）：当前生效的那条 + 已开过投影事件的深度，读档不能丢
     'echoProjection', 'echoProjectionLayers',
+    // 被别的面板压住、等结算完再开的**那一层**（2026-11-17 修「72 层只选到 3 次投影」时改成记层数）。
+    // 不进存档的话，断线续玩 / 节点重启恢复之后 pending 丢了，那层投影照样白丢。纯追加：
+    // 旧存档缺这项时为构造函数的默认值（false）。
+    'echoProjectionPending',
     // 已发过固定层诅咒的深度（2026-11-05）：固定层改成随机抽之后必须记住发过哪些层，
     // 否则读档 / 重进同一层会再叠一条
     'echoFixedCurseLayers',

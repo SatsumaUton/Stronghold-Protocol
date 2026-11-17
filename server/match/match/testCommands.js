@@ -106,8 +106,12 @@ export class MatchTestCommands {
     //     * ps.admin === true —— 三道门全过的管理员（身份 + tools.game 权限 + 验证码）
     //     * ps.playerId === this.hostId —— 上游原有的房主（测试模式下房主仍可下命令）
     //   注意 ps.admin 只来自 lobby 对已校验 session.admin 的写入，客户端改不了。
-    const isHost = ps.playerId === this.hostId;
-    if (!isHost && ps.admin !== true) {
+    // ★ 2026-11-17（维护者：「开了控制台的房间，房内所有玩家都要能用」）：
+    //   作弊房放行**所有真人座位**，不再限于房主；测试房仍按上游的老规矩只给房主。
+    //   管理员（ps.admin）任何房间都照旧可用。
+    const seatHost = ps.playerId === this.hostId;
+    const cheatSeat = this.experimental?.cheatConsole === true && !ps.spectator;
+    if (!seatHost && !cheatSeat && ps.admin !== true) {
       this._testAudit(ps, cmd, { rejected: true }, ERR.NOT_HOST);
       return fail(ERR.NOT_HOST);
     }

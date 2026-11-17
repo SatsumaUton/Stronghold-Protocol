@@ -176,9 +176,12 @@ export function TestConsole() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
   // 测试房（m.public.test）或「作弊控制台」房间（m.public.experimental.cheatConsole）：
-  // 两者都只给**本局房主**看；作弊房不需要管理员身份，那一局也不进任何记录/排行榜。
+  // ★ 2026-11-17（维护者：「开了控制台的房间，房内所有玩家都要能用」）：
+  //   作弊房对**房内所有真人座位**显示控制台；测试房仍只给房主（上游的老规矩）。
+  //   作弊房不需要管理员身份，那一局也不进任何记录/排行榜。
   const cheat = pub?.experimental?.cheatConsole === true;
-  if (!pub || (pub.test !== true && !cheat) || !myId || myId !== hostId) return null;
+  const seatMine = !myId ? false : (Array.isArray(pub?.players) ? pub.players.some((p) => p && p.playerId === myId && !p.spectator) : myId === hostId);
+  if (!pub || !myId || !(cheat ? seatMine : pub.test === true && myId === hostId)) return null;
   const table = { chess: 'chess', item: 'items', token: 'tokens', bond: 'bonds', strategy: 'bands', bounty: 'enemies' }[cmd];
   const owned = [...(mine?.hand || []), ...(mine?.temp || []), ...(mine?.board || []).map((x) => x.piece || x)].filter((x) => x?.kind === 'chess');
   const tokenIds = cmd === 'token' ? ownedTokenIds(owned) : null;

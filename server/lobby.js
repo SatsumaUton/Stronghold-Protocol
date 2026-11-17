@@ -4096,9 +4096,13 @@ if (!this.roomListCache || this.roomListCache.variant !== wantEcho || now - this
       const isAdmin = session.admin === true;
       // ★ 2026-11-17（维护者）：房间开了「作弊控制台」之后，本局房主不需要管理员身份也不需要 process 级
       //   测试开关就能下命令。这一局不写对局记录、不进深渊回响排行榜（settle 与 _recordEchoBoard 都会跳过）。
-      const cheatHost = room.experimental?.cheatConsole === true && room.hostId === session.playerId;
-      if (!this.testEnabled && !isAdmin && !cheatHost) return fail(ERR.TEST_DISABLED);
-      if (room.test !== true && !isAdmin && !cheatHost) return fail(ERR.TEST_FORBIDDEN);
+      // ★ 2026-11-17（维护者：「开了控制台的房间，房内所有玩家都要能用」）：一行原来是
+//   `cheatHost = … && room.hostId === session.playerId`，只放房主。现在放宽到房内**所有真人座位**；
+//   观战 / 隐身观战 / AI 座位仍然不行（下面有专门的 SPECTATOR 拦截）。
+//   作弊房本来就不写对局记录、不进深渊回响排行榜，放宽到全员没有刷榜风险。
+const cheatRoom = room.experimental?.cheatConsole === true && !room.watcherOf(session.playerId);
+      if (!this.testEnabled && !isAdmin && !cheatRoom) return fail(ERR.TEST_DISABLED);
+      if (room.test !== true && !isAdmin && !cheatRoom) return fail(ERR.TEST_FORBIDDEN);
     }
     if (!room.match) return fail(ERR.WRONG_PHASE, 'no running match');
     if (msg.t === 'g.leave') {

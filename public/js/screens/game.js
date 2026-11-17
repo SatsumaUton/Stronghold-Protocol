@@ -213,8 +213,9 @@ export function GameScreen() {
   const autoplay = useStore((s) => !!(Array.isArray(s.match.public?.players) && s.match.public.players.find((p) => p && p.playerId === s.me.playerId)?.autoplay));
   const gd = useGameData();
   // 深渊回响：抽到的图可能不在 data/stages.json 里（规程的 10 张在 data/echo-stages.json），
-  // 只有深潜房订阅它；加载完组件重渲染一次，baseStage 才查得到记录（否则进对局是黑图）。
-  const echoMatch = useStore((s) => !!(s.room && s.room.variant === 'deepecho'));
+  // 只有深潜局订阅它；加载完组件重渲染一次，stage 才查得到记录（否则进对局是黑图）。
+  // ★ 2026-11-17：以前只认 room.variant —— 断线续玩 / 观战时 room 可能还没到，pub.echo 才是权威。
+  const echoMatch = useStore((s) => !!(s.room && s.room.variant === 'deepecho') || !!s.match.public?.echo);
   useData(...(echoMatch ? [ECHO_STAGES_FILE] : []));
   // another official version: its checked data on the page first (see the header) — its own set, or the room's set with
   // gameplay plugins built on it (§37.210)

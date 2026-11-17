@@ -3,6 +3,11 @@
 import { createAssets, assets as defaultAssets } from '../../assets.js';
 import { standInRecord } from '../../../../shared/standIn.js';
 import { diyRecordOf } from '../../../../shared/diy.js';
+// 「深渊回响」的战场可能不在 data/stages.json 里（规程·序列Ⅰ 的 10 张在 data/echo-stages.json）。
+// ★ 2026-11-17（玩家反馈「进对局黑屏」）：这里以前没有兜底，而对局画面走的正是这条 look() ——
+//   规程的图查不到 → render/app.js 的 `if (st) setStage(st)` 整句跳过 → 棋盘没有地形 → 黑屏。
+//   准备阶段之所以正常，是因为那条路径走 gd.stage()（有兜底）。
+import { echoStageRec } from '../../ui/echoStages.js';
 
 /** Wait for optional assets, or stop waiting when this view is cancelled. Shared loads keep running. */
 function withTimeout(p, ms, signal) {
@@ -78,7 +83,7 @@ function makeData(src) {
   return {
     // (a 自选 operator's summons are data/backups.json tokens, 0.2.0)
     chess: (id) => look('chess', id), token: (id) => look('tokens', id) || (backups()?.tokens && Object.hasOwn(backups().tokens, id) ? backups().tokens[id] : null), item: (id) => look('items', id),
-    enemy: (id) => look('enemies', id), stage: (id) => look('stages', id), bond: (id) => look('bonds', id),
+    enemy: (id) => look('enemies', id), stage: (id) => look('stages', id) || echoStageRec(id), bond: (id) => look('bonds', id),
     standIn, diy,
   };
 }
