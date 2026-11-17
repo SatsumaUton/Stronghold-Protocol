@@ -1116,10 +1116,47 @@ node patcher/check-coverage.mjs
 
 ```powershell
 $env:SP_ROOT = 'D:\Stronghold-Protocol'
+node repo-sync\deploy\check-node1-drift.mjs    # ★ 先确认「repo-sync → node-1」没漏
 node repo-sync\deploy\sync-nodes.cjs          # 先看差异
 node repo-sync\deploy\sync-nodes.cjs --apply  # 再复制
 node repo-sync\deploy\sync-nodes.cjs          # 复检，必须「0 处差异」
 ```
+
+#### ★ `sync-nodes` 的参照物是 node-1，不是 repo-sync（2026-11-18 踩到）
+
+`deploy/sync-nodes.cjs` 里是
+
+```js
+for (const d of DIRS) ref[d] = walk(path.join(ROOT, 'node-1', d));   // ← node-1
+```
+
+所以它保证的是「node-1 和 node-2…30 一致」，**不保证「repo-sync 和 node-1 一致」**。
+改了 `repo-sync` 却忘了拷到 `node-1` 的文件，`sync-nodes` 会照报「0 处差异」，
+而线上跑的全是旧代码 —— 看起来部署成功，其实没生效。
+
+**最容易漏的是被 `.gitignore` 排除的运行时文件**：`git show --name-only <commit>`
+不会列出它们，照提交清单拷文件就会漏。
+
+| 被 gitignore 的运行时文件 | 内容 |
+|---|---|
+| `server/match/match/echo*.js` | 深渊回响的全部服务端逻辑 |
+| `public/js/ui/echo*.js` | 深渊回响的界面 |
+| `data/echo-stages.json` | 跨版本战场池 + 随包场地记录 |
+| `data/local-fx.json`、`data/local-assets.json` | 本地素材清单 |
+
+2026-11-18 就是这么漏的：`echoPhase.js` 里「盟约投影跨回合丢失」的修复在**所有 30 台**上
+都没生效（`node-1` 里连 `_echoOpenProjectionAt` 都没有），而 `sync-nodes` 一直报「0 处差异」，
+直到逐个比对 md5 才发现 30/30 都是旧的。
+
+所以改完先跑 `check-node1-drift.mjs`（退出码 1 = 有文件没同步到 node-1）：
+
+```powershell
+node repo-sync\deploy\check-node1-drift.mjs        # 报告；有意外差异时退出码 1
+node repo-sync\deploy\check-node1-drift.mjs --list # 只列，不判失败（排查用）
+```
+
+它忽略行尾差异（CRLF/LF 不算改动），并把**故意不同**的几项列成放行项（生产开房开关、
+公告、素材摘要各自生成）；新增放行项必须写理由。
 
 生效方式：**`public/js` 和 `public/css` 只需玩家刷新页面，不用重启节点**。
 
