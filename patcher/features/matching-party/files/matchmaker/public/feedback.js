@@ -209,6 +209,17 @@
       c.appendChild(rep);
     }
 
+    // ★ 2026-11-17（维护者）：管理员回复之后，玩家也能再回复管理员。
+    // 画两样东西：已有的那条追评（作者自己 / 服主都看得到）+ 作者本人的输入框。
+    if (it.authorReply) {
+      var arep = el('div', 'reply reply--author');
+      arep.appendChild(el('div', 'reply__who', '楼主追评' + (it.authorReplyAt ? ' · ' + fmtTime(it.authorReplyAt) : '')
+        + (isAdmin() && it.authorReplyUnread ? ' · 新的' : '')));
+      arep.appendChild(el('div', 'reply__body', it.authorReply));
+      c.appendChild(arep);
+    }
+    if (it.mine && it.reply) c.appendChild(authorReplyBox(it));
+
     var meta = el('div', 'card__meta');
     meta.appendChild(el('span', null, it.author ? it.author : '匿名'));
     var t = el('span', 'dot', fmtTime(it.createdAt));
@@ -220,6 +231,37 @@
 
     if (isAdmin()) c.appendChild(adminBox(it));
     return c;
+  }
+
+  /** 楼主追评：只有作者本人看得到（管理员回复之后才出现）。 */
+  function authorReplyBox(it) {
+    var box = el('div', 'adminbox adminbox--author');
+
+    var ta = el('textarea');
+    ta.placeholder = '回复管理员（留空并保存 = 清除你的追评）';
+    ta.maxLength = 2000;
+    ta.value = it.authorReply || '';
+    box.appendChild(ta);
+
+    var row = el('div', 'adminbox__row');
+    var saveBtn = el('button', 'btn btn--primary btn--sm', '发送追评');
+    saveBtn.type = 'button';
+    row.appendChild(saveBtn);
+    box.appendChild(row);
+
+    saveBtn.addEventListener('click', function () {
+      saveBtn.disabled = true;
+      api('/api/feedback/items/' + it.id + '/reply', { method: 'POST', body: { text: ta.value } })
+        .then(function (r) {
+          saveBtn.disabled = false;
+          if (r.status === 200 && r.data && r.data.item) {
+            replaceItem(r.data.item);
+            toast(r.data.item.authorReply ? '追评已发送' : '追评已清除');
+          } else toast(errText(r), true);
+        }).catch(function () { saveBtn.disabled = false; toast('网络错误', true); });
+    });
+
+    return box;
   }
 
   /** 服主工具：改状态 / 回复 / 隐藏 / 删除。 */
@@ -319,6 +361,8 @@
     if (e === 'INVALID') return '内容不合规（' + ((r.data && r.data.field) || '字段') + '）';
     if (e === 'ORIGIN') return '来源校验失败，请刷新页面重试';
     if (e === 'TOO_LARGE') return '内容太长了';
+    if (e === 'FORBIDDEN') return '只有这条反馈的作者本人可以追评';
+    if (e === 'NO_REPLY') return '管理员还没有回复，暂时不能追评';
     return '操作失败' + (e ? '（' + e + '）' : '');
   }
 

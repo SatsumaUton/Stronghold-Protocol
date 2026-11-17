@@ -17,7 +17,7 @@ const CATEGORIES = Object.freeze(['bug', 'gameplay', 'ui', 'other']);
 const STATUSES = Object.freeze(['unassigned', 'unplanned', 'planned', 'updated']);
 
 /** 文本上限，单位是**码点**（清洗 + NFC 之后计算，和对方一致：一两个汉字也算两个字）。 */
-const LIMITS = Object.freeze({ title: [2, 80], body: [5, 4000], author: [0, 24], client: [0, 160], reply: [0, 2000] });
+const LIMITS = Object.freeze({ title: [2, 80], body: [5, 4000], author: [0, 24], client: [0, 160], reply: [0, 2000], authorReply: [1, 2000] });
 /** 请求体上限：16 KiB，超过直接 413。 */
 const MAX_BODY = 16 * 1024;
 /** 列表默认 / 最大条数。 */
@@ -231,6 +231,25 @@ function ensureSchema() {
       await db().query(
         'UPDATE feedback_items SET reply_seen_at = reply_at WHERE reply_seen_at IS NULL AND reply_at IS NOT NULL');
     }
+    // ★ 2026-11-17（维护者）：管理员回复之后，**玩家也能回复管理员**（追评）。
+    //   author_reply 存玩家最近一次追评；authorReply_seen_at 是管理员那边的已读位
+    //   （对称于 reply_seen_at：那边玩家读管理员的回复，这边管理员读玩家的追评）。
+    //   MySQL 8 没有 ADD COLUMN IF NOT EXISTS，先查 information_schema。
+    const wantCols = ['author_reply', 'author_replied_at', 'authorReply_seen_at'];
+    const [cols] = await db().query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'feedback_items'
+          AND COLUMN_NAME IN (${wantCols.map(() => '?').join(',')})`, wantCols);
+    const have = new Set(cols.map((c) => c.COLUMN_NAME));
+    if (!have.has('author_reply')) {
+      await db().query('ALTER TABLE feedback_items ADD COLUMN author_reply TEXT NULL AFTER reply_seen_at');
+    }
+    if (!have.has('author_replied_at')) {
+      await db().query('ALTER TABLE feedback_items ADD COLUMN author_replied_at DATETIME NULL AFTER author_reply');
+    }
+    if (!have.has('authorReply_seen_at')) {
+      await db().query('ALTER TABLE feedback_items ADD COLUMN authorReply_seen_at DATETIME NULL AFTER author_replied_at');
+    }
   })().catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }
@@ -251,6 +270,12 @@ function toItem(row, { admin = false, viewerId = null } = {}) {
     status: row.status,
     reply: row.reply == null ? '' : row.reply,
     replyAt: ms(row.reply_at),
+    // 玩家对管理员回复的追评（2026-11-17）：空字符串 = 还没追评
+    authorReply: row.author_reply == null ? '' : row.author_reply,
+    authorReplyAt: ms(row.author_replied_at),
+    // 服主列表用：这条有没有管理员还没看过的追评
+    authorReplyUnread: !!(row.author_reply && (!row.authorReply_seen_at
+      || new Date(row.authorReply_seen_at) < new Date(row.author_replied_at))),
     createdAt: ms(row.created_at),
     updatedAt: ms(row.updated_at),
     mine: viewerId != null && row.account_id != null && String(row.account_id) === String(viewerId),
@@ -270,8 +295,8 @@ function searchClause(q) {
   const parts = [], params = [];
   for (const w of words) {
     const like = `%${w.replace(/[\\%_]/g, (c) => '\\' + c)}%`;
-    parts.push("(title LIKE ? ESCAPE '\\\\' OR body LIKE ? ESCAPE '\\\\' OR reply LIKE ? ESCAPE '\\\\' OR author LIKE ? ESCAPE '\\\\')");
-    params.push(like, like, like, like);
+    parts.push("(title LIKE ? ESCAPE '\\\\' OR body LIKE ? ESCAPE '\\\\' OR reply LIKE ? ESCAPE '\\\\' OR author LIKE ? ESCAPE '\\\\' OR author_reply LIKE ? ESCAPE '\\\\')");
+    params.push(like, like, like, like, like);
   }
   return { sql: parts.join(' AND '), params };
 }
@@ -533,6 +558,77 @@ async function markMyRepliesSeen(accountId) {
   return { seen: Number(res.affectedRows) || 0 };
 }
 
+/**
+ * 玩家追评：**只有该条反馈的作者本人**能写（维护者 2026-11-17「管理员回复之后，玩家也可以回复管理员」）。
+ *
+ * 规则：
+ *   * 必须已登录，且 account_id 与这条反馈的作者一致 —— 否则别人可以冒名在别人的帖子里发言；
+ *   * 必须已经有管理员回复（还没人回复的帖子请继续在原帖里补充，不在这里追评）；
+ *   * 长度 1–2000 码点，走 cleanBody（保留换行）；`text: ''` 清除自己的追评；
+ *   * 不消耗发帖限流（追评不是新帖），但有 30 秒最小间隔，防连点。
+ * 写完把 authorReply_seen_at 清空 —— 管理员还没看过这条新追评。
+ * @param {number} id @param {any} req @param {any} user
+ */
+async function authorReply(id, req, user) {
+  if (!user || user.id == null) return { error: 'LOGIN_REQUIRED' };
+  const body = await readJson(req);
+  const text = typeof body.text === 'string' ? cleanBody(body.text) : null;
+  if (text == null) return { error: 'INVALID', field: 'text' };
+  if (text !== '' && checkLen('authorReply', text)) return { error: 'INVALID', field: 'text' };
+  const [[row]] = await db().query('SELECT * FROM feedback_items WHERE id = ?', [id]);
+  if (!row || (row.hidden && !isAdmin(user))) return { error: 'NOT_FOUND' };
+  if (row.account_id == null || String(row.account_id) !== String(user.id)) return { error: 'FORBIDDEN' };
+  if (!row.reply) return { error: 'NO_REPLY' };
+  const now = new Date();
+  if (text !== '' && row.author_replied_at && now - new Date(row.author_replied_at) < 30_000) {
+    const wait = Math.ceil((30_000 - (now - new Date(row.author_replied_at))) / 1000);
+    return { error: 'RATE_LIMITED', retryAfter: Math.max(1, wait) };
+  }
+  await db().query(
+    'UPDATE feedback_items SET author_reply = ?, author_replied_at = ?, authorReply_seen_at = NULL WHERE id = ?',
+    [text === '' ? null : text, text === '' ? null : now, id]);
+  const [rows] = await db().query('SELECT * FROM feedback_items WHERE id = ?', [id]);
+  const fresh = rows[0];
+  try { if (fresh && fresh.author_reply && text !== '') notifyAdminsOfAuthorReply(fresh, user); } catch { /* 邮件失败不影响保存 */ }
+  return { item: toItem(fresh, { admin: isAdmin(user), viewerId: user.id }) };
+}
+
+/**
+ * 玩家追评 → 给服主/管理员发邮件（fire-and-forget）。收件人与 notifyAdmins 同一批。
+ */
+async function notifyAdminsOfAuthorReply(row, author, log = console) {
+  try {
+    const { mail, MAIL } = require('./account.cjs');
+    const fixed = String(process.env.SP_FEEDBACK_NOTIFY || '').split(',').map((v) => v.trim()).filter(Boolean);
+    let to = fixed;
+    if (!to.length) {
+      const [rows] = await db().query(
+        `SELECT email FROM accounts
+          WHERE role IN ('owner','admin') AND disabled = 0 AND deleted_at IS NULL
+            AND email IS NOT NULL AND email <> ''`);
+      to = rows.map((r) => r.email);
+    }
+    if (!to.length) return;
+    const body = [
+      `反馈：#${row.id}「${row.title}」`,
+      `作者：${author && author.name ? author.name : row.author || '（未署名）'}`,
+      '',
+      '玩家的追评：',
+      row.author_reply,
+      '',
+      '到「反馈板」查看：/mm/feedback.html#' + row.id,
+    ].join('\n');
+    await mail().sendMail({
+      from: `"萝卜喵公益服" <${MAIL.user}>`,
+      to: to.join(','),
+      subject: `【萝卜喵公益服】玩家在反馈 #${row.id} 里追评了`.slice(0, 180),
+      text: body,
+    });
+  } catch (e) {
+    log?.warn?.('[feedback] 追评邮件通知失败: ' + (e && e.message));
+  }
+}
+
 /** 服主操作：改状态 / 回复 / 隐藏。`reply: ''` 清除回复。 */
 async function adminUpdate(id, req, user) {
   const body = await readJson(req);
@@ -551,6 +647,12 @@ async function adminUpdate(id, req, user) {
   if (body.hidden !== undefined) {
     if (typeof body.hidden !== 'boolean') return { error: 'INVALID', field: 'hidden' };
     sets.push('hidden = ?'); params.push(body.hidden ? 1 : 0);
+  }
+  // 管理员打开/保存这条时，把「玩家的追评」也算作已读（对称于玩家的 reply_seen_at）
+  if (sets.length) {
+    await db().query(
+      'UPDATE feedback_items SET authorReply_seen_at = NOW() WHERE id = ? AND author_reply IS NOT NULL AND authorReply_seen_at IS NULL',
+      [id]);
   }
   if (!sets.length) return { error: 'INVALID', field: 'body' };
   // 记下改之前的回复，判断这次是不是真的写了新内容（避免反复保存重复发信）
@@ -658,6 +760,30 @@ async function handle(req, res, pathname) {
       return sendJson(res, 201, { item: out.item }), true;
     }
 
+    // ★ 2026-11-17（维护者）：作者对管理员回复的追评（POST /items/:id/reply）
+    const mr = /^\/items\/(\d+)\/reply$/.exec(rest);
+    if (mr) {
+      if (method !== 'POST') {
+        res.writeHead(405, { ...SEC_HEADERS, allow: 'POST' });
+        return res.end(JSON.stringify({ error: 'METHOD_NOT_ALLOWED' })), true;
+      }
+      if (!sameOrigin(req)) return fail(res, 403, 'ORIGIN'), true;
+      const id = Number(mr[1]);
+      if (!Number.isSafeInteger(id) || id <= 0) return fail(res, 400, 'BAD_REQUEST'), true;
+      const user = await currentUser(req).catch(() => null);
+      if (!user) return fail(res, 401, 'LOGIN_REQUIRED'), true;
+      const out = await authorReply(id, req, user);
+      if (out.error === 'RATE_LIMITED') {
+        return sendJson(res, 429, { error: 'RATE_LIMITED', retryAfter: out.retryAfter }, { 'retry-after': String(out.retryAfter) }), true;
+      }
+      if (out.error === 'NOT_FOUND') return fail(res, 404, 'NOT_FOUND'), true;
+      if (out.error === 'FORBIDDEN') return fail(res, 403, 'FORBIDDEN'), true;
+      if (out.error === 'NO_REPLY') return fail(res, 409, 'NO_REPLY'), true;
+      if (out.error === 'LOGIN_REQUIRED') return fail(res, 401, 'LOGIN_REQUIRED'), true;
+      if (out.error) return fail(res, 400, out.error, out.field ? { field: out.field } : undefined), true;
+      return sendJson(res, 200, { item: out.item }), true;
+    }
+
     const m = /^\/items\/(\d+)(\/admin)?$/.exec(rest);
     if (m) {
       const id = Number(m[1]);
@@ -708,4 +834,6 @@ module.exports = {
   unreadFor, markSeen, lastSeenId,
   // ★ 2026-11-16：回复通知作者（邮件 + 大厅提示）。导出供 test/feedback.test.cjs 直接测。
   notifyAuthor, myUnreadReplies, markMyRepliesSeen,
+  // ★ 2026-11-17：作者追评（管理员回复之后，玩家也可以回复）
+  authorReply, notifyAdminsOfAuthorReply,
 };

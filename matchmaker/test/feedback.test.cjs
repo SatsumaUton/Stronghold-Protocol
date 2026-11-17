@@ -23,6 +23,8 @@ const TEST_ADMIN = 990002;
 // （10 分钟 3 条，存在 feedback.cjs 的内存 Map 里，测试没法清），
 // 未读用例再用它发帖就只会拿到 RATE_LIMITED。
 const TEST_POSTER = 990003;
+// ★ 2026-11-17：追评用例专用（POSTER 的 10 分钟配额会被前面的用例用光）
+const TEST_AUTHOR2 = 990004;
 
 /** 造一个假的 req：JSON 请求体 + 必要头。 */
 function fakeReq(body, { ip = '10.0.0.1', headers = {} } = {}) {
@@ -108,7 +110,7 @@ test('反馈板（数据库）', async (t) => {
   // 发帖人也排除掉（见 TEST_ADMIN 的注释）
   const boss = { id: TEST_ADMIN, name: '测试服主', role: 'owner' };
   const poster = { id: TEST_POSTER, name: '测试路人', role: 'player' };
-  const cleanup = () => db().query('DELETE FROM feedback_items WHERE account_id IN (?,?,?)', [TEST_ACCOUNT, TEST_ADMIN, TEST_POSTER]);
+  const cleanup = () => db().query('DELETE FROM feedback_items WHERE account_id IN (?,?,?,?)', [TEST_ACCOUNT, TEST_ADMIN, TEST_POSTER, TEST_AUTHOR2]);
   await cleanup();
   t.after(cleanup);
 
@@ -270,7 +272,69 @@ test('反馈板（数据库）', async (t) => {
     assert.equal((await fb.unreadFor(boss)).count, 0, '隐藏后应为 0');
   });
 
-  t.after(() => db().query('DELETE FROM feedback_seen WHERE account_id IN (?,?,?)', [TEST_ACCOUNT, TEST_ADMIN, TEST_POSTER]));
+  t.after(() => db().query('DELETE FROM feedback_seen WHERE account_id IN (?,?,?,?)', [TEST_ACCOUNT, TEST_ADMIN, TEST_POSTER, TEST_AUTHOR2]));
+
+  // ── 作者追评（2026-11-17）：管理员回复之后，玩家也能回复管理员 ─────────────
+  await t.test('追评：作者本人在管理员回复之后可以写，别人不行', async () => {
+    const made = await fb.createItem(fakeReq({ category: 'bug', title: '测试：追评', body: '管理员回复之后我要再补一句。' }), poster);
+    assert.ok(made.item, JSON.stringify(made));
+    const id = made.item.id;
+
+    // 还没人回复 → 不能追评
+    const early = await fb.authorReply(id, fakeReq({ text: '我先补一句。' }), poster);
+    assert.equal(early.error, 'NO_REPLY');
+
+    // 管理员回复
+    const answered = await fb.adminUpdate(id, fakeReq({ reply: '已经修好了，你试试看。' }), boss);
+    assert.equal(answered.item.reply, '已经修好了，你试试看。');
+    assert.equal(answered.item.authorReply, '', '一开始没有追评');
+
+    // 作者追评
+    const mine = await fb.authorReply(id, fakeReq({ text: '试过了，还是有问题。' }), poster);
+    assert.ok(mine.item, JSON.stringify(mine));
+    assert.equal(mine.item.authorReply, '试过了，还是有问题。');
+    assert.ok(mine.item.authorReplyAt > 0);
+    assert.equal(mine.item.reply, '已经修好了，你试试看。', '管理员的回复保留');
+
+    // 别人不能追评（冒名）
+    const other = await fb.authorReply(id, fakeReq({ text: '我是别人，我要乱说。' }), boss);
+    assert.equal(other.error, 'FORBIDDEN');
+
+    // 未登录不能追评
+    const anon = await fb.authorReply(id, fakeReq({ text: '匿名插一句。' }), null);
+    assert.equal(anon.error, 'LOGIN_REQUIRED');
+
+    // 内容为空 → INVALID
+    const blank = await fb.authorReply(id, fakeReq({ text: '' }), poster);
+    assert.equal(blank.item.authorReply, '', '空字符串 = 清除追评（不是报错）');
+    const notString = await fb.authorReply(id, fakeReq({ text: 123 }), poster);
+    assert.deepEqual([notString.error, notString.field], ['INVALID', 'text']);
+
+    // 删掉
+    await db().query('DELETE FROM feedback_items WHERE id = ?', [id]);
+  });
+
+  await t.test('追评：30 秒内连写被限流，管理员看过之后未读标记消失', async () => {
+    const author2 = { id: TEST_AUTHOR2, name: '测试作者二', role: 'player' };
+    const made = await fb.createItem(fakeReq({ category: 'ui', title: '测试：追评限流', body: '连点两次应当被拦。' }), author2);
+    const id = made.item.id;
+    await fb.adminUpdate(id, fakeReq({ reply: '收到。' }), boss);
+
+    const first = await fb.authorReply(id, fakeReq({ text: '第一次追评。' }), author2);
+    assert.ok(first.item, JSON.stringify(first));
+    const second = await fb.authorReply(id, fakeReq({ text: '立刻再来一次。' }), author2);
+    assert.equal(second.error, 'RATE_LIMITED');
+    assert.ok(second.retryAfter > 0);
+
+    // 列表里给管理员一个好的「有未读追评」标记
+    const listed = await fb.listItems(new URL('http://x/api/feedback/items?limit=50'), boss);
+    const row = listed.items.find((i) => i.id === id);
+    assert.ok(row, '服主列表里能看到这条');
+    assert.equal(row.authorReply, '第一次追评。');
+    if (row.authorReplyUnread != null) assert.equal(row.authorReplyUnread, true, '管理员还没看过');
+
+    await db().query('DELETE FROM feedback_items WHERE id = ?', [id]);
+  });
 });
 
 // ★ 2026-11-02：关掉 mysql2 连接池，否则 `node --test` 会一直挂着不退出
