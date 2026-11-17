@@ -11,7 +11,11 @@
 #   JDK 17+（本机 C:\Program Files\Java\jdk-21.0.11）
 param(
   [string]$VersionName = "",
-  [int]$VersionCode = 0
+  [int]$VersionCode = 0,
+  # 自带资源包（维护者 2026-11-17）：默认打进去。用 -NoAssets 出一个轻量外壳（走网络）。
+  [switch]$NoAssets,
+  # 只带这些大类（逗号分隔，值 = public/ 下的目录名）：assets,fonts,icons,vendor
+  [string]$AssetDirs = "assets,fonts,icons,vendor"
 )
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -68,7 +72,40 @@ Push-Location "$build\dex"
 Pop-Location
 if ($LASTEXITCODE) { throw 'jar 打包 classes.dex 失败' }
 
-# ---- 5. 对齐 + 签名 ----
+# ---- 5. 自带资源包（维护者 2026-11-17）----
+# 把 public/assets、public/fonts、public/icons、public/vendor 打进 APK 的 assets/sp/ 下，
+# 由 AssetBridge 拦截这些请求直接读 APK（页面 / 数据 / js / css 仍走站点，站点更新照样即时生效）。
+#
+# ⚠ 两个已知坑：
+#   1. aapt2 的 -A 在 Windows 上把条目名写成**反斜杠**（assets\sp\…），Android 的 AssetManager 只认
+#      正斜杠，装到手机上读不到 → 所以不用 -A，而是先做出 APK，再用 android/pack-assets.mjs 重写 ZIP。
+#   2. 资源里 8 个文件名带方括号（[opt]merged_textures.png / [ucp]TX_water_normal.png）——
+#      自己写 ZIP 时按原样保留；aapt2 的 -A 路径试过也认，但条目名仍然是反斜杠，所以还是走 pack-assets。
+if ($NoAssets) {
+  Write-Host '（-NoAssets：跳过自带资源包，产物是轻量外壳，素材走网络）'
+} else {
+  $public = Join-Path $repo 'public'
+  $spec = @()
+  foreach ($d in ($AssetDirs -split ',')) {
+    $name = $d.Trim()
+    if (-not $name) { continue }
+    $src = Join-Path $public $name
+    if (-not (Test-Path $src)) { Write-Host "跳过不存在的目录：$src"; continue }
+    $spec += @{ src = $src; sub = $name }
+  }
+  if ($spec.Count -eq 0) {
+    Write-Host '（没有可打包的资源目录：产物是轻量外壳）'
+  } else {
+    $merged = Join-Path $build 'app-bundled.apk'
+    $args = @('--apk', "$build\app-unsigned.apk", '--out', $merged)
+    foreach ($s in $spec) { $args += @('--dir', "$($s.src)=$($s.sub)") }
+    & node (Join-Path $here 'pack-assets.mjs') @args
+    if ($LASTEXITCODE) { throw 'pack-assets 失败' }
+    Move-Item $merged "$build\app-unsigned.apk" -Force
+  }
+}
+
+# ---- 6. 对齐 + 签名 ----
 & "$bt\zipalign.exe" -f 4 "$build\app-unsigned.apk" "$build\app-aligned.apk"
 if ($LASTEXITCODE) { throw 'zipalign 失败' }
 

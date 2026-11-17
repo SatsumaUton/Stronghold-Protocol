@@ -1,14 +1,52 @@
 # 安卓 APK（卫戍协议：盟约 · 萝卜喵公益服）
 
-一个**薄外壳**：App 里直接加载线上站点 `https://stronghold.luobomiao.love/`，
-所以**站点一更新，App 不用重新发版就是最新的**（这就是「内容可以直接更新」）。
-PC 上的功能（3D 战场、WebGL、音频、全屏、文件上传、邀请链接进房）都走同一套网页，
-没有为移动端做任何删减。
+App 里直接加载线上站点 `https://stronghold.luobomiao.love/`，所以**站点一更新，App 不用重新发版就是最新的**。
+PC 上的功能（3D 战场、WebGL、音频、全屏、文件上传、邀请链接进房）都走同一套网页，没有为移动端做任何删减。
+
+## 自带完整资源包（维护者 2026-11-17）
+
+APK 里**已经装着**整套美术、音频、字体、图标与 vendor 库：
+
+```
+sp/assets/   public/assets 的 41654 个文件（2021.7 MB：立绘 / 模型 / 音效 / 语音 / 场景 / 特效 / 官方界面）
+sp/fonts/    public/fonts    7 个
+sp/icons/    public/icons    10 个
+sp/vendor/   public/vendor   12 个（preact / htm / pixi / three …）
+```
+
+由 `AssetBridge.java` 在 `shouldInterceptRequest` 里拦截这些请求、直接从 APK 读（不再走网络）：
+
+| 页面请求 | 读 APK 里的 |
+|---|---|
+| `https://stronghold.luobomiao.love/assets/~<hash>/char/avatar/x.png` | `sp/assets/char/avatar/x.png` |
+| `https://assets.luobomiao.love/assets/local/fx/a.json` | `sp/assets/local/fx/a.json` |
+| `https://<我方域名>/media/bgm/act1`（无扩展名） | `sp/assets/audio/bgm/act1.mp3` |
+| `/fonts/` `/icons/` `/vendor/` | 同名目录 |
+
+三条口径与服务器一致：**去掉内容哈希段**（`~`+16 位十六进制）、`/media/` **按扩展名次序试**
+（`shared/media.js` 的 `AUDIO_EXTS`）、**命中不了就返回 null 走网络**（所以 APK 里没有的图、
+或站点后加的新素材，都不会变成 404）。带 `Range` 的请求（音频拖动）也让给网络。
+
+**打包体积**：未压缩 2025.5 MB → APK **1464 MB**（png/音频本来就压过，所以按扩展名**存而不压**，
+只有 json/atlas/skel/js/css 走 deflate）。ZIP 单文件 2 GB 上限之内（余量 22.5 MB）。
+
+**⚠ 为什么不用 aapt2 的 `-A`**：Windows 上的 aapt2 把 assets 条目名写成**反斜杠**
+（`assets/sp\local\map\fx\[opt]merged_textures.png`），Android 的 `AssetManager` 只认正斜杠，
+装到手机上会一个都读不到。所以 `build.ps1` 先做出 APK，再用 `android/pack-assets.mjs` **自己重写 ZIP**
+（条目名一律 `/`，实测 41683 个条目 0 个反斜杠）。资源里 8 个带方括号的文件名（`[opt]merged_textures.png`、
+`[ucp]TX_water_normal.png`）按原样保留。
+
+只想要轻量外壳（素材全走网络）：
+
+```powershell
+pwsh -File android\build.ps1 -NoAssets
+# 或只带部分：-AssetDirs "fonts,icons,vendor"
+```
 
 ## 产物
 
 ```
-dist\StrongholdProtocol-<versionName>.apk      ← 分发给玩家安装
+dist\StrongholdProtocol-<versionName>.apk      ← 分发给玩家安装（自带资源，1.4 GB）
 ```
 
 - 包名：`love.luobomiao.stronghold`（**永远不要改**，否则新版本无法覆盖安装）
@@ -16,9 +54,15 @@ dist\StrongholdProtocol-<versionName>.apk      ← 分发给玩家安装
 - 权限：`INTERNET`、`ACCESS_NETWORK_STATE`、`WAKE_LOCK`（只这三条）
 - 图标：站点 `/icons/app-512.png` 生成的五档 mipmap
 
+**分发**：`dist/…apk` 覆盖到 `public/download/stronghold-android.apk`，然后
+`node deploy/sync-nodes.cjs --apply`（30 个节点各存一份 —— **复制这一步被打断就会留下坏文件**，
+复制完必须比对 sha256，见 `.cache/copy-apk-verified.mjs` 的做法），
+并把 `public/download/android-version.json` 的 `code` 改成新的 versionCode
+（App 启动时会拉这份小文件判断要不要提示更新）。
+
 ## 安装
 
-1. 把 APK 传到手机（微信/QQ 传文件、数据线、网盘都行）；
+1. 把 APK 传到手机（微信/QQ 传文件、数据线、网盘都行）；**1.4 GB**，第一次装要留够空间；
 2. 在手机上点开 APK → 允许「安装未知来源应用」（各品牌位置不同，一般是设置 → 应用 → 特殊权限）；
 3. 装好后桌面会出现「卫戍协议」，点开即用；第一次启动会自动进首页。
 
@@ -27,8 +71,14 @@ dist\StrongholdProtocol-<versionName>.apk      ← 分发给玩家安装
 ## 重新打包
 
 ```powershell
-# 版本号会自动 +1；要指定版本名：
-pwsh -File android\build.ps1 -VersionName 1.1
+# 默认自带完整资源包（1.4 GB，约 6 分钟）
+pwsh -File android\build.ps1 -VersionName 1.2
+
+# 只要轻量外壳（素材全走网络，约 1 MB）
+pwsh -File android\build.ps1 -NoAssets -VersionName 1.2
+
+# 只带一部分（值 = public/ 下的目录名）
+pwsh -File android\build.ps1 -AssetDirs "fonts,icons,vendor" -VersionName 1.2
 ```
 
 首次构建前需要一次性准备（本机已经装好，见下表）：
