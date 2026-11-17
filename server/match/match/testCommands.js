@@ -224,9 +224,17 @@ export class MatchTestCommands {
     const blocked = this._testQuiet();
     if (blocked) return blocked;
     const rec = ps.gd.chess(id);
-    if (!rec || (rec.isDiy && !rec.diyFor)) return fail(ERR.BAD_TARGET);
-    const owned = ps.acquireChess(id, { source: 'grant' });
-    if (!owned) return fail(ERR.BAD_TARGET);
+    // ★ 2026-11-18（维护者：管理员工具「拿干员」回「无效的目标」）：以前这里只会回一个**不带原因**的
+    //   BAD_TARGET，控制台上只显示「无效的目标」，看不出是 id 拼错、自选位没编入，还是这局被禁用。
+    //   `acquireChess` 有四个拒绝分支（见 player/acquire.js），这里逐条给出具体 detail，
+    //   客户端的 explainTestDetail 会把它们翻成人话。
+    if (!rec) return fail(ERR.BAD_TARGET, 'no-such-chess');
+    if (rec.isDiy && !rec.diyFor) return fail(ERR.BAD_TARGET, 'diy-empty');
+    if (this.bondChoice?.picked === null) return fail(ERR.BAD_TARGET, 'bond-unpicked');
+    // ★ 维护者 2026-11-18 追加：**本局被置灰的干员也要能发**（原版测试工具同样发不出来，这不是我们改坏的）。
+    //   只有这条管理员指令传 allowExcluded —— 购买 / 奖励 / 效果仍然按本局规则拒绝。
+    const owned = ps.acquireChess(id, { source: 'grant', allowExcluded: true });
+    if (!owned) return fail(ERR.BAD_TARGET, 'grant-failed');
     return OK;
   }
 

@@ -3421,5 +3421,10 @@
   "正在载入深渊图鉴…": "Loading the Abyss codex…",
   "打开后房主在对局里能用控制台改数据；本局不记入对局记录，也不会进入公开同盟列表或被多人匹配选中": "The host can use the console to change data during this match. This match is not recorded, cannot be listed publicly, and cannot be picked by matchmaking.",
   "这一局不会记入对局记录；本房间也不会出现在公开同盟列表里，不会被多人匹配选中。": "This match is not recorded. This room never appears in the public alliance list and is never picked by matchmaking.",
-  "开了作弊控制台的房间不能公开，也不会被多人匹配选进去": "A room with the cheat console cannot be made public and is never picked by matchmaking."
+  "开了作弊控制台的房间不能公开，也不会被多人匹配选进去": "A room with the cheat console cannot be made public and is never picked by matchmaking.",
+  "没有这个干员：检查干员 id 是否拼对": "No such operator — check the operator id",
+  "这是自选位，但本局没有编入干员：先在干员调配里编好自选，再用这条指令": "That is a 自选 slot with nobody put in for this match; set the 自选 roster in 干员调配 first",
+  "本局还没选盟约（开局简报的盟约分组未确认），现在不能改干员": "This match has no covenant picked yet (the briefing group is unconfirmed), so operators cannot change now",
+  "这个干员本局被禁用（所属盟约被置灰），拿不出来": "This operator is barred in this match (every covenant it belongs to is greyed out)",
+  "这个名字的干员现在拿不出来（手牌已满或池子已空）": "An operator of that name cannot be taken right now (hand full, or the pool is empty)"
 }

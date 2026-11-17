@@ -41,6 +41,13 @@ export function explainTestDetail(detail) {
     // 盟约指令失败时以前回的是不带原因的 BAD_TARGET：控制台上只显示一句「无效的目标」，
     // 甚至漏出原始 code（bad_target），维护者不知道该改哪儿。现在每种都带上具体原因。
     case 'no-such-bond': return t('没有这个盟约：检查盟约 id 是否拼对');
+    // 管理员工具「干员」页签的拒绝原因（2026-11-18，维护者：以前只显示「无效的目标」）：
+    // acquireChess 有四个拒绝分支，这里逐条翻成人话，省得维护者去猜是 id 错、自选位空，还是这局被禁。
+    case 'no-such-chess': return t('没有这个干员：检查干员 id 是否拼对');
+    case 'diy-empty': return t('这是自选位，但本局没有编入干员：先在干员调配里编好自选，再用这条指令');
+    case 'bond-unpicked': return t('本局还没选盟约（开局简报的盟约分组未确认），现在不能改干员');
+    case 'excluded': return t('这个干员本局被禁用（所属盟约被置灰），拿不出来');
+    case 'grant-failed': return t('这个名字的干员现在拿不出来（手牌已满或池子已空）');
     case 'cap': return t('层数超过上限：现在是 {cur} 层，最多 {max} 层，请求的是 {want} 层', params);
     case 'add': return t('这个盟约加不上去（现在是 {cur} 层，请求 {want} 层，只加到 {got} 层）', params);
     default: return '';

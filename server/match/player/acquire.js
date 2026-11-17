@@ -58,12 +58,14 @@ export class PlayerAcquire {
    * merges immediately when it completes a set, otherwise stows it (hand, overflow temp). Fires onGain (for the
    * elite when a merge happened, research 01 §7 "1+1+2"). Returns the owned piece (the elite after a merge) or null.
    * @param {string} chessId
-   * @param {{ source?: string, toTemp?: boolean, fromPool?: boolean, silent?: boolean }} [opts]
+   * @param {{ source?: string, toTemp?: boolean, fromPool?: boolean, silent?: boolean, allowExcluded?: boolean }} [opts]
+   *   `allowExcluded`（维护者 2026-11-18）：游戏内管理员工具可以发出**本局被置灰**的干员（规程的禁用干员）。
+   *   只有管理员指令这一条路会传它 —— 购买、奖励、效果仍按本局规则拒绝。
    */
-  acquireChess(chessId, { source = 'grant', toTemp = false, fromPool = true, silent = false } = {}) {
+  acquireChess(chessId, { source = 'grant', toTemp = false, fromPool = true, silent = false, allowExcluded = false } = {}) {
     const rec = this.gd.chess(chessId);
     // a DIY slot is only ever this player's own 自选 piece: a slot it has not filled has no body (甄选干员) to gain
-    if (!rec || (rec.isDiy && !rec.diyFor) || this.m.bondChoice?.picked === null || this.m.chessExcluded(rec)) return null;
+    if (!rec || (rec.isDiy && !rec.diyFor) || this.m.bondChoice?.picked === null || (!allowExcluded && this.m.chessExcluded(rec))) return null;
     const base = this.gd.baseIdOf(chessId);
     const need = rec.isGolden ? this.gd.goldenCopies : 1;
     // the shared pool, or this player's stock of a slotted 自选 piece (player/diy.js poolOf)
