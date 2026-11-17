@@ -132135,6 +132135,40 @@
           "width": 272.206,
           "height": 445.851
         }
+      },
+      "skins": {
+        "char_1014_nearl2_epoque_17": {
+          "spineLocal": {
+            "group": "spine/token/token_10019_nearl2_sword_epoque_17",
+            "skel": "token_10019_nearl2_sword_epoque_17.skel",
+            "atlas": "token_10019_nearl2_sword_epoque_17.atlas",
+            "textures": [
+              "token_10019_nearl2_sword_epoque_17.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10020_ling_soul1": {
@@ -132385,6 +132419,46 @@
           "y": -3.809,
           "width": 1125.841,
           "height": 390.5
+        }
+      },
+      "skins": {
+        "char_4016_kazema_witch_3": {
+          "spineLocal": {
+            "group": "spine/token/token_10022_kazema_shadow_witch_3",
+            "skel": "token_10022_kazema_shadow_witch_3.skel",
+            "atlas": "token_10022_kazema_shadow_witch_3.atlas",
+            "textures": [
+              "token_10022_kazema_shadow_witch_3.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10022_kazema_shadow_witch_3.back.skel",
+              "atlas": "token_10022_kazema_shadow_witch_3.back.atlas",
+              "textures": [
+                "token_10022_kazema_shadow_witch_3.back.png"
+              ]
+            }
+          }
         }
       }
     },
@@ -132778,6 +132852,43 @@
           "width": 310.598,
           "height": 221.751
         }
+      },
+      "skins": {
+        "char_427_vigil_epoque_27": {
+          "spineLocal": {
+            "group": "spine/token/token_10028_vigil_wolf_epoque_27",
+            "skel": "token_10028_vigil_wolf_epoque_27.skel",
+            "atlas": "token_10028_vigil_wolf_epoque_27.atlas",
+            "textures": [
+              "token_10028_vigil_wolf_epoque_27.png"
+            ],
+            "anims": {
+              "idle": "Idle_1",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        }
       }
     },
     "token_10029_slent2_protrb": {
@@ -132918,6 +133029,78 @@
           ]
         },
         "bounds": null
+      },
+      "skins": {
+        "char_249_mlyss_ambienceSynesthesia_6": {
+          "spineLocal": {
+            "group": "spine/token/token_10030_mlyss_wtrman_ambienceSynesthesia_6",
+            "skel": "token_10030_mlyss_wtrman_ambienceSynesthesia_6.skel",
+            "atlas": "token_10030_mlyss_wtrman_ambienceSynesthesia_6.atlas",
+            "textures": [
+              "token_10030_mlyss_wtrman_ambienceSynesthesia_6.png"
+            ],
+            "anims": {
+              "idle": "A_Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        },
+        "char_249_mlyss_boc_8": {
+          "spineLocal": {
+            "group": "spine/token/token_10030_mlyss_wtrman_boc_8",
+            "skel": "token_10030_mlyss_wtrman_boc_8.skel",
+            "atlas": "token_10030_mlyss_wtrman_boc_8.atlas",
+            "textures": [
+              "token_10030_mlyss_wtrman_boc_8.png"
+            ],
+            "anims": {
+              "idle": "A_Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        }
       }
     },
     "token_10031_swire2_gdtrap": {
@@ -133020,6 +133203,70 @@
           "y": -8.563,
           "width": 152,
           "height": 225.923
+        }
+      },
+      "skins": {
+        "char_1033_swire2_ambienceSynesthesia_4": {
+          "spineLocal": {
+            "group": "spine/token/token_10031_swire2_gdtrap_ambienceSynesthesia_4",
+            "skel": "token_10031_swire2_gdtrap_ambienceSynesthesia_4.skel",
+            "atlas": "token_10031_swire2_gdtrap_ambienceSynesthesia_4.atlas",
+            "textures": [
+              "token_10031_swire2_gdtrap_ambienceSynesthesia_4.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        },
+        "char_1033_swire2_nlc_1": {
+          "spineLocal": {
+            "group": "spine/token/token_10031_swire2_gdtrap_nlc_1",
+            "skel": "token_10031_swire2_gdtrap_nlc_1.skel",
+            "atlas": "token_10031_swire2_gdtrap_nlc_1.atlas",
+            "textures": [
+              "token_10031_swire2_gdtrap_nlc_1.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
@@ -133281,6 +133528,43 @@
           ]
         },
         "bounds": null
+      },
+      "skins": {
+        "char_1019_siege2_epoque_50": {
+          "spineLocal": {
+            "group": "spine/token/token_10040_siege2_vlion_epoque_50",
+            "skel": "token_10040_siege2_vlion_epoque_50.skel",
+            "atlas": "token_10040_siege2_vlion_epoque_50.atlas",
+            "textures": [
+              "token_10040_siege2_vlion_epoque_50.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die_1",
+              "move": null,
+              "stun": {
+                "begin": null,
+                "loop": "Stun",
+                "end": null
+              }
+            }
+          }
+        }
       }
     },
     "token_10041_cathy_catsld": {
@@ -133331,6 +133615,47 @@
           "y": -1.331,
           "width": 201.714,
           "height": 335.376
+        }
+      },
+      "skins": {
+        "char_4162_cathy_kitchen_5": {
+          "spineLocal": {
+            "group": "spine/token/token_10041_cathy_catsld_kitchen_5",
+            "skel": "token_10041_cathy_catsld_kitchen_5.skel",
+            "atlas": "token_10041_cathy_catsld_kitchen_5.atlas",
+            "textures": [
+              "token_10041_cathy_catsld_kitchen_5.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            },
+            "back": {
+              "skel": "token_10041_cathy_catsld_kitchen_5.back.skel",
+              "atlas": "token_10041_cathy_catsld_kitchen_5.back.atlas",
+              "textures": [
+                "token_10041_cathy_catsld_kitchen_5.back.png"
+              ]
+            }
+          }
         }
       }
     },
@@ -133728,6 +134053,40 @@
           "width": 203.49,
           "height": 220.517
         }
+      },
+      "skins": {
+        "char_1041_angel2_iteration_6": {
+          "spineLocal": {
+            "group": "spine/token/token_10056_angel2_target_iteration_6",
+            "skel": "token_10056_angel2_target_iteration_6.skel",
+            "atlas": "token_10056_angel2_target_iteration_6.atlas",
+            "textures": [
+              "token_10056_angel2_target_iteration_6.png"
+            ],
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Idle",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null
+            }
+          }
+        }
       }
     },
     "token_10057_svash2_eagle": {
@@ -133776,6 +134135,40 @@
           "y": -0.51,
           "width": 150,
           "height": 174
+        }
+      },
+      "skins": {
+        "char_1045_svash2_sale_20": {
+          "spineLocal": {
+            "group": "spine/token/token_10057_svash2_eagle_sale_20",
+            "skel": "token_10057_svash2_eagle_sale_20.skel",
+            "atlas": "token_10057_svash2_eagle_sale_20.atlas",
+            "textures": [
+              "token_10057_svash2_eagle_sale_20.png"
+            ],
+            "anims": {
+              "idle": "Default",
+              "deploy": "Default",
+              "attack": {
+                "begin": null,
+                "loop": "Default",
+                "end": null,
+                "via": "idle"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Default",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null
+            }
+          }
         }
       }
     },
