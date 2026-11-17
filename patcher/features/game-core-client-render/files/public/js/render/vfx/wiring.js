@@ -48,6 +48,7 @@ import { FunnelFx } from './funnelfx.js';
 import { YuWall, YU_WALL_SOURCE } from './yuwall.js';
 import { formModes } from './talents.js';
 import { shotOf } from './skills.js';
+import { skinEffectFor } from './skinfx.js';
 import { UF } from '../../../../shared/constants.js';
 
 /** Battle seconds a non-oneshot cast effect lasts without its end event. */
@@ -252,6 +253,10 @@ export class FxWiring {
   /** index.json, once. */
   async ready() {
     if (!this.idx) this.idx = await this.ofx.lib.index();
+    // 皮肤专属特效的替换表（data/skin-fx.json）：没有这个文件时保持 null，playOn 走基础特效。
+    if (!this.skinFx && typeof this.ofx.lib.skinFx === 'function') {
+      try { this.skinFx = await this.ofx.lib.skinFx(); } catch { this.skinFx = null; }
+    }
     return !!this.idx;
   }
 
@@ -506,6 +511,14 @@ export class FxWiring {
   playOn(key, v, o = {}) {
     let k = lc(key);
     if (!k || !this.ofx.lib.has(k)) return null;
+    // 皮肤专属特效（官方机制：特效名加皮肤后缀）：穿的皮肤有对应版本就换掉，没有就用基础特效。
+    const skinKey = v && v.info && typeof v.info.skin === 'string' ? v.info.skin : null;
+    if (skinKey) {
+      const alt = skinEffectFor(this.skinFx, skinKey, k);
+      if (alt && alt !== k && (this.ofx.lib.has(alt) || this._skinFxPending?.(alt))) {
+        k = alt;
+      }
+    }
     if (k === YU_WALL_SOURCE) {
       const wall = new YuWall(this, v);
       this.walls.add(wall);

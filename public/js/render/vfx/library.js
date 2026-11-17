@@ -16,6 +16,7 @@
 
 import { compileEffect } from './effect.js';
 import { FX_LIST_URL, loadFxList } from './available.js';
+import { loadSkinFxMap } from './skinfx.js';
 import { setIndexVersion } from './mounts.js';
 import { mergePluginFx } from './pluginLibrary.js';
 // ★ 本服 2026-11-01：特效文件（prefab / mesh / texture）同时下载的上限，8 → 4。
@@ -201,6 +202,13 @@ export class FxLibrary {
       return j;
     }).catch(() => null);
     return this._index;
+  }
+
+  /** 皮肤专属特效的替换表（data/skin-fx.json；没有该文件时 null —— 播放走基础特效）。 */
+  skinFx() {
+    if (this._skinFx) return this._skinFx;
+    this._skinFx = loadSkinFxMap(this.fetch || this._defaultFetch || globalThis.fetch).catch(() => null);
+    return this._skinFx;
   }
 
   /** textures.json entries (wrap / filter / mips by texture key). */
