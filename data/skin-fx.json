@@ -11,7 +11,8 @@
     "kalts_skill_01_buff": "kalts_skill_01_buff_boc#6",
     "kalts_skill_02_buff": "kalts_skill_02_buff_boc#6",
     "kalts_skill_03_buff": "kalts_skill_03_buff_boc#6",
-    "kalts_birth_01": "kalts_birth_01_boc#6"
+    "kalts_birth_01": "kalts_birth_01_boc#6",
+    "token_kalts_birth_01_start_02": "token_kalts_birth_01_start_02_boc#6"
    },
    "char_003_kalts_sale_14": {
     "kalts_attack_01_hit": "kalts_attack_01_hit_sale#14",
@@ -20,7 +21,25 @@
     "kalts_skill_01_buff": "kalts_skill_01_buff_sale#14",
     "kalts_skill_02_buff": "kalts_skill_02_buff_sale#14",
     "kalts_skill_03_buff": "kalts_skill_03_buff_sale#14",
-    "kalts_birth_01": "kalts_birth_01_sale#14"
+    "kalts_birth_01": "kalts_birth_01_sale#14",
+    "token_kalts_attack_01_hit": "token_kalts_attack_01_hit_sale#14",
+    "token_kalts_attack_01_start": "token_kalts_attack_01_start_sale#14",
+    "token_kalts_birth_01_start": "token_kalts_birth_01_start_sale#14",
+    "token_kalts_die_01_start": "token_kalts_die_01_start_sale#14",
+    "token_kalts_skill_02_hit": "token_kalts_skill_02_hit_sale#14",
+    "token_kalts_skill_02_start_02": "token_kalts_skill_02_start_02_sale#14",
+    "token_kalts_skill_02_start": "token_kalts_skill_02_start_sale#14",
+    "token_kalts_skill_03_buff_01": "token_kalts_skill_03_buff_01_sale#14",
+    "token_kalts_skill_03_buff_02": "token_kalts_skill_03_buff_02_sale#14",
+    "token_kalts_skill_03_hit": "token_kalts_skill_03_hit_sale#14",
+    "token_kalts_skill_03_start_02": "token_kalts_skill_03_start_02_sale#14",
+    "token_kalts_skill_03_start_03": "token_kalts_skill_03_start_03_sale#14",
+    "token_kalts_skill_03_start_04": "token_kalts_skill_03_start_04_sale#14",
+    "token_kalts_skill_03_start_05": "token_kalts_skill_03_start_05_sale#14",
+    "token_kalts_skill_03_start_06": "token_kalts_skill_03_start_06_sale#14",
+    "token_kalts_skill_03_start_07": "token_kalts_skill_03_start_07_sale#14",
+    "token_kalts_skill_03_start_08": "token_kalts_skill_03_start_08_sale#14",
+    "token_kalts_skill_03_start": "token_kalts_skill_03_start_sale#14"
    }
   },
   "char_010_chen": {
@@ -132,7 +151,12 @@
     "skadi2_skill_03_begin_start": "skadi2_skill_03_begin_start_boc#4",
     "skadi2_skill_03_buff_02": "skadi2_skill_03_buff_02_boc#4",
     "skadi2_skill_03_buff_03": "skadi2_skill_03_buff_03_boc#4",
-    "skadi2_skill_03_buff": "skadi2_skill_03_buff_boc#4"
+    "skadi2_skill_03_buff": "skadi2_skill_03_buff_boc#4",
+    "token_skadi2_birth_01_start": "token_skadi2_birth_01_start_boc#4",
+    "token_skadi2_buff_01_range": "token_skadi2_buff_01_range_boc#4",
+    "token_skadi2_skill_01_buff": "token_skadi2_skill_01_buff_boc#4",
+    "token_skadi2_skill_02_buff": "token_skadi2_skill_02_buff_boc#4",
+    "token_skadi2_skill_03_buff": "token_skadi2_skill_03_buff_boc#4"
    }
   },
   "char_1013_chen2": {
@@ -235,7 +259,8 @@
     "nearl2_skill_03_buff_03_b": "nearl2_skill_03_buff_03_b_epoque#17",
     "nearl2_skill_03_hit_01": "nearl2_skill_03_hit_01_epoque#17",
     "nearl2_skill_03_hit_02": "nearl2_skill_03_hit_02_epoque#17",
-    "nearl2_skill_03_start": "nearl2_skill_03_start_epoque#17"
+    "nearl2_skill_03_start": "nearl2_skill_03_start_epoque#17",
+    "token_nearl2_birth_01_start": "token_nearl2_birth_01_start_epoque#17"
    }
   },
   "char_1016_agoat2": {
@@ -308,7 +333,11 @@
     "siege2_skill_03_call_01": "siege2_skill_03_call_01_epoque#50",
     "siege2_skill_03_hit_01": "siege2_skill_03_hit_01_epoque#50",
     "siege2_skill_03_start_01": "siege2_skill_03_start_01_epoque#50",
-    "siege2_birth_01": "siege2_birth_01_epoque#50"
+    "siege2_birth_01": "siege2_birth_01_epoque#50",
+    "token_siege2_vlion_attack_hit_01": "token_siege2_vlion_attack_hit_01_epoque#50",
+    "token_siege2_vlion_attack_start_01": "token_siege2_vlion_attack_start_01_epoque#50",
+    "token_siege2_vlion_birth_01": "token_siege2_vlion_birth_01_epoque#50",
+    "token_siege2_vlion_buff_01": "token_siege2_vlion_buff_01_epoque#50"
    }
   },
   "char_1020_reed2": {
@@ -595,7 +624,8 @@
     "slent2_skill_03_buff_03_end": "slent2_skill_03_buff_03_end_epoque#32",
     "slent2_skill_03_hit_01": "slent2_skill_03_hit_01_epoque#32",
     "slent2_skill_03_start_01": "slent2_skill_03_start_01_epoque#32",
-    "slent2_skill_03_trail_01": "slent2_skill_03_trail_01_epoque#32"
+    "slent2_skill_03_trail_01": "slent2_skill_03_trail_01_epoque#32",
+    "token_slent2_protrbslent2_buff_01": "token_slent2_protrbslent2_buff_01_epoque#32"
    }
   },
   "char_1032_excu2": {
@@ -679,7 +709,11 @@
     "swire2_skill_03_start_03": "swire2_skill_03_start_03_ambienceSynesthesia#4",
     "swire2_skill_03_start_03_02": "swire2_skill_03_start_03_02_ambienceSynesthesia#4",
     "swire2_skill_03_trail": "swire2_skill_03_trail_ambienceSynesthesia#4",
-    "swire2_birth_01": "swire2_birth_01_ambienceSynesthesia#4"
+    "swire2_birth_01": "swire2_birth_01_ambienceSynesthesia#4",
+    "token_swire2_attack_01_hit": "token_swire2_attack_01_hit_ambienceSynesthesia#4",
+    "token_swire2_attack_01_hit_02": "token_swire2_attack_01_hit_02_ambienceSynesthesia#4",
+    "token_swire2_birth_01_start": "token_swire2_birth_01_start_ambienceSynesthesia#4",
+    "token_swire2_buff_01_start": "token_swire2_buff_01_start_ambienceSynesthesia#4"
    },
    "char_1033_swire2_nlc_1": {
     "swire2_attack_01_hit": "swire2_attack_01_hit_nlc#1",
@@ -737,7 +771,12 @@
     "jesca2_skill_03_start_02_down": "jesca2_skill_03_start_02_down_cfa#1",
     "jesca2_skill_03_trail_01": "jesca2_skill_03_trail_01_cfa#1",
     "jesca2_skill_03_trail_02": "jesca2_skill_03_trail_02_cfa#1",
-    "jesca2_skill_01_start_01_down": "jesca2_skill_01_start_01_down_cfa#1"
+    "jesca2_skill_01_start_01_down": "jesca2_skill_01_start_01_down_cfa#1",
+    "token_jesca2_jckshd_birth_01": "token_jesca2_jckshd_birth_01_cfa#1",
+    "token_jesca2_jckshd_skill_01_buff_01": "token_jesca2_jckshd_skill_01_buff_01_cfa#1",
+    "token_jesca2_jckshd_skill_01_buff_01_back": "token_jesca2_jckshd_skill_01_buff_01_back_cfa#1",
+    "token_jesca2_jckshd_skill_03_buff_01": "token_jesca2_jckshd_skill_03_buff_01_cfa#1",
+    "token_jesca2_jckshd_skill_03_buff_01_back": "token_jesca2_jckshd_skill_03_buff_01_back_cfa#1"
    }
   },
   "char_1035_wisdel": {
@@ -777,7 +816,14 @@
     "wisdel_skill_03_hit_03": "wisdel_skill_03_hit_03_sale#14",
     "wisdel_skill_03_start": "wisdel_skill_03_start_sale#14",
     "wisdel_skill_03_trail": "wisdel_skill_03_trail_sale#14",
-    "wisdel_skill_03_up_start": "wisdel_skill_03_up_start_sale#14"
+    "wisdel_skill_03_up_start": "wisdel_skill_03_up_start_sale#14",
+    "token_wisdel_attack_01_hit_02": "token_wisdel_attack_01_hit_02_sale#14",
+    "token_wisdel_attack_01_hit": "token_wisdel_attack_01_hit_sale#14",
+    "token_wisdel_attack_01_line": "token_wisdel_attack_01_line_sale#14",
+    "token_wisdel_attack_01_start": "token_wisdel_attack_01_start_sale#14",
+    "token_wisdel_birth_01_start": "token_wisdel_birth_01_start_sale#14",
+    "token_wisdel_buff_01": "token_wisdel_buff_01_sale#14",
+    "token_wisdel_skill_03_buff": "token_wisdel_skill_03_buff_sale#14"
    },
    "char_1035_wisdel_game_9": {
     "wisdel_skill_03_buff_02_F": "wisdel_skill_03_buff_02_F_game#9",
@@ -980,7 +1026,8 @@
     "angel2_skill_3_loop_hit_01": "angel2_skill_3_loop_hit_01_iteration#6",
     "angel2_skill_3_loop_start_01": "angel2_skill_3_loop_start_01_iteration#6",
     "angel2_skill_3_up_loop_start_01": "angel2_skill_3_up_loop_start_01_iteration#6",
-    "angel2_skill_3_begin_start_001": "angel2_skill_3_begin_start_001_iteration#6"
+    "angel2_skill_3_begin_start_001": "angel2_skill_3_begin_start_001_iteration#6",
+    "token_angel2_target_buff_01": "token_angel2_target_buff_01_iteration#6"
    }
   },
   "char_1042_phatm2": {
@@ -1017,7 +1064,12 @@
     "phatm2_skill_03_prison_01": "phatm2_skill_03_prison_01_sightseer#4",
     "phatm2_skill_03_range_01": "phatm2_skill_03_range_01_sightseer#4",
     "phatm2_skill_03_start_01": "phatm2_skill_03_start_01_sightseer#4",
-    "phatm2_skill_03_start_02": "phatm2_skill_03_start_02_sightseer#4"
+    "phatm2_skill_03_start_02": "phatm2_skill_03_start_02_sightseer#4",
+    "token_encdool_birth_01": "token_encdool_birth_01_sightseer#4",
+    "token_encdool_skill_02_debuff_01": "token_encdool_skill_02_debuff_01_sightseer#4",
+    "token_encdool_skill_02_range_01": "token_encdool_skill_02_range_01_sightseer#4",
+    "token_encdool_skill_02_range_02": "token_encdool_skill_02_range_02_sightseer#4",
+    "token_encdool_skill_02_start_01": "token_encdool_skill_02_start_01_sightseer#4"
    }
   },
   "char_1043_leizi2": {
@@ -1663,7 +1715,12 @@
     "dusk_skill_03_hit_02": "dusk_skill_03_hit_02_nian#7",
     "dusk_skill_03_hit": "dusk_skill_03_hit_nian#7",
     "dusk_skill_03_start_02": "dusk_skill_03_start_02_nian#7",
-    "dusk_skill_03_start": "dusk_skill_03_start_nian#7"
+    "dusk_skill_03_start": "dusk_skill_03_start_nian#7",
+    "token_dusk_attack_01_hit": "token_dusk_attack_01_hit_nian#7",
+    "token_dusk_attack_01_start": "token_dusk_attack_01_start_nian#7",
+    "token_dusk_birth_01_start": "token_dusk_birth_01_start_nian#7",
+    "token_dusk_buff_01_start": "token_dusk_buff_01_start_nian#7",
+    "token_dusk_buff_02_start": "token_dusk_buff_02_start_nian#7"
    },
    "char_2015_dusk_nian_12": {
     "dusk_attack_01_hit": "dusk_attack_01_hit_nian#12",
@@ -1713,7 +1770,8 @@
     "ling_skill_03_start_02": "ling_skill_03_start_02_nian#12",
     "ling_skill_03_trail_01": "ling_skill_03_trail_01_nian#12",
     "ling_birth_01": "ling_birth_01_nian#12",
-    "ling_skill_01_buff_01": "ling_skill_01_buff_01_nian#12"
+    "ling_skill_01_buff_01": "ling_skill_01_buff_01_nian#12",
+    "token_soul_birth": "token_soul_birth_nian#12"
    },
    "char_2023_ling_ncg_1": {
     "ling_buff_01": "ling_buff_01_ncg#1",
@@ -1735,7 +1793,21 @@
     "ling_skill_03_start_02": "ling_skill_03_start_02_ncg#1",
     "ling_skill_03_trail_01": "ling_skill_03_trail_01_ncg#1",
     "ling_birth_02": "ling_birth_02_ncg#1",
-    "ling_skill_01_buff_01": "ling_skill_01_buff_01_ncg#1"
+    "ling_skill_01_buff_01": "ling_skill_01_buff_01_ncg#1",
+    "token_soul_01_attack_start_01": "token_soul_01_attack_start_01_ncg#1",
+    "token_soul_01_buff_01": "token_soul_01_buff_01_ncg#1",
+    "token_soul_01_buff_eye_01": "token_soul_01_buff_eye_01_ncg#1",
+    "token_soul_01_hit_01": "token_soul_01_hit_01_ncg#1",
+    "token_soul_01_hit_02": "token_soul_01_hit_02_ncg#1",
+    "token_soul_02_attack_start_01": "token_soul_02_attack_start_01_ncg#1",
+    "token_soul_02_attack_start_02": "token_soul_02_attack_start_02_ncg#1",
+    "token_soul_02_attack_trail_01": "token_soul_02_attack_trail_01_ncg#1",
+    "token_soul_02_die_debuff_01": "token_soul_02_die_debuff_01_ncg#1",
+    "token_soul_02_die_hit_01": "token_soul_02_die_hit_01_ncg#1",
+    "token_soul_02_die_start_01": "token_soul_02_die_start_01_ncg#1",
+    "token_soul_02_die_start_02": "token_soul_02_die_start_02_ncg#1",
+    "token_soul_02_die_trail_01": "token_soul_02_die_trail_01_ncg#1",
+    "token_soul_02_attack_hit_01": "token_soul_02_attack_hit_01_ncg#1"
    },
    "char_2023_ling_nian_9": {
     "ling_buff_01": "ling_buff_01_nian#9",
@@ -1757,7 +1829,22 @@
     "ling_skill_03_start_02": "ling_skill_03_start_02_nian#9",
     "ling_skill_03_trail_01": "ling_skill_03_trail_01_nian#9",
     "ling_birth_01": "ling_birth_01_nian#9",
-    "ling_skill_01_buff_01": "ling_skill_01_buff_01_nian#9"
+    "ling_skill_01_buff_01": "ling_skill_01_buff_01_nian#9",
+    "token_soul_03_buff_range_01": "token_soul_03_buff_range_01_nian#9",
+    "token_soul_03_large_attack_start_01": "token_soul_03_large_attack_start_01_nian#9",
+    "token_soul_03_large_attack_weapon_01": "token_soul_03_large_attack_weapon_01_nian#9",
+    "token_soul_03_large_buff_01": "token_soul_03_large_buff_01_nian#9",
+    "token_soul_03_large_hit_01": "token_soul_03_large_hit_01_nian#9",
+    "token_soul_03_reborn_die_01": "token_soul_03_reborn_die_01_nian#9",
+    "token_soul_03_reborn_die_02": "token_soul_03_reborn_die_02_nian#9",
+    "token_soul_03_reborn_range_01": "token_soul_03_reborn_range_01_nian#9",
+    "token_soul_03_reborn_start_01": "token_soul_03_reborn_start_01_nian#9",
+    "token_soul_03_reborn_start_02": "token_soul_03_reborn_start_02_nian#9",
+    "token_soul_03_reborn_start_03": "token_soul_03_reborn_start_03_nian#9",
+    "token_soul_03_small_attack_start_01": "token_soul_03_small_attack_start_01_nian#9",
+    "token_soul_03_small_buff_01": "token_soul_03_small_buff_01_nian#9",
+    "token_soul_03_small_buff_eye_01": "token_soul_03_small_buff_eye_01_nian#9",
+    "token_soul_03_small_hit_01": "token_soul_03_small_hit_01_nian#9"
    }
   },
   "char_2024_chyue": {
@@ -2137,7 +2224,19 @@
     "mgllan_skill_01_buff": "mgllan_skill_01_buff_kitchen#1",
     "mgllan_skill_01_buff_02": "mgllan_skill_01_buff_02_kitchen#1",
     "mgllan_skill_02_buff": "mgllan_skill_02_buff_kitchen#1",
-    "mgllan_skill_03_buff": "mgllan_skill_03_buff_kitchen#1"
+    "mgllan_skill_03_buff": "mgllan_skill_03_buff_kitchen#1",
+    "token_mgllan_die_01_start": "token_mgllan_die_01_start_kitchen#1",
+    "token_mgllan_skill_03_buff_02": "token_mgllan_skill_03_buff_02_kitchen#1",
+    "token_mgllan_skill_02_start": "token_mgllan_skill_02_start_kitchen#1",
+    "token_mgllan_skill_03_buff": "token_mgllan_skill_03_buff_kitchen#1",
+    "token_mgllan_skill_02_hit": "token_mgllan_skill_02_hit_kitchen#1",
+    "token_mgllan_attack_01_start": "token_mgllan_attack_01_start_kitchen#1",
+    "token_mgllan_attack_01_trail": "token_mgllan_attack_01_trail_kitchen#1",
+    "token_mgllan_attack_01_hit": "token_mgllan_attack_01_hit_kitchen#1",
+    "token_mgllan_skill_03_hit_02": "token_mgllan_skill_03_hit_02_kitchen#1",
+    "token_mgllan_skill_03_hit": "token_mgllan_skill_03_hit_kitchen#1",
+    "token_mgllan_skill_03_start": "token_mgllan_skill_03_start_kitchen#1",
+    "token_mgllan_skill_03_trail": "token_mgllan_skill_03_trail_kitchen#1"
    }
   },
   "char_249_mlyss": {
@@ -2159,7 +2258,23 @@
     "mlyss_skill_03_buff_weapon_01": "mlyss_skill_03_buff_weapon_01_ambienceSynesthesia#6",
     "mlyss_skill_03_hit_01": "mlyss_skill_03_hit_01_ambienceSynesthesia#6",
     "mlyss_skill_03_start_01": "mlyss_skill_03_start_01_ambienceSynesthesia#6",
-    "mlyss_skill_03_trail_01": "mlyss_skill_03_trail_01_ambienceSynesthesia#6"
+    "mlyss_skill_03_trail_01": "mlyss_skill_03_trail_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_buff_01": "token_10030_mlyss_wtrman_buff_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c1_skill_buff_01": "token_10030_mlyss_wtrman_c1_skill_buff_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c1c2c3_combat_hit_01": "token_10030_mlyss_wtrman_c1c2c3_combat_hit_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c2_attack_start_01": "token_10030_mlyss_wtrman_c2_attack_start_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c2_combat_start_01": "token_10030_mlyss_wtrman_c2_combat_start_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c2_skill_01_buff_01": "token_10030_mlyss_wtrman_c2_skill_01_buff_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c2_skill_02_buff_01": "token_10030_mlyss_wtrman_c2_skill_02_buff_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c2_skill_03_buff_01": "token_10030_mlyss_wtrman_c2_skill_03_buff_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c2_skill_03_range_01": "token_10030_mlyss_wtrman_c2_skill_03_range_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c2c3_attack_hit_01": "token_10030_mlyss_wtrman_c2c3_attack_hit_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c3_skill_01_buff_01": "token_10030_mlyss_wtrman_c3_skill_01_buff_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c3_skill_02_buff_01": "token_10030_mlyss_wtrman_c3_skill_02_buff_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c3_skill_03_buff_01": "token_10030_mlyss_wtrman_c3_skill_03_buff_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_split_start_01": "token_10030_mlyss_wtrman_split_start_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c3_combat_start_01": "token_10030_mlyss_wtrman_c3_combat_start_01_ambienceSynesthesia#6",
+    "token_10030_mlyss_wtrman_c3_attack_start_01": "token_10030_mlyss_wtrman_c3_attack_start_01_ambienceSynesthesia#6"
    },
    "char_249_mlyss_boc_8": {
     "mlyss_attack_hit_01": "mlyss_attack_hit_01_boc#8",
@@ -2213,7 +2328,22 @@
     "phatom_skill_03_range_01": "phatom_skill_03_range_01_sale#4",
     "phatom_skill_03_range_02": "phatom_skill_03_range_02_sale#4",
     "phatom_skill_03_range_03": "phatom_skill_03_range_03_sale#4",
-    "phatom_skill_03_start": "phatom_skill_03_start_sale#4"
+    "phatom_skill_03_start": "phatom_skill_03_start_sale#4",
+    "token_phatom_attack_01_hit": "token_phatom_attack_01_hit_sale#4",
+    "token_phatom_attack_01_start": "token_phatom_attack_01_start_sale#4",
+    "token_phatom_birth_01_start": "token_phatom_birth_01_start_sale#4",
+    "token_phatom_skill_01_buff": "token_phatom_skill_01_buff_sale#4",
+    "token_phatom_skill_02_buff_01": "token_phatom_skill_02_buff_01_sale#4",
+    "token_phatom_skill_02_buff_02": "token_phatom_skill_02_buff_02_sale#4",
+    "token_phatom_skill_02_buff": "token_phatom_skill_02_buff_sale#4",
+    "token_phatom_skill_02_hit": "token_phatom_skill_02_hit_sale#4",
+    "token_phatom_skill_02_start_02": "token_phatom_skill_02_start_02_sale#4",
+    "token_phatom_skill_02_start": "token_phatom_skill_02_start_sale#4",
+    "token_phatom_skill_03_buff": "token_phatom_skill_03_buff_sale#4",
+    "token_phatom_skill_03_range_01": "token_phatom_skill_03_range_01_sale#4",
+    "token_phatom_skill_03_range_02": "token_phatom_skill_03_range_02_sale#4",
+    "token_phatom_skill_03_range_03": "token_phatom_skill_03_range_03_sale#4",
+    "token_phatom_skill_03_start": "token_phatom_skill_03_start_sale#4"
    }
   },
   "char_254_vodfox": {
@@ -2797,7 +2927,10 @@
     "beewax_skill_01_range": "beewax_skill_01_range_epoque#9",
     "beewax_skill_02_buff": "beewax_skill_02_buff_epoque#9",
     "beewax_skill_02_buff_01": "beewax_skill_02_buff_01_epoque#9",
-    "beewax_skill_02_range": "beewax_skill_02_range_epoque#9"
+    "beewax_skill_02_range": "beewax_skill_02_range_epoque#9",
+    "token_beewax_skill_02_buff": "token_beewax_skill_02_buff_epoque#9",
+    "token_beewax_skill_02_range": "token_beewax_skill_02_range_epoque#9",
+    "token_beewax_skill_02_start": "token_beewax_skill_02_start_epoque#9"
    },
    "char_344_beewax_summer_11": {
     "beewax_buff_01_start": "beewax_buff_01_start_summer#11",
@@ -3159,7 +3292,10 @@
     "rosmon_skill_03_range": "rosmon_skill_03_range_sale#16",
     "rosmon_skill_03_start": "rosmon_skill_03_start_sale#16",
     "rosmon_skill_03_start_02": "rosmon_skill_03_start_02_sale#16",
-    "rosmon_skill_02_range_01": "rosmon_skill_02_range_01_sale#16"
+    "rosmon_skill_02_range_01": "rosmon_skill_02_range_01_sale#16",
+    "token_rosmon_skill_03_buff": "token_rosmon_skill_03_buff_sale#16",
+    "token_rosmon_skill_03_range": "token_rosmon_skill_03_range_sale#16",
+    "token_rosmon_skill_03_start": "token_rosmon_skill_03_start_sale#16"
    }
   },
   "char_4009_irene": {
@@ -3226,7 +3362,10 @@
     "weedy_birth_01": "weedy_birth_01_sightseer#1",
     "weedy_attack_01_hit": "weedy_attack_01_hit_sightseer#1",
     "weedy_attack_01_start": "weedy_attack_01_start_sightseer#1",
-    "weedy_skill_03_hit": "weedy_skill_03_hit_sightseer#1"
+    "weedy_skill_03_hit": "weedy_skill_03_hit_sightseer#1",
+    "token_weedy_attack_01_hit": "token_weedy_attack_01_hit_sightseer#1",
+    "token_weedy_attack_01_start": "token_weedy_attack_01_start_sightseer#1",
+    "token_weedy_attack_01_trail": "token_weedy_attack_01_trail_sightseer#1"
    },
    "char_400_weedy_snow_2": {
     "weedy_attack_01_start": "weedy_attack_01_start_snow#2",
@@ -3649,7 +3788,14 @@
     "ebnhlz_attack_start_02_red_5": "ebnhlz_attack_start_02_red_5_boc#6",
     "ebnhlz_attack_start_02_red_4": "ebnhlz_attack_start_02_red_4_boc#6",
     "ebnhlz_attack_start_02_red_3": "ebnhlz_attack_start_02_red_3_boc#6",
-    "ebnhlz_attack_start_02_red_2": "ebnhlz_attack_start_02_red_2_boc#6"
+    "ebnhlz_attack_start_02_red_2": "ebnhlz_attack_start_02_red_2_boc#6",
+    "token_ebnhlz_birth_01_start": "token_ebnhlz_birth_01_start_boc#6",
+    "token_ebnhlz_buff": "token_ebnhlz_buff_boc#6",
+    "token_ebnhlz_buff_02": "token_ebnhlz_buff_02_boc#6",
+    "token_ebnhlz_die": "token_ebnhlz_die_boc#6",
+    "token_ebnhlz_skill_02_hit": "token_ebnhlz_skill_02_hit_boc#6",
+    "token_ebnhlz_skill_02_range": "token_ebnhlz_skill_02_range_boc#6",
+    "token_ebnhlz_skill_02_start_01": "token_ebnhlz_skill_02_start_01_boc#6"
    }
   },
   "char_4047_pianst": {
@@ -3721,7 +3867,22 @@
     "bgsnow_skill_03_start_01": "bgsnow_skill_03_start_01_yun#7",
     "bgsnow_skill_03_start_weapon_01": "bgsnow_skill_03_start_weapon_01_yun#7",
     "bgsnow_skill_03_start_weapon_02": "bgsnow_skill_03_start_weapon_02_yun#7",
-    "bgsnow_skill_03_trail_01": "bgsnow_skill_03_trail_01_yun#7"
+    "bgsnow_skill_03_trail_01": "bgsnow_skill_03_trail_01_yun#7",
+    "token_bgsnow_subbow_attack_hit_01": "token_bgsnow_subbow_attack_hit_01_yun#7",
+    "token_bgsnow_subbow_attack_start_01": "token_bgsnow_subbow_attack_start_01_yun#7",
+    "token_bgsnow_subbow_attack_start_01_down": "token_bgsnow_subbow_attack_start_01_down_yun#7",
+    "token_bgsnow_subbow_attack_trail_01": "token_bgsnow_subbow_attack_trail_01_yun#7",
+    "token_bgsnow_subbow_birth_01": "token_bgsnow_subbow_birth_01_yun#7",
+    "token_bgsnow_subbow_skill_01_buff_01": "token_bgsnow_subbow_skill_01_buff_01_yun#7",
+    "token_bgsnow_subbow_skill_02_hit_01": "token_bgsnow_subbow_skill_02_hit_01_yun#7",
+    "token_bgsnow_subbow_skill_02_trail_01": "token_bgsnow_subbow_skill_02_trail_01_yun#7",
+    "token_bgsnow_subbow_skill_03_buff_01": "token_bgsnow_subbow_skill_03_buff_01_yun#7",
+    "token_bgsnow_subbow_skill_03_buff_01_down": "token_bgsnow_subbow_skill_03_buff_01_down_yun#7",
+    "token_bgsnow_subbow_skill_03_buff_01_up": "token_bgsnow_subbow_skill_03_buff_01_up_yun#7",
+    "token_bgsnow_subbow_skill_03_hit_01": "token_bgsnow_subbow_skill_03_hit_01_yun#7",
+    "token_bgsnow_subbow_skill_03_trail_01": "token_bgsnow_subbow_skill_03_trail_01_yun#7",
+    "token_bgsnow_subbow_skill_start_01_down": "token_bgsnow_subbow_skill_start_01_down_yun#7",
+    "token_bgsnow_subbow_skill_start_01_up": "token_bgsnow_subbow_skill_start_01_up_yun#7"
    },
    "char_4055_bgsnow_wild_7": {
     "bgsnow_attack_hit_01": "bgsnow_attack_hit_01_wild#7",
@@ -3921,7 +4082,16 @@
     "ironmn_skill_03_start": "ironmn_skill_03_start_ambienceSynesthesia#5",
     "ironmn_skill_01_start_02": "ironmn_skill_01_start_02_ambienceSynesthesia#5",
     "ironmn_skill_02_start_02": "ironmn_skill_02_start_02_ambienceSynesthesia#5",
-    "ironmn_birth_01": "ironmn_birth_01_ambienceSynesthesia#5"
+    "ironmn_birth_01": "ironmn_birth_01_ambienceSynesthesia#5",
+    "token_ironmn_pile1_birth_01": "token_ironmn_pile1_birth_01_ambienceSynesthesia#5",
+    "token_ironmn_pile1_skill_01_buff_01": "token_ironmn_pile1_skill_01_buff_01_ambienceSynesthesia#5",
+    "token_ironmn_pile1_skill_01_buff_02": "token_ironmn_pile1_skill_01_buff_02_ambienceSynesthesia#5",
+    "token_ironmn_pile3_skill_03_buff_01": "token_ironmn_pile3_skill_03_buff_01_ambienceSynesthesia#5",
+    "token_ironmn_pile3_skill_03_buff_02_02": "token_ironmn_pile3_skill_03_buff_02_02_ambienceSynesthesia#5",
+    "token_ironmn_pile3_skill_03_hit": "token_ironmn_pile3_skill_03_hit_ambienceSynesthesia#5",
+    "token_ironmn_pile3_skill_03_start": "token_ironmn_pile3_skill_03_start_ambienceSynesthesia#5",
+    "token_ironmn_pile3_skill_03_start_up": "token_ironmn_pile3_skill_03_start_up_ambienceSynesthesia#5",
+    "token_ironmn_pile3_skill_03_trail": "token_ironmn_pile3_skill_03_trail_ambienceSynesthesia#5"
    },
    "char_4072_ironmn_summer_11": {
     "ironmn_attack_01_hit": "ironmn_attack_01_hit_summer#11",
@@ -3938,7 +4108,10 @@
     "ironmn_skill_03_buff_01": "ironmn_skill_03_buff_01_summer#11",
     "ironmn_skill_03_buff_02": "ironmn_skill_03_buff_02_summer#11",
     "ironmn_skill_03_hit": "ironmn_skill_03_hit_summer#11",
-    "ironmn_skill_03_start": "ironmn_skill_03_start_summer#11"
+    "ironmn_skill_03_start": "ironmn_skill_03_start_summer#11",
+    "token_ironmn_pile2_birth_01": "token_ironmn_pile2_birth_01_summer#11",
+    "token_ironmn_pile2_skill_02_buff_01": "token_ironmn_pile2_skill_02_buff_01_summer#11",
+    "token_ironmn_pile2_skill_02_buff_02": "token_ironmn_pile2_skill_02_buff_02_summer#11"
    }
   },
   "char_4079_haini": {
@@ -4380,7 +4553,10 @@
     "ray_skill_03_trail_01": "ray_skill_03_trail_01_summer#22",
     "ray_birth_01_start": "ray_birth_01_start_summer#22",
     "ray_skill_03_hit_02": "ray_skill_03_hit_02_summer#22",
-    "ray_skill_02_hit_02": "ray_skill_02_hit_02_summer#22"
+    "ray_skill_02_hit_02": "ray_skill_02_hit_02_summer#22",
+    "token_ray_sndbst_birth_01": "token_ray_sndbst_birth_01_summer#22",
+    "token_ray_sndbst_buff_end": "token_ray_sndbst_buff_end_summer#22",
+    "token_ray_sndbst_buff_loop": "token_ray_sndbst_buff_loop_summer#22"
    }
   },
   "char_4119_wanqin": {
@@ -4662,7 +4838,8 @@
     "ulpia_skill_03_range_01": "ulpia_skill_03_range_01_epoque#48",
     "ulpia_skill_03_range_02": "ulpia_skill_03_range_02_epoque#48",
     "ulpia_skill_03_start_01": "ulpia_skill_03_start_01_epoque#48",
-    "ulpia_birth_01": "ulpia_birth_01_epoque#48"
+    "ulpia_birth_01": "ulpia_birth_01_epoque#48",
+    "token_ulpia_buff_01": "token_ulpia_buff_01_epoque#48"
    }
   },
   "char_4146_nymph": {
@@ -4720,7 +4897,13 @@
     "mitm_skill_01_hit_01": "mitm_skill_01_hit_01_breaker#1",
     "mitm_skill_02_start_01": "mitm_skill_02_start_01_breaker#1",
     "mitm_skill_start_01": "mitm_skill_start_01_breaker#1",
-    "mitm_skill_02_buff": "mitm_skill_02_buff_breaker#1"
+    "mitm_skill_02_buff": "mitm_skill_02_buff_breaker#1",
+    "token_mitm_trshrb_attack_hit_01": "token_mitm_trshrb_attack_hit_01_breaker#1",
+    "token_mitm_trshrb_attack_start_01": "token_mitm_trshrb_attack_start_01_breaker#1",
+    "token_mitm_trshrb_birth_01": "token_mitm_trshrb_birth_01_breaker#1",
+    "token_mitm_trshrb_die_01": "token_mitm_trshrb_die_01_breaker#1",
+    "token_mitm_trshrb_skill_buff_01": "token_mitm_trshrb_skill_buff_01_breaker#1",
+    "token_mitm_trshrb_waste_01": "token_mitm_trshrb_waste_01_breaker#1"
    }
   },
   "char_4148_philae": {
@@ -4770,7 +4953,10 @@
     "cathy_skill_01_buff": "cathy_skill_01_buff_kitchen#5",
     "cathy_skill_01_hit_01": "cathy_skill_01_hit_01_kitchen#5",
     "cathy_skill_01_start_01": "cathy_skill_01_start_01_kitchen#5",
-    "cathy_skill_02_buff": "cathy_skill_02_buff_kitchen#5"
+    "cathy_skill_02_buff": "cathy_skill_02_buff_kitchen#5",
+    "token_cathy_catsld_buff_01": "token_cathy_catsld_buff_01_kitchen#5",
+    "token_cathy_catsld_shield_01": "token_cathy_catsld_shield_01_kitchen#5",
+    "token_cathy_catsld_shield_01_end": "token_cathy_catsld_shield_01_end_kitchen#5"
    }
   },
   "char_4163_rosesa": {
@@ -4876,7 +5062,14 @@
     "monstr_skill_03_hit": "monstr_skill_03_hit_boc#11",
     "monstr_skill_03_start_02": "monstr_skill_03_start_02_boc#11",
     "monstr_skill_03_buff_01_root": "monstr_skill_03_buff_01_root_boc#11",
-    "monstr_birth_01": "monstr_birth_01_boc#11"
+    "monstr_birth_01": "monstr_birth_01_boc#11",
+    "token_monstr_prosts_buff_01": "token_monstr_prosts_buff_01_boc#11",
+    "token_monstr_prosts_buff_01_2": "token_monstr_prosts_buff_01_2_boc#11",
+    "token_monstr_prosts_buff_02": "token_monstr_prosts_buff_02_boc#11",
+    "token_monstr_prosts_buff_02_2": "token_monstr_prosts_buff_02_2_boc#11",
+    "token_monstr_prosts_buff_03": "token_monstr_prosts_buff_03_boc#11",
+    "token_monstr_prosts_skill_03_start": "token_monstr_prosts_skill_03_start_boc#11",
+    "token_monstr_prosts_start": "token_monstr_prosts_start_boc#11"
    }
   },
   "char_4191_tippi": {
@@ -4985,7 +5178,20 @@
     "radian_skill3_start_01": "radian_skill3_start_01_game#8",
     "radian_skill3_tk_hit_01": "radian_skill3_tk_hit_01_game#8",
     "radian_skill3_trail_01": "radian_skill3_trail_01_game#8",
-    "radian_birth_01": "radian_birth_01_game#8"
+    "radian_birth_01": "radian_birth_01_game#8",
+    "token_radian_tower1_buff_01": "token_radian_tower1_buff_01_game#8",
+    "token_radian_tower1_hit_01": "token_radian_tower1_hit_01_game#8",
+    "token_radian_tower2_birth": "token_radian_tower2_birth_game#8",
+    "token_radian_tower2_buff_01": "token_radian_tower2_buff_01_game#8",
+    "token_radian_tower2_hit_01": "token_radian_tower2_hit_01_game#8",
+    "token_radian_tower2_start_01": "token_radian_tower2_start_01_game#8",
+    "token_radian_tower2_start_02": "token_radian_tower2_start_02_game#8",
+    "token_radian_tower2_start_03": "token_radian_tower2_start_03_game#8",
+    "token_radian_tower3_buff_01": "token_radian_tower3_buff_01_game#8",
+    "token_radian_tower3_hit_01": "token_radian_tower3_hit_01_game#8",
+    "token_radian_tower3_start_01": "token_radian_tower3_start_01_game#8",
+    "token_radian_tower3_start_02": "token_radian_tower3_start_02_game#8",
+    "token_radian_tower3_birth_01": "token_radian_tower3_birth_01_game#8"
    }
   },
   "char_4196_reckpr": {
@@ -5402,7 +5608,28 @@
     "necras_skill_03_hit_01": "necras_skill_03_hit_01_ambienceSynesthesia#7",
     "necras_skill_03_start_01": "necras_skill_03_start_01_ambienceSynesthesia#7",
     "necras_skill_03_start_02": "necras_skill_03_start_02_ambienceSynesthesia#7",
-    "necras_skill_03_start_03": "necras_skill_03_start_03_ambienceSynesthesia#7"
+    "necras_skill_03_start_03": "necras_skill_03_start_03_ambienceSynesthesia#7",
+    "token_necras_skeltn1_attack_hit_01": "token_necras_skeltn1_attack_hit_01_ambienceSynesthesia#7",
+    "token_necras_skeltn1_birth_01": "token_necras_skeltn1_birth_01_ambienceSynesthesia#7",
+    "token_necras_skeltn1_buff_01": "token_necras_skeltn1_buff_01_ambienceSynesthesia#7",
+    "token_necras_skeltn1_buff_01_02": "token_necras_skeltn1_buff_01_02_ambienceSynesthesia#7",
+    "token_necras_skeltn1_die_01": "token_necras_skeltn1_die_01_ambienceSynesthesia#7",
+    "token_necras_skeltn1_range_01": "token_necras_skeltn1_range_01_ambienceSynesthesia#7",
+    "token_necras_skeltn2_attack_hit_01": "token_necras_skeltn2_attack_hit_01_ambienceSynesthesia#7",
+    "token_necras_skeltn2_birth_01": "token_necras_skeltn2_birth_01_ambienceSynesthesia#7",
+    "token_necras_skeltn2_buff_01": "token_necras_skeltn2_buff_01_ambienceSynesthesia#7",
+    "token_necras_skeltn2_buff_01_02": "token_necras_skeltn2_buff_01_02_ambienceSynesthesia#7",
+    "token_necras_skeltn2_buff_02": "token_necras_skeltn2_buff_02_ambienceSynesthesia#7",
+    "token_necras_skeltn2_buff_02_02": "token_necras_skeltn2_buff_02_02_ambienceSynesthesia#7",
+    "token_necras_skeltn2_range_01": "token_necras_skeltn2_range_01_ambienceSynesthesia#7",
+    "token_necras_skeltn2_skill_hit_01": "token_necras_skeltn2_skill_hit_01_ambienceSynesthesia#7",
+    "token_necras_skeltn2_skill_start_01": "token_necras_skeltn2_skill_start_01_ambienceSynesthesia#7",
+    "token_necras_skeltn2_skill_start_01_down": "token_necras_skeltn2_skill_start_01_down_ambienceSynesthesia#7",
+    "token_necras_skeltn2_skill_start_02_down": "token_necras_skeltn2_skill_start_02_down_ambienceSynesthesia#7",
+    "token_necras_skeltn2_skill_start_03": "token_necras_skeltn2_skill_start_03_ambienceSynesthesia#7",
+    "token_necras_skeltn2_skill_start_03_down": "token_necras_skeltn2_skill_start_03_down_ambienceSynesthesia#7",
+    "token_necras_skeltn2_skill_start_03_up": "token_necras_skeltn2_skill_start_03_up_ambienceSynesthesia#7",
+    "token_necras_skeltn2_buff_00": "token_necras_skeltn2_buff_00_ambienceSynesthesia#7"
    }
   },
   "char_455_nothin": {
@@ -5579,7 +5806,12 @@
    "char_484_robrta_ambienceSynesthesia_3": {
     "robrta_attack_01_hit": "robrta_attack_01_hit_ambienceSynesthesia#3",
     "robrta_attack_01_start": "robrta_attack_01_start_ambienceSynesthesia#3",
-    "robrta_skill_02_buff": "robrta_skill_02_buff_ambienceSynesthesia#3"
+    "robrta_skill_02_buff": "robrta_skill_02_buff_ambienceSynesthesia#3",
+    "token_robrta_buff_01": "token_robrta_buff_01_ambienceSynesthesia#3",
+    "token_robrta_buff_02": "token_robrta_buff_02_ambienceSynesthesia#3",
+    "token_robrta_buff_03": "token_robrta_buff_03_ambienceSynesthesia#3",
+    "token_robrta_buff_04": "token_robrta_buff_04_ambienceSynesthesia#3",
+    "token_robrta_buff_end": "token_robrta_buff_end_ambienceSynesthesia#3"
    }
   },
   "char_485_pallas": {
@@ -5672,5 +5904,10 @@
     "inside_skill_02_trail_front": "inside_skill_02_trail_front_kitchen#2"
    }
   }
+ },
+ "counts": {
+  "chars": 182,
+  "skins": 271,
+  "pairs": 4995
  }
 }
